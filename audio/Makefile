@@ -7,6 +7,7 @@ G_SUBDIR =
 
 SUBDIR += snd-util
 SUBDIR += sounds
+SUBDIR += music
 
 .include <bsd.subdir_ports.mk>
 
