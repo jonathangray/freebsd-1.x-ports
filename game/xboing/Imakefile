@@ -1,0 +1,184 @@
+# ========================================================================
+# Imakefile for XBoing Version 1.8 - 2nd November 1993 - jck@citri.edu.au
+# ========================================================================
+
+# IMPORTANT: Please read this Imakefile and check if you need to change
+#            anything before asking for help. I suggest that you read the
+#            installation document README.install before continuing.
+#            If the program barfs then read README.problems please!!!
+
+# This is the directory where the highscore and level data will be placed.
+
+XBOING_DIR = $(LIBDIR)/xboing
+
+#if HasGcc==1
+CCOPTIONS = -DFUNCPROTO -Wall # -g -static
+#else /* !Gcc */
+CCOPTIONS =
+#endif
+
+
+# These are some defines that must be set. Some may be overwritten in the
+# machine arch section.
+
+XPMLIB = -L$(USRLIBDIR) -lXpm
+XPMINCLUDE = -I$(INCDIR)
+LEVEL_INSTALL_DIR = $(XBOING_DIR)/levels
+SOUNDS_DIR = $(XBOING_DIR)/sounds
+BACKUP_DIR = $(XBOING_DIR)/backups
+HIGH_SCORE_FILE = $(XBOING_DIR)/xboing.scores
+AUDIO_AVAILABLE = True
+AUDIO_SRC = audio/FreeBSDaudio.c
+AUDIO_INCLUDE =
+AUDIO_LIB =
+
+# Below are the special defines for different machine archs.
+
+#ifdef HPArchitecture
+	CCOPTIONS = -Ac -D_HPUX_SOURCE
+	AUDIO_AVAILABLE = True
+	AUDIO_SRC = audio/HPaudio.c
+	AUDIO_INCLUDE =
+	AUDIO_LIB = -laudio
+#endif /* HPArchitecture */
+
+#ifdef MultimaxArchitecture
+	CCOPTIONS = -q -nosb -q ext=parallel
+#endif /* MultimaxArchitecture */
+
+#ifdef i860Architecture
+	SYS_LIBRARIES = -lnsl
+#endif /* i860Architecture */
+
+#ifdef linux
+	AUDIO_AVAILABLE = True
+	AUDIO_SRC = audio/LINUXaudio.c
+	AUDIO_INCLUDE =
+	AUDIO_LIB = -laudio
+#endif /* linux */
+
+#ifdef SGIArchitecture
+	SYS_LIBRARIES = -lbsd -lsun
+	CCOPTIONS = -cckr
+#endif /* SGIArchitecture */
+
+#ifdef SparcArchitecture
+	AUDIO_AVAILABLE = True
+	AUDIO_SRC = audio/SUNaudio.c
+#if (OSMajorVersion==4)
+	AUDIO_INCLUDE = -I/usr/demo/SOUND/multimedia
+	AUDIO_LIB = -L/usr/demo/SOUND -laudio
+#endif
+#if (OSMajorVersion==5)
+	AUDIO_INCLUDE = -I/usr/demo/SOUND/include/multimedia
+	AUDIO_LIB = -L/usr/demo/SOUND/lib -laudio
+#endif
+#endif /* SparcArchitecture */
+
+EXTRA_INCLS = $(XPMINCLUDE) $(AUDIO_INCLUDE)
+
+# Please take the comment out from the USE_FLOCK bit if you want to use the
+# flock() system call for locking instead of the lockf() system call.
+# Also if you don't want any file locking then uncomment and add the \ to the
+# -DNO_LOCKING define.
+
+DEFINES = $(EXTRA_INCLS) \
+-DHIGH_SCORE_FILE=\"$(HIGH_SCORE_FILE)\" \
+-DAUDIO_FILE=\"$(AUDIO_SRC)\" \
+-DLEVEL_INSTALL_DIR=\"$(LEVEL_INSTALL_DIR)\" \
+-DAUDIO_AVAILABLE=\"$(AUDIO_AVAILABLE)\" \
+-DSOUNDS_DIR=\"$(SOUNDS_DIR)\" \
+-DREADMEP_FILE=\"$(XBOING_DIR)/README.problems\" \
+-DUSE_FLOCK=\"True\"
+#-DNO_LOCKING=\"True\" \
+
+LOCAL_LIBRARIES = $(AUDIO_LIB) $(XPMLIB) $(XLIB) -lm
+
+# ========================================================================
+# Please don't change anything below this point - no need really - I hope.
+# ========================================================================
+
+DEPLIBS = $(DEPXLIB)
+
+SRCS1 =	version.c main.c score.c error.c \
+		ball.c blocks.c init.c stage.c level.c \
+		paddle.c mess.c intro.c bonus.c sfx.c \
+		highscore.c misc.c inst.c gun.c keys.c \
+		audio.c special.c presents.c demo.c
+
+OBJS1 =	version.o main.o score.o error.o \
+		ball.o blocks.o init.o stage.o level.o \
+		paddle.o mess.o intro.o bonus.o sfx.o \
+		highscore.o misc.o inst.o gun.o keys.o \
+		audio.o special.o presents.o demo.o
+
+PROGRAMS = xboing
+
+all::	$(PROGRAMS)
+	@$(RM) version.c
+	@echo "XBoing built successfully, I hope ;-)"
+	@echo "Please read the README.problems document for any help first."
+
+version.c:
+	@sh ./version.sh $(PROGRAMS)
+
+audio.c::  $(AUDIO_SRC)
+	$(RM) $@
+	$(LN) $? $@
+
+depend:: version.c
+
+ComplexProgramTarget_1($(PROGRAMS), $(LOCAL_LIBRARIES), )
+
+install:: $(PROGRAMS)
+	@echo "XBoing directory is " $(XBOING_DIR)
+	@:
+	@echo "Creating directory " $(XBOING_DIR)
+	@if [ ! -d $(XBOING_DIR) ]; then mkdir $(XBOING_DIR); fi
+	$(INSTALL) -c $(INSTDATFLAGS) README.problems $(XBOING_DIR)
+	@:
+	@echo "Creating directory " $(LEVEL_INSTALL_DIR)
+	@if [ ! -d $(LEVEL_INSTALL_DIR) ]; then mkdir $(LEVEL_INSTALL_DIR); fi
+	@:
+	@echo "Copying level data into directory " $(LEVEL_INSTALL_DIR)
+	@cd ./levels; set -x; for file in *.data; do			\
+		$(INSTALL) -c $(INSTDATFLAGS) $$file $(LEVEL_INSTALL_DIR);\
+	done
+	@:
+	@if [ "$(AUDIO_AVAILABLE)" = "True" ]; 				\
+	 then								\
+		echo "Creating directory " $(SOUNDS_DIR); 		\
+		if [ ! -d $(SOUNDS_DIR) ]; then mkdir $(SOUNDS_DIR); fi;\
+		echo "Copying sound files into directory " $(SOUNDS_DIR);\
+		cd ./sounds; set -x; for file in *.au; do		\
+		    $(INSTALL) -c $(INSTDATFLAGS) $$file $(SOUNDS_DIR);	\
+		done;							\
+	 fi
+	@:
+	@echo "Creating a highscore file " $(HIGH_SCORE_FILE)
+	@touch $(HIGH_SCORE_FILE);
+	@chmod a+rw $(HIGH_SCORE_FILE);
+
+# I use this for my daily backup of my code.
+backup:
+	make clean
+	@:
+	@if [ -z "$(BACKUP_DIR)" ]; \
+	 then 
+		echo "*** BACKUP_DIR undefined."; 
+		exit 1; 
+	 fi
+	@:
+	@if [ ! -d $(BACKUP_DIR) ]; 
+	 then 
+		set -x; $(MKDIRHIER) $(BACKUP_DIR); 
+	 fi
+	@:
+	tar cvf - * | gzip -v > $(BACKUP_DIR)/`date '+xboing%d-%h-%y'`.tgz
+
+pkg: pkg_bin
+
+pkg_bin: install
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST xboing_bin
+
+# End of the XBoing Imakefile :-)
