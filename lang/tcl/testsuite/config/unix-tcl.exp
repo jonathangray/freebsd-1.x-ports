@@ -1,0 +1,123 @@
+#   Copyright (C) 1988, 1990, 1991, 1992 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
+
+# Please email any bugs, comments, and/or additions to this file to:
+# bug-dejagnu@prep.ai.mit.edu
+
+# This file was written by Rob Savoye. (rob@cygnus.com)
+
+set testdrv "tclTest"
+
+#
+# tcl_version -- extract and print the version number of tcl
+#
+proc tcl_version { } {
+    global testdrv
+    global subdir
+
+    set version ""
+    catch {exec echo "info tclversion" | $testdrv} tmp
+    regexp "\[0-9\]\.\[0-9\.\]+" $tmp version
+    clone_output "Tcl library is version $version\n"
+    unset tmp
+    unset version
+}
+
+#
+# tcl_load -- loads the program. For tcl, we just execute it
+#
+proc tcl_load { arg } {
+    global verbose
+    global exec_output
+    global subdir
+    global testdrv
+    global exec_output
+    global spawn_id
+
+    if ![file exists $arg] then {
+	error "$arg does not exist."
+	return -1
+    }
+
+    if $verbose>1 then {
+	send_user "Sourcing $arg...\n"
+    }
+    send "source $arg\n"
+    return 0
+}
+
+#
+# tcl_exit -- exit the test driver for tcl
+#
+proc tcl_exit {} {
+}
+
+#
+# tcl_start -- start the test driver for tcl
+#
+proc tcl_start { } {
+    global testdrv
+
+    global objdir
+    global subdir
+    global srcdir
+    global verbose
+    global spawn_id
+    
+    set testdrv "$objdir/$testdrv"
+    set defs	"$srcdir/../tests/defs"
+
+    spawn $testdrv
+    send "source $defs\n"
+    expect {
+	-re ".*source $defs.*$" {
+	    verbose "Sourced $defs" 1
+	    }
+	"Error: couldn't read file*" {
+	    error "Couldn't source $defs"
+	    return -1
+	}
+	"%" {
+	    verbose "Sourced $defs" 1
+	    return 0
+	    }
+	timeout {
+	    error "Timed out sourcing $defs."
+	    return 1
+	}
+    }
+
+    send "set VERBOSE 1\n"
+    expect {
+	-re "set VERBOSE 1.*1.*%" {
+	    if $verbose>1 then {
+		send_user "Set verbose flag for tests\n"
+	    }	    
+	}
+	timeout {
+	    error "Timed out setting verbose flag."
+	}
+    }
+    return $spawn_id
+}
+
+
+
+
+
+
+
+

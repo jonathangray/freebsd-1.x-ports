@@ -1,0 +1,356 @@
+
+
+
+1. Raster Font File Format
+
+1.1 Introduction
+  A raster font (RST) file contains a description of a font suitable for use on
+a  specific output device.  The images of characters are described by sequences
+of bits specifying which pixels in a bounding  rectangle  should  be  blackened
+when  the  character is painted.  RST files are not sufficient for typesetting,
+which requires information about kerning and  ligatures  (as  supplied  by  TFM
+files, for example, to the TEX typesetting system).  However, RST files contain
+enough information to print listings nicely, for example.
+
+
+
+1.1.1 Fonts, Glyphs, Characters, Symbols
+  The  term  font  can name potentially many concepts.  We will use it below in
+its more restricted sense of a collection of pictures or glyphs in a particular
+style, at a particular point size, for a particular output device.  A RST  file
+thus describes a font by this definition.
+
+  A  symbol  is  an  ideal picture with which one or more meanings are commonly
+associated.  The word ``commonly'' is used because a symbol such as  the  Greek
+alpha  symbol  may  have  a  meaning  arising  from  the  context  of  its use,
+independent of its common meaning.  It is ``ideal'' in the sense that it is the
+same symbol no matter what the style in which it is written or drawn.
+
+  The word character is used in different ways.    A  character  should  be  an
+alphabetic symbol.  But it is often used to denote a wider class of symbols, as
+in  the  phrase  ``the  ascii  character set.''  Sometimes it is used to mean a
+symbol written in a certain style, for example,  ``the  character  Times  Roman
+A.''    We will use the phrase character number in a fairly specific sense: the
+ordinal of a character in a given font, starting with zero.  For  example,  the
+character number of the symbol upper-case a in the ascii character set is 65.
+
+  A glyph is a particular instance of a symbol, a picture captured by a graphic
+description.  In RST files, glyphs are represented as bit maps, and thus, for a
+given  printer  with  fixed resolution and shape of dot, a glyph always has the
+same size and shape.
+
+
+
+1.1.2 Bit Map
+  Glyphs are represented in RST files as bit maps, a lists of rows; each row is
+a list of black and white dots.  To view the glyph, the rows should be  stacked
+vertically and displayed.
+
+
+
+1.1.3 Units of Measure in RST Files
+                                  -20
+  A  fix is an integer, equal to 2    points.  There are 72.27 points per inch.
+To convert a fix, f, to a real number of points, r, use the formula 
+
+             20
+    r = f / 2  .
+
+
+
+
+1.1.4 Strings
+  A string in an RST file is represented as a sequence of  8-bit  bytes.    The
+first  byte  contains  the  number  of bytes in the rest of the string.  Thus a
+string can contain at most 255 characters.
+
+
+
+1.1.5 File Addressing
+  An  RST  file  is  a  sequence  of  8-bit  bytes  (often  combined  to   form
+multiple-byte fields).  All pointers in the file are offsets from the beginning
+of the file, starting with zero.  Thus, a pointer to the first byte in the file
+would be zero.
+
+
+
+1.1.6 Host RST File Representation
+  This  document can say nothing about the actual representation of an RST file
+on a given file system.  Instead, it describes a virtual  representation  which
+is a randomly addressable sequence of 8-bit bytes.
+
+  In  practice,  RST  files  have  a host file-system name descriptive of their
+contents.  For example, on some systems, a Computer Modern  Roman  font,  point
+size  10,  magnification  1, would have the filename CMR10.R10 (the R10 encodes
+the unity magnification).  This  allows  typesetting  software  to  access  the
+correct  RST file for its needs (based on name, size and magnification) without
+searching  all  the  RST  files  in  a  font  database  (but   this   is   very
+host-environment-dependent).
+
+1.2 RST File Structure
+  There  are  four  portions of an RST file, viz., a font marker, the preamble,
+the directory and the raster section.
+
+  At the beginning of the file there is a file mark, declaring the file  to  be
+an  RST  file.   The preamble follows, giving vital information about the font,
+such as how many characters are in it, as  well  as  nonessential  information,
+such  as  who created the file.  Next, the glyph directory contains the size of
+each glyph and a pointer into the last section, which contains the raster  data
+for each glyph.
+
+
+
+1.2.1 File Mark
+  The  file  mark  is  8  bytes  long.   The first four bytes contain the ascii
+letters Rast, identifying the file as a raster-format  file.    The  next  four
+bytes are currently unused, and should contain zero.
+
+
+
+1.2.2 Preamble
+  The  preamble  begins  at  the  ninth byte (index 8) of the RST file with the
+number of bytes occupied by the rest of the preamble, followed by  the  version
+number  of the RST format.  An RST file format is version dependent.  Version 0
+has 18 fields of preamble information in at least 40 bytes.
+
+  Below are the fields of the preamble, followed by a discussion of some of the
+fields.  If the type of a field is not specified, it is an integer of the given
+size.
+
+   - the number of bytes in the preamble, not including the two  used  by  this
+     field (2 bytes, offset 8)
+
+   - format version number (currently zero) (1 byte, offset 10)
+
+   - pointer to the glyph directory (>= 46) (3 bytes, offset 11)
+
+   - character  number  of  the  first  glyph  in the font, usually 0 (2 bytes,
+     offset 14)
+
+   - character number of the last glyph in the  font,  usually  127  (2  bytes,
+     offset 16)
+
+   - font  magnification,  in  units of 1/1000 (dimensionless); for example, an
+     unmagnified font will have magnification 1000, and a font that is twice as
+     big as its designsize will have  magnification  2000  (a  0  magnification
+     should be interpreted as 1000) (4 bytes, offset 18)
+
+   - the  designsize  of  the font, in fix units; if the font is not magnified,
+     this will be the intended size of this font (4 bytes, offset 22)
+
+   - the interline spacing for the font, in fix units; if this field  is  zero,
+     try designsize * 1.2 (4 bytes, offset 26)
+
+   - the  width of a good looking interword space, in fixes.  If this parameter
+     is zero, try designsize/1.2 (4 bytes, offset 30)
+
+   - rotation of the font in counter-clockwise positive degrees;  normal  fonts
+     have rotation 0; fonts read while standing the page on its right edge have
+     rotation 270 (2 bytes, offset 34)
+
+   - character  advance  direction  relative to the font's rotation; this tells
+     where to place a ``next character'' on a ``line of  characters;''  0  mean
+     advance  to  the  right,  1 downward, 2 to the left, 3 upward (the English
+     fonts have character advance direction 0, Chinese 1, Hebrew  2)  (1  byte,
+     offset 36)
+
+   - line  advance  direction relative to the font's rotation; this tells where
+     to place a ``next line of characters'' on the page, relative to  the  last
+     line:   0 to the right, 1 downwards, 2 to the left, 3 upwards (the English
+     fonts and Hebrew have line advance direction 1, Chinese 0) (1 byte, offset
+     37)
+
+   - check identifier: this is used with metafont files  to  associate  an  RST
+     file  with  a  specific  TFM file, ensuring that the TFM and RST files are
+     describing the same font; if this field is zero, no check is to be done (4
+     bytes, offset 38)
+
+   - font resolution in pixels per inch:  240  for  the  IMPRINT-10  (2  bytes,
+     offset 42)
+
+   - font identifier string (variable size, offset 44)
+
+   - string describing the face-type encoding (variable size, offset >= 45)
+
+   - string naming the intended output device (variable size, offset >= 46)
+
+   - string naming the creator of this file (variable size, offset >=47)
+
+  The  first  five  fields  (size,  version,  pointer  to  the glyph directory,
+character numbers of the first and last glyphs in the font) must be correct for
+any RST file to be useable.
+
+  Though the magnification can presumably be obtained from  the  file  name  in
+some  host  environments,  it  is  included  for  verification  and  to allow a
+magnification of greater precision than the file name might allow.  The  widths
+of  the  characters  at their designsize are stored in the glyph directory.  If
+the font is at magnification 2.0, the characters are actually twice as  big  as
+their  designsize.    The  correct  printing width of a character, then, is its
+given width multiplied by the magnification.  (The individual character  widths
+are  given  without the magnification figured in so that a printing program can
+substitute a font at one magnification for one at another  magnification.    If
+TEX  says  an RST font file at magnification 2.4 is called for, but such a font
+does not exist and one at 2.5 does exist, the latter can  be  used.    The  2.5
+magnification   characters  will  be  printed,  but  the  2.4  widths  used  by
+multiplying by 2.4 instead of 2.5.  This will make words with these  characters
+slightly  cramped,  but  won't  effect the spacing of the rest of the document.
+Alternatively, the characters could be spaced correctly if  the  space  between
+words is shortened.)
+
+  The  designsize, interline spacing and space width are included to enable use
+of the font in simpler applications, such as  listing  generation  or  document
+production with software not concerned with kerns or ligatures.
+
+  The  designsize  is the generic size of the font, and also tells the distance
+between baselines.  An n point font normally has n/72 inches between baselines.
+
+  The interline spacing distance field may differ  from  the  designsize.    In
+proper  fonts  they  should  be  identical,  but  often fonts must be tuned for
+different devices.  The interline spacing is a subjective spacing based on  the
+look  of  text.  (Metafont, for example, does not know about interline spacing,
+but in the RST files it generates, this field is set to 1.2  times  the  design
+size.)
+
+  The width of a space determines the size of spaces and tabs.
+
+  The  rest of the fields are present to encourage correctness.  A verification
+program can check that a font's file name  corresponds  to  its  contents.    A
+device  dependent  program assembling text can ensure the font was made for it,
+or at least for a printer of its resolution.  A user can find out  who  made  a
+font in case it needs to be improved.
+
+
+
+1.2.3 Glyph Directory
+  Each glyph in the font has an entry in the glyph directory.  Each entry takes
+up  15 bytes, thus the directory size in bytes is 15 times the number of glyphs
+in the font.  A glyph is defined in the font if its character number is between
+the first and last character numbers (inclusive) as given in the  preamble  and
+if it has has a non-zero directory entry (described below).
+
+  Let fg be the character number of the first glyph in the font file, let lg be
+that  of the last glyph, and let DirPtr be the pointer to the first byte of the
+directory as given in the preamble.  Then the address (offset in the RST  file)
+of the directory entry for character n, assuming fg <= n <= lg, is 
+
+    DirPtr + ((n - fg) * 15).
+
+  The format of a directory entry is:
+
+   - h, height (in pixels) of raster picture (2 bytes, offset 0)
+
+   - w, width (in pixels) of raster picture (2 bytes, offset 2)
+
+   - y,  distance  (in pixels) from the top of the raster array to the glyphs's
+     reference point (2 bytes, offset 4)
+
+   - x, distance (in pixels) from the left of the raster array to  the  glyph's
+     reference point (2 bytes, offset 6)
+
+   - fw,  advance  width  of  the  character, in fix units; note that this is a
+     signed quantity (4 bytes, offset 8) also  called  the  printing  width  or
+     nominal width) (4 bytes)
+
+   - p, pointer to raster data (3 bytes, offset 12)
+
+  H and w are the height and width in pixels of the raster array containing the
+glyph.  The glyph is stored as a sequence of h rows, each row being w % 8 bytes
+long.    Again,  the pixel height and width have no connection with the nominal
+height and width of the glyph as far as  a  typesetting  system  is  concerned;
+rather,  they denote the size of the smallest bounding box that fits around the
+black pixels comprising the character's raster representation.
+
+  A character has a reference point often near, or just left of, its center.  Y
+and x are the distances from the top left corner  to  this  point  measured  in
+pixels.     Both  of  these  numbers  may  be  negative,  in  two's  complement
+representation.  For  the  y-coordinate,  positive  is  downward;  for  the  x,
+positive is rightward.
+
+  Fw  is  the  advance width of the character in fix units (a signed quantity).
+Remember to multiply this width by the  font  magnification  to  get  the  true
+physical  width.   This is also called the printing width or nominal width (and
+is, for example, the same as the width of the glyph in a TEX TFM file).
+
+  The final value contains a pointer to the character's raster picture  in  the
+raster  data section.  This pointer is an absolute byte address (the first byte
+of the file has address 0).
+
+
+
+1.2.4 Raster Data
+  The last section  of  the  RST  file  is  the  raster  data;  each  glyph  is
+represented  by a bit map in this section, but in no particular order (i.e., if
+you want to know where a particular glyph's raster  data  lives,  look  in  the
+glyph's directory entry).
+
+  Let  bw  be  the  width of the character in bytes, or (w % 8), where w is the
+pixel width of the raster data for the glyph as given in the  directory  entry.
+All  rows start on byte boundaries and are packed to the left, so the last byte
+in a row will not be fully used unless the width of the character is a multiple
+of 8.  Thus a glyph's ``picture'' (raster data, bit map) takes up  bw*h  bytes,
+where h is the pixel height of the glyph, also from the directory entry.
+
+  Here is a letter ``Q'' as represented in the raster section of some RST file:
+Row
+ 0  00001111 11100000 0.......
+ 1  00011111 11110000 0.......
+ 2  00111100 01111000 0.......
+ 3  01110000 00011100 0.......
+ 4  11110000 00011110 0.......
+ 5  11100000 00001110 0.......
+ 6  11100000 00001110 0.......
+ 7  11100111 11001110 0.......
+ 8  11111111 11011110 0.......
+ 9  01111100 11111100 0.......
+10  00111100 01111000 0.......
+11  00011111 11110000 0.......
+12  00X01111 11100011 1.......
+13  00000000 11100111 0.......
+14  00000000 01111100 0.......
+15  00000000 00111000 0.......
+
+Col 76543210 76543210 76543210
+    (Bit number within a byte,
+     high order bit is number 7)
+Here,  the  rows  and  columns  are  numbered,  and  the reference point of the
+character is marked with an X, but only the 0's and 1's are  actually  part  of
+the  character;  periods  represent  padding zero bits that are not part of the
+character.  H is 16 pixels, w 17 pixels, y 12 pixels, x  2  pixels,  and  bw  3
+bytes.  Note that the pixel width is just large enough to span the leftmost and
+rightmost  black  pixels  in the character.  Likewise, the pixel height is just
+large enough to span the topmost and bottommost black pixels.
+
+  If this ``Q'' had a TEX TFM width of 5620393 fixes, it  would  print  on  the
+IMPRINT-10 at a width of 
+
+                      20
+    5620393 fixes / (2   fixes/points) / (72.27 points/inch)
+      * 240 pixels/inch  =  17.8 pixels
+
+which would be rounded up to 18.
+
+  Suppose this were a font 5.4 points high.  If this font were made from a font
+10.8  points  high  and  thus  at magnification .5 (one half), then the nominal
+width would  have  been  11367088,  twice  as  much  as  before,  and  only  by
+multiplying  it  by  the  magnification  (.5) would one get the actual printing
+width.
+
+
+
+                               Table of Contents
+
+1. Raster Font File Format                                                    0
+
+1.1 Introduction                                                              0
+     1.1.1 Fonts, Glyphs, Characters, Symbols                                 0
+     1.1.2 Bit Map                                                            0
+     1.1.3 Units of Measure in RST Files                                      0
+     1.1.4 Strings                                                            0
+     1.1.5 File Addressing                                                    0
+     1.1.6 Host RST File Representation                                       0
+1.2 RST File Structure                                                        0
+     1.2.1 File Mark                                                          0
+     1.2.2 Preamble                                                           0
+     1.2.3 Glyph Directory                                                    1
+     1.2.4 Raster Data                                                        1
+

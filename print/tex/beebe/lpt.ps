@@ -1,0 +1,112 @@
+%!PS-Adobe-1.0
+%%Title: printfile.ps
+%%Creator: Glenn Reid, Adobe Systems Incorporated
+%%CreationDate: Tue Apr 22 15:35:53 1986
+%%Pages: 0
+%% Copyright (c) 1986 Glenn Reid and Adobe Systems Incorporated.
+%% Use it, distribute it (with this message), but don't sell it.
+%%
+%% This program will take miscellaneous text concatenated at its
+%% end and print it in some default font.  It is designed to be
+%% minimal in its functionality, but flexible enough to be easily
+%% adapted to other uses.
+
+/in.	{72 mul}	def
+/line	512	string def	% for input line buffering
+/buff	10	string def	% for page number conversion
+
+%% CHANGE THESE IF YOU LIKE
+
+%% If any of these parameters are defined ahead of this file, then
+%% those values will be used.  A typical way to use this is to
+%% allow an application to redefine some of the parameters by
+%% inserting definitions ahead of this file in the print stream.
+%% Examples of redefinitions look like:
+%% 
+%%     /fontname /Palatino-Roman def
+%%     /pointsize /13 def
+%%     /header (document.ps) def
+%%     /pagenumber false def
+%%     /leftmargin 36 def
+%% 
+%% Any number (including 0) of these parameters may be defined to
+%% be different from the defaults.  The defaults are quite
+%% reasonable for general use, and will print in 11-point Courier
+%% with a 12-point Courier-Bold header (only prints a header of
+%% /header string is defined by the user).  Margins top, left and
+%% bottom are: .75 in.,  .75 in., and .5 in.
+%% 
+%%  Otherwise, the following defaults will be used:
+
+/leftmargin where not
+    { /leftmargin .75 in. def } {pop} ifelse
+/bottom where not
+    { /bottom .5 in. def } {pop} ifelse
+/startX where not
+    { /startX leftmargin def } {pop} ifelse
+/startY where not
+    { /startY 10 in. def } {pop} ifelse
+/fontname where not
+    { /fontname /Courier def } {pop} ifelse
+/pointsize where not
+    { /pointsize 11 def } {pop} ifelse
+/leading where not
+    { /leading pointsize 2 add def } {pop} ifelse
+/headerfontname where not
+    { /headerfontname /Courier-Bold def } {pop} ifelse
+/headerpointsize where not
+    { /headerpointsize 12 def } {pop} ifelse
+/headerfont
+    headerfontname findfont headerpointsize scalefont
+def
+/page where not
+    { /page 1 def } {pop} ifelse
+/pagenumber where not
+    { /pagenumber true def } {pop} ifelse
+
+% This routine will print a header at the top of each page
+/printheader {
+    gsave
+	currentdict /header known {
+	    36 10.5 in. moveto
+	    headerfont setfont
+	    header show
+	} if
+	pagenumber {
+	    8 in. 10.5 in. moveto
+	    headerfont setfont
+	    page buff cvs show
+	    /page page 1 add def
+	} if
+    grestore
+    startX startY moveto
+} bind def
+
+/crlf {
+    leftmargin currentpoint exch pop	% replace X with leftmargin
+    leading sub
+    dup bottom le
+    { pop pop showpage printheader }
+    { moveto } ifelse
+} bind def
+
+/printfile {
+    line readline		% read a line from the file
+    {				% 'if' procedure body (+boolean)
+	{			% 'while' procedure body
+	    show crlf		% show what's left by readline
+	    currentfile cvlit	% use as operand
+	    line readline	% and read the next line
+	    not {exit} if	% exit if no more input to be had
+	} loop			% end of while-proc
+    } if
+    showpage			% when input file is exhausted
+} bind def			% /printfile
+
+fontname findfont pointsize scalefont setfont
+
+printheader		% execute header
+currentfile cvlit	% uses rest of this file as input
+
+% everything following 'PrintFile' is treated as data, through EOF
+printfile

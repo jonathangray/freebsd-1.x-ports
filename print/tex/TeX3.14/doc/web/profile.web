@@ -1,0 +1,3149 @@
+% This program by D. E. Knuth is not copyrighted and can be used freely.
+% Version 1.0 was completed October 31, 1983.
+% Version 1.1 added static weight totals (November, 1983).
+
+% Here is TeX material that gets inserted after \input webmac
+\def\hang{\hangindent 3em\indent\ignorespaces}
+\font\ninerm=amr9
+\let\mc=\ninerm % medium caps for names like PASCAL
+\def\PASCAL{{\mc PASCAL}}
+\def\v{\.{\char'174}} % vertical (|) in typewriter font
+\def\({} % kludge for alphabetizing certain module names
+
+\def\title{PROFILE}
+\def\topofcontents{\null
+  \vfill
+  \centerline{\titlefont The {\ttitlefont PROFILE} processor}
+  \vskip 15pt
+  \centerline{(Version 1, October 1983)}
+  \vfill}
+\def\botofcontents{\vfill
+  \centerline{\hsize 5in\baselineskip9pt
+    \vbox{\ninerm\noindent
+    The preparation of this report
+    was supported in part by the National Science
+    Foundation under grants IST-8201926 and MCS-8300984,
+    and by the System Development Foundation.}}}
+\pageno=\contentspagenumber \advance\pageno by 1
+
+@* Introduction.
+The purpose of \.{PROFILE} is to annotate a \PASCAL\ program with data
+about the estimated computer time ascribed to each line of code. If the
+\PASCAL\ program has been produced by \.{TANGLE}, the accumulated run time
+estimates for each section of the \.{WEB} source code will also be determined.
+
+Running time is estimated roughly by assigning an integer weight to each
+feature of \PASCAL. For example, the statement `$A[i]:=x+2/n$' will be
+weighted by the time to fetch $i$, $x$, 2, and $n$, plus the time to
+compute the location of $A[i]$ given $i$, plus the time to add, to convert
+$n$ from integer to real, to divide, and to store in memory. Approximate
+costs of each primitive operation appear in macro definitions like
+\\{int\_real\_cost} that are grouped together in one of the sections below;
+thus, they are not hard to change.
+
+The \.{PROFILE} program includes a \PASCAL\ parser, so it can probably be
+modified to do other operations on \PASCAL\ source code. Indeed, this program
+intentionally deals with \PASCAL\ in more generality than it needs to, so that
+it can be used as a starting point for programs that translate subsets of
+\PASCAL\ to other higher-level languages.
+
+Don Knuth wrote the first version of \.{PROFILE} in October, 1983, for the
+purpose of analyzing bottlenecks in the \TeX\ processor.
+(He apologizes for having written the program in haste, without adequate
+time to test whether it works on features of \PASCAL\ that he doesn't
+actually use in his own programs.)
+
+The ``banner line'' defined here should be changed whenever \.{PROFILE}
+is modified.
+
+@d banner=='This is PROFILE, Version 1.0'
+
+@ The program begins with a fairly normal header, made up of pieces that
+will mostly be filled in later. There are two input files:
+\smallskip
+\hang |pascal_file| is a syntactically correct \PASCAL\ source program,
+preferably (but not necessarily) output by \.{TANGLE}. The entire \PASCAL\
+language is permitted except for @!|with| statements, which require
+additional symbol table manipulations that have not been implemented (since
+the portable programs of the \TeX\ project don't use \&{with}).
+\smallskip
+\hang |count_file| is a text file containing integer counts, one per line,
+representing the number of times that key statements of the \PASCAL\ program
+were executed. There should be one count for the first statement in each
+block and for the first statement following {\bf do}, {\bf then}, {\bf else},
+{\bf repeat}, plus one count for each colon following a label. An artificial
+count of `{\tt-1}' should also appear at the very end of the file.
+(Dave Fuchs has modified the \PASCAL\ debugger at Stanford so that such a
+count file can be obtained.)
+\smallskip\noindent
+The |output| file will receive a ``pretty printed'' version of the \PASCAL\
+source code, with frequency counts and weights accompanying each statement.
+A summary of the total weight for each \.{WEB} section will also be
+appended to the output, if the source file contains comments like
+`\.{\{123:\}}' and `\.{\{:123\}}' around the code for section~123.
+Comments like `\.{\{+10\}}' or `\.{\{-5\}}' will add 10 or subtract 5
+from the weight that \.{PROFILE} ordinarily computes at a particular
+place in the source file. The special comment `\.{\{\^\}}' in a procedure
+heading indicates that the procedure in question does not exit.
+
+If it is necessary to abort the job because of a fatal error, the program
+calls the `|jump_out|' procedure, which goes to the label |end_of_PROFILE|.
+
+@d end_of_PROFILE = 9999 {go here to wrap it up}
+
+@p @t\4@>@<Compiler directives@>@/
+program PROFILE(pascal_file,count_file,output);
+label end_of_PROFILE; {go here to finish}
+const @<Constants in the outer block@>@/
+type @<Types in the outer block@>@/
+var @<Globals in the outer block@>@/
+@<Error handling procedures@>@/
+@<Memory management procedures@>@/
+procedure initialize;
+  var @<Local variables for initialization@>@/
+  begin @<Set initial values@>@/
+  end;
+
+@ Some of this code is optional for use when debugging only;
+such material is enclosed between the delimiters |debug| and $|gubed|$.
+
+@d debug==@{ {change this to `$\\{debug}\equiv\null$' when debugging}
+@d gubed==@t@>@} {change this to `$\\{gubed}\equiv\null$' when debugging}
+@f debug==begin
+@f gubed==end
+
+@ The \PASCAL\ compiler used to develop this system has ``compiler
+directives'' that can appear in comments whose first character is a dollar sign.
+In production versions of \.{PROFILE} these directives tell the compiler that
+@^system dependencies@>
+it is safe to avoid range checks and to leave out the extra code it inserts
+for the \PASCAL\ debugger's benefit, although interrupts will occur if
+there is arithmetic overflow.
+
+@<Compiler directives@>=
+@{@&$C-,A+,D-@} {no range check, catch arithmetic overflow, no debug overhead}
+@!debug @{@&$C+,D+@}@+ gubed {but turn everything on when debugging}
+
+@ Labels are given symbolic names by the following definitions. We insert
+the label `|exit|:' just before the `\ignorespaces|end|\unskip' of a
+procedure in which we have used the `|return|' statement defined below;
+the label `|restart|' is occasionally used at the very beginning of a
+procedure; and the label `|reswitch|' is occasionally used just prior to
+a \&{case} statement in which some cases change the conditions and we wish to
+branch to the newly applicable case.
+Loops that are set up with the \&{loop} construction defined below are
+commonly exited by going to `|done|' or to `|found|' or to `|not_found|',
+and they are sometimes repeated by going to `|continue|'.
+
+@d exit=10 {go here to leave a procedure}
+@d restart=20 {go here to start a procedure again}
+@d reswitch=21 {go here to start a case statement again}
+@d continue=22 {go here to resume a loop}
+@d done=30 {go here to exit a loop}
+@d done1=31 {go here to exit another loop}
+@d done2=32 {and another}
+@d done3=33 {and another}
+@d done4=34 {in case of five loops in one big procedure}
+@d found=40 {go here when you've found it}
+@d not_found=41 {go here when you've found something else}
+
+@ Here are some macros for common programming idioms.
+
+@d incr(#) == #:=#+1 {increase a variable by unity}
+@d decr(#) == #:=#-1 {decrease a variable by unity}
+@d loop == @+ while true do@+ {repeat over and over until a |goto| happens}
+@d do_nothing == {empty statement}
+@d return == goto exit {terminate a procedure call}
+@f return == nil
+@f loop == xclause
+
+@ We assume that |case| statements may include a default case that applies
+if no matching label is found. Thus, we shall use constructions like
+@^system dependencies@>
+$$\vbox{\halign{#\hfil\cr
+|case x of|\cr
+1: $\langle\,$code for $x=1\,\rangle$;\cr
+3: $\langle\,$code for $x=3\,\rangle$;\cr
+|othercases| $\langle\,$code for |x<>1| and |x<>3|$\,\rangle$\cr
+|endcases|\cr}}$$
+since most \PASCAL\ compilers have plugged this hole in the language by
+incorporating some sort of default mechanism. For example, the compiler
+used to develop \.{WEB} and \TeX\ allows `|others|:' as a default label,
+and other \PASCAL s allow syntaxes like `\ignorespaces|else|\unskip' or
+`\\{otherwise}' or `\\{otherwise}:', etc. The definitions of |othercases|
+and |endcases| should be changed to agree with local conventions.
+(Of course, if no default mechanism is available, the |case| statements of
+this program must be extended by listing all remaining cases.)
+
+When the \PASCAL\ source program being processed by \.{PROFILE} has
+default cases, we assume below that the default case is labeled with
+some recognizable keyword, and that the |count_file| contains a count
+for this label just like any other.
+
+@d othercases == others: {default for cases not listed explicitly}
+@d endcases == @+end {follows the default case in an extended |case| statement}
+@f othercases == else
+@f endcases == end
+
+@ The following parameters are set big enough to handle \TeX, so they
+should be sufficient for most applications of \.{PROFILE}.
+
+@<Constants...@>=
+@!max_names=4999; {maximum number of identifiers and reserved words;
+  should be a prime number}
+@!pool_size=30000; {maximum total length of identifiers and reserved words}
+@!max_modules=2000; {greater than the total number of \.{WEB} sections}
+@!buf_size=100; {maximum length of input line}
+@!line_length=50; {lines of unannotated \PASCAL\ output}
+@!weight_length=6; {columns of annotation for weight data}
+@!freq_length=12; {columns of annotation for frequency data}
+@!out_buf_size=128; {output lines before breaking to |line_length|}
+@!mem_size=30000; {largest index in the dynamic memory array;
+  must be less than |max_halfword|}
+@!max_comment=20; {comments are truncated to this many characters}
+@!save_size=500; {number of entries on the save stack}
+
+@ A global variable called |history| will contain one of four values
+at the end of every run: |spotless| means that no unusual messages were
+printed; |harmless_message| means that a message of possible interest
+was printed but no serious errors were detected; |error_message| means that
+at least one error was found; |fatal_message| means that the program
+terminated abnormally. The value of |history| does not influence the
+behavior of the program; it is simply computed for the convenience
+of systems that might want to use such information.
+
+@d spotless=0 {|history| value for normal jobs}
+@d harmless_message=1 {|history| value when non-serious info was printed}
+@d error_message=2 {|history| value when an error was noted}
+@d fatal_message=3 {|history| value when we had to stop prematurely}
+@#
+@d mark_harmless==@t@>@+if history=spotless then history:=harmless_message
+@d mark_error==history:=error_message
+@d mark_fatal==history:=fatal_message
+
+@<Glob...@>=@!history:spotless..fatal_message; {how bad was this run?}
+
+@ @<Set init...@>=history:=spotless;
+
+@ A lot of initialization needs to be done, and it's convenient to have
+an integer variable for iteration.
+
+@<Local variables for init...@>=
+@!i:integer; {all-purpose index for initialization loops}
+
+@* Operation costs.
+Here we define the assumed cost of each operation. The numbers are
+expressed in terms of a unit that essentially represents a memory
+access. The numbers aren't extremely precise, because the goal is simply
+to give a ballpark estimate of running time. On the KL-10 computer,
+each unit supposedly represents about 400 nanoseconds.
+
+@d fetch_cost=1 {time to load a variable or constant}
+@d store_cost=1 {time to store into a variable}
+@d jump_cost=1 {time to |goto| a (local) label}
+@d index_cost=1 {extra time for array-address computation}
+@d packed_index_cost=10 {ditto, for packed arrays}
+@d pointer_cost=1 {cost of |^| in pointers}
+@#
+@d add_cost=1 {integer addition or subtraction}
+@d mult_cost=5 {integer multiplication}
+@d div_cost=10 {integer |div| and |mod|}
+@d real_add_cost=5 {floating point addition or subtraction}
+@d real_mult_cost=6 {floating point multiplication}
+@d real_div_cost=12 {floating point division}
+@d compare_cost=1 {equality or inequality tests}
+@d in_cost=3 {\&{in}}
+@d set_cost=1 {set union, intersection, difference}
+@d and_or_cost=1 {\&{and}, \&{or}}
+@#
+@d unary_cost=1
+  {|abs| and |odd| and |pred| and |succ| and \&{not} and negation}
+@d ord_chr_cost=0 {|ord| or |chr|}
+@d int_real_cost=25 {|trunc|,|round|, or fix-to-float}
+@d char_string_cost=15 {read or write a |char|}
+@d int_string_cost=100 {read or write an integer}
+@d real_string_cost=300 {read or write a real}
+@d string_string_cost=5 {setup time for reading and writing a string}
+@d string_string_tax=5 {ditto, extra cost per character}
+@d array_string_cost=250 {reading characters into an array}
+@d transcendental_cost=100 {|sin|, |exp|, etc. (guesstimate)}
+@d new_cost=50 {|new|, |dispose| (guesstimate)}
+@d pack_cost=250 {|pack|, |unpack| (guesstimate)}
+@#
+@d packed_surcharge=1 {packed record field cost added to |fetch_cost|}
+@d var_surcharge=1 {extra cost for fetching or storing a \&{var} parameter}
+@d call_overhead=10
+  {push or pop stack and transfer to or from procedure or function}
+@#
+@d open_cost=3000 {|reset| or |rewrite|}
+@d close_cost=600 {|close|}
+@d break_in_cost=100 {|breakin|}
+@d get_put_cost=10 {|get| or |put| on a file}
+@d eof_cost=10 {|eof| or |eoln|}
+
+@ Besides the costs of basic operations, there are costs associated with
+changes of control.
+
+@d if_cost=1 {setup time for $\&{if}\ldots\&{then}\ldots\&{else}$}
+@d for_cost=5 {\&{for} loop setup time}
+@d for_tax=5 {extra charge per iteration}
+@d while_cost=1 {setup time for \&{while} loop}
+@d while_tax=1 {extra charge per iteration of \&{while} loop}
+@d repeat_tax=1 {extra time per iteration of \&{repeat} loop}
+@d case_cost=5 {setup time for branching in \&{case} statement}
+
+@* The character set.
+Most \.{WEB} programs convert their input to an internal seven-bit code
+that is essentially standard ASCII, the ``American Standard Code for
+Information Interchange.''  The conversion is done immediately when each
+character is read in. Conversely, characters are converted from ASCII to
+the user's external representation just before they are output.
+
+Here we use code conversion identical to that done by \.{WEAVE} and \.{TANGLE}.
+
+@<Types...@>=
+@!ASCII_code=0..127; {seven-bit numbers, a subrange of the integers}
+
+@ The original \PASCAL\ compiler was designed in the late 60s, when six-bit
+character sets were common, so it did not make provision for lowercase
+letters. Nowadays, of course, we need to deal with both capital and small
+letters in a convenient way, so \.{PROFILE} assumes that it is being used
+with a \PASCAL\ whose character set contains at least the characters of
+standard ASCII. Some \PASCAL\ compilers use the original
+name |char| for the data type associated with the characters in text files,
+while other \PASCAL s consider |char| to be a 64-element subrange of a larger
+data type that has some other name.
+
+In order to accommodate this difference, we shall use the name |text_char|
+to stand for the data type of the characters in the input and output
+files.  We shall also assume that |text_char| consists of the elements
+|chr(first_text_char)| through |chr(last_text_char)|, inclusive. The
+following definitions should be adjusted if necessary.
+@^system dependencies@>
+
+@d text_char == char {the data type of characters in text files}
+@d first_text_char=0 {ordinal number of the smallest element of |text_char|}
+@d last_text_char=127 {ordinal number of the largest element of |text_char|}
+
+@<Types...@>=
+@!text_file=packed file of text_char;
+
+@ Conversion between ASCII code and the user's external character set is
+done by means of arrays |xord| and |xchr| that are analogous to \PASCAL's
+|ord| and |chr| functions.
+
+@<Globals...@>=
+@!xord: array [text_char] of ASCII_code;
+  {specifies conversion of input characters}
+@!xchr: array [ASCII_code] of text_char;
+  {specifies conversion of output characters}
+
+@ If we assume that \.{PROFILE} is able to read and write the
+visible characters of standard ASCII (although not necessarily using the
+ASCII codes to represent them), the following assignment statements initialize
+most of the |xchr| array properly, without needing any system-dependent
+changes.
+
+@<Set init...@>=
+xchr[@'40]:=' ';
+xchr[@'41]:='!';
+xchr[@'42]:='"';
+xchr[@'43]:='#';
+xchr[@'44]:='$';
+xchr[@'45]:='%';
+xchr[@'46]:='&';
+xchr[@'47]:='''';@/
+xchr[@'50]:='(';
+xchr[@'51]:=')';
+xchr[@'52]:='*';
+xchr[@'53]:='+';
+xchr[@'54]:=',';
+xchr[@'55]:='-';
+xchr[@'56]:='.';
+xchr[@'57]:='/';@/
+xchr[@'60]:='0';
+xchr[@'61]:='1';
+xchr[@'62]:='2';
+xchr[@'63]:='3';
+xchr[@'64]:='4';
+xchr[@'65]:='5';
+xchr[@'66]:='6';
+xchr[@'67]:='7';@/
+xchr[@'70]:='8';
+xchr[@'71]:='9';
+xchr[@'72]:=':';
+xchr[@'73]:=';';
+xchr[@'74]:='<';
+xchr[@'75]:='=';
+xchr[@'76]:='>';
+xchr[@'77]:='?';@/
+xchr[@'100]:='@@';
+xchr[@'101]:='A';
+xchr[@'102]:='B';
+xchr[@'103]:='C';
+xchr[@'104]:='D';
+xchr[@'105]:='E';
+xchr[@'106]:='F';
+xchr[@'107]:='G';@/
+xchr[@'110]:='H';
+xchr[@'111]:='I';
+xchr[@'112]:='J';
+xchr[@'113]:='K';
+xchr[@'114]:='L';
+xchr[@'115]:='M';
+xchr[@'116]:='N';
+xchr[@'117]:='O';@/
+xchr[@'120]:='P';
+xchr[@'121]:='Q';
+xchr[@'122]:='R';
+xchr[@'123]:='S';
+xchr[@'124]:='T';
+xchr[@'125]:='U';
+xchr[@'126]:='V';
+xchr[@'127]:='W';@/
+xchr[@'130]:='X';
+xchr[@'131]:='Y';
+xchr[@'132]:='Z';
+xchr[@'133]:='[';
+xchr[@'134]:='\';
+xchr[@'135]:=']';
+xchr[@'136]:='^';
+xchr[@'137]:='_';@/
+xchr[@'140]:='`';
+xchr[@'141]:='a';
+xchr[@'142]:='b';
+xchr[@'143]:='c';
+xchr[@'144]:='d';
+xchr[@'145]:='e';
+xchr[@'146]:='f';
+xchr[@'147]:='g';@/
+xchr[@'150]:='h';
+xchr[@'151]:='i';
+xchr[@'152]:='j';
+xchr[@'153]:='k';
+xchr[@'154]:='l';
+xchr[@'155]:='m';
+xchr[@'156]:='n';
+xchr[@'157]:='o';@/
+xchr[@'160]:='p';
+xchr[@'161]:='q';
+xchr[@'162]:='r';
+xchr[@'163]:='s';
+xchr[@'164]:='t';
+xchr[@'165]:='u';
+xchr[@'166]:='v';
+xchr[@'167]:='w';@/
+xchr[@'170]:='x';
+xchr[@'171]:='y';
+xchr[@'172]:='z';
+xchr[@'173]:='{';
+xchr[@'174]:='|';
+xchr[@'175]:='}';
+xchr[@'176]:='~';@/
+xchr[0]:=' '; xchr[@'177]:=' '; {these ASCII codes are not used}
+
+@ Here now is the system-dependent part of the character set.  (Changes
+are appropriate only if nonstandard characters might be used in strings.)
+@^system dependencies@>
+
+@<Set init...@>=for i:=1 to @'37 do xchr[i]:=' ';
+
+@ The following system-independent code makes the |xord| array contain a
+suitable inverse to the information in |xchr|.
+
+@<Set init...@>=
+for i:=first_text_char to last_text_char do xord[chr(i)]:=@'40;
+for i:=1 to @'176 do xord[xchr[i]]:=i;
+
+@* Input and output.
+The input and output conventions of this program have been copied from those
+of \.{WEAVE} and \.{TANGLE}.  Therefore people who need to make
+modifications should already know how to do it.
+
+@ Terminal output is done by writing on file |term_out|, which is assumed to
+consist of characters of type |text_char|:
+@^system dependencies@>
+
+@d print(#)==write(term_out,#) {`|print|' means write on the terminal}
+@d print_ln(#)==write_ln(term_out,#) {`|print|' and then start new line}
+@d new_line==write_ln(term_out) {start new line}
+@d print_nl(#)==  {print information starting on a new line}
+  begin new_line; print(#);
+  end
+
+@<Globals...@>=
+@!term_out:text_file; {the terminal as an output file}
+
+@ Different systems have different ways of specifying that the output on a
+certain file will appear on the user's terminal. Here is one way to do this
+on the \PASCAL\ system that was used in \.{TANGLE}'s initial development:
+@^system dependencies@>
+
+@<Set init...@>=
+rewrite(term_out,'TTY:'); {send |term_out| output to the terminal}
+
+@ The |update_terminal| procedure is called when we want
+to make sure that everything we have output to the terminal so far has
+actually left the computer's internal buffers and been sent.
+@^system dependencies@>
+
+@d update_terminal == break(term_out) {empty the terminal output buffer}
+
+@ The main input comes from |pascal_file| and |count_file|, as explained
+earlier.
+
+@<Globals...@>=
+@!pascal_file:text_file; {the \PASCAL\ source code}
+@!count_file:text_file; {frequency counts}
+
+@ The following code opens the input files.  Since these files were listed
+in the program header, we assume that the \PASCAL\ runtime system has
+already checked that suitable file names have been given; therefore no
+additional error checking needs to be done.
+@^system dependencies@>
+
+@<Set init...@>=reset(pascal_file); reset(count_file);
+
+@ Input goes into an array called |buffer|.
+
+@<Globals...@>=@!buffer: array[0..buf_size] of ASCII_code;
+
+@ The |input_ln| procedure brings the next line of input from the specified
+file into the |buffer| array and returns the value |true|, unless the file has
+already been entirely read, in which case it returns |false|. The conventions
+of \.{TANGLE} are followed; i.e., |ASCII_code| numbers representing the
+next line of the file are input into |buffer[0]|, |buffer[1]|, \dots,
+|buffer[limit-1]|; trailing blanks are ignored; and the global variable
+|limit| is set to the length of the
+@^system dependencies@>
+line. The value of |limit| must be strictly less than |buf_size|.
+
+@p function input_ln(var f:text_file):boolean;
+  {inputs a line or returns |false|}
+var final_limit:0..buf_size; {|limit| without trailing blanks}
+begin limit:=0; final_limit:=0;
+if eof(f) then input_ln:=false
+else  begin while not eoln(f) do
+    begin buffer[limit]:=xord[f^]; get(f);
+    incr(limit);
+    if buffer[limit-1]<>" " then final_limit:=limit;
+    if limit=buf_size then
+      begin while not eoln(f) do get(f);
+      decr(limit); {keep |buffer[buf_size]| empty}
+      print_nl('! Input line too long'); loc:=0; error;
+@.Input line too long@>
+      end;
+    end;
+  read_ln(f); limit:=final_limit; input_ln:=true;
+  end;
+end;
+
+@ Input from the count file is trivial; we simply ask for a count, whenever
+it's time to know a new one. If |count_file| has the wrong number of counts,
+the discrepancy will be reported later; such problems will usually also be
+caught by the redundancy check that is made at the time of every
+`\&{else}' count.
+
+@p function get_count:integer;
+begin if last_count>=0 then
+  begin read_ln(count_file,last_count);
+  if last_count<0 then
+    begin last_count:=-1; get_count:=0;
+    end
+  else get_count:=last_count;
+  end
+else  begin decr(last_count); get_count:=0;
+  end;
+end;
+
+@ Here are two global variables associated with |get_count|.
+
+@<Glob...@>=
+@!last_count:integer; {the last count read from |count_file|, or $-n$ if
+  that file is $n$ counts short}
+@!n:integer; {a temporary counter}
+
+@ @<Set init...@>=
+last_count:=0;
+
+@ The proper number of counts is checked at the end, thusly:
+
+@<Check that |count_file| had the right number of counts@>=
+if last_count<0 then
+  begin print_nl('! count file had ',
+@.count file had n...@>
+  (-last_count):1,' too few counts'); error;
+  end
+else  begin n:=-1;
+  repeat incr(n); read_ln(count_file,last_count);
+  until last_count<0;
+  if n>0 then
+    begin print_nl('! count file had ',
+      n:1, ' too many counts.'); mark_harmless;
+    end;
+  end
+
+@* Reporting errors to the user.
+The command `|err_print('! Error message')|' will report a syntax error to
+the user, by printing the error message at the beginning of a new line and
+then giving an indication of where the error was spotted in the source file.
+Note that no period follows the error message, since the error routine
+will automatically supply a period.
+
+The actual error indications are provided by a procedure called |error|.
+
+Since \.{PROFILE} is supposedly working from a running \PASCAL\ program,
+its error messages have not been jazzed up for super error recovery.
+The main purpose of the many possible calls to |err_print| in this
+program is merely to give some assurance that \.{PROFILE} knows
+what it is doing.
+
+@d err_print(#)==
+    begin new_line; print(#); error;
+    end
+
+@<Error handling...@>=
+procedure error; {prints `\..' and location of error message}
+var@!k,@!l: 0..buf_size; {indices into |buffer|}
+begin @<Print error location based on input buffer@>;
+update_terminal; mark_error;
+end;
+
+@ The error locations can be indicated by using the global variables
+|loc| and |line|, which tell respectively the first
+unlooked-at position in |buffer| and the current line number.
+This routine should be modified on systems whose standard text editor
+has special line-numbering conventions.
+@^system dependencies@>
+
+@<Print error location based on input buffer@>=
+begin print('. (');
+print_ln('l.', line:1, ')');
+if loc>=limit then l:=limit else l:=loc;
+for k:=1 to l do
+  if buffer[k-1]=@'10 then print(' ') {tab becomes space}
+  else print(xchr[buffer[k-1]]); {print the characters already read}
+new_line;
+for k:=1 to l do print(' '); {space out the next line}
+for k:=l+1 to limit do print(xchr[buffer[k-1]]); {print the part not yet read}
+print(' '); {this space separates the message from future dots}
+end
+
+@ The |jump_out| procedure just cuts across all active procedure levels
+and jumps out of the program. This is the only non-local \&{goto} statement
+in \.{PROFILE}. It is used when no recovery from a particular error has
+been provided.
+
+Some \PASCAL\ compilers do not implement non-local |goto| statements.
+@^system dependencies@>
+In such cases the code that appears at label |end_of_PROFILE| should be
+copied into the |jump_out| procedure, followed by a call to a system procedure
+that terminates the program.
+
+@d fatal_error(#)==begin new_line; print(#); error; mark_fatal; jump_out;
+  end
+
+@<Error handling...@>=
+procedure jump_out;
+begin goto end_of_PROFILE;
+end;
+
+@ Sometimes the program's behavior is far different from what it should be,
+and \.{PROFILE} prints an error message that is really for the \.{PROFILE}
+maintenance person, not the user. In such cases the program says
+|confusion('indication of where we are')|.
+
+@d confusion(#)==fatal_error('! This can''t happen (',#,')')
+@.This can't happen@>
+
+@ An overflow stop occurs if \.{PROFILE}'s tables aren't large enough.
+
+@d overflow(#)==fatal_error('! Sorry, ',#,' capacity exceeded')
+@.Sorry, x capacity exceeded@>
+
+@* The dynamic memory.
+A large array called |mem| is used for general-purpose list manipulations.
+Each word of this array contains either a single integer or two halfwords.
+Halfwords are used to hold pointers or numeric data, as is usual in list
+processing.  As in \TeX82, halfwords are assumed to contain values between
+|min_halfword| and |max_halfword|; these quantities should be defined so
+that \PASCAL\ packs two halfwords into the space of an |integer|.  A null
+pointer is represented by |null|, which is defined to be |min_halfword|, the
+index of the smallest word in |mem|.
+
+@d min_halfword==0
+@d max_halfword==65535
+@d null==min_halfword
+
+@<Types...@>=
+@!halfword=min_halfword..max_halfword;@/
+@!pointer=null..mem_size;@/
+@!two_halves=packed record @!lh,@!rh:halfword;
+  end;
+@!memory_word=record case boolean of
+  false:(@!int:integer);
+  true:(@!hh:two_halves);
+  end;
+
+@ We use the notations |info(p)| and |link(p)| to stand for the halfwords
+in |mem[p]|; or |val(p)| to stand for the fullword integer value stored there.
+
+The largest |mem| index used so far is called |mem_end|. Available locations
+|<=mem_end| are maintained in a list |avail|, |link(avail)|,
+|link(link(avail))|, \dots; when this list is empty, we have |avail=null|.
+
+@d info(#)==mem[#].hh.lh {the ``left'' halfword in a given node}
+@d link(#)==mem[#].hh.rh {the ``right'' halfword in a given node}
+@d val(#)==mem[#].int {the memory word as a (possibly signed) integer}
+
+@<Glob...@>=
+@!mem: array[pointer] of memory_word; {dynamic all-purpose memory}
+@!mem_end:pointer; {we haven't touched |mem[mem_end+1..mem_size]|}
+@!avail:pointer; {head of available space stack}
+
+@ @<Set init...@>=
+mem_end:=null; avail:=null;
+
+@ The function |get_avail| returns a pointer to a new word whose |link| field
+is null. An overflow stop occurs if no room is left.
+
+@<Memory manage...@>=
+function get_avail:pointer; {allocation}
+var p:pointer; {the new node}
+begin p:=avail; {get top location in |avail| stack}
+if p<>null then avail:=link(p) {and pop it off}
+else if mem_end<mem_size then {or go into virgin territory}
+  begin incr(mem_end); p:=mem_end;
+  end
+else overflow('memory');
+link(p):=null; get_avail:=p;
+end;
+
+@ Conversely, word |p| can be recycled by calling |free_avail(p)|.
+(\.{PROFILE} doesn't bother to free up everything it could, but it does
+use |free_avail| for things that are likely to consume a lot of memory.)
+
+@d free_avail(#)=={liberation}
+  begin link(#):=avail; avail:=#;
+  end
+
+@* Identifiers.
+There's a separate memory for identifier names; such names will never
+be deleted after they've been inserted. \.{PROFILE}'s name memory is implemented
+essentially as \TeX's string pool: Name number~|k| consists of characters
+|id_start[k]| through |id_start[k+1]-1|, inclusive, of the |id_pool| array.
+Uppercase letters have been converted to their lowercase counterparts
+before being stored in |id_pool|.
+
+@<Types...@>=
+@!id_pointer=0..max_names;
+@!pool_pointer=0..pool_size;
+
+@ The variables |pool_ptr| and |id_ptr| are used to allocate space in
+|id_pool| and |id_start|, respectively.
+
+The ``meaning'' of identifier number |k| is stored in |equiv[k]|;
+it consists of two halfwords called |id_code(k)| and |id_aux(k)|.
+
+@d length(#)==(id_start[#+1]-id_start[#])
+@d id_code(#)==equiv[#].lh
+@d id_aux(#)==equiv[#].rh
+
+@<Glob...@>=
+@!id_pool:packed array[pool_pointer] of ASCII_code; {the characters}
+@!id_start:array[id_pointer] of pool_pointer; {the starting pointers}
+@!pool_ptr:pool_pointer; {the first unused position in |id_pool|}
+@!id_ptr:id_pointer; {the highest used position in |id_start|}
+@!equiv:array[id_pointer] of two_halves; {the equivalents}
+
+@ The first 128 ``identifiers'' are one character long, and they represent
+themselves.  (This is an exception to the lowercase-only convention stated
+earlier.)  Undefined entries have |id_code=undefined| and |id_aux=0|.
+
+@d undefined=34 {this should be greater than reserved word codes that follow!}
+
+@<Set init...@>=
+id_code(0):=undefined; id_aux(0):=0; {set up |equiv[0]|}
+for i:=0 to 127 do
+  begin id_start[i]:=i; id_pool[i]:=i; equiv[i]:=equiv[0];
+  end;
+id_start[128]:=128; id_ptr:=128; pool_ptr:=128;
+
+@ A hash table is used to help locate identifiers that are more than
+one character long. If |hash[k]| is nonzero, it points to such an identifier.
+
+Two global variables called |id_first| and |id_loc| are used to specify
+buffer locations when an identifier needs to be located.
+
+@<Glob...@>=
+@!hash:array[id_pointer] of id_pointer; {hash table for linear probing}
+@!id_first,id_loc:0..buf_size; {starting and ending locations in |buffer|}
+
+@ @<Set init...@>=
+for i:=0 to max_names do hash[i]:=0;
+
+@ The |id_lookup| procedure finds a given identifier and returns a pointer
+to its index in |id_start|. The identifier to be found appears in
+locations |id_first| through |id_loc-1|, inclusive, of the |buffer| array.
+
+It is possible to overflow the pool capacity or the name capacity. But
+the hash table will never fill up, because the first 128 names have been
+kept out of that table.
+
+@p function id_lookup:id_pointer; {finds the current identifier}
+label found;
+var i:0..buf_size; {index into |buffer|}
+@!h:id_pointer; {hash code}
+@!k:pool_pointer; {index into |id_pool|}
+@!l:0..buf_size; {length of the given identifier}
+@!p:id_pointer; {where it is being sought}
+begin l:=id_loc-id_first;
+if l=1 then p:=buffer[id_first]
+else  begin @<Compute the hash code, |h|@>;
+  @<Compute the id pointer, |p|@>;
+  end;
+id_lookup:=p;
+end;
+
+@ A simple hash code is used: If the sequence of
+ASCII codes is $c_1c_2\ldots c_m$, its hash value will be
+$$(2^{n-1}c_1+2^{n-2}c_2+\cdots+c_n)\,\bmod\,|max_names|.$$
+(That's why |max_names| is supposed to be prime.)
+
+@<Compute the hash...@>=
+h:=buffer[id_first]; i:=id_first+1;
+while i<id_loc do
+  begin h:=(h+h+buffer[i]) mod max_names; incr(i);
+  end
+
+@ @<Compute the id...@>=
+loop@+  begin p:=hash[h];
+  if p=0 then @<Enter a new name into the hash table at position~|h|
+      and |goto found|@>;
+  if length(p)=l then @<Compare name |p| with the current identifier;
+      |goto found| if equal@>;
+  if h=0 then h:=max_names@+else decr(h);
+  end;
+found:
+
+@ @<Enter a new name...@>=
+begin if pool_ptr+l>pool_size then overflow('name pool');
+if id_ptr=max_names then overflow('names');
+i:=id_first;
+while i<id_loc do
+  begin id_pool[pool_ptr]:=buffer[i]; incr(i); incr(pool_ptr);
+  end;
+p:=id_ptr; hash[h]:=p; equiv[p]:=equiv[0]; {the new identifier is |undefined|}
+incr(id_ptr); id_start[id_ptr]:=pool_ptr; goto found;
+end
+
+@ @<Compare name |p|...@>=
+begin i:=id_first; k:=id_start[p];
+while (i<id_loc)and(buffer[i]=id_pool[k]) do
+  begin incr(i); incr(k);
+  end;
+if i=id_loc then goto found; {all characters agree}
+end
+
+@* Initializing the table of reserved words.
+The reserved words of \PASCAL\ (e.g., `\&{begin}') are given distinctive
+|id_code| values (e.g., `|begin_code|'). All reserved words whose code
+value is between |min_blank_left| and |max_blank_left| will be preceded
+by a blank space in \.{PROFILE}'s output; all reserved words whose code
+value is between |min_blank_right| and |max_blank_right| will be
+followed by a blank space.
+
+@d array_code=1  { \&{array} }
+@d file_code=2  { \&{file} }
+@d nil_code=3  { \&{nil} }
+@d set_code=4  { \&{set} }
+@d end_code=5  { \&{end} }
+@#
+@d min_blank_left=6
+@d do_code=6  { \&{do} }
+@d then_code=7  { \&{then} }
+@#
+@d min_blank_right=8
+@d and_code=8  { \&{and} }
+@d div_or_mod_code=9  { \&{div}, \&{mod} }
+@d to_or_downto_code=10 { \&{downto}, \&{to} }
+@d in_code=11 { \&{in} }
+@d of_code=12 { \&{of} }
+@d or_code=13 { \&{or} }
+@d max_blank_left=13
+@#
+@d begin_code=14 { \&{begin} }
+@d case_code=15 { \&{case} }
+@d const_code=16 { \&{const} }
+@d else_code=17 { \&{else} }
+@d for_code=18 { \&{for} }
+@d function_code=19 { \&{function} }
+@d procedure_code=function_code+1 { \&{procedure} }
+@d goto_code=21 { \&{goto} }
+@d if_code=22 { \&{if} }
+@d label_code=23 { \&{label} }
+@d not_code=24 { \&{not} }
+@d packed_code=25 { \&{packed} }
+@d program_code=26 { \&{program} }
+@d record_code=27 { \&{record} }
+@d repeat_code=28 { \&{repeat} }
+@d type_code=29 { \&{type} }
+@d until_code=30 { \&{until} }
+@d var_code=31 { \&{var} }
+@d while_code=32 { \&{while} }
+@d with_code=33 { \&{with}---not currently implemented }
+@d max_blank_right=33
+@d aa=34 {the next code defined below will be |aa+1|}
+  {note that |@!undefined=34|}
+
+@ We have to get \PASCAL's reserved words into the hash table, and the
+simplest way to do this is to insert them every time \.{PROFILE} is run.
+A few macros permit us to do the initialization with a compact program.
+
+@d sid_tail_tail(#)==id_aux(cur_name):=#
+@d sid_tail(#)==id_code(cur_name):=#;sid_tail_tail
+@d sid9(#)==buffer[9]:=#;cur_name:=id_lookup;sid_tail
+@d sid8(#)==buffer[8]:=#;sid9
+@d sid7(#)==buffer[7]:=#;sid8
+@d sid6(#)==buffer[6]:=#;sid7
+@d sid5(#)==buffer[5]:=#;sid6
+@d sid4(#)==buffer[4]:=#;sid5
+@d sid3(#)==buffer[3]:=#;sid4
+@d sid2(#)==buffer[2]:=#;sid3
+@d sid1(#)==buffer[1]:=#;sid2
+@d id2==id_first:=8; sid8
+@d id3==id_first:=7; sid7
+@d id4==id_first:=6; sid6
+@d id5==id_first:=5; sid5
+@d id6==id_first:=4; sid4
+@d id7==id_first:=3; sid3
+@d id8==id_first:=2; sid2
+@d id9==id_first:=1; sid1
+
+@<Globals...@>=
+@!cur_name:id_pointer; {points to the identifier just inserted}
+
+@ The intended use of the macros above might not be immediately obvious,
+but the riddle is answered by the following:
+
+@<Set up all the reserved words and predefined identifiers@>=
+id_loc:=10; {the longest word has 9 characters}
+id3("a")("n")("d")(and_code)(0);@/
+id5("a")("r")("r")("a")("y")(array_code)(0);@/
+id5("b")("e")("g")("i")("n")(begin_code)(0);@/
+id4("c")("a")("s")("e")(case_code)(0);@/
+id5("c")("o")("n")("s")("t")(const_code)(0);@/
+id3("d")("i")("v")(div_or_mod_code)(0);@/
+id2("d")("o")(do_code)(0);@/
+id6("d")("o")("w")("n")("t")("o")(to_or_downto_code)(1);@/
+id4("e")("l")("s")("e")(else_code)(0);@/
+id3("e")("n")("d")(end_code)(0);@/
+id4("f")("i")("l")("e")(file_code)(0);@/
+id3("f")("o")("r")(for_code)(0);@/
+id8("f")("u")("n")("c")("t")("i")("o")("n")(function_code)(0);@/
+id4("g")("o")("t")("o")(goto_code)(0);@/
+id2("i")("f")(if_code)(0);@/
+id2("i")("n")(in_code)(0);@/
+id5("l")("a")("b")("e")("l")(label_code)(0);@/
+id3("m")("o")("d")(div_or_mod_code)(1);@/
+id3("n")("i")("l")(nil_code)(0);@/
+id3("n")("o")("t")(not_code)(0);@/
+id2("o")("f")(of_code)(0);@/
+id2("o")("r")(or_code)(0);@/
+id6("p")("a")("c")("k")("e")("d")(packed_code)(0);@/
+id9("p")("r")("o")("c")("e")("d")("u")("r")("e")(procedure_code)(0);@/
+id7("p")("r")("o")("g")("r")("a")("m")(program_code)(0);@/
+id6("r")("e")("c")("o")("r")("d")(record_code)(0);@/
+id6("r")("e")("p")("e")("a")("t")(repeat_code)(0);@/
+id3("s")("e")("t")(set_code)(0);@/
+id4("t")("h")("e")("n")(then_code)(0);@/
+id2("t")("o")(to_or_downto_code)(0);@/
+id4("t")("y")("p")("e")(type_code)(0);@/
+id5("u")("n")("t")("i")("l")(until_code)(0);@/
+id3("v")("a")("r")(var_code)(0);@/
+id5("w")("h")("i")("l")("e")(while_code)(0);@/
+id4("w")("i")("t")("h")(with_code)(0);@/
+
+@ A large number of other predeclared identifiers also need to be entered
+into the hash table. Most of these will be discussed later; the
+word |forward| is entered here:
+
+@<Set up all...@>=
+id7("f")("o")("r")("w")("a")("r")("d")(undefined)(0); fwd_loc:=cur_name;
+
+@ @<Glob...@>=
+@!fwd_loc:id_pointer; {location of |forward| in the lookup table}
+
+@* Representation of types.
+The rich type structures of \PASCAL\ must be represented inside of \.{PROFILE}
+since it is necessary to understand all of the identifiers and variables
+that come along. We represent a type by a memory word whose |info| field
+identifies a particular sort of type; the |link| field is an auxiliary argument
+in case the type has further structure.
+
+The rules for each type are given below, assuming that |t| points to a
+memory word representing the type in question. Predefined types are placed
+into |mem| locations |real_loc|, etc.
+
+@<Glob...@>=
+@!real_loc:pointer; {where |real| type lives in |mem|}
+@!char_loc:pointer; {|char| type}
+@!int_loc:pointer; {|integer| type}
+@!bool_loc:pointer; {|boolean| type}
+@!text_loc:pointer; {|text| type}
+@!nil_loc:pointer; {|nil| type}
+@!file_loc:pointer; {|file| type}
+@!string_loc:pointer; {|string| type}
+@!zero_loc:pointer; {the value 0}
+@!one_loc:pointer; {the value 1}
+@!extra_loc:pointer; {extra parameters}
+
+@ The |initialize| procedure is declared after |get_avail|, and we have
+already specified the initialization of |get_avail|; therefore it's
+possible to allocate words of |mem| as part of the work of initialization.
+Pointer variables |p| and |q| are used for this purpose.
+
+@<Local variables for init...@>=
+@!p,@!q:pointer; {used to construct predeclared information}
+
+@ First come the standard simple types |real| and |char|, which are represented
+by |info(t)=real_type| and |info(t)=char_type|, respectively; in both cases
+|link(t)=null|.
+
+A subrange type of integers |a..b| is represented by |info(t)=int_type|,
+|val(info(link(t)))=a|, and |val(link(link(t)))=b|. An enumerated type
+such as $(\\{red},\\{yellow},\\{blue})$ is effectively replaced by
+a subrange type $\\{red}\to\\{blue}$, accompanied by the constant definitions
+$\\{red}=0$, $\\{yellow}=1$, $\\{blue}=2$. The standard simple types
+|integer| and |boolean| are treated as |-max_int..max_int| and |(false,true)|,
+respectively.
+
+@d real_type=1 {identifies |real| type}
+@d char_type=2 {identifies |char| type}
+@d int_type=3 {identifies integer subrange type}
+
+@<Set init...@>=
+real_loc:=get_avail; info(real_loc):=real_type;@/
+char_loc:=get_avail; info(char_loc):=char_type;@/
+@#
+int_loc:=get_avail; info(int_loc):=int_type; p:=get_avail; link(int_loc):=p;@/
+q:=get_avail; val(q):=-max_int; info(p):=q;@/
+q:=get_avail; val(q):=max_int; link(p):=q;@/
+@#
+bool_loc:=get_avail; info(bool_loc):=int_type; p:=get_avail;
+link(bool_loc):=p;@/
+zero_loc:=get_avail; val(zero_loc):=0; info(p):=zero_loc;@/
+one_loc:=get_avail; val(one_loc):=1; link(p):=one_loc;
+
+@ Structured types are represented by |info(t)=array_type|, |record_type|,
+|set_type|, or |file_type| codes, or these same codes plus~1 if the
+structure is \&{packed}. The value of |link(t)| is |null| if the type is
+not further specified (e.g., if a standard procedure takes any \&{file}
+as a parameter).
+
+Otherwise, in the case of an array, |info(link(t))| points to the index
+type (which will be a special case of |int_type| or |char_type|), and
+|link(link(t))| points to the component type (which might be another
+array).
+
+In the case of a record, we retain only the names and types of fields that
+might be used, not the particular way they might occur as variants.
+For example,
+$$\vbox{\halign{#\hfill\cr
+\&{record} |a:real|;\cr
+\quad\&{case} |b:boolean| \&{of}\cr
+\quad\\{false}: (\ignorespaces
+  |c,d:integer|; \&{case} \\{integer} of |0:(e:real)|);\cr
+\quad\\{true}: (\ignorespaces
+  |f:packed file of set of char|)\cr
+\quad\&{end}\cr}}$$
+will have the same representation as
+$$\vbox{\halign{#\hfill\cr
+\&{record} |a:real|; |b:boolean|; |c,d:integer|;\cr
+\quad |e:real|; |f:packed file of set of char|;\cr
+\quad\&{end}\cr}}$$
+inside of \.{PROFILE}. A list of fields starts at |link(t)|. If |u| points
+to a node of this field list, |info(info(u))| points to the field name,
+|link(info(u))| to the field type, and |link(u)| to the next node in the list.
+
+For set and file types, |link(t)| points to the base type involved. Thus,
+for example, a |packed file of set of char| would have
+|info(t)=packed_file_type|, |info(link(t))=set_type|, and
+|info(link(link(t)))=char_type|. The standard file type |text| is
+considered to yield a |file of char|, as far as \.{PROFILE} is concerned.
+
+A more-or-less standard type |string| is introduced to represent
+`\ignorespaces|packed array[1..n] of char|\unskip'
+where |n| is unspecified.
+
+@d array_type=4
+@d packed_array_type=array_type+1
+@d record_type=6
+@d packed_record_type=record_type+1
+@d set_type=8
+@d packed_set_type=set_type+1
+@d file_type=10
+@d packed_file_type=file_type+1
+
+@<Set init...@>=
+text_loc:=get_avail; info(text_loc):=file_type; link(text_loc):=char_loc;@/
+file_loc:=get_avail; info(file_loc):=file_type; {|link(file_loc)=null|}
+string_loc:=get_avail; info(string_loc):=packed_array_type;
+p:=get_avail; link(string_loc):=p;
+q:=get_avail; info(p):=q; link(p):=char_loc;
+p:=get_avail; info(q):=int_type; link(q):=p;
+info(p):=one_loc; {|link(q)=null|}
+
+@ Finally, a pointer type like `|^|\\{person}' is represented by
+|info(t)=pointer_type|, with |link(t)| pointing to the identifier,
+`\\{person}'. Or |link(t)=null|, in the case of the type corresponding
+to the standard pointer value |nil|.
+
+@d pointer_type=12
+
+@<Set init...@>=
+nil_loc:=get_avail; info(nil_loc):=pointer_type;
+
+@* Identifier interpretation.
+The equivalent of each identifier consists of two halfwords called the
+|id_code| and |id_aux|, as we have seen. When an identifier is declared,
+its equivalent is redefined; and the old value is saved for future restoration
+if this declaration is not in the outer block.
+
+The |id_code| might be |undefined| or it might be one of the codes like
+|while_code| for a reserved word; or it might be one of the codes for
+non-reserved words that we are about to discuss.
+
+@ A constant declaration like `\&{const} |a=3|' will be recorded as
+|id_code=small_const| and |id_aux=3|. But if the constant is negative
+or greater than 9999, the |id_code| will be |int_const| and the |id_aux|
+will point to a |mem| word whose |val| is the constant value.
+
+Real constants simply have |id_code=real_const| and |id_aux=null|;
+string constants simply have |id_code=string_const| and |id_aux| the
+string length. \.{PROFILE} doesn't keep track of the precise values
+of real and string constants.
+
+A type definition like `\&{type} |b=array[1..3] of char|' will be
+recorded as |id_code=defined_type|; |id_aux| will point to the type
+representation (in this case a node whose |info| is |array_type| and
+whose |link| points to a node whose |info| points to a type
+specification of |1..3| and whose link is |char_loc|).
+
+A \&{var} declaration like `\&{var} |c:integer|' will be recorded as
+|id_code=variable| and |id_aux=int_loc|.
+
+@d min_case_label=aa+1 {the following codes have been carefully ordered!}
+@d small_const=aa+1
+@d int_const=aa+2
+@d plus_or_minus=aa+3 {this occurs in front of case-label constants}
+@d string_const=aa+4
+@d bool_const=aa+5
+@d max_case_label=aa+5
+@d real_const=aa+6
+@d defined_type=aa+7
+@d variable=aa+8
+
+@<Set up all...@>=
+id5("f")("a")("l")("s")("e")(bool_const)(0);@/
+id4("t")("r")("u")("e")(bool_const)(1);@/
+p:=get_avail; val(p):=max_int;
+id6("m")("a")("x")("i")("n")("t")(int_const)(p);@/
+id7("i")("n")("t")("e")("g")("e")("r")(defined_type)(int_loc);@/
+id7("b")("o")("o")("l")("e")("a")("n")(defined_type)(bool_loc);@/
+id4("r")("e")("a")("l")(defined_type)(real_loc);@/
+id4("c")("h")("a")("r")(defined_type)(char_loc);@/
+id6("s")("t")("r")("i")("n")("g")(defined_type)(string_loc);@/
+id4("t")("e")("x")("t")(defined_type)(text_loc);@/
+id5("i")("n")("p")("u")("t")(variable)(text_loc);@/
+id6("o")("u")("t")("p")("u")("t")(variable)(text_loc);@/
+id3("t")("t")("y")(variable)(text_loc);@/
+id6("o")("t")("h")("e")("r")("s")(small_const)(6969);
+  {label for |@!othercases|\unskip}
+
+@ @<Glob...@>=
+@!p,@!q,@!r:pointer; {for list manipulation}
+
+@ A procedure declaration causes |id_code| to be |procedure_id|, and
+|id_aux| will point to a list of nodes that specify the parameters.
+A function declaration is similar, but |id_aux| points to a word whose
+|info| points to the result type and whose |link| points to the
+parameter specification list.
+
+For each node |q| on the parameter specification list, |info(q)| points
+to a node whose |info| and |link| fields correspond to the |id_code|
+and |id_aux| of the parameter itself.
+
+This is best explained by an example. Consider the procedure heading
+$$\hbox{\&{procedure} |b(function f(x:char):boolean; x,y:integer;
+  var@?z:real)|.}$$
+This defines the identifier |b|, and (one level deeper) also |f|, |x|,
+|y|, and |z|. The |x| inside |f| is a dummy name of no importance.
+The |id_code| for |f| will be |function_id|; and its |id_aux| will point
+to~|p|, where |info(p)=bool_loc| and |link(p)=q|, and where |info(q)=r|
+and |link(q)=null|, and where |info(r)=variable| and |link(r)=char_loc|.
+The |id_code| for |x| and |y| will be |variable| and the |id_aux| will
+be |int_loc|. The |id_code| for |z| will be |var_param| and the |id_aux|
+will be |real_loc|. Finally, the |id_code| for |b| will be |procedure_id|,
+and its |id_aux| will point to a list of four items, pointing to nodes
+that copy the |equiv| table entries of |f|, |x|, |y|, and~|z|.
+
+If we had a more complex definition like
+$$\hbox{\&{procedure} \\{big}(\&{procedure} $b$ [as above])}$$
+the data structure for |b| would be the same, but no declarations of
+|f|, |x|, |y|, or~|z| would be made.
+
+@d function_id=aa+9
+@d procedure_id=function_id+1
+@d terminal_procedure_id=procedure_id+1 {declared with `\.{\{\^\}}'}
+@d var_param=aa+12
+
+@ As an example of procedure representation, let us put |call_i| into
+the symbol table. This is a nonstandard procedure available in
+Hedrick's \PASCAL; it calls an arbitrary monitor routine.
+The calling sequence is essentially the same as if the declaration
+had been
+$$\hbox{|procedure call_i(c,lh,rh:integer;var@?v,s:integer)|}$$
+and \.{PROFILE} adds no extra run time for execution of |call_i|.
+
+@<Set up all...@>=
+q:=get_avail; info(q):=variable; link(q):=int_loc; {integer parameter}
+r:=get_avail; {this will be the argument list head}
+p:=r; info(p):=q; link(p):=get_avail; {first argument}
+p:=link(p); info(p):=q; link(p):=get_avail; {second argument}
+p:=link(p); info(p):=q; link(p):=get_avail; {third argument}
+q:=get_avail; info(q):=var_param; link(q):=int_loc; {\&{var} integer parameter}
+p:=link(p); info(p):=q; link(p):=get_avail; {fourth argument}
+p:=link(p); info(p):=q; {fifth and last argument}
+id5("c")("a")("l")("l")("i")(procedure_id)(r);
+
+@ Standard procedures like `|read|' can have two other sorts of parameters
+not available to ordinary programmers. If the |info| field of an argument
+is |optional_file_param|, it means that a default file variable will be inserted
+as an argument if the procedure call does not have a file argument
+in the current position; the |link| field contains the runtime estimate.
+If the |info| field is |spec_param|, the argument is allowed to be of any
+type; in this case the |link| field points to a list of extra runtime
+weights that apply if the actual parameter is of type |char|, |integer|,
+|real|, \&{array}, or other, respectively. (These weights include
+the |store_cost|; and if the first parameter is a |spec_param|, the weight
+also includes the calling overhead.) A |spec_param| is optional;
+if |info(info(p))=spec_param| in a procedure's argument list, then
+|link(p)=p|; i.e., the argument list is arbitrarily long.
+
+If the result type of a function is |null|, the function returns the
+type of its last argument.
+
+@d optional_file_param=aa+13
+@d spec_param=aa+14
+@d bb=aa+14 {the next code defined below will be |bb+1|}
+
+@ Here are the standard functions of \PASCAL, and a
+few nonstandard ones needed for system programming (available in Hedrick's
+\PASCAL\ system). We set things up so that, e.g., |abs|, looks like a function
+call (even though the compiler expands it in-line).
+
+@d constant_spec(#)==
+  r:=get_avail; q:=get_avail; info(q):=spec_param; info(r):=q; link(r):=r;
+  p:=get_avail; link(q):=p; link(p):=p; info(p):=#
+@d file_spec(#)==
+  p:=get_avail; q:=get_avail; info(p):=q; link(p):=extra_loc;
+  info(q):=optional_file_param; link(q):=#
+
+@<Set up all...@>=
+constant_spec(fetch_cost+store_cost); extra_loc:=r;
+constant_spec(unary_cost); {now |r| represents |spec_param| with |unary_cost|}
+p:=get_avail; info(p):=null; link(p):=r; {unspecified result type}
+id3("a")("b")("s")(function_id)(p);@/
+id4("p")("r")("e")("d")(function_id)(p);@/
+id4("s")("u")("c")("c")(function_id)(p);@/
+p:=get_avail; info(p):=bool_loc; link(p):=r; {|boolean| result}
+id3("o")("d")("d")(function_id)(p);@/
+constant_spec(real_mult_cost);
+p:=get_avail; info(p):=null; link(p):=r; {unspecified result type}
+id3("s")("q")("r")(function_id)(p);@/
+constant_spec(ord_chr_cost);
+p:=get_avail; info(p):=int_loc; link(p):=r; {|integer| result}
+id3("o")("r")("d")(function_id)(p);@/
+p:=get_avail; info(p):=char_loc; link(p):=r; {|char| result}
+id3("c")("h")("r")(function_id)(p);@/
+constant_spec(int_real_cost);
+p:=get_avail; info(p):=int_loc; link(p):=r; {|integer| result}
+id5("r")("o")("u")("n")("d")(function_id)(p);@/
+id5("t")("r")("u")("n")("c")(function_id)(p);@/
+constant_spec(transcendental_cost);
+p:=get_avail; info(p):=real_loc; link(p):=r; {|real| result}
+id6("a")("r")("c")("t")("a")("n")(function_id)(p);@/
+id3("s")("i")("n")(function_id)(p);@/
+id3("c")("o")("s")(function_id)(p);@/
+id3("e")("x")("p")(function_id)(p);@/
+id2("l")("n")(function_id)(p);@/
+id4("s")("q")("r")("t")(function_id)(p);@/
+constant_spec(eof_cost);
+p:=get_avail; info(p):=bool_loc; link(p):=r; {|boolean| result}
+id3("e")("o")("f")(function_id)(p);@/
+id4("e")("o")("l")("n")(function_id)(p);@/
+q:=get_avail; info(q):=file_loc;
+p:=get_avail; info(p):=int_loc; link(p):=q; {maps |file| to |integer|}
+id6("c")("u")("r")("p")("o")("s")(function_id)(p);@/
+
+@ Similarly, here are the standard procedures.
+
+@<Set up all...@>=
+constant_spec(new_cost);
+id3("n")("e")("w")(procedure_id)(r);@/
+id7("d")("i")("s")("p")("o")("s")("e")(procedure_id)(r);@/
+file_spec(open_cost);@/
+id5("r")("e")("s")("e")("t")(procedure_id)(p);@/
+id7("r")("e")("w")("r")("i")("t")("e")(procedure_id)(p);@/
+file_spec(close_cost);@/
+id5("c")("l")("o")("s")("e")(procedure_id)(r);@/
+file_spec(0);@/
+id5("b")("r")("e")("a")("k")(procedure_id)(p);@/
+file_spec(break_in_cost);@/
+id7("b")("r")("e")("a")("k")("i")("n")(procedure_id)(p);@/
+constant_spec(get_put_cost);
+id3("g")("e")("t")(procedure_id)(r);@/
+id3("p")("u")("t")(procedure_id)(r);@/
+constant_spec((pack_cost div 3));@/
+id4("p")("a")("c")("k")(procedure_id)(r);@/
+id6("u")("n")("p")("a")("c")("k")(procedure_id)(r);@/
+p:=get_avail; info(p):=optional_file_param; link(p):=0;
+r:=get_avail; info(r):=p; p:=get_avail; link(r):=p; link(p):=p;
+q:=get_avail; info(p):=q; info(q):=spec_param;@/
+link(q):=get_avail; q:=link(q); info(q):=char_string_cost;@/
+link(q):=get_avail; q:=link(q); info(q):=int_string_cost;@/
+link(q):=get_avail; q:=link(q); info(q):=real_string_cost;@/
+link(q):=get_avail; q:=link(q); info(q):=array_string_cost;@/
+link(q):=get_avail; q:=link(q); info(q):=int_string_cost;@/
+id4("r")("e")("a")("d")(procedure_id)(r);@/
+id6("r")("e")("a")("d")("l")("n")(procedure_id)(r);@/
+id5("w")("r")("i")("t")("e")(procedure_id)(r);@/
+id7("w")("r")("i")("t")("e")("l")("n")(procedure_id)(r);@/
+id4("p")("a")("g")("e")(procedure_id)(r);@/
+
+@ Identifier equivalents are saved and restored by means of
+`|save_stack|'. The variable |save_ptr| points to the first unused
+location on this stack; and |save_ptr=save_base+2n|, when |n|
+equivalents are to be restored at the end of the current block.
+Location |save_base-1| contains the previous value of |save_base|,
+if |save_base>0|; we have |save_base>0| if and only if definitions
+are to be saved, i.e., if and only if we are not making a definition
+at the outermost level. A saved definition occupies two words on the save stack:
+First comes the old value of |equiv[n]| and then the value of |n|.
+
+@<Glob...@>=
+@!save_stack:array[0..save_size] of memory_word;
+@!save_ptr:0..save_size; {number of locations used in |save_stack|}
+@!save_base:0..save_size; {bottom of current level}
+
+@ The three operations we need for |save_stack| maintenance are really simple.
+
+@p procedure save(n:id_pointer);
+begin if save_base>0 then
+  begin if save_ptr+2>save_size then overflow('save stack');
+  save_stack[save_ptr].hh:=equiv[n];
+  save_stack[save_ptr+1].int:=n;
+  save_ptr:=save_ptr+2;
+  end;
+end;
+@#
+procedure push_save_stack;
+begin if save_ptr+1>save_size then overflow('save stack');
+save_stack[save_ptr].int:=save_base;
+incr(save_ptr); save_base:=save_ptr;
+end;
+@#
+procedure unsave;
+var n:id_pointer;
+begin  while save_ptr>save_base do
+    begin save_ptr:=save_ptr-2;
+    n:=save_stack[save_ptr+1].int;
+    equiv[n]:=save_stack[save_ptr].hh;
+    end;
+decr(save_ptr); save_base:=save_stack[save_ptr].int;
+end;
+
+@* Frequencies and weights.
+An operation of weight $w$ that is performed $f$ times contributes a total
+of $w\cdot f$ to the running time. Both $w$ and $f$ are integers, but the
+product $w\cdot f$ will be recorded as a floating-point quantity. (This
+avoids the need for multiple precision arithmetic; after all, the weights
+are only approximate.)
+
+If we are currently in \.{WEB} sections $m_1$, \dots, $m_k$ (from the
+``outside in''), the product $w\cdot f$ is be added to the explicit cost
+of section $m_k$ and to the implicit cost of sections $m_1$, \dots, $m_{k-1}$.
+By convention, $m_1$ is always zero; hence the dummy section~0 will be
+credited with all accumulated costs. A stack is maintained with
+|info(sec_ptr)=@t$m_k$@>|, |info(link(sec_ptr))=@t$m_{k-1}$@>|, etc.
+
+@<Glob...@>=
+@!impl_cost,@!expl_cost:array[0..max_modules] of real;
+  {accumulated implicit and explicit runtime estimates}
+@!static_weight:array[0..max_modules] of integer;
+  {accumulated weight without regard to frequency}
+@!max_section:0..max_modules;
+  {maximum section number whose weight has been recorded}
+@!sec_ptr:pointer; {top of the stack of current section numbers}
+
+@ @<Set init...@>=
+for i:=0 to max_modules do
+  begin impl_cost[i]:=0.0; expl_cost[i]:=0.0; static_weight[i]:=0;
+  end;
+sec_ptr:=get_avail; info(sec_ptr):=0; max_section:=0;
+
+@ The stack of section numbers is kept up to date by two fairly simple
+procedures. Mismatched numbers (e.g., \.{\{123:\}\{:124\}}) are not permitted.
+
+@p procedure push_section(@!m:halfword);
+var p:pointer;
+begin if m>max_section then
+  begin if m>max_modules then overflow('section');
+  max_section:=m;
+  end;
+p:=get_avail; info(p):=m; link(p):=sec_ptr; sec_ptr:=p;
+end;
+@#
+procedure pop_section(@!m:halfword);
+var p:pointer;
+begin if (m=0)or(info(sec_ptr)<>m) then
+  fatal_error('WEB sections don''t match, should be ',info(sec_ptr):1);
+@.WEB sections don't match@>
+p:=sec_ptr; sec_ptr:=link(p); free_avail(p);
+end;
+
+@ If \.{PROFILE}'s frequency assumptions are correct, the program component that
+it is currently processing was executed |cur_freq| times.
+
+Another global quantity, |out_wt|, contains the total weight that has
+not yet been reported in the |output| file.
+
+@<Glob...@>=
+@!cur_freq:integer; {the current frequency}
+@!out_wt: integer; {accumulated weight to show on the next output line}
+
+@ @<Set init...@>=
+cur_freq:=0; out_wt:=0;
+
+@ Here is the procedure that multiplies the current frequency by a given
+weight and adds it to all appropriate subtotals.
+
+@p procedure add_weight(@!w:integer);
+var p,@!q: pointer; {for list manipulation}
+@!wf:real; {weight times frequency}
+begin out_wt:=out_wt+w;
+static_weight[info(sec_ptr)]:=static_weight[info(sec_ptr)]+w;
+wf:=w; wf:=wf*cur_freq;
+expl_cost[info(sec_ptr)]:=expl_cost[info(sec_ptr)]+wf;@/
+p:=link(sec_ptr);
+while p<>null do
+  begin impl_cost[info(p)]:=impl_cost[info(p)]+wf;
+  p:=link(p);
+  end;
+end;
+
+@ After the weights have all been gathered, it's time to massage them
+a bit and sort them, then publish the output.
+
+@<Glob...@>=
+@!h,@!i,@!j,@!k,@!nn:0..max_modules; {variables to control sorting, etc.}
+@!x:array[0..max_modules] of 0..max_modules; {sections being sorted}
+@!factor:real; {multiply by this to get percentage of total weight}
+@!c:real; {temporary placeholder for a sort key}
+@!m:0..max_modules; {ditto}
+
+@ @<Output the accumulated statistics@>=
+begin for k:=0 to max_section do impl_cost[k]:=impl_cost[k]+expl_cost[k];
+if impl_cost[0]=0.0 then
+  begin print_nl('Total weight was zero.'); mark_harmless;
+@.Total weight was...@>
+  end
+else  begin factor:=100.0/impl_cost[0];
+  page; write_ln('Accumulated costs of individual WEB sections:'); write_ln;
+  write_ln('secno','implicit cost':17,'%  ':9,'explicit cost':17,'%  ':9,
+    'static weight');
+  write_ln;
+  for k:=0 to max_section do
+   if (impl_cost[k]<>0.0)or(static_weight[k]<>0) then
+    write_ln(k:5,impl_cost[k]:17:1,factor*impl_cost[k]:9:4,
+      expl_cost[k]:17:1,factor*expl_cost[k]:9:4,
+      static_weight[k]:13);
+  print_nl('Sorting...'); update_terminal;
+  @<Sort the sections in order of implicit cost@>;
+  page; write_ln('WEB sections in order of implicit cost:'); write_ln;
+  for k:=1 to nn do write_ln(x[k]:5,impl_cost[x[k]]:17:1,
+    factor*impl_cost[x[k]]:9:4);
+  @<Sort the sections in order of explicit cost@>;
+  page; write_ln('WEB sections in order of explicit cost:'); write_ln;
+  for k:=1 to nn do write_ln(x[k]:5,expl_cost[x[k]]:17:1,
+    factor*expl_cost[x[k]]:9:4);
+  print('Done.');
+  end;
+end
+
+@ Standard ``Shellsort'' is used [{\sl Art of Computer Programming},
+Algorithm 5.2.1D].
+
+@<Sort the sections in order of impl...@>=
+nn:=0;
+for k:=0 to max_section do if impl_cost[k]<>0.0 then
+  begin incr(nn); x[nn]:=k;
+  end;
+@<Choose starting increment, |h|, for Shellsort@>;
+while h>0 do
+  begin for j:=h+1 to nn do
+    begin i:=j-h; m:=x[j]; c:=impl_cost[m];
+    if (c>impl_cost[x[i]])or((c=impl_cost[x[i]])and(m<x[i])) then
+      repeat x[i+h]:=x[i]; x[i]:=m;
+      if i>h then i:=i-h;
+      until (c<=impl_cost[x[i]])and((c<>impl_cost[x[i]])or(m>=x[i]));
+    end;
+  h:=h div 3;
+  end
+
+@ (See 5.2.1-(8) in {\sl The Art of Computer Programming}.)
+
+@<Choose starting increment...@>=
+h:=1; while h<nn do h:=3*h+1; h:=h div 9; if h=0 then h:=1;
+
+@ @<Sort the sections in order of expl...@>=
+nn:=0;
+for k:=0 to max_section do if expl_cost[k]<>0.0 then
+  begin incr(nn); x[nn]:=k;
+  end;
+@<Choose starting increment, |h|, for Shellsort@>;
+while h>0 do
+  begin for j:=h+1 to nn do
+    begin i:=j-h; m:=x[j]; c:=expl_cost[m];
+    if (c>expl_cost[x[i]])or((c=expl_cost[x[i]])and(m<x[i])) then
+      repeat x[i+h]:=x[i]; x[i]:=m;
+      if i>h then i:=i-h;
+      until (c<=expl_cost[x[i]])and((c<>expl_cost[x[i]])or(m>=x[i]));
+    end;
+  h:=h div 3;
+  end
+
+@* Low level output.
+A queue of data waiting to be output is maintained in a linked list that begins
+at location |link(head)| and ends at |tail|; the queue is empty if |head=tail|.
+We have |link(tail)=null| at all times.
+
+The entries in this list are either commands or identifier pointers;
+a command is recognized by the fact that it is |<=max_command|. Some commands
+take arguments, in which case the argument follows in the queue.
+
+We shall use the term ``translation list'' to refer to a sequence of
+commands and identifier pointers, because such lists are produced as
+output of the parsing routines that will be described later. \.{PROFILE}'s
+main activity is to parse the given \PASCAL\ program and to translate
+it into a translation list.
+
+@d append(#)==begin link(tail):=get_avail; tail:=link(tail); info(tail):=#;
+  end
+
+@<Glob...@>=
+@!head,@!tail:pointer; {pointers for the main translation list}
+
+@ @<Set init...@>=
+head:=get_avail; tail:=head;
+
+@ The |out| macro puts a given item on the current translation list.
+
+@d out(#)==
+  begin link(tail):=get_avail; tail:=link(tail); info(tail):=#;
+  end
+
+@ Here is a list of all the commands that might appear in a translation list.
+
+@d verbatim=0 {entries up to the next |verbatim| should be output
+  without a line break}
+@d begin_section=1 {output `\.\{$m$\.{:\}}', where $m$ is the next entry}
+@d end_section=2 {output `\.{\{:}$m$\.\}', where $m$ is the next entry}
+@d change_weight=3 {output `\.{\{+}$v$\.\}', where the next entry points to $v$}
+@d backspace=4 {back up one character, if at the left margin}
+@d indent=5 {increase indentation by one}
+@d outdent=6 {decrease indentation by one}
+@d all_caps=7 {add |"A"-"a"| to all characters of the next identifier}
+@d initial_cap=8 {add |"A"-"a"| to the first character of the next identifier}
+@d max_command=8
+
+@ A global array |out_buf| is used to accumulate characters before they are
+printed. Output lines are indented by |cur_indent|.
+
+@<Glob...@>=
+@!cur_indent:0..out_buf_size; {indentation}
+@!out_buf:array[0..out_buf_size] of ASCII_code; {characters to be output}
+@!out_line:integer; {serial number of the next line of output}
+
+@ @<Set init...@>=
+cur_indent:=0; out_line:=1;
+
+@ The |flush_out| procedure outputs the current translation list and removes
+it from memory. If the list is empty, nothing happens. Otherwise one or
+more lines are output, with weight and frequency information placed on the
+final line (if |out_wt| and/or |cur_freq| are nonzero).
+
+@p procedure flush_out;
+label done;
+var p,@!q: pointer; {for list manipulation}
+@!i,@!j,@!k:0..out_buf_size; {indices into |out_buf|}
+@!t:pool_pointer; {index into |id_pool|}
+@!offset, @!next_offset:integer; {0 or |"A"-"a"|}
+@!n:halfword; {command or |id_pointer|}
+@!v,@!w:integer; {registers used in decimal output conversion}
+begin if tail<>head then
+  begin p:=link(head);
+  for k:=1 to cur_indent do out_buf[k-1]:=" ";
+  k:=cur_indent; offset:=0; next_offset:=0;
+  while p<>null do
+    begin @<Put material corresponding to command~|p|
+      into |out_buf|; also advance |p|
+      to the last node of the command@>;
+    q:=link(p); free_avail(p); p:=q;
+    end;
+  @<Write |out_buf|, |out_wt|, and |cur_freq|@>;
+  tail:=head;
+  end;
+end;
+
+@ Variable |k| represents the end of the buffer contents before a command
+is processed; variable~|j| represents the buffer's end after the command.
+
+@<Put material corr...@>=
+n:=info(p); j:=k;
+if n>max_command then @<Put an identifier into the buffer@>
+else case n of
+  verbatim:@<Output entries verbatim@>;
+  begin_section, end_section, change_weight: @<Output a special comment@>;
+  backspace: if k>0 then if k=cur_indent then decr(j);
+  indent: @<Increase |cur_indent|@>;
+  outdent: @<Decrease |cur_indent|@>;
+  all_caps: begin offset:="A"-"a"; next_offset:=offset;
+    end;
+  initial_cap: offset:="A"-"a"; {|next_offset=0|}
+  end; {there are no other cases}
+if j>line_length then @<Write |out_buf[0..k-1]| and shift the remaining
+  material left in the buffer@>;
+k:=j {this value is |<=line_length|}
+
+@ Lines that exceed |line_length| are broken, and excess material is indented
+by |cur_indent+2|.
+
+@<Write |out_buf[0..k-1]|...@>=
+begin for i:=0 to k-1 do write(xchr[out_buf[i]]);
+if out_line mod 5 = 0 then @<Fill out a broken line with leaders@>
+else write_ln;
+incr(out_line);
+for i:=1 to cur_indent+2 do out_buf[i-1]:=" ";
+i:=cur_indent+2;
+if j-(k-i)>line_length then overflow('line length');
+while k<j do
+  begin out_buf[i]:=out_buf[k]; incr(i); incr(k);
+  end;
+j:=i; {|k| need not be reset}
+end;
+
+@ @<Write |out_buf|, |out_wt|, and |cur_freq|@>=
+if k>0 then
+  begin for j:=0 to k-1 do write(xchr[out_buf[j]]);
+  if out_line mod 5 = 0 then @<Fill out a normal line with leaders@>
+  else  begin if (out_wt<>0)or(cur_freq<>0) then
+      begin if k<line_length then write(' ':line_length-k);
+      write(out_wt:weight_length,cur_freq:freq_length);
+      end;
+    write_ln;
+    end;
+  out_wt:=0; incr(out_line);
+  end
+
+@ @<Fill out a broken line...@>=
+begin for i:=k+1 to line_length+weight_length+freq_length do write('.');
+write_ln;
+@<Check for end of page@>;
+end
+
+@ @<Check for end of page@>=
+if out_line mod 100 = 0 then
+  begin print('.'); page;
+  if out_line mod 500 = 0 then print(out_line:1);
+  update_terminal; {progress report}
+  end
+
+@ @<Fill out a normal line...@>=
+begin if (out_wt=0)and(cur_freq=0) then
+  for i:=k+1 to line_length+weight_length+freq_length do write('.')
+else  begin for i:=k+1 to line_length do write('.');
+  i:=weight_length-1;v:=10;
+  while v<=out_wt do
+    begin v:=10*v; decr(i);
+    end;
+  for j:=1 to i do write('.');
+  write(out_wt:1);
+  i:=freq_length-1; v:=10;
+  while v<=cur_freq do
+    begin v:=10*v; decr(i);
+    end;
+  for j:=1 to i do write('.');
+  write(cur_freq:1);
+  end;
+write_ln; @<Check for end of page@>;
+end
+
+
+@ @d put_out(#)==begin out_buf[j]:=#; incr(j);
+  end
+
+@<Put an identifier into the buffer@>=
+begin for t:=id_start[n] to id_start[n+1]-1 do
+  begin put_out(id_pool[t]+offset); offset:=next_offset;
+  end;
+offset:=0; next_offset:=0;
+end
+
+@ Verbatim material should consist entirely of |ASCII_code| data. Nodes
+are deleted from |mem| as they are output.
+
+@<Output entries verbatim@>=
+begin loop@+begin q:=link(p); free_avail(p); p:=q;
+  if info(p)=verbatim then goto done;
+  put_out(info(p));
+  end;
+done: end
+
+@ @<Increase |cur_indent|@>=
+begin if k=cur_indent then
+  begin put_out(" ");
+  end;
+incr(cur_indent);
+if cur_indent+10>line_length then overflow('line length');
+end
+
+@ @<Decrease |cur_indent|@>=
+begin if k=cur_indent then decr(j);
+decr(cur_indent); {the value will not be negative}
+end
+
+@ @<Output a special comment@>=
+begin q:=link(p); free_avail(p); p:=q; put_out("{");
+if n=change_weight then
+  begin v:=val(info(p)); free_avail(info(p));
+  if v>=0 then put_out("+")
+  else  begin put_out("-"); v:=-v;
+    end;
+  end
+else  begin v:=info(p);
+  if n=end_section then put_out(":");
+  end;
+@<Convert |v| to decimal@>;
+if n=begin_section then put_out(":");
+put_out("}");
+end
+
+@ @<Convert |v| to decimal@>=
+w:=10;
+while v>=w do w:=10*w;
+repeat w:=w div 10; put_out("0"+(v div w)); v:=v mod w;
+until w=1 {this is inefficient, but it works from left to right}
+
+@* Levels of translation.
+Translation lists are actually output only when \.{PROFILE} is operating on
+its ``outer level.'' Inner levels are also possible; for example, the
+parsing of an arithmetic expression might involve many levels. The global
+variables |head| and |tail| always refer to the translation list on the
+current level; a stack of other head-tail pairs is accessible via |head_ptr|.
+
+@<Glob...@>=
+@!head_ptr:pointer; {top of stack for pushed-down translation lists in progress}
+@!trans_head,@!trans_tail:pointer; {translation list just completed}
+
+@ @<Set init...@>=
+head_ptr:=null;
+
+@ To enter a new level of translation list building, there's a |push_level|
+subroutine:
+
+@p procedure push_level;
+var p,@!q:pointer; {two new nodes added to the stack}
+begin p:=get_avail; q:=get_avail; link(p):=q; link(q):=head_ptr; head_ptr:=p;@/
+info(p):=head; info(q):=tail;@/
+head:=get_avail; tail:=head;
+end;
+
+@ Conversely, when we lower the level, the current head and tail are placed
+in variables |trans_head| and |trans_tail|, respectively.
+
+@p procedure pop_level;
+var p,@!q:pointer; {two old nodes removed from the stack}
+begin trans_head:=head; trans_tail:=tail;@/
+p:=head_ptr; q:=link(p); head_ptr:=link(q); head:=info(p); tail:=info(q);
+free_avail(p); free_avail(q);
+end;
+
+@ It is a simple matter to append the |trans_head/trans_tail| list to
+the current list:
+
+@p procedure app_trans;
+begin if trans_tail<>trans_head then
+  begin link(tail):=link(trans_head); tail:=trans_tail;
+  end;
+free_avail(trans_head);
+end;
+
+@* Getting the next token.
+A ``top down'' or ``recursive descent'' parsing strategy is used, in which
+the program has looked ahead one token in the input. A token is a special
+character like `\.+'; or a special pair of characters like `\.{<=}'; or
+a reserved word like `\.{ARRAY}'; or an identifier; or a numeric constant;
+or a string constant. Furthermore a token may be preceded by any number of
+blanks and/or comments enclosed in braces; blanks are removed, but the
+comments are considered to be part of the token.
+
+Whenever a token is acceptable to the syntax, that token is swallowed (never
+to be put back), and the program looks ahead for another token.
+
+This elementary lookahead is done by \.{PROFILE}'s |get_next| routine,
+which sets up several global variables to show what it has found:
+\smallskip
+\hang|cur_code| is the |id_code| of an identifier or reserved word,
+or a special code value like |plus_or_minus| for `\.{+}',
+|relation| for `\.{<=}', |real_const| for a real constant.
+\smallskip
+\hang|cur_aux| is the corresponding |id_aux|; or it's the ASCII
+character that has been encoded in |cur_code|.
+\smallskip
+\hang|cur_ptr| is zero or points to the identifier or reserved word whose
+|id_code| and |id_aux| are in |cur_code| and |cur_aux|.
+\smallskip
+\hang|cur_val| is the value of an integer constant, if |cur_code| is
+either |small_const| or |int_const|.
+\smallskip
+\hang|new_trans| is the head of a translation list for the token that has
+just been scanned. The translation list includes comments (interpreted
+if they have special forms, otherwise truncated
+so that the length is at most |max_comment|); spaces have been suppressed,
+except that spaces are inserted before or after reserved words as
+mentioned earlier. Reserved words have been preceded by an |all_caps|
+command in the translation.
+\smallskip
+\hang|kludge_flag| has been set |true| if the comment `\.{\{\^\}}' was sensed.
+
+@d new_trans==link(new_trans_loc)
+
+@<Glob...@>=
+@!cur_code:halfword; {|id_code| or other code in current lookahead token}
+@!cur_aux:halfword; {|id_aux| in current lookahead token}
+@!cur_val:integer; {integer value of current lookahead token, if appropriate}
+@!new_trans_loc:pointer; {head of translation list for current lookahead token}
+@!cur_ptr:id_pointer; {zero or pointer to identifier in current lookahead token}
+@!kludge_flag:boolean; {set to |true| when |get_next| sees an uparrow comment}
+
+@ @<Set init...@>=new_trans_loc:=get_avail;
+
+@ When |get_next| looks ahead and sees a comment like \.{\{:123\}}, it
+doesn't immediately delete section~123 from the section stack, because
+the lookahead process is (by definition) one jump ahead of the parsing
+process. The section stack is actually updated later, when the
+translation list specified by |new_trans| is appended to the
+parser's current |head/tail| list. The |get_next| routine does this
+delayed updating just before looking ahead for another token.
+
+@<Append the |new_trans| list to the end of |tail|, interpreting its
+comments@>=
+if new_trans<>null then
+  begin link(tail):=new_trans;
+  repeat tail:=link(tail);
+  case info(tail) of
+  verbatim:repeat tail:=link(tail);until info(tail)=verbatim;
+  begin_section:begin tail:=link(tail); push_section(info(tail));
+    end;
+  end_section:begin tail:=link(tail); pop_section(info(tail));
+    end;
+  change_weight:begin tail:=link(tail); add_weight(val(info(tail)));
+    end;
+  othercases do_nothing
+  endcases;@/
+  until link(tail)=null;
+  new_trans:=null;
+  end
+
+@ Three global variables help |get_next| control the low-level activities
+associated with taking characters out of the input buffer:
+
+@<Glob...@>=
+@!line:integer; {the number of the current line in the current file}
+@!limit:0..buf_size; {the last character position occupied in the buffer}
+@!loc:0..buf_size; {the next character position to be read from the buffer}
+
+@ @<Set init...@>=
+line:=0; loc:=1; limit:=0;
+
+@ The |get_line| procedure is called when |loc>limit|; it puts the next
+line of merged input into the buffer and updates the other variables
+appropriately. A space is placed at the right end of the line.
+
+@p procedure get_line; {inputs the next line}
+begin incr(line);
+if not input_ln(pascal_file) then fatal_error('Premature end of PASCAL file');
+@.Premature end...@>
+loc:=0; buffer[limit]:=" ";
+end;
+
+@ Here now is the program for |get_next|. Remember that a call of |get_next|
+means, essentially, ``I accept the previous token. Look ahead for another,
+because I will want to look at it later.''
+
+@d up_to(#)==#-24,#-23,#-22,#-21,#-20,#-19,#-18,#-17,#-16,#-15,#-14,
+  #-13,#-12,#-11,#-10,#-9,#-8,#-7,#-6,#-5,#-4,#-3,#-2,#-1,#
+@d app(#)==begin link(get_tail):=get_avail; get_tail:=link(get_tail);
+  info(get_tail):=#;
+  end
+
+@p procedure get_next;
+label restart, continue, not_found, done;
+var get_tail:pointer; {tail of the |new_trans| list being built}
+@!i:0..buf_size; {index into |buffer|}
+@!c:ASCII_code; {character found in the buffer}
+@!sign:integer; {$\pm1$}
+begin @<Append the |new_trans|...@>;
+cur_ptr:=0; get_tail:=new_trans_loc;
+restart: if loc>limit then get_line;
+c:=buffer[loc]; incr(loc); cur_aux:=c;
+case c of
+"A",up_to("Z"),"a",up_to("z"):@<Get an identifier or reserved word@>;
+"'":@<Get a string@>;
+"0","1","2","3","4","5","6","7","8","9":@<Get a constant@>;
+"{":@<Get a comment, then |goto restart|@>;
+@<Translate a special character, compressing two-symbol combinations like
+  `\.{<=}' into a single symbol@>@;
+0," ",@'11:goto restart; {ignore nulls, spaces, and tabs}
+othercases begin err_print('! Unknown character will be treated as comment');
+@.Unknown character...@>
+  app(verbatim);app(c);app(verbatim); goto restart;
+  end
+endcases;
+end;
+
+@ @d up_arrow=bb+1
+@d asterisk=bb+2
+@d slash=bb+3
+@d comma=bb+4
+@d semicolon=bb+5
+@d left_paren=bb+6
+@d right_paren=bb+7
+@d left_bracket=bb+8
+@d right_bracket=bb+9
+@d colon=bb+10
+@d colon_equal=bb+11
+@d dot=bb+12
+@d double_dot=bb+13
+@d relation=bb+14
+@#
+@d app_code(#)==begin app(c); cur_code:=#;
+  end
+@d compress(#)==begin app(c); app(buffer[loc]); incr(loc); cur_code:=#;
+  end
+
+@<Translate a special character...@>=
+"+","-":app_code(plus_or_minus);
+"*":app_code(asterisk);
+"/":app_code(slash);
+",":app_code(comma);
+";":app_code(semicolon);
+"(":app_code(left_paren);
+")":app_code(right_paren);
+"[":app_code(left_bracket);
+"]":app_code(right_bracket);
+"^":app_code(up_arrow);
+"=":app_code(relation);
+":":if buffer[loc]="=" then compress(colon_equal)@+else app_code(colon);
+".":if buffer[loc]="." then compress(double_dot)@+else app_code(dot);
+"<":if (buffer[loc]=">")or(buffer[loc]="=") then compress(relation)
+  @+else app_code(relation);
+">":if buffer[loc]="=" then compress(relation)@+else app_code(relation);
+
+@ @<Get an identifier or reserved word@>=
+begin decr(loc); id_first:=loc;
+repeat if c<="Z" then if c>="A" then buffer[loc]:=c+"a"-"A";
+incr(loc); c:=buffer[loc];
+until (c<"0")or((c>"9")and(c<"A"))or((c>"Z")and(c<"a"))or(c>"z");
+id_loc:=loc; cur_ptr:=id_lookup;
+cur_code:=id_code(cur_ptr); cur_aux:=id_aux(cur_ptr);
+if cur_code<=max_blank_left then if cur_code>=min_blank_left then app(" ");
+if cur_code<undefined then app(all_caps);
+app(cur_ptr);
+if cur_code<=max_blank_right then if cur_code>=min_blank_right then app(" ");
+if cur_code=int_const then cur_val:=val(cur_aux)
+else if cur_code=small_const then cur_val:=cur_aux;
+end
+
+@ @<Get a string@>=
+begin app(verbatim); app("'"); cur_code:=string_const; cur_aux:=0;
+continue: app(buffer[loc]);
+if buffer[loc]="'" then
+  if buffer[loc+1]="'" then
+    begin app("'"); loc:=loc+2; incr(cur_aux); goto continue;
+    end
+  else incr(loc)
+else  begin incr(cur_aux); incr(loc);
+  if loc>limit then err_print('! String constant didn''t end')
+  else goto continue;
+  end;
+app(verbatim); cur_code:=string_const;
+end
+
+@ @<Get a constant@>=
+begin id_first:=loc-1;
+cur_val:=c-"0"; cur_code:=int_const;
+while (buffer[loc]>="0")and(buffer[loc]<="9") do
+  begin cur_val:=10*cur_val+buffer[loc]-"0"; incr(loc);
+  end;
+@<Scan to the end of a real constant, if |"."| or |"E"| is present@>;
+if cur_code=int_const then
+  if cur_val<10000 then
+    begin cur_code:=small_const; cur_aux:=cur_val;
+    end
+  else  begin cur_aux:=get_avail; val(cur_aux):=cur_val;
+    end;
+app(verbatim);
+for i:=id_first to loc-1 do app(buffer[i]);
+app(verbatim);
+end
+
+@ @<Scan to the end of a real constant...@>=
+if buffer[loc]="." then if buffer[loc+1]<>"." then
+  begin cur_code:=real_const; cur_aux:=null;
+  repeat incr(loc);
+  until (buffer[loc]<"0")or(buffer[loc]>"9");
+  end;
+if (buffer[loc]="E")or(buffer[loc]="e") then
+  begin cur_code:=real_const; cur_aux:=null;
+  incr(loc);
+  if abs(buffer[loc]-",")=1 then incr(loc); {|"+"| or |"-"|}
+  while (buffer[loc]>="0")and(buffer[loc]<="9") do incr(loc);
+  end
+
+@ @<Get a comment, then |goto restart|@>=
+begin id_first:=loc-1;
+@<Check for \.{\{m:\}}, \.{\{:m\}}, \.{\{+v\}}, or \.{\{-v\}};
+  |goto restart| if one of these special types is found@>;
+id_loc:=id_first+max_comment;
+if id_loc>=limit then id_loc:=limit-1;
+loc:=id_first; app(verbatim);
+while buffer[loc]<>"}" do
+  begin app(buffer[loc]);
+  if loc=id_loc then @<Truncate the comment, |goto done|@>;
+  incr(loc);
+  end;
+done: app("}"); app(verbatim); incr(loc); goto restart;
+end
+
+@ @<Truncate the comment...@>=
+begin app("."); app("."); app(".");
+repeat incr(loc);
+if loc>limit then get_line;
+until buffer[loc]="}";
+goto done;
+end
+
+@ @<Check for \.{\{m:\}}, ...@>=
+if (buffer[loc]>="0")and(buffer[loc]<="9") then cur_code:=begin_section
+else if buffer[loc]=":" then
+  begin cur_code:=end_section; incr(loc);
+  end
+else if abs(buffer[loc]-",")=1 then
+  begin cur_code:=change_weight; sign:=","-buffer[loc]; incr(loc);
+  end
+else  begin if buffer[loc]="^" then if buffer[loc+1]="}" then kludge_flag:=true;
+  goto not_found;
+  end;
+cur_val:=0;
+while (buffer[loc]>="0")and(buffer[loc]<="9") do
+  begin cur_val:=10*cur_val+buffer[loc]-"0"; incr(loc);
+  end;
+if cur_code=begin_section then if buffer[loc]<>":" then goto not_found
+  else incr(loc);
+if buffer[loc]<>"}" then goto not_found;
+if cur_code=change_weight then
+  begin cur_val:=cur_val*sign; cur_aux:=get_avail; val(cur_aux):=cur_val;
+  cur_val:=cur_aux;
+  end
+else if cur_val>max_halfword then goto not_found;
+app(cur_code); app(cur_val); incr(loc); goto restart;
+not_found:
+
+@ Here's a little routine that is used when an identifier had better be next:
+
+@p procedure skip_to_id;
+begin if cur_ptr=0 then
+  begin err_print('! spurious stuff before the identifier is being skipped');
+@.spurious stuff...@>
+  repeat get_next;
+  until cur_ptr<>0;
+  end;
+end;
+
+@ When we need to swallow a semicolon, |get_semi| does the trick.
+
+@p procedure get_semi;
+begin if cur_code<>semicolon then
+  begin err_print('! spurious stuff before the semicolon is being skipped');
+  repeat get_next;
+  until cur_code=semicolon;
+  end;
+get_next;
+end;
+
+@ The most common error message that occurs in typical top-down parsing routines
+is the following.
+
+@d expected(#)==err_print('! "',#,'" was expected')
+
+@ Here's a routine that scans past a list of identifiers, separated by commas,
+and returns a pointer to a list of their locations (in reverse order).
+
+@p function get_id_list:pointer;
+label done;
+var p:pointer; {the list}
+@!q:pointer; {new item to put on it}
+begin p:=null;
+loop@+  begin skip_to_id;
+  q:=get_avail; info(q):=cur_ptr; link(q):=p; p:=q;
+  get_next;
+  if cur_code<>comma then goto done;
+  get_next;
+  end;
+done:get_id_list:=p;
+end;
+
+@* Small syntactic units.
+Now that we have |get_next| to scan tokens, the next job is to parse
+slightly larger entities. With luck, we'll eventually work up to the point
+where we'll be ready to parse a whole \PASCAL\ program.
+
+The remainder of the \.{PROFILE} program can be viewed as an expansion
+of the syntax diagrams at the end of the \PASCAL\ manual into a set
+of subroutines, as if those diagrams were ``flow charts.''
+
+@ First comes |get_int_const|, which scans an integer constant and returns its
+value.
+
+@p function get_int_const:integer;
+var s:integer;
+begin if cur_code=plus_or_minus then
+  begin s:=","-cur_aux; get_next;
+  if s<0 then cur_val:=-cur_val;
+  end;
+if cur_code<>int_const then if cur_code<>small_const then
+  begin expected('integer constant'); cur_val:=0;
+  end;
+s:=cur_val; get_next; get_int_const:=s;
+end;
+
+@ Here now is a subroutine that scans what \PASCAL\ calls a ``simple type.''
+The |get_s_type| function returns a pointer to the representation of the
+type that was scanned.
+
+After calling |get_s_type| (and several other subroutines below that use
+|push_level|), it's necessary to say `|app_trans|' to keep from losing the
+translation list that was formed, because the translation has been moved
+out of the |head/tail| list.
+
+@p function get_s_type:pointer;
+var p:pointer; {the resulting type}
+@!q:pointer; {temporary for list manipulation}
+@!m,@!n:integer; {subrange boundaries}
+begin push_level;
+if cur_code=defined_type then {it's a type identifier}
+  begin p:=cur_aux; get_next;
+  end
+else  begin if cur_code=left_paren then @<Scan an enumerated type@>
+  else @<Scan a subrange type@>;
+  @<Make |p| point to the subrange type $m\to n$@>;
+  end;
+pop_level; get_s_type:=p;
+end;
+
+@ @<Scan an enum...@>=
+begin m:=0; n:=-1;
+repeat get_next; skip_to_id;@/
+incr(n); save(cur_ptr); id_code(cur_ptr):=small_const; id_aux(cur_ptr):=n;
+get_next;
+until cur_code<>comma;
+if cur_code<>right_paren then expected(')')@+else get_next;
+end
+
+@ @<Scan a subrange...@>=
+begin m:=get_int_const;
+if cur_code<>double_dot then expected('..')@+else get_next;
+n:=get_int_const;
+end
+
+@ @<Make |p| point to the subrange type $m\to n$@>=
+begin p:=get_avail; val(p):=m; q:=get_avail; info(q):=p;
+p:=get_avail; val(p):=n; link(q):=p;@/
+p:=get_avail; info(p):=int_type; link(p):=q;
+end
+
+@ The next procedure is similar, but it gets a general type.
+
+@p function get_field_list:pointer; forward; @t\2@> {there's mutual recursion}
+@#
+function get_type:pointer;
+label done;
+var packt:0..1; {1 if \&{packed}}
+@!p,@!q:pointer; {for list manipulation}
+begin push_level;
+if cur_code=up_arrow then @<Scan a pointer type@>
+else  begin if cur_code<>packed_code then packt:=0
+  else  begin packt:=1; get_next;
+    end;
+  case cur_code of
+  array_code:@<Scan an array type@>;
+  file_code:@<Scan a file type@>;
+  set_code:@<Scan a set type@>;
+  record_code:@<Scan a record type@>;
+  othercases begin p:=get_s_type; app_trans;
+    end
+  endcases;
+  end;
+pop_level; get_type:=p;
+end;
+
+@ @<Scan a pointer type@>=
+begin get_next; skip_to_id; p:=get_avail;
+info(p):=pointer_type; link(p):=cur_ptr;
+get_next;
+end
+
+@ @<Scan an array type@>=
+begin get_next; p:=get_avail; info(p):=array_type+packt;
+q:=get_avail; link(p):=q;
+if cur_code<>left_bracket then expected('[')@+else get_next;
+loop@+  begin info(q):=get_s_type; app_trans;
+  if cur_code<>comma then goto done;
+  get_next; link(q):=get_avail; q:=link(q); info(q):=array_type+packt;
+  link(q):=get_avail; q:=link(q);
+  end;
+done: if cur_code<>right_bracket then expected(']')@+else get_next;
+if cur_code<>of_code then expected('of')@+else get_next;
+link(q):=get_type; app_trans;
+end
+
+@ @<Scan a file type@>=
+begin get_next; p:=get_avail; info(p):=file_type+packt;
+if cur_code<>of_code then expected('of')@+else get_next;
+link(p):=get_type; app_trans;
+end
+
+@ @<Scan a set type@>=
+begin get_next; p:=get_avail; info(p):=set_type+packt;
+if cur_code<>of_code then expected('of')@+else get_next;
+link(p):=get_s_type; app_trans;
+end
+
+@ @<Scan a record type@>=
+begin get_next; p:=get_avail; info(p):=record_type+packt;
+link(p):=get_field_list;
+if cur_code<>end_code then expected('end')@+else get_next;
+end
+
+@ The |get_field_list| routine returns a pointer to a field list in
+the form required by a record type.
+
+@p function get_field_list; {declared |forward| above}
+label continue,done,done1,done2;
+var p,@!q:pointer; {for list manipulation}
+@!h,@!t:pointer; {head and tail of list}
+begin h:=get_avail; t:=h;
+continue:if cur_code=case_code then @<Scan variant fields@>
+else  begin if (cur_ptr<>0)and(cur_code<>end_code) then
+    @<Scan identifier list and its type@>;
+  if cur_code=semicolon then
+    begin get_next; goto continue;
+    end;
+  end;
+get_field_list:=link(h); free_avail(h);
+end;
+
+@ @<Scan identifier list and its type@>=
+begin q:=t;
+loop@+  begin p:=get_avail; link(t):=p; t:=p; p:=get_avail; info(t):=p;
+  info(p):=cur_ptr; get_next;
+  if cur_code<>comma then goto done;
+  get_next; skip_to_id;
+  end;
+done:if cur_code<>colon then expected(':')@+else get_next;
+p:=get_type; app_trans;
+while q<>t do
+  begin q:=link(q); link(info(q)):=p;
+  end;
+end
+
+@ @<Scan variant fields@>=
+begin get_next; skip_to_id;
+p:=cur_ptr; get_next;
+if cur_code=colon then
+  begin get_next;
+  if cur_code<>defined_type then expected('type identifier')
+  else  begin q:=get_avail; link(t):=q; t:=q; q:=get_avail; info(t):=q;
+    info(q):=p; link(q):=cur_aux; get_next;
+    end;
+  end;
+if cur_code<>of_code then expected('of')@+else get_next;
+@<Scan conclusion of variant fields@>;
+end
+
+@ @<Scan conclusion of variant fields@>=
+loop@+  begin if (cur_code>=min_case_label)and(cur_code<=max_case_label) then
+    begin @<Scan past case labels@>;
+    if cur_code<>colon then expected(':')@+else get_next;
+    if cur_code<>left_paren then expected('(')@+else get_next;
+    link(t):=get_field_list;
+    while link(t)<>null do t:=link(t);
+    if cur_code<>right_paren then expected(')')@+else get_next;
+    end;
+  if cur_code<>semicolon then goto done2;
+  get_next;
+  end;
+done2:
+
+@ The following code is used twice; label |done1| needs to be declared
+in both contexts.
+
+@<Scan past case labels@>=
+begin loop
+  begin if cur_code<string_const then cur_val:=get_int_const else get_next;
+  if cur_code<>comma then goto done1;
+  get_next;
+  end;
+done1:end
+
+@* Expressions.
+The next few subroutines are the top-down parsers for \PASCAL\ expressions.
+The main routine is called |get_exp|; it returns it result in the
+|trans_head/trans_tail| translation list, and it also makes |cur_type|
+point to the type of expression. Meanwhile the assumed run-time cost
+of evaluating the expression is also taken into account.
+
+@<Glob...@>=
+@!cur_type:pointer; {the type of expression found by |get_exp| and its friends}
+@!cur_length:integer; {the length of string, if |cur_type=string_loc|}
+
+@ But before we get into |get_exp|, we need a simpler routine, |get_variable|.
+(If |with| statements were implemented, we would check for field identifiers
+in currently ``open'' record variables, at the beginning of |get_variable|.)
+
+@p procedure get_exp; forward;@t\2@>@#
+procedure get_variable;
+label continue,found;
+var p,@!q:pointer; {for link manipulation}
+begin push_level;
+if (cur_code=variable)or(cur_code=var_param) then
+  begin if cur_code=var_param then add_weight(var_surcharge);
+  cur_type:=cur_aux; get_next;
+  end
+else  begin expected('variable identifier');
+  if cur_code=undefined then get_next;
+  cur_type:=bool_loc;
+  end;
+continue:if cur_code=left_bracket then @<Scan subscript, |goto continue|@>
+else if cur_code=dot then @<Scan field, |goto continue|@>
+else if cur_code=up_arrow then @<Scan pointer, |goto continue|@>;
+pop_level;
+end;
+
+@ @<Scan subscript, |goto continue|@>=
+begin repeat get_next;
+if info(cur_type)=packed_array_type then add_weight(packed_index_cost)
+else  begin add_weight(index_cost);
+  if info(cur_type)<>array_type then
+    begin err_print('! subscript on non-array'); cur_type:=string_loc;
+@.subscript on non-array@>
+    end;
+  end;
+p:=link(cur_type); {now |info(p)| is index type, |link(p)| is entry type}
+get_exp; app_trans; {|cur_type| should now be compatible with |info(p)|,
+  but \.{PROFILE} doesn't bother to check}
+cur_type:=link(p);
+until cur_code<>comma;
+if cur_code<>right_bracket then expected(']')@+else get_next;
+goto continue;
+end
+
+@ @<Scan field, |goto continue|@>=
+begin get_next; skip_to_id;
+if info(cur_type)=packed_record_type then add_weight(packed_surcharge)
+else if info(cur_type)<>record_type then
+  begin err_print('! field on non-record');
+@.field on non-record@>
+  cur_type:=bool_loc; goto found;
+  end;
+p:=link(cur_type);
+while p<>null do
+  begin q:=info(p);
+  if info(q)=cur_ptr then
+    begin cur_type:=link(q); goto found;
+    end;
+  p:=link(p);
+  end;
+err_print('! unknown field'); cur_type:=bool_loc;
+@.unknown field@>
+found:get_next;
+goto continue;
+end
+
+@ @<Scan pointer, |goto continue|@>=
+begin get_next;
+if info(cur_type)=file_type then cur_type:=link(cur_type)
+else if info(cur_type)=packed_file_type then
+  begin add_weight(packed_surcharge); cur_type:=link(cur_type);
+  end
+else if info(cur_type)=pointer_type then
+  begin add_weight(pointer_cost);
+  p:=link(cur_type);
+  if id_code(p)<>defined_type then
+    begin err_print('! pointer type never defined');
+@.pointer type never defined@>
+    cur_type:=bool_loc;
+    end
+  else cur_type:=id_aux(p);
+  end
+else err_print('! extra "^"');
+@.extra uparrow@>
+goto continue;
+end
+
+@ It's time now to face the messy details of procedure and function calls,
+where standard procedures have nonstandard syntax.
+
+@p procedure get_call;
+label done, continue;
+var t:pointer; {final type, if known}
+@!p:pointer; {runs through the parameter list}
+@!q:pointer; {for list manipulation}
+@!r:pointer; {type of argument}
+@!c:0..100; {type code of argument}
+begin if cur_code=function_id then
+  begin p:=link(cur_aux); t:=info(cur_aux);
+  end
+else  begin p:=cur_aux; t:=null;
+  end;
+append(initial_cap); get_next;
+if p=null then add_weight(call_overhead)
+else if info(info(p))<>spec_param then add_weight(call_overhead);
+if cur_code=left_paren then
+  @<Scan argument list corresponding to parameter list |p|@>;
+if p<>null then
+  begin q:=info(p);
+  if info(q)=optional_file_param then add_weight(link(q))
+  else if info(q)<>spec_param then err_print('! argument(s) expected');
+@.argument(s) expected@>
+  end;
+if t<>null then cur_type:=t;
+end;
+
+@ One of the subtle things here is that our \PASCAL\ allows empty arguments
+to standard functions like |call_i|.
+
+@<Scan argument list...@>=
+begin loop begin get_next;
+  if (cur_code=comma)or(cur_code=right_paren) then cur_type:=int_loc
+  else  begin get_exp; app_trans;
+    end;
+  continue:if p=null then
+    begin err_print('! extra argument(s)'); p:=extra_loc;
+@.extra argument(s)@>
+    end;
+  q:=info(p);
+  if info(q)=optional_file_param then
+    begin add_weight(link(q));
+    if info(cur_type)<>file_type then
+     if info(cur_type)<>packed_file_type then
+      begin p:=link(p); goto continue;
+      end;
+    end
+  else if info(q)=spec_param then @<Process a special parameter@>
+  else @<Process a regular parameter@>;
+  p:=link(p);
+  if cur_code<>comma then goto done;
+  end;
+done:if cur_code<>right_paren then expected(')')@+else get_next;
+end
+
+@ The program could check for type conflicts between argument and parameter;
+but it doesn't.
+
+@<Process a regular parameter@>=
+begin if info(cur_type)=int_type then if info(link(q))=real_type then
+  add_weight(int_real_cost);
+add_weight(store_cost);
+end
+
+@ @<Process a special parameter@>=
+begin r:=cur_type;
+if r=string_loc then
+  add_weight(string_string_cost+cur_length*string_string_tax);
+n:=0;
+while cur_code=colon do
+  begin get_next; incr(n); get_exp; app_trans; add_weight(store_cost);
+  end;
+if n=2 then if info(r)=int_type then
+  begin add_weight(int_real_cost); r:=real_loc;
+  end;
+if r<>string_loc then
+  begin q:=link(q); c:=info(r);
+  if c<>char_type then
+    begin q:=link(q);
+    if c<>int_type then
+      begin q:=link(q);
+      if c<>real_type then
+        begin q:=link(q);
+        if c<>array_type then q:=link(q);
+        end;
+      end;
+    end;
+  add_weight(info(q));
+  end;
+end
+
+@ The next step up from a variable is a ``factor.''
+
+@p procedure get_factor;
+label done;
+var p:pointer; {list manipulation}
+begin push_level;
+case cur_code of
+real_const:begin get_next; cur_type:=real_loc; add_weight(fetch_cost);
+  end;
+int_const,small_const:begin get_next; cur_type:=int_loc; add_weight(fetch_cost);
+  end;
+bool_const:begin get_next; cur_type:=bool_loc; add_weight(fetch_cost);
+  end;
+string_const:begin if cur_aux=1 then cur_type:=char_loc
+  else  begin cur_type:=string_loc; cur_length:=cur_aux;
+    end;
+  get_next; add_weight(fetch_cost);
+  end;
+function_id:get_call;
+left_paren:begin get_next; get_exp; app_trans;
+  if cur_code<>right_paren then expected(')')@+else get_next;
+  end;
+not_code:begin get_next; add_weight(unary_cost); get_factor; app_trans;
+  end;
+left_bracket:@<Scan a set construction@>;
+othercases begin get_variable; app_trans; add_weight(fetch_cost);
+  end
+endcases;@/
+pop_level;
+end;
+
+@ @<Scan a set construction@>=
+begin get_next; add_weight(set_cost); cur_type:=null;
+loop@+  begin if cur_code=right_bracket then goto done;
+  get_exp; app_trans; add_weight(store_cost);
+  if cur_code=double_dot then
+    begin get_next; get_exp; app_trans; add_weight(store_cost);
+    end;
+  if cur_code=comma then get_next
+  else if cur_code<>right_bracket then
+    begin expected(']'); goto done;
+    end;
+  end;
+done:p:=get_avail; info(p):=set_type; link(p):=cur_type; cur_type:=p;
+end
+
+@ Factors make terms.
+
+@p procedure get_term;
+label exit,continue,not_found;
+var t:pointer; {type of the first operand}
+begin get_factor; app_trans;
+loop@+  begin continue:t:=cur_type;
+  case cur_code of
+  asterisk:@<Do multiplication or |goto not_found|@>;
+  slash:@<Do real division or |goto not_found|@>;
+  div_or_mod_code:@<Do integer division or |goto not_found|@>;
+  and_code:@<Do logical and or |goto not_found|@>;
+  othercases return
+  endcases;
+  goto continue;
+  not_found:err_print('! type mismatch');
+@.type mismatch@>
+  end;
+exit:end;
+
+@ @<Do multiplication or |goto not_found|@>=
+begin get_next; get_factor; app_trans;
+if info(t)=int_type then
+  if info(cur_type)=int_type then add_weight(mult_cost)
+  else if info(cur_type)=real_type then
+    add_weight(int_real_cost+real_mult_cost)
+  else goto not_found
+else if info(t)=real_type then
+  if info(cur_type)=real_type then add_weight(real_mult_cost)
+  else if info(cur_type)=int_type then
+    begin add_weight(int_real_cost+real_mult_cost); cur_type:=real_loc;
+    end
+  else goto not_found
+else if (info(t)=set_type)and(info(cur_type)=set_type) then add_weight(set_cost)
+else goto not_found;
+end
+
+@ @<Do real division or |goto not_found|@>=
+begin get_next; get_factor; app_trans;
+if info(t)=int_type then add_weight(int_real_cost)
+else if info(t)<>real_type then goto not_found;
+if info(cur_type)=int_type then add_weight(int_real_cost)
+else if info(cur_type)<>real_type then goto not_found;
+cur_type:=real_loc; add_weight(real_div_cost);
+end
+
+@ @<Do integer division or |goto not_found|@>=
+begin get_next; get_factor; app_trans;
+if (info(t)<>int_type)or(info(cur_type)<>int_type) then goto not_found;
+add_weight(div_cost);
+end
+
+@ @<Do logical and or |goto not_found|@>=
+begin get_next; get_factor; app_trans;
+if (t<>bool_loc)or(cur_type<>bool_loc) then goto not_found;
+add_weight(and_or_cost);
+end
+
+@ Terms make simple expressions.
+
+@p procedure get_s_exp;
+label exit,continue,not_found;
+var t:pointer; {type of first operand}
+begin if cur_code=plus_or_minus then
+  begin if cur_aux="-" then add_weight(unary_cost);
+  get_next;
+  end;
+get_term;
+loop@+  begin continue:t:=cur_type;
+  if cur_code=plus_or_minus then @<Do addition or |goto not_found|@>
+  else if cur_code=or_code then @<Do logical or or |goto not_found|@>
+  else return;
+  goto continue;
+  not_found:err_print('! type mismatch');
+@.type mismatch@>
+  end;
+exit:end;
+
+@ @<Do addition or |goto not_found|@>=
+begin get_next; get_term;
+if info(t)=int_type then
+  if info(cur_type)=int_type then add_weight(add_cost)
+  else if info(cur_type)=real_type then
+    add_weight(int_real_cost+real_add_cost)
+  else goto not_found
+else if info(t)=real_type then
+  if info(cur_type)=real_type then add_weight(real_add_cost)
+  else if info(cur_type)=int_type then
+    begin add_weight(int_real_cost+real_add_cost); cur_type:=real_loc;
+    end
+  else goto not_found
+else if (info(t)=set_type)and(info(cur_type)=set_type) then add_weight(set_cost)
+else goto not_found;
+end
+
+@ @<Do logical or or |goto not_found|@>=
+begin get_next; get_term;
+if (t<>bool_loc)or(cur_type<>bool_loc) then goto not_found;
+add_weight(and_or_cost);
+end
+
+@ Finally, simple expression lead us all the way up to expressions.
+(Once again, \.{PROFILE} does not bother to verify the validity of types;
+but the information is present.)
+
+@p procedure get_exp;
+var t:halfword; {code of left operand}
+begin push_level;
+get_s_exp;
+if (cur_code=relation)or(cur_code=in_code) then
+  begin t:=cur_code; get_next; get_s_exp;
+  if t=relation then add_weight(compare_cost)
+  else add_weight(in_cost);
+  cur_type:=bool_loc;
+  end;
+pop_level;
+end;
+
+@* Declarations.
+Our next task is to parse what \PASCAL\ syntax calls a ``block.'' The
+|get_block| routine declares all variables of the block; it has a lot to do.
+
+@ Before we tackle |get_block|, it will be helpful to get a subroutine
+out of the way. The following routine scans a parameter list, optionally
+declaring the identifiers found inside, and returns a pointer to the
+representation of this parameter list.
+
+@p function get_parameter_list(@!decl_params:boolean):pointer;
+var h,@!t:pointer; {head and tail of list being built}
+@!c,@!a:halfword; {code and aux values}
+@!r:halfword; {type to the right of a colon}
+@!p,@!q:pointer; {the usual}
+begin h:=get_avail; t:=h;
+if cur_code=left_paren then
+  begin repeat get_next;
+  if (cur_code=procedure_code)or(cur_code=function_code) then
+    @<Set up for subroutine parameters@>
+  else @<Set up for normal parameters@>;
+  @<Complete the current set of parameters@>;
+  until cur_code<>semicolon;
+  if cur_code<>right_paren then expected(')')@+else get_next;
+  end;
+get_parameter_list:=link(h); free_avail(h);
+end;
+
+@ @<Set up for normal parameters@>=
+begin if cur_code=var_code then
+  begin c:=var_param; get_next;
+  end
+else c:=variable;
+p:=get_id_list; a:=null;
+end
+
+@ @<Set up for subroutine parameters@>=
+begin c:=cur_code+(procedure_id-procedure_code);
+get_next; append(initial_cap); p:=get_id_list;
+a:=get_parameter_list(false);
+end
+
+@ @<Complete the current set...@>=
+begin if c<>procedure_id then
+  begin if cur_code<>colon then expected(':')@+else get_next;
+  if cur_code=defined_type then
+    begin r:=cur_aux; get_next;
+    end
+  else if cur_code=file_code then
+    begin r:=file_loc; get_next;
+    end
+  else  begin r:=null; expected('type identifier');
+    end;
+  if c=function_id then
+    begin q:=get_avail; link(q):=a; a:=q; info(a):=r;
+    end
+  else a:=r;
+  end;
+while p<>null do
+  begin q:=info(p);
+  if decl_params then
+    begin save(q); id_code(q):=c; id_aux(q):=a;
+    end;
+  link(t):=get_avail; t:=link(t); info(t):=p; q:=link(p);
+  info(p):=c; link(p):=a; p:=q;
+  end;
+end
+
+@ All right, let's |get_block|.
+
+@p procedure get_statement; forward; @t\2@>@#
+procedure get_block;
+label exit,found;
+var p,@!q,@!r,@!t:pointer; {list manipulation}
+@!s:integer; {sign}
+begin if cur_code=label_code then @<Handle the \&{label} part of a block@>;
+if cur_code=const_code then @<Handle the \&{const} part of a block@>;
+if cur_code=type_code then @<Handle the \&{type} part of a block@>;
+if cur_code=var_code then @<Handle the \&{var} part of a block@>;
+while (cur_code=procedure_code)or(cur_code=function_code) do
+  @<Handle a subroutine declaration@>;
+if cur_code<>begin_code then expected('begin')@+else get_next;
+cur_freq:=get_count; {the number of times this block is performed}
+loop@+  begin get_statement;
+  if cur_code=end_code then
+    begin flush_out; get_next; cur_freq:=next_freq; return;
+    end;
+  get_semi;
+  flush_out; cur_freq:=next_freq;
+  end;
+exit:end;
+
+@ The label part is easy.
+
+@<Handle the \&{label} part of a block@>=
+begin repeat get_next; cur_val:=get_int_const;
+until cur_code<>comma;
+if cur_code<>semicolon then expected(';')@+else get_next;
+flush_out;
+end;
+
+@ Constants are somewhat worse.
+
+@<Handle the \&{const} part of a block@>=
+begin get_next; append(indent); skip_to_id;
+while cur_code>=undefined do
+  begin p:=cur_ptr; save(p); get_next;
+  if cur_aux<>"=" then expected('=')@+else get_next;
+  @<Scan the constant and define |p| accordingly@>;
+  get_semi; flush_out; skip_to_id;
+  end;
+append(outdent);
+end
+
+@ @<Scan the constant and define |p| accordingly@>=
+if cur_code=plus_or_minus then
+  begin s:=","-cur_aux; get_next;
+  end;
+if (cur_code>=string_const)and(cur_code<=real_const) then
+    {this range includes |bool_const|}
+  begin id_code(p):=cur_code; id_aux(p):=cur_aux;
+  end
+else  begin if cur_code<>int_const then if cur_code<>small_const then
+    begin expected('constant'); cur_val:=0;
+    end;
+  if s<0 then cur_val:=-cur_val;
+  if (cur_val>=0)and(cur_val<10000) then
+    begin id_code(p):=small_const; id_aux(p):=cur_val;
+    end
+  else  begin q:=get_avail; val(q):=cur_val;
+    id_code(p):=int_const; id_aux(p):=q;
+    end;
+  end;
+get_next
+
+@ Types are not too bad, since |get_type| does the hard work.
+
+@<Handle the \&{type} part of a block@>=
+begin get_next; append(indent); skip_to_id;
+while cur_code>=undefined do
+  begin p:=cur_ptr; save(p); get_next;
+  if cur_aux<>"=" then expected('=')@+else get_next;
+  id_code(p):=defined_type; id_aux(p):=get_type; app_trans;
+  get_semi; flush_out; skip_to_id;
+  end;
+append(outdent);
+end
+
+@ Vars add one more twist.
+
+@<Handle the \&{var} part of a block@>=
+begin get_next; append(indent); skip_to_id;
+while cur_code>=undefined do
+  begin p:=get_id_list;
+  if cur_code<>colon then expected(':')@+else get_next;
+  t:=get_type; app_trans;
+  while p<>null do
+    begin q:=info(p); save(q); id_code(q):=variable; id_aux(q):=t;@/
+    q:=link(p); free_avail(p); p:=q;
+    end;
+  get_semi; flush_out; skip_to_id;
+  end;
+append(outdent);
+end
+
+@ And now comes the ``fun'' part.
+
+@<Handle a subroutine declaration@>=
+begin t:=cur_code+(procedure_id-procedure_code);
+append(indent); append(backspace); get_next; skip_to_id; r:=cur_ptr; save(r);
+push_save_stack; append(initial_cap); kludge_flag:=false; get_next;
+@<If identifier |r| was already |forward| declared, |goto found|@>;
+id_code(r):=t; p:=get_parameter_list(true);
+if t=function_id then
+  begin if cur_code<>colon then expected(':')@+else get_next;
+  q:=get_avail; link(q):=p; p:=q;
+  if cur_code=defined_type then
+    begin info(p):=cur_aux; get_next;
+    end
+  else  begin expected('type identifier');
+    while cur_code<>semicolon do get_next;
+    info(p):=null;
+    end;
+  end
+else if kludge_flag then id_code(r):=terminal_procedure_id;
+id_aux(r):=p;
+found: get_semi; flush_out; skip_to_id;
+if cur_code<undefined then get_block
+else  begin if cur_ptr=fwd_loc then
+    @<Put identifier |r| on the forward stack@>;
+  get_next;
+  end;
+get_semi; flush_out; unsave; append(outdent); cur_freq:=0;
+end
+
+@ A simple stack is maintained of identifier pointers that have been
+declared |forward| but not yet really declared.
+
+@<Glob...@>=@!fwd_ptr:pointer; {head of forward stack}
+
+@ @<Set init...@>=
+fwd_ptr:=null;
+
+@ @<If identifier |r| was already |forward| declared, |goto found|@>=
+begin q:=null; p:=fwd_ptr;
+while p<>null do
+  begin if info(p)=r then
+    begin if q=null then fwd_ptr:=link(p)@+else link(q):=link(p);
+    free_avail(p); goto found;
+    end;
+  q:=p; p:=link(q);
+  end;
+end
+
+@ @<Put identifier |r| on the forward stack@>=
+begin p:=get_avail; info(p):=r; link(p):=fwd_ptr; fwd_ptr:=p;
+end
+
+@* Statements.
+The scanning process reaches its glorious heights in the climactic
+|get_statement| procedure. This subroutine sets the global variable
+|next_freq| to the value that |cur_freq| should have if another
+statement follows.
+
+@<Glob...@>=
+@!next_freq:integer; {the flow that emanates from the statement just got}
+
+@ Basically, |get_statement| is a multiway switch between ten different
+kinds of \PASCAL\ statements.
+
+@p procedure get_statement;
+label done,done1,done2,done3; {lots of things get done}
+var in_freq,@!out_freq:integer; {frequencies before and after}
+@!w:integer; {weight of |while| clause}
+@!lhs_type:pointer; {type of left-hand side of assignment}
+@!t:0..100; {type of right-hand side type}
+@!n:integer; {number of items in assignment}
+begin while cur_code=small_const do @<Process a labelled statement@>;
+in_freq:=cur_freq; next_freq:=cur_freq;
+case cur_code of
+variable,var_param,function_id:@<Process an assignment statement@>;
+procedure_id:get_call;
+terminal_procedure_id:begin get_call; next_freq:=0;
+  end;
+begin_code:@<Process a compound statement@>;
+if_code:@<Process an if statement@>;
+case_code:@<Process a case statement@>;
+while_code:@<Process a while statement@>;
+repeat_code:@<Process a repeat statement@>;
+for_code:@<Process a for statement@>;
+goto_code:@<Process a go to statement@>;
+othercases do_nothing {we just saw an empty statement}
+endcases;
+end;
+
+
+@ @<Process a labelled statement@>=
+begin append(backspace); get_next;
+if cur_code<>colon then expected(':')@+else get_next;
+cur_freq:=get_count;
+end
+
+@ @<Process a go to statement@>=
+begin get_next;
+if cur_code<>small_const then expected('label')@+else get_next;
+add_weight(jump_cost); next_freq:=0;
+end
+
+@ @<Process a compound statement@>=
+begin get_next; append(indent);
+loop@+  begin get_statement;
+  if cur_code=end_code then goto done;
+  get_semi; flush_out; cur_freq:=next_freq;
+  end;
+done:flush_out; cur_freq:=next_freq; append(outdent); get_next;
+end
+
+@ @d check_boolean==
+  if cur_type<>bool_loc then err_print('! condition should be boolean')
+@.condition...boolean@>
+
+@<Process an if statement@>=
+begin get_next; add_weight(if_cost);
+get_exp; app_trans; check_boolean;
+if cur_code<>then_code then expected('then')@+else get_next;
+flush_out; cur_freq:=get_count; in_freq:=in_freq-cur_freq; next_freq:=cur_freq;
+if cur_code<>end_code then if cur_code<>semicolon then
+ if cur_code<>else_code then
+ if cur_code<>until_code then {controlled statement is nonempty}
+  begin append(indent); get_statement; append(outdent);
+  end;
+if cur_code=else_code then
+  begin out_freq:=get_count; {this count is supposedly redundant}
+  if in_freq<>out_freq then @<Show frequency lossage in the output@>
+  else flush_out;
+  get_next; append(indent); cur_freq:=out_freq;
+  out_freq:=next_freq; get_statement; next_freq:=next_freq+out_freq;
+  append(outdent);
+  end
+else next_freq:=in_freq+next_freq;
+end
+
+@ Frequency counts can be ``off'' for a variety of reasons (e.g., when a
+procedure sometimes doesn't return, or when a user aborts the program).
+Such discrepancies are indicated by a `\.{\{LOST..\}}' comment line.
+
+@<Show frequency lossage...@>=
+begin flush_out; append(lost_comment); cur_freq:=in_freq-out_freq;
+flush_out;
+end
+
+@ @<Process a case statement@>=
+begin get_next; add_weight(case_cost); get_exp; app_trans;
+if cur_code<>of_code then expected('of')@+else get_next;
+flush_out; append(indent); out_freq:=0;
+loop@+  begin if (cur_code>=min_case_label)and(cur_code<=max_case_label) then
+    begin append(backspace); @<Scan past case labels@>;
+    cur_freq:=get_count; in_freq:=in_freq-cur_freq;
+    if cur_code<>colon then expected(':')@+else get_next;
+    get_statement; out_freq:=out_freq+next_freq;
+    end;
+  if cur_code<>semicolon then goto done2;
+  get_next; flush_out;
+  end;
+done2: flush_out; append(outdent);
+if cur_code<>end_code then expected('end')@+else get_next;
+cur_freq:=in_freq; next_freq:=out_freq;
+if cur_freq<>0 then append(lost_comment);
+end
+
+@ The calculation of |next_freq| after a repeat statement is slightly
+tricky because of the possibility of |goto| statements leading out of the loop.
+
+@<Process a repeat statement@>=
+begin get_next; append(indent); cur_freq:=get_count; out_freq:=cur_freq;
+loop@+  begin get_statement;
+  if cur_code=until_code then goto done3;
+  get_semi; flush_out; cur_freq:=next_freq;
+  end;
+done3:flush_out; cur_freq:=next_freq; append(outdent); get_next;
+add_weight(repeat_tax); get_exp; app_trans; check_boolean;
+next_freq:=cur_freq-out_freq+in_freq;
+end
+
+@ The fact that \&{goto}'s can affect the frequencies means that we don't
+know how often the test of a |while| or |for| loop is performed until
+after the loop has been entirely scanned. \.{PROFILE} therefore outputs
+a special line that says `\.{\{WHILE..\}}' or `\.{\{FOR..\}}', after the
+necessary information has been gathered. These special comments are
+treated as identifiers, for simplicity.
+
+@<Set up all...@>=
+id9("{")("W")("H")("I")("L")("E")(".")(".")("}")(0)(0); while_comment:=cur_name;
+id8("{")("L")("O")("S")("T")(".")(".")("}")(0)(0); lost_comment:=cur_name;
+id7("{")("F")("O")("R")(".")(".")("}")(0)(0); for_comment:=cur_name;
+
+@ @<Glob...@>=
+@!while_comment,@!lost_comment,@!for_comment:pointer;
+  {locations of special comments}
+
+@ @<Process a for statement@>=
+begin get_next; add_weight(for_cost); get_variable; app_trans;
+if cur_code<>colon_equal then expected(':=')@+else get_next;
+get_exp; app_trans;
+if cur_code<>to_or_downto_code then expected('to or downto')@+else get_next;
+get_exp; app_trans;
+if cur_code<>do_code then expected('do')@+else get_next;
+flush_out; append(indent); cur_freq:=get_count; out_freq:=cur_freq;
+get_statement; append(outdent);
+flush_out; append(for_comment); cur_freq:=next_freq; add_weight(for_tax);
+next_freq:=next_freq-out_freq+in_freq;
+end
+
+@ @<Process a while statement@>=
+begin get_next; add_weight(while_cost);
+get_exp; app_trans; check_boolean;
+if cur_code<>do_code then expected('do')@+else get_next;
+w:=out_wt; flush_out; append(indent); cur_freq:=get_count; out_freq:=cur_freq;
+get_statement; append(outdent);
+flush_out; append(while_comment); cur_freq:=next_freq;
+add_weight(w+while_tax);
+next_freq:=next_freq-out_freq+in_freq;
+end
+
+@ An assignment of an array to an array is treated here as an assignment
+of a simple variable to a simple variable, since the author didn't want to
+bother to compute the size of the array. If the user actually uses such
+assignments, an appropriate `\.{\{+v\}}' comment should be given so that
+the statement is weighted properly.
+
+@d incomp==err_print('! incompatible types')
+@.incompatible types@>
+
+@<Process an assignment statement@>=
+begin if cur_code=function_id then
+  begin lhs_type:=info(cur_aux); append(initial_cap); get_next;
+  end
+else  begin get_variable; app_trans; lhs_type:=cur_type;
+  end;
+if cur_code<>colon_equal then expected(':=')@+else get_next;
+get_exp; app_trans; add_weight(store_cost); t:=info(cur_type);
+case info(lhs_type) of
+real_type:if t=int_type then add_weight(int_real_cost)
+  else if t<>real_type then incomp;
+packed_array_type,record_type: begin if(t<>info(lhs_type))or
+    ((link(cur_type)<>link(lhs_type))and(cur_type<>string_loc)) then incomp;
+  if t=packed_array_type then
+    begin if cur_type=string_loc then n:=cur_length
+    else n:=1;
+    end
+  else  begin n:=0; lhs_type:=link(lhs_type);
+    while lhs_type<>null do
+      begin incr(n); lhs_type:=link(lhs_type);
+      end;
+    end;
+  add_weight((n-1)*(fetch_cost+store_cost));
+  end;
+othercases if t<>info(lhs_type) then incomp
+endcases;
+end
+
+@* The program.
+Now there's only one thing left to do, namely to parse an entire
+\PASCAL\ program (meanwhile doing all the profiling). This is where
+\.{PROFILE} itself begins and ends.
+
+@p begin initialize; @<Set up all...@>;
+print_ln(banner); {print a ``banner line''}
+get_next; {get the first token}
+if cur_code<>program_code then expected('program')@+else get_next;
+append(initial_cap); skip_to_id; get_next;
+if cur_code=left_paren then
+  begin get_next; p:=get_id_list;
+  if cur_code<>right_paren then expected(')')@+else get_next;
+  end;
+get_semi; flush_out;@/
+get_block; {this is where most of the work is done}
+if cur_code<>dot then expected('.');
+append(".");flush_out; {if all went well, that's the `\&{end.}' of the program}
+@<Check that |count_file|...@>;
+if max_section=0 then write_ln('Total weight was',expl_cost[0]:17:1)
+@.Total weight was...@>
+else @<Output the accumulated statistics@>;
+end_of_PROFILE:
+  {here files should be closed if the operating system requires it}
+@<Print the job |history|@>;
+end.
+
+@ Some implementations may wish to pass the |history| value to the
+operating system so that it can be used to govern whether or not other
+programs are started. Here we simply report the history to the user.
+@^system dependencies@>
+
+@<Print the job |history|@>=
+case history of
+spotless: print_nl('(No errors were found.)');
+harmless_message: print_nl('(Did you see the warning message above?)');
+error_message: print_nl('(Pardon me, but I think I spotted something wrong.)');
+fatal_message: print_nl('(That was a fatal error, my friend.)');
+end {there are no other cases}
+
+@* System-dependent changes.
+This module should be replaced, if necessary, by changes to the program
+that are necessary to make \.{PROFILE} work at a particular installation.
+It is usually best to design your change file so that all changes to
+previous modules preserve the module numbering; then everybody's version
+will be consistent with the printed program. More extensive changes,
+which introduce new modules, can be inserted here; then only the index
+itself will get a new module number.
+@^system dependencies@>
+
+@* Index.
+Here is a cross-reference table for the \.{PROFILE} processor.  All
+sections in which an identifier is used are listed with that identifier,
+except that reserved words are indexed only in unusual cases.  Underlined
+entries correspond to where the identifier was declared. Error messages
+and a few other things like ``system dependencies'' are indexed here too.

@@ -1,0 +1,1612 @@
+%   Documentation for Tib reference formatting programs --- version 2.1
+%   Plain TeX file                    August, 1986
+%   Copyright (C) 1986, James C. Alexander
+%
+\def\TDOCDIR{AAAAA}%directory for Tib documentation
+\def\TMACDIR{BBBBB}%directory for Tib macros
+\def\TCOMMON{CCCCC}%name of Tib file of common words
+\def\DIRSEP{/}%directory separator in path names
+\def\OPTCH{-}%option character on program call
+
+\def\leftheadline{\rightheadline}%                          one-sided printing
+%\def\leftheadline{\bf folio\ \ --- \it\firstmark\hss\bfTib}%two-sided printing
+
+\baselineskip 1.2\normalbaselineskip
+\nopagenumbers\voffset=2\baselineskip
+\headline{\ifnum\pageno=1\hfill
+    \else{\ifodd\pageno\rightheadline\else\leftheadline\fi}\fi}
+\def\rightheadline{\bfTib\hss\it\firstmark\ ---\ \ \bf\folio}
+\outer\def\beginsection#1#2\par{\vskip0pt plus#1\vsize\penalty-250
+    \vskip0pt plus-#1\vsize\bigskip\vskip\parskip\message{#2}
+    \leftline{\kern-4pt\llap{$\bullet$\ }\bf#2\hfill}\mark{#2}
+    \nobreak\smallskip\noindent}
+\outer\def\beginsubsection#1#2\par{\vskip0pt plus#1\vsize\penalty-250
+    \vskip0pt plus-#1\vsize\medskip\vskip\parskip
+    \leftline{\bf\ \ #2}\nobreak\smallskip\noindent}
+\def\Tib{{\rm T\kern-.1667em\sevenrm I\rm b}}
+\def\bfTib{{\bf T\kern-.2em\sevenbf I\bf b}}
+\def\itTib{{\it T\kern-.2em\seveni I\it b}}
+\def\LaTeX{{\rm L\kern-.36em\raise.3ex\hbox{\sevenrm A}\kern-.15em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\def\itLaTeX{{\it L\kern-.3em\raise.3ex\hbox{\seveni A}\kern-.15em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\def\AmSTeX{$\cal A\kern-.1667em\lower.5ex\hbox{$\cal M$}\kern-.125em
+    S$-\TeX}
+\def\\{\begingroup\catcode`\\=12\tt\char"5C\endgroup}
+\def\{{\begingroup\catcode`\{=12\tt\char"7B\endgroup}
+\def\}{\begingroup\catcode`\}=12\tt\char"7D\endgroup}
+\def\<#1>{\leavevmode\hbox{$\langle${\it#1\/}$\rangle$}}
+\def\[#1]{\leavevmode\hbox{\tt[#1]}}
+\def\({\/\rm(}\def\){\/\rm)}
+\newdimen\tableindent\newdimen\leftbox
+\def\tableset{\tableindent=\leftbox\advance\tableindent by 20pt
+    \leftskip\tableindent\rightskip10pt\parindent=0pt}
+\def\tableentry#1{%
+    \setbox0\hbox{{\tt\tablemark#1}\hss}\wd0=\leftbox
+    \item{\box0}}
+\def\listitem{\tt\obeylines\obeyspaces\parindent20pt}
+
+\message{**** Documentation for Tib ****}
+{}\vglue-.45in
+\centerline{\bfTib\footnote*{Version 2.1. \copyright 1986, 1987
+James C. Alexander.
+\Tib{} may be distributed whole, but not sold.  It
+is available from {\tt june.cs.washington.edu:\~\ ftp/tex\/} via {\it ftp},
+and is also part of the Unix TeX distribution.}}
+\bigskip
+\centerline{A \TeX{} bibliographic preprocessor}
+\bigskip
+{\baselineskip10pt
+\centerline{J. C. Alexander}
+\smallskip
+\centerline{Department of Mathematics}
+\centerline{University of Maryland}
+\centerline{College Park, MD 20742}}
+
+\bigskip\hfill\hbox{\vbox{\baselineskip10pt
+\hbox{\it Small have continual plodders ever won,}
+\hbox{\it Save base authority from others{\rm'} books.}
+\smallskip
+\hbox{\ \ W. Shakespeare, \it Love{\rm'}s Labour{\rm'}s Lost}}}
+
+\beginsection{.3} 0. General
+
+\Tib{} is a package of four programs for making citations and reference
+lists in \TeX{} documents.  The main program, \Tib, operates on a \TeX{}
+file with incomplete or keyed citations, looks up the reference in a
+database, makes the complete citation and on command, makes a list of
+the references.  The citations in the source document
+are enclosed in (non-\TeX) escape characters
+which \Tib{} recognizes.  The output of \Tib{} is another \TeX{} file with
+complete citations and reference list formatted with a number of \TeX{} control
+sequences and with definitions for these control sequences, ready
+to be processed by plain \TeX, \LaTeX, or another \TeX.  With appropriate
+options in \Tib{} and definitions of the control sequences, set by
+flags in the call to \Tib{} or as environment variables,
+the citations and references can be formatted in any
+of a large variety of styles, and in particular, in the styles of various 
+journals.  It is intended that \Tib{} be easy to use as is and yet also allow
+custom citation and reference formats to be created and implemented
+without undue effort.
+
+\Tib, being a preprocessor, is more in the style of {\it refer\/}, a similar
+preprocessor for the {\it nroff{\rm/}troff\/} textsetters, than say
+B{\sevenrm I}B\TeX.  Indeed \Tib{} originally was to be a minor
+modification of the {\it nroff{\rm/}troff\/} preprocessor {\it bib\/}
+written by T. A. Budd (which was inspired by {\it refer\/}),
+but with \TeX{} output; however it has grown and changed
+considerably. The philosophy, though, is that of {\it refer\/} and {\it bib\/}
+(especially of {\it bib\/} in regard to modularity of the formatting files),
+and some of the code and subroutines from {\it bib\/} remain.
+The source code of \Tib{} is in the language C.
+
+The sections of this document are:
+\medskip
+\halign{\indent\indent#\hfil&\quad{\it#}\hfil\cr
+1.&Demonstration\cr
+2.&Program calls\cr
+3.&Available styles\cr
+4.&The input document\cr
+5.&Styles and files\cr
+6.&The reference file\cr
+7.&Error and warning messages\cr
+8.&Appendix: the example document\cr
+9.&Appendix: local changes\/ {\rm(if any)}\cr
+}
+\medskip\noindent
+Section~1 is for first-time users.  Indeed, probably the best course is
+to use the demonstration files as models and use the remainder of this
+documentation as reference when needed.
+
+\Tib{} is written to be fairly robust to handle the vast 
+majority of references automatically, but not necessarily rapidly.
+The escape characters of \Tib{} do not interfere with \TeX{} processing.
+If \TeX{} is applied to the original pre-\Tib{} document, the escape
+characters and incomplete citations will appear as written.
+Thus it is suggested that a \TeX{} document be debugged before applying
+\Tib.  When the \TeX{} bugs are eliminated, \Tib{} can be used
+for the final one or two runs.
+\beginsection{.3} 1. Demonstration
+
+{\leftskip3pc\parindent0pt\it
+\item{\rm1.} Copy the file\/ {\rm\TDOCDIR\DIRSEP test.tex} 
+{\rm(}see appendix\/{\rm)} into a directory.
+This is a sample\/ \TeX{} document ready for \itTib.
+
+\item{\rm2.} Copy the file\/ {\rm\TDOCDIR\DIRSEP test.ref} into the same
+directory.  This is a sample bibliographic database.
+
+\item{\rm3.} Apply the program \itTib dex to\/ {\rm test.ref\/}
+\smallskip\par\hskip40pt{\tt tibdex test} \hskip1em (the {\tt .ref} is appended
+automatically)\smallskip
+\par This creates an inverted index\/ {\rm INDEX\/} in the directory.
+
+\item{\rm4.} Apply \itTib{} to\/ {\rm test.tex\/}.
+\smallskip\par\hskip40pt{\tt tib test.tex}
+\par or
+\par\hskip40pt{\tt tib test}\smallskip
+\par {\rm(}the extension\/ {\rm .tex\/} need not be part of the call\/{\rm)}. 
+The output is the file\/ {\rm test-t.tex}, which is ready for\/ \TeX.
+
+\item{\rm4.L.} For \itLaTeX, follow the instructions in\/ {\rm test.tex\/} before
+performing step 4.
+
+\item{\rm5.} Process\/ {\rm test-t.tex\/} with \TeX{} or \itLaTeX{} as usual.
+\bigskip}\noindent
+This call sets default options.  A large variety of formatting options
+is available.  Some of them are: other fonts (old English, boldface ...),
+alphabetizing and other sorts of sorts, replacing successive
+listings of identical
+author(s) by underlines, other citation styles (3 letter codes from authors'
+names, authors' names and date, superscripts), reversing and/or abbreviating
+authors' names, caps-small caps for names, hyphenating strings of references
+in citations, footnotes instead of endnotes, other listing formats.  Any
+combination of these (and others) can be packaged in a format file and called
+with the \OPTCH s~\<style> option.  For demonstrations of some of these,
+repeat steps 4-5 with the following calls on {\it test.tex}:
+\smallskip{\tt
+\par\indent\indent tib \OPTCH s demo1 test
+\par\indent\indent tib \OPTCH s demo2 test {\rm(for plain \TeX)}
+\par\indent\indent tib \OPTCH s demo2l test {\rm(for \LaTeX)}
+\par\indent\indent tib \OPTCH s demo3 test {\rm(for plain \TeX)}
+\par\indent\indent tib \OPTCH s demo3l test {\rm(for \LaTeX)}
+\par\indent\indent tib \OPTCH s demo4 test
+\par\indent\indent tib \OPTCH s demo5 test
+\par\indent\indent tib \OPTCH s demo6p test {\rm(for plain \TeX)}
+\par\indent\indent tib \OPTCH s demo6l test {\rm(for \LaTeX)}}.
+\smallskip
+
+\noindent The last two call for footnotes; note the instructions in
+{\it test.tex}. Note that occasionally, reformatting or additional editing is 
+called for.  \Tib{} is not meant to cover {\it all\/} formatting possibilities.
+
+\beginsection{.1} 2. Program calls
+
+There are four programs in the \Tib{} package:
+\medskip\halign{\indent\indent#\hfil&\qquad{\it#}\hfil\cr
+\Tib&bibliographic preprocessor for \TeX{} documents,\cr
+\Tib dex&makes inverted index from database\/{\rm(}s\/{\rm)},\cr
+\Tib list&lists all members of the database\/{\rm(}s\/{\rm)},\cr
+\Tib look&interactively locates listings in the database\/{\rm(}s\/{\rm)}.\cr}
+\medskip
+We consider the specifications for each.  In the calls below angle brackets
+(\<name>) enclose names to be supplied by the user.  Square
+brackets (\[\OPTCH {\it flag}]) enclose optional items.  The brackets
+are not part of the call.  The space indicated between a flag and a
+\<name> can be omitted.  The flags need not be used in the order indicated
+below; files are processed in the order they appear, left to right.
+Note there is a distinction between {\it index\/}
+files and {\it reference\/} files.  The latter is the database created by
+the user; the former is created by \Tib dex.
+
+\centerline{\vrule height0pt depth.5pt width8pc}
+\par\vskip0pt plus.3\vsize\penalty-250\vskip0pt plus-.3\vsize
+{\noindent\raggedright\tt 
+\leftline{tib \[\OPTCH d \<directory>] \[\OPTCH i \<include file>]
+     \[\OPTCH n \<initial flag>]
+     \[\OPTCH p \<private index file\/{\rm(}s\/{\rm)}>]}
+     \rightline{\[\OPTCH s \<style file>]
+     \[\OPTCH x] \[\OPTCH z] \[\OPTCH $|$] \[\<input
+                file\/{\rm(}s\/{\rm)}>]}}
+\bigskip
+\noindent\Tib{} is a program to construct a bibliography for a \TeX{} file
+and to include calls to macros files so that \TeX{} formats the citations
+and bibliography in any of a number of styles.
+The {\it input file} is a \TeX{} file augmented with incomplete or keyed
+citations surrounded by \Tib{} escape characters, as described in section~4.
+Multiple input files are separated by spaces on the call and amalgamated
+into one output file.  If \<input file> is omitted, one prompt is given.
+If the input file is named {\it file\/} or {\it file.tex},
+the output file is named {\it file-t.tex}, unless the input file is
+{\it stdin}, in which case the output file is {\it stdout}.
+The following are the options:
+\par{\leftbox5pc\def\tablemark{\OPTCH }\tableset
+
+\tableentry{d \<directory>}Private directory of \Tib{} files.  Obviates
+\OPTCH i~option.  See Table~6.
+
+\tableentry{i \<file>}Include file of macros and \Tib{} commands.
+See sections 3 and~5.
+This option is used if there are private macro/command file(s).
+
+\tableentry{n \<initial flag>}Number (nonnegative) used as initial
+numerical citation flag (default 1).  Ignored for nonnumerical flags.
+
+\tableentry{p \<files>}Private index files, separated by commas.
+The default is the file {\it INDEX\/} in the working directory.
+
+\tableentry{s \<file>}Style file, which contains formatting instructions and
+also may call other files.  Style files are described in detail in section~6.
+The available style files are described in section~3.
+
+\tableentry{x}Output to {\it stdout}.
+
+\tableentry{z}Silent run.  Informational (but not warning or error)
+messages are suppressed.
+
+\tableentry{$|$}Pipe.  Input is {\it stdin\/}; output is {\it stdout}.  Silent.
+\par}\centerline{\vrule height0pt depth.5pt width8pc}
+
+\par\vskip0pt plus.3\vsize\penalty-250\vskip0pt plus-.3\vsize
+{\noindent\tt
+\leftline{tibdex \[\OPTCH c \<common-word files>] \[\OPTCH k \<key number>]
+       \[\OPTCH l \<length of keys>] \[\OPTCH n \<initial flag>]}
+       \rightline{\[\OPTCH p \<private output file>] \[\OPTCH z]
+       \[\OPTCH \%\<string>] \<reference file\/{\rm(}s\/{\rm)}>}}
+\bigskip
+\noindent\Tib dex makes an inverted index from reference file(s).  The
+reference files are described in section~6.  Names of multiple reference files
+are separated by spaces.  The output is an inverted index for use by
+\Tib{} and \Tib look.  The output index must not be moved or
+the links to the reference files will be broken.
+The following are the options:
+\par{\leftbox5pc\def\tablemark{\OPTCH }\tableset
+
+\tableentry{c \<file>}Common-word list, one word per line.  Common words
+are not used as keys (default \TCOMMON).
+
+\tableentry{k \<number>}Maximum number of keys kept per record (default 100).
+
+\tableentry{l \<number>}Maximum length of keys (default 6).
+
+\tableentry{n \<initial flag>}Number (nonnegative) used as initial
+numerical citation flag (default 1).  Ignored for nonnumerical flags.
+
+\tableentry{p \<file>}Private output file (default {\it INDEX\/} in the
+current directory).
+
+\tableentry{z}Silent run.  Informational (but not warning and error)
+messages are suppressed.
+
+\tableentry{\%\<string>}Ignore lines in the reference file that begin 
+with \%x where x is in {\it string\/} (see Table~10) (default CNOPVcnopv\\\%).
+\par}\centerline{\vrule height0pt depth.5pt width8pc}
+
+\par\vskip0pt plus.3\vsize\penalty-250\vskip0pt plus-.3\vsize
+{\noindent\raggedright\tt 
+     tiblist \[\OPTCH d \<directory>] \[\OPTCH i \<include file>]
+     \[\OPTCH s \<style file>] \[\OPTCH x] \[\OPTCH z] \[\OPTCH $|$] 
+     \[\<reference file\/{\rm(}s\/{\rm)}>]}
+\bigskip
+\noindent\Tib list makes a formatted plain \TeX{} file of all entries in the
+input reference file(s).  Names of multiple files are separated by spaces.
+If \<input file> is omitted, one prompt is given.  Unlike \Tib, \Tib list
+does not use inverted indices, but directly processes the reference files.
+The following are the options:
+\par{\leftbox5pc\def\tablemark{\OPTCH }\tableset
+
+\tableentry{d \<directory>}Private directory of \Tib{} files.  Obviates
+\OPTCH i~option.  See Table~6.
+
+\tableentry{i \<file>}Include file of macros and \Tib{} commands.
+See sections 3 and~5.
+This option is used if there are private macro/command file(s).
+
+\tableentry{s \<file>}Style file, which contains formatting instructions and
+also may call other files.  Style files are described in detail in section~5.
+The available style files are described in section~3.
+
+\tableentry{x}Output to {\it stdout}.
+
+\tableentry{z}Silent run.  Informational (but not warning and error)
+messages are suppressed.
+
+\tableentry{$|$}Pipe.  Input is {\it stdin\/}; output is {\it stdout}.  Silent.
+\par}
+
+\noindent Note: the \OPTCH p~option does not cause an error, but is ignored.
+\par\centerline{\vrule height0pt depth.5pt width8pc}
+
+\par\vskip0pt plus.3\vsize\penalty-250\vskip0pt plus-.3\vsize
+{\noindent\raggedright\hangindent1pc\hangafter0\tt
+          tiblook \[\OPTCH c \<common-words file>]
+          \[\OPTCH l \<length of keys>] \[\OPTCH p \<private indices>]
+          \[\<keywords>]}
+\bigskip
+\noindent\Tib look locates entries in reference files from keywords.
+If keywords are not entered on the command line, \Tib look gives
+instructions and operates interactively.  \Tib look, like \Tib, works
+through inverted indices to get to the reference files.
+
+The following are the options:
+\par{\leftbox5pc\def\tablemark{\OPTCH }\tableset
+
+\tableentry{c \<file>}Common-word list, one word per line.  Common words
+are not used as keys (default \TCOMMON).
+
+\tableentry{l \<number>}Maximum length of keys (default 6).
+
+\tableentry{p \<files>}Private index files, separated by commas.
+The default is the file {\it INDEX\/} in the working directory.
+
+\tableentry{\<keywords>}Keywords for noninteractive search.
+\par}\centerline{\vrule height0pt depth.5pt width8pc}
+\par\vskip0pt plus.1\vsize\penalty-250\vskip0pt plus-.1\vsize
+
+\bigskip
+\par\noindent  The following can optionally 
+be set as variables in the environment:
+\medskip\par{\leftbox5pc\def\tablemark{}\tableset
+\tableentry{\rm TMACLIB}Directory for macro files (no directory-separator
+character on the end).
+\tableentry{\rm TMPDIR}Scratch directory for temporary work files (no
+directory-separator character on the end).
+\tableentry{\rm COMFILE}File of common words.
+\tableentry{\rm SYSINDEX}System index file.
+\tableentry{\rm DEFSTYLE}Default style file.
+\par}\centerline{\vrule height0pt depth.5pt width8pc}
+
+\bigskip
+\par\noindent  The options permit a variety of possibilities in file
+organization.  At one extreme there can be a number of specialized 
+reference files and \Tib dex can be run
+on particular ones to create an index for each particular document.  At the
+other extreme, there can be one master reference file and one master
+index in a dedicated directory.  This index can be accessed by \Tib{}
+with the \OPTCH p~option.  In this case the \Tib{} programs could be {\it aliased\/}
+(or called from macros) so this index is automatically accessible.  The same
+is true of private command files which are accessed with the \OPTCH i~option or made
+available with the \OPTCH d~option.
+
+\beginsection{.1} 3. Available styles
+
+The selection of style file for the \OPTCH s~option for the call to 
+\Tib{} is the basic choice and is often the only choice necessary.
+It controls the format style of the citations and reference list.  A
+number of styles are supplied; they are listed for reference (Tables 1 \&~2).
+A {\it name\/} listed is called by the option {\tt \OPTCH s~\<name>}
+(although {\it name\/} is only part of the actual name of the file).  The
+effect of the choice on \Tib{} is described in section~5.  There are 
+a number of general styles and variations which are listed in Table~1.
+Also a number of journal styles are available.  Journal styles
+currently available are listed in Table~2.  One of the purposes
+of \Tib{} is generating citations and reference lists in journal styles
+so that papers can be sent to journals as \TeX{} files.  As journals develop
+format specifications for \TeX{} files, more journal styles will be
+developed and refined to those specifications.  Conversely, a journal
+which accepts papers in \TeX{} form and which has
+a copy of \Tib{}, or at least appropriate {\it .ttx\/} files
+(see section~5), could process a paper set in \TeX{} with \Tib{}
+control sequences and format it to its own journal style.  See also the
+file {\tt\TDOCDIR\DIRSEP Styles}.
+
+\midinsert
+\centerline{\bf Table~1.  General format styles}\smallskip
+{\tt\catcode`\u=12\parindent17pt
+\par num \hskip2pc{\rm(default unless reset at installation or in environment)}
+\par numo, numos, numb, numbs, numu, numub, numubs, numus, numul,
+numubl, numubsl
+\par alpha, alphab
+\par nmdt, nmdtb
+\par footp, footl
+\par intext, slyd}
+\medskip
+\centerline{Meanings:}
+{\leftbox5pc\def\tablemark{}\tableset
+\par\tableentry{num}standard numerical citations
+\par\tableentry{alpha}3 letter alphabetic citations
+\par\tableentry{nmdt}citations made from names and date
+\par\tableentry{foot}footnotes
+\par\tableentry{o}old English
+\par\tableentry{b}some boldface
+\par\tableentry{s}sorted (alphabetized)
+\par\tableentry{u}superscripts (up)
+\par\tableentry{p}plain \TeX
+\par\tableentry{l}\LaTeX
+\par\tableentry{intext}references in text
+\par\tableentry{slyd}for making slides
+\par\centerline{\vrule height0pt depth.5pt width8pc}}
+\centerline{\bf Table~2.  Journal format styles}\smallskip
+{\leftbox5pc\def\tablemark{}\tableset
+\par\tableentry{acm}Association of Computing Machinery (all journals)
+[{\tt acml} for \LaTeX]
+\par\tableentry{}American Mathematical Society (all journals)
+\par\tableentry{amsa}\hskip1pc alphabetical citations
+\par\tableentry{amsd}\hskip1pc name-date citations
+\par\tableentry{amsn}\hskip1pc numerical citations
+\par\tableentry{aps}American Physical Society        
+\par\tableentry{cmp}{\it Communications in Mathematical Physics}
+\par\tableentry{epes}{\it Electrical Power and Energy Systems}
+\par\tableentry{ijrr}{\it International Journal of Robotics Research}
+\par\tableentry{ieee}Institute of Electrical and Electronic Engineers 
+(all journals)
+\par\tableentry{jgr}{\it Journal of Geophysical Research}
+\par\tableentry{lala}{\it Linear Algebra and its Applications}
+\par\tableentry{}Society for Industrial and Applied Mathematics (all journals)
+\par\tableentry{siamd}\hskip1pc name-date citations [{\tt siamdl} for \LaTeX]
+\par\tableentry{siamn}\hskip1pc numerical citations [{\tt siamnl} for \LaTeX]
+\par\centerline{\vrule height0pt depth.5pt width8pc}}\endinsert
+
+\Tib{} is not universally successful with all styles.  There are
+several features which don't work well in slyd; these are detailed in
+the master file {\tt\TMACDIR\DIRSEP slyd.tib}.  Moreover, so that the
+alternate citation style (see section~4) works with footnotes, \Tib{}
+uses its own citation numbers in footnotes in plain \TeX.  If numbered
+footnotes are used for purposes other than citations, conflicts will
+arise.  \Tib{} works acceptably with \LaTeX, since it uses the footnote
+numbers generated by \LaTeX.  Certainly the same process can be made to
+work in plain \TeX{} ({\it The \TeX book}, exercise 15.12).  In
+addition, when using ``{\it loc.\ cit.}," \Tib{} refers only to the
+author(s).  However, see the appropriate {\tt .ttx} files for
+modifications to include the title also in the citation.  Also some
+styles call for amalgamating multiple references into one footnote or
+include comments and references in one footnote.  This is presently
+beyond \Tib's capability.  For example, \Tib{} has considerable trouble
+with the American Physical Society's style, which uses footnotes with
+all the above features, and in addition collects them at the end as
+endnotes.
+
+\beginsection{.2} 4. The input document
+
+\Tib{} operates on a \TeX{} file with incomplete citations.  It recognizes
+its own set of escape sequences, which are summarized in Table~3.  For an
+example document, see the appendix.  For each
+such citation it locates the reference in a reference file, constructs the
+citation in one of several styles and on demand, creates a reference list.
+In this section we discuss the way \Tib{} reads the file.
+
+An {\it ordinary incomplete\/} citation is surrounded by the characters
+{\tt [.} {\tt .]}.  For example:
+\medskip\centerline{\tt
+        \dots in Arnol'd's book,[.arnold singularities.]\ especially\dots}
+\medskip
+\noindent Words in the incomplete citation (separated by spaces)
+are matched against the inverted index created by \Tib dex
+and hence against the source reference files.  The words are any words
+in the reference listing, except those in the excluded fields (see section
+6 for a discussion of the reference files; see the \OPTCH \%~option for \Tib dex
+for excluded fields).  \Tib{} first searches the default index ({\it INDEX\/})
+or the indices designated with the \OPTCH p~option, in order from left to right
+and then the system index, if there is one.  If an entry is found that
+matches all words, that reference is used. If no reference entry is found
+or if multiple entries are found, a warning message is sent to the console.
+The case of the letters in the citation is immaterial.  The words in the
+citation are truncated (by default to 6 letters; see the \OPTCH l~option for
+\Tib dex).  Thus {\tt [.arnold singularities.]} and {\tt [.ARNOLD singul.]}
+effect the same result.  Embedded newlines, tabs and extra spaces are ignored.
+The format of the citation is controlled by \Tib{} format files (section~5).
+
+Note that punctuation is placed to the left of the citation.  In some
+citation styles (e.g.\ brackets), punctuation comes after the citation,
+and in others (e.g.\ superscripts), it comes before.  \Tib{}
+looks at the character immediately preceding the {\tt [.}\ and generates
+control sequences which are interpreted by \TeX{} via macro files appropriate
+to the citation style.  Punctuation to the right of citations is passed
+through unparsed to \TeX.
+Such a citation placed in a line after a \TeX{} comment character `\%'
+(or other character of category 14)
+will cause the cited reference to appear in the listing, but not in the text.
+
+Multiple citations in one citation mark are indicated by commas:
+\medskip\centerline{\tt
+       \dots equations.[.arnold singularities, arnold equations.]}
+\medskip
+
+\noindent {\it Additional information\/} can be placed at the end of a
+citation by enclosing it in angle brackets {\tt< >}, e.g.\
+\medskip\centerline{\tt
+       \dots in.[.arnold singularities <, chap.\catcode`\~=12{~}2>.]}
+\medskip
+\noindent In citation styles which use brackets, such insertions are enclosed
+{\it verbatim\/} in the brackets.  In other styles, such as footnotes, the
+information is appended to the reference listing.
+
+An {\it alternate citation} style can be used by surrounding the incomplete
+citation with {\tt<. .>}.  This is mostly for citations in running text.
+Thus:
+\medskip\centerline{\tt
+       \dots discussed in reference <.arnold singularities.>.}
+\medskip
+\noindent Insertions are not permitted in this alternative style.  Neither is
+punctuation handled specially; thus punctuation should be put in its
+usual place.
+
+A reference list is constructed and inserted in the document where the
+sequence {\tt .[]} is encountered at the beginning of a line.  The remainder
+of that line is processed and inserted before the listing.  The style and
+format of the listing is controlled by \Tib{} format files.
+
+If for some reason, one of \Tib's sequences is part of the text
+of the document, break up the sequence so \Tib{} will not recognize it
+(e.g.{} {\tt [\{\}.} or {\tt\$x< .5\$}).  
+Note that the \Tib{} escape sequences are transparent to
+\TeX{} so they do not interfere with \TeX{} processing.  Thus a \TeX{}
+document can be debugged without running \Tib{}.  The citations
+will appear as typed in the document.  After all \TeX{} bugs are eliminated,
+then \Tib{} can be used for the final one or two runs.
+
+\midinsert
+\centerline{\bf Table~3.  \bfTib's escape sequences}\smallskip
+{\leftbox10pc\def\tablemark{}\tableset
+
+\tableentry{[.{\it key words}.]}Citation,
+
+\tableentry{<.{\it key words\/}.>}Alternate citation,
+
+\tableentry{[.\ $\dots$<{\it insertion\/}>.]}Insertion in citation,
+
+\tableentry{.[]}Make reference list after this line (must be at beginning
+of line).
+\par}\endinsert
+
+\beginsection{.2} 5. Styles and files
+
+\Tib{} controls the format of the citations and reference lists by means
+of files of \Tib{} and \TeX{} commands.  For the most part the details of such
+controls can be ignored, with three possible exceptions.  
+
+One: it is possible
+to ``define" code words for use in the reference files.  For example, a file of
+1845 standard (= {\it Mathematical Reviews}) journal abbreviations is supplied
+and \Tib{} will automatically abbreviate journal names.  The process is
+discussed below in the subsection on definitions.  Additionally, private
+abbreviations can be defined and the standard abbreviations can be overridden.
+The method for doing such is discussed in this section.  
+
+Two: \Tib{} can automatically format
+99\kern.25em\raise.5ex\hbox{\the\scriptfont0 {44}}
+\kern-.35em/\kern-.15em\lower.25ex\hbox{\the\scriptfont0 {100}}\%\ \thinspace
+of citation work.  However it is only a computer
+program, and on occasion will require human assistance.  There will be
+references which \Tib{} just cannot format correctly.  Or an overfull
+{\tt\\hbox} may crop up.  The output of \Tib{} is a \TeX{} document
+which may be edited before applying \TeX.  However \Tib{} puts out
+a small jungle of control sequences and it is necessary to have some idea how
+to hack through them.  
+
+Three: concerning those control strings, \Tib{}
+reserves fifty or so control strings for its use.  The definitions of these
+strings can be modified for particular effects; however unintentional
+modification can result in chaos.  Thus it is at least necessary to
+know what the reserved strings are.
+
+\beginsubsection{.2} Reserved control strings
+
+We take care of the last point first.  Table~4 is a complete list
+of global control strings which \Tib{} may insert into a document.
+Also \Tib{} uses the plain \TeX{} strings {\tt\\bgroup}
+and {\tt\\egroup} as implicit left and right braces.  For
+completeness, it explicitly defines them with their plain \TeX{} meanings.
+In addition \Tib{} sets a number of other control strings.  However
+these are local and thus will not conflict with their possible other use
+in other parts of the document.  For the meaning of these strings,
+see the file {\tt\TMACDIR\DIRSEP Macros.ttx}, where
+these control strings are given their default definitions.
+
+\midinsert
+\centerline{\bf Table~4.  Reserved global control strings}
+\smallskip
+\centerline{(See file {\tt\TMACDIR\DIRSEP Macros.ttx} for definitions)}
+\smallskip
+{\tt\settabs4\columns
+
+\+\\TMACLIB		&\\aand		&\\Aand		&\\aandd\cr
+\+\\Aandd		&\\ACitefont	&\\acomma	&\\Acomma\cr
+\+\\Authfont		&\\Citebrackets	&\\Citebreak	&\\Citecomma\cr
+\+\\Citefont		&\\Citehyphen	&\\Citenamedate	&\\Citeparen\cr
+\+\\Citesuper		&\\eand		&\\Eand		&\\eandd\cr
+\+\\Eandd		&\\ecomma	&\\Ecomma	&\\Flagfont\cr
+\+\\Flagstyle		&\\Initgap	&\\Initper	&\\LAcitemark\cr
+\+\\Lbang		&\\Lcitemark	&\\Lcolon	&\\Lcomma\cr
+\+\\LIcitemark		&\\Lperiod	&\\Lpunct	&\\Lqquote\cr
+\+\\Lquest		&\\Lquote	&\\Lrquote	&\\Lscolon\cr
+\+\\Lspace		&\\Nameand	&\\Nameandd	&\\Namecomma\cr
+\+\\RAcitemark		&\\Rbang	&\\Rcitemark	&\\Rcolon\cr
+\+\\Rcomma		&\\Reffont	&\\Refformat	&\\Refstd\cr
+\+\\Refstda		&\\Resetstrings	&\\Revcomma	&\\RIcitemark\cr
+\+\\Rperiod		&\\Rpunct	&\\Rqquote	&\\Rquest\cr
+\+\\Rquote		&\\Rrquote	&\\Rscolon	&\\Rspace\cr
+\+\\Smallcapsaand	&\\Smallcapseand&\\Smallcapsfont&\\Titlefont\cr
+\+\\Tomefont		&\\Underlinemark&\\Volfont	&\\zstr\cr
+\+\\Zstr		&\\ztest	&\\Ztest\cr
+\settabs3\columns
+\+\\journalarticleformat    &\\conferencereportformat  &\\bookformat\cr
+\+\\technicalreportformat   &\\bookarticleformat       &\\otherformat\cr
+}\endinsert
+
+\Tib{} is intended to be compatible with virtually all possible \TeX s,
+in particular plain \TeX, \LaTeX, and \AmSTeX.
+With only a few exceptions, all macros in \Tib{} are written
+in terms of primitive \TeX{} (starred commands in D. Knuth's
+{\it The \TeX book}).  The exceptions are:
+\par{\leftskip2pc\parindent0pt
+\item{(1)} fonts {\tt\\rm} and {\tt\\sl} are assumed loaded; also
+{\tt\\sevenrm} if {\tt AX} or {\tt EX} is used,
+\item{(2)} footnote
+macros for plain \TeX{} and \LaTeX{} are used in the appropriate macro files,
+\item{(3)} the files of journal names are for Latin fonts and
+include plain \TeX{} diacritical marks
+(D. Knuth's {\it The \TeX book}, p.~52 or L. Lamport's \itLaTeX, p.~40);
+in particular, if a Cyrillic font is to be
+used, different journal word-definition files must be used.\par}
+\noindent On the other hand, \Tib{} requires
+that the category codes of plain \TeX{} be in force
+(see {\it The \TeX book}, p.~37).  For example `\{' and `\}'
+are assumed to be grouping characters, `\%' is assumed to terminate a
+line, etc.\ \Tib{} occasionally puts out something in 
+{\tt\$math mode\$}, but creates neither displayed nor tabular material.
+
+\beginsubsection{.2} \bfTib{} files
+
+\midinsert
+\centerline{\bf Table~5.  A typical {\tt .tib}\ file}
+{\tt\obeylines\obeyspaces%
+\#
+\#  standard format
+\#
+\#         include word-definition file (journals and publishers)
+I TMACLIB amsabb.ttz
+H         hyphenate strings of citations
+
+\%The lines below are copied verbatim into the output document as TeX commands.
+\%First the file \\TMACLIB Macros.tib is \\input with Macros and default settings.
+\%The control string \\TMACLIB is just a path.
+\%
+\\input\\TMACLIB\ stdbra.ttx \%TeX macros for formatting reference list
+\\Refstda\\Citebrackets \%set general formats for reference list and citations
+}\endinsert
+
+\noindent The \OPTCH s and \OPTCH i~options of the call to \Tib{} both cause \Tib{} to
+process files.  The files are processed in their orders in the call to \Tib.
+These files (Table~5) contain \Tib{} format commands (Table~7) which
+control how \Tib{} processes the input file and/or \TeX{} control
+strings which are printed {\it verbatim\/} in the output document.  In turn
+these files can contain a command to process further files.  In general
+the \OPTCH s~option causes \Tib{} to process a master style file which in turn
+effects processing of subsidiary files.  For the most part the user need 
+only be concerned with the master file.  The \OPTCH d and \OPTCH i~options are available
+if some private commands (such as definitions for code words) or styles
+are to be incorporated.
+Although any \Tib{} command file can contain either \Tib{} commands or \TeX{} 
+control strings or both, there is a general extension-naming convention:
+\medskip
+{\leftbox3.5pc\def\tablemark{}\tableset\everypar={\hangindent1em\hangafter1}
+\smallskip\tableentry{.tib}Master command files, which are usually called by
+the \OPTCH s~option. These files contain enough commands to completely set a style.
+It is possible for one of these files to call another.
+\smallskip\tableentry{.ttz}Subsidiary files consisting of \Tib{} commands
+and possibly \TeX{} commands, which are called by {\tt .tib} files.
+\smallskip\tableentry{.ttx}Files consisting of \TeX{} macros which are
+often {\tt\\input} by commands from the master {\tt .tib} file.
+\par}\medskip
+
+\noindent Thus there are files
+\medskip
+\par{\leftbox5pc\def\tablemark{}\tableset
+\par\tableentry{\tt num.tib} setting standard numerical flags enclosed in 
+brackets,
+\par\tableentry{\tt amsabb.ttz} containing definitions 
+(abbreviations) of code words for journals, and 
+\par\tableentry{\tt ieee.ttx} containing the \TeX{}
+macros for formatting citations and references in the style of IEEE
+journals.
+\medskip}
+
+\midinsert\centerline{\bf Table~6. Order of file search}\medskip
+\par\vskip0pt plus4\baselineskip\penalty-250\vskip0pt plus-4\baselineskip
+\par\indent\indent\indent first: look in the current directory for \<filename>,
+\par\indent\indent\indent second: append {\tt .tib} to \<filename> 
+and look in the current directory,
+\par\indent\indent\indent third: if the \OPTCH d~option is used, look in that 
+directory for \<filename>,
+\par\indent\indent\indent fourth: append {\tt .tib} to \<filename> and look 
+in the \OPTCH d~directory,
+\par\indent\indent\indent fifth: look in the system directory for \<filename>,
+\par\indent\indent\indent sixth: append {\tt .tib} to \<filename> and look 
+in the system directory,
+\par\indent\indent\indent seventh: quit with an error message.
+\par\endinsert
+\bigskip
+\midinsert
+\centerline{\bf Table~7.  \bfTib{} commands}\smallskip
+\par{\leftbox10pc\def\tablemark{}\tableset
+\everypar={\hangindent1em\hangafter1}
+
+\tableentry{\#}Comment, line ignored
+
+\tableentry{A}Format authors' names depending on following characters
+as follows:
+
+{\leftbox11pc\tableset
+\tableentry{AA}Abbreviate authors' first names
+
+\tableentry{AR\<num>}Reverse first and last names of first {\it num}
+authors.  If {\it num} is omitted, all authors's names are reversed.
+
+\tableentry{AX}Print authors' names in caps-small caps.  If {\tt AA} and
+{\tt AX} are called for, the abbreviated first names are not put in
+caps-small caps (relevant only for first names not beginning with a capital 
+letter).  Defining {\tt\\Authfont} as a caps-small caps font [such as 
+{\it amcsc\/} (={\tt\\sc} in \LaTeX)] if one is available, 
+is an alternative to using {\tt AX}.
+\par}
+
+\tableentry{E}Equivalent to the {\tt A} command, except for editors.
+
+\tableentry{C\<template>}Citation template.  See discussion in text.
+
+\tableentry{D \<word> \<definition>}Definition of word.  See discussion in text.
+
+\tableentry{f}Footnotes.  Print out reference immediately, instead of
+saving for list (in which case the escape sequence {\tt .[]} is not used).
+
+\tableentry{F}Use special citations flags from reference file if they exist,
+instead of constructed flags.
+
+\tableentry{I \<filename>}Include {\it filename\/} for processing; 
+{\it filename\/} may contain further \Tib{} commands.
+
+\tableentry{H}Hyphenate three or more citations in one citation mark that 
+refer to successive entries in the reference list.  For example, the citation 
+2,3,4,5 is replaced by 2--5.  The {\tt H}~option implies the {\tt O}~option.
+
+\tableentry{L}Use ``{\it loc.\ cit.}" and ``{\it ibid.}" 
+for duplicate references.
+
+\tableentry{N\<string>}Turn off options indicated by {\it string}, which must
+be composed of the letters A (for AA), F, H, O, R, S, X (for AX).
+
+\tableentry{O}Citations in one citation mark are sorted according to the order 
+given by the reference list.
+
+\tableentry{P}Print only first page numbers of articles.
+
+\tableentry{S\<template>}Sort reference list according to {\it template}.  See
+discussion in text.
+
+\tableentry{T\<string>}Generate trailing character strings for reference fields
+coded in {\it string}.  See discussion in text.
+
+\tableentry{U}Replace two or more successive reference listings of identical
+authors by underlines.
+\par}\endinsert
+
+\Tib{} searches for \<filename> called with the \OPTCH s or \OPTCH i~option in the call, or
+the I~command in a file (see next subsection) in the order listed in Table~6.
+Thus system {\tt .tib} files or private {\tt .tib}
+files can be called with short names.  All other files require full names.
+Private files can be kept in the working directory or a directory designated
+with the \OPTCH d~option.  If the \OPTCH d~option is to be used regularly, the calls to
+\Tib{} and \Tib list could be {\it aliased\/} or put in macros.
+The code {\tt TMACLIB} (followed by one or more spaces)
+is defined as the system directory \TMACDIR{}
+for use in command files, and the \TeX{} control string {\tt\\TMACLIB}
+is defined as the system directory name, for use in {\tt\\input} commands.
+
+A \Tib{} output file starts with the \TeX{} commands
+\smallskip\hskip20pt
+{\tt\\def\\TMACLIB\{\TMACDIR\DIRSEP\}\\input\\TMACLIB\ Macros.ttx}.  
+\smallskip\noindent The file {\tt TMACLIB\DIRSEP Macros.ttx\/} contains
+default definitions for the reserved control strings.  Then any \TeX{}
+commands from the files called with the \OPTCH s or \OPTCH i~options (and commands
+from files called by these files) are listed.  Then comes the processed
+document.  There are also {\tt\\message} commands to list the files
+called (in order with nesting) on the terminal and in the {\tt .log} file
+during the subsequent \TeX{} run.
+Note that any default \TeX{} definition can be overridden by a redefinition
+either in a file called with \OPTCH i or in the document proper.  Similarly
+\Tib{} commands can be added in files called with \OPTCH i.  If there is a
+standard private such file (e.g.\ containing definitions), it could be kept in
+a special directory and the call to \Tib{} could 
+be {\it aliased\/} or put in a macro so that this file is always included.
+
+\beginsubsection{.05} \bfTib{} commands
+
+\Tib{} commands begin in the first column of a file and are one-letter commands
+possibly followed by character sequences.  Table~7 lists the commands.
+The first line in the file that does not match one of the items in Table~7
+causes that line and all subsequent lines to be copied {\it verbatim\/} to the
+output file.
+
+\beginsubsection{.1} Citations
+
+\midinsert
+\centerline{\bf Table~8.  Citation styles}
+\medskip\par{\leftbox2.5pc\def\tablemark{}\tableset
+\everypar={\hangindent1em\hangafter1}
+
+\tableentry{0}No citation -- used for inserting reference in the body of the 
+text.
+\smallskip
+\tableentry{1}Numerical citation, starting at 1 (default style).
+\smallskip
+\tableentry{2}Alphabetic citation constructed from last names of author(s):
+if one author then first 3 letters of name; if two authors then
+first 2 letter of name of first and first letter of name of second;
+if 3 or more authors then first letter of name of first three.
+If the last name of an author does not begin with a capital letter,
+the citation is extended until the first capital letter is encountered.
+Can be followed by further code which denotes additional fields from the
+reference file.  For example the template {\tt 2D-2} means follow the
+alphabetic citation with the last two characters in the date field.
+The two fields are separated by the \TeX{} control string {\tt\\Citebreak}.
+If {\tt\\Citebreak} is defined to be empty, the template {\tt 2D-2} will
+effect citations of the form ``AuD77."  If there are no authors, citations
+are made from editors' names.  If there are also no editors, the issuer
+is used.
+\smallskip
+\tableentry{3}Last names of authors or first author {\it et al.}\ if more
+than three authors. Can be followed by further code which denotes additional 
+fields from the reference file, as above.  If {\tt\\Citebreak} is defined to 
+be \{, \}, the template {\tt 3D-4} will effect citations of the form 
+``Hale, 1983."  If there are no authors, editors or the issuer is used as 
+above.
+\medskip
+\tableentry{4--9}Available for future use or for local styles.
+\par}\endinsert
+
+\noindent The citation command {\tt C} determines the style of the citation.
+The template is one number 0 through 3, which codes the citation,
+possibly followed by further instructions.  The template 
+codes are listed in Table~8.  The numerical citation style is the default.
+%Each field in the template can be followed by either `u' or `l' and the
+%field will be printed in upper or lower case respectively.  
+If necessary,
+the character `@' can be used to separate objects in the citation template.
+If two citations are identical (e.g.\ two works by one author
+in one year), \Tib{} appends letters `a', `b', etc.
+at the end of the citation to resolve ambiguities.
+
+\beginsubsection{.1} Sorting
+
+This command causes the reference list to be sorted according to the
+order encoded in \<template>.  The template consists of letters
+denoting fields of the reference file, possibly followed by numbers.
+For example, the template AD will effect a sort on authors' last
+names, with a secondary sort on the date.  The template A1D will effect
+a sort on the first authors' last names, with a secondary sort on the date.
+A minus sign after a field code will cause the sort to be in the reverse
+order, e.g.\ anti-alphabetically.  Two references which test equally in the
+sort will be listed in order of citation.
+
+\beginsubsection{.05} Trailing characters
+
+If the \Tib{} {\tt T} command is set, for each {\it field\/} indicated in
+{\it template}, \Tib{} prints out a control string {\tt\\{\it field\/}trail}
+which is defined as the last character in {\tt\\{\it field\/}str}.  This
+sometimes is used for determining the punctuation after the {\it data\/} in
+the listing.
+
+\beginsubsection{.2} Definitions
+
+\Tib{} is able to store a list of code words and their expansions.
+Such word-definition pairs are inserted with the {\tt D} command, followed
+by a space, followed by the code {\it word}, followed by another space,
+followed by the {\it definition} (expansion), e.g.
+\smallskip\par\hskip20pt {\tt D PROC Proceedings}\smallskip
+\par\noindent or
+\smallskip\par\hskip20pt {\tt D COMMA1 Comm.\ ACM}\smallskip
+\par\noindent
+Code words are restricted to alphanumeric, ampersand and underscore characters.
+Whenever \Tib{} encounters a $|${\it word\/}$|$ (enclosed between two vertical
+bars) in a reference file, it searches its list and replaces {\it word} with
+{\it definition}.  Moreover {\it definition} can itself contain 
+$|${\it another\_word\/}$|$.  \Tib{} will iterate the process until all
+{\it words} are expanded.  Also, more than one field can be part of the
+definition.  For example (with reference to Table~10) the word-definition pair
+\smallskip{\par\hskip20pt\tt
+D AcPress Academic Press\\
+\par\hskip20pt\%C $|$NYC$|$
+}\smallskip
+\noindent causes {\tt$|$AcPress$|$} to expand to the publisher
+``Academic Press" and the city ``$|$NYC$|$", which of course further
+expands to ``New York, NY."  Both fields are automatically available.
+Similarly {\tt$|$LNMath$|$} expands to the series ``Lecture Notes in 
+Mathematics," the publisher ``Springer-Verlag" and the cities 
+``New York--Heidelberg--Berlin."
+
+Files of word-definition pairs can be collected and
+processed by \Tib{} before processing the document.
+Thus expansions which are different in different styles can 
+be changed by using different definition files.  For example, one style
+may require ``Proceedings" where another may require ``Proc."  Furthermore
+files of standard abbreviations can be made automatically available.
+In particular, {\it Mathematical Reviews\/} has supplied its databases of full
+journal names and abbreviations.  These are available as 
+{\it amsfll.ttz\/} and {\it amsabb.ttz\/} respectively, and are 
+automatically processed by the supplied format styles.\footnote{*}{\Tib{} 
+thanks {\it Mathematical Reviews\/} for its
+generosity in providing these files as a service to the
+scientific community.  The data in these files are copyright \copyright\ by
+{\it Mathematical Reviews\/} and are not to be used
+in any proprietary manner.}
+The styles of most journals call for abbreviated journal names in reference
+lists, although a few (such as the 
+{\it Journal of Optimization Theory and Applications\/}) require full names.
+The 6-letter codes may be obtained by perusing the files. Any definition can
+be overridden by a later word-definition pair.  Moreover, since \Tib{}
+iterates the process of expanding words, private (perhaps shorter) codes
+can be created which expand to the ones in the files.  These could be kept 
+in another file which is accessed with the \OPTCH i or \OPTCH d~option.  For example:
+\smallskip\par\hskip20pt {\tt D CACM $|$COMMA1$|$}\smallskip
+\noindent There are other word-definition files
+{\it pub.ttz\/} (publishers) and {\it misabb.ttz\/} and {\it misfll.ttz\/}
+(miscellaneous) which are automatically included with the journal files.
+For run-time efficiency, extensive word-definition files should be amalgamated
+as much as possible and sorted alphabetically on the {\it word\/}s.
+
+\beginsubsection{.2} Reference lists
+
+For each reference to be listed, \Tib{} generates a local sequence of
+control strings for \TeX.  The interpretation of these control strings
+is governed by the macros in the selected {\it .ttx\/} file.  The relation
+of control strings with reference file fields is discussed in section~6.
+In this section we discuss the control strings \Tib{} generates.  In Table~9
+is listed a typical reference listing in a \Tib{} output file.
+
+\midinsert
+\centerline{\bf Table~9.  A typical \bfTib{} reference listing}\smallskip
+{\obeylines\obeyspaces\tt
+\{\\Resetstrings\%
+\\def\\Loccittest\{\}\\def\\Abbtest\{\}\\def\\Capssmallcapstest\{\}\%
+\noindent       \\def\\Edabbtest\{\}\\def\\Edcapsmallcapstest\{\}\\def\\Underlinetest\{\}\%
+\\def\\NoArev\{0\}\\def\\NoErev\{0\}\\def\\Acnt\{1\}\\def\\Ecnt\{0\}\\def\\acnt\{0\}\\def\\ecnt\{0\}\%
+\\def\\Ftest\{\ \}\\def\\Fstr\{10\}\%
+\\def\\Atest\{\ \}\\def\\Astr\{Donald E. Knuth\}\%
+\\def\\Ttest\{\ \}\\def\\Tstr\{The \\TeX book\}\%
+\\def\\Itest\{\ \}\\def\\Istr\{Addison Wesley\}\%
+\\def\\Ctest\{\ \}\\def\\Cstr\{Reading, MA\}\%
+\\def\\Dtest\{\ \}\\def\\Dstr\{1984\}\%
+\\Refformat\%
+\}
+}\endinsert
+
+The control strings {\tt\\Loccittest}, etc.\ are printed out by \Tib{}
+depending on the setting of various \Tib{} controls.  They are defined
+as \{\} or \{\ \} depending on whether the control is off or on, respectively.
+The control strings {\tt\\NoArev}, {\tt\\Acnt}, etc.\ are respectively set equal
+to the numbers of authors' names to be reversed, the number of authors, etc.
+These are for use in formatting, if needed.  For certain fields, \Tib{}
+also prints out formatting aides.  For example, for listings with page
+numbers, \Tib{} prints out a control string {\tt\\Pcnt}, which is
+defined as \{\} or \{\ \} if there is one or more than one page, respectively,
+so that for example, a choice can be made between ``p." and ``pp." in the
+listing.  For each field {\it field\/} 
+of the reference file which contains {\it data}, \Tib{} prints out
+\smallskip\par\hskip20pt
+{\tt\\def\\{\it field\/}test\{\ \}\\def\\{\it field\/}str\{{\it data\/}\}\%}.
+\smallskip\noindent A new field can be inserted in the \Tib{} output file 
+before running \TeX{} by inserting such a line.  In particular, anything put 
+in the O field is appended to the end of the reference listing.
+Also if need be, the {\it data\/} can be changed.  Depending on \Tib{} 
+commands set, some fields, particularly author and editor fields,
+may contain inserted \TeX{} control strings.  The control string
+{\tt\\Resetstrings} resets all the {\tt\\{\it field\/}test}s and
+{\tt\\{\it field\/}str}s to \{\} (except for the Z and z fields,
+see Table~10).  The control string {\tt\\Refformat} effects the printing
+of the listing.  Thus any changes between these two control strings affect
+the final printed document.
+%\vfill\eject
+
+\beginsection{.3} 6. The reference file
+
+\midinsert
+\centerline{\bf Table~10.  Field tags}\smallskip
+\par{\leftbox2pc\def\tablemark{\%}\tableset
+
+\par\tableentry{A}Author(s) (may have multiple authors, separate 
+field entry for each author in order)
+\par\tableentry{B}Book title
+\par\tableentry{C}City of publication
+\par\tableentry{D}Date
+\par\tableentry{E}Editor(s) (may have multiple editors, separate 
+field entry for each editor in order)
+\par\tableentry{F}Special citation flag, use is governed by \Tib{} 
+{\tt F}~command
+\par\tableentry{G}Government (NTIS) ordering number
+\par\tableentry{I}Issuer (publisher)
+\par\tableentry{J}Journal name or for unpublished conference report, 
+the conference name
+\par\tableentry{K}Keys for searching, not printed out
+\par\tableentry{M}{\it Mathematical Reviews} number
+\par\tableentry{N}Number of issue (journal or series)
+\par\tableentry{O}Other information, appended to listing
+\par\tableentry{P}Page numbers
+\par\tableentry{R}Technical report identifier
+\par\tableentry{S}Series title
+\par\tableentry{T}Title of article or book
+\par\tableentry{V}Volume number (journal or series)
+\par\tableentry{Z}Reserved by \Tib{} for special insertions
+\par\tableentry{a}Translator(s), also editor(s) of translated compilations
+\par\tableentry{b}Translated book title
+\par\tableentry{c}City of publication of translated item
+\par\tableentry{d}Date of translated item
+\par\tableentry{e}Author(s) 
+of reviewed material; reviewers' names go in {\tt A} fields in order
+\par\tableentry{i}Issuer of translated item
+\par\tableentry{j}Translated journal name
+\par\tableentry{k}Reserved for future use for secondary references
+\par\tableentry{n}Number of translated item
+\par\tableentry{o}Other information, inserted after book title
+\par\tableentry{p}Pages of translated article
+\par\tableentry{r}Identifier of translated technical report
+\par\tableentry{s}Series of translated item
+\par\tableentry{t}Title of translated article or book
+\par\tableentry{v}Volume of translated item
+\par\tableentry{z}Reserved by \Tib{} for special insertions
+\par\tableentry{\\}Beginning of line of \TeX{} instruction(s)
+\par\tableentry{\%}Comment (passed as \TeX{} comment)
+\par}\endinsert
+
+\noindent A reference {\it file\/} is a database file containing any
+number of reference {\it items}, separated by one or more blank lines.
+Reference items consist of reference {\it fields\/} which in turn
+consist of data organized into field {\it tags\/} and field {\it data}.
+The meaning of field tags is an extension of that of {\it bib\/} and is
+suggested by that of {\it refer}.  However there are enough differences
+that {\it bib\/} or {\it refer\/} reference files are not directly
+usable with \Tib.  A field tag is a percent sign `\%' in column~1
+followed in column~2 by a single character.  The currently recognized
+tags are listed in Table~10.  Field data begins in column~4; the data
+can consist of any printable characters.  Field data can be as long as
+necessary and can extend into the next line.  Lines that do not begin
+with a percent sign are treated as continuation lines.  Every line
+(including continuation lines) must begin in column~1.  The {\tt A},
+{\tt E}, {\tt a}, {\tt e} and {\tt\\} fields can be repeated as often
+as necessary; other fields can occur at most once (more precisely the
+last occurance of a field is the one used).  Fields can occur in any
+order except that authors, editors, etc.\ are listed in order of
+appearance.  Lines beginning `{\tt\%\\}' are inserted {\it verbatim\/}
+into the output; they are assumed to be \TeX{} instructions.  Lines in
+a reference item beginning `{\tt\%\%}' are comments.
+
+\midinsert
+\centerline{\bf Table~11.  The control string {\tt\\Refformat}}\smallskip
+{\tt\obeylines\obeyspaces%
+\\def\\Refformat\{\%Determines the kind of reference by the presence or
+\%   absence of certain fields in the database listing, and calls the
+\%   appropriate macro.
+\noindent        \\if\\Jtest\\present
+\noindent            \{\\if\\Vtest\\present\\journalarticleformat
+\noindent                 \\else\\conferencereportformat\\fi\}
+\noindent           \\else\\if\\Btest\\present\\bookarticleformat
+\noindent              \\else\\if\\Rtest\\present\\technicalreportformat
+\noindent                 \\else\\if\\Itest\\present\\bookformat
+\noindent                    \\else\\otherformat\\fi\\fi\\fi\\fi\}}
+\endinsert
+
+As discussed in section~5, \Tib{} turns the field data in a reference
+item into a sequence of \TeX{} control strings.  In each {\it .ttx} file,
+there are six basic format macros.  Which one is used depends on the presence
+or absence of certain fields in the sequence (unless the process is
+overridden).  The control string {\tt\\Refformat} (Table~11),
+which \Tib{} sets up to be processed by \TeX{} 
+after the sequence of field strings (Table~9),
+is contained in the file {\it Macros.ttx}, and causes \TeX{} to choose
+one of the six.  The control string {\tt\\Resetstrings} defines {\tt\\present}
+to be a space, so that if {\\\it field\/}test is {\{\ \}}, then 
+{\tt\\if{\\\it field\/}test\\present} tests true.
+
+\midinsert
+\centerline{\bf Table~12.  A macro to print a reference item}\smallskip
+{\tt\obeylines\obeyspaces%
+\\def\\conferencereportformat\{\\Reffont\\let\\uchyph=1\\parindent=1.25pc\\def\\Comma\{\}\%
+\noindent    \\sfcode`\\.=1000\\sfcode`\\?=1000\\sfcode`\\!=1000\\sfcode`\\:=1000\%
+\noindent              \\sfcode`\\;=1000\\sfcode`\\,=1000\%\\frenchspacing
+\noindent               \\par\\vfil\\penalty-200\\vfilneg\%\\filbreak
+\noindent     \\if\\Ftest\\present\\Flagstyle\\Fstr\\fi\%
+\noindent      \\if\\Atest\\present\\bgroup\\Authfont\\Astr\\egroup\\def\\Comma\{\\unskip, \}\\fi\%
+\noindent       \\if\\Ttest\\present\\Comma\\bgroup\\Titlefont\\Tstr\\egroup\\def\\Comma\{, \}\\fi\%
+\noindent        \\if\\Jtest\\present\\Comma\\bgroup\\Tomefont\\Jstr\\egroup\\def\\Comma\{, \}\\fi\%
+\noindent         \\if\\Ctest\\present\\Comma\\bgroup\\Cstr\\egroup\\def\\Comma\{, \}\\fi\%
+\noindent          \\if\\Dtest\\present\\kern.16667em(\\bgroup\\Dstr\\egroup)\\def\\Comma\{, \}\\fi\%
+\noindent           \\if\\Otest\\present\\Comma\\bgroup\\Ostr\\egroup\\fi.\%
+\noindent            \\vskip3ptplus1ptminus1pt\}\%\\smallskip}
+\endinsert
+
+The six macros {\tt\\journalarticalformat}, etc.\ 
+that actually effect the printing of the reference listings are rather 
+straightforward (see Table~12).  They check for the presence of
+relevant fields and print them out in the desired form.  Thus they consist
+mostly of a series of {\tt\\if\dots\\fi} conditional commands enclosing
+printing commands.
+
+If {\tt\\Reffont}'s selection for a particular reference item is 
+unsatisfactory, it can be redefined locally on a one-time basis in the
+\Tib{} output document before running \TeX, or permanently by including
+control strings in the reference file (see the example below).  
+Indeed of course, {\tt\\Refformat} or any
+of the six formatting macros can be redefined in the document or in an
+included file (called with the \OPTCH i~option or the \Tib{} I~command (Table~7)).
+
+\beginsubsection{.15} The K (keyword) field
+
+The K field is searched to identify references but is not printed out.
+Thus it can be used to facilitate identification.  An example:
+\medskip\vbox{\catcode`\~=12{\listitem%
+\%A Dennie Van~Tassel
+\%T Program Style, Design, Efficiency
+\%I $|$PrHall$|$
+\%D 1978
+\%K testing debugging tassel
+}}\medskip
+\noindent Note also the use of the defined word in the \%I field.
+The city of publication is included as part of the definition.
+
+\beginsubsection{.2} Formatting techniques
+
+Most reference items are uncomplicated and present no formatting problems.
+In this subsection we discuss some techniques for the other cases.
+
+\TeX{} control strings in the reference file can be used to automatically
+effect the format of the reference listing.  Consider the example:
+\medskip{\listitem%
+\%A R. Colt Hoare
+\%T A Tour through the Island of Elba
+\%C London
+\%D 1814
+\%O out of print
+\%\\def\\Refformat\{\\bookformat\}
+}\medskip
+\noindent This example of a book has no listed publisher (I field).  The 
+I field is used by {\tt\\Refformat} in its decision
+(Table~11) and the decision would be incorrect for this example.  Thus
+{\tt\\Refformat} is redefined in the reference item.  The redefinition
+is local to the one reference and does not affect other references.
+
+Most data in the reference file is passed through to \TeX{} unaltered.
+Thus \TeX{} control strings are permitted in the field data:
+\medskip
+{\listitem%
+\%T The development of the January 1983\\/\$1\^\\circ\\times1\^\\circ\$ 
+mean free-air anomaly data tape}
+\medskip
+The italic correction spaces things correctly if the title is printed in
+italic or slant.  In the six formatting macros, the control string
+printing the data is preceded by {\tt\\bgroup} and followed by
+{\tt\\egroup}.  This permits certain techniques.  For example, either
+\medskip
+{\tt\raggedright
+\%T A refined gravity model from LAGEOS\\/ \\egroup(GEM-L2)\\bgroup}
+\smallskip\noindent or \smallskip
+{\tt\%T A refined gravity model from LAGEOS\\/ \{\\Reffont(GEM-L2)\}}
+\medskip\noindent
+causes ``(GEM-L2)" to be printed out in ordinary type (usually Roman),
+even if the font for titles is something else.
+
+It is necessary to be more careful with author, editor, reviewer,
+translator and possibly institution fields.  \Tib{} operates on
+these fields in response to commands to abbreviate names, reverse
+names, and put fields in caps-small caps.  We discuss how \Tib{}
+operates on these fields.  The `a' and `e' fields
+are governed by the commands for editors.  If a reference item
+has no authors, the editors are used in place of the authors, both
+in the listing and for sorting.  If there are also no editors, the
+publishing institution is used.  The last name is the last word
+in a field.  If the name is compound, it can be connected with
+an active character or a space control character.  Thus
+\smallskip
+{\tt\%A Dennie Van\catcode`\~=12{~}Tassel}
+\par\noindent or
+\par{\tt\%A Dennie Van\\\ Tassel}
+\smallskip\noindent is correct.  The first style prohibits a line
+break; the second permits a break.
+
+For purposes of sorting, the first capital letter of the
+last name is used.  The abbreviation routine has a certain amount
+of sophistication.  It will abbreviate ``Heinz-Otto" to ``H-O."
+It will abbreviate ``d'Arcy" to ``d'A."  However if both abbreviation
+and caps-small caps are called for, it will not set the `d' in ``d'A."
+in small caps.  That will have to be done by hand or with \TeX.
+Making special letters with control characters in these fields
+(D. Knuth's {\it The \TeX book}, p.~52 or L. Lamport's \itLaTeX, p.~40)
+must conform to the following rules: they may not be nested and
+they must be enclosed in braces.  When sorting or making caps-small caps,
+\Tib{} handles material in braces in special ways.  The following are
+correct:
+\medskip\vbox{{\listitem%
+\%A Ol\{\\'u\}wol\{\\'e\} \{\\'O\}d\{\\'u\}nd\{\\'u\}n
+\%A S\{\\o\}ren \{\\AA\}ngstr\{\\"o\}m
+\%A Heinz-Otto O'Grady
+\%A Serge\{\\v\\i\} \{\\t I\}ur'ev}}
+\medskip
+There is one more rule.  Caps-small caps turns lowercase letters into
+uppercase; accordingly lowercase strings must have uppercase analogues
+if \Tib's caps-small caps are to be used.  If necessary these
+can be set up by {\tt\\def} (which are local to the references).  
+Thus: \medskip\vbox{{\listitem%
+\%\\def\\SS\{\\ss\}
+\%A K. L. Weierstra\{\\ss\}}}
+\medskip
+\noindent The last example above is better:
+\medskip{\listitem%
+\%\\def\\I\{I\}
+\%A Serge\{\\v\\i\} \{\\t I\}ur'ev}
+
+In fact, such control strings can be created and used to fool \Tib,
+at least partially, if need be.  For example:
+\medskip{\listitem%
+\%\\def\\PRESIDENT\{The President's Commission on Aging\}
+\%A \{\\PRESIDENT\}
+}\medskip
+\noindent This will ensure that the reference is alphabetized by ``PRESIDENT,"
+rather than by ``The."  However, \Tib's caps-small caps will not work;
+the entry will have to be set by hand.
+
+\beginsubsection{.3} Reference items
+
+In this section we consider the forms in the reference database
+of various types of reference materials.  The criteria used are
+those of {\tt\\Refformat} (Table~11).  Tags are indicated in
+parenthesis.
+
+\beginsubsection{.2} Journal article
+
+A journal article must have a journal name (\%J) and a volume
+number (\%V).  It usually also has one or more authors (\%A),
+a title (\%T), page numbers (\%P), and a date of publication (\%D),
+and sometimes an issue number (\%N).  It may have
+a publisher (\%I) or be a translation.  In the last case, certain lower case
+fields are used.  Two examples:
+\medskip\vbox{\catcode`\~=12{\listitem%
+\%A Tammo tom~Dieck
+\%T Bordism of \$G\$-manifolds and integrality theorems
+\%J $|$TOPOL$|$
+\%P 345-358
+\%V 9
+\%D 1970
+\%K dieck
+}}\bigskip
+\vbox{\listitem%
+\%A V. I. Arnol'd
+\%T Singularities of smooth mappings
+\%J $|$USPMN1$|$
+\%V 23
+\%P 3-44
+\%D 1968
+\%K arnold
+\%j $|$RUSMS$|$
+\%v 23
+\%d 1968
+\%p 1-43
+}\medskip
+\noindent Note the use of journal codes to effect automatic
+standard abbreviation.
+
+\beginsubsection{.2} Conference presentation
+
+A conference presentation can be either an unpublished report
+or an article in a proceedings which has no editor and is identified
+by the conference.  In this case the name of the conference is put
+in the journal field (\%J).  There is no volume (\%V) field.  There
+are likely also one or more authors (\%A),
+a title (\%T), a date (\%D) and a city (\%C), and in a proceedings, pages (\%P).
+\medskip\vbox{\listitem%
+\%A F. J. Lerch
+\%A S. M. Klosko
+\%T Gravity model improvement using laser data
+\%J First Crustal Dynamics Working Group Meeting
+\%C Goddard Space Flight Center
+\%D $|$SEP$|$, 1981
+}
+
+\beginsubsection{.2} Technical report
+
+A technical report has a report number or identifier (\%R).  It
+probably also has one or more authors (\%A), a title (\%T), a date
+(\%D), and an issuing institution (\%I) (which may alternatively be
+part of the report identifier), and possibly a city (\%C), a government
+issue number (\%G) and perhaps pages (\%P).
+\medskip\vbox{\listitem%
+\%A F. J. Lerch
+\%A S. M. Klosko
+\%A G. B. Patel
+\%T A refined gravity model from LAGEOS\\/ \\egroup(GEM-L2)\\bgroup
+\%I $|$NASA$|$
+\%R Tech.\ Memo.\ TM 84986
+\%D $|$FEB$|$, 1983
+}
+
+\beginsubsection{.2} Book
+
+A book has a publisher (\%I) but no journal name (\%J) or report number
+(\%R).  Usually it also has one or more authors (\%A), a title (\%T),
+a date (\%D) and a
+city of publication (\%C).  It may also belong to a series, in which case
+it has a series name (\%S), and probably a series volume (\%V) or number (\%N).
+It may also have a government number (\%G).  Note the use of the F field.
+In these examples, the city of publication (\%C)
+included as part of the definition of the abbreviated \%I field.
+In the first example there is no author (\%A) or editor (\%E); the issuer (\%I)
+is used in place of the author for citation making and sorting.
+
+\medskip\vbox{\listitem%
+\%T Software Engineering Automated Tools Index
+\%I $|$SRA$|$
+\%F SRA
+\%D 1982
+}\bigskip
+\vbox{\listitem%
+\%A R. E. Griswold
+\%A J. F. Poage
+\%A I. P. Polonsky
+\%T The SNOBOL4 Programming Language
+\%o (second edition)
+\%I $|$PrHall$|$
+\%D 1971
+}
+
+\beginsubsection{.2} Article in book
+
+An article in a book has two titles, the title of the article (\%T) and
+the title of the book (\%B).  It probably has one or more authors (\%A), and
+the book probably has one or more editors (\%E).  It also probably has page
+numbers (\%P).  As well, the fields for a book are present.
+\medskip\vbox{\listitem%
+\%A C. A. R. Hoare
+\%T Procedures and parameters:\ An axiomatic approach
+\%B Symposium on Semantics of Algorithmic Languages
+\%E E. Engeler
+\%P 102-116
+\%S $|$LNMath$|$
+\%V 188
+\%D 1971
+}
+
+\beginsubsection{.2} Compilation
+
+A compilation is the work of several authors gathered together by one or more
+editors (\%E).  Thus there are no authors (\%A).  Other than that,
+it is treated as a book.
+\medskip\vbox{\listitem%
+\%E Heinz-Otto Peitgen
+\%E Hans-Otto Walther
+\%T Functional Differential Equations and Approximation of Fixed Points
+\%D 1979
+\%S $|$LNMath$|$
+\%V 730
+}
+
+\beginsubsection{.2} Dissertation or thesis
+
+Many manuals of style say to treat a PhD dissertation as a book, with the
+institution granting the degree as the issuer.  However most journals
+format dissertation and thesis listings as technical reports.
+\medskip\vbox{\listitem%
+\%A Martin Brooks
+\%T Automatic Generation of Test Data for Recursive Programs Having
+Simple Errors
+\%R PhD Thesis
+\%I Stanford $|$UNIV$|$
+\%D 1980
+}
+
+\beginsubsection{.05} Preprint
+
+A preprint is also best handled as a technical report with ``preprint"
+or ``to be published" or even ``unpublished" in the R field.  
+Sometimes a preprint has a report
+number which can be used and ``to be published" can be put in the O field.
+
+\beginsubsection{.2} Other
+
+Most sources fit in one of the above categories.  A little experimentation
+may be necessary for less-standard sources, such as newspapers, archival
+sources, or correspondence.  If the reference item does not meet any of
+the criteria of {\tt\\Refformat}, it is formated by {\tt\\otherformat}
+(see Table~11).
+
+\beginsection{.1} 7. Error and warning messages
+
+{{\parindent0pt\filbreak
+\medskip{\tt Can't open index {\tt <}{\it indexname\/}{\tt>}}
+{\par\leftskip1pc Index \<indexname> does not exist or not readable.\par}
+
+\filbreak\medskip{\tt command line:\ invalid switch 
+{\tt <}{\it switch\/}{\tt>}}
+{\par\leftskip1pc \<switch> not a valid option on the call.\par}
+
+\filbreak\medskip{\tt Can't open {\tt <}{\it filename\/}{\tt>} or 
+{\tt <}{\it filename\/}{\tt>}.tex}
+{\par\leftskip1pc Neither document file \<filename> nor \<filename>.tex is
+available for reading.\par}
+
+\filbreak\medskip{\tt Cannot locate reference file {\tt <}{\it filename\/}{\tt>}}
+{\par\leftskip1pc File of references \<filename> not available.\par}
+
+\filbreak\medskip{\tt {\tt <}{\it index\/}{\tt>} not up to date}
+{\par\leftskip1pc One of the reference files antecedent to \<index> has been
+changed since \<index> was made.\par}
+
+\filbreak\medskip{\tt word {\tt <}{\it word}{\tt>} not defined in 
+definition list}
+{\par\leftskip1pc Misspelled word in reference file?\par}
+
+\filbreak\medskip{\tt bad brackets in string {\tt <}{\it string}{\tt>} in 
+references}
+{\par\leftskip1pc Unmatched, or badly placed, pair of brackets \{\} in a
+reference item has caused \Tib{} to get lost.\par}
+
+\filbreak\medskip{\tt word expected in definition}
+{\par\leftskip1pc A undefined word exists in word-definition file.\par}
+
+\filbreak\medskip{\tt too many definitions}
+{\par\leftskip1pc Word-definition file larger than limit set in source code.
+Reset and recompile.\par}
+
+\filbreak\medskip{\tt out of storage}
+{\par\leftskip1pc \Tib{} too big for system (either while making 
+word-definition list or while processing citations).  Possibly have to use 
+smaller word-definition file.\par}
+
+\filbreak\medskip{\tt unexpected end of citation template}
+{\par\leftskip1pc Citation template not complete.\par}
+
+\filbreak\medskip{\tt can't open temporary reference file}
+{\par\leftskip1pc Work file cannot be opened---system or environment 
+problem.\par}
+
+\filbreak\medskip{\tt can't open temporary output file}
+{\par\leftskip1pc Work file cannot be opened---system or environment
+problem.\par}
+
+\filbreak\medskip{\tt can't open temporary output file for reading}
+{\par\leftskip1pc Work file cannot be reopened---system or environment problem.\par}
+
+\filbreak\medskip{\tt ill formed reference}
+{\par\leftskip1pc Bad reference item has caused \Tib{} to get lost.\par}
+
+\filbreak\medskip{\tt end of file reading citation}
+{\par\leftskip1pc Probably {\tt.]} was omitted in document.\par}
+
+\filbreak\medskip{\tt citation too long}
+{\par\leftskip1pc Too many keys, or keys too long (truncate to 6 letters).\par}
+
+\filbreak\medskip{\tt inconsistent citation found in pass two}
+{\par\leftskip1pc \Tib{} found a reference earlier, now it can't---something
+funny's going on.\par}
+
+\filbreak\medskip{\tt citation not found in pass two}
+{\par\leftskip1pc \Tib{} found a reference earlier, now it can't---something
+funny's going on.\par}
+
+\filbreak\medskip{\tt tibdex:\ can't open temporary output file}
+{\par\leftskip1pc Work file cannot be opened---system or environment
+problem.\par}
+
+\filbreak\medskip{\tt tibdex:\ error in open of {\tt <}{\it filename\/}{\tt>}}
+{\par\leftskip1pc \<filename> doesn't exist or can't be read.\par}
+
+\filbreak\medskip{\tt tibdex:\ error in opening file for compression}
+{\par\leftskip1pc Work file cannot be opened---system problem.\par}
+
+\filbreak\medskip{\tt ill formed reference file}
+{\par\leftskip1pc Bad reference item has caused \Tib{} to get lost.\par}
+
+\filbreak\medskip{\tt too many references}
+{\par\leftskip1pc Number of reference larger than limit set in source 
+code.\par}
+
+\filbreak\medskip{\tt locate:\ cannot open {\tt <}{\it filename\/}{\tt>}}
+{\par\leftskip1pc \<filename> not available for reading in subroutine 
+{\it locate}.\par}
+
+\filbreak\medskip{\tt locate:\ no keys for citation}
+{\par\leftskip1pc Empty citation discovered in subroutine {\it locate}.\par}
+
+\filbreak\medskip{\tt locate:\ insufficient space for references}
+{\par\leftskip1pc \Tib{} too big for system---discovered in subroutine 
+{\it locate}.\par}
+
+\filbreak\medskip{\tt locate:\ first key ({\tt <}{\it keyname}{\tt>}) matched 
+too many refs}
+{\par\leftskip1pc Put another key first in citation.\par}
+
+\filbreak\medskip{\tt tibdex:\ too many common words}
+{\par\leftskip1pc Too many words in list of words not to be used as keys.\par}
+
+\filbreak\medskip{\tt no reference matching {\tt <}{\it citation}{\tt>}}
+{\par\leftskip1pc Probably mistyped keyword.\par}
+
+\filbreak\medskip{\tt multiple references match {\tt <}{\it citation}{\tt>}}
+{\par\leftskip1pc Need more keys in citation.\par}
+
+\filbreak\medskip{\tt Warning:\ reference list not made -- .[] not encountered}
+{\par\leftskip1pc A reference list is made where the symbols {\tt.[]} begin a 
+line.\par}
+}
+\filbreak\medskip}
+Finally there is the possibility the \Tib{} output file will cause a
+\TeX{} error.  It may be that a reference item does not have the
+right format (e.g.\ unmatched braces).  In many cases a quick fix may be
+possible in the \Tib{} output file.  If something goes completely
+haywire, a reserved control string may have been inadverdently redefined.
+There is also the possibility
+that \TeX{} will run out of room (see {\it The \TeX book}, p.~300),
+most likely because there are too many macros that
+are too big.  The macros that \Tib{} creates are not particularly
+space efficient.  None the less, they seem to have no trouble
+coexisting with the macros of \LaTeX{} or \AmSTeX.  However, these
+macros together with a collection of private macros may be too much.
+In this regard, see {\it The \TeX book}, appendix~D.4.  It is also
+true that there is much room for compactification in the macros
+\Tib{} creates.  In particular, for any particular input document, many of
+the macros are probably not used and can be physically eliminated
+from the appropriate {\it .ttx\/} files.  
+
+It is hoped, however, that all your \TeX nical referencing is
+trouble-free and that you never have read this section.
+\filbreak
+\bigskip
+\centerline{\bf Disclaimer}
+\medskip
+{\narrower\narrower In no event will the author be liable for any
+damages, including any lost profits, or other incidental or
+consequential damages arising out the use of or inability to use this
+program, even if the author has been advised of the possibility of such
+damages, or for any claim by any other party.\par}
+\filbreak
+
+\beginsection{.3} 8. Appendix: the example document
+
+\bigskip
+{\tt\obeylines\obeyspaces\indent%
+\%           EXAMPLE PAGE FOR TIB -- FOR USE WITH test.refs
+\%
+\%       For plain TeX:\ adjust \\vglue just below if necessary.
+\%       For footnotes (demo.6.p) comment out (\%) the line "\\vsize ..."
+\%       just below and the line near the end beginning ".[]".
+\%
+\%       For LaTeX, comment out (\%) the line "\\vsize ..." just below
+\%       and activate the three indicated lines.\ \ Also activate the
+\%       line "\\end\{document\}" near the end.\ \ For footnotes (demo.6.l)
+\%       comment out the second of the three lines and the line near
+\%       the end beginning ".[]".
+\%
+\%   next line for plain TeX
+\\vsize10.3truein\\nopagenumbers\\vglue-.5truein\% adjust \\vglue if necessary
+\%
+\%   next 3 lines for LaTeX
+\%\\documentstyle\{article\}\\textwidth6.5truein\\nofiles\\oddsidemargin=0truein
+\%\\pagestyle\{empty\}\\textheight10.3truein\\topmargin=-.7truein
+\%\\begin\{document\}
+\\centerline\{\\bf Example Test Page\}\\smallskip
+This example shows a citation for a book,[.griswold poage polonsky.]
+a journal article,[.dieck.]\ a conference paper,[.lerch crustal.]
+a technical report,[.lerch patel.]\ an article in a book,[.hoare engeler.]
+and something that fits in no category.[.reagan.]\ \ Multiple citations 
+[.brooks, hoare engeler.]\ look like this---or this,\%
+[.brooks.].[.hoare engeler.]\ \ A run of citations [.derham, sra, knuth, tassel.]
+can sometimes be hyphenated.\ \ The alternate citation style, for referring to
+reference <.knuth.> in running text, is different.\ \ Extra text can be
+inserted in citations.[.griswold poage polonsky <, chap.\catcode`\~12{~}2>.]\ \ Translations
+can be referenced.[.arnold equations, arnold singularities,gantmacher.]
+If necessary, letters are appended to citations to remove ambiguities.
+If desired, citations can be sorted by any of several templates.[.lerch 
+crustal,lerch putney,hoare elba,hoare engeler.]\ \ If there are no authors, 
+editors are used instead;[.peitgen walther.]\ if there are also no editors, the
+publishing institution is used.[.sra.]\ \ Sorting and citation creation is 
+based on the first capital letter in the last name.[.tassel,dieck,derham.]
+Special strings can be part of references [.tex,momentum harmonic,derham,rapp.]
+and special citation strings can be used.[.sra.]\ \ Also note 
+the performance of the abbreviation routine.[.thompson,peitgen.]
+.[]\\smallskip\\centerline\{\\bf References\}\\smallskip  \%comment out for footnotes
+\%\\end\{document\}  \%LaTeX
+\\bye  \%plain TeX
+\par}
+
+%Insert local changes below after removing `%' from next line.
+%beginsection{.3}9. Appendix: local changes
+
+%Leave blank line before insertions.
+\bye%After insertions

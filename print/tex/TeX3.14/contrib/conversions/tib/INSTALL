@@ -1,0 +1,131 @@
+Tib installation
+
+Tape: 9 track, 1600 6250 bpi, variable record length, 
+      unlabelled, block size 512 8000
+      ANSI (DEC File-11), labelled "tib", block size 2048
+
+Source language: C
+
+List of files attached at end.
+
+There are four directories needed,
+    1. source listing directory,
+    2. macro directory,
+    3. documentation directory,
+    4. index directory.
+
+It is suggested these be subdirectories of a directory `tib'.
+(Alternately they can all be the same directory.)
+
+1. Dump the tape into the source listing directory.
+       a. Dump the first file with the unix instruction
+            dd if=<tape unit> of=dump
+          where <tape unit> refers to the device on which the tape is mounted.
+          Do *not* rewind the tape.
+       b. Edit this file "dump", replacing all "tapeunit" by the tape unit.
+       c. Make "dump" executable, and execute it.  It should dump the tape.
+       d. The final file vitaMake has its name at the top.  Take a look.
+   OR
+       a. Dump the single file with the unix instruction
+            dd if=<tape unit> of=abc ibs=8000
+          This creates a file abc (size ~630K) which is a shell script for 
+          writing all the tib files.  It uses the unix commands sh, echo, ls,
+          sed, chmod.
+       b. Enter
+            sh abc
+          to write the tib files.
+       c. Discard files abc and 0.
+
+2. With a text editor, change (once in each appropriate file except as noted):
+       a. tibdoc.tex --- A at top, B at top, C at top,
+       b. tib.man    --- A (5 times), B, C, E, F,
+       c. intro.tib  --- A (3 times),
+       d. tib.h      --- B (2 times), C, F,
+       e. Makefile   --- D (line 3).
+
+   A. string AAAAA to name of documentation directory (absolute path),
+   B. string BBBBB to name of macro directory (absolute path),
+   C. string CCCCC to name of common-words file (absolute path),
+      (see 8 below, `common' is supplied common-words file),
+   D. string DDDDD to name of system bin directory (absolute path),
+   E. string EEEEE to name of source directory (absolute path),
+   F. string FFFFF to name of system index file (absolute path)
+      (see 12 below).
+      (Note: CCCCC and FFFFF are files; the others are directories.)
+
+3. Make certain paths to temporary files in  #define  statements
+   are correct in tib.h (they are set to /tmp/)  (there are
+   three of them).
+
+4. Make certain paths to system descriptions in  #include  statements
+   are correct in tibargs.c (#include <sys/types.h>, #include <sys/stat.h>).
+
+5. Move the following files to the documentation directory:
+   tibdoc.tex, intro.tib, test.tex, test.ref, Styles.
+
+6. Create tib.cat (`make manual') and install tib.man, tib.cat in
+   manual directories.  If desired, move tib.man and/or tib.cat to 
+   documentation directory.
+
+7. Move all files with extensions tib, ttz, ttx, to the macro directory.
+
+8. Move common to the index directory.
+
+9. Compile and link the programs.  Single command `make' should do it.
+   4 executables should result: tib, tibdex, tiblist, tiblook
+   (tiblook uses unix getopt; see instructions at beginning of source).
+
+10. Test
+       a. Make a test directory.  To it copy INDEX, test.tex and test.ref---
+          the last two from the documentation directory.
+       b. Run
+                         tib test.tex
+          This uses INDEX and should create a TeX file.
+          (If you get a "INDEX not up to date" message when you test tib, it 
+          is because tib is comparing the last modify dates of test.ref and 
+          INDEX (with chkindex). Just put INDEX in and out of a text editor 
+          (touch) to give it a new date.)
+          Run (plain) TeX on the output file as usual.
+       c. Run
+                         tiblook
+          Enter derham when it asks for you to enter something.
+          This also uses INDEX.
+       d. Run
+                         tiblist test.ref
+          Run plain TeX on the output.
+       e. Rename INDEX.  Run
+                         tibdex test.ref
+          The output of tibdex is a new INDEX which should be
+          identical to the one supplied for testing purposes.
+       f. If everything works, the directory can be discarded.
+
+11. Install the programs.  Command `make install' should do it.
+
+12. Change directory to index directory.  Install system reference
+    file.  Apply tibdex to this reference file.  If no system reference
+    file is to be used, create dummy index by applying tibdex to empty file.
+
+13. Clean up as desired (delete object files?).
+
+14. Advertise <documentation directory>/intro.tib to TeX users.
+
+15. Comments:
+       a. The siam format styles (siamd.tib, siamn.tib, siamdl.tib, 
+          siamnl.tib) contain options on fonts (SIAM specifies smaller 
+          type for bibliographies).  Check if you want to modify.
+       b. On some machines, the stack can overflow in locate.c from `refs'.
+          I believe making `refs' a global variable should not cause problems.
+          Put the line `struct reftype refs[MAXREFS]...' after the 
+          `static struct reftype' declaration.
+       c. In numo.tib and numos.tib, the font ammi10 is used.  For some
+          sites, this should be cmmi10.
+       d. Files ieeabb.ttz and ieefll.ttz are included, but not documented.
+          They consist of journal names and abbreviations for ieee journals.
+          They can be installed in the macro subdirectory and made available
+          with either the -i flag on the call to tib or by modifying .tib 
+          files.
+       e. A small unix utility named tibabb is included, but not documented.
+          It should be made executable and called as `tibabb <word>'.  
+          It will exhibit all entries in the journal file(s) containing 
+          that word, so that the appropriate definition code can be used.  
+          It should be modified to local use.

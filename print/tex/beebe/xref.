@@ -1,0 +1,25 @@
+#!/bin/csh
+# Make a libref "references" and "referenced-by" pair of cross
+# reference tables on stdout from a list of C sources files.
+#
+# Usage:
+#	xref filelist >foo.xref
+#
+# [09-Sep-87]
+
+set TEMPFILE = xref$$
+
+# Make "name<tab>file" list in $TEMPFILE
+cxref $* | awk -f xref1.awk | sort -u > $TEMPFILE
+
+# Make "references" libref-style map
+echo Created `date` on `hostname`
+echo xref $*
+sort $TEMPFILE | awk -f xref2.awk
+
+# Make "referenced-by" libref-style map
+echo "Created" `date` on `hostname`
+echo xref $*
+awk '{if ($2 != "") printf "%s\t%s\n",$2,$1;}' $TEMPFILE | sort | awk -f xref3.awk
+
+/bin/rm -f $TEMPFILE

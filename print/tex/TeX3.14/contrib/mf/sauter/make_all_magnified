@@ -1,0 +1,57 @@
+#! /bin/csh -f
+# Make a set of fonts.
+
+# Get the list of possible files.
+if (-d mf) then
+   cd mf
+   set font_list=`/bin/ls *.mf`
+   cd ..
+else
+   echo 'No subdirectory named mf.'
+   exit(1)
+endif
+
+if (! -d tfm || ! -d gf) then
+   echo 'Sorry, no subdirectories named tfm and gf.'
+   exit(2)
+endif
+
+# Has this already been run?
+set out_file = make_gf_files
+if (-e $out_file) then
+   echo "The script $out_file already exists."
+   exit(2)
+endif
+
+set program = cmmf # Assume cmbase preloaded.
+
+# Get the output device.
+echo -n 'Mode name to generate for? '
+set mf_mode=$<
+
+# Before all the font-generating, need:
+echo '#! /bin/csh -f' >> $out_file
+echo 'setenv MFINPUTS .:mf:../../../../cmfonts/mf' >> $out_file
+
+foreach long_name ($font_list)
+   set font=$long_name:r
+   
+   if ($font =~ *[0-9]) then
+      echo -n "Magnifications for $font? "
+      set mags = $<
+      set made_mags = 0
+      
+      foreach mag ($mags)
+         echo $program" '\batchmode;mag:=magstep($mag);mode:=$mf_mode;input $font'" >> $out_file
+         set made_mags = 1
+      end
+      
+      if ($made_mags == 1) then
+         echo '/bin/mv -f '$font'.tfm tfm' >> $out_file
+         echo '/bin/mv '$font'.*gf gf'  >> $out_file
+      endif
+   endif
+end
+
+# Make it executable.
+chmod +x $out_file

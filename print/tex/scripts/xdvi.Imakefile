@@ -1,0 +1,53 @@
+#Default font sizes for 240 dpi fonts
+#magsteps 0:half:1:2:3:4:5
+#DEFAULT_FONT_SIZES=240:262.907:288:345.6:414.72:497.664:597.197
+#
+#this is for 300dpi devices
+#DEFAULT_FONT_SIZES=300:328.634:360:432:518:622.08:746.4960
+#
+#these fonts should exist on most systems
+#DEFAULT_FONT_SIZES=72:75:180:240:300:360:400
+#
+#But we use the generic style
+DEFAULT_FONT_SIZES=$(RESRES_386BSD)
+DEFAULT_RESOLUTION=$(DEFRES_386BSD)
+DEFAULT_ASPECT_RATIO=$(DEFAR_386BSD)
+DEFAULT_FONT_PATH=.:$(PK_386BSD)
+DEFAULT_SUBDIR_PATH=$(FONTLIB_386BSD)
+
+#Country specific definitions
+.ifdef GERMAN_386BSD
+.if $(GERMAN_386BSD) != 0
+LANG_DEFS=-DA4
+.endif
+.endif
+DEFS=-DMSBITFIRST -DBMSHORT -DBUTTONS -DSEARCH_SUBDIRECTORIES $(LANG_DEFS)
+
+FONTFORMATS_C=gf.c pk.c pxl.c
+FONTFORMATS_O=gf.o pk.o pxl.o
+
+CC=$(CC_386BSD)
+DEPLIBS=XawClientDepLibs
+LOCAL_LIBRARIES=XawClientLibs
+MATHLIB=-lm
+SYS_LIBRARIES=$(MATHLIB)
+LINTLIBS=$(LINTXAW) $(LINTXMU) $(LINTXTOOL) $(LINTEXTENSIONLIB) $(LINTXLIB) -lm
+SRCS=xdvi.c dvi_init.c dvi_draw.c $(FONTFORMATS_C) pxl_open.c tpic.c
+OBJS=xdvi.o dvi_init.o dvi_draw.o $(FONTFORMATS_O) pxl_open.o tpic.o
+DEFINES=$(DEFS) -DDEFAULT_FONT_PATH=\"$(DEFAULT_FONT_PATH)\" \
+  -DDEFAULT_FONT_SIZES=\"$(DEFAULT_FONT_SIZES)\" \
+  -DDEFAULT_RESOLUTION=$(DEFAULT_RESOLUTION) \
+  -DDEFAULT_ASPECT_RATIO=$(DEFAULT_ASPECT_RATIO) \
+  -DDEFAULT_SUBDIR_PATH=\"$(DEFAULT_SUBDIR_PATH)\"
+
+ComplexProgramTarget(xdvi)
+
+xdvi.man: xdvi_man.sed mksedscript
+	chmod u+x mksedscript
+	./mksedscript $(DEFAULT_FONT_PATH) $(DEFAULT_FONT_SIZES) $(DEFS) \
+		> sedscript
+	sed -f sedscript < xdvi_man.sed > xdvi.man
+
+clean::
+	$(RM) sedscript xdvi.man
+

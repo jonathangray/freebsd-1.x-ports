@@ -1,0 +1,169 @@
+#!/bin/sh
+#
+#   This script file makes TeX PK fonts. It is based on MakeTeXPK
+#   supplied with dvips. 
+#   
+#   Usage: -d device [-f] [-m mag] fonts ...
+#
+#   `fonts' are the names of the fonts to be made, such as `cmr10'.
+#
+#   OPTIONS
+#	-d device	device for which the fonts should be made,
+#			use -d ? to get a list of device names.
+#
+#	-m mag		magnification to use in font generation. `mag'
+#			is a string to pass to MF as the magnification.
+#
+#	-f		forces the recreation of the font, even if
+#			there was an existing pk file detected.
+#
+#   Note that this file must execute Metafont, and then gftopk,
+#   and place the result in the correct location for the PostScript
+#   driver to find it subsequently.  If this doesn't work, it will
+#   be evident because MF will be invoked over and over again.
+#
+# We should care on individual environment settings here...
+TEXDIR=$(LIBROOT_386BSD)
+LOCALDIR=$(LIBROOT_USER_386BSD)
+DESTTFMDIR=$(TFM_USER_386BSD)
+STDPKDIR=$(PK_386BSD)
+#where to find askmf.mf
+PSDIR=$(PSLIB_386BSD)
+#where to find askmf.awk
+MFDIR=$(MFINPUTS_386BSD)
+# this should be no (!) path but point to only one place
+DESTPKDIR=$(PK_USER_386BSD)
+#
+MODE=$(DEFDEV_386BSD)
+MAG="undef"
+USAGE="usage: $0 -d device [-f] [-m mag] fonts ..."
+#
+# TEMPDIR needs to be unique for each process because of the possibility
+# of simultaneous processes running this script.
+if [ "$TMPDIR" = "" ]
+then
+   TEMPDIR=/tmp/mtpk.$$
+else
+   TEMPDIR=$TMPDIR/mtpk.$$
+fi
+mkdir $TEMPDIR
+cd $TEMPDIR
+#
+# Get parameters
+while getopts ":d:m:f?" OPTION
+do
+  case $OPTION in 
+	d) if [ "$OPTARG" = "help" ]
+	   then
+	     echo "Currently available modes are: "
+# ask mf for the modes list
+echo "mode=help ;
+mode_setup ;
+end
+" |mf $MFDIR/askmf.mf |awk -f $PSDIR/askmf.awk |sed -e "s:_$::g" |column |more
+rm askmf.log
+# puh ... done
+	     echo "see $(MFINPUTS_386BSD)/modes.mf for further description."
+	     exit 0
+           else
+             MODE=$OPTARG ; shift
+	   fi ;;
+	m) MAG=$OPTARG ; shift ;;
+	f) FORCE=$OPTION ;;
+	?) echo $USAGE
+	   exit 1
+	   ;;
+  esac
+  shift
+done
+if [ $# = 0 ]
+then
+  echo "which font shall I make?"
+  echo $USAGE
+  exit 3
+else
+  NAMES=$@
+fi
+if [ $MAG = undef ]
+then
+  MAG=1
+fi
+#
+# ask mf for the actual pixel size
+DPI=`echo "
+mag=$MAG
+mode=$MODE ;
+mode_setup ;
+proofing:=0 ;
+fontmaking:=0 ;
+message decimal floor(pixels_per_inch+.5) ;
+end
+" |mf $MFDIR/askmf.mf |awk -f $PSDIR/askmf.awk` ; rm askmf.log
+#
+#   Prevent X-windows from displaying.  Except it doesn't always work;
+#   some sh'ells don't seem to understand unset.  There are also some
+#   versions of METAFONT that don't work if the DISPLAY isn't set and
+#   the term type is set to xterm.
+unset DISPLAY
+umask 0
+#
+# Clean up on normal or abnormal exit
+trap "cd /; rm -rf $TEMPDIR $DESTPKDIR/pktmp.$$ $DESTTFMDIR/tfmtmp.$$" 0 1 2 15
+########################################
+# loop over all fonts
+########################################
+for NAME in $NAMES
+do
+#
+# construct filenames
+GFNAME=$NAME.$DPI'gf'
+PKNAME=$NAME.$DPI'pk'
+TFMNAME=$NAME.tfm
+#
+# check for already made font
+if [ -z $FORCE ]
+then
+  if [ -r $DESTPKDIR/$PKNAME ]
+  then
+    echo "$DESTPKDIR/$PKNAME already exists!"
+    continue
+  fi
+#
+# check also in the standard place(s)
+  if [ -r $STDPKDIR/$PKNAME ]
+  then
+    echo $STDPKDIR/$PKNAME already exists!
+    continue
+  fi
+fi
+#
+echo "mf \mode:=$MODE; mag:=$MAG; scrollmode; input $NAME </dev/null"
+#
+mf "\mode:=$MODE; mag:=$MAG; scrollmode; input $NAME" </dev/null
+#
+# a font file should have been created, otherwise...
+if test ! -r $GFNAME
+then
+   echo "Metafont failed for some reason on $GFNAME"
+   exit 3
+fi
+#
+# we make a pk file from it
+gftopk -v ./$GFNAME ./$PKNAME
+#
+# install the PK and TFM files carefully, since others may be doing the same
+# as us simultaneously.
+mv $PKNAME $DESTPKDIR/pktmp.$$
+mv $TFMNAME $DESTTFMDIR/tfmtmp.$$
+cd $DESTPKDIR
+mv pktmp.$$ $PKNAME
+chmod a+r $PKNAME
+cd $DESTTFMDIR
+mv tfmtmp.$$ $TFMNAME
+chmod a+r $TFMNAME
+#
+done
+#################################
+# end of the loop
+#################################
+exit 0

@@ -1,0 +1,1055 @@
+@                                                           % sect.    2
+The program begins with a fairly normal header, made up of
+pieces that will mostly be filled in later.  The input comes
+from files |doc_file| and |change_file|, the output goes to
+file |prog_file|.  Messages from \MAKEPROG{} are written to
+|term_out|, which is supposed to be the terminal.
+@^system dependencies@>
+
+If it is necessary to abort the job because of a fatal
+error, the program calls the `|jump_out|' procedure, which
+goes to the label |end_of_MAKEPROG|.
+
+@d end_of_MAKEPROG = 9999 {go here to wrap it up}
+
+@p @t\4@>@<Compiler directives@>@/
+program MAKEPROG(@!doc_file,@!change_file,@!prog_file);
+label end_of_MAKEPROG; {go here to finish}
+const @<Constants in the outer block@>@;
+type @<Types in the outer block@>@;
+var @<Globals in the outer block@>@;
+@t\4@>@<Error handling procedures@>@;
+procedure initialize;
+  var @<Local variables for initialization@>@;
+  begin @<Set initial values@>
+  end;
+
+
+@                                                           % sect.    3
+Some of this code is optional for use when debugging only;
+such material is enclosed between the delimiters \&{debug}
+and \&{gubed}.
+
+@d debug==@{ {change this to `$\\{debug}\equiv\null$' when debugging}
+@d gubed==@t@>@} {change this to `$\\{gubed}\equiv\null$' when debugging}
+@f debug==repeat
+@f gubed==until
+
+
+@                                                           % sect.    4
+The \PASCAL\ compiler used to develop this system has
+``compiler directives'' that can appear in comments whose
+first character is a dollar sign.  In production versions of
+\MAKEPROG{} these directives tell the compiler that it is
+safe to avoid range checks and to leave out the extra code
+it inserts for the \PASCAL\ debugger's benefit.
+@^system dependencies@>
+
+@<Compiler directives@>=
+@{@&@=$D-@> @} {no debug overhead}
+@!debug @{@&@=$D+@> @}@+ gubed @; {but turn everything on when debugging}
+
+
+@                                                           % sect.    5
+Labels are given symbolic names by the following
+definitions.  We insert the label `|exit|' just before the
+`\&{end}' of a procedure in which we have used the
+`|return|' statement defined below; the label `|restart|' is
+occasionally used at the very beginning of a procedure; and
+the label `|reswitch|' is occasionally used just prior to a
+\&{case} statement in which some cases change the conditions
+and we wish to branch to the newly applicable case.  Loops
+that are set up with the \&{loop} construction defined below
+are commonly exited by going to `|done|' or to `|found|' or
+to `|not_found|', and they are sometimes repeated by going
+to `|continue|'.
+
+@d exit=10 {go here to leave a procedure}
+@d restart=20 {go here to start a procedure again}
+@d reswitch=21 {go here to start a case statement again}
+@d continue=22 {go here to resume a loop}
+@d done=30 {go here to exit a loop}
+@d found=31 {go here when you've found it}
+@d not_found=32 {go here when you've found something else}
+
+
+@                                                           % sect.    6
+Here are some macros for common programming idioms.
+
+@d incr(#) == #:=#+1 {increase a variable by unity}
+@d decr(#) == #:=#-1 {decrease a variable by unity}
+@d loop == @+ while true do@+ {repeat over and over until a |goto| happens}
+@d do_nothing == {empty statement}
+@d return == goto exit {terminate a procedure call}
+@f return == nil
+@f loop == xclause
+
+
+@                                                           % sect.    7
+We assume that |case| statements may include a default case
+that applies if no matching label is found.  Thus, we shall
+use constructions like
+@^system dependencies@>
+$$
+\vbox{\halign{#\hfil\cr
+|case x of|\cr
+   \quad 1: $\langle\,$code for $x=1\,\rangle$;\cr
+   \quad 3: $\langle\,$code for $x=3\,\rangle$;\cr
+   \quad |othercases| $\langle\,$code for |x<>1| and |x<>3|$\,\rangle$\cr
+|endcases|\cr
+}}
+$$
+since most \PASCAL\ compilers have plugged this hole in the
+language by incorporating some sort of default mechanism.
+For example, the compiler used to develop \.{WEB} and \TeX\
+allows `|others|:' as a default label, and other \PASCAL s
+allow syntaxes like `\&{else}' or `\&{otherwise}' or
+`\\{otherwise}:', etc.  The definitions of |othercases| and
+|endcases| should be changed to agree with local
+conventions.  (Of course, if no default mechanism is
+available, the |case| statements of this program must be
+extended by listing all remaining cases.)
+
+@d othercases == others: {default for cases not listed explicitly}
+@d endcases == @+end {follows the default case in an extended |case| statement}
+@f othercases == else
+@f endcases == end
+
+
+@                                                           % sect.    8
+The following parameter is set big enough to be sufficient
+for most applications of \MAKEPROG{}.
+
+@<Constants...@>=
+@!buf_size=500; {maximum length of input line}
+
+
+@                                                           % sect.    9
+A global variable called |history| will contain one of four values
+at the end of every run: |spotless| means that no unusual messages were
+printed; |harmless_message| means that a message of possible interest
+was printed but no serious errors were detected; |error_message| means that
+at least one error was found; |fatal_message| means that the program
+terminated abnormally. The value of |history| does not influence the
+behavior of the program; it is simply computed for the convenience
+of systems that might want to use such information.
+
+@d spotless=0 {|history| value for normal jobs}
+@d harmless_message=1 {|history| value when non-serious info was printed}
+@d error_message=2 {|history| value when an error was noted}
+@d fatal_message=3 {|history| value when we had to stop prematurely}
+@#
+@d mark_harmless==@t@>@+if history=spotless then history:=harmless_message
+@d mark_error==history:=error_message
+@d mark_fatal==history:=fatal_message
+
+@<Glob...@>=@!history:spotless..fatal_message; {how bad was this run?}
+
+@                                                           % sect.   10
+@<Set init...@>=history:=spotless;
+
+
+
+
+
+@* The character set.                                       % sect.   11
+
+\noindent One of the main goals in the design of \MAKEPROG{}
+has been to make it readily portable between a wide variety
+of computers.  Yet \MAKEPROG{} by its very nature must use a
+greater variety of characters than most computer programs
+deal with, and character encoding is one of the areas in
+which existing machines differ most widely from each other.
+
+To resolve this problem, all input to \MAKEPROG{} is
+converted to an internal seven-bit code that is essentially
+standard \ASCII{}, the ``American Standard Code for
+Information Interchange.'' The conversion is done
+immediately when each character is read in.  Conversely,
+characters are converted from \ASCII{} to the user's
+external representation just before they are output.  Such
+an internal code is never relevant to users of \MAKEPROG{}.
+
+\noindent Here is a table of the standard visible \ASCII{} codes:
+$$\def\:{\char\count255\global\advance\count255 by 1}
+\count255='40
+\vbox{
+\hbox{\hbox to 40pt{\it\hfill0\/\hfill}%
+\hbox to 40pt{\it\hfill1\/\hfill}%
+\hbox to 40pt{\it\hfill2\/\hfill}%
+\hbox to 40pt{\it\hfill3\/\hfill}%
+\hbox to 40pt{\it\hfill4\/\hfill}%
+\hbox to 40pt{\it\hfill5\/\hfill}%
+\hbox to 40pt{\it\hfill6\/\hfill}%
+\hbox to 40pt{\it\hfill7\/\hfill}}
+\vskip 4pt
+\hrule
+\def\^{\vrule height 10.5pt depth 4.5pt}
+\halign{\hbox to 0pt{\hskip -24pt\O{#0}\hfill}&\^
+\hbox to 40pt{\tt\hfill#\hfill\^}&
+&\hbox to 40pt{\tt\hfill#\hfill\^}\cr
+04&\:&\:&\:&\:&\:&\:&\:&\:\cr\noalign{\hrule}
+05&\:&\:&\:&\:&\:&\:&\:&\:\cr\noalign{\hrule}
+06&\:&\:&\:&\:&\:&\:&\:&\:\cr\noalign{\hrule}
+07&\:&\:&\:&\:&\:&\:&\:&\:\cr\noalign{\hrule}
+10&\:&\:&\:&\:&\:&\:&\:&\:\cr\noalign{\hrule}
+11&\:&\:&\:&\:&\:&\:&\:&\:\cr\noalign{\hrule}
+12&\:&\:&\:&\:&\:&\:&\:&\:\cr\noalign{\hrule}
+13&\:&\:&\:&\:&\:&\:&\:&\:\cr\noalign{\hrule}
+14&\:&\:&\:&\:&\:&\:&\:&\:\cr\noalign{\hrule}
+15&\:&\:&\:&\:&\:&\:&\:&\:\cr\noalign{\hrule}
+16&\:&\:&\:&\:&\:&\:&\:&\:\cr\noalign{\hrule}
+17&\:&\:&\:&\:&\:&\:&\:\cr}
+\hrule width 280pt}$$
+(Actually, of course, code @"20 is an invisible blank
+space.) Code @"3E was once an upward arrow (\.{\char'13}),
+and code @"3F was once a left arrow (\.^^X), in olden times
+when the first draft of \ASCII{} code was prepared; but
+\MAKEPROG{} works with today's standard \ASCII{} in which
+those codes represent circumflex and underline as shown.
+
+@<Types...@>=
+@!ASCII_code=0..@"7F; {seven-bit numbers, a subrange of the integers}
+
+
+@                                                           % sect.   12
+The original \PASCAL\ compiler was designed in the late 60s,
+when six-bit character sets were common, so it did not make
+provision for lowercase letters.  Nowadays, of course, we
+need to deal with both capital and small letters in a
+convenient way, so \MAKEPROG{} assumes that it is being used
+with a \PASCAL\ whose character set contains at least the
+characters of standard \ASCII{} as listed above.  Some
+\PASCAL\ compilers use the original name |char| for the data
+type associated with the characters in text files, while
+other \PASCAL s consider |char| to be a 64-element subrange
+of a larger data type that has some other name.
+
+In order to accommodate this difference, we shall use the
+name |text_char| to stand for the data type of the
+characters in the input and output files.  We shall also
+assume that |text_char| consists of the elements
+|chr(first_text_char)| through |chr(last_text_char)|,
+inclusive.  The following definitions should be adjusted if
+necessary.
+@^system dependencies@>
+
+@d text_char == char {the data type of characters in text files}
+@d first_text_char=0 {ordinal number of the smallest element of |text_char|}
+@d last_text_char=127 {ordinal number of the largest element of |text_char|}
+
+@<Types...@>=
+@!text_file=packed file of text_char;
+
+
+@                                                           % sect.   13
+The \MAKEPROG{} processor convert between \ASCII{} code and
+the user's external character set by means of arrays |xord|
+and |xchr| that are analogous to \PASCAL's |ord| and |chr|
+functions.
+
+@<Globals...@>=
+@!xord: array [text_char] of ASCII_code;
+  {specifies conversion of input characters}
+@!xchr: array [ASCII_code] of text_char;
+  {specifies conversion of output characters}
+
+
+@                                                           % sect.   14
+If we assume that every system using \.{WEB} is able to read
+and write the visible characters of standard \ASCII{}
+(although not necessarily using the \ASCII{} codes to
+represent them), the following assignment statements
+initialize most of the |xchr| array properly, without
+needing any system-dependent changes.  For example, the
+statement \.{xchr["A"]:=\'A\'} that appears in the present
+\.{WEB} file might be encoded in, say, \hbox{\mc EBCDIC}
+code on the external medium on which it resides, but
+\.{TANGLE} will convert from this external code to \ASCII{}
+and back again.  Therefore the assignment statement
+\.{XCHR[65]:=\'A\'} will appear in the corresponding
+\PASCAL\ file, and \PASCAL\ will compile this statement so
+that |xchr[65]| receives the character \.A in the external
+(|char|) code.  Note that it would be quite incorrect to say
+\.{xchr["A"]:="A"}, because |"A"| is a constant of type
+|integer|, not |char|, and because we have $|"A"|=65$
+regardless of the external character set.
+
+@<Set init...@>=
+xchr[" "]:=' ';
+xchr["!"]:='!';
+xchr[""""]:='"';
+xchr["#"]:='#';
+xchr["$"]:='$';
+xchr["%"]:='%';
+xchr["&"]:='&';
+xchr["'"]:='''';@/
+xchr["("]:='(';
+xchr[")"]:=')';
+xchr["*"]:='*';
+xchr["+"]:='+';
+xchr[","]:=',';
+xchr["-"]:='-';
+xchr["."]:='.';
+xchr["/"]:='/';@/
+xchr["0"]:='0';
+xchr["1"]:='1';
+xchr["2"]:='2';
+xchr["3"]:='3';
+xchr["4"]:='4';
+xchr["5"]:='5';
+xchr["6"]:='6';
+xchr["7"]:='7';@/
+xchr["8"]:='8';
+xchr["9"]:='9';
+xchr[":"]:=':';
+xchr[";"]:=';';
+xchr["<"]:='<';
+xchr["="]:='=';
+xchr[">"]:='>';
+xchr["?"]:='?';@/
+xchr["@@"]:='@@';
+xchr["A"]:='A';
+xchr["B"]:='B';
+xchr["C"]:='C';
+xchr["D"]:='D';
+xchr["E"]:='E';
+xchr["F"]:='F';
+xchr["G"]:='G';@/
+xchr["H"]:='H';
+xchr["I"]:='I';
+xchr["J"]:='J';
+xchr["K"]:='K';
+xchr["L"]:='L';
+xchr["M"]:='M';
+xchr["N"]:='N';
+xchr["O"]:='O';@/
+xchr["P"]:='P';
+xchr["Q"]:='Q';
+xchr["R"]:='R';
+xchr["S"]:='S';
+xchr["T"]:='T';
+xchr["U"]:='U';
+xchr["V"]:='V';
+xchr["W"]:='W';@/
+xchr["X"]:='X';
+xchr["Y"]:='Y';
+xchr["Z"]:='Z';
+xchr["["]:='[';
+xchr["\"]:='\';
+xchr["]"]:=']';
+xchr["^"]:='^';
+xchr["_"]:='_';@/
+xchr["`"]:='`';
+xchr["a"]:='a';
+xchr["b"]:='b';
+xchr["c"]:='c';
+xchr["d"]:='d';
+xchr["e"]:='e';
+xchr["f"]:='f';
+xchr["g"]:='g';@/
+xchr["h"]:='h';
+xchr["i"]:='i';
+xchr["j"]:='j';
+xchr["k"]:='k';
+xchr["l"]:='l';
+xchr["m"]:='m';
+xchr["n"]:='n';
+xchr["o"]:='o';@/
+xchr["p"]:='p';
+xchr["q"]:='q';
+xchr["r"]:='r';
+xchr["s"]:='s';
+xchr["t"]:='t';
+xchr["u"]:='u';
+xchr["v"]:='v';
+xchr["w"]:='w';@/
+xchr["x"]:='x';
+xchr["y"]:='y';
+xchr["z"]:='z';
+xchr["{"]:='{';
+xchr["|"]:='|';
+xchr["}"]:='}';
+xchr["~"]:='~';@/
+xchr[0]:=' '; xchr[@"7F]:=' '; {these \ASCII{} codes are not used}
+
+
+@                                                           % sect.   15
+Some of the nonprintable \ASCII{} codes have been given
+symbolic names in \MAKEPROG{} because they are used with a
+special meaning.
+
+@d tab_mark=@"09              {\ASCII{} code used as tab-skip}
+@d line_feed=@"0A             {\ASCII{} code thrown away at end of line}
+@d form_feed=@"0C             {\ASCII{} code used at end of page}
+@d carriage_return=@"0D       {\ASCII{} code used at end of line}
+
+
+@                                                           % sect.   16
+When we initialize the |xord| array and the remaining parts of |xchr|,
+it will be convenient to make use of an index variable, |i|.
+
+@<Local variables for init...@>=
+@!i:0..last_text_char;
+
+
+@                                                           % sect.   17
+Here now is the system-dependent part of the character set.
+If \MAKEPROG{} is being implemented on a garden-variety
+\PASCAL\ for which only standard \ASCII{} codes will appear
+in the input and output files, you don't need to make any
+changes here.
+@^system dependencies@>
+
+Changes to the present module will make \MAKEPROG{} more
+friendly on computers that have an extended character set,
+so that one can type things like Umlaute.  If you have an
+extended set of characters that are easily incorporated into
+text files, you can assign codes arbitrarily here, giving an
+|xchr| equivalent to whatever characters the users of
+\MAKEPROG{} are allowed to have in their input files,
+provided that unsuitable characters do not correspond to
+special codes like |carriage_return| that are listed above.
+
+@<Set init...@>=
+for i:=1 to " "-1 do xchr[i]:=' ';
+
+
+@                                                           % sect.   18
+The following system-independent code makes the |xord| array
+contain a suitable inverse to the information in |xchr|.
+
+@<Set init...@>=
+for i:=first_text_char to last_text_char do xord[chr(i)]:=" ";
+for i:=1 to "~" do xord[xchr[i]]:=i;
+
+
+
+
+
+@* Basic Input and output.
+
+\noindent The input conventions of \MAKEPROG{} are identical
+to those of \.{WEB}.  Therefore people who need to make
+modifications to both systems should be able to do so
+without too many headaches.
+
+
+@                                                           % sect.   20
+Terminal output is done by writing on file |term_out|, which
+is assumed to consist of characters of type |text_char|:
+@^system dependencies@>
+
+@d print(#)==write(term_out,#) {`|print|' means write on the terminal}
+@d print_ln(#)==write_ln(term_out,#) {`|print|' and then start new line}
+@d new_line==write_ln(term_out) {start new line}
+@d print_nl(#)==  {print information starting on a new line}
+  begin new_line; print(#);
+  end
+
+@<Globals...@>=
+@!term_out:text_file; {the terminal as an output file}
+
+
+@                                                           % sect.   21
+Different systems have different ways of specifying that the
+output on a certain file will appear on the user's terminal.
+Here is one way to do this on the \PASCAL{} system that was
+used in \.{TANGLE}'s initial development.
+@^system dependencies@>
+
+@<Set init...@>=
+rewrite(term_out,'TTY:'); {send |term_out| output to the terminal}
+
+
+@                                                           % sect.   22
+The |update_terminal| procedure is called when we want to
+make sure that everything we have output to the terminal so
+far has actually left the computer's internal buffers and
+been sent.
+@^system dependencies@>
+
+@d update_terminal == break(term_out) {empty the terminal output buffer}
+
+
+@                                                           % sect.   23
+The main input comes from |doc_file|; this input may be
+overridden by changes in |change_file|.  (If |change_file|
+is empty, there are no changes.)
+
+@<Globals...@>=
+@!doc_file:text_file; {primary input}
+@!change_file:text_file; {updates}
+
+
+@                                                           % sect.   24
+The following code opens the input files.  Since these files
+were listed in the program header, we assume that the
+\PASCAL\ runtime system has already checked that suitable
+file names have been given; therefore no additional error
+checking needs to be done.
+@^system dependencies@>
+
+@< Set init... @>=
+reset(doc_file); reset(change_file);
+
+
+@                                                           % sect.   25
+The output goes to |prog_file|.
+
+@<Globals...@>=
+@!prog_file: text_file;
+
+
+@                                                           % sect.   26
+The following code opens |prog_file|.  Since this file is
+listed in the program header, we assume that the \PASCAL\
+runtime system has checked that a suitable external file
+name have been given.
+@^system dependencies@>
+
+@<Set init...@>=
+rewrite(prog_file);
+
+
+@                                                           % sect.   27
+Input goes into an array called |buffer|.
+
+@<Globals...@>=
+@!buffer: array[0..buf_size] of ASCII_code;
+
+
+@                                                           % sect.   28
+The |input_ln| procedure brings the next line of input from
+the specified file into the |buffer| array and returns the
+value |true|, unless the file has already been entirely
+read, in which case it returns |false|.  The conventions of
+\.{WEB} are followed; i.e., |ASCII_code| numbers
+representing the next line of the file are input into
+|buffer[0]|, |buffer[1]|, \dots, |buffer[limit-1]|; trailing
+blanks are ignored; and the global variable |limit| is set
+to the length of the line.  The value of |limit| must be
+strictly less than |buf_size|.
+@^system dependencies@>
+
+We assume that none of the |ASCII_code| values of
+|buffer[j]| for |0<=j<limit| is equal to 0, @"7F,
+|line_feed|, |form_feed|, or |carriage_return|.
+
+@p
+function input_ln(var f:text_file):boolean; {inputs a line or returns |false|}
+   var final_limit:0..buf_size; {|limit| without trailing blanks}
+   begin limit:=0; final_limit:=0;
+   if eof(f) then input_ln:=false
+   else  begin
+      while not eoln(f) do
+         begin buffer[limit]:=xord[f^]; get(f);
+         incr(limit);
+         if (buffer[limit-1]<>" ") and (buffer[limit-1]<>tab_mark) then
+            final_limit:=limit;
+         if limit=buf_size then
+            begin while not eoln(f) do get(f);
+            decr(limit); {keep |buffer[buf_size]| empty}
+            print_nl('! Input line too long'); error; mark_error;
+@.Input line too long@>
+            end;
+         end;
+      read_ln(f); limit:=final_limit; input_ln:=true;
+      end;
+   end;
+
+
+
+
+
+@* Reporting errors to the user.                            % sect.   29
+
+\noindent Errors are reported to the user by saying
+$$
+   \hbox{`|err_print('! Error message')|'},
+$$
+followed by `|jump_out|' if no recovery from the error is
+provided.  This will print the error message followed by an
+indication of where the error was spotted in the source
+file.  Note that no period follows the error message, since
+the error routine will automatically supply a period.
+
+\noindent The actual error indications are provided by a
+procedure called |error|.
+
+@d err_print(#)==begin print_nl(#); error; mark_error; end
+
+@<Error handling...@>=
+procedure error; {prints '\..' and location of error message}
+   begin @< Print error location @>;
+   update_terminal;
+   end;
+
+
+@                                                           % sect.   32
+The error locations can be indicated by using the global
+variables |line| and |changing|, which tell respectively the
+the current line number and whether or not the current line
+is from |change_file| or |doc_file|.  This routine should be
+modified on systems whose standard text editor has special
+line-numbering conventions.
+@^system dependencies@>
+
+@< Print error location @>=
+begin
+if changing then  print('. (change file ') @+ else print('. (');
+print_ln('l.', line:1, ')');
+print(' '); {this space separates the message from future output}
+end
+
+
+@                                                           % sect.   34
+The |jump_out| procedure just cuts across all active
+procedure levels and jumps out of the program.  This is the
+only non-local |goto| statement in \MAKEPROG{}.  It is used
+when no recovery from a particular error has been provided.
+
+Some \PASCAL\ compilers do not implement non-local |goto| statements.
+@^system dependencies@>
+In such cases the code that appears at label
+|end_of_MAKEPROG| should be copied into the |jump_out|
+procedure, followed by a call to a system procedure that
+terminates the program.
+
+@d fatal_error(#)==begin print_nl(#); error; mark_fatal; jump_out;
+  end
+
+@<Error handling...@>=
+procedure jump_out;
+begin goto end_of_MAKEPROG;
+end;
+
+
+@                                                           % sect.   35
+Sometimes the program's behavior is far different from what
+it should be, and \MAKEPROG{} prints an error message that
+is really for the \MAKEPROG{} maintenance person, not the
+user.  In such cases the program says
+|confusion('indication of where we are')|.
+
+@d confusion(#)==fatal_error('! This can''t happen (',#,')')
+@.This can't happen@>
+
+
+
+
+
+@* The kernel.
+
+\noindent Let us now consider the routine |get_line| that
+takes care of merging |change_file| into |doc_file|.  The
+|get_line| procedure also updates the line numbers for error
+messages.
+
+@<Globals...@>=
+@!line:integer; {the number of the current line in the current file}
+@!other_line:integer; {the number of the current line in the input file that
+  is not currently being read}
+@!temp_line:integer; {used when interchanging |line| with |other_line|}
+@!limit:0..buf_size; {the last character position occupied in the buffer}
+@!input_has_ended: boolean; {if |true|, there is no more input}
+@!changing: boolean; {if |true|, the current line is from |change_file|}
+
+
+@                                                           % sect.  128
+As we change |changing| from |true| to |false| and back
+again, we must remember to swap the values of |line| and
+|other_line| so that the |err_print| routine will be sure to
+report the correct line number.
+
+@d change_changing==
+         begin changing := not changing;@/
+         temp_line:=other_line; other_line:=line; line:=temp_line;
+         end {$|line| \BA |other_line|$}
+
+
+@                                                           % sect.  129
+When |changing| is |false|, the next line of |change_file|
+is kept in |change_buffer[0..change_limit-1]|, for purposes
+of comparison with the next line of |doc_file|.  After the
+change file has been completely input, we set
+|change_limit:=0|, so that no further matches will be made.
+
+@<Globals...@>=
+@!change_buffer:array[0..buf_size] of ASCII_code;
+@!change_limit:0..buf_size; {the last position occupied in |change_buffer|}
+
+
+@                                                           % sect.  130
+Here's a simple function that checks if the two buffers are
+different.
+
+@p function lines_dont_match:boolean;
+label exit;
+var k:0..buf_size; {index into the buffers}
+begin lines_dont_match:=true;
+if change_limit<>limit then return;
+if limit>0 then
+  for k:=0 to limit-1 do if change_buffer[k]<>buffer[k] then return;
+lines_dont_match:=false;
+exit: end;
+
+
+@                                                           % sect.  131
+Procedure |prime_the_change_buffer| sets |change_buffer| in
+preparation for the next matching operation.  Since blank
+lines in the change file are not used for matching, we have
+|(change_limit=0)and not changing| if and only if the change
+file is exhausted.  This procedure is called only when
+|changing| is true; hence error messages will be reported
+correctly.
+
+@p procedure prime_the_change_buffer;
+label continue, done, exit;
+var k:0..buf_size; {index into the buffers}
+begin change_limit:=0; {this value will be used if the change file ends}
+@<Skip over comment lines in the change file; |return| if end of file@>;
+@<Skip to the next nonblank line; |return| if end of file@>;
+@<Move |buffer| and |limit| to |change_buffer| and |change_limit|@>;
+exit: end;
+
+
+@                                                           % sect.  132
+While looking for a line that begins with \.{@@x} in the
+change file, we allow lines that begin with \.{@@}, as long
+as they don't begin with \.{@@y} or \.{@@z} (which would
+probably indicate that the change file is fouled up).
+
+@<Skip over comment lines in the change file...@>=
+loop@+  begin incr(line);
+  if not input_ln(change_file) then return;
+  if limit<2 then goto continue;
+  if buffer[0]<>"@@" then goto continue;
+  if (buffer[1]>="X")and(buffer[1]<="Z") then
+    buffer[1]:=buffer[1]+"z"-"Z"; {lowercasify}
+  if buffer[1]="x" then goto done;
+  if (buffer[1]="y")or(buffer[1]="z") then
+    err_print('! Where is the matching @@x?');
+@.Where is the match...@>
+continue: end;
+done:
+
+
+@                                                           % sect.  133
+Here we are looking at lines following the \.{@@x}.
+
+@<Skip to the next nonblank line...@>=
+repeat incr(line);
+  if not input_ln(change_file) then
+    begin err_print('! Change file ended after @@x');
+@.Change file ended...@>
+    return;
+    end;
+until limit>0;
+
+
+@                                                           % sect.  134
+@<Move |buffer| and |limit| to |change_buffer| and |change_limit|@>=
+begin change_limit:=limit;
+for k:=0 to limit-1 do change_buffer[k]:=buffer[k];
+end
+
+
+@                                                           % sect.  135
+The following procedure is used to see if the next change
+entry should go into effect; it is called only when
+|changing| is false.  The idea is to test whether or not the
+current contents of |buffer| matches the current contents of
+|change_buffer|.  If not, there's nothing more to do; but if
+so, a change is called for:  All of the text down to the
+\.{@@y} is supposed to match.  An error message is issued if
+any discrepancy is found.  Then the procedure prepares to
+read the next line from |change_file|.
+
+@p
+procedure check_change; {switches to |change_file| if the buffers match}
+label exit;
+var n:integer; {the number of discrepancies found}
+@!k:0..buf_size; {index into the buffers}
+begin if lines_dont_match then return;
+n:=0;
+loop@+  begin change_changing; {now it's |true|}
+  incr(line);
+  if not input_ln(change_file) then
+    begin err_print('! Change file ended before @@y');@/
+@.Change file ended...@>
+    change_limit:=0;  change_changing; {|false| again}
+    return;
+    end;
+  @<If the current line starts with \.{@@y},
+    report any discrepancies and |return|@>;
+  @<Move |buffer| and |limit|...@>;
+  change_changing; {now it's |false|}
+  incr(line);
+  if not input_ln(doc_file) then
+    begin err_print('! CWEB file ended during a change');
+@.CWEB file ended...@>
+    input_has_ended:=true; return;
+    end;
+  if lines_dont_match then incr(n);
+  end;
+exit: end;
+
+
+@                                                           % sect.  136
+@<If the current line starts with \.{@@y}...@>=
+if limit>1 then if buffer[0]="@@" then
+  begin if (buffer[1]>="X")and(buffer[1]<="Z") then
+    buffer[1]:=buffer[1]+"z"-"Z"; {lowercasify}
+  if (buffer[1]="x")or(buffer[1]="z") then
+    err_print('! Where is the matching @@y?')
+@.Where is the match...@>
+  else if buffer[1]="y" then
+    begin if n>0 then
+      err_print('! Hmm... ',n:1,' of the preceding lines failed to match');
+@.Hmm... n of the preceding...@>
+    return;
+    end;
+  end
+
+
+@                                                           % sect.  137
+@< Initialize the input system @>=
+begin line:=0; other_line:=0;@/
+changing:=true; prime_the_change_buffer; change_changing;@/
+limit:=0; buffer[0]:=" "; input_has_ended:=false;
+end
+
+
+@                                                           % sect.  138
+The |get_line| procedure puts the next line of merged input
+into the buffer and updates the other variables
+appropriately.  A space is placed at the right end of the
+line.  We output points to show the user the progress in
+reading.
+
+@p
+procedure get_line; {inputs the next line}
+   label restart;
+   begin
+restart: if changing then
+      @<Read from |change_file| and maybe turn off |changing|@>;
+   if not changing then
+      begin @<Read from |doc_file| and maybe turn on |changing|@>;
+      if changing then  goto restart;
+      end;
+   buffer[limit]:=" ";
+   if (line mod 500) = 0 then
+      begin print(line:1);  update_terminal;
+      end
+   else if (line mod 100) = 0 then
+         begin print('.');  update_terminal;
+         end
+      @!debug else begin print('.');  update_terminal; @+ end @+ gubed @;
+      ;@/
+   end;
+
+
+@                                                           % sect.  139
+@<Read from |doc_file|...@>=
+begin incr(line);
+if not input_ln(doc_file) then input_has_ended:=true
+else if change_limit>0 then check_change;
+end
+
+
+@                                                           % sect.  140
+@<Read from |change_file|...@>=
+begin incr(line);
+if not input_ln(change_file) then
+  begin err_print('! Change file ended without @@z');
+@.Change file ended...@>
+  buffer[0]:="@@"; buffer[1]:="z"; limit:=2;
+  end;
+if limit>1 then {check if the change has ended}
+  if buffer[0]="@@" then
+    begin if (buffer[1]>="X")and(buffer[1]<="Z") then
+      buffer[1]:=buffer[1]+"z"-"Z"; {lowercasify}
+    if (buffer[1]="x")or(buffer[1]="y") then
+      err_print('! Where is the matching @@z?')
+@.Where is the match...@>
+    else if buffer[1]="z" then
+      begin prime_the_change_buffer; change_changing;
+      end;
+    end;
+end
+
+
+@                                                           % sect.  141
+At the end of the program, we will tell the user if the
+change file had a line that didn't match any relevant line
+in |doc_file|.
+
+@<Check that all changes have been read@>=
+begin
+if change_limit<>0 then {|changing| is false}
+   begin
+   for limit:=0 to change_limit do  buffer[limit] := change_buffer[limit];
+   limit := change_limit;  changing := true;  line := other_line;
+   err_print('! Change file entry did not match');
+@.Change file entry did not match@>
+   end;
+end
+
+
+@
+The |put_line| procedure outputs the next line from
+|buffer| to |prog_file|. Perhaps we should give here a
+progress report, too (with asterisks?)
+
+@p
+procedure put_line;
+   var i: 0..buf_size;
+   begin
+   for i:=0 to limit-1 do  write(prog_file, xchr[buffer[i]]);
+   write_ln(prog_file);
+   end;
+
+
+
+
+
+@* The main program.                                        % sect.  190
+
+\noindent We have defined some procedures, and it is time to
+use them---here is where \MAKEPROG{} starts, and where it
+ends.
+@^system dependencies@>
+
+@p
+   begin initialize;
+   print_ln(banner); {print a ``banner line''}
+   print_ln(copy_right); print_ln(rights_res); {print a copyright notice}
+   @< Initialize the input system @>;
+   debug  print_ln('begin copy');
+   gubed @;
+   @< Copy all program parts to the output @>;
+   debug  print_ln('end copy');
+   gubed @;
+   @< Check that all changes... @>;
+end_of_MAKEPROG:
+   @#
+   {here files should be closed if the operating system requires it}
+   @;@#
+   @<Print the job |history|@>;
+   end.
+
+
+@
+A program part begins after a line that begins with
+\.{\\beginprog} and ends before the next line with
+\.{\\endprog} starting it. If we find the starting line we
+set |state| to |begin_prog|, between to lines |state| has
+the value |inner_prog| and with the ending line |state| is
+set to |out_of_prog|.
+
+@d begin_prog = 0
+@d inner_prog = 1
+@d out_of_prog = 2
+
+@< Glob... @>=
+@!state: begin_prog..out_of_prog;
+
+@
+@< Set init... @>=
+state := out_of_prog;
+
+
+@
+After we have read the introducing line for a program part
+which is signaled with |state=begin_prog| we change the
+state to |inner_prog| to start copy the next line;
+
+@< Copy all program... @>=
+begin get_line;
+while not input_has_ended do
+   begin @< Look at the input line and store in |state| the result @>;
+   if state = inner_prog then  put_line
+   else if state = begin_prog then  state := inner_prog;
+   get_line;
+   end;
+if state = inner_prog then  err_print('! Input has ended prematurely');
+@.Input has ended...@>
+end
+
+
+@
+We first define a few macros to improve the readability of
+the program part behind. After \.{\\beginprog} no letters
+may appear and after \.{\\endprog} either the line is ended
+or white space is to be there. The comparison is facilitated
+by the fact that |buffer[limit]=" "|, i.e.\ the last
+character of a line is always a space.
+
+@d cmp_prog(#) == (buffer[#]="p") and (buffer[#+1]="r") and
+                  (buffer[#+2]="o") and (buffer[#+3]="g")
+@d cmp_begin == (buffer[1]="b") and (buffer[2]="e") and (buffer[3]="g") and@|
+                (buffer[4]="i") and (buffer[5]="n") and cmp_prog(6) and@|
+                ((buffer[10]<"A") or (buffer[10]>"Z")) and@|
+                ((buffer[10]<"a") or (buffer[10]>"z"))
+@d cmp_end == (buffer[1]="e") and (buffer[2]="n") and (buffer[3]="d") and
+              cmp_prog(4) and @|
+              ((buffer[8]=" ") or (buffer[8]=tab_mark))
+
+@< Look at the input... @>=
+begin
+if buffer[0] = "\" then
+   if limit >= 10 then
+      begin @+ if cmp_begin then  state := begin_prog;  @+ end
+   else if limit >= 8 then
+      if cmp_end then  state := out_of_prog;
+end
+
+
+@                                                           % sect.  195
+Some implementations may wish to pass the |history| value to the
+operating system so that it can be used to govern whether or not other
+programs are started. Here we simply report the history to the user.
+@^system dependencies@>
+
+@<Print the job |history|@>=
+case history of
+spotless: print_nl('(No errors were found.)');
+harmless_message: print_nl('(Did you see the warning message above?)');
+error_message: print_nl('(Pardon me, but I think I spotted something wrong.)');
+fatal_message: print_nl('(That was a fatal error, my friend.)');
+end {there are no other cases}
+
+
+
+
+
+@* System-dependent changes.                                % sect.  196
+
+\noindent This module should be replaced, if necessary, by
+changes to the program that are necessary to make
+\MAKEPROG{} work at a particular installation.  It is
+usually best to design your change file so that all changes
+to previous modules preserve the module numbering; then
+everybody's version will be consistent with the printed
+program.  More extensive changes, which introduce new
+modules, can be inserted here; then only the index itself
+will get a new module number.
+@^system dependencies@>
+
+
+
+
+
+@* Index.                                                   % sect.  197
+
+\noindent Here is a cross-reference table for the
+\MAKEPROG{} processor.  All modules in which an identifier
+is used are listed with that identifier, except that
+reserved words are indexed only when they appear in format
+definitions, and the appearances of identifiers in module
+names are not indexed.  Underlined entries correspond to
+where the identifier was declared.  Error messages and a few
+other things like ``system dependencies'' are indexed here
+too.
+

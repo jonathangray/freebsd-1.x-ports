@@ -1,0 +1,269 @@
+\Section{Composing Text}
+\SubSection{Paragraphs and All of That}
+99\% of the time, \Troff/ is reading text (with the occasional
+font change), filling up output lines as best it can, and outputting
+them (with occasional interrupts at page breaks).
+
+\TeX\ is doing
+something similar 99\% of the time.  It reads text (with occasional
+font changes) into a buffer.  Whenever an end of paragraph is found
+(the |\par| macro or an empty line), \TeX\ breaks the text in its
+buffer up into lines, breaking those lines at the points which
+will produce the most attractive output.  For example,
+it may space out an
+early line a little more to keep a line with a big word
+in it from looking too spaced out later.
+Because \TeX\ composes paragraphs, not lines, its output can look
+better, and strange tricks are possible.  For example,
+the last sentence of this paragraph
+ends {\bf flush} with the right margin because I told 
+\TeX\ to allow no space at the end of the paragraph.  Another result
+of setting paragraphs is that \TeX\ can usually avoid
+``widow'' lines at the top and bottom of pages, setting paragraphs
+a little more spaced out, if necessary.
+{\parfillskip=0pt\par}
+One useful feature of the line-breaking algorithm for \TeX\
+\tolerance 500
+is found in the use of {\sl ties\/}.  Ties
+are typed using the character |~| (the tilde character), and
+behave just like spaces, except that \TeX\ will never split a line
+at a tie.
+In \Troff/,
+the special sequence `\\\]' (backslash-space) is used
+similarly,
+but in \Troff/ this is also an ``unpaddable'' space that
+cannot be stretched; in \TeX, the {\bf only} effect of the analogous
+tie character, the tilde, is to prevent
+line breaking.
+There are no strict rules for the placement of ties; they
+should be used according to stylistic considerations, in places
+where a line break is unacceptable.
+For example, a phrase like `Chapter~2' should be typed as `|Chapter~2|'
+to avoid something that looks like `Chapter
+{\parfillskip=0pt\par\parskip=0pt\noindent}2'.  Other
+good places for ties
+\tolerance 200
+include (1)~after the number
+in enumerated cases like these; (2)~The space between the
+surnames in phrases like `Vincent~Van~Gogh'; (3)~Between math symbols
+in apposition as in `dimension~$d$'.
+
+Frequently, one wishes to change the normal paragraph indentation,
+or indent a paragraph at both margins, or adjust the amount of space
+between paragraphs.  \Troff/ allows one to set registers
+and specify local motions for these operations.
+\TeX\ allows
+something superficially similar, but the actual mechanism is
+quite different.  A discussion of {\sl glue\/} is thus appropriate.
+\SubSection{Boxes and Glue}
+Because \Troff/ targets its output for a phototypesetter
+that produces its output on a continuous form, the
+composition of elements on the page involves commands to move
+up and down the page, or left and right.  Even a `begin page'
+command just causes movement downward to the length of the
+current page\note{This causes problems when the phototypesetter
+is simulated on a page-oriented device and a page length other
+than 11 inches is specified.}.
+
+\TeX, however, composes pages
+as units rather than as a stream of commands, and builds
+them from blocks of text called {\sl boxes\/} (typically paragraphs),
+much as hand-set print was built from composing sticks filled
+with letters.  The blank space around the boxes (such as the
+paragraph indentation or the space between lines) is called
+{\sl glue\/}---it is much like the wedges, or {\sl quoins\/}, that
+printers used to set a page of print.  Thus, while a \Troff/ command
+like |.sp .4i| means ``move down .4 inches,'' the corresponding
+\TeX\ control sequence, |\vskip .4in| means ``at this point, there
+should be .4 inches of glue.''  Although the difference may seem
+to be minor, \TeX's behavior at paragraphs, page breaks, and so on
+can only be properly understood if the picture of ``boxes of text
+separated by glue'' is kept in mind.  Of course, these boxes
+{\sl should not\/} be confused with the boxes that can be drawn around
+``boxed tables'' in {\it tbl\/}, or the |.bx| macro in the |-me|
+package.  \TeX\ boxes
+are simply the units into which text material
+is organized on the page.
+
+Of course, the boxes themselves are often composed of other boxes,
+surrounded by glue.  The page that gets output is a box made up
+of paragraph boxes separated by vertical glue; these paragraph
+boxes are composed of line boxes with vertical glue (baseline
+spacing) between them; and these line boxes are in their turn
+made up of word boxes with horizontal glue (interword spacing)
+between them.  If one wants to get really fancy, one can even
+put together a box explicitly with |\hbox| (for horizontal boxes)
+and |\vbox| (for vertical boxes), as in
+\begintt
+for \vbox{\hbox{`A box}\hbox{of Text.'}}
+\endtt
+for \vbox{\hbox{`A box}\hbox{of Text.'}}
+This is a vertical box (|\vbox|) composed of two horizontal boxes
+(|\hbox|)---the first contains ``|`A box|'', the second ``|of Text.'|''.
+Such constructions are usually undertaken by
+\TeX perts, and are rarely needed in ordinary applications.
+However, one special type of box, called a {\sl rule\/}, is
+frequently useful.  A rule is a box that is filled entirely
+with ink.  Normally, rules are very thin and are used for
+horizontal and vertical lines.  The control sequences |\hrule|
+and |\vrule| are used to construct horizontal and vertical rules
+respectively.  For example, to construct
+the little blot `\vrule height 8pt width 4pt',
+I typed
+\begintt
+the little blot `\vrule height 8pt width 4pt',
+\endtt
+Vertical rules should be used within paragraphs, horizontal
+rules between paragraphs, even if this
+means having to specify a wide, flat ``vertical'' rule
+in order to get a horizontal line into a paragraph.
+Rules have default thicknesses
+of 0.4pt, appropriate to thin lines.
+
+Finally, a rule will have a default length equal to the box which
+contains it.  This can sometimes be confusing, but one important
+result is that a horizontal rule, when between paragraphs,
+is as wide as the page.  This can be useful in setting off diagrams
+and the like.  For example, |\hrule| was typed after this paragraph.
+\hrule\smallskip
+\SubSubSection{Dimensions}
+Just as \Troff/ lets you describe distances in inches, points, ems,
+etc., \TeX\ permits a variety of units in which the dimensions of
+glue and boxes can be specified:
+$$\halign{\indent\tt#&\quad#\hfil\cr
+pt&point (baselines in this paper are 12 pt apart)\cr
+pc&pica ($\rm1\,pc=12\,pt$)\cr
+in&inch ($\rm1\,in=72.27\,pt$)\cr
+bp&big point ($\rm72\,bp=1\,in$)\cr
+cm&centimeter ($\rm2.54\,cm=1\,in$)\cr
+mm&millimeter ($\rm10\,mm=1\,cm$)\cr
+dd&did\^ot point ($\rm1157\,dd=1238\,pt$)\cr
+cc&cicero ($\rm1\,cc=12\,dd$)\cr
+sp&scaled point ($\rm65536\,sp=1\,pt$)\cr}$$
+\filbreak
+In addition, there are two other context-dependent units of measure
+whose actual size depends on the current font:
+{\par\narrower\parskip 0pt\obeylines\nobreak
+{\bf em} is the width of a ``printer's em'' in the current font.
+\nobreak{\bf ex} is the ``x-height'' of the current font.
+}
+The ``em'' will be familiar to \Troff/ users---it is the same
+as the |m| unit used in such \Troff/ parameters as |10m|, and, in the
+days of mechanical type, was based on the width of the letter
+`M'.  This is typically the same as the point size of the
+current font.
+Similarly, the ``x-height'' is nominally the height of the
+letter `x', although this may not be exactly true in
+every font.  
+
+In fact, each font defines its own em and ex values.  In 10-point
+roman, the font
+you are now reading, $1\,{\rm em}=10\,{\rm pt}$
+and $1\,{\rm ex}\approx4.3\,{\rm pt}.$
+The figures for {\bf Bold face} type of the same size are
+11.5 and 4.44 respectively.
+\SubSubSection{Using Glue}
+When glue is placed into the document, it appears as white
+space.
+\TeX\ provides several control sequences that place glue
+into the document.  |\hskip 1in| will insert one inch of
+horizontal glue
+(i.e. a one-inch space)
+between words at the current position in the document..
+|\vskip 8pt| will terminate the current paragraph and
+follow it with 8 points of (vertical) glue.  One very useful type
+of horizontal glue is |\quad|, which simulates a ``printer's
+quad'', i.e. a 1-em space.
+
+There are also three types of useful vertical glue defined
+as plain \TeX\ macros, which are
+sometimes helpful in formatting.  The control sequence |\smallskip| generates
+a 3-point skip, |\medskip| a 6-point skip, and |\bigskip| a 12-point
+skip.
+$$\vbox{
+\hbox to 4in{This line is followed by a |\smallskip|,\hfil} \smallskip
+\hbox to 4in{this by a |\medskip|,\hfil}\medskip
+\hbox to 4in{and this by a |\bigskip|.\hfil} \bigskip
+\hbox to 4in{The sizes of these skips are independent of the current font size.\hfil}}$$
+
+Several parameters can be set to govern the glue
+to be placed at critical points in the document.  For example,
+the glue between lines in this document is set so that the distance between
+baselines is 12 points.  This can be adjusted by saying
+|\baselineskip=14pt|, for example,
+if wider spacing is desired (e.g. for 12-point type).  Here are
+some other useful
+parameters:
+$$\vbox{\halign{#\quad\hfil&\it#\hfil&\quad#\hfil\cr
+\hfil\sl Name&\hfil\rm\sl Default\hfil&\hfil\sl Description\hfil\cr
+\noalign{\smallskip}
+|\parskip|&0pt&Space between paragraphs\cr
+|\leftskip|&0pt&Placed at left of each line of a paragraph\cr
+|\rightskip|&0pt&Placed at right of each line of a paragraph\cr
+|\topskip|&10pt&Glue at top of page\cr
+|\parindent|&20pt&Paragraph indentation\cr
+|\hsize|&6.5in&Width of text on the page\cr
+|\vsize|&8.9in&Vertical size of text area on the page\cr
+}}$$
+\SubSubSection{Stretching and Shrinking}
+Actually, glue is more than just rigid wedges between boxes.
+It also has a certain amount of elasticity.  For example, when
+\TeX\ sets a line of text, the glue between the words in the
+line is able to shrink or stretch a certain amount in order
+to adjust that line's spacing.  Similarly, the |\parskip| glue
+between paragraphs is actually able to stretch an additional point
+if necessary to improve the appearance of a page, and
+the |\smallskip| series of skips can shrink {\bf or} stretch by as
+much as 33\% of their natural lengths to assist in page formatting.
+
+Some glue is infinitely elastic.  If you think of the printer's
+page filled with rigid steel boxes of type and wedges between, this
+infinitely stretchable glue is like a powerful spring.  
+The name of horizontally stretchable glue is |\hfil|\note
+{You can also specify such glue as {\tt\\hskip} or {\tt\\vskip} glue,
+with a dimension of {\tt0pt plus 1fil}.  The {\tt plus 1fil} tells
+\TeX\ that this glue can stretch to ``one degree of infinity''
+as needed.  You can even make it ``infinitely shrinkable'' by
+saying {\tt0pt minus 1fil}, or both at the same time.}.  If you type
+|\line{\hfil Text}| then \TeX\ will set a line of type
+the width of the page, with
+the word ``Text'' at the far right end.  The |\centerline| macro
+seen at the beginning of this paper is a |\line| with springs
+at {\sl both} sides of the text.
+\SubSection{Up, Down, Left, Right}
+We've already seen how to add vertical and horizontal glue (effectively
+skipping down and right) to create ``white space'' on the page.
+One can also use vertical and horizontal glue with a {\sl negative\/}
+dimension to move upwards or to the left, although this is rarely
+useful.
+There are a few other useful primitives for ``moving around'' the
+page.  The primitive control word |\kern| specifies unstretchable
+glue.
+The name derives from a printer's term referring to type that projects
+beyond the body of a letter.  |\kern| is normally used between letters
+to move them further apart or closer together (|\hskip|, nearly identical
+in semantics, can be used as well).
+For example, the letters `T' and `E' in ``\TeX'' have been
+moved closer together by the command |\kern-.1667em|.  Notice the
+size of this glue is negative and pulls the letter boxes on either
+side closer together than normal.  The `E' in `\TeX' has also been
+lowered; this was done with the control sequence |\lower .5ex\hbox{E}|.
+This is rather complex.  The |\hbox{E}| places the letter `E' in its
+own horizontal box; the |\lower .5ex| sequence moves the baseline
+of that box lower by .5ex.  Similarly, one can raise a box above
+its normal baseline by using |\raise| instead of |\lower| (or
+by using |\lower| with a negative dimension).
+Normally, someone setting a simple document
+will not need to set up his or her own |\hbox|es, just as one
+rarely requires the horizontal and vertical movements of \Troff/.
+
+Sometimes, one wishes to set type that
+behaves
+as if it takes up no space at all (e.g., for overstriking).
+Plain \TeX\ provides two macros, |\rlap| and |\llap| for this.
+|\rlap{something}| sets `something' and then backspaces as if
+nothing had been set at all.  Similarly, |\llap{something}|
+sets `something' at the left of the current point, overlapping
+whatever was on the left.
+Using typewriter font, for example,
+one can typeset `{\tt\rlap{/}=}' by saying `|\rlap{/}=|' or `|/\llap{=}|'.

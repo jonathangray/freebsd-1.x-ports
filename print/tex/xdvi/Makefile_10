@@ -1,0 +1,62 @@
+#
+# Makefile for dvi previewer.
+#
+# $Header: /a/cvs/386BSD/ports/print/tex/xdvi/Makefile_10,v 1.1 1993/08/09 11:01:06 alm Exp $
+# $Source: /a/cvs/386BSD/ports/print/tex/xdvi/Makefile_10,v $
+#
+DEFAULT_FONT_PATH=/usr/local/tex/fonts
+DEFAULT_FONT_SIZES=300:328.6:360:432:518.4:622:746.4
+DEFS=-DX10
+FONTDEFINES=-DDEFAULT_FONT_PATH=\"$(DEFAULT_FONT_PATH)\" \
+  -DDEFAULT_FONT_SIZES=\"$(DEFAULT_FONT_SIZES)\" \
+  -DDEFAULT_SUBDIR_PATH=\"$(DEFAULT_SUBDIR_PATH)\"
+FONTFORMATS_C=gf.c pk.c pxl.c
+FONTFORMATS_O=gf.o pk.o pxl.o
+TOP=/usr
+INCDIR=$(TOP)/include
+LIBDIR=$(TOP)/lib
+DESTDIR=$(TOP)
+BINDIR=$(DESTDIR)/bin
+MANDIR=$(DESTDIR)/man
+INCLUDES=-I$(INCDIR)
+CFLAGS=-O $(INCLUDES) $(DEFS)
+LIBS=-L$(LIBDIR) -lX -lm
+SRCS=xdvi.c dvi_init.c dvi_draw.c $(FONTFORMATS_C) pxl_open.c tpic.c
+OBJS=xdvi.o dvi_init.o dvi_draw.o $(FONTFORMATS_O) pxl_open.o tpic.o
+CC=gcc
+RM=rm -f
+
+.c.o:
+	$(CC) -c $(CFLAGS) $*.c
+
+xdvi:	$(OBJS)
+	$(CC) -o xdvi $(OBJS) $(LIBS)
+	chmod go+rx xdvi
+
+xdvi.o: xdvi.h patchlevel.h xdvi_curs.h xdvi_mask.h
+dvi_init.o:xdvi.h dvi.h
+dvi_draw.o:xdvi.h dvi.h
+tpic.o:	xdvi.h
+
+gf.o:	xdvi.h
+pk.o:	xdvi.h
+pxl.o:	xdvi.h
+
+pxl_open.o:	pxl_open.c xdvi.h
+	$(CC) -c $(CFLAGS) $(FONTDEFINES) pxl_open.c
+
+xdvi.man: xdvi_man.sed mksedscript
+	chmod u+x mksedscript
+	./mksedscript $(DEFAULT_FONT_PATH) $(DEFAULT_FONT_SIZES) $(DEFS) \
+		> sedscript
+	sed -f sedscript < xdvi_man.sed > xdvi.man
+
+install: xdvi xdvi.man
+	install -c -s -m 755 xdvi $(BINDIR)
+	install -c -m 644 xdvi.man $(MANDIR)/man1/xdvi.1
+
+clean:
+	$(RM) *.o *.BAK *.CKP sedscript xdvi.man xdvi a.out core errs *~
+
+lint:
+	lint $(INCLUDES) $(DEFS) $(FONTDEFINES) $(SRCS) -lm

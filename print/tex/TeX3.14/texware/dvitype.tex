@@ -1,0 +1,3529 @@
+\input webmac
+% This program by D. E. Knuth is not copyrighted and can be used freely.
+% Version 1 was completed in September, 1982.
+% Slight changes were made in October, 1982, for version 0.7 of TeX.
+% Version 1.1 corrected minor bugs (May, 1983).
+% Version 2 was released with version 0.999 of TeX (July, 1983).
+% Version 2.1 corrected a bug when no fonts are present (September, 1983).
+% Version 2.2 corrected bugs in max_*_so_far and put1 (October, 1983).
+% Version 2.3 corrected spacing of accents (March, 1984).
+% Version 2.4 fixed rounding, changed oriental font conventions (April, 1984).
+% Version 2.5 improved the case of zero pages (May, 1984).
+% Version 2.6 introduced max_drift (June, 1984).
+% Version 2.7 had minor editorial changes (August, 1984).
+% Version 2.8 made default resolution 300/1 (April, 1985).
+% Version 2.9 changed negative scaling as in TeX version 2.7 (November, 1987).
+% Version 3 introduced an intermediate level of verbosity (October,1989).
+% Version 3.1 gave magnification info in final font list (November, 1989).
+% Version 3.2 doublechecked design size of each font (January, 1990).
+% Version 3.3 had more robust for loops in print_font, define_font (May, 1990).
+% Version 3.4 more robustness in presence of bad fonts (September, 1990).
+
+% Here is TeX material that gets inserted after \input webmac
+\def\hang{\hangindent 3em\indent\ignorespaces}
+\font\ninerm=cmr9
+\let\mc=\ninerm % medium caps for names like SAIL
+\def\PASCAL{Pascal}
+
+\def\(#1){} % this is used to make section names sort themselves better
+\def\9#1{} % this is used for sort keys in the index
+
+\def\title{DVI$\,$\lowercase{type}}
+\def\contentspagenumber{401}
+\def\topofcontents{\null
+  \def\titlepage{F} % include headline on the contents page
+  \def\rheader{\mainfont\hfil \contentspagenumber}
+  \vfill
+  \centerline{\titlefont The {\ttitlefont DVItype} processor}
+  \vskip 15pt
+  \centerline{(Version 3.4, September 1990)}
+  \vfill}
+\def\botofcontents{\vfill
+  \centerline{\hsize 5in\baselineskip9pt
+    \vbox{\ninerm\noindent
+    The preparation of this report
+    was supported in part by the National Science
+    Foundation under grants IST-8201926 and MCS-8300984,
+    and by the System Development Foundation. `\TeX' is a
+    trademark of the American Mathematical Society.}}}
+\pageno=\contentspagenumber \advance\pageno by 1
+
+
+\N1.  Introduction.
+The \.{DVItype} utility program reads binary device-independent (``\.{DVI}'')
+files that are produced by document compilers such as \TeX, and converts them
+into symbolic form. This program has two chief purposes: (1)~It can be used to
+determine whether a \.{DVI} file is valid or invalid, when diagnosing
+compiler errors; and (2)~it serves as an example of a program that reads
+\.{DVI} files correctly, for system programmers who are developing
+\.{DVI}-related software.
+
+Goal number (2) needs perhaps a bit more explanation. Programs for
+typesetting need to be especially careful about how they do arithmetic; if
+rounding errors accumulate, margins won't be straight, vertical rules
+won't line up, and so on. But if rounding is done everywhere, even in the
+midst of words, there will be uneven spacing between the letters, and that
+looks bad. Human eyes notice differences of a thousandth of an inch in the
+positioning of lines that are close together; on low resolution devices,
+where rounding produces effects four times as great as this, the problem
+is especially critical. Experience has shown that unusual care is needed
+even on high-resolution equipment; for example, a mistake in the sixth
+significant hexadecimal place of a constant once led to a difficult-to-find
+bug in some software for the Alphatype CRS, which has a resolution of 5333
+pixels per inch (make that 5333.33333333 pixels per inch).  The document
+compilers that generate \.{DVI} files make certain assumptions about the
+arithmetic that will be used by \.{DVI}-reading software, and if these
+assumptions are violated the results will be of inferior quality.
+Therefore the present program is intended as a guide to proper procedure
+in the critical places where a bit of subtlety is involved.
+
+The first \.{DVItype} program was designed by David Fuchs in 1979, and it
+went through several versions on different computers as the format of
+\.{DVI} files was evolving to its present form.
+
+The \\{banner} string defined here should be changed whenever \.{DVItype}
+gets modified.
+
+\Y\P\D \37$\\{banner}\S\.{\'This\ is\ DVItype,\ Version\ 3.4\'}$\C{printed when
+the program starts}\par
+\fi
+
+\M2. This program is written in standard \PASCAL, except where it is necessary
+to use extensions; for example, \.{DVItype} must read files whose names
+are dynamically specified, and that would be impossible in pure \PASCAL.
+All places where nonstandard constructions are used have been listed in
+the index under ``system dependencies.''
+
+One of the extensions to standard \PASCAL\ that we shall deal with is the
+ability to move to a random place in a binary file; another is to
+determine the length of a binary file. Such extensions are not necessary
+for reading \.{DVI} files, and they are not important for efficiency
+reasons either---an infrequently used program like \.{DVItype} does not
+have to be efficient. But they are included there because of \.{DVItype}'s
+r\^^Dole as a model of a \.{DVI} reading routine, since other \.{DVI}
+processors ought to be highly efficient. If \.{DVItype} is being used with
+\PASCAL s for which random file positioning is not efficiently available,
+the following definition should be changed from \\{true} to \\{false}; in such
+cases, \.{DVItype} will not include the optional feature that reads the
+postamble first.
+
+Another extension is to use a default   \&{case}  as in \.{TANGLE}, \.{WEAVE},
+etc.
+
+\Y\P\D \37$\\{random\_reading}\S\\{true}$\C{should we skip around in the file?}%
+\par
+\P\D \37$\\{othercases}\S\\{others}$: \37\C{default for cases not listed
+explicitly}\par
+\P\D \37$\\{endcases}\S$\ \&{end} \C{follows the default case in an extended   %
+\&{case}  statement}\par
+\P\F \37$\\{othercases}\S\\{else}$\par
+\P\F \37$\\{endcases}\S\\{end}$\par
+\fi
+
+\M3. The binary input comes from \\{dvi\_file}, and the symbolic output is
+written
+on \PASCAL's standard \\{output} file. The term \\{print} is used instead of
+\\{write} when this program writes on \\{output}, so that all such output
+could easily be redirected if desired.
+
+\Y\P\D \37$\\{print}(\#)\S\\{write}(\#)$\par
+\P\D \37$\\{print\_ln}(\#)\S\\{write\_ln}(\#)$\par
+\Y\P\4\&{program}\1\  \37$\\{DVI\_type}(\\{dvi\_file},\39\\{output})$;\6
+\4\&{label} \37\X4:Labels in the outer block\X\6
+\4\&{const} \37\X5:Constants in the outer block\X\6
+\4\&{type} \37\X8:Types in the outer block\X\6
+\4\&{var} \37\X10:Globals in the outer block\X\6
+\4\&{procedure}\1\  \37\\{initialize};\C{this procedure gets things started
+properly}\6
+\4\&{var} \37\|i: \37\\{integer};\C{loop index for initializations}\2\6
+\&{begin} \37$\\{print\_ln}(\\{banner})$;\6
+\X11:Set initial values\X\6
+\&{end};\par
+\fi
+
+\M4. If the program has to stop prematurely, it goes to the
+`\\{final\_end}'. Another label, \\{done}, is used when stopping normally.
+
+\Y\P\D \37$\\{final\_end}=9999$\C{label for the end of it all}\par
+\P\D \37$\\{done}=30$\C{go here when finished with a subtask}\par
+\Y\P$\4\X4:Labels in the outer block\X\S$\6
+$\\{final\_end},\39\\{done}$;\par
+\U3.\fi
+
+\M5. The following parameters can be changed at compile time to extend or
+reduce \.{DVItype}'s capacity.
+
+\Y\P$\4\X5:Constants in the outer block\X\S$\6
+$\\{max\_fonts}=100$;\C{maximum number of distinct fonts per \.{DVI} file}\6
+$\\{max\_widths}=10000$;\C{maximum number of different characters among all
+fonts}\6
+$\\{line\_length}=79$;\C{bracketed lines of output will be at most this long}\6
+$\\{terminal\_line\_length}=150$;\C{maximum number of characters input in a
+single   line of input from the terminal}\6
+$\\{stack\_size}=100$;\C{\.{DVI} files shouldn't \\{push} beyond this depth}\6
+$\\{name\_size}=1000$;\C{total length of all font file names}\6
+$\\{name\_length}=50$;\C{a file name shouldn't be longer than this}\par
+\U3.\fi
+
+\M6. Here are some macros for common programming idioms.
+
+\Y\P\D \37$\\{incr}(\#)\S\#\K\#+1$\C{increase a variable by unity}\par
+\P\D \37$\\{decr}(\#)\S\#\K\#-1$\C{decrease a variable by unity}\par
+\P\D \37$\\{do\_nothing}\S$\C{empty statement}\par
+\fi
+
+\M7. If the \.{DVI} file is badly malformed, the whole process must be aborted;
+\.{DVItype} will give up, after issuing an error message about the symptoms
+that were noticed.
+
+Such errors might be discovered inside of subroutines inside of subroutines,
+so a procedure called \\{jump\_out} has been introduced. This procedure, which
+simply transfers control to the label \\{final\_end} at the end of the program,
+contains the only non-local \&{goto}  statement in \.{DVItype}.
+
+\Y\P\D \37$\\{abort}(\#)\S$\1\6
+\&{begin} \37$\\{print}(\.{\'\ \'},\39\#)$;\5
+\\{jump\_out};\6
+\&{end}\2\par
+\P\D \37$\\{bad\_dvi}(\#)\S\\{abort}(\.{\'Bad\ DVI\ file:\ \'},\39\#,\39\.{\'!%
+\'})$\par
+\Y\P\4\&{procedure}\1\  \37\\{jump\_out};\2\6
+\&{begin} \37\&{goto} \37\\{final\_end};\6
+\&{end};\par
+\fi
+
+\N8.  The character set.
+Like all programs written with the  \.{WEB} system, \.{DVItype} can be
+used with any character set. But it uses ASCII code internally, because
+the programming for portable input-output is easier when a fixed internal
+code is used, and because \.{DVI} files use ASCII code for file names
+and certain other strings.
+
+The next few sections of \.{DVItype} have therefore been copied from the
+analogous ones in the \.{WEB} system routines. They have been considerably
+simplified, since \.{DVItype} need not deal with the controversial
+ASCII codes less than \O{40} or greater than \O{176}.
+If such codes appear in the \.{DVI} file,
+they will be printed as question marks.
+
+\Y\P$\4\X8:Types in the outer block\X\S$\6
+$\\{ASCII\_code}=\.{"\ "}\to\.{"\~"}$;\C{a subrange of the integers}\par
+\As9\ET21.
+\U3.\fi
+
+\M9. The original \PASCAL\ compiler was designed in the late 60s, when six-bit
+character sets were common, so it did not make provision for lower case
+letters. Nowadays, of course, we need to deal with both upper and lower case
+alphabets in a convenient way, especially in a program like \.{DVItype}.
+So we shall assume that the \PASCAL\ system being used for \.{DVItype}
+has a character set containing at least the standard visible characters
+of ASCII code (\.{"!"} through \.{"\~"}).
+
+Some \PASCAL\ compilers use the original name \\{char} for the data type
+associated with the characters in text files, while other \PASCAL s
+consider \\{char} to be a 64-element subrange of a larger data type that has
+some other name.  In order to accommodate this difference, we shall use
+the name \\{text\_char} to stand for the data type of the characters in the
+output file.  We shall also assume that \\{text\_char} consists of
+the elements $\\{chr}(\\{first\_text\_char})$ through $\\{chr}(\\{last\_text%
+\_char})$,
+inclusive. The following definitions should be adjusted if necessary.
+
+\Y\P\D \37$\\{text\_char}\S\\{char}$\C{the data type of characters in text
+files}\par
+\P\D \37$\\{first\_text\_char}=0$\C{ordinal number of the smallest element of %
+\\{text\_char}}\par
+\P\D \37$\\{last\_text\_char}=127$\C{ordinal number of the largest element of %
+\\{text\_char}}\par
+\Y\P$\4\X8:Types in the outer block\X\mathrel{+}\S$\6
+$\\{text\_file}=$\1\5
+\&{packed} \37\&{file} \1\&{of}\5
+\\{text\_char};\2\2\par
+\fi
+
+\M10. The \.{DVItype} processor converts between ASCII code and
+the user's external character set by means of arrays \\{xord} and \\{xchr}
+that are analogous to \PASCAL's \\{ord} and \\{chr} functions.
+
+\Y\P$\4\X10:Globals in the outer block\X\S$\6
+\4\\{xord}: \37\&{array} $[\\{text\_char}]$ \1\&{of}\5
+\\{ASCII\_code};\C{specifies conversion of input characters}\2\6
+\4\\{xchr}: \37\&{array} $[0\to255]$ \1\&{of}\5
+\\{text\_char};\C{specifies conversion of output characters}\2\par
+\As22, 24, 25, 30, 33, 39, 41, 42, 45, 48, 57, 64, 67, 72, 73, 78, 96, 100%
+\ETs107.
+\U3.\fi
+
+\M11. Under our assumption that the visible characters of standard ASCII are
+all present, the following assignment statements initialize the
+\\{xchr} array properly, without needing any system-dependent changes.
+
+\Y\P$\4\X11:Set initial values\X\S$\6
+\&{for} $\|i\K0\mathrel{\&{to}}\O{37}$ \1\&{do}\5
+$\\{xchr}[\|i]\K\.{\'?\'}$;\2\6
+$\\{xchr}[\O{40}]\K\.{\'\ \'}$;\5
+$\\{xchr}[\O{41}]\K\.{\'!\'}$;\5
+$\\{xchr}[\O{42}]\K\.{\'"\'}$;\5
+$\\{xchr}[\O{43}]\K\.{\'\#\'}$;\5
+$\\{xchr}[\O{44}]\K\.{\'\$\'}$;\5
+$\\{xchr}[\O{45}]\K\.{\'\%\'}$;\5
+$\\{xchr}[\O{46}]\K\.{\'\&\'}$;\5
+$\\{xchr}[\O{47}]\K\.{\'\'}\.{\'\'}$;\6
+$\\{xchr}[\O{50}]\K\.{\'(\'}$;\5
+$\\{xchr}[\O{51}]\K\.{\')\'}$;\5
+$\\{xchr}[\O{52}]\K\.{\'*\'}$;\5
+$\\{xchr}[\O{53}]\K\.{\'+\'}$;\5
+$\\{xchr}[\O{54}]\K\.{\',\'}$;\5
+$\\{xchr}[\O{55}]\K\.{\'-\'}$;\5
+$\\{xchr}[\O{56}]\K\.{\'.\'}$;\5
+$\\{xchr}[\O{57}]\K\.{\'/\'}$;\6
+$\\{xchr}[\O{60}]\K\.{\'0\'}$;\5
+$\\{xchr}[\O{61}]\K\.{\'1\'}$;\5
+$\\{xchr}[\O{62}]\K\.{\'2\'}$;\5
+$\\{xchr}[\O{63}]\K\.{\'3\'}$;\5
+$\\{xchr}[\O{64}]\K\.{\'4\'}$;\5
+$\\{xchr}[\O{65}]\K\.{\'5\'}$;\5
+$\\{xchr}[\O{66}]\K\.{\'6\'}$;\5
+$\\{xchr}[\O{67}]\K\.{\'7\'}$;\6
+$\\{xchr}[\O{70}]\K\.{\'8\'}$;\5
+$\\{xchr}[\O{71}]\K\.{\'9\'}$;\5
+$\\{xchr}[\O{72}]\K\.{\':\'}$;\5
+$\\{xchr}[\O{73}]\K\.{\';\'}$;\5
+$\\{xchr}[\O{74}]\K\.{\'<\'}$;\5
+$\\{xchr}[\O{75}]\K\.{\'=\'}$;\5
+$\\{xchr}[\O{76}]\K\.{\'>\'}$;\5
+$\\{xchr}[\O{77}]\K\.{\'?\'}$;\6
+$\\{xchr}[\O{100}]\K\.{\'@\'}$;\5
+$\\{xchr}[\O{101}]\K\.{\'A\'}$;\5
+$\\{xchr}[\O{102}]\K\.{\'B\'}$;\5
+$\\{xchr}[\O{103}]\K\.{\'C\'}$;\5
+$\\{xchr}[\O{104}]\K\.{\'D\'}$;\5
+$\\{xchr}[\O{105}]\K\.{\'E\'}$;\5
+$\\{xchr}[\O{106}]\K\.{\'F\'}$;\5
+$\\{xchr}[\O{107}]\K\.{\'G\'}$;\6
+$\\{xchr}[\O{110}]\K\.{\'H\'}$;\5
+$\\{xchr}[\O{111}]\K\.{\'I\'}$;\5
+$\\{xchr}[\O{112}]\K\.{\'J\'}$;\5
+$\\{xchr}[\O{113}]\K\.{\'K\'}$;\5
+$\\{xchr}[\O{114}]\K\.{\'L\'}$;\5
+$\\{xchr}[\O{115}]\K\.{\'M\'}$;\5
+$\\{xchr}[\O{116}]\K\.{\'N\'}$;\5
+$\\{xchr}[\O{117}]\K\.{\'O\'}$;\6
+$\\{xchr}[\O{120}]\K\.{\'P\'}$;\5
+$\\{xchr}[\O{121}]\K\.{\'Q\'}$;\5
+$\\{xchr}[\O{122}]\K\.{\'R\'}$;\5
+$\\{xchr}[\O{123}]\K\.{\'S\'}$;\5
+$\\{xchr}[\O{124}]\K\.{\'T\'}$;\5
+$\\{xchr}[\O{125}]\K\.{\'U\'}$;\5
+$\\{xchr}[\O{126}]\K\.{\'V\'}$;\5
+$\\{xchr}[\O{127}]\K\.{\'W\'}$;\6
+$\\{xchr}[\O{130}]\K\.{\'X\'}$;\5
+$\\{xchr}[\O{131}]\K\.{\'Y\'}$;\5
+$\\{xchr}[\O{132}]\K\.{\'Z\'}$;\5
+$\\{xchr}[\O{133}]\K\.{\'[\'}$;\5
+$\\{xchr}[\O{134}]\K\.{\'\\\'}$;\5
+$\\{xchr}[\O{135}]\K\.{\']\'}$;\5
+$\\{xchr}[\O{136}]\K\.{\'\^\'}$;\5
+$\\{xchr}[\O{137}]\K\.{\'\_\'}$;\6
+$\\{xchr}[\O{140}]\K\.{\'\`\'}$;\5
+$\\{xchr}[\O{141}]\K\.{\'a\'}$;\5
+$\\{xchr}[\O{142}]\K\.{\'b\'}$;\5
+$\\{xchr}[\O{143}]\K\.{\'c\'}$;\5
+$\\{xchr}[\O{144}]\K\.{\'d\'}$;\5
+$\\{xchr}[\O{145}]\K\.{\'e\'}$;\5
+$\\{xchr}[\O{146}]\K\.{\'f\'}$;\5
+$\\{xchr}[\O{147}]\K\.{\'g\'}$;\6
+$\\{xchr}[\O{150}]\K\.{\'h\'}$;\5
+$\\{xchr}[\O{151}]\K\.{\'i\'}$;\5
+$\\{xchr}[\O{152}]\K\.{\'j\'}$;\5
+$\\{xchr}[\O{153}]\K\.{\'k\'}$;\5
+$\\{xchr}[\O{154}]\K\.{\'l\'}$;\5
+$\\{xchr}[\O{155}]\K\.{\'m\'}$;\5
+$\\{xchr}[\O{156}]\K\.{\'n\'}$;\5
+$\\{xchr}[\O{157}]\K\.{\'o\'}$;\6
+$\\{xchr}[\O{160}]\K\.{\'p\'}$;\5
+$\\{xchr}[\O{161}]\K\.{\'q\'}$;\5
+$\\{xchr}[\O{162}]\K\.{\'r\'}$;\5
+$\\{xchr}[\O{163}]\K\.{\'s\'}$;\5
+$\\{xchr}[\O{164}]\K\.{\'t\'}$;\5
+$\\{xchr}[\O{165}]\K\.{\'u\'}$;\5
+$\\{xchr}[\O{166}]\K\.{\'v\'}$;\5
+$\\{xchr}[\O{167}]\K\.{\'w\'}$;\6
+$\\{xchr}[\O{170}]\K\.{\'x\'}$;\5
+$\\{xchr}[\O{171}]\K\.{\'y\'}$;\5
+$\\{xchr}[\O{172}]\K\.{\'z\'}$;\5
+$\\{xchr}[\O{173}]\K\.{\'\{\'}$;\5
+$\\{xchr}[\O{174}]\K\.{\'|\'}$;\5
+$\\{xchr}[\O{175}]\K\.{\'\}\'}$;\5
+$\\{xchr}[\O{176}]\K\.{\'\~\'}$;\6
+\&{for} $\|i\K\O{177}\mathrel{\&{to}}255$ \1\&{do}\5
+$\\{xchr}[\|i]\K\.{\'?\'}$;\2\par
+\As12, 31, 43, 58, 65, 68, 74\ETs97.
+\U3.\fi
+
+\M12. The following system-independent code makes the \\{xord} array contain a
+suitable inverse to the information in \\{xchr}.
+
+\Y\P$\4\X11:Set initial values\X\mathrel{+}\S$\6
+\&{for} $\|i\K\\{first\_text\_char}\mathrel{\&{to}}\\{last\_text\_char}$ \1%
+\&{do}\5
+$\\{xord}[\\{chr}(\|i)]\K\O{40}$;\2\6
+\&{for} $\|i\K\.{"\ "}\mathrel{\&{to}}\.{"\~"}$ \1\&{do}\5
+$\\{xord}[\\{xchr}[\|i]]\K\|i$;\2\par
+\fi
+
+\N13.  Device-independent file format.
+Before we get into the details of \.{DVItype}, we need to know exactly
+what \.{DVI} files are. The form of such files was designed by David R.
+Fuchs in 1979. Almost any reasonable typesetting device can be driven by
+a program that takes \.{DVI} files as input, and dozens of such
+\.{DVI}-to-whatever programs have been written. Thus, it is possible to
+print the output of document compilers like \TeX\ on many different kinds
+of equipment.
+
+A \.{DVI} file is a stream of 8-bit bytes, which may be regarded as a
+series of commands in a machine-like language. The first byte of each command
+is the operation code, and this code is followed by zero or more bytes
+that provide parameters to the command. The parameters themselves may consist
+of several consecutive bytes; for example, the `\\{set\_rule}' command has two
+parameters, each of which is four bytes long. Parameters are usually
+regarded as nonnegative integers; but four-byte-long parameters,
+and shorter parameters that denote distances, can be
+either positive or negative. Such parameters are given in two's complement
+notation. For example, a two-byte-long distance parameter has a value between
+$-2^{15}$ and $2^{15}-1$.
+
+A \.{DVI} file consists of a ``preamble,'' followed by a sequence of one
+or more ``pages,'' followed by a ``postamble.'' The preamble is simply a
+\\{pre} command, with its parameters that define the dimensions used in the
+file; this must come first.  Each ``page'' consists of a \\{bop} command,
+followed by any number of other commands that tell where characters are to
+be placed on a physical page, followed by an \\{eop} command. The pages
+appear in the order that they were generated, not in any particular
+numerical order. If we ignore \\{nop} commands and \\{fnt\_def} commands
+(which are allowed between any two commands in the file), each \\{eop}
+command is immediately followed by a \\{bop} command, or by a \\{post}
+command; in the latter case, there are no more pages in the file, and the
+remaining bytes form the postamble.  Further details about the postamble
+will be explained later.
+
+Some parameters in \.{DVI} commands are ``pointers.'' These are four-byte
+quantities that give the location number of some other byte in the file;
+the first byte is number~0, then comes number~1, and so on. For example,
+one of the parameters of a \\{bop} command points to the previous \\{bop};
+this makes it feasible to read the pages in backwards order, in case the
+results are being directed to a device that stacks its output face up.
+Suppose the preamble of a \.{DVI} file occupies bytes 0 to 99. Now if the
+first page occupies bytes 100 to 999, say, and if the second
+page occupies bytes 1000 to 1999, then the \\{bop} that starts in byte 1000
+points to 100 and the \\{bop} that starts in byte 2000 points to 1000. (The
+very first \\{bop}, i.e., the one that starts in byte 100, has a pointer of
+$-1$.)
+
+\fi
+
+\M14. The \.{DVI} format is intended to be both compact and easily interpreted
+by a machine. Compactness is achieved by making most of the information
+implicit instead of explicit. When a \.{DVI}-reading program reads the
+commands for a page, it keeps track of several quantities: (a)~The current
+font \|f is an integer; this value is changed only
+by \\{fnt} and \\{fnt\_num} commands. (b)~The current position on the page
+is given by two numbers called the horizontal and vertical coordinates,
+\|h and \|v. Both coordinates are zero at the upper left corner of the page;
+moving to the right corresponds to increasing the horizontal coordinate, and
+moving down corresponds to increasing the vertical coordinate. Thus, the
+coordinates are essentially Cartesian, except that vertical directions are
+flipped; the Cartesian version of $(\|h,\|v)$ would be $(\|h,-\|v)$.  (c)~The
+current spacing amounts are given by four numbers \|w, \|x, \|y, and \|z,
+where \|w and~\|x are used for horizontal spacing and where \|y and~\|z
+are used for vertical spacing. (d)~There is a stack containing
+$(\|h,\|v,\|w,\|x,\|y,\|z)$ values; the \.{DVI} commands \\{push} and \\{pop}
+are used to
+change the current level of operation. Note that the current font~\|f is
+not pushed and popped; the stack contains only information about
+positioning.
+
+The values of \|h, \|v, \|w, \|x, \|y, and \|z are signed integers having up
+to 32 bits, including the sign. Since they represent physical distances,
+there is a small unit of measurement such that increasing \|h by~1 means
+moving a certain tiny distance to the right. The actual unit of
+measurement is variable, as explained below.
+
+\fi
+
+\M15. Here is a list of all the commands that may appear in a \.{DVI} file.
+Each
+command is specified by its symbolic name (e.g., \\{bop}), its opcode byte
+(e.g., 139), and its parameters (if any). The parameters are followed
+by a bracketed number telling how many bytes they occupy; for example,
+`$\|p[4]$' means that parameter \|p is four bytes long.
+
+\yskip\hang\\{set\_char\_0} 0. Typeset character number~0 from font~\|f
+such that the reference point of the character is at $(\|h,\|v)$. Then
+increase \|h by the width of that character. Note that a character may
+have zero or negative width, so one cannot be sure that \|h will advance
+after this command; but \|h usually does increase.
+
+\yskip\hang\\{set\_char\_1} through \\{set\_char\_127} (opcodes 1 to 127).
+Do the operations of \\{set\_char\_0}; but use the character whose number
+matches the opcode, instead of character~0.
+
+\yskip\hang\\{set1} 128 $\|c[1]$. Same as \\{set\_char\_0}, except that
+character
+number~\|c is typeset. \TeX82 uses this command for characters in the
+range $128\L\|c<256$.
+
+\yskip\hang\\{set2} 129 $\|c[2]$. Same as \\{set1}, except that \|c~is two
+bytes long, so it is in the range $0\L\|c<65536$. \TeX82 never uses this
+command, which is intended for processors that deal with oriental languages;
+but \.{DVItype} will allow character codes greater than 255, assuming that
+they all have the same width as the character whose code is $c \bmod 256$.
+
+\yskip\hang\\{set3} 130 $\|c[3]$. Same as \\{set1}, except that \|c~is three
+bytes long, so it can be as large as $2^{24}-1$.
+
+\yskip\hang\\{set4} 131 $\|c[4]$. Same as \\{set1}, except that \|c~is four
+bytes long, possibly even negative. Imagine that.
+
+\yskip\hang\\{set\_rule} 132 $\|a[4]$ $\|b[4]$. Typeset a solid black rectangle
+of height \|a and width \|b, with its bottom left corner at $(\|h,\|v)$. Then
+set $\|h\K\|h+\|b$. If either $\|a\L0$ or $\|b\L0$, nothing should be typeset.
+Note
+that if $\|b<0$, the value of \|h will decrease even though nothing else
+happens.
+Programs that typeset from \.{DVI} files should be careful to make the rules
+line up carefully with digitized characters, as explained in connection with
+the \\{rule\_pixels} subroutine below.
+
+\yskip\hang\\{put1} 133 $\|c[1]$. Typeset character number~\|c from font~\|f
+such that the reference point of the character is at $(\|h,\|v)$. (The `put'
+commands are exactly like the `set' commands, except that they simply put out a
+character or a rule without moving the reference point afterwards.)
+
+\yskip\hang\\{put2} 134 $\|c[2]$. Same as \\{set2}, except that \|h is not
+changed.
+
+\yskip\hang\\{put3} 135 $\|c[3]$. Same as \\{set3}, except that \|h is not
+changed.
+
+\yskip\hang\\{put4} 136 $\|c[4]$. Same as \\{set4}, except that \|h is not
+changed.
+
+\yskip\hang\\{put\_rule} 137 $\|a[4]$ $\|b[4]$. Same as \\{set\_rule}, except
+that
+\|h is not changed.
+
+\yskip\hang\\{nop} 138. No operation, do nothing. Any number of \\{nop}'s
+may occur between \.{DVI} commands, but a \\{nop} cannot be inserted between
+a command and its parameters or between two parameters.
+
+\yskip\hang\\{bop} 139 $c_0[4]$ $c_1[4]$ $\ldots$ $c_9[4]$ $p[4]$. Beginning
+of a page: Set $(\|h,\|v,\|w,\|x,\|y,\|z)\K(0,0,0,0,0,0)$ and set the stack
+empty. Set
+the current font \|f to an undefined value.  The ten $c_i$ parameters can
+be used to identify pages, if a user wants to print only part of a \.{DVI}
+file; \TeX82 gives them the values of \.{\\count0} $\ldots$ \.{\\count9}
+at the time \.{\\shipout} was invoked for this page.  The parameter \|p
+points to the previous \\{bop} command in the file, where the first \\{bop}
+has $p=-1$.
+
+\yskip\hang\\{eop} 140.  End of page: Print what you have read since the
+previous \\{bop}. At this point the stack should be empty. (The \.{DVI}-reading
+programs that drive most output devices will have kept a buffer of the
+material that appears on the page that has just ended. This material is
+largely, but not entirely, in order by \|v coordinate and (for fixed \|v) by
+\|h~coordinate; so it usually needs to be sorted into some order that is
+appropriate for the device in question. \.{DVItype} does not do such sorting.)
+
+\yskip\hang\\{push} 141. Push the current values of $(\|h,\|v,\|w,\|x,\|y,\|z)$
+onto the
+top of the stack; do not change any of these values. Note that \|f is
+not pushed.
+
+\yskip\hang\\{pop} 142. Pop the top six values off of the stack and assign
+them to $(\|h,\|v,\|w,\|x,\|y,\|z)$. The number of pops should never exceed the
+number
+of pushes, since it would be highly embarrassing if the stack were empty
+at the time of a \\{pop} command.
+
+\yskip\hang\\{right1} 143 $\|b[1]$. Set $\|h\K\|h+\|b$, i.e., move right \|b
+units.
+The parameter is a signed number in two's complement notation, $-128\L\|b<128$;
+if $\|b<0$, the reference point actually moves left.
+
+\yskip\hang\\{right2} 144 $\|b[2]$. Same as \\{right1}, except that \|b is a
+two-byte quantity in the range $-32768\L\|b<32768$.
+
+\yskip\hang\\{right3} 145 $\|b[3]$. Same as \\{right1}, except that \|b is a
+three-byte quantity in the range $\hbox{$-2^{23}$}\L\|b<\hbox{$2^{23}$}$.
+
+\yskip\hang\\{right4} 146 $\|b[4]$. Same as \\{right1}, except that \|b is a
+four-byte quantity in the range $\hbox{$-2^{31}$}\L\|b<\hbox{$2^{31}$}$.
+
+\yskip\hang\\{w0} 147. Set $\|h\K\|h+\|w$; i.e., move right \|w units. With
+luck,
+this parameterless command will usually suffice, because the same kind of
+motion
+will occur several times in succession; the following commands explain how
+\|w gets particular values.
+
+\yskip\hang\\{w1} 148 $\|b[1]$. Set $\|w\K\|b$ and $\|h\K\|h+\|b$. The value of
+\|b is a
+signed quantity in two's complement notation, $-128\L\|b<128$. This command
+changes the current \|w~spacing and moves right by \|b.
+
+\yskip\hang\\{w2} 149 $\|b[2]$. Same as \\{w1}, but \|b is a two-byte-long
+parameter, $-32768\L\|b<32768$.
+
+\yskip\hang\\{w3} 150 $\|b[3]$. Same as \\{w1}, but \|b is a three-byte-long
+parameter, $\hbox{$-2^{23}$}\L\|b<\hbox{$2^{23}$}$.
+
+\yskip\hang\\{w4} 151 $\|b[4]$. Same as \\{w1}, but \|b is a four-byte-long
+parameter, $\hbox{$-2^{31}$}\L\|b<\hbox{$2^{31}$}$.
+
+\yskip\hang\\{x0} 152. Set $\|h\K\|h+\|x$; i.e., move right \|x units. The `%
+\|x'
+commands are like the `\|w' commands except that they involve \|x instead
+of \|w.
+
+\yskip\hang\\{x1} 153 $\|b[1]$. Set $\|x\K\|b$ and $\|h\K\|h+\|b$. The value of
+\|b is a
+signed quantity in two's complement notation, $-128\L\|b<128$. This command
+changes the current \|x~spacing and moves right by \|b.
+
+\yskip\hang\\{x2} 154 $\|b[2]$. Same as \\{x1}, but \|b is a two-byte-long
+parameter, $-32768\L\|b<32768$.
+
+\yskip\hang\\{x3} 155 $\|b[3]$. Same as \\{x1}, but \|b is a three-byte-long
+parameter, $\hbox{$-2^{23}$}\L\|b<\hbox{$2^{23}$}$.
+
+\yskip\hang\\{x4} 156 $\|b[4]$. Same as \\{x1}, but \|b is a four-byte-long
+parameter, $\hbox{$-2^{31}$}\L\|b<\hbox{$2^{31}$}$.
+
+\yskip\hang\\{down1} 157 $\|a[1]$. Set $\|v\K\|v+\|a$, i.e., move down \|a
+units.
+The parameter is a signed number in two's complement notation, $-128\L\|a<128$;
+if $\|a<0$, the reference point actually moves up.
+
+\yskip\hang\\{down2} 158 $\|a[2]$. Same as \\{down1}, except that \|a is a
+two-byte quantity in the range $-32768\L\|a<32768$.
+
+\yskip\hang\\{down3} 159 $\|a[3]$. Same as \\{down1}, except that \|a is a
+three-byte quantity in the range $\hbox{$-2^{23}$}\L\|a<\hbox{$2^{23}$}$.
+
+\yskip\hang\\{down4} 160 $\|a[4]$. Same as \\{down1}, except that \|a is a
+four-byte quantity in the range $\hbox{$-2^{31}$}\L\|a<\hbox{$2^{31}$}$.
+
+\yskip\hang\\{y0} 161. Set $\|v\K\|v+\|y$; i.e., move down \|y units. With
+luck,
+this parameterless command will usually suffice, because the same kind of
+motion
+will occur several times in succession; the following commands explain how
+\|y gets particular values.
+
+\yskip\hang\\{y1} 162 $\|a[1]$. Set $\|y\K\|a$ and $\|v\K\|v+\|a$. The value of
+\|a is a
+signed quantity in two's complement notation, $-128\L\|a<128$. This command
+changes the current \|y~spacing and moves down by \|a.
+
+\yskip\hang\\{y2} 163 $\|a[2]$. Same as \\{y1}, but \|a is a two-byte-long
+parameter, $-32768\L\|a<32768$.
+
+\yskip\hang\\{y3} 164 $\|a[3]$. Same as \\{y1}, but \|a is a three-byte-long
+parameter, $\hbox{$-2^{23}$}\L\|a<\hbox{$2^{23}$}$.
+
+\yskip\hang\\{y4} 165 $\|a[4]$. Same as \\{y1}, but \|a is a four-byte-long
+parameter, $\hbox{$-2^{31}$}\L\|a<\hbox{$2^{31}$}$.
+
+\yskip\hang\\{z0} 166. Set $\|v\K\|v+\|z$; i.e., move down \|z units. The `\|z'
+commands
+are like the `\|y' commands except that they involve \|z instead of \|y.
+
+\yskip\hang\\{z1} 167 $\|a[1]$. Set $\|z\K\|a$ and $\|v\K\|v+\|a$. The value of
+\|a is a
+signed quantity in two's complement notation, $-128\L\|a<128$. This command
+changes the current \|z~spacing and moves down by \|a.
+
+\yskip\hang\\{z2} 168 $\|a[2]$. Same as \\{z1}, but \|a is a two-byte-long
+parameter, $-32768\L\|a<32768$.
+
+\yskip\hang\\{z3} 169 $\|a[3]$. Same as \\{z1}, but \|a is a three-byte-long
+parameter, $\hbox{$-2^{23}$}\L\|a<\hbox{$2^{23}$}$.
+
+\yskip\hang\\{z4} 170 $\|a[4]$. Same as \\{z1}, but \|a is a four-byte-long
+parameter, $\hbox{$-2^{31}$}\L\|a<\hbox{$2^{31}$}$.
+
+\yskip\hang\\{fnt\_num\_0} 171. Set $\|f\K0$. Font 0 must previously have been
+defined by a \\{fnt\_def} instruction, as explained below.
+
+\yskip\hang\\{fnt\_num\_1} through \\{fnt\_num\_63} (opcodes 172 to 234). Set
+$\|f\K1$, \dots, $\|f\K63$, respectively.
+
+\yskip\hang\\{fnt1} 235 $\|k[1]$. Set $\|f\K\|k$. \TeX82 uses this command for
+font
+numbers in the range $64\L\|k<256$.
+
+\yskip\hang\\{fnt2} 236 $\|k[2]$. Same as \\{fnt1}, except that \|k~is two
+bytes long, so it is in the range $0\L\|k<65536$. \TeX82 never generates this
+command, but large font numbers may prove useful for specifications of
+color or texture, or they may be used for special fonts that have fixed
+numbers in some external coding scheme.
+
+\yskip\hang\\{fnt3} 237 $\|k[3]$. Same as \\{fnt1}, except that \|k~is three
+bytes long, so it can be as large as $2^{24}-1$.
+
+\yskip\hang\\{fnt4} 238 $\|k[4]$. Same as \\{fnt1}, except that \|k~is four
+bytes long; this is for the really big font numbers (and for the negative
+ones).
+
+\yskip\hang\\{xxx1} 239 $\|k[1]$ $\|x[\|k]$. This command is undefined in
+general; it functions as a $(k+2)$-byte \\{nop} unless special \.{DVI}-reading
+programs are being used. \TeX82 generates \\{xxx1} when a short enough
+\.{\\special} appears, setting \|k to the number of bytes being sent. It
+is recommended that \|x be a string having the form of a keyword followed
+by possible parameters relevant to that keyword.
+
+\yskip\hang\\{xxx2} 240 $\|k[2]$ $\|x[\|k]$. Like \\{xxx1}, but $0\L\|k<65536$.
+
+\yskip\hang\\{xxx3} 241 $\|k[3]$ $\|x[\|k]$. Like \\{xxx1}, but $0\L\|k<%
+\hbox{$2^{24}$}$.
+
+\yskip\hang\\{xxx4} 242 $\|k[4]$ $\|x[\|k]$. Like \\{xxx1}, but \|k can be
+ridiculously
+large. \TeX82 uses \\{xxx4} when \\{xxx1} would be incorrect.
+
+\yskip\hang\\{fnt\_def1} 243 $\|k[1]$ $\|c[4]$ $\|s[4]$ $\|d[4]$ $\|a[1]$ $%
+\|l[1]$ $\|n[\|a+\|l]$.
+Define font \|k, where $0\L\|k<256$; font definitions will be explained
+shortly.
+
+\yskip\hang\\{fnt\_def2} 244 $\|k[2]$ $\|c[4]$ $\|s[4]$ $\|d[4]$ $\|a[1]$ $%
+\|l[1]$ $\|n[\|a+\|l]$.
+Define font \|k, where $0\L\|k<65536$.
+
+\yskip\hang\\{fnt\_def3} 245 $\|k[3]$ $\|c[4]$ $\|s[4]$ $\|d[4]$ $\|a[1]$ $%
+\|l[1]$ $\|n[\|a+\|l]$.
+Define font \|k, where $0\L\|k<\hbox{$2^{24}$}$.
+
+\yskip\hang\\{fnt\_def4} 246 $\|k[4]$ $\|c[4]$ $\|s[4]$ $\|d[4]$ $\|a[1]$ $%
+\|l[1]$ $\|n[\|a+\|l]$.
+Define font \|k, where $\hbox{$-2^{31}$}\L\|k<\hbox{$2^{31}$}$.
+
+\yskip\hang\\{pre} 247 $\|i[1]$ $\\{num}[4]$ $\\{den}[4]$ $\\{mag}[4]$ $\|k[1]$
+$\|x[\|k]$.
+Beginning of the preamble; this must come at the very beginning of the
+file. Parameters \|i, \\{num}, \\{den}, \\{mag}, \|k, and \|x are explained
+below.
+
+\yskip\hang\\{post} 248. Beginning of the postamble, see below.
+
+\yskip\hang\\{post\_post} 249. Ending of the postamble, see below.
+
+\yskip\noindent Commands 250--255 are undefined at the present time.
+
+\fi
+
+\M16. \P\D \37$\\{set\_char\_0}=0$\C{typeset character 0 and move right}\par
+\P\D \37$\\{set1}=128$\C{typeset a character and move right}\par
+\P\D \37$\\{set\_rule}=132$\C{typeset a rule and move right}\par
+\P\D \37$\\{put1}=133$\C{typeset a character}\par
+\P\D \37$\\{put\_rule}=137$\C{typeset a rule}\par
+\P\D \37$\\{nop}=138$\C{no operation}\par
+\P\D \37$\\{bop}=139$\C{beginning of page}\par
+\P\D \37$\\{eop}=140$\C{ending of page}\par
+\P\D \37$\\{push}=141$\C{save the current positions}\par
+\P\D \37$\\{pop}=142$\C{restore previous positions}\par
+\P\D \37$\\{right1}=143$\C{move right}\par
+\P\D \37$\\{w0}=147$\C{move right by \|w}\par
+\P\D \37$\\{w1}=148$\C{move right and set \|w}\par
+\P\D \37$\\{x0}=152$\C{move right by \|x}\par
+\P\D \37$\\{x1}=153$\C{move right and set \|x}\par
+\P\D \37$\\{down1}=157$\C{move down}\par
+\P\D \37$\\{y0}=161$\C{move down by \|y}\par
+\P\D \37$\\{y1}=162$\C{move down and set \|y}\par
+\P\D \37$\\{z0}=166$\C{move down by \|z}\par
+\P\D \37$\\{z1}=167$\C{move down and set \|z}\par
+\P\D \37$\\{fnt\_num\_0}=171$\C{set current font to 0}\par
+\P\D \37$\\{fnt1}=235$\C{set current font}\par
+\P\D \37$\\{xxx1}=239$\C{extension to \.{DVI} primitives}\par
+\P\D \37$\\{xxx4}=242$\C{potentially long extension to \.{DVI} primitives}\par
+\P\D \37$\\{fnt\_def1}=243$\C{define the meaning of a font number}\par
+\P\D \37$\\{pre}=247$\C{preamble}\par
+\P\D \37$\\{post}=248$\C{postamble beginning}\par
+\P\D \37$\\{post\_post}=249$\C{postamble ending}\par
+\P\D \37$\\{undefined\_commands}\S250,\39251,\39252,\39253,\39254,\39255$\par
+\fi
+
+\M17. The preamble contains basic information about the file as a whole. As
+stated above, there are six parameters:
+$$\hbox{$\|i[1]$ $\\{num}[4]$ $\\{den}[4]$ $\\{mag}[4]$ $\|k[1]$ $\|x[\|k]$.}$$
+The \|i byte identifies \.{DVI} format; currently this byte is always set
+to~2. (The value $\|i=3$ is currently used for an extended format that
+allows a mixture of right-to-left and left-to-right typesetting.
+Some day we will set $\|i=4$, when \.{DVI} format makes another
+incompatible change---perhaps in the year 2048.)
+
+The next two parameters, \\{num} and \\{den}, are positive integers that define
+the units of measurement; they are the numerator and denominator of a
+fraction by which all dimensions in the \.{DVI} file could be multiplied
+in order to get lengths in units of $10^{-7}$ meters. (For example, there are
+exactly 7227 \TeX\ points in 254 centimeters, and \TeX82 works with scaled
+points where there are $2^{16}$ sp in a point, so \TeX82 sets $%
+\\{num}=25400000$
+and $\\{den}=7227\cdot2^{16}=473628672$.)
+
+The \\{mag} parameter is what \TeX82 calls \.{\\mag}, i.e., 1000 times the
+desired magnification. The actual fraction by which dimensions are
+multiplied is therefore $mn/1000d$. Note that if a \TeX\ source document
+does not call for any `\.{true}' dimensions, and if you change it only by
+specifying a different \.{\\mag} setting, the \.{DVI} file that \TeX\
+creates will be completely unchanged except for the value of \\{mag} in the
+preamble and postamble. (Fancy \.{DVI}-reading programs allow users to
+override the \\{mag}~setting when a \.{DVI} file is being printed.)
+
+Finally, \|k and \|x allow the \.{DVI} writer to include a comment, which is
+not
+interpreted further. The length of comment \|x is \|k, where $0\L\|k<256$.
+
+\Y\P\D \37$\\{id\_byte}=2$\C{identifies the kind of \.{DVI} files described
+here}\par
+\fi
+
+\M18. Font definitions for a given font number \|k contain further parameters
+$$\hbox{$\|c[4]$ $\|s[4]$ $\|d[4]$ $\|a[1]$ $\|l[1]$ $\|n[\|a+\|l]$.}$$
+The four-byte value \|c is the check sum that \TeX\ (or whatever program
+generated the \.{DVI} file) found in the \.{TFM} file for this font;
+\|c should match the check sum of the font found by programs that read
+this \.{DVI} file.
+
+Parameter \|s contains a fixed-point scale factor that is applied to the
+character widths in font \|k; font dimensions in \.{TFM} files and other
+font files are relative to this quantity, which is always positive and
+less than $2^{27}$. It is given in the same units as the other dimensions
+of the \.{DVI} file.  Parameter \|d is similar to \|s; it is the ``design
+size,'' and (like~\|s) it is given in \.{DVI} units. Thus, font \|k is to be
+used at $\\{mag}\cdot s/1000d$ times its normal size.
+
+The remaining part of a font definition gives the external name of the font,
+which is an ASCII string of length $\|a+\|l$. The number \|a is the length
+of the ``area'' or directory, and \|l is the length of the font name itself;
+the standard local system font area is supposed to be used when $\|a=0$.
+The \|n field contains the area in its first \|a bytes.
+
+Font definitions must appear before the first use of a particular font number.
+Once font \|k is defined, it must not be defined again; however, we
+shall see below that font definitions appear in the postamble as well as
+in the pages, so in this sense each font number is defined exactly twice,
+if at all. Like \\{nop} commands, font definitions can
+appear before the first \\{bop}, or between an \\{eop} and a \\{bop}.
+
+\fi
+
+\M19. The last page in a \.{DVI} file is followed by `\\{post}'; this command
+introduces the postamble, which summarizes important facts that \TeX\ has
+accumulated about the file, making it possible to print subsets of the data
+with reasonable efficiency. The postamble has the form
+$$\vbox{\halign{\hbox{#\hfil}\cr
+\\{post} $\|p[4]$ $\\{num}[4]$ $\\{den}[4]$ $\\{mag}[4]$ $\|l[4]$ $\|u[4]$ $%
+\|s[2]$ $\|t[2]$\cr
+$\langle\,$font definitions$\,\rangle$\cr
+\\{post\_post} $\|q[4]$ $\|i[1]$ 223's$[{\G}4]$\cr}}$$
+Here \|p is a pointer to the final \\{bop} in the file. The next three
+parameters, \\{num}, \\{den}, and \\{mag}, are duplicates of the quantities
+that
+appeared in the preamble.
+
+Parameters \|l and \|u give respectively the height-plus-depth of the tallest
+page and the width of the widest page, in the same units as other dimensions
+of the file. These numbers might be used by a \.{DVI}-reading program to
+position individual ``pages'' on large sheets of film or paper; however,
+the standard convention for output on normal size paper is to position each
+page so that the upper left-hand corner is exactly one inch from the left
+and the top. Experience has shown that it is unwise to design %
+\.{DVI}-to-printer
+software that attempts cleverly to center the output; a fixed position of
+the upper left corner is easiest for users to understand and to work with.
+Therefore \|l and~\|u are often ignored.
+
+Parameter \|s is the maximum stack depth (i.e., the largest excess of
+\\{push} commands over \\{pop} commands) needed to process this file. Then
+comes \|t, the total number of pages (\\{bop} commands) present.
+
+The postamble continues with font definitions, which are any number of
+\\{fnt\_def} commands as described above, possibly interspersed with \\{nop}
+commands. Each font number that is used in the \.{DVI} file must be defined
+exactly twice: Once before it is first selected by a \\{fnt} command, and once
+in the postamble.
+
+\fi
+
+\M20. The last part of the postamble, following the \\{post\_post} byte that
+signifies the end of the font definitions, contains \|q, a pointer to the
+\\{post} command that started the postamble.  An identification byte, \|i,
+comes next; this currently equals~2, as in the preamble.
+
+The \|i byte is followed by four or more bytes that are all equal to
+the decimal number 223 (i.e., \O{337} in octal). \TeX\ puts out four to seven
+of
+these trailing bytes, until the total length of the file is a multiple of
+four bytes, since this works out best on machines that pack four bytes per
+word; but any number of 223's is allowed, as long as there are at least four
+of them. In effect, 223 is a sort of signature that is added at the very end.
+
+This curious way to finish off a \.{DVI} file makes it feasible for
+\.{DVI}-reading programs to find the postamble first, on most computers,
+even though \TeX\ wants to write the postamble last. Most operating
+systems permit random access to individual words or bytes of a file, so
+the \.{DVI} reader can start at the end and skip backwards over the 223's
+until finding the identification byte. Then it can back up four bytes, read
+\|q, and move to byte \|q of the file. This byte should, of course,
+contain the value 248 (\\{post}); now the postamble can be read, so the
+\.{DVI} reader discovers all the information needed for typesetting the
+pages. Note that it is also possible to skip through the \.{DVI} file at
+reasonably high speed to locate a particular page, if that proves
+desirable. This saves a lot of time, since \.{DVI} files used in production
+jobs tend to be large.
+
+Unfortunately, however, standard \PASCAL\ does not include the ability to
+access a random position in a file, or even to determine the length of a file.
+Almost all systems nowadays provide the necessary capabilities, so \.{DVI}
+format has been designed to work most efficiently with modern operating
+systems.
+As noted above, \.{DVItype} will limit itself to the restrictions of standard
+\PASCAL\ if \\{random\_reading} is defined to be \\{false}.
+
+\fi
+
+\N21.  Input from binary files.
+We have seen that a \.{DVI} file is a sequence of 8-bit bytes. The bytes
+appear physically in what is called a `\&{packed} \&{file} \&{of} $0\to255$'
+in \PASCAL\ lingo.
+
+Packing is system dependent, and many \PASCAL\ systems fail to implement
+such files in a sensible way (at least, from the viewpoint of producing
+good production software).  For example, some systems treat all
+byte-oriented files as text, looking for end-of-line marks and such
+things. Therefore some system-dependent code is often needed to deal with
+binary files, even though most of the program in this section of
+\.{DVItype} is written in standard \PASCAL.
+
+One common way to solve the problem is to consider files of \\{integer}
+numbers, and to convert an integer in the range $-2^{31}\L x<2^{31}$ to
+a sequence of four bytes $(a,b,c,d)$ using the following code, which
+avoids the controversial integer division of negative numbers:
+$$\vbox{\halign{#\hfil\cr
+ \&{if} $\|x\G0$ \&{then} $\|a\K\|x\mathbin{\&{div}}\O{100000000}$\cr
+  \&{else}  \&{begin} $\|x\K(\|x+\O{10000000000})+\O{10000000000}$; $\|a\K\|x%
+\mathbin{\&{div}}\O{100000000}+128$;\cr
+\quad  \&{end} \cr
+$\|x\K\|x\mathbin{\&{mod}}\O{100000000}$;\cr
+$\|b\K\|x\mathbin{\&{div}}\O{200000}$; $\|x\K\|x\mathbin{\&{mod}}\O{200000}$;%
+\cr
+$\|c\K\|x\mathbin{\&{div}}\O{400}$; $\|d\K\|x\mathbin{\&{mod}}\O{400}$;\cr}}$$
+The four bytes are then kept in a buffer and output one by one. (On 36-bit
+computers, an additional division by 16 is necessary at the beginning.
+Another way to separate an integer into four bytes is to use/abuse
+\PASCAL's variant records, storing an integer and retrieving bytes that are
+packed in the same place; {\sl caveat implementor!\/}) It is also desirable
+in some cases to read a hundred or so integers at a time, maintaining a
+larger buffer.
+
+We shall stick to simple \PASCAL\ in this program, for reasons of clarity,
+even if such simplicity is sometimes unrealistic.
+
+\Y\P$\4\X8:Types in the outer block\X\mathrel{+}\S$\6
+$\\{eight\_bits}=0\to255$;\C{unsigned one-byte quantity}\6
+$\\{byte\_file}=$\1\5
+\&{packed} \37\&{file} \1\&{of}\5
+\\{eight\_bits};\C{files that contain binary data}\2\2\par
+\fi
+
+\M22. The program deals with two binary file variables: \\{dvi\_file} is the
+main
+input file that we are translating into symbolic form, and \\{tfm\_file} is
+the current font metric file from which character-width information is
+being read.
+
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4\\{dvi\_file}: \37\\{byte\_file};\C{the stuff we are \.{DVI}typing}\6
+\4\\{tfm\_file}: \37\\{byte\_file};\C{a font metric file}\par
+\fi
+
+\M23. To prepare these files for input, we \\{reset} them. An extension of
+\PASCAL\ is needed in the case of \\{tfm\_file}, since we want to associate
+it with external files whose names are specified dynamically (i.e., not
+known at compile time). The following code assumes that `$\\{reset}(\|f,\|s)$'
+does this, when \|f is a file variable and \|s is a string variable that
+specifies the file name. If $\\{eof}(\|f)$ is true immediately after
+$\\{reset}(\|f,\|s)$ has acted, we assume that no file named \|s is accessible.
+
+\Y\P\4\&{procedure}\1\  \37\\{open\_dvi\_file};\C{prepares to read packed bytes
+in \\{dvi\_file}}\2\6
+\&{begin} \37$\\{reset}(\\{dvi\_file})$;\5
+$\\{cur\_loc}\K0$;\6
+\&{end};\7
+\4\&{procedure}\1\  \37\\{open\_tfm\_file};\C{prepares to read packed bytes in %
+\\{tfm\_file}}\2\6
+\&{begin} \37$\\{reset}(\\{tfm\_file},\39\\{cur\_name})$;\6
+\&{end};\par
+\fi
+
+\M24. If you looked carefully at the preceding code, you probably asked,
+``What are \\{cur\_loc} and \\{cur\_name}?'' Good question. They're global
+variables: \\{cur\_loc} is the number of the byte about to be read next from
+\\{dvi\_file}, and \\{cur\_name} is a string variable that will be set to the
+current font metric file name before \\{open\_tfm\_file} is called.
+
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4\\{cur\_loc}: \37\\{integer};\C{where we are about to look, in \\{dvi\_file}}%
+\6
+\4\\{cur\_name}: \37\&{packed} \37\&{array} $[1\to\\{name\_length}]$ \1\&{of}\5
+\\{char};\C{external name,   with no lower case letters}\2\par
+\fi
+
+\M25. It turns out to be convenient to read four bytes at a time, when we are
+inputting from \.{TFM} files. The input goes into global variables
+\\{b0}, \\{b1}, \\{b2}, and \\{b3}, with \\{b0} getting the first byte and %
+\\{b3}
+the fourth.
+
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4$\\{b0},\39\\{b1},\39\\{b2},\39\\{b3}$: \37\\{eight\_bits};\C{four bytes
+input at once}\par
+\fi
+
+\M26. The \\{read\_tfm\_word} procedure sets \\{b0} through \\{b3} to the next
+four bytes in the current \.{TFM} file.
+
+\Y\P\4\&{procedure}\1\  \37\\{read\_tfm\_word};\2\6
+\&{begin} \37$\\{read}(\\{tfm\_file},\39\\{b0})$;\5
+$\\{read}(\\{tfm\_file},\39\\{b1})$;\5
+$\\{read}(\\{tfm\_file},\39\\{b2})$;\5
+$\\{read}(\\{tfm\_file},\39\\{b3})$;\6
+\&{end};\par
+\fi
+
+\M27. We shall use another set of simple functions to read the next byte or
+bytes from \\{dvi\_file}. There are seven possibilities, each of which is
+treated as a separate function in order to minimize the overhead for
+subroutine calls.
+
+\Y\P\4\&{function}\1\  \37\\{get\_byte}: \37\\{integer};\C{returns the next
+byte, unsigned}\6
+\4\&{var} \37\|b: \37\\{eight\_bits};\2\6
+\&{begin} \37\&{if} $\\{eof}(\\{dvi\_file})$ \1\&{then}\5
+$\\{get\_byte}\K0$\6
+\4\&{else} \&{begin} \37$\\{read}(\\{dvi\_file},\39\|b)$;\5
+$\\{incr}(\\{cur\_loc})$;\5
+$\\{get\_byte}\K\|b$;\6
+\&{end};\2\6
+\&{end};\7
+\4\&{function}\1\  \37\\{signed\_byte}: \37\\{integer};\C{returns the next
+byte, signed}\6
+\4\&{var} \37\|b: \37\\{eight\_bits};\2\6
+\&{begin} \37$\\{read}(\\{dvi\_file},\39\|b)$;\5
+$\\{incr}(\\{cur\_loc})$;\6
+\&{if} $\|b<128$ \1\&{then}\5
+$\\{signed\_byte}\K\|b$\ \&{else} $\\{signed\_byte}\K\|b-256$;\2\6
+\&{end};\7
+\4\&{function}\1\  \37\\{get\_two\_bytes}: \37\\{integer};\C{returns the next
+two bytes, unsigned}\6
+\4\&{var} \37$\|a,\39\|b$: \37\\{eight\_bits};\2\6
+\&{begin} \37$\\{read}(\\{dvi\_file},\39\|a)$;\5
+$\\{read}(\\{dvi\_file},\39\|b)$;\5
+$\\{cur\_loc}\K\\{cur\_loc}+2$;\5
+$\\{get\_two\_bytes}\K\|a\ast256+\|b$;\6
+\&{end};\7
+\4\&{function}\1\  \37\\{signed\_pair}: \37\\{integer};\C{returns the next two
+bytes, signed}\6
+\4\&{var} \37$\|a,\39\|b$: \37\\{eight\_bits};\2\6
+\&{begin} \37$\\{read}(\\{dvi\_file},\39\|a)$;\5
+$\\{read}(\\{dvi\_file},\39\|b)$;\5
+$\\{cur\_loc}\K\\{cur\_loc}+2$;\6
+\&{if} $\|a<128$ \1\&{then}\5
+$\\{signed\_pair}\K\|a\ast256+\|b$\6
+\4\&{else} $\\{signed\_pair}\K(\|a-256)\ast256+\|b$;\2\6
+\&{end};\7
+\4\&{function}\1\  \37\\{get\_three\_bytes}: \37\\{integer};\C{returns the next
+three bytes, unsigned}\6
+\4\&{var} \37$\|a,\39\|b,\39\|c$: \37\\{eight\_bits};\2\6
+\&{begin} \37$\\{read}(\\{dvi\_file},\39\|a)$;\5
+$\\{read}(\\{dvi\_file},\39\|b)$;\5
+$\\{read}(\\{dvi\_file},\39\|c)$;\5
+$\\{cur\_loc}\K\\{cur\_loc}+3$;\5
+$\\{get\_three\_bytes}\K(\|a\ast256+\|b)\ast256+\|c$;\6
+\&{end};\7
+\4\&{function}\1\  \37\\{signed\_trio}: \37\\{integer};\C{returns the next
+three bytes, signed}\6
+\4\&{var} \37$\|a,\39\|b,\39\|c$: \37\\{eight\_bits};\2\6
+\&{begin} \37$\\{read}(\\{dvi\_file},\39\|a)$;\5
+$\\{read}(\\{dvi\_file},\39\|b)$;\5
+$\\{read}(\\{dvi\_file},\39\|c)$;\5
+$\\{cur\_loc}\K\\{cur\_loc}+3$;\6
+\&{if} $\|a<128$ \1\&{then}\5
+$\\{signed\_trio}\K(\|a\ast256+\|b)\ast256+\|c$\6
+\4\&{else} $\\{signed\_trio}\K((\|a-256)\ast256+\|b)\ast256+\|c$;\2\6
+\&{end};\7
+\4\&{function}\1\  \37\\{signed\_quad}: \37\\{integer};\C{returns the next four
+bytes, signed}\6
+\4\&{var} \37$\|a,\39\|b,\39\|c,\39\|d$: \37\\{eight\_bits};\2\6
+\&{begin} \37$\\{read}(\\{dvi\_file},\39\|a)$;\5
+$\\{read}(\\{dvi\_file},\39\|b)$;\5
+$\\{read}(\\{dvi\_file},\39\|c)$;\5
+$\\{read}(\\{dvi\_file},\39\|d)$;\5
+$\\{cur\_loc}\K\\{cur\_loc}+4$;\6
+\&{if} $\|a<128$ \1\&{then}\5
+$\\{signed\_quad}\K((\|a\ast256+\|b)\ast256+\|c)\ast256+\|d$\6
+\4\&{else} $\\{signed\_quad}\K(((\|a-256)\ast256+\|b)\ast256+\|c)\ast256+\|d$;%
+\2\6
+\&{end};\par
+\fi
+
+\M28. Finally we come to the routines that are used only if \\{random\_reading}
+is
+\\{true}. The driver program below needs two such routines: \\{dvi\_length}
+should
+compute the total number of bytes in \\{dvi\_file}, possibly also
+causing $\\{eof}(\\{dvi\_file})$ to be true; and $\\{move\_to\_byte}(\|n)$
+should position \\{dvi\_file} so that the next \\{get\_byte} will read byte %
+\|n,
+starting with $\|n=0$ for the first byte in the file.
+
+Such routines are, of course, highly system dependent. They are implemented
+here in terms of two assumed system routines called \\{set\_pos} and \\{cur%
+\_pos}.
+The call $\\{set\_pos}(\|f,\|n)$ moves to item \|n in file \|f, unless \|n is
+negative or larger than the total number of items in \|f; in the latter
+case, $\\{set\_pos}(\|f,\|n)$ moves to the end of file \|f.
+The call $\\{cur\_pos}(\|f)$ gives the total number of items in \|f, if
+$\\{eof}(\|f)$ is true; we use \\{cur\_pos} only in such a situation.
+
+\Y\P\4\&{function}\1\  \37\\{dvi\_length}: \37\\{integer};\2\6
+\&{begin} \37$\\{set\_pos}(\\{dvi\_file},\39-1)$;\5
+$\\{dvi\_length}\K\\{cur\_pos}(\\{dvi\_file})$;\6
+\&{end};\7
+\4\&{procedure}\1\  \37$\\{move\_to\_byte}(\|n:\\{integer})$;\2\6
+\&{begin} \37$\\{set\_pos}(\\{dvi\_file},\39\|n)$;\5
+$\\{cur\_loc}\K\|n$;\6
+\&{end};\par
+\fi
+
+\N29.  Reading the font information.
+\.{DVI} file format does not include information about character widths, since
+that would tend to make the files a lot longer. But a program that reads
+a \.{DVI} file is supposed to know the widths of the characters that appear
+in \\{set\_char} commands. Therefore \.{DVItype} looks at the font metric
+(\.{TFM}) files for the fonts that are involved.
+
+The character-width data appears also in other files (e.g., in \.{GF} files
+that specify bit patterns for digitized characters);
+thus, it is usually possible for \.{DVI} reading programs to get by with
+accessing only one file per font. \.{DVItype} has a comparatively easy
+task in this regard, since it needs only a few words of information from
+each font; other \.{DVI}-to-printer programs may have to go to some pains to
+deal with complications that arise when a large number of large font files
+all need to be accessed simultaneously.
+
+\fi
+
+\M30. For purposes of this program, we need to know only two things about a
+given character \|c in a given font \|f: (1)~Is \|c a legal character
+in~\|f? (2)~If so, what is the width of \|c? We also need to know the
+symbolic name of each font, so it can be printed out, and we need to know
+the approximate size of inter-word spaces in each font.
+
+The answers to these questions appear implicitly in the following data
+structures. The current number of known fonts is \\{nf}. Each known font has
+an internal number \|f, where $0\L\|f<\\{nf}$; the external number of this
+font,
+i.e., its font identification number in the \.{DVI} file, is
+$\\{font\_num}[\|f]$, and the external name of this font is the string that
+occupies positions $\\{font\_name}[\|f]$ through $\\{font\_name}[\|f+1]-1$ of
+the array
+\\{names}. The latter array consists of \\{ASCII\_code} characters, and
+$\\{font\_name}[\\{nf}]$ is its first unoccupied position.  A horizontal motion
+in the range $-4\ast\\{font\_space}[\|f]<\|h<\\{font\_space}[\|f]$
+will be treated as a `kern' that is not
+indicated in the printouts that \.{DVItype} produces between brackets. The
+legal characters run from $\\{font\_bc}[\|f]$ to $\\{font\_ec}[\|f]$,
+inclusive; more
+precisely, a given character \|c is valid in font \|f if and only if
+$\\{font\_bc}[\|f]\L\|c\L\\{font\_ec}[\|f]$ and $\\{char\_width}(\|f)(\|c)\I%
+\\{invalid\_width}$.
+Finally, $\\{char\_width}(\|f)(\|c)=\\{width}[\\{width\_base}[\|f]+\|c]$, and %
+\\{width\_ptr} is the
+first unused position of the \\{width} array.
+
+\Y\P\D \37$\\{char\_width\_end}(\#)\S\#$ ] \par
+\P\D $\\{char\_width}(\#)\S\\{width}$ [ $\\{width\_base}[\#]+\\{char\_width%
+\_end}$\par
+\P\D \37$\\{invalid\_width}\S\O{17777777777}$\par
+\P\D \37$\\{invalid\_font}\S\\{max\_fonts}$\par
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4\\{font\_num}: \37\&{array} $[0\to\\{max\_fonts}]$ \1\&{of}\5
+\\{integer};\C{external font numbers}\2\6
+\4\\{font\_name}: \37\&{array} $[0\to\\{max\_fonts}]$ \1\&{of}\5
+$1\to\\{name\_size}$;\C{starting positions   of external font names}\2\6
+\4\\{names}: \37\&{array} $[1\to\\{name\_size}]$ \1\&{of}\5
+\\{ASCII\_code};\C{characters of names}\2\6
+\4\\{font\_check\_sum}: \37\&{array} $[0\to\\{max\_fonts}]$ \1\&{of}\5
+\\{integer};\C{check sums}\2\6
+\4\\{font\_scaled\_size}: \37\&{array} $[0\to\\{max\_fonts}]$ \1\&{of}\5
+\\{integer};\C{scale factors}\2\6
+\4\\{font\_design\_size}: \37\&{array} $[0\to\\{max\_fonts}]$ \1\&{of}\5
+\\{integer};\C{design sizes}\2\6
+\4\\{font\_space}: \37\&{array} $[0\to\\{max\_fonts}]$ \1\&{of}\5
+\\{integer};\C{boundary between ``small''   and ``large'' spaces}\2\6
+\4\\{font\_bc}: \37\&{array} $[0\to\\{max\_fonts}]$ \1\&{of}\5
+\\{integer};\C{beginning characters in fonts}\2\6
+\4\\{font\_ec}: \37\&{array} $[0\to\\{max\_fonts}]$ \1\&{of}\5
+\\{integer};\C{ending characters in fonts}\2\6
+\4\\{width\_base}: \37\&{array} $[0\to\\{max\_fonts}]$ \1\&{of}\5
+\\{integer};\C{index into \\{width} table}\2\6
+\4\\{width}: \37\&{array} $[0\to\\{max\_widths}]$ \1\&{of}\5
+\\{integer};\C{character widths, in \.{DVI} units}\2\6
+\4\\{nf}: \37$0\to\\{max\_fonts}$;\C{the number of known fonts}\6
+\4\\{width\_ptr}: \37$0\to\\{max\_widths}$;\C{the number of known character
+widths}\par
+\fi
+
+\M31. \P$\X11:Set initial values\X\mathrel{+}\S$\6
+$\\{nf}\K0$;\5
+$\\{width\_ptr}\K0$;\5
+$\\{font\_name}[0]\K1$;\6
+$\\{font\_space}[\\{invalid\_font}]\K0$;\C{for \\{out\_space} and \\{out%
+\_vmove}}\6
+$\\{font\_bc}[\\{invalid\_font}]\K1$;\5
+$\\{font\_ec}[\\{invalid\_font}]\K0$;\par
+\fi
+
+\M32. It is, of course, a simple matter to print the name of a given font.
+
+\Y\P\4\&{procedure}\1\  \37$\\{print\_font}(\|f:\\{integer})$;\C{\|f is an
+internal font number}\6
+\4\&{var} \37\|k: \37$0\to\\{name\_size}$;\C{index into \\{names}}\2\6
+\&{begin} \37\&{if} $\|f=\\{invalid\_font}$ \1\&{then}\5
+$\\{print}(\.{\'UNDEFINED!\'})$\6
+\4\&{else} \&{begin} \37\&{for} $\|k\K\\{font\_name}[\|f]\mathrel{\&{to}}%
+\\{font\_name}[\|f+1]-1$ \1\&{do}\5
+$\\{print}(\\{xchr}[\\{names}[\|k]])$;\2\6
+\&{end};\2\6
+\&{end};\par
+\fi
+
+\M33. An auxiliary array \\{in\_width} is used to hold the widths as they are
+input. The global variables \\{tfm\_check\_sum} and \\{tfm\_design\_size} are
+set to the check sum and design size that
+appear in the current \.{TFM} file.
+
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4\\{in\_width}: \37\&{array} $[0\to255]$ \1\&{of}\5
+\\{integer};\C{\.{TFM} width data in \.{DVI} units}\2\6
+\4\\{tfm\_check\_sum}: \37\\{integer};\C{check sum found in \\{tfm\_file}}\6
+\4\\{tfm\_design\_size}: \37\\{integer};\C{design size found in \\{tfm\_file},
+in \.{DVI} units}\6
+\4\\{tfm\_conv}: \37\\{real};\C{\.{DVI} units per absolute \.{TFM} unit}\par
+\fi
+
+\M34. Here is a procedure that absorbs the necessary information from a
+\.{TFM} file, assuming that the file has just been successfully reset
+so that we are ready to read its first byte. (A complete description of
+\.{TFM} file format appears in the documentation of \.{TFtoPL} and will
+not be repeated here.) The procedure does not check the \.{TFM} file
+for validity, nor does it give explicit information about what is
+wrong with a \.{TFM} file that proves to be invalid; \.{DVI}-reading
+programs need not do this, since \.{TFM} files are almost always valid,
+and since the \.{TFtoPL} utility program has been specifically designed
+to diagnose \.{TFM} errors. The procedure simply returns \\{false} if it
+detects anything amiss in the \.{TFM} data.
+
+There is a parameter, \|z, which represents the scaling factor being
+used to compute the font dimensions; it must be in the range $0<z<2^{27}$.
+
+\Y\P\4\&{function}\1\  \37$\\{in\_TFM}(\|z:\\{integer})$: \37\\{boolean};%
+\C{input \.{TFM} data or return \\{false}}\6
+\4\&{label} \37$9997,\39$\C{go here when the format is bad}\6
+$9998,\39$\C{go here when the information cannot be loaded}\6
+9999;\C{go here to exit}\6
+\4\&{var} \37\|k: \37\\{integer};\C{index for loops}\6
+\\{lh}: \37\\{integer};\C{length of the header data, in four-byte words}\6
+\\{nw}: \37\\{integer};\C{number of words in the width table}\6
+\\{wp}: \37$0\to\\{max\_widths}$;\C{new value of \\{width\_ptr} after
+successful input}\6
+$\\{alpha},\39\\{beta}$: \37\\{integer};\C{quantities used in the scaling
+computation}\2\6
+\&{begin} \37\X35:Read past the header data; \&{goto} 9997 if there is a
+problem\X;\6
+\X36:Store character-width indices at the end of the \\{width} table\X;\6
+\X37:Read and convert the width values, setting up the \\{in\_width} table\X;\6
+\X40:Move the widths from \\{in\_width} to \\{width}, and append \\{pixel%
+\_width} values\X;\6
+$\\{width\_ptr}\K\\{wp}$;\5
+$\\{in\_TFM}\K\\{true}$;\5
+\&{goto} \379999;\6
+\49997: \37$\\{print\_ln}(\.{\'---not\ loaded,\ TFM\ file\ is\ bad\'})$;\6
+\49998: \37$\\{in\_TFM}\K\\{false}$;\6
+\49999: \37\&{end};\par
+\fi
+
+\M35. \P$\X35:Read past the header data; \&{goto} 9997 if there is a problem\X%
+\S$\6
+\\{read\_tfm\_word};\5
+$\\{lh}\K\\{b2}\ast256+\\{b3}$;\5
+\\{read\_tfm\_word};\5
+$\\{font\_bc}[\\{nf}]\K\\{b0}\ast256+\\{b1}$;\5
+$\\{font\_ec}[\\{nf}]\K\\{b2}\ast256+\\{b3}$;\6
+\&{if} $\\{font\_ec}[\\{nf}]<\\{font\_bc}[\\{nf}]$ \1\&{then}\5
+$\\{font\_bc}[\\{nf}]\K\\{font\_ec}[\\{nf}]+1$;\2\6
+\&{if} $\\{width\_ptr}+\\{font\_ec}[\\{nf}]-\\{font\_bc}[\\{nf}]+1>\\{max%
+\_widths}$ \1\&{then}\6
+\&{begin} \37$\\{print\_ln}(\.{\'---not\ loaded,\ DVItype\ needs\ larger\ width%
+\ table\'})$;\5
+\&{goto} \379998;\6
+\&{end};\2\6
+$\\{wp}\K\\{width\_ptr}+\\{font\_ec}[\\{nf}]-\\{font\_bc}[\\{nf}]+1$;\5
+\\{read\_tfm\_word};\5
+$\\{nw}\K\\{b0}\ast256+\\{b1}$;\6
+\&{if} $(\\{nw}=0)\V(\\{nw}>256)$ \1\&{then}\5
+\&{goto} \379997;\2\6
+\&{for} $\|k\K1\mathrel{\&{to}}3+\\{lh}$ \1\&{do}\6
+\&{begin} \37\&{if} $\\{eof}(\\{tfm\_file})$ \1\&{then}\5
+\&{goto} \379997;\2\6
+\\{read\_tfm\_word};\6
+\&{if} $\|k=4$ \1\&{then}\6
+\&{if} $\\{b0}<128$ \1\&{then}\5
+$\\{tfm\_check\_sum}\K((\\{b0}\ast256+\\{b1})\ast256+\\{b2})\ast256+\\{b3}$\6
+\4\&{else} $\\{tfm\_check\_sum}\K(((\\{b0}-256)\ast256+\\{b1})\ast256+\\{b2})%
+\ast256+\\{b3}$\2\6
+\4\&{else} \&{if} $\|k=5$ \1\&{then}\6
+\&{if} $\\{b0}<128$ \1\&{then}\5
+$\\{tfm\_design\_size}\K\\{round}(\\{tfm\_conv}\ast(((\\{b0}\ast256+\\{b1})%
+\ast256+\\{b2})\ast256+\\{b3}))$\6
+\4\&{else} \&{goto} \379997;\2\2\2\6
+\&{end};\2\par
+\U34.\fi
+
+\M36. \P$\X36:Store character-width indices at the end of the \\{width} table\X%
+\S$\6
+\&{if} $\\{wp}>0$ \1\&{then}\6
+\&{for} $\|k\K\\{width\_ptr}\mathrel{\&{to}}\\{wp}-1$ \1\&{do}\6
+\&{begin} \37\\{read\_tfm\_word};\6
+\&{if} $\\{b0}>\\{nw}$ \1\&{then}\5
+\&{goto} \379997;\2\6
+$\\{width}[\|k]\K\\{b0}$;\6
+\&{end};\2\2\par
+\U34.\fi
+
+\M37. The most important part of \\{in\_TFM} is the width computation, which
+involves multiplying the relative widths in the \.{TFM} file by the
+scaling factor in the \.{DVI} file. This fixed-point multiplication
+must be done with precisely the same accuracy by all \.{DVI}-reading programs,
+in order to validate the assumptions made by \.{DVI}-writing programs
+like \TeX82.
+
+Let us therefore summarize what needs to be done. Each width in a \.{TFM}
+file appears as a four-byte quantity called a \\{fix\_word}.  A \\{fix\_word}
+whose respective bytes are $(a,b,c,d)$ represents the number
+$$x=\left\{\vcenter{\halign{$#$,\hfil\qquad&if $#$\hfil\cr
+b\cdot2^{-4}+c\cdot2^{-12}+d\cdot2^{-20}&a=0;\cr
+-16+b\cdot2^{-4}+c\cdot2^{-12}+d\cdot2^{-20}&a=255.\cr}}\right.$$
+(No other choices of $a$ are allowed, since the magnitude of a \.{TFM}
+dimension must be less than 16.)  We want to multiply this quantity by the
+integer~\|z, which is known to be less than $2^{27}$.
+If $\|z<2^{23}$, the individual multiplications $b\cdot z$, $c\cdot z$,
+$d\cdot z$ cannot overflow; otherwise we will divide \|z by 2, 4, 8, or
+16, to obtain a multiplier less than $2^{23}$, and we can compensate for
+this later. If \|z has thereby been replaced by $\|z^\prime=\|z/2^e$, let
+$\beta=2^{4-e}$; we shall compute
+$$\lfloor(b+c\cdot2^{-8}+d\cdot2^{-16})\,z^\prime/\beta\rfloor$$ if $a=0$,
+or the same quantity minus $\alpha=2^{4+e}z^\prime$ if $a=255$.
+This calculation must be
+done exactly, for the reasons stated above; the following program does the
+job in a system-independent way, assuming that arithmetic is exact on
+numbers less than $2^{31}$ in magnitude.
+
+\Y\P$\4\X37:Read and convert the width values, setting up the \\{in\_width}
+table\X\S$\6
+\X38:Replace \|z by $\|z^\prime$ and compute $\alpha,\beta$\X;\6
+\&{for} $\|k\K0\mathrel{\&{to}}\\{nw}-1$ \1\&{do}\6
+\&{begin} \37\\{read\_tfm\_word};\5
+$\\{in\_width}[\|k]\K(((((\\{b3}\ast\|z)\mathbin{\&{div}}\O{400})+(\\{b2}\ast%
+\|z))\mathbin{\&{div}}\O{400})+(\\{b1}\ast\|z))\mathbin{\&{div}}\\{beta}$;\6
+\&{if} $\\{b0}>0$ \1\&{then}\6
+\&{if} $\\{b0}<255$ \1\&{then}\5
+\&{goto} \379997\6
+\4\&{else} $\\{in\_width}[\|k]\K\\{in\_width}[\|k]-\\{alpha}$;\2\2\6
+\&{end}\2\par
+\U34.\fi
+
+\M38. \P$\X38:Replace \|z by $\|z^\prime$ and compute $\alpha,\beta$\X\S$\6
+\&{begin} \37$\\{alpha}\K16$;\6
+\&{while} $\|z\G\O{40000000}$ \1\&{do}\6
+\&{begin} \37$\|z\K\|z\mathbin{\&{div}}2$;\5
+$\\{alpha}\K\\{alpha}+\\{alpha}$;\6
+\&{end};\2\6
+$\\{beta}\K256\mathbin{\&{div}}\\{alpha}$;\5
+$\\{alpha}\K\\{alpha}\ast\|z$;\6
+\&{end}\par
+\U37.\fi
+
+\M39. A \.{DVI}-reading program usually works with font files instead of
+\.{TFM} files, so \.{DVItype} is atypical in that respect. Font files
+should, however, contain exactly the same character width data that is
+found in the corresponding \.{TFM}s; check sums are used to help
+ensure this. In addition, font files usually also contain the widths of
+characters in pixels, since the device-independent character widths of
+\.{TFM} files are generally not perfect multiples of pixels.
+
+The \\{pixel\_width} array contains this information; when $\\{width}[\|k]$ is
+the
+device-independent width of some character in \.{DVI} units, $\\{pixel\_width}[%
+\|k]$
+is the corresponding width of that character in an actual font.
+The macro \\{char\_pixel\_width} is set up to be analogous to \\{char\_width}.
+
+\Y\P\D $\\{char\_pixel\_width}(\#)\S\\{pixel\_width}$ [ $\\{width\_base}[\#]+%
+\\{char\_width\_end}$\par
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4\\{pixel\_width}: \37\&{array} $[0\to\\{max\_widths}]$ \1\&{of}\5
+\\{integer};\C{actual character widths,   in pixels}\2\6
+\4\\{conv}: \37\\{real};\C{converts \.{DVI} units to pixels}\6
+\4\\{true\_conv}: \37\\{real};\C{converts unmagnified \.{DVI} units to pixels}\6
+\4$\\{numerator},\39\\{denominator}$: \37\\{integer};\C{stated conversion
+ratio}\6
+\4\\{mag}: \37\\{integer};\C{magnification factor times 1000}\par
+\fi
+
+\M40. The following code computes pixel widths by simply rounding the \.{TFM}
+widths to the nearest integer number of pixels, based on the conversion factor
+\\{conv} that converts \.{DVI} units to pixels. However, such a simple
+formula will not be valid for all fonts, and it will often give results that
+are off by $\pm1$ when a low-resolution font has been carefully
+hand-fitted. For example, a font designer often wants to make the letter `m'
+a pixel wider or narrower in order to make the font appear more consistent.
+\.{DVI}-to-printer programs should therefore input the correct pixel width
+information from font files whenever there is a chance that it may differ.
+A warning message may also be desirable in the case that at least one character
+is found whose pixel width differs from $\\{conv}\ast\\{width}$ by more than a
+full pixel.
+
+\Y\P\D \37$\\{pixel\_round}(\#)\S\\{round}(\\{conv}\ast(\#))$\par
+\Y\P$\4\X40:Move the widths from \\{in\_width} to \\{width}, and append %
+\\{pixel\_width} values\X\S$\6
+\&{if} $\\{in\_width}[0]\I0$ \1\&{then}\5
+\&{goto} \379997;\C{the first width should be zero}\2\6
+$\\{width\_base}[\\{nf}]\K\\{width\_ptr}-\\{font\_bc}[\\{nf}]$;\6
+\&{if} $\\{wp}>0$ \1\&{then}\6
+\&{for} $\|k\K\\{width\_ptr}\mathrel{\&{to}}\\{wp}-1$ \1\&{do}\6
+\&{if} $\\{width}[\|k]=0$ \1\&{then}\6
+\&{begin} \37$\\{width}[\|k]\K\\{invalid\_width}$;\5
+$\\{pixel\_width}[\|k]\K0$;\6
+\&{end}\6
+\4\&{else} \&{begin} \37$\\{width}[\|k]\K\\{in\_width}[\\{width}[\|k]]$;\5
+$\\{pixel\_width}[\|k]\K\\{pixel\_round}(\\{width}[\|k])$;\6
+\&{end}\2\2\2\par
+\U34.\fi
+
+\N41.  Optional modes of output.
+\.{DVItype} will print different quantities of information based on some
+options that the user must specify: The \\{out\_mode} level is set to one of
+five values (\\{errors\_only}, \\{terse}, \\{mnemonics\_only},
+\\{verbose}, \\{the\_works}), giving
+different degrees of output; and the typeout can be confined to a
+restricted subset of the pages by specifying the desired starting page and
+the maximum number of pages. Furthermore there is an option to specify the
+resolution of an assumed discrete output device, so that pixel-oriented
+calculations will be shown; and there is an option to override the
+magnification factor that is stated in the \.{DVI} file.
+
+The starting page is specified by giving a sequence of 1 to 10 numbers or
+asterisks separated by dots. For example, the specification `\.{1.*.-5}'
+can be used to refer to a page output by \TeX\ when $\.{\\count0}=1$
+and $\.{\\count2}=-5$. (Recall that \\{bop} commands in a \.{DVI} file
+are followed by ten `count' values.) An asterisk matches any number,
+so the `\.*' in `\.{1.*.-5}' means that \.{\\count1} is ignored when
+specifying the first page. If several pages match the given specification,
+\.{DVItype} will begin with the earliest such page in the file. The
+default specification `\.*' (which matches all pages) therefore denotes
+the page at the beginning of the file.
+
+When \.{DVItype} begins, it engages the user in a brief dialog so that the
+options will be specified. This part of \.{DVItype} requires nonstandard
+\PASCAL\ constructions to handle the online interaction; so it may be
+preferable in some cases to omit the dialog and simply to stick to the
+default options ($\\{out\_mode}=\\{the\_works}$, starting page `\.*',
+$\\{max\_pages}=1000000$, $\\{resolution}=300.0$, $\\{new\_mag}=0$).  On other
+hand, the
+system-dependent routines that are needed are not complicated, so it will
+not be terribly difficult to introduce them.
+
+\Y\P\D \37$\\{errors\_only}=0$\C{value of \\{out\_mode} when minimal printing
+occurs}\par
+\P\D \37$\\{terse}=1$\C{value of \\{out\_mode} for abbreviated output}\par
+\P\D \37$\\{mnemonics\_only}=2$\C{value of \\{out\_mode} for medium-quantity
+output}\par
+\P\D \37$\\{verbose}=3$\C{value of \\{out\_mode} for detailed tracing}\par
+\P\D \37$\\{the\_works}=4$\C{\\{verbose}, plus check of postamble if \\{random%
+\_reading}}\par
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4\\{out\_mode}: \37$\\{errors\_only}\to\\{the\_works}$;\C{controls the amount
+of output}\6
+\4\\{max\_pages}: \37\\{integer};\C{at most this many $\\{bop}\to\\{eop}$ pages
+will be printed}\6
+\4\\{resolution}: \37\\{real};\C{pixels per inch}\6
+\4\\{new\_mag}: \37\\{integer};\C{if positive, overrides the postamble's
+magnification}\par
+\fi
+
+\M42. The starting page specification is recorded in two global arrays called
+\\{start\_count} and \\{start\_there}. For example, `\.{1.*.-5}' is represented
+by $\\{start\_there}[0]=\\{true}$, $\\{start\_count}[0]=1$, $\\{start%
+\_there}[1]=\\{false}$,
+$\\{start\_there}[2]=\\{true}$, $\\{start\_count}[2]=-5$.
+We also set $\\{start\_vals}=2$, to indicate that count 2 was the last one
+mentioned. The other values of \\{start\_count} and \\{start\_there} are not
+important, in this example.
+
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4\\{start\_count}: \37\&{array} $[0\to9]$ \1\&{of}\5
+\\{integer};\C{count values to select starting page}\2\6
+\4\\{start\_there}: \37\&{array} $[0\to9]$ \1\&{of}\5
+\\{boolean};\C{is the \\{start\_count} value relevant?}\2\6
+\4\\{start\_vals}: \37$0\to9$;\C{the last count considered significant}\6
+\4\\{count}: \37\&{array} $[0\to9]$ \1\&{of}\5
+\\{integer};\C{the count values on the current page}\2\par
+\fi
+
+\M43. \P$\X11:Set initial values\X\mathrel{+}\S$\6
+$\\{out\_mode}\K\\{the\_works}$;\5
+$\\{max\_pages}\K1000000$;\5
+$\\{start\_vals}\K0$;\5
+$\\{start\_there}[0]\K\\{false}$;\par
+\fi
+
+\M44. Here is a simple subroutine that tests if the current page might be the
+starting page.
+
+\Y\P\4\&{function}\1\  \37\\{start\_match}: \37\\{boolean};\C{does \\{count}
+match the starting spec?}\6
+\4\&{var} \37\|k: \37$0\to9$;\C{loop index}\6
+\\{match}: \37\\{boolean};\C{does everything match so far?}\2\6
+\&{begin} \37$\\{match}\K\\{true}$;\6
+\&{for} $\|k\K0\mathrel{\&{to}}\\{start\_vals}$ \1\&{do}\6
+\&{if} $\\{start\_there}[\|k]\W(\\{start\_count}[\|k]\I\\{count}[\|k])$ \1%
+\&{then}\5
+$\\{match}\K\\{false}$;\2\2\6
+$\\{start\_match}\K\\{match}$;\6
+\&{end};\par
+\fi
+
+\M45. The \\{input\_ln} routine waits for the user to type a line at his or her
+terminal; then it puts ASCII-code equivalents for the characters on that line
+into the \\{buffer} array. The \\{term\_in} file is used for terminal input,
+and \\{term\_out} for terminal output.
+
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4\\{buffer}: \37\&{array} $[0\to\\{terminal\_line\_length}]$ \1\&{of}\5
+\\{ASCII\_code};\2\6
+\4\\{term\_in}: \37\\{text\_file};\C{the terminal, considered as an input file}%
+\6
+\4\\{term\_out}: \37\\{text\_file};\C{the terminal, considered as an output
+file}\par
+\fi
+
+\M46. Since the terminal is being used for both input and output, some systems
+need a special routine to make sure that the user can see a prompt message
+before waiting for input based on that message. (Otherwise the message
+may just be sitting in a hidden buffer somewhere, and the user will have
+no idea what the program is waiting for.) We shall invoke a system-dependent
+subroutine \\{update\_terminal} in order to avoid this problem.
+
+\Y\P\D \37$\\{update\_terminal}\S\\{break}(\\{term\_out})$\C{empty the terminal
+output buffer}\par
+\fi
+
+\M47. During the dialog, \.{DVItype} will treat the first blank space in a
+line as the end of that line. Therefore \\{input\_ln} makes sure that there
+is always at least one blank space in \\{buffer}.
+
+\Y\P\4\&{procedure}\1\  \37\\{input\_ln};\C{inputs a line from the terminal}\6
+\4\&{var} \37\|k: \37$0\to\\{terminal\_line\_length}$;\2\6
+\&{begin} \37\\{update\_terminal};\5
+$\\{reset}(\\{term\_in})$;\6
+\&{if} $\\{eoln}(\\{term\_in})$ \1\&{then}\5
+$\\{read\_ln}(\\{term\_in})$;\2\6
+$\|k\K0$;\6
+\&{while} $(\|k<\\{terminal\_line\_length})\W\R\\{eoln}(\\{term\_in})$ \1\&{do}%
+\6
+\&{begin} \37$\\{buffer}[\|k]\K\\{xord}[\\{term\_in}\^]$;\5
+$\\{incr}(\|k)$;\5
+$\\{get}(\\{term\_in})$;\6
+\&{end};\2\6
+$\\{buffer}[\|k]\K\.{"\ "}$;\6
+\&{end};\par
+\fi
+
+\M48. The global variable \\{buf\_ptr} is used while scanning each line of
+input;
+it points to the first unread character in \\{buffer}.
+
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4\\{buf\_ptr}: \37$0\to\\{terminal\_line\_length}$;\C{the number of characters
+read}\par
+\fi
+
+\M49. Here is a routine that scans a (possibly signed) integer and computes
+the decimal value. If no decimal integer starts at \\{buf\_ptr}, the
+value 0 is returned. The integer should be less than $2^{31}$ in
+absolute value.
+
+\Y\P\4\&{function}\1\  \37\\{get\_integer}: \37\\{integer};\6
+\4\&{var} \37\|x: \37\\{integer};\C{accumulates the value}\6
+\\{negative}: \37\\{boolean};\C{should the value be negated?}\2\6
+\&{begin} \37\&{if} $\\{buffer}[\\{buf\_ptr}]=\.{"-"}$ \1\&{then}\6
+\&{begin} \37$\\{negative}\K\\{true}$;\5
+$\\{incr}(\\{buf\_ptr})$;\6
+\&{end}\6
+\4\&{else} $\\{negative}\K\\{false}$;\2\6
+$\|x\K0$;\6
+\&{while} $(\\{buffer}[\\{buf\_ptr}]\G\.{"0"})\W(\\{buffer}[\\{buf\_ptr}]\L%
+\.{"9"})$ \1\&{do}\6
+\&{begin} \37$\|x\K10\ast\|x+\\{buffer}[\\{buf\_ptr}]-\.{"0"}$;\5
+$\\{incr}(\\{buf\_ptr})$;\6
+\&{end};\2\6
+\&{if} $\\{negative}$ \1\&{then}\5
+$\\{get\_integer}\K-\|x$\ \&{else} $\\{get\_integer}\K\|x$;\2\6
+\&{end};\par
+\fi
+
+\M50. The selected options are put into global variables by the \\{dialog}
+procedure, which is called just as \.{DVItype} begins.
+
+\Y\P\4\&{procedure}\1\  \37\\{dialog};\6
+\4\&{label} \37$1,\392,\393,\394,\395$;\6
+\4\&{var} \37\|k: \37\\{integer};\C{loop variable}\2\6
+\&{begin} \37$\\{rewrite}(\\{term\_out})$;\C{prepare the terminal for output}\6
+$\\{write\_ln}(\\{term\_out},\39\\{banner})$;\5
+\X51:Determine the desired \\{out\_mode}\X;\6
+\X52:Determine the desired \\{start\_count} values\X;\6
+\X53:Determine the desired \\{max\_pages}\X;\6
+\X54:Determine the desired \\{resolution}\X;\6
+\X55:Determine the desired \\{new\_mag}\X;\6
+\X56:Print all the selected options\X;\6
+\&{end};\par
+\fi
+
+\M51. \P$\X51:Determine the desired \\{out\_mode}\X\S$\6
+\41: \37$\\{write}(\\{term\_out},\39\.{\'Output\ level\ (default=4,\ ?\ for\
+help):\ \'})$;\5
+$\\{out\_mode}\K\\{the\_works}$;\5
+\\{input\_ln};\6
+\&{if} $\\{buffer}[0]\I\.{"\ "}$ \1\&{then}\6
+\&{if} $(\\{buffer}[0]\G\.{"0"})\W(\\{buffer}[0]\L\.{"4"})$ \1\&{then}\5
+$\\{out\_mode}\K\\{buffer}[0]-\.{"0"}$\6
+\4\&{else} \&{begin} \37$\\{write}(\\{term\_out},\39\.{\'Type\ 4\ for\ complete%
+\ listing,\'})$;\5
+$\\{write}(\\{term\_out},\39\.{\'\ 0\ for\ errors\ only,\'})$;\5
+$\\{write\_ln}(\\{term\_out},\39\.{\'\ 1\ or\ 2\ or\ 3\ for\ something\ in\
+between.\'})$;\5
+\&{goto} \371;\6
+\&{end}\2\2\par
+\U50.\fi
+
+\M52. \P$\X52:Determine the desired \\{start\_count} values\X\S$\6
+\42: \37$\\{write}(\\{term\_out},\39\.{\'Starting\ page\ (default=*):\ \'})$;\5
+$\\{start\_vals}\K0$;\5
+$\\{start\_there}[0]\K\\{false}$;\5
+\\{input\_ln};\5
+$\\{buf\_ptr}\K0$;\5
+$\|k\K0$;\6
+\&{if} $\\{buffer}[0]\I\.{"\ "}$ \1\&{then}\6
+\1\&{repeat} \37\&{if} $\\{buffer}[\\{buf\_ptr}]=\.{"*"}$ \1\&{then}\6
+\&{begin} \37$\\{start\_there}[\|k]\K\\{false}$;\5
+$\\{incr}(\\{buf\_ptr})$;\6
+\&{end}\6
+\4\&{else} \&{begin} \37$\\{start\_there}[\|k]\K\\{true}$;\5
+$\\{start\_count}[\|k]\K\\{get\_integer}$;\6
+\&{end};\2\6
+\&{if} $(\|k<9)\W(\\{buffer}[\\{buf\_ptr}]=\.{"."})$ \1\&{then}\6
+\&{begin} \37$\\{incr}(\|k)$;\5
+$\\{incr}(\\{buf\_ptr})$;\6
+\&{end}\6
+\4\&{else} \&{if} $\\{buffer}[\\{buf\_ptr}]=\.{"\ "}$ \1\&{then}\5
+$\\{start\_vals}\K\|k$\6
+\4\&{else} \&{begin} \37$\\{write}(\\{term\_out},\39\.{\'Type,\ e.g.,\ 1.*.-5\
+to\ specify\ the\ \'})$;\5
+$\\{write\_ln}(\\{term\_out},\39\.{\'first\ page\ with\ \\count0=1,\ %
+\\count2=-5.\'})$;\5
+\&{goto} \372;\6
+\&{end};\2\2\6
+\4\&{until}\5
+$\\{start\_vals}=\|k$\2\2\par
+\U50.\fi
+
+\M53. \P$\X53:Determine the desired \\{max\_pages}\X\S$\6
+\43: \37$\\{write}(\\{term\_out},\39\.{\'Maximum\ number\ of\ pages\
+(default=1000000):\ \'})$;\5
+$\\{max\_pages}\K1000000$;\5
+\\{input\_ln};\5
+$\\{buf\_ptr}\K0$;\6
+\&{if} $\\{buffer}[0]\I\.{"\ "}$ \1\&{then}\6
+\&{begin} \37$\\{max\_pages}\K\\{get\_integer}$;\6
+\&{if} $\\{max\_pages}\L0$ \1\&{then}\6
+\&{begin} \37$\\{write\_ln}(\\{term\_out},\39\.{\'Please\ type\ a\ positive\
+number.\'})$;\5
+\&{goto} \373;\6
+\&{end};\2\6
+\&{end}\2\par
+\U50.\fi
+
+\M54. \P$\X54:Determine the desired \\{resolution}\X\S$\6
+\44: \37$\\{write}(\\{term\_out},\39\.{\'Assumed\ device\ resolution\'})$;\5
+$\\{write}(\\{term\_out},\39\.{\'\ in\ pixels\ per\ inch\ (default=300/1):\ %
+\'})$;\5
+$\\{resolution}\K300.0$;\5
+\\{input\_ln};\5
+$\\{buf\_ptr}\K0$;\6
+\&{if} $\\{buffer}[0]\I\.{"\ "}$ \1\&{then}\6
+\&{begin} \37$\|k\K\\{get\_integer}$;\6
+\&{if} $(\|k>0)\W(\\{buffer}[\\{buf\_ptr}]=\.{"/"})\W(\\{buffer}[\\{buf%
+\_ptr}+1]>\.{"0"})\W(\\{buffer}[\\{buf\_ptr}+1]\L\.{"9"})$ \1\&{then}\6
+\&{begin} \37$\\{incr}(\\{buf\_ptr})$;\5
+$\\{resolution}\K\|k/\\{get\_integer}$;\6
+\&{end}\6
+\4\&{else} \&{begin} \37$\\{write}(\\{term\_out},\39\.{\'Type\ a\ ratio\ of\
+positive\ integers;\'})$;\5
+$\\{write\_ln}(\\{term\_out},\39\.{\'\ (1\ pixel\ per\ mm\ would\ be\ 254/10).%
+\'})$;\5
+\&{goto} \374;\6
+\&{end};\2\6
+\&{end}\2\par
+\U50.\fi
+
+\M55. \P$\X55:Determine the desired \\{new\_mag}\X\S$\6
+\45: \37$\\{write}(\\{term\_out},\39\.{\'New\ magnification\ (default=0\ to\
+keep\ the\ old\ one):\ \'})$;\5
+$\\{new\_mag}\K0$;\5
+\\{input\_ln};\5
+$\\{buf\_ptr}\K0$;\6
+\&{if} $\\{buffer}[0]\I\.{"\ "}$ \1\&{then}\6
+\&{if} $(\\{buffer}[0]\G\.{"0"})\W(\\{buffer}[0]\L\.{"9"})$ \1\&{then}\5
+$\\{new\_mag}\K\\{get\_integer}$\6
+\4\&{else} \&{begin} \37$\\{write}(\\{term\_out},\39\.{\'Type\ a\ positive\
+integer\ to\ override\ \'})$;\5
+$\\{write\_ln}(\\{term\_out},\39\.{\'the\ magnification\ in\ the\ DVI\ file.%
+\'})$;\5
+\&{goto} \375;\6
+\&{end}\2\2\par
+\U50.\fi
+
+\M56. After the dialog is over, we print the options so that the user
+can see what \.{DVItype} thought was specified.
+
+\Y\P$\4\X56:Print all the selected options\X\S$\6
+$\\{print\_ln}(\.{\'Options\ selected:\'})$;\5
+$\\{print}(\.{\'\ \ Starting\ page\ =\ \'})$;\6
+\&{for} $\|k\K0\mathrel{\&{to}}\\{start\_vals}$ \1\&{do}\6
+\&{begin} \37\&{if} $\\{start\_there}[\|k]$ \1\&{then}\5
+$\\{print}(\\{start\_count}[\|k]:1)$\6
+\4\&{else} $\\{print}(\.{\'*\'})$;\2\6
+\&{if} $\|k<\\{start\_vals}$ \1\&{then}\5
+$\\{print}(\.{\'.\'})$\6
+\4\&{else} $\\{print\_ln}(\.{\'\ \'})$;\2\6
+\&{end};\2\6
+$\\{print\_ln}(\.{\'\ \ Maximum\ number\ of\ pages\ =\ \'},\39\\{max%
+\_pages}:1)$;\5
+$\\{print}(\.{\'\ \ Output\ level\ =\ \'},\39\\{out\_mode}:1)$;\6
+\&{case} $\\{out\_mode}$ \1\&{of}\6
+\4\\{errors\_only}: \37$\\{print\_ln}(\.{\'\ (showing\ bops,\ fonts,\ and\
+error\ messages\ only)\'})$;\6
+\4\\{terse}: \37$\\{print\_ln}(\.{\'\ (terse)\'})$;\6
+\4\\{mnemonics\_only}: \37$\\{print\_ln}(\.{\'\ (mnemonics)\'})$;\6
+\4\\{verbose}: \37$\\{print\_ln}(\.{\'\ (verbose)\'})$;\6
+\4\\{the\_works}: \37\&{if} $\\{random\_reading}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'\ (the\ works)\'})$\6
+\4\&{else} \&{begin} \37$\\{out\_mode}\K\\{verbose}$;\5
+$\\{print\_ln}(\.{\'\ (the\ works:\ same\ as\ level\ 3\ in\ this\ DVItype)%
+\'})$;\6
+\&{end};\2\2\6
+\&{end};\6
+$\\{print\_ln}(\.{\'\ \ Resolution\ =\ \'},\39\\{resolution}:12:8,\39\.{\'\
+pixels\ per\ inch\'})$;\6
+\&{if} $\\{new\_mag}>0$ \1\&{then}\5
+$\\{print\_ln}(\.{\'\ \ New\ magnification\ factor\ =\ \'},\39\\{new%
+\_mag}/1000:8:3)$\2\par
+\U50.\fi
+
+\N57.  Defining fonts.
+When $\\{out\_mode}=\\{the\_works}$, \.{DVItype} reads the postamble first and
+loads
+all of the fonts defined there; then it processes the pages. In this
+case, a \\{fnt\_def} command should match a previous definition if and only
+if the \\{fnt\_def} being processed is not in the postamble. But if
+$\\{out\_mode}<\\{the\_works}$, \.{DVItype} reads the pages first and the
+postamble
+last, so the conventions are reversed: a \\{fnt\_def} should match a previous
+\\{fnt\_def} if and only if the current one is a part of the postamble.
+
+A global variable \\{in\_postamble} is provided to tell whether we are
+processing the postamble or not.
+
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4\\{in\_postamble}: \37\\{boolean};\C{are we reading the postamble?}\par
+\fi
+
+\M58. \P$\X11:Set initial values\X\mathrel{+}\S$\6
+$\\{in\_postamble}\K\\{false}$;\par
+\fi
+
+\M59. The following subroutine does the necessary things when a \\{fnt\_def}
+command is being processed.
+
+\Y\P\4\&{procedure}\1\  \37$\\{define\_font}(\|e:\\{integer})$;\C{\|e is an
+external font number}\6
+\4\&{var} \37\|f: \37$0\to\\{max\_fonts}$;\5
+\|p: \37\\{integer};\C{length of the area/directory spec}\6
+\|n: \37\\{integer};\C{length of the font name proper}\6
+$\|c,\39\|q,\39\|d,\39\|m$: \37\\{integer};\C{check sum, scaled size, design
+size, magnification}\6
+\|r: \37$0\to\\{name\_length}$;\C{index into \\{cur\_name}}\6
+$\|j,\39\|k$: \37$0\to\\{name\_size}$;\C{indices into \\{names}}\6
+\\{mismatch}: \37\\{boolean};\C{do names disagree?}\2\6
+\&{begin} \37\&{if} $\\{nf}=\\{max\_fonts}$ \1\&{then}\5
+$\\{abort}(\.{\'DVItype\ capacity\ exceeded\ (max\ fonts=\'},\39\\{max%
+\_fonts}:1,\39\.{\')!\'})$;\2\6
+$\\{font\_num}[\\{nf}]\K\|e$;\5
+$\|f\K0$;\6
+\&{while} $\\{font\_num}[\|f]\I\|e$ \1\&{do}\5
+$\\{incr}(\|f)$;\2\6
+\X61:Read the font parameters into position for font \\{nf}, and print the font
+name\X;\6
+\&{if} $((\\{out\_mode}=\\{the\_works})\W\\{in\_postamble})\V\30((\\{out%
+\_mode}<\\{the\_works})\W\R\\{in\_postamble})$ \1\&{then}\6
+\&{begin} \37\&{if} $\|f<\\{nf}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'---this\ font\ was\ already\ defined!\'})$;\2\6
+\&{end}\6
+\4\&{else} \&{begin} \37\&{if} $\|f=\\{nf}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'---this\ font\ wasn\'}\.{\'t\ loaded\ before!\'})$;\2\6
+\&{end};\2\6
+\&{if} $\|f=\\{nf}$ \1\&{then}\5
+\X62:Load the new font, unless there are problems\X\6
+\4\&{else} \X60:Check that the current font definition matches the old one\X;\2%
+\6
+\&{end};\par
+\fi
+
+\M60. \P$\X60:Check that the current font definition matches the old one\X\S$\6
+\&{begin} \37\&{if} $\\{font\_check\_sum}[\|f]\I\|c$ \1\&{then}\5
+$\\{print\_ln}(\.{\'---check\ sum\ doesn\'}\.{\'t\ match\ previous\ definition!%
+\'})$;\2\6
+\&{if} $\\{font\_scaled\_size}[\|f]\I\|q$ \1\&{then}\5
+$\\{print\_ln}(\.{\'---scaled\ size\ doesn\'}\.{\'t\ match\ previous\
+definition!\'})$;\2\6
+\&{if} $\\{font\_design\_size}[\|f]\I\|d$ \1\&{then}\5
+$\\{print\_ln}(\.{\'---design\ size\ doesn\'}\.{\'t\ match\ previous\
+definition!\'})$;\2\6
+$\|j\K\\{font\_name}[\|f]$;\5
+$\|k\K\\{font\_name}[\\{nf}]$;\6
+\&{if} $\\{font\_name}[\|f+1]-\|j\I\\{font\_name}[\\{nf}+1]-\|k$ \1\&{then}\5
+$\\{mismatch}\K\\{true}$\6
+\4\&{else} \&{begin} \37$\\{mismatch}\K\\{false}$;\6
+\&{while} $\|j<\\{font\_name}[\|f+1]$ \1\&{do}\6
+\&{begin} \37\&{if} $\\{names}[\|j]\I\\{names}[\|k]$ \1\&{then}\5
+$\\{mismatch}\K\\{true}$;\2\6
+$\\{incr}(\|j)$;\5
+$\\{incr}(\|k)$;\6
+\&{end};\2\6
+\&{end};\2\6
+\&{if} $\\{mismatch}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'---font\ name\ doesn\'}\.{\'t\ match\ previous\ definition!%
+\'})$;\2\6
+\&{end}\par
+\U59.\fi
+
+\M61. \P$\X61:Read the font parameters into position for font \\{nf}, and print
+the font name\X\S$\6
+$\|c\K\\{signed\_quad}$;\5
+$\\{font\_check\_sum}[\\{nf}]\K\|c$;\6
+$\|q\K\\{signed\_quad}$;\5
+$\\{font\_scaled\_size}[\\{nf}]\K\|q$;\6
+$\|d\K\\{signed\_quad}$;\5
+$\\{font\_design\_size}[\\{nf}]\K\|d$;\6
+\&{if} $(\|q\L0)\V(\|d\L0)$ \1\&{then}\5
+$\|m\K1000$\6
+\4\&{else} $\|m\K\\{round}((1000.0\ast\\{conv}\ast\|q)/(\\{true\_conv}\ast%
+\|d))$;\2\6
+$\|p\K\\{get\_byte}$;\5
+$\|n\K\\{get\_byte}$;\6
+\&{if} $\\{font\_name}[\\{nf}]+\|n+\|p>\\{name\_size}$ \1\&{then}\5
+$\\{abort}(\.{\'DVItype\ capacity\ exceeded\ (name\ size=\'},\39\\{name%
+\_size}:1,\39\.{\')!\'})$;\2\6
+$\\{font\_name}[\\{nf}+1]\K\\{font\_name}[\\{nf}]+\|n+\|p$;\6
+\&{if} $\\{showing}$ \1\&{then}\5
+$\\{print}(\.{\':\ \'})$\C{when \\{showing} is true, the font number has
+already been printed}\6
+\4\&{else} $\\{print}(\.{\'Font\ \'},\39\|e:1,\39\.{\':\ \'})$;\2\6
+\&{if} $\|n+\|p=0$ \1\&{then}\5
+$\\{print}(\.{\'null\ font\ name!\'})$\6
+\4\&{else} \&{for} $\|k\K\\{font\_name}[\\{nf}]\mathrel{\&{to}}\\{font\_name}[%
+\\{nf}+1]-1$ \1\&{do}\5
+$\\{names}[\|k]\K\\{get\_byte}$;\2\2\6
+$\\{print\_font}(\\{nf})$;\6
+\&{if} $\R\\{showing}$ \1\&{then}\6
+\&{if} $\|m\I1000$ \1\&{then}\5
+$\\{print}(\.{\'\ scaled\ \'},\39\|m:1)$\2\2\par
+\U59.\fi
+
+\M62. \P$\X62:Load the new font, unless there are problems\X\S$\6
+\&{begin} \37\X66:Move font name into the \\{cur\_name} string\X;\6
+\\{open\_tfm\_file};\6
+\&{if} $\\{eof}(\\{tfm\_file})$ \1\&{then}\5
+$\\{print}(\.{\'---not\ loaded,\ TFM\ file\ can\'}\.{\'t\ be\ opened!\'})$\6
+\4\&{else} \&{begin} \37\&{if} $(\|q\L0)\V(\|q\G\O{1000000000})$ \1\&{then}\5
+$\\{print}(\.{\'---not\ loaded,\ bad\ scale\ (\'},\39\|q:1,\39\.{\')!\'})$\6
+\4\&{else} \&{if} $(\|d\L0)\V(\|d\G\O{1000000000})$ \1\&{then}\5
+$\\{print}(\.{\'---not\ loaded,\ bad\ design\ size\ (\'},\39\|d:1,\39\.{\')!%
+\'})$\6
+\4\&{else} \&{if} $\\{in\_TFM}(\|q)$ \1\&{then}\5
+\X63:Finish loading the new font info\X;\2\2\2\6
+\&{end};\2\6
+\&{if} $\\{out\_mode}=\\{errors\_only}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'\ \'})$;\2\6
+\&{end}\par
+\U59.\fi
+
+\M63. \P$\X63:Finish loading the new font info\X\S$\6
+\&{begin} \37$\\{font\_space}[\\{nf}]\K\|q\mathbin{\&{div}}6$;\C{this is a
+3-unit ``thin space''}\6
+\&{if} $(\|c\I0)\W(\\{tfm\_check\_sum}\I0)\W(\|c\I\\{tfm\_check\_sum})$ \1%
+\&{then}\6
+\&{begin} \37$\\{print\_ln}(\.{\'---beware:\ check\ sums\ do\ not\ agree!\'})$;%
+\5
+$\\{print\_ln}(\.{\'\ \ \ (\'},\39\|c:1,\39\.{\'\ vs.\ \'},\39\\{tfm\_check%
+\_sum}:1,\39\.{\')\'})$;\5
+$\\{print}(\.{\'\ \ \ \'})$;\6
+\&{end};\2\6
+\&{if} $\\{abs}(\\{tfm\_design\_size}-\|d)>2$ \1\&{then}\6
+\&{begin} \37$\\{print\_ln}(\.{\'---beware:\ design\ sizes\ do\ not\ agree!%
+\'})$;\5
+$\\{print\_ln}(\.{\'\ \ \ (\'},\39\|d:1,\39\.{\'\ vs.\ \'},\39\\{tfm\_design%
+\_size}:1,\39\.{\')\'})$;\5
+$\\{print}(\.{\'\ \ \ \'})$;\6
+\&{end};\2\6
+$\\{print}(\.{\'---loaded\ at\ size\ \'},\39\|q:1,\39\.{\'\ DVI\ units\'})$;\5
+$\|d\K\\{round}((100.0\ast\\{conv}\ast\|q)/(\\{true\_conv}\ast\|d))$;\6
+\&{if} $\|d\I100$ \1\&{then}\6
+\&{begin} \37$\\{print\_ln}(\.{\'\ \'})$;\5
+$\\{print}(\.{\'\ (this\ font\ is\ magnified\ \'},\39\|d:1,\39\.{\'\%)\'})$;\6
+\&{end};\2\6
+$\\{incr}(\\{nf})$;\C{now the new font is officially present}\6
+\&{end}\par
+\U62.\fi
+
+\M64. If $\|p=0$, i.e., if no font directory has been specified, \.{DVItype}
+is supposed to use the default font directory, which is a
+system-dependent place where the standard fonts are kept.
+The string variable \\{default\_directory} contains the name of this area.
+
+\Y\P\D \37$\\{default\_directory\_name}\S\.{\'TeXfonts:\'}$\C{change this to
+the correct name}\par
+\P\D \37$\\{default\_directory\_name\_length}=9$\C{change this to the correct
+length}\par
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4\\{default\_directory}: \37\&{packed} \37\&{array} $[1\to\\{default%
+\_directory\_name\_length}]$ \1\&{of}\5
+\\{char};\2\par
+\fi
+
+\M65. \P$\X11:Set initial values\X\mathrel{+}\S$\6
+$\\{default\_directory}\K\\{default\_directory\_name}$;\par
+\fi
+
+\M66. The string \\{cur\_name} is supposed to be set to the external name of
+the
+\.{TFM} file for the current font. This usually means that we need to
+prepend the name of the default directory, and
+to append the suffix `\.{.TFM}'. Furthermore, we change lower case letters
+to upper case, since \\{cur\_name} is a \PASCAL\ string.
+
+\Y\P$\4\X66:Move font name into the \\{cur\_name} string\X\S$\6
+\&{for} $\|k\K1\mathrel{\&{to}}\\{name\_length}$ \1\&{do}\5
+$\\{cur\_name}[\|k]\K\.{\'\ \'}$;\2\6
+\&{if} $\|p=0$ \1\&{then}\6
+\&{begin} \37\&{for} $\|k\K1\mathrel{\&{to}}\\{default\_directory\_name%
+\_length}$ \1\&{do}\5
+$\\{cur\_name}[\|k]\K\\{default\_directory}[\|k]$;\2\6
+$\|r\K\\{default\_directory\_name\_length}$;\6
+\&{end}\6
+\4\&{else} $\|r\K0$;\2\6
+\&{for} $\|k\K\\{font\_name}[\\{nf}]\mathrel{\&{to}}\\{font\_name}[\\{nf}+1]-1$
+\1\&{do}\6
+\&{begin} \37$\\{incr}(\|r)$;\6
+\&{if} $\|r+4>\\{name\_length}$ \1\&{then}\5
+$\\{abort}(\.{\'DVItype\ capacity\ exceeded\ (max\ font\ name\ length=\'},\39%
+\\{name\_length}:1,\39\.{\')!\'})$;\2\6
+\&{if} $(\\{names}[\|k]\G\.{"a"})\W(\\{names}[\|k]\L\.{"z"})$ \1\&{then}\5
+$\\{cur\_name}[\|r]\K\\{xchr}[\\{names}[\|k]-\O{40}]$\6
+\4\&{else} $\\{cur\_name}[\|r]\K\\{xchr}[\\{names}[\|k]]$;\2\6
+\&{end};\2\6
+$\\{cur\_name}[\|r+1]\K\.{\'.\'}$;\5
+$\\{cur\_name}[\|r+2]\K\.{\'T\'}$;\5
+$\\{cur\_name}[\|r+3]\K\.{\'F\'}$;\5
+$\\{cur\_name}[\|r+4]\K\.{\'M\'}$\par
+\U62.\fi
+
+\N67.  Low level output routines.
+Simple text in the \.{DVI} file is saved in a buffer until $\\{line\_length}-2$
+characters have accumulated, or until some non-simple \.{DVI} operation
+occurs. Then the accumulated text is printed on a line, surrounded by
+brackets. The global variable \\{text\_ptr} keeps track of the number of
+characters currently in the buffer.
+
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4\\{text\_ptr}: \37$0\to\\{line\_length}$;\C{the number of characters in %
+\\{text\_buf}}\6
+\4\\{text\_buf}: \37\&{array} $[1\to\\{line\_length}]$ \1\&{of}\5
+\\{ASCII\_code};\C{saved characters}\2\par
+\fi
+
+\M68. \P$\X11:Set initial values\X\mathrel{+}\S$\6
+$\\{text\_ptr}\K0$;\par
+\fi
+
+\M69. The \\{flush\_text} procedure will empty the buffer if there is something
+in it.
+
+\Y\P\4\&{procedure}\1\  \37\\{flush\_text};\6
+\4\&{var} \37\|k: \37$0\to\\{line\_length}$;\C{index into \\{text\_buf}}\2\6
+\&{begin} \37\&{if} $\\{text\_ptr}>0$ \1\&{then}\6
+\&{begin} \37\&{if} $\\{out\_mode}>\\{errors\_only}$ \1\&{then}\6
+\&{begin} \37$\\{print}(\.{\'[\'})$;\6
+\&{for} $\|k\K1\mathrel{\&{to}}\\{text\_ptr}$ \1\&{do}\5
+$\\{print}(\\{xchr}[\\{text\_buf}[\|k]])$;\2\6
+$\\{print\_ln}(\.{\']\'})$;\6
+\&{end};\2\6
+$\\{text\_ptr}\K0$;\6
+\&{end};\2\6
+\&{end};\par
+\fi
+
+\M70. And the \\{out\_text} procedure puts something in it.
+
+\Y\P\4\&{procedure}\1\  \37$\\{out\_text}(\|c:\\{ASCII\_code})$;\2\6
+\&{begin} \37\&{if} $\\{text\_ptr}=\\{line\_length}-2$ \1\&{then}\5
+\\{flush\_text};\2\6
+$\\{incr}(\\{text\_ptr})$;\5
+$\\{text\_buf}[\\{text\_ptr}]\K\|c$;\6
+\&{end};\par
+\fi
+
+\N71.  Translation to symbolic form.
+The main work of \.{DVItype} is accomplished by the \\{do\_page} procedure,
+which produces the output for an entire page, assuming that the \\{bop}
+command for that page has already been processed. This procedure is
+essentially an interpretive routine that reads and acts on the \.{DVI}
+commands.
+
+\fi
+
+\M72. The definition of \.{DVI} files refers to six registers,
+$(h,v,w,x,y,z)$, which hold integer values in \.{DVI} units.  In practice,
+we also need registers \\{hh} and \\{vv}, the pixel analogs of $h$ and $v$,
+since it is not always true that $\\{hh}=\\{pixel\_round}(\|h)$ or
+$\\{vv}=\\{pixel\_round}(\|v)$.
+
+The stack of $(h,v,w,x,y,z)$ values is represented by eight arrays
+called \\{hstack}, \dots, \\{zstack}, \\{hhstack}, and \\{vvstack}.
+
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4$\|h,\39\|v,\39\|w,\39\|x,\39\|y,\39\|z,\39\\{hh},\39\\{vv}$: \37\\{integer};%
+\C{current state values}\6
+\4$\\{hstack},\39\\{vstack},\39\\{wstack},\39\\{xstack},\39\\{ystack},\39%
+\\{zstack}$: \37\&{array} $[0\to\\{stack\_size}]$ \1\&{of}\5
+\\{integer};\C{pushed down values in \.{DVI} units}\2\6
+\4$\\{hhstack},\39\\{vvstack}$: \37\&{array} $[0\to\\{stack\_size}]$ \1\&{of}\5
+\\{integer};\C{pushed down values in pixels}\2\par
+\fi
+
+\M73. Three characteristics of the pages (their \\{max\_v}, \\{max\_h}, and
+\\{max\_s}) are specified in the postamble, and a warning message
+is printed if these limits are exceeded. Actually \\{max\_v} is set to
+the maximum height plus depth of a page, and \\{max\_h} to the maximum width,
+for purposes of page layout. Since characters can legally be set outside
+of the page boundaries, it is not an error when \\{max\_v} or \\{max\_h} is
+exceeded. But \\{max\_s} should not be exceeded.
+
+The postamble also specifies the total number of pages; \.{DVItype}
+checks to see if this total is accurate.
+
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4\\{max\_v}: \37\\{integer};\C{the value of $\\{abs}(\|v)$ should probably not
+exceed this}\6
+\4\\{max\_h}: \37\\{integer};\C{the value of $\\{abs}(\|h)$ should probably not
+exceed this}\6
+\4\\{max\_s}: \37\\{integer};\C{the stack depth should not exceed this}\6
+\4$\\{max\_v\_so\_far},\39\\{max\_h\_so\_far},\39\\{max\_s\_so\_far}$: \37%
+\\{integer};\C{the record high levels}\6
+\4\\{total\_pages}: \37\\{integer};\C{the stated total number of pages}\6
+\4\\{page\_count}: \37\\{integer};\C{the total number of pages seen so far}\par
+\fi
+
+\M74. \P$\X11:Set initial values\X\mathrel{+}\S$\6
+$\\{max\_v}\K\O{17777777777}-99$;\5
+$\\{max\_h}\K\O{17777777777}-99$;\5
+$\\{max\_s}\K\\{stack\_size}+1$;\6
+$\\{max\_v\_so\_far}\K0$;\5
+$\\{max\_h\_so\_far}\K0$;\5
+$\\{max\_s\_so\_far}\K0$;\5
+$\\{page\_count}\K0$;\par
+\fi
+
+\M75. Before we get into the details of \\{do\_page}, it is convenient to
+consider a simpler routine that computes the first parameter of each
+opcode.
+
+\Y\P\D \37$\\{four\_cases}(\#)\S\#,\39\#+1,\39\#+2,\39\#+3$\par
+\P\D \37$\\{eight\_cases}(\#)\S\\{four\_cases}(\#),\39\\{four\_cases}(\#+4)$\par
+\P\D \37$\\{sixteen\_cases}(\#)\S\\{eight\_cases}(\#),\39\\{eight\_cases}(%
+\#+8)$\par
+\P\D \37$\\{thirty\_two\_cases}(\#)\S\\{sixteen\_cases}(\#),\39\\{sixteen%
+\_cases}(\#+16)$\par
+\P\D \37$\\{sixty\_four\_cases}(\#)\S\\{thirty\_two\_cases}(\#),\39\\{thirty%
+\_two\_cases}(\#+32)$\par
+\Y\P\4\&{function}\1\  \37$\\{first\_par}(\|o:\\{eight\_bits})$: \37%
+\\{integer};\2\6
+\&{begin} \37\&{case} $\|o$ \1\&{of}\6
+\4$\\{sixty\_four\_cases}(\\{set\_char\_0}),\39\\{sixty\_four\_cases}(\\{set%
+\_char\_0}+64)$: \37$\\{first\_par}\K\|o-\\{set\_char\_0}$;\6
+\4$\\{set1},\39\\{put1},\39\\{fnt1},\39\\{xxx1},\39\\{fnt\_def1}$: \37$\\{first%
+\_par}\K\\{get\_byte}$;\6
+\4$\\{set1}+1,\39\\{put1}+1,\39\\{fnt1}+1,\39\\{xxx1}+1,\39\\{fnt\_def1}+1$: %
+\37$\\{first\_par}\K\\{get\_two\_bytes}$;\6
+\4$\\{set1}+2,\39\\{put1}+2,\39\\{fnt1}+2,\39\\{xxx1}+2,\39\\{fnt\_def1}+2$: %
+\37$\\{first\_par}\K\\{get\_three\_bytes}$;\6
+\4$\\{right1},\39\\{w1},\39\\{x1},\39\\{down1},\39\\{y1},\39\\{z1}$: \37$%
+\\{first\_par}\K\\{signed\_byte}$;\6
+\4$\\{right1}+1,\39\\{w1}+1,\39\\{x1}+1,\39\\{down1}+1,\39\\{y1}+1,\39%
+\\{z1}+1$: \37$\\{first\_par}\K\\{signed\_pair}$;\6
+\4$\\{right1}+2,\39\\{w1}+2,\39\\{x1}+2,\39\\{down1}+2,\39\\{y1}+2,\39%
+\\{z1}+2$: \37$\\{first\_par}\K\\{signed\_trio}$;\6
+\4$\\{set1}+3,\39\\{set\_rule},\39\\{put1}+3,\39\\{put\_rule},\39\\{right1}+3,%
+\39\\{w1}+3,\39\\{x1}+3,\39\\{down1}+3,\39\\{y1}+3,\39\\{z1}+3,\39\\{fnt1}+3,%
+\39\\{xxx1}+3,\39\\{fnt\_def1}+3$: \37$\\{first\_par}\K\\{signed\_quad}$;\6
+\4$\\{nop},\39\\{bop},\39\\{eop},\39\\{push},\39\\{pop},\39\\{pre},\39\\{post},%
+\39\\{post\_post},\39\\{undefined\_commands}$: \37$\\{first\_par}\K0$;\6
+\4\\{w0}: \37$\\{first\_par}\K\|w$;\6
+\4\\{x0}: \37$\\{first\_par}\K\|x$;\6
+\4\\{y0}: \37$\\{first\_par}\K\|y$;\6
+\4\\{z0}: \37$\\{first\_par}\K\|z$;\6
+\4$\\{sixty\_four\_cases}(\\{fnt\_num\_0})$: \37$\\{first\_par}\K\|o-\\{fnt%
+\_num\_0}$;\2\6
+\&{end};\6
+\&{end};\par
+\fi
+
+\M76. Here is another subroutine that we need: It computes the number of
+pixels in the height or width of a rule. Characters and rules will line up
+properly if the sizes are computed precisely as specified here.  (Since
+\\{conv} is computed with some floating-point roundoff error, in a
+machine-dependent way, format designers who are tailoring something for a
+particular resolution should not plan their measurements to come out to an
+exact integer number of pixels; they should compute things so that the
+rule dimensions are a little less than an integer number of pixels, e.g.,
+4.99 instead of 5.00.)
+
+\Y\P\4\&{function}\1\  \37$\\{rule\_pixels}(\|x:\\{integer})$: \37\\{integer};%
+\C{computes $\lceil\\{conv}\cdot x\rceil$}\6
+\4\&{var} \37\|n: \37\\{integer};\2\6
+\&{begin} \37$\|n\K\\{trunc}(\\{conv}\ast\|x)$;\6
+\&{if} $\|n<\\{conv}\ast\|x$ \1\&{then}\5
+$\\{rule\_pixels}\K\|n+1$\ \&{else} $\\{rule\_pixels}\K\|n$;\2\6
+\&{end};\par
+\fi
+
+\M77. Strictly speaking, the \\{do\_page} procedure is really a function with
+side effects, not a `\&{procedure}'\thinspace; it returns the value \\{false}
+if \.{DVItype} should be aborted because of some unusual happening. The
+subroutine is organized as a typical interpreter, with a multiway branch
+on the command code followed by \&{goto}  statements leading to routines that
+finish up the activities common to different commands. We will use the
+following labels:
+
+\Y\P\D \37$\\{fin\_set}=41$\C{label for commands that set or put a character}%
+\par
+\P\D \37$\\{fin\_rule}=42$\C{label for commands that set or put a rule}\par
+\P\D \37$\\{move\_right}=43$\C{label for commands that change \|h}\par
+\P\D \37$\\{move\_down}=44$\C{label for commands that change \|v}\par
+\P\D \37$\\{show\_state}=45$\C{label for commands that change \|s}\par
+\P\D \37$\\{change\_font}=46$\C{label for commands that change \\{cur\_font}}%
+\par
+\fi
+
+\M78. Some \PASCAL\ compilers severely restrict the length of procedure bodies,
+so we shall split \\{do\_page} into two parts, one of which is
+called \\{special\_cases}. The different parts communicate with each other
+via the global variables mentioned above, together with the following ones:
+
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4\|s: \37\\{integer};\C{current stack size}\6
+\4\\{ss}: \37\\{integer};\C{stack size to print}\6
+\4\\{cur\_font}: \37\\{integer};\C{current internal font number}\6
+\4\\{showing}: \37\\{boolean};\C{is the current command being translated in
+full?}\par
+\fi
+
+\M79. Here is the overall setup.
+
+\Y\P\hbox{\4}\X82:Declare the function called \\{special\_cases}\X\6
+\4\&{function}\1\  \37\\{do\_page}: \37\\{boolean};\6
+\4\&{label} \37$\\{fin\_set},\39\\{fin\_rule},\39\\{move\_right},\39\\{show%
+\_state},\39\\{done},\399998,\399999$;\6
+\4\&{var} \37\|o: \37\\{eight\_bits};\C{operation code of the current command}\6
+$\|p,\39\|q$: \37\\{integer};\C{parameters of the current command}\6
+\|a: \37\\{integer};\C{byte number of the current command}\6
+\\{hhh}: \37\\{integer};\C{\|h, rounded to the nearest pixel}\2\6
+\&{begin} \37$\\{cur\_font}\K\\{invalid\_font}$;\C{set current font undefined}\6
+$\|s\K0$;\5
+$\|h\K0$;\5
+$\|v\K0$;\5
+$\|w\K0$;\5
+$\|x\K0$;\5
+$\|y\K0$;\5
+$\|z\K0$;\5
+$\\{hh}\K0$;\5
+$\\{vv}\K0$;\C{initialize the state variables}\6
+\&{while} $\\{true}$ \1\&{do}\5
+\X80:Translate the next command in the \.{DVI} file; \&{goto} 9999 with $\\{do%
+\_page}=\\{true}$ if it was \\{eop}; \&{goto} 9998 if premature termination is
+needed\X;\2\6
+\49998: \37$\\{print\_ln}(\.{\'!\'})$;\5
+$\\{do\_page}\K\\{false}$;\6
+\49999: \37\&{end};\par
+\fi
+
+\M80. Commands are broken down into ``major'' and ``minor'' categories:
+A major command is always shown in full, while a minor one is
+put into the buffer in abbreviated form. Minor commands, which
+account for the bulk of most \.{DVI} files, involve horizontal spacing
+and the typesetting of characters in a line; these are shown in full
+only if $\\{out\_mode}\G\\{verbose}$.
+
+\Y\P\D \37$\\{show}(\#)\S$\1\6
+\&{begin} \37\\{flush\_text};\5
+$\\{showing}\K\\{true}$;\5
+$\\{print}(\|a:1,\39\.{\':\ \'},\39\#)$;\6
+\&{end}\2\par
+\P\D \37$\\{major}(\#)\S$\1\6
+\&{if} $\\{out\_mode}>\\{errors\_only}$ \1\&{then}\5
+$\\{show}(\#)$\2\2\par
+\P\D \37$\\{minor}(\#)\S$\1\6
+\&{if} $\\{out\_mode}>\\{terse}$ \1\&{then}\6
+\&{begin} \37$\\{showing}\K\\{true}$;\5
+$\\{print}(\|a:1,\39\.{\':\ \'},\39\#)$;\6
+\&{end}\2\2\par
+\P\D \37$\\{error}(\#)\S$\1\6
+\&{if} $\R\\{showing}$ \1\&{then}\5
+$\\{show}(\#)$\6
+\4\&{else} $\\{print}(\.{\'\ \'},\39\#)$\2\2\par
+\Y\P$\4\X80:Translate the next command in the \.{DVI} file; \&{goto} 9999 with
+$\\{do\_page}=\\{true}$ if it was \\{eop}; \&{goto} 9998 if premature
+termination is needed\X\S$\6
+\&{begin} \37$\|a\K\\{cur\_loc}$;\5
+$\\{showing}\K\\{false}$;\5
+$\|o\K\\{get\_byte}$;\5
+$\|p\K\\{first\_par}(\|o)$;\6
+\&{if} $\\{eof}(\\{dvi\_file})$ \1\&{then}\5
+$\\{bad\_dvi}(\.{\'the\ file\ ended\ prematurely\'})$;\2\6
+\X81:Start translation of command \|o and \&{goto}  the appropriate label to
+finish the job\X;\6
+\4\\{fin\_set}: \37\X89:Finish a command that either sets or puts a character,
+then \&{goto} \\{move\_right} or \\{done}\X;\6
+\4\\{fin\_rule}: \37\X90:Finish a command that either sets or puts a rule, then
+\&{goto} \\{move\_right} or \\{done}\X;\6
+\4\\{move\_right}: \37\X91:Finish a command that sets $\|h\K\|h+\|q$, then %
+\&{goto} \\{done}\X;\6
+\4\\{show\_state}: \37\X93:Show the values of \\{ss}, \|h, \|v, \|w, \|x, \|y, %
+\|z, \\{hh}, and \\{vv}; then \&{goto} \\{done}\X;\6
+\4\\{done}: \37\&{if} $\\{showing}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'\ \'})$;\2\6
+\&{end}\par
+\U79.\fi
+
+\M81. The multiway switch in \\{first\_par}, above, was organized by the length
+of each command; the one in \\{do\_page} is organized by the semantics.
+
+\Y\P$\4\X81:Start translation of command \|o and \&{goto}  the appropriate
+label to finish the job\X\S$\6
+\&{if} $\|o<\\{set\_char\_0}+128$ \1\&{then}\5
+\X88:Translate a \\{set\_char} command\X\6
+\4\&{else} \&{case} $\|o$ \1\&{of}\6
+\4$\\{four\_cases}(\\{set1})$: \37\&{begin} \37$\\{major}(\.{\'set\'},\39\|o-%
+\\{set1}+1:1,\39\.{\'\ \'},\39\|p:1)$;\5
+\&{goto} \37\\{fin\_set};\6
+\&{end};\6
+\4$\\{four\_cases}(\\{put1})$: \37\&{begin} \37$\\{major}(\.{\'put\'},\39\|o-%
+\\{put1}+1:1,\39\.{\'\ \'},\39\|p:1)$;\5
+\&{goto} \37\\{fin\_set};\6
+\&{end};\6
+\4\\{set\_rule}: \37\&{begin} \37$\\{major}(\.{\'setrule\'})$;\5
+\&{goto} \37\\{fin\_rule};\6
+\&{end};\6
+\4\\{put\_rule}: \37\&{begin} \37$\\{major}(\.{\'putrule\'})$;\5
+\&{goto} \37\\{fin\_rule};\6
+\&{end};\6
+\hbox{\4}\X83:Cases for commands \\{nop}, \\{bop}, \dots, \\{pop}\X\6
+\hbox{\4}\X84:Cases for horizontal motion\X\6
+\4\&{othercases} \37\&{if} $\\{special\_cases}(\|o,\39\|p,\39\|a)$ \1\&{then}\5
+\&{goto} \37\\{done}\ \&{else} \&{goto} \379998\2\2\6
+\&{endcases}\2\par
+\U80.\fi
+
+\M82. \P$\X82:Declare the function called \\{special\_cases}\X\S$\6
+\4\&{function}\1\  \37$\\{special\_cases}(\|o:\\{eight\_bits};\,\35\|p,\39\|a:%
+\\{integer})$: \37\\{boolean};\6
+\4\&{label} \37$\\{change\_font},\39\\{move\_down},\39\\{done},\399998$;\6
+\4\&{var} \37\|q: \37\\{integer};\C{parameter of the current command}\6
+\|k: \37\\{integer};\C{loop index}\6
+\\{bad\_char}: \37\\{boolean};\C{has a non-ASCII character code appeared in
+this \\{xxx}?}\6
+\\{pure}: \37\\{boolean};\C{is the command error-free?}\6
+\\{vvv}: \37\\{integer};\C{\|v, rounded to the nearest pixel}\2\6
+\&{begin} \37$\\{pure}\K\\{true}$;\6
+\&{case} $\|o$ \1\&{of}\6
+\hbox{\4}\X85:Cases for vertical motion\X\6
+\hbox{\4}\X86:Cases for fonts\X\6
+\4$\\{four\_cases}(\\{xxx1})$: \37\X87:Translate an \\{xxx} command and %
+\&{goto} \\{done}\X;\6
+\4\\{pre}: \37\&{begin} \37$\\{error}(\.{\'preamble\ command\ within\ a\ page!%
+\'})$;\5
+\&{goto} \379998;\6
+\&{end};\6
+\4$\\{post},\39\\{post\_post}$: \37\&{begin} \37$\\{error}(\.{\'postamble\
+command\ within\ a\ page!\'})$;\5
+\&{goto} \379998;\6
+\&{end};\6
+\4\&{othercases} \37\&{begin} \37$\\{error}(\.{\'undefined\ command\ \'},\39%
+\|o:1,\39\.{\'!\'})$;\5
+\&{goto} \37\\{done};\6
+\&{end}\2\6
+\&{endcases};\6
+\4\\{move\_down}: \37\X92:Finish a command that sets $\|v\K\|v+\|p$, then %
+\&{goto} \\{done}\X;\6
+\4\\{change\_font}: \37\X94:Finish a command that changes the current font,
+then \&{goto} \\{done}\X;\6
+\49998: \37$\\{pure}\K\\{false}$;\6
+\4\\{done}: \37$\\{special\_cases}\K\\{pure}$;\6
+\&{end};\par
+\U79.\fi
+
+\M83. \P$\X83:Cases for commands \\{nop}, \\{bop}, \dots, \\{pop}\X\S$\6
+\4\\{nop}: \37\&{begin} \37$\\{minor}(\.{\'nop\'})$;\5
+\&{goto} \37\\{done};\6
+\&{end};\6
+\4\\{bop}: \37\&{begin} \37$\\{error}(\.{\'bop\ occurred\ before\ eop!\'})$;\5
+\&{goto} \379998;\6
+\&{end};\6
+\4\\{eop}: \37\&{begin} \37$\\{major}(\.{\'eop\'})$;\6
+\&{if} $\|s\I0$ \1\&{then}\5
+$\\{error}(\.{\'stack\ not\ empty\ at\ end\ of\ page\ (level\ \'},\39\|s:1,\39%
+\.{\')!\'})$;\2\6
+$\\{do\_page}\K\\{true}$;\5
+$\\{print\_ln}(\.{\'\ \'})$;\5
+\&{goto} \379999;\6
+\&{end};\6
+\4\\{push}: \37\&{begin} \37$\\{major}(\.{\'push\'})$;\6
+\&{if} $\|s=\\{max\_s\_so\_far}$ \1\&{then}\6
+\&{begin} \37$\\{max\_s\_so\_far}\K\|s+1$;\6
+\&{if} $\|s=\\{max\_s}$ \1\&{then}\5
+$\\{error}(\.{\'deeper\ than\ claimed\ in\ postamble!\'})$;\2\6
+\&{if} $\|s=\\{stack\_size}$ \1\&{then}\6
+\&{begin} \37$\\{error}(\.{\'DVItype\ capacity\ exceeded\ (stack\ size=\'},\39%
+\\{stack\_size}:1,\39\.{\')\'})$;\5
+\&{goto} \379998;\6
+\&{end};\2\6
+\&{end};\2\6
+$\\{hstack}[\|s]\K\|h$;\5
+$\\{vstack}[\|s]\K\|v$;\5
+$\\{wstack}[\|s]\K\|w$;\5
+$\\{xstack}[\|s]\K\|x$;\5
+$\\{ystack}[\|s]\K\|y$;\5
+$\\{zstack}[\|s]\K\|z$;\5
+$\\{hhstack}[\|s]\K\\{hh}$;\5
+$\\{vvstack}[\|s]\K\\{vv}$;\5
+$\\{incr}(\|s)$;\5
+$\\{ss}\K\|s-1$;\5
+\&{goto} \37\\{show\_state};\6
+\&{end};\6
+\4\\{pop}: \37\&{begin} \37$\\{major}(\.{\'pop\'})$;\6
+\&{if} $\|s=0$ \1\&{then}\5
+$\\{error}(\.{\'(illegal\ at\ level\ zero)!\'})$\6
+\4\&{else} \&{begin} \37$\\{decr}(\|s)$;\5
+$\\{hh}\K\\{hhstack}[\|s]$;\5
+$\\{vv}\K\\{vvstack}[\|s]$;\5
+$\|h\K\\{hstack}[\|s]$;\5
+$\|v\K\\{vstack}[\|s]$;\5
+$\|w\K\\{wstack}[\|s]$;\5
+$\|x\K\\{xstack}[\|s]$;\5
+$\|y\K\\{ystack}[\|s]$;\5
+$\|z\K\\{zstack}[\|s]$;\6
+\&{end};\2\6
+$\\{ss}\K\|s$;\5
+\&{goto} \37\\{show\_state};\6
+\&{end};\par
+\U81.\fi
+
+\M84. Rounding to the nearest pixel is best done in the manner shown here, so
+as
+to be inoffensive to the eye: When the horizontal motion is small, like a
+kern, \\{hh} changes by rounding the kern; but when the motion is large, \\{hh}
+changes by rounding the true position \|h so that accumulated rounding errors
+disappear. We allow a larger space in the negative direction than in
+the positive one, because \TeX\ makes comparatively
+large backspaces when it positions accents.
+
+\Y\P\D \37$\\{out\_space}(\#)\S$\1\6
+\&{if} $(\|p\G\\{font\_space}[\\{cur\_font}])\V(\|p\L-4\ast\\{font\_space}[%
+\\{cur\_font}])$ \1\&{then}\6
+\&{begin} \37$\\{out\_text}(\.{"\ "})$;\5
+$\\{hh}\K\\{pixel\_round}(\|h+\|p)$;\6
+\&{end}\6
+\4\&{else} $\\{hh}\K\\{hh}+\\{pixel\_round}(\|p)$;\2\2\6
+$\\{minor}(\#,\39\.{\'\ \'},\39\|p:1)$;\5
+$\|q\K\|p$;\5
+\&{goto} \37\\{move\_right}\par
+\Y\P$\4\X84:Cases for horizontal motion\X\S$\6
+\4$\\{four\_cases}(\\{right1})$: \37\&{begin} \37$\\{out\_space}(\.{\'right\'},%
+\39\|o-\\{right1}+1:1)$;\6
+\&{end};\6
+\4$\\{w0},\39\\{four\_cases}(\\{w1})$: \37\&{begin} \37$\|w\K\|p$;\5
+$\\{out\_space}(\.{\'w\'},\39\|o-\\{w0}:1)$;\6
+\&{end};\6
+\4$\\{x0},\39\\{four\_cases}(\\{x1})$: \37\&{begin} \37$\|x\K\|p$;\5
+$\\{out\_space}(\.{\'x\'},\39\|o-\\{x0}:1)$;\6
+\&{end};\par
+\U81.\fi
+
+\M85. Vertical motion is done similarly, but with the threshold between
+``small'' and ``large'' increased by a factor of five. The idea is to make
+fractions like ``$1\over2$'' round consistently, but to absorb accumulated
+rounding errors in the baseline-skip moves.
+
+\Y\P\D \37$\\{out\_vmove}(\#)\S$\1\6
+\&{if} $\\{abs}(\|p)\G5\ast\\{font\_space}[\\{cur\_font}]$ \1\&{then}\5
+$\\{vv}\K\\{pixel\_round}(\|v+\|p)$\6
+\4\&{else} $\\{vv}\K\\{vv}+\\{pixel\_round}(\|p)$;\2\2\6
+$\\{major}(\#,\39\.{\'\ \'},\39\|p:1)$;\5
+\&{goto} \37\\{move\_down}\par
+\Y\P$\4\X85:Cases for vertical motion\X\S$\6
+\4$\\{four\_cases}(\\{down1})$: \37\&{begin} \37$\\{out\_vmove}(\.{\'down\'},%
+\39\|o-\\{down1}+1:1)$;\6
+\&{end};\6
+\4$\\{y0},\39\\{four\_cases}(\\{y1})$: \37\&{begin} \37$\|y\K\|p$;\5
+$\\{out\_vmove}(\.{\'y\'},\39\|o-\\{y0}:1)$;\6
+\&{end};\6
+\4$\\{z0},\39\\{four\_cases}(\\{z1})$: \37\&{begin} \37$\|z\K\|p$;\5
+$\\{out\_vmove}(\.{\'z\'},\39\|o-\\{z0}:1)$;\6
+\&{end};\par
+\U82.\fi
+
+\M86. \P$\X86:Cases for fonts\X\S$\6
+\4$\\{sixty\_four\_cases}(\\{fnt\_num\_0})$: \37\&{begin} \37$\\{major}(\.{%
+\'fntnum\'},\39\|p:1)$;\5
+\&{goto} \37\\{change\_font};\6
+\&{end};\6
+\4$\\{four\_cases}(\\{fnt1})$: \37\&{begin} \37$\\{major}(\.{\'fnt\'},\39\|o-%
+\\{fnt1}+1:1,\39\.{\'\ \'},\39\|p:1)$;\5
+\&{goto} \37\\{change\_font};\6
+\&{end};\6
+\4$\\{four\_cases}(\\{fnt\_def1})$: \37\&{begin} \37$\\{major}(\.{\'fntdef\'},%
+\39\|o-\\{fnt\_def1}+1:1,\39\.{\'\ \'},\39\|p:1)$;\5
+$\\{define\_font}(\|p)$;\5
+\&{goto} \37\\{done};\6
+\&{end};\par
+\U82.\fi
+
+\M87. \P$\X87:Translate an \\{xxx} command and \&{goto} \\{done}\X\S$\6
+\&{begin} \37$\\{major}(\.{\'xxx\ \'}\.{\'\'})$;\5
+$\\{bad\_char}\K\\{false}$;\6
+\&{if} $\|p<0$ \1\&{then}\5
+$\\{error}(\.{\'string\ of\ negative\ length!\'})$;\2\6
+\&{for} $\|k\K1\mathrel{\&{to}}\|p$ \1\&{do}\6
+\&{begin} \37$\|q\K\\{get\_byte}$;\6
+\&{if} $(\|q<\.{"\ "})\V(\|q>\.{"\~"})$ \1\&{then}\5
+$\\{bad\_char}\K\\{true}$;\2\6
+\&{if} $\\{showing}$ \1\&{then}\5
+$\\{print}(\\{xchr}[\|q])$;\2\6
+\&{end};\2\6
+\&{if} $\\{showing}$ \1\&{then}\5
+$\\{print}(\.{\'\'}\.{\'\'})$;\2\6
+\&{if} $\\{bad\_char}$ \1\&{then}\5
+$\\{error}(\.{\'non-ASCII\ character\ in\ xxx\ command!\'})$;\2\6
+\&{goto} \37\\{done};\6
+\&{end}\par
+\U82.\fi
+
+\M88. \P$\X88:Translate a \\{set\_char} command\X\S$\6
+\&{begin} \37\&{if} $(\|o>\.{"\ "})\W(\|o\L\.{"\~"})$ \1\&{then}\6
+\&{begin} \37$\\{out\_text}(\|p)$;\5
+$\\{minor}(\.{\'setchar\'},\39\|p:1)$;\6
+\&{end}\6
+\4\&{else} $\\{major}(\.{\'setchar\'},\39\|p:1)$;\2\6
+\&{goto} \37\\{fin\_set};\6
+\&{end}\par
+\U81.\fi
+
+\M89. \P$\X89:Finish a command that either sets or puts a character, then %
+\&{goto} \\{move\_right} or \\{done}\X\S$\6
+\&{if} $\|p<0$ \1\&{then}\5
+$\|p\K255-((-1-\|p)\mathbin{\&{mod}}256)$\6
+\4\&{else} \&{if} $\|p\G256$ \1\&{then}\5
+$\|p\K\|p\mathbin{\&{mod}}256$;\C{width computation for oriental fonts}\2\2\6
+\&{if} $(\|p<\\{font\_bc}[\\{cur\_font}])\V(\|p>\\{font\_ec}[\\{cur\_font}])$ %
+\1\&{then}\5
+$\|q\K\\{invalid\_width}$\6
+\4\&{else} $\|q\K\\{char\_width}(\\{cur\_font})(\|p)$;\2\6
+\&{if} $\|q=\\{invalid\_width}$ \1\&{then}\6
+\&{begin} \37$\\{error}(\.{\'character\ \'},\39\|p:1,\39\.{\'\ invalid\ in\
+font\ \'})$;\5
+$\\{print\_font}(\\{cur\_font})$;\6
+\&{if} $\\{cur\_font}\I\\{invalid\_font}$ \1\&{then}\5
+$\\{print}(\.{\'!\'})$;\C{the invalid font has `\.!' in its name}\2\6
+\&{end};\2\6
+\&{if} $\|o\G\\{put1}$ \1\&{then}\5
+\&{goto} \37\\{done};\2\6
+\&{if} $\|q=\\{invalid\_width}$ \1\&{then}\5
+$\|q\K0$\6
+\4\&{else} $\\{hh}\K\\{hh}+\\{char\_pixel\_width}(\\{cur\_font})(\|p)$;\2\6
+\&{goto} \37\\{move\_right}\par
+\U80.\fi
+
+\M90. \P$\X90:Finish a command that either sets or puts a rule, then \&{goto} %
+\\{move\_right} or \\{done}\X\S$\6
+$\|q\K\\{signed\_quad}$;\6
+\&{if} $\\{showing}$ \1\&{then}\6
+\&{begin} \37$\\{print}(\.{\'\ height\ \'},\39\|p:1,\39\.{\',\ width\ \'},\39%
+\|q:1)$;\6
+\&{if} $\\{out\_mode}>\\{mnemonics\_only}$ \1\&{then}\6
+\&{if} $(\|p\L0)\V(\|q\L0)$ \1\&{then}\5
+$\\{print}(\.{\'\ (invisible)\'})$\6
+\4\&{else} $\\{print}(\.{\'\ (\'},\39\\{rule\_pixels}(\|p):1,\39\.{\'x\'},\39%
+\\{rule\_pixels}(\|q):1,\39\.{\'\ pixels)\'})$;\2\2\6
+\&{end};\2\6
+\&{if} $\|o=\\{put\_rule}$ \1\&{then}\5
+\&{goto} \37\\{done};\2\6
+\&{if} $\\{showing}$ \1\&{then}\6
+\&{if} $\\{out\_mode}>\\{mnemonics\_only}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'\ \'})$;\2\2\6
+$\\{hh}\K\\{hh}+\\{rule\_pixels}(\|q)$;\5
+\&{goto} \37\\{move\_right}\par
+\U80.\fi
+
+\M91. A sequence of consecutive rules, or consecutive characters in a
+fixed-width
+font whose width is not an integer number of pixels, can cause \\{hh} to drift
+far away from a correctly rounded value. \.{DVItype} ensures that the
+amount of drift will never exceed \\{max\_drift} pixels.
+
+Since \.{DVItype} is intended to diagnose strange errors, it checks
+carefully to make sure that \|h and \|v do not get out of range.
+Normal \.{DVI}-reading programs need not do this.
+
+\Y\P\D \37$\\{infinity}\S\O{17777777777}$\C{$\infty$ (approximately)}\par
+\P\D \37$\\{max\_drift}=2$\C{we insist that abs$(\\{hh}-\\{pixel\_round}(\|h))%
+\L\\{max\_drift}$}\par
+\Y\P$\4\X91:Finish a command that sets $\|h\K\|h+\|q$, then \&{goto} \\{done}\X%
+\S$\6
+\&{if} $(\|h>0)\W(\|q>0)$ \1\&{then}\6
+\&{if} $\|h>\\{infinity}-\|q$ \1\&{then}\6
+\&{begin} \37$\\{error}(\.{\'arithmetic\ overflow!\ parameter\ changed\ from\ %
+\'},\39\|q:1,\39\.{\'\ to\ \'},\39\\{infinity}-\|h:1)$;\5
+$\|q\K\\{infinity}-\|h$;\6
+\&{end};\2\2\6
+\&{if} $(\|h<0)\W(\|q<0)$ \1\&{then}\6
+\&{if} $-\|h>\|q+\\{infinity}$ \1\&{then}\6
+\&{begin} \37$\\{error}(\.{\'arithmetic\ overflow!\ parameter\ changed\ from\ %
+\'},\39\|q:1,\39\.{\'\ to\ \'},\39(-\|h)-\\{infinity}:1)$;\5
+$\|q\K(-\|h)-\\{infinity}$;\6
+\&{end};\2\2\6
+$\\{hhh}\K\\{pixel\_round}(\|h+\|q)$;\6
+\&{if} $\\{abs}(\\{hhh}-\\{hh})>\\{max\_drift}$ \1\&{then}\6
+\&{if} $\\{hhh}>\\{hh}$ \1\&{then}\5
+$\\{hh}\K\\{hhh}-\\{max\_drift}$\6
+\4\&{else} $\\{hh}\K\\{hhh}+\\{max\_drift}$;\2\2\6
+\&{if} $\\{showing}$ \1\&{then}\6
+\&{if} $\\{out\_mode}>\\{mnemonics\_only}$ \1\&{then}\6
+\&{begin} \37$\\{print}(\.{\'\ h:=\'},\39\|h:1)$;\6
+\&{if} $\|q\G0$ \1\&{then}\5
+$\\{print}(\.{\'+\'})$;\2\6
+$\\{print}(\|q:1,\39\.{\'=\'},\39\|h+\|q:1,\39\.{\',\ hh:=\'},\39\\{hh}:1)$;\6
+\&{end};\2\2\6
+$\|h\K\|h+\|q$;\6
+\&{if} $\\{abs}(\|h)>\\{max\_h\_so\_far}$ \1\&{then}\6
+\&{begin} \37\&{if} $\\{abs}(\|h)>\\{max\_h}+99$ \1\&{then}\6
+\&{begin} \37$\\{error}(\.{\'warning:\ |h|>\'},\39\\{max\_h}:1,\39\.{\'!\'})$;\5
+$\\{max\_h}\K\\{abs}(\|h)$;\6
+\&{end};\2\6
+$\\{max\_h\_so\_far}\K\\{abs}(\|h)$;\6
+\&{end};\2\6
+\&{goto} \37\\{done}\par
+\U80.\fi
+
+\M92. \P$\X92:Finish a command that sets $\|v\K\|v+\|p$, then \&{goto} \\{done}%
+\X\S$\6
+\&{if} $(\|v>0)\W(\|p>0)$ \1\&{then}\6
+\&{if} $\|v>\\{infinity}-\|p$ \1\&{then}\6
+\&{begin} \37$\\{error}(\.{\'arithmetic\ overflow!\ parameter\ changed\ from\ %
+\'},\39\|p:1,\39\.{\'\ to\ \'},\39\\{infinity}-\|v:1)$;\5
+$\|p\K\\{infinity}-\|v$;\6
+\&{end};\2\2\6
+\&{if} $(\|v<0)\W(\|p<0)$ \1\&{then}\6
+\&{if} $-\|v>\|p+\\{infinity}$ \1\&{then}\6
+\&{begin} \37$\\{error}(\.{\'arithmetic\ overflow!\ parameter\ changed\ from\ %
+\'},\39\|p:1,\39\.{\'\ to\ \'},\39(-\|v)-\\{infinity}:1)$;\5
+$\|p\K(-\|v)-\\{infinity}$;\6
+\&{end};\2\2\6
+$\\{vvv}\K\\{pixel\_round}(\|v+\|p)$;\6
+\&{if} $\\{abs}(\\{vvv}-\\{vv})>\\{max\_drift}$ \1\&{then}\6
+\&{if} $\\{vvv}>\\{vv}$ \1\&{then}\5
+$\\{vv}\K\\{vvv}-\\{max\_drift}$\6
+\4\&{else} $\\{vv}\K\\{vvv}+\\{max\_drift}$;\2\2\6
+\&{if} $\\{showing}$ \1\&{then}\6
+\&{if} $\\{out\_mode}>\\{mnemonics\_only}$ \1\&{then}\6
+\&{begin} \37$\\{print}(\.{\'\ v:=\'},\39\|v:1)$;\6
+\&{if} $\|p\G0$ \1\&{then}\5
+$\\{print}(\.{\'+\'})$;\2\6
+$\\{print}(\|p:1,\39\.{\'=\'},\39\|v+\|p:1,\39\.{\',\ vv:=\'},\39\\{vv}:1)$;\6
+\&{end};\2\2\6
+$\|v\K\|v+\|p$;\6
+\&{if} $\\{abs}(\|v)>\\{max\_v\_so\_far}$ \1\&{then}\6
+\&{begin} \37\&{if} $\\{abs}(\|v)>\\{max\_v}+99$ \1\&{then}\6
+\&{begin} \37$\\{error}(\.{\'warning:\ |v|>\'},\39\\{max\_v}:1,\39\.{\'!\'})$;\5
+$\\{max\_v}\K\\{abs}(\|v)$;\6
+\&{end};\2\6
+$\\{max\_v\_so\_far}\K\\{abs}(\|v)$;\6
+\&{end};\2\6
+\&{goto} \37\\{done}\par
+\U82.\fi
+
+\M93. \P$\X93:Show the values of \\{ss}, \|h, \|v, \|w, \|x, \|y, \|z, \\{hh},
+and \\{vv}; then \&{goto} \\{done}\X\S$\6
+\&{if} $\\{showing}$ \1\&{then}\6
+\&{if} $\\{out\_mode}>\\{mnemonics\_only}$ \1\&{then}\6
+\&{begin} \37$\\{print\_ln}(\.{\'\ \'})$;\5
+$\\{print}(\.{\'level\ \'},\39\\{ss}:1,\39\.{\':(h=\'},\39\|h:1,\39\.{\',v=\'},%
+\39\|v:1,\39\.{\',w=\'},\39\|w:1,\39\.{\',x=\'},\39\|x:1,\39\.{\',y=\'},\39%
+\|y:1,\39\.{\',z=\'},\39\|z:1,\39\.{\',hh=\'},\39\\{hh}:1,\39\.{\',vv=\'},\39%
+\\{vv}:1,\39\.{\')\'})$;\6
+\&{end};\2\2\6
+\&{goto} \37\\{done}\par
+\U80.\fi
+
+\M94. \P$\X94:Finish a command that changes the current font, then \&{goto} %
+\\{done}\X\S$\6
+$\\{font\_num}[\\{nf}]\K\|p$;\5
+$\\{cur\_font}\K0$;\6
+\&{while} $\\{font\_num}[\\{cur\_font}]\I\|p$ \1\&{do}\5
+$\\{incr}(\\{cur\_font})$;\2\6
+\&{if} $\\{cur\_font}=\\{nf}$ \1\&{then}\6
+\&{begin} \37$\\{cur\_font}\K\\{invalid\_font}$;\5
+$\\{error}(\.{\'invalid\ font\ selection:\ font\ \'},\39\|p:1,\39\.{\'\ was\
+never\ defined!\'})$;\6
+\&{end};\2\6
+\&{if} $\\{showing}$ \1\&{then}\6
+\&{if} $\\{out\_mode}>\\{mnemonics\_only}$ \1\&{then}\6
+\&{begin} \37$\\{print}(\.{\'\ current\ font\ is\ \'})$;\5
+$\\{print\_font}(\\{cur\_font})$;\6
+\&{end};\2\2\6
+\&{goto} \37\\{done}\par
+\U82.\fi
+
+\N95.  Skipping pages.
+A routine that's much simpler than \\{do\_page} is used to pass over
+pages that are not being translated. The \\{skip\_pages} subroutine
+is assumed to begin just after the preamble has been read, or just
+after a \\{bop} has been processed. It continues until either finding a
+\\{bop} that matches the desired starting page specifications, or until
+running into the postamble.
+
+\Y\P\4\&{procedure}\1\  \37\\{skip\_pages};\6
+\4\&{label} \379999;\C{end of this subroutine}\6
+\4\&{var} \37\|p: \37\\{integer};\C{a parameter}\6
+\|k: \37$0\to255$;\C{command code}\6
+\\{down\_the\_drain}: \37\\{integer};\C{garbage}\2\6
+\&{begin} \37$\\{showing}\K\\{false}$;\6
+\&{while} $\\{true}$ \1\&{do}\6
+\&{begin} \37\&{if} $\\{eof}(\\{dvi\_file})$ \1\&{then}\5
+$\\{bad\_dvi}(\.{\'the\ file\ ended\ prematurely\'})$;\2\6
+$\|k\K\\{get\_byte}$;\5
+$\|p\K\\{first\_par}(\|k)$;\6
+\&{case} $\|k$ \1\&{of}\6
+\4\\{bop}: \37\&{begin} \37\X98:Pass a \\{bop} command, setting up the %
+\\{count} array\X;\6
+\&{if} $\R\\{started}\W\\{start\_match}$ \1\&{then}\6
+\&{begin} \37$\\{started}\K\\{true}$;\5
+\&{goto} \379999;\6
+\&{end};\2\6
+\&{end};\6
+\4$\\{set\_rule},\39\\{put\_rule}$: \37$\\{down\_the\_drain}\K\\{signed%
+\_quad}$;\6
+\4$\\{fnt\_def1},\39\\{fnt\_def1}+1,\39\\{fnt\_def1}+2,\39\\{fnt\_def1}+3$: \37%
+\&{begin} \37$\\{define\_font}(\|p)$;\5
+$\\{print\_ln}(\.{\'\ \'})$;\6
+\&{end};\6
+\4$\\{xxx1},\39\\{xxx1}+1,\39\\{xxx1}+2,\39\\{xxx1}+3$: \37\&{while} $\|p>0$ \1%
+\&{do}\6
+\&{begin} \37$\\{down\_the\_drain}\K\\{get\_byte}$;\5
+$\\{decr}(\|p)$;\6
+\&{end};\2\6
+\4\\{post}: \37\&{begin} \37$\\{in\_postamble}\K\\{true}$;\5
+\&{goto} \379999;\6
+\&{end};\6
+\4\&{othercases} \37\\{do\_nothing}\2\6
+\&{endcases};\6
+\&{end};\2\6
+\49999: \37\&{end};\par
+\fi
+
+\M96. Global variables called \\{old\_backpointer} and \\{new\_backpointer}
+are used to check whether the back pointers are properly set up.
+Another one tells whether we have already found the starting page.
+
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4\\{old\_backpointer}: \37\\{integer};\C{the previous \\{bop} command
+location}\6
+\4\\{new\_backpointer}: \37\\{integer};\C{the current \\{bop} command location}%
+\6
+\4\\{started}: \37\\{boolean};\C{has the starting page been found?}\par
+\fi
+
+\M97. \P$\X11:Set initial values\X\mathrel{+}\S$\6
+$\\{old\_backpointer}\K-1$;\5
+$\\{started}\K\\{false}$;\par
+\fi
+
+\M98. \P$\X98:Pass a \\{bop} command, setting up the \\{count} array\X\S$\6
+$\\{new\_backpointer}\K\\{cur\_loc}-1$;\5
+$\\{incr}(\\{page\_count})$;\6
+\&{for} $\|k\K0\mathrel{\&{to}}9$ \1\&{do}\5
+$\\{count}[\|k]\K\\{signed\_quad}$;\2\6
+\&{if} $\\{signed\_quad}\I\\{old\_backpointer}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'backpointer\ in\ byte\ \'},\39\\{cur\_loc}-4:1,\39\.{\'\
+should\ be\ \'},\39\\{old\_backpointer}:1,\39\.{\'!\'})$;\2\6
+$\\{old\_backpointer}\K\\{new\_backpointer}$\par
+\Us95\ET110.\fi
+
+\N99.  Using the backpointers.
+The routines in this section of the program are brought into play only
+if \\{random\_reading} is \\{true} (and only if $\\{out\_mode}=\\{the%
+\_works}$).
+First comes a routine that illustrates how to find the postamble quickly.
+
+\Y\P$\4\X99:Find the postamble, working back from the end\X\S$\6
+$\|n\K\\{dvi\_length}$;\6
+\&{if} $\|n<53$ \1\&{then}\5
+$\\{bad\_dvi}(\.{\'only\ \'},\39\|n:1,\39\.{\'\ bytes\ long\'})$;\2\6
+$\|m\K\|n-4$;\6
+\1\&{repeat} \37\&{if} $\|m=0$ \1\&{then}\5
+$\\{bad\_dvi}(\.{\'all\ 223s\'})$;\2\6
+$\\{move\_to\_byte}(\|m)$;\5
+$\|k\K\\{get\_byte}$;\5
+$\\{decr}(\|m)$;\6
+\4\&{until}\5
+$\|k\I223$;\2\6
+\&{if} $\|k\I\\{id\_byte}$ \1\&{then}\5
+$\\{bad\_dvi}(\.{\'ID\ byte\ is\ \'},\39\|k:1)$;\2\6
+$\\{move\_to\_byte}(\|m-3)$;\5
+$\|q\K\\{signed\_quad}$;\6
+\&{if} $(\|q<0)\V(\|q>\|m-33)$ \1\&{then}\5
+$\\{bad\_dvi}(\.{\'post\ pointer\ \'},\39\|q:1,\39\.{\'\ at\ byte\ \'},\39%
+\|m-3:1)$;\2\6
+$\\{move\_to\_byte}(\|q)$;\5
+$\|k\K\\{get\_byte}$;\6
+\&{if} $\|k\I\\{post}$ \1\&{then}\5
+$\\{bad\_dvi}(\.{\'byte\ \'},\39\|q:1,\39\.{\'\ is\ not\ post\'})$;\2\6
+$\\{post\_loc}\K\|q$;\5
+$\\{first\_backpointer}\K\\{signed\_quad}$\par
+\U106.\fi
+
+\M100. Note that the last steps of the above code save the locations of the
+the \\{post} byte and the final \\{bop}.  We had better declare these global
+variables, together with another one that we will need shortly.
+
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4\\{post\_loc}: \37\\{integer};\C{byte location where the postamble begins}\6
+\4\\{first\_backpointer}: \37\\{integer};\C{the pointer following \\{post}}\6
+\4\\{start\_loc}: \37\\{integer};\C{byte location of the first page to process}%
+\par
+\fi
+
+\M101. The next little routine shows how the backpointers can be followed
+to move through a \.{DVI} file in reverse order. Ordinarily a \.{DVI}-reading
+program would do this only if it wants to print the pages backwards or
+if it wants to find a specified starting page that is not necessarily the
+first page in the file; otherwise it would of course be simpler and faster
+just to read the whole file from the beginning.
+
+\Y\P$\4\X101:Count the pages and move to the starting page\X\S$\6
+$\|q\K\\{post\_loc}$;\5
+$\|p\K\\{first\_backpointer}$;\5
+$\\{start\_loc}\K-1$;\6
+\&{if} $\|p<0$ \1\&{then}\5
+$\\{in\_postamble}\K\\{true}$\6
+\4\&{else} \&{begin} \37\1\&{repeat} \37\C{now \|q points to a \\{post} or %
+\\{bop} command; $\|p\G0$ is prev pointer}\6
+\&{if} $\|p>\|q-46$ \1\&{then}\5
+$\\{bad\_dvi}(\.{\'page\ link\ \'},\39\|p:1,\39\.{\'\ after\ byte\ \'},\39%
+\|q:1)$;\2\6
+$\|q\K\|p$;\5
+$\\{move\_to\_byte}(\|q)$;\5
+$\|k\K\\{get\_byte}$;\6
+\&{if} $\|k=\\{bop}$ \1\&{then}\5
+$\\{incr}(\\{page\_count})$\6
+\4\&{else} $\\{bad\_dvi}(\.{\'byte\ \'},\39\|q:1,\39\.{\'\ is\ not\ bop\'})$;\2%
+\6
+\&{for} $\|k\K0\mathrel{\&{to}}9$ \1\&{do}\5
+$\\{count}[\|k]\K\\{signed\_quad}$;\2\6
+\&{if} $\\{start\_match}$ \1\&{then}\5
+$\\{start\_loc}\K\|q$;\2\6
+$\|p\K\\{signed\_quad}$;\6
+\4\&{until}\5
+$\|p<0$;\2\6
+\&{if} $\\{start\_loc}<0$ \1\&{then}\5
+$\\{abort}(\.{\'starting\ page\ number\ could\ not\ be\ found!\'})$;\2\6
+$\\{move\_to\_byte}(\\{start\_loc}+1)$;\5
+$\\{old\_backpointer}\K\\{start\_loc}$;\6
+\&{for} $\|k\K0\mathrel{\&{to}}9$ \1\&{do}\5
+$\\{count}[\|k]\K\\{signed\_quad}$;\2\6
+$\|p\K\\{signed\_quad}$;\5
+$\\{started}\K\\{true}$;\6
+\&{end};\2\6
+\&{if} $\\{page\_count}\I\\{total\_pages}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'there\ are\ really\ \'},\39\\{page\_count}:1,\39\.{\'\
+pages,\ not\ \'},\39\\{total\_pages}:1,\39\.{\'!\'})$\2\par
+\U106.\fi
+
+\N102.  Reading the postamble.
+Now imagine that we are reading the \.{DVI} file and positioned just
+four bytes after the \\{post} command. That, in fact, is the situation,
+when the following part of \.{DVItype} is called upon to read, translate,
+and check the rest of the postamble.
+
+\Y\P\4\&{procedure}\1\  \37\\{read\_postamble};\6
+\4\&{var} \37\|k: \37\\{integer};\C{loop index}\6
+$\|p,\39\|q,\39\|m$: \37\\{integer};\C{general purpose registers}\2\6
+\&{begin} \37$\\{showing}\K\\{false}$;\5
+$\\{post\_loc}\K\\{cur\_loc}-5$;\5
+$\\{print\_ln}(\.{\'Postamble\ starts\ at\ byte\ \'},\39\\{post\_loc}:1,\39\.{%
+\'.\'})$;\6
+\&{if} $\\{signed\_quad}\I\\{numerator}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'numerator\ doesn\'}\.{\'t\ match\ the\ preamble!\'})$;\2\6
+\&{if} $\\{signed\_quad}\I\\{denominator}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'denominator\ doesn\'}\.{\'t\ match\ the\ preamble!\'})$;\2\6
+\&{if} $\\{signed\_quad}\I\\{mag}$ \1\&{then}\6
+\&{if} $\\{new\_mag}=0$ \1\&{then}\5
+$\\{print\_ln}(\.{\'magnification\ doesn\'}\.{\'t\ match\ the\ preamble!\'})$;%
+\2\2\6
+$\\{max\_v}\K\\{signed\_quad}$;\5
+$\\{max\_h}\K\\{signed\_quad}$;\6
+$\\{print}(\.{\'maxv=\'},\39\\{max\_v}:1,\39\.{\',\ maxh=\'},\39\\{max\_h}:1)$;%
+\6
+$\\{max\_s}\K\\{get\_two\_bytes}$;\5
+$\\{total\_pages}\K\\{get\_two\_bytes}$;\6
+$\\{print\_ln}(\.{\',\ maxstackdepth=\'},\39\\{max\_s}:1,\39\.{\',\ totalpages=%
+\'},\39\\{total\_pages}:1)$;\6
+\&{if} $\\{out\_mode}<\\{the\_works}$ \1\&{then}\5
+\X103:Compare the \\{lust} parameters with the accumulated facts\X;\2\6
+\X105:Process the font definitions of the postamble\X;\6
+\X104:Make sure that the end of the file is well-formed\X;\6
+\&{end};\par
+\fi
+
+\M103. No warning is given when \\{max\_h\_so\_far} exceeds \\{max\_h} by less
+than~100,
+since 100 units is invisibly small; it's approximately the wavelength of
+visible light, in the case of \TeX\ output. Rounding errors can be expected
+to make \|h and \|v slightly more than \\{max\_h} and \\{max\_v}, every once in
+a~while; hence small discrepancies are not cause for alarm.
+
+\Y\P$\4\X103:Compare the \\{lust} parameters with the accumulated facts\X\S$\6
+\&{begin} \37\&{if} $\\{max\_v}+99<\\{max\_v\_so\_far}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'warning:\ observed\ maxv\ was\ \'},\39\\{max\_v\_so%
+\_far}:1)$;\2\6
+\&{if} $\\{max\_h}+99<\\{max\_h\_so\_far}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'warning:\ observed\ maxh\ was\ \'},\39\\{max\_h\_so%
+\_far}:1)$;\2\6
+\&{if} $\\{max\_s}<\\{max\_s\_so\_far}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'warning:\ observed\ maxstackdepth\ was\ \'},\39\\{max\_s%
+\_so\_far}:1)$;\2\6
+\&{if} $\\{page\_count}\I\\{total\_pages}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'there\ are\ really\ \'},\39\\{page\_count}:1,\39\.{\'\
+pages,\ not\ \'},\39\\{total\_pages}:1,\39\.{\'!\'})$;\2\6
+\&{end}\par
+\U102.\fi
+
+\M104. When we get to the present code, the \\{post\_post} command has
+just been read.
+
+\Y\P$\4\X104:Make sure that the end of the file is well-formed\X\S$\6
+$\|q\K\\{signed\_quad}$;\6
+\&{if} $\|q\I\\{post\_loc}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'bad\ postamble\ pointer\ in\ byte\ \'},\39\\{cur\_loc}-4:1,%
+\39\.{\'!\'})$;\2\6
+$\|m\K\\{get\_byte}$;\6
+\&{if} $\|m\I\\{id\_byte}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'identification\ in\ byte\ \'},\39\\{cur\_loc}-1:1,\39\.{\'\
+should\ be\ \'},\39\\{id\_byte}:1,\39\.{\'!\'})$;\2\6
+$\|k\K\\{cur\_loc}$;\5
+$\|m\K223$;\6
+\&{while} $(\|m=223)\W\R\\{eof}(\\{dvi\_file})$ \1\&{do}\5
+$\|m\K\\{get\_byte}$;\2\6
+\&{if} $\R\\{eof}(\\{dvi\_file})$ \1\&{then}\5
+$\\{bad\_dvi}(\.{\'signature\ in\ byte\ \'},\39\\{cur\_loc}-1:1,\39\.{\'\
+should\ be\ 223\'})$\6
+\4\&{else} \&{if} $\\{cur\_loc}<\|k+4$ \1\&{then}\5
+$\\{print\_ln}(\.{\'not\ enough\ signature\ bytes\ at\ end\ of\ file\ (\'},\39%
+\\{cur\_loc}-\|k:1,\39\.{\')\'})$;\2\2\par
+\U102.\fi
+
+\M105. \P$\X105:Process the font definitions of the postamble\X\S$\6
+\1\&{repeat} \37$\|k\K\\{get\_byte}$;\6
+\&{if} $(\|k\G\\{fnt\_def1})\W(\|k<\\{fnt\_def1}+4)$ \1\&{then}\6
+\&{begin} \37$\|p\K\\{first\_par}(\|k)$;\5
+$\\{define\_font}(\|p)$;\5
+$\\{print\_ln}(\.{\'\ \'})$;\5
+$\|k\K\\{nop}$;\6
+\&{end};\2\6
+\4\&{until}\5
+$\|k\I\\{nop}$;\2\6
+\&{if} $\|k\I\\{post\_post}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'byte\ \'},\39\\{cur\_loc}-1:1,\39\.{\'\ is\ not\ postpost!%
+\'})$\2\par
+\U102.\fi
+
+\N106.  The main program.
+Now we are ready to put it all together. This is where \.{DVItype} starts,
+and where it ends.
+
+\Y\P\&{begin} \37\\{initialize};\C{get all variables initialized}\6
+\\{dialog};\C{set up all the options}\6
+\X108:Process the preamble\X;\6
+\&{if} $\\{out\_mode}=\\{the\_works}$ \1\&{then}\C{$\\{random\_reading}=%
+\\{true}$}\6
+\&{begin} \37\X99:Find the postamble, working back from the end\X;\6
+$\\{in\_postamble}\K\\{true}$;\5
+\\{read\_postamble};\5
+$\\{in\_postamble}\K\\{false}$;\5
+\X101:Count the pages and move to the starting page\X;\6
+\&{end}\6
+\4\&{else} \\{skip\_pages};\2\6
+\&{if} $\R\\{in\_postamble}$ \1\&{then}\5
+\X110:Translate up to \\{max\_pages} pages\X;\2\6
+\&{if} $\\{out\_mode}<\\{the\_works}$ \1\&{then}\6
+\&{begin} \37\&{if} $\R\\{in\_postamble}$ \1\&{then}\5
+\\{skip\_pages};\2\6
+\&{if} $\\{signed\_quad}\I\\{old\_backpointer}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'backpointer\ in\ byte\ \'},\39\\{cur\_loc}-4:1,\39\.{\'\
+should\ be\ \'},\39\\{old\_backpointer}:1,\39\.{\'!\'})$;\2\6
+\\{read\_postamble};\6
+\&{end};\2\6
+\4\\{final\_end}: \37\&{end}.\par
+\fi
+
+\M107. The main program needs a few global variables in order to do its work.
+
+\Y\P$\4\X10:Globals in the outer block\X\mathrel{+}\S$\6
+\4$\|k,\39\|m,\39\|n,\39\|p,\39\|q$: \37\\{integer};\C{general purpose
+registers}\par
+\fi
+
+\M108. A \.{DVI}-reading program that reads the postamble first need not look
+at the
+preamble; but \.{DVItype} looks at the preamble in order to do error
+checking, and to display the introductory comment.
+
+\Y\P$\4\X108:Process the preamble\X\S$\6
+\\{open\_dvi\_file};\5
+$\|p\K\\{get\_byte}$;\C{fetch the first byte}\6
+\&{if} $\|p\I\\{pre}$ \1\&{then}\5
+$\\{bad\_dvi}(\.{\'First\ byte\ isn\'}\.{\'t\ start\ of\ preamble!\'})$;\2\6
+$\|p\K\\{get\_byte}$;\C{fetch the identification byte}\6
+\&{if} $\|p\I\\{id\_byte}$ \1\&{then}\5
+$\\{print\_ln}(\.{\'identification\ in\ byte\ 1\ should\ be\ \'},\39\\{id%
+\_byte}:1,\39\.{\'!\'})$;\2\6
+\X109:Compute the conversion factors\X;\6
+$\|p\K\\{get\_byte}$;\C{fetch the length of the introductory comment}\6
+$\\{print}(\.{\'\'}\.{\'\'})$;\6
+\&{while} $\|p>0$ \1\&{do}\6
+\&{begin} \37$\\{decr}(\|p)$;\5
+$\\{print}(\\{xchr}[\\{get\_byte}])$;\6
+\&{end};\2\6
+$\\{print\_ln}(\.{\'\'}\.{\'\'})$\par
+\U106.\fi
+
+\M109. The conversion factor \\{conv} is figured as follows: There are exactly
+$\|n/\|d$ decimicrons per \.{DVI} unit, and 254000 decimicrons per inch,
+and \\{resolution} pixels per inch. Then we have to adjust this
+by the stated amount of magnification.
+
+\Y\P$\4\X109:Compute the conversion factors\X\S$\6
+$\\{numerator}\K\\{signed\_quad}$;\5
+$\\{denominator}\K\\{signed\_quad}$;\6
+\&{if} $\\{numerator}\L0$ \1\&{then}\5
+$\\{bad\_dvi}(\.{\'numerator\ is\ \'},\39\\{numerator}:1)$;\2\6
+\&{if} $\\{denominator}\L0$ \1\&{then}\5
+$\\{bad\_dvi}(\.{\'denominator\ is\ \'},\39\\{denominator}:1)$;\2\6
+$\\{print\_ln}(\.{\'numerator/denominator=\'},\39\\{numerator}:1,\39\.{\'/\'},%
+\39\\{denominator}:1)$;\5
+$\\{tfm\_conv}\K(25400000.0/\\{numerator})\ast(%
+\\{denominator}/473628672)/16.0$;\5
+$\\{conv}\K(\\{numerator}/254000.0)\ast(\\{resolution}/\\{denominator})$;\5
+$\\{mag}\K\\{signed\_quad}$;\6
+\&{if} $\\{new\_mag}>0$ \1\&{then}\5
+$\\{mag}\K\\{new\_mag}$\6
+\4\&{else} \&{if} $\\{mag}\L0$ \1\&{then}\5
+$\\{bad\_dvi}(\.{\'magnification\ is\ \'},\39\\{mag}:1)$;\2\2\6
+$\\{true\_conv}\K\\{conv}$;\5
+$\\{conv}\K\\{true\_conv}\ast(\\{mag}/1000.0)$;\5
+$\\{print\_ln}(\.{\'magnification=\'},\39\\{mag}:1,\39\.{\';\ \'},\39%
+\\{conv}:16:8,\39\.{\'\ pixels\ per\ DVI\ unit\'})$\par
+\U108.\fi
+
+\M110. The code shown here uses a convention that has proved to be useful:
+If the starting page was specified as, e.g., `\.{1.*.-5}', then
+all page numbers in the file are displayed by showing the values of
+counts 0, 1, and~2, separated by dots. Such numbers can, for example,
+be displayed on the console of a printer when it is working on that
+page.
+
+\Y\P$\4\X110:Translate up to \\{max\_pages} pages\X\S$\6
+\&{begin} \37\&{while} $\\{max\_pages}>0$ \1\&{do}\6
+\&{begin} \37$\\{decr}(\\{max\_pages})$;\5
+$\\{print\_ln}(\.{\'\ \'})$;\5
+$\\{print}(\\{cur\_loc}-45:1,\39\.{\':\ beginning\ of\ page\ \'})$;\6
+\&{for} $\|k\K0\mathrel{\&{to}}\\{start\_vals}$ \1\&{do}\6
+\&{begin} \37$\\{print}(\\{count}[\|k]:1)$;\6
+\&{if} $\|k<\\{start\_vals}$ \1\&{then}\5
+$\\{print}(\.{\'.\'})$\6
+\4\&{else} $\\{print\_ln}(\.{\'\ \'})$;\2\6
+\&{end};\2\6
+\&{if} $\R\\{do\_page}$ \1\&{then}\5
+$\\{bad\_dvi}(\.{\'page\ ended\ unexpectedly\'})$;\2\6
+\1\&{repeat} \37$\|k\K\\{get\_byte}$;\6
+\&{if} $(\|k\G\\{fnt\_def1})\W(\|k<\\{fnt\_def1}+4)$ \1\&{then}\6
+\&{begin} \37$\|p\K\\{first\_par}(\|k)$;\5
+$\\{define\_font}(\|p)$;\5
+$\|k\K\\{nop}$;\6
+\&{end};\2\6
+\4\&{until}\5
+$\|k\I\\{nop}$;\2\6
+\&{if} $\|k=\\{post}$ \1\&{then}\6
+\&{begin} \37$\\{in\_postamble}\K\\{true}$;\5
+\&{goto} \37\\{done};\6
+\&{end};\2\6
+\&{if} $\|k\I\\{bop}$ \1\&{then}\5
+$\\{bad\_dvi}(\.{\'byte\ \'},\39\\{cur\_loc}-1:1,\39\.{\'\ is\ not\ bop\'})$;\2%
+\6
+\X98:Pass a \\{bop} command, setting up the \\{count} array\X;\6
+\&{end};\2\6
+\4\\{done}: \37\&{end}\par
+\U106.\fi
+
+\N111.  System-dependent changes.
+This section should be replaced, if necessary, by changes to the program
+that are necessary to make \.{DVItype} work at a particular installation.
+It is usually best to design your change file so that all changes to
+previous sections preserve the section numbering; then everybody's version
+will be consistent with the printed program. More extensive changes,
+which introduce new sections, can be inserted here; then only the index
+itself will get a new section number.
+
+\fi
+
+\N112.  Index.
+Pointers to error messages appear here together with the section numbers
+where each ident\-i\-fier is used.
+\fi
+
+
+\inx
+\:\|{a}, \[27], \[79], \[82].
+\:\\{abort}, \[7], 59, 61, 66, 101.
+\:\\{abs}, 63, 73, 85, 91, 92.
+\:\.{all 223s}, 99.
+\:\\{alpha}, \[34], 37, 38.
+\:\.{arithmetic overflow...}, 91, 92.
+\:\\{ASCII\_code}, \[8], 10, 30, 45, 67, 70.
+\:\|{b}, \[27].
+\:\.{backpointer...should be p}, 98, 106.
+\:\.{bad design size}, 62.
+\:\.{Bad DVI file}, 7.
+\:\.{bad postamble pointer}, 104.
+\:\.{bad scale}, 62.
+\:\\{bad\_char}, \[82], 87.
+\:\\{bad\_dvi}, \[7], 80, 95, 99, 101, 104, 108, 109, 110.
+\:\\{banner}, \[1], 3, 50.
+\:\\{beta}, \[34], 37, 38.
+\:\.{beware: check sums do not agree}, 63.
+\:\.{beware: design sizes do not agree}, 63.
+\:\\{boolean}, 34, 42, 44, 49, 57, 59, 78, 79, 82, 96.
+\:\\{bop}, 13, 15, \[16], 18, 19, 41, 71, 75, 83, 95, 96, 100, 101, 110.
+\:\.{bop occurred before eop}, 83.
+\:\\{break}, 46.
+\:\\{buf\_ptr}, \[48], 49, 52, 53, 54, 55.
+\:\\{buffer}, \[45], 47, 48, 49, 51, 52, 53, 54, 55.
+\:\.{byte n is not bop}, 101, 110.
+\:\.{byte n is not post}, 99.
+\:\.{byte n is not postpost}, 105.
+\:\\{byte\_file}, \[21], 22.
+\:\\{b0}, \[25], 26, 35, 36, 37.
+\:\\{b1}, \[25], 26, 35, 37.
+\:\\{b2}, \[25], 26, 35, 37.
+\:\\{b3}, \[25], 26, 35, 37.
+\:\|{c}, \[27], \[59].
+\:\\{change\_font}, \[77], 82, 86.
+\:\\{char}, 9, 24, 64.
+\:\\{char\_pixel\_width}, \[39], 89.
+\:\\{char\_width}, \[30], 39, 89.
+\:\\{char\_width\_end}, \[30], 39.
+\:\.{character $c$ invalid...}, 89.
+\:{check sum}, 18.
+\:\.{check sum doesn't match}, 60.
+\:\.{check sums do not agree}, 63.
+\:{Chinese characters}, 15, 89.
+\:\\{chr}, 9, 10, 12.
+\:\\{conv}, \[39], 40, 61, 63, 76, 109.
+\:\\{count}, \[42], 44, 98, 101, 110.
+\:\\{cur\_font}, 77, \[78], 79, 84, 85, 89, 94.
+\:\\{cur\_loc}, 23, \[24], 27, 28, 80, 98, 102, 104, 105, 106, 110.
+\:\\{cur\_name}, 23, \[24], 59, 66.
+\:\\{cur\_pos}, 28.
+\:\|{d}, \[27], \[59].
+\:\\{decr}, \[6], 83, 95, 99, 108, 110.
+\:\.{deeper than claimed...}, 83.
+\:\\{default\_directory}, \[64], 65, 66.
+\:\\{default\_directory\_name}, \[64], 65.
+\:\\{default\_directory\_name\_length}, \[64], 66.
+\:\\{define\_font}, \[59], 86, 95, 105, 110.
+\:\\{den}, 15, \[17], 19.
+\:\\{denominator}, \[39], 102, 109.
+\:\.{denominator doesn't match}, 102.
+\:\.{denominator is wrong}, 109.
+\:\.{design size doesn't match}, 60.
+\:\.{design sizes do not agree}, 63.
+\:\\{dialog}, \[50], 106.
+\:\\{do\_nothing}, \[6], 95.
+\:\\{do\_page}, 71, 75, 77, 78, \[79], 81, 83, 95, 110.
+\:\\{done}, \[4], 79, 80, 81, 82, 83, 86, 87, 89, 90, 91, 92, 93, 94, 110.
+\:\\{down\_the\_drain}, \[95].
+\:\\{down1}, 15, \[16], 75, 85.
+\:\\{down2}, 15.
+\:\\{down3}, 15.
+\:\\{down4}, 15.
+\:\.{DVI {\rm files}}, 13.
+\:\\{dvi\_file}, \[3], \[22], 23, 24, 27, 28, 80, 95, 104.
+\:\\{dvi\_length}, \[28], 99.
+\:\\{DVI\_type}, \[3].
+\:\.{DVItype capacity exceeded...}, 59, 61, 66.
+\:\.{DVItype needs larger...}, 35.
+\:\|{e}, \[59].
+\:\\{eight\_bits}, \[21], 25, 27, 75, 79, 82.
+\:\\{eight\_cases}, \[75].
+\:\&{else}, 2.
+\:\&{end}, 2.
+\:\&{endcases}, \[2].
+\:\\{eof}, 23, 27, 28, 35, 62, 80, 95, 104.
+\:\\{eoln}, 47.
+\:\\{eop}, 13, 15, \[16], 18, 41, 75, 83.
+\:\\{error}, \[80], 82, 83, 87, 89, 91, 92, 94.
+\:\\{errors\_only}, \[41], 56, 62, 69, 80.
+\:\|{f}, \[32], \[59].
+\:\\{false}, 2, 20, 34, 42, 43, 44, 49, 52, 58, 60, 77, 79, 80, 82, 87, 95, 97,
+102, 106.
+\:\\{fin\_rule}, \[77], 79, 80, 81.
+\:\\{fin\_set}, \[77], 79, 80, 81, 88.
+\:\\{final\_end}, \[4], 7, 106.
+\:\.{First byte isn't...}, 108.
+\:\\{first\_backpointer}, 99, \[100], 101.
+\:\\{first\_par}, \[75], 80, 81, 95, 105, 110.
+\:\\{first\_text\_char}, \[9], 12.
+\:\\{fix\_word}, 37.
+\:\\{flush\_text}, \[69], 70, 80.
+\:\\{fnt\_def1}, 15, \[16], 75, 86, 95, 105, 110.
+\:\\{fnt\_def2}, 15.
+\:\\{fnt\_def3}, 15.
+\:\\{fnt\_def4}, 15.
+\:\\{fnt\_num\_0}, 15, \[16], 75, 86.
+\:\\{fnt\_num\_1}, 15.
+\:\\{fnt\_num\_63}, 15.
+\:\\{fnt1}, 15, \[16], 75, 86.
+\:\\{fnt2}, 15.
+\:\\{fnt3}, 15.
+\:\\{fnt4}, 15.
+\:\.{font name doesn't match}, 60.
+\:\\{font\_bc}, \[30], 31, 35, 40, 89.
+\:\\{font\_check\_sum}, \[30], 60, 61.
+\:\\{font\_design\_size}, \[30], 60, 61.
+\:\\{font\_ec}, \[30], 31, 35, 89.
+\:\\{font\_name}, \[30], 31, 32, 60, 61, 66.
+\:\\{font\_num}, \[30], 59, 94.
+\:\\{font\_scaled\_size}, \[30], 60, 61.
+\:\\{font\_space}, \[30], 31, 63, 84, 85.
+\:\\{four\_cases}, \[75], 81, 82, 84, 85, 86.
+\:{Fuchs, David Raymond}, 1, 13, 20.
+\:\\{get}, 47.
+\:\\{get\_byte}, \[27], 28, 61, 75, 80, 87, 95, 99, 101, 104, 105, 108, 110.
+\:\\{get\_integer}, \[49], 52, 53, 54, 55.
+\:\\{get\_three\_bytes}, \[27], 75.
+\:\\{get\_two\_bytes}, \[27], 75, 102.
+\:\|{h}, \[72].
+\:\\{hh}, \[72], 79, 83, 84, 89, 90, 91, 93.
+\:\\{hhh}, \[79], 91.
+\:\\{hhstack}, \[72], 83.
+\:\\{hstack}, \[72], 83.
+\:\|{i}, \[3], \[17].
+\:\.{ID byte is wrong}, 99.
+\:\\{id\_byte}, \[17], 99, 104, 108.
+\:\.{identification...should be n}, 104, 108.
+\:\\{in\_postamble}, \[57], 58, 59, 95, 101, 106, 110.
+\:\\{in\_TFM}, \[34], 37, 62.
+\:\\{in\_width}, \[33], 37, 40.
+\:\\{incr}, \[6], 27, 47, 49, 52, 54, 59, 60, 63, 66, 70, 83, 94, 98, 101.
+\:\\{infinity}, \[91], 92.
+\:\\{initialize}, \[3], 106.
+\:\\{input\_ln}, 45, \[47], 51, 52, 53, 54, 55.
+\:\\{integer}, 3, 21, 24, 27, 28, 30, 32, 33, 34, 39, 41, 42, 49, 50, 59, 72,
+73, 75, 76, 78, 79, 82, 95, 96, 100, 102, 107.
+\:\\{invalid\_font}, \[30], 31, 32, 79, 89, 94.
+\:\\{invalid\_width}, \[30], 40, 89.
+\:\|{j}, \[59].
+\:{Japanese characters}, 15, 89.
+\:\\{jump\_out}, \[7].
+\:\|{k}, \[17], \[32], \[34], \[44], \[47], \[50], \[59], \[69], \[82], \[95], %
+\[102], \[107].
+\:\\{last\_text\_char}, \[9], 12.
+\:\\{lh}, \[34], 35.
+\:\\{line\_length}, \[5], 67, 69, 70.
+\:\|{m}, \[59], \[102], \[107].
+\:\\{mag}, 15, \[17], 18, 19, \[39], 102, 109.
+\:\.{magnification doesn't match}, 102.
+\:\.{magnification is wrong}, 109.
+\:\\{major}, \[80], 81, 83, 85, 86, 87, 88.
+\:\\{match}, \[44].
+\:\\{max\_drift}, \[91], 92.
+\:\\{max\_fonts}, \[5], 30, 59.
+\:\\{max\_h}, \[73], 74, 91, 102, 103.
+\:\\{max\_h\_so\_far}, \[73], 74, 91, 103.
+\:\\{max\_pages}, \[41], 43, 53, 56, 110.
+\:\\{max\_s}, \[73], 74, 83, 102, 103.
+\:\\{max\_s\_so\_far}, \[73], 74, 83, 103.
+\:\\{max\_v}, \[73], 74, 92, 102, 103.
+\:\\{max\_v\_so\_far}, \[73], 74, 92, 103.
+\:\\{max\_widths}, \[5], 30, 34, 35, 39.
+\:\\{minor}, \[80], 83, 84, 88.
+\:\\{mismatch}, \[59], 60.
+\:\\{mnemonics\_only}, \[41], 56, 90, 91, 92, 93, 94.
+\:\\{move\_down}, \[77], 82, 85.
+\:\\{move\_right}, \[77], 79, 80, 84, 89, 90.
+\:\\{move\_to\_byte}, \[28], 99, 101.
+\:\|{n}, \[59], \[76], \[107].
+\:\\{name\_length}, \[5], 24, 59, 66.
+\:\\{name\_size}, \[5], 30, 32, 59, 61.
+\:\\{names}, \[30], 32, 59, 60, 61, 66.
+\:\\{negative}, \[49].
+\:\\{new\_backpointer}, \[96], 98.
+\:\\{new\_mag}, \[41], 55, 56, 102, 109.
+\:\\{nf}, \[30], 31, 35, 40, 59, 60, 61, 63, 66, 94.
+\:\.{non-ASCII character...}, 87.
+\:\\{nop}, 13, 15, \[16], 18, 19, 75, 83, 105, 110.
+\:\.{not enough signature bytes...}, 104.
+\:\.{null font name}, 61.
+\:\\{num}, 15, \[17], 19.
+\:\\{numerator}, \[39], 102, 109.
+\:\.{numerator doesn't match}, 102.
+\:\.{numerator is wrong}, 109.
+\:\\{nw}, \[34], 35, 36, 37.
+\:\|{o}, \[79], \[82].
+\:\.{observed maxh was x}, 103.
+\:\.{observed maxstackdepth was x}, 103.
+\:\.{observed maxv was x}, 103.
+\:\\{old\_backpointer}, \[96], 97, 98, 101, 106.
+\:\.{only n bytes long}, 99.
+\:\\{open\_dvi\_file}, \[23], 108.
+\:\\{open\_tfm\_file}, \[23], 24, 62.
+\:\.{Options selected}, 56.
+\:\\{ord}, 10.
+\:{oriental characters}, 15, 89.
+\:\&{othercases}, \[2].
+\:\\{others}, 2.
+\:\\{out\_mode}, \[41], 43, 51, 56, 57, 59, 62, 69, 80, 90, 91, 92, 93, 94, 99,
+102, 106.
+\:\\{out\_space}, 31, \[84].
+\:\\{out\_text}, \[70], 84, 88.
+\:\\{out\_vmove}, 31, \[85].
+\:\\{output}, \[3].
+\:\|{p}, \[59], \[79], \[82], \[95], \[102], \[107].
+\:\.{page ended unexpectedly}, 110.
+\:\.{page link wrong...}, 101.
+\:\\{page\_count}, \[73], 74, 98, 101, 103.
+\:\\{pixel\_round}, \[40], 72, 84, 85, 91, 92.
+\:\\{pixel\_width}, \[39], 40.
+\:\\{pop}, 14, 15, \[16], 19, 75, 83.
+\:\\{post}, 13, 15, \[16], 19, 20, 75, 82, 95, 99, 100, 101, 102, 110.
+\:\.{post pointer is wrong}, 99.
+\:\\{post\_loc}, 99, \[100], 101, 102, 104.
+\:\\{post\_post}, 15, \[16], 19, 20, 75, 82, 104, 105.
+\:\.{postamble command within a page}, 82.
+\:\.{Postamble starts at byte n}, 102.
+\:\\{pre}, 13, 15, \[16], 75, 82, 108.
+\:\.{preamble command within a page}, 82.
+\:\\{print}, \[3], 7, 32, 56, 61, 62, 63, 69, 80, 87, 89, 90, 91, 92, 93, 94,
+102, 108, 110.
+\:\\{print\_font}, \[32], 61, 89, 94.
+\:\\{print\_ln}, \[3], 34, 35, 56, 59, 60, 62, 63, 69, 79, 80, 83, 90, 93, 95,
+98, 101, 102, 103, 104, 105, 106, 108, 109, 110.
+\:\\{pure}, \[82].
+\:\\{push}, 5, 14, 15, \[16], 19, 75, 83.
+\:\.{push deeper than claimed...}, 83.
+\:\\{put\_rule}, 15, \[16], 75, 81, 90, 95.
+\:\\{put1}, 15, \[16], 75, 81, 89.
+\:\\{put2}, 15.
+\:\\{put3}, 15.
+\:\\{put4}, 15.
+\:\|{q}, \[59], \[79], \[82], \[102], \[107].
+\:\|{r}, \[59].
+\:\\{random\_reading}, \[2], 20, 28, 41, 56, 99, 106.
+\:\\{read}, 26, 27.
+\:\\{read\_ln}, 47.
+\:\\{read\_postamble}, \[102], 106.
+\:\\{read\_tfm\_word}, \[26], 35, 36, 37.
+\:\\{real}, 33, 39, 41.
+\:\\{reset}, 23, 47.
+\:\\{resolution}, \[41], 54, 56, 109.
+\:\\{rewrite}, 50.
+\:\\{right1}, 15, \[16], 75, 84.
+\:\\{right2}, 15.
+\:\\{right3}, 15.
+\:\\{right4}, 15.
+\:\\{round}, 35, 40, 61, 63.
+\:\\{rule\_pixels}, 15, \[76], 90.
+\:\|{s}, \[78].
+\:\.{scaled}, 61.
+\:\.{scaled size doesn't match}, 60.
+\:\\{set\_char\_0}, 15, \[16], 75, 81.
+\:\\{set\_char\_1}, 15.
+\:\\{set\_char\_127}, 15.
+\:\\{set\_pos}, 28.
+\:\\{set\_rule}, 13, 15, \[16], 75, 81, 95.
+\:\\{set1}, 15, \[16], 75, 81.
+\:\\{set2}, 15.
+\:\\{set3}, 15.
+\:\\{set4}, 15.
+\:\\{show}, \[80].
+\:\\{show\_state}, \[77], 79, 80, 83.
+\:\\{showing}, 61, \[78], 80, 87, 90, 91, 92, 93, 94, 95, 102.
+\:\.{signature...should be...}, 104.
+\:\\{signed\_byte}, \[27], 75.
+\:\\{signed\_pair}, \[27], 75.
+\:\\{signed\_quad}, \[27], 61, 75, 90, 95, 98, 99, 101, 102, 104, 106, 109.
+\:\\{signed\_trio}, \[27], 75.
+\:\\{sixteen\_cases}, \[75].
+\:\\{sixty\_four\_cases}, \[75], 86.
+\:\\{skip\_pages}, \[95], 106.
+\:{sp}, 17.
+\:\\{special\_cases}, 78, 81, \[82].
+\:\\{ss}, \[78], 83, 93.
+\:\.{stack not empty...}, 83.
+\:\\{stack\_size}, \[5], 72, 74, 83.
+\:\\{start\_count}, \[42], 44, 52, 56.
+\:\\{start\_loc}, \[100], 101.
+\:\\{start\_match}, \[44], 95, 101.
+\:\\{start\_there}, \[42], 43, 44, 52, 56.
+\:\\{start\_vals}, \[42], 43, 44, 52, 56, 110.
+\:\\{started}, 95, \[96], 97, 101.
+\:\.{starting page number...}, 101.
+\:\.{string of negative length}, 87.
+\:{system dependencies}, \[2], 7, 9, 20, 21, 23, 26, 27, 28, 40, 41, 45, 46,
+47, 50, 64, 66, 111.
+\:\\{term\_in}, \[45], 47.
+\:\\{term\_out}, \[45], 46, 50, 51, 52, 53, 54, 55.
+\:\\{terminal\_line\_length}, \[5], 45, 47, 48.
+\:\\{terse}, \[41], 56, 80.
+\:\\{text\_buf}, \[67], 69, 70.
+\:\\{text\_char}, \[9], 10.
+\:\\{text\_file}, \[9], 45.
+\:\\{text\_ptr}, \[67], 68, 69, 70.
+\:\.{TFM {\rm files}}, 29.
+\:\.{TFM file can\'t be opened}, 62.
+\:\.{TFM file is bad}, 34.
+\:\\{tfm\_check\_sum}, \[33], 35, 63.
+\:\\{tfm\_conv}, \[33], 35, 109.
+\:\\{tfm\_design\_size}, \[33], 35, 63.
+\:\\{tfm\_file}, \[22], 23, 26, 33, 35, 62.
+\:\.{the file ended prematurely}, 80, 95.
+\:\\{the\_works}, \[41], 43, 51, 56, 57, 59, 99, 102, 106.
+\:\.{there are really n pages}, 101, 103.
+\:\\{thirty\_two\_cases}, \[75].
+\:\.{this font is magnified}, 63.
+\:\.{this font was already defined}, 59.
+\:\.{this font wasn't loaded before}, 59.
+\:\\{total\_pages}, \[73], 101, 102, 103.
+\:\\{true}, 2, 28, 34, 42, 44, 49, 52, 60, 79, 80, 82, 83, 87, 95, 99, 101,
+106, 110.
+\:\\{true\_conv}, \[39], 61, 63, 109.
+\:\\{trunc}, 76.
+\:\.{UNDEFINED}, 32.
+\:\.{undefined command}, 82.
+\:\\{undefined\_commands}, \[16], 75.
+\:\\{update\_terminal}, \[46], 47.
+\:\|{v}, \[72].
+\:\\{verbose}, \[41], 56, 80.
+\:\\{vstack}, \[72], 83.
+\:\\{vv}, \[72], 79, 83, 85, 92, 93.
+\:\\{vvstack}, \[72], 83.
+\:\\{vvv}, \[82], 92.
+\:\|{w}, \[72].
+\:\.{warning: |h|...}, 91.
+\:\.{warning: |v|...}, 92.
+\:\.{warning: observed maxh...}, 103.
+\:\.{warning: observed maxstack...}, 103.
+\:\.{warning: observed maxv...}, 103.
+\:\\{width}, \[30], 36, 39, 40.
+\:\\{width\_base}, \[30], 39, 40.
+\:\\{width\_ptr}, \[30], 31, 34, 35, 36, 40.
+\:\\{wp}, \[34], 35, 36, 40.
+\:\\{write}, 3, 51, 52, 53, 54, 55.
+\:\\{write\_ln}, 3, 50, 51, 52, 53, 54, 55.
+\:\\{wstack}, \[72], 83.
+\:\\{w0}, 15, \[16], 75, 84.
+\:\\{w1}, 15, \[16], 75, 84.
+\:\\{w2}, 15.
+\:\\{w3}, 15.
+\:\\{w4}, 15.
+\:\|{x}, \[17], \[49], \[72].
+\:\\{xchr}, \[10], 11, 12, 32, 66, 69, 87, 108.
+\:\\{xord}, \[10], 12, 47.
+\:\\{xstack}, \[72], 83.
+\:\\{xxx1}, 15, \[16], 75, 82, 95.
+\:\\{xxx2}, 15.
+\:\\{xxx3}, 15.
+\:\\{xxx4}, 15, \[16].
+\:\\{x0}, 15, \[16], 75, 84.
+\:\\{x1}, 15, \[16], 75, 84.
+\:\\{x2}, 15.
+\:\\{x3}, 15.
+\:\\{x4}, 15.
+\:\|{y}, \[72].
+\:\\{ystack}, \[72], 83.
+\:\\{y0}, 15, \[16], 75, 85.
+\:\\{y1}, 15, \[16], 75, 85.
+\:\\{y2}, 15.
+\:\\{y3}, 15.
+\:\\{y4}, 15.
+\:\|{z}, \[34], \[72].
+\:\\{zstack}, \[72], 83.
+\:\\{z0}, 15, \[16], 75, 85.
+\:\\{z1}, 15, \[16], 75, 85.
+\:\\{z2}, 15.
+\:\\{z3}, 15.
+\:\\{z4}, 15.
+\fin
+\:\X83:Cases for commands \\{nop}, \\{bop}, \dots, \\{pop}\X
+\U81.
+\:\X86:Cases for fonts\X
+\U82.
+\:\X84:Cases for horizontal motion\X
+\U81.
+\:\X85:Cases for vertical motion\X
+\U82.
+\:\X60:Check that the current font definition matches the old one\X
+\U59.
+\:\X103:Compare the \\{lust} parameters with the accumulated facts\X
+\U102.
+\:\X109:Compute the conversion factors\X
+\U108.
+\:\X5:Constants in the outer block\X
+\U3.
+\:\X101:Count the pages and move to the starting page\X
+\U106.
+\:\X82:Declare the function called \\{special\_cases}\X
+\U79.
+\:\X53:Determine the desired \\{max\_pages}\X
+\U50.
+\:\X55:Determine the desired \\{new\_mag}\X
+\U50.
+\:\X51:Determine the desired \\{out\_mode}\X
+\U50.
+\:\X54:Determine the desired \\{resolution}\X
+\U50.
+\:\X52:Determine the desired \\{start\_count} values\X
+\U50.
+\:\X99:Find the postamble, working back from the end\X
+\U106.
+\:\X94:Finish a command that changes the current font, then \&{goto} \\{done}\X
+\U82.
+\:\X89:Finish a command that either sets or puts a character, then \&{goto} %
+\\{move\_right} or \\{done}\X
+\U80.
+\:\X90:Finish a command that either sets or puts a rule, then \&{goto} \\{move%
+\_right} or \\{done}\X
+\U80.
+\:\X91:Finish a command that sets $\|h\K\|h+\|q$, then \&{goto} \\{done}\X
+\U80.
+\:\X92:Finish a command that sets $\|v\K\|v+\|p$, then \&{goto} \\{done}\X
+\U82.
+\:\X63:Finish loading the new font info\X
+\U62.
+\:\X10, 22, 24, 25, 30, 33, 39, 41, 42, 45, 48, 57, 64, 67, 72, 73, 78, 96,
+100, 107:Globals in the outer block\X
+\U3.
+\:\X4:Labels in the outer block\X
+\U3.
+\:\X62:Load the new font, unless there are problems\X
+\U59.
+\:\X104:Make sure that the end of the file is well-formed\X
+\U102.
+\:\X66:Move font name into the \\{cur\_name} string\X
+\U62.
+\:\X40:Move the widths from \\{in\_width} to \\{width}, and append \\{pixel%
+\_width} values\X
+\U34.
+\:\X98:Pass a \\{bop} command, setting up the \\{count} array\X
+\Us95\ET110.
+\:\X56:Print all the selected options\X
+\U50.
+\:\X105:Process the font definitions of the postamble\X
+\U102.
+\:\X108:Process the preamble\X
+\U106.
+\:\X37:Read and convert the width values, setting up the \\{in\_width} table\X
+\U34.
+\:\X35:Read past the header data; \&{goto} 9997 if there is a problem\X
+\U34.
+\:\X61:Read the font parameters into position for font \\{nf}, and print the
+font name\X
+\U59.
+\:\X38:Replace \|z by $\|z^\prime$ and compute $\alpha,\beta$\X
+\U37.
+\:\X11, 12, 31, 43, 58, 65, 68, 74, 97:Set initial values\X
+\U3.
+\:\X93:Show the values of \\{ss}, \|h, \|v, \|w, \|x, \|y, \|z, \\{hh}, and %
+\\{vv}; then \&{goto} \\{done}\X
+\U80.
+\:\X81:Start translation of command \|o and \&{goto}  the appropriate label to
+finish the job\X
+\U80.
+\:\X36:Store character-width indices at the end of the \\{width} table\X
+\U34.
+\:\X88:Translate a \\{set\_char} command\X
+\U81.
+\:\X87:Translate an \\{xxx} command and \&{goto} \\{done}\X
+\U82.
+\:\X80:Translate the next command in the \.{DVI} file; \&{goto} 9999 with $%
+\\{do\_page}=\\{true}$ if it was \\{eop}; \&{goto} 9998 if premature
+termination is needed\X
+\U79.
+\:\X110:Translate up to \\{max\_pages} pages\X
+\U106.
+\:\X8, 9, 21:Types in the outer block\X
+\U3.
+\con

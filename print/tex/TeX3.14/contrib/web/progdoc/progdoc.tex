@@ -1,0 +1,197 @@
+% This is MAKEPROG.WEB                    as of 29 Nov 88
+%---------------------------------------------------------
+% (c) 1988 by J.Schrod.
+%        Major parts of this program have been taken from TANGLE.WEB
+%           by D.E.Knuth, which is not copyrighted.
+
+%
+% Version 1.0 was released in November, 1988.
+%
+
+
+\def\title{MAKEPROG (V\version)}
+\def\version{1.0}
+\def\years{1988}
+
+\font\ninerm=cmr9
+\let\mc=\ninerm % medium caps for names like EBCDIC
+
+\def\hang{\hangindent 3em\indent\ignorespaces}
+\def\item#1{                             % fixed item of 30pt width
+   {\parskip=0pt\endgraf\noindent}%      % new line
+   \hangindent 30pt %
+   \hbox to 30pt{\hfil#1\kern 1em}%
+   \ignorespaces                         % ignore following blanks
+   }
+
+\def\PASCAL{Pascal}
+\def\MAKEPROG{\leavevmode\hbox{\mc MAKEPROG\/}}
+\def\ASCII{\leavevmode\hbox{\mc ASCII\/}}
+\mathchardef\BA="3224      % double arrow as relation
+
+\def\topofcontents{\null\vfill
+   \centerline{\titlefont The MAKEPROG processor}
+   \vskip 15pt
+   \centerline{(Version \version)}
+   \vskip 2cm}
+\def\botofcontents{\vfill
+   \hangindent 3em
+   \noindent $\copyright$ \years{} by J.~Schrod.\hfil\break
+   All rights reserved.
+   \par \vskip 1ex
+   \noindent The source of this program may be used for
+   noncommercial purposes, but credits must be given to the origin.
+   \par}
+
+
+
+
+
+@* Introduction.                                            % sect.    1
+
+\noindent This program converts a documentation file to a
+program file, i.e.\ all files between \.{\\beginprog} and
+\.{\\endprog} are copied verbatim.  It was written by
+J.~Schrod in September, 1987.  This program is written in
+\.{WEB}.
+
+The program uses a few features of the local \PASCAL\
+compiler that may need to be changed in other installations:
+
+\item{1)} Case statements have a default.
+
+\item{2)} Input-output routines may need to be adapted for
+use with a particular character set and/or for printing
+messages on the user's terminal.
+
+\noindent System-dependent portions of \MAKEPROG{} can be
+identified by looking at the entries for `system
+dependencies' in the index below.
+@!@^system dependencies@>
+
+\noindent The ``banner line'' defined here should be changed
+whenever \MAKEPROG{} is modified.  The copyright notice must
+not be changed.
+
+@d banner=='This is MAKEPROG, Version 1.0.'
+@d copy_right=='    (c) 1988 by J.Schrod.'
+@d rights_res=='        All rights reserved.'
+
+
+% from progdoc.doc   05 Dec 88
+%------------------------------
+% These lines were inserted by hand (not with MAKEPROG).
+\chardef\escape=0
+\chardef\letter=11
+\chardef\other=12
+%\chardef\active=13              % is defined in Plain already
+
+\chardef\atcode=\catcode`\@
+\chardef\uscode=\catcode`\_
+
+\catcode`\@=\letter
+\catcode`\_=\letter
+\font\tentex=cmtex10            % typewriter extended ASCII 10pt
+\let\ttex=\tentex               % only for PLAIN with base size 10pt
+
+\def\setup_verbatim{%
+   \def\do##1{\catcode`##1\other}\dospecials
+   \parskip\z@skip \parindent\z@
+   \obeylines \obeyspaces \obeytabs \frenchspacing
+   \ttex
+   }
+
+\let\tab=\space
+\begingroup
+   \catcode`\^^I=\active%       % Attention: no tabs!
+   \gdef\obeytabs{\catcode`\^^I=\active\def^^I{\tab}}
+   \global\let^^I=\tab%         % if an active tab appears in a \write
+\endgroup
+\let\origvert=|
+\chardef\vbar=`\|
+
+\catcode`\|=\active
+
+\def|{%
+   \leavevmode
+   \hbox\bgroup
+      \let\par\space \setup_verbatim
+      \let|\egroup
+   }
+\newif\if@print
+
+\def\beginprog{%
+   \endgraf
+   \bigbreak
+   \begingroup
+      \setup_verbatim \catcode`\|\other
+      \@printtrue
+      \ignore_rest_line
+   }
+\let\end_verbatim=\endgroup             % internal command !
+\begingroup
+   \obeylines%          % ^^M is active! ==> every line must end with %
+   \gdef\ignore_rest_line#1^^M{\set_next_line}%
+   \gdef\set_next_line#1^^M{\do_set{#1}}%
+\endgroup
+
+\def\do_set#1{%
+   \endgraf
+   \check_print{#1}%
+   \if@print  \indent \print_char#1\end_line\end_line
+   \else  \let\set_next_line\end_verbatim
+   \fi
+   \set_next_line
+   }
+\let\end_line=\relax
+\begingroup
+\obeyspaces\obeytabs
+\gdef\check_print#1{\cut_at_tab#1^^I\end_line}
+\gdef\cut_at_tab#1^^I#2\end_line{\check_first_part#1 \end_line}
+\gdef\check_first_part#1 #2\end_line{\do_check{#1}}
+\endgroup
+\def\do_check#1{%
+   \def\@line{#1}%
+   \ifx \@line\@endverbatim  \@printfalse
+   \fi
+   }
+
+{\catcode`\|=\escape  \catcode`\\=\other % | is temporary escape char
+   |gdef|@endverbatim{\endprog}
+}                       % he \endgroup can't be used
+\newcount\char_count  \char_count\@ne
+
+\def\print_char#1#2\end_line{%
+   \print_first_char{#1}%
+   \print_rest_of_line{#2}%
+   }
+{\obeytabs\gdef\@tab{^^I}}
+
+\def\print_first_char#1{%
+   \def\@char{#1}%
+   \advance \char_count\@ne
+   \ifx \@char\@tab  \print_tab
+   \else  \@char
+   \fi
+   }
+\newcount\count_mod_viii
+\def\mod_viii#1{%
+   \count@ #1\relax  \count_mod_viii\count@
+   \divide \count@ 8\relax
+   \multiply \count@ 8\relax
+   \advance \count_mod_viii -\count@
+   }
+\def\print_tab{%
+   \loop  \space \mod_viii\char_count
+      \ifnum \count_mod_viii>\z@
+         \advance \char_count\@ne
+   \repeat
+   }
+\def\print_rest_of_line#1{%
+   \def\@line{#1}%
+   \ifx \@line\empty  \char_count\@ne
+        \def\next##1\end_line{\relax}%
+   \else  \let\next\print_char
+   \fi
+   \next#1\end_line
+   }

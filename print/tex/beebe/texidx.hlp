@@ -1,0 +1,183 @@
+                 TeXIDX - TeX/LaTeX Index Filter
+                           [18-Oct-86]
+
+TeXIDX (TeXINDEX on Unix systems) is a filter for converting  the
+index file output of TeX and  LaTeX to a form suitable for  later
+input and generation of an index, with entries sorted by  primary
+text entries, and within these, sorted by secondary text entries,
+and with  duplicate page  numbers  eliminated.  Elision  of  page
+ranges is not yet supported.
+
+TeXIDX expects one or more files  of index entries output by  TeX
+or LaTeX in the forms
+
+\entry{sort key}{page number}{primary entry}
+\entry{sort key}{page number}{primary entry}{secondary entry}
+
+Several examples  are given  below.
+
+TeXIDX is run by
+
+@TeXIDX file1 file2 ... filen
+
+and produces output files with the same name, but the letter  `s'
+appended.  Thus `foo.idx' is transformed to `foo.idxs'.
+
+The output of TeXIDX will contain lines like:
+
+\initial {c}                    % before the first topic whose
+                                % initial is c
+\entry {topic}{pagelist}        % for a topic that is used
+                                % without subtopics
+\primary {topic}                % for the beginning of a topic
+                                % that is used with subtopics
+\secondary {subtopic}{pagelist} % for each subtopic.
+
+All sorting  is by  the sort  key field  ONLY, with  letter  case
+IGNORED.  This means  that if two  primary/secondary fields  have
+the same leading text,  a sort key must  be given which  includes
+both the primary  and secondary  fields to  preserve the  correct
+order, and this  key must be  distinguishable from another  which
+just happens to have a  primary string equal to the  concatenated
+primary and secondary strings of the first.  For example,
+
+\entry{text editing}{18}{text editing}
+\entry{text}{20}{text}
+\entry{text<TAB>editing}{32}{text}{editing}
+\entry{text<TAB>buffering}{57}{text}{buffering}
+
+will produce correct index entries
+
+        text, 20
+           buffering, 57
+           editing, 32
+        text editing, 37
+
+whereas simple juxtaposition of the primary and secondary  fields
+in the sort keys
+
+\entry{text editing}{18}{text editing}
+\entry{text}{20}{text}
+\entry{text editing}{32}{text}{editing}
+\entry{text buffering}{57}{text}{buffering}
+
+will produce INCORRECT ordering:
+
+        text, 20
+           buffering, 57
+        text editing, 18
+           editing, 32
+
+Any ASCII character which collates below space (dec. 32) will  do
+as a separator between  the primary and  secondary fields in  the
+sort key, but the only one that TeX will accept as input  without
+modification  of  character   \catcode's  is   <TAB>  (dec.   9).
+Therefore, make sure that  <TAB> characters are  not used in  the
+primary or secondary text values themselves.
+
+In order for TeXIDX to be used, you must first provide  TeX/LaTeX
+with definitions of  macros that  create the  output index  file;
+neither the TeX manmac  macros (p. 423ff of  the TeXbook) or  the
+LaTeX \index{} macros (p.  78, p.  189 of the LaTeX User's  Guide
+and Reference Manual)  are suitable.  Once  TeXIDX has been  run,
+you must  have definitions  of  \initial, \entry,  \primary,  and
+\secondary so that the index file can be processed.
+
+Since these definitions only have to be done once, they have been
+put in a LaTeX style file which can be automatically included  in
+the documentstyle option list:
+
+\documentstyle[gnuindex]{...}
+
+This will cause  the file  texinputs:gnuindex.sty to  be read  by
+LaTeX at startup.  This file defines \initial, \entry,  \primary,
+and \secondary, so that LaTeX can format your index, and provides
+you with two macros to use to generate index entries.
+
+\INDEX{sortkey}{primary}
+\SUBINDEX{sortkey}{primary}{secondary}
+
+For \SUBINDEX{}, the {secondary} field is automatically  appended
+to the  sort  key,  but  separated from  it  by  an  ASCII  <TAB>
+character; in most cases, this makes it possible to use the  just
+primary field as  the sort key  too, as long  as the primary  and
+secondary fields do not have special characters, font changes, or
+TeX control sequences embedded in them.
+
+To save some typing,  and reduce the chances  of error, you  will
+probably want to produce your  own macros which reference  these.
+Here are two useful ones:
+
+\newcommand{\X}[1]{{#1}\INDEX{#1}{#1}}
+\newcommand{\XX}[2]{{#1}\SUBINDEX{#1}{#1}{#2}}
+
+You can then type
+
+        \X{gnats and gnus}
+
+to get the  phrase `gnats and  gnus' into the  document text,  as
+well as into  the index  both as  a sort  key, and  as a  primary
+field.  Typing
+
+        This chapter will discuss the cooking of
+        \XX{gnats and gnus}{cooking directions} ...
+
+will put the same phrase `gnats and gnus' into the document text,
+but the index will get  the sort key `gnats and  gnus<TAB>cooking
+directions', a primary  field `gnats and  gnus', and a  secondary
+field `cooking directions'.  You would use \XX{} instead of  \X{}
+when you wanted to  make the index entry  more precise, but  only
+have the primary string in the running text.
+
+For those occasions when you  need special fonts, or TeX  control
+sequences,  in  your  index,  you  can  still  use  \INDEX{}  and
+\SUBINDEX{} directly:
+
+  \INDEX{LaTeX's gnus}{\string\LaTeX{}'s gnus}
+  \INDEX{gnats}{\string\sc GNATS}
+
+Note the use of `\string'  in front of each control  sequence--it
+prevents the expansion of  the following control sequence.   That
+way, your index file will  contain the words `\LaTeX' and  `\sc',
+instead of the messy expansions of these.
+
+In summary, then, here is what your `foo.ltx' file might look like:
+
+ \documentstyle[gnuindex]{...}
+ \makeindex
+ \begin{document}
+ ...
+   \begin{theindex}
+    \input{foo.idxs}    % Change this to whatever your file is called
+   \end{theindex}
+ \end{document}
+
+To process it, you need to run LaTeX twice and TeXIDX once:
+
+@LaTeX  foo.ltx
+@TeXIDX foo.idx
+@LaTeX  foo.ltx
+
+TeXIDX was written by Richard Stallman as part of the GNU Project
+at the Free Software Foundation in  Cambridge, MA, and is in  the
+public domain (though subject to a liberal copyright contained in
+the source file).  It uses no proprietary software and should  be
+implementable  with  most  C  compilers  on  micros,  minis,  and
+mainframes.  In  particular, all  sorting is  done with  its  own
+code, rather than relying on system or library sorting  routines.
+The  sorting  is  done  in-core  when  possible,  and  otherwise,
+automatically spills  to  scratch files  which  are  individually
+sorted, then merged.
+
+Nelson H.F. Beebe
+College of Science Computer
+Department of Physics
+University of Utah
+Salt Lake City, UT 84112
+ Tel: (801) 581-5254
+
+Net mail:
+        BEEBE@UTAH-SCIENCE
+        BEEBE@UTAH-CS
+        BEEBE@UTAH-MATH
+        BEEBEN@UTAH-RUAC

@@ -1,0 +1,35 @@
+#!/bin/sh
+# Convert Metafont to C.
+# 
+sed=sed
+
+# step 1
+
+$sed -e '
+	: again
+	/\.$/{
+		N
+		s/\.\n/\
+./
+		t again
+	}
+	s/\.hh/.hhfield/g
+	s/\.lh/.lhfield/g
+' ../common/common.defines ../common/texmf.defines mf.p |\
+$sed -e '
+	s/hhfieldfieldfield/hhfield/g
+	s/hhfieldfield/hhfield/g
+	s/lhfieldfieldfield/lhfield/g
+	s/lhfieldfield/lhfield/g
+' | ../web2c/web2c -h../common/texmf.h -m |\
+$sed -e '
+    s/else write/else\
+    write/
+    s/ maxcoef\( *[^( ]\)/ lmaxcoef\1/g
+    s/ b1/ lb1/g
+    s/ b2/ lb2/g
+    s/ b3/ lb3/g
+' | ../web2c/fixwrites | ../web2c/splitup mf
+
+cat coerce.h fixcoerce.h > xcoerce.h
+mv xcoerce.h coerce.h

@@ -1,0 +1,184 @@
+# Generated automatically from Makefile.in by configure.
+#
+# This Makefile is for use when distributing Tcl to the outside world.
+# It is normally set up by running the "config" script.  Before modifying
+# this file by hand, you should read through the "config" script to see
+# what it does.
+#
+
+srcdir 		= .
+
+VPATH 		= .
+
+#
+# both these values get replaced by running configure
+#
+prefix 		= /usr/local
+exec_prefix 	= /usr/local
+
+bindir 		= $(exec_prefix)/bin
+libdir 		= $(exec_prefix)/lib
+
+datadir 	= $(prefix)/lib
+mandir 		= $(prefix)/man
+man1dir 	= $(mandir)/man1
+man2dir 	= $(mandir)/man2
+man3dir 	= $(mandir)/man3
+infodir 	= $(prefix)/info
+manpostfix      = 1
+
+includedir 	= $(prefix)/include
+docdir 		= $(datadir)/doc
+
+SHELL 		= /bin/sh
+
+INSTALL         = /usr/bin/install -c
+INSTALL_PROGRAM = $(INSTALL)
+INSTALL_DATA    = $(INSTALL) -m 644
+
+CC 		= cc
+AR 		= ar
+AR_FLAGS 	= qv
+CFLAGS 		= -g
+CFLAGS_INT 	= -DTCL_LIBRARY=\"${TCL_LIBRARY}\" $(CFLAGS)  -DTCL_PID_T=1 -DSTDC_HEADERS=1 -DHAVE_UNISTD_H=1 -DHAVE_DIRENT=1 -DTCL_GETWD=1 -DTCL_GETTOD=1 -DTCL_UNION_WAIT=1
+
+RANLIB 		= ranlib
+RM 		= rm -f
+
+RUNTEST		= runtest
+RUNTESTFLAGS	=
+
+TARGETLIB       = libtcl.a
+
+TCL_LIBRARY 	= $(datadir)/tcl
+TCL_LIBTCL 	= $(libdir)/libtcl.a
+
+GENERIC_OFILES = regexp.o tclAssem.o tclBasic.o tclCkalloc.o \
+		tclCmdAH.o tclCmdIL.o tclCmdMZ.o tclExpr.o tclGet.o \
+		tclHash.o tclHistory.o tclParse.o tclProc.o tclUtil.o \
+		tclVar.o
+
+UNIX_OFILES =	panic.o tclEnv.o tclGlob.o tclUnixAZ.o tclUnixStr.o \
+		tclUnixUtil.o 
+
+COMPAT_OFILES = 
+
+#### Host, target, and site specific Makefile fragments come in here.
+###
+
+OFILES = ${GENERIC_OFILES} ${UNIX_OFILES} ${COMPAT_OFILES}
+
+.c.o:
+	$(CC) -c -I$(srcdir) -I. $(CFLAGS_INT) $<
+
+# Do we want/need any config overrides?
+#	 
+
+STAGESTUFF =	$(TARGETLIB) *.o
+
+all:		$(TARGETLIB) tclTest
+
+info:
+clean-info:
+install-info:
+dvi:
+installcheck:
+check:	tclTest
+	$(RUNTEST) $(RUNTESTFLAGS) --tool tcl --srcdir $(srcdir)/testsuite
+
+install: 	all
+	-parent=`echo $(libdir)|sed -e 's@/[^/]*$$@@'`; \
+	if [ -d $$parent ] ; then true ; else mkdir $$parent ; fi
+	-if [ -d $(libdir) ] ; then true ; else mkdir $(libdir) ; fi
+	$(INSTALL_DATA) $(TARGETLIB) $(libdir)/$(TARGETLIB).n
+	$(RANLIB) $(libdir)/$(TARGETLIB).n
+	mv -f $(libdir)/$(TARGETLIB).n $(libdir)/$(TARGETLIB)
+	-parent=`echo $(TCL_LIBRARY)|sed -e 's@/[^/]*$$@@'`; \
+	if [ -d $$parent ] ; then true ; else mkdir $$parent ; fi
+	-if [ -d $(TCL_LIBRARY) ] ; then true ; else mkdir $(TCL_LIBRARY) ; fi
+	# install the tcl library files
+	$(INSTALL_DATA) $(srcdir)/library/*.tcl $(TCL_LIBRARY)
+	-parent=`echo $(includedir)|sed -e 's@/[^/]*$$@@'`; \
+	if [ -d $$parent ] ; then true ; else mkdir $$parent ; fi
+	-if [ -d $(includedir) ] ; then true ; else mkdir $(includedir) ; fi
+	#install the header files
+	for i in tcl.h tclHash.h tclInt.h ; do \
+	  $(INSTALL_DATA) $(srcdir)/$$i $(includedir)/$$i ; \
+	done
+	# install the man pages
+	-if [ -d $(mandir) ] ; then true ; else mkdir $(mandir) ; fi
+	-if [ -d $(man1dir) ] ; then true ; else mkdir $(man1dir) ; fi
+	-if [ -d $(man3dir) ] ; then true ; else mkdir $(man3dir) ; fi
+	rootme=`pwd`; cd $(srcdir)/doc ; \
+	for i in *.3 ; do \
+	  $(INSTALL_DATA) $$i $(man3dir)/$$i ; \
+	done ; \
+	for i in *.n ; do \
+	  newname=`echo $$i|sed -e 's/\.n/\.1/'` ; \
+	  $(INSTALL_DATA) $$i $(man1dir)/$$newname ; \
+	done ; \
+	cd $$rootme
+
+$(TARGETLIB):	$(OFILES)
+	$(RM) -f $@
+	$(AR) $(AR_FLAGS) $@ $(OFILES)
+	$(RANLIB) $@
+
+$(OFILES) :	$(HFILES)
+
+strerror.c 	: $(srcdir)/compat/strerror.c
+	cp $(srcdir)/compat/strerror.c .
+
+strtoul.c 	: $(srcdir)/compat/strtoul.c
+	cp $(srcdir)/compat/strtoul.c .
+
+opendir.c 	: $(srcdir)/compat/opendir.c
+	cp $(srcdir)/compat/opendir.c .
+
+strstr.c	: $(srcdir)/compat/strstr.c
+	cp $(srcdir)/compat/strstr.c .
+
+strtod.c 	: $(srcdir)/compat/strtod.c
+	cp $(srcdir)/compat/strtod.c .
+
+strtol.c 	: $(srcdir)/compat/strtol.c
+	cp $(srcdir)/compat/strtol.c .
+
+.PHONEY: all etags tags ls clean 
+
+etags tags:	TAGS
+
+TAGS: $(CFILES)
+	etags $(HFILES) $(CFILES)
+
+ls:
+	@echo Makefile $(HFILES) $(CFILES)
+
+configured:
+	@echo "The configuration script \"./config\" hasn't been run"
+	@echo "successfully yet.  Please run it as described in the "
+	@echo "README file, then run make again."
+	exit 1
+
+clean:
+	rm -f *.a *.o core errs *~ \#* TAGS *.E a.out errors tclTest
+
+distclean:	clean
+	-$(RM) Makefile config.status
+	for i in compat/*.[ch] ; do rm -f `basename $$i` ; done
+
+realclean: distclean
+
+mostlyclean: distclean
+force:
+
+Makefile: $(srcdir)/Makefile.in $(host_makefile_frag) \
+	$(target_makefile_frag)
+	$(SHELL) ./config.status
+
+tclTest: tclTest.o $(TARGETLIB)
+	$(CC) $(CFLAGS) tclTest.o $(TARGETLIB) -o tclTest
+
+test: tclTest
+	( echo cd $(srcdir)/tests ; echo source all ) | ./tclTest
+

@@ -1,0 +1,61 @@
+#! /bin/csh -f
+# Make mf source files.
+
+if ($#argv < 2) then
+   echo "Usage: $0 family_name size [size ...]."
+   exit(1)
+endif
+
+# Remember the family name (e.g., ``cmr'').
+set family = $1
+shift
+
+# Make a mf subdirectory to put the files in.
+if (! -d mf) then
+   mkdir mf
+endif
+
+# We don't want the current and future directories to
+# be printed on the terminal. (I use pushd instead of cd
+# because cd .. will cause havoc if `cd mf' cd'd into
+# a symbolic link. (I didn't think of this until I did it.)
+pushd mf > /dev/null
+foreach size ($argv)
+   set name_size = $size:r # Lose any decimal digits.
+   set mf_name = $family$name_size.mf
+   
+   # The Computer Modern point sizes are based on the 1.2 ratio.
+   # Delete this switch statement if you prefer to have point
+   # sizes that are exactly what you type.
+   switch($size)
+   case 11
+      set size = 10.954451
+      breaksw
+   case 14
+      set size = 14.4
+      breaksw
+   case 17
+      set size = 17.28
+      breaksw
+   case 20
+      set size = 20.736
+      breaksw
+   case 25
+      set size = 24.8832
+      breaksw
+   case 30
+      set size = 29.8685984
+      breaksw
+   endsw
+   # Make sure it doesn't exist already.
+   if (-e $mf_name) then
+      echo "$mf_name already exists, so I'm not going to change it."
+   else
+      echo "% $size-point $family." > $mf_name
+      echo "design_size := $size;" >> $mf_name
+      echo "input build_$family;" >> $mf_name
+   endif
+end
+
+# Come back to where we were.
+popd > /dev/null

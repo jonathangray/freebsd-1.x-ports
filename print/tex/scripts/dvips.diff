@@ -1,0 +1,217 @@
+*** dvips.c	Fri Mar 19 06:28:24 1993
+--- dvips.c.386bsd	Sat Apr 24 00:06:35 1993
+***************
+*** 201,213 ****
+  "or",
+  "           dvips fname[.ftype[.fmode]] [options]",
+  #endif
+! "a*  Conserve memory, not time      y # Multiply by dvi magnification",
+! "b # Page copies, for posters e.g.  A   Print only odd (TeX) pages",
+! "c # Uncollated copies              B   Print only even (TeX) pages",
+! "d # Debugging                      C # Collated copies",
+! "e # Maxdrift value                 D # Resolution",
+! "f*  Run as filter                  E*  Try to create EPSF",
+! "h f Add header file                F*  Send control-D at end",
+  "i*  Separate file per section      K*  Pull comments from inclusions",
+  "k*  Print crop marks               M*  Don't make fonts",
+  "l # Last page                      N*  No structured comments",
+--- 201,213 ----
+  "or",
+  "           dvips fname[.ftype[.fmode]] [options]",
+  #endif
+! "a*  Conserve memory, not time      A   Print only odd (TeX) pages",
+! "b # Page copies, for posters e.g.  B   Print only even (TeX) pages",
+! "c # Uncollated copies              C # Collated copies",
+! "d # Debugging                      D # Resolution",
+! "e # Maxdrift value                 E*  Try to create EPSF",
+! "f*  Run as filter                  F*  Send control-D at end",
+! "h f Add header file                G s Device/MFmode name",
+  "i*  Separate file per section      K*  Pull comments from inclusions",
+  "k*  Print crop marks               M*  Don't make fonts",
+  "l # Last page                      N*  No structured comments",
+***************
+*** 220,225 ****
+--- 220,226 ----
+  "s*  Enclose output in save/restore X # Horizontal resolution",
+  "t s Paper format                   Y # Vertical resolution",
+  "x # Override dvi magnification     Z*  Compress bitmap fonts",
++ "y # Multiply by dvi magnification",
+  /* "-   Interactive query of options", */
+  "    # = number   f = file   s = string  * = suffix, `0' to turn off",
+  "    c = comma-separated dimension pair (e.g., 3.2in,-32.1cm)", 0} ;
+***************
+*** 516,521 ****
+--- 517,527 ----
+                 noenv = 1 ;
+                 sendcontrolD = 0 ;
+                 break ;
++ case 'G' :
++                if (*p == 0 && argv[i+1])
++                  p = argv[++i] ;
++ 	       mfmode = p ;
++ 	       break ;
+  case 'h' : case 'H' :
+                 if (*p == 0 && argv[i+1])
+                    p = argv[++i] ;
+*** dvips.h	Fri Mar 19 04:03:58 1993
+--- dvips.h.386bsd	Sat Apr 24 00:06:21 1993
+***************
+*** 12,18 ****
+  /*   This file is the header for dvips's global data structures. */
+  
+  #define BANNER \
+!              "This is dvips 5.515 Copyright 1986, 1993 Radical Eye Software\n"
+  #include <stdio.h>
+  #if defined(SYSV) || defined(VMS) || defined(__THINK__) || defined(MSDOS)
+  #include <string.h>
+--- 12,18 ----
+  /*   This file is the header for dvips's global data structures. */
+  
+  #define BANNER \
+!              "This is dvips 5.515/386BSD Copyright 1986, 1993 Radical Eye Software\n"
+  #include <stdio.h>
+  #if defined(SYSV) || defined(VMS) || defined(__THINK__) || defined(MSDOS)
+  #include <string.h>
+*** makefont.c	Sat Feb 13 19:31:41 1993
+--- makefont.c.386bsd	Sat Apr 24 00:28:31 1993
+***************
+*** 109,114 ****
+--- 109,121 ----
+     else
+        return((int)(0.5 + bdpi * t)) ;
+  }
++ /*
++ This is to make the makefont command more flexible in terms of
++ parameter passing. 
++ */
++ #ifdef MAKEFONT_DEFCOMMAND
++ static char *defcommand = "MAKEFONT_DEFCOMMAND" ;
++ #else
+  #ifdef MAKEPKCMD
+  static char *defcommand = MAKEPKCMD " %n %d %b %m" ;
+  #else
+***************
+*** 128,133 ****
+--- 135,141 ----
+  #endif
+  #endif
+  #endif
++ #endif
+  char *command = 0 ;
+  /*
+   *   This routine tries to create a font by executing a command, and
+***************
+*** 230,235 ****
+--- 238,251 ----
+              }
+  #endif
+              break ;
++ /* 
++ The following is here, because of the use of mftopk script in TeX 386BSD.
++ We need to set the mfmode parameter more flexible. Unfortunately %m for
++ Mode and %d for Device are already occupied, so we choose %p for Printer.
++ */
++ case 'p' : case 'P' :
++             (void)sprintf(q, "%s", mfmode) ;
++             break ;
+  case 0 :    *q = 0 ;
+              break ;
+  default:    *q++ = *p ;
+***************
+*** 239,248 ****
+--- 255,267 ----
+           q += strlen(q) ;
+        }
+     *q = 0 ;
++ /*
++ this is made obsolete by the %p placeholder for the mfmode setting
+     if (mfmode) {
+        strcpy(q, " ") ;
+        strcat(q, mfmode) ;
+     }
++ */
+  #ifndef VMCMS   /* no filters and no need to print to stderr */
+  #ifndef MSDOS
+  #ifndef MVSXA
+*** resident.c	Sat Feb 13 19:20:57 1993
+--- resident.c.386bsd	Sat Apr 24 01:06:58 1993
+***************
+*** 79,84 ****
+--- 79,85 ----
+  extern int vmaxdrift ;
+  extern char *printer ;
+  extern char *mfmode ;
++ extern char *command ;
+  extern Boolean sendcontrolD ;
+  extern int lastresortsizes[] ;
+  extern integer hoff, voff ;
+***************
+*** 411,416 ****
+--- 412,420 ----
+  case 'M' :
+           mfmode = configstring(was_inline+1, 0) ;
+           break ;
++ case 'g' :
++          command = configstring(was_inline+1, 0) ;
++          break ;
+  case 'o' :
+           oname = configstring(was_inline+1, 1) ;
+           if (*oname && oname[strlen(oname)-1] == ':')
+***************
+*** 489,495 ****
+           i = 0 ;
+           p = was_inline + 1 ;
+           while (*p) {
+!             while (*p && *p <= ' ')
+                 p++ ;
+              if ('0' <= *p && *p <= '9') {
+                 j = 0 ;
+--- 493,499 ----
+           i = 0 ;
+           p = was_inline + 1 ;
+           while (*p) {
+!             while (*p && ((*p <= ' ') || (*p = ':')))
+                 p++ ;
+              if ('0' <= *p && *p <= '9') {
+                 j = 0 ;
+***************
+*** 504,510 ****
+              } else {
+                 if (*p == 0)
+                    break ;
+!                error("! only numbers expected on `R' line in config!") ;
+              }
+           }
+           lastresortsizes[i] = 32000 ;
+--- 508,514 ----
+              } else {
+                 if (*p == 0)
+                    break ;
+!                error("in config: <R-line> := <number> [ ':' <R-line> ]") ;
+              }
+           }
+           lastresortsizes[i] = 32000 ;
+*** texc.script	Wed Feb 12 06:59:12 1992
+--- texc.script.386bsd	Sat Apr 24 01:14:22 1993
+***************
+*** 4,12 ****
+  # To use it, say
+  #       texc.script tex.lpro texc.lpro
+  #
+! ed - $1 <<edscriptend
+  /% begin code for uncompressed fonts only/d
+  .,/% end code for uncompressed fonts only/d
+  .,/% end of code for unpacking compressed fonts/s/% //
+! w $2
+  edscriptend
+--- 4,13 ----
+  # To use it, say
+  #       texc.script tex.lpro texc.lpro
+  #
+! elvis -e - $1 <<edscriptend
+  /% begin code for uncompressed fonts only/d
+  .,/% end code for uncompressed fonts only/d
+  .,/% end of code for unpacking compressed fonts/s/% //
+! w! $2
+  edscriptend
++ echo > /dev/null

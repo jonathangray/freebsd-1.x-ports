@@ -1,0 +1,59 @@
+# Generated automatically from Makefile.in by configure.
+# Makefile for standalone distribution of libglob.a (fnmatch, glob).
+
+# Copyright (C) 1991, 1992, 1993 Free Software Foundation, Inc.
+# This file is part of the GNU C Library.
+
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Library General Public License
+# as published by the Free Software Foundation; either version 2 of
+# the License, or (at your option) any later version.
+
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Library General Public License for more details.
+
+# You should have received a copy of the GNU Library General Public
+# License along with this library; see the file COPYING.LIB.  If
+# not, write to the Free Software Foundation, Inc., 675 Mass Ave,
+# Cambridge, MA 02139, USA.
+
+# Ultrix 2.2 make doesn't expand the value of VPATH.
+VPATH = .
+srcdir = $(VPATH)
+
+CPPFLAGS = -DHAVE_CONFIG_H
+
+# How the invoke ar.
+AR = ar
+ARFLAGS = rv
+
+# How to invoke ranlib.
+RANLIB = ranlib
+
+.PHONY: all
+all: libglob.a
+
+libglob.a: glob.o fnmatch.o
+	$(AR) $(ARFLAGS) $@ glob.o fnmatch.o
+	$(RANLIB) $@
+
+# For some reason, Unix make wants the dependencies on the source files.
+# Otherwise it refuses to use an implicit rule!
+# And, get this: it doesn't work to use $(srcdir)/foo.c!!
+glob.o: $(srcdir)/glob.h $(srcdir)/fnmatch.h glob.c
+fnmatch.o: $(srcdir)/fnmatch.h fnmatch.c
+
+.c.o:
+	$(CC) -I. -I$(srcdir) -c $(CPPFLAGS) $(CFLAGS) $< $(OUTPUT_OPTION)
+
+.PHONY: clean realclean glob-clean glob-realclean
+clean glob-clean:
+	-rm -f libglob.a *.o core
+realclean glob-realclean: clean
+	-rm -f TAGS tags Makefile
+
+# For inside the C library.
+glob.tar glob.tar.Z:
+	$(MAKE) -C .. $@

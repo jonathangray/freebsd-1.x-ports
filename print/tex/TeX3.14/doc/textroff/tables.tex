@@ -1,0 +1,212 @@
+\Section{Tables}
+Users of \Troff/ often find themselves setting up tables
+in their documents by using {\it tbl\/}, a program that
+turns (relatively) simple table descriptions into the
+complicated commands that unvarnished \Troff/ requires
+to set the document.  Plain \TeX\ has its own built-in
+facility for the creation of small (less than one page)
+tables.  While \TeX\ table descriptions may be
+somewhat harder to read than the corresponding
+input for {\it tbl},
+the table mechanism is well-integrated with the other
+\TeX\ facilities, and there is no preprocessor required.
+\SubSection{Tabs}
+The easiest kind of table is one that uses ``tab stops''
+set regularly across the page, analogous to the physical stops
+in a typewriter.  In \TeX, one can set these tab stops by
+saying |\settabs| $n$ |\columns|.  This divides the line
+into $n$ equal parts.  To use the tab stops, one types
+text that begins with the control sequence |\+| 
+and ends with the sequence |\cr|. 
+``|\cr|'' stands for Carriage-Return,
+and suggests a time when typewriters had carriages.  If you forget
+to end a tabbed line with |\cr|, \TeX\ will become very confused.
+Of course, this means that the text for a single tabbed line may
+occupy several lines in the input file, as long as it ends
+with |\cr|.
+
+The \TeX\ tab character is the ampersand, |&|; while this
+can be changed to something else, the syntax-changing commands
+of \TeX\ are (deliberately) somewhat opaque, and you probably
+don't want to try it.  Here's an example of using tabs (stolen
+shamelessly from ``{\sl The \TeX book\/}''):\penalty 200
+\begintt
+\settabs 4 \columns
+\+&&Text that starts in the third column\cr
+\+&Text that starts in the second column\cr
+\+\it Text that starts in the first column, and&&&
+ the fourth, and&beyond!\cr
+\endtt
+The result of all this is:
+\penalty 200
+\medskip
+\settabs 4 \columns
+\+&&Text that starts in the third column\cr
+\+&Text that starts in the second column\cr
+\+\it Text that starts in the first column, and&&&
+ the fourth, and&beyond!\cr
+\def\tick{\kern-0.2pt\vbox to 0pt{\kern-36pt\leaders\hbox{\vrule height 1pt
+\vbox to4pt{}}\vfil}}
+\vskip-\baselineskip
+\+\tick&\tick&\tick&\tick&\tick\cr
+\medskip
+There are several interesting features in this example.  The
+ampersand isn't exactly like a mechanical tab because it backs up,
+if necessary, to reach the next numerical tab stop; this makes
+tab-based tables somewhat easier than their \Troff/ counterparts, in
+which one must always know when a field will slop over into
+the next tabbed column.  Thus, in the last line, three |&|'s were required
+to get to column~4, even though the first entry had extended
+into column~2.  Lines~2~and~3 show that the |\cr| can end a line even
+if some fields are not specified.  The last pair of lines shows
+that spaces are ignored after ampersands; hence you can end an
+input line harmlessly at such a point without getting extraneous
+spaces.  The last line also shows that each individual entry
+in a tabbed line is implicitly grouped as if it were in braces;
+for this reason, no braces were required around the |\it| section.
+
+The dashed columns, by the way, are pedagogical, and do not normally
+appear.
+\SubSection{General Tab Stops}
+For somewhat more complicated tables, there's a second form of the
+|\settabs| control sequence, in which a sample line (usually
+consisting of the widest entries to be found in each field) is
+supplied in order to set the tab stops.  The tabs are placed
+at the positions of the |&|'s in the sample line, but the
+sample line itself will {\bf not}
+actually appear in the output.  There should be
+some extra space between columns, to prevent the text in adjacent
+columns from touching.  For example:\penalty 200
+\begintt
+\settabs\+\hskip 1in&Section Three\quad&\cr % Sample line
+\+&Section One&Commands\cr
+\+&Section Two&System Calls\cr
+\+&Section Three&Subroutines\cr
+\endtt
+causes the following three lines to be typeset:\penalty 200
+{\interlinepenalty=150
+\medskip
+\settabs\+\hskip 1in&Section Three\quad&\cr % Sample line
+\+&Section One&Commands\cr
+\+&Section Two&System Calls\cr
+\+&Section Three&Subroutines\cr
+}
+\medskip
+Notice that the sample line will typically end with |&\cr|, because
+the text following the last tab isn't used for anything.  In other
+words, the {\bf only} thing a sample field does is determine the
+amount of space to the {\sl next} tab stop.  Also notice that each
+tabbed line in this example
+begins with a tab, so as to get the 1-inch indentation
+(|\hskip 1in|) that was specified for the first field width in the
+sample line.
+
+Tabbed entries can also contain stretchable glue%
+\note{{\tt\\hfill} glue (with two `l's) must be used here,
+as you need
+something ``infinitely more stretchable'' than the normal {\tt\\hfil}
+glue that \TeX\ uses to left-justify the tabbed entries.  In
+effect, the {\tt\\hfill} glue overrides the normal glue.}, allowing one
+to do centering and justifying.  For example:\penalty 200
+\begintt
+\settabs 2 \columns
+\+\hfill This material&\hfill While this\hfill&\cr
+\+\hfill is flush right&\hfill material is centered\hfill&\cr
+\+\hfill in the left-hand column&\hfill in the right-hand column.\hfill&\cr
+\endtt
+produces the following:\penalty 200
+\penalty 200
+\medskip
+\settabs 2 \columns
+\+\hfill This material&\hfill While this\hfill&\cr
+\+\hfill is flush right&\hfill material is centered\hfill&\cr
+\+\hfill in the left-hand column&\hfill in the right-hand column.\hfill&\cr
+\medskip
+\SubSection{Alignments}
+Finally, there is a general mechanism, known as {\sl alignment},
+which can be used to set generalized tables.  The details of
+alignments can get quite complex, and a full chapter is devoted
+to them in ``{\sl The \TeX book\/}.''  However, a short explanation
+and example may be of
+interest.
+The command |\halign| is used to set up arbitrary tables.  The
+general format is
+\penalty 200\begintt
+\halign{|begingroup|it Line Template |endgroup\cr
+|begingroup|it table lines, each ending with |endgroup\cr
+}
+\endtt
+\noindent Each table line will be ``plugged into'' the line template,
+with the individual line elements (separated, as before,
+with ampersands) substituted wherever
+a pound-sign (|#|, also known as ``sharp-sign'' or ``octothorpe'')
+occurs in the template.  As a specific example,
+suppose we want to set the following table:
+\penalty 200
+\medskip
+$$\vbox{\halign{\hfil\bf#\hfil & \quad#\hfil\cr
+\sl Section&\sl Subject\cr
+&\cr
+1&Commands\cr
+2&System Calls\cr
+3&Subroutines\cr
+4&Special Files\cr
+5&File Formats\cr
+6&Games\cr
+7&Miscellany\cr
+8&System Maintenance\cr}}$$
+\medskip
+To accomplish this, the
+line template must include the |\hfil| glue used to center
+and justify the columns, and the boldface shift for the numerals
+that appear
+in the first column.  In fact, it looks like this:\penalty 200
+\begintt
+\hfil\bf#\hfil & \quad#\hfil\cr
+\endtt
+The first column,` |\hfil\bf#\hfil|' will automatically have its
+text, represented by the pound-sign,
+centered by the two |\hfil| commands, and emboldened
+by the |\bf|.  As with tabbing (which is really just a special
+case of alignment), the font change is implicitly grouped
+within the single table entry.  The second column,
+`|\quad#\hfil|' will have a 1-em padding at the beginning,
+and will be left-justified by the |\hfil| glue at the end.
+Here's the whole command:\penalty 200
+\begintt
+\halign
+   {\hfil\bf#\hfil & \quad#\hfil\cr
+
+\sl Section&\sl Subject\cr
+&\cr
+1&Commands\cr
+2&System Calls\cr
+3&Subroutines\cr
+4&Special Files\cr
+5&File Formats\cr
+6&Games\cr
+7&Miscellany\cr
+8&System Maintenance\cr}
+\endtt
+Notice how the normal fonts were overridden in the title line, and
+how an empty line was set to separate the title line from the remainder
+of the table.  As an alternative way to get some space between
+lines in an alignment, you can say\penalty 200
+\begintt
+\noalign{|begingroup|it material|endgroup| }
+\endtt\penalty200
+after a |\cr| in an alignment and that material will be copied  
+in place without being aligned.  For example, `|\noalign{\smallskip}|'
+is an easy way to get a small skip between two lines of a table.
+
+There was also some other magic involved in centering the
+table on the page, to be described in the next section.  Basically,
+the alignment was placed in its own |\vbox|, and that vertical
+box was horizontally centered.
+
+The examples of this section have been simple ones, but cover
+most of the types of tables that are used in most
+documents (such as the tables of dimensions or special characters
+used in the earlier sections of this document).  People with more
+complex needs will have to consult a \TeX\ guru, or learn more
+from the chapter on alignments in ``{\sl The \TeX book\/}.''

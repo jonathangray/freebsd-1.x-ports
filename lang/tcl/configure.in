@@ -1,0 +1,44 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(tcl.h)
+AC_PROG_INSTALL
+AC_PROG_RANLIB
+echo checking for pid_t in sys/types.h
+AC_HEADER_EGREP(pid_t, sys/types.h, AC_DEFINE(TCL_PID_T, 1), AC_DEFINE(TCL_PID_T, 0))
+AC_STDC_HEADERS
+AC_UNISTD_H
+AC_HEADER_CHECK(dirent.h, AC_DEFINE(HAVE_DIRENT))
+
+
+AC_REPLACE_FUNCS(opendir strerror strstr strtod strtol)
+AC_FUNC_CHECK(getwd,AC_DEFINE(TCL_GETWD,1),AC_DEFINE(TCL_GETWD,0))
+AC_FUNC_CHECK(gettimeofday,AC_DEFINE(TCL_GETTOD,1),AC_DEFINE(TCL_GETTOD,0))
+
+AC_TEST_PROGRAM([ /* this program taken from compat/teststrtoul.c */
+extern int strtoul();
+int main()
+{
+    char *string = "0";
+    char *term;
+    int value;
+    value = strtoul(string, &term, 0);
+    if ((value != 0) || (term != (string+1))) {
+        exit(1);
+    }
+    exit(0);
+}], , [LIBOBJS="$LIBOBJS strtoul.o"])
+
+AC_COMPILE_CHECK([union wait], [#include <sys/types.h> 
+#include <sys/wait.h>], [ /* this program taken from compat/testwait.c */
+/* This code is very tricky, mostly because of weirdness in HP-UX
+ * where "union wait" is defined in both the BSD and SYS-V
+ * environments.  Supposedly the WIFEXITED business will do the
+ * right thing... */
+union wait x;
+WIFEXITED(x);               /* Generates compiler error if WIFEXITED
+                                 * uses an int. */
+return 0;
+], AC_DEFINE(TCL_UNION_WAIT,1), AC_DEFINE(TCL_UNION_WAIT,0))
+
+AC_CHAR_UNSIGNED
+AC_CONST
+AC_OUTPUT(Makefile)

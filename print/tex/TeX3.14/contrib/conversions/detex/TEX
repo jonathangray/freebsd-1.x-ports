@@ -1,0 +1,227 @@
+#! /bin/csh -f
+#
+# Usage: TEX [-flags ...] filename
+#
+# The various flags are described below, but only one filename should
+# be given; stdin is not used. File types are indicated by the filename
+# suffix. Input files may have one of the following suffixes:
+#	.tex -- a file with tex commands, equations.
+#	.dvi -- device independent format.
+#	.ver -- output of verser1 (for the varian or AED)
+#	.imp -- output of dvi-imagen (or dviimp)
+# Anything else is assumed to be in .tex format.
+# If TEX sees a .dvi, .ver, or .imp suffix, it will skip ahead to the right
+# point in the processing sequence. Specifically,
+#	texeqn	accepts .tex, outputs .tex
+#	tex	accepts .tex, outputs .dvi and .log
+#	latex	accepts .tex, outputs .dvi and .log
+#	verser1	accepts .dvi, outputs .ver (for the varian or AED, not on hanuma).
+#	lpr	accepts .ver, outputs raster
+#	ipr	accepts	.imp, outputs raster
+#
+# Flags:
+# -latex uses LaTeX.
+# -log	 saves a log file from the tex run in filename.log.
+# -d	 quits once the .dvi file has been made.
+# -x	 makes two passes on the (latex) input, so cross-references
+#	 are resolved.
+# -v	 output device is the varian (imagen is the default)
+# -q	 quits once the .imp file has been made if the imagen is the target printer
+#	 or after the .ver file	(i.e. after verser1 stage) if the AED or the varian
+#	 is the target printer.
+# -eqn	 strips out the equations with texeqn and typeset them.
+#
+# Authors: Kamal Al-Yahya, Jeff Thorson, and Chuck Sword, Stanfor University
+#
+umask 0
+onintr removal
+set name=() host=()
+set destdir = /usr/local
+set tmp = TEX$$
+set device = imagen
+set st = 0
+unset latex x d q eqn log
+
+if ($#argv == 0) then
+	echo "usage: TEX [-latex] [-eqn] [-log] [-d] [-q] [-x] filename"
+	exit(-1)
+endif
+
+while ($#argv > 0 && !($?inf))
+	switch ($argv[1])
+		case -latex:
+			set latex
+			breaksw
+
+		case -x:
+			set x
+			breaksw
+
+		case -q:
+			set q
+			breaksw
+
+		case -d:
+			set d
+			breaksw
+
+		case -v:
+			set device = varian
+			breaksw
+
+		case -eqn:
+			set eqn
+			breaksw
+
+		case -log:
+			set log
+			breaksw
+
+		case -*:
+			echo unknown flag $argv[1], ignored
+			breaksw
+                default:
+			set inf = $argv[1]
+			if !(-e $inf) then
+
+#  filename not found, try with .tex ending
+
+				if !(-e $inf.tex) then 
+					echo $0 'cannot find file' $inf.
+					exit(-1)
+				else
+					set inf = ($inf.tex)
+				endif
+			endif
+			breaksw
+		endsw
+	shift argv
+end
+
+set name = $inf:t
+set sname = $name:r
+set name = $cwd/$name
+set suffix = $name:e
+
+if ($suffix == dvi) then
+	echo TEX: starting with .dvi file
+	set name = $name:r
+	set dvifile = $inf
+	goto dvi
+endif
+
+if ($suffix == ver) then
+	echo TEX: starting with .ver file
+	set name = $name:r
+	set verfile = $inf
+	goto ver
+endif
+
+if ($suffix == imp) then
+	echo TEX: starting with .imp file
+	set name = $name:r
+	set impfile = $inf
+	goto imp
+endif
+
+if ($suffix == tex || $suffix == eqn) then
+	set name = $name:r
+endif
+
+echo "\batchmode" > $tmp.tex
+
+if ($?eqn) then
+	$destdir/texeqn < $inf >> $tmp.tex
+else
+	cat $inf >> $tmp.tex
+endif
+
+echo "\bye" >> $tmp.tex
+
+# Choose tex or latex
+
+if ($?latex) then
+	if (-e $name.aux) then
+		cp $name.aux $tmp.aux
+	endif
+	$destdir/latex $tmp:t
+	if ($status != 0) then
+		goto oops
+	else
+		if (-e $tmp.aux) then
+			cp $tmp.aux $name.aux
+		endif
+	endif
+
+	if ($?x) then
+		echo "Starting second pass"
+		$destdir/latex $tmp
+		if ($status != 0) then
+			goto oops
+		endif
+		if (-e $tmp.aux) then
+			cp $tmp.aux $name.aux
+		endif
+	endif
+
+else	$destdir/tex $tmp
+	if ($status != 0) then
+oops:
+		echo TEX could not process your file.
+		echo Error messages are in $name.log
+		mv -f $tmp.log $name.log
+		set st = -1
+		goto removal
+	endif
+endif
+
+if ($?log) then
+	mv -f $tmp.log $name.log
+	if (-e $tmp.aux) then
+		mv -f $tmp.aux $name.aux
+	endif
+endif
+
+set dvifile = $tmp.dvi
+
+if ($?d) then
+	mv -f $dvifile $name.dvi
+	goto removal
+endif
+
+dvi:
+
+if($device == imagen) then
+	$destdir/dvi-imagen -s $dvifile > $tmp.imp
+	if ($?q) then
+		mv -f $tmp.imp $name.imp
+		goto removal
+	endif
+	set impfile = $tmp.imp
+imp:
+	(echo -n \@document\(owner \"$user\", site \"$host\", spooldate \
+	\"`date`\", language \"imPress\", jobheader off, \
+	jamresistance on\) ; cat $impfile ) | $destdir/ipr
+	goto removal
+endif
+
+if($device == varian) then
+	$destdir/verser1 < $dvifile > $tmp.ver
+	if ($status != 0) then
+		echo TEX bombed out on verser1.
+		set st = -1
+		goto removal
+	endif
+	set verfile = $tmp.ver
+
+	if ($?q) then
+		mv -f $verfile $name.ver
+		goto removal
+	endif
+ver:
+	lpr -d -s -Pvarian $tmp.ver
+endif
+
+removal:
+/bin/rm -f $tmp.tex $tmp.log $tmp.dvi $tmp.ver $tmp.imp $tmp.aux
+exit($st)

@@ -1,0 +1,92 @@
+%    Copyright (C) 1992 Aladdin Enterprises.  All rights reserved.
+%
+% This file is part of Ghostscript.
+%
+% Ghostscript is distributed in the hope that it will be useful, but
+% WITHOUT ANY WARRANTY.  No author or distributor accepts responsibility
+% to anyone for the consequences of using it or for whether it serves any
+% particular purpose or works at all, unless he says so in writing.  Refer
+% to the Ghostscript General Public License for full details.
+%
+% Everyone is granted permission to copy, modify and redistribute
+% Ghostscript, but only under the conditions described in the Ghostscript
+% General Public License.  A copy of this license is supposed to have been
+% given to you along with Ghostscript so you can know your rights and
+% responsibilities.  It should be in a file named COPYING.  Among other
+% things, the copyright notice and this notice must be preserved on all
+% copies.
+
+% mergeini.ps - utility for merging all the Ghostscript initialization files
+% (gs_*.ps) into a single file.
+
+/rl { in =string readline } def
+/wl { out exch writestring out (\n) writestring } def
+/infile { findlibfile { exch pop } { (r) file } ifelse } def
+
+/merge			% <in_name> <out_name> <squash>
+ { /squash exch def
+   exch infile
+   exch (w) file /out exch def
+
+	% Copy comments up to the first blank line,
+	% since this is the legal notice for the file.
+   /in exch def
+    { rl pop dup wl
+      () eq { exit } if
+    }
+   loop
+
+   in mergefile
+   out closefile
+ } def
+
+/doit			% <string> -> <string> true | false
+ { squash
+    { dup () eq
+       { pop false
+       }
+       { dup 0 1 getinterval (%) ne
+          { true
+	  }
+	  { dup (%END) anchorsearch
+	     { pop pop true
+	     }
+	     { pop pop false
+	     }
+	    ifelse
+	  }
+	 ifelse
+       }
+      ifelse
+    }
+    { true
+    }
+   ifelse
+ } def
+
+/mergefile		% <in_file>
+ { /in exch def
+    { rl not { pop exit } if
+      (%% Replace ) anchorsearch
+       { pop
+         in exch
+         token pop			% # of lines
+	 exch token pop exch pop	% file name or list name
+	 exch
+          { rl pop pop }
+	 repeat
+	 exec dup type /stringtype eq { [ exch ] } if
+	  { infile mergefile
+	  }
+	 forall
+	 /in exch def
+       }
+       { doit { wl } if
+       }
+      ifelse
+    } loop
+   in closefile
+ } def
+
+(gs_init.ps) (gs_xinit.ps) true merge
+quit

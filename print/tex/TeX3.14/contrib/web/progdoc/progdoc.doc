@@ -1,0 +1,496 @@
+% This is PROGDOC.DOC                     as of 05 Dec 88
+%---------------------------------------------------------
+% (c) 1988 by J.Schrod. Put into the public domain.
+
+%
+% Macro package for the documentation of programs (and TeX macros)
+% english version
+%
+
+%
+% first version (for ftp/Bitnet)                                   (88-12-05)
+%
+
+
+
+% documented with itself...
+\input progdoc
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% local macros
+%
+
+\font\mc=cmr9           % for names like ASCII
+\font\sc=cmcsc10        % caps and small caps 10pt
+
+\def\WEB{{\tt WEB\/}}
+\def\LaTeX{{\rm L\kern-.36em\raise.3ex\hbox{\sc a}\kern-.15em\TeX}}
+
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+\chap Introduction.
+
+\WEB{} systems allow the documentation of programs by supporting the
+separation in program fragments which can be collected and rearranged
+afterwards.  This allows {\it top-down\/} programming as well as the
+{\it bottom-up\/} design of programs.  Each program fragment can be
+documented, usually with \TeX{}.  A disadvantadge is that \WEB{}
+actually exists only for a few programming languages (Pascal, C,
+Modula-2).  Besides, building up \WEB{} systems for ``exotic''
+programming languages like \TeX{} is very difficult.
+
+This macro package was built to allow good documentation for programs
+in languages for which \WEB{} doesn't exist.  It separates a program
+text in sections that can be documented.  All sections, collected
+sequentially, will result in the complete program.  In every section
+begin and end of the program part are marked with |\beginprog| and
+|\endprog|, this program part will be formatted as it is input
+(``verbatim'').
+
+The separation of the sections is done in this version (which is based
+on Plain~\TeX{}) by the macros |\chap| and |\sect|.  But this can be
+changed easily, e.g.\ for preparing the documentation with \LaTeX{}.
+Then the last section group of this macro package must be omitted and
+the rest must be realized as a style option.
+
+In the documentation part of a section text pieces, e.g.\ names of
+variables, can be inserted verbatim to demonstrate the connection to
+the program text.  These parts are included in vertical bars
+(`{\tt\vbar}') while the vertical bar itself can be obtained by
+|\origvert|.
+
+This macro package does not offer the creation of an index because it
+is not known which syntactical tokens the language has that should be
+mentioned in an index.  As well the creation of a table of contents
+and of headings would be preferable to allow better orientation in the
+document.  Some remarks about future enhancements which should be done
+urgently are set in slanted type.
+
+
+\sect We have to realize three parts:  (1)~the formatting of rather
+small verbatim texts in a line, (2)~the formatting of larger parts of
+program and (3)~the document structuring elements for the separation
+of the sections.  Before we start we declare some shorthands for
+category codes.
+
+By declaring the at sign~(`|@|') as well as the underscore~`(|_|)' as
+letters we can use them in our macros.
+{\tolerance=10000
+(I agree with D.~Knuth that |\identifier_several_words_long| is much
+better readable than |\IdentifierSeveralWordsLong| and both are better
+than |\pr@@@s|.)
+With the at sign we can use the ``private'' Plain macros and with the
+underscore we can make our own macros more readable.  But as we have
+to restore these category codes at the end of this macro file we store
+their former values in the control sequences |\atcode| and |\uscode|.
+This method is better than the usage of a group because not all macros
+have to be defined global this way.
+\par}
+
+\beginprog
+\chardef\escape=0
+\chardef\letter=11
+\chardef\other=12
+%\chardef\active=13              % is defined in Plain already
+
+\chardef\atcode=\catcode`\@
+\chardef\uscode=\catcode`\_
+
+\catcode`\@=\letter
+\catcode`\_=\letter
+\endprog
+
+
+
+
+\chap Local Verbatim Formatting.
+
+The main point of every verbatim formatting is the switching of the
+character codes of all characters that have a special \TeX{} meaning.
+This can be done with the control sequence |\dospecials| that applies
+the control sequence |\do| to all special characters.  Additionally,
+every line is regarded as a paragraph without indentation.  Between
+two paragraphs, i.e.\ between two lines, no extra space is set.
+Finally all blanks and tabular characters shall be obeyed and the
+inter word space after sentence terminators shall not be enlarged.
+The activation of the tabular characters with |\obeytabs| is
+equivalent to |\obeyspaces| in {\tt plain.tex\/}.
+
+Verbatim texts are set in monospace, we use (like in \WEB{}) the
+character set with the extended {\mc ASCII}.  For \LaTeX{} we would
+have to add here |\ttex| to all size modifications like |\xpt|,
+|\xiipt|, etc.
+
+\beginprog
+\font\tentex=cmtex10            % typewriter extended ASCII 10pt
+\let\ttex=\tentex               % only for PLAIN with base size 10pt
+
+\def\setup_verbatim{%
+   \def\do##1{\catcode`##1\other}\dospecials
+   \parskip\z@skip \parindent\z@
+   \obeylines \obeyspaces \obeytabs \frenchspacing
+   \ttex
+   }
+
+\let\tab=\space
+\begingroup
+   \catcode`\^^I=\active%       % Attention: no tabs!
+   \gdef\obeytabs{\catcode`\^^I=\active\def^^I{\tab}}
+   \global\let^^I=\tab%         % if an active tab appears in a \write
+\endgroup
+\endprog
+
+\sect After having saved the old meaning of `{\tt\vbar}' in
+|\origvert| and after declaring |\vbar| as a synonym for the character
+that has the code of a vertical bar in the actual font, the vertical
+bar can be made active.  Then we call |\setup_verbatim|.  But the
+newline characters shall not be processed, they shall be regarded like
+blank space.  This can be reached by defining |\par| as |\space|.
+
+The next vertical bar in the input closes the group which becomes an
+(unbreakable) |\hbox| then.  The old meanings of the special
+characters and of the vertical bar are restored and \TeX{} is in
+normal (horizontal) mode again.
+
+\beginprog
+\let\origvert=|
+\chardef\vbar=`\|
+
+\catcode`\|=\active
+
+\def|{%
+   \leavevmode
+   \hbox\bgroup
+      \let\par\space \setup_verbatim
+      \let|\egroup
+   }
+\endprog
+
+
+
+
+\chap  Program Fragments in Verbatim.
+
+We need macros to format the program fragments without any
+linebreaking.  Such a text area shall start with the macro
+|\beginprog| and end with |\endprog|.  The macro |\endprog| must stand
+at the very beginning of a line and must be followed by white space
+(blank, tab or newline character).  After |\beginprog| as well as
+after |\endprog| the rest of the line is ignored.
+
+Two demands must be regarded:  There should be no length restrictions
+for the processed text, and the tabular characters should be expanded
+so that this macro works on PC's and on VAXes, too.
+
+
+\sect The implementation method is quite simple:  We read the next
+line, test, wether the end is reached (by comparing with |\endprog|)
+and otherwise set the character actually read.  Every character is
+inspected and tabular characters are expanded.
+
+Wether a line is set or wether the end of the processed area is
+reached is indicated by the switch |\if@print|.  At the beginning of
+the |\beginprog| macro most settings are done with |\setup_verbatim|
+(the vertical bar must be handled separately) and the rest of the line
+is ignored.  As everything is done within a group, the end of the
+verbatim text can be processed by simply closing this group.
+
+For the user it looks as if |\endprog| terminates the processing, but
+it just serves for the identification of the end, the true processing
+is done with the internal macro |\end_verbatim|.
+
+\beginprog
+\newif\if@print
+
+\def\beginprog{%
+   \endgraf
+   \bigbreak
+   \begingroup
+      \setup_verbatim \catcode`\|\other
+      \@printtrue
+      \ignore_rest_line
+   }
+\let\end_verbatim=\endgroup             % internal command !
+\endprog
+
+
+\sect The first line is ignored, all the other lines are identified
+with |\set_next_line| and processed with |\do_set|.  This separation
+in identification and processing allows that the line end character is
+active in the definition only for a short time.
+
+When a line is to be formatted, we first check with |\check_print|
+wether it contains |\endprog|, otherwise it is printed with
+|\print_char|.  The printing must be done for every character
+individually because we want to check for tabular characters; the
+exact algorithm is described below.  Here we just have to note that
+|\print_char| is used with two parameters of which the second one is
+finished with the token |\end_line|.  The first parameter is the first
+character of the line, the second parameter is the rest of the line.
+If the line is empty, the argument of |\do_set| is empty, too; so the
+activation of |\print_char| must be finished with two |\end_line|.
+Then the first |\end_line| is the first argument for |\print_char| and
+the second argument is empty.  But if the line did contain something,
+the second |\end_line| is evaluated, for this case it is defined as
+|\relax|.
+
+At last we call |\set_next_line| again to format the next line.  If
+the end is reached, i.e.\ if a line with |\endprog| was found,
+|\set_next_line| is redefined as |\relax|.  This can be done because
+the original meaning is restored while closing the group with
+|\end_verbatim|.
+
+\beginprog
+\begingroup
+   \obeylines%          % ^^M is active! ==> every line must end with %
+   \gdef\ignore_rest_line#1^^M{\set_next_line}%
+   \gdef\set_next_line#1^^M{\do_set{#1}}%
+\endgroup
+
+\def\do_set#1{%
+   \endgraf
+   \check_print{#1}%
+   \if@print  \indent \print_char#1\end_line\end_line
+   \else  \let\set_next_line\end_verbatim
+   \fi
+   \set_next_line
+   }
+\let\end_line=\relax
+\endprog
+
+
+\sect Before we look at the problem of formatting a line, we declare
+|\check_print| that checks the end of the verbatim mode.  We have to
+do two things:  we must split everything in front of the first blank
+or tabular character and compare for identity with |\endprog|.  The
+splitting is easy because the line which is our first argument
+contains blanks and tabulators as active characters.  First we call
+|\cut_at_tab| that demands a tabular character as separator for its
+two pramenters so that everything in the line in front of the first
+tabulator is part of the first parameter.  If there is no tabular
+character in the line, we append one so that the second parameter is
+empty.  The same trick is used to separate the part in front of the
+first blank character from the resulting first part.
+
+The check is done with |\do_check|.  We use a separate macro here so
+that we can indent it (in the following definition blanks are active!)
+
+\beginprog
+\begingroup
+\obeyspaces\obeytabs
+\gdef\check_print#1{\cut_at_tab#1^^I\end_line}
+\gdef\cut_at_tab#1^^I#2\end_line{\check_first_part#1 \end_line}% blank !
+\gdef\check_first_part#1 #2\end_line{\do_check{#1}}
+\endgroup
+\endprog
+
+
+\sect |\do_check| compares the line with a sample line that is
+available in |\@endverbatim|.  During the definition of
+|\@endverbatim| it must be cared for that the escape character `|\|'
+is a printable character:  A comparison with |\ifx| demands identical
+category codes.  As a temporary escape character we use the vertical
+bar.
+
+\beginprog
+\def\do_check#1{%
+   \def\@line{#1}%
+   \ifx \@line\@endverbatim  \@printfalse
+   \fi
+   }
+
+{\catcode`\|=\escape  \catcode`\\=\other % | is temporary escape char
+   |gdef|@endverbatim{\endprog}          % sample line
+}                                        % here \endgroup can't be used
+\endprog
+
+
+\sect Now we can set a line:  we start with the first character,
+followed by the rest of the line.  Each character is counted in
+|\char_count|.  At the beginning of a line |\char_count| is~1, this
+is reset at the end of the line.
+
+\goodbreak
+
+\beginprog
+\newcount\char_count  \char_count\@ne
+
+\def\print_char#1#2\end_line{%
+   \print_first_char{#1}%
+   \print_rest_of_line{#2}%
+   }
+\endprog
+
+
+\sect For each character that is set |\char_count| is incremented.
+If a character is a tabulator, we set with |\print_tab| the fitting
+amount of blank characters, otherwise the character itself.  We must
+compare the character that is stored in |\@char| with a macro of which
+the ``first-level'' expansion is an active tabulator.  For this case
+we declare |\@tab|.
+
+\beginprog
+{\obeytabs\gdef\@tab{^^I}}
+
+\def\print_first_char#1{%
+   \def\@char{#1}%
+   \advance \char_count\@ne
+   \ifx \@char\@tab  \print_tab
+   \else  \@char
+   \fi
+   }
+\endprog
+
+
+\sect If we want to fill the line with blank spaces up to the next
+column with a number that can be divided by~8, we must be able to
+compute the column number modulo~8, but \TeX{} has no modulo operator.
+So we define the macro |\mod_viii| that computes its argument modulo~8
+and returns the result in the counter |\count_mod_viii|.  For the
+computation we need the temporary counter |\count@|.
+
+\beginprog
+\newcount\count_mod_viii
+\def\mod_viii#1{%
+   \count@ #1\relax  \count_mod_viii\count@
+   \divide \count@ 8\relax
+   \multiply \count@ 8\relax
+   \advance \count_mod_viii -\count@
+   }
+\endprog
+
+
+\sect Now we can declare |\print_tab|.  We must remember that
+|\char_count| was incremented already, if we set only one blank
+character the counter keeps untouched.
+
+\beginprog
+\def\print_tab{%
+   \loop  \space \mod_viii\char_count
+      \ifnum \count_mod_viii>\z@
+         \advance \char_count\@ne
+   \repeat
+   }
+\endprog
+
+
+\sect If the rest of the line is empty, we are ready.  |\char_count|
+is reset to~1 for the next line.
+
+Inside the |\else| part of |\ifx| |\print_char| should not be used
+directly because this costs too much storage of \TeX{}.  Instead we
+set a control sequence |\next| that is processed afterwards, depending
+on the result of the comparison.  If there is still something to set,
+we use |\print_char| again, otherwise a syntactically similar macro
+that expands to |\relax|.
+
+\beginprog
+\def\print_rest_of_line#1{%
+   \def\@line{#1}%
+   \ifx \@line\empty  \char_count\@ne
+        \def\next##1\end_line{\relax}%
+   \else  \let\next\print_char
+   \fi
+   \next#1\end_line
+   }
+\endprog
+
+
+
+
+\chap Document Structuring.
+
+The layout of the document shall be like in \WEB{}.  This can be done
+easily in Plain.  If \LaTeX{} shall be used for the document
+preparation, this part of the macro must be eliminated.  It will also
+be better to include the program parts \LaTeX-like as an environment
+between |\begin{prog}| and |\end{prog}| and to define control
+sequences |\makebaractive| and |\makebarother| for the switch of the
+special meaning of the vertical bar (`{\tt \origvert\/}') (for the
+{\tt tabular\/} environment!)
+
+All sections are enumerated, the number of the next section is stored
+in the counter |\sectno|.  We differenciate between main sections
+which start a group of sections and between normal sections within a
+group.
+
+\beginprog
+\newcount\sectno  \sectno=\@ne
+\endprog
+
+
+\sect The main sections are started with the macro |\chap| that has
+one parameter, the title of the section group.  This parameter must be
+terminated by a dot.  We start a new page, typeset the title in bold
+face and separate it from the section text with a |\medskip|.  This
+text, the documentation part of the section, is formatted without
+paragraph indentation.
+
+The deletion of the paragraph indentation is done with |\everypar|.
+We do not care if |\everypar| is used for something else and delete it
+after usage.
+
+\begingroup \sl
+Here the title, the section and the page number should be written to
+an auxiliary file so that a table of contents could be created at the
+end of the run (at |\bye|), and the dealing with |\everypar| should
+not be so cruel.
+\endgroup
+
+\beginprog
+\def\chap#1.{%
+   \endgraf
+   \vfill\eject
+   \noindent {\bf \number\sectno.\quad #1.}%
+   \advance \sectno\@ne
+   \endgraf
+   \medskip  \nobreak
+   \everypar{%
+      \setbox0\lastbox
+      \global\everypar{}%
+      }%
+   }
+\endprog
+
+
+\sect Normal sections are started with |\sect|.  This macro has no
+parameter.  Between two paragraphs we set 2~pica space (if possible)
+and prefer the page breaking.  Between the section number and the text
+one quad of space is set.
+
+\begingroup \sl
+The page break manipulation could be more sophisticated.
+\endgroup
+
+\beginprog
+\def\sect{%
+   \endgraf
+   \vskip 2pc plus 1pc minus 6dd  \goodbreak
+   \noindent {\bf \number\sectno.}\advance \sectno\@ne
+   \quad \ignorespaces
+   }
+\endprog
+
+
+\sect We are finished and just have to restore the category codes.
+
+\beginprog
+\catcode`\@=\atcode
+\catcode`\_=\uscode
+
+\endinput
+\endprog
+
+
+
+
+
+\bye
+

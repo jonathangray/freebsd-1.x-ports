@@ -1,0 +1,302 @@
+#!/bin/sh
+########################################################
+# dvidr -- front end dvi driver
+#
+# see dvidr($(MANEXT_386BSD)) for more.
+#
+# You have to configure some values by hand, since it is too divers to
+# be exported from the Makefile. Here is how you do it:
+#
+##############################
+# GhostScript defaults,
+#
+# see what devices your gs(l1) provides for you
+GDEVICE="star"
+# you probably don't need to change this
+GOUTPUT="|lpr"
+#
+##############################
+# Beebe defaults
+#
+# choose one of these:
+#   alw bit can e72 eps  gd imp
+#   jep jet l3p l75 m72 mac mpi
+#   oki prx tos o72
+BDEVICE="eps"
+# how the output is printed
+BOUTPUT="lpr"
+#
+##############################
+# null defaults, make fonts for
+#
+# this is set automaticaly and probably need not to be changed. Check
+# if it is consistent with what you told to GDEVICE and BDEVICE
+NDEVICE="$(DEFDEV_386BSD)"
+#
+##############################
+#
+# Now please watch out for lines calling the function `correct' whith
+# two parameters. You may have to change these parameters. Correct is
+# the routine that adds device specific offsets to the page offset.
+# The syntax is
+#
+# correct <x-corr> <y-corr>
+#
+# where <x-corr> and <y-corr> are decimal numbers often negative and
+# float, that specivy the correction in inches. It takes some time to
+# figure them out by trial and error. Do the following:
+#
+# 1. set all correct parameters to zero `correct 0 0'
+# 2. print the file `adjust.dvi' which is in $(DVILIB_386BSD) with dvidr.
+# 3. there sould be a small square at the position 1in left and 1in
+#    down from the upper left corner. Measure the actual distances you've
+#    got.
+# 4. Subtract 1in from the measured actual distance, and try them.
+#
+# Of course you have to do this procedure for dvips and beebe's
+# seperately :-(.
+#   Remember that most printers have a unprintable margin, if you try
+# dvidr with -x0 -y0 then the square may hide behind that margin.
+# 
+##############################
+#
+# There may be some options setting the paper size. Like `paper_size'
+# or `-t a4'. Change them if you want.
+#
+##############################
+#
+# There should be no other changes to make
+########################################
+#
+# The default page offset. I cannot understand the need of these 1in
+# offsets to be default, since most pin printers do have their own
+# offset (a mecanical must there) which you have to compensate then, 
+# it is so nasty!
+XOFFSET=1
+YOFFSET=1
+##############################
+# Usage
+usage () {
+  case $PNAME in
+  dvi) echo \
+       "usage: dvi [-GXh] [-x hoff] [-y voff] [-- options ... ] dvifile" ;;
+  dvipr) echo "usage: dvipr [-GBh][-x hoff] [-y voff] [-d dev] [-o file]" ;
+         echo "             [-- options ... ] dvifile" ;;
+  *) echo "usage: $PNAME [-GXhvp] [-x hoff] [-y voff] [-d dev] [-o file]" ;
+     echo "                    [-- options ... ] dvifile" ;;
+  esac
+  exit 1
+}
+##############################
+# Methods:
+# MODE	DRIVER		ACTION
+# -v	-X		xdvi
+# -v	-G		dvips -f >> gs >> X11
+# -p	-G		dvips -f >> gs >> lpr
+# -p	-B		dvixxx -f >> lpr
+# -n	{implies -G}	dvips -f >> /dev/null  (side effect: make fonts!) 
+################
+# Defaults:
+PNAME=`basename $0`
+case $PNAME in
+dvi) DEF_MODE=v ;;
+dvipr) DEF_MODE=p ;;
+mkfonts) DEF_MODE=n ;;
+*) DEF_MODE=v ;;
+esac
+DEF_VI=X
+DEF_PR=G
+######
+setmode() {
+  if [ -n "$MODE" ]
+  then 
+    if [ "$MODE" != "$1" ]
+    then
+      echo "ambiguous options: p/v"
+      exit 1
+    fi
+  fi
+  MODE=$1 
+}
+######
+setdrv() {
+  if [ -n "$DRIVER" ]
+  then
+    if [ "$1" != "$DRIVER" ]
+    then
+      echo "ambiguous driver select: $DRIVER/$1"
+      exit 1
+    fi
+  fi
+  DRIVER=$1 
+}
+#
+######
+#isset - check if option was set
+isset() { local i 
+for i in $OLIST
+do
+  if [ "$i" = "$1" ]
+  then
+    return 0
+  fi
+done
+}
+#
+##############################
+# collect parameters
+MODE=
+DRIVER=
+while getopts "vpnBGXx:y:d:o:b:e:2c:rh?" OPTION
+do
+  case $OPTION in
+# Modes
+  v) setmode v ;;
+  p) setmode p ;;
+  n) setmode n ;;
+# Drivers
+  G) setdrv G ;;
+  B) setdrv B ; setmode p ;;
+  X) setdrv X ; setmode v ;;
+# Offsets
+  x) XOFFSET=$OPTARG ; shift ;;
+  y) YOFFSET=$OPTARG ; shift ;;
+# Misc
+  d) DEVICE=$OPTARG ; shift ;;
+  o) OUTPUT=$OPTARG ; shift ;;
+# Help
+  ?) usage ;;
+  h) usage ;;
+  *) usage ;;
+  esac
+  OLIST="$OLIST $OPTION"
+  shift 
+done
+##############################
+# collect auxiliarry parameters and dvi file
+if [ "$1" = "--" ]
+then
+  shift
+fi
+for i in $*
+do
+  shift
+  if [ $# -gt 0 ]
+  then 
+    PARAM="$PARAM $i"
+  else
+    FILE=$i
+  fi
+done
+#
+##############################
+# construct method with defaults
+if [ -z "$MODE" ]
+then
+  setmode $DEF_MODE
+fi
+if [ -z "$DRIVER" ]
+then
+case $MODE in
+  v) setdrv $DEF_VI ;;
+  p) setdrv $DEF_PR ;;
+  n) setdrv G
+     if [ -z "$DEVICE" ]
+     then
+       DEVICE=$NDEVICE
+     fi
+     ;;
+  esac
+fi
+######
+METHOD=${MODE}${DRIVER}
+######
+if [ -z "$OUTPUT" ]
+then
+  case $METHOD in
+  pG) OUTPUT="$GOUTPUT" ;;
+  pB) OUTPUT="$BOUTPUT" ;;
+  *) OUTPUT="not set" ;;
+  esac
+fi
+if [ -z "$DEVICE" ]
+then
+  case $METHOD in
+  pG) DEVICE="$GDEVICE" ;;
+  pB) DEVICE="$BDEVICE" ;;
+  nG) DEVICE="$NDEVICE" ;;
+  *) DEVICE="not set" ;;
+  esac
+fi
+#
+############################## 
+# implement a simple adding machine by a script awkwarded to for :-)
+AWKPROG='	BEGIN { i=0; RS=" " ; }
+	/[-+]?[0-9]+\.?[0-9]*/ { a[i++]=$1 ; }
+	/\+/ { printf ( "%f\n", a[--i]+a[--i] ) ; } '
+#
+correct() {
+X=`echo "$XOFFSET $1 +" |awk -- "$AWKPROG"`
+Y=`echo "$YOFFSET $2 +" |awk -- "$AWKPROG"`
+}
+#
+############################################################
+# do actions
+case $METHOD in
+############################################################
+vG) echo "using: dvips -f >> gs >> X11"
+###############
+    correct -1 -0.4
+###############
+    dvips -f -O ${X}in,${Y}in -t a4 $PARAM -o /tmp/$$.ps $FILE
+    gs -sDEVICE=x11 -sPAPERSIZE=a4 /tmp/$$.ps quit.ps
+    rm /tmp/$$.ps
+    ;;
+############################################################
+vX) echo "using: Xdvi >> X11"
+###############
+    correct 0 -0.16
+###############
+###############
+# CAUTION: I used a4 paper
+##### DIN A4 paper has a height of 29.7cm plus 1in is 32.24cm. But the
+    # result is off by 0.14cm. --> 32.38cm
+    xdvi -paper 21cmx32.38cm \
+         -xoffset ${X}in -yoffset ${Y}in \
+         $PARAM $FILE &
+    ;;
+############################################################
+# dvips -f >> gs >> lpr
+pG) echo "using: dvips -f >> gs >> lpr"
+###############
+    correct -1.25 -1.35
+###############
+# CAUTION: I used a4 paper
+###############
+    dvips -f -t a4 -O ${X}in,${Y}in $PARAM $FILE | \
+    gs -sOutputFile=$OUTPUT -sDEVICE=$DEVICE -sPAPERSIZE=a4 -
+    ;;
+############################################################
+# dvips -f >> null (side effect: make missing fonts)
+nG) echo "using: dvips -f >> null; making missed fonts"
+    dvips -f -G $DEVICE $PARAM $FILE >/dev/null
+    ;;
+############################################################
+# beebe >> lpr
+pB) echo "using: a Beebe driver"
+###############
+    correct -0.25 -0.35
+###############
+    OLD=`pwd` ; DIR=`dirname $FILE` ; FILE=`basename $FILE` ; TMP=/tmp/$$.dvipr
+    mkdir $TMP
+    cp $DIR/$FILE $TMP/$FILE
+    cd $TMP
+    dvi$DEVICE -x${X}in -y${Y}in $PARAM $FILE
+    $OUTPUT $FILE-$DEVICE
+    cd $OLD
+    rm -r $TMP  
+    ;;
+esac
+############################################################
+exit 0
+

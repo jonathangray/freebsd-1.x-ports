@@ -1,0 +1,225 @@
+[This file is ./fontutil/README.virtual_fonts.    
+It consists of excerpts from the electronic digest TeXhax (1990), 
+issues 11 and 12.]
+
+Excerpted from:
+     TeXhax Digest    Sunday,  January 14, 1990  Volume 90 : Issue 11
+
+Date: 08 Jan 90  1727 PST
+From: Don Knuth <DEK@SAIL.Stanford.EDU>
+Subject: Virtual fonts: More fun for Grand Wizards    
+Keywords: fonts
+
+Many writers to TeXhax during the past year or so have been struggling with
+interfaces between differing font conventions. For example, there's been a
+brisk correspondence about mixing oldstyle digits with a caps-and-small-caps
+alphabet. Other people despair of working with fonts supplied by manufacturers
+like Autologic, Compugraphic, Monotype, etc.; still others are afraid to leave
+the limited accent capabilities of Computer Modern for fonts containing letters
+that are individually accented as they should be, because such fonts are not
+readily available in a form that existing TeX software understands.
+
+There is a much better way to solve such problems than the remedies
+that have been proposed in TeXhax. This better way was first realized
+by David Fuchs in 1983, when he installed it in our DVI-to-APS
+software at Stanford (which he also developed for commercial
+distribution by ArborText). We used it, for example, to typeset my
+article on Literate Programming for The Computer Journal, using native
+Autologic fonts to match the typography of that journal.
+
+I was expecting David's strategy to become widely known and adopted.
+But alas --- and this has really been the only significant
+disappointment I've had with respect to the way TeX has been
+propagating around the world --- nobody else's DVI-to-X drivers have
+incorporated anything resembling David's ideas, and TeXhax
+contributors have spilled gallons of electronic ink searching for
+answers in the wrong direction.
+
+The right direction is obvious once you've seen it (although it wasn't
+obvious in 1983): All we need is a good way to specify a mapping from
+TeX's notion of a font character to a device's capabilities for
+printing. Such a mapping was called a "virtual font" by the AMS
+speakers at the TUG meetings this past August. At that meeting I spoke
+briefly about the issue and voiced my hope that all DVI drivers be
+upgraded within a year to add a virtual font capability.  Dave Rodgers
+of ArborText announced that his company would make their WEB routines
+for virtual font design freely available, and I promised to edit them
+into a form that would match the other programs in the standard
+TeXware distribution.
+
+The preparation of TeX Version 3 and MF Version 2 has taken me much longer
+than expected, but at last I've been able to look closely at the concept of
+virtual fonts. (The need for such fonts is indeed much greater now than it
+was before, because TeX's new multilingual capabilities are significantly
+more powerful only when suitable fonts are available. Virtual fonts can
+easily be created to meet these needs.)
+
+After looking closely at David Fuchs's original design, I decided to design
+a completely new file format that would carry his ideas further, making the
+virtual font mechanism completely device-independent; David's original code
+was very APS-specific. Furthermore I decided to extend his notions so that
+arbitrary DVI commands (including rules and even specials) could be
+part of a virtual font. The new file format I've just designed is called
+VF; it's easy for DVI drivers to read VF files, because VF format is similar
+to the PK and DVI formats they already deal with.
+
+The result is two new system routines called VFtoVP and VPtoVF. These
+routines are extensions of the old ones called TFtoPL and PLtoTF;
+there's a property-list language called VPL that extends the ordinary
+PL format so that virtual fonts can be created easily.
+
+In addition to implementing these routines, I've also tested the ideas by
+verifying that virtual fonts could be incorporated into Tom Rokicki's dvips
+system without difficulty. I wrote a C program (available from Tom) that
+converts Adobe AFM files into virtual fonts for TeX; these virtual fonts
+include almost all the characteristics of Computer Modern text fonts
+(lacking only the uppercase Greek and the dotless j) and they include all
+the additional Adobe characters as well. These virtual fonts even include
+all the "composite characters" listed in the AFM file, from `Aacute' to
+`zcaron'; such characters are available as ligatures. For example, to get
+`Aacute' you type first `acute' (which is character 19 = ^S in Computer Modern
+font layout, it could also be character 194 = Meta-B if you're using an
+8-bit keyboard with the new TeX) followed by `A'. Using such fonts, it's
+now easier for me to typeset European language texts in Times-Roman and
+Helvetica and Palatino than in Computer Modern! [But with less than an hour's
+work I could make a virtual font for Computer Modern that would do the same
+things; I just haven't gotten around to it yet.]
+
+[A nice ligature scheme for dozens of European languages was just published
+by Haralambous in the November TUGboat. He uses only ASCII characters, getting
+Aacute with the combination <A. I could readily add his scheme to mine, by
+adding a few lines to my VPL files. Indeed, multiple conventions can be
+supported simultaneously (although I don't recommend that really).]
+
+Virtual fonts make it easy to go from DVI files to the font layouts of
+any manufacturer or font supplier. They also (I'm sorry to say) make
+"track kerning" easy, for people who have to resort to that oft-abused
+feature of lead-free type.
+
+Furthermore, virtual fonts solve the problem of proofreading with screen
+fonts or with lowres laserprinter fonts, because you can have several
+virtual fonts sharing a common TFM file.  Suppose, for example, that you
+want to typeset camera copy on an APS machine using Univers as the
+ultimate font, but you want to do proofreading with a screen previewer and
+with a laserprinter. Suppose further that you don't have Univers for your
+laserprinter; the closest you have is Helvetica.  And suppose that you
+haven't even got Helvetica for your screen, but you do have cmss10. Here's
+what you can do: First make a virtual property list (VPL) file
+univers-aps.vpl that describes the high-quality font of your ultimate
+output. Then edit that file into univers-laser.vpl, which has identical
+font metric info but maps the characters into Helvetica; similarly, make
+univers-screen.vpl, which maps them into cmss10. Now run VPtoVF on each of
+the three VPL files. This will produce three identical TFM files
+univers.tfm, one of which you should put on the directory read by TeX.
+You'll also get three distinct VF files called univers.vf, which you
+should put on three different directories --- one directory for your
+DVI-to-APS software, another for your DVI-to-laserwriter software, and the
+third for the DVI-to-screen previewer.  Voil^^Ra.
+
+So virtual fonts are evidently quite virtuous. But what exactly are
+virtual fonts, detail-wise? Appended to this message are excerpts from
+VFtoVP.WEB and VPtoVF.WEB, which give a complete definition of the
+VF and VPL file formats.
+
+I fully expect that all people who have implemented DVI drivers will
+immediately see the great potential of virtual fonts, and that they will
+be unable to resist installing a VF capability into their own software
+during the first few months of 1990. (The idea is this: For each font
+specified in a DVI file, the software looks first in a special table to
+see if the font is device-resident (in which case the TFM file is loaded,
+to get the character widths); failing that, it looks for a suitable GF or
+PK file; failing that, it looks for a VF file, which may in turn lead to
+other actual or virtual files. The latter files should not be loaded
+immediately, but only on demand, because the process is recursive.
+Incidentally, if no resident or GF or PK or VF file is found, a TFM file
+should be loaded as a last resort, so that the characters can be left
+blank with appropriate widths.)
+
+%--- an excerpt from VFtoVP.web -----------------------------------------------
+
+@* Virtual fonts.  The idea behind \.{VF} files is that a 
+general interface mechanism is needed to switch between the myriad font 
+layouts provided by different suppliers of typesetting equipment. Without such 
+a mechanism, people must go to great lengths writing inscrutable macros 
+whenever they want to use typesetting conventions based on one font layout in 
+connection with actual fonts that have another layout. This puts an extra 
+burden on the typesetting system, interfering with the other things it needs 
+to do (like kerning, hyphenation, and ligature formation). 
+
+These difficulties go away when we have a ``virtual font,''
+i.e., a font that exists in a logical sense but not a physical sense.
+A typesetting system like \TeX\ can do its job without knowing where the
+actual characters come from; a device driver can then do its job by
+letting a \.{VF} file tell what actual characters correspond to the
+characters \TeX\ imagined were present. The actual characters
+can be shifted and/or magnified and/or combined with other characters
+from many different fonts. A virtual font can even make use of characters
+from virtual fonts, including itself.
+
+Virtual fonts also allow convenient character substitutions for proofreading
+purposes, when fonts designed for one output device are unavailable on another.
+
+@ A \.{VF} file is organized as a stream of 8-bit bytes, using conventions
+borrowed from \.{DVI} and \.{PK} files. Thus, a device driver that knows
+about \.{DVI} and \.{PK} format will already
+contain most of the mechanisms necessary to process \.{VF} files. 
+We shall assume that \.{DVI} format is understood; the conventions in the
+\.{DVI} documentation (see, for example, {\sl \TeX: The Program}, part 31)
+are adopted here to define \.{VF} format.
+
+A preamble
+appears at the beginning, followed by a sequence of character definitions,
+followed by a postamble. More precisely, the first byte of every \.{VF} file
+must be the first byte of the following ``preamble command'':
+
+     [The rest of the excerpt is omitted.  By using the default compilation, 
+     the executable program "weave" will be made for you.  Weave the file 
+     vftovp.web to create a vftovp.tex file.  TeX the vftovp.tex file to 
+     create a vftovp.dvi file.  Preview or print the .dvi file to learn more 
+     about virtual fonts.] 
+
+===============================================================================
+
+Excerpted from:
+     TeXhax Digest    Sunday,  January 14, 1990  Volume 90 : Issue 12
+     %%Moderators' note: The following contribution is continued from
+     %%TeXhax Digest Issue 11.
+
+Virtual fonts: More fun for Grand Wizards    
+
+%------------- and here's an extract from VPtoVF.web --------------------------
+
+@* Property list description of font metric data.
+The idea behind \.{VPL} files is that precise details about fonts, i.e., the
+facts that are needed by typesetting routines like \TeX, sometimes have to
+be supplied by hand. The nested property-list format provides a reasonably
+convenient way to do this.
+
+A good deal of computation is necessary to parse and process a
+\.{VPL} file, so it would be inappropriate for \TeX\ itself to do this
+every time it loads a font. \TeX\ deals only with the compact descriptions
+of font metric data that appear in \.{TFM} files. Such data is so compact,
+however, it is almost impossible for anybody but a computer to read it.
+
+Device drivers also need a compact way to describe mappings from \TeX's idea
+of a font to the actual characters a device can produce. They can do this
+conveniently when given a packed sequence of bytes called a \.{VF} file.
+
+The purpose of \.{VPtoVF} is to convert from a human-oriented file of text
+to computer-oriented files of binary numbers. There's a companion program,
+\.{VFtoVP}, which goes the other way.
+
+...   ...   ...
+
+@ A \.{VPL} file is like a \.{PL} file with a few extra features, so we
+can begin to define it by reviewing the definition of \.{PL} files. The
+material in the next few sections is copied from the program \.{PLtoTF}.
+...   ...   ...
+
+[The rest of the excerpt is omitted.  Weave the web file, TeX the resulting 
+file, preview or print the output of TeX to learn more about these new, 
+exciting programs from the inventor of TeX.] 
+
+
+End of File ----------------------------------------------------------------
+

@@ -1,0 +1,341 @@
+Copyright (C) 1993 Aladdin Enterprises.  All rights reserved.
+
+This file is part of Ghostscript; it is licensed under the same terms
+as the rest of Ghostscript.  If you do not have Ghostscript, you do
+not have the right to have this file.
+
+Fixes for Ghostscript 2.6.1
+---------------------------
+
+(last update: 7/20/93)
+
+This file summarizes a number of important quality fixes for Ghostscript
+2.6.1.  The fixes are supplied in the form of replacements for
+corresponding files in the 2.6.1 release.  Please report any problems.
+
+6/5/93
+------
+
+Problem:
+	The Unix install script used gs rather than $(GS) as the name of
+	the executable.
+	The Unix install script didn't copy gs_dbt_e.ps to $(gsdatadir).
+Files affected:
+	unixtail.mak (and unix-*.mak, built from it using tar_cat)
+
+Problem:
+	The ps2ascii script still referenced ps2ascii.ps under its
+	old name gs_2asc.ps.
+Files affected:
+	ps2ascii
+
+Problem:
+	ps2image.ps had a 'pop' missing in the written-out definition of
+	'max' in the boilerplate code it put at the beginning of
+	compressed files.
+	ps2image.ps got a typecheck if a scan line had no repeated
+	data in it anywhere.
+Files affected:
+	ps2image.ps
+
+Problem:
+	rectfill drew rectangles with vertices specified in clockwise
+	order as 0-width lines.
+Files affected:
+	gsdps1.c
+
+Problem:
+	The string matching function reported that 'abcdefg'
+	matched the pattern 'abcde'.
+Files affected:
+	gsutil.c
+
+Problem:
+	The bounding box of non-rectangular clipping paths was not
+	being marked as valid, so cached characters would simply get
+	discarded as being outside the bounding box.
+Fix:
+	Have gx_path_intersect set the `setbbox' flag if the new clipping
+	path is not rectangular.
+Files affected:
+	gxcpath.c
+
+6/9/93
+------
+
+Problem:
+	The PCX driver didn't offer a gray-scale option.
+Fix:
+	Implement one.
+Files affected:
+	devs.mak
+	gdevpcx.c
+
+6/10/93
+-------
+
+Problem:
+	Colors with equal R/G/B or C/M/Y components were converted to
+	gray before being mapped through the transfer function.
+Files affected:
+	gxcmap.c
+
+6/11/93
+-------
+
+Problem:
+	Faulty X servers could generate bogus errors on XFreeColors.
+Fix:
+	Catch and ignore the errors.
+Files affected:
+	gdevxini.c
+	x_.h
+
+Problem:
+	X driver gave up on color allocation too easily.
+	X driver dynamic color table size could become negative.
+Files affected:
+	gdevx.c
+
+Problem:
+	x_lookup_font could return platform fonts of very small
+	sizes, which have very inaccurate metrics.
+Fix:
+	Don't return fonts of size 4 pixels or smaller.
+Files affected:
+	gdevxxf.c
+
+6/14/93
+-------
+
+Problem:
+	rc_unshare could indirect through 0 to obtain the size of a
+	new block, causing the CIE rendering caches to be allocated
+	with a random size.
+Fix:
+	Change it to use rc_alloc_struct_1 rather than rc_alloc_1.
+Files affected:
+	gxrefct.h
+
+---------------- Fixes up to here distributed 6/23/93 ----------------
+
+6/28/93
+-------
+
+Problem:
+	The Unix install script attempts to install the nonexistent
+	file type1enc.ps.
+Files affected:
+	unixtail.mak (and unix-*.mak, built from it using tar_cat)
+
+Problem:
+	X driver didn't free dynamic colors at the start of each page.
+Files affected:
+	gdevx.h
+	gdevx.c
+
+Problems:
+	X driver didn't bind foreground/background defaults tightly.
+	X driver didn't check for GHOSTVIEW_COLORS properly.
+	X driver freed too many colors if an allocation request failed.
+	X driver didn't check return value of gs_malloc for being NULL.
+Files affected:
+	gdevxini.c
+
+Problem:
+	There was no LaserJet 4 driver that could use the 600 dpi mode.
+Fix:
+	Implement one.
+Files affected:
+	devs.mak
+	gdevdjet.c
+
+Problem:
+	The DeskJet and LaserJet drivers used \033&l0H (page eject)
+	instead of \f (end of page), which prevented duplex printing.
+	The DeskJet and LaserJet drivers reset the printer at the
+	start of each page, which prevented manually initiated duplex
+	printing.
+Files affected:
+	gdevdjet.c
+
+7/8/93
+------
+
+Problem:
+	kshow returned an incorrect (random, 32-bit) character code
+	for the second character.
+Fix:
+	Make sure the character code is stored properly on all control paths.
+Files affected:
+	gschar.c
+
+Problem:
+	Color halftones "flipped over" at the 50% point, inverting
+	foreground and background.
+Fix:
+	Correct a numerical error in the octant flip test.
+Files affected:
+	gxdither.c
+
+Problem:
+	setbbox didn't round the coordinates properly, which could cause
+	erroneous rangecheck errors with coordinates on the edge of the box.
+Files affected:
+	gsdps1.c
+
+Problem:
+	The PCX driver put an old version number in the header, and
+	didn't pad scan lines to an even number of bytes.
+Files affected:
+	gdevpcx.c
+
+Problem:
+	The TIFF driver didn't handle A4 or B4 size paper correctly.
+Fix:
+	Make the driver handle variable page sizes properly.
+Files affected:
+	gdevtiff.c
+
+Problem:
+	The VMS script files referenced IBSCAN instead of ISCAN2,
+	and omitted GDEVXXF.
+Files affected:
+	vms-cc.mak
+	vms-gcc.mak
+
+Problem:
+	zht2.c didn't include alloc.h.
+Files affected:
+	zht2.c
+
+Problem:
+	gdevx.h was inadvertently omitted from an earlier batch of fixes.
+Files affected:
+	gdevx.h
+
+Problem:
+	The UUENCODEd icons for the MS Windows platform were omitted
+	from the fileset.
+Files added:
+	gsgraph.uue
+	gstext.uue
+
+7/9/93
+------
+
+Problem:
+	exitserver didn't check the password, and always succeeded.
+Fix:
+	Make exitserver do a minimal password check.
+Files affected:
+	gs_statd.ps
+
+Problem:
+	Ghostscript only knew about a limited set of paper sizes.
+Fix:
+	Add many new paper sizes to gs_statd.ps.  It now includes ISO
+	a0-a10 and b0-b10, and CAD sizes archA-archE.
+Files affected:
+	gs_statd.ps
+
+7/17/93
+-------
+
+Problem:
+	The ESCP/2 driver was incorrectly named gdevescp2 in devs.mak.
+Files affected:
+	devs.mak
+
+Problem:
+	The X11 driver incorrectly demanded the Xmu library, which was
+	not needed and which caused link errors on some versions of SunOS.
+Solution:
+	Remove Xmu from the list of X libraries.
+Files affected:
+	devs.mak
+
+Problem:
+	X11 font matching scheme was too loose, causing overlaps and
+	other problems.
+Solution:
+	X11 font must be within 1/2 pixel of desired height to be used.
+Files affected:
+	gdevx.c, gdevx.h, gdevxini.c, gdevxxf.c
+
+Problem:
+	X11 Font Extensions (rotated and mirrored fonts) did not work
+	properly on NCD terminals.
+Solution:
+	Add an X resource to be able to selectively turn off the use
+	of Font Extensions.  It is called useFontExtensions.
+Files affected:
+	gdevx.c, gdevx.h, gdevxini.c, gdevxxf.c
+
+Problem:
+	When the X11 driver freed the rgb cube/gray ramp, the parameters
+	to gs_free() did not exactly match the parameters to gs_malloc().
+Solution:
+	Make them match.
+Files affected:
+	gdevx.c
+
+Problem:
+	The X11 driver failed to warn the user when it could not allocate
+	the original color cube/gray ramp and dropped back to a smaller
+	cube/ramp, or from color to mono.
+Solution:
+	Warn the user when color allocation fails during initialization.
+Files:
+	gdevxini.c
+
+Problem:
+	x_release could cause Ghostscript to fail if a font was freed
+	after the device was closed.
+Solution:
+	Don't free the font in x_release.  The font will be freed when
+	the connection to the X server is closed.
+Files affected:
+	gdevx.c
+
+7/18/93
+-------
+
+Problem:
+	On MS-DOS systems, filenameforall didn't interpret * alone
+	as a pattern matching all files.
+Fix:
+	Recognize a trailing * in a pattern as a special case.
+Files affected:
+	gp_msdos.c
+
+Problem:
+	The FontName in the font file had be the same as the name in
+	Fontmap.  (This requirement led to the need for aliases, and
+	was extremely confusing to users.)
+Fix:
+	If loading a font file doesn't define the font with the
+	requested name, parse the file to find the FontName, and make
+	the requested name an alias for it.
+Files affected:
+	gs_fonts.ps
+
+Problem:
+	Users had to remember to edit the Fontmap file whenever they
+	installed a new font.
+Fix:
+	Add a GS_FONTPATH environment variable containing a list of
+	directories that should be scanned automatically for fonts at
+	startup time.
+Files affected:
+	gs_fonts.ps, fonts.doc, use.doc
+
+---------------- Fixes up to here distributed 7/18/93 ----------------
+
+7/20/93
+-------
+
+Problem:
+	gdevdjet.c was omitted from the previous patch distribution.
+
+---------------- ALL fixes up to here distributed 7/20/93 ----------------

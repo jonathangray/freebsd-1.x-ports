@@ -1,0 +1,41 @@
+% This file can be loaded after PLAIN.MF.
+% It adds the LNOthree device and redefines ``bye'' to augment
+% the TFM header.
+
+% LNOthree mode: for the DEC LN03 printer (Ricoh LP)
+mode_def LNOthree =
+proofing:=0;                    % no, we're not making proofs
+fontmaking:=1;                  % yes, we are making a font
+tracingtitles:=0;               % no, don't show titles in the log
+pixels_per_inch:=300;           % pixels per inch
+blacker:=0.65;                  % blacker pens
+%blacker:=0.3;                  % makes CMR5 "a" look better
+fillin:=-0.1;                   % compensate for light diagonals
+o_correction:=.5;               % overshoot
+enddef;
+
+localfont:=LNOthree;
+
+% Place the font coding scheme and font identifier in bytes 9-48 and
+% 49-68, respectively.  Also, place an encoding of the design size in
+% byte 72 in some cases.  Although TeX does not use this information,
+% TFTOPL does.  This code is based on an example in Appendix F of
+% The METAfont Book.
+
+def counted_string(expr s,n) = % string s becomes an n-byte counted string
+ for l:=if length(s)>=n: n-1 else: length(s) fi: l
+  for k:=1 upto l: , substring (k-1,k) of s endfor
+  for k:=l+2 upto n: , 0 endfor endfor enddef;
+
+inner end;
+def bye = if fontmaking>0:
+  headerbyte 9: counted_string(font_coding_scheme_,40);
+  special "codingscheme " & font_coding_scheme_;
+  headerbyte 49: counted_string(font_identifier_,20);
+  special "identifier " & font_identifier_;
+  headerbyte 72: max(0, 254 - round 2designsize); fi
+ end enddef;
+outer bye,end;
+
+base_version:=base_version&"/sauter LN03/augmented TFM header";
+

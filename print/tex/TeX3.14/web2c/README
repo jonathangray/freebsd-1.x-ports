@@ -1,0 +1,412 @@
+This file describes web2c, a system which converts TeX, Metafont, and
+other products of the Stanford TeX project to C.  (It is definitely not
+a general-purpose Pascal-to-C translator.)
+
+web2c is primarily the product of Tim Morgan <morgan@ics.uci.edu>.
+Tomas Rokicki wrote the original TeX to C program.  Pierre Mackay
+<mackay@cs.washington.edu> wrote the original change files for most of
+the Metafontware programs.  Karl Berry <karl@cs.umb.edu> made everything
+work with the 8-bit release of TeX and Metafont, and is probably to
+blame for things that don't work now, but used to.  And over a hundred
+more people have also contributed.
+
+The file ./MACHINES.W2C contains a list of known configurations that
+have passed the trip and trap test.  If your configuration is not on
+this list, you should build triptex and trapmf (instructions below), and
+then send mail to Karl with the vital statistics, and, of course, any
+changes you made, preferably in the form of context diffs.
+
+The file ./ChangeLog.W2C records changes to web2c.  The current version number
+of web2c can be found at the beginning of that file (and also in the
+Makefile).
+
+The file ./PROJECTS.W2C describes some improvements to the current setup
+that would be nice to have.
+
+The file ./PROBLEMS.W2C describes various difficulties people have
+encountered.  If you have trouble getting the distribution up, look here
+first.  You should also look in ./MACHINES.W2C.
+
+The file ./COPYING.W2C describes copying conditions for this software.
+
+We try to keep web2c up-to-date with respect to the master WEB files.
+But we can't, always.  The web-*.tar.Z file holds the versions that we
+know to work with these change files.  If you get different versions and
+encounter any problems, please write to us.
+
+If you know enough about TeX to be reading this, then you (or perhaps
+your institution) should consider joining the TeX Users Group.  TUG
+produces a quarterly journal (TUGboat), sponsors an annual meeting (the
+proceedings of which are published as an issue of TUGboat), and arranges
+courses on TeX for all levels of users.  Given sufficient funding (which
+your joining will help), TUG could sponsor more projects that will
+benefit the TeX community.  Here is the address:
+
+TeX Users Group
+P.O. Box 9506
+Providence, RI 02940-9506
+phone: (401) 751-7760
+email: tug@math.ams.com
+
+
+Here is a table of contents for the rest of this file:
+   Bootstrapping tangle
+   Installation
+   Changing constants
+   Format files and preloading
+   Directory hierarchies
+   Online output from Metafont
+   Portability
+
+
+
+Bootstrapping tangle
+%%%%%%%%%%%%%%%%%%%%
+If you have an already working tangle, you may wish to copy it into the
+directory `./web', to omit the bootstrapping step.  If you don't,
+web/Makefile will attempt to compile a bootstrap version.  This step can
+fail and go into a loop.  If this happens you need to fix the problem
+manually.  Possible problems and remedies:
+
+If tangle fails tangling tangle.web:
+	tangle.ch may not match tangle.web; get the correct versions.
+
+If tangleboot.c or tanglext.c does not compile:
+	Make the converted C files acceptable to your compiler and retry
+        (also tell Karl or Tim, so web2c can be fixed).
+
+
+
+Installation
+%%%%%%%%%%%%
+Here is the procedure for getting things running.
+
+0. Copy site.h-dist to site.h.
+
+1. Edit ./site.h and ./Makefile to set up your local paths, compiler,
+   etc.  The symbols BSD, SYSV, and the like affect the conversion from
+   WEB to C, not just the compilation of the C files.  Therefore, you
+   must recompile web2c if you change the definition of these symbols.
+   (The Makefile does that automatically if you change site.h, but you
+   should be aware of this, anyway.)  If you move ./site.h to another
+   directory (i.e., change SITEDIR in Makefile), move ./defaults.h
+   there, also.
+
+2. `make triptrap' to build triptex and trapmf (and some of the other 
+   programs that are needed to run the tests).
+
+3. `make run-triptrap' to run the tests.  The differences (and many
+   error messages) will show up on your terminal.  If you have a
+   question about whether the differences are OK or not, consult
+   tex/TeXtrip/tripman.tex and mf/MFtrap/trapman.tex.  The most common
+   differences are in:
+   * glue setting being rounded differently in the TeX log;
+   * string space used;
+   * the `down4' and `right4' commands in the dvitype output;
+   * and the dates and times.
+   All these differences are acceptable.
+
+4. `make clean-triptrap' to get rid of the test programs and output.  You
+   need to do this before making the working versions.
+
+5. `make' to make the working versions of every program in this
+   hierarchy.  If you wish to make a `big' TeX or Metafont, or make a
+   TeX with a large hyphenation trie, now is the time to set up for it.
+   See the section `Changing constants' below.
+
+6. `make formats' to make the format files you want (the variable `formats'
+   in ./Makefile defines the list).  If you don't know what this means,
+   see the section `Format files and preloading' below.
+
+7. `make bases' to make the base files for Metafont that you want.
+   Besides the variable `bases' in ./Makefile, you may also want to
+   change the variable `localmodes'.  It is also a good idea to try to
+   draw something online (if you intend to support that) before
+   installing Metafont, as this often fails to work right on the first
+   try.  See the `Running Metafont' chapter in the Metafontbook.
+
+8. `make install' to install the programs, and `make install-formats
+   install-bases' to install the formats/bases to create links to
+   `virtex' and `virmf' named for each of the formats and bases that you
+   made.  texware/pooltype and texware/patgen are not installed by
+   default, even though they are made, since most sites would never want
+   to run them.
+
+9. `make manpages' to edit the documentation in `man' for the paths and
+   constants you defined in `site.h' and `Makefile'.  Then `make
+   install-manpages' to install them.
+
+10. `make clean' if you intend to compile the programs on another
+    architecture.  Since the .c files are intended to be portable across
+    architectures, they are not removed by this.
+
+11. `make veryclean' when you're all done.  This removes everything that
+   was not in the original distribution (and more besides).
+
+If you wish to make just TeX or Metafont, the top-level Makefile has
+targets named `TeX' and `MF' which make {ini,vir}{tex,mf}, and nothing
+else. Similarly, if you don't want to (or can't) run both the trip and
+trap tests, `Makefile' has targets `run-trip' and `run-trap'.
+
+Ordinarily, you don't need to ever `make' anything in subdirectories,
+but only from the top-level directory.  If you ever do run `make' in a
+subdirectory, you should be aware that they all define their own CC,
+OPT, etc. -- and so you will probably want to change them.
+
+You will also need the latest plain.tex, plain.mf, and other macro
+files.  You can get them from labrea.stanford.edu, in the directory
+tex/lib.  LaTeX's lplain.tex and splain.tex have been updated to work
+with TeX 3.0; if your version of these files don't assign to
+\lefthyphenmin and \righthyphenmin, you should get the new versions.
+
+
+
+Changing constants
+%%%%%%%%%%%%%%%%%%
+The files tex/bigtex.diff and mf/bigmf.diff contain patches to build
+versions of TeX and Metafont with much more memory, pool space, etc.
+You should apply the patches before beginning to compile the programs.
+The 32-bit TeX that results (all of this goes for Metafont, too) will
+have a smaller text segment and run faster, because it doesn't have to
+convert frequently between 16-bit and 32-bit integers.  It is therefore
+a good idea to build such a TeX if possible.
+
+The file tex/trie.diff is a patch that allows for more than 256 ops in
+TeX's hyphenation trie.  This is useful for some non-English languages.
+It was contributed by xitikgun@ddathd21.bitnet.  The file
+tex/bigtrie.diff combines trie.diff and bigtex.diff, as you might guess.
+
+You can obtain the patch program, written by Larry Wall
+<lwall@jpl-devvax.jpl.nasa.gov> from a comp.sources.unix archive, or by
+ftp from his machine (among many other places).  The GNU project has
+made some extensions to path; you can get the GNU version from
+prep.ai.mit.edu.
+
+You should first save the original c{tex,mf}.ch as ctex16.ch or some
+such, because `make veryclean' removes files whose names end in `~',
+`.orig', and others, which would probably wipe out the originals.
+
+Then apply the patches by saying, e.g.,
+% cd tex; patch < bigtex.diff
+
+
+
+Format files and preloading
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+TeX (and Metafont; I'll talk about TeX, but MF is completely analogous)
+can write its memory to a file; such a file is called a ``format file''.
+Why is this interesting?  Because TeX can read a format file much faster
+than the source file that gave rise to it.
+
+To create a format file, you give the command `\dump' to initex after
+reading the source file.  (This is more or less the raison d'etre for
+initex.)  For example:
+% initex
+This is TeX, C Version 3.0
+**plain \dump
+<blurbs>
+Starting to dump on file plain.fmt
+<more blurbs>
+
+Voila, you have a plain.fmt you can install somewhere with `make
+install-formats' (or cp, or whatever).
+
+The `formats' target in ./Makefile and tex/Makefile does the above for the
+formats defined by the make variable $(formats).
+
+Unlike all the other files in the TeX world, format files are not
+perfectly portable.  web2c itself always writes the format files in
+BigEndian order; for formats which do not dump any real (e.g.,
+|glue_ratio|) information, this suffices to make them portable across
+architectures.   Most formats (including plain) do not do this.  But you
+should always check.
+
+Well, I said Metafont is completely analogous, but you actually need to
+do a little more: create a file that defines your local output devices
+(i.e., ``mode_defs'').  A collection of most existing Metafont modes is
+available by ftp from ftp.cs.umb.edu [192.12.26.23]:pub/tex/modes.mf, or
+by email from Karl (if you have modes which are not in this file, please
+send him mail).  Using modes.mf for your local modes wastes a little bit
+of Metafont's memory, but it has several advantages: you can be sure
+that your fonts will be identical to others'; you get extra information
+added to your fonts; you don't have to experiment to find your own
+settings.  modes.mf also explains what goes into a mode_def, and how to
+use Metafont with different devices.  (end of commercial)
+
+Once you have such a file, you say something like the following:
+% inimf
+This is METAFONT, C Version 2.0
+**plain
+<blurbs>
+*input modes
+<blurbs>
+*dump
+<final blurbs>
+
+and you should have a file `plain.base', analogous to TeX's `plain.fmt'.
+
+The target `bases' in ./Makefile and mf/Makefile does the above for the
+bases defined by the make variable $(bases).
+
+TeX uses the name it was invoked with to figure out what format file to
+read.  Therefore, for each format file, you should create a link to the
+virtex executable named the name of the format file.  For example:
+% cd $(bindir)
+% ln virtex tex
+% ln virtex latex
+% ln virtex texinfo
+
+Then, when you run, say,
+% texinfo
+TeX looks for a format file named `texinfo.fmt'.
+All of this goes for Metafont, too.
+./Makefile tries to install these links automatically.
+
+One more thing about format (and base) files: It is possible to
+``preload'' TeX, i.e., avoid reading the .fmt file at runtime.  However,
+on most modern machines, you don't gain a lot of startup time, and you
+lose a lot of disk space.  Furthermore, different flavors of TeX will
+not have their code segments shared.  Therefore, it is probably best not
+to preload, unless, of course, you try that and the response is
+horrible.
+
+You may be wondering what the formats listed in ./Makefile are.  Here is
+a brief description:
+
+tex:
+        from plain.tex; described in the TeXbook.  The Makefile also
+        installs tex.fmt as plain.fmt, so that the constructions
+        described in the TeXbook will work.
+latex:
+	from lplain.tex and latex.tex; described in the LaTeX manual,
+        by Leslie Lamport, published by Addison-Wesley.
+slitex:
+	LaTeX for making slides; also described in the LaTeX manual.
+amstex:
+	especially for mathematical papers; described in the Joy of
+        TeX, by Michael Spivak, published by the American Mathematical
+        Society.
+etex:
+        from eplain.tex; macros for common facilities that plain does
+        not have, e.g., symbolic cross-referencing.  Described in
+        documentation that comes with the macros.
+picplus:
+	helps to make pictures; described in the PiCTeX manual, by
+        Michael Wichura, published by the TeX Users Group.
+
+You can get more information about these packages and order the manuals
+from TUG.
+
+Here is some data collected by Ken Yap <ken@cs.rochester.edu> on a
+Sun 3/60 running Sun Unix 3.4 on preloaded vs. non-preloaded format
+files, and also 16-bit vs. 32-bit.
+
+    16 bit, unloaded:  42.1u 1.4s 0:50 86% 10+29k 72+17io 0pf+0w
+    16 bit, preloaded: 41.7u 0.9s 0:46 90% 10+27k 4+17io 80pf+0w
+    32 bit, unloaded:  42.4u 1.7s 0:47 92% 10+52k 95+17io 0pf+0w
+    32 bit, preloaded: 41.6u 1.2s 0:48 88% 10+47k 5+17io 102pf+0w
+
+    It is interesting that i/o is traded off with page faulting, as is to
+    be expected. Also 32 bit unloaded runs slightly faster than 16 bit
+    unloaded, in spite of more i/o.
+
+    Sizes:
+    text    data    bss     dec     hex
+    180224  16384   587868  784476  bf85c   virtex (16 bit)
+    180224  630784  0       811008  c6000   latex (32 bit)
+    172032  16384   3110692 3299108 325724  virtex (32 bit)
+    172032  3153920 0       3325952 32c000  latex (32 bit)
+
+    File sizes:
+    -rwxr-xr-x  1 ken        196608 Jun 29 15:57 virtex (16 bit)
+    -rwxr-xr-x  1 ken        811008 Jun 29 15:58 latex (32 bit)
+    -rwxr-xr-x  1 ken        188416 Jun 29 15:34 virtex (32 bit)
+    -rwxr-xr-x  1 ken       3325952 Jun 29 15:36 latex (32 bit)
+
+
+
+Directory hierarchies
+%%%%%%%%%%%%%%%%%%%%%
+TeX and its friends use many different sorts of files: fonts, macros,
+format dumps, pool files, etc.  When you install TeX, you have to decide
+how everything should be organized.
+
+The most painful thing to organize is the fonts.  There are both the
+.tfm files, which TeX and some DVI-readers need, and the PXL/GF/PK
+files, one for each point size and resolution, which only the
+DVI-readers look at.  Here are some of the common approaches:
+
+1) Put everything in one directory, say /usr/local/lib/tex/fonts. 
+Advantages: it's simple; everything is together; it's easy to tell if a
+particular file exists.  Disadvantage: the directory is huge.
+
+2) Put each set of pixel files at a given resolution (i.e.,
+magnification) in a different directory, and put the TFM files in
+another directory.  Advantage: the directories are smaller. 
+Disadvantage: the files for any given typeface are not together.
+
+3) Put each typeface family in a different subdirectory; e.g., have
+subdirectories `cm' (Computer Modern), `pandora', `euler', etc.
+Advantage: the files for a given typeface are together.  Disadvantage:
+most DVI-readers will not automatically look in subdirectories of
+TEXFONTS.  (As of web2c 5.0d, TeX, Metafont, and all their companion
+programs look for subdirectories if SEARCH_SUBDIRECTORIES is defined in
+site.h at compilation time.)  dvips (perhaps the most widely used
+dvi-to-PostScript translator), and xdvi (a previewer running under X11
+or X10) both know how to search subdirectories.
+
+
+
+Online output from Metafont
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Metafont in C can be compiled to support multiple window systems. 
+You say which you want via definitions in `site.h'.  You also have to say
+which system libraries should be linked into the library in `./Makefile'..
+
+There are two versions of the X11 support in mf/MFwindow.  One is based
+on Xt, one on Xlib.  The Xt version is faster and has more
+functionality, so if it works on your system, you should use it.  It is
+the default.  But if it fails, you can try the Xlib version.
+
+There are also two version of the Sun support in mf/MFwindow.  One is
+based on Sunview, the other on Suntools (i.e., the gfx_hs structure).
+The former has more functionality, and it works on recent versions of
+SunOS, so it is the default.
+
+Defining more devices is fairly straightforward.  A file should be put
+in mf/MFwindow to support the actual interface routines, all of which
+are described in the Metafont source.  Then you need to add another
+entry to the tables in `mf/extra.c'; that should be it.
+
+
+
+Portability
+%%%%%%%%%%%
+The C code generated by the web2c translator is intended to be as
+portable as possible (for any given set of definitions in site.h).  If
+you find bugs or portability programs with the generated code, report
+them to Tim.
+
+The generated code assumes that the type `short' has at least the range
+-32768..32767, and that `unsigned short' has at least the range
+0..65535.  If this isn't the case, the translator will have to be
+modified.
+
+Also, if you change the type of `integer' in site.h to something other
+than `long', you will have to modify web2c/fixwrites.c, since it
+generates code to integer output using "%ld", and casts all integral
+values to be printed to |long|.
+
+The file common/extra.c defines routines `clearterminal' and
+`wakeupterminal', written for machines running BSD.  If you're not on
+such a machine, you may wish to write your own version of the routines
+(and please send them to Karl).
+
+On another front, various of the `convert' scripts assume some basic
+Unix utilities: basename, cat, cp, diff, ln, make, mv, rm, sed, and
+touch.  The Bourne shell is also assumed.  If your system versions are
+broken, you can try the GNU versions, available by anonymous ftp from
+prep.ai.mit.edu in pub/gnu, among many other places.  The GNU C compiler
+is also better (more reliable, faster, and produces better code) than
+many other C compilers, so you might want to get that.  For more
+information about the GNU project, write to gnu@prep.ai.mit.edu.

@@ -1,0 +1,25 @@
+	title	ZEROM - C function to zero memory
+COMMENT #
+Zero a block of memory with a fast BLT instruction.
+
+Usage:	(void)zerom(array,length);
+#
+	search	$mdefs
+	twoseg	$text
+	entry	zerom
+
+define	array	<-1(p)>		;n-th arg always at -n(fp)
+define	length	<-2(p)>		;and here we have fp=p for speed
+
+zerom:	skipg	length
+	 jrst	done		;exit if length <= 0
+	hrl	1,array		;[array,,]
+	hlr	1,1		;[array,,array]
+	hrrz	2,1		;[0,,array]
+	setzm	0(2)		;array[0] = 0
+	add	2,length	;[0,,array+length]
+	addi	1,1		;[array,,array+1] = BLT control word
+	blt	1,-1(2)		;clear the array up to array+length-1
+done:
+	popj	p,		;return to caller
+	end

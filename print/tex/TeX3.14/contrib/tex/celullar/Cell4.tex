@@ -1,0 +1,355 @@
+% File:       TeX Inputs Cell4.tex
+% Author:     J E Pittman
+% Bitnet:     JEPTeX@TAMVenus
+% Internet:   JEPTeX@Venus.TAMU.EDU
+% Date:       November 8, 1988
+%
+% Set up to output the data.
+%
+\catcode`_=11 % Protect local control sequence names.
+%
+% The user supplied information about the column has already been 
+% processed.
+%
+\def\column #1{\relax\ignorespaces}%
+%
+\row_number=0
+\rowpenalty=0
+%
+% This routine is used for horizontal kerning when there might be a 
+% kern to the left of the current position.
+%
+\def\move_right_via_lastkern #1{\relax
+   \temp_dimen=#1\relax
+   \ifdim \lastkern>\zeropt
+      \advance \temp_dimen \by \lastkern
+      \unkern
+   \else
+   \fi
+   \kern \temp_dimen
+   }%
+%
+% \row begins a row by getting its specifications, terminating the 
+% previous row (if any) and going into horizontal mode.
+%
+\def\row #1{\relax
+   \advance \row_number \by 1
+   \everyrow
+   \get_row_number_data
+   \advance \rowheight \by \expansion
+   \ifdim \bottomrulewidth>\zeropt
+      \advance \bottomrulewidth \by \horizontal_rule_adjust
+   \fi
+   \column_number=0
+   \par
+   \ifnum \rowpenalty=0
+   \else
+      \penalty \rowpenalty
+      \rowpenalty=0
+   \fi
+   \noindent
+   \ignorespaces
+   \message{Outputting row \the\row_number.}%
+   }%
+%
+% \blank creates a blank cell by kerning the appropriate amount.
+%
+\def\blank {\relax
+   \advance \column_number \by 1
+   \everycolumn
+   \get_column_number_data
+   \advance \columnwidth \by \expansion
+   \advance \merge_width \by \expansion
+   \move_right_via_lastkern \merge_width
+%
+% Terminate merger(s).
+%
+   \merge_width=\zeropt
+   \merge_columns=0
+   \ifnum \merge_rows>0
+      \add_column_number_data
+            {\merge_rows=0\relax\merge_height=\zeropt\relax}%
+   \fi
+   }%
+%
+% \cell outputs a cell.  The components of the cell are (in the order 
+% output) the entry, the top ruler, the bottom ruler, and the left and 
+% right rulers.
+%
+\def\cell #1{\relax
+   \advance \column_number \by 1
+   \everycolumn
+   \get_column_number_data
+   \advance \columnwidth \by \expansion
+   \advance \merge_height \by \rowheight
+   \advance \merge_width \by \columnwidth
+   \ifdim \leftrulewidth>\zeropt
+      \advance \leftrulewidth \by \vertical_rule_adjust
+   \fi
+   \ifdim \rightrulewidth>\zeropt
+      \advance \rightrulewidth \by \vertical_rule_adjust
+   \fi
+%
+% Get the correct top border skip and rule width.  Note that it is 
+% necessary to extract this informaion even if a row merger is not 
+% present because a previous row merger might have left the wrong 
+% values.
+%
+   \begingroup
+      \advance \row_number \by -\merge_rows
+      \everyrow
+      \get_row_number_data
+      \xdef\globaltemp{\topborderskip=\the\topborderskip\relax
+         \toprulewidth=\the\toprulewidth\relax
+         }%
+      \aftergroup \globaltemp
+      \endgroup
+   \ifdim \toprulewidth>\zeropt
+      \advance \toprulewidth \by \horizontal_rule_adjust
+   \fi
+%
+% Same procedure for the left border skip and rule width except that 
+% extraction is necessary only in the presense of a column merger due 
+% to the execution of an every column and a get at the start of \cell.  
+%
+   \ifnum \merge_columns>0
+      \begingroup
+         \advance \column_number \by -\merge_columns
+         \everycolumn
+         \get_column_number_data
+         \xdef\globaltemp{\leftrulewidth=\the\leftrulewidth\relax
+            \leftborderskip=\the\leftborderskip\relax
+            }%
+         \aftergroup \globaltemp
+         \endgroup
+      \ifdim \leftrulewidth>\zeropt
+         \advance \leftrulewidth \by \vertical_rule_adjust
+      \fi
+   \fi
+%
+% Typeset the entry into temp box horizontally first, trying kerns 
+% before glue in case the cell does not require horizontal stretching 
+% and taking advantage of an empty cell by doing nothing, if such is 
+% the case.
+%
+   \setbox\temp_box=\hbox{#1}%
+   \ifdim\wd\temp_box>\zeropt
+      \setbox\temp_box=\hbox \bgroup
+         \kern \leftborderskip
+         \box\temp_box
+         \egroup
+      \temp_dimen=\wd\temp_box
+      \advance\temp_dimen \by \rightborderskip
+      \wd\temp_box=\temp_dimen
+%
+      \ifdim\wd\temp_box=\merge_width
+%
+% then the kerns can be used instead of skips.
+%
+      \else
+         \setbox\temp_box=\hbox \to \merge_width \bgroup
+            \hskip \leftborderskip
+            #1%
+            \hskip \rightborderskip
+            \egroup
+      \fi
+%
+% Hide the width of temp box and put a phantom into it the hard way.
+%
+      \wd\temp_box=\zeropt
+      \setbox\scratch_box=\hbox{#1)}%
+      \ifdim \dp\scratch_box>\dp\temp_box
+         \dp\temp_box=\dp\scratch_box
+      \fi
+      \ifdim \ht\scratch_box>\ht\temp_box
+         \ht\temp_box=\ht\scratch_box
+      \fi
+%
+      \temp_dimen=\ht\temp_box
+      \advance \temp_dimen \by \dp\temp_box
+      \advance \temp_dimen \by \bottomborderskip
+      \advance \temp_dimen \by \topborderskip
+      \ifdim \temp_dimen=\merge_height
+%
+% then the entry can be positioned vertically via a raise statement.  
+% The total height of the material output should be equal to the row 
+% height, thus acting as a strut.
+%
+         \temp_dimen=\bottomborderskip
+         \advance \temp_dimen \by \dp\temp_box
+         \scratch_dimen=\rowheight
+         \advance\scratch_dimen by -\temp_dimen
+         \ht\temp_box=\scratch_dimen
+         \raise \temp_dimen \box\temp_box
+      \else % have to do it via a box
+         \setbox\temp_box=\vbox \to \rowheight \bgroup
+%
+% Subtracting merge height - row height from top border skip allows 
+% the cell to stick up into the next row by an appropriate amount.
+%
+            \advance \topborderskip \by \rowheight
+            \advance \topborderskip \by -\merge_height
+            \vskip \topborderskip
+            \box\temp_box
+            \vskip \bottomborderskip
+            \egroup
+         \box\temp_box
+      \fi
+   \fi
+%
+% All of the rules are typeset with an overlap of at least pixel width 
+% which insures that there will be no gaps.
+%
+% Typeset the top rule into an hbox and use a raise statement to put 
+% it into position.
+%
+   \ifdim \toprulewidth>\zeropt
+      \setbox\temp_box=\hbox \bgroup
+         \temp_dimen=\merge_width
+         \ifdim \half\leftrulewidth<\pixelwidth
+            \kern -\pixelwidth
+         \else
+            \kern -\half\leftrulewidth
+         \fi
+         \advance \temp_dimen \by -\lastkern
+         \vrule \height \half\toprulewidth
+                \depth  \half\toprulewidth
+                \width  \temp_dimen
+         \ifdim \half\rightrulewidth<\pixelwidth
+            \temp_dimen=\pixelwidth
+         \else
+            \temp_dimen=\half\rightrulewidth
+         \fi
+         \kern -\temp_dimen
+         \vrule \height \half\toprulewidth
+                \depth  \half\toprulewidth
+                \width  2\temp_dimen
+         \egroup
+      \wd\temp_box=\zeropt
+      \temp_dimen=\rowheight
+      \advance\temp_dimen \by -\merge_height
+      \ht\temp_box=\temp_dimen
+      \dp\temp_box=\merge_height
+      \raise \merge_height \box\temp_box
+   \fi
+%
+% Output the bottom rule using the same methods.
+%
+   \ifdim \bottomrulewidth>\zeropt
+      \setbox\temp_box=\hbox \bgroup
+         \temp_dimen=\merge_width
+         \ifdim \half\leftrulewidth<\pixelwidth
+            \kern -\pixelwidth
+         \else
+            \kern -\half\leftrulewidth
+         \fi
+         \advance \temp_dimen \by -\lastkern
+         \vrule \height \half\bottomrulewidth
+                \depth  \half\bottomrulewidth
+                \width  \temp_dimen
+         \ifdim \half\rightrulewidth<\pixelwidth
+            \temp_dimen=\pixelwidth
+         \else
+            \temp_dimen=\half\rightrulewidth
+         \fi
+         \kern -\temp_dimen
+         \vrule \height \half\bottomrulewidth
+                \depth  \half\bottomrulewidth
+                \width  2\temp_dimen
+         \egroup
+      \wd\temp_box=\zeropt
+      \dp\temp_box=\zeropt
+      \ht\temp_box=\rowheight
+      \box\temp_box
+   \fi
+%
+% Test to see if the left inclusive-or right rule width is non-zero.
+%
+   \ifdim \leftrulewidth=\zeropt
+      \temp_dimen=\rightrulewidth
+   \else
+      \temp_dimen=\leftrulewidth
+   \fi
+   \ifdim \temp_dimen>\zeropt
+      \setbox\temp_box=\hbox \bgroup
+         \temp_dimen=\merge_height
+         \advance \merge_height \by \pixelwidth
+         \ifdim \leftrulewidth>\zeropt
+            \kern -\half\leftrulewidth
+            \vrule \height \temp_dimen
+                   \depth  \pixelwidth
+                   \width  \leftrulewidth
+         \fi
+         \ifdim \rightrulewidth>\zeropt
+            \scratch_dimen=\merge_width
+            \advance \scratch_dimen \by -\half\leftrulewidth
+            \advance \scratch_dimen \by -\half\rightrulewidth
+            \kern \scratch_dimen
+            \vrule \height \temp_dimen
+                   \depth  \pixelwidth
+                   \width  \rightrulewidth
+         \fi
+         \egroup
+      \wd\temp_box=\merge_width
+      \ht\temp_box=\rowheight
+      \dp\temp_box=\zeropt
+      \box\temp_box
+   \else
+      \move_right_via_lastkern \merge_width
+   \fi
+%
+% Cancel the mergers.
+%
+   \merge_width=\zeropt
+   \merge_columns=0
+   \ifnum \merge_rows>0
+      \add_column_number_data
+            {\merge_rows=0\relax\merge_height=\zeropt\relax}%
+   \fi
+   \ignorespaces
+   }%
+%
+% No surprises here.
+%
+\def\mergeright {\relax
+   \advance \column_number \by 1
+   \everycolumn
+   \get_column_number_data
+   \advance \columnwidth \by \expansion
+   \advance \merge_width \by \columnwidth
+   \advance \merge_columns \by 1
+   \ifnum \merge_rows>0
+      \add_column_number_data
+            {\merge_rows=0\relax\merge_height=\zeropt\relax}%
+   \fi
+   }%
+%
+% No surprises here.
+%
+\def\mergedown {\relax
+   \advance \column_number \by 1
+   \everycolumn
+   \get_column_number_data
+   \advance \columnwidth \by \expansion
+   \advance \merge_width \by \columnwidth
+   \move_right_via_lastkern \merge_width
+   \merge_width=\zeropt
+   \merge_columns=0
+   \advance \merge_height \by \rowheight
+   \let\info=\relax
+   \edef\temp{\the\column_number>\info
+         {\merge_height=\the\merge_height\relax
+         \advance\merge_rows \by 1\relax}}%
+   \let\info=\column_info
+   \x_after \add_data \temp
+   \rowpenalty=10000 % do not allow a break over a row merge.
+   }%
+%
+\catcode`_=8 % Back to normal.
+%
+\def\noalign#1{\relax
+   \vadjust{#1}%
+   \ignorespaces
+   }%
+%
+\endinput

@@ -1,0 +1,132 @@
+% File:       TeX Inputs Cell3.tex
+% Author:     J E Pittman
+% Bitnet:     JEPTeX@TAMVenus
+% Internet:   JEPTeX@Venus.TAMU.EDU
+% Date:       October 11, 1988
+%
+% Process the column and row span info.
+%
+\declaredimen\expansion
+%
+\edef\everycolumn{\everycolumn\expansion=\zeropt\relax}%
+\edef\everyrow{\everyrow\expansion=\zeropt\relax}%
+%
+\catcode`_=11 % used to protect local control sequence names.
+%
+%\message{\string\row_span_info=\the\row_span_info}% debug
+%\message{\string\column_span_info=\the\column_span_info}% debug
+%
+\def\process#1#2#3{\relax
+   \last_cell=#3\relax
+   \first_cell=\last_cell
+   \advance \first_cell \by -#1\relax
+   \span_size=#2\relax
+%
+% Compute the gap between the size of the span and the total size of 
+% the cells spanned.
+%
+   \gap=\span_size
+   \forcount \cell_number=\first_cell to \last_cell by 1 do
+      \everycell
+      \get_cell_number_data
+      \advance \gap \by -\cell_size
+      \advance \gap \by -\expansion
+      \endfor \cell_number
+%  \message{\string\first_cell=\the\first_cell}% debug
+%  \message{\string\last_cell=\the\last_cell}% debug
+%  \message{\string\span_size=\the\span_size}% debug
+%  \message{\string\gap=\the\gap}% debug
+%
+% If the gap is 0pt or less, nothing needs to be done, else search for 
+% the minimum expansion that can be applied to every cell with a 
+% current expansion less than the expansion found such that the span 
+% is properly accomadated.
+%
+   \ifdim \gap>\zeropt
+      \expandable_cells=#1\relax
+      \advance \expandable_cells \by 1
+      \trial_expansion=\zeropt
+      \whilenot\search \ifdim\gap=\zeropt do
+%        \message{\string\gap=\the\gap}% debug
+         \ifnum \expandable_cells=0
+            \advance \trial_expansion \by \expansion
+         \else
+            \multiply \trial_expansion \by \expandable_cells
+            \advance \trial_expansion \by \gap
+            \divide \trial_expansion \by \expandable_cells
+            \expandable_cells=0
+         \fi
+         \gap=\span_size
+%        \message{\string\trial_expansion=\the\trial_expansion}% debug
+         \forcount \cell_number=\first_cell to \last_cell by 1 do
+            \everycell
+            \get_cell_number_data
+            \advance \gap \by -\cell_size
+            \ifdim \expansion>\trial_expansion
+               \advance \gap \by -\expansion
+            \else
+               \advance \gap \by -\trial_expansion
+               \advance \expandable_cells \by 1
+            \fi
+            \endfor \cell_number
+         \temp_dimen=1sp
+         \multiply \temp_dimen \by \expandable_cells
+         \ifdim \gap>-\temp_dimen
+            \ifdim \gap<\temp_dimen
+               \gap=\zeropt
+            \fi
+         \fi
+         \endwhilenot \search
+      \forcount \cell_number=\first_cell to \last_cell by 1 do
+         \everycell
+         \get_cell_number_data
+         \ifdim \expansion<\trial_expansion
+            \let\info=\relax
+            \edef\temp{\the\cell_number>\info
+                  {\expansion=\the\trial_expansion\relax}}%
+            \let\info=\cell_info
+            \x_after \add_data \temp
+            \ifnum\tracingexpansions>0
+               \message{Expanded \the\cell_number}%
+               \message{by \the\trial_expansion}%
+               \message{from \the\cell_size}%
+               \advance \cell_size \by \trial_expansion
+               \message{to \the\cell_size.}%
+            \fi
+         \fi
+         \endfor \cell_number
+   \fi
+   }%
+%
+\declarecount\first_cell
+\declarecount\last_cell
+\declaredimen\span_size
+\let\expandable_cells=\temp_count
+\declaredimen\trial_expansion
+\let\gap=\scratch_dimen
+%
+\let\cell_number=\row_number
+\let\everycell=\everyrow
+\let\get_cell_number_data=\get_row_number_data
+\let\cell_info=\row_info
+\let\cell_size=\rowheight
+\ifnum\tracingexpansions>0
+   \message{Checking row expansions.}%
+\fi
+\the\row_span_info
+%
+\let\cell_number=\column_number
+\let\everycell=\everycolumn
+\let\get_cell_number_data=\get_column_number_data
+\let\cell_info=\column_info
+\let\cell_size=\columnwidth
+\ifnum\tracingexpansions>0
+   \message{Checking column expansions.}%
+\fi
+\the\column_span_info
+%
+\let\process=\relax
+%
+\catcode`_=8 % back to normal
+%
+\endinput

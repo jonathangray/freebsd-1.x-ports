@@ -1,0 +1,195 @@
+%%% TUGPROC.sty  03-feb-90 (renamed 13-feb-90) 20-feb-90
+%%%                          
+%%% Supplementary header file for TUG Proceedings volume
+%%% for use with plain.tex  (under revision still)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\input tugboat.sty
+
+\makeatletter
+
+% fonts
+
+\font\twelverm=cmr10 scaled 1200
+%\font\twelveit=cmti10 scaled 1200      % see below
+%\font\twelvesl=cmsl10 scaled 1200      %       "
+\font\twelvebf=cmbx10 scaled 1200       
+%\font\twelvett=cmtt10 scaled 1200      %       "
+\font\fourteenrm=cmr10 scaled 1440
+\font\fourteenit=cmti10 scaled 1440
+\font\fourteensl=cmsl10 scaled 1440
+%\font\fourteenbf=cmbx10 scaled 1440    %       "
+%\font\fourteentt=cmtt10 scaled 1440    %       "
+
+\def\twelvepoint{%
+  \normalbaselineskip=14pt
+  \def\rm{\fam\z@\twelverm}%
+  \textfont\z@=\twelverm
+%  \def\it{\fam\itfam\twelveit}%        % with these all
+%  \textfont\itfam=\twelveit            % things left in,
+%  \def\sl{\fam\slfam\twelvesl}%        % pcTeX (v.2.931)
+%  \textfont\slfam=\twelvesl            % has no room for
+  \def\bf{\fam\bffam\twelvebf}%
+  \textfont\bffam=\twelvebf 
+%  \def\tt{\twelvett}%                  % \LoadSansFonts
+%  \setttglue                           %       "
+  \normalbaselines \rm}
+
+\def\fourteenpoint{%
+  \normalbaselineskip=18pt
+  \def\rm{\fam\z@\fourteenrm}%
+  \textfont\z@=\fourteenrm
+  \def\it{\fam\itfam\fourteenit}%
+  \textfont\itfam=\fourteenit
+  \def\sl{\fam\slfam\fourteensl}%
+  \textfont\slfam=\fourteensl
+%  \def\bf{\fam\bffam\fourteenbf}%      %       "
+%  \textfont\bffam=\fourteenbf          %       "
+%  \def\tt{\fourteentt}%                %       "
+%  \setttglue                           %       "
+  \normalbaselines \rm}
+
+\def\AUTHORfont{\twelvepoint\rm}
+\def\HEADfont{\twelvepoint\bf}
+\def\TITLEfont{\fourteenpoint\rm}
+\def\addressfont{\ninepoint\rm}
+\def\netaddrfont{\ninepoint\tt}
+
+\def\br{\unskip\hfil\break}             % version for titles
+\def\degrade{\def\br{\unskip\space\ignorespaces}} % in running heads.
+
+% running heads & feet
+\newif\ifpreprint \def\preprint{\preprinttrue} \preprintfalse
+\let\midrtitle=\null
+\def\rtitlex{%
+   \ifodd\pageno\degrade\rhTitle\else\rhAuthor\fi}
+\def\rtitle{%
+   \hbox to \pagewd{%
+      \tenrm
+      \makestrut[10pt;\z@]%
+      \ifnum\the\pageno=1\space\else
+      \ifodd\pageno
+         \hfill\rtitlex
+      \else
+         \rtitlex\hfill
+      \fi\fi
+      }%
+   }      
+
+\pageno=1
+\def\Pageno{\ifnum\pageno>999
+      \number\pageno
+   \else\ifnum\pageno>99
+      0\number\pageno
+   \else\ifnum\pageno>9
+      00\number\pageno
+   \else
+      000\number\pageno
+   \fi\fi\fi}
+
+\def\rfoot{%
+   \hbox to \pagewd{%
+      \tenrm
+      \makestrut[\z@;0.5pc]%
+      \ifpreprint
+         \ifodd\pageno
+            \pfoottext\hfil\Now\hfil\number\pageno
+         \else
+            \number\pageno\hfil\Now\hfil\pfoottext
+         \fi
+      \else
+         \ifodd\pageno
+            \rfoottext\hfil\Pageno
+         \else
+            \Pageno\hfil\rfoottext
+         \fi
+      \fi
+      }%
+   }
+
+\def\pfoottext{{\smc Preprint}: 1990 \TUG\ Annual Meeting}
+
+\def\rfoottext{\TUB, Volume 11 (1990), No.\ 3\Dash 
+   1990 Conference Proceedings}
+
+% Verbatim, smallcode
+\def\smallcode{\ninepoint\tt\baselineskip=10pt}
+
+% Bibliography
+\def\Hang{1em} 
+\def\entry #1{\noindent\frenchspacing\hangindent\Hang #1}
+
+% Appendix
+\def\appendix #1\endappendix{\newpage\onecol\centerline{\HEADfont #1}}
+
+% Box for deadlines:
+\newbox\textbox         % \twocolcolwd=18.75pc [cf. tugboat.sty]
+\long\def\boxit #1{\vbox{\hrule\hbox{\vrule\kern3pt
+   \vbox{\kern3pt\vskip 4pt#1\vskip 4pt\kern3pt}\kern3pt\vrule}\hrule}}
+\long\def\boxedlist #1{$$\boxit{\setbox\textbox=\vbox{\hsize 18pc
+   \strut{#1}\strut}\box\textbox}$$}  % TeXbook, 94 & 223 (exer 21.3)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% top matter
+\def\Title #1\endTitle{\def\@title{{\hsize\pagewd\TITLEfont
+   \raggedright\noindent #1\par}}\def\rhTitle{#1}}
+        % If your title is too long for the running head,
+        % use this to construct a shorter version:
+\def\shortTitle #1\endshortTitle{\def\rhTitle{#1}}
+\newcount\authors \newcount\@authors \authors=0 \@authors=0
+\def\Author #1\endAuthor{\global\advance\authors by 1
+   \expandafter\def\csname @author\number\authors\endcsname
+      {\baselineskip=\normalbaselineskip
+      \vskip 20pt\noindent{\AUTHORfont #1}}
+      \ifnum\authors=1\def\rhAuthor{#1}\fi
+   }%  
+        % Use the following for running heads if more than
+        % one author or author's name is too long to fit:
+\def\shortAuthor #1\endshortAuthor{\def\rhAuthor{#1}}
+\def\address #1\endaddress{\expandafter
+   \def\csname @addr\number\authors\endcsname
+      {\hsize\pagewd\par\noindent
+      {\addressfont #1}}}
+\def\netaddress #1\endnetaddress{\expandafter
+   \def\csname @neta\number\authors\endcsname
+      {\hsize\pagewd\par\noindent
+      {\netaddrfont #1}}}
+\long\def\Abstract #1\endAbstract{\long\def\@abstract{\vskip 20pt
+   \hbox to \pagewd{\hfil\vbox{\hsize 0.6\pagewd
+   \centerline{\bf Abstract}\vskip 5pt
+   \baselineskip=\normalbaselineskip\noindent #1\par}\hfil}}}
+\newbox\startbox \newdimen\startheight
+\def\article{\setbox\startbox=\hbox to\colwd
+   {\hbox to\pagewd{\vbox{\@title
+   \advance\authors by 1
+   \loop
+      \advance\@authors by 1
+   \ifnum\@authors<\authors
+      \csname @author\number\@authors\endcsname
+      \csname @addr\number\@authors\endcsname
+      \csname @neta\number\@authors\endcsname
+   \repeat
+   \@abstract\vskip 1pc}}\hss}
+   \global\startheight=1\ht\startbox
+   \twocolfigure\box\startbox\endfigure}
+
+% \head  (This writes over a definition in tugboat.sty)
+\def\@domainhead{%              
+  \if@removeprewhite\else\vskip\baselineskip\fi
+  \noindent{\HEADfont\baselineskip15pt % larger type than usual
+    \raggedright\bf\ignorespaces\the\@argument\unskip\endgraf}%
+  \if@removepostwhite          %  usually we want the white space
+  \else\kern0.5\baselineskip\fi
+  \nobreak
+  \gdef\@next{%
+    \if@allowindent\def\@next{}%  usually we don't want to indent here
+    \else\def\@next{\DeleteOptionalSpacesandPars{\noindent\ignorespaces}}\fi
+    \@next
+    }%
+  }
+
+\makeatother
+
+\endinput

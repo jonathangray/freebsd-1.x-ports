@@ -1,0 +1,516 @@
+[The patches TeX-01.5.diffs, below, have already been applied to this 
+TeX distribution and should NOT be applied again.]
+
+Notes on installing Gunther Schadow's TeX package under FreeBSD
+-----
+1) Apply the patches in TeX-01.5.diffs, listed below, and make a usr 
+   directory:
+	$ tar zxf TeX01.5.tar.z
+	$ cd ./TeX01.5
+	$ mkdir ./usr
+	$ patch <../TeX-01.5.diffs
+2) Before the xdvi previewer can be built, XFree86 must be installed, and:
+	$ ln -s /usr/X386/include/X11 /usr/include/X11
+3) Edit TeX0.15/Makefile for your site [ by default, TeX is installed under
+   /usr/local/ and fonts are generated for a laser printer (HP-style) at 360 
+   dpi ].  Then:
+	$ make
+	$ make 	# make stops after updating Makefile.inc, the first time
+	$ make install
+4) After TeX has been installed, copy the files in ./usr
+   to the HOME directory of each TeX user:
+   	$ cp ./usr/.Xdefauts* $HOME/.Xdefaults-`hostname`
+   	$ cp ./usr/texsetup.* $HOME/
+   	$ ( 
+   	cd $HOME
+   	cat >> .cshrc <<EOF
+   	source texsetup.csh
+   	EOF
+   	cat >> .bashrc <<EOF
+   	. texsetup.sh
+   	EOF
+   	)
+   And create a private TeX library in each TeX user's HOME directory:
+   	$ cp -R ./usr/TeX $HOME/
+5) When running tex or latex or texi2dvi, TeX sometimes complains
+   about missing metric files (.tfm).  If the corresponding MetaFont
+   (.mf) files exist (in lib/TeX/mf/inputs), the metric can be
+   built with the `mftopk' command.  First select a device from 
+   the list displayed by:
+	$ mftopk -d help
+   Then to build the missing metric with:
+	$ mftopk -d device-name font-name ...  
+   For example, if TeX stops with the error:
+
+! Font \textbf=cmb10 scaled 1095 not loadable: Metric (TFM) file not found.
+\mainmagstep ->1095
+
+   you must quit TeX and build the cmb10.tfm metric:
+	$ mftopk -d hplaser cmb10
+
+   [ Multiple device support: while font metrics are device 
+   independent, the font (.pk) files themselves in general are not.
+   Therefore separate logins may be necessary for each type of
+   printing device supported.  In this case, when using dvips(1),
+   be sure to specify a METAFONT mode via its -G option (see dvips(1)
+   and mftopk(1)).
+
+   Mathematically, if res1= res2*(1.2)^n, for some integer n >= 0,
+   where res is the device resolution, then the font files should
+   be kept separate.  E.g., 300 dpi and 360 dpi devices should use
+   separate logins. ]
+
+6) Finally, it is recommended that you get a copy of GNU's texinfo
+   (and, in particular, texi2dvi for converting GNUS's .texi
+   documenation files into TeX's .dvi format), and GNU's ghostscript
+   PostScript interpreter for converting PostScript data to
+   device-specific format (e.g., for printing on a dot-matrix
+   printer, or viewing under X).  If there is a dvixxx driver for
+   your printer, then you can print .dvi files directly.  Otherwise,
+   convert .dvi files to PostScript format using dvips(1), and
+   print using ghostscript.  Hint: look in the TeX01.5/dvips-*/contrib
+   directory for some interesting applications (like psfig, for
+   incorporating PostScript figures in a LaTeX document.)
+
+---- Begin of TeX-01.5.diffs ----
+*** Makefile.orig	Tue May 25 09:24:09 1993
+--- Makefile	Mon Jul 19 16:21:03 1993
+***************
+*** 6,17 ****
+  ##
+  
+  ### how to call the compiler, including optimization or debug
+! CC=gcc2 -O2
+  #-m486
+  
+  ### how to install files (stripped, and mode will be selected
+  ### automaticaly) 
+! INSTALL=install -o gunther -g tex
+  
+  ###########################################################################
+  ## Default settings
+--- 6,17 ----
+  ##
+  
+  ### how to call the compiler, including optimization or debug
+! CC=gcc -O2
+  #-m486
+  
+  ### how to install files (stripped, and mode will be selected
+  ### automaticaly) 
+! INSTALL=install -c -o bin -g bin
+  
+  ###########################################################################
+  ## Default settings
+***************
+*** 26,32 ****
+  
+  ### For METAFONT/modes.mf/mftopk: which is the default device? There
+  ### are a lot, see ./scripts/modes.mf.raw for what you have.
+! DEFDEV=EpsonMXFX
+  
+  ### still for METAFONT: default window geometry for online graphics
+  ### output. (Normally needs not to be changed)
+--- 26,32 ----
+  
+  ### For METAFONT/modes.mf/mftopk: which is the default device? There
+  ### are a lot, see ./scripts/modes.mf.raw for what you have.
+! DEFDEV=CanonCX
+  
+  ### still for METAFONT: default window geometry for online graphics
+  ### output. (Normally needs not to be changed)
+***************
+*** 35,41 ****
+  
+  ### For ANY DVI-DRIVER (Beebe, dvips and xdvi): The default resolution
+  ### given in dpi
+! DEFRES=240
+  
+  ### For DVIPS and XDVI: The "last resort" fontsizes, if no better PK,
+  ### GF or PXL font was found, try these sizes. This isn't really
+--- 35,41 ----
+  
+  ### For ANY DVI-DRIVER (Beebe, dvips and xdvi): The default resolution
+  ### given in dpi
+! DEFRES=360
+  
+  ### For DVIPS and XDVI: The "last resort" fontsizes, if no better PK,
+  ### GF or PXL font was found, try these sizes. This isn't really
+***************
+*** 44,50 ****
+  ###
+  ### resolution*(1.2**n) ; n: 1..5
+  ###
+! RESRES=120:240
+  
+  ### For XDVI: the default aspect ratio, given in vertical resolution
+  ### devided by horizontal resolution and multiplied with 1000. (eg.
+--- 44,50 ----
+  ###
+  ### resolution*(1.2**n) ; n: 1..5
+  ###
+! RESRES=360:432
+  
+  ### For XDVI: the default aspect ratio, given in vertical resolution
+  ### devided by horizontal resolution and multiplied with 1000. (eg.
+***************
+*** 55,61 ****
+  ### For DVIPS: which output method shall be used. You don't really 
+  ### want to change this, since it's the filter mode PSOUT=f which
+  ### anything else relies on
+! PSOUT=f
+  
+  ###########################################################################
+  ## What to make
+--- 55,61 ----
+  ### For DVIPS: which output method shall be used. You don't really 
+  ### want to change this, since it's the filter mode PSOUT=f which
+  ### anything else relies on
+! PSOUT=
+  
+  ###########################################################################
+  ## What to make
+***************
+*** 75,81 ****
+  ###	dvialw	dvibit	dvican	dvie72	dvieps	dvigd	dviimp
+  ###	dvijep	dvijet	dvil3p	dvil75	dvim72	dvimac	dvimpi
+  ###	dvioki  dviprx	dvitos	dvio72  all     none
+! BEEBEDRV=dvieps
+  
+  ### INTERNATIONAL TeX:
+  ### comment out if you don't want multilingual TeX, currently there is
+--- 75,81 ----
+  ###	dvialw	dvibit	dvican	dvie72	dvieps	dvigd	dviimp
+  ###	dvijep	dvijet	dvil3p	dvil75	dvim72	dvimac	dvimpi
+  ###	dvioki  dviprx	dvitos	dvio72  all     none
+! BEEBEDRV=dvieps dvil3p
+  
+  ### INTERNATIONAL TeX:
+  ### comment out if you don't want multilingual TeX, currently there is
+***************
+*** 276,282 ****
+  	cp ./mf.convert ../$(TeX)/mf/convert ; \
+  	cp ./askmf.awk ../$(dvips) ; \
+  	cp ./askmf.mf ../$(dvips)
+! 	ln -f $(TeX)/mf/MFwindow/x11-Xlib.c $(TeX)/mf/MFwindow/x11.c 
+  	touch stamp-port
+  #
+  #	patch -d ../$(dvips) -N -c < dvips.diff
+--- 276,283 ----
+  	cp ./mf.convert ../$(TeX)/mf/convert ; \
+  	cp ./askmf.awk ../$(dvips) ; \
+  	cp ./askmf.mf ../$(dvips)
+! 	rm -f $(TeX)/mf/MFwindow/x11.c
+! 	ln $(TeX)/mf/MFwindow/x11-Xlib.c $(TeX)/mf/MFwindow/x11.c 
+  	touch stamp-port
+  #
+  #	patch -d ../$(dvips) -N -c < dvips.diff
+***************
+*** 351,359 ****
+  install: $(ALL:S/^/install./g)
+  	$(INSTALL) -m 755 scripts/dvidr $(BINDIR)
+  	$(INSTALL) -m 644 scripts/dvidr.1 $(MANDIR)/man$(MANEXT)
+! 	ln $(BINDIR)/dvidr $(BINDIR)/dvi
+! 	ln $(BINDIR)/dvidr $(BINDIR)/dvipr
+! 	ln $(BINDIR)/dvidr $(BINDIR)/mkfonts
+  	cp -R usr $(LIBROOT)
+  
+  install.TeX: stamp-tree
+--- 352,360 ----
+  install: $(ALL:S/^/install./g)
+  	$(INSTALL) -m 755 scripts/dvidr $(BINDIR)
+  	$(INSTALL) -m 644 scripts/dvidr.1 $(MANDIR)/man$(MANEXT)
+! 	-ln $(BINDIR)/dvidr $(BINDIR)/dvi
+! 	-ln $(BINDIR)/dvidr $(BINDIR)/dvipr
+! 	-ln $(BINDIR)/dvidr $(BINDIR)/mkfonts
+  	cp -R usr $(LIBROOT)
+  
+  install.TeX: stamp-tree
+***************
+*** 451,456 ****
+--- 452,458 ----
+  	do \
+  	  if [ ! -d $$i ] ; \
+  	  then \
++ 	  echo "making $$i"; \
+  	    mkdir -p $$i ; \
+  	  fi ; \
+  	done
+***************
+*** 461,466 ****
+--- 463,469 ----
+  	do \
+  	  if [ ! -d $$i ] ; \
+  	  then \
++ 	    echo "making $$i" ; \
+  	    mkdir -p $$i ; \
+  	  fi ; \
+  	done
+*** scripts/dvidr.raw~	Mon Jul 19 23:49:29 1993
+--- scripts/dvidr.raw	Mon Jul 19 23:50:45 1993
+***************
+*** 91,100 ****
+  # Methods:
+  # MODE	DRIVER		ACTION
+  # -v	-X		xdvi
+! # -v	-G		dvips >> gs >> X11
+! # -p	-G		dvips >> gs >> lpr
+! # -p	-B		dvixxx >> lpr
+! # -n	{implies -G}	dvips >> /dev/null  (side effect: make fonts!) 
+  ################
+  # Defaults:
+  PNAME=`basename $0`
+--- 91,100 ----
+  # Methods:
+  # MODE	DRIVER		ACTION
+  # -v	-X		xdvi
+! # -v	-G		dvips -f >> gs >> X11
+! # -p	-G		dvips -f >> gs >> lpr
+! # -p	-B		dvixxx -f >> lpr
+! # -n	{implies -G}	dvips -f >> /dev/null  (side effect: make fonts!) 
+  ################
+  # Defaults:
+  PNAME=`basename $0`
+***************
+*** 244,254 ****
+  # do actions
+  case $METHOD in
+  ############################################################
+! vG) echo "using: dvips >> gs >> X11"
+  ###############
+      correct -1 -0.4
+  ###############
+!     dvips -O ${X}in,${Y}in -t a4 $PARAM -o /tmp/$$.ps $FILE
+      gs -sDEVICE=x11 -sPAPERSIZE=a4 /tmp/$$.ps quit.ps
+      rm /tmp/$$.ps
+      ;;
+--- 244,254 ----
+  # do actions
+  case $METHOD in
+  ############################################################
+! vG) echo "using: dvips -f >> gs >> X11"
+  ###############
+      correct -1 -0.4
+  ###############
+!     dvips -f -O ${X}in,${Y}in -t a4 $PARAM -o /tmp/$$.ps $FILE
+      gs -sDEVICE=x11 -sPAPERSIZE=a4 /tmp/$$.ps quit.ps
+      rm /tmp/$$.ps
+      ;;
+***************
+*** 266,285 ****
+           $PARAM $FILE &
+      ;;
+  ############################################################
+! # dvips >> gs >> lpr
+! pG) echo "using: dvips >> gs >> lpr"
+  ###############
+      correct -1.25 -1.35
+  ###############
+  # CAUTION: I used a4 paper
+  ###############
+!     dvips -t a4 -O ${X}in,${Y}in $PARAM $FILE | \
+      gs -sOutputFile=$OUTPUT -sDEVICE=$DEVICE -sPAPERSIZE=a4 -
+      ;;
+  ############################################################
+! # dvips >> null (side effect: make missing fonts)
+! nG) echo "using: dvips >> null; making missed fonts"
+!     dvips -G $DEVICE $PARAM $FILE >/dev/null
+      ;;
+  ############################################################
+  # beebe >> lpr
+--- 266,285 ----
+           $PARAM $FILE &
+      ;;
+  ############################################################
+! # dvips -f >> gs >> lpr
+! pG) echo "using: dvips -f >> gs >> lpr"
+  ###############
+      correct -1.25 -1.35
+  ###############
+  # CAUTION: I used a4 paper
+  ###############
+!     dvips -f -t a4 -O ${X}in,${Y}in $PARAM $FILE | \
+      gs -sOutputFile=$OUTPUT -sDEVICE=$DEVICE -sPAPERSIZE=a4 -
+      ;;
+  ############################################################
+! # dvips -f >> null (side effect: make missing fonts)
+! nG) echo "using: dvips -f >> null; making missed fonts"
+!     dvips -f -G $DEVICE $PARAM $FILE >/dev/null
+      ;;
+  ############################################################
+  # beebe >> lpr
+*** scripts/mksedscript.sed~	Sat Jul 10 22:04:19 1993
+--- scripts/mksedscript.sed	Sat Jul 10 22:04:50 1993
+***************
+*** 8,12 ****
+  # Here we make a sedscript
+  #
+  
+! s/\([^ ]*_386BSD\)="\([^"]*\)"/s\#$(\1)\#\2\#g
+  /g
+--- 8,12 ----
+  # Here we make a sedscript
+  #
+  
+! s/\([^ ]*_386BSD\)="\([^"]*\)"/s\#$(\1)\#\2\#g\
+  /g
+*** dvips-5.515/mftopk~	Sat Jul 17 02:00:07 1993
+--- dvips-5.515/mftopk	Sat Jul 17 04:12:50 1993
+***************
+*** 60,66 ****
+  echo "mode=help ;
+  mode_setup ;
+  end
+! " |mf $MFDIR/askmf.mf |awk -f $PSDIR/askmf.awk |sed -e "s:_$::g" |column |more
+  rm askmf.log
+  # puh ... done
+  	     echo "see /usr/local/lib/TeX/mf/inputs/modes.mf for further description."
+--- 60,68 ----
+  echo "mode=help ;
+  mode_setup ;
+  end
+! " |mf $MFDIR/askmf.mf |
+! sed -e '1,/ASKMF_OUTPUT/d' -e '/help_ASKMF_OUTPUT/,$d'  -e "s:_$::g" |
+! print -2 -t -l1 |more
+  rm askmf.log
+  # puh ... done
+  	     echo "see /usr/local/lib/TeX/mf/inputs/modes.mf for further description."
+***************
+*** 84,90 ****
+  else
+    NAMES=$@
+  fi
+! if [ $MAG = undef ]
+  then
+    MAG=1
+  fi
+--- 86,92 ----
+  else
+    NAMES=$@
+  fi
+! if [ "$MAG" = "undef" ]
+  then
+    MAG=1
+  fi
+***************
+*** 116,136 ****
+  do
+  #
+  # construct filenames
+! GFNAME=$NAME.$DPI'gf'
+! PKNAME=$NAME.$DPI'pk'
+! TFMNAME=$NAME.tfm
+  #
+  # check for already made font
+! if [ -z $FORCE ]
+  then
+!   if [ -r $DESTPKDIR/$PKNAME ]
+    then
+      echo "$DESTPKDIR/$PKNAME already exists!"
+      continue
+    fi
+  #
+  # check also in the standard place(s)
+!   if [ -r $STDPKDIR/$PKNAME ]
+    then
+      echo $STDPKDIR/$PKNAME already exists!
+      continue
+--- 118,139 ----
+  do
+  #
+  # construct filenames
+! GFNAME=`basename $NAME .mf`.${DPI}gf
+! PKNAME=`basename $NAME .mf`.${DPI}pk
+! TFMNAME=`basename $NAME .mf`.tfm
+! 
+  #
+  # check for already made font
+! if [ -z "$FORCE" ]
+  then
+!   if [ -r "$DESTPKDIR/$PKNAME" ]
+    then
+      echo "$DESTPKDIR/$PKNAME already exists!"
+      continue
+    fi
+  #
+  # check also in the standard place(s)
+!   if [ -r "$STDPKDIR/$PKNAME" ]
+    then
+      echo $STDPKDIR/$PKNAME already exists!
+      continue
+***************
+*** 142,148 ****
+  mf "\mode:=$MODE; mag:=$MAG; scrollmode; input $NAME" </dev/null
+  #
+  # a font file should have been created, otherwise...
+! if test ! -r $GFNAME
+  then
+     echo "Metafont failed for some reason on $GFNAME"
+     exit 3
+--- 145,151 ----
+  mf "\mode:=$MODE; mag:=$MAG; scrollmode; input $NAME" </dev/null
+  #
+  # a font file should have been created, otherwise...
+! if [ ! -r "$GFNAME" ]
+  then
+     echo "Metafont failed for some reason on $GFNAME"
+     exit 3
+*** dvips-5.515/texc.script~	Sun Jul 18 00:01:33 1993
+--- dvips-5.515/texc.script	Sun Jul 18 00:02:21 1993
+***************
+*** 4,13 ****
+  # To use it, say
+  #       texc.script tex.lpro texc.lpro
+  #
+! elvis -e - $1 <<edscriptend
+  /% begin code for uncompressed fonts only/d
+  .,/% end code for uncompressed fonts only/d
+  .,/% end of code for unpacking compressed fonts/s/% //
+! w! $2
+  edscriptend
+- echo > /dev/null
+--- 4,12 ----
+  # To use it, say
+  #       texc.script tex.lpro texc.lpro
+  #
+! ed - $1 <<edscriptend
+  /% begin code for uncompressed fonts only/d
+  .,/% end code for uncompressed fonts only/d
+  .,/% end of code for unpacking compressed fonts/s/% //
+! w $2
+  edscriptend
+*** dvips-5.515/dvips.1~	Mon Jul 19 10:13:59 1993
+--- dvips-5.515/dvips.1	Mon Jul 19 10:23:18 1993
+***************
+*** 150,155 ****
+--- 150,161 ----
+  is driving the printer directly instead of working through a spooler,
+  as is common on extremely small systems.  NOTE! DO NOT USE THIS OPTION!
+  .TP
++ .B -G mfmode
++ Set the METAFONT mode to
++ .I mfmode
++ when building new fonts with
++ .IR mftopk (1).
++ .TP
+  .B -h name
+  Prepend file
+  .I name
+***************
+*** 394,400 ****
+  used.  Will slow down printing somewhat, especially on early 68000-based
+  PostScript printers.
+  .SH "SEE ALSO"
+! mf(1), afm2tfm(1), tex(1), latex(1), lpr(1), 
+  .I dvips.tex.
+  .SH DIAGNOSTICS
+  .LP
+--- 400,406 ----
+  used.  Will slow down printing somewhat, especially on early 68000-based
+  PostScript printers.
+  .SH "SEE ALSO"
+! mf(1), afm2tfm(1), tex(1), latex(1), lpr(1), mftopk(1)
+  .I dvips.tex.
+  .SH DIAGNOSTICS
+  .LP
+---- End of TeX-01.5.diffs ----

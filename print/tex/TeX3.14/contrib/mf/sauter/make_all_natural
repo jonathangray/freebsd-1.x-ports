@@ -1,0 +1,48 @@
+#! /bin/csh -f
+# Make a set of fonts, at their natural sizes.
+
+# Get the list of possible files.
+if (-d mf) then
+   cd mf
+   set font_list=`/bin/ls *.mf`
+   cd ..
+else
+   echo 'No subdirectory named mf.'
+   exit(1)
+endif
+
+if (! -d tfm || ! -d gf) then
+   echo 'Sorry, no subdirectories named tfm and gf.'
+   exit(2)
+endif
+
+# Has this already been run?
+set out_file = make_gf_files
+if (-e $out_file) then
+   echo "The script $out_file already exists."
+   exit(2)
+endif
+
+set program = cmmf # Assume cmbase preloaded.
+
+# Get the output device.
+echo -n 'Mode name to generate for? '
+set mf_mode = $<
+
+# If this directory is not a subdirectory of `mf84/MFfonts/cm'
+# in the TeX distribution, the assignment to MFINPUTS will
+# have to be changed. The idea is to include the standard Computer
+# Modern files, like roman.mf, romanu.mf, and so forth.
+echo '#! /bin/csh -f' > $out_file
+echo 'setenv MFINPUTS .:mf:../../../../cmfonts/mf' >> $out_file
+
+foreach long_name ($font_list)
+   set font=$long_name:r
+
+   echo $program" '\batchmode;mode:=$mf_mode;input $font'" >> $out_file
+   echo '/bin/mv -f '$font'.tfm tfm' >> $out_file
+   echo '/bin/mv '$font'.*gf gf'  >> $out_file
+end
+
+# Make it executable.
+chmod +x $out_file

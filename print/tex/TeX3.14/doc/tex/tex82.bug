@@ -1,0 +1,4558 @@
+First updates to the TeX82 listing published in September, 1982.
+(These changes were included in the original Version 0 of TeX, but they
+were discovered after the listing went to press.)
+
+1. Module 943, line 6 (bug discovered 9/28)
+change "if cur_cmd=char_num then" to
+        if (cur_cmd=letter) or (cur_cmd=other_char) then r:=qi(cur_chr)
+        else if cur_cmd=char_num then
+
+2. "pause" changed to "pausing" and "pause_code" to "pausing code", throughout.
+
+3. Module 719, lines 8 and 11 (bug discovered 9/28)
+insert "rule_save:=overfull_rule; overfull_rule:=0;" after "save_ptr-2;"
+insert "overfull_rule:=rule_save;" before "q:=p+list_offset;"
+and insert a declaration of "overfull_rule: scaled" in module 716.
+
+4. Module 1128, lines 6 and following (bug discovered 9/28)
+change "while n<>0 do" to "loop"
+change "goto done" to
+        begin scan_left_brace; new_save_level(false_group);
+        goto done;
+        end
+change "... return 1130>;" to
+                ... return 1130>
+        else if n=0 then
+                begin new_save_level(case_group); goto done;
+                end;
+and change "done: ... (false_group);" to "done:".
+
+5. Module 182, line 10 (suggestion by DRF on 9/30)
+change "0.0" to "?.?"
+
+6. Module 682, new definition of math_spacing (decision of 10/2)
+"0234000122*4000133**3**344*0400400*000000234000111*4111112341011"
+
+7. Module 684, new code for case "4" (decision of 10/2)
+"4": if cur_style<script_style then x:=thick_mu_skip_code else x:=0;
+[Also in module 682 line 7, say "...a conditional thick space (\nonscript..."]
+
+8. Module 11, trie_size changed from 7000 to 8000 because of new
+improved (but longer) hyphenation patterns (10/4)
+
+9. Module 453, forgot to change this when 454 changed (noted by DRF 10/6)
+format_default_length=20 (not 22)
+format_area_length=11 (not 13)
+
+Changes to TEX.WEB made after Version 0 was released in October, 1982.
+
+Since copies of TEX.WEB are not supposed to be edited, there are
+two ways to make your version of TeX bug-free:
+        1. Get a new copy of TEX.WEB.
+        2. Put the corrections into your change file(s).
+Some people will find (1) easier than (2), except the main TeX sources at
+SCORE won't be updated quite as fast as the sources at SAIL (which have to
+be translated into ascii before they are sent to the outside world).
+Actually (2) will be quite easy, unless the list of changes becomes quite
+long, so it is the recommended procedure. In case (2) it would be useful
+to include a comment like "this is fix number xx" (using the numbering
+scheme in this file), so that the change could readily be deleted at some
+future time.
+
+10. Module 857 line -5 (bug discovered 10/8/82 by HWT)
+change it to: if h>0 then decr(h) else h:=trie_op_hash_size;
+
+11. Module 457 line 3 (typo discovered 10/9/82)
+change `\.!' to `\.\&'
+
+12. Module 1245 line 8 (bug fixed 10/9/82, discovered by MMD)
+insert the following between "begin" and "if":
+if format_ident<>0 then initialize; {erase preloaded format}
+
+** Version 0.1 incorporates the above changes.
+
+13. This is an extension to the language, put in to satisfy people who
+objected to the fact that \write (and \openout and \closeout) only
+caused action after being deferred to the next \shipout. Some applications
+call for immediate output, hence a new feature: \immediate followed by
+\openout or \write or \closeout causes the output action to take place
+without delay. For example, \immediate\write{x} is equivalent to
+\shipout\vbox{\write{x}} except that the latter also puts an empty
+page into the DVI file.
+
+The extension requires the following new code:
+13a. Insert `\immediate' after `\closeout' in module 1248.
+13b. Define immediate_code=4 and include the following in module 1252:
+        primitive("immediate",extension,immediate_code);
+13c. Include the following in module 1254:
+        immediate_code:print_esc("immediate");
+13d. And, in module 1256:
+        immediate_code:@<Implement \.{\\immediate}@>;
+13e. Finally, there's a new module inserted after old module 1280.
+Here is the WEB coding for this module:
+
+@ The presence of `\.{\\immediate}' causes the |do_extension| procedure
+to descend to one level of recursion. Nothing happens unless \.{\\immediate}
+is followed by `\.{\\openout}', `\.{\\write}', or `\.{\\closeout}'.
+@^recursion@>
+
+@<Implement \.{\\immediate}@>=
+begin get_nc_token;
+if (cur_cmd=extension)and(cur_chr<=close_node) then
+        begin p:=tail; do_extension; {append a whatsit node}
+        out_what(tail); {do the action immediately}
+        flush_node_list(tail); tail:=p; link(p):=null;
+        end
+else back_input;
+end;
+
+** Version 0.2 incorporates the above changes.
+
+14. Like change 11, this one doesn't affect the program, it just improves
+the documentation: Insert the following definitions in module 106:
+define set_glue_ratio_zero(#) == #:=0.0 {assign representation of zero ratio}
+define set_glue_ratio_one(#) == #:=1.0 {assign representation of unit ratio}
+
+These macros are now introduced in a dozen or so future modules, thereby
+eliminating most of the system-dependent changes needed elsewhere for ratios.
+(Note: I also changed 0 to 0.0 in two places of module 182, where a glue_ratio
+comparision was being made.)
+
+15. Change of module 576 (discovered by HWT, 10/14/82)
+"hd:quarterword" should be "hd:eight_bits".
+(The same error occurs in module 522, but in that module the remedy is
+simply to delete the declaration of hd, since this variable is no longer used.)
+
+16. A most embarrassing bug (discovered by DRF, 10/14/82)
+Replace module 531 by:
+
+@ A mild optimization of the output is performed by the |dvi_pop|
+routine, which issues a |pop| unless it is possible to cancel a
+`|push| |pop|' pair. The parameter to |dvi_pop| is the byte address
+following the old |push| that matches the new |pop|.
+
+@p procedure dvi_pop(@!l:integer);
+begin if (l=dvi_offset+dvi_ptr)and(dvi_ptr>0) then decr(dvi_ptr)
+else dvi_out(pop);
+end;
+
+Now we need to make a few changes to subsequent modules:
+16a. In 549, after "incr(cur_s)", insert
+        if cur_s>0 then dvi_out(push);
+and before "decr(cur_s)", insert
+        if cur_s>0 then dvi_pop(save_loc);
+
+16b. Delete "dvi_out(push);" and "dvi_pop;" from modules 553, 558, 562, 567.
+
+16c. Change module 559 just as in 16a.
+
+17. Module 605, line 6 (discovered 10/15/82)
+The test should be "prev_depth>ignore_depth"
+
+** Version 0.3 incorporates the above changes.
+
+18. Module 11 (noticed by WLS, 10/16/82)
+Delete the definition of align_size (it's harmless but never used)
+
+19. (This change and the next cause major changes to the TRIP output;
+file TRIP.LOG and its relatives are being kept up to date on area [tug,dek].)
+The change avoids error messages when vpackage is called during output.
+Such messages can occur when there was no error, because the page is being
+boxed without the \skip glue from its insertions; so they should be omitted.
+The user who really wants such messages can still get them by saying
+"\setbox255=\vbox to 1ht255{\unbox255}".
+In module 903, insert the followng before the declaration of "wait":
+        save_vbadness:integer; {saved value of |vbadness|}
+        save_vfuzz: scaled; {saved value of |vfuzz|}
+Then in module 924, insert
+        save_vbadness:=vbadness; vbadness:=inf_bad;
+        save_vfuzz:=vfuzz; vfuzz:=max_dimen; {inhibit error messages}
+before the call on vpackage, and
+        vbadness:=save_vbadness; vfuzz:=save_vfuzz;
+after.
+
+20. Module 917 computes |page_size| improperly. (Noticed 10/21/82)
+Delete the statement "page_so_far[1]:=page_so_far[1]+width(q);"
+and change the preceding statement to:
+        page_size:=page_size-h-width(q);
+(The comment about page_so_far in the first paragraph of module 895 is
+correct; I mistakenly introduced a bug in module 917 some months after
+writing the first draft of the code, believing that I was making the
+algorithm more elegant or something.)
+
+** Version 0.4 incorporates the above changes.
+
+21. Since TeX82 applied to (the "woven" documentation) TEX.TEX uses
+about 11500 words of variable-size memory, I'm increasing hi_mem_size
+(in module 12) from 12000 to 13000. Actually, I recommend using considerably
+larger values for mem_max and hi_mem_size, whenever possible.
+
+22. Addition of the \boxmaxdepth parameter (10/22/82):
+This involves renumbering hfuzz_code through dimen_pars, in module 234,
+to numbers 9 through 18; inserting the lines
+        @d box_max_depth_code=8 {maximum depth of explicit vboxes}
+        @d box_max_depth==dimen_par(box_max_depth_code)
+        box_max_depth_code:print_esc("boxmaxdepth");
+to module 234 and
+        primitive("boxmaxdepth",assign_dimen,box_max_depth_code);
+to module 235; and changing the call on vpack in module 996 to
+        vpackage(link(head),saved(2),saved(1),box_max_depth);
+
+** Version 0.5 incorporates the above changes.
+
+23. Module 1224, line 4 (bug found by GMK/HWT on 10/26/82)
+change "(k+x>eqtb_size)" to "(k+x>eqtb_size+1)"
+
+24. Module 247, line 13 (bug found 10/26/82)
+(bug was reflected in TRIP.LOG but not noticed)
+change "ch_code(p)" to "ch_code(p-single_base)"
+
+25. Module 670, line 18 (bug found 10/27/82)
+interchange the statements "fetch(...)" and "math_type(...):=..."
+(since the fetch routine sometimes has a side-effect of changing math_type)
+A major change (Version 0.6) made on October 28:
+The following list of changes counts as "number 26" on the list.
+Fonts now have identifiers instead of code numbers; the "\:" primitive
+has disappeared; and there are associated new features for "\the".
+
+a. In module 11, delete bad_font_code.
+b. In modules 170 and 172, delete print_esc(":"), and change
+        `print_int(font_code' to `sprint_cs(font_ident'.
+c. In module 205, the comment for set_font is revised.
+d. In module 217, there are now five locations for control sequences
+        that are perpetually defined; undefined_control_sequence
+        is therefore defined to be frozen_control_sequence+5.
+e. In module 248, sprint_cs is now included among <Basic printing procedures>.
+f. Delete the primitive ":" in modules 250 and 251.
+g. Add to module 376: <Declare procedures that scan font-related stuff>
+h. In module 377, seven levels are now distinguished; we define
+        font_val=4, ident_val=5, tok_val=6.
+i. In module 380, delete the previous cases for def_family and set_font,
+        and the following takes the place of case assign_toks:
+          assign_toks,def_family,set_font,def_font: <Fetch a token list or
+                font number or font identifier, provided that level=tok_val>;
+j. Module 382 (which now has a new name) has this new ending:
+        else if cur_cmd=assign_toks then scanned_result(equiv(m))(tok_val)
+        else <Fetch a font number or a font identifier>
+k. Module 389 becomes
+        <Fetch a font number or a font identifier>=
+        if cur_cmd=set_font then scanned_result(cur_chr)(font_val)
+        else if cur_cmd=def_font then
+                scanned_result(font_ident[cur_font])(ident_val)
+        else    begin scan_four_bit_int;
+                scanned_result(font_ident[equiv(m+cur_val)])(ident_val);
+                end
+l. In module 393, the relation `<>tok_val' becomes `<=mu_val'.
+m. In module 426, the relation `=tok_val' becomes '>=ident_val'.
+        Also add a new case to the case statement:
+          font_val: begin print(font_name[cur_val]);
+                if font_size[cur_val]<>font_dsize[cur_val] then
+                        begin print(" at "); print_scaled(font_size[cur_val]);
+                        print("pt");
+                        end;
+                end;
+n. The body of module 427 becomes:
+        begin p:=temp_head; link(p):=null;
+        if cur_val_level=ident_val then store_new_token(cs_token_flag+cur_val)
+        else if cur_val<>null then
+                begin r:=link(cur_val); {do not copy the reference count}
+                while r<>null do
+                        begin store_new_token(info(r)); r:=link(r);
+                        end;
+                end;
+        the_toks:=p;
+        end
+o. In module 480, delete user_font_code; there's a new comment:
+        When the user defines \font\f, say, TeX assigns an internal number
+        to the user's font \f. For example, if this internal number is 13,
+        we will have font_ident[13]=p and equiv(p)=13, where p is the eqtb
+        location of the control sequence \f.
+p. In module 481, delete the declaration of font_number, and
+        replace the declaration of font_code by
+          font_ident:array[internal_font_number] of pointer;
+q. New stuff in module 483 (also delete references to font_number, font_code):
+        define bad_font_ident=frozen_control_sequence+4 {denotes a null font}
+        font_name[undefined_font]:="nullfont";
+        font_ident[undefined_font]:=bad_font_ident;
+        text(bad_font_ident):="nullfont"; eq_level(bad_font_ident):=level_one;
+        eq_type(bad_font_ident):=set_font;
+        equiv(bad_font_ident):=undefined_font;
+r. In module 490, parameter u is new of type pointer, and the
+        read_font_info subroutine is changed to a function that
+        returns an internal_font_number. There's a new local variable
+          g:internal_font_namber; {the number to return}
+        and we set g:=undefined_font immediately upon entering read_font_info.
+        Also set read_font_info:=g just before exiting.
+s. In module 491, print_int(u) becomes sprint_cs(u).
+t. Delete the statements involving font_code and font_number in module 506,
+        and set g:=f at the end of that module.
+u. The body of module 507 becomes:
+        <Declare procedures that scan font-related stuff>=
+        procedure scan_font_ident;
+        var f:internal_font_number;
+        begin <Get the next non-blank non-call...>;
+        if cur_cmd=set_font then f:=cur_chr
+        else    begin print_nl("! Missing font identifier");
+                help2("I was looking for a control sequence whose")
+                ("current meaning has been defined by \font.");
+                back_error; f:=undefined_font;
+                end;
+        end;
+v. New beginning of module 508:
+        The following routine is used to implement `\texinfo f n'.
+        The boolean parameter writing is set true if the calling program
+        intends to change the parameter value.
+        <Declare procedures that scan font-related stuff>=
+and "scan_font_number" is changed to "scan_font_ident".
+w. In module 509, "print_int(font_code" becomes "sprint_cs(font_ident".
+        Also "font code is defined" becomes "\font is loaded" in the help.
+x. In module 940, the first line of help is changed to
+        "You have to specify a font identifier,"
+y. The set_font case in module 1138 reduces to
+        set_font: define(cur_font_loc,data,cur_chr);
+z. In module 1153, delete all the complicated stuff starting with "scan_int"
+        and substitute simply this:
+                scan_font_ident; define(p,data,cur_val);
+                end;
+aa. Change new_font to new_font(a) in module 1169, and add parameter
+          (a:small_number)
+        in module 1170. Also add the label common_ending, and declare
+        variable u to have type pointer. The code beginning with "scan_int"
+        is changed to the following:
+          get_token;
+          if cs_ptr=0 then
+                 <Complain about the missing control sequence and return>;
+          u:=cs_ptr; scan_optional_equals; scan_file_name;
+          <Scan the ``at'' size specification>;
+          <If this font has already been loaded, set f to the internal
+                font number and goto common_ending>;
+          f:=read_font_info(u,cur_name,cur_area,s);
+          common_ending: define(u,set_font,f); font_ident[f]:=u;
+          exit:end;
+bb. New module 1172:
+        When the user gives a new identifier to a font that was previously
+        loaded, the new value becomes the font_ident of record.
+        Font names `xyz' and `XYZ' are considered to be different.
+        <If this font has already been loaded...>=
+        for f:=font_base+1 to font_ptr do
+                if [the test previously in module 1174] then goto common_ending
+cc. New module 1173:
+        <Complain about the missing control sequence and return>=
+        begin print_nl("! A font identifier must be a control sequence");
+        help2("You should say, e.g., `\font\f=fontfilename'.")
+        ("(I'm going to ignore the \font command you just gave.)");
+        back_error; return;
+        end
+dd. New module 1174:
+        <Cases of print_cmd_chr...>=
+        set_font:begin print("select font "); print(font_name[chr_code]);
+                if font_size[chr_code]<>font_dsize[chr_code] then
+                        begin print(" at "); print_scaled(font_size[chr_code]);
+                        print("pt");
+                        end;
+                end;
+ee. Delete the comment at the beginning of module 1227, and delete the
+        loop for k:=0 to bad_font_code-1, and delete dump_int(undefined_font).
+ff. Delete the repeat loop in module 1228.
+gg. Change font_code to font_ident in module 1229, and change
+        print_int(font_code to sprint_int(font_ident.
+hh. In module 1230,
+        begin undump(single_base)(undefined_control_sequence)(font_ident[k]);
+        undump_qqqq(font_check[k]); [and continue as before]
+
+The changes above have been incorporated into Version 0.6.
+The ill-fated Version 0.7
+
+27. (Here's a change that I retracted shortly after making it, since I
+discovered that the source was flaky after all; and I also found a reliable
+source [NBS Circular 570] confirming my original information. I include
+the note here only for historical purposes...)
+
+"After years of searching, I've finally found a definitive definition of
+the printer's point; and (unfortunately) my previous conjecture was wrong.
+The truth is that 83pc=35cm, exactly; so I am changing TeX to conform.
+This means some changes in the comments of modules 101 and 517, and the
+following changes to the program:
+
+"27a. In modules 547 and 571, the appropriate DVI numbers are now:
+        dvi_four(109375); dvi_four(2039808); {conversion ratio for sp}
+"27b. The guts of module 418 become:
+        if scan_keyword("in") then set_conversion(63246)(875)
+        else if scan_keyword("pc") then set_conversion(12)(1)
+        else if scan_keyword("cm") then set_conversion(996)(35)
+        else if scan_keyword("mm") then set_conversion(498)(175)
+        else if scan_keyword("bp") then set_conversion(10541)(10500)
+        else if scan_keyword("dd") then set_conversion(996)(931)
+        else if scan_keyword("cc") then set_conversion(11952)(931)
+        else..."
+
+*** Version 0.7 of TeX incorporated the changes above (82/10/30);
+this version was withdrawn on 82/11/2.
+Changes subsequent to Version 0.6
+
+28. The experience with #27 did lead me to one improvement, thanks
+to Chuck Bigelow, with respect to Didot points. (11/4/82)
+Add the following comment to module 418:
+        According to the definitions here, $\rm2660\,dd\approx1000.33297\,mm$;
+        this agrees well with the value $\rm1000.333/,mm$ cited by Bosshard
+        in {\sl Technische Grundlagen zur Satzherstellung\/} (Bern, 1980).
+And change two lines of the code there as follows:
+        else if scan_keyword("dd") then set_conversion(1238)(1157)
+        else if scan_keyword("cc") then set_conversion(14856)(1157)
+
+29. The new font material is made more robust by ensuring that \the\font
+always returns a pointer to a control sequence whose command code is
+set_font. (Change 11/4/82)
+
+29a. The code changed in 26aa is changed again, to the following:
+        <If the next token isn't a control sequence, issue a complaint and
+                return; otherwise set u:=cs_ptr, and set hash_used to the
+                location of a ``frozen'' copy of the new font identifier>;
+        define(u,set_font,undefined_font);
+        scan_optional_equals; scan_file_name;
+        <Scan the ``at'' size specification>;
+        <If this font has already been loaded, set f to the internal
+                font number and goto common_ending>;
+        f:=read_font_info(u,cur_name,cur_area,s);
+        common_ending: equiv(u):=f; geq_define(hash_used,set_font,f);
+        font_ident[f]:=hash_used;
+        exit:end;
+29b. Instead of 26cc, here's the new module 1173:
+        We reserve a special control sequence for the font identifier;
+        this one cannot be redefined by the user, so it is safe to
+        return it as a value of \the\font.
+        <If the next token isn't a control sequence...>=
+        get_token;
+        if cs_ptr<hash_base then
+            begin print_nl(
+             "! A font identifier must be a multiletter control sequence");
+            help2("You should say, e.g., `\font\ffn=fontfilename'.")
+            ("(I'm going to ignore the \font command you just gave.)");
+            back_error; return;
+            end;
+        repeat if hash_is_full then overflow("hash size",hash_size);
+        decr(hash_used);
+        until text(hash_used)=0; {search for an empty location in hash}
+        u:=cs_ptr; text(hash_used):=text(u); {copy the name}
+        stat incr(cs_count); tats
+
+30. Module 993, replace lines 5 to 7 (11/5/82):
+else    begin if k=vmode then new_save_level(vbox_group)
+        else    begin new_save_level(vtop_group); k:=vmode;
+                end;
+        if looseness<>0 then eq_word_define(int_base+looseness_code,0);
+        if hanging_indent<>0 then
+                eq_word_define(dimen_base+hanging_indent_code,0);
+        if par_shape_ptr<>null then eq_define(par_shape_loc,shape_ref,null);
+        end;
+
+31. Module 403, replace line 5 (11/6/82):
+if cur_tok<cs_token_flag then
+        begin cur_val:=cur_chr;
+        if cur_cmd<=right_brace then
+                if cur_cmd=right_brace then incr(align_state)
+                else decr(align_state);
+        end
+
+32. Improvements to error recovery for bad alignments (11/6/82):
+In module 1039, replace "begin align_error; goto reswitch; end" by "align_error"
+In module 1040, delete "cur_cmd:=left_brace;" and "cur_cmd:=right_brace;"
+        and change "error" to "back_error"
+In module 1041, delete "cur_cmd:=relax;"
+
+33. More power to \let (11/8/82):
+33a. Module 1141 becomes:
+        <Assignments>+=
+        let:    begin get_token;
+                if cs_ptr<>0 then <Carry out the \let operation>
+                else    begin print_nl
+                         ("! You can use \let only with control sequences");
+                        help2("I'm not \let-ting anything change here,")
+                                ("since I can only do things like `\let\a=b'.");
+                        back_error;
+                        end;
+                end;
+33b. Module 1142 becomes:
+        <Carry out the \let...>=
+        begin p:=cs_ptr;
+        repeat get_token;
+        until cur_cmd<>spacer;
+        if cur_tok=other_token+"=" then
+                begin get_token;
+                if cur_cmd=spacer then get_token;
+                end;
+        if cur_cmd>=call then add_token_ref(cur_chr);
+        define(p,cur_cmd,cur_chr);
+        end
+
+34. This change helps you see an undefined control sequence
+in certain unusual cases (discovered by JDH, 11/8/82):
+Add the clause "(base_ptr=input_ptr) or" to module 294, line 2.
+
+35. Here's an improvement in the formula for demerits; previously
+more weight was given to minimizing bad spacing on lines with penalties,
+so that (slightly loose hyphenated line)(OK line) was considered worse
+than (OK hyphenated line)(quite loose line). (fixed 11/8/82)
+Change lines 2--7 of module 772 to the following:
+        d:=line_penalty+b; d:=d*d;
+        if pi<>0 then
+                if pi>0 then d:=d+pi*pi
+                else if pi>eject_penalty then d:=d-pi*pi;
+
+36. Minor change to save buffer space in non-INITEX (11/10/82):
+Enclose the declaration of pool_file in module 50 by init...tini.
+
+37. Minor improvement in format for the context of error messages (11/13/82):
+37a. Module 289, type "inserted" split into "backed_up=3", "inserted=4"
+and the other type numbers increase: "macro=5", etc.
+37b. In module 296, backed_up: if loc=null then print_nl("<recently read>")
+                        else print_nl("<to be read again> ");
+                inserted: print_nl("<inserted text> ");
+37c. Minor changes to comments in modules 289 and 293.
+37d. Change "inserted" to "backed_up" in module 294.
+37e. Add definition "back_list(#)==begin_token_list(#,backed_up)" in module 305.
+37f. In module 306, first test should be ">=backed_up", second "<=inserted".
+37g. Change ins_list to back_list in modules 307, 318, 375, 1195.
+37h. Add definition to module 308:
+        ins_error==begin back_error; token_type:=inserted; end
+37i. Change back_error to ins_error in modules 362, 1040, 1046.
+37j. Change "<to be read again>" to "<inserted text>" in module 973 help.
+
+38. Module 407, the error message is changed (11/11/82) to:
+"! Missing number, treated as zero".
+
+39. Fix anomaly when hbadness or vbadness is small (11/11/82):
+Module 593, line 2, "if (-x-total_shrink[normal]>hfuzz) or (hbadness<100)"
+Module 603, line 2, "if (-x-total_shrink[normal]>vfuzz) or (vbadness<100)"
+
+40. Added the \tokens primitive (11/13/82):
+In module 223, defined tokens_loc and tokens (analogous to every_par).
+In module 225, defined the primitive.
+In module 1146, changed the comment to include tokens_loc as a possibility.
+
+41. Change get_nc_token to get_token in module 374 (11/13/82).
+(In particular \def\foo{...}\foo won't say "undefined c.s." now!)
+(This change later retracted during debugging; it was found that
+"endv" aborts the job, so this cure was worse than the disease. Then
+it was re-established as part of the major change to conditionals,
+because endv needed to be more robust anyway.)
+
+42. In module 699, we make \span expand in a preamble (11/13/82).
+Change lines -7 through -3 to:
+        begin get_nc_token; goto reswitch;
+        end;
+
+43. Modules 321 and 322 have been altered for better efficiency (11/12/82)
+and better exposition; the three conditions of module 322 are now
+in separate if tests.
+
+44. Frozen control sequences are now unredefinable. (11/16/82)
+A new procedure get_r_token has been introduced to give uniform error
+messages for \def, \let, \read, \font, \mathchardef, and to make them
+incapable of changing the frozen equivalents.
+
+Incidentally, get_nc_token is changed to get_x_token; and ch_code
+becomes cat_code.
+A major change (Version 0.8) made on November 14--16:
+Conditional statements are taken from semantics to syntax.
+
+This change, which counts as number 45 on the list, made it necessary
+to renumber the modules. And it was such a drastic change, the
+differences can only be sketched here, using the old module numbers
+for reference. A variety of other things were cleaned up because this
+change made it more natural for them to be handled differently.
+
+45a. Module 158, inserted a permanently empty token list called null_list.
+45b. Module 204, deleted if_test, case_branch, else_code, convert;
+        inserted end_cs_name.
+45c. Module 206, inserted if_test, fi_or_else, cs_name, convert, and
+        end_template (the latter comes after long_outer_call).
+45d. Module 217, there are now nine frozen control sequences; also null_cs.
+45e. Modules 247 and 248, must be able to print a null control sequence.
+45f. Module 268 (leave_transparent_group) disappears; comments in the
+        previous modules also are appropriately simplified.
+45g. Module 273, delete endv_token.
+45h. Modules 277 and 278, delete references to endv (it no longer appears).
+45i. After module 281, a procedure show_cur_cmd_chr takes the
+        code for tracing commands from module 937.
+45j. Module 317 now forbids \outer control sequences when skipping,
+        and inserts \fi in front of them, for error recovery.
+45k. Module 334 now uses null_cs if carriage-return is an escape.
+45l. Module 343 no longer has endv test.
+45m. Module 344, major extensions to expand_calls make it several modules
+        longer. It saves global variables like cur_val. It changes
+        end_template to endv. It processes cs_name and convert.
+        It processes if_test by calling the "conditional" procedure.
+        It processes fi_or_else by checking their legality, and (if legal)
+        updating the if stack.
+45n. Module 373 (pass_block) disappears.
+45o. After module 400, radix and cur_val and cur_val_level are initialized.
+45p. Module 428 changes so that conv_toks is a procedure rather than a
+        function; this procedure is invoked by expand_calls.
+45q. Modules 436 and 1032, delete reference to conv_toks.
+45r. After module 443, the entire part 48 moves to this part of the program,
+        and the parts are renumbered accordingly. \case is changed to
+        \ifcase, and it resides under the if_test command.
+        New routines are inserted to maintain a linked stack that records
+        the current state of conditionals. There's a procedure
+        pass_text that skips text while looking for \fi or \else or \or
+        on level zero with respect to \if...\fi nesting. The previous
+        routines for skip control via handle_right_brace are eliminated,
+        and the new ones are somewhat simpler. The new \ifcat is mostly
+        combined with the old \if; they no longer ignore spaces.
+        The scanner_status is set to normal while processing \ifx.
+        \ifx will consider \a to equal 0 after \let\a=0.
+45s. Modules 701, 707: endv_token is replaced by a token for a frozen
+        control sequence whose command code end_template makes it behave
+        like an outer_call. After expand_calls, it is converted to another
+        frozen control sequence, whose command code is endv. This two-step
+        facilitates error recovery, instead of giving a fatal error stop.
+45t. Module 874, remove "pass_block(1); goto done".
+45u. After module 1047, routine for end_cs_name prints an error message.
+45v. Module 1049, get_nc_token becomes get_token. (else $\ifmmode fails)
+45w. Module 1202 gets another case (end_template).
+45x. Module 1243, new warning is printed if the if stack isn't empty.
+Changes after version 0.8
+
+46. Declare c : ascii_code in module 825 (noted by DRF, 11/21/82)
+
+47. Module 776 lines 4-6 (suggested by DRF, 11/21/82)
+threshold:=pretolerance;
+if threshold>=0 then
+        begin stat if tracing_stats>2 then
+                begin begin_diagnostic; print_nl("@@firstpass");
+                end; tats
+        second_pass:=false;
+        end
+else    begin threshold:=tolerance; second_pass:=true;
+        end;
+
+48. Protection for DVI files (added 11/16/82)
+Replace lines 2 and 3 of module 570 by:
+        <Update the values of max_h and max_v; but if the page is too large,
+                goto done>;
+Move the statement "dead_cycles:=0" from module 570 to module 568.
+Declare "label done;" in module 568.
+And add the following new module after 570:
+
+@ Sometimes the user will generate a huge page because other error messages
+are being ignored. Such pages are not output to the \.{dvi} file, since they
+may confuse the printing software.
+
+@<Update the values of |max_h| and |max_v|; but if the page is too large...@>=
+if (height(p)>max_dimen)or(depth(p)>max_dimen)or(width(p)>max_dimen) then
+        begin print_nl("! Huge page cannot be shipped out");
+        help2("The page just created is more than 18 feet tall or")@/
+         ("more than 18 feet wide, so I suspect something went wrong.");
+        error;
+        if tracing_output=0 then
+                begin begin_diagnostic;
+                print_nl("The following box has been deleted:");
+                show_box(p);
+                end_diagnostic(true);
+                end;
+        goto done;
+        end;
+if height(p)+depth(p)>max_v then max_v:=height(p)+depth(p);
+if width(p)>max_h then max_h:=width(p)
+
+49. New features \everymath and \everydisplay (12/2/82).
+Make changes analogous to those for "\tokens" (see change 40).
+Put the following just before the end of module 1050:
+  if every_math<>null then begin_token_list(every_math,every_math_text);
+And put the following just before the end of module 1056:
+  if every_display<>null then
+        begin_token_list(every_display,every_display_text);
+
+50. New feature \futurelet (12/2/82):
+Module 1141 changes again. (Also, "let" and "futurelet" share cmd code "let".)
+let:    begin n:=cur_chr;
+        get_r_token; p:=cs_ptr;
+        if n=normal then
+                begin repeat get_token;
+                until cur_cmd<>spacer;
+                if cur_tok=other_token+"=" then
+                        begin get_token;
+                        if cur_cmd=spacer then get_token;
+                        end;
+                end
+        else    begin get_token; q:=cur_tok; get_token; back_input;
+                cur_tok:=q; back_input; {look ahead, then back up}
+                end; {|back_input| doesn't affect |cur_cmd|, |cur_chr|}
+and continue with "if cur_cmd>=call", as before.
+
+*** The changes above have been incorporated into version 0.9 of TeX.
+Changes after version 0.9
+
+51. new \endinput primitive (suggested by FY, 12/7/82):
+\input and \endinput both use the same command code. The cases in module
+955 are deleted and replaced by those in module 965 (which disappears),
+because \input is now allowed in any mode. The code for any_mode(input)
+is "if cur_chr=0 then start_input else force_eof:=true", and it moves from
+module 952 to just before module 1197. The global variable force_eof
+is initially false, and module 340 becomes (after first:=start;)
+        if not force_eof then
+                begin if input_ln.... else force_eof:=true;
+                end;
+        if force_eof then begin print_char(")"); force_eof:=false;...
+
+52. Module 1005, line 4 (12/8/82)
+change "if align_state<0" to "if (mode<0)or(align_state<0)"
+(This avoids embarrassing case where TeX says "type a command or say \end"
+but when you type \end it says "You can't use \end in restricted horiz mode".)
+
+53. Patch to the new code for \csname (12/21/82)
+After eq_type(cs_ptr):=relax, also say equiv(cs_ptr):=256.
+(This corrects a bug that would appear only if \csname occurs right
+after a file name.)
+
+54. Change 47 introduced a bug when tracingonline=0 (12/20/82)
+when omitting firstpass, also do "if tracing_stats>2 then begin_diagnostic;"
+
+55. \hskip -1pt plus 2pt was parsed as \hskip -(1pt plus 2pt)! (12/20/82)
+In module 421, before line -4, insert the following:
+        if negative then
+                begin cur_val:=-cur_val; negative:=false;
+                end;
+But then realize that "negative" is always false on line -2; simplify.
+
+56. Cosmetic change to paragraph statistics (12/23/82)
+tight_fit..very_loose_fit codes have been renumbered very_loose_fit..tight_fit.
+
+57. Module 729 changes to make TeX language more consistent (12/23/82):
+else if type(tail)<>glue_node then tail_append(new_penalty(inf_penalty))
+else    begin type(tail):=penalty_node; delete_glue_ref(glue_ptr(tail));
+        flush_node_list(leader_ptr(tail)); penalty(tail):=inf_penalty;
+
+58. Commas are allowed as alternates to radix points. (12/23/82)
+define continental_point_token=other_token+"," {decimal point, Eurostyle}
+in module 400, and insert the following twice in 409:
+        if cur_tok=continental_point_token then cur_tok:=point_token;
+
+59. \hangindent becomes a normal parameter. (12/23/82)
+This simplifies the code in obvious ways; for example, module 1148 disappears.
+The command code hang_indent goes away too; what was previously called
+hanging_indent is then renamed hang_indent.
+
+60. \prevgraf becomes accessible. (12/23/82)
+This involves renaming the "after" field "pg_field" in the nest array;
+making a new command code set_prev_graf;
+including the following loop into scan_the:
+        nest[nest_ptr]:=cur_list; p:=nest_ptr;
+        while abs(nest[p].mode_field)<>vmode do decr(p);
+        scanned_result(nest[p].pg_field)(int_val);
+and including the following active procedure for any_mode(set_prev_graf):
+        procedure change_prev_graf;
+        var p:0..nest_size; {index into |nest|}
+        begin nest[nest_ptr]:=cur_list; p:=nest_ptr;
+        while abs(nest[p].mode_field)<>vmode do decr(p);
+        scan_optional_equals; scan_int;
+        if cur_val<0 then
+                begin print_nl("! Bad \prevgraf");
+                help1("I allow only nonnegative values here.");
+                int_error(cur_val);
+                end
+        else    begin nest[p].pg_field:=cur_val; cur_list:=nest[nest_ptr];
+                end;
+        end;
+
+61. \clubpenalty is split off from \widowpenalty. (12/23/82)
+
+62. Bad bug in module 1005 (12/24/82)
+(must not go to reswitch if \par is a macro!)
+Instead of setting cur_cmd and cur_chr and goto reswitch, just back_input
+and set token_type:=inserted.
+
+63. \openin not to prompt if file not present (12/25/82)
+Change lines -4 and -3 of module 1183 to:
+        if a_open_in(read_file[n]) then read_open[n]:=just_open
+        else read_open[n]:=closed;
+
+64. New \jobname primitive (12/25/82)
+It is added to the "convert" command in the obvious way.
+In conv_toks, the relevant code is
+        if job_name=0 then open_log_file
+before "selector" is changed and
+        print(job_name)
+after.
+
+65. Better error recovery for math-only things (12/25/82):
+In module 952, don't goto reswitch after insert_dollar_sign.
+In module 954, first back_input, then set cur_tok, and
+don't bother to set cur_chr or cur_cmd; ins_error instead of back_error.
+
+66. Module 1163, line 3, insert "scan_optional_equals" (12/25/82).
+Also make \the\parshape allowed.
+
+67. The location where an \if begins is stacked (12/26/82)
+so that a better error message can be given for \end while \if is incomplete.
+This means two-word nodes instead of one-word nodes in the if stack.
+
+68. Change 30 is extended to \insert, \vadjust, \valign, \output (12/26/82)
+The one-time-only paragraph parameters are now cleared by a
+subroutine called normal_paragraph; hang_after is also set to 1.
+The essential change being made now is to call normal_paragraph in modules
+704, 932, 1009, and 1076.
+
+69. \pagetotal and \pagegoal are added (12/27/82)
+The changes are analogous to, but simpler than, those for \prevgraf.
+
+70. Tracing of page-optimization calculations (12/27/82)
+A bunch of print commands are added to modules 897, 914, and 918,
+activated if tracing_pages>0. Also, \tracingparagraphs is separated
+from \tracingstats.
+
+**** The changes above have been incorporated into version 0.91 of TeX
+
+71. The build_page procedure is broken in two parts (Dec 31, 1982)
+by making module 919 into a procedure called fire_up.
+
+72. \ifeven1\else is made legal by introducing if_code (Dec 31, 1982)
+This improves part of the code in change 45; if_limit has a specific
+value that recovers automatically from a former syntax error.
+
+73. Improvement to alignments when columns don't occur (Dec 31, 1982)
+Delete module 711; and where it was used in module 708, say this:
+        begin fin_col:=true; return;
+        end;
+Also, in module 717, replace the statement "width(q):=0" by
+"<Nullify width(q) and the tabskip glue following the current column>"
+where that new module has the following code:
+        begin width(q):=0; r:=link(q); s:=glue_ptr(r);
+        if s<>zero_glue then
+                begin add_glue_rel(zero_glue); delete_glue_ref(s);
+                glue_ptr(r):=zero_glue;
+                end;
+        end
+
+74. Better error message in overfull alignment (Dec 31, 1982)
+In module 717, don't set both height and width; set the height zero.
+Then in module 719, switch width to height if necessary.  (People didn't
+understand the previous error messages, and I couldn't blame them.)
+
+*** The changes above have been incorporated into version 0.92 of TeX82
+*** (which was the last version of 1982, completed 11:59pm on December 31)
+The first changes after 1982
+
+75. Modules 961 and 962 should be one module. (Jan 3, 1983)
+Also, the absolute constant 100 is replaced, and the test becomes
+        if ((page_head=page_tail)and(head=tail)and(dead_cycles=0))or
+                 (dead_cycles>max_dead_cycles) then
+
+76. Surprise bug: module 1010. (Jan 3, 1983)
+The case "if head<>tail" needs an else clause: else pop_nest.
+Also remove the "<Scan an optional space>" in that module.
+
+77. Improvement to change 22 (Jan 4, 1983)
+In module 996, use box_max_depth from inside the \vbox:
+        @!d:scaled; {maximum depth}
+        begin d:=box_max_depth; unsave;... vpackage(...,d);
+
+78. \groupbegin and \groupend changed to \begingroup and \endgroup (Jan 4, 83)
+
+79. \deadcycles made accessible (Jan 4, 83)
+
+80. New calculations for split insertions (Jan 4, 83)
+In module 918, we now work with natural width, and add in the page depth too:
+The line "else w:=x_over_n..." is changed to
+        else    begin w:=page_goal-page_total-page_depth;
+                if count(n)<>1000 then w:=x_over_n(w,count(n))*1000;
+                end;
+(Note that cur_page_height and cur_page_depth and page_size have been
+renamed page_total, page_depth, and page_goal, in accordance with new syntax.)
+
+*** The changes above have been incorporated into Version 0.93
+
+81. Old bug finally unearthed by PHY (Jan 6, 1983)
+insert "incompleat_node:=null;" after "push_nest;" in module 1097.
+
+82. Extension of change 69: \pageshrink, etc. added (Jan 6, 1983)
+
+83. \floatingpenalty and \insertpenalties added (Jan 6, 1983)
+Also, the insertion nodes now have a new format, so that the values of
+\floatingpenalty, \splittopskip, and \splitmaxdepth can be stored with
+each insertion; this requires the obvious changes in several places:
+a) Module 136, ins_node has fields float,depth,height,ins_ptr,split_top_ptr
+b) Module 184, these fields are displayed
+c) Module 198, ins_node case, also delete_glue_ref(split_top_ptr(p))
+d) Module 202, ins_node case, also add_glue_ref(split_top_ptr(p))
+e) Modules 226-228, new integer parameter \floatingpenalty
+f) Module 883, add parameter d to vert_break subroutine
+g) Module 885, use d instead of split_max_depth
+h) Module 890, argument split_max_depth to call of vert_break
+i) Module 894, change width to height (better name)
+j) Module 900, initialize insert_penalties here, not in 901
+k) Module 914, cost to be awful_bad if insert_penalties>=10000
+l) Module 916, add float(p) to insert_penalties if type(r)<>inserting
+m) Module 916, subtract page_depth from delta
+n) Module 918, subtract page_shrink from delta
+o) Module 918, argument depth(p) to call of vert_break
+p) Module 921, insert_penalties:=0, save split_top_skip before calling 925
+q) Module 921, restore split_top_skip before calling 924
+r) Module 928, set split_top_skip:=split_top_ptr(p) before prune_page_top
+s) Module 929, after q:=p, incr(insert_penalties)
+t) Module 929, before free_node, delete_glue_ref(split_top_ptr(p))
+u) Module 933, clear insert_penalties before calling 934
+v) Module 978, more local variables needed
+w) Module 1010, build the newfangled ins_node
+
+84. Scanner goes to new_line when <return> is category 13 (Jan 7, 1983)
+Insert state:=new_line in module 323 just before the reference to module 339;
+and delete "state:=new_line;" from modules 328 and 330 (and their names).
+
+85. Distinguish between user \kern and font \kern (Jan 9, 1983)
+The nontrivial parts of this are to change "type(s)<>kern_node" to
+"(type(s)<>kern_node)or(subtype(s)<>normal)" in modules 809 and 810;
+and to say "kern_node: if subtype(s)=explicit then goto done4" in module 812.
+The \kern primitive now has "explicit" instead of "normal" in 967.
+
+86. "ignorespace" becomes "ignorespaces" (Jan 9, 1983)
+
+87. Don't omit a blank space after \def, \message, \mark, etc. (Jan 9, 1983)
+<Scan an optional space> is removed from modules 431, 848, 874.
+"info(r):=space_token;" and "link(r):=get_avail; r:=link(r);" removed from 1278.
+
+*** The above changes appear in Version 0.94.
+Version 0.95
+
+88. New active characters in math mode (Jan 12, 1983)
+In module 1062, add a label "restart" and change lines -3 and -2 as follows:
+fam(p):=(c div 256) mod 16;
+if c>=var_code then
+  if fam(p)<8 then fam(p):=cur_fam
+  else begin <Convert c to an active character whose equivalent is
+                        ready to be scanned next>; goto restart;
+        end;
+In module 1064, the body of the procedure becomes
+begin if c>='4000 then <Convert c ...> else <the former body>; end
+And there's a new module:
+<Convert c...>=
+begin cs_ptr:=(c mod 128)+active_base;
+cur_cmd:=eq_type(cs_ptr); cur_chr:=equiv(cs_ptr); x_token; back_input;
+end
+
+89. Surprise bug: $1-$ treated the - as binary (Jan 15, 1983)
+New module <Convert a final bin_noad to an ord_noad>=
+        if r_type=bin_noad then type(r):=ord_noad
+is called in module 649 before the call of 678, and in module 651
+in the place where that code already appears.
+
+90. Another oversight (Jan 15, 1983)
+Add "space_factor:=1000;" after "push_nest" in modules 1027, 1029
+
+91. And a more embarrassing one (Jan 16, 1983)
+I forgot "spotless:=false;" at the beginning of the procedure in module 80.
+But while fixing this, I decided to make it more general since IBMers want
+a return code at the end of the job. So there's a history variable that has
+four values: spotless, warning_issued, error_message_issued, fatal_error_stop.
+a) module 75: declare history, define spotless etc.
+b) module 76: initialize history:=spotless
+c) module 80: if history<error_mess... then history:=error_mess...
+d) 80 and 90: history:=fatal_error_stop before jump_out
+e) 92: if history<error_message_issued then
+f) 232: if history=spotless then history:=warning_issued
+g) 1243: if history=warning_issued then print_nl("(see the log...)")
+
+92. "This can't happen" could happen, so there's new error recovery (Jan 16, 83)
+In module 933, replace the call on confusion by a call of the following module:
+        @ @<Recover from an unbalanced output routine@>=
+        begin print_nl("! Unbalanced \output routine");
+        help2("Your sneaky output routine has fewer real {'s than }'s.")@/
+        ("I can't handle that very well; good luck."); error;
+        repeat get_token;
+        until loc=null;
+        end
+In module 1278, replace the call on confusion by a call of:
+        @ @<Recover from an unbalanced write command@>=
+        begin print_nl("! Unbalanced \write command");
+        help2("On this page there's a \write with fewer real {'s than }'s.")@/
+        ("I can't handle that very well; good luck."); error;
+        repeat get_token;
+        until cur_tok=end_write_token;
+        end
+
+93. String overflow clobbered the log file (Jan 18, 1983)
+Also, "confusion" before log file open would cause problems.  Also start_input
+calling open_log_file calling prompt_file_name calling fatal_error!
+To fix these anomalies, open_log_file no longer calls prompt_file_name,
+if interaction<scrollmode; instead, it terminates after printing what went
+wrong. Also, the fatal_error and overflow and confusion procedures call
+the following new subroutine:
+procedure normalize_selector;
+begin if job_name>0 then selector:=term_and_log else selector:=term_only;
+if interaction=batch_mode then decr(selector);
+if job_name=0 then open_log_file;
+end;
+
+94. \ifeof\fi loops infinitely (Jan 18, discovered by Lamport)
+Change 72 converted such a \fi to <space>\fi. Now it is converted to \relax\fi.
+
+95. \limitswitch changed to \displaylimits et al. (Jan 18, 1983)
+[Incidentally, this fixes a bug in the former positioning of \int\limitswitch]
+a) module 608: subtype of Op can be normal, limits, or no_limits.
+b) 620: display the subtype if not normal
+c) 667: new logic decides limits before looking at the operand (and the operand
+ is now called the nucleus); the italic correction is removed only if
+ it should not be put back
+d) 1069: subtype(tail):=cur_chr
+
+96. Minor changes to math in unusual cases (Jan 19, 1983)
+a:delete "if height(y)<=0 then height(y):=default_rule_thickness" in module 658
+b:move "if thickness(q)=default..." from module 664 to module 661
+c:delete module 1081, that error message isn't worth the bother
+d:in module 1062, char_num case, c:=math_code(cur_val) (if cur_val<128)
+e:in module 1064, a similar change
+
+97. Bad spacing from change 6 is corrected (Jan 19, 1983)
+underline, overline, radical, vcenter, and accent noads now revert to type
+Ord instead of type Inner.
+{...} produces type Ord also.
+There's a new primitive \mathinner.
+The new_noad function now produces an ord_noad (change its calls accordingly).
+And the default is changed in module 679 to t:=ord_noad; the fraction_noad
+case sets t:=inner_noad, and the (inner_noad,ord_noad) cases swap places.
+
+98. New \mathchoice primitive (Jan 19, 1983)
+a) module 204: new command
+b) 254: math_choice_group
+c) 614: style node three words long, so a choice node can be converted to it
+d) 614a: choice node has four subfields: display_mlist, text_mlits, etc.
+e) 1081a: routines to build a choice_node like 1027-1029 build discretionaries
+
+99. \input moves to syntax from semantics (Jan 19, 1983)
+a) 204, 206: renumber commands
+b) When input is to be expanded, if name_in_progress then insert_relax
+c) 459,464: name_in_pr:=true; begin_name;...end_name; name_in_pr:=false;
+d) 406,461: declare name_in_progress, a global boolean initially false
+
+100. \chardef joins \mathchardef (Jan 19, 1983)
+a) 204: math_only becomes math_given; add new command char_given
+b) 205: new command char_def
+c) 250,251: new primitive char_def
+d) 380: char_given,math_given yield integer after \the
+e) 401: char_given,math_given yield integer in context of integer
+f) 936,943: char_given treated like other_char
+g) 1062,1064: same, if cur_chr<128, else assume math_code(x)=x
+h) 1143,1144: char_def is analogous to math_char_def
+
+101. \unbox becomes \unhbox,\unvbox; also add \unhcopy (Jan 19, 1983)
+Module 1020 changes in the obvious way.
+
+102. \spacefactor, \pagetotal, etc. move to prefixed_command (Jan 20, 1983)
+
+103. \hrule in horizontal mode, \vrule in vertical mode: switch modes (Jan 20)
+
+104. \globaldefs parameter, affects prefixed_command (Jan 20, 1983)
+
+105. After looking at frequency counts, some optimizations made (Jan 21, 1983)
+a) "fast_get_avail" and "fast_store_new_token" introduced to speed up the loops
+in modules 360 and 431.
+b) some procedure call overhead eliminated in begin_token_list, end_token_list,
+back_input, and flush_node_list.
+c) a few if tests changed from "if a and b then" to "if a then if b then".
+
+106. Changes for space efficiency in math constructions (Jan 22, 1983)
+a) In module 1102, mlist_penalties:=(mode>0)
+b) The following code is inserted before "free_node" in module 639 (rebox):
+        if (is_char_node(p))and(link(p)=null) then
+                begin f:=font(p); v:=char_width(f)(char_info(f)(character(p)));
+                if v<>width(b) then link(p):=new_kern(width(b)-v);
+                end;
+c) A new module is called just before clean_box exits:
+<Simplify a trivial box>=
+q:=list_ptr(x);
+if is_char_node(q) then
+        begin r:=link(q);
+        if r<>null then if link(r)=null then if type(r)=kern_node then
+                begin free_node(r,small_node_size); link(q):=null;
+                end;
+        end
+
+107. Oversight in rebox routine (module 639) corrected (Jan 22, 1983)
+if type(b)=vlist_node then b:=hpack(b,natural);
+
+108. Module 217 clobbers eqtb[bad_font_ident] set in change 26q (Jan 22, 1983)
+Decided to fix this by making \nullfont a primitive.
+This means the procedure missing_font can be deleted, and the test for
+undefined font can be removed from the inner loop.
+(This reflects a rather dramatic change from TeX80, where
+a missing font was a fatal "Whoa" error!)
+Note: I thought I could delete module 646, but realized that it still provides
+a useful error message. The dump/undump routines (cf. change 26ee) now
+dump the null_font information too, as its parameters can be changed.
+
+109. End of program now lists all incomplete \ifs (Jan 24, 1983)
+
+110. Alignment preamble setup to allow \halign\lb (Jan 29, 1983)
+The statement "align_state:=-1000000;" is inserted near the beginning
+of module 695 (and the comment about align_state=-999999 is deleted).
+The constant -999999 is changed to -1000000 in modules 700 and 701.
+
+111. Forgot to test is_char_node(r) (Jan 30, 1983)
+in the <Simplify a trivial box> code of change 106c.
+By coincidence, this was caught since somebody used font number 11
+in the second character of a list of length 2!
+
+112. Improved format for stats at end of run (suggested by DRF, Jan 30, 1983)
+Module 1242 changes; nothing subtle.
+
+**** The changes above have been incorporated into version 0.95
+Version 0.96
+
+113. space after one-symbol control sequences NOT to be ignored unless
+the catcode of that symbol is letter or spacer. (Jan 30, 1983)
+The name of module 334 changes slightly; the state is set based
+on cat_code(cur_chr), shortly after label start_cs.
+A new variable cat is introduced and set to cat_code(cur_chr) in modules
+334 and 336.
+
+114. trailing spaces removed on all lines of input (Jan 30, 1983)
+last_nonblank is added to input_ln routine (module 31)
+
+115. mmode+accent gives error but assumes math_accent (Feb 3, 1983)
+This goes into math_ac procedure (module 1075); module 1035 is eliminated.
+
+116. \iftrue and \iffalse (Feb 5, 1983)
+Simple addition of two new conditions.
+
+117. Bad calculation of size for \left and \right (Feb 6, 1983)
+In module 680, the first assignment to delta should be
+        delta:=(delta1 div 500)*delimiter_factor.
+
+118. \delimitershortfall (new name) replaces \delimiterlimit. (Feb 12)
+
+119. \abovewithdelims.. to be equivalent to \above (Feb 12)
+Module 1089 revised so that the delimiters are scanned before the dimension.
+
+120. Remove the kludgy math codes introduced in change 88 (Feb 12)
+\fam becomes a normal integer parameter
+and \mathcode stored with min_halfword added
+and \mathcode allowed to be 32768
+and current family is substituted only when it's in range.
+Also the initialization of mathcode for letters now specifies family 1.
+(This implies a dozen or so obvious revisions.)
+
+121. Bug in module 1152: max spacefactor is 32767 (Feb 12)
+also module 1013 gets a restricted range
+
+122. Octal output to be replaced by hexadecimal. (Feb 14)
+
+123. Forgot to include char_given in module 1037, re change 100 (Feb 14)
+
+124. vmode+valign,hmode+halign made legal transitions (Feb 17)
+
+125. \tracingrestores (Feb 18)
+This involves a lot of new, rather tedious code that's interspersed with the
+eqtb definitions (the body of a procedure called show_eqtb).
+
+126. New error message for hmode+hrule in -hmode. (Feb 25)
+head_for_vmode now suggests \leaders in this case. [improves change 103]
+
+127. under/overfull boxes in alignment: Better message. (Feb 27)
+par_begin_line becomes pack_begin_line, and it is set (negative) in
+module 719, read in modules 590 and 601.
+
+128. New \xcr feature. (suggested by Lamport comments, Mar 4)
+align_peek (module 702) ignores it, otherwise it acts like ordinary \cr.
+
+129. In stats, subtract out TeX's own string requirements (Mar 4)
+(cf. change 112)
+init_pool_ptr and init_str_ptr variables added in obvious way
+(declared in module 39, set in module 1240, used in module 1242)
+
+130. \everyhbox and \everyvbox. (Mar 6)
+The modifications are obvious; for example, module 1076 gets the statement
+        if every_vbox<>null then begin_token_list(every_vbox,every_vbox_text);
+and a similar pair of statements goes into module 993.
+
+131. Precaution in module 1105 error recovery (March 9, 1983)
+Change the first test to "if (a=null)or danger", in order to
+avoid accessing math_quad when the symbol fonts aren't known to be present.
+
+132. Installed float and unfloat to aid portability (suggested by HWT, 3/7/83)
+
+133. \dispskip becomes \abovedisplayskip and \belowdisplayskip (3/9/83)
+Also \dispaskip becomes \abovedisplayshortskip; \dispbskip similar.
+
+134. \romannumeral separated from \number (suggested by FY, March 10)
+Obvious changes; print_roman_int now accepts negative input but gives
+no output in such cases (the test in module 68 becomes "if n<=0 then return").
+
+135. scan_keyword to ignore leading spaces (Mar 12)
+In module 375, change "else begin" to
+"else if (cur_cmd<>spacer)or(p<>backup_head) then begin".
+
+136. Update to change 112 (Mar 14)
+Module 1242 now uses write and write_ln directly (saves space and time).
+
+137. Another change to page-break cost (suggested by Lamport, March 16)
+Cf. change 83k above; the relevant lines of module 914 now read
+        if b<awful_bad then
+                if pi<=eject_penalty then c:=pi
+                else    if b<inf_bad then c:=b+pi+insert_penalties
+                        else c:=deplorable
+        else c:=b;
+        if insert_penalties>=10000 then c:=awful_bad;
+and a similar change (but without insert_penalties) occurs in module 887.
+
+**** The changes above have been incorporated into version 0.96 (March 16, 1983)
+Version 0.97
+
+138. \everyjob (suggested by FY, March 18)
+Module 936: main_control inserts every_job as its first action.
+
+139. Improved printout of macro definitions (March 19)
+In module 278, simply treat left_brace like right_brace.
+(This corresponds to the way the manual describes parameter matching.)
+
+140. Omit blanks as non-delimited parameters (March 19)
+In module 360, replace
+        else store_new_token(cur_tok);
+by
+        else @<Store the current token, but |goto continue| if it is
+                 a blank space that would become an undelimited parameter@>;
+Then define @<Store the current token...@> to be:
+begin if cur_tok=space_token then
+        if info(r)<=end_match_token then
+                if info(r)>=match_token then goto continue;
+store_new_token(cur_tok);
+end
+
+141. Minor patch in module 386, catches mu_glue (March 21)
+begin cur_val:=zero_glue; cur_val_level:=glue_val;
+if not is_char_node(tail)and(mode<>0) then
+        begin if type(tail)=glue_node then
+                begin cur_val:=glue_ptr(tail);
+                if subtype(tail)=mu_glue then cur_val_level:=mu_val;
+                end;
+        end
+else if (mode=vmode)and(tail=head)and(last_page_glue<>max_halfword) then
+        cur_val:=last_page_glue;
+end
+
+142. Patch in module 699, \span expands only one level (March 21)
+(See previous change #42.) The "get_x_token" in the code
+while (cur_chr=span_code)and(cur_cmd=tab_mark) do get_x_token;
+should be replaced by:
+        begin get_token;
+        if cur_cmd>max_command then
+                begin expand_calls; get_token;
+                end;
+        end
+
+143. Single # in \tokens, \message, etc. (March 22)
+(The previous rule was really bad in connection with \uppercase,
+or with \write when #'s had to be given four times!)
+Module 437 should be prefaced with "if macro_def then".
+And get_token should become get_x_token there, if xpand is true.
+
+144. Keyword "to" required in \read. (March 22)
+This will avoid the common error of a missing space before the \cs.
+Also the stream number can be out of range, for terminal input.
+The stream number in a \write can be out of range too, for terminal output.
+Modules 1145 and 1258 and 1280, etc., change in the obvious ways.
+
+145. \ifeven<countnumber> replaced by \ifodd<number> (March 26)
+This makes the language more consistent.
+
+146. Big surprise bug relating to \if\if aabc\fi (March 26)
+(related to change 45; the possibility that cur_if might not be the
+correct one when the conditional is evaluated was discovered today)
+The main change is to add the change_if_limit procedure, and to add
+the variable save_cond_ptr and the code that now depends on it.
+
+147. \if and \ifcat should tolerate primitives (March 28)
+
+148. "absent" becomes "void", a better word (March 28)
+
+149. Module 990: \lastbox to clear the shift_amount (March 28)
+since I don't want to figure out what it means in all cases (\vsplit, etc)
+
+150. print_err("...") takes the place of print_nl("! ...") (DRF, March 29)
+And wake_up_terminal is introduced in module 34, and used in modules
+37, 70, 341, 441, 457, 463, 1210, 1240, 1246.
+
+151. \halign extended to periodic preambles (April 1)
+Modules 688--690: cur_loop introduced, stacked/unstacked
+Module 695: cur_loop initialized
+Module 700: cur_loop set up
+Module 708--709: cur_loop used and advanced
+
+152. \leaders to align by the smallest enclosing box. (April 1)
+Module 549: new local variable left_edge, initialized to cur_h
+Module 557: cur_h:=left_edge+leader_wd*((cur_h-left_edge) div leader_wd)
+Module 559: new local variable top_edge, initialized to cur_v-height(this_box)
+Module 566: analogous to 557
+
+153. hyphenation after whatsits is OK (April 1)
+In module 809, skip past whatsits
+
+154. \par in vertical mode should build_page (April 2)
+vmode+par_end moves from 952 to 1005
+
+155. Clear aux to zero in module 703 (April 2)
+
+156. Digits will switch families (April 4)
+(initialize their math codes differently in module 225)
+
+157. Refinement to correction 83m (April 7)
+the test for not splitting should be
+        if ((h<=0)or(h<=delta))and(height(p)+height(r)<=dimen(n)) then
+
+158. (re 128) \xcr renamed to \crcr, at Lamport's request. (April 8)
+
+159. Better error recovery in runaway preamble (April 11)
+Module 319, aligning: set align_state:=-1000000
+
+160. \read to get balanced braces (April 12)
+Module 440 changed to look more like 431.
+Module 443 gives error message if the \read goes off end of file.
+Module 319 removes \outer from forbidden control sequence that is \read.
+
+161. Bug found by Jim Sterken (April 14)
+Module 798 can make q a char_node, so module 794 needs this patch:
+        if not is_char_node(q) then
+to be inserted just before "if (type(q)=math_node)..."
+
+162. \uppercase and \lowercase to apply to all characters (April 15)
+module 1196 changes; also I put active_base before single_base in eqtb
+
+**** The changes above have been incorporated into version 0.97 (April 16, 1983)
+**** except the part of 144 about \read-1 was forgotten and put in 0.98 later
+Version 0.98
+
+163. change small_number to 0..65 in module 814 (found by DRF, April 17)
+
+164. improved error recovery in module 1166 (suggested by DRF, April 17)
+after error: repeat get_token; until cur_cmd=right_brace; {flush the patterns}
+
+165. improved \read from terminal (suggested by Todd Allen at Yale, May 1)
+I had forgotten to implement the extended stream numbers in change 144.
+Also, the prompt is now omitted if n<0.
+
+166. \write n writes only to the log file, if n<0. (May 18)
+
+167. Unified syntax for parameters and registers. (May 18)
+a) Command code changes: def_font moved to before prefix;
+   register eliminated; set_register renamed register and
+   moved (with adv_register...div_register) to before prefix;
+   min_internal and max_internal defined.
+b) scan_the renamed scan_something_internal, and it acts on cur_tok.
+c) scan_int, scan_dimen, scan_glue simplified accordingly; instead of
+   testing for cur_cmd=the or cur_cmd=register, they now test
+   cur_cmd versus min_internal and max_internal.
+d) ins_the is removed.
+e) \minusthe is removed. Consequently "the_toks" needs no parameter.
+
+168. new parameters \hoffset, \voffset (May 18)
+
+169. \everycr (suggested by Spivak, installed May 24)
+
+170. \countdef, \dimendef, etc. (suggested by DRF long ago, installed May 25)
+Straightforward change to internal representation of assign_int and similar
+commands, so that the chr part is now a pointer to the eqtb location.
+
+171. \advance, \multiply, \divide (suggested by FY, installed May 25)
+
+172. \hyphenchar (May 25)
+A new command assign_font_int is introduced, and incorporated into
+scan_something_internal and prefixed_command in the usual way.
+The hyphen_char array entries are initialized in modules 483 and 506,
+allocated in 482, used in modules 809 [is hyphenation to be suppressed?],
+828 [insert the hyphen character], 946 [insert discretionary node
+following hyphen], 1027 [implementation of \-].
+hyphen_char[k] is dumped and undumped in modules 1229 and 1230.
+
+173. \skewchar (May 25)
+Loaded and fetched with the same command code as \hyphenchar.
+Module 659 gets a dozen more lines of program, to compute the skew.
+
+174. \noexpand (May 25)
+This involves: introduction of no_expand and dont_expand command codes;
+frozen_dont_expand as an internal marker; small change to get_next
+when that marker is sensed; change to processing of \if and \ifcat;
+implementation of no_expand in the expand_calls subroutine.
+I also changed the name of expand_calls to "expand".
+
+175. \meaning (May 25)
+This adds one case to the "convert" command.
+print_meaning is a new subroutine, using code that was in show_whatever.
+
+176. "dm" and "vu" are out, ".5\hsize" is in (May 25)
+Straightforward changes to module 416.
+
+177. \texinfo f n becomes \fontdimen n f (May 25)
+
+178. \afterassignment (suggested by ARK, May 27)
+
+179. \chardef\xx=5\xx shouldn't say that \xx is undefined (May 27)
+
+180. \relax to be ignored like spaces in math mode (May 28)
+and in a few other places: <Get next non-blank non-relax non-call token>
+is now used in modules 379, 988, 994, 1062, 1070, 1134, 1179
+(i.e., scan_left_brace, scan_box, scan_math, scan_delimiter, prefixed_command,
+do_assignments, and just after \leaders).
+
+181. improve \mathaccent wrt sub/superscripts (sugg by HWT, May 30)
+
+182. its_all_over: remove dead_cycles>max_dead_cycles (May 30)
+Modules 961 and 962 are combined and simplified.
+
+*** The changes above were installed into version 0.98 on May 31, 1983 ***
+Version 0.99
+
+183. \mark and \insert and \vadjust allowed in restricted hmode (Jun 3)
+also in math; this is a comparatively big change
+[at present, \mark in a display causes TeX to crash with "can't happen"!]
+modules 652 and 679: mark_node,ins_node,adjust_node now permitted
+modules 576 and 578: t becomes a global variable adjust_tail
+modules 802 and 1110: new calling sequence to get the adjustments
+modules 254, 986, 993, 995, 996: adjusted_hbox_group for the new kind of hbox
+modules 698--690: cur_head and cur_tail added to alignment stack
+modules 703, 712, 715: adjustments gathered and appended during \halign
+
+184. \ht, \wd, and \dp (Jun 6)
+
+185. When displaying noads, use ^ and _ instead of ( and [ (Jun 6)
+
+186. A..F in hex constants could be otherchar as well as letter (Jun 6)
+
+187. Remove <scan optional space> from module 417 (Jun 7)
+(it was redundant code)
+
+188. \mkern .5\thinmuskip and \mkern\thinmuskip should be legal (Jun 7)
+
+189. 2.5\space\space\dimen0 should work (Jun 7)
+previously it worked after "plus" or "minus" only!
+
+190. <font identifier> to allow also \font for current font (Jun 7)
+"if cur_cmd=def_font then f:=cur_font else" added to module 507
+
+191. \gdef not to be global when \globaldefs<0 (Jun 7)
+"and (global_defs>=0)" added to module 1139
+
+192. \advance\spaceskip by-\spaceskip should yield zero_glue (Jun 7)
+the procedure trap_zero_glue is culled from module 1147
+
+193. \show should work with any token (Jun 7)
+
+194. \tokens to become 256 registers (Jun 8)
+\toks and \toksdef added in the straightforward way
+(this affects mainly eqtb, scan_something_internal, prefixed_command)
+
+195. allow \indent in math mode (Jun 8)
+also, \valign in math mode to give missing $ error
+modules 1001 and 1043 disappear; 1004 is generalized slightly.
+
+196. remove redundant code (Jun 8)
+In module 1044, there's no need to check cur_group and call off_save.
+Similarly in module 1053.
+
+197. new_write_whatsit shouldn't allow \openout-1, \closeout-1 (Jun 8)
+(simple change to module 1258)
+
+198. \lastbox should give error in math mode (Jun 8)
+(simple change to module 990)
+
+199. \leaders not followed by proper glue should be back_error (Jun 9)
+[I made the change; TRIP should test this error message!]
+
+200. Module 702, correction to beginning of \noalign (Jun 9)
+if mode=-vmode then normal_paragraph;
+
+201. After alphabetic constant, expand the optional space (Jun 10)
+
+202. Set space_factor:=1000 after rule or constructing an accent (Jun 12)
+That's in modules 964 and 1036.
+
+203. blunder in module 783 (caught by Jim Sterken, fixed Jun 14)
+disc_width:=0 needs to be set before testing if s=null
+(A real bug that existed since the beginning! It showed up on page 37
+  of the September 1982 TRIP manual; my hand-checking was incomplete...)
+
+204. Change to optional spaces after <dimen> (Jun 14)
+The optional space will now be analogous to that after <number>.
+
+205. Fix conflict between \output and \everydisplay (Jun 14)
+In change 49, I should have inserted every_display before calling build_page.
+
+206. Overflow errors to be consistent with statistics reporting (Jun 17)
+(See change 129.)
+
+207. \tracing switches to be all positive vs nonpositive (Jun 17)
+
+*** The changes above were installed into version 0.99 on June 19, 1983 ***
+Version 0.999
+
+208. \catcode`\%=14 to be done by INITEX (Jun 20)
+
+209. \par in vmode to clear parshape etc. (Jun 21)
+Module 1005, which contains vmode+par_end, now calls normal_paragraph.
+
+210. Improvement to change 39 (Jun 21)
+Module 593, overfull_rule not appended if solely due to hbadness
+
+211. Alignment bug allows glue_set to be less than -1! (Jun 21)
+Modules 723 and 724 need to be patched.
+
+212. Correction to change 134 (found by Debby Clark, Jun 22)
+Module 68: n to be declared integer, not nonnegative_integer.
+
+213. "by" to be optional (suggested by Lamport, Jun 22)
+Module 1158 disappears
+
+214. Module 1235, slight change in format_ident message (Jun 24)
+
+215. New measures needed to thwart trickery (Jun 25)
+Glue set values computed by \span could have been brought into
+TeX's registers via, e.g., \valign and \vsplit; so the
+"kern" idea of module 722 is insufficient and should be abandoned.
+Extra boxes and glue are added; this has additional virtue
+of perfect accuracy in alignment of vertical rules.
+The main change is to introduce a new module after 722, in which s and t
+are updated for spans, and to eliminate the "equivalent kern" code from 719
+(the corresponding glue calculations are now done in the new module).
+
+216. leaders to affect height/width of their boxes (Jun 25)
+Module 583 splits into two parts (one for hpack, one for vpack).
+
+217. \unskip permitted a little more often (Jun 28)
+Module 1018 reports error only if last_page_glue<max_halfword.
+
+218. {\bf A} in math: not to make a box (Jul 1)
+Module 1093 changes as follows: info(saved(0)):=fin_mlist(null) becomes
+p:=fin_mlist(null); info(saved(0)):=p; if <simple case> then <simplify>.
+
+219. "scaled" feature added to \font input.
+
+220. \mathaccent still not working right? (Jul 2)
+Change 181, I forgot to correct delta when box x changed.
+
+221. Remove confusion possible on file of length 1 (found by Lamport)
+Correction suggested by DRF, July 2: introduce bypass_eoln
+
+222. Allow things like ^^b. (July 4)
+This simplifies modules 332 and 335; also affects 48 and 49.
+And (surprise) 58.
+
+223. \escapechar \defaulthyphenchar \defaultskewchar \endlinechar (July 4)
+to make TeX less dependent on the character set
+A lot of error messages are now broken up so that they use print_esc
+
+224. erstat added for file opening/closing (by DRF, July 7)
+That's module 27.
+
+225. \tracingpages output to show total glue too (July 11)
+Added a procedure called print_page_totals, used also by show_activities.
+Broke modules 214 and 896 into two modules each.
+
+226. Guard against insertion into an hbox (July 11)
+A new procedure ensure_vbox is called in modules 917 and 925.
+
+227. <tokenvar>=<tokenvar> allowed (July 11)
+
+228. \errhelp parameter added (July 11)
+
+229. get_preamble_token should look at global_defs (July 11)
+Module 699 is patched.
+
+*** The above changes installed in preliminary version 0.999 on July 12, 1983,
+but I decided later in the day to do a few more things:
+
+230. \string, \noexpand, \meaning to allow \outer (Todd Allen, July 12)
+
+231. \the to be an expandable control sequence (July 12)
+Several things in the language are cleaned up:
+a) \the\tenrm replaced by \fontname\tenrm [\fontname<font>]
+b) when expanding edef, etc., result of \the still expanded only only level
+c) expansion after \def not inhibited, since \noexpand is now present
+d) \the\the disallowed.
+
+232. \unhbox and \unhcopy allowed in math mode if the box is void (July 12)
+Module 1020 is extended to handle this case.
+
+233. Value of default_rule was incorrectly rounded (July 16)
+Module 424: default_rule=26214 {.39999 pt}
+
+234. \mathaccent still not right! (July 16)
+I need to make the final height the max of (height of accented letter w/o
+superscript, height of unaccented letter w superscript).
+
+235. \newlinechar parameter (July 16)
+simple change to print subroutine
+
+236. boxes and rules to be allowed in discretionaries (sugg by HP man, July 16)
+in fact this simply requires omitting of the prohibition (in module 1031)
+and a few more cases equivalent to kern_node in modules 754, 755, 784.
+
+237. \tracingcommands to show all expandable tokens (July 16)
+
+238. \char to be allowed in \hyphenation list (July 16)
+Module 848 changes in the obvious way.
+
+239. \aftergroup (July 16)
+A new save_type.
+
+240. Curtail running dimensions inside alignments (sugg by ARK, July 16)
+Module 720.
+
+241. Strange pattern data could cause PASCAL error (found July 17)
+Put "if hc[1]=127 then hyf[0]:=0;" at beginning of module 878.
+
+242. hc codes for hyphenation are one lower (July 17)
+e.g., hc[...]:=lc_code(...)-1. This makes code 127 impossible to match.
+
+243. whatsits also allowed after hyphenatable words (July 17)
+Module 812.
+
+244. \/ makes an explicit kern (July 17)
+"subtype(tail):=explicit" in module 1023.
+
+*** Version 0.999 installed July 17, 1983.
+But later in the day I decided to do a few more things:
+
+245. Lowercase letters allowed in file names (July 18)
+In module 452, omit the conversion to uppercase.
+
+246. "No output file" becomes "No pages of output." (July 18)
+Module 571.
+
+247. QRS on error leads to confirmation message (sugg by ARK, July 18)
+Module 84.
+
+*** The real version 0.999 finally installed July 18.
+* Version 1.0
+
+(Changes made after the Version 0.999 listing of TeX82)
+(Henceforth the "final" module numbers are used)
+
+248. Module 1215, allow space in \read n to \cs (by FY, July 25, 1983)
+@x patch in get_r_token routine
+begin restart: get_token;
+@y
+begin restart: repeat get_token;
+until cur_tok<>space_token;
+@z
+
+249. Module 498, we must stack the current if type (FY, July 27)
+@x patch in conditional routine
+begin @<Push the condition stack@>;@+save_cond_ptr:=cond_ptr;@/
+@y
+@!this_if:small_number; {type of this conditional}
+begin @<Push the condition stack@>;@+save_cond_ptr:=cond_ptr;this_if:=cur_chr;@/
+@z
+Also replace cur_if by this_if in modules 501, 503, 506. The following
+patches do only what is necessary to make things work:
+@x
+  print_cmd_chr(if_test,cur_if);
+@y
+  print_cmd_chr(if_test,this_if);
+@z
+@x
+if cur_if=if_int_code then scan_int@+else scan_normal_dimen;
+@y
+if this_if=if_int_code then scan_int@+else scan_normal_dimen;
+@z
+@x
+if cur_if=if_char_code then b:=(n=cur_chr)@+else b:=(m=cur_cmd);
+@y
+if this_if=if_char_code then b:=(n=cur_chr)@+else b:=(m=cur_cmd);
+@z
+
+250. Module 507, \ifx need not put a control sequence in hash table (July 29)
+@x
+get_token; n:=cs_ptr; p:=cur_cmd; q:=cur_chr;
+get_token; if cur_cmd<>p then b:=false
+@y
+get_next; n:=cs_ptr; p:=cur_cmd; q:=cur_chr;
+get_next; if cur_cmd<>p then b:=false
+@z
+
+251. Module 86, message is lost (noticed by HWT, July 31)
+@x
+print("..."); print_ln; return;
+@y
+print("..."); print_ln; update_terminal; return;
+@z
+
+252. Don't put empty at end of \input file! (Aug 1)
+[This simplifies the rules and the program, and also gets around a bug
+that occurred at the end of files with \endlinechar<0.]
+@x Module 362:
+@ An empty line is inserted at the end of the file, if the last line
+wasn't already empty, because |input_ln| sets |last:=first| when
+it discovers an |eof|.
+@^empty line at end of file@>
+
+@<Read next line of file into |buffer|, or
+  |goto restart| if the file has ended@>=
+begin incr(line); first:=start;
+if not force_eof then
+  begin if input_ln(cur_file,true) then {not end of file}
+    firm_up_the_line {this sets |limit|}
+  else if limit<>start then firm_up_the_line
+    {if |pausing|, the user can add more lines}
+  else force_eof:=true;
+@y
+@ @<Read next line of file into |buffer|, or
+  |goto restart| if the file has ended@>=
+begin incr(line); first:=start;
+if not force_eof then
+  begin if input_ln(cur_file,true) then {not end of file}
+    firm_up_the_line {this sets |limit|}
+  else force_eof:=true;
+@z
+
+*** The changes above went into Version 0.9999, which was widely distributed
+
+253. Ridiculous blunder made in change 146 (found by FY, August 16)
+@x Correction to module 497
+else loop@+begin q:=cond_ptr;
+  if link(q)=p then
+    begin type(p):=l; return;
+    end;
+  if q=null then confusion("if");
+@:this can't happen if}{\quad if@>
+  q:=link(q);
+@y
+else  begin q:=cond_ptr;
+  loop@+  begin if q=null then confusion("if");
+@:this can't happen if}{\quad if@>
+    if link(q)=p then
+      begin type(q):=l; return;
+      end;
+    q:=link(q);
+    end;
+@z
+
+254. Minor amendment to stat(s) printing (cf. change 129) (August 16)
+@x in module 1334
+  wlog_ln(' ',str_ptr-init_str_ptr:1,' strings out of ',
+    max_strings-init_str_ptr:1);@/
+@y
+  wlog(' ',str_ptr-init_str_ptr:1,' string');
+  if str_ptr<>init_str_ptr+1 then wlog('s');
+  wlog_ln(' out of ',
+@z
+
+255. Bug in \xleader computations (found by FY, August 18)
+@x in module 592
+@!lq,@!lr:integer; {quantities used in calculations for leaders}
+@y
+@!lq,@!lr,@!lx:integer; {quantities used in calculations for leaders}
+@z
+@x in module 626
+  begin edge:=cur_h+rule_wd;
+  @<Let |cur_h| be the position of the first box, and set |leader_wd|
+    to the spacing between corresponding parts of boxes@>;
+  while cur_h+leader_wd<=edge do
+    @<Output a leader box at |cur_h|,
+      then advance |cur_h| by |leader_wd|@>;
+@y
+  begin edge:=cur_h+rule_wd; lx:=0;
+  @<Let |cur_h| be the position of the first box, and set |leader_wd+lx|
+    to the spacing between corresponding parts of boxes@>;
+  while cur_h+leader_wd<=edge do
+    @<Output a leader box at |cur_h|,
+      then advance |cur_h| by |leader_wd+lx|@>;
+@z
+@x in module 627
+    leader_wd:=leader_wd+lx;
+@y
+@z
+@x in module 628
+cur_h:=save_h+leader_wd;
+@y
+cur_h:=save_h+leader_wd+lx;
+@z
+@x in module 635
+  begin edge:=cur_v+rule_ht;
+  @<Let |cur_v| be the position of the first box, and set |leader_ht|
+    to the spacing between corresponding parts of boxes@>;
+  while cur_v+leader_ht<=edge do
+    @<Output a leader box at |cur_v|,
+      then advance |cur_v| by |leader_ht|@>;
+@y
+  begin edge:=cur_v+rule_ht; lx:=0;
+  @<Let |cur_v| be the position of the first box, and set |leader_ht+lx|
+    to the spacing between corresponding parts of boxes@>;
+  while cur_v+leader_ht<=edge do
+    @<Output a leader box at |cur_v|,
+      then advance |cur_v| by |leader_ht+lx|@>;
+@z
+@x in module 636
+    leader_ht:=leader_ht+lx;
+@y
+@z
+@x in module 637
+cur_v:=save_v-height(leader_box)+leader_ht;
+@y
+cur_v:=save_v-height(leader_box)+leader_ht+lx;
+@z
+Also insert the following in modules 619 and 629:
+@!lx:scaled; {extra space between leader boxes}
+
+256. \/ should apply to ligatures! (August 20)
+@x in module 1113
+var f:internal_font_number; {the font in the |char_node|}
+begin if is_char_node(tail)and(tail<>head) then
+  begin f:=font(tail);
+  tail_append(new_kern(char_italic(f)(char_info(f)(character(tail)))));
+@y
+label exit;
+var p:pointer; {|char_node| at the tail of the current list}
+@!f:internal_font_number; {the font in the |char_node|}
+begin if tail<>head then
+  begin if is_char_node(tail) then p:=tail
+  else if type(tail)=ligature_node then p:=lig_char(tail)
+  else return;
+  f:=font(p);
+  tail_append(new_kern(char_italic(f)(char_info(f)(character(p)))));
+@z
+@x later in that same module
+end;
+@y
+exit: end;
+@z
+
+257. Another debugging hack. (August 27)
+@x module 1339
+15: begin font_in_short_display:=null_font; short_display(n);
+  end;
+@y
+15: begin font_in_short_display:=null_font; short_display(n);
+  end;
+16: panicking:=not panicking;
+@z
+
+258. Redundant code eliminated (August 27)
+Module 531 needn't set and reset name_in_progress [but it's harmless].
+
+259. Bug: \input shouldn't occur during font size spec (Spivak; fixed August 27)
+@x module 1258
+@ @<Scan the font size specification@>=
+@y
+@ @<Scan the font size specification@>=
+name_in_progress:=true; {this keeps |cur_name| from being changed}
+@z
+@x module 1258
+else s:=-1000
+@y
+else s:=-1000;
+name_in_progress:=false
+@z
+
+260. \ifhbox and \ifvbox introduced. (August 27)
+@x module 487
+@d ifx_code=10 { `\.{\\ifx}' }
+@d if_eof_code=11 { `\.{\\ifeof}' }
+@d if_true_code=12 { `\.{\\iftrue}' }
+@d if_false_code=13 { `\.{\\iffalse}' }
+@d if_case_code=14 { `\.{\\ifcase}' }
+@y
+@d if_hbox_code=10 { `\.{\\ifhbox}' }
+@d if_vbox_code=11 { `\.{\\ifvbox}' }
+@d ifx_code=12 { `\.{\\ifx}' }
+@d if_eof_code=13 { `\.{\\ifeof}' }
+@d if_true_code=14 { `\.{\\iftrue}' }
+@d if_false_code=15 { `\.{\\iffalse}' }
+@d if_case_code=16 { `\.{\\ifcase}' }
+@z
+@x
+primitive("ifx",if_test,ifx_code);
+@y
+primitive("ifhbox",if_test,if_hbox_code);
+@!@:if_hbox_}{\.{\\ifhbox} primitive@>
+primitive("ifvbox",if_test,if_vbox_code);
+@!@:if_vbox_}{\.{\\ifvbox} primitive@>
+primitive("ifx",if_test,ifx_code);
+@z
+@x module 488
+  ifx_code:print_esc("ifx");
+@y
+  if_hbox_code:print_esc("ifhbox");
+  if_vbox_code:print_esc("ifvbox");
+  ifx_code:print_esc("ifx");
+@z
+@x module 501
+if_void_code: @<Test if a box is void@>;
+@y
+if_void_code, if_hbox_code, if_vbox_code: @<Test box register status@>;
+@z
+@x module 505
+@ @<Test if a box is void@>=
+begin scan_eight_bit_int; b:=(box(cur_val)=null);
+end
+@y
+@ @<Test box register status@>=
+begin scan_eight_bit_int; p:=box(cur_val);
+if this_if=if_void_code then b:=(p=null)
+else if p=null then b:=false
+else if this_if=if_hbox_code then b:=(type(p)=hlist_node)
+else b:=(type(p)=vlist_node);
+end
+
+261. Serious data structure error (found by Todd Allen, August 29)
+@x module 478 (an error introduced in change 231)
+  q:=the_toks; link(p):=link(temp_head); p:=q;
+@y
+  q:=the_toks;
+  if link(temp_head)<>null then
+    begin link(p):=link(temp_head); p:=q;
+    end;
+@z
+
+262. Minor patch for efficiency (August 29)
+@x module 466
+    begin store_new_token(info(r)); r:=link(r);
+@y
+    begin fast_store_new_token(info(r)); r:=link(r);
+@z
+
+263. Minor patch to error message (August 29)
+@module 579
+  print(" has "); print_int(font_params[f]);
+  print(" fontdimen parameters");
+@.Font x has n fontdimen...@>
+@y
+  print(" has only "); print_int(font_params[f]);
+  print(" fontdimen parameters");
+@.Font x has only...@>
+@z
+
+*** The changes above comprise version 0.99999, used only at SAIL (August 29)
+
+264. funny blank spaces are showable (August 30)
+@x module 298
+spacer: print("blank space");
+@y
+spacer: chr_cmd("blank space ");
+@z
+
+265. \newlinechar [change 235] should affect print_char too (August 31)
+@x module 58
+procedure print_char(@!c:ascii_code); {prints a single character}
+begin case selector of
+term_and_log: begin wterm(xchr[c]); write(log_file,xchr[c]);
+  incr(term_offset); incr(file_offset);
+  if term_offset=max_print_line then
+    begin wterm_cr; term_offset:=0;
+    end;
+  if file_offset=max_print_line then
+    begin wlog_cr; file_offset:=0;
+    end;
+  end;
+log_only: begin write(log_file,xchr[c]); incr(file_offset);
+  if file_offset=max_print_line then print_ln;
+  end;
+term_only: begin wterm(xchr[c]); incr(term_offset);
+  if term_offset=max_print_line then print_ln;
+  end;
+no_print: do_nothing;
+pseudo: if tally<trick_count then trick_buf[tally mod error_line]:=c;
+new_string: begin if pool_ptr<pool_size then append_char(c);
+  end; {drop characters if the string space is full}
+othercases write(write_file[selector],xchr[c])
+endcases;@/
+incr(tally);
+end;
+@y
+procedure print_char(@!s:ascii_code); {prints a single character}
+label exit;
+begin if @<Character |s| is the current new-line character@> then
+ if selector<pseudo then
+  begin print_ln; return;
+  end;
+case selector of
+term_and_log: begin wterm(xchr[s]); wlog(xchr[s]);
+  incr(term_offset); incr(file_offset);
+  if term_offset=max_print_line then
+    begin wterm_cr; term_offset:=0;
+    end;
+  if file_offset=max_print_line then
+    begin wlog_cr; file_offset:=0;
+    end;
+  end;
+log_only: begin wlog(xchr[s]); incr(file_offset);
+  if file_offset=max_print_line then print_ln;
+  end;
+term_only: begin wterm(xchr[s]); incr(term_offset);
+  if term_offset=max_print_line then print_ln;
+  end;
+no_print: do_nothing;
+pseudo: if tally<trick_count then trick_buf[tally mod error_line]:=s;
+new_string: begin if pool_ptr<pool_size then append_char(s);
+  end; {drop characters if the string space is full}
+othercases write(write_file[selector],xchr[s])
+endcases;@/
+incr(tally);
+exit:end;
+
+266. \lastkern,\lastpenalty,\unkern,\unpenalty (September 4)
+@x module 208
+@d unskip=25 {nullify glue ( \.{\\unskip} )}
+@y
+@d remove_item=25 {nullify last item ( \.{\\unpenalty},
+  \.{\\unkern}, \.{\\unskip} )}
+@z
+@x module 208
+@d last_skip=69 {most recent glue ( \.{\\lastskip} )}
+@y
+@d last_item=69 {most recent item ( \.{\\lastpenalty},
+  \.{\\lastkern}, \.{\\lastskip} )}
+@z
+@x module 265
+primitive("lastskip",last_skip,0);@/
+@!@:last_skip_}{\.{\\lastskip} primitive@>
+@y
+@z
+@x module 265
+primitive("the",the,0);
+@!@:the_}{\.{\\the} primitive@>
+primitive("toks",toks_register,0);
+@!@:toks_}{\.{\\toks} primitive@>
+primitive("unskip",unskip,0);@/
+@!@:unskip_}{\.{\\unskip} primitive@>
+@y
+primitive("the",the,0);@/
+@!@:the_}{\.{\\the} primitive@>
+primitive("toks",toks_register,0);@/
+@!@:toks_}{\.{\\toks} primitive@>
+@z
+@x module 266
+last_skip: print_esc("lastskip");
+@y
+@z
+@x module 266
+unskip: print_esc("unskip");
+@y
+@z
+@x module 413
+last_skip: @<Fetch the glue in the current node, if any@>;
+@y
+last_item: @<Fetch an item in the current node, if appropriate@>;
+@z
+@x module 416 [I also changed the comment]
+primitive("dp",set_box_dimen,depth_offset);
+@!@:dp_}{\.{\\dp} primitive@>
+@y
+primitive("dp",set_box_dimen,depth_offset);
+@!@:dp_}{\.{\\dp} primitive@>
+primitive("lastpenalty",last_item,int_val);
+@!@:last_penalty_}{\.{\\lastpenalty} primitive@>
+primitive("lastkern",last_item,dimen_val);
+@!@:last_kern_}{\.{\\lastkern} primitive@>
+primitive("lastskip",last_item,glue_val);
+@!@:last_skip_}{\.{\\lastskip} primitive@>
+@z
+@x module 417
+else print_esc("dp");
+@y
+else print_esc("dp");
+last_item: if chr_code=int_val then print_esc("lastpenalty")
+else if chr_code=dimen_val then print_esc("lastkern")
+else print_esc("lastskip");
+@z
+@x module 424
+@ Here is where \.{\\lastskip} is implemented. The reference count will be
+updated later.
+@:last_skip_}{\.{\\lastskip} primitive@>
+
+@<Fetch the glue in the current node, if any@>=
+begin cur_val:=zero_glue; cur_val_level:=glue_val;
+if not is_char_node(tail)and(mode<>0) then
+  begin if type(tail)=glue_node then
+    begin cur_val:=glue_ptr(tail);
+    if subtype(tail)=mu_glue then cur_val_level:=mu_val;
+    end;
+  end
+else if (mode=vmode)and(tail=head)and(last_page_glue<>max_halfword) then
+  cur_val:=last_page_glue;
+end
+@y
+@ Here is where \.{\\lastpenalty}, \.{\\lastkern}, and \.{\\lastskip} are
+implemented. The reference count for \.{\\lastskip} will be updated later.
+
+@<Fetch an item in the current node...@>=
+begin if cur_chr=glue_val then cur_val:=zero_glue@+else cur_val:=0;
+cur_val_level:=cur_chr;
+if not is_char_node(tail)and(mode<>0) then
+  case cur_chr of
+  int_val: if type(tail)=penalty_node then cur_val:=penalty(tail);
+  dimen_val: if type(tail)=kern_node then cur_val:=width(tail);
+  glue_val: if type(tail)=glue_node then
+    begin cur_val:=glue_ptr(tail);
+    if subtype(tail)=mu_glue then cur_val_level:=mu_val;
+    end;
+  end {there are no other cases}
+else if (mode=vmode)and(tail=head) then
+  case cur_chr of
+  int_val: cur_val:=last_penalty;
+  dimen_val: cur_val:=last_kern;
+  glue_val: if last_glue<>max_halfword then cur_val:=last_glue;
+  end; {there are no other cases}
+end
+@z
+@x module 982 [also the comment changes]
+@!last_page_glue:pointer; {used to implement \.{\\lastskip}}
+@y
+@!last_glue:pointer; {used to implement \.{\\lastskip}}
+@!last_penalty:integer; {used to implement \.{\\lastpenalty}}
+@!last_kern:scaled; {used to implement \.{\\lastkern}}
+@z
+@x module 991
+last_page_glue:=max_halfword;
+@y
+last_glue:=max_halfword; last_penalty:=0; last_kern:=0;
+@z
+@x module 994
+@<Update the value of |last_page_glue|@>;
+@y
+@<Update the values of |last_glue|, |last_penalty|, and |last_kern|@>;
+@z
+@x module 996
+@ @<Update the value of |last_page_glue|@>=
+if last_page_glue<>max_halfword then delete_glue_ref(last_page_glue);
+if type(p)=glue_node then
+  begin last_page_glue:=glue_ptr(p); add_glue_ref(last_page_glue);
+  end
+else last_page_glue:=max_halfword
+@y
+@ @<Update the values of |last_glue|...@>=
+if last_glue<>max_halfword then delete_glue_ref(last_glue);
+last_penalty:=0; last_kern:=0;
+if type(p)=glue_node then
+  begin last_glue:=glue_ptr(p); add_glue_ref(last_glue);
+  end
+else  begin last_glue:=max_halfword;
+  if type(p)=penalty_node then last_penalty:=penalty(p)
+  else if type(p)=kern_node then last_kern:=width(p);
+  end
+@z
+@x module 1017
+if last_page_glue<>max_halfword then delete_glue_ref(last_page_glue);
+@<Start a new current page@>; {this sets |last_page_glue:=max_halfword|}
+@y
+if last_glue<>max_halfword then delete_glue_ref(last_glue);
+@<Start a new current page@>; {this sets |last_glue:=max_halfword|}
+@z
+@x module 1048
+vmode+vmove,hmode+hmove,mmode+hmove,any_mode(last_skip),
+@y
+vmode+vmove,hmode+hmove,mmode+hmove,any_mode(last_item),
+@z
+@x module 1104
+any_mode(unskip): delete_skip;
+@y
+any_mode(remove_item): delete_last;
+@z
+@x module 1105
+procedure delete_skip;
+var p:pointer; {runs through the current list}
+begin if (mode=vmode)and(tail=head) then
+  @<Apologize for inability to do \.{\\unskip} now,
+    unless the previous node was not glue@>
+else  begin if not is_char_node(tail) then if type(tail)=glue_node then
+@y
+procedure delete_last;
+var p:pointer; {runs through the current list}
+begin if (mode=vmode)and(tail=head) then
+  @<Apologize for inability to do the operation now,
+    unless \.{\\unskip} follows non-glue@>
+else  begin if not is_char_node(tail) then if type(tail)=cur_chr then
+@z
+@x module 1106
+@ @<Apologize for inability to do \.{\\unskip}...@>=
+begin if last_page_glue<>max_halfword then
+  begin you_cant;
+  help2("Sorry...I'm usually unable to take things from the current")@/
+    ("page. Try `I\vskip-\lastskip' instead."); error;
+@y
+@ @<Apologize for inability to do the operation...@>=
+begin if (cur_chr<>glue_node)or(last_glue<>max_halfword) then
+  begin you_cant;
+  help2("Sorry...I'm usually unable to take things from the current")@/
+    ("page. Try `I\vskip-\lastskip' instead.");
+  if cur_chr=kern_node then help_line[0]:=
+    ("page. Try `I\kern-\lastkern' instead.")
+  else if cur_chr<>glue_node then help_line[0]:=@|
+    ("page. Perhaps you can make the output routine do it.");
+  error;
+@z
+@x module 1107
+primitive("unhbox",un_hbox,box_code);@/
+@y
+primitive("unpenalty",remove_item,penalty_node);@/
+@!@:un_penalty_}{\.{\\unpenalty} primitive@>
+primitive("unkern",remove_item,kern_node);@/
+@!@:un_kern_}{\.{\\unkern} primitive@>
+primitive("unskip",remove_item,glue_node);@/
+@!@:un_skip_}{\.{\\unskip} primitive@>
+primitive("unhbox",un_hbox,box_code);@/
+@z
+@x module 1108
+un_hbox: if chr_code=copy_code then print_esc("unhcopy")
+@y
+remove_item: if chr_code=glue_node then print_esc("unskip")
+  else if chr_code=kern_node then print_esc("unkern")
+  else print_esc("unpenalty");
+un_hbox: if chr_code=copy_code then print_esc("unhcopy")
+@z
+
+*** The above changes installed in version 0.999999 (September 5, 1983)
+
+267. Undo change 29: it was overkill and not needed (Sep 17)
+@x module 1257
+label exit, common_ending;
+var u:pointer; {user's font identifier}
+@!s:scaled; {stated ``at'' size, or negative of scaled magnification}
+@!f:internal_font_number; {runs through existing fonts}
+begin if job_name=0 then open_log_file;
+  {avoid confusing \.{texput} with the font name}
+@<If the next token isn't a suitable control sequence, issue a complaint
+  and |return|; otherwise set |u:=cs_ptr|, and set |hash_used| to the
+  location of a ``frozen'' copy of the new font identifier@>;
+define(u,set_font,null_font); scan_optional_equals; scan_file_name;
+@<Scan the font size specification@>;
+@<If this font has already been loaded, set |f| to the internal
+  font number and |goto common_ending|@>;
+f:=read_font_info(u,cur_name,cur_area,s);
+common_ending: equiv(u):=f; geq_define(hash_used,set_font,f);
+font_ident[f]:=hash_used;
+exit:end;
+@y
+label common_ending;
+var u:pointer; {user's font identifier}
+@!s:scaled; {stated ``at'' size, or negative of scaled magnification}
+@!f:internal_font_number; {runs through existing fonts}
+begin if job_name=0 then open_log_file;
+  {avoid confusing \.{texput} with the font name}
+get_r_token; u:=cs_ptr;
+define(u,set_font,null_font); scan_optional_equals; scan_file_name;
+@<Scan the font size specification@>;
+@<If this font has already been loaded, set |f| to the internal
+  font number and |goto common_ending|@>;
+f:=read_font_info(u,cur_name,cur_area,s);
+common_ending: equiv(u):=f; font_ident[f]:=u;
+end;
+@z
+@x module 1260
+@ We reserve a special control sequence for the font identifier; this one
+cannot be redefined by the user, so it is safe to return it as a value of
+\.{\\the\\font}.
+
+@<If the next token isn't a suitable control sequence...@>=
+get_r_token;
+if cs_ptr<hash_base then
+  begin print_err("A font identifier must be a multiletter control sequence");
+@.A font identifier...@>
+  help2("You should say, e.g., `\font\ffn=fontfilename'.")@/
+  ("(I'm going to ignore the \font command you just gave.)");
+  back_error; return;
+  end;
+repeat if hash_is_full then overflow("hash size",hash_size);
+@:TeX capacity exceeded hash size}{\quad hash size@>
+decr(hash_used);
+until text(hash_used)=0; {search for an empty location in |hash|}
+u:=cs_ptr; text(hash_used):=text(u); {copy the name}
+@!stat incr(cs_count);@+tats@;@/
+@y
+@z
+Note: Since module 1260 has disappeared, module 1258 has been split into two.
+
+268. Minor change to diagnostic output format (September 18)
+@x module 211 [print_mode]
+  2:print("displayed math");
+@y
+  2:print("display math");
+@z
+
+269. Kerns inserted for accents must be explicit (September 20)
+@x module 1123
+@!p,@!q: pointer; {character and box nodes}
+@y
+@!p,@!q,@!r:pointer; {character, box, and kern nodes}
+@z
+@x module 1125
+link(tail):=new_kern(delta); link(link(tail)):=p;
+link(p):=new_kern(-a-delta); tail:=link(p); p:=q;
+@y
+r:=new_kern(delta); subtype(r):=explicit; link(tail):=r; link(r):=p;
+tail:=new_kern(-a-delta); subtype(tail):=explicit; link(p):=tail; p:=q;
+@z
+
+270. "log" changed to "transcript" in a few output messages (Sep 26)
+@x module 535
+prompt_file_name("log file name",".log");
+@y
+prompt_file_name("transcript file name",".log");
+@z
+@x module 1293
+      ("lists on your terminal as well as on the log file.");
+@y
+      ("lists on your terminal as well as in the transcript file.");
+@z
+@x module 1335
+  print_nl("(see the log file for additional information)");
+@.see the log file...@>
+@y
+  print_nl("(see the transcript file for additional information)");
+@.see the transcript file...@>
+@z
+
+271. Uninitialized variable bug (found by Bernd Schulze, 1 Oct 83)
+@x module 944
+    begin if trie_op_ptr>=max_quarterword-1 then {overflow}
+      begin trie_op_ptr:=max_quarterword;
+      new_trie_op:=min_quarterword; return;
+@y we allow one more trie op (OK since trie_op_hash_size is big enough)
+    begin if trie_op_ptr=max_quarterword then {overflow}
+      begin new_trie_op:=min_quarterword; return;
+@z
+
+272. Spaces at end of lines ignored also in TEX.POOL (by DRF, 14 Oct 83)
+@x module 52
+    begin if eoln(pool_file) then bad_pool('! TEX.POOL line too short.');
+@.TEX.POOL line too short@>
+    read(pool_file,m); append_char(xord[m]);
+@y
+    begin if eoln(pool_file) then m:=' '@+else read(pool_file,m);
+    append_char(xord[m]);
+@z
+
+273. |history| updates (by DRF, 14 Oct 83)
+@x module 77
+deletions_allowed:=true; history:=spotless; error_count:=0;
+@y
+deletions_allowed:=true; error_count:=0; {|history| is initialized elsewhere}
+@z
+@x module 1332
+@p begin {@!|start_here|}
+@y
+@p begin {@!|start_here|}
+history:=fatal_error_stop; {in case we quit during initialization}
+@z
+@x ibid.
+main_control; {come to life}
+@y
+history:=spotless; {ready to go!}
+main_control; {come to life}
+@z
+
+274. improved "runaway" messages (suggested by FY, October 18)
+@x module 305 (the introductory comment is changed too)
+@d aligning=4 {|scanner_status| when reading an alignment preamble}
+
+@<Glob...@>=
+@!scanner_status : normal..aligning; {can a subfile end now?}
+@y
+@d aligning=4 {|scanner_status| when reading an alignment preamble}
+@d absorbing=5 {|scanner_status| when reading a balanced text}
+
+@<Glob...@>=
+@!scanner_status : normal..absorbing; {can a subfile end now?}
+@z
+@x module 306 (string space is also now conserved slightly)
+  defining: begin print("definition?"); p:=def_ref;
+    end;
+  matching: begin print("argument?"); p:=temp_head;
+    end;
+  aligning: begin print("preamble?"); p:=hold_head;
+    end;
+  end; {there are no other cases}
+  print_ln; show_token_list(link(p),null,error_line-10);
+@y
+  defining: begin print("definition"); p:=def_ref;
+    end;
+  matching: begin print("argument"); p:=temp_head;
+    end;
+  aligning: begin print("preamble"); p:=hold_head;
+    end;
+  absorbing: begin print("text"); p:=def_ref;
+    end;
+  end; {there are no other cases}
+  print_char("?");print_ln; show_token_list(link(p),null,error_line-10);
+@x module 339 (I also changed the module name)
+end; {there are no other cases}
+@y
+absorbing:begin print("text"); info(p):=right_brace_token+"}";
+  end;
+end; {there are no other cases}
+@z
+@x module 473
+begin scanner_status:=defining; warning_index:=cs_ptr;
+def_ref:=get_avail; info(def_ref):=null;
+@y
+begin if macro_def then scanner_status:=defining
+@+else scanner_status:=absorbing;
+warning_index:=cs_ptr; def_ref:=get_avail; info(def_ref):=null;
+@z
+
+275. similar, but this corrects a real bug (found by FY, October 18)
+@x module 1226
+  cs_ptr:=q;
+  @<Get the next non-blank non-relax non-call token@>;
+  if cur_cmd<>left_brace then @<If the righthand side is a token parameter
+      or token register, finish the assignment and |goto done|@>;
+  back_input; q:=scan_toks(false,false);
+@y
+  @<Get the next non-blank non-relax non-call token@>;
+  if cur_cmd<>left_brace then @<If the righthand side is a token parameter
+      or token register, finish the assignment and |goto done|@>;
+  back_input; cs_ptr:=q; q:=scan_toks(false,false);
+@z
+
+276. Change #119 should have changed module 1090 too (by Barry Smith, Oct 24)
+@x module 1183 [which was module 1090 at the time of change 119]
+begin if c mod delimited_code=above_code then scan_normal_dimen;
+if c>=delimited_code then
+  begin scan_delimiter(garbage,false); scan_delimiter(garbage,false);
+  end;
+@y
+begin if c>=delimited_code then
+  begin scan_delimiter(garbage,false); scan_delimiter(garbage,false);
+  end;
+if c mod delimited_code=above_code then scan_normal_dimen;
+@z
+
+277. Changes for efficiency, based on empirical frequency data (Nov 9)
+@x module 45 [since the result is true almost always]
+begin j:=str_start[s]; result:=false;
+while j<str_start[s+1] do
+  begin if str_pool[j]<>buffer[k] then goto not_found;
+@y
+begin j:=str_start[s];
+while j<str_start[s+1] do
+  begin if str_pool[j]<>buffer[k] then
+    begin result:=false; goto not_found;
+    end;
+@z
+@x module 380 [many compilers don't handle "while true do" very well]
+label done;
+begin loop begin get_next;
+@^inner loop@>
+  if cur_cmd<=max_command then goto done;
+  if cur_cmd>=call then
+    if cur_cmd<end_template then macro_call
+    else  begin cs_ptr:=frozen_endv; cur_cmd:=endv;
+      goto done; {|cur_chr=null_list|}
+      end
+  else expand;
+  end;
+@y
+label restart,done;
+begin restart: get_next;
+@^inner loop@>
+if cur_cmd<=max_command then goto done;
+if cur_cmd>=call then
+  if cur_cmd<end_template then macro_call
+  else  begin cs_ptr:=frozen_endv; cur_cmd:=endv;
+    goto done; {|cur_chr=null_list|}
+    end
+else expand;
+goto restart;
+@z
+@x module 829 [preparation for change to module 852]
+label exit,done,continue,deactivate;
+@y
+label exit,done,done1,continue,deactivate;
+@z
+@x module 830 [ditto]
+@!save_link:pointer; {temporarily holds value of |link(cur_p)|}
+@y
+@!save_link:pointer; {temporarily holds value of |link(cur_p)|}
+@!shortfall:scaled; {used in badness calculations}
+@z
+@x modue 851 [ditto]
+if cur_active_width[1]<line_width then
+@y
+shortfall:=line_width-cur_active_width[1]; {we're this much too short}
+if shortfall>0 then
+@z
+@x module 852 [avoid calling |badness| in most common case]
+else  begin b:=badness(line_width-cur_active_width[1],cur_active_width[2]);
+@y
+else  begin if shortfall>7230584 then if cur_active_width[2]<1663497 then
+    begin b:=inf_bad; fit_class:=very_loose_fit; goto done1;
+    end;
+  b:=badness(shortfall,cur_active_width[2]);
+@z
+@x module 852, continued
+  else fit_class:=decent_fit;
+@y
+  else fit_class:=decent_fit;
+  done1:
+@z
+@x module 853 [using |shortfall|, since we now have it]
+begin if cur_active_width[1]-line_width>cur_active_width[6] then
+  b:=inf_bad+1
+else b:=badness(cur_active_width[1]-line_width,cur_active_width[6]);
+@y
+begin if -shortfall>cur_active_width[6] then b:=inf_bad+1
+else b:=badness(-shortfall,cur_active_width[6]);
+@z
+
+278. Forgotten |error| call (noticed by Gabi Kuper, December 3, 1983)
+@x module 500
+    help1("I'm ignoring this; it doesn't match any \if.");
+@y
+    help1("I'm ignoring this; it doesn't match any \if.");
+    error;
+@z
+
+*** Version 1.0 released on December 3, 1983 incorporates all of the above.
+Version 1.1
+
+279. Problem with change 267 (found by Mike Urban, received 2 Feb 84)
+(I had overlooked many problems, e.g. `{\font\a=x \global\a}\the\font'
+and `\font\a=x \font\b=x \let\b=\undefined \the\a', etc.
+The remedy involves removal of the font_ident array, so there's a
+sprinkling of corrections in lots of modules. But basically the change
+is quite conservative, so it shouldn't spawn any new bugs (it says here).)
+
+@x module 174 (removing a reference to |font_ident|)
+        else sprint_cs(font_ident[font(p)]);
+@y
+        else @<Print the font identifier for |font(p)|@>;
+@z
+@x module 176 (removing a reference to |font_ident|)
+  else sprint_cs(font_ident[font(p)]);
+@y
+  else @<Print the font identifier for |font(p)|@>;
+@z
+@x module 222 (redefining and expanding the `frozen' area)
+@d frozen_null_font=frozen_control_sequence+9 {permanent `\.{\\nullfont}'}
+@d frozen_dont_expand=frozen_control_sequence+10
+  {permanent `\.{\\notexpanded:}'}
+@d undefined_control_sequence=frozen_control_sequence+11 {dummy location}
+@y
+@d frozen_dont_expand=frozen_control_sequence+9
+  {permanent `\.{\\notexpanded:}'}
+@d frozen_null_font=frozen_control_sequence+10
+  {permanent `\.{\\nullfont}'}
+@d font_id_base=frozen_null_font-font_base
+  {begins table of 257 permanent font identifiers}
+@d undefined_control_sequence=frozen_null_font+257 {dummy location}
+@z
+@x module 234 (removing a reference to |font_ident|, awkwardly)
+print_char("="); sprint_cs(font_ident[equiv(n)]);
+@y
+print_char("=");@/
+print_esc(hash[font_id_base+equiv(n)].rh);
+  {that's |text(font_id_base+equiv(n))|}
+@z
+@x module 256 (adding a new macro, font_id_text)
+@d hash_is_full == (hash_used=hash_base) {test if all positions are occupied}
+@y
+@d hash_is_full == (hash_used=hash_base) {test if all positions are occupied}
+@d font_id_text(#) == text(font_id_base+#) {a frozen font identifier's name}
+@z
+@x module 262 (relaxing a former restriction)
+else if (text(p)<128)or(text(p)>=str_ptr) then print_esc("NONEXISTENT.")
+@y
+else if (text(p)<0)or(text(p)>=str_ptr) then print_esc("NONEXISTENT.")
+@z
+@x module 267 (pick up the changes from 174 and 176)
+@!@^Single-character primitives@>
+@y
+@!@^Single-character primitives@>
+
+Meanwhile, this is a convenient place to catch up on something we were unable
+to do before the hash table was defined:
+
+@<Print the font identifier for |font(p)|@>=
+print_esc(font_id_text(font(p)))
+@z
+@x module 415 (removing another reference to font_ident)
+  scanned_result(font_ident[cur_val])(ident_val);
+@y
+  scanned_result(font_id_base+cur_val)(ident_val);
+@z
+@x module 548 (change to the comment only)
+to the user's font~\.{\\f}. For example, if this internal number is 13,
+we will have |font_ident[13]=p| and |equiv(p)=13|, where |p| is the |eqtb|
+location of the control sequence~\.{\\f}.
+@y
+to the user's font~\.{\\f}. Adding this number to |font_id_base| gives the
+|eqtb| location of a ``frozen'' control sequence that will always select
+the font.
+@z
+@x module 549 (deleting the declaration of font_ident)
+@!font_ident:array[internal_font_number] of pointer; {the most recent user
+  font identifier corresponding to an internal font number}
+@y
+@z
+@x module 552 (deleting an unnecessary initialization of font_ident)
+font_ident[null_font]:=frozen_null_font;
+@y
+@z
+@x module 579 (removing another reference to font_ident)
+  begin print_err("Font "); sprint_cs(font_ident[f]);
+@y
+  begin print_err("Font "); print_esc(font_id_text(f));
+@z
+@x module 1257 (this is the real change!)
+begin if job_name=0 then open_log_file;
+  {avoid confusing \.{texput} with the font name}
+get_r_token; u:=cs_ptr;
+define(u,set_font,null_font); scan_optional_equals; scan_file_name;
+@<Scan the font size specification@>;
+@<If this font has already been loaded, set |f| to the internal
+  font number and |goto common_ending|@>;
+f:=read_font_info(u,cur_name,cur_area,s);
+common_ending: equiv(u):=f; font_ident[f]:=u;
+@y
+@!t:str_number; {name for the frozen font identifier}
+@!old_setting:0..max_selector; {holds |selector| setting}
+begin if job_name=0 then open_log_file;
+  {avoid confusing \.{texput} with the font name}
+get_r_token; u:=cs_ptr;
+if u>=hash_base then t:=text(u)
+else if u>=single_base then
+  if u=null_cs then t:="FONT"@+else t:=u-single_base
+else  begin old_setting:=selector; selector:=new_string;
+  print("FONT"); print(u-active_base); selector:=old_setting;
+@.FONTx@>
+  str_room(1); t:=make_string;
+  end;
+define(u,set_font,null_font); scan_optional_equals; scan_file_name;
+@<Scan the font size specification@>;
+@<If this font has already been loaded, set |f| to the internal
+  font number and |goto common_ending|@>;
+f:=read_font_info(u,cur_name,cur_area,s);
+common_ending: equiv(u):=f; eqtb[font_id_base+f]:=eqtb[u]; font_id_text(f):=t;
+@z
+@x module 1260 (change to the comment only)
+the new value becomes the |font_ident| of record. Font names `\.{xyz}' and
+@y
+the new name becomes the font identifier of record. Font names `\.{xyz}' and
+@z
+@x module 1322 (no need to dump font_ident)
+begin dump_int(font_ident[k]);
+dump_qqqq(font_check[k]);
+@y
+begin dump_qqqq(font_check[k]);
+@z
+@x module 1322 (or to print from it)
+print_nl("\font"); sprint_cs(font_ident[k]); print_char("=");
+@y
+print_nl("\font"); print_esc(font_id_text(k)); print_char("=");
+@z
+@x module 1323 (or to undump it)
+begin undump(active_base)(undefined_control_sequence)(font_ident[k]);
+undump_qqqq(font_check[k]);@/
+@y
+begin undump_qqqq(font_check[k]);@/
+@z
+
+280. Double interrupt possibility (found by Clint Cuzzo, received 9 Feb 84)
+@x module 1031
+if interrupt>0 then if OK_to_interrupt then
+  begin back_input; pause_for_instructions; goto big_switch;
+@y
+if interrupt<>0 then if OK_to_interrupt then
+  begin back_input; check_interrupt; goto big_switch;
+@z
+
+281. Improve spacing in $(A,<)$. (12 Feb 84)
+@x module 764
+"0234000122*4000133**3**344*0400400*000000234000111*4111112341011"
+@y
+"0234000122*4000133**3**344*0400400*000000234000111*1111112341011"
+@z
+
+282. Bad goto! (diagnosis by Clint Cuzzo and George O'Connor, recd 13 Feb 84)
+@x module 344 (here we simply change the name of module 346)
+any_state_plus(invalid_char): @<Decry the invalid character and
+  |goto switch|@>;
+@y
+any_state_plus(invalid_char): @<Decry the invalid character and
+  |goto restart|@>;
+@z
+@x module 346 (because clear_for_error_prompt might make state=token_list)
+goto switch;
+@y
+goto restart;
+@z
+
+283. String pool economy (suggested by DRF, 13 Feb 84)
+@x module 537
+@<Read the first line of the new file@>;
+@y
+if name=str_ptr-1 then {we can conserve string pool space now}
+  begin flush_string; name:=cur_name;
+  end;
+@<Read the first line of the new file@>;
+@z
+
+284. Nicer scaled output (suggested by METAFONT development, 26 Feb 84)
+@x module 103
+be reproduced exactly. [{\sl Proof:\/} If round$(x)=\lfloor
+x+{1\over2}\rfloor$ and if $\alpha<1$, it is not difficult to verify that
+round$(\alpha\,\hbox{round}( \alpha^{-1}n))=n$ for all integers |n|. In
+our case $\alpha=2^{16}/10^5$.]
+
+@p procedure print_scaled(@!s:scaled); {prints scaled real, rounded to five
+  digits}
+begin if s<0 then
+  begin print_char("-"); negate(s); {print the sign, if negative}
+  end;
+print_int(s div unity); {print the integer part}
+s:=((s mod unity) * 3125 + 1024) div 2048;
+  {now |0<=s<100000| is the fraction part}
+print_char(".");
+repeat print_char("0"+(s div 10000)); s:=10*(s mod 10000);
+until s=0;
+end;
+@y
+be reproduced exactly; the ``simplest'' such decimal number is output,
+but there is always at least one digit following the decimal point.
+
+The invariant relation in the \&{repeat} loop is that a sequence of
+decimal digits yet to be printed will yield the original number if and only if
+they form a fraction~$f$ in the range $s-\delta\L10\cdot2^{16}f<s$.
+We can stop if and only if $f=0$ satisfies this condition; the loop will
+terminate before $s$ can possibly become zero.
+
+@p procedure print_scaled(@!s:scaled); {prints scaled real, rounded to five
+  digits}
+var delta:scaled; {amount of allowable inaccuracy}
+begin if s<0 then
+  begin print_char("-"); negate(s); {print the sign, if negative}
+  end;
+print_int(s div unity); {print the integer part}
+print_char(".");
+s:=10*(s mod unity)+5; delta:=10;
+repeat if delta>unity then s:=s+@'100000-(delta div 2); {round the last digit}
+print_char("0"+(s div unity)); s:=10*(s mod unity); delta:=delta*10;
+until s<=delta;
+end;
+@z
+
+*** Those six changes account for version 1.1 (February 29, 1984).
+*** And we put the following change in too, at the last minute:
+
+285. ".00000762939453126pt" didn't round correctly! (March 2, 1984)
+@x module 452
+  if k<16 then {digits for |k>=16| cannot affect the result}
+@y (Note, I also changed the comment in module 102: 16 -> 17)
+  if k<17 then {digits for |k>=17| cannot affect the result}
+@z
+
+*** Note: I changed "cs_ptr" to "cur_cs", since the name change is more
+indicative of the fact that this variable makes a trio with cur_cmd
+and cur_chr. The TEX.WEB source changed 78 times, as a result, but
+none of the author's change files were affected.
+(But note: "save_cs_ptr" was not changed to "save_cur_cs", because
+of a name conflict.)
+
+*** And the following two were slipped in at the last second:
+
+286. loophole permitted get_next recursion (March 16, 1984)
+@x module 336
+  begin @<Back up an outer control sequence so that it can be reread@>;
+@y
+  begin deletions_allowed:=false;
+  @<Back up an outer control sequence so that it can be reread@>;
+@z
+@x ibid
+  end;
+@y
+  deletions_allowed:=true;
+  end;
+@z [the changes to deletions_allowed in module 338 can now be removed]
+
+287. terminal not open when the program starts bad (March 24, 1984)
+@x module 1332
+initialize; {set global variables to their starting values}
+@<Check the ``constant'' values...@>@;
+if bad>0 then
+  begin wake_up_terminal;
+  wterm('Ouch---my internal constants have been',
+    ' clobbered!---case ',bad:1);
+@.Ouch...clobbered@>
+  goto final_end;
+  end;
+@y
+@<Check the ``constant'' values...@>@;
+if bad>0 then
+  begin t_open_out;
+  wterm('Ouch---my internal constants have been',
+    ' clobbered!---case ',bad:1);
+@.Ouch...clobbered@>
+  goto final_end;
+  end;
+initialize; {set global variables to their starting values}
+@z
+
+*** Note: "Cosmetic" changes were also made in module 363 ("print_ln"
+moved to after "wake_up_terminal") and in some commentary.
+
+*** Another last-minute correction:
+288. \patterns{xxx...xxxdxxxdxxx} anomaly found by JRD (Mar 27, 1984)
+@x module 962
+else  begin hyf[k]:=cur_chr-"0"; digit_sensed:=true;
+@y
+else  begin hyf[k]:=cur_chr-"0";
+  if k<63 then digit_sensed:=true;
+@z
+
+*** Yoicks, yet ANOTHER:
+289. a whole case of copy_node_list forgotten (Apr 11, 1984)
+@x module 206
+othercases confusion("copying")
+@y
+adjust_node: begin r:=get_node(small_node_size);
+  adjust_ptr(r):=copy_node_list(adjust_ptr(p));
+  end; {|words=1=small_node_size-1|}
+othercases confusion("copying")
+@z
+
+*** And "finally"...
+290. uninitialized variables could be accessed (found by Nick Briggs, June 11)
+@x module 552
+font_size[null_font]:=0; font_dsize[null_font]:=0;
+@y
+font_size[null_font]:=0; font_dsize[null_font]:=0;
+char_base[null_font]:=0; width_base[null_font]:=0;
+height_base[null_font]:=0; depth_base[null_font]:=0;
+italic_base[null_font]:=0; lig_kern_base[null_font]:=0;
+kern_base[null_font]:=0; exten_base[null_font]:=0;
+@z (actual values are immaterial except for debugging safeguards)
+
+291. same, cf. modules 355 and 389 (Nick Briggs, June 11)
+@x module 331
+scanner_status:=normal; first:=1;
+@y
+for first:=0 to buf_size do buffer[first]:=0;
+scanner_status:=normal; warning_index:=null; first:=1;
+@z (error was harmless except that it might trigger debugging checks)
+
+292. missing ligature/kern (found by JRD, June 21)
+@x module 1036
+  if (cur_cmd=letter)or(cur_cmd=other_char) then r:=qi(cur_chr)
+@y
+  if (cur_cmd=letter)or(cur_cmd=other_char)or(cur_cmd=char_given) then
+    r:=qi(cur_chr)
+@z
+
+293. quarterword constraint is made explicit (July 4)
+@x module 111
+if (buf_size>max_halfword) then bad:=18;
+@y
+if buf_size>max_halfword then bad:=18;
+if max_quarterword-min_quarterword<255 then bad:=19;
+@z
+
+294. trivial optimization made for consistency with MF (July 7)
+@x module 363
+if (pausing>0)and(interaction>nonstop_mode) then
+@y
+if pausing>0 then if interaction>nonstop_mode then
+@z
+
+295. \tracingmacros>1 for more diagnostics (July 8)
+@x module 323
+  if t=macro then param_start:=param_ptr@+else loc:=link(p);
+@y
+  if t=macro then param_start:=param_ptr
+  else  begin loc:=link(p);
+    if tracing_macros>1 then
+      begin begin_diagnostic; print_nl("");
+      case t of
+      mark_text:print_esc("mark");
+      write_text:print_esc("write");
+      othercases print_cmd_chr(assign_toks,t-output_text+output_routine_loc)
+      endcases;@/
+      print("->"); token_show(p); end_diagnostic(false);
+      end;
+    end;
+@z
+
+*** The changes above were incorporated in Version 1.1, released July 9, 1984.
+Version 1.2
+
+296. "see the transcript file" on offline show commands. (July 27, 1984)
+@x module 1293
+@ @d show_error==@;@/
+  if interaction<error_stop_mode then
+    begin help0; decr(error_count);
+    end
+  else  if tracing_online>0 then
+      begin@t@>@;@/
+      help3("This isn't an error message; I'm just \showing something.")
+        @t\4\4@>@/
+      ("Type `I\show...' to show more (e.g., \show\cs,")@/
+      ("\showthe\count10, \showbox255, \showlists).");
+      end
+    else  begin@t@>@;@/
+      help5("This isn't an error message; I'm just \showing something.")
+        @t\4\4@>@/
+      ("Type `I\show...' to show more (e.g., \show\cs,")@/
+      ("\showthe\count10, \showbox255, \showlists).")@/
+      ("And type `I\tracingonline=1\show...' to show boxes and")@/
+      ("lists on your terminal as well as in the transcript file.");
+      end;
+  error
+
+@<Declare act...@>=
+procedure show_whatever;
+var p:pointer; {tail of a token list to show}
+begin case cur_chr of
+show_code: @<Show the current meaning of a token@>;
+show_box_code: @<Show the current contents of a box@>;
+show_the_code: @<Show the current value of some parameter or register@>;
+othercases @<Show the current semantic nest@>
+endcases;
+end;
+@y
+@ @<Declare act...@>=
+procedure show_whatever;
+label common_ending;
+var p:pointer; {tail of a token list to show}
+begin case cur_chr of
+show_lists: begin begin_diagnostic; show_activities;
+  end;
+show_box_code: @<Show the current contents of a box@>;
+show_code: @<Show the current meaning of a token, then |goto common_ending|@>;
+othercases @<Show the current value of some parameter or register,
+  then |goto common_ending|@>
+endcases;@/
+@<Complete a potentially long \.{\\show} command@>;
+common_ending: if interaction<error_stop_mode then
+  begin help0; decr(error_count);
+  end
+else if tracing_online>0 then
+  begin@t@>@;@/
+  help3("This isn't an error message; I'm just \showing something.")@/
+  ("Type `I\show...' to show more (e.g., \show\cs,")@/
+  ("\showthe\count10, \showbox255, \showlists).");
+  end
+else  begin@t@>@;@/
+  help5("This isn't an error message; I'm just \showing something.")
+  ("Type `I\show...' to show more (e.g., \show\cs,")@/
+  ("\showthe\count10, \showbox255, \showlists).")@/
+  ("And type `I\tracingonline=1\show...' to show boxes and")@/
+  ("lists on your terminal as well as in the transcript file.");
+  end;
+error;
+end;
+@z
+@x module 1294
+@ @<Show the current meaning of a token@>=
+begin get_token; print_nl("> ");
+if cur_cs<>0 then
+  begin sprint_cs(cur_cs); print_char("=");
+  end;
+print_meaning; show_error;
+@y
+@ @<Show the current meaning of a token...@>=
+begin get_token; print_nl("> ");
+if cur_cs<>0 then
+  begin sprint_cs(cur_cs); print_char("=");
+  end;
+print_meaning; goto common_ending;
+@z
+@x module 1296
+end_diagnostic(true);
+print_err("OK");
+@.OK@>
+show_error;
+@y
+@z
+@x module 1297
+flush_list(link(temp_head)); show_error;
+@y
+flush_list(link(temp_head)); goto common_ending;
+@z
+@x module 1298
+@ @<Show the current semantic nest@>=
+begin begin_diagnostic; show_activities; end_diagnostic(true);
+print_err("OK");
+show_error;
+@.OK@>
+end
+@y
+@ @<Complete a potentially long \.{\\show} command@>=
+end_diagnostic(true); print_err("OK");
+@.OK@>
+if selector=term_and_log then if tracing_online<=0 then
+  begin selector:=term_only; print(" (see the transcript file)");
+  selector:=term_and_log;
+  end
+@z
+
+297. allow `0' in response to error prompts (October 20, 1984)
+@x module 84
+"1","2","3","4","5","6","7","8","9": if deletions_allowed then
+@y
+"0","1","2","3","4","5","6","7","8","9": if deletions_allowed then
+@z
+Versions 1.3 and 1.4
+
+298. Dirty PASCAL (two quarterword 0's were read as a halfword) (25 Nov 84)
+@x module 846
+print(" -> @@@@"); print_int(serial(prev_break(passive)));
+@y
+print(" -> @@@@");
+if prev_break(passive)=null then print_char("0")
+else print_int(serial(prev_break(passive)));
+@z
+
+299. Ditto! (25 Nov 84)
+@x module 934
+label reswitch, exit, found, not_found;
+@y
+label reswitch, exit, found, not_found, done;
+@z
+@x module 939
+while info(p)>n-3 do {eliminate hyphens \TeX\ doesn't like}
+  begin q:=link(p); free_avail(p); p:=q;
+  end;
+@<Insert the \(p)pair |(s,p)| into the exception table@>;
+@y
+loop@+  begin if p=null then goto done;
+  if info(p)<n-2 then goto done;
+  q:=link(p); free_avail(p); p:=q; {eliminate hyphens that \TeX\ doesn't like}
+  end;
+done: @<Insert the \(p)pair |(s,p)| into the exception table@>;
+@z
+
+300. Major change to memory management (25 Nov 84)
+[The following changes have two main merits: (1) TeX should run faster on
+virtual-memory systems when the jobs are small; (2) it should be possible
+to use the same production version of TeX both for jobs with lots of macros
+and few boxes as well as for jobs with lots of boxes and few macros, because
+the boundary line between the two types of storage is now chosen dynamically.]
+[The user is unaffected, except that there's only one "memory size" overflow
+error now instead of two.]
+[The TRIP test is now changed slightly: The correct settings of memory
+size parameters are now mem_min=mem_bot=1, mem_top=mem_max=3000.]
+
+@x module 11
+@!mem_max=30000; {greatest index in \TeX's internal |mem| array;
+  must be strictly less than |max_halfword|}
+@y
+@!mem_max=30000; {greatest index in \TeX's internal |mem| array;
+  must be strictly less than |max_halfword|;
+  must be equal to |mem_top| in \.{INITEX}, otherwise |>=mem_top|}
+@!mem_min=0; {smallest index in \TeX's internal |mem| array;
+  must be |min_halfword| or more;
+  must be equal to |mem_bot| in \.{INITEX}, otherwise |<=mem_bot|}
+@z
+@x module 12
+@d mem_base=0 {smallest index in the |mem| array; must not be less
+  than |min_halfword|}
+@d hi_mem_base=13000 {smallest index in the single-word area of |mem|;
+  must be substantially larger than |mem_base| and smaller than |mem_max|}
+@y
+@d mem_bot=0 {smallest index in the |mem| array dumped by \.{INITEX};
+  must not be less than |mem_min|}
+@d mem_top==30000 {largest index in the |mem| array dumped by \.{INITEX};
+  must be substantially larger than |mem_bot|
+  and not greater than |mem_max|}
+@z
+@x module 12
+  about |(mem_max-hi_mem_base)/6|, but 2100 is already quite generous}
+@y
+  about |(mem_max-mem_min)/10|, but 2100 is already quite generous}
+@z
+@x module 14
+if (hi_mem_base<mem_base+100)or(hi_mem_base+100>mem_max) then bad:=4;
+@y
+if mem_bot+1100>mem_top then bad:=4;
+@z
+@x module 111
+if (min_quarterword>0)or(max_quarterword<127) then bad:=11;
+@y
+init if (mem_min<>mem_bot)or(mem_max<>mem_top) then bad:=10;@+tini@;@/
+if (mem_min>mem_bot)or(mem_max<mem_top) then bad:=10;
+if (min_quarterword>0)or(max_quarterword<127) then bad:=11;
+@z
+@x module 111
+if (mem_base<min_halfword)or(mem_max>=max_halfword) then bad:=14;
+@y
+if (mem_min<min_halfword)or(mem_max>=max_halfword) then bad:=14;
+@z
+@x module 115
+value represents a null pointer.
+
+@d pointer==halfword {a flag or a location in |mem| or |eqtb|}
+@d null==mem_base {the null pointer}
+@y
+value represents a null pointer. \TeX\ does not assume that |mem[null]| exists.
+
+@d pointer==halfword {a flag or a location in |mem| or |eqtb|}
+@d null==min_halfword {the null pointer}
+@z
+@x module 116
+@ The |mem| array is divided once and for all into two regions that are
+allocated separately. Locations less than |hi_mem_base| are used for storing
+@y
+@ The |mem| array is divided into two regions that are allocated separately,
+but the dividing line between these two regions is not fixed; they grow
+together until finding their ``natural'' size in a particular job.
+Locations less than or equal to |lo_mem_max| are used for storing
+@z
+@x module 116
+relevant size when a node is freed. The remaining region of |mem| is
+allocated in single words using a conventional \.{AVAIL} stack.
+
+Incidentally, it would be feasible to construct implementations of \TeX\ that
+are based on 16-bit words instead of 32-bit words, for machines having
+comparatively small memories. In such cases it might be desirable to have
+two parallel arrays for the upper part of memory, called say \\{mem\_link}|[p]|
+and \\{mem\_info}|[p]|,
+since the single-word region in the present implementation
+consists entirely of |memory_word| items of type |two_halves|.
+@^small computers@>
+@y
+relevant size when a node is freed. Locations greater than or equal to
+|hi_mem_min| are used for storing one-word records; a conventional
+\.{AVAIL} stack is used for allocation in this region.
+
+Locations of |mem| between |mem_bot| and |mem_top| may be dumped as part
+of preloaded format files, by the \.{INITEX} preprocessor.
+@.INITEX@>
+Production versions of \TeX\ may extend the memory at both ends in order to
+provide more space; locations between |mem_min| and |mem_bot| are always
+used for variable-size nodes, and locations between |mem_top| and |mem_max|
+are always used for single-word nodes.
+
+The key pointers that govern |mem| allocation have a prescribed order:
+$$\hbox{|null<=mem_min<=mem_bot<lo_mem_max<
+  hi_mem_min<mem_top<=mem_end<=mem_max|.}$$
+@z
+@x module 116
+@!mem : array[mem_base..mem_max] of memory_word; {the big dynamic storage area}
+@y
+@!mem : array[mem_min..mem_max] of memory_word; {the big dynamic storage area}
+@!lo_mem_max : pointer; {the largest location of variable-size memory in use}
+@!hi_mem_min : pointer; {the smallest location of one-word memory in use}
+@z
+@x module 117
+@!max_var_used : integer; {how much memory was in use}
+@y
+@z
+@x module 118
+occur between |hi_mem_base| and |mem_end|, inclusive, are of type
+@y
+occur between |hi_mem_min| and |mem_end|, inclusive, are of type
+@z
+@x module 120
+else  begin runaway; {if memory is exhausted, display possible runaway text}
+  overflow("macro memory size",mem_max+1-hi_mem_base);
+    {quit; all one-word nodes are busy}
+@:TeX capacity exceeded macro memory size}{\quad macro memory size@>
+  end;
+@y
+else   begin decr(hi_mem_min); p:=hi_mem_min;
+  if hi_mem_min<=lo_mem_max then
+    begin runaway; {if memory is exhausted, display possible runaway text}
+    overflow("main memory size",mem_max+1-mem_min);
+      {quit; all one-word nodes are busy}
+@:TeX capacity exceeded main memory size}{\quad main memory size@>
+    end;
+  end;
+@z
+@x module 125
+label found,exit;
+@y
+label found,exit,restart;
+@z
+@x module 125
+begin p:=rover; {start at some free node in the ring}
+@y
+begin restart: p:=rover; {start at some free node in the ring}
+@z
+@x module 125
+overflow("box memory size",hi_mem_base-mem_base);
+  {sorry, nothing satisfactory is left}
+@:TeX capacity exceeded box memory size}{\quad box memory size@>
+found: link(r):=null; {this node is now nonempty}
+@!stat var_used:=var_used+s; {maintain usage statistics}
+if var_used>max_var_used then max_var_used:=var_used;
+@y
+if lo_mem_max+2<hi_mem_min then
+  @<Grow more variable-size memory and |goto restart|@>;
+overflow("main memory size",mem_max+1-mem_min);
+  {sorry, nothing satisfactory is left}
+@:TeX capacity exceeded main memory size}{\quad main memory size@>
+found: link(r):=null; {this node is now nonempty}
+@!stat var_used:=var_used+s; {maintain usage statistics}
+@z
+@x modules 126--127
+@ Empirical tests show that the routine in this section performs a
+|remove_node| operation about 0.75 times per allocation, on the average,
+after which it finds that |r>p+1| about 95\% of the time.
+
+@<Try to allocate...@>=
+q:=p+node_size(p); {find the physical successor}
+@^inner loop@>
+while is_empty(q) do @<Merge node |p| with node |q|@>;
+r:=q-s;
+if r>p+1 then @<Allocate from the top of node |p| and |goto found|@>;
+if r=p then if ((rlink(p)<>rover) or (llink(p)<>rover)) then
+  @<Allocate entire node |p| and |goto found|@>;
+node_size(p):=q-p {reset the size in case it grew}
+
+@ @<Merge node |p| with node |q|@>=
+begin t:=rlink(q);
+@^inner loop@>
+if q=rover then rover:=t;
+llink(t):=llink(q); rlink(llink(q)):=t;@/
+q:=q+node_size(q);
+end
+@y
+@ The lower part of |mem| grows by 1000 words at a time, unless
+we are very close to going under. When it grows, we simply link
+a new node into the available-space list. This method of controlled
+growth helps to keep the |mem| usage consecutive when \TeX\ is
+implemented on ``virtual memory'' systems.
+@^virtual memory@>
+
+@<Grow more variable-size memory and |goto restart|@>=
+begin if lo_mem_max+1000<hi_mem_min then t:=lo_mem_max+1000
+else t:=(lo_mem_max+hi_mem_min+2) div 2; {|lo_mem_max+2<=t<hi_mem_min|}
+p:=llink(rover); q:=lo_mem_max; rlink(p):=q; llink(rover):=q;@/
+rlink(q):=rover; llink(q):=p; link(q):=empty_flag; node_size(q):=t-lo_mem_max;@/
+lo_mem_max:=t; link(lo_mem_max):=null; info(lo_mem_max):=null;
+rover:=q; goto restart;
+end
+
+@ Empirical tests show that the routine in this section performs a
+node-merging operation about 0.75 times per allocation, on the average,
+after which it finds that |r>p+1| about 95\% of the time.
+
+@<Try to allocate...@>=
+q:=p+node_size(p); {find the physical successor}
+@^inner loop@>
+while is_empty(q) do {merge node |p| with node |q|}
+  begin t:=rlink(q);
+  if q=rover then rover:=t;
+  llink(t):=llink(q); rlink(llink(q)):=t;@/
+  q:=q+node_size(q);
+  end;
+r:=q-s;
+if r>p+1 then @<Allocate from the top of node |p| and |goto found|@>;
+if r=p then if ((rlink(p)<>rover) or (llink(p)<>rover)) then
+  @<Allocate entire node |p| and |goto found|@>;
+node_size(p):=q-p {reset the size in case it grew}
+@z
+% module 129 no longer refers to remove_node; I don't recall when it changed!
+@x module 134
+@d is_char_node(#) == (#>hi_mem_base)
+@y
+@d is_char_node(#) == (#>=hi_mem_min)
+@z
+@x module 162
+example, locations |mem_base| to |mem_base+3| are always used to store the
+specification for glue that is `\.{0pt plus 0pt minus 0pt}'. The
+following macro definitions accomplish the static allocation by giving
+symbolic names to the fixed positions. Dynamic allocation of variable-size
+nodes is restricted to locations |first_mem| through |(hi_mem_base-1)|,
+and single-word nodes are dynamically allocated in locations |second_mem|
+through |mem_max|, inclusive. It is harmless to let |lig_trick|, |garbage|,
+and |backup_head| share the same location of |mem|.
+
+@d zero_glue==mem_base {specification for \.{0pt plus 0pt minus 0pt}}
+@y
+example, locations |mem_bot| to |mem_bot+3| are always used to store the
+specification for glue that is `\.{0pt plus 0pt minus 0pt}'. The
+following macro definitions accomplish the static allocation by giving
+symbolic names to the fixed positions. Static variable-size nodes appear
+in locations |mem_bot| through |lo_mem_stat_max|, and static single-word nodes
+appear in locations |hi_mem_stat_min| through |mem_top|, inclusive. It is
+harmless to let |lig_trick|, |garbage|, and |backup_head| share the same
+location of |mem|.
+
+@d zero_glue==mem_bot {specification for \.{0pt plus 0pt minus 0pt}}
+@z
+@x module 162
+@d first_mem==fil_neg_glue+glue_spec_size {first dynamically allocatable word
+  in the variable-size |mem|}
+@#
+@d page_ins_head==hi_mem_base {list of insertion data for current page}
+@d contrib_head==hi_mem_base+1 {vlist of items not yet on current page}
+@d page_head==hi_mem_base+2 {vlist for current page}
+@d temp_head==hi_mem_base+3 {head of a temporary list of some kind}
+@d hold_head==hi_mem_base+4 {head of a temporary list of another kind}
+@d adjust_head==hi_mem_base+5 {head of adjustment list returned by |hpack|}
+@d active==hi_mem_base+6 {head of active list in |line_break|, needs two words}
+@d align_head==hi_mem_base+8 {head of preamble list for alignments}
+@d end_span==hi_mem_base+9 {tail of spanned-width lists}
+@d omit_template==hi_mem_base+10 {a constant token list}
+@d null_list==hi_mem_base+11 {permanently empty list}
+@d lig_trick==hi_mem_base+12 {a ligature masquerading as a |char_node|}
+@d garbage==hi_mem_base+12 {used for scrap information}
+@d backup_head==hi_mem_base+13 {head of token list built by |scan_keyword|}
+@d second_mem==hi_mem_base+14 {first dynamically allocatable word in
+  the one-word |mem|}
+@y
+@d lo_mem_stat_max==fil_neg_glue+glue_spec_size-1 {largest statically
+  allocated word in the variable-size |mem|}
+@#
+@d page_ins_head==mem_top {list of insertion data for current page}
+@d contrib_head==mem_top-1 {vlist of items not yet on current page}
+@d page_head==mem_top-2 {vlist for current page}
+@d temp_head==mem_top-3 {head of a temporary list of some kind}
+@d hold_head==mem_top-4 {head of a temporary list of another kind}
+@d adjust_head==mem_top-5 {head of adjustment list returned by |hpack|}
+@d active==mem_top-6 {head of active list in |line_break|, needs two words}
+@d align_head==mem_top-8 {head of preamble list for alignments}
+@d end_span==mem_top-9 {tail of spanned-width lists}
+@d omit_template==mem_top-10 {a constant token list}
+@d null_list==mem_top-11 {permanently empty list}
+@d lig_trick==mem_top-12 {a ligature masquerading as a |char_node|}
+@d garbage==mem_top-12 {used for scrap information}
+@d backup_head==mem_top-13 {head of token list built by |scan_keyword|}
+@d hi_mem_stat_min==mem_top-13 {smallest statically allocated word in
+  the one-word |mem|}
+@z
+@x module 164
+for k:=mem_base+1 to first_mem-1 do mem[k].sc:=0;
+  {all glue dimensions are zeroed}
+@^data structure assumptions@>
+k:=mem_base;@+while k<first_mem do {set first words of glue specifications}
+@y
+for k:=mem_bot+1 to lo_mem_stat_max do mem[k].sc:=0;
+  {all glue dimensions are zeroed}
+@^data structure assumptions@>
+k:=mem_bot;@+while k<=lo_mem_stat_max do
+    {set first words of glue specifications}
+@z
+@x module 164
+rover:=first_mem; link(rover):=empty_flag; {now initialize the dynamic memory}
+node_size(rover):=hi_mem_base-rover; {which is one big available node}
+llink(rover):=rover; rlink(rover):=rover;@/
+link(hi_mem_base):=null; info(hi_mem_base):=null;
+for k:=hi_mem_base+1 to second_mem-1 do
+  mem[k]:=mem[hi_mem_base];{clear list heads}
+@<Initialize the special list heads and constant nodes@>;
+avail:=null; mem_end:=second_mem-1; {initialize the one-word memory}
+var_used:=first_mem-mem_base; dyn_used:=second_mem-hi_mem_base;
+max_var_used:=var_used; {initialize statistics}
+@y
+rover:=lo_mem_stat_max+1;
+link(rover):=empty_flag; {now initialize the dynamic memory}
+node_size(rover):=1000; {which is a 1000-word available node}
+llink(rover):=rover; rlink(rover):=rover;@/
+lo_mem_max:=rover+1000; link(lo_mem_max):=null; info(lo_mem_max):=null;@/
+for k:=hi_mem_stat_min to mem_top do
+  mem[k]:=mem[lo_mem_max]; {clear list heads}
+@<Initialize the special list heads and constant nodes@>;
+avail:=null; mem_end:=mem_top;
+hi_mem_min:=hi_mem_stat_min; {initialize the one-word memory}
+var_used:=lo_mem_stat_max+1-mem_bot; dyn_used:=mem_top+1-hi_mem_stat_min;
+  {initialize statistics}
+@z
+@x module 165
+@t\hskip1em@>@!was_mem_end: pointer; {previous |mem_end|}
+@y
+@t\hskip1em@>@!was_mem_end,@!was_lo_max,@!was_hi_min: pointer;
+  {previous |mem_end|, |lo_mem_max|,and |hi_mem_min|}
+@z
+@x module 166
+@!debug was_mem_end:=mem_base; {indicate that everything was previously free}
+@y
+@!debug was_mem_end:=mem_min; {indicate that everything was previously free}
+was_lo_max:=mem_min; was_hi_min:=mem_max;
+@z
+@x module 167
+begin for p:=mem_base to mem_end do free[p]:=false; {you can probably
+  do this faster}
+@y
+begin for p:=mem_min to lo_mem_max do free[p]:=false; {you can probably
+  do this faster}
+for p:=hi_mem_min to mem_end do free[p]:=false; {ditto}
+@z
+@x module 167
+for p:=0 to mem_end do was_free[p]:=free[p]; {|was_free:=free| might be faster}
+was_mem_end:=mem_end;
+@y
+for p:=mem_min to lo_mem_max do was_free[p]:=free[p];
+for p:=hi_mem_min to mem_end do was_free[p]:=free[p];
+  {|was_free:=free| might be faster}
+was_mem_end:=mem_end; was_lo_max:=lo_mem_max; was_hi_min:=hi_mem_min;
+@z
+@x module 168
+  begin if (p>mem_end)or(p<second_mem) then clobbered:=true
+@y
+  begin if (p>mem_end)or(p<hi_mem_min) then clobbered:=true
+@z
+@x module 169
+repeat if (p>=hi_mem_base)or(p<first_mem) then clobbered:=true
+  else if (rlink(p)>=hi_mem_base)or(rlink(p)<first_mem) then clobbered:=true
+  else if  not(is_empty(p))or(node_size(p)<2)or@|
+   (p+node_size(p)>hi_mem_base)or@| (llink(rlink(p))<>p) then clobbered:=true;
+@y
+repeat if (p>=lo_mem_max)or(p<mem_min) then clobbered:=true
+  else if (rlink(p)>=lo_mem_max)or(rlink(p)<mem_min) then clobbered:=true
+  else if  not(is_empty(p))or(node_size(p)<2)or@|
+   (p+node_size(p)>lo_mem_max)or@| (llink(rlink(p))<>p) then clobbered:=true;
+@z
+@x module 170
+p:=mem_base;
+while p<=hi_mem_base do {node |p| should not be empty}
+@y
+p:=mem_min;
+while p<=lo_mem_max do {node |p| should not be empty}
+@z
+@x module 170
+  while (p<=hi_mem_base) and not free[p] do incr(p);
+  while (p<=hi_mem_base) and free[p] do incr(p);
+@y
+  while (p<=lo_mem_max) and not free[p] do incr(p);
+  while (p<=lo_mem_max) and free[p] do incr(p);
+@z
+@x module 171
+for p:=mem_base to mem_end do
+  if not free[p] and ((p>was_mem_end) or was_free[p]) then
+@y
+for p:=mem_min to lo_mem_max do
+  if not free[p] and ((p>was_lo_max) or was_free[p]) then
+    begin print_char(" "); print_int(p);
+    end;
+for p:=hi_mem_min to mem_end do
+  if not free[p] and
+   ((p<was_hi_min) or (p>was_mem_end) or was_free[p]) then
+@z
+@x module 172
+begin for q:=mem_base to mem_end do
+@y
+begin for q:=mem_min to lo_mem_max do
+@z
+@x module 172
+@<Search |eqtb| for equivalents equal to |p|@>;
+@y
+for q:=hi_mem_min to mem_end do
+  begin if link(q)=p then
+    begin print_nl("LINK("); print_int(q); print_char(")");
+    end;
+  if info(q)=p then
+    begin print_nl("INFO("); print_int(q); print_char(")");
+    end;
+  end;
+@<Search |eqtb| for equivalents equal to |p|@>;
+@z
+@x module 176
+if (p<hi_mem_base)or(p>mem_end) then print_esc("CLOBBERED.")
+@y
+if (p<hi_mem_min)or(p>mem_end) then print_esc("CLOBBERED.")
+@z
+@x module 178
+begin if (p<mem_base)or(p>=hi_mem_base) then print_char("*")
+@y
+begin if (p<mem_min)or(p>=lo_mem_max) then print_char("*")
+@z
+@x module 293
+if (p<hi_mem_base) or (p>mem_end) then
+@y
+if (p<hi_mem_min) or (p>mem_end) then
+@z
+@x module 693
+  print_int(dyn_used); print("; max so far: ");
+  print_int(max_var_used); print_char("&");
+  print_int(mem_end+1-hi_mem_base); print_ln;
+@y
+  print_int(dyn_used); print("; still untouched: ");
+  print_int(hi_mem_min-lo_mem_max-1); print_ln;
+@z
+@x module 857
+begin save_link:=link(cur_p); {this is OK even if |cur_p=null|}
+link(cur_p):=null; print_nl(""); short_display(link(printed_node));
+link(cur_p):=save_link; printed_node:=cur_p;
+@y
+begin print_nl("");
+if cur_p=null then short_display(link(printed_node))
+else  begin save_link:=link(cur_p);
+  link(cur_p):=null; print_nl(""); short_display(link(printed_node));
+  link(cur_p):=save_link;
+  end;
+printed_node:=cur_p;
+@z
+@x module 1249
+if 2*max_halfword<hi_mem_base-mem_base then bad:=41;
+@y
+if 2*max_halfword<mem_top-mem_min then bad:=41;
+@z
+@x module 1307
+dump_int(hi_mem_base);@/
+@y
+dump_int(mem_bot);@/
+dump_int(mem_top);@/
+@z
+@x module 1308
+if x<>hi_mem_base then goto bad_fmt;
+@y
+if x<>mem_bot then goto bad_fmt;
+undump_int(x);
+if x<>mem_top then goto bad_fmt;
+@z
+@x module 1311
+dump_int(rover);
+p:=mem_base; q:=rover; x:=0;
+@y
+dump_int(lo_mem_max); dump_int(rover);
+p:=mem_bot; q:=rover; x:=0;
+@z
+@x module 1311
+var_used:=var_used+hi_mem_base-p; dyn_used:=mem_end+1-hi_mem_base;@/
+dump_int(mem_end); dump_int(avail);
+for k:=p to mem_end do dump_wd(mem[k]);
+x:=x+mem_end+1-p;
+@y
+var_used:=var_used+lo_mem_max-p; dyn_used:=mem_end+1-hi_mem_min;@/
+for k:=p to lo_mem_max do dump_wd(mem[k]);
+x:=x+lo_mem_max+1-p;
+dump_int(hi_mem_min); dump_int(avail);
+for k:=hi_mem_min to mem_end do dump_wd(mem[k]);
+x:=x+mem_end+1-hi_mem_min;
+@z
+@x module 1312
+undump(min_halfword)(hi_mem_base)(rover);
+p:=mem_base; q:=rover; x:=0;
+repeat for k:=p to q+1 do undump_wd(mem[k]);
+p:=q+node_size(q);
+if (p>hi_mem_base)or((q>=rlink(q))and(rlink(q)<>rover)) then goto bad_fmt;
+q:=rlink(q);
+until q=rover;
+undump_size(hi_mem_base)(mem_max)('mem max')(mem_end);
+undump(null)(mem_end)(avail);
+for k:=p to mem_end do undump_wd(mem[k]);
+undump_int(var_used); undump_int(dyn_used);
+max_var_used:=var_used
+@y
+undump(lo_mem_stat_max+1000)(hi_mem_stat_min-1)(lo_mem_max);
+undump(lo_mem_stat_max+1)(lo_mem_max)(rover);
+p:=mem_bot; q:=rover; x:=0;
+repeat for k:=p to q+1 do undump_wd(mem[k]);
+p:=q+node_size(q);
+if (p>lo_mem_max)or((q>=rlink(q))and(rlink(q)<>rover)) then goto bad_fmt;
+q:=rlink(q);
+until q=rover;
+for k:=p to lo_mem_max do undump_wd(mem[k]);
+if mem_min<mem_bot-2 then {make more low memory available}
+  begin p:=llink(rover); q:=mem_min+1;
+  link(mem_min):=null; info(mem_min):=null; {we don't use the bottom word}
+  rlink(p):=q; llink(rover):=q;@/
+  rlink(q):=rover; llink(q):=p; link(q):=empty_flag;
+  node_size(q):=mem_bot-q;
+  end;
+undump(lo_mem_max+1)(hi_mem_stat_min)(hi_mem_min);
+undump(null)(mem_top)(avail); mem_end:=mem_top;
+for k:=hi_mem_min to mem_end do undump_wd(mem[k]);
+undump_int(var_used); undump_int(dyn_used)
+@z
+@x module 1323
+undump(min_halfword)(hi_mem_base)(font_glue[k]);
+@y
+undump(min_halfword)(lo_mem_max)(font_glue[k]);
+@z
+@x module 1334
+  wlog_ln(' ',max_var_used:1,'&',mem_end+1-hi_mem_base:1,@|
+    ' words of memory out of ',
+    hi_mem_base-mem_base:1,'&',mem_max+1-hi_mem_base:1);@/
+@y
+  wlog_ln(' ',lo_mem_max-mem_min+mem_end-hi_mem_min+2:1,@|
+    ' words of memory out of ',mem_end+1-mem_min:1);@/
+@z that's the end of change number 300!
+
+301. node_size field could overflow if low mem was too large (Dec 20, 1984)
+[This bug existed from the beginning, if hi_mem_base-first_mem>max_halfword!]
+@x module 111
+if (mem_min<min_halfword)or(mem_max>=max_halfword) then bad:=14;
+@y
+if (mem_min<min_halfword)or(mem_max>=max_halfword)or@|
+  (mem_bot-mem_min>max_halfword+1) then bad:=14;
+@z
+@x module 125
+@!t:pointer; {temporary register}
+@y
+@!t:integer; {temporary register}
+@z
+@x module 125
+if lo_mem_max+2<hi_mem_min then
+@y
+if lo_mem_max+2<hi_mem_min then if lo_mem_max+2<=mem_bot+max_halfword then
+@z
+@x module 126
+rlink(q):=rover; llink(q):=p; link(q):=empty_flag; node_size(q):=t-lo_mem_max;@/
+@y
+if t>mem_bot+max_halfword then t:=mem_bot+max_halfword;
+rlink(q):=rover; llink(q):=p; link(q):=empty_flag; node_size(q):=t-lo_mem_max;@/
+@z
+
+302. Improvement to missing-format-file error (DRF, 5 Jan 85)
+@x module 524
+var j:0..buf_size; {the first space after the file name}
+begin if buffer[loc]="&" then
+  begin incr(loc); j:=loc; buffer[last]:=" ";
+  while buffer[j]<>" " do incr(j);
+  pack_buffered_name(0,loc,j-1); {try first without the system file area}
+  if w_open_in(fmt_file) then
+    begin loc:=j; goto found;
+    end;@/
+  pack_buffered_name(format_area_length,loc,j-1);
+    {now try the system format file area}
+  if w_open_in(fmt_file) then
+    begin loc:=j; goto found;
+    end;
+  wake_up_terminal;
+  wterm_ln('Sorry, I can''t find that format;',' will try PLAIN.');
+@.Sorry, I can't find...@>
+  end;
+  {now pull out all the stops: try for the system \.{PLAIN} file}
+pack_buffered_name(format_default_length-format_ext_length,1,0);
+if not w_open_in(fmt_file) then
+  begin wake_up_terminal;
+  wterm_ln('I can''t find the PLAIN format file!');
+@.I can't find PLAIN...@>
+@.PLAIN@>
+  open_fmt_file:=false; return;
+  end;
+found:open_fmt_file:=true;
+@y
+var j:0..buf_size; {the first space after the format file name}
+begin j:=loc;
+if buffer[loc]="&" then
+  begin incr(loc); j:=loc; buffer[last]:=" ";
+  while buffer[j]<>" " do incr(j);
+  pack_buffered_name(0,loc,j-1); {try first without the system file area}
+  if w_open_in(fmt_file) then goto found;
+  pack_buffered_name(format_area_length,loc,j-1);
+    {now try the system format file area}
+  if w_open_in(fmt_file) then goto found;
+  wake_up_terminal;
+  wterm_ln('Sorry, I can''t find that format;',' will try PLAIN.');
+@.Sorry, I can't find...@>
+  update_terminal;
+  end;
+  {now pull out all the stops: try for the system \.{PLAIN} file}
+pack_buffered_name(format_default_length-format_ext_length,1,0);
+if not w_open_in(fmt_file) then
+  begin wake_up_terminal;
+  wterm_ln('I can''t find the PLAIN format file!');
+@.I can't find PLAIN...@>
+@.PLAIN@>
+  open_fmt_file:=false; return;
+  end;
+found:loc:=j; open_fmt_file:=true;
+@z
+
+303. Welcoming message appears sooner (DRF, Jan 7)
+@x module 61
+else  begin print(format_ident); print_ln;
+  end;
+@y
+else  begin print(format_ident); print_ln;
+  end;
+update_terminal;
+@z
+
+304. Minor change to help message in "confusion" (Jan 23)
+@x module 95
+  help2("One of your earlier faux pas has wounded me deeply,")@/
+    ("so I'm barely conscious. Please fix it and try again.");
+@y
+  help2("One of your faux pas seems to have wounded me deeply...")@/
+    ("in fact, I'm barely conscious. Please fix it and try again.");
+@z
+
+305. Improved logic for `(see the transcript file...)' (Jan 23)
+@x module 245
+if history=spotless then history:=warning_issued;
+if (tracing_online<=0)and(selector=term_and_log) then decr(selector);
+@y
+if (tracing_online<=0)and(selector=term_and_log) then
+  begin decr(selector);
+  if history=spotless then history:=warning_issued;
+  end;
+@z
+
+306. Change 291 violated standard PASCAL (CET1, Feb 18)
+@x module 331
+for first:=0 to buf_size do buffer[first]:=0;
+@y since some procedures `threaten' |first| globally [BS/6192 sec 6.8.3.9]
+first:=buf_size; repeat buffer[first]:=0; decr(first); until first=0;
+@z
+
+307. Nonexistent character could be output via ligature hyphenation (April 11)
+@x module 582 (slight inefficiency removed while correcting this)
+begin if (font_bc[f]<=c)and(font_ec[f]>=c) then
+@y
+begin if font_bc[f]<=c then if font_ec[f]>=c then
+@z
+@x module 892 (likewise)
+@!hu:array[1..63] of ASCII_code; {like |hc|, before conversion to lowercase}
+@y
+@!hu:array[1..63] of ASCII_code; {like |hc|, before conversion to lowercase}
+@!hyf_char:integer; {hyphen character of the relevant font}
+@z
+@x module 896 (likewise)
+done2: if hyphen_char[hf]<0 then goto done1;
+if hyphen_char[hf]>255 then goto done1;
+@y
+done2: hyf_char:=hyphen_char[hf];
+if hyf_char<0 then goto done1;
+if hyf_char>255 then goto done1;
+@z
+@x module 912 and another local variable
+@!c:ASCII_code; {character temporarily replaced by a hyphen}
+@y
+@!c:ASCII_code; {character temporarily replaced by a hyphen}
+@!hyf_node:pointer; {the hyphen, if it exists}
+@z
+@x module 915 (this is the real bugfix)
+minor_tail:=null; c:=hu[i+1]; hu[i+1]:=hyphen_char[hf];
+repeat l:=reconstitute(l+1,i+1);
+if minor_tail=null then pre_break(r):=link(hold_head)
+else link(minor_tail):=link(hold_head);
+minor_tail:=link(hold_head);
+if link(minor_tail)<>null then minor_tail:=link(minor_tail);
+until l>i;
+hu[i+1]:=c; {restore the character in the hyphen position}
+decr(l); hyf[l]:=0
+@y
+minor_tail:=null; hyf_node:=new_character(hf,hyf_char);
+if hyf_node<>null then
+  begin incr(i); c:=hu[i]; hu[i]:=hyf_char;
+  end;
+repeat l:=reconstitute(l+1,i);
+if minor_tail=null then pre_break(r):=link(hold_head)
+else link(minor_tail):=link(hold_head);
+minor_tail:=link(hold_head);
+if link(minor_tail)<>null then minor_tail:=link(minor_tail);
+until l=i;
+if hyf_node<>null then
+  begin hu[i]:=c; {restore the character in the hyphen position}
+  free_avail(hyf_node); decr(i); l:=i;
+  end;
+hyf[i]:=0
+@z
+@x module 918
+begin r:=new_disc; pre_break(r):=new_character(hf,hyphen_char[hf]);
+@y
+begin r:=new_disc; pre_break(r):=new_character(hf,hyf_char);
+@z
+
+308. Improper memory usage computed by INITEX in change 300. (DRF, April 15)
+@x module 162
+@d hi_mem_stat_min==mem_top-13 {smallest statically allocated word in
+  the one-word |mem|}
+@y
+@d hi_mem_stat_min==mem_top-13 {smallest statically allocated word in
+  the one-word |mem|}
+@d hi_mem_stat_usage=14 {the number of one-word nodes always present}
+@z
+@x module 164 (text macro without parentheses strikes again!)
+var_used:=lo_mem_stat_max+1-mem_bot; dyn_used:=mem_top+1-hi_mem_stat_min;
+@y
+var_used:=lo_mem_stat_max+1-mem_bot; dyn_used:=hi_mem_stat_usage;
+@z
+
+309. A faster |flush_list| routine for the inner loop. (DRF, April 16)
+@x module 123
+var q:pointer; {the successor of node |p|}
+begin while p<>null do
+  begin q:=link(p); free_avail(p); p:=q;
+  end;
+@y
+var @!q,@!r:pointer; {list traversers}
+begin if p<>null then
+  begin r:=p;
+  repeat q:=r; r:=link(r); @!stat decr(dyn_used);@+tats@/
+  until r=null; {now |q| is the last node on the list}
+  link(q):=avail; avail:=p;
+  end;
+@z
+
+310. Kern for accent positioning could disappear after a line break (April 17)
+(Change 269 fixed only part of the problem!)
+@x module 155
+@d explicit=1 {|subtype| of kern nodes from \.{\\kern} and \.{\\/} and accents}
+@y
+@d explicit=1 {|subtype| of kern nodes from \.{\\kern} and \.{\\/}}
+@d acc_kern=2 {|subtype| of kern nodes from accents}
+@z
+@x module 191
+if subtype(p)<=explicit then
+  begin print_esc("kern");
+  if subtype(p)=explicit then print_char(" ");
+  print_scaled(width(p));
+@y
+if subtype(p)<>mu_glue then
+  begin print_esc("kern");
+  if subtype(p)<>normal then print_char(" ");
+  print_scaled(width(p));
+  if subtype(p)=acc_kern then print(" (for accent)");
+@.for accent@>
+@z
+@x module 837
+    math_node,kern_node: break_width[1]:=break_width[1]-width(s);
+@y
+    math_node,kern_node: if subtype(s)=acc_kern then goto done
+      else break_width[1]:=break_width[1]-width(s);
+@z
+@x module 879
+  if non_discardable(q) then goto done1;
+@y
+  if non_discardable(q) then goto done1;
+  if subtype(q)=acc_kern then if type(q)=kern_node then goto done1;
+@z
+@x module 1125
+r:=new_kern(delta); subtype(r):=explicit; link(tail):=r; link(r):=p;
+tail:=new_kern(-a-delta); subtype(tail):=explicit; link(p):=tail; p:=q;
+@y
+r:=new_kern(delta); subtype(r):=acc_kern; link(tail):=r; link(r):=p;
+tail:=new_kern(-a-delta); subtype(tail):=acc_kern; link(p):=tail; p:=q;
+@z
+
+311. \lastbox and \unkern must not remove discretionary replacements (April 18)
+(Change 236 introduced this bug!)
+@x module 1079
+label exit;
+var p:pointer; {runs through the current list}
+@y
+label exit, done;
+var @!p,@!q:pointer; {run through the current list}
+@!m:quarterword; {the length of a replacement list}
+@z
+@x modules 1080 and 1081
+  @<Apologize for inability to do \.{\\lastbox} now@>
+else  begin if not is_char_node(tail) then
+    if (type(tail)=hlist_node)or(type(tail)=vlist_node) then
+      begin p:=head; cur_box:=tail; shift_amount(cur_box):=0;
+      while link(p)<>tail do p:=link(p);
+      tail:=p; link(p):=null;
+      end;
+  end;
+end
+
+@ @<Apologize for inability to do \.{\\lastbox} now@>=
+begin you_cant;
+help2("Sorry...I'm usually unable to take things from the current")@/
+  ("page. This \lastbox will therefore be void."); error;
+end
+@y
+  begin you_cant;
+  help2("Sorry...I usually can't take things from the current page.")@/
+    ("This \lastbox will therefore be void."); error;
+  end
+else  begin if not is_char_node(tail) then
+    if (type(tail)=hlist_node)or(type(tail)=vlist_node) then
+      @<Remove the last box, unless it's part of a discretionary@>;
+  end;
+end
+
+@ @<Remove the last box...@>=
+begin q:=head;
+repeat p:=q;
+if not is_char_node(q) then if type(q)=disc_node then
+  begin for m:=1 to replace_count(q) do p:=link(p);
+  if p=tail then goto done;
+  end;
+q:=link(p);
+until q=tail;
+cur_box:=tail; shift_amount(cur_box):=0;
+tail:=p; link(p):=null;
+done: end
+@z
+@x module 1105
+var p:pointer; {runs through the current list}
+@y
+label exit;
+var @!p,@!q:pointer; {run through the current list}
+@!m:quarterword; {the length of a replacement list}
+@z
+@x module 1105
+    begin p:=head;
+    while link(p)<>tail do p:=link(p);
+    link(p):=null; flush_node_list(tail); tail:=p;
+    end;
+  end;
+end;
+@y
+    begin q:=head;
+    repeat p:=q;
+    if not is_char_node(q) then if type(q)=disc_node then
+      begin for m:=1 to replace_count(q) do p:=link(p);
+      if p=tail then return;
+      end;
+    q:=link(p);
+    until q=tail;
+    link(p):=null; flush_node_list(tail); tail:=p;
+    end;
+  end;
+exit:end;
+@z
+@x module 1106
+  help2("Sorry...I'm usually unable to take things from the current")@/
+    ("page. Try `I\vskip-\lastskip' instead.");
+  if cur_chr=kern_node then help_line[0]:=
+    ("page. Try `I\kern-\lastkern' instead.")
+  else if cur_chr<>glue_node then help_line[0]:=@|
+    ("page. Perhaps you can make the output routine do it.");
+@y
+  help2("Sorry...I usually can't take things from the current page.")@/
+    ("Try `I\vskip-\lastskip' instead.");
+  if cur_chr=kern_node then help_line[0]:=
+    ("Try `I\kern-\lastkern' instead.")
+  else if cur_chr<>glue_node then help_line[0]:=@|
+    ("Perhaps you can make the output routine do it.");
+@z
+@x module 1120
+if n<128 then replace_count(tail):=n
+@y
+if n<=max_quarterword then replace_count(tail):=n
+@z
+
+
+*** Note by DEK, 18 Apr 1985
+(The code for version 1.3 has been published by Addison-Wesley under the
+title "TeX: The Program". It was phototypeset on our APS, but does not
+contain changes > 300. Some of those changes have been made in versions
+of TeX called 1.3; but the exact definition of version 1.3 is somewhat
+vague. Version 1.4 was released on April 18, 1985, after
+making change 311. At present I believe Version 1.4 will be identical
+to Version 2.0 except perhaps for things like index entries in the
+documentation and slightly revised help messages. Version 2.0 will
+coincide with the publication of Volume 1 of Computers and Typesetting,
+which will come out when METAFONT and Computer Modern are both finished.)
+Version 1.5
+312. if nonstandard area specified, don't try TEX_area too. (DRF, 26 Apr 85)
+@x module 537
+  pack_file_name(cur_name,TEX_area,cur_ext);
+  if a_open_in(cur_file) then goto done;
+@y
+  if cur_area="" then
+    begin pack_file_name(cur_name,TEX_area,cur_ext);
+    if a_open_in(cur_file) then goto done;
+    end;
+@z
+
+313. length of \write need no longer be limited (cf 235). (NBT, 30 Apr 85)
+@x module 1370
+show_token_list(link(def_ref),null,buf_size-10); print_ln;
+@y
+show_token_list(link(def_ref),null,10000000); print_ln;
+@z
+
+314. bug introduced in #300, just lucky it didn't cause trouble (CET1, 8 May 85)
+@x module 162
+@d active==mem_top-6 {head of active list in |line_break|, needs two words}
+@y
+@d active==mem_top-7 {head of active list in |line_break|, needs two words}
+@z
+
+315. Missing eoln after last typeout (Gropp, 11 May 85)
+@x module 1332
+  wterm('Ouch---my internal constants have been',
+@y
+  wterm_ln('Ouch---my internal constants have been',
+@z
+
+316. Redundancy (CET1, 17 May 85)
+[Change 287 was apparently introduced because of a faulty assumption,
+although its change to the calling of "initialize" was valid.]
+@x module 1332
+  begin t_open_out;
+  wterm_ln('Ouch---my internal constants have been',
+    ' clobbered!---case ',bad:1);
+@y
+  begin wterm_ln('Ouch---my internal constants have been clobbered!',
+    '---case ',bad:1);
+@z
+
+317. batchmode to see if log file couldn't be opened (DRF, 22 May 85)
+@x module 92
+if interaction=batch_mode then decr(selector);
+if job_name=0 then open_log_file;
+@y
+if job_name=0 then open_log_file;
+if interaction=batch_mode then decr(selector);
+@z
+
+318. If the string pool overflows while reading the command line... (22 May 85)
+[This bug was first found in METAFONT, when it could occur more easily]
+@x module 525
+begin str_room(name_length);
+for k:=1 to name_length do append_char(xord[name_of_file[k]]);
+make_name_string:=make_string;
+@y
+begin if (pool_ptr+name_length>pool_size)or(str_ptr=max_strings) then
+  make_name_string:="?"
+else  begin for k:=1 to name_length do append_char(xord[name_of_file[k]]);
+  make_name_string:=make_string;
+  end;
+@z
+
+319. Bug in \edef\foo{\iffalse\fi\the\toks0} (found by Dan Brotsky, 7 Aug 85)
+@x module 478
+  if cur_cmd<>the then goto done2;
+  q:=the_toks;
+  if link(temp_head)<>null then
+    begin link(p):=link(temp_head); p:=q;
+    end;
+@y
+  if cur_cmd<=max_command then goto done2;
+  if cur_cmd<>the then expand
+  else  begin q:=the_toks;
+    if link(temp_head)<>null then
+      begin link(p):=link(temp_head); p:=q;
+      end;
+    end;
+@z
+
+*** Version 1.5 was released on August 7, 1985.
+
+320. Lowercase `plain' for consistency with the manual
+@x module 521
+TEX_format_default:='TeXformats:PLAIN.fmt';
+@.TeXformats@>
+@.PLAIN@>
+@y
+TEX_format_default:='TeXformats:plain.fmt';
+@.TeXformats@>
+@.plain@>
+@z (index entries also changed to lowercase in modules 524, 1331)
+
+321. Terminal woken up by \show and \showthe (November 27, 1985)
+@x module 1294
+begin get_token; print_nl("> ");
+@y
+begin get_token;
+if interaction=error_stop_mode then wake_up_terminal;
+print_nl("> ");
+@z
+@x module 1297
+begin p:=the_toks; print_nl("> "); token_show(temp_head);
+@y
+begin p:=the_toks;
+if interaction=error_stop_mode then wake_up_terminal;
+print_nl("> "); token_show(temp_head);
+@z
+Changes subsequent to `Version 2.0' as published in C&T, Volume B:
+
+322. Trivial change to a help message.
+@x module 1283
+  ("Pretend that you're Hercule Poirot, examine all clues,")@/
+@y
+  ("Pretend that you're Hercule Poirot: Examine all clues,")@/
+@z
+
+323. Precaution since |index| can be as high as |max_in_open|. (DRF)
+@x module 14
+if hash_prime>hash_size then bad:=5;
+@y
+if hash_prime>hash_size then bad:=5;
+if max_in_open>=128 then bad:=6;
+@z
+
+324. \kern clobbered at end of pre-break list in discretionary break.
+@x module 881
+        |disc_break:=true|@>;
+    if not is_char_node(q) then
+      if (type(q)=math_node)or(type(q)=kern_node) then width(q):=0;
+@y
+        |disc_break:=true|@>
+    else if (type(q)=math_node)or(type(q)=kern_node) then width(q):=0;
+@z
+
+325. width after discretionary didn't take account of discarded nodes.
+@x module 830 (slight redefinition)
+@!t:quarterword; {replacement count, if |cur_p| is a discretionary node}
+@y
+@!t:integer; {node count, if |cur_p| is a discretionary node}
+@z
+@x module 837 (slight rearrangement)
+if (break_type=unhyphenated)or(cur_p=null) then
+  begin s:=cur_p;
+  while s<>null do
+    begin if is_char_node(s) then goto done;
+    case type(s) of
+    glue_node:@<Subtract glue from |break_width|@>;
+    penalty_node: do_nothing;
+    math_node,kern_node: if subtype(s)=acc_kern then goto done
+      else break_width[1]:=break_width[1]-width(s);
+    othercases goto done
+    endcases;@/
+    s:=link(s);
+    end;
+  end
+else @<Compute the discretionary |break_width| values@>;
+@y
+s:=cur_p;
+if break_type>unhyphenated then if cur_p<>null then
+  @<Compute the discretionary |break_width| values@>;
+while s<>null do
+  begin if is_char_node(s) then goto done;
+  case type(s) of
+  glue_node:@<Subtract glue from |break_width|@>;
+  penalty_node: do_nothing;
+  math_node,kern_node: if subtype(s)=acc_kern then goto done
+    else break_width[1]:=break_width[1]-width(s);
+  othercases goto done
+  endcases;@/
+  s:=link(s);
+  end;
+@z
+@x module 840 (this is the main change to fix the bug)
+begin t:=replace_count(cur_p); s:=cur_p;
+while t>0 do
+  begin decr(t); s:=link(s);
+  @<Subtract the width of node |s| from |break_width|@>;
+  end;
+s:=post_break(cur_p);
+while s<>null do
+  begin @<Add the width of node |s| to |break_width|@>;
+@y
+begin t:=replace_count(cur_p); v:=cur_p; s:=post_break(cur_p);
+while t>0 do
+  begin decr(t); v:=link(v);
+  @<Subtract the width of node |v| from |break_width|@>;
+  end;
+while s<>null do
+  begin @<Add the width of node |s| to |break_width| and increase |t|,
+    unless it's discardable@>;
+@z
+@x module 840, continued
+break_width[1]:=break_width[1]+disc_width;
+@y
+break_width[1]:=break_width[1]+disc_width;
+if t=0 then s:=link(v); {more nodes may also be discardable after the break}
+@z
+@x module 841 (here we just change |s| to |v|)
+@<Subtract the width of node |s|...@>=
+if is_char_node(s) then
+  begin f:=font(s);
+  break_width[1]:=break_width[1]-char_width(f)(char_info(f)(character(s)));
+  end
+else  case type(s) of
+  ligature_node: begin f:=font(lig_char(s));@/
+    break_width[1]:=@|break_width[1]-
+      char_width(f)(char_info(f)(character(lig_char(s))));
+    end;
+  hlist_node,vlist_node,rule_node,kern_node:
+    break_width[1]:=break_width[1]-width(s);
+@y
+@<Subtract the width of node |v|...@>=
+if is_char_node(v) then
+  begin f:=font(v);
+  break_width[1]:=break_width[1]-char_width(f)(char_info(f)(character(v)));
+  end
+else  case type(v) of
+  ligature_node: begin f:=font(lig_char(v));@/
+    break_width[1]:=@|break_width[1]-
+      char_width(f)(char_info(f)(character(lig_char(v))));
+    end;
+  hlist_node,vlist_node,rule_node,kern_node:
+    break_width[1]:=break_width[1]-width(v);
+@z
+@x module 842
+  hlist_node,vlist_node,rule_node,kern_node:
+    break_width[1]:=break_width[1]+width(s);
+  othercases confusion("disc2")
+@:this can't happen disc2}{\quad disc2@>
+  endcases
+@y
+  hlist_node,vlist_node,rule_node:break_width[1]:=break_width[1]+width(s);
+  kern_node: if (t=0)and(subtype(s)<>acc_kern) then t:=-1 {discardable}
+    else break_width[1]:=break_width[1]+width(s);
+  othercases confusion("disc2")
+@:this can't happen disc2}{\quad disc2@>
+  endcases;
+incr(t)
+@z
+
+*** Version 2.1 was released on January 26, 1987.
+
+326. Removal of redundant code (found by Pat Monardo, 5 Feb 87)
+@x module 1224 [this change need not be made, since it has no effect]
+    char_def_code: define(p,char_given,cur_val);
+    math_char_def_code: define(p,math_given,cur_val);
+@y the cases cannot occur, so we simply don't list them
+@z
+
+327. More robustness is needed when debugging (Ronaldo Am\'a, 14 Apr 87)
+@x module 174
+begin while p>null do
+@y maybe mem_min>null (but nodes shouldn't be put in location mem_min exactly)
+begin while p>mem_min do
+@z
+@x module 182
+@p procedure show_node_list(@!p:pointer); {prints a node list symbolically}
+@y
+@p procedure show_node_list(@!p:integer); {prints a node list symbolically}
+@z
+@x module 182, continued
+while p>null do
+@y
+while p>mem_min do
+@z
+
+328. Storage allocation can be more elegant and efficient (4/21/87)
+@x module 127
+if r=p then if ((rlink(p)<>rover) or (llink(p)<>rover)) then
+@y
+if r=p then if rlink(p)<>p then
+@z
+
+329. Miscalculation of empty-line condition (April 22, 1987)
+@x module 360
+    begin if limit=start then {previous line was empty}
+@y
+    begin if (end_line_char<0)or(end_line_char>127) then incr(limit);
+    if limit=start then {previous line was empty}
+@z
+
+330. A case where we don't have to assume system bookkeeping (April 28, 1987)
+@x module 560
+done: b_close(tfm_file); read_font_info:=g;
+@y [suggested by Jim Sterken]
+done: if file_opened then b_close(tfm_file);
+read_font_info:=g;
+@z [this was not a bug, according to the comment in module 28]
+
+331. jump_out must fix unfinished output (Found by Klaus Gunterman, 3 Aug 87)
+@x module 593
+doing_leaders:=false; dead_cycles:=0;
+@y
+doing_leaders:=false; dead_cycles:=0; cur_s:=-1;
+@z
+@x module 617
+cur_s:=-1; ensure_dvi_open;
+@y
+ensure_dvi_open;
+@z
+@x module 640
+dvi_out(eop); incr(total_pages);
+@y
+dvi_out(eop); incr(total_pages); cur_s:=-1;
+@z
+@x module 642
+if total_pages=0 then print_nl("No pages of output.")
+@y
+while cur_s>-1 do
+  begin if cur_s>0 then dvi_out(pop)
+  else  begin dvi_out(eop); incr(total_pages);
+    end;
+  decr(cur_s);
+  end;
+if total_pages=0 then print_nl("No pages of output.")
+@z
+
+332. \hangindent=1pt$$\halign{...\cr\noalign{\hrule}}$$ problem (19 Aug 87)
+@x module 805
+q:=link(head);
+@y
+q:=link(head); s:=head;
+@z
+@x module 805, continued
+  q:=link(q);
+@y
+  s:=q; q:=link(q);
+@z
+@x module 806
+if is_running(depth(q)) then depth(q):=depth(p);
+@y
+if is_running(depth(q)) then depth(q):=depth(p);
+if o<>0 then
+  begin r:=link(q); link(q):=null; q:=hpack(q,natural);
+  shift_amount(q):=o; link(q):=r; link(s):=q;
+  end;
+@z
+
+333. \hskip 0pt plus 1fil\ifdim problem (found by Alan Guth, 20 Aug 87)
+@x module 366
+@!cvl_backup,@!radix_backup:small_number; {to save |cur_val_level| and |radix|}
+@y
+@!cvl_backup,@!radix_backup,@!co_backup:small_number;
+  {to save |cur_val_level|, etc.}
+@z
+@x
+backup_backup:=link(backup_head);
+@y
+co_backup:=cur_order; backup_backup:=link(backup_head);
+@z
+@x
+link(backup_head):=backup_backup;
+@y
+cur_order:=co_backup; link(backup_head):=backup_backup;
+@z
+
+334. leaders too sensitive near exact multiples (M. F. Bridgland, 9 Nov 87)
+@x module 626
+  begin edge:=cur_h+rule_wd; lx:=0;
+@y
+  begin rule_wd:=rule_wd+10; {compensate for floating-point rounding}
+  edge:=cur_h+rule_wd; lx:=0;
+@z
+@x ibid
+  cur_h:=edge; goto next_p;
+@y
+  cur_h:=edge-10; goto next_p;
+@z
+@x module 635
+  begin edge:=cur_v+rule_ht; lx:=0;
+@y
+  begin rule_ht:=rule_ht+10; {compensate for floating-point rounding}
+  edge:=cur_v+rule_ht; lx:=0;
+@z
+@x ibid
+  cur_v:=edge; goto next_p;
+@y
+  cur_v:=edge-10; goto next_p;
+@z
+
+335. Glitch in fixed-point multiplication of negatives (W.G. Sullivan, 17Nov87)
+@x module 572
+begin alpha:=16*z; beta:=16;
+while z>=@'40000000 do
+  begin z:=z div 2; beta:=beta div 2;
+  end;
+@y
+begin alpha:=16;
+while z>=@'40000000 do
+  begin z:=z div 2; alpha:=alpha+alpha;
+  end;
+beta:=256 div alpha; alpha:=alpha*z;
+@z
+
+336. If there are no \patterns and some \lccode is 1 (Breitenlohner, 12Dec87)
+@x module 952
+trie_link(0):=0; trie_char(0):=0; trie_op(0):=0;
+@y
+trie_link(0):=0; trie_char(0):=0; trie_op(0):=min_quarterword;
+@z
+
+337. \csname might encounter undefined_cs in a group (Chris Thompson, 23Dec87)
+@x module 372
+  begin eqtb[cur_cs]:=eqtb[frozen_relax];
+@y
+  begin eq_define(cur_cs,relax,256);
+@z
+
+338. \outer\def\a0{}\a\a shows temp_head list garbage (Silvio Levy, 20Apr88)
+@x module 391
+repeat if (info(r)>match_token+127)or(info(r)<match_token) then s:=null
+else  begin match_chr:=info(r)-match_token; s:=link(r); r:=s;
+  p:=temp_head; link(p):=null; m:=0;
+@y
+repeat link(temp_head):=null;
+if (info(r)>match_token+127)or(info(r)<match_token) then s:=null
+else  begin match_chr:=info(r)-match_token; s:=link(r); r:=s;
+  p:=temp_head; m:=0;
+@z
+
+339. \def\\#1{}\input a\\b failed (Robert Messer, 24Apr88)
+@x module 259
+var h:integer; {hash code}
+@y
+var h:integer; {hash code}
+@!d:integer; {number of characters in incomplete current string}
+@z
+@x module 260
+str_room(l);
+for k:=j to j+l-1 do append_char(buffer[k]);
+text(p):=make_string;
+@y
+str_room(l); d:=cur_length;
+while pool_ptr>str_start[str_ptr] do
+  begin decr(pool_ptr); str_pool[pool_ptr+l]:=str_pool[pool_ptr];
+  end; {move current string up to make room for another}
+for k:=j to j+l-1 do append_char(buffer[k]);
+text(p):=make_string; pool_ptr:=pool_ptr+d;
+@z
+
+340. Make patterns work when trie_min=0 (Peter Breitenlohner, 10May88)
+@x module 951
+trie_max:=128; trie_min:=128; trie_link(0):=1; trie_taken[0]:=false;
+@y
+trie_max:=128; trie_min:=128; trie_link(0):=1; trie_taken[0]:=false;
+trie_link(trie_size):=0; trie_back(0):=trie_size; {wrap around}
+@z
+@x module 953
+begin c:=trie_c[p]; {we have |c>0|}
+if c<trie_min then trie_min:=c;
+z:=trie_link(trie_min-1); {get the first conceivably good hole}
+@y
+begin c:=trie_c[p];
+if c<trie_min then trie_min:=c;
+if trie_min=0 then z:=trie_link(trie_size)
+else z:=trie_link(trie_min-1); {get the first conceivably good hole}
+@z
+@x module 966
+r:=0; {finally, we will zero out the holes}
+@y
+r:=trie_size; {finally, we will zero out the holes}
+@z
+
+341. Avoid possible trie_pointer out of range (24May88)
+@x module 923
+hc[0]:=127; hc[hn+1]:=127; hc[hn+2]:=256; {insert delimiters}
+@y
+hc[0]:=127; hc[hn+1]:=127; hc[hn+2]:=128; {insert delimiters}
+@z
+
+342. \input a\romannumeral1 etc.; similar to bug 339. (25May88)
+@x module 464
+@p function str_toks:pointer; {changes the current string to a token list}
+@y
+@p function str_toks(@!b:pool_pointer):pointer;
+  {changes the string |str_pool[b..pool_ptr]| to a token list}
+@z
+@x module 464, continued
+p:=temp_head; link(p):=null; k:=str_start[str_ptr];
+@y
+p:=temp_head; link(p):=null; k:=b;
+@z
+@x module 464, concluded
+pool_ptr:=str_start[str_ptr]; str_toks:=p;
+@y
+pool_ptr:=b; str_toks:=p;
+@z
+@x module 465
+begin get_x_token; scan_something_internal(tok_val,false);
+if cur_val_level>=ident_val then @<Copy the token list@>
+else begin old_setting:=selector; selector:=new_string;
+@y
+@!b:pool_pointer; {base of temporary string}
+begin get_x_token; scan_something_internal(tok_val,false);
+if cur_val_level>=ident_val then @<Copy the token list@>
+else begin old_setting:=selector; selector:=new_string; b:=pool_ptr;
+@z
+@x module 465, continued
+  selector:=old_setting; the_toks:=str_toks;
+@y
+  selector:=old_setting; the_toks:=str_toks(b);
+@z
+@x module 470
+begin c:=cur_chr; @<Scan the argument for command |c|@>;
+old_setting:=selector; selector:=new_string;
+@<Print the result of command |c|@>;
+selector:=old_setting; link(garbage):=str_toks; ins_list(link(temp_head));
+@y
+@!b:pool_pointer; {base of temporary string}
+begin c:=cur_chr; @<Scan the argument for command |c|@>;
+old_setting:=selector; selector:=new_string; b:=pool_ptr;
+@<Print the result of command |c|@>;
+selector:=old_setting; link(garbage):=str_toks(b); ins_list(link(temp_head));
+@z
+
+343. **\input\romannumeral6 confusion bypassed (25May88)
+@x module 525
+begin if (pool_ptr+name_length>pool_size)or(str_ptr=max_strings) then
+@y
+begin if (pool_ptr+name_length>pool_size)or(str_ptr=max_strings)or
+ (cur_length>0) then
+@z
+
+344. Avoid negative dividend rounding upward (Chris Thompson, fixed 19Jun88)
+@x module 126
+else t:=(lo_mem_max+hi_mem_min+2) div 2; {|lo_mem_max+2<=t<hi_mem_min|}
+@y
+else t:=lo_mem_max+1+(hi_mem_min-lo_mem_max)div 2; {|lo_mem_max+2<=t<hi_mem_min|}
+@z
+
+345. Better strategy when near memory overflow (Chris Thompson)
+@x module 126
+begin if lo_mem_max+1000<hi_mem_min then t:=lo_mem_max+1000
+@y
+begin if hi_mem_min-lo_mem_max>=1998 then t:=lo_mem_max+1000
+@z
+
+346. An omission from change 333 (Tsunetoshi Hayashi, reported 20June88)
+@x module 439
+cur_val:=0; cur_val_level:=int_val; radix:=0;
+@y
+cur_val:=0; cur_val_level:=int_val; radix:=0; cur_order:=0;
+@z
+
+347. Avoid fatal_error after terminal eof (Tim Morgan, reported 25Oct88)
+@x module 71 [serious problem occurred if this was called in open_log_file]
+if not input_ln(term_in,true) then fatal_error("End of file on the terminal!");
+@y
+if not input_ln(term_in,true) then t_open_in;
+@z
+
+348. Force terminal output when open_log_file aborts (6Nov88)
+@x module 535
+  begin print_err("I can't write on file `");
+@y
+  begin selector:=term_only; print_err("I can't write on file `");
+@z
+
+349. By popular request, undo #347 and fix the bug a more complex way.
+@x module 71 [this undoes change #347]
+if not input_ln(term_in,true) then t_open_in;
+@y
+if not input_ln(term_in,true) then fatal_error("End of file on the terminal!");
+@z
+@x module 92 [now we get to the new stuff]
+begin if job_name>0 then selector:=term_and_log
+@y
+begin if log_opened then selector:=term_and_log
+@z
+@x module 93
+  error;
+@y
+  if log_opened then error;
+@z
+@x module 527
+@!job_name:str_number; {principal file name}
+@y
+@!job_name:str_number; {principal file name}
+@!log_opened:boolean; {has the transcript file been opened?}
+@z
+@x module 528
+@<Initialize the output...@>=job_name:=0; name_in_progress:=false;
+@y
+@<Initialize the output...@>=
+job_name:=0; name_in_progress:=false; log_opened:=false;
+@z
+@x module 534
+selector:=log_only;
+@y
+selector:=log_only; log_opened:=true;
+@z
+@x module 535
+begin if interaction<scroll_mode then {bypass |fatal_error|}
+  begin selector:=term_only; print_err("I can't write on file `");
+@.I can't write on file x@>
+  print_file_name(cur_name,cur_area,cur_ext); print("'.");@/
+  job_name:=0; history:=fatal_error_stop; jump_out;
+  end; {abort the program without a log file}
+@y
+begin selector:=term_only;
+@z
+@x module 1265 [this change is optional, but it's a slight improvement]
+if job_name<>0 then selector:=selector+2;
+@y
+if log_opened then selector:=selector+2;
+@z
+@x module 1333
+if job_name>0 then
+@y
+if log_opened then
+@z
+@x module 1334
+if job_name>0 then {the log file is open}
+@y
+if log_opened then
+@z
+
+350. (I sincerely hope that there won't be any more)
+* Possibly nice ideas that will not be implemented
+
+. Classes of marks analogous to classes of insertions
+
+. \badness n, the badness of \box n
+
+. A way to copy the current page before its insertions have been removed
+
+. \showcontext to show the current location without stopping for error
+
+. \everyeof to insert tokens before an \input file ends
+  (strange example: \everyeof{\noexpand} will allow things
+    like \xdef\a{\input foo}!)

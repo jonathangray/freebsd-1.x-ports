@@ -1,0 +1,71 @@
+#   Copyright (C) 1988, 1990, 1991, 1992 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
+
+# Please email any bugs, comments, and/or additions to this file to:
+# bug-dejagnu@prep.ai.mit.edu
+
+# This file was written by Rob Savoye. (rob@cygnus.com)
+
+#
+# the initial work on the version of these tests from the tcl release was done
+# by Mary Ann May-Pumphrey of Sun Microsystems.
+#
+if $tracelevel then {
+	strace $tracelevel
+	}
+
+expect_before buffer_full { error "Buffer full" }
+tcl_start
+
+###foreach file [glob -nocomplain $srcdir/$subdir/*.test] {
+foreach file [glob -nocomplain $srcdir/../tests/*.test] {
+    set command "unidentified test in $file"
+    send "source $file\n"
+    expect {
+	"source $file*\r\n\r\n\r\n" {
+	    verbose "Sourcing test $file ..." 1
+	    set timeoutmsg "Never got to the end of "
+	    continue -expect
+    }
+	"\+\+\+*PASSED" {
+	    regexp "\+\+\+\+ [file rootname [file tail $file]].* PASSED" $expect_out(buffer) tmp
+	    pass [lindex $tmp 1]
+	    continue -expect
+	}
+	"\+\+\+*FAILED" {
+	    regexp "\+\+\+\+ [file rootname [file tail $file]].* FAILED" $expect_out(buffer) tmp
+	    fail [lindex $tmp 1]
+	    continue -expect
+	}
+	-re "^\r\n% $" {
+	    verbose "$file done" 1
+	    }
+	"*Error: bad option *" {
+	    fail "$command (Got a bad option)"
+	}
+	timeout {
+	    error "$timeoutmsg $file"
+	}
+    }
+}
+
+
+
+
+
+
+
+

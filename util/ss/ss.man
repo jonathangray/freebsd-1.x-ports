@@ -1,0 +1,2429 @@
+'\" t
+.\" Run through tbl first
+.\" **********************************************************************
+.\"              Copyright (c) 1992 by Arthur E. Mulder.
+.\"
+.\"         (See the end of this file for a copyright notice)
+.\" **********************************************************************
+.\" * %M%
+.\" * ss    :       A SpreadSheet Program
+.\" *
+.\" * Art's Spreadsheet program.        Art Mulder ( art@cs.ualberta.ca )
+.\" * University of Alberta, Department of Computing Science.
+.\" **********************************************************************
+.\" * Main Documentation (Man Page)
+.\" **********************************************************************
+.\"
+.\" USAGE: tbl <this file> | nroff -man 
+.\"
+.\" WARNING:
+.\"   1) The string "pname" is converted to the true program name
+.\"      by the makefile, throughout this document.
+.\"   2) The string "#LIBDIR#" is converted to the value of the variable
+.\"	 LIBDIR from the Makefile.
+.\"   3) The string "#REVISION#" is converted to the revision number of
+.\"      of the package, as stripped from 'version.c', by 'torev'.
+.\"
+.\" CONVENTIONS:
+.\" - pname italicized and never uppercased (it's a proper name).
+.\" - Refer to lists of commands in the same order as introduced.
+.\" - Command and function names bold when introduced, italicized in all
+.\"   other places if possible, or in `` '' if not.
+.\" - Cell names italicized except when used in expressions; row numbers
+.\"   and column names not italicized.
+.\" - Use `` '' rather than " " except referring to literal input or output.
+.\" - TPs use default indent except for function names, then 18.
+.\" - Smallify uppercase strings.
+.\" - Avoid passive voice and third person.
+.\" $Revision: 1.1 $
+.\" **********************************************************************
+.\"
+.TH PNAME\ #REVISION#\  L
+.SH NAME
+pname \- simple spreadsheet program
+.SH SYNOPSIS
+.B pname
+[
+.B -c
+]
+[
+.B -m
+]
+[
+.B -r
+]
+[
+.B -x
+]
+[
+.B -C
+]
+[
+.B -R
+]
+[
+.I file
+]
+.\"
+.\" **********************************************************************
+.SH DESCRIPTION
+.\" ***********
+.I pname
+is a spreadsheet program (big surprise!).  
+.LP
+It is not another Lotus 1-2-3(tm) or Excel(tm) or etc spreadsheet
+program that consumes megabytes of disk space and is full of whiz-bang
+graphics and fonts and so on and so forth that the average user (IMHO)
+needs and uses only infrequently.
+.LP
+.I pname
+is a character based program that should run on any standard ASCII
+terminal.  It is based on rectangular tables much like a financial
+spreadsheet.  When invoked it presents you with a table organized as
+rows and columns of cells \- just like any ``normal'' spreadsheet
+program.  
+.\" ** .LP
+.\" ** For a online tutorial, type the command:
+.\" ** .IP
+.\" ** pname #LIBDIR#/tutorial.pname
+.\" ** .LP
+.\" ** To print a quick reference card, type the command:
+.\" ** .IP
+.\" ** pnameqref | [your_printer_commmand]
+.\"
+.\" **********************************************************************
+.SH OPTIONS
+.\" ***********
+.TP
+.B \-c
+Start the program with the recalculation being done in column order.
+.\" ----------------------------------------------------------------------
+.TP
+.B \-m
+Start the program with automatic recalculation disabled.  The
+spreadsheet will be recalculated only when the recalc command (see
+below) is used.
+.\" ----------------------------------------------------------------------
+.TP
+.B \-r
+Start the program with the recalculation being done in row order
+(default option).
+.\" ----------------------------------------------------------------------
+.TP
+.B \-x
+Cause the data files to be decrypted/encrypted when read/written.  (This
+option may not be available at your site, depending on the capabilities
+of your computer system, check with your system administrator.)
+.\" ----------------------------------------------------------------------
+.TP
+.B \-R
+Start the program with automatic newline action set to increment the
+row (see below).
+.\" ----------------------------------------------------------------------
+.TP
+.B \-C
+Start the program with automatic newline action set to increment the
+column (see below).
+.\" ----------------------------------------------------------------------
+.TP
+.B file
+If invoked without a
+.I file
+argument, the table is initially empty.  Otherwise
+.I file
+is read in.
+.\" ----------------------------------------------------------------------
+.PP
+All of these options can also be changed from within
+.IR pname .
+Those changes will then be saved when the current spreadsheet is saved,
+and reloaded when that spreadsheet is read in from disk.  Options
+specified when
+.I pname
+is invoked override options saved in the data file.
+.\"
+.\"
+**********************************************************************
+.SH INTRODUCTION
+.\" ***********
+.I pname
+is based upon the well-known (?)  public domain spreadsheet program
+.RB `` sc '',
+version 6.19.
+.LP
+.I pname
+is an ``un-moded'' program.  It does not have separate input and output
+modes that you toggle between.  To enter numbers into your
+spreadsheet, go ahead and start typing.  You can enter text the same
+way, just do it (more detail on these operations below).
+.LP
+If your keyboard has Arrow keys and/or Page-Up and Page-Down keys,
+they should work as you expect them too.  If they don't, talk to
+whomever installed this program on your system, it could be a simple
+terminfo/termcap problem.  If your keyboard doesn't have cursor
+movement keys, relax.  When you use
+.I pname 
+you can also use the same cursor movement commands as emacs  (more
+on that below, also).
+.LP
+There are a wide selection of financial and other ``standard''
+spreadsheet functions that you can use.  They are listed and explained
+in detail below.  (Wow, sure must be a lot of stuff below!)
+.LP
+Finally, instead of forcing you to memorize bazillions of different
+commands, 
+.I pname
+places most spreadsheet operations (Save, Move, etc) in menus.  These
+menus are probably vaguely familiar to you, since they were inspired
+by a certain well-known DOS spreadsheet program.  Go ahead, hit the
+``/'' key.  You probably will figure many things out without even
+reading on in this man page.
+.LP
+However, you probably should read on, because there's lot's to learn.
+I'd also hate to have typed all this in for nothing!  :-)
+.LP
+NOTE: This man page assumes that the reader has a general familiarity
+with spreadsheet programs.
+.\" ----------------------------------------------------------------------
+.SS Screen Layout
+.\" ----------------------------------------------------------------------
+The screen is divided into four regions.  The top line is for entering
+commands/data and displaying cell values.  The second line is for messages
+from
+.IR pname .
+The third line and the first four columns show the column and row
+numbers, from which are derived cell addresses, e.g.
+.I A0
+for the cell in column A, row 0.  Note that column names are
+case-insensitive: Entering
+.I A0
+is equivalent to
+.IR a0 .
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.PP
+The rest of the screen forms a window looking at a portion of the
+table.  The total number of table rows and columns displayed is set
+by
+.IR curses (3)
+and may be overridden by setting the LINES and COLUMNS environment
+variables, respectively.
+.PP
+.RS
+Note to X-Windows users; Yes you can resize your terminal windows.
+The next time a command is processed, or the screen is redrawn,
+.I pname
+will figure things out and adjust itself.
+.RE
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.PP
+The screen has two cursors:  a cell cursor, indicated by a highlighted
+cell and a ``<'' on the screen, and a character cursor, indicated by
+the terminal's hardware cursor.  The cell and character cursors are
+often the same.  They differ when you type a command on the top line.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.PP
+If a cell's numeric value is wider than the column width the cell is
+filled with asterisks.  If a cell's label string is wider than the
+column width, it is truncated at the start of the next non-blank cell
+in the row, if any.
+.\" ----------------------------------------------------------------------
+.SH How Input Is Processed
+.\" ----------------------------------------------------------------------
+Let's assume that you have just started
+.IR pname ,
+so that you are at the ``top-level'' of input processing.  You enter
+a keystroke, a number or letter, arrow key or function key.  The
+program reads your input and processes it as follows:
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.B Control-key, Arrow key, or Function key
+The appropriate function is performed  (ie: Move the cursor to
+the next row).  See the section below entitled
+.BR COMMANDS .
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.B `/'
+The main top-level menu is displayed and the program enters
+``menu-mode''.  See the section below entitled 
+.BR MENUS .
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.\" ** .IP `?'
+.\" ** Pop-up help is invoked.  CURRENTLY DISABLED.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.B `0-9',`-',`.',`+',`@'
+It is assumed that you are entering a number (or a function, in the
+case of `@'), into the current cell.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.B `='
+This is retained for compatibility with ``sc'' .  It signals that you
+wish to enter a number/function in the current cell.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.B `"',`>',`<'
+These characters indicate that you want to enter a centered,
+right-justified, or left-justified string into the cell.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.B Default:
+The entry of any other character is taken to be a signal that you wish
+to enter a left-justified string.
+.\"
+.\" **********************************************************************
+.SH MENUS
+.\" ***********
+The main (top-level) menu is invoked with the `/' key.  
+.LP
+Menus are displayed on the top line of the screen.  Each menu item is
+usually one (hopefully self-explanatory) word.  Each menu item begins
+with a single highlighted letter.  By typing the key corresponding to
+the letter \- case is unimportant \- you select that menu item.
+.LP 
+I tried to have all the highlighted letters match the first letter of
+their menu item, but unfortunately there had to be a few exceptions.
+Watch for those!
+.LP
+By typing a <Return> or a <Space> you will abort out of any menu (no
+matter how deep you are into sub-menu's) back to the top-level of the
+program.
+.\" ----------------------------------------------------------------------
+.SS Main Menu
+.BR F :File 
+.BR E :Edit
+.BR C :Cell
+.BR R :Row
+.BR O :Column
+.BR M :Misc
+.BR A :Macro
+.BR Q :Quit
+.LP
+With the exception of 
+.BR Quit ,
+all menu items on the Main Menu invoke sub-menus.  See below for
+explanations of those.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Quit
+Exit from the program.  If there have been any changes in the
+spreadsheet since the last Load or Save command
+.I pname
+asks about saving your data before exiting.
+.\" ----------------------------------------------------------------------
+.SS File Sub-Menu
+.BR N :New
+.BR L :Load
+.BR M :Merge
+.BR S :Save
+.BR A :Save As
+.BR W :Write
+txt
+.BR T :Tbl
+.RI save( mode )
+.BR Q :Quit
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I New
+Erase the current spreadsheet from memory and start fresh with an
+empty table.
+.I (Unimplemented)
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Load
+Load (``get'') a new spreadsheet file from disk.  Enter the name of a
+spreadsheet file to load, followed by <CR>.  If encryption is enabled,
+the file is decrypted before it is loaded into the spreadsheet.
+.IP
+NOTE: 
+.I pname
+files are (currently) identical to ``sc'' data files.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Merge
+Merge the spreadsheet from the named file into the current one.
+Values and expressions defined in the named file are read into the
+current spreadsheet, overwriting the existing entries at matching cell
+locations.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Save
+Save (``put'') the current spreadsheet into a file.
+If encryption is enabled, the file is encrypted before it is saved.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Save As
+Prompt the user to enter a filename, and then save (``put'') the
+spreadsheet into a file with that name.  If a <CR> is entered, the
+current default filename is used.  The newly entered filename becomes
+the new default filename.  If encryption is enabled, the file is
+encrypted before it is saved.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Write Txt
+Write a text-only listing of the current spreadsheet (No functions,
+etc) into a file in a form that matches its appearance on the screen.
+.IP
+This differs from the ``Save'' commands in that files saved with those
+commands are intended to be reloaded with ``Load'', while ``Write
+txt'' produces a file for people to look at.  Hidden rows or columns
+are not shown when the data is printed.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Table Save
+Write a text-only listing of the current spreadsheet to a file,
+but include delimiters suitable for processing by the
+.IR tbl ,
+.IR LaTeX ,
+.IR TeX ,
+or 
+.I FrameMaker
+table processors.
+.IP
+The 
+.I tblstyle
+option (see the ``Settings'' item on the Misc menu) controls which
+delimiters are output.  The delimiters are are a colon (:) for style
+.I 0
+(no style defined) or
+.IR tbl ,
+and an ampersand (&) for style
+.I LaTeX
+or
+.IR TeX .
+.IP
+The current setting of the 
+.I tblstyle 
+option is displayed in parentheses after the ``Tbl Save'' entry of the
+File menu.  A question mark (?) indicates that no style has been defined
+(style 0).
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Quit
+Exit from the program.  Identical to the Quit option on the main
+top-most menu.  (Actually the Quit option on the main top-most
+menu is identical to 
+.I this
+option, but that really is irrelevant).
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.PP
+With the ``Save'', ``Write Text'', and ``Table Save'' commands,
+it is possible to save a write a subset of the spreadsheet to the
+output file.  To do that, a 
+.I range
+must be defined prior to invoking those commands.  See the section
+below on Ranges, for instructions on defining a range.
+.PP
+With the ``Write Text'' and ``Table Save'' commands, if you try to
+write to the last file used with the ``Load'' or ``Save/Save As''
+commands, or the file specified on the command line when
+.I pname
+was invoked, you are asked to confirm that the (potentially) dangerous
+operation is really what you want.
+.PP
+The four output commands, (``Save'', ``Save As'', ``Write Text'' and
+``Table Save''), can pipe their (unencrypted only) output to a
+program.  To use this feature, enter ``| program'' to the prompt
+asking for a filename.  For example, to redirect the output of the
+``Write Text'' command to the printer, you might enter ``| lpr -p''.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.\" ** Hmmm, now that I've changed the way input is processed, this 
+.\" ** next feature is no longer available, since I put the "filename"
+.\" ** in quotes.  Can a workaround be discovered somehow?  Hmmm.
+.\" 
+.\" The filename can also be obtained from a cell's label string or string
+.\" expression.  In this case, delete the leading " with the backspace key
+.\" and enter a cell name such as
+.\" .I a22
+.\" instead.  If the resulting string starts with ``|'', the rest of the
+.\" string is interpreted as a
+.\" .SM UNIX
+.\" command, as mentioned above.
+.\"
+.\" ----------------------------------------------------------------------
+.SS Edit Sub-Menu
+.BR C :Copy 
+.BR E :Erase
+.BR N :Name
+.BR L :Lock
+.BR U :Unlck
+.BR F :Format
+.BR I :Fill
+.BR V :Valueize
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Copy 
+Copy a source range to a destination range.  The source and
+destination may be different sizes.  The result is always one or more
+full copies of the source.  Copying a row to a row yields a row.
+Copying a column to a column yields a column.  Copying a range to
+anything yields a range.  Copying a row to a column or a column to a
+row yields a range with as many copies of the source as there are
+cells in the destination.  This command can be used to duplicate a
+cell through an arbitrary range by making the source a single cell
+range such as
+.IR b20:b20 .
+.IP
+The Source Range must be defined before selecting this command.
+You will be prompted to enter a destination range.
+.IP
+.I BUG: 
+You MUST enter a range, and the range WILL be copied.  If you
+want to abort this operation the only current solution is to select
+your source range to also be your destination range.  Then there will
+be a net effect of zero.  This should be addressed in the next release.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Erase
+Clear a range.  Cells cleared with this command may be recalled with
+the ``Yank'' or ``Merge'' commands under the Row or Column menus.
+(This is, of course, less than ideal \- this awkwardness is an example
+of some of the problems that arose in converting from ``sc''.)
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Name
+Invoke the Name sub-menu.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Lock
+This command will lock the current cell -- or a range of cells, if a
+range of cells is specified.  Locking will make them immune to any
+type of editing. A locked cell can't be changed in anyway until it is
+unlocked.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I UnLock
+In light of the previous command, the necessity of this command is
+obvious.  This command will unlock a locked cell and make it editable.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Format
+Use this command to assign a value format string to a range of cells.
+See the section ``Formatting Cell Contents'' for details.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Fill
+Fill a range with constant values starting with a given value and
+increasing by a given increment.  Each row is filled before moving on
+to the next row, if row order recalculation is set.  Column order fills
+each column in the range before moving on to the next column.  The
+start and increment numbers may be positive or negative.  To fill all
+cells with the same value, give an increment of zero.
+.IP
+.I Example:
+A Starting value and Increment of "2 5"  (2 is the starting value, 5
+is the increment)  will result in the defined range being filled with
+the values 2 7 12 17 22 27 ...
+.IP
+A Range must be defined or this command will abort.  (Filling a single
+cell is rather a silly thing to do).
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Valueize
+Values only.
+This command removes the expressions from a range of cells,
+leaving just the values of the expressions.
+.IP
+.I Example:
+A cell contains a function which currently evaluates to 12.
+Valueizing that cell would result in the function being removed, and
+the constant value 12 being inserted into the cell.
+.IP
+.I BUG:
+``Valueize'' is almost certainly not a real word.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.LP
+The Copy and Erase parts of this section are rather klunky &
+kludgy.  It needs work.  One hoped for improvement is to re-do this
+section into a more Macintosh-like setup, with a CUT/COPY/PASTE type of
+interface.  Hopefully this section will be cleaned up in the next
+release. 
+.\"
+.\" ----------------------------------------------------------------------
+.SS Cell Sub-Menu
+.BR E :Erase
+.BR G :Goto
+.BR M :Mark
+.BR C :Copy
+marked cell
+.BR L :edit
+Label 
+.BR V :edit
+Value
+.LP
+This menu deals with operations that affect the current cell only.
+All of these menu items have direct Control- or Function-Key
+equivalents.  I suspect that the direct keyboard equivalents will
+prove to be more used than this menu.  In which case, this menu will
+disappear with the next release.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.\" ** Erasing a single cell can be accomplished by the Erase
+.\" ** option of the edit menu, when called WITHOUT a range.
+.\" ** Hence, it it redundant here.
+.\" .TP
+.\" .I Erase
+.\" Clear the current cell.  Deletes the numeric value, label string,
+.\" and/or numeric or string expression.  Cells cleared with this command
+.\" may be recalled with any of the ``pull'' commands (see below).
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.\" .TP
+.\" .I Format
+.\" Enter a format string into the current cell.  This format string
+.\" overrides the precision specified with the ``Edit/Format'' command.
+.\" The format only applies to numeric values.  See the Section on 
+.\" .B Format
+.\" for details.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP 
+.I Goto
+Go to a cell.
+.I pname
+prompts for a cell's name, a regular expression surrounded by quotes,
+or a number.  
+.IP
+If a cell's name such as ``ae122 '' or the name of a
+defined range is given, the cell cursor goes directly to that cell.
+If a quoted regular expression such as "Tax Table" or "^Jan [0-9]*$"
+is given,
+.I pname
+searches for a cell containing a string matching the regular
+expression.  Note that you must use double quotes (") around a regular
+expression.  See
+.I regex(3)
+or
+.I ed(1)
+for more details on the form of regular expressions.  
+.IP
+If a number is given,
+.I pname
+will search for a cell containing that number.
+Searches for either strings or numbers proceed forward from the
+current cell, wrapping back to a0 at the end of the table, and
+terminate at the current cell if the string or number is not found.
+.IP
+You may also go to a cell with an ERROR (divide by zero, etc in this
+cell) or INVALID (references a cell containing an ERROR).  Entering
+``error'' (No quotes!  Case unimportant) will take you to the next
+ERROR, while ``invalid'' takes you to the next invalid.  The last goto
+command is saved, and can be re-issued by entering <return> at the
+Goto prompt.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP 
+.I Mark
+Mark a cell to be used as the source for the ``Copy Marked Cell''
+command.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Copy Marked Cell
+Copy the last cell marked with the ``Mark'' command to the current
+cell, updating row and column references in its numeric or string
+expression, if any.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Edit Label
+Edit the string associated with the current cell.  A subset of
+``emacs'' commands are used in this mode.  See ``Emacs Command/Entry
+Editing'' below.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Edit Value
+Edit the value associated with the current cell.  A subset of
+``emacs'' commands are used in this mode.
+.\" ----------------------------------------------------------------------
+.SS Row & Column Sub-Menu's
+.BR I :Insert
+.BR D :Delete
+.BR Y :Yank
+.BR M :Merge
+.BR C :Copy
+.BR H :Hide
+.BR S :Show
+.BR V :Valueize
+.BR F :Fmt
+.LP
+With the exception of the ``Fmt'' item, the Row and Column Menus are
+identical.  Fmt appears on the Column Menu only.  The operations on
+the two menus are also identical, with the obvious explanation that
+Row menu commands operate on Rows, and Column menu commands operate on
+Columns. 
+.LP
+Commands which move or copy cells
+also modify the row and column references in affected cell expressions.
+The references may be frozen by using the
+.I fixed
+operator or using the
+.I $
+character in the reference to the cell.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Insert
+Insert some Rows or Columns.  If a range is defined, insert the number
+of rows (columns) spanned by the range.  If no range is defined,
+insert just one row (column).  The new row (column) is empty.
+.IP
+Rows (columns) will be inserted before the current one.
+In the case of a range, the 'current' row (column) will be the 
+top-most row (leftmost column).
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Delete
+Delete some Rows or Columns.  If a range is defined, delete the 
+rows (columns) spanned by the range.  If no range is defined, delete
+just the row (column) where the cell cursor is.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Yank
+Yank (Pull) back a previously deleted set of cells, making room for
+them by inserting enough rows, or columns.  They are inserted at the
+current cursor location.
+.IP
+.I Note:
+Using the Row menu to Yank back a deleted Column will insert as many
+rows as were in the deleted column.  The same is true of using the
+Column menu to yank back a deleted Row.  These ``Features'' are
+probably bugs.
+.IP
+.I Bug:
+(Feature?) This operation will also yank back cells erased with the
+``Erase'' command on the Edit menu.  In most of those cases though,
+you will probably want to use the Merge command to do that.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Merge
+This command also yanks back previously deleted cells.  However, it
+does NOT insert rows or columns to make room for the yanked back
+material.  The present contents of any cells (beginning at the current
+cell cursor location) will be overwritten.
+.IP
+Unlike the yank command, a merged-back column will start at the
+current cell cursor location, it will NOT start in row 0.  The same is
+true of merged-back rows.
+.IP
+This command is the same, whether you select it through the Row menu
+or the Column menu.
+.IP
+This operation will also yank back cells erased with the
+``Erase'' command on the Edit menu. 
+.IP
+.I Note:
+This command really belongs on the Edit menu.  However, it is
+temporarily staying here, to be by the Yank command, to which it is a
+``partner''. 
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP 
+.I Copy
+Make a copy (a duplicate really) of the current row (column), and
+insert it into the spreadsheet to the right (below) of the current row
+(column).
+.IP
+This command operates on only one row (column) at a time.  Any defined
+range is ignored.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP 
+.I Hide
+Hide some rows (columns).  If a range is defined, hide the number of
+rows (columns) spanned by the range.  If no range is defined, hide
+just the current row (column).
+.IP
+This keeps a row (column) from being displayed but keeps it in the
+spreadsheet.  The status of the rows and columns is saved with the
+sheet so hidden rows and columns will be still be hidden when you 
+reload the spreadsheet.  Hidden rows or columns are not printed by the
+``Write Txt'' command.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Show
+Show Hidden Row's (Columns).  Shows the first hidden row(s) (columns)
+in the spreadsheet, starting at the left (top).
+.\" ** in ``sc'' you could enter a range of rows/columns to be
+.\" ** shown.  Perhaps that can be added back in, for the next release.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Valueize
+Valueize some rows (columns).  If a range is defined, Valueize the
+number of rows (columns) spanned by the range.  If no range is
+defined, valueize just the current row (column).
+.IP
+See the section on ``Valueize'' under the Edit Menu (above) for more
+information.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Fmt (Format)
+This option appears on the Column menu only.
+.IP
+Format the current column.  (This is primarily useful for adjusting
+the column width.)  There seems to be some overlap here between this
+function and the format function in the edit menu.  (as you might have
+guessed, this function is a holdover from ``sc'' that I have not
+explored in any great depth.)
+SHOULD BE FIXED UP.
+.IP
+.I (Here's the ``sc'' definition)
+Set the output format to be used for printing the numeric values in
+each cell in the current column.  Enter three numbers: the total width
+in characters of the column, the number of digits to follow decimal
+points, and the format type.  Format types are 0 for fixed point, 1
+for scientific notation, 2 for engineering notation, and 3 for dates.
+Values are rounded off to the least significant digit displayed.  The
+total column width affects displays of strings as well as numbers.  A
+preceding count can be used to affect more than one column. 
+.\" ----------------------------------------------------------------------
+.SS Misc Sub-Menu
+.BR ! :Shell
+Cmd
+.BR O :Options
+.BR S :Settings
+.BR V :show
+Values
+.BR E :show
+Expr.
+.BR R :Recalc
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Shell Command
+.I pname
+prompts for a shell command to run.  End the command line with the
+<RETURN> key.  If the environment variable SHELL is defined, that
+shell is run.  If not, /bin/sh is used.  Giving a null command line
+starts the shell in interactive mode.  A second ``!'' repeats the
+previous command.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Options
+Invoke the Options sub-menu.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP 
+.I Settings
+Set options.  This command allows you to set various options.
+A small menu lists some of the options that can be changed here.
+.IP
+At the prompt, enter one of the following commands to change a
+spreadsheet setting.
+.RS
+.TP
+.\" - - - - - - - - - -
+.BR byrows /  bycols
+Specify the order of cell evaluation when updating.  These options
+also affect the order in which cells are filled (see the Fill command
+on the Edit menu).
+.\" ** and whether a row or column is cleared by an
+.\" ** .I x
+.\" ** command.
+.\" - - - - - - - - - -
+.TP
+.BI iterations =n
+Set the maximum number of recalculations before the screen is
+displayed again.  Iterations is set to 10 by default.
+.\" - - - - - - - - - -
+.TP
+.BI tblstyle =s
+Control the output of the Table Save command.
+.I s
+can be:
+.B 0
+(default) to give colon delimited fields, with no 
+.I tbl
+control lines;
+.B tbl
+to give colon delimited fields, with
+.IR tbl (1)
+control lines;
+.B latex
+to give a
+.I LaTeX
+tabular environment; 
+.B slatex
+to give a
+.I SLaTeX (Scandinavian LaTeX)
+tabular environment; 
+.B tex
+to give a
+.I TeX
+simple tabbed alignment with ampersands as delimiters; and
+.B frame
+to produce a file suitable for reading into 
+.BR FrameMaker .
+.\" - - - - - - - - - -
+.PP
+Other options are normally used only in
+.I pname
+data files since they are available through the Options sub-menu.
+However, they can also be set here.  (``sc'' holdover).
+.TP
+.BR autocalc / !autocalc
+Set/clear auto recalculation mode.
+.\" - - - - - - - - - -
+.TP
+.BR prescale / !prescale
+Set/clear numeric prescale mode.
+.\" - - - - - - - - - -
+.TP
+.BR extfun / !extfun
+Enable/disable external functions.
+.\" - - - - - - - - - -
+.TP
+.BR cellcur / !cellcur
+Set/clear current cell highlighting mode.
+.\" - - - - - - - - - -
+.TP
+.BR toprow /  !toprow
+Set/clear top row display mode.
+.\" - - - - - - - - - -
+.TP
+.BR rndinfinity /  !rndinfinity
+default: round-to-even (banker's round), *.5 will round to the closest even
+number; doing a 'set rndinfinity' will round *.5 up to the next integer
+(rounding to infinity).
+.\" - - - - - - - - - -
+.TP
+.BI craction =n
+Set the newline action.
+.I n
+can be:
+.B 0
+(default) to give no action;
+.B 1
+to move down after each entry; or
+.B 2
+to move right after each entry.
+.\" - - - - - - - - - -
+.TP
+.BI rowlimit =n
+Set the remembered limit for the maximum row below which
+the current cell will be moved to the top of the next column
+if the newline action is set to move the current cell down.
+.I n
+can be
+.B -1
+(default) to disable this facility.
+.\" - - - - - - - - - -
+.TP
+.BI collimit =n
+Set the remembered limit for the maximum column to the right of which
+the current cell will be moved to the left of the next row
+if the newline action is set to move the current cell right.
+.I n
+can be
+.B -1
+(default) to disable this facility.
+.RE
+.\" - - - - - - - - - -
+.IP
+NOTE: this menu option is a holdover from the ``sc'' spreadsheet.
+It's 
+.I feel
+really does not match the current user interface, and should be
+reworked / replaced for the next release.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP 
+.I Show Values
+Redraw the screen with special highlighting of cells to be filled in.
+This is useful for finding values you need to provide or update in a
+form with which you aren't familiar or of which you have forgotten the
+details.
+.IP
+It's also useful for checking a form you are creating.  All cells
+which contain constant numeric values (not the result of a numeric
+expression) are highlighted temporarily, until the next screen change,
+however minor.  To avoid ambiguity, the current range (if any) and
+current cell are not highlighted.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Show Expr.
+This command is similar to
+.I Show 
+.IR Values ,
+but highlights cells which have expressions.  It also displays the
+expressions in the highlighted cells as left-flushed strings, instead
+of the numeric values and/or label strings of those cells.  This
+command makes it easier to check expressions, at least when they fit
+in their cells or the following cell(s) are blank so the expressions
+can slop over (like label strings).  In the latter case, the slop over
+is not cleared on the next screen update, so you may want redraw the
+screen (via
+.IR ^L )
+after this command in order to clean up the screen.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Recalc
+Recalculates the spreadsheet.
+.\" ----------------------------------------------------------------------
+.SS Macro Sub-Menu
+.BR R :Run
+.BR D :Define
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Run
+(Run macros) Since
+.I pname
+files are saved as ASCII files, it is possible to use them as
+primitive macro definition files.  The ``Run'' command makes this
+easier.  It's like the ``File/Merge'' command, but prints a saved path
+name as the start of the filename to merge in.  The string to use is
+set with the ``Define'' command.  To write macros, you must be
+familiar with the file format written by the ``File/Save'' commands.
+.B This facility is still primitive
+.B and could be much improved.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Define
+Define a path for the ``Run'' command to use.
+.\" ----------------------------------------------------------------------
+.SS Name Sub-Menu
+.BR D :Define
+Name
+.BR E :Erase
+Name
+.BR S :Show
+Names
+.LP
+This menu is invoked from the Edit menu.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP 
+.I Define Name
+Define a Name for a range of cells.  If no range is currently defined,
+then define a name for the current cell.
+.IP
+Names defined in this fashion are used by the program in future
+prompts, may be entered in response to prompts requesting a cell or
+range name, and are saved when the spreadsheet is saved.  Names
+defined must be more than two alpha characters long to differentiate
+them from a column names, and must not have embedded special
+characters.  Names may include the character ``_'' or numerals as long
+as they occur after the first three alpha characters.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Erase Name
+Erase the name assigned to a range of cells.  If no range is currently
+defined, then prompt for a cell name to erase.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Show Names
+List all Names that have been assigned to cells, or ranges of cells.
+Pipe the output to 'sort' and then to a pager.  Therefore the list of
+names is sorted, and it will not run off the top of your display.
+If the environment variable PAGER is set, its value is used as your
+pager, otherwise a (sytem dependent) default pager is used.
+\" ----------------------------------------------------------------------
+.SS Options Sub-Menu
+.BR X :Encrypt
+.BR A :Auto
+.BR C :Cell
+.BR E :Ext
+fn's
+.BR L :Label
+.BR R :Return
+.BR T :Top
+.BR Z :Limits
+.BR $ :Pre-Scale
+.LP
+This menu is invoked from the Misc Menu.
+.LP
+The items listed on this menu are all ``Toggle'' Options.  Choosing
+one of them will toggle that option to be on or off.  The options
+selected are saved when the data and formulas are saved so that you
+will have the same setup next time you enter the spreadsheet.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Encrypt
+Turn encryption of files on/off.
+.IP
+NOTE: Encryption may not be available at your sight.  See the ``-x''
+item under
+.B OPTIONS
+above for further details.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP 
+.I Auto
+Automatic Recalculation.  When set, each change in the spreadsheet
+causes the entire spreadsheet be recalculated.  Normally this is not
+noticeable, but for very large spreadsheets, it may be faster to clear
+automatic recalculation mode and update the spreadsheet via explicit
+requests to recalculate the spreadsheet.  (DEFAULT: automatic
+recalculation on)
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Cell
+Current cell highlighting.  If enabled, the current cell is highlighted
+(using the terminal's standout mode, if available) in addition to being
+marked by the cell cursor.  (DEFAULT: cell highlighting on)
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Ext Fn's
+External function execution.  When disabled, external functions (see
+.IR @ext ()
+below) are not called.  This saves a lot of time at each screen
+update.  If disabled, and external functions are used anywhere, a
+warning is printed each time the screen is updated, and the result of
+.IR @ext ()
+is the value from the previous call, if any, or a null string.
+(DEFAULT: external function execution disabled)
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Label
+Autolabeling.  If enabled, using the Define command (on the Name
+sub-menu) causes a label to be automatically generated in the cell to
+the left of the defined cell.  This is only done if the cell to the
+left is empty.  (DEFAULT: autolabeling enabled)
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Return
+Newline action.  This option toggles between three cases.  The default
+is no action.  If this option is used once, after each command which is
+terminated by a newline character is completed, the current cell will
+be moved down one row.  If this option is used again, after each
+command which is terminated by a newline character is completed, the
+current cell will be moved right one column.  Another use of this
+option will restore the default action.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Top
+Top line display.  If enabled, the name and value of the current cell
+is displayed on the top line.  If there is an associated label string,
+the first character of the string value is ``|'' for a centered
+string, ``<'' for a leftstring or ``>'' for a rightstring (see below),
+followed by "\fIstring\fP" for a constant string or
+.RI { expr }
+for a string expression.  A constant string may be preceded with a
+backslash (`\\').  In this case the constant string will be used as a
+``wheel'' to fill a column, e.g. "\\-" for a line in a column, and
+"\\Yeh\ " for "Yeh\ Yeh\ Ye".  If the cell has a numeric value, it
+follows as
+.RI [ value ],
+which may be a constant or expression.  (DEFAULT: top line display
+enabled)
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Limits
+Set newline action limits.  This option sets limits to the newline
+action option above.  When this option is invoked, the row and column
+of the current cell are remembered.  If a later newline action would
+take the current cell to the right of the remembered column, then the
+current cell is instead moved to the first column of the next row.  If
+a newline action would take the current cell below the remembered row,
+then the current cell is instead moved to the top row of the next
+column.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.I Pre-Scale
+Dollar prescale.  If enabled, all numeric constants (not expressions)
+which you enter are multiplied by 0.01 so you don't have to keep typing
+the decimal point if you enter lots of dollar figures.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.LP
+The ``newline action'' and ``set newline action limits'' options can
+be combined to allow very quick entry of large amounts of data.  If
+all the data to be entered is in a single row or column then setting
+the appropriate newline action will allow the numbers to be entered
+without any explicit commands to position the current cell.
+.LP
+If the data entry involves several entries in each row for many rows,
+then setting the quick numeric entry option, setting the newline
+action to move right after each entry and setting the newline action
+limits on the last column on which data should be entered will allow
+the data to entered quickly.  If necessary, columns which do not need
+data to be entered can be hidden.  Similar arrangements can be made
+for entering several rows of data in each column.
+.RE
+.\"
+.\" **********************************************************************
+.SH COMMANDS
+.\" ***********
+.LP 
+A number of commands are accessible directly from the keyboard, via
+Control-keys, or Function-keys.  These are primarily cursor movement
+commands (ie: up-arrow key, etc), but there are also a small number of
+control-keys which access other functions.
+.LP
+.I NOTE:
+In the following 
+.RB `` ^ ''
+indicates the use of the Control key.  Hence,
+.B ^A
+means ``Hold down the Control key, while typing the `A' key''.  Also,
+.B < >
+are used to identify ``named'' keys.  So, 
+.B <Delete>
+stands for the Delete Key.
+.LP
+There are also a few commands that are invoked by two keystrokes in
+succession.  For example, `` ^X v '' means ``Type Control-X, then v''
+(Case is unimportant, V or v is fine).  Also, ``<Esc> v'' means ``Type
+<Esc>, then v''.
+In some cases, there exists more than one command sequence for the
+same thing.  (Like ^B and <Left Arrow>).  Both commands are then
+listed together, separated by a comma.
+.\" ----------------------------------------------------------------------
+.SS Cursor Movement
+These key sequences all move the cell cursor.  When possible, I strove
+to use the same control-key sequences as the emacs text editor \- no
+point in reinventing the wheel!
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.LP
+Moving Short Distances:
+.\" - - - - - - - - - -
+.RS .15in
+.TP 2in         .\" the 2in indent stays in effect until the next .RE
+.B ^B, <Left Arrow>
+Move left one cell.
+.TP
+.B ^F, <Right Arrow>
+Move right one cell.
+.TP
+.B ^P, <Up Arrow>
+Move up one cell.
+.TP
+.B ^N, <Down Arrow>
+Move down one cell.
+.\"
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.LP
+Moving Longer Distances:
+.\" - - - - - - - - - -
+.RS .15in
+.TP 1in
+.B <Esc> <, <Home>
+Jump to cell A0.
+.TP
+.B <Esc> >, <End>
+Jump to the last row of the current column.
+.TP
+.B ^T
+Jump to row 0 of the current column.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.B ^A
+Jump to the first cell in the current row (Column A).
+.TP
+.B ^E
+Jump to the last valid cell in the current row.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.B <Esc> v, <PgUp>
+Jump a (half) page up.
+.TP 
+.B ^V, <PgDn>
+Jump a (half) page down.
+.TP
+.B ^X <, <Shift><Left Arrow>
+Jump a (half) page left.
+.TP
+.B ^X >, <Shift><Right Arrow>
+Jump a (half) page right.
+.RE
+.\"
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.LP
+Special Movement:
+.\" - - - - - - - - - -
+.RS .15in
+.TP 1in
+.B <Esc> b
+Move the cursor backward to the previous valid cell.
+.TP
+.B <Esc> f
+Move the cell cursor forward to the next valid cell.
+These two commands do not ``wrap around'' when the end of the
+spreadsheet is encountered.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.B ^J
+Jump the cursor to the end of a (user-specified) range.  The user is
+prompted for a direction (Any of the Up,Down,Left,Right commands
+above), and the cell cursor is then jumped to the last valid cell in
+that direction.
+.IP
+The user can enter a <Space> or <Return> to abort this procedure.
+.RE
+.\" ----------------------------------------------------------------------
+.SS Menu Short-Cuts
+These commands all duplicate functions that are also available through
+menu's.  They exist here because I felt that they would be used often
+enough to warrant a quicker access to their functionality.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.LP
+Cell Menu Short-Cuts:
+.\" - - - - - - - - - -
+.RS .15in
+.TP
+.B ^G
+Goto a Cell.  See ``Goto'' on the Cell Menu.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.B ^W
+Mark a Cell for later copying.  See ``Mark''.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.B ^Y 
+Copy a previously marked cell to the current cell.  See ``Copy''.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.B ^X V
+Edit the Value of the Current Cell.  See  ``edit Value''.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.B ^X L
+Edit the Label of the Current Cell.  See  ``edit Label''.
+.RE
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.LP
+Edit Menu Short-Cuts:
+.\" - - - - - - - - - -
+.RS .15in
+.TP
+.B <Del>, <BackSpace>, ^D
+Erase the contents (Label and Value) of the current cell.  This is
+similar to choosing the ``Erase'' item on the Edit Menu with no range
+defined, and therefore the ``Yank'' and ``Merge'' commands on the Row
+& Column menus with undo this deletion.  See the relevant sections of
+this man page for more details.
+.RE
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.LP
+Misc Menu Short-Cuts:
+.\" - - - - - - - - - -
+.RS .15in
+.TP
+.B ^L
+Redraw the screen.  (This isn't a menu shortcut, but it does belong
+with the next two commands).
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.B ^R
+Redraw the Screen and Highlight all Values.  See ``Show Values''
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP
+.B ^K
+Redraw the Screen and Highlight all Expressions.  See ``Show Expr''
+.RE
+.\" ----------------------------------------------------------------------
+.SS Other Commands
+These commands do not fit into either of the the two previous
+categories, so they are dumped here into that wonderful category known
+as ``Miscellaneous''.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP 1in
+.B <Tab>
+Toggle Range display/definition mode.  See the section below on 
+.B RANGES
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP 1in
+.B <Return>
+(or ^M)  The cell-cursor is moved in one of a number of directions.
+See ``/ Misc - Options - Return''.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.TP 1in
+.B ^Z
+Stop.  On systems where this is possible, the program is stopped, and 
+control is given to the shell.
+.\"
+.\" **********************************************************************
+.SH ENTERING DATA (Emacs Command/Entry Editing)
+.\" ***********
+.I pname
+frequently prompts the user to enter a line of data on the top line of
+the display.  When entering such data, a number of Emacs-compatible
+commands are supported for the editing of the data as it is entered.
+.LP
+There are two kinds of these data input modes.  In the general case,
+(Cursor Terminated), the user is simply entering a number, function, or
+label into the spreadsheet (See ``How Input Is Processed'' above).  In
+that general case, input is terminated with a <Return> or with an
+arrow key (or ^N, ^P, ^F, ^B).  When input is ended with an arrow key,
+the cell cursor is then moved in that direction.  (This sounds
+confusing, but really it isn't.)
+.LP
+In the other case, (<CR> Terminated), the user is either editing the
+contents of a cell (through one of the cell editing commands discussed
+above), or is entering input in response to a question from the program.
+(For example: Enter the name of a filename to load).  In this case,
+only a <CR> is accepted as terminating input.
+.\" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+.SS Input Editing Commands:
+.TP
+.B ^A
+Move the cursor to the beginning of the line
+.TP
+.B ^B, <Left Arrow>
+Move the cursor left.  This command obviously does not apply to the
+``Cursor Terminated'' mode.
+.TP
+.B ^G
+Abort input.  If you are editing a cell, this command will abort the
+operation and leave the cells contents unchanged.
+.TP
+.B ^D
+Delete the character ``under'' cursor.
+.TP
+.B ^E
+Move to the end of the line.
+.TP
+.B ^F, <Right Arrow>
+Move the cursor right.  This command obviously does not apply to the
+``Cursor Terminated'' mode.
+.TP
+.B ^H, <Del>
+Delete the character to the left of cursor.
+.TP
+.B ^K
+Kill from the cursor to the end of the line.
+.TP
+.B ^L
+Redraw the line.
+.TP
+.B ^M, <Return>
+Terminate input.
+.TP
+.B ^O
+Toggle Overwrite (versus insert) mode.  In Overwrite, text to the
+right of the cursor is overwritten instead of ``pushed'' right.
+.TP
+.B ^T
+Transpose the character to the left of the cursor, with the character
+``under'' the cursor.
+.TP
+.B ^Y
+At the current cursor location, Yank back text killed with ^K.
+.\"
+.\" **********************************************************************
+.SH FORMATTING CELL CONTENTS
+.\" ***********
+.LP
+The following characters can be used in building a format string:
+.RS
+.TP
+.BR #
+Digit placeholder.  If the number has fewer digits on either side of
+the decimal point than there are `#' characters in the format, the
+extra `#' characters are ignored.  The number is rounded to the number
+of digit placeholders as there are to the right of the decimal point.
+If there are more digits in the number than there are digit
+placeholders on the left side of the decimal point, then those digits
+are displayed.
+.\" ----------------------------------------------------------------------
+.TP
+.BR 0
+Digit placeholder.  Same as for `#' except that the number is padded
+with zeroes on either side of the decimal point.  The number of zeroes
+used in padding is determined by the number of digit placeholders
+after the `0' for digits on the left side of the decimal point and by
+the number of digit placeholders before the `0' for digits on the
+right side of the decimal point.
+.\" ----------------------------------------------------------------------
+.TP
+.BR .
+Decimal point.  Determines how many digits are placed on the right and
+left sides of the decimal point in the number.  Note that numbers
+smaller than 1 will begin with a decimal point if the left side of the
+decimal point contains only a `#' digit placeholder.  Use a `0'
+placeholder to get a leading zero in decimal formats.
+.\" ----------------------------------------------------------------------
+.TP
+.BR %
+Percentage.  For each `%' character in the format, the actual number
+gets multiplied by 100 (only for purposes of formatting \- the
+original number is left unmodified) and the `%' character is placed in
+the same position as it is in the format.
+.\" ----------------------------------------------------------------------
+.TP
+.BR ,
+Thousands separator (comma).  The presence of a `,' in the format
+(multiple commas are treated as one) will cause the number to be
+formatted with a `,' separating each set of three digits in the
+integer part of the number with numbering beginning from the right end
+of the integer.
+.\" ----------------------------------------------------------------------
+.TP
+.BR \e
+Quote.  This character causes the next character to be inserted into
+the formatted string directly with no special interpretation.
+.\" ----------------------------------------------------------------------
+.TP
+.BR E-\ E+\ e-\ e+
+Scientific format.  Causes the number to formatted in scientific
+notation.  The case of the `E' or `e' given is preserved.  If the
+format uses a `+', then the sign is always given for the exponent
+value.  If the format uses a `-', then the sign is only given when the
+exponent value is negative.  Note that if there is no digit
+placeholder following the `+' or `-', then that part of the formatted
+number is left out.  In general, there should be one or more digit
+placeholders after the `+' or `-'.
+.\" ----------------------------------------------------------------------
+.TP
+.BR ;
+Format selector.  Use this character to separate the format into two
+distinct formats.  The format to the left of the `;' character will be
+used if the number given is zero or positive.  The format to the right
+of the `;' character is used if the number given is negative.
+.\" ----------------------------------------------------------------------
+.RE
+.IP
+Some example formats:
+.TS
+center;
+l   l.
+Integer	``0'' or ``#''
+Fixed	``0.00''
+Percentage	``0%'' or ``0.00%''
+Scientific	``0.00E+00''
+Currency 	``$#,0.00;($#,0.00)''
+.TE
+.\"
+.\" **********************************************************************
+.SH WORKING WITH RANGES
+.\" ***********
+.LP
+A Range is defined as being some rectangular block of cells.  A range
+is identified by the cells in the top right and bottom left corners of
+the block.  For example, the range C3:F5 refers to the rectangular
+block of cells:
+.TS
+center;
+l   l	l   l.
+C3  D3	E3  F3
+C4  D4	E4  F4
+C5  D5	E5  F5
+.TE
+.LP
+A number of commands operate upon ranges.  Most of those commands will
+also function without a range, in that case there is some default
+effect.  For example, the ``/-File-Save'' command will save the entire
+spreadsheet by default.  If a range of cells is defined, then that
+command will instead just save the defined range of cells.
+In contrast, the ``/-Edit-Erase'' command will by default just
+erase the cell at the current cursor location.  If a range is defined,
+it will erase the entire range of cells.
+.LP
+.I PNAME
+follows the ``Select then execute'' philosophy, much like
+mouse-oriented systems do.  For example, instead of choosing the erase
+command, and then entering a range of cells to be erase, you first
+select a range of cells, and then choose the erase command.
+.LP
+To start defining a range, use the <Tab> key.  Then, use any of the
+cursor motion keys (arrow keys, PdDn, etc) to move your cursor.  All
+cells making up the rectangular region between the current cell, and
+the cell where you first typed the <Tab> key, will be highlighted,
+indicating the range of cells you are defining.
+.LP
+Once you have highlighted the desired range, simply use the menu
+commands, like always, to choose an operation to perform upon the
+range you have defined.  See the section above on MENUS to find out
+which commands also apply to ranges.
+.LP
+If, for some reason, you decide that you don't want to do anything
+with the range you have defined, you can type the <Tab> key a second
+time to discontinue defining a range.  The highlighted section will
+then be returned to normal video, and you will no longer have a range defined.
+.LP
+.\"
+.\" **********************************************************************
+.\" **********************************************************************
+.\" SO FAR UPDATED (updated carefully, that is)
+.\" **********************************************************************
+.\" **********************************************************************
+.\"
+.\" **********************************************************************
+.SH WORKING WITH PNAME
+.\" ***********
+.\" ----------------------------------------------------------------------
+\0 \" exactly one blank line (hard to get)
+.SS Spreadsheet Update
+.\" ----------------------------------------------------------------------
+Reevaluation of spreadsheet expressions is done by row or by column
+depending on the selected calculation order.  Evaluation is repeated up
+to
+.I iterations
+times for each update if necessary, so forward references usually work
+as expected.  See ``Settings'' under the Misc Menu above.  If
+stability is not reached after ten iterations, a warning is printed.
+This is usually due to a long series of forward references, or to
+unstable cyclic references (for example, set
+.IR A0 's
+expression to ``A0+1'').
+.\" ----------------------------------------------------------------------
+.SS About Cells
+.\" ----------------------------------------------------------------------
+Cells can contain both a numeric value and a string value.  Either
+value can be the result of an expression, but not both at once, i.e.
+each cell can have only one expression associated with it.  Entering a
+valid numeric expression alters the cell's previous numeric value, if
+any, and replaces the cell's previous string expression, if any,
+leaving only the previously computed constant label string.  Likewise,
+entering a valid string expression alters the cell's the previous
+label string, if any, and replaces the cell's previous numeric
+expression, if any, leaving only the previously computed constant
+numeric value.
+.\" ----------------------------------------------------------------------
+.SS Variable Names
+.\" ----------------------------------------------------------------------
+Normally, a variable name is just the name of a cell, such as
+.IR K20 .
+The value is the numeric or string value of the cell, according to
+context.
+.\" ----------
+.PP
+When a cell's expression (formula) is copied to another location via
+.I copy
+or
+.IR range-copy ,
+variable references are by default offset by the amount the formula
+moved.  This allows the new formula to work on new data.  If cell
+references are not to change, you can either use the
+.I fixed
+operator (see below),
+or one of the following variations on the cell name.
+.\" ----------
+.TP
+.I K20
+References cell
+.IR K20 ;
+the reference changes when the formula is copied.
+.\" ----------
+.TP
+.BI $ K $ 20
+Always refers to cell
+.IR K20 ;
+the reference stays fixed when the formula is copied.
+.\" ----------
+.TP
+.BI $ K20
+Keeps the column fixed at column K;
+the row is free to vary.
+.\" ----------
+.TP
+.IB K $ 20
+Similarly, this fixes the row and allows the column to vary.
+.\" ----------
+.PP
+These conventions also hold on defined ranges.  Range references vary
+when formulas containing them are copied.  If the range is defined with
+fixed variable references, the references do not change.
+.\" ----------
+.TP
+.B fixed
+To make a variable not change automatically when a cell moves, put the
+word
+.I fixed
+in front of the reference, for example:  B1 \(** fixed C3.
+.\" ----------------------------------------------------------------------
+.SS Numeric Expressions
+.\" ----------------------------------------------------------------------
+Numeric expressions used with the ``='' and
+.I e
+commands have a fairly conventional syntax.  Terms may be constants,
+variable names, parenthesized expressions, and negated terms.  Ranges
+may be operated upon with range functions such as sum
+.RI ( @sum ())
+and average
+.RI ( @avg ()).
+Terms may be combined using binary operators.
+.\" ----------
+.TP
+.BR \- e
+Negation.
+.\" ----------
+.TP
+.RB e + e
+Addition.
+.\" ----------
+.TP
+.RB e \- e
+Subtraction.
+.\" ----------
+.TP
+.RB e \(** e
+Multiplication.
+.\" ----------
+.TP
+.RB e / e
+Division.
+.\" ----------
+.TP
+.RB e1 % e2
+e1 mod e2.
+.\" ----------
+.TP
+.RB e ^ e
+Exponentiation.
+.\" ----------
+.TP
+.RB e < e
+.PD 0
+.TP
+.RB e <= e
+.TP
+.RB e = e
+.TP
+.RB e != e
+.TP
+.RB e >= e
+.TP
+.RB e > e
+Relationals:  true (1) if and only if the indicated relation holds,
+else false (0).  Note that ``<='', ``!='', and ``>='' are converted to
+their ``~()'' equivalents.
+.PD
+.\" ----------
+.TP
+.BR ~ e
+Boolean operator
+.SM NOT.
+.\" ----------
+.TP
+.RB e & e
+Boolean operator
+.SM AND.
+.\" ----------
+.TP
+.RB e | e
+Boolean operator
+.SM OR.
+.\" ----------
+.TP
+.RB @if (e, e, e)
+.PD 0
+.TP
+.RB e ? e : e
+Conditional:  If the first expression is true then the value of the
+second is returned, otherwise the value of the third.
+.\" ----------
+.PP
+Operator precedence from highest to lowest is:
+.PP
+.nf
+.RS
+\-, ~ ^ \(**, / +, \- <, <=, =, !=, >=, > & | ?:
+.RE
+.fi
+.\" ----------------------------------------------------------------------
+.SS String Expressions
+.\" ----------------------------------------------------------------------
+String expressions are made up of constant strings (characters
+surrounded by double quotation marks), variables (cell names, which
+refer to the cells's label strings or expressions), and string
+functions.  Note that string expressions are only allowed when
+entering a cell's label string, not its numeric part.  Also note that
+string expression results may be left or right flushed or centered,
+according to the type of the cell's string label.
+.TP
+.B #
+Concatenate strings.  For example, the string expression
+.IP ""
+	A0 # "zy dog"
+.IP ""
+displays the string ``the lazy dog'' in the cell if the value of
+.IR A0 's
+string is ``the la''.
+.\"
+.\" **********************************************************************
+.SH FUNCTIONS
+.\" ***********
+.\" ----------------------------------------------------------------------
+\0 \" exactly one blank line (hard to get)
+.SS Cell Functions
+.\" ----------------------------------------------------------------------
+.B "@myrow, @mycol"
+Are functions that return the row or column of the current cell respectively.
+ex: The cell directly above a cell in the D column could then be accessed
+by @nval("d",@myrow-1).
+NOTE: @myrow and @mycol can't be used in specifying ranges.
+.\" ----------------------------------------------------------------------
+\0 \" exactly one blank line (hard to get)
+.SS Range Functions
+.\" ----------------------------------------------------------------------
+These functions return numeric values.
+.TP 18
+.BR @sum (r)
+Sum all valid (non-blank) entries in the region whose two corners are
+defined by the two variable names (e.g.
+.IR c5:e14 )
+or the range name specified.
+.\" ----------
+.TP 18
+.BR @prod (r)
+Multiply together all valid (non-blank) entries in the specified
+region.
+.\" ----------
+.TP 18
+.BR @avg (r)
+Average all valid (non-blank) entries in the specified region.
+.\" ----------
+.TP 18
+.BR @count (r)
+Count all valid (non-blank) entries in the specified region.
+.\" ----------
+.TP 18
+.BR @max (r)
+Return the maximum value in the specified region.  See also the multi
+argument version of
+.I @max
+below.
+.\" ----------
+.TP 18
+.BR @min (r)
+Return the minimum value in the specified region.  See also the multi
+argument version of
+.I @min
+below.
+.\" ----------
+.TP 18
+.BR @stddev (r)
+Return the sample standard deviation of the cells in the specified
+region.
+.\" ----------
+.TP 18
+.BR @lookup (e,r)
+.PD 0
+.TP 18
+.BR @lookup (se,r)
+.PD
+Evaluates the expression then searches through the range
+.I r
+for a matching value.  The range should be either a single row or a
+single column.  The expression can be either a string expression or a
+numeric expression.  If it is a numeric expression, the range is
+searched for the the last value less than or equal to
+.IR e .
+If the expression is a string expression, the string portions of the
+cells in the range are searched for an exact string match.  The value
+returned is the numeric value from the next row and the same column as
+the match, if the range was a single row, or the value from the next
+column and the same row as the match if the range was a single column.
+.\" ----------
+.TP 18
+.BR @hlookup (e,r,n)
+.PD 0
+.TP 18
+.BR @hlookup (se,r,n)
+.PD
+Evaluates the expression then searches through the first row in the
+range
+.I r
+for a matching value.  The expression can be either a string expression
+or a numeric expression.  If it is a numeric expression, the row is
+searched for the the last value less than or equal to
+.IR e .
+If the expression is a string expression, the string portions of the
+cells in the row are searched for an exact string match.  The value
+returned is the numeric value from the same column
+.I n
+rows below the match.
+.\" ----------
+.TP 18
+.BR @vlookup (e,r,n)
+.PD 0
+.TP 18
+.BR @vlookup (se,r,n)
+.PD
+Evaluates the expression then searches through the first column in the
+range
+.I r
+for a matching value.  The expression can be either a string expression
+or a numeric expression.  If it is a numeric expression, the column is
+searched for the the last value less than or equal to
+.IR e .
+If the expression is a string expression, the string portions of the
+cells in the column are searched for an exact string match.  The value
+returned is the numeric value from the same row
+.I n
+columns to the right of the match.
+.\" ----------
+.TP 18
+.BR @index (e,r)
+Use the value of the expression
+.I e
+to index into the range
+.IR r .
+The numeric value at that position is returned.  The value 1 selects
+the first item in the range, 2 selects the second item, etc.
+.I R
+should be either a single row or a single column.
+.\" ----------
+.TP 18
+.BR @stindex (e,r)
+Use the value of
+.I e
+to index into the range
+.IR r .
+The string value at that position is returned.  The value 1 selects the
+first item in the range, 2 selects the second item, etc.  The range
+should be either a single row or a single column.
+.\" ----------------------------------------------------------------------
+\0 \" exactly one blank line (hard to get)
+.SS Numeric Functions
+.\" ----------------------------------------------------------------------
+All of these functions operate on floating point numbers (doubles) and
+return numeric values.  Most of them are standard system functions more
+fully described in
+.IR math (3).
+The trig functions operate with angles in radians.
+.\" ----------
+.TP 18
+.BR @sqrt (e)
+Return the square root of
+.IR e .
+.\" ----------
+.TP 18
+.BR @exp (e)
+Return the exponential function of
+.IR e .
+.\" ----------
+.TP 18
+.BR @ln (e)
+Return the natural logarithm of
+.IR e .
+.\" ----------
+.TP 18
+.BR @log (e)
+Return the base 10 logarithm of
+.IR e .
+.\" ----------
+.TP 18
+.BR @floor (e)
+Return the largest integer not greater than
+.IR e .
+.\" ----------
+.TP 18
+.BR @ceil (e)
+Return the smallest integer not less than
+.IR e .
+.\" ----------
+.TP 18
+.BR @rnd (e)
+Round
+.I e
+to the nearest integer.  default: round-to-even (banker's round), *.5
+will round to the closest even number; 'set rndinfinity' will round *.5
+up to the next integer.
+.TP 18
+.BR @round (e,n)
+Round
+.I e
+to
+.I n
+decimal places.  n may be positive to round off the right side of the
+decimal, and negative to round off the left side. See @rnd(e) above for
+rounding types.
+.\" ----------
+.TP 18
+.BR @abs (e)
+.PD 0
+.TP 18
+.BR @fabs (e)
+Return the absolute value of
+.IR e .
+.\" ----------
+.TP 18
+.BR @pow (e1,e2)
+Return
+.I e1
+raised to the power of
+.IR e2 .
+.\" ----------
+.TP 18
+.BR @hypot (e1,e2)
+Return sqrt(e1\(**e1+e2\(**e2), taking precautions against unwarranted
+overflows.
+.\" ----------
+.TP 18
+.B pi\ \ @pi
+A constant quite close to pi.
+.\" ----------
+.TP 18
+.BR @dtr (e)
+Convert
+.I e
+in degrees to radians.
+.\" ----------
+.TP 18
+.BR @rtd (e)
+Convert
+.I e
+in radians to degrees.
+.\" ----------
+.TP 18
+.BR @sin (e)
+.PD 0
+.TP 18
+.BR @cos (e)
+.TP 18
+.BR @tan (e)
+Return trigonometric functions of radian arguments.  The magnitude of
+the arguments are not checked to assure meaningful results.
+.PD
+.\" ----------
+.TP 18
+.BR @asin (e)
+Return the arc sine of
+.I e
+in the range -pi/2 to pi/2.
+.\" ----------
+.TP 18
+.BR @acos (e)
+Return the arc cosine of
+.I e
+in the range 0 to pi.
+.\" ----------
+.TP 18
+.BR @atan (e)
+Return the arc tangent of
+.I e
+in the range -pi/2 to pi/2.
+.\" ----------
+.TP 18
+.BR @atan2 (e1,e2)
+Returns the arc tangent of
+.IR e1 / e2
+in the range -pi to pi.
+.\" ----------
+.TP 18
+.BR @max (e1,e2,...)
+Return the maximum of the values of the expressions.  Two or more
+expressions may be specified.  See also the range version of
+.I @max
+above.
+.\" ----------
+.TP 18
+.BR @min (e1,e2,...)
+Return the minimum of the values of the expressions.  Two or more
+expressions may be specified.  See also the range version of
+.I @min
+above.
+.\" ----------
+.TP 18
+.BR @ston (se)
+Convert string expression
+.I se
+to a numeric value.
+.\" ----------
+.TP 18
+.BR @eqs (se1,se2)
+Return 1 if string expression
+.I se1
+has the same value as string expression
+.IR se2 ,
+0 otherwise.
+.\" ----------
+.TP 18
+.BR @nval (se,e)
+Return the numeric value of a cell selected by name.  String expression
+.I se
+must evaluate to a column name (``A''-``AE'') and
+.I e
+must evaluate to a row number (0-199).  If
+.I se
+or
+.I e
+is out of bounds, or the cell has no numeric value, the result is 0.
+You can use this for simple table lookups.  Be sure the table doesn't
+move unexpectedly!  See also
+.IR @sval ()
+below.
+.\" ----------------------------------------------------------------------
+\0 \" exactly one blank line (hard to get)
+.SS String Functions
+.\" ----------------------------------------------------------------------
+.PD 0
+.TP 18
+.BR @substr (se,e1,e2)
+Extract and return from string expression
+.I se
+the substring indexed by character number
+.I e1
+through character number
+.I e2
+(defaults to the size of
+.I se
+if beyond the end of it).
+If
+.I e1
+is less than 1 or greater than
+.IR e2 ,
+the result is the null string.
+For example,
+.PD
+.IP ""
+	@substr ("Nice jacket", 4, 7)
+.IP ""
+returns the string ``e jac''.
+.\" ----------
+.TP 18
+.BR @fmt (se,e)
+Convert a number to a string.
+The argument
+.I se
+must be a valid
+.IR printf (3)
+format string.
+.I e
+is converted according to the standard rules.
+For example, the expression
+.IP ""
+	@fmt ("\(**\(**%6.3f\(**\(**", 10.5)
+.IP ""
+yields the string ``\(**\(**10.500\(**\(**''.
+.I e
+is a double, so applicable formats are e, E, f, g, and G.
+Try ``%g'' as a starting point.
+.\" ----------
+.TP 18
+.BR @sval (se,e)
+Return the string value of a cell selected by name.
+String expression
+.I se
+must evaluate to a column name (``A''-``AE'') and
+.I e
+must evaluate to a row number (0-199). 
+If
+.I se
+or
+.I e
+is out of bounds, or the cell has no string value,
+the result is the null string.
+You can use this for simple table lookups.
+Be sure the table doesn't move unexpectedly!
+.\" ----------
+.TP 18
+.BR @upper (e)
+and
+.BR @lower (e)
+will case the string expression to upper or lower.
+.\" ----------
+.TP 18
+.BR @capital (e)
+will convert the first letter of words in a string
+into upper case and other letters to lower case
+(the latter if all letters of the string are upper case).
+.\" ----------
+.TP 18
+.BR @upper (e)
+and
+.BR @lower (e)
+will case the string expression to upper or lower.
+.\" ----------
+.TP 18
+.BR @capital (e)
+will convert the first letter of words in a string
+into upper case.
+.\" ----------
+.TP 18
+.BR @ext (se,e)
+Call an external function (program or script).
+The purpose is to allow arbitrary functions on values,
+e.g. table lookups and interpolations.
+String expression
+.I se
+is a command or command line to call with
+.IR popen (3).
+The value of
+.I e
+is converted to a string and appended to the command line as an argument.
+The result of
+.IR @ext ()
+is a string:
+the first line printed to standard output by the command.
+The command should emit exactly one output line.
+Additional output, or output to standard error, messes up the screen.
+.IR @ext ()
+returns a null string and prints an appropriate warning
+if external functions are disabled,
+.I se
+is null, or the attempt to run the command fails.
+.IP ""
+External functions can be slow to run,
+and if enabled are called at each screen update,
+so they are disabled by default.
+You can enable them with
+.I ^T
+when you really want them called.
+.IP ""
+A simple example:
+.IP ""
+	@ext ("echo", a1)
+.IP ""
+You can use
+.IR @ston ()
+to convert the
+.IR @ext ()
+result back to a number.
+For example:
+.IP ""
+	@ston (@ext ("form.sc.ext", a9 + b9))
+.IP ""
+Note that you can built a command line (including more argument values)
+from a string expression with concatenation.
+You can also "hide" the second argument by ending the command line
+(first argument) with `` #'' (shell comment).
+.\" ----------
+.TP 18
+.BR @coltoa (e)
+Returns a string name for a column from the numeric argument.
+For example:
+.IP ""
+	@coltoa(@mycol-1)
+	@nval(coltoa(@mycol-1), @myrow+1)
+.IP ""
+.\" ----------------------------------------------------------------------
+\0 \" exactly one blank line (hard to get)
+.SS Financial Functions
+.\" ----------------------------------------------------------------------
+Financial functions compute the mortgage (or loan) payment, future value,
+and the present value functions.  Each accepts
+three arguments, an amount, a rate of interest (per period), and 
+the number of periods.
+These functions are the same as those commonly found in other spreadsheets
+and financial calculators
+.\" ----------
+.TP 18
+.BR @pmt (e1,e2,e3)
+.IR @pmt (60000,.01,360)
+computes the monthly payments for a $60000 mortgage at 12% annual interest
+(.01 per month) for 30 years (360 months).
+.\" ----------
+.TP 18
+.BR @fv (e1,e2,e3)
+.IR @fv (100,.005,36)
+computes the future value for of 36 monthly payments of $100 at 6% 
+interest (.005 per month).  It answers the question: "How much
+will I have in 36 months if I deposit $100 per month in a savings
+account paying 6% interest compounded monthly?"
+.\" ----------
+.TP 18
+.BR @pv (e1,e2,e3)
+.IR @pv (1000,.015,36)
+computes the present value of an a ordinary annuity of
+36 monthly payments of $1000 at 18% annual interest.
+It answers the question: "How much can I borrow at 18% for 30 years
+if I pay $1000 per month?"
+.\" ----------------------------------------------------------------------
+\0 \" exactly one blank line (hard to get)
+.SS Date and Time Functions
+.\" ----------------------------------------------------------------------
+Time for
+.I pname
+follows the system standard:
+the number of seconds since 1970.
+All date and time functions except
+.IR @date ()
+return numbers, not strings.
+.\" ----------
+.TP 18
+.B @now
+Return the current time encoded
+as the number of seconds since the beginning of the
+epoch (December 31, 1969, midnight, GMT.)
+.\" ----------
+.TP 18
+.BR @dts (e1,e2,e3)
+.IR @dts (9,14,1988)
+converts the date September 14, 1988
+to the number of seconds from the epoch
+to the first second of 9/14/88, local time.
+For example,
+.IR @date ( @dts (12,14,1976))
+yields
+.IP ""
+.I "	Tue Dec 14 00:00:00 1976"
+.IP ""
+The month should be range from  1 to 12, the day should range from
+1 to the number of days in the specified month, and the year should
+range from 1970 to 1999.
+.\" ----------
+.TP 18
+.BR @tts (e1,e2,e3)
+.IR @tts (8,20,45)
+converts the time 8:40:45 to the number of seconds since
+midnight, the night before.  The hour should range from 0 to 23;
+the minutes and seconds should range from 0 to 59.
+.\" ----------
+.PP
+The following functions take the time in seconds
+(e.g. from
+.IR @now )
+as an argument and return the specified value.
+The functions all convert from GMT to local time.
+.\" ----------
+.TP 18
+.BR @date (e)
+Convert the time in seconds to a date string
+24 characters long in the following form:
+.IP ""
+.I "	Sun Sep 16 01:03:52 1973"
+.IP ""
+Note that you can extract parts of this fixed-format string with
+.IR @substr ().
+.\" ----------
+.TP 18
+.BR @year (e)
+Return the year.  Valid years begin with 1970.  The last legal year is
+system dependent.
+.\" ----------
+.TP 18
+.BR @month (e)
+Return the month, encoded as 1 (January) to 12 (December).
+.\" ----------
+.TP 18
+.BR @day (e)
+Return the day of the month, encoded as 1 to 31.
+.\" ----------
+.TP 18
+.BR @hour (e)
+Return the number of hours since midnight, encoded as 0 to 23.
+.\" ----------
+.TP 18
+.BR @minute (e)
+Return the number of minutes since the last full hour, encoded as 0 to
+59.
+.\" ----------
+.TP 18
+.BR @second (e)
+Return the number of seconds since the last full minute, encoded as 0
+to 59.
+.\"
+.\" **********************************************************************
+.\".SH FILES
+.\" ***********
+.\" .TP 4in
+.\" #LIBDIR#/tutorial.pname
+.\" tutorial spreadsheet
+.\"
+.\" **********************************************************************
+.SH SEE ALSO
+.\" ***********
+bc(1), dc(1), crypt(1), ppname(1), sc(1)
+.\"
+.\" **********************************************************************
+.SH BUGS
+.\" ***********
+Top-to-bottom, left-to-right evaluation of expressions is silly.
+A proper following of the dependency graph
+with (perhaps) recourse to relaxation should be implemented.
+.\" ----------------------------------------------------------------------
+.PP
+Only one previous value is saved from any call of
+.IR @ext ().
+If it is used more than once in a spreadsheet and external functions
+are enabled and later disabled, the last returned value pops up in
+several places.
+.\" ----------------------------------------------------------------------
+.PP
+On some systems, if the cell cursor is in column 0 with topline enabled
+(so the current cell is highlighted), or if any cell in column 0 is
+highlighted, the corresponding row number gets displayed and then
+blanked during a screen refresh.  This looks like a bug in
+.IR curses .
+.\" ----------------------------------------------------------------------
+.PP
+Many commands give no indication (a message or beep) if they have null effect.
+Some should give confirmation of their action, but they don't.
+.\"
+.\" **********************************************************************
+.SH AUTHORS
+.\" ***********
+This is a much modified version of a public domain spread sheet
+originally authored by James Gosling, and subsequently modified and
+posted to USENET by Mark Weiser under the name
+.IR vc .
+.PP
+The program was subsequently renamed
+.IR sc ,
+and further modified by numerous contributors, Jeff Buhrt
+of Proslink, Inc.  ({sequent, uunet}!sawmill!prslnk!buhrt)
+and Robert Bond of Sequent, prominent among them.
+.PP
+Other contributors include:
+Tom Anderson,
+Glenn T. Barry,
+Gregory Bond,
+Stephen (Steve) M. Brooks,
+Peter Brower,
+John Campbell,
+Lawrence Cipriani,
+Jim Clausing,
+Dave Close,
+Chris Cole,
+Jonathan Crompron,
+David I. Dalva,
+Glen Ditchfield,
+Sam Drake,
+James P. Dugal,
+Paul Eggert,
+Andy Fyfe,
+Jack Goral,
+Piercarlo "Peter" Grandi,
+Henk Hesselink,
+Jeffrey C Honig,
+Kurt Horton,
+Jonathan I. Kamens,
+Peter King,
+Tom Kloos,
+Casey Leedom,
+Jay Lepreau,
+Dave Lewis,
+Rick Linck,
+Soren Lundsgaard,
+Tad Mannes,
+Rob McMahon,
+Chris Metcalf,
+Mark Nagel,
+Ulf Noren,
+Marius Olafsson,
+Gene H. Olson,
+Henk P. Penning,
+Rick Perry,
+Larry Philps,
+Eric Putz,
+Jim Richardson,
+Michael Richardson,
+R. P. C. Rodgers,
+Kim Sanders,
+Mike Schwartz,
+Alan Silverstein,
+Lowell Skoog,
+Herr Soeryantono,
+Tim Theisen,
+Tom Tkacik,
+Andy Valencia,
+Adri Verhoef,
+Rick Walker,
+Petri Wessman,
+and
+Tim Wilson.
+.\" ----------------------------------------------------------------------
+.LP
+Finally, Art Mulder ( art@cs.ualberta.ca ) took
+.I sc
+version 6.19 and radically overhauled the user interface of it, to
+create
+.IR ss .
+.LP
+Apologies are freely offered to all 
+.I sc 
+adherents offended by what has been done to ``their'' program.
+.\"
+.\" **********************************************************************
+.SH COPYRIGHT
+.\" ***********
+Copyright (c) 1992 by Arthur E. Mulder.
+.LP
+All Rights Reserved
+.LP
+Permission to use, copy, modify, and distribute this software and its
+documentation for any purpose and without fee is hereby granted,
+provided that the above copyright notice appears in all copies and that
+both that copyright notice and this permission notice appear in
+supporting documentation, and that the names of any persons or
+organizations involved not be used in advertising or publicity
+pertaining to distribution of the software without specific, written
+prior permission.
+.LP
+ALL PERSONS AND ORGANIZATIONS INVOLVED IN THE CREATION OF THIS SOFTWARE
+DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING ALL
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL
+ANY OF THEM BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL
+DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
+ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+THIS SOFTWARE.
+.\" ---------- ---------- ---------- ---------- ---------- ----------
+.\" end of man page

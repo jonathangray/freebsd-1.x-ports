@@ -1,0 +1,337 @@
+#              vitaMake (remove this line)
+#  This file contains three files for constructing vitae or resumes:
+#  a Makefile, vita.tib and two version of vita.ttx (which should
+#  be modified to user's preferences).  With an editor, break them apart.
+#  BEGIN Makefile
+#  
+#  This make file constructs a vita (vita.dvi) from the input files
+#  vita.tex and PUBLIST.  The macro files vita.tib and vita.ttx
+#  must also exist.  All other files are created by make.
+#  
+#  The file vita.tex contains the body of the vita.  It should include
+#  a line '\input vita.pubs' where publications are to be listed.
+#
+#  A simple "make"  makes the vita (vita.dvi).  "make clean" removes
+#  garbage.  "make virgin" removes all but the bare necessities.
+#
+#  The comments lines below may be activated on a Sun.
+#  
+#  The author whose name is given in the SELF macro is not included in
+#  the publication references in the vita.
+#  
+#  Author: Doug Arnold
+
+PUBLIST = reference list to create vita, e.g. /path/vita.ref
+VITATEX = vita text, e.g. /path/vita.tex
+SELF = author to eliminate from vita listings, e.g. 'I. M. Author'
+SHELL = /bin/csh
+
+vita: vita.dvi
+	@echo "                 +----------------------+"
+	@echo "                 | Vita is in vita.dvi. |"
+	@echo "                 +----------------------+"
+
+clean:
+	-rm -f *% core *.log
+
+virgin: clean
+	-rm -f vita.dvi vita.pubs vita.ref publist.dvi publist.tex
+
+vita.dvi: $(VITATEX) vita.pubs
+#	@if (-f vita.dvi) chmod u+w vita.dvi;
+	@tex vita
+#	@chmod a-w vita.dvi
+	@-rm vita.log
+
+vita.pubs: vita.tib vita.ttx vita.ref
+#	@if (-f vita.pubs) chmod u+w vita.pubs;
+	@tiblist -s vita.tib -x vita.ref | sed '$$d' > vita.pubs
+#	@chmod a-w vita.pubs
+
+vita.ref: $(PUBLIST)
+#	@if (-f vita.ref) chmod u+w vita.ref;
+	@grep -v '^%A.*$(SELF)' $(PUBLIST) > vita.ref
+#	@chmod a-w vita.ref
+#####################################################
+#   vita.tib
+#
+I TMACLIB amsabb.ttz
+AA        abbreviate authors' first names
+EA        abbreviate editors' first names
+#
+\input vita.ttx
+######################################################
+%standard reference formatting vitae
+%numerical flag, title, coauthors, etc., volume (date) pages gov't no., other
+
+\global\overfullrule0pt  %turn off black boxes
+\Refstd\Citebrackets
+\def\Flagstyle#1{\hangindent\parindent\indent\hbox to0pt{\hss{\Flagfont#1}.\hskip.5em}}%flag style
+
+\def\journalarticleformat{\Reffont\let\uchyph=1\parindent=1.25pc\def\Comma{}%
+                \sfcode`\.=1000\sfcode`\?=1000\sfcode`\!=1000\sfcode`\:=1000\sfcode`\;=1000\sfcode`\,=1000%\frenchspacing
+                \par\vfil\penalty-200\vfilneg%\filbreak
+      \if\Ftest\present\Flagstyle\Fstr\fi%
+       \if\Ttest\present\Comma\bgroup``\Titlefont\Tstr\egroup\def\Comma{," }\fi%
+        \if\Atest\present\bgroup" (with \Authfont\Astr\/\egroup)\def\Comma{\unskip, }\fi%
+         \if\Jtest\present\Comma\bgroup\Tomefont\Jstr\/\egroup\def\Comma{, }\fi%
+          \if\Vtest\present\if\Jtest\present\hskip.16667em\else\Comma\fi\bgroup\Volfont\Vstr\egroup\def\Comma{, }\fi%
+           \if\Dtest\present\hskip.16667em(\bgroup\Dstr\egroup)\def\Comma{, }\fi%
+            \if\Ptest\present\bgroup, \Pstr\egroup\def\Comma{, }\fi%
+             \if\ttest\present\Comma\bgroup``\Titlefont\tstr\egroup\def\Comma{," }\fi%
+              \if\jtest\present\Comma\bgroup\Tomefont\jstr\/\egroup\def\Comma{, }\fi%
+               \if\vtest\present\if\jtest\present\hskip.16667em\else\Comma\fi\bgroup\Volfont\vstr\egroup\def\Comma{, }\fi%
+                \if\dtest\present\hskip.16667em(\bgroup\dstr\egroup)\def\Comma{, }\fi%
+                 \if\ptest\present\bgroup, \pstr\egroup\def\Comma{, }\fi%
+                  \if\Gtest\present{\Comma Gov't ordering no. }\bgroup\Gstr\egroup\def\Comma{, }\fi%
+                   \if\Otest\present{\Comma\bgroup\Ostr\egroup.}\else{.}\fi%
+                    \vskip3ptplus1ptminus1pt}%\smallskip
+
+\def\conferencereportformat{\Reffont\let\uchyph=1\parindent=1.25pc\def\Comma{}%
+                \sfcode`\.=1000\sfcode`\?=1000\sfcode`\!=1000\sfcode`\:=1000\sfcode`\;=1000\sfcode`\,=1000%\frenchspacing
+                \par\vfil\penalty-200\vfilneg%\filbreak
+      \if\Ftest\present\Flagstyle\Fstr\fi%
+       \if\Ttest\present\Comma\bgroup``\Titlefont\Tstr\egroup\def\Comma{," }\fi%
+        \if\Atest\present\bgroup" (with \Authfont\Astr\/\egroup)\def\Comma{\unskip, }\fi%
+         \if\Jtest\present\Comma\bgroup\Tomefont\Jstr\/\egroup\def\Comma{, }\fi%
+          \if\Ctest\present\Comma\bgroup\Cstr\egroup\def\Comma{, }\fi%
+           \if\Dtest\present\hskip.16667em(\bgroup\Dstr\egroup)\def\Comma{, }\fi%
+            \if\Otest\present{\Comma\bgroup\Ostr\egroup.}\else{.}\fi%
+             \vskip3ptplus1ptminus1pt}%\smallskip
+
+\def\bookarticleformat{\Reffont\let\uchyph=1\parindent=1.25pc\def\Comma{}%
+                \sfcode`\.=1000\sfcode`\?=1000\sfcode`\!=1000\sfcode`\:=1000\sfcode`\;=1000\sfcode`\,=1000%\frenchspacing
+                \par\vfil\penalty-200\vfilneg%\filbreak
+      \if\Ftest\present\Flagstyle\Fstr\fi%
+       \if\Ttest\present\Comma\bgroup``\Titlefont\Tstr\egroup\def\Comma{," }\fi%
+        \if\Atest\present\bgroup" (with \Authfont\Astr\/\egroup)\def\Comma{\unskip, }\fi%
+         \if\Btest\present\Comma in \bgroup\Tomefont\Bstr\/\egroup\def\Comma{\unskip, }\fi%
+          \if\otest\present\ \bgroup\ostr\egroup\def\Comma{, }\fi%
+           \if\Etest\present\Comma\bgroup\Estr\egroup\unskip, \ifnum\Ecnt>1eds.\else ed.\fi\def\Comma{, }\fi%
+            \if\Stest\present\Comma\bgroup\Sstr\egroup\def\Comma{, }\fi%
+             \if\Vtest\present\bgroup\hskip.16667em\#\Volfont\Vstr\egroup\def\Comma{, }\fi%
+              \if\Ntest\present\bgroup\hskip.16667em\#\Volfont\Nstr\egroup\def\Comma{, }\fi%
+               \if\Itest\present\Comma\bgroup\Istr\egroup\def\Comma{, }\fi%
+                \if\Ctest\present\Comma\bgroup\Cstr\egroup\def\Comma{, }\fi%
+                 \if\Dtest\present\Comma\bgroup\Dstr\egroup\def\Comma{, }\fi%
+                  \if\Ptest\present\Comma\Pstr\def\Comma{, }\fi%
+                   \if\ttest\present\Comma\bgroup``\Titlefont\Tstr\egroup\def\Comma{," }\fi%
+                    \if\btest\present\Comma in \bgroup\Tomefont\bstr\egroup\def\Comma{, }\fi%
+                      \if\atest\present\Comma\bgroup\astr\egroup\unskip, \if\acnt\present eds.\else ed.\fi\def\Comma{, }\fi%
+                       \if\stest\present\Comma\bgroup\sstr\egroup\def\Comma{, }\fi%
+                        \if\vtest\present\bgroup\hskip.16667em\#\Volfont\vstr\egroup\def\Comma{, }\fi%
+                         \if\ntest\present\bgroup\hskip.16667em\#\Volfont\nstr\egroup\def\Comma{, }\fi%
+                          \if\itest\present\Comma\bgroup\istr\egroup\def\Comma{, }\fi%
+                           \if\ctest\present\Comma\bgroup\cstr\egroup\def\Comma{, }\fi%
+                            \if\dtest\present\Comma\bgroup\dstr\egroup\def\Comma{, }\fi%
+                             \if\ptest\present\Comma\pstr\def\Comma{, }\fi%
+                              \if\Gtest\present{\Comma Gov't ordering no. }\bgroup\Gstr\egroup\def\Comma{, }\fi%
+                               \if\Otest\present{\Comma\bgroup\Ostr\egroup.}\else{.}\fi%
+                                \vskip3ptplus1ptminus1pt}%\smallskip
+
+\def\bookformat{\Reffont\let\uchyph=1\parindent=1.25pc\def\Comma{}%
+                \sfcode`\.=1000\sfcode`\?=1000\sfcode`\!=1000\sfcode`\:=1000\sfcode`\;=1000\sfcode`\,=1000%\frenchspacing
+                \par\vfil\penalty-200\vfilneg%\filbreak
+      \if\Ftest\present\Flagstyle\Fstr\fi%
+       \if\Ttest\present\Comma\bgroup\Tomefont\Tstr\/\egroup\def\Comma{\unskip, }%
+             \else\if\Btest\present\Comma\bgroup\Tomefont\Bstr\/\egroup\def\Comma{\unskip, }\fi\fi%
+         \if\otest\present\ \bgroup\ostr\egroup\def\Comma{, }\fi%
+          \if\Atest\present\bgroup\ (with \Authfont\Astr\/\egroup)\def\Comma{\unskip, }\fi%
+           \if\Etest\present\bgroup\Comma\Estr\egroup\unskip, \ifnum\Ecnt>1eds.\else ed.\fi\def\Comma{, }\fi%
+            \if\etest\present\hskip.16667em(\bgroup\estr\egroup)\def\Comma{\unskip, }\fi%
+             \if\Stest\present\Comma\bgroup\Sstr\egroup\def\Comma{, }\fi%
+              \if\Vtest\present\bgroup\hskip.16667em\#\Volfont\Vstr\egroup\def\Comma{, }\fi%
+               \if\Ntest\present\bgroup\hskip.16667em\#\Volfont\Nstr\egroup\def\Comma{, }\fi%
+                \if\Itest\present\Comma\bgroup\Istr\egroup\def\Comma{\unskip, }\fi%
+                 \if\Ctest\present\Comma\bgroup\Cstr\egroup\def\Comma{, }\fi%
+                  \if\Dtest\present\Comma\bgroup\Dstr\egroup\def\Comma{, }\fi%
+                   \if\ttest\present\Comma\bgroup\Tomefont\tstr\egroup\def\Comma{, }%
+                         \else\if\btest\present\Comma\bgroup\Tomefont\bstr\egroup\def\Comma{, }\fi\fi%
+                      \if\stest\present\Comma\bgroup\sstr\egroup\def\Comma{, }\fi%
+                       \if\vtest\present\bgroup\hskip.16667em\#\Volfont\vstr\egroup\def\Comma{, }\fi%
+                        \if\ntest\present\bgroup\hskip.16667em\#\Volfont\nstr\egroup\def\Comma{, }\fi%
+                         \if\itest\present\Comma\bgroup\istr\egroup\def\Comma{, }\fi%
+                          \if\ctest\present\Comma\bgroup\cstr\egroup\def\Comma{, }\fi%
+                           \if\dtest\present\Comma\bgroup\dstr\egroup\def\Comma{, }\fi%
+                            \if\Gtest\present{\Comma Gov't ordering no. }\bgroup\Gstr\egroup\def\Comma{, }\fi%
+                             \if\Otest\present{\Comma\bgroup\Ostr\egroup.}\else{.}\fi%
+                              \vskip3ptplus1ptminus1pt}%\smallskip
+
+\def\technicalreportformat{\Reffont\let\uchyph=1\parindent=1.25pc\def\Comma{}%
+                \sfcode`\.=1000\sfcode`\?=1000\sfcode`\!=1000\sfcode`\:=1000\sfcode`\;=1000\sfcode`\,=1000%\frenchspacing
+                \par\vfil\penalty-200\vfilneg%\filbreak
+      \if\Ftest\present\Flagstyle\Fstr\fi%
+       \if\Ttest\present\Comma\bgroup``\Titlefont\Tstr\egroup\def\Comma{," }\fi%
+        \if\Atest\present\bgroup" (with \Authfont\Astr\/\egroup)\def\Comma{\unskip, }\fi%
+         \if\Etest\present\bgroup\Estr\egroup\unskip, \ifnum\Ecnt>1eds.\else ed.\fi\def\Comma{, }\fi%
+          \if\Itest\present\Comma\bgroup\Istr\egroup\def\Comma{, }\fi%
+           \if\Rtest\present\Comma\bgroup\Rstr\egroup\def\Comma{, }\fi%
+            \if\Ctest\present\Comma\bgroup\Cstr\egroup\def\Comma{, }\fi%
+             \if\Dtest\present\Comma\bgroup\Dstr\egroup\def\Comma{, }\fi%
+              \if\ttest\present\Comma\bgroup``\Titlefont\tstr\egroup\def\Comma{," }\fi%
+               \if\itest\present\Comma\bgroup\istr\egroup\def\Comma{, }\fi%
+                \if\rtest\present\Comma\bgroup\rstr\egroup\def\Comma{, }\fi%
+                 \if\ctest\present\Comma\bgroup\cstr\egroup\def\Comma{, }\fi%
+                  \if\dtest\present\Comma\bgroup\dstr\egroup\def\Comma{, }\fi%
+                   \if\Gtest\present{\Comma Gov't ordering no. }\bgroup\Gstr\egroup\def\Comma{, }\fi%
+                    \if\Otest\present{\Comma\bgroup\Ostr\egroup.}\else{.}\fi%
+                     \vskip3ptplus1ptminus1pt}%\smallskip
+
+\def\otherformat{\Reffont\let\uchyph=1\parindent=1.25pc\def\Comma{}%
+                \sfcode`\.=1000\sfcode`\?=1000\sfcode`\!=1000\sfcode`\:=1000\sfcode`\;=1000\sfcode`\,=1000%\frenchspacing
+                \par\vfil\penalty-200\vfilneg%\filbreak
+      \if\Ftest\present\Flagstyle\Fstr\fi%
+       \if\Ttest\present\Comma\bgroup``\Titlefont\Tstr\egroup\def\Comma{," }\fi%
+        \if\Atest\present\bgroup" (with \Authfont\Astr\/\egroup)\def\Comma{\unskip, }\fi%
+         \if\Etest\present\bgroup\Estr\egroup\unskip, \ifnum\Ecnt>1eds.\else ed.\fi\def\Comma{, }\fi%
+          \if\Itest\present\Comma\bgroup\Istr\egroup\def\Comma{, }\fi%
+           \if\Ctest\present\Comma\bgroup\Cstr\egroup\def\Comma{, }\fi%
+            \if\Dtest\present\Comma\bgroup\Dstr\egroup\def\Comma{, }\fi%
+             \if\Gtest\present{\Comma Gov't ordering no. }\bgroup\Gstr\egroup\def\Comma{, }\fi%
+              \if\Otest\present{\Comma\bgroup\Ostr\egroup.}\else{.}\fi%
+               \vskip3ptplus1ptminus1pt}%\smallskip
+######################################################
+% Turn off black boxes
+\global\overfullrule0pt
+\Refstd\Citebrackets
+\def\Reffont{\rm}\def\Authfont{\rm}\def\Titlefont{\rm}\def\Tomefont{\it}
+\def\Flagstyle#1{\hangindent30pt\hskip10pt\hbox to0pt{\hss{\Flagfont#1}.\kern1em}}
+
+\def\journalarticleformat{\Reffont\let\uchyph=1\parindent=1em\def\Comma{}%
+                \sfcode`\.=1000\sfcode`\?=1000\sfcode`\!=1000\sfcode`\:=1000\sfcode`\;=1000\sfcode`\,=1000%\frenchspacing
+                \par\vfil\penalty-200\vfilneg%\filbreak
+      \if\Ftest\present\Flagstyle\Fstr\fi%
+       \if\Ttest\present\bgroup\Titlefont\Tstr\egroup\def\Comma{, }\fi%
+        \if\Atest\present\Comma\bgroup\Authfont with \Astr\egroup\def\Comma{\unskip, }%
+            \else\if\Etest\present\def\Eand{\Aand}\def\Eandd{\Aandd}\bgroup\Authfont\Estr\egroup\def\Comma{\unskip, }%
+                  \else\if\Itest\present\bgroup\Authfont\Istr\egroup\def\Comma{, }\fi\fi\fi%
+         \if\etest\present(\bgroup\estr\egroup)\def\Comma{\unskip, }\fi%
+          \if\Jtest\present\Comma\bgroup\Reffont\Jstr\/\egroup\def\Comma{, }\fi%
+           \if\Vtest\present\Comma\bgroup\Volfont\Vstr\egroup\def\Comma{, }\fi%
+            \if\Dtest\present\kern.16667em(\bgroup\Dstr\egroup)\def\Comma{, }\fi%
+             \if\Ptest\present\Comma\bgroup{\if\Pcnt\present pp. \else p. \fi}\Pstr\egroup\def\Comma{, }\fi%
+              \if\ttest\present. \bgroup\Titlefont\tstr\egroup\def\Comma{, }\fi%
+               \if\jtest\present\if\ttest\present\Comma\else. \fi\bgroup\Tomefont\jstr\/\egroup\def\Comma{, }\fi%
+                \if\vtest\present\Comma\bgroup\Volfont\vstr\egroup\def\Comma{, }\fi%
+                 \if\dtest\present\kern.16667em(\bgroup\dstr\egroup)\def\Comma{, }\fi%
+                  \if\ptest\present\Comma\bgroup{\if\pcnt\present pp. \else p. \fi}\pstr\egroup\def\Comma{, }\fi%
+                   \if\Gtest\present{\Comma Gov't ordering no. }\bgroup\Gstr\egroup\def\Comma{, }\fi%
+                    \if\Otest\present{\Comma\bgroup\Ostr\egroup.}\else{.}\fi%
+                     \vskip3ptplus1ptminus1pt}%\smallskip
+
+\def\conferencereportformat{\Reffont\let\uchyph=1\parindent=1em\def\Comma{}%
+                \sfcode`\.=1000\sfcode`\?=1000\sfcode`\!=1000\sfcode`\:=1000\sfcode`\;=1000\sfcode`\,=1000%\frenchspacing
+                \par\vfil\penalty-200\vfilneg%\filbreak
+      \if\Ftest\present\Flagstyle\Fstr\fi%
+       \if\Ttest\present\bgroup\Titlefont\Tstr\egroup\def\Comma{, }\fi%
+        \if\Atest\present\Comma\bgroup\Authfont with \Astr\egroup\def\Comma{\unskip, }\fi%
+         \if\Jtest\present\Comma\bgroup\Tomefont\Jstr\/\egroup\def\Comma{, }\fi%
+          \if\Ctest\present\Comma\bgroup\Cstr\egroup\def\Comma{, }\fi%
+           \if\Dtest\present\kern.16667em(\bgroup\Dstr\egroup)\def\Comma{, }\fi%
+            \if\Otest\present{\Comma\bgroup\Ostr\egroup.}\else{.}\fi%
+             \vskip3ptplus1ptminus1pt}%\smallskip
+
+\def\bookarticleformat{\Reffont\let\uchyph=1\parindent=1em\def\Comma{}%
+                \sfcode`\.=1000\sfcode`\?=1000\sfcode`\!=1000\sfcode`\:=1000\sfcode`\;=1000\sfcode`\,=1000%\frenchspacing
+                \par\vfil\penalty-200\vfilneg%\filbreak
+      \if\Ftest\present\Flagstyle\Fstr\fi%
+       \if\Ttest\present\bgroup\Titlefont\Tstr\egroup\def\Comma{, }\fi%
+        \if\Atest\present\Comma\bgroup\Authfont with \Astr\egroup\def\Comma{\unskip, }\fi%
+         \if\etest\present(\bgroup\estr\egroup)\def\Comma{\unskip, }\fi%
+          \if\Btest\present\Comma in \bgroup\Tomefont\Bstr\/\egroup\def\Comma{\unskip, }\fi%
+           \if\otest\present\ \bgroup\ostr\egroup\def\Comma{, }\fi%
+            \if\Etest\present\Comma\bgroup\Estr\egroup\unskip, \ifnum\Ecnt>1eds.\else ed.\fi\def\Comma{, }\fi%
+             \if\Stest\present\Comma\bgroup\Sstr\egroup\def\Comma{, }\fi%
+              \if\Vtest\present\Comma\bgroup\Volfont\Vstr\egroup\def\Comma{, }\fi%
+               \if\Ntest\present\Comma\bgroup\Volfont\Nstr\egroup\def\Comma{, }\fi%
+                \if\Itest\present\Comma\bgroup\Istr\egroup\def\Comma{, }\fi%
+                 \if\Ctest\present\Comma\bgroup\Cstr\egroup\def\Comma{, }\fi%
+                  \if\Dtest\present\Comma\bgroup\Dstr\egroup\def\Comma{, }\fi%
+                   \if\Ptest\present\Comma{\if\Pcnt\present pp. \else p. \fi}\Pstr\def\Comma{, }\fi%
+                    \if\ttest\present. \bgroup\Titlefont\Tstr\egroup\def\Comma{, }\fi%
+                     \if\btest\present\Comma in \bgroup\Tomefont\bstr\/\egroup\def\Comma{, }\fi%
+                      \if\atest\present\Comma\bgroup\astr\egroup\unskip, \if\acnt\present eds.\else ed.\fi\def\Comma{, }\fi%
+                       \if\stest\present\Comma\bgroup\sstr\egroup\def\Comma{, }\fi%
+                        \if\vtest\present\Comma\bgroup\Volfont\vstr\egroup\def\Comma{, }\fi%
+                         \if\ntest\present\Comma\bgroup\Volfont\nstr\egroup\def\Comma{, }\fi%
+                          \if\itest\present\Comma\bgroup\istr\egroup\def\Comma{, }\fi%
+                           \if\ctest\present\Comma\bgroup\cstr\egroup\def\Comma{, }\fi%
+                            \if\dtest\present\Comma\bgroup\dstr\egroup\def\Comma{, }\fi%
+                             \if\ptest\present\Comma{\if\pcnt\present pp. \else p. \fi}\pstr\def\Comma{, }\fi%
+                              \if\Gtest\present{\Comma Gov't ordering no. }\bgroup\Gstr\egroup\def\Comma{, }\fi%
+                               \if\Otest\present{\Comma\bgroup\Ostr\egroup.}\else{.}\fi%
+                                \vskip3ptplus1ptminus1pt}%\smallskip
+
+\def\bookformat{\Reffont\let\uchyph=1\parindent=1em\def\Comma{}%
+                \sfcode`\.=1000\sfcode`\?=1000\sfcode`\!=1000\sfcode`\:=1000\sfcode`\;=1000\sfcode`\,=1000%\frenchspacing
+                \par\vfil\penalty-200\vfilneg%\filbreak
+      \if\Ftest\present\Flagstyle\Fstr\fi%
+       \if\Ttest\present\bgroup\Titlefont\Tstr\/\egroup\def\Comma{\unskip, }%
+                \else\if\Btest\present\Comma\bgroup\Titlefont\Bstr\/\egroup\def\Comma{\unskip, }\fi\fi%
+        \if\Atest\present\bgroup\Authfont with \Astr\egroup\def\Comma{\unskip, }%
+            \else\if\Etest\present\bgroup\def\Comma\Eand{\Aand}\def\Eandd{\Aandd}\Authfont\Estr\egroup\unskip, \ifnum\Ecnt>1eds.\else ed.\fi\def\Comma{, }%
+                  \else\if\Itest\present\bgroup\Authfont\Istr\egroup\def\Comma{, }\fi\fi\fi%
+            \if\otest\present\ \bgroup\ostr\egroup\def\Comma{, }\fi%
+             \if\etest\present\kern.16667em(\bgroup\estr\egroup)\def\Comma{\unskip, }\fi%
+              \if\Stest\present\Comma\bgroup\Sstr\egroup\def\Comma{, }\fi%
+               \if\Vtest\present\Comma\bgroup\Volfont\Vstr\egroup\def\Comma{, }\fi%
+                \if\Ntest\present\Comma\bgroup\Volfont\Nstr\egroup\def\Comma{, }\fi%
+                 \if\Atest\present\if\Itest\present
+                         \Comma\bgroup\Istr\egroup\def\Comma{\unskip, }\fi%
+                      \else\if\Etest\present\if\Itest\present
+                              \Comma\bgroup\Istr\egroup\def\Comma{\unskip, }\fi\fi\fi%
+                     \if\Ctest\present\Comma\bgroup\Cstr\egroup\def\Comma{, }\fi%
+                      \if\Dtest\present\Comma\bgroup\Dstr\egroup\def\Comma{, }\fi%
+                       \if\ttest\present. \bgroup\Titlefont\tstr\egroup\def\Comma{, }%
+                             \else\if\btest\present. \bgroup\Titlefont\bstr\egroup\def\Comma{, }\fi\fi%
+                          \if\stest\present\Comma\bgroup\sstr\egroup\def\Comma{, }\fi%
+                           \if\vtest\present\Comma\bgroup\Volfont\vstr\egroup\def\Comma{, }\fi%
+                            \if\ntest\present\Comma\bgroup\Volfont\nstr\egroup\def\Comma{, }\fi%
+                             \if\itest\present\Comma\bgroup\istr\egroup\def\Comma{, }\fi%
+                              \if\ctest\present\Comma\bgroup\cstr\egroup\def\Comma{, }\fi%
+                               \if\dtest\present\Comma\bgroup\dstr\egroup\def\Comma{, }\fi%
+                                \if\Gtest\present{\Comma Gov't ordering no. }\bgroup\Gstr\egroup\def\Comma{, }\fi%
+                                 \if\Otest\present{\Comma\bgroup\Ostr\egroup.}\else{.}\fi%
+                                  \vskip3ptplus1ptminus1pt}%\smallskip
+
+\def\technicalreportformat{\Reffont\let\uchyph=1\parindent=1em\def\Comma{}%
+                \sfcode`\.=1000\sfcode`\?=1000\sfcode`\!=1000\sfcode`\:=1000\sfcode`\;=1000\sfcode`\,=1000%\frenchspacing
+                \par\vfil\penalty-200\vfilneg%\filbreak
+      \if\Ftest\present\Flagstyle\Fstr\fi%
+       \if\Ttest\present\bgroup\Titlefont\Tstr\egroup\def\Comma{, }\fi%
+        \if\Atest\present\Comma\bgroup\Authfont with \Astr\egroup\def\Comma{\unskip, }%
+            \else\if\Etest\present\bgroup\def\Eand{\Aand}\def\Eandd{\Aandd}\Authfont\Estr\egroup\def\Comma{\unskip, }%
+                  \else\if\Itest\present\bgroup\Authfont\Istr\egroup\def\Comma{, }\fi\fi\fi%
+           \if\Atest\present\if\Itest\present
+                   \Comma\bgroup\Istr\egroup\def\Comma{, }\fi%
+                \else\if\Etest\present\if\Itest\present
+                        \Comma\bgroup\Istr\egroup\def\Comma{, }\fi\fi\fi%
+            \if\Rtest\present\Comma\bgroup\Rstr\egroup\def\Comma{, }\fi%
+             \if\Ctest\present\Comma\bgroup\Cstr\egroup\def\Comma{, }\fi%
+              \if\Dtest\present\Comma\bgroup\Dstr\egroup\def\Comma{, }\fi%
+               \if\ttest\present. \bgroup\Titlefont\tstr\egroup\def\Comma{, }\fi%
+                \if\itest\present\Comma\bgroup\istr\egroup\def\Comma{, }\fi%
+                 \if\rtest\present\bgroup\rstr\egroup\def\Comma{, }\fi%
+                  \if\ctest\present\Comma\bgroup\cstr\egroup\def\Comma{, }\fi%
+                   \if\dtest\present\Comma\bgroup\dstr\egroup\def\Comma{, }\fi%
+                    \if\Gtest\present{\Comma Gov't ordering no. }\bgroup\Gstr\egroup\def\Comma{, }\fi%
+                     \if\Otest\present{\Comma\bgroup\Ostr\egroup.}\else{.}\fi%
+                      \vskip3ptplus1ptminus1pt}%\smallskip
+
+\def\otherformat{\Reffont\let\uchyph=1\parindent=1em\def\Comma{}%
+                \sfcode`\.=1000\sfcode`\?=1000\sfcode`\!=1000\sfcode`\:=1000\sfcode`\;=1000\sfcode`\,=1000%\frenchspacing
+                \par\vfil\penalty-200\vfilneg%\filbreak
+      \if\Ftest\present\Flagstyle\Fstr\fi%
+       \if\Ttest\present\bgroup\Titlefont\Tstr\egroup\def\Comma{, }\fi%
+        \if\Atest\present\Comma\bgroup\Authfont with \Astr\egroup\def\Comma{\unskip, }%
+            \if\Atest\present\if\Itest\present
+                    \Comma\bgroup\Istr\egroup\def\Comma{, }\fi%
+                 \else\if\Etest\present\if\Itest\present
+                         \Comma\bgroup\Istr\egroup\def\Comma{, }\fi\fi\fi%
+                 \if\Ctest\present\Comma\bgroup\Cstr\egroup\def\Comma{, }\fi%
+                  \if\Dtest\present\Comma\bgroup\Dstr\egroup\def\Comma{, }\fi%
+                   \if\Gtest\present{\Comma Gov't ordering no. }\bgroup\Gstr\egroup\def\Comma{, }\fi%
+                    \if\Otest\present{\Comma\bgroup\Ostr\egroup.}\else{.}\fi%
+            \else\if\Etest\present\def\Eand{\Aand}\def\Eandd{\Aandd}\bgroup\Authfont\Estr\egroup\def\Comma{\unskip, }%
+                  \else\if\Itest\present\bgroup\Authfont\Istr\egroup\def\Comma{, }\fi\fi\fi%
+                     \vskip3ptplus1ptminus1pt}%\smallskip

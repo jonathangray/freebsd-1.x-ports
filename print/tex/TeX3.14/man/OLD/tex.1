@@ -1,0 +1,299 @@
+.TH TEX 1  3/12/90
+.SH NAME
+tex, initex, virtex  \- text formatting and typesetting
+.SH SYNOPSIS
+.B tex
+[ first line ]
+.PP
+.B initex
+[ first line ]
+.PP
+.B virtex
+[ first line ]
+.ie t .ds TX \fRT\v'+0.3m'E\v'-0.3m'X\fP \" for troff
+.el .ds TX TeX\" for nroff
+.\" to use, type \*(TX
+.ie t .ds OX \fIT\v'+0.3m'E\v'-0.3m'X\fP\" for troff
+.el .ds OX TeX\" for nroff
+.\" the same but obliqued
+
+.SH DESCRIPTION
+\*(TX
+formats the interspersed text and commands contained in the named
+files
+and outputs a typesetter independent file (called
+.I DVI
+which is short for
+.IR D e V ice
+.IR I ndependent ).
+\*(TX
+capabilities and language are described in
+.I The \*(OXbook
+by Donald E. Knuth, published by Addison-Wesley.
+.PP
+\*(TX
+is normally used with a large body of precompiled macros,
+and there are several specific formatting systems, such as
+LaTeX, 
+which require the support of several macro files.  The basic
+programs as compiled are called
+.I initex
+and
+.I virtex, 
+and are distinguished by the fact that 
+.I initex 
+can be used to precompile macros into a ``*.\|fmt'' file,
+which is used by
+.I virtex. Virtex
+can read a precompiled ``*.\|fmt'' file, but it cannot create one.  It is
+the version of
+\*(TX
+which usually lies behind a working typesetting formatter.
+.PP
+Any arguments given on the command line to the
+\*(TX
+programs are passed to them as the first input line.
+(But it is often easier to type extended arguments
+as the first input line, since Unix shells tend
+to gobble up or misinterpret \*(TX's favorite symbols
+unless you quote them.)
+As described in 
+.I The \*(OXbook,
+that first line should begin with a file name
+or a \\controlsequence.
+The normal usage is to say
+.RB `` tex
+.IR paper ''
+to start processing 
+.I paper\|.\|tex.
+The name ``paper'' will be the ``jobname'', and is used in forming
+output file names.
+If \*(TX doesn't get a file name in the first line, the jobname is ``texput''.
+The default `\|.\|tex' extension can be overridden by specifying an extension
+explicitly. There is no way to read a \*(TX input file with
+no filename extension.
+.PP
+If there is no paper\|.\|tex in the current directory, \*(TX will look
+look through a search path of directories to try to find it.
+If ``paper'' is the ``jobname''
+a log of error messages, with rather more detail than
+normally appears on the screen, will appear in 
+.I paper\|.\|log,
+and the output file will be in
+.I paper\|.\|dvi.
+The standard library on the default search path
+has the basic format package, 
+.I plain\|.\|tex, 
+described in 
+.I The \*(OXbook, 
+as well as several others.
+Files such as 
+.I plain\|.\|tex,
+(e.g., the basic files associated with LaTeX:
+.I lplain\|.\|tex,
+.I lfonts\|.\|tex,
+and 
+.IR latex\|.\|tex )
+are used to prepare ``predigested'' 
+.I .\|fmt 
+files. 
+(Except when \fI.\|fmt\fP files are being prepared
+it is hardly ever necessary to \\Input plain, since almost
+all instances of the \*(TX program begin by loading these
+predigested versions of it.)
+This means that all of the control sequences discussed in 
+.I The \*(OXbook
+are known to \*(TX.  For a discussion of \fI.\|fmt\fP files,
+see below.
+.PP
+Several environment variables can be used to set up directory
+paths to search when \*(TX opens a file for input.
+For example, the
+.I csh
+command
+.br
+.in +4
+setenv \s-2TEXINPUTS\s0 .\|:\|/usr/me/mylib:/usr/local/lib/tex/inputs
+.in -4
+or the
+.I sh
+command sequence
+.br
+.in +4
+\s-2TEXINPUTS\s0=.\|:\|/usr/me/mylib:/usr/local/lib/tex/inputs
+.br
+export \s-2TEXINPUTS\s0
+.in -4
+.br
+would cause all invocations of \*(TX and its derivatives to look for
+\\input files first in the current directory, then in a hypothetical
+user's ``mylib'', and finally in the system library.
+Normally, the user will place the command sequence which sets up the
+\s-2TEXINPUTS\s0 environment variable in the
+.I .cshrc
+or
+.I .profile
+file.
+The Environment section below lists the relevant environment variables,
+and their defaults.
+.PP
+The
+.I e
+response to \*(TX's error prompt causes the
+.I GNU emacs
+editor to start up at the current line of the current file.
+There is an environment variable, \s-2TEXEDIT\s0, that can be used to change the
+editor used.  It should contain a string with "%s" indicating where the
+filename goes and "%d" indicating where the decimal linenumber (if any) goes.
+For example, a \s-2TEXEDIT\s0 string for
+.I vi
+can be set by:
+.br
+.ti +4
+setenv \s-2TEXEDIT\s0 "/usr/bin/vi +%d %s"
+.br
+.PP
+.PP
+A convenient file in the library is null\|.\|tex, containing nothing.
+When \*(TX can't find a file it thinks you want to input, it keeps
+asking you for another file name;  responding `null' gets you out
+of the loop if you don't want to input anything.
+.PP
+The
+.I initex
+and
+.IR virtex 
+programs
+can be used to create fast-loading customized versions of \*(TX 
+based on complex macro files.
+The
+.I initex
+program is used to create a
+.I format (.\|fmt)
+file that permits fast loading of fonts and macro packages.
+After processing the fonts and definitions desired, a \\dump command
+will create the format file.
+The format file is used by
+.I virtex.
+It needs to be given a format file name as the first thing it reads.
+A format file name is preceded by an &, which needs to be escaped with \\
+if given on the command line.
+.PP
+Fortunately, it is no longer necessary to make explicit references
+to the format file.  The present version of \*(TX, when compiled
+from this distribution, looks at its own command line to determine
+what name it was called under.  It then uses that name, with the
+``.\|fmt'' suffix appended, to search for the appropriate format file.
+You should probably make up one format file with the name
+.I tex\|.\|fmt,
+with only the 
+.I plain\|.\|tex 
+file in it.  
+This will be your format file when
+you invoke \fIvirtex\fP with the name \fBtex\fP.
+You can also create a file mytex\|.\|fmt using \fIinitex\fP,
+so that this will be loaded when you invoke 
+\fIvirtex\fP with the name \fBmytex\fP.
+To make the whole thing work, it is necessary to link \fIvirtex\fP to all
+the names of format files that you have prepared.  Hard links will do
+for system-wide equivalences and Unix systems which do
+not use symbolic links.  Symbolic links can be used for access 
+to formats for individual projects.  For example: 
+\fIvirtex\fP can be hard linked to \fItex\fP in the
+general system directory for executable programs, but
+an individual version of \*(TX will more likely be
+linked by a symbolic link in a privately maintained path
+.br
+.ti +4
+ln \-s /usr/local/bin/virtex mytex
+.br
+in a directory such as \fI/home/me/bin\fP.
+.PP
+An older approach is to
+set up a Cshell alias with
+.br
+.ti +4
+alias mytex "virtex \\&myfmt"
+.br
+Besides being more cumbersome, however, this approach is
+not available to systems which do not accept aliases.
+Finally there is the system known as ``undump'' which
+takes the headers from an \fIa.out\fP file (e.g. \fIvirtex\fP)
+and applies them to a core image which has been dumped
+by the Unix \s-2QUIT\s0 signal.  This is very system-dependent,
+and produces extremely large files when used with a large-memory
+version of \*(TX.  It is less and less used.
+.SH ENVIRONMENT
+The defaults for all environments are set at the
+time of compilation, by reference to a file called site.h.
+The values given below are set in the distributed version
+of this file, and are likely to be different at many
+sites.
+.PP
+.IP \s-2TEXINPUTS\s0
+Search path for \\input and \\openin files.  It should be colon-separated,
+and start with ``.''.  The entire path must be no longer than 700
+characters long.
+Default: .\|:\|/usr/local/lib/tex/inputs
+.IP \s-2TEXFONTS\s0
+Search path for font metric files.  The entire path must be no longer than 700
+characters long.  Default: .\|:\|/usr/local/lib/tex/fonts/tfm
+.IP \s-2TEXFORMATS\s0
+Search path for format files.  Default: .\|:\|/usr/local/lib/tex/formats
+.IP \s-2TEXPOOL\s0
+Search path for \s-2INITEX\s0 internal strings.  Default: .\|:\|/usr/local/lib/tex
+.IP \s-2TEXEDIT\s0
+Command template for switching to editor.  
+Default: "emacs +%d %s"
+
+.SH FILES
+
+.TP 1.5i
+/usr/local/lib/tex
+\*(TX's library areas
+.TP
+/usr/local/lib/tex/tex.pool
+Encoded text of \*(TX's messages
+.TP
+/usr/local/lib/tex/fonts/tfm/*.tfm
+Width information used by \*(TX (TeX Font Metric files)
+.TP
+/usr/local/lib/tex/fonts/{gf,pk}\fInnn\fP
+Bit maps for low resolution devices. (An old and bad habit
+was to include these with the associated \fItfm\fP files,
+which produced a single directory of unmanageable 
+complexity.  This should not be done, as these
+files have no direct connection with \*(TX, but
+only with programs for interpreting DVI files onto
+paper or CRT screens.)
+.TP
+/usr/local/lib/tex/formats/*\|.\|fmt
+\*(TX .\|fmt files
+.TP
+/usr/local/lib/tex/inputs/plain\|.\|tex
+The ``default'' macro package
+.br
+.SH "SEE ALSO"
+Donald E. Knuth,
+.I The \*(OXbook
+.br
+Leslie Lamport,
+.I The LaTeX  Document Preparation System
+.br
+Michael Spivak,
+.I The Joy of \*(TX
+.br
+.I TUGBOAT
+(the publication of the \*(TX Users Group)
+.SH "TRIVIA"
+\*(TX, pronounced properly, rhymes with ``blecchhh.''  Note that the proper
+spelling in typewriter-like output is ``TeX'' and not ``TEX'' or ``tex.''
+.SH "AUTHORS"
+\*(TX was designed by Donald E. Knuth, 
+who implemented it using his W\s-2EB\s0 system for Pascal programs.
+It was ported to Unix at Stanford by Howard Trickey, and
+at Cornell by Pavel Curtis.
+The version now offered with the Unix \*(TX distribution is that 
+generated by the W\s-2EB\s0 to C system, written by Tomas
+Rokicki and Tim Morgan.
+

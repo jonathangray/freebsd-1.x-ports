@@ -1,0 +1,216 @@
+% File:       TeX Inputs Cell2.tex
+% Author:     J E Pittman
+% Bitnet:     JEPTeX@TAMVenus
+% Internet:   JEPTeX@Venus.TAMU.EDU
+% Date:       November 8, 1988
+%
+% Prepare to scan the data, taking notes as to span sizes, row and 
+% column dimensions, et cetera.
+%
+\catcode`_=11 % Used to protect local control sequence names.
+%
+% The span info tokens contain sets of entries of the form \process 
+% {position}{number}{dimension}, where position is the terminal column 
+% or row, number is the number of columns or rows leading into the 
+% column or row, and dimension is the size of the information.
+% 
+\declaretoks\column_span_info
+\column_span_info={}%
+\declaretoks\row_span_info
+\row_span_info={}%
+%
+\let\process=\relax
+%
+\declarecount\column_number
+\column_number=0
+%
+% Create a column information entry and put the user's specifications 
+% into it.
+%
+\def\column#1{\relax
+   \advance\column_number \by 1
+   \last_column=\column_number
+   \get_column_number_data
+   \add_column_number_data {#1}%
+   \ignorespaces
+   }%
+%
+\declarecount\row_number
+\row_number=0
+%
+% Same as \column.
+%
+\def\row#1{\relax
+   \advance\row_number \by 1
+   \message{Scanning row \the\row_number.}%
+   \last_row=\row_number
+   \everyrow
+   \get_row_number_data
+   \add_row_number_data {#1}%
+   \column_number=0
+   \ignorespaces
+   }%
+%
+% \blank is used to generate a cell without a border or data.  In this 
+% context, all it does is absorb merges.
+%
+\def\blank{\relax
+   \advance\column_number \by 1
+   \if\column_number>\last_column
+      \advance\column_number \by -1
+      \column{}%
+   \fi
+   \everycolumn
+   \get_column_number_data
+   \ifnum\merge_rows>1
+      \add_column_number_data {\merge_rows=0\relax}%
+   \fi
+   \merge_columns=0
+   }%
+%
+% \cell is used to generate a normal, ruled cell.  In this context, it 
+% merely measures the cell and makes the appropriate notes.
+%
+\def\cell#1{\relax
+   \advance\column_number \by 1
+   \if\column_number>\last_column
+      \advance\column_number \by -1
+      \column{}%
+   \fi
+   \everycolumn
+   \get_column_number_data
+%
+% Typeset the information into temp box.
+%
+   \setbox\temp_box=\vbox \bgroup
+      \begingroup
+         \ifnum\merge_rows>0
+            \advance\row_number \by -\merge_rows
+            \get_row_number_data
+         \fi
+         \vskip \topborderskip
+         \endgroup
+      \hbox \bgroup
+         \begingroup
+            \ifnum\merge_columns>0
+               \advance\column_number \by -\merge_columns
+               \get_column_number_data
+            \fi
+            \hskip \leftborderskip
+            \endgroup
+         #1\vphantom{)}%
+         \hskip \rightborderskip
+         \egroup
+      \vskip \bottomborderskip
+      \egroup
+%
+% If it is a row merger, record it for later processing.
+%
+   \ifnum \merge_rows>0
+      \edef\temp{\process
+         {\the\merge_rows}{\the\ht\temp_box}{\the\row_number}%
+         \the\row_span_info
+         }%
+      \x_after\row_span_info\x_after=\x_after{\temp}%
+%     \message{\string\row_span_info=\the\row_span_info}% debug
+      \add_column_number_data {\merge_rows=0\relax}%
+   \else
+%
+% Not a merger, record the height if max.
+%
+      \ifdim\ht\temp_box>\rowheight
+         \let\info=\relax
+         \edef\temp{\the\row_number>\info
+               {\rowheight=\the\ht\temp_box\relax}}%
+         \let\info=\row_info
+         \x_after \add_data \temp
+%        \message{\string\row_info=\the\row_info}% debug
+         \rowheight=\ht\temp_box
+      \fi
+   \fi
+%
+% Same as above for column merger and width.
+%
+   \ifnum \merge_columns>0
+      \edef\temp{\process
+         {\the\merge_columns}{\the\wd\temp_box}{\the\column_number}%
+         \the\column_span_info
+         }%
+      \x_after\column_span_info\x_after=\x_after{\temp}%
+%     \message{\string\column_span_info=\the\column_span_info}% debug
+      \merge_columns=0
+   \else
+      \ifdim\wd\temp_box>\columnwidth
+         \let\info=\relax
+         \edef\temp{\the\column_number>\info
+               {\columnwidth=\the\wd\temp_box\relax}}%
+         \let\info=\column_info
+         \x_after \add_data \temp
+%        \message{\string\column_info=\the\column_info}% debug
+      \fi
+   \fi
+   }%
+%
+% \mergeright specifies that the corresponding position is to be 
+% merged with the cell to its right.
+%
+\def\mergeright{\relax
+   \advance\column_number \by 1
+   \if\column_number>\last_column
+      \advance\column_number \by -1
+      \column{}%
+   \fi
+   \everycolumn
+   \get_column_number_data
+   \advance\merge_columns \by 1
+%
+% Cancel a row merge, if present.
+%
+   \ifnum\merge_rows>1
+      \add_column_number_data {\merge_rows=0\relax}%
+   \fi
+   }%
+%
+% Same as \mergeright, except down.
+%
+\def\mergedown{\relax
+   \advance\column_number \by 1
+   \if\column_number>\last_column
+      \advance\column_number \by -1
+      \column{}%
+   \fi
+   \everycolumn
+   \get_column_number_data
+   \add_column_number_data {\advance\merge_rows \by 1\relax}%
+   \merge_columns=0
+   }%
+%
+% The horizontal and vertical stretch macros allow the user to specify 
+% an explicit stretch that will subsequently be processed like a span.  
+% User-specified stretches are processed after span caused ones.  The 
+% parameters are the starting column/row, the ending column/row, and 
+% the size of the stretch.
+%
+\def\horizontalstretch#1#2#3{\relax
+   \temp_count=#2\relax
+   \advance\temp_count \by -#1\relax
+   \edef\temp{\the\column_span_info\process{\the\temp_count}{#3}{#2}}%
+   \x_after \column_span_info\x_after=\x_after{\temp}%
+%  \message{\string\column_span_info=\the\column_span_info}% debug
+   \ignorespaces
+   }%
+%
+\def\verticalstretch#1#2#3{\relax
+   \temp_count=#2\relax
+   \advance\temp_count \by -#1\relax
+   \edef\temp{\the\row_span_info\process{\the\temp_count}{#3}{#2}}%
+   \x_after \row_span_info\x_after=\x_after{\temp}%
+%  \message{\string\row_span_info=\the\row_span_info}% debug
+   \ignorespaces
+   }%
+%
+\def\noalign#1{\ignorespaces}% don't do anything for the first pass
+%
+\catcode`_=8 % Return to normal.
+%
+\endinput

@@ -1,0 +1,296 @@
+% <BEEBE.TEX.DVI>DVIALW.PS.17, 18-Sep-87 17:48:04, Edit by BEEBE
+% Add test for note paper and if unknown, use letter paper instead.
+% Non-Apple PostScript implementations do not know about note paper
+% but its use on the Apple LaserWriter gains 92K of virtual memory
+% <BEEBE.TEX.DVI>DVIALW.PS.16, 18-Sep-87 15:50:52, Edit by BEEBE
+% Modify coordinate computations to remove round-off errors
+% in landscape mode, and correct landscape page origin
+% <BEEBE.TEX.DVI>DVIALW.PS.14, 22-Jun-87 09:55:05, Edit by BEEBE
+% Add missing "0 900 translate Mtrx currentmatrix pop" to /LEGAL
+% <BEEBE.TEX.DVI>DVIALW.PS.13,  7-Jan-87 17:38:51, Edit by BEEBE
+% Add translate command to BOP so that (0,0) really corresponds to
+% the top left physical page corner.  The standard LaTeX file 
+% TESTPAGE.TEX can be used for this calibration; it might be sensitive
+% to the particular printer used.	
+% <BEEBE.TEX.DVI.NEW>DVIALW.PS.12, 10-Dec-86 17:24:50, Edit by BEEBE
+% Fix off-by-one error in definition of /B; to draw a box N pixels
+% wide, microscopic examination of output shows that the box width
+% must be N-1, not N, pixels; the boundary counts in the filling.                
+% <BEEBE.TEX.DVI.NEW>DVIALW.PS.9, 28-Nov-86 19:00:52, Edit by BEEBE
+% Change definition of EOP to use #copies and showpage
+% instead of {copypage} repeat erasepage
+% <BEEBE.TEX.DVI.NEW>DVIALW.PS.7, 16-Oct-86 13:09:36, Edit by BEEBE
+% Following Macintosh LaserWriter md dictionary, change most
+% def's to bdf's (bind def); this is claimed to speed up
+% operator access
+% <BEEBE.TEX.DVI.NEW>DVIALW.PS.5, 16-Oct-86 12:01:12, Edit by BEEBE
+% Change CTL-L to caret-L in comment
+% <BEEBE.TEX.DVI.NEW>DVIALW.PS.3, 13-Jun-86 10:48:39, Edit by BEEBE
+% Fix definition of NOTE, make it default in BOJ macro to try to reduce
+% incidence of VM errors
+% ----------------------------------------------------------------------
+% DVIALW PostScript macro definitions (keep in alphabetical order).  For
+% readability, these  are  heavily  commented,  but  we  adhere  to  the
+% convention that  percent is  used  ONLY to  mark  the beginning  of  a
+% comment (NEVER  occurs  inside a  PostScript  string), and  lines  are
+% limited to 80 characters.  That way, DVIALW can read these definitions
+% from a  file and  discard  comments and  trailing white  space  before
+% transmission to  the  PostScript output  file.   In the  interests  of
+% compactness, macros which  receive any significant  degree of use  are
+% given single letter names -- PostScript is already much too verbose.
+%
+% Coordinates are assumed to  be in pixels  (Resolution per inch).   The
+% page origin follows the  PostScript convention of  being in the  lower
+% left corner, y positive upwards along  the longer side of the page,  x
+% positive  to  the  right.   Letter  and  legal  sizes  are   therefore
+% equivalent as far as PostScript is concerned, but y coordinates can be
+% bigger in legal size.  In landscape mode, the page is rotated to place
+% the origin in  the upper left  corner, x positive  downward along  the
+% longer side of  the page, y  positive to the  right.  That way,  pages
+% eject from  the printer  upright when  viewed from  the front  of  the
+% printer.
+%
+% Document format is something like this:
+%
+%	%!PS-Adobe-1.0
+%	%%Dimensions: 0 0 612 792
+%	%%Title: DVIALW  -o1 -s300 foo12
+%	%%CreationDate: Sat Mar  8 10:52:52 1986
+%	%%Creator: BEEBE and [TeX82 DVI Translator Version 2.03b...]
+%	%%Pages: (atend)
+%	%%BugHistory: Incorporates save/restore and font reloading...
+%	%%BugHistory: Incorporates Allan Hetzel's 31-Oct-85 DARPA...
+%	%%EndComments
+%	%%EndProlog
+%	%%Page: 0 1
+%	TeXdict begin
+%	BOJ
+%	BOP
+%	...
+%	 1 EOP
+%	^LBOP
+%	...
+%	 1 EOP
+%	^LBOP
+%	...
+%	 1 EOP
+%	^LEOJ
+%	%%Trailer
+%	%%Pages: 7
+%	%%PageTable:  0 1 3434
+%	^D
+%
+% One formfeed is output  for each printed page  copy, in order to  make
+% spooler page accounting simple.  The additional comments wrapping  the
+% BOJ ..  EOJ  sequence conform  to  Adobe PostScript  file  structuring
+% conventions, and the first line can be used by the spooler to identify
+% the file as containing PostScript.
+% ----------------------------------------------------------------------
+
+
+/TeXdict 200 dict def		% dictionary for these definitions
+TeXdict begin
+
+% bdf -- bind def (for efficiency)
+% Usage -- just like def, but not on constant objects
+/bdf {bind def} def
+
+% B -- draw bar (TeX rule) of size w by h at currentpoint
+% Usage -- w h B
+/B
+{
+  /h exch def
+  /w exch def
+  gsave
+  currentpoint
+  newpath
+    moveto
+    w 1 sub 0 rlineto
+    0 h 1 sub rlineto
+    w 1 sub neg 0 rlineto
+  closepath fill
+  grestore
+} bdf
+
+% BOJ -- beginning of job (EOF ends it and closes TeXdict)
+% Usage -- BOJ
+/BOJ
+{
+  72 Resolution div 72 Resolution div scale
+  userdict /note known 
+  {NOTE}				% default page format for ALW
+  {LETTER}				% default page format for others
+  ifelse
+} bdf
+
+% BOP -- beginning of page
+% Usage -- BOP
+/BOP
+{
+  clear
+  Mtrx setmatrix
+  25 0 translate % Physical page origin is at (-25,0) from the top left corner
+} bdf
+
+% ch-fieldname -- extract field from ch-data array (order defined by positions
+% in first array argument to macro D)
+% Usage -- ch-fieldname
+/ch-image  {ch-data 0 get} bdf	% the bitmap hex string image
+/ch-xoff   {ch-data 1 get} bdf	% pixels from left edge of bitmap to char origin
+/ch-yoff   {ch-data 2 get} bdf	% pixels from top edge of bitmap to char origin
+/ch-width  {ch-data 3 get} bdf	% bitmap width in pixels
+/ch-height {ch-data 4 get} bdf  % bitmap height in pixels
+/ch-tfmw   {ch-data 5 get} bdf	% pixels to next character (precise flt value)
+
+% CharBuilder -- image one character
+% Usage -- fontdict ch CharBuilder
+/CharBuilder
+{
+  /ch-code exch def		% save the char code
+  /font-dict exch def		% and the font dict.
+  /ch-data font-dict /BitMaps get
+    ch-code get def		% get the bitmap descriptor for char
+  ch-data null eq not		% show character if entry is not empty
+  {
+    ch-tfmw 	   		0
+    ch-xoff neg			ch-yoff ch-height sub
+    ch-width ch-xoff sub	ch-yoff
+    setcachedevice
+    0 0 SNAP translate
+    ch-width ch-height true [ 1 0 0 -1 ch-xoff ch-yoff ]
+    {ch-image} imagemask
+  } if
+} bdf
+
+
+% D -- define new character in current font
+% Usage -- [<bitmap> xoff yoff pixwid pixht tfmpixwid] charnum D
+/D
+{
+  /ch-code exch def
+  /ch-data exch def
+  currentfont /BitMaps get ch-code ch-data put
+  currentfont /Encoding get ch-code dup 3 string cvs cvn put
+} bdf
+
+% EOJ -- end of job
+% Usage -- EOJ
+/EOJ
+{
+  end				% matches begin issued before BOJ
+} bdf
+
+% EOP -- end of page
+% Usage -- ncopies EOP
+/EOP
+{
+/#copies exch def
+showpage
+} bdf
+
+% LANDSCAPE -- landscape format page (11inH x 8.5inV)
+% Usage -- LANDSCAPE
+/LANDSCAPE
+{
+  letter initmatrix
+  72 Resolution div dup scale
+  0 3300 translate
+  -90 rotate
+  0 -750 translate
+  Mtrx currentmatrix pop
+} bdf
+
+% LEGAL -- legal format page (8.5inH x 13inV)
+% Usage -- LEGAL
+/LEGAL
+{
+  legal initmatrix
+  72 Resolution div dup scale
+  0 900 translate
+  Mtrx currentmatrix pop
+} bdf
+
+% LETTER -- letter format page
+% Usage -- LETTER
+/LETTER
+{
+  letter initmatrix
+  72 Resolution div dup scale
+  Mtrx currentmatrix pop
+} bdf
+
+% M -- moveto
+% Usage -- x y M
+/M
+{
+  moveto
+} bdf
+
+% Mtrx -- permanent storage for page transformation matrix
+% Usage -- Mtrx
+/Mtrx 6 array def
+
+% NF -- define new font
+% Usage -- /fontname NF
+/NF
+{
+  /newname exch def
+  newname 7 dict def
+  newname load
+  begin
+    /BitMaps 128 array def
+    /BuildChar { CharBuilder } def
+    /Encoding 128 array def
+	0 1 127 { Encoding exch /.notdef put } for
+    /FontBBox [ 0 0 1 1 ] def
+    /FontMatrix [ 1 0 0 1 0 0 ] def
+    /FontType 3 def
+  end
+  newname newname load definefont pop
+} bdf() pop
+
+% NOTE -- note format page (increases available virtual memory from 240K
+%	  to 340K on Apple LaserWriter)
+% Usage -- NOTE
+/NOTE
+{
+  note initmatrix
+  72 Resolution div dup scale		   % set scaling to 1.
+  Mtrx currentmatrix pop
+} bdf
+
+% P -- show string at current point, updating horizontal position to new endpt
+% Usage -- (string) P
+/P {show} bdf() pop
+
+% Q -- draw bar of last size set by B command at specified point
+% Usage -- x y Q
+/Q {moveto w h B} bdf() pop
+
+% R -- move relative right and show string, updating horizontal position to
+%      new endpoint
+% Usage -- (string) xxx R
+/R {0 rmoveto show} bdf() pop
+
+% Resolution -- device resolution in dots/inch
+% Usage -- Resolution
+/Resolution 300 def
+
+% S -- move absolute and show string, updating horizontal position to new endpt
+% Usage -- (string) xxx yyy S
+/S {moveto show} bdf() pop
+
+% SF -- set new font at scale nnn (nnn = 1 normally; 2 gives double size chars)
+% Usage -- nnn /fontname SF
+/SF {findfont exch scalefont setfont} bdf() pop
+
+% SNAP -- convert coordinates to integer device coordinates and back again
+% Usage -- xxx yyy SNAP (leave xxx' yyy' on stack)
+/SNAP {transform 2 {floor 0.5 add exch} repeat itransform} bdf
+
+% T -- move absolute horizontally and show string, updating horizontal position
+% to new endpt
+% Usage -- (string) xxx T
+/T {currentpoint exch pop moveto show} bdf() pop
+
+end				% TeXdict

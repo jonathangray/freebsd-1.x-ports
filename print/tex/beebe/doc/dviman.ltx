@@ -1,0 +1,1127 @@
+% -*-LaTeX-*-
+% <BEEBE.TEX.DVI.DOC>DVIMAN.LTX.127, 12-Oct-87 14:55:47, Edit by BEEBE
+% Revised to bring into agreement with dvi.1l (Unix troff man
+% page file), with a couple of new features and drivers, and some
+% rearrangement of the -x and -y option sections.
+% <BEEBE.TEX.DVI.DOC>DVIMAN.LTX.63,  9-Apr-87 10:56:33, Edit by BEEBE
+% Added DVIL75 and updated DVIBIT description again
+% <BEEBE.TEX.DVI.DOC>DVIMAN.LTX.60, 22-Dec-86 12:24:43, Edit by BEEBE
+% Added DVIIMP and updated DVIBIT description (new section SCREEN CONTROL)
+% <BEEBE.TEX.DVI.DOC>DVIMAN.LTX.36, 13-Oct-86 15:53:26, Edit by BEEBE
+% Add -d32 truncated text option
+% <BEEBE.TEX.DVI.DOC>DVIMAN.LTX.34, 16-Sep-86 00:09:53, Edit by BEEBE
+% Add description of page number step size in -o#:#:# option, and
+% new -z option for automatic output spooling on TOPS-20.
+% <BEEBE.TEX.DVI.NEW>DVIMAN.LTX.27, 12-Sep-86 18:36:27, Edit by BEEBE
+% Put options in alphabetical order (one was out), and add IBM PC
+% caveat section
+% <BEEBE.TEX.DVI.DOC>DVIMAN.LTX.19,  9-Sep-86 17:13:23, Edit by BEEBE
+% Update -d# description to define possible settings
+% <BEEBE.TEX.DVI.DOC>DVIMAN.LTX.14, 27-Aug-86 16:40:17, Edit by BEEBE
+% Unix-style ``man'' pages for DVI driver family; adapted from DVI.HLP
+%------------------------------------------------------------------------
+% EVERYTHING TO THE RIGHT OF A  %  IS A REMARK TO YOU AND IS IGNORED BY
+% LaTeX.
+%
+% WARNING!  DO NOT TYPE ANY OF THE FOLLOWING 10 CHARACTERS AS NORMAL TEXT
+% CHARACTERS:
+%                &   $   #   %   _    {   }   ^   ~   \
+%
+% The following seven are printed by typing a backslash in front of them:
+%  \$  \&  \#  \%  \_  \{  and  \}.
+%------------------------------------------------------------------------
+\newcommand{\namelistlabel}[1]{\mbox{#1}\hfil}
+\newenvironment{namelist}[1]{%
+\begin{list}{}
+    {
+      \let\makelabel\namelistlabel
+      \settowidth{\labelwidth}{#1}
+      \setlength{\leftmargin}{1.1\labelwidth}
+    }
+  }{%
+\end{list}}
+
+% Document point size should match that in dvidriver.ltx
+\documentstyle[11pt,dvidriver]{article}
+\newcommand{\INDEX}[2]{}        % need for \UNIX et al macros
+% !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+% LaTeX article style puts page numbers in headings, while Unix
+% man pages have them in footers.  Unfortunately, there is no
+% clean way of changing them, except by modification of the
+% article.sty code which defines \@{odd,even}{head,foot}, sigh...
+% If I were doing this regularly, I'd make a new document style,
+% but this file is likely to be unique.
+\makeatletter
+\if@twoside             % If two-sided printing.
+    \def\ps@headings{%
+        \let\@mkboth\markboth%
+        \def\@oddhead{dvi(1L) \hfil Unix Programmer's Manual\hfil dvi(1L)}%
+        \let\@evenhead\@oddhead%
+        \def\@oddfoot{\rm 4th Berkeley Distribution \hfil 12 October 1987 %
+            \hfil \thepage}%
+        \def\@evenfoot{\rm \thepage \hfil 12 October 1987 %
+            \hfil 4th Berkeley Distribution}%
+    }%
+\else			% must be one-sided printing.
+    \def\ps@headings{%
+        \let\@mkboth\markboth%
+        \def\@oddhead{dvi(1L)\hfil Unix Programmer's Manual\hfil dvi(1L)}%
+        \def\@oddfoot{\rm 4th Berkeley Distribution \hfil 12 October 1987 %
+            \hfil \thepage}%
+        \let\@evenfoot\@oddfoot%
+        \let\@evenhead\@oddhead%
+    }%
+\fi%
+\makeatother
+% !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+\begin{document}
+% Still have not solved problem of first page coming out in plain style;
+% the following does not suffice:
+% \thispagestyle{headings}
+\pagestyle{headings}
+\title{DVIxxx - Display \TeX{} DVI Files on Assorted Output Devices}
+\author{}
+\date{}
+\maketitle
+
+\subsection*{NAME}
+
+DVIxxx --- TeX DVI to device xxx translator family
+
+\subsection*{SYNOPSIS}
+
+ \begin{bf}
+\obeylines\obeyspaces
+dvixxx [-a] [-b] [-c\#] [-d\#] [-e{\it VAR=value}] [-f{\it fontsubfile}]
+       [-l] [-m\#] [-o\#] [-o\#:\#] [-o\#:\#:\#] [-p] [-q] [-r\#] [-s\#] [-v]
+       [-x\#{\it units}] [-y\#{\it units}] [-z] dvifile1 [ dvifile2] \ldots{}
+
+{\it xxx} {\rm = output device identifier suffix (see below)}
+ \end{bf}
+
+\subsection*{DESCRIPTION}
+
+Several \TeX{} DVI translators are available.  They all expect
+the name of the DVI file on the command line, and the extension
+{\tt .dvi} can always be omitted.  As illustrated below, they
+issue a one-line identifier message and, if no command line
+arguments are given, type a \UNIX{}-style\footnote{
+\UNIX{} is a trademark of AT\&T Bell Laboratories.
+\PCDOS{} is a trademark of IBM Corporation.
+\TeX{} is a trademark of the American Mathematical Society.
+\TOPS{}, \VAX{}, and \VMS{} are trademarks of Digital Equipment
+Corporation.
+}
+{\em usage} message.
+Some of them may have additional help files.  On case-sensitive
+file systems, file names
+may be expected to be entirely in lower case, so you should
+type {\tt dvialw} instead of {\tt DVIALW}.
+
+For all except DVIBIT (which is intended for interactive
+display), the output file will be given the name of the {\tt
+.dvi} file, but extension {\tt .dvi-xxx}, where {\tt xxx} is the
+three-character mnemonic for the translator program.  If long
+extensions are not supported, then {\tt .xxx} is used.  For DVIBIT,
+output is on {\tt stdout} which defaults to the terminal; it may
+be redirected in the usual \UNIX{} fashion by {\tt >filename} on the
+command line (e.g. {\tt dvibit foo >foo.out}).
+
+As each {\tt .dvi} file is processed, a list of errors is printed
+on the standard error unit {\tt stderr}; this list is also saved
+in a file with extension {\tt .dvi-err}, or if long extensions
+are not supported by the host, then extension {\tt .err} is used.
+This file is not created if there are no errors.  As each page is
+printed, the physical page number and the \TeX{} page number(s) are
+printed without a following carriage return; after the last
+page, the string \verb|[OK]| is printed, followed by a newline.
+This gives a convenient progress report to the terminal.
+If it is not wanted, then the error output can be redirected into
+a file (possibly the null device) (e.g. {\tt dvixxx foo
+\&foo.err}), or the {\tt -q} (quiet) option can be given to
+suppress it.
+
+These drivers  are written  in C,  and with  C preprocessor  conditional
+compilation features, are all derived from  one master set of files,  so
+that there is  substantial code  sharing among them.   Host machine  and
+output device dependencies  are parametrized to  allow easy movement  to
+new hosts and new output devices.  Implementations now exist on
+Gould \UNIX{},
+Hewlett-Packard \UNIX{},
+\PCDOS{},
+\TOPS{},
+\VAX{} \UNIX{}, and
+\VAX{} \VMS{},
+with others in progress.
+
+\subsection*{DEVICES SUPPORTED}
+
+The available translators are as follows:
+
+  \begin{namelist}{DVIMMM}
+  \item[DVIALW]
+    \POSTSCRIPT{} (Apple LaserWriter)
+  \item[DVIBIT]
+    Version 3.10 BBN BitGraph terminal
+  \item[DVICAN]
+    Canon LBP-8 A2 laser printer
+  \item[DVIGD]
+    Golden Dawn Golden Laser 100 printer
+  \item[DVIIMP]
+    Imagen imPRESS-language laser printer family
+  \item[DVIJEP]
+    Hewlett-Packard LaserJet Plus
+  \item[DVIJET]
+    Hewlett-Packard LaserJet
+  \item[DVIL3P]
+    DEC LN03 Plus laser printer
+  \item[DVIL75]
+    DEC LA75 144 dpi printer
+  \item[DVIM72]
+    Apple Imagewriter 72 dpi printer
+  \item[DVIMAC]
+    Apple Imagewriter 144 dpi printer
+  \item[DVIMPI]
+    MPI Sprinter 72 dpi printer
+  \item[DVIO72]
+    OKIDATA Pacemark 2410 72 dpi printer
+  \item[DVIOKI]
+    OKIDATA Pacemark 2410 144 dpi printer
+  \item[DVIPRX]
+    Printronix 60h $\times$ 72v dpi printer
+  \item[DVITOS]
+    Toshiba P-1351 180 dpi printer
+  \item[DVITYP or DVITYPE]
+    \mbox{}
+
+    DVI Translator for human-readable output
+  \end{namelist}
+
+\subsection*{OPTIONS}
+
+The order of command options and DVI file names is {\em not\/}
+significant; all switch values apply to all DVI files.  DVI files
+are processed in order from left to right.
+
+Letter case is {\em ignored\/} in option switches: {\tt -A}
+and  {\tt -a} are equivalent.
+  \begin{namelist}{{\tt -o\#}}
+  \item[{\tt -a}]
+                Implement virtual font caching, if possible.
+                When a font file is opened, a buffer is allocated
+                to contain the entire file, and the file is then
+                read with one system call.  This is important
+                primarily on networked file systems, where the
+                many random-access calls in the font file for
+                small amounts of data entail substantial network
+                overhead.  With the entire file cached in local
+                memory, this overhead is removed.   The
+                additional memory required for the font file
+                buffers amounts to 100K to 200K bytes (assuming
+                the compact {\tt .PK} font file format), which is
+                not excessive.  If memory cannot be allocated for
+                a font file, then normal buffering of small
+                blocks is used.  A trace option ({\tt -d64}) is
+                provided to monitor the font caching; see below.
+
+  \item[{\tt -b}]
+                Backwards order printing from the default.  For example,
+                laser printers using the Canon LBP-CX print
+                engine normally
+                receive  pages  in  reverse  order  because  they  stack
+                printed side  up.  Some  have page  handling  mechanisms
+                that stack them face  down, and in such  a case
+                {\tt -b}  will
+                ensure that they  come out in  order $1, 2, \ldots{}$
+                instead  of $n, n-1, n-2, \ldots$
+
+  \item[{\tt -c\#}]
+                Print \# copies of each output page.  Page copies
+                are printed consecutively; this does {\em not}
+                give multiple collated copies of the entire job.
+
+  \item[{\tt -d\#}]
+                Produce debugging output on {\tt stderr} if a
+                non-zero value is given.  Multiple {\tt -d}
+                switches may be specified, and one may also add
+                values of the following possible options to
+                obtain the switch value:
+                \begin{namelist}{888}
+                \item[1]
+                        (DVIJET only) print page bitmap in hexadecimal;
+                \item[2]
+                        display page coordinates and metrics of
+                        each output character, and print each
+                        character bitmap in hexadecimal;
+                \item[4]
+                        (DVIJEP only) display updated page
+                        coordinate of each character after each call
+                        to {\tt fixpos()};
+                \item[8]
+                        print filename and open mode of
+                        each {\em successful} file opening;
+                \item[16]
+                        print filename and open mode of
+                        each {\em unsuccessful} file opening;
+                \item[32]
+                        show discarded off-page text;
+                \item[64]
+                        trace virtual font caching;
+                \item[128]
+                	trace character setting ({\em lots} of output).
+                \end{namelist}
+                For example, either {\tt -d8 -d16} or {\tt -d24}
+                will trace all attempted file openings.
+
+  \item[{\tt -eVAR=value}]
+                \mbox{}
+
+                Define an environment variable on the command
+                line (see the later section {\em Environment
+                Variables}).  The acceptable values for {\tt
+                VAR} are {\tt DVIHELP},
+                {\tt FONTLIST},
+                {\tt TEXFONTS}, and
+                {\tt TEXINPUTS}.  Under normal use of the
+                translators, these can be set by \TOPS{} and
+                \VAX{} \VMS{} {\tt
+                define VAR: value} commands, or by \UNIX{}
+                {\sc csh} {\tt setenv VAR value} or {\sc sh}
+                {\tt VAR=value} commands.   When the
+                translator is invoked by another program, such as
+                a print spooler, on some systems it may not be
+                possible to set a
+                particular value of an environment variable for
+                the subprocess, so this option gets around this
+                limitation.  On most \UNIX{} systems, it should
+                be possible to use the call {\tt
+                system("VAR=value; dvixxx filename")}.
+
+  \item[{\tt -ffontsubfile}]
+                \mbox{}
+
+                Define an alternate font substitution file which
+                is to be used instead of the default ones (see below).
+
+  \item[{\tt -l}]
+                Inhibit logging.
+
+  \item[{\tt -m\#}]
+                Reset magnification to \#.  The default for low
+                resolution printers is {\tt -m603}, corresponding
+                to $1/1.2^5$ magnification of 300-dot/\-inch
+                fonts.  By \TeX{}
+                conventions, magnification 1000 corresponds to a
+                200-dot/inch output device.  The default
+                magnification is always adjusted according to the
+                output device resolution in order to give a
+                normal page size, so this parameter should rarely
+                be required.  Legal values are
+                $$int((1000\mbox{\rm{} or } 1440 \mbox{\rm{} or }
+                1500)\times1.2^{k/2})\quad (k = -16\ldots16);$$
+                other values will be set to the nearest in this
+                family.  Not all fonts will be available in this
+                wide range, and most installations will probably
+                have only a half dozen or so magnifications.
+
+                Magnification values less than 25 are taken to be a
+                \TeX{} magstep parameter which is applied to the
+                standard magnification for that device.  For
+                example, {\tt -m-0.5} selects a smaller size, and
+                {\tt -m2} selects a size 1.44 times larger than
+                normal.
+
+  \item[{\tt -o\#} or {\tt -o\#:\#} or {\tt -o\#:\#:\#}]
+                \mbox{}
+
+                Specify a page number, or range of page numbers,
+                to be selected for output.  In the third form,
+                the last number is the page number step size; it
+                is normally 1.    This option may be
+                specified any number of times.  If it is not
+                specified, then all pages will be printed.  Pages
+                are numbered in order $1, 2, 3, \ldots{}$ in the
+                file, but any page number recorded by \TeX{} on
+                the printed page will in general be different.
+                Negative page numbers count backward; -1 is the
+                last page in the document, -2 the second last
+                page, and so on.
+
+                As pages are selected for
+                printing, \verb|[#{#}| will be printed on {\tt
+                stderr}, where the first \verb|#| is the page
+                number in the file, and the second \verb|#| is
+                a string of values of the \TeX{} counters
+                \verb|\count0| through  \verb|\count9|, separated
+                by dots, with trailing zero counters dropped.
+                \verb|\count0| usually records the printed page number.
+                When the page is completely output, a closing
+                {\tt ]} will be printed on {\tt stderr}.  Any
+                error messages from processing of that page will
+                therefore occur between the square brackets.  For
+                example, {\tt -o1:3 -o12 -o17:23 -o-3:-1} would
+                select pages 1, 2, 3, 12, 17, 18, 19, 20, 21, 22,
+                and 23, plus the last three pages.
+
+                Pages are
+                processed in the order found in the DVI file;
+                there is intentionally no attempt made to sort
+                them according the \verb|\count0| values, since
+                different macro packages may use this counter for
+                different purposes, and in the case of floating
+                tables and figures, the pages may not be in order
+                anyway.
+
+                Pages will always be printed in an order
+                appropriate for the device so that the first
+                document page occurs first face up in the
+                document stack; the {\tt -b} option can be used
+                to reverse this order.  For example, some
+                Hewlett-Packard LaserJet Plus printers are
+                equipped with a page flipper which stacks output
+                face down; for these, the {\tt -b} option will
+                ensure that the pages come out in the expected
+                order.
+
+                Specification of a page number step size is
+                useful for producing duplex (two-sided) printing.
+                For example, with laser printers using the Canon
+                LBP-CX engine, the first run could specify {\tt
+                -o1:9999:2}, which would stack output face up,
+                beginning with the last page, and ending with
+                page 1 on top.  The printed pages can then be
+                reinserted in the input tray {\em face up}, page
+                1 on the top, exactly as they were found in the
+                output tray, with the top of the page in the tray
+                closest to the end which is inserted first into the
+                printer.  A second run with {\tt -b -o2:9999:2}
+                would then print pages 2, 4, \ldots, on the backs
+                of pages 1, 3, \ldots; note the {\tt -b} option
+                to get backwards order on the second run.
+
+                There is a bug in Microsoft C's {\sf sscanf()} on
+                the  IBM PC; it does not correctly parse input on
+                the format {\tt "\%d:\%d:\%d"} in {\tt option()}
+                for the page number switch.  It correctly returns
+                the numbers, but instead of returning the number
+                of such items parsed, it returns -1, which should
+                only happen if none are parsed.  A work around
+                seems to be to supply a trailing colon on the
+                switch, so that you write {\tt -o17:} instead of
+                {\tt -o17}.
+
+
+  \item[{\tt -p}]
+                Inhibit font preloading.  This may produce output a  few
+                seconds earlier when  all pages are  output, but  should
+                have  negligible  effect  on  the  execution  time,  and
+                consequently, should  normally not  be specified.   When
+                individual pages are being printed with the {\tt
+                -o\#}  option,
+                preloading is necessary (and  will be forced) to  ensure
+                that all fonts are defined before they are referenced.
+
+  \item[{\tt -q}]
+                Quiet mode.  Status displays to {\tt stderr} are
+                suppressed, unless warning or error messages are
+                issued.  For interactive devices (DVIBIT), warning
+                messages are suppressed.
+
+  \item[{\tt -r\#}]
+                (Device = HP LaserJet only).  Specify the Laser
+                Jet output resolution in dots per inch.  {\tt \#}
+                must be one of 75, 100, 150, or 300.  The actual
+                plot file is identical in each case; only the
+                size on the output page is changed, because the
+                resolution change is effected by printing 1
+                $\times$ 1, 2 $\times$ 2, 3 $\times$ 3, or 4
+                $\times$ 4 pixel blocks.
+
+  \item[{\tt -r}]
+                (Device = Golden Laser 100 only).  Select
+                run-length encoding of the output file.  This
+                reduces disk space typically by 10\% to 40\%, but
+                increases host CPU time for the preparation of
+                the output file.
+
+  \item[{\tt -r}]
+                (Device  = Apple ImageWriter only).   Select  run-length
+                encoding of the output file.
+
+  \item[{\tt -r}]
+                (Device = Toshiba P-1351 only).  Select
+                run-length encoding of the output file.  This
+                reduces disk space typically by 10\% to 40\%, but
+                increases host CPU time for the preparation of
+                the output file, and because of poor logic in the
+                printer, may double the print time!  The print
+                quality is also substantially worse, so this
+                option is generally {\em not} recommended.
+
+  \item[{\tt -s\#}]
+                (Device = Apple LaserWriter only).  Force
+                characters larger than \# pixels wide or high to
+                be reloaded each time they are required.  The
+                Version 23.0 \POSTSCRIPT{} interpreter has a bug
+                which manifests itself in fatal {\tt VM error}
+                messages when large characters are sent.  A
+                reasonable default value has been set for this
+                which should normally avoid the problem.
+                Specifying {\tt -s0} will cause reloading of
+                every character each time it is used.
+
+  \item[{\tt -v}]
+                (Device = Apple LaserWriter  only).  Force reloading  of
+                all required fonts at start of each page.
+
+  \item[{\tt -x\#}{\it units}]
+                \mbox{}
+
+                The {\tt -x} options specify the left margin of
+                the \TeX{} page on the output page in any of
+                several units.  Letter case is not significant
+                in the units field, which must {\em not} be
+                separated from the number by any space.  {\tt \#}
+                may be fractional.  For example, {\tt -x1.0in},
+                {\tt -x2.54cm}, {\tt -x72.27pt}, and {\tt
+                -x6.0225pc} all specify a one-inch left margin.
+                Negative values are permissible, and may be used
+                to shift the output page left (possibly
+                truncating it on the left) in order to display a
+                wide \TeX{} page.
+
+                The units field is mandatory, and may be one of
+                \begin{namelist}{mm}
+                \item[{\tt bp}]
+                    big point ($1in = 72bp$)
+                \item[{\tt cc}]
+                    cicero ($1cc = 12dd$)
+                \item[{\tt cm}]
+                    centimeter ($1in = 2.54cm$)
+                \item[{\tt dd}]
+                    didot point ($1157dd = 1238pt$)
+                \item[{\tt in}]
+                    inch
+                \item[{\tt mm}]
+                    millimeter ($10mm = 1cm$)
+                \item[{\tt pc}]
+                    pica ($1pc = 12pt$)
+                \item[{\tt pt}]
+                    point ($72.27pt = 1in$)
+                \item[{\tt sp}]
+                    scaled point ($65536sp = 1pt$)
+                \end{namelist}
+
+
+  \item[{\tt -y\#}{\it units}]
+                \mbox{}
+
+                The {\tt -y} options specify the top margin of
+                the \TeX{} page
+                on the output page in any of the indicated units.
+                Letter case is not significant in the unit field,
+                which must {\em not} be separated from the number by
+                any space.  {\tt \#} may be fractional.  For example,
+                {\tt -y1.0in}, {\tt -y2.54cm}, {\tt -y72.27pt},
+                and {\tt -y6.0225pc} all specify a one-inch top
+                margin.  Negative values are permissible, and may
+                be used to shift the output page up (possibly
+                truncating it on the top) in order to display a
+                long \TeX{} page.
+
+                By decree of the Stanford \TeX{} Project, the
+                default \TeX{} page origin is always 1 inch over and
+                down from the top-left page corner, even when
+                non-American paper sizes are used.  This
+                corresponds to the switch settings {\tt -x1in
+                -y1in}; these values are assumed unless  overridden.
+
+  \item[{\tt -z}]
+                (TOPS-20 or 4.xBSD Unix only).
+                For each DVI file processed, type in
+                an EXEC command {\tt DVISPOOL: dvifilename} (on
+                Unix, {\tt DVISPOOL dvifilename}) followed by a
+                newline; the user may then define {\tt DVISPOOL:} (or
+                {\tt DVISPOOL}) to be a program or shell script
+                which sends the translation of the DVI file to
+                the appropriate output spooler.
+  \end{namelist}
+
+\subsection*{SAMPLE EXECUTION}
+
+Here is a sample execution of \LaTeX{} and DVIALW extracted from
+a \TOPS{} PHOTO log:
+\begin{small}%
+\begin{verbatim}
+@latex biblio.ltx
+This is TeX, Tops-20 Version 1.1 (preloaded format=lplain 84.9.29)
+(APS:<BEEBE.PLOT79.DOCUMENTATION>BIBLIO.LTX.28
+LaTeX Version 2.06a - Release 7 July 84
+(APS:<TEX.LATEX>REPORT.STY.2
+Document Style 'report'. Version 0.91 - released 25 June 1984
+(APS:<TEX.LATEX>REP11.STY.2))
+(APS:<BEEBE.PLOT79.DOCUMENTATION>MYBIBLIO.STY.1 Mybibliography
+environment style - Version 0.0 - 15-May-86)
+(APS:<BEEBE.PLOT79.DOCUMENTATION>BIBLIO.AUX.12) [0]
+(APS:<BEEBE.PLOT79.DOCUMENTATION>BIBLIO1.LTX.3 [1] [2] [3] [4]
+[5]) [6]
+(APS:<BEEBE.PLOT79.DOCUMENTATION>BIBLIO.AUX.13)
+(see the transcript file for additional information)
+Output written on APS:<BEEBE.PLOT79.DOCUMENTATION>BIBLIO.DVI.1
+(7 pages, 13960 bytes).
+Transcript written on APS:<BEEBE.PLOT79.DOCUMENTATION>BIBLIO.LST.1.
+
+@dvialw -x0.3in -y0.2in biblio bt:example
+[TeX82 DVI Translator Version 2.0 for PostScript [Apple LaserWriter
+laser printer]]
+[Input from DVI file biblio.dvi]
+[Output on file biblio.dvi-alw]
+[7 pages]
+[1500 magnification]
+[7{6}] [6{5}] [5{4}] [4{3}] [3{2}] [2{1}] [1{0}]  [OK]
+[Input from DVI file bt:example.dvi]
+[Output on file bt:example.dvi-alw]
+[1 pages]
+[1500 magnification]
+[1{1}]  [OK]
+\end{verbatim}%
+\end{small}
+When the \TOPS{} version of \TeX{} finishes execution, it
+normally simulates terminal input of a line of the form
+\begin{verbatim}
+TeXspool: dvifile
+\end{verbatim}
+without supplying a final carriage return.
+The default value of the logical name {\tt TeXspool:} points to a
+dummy program which does nothing, so if you just type a carriage
+return yourself, the line is effectively ignored.  This is
+reasonable in that it usually takes several trips through \TeX{}
+before you have a {\tt .dvi} file worth printing.  If you like,
+you can redefine {\tt TeXspool:} to point to your favorite DVI
+translator, for example,
+\begin{verbatim}
+define TeXspool: sys:dvialw.exe
+\end{verbatim}
+Then when you type a carriage return when \TeX{} finishes, it
+will run the translator immediately, saving you a line of typing.
+If you do not want the translator to run, just cancel the line by
+typing {\tt CTL-U} or {\tt CTL-C}.
+
+A sample invocation of DVITYPE is as follows:
+\begin{verbatim}
+@dvitype
+DVIFILE    : story.dvi
+OUTPUT     : tty:
+This is DVItype, Tops-20 Version 2.8
+Output level (default=3, ? for help):
+Starting page (default=*):
+Maximum number of pages (default=1000000):
+Assumed device resolution in pixels per inch (default=300/1):
+New magnification (default=0 to keep the old one):
+Options selected:
+  Starting page = *
+  Maximum number of pages = 1000000
+  Output level = 3 (the works)
+  Resolution =  300.00000000 pixels per inch
+numerator/denominator=25400000/473628672
+magnification=1000;       0.00006334 pixels per DVI unit
+' TeX output 1986.06.20:1039'
+Postamble starts at byte 569.
+maxv=43725786, maxh=30785863, maxstackdepth=3, totalpages=1
+Font 33: amsl10---loaded at size 655360 DVI units
+Font 23: ambx10---loaded at size 655360 DVI units
+...and so on...
+\end{verbatim}
+
+\subsection*{FONT SUBSTITUTION}
+
+If no {\tt -ffontsubfile} option is given, and font substitution
+is required, if the current DVI file is {\tt foo.dvi}, then the
+files {\tt foo.sub}, {\tt texfonts.sub}, and {\tt
+texinputs:texfonts.sub} will be tried in order.  The first two
+will be found on the current directory, and the last is the
+system default.  This gives the option of document-specific,
+user-specific, and system-specific substitutions, and the {\tt
+-f} option allows all of these to be overridden.
+
+Font substitution lines have the form:
+\begin{verbatim}
+% comment
+oldname.oldmag  ->      subname.submag  % comment
+oldname oldmag  ->      subname submag  % comment
+oldname         ->      subname         % comment
+\end{verbatim}
+Examples are:
+\begin{verbatim}
+% These provide replacements for some LaTeX invisible fonts:
+iamr10 1500     ->      amr10 1500      % comment
+iamr10.1500     ->      amr10.1500      % comment
+iamssb8         ->      amssb8          % comment
+\end{verbatim}
+The first  two  forms request  substitution  of a  particular  font  and
+magnification.  The third  form substitutes an  entire font family;  the
+closest available magnification to the  required one will be used.   Any
+dots in  the  non-comment  portion  will be  converted  to  spaces,  and
+therefore, cannot be part of a name field.
+
+The first matching substitution will be selected, so
+magnification-specific substitutions should be given first,
+before family substitutions.
+
+Comments are introduced by percent and continue to end-of-line,
+just as for \TeX{}.  One whitespace character is equivalent to
+any amount of whitespace.  Whitespace and comments are optional.
+
+\subsection*{SCREEN CONTROL}
+
+At present, DVIBIT is the only family member which supports
+interactive viewing of the \TeX{} output.  The following
+description therefore applies only to it, but the functionality
+should be adhered to in any new interactive device drivers.
+
+All switches, including the page selection ({\tt -o}) and page
+origin ({\tt -x} and {\tt -y}) switches, work normally.  In order
+to avoid unnecessary waste of screen space, you probably will
+want to specify {\tt -x0in} and {\tt -y0in} to remove the default
+one-inch left and top margins.  The {\tt -q} option is probably also
+advisable to avoid warning messages, such as from font substitutions.
+
+At beginning of page, a command and status menu is displayed at
+the top of the screen.  When the end-of-page command is reached
+in the DVI file, or as soon as keyboard input is available, the
+driver will enter the end-of-page routine.  Any keyboard input
+command is then read and acted upon; unrecognized input is
+discarded with a warning beep.  The advantage of checking for
+keyboard input during the main DVI reading loop is that unwanted
+display can be avoided.  This is valuable if you are
+repositioning the page, or skimming a document.  The EMACS text
+editor uses much the same display algorithm---do nothing more to
+the screen if a user command will probably invalidate it anyway.
+
+The input can select
+ \begin{itemize}
+   \item
+        redisplay of the current page, possibly shifting it up,
+        down, left, or right, to see more of it, or to restore a
+        display trashed by an unexpected system message or
+        transmission line error;
+   \item
+        continuation to the next page in the page list selected
+        by default or by the {\tt -o} option;
+   \item
+        backing up to the previous page (useful if you overshoot);
+   \item
+        display of an arbitrary page by typing its sequence number;
+   \item
+        termination of execution.
+ \end{itemize}
+
+Although the menu  on the top line displays only a subset of
+the possible commands, a number of synonyms are provided for user
+convenience.  In particular, arrow keys in VT52 and VT100 modes
+are recognized, as are EMACS control-character commands to move
+the cursor or page display.  Commands are provided for  both
+coarse and fine adjustment of page position.
+
+Here is the current command list.  Input is immediate; no
+terminating carriage return is necessary.  Consequently, typing
+error correction is supported only for the digit string command;
+it ends at the first non-digit typed.
+
+ \begin{namelist}{\bf D}
+   \item[{\bf D}]
+       Move the display down  by 1/8 of screen size.
+   \item[{\bf U}]
+       Move the display up   by 1/8 of screen size.
+   \item[{\bf L}]
+       Move the display left   by 1/8 of screen size.
+   \item[{\bf R}]
+       Move the display right   by 1/8 of screen size.
+   \item[{\bf d} or {\bf Ctl-N} or {\bf down-arrow}]
+       \mbox{}
+
+       Move the display down   by 1/64 of screen size.
+   \item[{\bf u} or {\bf Ctl-P} or {\bf up-arrow}]
+       \mbox{}
+
+       Move the display up   by 1/64 of screen size.
+
+   \item[{\bf l} or {\bf Ctl-B} or {\bf left-arrow}]
+       \mbox{}
+
+       Move the display left   by 1/64 of screen size.
+   \item[{\bf r} or {\bf Ctl-F} or {\bf right-arrow}]
+       \mbox{}
+
+       Move the display right   by 1/64 of screen size.
+   \item[{\bf .} or {\bf Ctl-L}]
+       \mbox{}
+
+       Redisplay current page.
+   \item[{\bf @}]
+       Redisplay current page with {\em startup} page
+       positioning.
+   \item[{\bf CARET} or {\bf BACKSPACE}]
+       \mbox{}
+
+       Redisplay previous page.
+   \item[{\bf $nnn$}]
+       \mbox{}
+
+       $nnn$ is a digit string; DELETE/RUBOUT and BACKSPACE keys
+       correct typing errors in it.
+       Move to $nnn^{th}$ page, where  document pages are numbered 1,
+       2, \ldots.  The \TeX{} page numbers are displayed in the
+       status window. This is a recursive display; if you respond
+       at end-of-page with a {\em next-page} command, display
+       will revert to the page sequence you were viewing when you
+       first issued the $nnn$ command.
+   \item[{\bf SPACE} or {\bf RETURN} or {\bf Ctl-V}]
+       \mbox{}
+
+       Display next page.
+   \item[{\bf Q} or {\bf q} or {\bf X} or {\bf x}]
+       \mbox{}
+
+       Quit or exit.  The screen will be cleared and the terminal
+       restored to its normal font and emulation mode.
+    \item[{\bf Z}]
+       Zoom up one magstep (1.2 times larger) from current size.
+    \item[{\bf z}]
+       Zoom down one magstep (1.2 times smaller) from current
+       size.
+
+       It is likely that some font magnifications will be
+       unavailable for zooming, so do not be alarmed if some
+       characters are displayed as blanks when you do this.  You
+       can use the font substitution mechanism ({\tt -f} option
+       above) to work around this, or you can ask your font
+       administrator to generate the required magnifications.
+       When font substitution happens because of an unavailable
+       magnification, characters of an incorrect size are used
+       with the spacing required for the font which \TeX{} used,
+       so output is likely to look peculiar.
+
+       To avoid exhausting the terminal's font memory, larger
+       characters as sent as raster bitmaps each time they are
+       used, rather than as downloaded fonts, making the screen
+       display much slower.  The size limit is large enough that
+       this should not be necessary except at large
+       magnifications.
+ \end{namelist}
+
+\subsection*{SPECIALS}
+
+The \TeX{} \verb|\special{}| command is intended to allow the
+specification in a {\tt .tex} file of a request to the DVI
+driver, usually for the insertion of graphical material at that
+point in the document.  It is currently implemented only for
+DVIALW; other drivers will simply issue a warning message.
+
+The \TeX{} \verb|\special{}| command is expected to look like one
+of the following:
+\begin{verbatim}
+    \special{overlay filename}          % absolute positioning
+    \special{include filename}          % relative positioning
+    \special{insert filename}           % relative positioning
+\end{verbatim}
+In the first case, the \POSTSCRIPT{} file to be included will be
+mapped onto the page at precisely the coordinates it specifies.
+In the other two cases, the upper-left corner of the bounding box
+will be placed at the current point.  The \POSTSCRIPT{} file must
+then contain (usually near the start) a comment of the form
+\begin{verbatim}
+%%BoundingBox: llx lly urx ury
+\end{verbatim}
+specifying the bounding  box lower-left and  upper-right coordinates  in
+standard \POSTSCRIPT{} units (1/72 inch).  Alternatively, if the comment
+\begin{verbatim}
+%%BoundingBox: (atend)
+\end{verbatim}
+is found in  the file,  the last  1000 characters  of the  file will  be
+searched to find a comment of the form:
+\begin{verbatim}
+%%BoundingBox: llx lly urx ury
+\end{verbatim}
+If the \POSTSCRIPT{} file cannot be opened, or the
+\verb|\special{}| command string cannot be recognized, or for
+relative positioning, the bounding box cannot be determined, a
+warning message is issued and the \verb|\special| command is
+ignored.
+
+Otherwise, the section of the \POSTSCRIPT{} file between the
+comment lines
+\begin{verbatim}
+%begin(plot)
+%end(plot)
+\end{verbatim}
+is copied to the output file surrounded by
+\begin{verbatim}
+save
+300 72 div 300 72 div scale % revert to standard 1/72 inch units
+% if relative positioning, then
+% (xcp(in 1/72in)-llx) (ycp(in 1/72in)-ury) translate
+...PostScript file contents...
+restore
+\end{verbatim}
+Plot files produced by \PLOT{} have all the expected commands in
+them to allow their use in \TeX{} \verb|\special{}| commands.
+The two \PLOT{} parameters which influence the size of the plot
+are
+  \begin{itemize}
+  \item
+the device  size specified in  the call to  SETSZ(); it defaults  to
+$11in$ if SETSZ is not called.
+  \item
+the device space specified in  the call to SETDS2() or SETDS3();  it
+defaults in the  CORE system  to the unit  square, but  if the  \PLOT{}
+framing routines  are called,  they will  reset the  device space  to  a
+horizontal or vertical frame in proportions of the local standard paper
+size ($1 : 8.5/11$ in the USA).
+  \end{itemize}
+For example, if a device size of $5in$ is specified for a
+standard horizontal frame, the bounding box will be declared to
+be $5in$ wide and $(8.5/11)\times5in = 3.8636in$ high, so a
+\TeX{} manuscript requiring the plot could have the following
+commands at the start of a new paragraph:
+\begin{verbatim}
+\special{include plotfilename}
+\vspace*{3.9in}
+\end{verbatim}
+
+\subsection*{ENVIRONMENT VARIABLES}
+
+The behavior of the DVI translators can be influenced by
+definition of logical names on \TOPS{} and \VAX{} \VMS{}, or
+environment variables in \UNIX{} and \PCDOS{}.  Compiled-in
+internal defaults will be provided for any of these which are not
+defined.   They {\em must} be entirely in upper-case, since that
+is conventional on \UNIX{} systems.  The names currently recognized
+are as follows:
+
+  \begin{namelist}{TEXINPUTS}
+  \item[DVIHELP]
+                This variable defines an alternate help string which  is
+                typed when the  user makes  an input  error.  It  should
+                direct  the  user  to  additional  documentation.    For
+                example, on \TOPS{}, it might be {\tt try HELP
+                DVI or XINFO DVI}.
+
+  \item[FONTLIST]
+                Normally, the drivers are prepared to search
+                first for {\tt .pk}, then {\tt .gf}, then {\tt
+                .pxl} font files.  This variable can be used to
+                change this search order, or remove one or more
+                of the possibilities.  It is expected to contain
+                at least one of the strings {\tt PK}, {\tt GF},
+                or {\tt PXL}, possibly separated by arbitrary
+                punctuation and other text.  This flexibility is
+                necessary because some operating systems expect
+                environment variables to conform to some syntax,
+                such as that of a file name.  Letter case is {\em
+                not} significant.    Some acceptable
+                strings are {\tt PXL-then-PK-then-GF}, {\tt
+                pk.gf}, {\tt use-only-PXL-fonts}, and {\tt PXL/GF/PK}.
+
+  \item[TERM]
+                This variable is used only for DVIBIT; if it does
+                not evaluate to either {\tt bitgraph} or {\tt
+                bg}, DVIBIT will refuse to run.  On \UNIX{}, this
+                is the conventional way of defining terminal
+                types with the TERMCAP or TERMINFO systems.  This
+                variable is ignored on \VAX{} \VMS{}, since the
+                \VMS{} C library sets it to a value which can
+                never be {\tt bitgraph} or {\tt bg}.
+
+  \item[TEXFONTS]
+    \begin{sloppy}
+                This defines the directory path for finding font
+                files.  Its value is {\em prepended} to the name
+                of a \TeX{} font to get a full file
+                specification.  A typical value in \UNIX{} for {\tt
+                TEXFONTS} would be {\tt
+                /usr/\-local/\-lib/\-tex/\-fonts/}.  On \TOPS{},
+                font {\em cmr10} on a 300-dot/inch device might
+                correspond to the files {\tt
+                texfonts:\-cmr10.\-300gf}, {\tt
+                texfonts:\-cmr10.\-300pk}, or {\tt
+                texfonts:\-cmr10.\-1500pxl}.
+    \end{sloppy}
+  \item[TEXINPUTS]
+                This defines the directory path for finding files
+                which are not in the current working directory.
+                It is {\em prepended} to file names.  A typical
+                value in \UNIX{} would be {\tt
+                /usr\-/local\-/lib\-/tex\-/macros/}.
+
+  \end{namelist}
+
+\subsection*{IBM PC Caveats}
+
+The latest version of the drivers has been compiled with
+Microsoft C Version 4.0.  With Version 3.0, some {\tt .dvi} files
+experienced a fatal ``{\em floating-point stack overflow\/}''
+error both with and without a floating-point coprocessor; this
+can only be due to code generation errors, and it disappeared
+with Version 4.0.
+
+\PCDOS{} by default has only a small number of available open
+files, and this number is not adequate for the drivers with the
+value of five  for  {\tt MAXOPEN}  set in {\tt machdefs.h}.  You need
+to increase the limits by entering the lines
+\begin{verbatim}
+FILES=10
+BUFFERS=10
+\end{verbatim}
+in the {\tt config.sys} file in the boot directory, then reboot
+the system to have the new values take effect.  Larger values are of
+course possible, though {\tt FILES=20} is the limit with current
+versions of \PCDOS{}.   Run-time performance can be quite sensitive
+to these settings, so you may wish to experiment.
+
+  If there is no {\tt config.sys} file, or the settings of {\tt
+FILES} and {\tt BUFFERS} are too small, you will find the disk
+whirring madly while the driver attempts to open font files with
+neighboring magnifications, and then it will finally die with a
+message ``{\em unable to open .err file\/}''.  Use of the {\tt
+-d24} option may be useful in tracking how many files can
+successfully be opened.
+
+The drivers have been loaded with the default Microsoft
+floating-point library; the compiler generates calls to library
+routines which test a flag initialized at startup time which
+indicates the presence or absence of the floating-point
+coprocessor chip.  If it is available, the library routines will
+automatically use it.  You can force the chip to be ignored by
+defining an arbitrary non-empty string value for the environment
+variable
+{\tt NO87}, for example
+\begin{verbatim}
+set NO87=no-8087-available
+\end{verbatim}
+When the DVI translator runs, the value of this variable should
+be typed on the screen as the first output line.  On a Leading
+Edge PC, this typeout does not appear, for unknown reasons.
+On a 4.77MHz PC XT, the translators run twice (!) as slowly when
+{\tt NO87} is defined.
+
+The reason that you might need to know this is that the method
+employed by the library routines for detecting the presence or
+absence of an 8087 (or 80287) chip is not infallible, thanks to
+design flaws of some PC's and possibly also the Intel chips.  It
+is conceivable that the library might think a coprocessor chip is
+present, when in fact it is not, and the first floating-point
+instruction executed would hang the machine.
+
+\subsection*{FILES}
+
+The values of {\tt texinputs:} and {\tt texfonts:} below are
+system-dependent. On Unix systems, typical values are {\tt
+/usr/\-local/\-lib/\-tex/\-macros/} and {\tt
+/usr/\-local/\-lib/\-tex/\-fonts/}.
+
+  \begin{namelist}{\tt texinputs:texfonts.sub}
+\item[{\tt *.dvi}]
+                \TeX{} DeVice Independent output file
+\item[{\tt *.dvi-err}]
+                \TeX{} DVIxxx translator error log
+\item[{\tt *.err}]
+                \TeX{} DVIxxx translator error log
+                when long extensions are not available
+\item[{\tt *.dvi-xxx}]
+                \TeX{} DVIxxx translator output file
+\item[{\tt *.xxx}]
+                \TeX{} DVIxxx translator output
+                file when long extensions are not available
+\item[{\tt *.sub}]
+                DVI file-specific font substitution file
+\item[{\tt DVISPOOL}]
+                Environment variable (4.xBSD \UNIX{} only) defining
+                program or shell script which sends translation
+                of DVI file to the appropriate output spooler.
+\item[{\tt DVISPOOL:}]
+                Logical name (\TOPS{} only) defining program
+                which sends translation of DVI file to the
+                appropriate output spooler.
+\item[{\tt texfonts.sub}]
+                Job-wide font substitution file
+\item[{\tt texfonts:*.*pxl}]
+                \TeX{} default font rasters
+\item[{\tt texfonts:*.*gf}]
+                \TeX{} default font rasters
+\item[{\tt texfonts:*.*pk}]
+                \TeX{} default font rasters
+\item[{\tt texinputs:dvialw.ps}]
+                \begin{sloppy}
+                \POSTSCRIPT{} header file containing standard macro
+                definitions prefixed to \POSTSCRIPT{} output from
+                DVIALW
+                \end{sloppy}
+\item[{\tt texinputs:texfonts.sub}]
+                System-wide font substitution file
+  \end{namelist}
+
+\subsection*{SEE ALSO}
+
+dvitype(1), latex(1), tex(1), tr2tex(1), {\em Local \LaTeX{}
+Guide}, {\em A \TeX{} DVI Driver Family}.
+
+\subsection*{BUGS}
+
+Bugs in either the software or its documentation
+should be reported by electronic or postal mail to
+ \begin{verse}
+Nelson H.F. Beebe\\
+Center for Scientific Computation\\
+220 South Physics Building\\
+University of Utah\\
+Salt Lake City, UT 84112\\
+USA\\
+ \medskip
+Tel: (801) 581-5254\\
+EMAIL: Beebe@Science.Utah.Edu (Internet)
+ \end{verse}
+
+An active electronic mailing list for news about the DVI driver family
+development is maintained by the author at the above net address.  Send
+requests there if you wish to be on it.
+
+\subsection*{AUTHORS}
+
+David Fuchs at Stanford University wrote DVITYPE in {\sc web} and
+defined the DVI file format.
+
+Mark Senn at Purdue University wrote a preliminary version of the
+BBN BitGraph driver in C, using DVITYPE as a model.
+
+  Stephan v. Bechtolsheim and Bob Brown at Purdue, Robert Wells
+at BBN, and Jim Schaad and Richard Furuta at the University of
+Washington, improved it.
+
+Contributions for \POSTSCRIPT{} devices came from Neal Holtz at
+Carleton University.  Simon Barnes of Schlumberger Cambridge
+Research Ltd., and Robin Rohlicek at BBN provided useful
+additions to the BBN BitGraph driver which have been generalized
+and incorporated in Version 2.07.
+
+  The transformation to about a dozen other device drivers,
+the massive code rearrangement for many new features as well as
+easy identification of host- and device-dependent sections, plus
+support for {\tt .pk} and {\tt .gf} compact font files,
+was carried out at the University of Utah by Nelson H.F.  Beebe.
+He also wrote the documents {\em A \TeX{} DVI Driver Family} and
+{\em Using \LaTeX{} at the University of Utah College of Science
+DEC-20}.   The first describes all of these drivers in detail,
+and the second is the {\em Local \LaTeX{} Guide}.
+
+Lon Willett at Utah adapted DVIJEP to make DVIIMP for the Imagen
+laser printer family.
+
+John Sauter adapted one of the low-resolution printer drivers to
+produce DVIL75 for the DEC LA75 printer, and DVIL3P for the DEC
+LN03 Plus laser printer
+
+  Norman Naugle and colleagues at Texas A\&M implemented the
+family on several new systems.
+
+\end{document}

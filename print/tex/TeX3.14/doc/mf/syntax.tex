@@ -1,0 +1,1617 @@
+% Interim specs of METAFONT start on the next page
+
+\font\ninerm=amr9
+\let\mc=\ninerm % medium caps for names like PASCAL
+\font\logo=manfnt % font used for the METAFONT logo
+\def\MF{{\logo META}\-{\logo FONT}}
+\font\tenss=amss10 % for `The METAFONTbook'
+\def\today{\ifcase\month\or
+  January\or February\or March\or April\or May\or June\or
+  July\or August\or September\or October\or November\or December\fi
+  \space\number\day, \number\year}
+
+\def\newsection #1. #2\par
+  {\medbreak\noindent{\bf #1.\enspace #2\par}
+  \nobreak\smallskip\noindent}
+\def\oct#1{\hbox{\rm\'{}\kern-.2em\it#1\/\kern.05em}} % octal constant
+\def\<#1>{{$\,\langle$\rm#1$\rangle\,$}}
+\def\is{$\;\longrightarrow\;$}
+\def\alt{$\;\mid\;$}
+\def\andalso{\hskip5em \alt\futurelet\next\andalsocontinued}
+\def\andalsocontinued{\ifx\next\.$\;$\fi}
+\def\syntaxlines#1{$$\openup1\jot
+  \halign{\hbox to\displaywidth{\indent##\hfil}\cr#1}$$}
+\def\.#1{\hbox{\tt#1}}
+\def\syntaxbreak{\noalign{\smallbreak}}
+\def\Bigbreak{\par\ifdim\lastskip<16pt
+  \removelastskip\penalty-200\vskip 16pt plus 5pt minus 4pt\fi}
+\sfcode`\:=\sfcode`\;
+
+\line{{\bf Low-level \MF}\hfil as of \today}
+\rightline{Beware: These specifications change daily!}
+\bigskip\bigskip\noindent
+This is a preliminary description of what the new \MF\ language will look
+like at the lowest level. Please forgive the author for the terseness of
+this document; there
+hasn't been time to explain things yet. Also please remember that the
+low-level language is not what \MF\ programmers will usually be writing;
+it is intended as a vehicle for defining nicer high-level languages.
+\MF\ users will almost always work with a set of macros and other definitions
+called a ``base'' file; the {\tt PLAIN} base will be defined in
+{\tenss The \MF book}, in a fashion similar to the way {\tt PLAIN} format
+has been defined in {\sl The \TeX book}.
+
+\newsection 1. The lowest level: Tokens.
+
+\MF\ is governed by sequences of {\it tokens}, which it gets either by
+reading a file or by regurgitating a list of tokens that were previously
+read. So we can understand tokens by understanding what happens when
+\MF\ reads from a file. A file is a sequence of lines of text, where
+each line of text is a sequence of zero or more characters. The characters
+are assumed to be those of standard ASCII (codes \oct{040} through
+\oct{176} in Appendix~C of {\sl The \TeX book}). Any other characters that
+might appear in the file are flagged as errors,
+except that certain systems may make allowances for certain characters.
+[For example, the {\mc WAITS} implementation places codes \oct{030},
+\oct{032}, \oct{034}, and \oct{035} into the same class as equal signs,
+because the special keys for those two-character combinations on {\mc
+WAITS} keyboards are too tempting to ignore.]
+
+Each line of text is converted into zero or more tokens according to the
+following rules, repeated until no more characters remain on the line:
+
+\smallskip
+\item{1)} If the next character is a space, or if it's a period that isn't
+followed by a decimal digit or a period, ignore~it and move on.
+
+\item{2)} If the next character is a percent sign, ignore it and also
+ignore everything else that remains on the current line. (Percent signs
+allow you to put comments in your file that are unseen by \MF.)
+
+\item{3)} If the next character is a decimal digit or a period that's
+followed by a decimal digit, the next token is called a {\it numeric
+token}. It is the longest sequence of contiguous characters starting
+at the current place that satisfies the following syntax:
+\syntaxlines{\<numeric token>\is\<digit string>\alt.\<digit string>
+  \alt\<digit string>.\<digit string>\cr
+\<decimal digit>\is\.0\alt\.1\alt\.2\alt\.3\alt\.4\alt\.5\alt\.6\alt
+  \.7\alt\.8\alt\.9\cr
+\<digit string>\is\<decimal digit>\alt\<digit string>\<decimal digit>\cr}
+Numeric tokens are interpreted according to ordinary decimal notation;
+the value of the number must be less than 4096. \MF\ converts decimal
+fractions to the nearest multiple of $2^{-16}$.
+
+\item{4)} If the next character is a double-quote mark
+(\thinspace{\tt\char`"}\thinspace), the next token is called a {\it string
+token}. It consists of all characters following the double-quote up to
+but not including the next double-quote on the current line. There must be
+at least one more double-quote remaining on the line, otherwise you
+get an error message.
+
+\item{5)} If the next character is a left parenthesis, a right parenthesis,
+a comma, or a semicolon, the next token is that single character.
+
+\item{6)} Otherwise the next token consists of the next character together
+with all immediately following characters of the same class.
+
+\smallskip\noindent
+Rules 1--5 tell what to do for 17 of the 95 possible ASCII characters
+that might be next. The most interesting rule is number~6, which depends
+on a breakdown of the remaining 78 ASCII characters into 12 {\it
+classes\/} as shown in Table~1.  Two characters are in the same class if
+and only if they belong to the same row in the class~table.
+
+\topinsert
+$$\vbox{\halign{\hfil\tt#\hfil&\qquad#\hfil\cr
+\hidewidth
+ABCDEFGHIJKLMNOPQRSTUVWXYZ\char`\_abcdefghijklmnopqrstuvwxyz\hidewidth\cr
+<=>:|\cr
+`'\cr
++-\cr
+/*\char`\\\cr
+!?\cr
+\#\&@\$\cr
+\char`\^\char`\~\cr
+[\cr
+]\cr
+\char`\{\char`\}\cr
+.&(see rules 1, 3, 6)\cr
+,&(see rule 5)\cr
+;&(see rule 5)\cr
+(&(see rule 5)\cr
+)&(see rule 5)\cr
+"&(see rule 4)\cr
+0123456789&(see rule 3)\cr
+\%&(see rule 2)\cr}}$$
+{\bf Table 1.}\enspace The visible ASCII characters, divided into classes.
+Characters in the bottom eight rows are subject to special rules as
+indicated.
+\endinsert
+
+For example, the (ridiculous) line
+$$\hbox{\tt xx3.1.6..[[a+-bc\char`\_d.e] ]"a string \%"
+  <>\char`\$1."+-""" \% forget this}$$
+produces 17 tokens: `\.{xx}', `\.{3.1}' (which is numeric), `\.{.6}' (another
+numeric), `\.{..}', `\.{[[}', `\.a', `\.{+-}', `\.{bc\char`\_d}', `\.e',
+`\.]', `\.]', `\.{a string \%}' (which is indeed a string),
+`\.{<>}', `\.\$', `\.{1}' (another numeric token), `\.{+-}' (a string, hence
+different from the other~`\.{+-}'), and `' (an empty string).
+Notice that three of the spaces and two of the periods were deleted
+by rule~1.
+
+\newsection 2. The next lowest level: Variables.
+
+But what do tokens mean? Well, numeric tokens stand for numbers and string
+tokens stand for strings, but the other tokens are just arbitrary symbols
+that can stand for almost anything. Let's say that tokens of the third kind
+are {\it symbolic tokens}.
+
+Some of the symbolic tokens have predefined ``primitive'' meanings when
+\MF\ begins its operations, but it is possible to change the meaning of
+any symbolic token. The `\.{let}' command does this; one simply
+says `\.{let}' \<symbolic token>=\<symbolic token>'.
+For example, you can even make a left parenthesis
+denote the same thing as `\.+', if you want to confuse everybody
+who tries to read your code.
+
+Symbolic tokens are further subdivided into two categories based on their
+current meaning. If the token currently stands for one of \MF's
+primitives, or for a macro that was not defined with \.{vardef}, we shall
+call it a {\it spark\/}; otherwise we call it a {\it tag}.  Thus, almost
+every token you can think of is initially a tag, available for use as a
+name, except those that were needed to define \MF's fundamental
+operations. Such pre-reserved tokens can be redefined and used as names,
+if you want to use them in your own way; but you probably won't have to,
+since they're generally words that don't make desirable names.
+
+Tags are used for the variables in \MF\ programs. These variables can
+be structured, like arrays and records in more conventional programming
+languages; for example, `\.{x32a}' might be a variable that would be written
+`\.{x[32].a}' in {\mc PASCAL}. A variable identifier has the following
+syntax:
+\syntaxlines{\<variable>\is\<tag>\<suffix>\alt\<internal quantity>\cr
+\<suffix>\is\<empty>\alt\<suffix>\<subscript>\alt\<suffix>\<tag>
+ \alt\<suffix>\<internal quantity>\cr
+\<subscript>\is\<numeric token>\alt\.[\<numeric expression>\.]\cr}
+A \<suffix> is taken to be as long as possible; i.e., if a \<suffix> is
+followed by a \<subscript> or a \<tag>, the \<suffix> will be extended.
+
+Notice the two permissible forms of subscripts: a numeric token can be
+written without brackets, or a bracketed expression can be used.
+For example, if \.i is a variable whose value is~7, the variable identifiers
+`\.{b7}', `\.{b007}', `\.{b[7]}', `\.{b[i]}', and `\.{b[21-2i]}' are
+all equivalent. On the other hand, `\.{b.007}' would be different, since
+it involves the fractional subscript `\.{.007}'. Also, `\.{b.i}' would
+be different; in this case the `\.i' is simply a tag that appears as a suffix,
+it's not a subscript.
+
+Incidentally, the `\.[' and `\.]' that appear in the syntax for
+\<subscript> stand for any tokens that have \MF's primitive meanings
+for left bracket and right bracket, respectively. They aren't necessarily
+brackets; indeed, if the tokens `\.[' and `\.]' have been redefined,
+they no longer can be used to produce subscripts. Similar remarks
+apply to all of the tokens in all of the rules below. \MF\ doesn't look
+at the form of a token; only the current meaning is relevant.
+
+Variables can be of many types:
+\syntaxlines{\<type>\is\.{numeric}\alt\.{string}\alt\.{boolean}\alt
+\.{path}\alt\.{pen}\alt\.{picture}\alt\.{transform}\alt\.{pair}\cr}
+To specify a type other than \.{numeric}, you simply give a type
+declaration that lists the relevant identifiers. For example, the declaration
+$$\hbox{\tt pair right, left, a.zz}$$
+says that `\.{right}', `\.{left}', and `\.{a.zz}' will be variables of type
+\.{pair}, so that equations like
+$$\hbox{\tt right = -left = 2a.zz = (1,0)}$$
+can be given later. These equations, incidentally, define
+$\.{right}=(1,0)$, $\.{left}=(-1,0)$, and $\.{a.zz}=(.5,0)$.
+
+The declaration of an array variable is independent of all the subscript
+values; all subscripts in the declaration are therefore given in a
+special collective form. For example,
+$$\hbox{\tt path p[], x[]arc, f[][]}$$
+declares all variables of the form \.{p[i]} and \.{x[i]arc} and \.{f[i][j]}
+to be of type \.{path}. This declaration doesn't affect the types of
+variables like \.p or \.{p3arc}. \MF\ considers a declaration
+like `\.{path}~\.{p3}' to be illegal, since it falsely implies that only
+\.{p3} (not \.{p2}) is a path; subscripts in a type declaration must
+be collective.
+
+Here are the formal syntax rules:
+\syntaxlines{\<declaration>\is\<type>\<declaration list>\cr
+\<declaration list>\is\<declared variable>\alt
+  \<declaration list>\.,\<declared variable>\cr
+\<declared variable>\is\<symbolic token>\<declared suffix>\cr
+\<declared suffix>\is\<empty>\alt\<declared suffix>\.{[]}\cr
+\andalso\<declared suffix>\<tag>\alt\<declared suffix>\<internal quantity>\cr}
+A variable that hasn't been declared is automatically of type \.{numeric},
+but its value is undefined until it appears in an equation. Declarations
+destroy all previous values; thus, a declaration like `\.{numeric}~\.x'
+isn't redundant, since it removes any existing value that \.x may have
+had, of whatever type.  Incidentally, this declaration doesn't affect
+other values like \.{x2} or \.{x2arc} or \.{x.x} that might coexist with~\.x.
+
+\newsection 3. The next lowest level: Expressions.
+
+The declaration `\.{delimiters} \<symbolic token>\<symbolic token>'
+declares a pair of tokens to be matching delimiters. For example, the
+\.{PLAIN} base says `\.{delimiters}~\.{()}' so that parentheses do
+the usual thing. Any distinct symbolic tokens can be defined to act
+as delimiters, and many different pairs of delimiters can be
+in use simultaneously.
+
+There are eight kinds of expressions in \MF, corresponding to the
+eight types numeric, string, etc. The full syntax is quite long,
+but most of it falls into a simple pattern: There are four levels
+of precedence called the primary level (tightest binding), the
+secondary level (next tightest), the tertiary level (next loosest),
+and the expression level (loosest); they're something like freshmen,
+sophomores, juniors, and seniors. If $\alpha$, $\beta$, and
+$\gamma$ are types, most of the syntax rules are of the following
+general form:
+\syntaxlines{\<$\alpha$ primary>\is\<$\alpha$ variable>\alt
+ \<$\alpha$ constant>\cr
+\andalso\<left delimiter>\<$\alpha$ expression>\<right delimiter>\cr
+\andalso\.{begingroup} \<statement list> \<$\alpha$ expression> \.{endgroup}\cr
+\andalso\<operator that takes type $\beta$ to type $\alpha$>
+ \<$\beta$ primary>\cr
+\syntaxbreak
+\<$\alpha$ secondary>\is\<$\alpha$ primary>\cr
+\andalso\<$\beta$ secondary>\<multiplicative operator taking types $\beta$ and
+ $\gamma$ to type $\alpha$>\<$\gamma$ primary>\cr
+\syntaxbreak
+\<$\alpha$ tertiary>\is\<$\alpha$ secondary>\cr
+\andalso\<$\beta$ tertiary>\<additive operator taking types $\beta$ and
+ $\gamma$ to type $\alpha$>\<$\gamma$ secondary>\cr
+\syntaxbreak
+\<$\alpha$ expression>\is\<$\alpha$ tertiary>\cr
+\andalso\<$\beta$ expression>\<external operator taking types $\beta$ and
+ $\gamma$ to type $\alpha$>\<$\gamma$ tertiary>\cr}
+These schematic rules don't give the whole story, but they give the
+general structure of the plot.
+
+The complete syntax appears below, as a set of rules that can be used as a
+summary of all the primitive features that \MF\ provides within
+expressions. (We shall see later that macros can be used to extend the
+language; hence this list doesn't really exhaust the possibilities.)
+\syntaxlines{\<expression>\is
+\<boolean expression>\alt
+ \<string expression>\alt
+ \<path expression>\cr
+\andalso \<pen expression>\alt
+ \<picture expression>\alt
+ \<transform expression>\cr
+\andalso \<numeric expression>\alt
+ \<pair expression>\cr
+\<primary>\is
+\<boolean primary>\alt
+ \<string primary>\alt
+ \<path primary>\cr
+\andalso \<pen primary>\alt
+ \<picture primary>\alt
+ \<transform primary>\cr
+\andalso \<numeric primary>\alt
+ \<pair primary>\alt\<future pen primary>\cr
+\<secondary>\is
+\<boolean secondary>\alt
+ \<string secondary>\alt
+ \<path secondary>\cr
+\andalso \<pen secondary>\alt
+ \<picture secondary>\alt
+ \<transform secondary>\cr
+\andalso \<numeric secondary>\alt
+ \<pair secondary>\alt\<future pen secondary>\cr
+\<tertiary>\is
+\<boolean tertiary>\alt
+ \<string tertiary>\alt
+ \<path tertiary>\cr
+\andalso \<pen tertiary>\alt
+ \<picture tertiary>\alt
+ \<transform tertiary>\cr
+\andalso \<numeric tertiary>\alt \<pair tertiary>\cr}
+
+\Bigbreak
+\noindent Boolean expressions:
+\syntaxlines{\<boolean primary>\is
+ \<boolean variable>\alt \.{true}\alt\.{false}\cr
+\andalso\<left delimiter>\<boolean expression>\<right delimiter>\cr
+\andalso\.{begingroup} \<statement list> \<boolean expression> \.{endgroup}\cr
+\andalso \.{known}\<primary>\alt\.{cycle}\<primary>\alt
+ \<type>\<primary>\cr
+\andalso \.{odd}\<numeric primary>\cr
+\andalso\.{charexists}\<numeric primary>\cr
+\andalso \.{not}\<boolean primary>\cr
+\syntaxbreak
+\<boolean secondary>\is\<boolean primary>\cr
+\andalso \<boolean secondary>\.{and}\<boolean primary>\cr
+\syntaxbreak
+\<boolean tertiary>\is\<boolean secondary>\cr
+\andalso \<boolean tertiary>\.{or}\<boolean secondary>\cr
+\syntaxbreak
+\<boolean expression>\is\<boolean tertiary>\cr
+\andalso\<numeric expression>\<relation>\<numeric tertiary>\cr
+\andalso\<string expression>\<relation>\<string tertiary>\cr
+\andalso\<pair expression>\<relation>\<pair tertiary>\cr
+\andalso\<boolean expression>\<relation>\<boolean tertiary>\cr
+\<relation>\is\.<\alt\.{<=}\alt\.>\alt\.{>=}\alt\.=\alt\.{<>}\cr}
+
+\Bigbreak
+\noindent String expressions:
+\syntaxlines{\<string primary>\is
+ \<string variable>\alt \<string token>\cr
+\andalso\<left delimiter>\<string expression>\<right delimiter>\cr
+\andalso\.{begingroup} \<statement list> \<string expression> \.{endgroup}\cr
+\andalso \.{jobname}\alt\.{readstring}\alt\.{str}\<suffix>\cr
+\andalso \.{char}\<numeric primary>\alt\.{decimal}\<numeric primary>\cr
+\andalso \.{substring}\<pair expression>\.{of}\<string primary>\cr
+\syntaxbreak
+\<string secondary>\is\<string primary>\cr
+\syntaxbreak
+\<string tertiary>\is\<string secondary>\cr
+\syntaxbreak
+\<string expression>\is\<string tertiary>\cr
+\andalso\<string expression>\.\&\<string tertiary>\cr}
+
+\Bigbreak
+\noindent Path expressions:
+\syntaxlines{\<path primary>\is
+ \<path variable>\cr
+\andalso\<left delimiter>\<path expression>\<right delimiter>\cr
+\andalso\.{begingroup} \<statement list> \<path expression> \.{endgroup}\cr
+\andalso \.{reverse}\<path primary>\alt\.{makepath}\<pen primary>
+ \alt\.{makepath}\<future pen primary>\cr
+\andalso \.{subpath}\<pair expression>\.{of}\<path primary>\cr
+\syntaxbreak
+\<path secondary>\is\<path primary>\alt\<path secondary>\<transform>\cr
+\syntaxbreak
+\<path tertiary>\is\<path secondary>\cr
+\syntaxbreak
+\<path subexpression>\is\<path tertiary>\alt\<pair tertiary>\cr
+\andalso\<path subexpression>\<path join>\<path tertiary>\cr
+\syntaxbreak
+\<path join>\is\<direction specifier>\<basic path join>\<direction specifier>\cr
+\<direction specifier>\is\<empty>\alt
+ \.{\char`\{curl}\<numeric expression>\.{\char`\}}\cr
+\andalso\.{\char`\{}\<pair expression>\.{\char`\}}\alt
+  \.{\char`\{}\<numeric expression>,\<numeric expression>\.{\char`\}}\cr
+\syntaxbreak
+\<basic path join>\is\.\&\alt\.{..}\alt\.{..}\<tension>\.{..}
+  \alt\.{..}\<controls>\.{..}\cr
+\<tension>\is\.{tension}\<tension amount>\alt
+ \.{tension}\<tension amount>\.{and}\<tension amount>\cr
+\<tension amount>\is\<numeric primary>\alt\.{atleast}\<numeric primary>\cr
+\<controls>\is\.{controls}\<pair primary>\alt
+ \.{controls}\<pair primary>\.{and}\<pair primary>\cr
+\<path expression>\is\<path subexpression>\alt
+\<path subexpression>\<direction specifier>\cr
+\andalso \<path subexpression>\<path join>\.{cycle}\cr}
+
+\Bigbreak
+\noindent Picture expressions:
+\syntaxlines{\<picture primary>\is
+ \<picture variable>\alt\.{nullpicture}\cr
+\andalso\<left delimiter>\<picture expression>\<right delimiter>\cr
+\andalso\.{begingroup} \<statement list> \<picture expression> \.{endgroup}\cr
+\andalso\<plus or minus>\<picture primary>\cr
+\syntaxbreak
+\<picture secondary>\is\<picture primary>\alt\<picture secondary>\<transform>\cr
+\syntaxbreak
+\<picture tertiary>\is\<picture secondary>\cr
+\andalso \<picture tertiary>\<additive op>\<picture secondary>\cr
+\<picture expression>\is\<picture tertiary>\cr}
+
+\Bigbreak
+\noindent Pen expressions:
+\syntaxlines{\<pen primary>\is
+ \<pen variable>\alt\.{nullpen}\cr
+\andalso\<left delimiter>\<pen expression>\<right delimiter>\cr
+\andalso\.{begingroup} \<statement list> \<pen expression> \.{endgroup}\cr
+\<future pen primary>\is
+\.{pencircle}\alt
+\.{makepen}\<path primary>\cr
+\syntaxbreak
+\<pen secondary>\is\<pen primary>\cr
+\<future pen secondary>\is\<future pen primary>\alt
+  \<future pen secondary>\<transform>\cr
+\andalso\<pen secondary>\<transform>\cr
+\syntaxbreak
+\<pen tertiary>\is\<pen secondary>\alt\<future pen secondary>\cr
+\syntaxbreak
+\<pen expression>\is\<pen tertiary>\cr}
+
+\Bigbreak
+\noindent Transform expressions:
+\syntaxlines{\<transform primary>\is
+ \<transform variable>\cr
+\andalso\<left delimiter>\<transform expression>\<right delimiter>\cr
+\andalso\.{begingroup} \<statement list> \<transform expression> \.{endgroup}\cr
+\syntaxbreak
+\<transform secondary>\is\<transform primary>\alt
+  \<transform secondary>\<transform>\cr
+\<transform>\is\.{rotated}\<numeric primary>\alt
+\.{slanted}\<numeric primary>\alt\.{scaled}\<numeric primary>\cr
+\andalso\.{shifted}\<pair primary>\alt
+\.{transformed}\<transform primary>\cr
+\andalso\.{xscaled}\<numeric primary>\alt
+\.{yscaled}\<numeric primary>\alt
+\.{zscaled}\<pair primary>\cr
+\syntaxbreak
+\<transform tertiary>\is\<transform secondary>\cr
+\syntaxbreak
+\<transform expression>\is\<transform tertiary>\cr}
+
+\Bigbreak
+\noindent Numeric expressions:
+\syntaxlines{\<numeric primary>\is
+ \<numeric variable>\alt\<numeric token primary>\alt\.{normaldeviate}\cr
+\andalso\<expression parameter>\alt\<internal quantity>\cr
+\andalso\<left delimiter>\<numeric expression>\<right delimiter>\cr
+\andalso\.{begingroup} \<statement list> \<numeric expression> \.{endgroup}\cr
+\andalso\.{oct}\<string primary>\alt\.{hex}\<string primary>
+\alt\.{ASCII}\<string primary>\cr
+\andalso\.{length}\<string primary>\alt\.{length}\<path primary>\cr
+\andalso\.{length}\<pair primary>\alt\.{length}\<numeric primary>\cr
+\andalso\<pair part specifier>\<pair primary>
+\alt\<transform part specifier>\<transform primary>\cr
+\andalso\<unary operator>\<numeric primary>
+\alt\.{angle}\<pair primary>\cr
+\andalso\.{totalweight}\<picture primary>
+\alt\.{turningnumber}\<path primary>\cr
+\andalso\.{directiontime}\<pair expression>\.{of}\<path primary>\cr
+\<pair part specifier>\is\.{xpart}\alt\.{ypart}\cr
+\<transform part specifier>\is \.{xxpart}\alt\.{xypart}\alt
+\.{yxpart}\alt\.{yypart}\alt \.{xpart}\alt\.{ypart}\cr
+\<scalar multiplication operator>\is
+ \.+\alt\.-\cr
+\andalso\<numeric token primary not followed by \.+ or \.- or numeric token>\cr
+\<numeric token primary>\is\<numeric token
+  not followed by `\./$\langle$numeric token$\rangle$'\thinspace>\cr
+\andalso \<numeric token>\./\<numeric token>\cr
+\<unary operator>\is\<scalar multiplication operator>\cr
+\andalso\.{sqrt}\alt\.{mexp}\alt\.{mlog}\alt\.{sind}\alt\.{cosd}\alt
+\.{floor}\alt\.{uniformdeviate}\cr
+\syntaxbreak
+\<numeric secondary>\is\<numeric primary>\cr
+\andalso\<numeric secondary>\<multiplicative op>\<numeric primary>\cr
+\andalso\<numeric secondary>\.[\<numeric expression>\.,
+  \<numeric expression>\.]\cr
+\<multiplicative op>\is\.*\alt\./\cr
+\syntaxbreak
+\<numeric tertiary>\is\<numeric secondary>\cr
+\andalso\<numeric tertiary>\<additive op>\<numeric secondary>\cr
+\andalso\<numeric tertiary>\<pythagorean additive op>\<numeric secondary>\cr
+\<additive op>\is\.+\alt\.-\cr
+\<pythagorean additive op>\is\.{++}\alt\.{+-+}\cr
+\syntaxbreak
+\<numeric expression>\is\<numeric tertiary>\cr}
+
+\Bigbreak
+\noindent Pair expressions:
+\syntaxlines{\<pair primary>\is
+ \<pair variable>\cr
+\andalso\<left delimiter>\<numeric expression>\.,
+  \<numeric expression>\<right delimiter>\cr
+\andalso\<left delimiter>\<pair expression>\<right delimiter>\cr
+\andalso\.{begingroup} \<statement list> \<pair expression> \.{endgroup}\cr
+\andalso\.{point}\<numeric expression>\.{of}\<path primary>\cr
+\andalso\.{precontrol}\<numeric expression>\.{of}\<path primary>\cr
+\andalso\.{postcontrol}\<numeric expression>\.{of}\<path primary>\cr
+\andalso\.{penoffset}\<pair expression>\.{of}\<pen primary>\cr
+\andalso\.{penoffset}\<pair expression>\.{of}\<future pen primary>\cr
+\andalso\<scalar multiplication operator>\<pair primary>\cr
+\syntaxbreak
+\<pair secondary>\is\<pair primary>\cr
+\andalso\<pair secondary>\<multiplicative op>\<numeric primary>\cr
+\andalso\<numeric secondary>\.*\<pair primary>\cr
+\andalso\<numeric secondary>\.[\<pair expression>\.,\<pair expression>\.]\cr
+\andalso\<pair secondary>\<transform>\cr
+\syntaxbreak
+\<pair tertiary>\is\<pair secondary>\cr
+\andalso\<pair tertiary>\<additive op>\<pair secondary>\cr
+\andalso\<path tertiary>\.{intersectiontimes}\<path secondary>\cr
+\syntaxbreak
+\<pair expression>\is\<pair tertiary>\cr}
+
+  One of the most important consequences of these rules is that \MF\
+always knows the type of the expression it is dealing with. For example,
+a \<pair variable> is a variable that has been declared to have type
+\.{pair}; such a variable will be recognized as a \<pair expression>
+and not as any other kind of expression. There are only a few exceptions:
+(1)~A \<pair tertiary> can be a \<path subexpression>; but it
+is considered to be only a \<pair tertiary> unless the \<path
+subexpression> interpretation is mandatory, i.e., unless followed by
+`\.{\char`\{}', `\.{..}', or `\.{\&}'. The boolean expression `\.{path((0,0))}'
+is false.  (2)~A \<boolean expression> like `\.{x=y}' that involves the
+equality relation looks something like an equation. \MF\ will consider an
+equals sign to be a \<relation> unless the expression to its left occurs
+at the very beginning of a statement, or just after an equals sign
+or `\.{:=}' in an equation or assignment.
+(3)~Similarly, a \<type> that occurs at the beginning of a statement
+is not considered to be part of a \<boolean primary>; it is considered to
+be the beginning of a type declaration.
+(4)~After a \<path join>, the `\.{cycle}' operator is not considered
+to be part of a \<boolean primary>.
+
+\newsection 4. Macro definitions.
+
+\MF's most powerful way to produce new high-level constructions is to make
+one token stand for a combination of other tokens. One easy way to
+make this happen is to say
+$$\hbox{\.{def} \<symbolic token> \.=
+  \<replacement text> \.{enddef};}$$
+this is called a {\it definition}.  For example, the definition
+$$\hbox{\tt def -- = - - enddef}$$
+simply says that the token `\.{--}' is to be replaced by two
+consecutive `\.-' tokens. Here's an even more trivial definition:
+$$\hbox{\tt def \char`\\\ = enddef;}$$
+it causes a single backslash token to be replaced by nothing at all.
+(\MF\ actually has this definition built in, because it makes
+the use of \MF\ analogous to the use of \TeX, especially in command
+lines when you're running the program.)
+
+More interesting definitions include parameters that are replaced by
+arguments when the token appears later. In this way definitions provide
+the capabilities of subroutines as well as the features of simple macro
+expansion.  It's convenient for the sake of brevity to give the general
+rules first, and examples later---even though good expository technique
+would go the other way; so here's more syntax:
+\syntaxlines{\<definition>\is\<definition heading>\.=\<replacement
+  text>\.{enddef}\cr
+\<definition heading>\is\.{def}\<symbolic token>\<parameter heading>\cr
+\andalso\.{vardef}\<defined variable>\<parameter heading>\cr
+\<parameter heading>\is\<parameter list>
+  \<undelimited parameter heading>\cr
+\<parameter list>\is\<empty>\alt\<parameter list>\<parameter declaration>\cr
+\<parameter declaration>\is\<left delimiter>\<parameter type>
+  \<parameter tokens>\<right delimiter>\cr
+\<parameter type>\is\.{expr}\alt\.{text}\alt\.{suffix}\cr
+\<parameter tokens>\is\<tag>\alt\<parameter tokens>\.,\<tag>\cr
+\<defined variable>\is\<declared variable>\alt
+  \<declared variable>\.{@\#}\cr}
+For example, the parameter list
+$$\hbox{\tt (suffix i,j)(text foo)(expr */*)}$$
+introduces four parameter
+tokens `\.i', `\.j', `\.{foo}', and `\.{*/*}'; they will be
+treated specially whenever they occur within the \<replacement
+text>.
+
+The \<replacement text> is any sequence of tokens that is balanced with
+respect to unquoted \.{def} and \.{enddef} tokens.
+This rule needs some explanation:
+There's a primitive operation (initially called \.{quote}) that
+inhibits special interpretation of whatever token follows it in a
+replacement text. A few
+tokens are treated specially when \MF\ is scanning the replacement text of
+a definition, unless they've been quoted:
+
+\smallskip\item{1)}\.{def}, \.{vardef}, \.{primarydef}, \.{secondarydef},
+and \.{tertiarydef}, which introduce definitions inside definitions.
+
+\item{2)}\.{enddef}, which ends the replacement text unless it is matched
+by a preceding \.{def}-like token as listed in rule~1.
+
+\item{3)}a parameter token (like `\.i' or `\.{*/*}' in the example above),
+which is replaced by a special internal token that will tell \MF\ to
+substitute an argument when this token is encountered again.
+
+\item{4)}\.{quote}, which disables any special interpretation of the
+immediately following token; this token doesn't survive in the
+replacement text, unless of course it has been quoted.
+
+\item{5)}\.{\#@}, \.@, and \.{@\#}, which will be replaced respectively by
+the prefix, the name, and the suffix of this macro when it's used.
+(This rule applies only to \.{vardef} macros; and \.{@\#} is replaced only
+when the \<defined variable> in the definition heading ends with \.{@\#}.)
+
+\smallskip\noindent
+Rule 5 is the only unusual one, but the examples below should make it clear.
+The mnemonic for distinguishing \.{\#@} from \.{@\#} is that the \.@ sign
+represents where the macro is ``at,'' and the other sign retrieves the
+tokens that either precede or follow the ``at'' position.
+
+It may be worthwhile to reiterate the fact that these rules don't
+really apply to the specific tokens \.{enddef}, \.{quote}, \.{\#@}, \.@, and
+\.{@\#}; they apply to tokens whose meaning (at the time \MF\ is
+recording the definition) is the same as the primitive meaning that those
+other tokens had when \MF\ was started up. In particular, if the meanings
+of \.{enddef}, \.{quote}, \.{\#@}, \.@, and \.{@\#} have changed at the time of
+definition recording, no quoting is actually necessary. But some other
+token had better have received the meaning of \.{enddef}, or the definition
+will never end!
+
+A defined quantity that has parameters must be supplied with corresponding
+{\sl arguments\/} when it is used.  The arguments are enclosed in
+delimiters (usually parentheses). It's also possible to use a comma
+between arguments; in this context a comma can be thought of as an
+abbreviation for \<right delimiter>\<left delimiter> with respect to the
+delimiter pair that preceded the comma.
+
+The argument corresponding to a parameter of type \.{expr} can be any
+\<expression>.  This expression is effectively parenthesized before it is
+substituted into the replacement text, hence it occurs as a \<primary> in
+expressions.  Expression parameters are evaluated as much as possible
+before the macro is invoked, but they need not have ``known'' values. They
+should not appear on the left of `\.{:=}' operations.
+
+The argument corresponding to a parameter of type \.{suffix} can be any
+\<suffix>.  Subscripts in that suffix, if any, will have been evaluated
+and replaced by (signed) numeric tokens of the corresponding value, before
+the argument is actually substituted into the replacement text.
+
+The argument corresponding to a parameter of type \.{text} is any sequence
+of tokens that are balanced with respect to the enclosing delimiters.
+This means that text arguments cannot be followed by commas. For example,
+a list of three arguments can usually be given either as `\.{(a,b,c)}'
+or `\.{(a,b)(c)}' or `\.{(a)(b,c)}' or `\.{(a)(b)(c)}'; but only the
+second and last of these alternatives is permitted when the second
+argument corresponds to a text parameter. Since delimiters need not
+be parentheses, a text argument need not be balanced with respect
+to parentheses; but it's usually not a good idea to play with
+unbalanced parentheses unless you have a really special reason. Text
+arguments are not ``evaluated'' at the time of a macro call; they are
+simply stored away, and substituted for the corresponding parameter when
+it shows up in the replacement text.
+
+The defined quantity in a \.{vardef} can be any \<defined variable>, not simply
+a \<tag>; for example, you can define `\.{a[]b@\#}'. What does this mean? Well,
+it means that a supposed variable name like `\.{a35b42c.d}' becomes a
+macro call instead. The prefix that gets substituted for \.{\#@} in the
+replacement text will be `\.{a35}' in this example; the name that gets
+substituted for \.@ will be `\.b'; and the suffix that gets substituted
+for \.{@\#} will be `\.{42c.d}'. In simpler cases the prefix and suffix
+are empty. If there's no \.{@\#} at the end of the \<defined variable>,
+the suffix part is always empty. For example, after a definition of
+\.{a[]b}, the text `\.{a35b42c.d}' will be interpreted as simply `\.{a35b}'
+and \MF\ will not look ahead for a suffix.
+
+One of the important definitions in the \.{PLAIN} base is
+$$\hbox{\tt vardef z@\# = (x@\#,y@\#) enddef};$$
+it converts variable names like `\.{z20}' and `\.{z[i]r}' into
+`\.{(x20,y20)}' and `\.{(x[i]r,y[i]r)}', respectively, making it
+possible to give convenient names to the components of a pair
+variable without explicitly defining \.z as a pair variable.
+Consider also the definition
+$$\hbox{\tt vardef p[]slope=(\#@dx,\#@dy) enddef};$$
+this converts, e.g., `\.{p5slope}' into `\.{(p5dx,p5dy)}'.
+
+\MF\ actually puts \.{begingroup...endgroup} around the replacement text of
+\.{vardef}'ed macros, in order to make them variable-like.
+Thus, `\.{z20}' really stands for `\.{begingroup}~\.{(x20,y20)}~\.{endgroup}'.
+
+Here now are a few more examples, as promised. The first one
+is intended to set up a triple of points that represent the position
+of a broad pen. For example, `\.{penpos(3,20,45)}' will stand for pen
+position~3 at which the pen is 20~pixels broad and inclined at an
+angle of $45^\circ$; there will be three points \.{z3}, \.{z3l}, and
+\.{z3r}, representing the middle of the pen, its left edge, and its
+right edge. Here's one way to define \.{penpos} accordingly:
+$$\vcenter{\halign{\tt#\hfil\cr
+def penpos(suffix i)(expr l,theta)=\cr
+\ \ \ \ \ z.i.r-z.i.quote l = (l,0) rotated theta;\cr
+\ \ \ \ \ z.i = .5[z.i.quote l, z.i.r] enddef\cr}}$$
+Now the tokens `\.{penpos(4,15,d+90)}' will expand into
+`\.{z4r-z4l=(15,0)rotated135;} \.{z4=.5[z4l,z4r]}', if \.{d=45}. It
+wouldn't have been necessary to quote any of the appearances of `\.l' if
+another name had been chosen for the parameter. For example,
+$$\vcenter{\halign{\tt#\hfil\cr
+def penpos(suffix i)(expr length,theta)=\cr
+\ \ \ \ \ z.i.r-z.i.l = (length,0) rotated theta;\cr
+\ \ \ \ \ z.i = .5[z.i.l, z.i.r] enddef\cr}}$$
+would have been simpler. The \.{quote} operation has been provided
+mostly to permit definitions within definitions, not to compensate for
+poorly chosen parameter names.
+
+The following example illustrates the use of a text parameter.
+$$\vcenter{\halign{\tt#\hfil\cr
+def label(text t)=\cr
+\ \ \ \ \ forsuffixes \$=t:\ autolabel(z\$,"point"\&str\$); endfor\cr}}$$
+The expansion of `\.{label(1,[i+1],7a)}' will be
+$$\hbox{\tt forsuffixes \$=1,[i+1],7a:\
+  autolabel(z\$,"point"\&str\$); endfor}$$
+and this, in turn, is a macro-like construction that essentially expands into
+$$\hbox{\tt autolabel(z1,"point1"); autolabel(z2,"point2");
+  autolabel(z7a,"point7a");}$$
+if \.{i=1}, after which the `\.{autolabel}' and `\.z' macros expand the
+text even more.
+
+Going back to the syntax for \<parameter heading>, you'll note that there's
+something called an \<un\-delim\-ited parameter heading> that hasn't yet been
+explained. Well, here's the missing syntax:
+\syntaxlines{\<undelimited parameter heading>\is\<empty>\alt
+ \.{primary}\<tag>\alt\.{secondary}\<tag>\alt\.{tertiary}\<tag>\cr
+\andalso\.{expr}\<tag>\alt\.{expr}\<tag>\.{of}\<tag>\cr
+\andalso\.{suffix}\<tag>\alt\.{text}\<tag>\cr}
+In this case the macro works just as usual, but its arguments are parsed
+like the components of expressions or statements; no delimiters are required.
+The first undelimited argument may be preceded by an optional
+`\.=' or `\.{:=}' (except in the case of undelimited text arguments).
+When `\.{primary}\<tag>' is given, the argument is a \<primary>; when
+`\.{expr}\<tag>' is given, the argument is an \<expression>;
+and `\.{expr}\<tag>\.{of}\<tag>' parses the first argument as an
+expression and the second as a primary. This essentially extends the
+syntax of \MF\ expressions so that additional operators are provided.
+An undelimited text argument runs until the end of the current statement;
+more precisely, until the next semicolon or
+\.{endgroup} or \.{end} that is not nested inside \.{begingroup..endgroup}.
+
+For example, plain \MF\ defines rounding as follows:
+$$\hbox{\tt vardef round primary x = floor(x+.5) enddef};$$
+it's not necessary to put parenthesis around the argument when that
+argument is a numeric primary as in `\.{round 1.5u}'. And here's
+a slightly more complex example that rounds its argument to a ``good''
+value with respect to a given ``pen width'' \.{w[i]}:
+$$\vcenter{\halign{\tt#\hfil\cr
+vardef good[] primary x=\cr
+\ \ begingroup save t;\cr
+\ \ if odd w@: t=(floor x)+.5;\cr
+\ \ else: t=round x;\cr
+\ \ fi; t endgroup enddef\cr}}$$
+Now, for example, if \.{w3=4.9} and \.{x10=15.2}, the result of
+`\.{good3 x10}' will be 15.5.
+
+The following example defines a transform that is like a given one but
+fixes the origin:
+$$\hbox{\tt vardef unshifted primary t =
+  t shifted-((0,0) transformed t) enddef}$$
+And here's an absolute-value operator that works on pairs and numbers:
+$$\vcenter{\halign{\tt#\hfil\cr
+def abs primary x =\cr
+\ \ if pair x: (xpart x ++ ypart x)\cr
+\ \ elseif numeric x: if x<0: (-x) else: x fi\cr
+\ \ else: x fi\cr
+\ \ enddef\cr}}$$
+
+It's also possible to define macros that act as infix operators:
+\syntaxlines{\<infix definition>\is
+ \<level indicator>\<tag>\<symbolic token>\<tag>\.=%
+  \<replacement text>\.{enddef}\cr
+\<level indicator>\is\.{primarydef}\alt
+ \.{secondarydef}\alt\.{tertiarydef}\cr}
+For example,
+$$\hbox{\tt secondarydef x++y = sqrt(x*x+y*y) enddef}$$
+would be a way to define the \.{++} operator. (However, \MF's built-in
+\.{++} is much better, because it won't overflow when \.{x*x} or \.{y*y}
+are out of range.) Exponentiation can be defined by
+$$\hbox{\tt primarydef x**y = mexp(y*mlog x) enddef}$$
+but such a definition blows up when $x<0$ and $y=2$. Here's a better way:
+$$\vcenter{\halign{\tt#\hfil\cr
+primarydef x**y =\cr
+\ \ begingroup save t;\cr
+\ \ if y=2: t=x*x; \% that's the most common case\cr
+\ \ elseif x>0: t=mexp(y*mlog x);\cr
+\ \ elseif y=floor y: t=1;\cr
+\ \ \ \ if y>=0: for n=1 step 1 until y:  t:=t*x endfor;\cr
+\ \ \ \ else: for n=-1 step -1 until y: t:=t/x endfor;\cr
+\ \ \ \ fi;\cr
+\ \ else: errmessage("Undefined power " \& decimal x \& "**" \& decimal y);\cr
+\ \ \ \ t=1;\cr
+\ \ fi; t endgroup enddef\cr}}$$
+The \<level indicator> indicates how the arguments should be parsed
+within \MF\ expressions.  If it is `\.{primarydef}', the first argument is
+parsed as a secondary and the second as a primary; if it is
+`\.{secondarydef}', the first argument is parsed as a tertiary and the
+second as a secondary; if it is `\.{tertiarydef}', the first argument is
+parsed as an expression and the second as a tertiary.
+
+Here is a way to define the sum of two transforms:
+$$\vcenter{\halign{\tt#\hfil\cr
+secondarydef x transum y =\cr
+\ \ begingroup save t; transform t;\cr
+\ \ (0,1) transformed t = (0,1) transformed x + (0,1) transformed y;\cr
+\ \ (1,0) transformed t = (1,0) transformed x + (1,0) transformed y;\cr
+\ \ (0,0) transformed t = (0,0) transformed x + (0,0) transformed y;\cr
+\ \ t endgroup enddef\cr}}$$
+
+A symbolic token whose current meaning was defined in a \.{def} or an
+infix definition is not usable as a \<tag> in a variable; it has become
+a spark. But the symbolic tokens defined by \.{vardef} are like
+variables, except that their suffixes no longer carry values. For example,
+after making the definitions above, it is obviously impossible to refer
+to a variable called `\.{x.transum}' or `\.{good3y}'; but `\.{x.good}'
+would be OK.
+
+\newsection 5. Conditions and loops.
+
+\MF\ also handles a few other things with a macro-like behavior, in the
+sense that they effectively change the text that reaches \MF's ``stomach.''
+The first of these allows you to select between different pieces of program:
+\syntaxlines{\<conditional>\is\.{if}\<boolean expression>\.:%
+  \<conditional text>\<alternatives>\.{fi}\cr
+\<alternatives>\is\<empty>\alt\.{else:}\<conditional text>\cr
+\andalso\.{elseif}\<boolean expression>:\<conditional text>\<alternatives>\cr}
+Conditionals are expanded whenever macros would be expanded, as in \TeX;
+in particular, conditionals are permitted in the middle of expressions and
+commands. When you write
+$$\hbox{\tt if $\beta_1$: \<text$_1$> elseif $\beta_2$: \<text$_2$>
+  elseif $\beta_3$: \<text$_3$> else: \<text$_4$> fi}$$
+\MF\ will evaluate $\beta_1$ first; if it's true, \<text$_1$> will be
+interpreted and everything else from \.{elseif} to \.{fi} will be ignored.
+But if $\beta_1$ is false, \<text$_1$> will be ignored and $\beta_2$
+will be evaluated in a similar fashion. Ultimately if $\beta_1$, $\beta_2$,
+and~$\beta_3$ all turn out to be false, \<text$_4$> will be read.
+
+The conditional texts inside a conditional construction are arbitrary
+sequences of tokens that are balanced with respect to \.{if} and \.{fi}.
+
+There's also a general iteration facility:
+\syntaxlines{\<iteration>\is\.{for}\<symbolic token>\<gets>\<expression list>%
+  \.:\<iterated text>\.{endfor}\cr
+\andalso\.{for}\<symbolic token>\<gets>\<arithmetic progression>%
+  \.:\<iterated text>\.{endfor}\cr
+\andalso\.{forsuffixes}\<symbolic token>\<gets>\<suffix list>%
+  \.:\<iterated text>\.{endfor}\cr
+\andalso\.{forever}\.:\<iterated text>\.{endfor}\cr
+\<gets>\is\.=\alt\.{:=}\cr
+\<expression list>\is\<expression>\alt\<expression list>\.,\<expression>\cr
+\<suffix list>\is\<suffix>\alt\<suffix list>\.,\<suffix>\cr
+\<arithmetic progression>\is\<initial value and step size>%
+  \.{until}\<numeric expression>\cr
+\<initial value and step size>\is\<numeric expression>\.{step}%
+  \<numeric expression>\cr
+\<exit clause>\is\.{exitif}\<boolean expression>\.;\cr}
+Here \<iterated text> is any sequence of tokens that is balanced with
+respect to unquoted appearances of \.{for}/\.{forsuffixes}/\.{forever}
+and \.{endfor} delimiters.
+
+These iterative statements have the conventional meaning of similar
+constructions in other languages, but it is necessary to spell out the
+rules precisely because each language has certain quirks. The statement
+$$\hbox{\tt forsuffixes s = $\sigma_1$,$\sigma_2$,$\sigma_3$:
+  \<text> endfor}$$
+is equivalent to
+$$\hbox{\tt \<text($\sigma_1$)> \<text($\sigma_2$)> \<text($\sigma_3$)>}$$
+where \<text($\sigma$)> means that the value of suffix $\sigma$ is inserted
+in place of the token~\.s in the text. It's just as if \.s were a \.{suffix}
+parameter to a macro; subscripts in $\sigma_1$, $\sigma_2$, and~$\sigma_3$
+are evaluated before the replacement is done. Similarly
+$$\hbox{\tt for e = $\epsilon_1$,$\epsilon_2$,$\epsilon_3$: \<text> endfor}$$
+is equivalent to
+$$\hbox{\tt \<text($\epsilon_1$)> \<text($\epsilon_2$)>
+  \<text($\epsilon_3$)>}$$
+with \.e treated as an \.{expr} parameter.
+
+Arithmetic progressions are similar but the rules are slightly more fussy.
+The statement
+$$\hbox{\tt for n = 1 step 2 until 7: \<text> endfor}$$
+is equivalent to
+$$\hbox{\tt for n = 1,3,5,7: \<text> endfor}$$
+but
+$$\hbox{\tt for n = 1 step 2 until 0: \<text> endfor}$$
+skips over the text entirely. In general
+$$\hbox{\tt for n = $\nu_1$ step $\nu_2$ until $\nu_3$: \<text> endfor}$$
+causes \MF\ to evaluate the expressions (once and for all) and then to
+form an arithmetic progression of values as follows:
+If $\nu_2>0$ and $\nu_1>\nu_3$, or if $\nu_2<0$ and $\nu_1<\nu_3$,
+the sequence is empty; otherwise the sequence is $\nu_1$ followed by the
+sequence that would be obtained if $\nu_1+\nu_2$ were substituted
+for~$\nu_1$. (In particular, if $\nu_2=0$ the sequence is $\nu_1$,
+$\nu_1$, $\nu_1$, \dots\ repeated endlessly.)
+
+In all of these instances the iteration index (i.e., the tokens
+\.s, \.e, and \.n in our examples) are treated as macro parameters
+inside the \<iterated text>; they have no connection with similarly named
+variables elsewhere in the program. For example, if you say
+$$\hbox{\tt n=0; for n=1: m=n; endfor; show m,n}$$
+you will find that \.{m=1} and \.{n=0}.
+
+Nested iterations like the following are possible:
+$$\vcenter{\halign{\tt#\hfil\cr
+for i=1 step 1 until n:\cr
+\ for j=i+1 step 1 until n: a[i][j]=a[j][i]; endfor; endfor\cr}}$$
+But \MF\ can't do such things with super efficiency; in this example,
+it has to scan and redefine and undefine the inner \.{for} loop
+\.n~times.
+
+The `\.{forever}' construction iterates the text repeatedly, and you
+may well wonder how this could possibly be useful. Well, there's a way to
+get out of a loop without terminating it normally. When \MF\ encounters
+the construction
+$$\hbox{\.{exitif}\<boolean expression>\.;}$$
+as it interprets an iterated text, it will conclude the iteration
+immediately if the boolean expression is true.
+
+There are a few other things that transform program text something like
+macro expansion. The construction `\.{expandafter}\<token>\<token>'
+expands the second token before the first, as in \TeX. The construction
+`\.{scantokens}\<string primary>' converts the string primary to a
+sequence of tokens as if it were a line of characters read from a file.
+
+If \MF\ encounters the construction `\.{input} \<filename>' while reading
+a file, it will begin to read from the specified file instead (and will
+resume the previous file later). This operation is permitted only when
+\MF\ is scanning a line of characters that have not yet been converted to
+tokens; otherwise the file name might be garbaged by the tokenizing process.
+(You can use \.{input} inside macros by saying, e.g., `\.{scantokens}
+\.{"input} \<filename>\.{"}.)
+The command `\.{endinput}' tells \MF\ to cease reading a particular file
+at the end of the current line. As in \TeX, the syntax of file names
+is system dependent, and both of these commands are performed only
+when they are ``expanded'' like macros and conditionals.
+
+Here's a somewhat silly program that illustrates a few of these ideas:
+$$\vcenter{\halign{\tt#\hfil\cr
+Yes=1; No=0;\cr
+forever: message "Are you happy? ";\cr
+\ result:=scantokens readstring;\cr
+\ exitif known result;\cr
+\ message "(Please type Yes or No.)";\cr
+endfor;\cr}}$$
+The user is assumed to be cooperative; lots of potential responses
+in this example would get \MF\ incredibly mixed up. There is a
+safer alternative:
+$$\vcenter{\halign{\tt#\hfil\cr
+string answer;\cr
+forever: message "Are you happy? ";\cr
+\ answer:=readstring;\cr
+\ exitif answer="Yes";\cr
+\ exitif answer="No";\cr
+\ message "(Please type Yes or No.)";\cr
+endfor;\cr}}$$
+
+\newsection 6. Statements and commands.
+
+A \MF\ program is a sequence of statements separated by semicolons and
+followed by \.{end}. More precisely, the syntax
+\syntaxlines{\<program>\is\<statement list> \.{end}\cr
+\<statement list>\is\<empty>\alt\<statement>\.;\<statement list>\cr}
+defines a \<program> in terms of a \<statement>.
+
+But what are statements? Well, they are of various kinds. An ``equation''
+states that two expressions are supposed to be equal. An ``assignment''
+assigns the value of an expression to a variable. A ``declaration''
+states that certain variables will have a certain type.
+A ``definition'' defines a macro.  A ``title''
+gives a descriptive name to the character that is to follow.
+And a ``command'' orders \MF\ to do some specific operation, immediately.
+\syntaxlines{\<statement>\is\<equation>\alt\<assignment>\alt
+ \<declaration>\alt\<definition>\alt\<title>\alt\<command>\cr
+\andalso\.{begingroup} \<statement list> \<statement> \.{endgroup}\cr
+\<equation>\is\<expression>\.=\<right-hand side>\cr
+\<assignment>\is\<variable>\.{:=}\<right-hand side>\cr
+\<right-hand side>\is\<expression>\alt\<equation>\alt\<assignment>\cr
+\<title>\is\<string expression>\cr}
+We have already given the syntax and rules for \<declaration> and
+\<definition>; the syntax for each of the various kinds of \<command>
+appears below.
+
+Multiple equations and assignments are performed from right to left.
+For example,
+$$\hbox{\tt x+1=y:=y+1=z:=1/2x=z+2}$$
+first equates \.{.5x} to \.{z+2}, then assigns this common value to \.z,
+then equates \.z to \.{y+1}, then assigns this to \.y, and finally
+equates \.y to \.{x+1}. This, of course, is more complicated than anything
+a person ought to write, but it is still instructive to see what it means.
+Let's suppose that \.x, \.y, and \.z have not appeared in any equations
+or assignments before this point. Then `\.{1/2x=z+2}' makes \.x an
+independent variable and gives \.z the value \.{.5x-2}. The next
+assignment wipes this out and gives \.z the value \.{.5x} instead.
+Then \.{y+1} is equated to \.z, so \.y becomes equal to \.{.5x-1};
+but the subsequent assignment wipes out \.y's former value and
+makes it \.{.5x}. Finally, the equation \.{x+1=y} becomes \.{x+1=.5x},
+so \.x is set to $-2$; this causes \.y and \.z to become equal to~$-1$.
+
+A numeric variable is either ``independent'' or ``dependent'' or ``known.''
+Before it receives a value it is independent; later it may be expressed as
+a linear combination of independent variables (e.g., `\.{.5x-2}'); and
+eventually its value ought to become precisely known, so that we can do
+something with it. Every equation that \MF\ encounters is transformed
+into a linear combination of independent variables that is equated to zero.
+An independent variable whose coefficient is greatest, in absolute value,
+is chosen to depend on the others; this variable becomes dependent
+or known. Notice that each equation reduces the number of independent
+variables by one, unless the equation is redundant (e.g., `\.{x=x}')
+or inconsistent (e.g., `\.{0=1}'). Thus if you have $n$ independent variables,
+you should give $n$ equations in order to define their values.
+
+Each component of a pair or transform variable is, similarly,
+independent or dependent or known. An equation between pair expressions
+is equivalent to two equations (one for the $x$~part, and one for the
+$y$~part). Similarly, an equation between transform expressions is
+equivalent to six equations. \MF\ won't complain if one or more of these
+equations prove to be redundant, although it does report an error if
+two unequal expressions of type \.{numeric} have been equated.
+
+The other five types of variables can appear in equations, but only
+in simple ways. A boolean, string, pen, picture, or path variable is
+either ``unknown'' or ``known.'' Unknown variables of these types should
+appear only by themselves on one side or the other of an equation. If, for
+example, \.{s[]} is an array of strings, \MF\ will be able to deduce from
+$$\hbox{\tt s1=s2; s3=s4; s1=s3; s2="gosh";}$$
+that \.{s4} equals \.{"gosh"}. But \MF\ will {\it not\/} be able to
+deduce from the equation \.{"h"\&s5="heck"} that \.{s5="eck"}.
+
+\MF\ prefers equations to assignments. If you find yourself using
+assignments a lot, you are probably not getting the best results;
+you're still locked into old-style ``imperative'' programming languages,
+poor soul.
+
+So much for equations and assignments. A \<title> is a string that
+is simply ignored as if it were a comment, except in two circumstances:
+If \.{tracingtitles>0}, the title is displayed on the user's terminal
+when it is encountered. And if \.{proofing>0}, the title is written
+into the output so that it can be displayed as a caption on
+the proofsheet that follows.
+
+The quantities \.{tracingtitles} and \.{proofing}, just mentioned,
+are special internal variables of \MF, by which it is possible to interact
+with the system in a variety of ways. Here is a complete
+list of \MF's internal variables, together with a brief indication
+of their meanings:
+$$\tabskip\centering
+\halign to\hsize{\tt#\hfil\quad\tabskip0pt&#\hfil\tabskip\centering\cr
+tracingtitles&show titles online when they appear\cr
+tracingequations&show each variable when it becomes known via an equation\cr
+tracingcapsules&show capsules as well as variables\cr
+tracingchoices&show the control points chosen for paths\cr
+tracingspecs&show subdivision of paths into octants before digitizing\cr
+tracingpens&show details of pens that are made\cr
+tracingcommands&show commands and operations before they are performed\cr
+tracingmacros&show macros before they are expanded\cr
+tracingedges&show digitized edges as they are computed\cr
+tracingoutput&show digitized edges as they are output\cr
+tracingstats&log the memory usage at end of job\cr
+tracingonline&show long diagnostics on terminal as well as in the log file\cr
+year&the current year (e.g., 1984)\cr
+month&the current month (e.g, 3 $\equiv$ March)\cr
+day&the current day of the month\cr
+time&the number of minutes since midnight when this job started\cr
+charcode&the number of the next character to be output\cr
+charfam&the class of the next character to be output\cr
+charwd&the width of the next character to be output\cr
+charht&the height of the next character to be output\cr
+chardp&the depth of the next character to be output\cr
+charic&the italic correction of the next character to be output\cr
+chardx&horizontal device displacement of the next character, in pixels\cr
+chardy&vertical device displacement of the next character, in pixels\cr
+designsize&the unit of measure used for \.{charwd...charic}, in points\cr
+hppp&the number of horizontal pixels per point\cr
+vppp&the number of vertical pixels per point\cr
+pausing&positive to display lines before they are executed\cr
+proofing&positive for proof mode, negative if there's no output at all\cr
+fontmaking&positive if font metric output is to be produced\cr
+showstopping&positive if \.{show} commands are to stop like errors\cr
+smoothing&positive if certain glitches are to be removed automatically\cr
+autorounding&positive to fix horizontal/vertical curve points;
+ $>1$ for diagonals\cr
+granularity&the number of pixels per ``large'' pixel\cr
+warningcheck&positive for warnings when variables get large values\cr
+turningcheck&positive to reorient clockwise paths;
+ $>1$ to flag strange ones\cr}$$
+All of these quantities are numeric, and initially zero (except for
+\.{year}, \.{month}, \.{day}, and \.{time}, which are initialized to
+the time the run began). Plain \MF\ sets \.{smoothing:=1} and
+\.{autorounding:=2}, because such adjustments are usually desirable.
+You can use any of these quantities
+in expressions or on the left-hand side of assignments---they show up
+under the heading \<internal quantity> in the syntax rules above---but
+when you assign a new value to them it should be numeric and ``known.''
+
+\medbreak
+All of the remaining statements of \MF\ are called {\it commands}, and they
+will be listed here in a more or less arbitrary order. Macros and
+conditionals and such things are not expanded in commands when the
+next token is being defined or used in some unusual way; but expansion
+usually happens unless there's a good reason for not doing so.
+
+\def\@{\bigskip\textindent{$\bullet$}}
+\@A {\it save command\/} has the syntax
+\syntaxlines{\<save command>\is\.{save}\<symbolic token list>\cr
+\<symbolic token list>\is\<symbolic token>\alt
+ \<symbolic token list>\.,\<symbolic token>\cr}
+This tells \MF\ to put the current meaning of the symbolic tokens into
+a safe place, and to restore those meanings at the end of the current
+group. Each token in the list becomes undefined, as if it had never appeared
+before; in particular, it loses any ``primitive'' meaning that
+would have prevented it from being used as a \<tag>.
+
+\@An {\it interim command\/}
+$$\hbox{\.{interim}\<internal quantity>\.{:=}\<right-hand side>}$$
+acts like an ordinary assignment, but the previous value of the internal
+quantity is saved away, to be restored at the end of the current group.
+
+\@The {\it let command\/}
+$$\hbox{\.{let}\<symbolic token>\.=\<symbolic token>}$$
+assigns the current meaning of the right-hand token as the current
+meaning of the left-hand token. For example, after
+`\.{let} \.{diamonds=forever}', the token `\.{diamonds}' will introduce
+loops. If the left-hand token was the
+first token in any variable names, those variables all disappear.
+If the right-hand token was the first token in any variable names,
+those variables still have their old names; the left-hand token
+will act like an undefined variable in that case. (The purpose of
+\.{let} is to redefine primitive meanings, not variable names.)
+
+Note: If the right-hand symbol is one of a pair of matching delimiters,
+the subsequent behavior of the left-hand symbol is undefined. For
+example, it's a bad idea to say `\.{let[[=(;} \.{let]]=)}'.
+
+\@The {\it shipout command\/}
+$$\hbox{\.{shipout}\<picture expression>}$$
+puts the pixels of positive weight, as defined by the given picture,
+into a generic font output file, where they will be the image associated
+with character number \.{charcode+256*charfam}. (However, no output is done
+if \.{proofing<0}.) This command also saves the \.{charwd}, \.{charht},
+\.{chardp}, \.{charic}, and \.{chardw} values and associates them with
+the current \.{charcode} number modulo~256. (The \.{charcode}, \.{charfam},
+and \.{chardw} values are rounded to integers before \.{shipout} uses them.)
+
+\@The {\it special commands\/} $$\hbox{\.{special}\<string expression>\alt
+\.{numspecial}\<numeric expression>}$$ specify non-pixel information that
+is shipped to the generic output file, if \.{proofing} is nonnegative.
+Such special information is unrestricted, although it should follow
+conventions that are understood by the software that reads the output;
+such conventions may grow up over the years after \MF\ has been
+``frozen,'' so that there will always be an easy way to make extensions.
+Initially the \.{PLAIN} base will use \.{special} and \.{numspecial} to
+implement some conventions that provide rudimentary proof outputs; for
+example, the \.{autolabel} operation in one of the examples above will
+expand into a sequence of \.{special} and \.{numspecial} commands.
+
+\@The {\it drawing command\/} does \MF's main duty:
+\syntaxlines{\<drawing command>\is\.{addto}\<picture variable>
+ \.{also}\<picture expression>\cr
+\andalso\.{addto}\<picture variable>\.{contour}\<path expression>\<with list>\cr
+\andalso
+ \.{addto}\<picture variable>\.{doublepath}\<path expression>\<with list>\cr
+\<with list>\is\<empty>\alt\<with list>\<with clause>\cr
+\<with clause>\is\.{withpen}\<pen expression>\cr
+\andalso\.{withweight}\<numeric expression>\cr}
+The amount of weight should be $-3$, $-2$, $-1$, 1, 2, or 3.
+A \.{contour} should be a cyclic path; a \.{doublepath} is a contour
+obtained by going from the beginning to the end and then back to the beginning.
+When a pen is specified, the envelope of the contour is used.
+The effect of this command is to add the specified weight to each pixel
+inside the specified contour or envelope. (Complications arise if the
+path ``winds around'' some points more than once; such pixels are
+``colored'' more than once. The manual will explain this further.)
+
+\@Arrays of pixels can be modified and ``standardized'' by the {\it cull
+command}, which looks like this:
+\syntaxlines{\<cull command>\is\.{cull}\<picture variable>
+  \<keep or drop>\<pair expression>\cr
+\andalso\<cull command>\.{withweight}\<numeric expression>\cr
+\<keep or drop>\is\.{keeping}\alt\.{dropping}\cr}
+Each pixel whose weight is included in or excluded from the given closed
+interval is replaced by a pixel of the specified weight,
+and all other pixels get weight zero. For example,
+$$\hbox{\tt cull pic dropping (-4095,0)}$$
+zeros out all pixels of negative weight and changes pixels of weight $>2$
+to weight~1. The interval must be such that
+pixels of weight zero remain of weight zero.
+
+\@The {\it display commands\/} provide online graphic output:
+\syntaxlines{\<openwindow command>\is\.{openwindow}\<window number>
+ \<screen rectangle>\.{at}\<pair expression>\cr
+\<window number>\is\<numeric expression>\cr
+\<screen rectangle>\is\.{from}\<pair expression>\.{to}\<pair expression>\cr
+\<display command>\is\.{display}\<picture variable>\.{inwindow}\<window
+  number>\cr}
+A window number must be between 0 and 15. The statement
+$$\hbox{\.{openwindow} $k$ \.{from} $(r_0,c_0)$ \.{to}
+ $(r_1,c_1)$ \.{at} $(x,y)$}$$
+associates a rectangular area of the user's screen with \MF's pixels.
+The $(r,c)$ coordinates are row and column numbers on the screen,
+considering the top row and left column to be number zero; note that this
+is quite different from the Cartesian coordinates used elsewhere in \MF.
+The values will all be rounded to integers. Point $(x,y)$ of \MF's
+raster will be equated to the upper left corner of the rectangle, i.e.,
+to the upper left corner of the pixel in screen column~$c_0$ of screen
+row~$r_0$.  The window itself contains $r_1-r_0$ rows and $c_1-c_0$
+columns; thus, $(r_1,c_1)$ is the screen pixel diagonally just southeast of
+the lower right corner of the window, but it is not in the window itself.
+A window can be opened any number of times (hence moved to different
+locations on the screen, if desired), but it must be opened at least once
+before it is used in a \.{display} command.
+Opening a window blanks the corresponding screen rectangle.
+The effect of overlapping windows is undefined, because \MF\ does not
+always update pixels that have previously been displayed in a window area.
+
+\@The {\it protection commands\/}
+$$\hbox{\.{outer}\<symbolic token list>\alt\.{inner}\<symbolic token list>}$$
+apply or remove a ``protection tag'' to the given tokens. If a token
+tagged \.{outer} occurs when \MF\ is skipping over tokens at high speed,
+the program will stop and insert an appropriate delimiter, since \.{outer}
+tokens are supposed to occur only at ``quiet'' times. (Unquiet times
+occur when \MF\ is skipping tokens because of a false conditional,
+or because it is reading the replacement text of a macro
+or iteration definition, or because it is scanning a text parameter to
+a macro, or because it is flushing erroneous tokens that were found
+at the end of a statement.) Without such protection, a missing right
+delimiter could cause \MF\ to eat up your whole program before any
+error was detected; the protections keep such errors localized.
+Changing the protection tag has no other effect on a token's meaning.
+
+\@The {\it show commands\/} provide diagnostic output:
+\syntaxlines{\<show command>\is\.{show} \<expression list>\cr
+\andalso\.{showvariable} \<symbolic token list>\cr
+\andalso\.{showtoken} \<symbolic token list>\cr
+\andalso\.{showstats}\cr
+\andalso\.{showdependencies}\cr}
+The first of these displays the value of each expression, in turn.
+The \.{showvariable} command gives the structure of all variables that begin
+with a given name, together with their values in an abbreviated form;
+this allows you to see which of its subscripts and attributes have
+occurred. The \.{showtoken} command gives the current meaning
+of a token (i.e., whether it is a primitive or not).
+The \.{showstats} command tells you how much of \MF's internal memory is
+currently being used.
+And \.{showdependencies} tells you about every dependent variable
+that is currently not known.
+ In each case \MF\
+pauses to allow subsequent interaction, as if an error had occurred,
+if \.{showstopping} is positive;
+but the ``error message'' is simply `\.{OK}'.
+
+\@The {\it mode commands\/} control error recovery interaction; they
+are the same as in \TeX:
+$$\hbox{\.{batchmode}\alt\.{nonstopmode}
+ \alt\.{scrollmode}\alt\.{errorstopmode}}$$
+
+\@The command `\.{randomseed} \.{:=} \<numeric expression>'
+initializes the random number generator to a specific value. If you
+do this you can guarantee consistent results in different runs;
+otherwise \MF\ uses \.{day+time/256/256} as the seed value, so
+you will rarely get the same pseudo-random results twice.
+
+\@The token `\.{dump}' can be substituted for `\.{end}', if a special
+version of \MF\ is being used. This stores the macros defined so
+far, so that they can be loaded as a base file. (It is analogous
+to \TeX's \.{\char`\\dump} command.)
+
+\@The command `\.{everyjob}\<symbolic token>' tells \MF\ that
+the designated token should be inserted first, just before the
+input file is read, when a job starts. (This is meaningful only
+in a base file that will be loaded at the beginning of a run;
+it is analogous to \TeX's \.{\char`\\everyjob} command.)
+
+\@The command `\.{message}\<string expression>' displays the string
+on the user's terminal, beginning with a new line. And
+`\.{errmessage}\<string expression>' displays the string in
+\MF's error message format, then stops as if an error had occurred.
+And `\.{errhelp}\<string expression>' displays the string if the
+user asks for help on the next \.{errmessage} error, unless the
+string is empty.
+
+\@The `\.{delimiters}\<symbolic token>\<symbolic token>' command
+has already been described.
+
+\@The command `\.{newinternal}\<symbolic token list>' defines each symbolic
+token to act like an internal quantity (i.e., like `\.{pausing}',
+`\.{proofing}', etc.); the values of these internal quantities are set to
+zero initially.
+
+\@The {\it font metric commands\/} specify information that \MF\ will pass
+to a special output file for font metric data if \.{fontmaking} is
+positive.  The syntax of these commands is explained in the appendix.
+(The idea is to specify information for ligatures, kerns, extensible
+characters, and character lists, as well as certain esoteric data that
+goes in the \.{TFM} header.)
+
+\@Finally, there's the {\it empty command}, which consists
+of no tokens and causes \MF\ to do nothing. This may seem useless,
+but actually it's very handy: You can always feel safe when you put
+extra semicolons between statements (e.g., in conditionals or iterations).
+
+\vfill\eject
+
+\newsection Appendix: Font metric commands.
+
+A special series of commands is available to specify data that will go in
+the \.{TFM} output file if `\.{fontmaking}' is positive. To fully
+understand these commands you should understand the conventions of font
+metric files; see, for example, the listing of \TeX82 or the \TeX ware
+report.
+\syntaxlines{\<font metric command>\is\.{charlist}\<byte list>\cr
+\andalso\.{extensible}\<byte>\.: \<top byte>\., \<mid byte>\., \<bot
+  byte>\., \<rep byte>\cr
+\andalso\.{headerbyte}\<numeric expression>\.:\<byte list>\cr
+\andalso\.{fontdimen}\<numeric expression>\.:\<expression list>\cr
+\andalso\.{ligtable}\<ligtable program sequence>\cr
+\<byte list>\is\<byte>\alt\<byte list>\.,\<byte>\cr
+\<byte>\is\<numeric expression>\alt\<string expression>\cr
+\<top byte>\is\<byte>\cr
+\<mid byte>\is\<byte>\cr
+\<bot byte>\is\<byte>\cr
+\<rep byte>\is\<byte>\cr
+\<ligtable program sequence>\is\<ligtable step>\cr
+\andalso\<ligtable program sequence>\., \<ligtable step>\cr
+\<ligtable step>\is\<ligature replacement>\alt\<kern specification>\cr
+\andalso\<byte>\.:\<ligtable step>\cr
+\<ligature replacement>\is\<byte>\.{=:}\<byte>\cr
+\<kern specification>\is\<byte>\.{kern}\<numeric expression>\cr}
+A \<byte> specifies an eight-bit number; it is either a numeric
+expression---which should have a known value between 0 and~255, inclusive,
+when rounded to the nearest integer---or it is a string expression for
+a string of length~1. In the latter case it denotes the ASCII code
+of that string character. For example, `\.{"A"}' and `\.{64.61}' both
+specify the byte value~65.
+
+Several characters of a font can be linked together in a series by
+means of the \.{charlist} command. For example,
+$$\.{charlist oct"000", oct"020", oct"022", oct"040", oct"060"}$$
+is used in the font \.{amathx} to specify the left parentheses that
+\TeX\ uses in displayed math formulas, in increasing order of size.
+(Font \.{amathx} is shown on page 432 of {\sl The \TeX book}.)
+
+An extensible character is specified by giving top, middle, bottom,
+and repeatable characters that \TeX\ can string together to make
+arbitrarily large delimiters. For example, the extensible left
+parentheses in \.{amathx} are defined by
+$$\.{extensible oct"060": oct"060", 0, oct"100", oct"102";}$$
+this says that character code \oct{060} specifies an extensible
+delimiter constructed from character number \oct{060} as the top piece,
+character number \oct{100} as the bottom piece, and character number
+\oct{102} as the piece that should be repeated as often as necessary to
+reach a desired size. (In this particular example there is no ``middle''
+piece, but characters like braces have a middle piece as well.)
+
+Numeric parameters of a font are specified by saying, e.g.,
+$$\.{fontdimen 3: 2.5, 6.5, 0, 4x}$$
+which says that parameters 3--6 are to be 2.5, 6.5, zero, and $4x$,
+respectively. These are the parameters that \TeX\ calls
+\.{\char`\\fontdimen3} through \.{\char`\\fontdimen6}. Byte-valued
+parameters in the \.{TFM} header are specified in a similar
+way:
+$$\.{headerbyte 33: 0, 214, 0, "c"}$$
+says that bytes 33--36 of the header (which constitute the ninth
+word, since there are four bytes per word) will be 0, 214, 0, and 99.
+This can be used for various hacks; for example, it's possible to
+override the normal check sum by specifying values of the first four
+header bytes. Here is a conventional way to put the name of a font
+family into the \.{TFM} header:
+$$\vcenter{\halign{\tt#\hfil\cr
+def BCPLstring(expr s,max)=\cr
+\ \ for l:=if length(s)>max: max else: length(s) fi: l\cr
+\ \ for n:=1 step 1 until l: , substring (n-1,n) of s endfor\cr
+\ \ for n:=l+1 step 1 until max: , 0 endfor endfor enddef;\cr
+def fontfamily expr s=headerbyte 49: BCPLstring(s,19) enddef;\cr
+def codingscheme expr s=headerbyte 9: BCPLstring(s,39) enddef;\cr
+fontfamily "HELVETICA"; codingscheme "XEROX TEXT";\cr}}$$
+
+Ligatures and kerns are specified by little ``programs'' like the
+following:
+$$\vcenter{\halign{\tt#\hfil\cr
+ligtable "f": "i" =: oct"200", "f" =: oct"201", "/": ")" kern 1.5;\cr
+ligtable oct"201": "i" =: oct "202";\cr}}$$
+Paraphrased, this cryptic code means:
+If character `\.f' is followed by `\.i', replace those two
+characters by number \oct{200}; if `\.f' is followed by another `\.f',
+replace them both by character number \oct{201}; if `\.f' or `\./' is
+followed by a right parenthesis, insert 1.5 points of space between them;
+and if \oct{201} is followed by `\.i', replace those two characters by
+\oct{202} (which presumably is the ligature `ffi').
+
+A character code should not appear more than once in the following
+places: (1)~As one of the bytes of a \.{charlist} that is followed
+by a comma; (2)~as the byte in an \.{extensible} recipe that is
+followed by a colon; (3)~as a byte in a \.{ligtable} that is
+followed by a colon. Each of these usages is mutually exclusive;
+for example, only the final character of a \.{charlist} can be
+extensible or form a ligature.
+
+\vfill\eject
+
+\newsection Index to primitive tokens.
+
+\medskip
+\spaceskip=.16em
+\def\\#1  {{\tt#1}\quad}
+\line{\vtop{\halign{#\hfil\cr
+\\"  1\cr
+\\\#@  9\cr
+\\\%  1\cr
+\\\&  5\cr
+\\*  7\cr
+\\+  6, 7\cr
+\\++{\rm,\thinspace}+-+  7\cr
+\\,  7, 8, 12, 16, 20\cr
+\\-  6, 7\cr
+\\.  1\cr
+\\..  5\cr
+\\/  7\cr
+\\:  12, 20\cr
+\\:=  12, 14, 15, 16\cr
+\\;  12, 14\cr
+\\<  4\cr
+\\<=  4\cr
+\\<>  4\cr
+\\=  4, 8, 11, 14, 17\cr
+\\=:  20\cr
+\\>  4\cr
+\\>=  4\cr
+\\@  9\cr
+\\@\#  8, 9\cr
+\\[  2, 3, 7\cr
+\\\char`\\  8\cr
+\\]  2, 3, 7\cr
+\\\char`\{  5\cr
+\\\char`\}  5\cr
+\\addto  17\cr
+\\also  17\cr
+\\and  4, 5\cr
+\\angle  6\cr
+\\ASCII  6\cr
+\\at  18\cr
+\\atleast  5\cr
+\\autorounding  16\cr
+\\batchmode  18\cr
+\\begingroup  3, 9, 14\cr
+\\boolean  3\cr
+\\char  5\cr
+\\charcode  15\cr
+\\chardp  15\cr
+\\chardx  15\cr
+\\chardy  15\cr
+\\charexists  4\cr
+\\charfam  15\cr
+\\charht  15\cr
+\\charic  15\cr
+\\charlist  20\cr
+\\charwd  15\cr
+\\contour  17\cr
+\\controls  5\cr
+}}\hfil\vtop{\halign{#\hfil\cr
+\\cosd  7\cr
+\\cull  17\cr
+\\curl  5\cr
+\\cycle  4\cr
+\\day  15\cr
+\\decimal  5\cr
+\\def  8\cr
+\\delimiters  3\cr
+\\designsize  15\cr
+\\directiontime  6\cr
+\\display  17\cr
+\\doublepath  17\cr
+\\dropping  17\cr
+\\dump  19\cr
+\\else  12\cr
+\\elseif  12\cr
+\\end  14\cr
+\\enddef  8, 11\cr
+\\endfor  12\cr
+\\endgroup  3, 9, 14\cr
+\\endinput  13\cr
+\\errhelp  19\cr
+\\errmessage  19\cr
+\\errorstopmode  18\cr
+\\everyjob  19\cr
+\\exitif  12\cr
+\\expandafter  13\cr
+\\expr  8, 9\cr
+\\extensible  20\cr
+\\false  4\cr
+\\fi  12\cr
+\\floor  7\cr
+\\fontdimen  20\cr
+\\fontmaking  16\cr
+\\for  12\cr
+\\forever  12\cr
+\\forsuffixes  12\cr
+\\from  17\cr
+\\granularity 16\cr
+\\headerbyte  20\cr
+\\hex  6\cr
+\\hppp  15\cr
+\\if  12\cr
+\\inner  18\cr
+\\input  13\cr
+\\interim  16\cr
+\\intersectiontimes  7\cr
+\\inwindow  17\cr
+\\keeping  17\cr
+\\kern  20\cr
+\\known  4\cr
+\\jobname  5\cr
+\\length  6\cr
+}}\hfil\vtop{\halign{#\hfil\cr
+\\let  16\cr
+\\ligtable  20\cr
+\\makepath  5\cr
+\\makepen  6\cr
+\\message  19\cr
+\\mexp  7\cr
+\\mlog  7\cr
+\\month  15\cr
+\\newinternal  19\cr
+\\nonstopmode  18\cr
+\\normaldeviate  6\cr
+\\not  4\cr
+\\nullpen  6\cr
+\\nullpicture  5\cr
+\\numeric  3\cr
+\\numspecial  16\cr
+\\oct  6\cr
+\\odd  4\cr
+\\of  5, 6, 7, 10\cr
+\\openwindow  17\cr
+\\or  4\cr
+\\outer  18\cr
+\\pair  3\cr
+\\path  3\cr
+\\pausing  15\cr
+\\pen  3\cr
+\\pencircle  6\cr
+\\penoffset  7\cr
+\\picture  3\cr
+\\point  7\cr
+\\postcontrol  7\cr
+\\precontrol  7\cr
+\\primary  9\cr
+\\primarydef  8, 11\cr
+\\proofing  15\cr
+\\quote  8\cr
+\\randomseed  19\cr
+\\readstring  5\cr
+\\reverse  5\cr
+\\rotated  6\cr
+\\save  16\cr
+\\scaled  6\cr
+\\scantokens  13\cr
+\\scrollmode  19\cr
+\\secondary  9\cr
+\\secondarydef  8, 11\cr
+\\shifted  6\cr
+\\shipout  16\cr
+\\show  18\cr
+\\showdependencies  18\cr
+\\showstats  18\cr
+\\showstopping  16\cr
+\\showtoken  18\cr
+}}\hfil\vtop{\halign{#\hfil\cr
+\\showvariable  18\cr
+\\sind  7\cr
+\\slanted  6\cr
+\\smoothing  16\cr
+\\special  16\cr
+\\sqrt  7\cr
+\\step  12\cr
+\\str  5\cr
+\\string  3\cr
+\\subpath  5\cr
+\\substring  5\cr
+\\suffix  8\cr
+\\tension  5\cr
+\\tertiary  9\cr
+\\tertiarydef  8, 11\cr
+\\text  8\cr
+\\time  15\cr
+\\to  17\cr
+\\totalweight  6\cr
+\\tracingcapsules  15\cr
+\\tracingchoices  15\cr
+\\tracingcommands  15\cr
+\\tracingedges  15\cr
+\\tracingequations  15\cr
+\\tracingmacros  15\cr
+\\tracingonline  15\cr
+\\tracingoutput  15\cr
+\\tracingpens  15\cr
+\\tracingspecs  15\cr
+\\tracingstats  15\cr
+\\tracingtitles  15\cr
+\\transform  3\cr
+\\transformed  6\cr
+\\true  4\cr
+\\turningcheck  16\cr
+\\turningnumber 6\cr
+\\uniformdeviate  7\cr
+\\until  12\cr
+\\vardef  8\cr
+\\vppp  15\cr
+\\warningcheck  16\cr
+\\withpen  17\cr
+\\withweight  17\cr
+\\xpart  6\cr
+\\xscaled  6\cr
+\\xxpart  6\cr
+\\xypart  6\cr
+\\year  15\cr
+\\ypart  6\cr
+\\yscaled  6\cr
+\\yxpart  6\cr
+\\yypart  6\cr
+\\zscaled  6\cr
+}}}
+\bye
+
+\vfill\end
