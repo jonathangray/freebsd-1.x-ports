@@ -1,11 +1,6 @@
 srcdir=/usr/ports/editor/emacs/src
-vpath %.c $(srcdir)
-vpath %.h $(srcdir)
-vpath %.y $(srcdir)
-vpath %.l $(srcdir)
-vpath %.s $(srcdir)
-vpath %.in $(srcdir)
 VPATH=/usr/ports/editor/emacs/src
+CC=gcc
 CPP=gcc -E
 CFLAGS=-g -O 
 C_SWITCH_SYSTEM=
@@ -117,7 +112,7 @@ termcap.o : termcap.c $(config_h)
 terminfo.o : terminfo.c $(config_h)
 tparam.o : tparam.c $(config_h)
 undo.o : undo.c buffer.h commands.h $(config_h) 
-unexfreebsd.o  : unexec.c  $(config_h)
+unexfreebsd.o  : unexfreebsd.c  $(config_h)
 window.o : window.c indent.h commands.h frame.h window.h buffer.h termchar.h    termhooks.h disptab.h keyboard.h $(config_h)
 xdisp.o : xdisp.c macros.h commands.h indent.h buffer.h dispextern.h    termchar.h frame.h window.h disptab.h termhooks.h $(config_h) 
 xfaces.o : xfaces.c dispextern.h frame.h xterm.h buffer.h blockinput.h    window.h $(config_h) 

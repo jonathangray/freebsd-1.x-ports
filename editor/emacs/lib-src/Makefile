@@ -53,12 +53,6 @@ libdir=${exec_prefix}/lib
 # this makefile is not identical to what was specified with --srcdir,
 # since the variable here has `/lib-src' added at the end.
 srcdir=/usr/ports/editor/emacs/lib-src
-vpath %.c $(srcdir)
-vpath %.h $(srcdir)
-vpath %.y $(srcdir)
-vpath %.l $(srcdir)
-vpath %.s $(srcdir)
-vpath %.in $(srcdir)
 VPATH=/usr/ports/editor/emacs/lib-src
 
 # ==================== Emacs-specific directories ====================
@@ -71,6 +65,7 @@ VPATH=/usr/ports/editor/emacs/lib-src
 # so that multiple configurations for multiple versions of Emacs may
 # be installed at once.  This can be set with the --archlibdir option
 # to `../configure'.
+archlibdir=${libdir}/emacs/${version}/${configuration}
 
 # ==================== Utility Programs for the Build ====================
 

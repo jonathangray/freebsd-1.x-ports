@@ -33,7 +33,7 @@
 #      Still more severe - delete backup and autosave files, too.
 
 SHELL = /bin/sh
-#MAKE = make  # BSD doesn't have it as a default.
+# BSD doesn't have it as a default.
 
 # ==================== Things `configure' Might Edit ====================
 
@@ -66,7 +66,7 @@ libsrc_libs= -lutil
 # The default location for installation.  Everything is placed in
 # subdirectories of this directory.  The default values for many of
 # the variables below are expressed in terms of this one, so you may
-# not need to change them.  This defaults to /usr/local.
+# not need to change them.  This defaults to /usr/gnu.
 prefix=/usr/gnu
 
 # Like `prefix', but used for architecture-specific files.
@@ -108,12 +108,6 @@ infodir=${prefix}/info
 srcdir=/usr/ports/editor/emacs
 
 # Tell make where to find source files; this is needed for the makefiles.
-vpath %.c $(srcdir)
-vpath %.h $(srcdir)
-vpath %.y $(srcdir)
-vpath %.l $(srcdir)
-vpath %.s $(srcdir)
-vpath %.in $(srcdir)
 VPATH=/usr/ports/editor/emacs
 
 # ==================== Emacs-specific directories ====================
@@ -125,6 +119,7 @@ VPATH=/usr/ports/editor/emacs
 # Emacs.  This includes the Emacs version, so that the
 # lisp files for different versions of Emacs will install
 # themselves in separate directories.
+lispdir=${datadir}/emacs/${version}/lisp
 
 # Directories Emacs should search for lisp files specific
 # to this site (i.e. customizations), before consulting
@@ -193,13 +188,7 @@ SUBDIR_MAKEFILES = lib-src/Makefile src/Makefile oldXMenu/Makefile
 COPYDIR = ${srcdir}/etc ${srcdir}/lisp
 COPYDESTS = ${etcdir} ${lispdir}
 
-all:	setup src/paths.h ${SUBDIR}
-
-pkg: install
-	pkg_create -d pkg/+DESC -f pkg/+CONTENTS -c pkg/+COMMENT emacs_bin
-
-setup:
-	@if [ -f src/config.h ]; then touch src/config.h; fi
+all:	src/paths.h ${SUBDIR}
 
 removenullpaths=sed -e 's/^://' -e 's/:$$//' -e 's/::/:/'
 
@@ -229,7 +218,7 @@ lib-src: FRC.lib-src
 
 ${SUBDIR}: ${SUBDIR_MAKEFILES} FRC
 	cd $@; $(MAKE) all $(MFLAGS) \
-		CC='${CC}' CFLAGS='${CFLAGS}'
+		CC='${CC}' CFLAGS='${CFLAGS}' MAKE='${MAKE}'
 
 Makefile: Makefile.in config.status
 	./config.status
@@ -298,7 +287,7 @@ do-install: mkdir
 	     if [ ! -f ${infodir}/dir ] && [ -f dir ]; then \
 	       ${INSTALL_DATA} dir ${infodir}/dir ; \
 	     fi ; \
-	     for f in cl* emacs* forms* gnus* info* sc* vip* ; do \
+	     for f in cl* emacs* forms* gnus* info* vip* ; do \
 	       ${INSTALL_DATA} $$f ${infodir}/$$f ; \
 	     done); \
 	else true; fi

@@ -1,12 +1,7 @@
 # Generated automatically from Makefile.in by configure.
 srcdir=/usr/ports/editor/emacs/oldXMenu
-vpath %.c $(srcdir)
-vpath %.h $(srcdir)
-vpath %.y $(srcdir)
-vpath %.l $(srcdir)
-vpath %.s $(srcdir)
-vpath %.in $(srcdir)
 VPATH=/usr/ports/editor/emacs/oldXMenu
+C_SWITCH_X_SITE=-I/usr/X386/include
 
 EXTRA=insque.o
 CC=gcc

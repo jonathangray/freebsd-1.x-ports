@@ -109,7 +109,7 @@ and this notice must be preserved on all copies.  */
 /* #undef CRAY_STACKSEG_END */
 /* #undef STACK_DIRECTION */
 
-#define UNEXEC_SRC unexec.c
+#define UNEXEC_SRC unexfreebsd.c
 
 /* #undef HAVE_LIBXBSD */
 #define HAVE_XRMSETDATABASE 1
