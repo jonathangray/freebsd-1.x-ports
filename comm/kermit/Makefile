@@ -31,4 +31,12 @@ ckcpro.c: wart
 
 CLEANFILES+= ckcpro.c wart
 
+pkg:	pkg_src pkg_bin
+
+pkg_src: +DESC_S +ONELINE_S +PLIST_S +REQ_S
+	pkg_create -c +ONELINE_S -d +DESC_S -f +PLIST_S -r +REQ_S kermit_src
+
+pkg_bin: +DESC_B +ONELINE_B +PLIST_B +REQ_B
+	pkg_create -c +ONELINE_B -d +DESC_B -f +PLIST_B -r +REQ_B kermit_bin
+
 .include <bsd.prog.mk>
