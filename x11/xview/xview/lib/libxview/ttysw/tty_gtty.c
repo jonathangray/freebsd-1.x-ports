@@ -66,9 +66,9 @@ static struct termios	default_modes = {
 	TTYDEF_CFLAG,   /* control modes */
 	TTYDEF_LFLAG,   /* local modes */
 	                /* control characters */
-        CEOF,   CEOL,   CEOL,   CERASE, CWERASE, CKILL, CREPRINT, 
+        { CEOF,   CEOL,   CEOL,   CERASE, CWERASE, CKILL, CREPRINT, 
         _POSIX_VDISABLE, CINTR, CQUIT,  CSUSP,  CDSUSP, CSTART, CSTOP,  CLNEXT,
-        CDISCARD, CMIN, CTIME,  CSTATUS, _POSIX_VDISABLE,
+        CDISCARD, CMIN, CTIME,  CSTATUS, _POSIX_VDISABLE },
 
 	TTYDEF_SPEED, TTYDEF_SPEED /* input and output speeds */
 };
