@@ -1,0 +1,294 @@
+How to install the pcvt driver on a FreeBSD machine	       (pcvt rel. 3.00)
+-------------------------------------------------------------------------------
+                                 last edit-date: [Sat Feb 12 17:41:58 1994]
+
+(1) Copy the driver distributiuon files into appropriate directories:
+
+	(1a) make a fresh directory
+	
+		mkdir /usr/src/sys/i386/isa/pcvt
+		cd /usr/src/sys/i386/isa/pcvt
+
+	(1b) copy the pcvt distribution (or unshar it) into this newly
+ 	     created directory (/usr/src/sys/i386/isa/pcvt)
+
+	(1c) copy the ioctl-header file into its destination directory
+
+		cp pcvt_ioctl.h /usr/include/machine
+
+(2) Make a backup copy of /usr/src/sys/i386/conf/files.i386
+
+	cp /usr/src/sys/i386/conf/files.i386 /usr/src/sys/i386/conf/files.i386.BAK
+	
+(3) Modify the file /usr/src/sys/arch/i386/conf/files.i386:
+
+	Add the lines:
+
+    i386/isa/pcvt/pcvt_drv.c  optional vt device-driver
+    i386/isa/pcvt/pcvt_kbd.c  optional vt device-driver
+    i386/isa/pcvt/pcvt_out.c  optional vt device-driver
+    i386/isa/pcvt/pcvt_sup.c  optional vt device-driver
+    i386/isa/pcvt/pcvt_ext.c  optional vt device-driver
+    i386/isa/pcvt/pcvt_vtf.c  optional vt device-driver
+
+(4) You have the choice of two keyboard layouts regarding the placement of
+    the vt220 function keys and the HELP and DO keys.
+
+    Both configurations are documented in the files Keyboard.HP and Keyboard.VT
+    respectively.
+
+    Decide which one to use and set the "#define" of PCVT_VT220KEYB to 
+    compile the one you choosed.          (see also pcvt_hdr.h and pcvt_kbd.c)
+    Note: the preferrable way to do all option hacking is to add "options"
+    lines to the kernel's config file. See the pcvt(4) man page (in this
+    directory).
+
+(5) There are several other configuration "#define"-able options located at
+    the beginning of pcvt_hdr.h. "user"-settable options all start with
+    "PCVT_".
+    Please (!!!) read the comments for them in the header file !
+
+(6) Add a line
+
+	option    "PCVT_FREEBSD=102"
+
+    into your kernel config file. The quotes are important. The number
+    should represent the version of your kernel, "102" stands for "1.0.2",
+    i.e., the official release of FreeBSD 1.0. If you happen to run a
+    more recent -current kernel (with ANSIfied declarations), use the
+    version number "103" instead.
+
+(7) Edit your kernel configuration file and comment the following line out
+    by placing a "#" in front of it:
+
+      device     pc0     at isa? port "IO_KBD" tty irq 1 vector pcrint
+
+    add a new config-line just below it:
+
+      device     vt0     at isa? port "IO_KBD" tty irq 1 vector pcrint
+
+    The lines in my config file look like this:
+
+      #device    pc0     at isa? port "IO_KBD" tty irq 1 vector pcrint
+      device     vt0     at isa? port "IO_KBD" tty irq 1 vector pcrint
+
+    You can use now either the pccons driver or the pcvt driver (or possibly
+    other console drivers too!) by simply un-commenting ONE of them.
+
+    YOU CANNOT USE/UNCOMMENT MORE THAN __ONE__ CONSOLE DRIVER !!!
+
+(8) Configure a new kernel using config(8).
+
+(9) Run "make depend" for the new kernel !!!!
+
+     (if you upgrade from a previous version of pcvt, or get unresolved
+      symbols during step 10, it may be necessary to run a "make clean"
+      prior to running "make depend" !!)
+
+(10) Compile the new kernel
+
+(11) Test the new kernel and check whether it still works with your
+     keyboard and your videoboard. Testing could be done best by entering
+     the kernel name (e.g. /386bsd.pcvt) at the boot prompt, append a
+     "-s" flag to prevent it from booting multi-user! The multi-user
+     boot phase requires the kernel to be named "/386bsd".
+
+     If the kernel works, rename the old kernel (you don't need it any
+     more?), link the new one to "/386bsd", and reboot up to multi-user.
+
+(12) Change into the distribution subdirectory "Util".
+     Copy Makefile.inc.FreeBSD to Makefile.inc and edit Makefile.inc
+     to suit your needs, especially have a look at "MANDIR" and "BINDIR".
+     then execute "make". This makes all the utilities in their directories.
+     when you are satisfied with the results, execute "make install". This
+     installs all programs in all subdirs in "BINDIR" and all manual pages
+     in "MANDIR", all fonts in "FONTDIR" and the keycap database in "CAPDIR".
+     NB: unless you've got this distribution along with a FreeBSD distrib-
+     ution (where it is pre-installed:-), you WILL have to edit Makefile.inc
+     in order to get the man pages installed in source form.
+
+     Change into the distribution subdirectory "Doc" and edit Makefile
+     to suit your needs. Then execute "make" to prepare the manpage for
+     the driver.
+
+(13) If necessary, edit /usr/share/misc/keycap to match your keyboard.
+     Keycap uses special codes which are documented in Util/kcon/keycap.3
+     and Util/kcon/keycap.5. Also have a look at Util/kcon/kcon.1.
+
+(14) There are example termcap entries for the various screen resolutions
+     in the file "Doc/Termcap". Integrate them into your termcap file if
+     you don't have a "normal" vt220 entry or want to use pcvt's extensions.
+
+     NOTE: pcvt works with an unmodified VT220 termcap entry !
+	   (it was written to do that .... ;-)
+	
+(15) To use the virtual terminals, one must "mknod" this devices, they have 
+     major number 12 and minor numbers 0 to n:
+
+	mknod /dev/ttyv0 c 12 0
+	mknod /dev/ttyv1 c 12 1
+	mknod /dev/ttyv2 c 12 2
+	mknod /dev/ttyv3 c 12 3
+	...
+	mknod /dev/ttyv<n> c 12 <n>
+
+     There is a shell-script available (Doc/MAKEDEV.pcvt) for this purpose.
+
+     ls -l in my /dev directory looks like this:
+
+	crw-------    1 root       0,   0 Nov 12 15:55 /dev/console
+	crw-rw----    1 root      12,   0 Aug 12 21:13 /dev/ttyv0
+	crw-------    1 root      12,   1 Nov 12 14:11 /dev/ttyv1
+	crw-------    1 root      12,   2 Nov 12 14:11 /dev/ttyv2
+	crw-------    1 root      12,   3 Nov 12 14:11 /dev/ttyv3
+
+     If you want to use the mouse emulator, see the comments in pcvt(4).
+
+(16) edit /etc/ttys to enable login on the virtual consoles, mine looks like
+     this:
+	
+	ttyv0	"/usr/libexec/getty console"	pcvt25h	on secure
+	ttyv1	"/usr/libexec/getty console"	pcvt25h	on secure
+	ttyv2	"/usr/libexec/getty console"	pcvt25h	on secure
+	ttyv3	"/usr/libexec/getty console"	pcvt25h	on secure
+	
+     Do _NOT_ run a getty on /dev/console. Sigh, this breaks xterm -C
+     and xconsole, i know. The patch below went out off the source
+     tree between FreeBSD 1.0 GAMMA and 1.0 Release since it was suspected
+     to cause panics. Anyway, i worked well with it for several months,
+     and it allows for getty on /dev/console. USE AT YOUR OWN RISK!
+
+(17) Because the driver is (mostly) 8-bit clean, the entry to be used with it
+     in /etc/gettytab has to contain a ":np:" (no parity) entry, the "default"
+     entry has a ":ap:" (any parity), if you want to use this entry, you have
+     to change the ":ap:" to ":np:"!
+     my default entry looks like this:
+
+	default:\
+		:np:fd#1000:im=\r\n   386BSD (%h) (%t)\r\n\r\n:sp#9600:
+
+
+(18) Edit /etc/rc.local to download fonts and establish emulation modes, mine
+     looks like the example provided in Doc/rc.local
+
+
+good luck !
+
+This patch *might* solve the console problems...
+
+*** sys/i386/i386/cons.c.orig	Mon Oct 18 15:21:34 1993
+--- sys/i386/i386/cons.c	Sun Jan 23 17:13:52 1994
+***************
+*** 49,54 ****
+--- 49,55 ----
+  #include "sys/tty.h"
+  #include "sys/file.h"
+  #include "sys/conf.h"
++ #include "sys/vnode.h"
+  
+  #include "cons.h"
+  
+***************
+*** 98,111 ****
+--- 99,123 ----
+  	(*cp->cn_init)(cp);
+  }
+  
++ static struct vnode	*cnopenvp = NULLVP;
++ 
++ 
+  cnopen(dev, flag, mode, p)
+  	dev_t dev;
+  	int flag, mode;
+  	struct proc *p;
+  {
++ 	int		error;
++ 
++ 
+  	if (cn_tab == NULL)
+  		return (0);
+  	dev = cn_tab->cn_dev;
++ 	if (cnopenvp == NULLVP)
++ 		if ((error = getdevvp(dev, &cnopenvp, VCHR))) {
++ 			printf("cnopen: getdevvp returned %d !\n", error);
++ 			return(error);
++ 		}
+  	return ((*cdevsw[major(dev)].d_open)(dev, flag, mode, p));
+  }
+   
+***************
+*** 114,123 ****
+  	int flag, mode;
+  	struct proc *p;
+  {
+  	if (cn_tab == NULL)
+  		return (0);
+  	dev = cn_tab->cn_dev;
+! 	return ((*cdevsw[major(dev)].d_close)(dev, flag, mode, p));
+  }
+   
+  cnread(dev, uio, flag)
+--- 126,146 ----
+  	int flag, mode;
+  	struct proc *p;
+  {
++ 	int		error;
++ 
++ 
+  	if (cn_tab == NULL)
+  		return (0);
+  	dev = cn_tab->cn_dev;
+! 	if (vcount(cnopenvp) <= 1)
+! 		error = (*cdevsw[major(dev)].d_close)(dev, flag, mode, p);
+! 	else
+! 		error = 0;
+! 	if (error == 0) {
+! 		vrele(cnopenvp);
+! 		cnopenvp = NULLVP;
+! 	return(error);
+! 	}
+  }
+   
+  cnread(dev, uio, flag)
+*** sys/kern/vfs_subr.c.orig	Mon Oct 18 15:22:02 1993
+--- sys/kern/vfs_subr.c	Sun Jan 23 17:13:38 1994
+***************
+*** 555,560 ****
+--- 555,574 ----
+  	dev_t dev;
+  	struct vnode **vpp;
+  {
++ 	return(getdevvp(dev, vpp, VBLK));
++ }
++ 
++ 
++ /*
++  * Create a vnode for a device.
++  * Used by bdevvp (block device) for root file system etc.,
++  * and by cnopen for console (character device).
++  */
++ getdevvp(dev, vpp, type)
++ 	dev_t dev;
++ 	struct vnode **vpp;
++ 	enum vtype type;
++ {
+  	register struct vnode *vp;
+  	struct vnode *nvp;
+  	int error;
+***************
+*** 567,573 ****
+  		return (error);
+  	}
+  	vp = nvp;
+! 	vp->v_type = VBLK;
+  	if (nvp = checkalias(vp, dev, (struct mount *)0)) {
+  		vput(vp);
+  		vp = nvp;
+--- 581,587 ----
+  		return (error);
+  	}
+  	vp = nvp;
+! 	vp->v_type = type;
+  	if (nvp = checkalias(vp, dev, (struct mount *)0)) {
+  		vput(vp);
+  		vp = nvp;

@@ -1,0 +1,195 @@
+How to install the pcvt driver on a 386BSD 0.1 machine		(pcvt rel. 3.00)
+--------------------------------------------------------------------------------
+                                      last edit-date: [Sat Feb 12 17:40:08 1994]
+
+(1) copy the driver distributiuon files into appropriate directories:
+
+	(1a) make a fresh directory
+	
+		mkdir /usr/src/sys.386bsd/i386/isa/pcvt
+		cd /usr/src/sys.386bsd/i386/isa/pcvt
+
+	(1b) copy the pcvt distribution (or unshar it) into this newly
+ 	     created directory (/usr/src/sys.386bsd/i386/isa/pcvt)
+
+	(1c) copy the ioctl-header file into it's destination directory
+
+		cp pcvt_ioctl.h /usr/include/machine
+
+(3) keep the file /sys/i386/conf/files.i386 in a safe place; you'll
+    have to restore it before applying any of the official patches
+
+(3) add the following lines to /sys/i386/conf/files.i386
+
+	i386/isa/pcvt/pcvt_drv.c	optional vt device-driver
+	i386/isa/pcvt/pcvt_out.c	optional vt device-driver
+	i386/isa/pcvt/pcvt_kbd.c	optional vt device-driver
+	i386/isa/pcvt/pcvt_sup.c	optional vt device-driver
+	i386/isa/pcvt/pcvt_ext.c	optional vt device-driver
+	i386/isa/pcvt/pcvt_vtf.c	optional vt device-driver
+
+(4) there are escape sequences coded into the init file /etc/rc. the escape-
+    sequences to change the color do now conform to the ansi-standard, change
+    them! look for the lines:
+
+	# yellow characters with blue background
+	echo -n "[3;30x"	(read as "ESC [ 3 ; 30 x")
+
+    and
+
+	# reset to normal (no colors)
+	echo -n "[0x"		(read as "ESC [ 0 x")
+
+    place a comment character ("#") in front of the "echo -n" - lines or
+    change them, mine looks like:
+
+	# yellow characters with blue background
+	if [ -x /usr/sbin/ispcvt ]
+	then
+		if /usr/sbin/ispcvt
+		then
+			echo -n "[31;44m"
+		else
+			echo -n "[3;30x"
+		fi
+	else
+		echo -n "[3;30x"
+	fi
+
+    and
+
+	# reset to normal (no colors)
+	if [ -x /usr/sbin/ispcvt ]
+	then
+		if /usr/sbin/ispcvt
+		then
+			echo -n "[0m"
+		else
+			echo -n "[0x"
+		fi
+	else
+		echo -n "[0x"
+	fi
+
+(5) you have the choice of two keyboard layouts regarding the placement of
+    the vt220 function keys and the HELP and DO keys.
+
+    both configurations are documented in the files Keyboard.HP and Keyboard.VT
+    respectively.
+
+    decide which one to use and set the "#define" of PCVT_VT220KEYB to 
+    compile the one you choosed.          (see also pcvt_hdr.h and pcvt_kbd.c)
+
+(6) there are several other configuration "#define"-able options located at
+    the beginning of pcvt_hdr.h. "user"-settable options all start with "PCVT_".
+    Please (!!!) read the comments for them in the header file !
+
+(7) edit your kernel configuration file and comment the following line out
+    by placing a "#" in front of it:
+
+      device     pc0     at isa? port "IO_KBD" tty irq 1 vector pcrint
+
+    add a new config-line just below it:
+
+      device     vt0     at isa? port "IO_KBD" tty irq 1 vector pcrint
+
+    the lines in my config file look like this:
+
+      #device    pc0     at isa? port "IO_KBD" tty irq 1 vector pcrint
+      device     vt0     at isa? port "IO_KBD" tty irq 1 vector pcrint
+
+    you can use now either the pccons driver or the pcvt driver (or possibly
+    other console drivers too!) by simply un-commenting ONE of them.
+
+    YOU CANNOT USE/UNCOMMENT MORE THAN __ONE__ CONSOLE DRIVER !!!
+
+    if you ever configured a kernel for use with codrv, remember to
+    uncomment/remove the pseudo device entries for vty and vtemul.
+
+    add a line 'option "PCVT_386BSD=1"' to your kernel config file.
+
+(8) configure a new kernel using config(8).
+
+(9) run "make depend" for the new kernel !!!!
+
+     (if you upgrade from a previous version of pcvt, or get unresolved
+      symbols during step 10, it may be necessary to run a "make clean"
+      prior to running "make depend" !!)
+
+(10) compile the new kernel
+
+(11) test the new kernel (i.e. on a floppy) and check whether it still works
+     with your keyboard and your videoboard.
+
+     if the kernel works, install it on your harddisk and reboot.
+
+(12) change into the distribution subdirectory "Util". Copy 
+     Makefile.inc.386BSD to Makefile.inc and edit it to suit your needs,
+     especially have a look at "MANDIR" and "BINDIR".
+     then execute "make". this makes all the utilities in their directories.
+     when you are satisfied with the results, execute "make install". this
+     installs all programs in all subdirs in "BINDIR" and all manual pages
+     in "MANDIR", all fonts in "FONTDIR" and the keycap database in "CAPDIR".
+
+     change into the distribution subdirectory "Doc" and edit Makefile
+     to suit your needs. then execute "make" to prepare the manpage for
+     the driver.
+
+     the file /usr/share/misc/keycap is overwritten by this installation.
+     if you've edited it (e. g., for a previous use with codrv), make
+     a backup copy (or hard link) before installing.
+
+(13) if necessary, edit /usr/share/misc/keycap to match your keyboard.
+     keycap uses special codes which are documented in Util/kcon/keycap.3
+     and Util/kcon/keycap.5. also have a look at Util/kcon/kcon.1.
+
+(14) there are example termcap entries for the various screen resolutions
+     in the file "Doc/Termcap". integrate them into your termcap file if
+     you don't have a "normal" vt220 entry or want to use pcvt's extensions.
+
+     NOTE: pcvt works with an unmodified VT220 termcap entry !
+	
+(15) to use the virtual terminals, one must "mknod" this devices, they have 
+     major number 12 and minor numbers 0 to n:
+
+	mknod /dev/ttyv0 c 12 0
+	mknod /dev/ttyv1 c 12 1
+	mknod /dev/ttyv2 c 12 2
+	mknod /dev/ttyv3 c 12 3
+	...
+	mknod /dev/ttyv<n> c 12 <n>
+
+     There is a shell-script available (Doc/MAKEDEV.pcvt) for this purpose.
+
+     ls -l in my /dev directory looks like this:
+
+	crw-------    1 root       0,   0 Nov 12 15:55 /dev/console
+	crw-rw----    1 root      12,   0 Aug 12 21:13 /dev/ttyv0
+	crw-------    1 root      12,   1 Nov 12 14:11 /dev/ttyv1
+	crw-------    1 root      12,   2 Nov 12 14:11 /dev/ttyv2
+	crw-------    1 root      12,   3 Nov 12 14:11 /dev/ttyv3
+
+(16) edit /etc/ttys to enable login on the virtual consoles, mine looks like
+     this:
+	
+	ttyv0	"/usr/libexec/getty console"	pcvt25h	on secure
+	ttyv1	"/usr/libexec/getty console"	pcvt25h	on secure
+	ttyv2	"/usr/libexec/getty console"	pcvt25h	on secure
+	ttyv3	"/usr/libexec/getty console"	pcvt25h	on secure
+	
+
+(17) because the driver is (mostly) 8-bit clean, the entry to be used with it
+     in /etc/gettytab has to contain a ":np:" (no parity) entry, the "default"
+     entry has a ":ap:" (any parity), if you want to use this entry, you have
+     to change the ":ap:" to ":np:"!
+     my default entry looks like this:
+
+	default:\
+		:np:fd#1000:im=\r\n   386BSD (%h) (%t)\r\n\r\n:sp#9600:
+
+
+(18) edit /etc/rc.local to download fonts and establish emulation modes, mine
+     looks like the example provided in Doc/rc.local
+
+
+good luck !

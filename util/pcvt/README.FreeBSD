@@ -1,0 +1,48 @@
+Refer to the documentation directory for detailed information
+(usr.bin/pcvt/Doc relative to this directory). The file
+INSTALLATION.FreeBSD describes the installation steps. Since that
+file is the original one from the standalone pcvt package, things go
+a bit different (i. e., simpler) here:
+ 
+. copy the trees under usr.bin and sys into /usr/src; this will pre-install
+  the required files:
+ 
+        tar -cf - usr.bin sys | (cd /usr/src; tar -xf -)
+ 
+. apply the patch usr.bin.Makefile.diff to your /usr/src/usr.bin/Makefile:
+ 
+        patch /usr/src/usr.bin/Makefile < usr.bin.Makefile.diff
+ 
+. the file /usr/src/sys/i386/conf/PCVT gives you a sample configuration
+  for a FreeBSD kernel using the pcvt driver.  Copy the file, edit it to
+  suit your needs (refer to the pcvt.4 man page in the Doc directory for
+  a description of available options), configure a new kernel, compile and
+  install it.
+ 
+  For a sample kernel named FOO, this looks like:
+ 
+        cd /sys/i386/isa/conf           # you MUST cd to this directory
+        cp PCVT FOO                     # make your private configuration
+        vi FOO                          # customize it
+        config FOO                      # run config
+        cd /sys/compile/FOO             # the compilation directory
+        make depend all                 # this takes a while...
+        mv /kernel /kernel.bak          # save the old kernel
+        cp kernel /kernel.pcvt          # copy into root file system
+        ln /kernel.pcvt /kernel         # make this the current default kernel
+        shutdown -rf now                # and attempt to boot it
+ 
+  If the kernel boot fails, reset your system, and at the next boot prompt,
+  enter ``/386bsd.bak -s'' to boot the backup copy into single-user mode.
+  Then, fsck all your file systems, mount the root fs read/write, remove
+  the /kernel (don't panic: your /kernel.pcvt will still remain), and link
+  /kernel.bak to /kernel. After this step, it's safe to boot multi-user
+  again (simply enter `exit' now).
+ 
+. If all went well, build and install the utilities:
+ 
+        cd /usr/src/usr.bin/pcvt
+        make obj all install
+ 
+. That's all folks! (Though you'd certainly wish to modify your rc.local...)
+ 
