@@ -632,8 +632,13 @@ main(argc, argv)
 	ProgramName++;
     else
 	ProgramName = argv[0];
-	fetchPass();
-	setuid(getuid());
+
+    /* 
+     * fetchPass() gets the encrypted password entries and then 
+     * revokes xlock's suid status
+     */
+    fetchPass();
+
     srandom(time((long *) 0));	/* random mode needs the seed set. */
 
     GetResources(argc, argv);
@@ -791,4 +796,17 @@ int fetchPass()
     pw = getpwuid(uid = getuid());
     strcpy(userpass, pw->pw_passwd);
     user = pw->pw_name;
+
+    /* We need to be root to get the password entries */
+    if ( userpass[0] == '*' ) {
+	fprintf(stderr, "Your account has a null password\n");
+	fprintf(stderr, "OR\n");
+	fprintf(stderr, "The program needs to be installed set-uid to\n");
+	fprintf(stderr, "the uid that 'owns' the password database in\n");
+	fprintf(stderr, "order to read the encryped password entries\n");
+	exit(-1);
+    }
+
+    /* Back to regular user */
+    setuid(getuid());
 }
