@@ -20,6 +20,30 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 #ifdef HAVE_TERMIOS
 #define HAVE_TCATTR
 #endif
+
+/* If we defined these before and we are about to redefine them,
+   prevent alarming warnings.  */
+#ifdef BSD_TERMIOS
+#undef NL0
+#undef NL1
+#undef CR0
+#undef CR1
+#undef CR2
+#undef CR3
+#undef TAB0
+#undef TAB1
+#undef TAB2
+#undef XTABS
+#undef BS0
+#undef BS1
+#undef FF0
+#undef FF1
+#undef ECHO
+#undef NOFLSH
+#undef TOSTOP
+#undef FLUSHO
+#undef PENDIN
+#endif
 
 /* Include the proper files.  */
 #ifdef HAVE_TERMIO
@@ -114,11 +138,18 @@ static struct sensemode {
 #ifdef AIX
 #include <sys/pty.h>
 #include <unistd.h>
+#define UNISTD_H_INCLUDED
 #endif /* AIX */
 
 #ifdef IRIX4
 /* Get _getpty prototype */
 #include <unistd.h>
+#define UNISTD_H_INCLUDED
+#endif
+
+#if defined (POSIX) && !defined (UNISTD_H_INCLUDED) && defined (HAVE_UNISTD_H)
+#include <unistd.h>
+#define UNISTD_H_INCLUDED
 #endif
 
 #ifdef SYSV_PTYS
@@ -264,6 +295,19 @@ static struct sensemode {
 
 #endif
 
+/* EMACS_GETPGRP (arg) returns the process group of the terminal.  */
+
+#if defined (USG) && !defined (GETPGRP_NEEDS_ARG)
+#  if !defined (GETPGRP_NO_ARG)
+#    define GETPGRP_NO_ARG
+#  endif
+#endif
+
+#if defined (GETPGRP_NO_ARG)
+#  define EMACS_GETPGRP(x) getpgrp()
+#else
+#  define EMACS_GETPGRP(x) getpgrp(x)
+#endif /* !GETPGRP_NO_ARG */
 
 /* Manipulate a TTY's input/output processing parameters.  */
 

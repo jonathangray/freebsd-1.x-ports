@@ -30,6 +30,7 @@
 (defvar rmail-output-file-alist nil
   "*Alist matching regexps to suggested output Rmail files.
 This is a list of elements of the form (REGEXP . NAME-EXP).
+The suggestion is taken if REGEXP matches anywhere in the message buffer.
 NAME-EXP may be a string constant giving the file name to use,
 or more generally it may be any kind of expression that returns
 a file name as a string.")
@@ -137,6 +138,7 @@ starting with the current one.  Deleted messages are skipped and don't count."
 	    (rmail-next-undeleted-message 1))))))
 
 ;; Returns t if file FILE is an Rmail file.
+;;;###autoload
 (defun rmail-file-p (file)
   (let ((buf (generate-new-buffer " *rmail-file-p*")))
     (unwind-protect
@@ -148,14 +150,20 @@ starting with the current one.  Deleted messages are skipped and don't count."
 
 ;;; There are functions elsewhere in Emacs that use this function; check
 ;;; them out before you change the calling method.
-(defun rmail-output (file-name &optional count noattribute)
+(defun rmail-output (file-name &optional count noattribute from-gnus)
   "Append this message to Unix mail file named FILE-NAME.
 A prefix argument N says to output N consecutive messages
 starting with the current one.  Deleted messages are skipped and don't count.
 When called from lisp code, N may be omitted.
 
+If the pruned message header is shown on the current message, then
+messages will be appended with pruned headers; otherwise, messages
+will be appended with their original headers.
+
 The optional third argument NOATTRIBUTE, if non-nil, says not
-to set the `filed' attribute, and not to display a message."
+to set the `filed' attribute, and not to display a message.
+
+The optional fourth argument FROM-GNUS is set when called from GNUS."
   (interactive
    (list (setq rmail-last-file
 	       (read-file-name
@@ -175,22 +183,45 @@ to set the `filed' attribute, and not to display a message."
 			       (file-name-directory rmail-last-file))))
   (if (and (file-readable-p file-name) (rmail-file-p file-name))
       (rmail-output-to-rmail-file file-name count)
-    (while (> count 0)
-      (let ((rmailbuf (current-buffer))
-	    (tembuf (get-buffer-create " rmail-output"))
-	    (case-fold-search t))
+    (let ((orig-count count)
+	  (rmailbuf (current-buffer))
+	  (case-fold-search t)
+	  (tembuf (get-buffer-create " rmail-output"))
+	  (original-headers-p
+	   (and (not from-gnus)
+		(save-excursion 
+		  (save-restriction
+		    (narrow-to-region (rmail-msgbeg rmail-current-message) (point-max))
+		    (goto-char (point-min))
+		    (forward-line 1)
+		    (= (following-char) ?0)))))
+	  header-beginning
+	  mail-from)
+      (while (> count 0)
+	(or from-gnus
+	    (setq mail-from
+		  (save-excursion
+		    (save-restriction
+		      (widen)
+		      (goto-char (rmail-msgbeg rmail-current-message))
+		      (setq header-beginning (point))
+		      (search-forward "\n*** EOOH ***\n")
+		      (narrow-to-region header-beginning (point))
+		      (mail-fetch-field "Mail-From")))))
 	(save-excursion
 	  (set-buffer tembuf)
 	  (erase-buffer)
 	  (insert-buffer-substring rmailbuf)
 	  (insert "\n")
 	  (goto-char (point-min))
-	  (insert "From "
-		  (mail-strip-quoted-names (or (mail-fetch-field "from")
-					       (mail-fetch-field "really-from")
-					       (mail-fetch-field "sender")
-					       "unknown"))
-		  " " (current-time-string) "\n")
+	  (if mail-from
+	      (insert mail-from "\n")
+	    (insert "From "
+		    (mail-strip-quoted-names (or (mail-fetch-field "from")
+						 (mail-fetch-field "really-from")
+						 (mail-fetch-field "sender")
+						 "unknown"))
+		    " " (current-time-string) "\n"))
 	  ;; ``Quote'' "\nFrom " as "\n>From "
 	  ;;  (note that this isn't really quoting, as there is no requirement
 	  ;;   that "\n[>]+From " be quoted in the same transparent way.)
@@ -199,14 +230,27 @@ to set the `filed' attribute, and not to display a message."
 	    (insert ?>))
 	  (write-region (point-min) (point-max) file-name t
 			(if noattribute 'nomsg)))
-	(kill-buffer tembuf))
-      (or noattribute
-	  (if (equal major-mode 'rmail-mode)
-	      (rmail-set-attribute "filed" t)))
-      (setq count (1- count))
-      (if rmail-delete-after-output
-	  (rmail-delete-forward)
-	(if (> count 0)
-	    (rmail-next-undeleted-message 1))))))
+	(or noattribute
+	    (if (equal major-mode 'rmail-mode)
+		(rmail-set-attribute "filed" t)))
+	(setq count (1- count))
+	(or from-gnus
+	    (let ((next-message-p
+		   (if rmail-delete-after-output
+		       (rmail-delete-forward)
+		     (if (> count 0)
+			 (rmail-next-undeleted-message 1))))
+		  (num-appended (- orig-count count)))
+	      (if (and next-message-p original-headers-p)
+		  (rmail-toggle-header))
+	      (if (and (> count 0) (not next-message-p))
+		  (progn 
+		    (error
+		     (save-excursion
+		       (set-buffer rmailbuf)
+		       (format "Only %d message%s appended" num-appended
+			       (if (= num-appended 1) "" "s"))))
+		    (setq count 0))))))
+      (kill-buffer tembuf))))
 
 ;;; rmailout.el ends here

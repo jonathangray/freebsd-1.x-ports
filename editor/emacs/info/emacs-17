@@ -2,6 +2,311 @@ This is Info file ../info/emacs, produced by Makeinfo-1.54 from the
 input file emacs.texi.
 
 
+File: emacs,  Node: Disabling,  Prev: Mouse Buttons,  Up: Key Bindings
+
+Disabling Commands
+------------------
+
+   Disabling a command marks the command as requiring confirmation
+before it can be executed.  The purpose of disabling a command is to
+prevent beginning users from executing it by accident and being
+confused.
+
+   Attempting to invoke a disabled command interactively in Emacs
+causes the display of a window containing the command's name, its
+documentation, and some instructions on what to do immediately; then
+Emacs asks for input saying whether to execute the command as
+requested, enable it and execute, or cancel it.  If you decide to
+enable the command, you are asked whether to do this permanently or
+just for the current session.  Enabling permanently works by
+automatically editing your `.emacs' file.
+
+   The direct mechanism for disabling a command is to have a non-`nil'
+`disabled' property on the Lisp symbol for the command.  Here is the
+Lisp program to do this:
+
+     (put 'delete-region 'disabled t)
+
+   If the value of the `disabled' property is a string, that string is
+included in the message printed when the command is used:
+
+     (put 'delete-region 'disabled
+          "Text deleted this way cannot be yanked back!\n")
+
+   You can make a command disabled either by editing the `.emacs' file
+directly or with the command `M-x disable-command', which edits the
+`.emacs' file for you.  Likewise, `M-x enable-command' edits `.emacs'
+to enable a command permanently.  *Note Init File::.
+
+   Whether a command is disabled is independent of what key is used to
+invoke it; it also applies if the command is invoked using `M-x'.
+Disabling a command has no effect on calling it as a function from Lisp
+programs.
+
+
+File: emacs,  Node: Keyboard Translations,  Next: Syntax,  Prev: Key Bindings,  Up: Customization
+
+Keyboard Translations
+=====================
+
+   Some keyboards do not make it convenient to send all the special
+characters that Emacs uses.  The most common problem case is the DEL
+character.  Some keyboards provide no convenient way to type this very
+important character--usually because they were designed to expect the
+character `C-h' to be used for deletion.  On these keyboard, if you
+press the key normally used for deletion, Emacs handles the `C-h' as a
+prefix character and offers you a list of help options, which is not
+what you want.
+
+   You can work around this problem within Emacs by setting up keyboard
+translations to turn `C-h' into DEL and DEL into `C-h', as follows:
+
+     ;; Translate `C-h' to DEL.
+     (keyboard-translate ?\C-h ?\C-?)
+     ;; Translate DEL to `C-h'.
+     (keyboard-translate ?\C-? ?\C-h)
+
+   Keyboard translations are not the same as key bindings in keymaps
+(*note Keymaps::.).  Emacs contains numerous keymaps that apply in
+different situations, but there is only one set of keyboard
+translations, and it applies to every character that Emacs reads from
+the terminal.  Keyboard translations take place at the lowest level of
+input processing; the keys that are looked up in keymaps contain the
+characters that result from keyboard translation.
+
+   For full information about how to use keyboard translations, see
+*Note Translating Input: (elisp)Translating Input.
+
+
+File: emacs,  Node: Syntax,  Next: Init File,  Prev: Keyboard Translations,  Up: Customization
+
+The Syntax Table
+================
+
+   All the Emacs commands which parse words or balance parentheses are
+controlled by the "syntax table".  The syntax table says which
+characters are opening delimiters, which are parts of words, which are
+string quotes, and so on.  Each major mode has its own syntax table
+(though sometimes related major modes use the same one) which it
+installs in each buffer that uses that major mode.  The syntax table
+installed in the current buffer is the one that all commands use, so we
+call it "the" syntax table.  A syntax table is a Lisp object, a vector
+of length 256 whose elements are numbers.
+
+   To display a description of the contents of the current syntax table,
+type `C-h s' (`describe-syntax').  The description of each character
+includes both the string you would have to give to
+`modify-syntax-entry' to set up that character's current syntax, and
+some English to explain that string if necessary.
+
+   For full information on the syntax table, see *Note Syntax Table:
+(elisp)Syntax Table.
+
+
+File: emacs,  Node: Init File,  Prev: Syntax,  Up: Customization
+
+The Init File, `~/.emacs'
+=========================
+
+   When Emacs is started, it normally loads a Lisp program from the file
+`.emacs' in your home directory.  We call this file your "init file"
+because it specifies how to initialize Emacs for you.  You can use the
+command line switches `-q' and `-u' to tell Emacs whether to load an
+init file, and which one (*note Entering Emacs::.).
+
+   There can also be a "default init file", which is the library named
+`default.el', found via the standard search path for libraries.  The
+Emacs distribution contains no such library; your site may create one
+for local customizations.  If this library exists, it is loaded
+whenever you start Emacs (except when you specify `-q').  But your init
+file, if any, is loaded first; if it sets `inhibit-default-init'
+non-`nil', then `default' is not loaded.
+
+   If you have a large amount of code in your `.emacs' file, you should
+move it into another file such as `~/SOMETHING.el', byte-compile it,
+and make your `.emacs' file load it with `(load "~/SOMETHING")'.  *Note
+Byte Compilation: (elisp)Byte Compilation, for more information about
+compiling Emacs Lisp programs.
+
+* Menu:
+
+* Init Syntax::     Syntax of constants in Emacs Lisp.
+* Init Examples::   How to do some things with an init file.
+* Terminal Init::   Each terminal type can have an init file.
+* Find Init::	    How Emacs finds the init file.
+
+
+File: emacs,  Node: Init Syntax,  Next: Init Examples,  Up: Init File
+
+Init File Syntax
+----------------
+
+   The `.emacs' file contains one or more Lisp function call
+expressions.  Each of these consists of a function name followed by
+arguments, all surrounded by parentheses.  For example, `(setq
+fill-column 60)' calls the function `setq' to set the variable
+`fill-column' (*note Filling::.) to 60.
+
+   The second argument to `setq' is an expression for the new value of
+the variable.  This can be a constant, a variable, or a function call
+expression.  In `.emacs', constants are used most of the time.  They
+can be:
+
+Numbers:
+     Numbers are written in decimal, with an optional initial minus
+     sign.
+
+Strings:
+     Lisp string syntax is the same as C string syntax with a few extra
+     features.  Use a double-quote character to begin and end a string
+     constant.
+
+     In a string, you can include newlines and special characters
+     literally.  But often it is cleaner to use backslash sequences for
+     them: `\n' for newline, `\b' for backspace, `\r' for carriage
+     return, `\t' for tab, `\f' for formfeed (control-L), `\e' for
+     escape, `\\' for a backslash, `\"' for a double-quote, or `\OOO'
+     for the character whose octal code is OOO.  Backslash and
+     double-quote are the only characters for which backslash sequences
+     are mandatory.
+
+     `\C-' can be used as a prefix for a control character, as in
+     `\C-s' for ASCII control-S, and `\M-' can be used as a prefix for
+     a Meta character, as in `\M-a' for `Meta-A' or `\M-\C-a' for
+     `Control-Meta-A'.
+
+Characters:
+     Lisp character constant syntax consists of a `?' followed by
+     either a character or an escape sequence starting with `\'.
+     Examples: `?x', `?\n', `?\"', `?\)'.  Note that strings and
+     characters are not interchangeable in Lisp; some contexts require
+     one and some contexts require the other.
+
+True:
+     `t' stands for `true'.
+
+False:
+     `nil' stands for `false'.
+
+Other Lisp objects:
+     Write a single-quote (') followed by the Lisp object you want.
+
+
+File: emacs,  Node: Init Examples,  Next: Terminal Init,  Prev: Init Syntax,  Up: Init File
+
+Init File Examples
+------------------
+
+   Here are some examples of doing certain commonly desired things with
+Lisp expressions:
+
+   * Make TAB in C mode just insert a tab if point is in the middle of a
+     line.
+
+          (setq c-tab-always-indent nil)
+
+     Here we have a variable whose value is normally `t' for `true' and
+     the alternative is `nil' for `false'.
+
+   * Make searches case sensitive by default (in all buffers that do not
+     override this).
+
+          (setq-default case-fold-search nil)
+
+     This sets the default value, which is effective in all buffers
+     that do not have local values for the variable.  Setting
+     `case-fold-search' with `setq' affects only the current buffer's
+     local value, which is not what you probably want to do in an init
+     file.
+
+   * Make Text mode the default mode for new buffers.
+
+          (setq default-major-mode 'text-mode)
+
+     Note that `text-mode' is used because it is the command for
+     entering Text mode.  The single-quote before it makes the symbol a
+     constant; otherwise, `text-mode' would be treated as a variable
+     name.
+
+   * Turn on Auto Fill mode automatically in Text mode and related
+     modes.
+
+          (add-hook 'text-mode-hook
+            '(lambda () (auto-fill-mode 1)))
+
+     This shows how to add a hook function to a normal hook variable
+     (*note Hooks::.).  The function we supply is a list starting with
+     `lambda', with a single-quote in front of it to make it a list
+     constant rather than an expression.
+
+     It's beyond the scope of this manual to explain Lisp functions,
+     but for this example it is enough to know that the effect is to
+     execute `(auto-fill-mode 1)' when Text mode is entered.  You can
+     replace it with any other expression that you like, or with
+     several expressions in a row.
+
+     Emacs comes with a function named `turn-on-auto-fill' whose
+     definition is `(lambda () (auto-fill-mode 1))'.  Thus, a simpler
+     way to write the above example is as follows:
+
+          (add-hook 'text-mode-hook 'turn-on-auto-fill)
+
+   * Load the installed Lisp library named `foo' (actually a file
+     `foo.elc' or `foo.el' in a standard Emacs directory).
+
+          (load "foo")
+
+     When the argument to `load' is a relative file name, not starting
+     with `/' or `~', `load' searches the directories in `load-path'
+     (*note Lisp Libraries::.).
+
+   * Load the compiled Lisp file `foo.elc' from your home directory.
+
+          (load "~/foo.elc")
+
+     Here an absolute file name is used, so no searching is done.
+
+   * Rebind the key `C-x l' to run the function `make-symbolic-link'.
+
+          (global-set-key "\C-xl" 'make-symbolic-link)
+
+     or
+
+          (define-key global-map "\C-xl" 'make-symbolic-link)
+
+     Note once again the single-quote used to refer to the symbol
+     `make-symbolic-link' instead of its value as a variable.
+
+   * Do the same thing for C mode only.
+
+          (define-key c-mode-map "\C-xl" 'make-symbolic-link)
+
+   * Redefine all keys which now run `next-line' in Fundamental mode so
+     that they run `forward-line' instead.
+
+          (substitute-key-definition 'next-line 'forward-line
+                                     global-map)
+
+   * Make `C-x C-v' undefined.
+
+          (global-unset-key "\C-x\C-v")
+
+     One reason to undefine a key is so that you can make it a prefix.
+     Simply defining `C-x C-v ANYTHING' will make `C-x C-v' a prefix,
+     but `C-x C-v' must first be freed of its usual non-prefix
+     definition.
+
+   * Make `$' have the syntax of punctuation in Text mode.  Note the
+     use of a character constant for `$'.
+
+          (modify-syntax-entry ?\$ "." text-mode-syntax-table)
+
+   * Enable the use of the command `eval-expression' without
+     confirmation.
+
+          (put 'eval-expression 'disabled nil)
+
+
 File: emacs,  Node: Terminal Init,  Next: Find Init,  Prev: Init Examples,  Up: Init File
 
 Terminal-specific Initialization
@@ -829,285 +1134,4 @@ line.
 * Borders X::	        Internal and external borders, under X.
 * Icons X::             Choosing what sort of icon to use, under X.
 * Resources X::         Advanced use of classes and resources, under X.
-
-
-File: emacs,  Node: Ordinary Arguments,  Next: Initial Options,  Up: Command Arguments
-
-Ordinary Arguments
-==================
-
-   Here is a table of the ordinary arguments and options:
-
-`FILE'
-     Visit FILE using `find-file'.  *Note Visiting::.
-
-`+LINENUM FILE'
-     Visit FILE using `find-file', then go to line number LINENUM in it.
-
-`-l FILE'
-`-load FILE'
-     Load a file FILE of Lisp code with the function `load'.  *Note
-     Lisp Libraries::.
-
-`-f FUNCTION'
-`-funcall FUNCTION'
-     Call Lisp function FUNCTION with no arguments.
-
-`-insert FILE'
-     Insert the contents of FILE into the current buffer.  This is like
-     what `M-x insert-buffer' does; *Note Misc File Ops::.
-
-`-kill'
-     Exit from Emacs without asking for confirmation.
-
-
-File: emacs,  Node: Initial Options,  Next: Command Example,  Prev: Ordinary Arguments,  Up: Command Arguments
-
-Initial Options
-===============
-
-   The initial options are recognized only at the beginning of the
-command line.  If you use more than one of them, they must appear in the
-order that they appear in this table.
-
-`-t DEVICE'
-     Use DEVICE as the device for terminal input and output.
-
-`-d DISPLAY'
-     When running with the X Window System, use the display named
-     DISPLAY to make the window that serves as Emacs's terminal.
-
-`-nw'
-     Don't communicate directly with X, disregarding the `DISPLAY'
-     environment variable even if it is set.  `-nw' stands for
-     "non-window."
-
-`-batch'
-     Run Emacs in "batch mode", which means that the text being edited
-     is not displayed and the standard Unix interrupt characters such
-     as `C-z' and `C-c' continue to have their normal effect.  Emacs in
-     batch mode outputs to `stdout' only what would normally be printed
-     in the echo area under program control.
-
-     Batch mode is used for running programs written in Emacs Lisp from
-     shell scripts, makefiles, and so on.  Normally the `-l' option or
-     `-f' option will be used as well, to invoke a Lisp program to do
-     the batch processing.
-
-     `-batch' implies `-q' (do not load an init file).  It also causes
-     Emacs to kill itself after all command options have been
-     processed.  In addition, auto-saving is not done except in buffers
-     for which it has been explicitly requested.
-
-`-q'
-`-no-init-file'
-     Do not load your Emacs init file `~/.emacs'.
-
-`-u USER'
-`-user USER'
-     Load USER's Emacs init file `~USER/.emacs' instead of your own.
-
-   The init file can get access to the values of the command line
-arguments as the elements of a list in the variable
-`command-line-args'.  (The list contains only the arguments from the
-first table above.  Emacs processes the arguments from the second table
-before building the list.)  The init file can override the normal
-processing of the other arguments by setting this variable.
-
-
-File: emacs,  Node: Command Example,  Next: Resume Arguments,  Prev: Initial Options,  Up: Command Arguments
-
-Command Argument Example
-========================
-
-   Here is an example of using Emacs with arguments and options.  It
-assumes you have a Lisp program file called `hack-c.el' which, when
-loaded, performs some useful operation on current buffer, expected to be
-a C program.
-
-     emacs -batch foo.c -l hack-c -f save-buffer -kill > log
-
-This says to visit `foo.c', load `hack-c.el' (which makes changes in
-the visited file), save `foo.c' (note that `save-buffer' is the
-function that `C-x C-s' is bound to), and then exit to the shell that
-this command was done with.  The initial option `-batch' guarantees
-there will be no problem redirecting output to `log', because Emacs
-will not assume that it has a display terminal to work with.
-
-
-File: emacs,  Node: Resume Arguments,  Next: Display X,  Prev: Command Example,  Up: Command Arguments
-
-Resuming Emacs with Arguments
-=============================
-
-   You can specify ordinary arguments for Emacs when you resume it after
-a suspension.  To prepare for this, put the following code in your
-`.emacs' file (*note Hooks::.):
-
-     (add-hook 'suspend-hook 'resume-suspend-hook)
-
-   As further preparation, you must execute the shell script
-`emacs.csh' (if you use CSH as your shell) or `emacs.bash' (if you use
-BASH as your shell).  These scripts define an alias named `edit', which
-will resume Emacs give it new command line arguments such as files to
-visit.
-
-   Only ordinary arguments work properly when you resume Emacs.  Initial
-arguments are not recognized.  It's too late to execute them anyway.
-
-   Note that resuming Emacs (with or without arguments) must be done
-from within the shell that is the parent of the Emacs job.  This is why
-`edit' is an alias rather than a program or a shell script.  It is not
-possible to implement a resumption command that could be run from other
-subjobs of the shell; no way to define a command that could be made the
-value of `EDITOR', for example.  Therefore, this feature does not take
-the place of the the Emacs Server feature.  *Note Emacs Server::.
-
-   The aliases use the Emacs Server feature if you appear to have a
-server Emacs running.  However, they cannot determine this with complete
-accuracy.  They may think that a server is still running when in
-actuality you have killed that Emacs, because the file `/tmp/.esrv...'
-still exists.  If this happens, find that file and delete it.
-
-
-File: emacs,  Node: Display X,  Next: Font X,  Prev: Resume Arguments,  Up: Command Arguments
-
-Specifying the Display Name
-===========================
-
-   The environment variable `DISPLAY' tells all X clients where to
-display their windows.  Its value is set up by default in ordinary
-circumstances, when you start an X server and run jobs locally.
-Occasionally you may need to specify the display yourself; for example,
-if you do a remote login and want to run a client program remotely,
-displaying on your local screen.
-
-   With Emacs, the main reason people change the default display is to
-let them log into another system, run Emacs on that system, but have the
-window displayed at their local terminal.  You might need to use login
-to another system because the files you want to edit are there, or
-because the Emacs executable file you want to run is there.
-
-   The syntax of the `DISPLAY' environment variable is:
-
-     HOST:DISPLAY.SCREEN
-
-where HOST is the host name of the X Window System server machine,
-DISPLAY is an arbitrarily-assigned number that distinguishes your
-server (X terminal) from other servers on the same machine, and SCREEN
-is a rarely-used field that allows an X server to control multiple
-terminal screens.  The period and the SCREEN field are optional.  If
-included, SCREEN is usually zero.
-
-   If your host is named `glasperle' and your server is the first (or
-perhaps the only) server listed in the configuration, your `DISPLAY' is
-`glasperle:0.0'.
-
-   You can specify the display name explicitly when you run Emacs,
-either by changing the `DISPLAY' variable, or with the option `-d
-DISPLAY' or `-display DISPLAY'.  These are initial options; they must
-come at the beginning of the command line.  *Note Initial Options::.
-Here is an example:
-
-     emacs -display glasperle:0 &
-
-   You can inhibit the direct use of X with the `-nw' option.  This is
-also an initial option.  This option tells Emacs to display using
-ordinary ASCII on its controlling terminal.
-
-   Sometimes, security arrangements prevent a program on a remote system
-from displaying on your local system.  In this case, trying to run Emacs
-produces messages like:
-
-     Xlib:  connection to "glasperle:0.0" refused by server
-
-   You might be able to overcome this problem by using the `xhost'
-command on the local system to give permission for access from your
-remote machine.
-
-
-File: emacs,  Node: Font X,  Next: Colors X,  Prev: Display X,  Up: Command Arguments
-
-Font Specification Options
-==========================
-
-   By default, Emacs displays text in the font named `9x15', which
-makes each character nine pixels wide and fifteen pixels high.  You can
-specify a different font on your command line through the option `-fn
-NAME'.  The `-font' option is a synonym for `-fn'.
-
-   Here is how to specify the font `6x13':
-
-     emacs -fn 6x13 &
-
-You can also do this in your `.Xdefaults' file:
-
-     emacs.font:      6x13
-
-   Use only fixed width fonts--that is, fonts in which all characters
-have the same width.  Emacs cannot yet handle display properly for
-variable width fonts.  Fixed width fonts include the one named `fixed',
-and fonts with names in the form NxN, such as `6x13', `8x13', and
-`9x15'.  Under the font-naming conventions in X11 Release 4 or later,
-any font with `m' or `c' in the eleventh field of the name is a fixed
-width font.
-
-   Here's how to use the `xlsfonts' program to list all the fixed width
-fonts available on your system:
-
-     xlsfonts -fn '*x*'
-     xlsfonts -fn '*-*-*-*-*-*-*-*-*-*-*-m*'
-     xlsfonts -fn '*-*-*-*-*-*-*-*-*-*-*-c*'
-
-To see what a particular font looks like, use the `xfd' command.  For
-example:
-
-     xfd -fn 6x13
-
-displays the entire font `6x13'.
-
-   While running Emacs, you can set the font of the current frame
-(*note Frame Parameters::.) or for a specific kind of text (*note
-Faces::.).
-
-
-File: emacs,  Node: Colors X,  Next: Window Size X,  Prev: Font X,  Up: Command Arguments
-
-Window Color Options
-====================
-
-   On a color display, you can specify which color to use for various
-parts of the Emacs display.  To find out what colors are available on
-your system, look at the `/usr/lib/X11/rgb.txt' file.  If you do not
-specify colors, the default for the background is white and the default
-for all other colors is black.
-
-   On a monochrome (black and white) display, the foreground is black,
-the background is white, and the border is grey.  You can reverse the
-foreground and background colors through the `-r' option or the
-`reverseVideo' resource.
-
-   Here is a list of the options for specifying colors:
-
-`-fg COLOR'
-     Specify the foreground color.
-
-`-bg COLOR'
-     Specify the background color.
-
-`-bd COLOR'
-     Specify the color of the border of the X window.
-
-`-cr COLOR'
-     Specify the color of the Emacs cursor which indicates where point
-     is.
-
-`-ms COLOR'
-     Specify the color for the mouse cursor when the mouse is in the
-     Emacs window.
-
-   For example, to use a coral mouse cursor and a slate blue text
-cursor, enter:
-
-     emacs -ms coral -cr 'slate blue' &
 

@@ -1,7 +1,7 @@
-This is Info file ../info/forms, produced by Makeinfo-1.55 from the
-input file forms.texinfo.
+This is Info file ../info/forms, produced by Makeinfo-1.54 from the
+input file forms.texi.
 
-   This file documents forms-mode, a forms based major mode for GNU
+   This file documents Forms mode, a form-editing major mode for GNU
 Emacs.
 
    Permission is granted to make and distribute verbatim copies of this
@@ -9,46 +9,46 @@ manual provided the copyright notice and this permission notice are
 preserved on all copies.
 
 
-File: forms,  Node: Top,  Next: What is in a Forms,  Up: (DIR)
+File: forms,  Node: Top,  Next: Forms Example,  Prev: (DIR),  Up: (DIR)
 
-   Forms mode is an Emacs major mode for working with simple plain-text
-databases in a forms-oriented manner. In forms mode, the information in
-these files is presented in an Emacs window in a user-defined format,
-one record at a time. Forms can be inspected read-only (viewing) or
-modified and updated.
+Forms Mode
+**********
+
+   Forms mode is an Emacs major mode for working with simple textual
+data bases in a forms-oriented manner.  In Forms mode, the information
+in these files is presented in an Emacs window in a user-defined format,
+one record at a time.  The user can view records or modify their
+contents.
 
    Forms mode is not a simple major mode, but requires two files to do
-its job: a control file and a data file. The data file holds the actual
-data which will be presented. The control file describes how it will be
-presented.
+its job: a control file and a data file.  The data file holds the
+actual data to be presented.  The control file describes how to present
+it.
 
 * Menu:
 
-* What is in a Forms::	Introduction.
-* Data File Format::	How to format the data file.
-* Control File Format::	How to control forms mode.
-* Forms Format Description::
-			How to define the forms layout.
-* Modifying Forms Contents::
-			How to modify.
-* Forms Mode Commands::	The commands available, and how to use them.
-* Key Bindings::	Which keys are bound to what commands.
-* Miscellaneous::	Forms mode messages and other remarks.
-* Error Messages::	List of error messages forms mode can produce.
-* Examples::		Some examples.
-* Credits::		Thanks everyone.
-* Concept Index::	Index of Concepts
-* Variable Index::	Index of Variables.
-* Function Index::	Index of Functions.
+* Forms Example::               An example: editing the password data base.
+* Entering and Exiting Forms Mode::
+                                How to visit a file in Forms mode.
+* Forms Commands::              Special commands to use while in Forms mode.
+* Data File Format::            How to format the data file.
+* Control File Format::         How to control forms mode.
+* Format Description::          How to define the forms layout.
+* Modifying Forms Contents::    How to modify.
+* Miscellaneous::               Forms mode messages and other remarks.
+* Error Messages::              List of error messages forms mode can produce.
+* Long Example::                A more complex control file example.
+* Credits::                     Thanks everyone.
+* Index::                       Index to this manual.
 
 
-File: forms,  Node: What is in a Forms,  Next: Data File Format,  Prev: Top,  Up: Top
+File: forms,  Node: Forms Example,  Next: Entering and Exiting Forms Mode,  Prev: Top,  Up: Top
 
-What is in a forms
-==================
+Forms Example
+*************
 
-   Let's illustrate forms mode with an example. Suppose you are looking
-at your `/etc/passwd' file, and your screen looks as follows:
+   Let's illustrate Forms mode with an example.  Suppose you are
+looking at the `/etc/passwd' file, and the screen looks like this:
 
      ====== /etc/passwd ======
      
@@ -65,156 +65,299 @@ are all there, but instead of being colon-separated on one single line,
 they make up a forms.
 
    The contents of the forms consists of the contents of the fields of
-the record (e.g. "root", "0", "1", "Super User") interspersed with
-normal text (e.g "User : ", "Uid: ").
+the record (e.g. `root', `0', `1', `Super User') interspersed with
+normal text (e.g `User : ', `Uid: ').
 
-   You can define yourself how text and fields will be used to make up
-the forms.
+   If you modify the contents of the fields, Forms mode will analyze
+your changes and update the file appropriately.  You cannot modify the
+interspersed explanatory text (unless you go to some trouble about it),
+because that is marked read-only (*note Text Properties: (elisp)Text
+Properties.).
 
-   When you modifiy the contents of the forms, it will be analyzed and
-the new contents of the fields of this record will be extracted. It
-possible, the file will be updated with the new contents.
+   The Forms mode control file specifies the relationship between the
+format of `/etc/passwd' and what appears on the screen in Forms mode.
+*Note Control File Format::.
 
 
-File: forms,  Node: Data File Format,  Next: Control File Format,  Prev: What is in a Forms,  Up: Top
+File: forms,  Node: Entering and Exiting Forms Mode,  Next: Forms Commands,  Prev: Forms Example,  Up: Top
 
-Data file format
-================
+Entering and Exiting Forms Mode
+*******************************
 
-   Files for use with forms mode are very simple - each record (line)
-forms the contents one form.  Each record is supposed to consist of a
-number of fields. These fields are separated by the value of the string
-`forms-field-sep', which is a `TAB' by default.
+`M-x forms-find-file RET CONTROL-FILE RET'
+     Visit a database using Forms mode.  Specify the name of the
+     *control file*, not the data file!
+
+`M-x forms-find-file-other-window RET CONTROL-FILE RET'
+     Similar, but displays the file in another window.
+
+   The command `forms-find-file' evaluates the file CONTROL-FILE, and
+also visits it in Forms mode.  What you see in its buffer is not the
+contents of this file, but rather a single record of the corresponding
+data file that is visited in its own buffer.  So there are two buffers
+involved in Forms mode: the "forms buffer" that is initially used to
+visit the control file and that shows the records being browsed, and
+the "data buffer" that holds the data file being visited.  The latter
+buffer is normally not visible.
+
+   Initially, the first record is displayed in the forms buffer.  The
+mode line displays the major mode name `Forms', followed by the minor
+mode `View' if the data base is read-only.  The number of the current
+record (N) and the total number of records in the file(T) are shown in
+the mode line as `N/T'.  For example:
+
+     --%%-Emacs: passwd-demo          (Forms View 1/54)----All-------
+
+   If the buffer is not read-only, you may change the buffer to modify
+the fields in the record.  When you move to a different record, the
+contents of the buffer are parsed using the specifications in
+`forms-format-list', and the data file is updated.  If the record has
+fields that aren't included in the display, they are not changed.
+
+   Entering Forms mode runs the normal hook `forms-mode-hooks' to
+perform user-defined customization.
+
+   To save any modified data, you can use `C-x C-s' (`save-buffer').
+This does not save the forms buffer (which would be rather useless),
+but instead saves the buffer visiting the data file.
+
+   To terminate Forms mode, you can use `C-x C-s' (`save-buffer') and
+then kill the forms buffer.  However, the data buffer will still
+remain.  If this is not desired, you have to kill this buffer too.
+
+
+File: forms,  Node: Forms Commands,  Next: Data File Format,  Prev: Entering and Exiting Forms Mode,  Up: Top
+
+Forms Commands
+**************
+
+   The commands of Forms mode belong to the `C-c' prefix, with one
+exception: TAB, which moves to the next field.  Forms mode uses
+different key maps for normal mode and read-only mode.  In read-only
+Forms mode, you can access most of the commands without the `C-c'
+prefix, but you must type ordinary letters instead of control
+characters; for example, type `n' instead of `C-c C-n'.
+
+`C-c C-n'
+     Show the next record (`forms-next-record').  With a prefix
+     argument N, show the Nth next record.
+
+`C-c C-p'
+     Show the previous record (`forms-prev-record').  With a prefix
+     argument N, show the Nth previous record.
+
+`C-c C-l'
+     Jump to a record by number (`forms-jump-record').   Specify the
+     record number with a prefix argument.
+
+`C-c <'
+     Jump to the first record (`forms-first-record').
+
+`C-c >'
+     Jump to the last record (`forms-last-record').  This command also
+     recalculates the number of records in the data file.
+
+`TAB'
+`C-c TAB'
+     Jump to the next field in the current record (`forms-next-field').
+     With a numeric argument N, jump forward N fields.  If this command
+     would move past the last field, it wraps around to the first field.
+
+`C-c C-q'
+     Toggles read-only mode (`forms-toggle-read-only').  In read-only
+     Forms mode, you cannot edit the fields; most Forms mode commands
+     can be accessed without the prefix `C-c' if you use the normal
+     letter instead (for example, type `n' instead of `C-c C-n').  In
+     edit mode, you can edit the fields and thus change the contents of
+     the data base; you must begin Forms mode commands with `C-c'.
+     Switching to edit mode is allowed only if you have write access to
+     the data file.
+
+`C-c C-o'
+     Create a new record and insert it before the current record
+     (`forms-insert-record').  It starts out with empty (or default)
+     contents for its fields; you can then edit the fields.  With a
+     prefix argument, the new record is created *after* the current one.
+     See also `forms-modified-record-filter' in *Note Modifying Forms
+     Contents::.
+
+`C-c C-k'
+     Delete the current record (`forms-delete-record').  You are
+     prompted for confirmation before the record is deleted unless a
+     prefix argument has been provided.
+
+`C-c C-s REGEXP RET'
+     Search for REGEXP in all records following this one
+     (`forms-search').  If found, this record is shown.  If you give an
+     empty argument, the previous regexp is used again.
+
+`M-x forms-prev-field'
+     Similar to `forms-next-field' but moves backwards.
+
+   In addition, commands such as `C-x C-s' (`save-buffer') and `M-x
+revert-buffer' are useful in Forms mode just as in other modes.
+
+   The following function key definitions are set up in Forms mode
+(whether read-only or not):
+
+`next'
+     forms-next-record
+
+`prior'
+     forms-prev-record
+
+`begin'
+     forms-first-record
+
+`end'
+     forms-last-record
+
+`S-Tab'
+     forms-prev-field
+
+
+File: forms,  Node: Data File Format,  Next: Control File Format,  Prev: Forms Commands,  Up: Top
+
+Data File Format
+****************
+
+   Files for use with Forms mode are very simple--each "record"
+(usually one line) forms the contents of one form.  Each record consists
+of a number of "fields", which are separated by the value of the string
+`forms-field-sep', which is `"\t"' (a tab) by default.
 
    Fields may contain text which shows up in the forms in multiple
-lines.  These lines are separated in the field using a PSEUDO-NEWLINE
+lines.  These lines are separated in the field using a "pseudo-newline"
 character which is defined by the value of the string
-`forms-multi-line'. Its default value is a Control-K character. If it
-is set to `nil' multiple line fields are prohibited.
+`forms-multi-line'.  Its default value is `"\^k"'.  If it is set to
+`nil', multiple line fields are prohibited.
 
 
-File: forms,  Node: Control File Format,  Next: Forms Format Description,  Prev: Data File Format,  Up: Top
+File: forms,  Node: Control File Format,  Next: Format Description,  Prev: Data File Format,  Up: Top
 
-Control file format
-===================
+Control File Format
+*******************
 
-   The control file serves two purposes.
+   The Forms mode "control file" serves two purposes.  First, it names
+the data file to use, and defines its format and properties.  Second,
+the Emacs buffer it occupies is used by Forms mode to display the forms.
 
-   First, it defines the data file to use, and its properties.
-
-   Second, the Emacs buffer it occupies will be used by the forms mode
-to display the forms.
-
-   The contents of the control file are evaluated using the Emacs
-command `eval-current-buffer', hence must contain valid Emacs-lisp
-expressions.  These expressions must set the following lisp variables
-to a suitable value:
+   The contents of the control file are evaluated as a Lisp program.  It
+should set the following Lisp variables to suitable values:
 
 `forms-file'
-     This variable must be set to the name of the data file.
-     Example:
+     This variable specifies the name of the data file.  Example:
+
           (setq forms-file "my/data-file")
 
 `forms-format-list'
      This variable describes the way the fields of the record are
-     formatted on the screen. See the next section for details.
+     formatted on the screen.  For details, see *Note Format
+     Description::.
 
 `forms-number-of-fields'
      This variable holds the number of fields in each record of the data
-     file.
-     Example:
+     file.  Example:
+
           (setq forms-number-of-fields 10)
 
-   An error will be given if one of the above values has not been set.
+   If the control file doesn't set all of these variables, Forms mode
+reports an error.
 
-   Other variables that may be set from the control file are optional.
-Most of them have suitable default values.
+   The control file can optionally set the following additional Forms
+mode variables.  Most of them have default values that are good for most
+applications.
 
 `forms-field-sep'
      This variable may be used to designate the string which separates
-     the fields in the records of the data file. If not set, it
-     defaults to a string containing a single `TAB' character.
-     Example:
+     the fields in the records of the data file.  If not set, it
+     defaults to the string `"\t"' (a tab character).  Example:
+
           (setq forms-field-sep "\t")
 
 `forms-read-only'
-     If set to a value other than `nil', the data file is treated
-     read-only. If the data file can not be written into, read-only
-     mode is enforced. The default value for `forms-read-only' is
-     derived from the access permissions of the data file.
-     Example:
+     If the value is non-`nil', the data file is treated read-only.
+     (Forms mode also treats the data file as read-only if you don't
+     have access to write it.)  Example:
+
           (set forms-read-only t)
 
 `forms-multi-line'
-     This variable may be set to allow multi-line text in fields. It
-     should be set to a string of one character, which denotes the
-     pseudo new-line character to be used to separate the text lines.
-     Its default value is Control-K (octal 013). If set to `nil',
-     multi-line text fields are prohibited.
-     It may not be a character contained in `forms-field-sep'.
-     Example:
-          (setq forms-multi-line "\C-k")
+     This variable specifies the "pseudo newline" separator that allows
+     multi-line fields.  This separator goes between the "lines" within
+     a field--thus, the field doesn't really contain multiple lines,
+     but it appears that way when displayed in Forms mode.  If the
+     value is `nil', multi-line text fields are prohibited.  The pseudo
+     newline must not be a character contained in `forms-field-sep'.
 
-`forms-forms-scroll'
-     *Note Forms Mode Commands:: for the description.
+     The default value is `"\^k"', so the default pseudo newline is the
+     character control-k.  Example:
 
-`forms-forms-jump'
-     *Note Forms Mode Commands:: for the description.
+          (setq forms-multi-line "\^k")
 
 `forms-new-record-filter'
-     The control file may define a function `forms-new-record-filter',
-     or set `forms-new-record-filter' to such a function. If so, this
-     function is called when a new record is created to supply default
-     values for fields.
+     This variable holds a function to be called whenever a new record
+     is created to supply default values for fields.  If it is `nil',
+     no function is called.  *Note Modifying Forms Contents::, for
+     details.
 
 `forms-modified-record-filter'
-     The control file may define a function
-     `forms-modified-record-filter', or set
-     `forms-modified-record-filter' to such a function.  If so, this
-     function is called when a record is modified, just before writing
-     the modified record back to the data file.
+     This variable holds a function to be called whenever a record is
+     modified, just before updating the Forms data file.  If it is
+     `nil', no function is called.  *Note Modifying Forms Contents::,
+     for details.
 
 
-File: forms,  Node: Forms Format Description,  Next: Modifying Forms Contents,  Prev: Control File Format,  Up: Top
+File: forms,  Node: Format Description,  Next: Modifying Forms Contents,  Prev: Control File Format,  Up: Top
 
-The forms format description
-============================
+The Format Description
+**********************
 
-   The value of the variable `forms-format-list' is used to specify the
-format of the forms. It must be a list of formatting elements, each of
-which can be a string, number, lisp list or a lisp symbol that
-evaluates to one of these. The formatting elements are processed in the
+   The variable `forms-format-list' specifies the format of the data in
+the data file, and how to convert the data for display in Forms mode.
+Its value must be a list of Forms mode "formatting elements", each of
+which can be a string, a number, a Lisp list, or a Lisp symbol that
+evaluates to one of those.  The formatting elements are processed in the
 order they appear in the list.
 
-   A `string' formatting element is inserted in the forms "as is".
+STRING
+     A string formatting element is inserted in the forms "as is," as
+     text that the user cannot alter.
 
-   A `number' element selects a field of the record. The contents of
-this field are inserted. The first field of the record has number 1
-(one).
+NUMBER
+     A number element selects a field of the record.  The contents of
+     this field are inserted in the display at this point.  Field
+     numbers count starting from 1 (one).
 
-   A `lisp list' specifies a function call. This function is called
-every time a record is displayed, and its result, that must be a
-string, is inserted in the forms. The function should do nothing but
-returning a string. The fields of the record being displayed are
-available to this function as the list `forms-fields' and can be
-accessed using `(nth 'FIELD NUMBER` forms-fields)'.  Fields are
-numbered starting from 1 (one).
+LIST
+     A formatting element that is a list specifies a function call.
+     This function is called every time a record is displayed, and its
+     result, which must be a string, is inserted in the display text.
+     The function should do nothing but returning a string.
 
-   A `lisp symbol' must evaluate to one of the above possibilities.
+     The function you call can access the fields of the record as a
+     list in the variable `forms-fields'.
+
+SYMBOL
+     A symbol used as a formatting element should evaluate to a string,
+     number, or list; the value is interpreted as a formatting element,
+     as described above.
 
    If a record does not contain the number of fields as specified in
-`forms-number-of-fields', a warning message will be printed. Excess
+`forms-number-of-fields', a warning message will be printed.  Excess
 fields are ignored, missing fields are set to empty.
 
-   The control file which shows your `/etc/passwd' file as demonstrated
-in the beginning of this document might look as follows:
-     ;; This demo visits /etc/passwd.
+   The control file which displays `/etc/passwd' file as demonstrated
+in the beginning of this manual might look as follows:
+
+     ;; This demo visits `/etc/passwd'.
      
      (setq forms-file "/etc/passwd")
      (setq forms-number-of-fields 7)
      (setq forms-read-only t)                 ; to make sure
      (setq forms-field-sep ":")
-     (setq forms-multi-line nil)              ; not allowed
+     ;; Don't allow multi-line fields.
+     (setq forms-multi-line nil)
      
      (setq forms-format-list
            (list
@@ -230,19 +373,8 @@ in the beginning of this document might look as follows:
             "Shell: "    7
             "\n"))
 
-   When functions are to be used in `forms-format-list' they must be
-quoted to prevent them from being evaluated too early:
-
-     (setq forms-format-list
-           (list
-            "====== " forms-file " ======\n\n"
-            "User : "    1
-            '(make-string 20 ?-)
-            ...
-           ))
-
-   Alternatively, instead of quoting the functions, the whole list may
-be quoted:
+   When you construct the value of  `forms-format-list', you should
+usually either quote the whole value, like this,
 
      (setq forms-format-list
           '(
@@ -252,383 +384,201 @@ be quoted:
             ...
            ))
 
-   Upon startup, the contents of `forms-format-list' are validated. If
-errors are encountered, processing is aborted with an error message
-which includes a descriptive text. *Note Error Messages::, for a
-detailed list of error messages.
+or quote the elements which are lists, like this:
+
+     (setq forms-format-list
+           (list
+            "====== " forms-file " ======\n\n"
+            "User : "    1
+            '(make-string 20 ?-)
+            ...
+           ))
+
+   Forms mode validates the contents of `forms-format-list' when you
+visit a database.  If there are errors, processing is aborted with an
+error message which includes a descriptive text.  *Note Error
+Messages::, for a detailed list of error messages.
 
 
-File: forms,  Node: Modifying Forms Contents,  Next: Forms Mode Commands,  Prev: Forms Format Description,  Up: Top
+File: forms,  Node: Modifying Forms Contents,  Next: Miscellaneous,  Prev: Format Description,  Up: Top
 
 Modifying The Forms Contents
-============================
+****************************
 
-   If a forms is not read-only, it's contents can be modified.
+   If `forms-read-only' is `nil', the user can modify the fields and
+records of the database.
 
-   All normal editor commands may be used to change the forms. There is
-no distinction between the "fixed" text and the text from the fields of
-the records. However, upon completion, the forms is parsed to extract
-the new contents of the fields. The "fixed" portions of the forms are
-used to delimit the fields, these portions should therefore not be
-modified to avoid the risk that the field contents cannot be determined.
-Moreover, ambiguous field contents, which can not be discriminated from
-"fixed" text, must be avoided.
+   All normal editing commands are available for editing the contents
+of the displayed record.  You cannot delete or modify the fixed,
+explanatory text that comes from string formatting elements, but you
+can modify the actual field contents.
 
-   If the contents of the forms cannot be recognized properly, this is
-signaled using a descriptive text. *Note Error Messages::, for more
-info.  The cursor will indicate the last part of the forms which was
-successfully parsed.
+   If the variable `forms-modified-record-filter' is non-`nil', it is
+called as a function before the new data is written to the data file.
+The function receives one argument, a vector that contains the contents
+of the fields of the record.
 
-   If `forms-modified-record-filter' has been set, this function is
-called before the new data is written to the data file. The function is
-called with one argument: a vector that contains the contents of the
-fields of the record. Fields can referenced or modified using the lisp
-functions `aref' and `aset'. The first field has number 1 (one). The
-function must return the (possibly modified) vector to the calling
-environment.
+   The function can refer to fields with `aref' and modify them with
+`aset'.  The first field has number 1 (one); thus, element 0 of the
+vector is not used.  The function should return the same vector it was
+passed; the (possibly modified) contents of the vector determine what is
+actually written in the file.  Here is an example:
 
      (defun my-modified-record-filter (record)
-       ;; modify second field
+       ;; Modify second field.
        (aset record 2 (current-time-string))
-       record		; return it
-     )
+       ;; Return the field vector.
+       record)
+     
      (setq forms-modified-record-filter 'my-modified-record-filter)
 
-
-File: forms,  Node: Forms Mode Commands,  Next: Key Bindings,  Prev: Modifying Forms Contents,  Up: Top
+   If the variable `forms-new-record-filter' is non-`nil', its value is
+a function to be called to fill in default values for the fields of a
+new record.  The function is passed a vector of empty strings, one for
+each field; it should return the same vector, with the desired field
+values stored in it.  Fields are numbered starting from 1 (one).
+Example:
 
-Forms mode commands
-===================
-
-`M-x forms-find-file FILE'
-   Visits FILE, runs `eval-current-buffer' on it, and puts the buffer
-into forms-mode. The first record of the data file will be loaded and
-shown.
-
-   The modeline will display the major mode `"Forms"' followed by the
-minor mode `"View"' if the file is visited read-only.  The number of
-the current record (N) and the total number of records (T) in the file
-is shown in the modeline as `"n/t"'.
-For example:
-     --%%-Emacs: passwd-demo          (Forms View 1/54)----All-------
-
-`M-x forms-find-file-other-window FILE'
-   This command is similar to `forms-find-file', but visits the file in
-another window.
-
-   If the buffer is not read-only, you may change the buffer to modify
-the fields in the record. When the current record is left, e.g. by
-switching to another record, the contents of the buffer are parsed
-using the specifications in `forms-format-list', and a new record is
-constructed which replaces the current record in the data file. Fields
-of the record which are not shown in the forms are not modified; they
-retain their original contents.
-
-   Most forms mode commands are bound to keys, and are accessible with
-the conventional `C-c' prefix. In read-only mode this prefix is not
-used.  *Note Key Bindings::, for the default key bindigs used by forms
-mode.
-
-   The following commands are available within forms mode.
-
-`forms-next-record'
-     shows the next record. With a prefix argument, show the n-th next
-     record.
-
-`forms-prev-record'
-     shows the previous record. With a prefix argument, show the n-th
-     previous record.
-
-`forms-jump-record'
-     jumps to a record by number. A prefix argument is used for the
-     record number to jump to. If no prefix argument is supplied, a
-     record number is asked for in the minibuffer.
-     If an invalid record number is supplied, an error message is
-     displayed reading the offending record number, and the allowable
-     range of numbers.
-
-`forms-first-record'
-     jumps to the first record.
-
-`forms-last-record'
-     jumps to the last record. Also re-counts the number of records in
-     the data file.
-
-`forms-next-field'
-     jumps to the next field in the forms. With a numeric argument:
-     jumps that many fields, or to the first field if there are not
-     that many fields left.
-
-     Jumping to fields is implemented using markers, which are placed
-     in front of the fields. If the contents of the forms are modified,
-     the markers are adjusted. However, if text around a marker has
-     been deleted from the screen and inserted again it is possible
-     that this marker no longer points at its field correctly.  *Note
-     Markers: (emacs)Markers, for more information on markers.
-
-`forms-view-mode'
-     switches to read-only mode. Forms mode commands may no longer be
-     prefixed with `C-c'.
-
-`forms-edit-mode'
-     switches to edit mode. Forms mode commands must be prefixed with
-     `C-c'.
-     Switching to edit mode is only possible if write access to the data
-     file is allowed.
-
-`forms-insert-record'
-     create a new record, which is inserted before the current record.
-     An empty form is presented, which can be filled in using familiar
-     editor commands. With a prefix argument: the new record is created
-     after the current one.
-
-     If a function `forms-new-record-filter' was defined in the control
-     file, this function is called to fill in default values for
-     fields. The function is passed a vector of empty strings, one for
-     each field. For convenience, an additional element is added so the
-     numbers of the elements are the same as the numbers used in the
-     forms description. The function must return the (updated) vector.
-
-     Instead of defining the function, `forms-new-record-filter' may be
-     set to a function.
-
-     Example:
-          (defun my-new-record-filter (fields)
-            (aset fields 5 (login-name))
-            (aset fields 1 (current-time-string))
-            ;; and return it
-            fields)
-          (setq forms-new-record-filter 'my-new-record-filter)
-
-`forms-delete-record'
-     deletes the current record. You are prompted for confirmation
-     before the record is deleted unless a prefix argument has been
-     provided.
-
-`forms-search REGEXP'
-     searches for REGEXP in all records following this one. If found,
-     this record is shown.
-     The next time it is invoked, the previous regexp is the default,
-     so you can do repeated searches by simply pressing RET in response
-     to the prompt.
-
-`revert-buffer'
-     reverts a possibly modified forms to its original state. It only
-     affect the record currently in the forms.
-
-`forms-exit'
-     terminates forms processing. The data file is saved if it has been
-     modified.
-
-`forms-exit-no-save'
-     aborts forms processing. If the data file has been modified Emacs
-     will ask questions.
-
-`describe-mode'
-     gives additional help.
-
-`save-buffer'
-     saves the changes in the data file, if modified.
-
-   If the variable `forms-forms-scrolls' is set to a value other than
-`nil' (which it is, by default), the Emacs functions `scroll-up' and
-`scroll-down' will perform a `forms-next-record' and
-`forms-prev-record' when in forms mode.  So you can use your favourite
-page commands to page through the data file.
-
-   Likewise, if the variable `forms-forms-jump' is not `nil' (which it
-is, by default), Emacs functions `beginning-of-buffer' and
-`end-of-buffer' will perform `forms-first-record' and
-`forms-last-record' when in forms mode.
-
-   After forms mode is entered, functions contained in
-`forms-mode-hooks' are executed to perform user defined customization.
+     (defun my-new-record-filter (fields)
+       (aset fields 5 (login-name))
+       (aset fields 1 (current-time-string))
+       fields)
+     
+     (setq forms-new-record-filter 'my-new-record-filter)
 
 
-File: forms,  Node: Key Bindings,  Next: Miscellaneous,  Prev: Forms Mode Commands,  Up: Top
-
-Key bindings
-============
-
-   This section describes the key bindings as they are defined when
-invoking forms mode.
-All commands must be prefixed with `C-c' when editing a forms. If a
-forms is read-only, `C-c' is not used.  The only exception to this rule
-is `forms-next-field', which is bound to `TAB' in all maps.
-
-`C-c TAB'
-     `forms-next-field'
-
-`C-c SPC'
-     `forms-next-record'
-
-`C-c <'
-     `forms-first-record'
-
-`C-c >'
-     `forms-first-record'
-
-`C-c d'
-     `forms-delete-record'
-
-`C-c e'
-     `forms-edit-mode'
-
-`C-c i'
-     `forms-insert-record'
-
-`C-c j'
-     `forms-jump-record'
-
-`C-c n'
-     `forms-next-record'
-
-`C-c p'
-     `forms-prev-record'
-
-`C-c q'
-     `forms-exit'
-
-`C-c s REGEXP'
-     `forms-search'
-
-`C-c v'
-     `forms-view-mode'
-
-`C-c x'
-     `forms-exit-no-save'
-
-`C-c ?'
-     `describe-mode'
-
-`C-c DEL'
-     `forms-prev-record'
-
-
-File: forms,  Node: Miscellaneous,  Next: Error Messages,  Prev: Key Bindings,  Up: Top
+File: forms,  Node: Miscellaneous,  Next: Error Messages,  Prev: Modifying Forms Contents,  Up: Top
 
 Miscellaneous
-=============
+*************
 
-   A global variable `forms-version' holds the version information of
-the current implementation of forms mode.
+   The global variable `forms-version' holds the version information of
+the Forms mode software.
 
    It is very convenient to use symbolic names for the fields in a
 record.  The function `forms-enumerate' provides an elegant means to
-define a series of variables to consecutive numbers.  The function
-returns the higest number used, so it can be used to set
-`forms-number-of-fields' also:
+define a series of variables whose values are consecutive integers.  The
+function returns the highest number used, so it can be used to set
+`forms-number-of-fields' also.  For example:
+
      (setq forms-number-of-fields
            (forms-enumerate
-            '(field1 field2 field3 ... )))
+            '(field1 field2 field3 ...)))
 
-   `field1' will be set to 1, `field2' to 2 and so on.
+   This sets `field1' to 1, `field2' to 2, and so on.
 
-   Care has been taken to localize the current information of the forms
-mode, so it is possible to visit multiple files in forms mode
-simultaneously, even if they have different properties.
+   Care has been taken to keep the Forms mode variables buffer-local,
+so it is possible to visit multiple files in Forms mode simultaneously,
+even if they have different properties.
 
-   Since buffer-local functions are not available in this version of GNU
-Emacs, the definitions of the filter functions
-`forms-new-record-filter' and `forms-modified-record-filter' are copied
-into internal, buffer local variables when forms-mode is initialized.
+   If you have visited the control file in normal fashion with
+`find-file' or a like command, you can switch to Forms mode with the
+command `M-x forms-mode'.  If you put `-*- forms -*-' in the first line
+of the control file, then visiting it enables Forms mode automatically.
+But this makes it hard to edit the control file itself, so you'd
+better think twice before using this.
 
-   If a control file is visited using the standard `find-file'
-commands, forms mode can be enabled with the command `M-x forms-mode'.
-Forms mode will be automatically enabled if the file contains the
-string `"-*- forms -*-"' somewhere in the first line. However, this
-makes it hard to edit the control file itself so you'd better think
-twice before using this.
-
-   The default format for the data file, using TAB to separate fields
-and `C-k' to separate multi-line fields, matches the file format of
-some popular Macintosh database programs, e.g. FileMaker. So
-`forms-mode' could decrease the need to use Apple computers.
+   The default format for the data file, using `"\t"' to separate
+fields and `"\^k"' to separate lines within a field, matches the file
+format of some popular database programss, e.g. FileMaker.  So
+`forms-mode' can decrease the need to use proprietary software.
 
 
-File: forms,  Node: Error Messages,  Next: Examples,  Prev: Miscellaneous,  Up: Top
+File: forms,  Node: Error Messages,  Next: Long Example,  Prev: Miscellaneous,  Up: Top
 
 Error Messages
-==============
+**************
 
    This section describes all error messages which can be generated by
-forms mode.
+forms mode.  Error messages that result from parsing the control file
+all start with the text `Forms control file error'.  Messages generated
+while analyzing the definition of `forms-format-list' start with `Forms
+format error'.
 
-`'forms-file' has not been set'
+`Forms control file error: 'forms-file' has not been set'
      The variable `forms-file' was not set by the control file.
 
-`'forms-number-of-fields' has not been set'
+`Forms control file error: 'forms-number-of-fields' has not been set'
      The variable `forms-number-of-fields' was not set by the control
      file.
 
-`'forms-number-of-fields' must be > 0'
+`Forms control file error: 'forms-number-of-fields' must be a number > 0'
      The variable `forms-number-of-fields' did not contain a positive
      number.
 
-`'forms-field-sep' is not a string'
-`'forms-multi-line' must be nil or a one-character string'
+`Forms control file error: 'forms-field-sep' is not a string'
+`Forms control file error: 'forms-multi-line' must be nil or a one-character string'
      The variable `forms-multi-line' was set to something other than
-     `nil or' a single-character string.
+     `nil' or a single-character string.
 
-`'forms-multi-line' is equal to 'forms-field-sep''
+`Forms control file error: 'forms-multi-line' is equal to 'forms-field-sep''
      The variable `forms-multi-line' may not be equal to
      `forms-field-sep' for this would make it impossible to distinguish
      fields and the lines in the fields.
 
-`'forms-format-list' has not been set'
-`'forms-format-list' is not a list'
-     The variable `forms-format-list' was not set to a lisp `list' by
-     the control file.
+`Forms control file error: 'forms-new-record-filter' is not a function'
+`Forms control file error: 'forms-modified-record-filter' is not a function'
+     The variable has been set to something else than a function.
 
-`Forms error: field number XX out of range 1..NN'
-     A field number was supplied with a value of XX, which was not
-     greater than zero and smaller than or equal to the number of
-     fields in the forms, NN.
+`Forms control file error: 'forms-format-list' has not been set'
+`Forms control file error: 'forms-format-list' is not a list'
+     The variable `forms-format-list' was not set to a Lisp list by the
+     control file.
 
-`Forms error: not a function FUN'
-     The first element of the lisp list specified in `forms-format-list'
-     did not have a function value.
+`Forms format error: field number XX out of range 1..NN'
+     A field number was supplied in `forms-format-list' with a value of
+     XX, which was not greater than zero and smaller than or equal to
+     the number of fields in the forms, NN.
 
-`Invalid element in 'forms-format-list': XX'
+`Forms format error:  not a function FUN'
+     The first element of a list which is an element of
+     `forms-format-list' was not a valid Lisp function.
+
+`Forms format error:  invalid element XX'
      A list element was supplied in `forms-format-list' which was not a
-     `string', `number' nor a `lisp list'.
+     string, number or list.
 
-`Parse error: not looking at "..."'
-     When re-parsing the contents of a forms, the text shown could not
-     be found.
-
-`Parse error: cannot find "..."'
-     When re-parsing the contents of a forms, the text shown, which
-     separates two fields, could not be found.
-
-`Parse error: cannot parse adjacent fields XX and YY'
-     Fields XX and YY were not separated by text, so could not be
-     parsed again.
-
-`Record has XX fields instead of YY'
+`Warning: this record has XX fields instead of YY'
      The number of fields in this record in the data file did not match
-     `forms-number-of-fields'. Missing fields will be set to empty.
+     `forms-number-of-fields'.  Missing fields will be made empty.
 
 `Multi-line fields in this record - update refused!'
      The current record contains newline characters, hence can not be
-     written back to the data file, for it would corrupt it.
-     probably a field was set to a multi-line value, while the setting
-     of `forms-multi-line' prohibited this.
+     written back to the data file, for it would corrupt it.  Probably
+     you inserted a newline in a field, while `forms-multi-line' was
+     `nil'.
 
 `Record number XX out of range 1..YY'
-     A jump was made to non-existing record XX. YY denotes the number
+     A jump was made to non-existing record XX.  YY denotes the number
      of records in the file.
 
 `Stuck at record XX'
      An internal error prevented a specific record from being retrieved.
 
+`No write access to `"'FILE`"''
+     An attempt was made to enable edit mode on a file that has been
+     write protected.
+
+``"'REGEXP`"' not found'
+     The REGEXP could not be found in the data file, starting at the
+     current record location.
+
+`Warning: number of records changed to NN'
+     Forms mode's idea of the number of records has been adjusted to the
+     number of records actually present in the data file.
+
+`Problem saving buffers?'
+     An error occurred while saving the data file buffer. Most likely,
+     Emacs did ask to confirm deleting the buffer because it had been
+     modified, and you said `no'.
+
 
-File: forms,  Node: Examples,  Next: Credits,  Prev: Error Messages,  Up: Top
+File: forms,  Node: Long Example,  Next: Credits,  Prev: Error Messages,  Up: Top
 
-Examples
-========
+Long Example
+************
 
-   The following example exploits most of the features of forms-mode.
+   The following example exploits most of the features of Forms mode.
 This example is included in the distribution as file `forms-d2.el'.
 
      ;; demo2 -- demo forms-mode	-*- emacs-lisp -*-
@@ -646,7 +596,7 @@ This example is included in the distribution as file `forms-d2.el'.
      ;; Set the name of the data file.
      (setq forms-file "forms-d2.dat")
      
-     ;; Use 'forms-enumerate' to set field names and number thereof.
+     ;; Use `forms-enumerate' to set field names and number thereof.
      (setq forms-number-of-fields
            (forms-enumerate
             '(arch-newsgroup			; 1
@@ -664,7 +614,8 @@ This example is included in the distribution as file `forms-d2.el'.
      ;; The following functions are used by this form for layout purposes.
      ;;
      (defun arch-tocol (target &optional fill)
-       "Produces a string to skip to column TARGET. Prepends newline if needed.
+       "Produces a string to skip to column TARGET.
+     Prepends newline if needed.
      The optional FILL should be a character, used to fill to the column."
        (if (null fill)
            (setq fill ? ))
@@ -673,20 +624,21 @@ This example is included in the distribution as file `forms-d2.el'.
          (make-string (- target (current-column)) fill)))
      ;;
      (defun arch-rj (target field &optional fill)
-       "Produces a string to skip to column TARGET minus the width of field FIELD.
-     Prepends newline if needed. The optional FILL should be a character,
+       "Produces a string to skip to column TARGET\
+      minus the width of field FIELD.
+     Prepends newline if needed.
+     The optional FILL should be a character,
      used to fill to the column."
        (arch-tocol (- target (length (nth field forms-fields))) fill))
      
      ;; Record filters.
-     ;; This example uses the (defun ...) method of defining.
      ;;
-     (defun forms-new-record-filter (the-record)
+     (defun new-record-filter (the-record)
        "Form a new record with some defaults."
        (aset the-record arch-from (user-full-name))
        (aset the-record arch-date (current-time-string))
-       the-record				; return it
-     )
+       the-record)				; return it
+     (setq forms-new-record-filter 'new-record-filter)
      
      ;; The format list.
      (setq forms-format-list
@@ -718,116 +670,100 @@ This example is included in the distribution as file `forms-d2.el'.
      ;; That's all, folks!
 
 
-File: forms,  Node: Credits,  Next: Concept Index,  Prev: Examples,  Up: Top
+File: forms,  Node: Credits,  Next: Index,  Prev: Long Example,  Up: Top
 
 Credits
-=======
+*******
 
-   Forms mode is developed by Johan Vromans `<jv@mh.nl>' at Multihouse
+   Forms mode was developed by Johan Vromans while working at Multihouse
 Research in the Netherlands.
 
-   Harald Hanche-Olsen `<hanche@imf.unit.no>' supplied the idea for the
-new record filter, and provided better replacements for some internal
-functions.
-
-   Bugfixes and other useful suggestions were supplied by
-cwitty@portia.stanford.edu, Jonathan I. Kamens, Ignatios Souvatzis and
-Harald Hanche-Olsen.
+   Bug fixes and other useful suggestions were supplied by Richard
+Stallman (`rms@gnu.ai.mit.edu'), Harald Hanche-Olsen
+(`hanche@imf.unit.no'), `cwitty@portia.stanford.edu', Jonathan I.
+Kamens, Per Cederqvist  (`ceder@signum.se'), and Ignatios Souvatzis.
 
    This documentation was slightly inspired by the documentation of
 "rolo mode" by Paul Davis at Schlumberger Cambridge Research
-`<davis%scrsu1%sdr.slb.com@relay.cs.net>'.
+(`davis%scrsu1%sdr.slb.com@relay.cs.net').
 
    None of this would have been possible without GNU Emacs of the Free
-Software Foundation. Thanks, Richard!
+Software Foundation.  Thanks, Richard!
 
 
-File: forms,  Node: Concept Index,  Next: Variable Index,  Prev: Credits,  Up: Top
+File: forms,  Node: Index,  Prev: Credits,  Up: Top
 
-Concept Index
-*************
+Index
+*****
 
 * Menu:
 
-* forms-mode:                           Top.
-* pseudo-newline:                       Data File Format.
-
-
-File: forms,  Node: Variable Index,  Next: Function Index,  Prev: Concept Index,  Up: Top
-
-Variable Index
-**************
-
-* Menu:
-
-* forms-field-sep:                      Control File Format.
-* forms-fields:                         Forms Format Description.
-* forms-file:                           Control File Format.
-* forms-format-list:                    Forms Format Description.
-* forms-format-list:                    Control File Format.
-* forms-forms-jump:                     Control File Format.
-* forms-forms-jump:                     Forms Mode Commands.
-* forms-forms-scroll:                   Forms Mode Commands.
-* forms-forms-scroll:                   Control File Format.
-* forms-mode-hooks:                     Forms Mode Commands.
-* forms-multi-line:                     Control File Format.
-* forms-number-of-fields:               Control File Format.
-* forms-read-only:                      Control File Format.
-* forms-version:                        Miscellaneous.
-
-
-File: forms,  Node: Function Index,  Prev: Variable Index,  Up: Top
-
-Function Index
-**************
-
-* Menu:
-
-* beginning-of-buffer:                  Forms Mode Commands.
-* describe-mode:                        Forms Mode Commands.
-* end-of-buffer:                        Forms Mode Commands.
-* eval-current-buffer:                  Control File Format.
-* forms-delete-record:                  Forms Mode Commands.
-* forms-edit-mode:                      Forms Mode Commands.
+* TAB:                                  Forms Commands.
+* begin:                                Forms Commands.
+* C-c <:                                Forms Commands.
+* C-c >:                                Forms Commands.
+* C-c TAB:                              Forms Commands.
+* C-c C-k:                              Forms Commands.
+* C-c C-l:                              Forms Commands.
+* C-c C-n:                              Forms Commands.
+* C-c C-o:                              Forms Commands.
+* C-c C-p:                              Forms Commands.
+* C-c C-q:                              Forms Commands.
+* C-c C-s REGEXP RET:                   Forms Commands.
+* control file:                         Control File Format.
+* end:                                  Forms Commands.
+* field:                                Data File Format.
+* forms-delete-record:                  Forms Commands.
 * forms-enumerate:                      Miscellaneous.
-* forms-exit:                           Forms Mode Commands.
-* forms-exit-no-save:                   Forms Mode Commands.
-* forms-find-file:                      Forms Mode Commands.
-* forms-find-file-other-window:         Forms Mode Commands.
-* forms-first-record:                   Forms Mode Commands.
-* forms-insert-record:                  Forms Mode Commands.
-* forms-jump-record:                    Forms Mode Commands.
-* forms-last-record:                    Forms Mode Commands.
-* forms-modified-record-filter:         Modifying Forms Contents.
+* forms-field-sep:                      Control File Format.
+* forms-field-sep:                      Data File Format.
+* forms-fields:                         Format Description.
+* forms-file:                           Control File Format.
+* forms-find-file:                      Entering and Exiting Forms Mode.
+* forms-find-file-other-window:         Entering and Exiting Forms Mode.
+* forms-first-record:                   Forms Commands.
+* forms-format-list:                    Control File Format.
+* forms-format-list:                    Format Description.
+* forms-insert-record:                  Forms Commands.
+* forms-jump-record:                    Forms Commands.
+* forms-last-record:                    Forms Commands.
+* forms-mode:                           Miscellaneous.
+* forms-mode-hooks:                     Entering and Exiting Forms Mode.
 * forms-modified-record-filter:         Control File Format.
+* forms-multi-line:                     Data File Format.
+* forms-multi-line:                     Control File Format.
 * forms-new-record-filter:              Control File Format.
-* forms-next-field:                     Forms Mode Commands.
-* forms-next-record:                    Forms Mode Commands.
-* forms-prev-record:                    Forms Mode Commands.
-* forms-search:                         Forms Mode Commands.
-* forms-view-mode:                      Forms Mode Commands.
-* revert-buffer:                        Forms Mode Commands.
-* save-buffer:                          Forms Mode Commands.
-* scroll-down:                          Forms Mode Commands.
-* scroll-up:                            Forms Mode Commands.
+* forms-next-field:                     Forms Commands.
+* forms-next-record:                    Forms Commands.
+* forms-number-of-fields:               Control File Format.
+* forms-prev-field:                     Forms Commands.
+* forms-prev-field:                     Forms Commands.
+* forms-prev-record:                    Forms Commands.
+* forms-read-only:                      Control File Format.
+* forms-search:                         Forms Commands.
+* forms-toggle-read-only:               Forms Commands.
+* forms-version:                        Miscellaneous.
+* next:                                 Forms Commands.
+* prior:                                Forms Commands.
+* pseudo-newline:                       Data File Format.
+* record:                               Data File Format.
+* S-Tab:                                Forms Commands.
 
 
 
 Tag Table:
-Node: Top337
-Node: What is in a Forms1615
-Node: Data File Format2652
-Node: Control File Format3368
-Node: Forms Format Description6352
-Node: Modifying Forms Contents9286
-Node: Forms Mode Commands10941
-Node: Key Bindings16738
-Node: Miscellaneous17694
-Node: Error Messages19457
-Node: Examples22244
-Node: Credits25306
-Node: Concept Index26092
-Node: Variable Index26320
-Node: Function Index27312
+Node: Top335
+Node: Forms Example1755
+Node: Entering and Exiting Forms Mode2975
+Node: Forms Commands5160
+Node: Data File Format8242
+Node: Control File Format8949
+Node: Format Description11734
+Node: Modifying Forms Contents14867
+Node: Miscellaneous16754
+Node: Error Messages18293
+Node: Long Example21960
+Node: Credits25032
+Node: Index25768
 
 End Tag Table

@@ -3,7 +3,7 @@
 ;; Copyright (C) 1989, 1990, 1993 Free Software Foundation, Inc.
 
 ;; Author: Masanobu UMEDA <umerin@flab.flab.fujitsu.junet>
-;; Version: $Header: /a/cvs/386BSD/ports/editor/emacs/lisp/gnuspost.el,v 1.1 1993/08/26 06:09:11 rgrimes Exp $
+;; Version: $Header: /a/cvs/386BSD/ports/editor/emacs/lisp/gnuspost.el,v 1.2 1993/11/22 16:36:59 rich Exp $
 ;; Keywords: news
 
 ;; This file is part of GNU Emacs.

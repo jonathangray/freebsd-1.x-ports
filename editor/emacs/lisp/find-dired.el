@@ -7,8 +7,8 @@
 ;; Maintainer: Sebastian Kremer <sk@thp.uni-koeln.de>
 ;; Keywords: unix
 
-(defconst find-dired-version (substring "$Revision: 1.1 $" 11 -2)
-  "$Id: find-dired.el,v 1.1 1993/08/26 06:09:06 rgrimes Exp $")
+(defconst find-dired-version (substring "$Revision: 1.2 $" 11 -2)
+  "$Id: find-dired.el,v 1.2 1993/11/22 16:36:35 rich Exp $")
 
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
 ;;    find-dired|Roland McGrath, Sebastian Kremer
 ;;    |roland@gnu.ai.mit.edu, sk@thp.uni-koeln.de
 ;;    |Run a `find' command and dired the output
-;;    |$Date: 1993/08/26 06:09:06 $|$Revision: 1.1 $|
+;;    |$Date: 1993/11/22 16:36:35 $|$Revision: 1.2 $|
 
 ;; INSTALLATION ======================================================
 

@@ -11,7 +11,7 @@
 ;;;_  - Author: Ken Manheimer <klm@nist.gov>
 ;;;_  - Maintainer: Ken Manheimer <klm@nist.gov>
 ;;;_  - Created: Dec 1991 - first release to usenet
-;;;_  - Version: $Id: allout.el,v 1.1 1993/08/26 06:08:41 rgrimes Exp $||
+;;;_  - Version: $Id: allout.el,v 1.2 1993/11/22 16:34:50 rich Exp $||
 ;;;_  - Keywords: outline mode
 
 ;;;_  - LCD Archive Entry
@@ -19,7 +19,7 @@
 ;; LCD Archive Entry:
 ;; allout|Ken Manheimer|klm@nist.gov
 ;; |A more thorough outline-mode
-;; |27-May-1993|$Id: allout.el,v 1.1 1993/08/26 06:08:41 rgrimes Exp $||
+;; |27-May-1993|$Id: allout.el,v 1.2 1993/11/22 16:34:50 rich Exp $||
 
 ;;;_  - Description
 ;; A full-fledged outline mode, based on the original rudimentary

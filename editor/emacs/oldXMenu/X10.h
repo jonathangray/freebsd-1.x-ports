@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/editor/emacs/oldXMenu/X10.h,v 1.1 1993/08/26 06:10:16 rgrimes Exp $ */
+/* $Header: /a/cvs/386BSD/ports/editor/emacs/oldXMenu/X10.h,v 1.2 1993/11/22 16:41:53 rich Exp $ */
 /* 
  * Copyright 1985, 1986, 1987 by the Massachusetts Institute of Technology
  *

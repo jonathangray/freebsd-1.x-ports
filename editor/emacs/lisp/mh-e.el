@@ -48,7 +48,7 @@
 ;;; Modified by James Larus, BBN, July 1984 and UCB, 1984 & 1985.
 ;;; Rewritten for GNU Emacs, James Larus 1985.  larus@ginger.berkeley.edu
 ;;; Modified by Stephen Gildea 1988.  gildea@bbn.com
-(defconst mh-e-RCS-id "$Header: /a/cvs/386BSD/ports/editor/emacs/lisp/mh-e.el,v 1.1 1993/08/26 06:09:28 rgrimes Exp $")
+(defconst mh-e-RCS-id "$Header: /a/cvs/386BSD/ports/editor/emacs/lisp/mh-e.el,v 1.2 1993/11/22 16:37:58 rich Exp $")
 
 ;;; Code:
 

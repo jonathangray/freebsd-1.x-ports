@@ -28,5 +28,3 @@
 
 /* rich@lamprey.utmb.edu says needed for job control in subshells.  */
 #define HAVE_SETSID
-
-#define MAIL_PROGRAM_NAME "/usr/bin/mail"

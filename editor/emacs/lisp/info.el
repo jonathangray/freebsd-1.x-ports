@@ -844,8 +844,8 @@ Completion is allowed, and the menu item point is on is the default."
     (goto-char (point-min))
     (or (search-forward "\n* menu:" nil t)
 	(error "No menu in this node"))
-    (or (re-search-forward (concat "\n* " menu-item ":") nil t)
-	(re-search-forward (concat "\n* " menu-item) nil t)
+    (or (re-search-forward (concat "\n\\* " menu-item ":") nil t)
+	(re-search-forward (concat "\n\\* " menu-item) nil t)
 	(error "No such item in menu"))
     (beginning-of-line)
     (forward-char 2)
@@ -1292,9 +1292,9 @@ Selecting other nodes:
 \\[Info-index-next]	(comma) Move to the next match from a previous `i' command.
 
 Moving within a node:
-\\[scroll-up]	Normally, scroll forward a full screen.  If the end of the buffer is
+\\[Info-scroll-up]	Normally, scroll forward a full screen.  If the end of the buffer is
 already visible, try to go to the next menu entry, or up if there is none.
-\\[scroll-down]  Normally, scroll backward.  If the beginning of the buffer is
+\\[Info-scroll-down]  Normally, scroll backward.  If the beginning of the buffer is
 already visible, try to go to the previous menu entry, or up if there is none.
 \\[beginning-of-buffer]	Go to beginning of node.  
 

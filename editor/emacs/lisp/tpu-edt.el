@@ -30,7 +30,7 @@
 ;;;  Revision and Version Information
 ;;;
 (defconst tpu-version "3.1" "TPU-edt version number.")
-(defconst tpu-revision "$Revision: 1.1 $" "Revision number of TPU-edt.")
+(defconst tpu-revision "$Revision: 1.2 $" "Revision number of TPU-edt.")
 
 
 ;;;

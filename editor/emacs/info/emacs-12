@@ -2,6 +2,224 @@ This is Info file ../info/emacs, produced by Makeinfo-1.54 from the
 input file emacs.texi.
 
 
+File: emacs,  Node: External Lisp,  Prev: Lisp Eval,  Up: Building
+
+Running an External Lisp
+========================
+
+   Emacs has facilities for running programs in other Lisp systems.
+You can run a Lisp process as an inferior of Emacs, and pass
+expressions to it to be evaluated.  You can also pass changed function
+definitions directly from the Emacs buffers in which you edit the Lisp
+programs to the inferior Lisp process.
+
+   To run an inferior Lisp process, type `M-x run-lisp'.  This runs the
+program named `lisp', the same program you would run by typing `lisp'
+as a shell command, with both input and output going through an Emacs
+buffer named `*lisp*'.  That is to say, any "terminal output" from Lisp
+will go into the buffer, advancing point, and any "terminal input" for
+Lisp comes from text in the buffer.  (You can change the name of the
+Lisp executable file by setting the variable `inferior-lisp-program'.)
+
+   To give input to Lisp, go to the end of the buffer and type the
+input, terminated by RET.  The `*lisp*' buffer is in Inferior Lisp
+mode, which combines the special characteristics of Lisp mode and Shell
+mode (*note Shell Mode::.).
+
+   For the source files of programs to run in external Lisps, use Lisp
+mode.  This mode can be selected with `M-x lisp-mode', and is used
+automatically for files whose names end in `.l' or `.lisp', as most Lisp
+systems usually expect.
+
+   When you edit a function in a Lisp program you are running, the
+easiest way to send the changed definition to the inferior Lisp process
+is the key `C-M-x'.  In Lisp mode, this runs the function
+`lisp-send-defun', which finds the defun around or following point and
+sends it as input to the Lisp process.  (Emacs can send input to any
+inferior process regardless of what buffer is current.)
+
+   Contrast the meanings of `C-M-x' in Lisp mode (for editing programs
+to be run in another Lisp system) and Emacs-Lisp mode (for editing Lisp
+programs to be run in Emacs): in both modes it has the effect of
+installing the function definition that point is in, but the way of
+doing so is different according to where the relevant Lisp environment
+is found.  *Note Executing Lisp::.
+
+
+File: emacs,  Node: Abbrevs,  Next: Picture,  Prev: Building,  Up: Top
+
+Abbrevs
+*******
+
+   An "abbrev" is a word which "expands", if you insert it, into some
+different text.  Abbrevs are defined by the user to expand in specific
+ways.  For example, you might define `foo' as an abbrev expanding to
+`find outer otter'.  With this abbrev defined, you would be able to get
+`find outer otter ' into the buffer by typing `f o o SPC'.
+
+   Abbrevs expand only when Abbrev mode (a minor mode) is enabled.
+Disabling Abbrev mode does not cause abbrev definitions to be forgotten,
+but they do not expand until Abbrev mode is enabled again.  The command
+`M-x abbrev-mode' toggles Abbrev mode; with a numeric argument, it
+turns Abbrev mode on if the argument is positive, off otherwise.  *Note
+Minor Modes::.  `abbrev-mode' is also a variable; Abbrev mode is on
+when the variable is non-`nil'.  The variable `abbrev-mode'
+automatically becomes local to the current buffer when it is set.
+
+   Abbrev definitions can be "mode-specific"--active only in one major
+mode.  Abbrevs can also have "global" definitions that are active in
+all major modes.  The same abbrev can have a global definition and
+various mode-specific definitions for different major modes.  A mode
+specific definition for the current major mode overrides a global
+definition.
+
+   Abbrevs can be defined interactively during the editing session.
+Lists of abbrev definitions can also be saved in files and reloaded in
+later sessions.  Some users keep extensive lists of abbrevs that they
+load in every session.
+
+   A second kind of abbreviation facility is called the "dynamic
+expansion".  Dynamic abbrev expansion happens only when you give an
+explicit command and the result of the expansion depends only on the
+current contents of the buffer.  *Note Dynamic Abbrevs::.
+
+* Menu:
+
+* Defining Abbrevs::  Defining an abbrev, so it will expand when typed.
+* Expanding Abbrevs:: Controlling expansion: prefixes, canceling expansion.
+* Editing Abbrevs::   Viewing or editing the entire list of defined abbrevs.
+* Saving Abbrevs::    Saving the entire list of abbrevs for another session.
+* Dynamic Abbrevs::   Abbreviations for words already in the buffer.
+
+
+File: emacs,  Node: Defining Abbrevs,  Next: Expanding Abbrevs,  Up: Abbrevs
+
+Defining Abbrevs
+================
+
+`C-x a g'
+     Define an abbrev, using one or more words before point as its
+     expansion (`add-global-abbrev').
+
+`C-x a l'
+     Similar, but define an abbrev specific to the current major mode
+     (`add-mode-abbrev').
+
+`C-x a i g'
+     Define a word in the buffer as an abbrev
+     (`inverse-add-global-abbrev').
+
+`C-x a i l'
+     Define a word in the buffer as a mode-specific abbrev
+     (`inverse-add-mode-abbrev').
+
+`M-x kill-all-abbrevs'
+     After this command, there are no abbrev definitions in effect.
+
+   The usual way to define an abbrev is to enter the text you want the
+abbrev to expand to, position point after it, and type `C-x a g'
+(`add-global-abbrev').  This reads the abbrev itself using the
+minibuffer, and then defines it as an abbrev for one or more words
+before point.  Use a numeric argument to say how many words before
+point should be taken as the expansion.  For example, to define the
+abbrev `foo' as mentioned above, insert the text `find outer otter' and
+then type `C-u 3 C-x a g f o o RET'.
+
+   An argument of zero to `C-x a g' means to use the contents of the
+region as the expansion of the abbrev being defined.
+
+   The command `C-x a l' (`add-mode-abbrev') is similar, but defines a
+mode-specific abbrev.  Mode specific abbrevs are active only in a
+particular major mode.  `C-x a l' defines an abbrev for the major mode
+in effect at the time `C-x a l' is typed.  The arguments work the same
+as for `C-x a g'.
+
+   If the text of the abbrev you want is already in the buffer instead
+of the expansion, use command `C-x a i g' (`inverse-add-global-abbrev')
+instead of `C-x a g', or use `C-x a i l' (`inverse-add-mode-abbrev')
+instead of `C-x a l'.  These commands are called "inverse" because they
+invert the meaning of the argument found in the buffer and the argument
+read using the minibuffer.
+
+   To change the definition of an abbrev, just add the new definition.
+You will be asked to confirm if the abbrev has a prior definition.  To
+remove an abbrev definition, give a negative argument to `C-x a g' or
+`C-x a l'.  You must choose the command to specify whether to kill a
+global definition or a mode-specific definition for the current mode,
+since those two definitions are independent for one abbrev.
+
+   `M-x kill-all-abbrevs' removes all the abbrev definitions there are.
+
+
+File: emacs,  Node: Expanding Abbrevs,  Next: Editing Abbrevs,  Prev: Defining Abbrevs,  Up: Abbrevs
+
+Controlling Abbrev Expansion
+============================
+
+   An abbrev expands whenever it is present in the buffer just before
+point and a self-inserting punctuation character (SPC, comma, etc.) is
+typed.  Most often the way an abbrev is used is to insert the abbrev
+followed by punctuation.
+
+   Abbrev expansion preserves case; thus, `foo' expands into `find
+outer otter'; `Foo' into `Find outer otter', and `FOO' into `FIND OUTER
+OTTER' or `Find Outer Otter' according to the variable
+`abbrev-all-caps' (a non-`nil' value chooses the first of the two
+expansions).
+
+   These two commands are used to control abbrev expansion:
+
+`M-''
+     Separate a prefix from a following abbrev to be expanded
+     (`abbrev-prefix-mark').
+
+`C-x a e'
+     Expand the abbrev before point (`expand-abbrev').  This is
+     effective even when Abbrev mode is not enabled.
+
+`M-x unexpand-abbrev'
+     Undo last abbrev expansion.
+
+`M-x expand-region-abbrevs'
+     Expand some or all abbrevs found in the region.
+
+   You may wish to expand an abbrev with a prefix attached; for
+example, if `cnst' expands into `construction', you might want to use
+it to enter `reconstruction'.  It does not work to type `recnst',
+because that is not necessarily a defined abbrev.  What does work is to
+use the command `M-'' (`abbrev-prefix-mark') in between the prefix `re'
+and the abbrev `cnst'.  First, insert `re'.  Then type `M-''; this
+inserts a minus sign in the buffer to indicate that it has done its
+work.  Then insert the abbrev `cnst'; the buffer now contains
+`re-cnst'.  Now insert a punctuation character to expand the abbrev
+`cnst' into `construction'.  The minus sign is deleted at this point,
+because `M-'' left word for this to be done.  The resulting text is the
+desired `reconstruction'.
+
+   If you actually want the text of the abbrev in the buffer, rather
+than its expansion, you can accomplish this by inserting the following
+punctuation with `C-q'.  Thus, `foo C-q -' leaves `foo-' in the buffer.
+
+   If you expand an abbrev by mistake, you can undo the expansion
+(replace the expansion by the original abbrev text) with `M-x
+unexpand-abbrev'.  `C-_' (`undo') can also be used to undo the
+expansion; but first it undoes the insertion of the following
+punctuation character.  Therefore, if you want both the punctuation
+character and the unexpanded abbrev, you must reinsert the punctuation
+character, quoting it with `C-q'.
+
+   `M-x expand-region-abbrevs' searches through the region for defined
+abbrevs, and for each one found offers to replace it with its expansion.
+This command is useful if you have typed in text using abbrevs but
+forgot to turn on Abbrev mode first.  It may also be useful together
+with a special set of abbrev definitions for making several global
+replacements at once.  This command is effective even if Abbrev mode is
+not enabled.
+
+   Expanding an abbrev runs the hook `pre-abbrev-expand-hook' (*note
+Hooks::.).
+
+
 File: emacs,  Node: Editing Abbrevs,  Next: Saving Abbrevs,  Prev: Expanding Abbrevs,  Up: Abbrevs
 
 Examining and Editing Abbrevs
@@ -566,9 +784,9 @@ them in.  To enable this feature, execute the following:
 
 This can go in your `.emacs' file.  *Note Hooks::.  If you use this
 feature, you must use `define-mail-abbrev' instead of
-`define-mail-alias'; the latter does not work with this package.  The
-mail abbreviation packages also uses the variable `mail-abbrevs'
-instead of `mail-aliases'.
+`define-mail-alias'; the latter does not work with this package.  Also,
+the mail abbreviation package uses the variable `mail-abbrevs' instead
+of `mail-aliases'.
 
    Note that abbrevs expand only if you insert a word-separator
 character afterward.  However, any mail aliases that you didn't expand
@@ -941,158 +1159,4 @@ undelete it.
 `deleted' appears in the mode line when the current message is deleted.
 In fact, deleting or undeleting a message is nothing more than adding
 or removing this attribute.  *Note Rmail Labels::.
-
-
-File: emacs,  Node: Rmail Inbox,  Next: Rmail Files,  Prev: Rmail Deletion,  Up: Rmail
-
-Rmail Files and Inboxes
-=======================
-
-   Unix places incoming mail for you in a file that we call your
-"inbox".  When you start up Rmail, it copies the new messages from your
-inbox into your primary mail file, an Rmail file, which also contains
-other messages saved from previous Rmail sessions.  It is in this file
-that you actually read the mail with Rmail.  This operation is called
-"getting new mail".  It can be repeated at any time using the `g' key
-in Rmail.  The inbox file name is `/usr/spool/mail/USERNAME' on some
-systems (typically Berkeley-derived ones) and `/usr/mail/USERNAME' on
-other systems.
-
-   There are three reason for having separate Rmail files and inboxes.
-
-  1. The inbox file format varies between operating systems and
-     according to the other mail software in use.  Only one part of
-     Rmail needs to know about the alternatives, and it need only
-     understand how to convert all of them to Rmail's own format.
-
-  2. The inbox file format usually doesn't provide a place for all the
-     information that Rmail records.
-
-  3. It is very cumbersome to access an inbox file without danger of
-     losing mail, because it is necessary to interlock with mail
-     delivery.  Moreover, different operating systems use different
-     interlocking techniques.  The strategy of moving mail out of the
-     inbox once and for all into a separate Rmail file avoids the need
-     for interlocking in all the rest of Rmail, since only Rmail
-     operates on the Rmail file.
-
-   When getting new mail, Rmail first copies the new mail from the inbox
-file to the Rmail file; then it saves the Rmail file; then it truncates
-the inbox file.  This way, a system crash may cause duplication of mail
-between the inbox and the Rmail file, but cannot lose mail.
-
-   Copying mail from an inbox in the system's mailer directory actually
-puts it in an intermediate file `~/.newmail'.  This is because the
-interlocking is done by a C program that copies to another file.
-`~/.newmail' is deleted after mail merging is successful.  If there is
-a crash at the wrong time, this file continues to exist and will be
-used as an inbox the next time you get new mail.
-
-
-File: emacs,  Node: Rmail Files,  Next: Rmail Output,  Prev: Rmail Inbox,  Up: Rmail
-
-Multiple Mail Files
-===================
-
-   Rmail operates by default on your "primary mail file", which is named
-`~/RMAIL' and receives your incoming mail from your system inbox file.
-But you can also have other mail files and edit them with Rmail.  These
-files can receive mail through their own inboxes, or you can move
-messages into them with explicit Rmail commands (*note Rmail Output::.).
-
-`i FILE RET'
-     Read FILE into Emacs and run Rmail on it (`rmail-input').
-
-`M-x set-rmail-inbox-list RET FILES RET'
-     Specify inbox file names for current Rmail file to get mail from.
-
-`g'
-     Merge new mail from current Rmail file's inboxes
-     (`rmail-get-new-mail').
-
-`C-u g FILE RET'
-     Merge new mail from inbox file FILE.
-
-   To run Rmail on a file other than your primary mail file, you may use
-the `i' (`rmail-input') command in Rmail.  This visits the file, puts
-it in Rmail mode, and then gets new mail from the file's inboxes if
-any.  The file should be in Rmail format.  You can use `M-x
-rmail-input' even when not in Rmail.
-
-   The file you read with `i' should usually be a valid Rmail file.  If
-it is not, then Rmail tries to decompose it into a stream of messages
-in various known formats.  If it succeeds, it converts the whole file to
-an Rmail file.
-
-   Each Rmail file can contain a list of inbox file names; you can
-specify this list with `M-x set-rmail-inbox-list RET FILES RET'.  The
-argument can contain any number of file names, separated by commas.  It
-can also be empty, which specifies that this file should have no
-inboxes.  Once a list of inboxes is specified, the Rmail file remembers
-it permanently until it is explicitly changed.
-
-   If an Rmail file has inboxes, new mail is merged in from the inboxes
-when the Rmail file is brought into Rmail, and when you use the `g'
-(`rmail-get-new-mail') command.  If the Rmail file specifies no
-inboxes, then no new mail is merged in at these times.  As a special
-exception, if your primary mail file does not specify any inbox files,
-it uses the standard system inbox.
-
-   To merge mail from a file that is not the usual inbox, give the `g'
-key a numeric argument, as in `C-u g'.  Then it reads a file name and
-merges mail from that file.  The inbox file is not deleted or changed
-in any way when `g' with an argument is used.  This is, therefore, a
-general way of merging one file of messages into another.
-
-
-File: emacs,  Node: Rmail Output,  Next: Rmail Labels,  Prev: Rmail Files,  Up: Rmail
-
-Copying Messages Out to Files
-=============================
-
-`o FILE RET'
-     Append a copy of the current message to the file FILE, writing it
-     in Rmail file format by default (`rmail-output-to-rmail-file').
-
-`C-o FILE RET'
-     Append a copy of the current message to the file FILE, writing it
-     in Unix mail file format by default (`rmail-output').
-
-   If an Rmail file has no inboxes, the only way messages get into it is
-by means of explicit `o' commands.
-
-   `o' (`rmail-output-to-rmail-file') appends the current message in
-Rmail format to the end of the specified file.  This is the best command
-to use to move messages between Rmail files.  If the other Rmail file is
-currently visited, the copying is done into the other file's Emacs
-buffer instead.  You should eventually save it on disk.
-
-   The `C-o' (`rmail-output') command in Rmail appends a copy of the
-current message to a specified file, in inbox file format.  This is
-useful for moving messages into files to be read by other mail
-processors that do not understand Rmail format.
-
-   The `o' and `C-o' commands are actually equivalent (aside from
-having separate file name defaults) when you specify an existing file;
-both commands check the file's contents to determine which format to use
-(Rmail or inbox).  But it does matter which command you use when you
-specify a nonexistent file; `o' starts it in Rmail format, while `C-o'
-starts it in inbox format.
-
-   Copying a message with `o' or `C-o' gives the original copy of the
-message the `filed' attribute, so that `filed' appears in the mode line
-when such a message is current.  If you like to keep just a single copy
-of every mail message, set the variable `rmail-delete-after-output' to
-`t'; then the `o' and `C-o' commands delete the original message after
-copying it.  (You can undelete the original afterward.)
-
-   The variable `rmail-output-file-alist' lets you specify intelligent
-defaults for the output file, based on the contents of the current
-message.  The value should be a list whose elements have this form:
-
-     (REGEXP . FILENAME)
-
-If there's a match for REGEXP in the current message, then the default
-file name for output is FILENAME.  If multiple elements match the
-message, the first matching element decides the default file name.
 

@@ -46,7 +46,7 @@ may contain even `F', `b', `i' and `s'.")
 
 ;;;###autoload
 (defvar dired-chown-program
-  (if (memq system-type '(hpux dgux usg-unix-v silicon-graphics-unix))
+  (if (memq system-type '(hpux dgux usg-unix-v irix))
       "chown" "/etc/chown")
   "Name of chown command (usually `chown' or `/etc/chown').")
 
@@ -928,7 +928,7 @@ Keybindings:
   (dired-advertise)			; default-directory is already set
   (setq major-mode 'dired-mode
 	mode-name "Dired"
-	case-fold-search nil
+;;	case-fold-search nil
 	buffer-read-only t
 	selective-display t		; for subdirectory hiding
 	mode-line-buffer-identification '("Dired: %17b"))
@@ -1100,6 +1100,10 @@ Optional arg NO-ERROR-IF-NOT-FILEP means return nil if no filename on
   ;; DIR must be file-name-as-directory, as with all directory args in
   ;; Emacs Lisp code.
   (or dir (setq dir default-directory))
+  ;; This case comes into play if default-directory is set to
+  ;; use ~.
+  (if (and (> (length dir) 0) (= (aref dir 0) ?~))
+      (setq dir (expand-file-name dir)))
   (if (string-match (concat "^" (regexp-quote dir)) file)
       (substring file (match-end 0))
     (if no-error
@@ -1325,18 +1329,25 @@ Returns the new value of the alist."
   (interactive)
   (dired-clear-alist)
   (save-excursion
-    (let ((count 0))
+    (let ((count 0)
+	  (buffer-read-only nil)
+	  new-dir-name)
       (goto-char (point-min))
       (setq dired-subdir-alist nil)
       (while (re-search-forward dired-subdir-regexp nil t)
+	(save-excursion
+	  (goto-char (match-beginning 1))
+	  (setq new-dir-name
+		(expand-file-name (buffer-substring (point) (match-end 1))))
+	  (delete-region (point) (match-end 1))
+	  (insert new-dir-name))
 	(setq count (1+ count))
-	(dired-alist-add-1 (buffer-substring (match-beginning 1)
-					     (match-end 1))
-			 ;; Put subdir boundary between lines:
-			 (save-excursion
-			   (goto-char (match-beginning 0))
-			   (beginning-of-line)
-			   (point-marker))))
+	(dired-alist-add-1 new-dir-name
+			   ;; Place a sub directory boundary between lines.
+			   (save-excursion
+			     (goto-char (match-beginning 0))
+			     (beginning-of-line)
+			     (point-marker))))
       (if (> count 1)
 	  (message "Buffer includes %d directories" count))
       ;; We don't need to sort it because it is in buffer order per
@@ -2288,8 +2299,8 @@ Use \\[dired-hide-subdir] to (un)hide a particular subdirectory."
 (if (eq system-type 'vax-vms)
     (load "dired-vms"))
 
-(run-hooks 'dired-load-hook)		; for your customizations
-
 (provide 'dired)
+
+(run-hooks 'dired-load-hook)		; for your customizations
 
 ;;; dired.el ends here

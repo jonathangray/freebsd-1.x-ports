@@ -53,7 +53,7 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 #include <sys/file.h>
 #include <errno.h>
 #define NO_SHORTNAMES   /* Tell config not to load remap.h */
-#include "../src/config.h"
+#include <../src/config.h>
 
 #ifdef USG
 #include <fcntl.h>
@@ -200,7 +200,7 @@ main (argc, argv)
       /* Give up if cannot do that.  */
       desc = open (tempname, O_WRONLY | O_CREAT, 0666);
       if (desc < 0)
-        pfatal_with_name ("lock file--see source file etc/movemail.c");
+        pfatal_with_name ("lock file--see source file lib-src/movemail.c");
       close (desc);
 
       tem = link (tempname, lockname);

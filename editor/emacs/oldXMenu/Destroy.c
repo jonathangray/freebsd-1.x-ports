@@ -1,6 +1,6 @@
 #include "copyright.h"
 
-/* $Header: /a/cvs/386BSD/ports/editor/emacs/oldXMenu/Destroy.c,v 1.1 1993/08/26 06:10:15 rgrimes Exp $ */
+/* $Header: /a/cvs/386BSD/ports/editor/emacs/oldXMenu/Destroy.c,v 1.2 1993/11/22 16:41:37 rich Exp $ */
 /* Copyright    Massachusetts Institute of Technology    1985	*/
 
 /*

@@ -33,8 +33,7 @@
 #      Still more severe - delete backup and autosave files, too.
 
 SHELL = /bin/sh
-MAKE = make
-# BSD doesn't have it as a default.
+#MAKE = make  # BSD doesn't have it as a default.
 
 # ==================== Things `configure' Might Edit ====================
 
@@ -53,14 +52,14 @@ YACC=yacc
 
 ### This should be the number of the Emacs version we're building,
 ### like `18.59' or `19.0'.
-version=19.19
+version=19.21
 
 ### This should be the name of the configuration we're building Emacs
 ### for, like `mips-dec-ultrix' or `sparc-sun-sunos'.
-configuration=i386--386bsd
+configuration=i386--freebsd
 
 ### Libraries which should be edited into lib-src/Makefile.
-libsrc_libs= 
+libsrc_libs= -lutil 
 
 # ==================== Where To Install Things ====================
 
@@ -106,7 +105,10 @@ infodir=${prefix}/info
 # expected to be in ${srcdir}/src, and the source code for Emacs's
 # utility programs is expected to be in ${srcdir}/lib-src.  This is
 # set by the configure script's `--srcdir' option.
-srcdir=/usr/ports/emacs
+srcdir=/a/rich/w/emacs
+
+# Tell make where to find source files; this is needed for the makefiles.
+VPATH=/a/rich/w/emacs
 
 # ==================== Emacs-specific directories ====================
 
@@ -161,22 +163,6 @@ lockdir=${statedir}/emacs/lock
 # once.
 archlibdir=${libdir}/emacs/${version}/${configuration}
 
-# ====================== Developer's configuration =======================
-
-# The following assignments make sense if you're running Emacs on a single
-# machine, one version at a time, and  you want changes to the lisp and etc
-# directories in the source tree to show up immediately in your working
-# environment.  It saves a great deal of disk space by not duplicating the
-# lisp and etc directories.
-
-#disabled# lispdir=${srcdir}/lisp
-#disabled# externallispdir=${srcdir}/externallisp
-#disabled# locallisppath=${srcdir}/site-lisp:${datadir}/emacs/site-lisp
-#disabled# etcdir=${srcdir}/etc
-#disabled# lockdir=${srcdir}/lock
-#disabled# archlibdir=${srcdir}/lib-src
-#disabled# infodir=${srcdir}/info
-
 # ==================== Utility Programs for the Build ====================
 
 # Allow the user to specify the install program.
@@ -185,9 +171,6 @@ INSTALL_PROGRAM = $(INSTALL)
 INSTALL_DATA = $(INSTALL) -m 644
 
 # ============================= Targets ==============================
-
-# Flags passed down to subdirectory makefiles.
-MFLAGS = 
 
 # Subdirectories to make recursively.  `lisp' is not included
 # because the compiled lisp files are part of the distribution
@@ -234,81 +217,19 @@ lib-src: FRC.lib-src
 .RECURSIVE: ${SUBDIR}
 
 ${SUBDIR}: ${SUBDIR_MAKEFILES} FRC
-	cd $@; $(MAKE) all ${MFLAGS} \
-		CC='${CC}' CFLAGS='${CFLAGS}' MAKE='${MAKE}' \
-		prefix='${prefix}' srcdir='${srcdir}/$@' libdir='${libdir}'
+	cd $@; $(MAKE) all $(MFLAGS) \
+		CC='${CC}' CFLAGS='${CFLAGS}'
 
-## We build the makefiles for the subdirectories here so that we can
-## edit the values for the path variables into them.  This means that
-## when the user has built them from this makefile once, they will use
-## the right default values for the path variables.
-lib-src/Makefile: ${srcdir}/lib-src/Makefile.in Makefile
-	rm -f lib-src/Makefile.tmp
-	@echo "Producing \`lib-src/Makefile' from \`${srcdir}/lib-src/Makefile.in'."
-	@(echo "# This file is generated from \`${srcdir}/lib-src/Makefile.in'." ; \
-	  echo "# If you are thinking about editing it, you should seriously consider" ; \
-	  echo "# running \`make lib-src/Makefile' at the top of the" ;	\
-	  echo "# Emacs build tree instead, or editing" ;		\
-	  echo "# \`${srcdir}/lib-src/Makefile.in' itself." ;		\
-	  sed < ${srcdir}/lib-src/Makefile.in				\
-	  -e 's|^\(version *=\).*$$|\1'"${version}"'|'			\
-	  -e 's|^\(configname *=\).*$$|\1'"${configuration}"'|'		\
-	  -e 's|^\(prefix *=\).*$$|\1'"${prefix}"'|'			\
-	  -e 's|^\(exec_prefix *=\).*$$|\1'"${exec_prefix}"'|'		\
-	  -e 's|^\(libdir *=\).*$$|\1'"${libdir}"'|'			\
-	  -e 's|^\(srcdir *=\).*$$|\1'"${srcdir}"'/lib-src|'		\
-	  -e 's|^\(VPATH *=\).*$$|\1'"${srcdir}"'/lib-src|'		\
-	  -e 's|^\(archlibdir *=\).*$$|\1'"${archlibdir}"'|'		\
-	  -e 's|^\(ALLOCA *=\).*$$|\1'"${ALLOCA}"'|'			\
-	  -e 's|^\(YACC *=\).*$$|\1'"${YACC}"'|'			\
-	  -e 's|^CC *=.*$$|CC='"${CC}"'|'				\
-	  -e 's|^CFLAGS *=.*$$|CFLAGS='"${CFLAGS}"'|' \
-	  -e 's|^C_SWITCH_SYSTEM *=.*$$|C_SWITCH_SYSTEM='"${C_SWITCH_SYSTEM}"'|' \
-	  -e 's|^LOADLIBES *=.*$$|LOADLIBES='"${libsrc_libs}"'|'	\
-	  -e '/^# DIST: /d') > lib-src/Makefile.tmp
-	@${srcdir}/move-if-change lib-src/Makefile.tmp lib-src/Makefile
-	chmod -w lib-src/Makefile
+Makefile: Makefile.in config.status
+	./config.status
 
-src/Makefile: ${srcdir}/src/Makefile.in Makefile
-	rm -f src/Makefile.tmp
-	@echo "Producing \`src/Makefile' from \`${srcdir}/src/Makefile.in'."
-	@(echo "# This file is generated from \`${srcdir}/src/Makefile.in'." ; \
-	  echo "# If you are thinking about editing it, you should seriously consider" ; \
-	  echo "# running \`make src/Makefile' at the top of the" ;	\
-	  echo "# Emacs build tree instead, or editing" ;		\
-	  echo "# \`${srcdir}/src/Makefile.in' itself." ;		\
-	  sed < ${srcdir}/src/Makefile.in				\
-	  -e 's|^\(srcdir *=\).*$$|\1${srcdir}/src|'			\
-	  -e 's|^\(VPATH *=\).*$$|\1${srcdir}/src|'			\
-	  -e 's|^CC *=.*$$|CC=${CC}|'					\
-	  -e 's|^CPP *=.*$$|CPP=${CPP}|'				\
-	  -e 's|^LN_S *=.*$$|LN_S=${LN_S}|'				\
-	  -e 's|^CFLAGS *=.*$$|CFLAGS=${CFLAGS}|' 			\
-	  -e 's|^\(C_SWITCH_SYSTEM *=\).*$$|\1'"${C_SWITCH_SYSTEM}"'|'	\
-	  -e 's|^\(LD_SWITCH_X_SITE *=\).*$$|\1${LD_SWITCH_X_SITE}|'	\
-	  -e '/^# DIST: /d') > src/Makefile.tmp
-	@${srcdir}/move-if-change src/Makefile.tmp src/Makefile
-	chmod -w src/Makefile
+src/Makefile: src/Makefile.in.in config.status
+	./config.status
 
-oldXMenu/Makefile: ${srcdir}/oldXMenu/Makefile.in Makefile
-	rm -f oldXMenu/Makefile.tmp
-	@echo "Producing \`oldXMenu/Makefile' from \`${srcdir}/oldXMenu/Makefile.in'."
-	@(echo "# This file is generated from \`${srcdir}/oldXMenu/Makefile.in'." ; \
-	  echo "# If you are thinking about editing it, you should seriously consider" ; \
-	  echo "# running \`make oldXMenu/Makefile' at the top of the" ; \
-	  echo "# Emacs build tree instead, or editing" ;		\
-	  echo "# \`${srcdir}/oldXMenu/Makefile.in' itself." ;		\
-	  sed < ${srcdir}/oldXMenu/Makefile.in				\
-	  -e 's|^\(srcdir *=\).*$$|\1'"${srcdir}"'/oldXMenu|'		\
-	  -e 's|^\(VPATH *=\).*$$|\1'"${srcdir}"'/oldXMenu|'		\
-	  -e 's|^\(C_SWITCH_X_SITE *=\).*$$|\1'"${C_SWITCH_X_SITE}"'|'	\
-	  -e 's|^CC *=.*$$|CC='"${CC}"'|'				\
-	  -e 's|^DEFS *=.*$$|DEFS='"${DEFS}"'|' \
-	  -e '/^# DIST: /d') > oldXMenu/Makefile.tmp
-	@${srcdir}/move-if-change oldXMenu/Makefile.tmp oldXMenu/Makefile
-	chmod -w oldXMenu/Makefile
+lib-src/Makefile: lib-src/Makefile.in config.status
+	./config.status
 
-Makefile:
+oldXMenu/Makefile: oldXMenu/Makefile.in config.status
 	./config.status
 
 # ==================== Installation ====================
@@ -331,7 +252,7 @@ install: all do-install
 ### as well as lots of things from ${srcdir}/etc.
 do-install: mkdir
 	(cd lib-src; \
-	  $(MAKE) install ${MFLAGS} prefix=${prefix} \
+	  $(MAKE) install $(MFLAGS) prefix=${prefix} \
 	    exec_prefix=${exec_prefix} bindir=${bindir} libdir=${libdir} \
 	    archlibdir=${archlibdir})
 	-set ${COPYDESTS} ; \
@@ -366,7 +287,7 @@ do-install: mkdir
 	     if [ ! -f ${infodir}/dir ] && [ -f dir ]; then \
 	       ${INSTALL_DATA} dir ${infodir}/dir ; \
 	     fi ; \
-	     for f in cl* emacs* forms* gnus* info* vip* ; do \
+	     for f in cl* emacs* forms* gnus* info* sc* vip* ; do \
 	       ${INSTALL_DATA} $$f ${infodir}/$$f ; \
 	     done); \
 	else true; fi
@@ -374,9 +295,9 @@ do-install: mkdir
 	  ${INSTALL_DATA} $${page}.1 ${mandir}/$${page}${manext} ; \
 	done
 	${INSTALL_PROGRAM} src/emacs ${bindir}/emacs-${version}
-	chmod 1755  ${bindir}/emacs-${version}
+	-chmod 1755  ${bindir}/emacs-${version}
 	rm -f ${bindir}/emacs
-	ln ${bindir}/emacs-${version} ${bindir}/emacs
+	-ln ${bindir}/emacs-${version} ${bindir}/emacs
 
 ### Build all the directories we're going to install Emacs in.	Since
 ### we may be creating several layers of directories (for example,
@@ -386,7 +307,7 @@ mkdir: FRC.mkdir
 	./lib-src/make-path ${COPYDESTS} ${lockdir} ${infodir} ${mandir} \
 	  ${bindir} ${datadir} ${libdir} \
 	  `echo ${locallisppath} | sed 's/:/ /'`
-	chmod 777 ${COPYDESTS} ${lockdir}
+	-chmod 777 ${COPYDESTS} ${lockdir}
 
 ### Delete all the installed files that the `install' target would
 ### create (but not the noninstalled files such as `make all' would
@@ -395,7 +316,7 @@ mkdir: FRC.mkdir
 ### Don't delete the lisp and etc directories if they're in the source tree.
 uninstall:
 	(cd lib-src; 					\
-	 $(MAKE) ${MFLAGS} uninstall			\
+	 $(MAKE) $(MFLAGS) uninstall			\
 	    prefix=${prefix} exec_prefix=${exec_prefix}	\
 	    bindir=${bindir} libdir=${libdir} archlibdir=${archlibdir})
 	for dir in ${lispdir} ${etcdir} ; do 		\
@@ -427,10 +348,10 @@ FRC.mostlyclean FRC.clean FRC.distclean FRC.realclean:
 ###      target for GCC does not delete `libgcc.a', because recompiling it
 ###      is rarely necessary and takes a lot of time.
 mostlyclean: FRC.mostlyclean
-	(cd src;      make ${MFLAGS} mostlyclean)
-	(cd oldXMenu; make ${MFLAGS} mostlyclean)
-	(cd lib-src;  make ${MFLAGS} mostlyclean)
-	(cd man;      make ${MFLAGS} mostlyclean)
+	(cd src;      $(MAKE) $(MFLAGS) mostlyclean)
+	(cd oldXMenu; $(MAKE) $(MFLAGS) mostlyclean)
+	(cd lib-src;  $(MAKE) $(MFLAGS) mostlyclean)
+	-(cd man;     $(MAKE) $(MFLAGS) mostlyclean)
 
 ### `clean'
 ###      Delete all files from the current directory that are normally
@@ -441,10 +362,10 @@ mostlyclean: FRC.mostlyclean
 ### 
 ###      Delete `.dvi' files here if they are not part of the distribution.
 clean: FRC.clean
-	(cd src;      make ${MFLAGS} clean)
-	(cd oldXMenu; make ${MFLAGS} clean)
-	(cd lib-src;  make ${MFLAGS} clean)
-	(cd man;      make ${MFLAGS} clean)
+	(cd src;      $(MAKE) $(MFLAGS) clean)
+	(cd oldXMenu; $(MAKE) $(MFLAGS) clean)
+	(cd lib-src;  $(MAKE) $(MFLAGS) clean)
+	-(cd man;     $(MAKE) $(MFLAGS) clean)
 
 ### `distclean'
 ###      Delete all files from the current directory that are created by
@@ -457,10 +378,10 @@ top_distclean=\
 	rm -f Makefile ${SUBDIR_MAKEFILES} ; \
 	(cd lock ; rm -f *)
 distclean: FRC.distclean
-	(cd src;      make ${MFLAGS} distclean)
-	(cd oldXMenu; make ${MFLAGS} distclean)
-	(cd lib-src;  make ${MFLAGS} distclean)
-	(cd man;      make ${MFLAGS} distclean)
+	(cd src;      $(MAKE) $(MFLAGS) distclean)
+	(cd oldXMenu; $(MAKE) $(MFLAGS) distclean)
+	(cd lib-src;  $(MAKE) $(MFLAGS) distclean)
+	(cd man;      $(MAKE) $(MFLAGS) distclean)
 	${top_distclean}
 	
 
@@ -476,10 +397,10 @@ distclean: FRC.distclean
 ###      anything that needs to exist in order to run `configure' and then
 ###      begin to build the program.
 realclean: FRC.realclean
-	(cd src;      make ${MFLAGS} realclean)
-	(cd oldXMenu; make ${MFLAGS} realclean)
-	(cd lib-src;  make ${MFLAGS} realclean)
-	(cd man;      make ${MFLAGS} realclean)
+	(cd src;      $(MAKE) $(MFLAGS) realclean)
+	(cd oldXMenu; $(MAKE) $(MFLAGS) realclean)
+	(cd lib-src;  $(MAKE) $(MFLAGS) realclean)
+	-(cd man;     $(MAKE) $(MFLAGS) realclean)
 	${top_distclean}
 
 ### This doesn't actually appear in the coding standards, but Karl
@@ -487,7 +408,7 @@ realclean: FRC.realclean
 ### the coding standards seem to come from.  It's like distclean, but
 ### it deletes backup and autosave files too.
 extraclean:
-	for i in ${SUBDIR}; do (cd $$i; $(MAKE) ${MFLAGS} extraclean); done
+	for i in ${SUBDIR}; do (cd $$i; $(MAKE) $(MFLAGS) extraclean); done
 	-(cd lock; rm *)
 	-rm config.status config-tmp-*
 	-rm -f *~ \#*
@@ -508,24 +429,24 @@ SOURCES = ChangeLog GETTING.GNU.SOFTWARE INSTALL Makefile.in PROBLEMS \
 unlock:
 	chmod u+w $(SOURCES) cpp/*
 	-(cd elisp; chmod u+w Makefile README *.texi)
-	(cd etc; make unlock)
-	(cd lib-src; make unlock)
-	(cd lisp; make unlock)
+	(cd etc; $(MAKE) $(MFLAGS) unlock)
+	(cd lib-src; $(MAKE) $(MFLAGS) unlock)
+	(cd lisp; $(MAKE) $(MFLAGS) unlock)
 	(cd lisp/term; chmod u+w README *.el)
 	(cd man; chmod u+w *texi* ChangeLog split-man)
 	(cd oldXMenu; chmod u+w *.[ch] Makefile README)
-	(cd src; make unlock)
+	(cd src; $(MAKE) $(MFLAGS) unlock)
 
 relock:
 	chmod u-w $(SOURCES) cpp/*
 	-(cd elisp; chmod u-w Makefile README *.texi)
-	(cd etc; make relock)
-	(cd lib-src; make relock)
-	(cd lisp; make relock)
+	(cd etc; $(MAKE) $(MFLAGS) relock)
+	(cd lib-src; $(MAKE) $(MFLAGS) relock)
+	(cd lisp; $(MAKE) $(MFLAGS) relock)
 	(cd lisp/term; chmod u+w README *.el)
 	(cd man; chmod u+w *texi* ChangeLog split-man)
 	(cd oldXMenu; chmod u+w *.[ch] Makefile README)
-	(cd src; make relock)
+	(cd src; $(MAKE) $(MFLAGS) relock)
 
 TAGS tags:	lib-src
 	(cd ${srcdir}/src; \
@@ -538,6 +459,6 @@ dist:
 	cd ${srcdir}; make-dist
 
 info:
-	(cd ${srcdir}/man; make ${MFLAGS} info)
+	(cd ${srcdir}/man; $(MAKE) $(MFLAGS) info)
 dvi:
-	(cd ${srcdir}/man; make ${MFLAGS} dvi)
+	(cd ${srcdir}/man; $(MAKE) $(MFLAGS) dvi)

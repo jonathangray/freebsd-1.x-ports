@@ -104,7 +104,7 @@
 
 ;;;  Revision Information
 
-(defconst tpu-extras-revision "$Revision: 1.1 $"
+(defconst tpu-extras-revision "$Revision: 1.2 $"
   "Revision number of the TPU-edt extras.")
 
 

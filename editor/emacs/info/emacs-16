@@ -2,6 +2,281 @@ This is Info file ../info/emacs, produced by Makeinfo-1.54 from the
 input file emacs.texi.
 
 
+File: emacs,  Node: Minor Modes,  Next: Variables,  Up: Customization
+
+Minor Modes
+===========
+
+   Minor modes are optional features which you can turn on or off.  For
+example, Auto Fill mode is a minor mode in which SPC breaks lines
+between words as you type.  All the minor modes are independent of each
+other and of the selected major mode.  Most minor modes say in the mode
+line when they are on; for example, `Fill' in the mode line means that
+Auto Fill mode is on.
+
+   Append `-mode' to the name of a minor mode to get the name of a
+command function that turns the mode on or off.  Thus, the command to
+enable or disable Auto Fill mode is called `M-x auto-fill-mode'.  These
+commands are usually invoked with `M-x', but you can bind keys to them
+if you wish.  With no argument, the function turns the mode on if it was
+off and off if it was on.  This is known as "toggling".  A positive
+argument always turns the mode on, and an explicit zero argument or a
+negative argument always turns it off.
+
+   Enabling or disabling some minor modes applies only to the current
+buffer; each buffer is independent of the other buffers.  Therefore, you
+can enable the mode in particular buffers and disable it in others.
+
+   Auto Fill mode allows you to enter filled text without breaking lines
+explicitly.  Emacs inserts newlines as necessary to prevent lines from
+becoming too long.  *Note Filling::.
+
+   Outline minor mode provides the same facilities as the major mode
+called Outline mode; but since it is a minor mode instead, you can
+combine it with any major mode.  *Note Outline Mode::.
+
+   Overwrite mode causes ordinary printing characters to replace
+existing text instead of shoving it over.  For example, if the point is
+in front of the `B' in `FOOBAR', then in Overwrite mode typing a `G'
+changes it to `FOOGAR', instead of making it `FOOGBAR' as usual.
+
+   Auto Save mode causes the contents of a buffer to be saved
+periodically to reduce the amount you will lose in case of a system
+crash.  *Note Auto Save::.
+
+   ISO Accents mode makes the characters ``', `'', `"', `^', `/' and
+`~' combined with the following letter, to produce an accented letter
+in the ISO Latin-1 character set.  *Note European Display::.
+
+   The following minor modes normally apply to all buffers at once.
+Since each is enabled or disabled by the value of a variable, you *can*
+set them differently for particular buffers, by explicitly making the
+corresponding variables local in those buffers.  *Note Locals::.
+
+   Abbrev mode allows you to define abbreviations that automatically
+expand as you type them.  For example, `amd' might expand to `abbrev
+mode'.  *Note Abbrevs::, for full information.
+
+   Line Number mode enables continuous display in the mode line of the
+line number of point.  *Note Mode Line::.
+
+   Scroll Bar mode gives each window a scroll bar (*note Scroll
+Bars::.).  Menu Bar mode gives each frame a menu bar (*note Menu
+Bars::.).  Both of these modes are enabled by default when you use the
+X Window System.
+
+   In Transient Mark mode, every change in the buffer "deactivates" the
+mark, so that commands that operate on the region will get an error.
+This means you must either set the mark, or explicitly "reactivate" it,
+before each command that uses the region.  The advantage of Transient
+Mark mode is that Emacs can display the region highlighted (currently
+only when using X).  *Note Setting Mark::.
+
+
+File: emacs,  Node: Variables,  Next: Keyboard Macros,  Prev: Minor Modes,  Up: Customization
+
+Variables
+=========
+
+   A "variable" is a Lisp symbol which has a value.  The symbol's name
+is also called the name of the variable.  A variable name can contain
+any characters that can appear in a file, but conventionally variable
+names consist of words separated by hyphens.  A variable can have a
+documentation string which describes what kind of value it should have
+and how the value will be used.
+
+   Lisp allows any variable to have any kind of value, but most
+variables that Emacs uses require a value of a certain type.  Often the
+value should always be a string, or should always be a number.
+Sometimes we say that a certain feature is turned on if a variable is
+"non-`nil'," meaning that if the variable's value is `nil', the feature
+is off, but the feature is on for *any* other value.  The conventional
+value to use to turn on the feature--since you have to pick one
+particular value when you set the variable--is `t'.
+
+   Emacs uses many Lisp variables for internal recordkeeping, as any
+Lisp program must, but the most interesting variables for you are the
+ones that exist for the sake of customization.  Emacs does not
+(usually) change the values of these variables; instead, you set the
+values, and thereby alter and control the behavior of certain Emacs
+commands.  These variables are called "options".  Most options are
+documented in this manual, and appear in the Variable Index (*note
+Variable Index::.).
+
+   One example of a variable which is an option is `fill-column', which
+specifies the position of the right margin (as a number of characters
+from the left margin) to be used by the fill commands (*note
+Filling::.).
+
+* Menu:
+
+* Examining::           Examining or setting one variable's value.
+* Edit Options::        Examining or editing list of all variables' values.
+* Hooks::		Hook variables let you specify programs for parts
+			  of Emacs to run on particular occasions.
+* Locals::              Per-buffer values of variables.
+* File Variables::      How files can specify variable values.
+
+
+File: emacs,  Node: Examining,  Next: Edit Options,  Up: Variables
+
+Examining and Setting Variables
+-------------------------------
+
+`C-h v VAR RET'
+     Print the value and documentation of variable VAR
+     (`describe-variable').
+
+`M-x set-variable RET VAR RET VALUE RET'
+     Change the value of variable VAR to VALUE.
+
+   To examine the value of a single variable, use `C-h v'
+(`describe-variable'), which reads a variable name using the
+minibuffer, with completion.  It prints both the value and the
+documentation of the variable.  For example,
+
+     C-h v fill-column RET
+
+prints something like this:
+
+     fill-column's value is 75
+     
+     Documentation:
+     *Column beyond which automatic line-wrapping should happen.
+     Automatically becomes buffer-local when set in any fashion.
+
+The star at the beginning of the documentation indicates that this
+variable is an option.  `C-h v' is not restricted to options; it allows
+any variable name.
+
+   The most convenient way to set a specific option is with `M-x
+set-variable'.  This reads the variable name with the minibuffer (with
+completion), and then reads a Lisp expression for the new value using
+the minibuffer a second time.  For example,
+
+     M-x set-variable RET fill-column RET 75 RET
+
+sets `fill-column' to 75.
+
+   You can set any variable with a Lisp expression using the function
+`setq'.  Here's how to use it to set `fill-column':
+
+     (setq fill-column 75)
+
+   Setting variables, like all means of customizing Emacs except where
+explicitly stated, affects only the current Emacs session.
+
+
+File: emacs,  Node: Edit Options,  Next: Hooks,  Prev: Examining,  Up: Variables
+
+Editing Variable Values
+-----------------------
+
+   These two functions make it easy to display all the user edit options
+and change some of them.
+
+`M-x list-options'
+     Display a buffer listing names, values and documentation of all
+     options.
+
+`M-x edit-options'
+     Change option values by editing a list of options.
+
+   `M-x list-options' displays a list of all Emacs option variables, in
+an Emacs buffer named `*List Options*'.  Each option is shown with its
+documentation and its current value.  Here is what a portion of it might
+look like:
+
+     ;; exec-path:
+     ("." "/usr/local/bin" "/usr/ucb" "/bin" "/usr/bin" "/u2/emacs/etc")
+     *List of directories to search programs to run in subprocesses.
+     Each element is a string (directory name)
+     or nil (try the default directory).
+     ;;
+     ;; fill-column:
+     75
+     *Column beyond which automatic line-wrapping should happen.
+     Automatically becomes buffer-local when set in any fashion.
+     ;;
+
+   `M-x edit-options' goes one step further and immediately selects the
+`*List Options*' buffer; this buffer uses the major mode Options mode,
+which provides commands that allow you to point at an option and change
+its value:
+
+`s'
+     Set the variable point is in or near to a new value read using the
+     minibuffer.
+
+`x'
+     Toggle the variable point is in or near: if the value was `nil',
+     it becomes `t'; otherwise it becomes `nil'.
+
+`1'
+     Set the variable point is in or near to `t'.
+
+`0'
+     Set the variable point is in or near to `nil'.
+
+`n'
+`p'
+     Move to the next or previous variable.
+
+   Any changes take effect immediately, and last until you exit from
+Emacs.
+
+
+File: emacs,  Node: Hooks,  Next: Locals,  Prev: Edit Options,  Up: Variables
+
+Hooks
+-----
+
+   A "hook" is a variable where you can store a function or functions
+to be called on a particular occasion by an existing program.  Emacs
+provides a number of hooks for the sake of customization.
+
+   Most of the hooks in Emacs are "normal hooks".  These variables
+contain lists of functions to be called with no arguments.  The reason
+most hooks are normal hooks is so that you can use them in a uniform
+way.  Every variable in Emacs whose name ends in `-hook' is a normal
+hook.
+
+   Most major modes run hooks as the last step of initialization.  This
+makes it easy for a user to customize the behavior of the mode, by
+overriding the local variable assignments already made by the mode.  But
+hooks may also be used in other contexts.  For example, the hook
+`suspend-hook' runs just before Emacs suspends itself (*note
+Exiting::.).
+
+   The recommended way to add a hook function to a normal hook is by
+calling `add-hook'.  You can use any valid Lisp function as the hook
+function.  For example, here's how to set up a hook to turn on Auto
+Fill mode when entering Text mode and other modes based on Text mode:
+
+     (add-hook 'text-mode-hook 'turn-on-auto-fill)
+
+   The next example shows how to use a hook to customize the indentation
+of C code.  (People often have strong personal preferences for one
+format compared to another.)  Here the hook function is an anonymous
+lambda expression.
+
+     (add-hook 'c-mode-hook
+       (function (lambda ()
+                   (setq c-indent-level 4
+                         c-argdecl-indent 0
+                         c-label-offset -4
+                         c-continued-statement-indent 0
+                         c-brace-offset 0
+                         comment-column 40))))
+     
+     (setq c++-mode-hook c-mode-hook)
+
+   It is best to design your hook functions so that the order in which
+they are executed does not matter.  Any dependence on the order is
+"asking for trouble."  However, the order is predictable: the most
+recently added hook functions are executed first.
+
+
 File: emacs,  Node: Locals,  Next: File Variables,  Prev: Hooks,  Up: Variables
 
 Local Variables
@@ -163,10 +438,11 @@ list, showing you the local variables list to consider.
 
    The `eval' "variable" creates special risks, so there is a separate
 variable `enable-local-eval' to control whether Emacs processes `eval'
-variables.  The three possibilities for the value are `t', `nil', and
-anything else, just as for `enable-local-variables'.  The default is
-`maybe', which is neither `t' nor `nil', so normally Emacs queries about
-`eval' variable settings.
+variables, as well variables with names that end in `-hook', `-hooks',
+`-function' or `-functions'.  The three possibilities for the value are
+`t', `nil', and anything else, just as for `enable-local-variables'.
+The default is `maybe', which is neither `t' nor `nil', so normally
+Emacs queries about `eval' variable settings.
 
    Use the command `normal-mode' to reset the local variables and major
 mode of a buffer according to the file name and contents, including the
@@ -422,7 +698,7 @@ character into a pair of characters starting with ESC.  When you type
 the character `M-a' in a key sequence, Emacs replaces it with `ESC a'.
 A meta key comes in as a single input event, but becomes two events for
 purposes of key bindings.  The reason for this is historical, and we
-might change in someday.
+might change it someday.
 
    Most modern keyboards have function keys as well as character keys.
 Function keys send input events just as character keys do, and keymaps
@@ -850,309 +1126,4 @@ meanings:
 
    You can put more than one mouse button in a key sequence, but it
 isn't usual to do so.
-
-
-File: emacs,  Node: Disabling,  Prev: Mouse Buttons,  Up: Key Bindings
-
-Disabling Commands
-------------------
-
-   Disabling a command marks the command as requiring confirmation
-before it can be executed.  The purpose of disabling a command is to
-prevent beginning users from executing it by accident and being
-confused.
-
-   Attempting to invoke a disabled command interactively in Emacs
-causes the display of a window containing the command's name, its
-documentation, and some instructions on what to do immediately; then
-Emacs asks for input saying whether to execute the command as
-requested, enable it and execute, or cancel it.  If you decide to
-enable the command, you are asked whether to do this permanently or
-just for the current session.  Enabling permanently works by
-automatically editing your `.emacs' file.
-
-   The direct mechanism for disabling a command is to have a non-`nil'
-`disabled' property on the Lisp symbol for the command.  Here is the
-Lisp program to do this:
-
-     (put 'delete-region 'disabled t)
-
-   If the value of the `disabled' property is a string, that string is
-included in the message printed when the command is used:
-
-     (put 'delete-region 'disabled
-          "Text deleted this way cannot be yanked back!\n")
-
-   You can make a command disabled either by editing the `.emacs' file
-directly or with the command `M-x disable-command', which edits the
-`.emacs' file for you.  Likewise, `M-x enable-command' edits `.emacs'
-to enable a command permanently.  *Note Init File::.
-
-   Whether a command is disabled is independent of what key is used to
-invoke it; it also applies if the command is invoked using `M-x'.
-Disabling a command has no effect on calling it as a function from Lisp
-programs.
-
-
-File: emacs,  Node: Keyboard Translations,  Next: Syntax,  Prev: Key Bindings,  Up: Customization
-
-Keyboard Translations
-=====================
-
-   Some keyboards do not make it convenient to send all the special
-characters that Emacs uses.  The most common problem case is the DEL
-character.  Some keyboards provide no convenient way to type this very
-important character--usually because they were designed to expect the
-character `C-h' to be used for deletion.  On these keyboard, if you
-press the key normally used for deletion, Emacs handles the `C-h' as a
-prefix character and offers you a list of help options, which is not
-what you want.
-
-   You can work around this problem within Emacs by setting up keyboard
-translations to turn `C-h' into DEL and DEL into `C-h', as follows:
-
-     ;; Translate `C-h' to DEL.
-     (keyboard-translate ?\C-h ?\C-?)
-     ;; Translate DEL to `C-h'.
-     (keyboard-translate ?\C-? ?\C-h)
-
-   Keyboard translations are not the same as key bindings in keymaps
-(*note Keymaps::.).  Emacs contains numerous keymaps that apply in
-different situations, but there is only one set of keyboard
-translations, and it applies to every character that Emacs reads from
-the terminal.  Keyboard translations take place at the lowest level of
-input processing; the keys that are looked up in keymaps contain the
-characters that result from keyboard translation.
-
-   For full information about how to use keyboard translations, see
-*Note Translating Input: (elisp)Translating Input.
-
-
-File: emacs,  Node: Syntax,  Next: Init File,  Prev: Keyboard Translations,  Up: Customization
-
-The Syntax Table
-================
-
-   All the Emacs commands which parse words or balance parentheses are
-controlled by the "syntax table".  The syntax table says which
-characters are opening delimiters, which are parts of words, which are
-string quotes, and so on.  Each major mode has its own syntax table
-(though sometimes related major modes use the same one) which it
-installs in each buffer that uses that major mode.  The syntax table
-installed in the current buffer is the one that all commands use, so we
-call it "the" syntax table.  A syntax table is a Lisp object, a vector
-of length 256 whose elements are numbers.
-
-   To display a description of the contents of the current syntax table,
-type `C-h s' (`describe-syntax').  The description of each character
-includes both the string you would have to give to
-`modify-syntax-entry' to set up that character's current syntax, and
-some English to explain that string if necessary.
-
-   For full information on the syntax table, see *Note Syntax Table:
-(elisp)Syntax Table.
-
-
-File: emacs,  Node: Init File,  Prev: Syntax,  Up: Customization
-
-The Init File, `~/.emacs'
-=========================
-
-   When Emacs is started, it normally loads a Lisp program from the file
-`.emacs' in your home directory.  We call this file your "init file"
-because it specifies how to initialize Emacs for you.  You can use the
-command line switches `-q' and `-u' to tell Emacs whether to load an
-init file, and which one (*note Entering Emacs::.).
-
-   There can also be a "default init file", which is the library named
-`default.el', found via the standard search path for libraries.  The
-Emacs distribution contains no such library; your site may create one
-for local customizations.  If this library exists, it is loaded
-whenever you start Emacs (except when you specify `-q').  But your init
-file, if any, is loaded first; if it sets `inhibit-default-init'
-non-`nil', then `default' is not loaded.
-
-   If you have a large amount of code in your `.emacs' file, you should
-move it into another file such as `~/SOMETHING.el', byte-compile it,
-and make your `.emacs' file load it with `(load "~/SOMETHING")'.  *Note
-Byte Compilation: (elisp)Byte Compilation, for more information about
-compiling Emacs Lisp programs.
-
-* Menu:
-
-* Init Syntax::     Syntax of constants in Emacs Lisp.
-* Init Examples::   How to do some things with an init file.
-* Terminal Init::   Each terminal type can have an init file.
-* Find Init::	    How Emacs finds the init file.
-
-
-File: emacs,  Node: Init Syntax,  Next: Init Examples,  Up: Init File
-
-Init File Syntax
-----------------
-
-   The `.emacs' file contains one or more Lisp function call
-expressions.  Each of these consists of a function name followed by
-arguments, all surrounded by parentheses.  For example, `(setq
-fill-column 60)' calls the function `setq' to set the variable
-`fill-column' (*note Filling::.) to 60.
-
-   The second argument to `setq' is an expression for the new value of
-the variable.  This can be a constant, a variable, or a function call
-expression.  In `.emacs', constants are used most of the time.  They
-can be:
-
-Numbers:
-     Numbers are written in decimal, with an optional initial minus
-     sign.
-
-Strings:
-     Lisp string syntax is the same as C string syntax with a few extra
-     features.  Use a double-quote character to begin and end a string
-     constant.
-
-     In a string, you can include newlines and special characters
-     literally.  But often it is cleaner to use backslash sequences for
-     them: `\n' for newline, `\b' for backspace, `\r' for carriage
-     return, `\t' for tab, `\f' for formfeed (control-L), `\e' for
-     escape, `\\' for a backslash, `\"' for a double-quote, or `\OOO'
-     for the character whose octal code is OOO.  Backslash and
-     double-quote are the only characters for which backslash sequences
-     are mandatory.
-
-     `\C-' can be used as a prefix for a control character, as in
-     `\C-s' for ASCII control-S, and `\M-' can be used as a prefix for
-     a Meta character, as in `\M-a' for `Meta-A' or `\M-\C-a' for
-     `Control-Meta-A'.
-
-Characters:
-     Lisp character constant syntax consists of a `?' followed by
-     either a character or an escape sequence starting with `\'.
-     Examples: `?x', `?\n', `?\"', `?\)'.  Note that strings and
-     characters are not interchangeable in Lisp; some contexts require
-     one and some contexts require the other.
-
-True:
-     `t' stands for `true'.
-
-False:
-     `nil' stands for `false'.
-
-Other Lisp objects:
-     Write a single-quote (') followed by the Lisp object you want.
-
-
-File: emacs,  Node: Init Examples,  Next: Terminal Init,  Prev: Init Syntax,  Up: Init File
-
-Init File Examples
-------------------
-
-   Here are some examples of doing certain commonly desired things with
-Lisp expressions:
-
-   * Make TAB in C mode just insert a tab if point is in the middle of a
-     line.
-
-          (setq c-tab-always-indent nil)
-
-     Here we have a variable whose value is normally `t' for `true' and
-     the alternative is `nil' for `false'.
-
-   * Make searches case sensitive by default (in all buffers that do not
-     override this).
-
-          (setq-default case-fold-search nil)
-
-     This sets the default value, which is effective in all buffers
-     that do not have local values for the variable.  Setting
-     `case-fold-search' with `setq' affects only the current buffer's
-     local value, which is not what you probably want to do in an init
-     file.
-
-   * Make Text mode the default mode for new buffers.
-
-          (setq default-major-mode 'text-mode)
-
-     Note that `text-mode' is used because it is the command for
-     entering Text mode.  The single-quote before it makes the symbol a
-     constant; otherwise, `text-mode' would be treated as a variable
-     name.
-
-   * Turn on Auto Fill mode automatically in Text mode and related
-     modes.
-
-          (add-hook 'text-mode-hook
-            '(lambda () (auto-fill-mode 1)))
-
-     This shows how to add a hook function to a normal hook variable
-     (*note Hooks::.).  The function we supply is a list starting with
-     `lambda', with a single-quote in front of it to make it a list
-     constant rather than an expression.
-
-     It's beyond the scope of this manual to explain Lisp functions,
-     but for this example it is enough to know that the effect is to
-     execute `(auto-fill-mode 1)' when Text mode is entered.  You can
-     replace it with any other expression that you like, or with
-     several expressions in a row.
-
-     Emacs comes with a function named `turn-on-auto-fill' whose
-     definition is `(lambda () (auto-fill-mode 1))'.  Thus, a simpler
-     way to write the above example is as follows:
-
-          (add-hook 'text-mode-hook 'turn-on-auto-fill)
-
-   * Load the installed Lisp library named `foo' (actually a file
-     `foo.elc' or `foo.el' in a standard Emacs directory).
-
-          (load "foo")
-
-     When the argument to `load' is a relative file name, not starting
-     with `/' or `~', `load' searches the directories in `load-path'
-     (*note Lisp Libraries::.).
-
-   * Load the compiled Lisp file `foo.elc' from your home directory.
-
-          (load "~/foo.elc")
-
-     Here an absolute file name is used, so no searching is done.
-
-   * Rebind the key `C-x l' to run the function `make-symbolic-link'.
-
-          (global-set-key "\C-xl" 'make-symbolic-link)
-
-     or
-
-          (define-key global-map "\C-xl" 'make-symbolic-link)
-
-     Note once again the single-quote used to refer to the symbol
-     `make-symbolic-link' instead of its value as a variable.
-
-   * Do the same thing for C mode only.
-
-          (define-key c-mode-map "\C-xl" 'make-symbolic-link)
-
-   * Redefine all keys which now run `next-line' in Fundamental mode so
-     that they run `forward-line' instead.
-
-          (substitute-key-definition 'next-line 'forward-line
-                                     global-map)
-
-   * Make `C-x C-v' undefined.
-
-          (global-unset-key "\C-x\C-v")
-
-     One reason to undefine a key is so that you can make it a prefix.
-     Simply defining `C-x C-v ANYTHING' will make `C-x C-v' a prefix,
-     but `C-x C-v' must first be freed of its usual non-prefix
-     definition.
-
-   * Make `$' have the syntax of punctuation in Text mode.  Note the
-     use of a character constant for `$'.
-
-          (modify-syntax-entry ?\$ "." text-mode-syntax-table)
-
-   * Enable the use of the command `eval-expression' without
-     confirmation.
-
-          (put 'eval-expression 'disabled nil)
 

@@ -3,7 +3,7 @@
 ;; Copyright (C) 1990, 1993 Free Software Foundation, Inc.
 
 ;; Author: Masanobu UMEDA <umerin@mse.kyutech.ac.jp>
-;; Version: $Header: /a/cvs/386BSD/ports/editor/emacs/lisp/rmailsort.el,v 1.1 1993/08/26 06:09:39 rgrimes Exp $
+;; Version: $Header: /a/cvs/386BSD/ports/editor/emacs/lisp/rmailsort.el,v 1.2 1993/11/22 16:38:41 rich Exp $
 ;; Keywords: mail
 
 ;; This file is part of GNU Emacs.

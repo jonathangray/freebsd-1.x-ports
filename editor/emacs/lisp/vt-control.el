@@ -52,7 +52,7 @@
 
 ;;;  Revision Information
 
-(defconst vt-revision "$Revision: 1.1 $"
+(defconst vt-revision "$Revision: 1.2 $"
   "Revision number of vt-control.")
 
 

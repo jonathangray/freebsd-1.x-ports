@@ -3,7 +3,7 @@
 ;; Copyright (C) 1993 Masanobu UMEDA
 
 ;; Author: Masanobu UMEDA <umerin@mse.kyutech.ac.jp>
-;; Version: $Header: /a/cvs/386BSD/ports/editor/emacs/lisp/metamail.el,v 1.1 1993/08/26 06:09:27 rgrimes Exp $
+;; Version: $Header: /a/cvs/386BSD/ports/editor/emacs/lisp/metamail.el,v 1.2 1993/11/22 16:37:55 rich Exp $
 ;; Keywords: mail, news, mime, multimedia
 
 ;; This file is part of GNU Emacs.
@@ -27,7 +27,7 @@
 ;; LCD Archive Entry:
 ;; metamail|Masanobu UMEDA|umerin@mse.kyutech.ac.jp|
 ;; Metamail interface for GNU Emacs|
-;; $Date: 1993/08/26 06:09:27 $|$Revision: 1.1 $|~/misc/metamail.el.Z|
+;; $Date: 1993/11/22 16:37:55 $|$Revision: 1.2 $|~/misc/metamail.el.Z|
 
 ;; Note: Metamail does not have all options which is compatible with
 ;; the environment variables.  For that reason, matamail.el have to

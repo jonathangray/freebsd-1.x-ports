@@ -18,7 +18,7 @@
 
 ;; So, for the meantime, this is not the default mode for makefiles.
 
-;; $Id: makefile.el,v 1.1 1993/08/26 06:09:25 rgrimes Exp $
+;; $Id: makefile.el,v 1.2 1993/11/22 16:37:47 rich Exp $
 
 ;; This file is part of GNU Emacs.
 

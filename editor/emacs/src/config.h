@@ -49,7 +49,7 @@ and this notice must be preserved on all copies.  */
 #define HAVE_X11 1
 
 /* Define this if you're using XFree386.  */
-/* #undef HAVE_XFREE386 */
+#define HAVE_XFREE386 1
 
 /* Define HAVE_X_MENU if you want to use the X window menu system.
    This appears to work on some machines that support X
@@ -84,6 +84,7 @@ and this notice must be preserved on all copies.  */
    configure.in.  */
 #define HAVE_SYS_TIMEB_H 1
 #define HAVE_SYS_TIME_H 1
+#define HAVE_UNISTD_H 1
 #define STDC_HEADERS 1
 #define TIME_WITH_SYS_TIME 1
 
@@ -122,6 +123,7 @@ and this notice must be preserved on all copies.  */
 #define HAVE_LOGB 1
 #define HAVE_FREXP 1
 /* #undef HAVE_FTIME */
+#define HAVE_RES_INIT 1 /* For -lresolv on Suns.  */
 
 /* #undef HAVE_AIX_SMT_EXP */
 
@@ -140,7 +142,7 @@ and this notice must be preserved on all copies.  */
    configuration names to use for them.
 
    See s/template.h for documentation on writing s/*.h files.  */
-#define config_opsysfile "s/386bsd.h" 
+#define config_opsysfile "s/freebsd.h" 
 #include config_opsysfile
 
 /* The configuration script defines machfile to be the name of the

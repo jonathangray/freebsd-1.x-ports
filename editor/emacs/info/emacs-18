@@ -2,6 +2,287 @@ This is Info file ../info/emacs, produced by Makeinfo-1.54 from the
 input file emacs.texi.
 
 
+File: emacs,  Node: Ordinary Arguments,  Next: Initial Options,  Up: Command Arguments
+
+Ordinary Arguments
+==================
+
+   Here is a table of the ordinary arguments and options:
+
+`FILE'
+     Visit FILE using `find-file'.  *Note Visiting::.
+
+`+LINENUM FILE'
+     Visit FILE using `find-file', then go to line number LINENUM in it.
+
+`-l FILE'
+`-load FILE'
+     Load a file FILE of Lisp code with the function `load'.  *Note
+     Lisp Libraries::.
+
+`-f FUNCTION'
+`-funcall FUNCTION'
+     Call Lisp function FUNCTION with no arguments.
+
+`-insert FILE'
+     Insert the contents of FILE into the current buffer.  This is like
+     what `M-x insert-buffer' does; *Note Misc File Ops::.
+
+`-kill'
+     Exit from Emacs without asking for confirmation.
+
+
+File: emacs,  Node: Initial Options,  Next: Command Example,  Prev: Ordinary Arguments,  Up: Command Arguments
+
+Initial Options
+===============
+
+   The initial options are recognized only at the beginning of the
+command line.  If you use more than one of them, they must appear in the
+order that they appear in this table.
+
+`-t DEVICE'
+     Use DEVICE as the device for terminal input and output.
+
+`-d DISPLAY'
+     When running with the X Window System, use the display named
+     DISPLAY to make the window that serves as Emacs's terminal.
+
+`-nw'
+     Don't communicate directly with X, disregarding the `DISPLAY'
+     environment variable even if it is set.  `-nw' stands for
+     "non-window."
+
+`-batch'
+     Run Emacs in "batch mode", which means that the text being edited
+     is not displayed and the standard Unix interrupt characters such
+     as `C-z' and `C-c' continue to have their normal effect.  Emacs in
+     batch mode outputs to `stdout' only what would normally be printed
+     in the echo area under program control.
+
+     Batch mode is used for running programs written in Emacs Lisp from
+     shell scripts, makefiles, and so on.  Normally the `-l' option or
+     `-f' option will be used as well, to invoke a Lisp program to do
+     the batch processing.
+
+     `-batch' implies `-q' (do not load an init file).  It also causes
+     Emacs to kill itself after all command options have been
+     processed.  In addition, auto-saving is not done except in buffers
+     for which it has been explicitly requested.
+
+`-q'
+`-no-init-file'
+     Do not load your Emacs init file `~/.emacs'.
+
+`-u USER'
+`-user USER'
+     Load USER's Emacs init file `~USER/.emacs' instead of your own.
+
+   The init file can get access to the values of the command line
+arguments as the elements of a list in the variable
+`command-line-args'.  (The list contains only the arguments from the
+first table above.  Emacs processes the arguments from the second table
+before building the list.)  The init file can override the normal
+processing of the other arguments by setting this variable.
+
+
+File: emacs,  Node: Command Example,  Next: Resume Arguments,  Prev: Initial Options,  Up: Command Arguments
+
+Command Argument Example
+========================
+
+   Here is an example of using Emacs with arguments and options.  It
+assumes you have a Lisp program file called `hack-c.el' which, when
+loaded, performs some useful operation on current buffer, expected to be
+a C program.
+
+     emacs -batch foo.c -l hack-c -f save-buffer -kill > log
+
+This says to visit `foo.c', load `hack-c.el' (which makes changes in
+the visited file), save `foo.c' (note that `save-buffer' is the
+function that `C-x C-s' is bound to), and then exit to the shell that
+this command was done with.  The initial option `-batch' guarantees
+there will be no problem redirecting output to `log', because Emacs
+will not assume that it has a display terminal to work with.
+
+
+File: emacs,  Node: Resume Arguments,  Next: Display X,  Prev: Command Example,  Up: Command Arguments
+
+Resuming Emacs with Arguments
+=============================
+
+   You can specify ordinary arguments for Emacs when you resume it after
+a suspension.  To prepare for this, put the following code in your
+`.emacs' file (*note Hooks::.):
+
+     (add-hook 'suspend-hook 'resume-suspend-hook)
+
+   As further preparation, you must execute the shell script
+`emacs.csh' (if you use CSH as your shell) or `emacs.bash' (if you use
+BASH as your shell).  These scripts define an alias named `edit', which
+will resume Emacs giving it new command line arguments such as files to
+visit.
+
+   Only ordinary arguments work properly when you resume Emacs.  Initial
+arguments are not recognized.  It's too late to execute them anyway.
+
+   Note that resuming Emacs (with or without arguments) must be done
+from within the shell that is the parent of the Emacs job.  This is why
+`edit' is an alias rather than a program or a shell script.  It is not
+possible to implement a resumption command that could be run from other
+subjobs of the shell; no way to define a command that could be made the
+value of `EDITOR', for example.  Therefore, this feature does not take
+the place of the the Emacs Server feature.  *Note Emacs Server::.
+
+   The aliases use the Emacs Server feature if you appear to have a
+server Emacs running.  However, they cannot determine this with complete
+accuracy.  They may think that a server is still running when in
+actuality you have killed that Emacs, because the file `/tmp/.esrv...'
+still exists.  If this happens, find that file and delete it.
+
+
+File: emacs,  Node: Display X,  Next: Font X,  Prev: Resume Arguments,  Up: Command Arguments
+
+Specifying the Display Name
+===========================
+
+   The environment variable `DISPLAY' tells all X clients where to
+display their windows.  Its value is set up by default in ordinary
+circumstances, when you start an X server and run jobs locally.
+Occasionally you may need to specify the display yourself; for example,
+if you do a remote login and want to run a client program remotely,
+displaying on your local screen.
+
+   With Emacs, the main reason people change the default display is to
+let them log into another system, run Emacs on that system, but have the
+window displayed at their local terminal.  You might need to use login
+to another system because the files you want to edit are there, or
+because the Emacs executable file you want to run is there.
+
+   The syntax of the `DISPLAY' environment variable is:
+
+     HOST:DISPLAY.SCREEN
+
+where HOST is the host name of the X Window System server machine,
+DISPLAY is an arbitrarily-assigned number that distinguishes your
+server (X terminal) from other servers on the same machine, and SCREEN
+is a rarely-used field that allows an X server to control multiple
+terminal screens.  The period and the SCREEN field are optional.  If
+included, SCREEN is usually zero.
+
+   If your host is named `glasperle' and your server is the first (or
+perhaps the only) server listed in the configuration, your `DISPLAY' is
+`glasperle:0.0'.
+
+   You can specify the display name explicitly when you run Emacs,
+either by changing the `DISPLAY' variable, or with the option `-d
+DISPLAY' or `-display DISPLAY'.  These are initial options; they must
+come at the beginning of the command line.  *Note Initial Options::.
+Here is an example:
+
+     emacs -display glasperle:0 &
+
+   You can inhibit the direct use of X with the `-nw' option.  This is
+also an initial option.  This option tells Emacs to display using
+ordinary ASCII on its controlling terminal.
+
+   Sometimes, security arrangements prevent a program on a remote system
+from displaying on your local system.  In this case, trying to run Emacs
+produces messages like:
+
+     Xlib:  connection to "glasperle:0.0" refused by server
+
+   You might be able to overcome this problem by using the `xhost'
+command on the local system to give permission for access from your
+remote machine.
+
+
+File: emacs,  Node: Font X,  Next: Colors X,  Prev: Display X,  Up: Command Arguments
+
+Font Specification Options
+==========================
+
+   By default, Emacs displays text in the font named `9x15', which
+makes each character nine pixels wide and fifteen pixels high.  You can
+specify a different font on your command line through the option `-fn
+NAME'.  The `-font' option is a synonym for `-fn'.
+
+   Here is how to specify the font `6x13':
+
+     emacs -fn 6x13 &
+
+You can also do this in your `.Xdefaults' file:
+
+     emacs.font:      6x13
+
+   Use only fixed width fonts--that is, fonts in which all characters
+have the same width.  Emacs cannot yet handle display properly for
+variable width fonts.  Fixed width fonts include the one named `fixed',
+and fonts with names in the form NxN, such as `6x13', `8x13', and
+`9x15'.  Under the font-naming conventions in X11 Release 4 or later,
+any font with `m' or `c' in the eleventh field of the name is a fixed
+width font.
+
+   Here's how to use the `xlsfonts' program to list all the fixed width
+fonts available on your system:
+
+     xlsfonts -fn '*x*'
+     xlsfonts -fn '*-*-*-*-*-*-*-*-*-*-*-m*'
+     xlsfonts -fn '*-*-*-*-*-*-*-*-*-*-*-c*'
+
+To see what a particular font looks like, use the `xfd' command.  For
+example:
+
+     xfd -fn 6x13
+
+displays the entire font `6x13'.
+
+   While running Emacs, you can set the font of the current frame
+(*note Frame Parameters::.) or for a specific kind of text (*note
+Faces::.).
+
+
+File: emacs,  Node: Colors X,  Next: Window Size X,  Prev: Font X,  Up: Command Arguments
+
+Window Color Options
+====================
+
+   On a color display, you can specify which color to use for various
+parts of the Emacs display.  To find out what colors are available on
+your system, look at the `/usr/lib/X11/rgb.txt' file.  If you do not
+specify colors, the default for the background is white and the default
+for all other colors is black.
+
+   On a monochrome (black and white) display, the foreground is black,
+the background is white, and the border is grey.  You can reverse the
+foreground and background colors through the `-r' option or the
+`reverseVideo' resource.
+
+   Here is a list of the options for specifying colors:
+
+`-fg COLOR'
+     Specify the foreground color.
+
+`-bg COLOR'
+     Specify the background color.
+
+`-bd COLOR'
+     Specify the color of the border of the X window.
+
+`-cr COLOR'
+     Specify the color of the Emacs cursor which indicates where point
+     is.
+
+`-ms COLOR'
+     Specify the color for the mouse cursor when the mouse is in the
+     Emacs window.
+
+   For example, to use a coral mouse cursor and a slate blue text
+cursor, enter:
+
+     emacs -ms coral -cr 'slate blue' &
+
+
 File: emacs,  Node: Window Size X,  Next: Borders X,  Prev: Colors X,  Up: Command Arguments
 
 Options for Window Geometry
@@ -24,9 +305,9 @@ The WIDTH and HEIGHT are measured in characters, so a large font
 creates a larger frame than a small font.  The XOFFSET and YOFFSET are
 measured in pixels.
 
-   Since the the mode line and the echo area occupy the last 2 lines of
-the frame, the height of the initial text window is 2 less than the
-height specified in your geometry.
+   Since the mode line and the echo area occupy the last 2 lines of the
+frame, the height of the initial text window is 2 less than the height
+specified in your geometry.
 
    You do not have to specify all of the fields in the geometry
 specification.  The default width for Emacs is 80 characters and the

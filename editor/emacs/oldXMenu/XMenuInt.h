@@ -1,5 +1,5 @@
 
-/* $Header: /a/cvs/386BSD/ports/editor/emacs/oldXMenu/XMenuInt.h,v 1.1 1993/08/26 06:10:17 rgrimes Exp $ */
+/* $Header: /a/cvs/386BSD/ports/editor/emacs/oldXMenu/XMenuInt.h,v 1.2 1993/11/22 16:41:55 rich Exp $ */
 /* Copyright    Massachusetts Institute of Technology    1985	*/
 
 /*

@@ -5,7 +5,7 @@
 ;; Author: Eric S. Raymond <esr@snark.thyrsus.com>
 ;; Maintainer: Eric S. Raymond <esr@snark.thyrsus.com>
 ;; Created: 14 Jul 1992
-;; Version: $Id: lisp-mnt.el,v 1.1 1993/08/26 06:09:19 rgrimes Exp $
+;; Version: $Id: lisp-mnt.el,v 1.2 1993/11/22 16:37:31 rich Exp $
 ;; Keywords: docs
 ;; Bogus-Bureaucratic-Cruft: Gruad will get you if you don't watch out!
 

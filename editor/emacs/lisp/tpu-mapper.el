@@ -69,7 +69,7 @@
 ;;;
 ;;;  Revision Information
 ;;;
-(defconst tpu-mapper-revision "$Revision: 1.1 $"
+(defconst tpu-mapper-revision "$Revision: 1.2 $"
     "Revision number of TPU-edt x-windows emacs key mapper.")
 
 
