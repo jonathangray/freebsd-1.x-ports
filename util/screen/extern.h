@@ -18,7 +18,7 @@
  * Free Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  ****************************************************************
- * $Id: extern.h,v 1.1 1993/08/15 18:32:55 nate Exp $ FAU
+ * $Id: extern.h,v 1.2 1993/08/15 19:22:20 nate Exp $ FAU
  */
 
 
@@ -245,6 +245,13 @@ extern char *SaveStr __P((const char *));
 extern void  centerline __P((char *));
 extern char *Filename __P((char *));
 extern char *stripdev __P((char *));
+/*
+ * configure no longer has MEMFUNCS_DECLARED anywhere, so 
+ * we hard-code it for 386BSD
+ */
+#if __386BSD__
+#define MEMFUNCS_DECLARED
+#endif
 #if !defined(MEMFUNCS_DECLARED) && !defined(bcopy)
 extern void  bcopy __P((char *, char *, int));
 #endif /* !MEMFUNCS_DECLARED && !bcopy */
