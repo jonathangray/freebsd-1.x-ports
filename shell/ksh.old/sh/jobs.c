@@ -595,10 +595,10 @@ j_reapchld()
 		WAIT_T status;
 #ifdef JOBS
 		if (flag[FMONITOR])
-			pid = waitpid(-1, &status, (WNOHANG|WUNTRACED));
+			pid = waitpid(-1, (int *)&status, (WNOHANG|WUNTRACED));
 		else
 #endif
-			pid = wait(&status);
+			pid = wait((int *)&status);
 		if (pid < 0 && errno == ECHILD)
 		{
 		  /* no children - what are we doing here? */
