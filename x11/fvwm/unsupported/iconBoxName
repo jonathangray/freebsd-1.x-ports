@@ -1,0 +1,327 @@
+From soulard@corto.inria.fr Tue Nov 16 08:35:51 1993
+Return-Path: <soulard@corto.inria.fr>
+Received: from eagle.is.lmsc.lockheed.com (eagle.lockheed.com) by rocket (4.1/SMI-4.1)
+	id AA04862; Tue, 16 Nov 93 08:35:43 EST
+Received: by eagle.is.lmsc.lockheed.com (5.57/Ultrix-4.2)
+	id AA26116; Tue, 16 Nov 93 05:37:24 -0800
+Received: from sor.inria.fr (simplet.inria.fr) by concorde.inria.fr; Tue, 16 Nov 1993 14:37:17 +0100
+Received: from localhost.inria.fr by sor.inria.fr (5.65/client.23-dec-86)
+	id AA05771; Tue, 16 Nov 1993 14:37:16 +0100
+Message-Id: <9311161337.AA05771@sor.inria.fr>
+Organization: INRIA, BP 105, F-78153 Rocquencourt Cedex, France
+	telephone +33(1)39-63-55-11, telex 697033 F, fax +33(1)39-63-53-30
+To: nation@rocket.sanders.lockheed.com
+Subject: patch to fvwm 
+Date: Tue, 16 Nov 93 14:37:15 +0100
+From: Herve.Soulard@inria.fr
+X-Mts: smtp
+Status: RO
+
+
+Hellp Rob,
+
+First of all thanks very much for your great WM.
+
+Next, I've written a bad patch to the 1.07 version of fvwm that
+allows to give a name to an IconBox and then use this name in the Icon
+definition such that this icon if placed in the given box :
+
+	IconBox +940 +1 +1180 +130 Box3
+	Icon "XTerm" /usr/local/include/X11/pixmaps/term.xpm Box3
+
+
+Are you interested with it ?
+
+		Herve Soulard.
+
+From soulard@corto.inria.fr Tue Nov 16 09:04:19 1993
+Return-Path: <soulard@corto.inria.fr>
+Received: by rocket (4.1/SMI-4.1)
+	id AA05171; Tue, 16 Nov 93 09:04:18 EST
+Received: from concorde.inria.fr by relay1.UU.NET with SMTP 
+	(5.61/UUNET-internet-primary) id AA16744; Tue, 16 Nov 93 08:57:00 -0500
+Received: from sor.inria.fr (simplet.inria.fr) by concorde.inria.fr; Tue, 16 Nov 1993 14:56:58 +0100
+Received: from localhost.inria.fr by sor.inria.fr (5.65/client.23-dec-86)
+	id AA05790; Tue, 16 Nov 1993 14:56:57 +0100
+Message-Id: <9311161356.AA05790@sor.inria.fr>
+Organization: INRIA, BP 105, F-78153 Rocquencourt Cedex, France
+	telephone +33(1)39-63-55-11, telex 697033 F, fax +33(1)39-63-53-30
+To: nation@rocket.sanders.com (Robert Nation)
+Subject: Re: patch to fvwm  
+In-Reply-To: Your message of "Tue, 16 Nov 93 08:37:30 EST."
+             <9311161337.AA04870@rocket> 
+Date: Tue, 16 Nov 93 14:56:57 +0100
+From: Herve.Soulard@inria.fr
+X-Mts: smtp
+Status: RO
+
+
+> Yes, If you send me a patch, I will put it in the unsupported patches 
+directory.
+
+OK, here it is.
+
+	Herve Soulard.
+
+
+diff -b -c3 fvwm/configure.c fvwm-1.07a/configure.c
+*** fvwm/configure.c	Mon Nov 15 14:48:45 1993
+--- fvwm-1.07a/configure.c	Tue Nov 16 14:03:01 1993
+***************
+*** 429,442 ****
+  void SetBox(char *text, FILE *fd, char **arg,int *junk)
+  {
+    int num;
+  
+    if(Scr.NumBoxes < MAX_BOXES)
+      {
+        /* Standard X11 geometry string */
+!       num = sscanf(text,"%d%d%d%d",&Scr.IconBoxes[Scr.NumBoxes][0],
+  	     &Scr.IconBoxes[Scr.NumBoxes][1],
+  	     &Scr.IconBoxes[Scr.NumBoxes][2],
+! 	     &Scr.IconBoxes[Scr.NumBoxes][3]);
+  
+        /* check for negative locations */
+        if(Scr.IconBoxes[Scr.NumBoxes][0] < 0)
+--- 429,445 ----
+  void SetBox(char *text, FILE *fd, char **arg,int *junk)
+  {
+    int num;
++   char boxname[256];
+  
+    if(Scr.NumBoxes < MAX_BOXES)
+      {
+        /* Standard X11 geometry string */
+!       num = sscanf(text,"%d%d%d%d%s",&Scr.IconBoxes[Scr.NumBoxes][0],
+  	     &Scr.IconBoxes[Scr.NumBoxes][1],
+  	     &Scr.IconBoxes[Scr.NumBoxes][2],
+! 	     &Scr.IconBoxes[Scr.NumBoxes][3],
+!              boxname);
+!       Scr.IconBoxesName[Scr.NumBoxes] = stripcpy(boxname);
+  
+        /* check for negative locations */
+        if(Scr.IconBoxes[Scr.NumBoxes][0] < 0)
+***************
+*** 449,455 ****
+        if(Scr.IconBoxes[Scr.NumBoxes][3] < 0)
+  	Scr.IconBoxes[Scr.NumBoxes][3] += Scr.MyDisplayHeight;
+  
+!       if(num == 4)
+  	Scr.NumBoxes++;
+      }
+  }
+--- 452,458 ----
+        if(Scr.IconBoxes[Scr.NumBoxes][3] < 0)
+  	Scr.IconBoxes[Scr.NumBoxes][3] += Scr.MyDisplayHeight;
+  
+!       if(num == 5)
+  	Scr.NumBoxes++;
+      }
+  }
+***************
+*** 1402,1408 ****
+--- 1405,1443 ----
+    return;
+  }
+  
++ void stripcpy4(char *source, char **s1, char **s2)
++ {
++   char *tmp;
+  
++   while((*source != '"')&&(*source != 0))
++     source++;
++   if(*source != 0)
++     source++;
++   while((*source != '"')&&(*source != 0))
++     source++;
++   if(*source != 0)
++     source++;
++   while(isspace(*source)&&(*source != 0))
++     source++;
++   if(*source != 0)
++     {
++         tmp = *s1 = stripcpy(source);
++         while((*tmp != ' ')&&(*tmp != 0))
++             tmp++;
++         if (*tmp == 0)
++         {
++             *s2 = NULL;
++         }
++         else 
++         {
++             *tmp = 0;
++             tmp++;
++             *s2 = tmp;
++         }
++     }
++ }
++   
++ 
+  /***********************************************************************
+   *
+   *  Procedure:
+***************
+*** 1524,1530 ****
+  	nptr->flags |= new_flags;
+  	if(new_flags & ICON_FLAG)
+  	  {
+! 	    nptr->value = stripcpy3(text,TRUE);
+  	  }
+  	return;
+        }
+--- 1559,1565 ----
+  	nptr->flags |= new_flags;
+  	if(new_flags & ICON_FLAG)
+  	  {
+!             stripcpy4(text, &nptr->value, &nptr->box);
+  	  }
+  	return;
+        }
+***************
+*** 1536,1542 ****
+    nptr->value = (char *)0;
+    if(new_flags & ICON_FLAG)
+      {
+!       nptr->value = stripcpy3(text,True);
+      }
+    Scr.TheList = nptr;
+  }    
+--- 1571,1577 ----
+    nptr->value = (char *)0;
+    if(new_flags & ICON_FLAG)
+      {
+!         stripcpy4(text, &nptr->value, &nptr->box);
+      }
+    Scr.TheList = nptr;
+  }    
+diff -b -c3 fvwm/icons.c fvwm-1.07a/icons.c
+*** fvwm/icons.c	Fri Nov 12 21:40:48 1993
+--- fvwm-1.07a/icons.c	Tue Nov 16 14:16:35 1993
+***************
+*** 392,402 ****
+    /* Search down the right side of the display, avoiding places where 
+     * icons live, or active windows are open, then go accross the bottom
+     * If no home is found, put it at the default location */
+!   int test_x=0, test_y=0,tw,th,tx,ty,i,temp_h,temp_w;
+    int width,height;
+    FvwmWindow *test_window;
+    Bool loc_ok;
+  
+    if(t->flags & ICON_MOVED)
+      {
+        /* just make sure the icon is on this screen */
+--- 392,404 ----
+    /* Search down the right side of the display, avoiding places where 
+     * icons live, or active windows are open, then go accross the bottom
+     * If no home is found, put it at the default location */
+!   int test_x=0, test_y=0,tw,th,tx,ty,i,nbBox,temp_h,temp_w;
+    int width,height;
+    FvwmWindow *test_window;
+    Bool loc_ok;
+  
++   name_list *nptr;
++ 
+    if(t->flags & ICON_MOVED)
+      {
+        /* just make sure the icon is on this screen */
+***************
+*** 417,427 ****
+      {
+        width = t->icon_p_width;
+        height = t->icon_w_height + t->icon_p_height;
+        loc_ok = False;  
+        
+        /* check all boxes in order */
+        i=0;
+!       while((i<Scr.NumBoxes)&&(!loc_ok))
+  	{
+  	  /* In each IconBox, start at the upper left, travel right, then
+  	   * down */
+--- 419,475 ----
+      {
+        width = t->icon_p_width;
+        height = t->icon_w_height + t->icon_p_height;
++       
++       /* check if box given for that icon */
++ 
+        loc_ok = False;  
++       if (t->icon_bitmap_file != NULL) 
++       {
++           for (nptr = Scr.TheList; nptr != NULL; nptr = nptr->next)
++           {
++               if (nptr->flags & ICON_FLAG)
++               {
++                   if (strcasecmp(t->icon_bitmap_file, nptr->value) == 0)
++                   {
++                       if (nptr->box != NULL)
++                       {
++                           i = 0;
++                           while((i<Scr.NumBoxes)&&(!loc_ok))
++                           {
++                               if (strcasecmp(Scr.IconBoxesName[i], nptr->box) 
+== 0)
++                               {
++                                   loc_ok = True;
++                               }
++                               else 
++                               {
++                                   i++;
++                               }
++                           }
++                       }
++                       break;
++                   }
++               }
++           }
++       }
+  
+        /* check all boxes in order */
++       if (loc_ok == False)
++       {
+            i=0;
+!           nbBox = Scr.NumBoxes;
+!       }
+!       else
+!       {
+!           nbBox = i+1;
+! /*
+! 	  fprintf(stderr, "Box = %s %d %d %d %d\n", Scr.IconBoxesName[i], 
+!                   Scr.IconBoxes[i][0], Scr.IconBoxes[i][1], 
+Scr.IconBoxes[i][2],
+!                   Scr.IconBoxes[i][3]);
+! */
+!       }
+!           
+!       loc_ok = False;  
+!       while((i<nbBox)&&(!loc_ok))
+  	{
+  	  /* In each IconBox, start at the upper left, travel right, then
+  	   * down */
+diff -b -c3 fvwm/misc.h fvwm-1.07a/misc.h
+*** fvwm/misc.h	Mon Nov 15 14:36:49 1993
+--- fvwm-1.07a/misc.h	Tue Nov 16 12:06:01 1993
+***************
+*** 40,45 ****
+--- 40,46 ----
+    struct name_list_struct *next;   /* pointer to the next name */
+    char *name;		  	   /* the name of the window */
+    char *value;                     /* icon name */
++   char *box;                       /* box for the icon */
+    unsigned long flags; 
+  } name_list;
+
+diff -b -c3 fvwm/screen.h fvwm-1.07a/screen.h
+*** fvwm/screen.h	Mon Nov  1 15:19:39 1993
+--- fvwm-1.07a/screen.h	Tue Nov 16 11:40:54 1993
+***************
+*** 137,142 ****
+--- 137,143 ----
+  
+    unsigned flags;
+    int IconBoxes[MAX_BOXES][4];
++   char *IconBoxesName[MAX_BOXES];
+    int NumBoxes;
+    int randomx;                  /* values used for randomPlacement */
+    int randomy;
+
+

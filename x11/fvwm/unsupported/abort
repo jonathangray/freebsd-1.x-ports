@@ -1,0 +1,164 @@
+Return-Path: minamino@sramhc.sra.co.jp
+Return-Path: <minamino@sramhc.sra.co.jp>
+Received: from eagle.is.lmsc.lockheed.com (eagle.lockheed.com) by rocket (4.1/SMI-4.1)
+	id AA14826; Mon, 20 Dec 93 08:08:51 EST
+Received: from srawgw.sra.co.jp by eagle.is.lmsc.lockheed.com (5.65/Ultrix4.3-C)
+	id AA24349; Mon, 20 Dec 1993 05:10:19 -0800
+Received: from sranhd.sra.co.jp by srawgw.sra.co.jp (8.6.4@WH-2.2/2.0)
+	id WAA01628; Mon, 20 Dec 1993 22:10:16 +0900
+Received: from sramhc.sra.co.jp (sras48.sra.co.jp) by sranhd.sra.co.jp (5.67gw/6.4J.6-BX)
+	id AA25436; Mon, 20 Dec 93 22:08:27 +0900
+Received: from localhost by sramhc.sra.co.jp (8.6.4/6.4J.6-SJX)
+	id WAA00721; Mon, 20 Dec 1993 22:08:40 +0900
+Message-Id: <199312201308.WAA00721@sramhc.sra.co.jp>
+To: nation@rocket.sanders.lockheed.com
+Subject: fvwm-1.15[bh]
+Date: Mon, 20 Dec 1993 22:08:39 +0900
+From: Hisashi MINAMINO <minamino@sramhc.sra.co.jp>
+
+Sometimes fvwm-1.15[bh] says, and then dies:
+
+|fvwm: can't alloc shadow color 
+|fvwm: can't alloc hilight color 
+|fvwm: can't alloc shadow color 
+|fvwm: can't alloc hilight color 
+|fvwm: can't alloc color #5c54c0
+|fvwm: can't alloc color orchid
+	:
+   (more colorful client was invoked.)
+	:
+|fvwm: lost X connection!
+|fvwm: Notify nation@rocket.sanders.lockheed.com
+
+"display" has 16 colors, but more colors are requested.
+
+
+BTW1, GoodStuff seems ambigous name, I think.  How about
+fvwm.module or, fvwm.stuff?
+
+BTW2, here is improved patch of fvwm/unsupported_patches/abort.
+
+--
+  Hisashi MINAMINO, <minamino@sra.co.jp>
+  System Development Dept, Kansai branch, SRA Inc.
+  -- wing + nut = wingnut
+--
+diff -Nau ./move.c.orig ./move.c
+--- ./move.c.orig	Thu Dec 16 10:41:49 1993
++++ ./move.c	Mon Dec 20 21:10:16 1993
+@@ -22,6 +22,8 @@
+ #include "parse.h"
+ #include "screen.h"
+ 
++int abortOp;
++
+ extern XEvent Event;
+ extern int menuFromFrameOrWindowOrTitlebar;
+ /****************************************************************************
+@@ -51,6 +53,7 @@
+       XFlush(dpy);
+     }
+ 
++ 
+ 
+   DragX = eventp->xbutton.x_root;
+   DragY = eventp->xbutton.y_root;
+@@ -385,9 +388,23 @@
+     case XK_l:
+       x_move = move_size;
+       break;
++    case XK_m:
++      if ((Event->xkey.state & ControlMask) == 0)
++	break;
++      /* FALLTHRU */
+     case XK_Return:
+     case XK_space:
+       /* beat up the event */
++      Event->type = ReturnEvent;
++      break;
++    case XK_bracketleft:
++    case XK_c:
++    case XK_g:
++      if ((Event->xkey.state & ControlMask) == 0)
++	break;
++      /* FALLTHRU */
++    case XK_Escape:
++      abortOp = 1;
+       Event->type = ReturnEvent;
+       break;
+     default:
+diff -Nau ./resize.c.orig ./resize.c
+--- ./resize.c.orig	Fri Dec 17 22:06:48 1993
++++ ./resize.c	Mon Dec 20 21:11:07 1993
+@@ -60,6 +60,8 @@
+ extern int menuFromFrameOrWindowOrTitlebar;
+ extern Window PressedW;
+ 
++extern int abortOp;
++
+ /****************************************************************************
+  *
+  * Starts a window resize operation
+@@ -71,11 +73,14 @@
+   int x,y,delta_x,delta_y;
+   Window ResizeWindow;
+   extern int Stashed_X, Stashed_Y;
++  int startX, startY;
+   Bool flags;
+ #ifndef NO_PAGER
+   extern Bool pagerOn;
+ #endif
+ 
++  abortOp = 0;
++
+   /* can't resize icons */
+   if(tmp_win->flags & ICON)
+     return;
+@@ -113,8 +118,8 @@
+ 
+   dragx += BW;
+   dragy += BW;
+-  origx = dragx;
+-  origy = dragy;
++  startX = origx = dragx;
++  startY = origy = dragy;
+   origWidth = dragWidth;
+   origHeight = dragHeight;
+   ymotion=xmotion=0;
+@@ -230,6 +235,13 @@
+ #endif
+   /* pop down the size window */
+   XUnmapWindow(dpy, Scr.SizeWindow);
++
++  if (abortOp) {
++    dragWidth = origWidth;
++    dragHeight = origHeight;
++    dragx = startX;
++    dragy = startY;
++  }
+ 
+ #ifndef NO_PAGER
+   pagerOn = True;
+--- menus.c.org	Sat Dec 18 03:42:39 1993
++++ menus.c	Mon Dec 20 21:23:19 1993
+@@ -471,6 +471,20 @@
+   MenuItem *mi;
+   KeySym keysym = XLookupKeysym(&ev->xkey,0);
+   
++  /* first, check abort keys */
++  switch (keysym) {
++  case XK_bracketleft:
++  case XK_c:
++  case XK_g:
++    if ((ev->xkey.state & ControlMask) == 0)
++      break;
++    /* FALLTHRU */
++  case XK_Escape:
++    ActiveItem = NULL;			      /* No selection */
++    ev->type = ButtonRelease;		      /* Make the menu exit */
++    return;
++  }
++
+   /* Try to match hot keys */
+   if (((keysym >= XK_a) && (keysym <= XK_z)) ||	/* Only consider alphabetic */
+       ((keysym >= XK_0) && (keysym <= XK_9)))	/* ...or numeric keys	*/

@@ -1,0 +1,214 @@
+Return-Path: jlnance@eos.ncsu.edu
+Return-Path: <jlnance@eos.ncsu.edu>
+Received: from eagle.is.lmsc.lockheed.com (eagle.lockheed.com) by rocket (4.1/SMI-4.1)
+	id AA03690; Wed, 22 Dec 93 16:00:12 EST
+Received: from [152.1.60.40] by eagle.is.lmsc.lockheed.com (5.65/Ultrix4.3-C)
+	id AA00363; Wed, 22 Dec 1993 13:01:34 -0800
+Received: by volt.ece.ncsu.edu (5.65/Eos/C-U-09Sep93)
+	id AA10672; Wed, 22 Dec 1993 16:00:59 -0500
+From: jlnance@eos.ncsu.edu
+Message-Id: <9312222100.AA10672@volt.ece.ncsu.edu>
+Subject: fvwm enhancement
+To: nation@rocket.sanders.lockheed.com
+Date: Wed, 22 Dec 1993 16:00:58 -0500 (EST)
+X-Mailer: ELM [version 2.4 PL3]
+Content-Type: text
+Content-Length: 6211      
+
+Hello Robert,
+	First, I would like to thank you for fvwm.  I love it.  I run it on Linux
+at home, and I run it at school in place of mwm because it is so much faster
+than mwm.
+	I have made a patch which makes it easier to administer the system.fvwmrc
+file on a multiuser system.  This patch allows other files to be included into
+the system.fvwmrc file in a manner similar to the 
+
+#include "file"
+
+statement in C.  This feature is nice, because system.fvwmrc can be written to
+privide basic funtionality, like MWM emulation, and include items like 
+menu binding from other files.  If a user wants to change their menu binding,
+they can simply write a new include file, and keep using the normal
+system.fvwmrc (the search path is set up to allow this to work).  The advantage
+of this is the next time I update the system.fvwmrc file, I can change
+everyones basic setup, and I do not break their customized menus.
+
+In the system.fvwmrc file if a line of the following form is encountered:
+
+include myfile
+
+The file myfile is looked for as ~/myfile and FVWMDIR/myfile and inserted in
+place of this line.   If a line of the form:
+
+include /myfile
+
+The file /myfile is inserted in place of the line.  These substitutions can
+be recursive if desired.  If myfile does not exist, an error messages is 
+printed to stderr, and the include step is skipped.
+
+Anyway, the patch is included below.  It really only changes the file
+configure.c and adds 1 line to the Imakefile.  There is probably a much
+cleaner way to do this, but the pipe/fork method I used allowed me to make
+minimal changes to your code.  This is really only a proof of concept patch.
+If you like it, you can probably think of better ways to implement it, and
+perhaps include more functionality also.  Hope you like the idea, and 
+thanks again.
+
+Jim Nance
+
+diff -rc fvwm.orig//fvwm/Imakefile fvwm/fvwm/Imakefile
+*** fvwm.orig//fvwm/Imakefile	Mon Dec 20 17:26:03 1993
+--- fvwm/fvwm/Imakefile	Wed Dec 22 13:29:36 1993
+***************
+*** 125,136 ****
+  ##-DNEEDS_STRNCASECMP
+  ##-DNEEDS_SIGCHLD
+  ##-DSYSV
+! EXTRAFLAGS = -DMODULES -DXPM -DSHAPE -DHOTKEYS -DNEEDS_SIGCHLD
+  
+  ## if you specify -DXPM, you need to uncomment this line
+! XPMLIB = -lXpm
+  
+! EXTRA_DEFINES = $(EXTRAFLAGS) -DFVWMRC=\"$(FVWMDIR)/system.fvwmrc\"
+  
+  DEPLIBS = $(DEPXLIB) 
+  #ifdef AlphaArchitecture
+--- 125,138 ----
+  ##-DNEEDS_STRNCASECMP
+  ##-DNEEDS_SIGCHLD
+  ##-DSYSV
+! #EXTRAFLAGS = -DMODULES -DXPM -DSHAPE -DHOTKEYS -DNEEDS_SIGCHLD
+! EXTRAFLAGS = -DMODULES -DHOTKEYS -DNEEDS_SIGCHLD
+  
+  ## if you specify -DXPM, you need to uncomment this line
+! #XPMLIB = -lXpm
+  
+! EXTRA_DEFINES = $(EXTRAFLAGS) -DFVWMDIR=\"$(FVWMDIR)\" \
+!                 -DFVWMRC=\"$(FVWMDIR)/system.fvwmrc\"
+  
+  DEPLIBS = $(DEPXLIB) 
+  #ifdef AlphaArchitecture
+Only in fvwm/fvwm: Makefile
+diff -rc fvwm.orig//fvwm/configure.c fvwm/fvwm/configure.c
+*** fvwm.orig//fvwm/configure.c	Fri Dec 17 19:47:58 1993
+--- fvwm/fvwm/configure.c	Wed Dec 22 15:02:42 1993
+***************
+*** 19,24 ****
+--- 19,26 ----
+  #include <ctype.h>
+  #include <stdlib.h>
+  #include <fcntl.h>
++ #include <sys/types.h>
++ #include <sys/stat.h>
+  #include <X11/Xproto.h>
+  #include <X11/Xatom.h>
+  #include "fvwm.h"
+***************
+*** 262,267 ****
+--- 264,307 ----
+  
+  /*****************************************************************************
+   * 
++  * This routine allows include files in the config file
++  *
++  ****************************************************************************/
++ static void filter_file(FILE *outfile, FILE *infile, char *homedir) {
++   char      buffer[1024];
++ 
++   while(fgets(buffer, 1024, infile)) {
++       if(strncmp(buffer, "include", 7)) fputs(buffer, outfile); else {
++          struct stat     buf;
++          FILE            *newin = 0;
++          char            *ptr;
++          char            fname[2][256];
++ 
++          strtok(buffer," \t\n");
++          if(strlen(ptr=strtok(NULL," \t\n"))<1) continue;
++ 
++          strcat(strcat(strcpy(fname[0], homedir),"/"),ptr);
++          strcat(strcat(strcpy(fname[1], FVWMDIR),"/"),ptr);
++ 
++          if(*ptr=='/') {
++             if(!stat(ptr, &buf)) newin=fopen(ptr,"r");
++             }
++          else {
++             if     (!stat(fname[0], &buf)) newin=fopen(fname[0],"r");
++             else if(!stat(fname[1], &buf)) newin=fopen(fname[1],"r");
++             }
++ 
++          if(newin) {
++             filter_file(outfile, newin, homedir);
++             fclose(newin);
++             }
++          else perror(ptr);
++          }
++       }
++    }
++ 
++ /*****************************************************************************
++  * 
+   * This routine is responsible for reading and parsing the config file
+   *
+   ****************************************************************************/
+***************
+*** 272,277 ****
+--- 312,320 ----
+    char line[256],*tline;
+    char *Home;			/* the HOME environment variable */
+    int HomeLen;			/* length of Home */
++   int filter[2];
++   int dummy;
++   pid_t filter_pid;
+  
+    Stdback = white;
+    Stdfore = black;
+***************
+*** 314,319 ****
+--- 357,387 ----
+      }
+    free(home_file);
+  
++ /*
++  * This could be done w/o forking, but this lets me change as little of
++  * the code as possible.
++  *
++  * jln - 12/22/93
++  *
++  */
++ 
++   pipe(filter);
++   if((filter_pid=fork())) { /* Parrent */
++       close(filter[1]);     /* Dont need to write on this end */
++       fclose(config_fd);
++       config_fd=fdopen(filter[0], "r");
++       }
++    else {                   /* Child */
++       FILE *pipefile;
++       close(filter[0]);     /* Dont need to read on this end */
++       pipefile=fdopen(filter[1], "w");
++       filter_file(pipefile, config_fd, Home);
++       fclose(pipefile);
++       exit(0);              /* Done */
++       }
++ 
++ 
++ 
+    tline = fgets(line,(sizeof line)-1,config_fd);
+    orig_tline = tline;
+    while(tline != (char *)0)
+***************
+*** 326,331 ****
+--- 394,406 ----
+      }
+    fclose(config_fd);
+    config_fd = (FILE *)NULL;
++ 
++  /*
++   * Wait for the filter to terminate
++   */
++ 
++   wait(&dummy);
++ 
+    /* If no edge scroll line is provided in the setup file, use
+     * a default */
+    if(Scr.EdgeScrollX == -100000)

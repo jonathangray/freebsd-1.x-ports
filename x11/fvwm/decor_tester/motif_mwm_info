@@ -1,0 +1,190 @@
+Return-Path: mitnits@bgumail.bgu.ac.il
+Return-Path: <mitnits@bgumail.bgu.ac.il>
+Received: from eagle.is.lmsc.lockheed.com by rocket (4.1/SMI-4.1)
+	id AA03916; Thu, 10 Feb 94 13:17:34 EST
+Received: from bgumail.bgu.ac.il by eagle.is.lmsc.lockheed.com (5.65/Ultrix4.3-C)
+	id AA15619; Thu, 10 Feb 1994 10:18:03 -0800
+Received: by bgumail.bgu.ac.il (5.65/DEC-Ultrix/4.3)
+	id AA07622; Thu, 10 Feb 1994 20:17:06 +0200
+Date: Thu, 10 Feb 1994 20:17:06 +0200
+From: mitnits@bgumail.bgu.ac.il (Roman Mitnitski )
+Message-Id: <9402101817.AA07622@bgumail.bgu.ac.il>
+To: nation@rocket.sanders.lockheed.com
+Subject: motif stuff.
+
+
+ Hi, Rob.
+
+I'm happy to announce, that you can use motif public
+headers in any way you can... I just got the letter from
+my friend, it says literally:
+
+>    Hi.
+>
+> Yes, you can use motif public header files, in particular
+> because there is NO limitation on inclusion of this files
+> in your programms....Also, no one can put copyright to the NUMBERS
+> (I mean binary flags for decorations) or DATA STRUCTURES
+> (I mean little structure used by motif to pass description
+> of the decorations to the mwm). Call it another name, if you are
+> THAT MUCH concerned.
+>
+> You can even use the little piece of code I've passed to you - 
+> we are talking about 10M distribution against two pages of code.
+> Don't be silly.
+> 
+> Best wishes. 
+> Eli.
+--------------------------------------------------------------------
+So, here comes the stuff I want to submit to you:
+1) Part of the header where integer values are defined.
+MOTE: I ONLY PLAYED WITH DECORATIONS, NOT WITH THE MENUS
+Sorry, but I just don't want to bother you with digging thru
+dirty code of my widget, so I made this issue.
+If something is missing for you, let me know.
+-----------------------------------------------------------------------
+/* Motif window hints */
+
+#define MWM_HINTS_DECORATIONS         (1L << 1)
+#define MWM_HINTS_DECORATIONS         (1L << 1)
+/* bit definitions for MwmHints.decorations */
+#define MWM_DECOR_ALL                 (1L << 0)
+#define MWM_DECOR_BORDER              (1L << 1)
+#define MWM_DECOR_RESIZEH             (1L << 2)
+#define MWM_DECOR_TITLE               (1L << 3)
+#define MWM_DECOR_MENU                (1L << 4)
+#define MWM_DECOR_MINIMIZE            (1L << 5)
+#define MWM_DECOR_MAXIMIZE            (1L << 6)
+#define PROP_MOTIF_WM_HINTS_ELEMENTS  4
+#define MWM_HINTS_DECORATIONS         (1L << 1)
+#define PROP_MWM_HINTS_ELEMENTS       PROP_MOTIF_WM_HINTS_ELEMENTS
+------------------------------------------------------------------------
+
+Part which declare structure I need to pass decor. description:
+
+/* All X include you may want include here */
+#include <X11/XWDFile.h> /* CARD32 , INT32 etc declared here */
+
+
+static Atom MwmAtom      = None;
+
+/* Motif  window hints */
+
+typedef struct
+{
+    CARD32      flags;
+    CARD32      functions;
+    CARD32      decorations;
+    INT32       inputMode;
+} PropMotifWmHints;
+typedef PropMotifWmHints        PropMwmHints;
+
+PropMwmHints  prop;
+
+/* Here comes the code */
+------------------------------------------------------------------------
+/* 
+ *  Now, if we (hopefully) have MWW - compatible window manager ,
+ *  say, mwm, ncdwm, or else, we will set useful decoration style.
+ *  Never check for MWM_RUNNING property.May be considered bad.
+ */
+
+  if (MwmAtom==None)
+    {
+      MwmAtom=XInternAtom(dpy,"_MOTIF_WM_HINTS",False);
+    }
+  if (MwmAtom!=None)
+    {
+/* sh->mwm.decorations contains OR of the MWM_DECOR_XXXXX */
+      prop.decorations= sh->mwm.decorations;
+
+      prop.flags = MWM_HINTS_DECORATIONS;
+
+/* HOP - LA! */
+      XChangeProperty (dpy,win,
+		       MwmAtom, MwmAtom,
+		       32, PropModeReplace,
+		       (unsigned char *)&prop,
+		       PROP_MWM_HINTS_ELEMENTS);
+  
+---------------------------------------------------------------------------
+Nothing terrible...
+Now, at least, the original code from motif... :
+(There is useful chunk of code controlling menus)
+
+
+/************************************************************************
+ *
+ *  SetMwmHints
+ *
+ ************************************************************************/
+static void 
+#ifdef _NO_PROTO
+SetMwmHints( ve )
+        XmVendorShellExtObject ve ;
+#else
+SetMwmHints(
+        XmVendorShellExtObject ve )
+#endif /* _NO_PROTO */
+{
+    PropMwmHints        prop;
+    Atom                mwm_hints_atom;
+    Widget              shell = ve->ext.logicalParent;
+
+    mwm_hints_atom = XmInternAtom(XtDisplay(shell),
+                                  _XA_MWM_HINTS, 
+                                  FALSE);
+
+#define SET(field) prop.field = ve->vendor.mwm_hints.field
+    SET(flags);
+    SET(functions);
+    SET(decorations);
+    prop.inputMode = ve->vendor.mwm_hints.input_mode;
+#undef SET
+
+    XChangeProperty (XtDisplay(shell), 
+                     XtWindow(shell),
+                     mwm_hints_atom,mwm_hints_atom, 
+                     32, PropModeReplace, 
+                     (unsigned char *) &prop, PROP_MWM_HINTS_ELEMENTS);
+}       
+
+
+
+
+/************************************************************************
+ *
+ *  SetMwmMenu
+ *
+ ************************************************************************/
+static void 
+#ifdef _NO_PROTO
+SetMwmMenu( ve )
+        XmVendorShellExtObject ve ;
+#else
+SetMwmMenu(
+        XmVendorShellExtObject ve )
+#endif /* _NO_PROTO */
+{
+    Widget              shell = ve->ext.logicalParent;
+    Atom                mwm_menu_atom;
+
+
+    mwm_menu_atom = XmInternAtom(XtDisplay(shell),
+                                  _XA_MWM_MENU, 
+                                  FALSE);
+
+    XChangeProperty (XtDisplay(shell), 
+                     XtWindow(shell),
+                     mwm_menu_atom, mwm_menu_atom, 
+                     8, PropModeReplace, 
+                     (unsigned char *) ve->vendor.mwm_menu, 
+                     strlen(ve->vendor.mwm_menu) + 1);
+}
+
+-----------------------------------------------------------------------
+
+ Hope it will hope to kick mwm.
+
+Best wishes.
+ Roman

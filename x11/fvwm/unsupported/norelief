@@ -1,0 +1,100 @@
+Return-Path: rskm@vnet.ibm.com
+Return-Path: <rskm@vnet.ibm.com>
+Received: from eagle.is.lmsc.lockheed.com (eagle.lockheed.com) by rocket (4.1/SMI-4.1)
+	id AA09894; Thu, 11 Nov 93 20:14:18 EST
+Received: by eagle.is.lmsc.lockheed.com (5.57/Ultrix-4.2)
+	id AA19805; Thu, 11 Nov 93 17:15:55 -0800
+Received: from RCHLAND by vnet.IBM.COM (IBM VM SMTP V2R2) with BSMTP id 8390;
+   Thu, 11 Nov 93 20:15:40 EST
+Reply-To: "Robert Kemmetmueller" <rskm@vnet.ibm.com>
+Received: by po1 (AIX 3.2/UCB 5.64/4.7) id <AA21820> for nation@rocket.sanders.lockheed.com; Thu, 11 Nov 1993 18:32:48 -0600
+Received: via switchmail; Thu, 11 Nov 1993 18:32:47 -0600 (CST)
+Received: from coredump.rchland.ibm.com via qmail
+          ID </afs/rchland.ibm.com/service/mailqs/q001/QF.ogshahc91JbQQhZ2wL>;
+          Thu, 11 Nov 1993 18:32:45 -0600 (CST)
+Received: from coredump.rchland.ibm.com via qmail
+          ID </afs/rchland.ibm.com/usr3/rskm/.Outgoing/QF.Egshagg91JbQ1Mg2AG>;
+          Thu, 11 Nov 1993 18:32:44 -0600 (CST)
+Received: from Messages.8.5.N.CUILIB.3.45.SNAP.NOT.LINKED.coredump.rchland.ibm.com.rs.aix32
+          via MS.5.6.coredump.rchland.ibm.com.rs_aix32;
+          Thu, 11 Nov 1993 18:32:44 -0600 (CST)
+Message-Id: <ggshagc91JbQ1Mg25S@rchland.ibm.com>
+Date: Thu, 11 Nov 1993 18:32:44 -0600 (CST)
+From: Robert Kemmetmueller <rskm+@rchland.ibm.com>
+To: nation@rocket.sanders.lockheed.com
+Subject: fvwm suggestions
+
+Well, now that the sluggish move/resize border has been repaired, only
+two things keep fvwm from being the perfect window manager:
+
+  1. Since fvwm is the untimate minimalist (yet usable) window
+    manager, with roots in twm, the fact that the decorative chiseled
+    borders CANNOT be disabled is simply unforgivable (and I want my
+    money back! ;-).
+
+  2. Although this may have been a conscious design choice (to fully
+    support mouseless use?), I dislike the fact that, unlike twm,
+    keystrokes I type while a window is waiting to be placed are
+    DISCARDED.
+
+Here's a patch I wrote that takes a quick&dirty approach (and isn't very
+binary-size efficient) to correcting problem #1.  I'd LIKE to get rid of
+the extra black line around inactive windows, too, but haven't figured
+out how yet.
+
+_______________PATCH DESCRIPTION_______________
+norelief: Allows removal of 3-D chiseled edges via a compile-time
+    option (-DNORELIEF)
+
+_______________PATCH CDIFF_______________
+*** borders.c	Tue Nov  9 22:19:44 1993
+--- borders.c	Thu Nov 11 18:03:54 1993
+***************
+*** 411,416 ****
+--- 411,417 ----
+  		   GC ReliefGC,GC ShadowGC)
+  #endif
+  {
++ #ifndef NORELIEF
+    XSegment seg[4];
+    int i;
+
+***************
+*** 468,475 ****
+--- 469,482 ----
+    seg[i].x2 = x+w-2;    seg[i++].y2 = y+h-2;
+  #endif
+    XDrawSegments(dpy, win, ShadowGC, seg, i);
++ #endif /*NORELIEF*/
+  }
+
++ #ifdef NORELIEF
++ void RelieveParts(FvwmWindow *t,int i,GC hor, GC vert)
++ {
++ }
++ #else /*NORELIEF*/
+  #ifdef MOTIF
+  void RelieveParts(FvwmWindow *t,int i,GC hor, GC vert)
+  {
+***************
+*** 637,642 ****
+--- 644,651 ----
+    XDrawSegments(dpy, t->corners[i], vert, seg, 2);
+  }
+  #endif /* MOTIF */
++ #endif /*NORELIEF*/
++
+
+/****************************************************************************
+   *
+   *  Draws a little pattern within a window
+
+_______________ CLOSING STATEMENT _______________
+Feel free to clean this up, integrate it, throw it into
+unsupported_patches/, or just discard it, at your discretion.  Either
+way, Thank you for an almost-perfect window manager!
+
+                          Robert Kemmetmueller
+                              rskm@rchland
+                                 3-4968
+

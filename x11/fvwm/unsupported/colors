@@ -1,0 +1,620 @@
+Return-Path: toivo@ucs.uwa.edu.au
+Return-Path: <toivo@ucs.uwa.edu.au>
+Received: from eagle.is.lmsc.lockheed.com by rocket (4.1/SMI-4.1)
+	id AA19831; Thu, 10 Feb 94 03:40:44 EST
+Received: from sage.ucs.uwa.edu.au by eagle.is.lmsc.lockheed.com (5.65/Ultrix4.3-C)
+	id AA01268; Thu, 10 Feb 1994 00:41:37 -0800
+Received: from localhost (toivo@localhost) by sage.ucs.uwa.edu.au (8.6.4/8.6.4) id QAA04022 for nation@rocket.sanders.lockheed.com; Thu, 10 Feb 1994 16:43:57 +0800
+Date: Thu, 10 Feb 1994 16:43:57 +0800
+From: Toivo Pedaste <toivo@ucs.uwa.edu.au>
+Message-Id: <199402100843.QAA04022@sage.ucs.uwa.edu.au>
+To: nation@rocket.sanders.lockheed.com
+Subject: fvwm patches
+Content-Type: X-sun-attachment
+
+----------
+X-Sun-Data-Type: text
+X-Sun-Data-Description: text
+X-Sun-Data-Name: text
+X-Sun-Charset: us-ascii
+X-Sun-Content-Lines: 15
+
+You might a well have a version ofthe color window patches that says what
+they do. These are against version 1.20i.
+
+These patches allow the specification of colors for window borders and
+title text based on window name , similar to how you can specify icons.
+
+eg
+WinForeColor    "sage-s" yellow
+WinForeColor    "styx-s" yellow
+WinColor  "xterm-tartarus" Firebrick1
+WinColor  "xterm-lethe" Lightcoral
+WinColor  "xterm-uniwa" Navy
+
+The patches are compiled in if NO_MORE_COLORS is not
+defined.
+----------
+X-Sun-Data-Type: default
+X-Sun-Data-Name: fvwm.diff
+X-Sun-Charset: us-ascii
+X-Sun-Content-Lines: 578
+
+Only in fvwm: Makefile
+Only in fvwm: Makefile.bak
+diff -u ../fvwm.old/fvwm/add_window.c fvwm/add_window.c
+--- ../fvwm.old/fvwm/add_window.c	Tue Feb  8 22:15:44 1994
++++ fvwm/add_window.c	Thu Feb 10 15:16:53 1994
+@@ -78,6 +78,7 @@
+   int DragWidth,DragHeight,xl= -1,yt,a,b;
+   char *value;
+   unsigned long tflag;
++  name_list *nlist;
+ 
+   /* allocate space for the fvwm window */
+   tmp_win = (FvwmWindow *)calloc(1, sizeof(FvwmWindow));
+@@ -159,7 +160,22 @@
+       tmp_win->corner_width = tmp_win->title_height + tmp_win->boundary_width;
+     }
+ 
+-  tflag = LookInList(Scr.TheList,tmp_win->name,&tmp_win->class, &value);
++  tflag = LookInList(Scr.TheList,tmp_win->name,&tmp_win->class, &nlist);
++#ifndef NO_MORE_COLORS
++  tmp_win->wincol = NULL;
++  tmp_win->wincol_for = 0;
++#endif
++  if (nlist) {
++    value = nlist->value;
++#ifndef NO_MORE_COLORS
++    if (nlist->wincol) {
++        tmp_win->wincol = nlist->wincol;
++    }
++    if (nlist->wincol_for) {
++        tmp_win->wincol_for = nlist->wincol_for;
++    }
++#endif
++  }	
+   if ((tflag & NOTITLE_FLAG)||
+       ((!(Scr.flags & DecorateTransients)) && (tmp_win->flags & TRANSIENT)))
+     {
+@@ -371,6 +387,8 @@
+ #ifndef NO_MORE_COLORS
+       if(tmp_win->flags & STICKY)
+ 	attributes.background_pixmap = Scr.sticky_gray_pixmap;
++        if (tmp_win->wincol)
++          attributes.background_pixel = tmp_win->wincol->win_color;
+ #endif
+       valuemask |= CWBackPixmap;
+     }
+@@ -380,6 +398,8 @@
+ #ifndef NO_MORE_COLORS
+       if(tmp_win->flags & STICKY)
+ 	attributes.background_pixel = Scr.StickyColors.back;
++        if (tmp_win->wincol)
++          attributes.background_pixel = tmp_win->wincol->win_color;
+ #endif
+       valuemask |= CWBackPixel;
+     }
+@@ -398,6 +418,8 @@
+ #ifndef NO_MORE_COLORS
+       if(tmp_win->flags & STICKY)
+ 	attributes.border_pixel = Scr.StickyColors.back;
++      if (tmp_win->wincol)
++	attributes.border_pixel = tmp_win->wincol->win_color;
+ #endif
+     }
+ 
+@@ -460,6 +482,10 @@
+        * care of the mess */
+       for(i=0;i<4;i++)
+ 	{
++#ifndef NO_MORE_COLORS
++        if (tmp_win->wincol)
++          attributes.background_pixel = tmp_win->wincol->win_color;
++#endif
+ 	  attributes.cursor = Scr.FvwmCursors[TOP_LEFT+i];	  
+ 	  tmp_win->corners[i] = 
+ 	    XCreateWindow (dpy, tmp_win->frame, 0,0,
+@@ -474,6 +500,10 @@
+       tmp_win->title_x = tmp_win->boundary_width +tmp_win->title_height+1; 
+       tmp_win->title_y = tmp_win->boundary_width;
+       attributes.cursor = Scr.FvwmCursors[TITLE_CURSOR];
++#ifndef NO_MORE_COLORS
++        if (tmp_win->wincol)
++          attributes.background_pixel = tmp_win->wincol->win_color;
++#endif
+       tmp_win->title_w = 
+ 	XCreateWindow (dpy, tmp_win->frame, tmp_win->title_x, tmp_win->title_y,
+ 		       tmp_win->title_width, tmp_win->title_height,0,
+@@ -516,6 +546,10 @@
+       for(i=0;i<4;i++)
+ 	{
+ 	  attributes.cursor = Scr.FvwmCursors[TOP+i];
++#ifndef NO_MORE_COLORS
++        if (tmp_win->wincol)
++          attributes.background_pixel = tmp_win->wincol->win_color;
++#endif
+ 	  tmp_win->sides[i] = 
+ 	    XCreateWindow (dpy, tmp_win->frame, 0, 0, tmp_win->boundary_width,
+ 			   tmp_win->boundary_width, 0, CopyFromParent,
+@@ -813,7 +847,7 @@
+  *
+  ***********************************************************************/
+ unsigned long LookInList(name_list *list, char *name, XClassHint *class, 
+-			 char **value)
++			 name_list **entry)
+ {
+   name_list *nptr;
+ 
+@@ -821,7 +855,8 @@
+   for (nptr = list; nptr != NULL; nptr = nptr->next)
+     if (strcmp(name, nptr->name) == 0)
+       {
+-	*value = nptr->value;
++	if (entry)
++	  *entry = nptr;
+ 	return nptr->flags;
+       }
+   
+@@ -831,7 +866,8 @@
+       for (nptr = list; nptr != NULL; nptr = nptr->next)
+ 	if (strcmp(class->res_name, nptr->name) == 0)
+ 	  {
+-	    *value = nptr->value;
++	    if (entry)
++	      *entry = nptr;
+ 	    return nptr->flags;
+ 	  }
+       
+@@ -839,11 +875,13 @@
+       for (nptr = list; nptr != NULL; nptr = nptr->next)
+ 	if (strcmp(class->res_class, nptr->name) == 0)
+ 	  {
+-	    *value = nptr->value;
++	    if (entry)
++	      *entry = nptr;
+ 	    return nptr->flags;
+ 	  }
+     }
+-  *value = (char *)0;
++  if (entry)
++    *entry = NULL;
+   return 0;
+ }
+ 
+Only in fvwm: add_window.c.orig
+Only in fvwm: add_window.o
+diff -u ../fvwm.old/fvwm/borders.c fvwm/borders.c
+--- ../fvwm.old/fvwm/borders.c	Tue Feb  8 01:01:14 1994
++++ fvwm/borders.c	Thu Feb 10 15:16:53 1994
+@@ -124,6 +124,19 @@
+       ReliefGC = Scr.HiReliefGC;
+       ShadowGC = Scr.HiShadowGC;
+       BorderColor = Scr.HiRelief.back;
++#ifndef NO_MORE_COLORS
++       if (t->wincol)
++        {
++          BackColor = t->wincol->win_color;
++        }
++       if (t->wincol)
++        {
++          BorderColor = t->wincol->win_color;
++          BackColor = t->wincol->win_color;
++          ShadowGC = t->wincol->shadow;
++          ReliefGC = t->wincol->relief;
++        } 
++#endif
+     }
+   else
+     {
+@@ -153,9 +166,19 @@
+ 	  ShadowGC = Scr.StickyShadowGC;
+ 	  BorderColor = Scr.StickyRelief.back;	  
+ 	}
++        if (t->wincol_for)
++        {
++          TextColor = t->wincol_for;
++        }
++        if (t->wincol)
++        {
++          BorderColor = t->wincol->win_color;
++          BackColor = t->wincol->win_color;
++          ShadowGC = t->wincol->shadow;
++          ReliefGC = t->wincol->relief;
++        }
+ #endif
+     }
+-  
+ #ifndef NO_PAGER
+   if((Scr.Pager_w) && !(t->flags & STICKY))
+     {
+@@ -397,8 +420,18 @@
+ 	  ReliefGC=(PressedW==t->title_w?Scr.StickyShadowGC:Scr.StickyReliefGC);
+ 	  ShadowGC=(PressedW==t->title_w?Scr.StickyReliefGC:Scr.StickyShadowGC);
+ 	}
++      if (t->wincol_for)
++	{
++	  Forecolor = t->wincol_for;
++	}
++      if (t->wincol) 
++	{
++	  BackColor = t->wincol->win_color;
++	  ReliefGC=(PressedW==t->title_w?t->wincol->shadow:t->wincol->relief);
++	  ShadowGC=(PressedW==t->title_w?t->wincol->relief:t->wincol->shadow);
++	}	  
+ #endif
+-    }
++   }
+   flush_expose(t->title_w);
+   
+   w=XTextWidth(Scr.WindowFont.font,t->name,strlen(t->name));
+@@ -429,6 +462,11 @@
+     }
+   else
+     { 
++      if (onoroff) 
++        XFillRectangle(dpy,t->title_w,
++		     (PressedW==t->title_w?ShadowGC:ReliefGC),
++		     2, 0, t->title_width -2 ,
++		     t->title_height);
+       XDrawString (dpy, t->title_w,Scr.FontGC,hor_off, Scr.WindowFont.y+1, 
+ 		   t->name, strlen(t->name));
+       RelieveWindow(t->title_w,0,0,t->title_width,t->title_height,
+diff -u ../fvwm.old/fvwm/configure.c fvwm/configure.c
+--- ../fvwm.old/fvwm/configure.c	Tue Feb  8 21:10:15 1994
++++ fvwm/configure.c	Thu Feb 10 15:16:54 1994
+@@ -123,6 +123,8 @@
+ #ifndef NO_MORE_COLORS
+   {"StickyForeColor",   assign_string,  &Stickyfore, (int *)0},
+   {"StickyBackColor",   assign_string,  &Stickyback, (int *)0},
++  {"WinColor",          AddToList,      (char **)&Scr.TheList,(int *)COLOR_FLAG},
++  {"WinForeColor",      AddToList,      (char **)&Scr.TheList,(int *)FCOLOR_FLAG},
+ #endif
+   {"HiForeColor",       assign_string,  &Hifore, (int *)0},
+   {"HiBackColor",       assign_string,  &Hiback, (int *)0},
+@@ -321,7 +323,10 @@
+   Scr.MouseButtonRoot = NULL;
+   Scr.FuncKeyRoot.next = NULL;
+   Scr.TheList = NULL;
+-  
++#ifndef NO_MORE_COLORS
++  Scr.WinCols = NULL;
++#endif
++
+   Scr.DefaultIcon = NULL;
+ 
+   /* find the home directory to look in */
+@@ -1242,7 +1247,6 @@
+ #endif /* HOTKEYS */
+ 
+ 
+-
+ /***********************************************************************
+  *
+  *  Procedure:
+@@ -1582,7 +1586,8 @@
+ {
+   XGCValues gcv;
+   unsigned long gcm;
+-  
++  wincol_list *nptr; 
++
+   /* create GC's */
+   gcm = GCFunction|GCLineWidth|GCForeground|GCSubwindowMode; 
+   gcv.function = GXxor;
+@@ -1630,6 +1635,17 @@
+   gcv.background = Scr.StdRelief.fore;
+   Scr.StdShadowGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);  
+ #ifndef NO_MORE_COLORS
++
++   /* create GC's for the 3d borders in the list of window specific colors */	   for (nptr = Scr.WinCols; nptr != NULL; nptr = nptr->next) {
++    gcv.foreground = GetHilite(nptr->win_color);
++    gcv.background = GetShadow(nptr->win_color);
++    nptr->relief = XCreateGC(dpy, Scr.Root, gcm, &gcv);
++
++    gcv.foreground = GetShadow(nptr->win_color);
++    gcv.background = GetHilite(nptr->win_color);
++    nptr->shadow = XCreateGC(dpy, Scr.Root, gcm, &gcv);
++  }
++
+   gcv.foreground = Scr.StickyRelief.fore;
+   gcv.background = Scr.StickyRelief.back;
+   Scr.StickyReliefGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);  
+@@ -1664,6 +1680,32 @@
+   return ptr;
+ }
+ 
++#ifndef NO_MORE_COLORS
++/***********************************************************************
++ *
++ *  Procedure:
++ *	AddToColList - add a window color structure to the WinCols list
++ *
++ *  Inputs:
++ *	col	- color to add
++ *
++ ***********************************************************************/
++wincol_list *AddToColList(Pixel col)
++{
++  wincol_list *nptr;
++
++  /* If entry already exists, return it */
++  for (nptr = Scr.WinCols; nptr != NULL; nptr = nptr->next)
++    if (nptr->win_color == col) 
++      return nptr;
++
++  /* otherwise add new entry */
++  nptr = (wincol_list *)safemalloc(sizeof(wincol_list));
++  nptr->next = (wincol_list *)Scr.WinCols;
++  nptr->win_color = col;
++  Scr.WinCols = nptr;
++}
++#endif
+ 
+ /***********************************************************************
+  *
+@@ -1677,24 +1719,34 @@
+ void AddToList(char *text, FILE *fd, char **list, int *junk)
+ {
+   name_list *nptr;
+-  char *name;
++  char *name, *val;
+   unsigned long new_flags;
++  Pixel tmp;
+ 
+   new_flags = (unsigned long)junk;
++  tmp = 0;
+ 
+   /* first, see if an entry for this name exists */
+-  if(new_flags == ICON_FLAG)
+-    name = stripcpy2(text,FALSE,TRUE);
+-  else
+-    name = stripcpy(text);
++  if (new_flags == FCOLOR_FLAG  || new_flags == COLOR_FLAG) {
++        name = stripcpy2(text,FALSE,TRUE);
++        val = stripcpy3(text,TRUE);
++	tmp =  GetColor(val);
++	free(val);
++  } else {
++    if(new_flags == ICON_FLAG)
++      name = stripcpy2(text,FALSE,TRUE);
++    else
++      name = stripcpy(text);
+   
+-  /* capture default icons */
+-  if(strlen(name) == 0)
+-    {
+-      if(new_flags & ICON_FLAG)
+-	Scr.DefaultIcon = stripcpy3(text,TRUE);
+-      return;
+-    }
++    /* capture default icons */
++    if(strlen(name) == 0)
++      {
++        if(new_flags & ICON_FLAG)
++	  Scr.DefaultIcon = stripcpy3(text,TRUE);
++        return;
++      }
++  }
++
+   for (nptr = Scr.TheList; nptr != NULL; nptr = nptr->next)
+     if (strcasecmp(name, nptr->name) == 0)
+       {
+@@ -1705,6 +1757,14 @@
+ 	  {
+ 	    nptr->value = stripcpy3(text,TRUE);
+ 	  }
++#ifndef NO_MORE_COLORS
++        if (new_flags & COLOR_FLAG) {
++	    nptr->wincol = AddToColList(tmp);
++	}
++        else if (new_flags & FCOLOR_FLAG) {
++	    nptr->wincol_for = tmp;
++	}
++#endif
+ 	return;
+       }
+   /* otherwise, add the entry to the end of the list */
+@@ -1717,6 +1777,14 @@
+     {
+       nptr->value = stripcpy3(text,True);
+     }
++#ifndef NO_MORE_COLORS
++  if(new_flags == COLOR_FLAG) {
++    nptr->wincol = AddToColList(tmp);
++  }
++  else if (new_flags & FCOLOR_FLAG) {
++    nptr->wincol_for = tmp;
++  }
++#endif
+   Scr.TheList = nptr;
+ }    
+ 
+Only in fvwm: configure.c.orig
+Only in fvwm: configure.o
+Only in fvwm: events.o
+diff -u ../fvwm.old/fvwm/functions.c fvwm/functions.c
+--- ../fvwm.old/fvwm/functions.c	Tue Feb  8 05:38:39 1994
++++ fvwm/functions.c	Thu Feb 10 15:16:55 1994
+@@ -226,7 +226,7 @@
+       
+       RaiseWindow(tmp_win);
+ 
+-      if (LookInList(Scr.TheList,tmp_win->name, &tmp_win->class, &junk)
++      if (LookInList(Scr.TheList,tmp_win->name, &tmp_win->class, NULL)
+ 	  & STAYSONTOP_FLAG)
+ 	tmp_win->flags |= ONTOP;
+       KeepOnTop();
+@@ -448,7 +448,7 @@
+       else
+ 	{
+ 	  RaiseWindow(tmp_win);
+-	  if (LookInList(Scr.TheList,tmp_win->name, &tmp_win->class,&junk)&
++	  if (LookInList(Scr.TheList,tmp_win->name, &tmp_win->class, NULL)&
+ 	      STAYSONTOP_FLAG)
+ 	    tmp_win->flags |= ONTOP;	    
+ 	  KeepOnTop();
+@@ -566,10 +566,10 @@
+       if(t->Desk != Scr.CurrentDesk)
+ 	found = False;
+       
+-      if (LookInList(Scr.TheList,t->name, &t->class,&junk) & 
++      if (LookInList(Scr.TheList,t->name, &t->class, NULL) & 
+ 	  CIRCULATESKIP_FLAG)
+ 	found = FALSE;
+-      if (LookInList(Scr.TheList,t->icon_name, &t->class,&junk)& 
++      if (LookInList(Scr.TheList,t->icon_name, &t->class, NULL)& 
+ 	  CIRCULATESKIP_FLAG)
+ 	found = FALSE;
+       if((t->flags & ICONIFIED)&&(Scr.flags & SuppressIcons))
+Only in fvwm: functions.c.orig
+Only in fvwm: functions.o
+Only in fvwm: fvwm
+diff -u ../fvwm.old/fvwm/fvwm.h fvwm/fvwm.h
+--- ../fvwm.old/fvwm/fvwm.h	Thu Feb  3 22:05:26 1994
++++ fvwm/fvwm.h	Thu Feb 10 15:16:55 1994
+@@ -173,6 +173,10 @@
+     Pixmap iconPixmap;		/* pixmap for the icon */
+     int iconDepth;		/* Drawable depth for the icon */
+     Pixmap icon_maskPixmap;	/* pixmap for the icon mask */
++#ifndef NO_MORE_COLORS
++    struct wincol_list_struct *wincol;        /* window specific color struct */
++    Pixel wincol_for;		/* window specific text color */
++#endif
+     char *name;			/* name of the window */
+     char *icon_name;		/* name of the icon */
+     XWindowAttributes attr;	/* the child window attributes */
+Only in fvwm: fvwm.h.orig
+Only in fvwm: fvwm.o
+diff -u ../fvwm.old/fvwm/icons.c fvwm/icons.c
+--- ../fvwm.old/fvwm/icons.c	Fri Jan 28 02:42:30 1994
++++ fvwm/icons.c	Thu Feb 10 15:16:56 1994
+@@ -221,7 +221,7 @@
+ 				 Scr.StickyColors.back);
+ 	  TextColor = Scr.StickyColors.fore;
+ 	  BackColor = Scr.StickyColors.back;
+-
++#
+ 	}
+       else
+ #endif
+@@ -241,6 +241,19 @@
+ 	  TextColor = Scr.StdColors.fore;
+ 	  BackColor = Scr.StdColors.back;
+ 	}
++#ifndef NO_MORE_COLORS
++      if (Tmp_win->wincol_for)
++	{
++	  TextColor = Tmp_win->wincol_for;
++	}
++      if (Tmp_win->wincol)
++	{
++          BackColor = Tmp_win->wincol->win_color;
++	  Shadow = Tmp_win->wincol->shadow;
++	  Relief = Tmp_win->wincol->relief;
++	  XSetWindowBackground(dpy,Tmp_win->icon_w,BackColor);
++	}
++#endif
+       /* resize the icon name window */
+       Tmp_win->icon_w_width = Tmp_win->icon_p_width;
+       Tmp_win->icon_xl_loc = Tmp_win->icon_x_loc;
+Only in fvwm: icons.c.orig
+Only in fvwm: icons.o
+Only in fvwm: menus.o
+diff -u ../fvwm.old/fvwm/misc.h fvwm/misc.h
+--- ../fvwm.old/fvwm/misc.h	Thu Feb  3 22:08:37 1994
++++ fvwm/misc.h	Thu Feb 10 15:16:57 1994
+@@ -35,11 +35,21 @@
+ #define  inline  /*nothing*/
+ #endif /*__GNUC__*/
+ 
++typedef struct wincol_list_struct
++{
++  struct wincol_list_struct *next;
++  Pixel win_color;		   /* color of window border */
++  GC relief;			   /* GC's for 3d borders */
++  GC shadow;			   /* GC's for 3d borders */
++} wincol_list;
++
+ typedef struct name_list_struct
+ {
+   struct name_list_struct *next;   /* pointer to the next name */
+   char *name;		  	   /* the name of the window */
+   char *value;                     /* icon name */
++  wincol_list *wincol;		   /* window specific color struct */
++  Pixel wincol_for;		   /* window specific text color */
+   unsigned long flags; 
+ } name_list;
+ 
+@@ -64,6 +74,8 @@
+ #define ICON_FLAG          32
+ #define CIRCULATESKIP_FLAG 64
+ #define LISTSKIP_FLAG     128
++#define COLOR_FLAG	  256
++#define FCOLOR_FLAG	  512
+ 
+ /* some fancy font handling stuff */
+ #define NewFontAndColor(newfont,color,backcolor) {\
+@@ -85,7 +97,7 @@
+ extern char NoName[];
+ 
+ extern unsigned long LookInList(name_list *, char *, XClassHint *, 
+-				char **value);
++				name_list **);
+ extern void       MoveOutline(Window, int,int,int,int);
+ extern void       DoResize(int, int, FvwmWindow *);
+ extern void       DisplaySize(FvwmWindow *, int, int, Bool);
+Only in fvwm: misc.h.orig
+Only in fvwm: module.o
+Only in fvwm: move.o
+diff -u ../fvwm.old/fvwm/pager.c fvwm/pager.c
+--- ../fvwm.old/fvwm/pager.c	Sat Feb  5 06:18:47 1994
++++ fvwm/pager.c	Thu Feb 10 15:16:57 1994
+@@ -85,6 +85,17 @@
+ 	
+       for (t = Scr.FvwmRoot.next; t != NULL; t = t->next)
+ 	{
++#ifndef NO_MORE_COLORS
++      if (t->wincol_for)
++	{
++	  TextColor = t->wincol_for;
++	}
++      if (t->wincol) 
++	{
++	  BackColor = t->wincol->win_color;
++	}
++#endif
++      NewFontAndColor(Scr.PagerFont.font->fid,TextColor,BackColor);
+ 	  if(t != Scr.Hilite)
+ 	    {
+ 	      if(!(t->flags & STICKY)&&
+Only in fvwm: pager.c.orig
+Only in fvwm: pager.o
+Only in fvwm: placement.o
+Only in fvwm: resize.o
+diff -u ../fvwm.old/fvwm/screen.h fvwm/screen.h
+--- ../fvwm.old/fvwm/screen.h	Thu Feb  3 22:03:40 1994
++++ fvwm/screen.h	Thu Feb 10 15:16:57 1994
+@@ -129,6 +129,7 @@
+ 
+   ColorPair StdColors; 	/* standard fore/back colors */
+ #ifndef NO_MORE_COLORS
++  wincol_list *WinCols;		/* list of different window specific colors */
+   ColorPair StickyColors; 	/* sticky fore/back colors */
+   ColorPair StickyRelief; 	/* sticky hilight colors */
+ #endif
+Only in fvwm: screen.h.orig
+diff -u ../fvwm.old/fvwm/windows.c fvwm/windows.c
+--- ../fvwm.old/fvwm/windows.c	Fri Jan 28 04:58:36 1994
++++ fvwm/windows.c	Thu Feb 10 15:16:58 1994
+@@ -89,7 +89,7 @@
+       for (t = Scr.FvwmRoot.next; t != NULL; t = t->next)
+ 	{
+ 	  if((t->Desk == next_desk)&&
+-	    (!(LookInList(Scr.TheList,t->name,&t->class,&junk)&LISTSKIP_FLAG)))
++	    (!(LookInList(Scr.TheList,t->name,&t->class,NULL)&LISTSKIP_FLAG)))
+ 	    {
+ #ifdef HOTKEYS
+ 	      if (++scut == ('9' + 1)) scut = 'A';	/* Next shortcut key */
+Only in fvwm: windows.c.orig
+Only in fvwm: windows.o

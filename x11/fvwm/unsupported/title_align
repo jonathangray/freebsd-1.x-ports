@@ -1,0 +1,130 @@
+Return-Path: splite@bambi.sdd.trw.com
+Return-Path: <splite@bambi.sdd.trw.com>
+Received: from eagle.is.lmsc.lockheed.com (eagle.lockheed.com) by rocket (4.1/SMI-4.1)
+	id AA01276; Wed, 8 Dec 93 18:01:56 EST
+Received: by eagle.is.lmsc.lockheed.com (5.57/Ultrix-4.2)
+	id AA05742; Wed, 8 Dec 93 15:03:55 -0800
+Received: by bambi.sdd.trw.com (5.0/SMI-SVR4)
+	id AA09452; Wed, 8 Dec 93 15:02:05 PST
+Date: Wed, 8 Dec 93 15:02:05 PST
+From: splite@bambi.sdd.trw.com (Steven Plite)
+Message-Id: <9312082302.AA09452@bambi.sdd.trw.com>
+To: nation@rocket.sanders.lockheed.com
+Subject: patch to fvwm-1.11 to control title placement
+Content-Length: 5062
+
+Here's a small patch to fvwm-1.11 to allow for control of title placement
+inside the title-bar.  (For those of us who don't like our titles centered. :)
+Also, I moved the position of the definition of ClickTime in configure.c,
+since I couldn't see what it had to do with virtual desktops.  Feel free to
+correct me on this one.  I'll also add my kudos for a nifty WM.  Thanks.
+_______________________________________________________________________________
+Steven Plite  [splite@bambi.sdd.trw.com]                Unix administrator with
+System Manager, Information Technology Center, TRW      a crunchy candy coating
+    "This is the roller coaster of endless and violent vomit."  -- Jason Fox
+
+---8<-- snip snip --8<---
+*** fvwm-1.11/borders.c	Thu Dec  2 06:13:14 1993
+--- fvwm-1.11-new/borders.c	Wed Dec  8 14:35:17 1993
+***************
+*** 399,405 ****
+    flush_expose(t->title_w);
+    
+    w=XTextWidth(Scr.WindowFont.font,t->name,strlen(t->name));
+!   hor_off = (t->title_width - w)/2;
+    
+    NewFontAndColor(Scr.WindowFont.font->fid,Forecolor, BackColor);
+    
+--- 399,410 ----
+    flush_expose(t->title_w);
+    
+    w=XTextWidth(Scr.WindowFont.font,t->name,strlen(t->name));
+!   if (Scr.TitleOffset < 0)
+!       hor_off = (t->title_width - w)+Scr.TitleOffset;
+!   else if (Scr.TitleOffset > 0)
+!       hor_off = Scr.TitleOffset;
+!   else
+!       hor_off = (t->title_width - w)/2;
+    
+    NewFontAndColor(Scr.WindowFont.font->fid,Forecolor, BackColor);
+    
+diff -cr fvwm-1.11/configure.c fvwm-1.11-new/configure.c
+*** fvwm-1.11/configure.c	Wed Dec  1 11:54:31 1993
+--- fvwm-1.11-new/configure.c	Wed Dec  8 14:26:33 1993
+***************
+*** 153,161 ****
+  #ifndef NON_VIRTUAL
+    {"DeskTopScale",      SetInts,        (char **)&Scr.VScale, &dummy},
+    {"OpaqueMove",        SetInts,        (char **)&Scr.OpaqueSize, &dummy},
+-   {"ClickTime",         SetInts,        (char **)&Scr.ClickTime, &dummy},
+    {"DeskTopSize",       SetInts,        (char **)&Scr.VxMax, &Scr.VyMax},
+  #endif
+    {"BoundaryWidth",     SetInts,        (char **)&Scr.BoundaryWidth,&dummy},
+    {"NoBoundaryWidth",   SetInts,        (char **)&Scr.NoBoundaryWidth,&dummy},
+    {"Mouse",             ParseMouseEntry,(char **)1, (int *)0},
+--- 153,161 ----
+  #ifndef NON_VIRTUAL
+    {"DeskTopScale",      SetInts,        (char **)&Scr.VScale, &dummy},
+    {"OpaqueMove",        SetInts,        (char **)&Scr.OpaqueSize, &dummy},
+    {"DeskTopSize",       SetInts,        (char **)&Scr.VxMax, &Scr.VyMax},
+  #endif
++   {"ClickTime",         SetInts,        (char **)&Scr.ClickTime, &dummy},
+    {"BoundaryWidth",     SetInts,        (char **)&Scr.BoundaryWidth,&dummy},
+    {"NoBoundaryWidth",   SetInts,        (char **)&Scr.NoBoundaryWidth,&dummy},
+    {"Mouse",             ParseMouseEntry,(char **)1, (int *)0},
+***************
+*** 166,171 ****
+--- 166,172 ----
+    {"Cursor",            SetCursor,      (char **)0, (int *)0},
+    {"EdgeResistance",    SetInts,        (char **)&Scr.ScrollResistance,
+                                                   &Scr.MoveResistance},
++   {"TitleOffset",	SetInts,	(char **)&Scr.TitleOffset, &dummy},
+    {"",                  0,              (char **)0, (int *)0}
+  };
+  
+diff -cr fvwm-1.11/fvwm.1 fvwm-1.11-new/fvwm.1
+*** fvwm-1.11/fvwm.1	Wed Dec  1 13:43:33 1993
+--- fvwm-1.11-new/fvwm.1	Wed Dec  8 14:42:20 1993
+***************
+*** 232,237 ****
+--- 232,245 ----
+  handy for clocks and similar gadgets that you don't want to take up too
+  much space. \fIwindowname\fP can be a window's name or its class.
+  
++ .IP "TitleOffset \fIoffset\fP"
++ Controls the placement of the title inside the title-bar.  A positive
++ \fIoffset\fP will left-justify the title \fIoffset\fP pixels from the
++ rightmost of the left-side title buttons.  A negative \fIoffset\fP
++ will right-justify the title \fIoffset\fP pixels from the leftmost of the
++ right-side title buttons.  An \fIoffset\fP of 0 (the default) will center
++ the title.
++ 
+  .IP "NoBorder \fIwindowname\fP"
+  Keeps \fIfvwm\fP from putting decorative borders on windows 
+  named \fIwindowname\fP. This command has no effect on the title-bar.
+diff -cr fvwm-1.11/fvwm.c fvwm-1.11-new/fvwm.c
+*** fvwm-1.11/fvwm.c	Thu Dec  2 06:15:29 1993
+--- fvwm-1.11-new/fvwm.c	Wed Dec  8 14:27:39 1993
+***************
+*** 529,534 ****
+--- 529,535 ----
+    Scr.OpaqueSize = 5;
+    Scr.ClickTime = 150;
+    Scr.AutoRaiseDelay = -750;
++   Scr.TitleOffset = 0;
+  
+    /* set major operating modes */
+    Scr.flags = 0;
+diff -cr fvwm-1.11/screen.h fvwm-1.11-new/screen.h
+*** fvwm-1.11/screen.h	Wed Dec  1 06:56:20 1993
+--- fvwm-1.11-new/screen.h	Wed Dec  8 14:27:31 1993
+***************
+*** 168,173 ****
+--- 168,174 ----
+    int nr_right_buttons;        /* number of right-side title-bar buttons */
+    int left_button_styles[2][5];
+    int right_button_styles[2][5];
++   int TitleOffset;	       /* Offset of title from nearest title button */
+  
+    int ClickTime;               /*Max button-click delay for Function built-in*/
+    int AutoRaiseDelay;          /* Delay between setting focus and raising win*/

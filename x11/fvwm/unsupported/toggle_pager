@@ -1,0 +1,101 @@
+Return-Path: espel@clipper.ens.fr
+Return-Path: <espel@clipper.ens.fr>
+Received: from eagle.is.lmsc.lockheed.com (eagle.lockheed.com) by rocket (4.1/SMI-4.1)
+	id AA06748; Sun, 23 Jan 94 00:43:33 EST
+Received: from nef.ens.fr by eagle.is.lmsc.lockheed.com (5.65/Ultrix4.3-C)
+	id AA29538; Sat, 22 Jan 1994 21:45:21 -0800
+Received: from clipper.ens.fr (clipper-gw.ens.fr) by nef.ens.fr (5.65c8/ULM-1.0)
+	Id AA21883 ; Sun, 23 Jan 1994 06:44:40 +0100
+Received: from trimaran.ens.fr by clipper.ens.fr (4.1/version 1.10 of 88/05/05)
+ 	id AA26897; Sun, 23 Jan 94 06:44:39 +0100
+From: espel@clipper.ens.fr (Roger Espel Llima)
+Message-Id: <9401230544.AA26897@clipper.ens.fr>
+Subject: fvwm patch
+To: nation@rocket.sanders.lockheed.com
+Date: Sun, 23 Jan 94 6:44:35 MET
+X-Mailer: ELM [version 2.3 PL11]
+
+Hello,
+
+  Here is a small patch to your great fvwm, that allows you to toggle
+whether the pager is displayed or not, like tvtwm's f.panner function.
+
+  I've found it useful to bind the new TogglePager function to a key,
+so I can remove the pager when I really want to have a window there.
+
+  I've tested it only with fvwm version 1.10, though.
+
+	bye,
+
+		-- Roger (espel@clipper.ens.fr)
+
+
+Here are the diffs:
+
+---------------------------- CUT HERE -------------------------------
+*** parse.h Tue Nov 30 01:04:56 1993
+--- parse.h Sun Jan 23 04:40:07 1994
+***************
+*** 56,61 ****
+--- 56,62 ----
+  #define F_STICK                 14
+  #define F_CIRCULATE_UP          15
+  #define F_CIRCULATE_DOWN        16
++ #define F_TOGGLE_PAGER          18
+  #define F_GOTO_PAGE             19
+  #define F_RAISELOWER            20
+  #define F_MAXIMIZE              21
+*** configure.c Sun Jan 23 06:24:47 1994
+--- configure.c Wed Dec  1 20:54:31 1993
+***************
+*** 191,199 ****
+    {"Stick",        set_func,(char **)F_STICK},
+    {"CirculateUp",  set_func,(char **)F_CIRCULATE_UP},
+    {"CirculateDown",set_func,(char **)F_CIRCULATE_DOWN},
+- #ifndef NO_PAGER
+-   {"TogglePager",  set_func,(char **)F_TOGGLE_PAGER},
+- #endif
+    {"Warp",         set_func,(char **)F_WARP},
+  #ifndef NON_VIRTUAL
+    {"Scroll",       set_func,(char **)F_SCROLL},
+--- 191,196 ----
+*** functions.c Wed Dec  1 16:09:24 1993
+--- functions.c Sun Jan 23 05:50:49 1994
+***************
+*** 369,375 ****
+        break;
+  #endif
+  
+!     case F_CIRCULATE_UP:
+        t=Circulate(tmp_win,action,UP);
+        FocusOn(t);
+        break;
+--- 369,395 ----
+        break;
+  #endif
+  
+! #ifndef NO_PAGER      
+!     case F_TOGGLE_PAGER:
+!       if (Scr.Pager_w)
+!       {
+!         tmp_win = Scr.FvwmPager;
+!         if (tmp_win->flags & MAPPED)
+!         {
+!             tmp_win->flags &= ~MAPPED;
+!             XUnmapWindow(dpy,tmp_win->frame);
+!         }
+!         else
+!         {
+!             tmp_win->flags |= MAPPED;
+!             XMapRaised(dpy,tmp_win->frame);
+!             XMapRaised(dpy,tmp_win->w);
+!         }
+!       }
+!       break;
+! #endif
+! 
+!       case F_CIRCULATE_UP:
+        t=Circulate(tmp_win,action,UP);
+        FocusOn(t);
+        break;
+

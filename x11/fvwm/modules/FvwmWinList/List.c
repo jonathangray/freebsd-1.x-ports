@@ -1,0 +1,279 @@
+/* FvwmWinList Module for Fvwm. 
+ *
+ *  Copyright 1994,  Mike Finger (mfinger@mermaid.micro.umn.edu or
+ *                               Mike_Finger@atk.com)
+ *
+ * The functions in this source file are the original work of Mike Finger.
+ * 
+ * No guarantees or warantees or anything are provided or implied in any way
+ * whatsoever. Use this program at your own risk. Permission to use this
+ * program for any purpose is given, as long as the copyright is kept intact.
+ *
+ *  Things to do:  Convert to C++  (In Progress)
+ */
+
+#include "configure.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include "List.h"
+#include "Mallocs.h"
+#include "module.h"
+
+
+#ifdef BROKEN_SUN_HEADERS
+#include "sun_headers.h"
+#endif
+
+#ifdef NEEDS_ALPHA_HEADER
+#include "alpha_header.h"
+#endif /* NEEDS_ALPHA_HEADER */
+
+
+/******************************************************************************
+  InitList - Initialize the list
+******************************************************************************/
+void InitList(List *list)
+{
+  list->head=list->tail=NULL;
+  list->count=0;
+}
+
+/******************************************************************************
+  AddItem - Allocates spaces for and appends an item to the list
+******************************************************************************/
+void AddItem(List *list, long id,long flags)
+{
+Item *new;
+  new=(Item *)safemalloc(sizeof(Item));
+  new->id=id;
+  new->name=NULL;
+  new->iname=NULL;
+  new->rname=NULL;
+  new->rclass=NULL;
+  new->flags=flags;
+  new->next=NULL;
+
+  if (list->tail==NULL) list->head=list->tail=new;
+  else {
+   list->tail->next=new;
+   list->tail=new;
+  }
+  list->count++;
+}
+
+/******************************************************************************
+  FindItem - Find the item in the list matching the id
+******************************************************************************/
+int FindItem(List *list, long id)
+{
+Item *temp;
+int i;
+  for(i=0,temp=list->head;temp!=NULL && temp->id!=id;i++,temp=temp->next);
+  if (temp==NULL) return -1;
+  return i;
+}
+
+/******************************************************************************
+  UpdateItem - Update the item in the list, setting name & flags as necessary.
+******************************************************************************/
+int UpdateItemName(List *list, long id, char *string, long type)
+{
+Item *temp;
+int i;
+  for(i=0,temp=list->head;temp!=NULL && id!=temp->id;i++,temp=temp->next);
+  if (temp==NULL) return -1;
+  switch(type) {
+    case M_WINDOW_NAME:
+      UpdateString(&temp->name,string);
+      break;
+    case M_ICON_NAME:
+      UpdateString(&temp->iname,string);
+      break;
+    case M_RES_NAME:
+      UpdateString(&temp->rname,string);
+      break;
+    case M_RES_CLASS:
+      UpdateString(&temp->rclass,string);
+      break;
+  }
+  return i;
+}
+
+int UpdateItemFlags(List *list, long id, long flags)
+{
+Item *temp;
+int i;
+  for(i=0,temp=list->head;temp!=NULL && id!=temp->id;i++,temp=temp->next);
+  if (temp==NULL) return -1;
+  if (flags!=-1) temp->flags=flags;
+  return i;
+}
+  
+/******************************************************************************
+  FreeItem - Frees allocated space for an Item
+******************************************************************************/
+void FreeItem(Item *ptr)
+{
+  if (ptr != NULL) {
+    if (ptr->name!=NULL) free(ptr->name);
+    if (ptr->iname!=NULL) free(ptr->iname);
+    if (ptr->rname!=NULL) free(ptr->rname);
+    if (ptr->rclass!=NULL) free(ptr->rclass);
+    free(ptr);
+  }
+}
+
+/******************************************************************************
+  DeleteItem - Deletes an item from the list
+******************************************************************************/
+int DeleteItem(List *list,long id)
+{
+Item *temp,*temp2;
+int i;
+  if (list->head==NULL) return -1;
+  if (list->head->id==id) {
+    temp2=list->head;
+    temp=list->head=list->head->next;
+    i=-1;
+  } else {
+    for(i=0,temp=list->head;temp->next!=NULL && temp->next->id!=id;
+      i++,temp=temp->next);
+    if (temp->next==NULL) return -1;
+    temp2=temp->next;
+    temp->next=temp2->next;
+  }
+
+  if (temp2==list->tail) list->tail=temp;
+
+  FreeItem(temp2);
+  list->count--;
+  return i+1;
+}
+
+/******************************************************************************
+  FreeList - Free the entire list of Items
+******************************************************************************/
+void FreeList(List *list)
+{
+Item *temp,*temp2;
+  for(temp=list->head;temp!=NULL;) {
+    temp2=temp;
+    temp=temp->next;
+    FreeItem(temp2);
+  }
+  list->count=0;
+}
+
+/******************************************************************************
+  PrintList - Print the list of item on the console. (Debugging)
+******************************************************************************/
+void PrintList(List *list)
+{
+Item *temp;
+  ConsoleMessage("List of Items:\n");
+  ConsoleMessage("   %10s %-15s %-15s %-15s %-15s Flgs\n","ID","Name","I-Name",
+    "R-Name","R-Class");
+  ConsoleMessage("   ---------- --------------- --------------- --------------- --------------- ----\n");
+  for(temp=list->head;temp!=NULL;temp=temp->next) {
+    ConsoleMessage("   %10ld %-15.15s %-15.15s %-15.15s %-15.15s %4d\n",temp->id,
+      (temp->name==NULL) ? "<null>" : temp->name,
+      (temp->iname==NULL) ? "<null>" : temp->iname,
+      (temp->rname==NULL) ? "<null>" : temp->rname,
+      (temp->rclass==NULL) ? "<null>" : temp->rclass,
+       temp->flags);
+  }
+}
+
+/******************************************************************************
+  ItemName - Return the name of an Item
+******************************************************************************/
+char *ItemName(List *list, int n, long type)
+{
+Item *temp;
+int i;
+  for(i=0,temp=list->head;temp!=NULL && i<n;i++,temp=temp->next);
+  if (temp==NULL) return NULL;
+  switch(type) {
+    case M_WINDOW_NAME:
+      return temp->name;
+    case M_ICON_NAME:
+      return temp->iname;
+    case M_RES_NAME:
+      return temp->rname;
+    case M_RES_CLASS:
+      return temp->rclass;
+  }
+}
+
+/******************************************************************************
+  ItemFlags - Return the flags for an item
+******************************************************************************/
+long ItemFlags(List *list, long id)
+{
+Item *temp;
+  for(temp=list->head;temp!=NULL && id!=temp->id;temp=temp->next);
+  if (temp==NULL) return -1;
+  else return temp->flags;
+}
+
+/******************************************************************************
+  XorFlags - Exclusive of the flags with the specified value.
+******************************************************************************/
+long XorFlags(List *list, int n, long value)
+{
+Item *temp;
+int i;
+long ret;
+  for(i=0,temp=list->head;temp!=NULL && i<n;i++,temp=temp->next)
+  if (temp==NULL) return -1;
+  ret=temp->flags;
+  temp->flags^=value;
+  return ret;
+}
+
+/******************************************************************************
+  ItemCount - Return the number of items inthe list
+******************************************************************************/
+int ItemCount(List *list)
+{
+  return list->count;
+}
+
+/******************************************************************************
+  ItemID - Return the ID of the item in the list.
+******************************************************************************/
+long ItemID(List *list, int n)
+{
+Item *temp;
+int i;
+  for(i=0,temp=list->head;temp!=NULL && i<n;i++,temp=temp->next);
+  if (temp==NULL) return -1;
+  return temp->id;
+}
+
+/******************************************************************************
+  CopyItem - Copy an item from one list to another
+******************************************************************************/
+void CopyItem(List *dest, List *source, int n)
+{
+Item *temp;
+int i;
+  for(i=0,temp=source->head;temp!=NULL && i<n;i++,temp=temp->next);
+  if (temp==NULL) return;
+  AddItem(dest,temp->id,temp->flags);
+  UpdateItemName(dest,temp->id,temp->name,M_WINDOW_NAME);
+  UpdateItemName(dest,temp->id,temp->iname,M_ICON_NAME);
+  UpdateItemName(dest,temp->id,temp->rname,M_RES_NAME);
+  UpdateItemName(dest,temp->id,temp->rclass,M_RES_CLASS);
+  DeleteItem(source,temp->id);
+}
+
+int CompleteItem(List *list, int n)
+{
+Item *temp;
+int i;
+  for(i=0,temp=list->head;temp!=NULL && i<n;i++,temp=temp->next);
+  if (temp==NULL) return -1;
+  return(temp->name!=NULL && temp->iname!=NULL &&
+    temp->rname!=NULL && temp->rclass!=NULL);
+}

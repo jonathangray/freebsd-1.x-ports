@@ -1,0 +1,609 @@
+Return-Path: jamin@catarina.usc.edu
+Return-Path: <jamin@catarina.usc.edu>
+Received: from eagle.is.lmsc.lockheed.com by rocket (SPCOT.6)
+	id AA25282; Fri, 25 Mar 94 20:27:26 EST
+Received: from usc.edu by eagle.is.lmsc.lockheed.com (5.65/Ultrix4.3-C)
+	id AA18501; Fri, 25 Mar 1994 17:25:10 -0800
+Received: from catarina.usc.edu by usc.edu (4.1/SMI-3.0DEV3-USC+3.1)
+	id AA06245; Fri, 25 Mar 94 17:27:16 PST
+Received: from ensenada.usc.edu.infralab by catarina.usc.edu (4.1/SMI-4.1+ucs-3.6)
+	id AA24868; Fri, 25 Mar 94 17:30:08 PST
+Message-Id: <9403260130.AA24868@catarina.usc.edu>
+From: jamin@usc.edu
+Date: Fri, 25 Mar 1994 17:30:47 -0800
+Sender: jamin@usc.edu
+Reply-To: jamin@usc.edu
+Phone: +1 818 457 6324
+X-Mailer: Mail User's Shell (7.2.5 10/14/92)
+To: nation@sanders.com
+Subject: NoIconTitle
+Cc: mitzel@catarina.usc.edu
+
+Rob,
+
+I've upgraded the NoIconTitle patch from
+Henrique Martins <martins@hplhasm.hpl.hp.com> to fvwm-1.21r.
+Here's the patch:
+===========================================================================
+*** add_window.c.orig	Fri Mar 25 17:22:04 1994
+--- add_window.c	Fri Mar 25 17:23:04 1994
+***************
+*** 175,180 ****
+--- 175,183 ----
+        tmp_win->icon_bitmap_file = Scr.DefaultIcon;
+      }
+  
++   if(tflag & NOICON_TITLE_FLAG)
++     tmp_win->flags |= NOICON_TITLE;
++ 
+    if (tflag & STAYSONTOP_FLAG)
+      tmp_win->flags |= ONTOP;
+    
+***************
+*** 436,442 ****
+    /* wait until the window is iconified and the icon window is mapped
+     * before creating the icon window 
+     */
+!   tmp_win->icon_w = (int)NULL;
+    GrabButtons(tmp_win);
+    GrabKeys(tmp_win);
+  
+--- 439,445 ----
+    /* wait until the window is iconified and the icon window is mapped
+     * before creating the icon window 
+     */
+!   tmp_win->icon_w = None;
+    GrabButtons(tmp_win);
+    GrabKeys(tmp_win);
+  
+*** configure.c.orig	Fri Mar 25 17:22:11 1994
+--- configure.c	Fri Mar 25 17:23:13 1994
+***************
+*** 119,124 ****
+--- 119,126 ----
+    {"StickyIcons",       SetFlag,        (char **)StickyIcons, (int *)0},
+    {"IconFont",          assign_string,  &Scr.IconFont.name, (int *)0},
+    {"Icon",              AddToList,      (char **)&Scr.TheList,(int *)ICON_FLAG},
++   {"NoIconTitle",       AddToList,      (char **)&Scr.TheList,
++                                         (int *)NOICON_TITLE_FLAG},
+  #endif
+    {"MWMBorders",        SetFlag,        (char **)MWMBorders, (int *)0},
+    {"MWMMenus",          SetFlag,        (char **)MWMMenus, (int *)0},
+*** events.c.orig	Fri Mar 25 17:22:20 1994
+--- events.c	Fri Mar 25 17:23:20 1994
+***************
+*** 429,440 ****
+          if(Tmp_win->icon_bitmap_file == Scr.DefaultIcon)
+            Tmp_win->icon_bitmap_file = (char *)0;
+        
+!       if((Tmp_win->icon_w)&&((Tmp_win->wmhints->flags & IconPixmapHint)||
+!                              (Tmp_win->wmhints->flags & IconWindowHint)))
+          {
+            if (!(Scr.flags & SuppressIcons))
+              {
+!               XDestroyWindow(dpy,Tmp_win->icon_w);
+                XDeleteContext(dpy, Tmp_win->icon_w, FvwmContext);
+                if(Tmp_win->flags & ICON_OURS)
+                  {
+--- 429,441 ----
+          if(Tmp_win->icon_bitmap_file == Scr.DefaultIcon)
+            Tmp_win->icon_bitmap_file = (char *)0;
+        
+!       if((Tmp_win->wmhints->flags & IconPixmapHint)||
+!          (Tmp_win->wmhints->flags & IconWindowHint))
+          {
+            if (!(Scr.flags & SuppressIcons))
+              {
+!               if (Tmp_win->icon_w)
+!                 XDestroyWindow(dpy,Tmp_win->icon_w);
+                XDeleteContext(dpy, Tmp_win->icon_w, FvwmContext);
+                if(Tmp_win->flags & ICON_OURS)
+                  {
+***************
+*** 447,454 ****
+                else 
+                  XUnmapWindow(dpy,Tmp_win->icon_pixmap_w);
+              }
+!           Tmp_win->icon_w = (Window)NULL;
+!           Tmp_win->icon_pixmap_w = (Window)NULL;
+            Tmp_win->iconPixmap = (Window)NULL;
+            if(Tmp_win->flags & ICONIFIED)
+              {
+--- 448,455 ----
+                else 
+                  XUnmapWindow(dpy,Tmp_win->icon_pixmap_w);
+              }
+!           Tmp_win->icon_w = None;
+!           Tmp_win->icon_pixmap_w = None;
+            Tmp_win->iconPixmap = (Window)NULL;
+            if(Tmp_win->flags & ICONIFIED)
+              {
+***************
+*** 469,475 ****
+                    AutoPlace(Tmp_win);
+                    if(Tmp_win->Desk == Scr.CurrentDesk)
+                      {
+!                       XMapWindow(dpy, Tmp_win->icon_w);
+                        if(Tmp_win->icon_pixmap_w != None)
+                          XMapWindow(dpy, Tmp_win->icon_pixmap_w);
+                      }
+--- 470,477 ----
+                    AutoPlace(Tmp_win);
+                    if(Tmp_win->Desk == Scr.CurrentDesk)
+                      {
+!                       if (Tmp_win->icon_w)
+!                         XMapWindow(dpy, Tmp_win->icon_w);
+                        if(Tmp_win->icon_pixmap_w != None)
+                          XMapWindow(dpy, Tmp_win->icon_pixmap_w);
+                      }
+*** functions.c.orig	Fri Mar 25 17:22:27 1994
+--- functions.c	Fri Mar 25 17:23:25 1994
+***************
+*** 795,800 ****
+--- 795,801 ----
+    
+    data[0] = (unsigned long) state;
+    data[1] = (unsigned long) tmp_win->icon_w;
++   data[2] = (unsigned long) tmp_win->icon_pixmap_w;
+    
+    XChangeProperty (dpy, tmp_win->w, _XA_WM_STATE, _XA_WM_STATE, 32, 
+                     PropModeReplace, (unsigned char *) data, 3);
+***************
+*** 867,873 ****
+            if(!((t->flags & ICONIFIED)&&(Scr.flags & StickyIcons)) &&
+               (!(t->flags & STICKY)))
+              {
+!               if((t->icon_w)&&(!(Scr.flags & StickyIcons)))
+                  {
+                    t->icon_x_loc += deltax;
+                    t->icon_xl_loc += deltax;
+--- 868,874 ----
+            if(!((t->flags & ICONIFIED)&&(Scr.flags & StickyIcons)) &&
+               (!(t->flags & STICKY)))
+              {
+!               if(!(Scr.flags & StickyIcons))
+                  {
+                    t->icon_x_loc += deltax;
+                    t->icon_xl_loc += deltax;
+***************
+*** 875,882 ****
+                    if(t->icon_pixmap_w != None)
+                      XMoveWindow(dpy,t->icon_pixmap_w,t->icon_x_loc,
+                                  t->icon_y_loc);
+!                   XMoveWindow(dpy,t->icon_w,t->icon_x_loc,
+!                               t->icon_y_loc+t->icon_p_height);
+                    Broadcast(M_ICON_LOCATION,7,t->w,t->frame,
+                              (unsigned long)t,
+                              t->icon_x_loc,t->icon_y_loc,
+--- 876,884 ----
+                    if(t->icon_pixmap_w != None)
+                      XMoveWindow(dpy,t->icon_pixmap_w,t->icon_x_loc,
+                                  t->icon_y_loc);
+!                   if(t->icon_w != None)
+!                     XMoveWindow(dpy,t->icon_w,t->icon_x_loc,
+!                                 t->icon_y_loc+t->icon_p_height);
+                    Broadcast(M_ICON_LOCATION,7,t->w,t->frame,
+                              (unsigned long)t,
+                              t->icon_x_loc,t->icon_y_loc,
+*** fvwm.h.orig	Fri Mar 25 17:22:33 1994
+--- fvwm.h	Fri Mar 25 17:23:30 1994
+***************
+*** 219,224 ****
+--- 219,225 ----
+  /* was the icon unmapped, even though the window is still iconified
+   * (Transients) */
+  #define ICON_UNMAPPED          131072 
++ #define NOICON_TITLE           262144
+  
+  #include <stdlib.h>
+  extern void Reborder(void);
+*** icons.c.orig	Fri Mar 25 17:22:39 1994
+--- icons.c	Fri Mar 25 17:23:35 1994
+***************
+*** 89,96 ****
+      GetIconBitmap(tmp_win);
+  
+    /* figure out the icon window size */
+!   tmp_win->icon_t_width = XTextWidth(IconFont->font,tmp_win->icon_name, 
+!                                      strlen(tmp_win->icon_name));
+    if((tmp_win->flags & ICON_OURS)&&(tmp_win->icon_p_height >0))
+      {
+        tmp_win->icon_p_width += 4;
+--- 89,106 ----
+      GetIconBitmap(tmp_win);
+  
+    /* figure out the icon window size */
+!    if (!(tmp_win->flags & NOICON_TITLE)||(tmp_win->icon_p_height == 0))
+!      {
+!        tmp_win->icon_t_width = XTextWidth(IconFont->font,tmp_win->icon_name, 
+!                                           strlen(tmp_win->icon_name));
+!        tmp_win->icon_w_height = ICON_HEIGHT;
+!      }
+!    else
+!      {
+!        tmp_win->icon_t_width = 0;
+!        tmp_win->icon_w_height = 0;
+!      }
+! 
+    if((tmp_win->flags & ICON_OURS)&&(tmp_win->icon_p_height >0))
+      {
+        tmp_win->icon_p_width += 4;
+***************
+*** 101,108 ****
+      tmp_win->icon_p_width = tmp_win->icon_t_width+6;
+    tmp_win->icon_w_width = tmp_win->icon_p_width;
+  
+-   tmp_win->icon_w_height = ICON_HEIGHT;
+- 
+    final_x = def_x;
+    final_y = def_y;
+    if(final_x <0)
+--- 111,116 ----
+***************
+*** 128,138 ****
+                             VisibilityChangeMask |
+                             ExposureMask | KeyPressMask|EnterWindowMask |
+                             FocusChangeMask | LeaveWindowMask );
+!   tmp_win->icon_w = 
+!     XCreateWindow(dpy, Scr.Root, final_x, final_y+tmp_win->icon_p_height,
+!                   tmp_win->icon_w_width, tmp_win->icon_w_height,0,
+!                   CopyFromParent, 
+!                   CopyFromParent,CopyFromParent,valuemask,&attributes);
+  
+    if((tmp_win->flags & ICON_OURS)&&(tmp_win->icon_p_width>0)&&
+       (tmp_win->icon_p_height>0))
+--- 136,147 ----
+                             VisibilityChangeMask |
+                             ExposureMask | KeyPressMask|EnterWindowMask |
+                             FocusChangeMask | LeaveWindowMask );
+!   if (!(tmp_win->flags & NOICON_TITLE)||(tmp_win->icon_p_height == 0))     
+!     tmp_win->icon_w = 
+!       XCreateWindow(dpy, Scr.Root, final_x, final_y+tmp_win->icon_p_height,
+!                     tmp_win->icon_w_width, tmp_win->icon_w_height,0,
+!                     CopyFromParent, 
+!                     CopyFromParent,CopyFromParent,valuemask,&attributes);
+  
+    if((tmp_win->flags & ICON_OURS)&&(tmp_win->icon_p_width>0)&&
+       (tmp_win->icon_p_height>0))
+***************
+*** 165,179 ****
+  #endif
+  #endif
+  
+!   XSaveContext(dpy, tmp_win->icon_w, FvwmContext, (caddr_t)tmp_win);
+    if(tmp_win->icon_pixmap_w != None)
+-     XSaveContext(dpy, tmp_win->icon_pixmap_w, FvwmContext, (caddr_t)tmp_win);
+-   XDefineCursor(dpy, tmp_win->icon_w, Scr.FvwmCursors[DEFAULT]);
+-   XDefineCursor(dpy, tmp_win->icon_pixmap_w, Scr.FvwmCursors[DEFAULT]);
+-   GrabIconButtons(tmp_win,tmp_win->icon_w);
+-   GrabIconKeys(tmp_win,tmp_win->icon_w);
+-   if(tmp_win->icon_pixmap_w)
+      {
+        GrabIconButtons(tmp_win,tmp_win->icon_pixmap_w);
+        GrabIconKeys(tmp_win,tmp_win->icon_pixmap_w);
+      }
+--- 174,190 ----
+  #endif
+  #endif
+  
+!   if(tmp_win->icon_w != None)
+!     {
+!       XSaveContext(dpy, tmp_win->icon_w, FvwmContext, (caddr_t)tmp_win);
+!       XDefineCursor(dpy, tmp_win->icon_w, Scr.FvwmCursors[DEFAULT]);
+!       GrabIconButtons(tmp_win,tmp_win->icon_w);
+!       GrabIconKeys(tmp_win,tmp_win->icon_w);
+!     }
+    if(tmp_win->icon_pixmap_w != None)
+      {
++       XSaveContext(dpy, tmp_win->icon_pixmap_w, FvwmContext, (caddr_t)tmp_win);
++       XDefineCursor(dpy, tmp_win->icon_pixmap_w, Scr.FvwmCursors[DEFAULT]);
+        GrabIconButtons(tmp_win,tmp_win->icon_pixmap_w);
+        GrabIconKeys(tmp_win,tmp_win->icon_pixmap_w);
+      }
+***************
+*** 196,202 ****
+    if(Scr.flags & SuppressIcons)
+      return;
+  
+!   flush_expose (Tmp_win->icon_w);
+    if(Tmp_win->icon_pixmap_w != None)
+      flush_expose (Tmp_win->icon_pixmap_w);
+  
+--- 207,214 ----
+    if(Scr.flags & SuppressIcons)
+      return;
+  
+!   if(Tmp_win->icon_w != None)
+!     flush_expose (Tmp_win->icon_w);
+    if(Tmp_win->icon_pixmap_w != None)
+      flush_expose (Tmp_win->icon_pixmap_w);
+  
+***************
+*** 207,221 ****
+        else
+          Relief = Scr.HiReliefGC;
+        Shadow = Scr.HiShadowGC;
+!       XSetWindowBackground(dpy,Tmp_win->icon_w,Scr.HiColors.back);
+        if((Tmp_win->flags & ICON_OURS)&&(Tmp_win->icon_pixmap_w != None))
+          XSetWindowBackground(dpy,Tmp_win->icon_pixmap_w,Scr.HiColors.back);
+-       /* resize the icon name window */
+-       Tmp_win->icon_w_width = Tmp_win->icon_t_width+6;
+-       if(Tmp_win->icon_w_width < Tmp_win->icon_p_width)
+-         Tmp_win->icon_w_width = Tmp_win->icon_p_width;
+-       Tmp_win->icon_xl_loc = Tmp_win->icon_x_loc - 
+-         (Tmp_win->icon_w_width - Tmp_win->icon_p_width)/2;
+        TextColor = Scr.HiColors.fore;
+        BackColor = Scr.HiColors.back;
+      }
+--- 219,236 ----
+        else
+          Relief = Scr.HiReliefGC;
+        Shadow = Scr.HiShadowGC;
+!       if(Tmp_win->icon_w != None)
+!         {
+!           XSetWindowBackground(dpy,Tmp_win->icon_w,Scr.HiColors.back);
+!           /* resize the icon name window */
+!           Tmp_win->icon_w_width = Tmp_win->icon_t_width+6;
+!           if(Tmp_win->icon_w_width < Tmp_win->icon_p_width)
+!             Tmp_win->icon_w_width = Tmp_win->icon_p_width;
+!           Tmp_win->icon_xl_loc = Tmp_win->icon_x_loc - 
+!             (Tmp_win->icon_w_width - Tmp_win->icon_p_width)/2;
+!         }
+        if((Tmp_win->flags & ICON_OURS)&&(Tmp_win->icon_pixmap_w != None))
+          XSetWindowBackground(dpy,Tmp_win->icon_pixmap_w,Scr.HiColors.back);
+        TextColor = Scr.HiColors.fore;
+        BackColor = Scr.HiColors.back;
+      }
+***************
+*** 243,255 ****
+            else
+              Relief = Scr.StdReliefGC;
+            Shadow = Scr.StdShadowGC;
+!           XSetWindowBackground(dpy,Tmp_win->icon_w,Scr.StdColors.back);
+            if((Tmp_win->flags & ICON_OURS)&&(Tmp_win->icon_pixmap_w != None))
+              XSetWindowBackground(dpy,Tmp_win->icon_pixmap_w,
+                                   Scr.StdColors.back);
+-           /* resize the icon name window */
+-           Tmp_win->icon_w_width = Tmp_win->icon_p_width;
+-           Tmp_win->icon_xl_loc = Tmp_win->icon_x_loc;
+            TextColor = Scr.StdColors.fore;
+            BackColor = Scr.StdColors.back;
+          }
+--- 258,273 ----
+            else
+              Relief = Scr.StdReliefGC;
+            Shadow = Scr.StdShadowGC;
+!           if (Tmp_win->icon_w != None)
+!             {
+!               XSetWindowBackground(dpy,Tmp_win->icon_w,Scr.StdColors.back);
+!               /* resize the icon name window */
+!               Tmp_win->icon_w_width = Tmp_win->icon_p_width;
+!               Tmp_win->icon_xl_loc = Tmp_win->icon_x_loc;
+!             }
+            if((Tmp_win->flags & ICON_OURS)&&(Tmp_win->icon_pixmap_w != None))
+              XSetWindowBackground(dpy,Tmp_win->icon_pixmap_w,
+                                   Scr.StdColors.back);
+            TextColor = Scr.StdColors.fore;
+            BackColor = Scr.StdColors.back;
+          }
+***************
+*** 261,274 ****
+    /* write the icon label */
+    NewFontAndColor(IconFont->font->fid,TextColor,BackColor);
+  
+!   XMoveWindow(dpy,Tmp_win->icon_pixmap_w,Tmp_win->icon_x_loc,
+!               Tmp_win->icon_y_loc);
+!   XMoveResizeWindow(dpy, Tmp_win->icon_w, Tmp_win->icon_xl_loc,
+!                     Tmp_win->icon_y_loc+Tmp_win->icon_p_height,
+!                     Tmp_win->icon_w_width,ICON_HEIGHT);
+!   
+!   XClearWindow(dpy,Tmp_win->icon_w);
+! 
+    if((Tmp_win->iconPixmap != None)&&(!(Tmp_win->flags & SHAPED_ICON)))
+      RelieveWindow(Tmp_win->icon_pixmap_w,0,0,Tmp_win->icon_p_width,
+                    Tmp_win->icon_p_height, Relief,Shadow, FULL_HILITE);  
+--- 279,295 ----
+    /* write the icon label */
+    NewFontAndColor(IconFont->font->fid,TextColor,BackColor);
+  
+!   if(Tmp_win->icon_pixmap_w != None)
+!     XMoveWindow(dpy,Tmp_win->icon_pixmap_w,Tmp_win->icon_x_loc,
+!                 Tmp_win->icon_y_loc);
+!   if(Tmp_win->icon_w != None)
+!     {
+!       XMoveResizeWindow(dpy, Tmp_win->icon_w, Tmp_win->icon_xl_loc,
+!                         Tmp_win->icon_y_loc+Tmp_win->icon_p_height,
+!                         Tmp_win->icon_w_width,ICON_HEIGHT);
+!       
+!       XClearWindow(dpy,Tmp_win->icon_w);
+!     }
+    if((Tmp_win->iconPixmap != None)&&(!(Tmp_win->flags & SHAPED_ICON)))
+      RelieveWindow(Tmp_win->icon_pixmap_w,0,0,Tmp_win->icon_p_width,
+                    Tmp_win->icon_p_height, Relief,Shadow, FULL_HILITE);  
+***************
+*** 286,300 ****
+                     0,Tmp_win->icon_p_width-4, Tmp_win->icon_p_height-4,2,2,1);  
+      }      
+  
+!   /* text position */
+!   x = (Tmp_win->icon_w_width - Tmp_win->icon_t_width)/2;
+!   if(x<3)x=3;
+!   
+!   XDrawString (dpy, Tmp_win->icon_w, Scr.FontGC, x,
+!                Tmp_win->icon_w_height-IconFont->height+IconFont->y-3,
+!                Tmp_win->icon_name, strlen(Tmp_win->icon_name));
+!   RelieveWindow(Tmp_win->icon_w,0,0,Tmp_win->icon_w_width,      
+!                 ICON_HEIGHT,Relief,Shadow, FULL_HILITE);
+  #endif  
+  }
+  
+--- 307,324 ----
+                     0,Tmp_win->icon_p_width-4, Tmp_win->icon_p_height-4,2,2,1);  
+      }      
+  
+!   if (Tmp_win->icon_w != None)
+!     {
+!       /* text position */
+!       x = (Tmp_win->icon_w_width - Tmp_win->icon_t_width)/2;
+!       if(x<3)x=3;
+!       
+!       XDrawString (dpy, Tmp_win->icon_w, Scr.FontGC, x,
+!                    Tmp_win->icon_w_height-IconFont->height+IconFont->y-3,
+!                    Tmp_win->icon_name, strlen(Tmp_win->icon_name));
+!       RelieveWindow(Tmp_win->icon_w,0,0,Tmp_win->icon_w_width,      
+!                     ICON_HEIGHT,Relief,Shadow, FULL_HILITE);
+!     }
+  #endif  
+  }
+  
+***************
+*** 429,437 ****
+                      {
+                        if(test_window->Desk == t->Desk)
+                          {
+!                           if((test_window->flags&ICONIFIED)&&
+!                              (test_window->icon_w)&&
+!                              (test_window != t))
+                              {
+                                tw=test_window->icon_p_width;
+                                th=test_window->icon_p_height+
+--- 453,460 ----
+                      {
+                        if(test_window->Desk == t->Desk)
+                          {
+!                           if((test_window->flags&ICONIFIED)&& (test_window != t)&&
+!                              (test_window->icon_w || test_window->icon_pixmap_w))
+                              {
+                                tw=test_window->icon_p_width;
+                                th=test_window->icon_p_height+
+***************
+*** 485,493 ****
+    t->icon_w_width = t->icon_p_width;
+    t->icon_xl_loc = t->icon_x_loc;
+  
+!   XMoveResizeWindow(dpy, t->icon_w, t->icon_xl_loc,
+!                     t->icon_y_loc+t->icon_p_height, 
+!                     t->icon_w_width,ICON_HEIGHT);
+    Broadcast(M_ICON_LOCATION,7,t->w,t->frame,
+              (unsigned long)t,
+              t->icon_x_loc,t->icon_y_loc,
+--- 508,517 ----
+    t->icon_w_width = t->icon_p_width;
+    t->icon_xl_loc = t->icon_x_loc;
+  
+!   if (t->icon_w != None)
+!     XMoveResizeWindow(dpy, t->icon_w, t->icon_xl_loc,
+!                       t->icon_y_loc+t->icon_p_height, 
+!                       t->icon_w_width,ICON_HEIGHT);
+    Broadcast(M_ICON_LOCATION,7,t->w,t->frame,
+              (unsigned long)t,
+              t->icon_x_loc,t->icon_y_loc,
+***************
+*** 918,924 ****
+              MoveResizePagerView(t);
+          }
+      } 
+!   if (tmp_win->icon_w == (int)NULL)
+      if(tmp_win->flags & ICON_MOVED)
+        CreateIconWindow(tmp_win,tmp_win->icon_x_loc,tmp_win->icon_y_loc);
+      else
+--- 942,948 ----
+              MoveResizePagerView(t);
+          }
+      } 
+!   if (tmp_win->icon_w == None)
+      if(tmp_win->flags & ICON_MOVED)
+        CreateIconWindow(tmp_win,tmp_win->icon_x_loc,tmp_win->icon_y_loc);
+      else
+***************
+*** 936,942 ****
+    LowerWindow(tmp_win);
+    if(tmp_win->Desk == Scr.CurrentDesk)
+      {
+!       XMapWindow(dpy, tmp_win->icon_w);
+        
+        if(tmp_win->icon_pixmap_w != None)
+          XMapWindow(dpy, tmp_win->icon_pixmap_w);
+--- 960,967 ----
+    LowerWindow(tmp_win);
+    if(tmp_win->Desk == Scr.CurrentDesk)
+      {
+!       if (tmp_win->icon_w != None)
+!         XMapWindow(dpy, tmp_win->icon_w);
+        
+        if(tmp_win->icon_pixmap_w != None)
+          XMapWindow(dpy, tmp_win->icon_pixmap_w);
+*** misc.c.orig	Fri Mar 25 17:22:46 1994
+--- misc.c	Fri Mar 25 17:23:39 1994
+***************
+*** 152,158 ****
+  
+    XDeleteContext(dpy, Tmp_win->w, FvwmContext);
+    
+!   if ((Tmp_win->icon_w)&&(Tmp_win->flags & PIXMAP_OURS))
+      XFreePixmap(dpy, Tmp_win->iconPixmap);
+    
+  
+--- 152,158 ----
+  
+    XDeleteContext(dpy, Tmp_win->w, FvwmContext);
+    
+!   if ((Tmp_win->icon_pixmap_w)&&(Tmp_win->flags & PIXMAP_OURS))
+      XFreePixmap(dpy, Tmp_win->iconPixmap);
+    
+  
+*** misc.h.orig	Fri Mar 25 17:22:51 1994
+--- misc.h	Fri Mar 25 17:23:43 1994
+***************
+*** 62,67 ****
+--- 62,68 ----
+  #define CIRCULATESKIP_FLAG 64
+  #define LISTSKIP_FLAG     128
+  #define STAYSONDESK_FLAG  256
++ #define NOICON_TITLE_FLAG 512
+  
+  /* some fancy font handling stuff */
+  #define NewFontAndColor(newfont,color,backcolor) {\
+*** move.c.orig	Fri Mar 25 17:22:57 1994
+--- move.c	Fri Mar 25 17:23:47 1994
+***************
+*** 76,83 ****
+  #endif
+  
+    if(tmp_win->flags & ICONIFIED)
+!     w = tmp_win->icon_w;
+!   else if (w != tmp_win->icon_w)
+      w = tmp_win->frame;
+    
+    XGetGeometry(dpy, w, &JunkRoot, &origDragX, &origDragY,
+--- 76,87 ----
+  #endif
+  
+    if(tmp_win->flags & ICONIFIED)
+!     {
+!       w = tmp_win->icon_w;
+!       if (w == None)
+!         w = tmp_win->icon_pixmap_w;
+!     }
+!   else if (w != tmp_win->icon_w && w != tmp_win->icon_pixmap_w)
+      w = tmp_win->frame;
+    
+    XGetGeometry(dpy, w, &JunkRoot, &origDragX, &origDragY,
+***************
+*** 318,324 ****
+                    tmp_win->icon_xl_loc = xl -
+                      (tmp_win->icon_w_width - tmp_win->icon_p_width)/2;
+                    tmp_win->icon_y_loc = yt; 
+!                   XMoveWindow(dpy, tmp_win->icon_w,tmp_win->icon_xl_loc,
+                                yt+tmp_win->icon_p_height);
+                    if(tmp_win->icon_pixmap_w != None)
+                      XMoveWindow (dpy, tmp_win->icon_pixmap_w,
+--- 322,329 ----
+                    tmp_win->icon_xl_loc = xl -
+                      (tmp_win->icon_w_width - tmp_win->icon_p_width)/2;
+                    tmp_win->icon_y_loc = yt; 
+!                   if (tmp_win->icon_w != None)
+!                     XMoveWindow(dpy, tmp_win->icon_w,tmp_win->icon_xl_loc,
+                                yt+tmp_win->icon_p_height);
+                    if(tmp_win->icon_pixmap_w != None)
+                      XMoveWindow (dpy, tmp_win->icon_pixmap_w,

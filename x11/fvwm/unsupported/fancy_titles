@@ -1,0 +1,276 @@
+Return-Path: lcd@umcc.umich.edu
+Return-Path: <lcd@umcc.umich.edu>
+Received: from eagle.is.lmsc.lockheed.com (eagle.lockheed.com) by rocket (4.1/SMI-4.1)
+	id AA20854; Sat, 13 Nov 93 15:10:19 EST
+Received: by eagle.is.lmsc.lockheed.com (5.57/Ultrix-4.2)
+	id AA04678; Sat, 13 Nov 93 12:11:40 -0800
+Received: by umcc.umich.edu (/\==/\ Smail3.1.25.1 #25.6)
+	id <m0oyRJl-000ABOC@umcc.umich.edu>; Sat, 13 Nov 93 15:11 EST
+Message-Id: <m0oyRJl-000ABOC@umcc.umich.edu>
+From: lcd@umcc.umich.edu (Leon Dent)
+Subject: Refurbished diffs for fancy_titles in fvwm
+To: dave@devteq.co.uk
+Date: Sat, 13 Nov 1993 15:11:32 -0500 (EST)
+Cc: nation@rocket.sanders.lockheed.com
+X-Mailer: ELM [version 2.4 PL23]
+Mime-Version: 1.0
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: 7bit
+Content-Length: 7881      
+Status: O
+
+Here are the diffs for fancy_titles updated to fvwm-1.05.
+This keeps hunks from being rejected and an error in events.c from
+occuring.
+This message is cc'd to dave@devteq.co.uk and
+nation@rocket.sanders.lockheed.com
+
+Leon Dent
+lcd@umcc.umich.edu
+
+
+fancy_titles
+---------------Cut here--------------
+*** borders.c~	Tue Nov  9 23:19:44 1993
+--- borders.c	Sat Nov 13 07:57:23 1993
+***************
+*** 333,338 ****
+--- 333,341 ----
+    int hor_off, w;
+    GC ReliefGC,ShadowGC;
+    Pixel Forecolor, BackColor;
++   char *pTitle;
++   static char *pTitleBuff = 0;
++   static size_t titleBuffLen = 0;
+  
+    if(!(t->flags & TITLE))
+      return;
+***************
+*** 353,366 ****
+      }
+    flush_expose(t->title_w);
+  
+-   w=XTextWidth(Scr.WindowFont.font,t->name,strlen(t->name));
+-   hor_off = (t->title_width - w)/2;
+-   
+    NewFontAndColor(Scr.WindowFont.font->fid,Forecolor, BackColor);
+  
+    if(NewTitle)
+      XClearWindow(dpy,t->title_w);
+  
+    /* for mono, we clear an area in the title bar where the window
+     * title goes, so that its more legible. For color, no need */
+    if(Scr.d_depth<2)
+--- 356,395 ----
+      }
+    flush_expose(t->title_w);
+  
+    NewFontAndColor(Scr.WindowFont.font->fid,Forecolor, BackColor);
+  
++   pTitle = t->name;
++  
++   /* DT - add the time to the title if present and this window has focus */
++   /* We do a little jig with the format. We assume it to contain the     */
++   /* string '%%s' someplace. This gets converted to '%s' by strftime,    */
++   /* and that gets replaced by the window name by the sprintf.           */
++  
++   if (onoroff && Scr.pTitleTimeString) {  
++     char tmpBuff[200];
++     time_t now;
++     struct tm *pTM;
++     int len;
++ 
++     (void)time(&now);
++     pTM = localtime(&now);
++     len = strftime(tmpBuff, sizeof(tmpBuff)-1, Scr.pTitleTimeString, pTM);
++     len += strlen(t->name);
++     if (len > titleBuffLen) {
++       pTitleBuff = (char *)realloc((void *)pTitleBuff, len+2);
++       titleBuffLen = len;
++     }
++     sprintf(pTitleBuff, tmpBuff, t->name);
++     pTitle = pTitleBuff;
++     NewTitle = TRUE;
++   }
++ 
+    if(NewTitle)
+      XClearWindow(dpy,t->title_w);
+  
++   w=XTextWidth(Scr.WindowFont.font,pTitle,strlen(pTitle));
++   hor_off = (t->title_width - w)/2;
++   
+    /* for mono, we clear an area in the title bar where the window
+     * title goes, so that its more legible. For color, no need */
+    if(Scr.d_depth<2)
+***************
+*** 392,398 ****
+  #endif
+    
+    XDrawString (dpy, t->title_w,Scr.FontGC,hor_off, Scr.WindowFont.y+1, 
+! 	       t->name, strlen(t->name));
+    XFlush(dpy);
+  }
+  
+--- 421,427 ----
+  #endif
+    
+    XDrawString (dpy, t->title_w,Scr.FontGC,hor_off, Scr.WindowFont.y+1, 
+! 	       pTitle, strlen(pTitle));
+    XFlush(dpy);
+  }
+  
+*** configure.c~	Wed Nov 10 08:02:43 1993
+--- configure.c	Sat Nov 13 07:45:09 1993
+***************
+*** 96,101 ****
+--- 96,102 ----
+  {
+    {"Font",              assign_string,  &Scr.StdFont.name, (int *)0},
+    {"WindowFont",        assign_string,  &Scr.WindowFont.name, (int *)0},
++   {"TitleTime",         assign_string,  &Scr.pTitleTimeString, (int *)0},
+    {"StdForeColor",      assign_string,  &Stdfore, (int *)0},
+    {"StdBackColor",      assign_string,  &Stdback, (int *)0},
+    {"HiForeColor",       assign_string,  &Hifore, (int *)0},
+*** events.c~	Tue Nov  9 22:50:42 1993
+--- events.c	Sat Nov 13 10:16:36 1993
+***************
+*** 1397,1402 ****
+--- 1397,1405 ----
+   *
+   * Waits for next X event, or for an auto-raise timeout.
+   *
++  * Modified (dave@devteq.co.uk) - if there's a title_time string,
++  * then set a timeout for the next minute boundary.
++  *
+   ****************************************************************************/
+  void My_XNextEvent(Display *dpy, XEvent *event)
+  {
+***************
+*** 1403,1408 ****
+--- 1406,1413 ----
+    struct itimerval value;
+    fd_set in_fdset;
+    Window child;
++   Bool   fTitleTiming = FALSE;
++   int    fds;
+  
+    if(XPending(dpy))
+      {
+***************
+*** 1416,1424 ****
+    FD_SET(x_fd,&in_fdset);
+    if((value.it_value.tv_usec != 0)||
+       (value.it_value.tv_sec != 0))
+!     select(fd_width,&in_fdset, 0, 0, &value.it_value);
+!   else
+!     select(fd_width,&in_fdset, 0, 0, NULL);
+  
+    if(alarmed)
+      {
+--- 1421,1466 ----
+    FD_SET(x_fd,&in_fdset);
+    if((value.it_value.tv_usec != 0)||
+       (value.it_value.tv_sec != 0))
+!     fds = select(fd_width,&in_fdset, 0, 0, &value.it_value);
+!   else {			/* DT - check for title timing */
+!     if (Scr.pTitleTimeString) {	/* yup - how long til next minute? */
+!       time_t secsToNextMin, now;
+!       (void)time(&now);
+!       secsToNextMin = 60 - (now % 60);
+!       value.it_value.tv_usec = 500000; /* touch of rounding up */
+!       value.it_value.tv_sec  = secsToNextMin;
+!       value.it_interval.tv_usec = 0;
+!       value.it_interval.tv_sec  = 0;
+!       fTitleTiming = TRUE;
+!     }
+! 
+!     fds = select(fd_width,&in_fdset, 0, 0, 
+! 		 fTitleTiming ? &value.it_value : NULL);
+!   }
+! 
+!   /* Now we've a problem. If the select timed didn't quite time out,
+!      but there's less than 500mS to run, then we won't catch it next time.
+!      POSIX says the it_value field should be decremented by select, but not
+!      all Unices to this (Linux does). So, although the test below won't 
+!      blow up, it can cause us to miss time events.
+!   */
+! 
+!   if (fTitleTiming) {
+! 
+!     if ((fds == 0) || ((value.it_value.tv_sec == 0) &&
+! 		       (value.it_value.tv_usec <= 500000))) {
+!       
+!       XQueryPointer(dpy,Scr.Root,&JunkRoot,&child,&JunkX,&JunkY,&JunkX, 
+! 		    &JunkY,&JunkMask );
+! 
+!       if((Scr.Focus != NULL)&&(child == Scr.Focus->frame))
+! 	{
+! 	  if (Scr.Focus->flags & TITLE)
+! 	    SetTitleBar(Scr.Focus, TRUE,TRUE);
+! 	}
+! 
+!     }
+!   }
+  
+    if(alarmed)
+      {
+*** fvwm.1~	Wed Nov 10 14:45:36 1993
+--- fvwm.1	Sat Nov 13 07:45:04 1993
+***************
+*** 205,210 ****
+--- 205,230 ----
+  Makes \fIfvwm\fP use font \fIfontname\fP instead of "fixed" for the window 
+  title bar.
+  
++ .IP "TitleTime \fIformatstring\fP"
++ \fITitleTime\fP allows you to specify a format string for the title
++ of the window that currently has focus. The \fIformatstring\fP
++ argument is a \fBstrftime\fP (MAN3) format string, allowing arbitrary
++ text and time/date substitutions to be made. The string \fI%%s\fP will
++ be replaced by the window's name. Ths the line
++ .sp
++ .in +5
++     TitleTime %a %d  [ %%s ]  %H:%M
++ .sp
++ .in -5
++ might cause the title of the window with focus to be
++ .sp
++ .in +5
++     Wed 17  [ MyWindow ]  12:34
++ .in -5
++ .sp
++ The time will be updated whenever the window title is redisplayed, and
++ every minute.
++ 
+  .IP "PagerFont \fIfontname\fP"
+  Makes \fIfvwm\fP use font \fIfontname\fP for writing window icon names into the
+  window's representation in the pager. If this option is omitted, no
+*** screen.h~	Mon Nov  1 09:19:39 1993
+--- screen.h	Sat Nov 13 07:54:38 1993
+***************
+*** 158,163 ****
+--- 158,165 ----
+    int ScrollResistance;        /* resistance to scrolling in desktop */
+    int MoveResistance;          /* res to moving windows over viewport edge */
+    int OpaqueSize;
++   char *pTitleTimeString;      /* DT - points to strftime format string  */
++                                /*      to use to title windows */
+  } ScreenInfo;
+  
+  extern ScreenInfo Scr;
+*** system.fvwmrc~	Wed Nov 10 14:35:57 1993
+--- system.fvwmrc	Sat Nov 13 07:45:05 1993
+***************
+*** 32,37 ****
+--- 32,42 ----
+  PagerBackColor		#5c54c0
+  PagerForeColor		orchid
+  
++ # You can set the active window's title to contain arbitrary text and/
++ # or the time (using strftime formats)
++ 
++ TitleTime		%a %d   [ %%s ]   %H:%M
++ 
+  ############################################################################
+  # Now the fonts - one for menus/icons, another for window titles
+  Font			-adobe-helvetica-medium-r-*-*-*-120-*-*-*-*-*-*

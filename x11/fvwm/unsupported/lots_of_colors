@@ -1,0 +1,1304 @@
+Return-Path: uunet!rocket!cs.mtu.edu!devmorfo
+Return-Path: <uunet!rocket!cs.mtu.edu!devmorfo>
+Received: from uunet!rocket!cs.mtu.edu by rocket (4.1/SMI-4.1)
+	id AA02797; Fri, 7 Jan 94 08:13:04 EST
+Received: from spool.uu.net (via LOCALHOST) by relay1.UU.NET with SMTP 
+	(5.61/UUNET-internet-primary) id AA17007; Fri, 7 Jan 94 06:23:02 -0500
+Received: from rocket.UUCP by uucp1.uu.net with UUCP/RMAIL
+	(queueing-rmail) id 062133.21134; Fri, 7 Jan 1994 06:21:33 EST
+Received: by rocket (4.1/SMI-4.1)
+	id AA02377; Fri, 7 Jan 94 06:17:19 EST
+Received: from cs.mtu.edu by relay1.UU.NET with SMTP 
+	(5.61/UUNET-internet-primary) id AA04281; Fri, 7 Jan 94 03:11:27 -0500
+Received: from werner.mtu.edu (werner.cs.mtu.edu) by cs.mtu.edu (4.1/SMI-4.1)
+	id AA05303; Fri, 7 Jan 94 03:11:27 EST
+From: devmorfo@cs.mtu.edu (Evmorfopoulos Dimitris)
+Message-Id: <9401070811.AA05303@cs.mtu.edu>
+Subject: Re: fvwm patches.
+To: rocket!rocket.sanders.com!nation@uunet.uu.net
+Date: Fri, 7 Jan 1994 03:11:26 -0500 (EST)
+In-Reply-To: <9401051334.AA18777@rocket> from "Robert Nation" at Jan 5, 94 08:34:00 am
+X-Mailer: ELM [version 2.4 PL22]
+Content-Type: text
+Content-Length: 43047     
+
+Ok. These are the patches for LOTS_OF_COLORS option for fvwm. If I left 
+something out, tell me and I'll fix it. These patches are relative to 1.18c
+version of fvwm. The LOTS_OF_COLORS option makes no difference to the 
+compilation if the NO_MORE_COLORS option is defined. 
+
+Asside from that, I have been having great trouble with m4. I have no 
+experience with it, and I cannot find the man page for it. What it does is
+that it gives me a "Too few arguments for `include`" on both IconPath, and
+PixmapPath, no matter what I do with them. It also looses bitmaps and pixmaps
+in an unpredictable way, depending on the settings in the fvwmrc file. 
+Good thing you fixed the menus. There is still a small bug with them. 
+When the menu extends out of the screen, and it is relocated, and the option
+on which the cursor is, is a submenu option, the submenu appears OK, but on
+the menu, only the current line is displayed. The rest stay blank.
+As for the problem with term, that I mentioned last time, I found the source
+of it. It is in the kernel code for networks. The latest kernel for Linux
+0.99pl14m has this problem fixed somehow. 
+
+--- Cut Here --- fvwm-1.18c-1.18d.diff ---
+
+*** ../../fvwm/fvwm/Imakefile	Wed Jan  5 14:26:20 1994
+--- ./Imakefile	Thu Jan  6 17:57:27 1994
+***************
+*** 78,84 ****
+  ##-DNO_MORE_COLORS
+  ##    if you don't want separate colors for sticky icons,
+  ##    then use this
+! 
+  #############################################################################
+  ## User Preference
+  #############################################################################
+--- 78,86 ----
+  ##-DNO_MORE_COLORS
+  ##    if you don't want separate colors for sticky icons,
+  ##    then use this
+! ##-DLOTS_OF_COLORS
+! ##    if you have separate colors for sticky windows, and you want even 
+! ##    more colors, then define this
+  #############################################################################
+  ## User Preference
+  #############################################################################
+***************
+*** 138,144 ****
+  ##-DNEEDS_STRNCASECMP
+  ##-DNEEDS_SIGCHLD
+  ##-DSYSV
+! EXTRAFLAGS = -DMODULES -DXPM -DSHAPE -DHOTKEYS -DNEEDS_SIGCHLD -DCENTER_SIZEWIN -DM4
+  
+  ## if you specify -DXPM, you need to uncomment this line
+  XPMLIB = -lXpm
+--- 140,146 ----
+  ##-DNEEDS_STRNCASECMP
+  ##-DNEEDS_SIGCHLD
+  ##-DSYSV
+! EXTRAFLAGS = -DMODULES -DXPM -DSHAPE -DHOTKEYS -DNEEDS_SIGCHLD -DCENTER_SIZEWIN -DLOTS_OF_COLORS
+  
+  ## if you specify -DXPM, you need to uncomment this line
+  XPMLIB = -lXpm
+*** ../../fvwm/fvwm/add_window.c	Mon Jan  3 14:51:18 1994
+--- ./add_window.c	Wed Jan  5 23:10:41 1994
+***************
+*** 378,398 ****
+      }
+    else
+      {
+-       attributes.background_pixel = Scr.StdColors.back;
+  #ifndef NO_MORE_COLORS
+        if(tmp_win->flags & STICKY)
+  	attributes.background_pixel = Scr.StickyColors.back;
+  #endif
+        valuemask |= CWBackPixel;
+      }
+  
+    if(tmp_win->flags &(BORDER|TITLE))
+      {
+-       attributes.border_pixel = Scr.StdRelief.back;
+  #ifndef NO_MORE_COLORS
+        if(tmp_win->flags & STICKY)
+  	attributes.border_pixel = Scr.StickyRelief.back;
+  #endif
+      }
+    else
+      {
+--- 378,406 ----
+      }
+    else
+      {
+  #ifndef NO_MORE_COLORS
++ #ifdef LOTS_OF_COLORS
++       attributes.background_pixel = Scr.BorderColors.back;
+        if(tmp_win->flags & STICKY)
+  	attributes.background_pixel = Scr.StickyColors.back;
+  #endif
++ #else
++       attributes.background_pixel = Scr.StdColors.back;
++ #endif
+        valuemask |= CWBackPixel;
+      }
+  
+    if(tmp_win->flags &(BORDER|TITLE))
+      {
+  #ifndef NO_MORE_COLORS
++ #ifdef LOTS_OF_COLORS
++       attributes.border_pixel = Scr.BorderRelief.back;
+        if(tmp_win->flags & STICKY)
+  	attributes.border_pixel = Scr.StickyRelief.back;
+  #endif
++ #else
++       attributes.border_pixel = Scr.StdRelief.back;
++ #endif
+      }
+    else
+      {
+***************
+*** 454,459 ****
+--- 462,476 ----
+        for(i=0;i<4;i++)
+  	{
+  	  attributes.cursor = Scr.FvwmCursors[TOP_LEFT+i];	  
++ #ifndef NO_MORE_COLORS
++           if(Scr.d_depth >= 2) {
++ #ifdef LOTS_OF_COLORS
++             attributes.background_pixel = Scr.BorderColors.back;
++ #endif
++             if(tmp_win->flags & STICKY)
++  	      attributes.background_pixel = Scr.StickyColors.back;
++ 	    }
++ #endif
+  	  tmp_win->corners[i] = 
+  	    XCreateWindow (dpy, tmp_win->frame, 0,0,
+  			   tmp_win->corner_width, tmp_win->corner_width,
+***************
+*** 466,471 ****
+--- 483,492 ----
+        tmp_win->title_x = tmp_win->boundary_width +tmp_win->title_height+1; 
+        tmp_win->title_y = tmp_win->boundary_width;
+        attributes.cursor = Scr.FvwmCursors[TITLE_CURSOR];
++ #ifndef NO_MORE_COLORS
++       if(Scr.d_depth >= 2) 
++         attributes.background_pixel = Scr.StdColors.back;
++ #endif
+        tmp_win->title_w = 
+  	XCreateWindow (dpy, tmp_win->frame, tmp_win->title_x, tmp_win->title_y,
+  		       tmp_win->title_width, tmp_win->title_height,0,
+***************
+*** 474,479 ****
+--- 495,506 ----
+        attributes.cursor = Scr.FvwmCursors[SYS];
+        for(i=4;i>=0;i--)
+  	{
++ #ifndef NO_MORE_COLORS
++ #ifdef LOTS_OF_COLORS
++           if(Scr.d_depth >= 2) 
++             attributes.background_pixel = Scr.ButtonColors.back;
++ #endif
++ #endif
+  	  if(i<Scr.nr_left_buttons)
+  	    {
+  	      tmp_win->left_w[i] =
+***************
+*** 508,513 ****
+--- 535,549 ----
+        for(i=0;i<4;i++)
+  	{
+  	  attributes.cursor = Scr.FvwmCursors[TOP+i];
++ #ifndef NO_MORE_COLORS
++           if(Scr.d_depth >= 2) {
++ #ifdef LOTS_OF_COLORS
++             attributes.background_pixel = Scr.BorderColors.back;
++ #endif
++             if(tmp_win->flags & STICKY)
++  	      attributes.background_pixel = Scr.StickyColors.back;
++               }
++ #endif
+  	  tmp_win->sides[i] = 
+  	    XCreateWindow (dpy, tmp_win->frame, 0, 0, tmp_win->boundary_width,
+  			   tmp_win->boundary_width, 0, CopyFromParent,
+*** ../../fvwm/fvwm/borders.c	Sun Jan  2 04:04:38 1994
+--- ./borders.c	Wed Jan  5 23:30:12 1994
+***************
+*** 77,84 ****
+  {
+    Window w=None;
+    int y, i, x;
+!   GC ReliefGC,ShadowGC;
+!   Pixel BorderColor,BackColor;
+    Pixmap BackPixmap,TextColor;
+    Bool NewColor = False;
+    XSetWindowAttributes attributes;
+--- 77,84 ----
+  {
+    Window w=None;
+    int y, i, x;
+!   GC ReliefGC,ShadowGC,BReliefGC,BShadowGC;
+!   Pixel BorderColor,BackColor, ButtColor;
+    Pixmap BackPixmap,TextColor;
+    Bool NewColor = False;
+    XSetWindowAttributes attributes;
+***************
+*** 114,125 ****
+--- 114,152 ----
+  	w = t->icon_w;
+        Scr.Hilite = t;
+        
++ #ifndef NO_MORE_COLORS
++ #ifdef LOTS_OF_COLORS
++       TextColor = Scr.HiColors.fore;
++       BackPixmap= Scr.gray_pixmap;
++       BackColor = Scr.HiColors.back;
++       ButtColor = Scr.ButtonColors.back;
++       BorderColor = Scr.HiBorderColors.back;
++       ReliefGC = Scr.HiBordersReliefGC;
++       ShadowGC = Scr.HiBordersShadowGC;
++       BReliefGC = Scr.ButtonsReliefGC;
++       BShadowGC = Scr.ButtonsShadowGC;
++ #else
+        TextColor = Scr.HiColors.fore;
+        BackPixmap= Scr.gray_pixmap;
+        BackColor = Scr.HiColors.back;
++       ButtColor = Scr.HiColors.back;
++       BorderColor = Scr.HiRelief.back;
+        ReliefGC = Scr.HiReliefGC;
+        ShadowGC = Scr.HiShadowGC;
++       BReliefGC = Scr.HiReliefGC;
++       BShadowGC = Scr.HiShadowGC;
++ #endif
++ #else
++       TextColor = Scr.HiColors.fore;
++       BackPixmap= Scr.gray_pixmap;
++       BackColor = Scr.HiColors.back;
++       ButtColor = Scr.HiColors.back;
+        BorderColor = Scr.HiRelief.back;
++       ReliefGC = Scr.HiReliefGC;
++       ShadowGC = Scr.HiShadowGC;
++       BReliefGC = Scr.HiReliefGC;
++       BShadowGC = Scr.HiShadowGC;
++ #endif
+      }
+    else
+      {
+***************
+*** 133,154 ****
+  	  NewColor = True;
+  	}
+        
+        TextColor = Scr.StdColors.fore;
+        BackPixmap = Scr.light_gray_pixmap;
+        BackColor = Scr.StdColors.back;
+        ReliefGC = Scr.StdReliefGC;
+        ShadowGC = Scr.StdShadowGC;
+!       BorderColor = Scr.StdRelief.back;
+! #ifndef NO_MORE_COLORS
+        if(t->flags & STICKY)
+  	{
+  	  TextColor = Scr.StickyColors.fore;
+  	  BackPixmap = Scr.sticky_gray_pixmap;
+- 	  BackColor = Scr.StickyColors.back;
+  	  ReliefGC = Scr.StickyReliefGC;
+  	  ShadowGC = Scr.StickyShadowGC;
+! 	  BorderColor = Scr.StickyRelief.back;	  
+  	}
+  #endif
+      }
+    
+--- 160,202 ----
+  	  NewColor = True;
+  	}
+        
++ #ifndef NO_MORE_COLORS
+        TextColor = Scr.StdColors.fore;
+        BackPixmap = Scr.light_gray_pixmap;
+        BackColor = Scr.StdColors.back;
++ #ifdef LOTS_OF_COLORS
++       ButtColor = Scr.ButtonColors.back;
++       BorderColor = Scr.BorderColors.back;
++       ReliefGC = Scr.BordersReliefGC;
++       ShadowGC = Scr.BordersShadowGC;
++       BReliefGC = Scr.ButtonsReliefGC;
++       BShadowGC = Scr.ButtonsShadowGC;
++ #else
++       ButtColor = Scr.StdColors.back;
++       BorderColor = Scr.StdRelief.back;
+        ReliefGC = Scr.StdReliefGC;
+        ShadowGC = Scr.StdShadowGC;
+!       BReliefGC = Scr.StdReliefGC;
+!       BShadowGC = Scr.StdShadowGC;
+! #endif
+        if(t->flags & STICKY)
+  	{
+  	  TextColor = Scr.StickyColors.fore;
+  	  BackPixmap = Scr.sticky_gray_pixmap;
+  	  ReliefGC = Scr.StickyReliefGC;
+  	  ShadowGC = Scr.StickyShadowGC;
+! 	  BorderColor = Scr.StickyColors.back;
+  	}
++ #else
++       TextColor = Scr.StdColors.fore;
++       BackPixmap = Scr.light_gray_pixmap;
++       BackColor = Scr.StdColors.back;
++       ButtColor = Scr.StdColors.back;
++       BorderColor = Scr.StdRelief.back;
++       ReliefGC = Scr.StdReliefGC;
++       ShadowGC = Scr.StdShadowGC;
++       BReliefGC = Scr.StdReliefGC;
++       BShadowGC = Scr.StdShadowGC;
+  #endif
+      }
+    
+***************
+*** 200,205 ****
+--- 248,254 ----
+  	  ChangeWindowColor(t->title_w);
+  	  for(i=0;i<Scr.nr_left_buttons;i++)
+  	    {
++               attributes.background_pixel = ButtColor;
+  	      ChangeWindowColor(t->left_w[i]);
+  	      if(flush_expose(t->left_w[i])||(expose_win == t->left_w[i])||
+  		 (expose_win == None))
+***************
+*** 206,215 ****
+  		{	
+  		  RelieveWindow(t->left_w[i],0,0,t->title_height,
+  				t->title_height,
+! 				(PressedW==t->left_w[i]?ShadowGC:ReliefGC), 
+! 				(PressedW==t->left_w[i]?ReliefGC:ShadowGC), 
+  				BOTTOM_HILITE);
+! 		  DrawPattern(t->left_w[i],ReliefGC,ShadowGC,
+  			      Scr.left_button_styles[1][i],
+  			      Scr.left_button_styles[0][i],t->title_height);
+  		}
+--- 255,264 ----
+  		{	
+  		  RelieveWindow(t->left_w[i],0,0,t->title_height,
+  				t->title_height,
+! 				(PressedW==t->left_w[i]?BShadowGC:BReliefGC), 
+! 				(PressedW==t->left_w[i]?BReliefGC:BShadowGC), 
+  				BOTTOM_HILITE);
+! 		  DrawPattern(t->left_w[i],BReliefGC,BShadowGC,
+  			      Scr.left_button_styles[1][i],
+  			      Scr.left_button_styles[0][i],t->title_height);
+  		}
+***************
+*** 217,222 ****
+--- 266,272 ----
+  	    }	     
+  	  for(i=0;i<Scr.nr_right_buttons;i++)
+  	    {
++               attributes.background_pixel = ButtColor;
+  	      if(t->right_w[i] != None)
+  		{
+  		  ChangeWindowColor(t->right_w[i]);
+***************
+*** 225,243 ****
+  		    {
+  		      GC sgc,rgc;
+  		      
+! 		      sgc=ShadowGC;
+! 		      rgc=ReliefGC;
+  		      if((Scr.flags & MWMButtons)&&(!i)&&(t->flags&MAXIMIZED))
+  			{
+! 			  sgc = ReliefGC;
+! 			  rgc = ShadowGC;
+  			}
+  		      RelieveWindow(t->right_w[i],0,0,t->title_height,
+  				    t->title_height,
+  				    (PressedW==t->right_w[i]
+! 				     ?ShadowGC:ReliefGC),
+  				    (PressedW==t->right_w[i]
+! 				     ?ReliefGC:ShadowGC), 
+  				    BOTTOM_HILITE);
+  		      DrawPattern(t->right_w[i],rgc,sgc,
+  				  Scr.right_button_styles[1][i],
+--- 275,293 ----
+  		    {
+  		      GC sgc,rgc;
+  		      
+! 		      sgc=BShadowGC;
+! 		      rgc=BReliefGC;
+  		      if((Scr.flags & MWMButtons)&&(!i)&&(t->flags&MAXIMIZED))
+  			{
+! 			  sgc = BReliefGC;
+! 			  rgc = BShadowGC;
+  			}
+  		      RelieveWindow(t->right_w[i],0,0,t->title_height,
+  				    t->title_height,
+  				    (PressedW==t->right_w[i]
+! 				     ?BShadowGC:BReliefGC),
+  				    (PressedW==t->right_w[i]
+! 				     ?BReliefGC:BShadowGC), 
+  				    BOTTOM_HILITE);
+  		      DrawPattern(t->right_w[i],rgc,sgc,
+  				  Scr.right_button_styles[1][i],
+***************
+*** 259,264 ****
+--- 309,315 ----
+  	  
+  	  for(i=0;i<4;i++)
+  	    {
++               attributes.background_pixel = BorderColor;
+  	      ChangeWindowColor(t->sides[i]);
+  	      if((flush_expose (t->sides[i]))||(expose_win == t->sides[i])||
+  		 (expose_win == None))
+***************
+*** 284,289 ****
+--- 335,341 ----
+  				((i%2)?y:t->boundary_width),
+  				rgc, sgc, (0x0001<<i));
+  		}
++               attributes.background_pixel = BorderColor;
+  	      ChangeWindowColor(t->corners[i]);
+  	      if((flush_expose(t->corners[i]))||(expose_win==t->corners[i])||
+  		 (expose_win == None))
+***************
+*** 339,344 ****
+--- 391,397 ----
+  	      sgc=ReliefGC;
+  	      rgc=ShadowGC;
+  	    }
++           attributes.background_pixel = BorderColor;
+  	  ChangeWindowColor(t->frame);
+  	  if((flush_expose(t->frame))||(expose_win == t->frame)||
+  	     (expose_win == None))
+*** ../../fvwm/fvwm/configure.c	Wed Jan  5 14:04:00 1994
+--- ./configure.c	Wed Jan  5 23:37:41 1994
+***************
+*** 49,55 ****
+--- 49,64 ----
+  #ifndef NO_MORE_COLORS
+  char *Stickyback;
+  char *Stickyfore;
++ #ifdef LOTS_OF_COLORS
++ char *Buttonback;
++ char *Buttonfore;
++ char *Menuback;
++ char *Menufore;
++ char *MenuArrowcolor;
++ char *Bordercolor;
++ char *HiBordercolor;
+  #endif
++ #endif
+  char *Hiback;
+  char *Hifore;
+  #ifndef NO_PAGER
+***************
+*** 110,115 ****
+--- 119,133 ----
+  #ifndef NO_MORE_COLORS
+    {"StickyForeColor",   assign_string,  &Stickyfore, (int *)0},
+    {"StickyBackColor",   assign_string,  &Stickyback, (int *)0},
++ #ifdef LOTS_OF_COLORS
++   {"ButtonForeColor",	assign_string,	&Buttonfore ,(int *)0},
++   {"ButtonBackColor",	assign_string,	&Buttonback ,(int *)0},
++   {"MenuForeColor",	assign_string,	&Menufore ,(int *)0},
++   {"MenuBackColor",	assign_string,	&Menuback ,(int *)0},
++   {"BorderColor",	assign_string,	&Bordercolor ,(int *)0},
++   {"HiBorderColor",	assign_string,	&HiBordercolor ,(int *)0},
++   {"MenuArrowColor",	assign_string,	&MenuArrowcolor ,(int *)0},
++ #endif
+  #endif
+    {"HiForeColor",       assign_string,  &Hifore, (int *)0},
+    {"HiBackColor",       assign_string,  &Hiback, (int *)0},
+***************
+*** 292,298 ****
+--- 310,325 ----
+  #ifndef NO_MORE_COLORS
+    Stickyback = NULL;
+    Stickyfore = NULL;
++ #ifdef LOTS_OF_COLORS
++   Buttonback = NULL;
++   Buttonfore = NULL;
++   Menuback = NULL;
++   Menufore = NULL;
++   Bordercolor = NULL;
++   HiBordercolor = NULL;
++   MenuArrowcolor = NULL;
+  #endif
++ #endif
+    Hiback = white;
+    Hifore = black;
+  #ifndef NO_PAGER
+***************
+*** 635,644 ****
+    if(have_em) return;
+  
+  #ifndef NO_MORE_COLORS
+!   if(Stickyback == NULL)
+!     Stickyback = Stdback;
+!   if(Stickyfore == NULL)
+!     Stickyfore = Stdfore;
+  #endif
+    have_em = 1;
+  
+--- 662,678 ----
+    if(have_em) return;
+  
+  #ifndef NO_MORE_COLORS
+!   if(Stickyback == NULL) Stickyback = Stdback;
+!   if(Stickyfore == NULL) Stickyfore = Stdfore;
+! #ifdef LOTS_OF_COLORS
+!   if(Buttonback == NULL) Buttonback = Stdback;
+!   if(Buttonfore == NULL) Buttonfore = Stdfore;
+!   if(Menuback == NULL) Menuback = Stdback;
+!   if(Menufore == NULL) Menufore = Stdfore;
+!   if(Bordercolor == NULL) Bordercolor = Stdback;
+!   if(HiBordercolor == NULL) HiBordercolor = Hiback;
+!   if(MenuArrowcolor == NULL) MenuArrowcolor = Menuback;
+! #endif
+  #endif
+    have_em = 1;
+  
+***************
+*** 651,657 ****
+--- 685,703 ----
+  #ifndef NO_MORE_COLORS
+        Scr.StickyColors.back = GetColor(white);
+        Scr.StickyColors.fore = GetColor(black); 
++ #ifdef LOTS_OF_COLORS
++       Scr.ButtonColors.back = GetColor(white);
++       Scr.ButtonColors.fore = GetColor(black);
++       Scr.MenuColors.back = GetColor(white);
++       Scr.MenuColors.fore = GetColor(black);
++       Scr.BorderColors.back = GetColor(white);
++       Scr.BorderColors.fore = GetColor(black);
++       Scr.HiBorderColors.back = GetColor(white);
++       Scr.HiBorderColors.fore = GetColor(black);
++       Scr.MenuArrowColors.back = GetColor(white);
++       Scr.MenuArrowColors.fore = GetColor(black);
+  #endif
++ #endif
+        Scr.HiColors.back  = GetColor(white);
+        Scr.HiColors.fore  = GetColor(black); 
+        Scr.StdRelief.back = GetColor(black);
+***************
+*** 659,664 ****
+--- 705,722 ----
+  #ifndef NO_MORE_COLORS
+        Scr.StickyRelief.back = GetColor(black);
+        Scr.StickyRelief.fore = GetColor(white);
++ #ifdef LOTS_OF_COLORS
++       Scr.ButtonRelief.back = GetColor(black);
++       Scr.ButtonRelief.fore = GetColor(white);
++       Scr.MenuRelief.back = GetColor(black);
++       Scr.MenuRelief.fore = GetColor(white);
++       Scr.BorderRelief.back = GetColor(black);
++       Scr.BorderRelief.fore = GetColor(white);
++       Scr.HiBorderRelief.back = GetColor(black);
++       Scr.HiBorderRelief.fore = GetColor(white);
++       Scr.MenuArrowRelief.back = GetColor(black);
++       Scr.MenuArrowRelief.fore = GetColor(white);
++ #endif
+  #endif
+        Scr.HiRelief.back  = GetColor(black);
+        Scr.HiRelief.fore  = GetColor(white);
+***************
+*** 675,681 ****
+--- 733,749 ----
+  #ifndef NO_MORE_COLORS
+        Scr.StickyColors.back = GetColor(Stickyback);
+        Scr.StickyColors.fore = GetColor(Stickyfore); 
++ #ifdef LOTS_OF_COLORS
++       Scr.ButtonColors.back = GetColor(Buttonback);
++       Scr.ButtonColors.fore = GetColor(Buttonfore);
++       Scr.MenuColors.back = GetColor(Menuback);
++       Scr.MenuColors.fore = GetColor(Menufore);
++       Scr.BorderColors.back = GetColor(Bordercolor);
++       Scr.HiBorderColors.back = GetColor(HiBordercolor);
++       Scr.MenuArrowColors.back = GetColor(MenuArrowcolor);
++       Scr.MenuArrowColors.fore = GetColor(MenuArrowcolor);
+  #endif
++ #endif
+        Scr.HiColors.back  =  GetColor(Hiback);
+        Scr.HiColors.fore  = GetColor(Hifore); 
+        Scr.StdRelief.back = GetShadow(Scr.StdColors.back);
+***************
+*** 683,688 ****
+--- 751,768 ----
+  #ifndef NO_MORE_COLORS
+        Scr.StickyRelief.back = GetShadow(Scr.StickyColors.back);
+        Scr.StickyRelief.fore = GetHilite(Scr.StickyColors.back);
++ #ifdef LOTS_OF_COLORS
++       Scr.ButtonRelief.back = GetShadow(Scr.ButtonColors.back);
++       Scr.ButtonRelief.fore = GetHilite(Scr.ButtonColors.back);
++       Scr.MenuRelief.back = GetShadow(Scr.MenuColors.back);
++       Scr.MenuRelief.fore = GetHilite(Scr.MenuColors.back);
++       Scr.BorderRelief.back = GetShadow(Scr.BorderColors.back);
++       Scr.BorderRelief.fore = GetHilite(Scr.BorderColors.back);
++       Scr.HiBorderRelief.back = GetShadow(Scr.HiBorderColors.back);
++       Scr.HiBorderRelief.fore = GetHilite(Scr.HiBorderColors.back);
++       Scr.MenuArrowRelief.back = GetShadow(Scr.MenuArrowColors.back);
++       Scr.MenuArrowRelief.fore = GetHilite(Scr.MenuArrowColors.back);
++ #endif
+  #endif
+        Scr.HiRelief.back  = GetShadow(Scr.HiColors.back);
+        Scr.HiRelief.fore  = GetHilite(Scr.HiColors.back);
+***************
+*** 1100,1107 ****
+      }
+  }
+  
+!   
+!   
+  
+  /****************************************************************************
+   * 
+--- 1180,1187 ----
+      }
+  }
+  
+! 
+! 
+  
+  /****************************************************************************
+   * 
+***************
+*** 1168,1174 ****
+--- 1248,1260 ----
+  #else
+    valuemask = (CWBackPixel | CWEventMask | CWCursor);
+  #endif
++ #ifndef NO_MORE_COLORS
++ #ifdef LOTS_OF_COLORS
++   attributes.background_pixel = Scr.MenuColors.back;
++ #else
+    attributes.background_pixel = Scr.StdColors.back;
++ #endif
++ #endif
+    attributes.event_mask = (ExposureMask | EnterWindowMask);
+    attributes.cursor = Scr.FvwmCursors[MENU];
+  #ifndef NO_SAVEUNDERS   
+***************
+*** 1572,1577 ****
+--- 1658,1686 ----
+    gcv.subwindow_mode = IncludeInferiors;
+    Scr.DrawGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);
+  
++ #ifndef NO_MORE_COLORS
++ #ifdef LOTS_OF_COLORS
++   gcm = GCFunction|GCPlaneMask|GCGraphicsExposures|GCLineWidth|GCForeground|
++     GCBackground|GCFont;
++   gcv.line_width = 0;
++   gcv.function = GXcopy;
++   gcv.plane_mask = AllPlanes;
++   gcv.foreground = Scr.MenuColors.fore;
++   gcv.background = Scr.MenuColors.back;
++   gcv.font =  Scr.StdFont.font->fid;
++   gcv.graphics_exposures = False;
++   Scr.MenusGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);
++ 
++   gcv.foreground = Scr.ButtonColors.fore;
++   gcv.background = Scr.ButtonColors.back;
++   Scr.ButtonsMenuGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);
++ 
++   gcv.foreground = Scr.MenuArrowColors.fore;
++   gcv.background = Scr.MenuArrowColors.back;
++   Scr.MenusArrowGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);
++ #endif
++ #endif
++ 
+    gcm = GCFunction|GCPlaneMask|GCGraphicsExposures|GCLineWidth|GCForeground|
+      GCBackground|GCFont;
+    gcv.line_width = 0;
+***************
+*** 1618,1623 ****
+--- 1727,1774 ----
+    gcv.foreground = Scr.StickyRelief.back;
+    gcv.background = Scr.StickyRelief.fore;
+    Scr.StickyShadowGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);  
++ 
++ #ifdef LOTS_OF_COLORS
++   gcv.foreground = Scr.ButtonRelief.fore;
++   gcv.background = Scr.ButtonRelief.back;
++   Scr.ButtonsReliefGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);  
++ 
++   gcv.foreground = Scr.ButtonRelief.back;
++   gcv.background = Scr.ButtonRelief.fore;
++   Scr.ButtonsShadowGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);  
++ 
++   gcv.foreground = Scr.MenuRelief.fore;
++   gcv.background = Scr.MenuRelief.back;
++   Scr.MenusReliefGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);  
++ 
++   gcv.foreground = Scr.MenuRelief.back;
++   gcv.background = Scr.MenuRelief.fore;
++   Scr.MenusShadowGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);  
++ 
++   gcv.foreground = Scr.BorderRelief.fore;
++   gcv.background = Scr.BorderRelief.back;
++   Scr.BordersReliefGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);  
++ 
++   gcv.foreground = Scr.BorderRelief.back;
++   gcv.background = Scr.BorderRelief.fore;
++   Scr.BordersShadowGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);  
++ 
++   gcv.foreground = Scr.HiBorderRelief.fore;
++   gcv.background = Scr.HiBorderRelief.back;
++   Scr.HiBordersReliefGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);  
++ 
++   gcv.foreground = Scr.HiBorderRelief.back;
++   gcv.background = Scr.HiBorderRelief.fore;
++   Scr.HiBordersShadowGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);  
++ 
++   gcv.foreground = Scr.MenuArrowRelief.fore;
++   gcv.background = Scr.MenuArrowRelief.back;
++   Scr.MenusArrowReliefGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);  
++ 
++   gcv.foreground = Scr.MenuArrowRelief.back;
++   gcv.background = Scr.MenuArrowRelief.fore;
++   Scr.MenusArrowShadowGC = XCreateGC(dpy, Scr.Root, gcm, &gcv);  
++ #endif
+  #endif
+    
+  }
+***************
+*** 1966,1971 ****
+--- 2117,2125 ----
+  #endif
+  #ifdef	NO_MORE_COLORS
+      strcat(options, "NO_MORE_COLORS ");
++ #endif
++ #ifdef	LOTS_OF_COLORS
++     strcat(options, "LOTS_OF_COLORS ");
+  #endif
+  #ifdef	STUBBORN_PLACEMENT
+      strcat(options, "STUBBORN_PLACEMENT ");
+*** ../../fvwm/fvwm/fvwm.1	Mon Jan  3 04:32:21 1994
+--- ./fvwm.1	Thu Jan  6 17:25:25 1994
+***************
+*** 1,6 ****
+  .\" t
+  .\" @(#)fvwm.1	12/20/93
+! .TH FVWM 1.16 "20 December 1993"
+  .UC
+  .SH NAME
+  fvwm \- F(?) Virtual Window Manager for X11
+--- 1,6 ----
+  .\" t
+  .\" @(#)fvwm.1	12/20/93
+! .TH FVWM 1.18d "9 January 1994"
+  .UC
+  .SH NAME
+  fvwm \- F(?) Virtual Window Manager for X11
+***************
+*** 224,259 ****
+  configuration commands.
+  
+  .IP "StdForeColor \fIcolorname\fP"
+! Sets the foreground color for menus and non-selected window
+  titles to \fIcolorname\fP. When using a monochrome screen, this option is 
+  ignored, and black is used. 
+  
+  .IP "StdBackColor \fIcolorname\fP"
+! Sets the background color for menus, and non-selected 
+! windows to \fIcolorname\fP. When using a monochrome screen, this option is 
+  ignored, and white is used.
+  
+  .IP "StickyForeColor \fIcolorname\fP"
+  Sets the foreground color for non-selected window sticky (Sticks-to-glass)
+! titles to \fIcolorname\fP. When using a monochrome screen, this option is 
+! ignored, and black is used. Only available if -DMORE_COLORS is used
+  when compiling.
+  
+  .IP "StickyBackColor \fIcolorname\fP"
+  Sets the background color for non-selected window sticky (Sticks-to-glass)
+! windows to \fIcolorname\fP. When using a monochrome screen, this option is 
+! ignored, and white is used. Only available if -DMORE_COLORS is used
+! when compiling.
+  
+  .IP "HiForeColor \fIcolorname\fP"
+! Sets the color for selected window's
+  title to \fIcolorname\fP. When using a monochrome screen, this option is 
+  ignored, and black is used.
+  
+  .IP "HiBackColor \fIcolorname\fP"
+  Sets the background color for the selected 
+! window to \fIcolorname\fP. When using a monochrome screen, this option is 
+  ignored, and white is used.
+  
+  .IP "PagerBackColor \fIcolorname\fP"
+  Causes the pager background color to be \fIcolorname\fP, instead of white.
+--- 224,286 ----
+  configuration commands.
+  
+  .IP "StdForeColor \fIcolorname\fP"
+! Sets the foreground color for non-selected window
+  titles to \fIcolorname\fP. When using a monochrome screen, this option is 
+  ignored, and black is used. 
+  
+  .IP "StdBackColor \fIcolorname\fP"
+! Sets the background color for non-selected 
+! window titles to \fIcolorname\fP. When using a monochrome screen, this option is 
+  ignored, and white is used.
+  
+  .IP "StickyForeColor \fIcolorname\fP"
+  Sets the foreground color for non-selected window sticky (Sticks-to-glass)
+! borders to \fIcolorname\fP. When using a monochrome screen, this option is 
+! ignored, and black is used.
+  when compiling.
+  
+  .IP "StickyBackColor \fIcolorname\fP"
+  Sets the background color for non-selected window sticky (Sticks-to-glass)
+! borders to \fIcolorname\fP. When using a monochrome screen, this option is 
+! ignored, and white is used. 
+  
+  .IP "HiForeColor \fIcolorname\fP"
+! Sets the foreground color for selected window's
+  title to \fIcolorname\fP. When using a monochrome screen, this option is 
+  ignored, and black is used.
+  
+  .IP "HiBackColor \fIcolorname\fP"
+  Sets the background color for the selected 
+! window's title to \fIcolorname\fP. When using a monochrome screen, this option is 
+  ignored, and white is used.
++ 
++ .IP "ButtonForeColor \fIcolorname\fP"
++ Sets the foreground color for buttons on windows decorations to \fIcolorname\fP. 
++ When using a monochrome screen, this option is ignored, and black is used.
++ 
++ .IP "ButtonBackColor \fIcolorname\fP"
++ Sets the background color for buttons on windows decorations to \fIcolorname\fP. 
++ When using a monochrome screen, this option is ignored, and white is used.
++ 
++ .IP "MenuForeColor \fIcolorname\fP"
++ Sets the foreground color for menus that appear on the root window to \fIcolorname\fP. 
++ When using a monochrome screen, this option is ignored, and black is used.
++ 
++ .IP "MenuBackColor \fIcolorname\fP"
++ Sets the background color for menus that appear on the root window to \fIcolorname\fP. 
++ When using a monochrome screen, this option is ignored, and white is used.
++ 
++ .IP "MenuArrowColor \fIcolorname\fP"
++ Sets the color of the arrow the denotes submenus of a menu item to \fIcolorname\fP. 
++ When using a monochrome screen, this option is ignored, and white is used.
++ 
++ .IP "BorderColor \fIcolorname\fP"
++ Sets the border color for unselected windows to \fIcolorname\fP. 
++ When using a monochrome screen, this option is ignored, and black is used.
++ 
++ .IP "HiBorderColor \fIcolorname\fP"
++ Sets the border color for the selected window to \fIcolorname\fP. 
++ When using a monochrome screen, this option is ignored, and white is used.
+  
+  .IP "PagerBackColor \fIcolorname\fP"
+  Causes the pager background color to be \fIcolorname\fP, instead of white.
+*** ../../fvwm/fvwm/fvwm.man	Mon Jan  3 04:32:21 1994
+--- ./fvwm.man	Thu Jan  6 17:25:25 1994
+***************
+*** 1,6 ****
+  .\" t
+  .\" @(#)fvwm.1	12/20/93
+! .TH FVWM 1.16 "20 December 1993"
+  .UC
+  .SH NAME
+  fvwm \- F(?) Virtual Window Manager for X11
+--- 1,6 ----
+  .\" t
+  .\" @(#)fvwm.1	12/20/93
+! .TH FVWM 1.18d "9 January 1994"
+  .UC
+  .SH NAME
+  fvwm \- F(?) Virtual Window Manager for X11
+***************
+*** 224,259 ****
+  configuration commands.
+  
+  .IP "StdForeColor \fIcolorname\fP"
+! Sets the foreground color for menus and non-selected window
+  titles to \fIcolorname\fP. When using a monochrome screen, this option is 
+  ignored, and black is used. 
+  
+  .IP "StdBackColor \fIcolorname\fP"
+! Sets the background color for menus, and non-selected 
+! windows to \fIcolorname\fP. When using a monochrome screen, this option is 
+  ignored, and white is used.
+  
+  .IP "StickyForeColor \fIcolorname\fP"
+  Sets the foreground color for non-selected window sticky (Sticks-to-glass)
+! titles to \fIcolorname\fP. When using a monochrome screen, this option is 
+! ignored, and black is used. Only available if -DMORE_COLORS is used
+  when compiling.
+  
+  .IP "StickyBackColor \fIcolorname\fP"
+  Sets the background color for non-selected window sticky (Sticks-to-glass)
+! windows to \fIcolorname\fP. When using a monochrome screen, this option is 
+! ignored, and white is used. Only available if -DMORE_COLORS is used
+! when compiling.
+  
+  .IP "HiForeColor \fIcolorname\fP"
+! Sets the color for selected window's
+  title to \fIcolorname\fP. When using a monochrome screen, this option is 
+  ignored, and black is used.
+  
+  .IP "HiBackColor \fIcolorname\fP"
+  Sets the background color for the selected 
+! window to \fIcolorname\fP. When using a monochrome screen, this option is 
+  ignored, and white is used.
+  
+  .IP "PagerBackColor \fIcolorname\fP"
+  Causes the pager background color to be \fIcolorname\fP, instead of white.
+--- 224,286 ----
+  configuration commands.
+  
+  .IP "StdForeColor \fIcolorname\fP"
+! Sets the foreground color for non-selected window
+  titles to \fIcolorname\fP. When using a monochrome screen, this option is 
+  ignored, and black is used. 
+  
+  .IP "StdBackColor \fIcolorname\fP"
+! Sets the background color for non-selected 
+! window titles to \fIcolorname\fP. When using a monochrome screen, this option is 
+  ignored, and white is used.
+  
+  .IP "StickyForeColor \fIcolorname\fP"
+  Sets the foreground color for non-selected window sticky (Sticks-to-glass)
+! borders to \fIcolorname\fP. When using a monochrome screen, this option is 
+! ignored, and black is used.
+  when compiling.
+  
+  .IP "StickyBackColor \fIcolorname\fP"
+  Sets the background color for non-selected window sticky (Sticks-to-glass)
+! borders to \fIcolorname\fP. When using a monochrome screen, this option is 
+! ignored, and white is used. 
+  
+  .IP "HiForeColor \fIcolorname\fP"
+! Sets the foreground color for selected window's
+  title to \fIcolorname\fP. When using a monochrome screen, this option is 
+  ignored, and black is used.
+  
+  .IP "HiBackColor \fIcolorname\fP"
+  Sets the background color for the selected 
+! window's title to \fIcolorname\fP. When using a monochrome screen, this option is 
+  ignored, and white is used.
++ 
++ .IP "ButtonForeColor \fIcolorname\fP"
++ Sets the foreground color for buttons on windows decorations to \fIcolorname\fP. 
++ When using a monochrome screen, this option is ignored, and black is used.
++ 
++ .IP "ButtonBackColor \fIcolorname\fP"
++ Sets the background color for buttons on windows decorations to \fIcolorname\fP. 
++ When using a monochrome screen, this option is ignored, and white is used.
++ 
++ .IP "MenuForeColor \fIcolorname\fP"
++ Sets the foreground color for menus that appear on the root window to \fIcolorname\fP. 
++ When using a monochrome screen, this option is ignored, and black is used.
++ 
++ .IP "MenuBackColor \fIcolorname\fP"
++ Sets the background color for menus that appear on the root window to \fIcolorname\fP. 
++ When using a monochrome screen, this option is ignored, and white is used.
++ 
++ .IP "MenuArrowColor \fIcolorname\fP"
++ Sets the color of the arrow the denotes submenus of a menu item to \fIcolorname\fP. 
++ When using a monochrome screen, this option is ignored, and white is used.
++ 
++ .IP "BorderColor \fIcolorname\fP"
++ Sets the border color for unselected windows to \fIcolorname\fP. 
++ When using a monochrome screen, this option is ignored, and black is used.
++ 
++ .IP "HiBorderColor \fIcolorname\fP"
++ Sets the border color for the selected window to \fIcolorname\fP. 
++ When using a monochrome screen, this option is ignored, and white is used.
+  
+  .IP "PagerBackColor \fIcolorname\fP"
+  Causes the pager background color to be \fIcolorname\fP, instead of white.
+*** ../../fvwm/fvwm/menus.c	Tue Jan  4 18:23:17 1994
+--- ./menus.c	Wed Jan  5 23:40:35 1994
+***************
+*** 54,59 ****
+--- 54,61 ----
+  
+  int menu_on=0;
+  
++ int Button_menu = 0;
++ 
+  MenuRoot *ActiveMenu = NULL;		/* the active menu */
+  MenuItem *ActiveItem = NULL;		/* the active menu item */
+  
+***************
+*** 64,70 ****
+  extern XEvent Event;
+  int Stashed_X, Stashed_Y,MenuY=0;
+  
+! void DrawTrianglePattern(Window,GC,GC,GC,int,int,int,int);
+  void DrawSeparator(Window, GC,GC,int, int,int,int,int);
+  #ifdef HOTKEYS
+  void DrawUnderline(Window w, GC gc, int x, int y, char *txt, int off);
+--- 66,72 ----
+  extern XEvent Event;
+  int Stashed_X, Stashed_Y,MenuY=0;
+  
+! void DrawTrianglePattern(Window,GC,GC,GC,GC,int,int,int,int);
+  void DrawSeparator(Window, GC,GC,int, int,int,int,int);
+  #ifdef HOTKEYS
+  void DrawUnderline(Window w, GC gc, int x, int y, char *txt, int off);
+***************
+*** 181,197 ****
+  void PaintEntry(MenuRoot *mr, MenuItem *mi)
+  {
+    int y_offset,text_y,d, y_height;
+!   GC ShadowGC, ReliefGC;
+  
+    y_offset = mi->y_offset;
+    y_height = mi->y_height;
+    text_y = y_offset + Scr.StdFont.y;
+  
+!   ShadowGC = Scr.StdShadowGC;
+    if(Scr.d_depth<2)
+!     ReliefGC = Scr.StdShadowGC;
+    else
+!     ReliefGC = Scr.StdReliefGC;
+  
+    if(Scr.flags & MWMMenus)
+      {
+--- 183,234 ----
+  void PaintEntry(MenuRoot *mr, MenuItem *mi)
+  {
+    int y_offset,text_y,d, y_height;
+!   GC ShadowGC, ReliefGC, NMenuGC;
+!   GC TShadowGC, TReliefGC, TArrowGC;
+  
+    y_offset = mi->y_offset;
+    y_height = mi->y_height;
+    text_y = y_offset + Scr.StdFont.y;
+  
+! #ifndef NO_MORE_COLORS
+! #ifdef LOTS_OF_COLORS
+!   TShadowGC = Scr.MenusArrowShadowGC;
+!   TReliefGC = Scr.MenusArrowReliefGC;
+!   TArrowGC = Scr.MenusArrowGC;
+!   if (Button_menu) {
+!     ShadowGC = Scr.ButtonsShadowGC;
+!     if(Scr.d_depth<2)
+!       ReliefGC = Scr.ButtonsShadowGC;
+!     else
+!       ReliefGC = Scr.ButtonsReliefGC;
+!     NMenuGC = Scr.ButtonsMenuGC;
+!     XSetWindowBackground(dpy,mr->w,Scr.ButtonColors.back);
+!     }
+!   else {
+!     ShadowGC = Scr.MenusShadowGC;
+!     if(Scr.d_depth<2)
+!       ReliefGC = Scr.MenusShadowGC;
+!     else
+!       ReliefGC = Scr.MenusReliefGC;
+!     NMenuGC = Scr.MenusGC;
+!     XSetWindowBackground(dpy,mr->w,Scr.MenuColors.back);
+!     }
+! #else
+!   ShadowGC = TShadowGC = Scr.StdShadowGC;
+!   if(Scr.d_depth<2)
+!     ReliefGC = TReliefGC = Scr.StdShadowGC;
+!   else
+!     ReliefGC = TReliefGC = Scr.StdReliefGC;
+!   NMenuGC = Scr.NormalGC;
+! #endif
+! #else
+!   ShadowGC = TShadowGC = Scr.StdShadowGC;
+    if(Scr.d_depth<2)
+!     ReliefGC = TReliefGC = Scr.StdShadowGC;
+    else
+!     ReliefGC = TReliefGC = Scr.StdReliefGC;
+!   NMenuGC = Scr.NormalGC;
+! #endif
+  
+    if(Scr.flags & MWMMenus)
+      {
+***************
+*** 261,285 ****
+      DrawSeparator(mr->w,ReliefGC,ReliefGC,0,0, mr->width-1,0,-1);
+  
+    if(*mi->item)
+!     XDrawString(dpy, mr->w, Scr.NormalGC,mi->x,text_y, mi->item, mi->strlen);
+    if(mi->strlen2>0)
+!     XDrawString(dpy, mr->w, Scr.NormalGC,mi->x2,text_y, mi->item2,mi->strlen2);
+  
+  #ifdef HOTKEYS
+    /* pete@tecc.co.uk: If the item has a hot key, underline it */
+    if (mi->hotkey > 0)
+!     DrawUnderline(mr->w,Scr.NormalGC,mi->x,text_y,mi->item,mi->hotkey - 1);
+    if (mi->hotkey < 0)
+!     DrawUnderline(mr->w,Scr.NormalGC,mi->x2,text_y,mi->item2, -1 - mi->hotkey);
+  #endif /* HOTKEYS */
+  
+    d=(Scr.EntryHeight-7)/2;
+    if(mi->func == F_POPUP)
+      if(mi->state)
+!       DrawTrianglePattern(mr->w, ShadowGC, ReliefGC, ShadowGC,mr->width-d-8,
+  			  y_offset+d-1, mr->width-d-1, y_offset+d+7);
+      else
+!       DrawTrianglePattern(mr->w, ReliefGC, ShadowGC, ReliefGC,mr->width-d-8,
+  			  y_offset+d-1, mr->width-d-1, y_offset+d+7);
+    return;
+  }
+--- 298,322 ----
+      DrawSeparator(mr->w,ReliefGC,ReliefGC,0,0, mr->width-1,0,-1);
+  
+    if(*mi->item)
+!     XDrawString(dpy, mr->w, NMenuGC,mi->x,text_y, mi->item, mi->strlen);
+    if(mi->strlen2>0)
+!     XDrawString(dpy, mr->w, NMenuGC,mi->x2,text_y, mi->item2,mi->strlen2);
+  
+  #ifdef HOTKEYS
+    /* pete@tecc.co.uk: If the item has a hot key, underline it */
+    if (mi->hotkey > 0)
+!     DrawUnderline(mr->w,NMenuGC,mi->x,text_y,mi->item,mi->hotkey - 1);
+    if (mi->hotkey < 0)
+!     DrawUnderline(mr->w,NMenuGC,mi->x2,text_y,mi->item2, -1 - mi->hotkey);
+  #endif /* HOTKEYS */
+  
+    d=(Scr.EntryHeight-7)/2;
+    if(mi->func == F_POPUP)
+      if(mi->state)
+!       DrawTrianglePattern(mr->w, TShadowGC, TReliefGC, TShadowGC, TArrowGC, mr->width-d-8,
+  			  y_offset+d-1, mr->width-d-1, y_offset+d+7);
+      else
+!       DrawTrianglePattern(mr->w, TReliefGC, TShadowGC, TReliefGC, TArrowGC, mr->width-d-8,
+  			  y_offset+d-1, mr->width-d-1, y_offset+d+7);
+    return;
+  }
+***************
+*** 320,331 ****
+   *  Draws a little Triangle pattern within a window
+   *
+   ****************************************************************************/
+! void DrawTrianglePattern(Window w,GC GC1,GC GC2,GC GC3,int l,int u,int r,int b)
+  {
+!   int m;
+! 
+!   m = (u + b)/2;
+! 
+    XDrawLine(dpy,w,GC1,l,u,l,b);
+  
+    XDrawLine(dpy,w,GC2,l,b,r,m);
+--- 357,376 ----
+   *  Draws a little Triangle pattern within a window
+   *
+   ****************************************************************************/
+! void DrawTrianglePattern(Window w,GC GC1,GC GC2,GC GC3,GC GC4,int l,int u,int r,int b)
+  {
+!   int m = (u + b)/2;
+! #ifndef NO_MORE_COLORS
+! #ifdef LOTS_OF_COLORS
+!   XPoint	pts[4];
+! 
+!   pts[0].x = l; pts[0].y = u;
+!   pts[1].x = l; pts[1].y = b;
+!   pts[2].x = r; pts[2].y = m;
+!   pts[3].x = l; pts[3].y = u;
+!   XFillPolygon(dpy,w,GC4,pts,4,Convex,CoordModeOrigin);
+! #endif
+! #endif
+    XDrawLine(dpy,w,GC1,l,u,l,b);
+  
+    XDrawLine(dpy,w,GC2,l,b,r,m);
+***************
+*** 657,663 ****
+  
+    Stashed_X = x;
+    Stashed_Y = y;
+!   
+    /* pop up the menu */
+    ActiveMenu = menu;
+    ActiveItem = NULL;
+--- 702,708 ----
+  
+    Stashed_X = x;
+    Stashed_Y = y;
+! 
+    /* pop up the menu */
+    ActiveMenu = menu;
+    ActiveItem = NULL;
+***************
+*** 664,669 ****
+--- 709,716 ----
+    
+    x -= (menu->width >> 1);
+    y -= (Scr.EntryHeight >> 1);
++ 
++   Button_menu = ((Context & C_LALL) | (Context & C_RALL));
+    
+    if((menu_on == 1)&&(Context&C_LALL))
+      {
+***************
+*** 727,733 ****
+  /*  UngrabEm(); */
+    UninstallRootColormap();
+    XFlush(dpy);
+!   if (Context & (C_WINDOW | C_FRAME | C_TITLE | C_SIDEBAR))
+      menuFromFrameOrWindowOrTitlebar = TRUE;
+    else
+      menuFromFrameOrWindowOrTitlebar = FALSE;
+--- 774,780 ----
+  /*  UngrabEm(); */
+    UninstallRootColormap();
+    XFlush(dpy);
+!   if (Context & (C_WINDOW | C_FRAME | C_TITLE | C_SIDEBAR)) 
+      menuFromFrameOrWindowOrTitlebar = TRUE;
+    else
+      menuFromFrameOrWindowOrTitlebar = FALSE;
+*** ../../fvwm/fvwm/screen.h	Sun Jan  2 02:31:13 1994
+--- ./screen.h	Wed Jan  5 23:12:03 1994
+***************
+*** 119,125 ****
+--- 119,137 ----
+  #ifndef NO_MORE_COLORS
+    ColorPair StickyColors; 	/* sticky fore/back colors */
+    ColorPair StickyRelief; 	/* sticky hilight colors */
++ #ifdef LOTS_OF_COLORS
++   ColorPair ButtonColors;	/* button colors for all windows */
++   ColorPair ButtonRelief;	/* button colors for all windows */
++   ColorPair MenuColors;		/* Root menu colors */
++   ColorPair MenuRelief;		/* Root menu colors */
++   ColorPair BorderColors;	/* Windows normal border colors */
++   ColorPair BorderRelief;	/* Windows normal border colors */
++   ColorPair HiBorderColors;	/* Windows highlighted border colors */
++   ColorPair HiBorderRelief;	/* Windows highlighted border colors */
++   ColorPair MenuArrowColors;	/* Submenu arrow colors */
++   ColorPair MenuArrowRelief;	/* Submenu arrow colors */
+  #endif
++ #endif
+    ColorPair HiColors; 	/* standard fore/back colors */
+    ColorPair StdRelief;
+    ColorPair HiRelief;
+***************
+*** 132,138 ****
+    MyFont IconFont;      /* for icon labels */
+  #endif
+    
+!   GC NormalGC;		        /* normal GC for menus, pager, resize window */
+    GC DrawGC;			/* GC to draw lines for move and resize */
+    GC HiReliefGC;                /* GC for highlighted window relief */
+    GC HiShadowGC;                /* GC for highlighted window shadow */
+--- 144,150 ----
+    MyFont IconFont;      /* for icon labels */
+  #endif
+    
+!   GC NormalGC;		        /* normal GC for pager, resize window */
+    GC DrawGC;			/* GC to draw lines for move and resize */
+    GC HiReliefGC;                /* GC for highlighted window relief */
+    GC HiShadowGC;                /* GC for highlighted window shadow */
+***************
+*** 139,146 ****
+    GC StdReliefGC;               /* GC for unselected window relief */
+    GC StdShadowGC;               /* GC for unselected window shadow */
+  #ifndef NO_MORE_COLORS
+!   GC StickyReliefGC;               /* GC for unselected sticky window relief */
+!   GC StickyShadowGC;               /* GC for unselected sticky window shadow */
+  #endif
+    GC FontGC;                    /* GC for non-standard fonts */
+  
+--- 151,173 ----
+    GC StdReliefGC;               /* GC for unselected window relief */
+    GC StdShadowGC;               /* GC for unselected window shadow */
+  #ifndef NO_MORE_COLORS
+!   GC StickyReliefGC;            /* GC for unselected sticky window relief */
+!   GC StickyShadowGC;            /* GC for unselected sticky window shadow */
+! #ifdef LOTS_OF_COLORS
+!   GC ButtonsMenuGC;             /* GC for window button menus */
+!   GC ButtonsReliefGC;           /* GC for window buttons */
+!   GC ButtonsShadowGC;           /* GC for window buttons */
+!   GC MenusGC;                   /* GC for root menus */
+!   GC MenusReliefGC;             /* GC for root menus */
+!   GC MenusShadowGC;             /* GC for root menus */
+!   GC BordersReliefGC;           /* GC for normal borders */
+!   GC BordersShadowGC;           /* GC for normal borders */
+!   GC HiBordersReliefGC;         /* GC for highlighted borders */
+!   GC HiBordersShadowGC;         /* GC for highlighted borders */
+!   GC MenusArrowGC;              /* GC for menu arrows */
+!   GC MenusArrowReliefGC;        /* GC for menu arrows */
+!   GC MenusArrowShadowGC;        /* GC for menu arrows */
+! #endif
+  #endif
+    GC FontGC;                    /* GC for non-standard fonts */
+  
+--- Cut Here ---
+-- 
+	 ______      _______
+	|  __  \    |  _____|	devmorfo@cs.mtu.edu  (Evmorfopoulos Dimitris)
+	| |  \  |   | |___              
+	| |   | |   |  ___|     Masters student working hard on        
+	| |___| |   | |_____
+	|_______| * |_______| * "Sliding Sunday, Week compression algorithm." 

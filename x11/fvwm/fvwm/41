@@ -1,0 +1,132 @@
+*** fvwm/fvwm.c.dist	Fri Apr  1 12:01:58 1994
+--- fvwm/fvwm.c	Sat Apr  2 11:30:37 1994
+***************
+*** 783,801 ****
+  {
+    int killed = 0;
+  #ifdef NEEDS_SIGCHLD
+! #if defined(SYSV) || defined(SVR4)
+    sigset_t newmask, oldmask;
+    int status;
+    pid_t pid;
+  #else
+    int oldmask;
+    int pid;
+!   int status;
+!   /* union wait status; */
+  #endif
+  
+    /* Need to block SIGCHLD while we do this */
+! #if defined(SYSV) || defined(SVR4)
+    sigemptyset(&newmask);
+    sigemptyset(&oldmask);
+    sigaddset(&newmask, SIGCHLD);
+--- 783,800 ----
+  {
+    int killed = 0;
+  #ifdef NEEDS_SIGCHLD
+! #if defined(SYSV) || defined(SVR4) || defined(_POSIX_SOURCE)
+    sigset_t newmask, oldmask;
+    int status;
+    pid_t pid;
+  #else
+    int oldmask;
+    int pid;
+!   union wait status;
+  #endif
+  
+    /* Need to block SIGCHLD while we do this */
+! #if defined(SYSV) || defined(SVR4) || defined(_POSIX_SOURCE)
+    sigemptyset(&newmask);
+    sigemptyset(&oldmask);
+    sigaddset(&newmask, SIGCHLD);
+***************
+*** 806,812 ****
+  
+    while (DeadChildren>0)
+      {
+! #if defined(SYSV) || defined(SVR4)
+        pid = waitpid(-1, &status, WNOHANG);
+  #else
+        pid = wait3(&status, WNOHANG, (struct rusage *)0);
+--- 805,811 ----
+  
+    while (DeadChildren>0)
+      {
+! #if defined(SYSV) || defined(SVR4) || defined(_POSIX_SOURCE)
+        pid = waitpid(-1, &status, WNOHANG);
+  #else
+        pid = wait3(&status, WNOHANG, (struct rusage *)0);
+***************
+*** 828,834 ****
+      }
+  
+    /* restore the original signal mask */
+! #if defined(SYSV) || defined(SVR4)
+    sigprocmask(SIG_SETMASK, &oldmask, &oldmask);
+  #else
+    (void) sigsetmask(oldmask);
+--- 827,833 ----
+      }
+  
+    /* restore the original signal mask */
+! #if defined(SYSV) || defined(SVR4) || defined(_POSIX_SOURCE)
+    sigprocmask(SIG_SETMASK, &oldmask, &oldmask);
+  #else
+    (void) sigsetmask(oldmask);
+*** fvwm/module.c.dist	Thu Mar 31 23:54:56 1994
+--- fvwm/module.c	Sat Apr  2 11:31:35 1994
+***************
+*** 67,78 ****
+    int closed = 0;
+  #ifdef NEEDS_SIGCHLD
+    int waits = 0;
+! #if defined(SYSV) || defined(SVR4)
+    pid_t pid;
+    int status;
+  #else
+!   /* union wait status; */
+!   int status;
+    int pid;
+  #endif
+  #endif
+--- 67,77 ----
+    int closed = 0;
+  #ifdef NEEDS_SIGCHLD
+    int waits = 0;
+! #if defined(SYSV) || defined(SVR4) || defined(_POSIX_SOURCE)
+    pid_t pid;
+    int status;
+  #else
+!   union wait status;
+    int pid;
+  #endif
+  #endif
+***************
+*** 93,99 ****
+  #ifdef NEEDS_SIGCHLD
+    while((closed>0)&&(waits < closed+100))
+      {
+! #if defined(SYSV) || defined(SVR4)
+        pid = waitpid(-1, &status, WNOHANG);
+  #else
+        pid = wait3(&status, WNOHANG, (struct rusage *)0);
+--- 92,98 ----
+  #ifdef NEEDS_SIGCHLD
+    while((closed>0)&&(waits < closed+100))
+      {
+! #if defined(SYSV) || defined(SVR4) || defined(_POSIX_SOURCE)
+        pid = waitpid(-1, &status, WNOHANG);
+  #else
+        pid = wait3(&status, WNOHANG, (struct rusage *)0);
+
+If you want to make fvwm using ONLY systemV world and bsd-like system
+which has POSIX library, this patch should not, but this is what you
+intend to ?
+
+I think 1.21[yz] cannot be compiled in NEWS-OS 4.x, Ultrix 4.3(or
+later), or somewhat bsd-like system which doesn't have POSIX library.
+I hope it'll be included 1.22a (?)...
+
+- -
+$DB->{"Nick"}->{$Mail->{"Sender"}} eq 'MAR_kun';

@@ -1,0 +1,368 @@
+Return-Path: mcrocker@student.umass.edu
+Return-Path: <mcrocker@student.umass.edu>
+Received: from eagle.is.lmsc.lockheed.com (eagle.lockheed.com) by rocket (4.1/SMI-4.1)
+	id AA00677; Wed, 8 Dec 93 15:53:52 EST
+Received: by eagle.is.lmsc.lockheed.com (5.57/Ultrix-4.2)
+	id AA29776; Wed, 8 Dec 93 12:55:43 -0800
+Received: from twain.ucs.umass.edu by pobox.ucs.umass.edu (PMDF V4.2-14 #2573)
+ id <01H68Q6A8XLS0024BF@pobox.ucs.umass.edu>; Wed, 8 Dec 1993 15:38:14 -0500
+Received: from localhost (mcrocker@localhost) by twain.ucs.umass.edu
+ (8.6.4/8.6.4) id PAA06664 for nation@rocket.sanders.lockheed.com; Wed,
+ 8 Dec 1993 15:38:10 -0500
+Date: Wed, 08 Dec 1993 15:38:10 -0500 (EST)
+From: "Matthew S. Crocker" <mcrocker@student.umass.edu>
+Subject: fvwm 1.11 & force-mono patch
+To: nation@rocket.sanders.lockheed.com
+Message-Id: <199312082038.PAA06664@twain.ucs.umass.edu>
+Mime-Version: 1.0
+X-Mailer: ELM [version 2.4 PL22]
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: 7bit
+Content-Length: 9510
+
+
+
+Included is a patch which will force fvwm into mono mode for its
+window decorations.  This patch came about because the mono Xstation I use has
+a broken server and thinks its 8-bit, hence, the decorations look
+ugly!.
+
+Apply this patch if you want pretty decorations on 1-bit displays
+
+Patch Updated for verson 1.11 it should replace the patch in the
+unsupported directory that comes with fvwm-1.11-sources.tar.gz
+
+Thanks again for a wonderful window manager!
+
+-Matt/2
+
+-- 
+-Matthew S Crocker               "The mask, given time, comes
+mcrocker@twain.ucs.umass.edu      to be the face itself."  -anonymous
+*OS/2*OS/2*OS/2*OS/2*OS/2*OS/2*OS/2*OS/2*OS/2*OS/2*OS/2*OS/2*OS/2*OS/2*OS/2*
+ *linux*linux*linux*linux*linux*linux*linux*linux*linux*linux*linux*linux*
+
+
+---- CUT HERE ------
+Only in fvwm: Makefile
+diff -c fvwm/Makefile.noImake fvmw-forcemono/Makefile.noImake
+*** fvwm/Makefile.noImake	Wed Dec  1 16:33:10 1993
+--- fvmw-forcemono/Makefile.noImake	Wed Dec  8 14:03:02 1993
+***************
+*** 89,97 ****
+  
+  # if you don't want separate colors for sticky icons,
+  # comment this out
+! EF5 = -DMORE_COLORS
+  
+! EXTRAFLAGS = $(EF1) $(EF2) $(EF3) $(EF4) $(EF5) $(MENUFLAGS)
+  
+  
+  
+--- 89,106 ----
+  
+  # if you don't want separate colors for sticky icons,
+  # comment this out
+! EF5 = -DMORE_COLORS 
+  
+! # if you have a 1 bit frame-buffer but your Xserver thinks it has
+! # color,  then comment out the next line.  This will force fvwm into
+! # thinking that the screen is mono and will draw all screen
+! # decorations in black & white  (prettier)
+! #
+! # Matthew S. Crocker  mcrocker@twain.ucs.umass.edu
+! #
+! #EF6 = -DFORCEMONO
+! 
+! EXTRAFLAGS = $(EF1) $(EF2) $(EF3) $(EF4) $(EF5) $(EF6) $(MENUFLAGS)
+  
+  
+  
+diff -c fvwm/add_window.c fvmw-forcemono/add_window.c
+*** fvwm/add_window.c	Wed Dec  1 09:54:46 1993
+--- fvmw-forcemono/add_window.c	Wed Dec  8 13:35:46 1993
+***************
+*** 349,356 ****
+--- 349,358 ----
+      2*tmp_win->boundary_width;
+  
+    valuemask = CWBorderPixel | CWCursor | CWEventMask;
++ #ifndef FORCEMONO
+    if(Scr.d_depth < 2)
+      {
++ #endif FORCEMONO
+        attributes.background_pixmap = Scr.light_gray_pixmap ;
+  #ifdef MORE_COLORS
+        if(tmp_win->flags & STICKY)
+***************
+*** 357,362 ****
+--- 359,365 ----
+  	attributes.background_pixmap = Scr.sticky_gray_pixmap;
+  #endif
+        valuemask |= CWBackPixmap;
++ #ifndef FORCEMONO
+      }
+    else
+      {
+***************
+*** 367,372 ****
+--- 370,376 ----
+  #endif
+        valuemask |= CWBackPixel;
+      }
++ #endif FORCEMONO
+    attributes.border_pixel = Scr.StdRelief.back;
+  #ifdef MORE_COLORS
+        if(tmp_win->flags & STICKY)
+diff -c fvwm/borders.c fvmw-forcemono/borders.c
+*** fvwm/borders.c	Thu Dec  2 09:13:14 1993
+--- fvmw-forcemono/borders.c	Wed Dec  8 13:39:36 1993
+***************
+*** 160,169 ****
+--- 160,173 ----
+      {
+        if(NewColor)
+  	{
++ #ifndef FORCEMONO
+  	  if(Scr.d_depth < 2)
++ #endif FORCEMONO
+  	    XSetWindowBackgroundPixmap(dpy,t->pager_view,BackPixmap);
++ #ifndef FORCEMONO
+  	  else
+  	    XSetWindowBackground(dpy,t->pager_view,BackColor);
++ #endif FORCEMONO
+  	  XClearWindow(dpy,t->pager_view);
+  	}
+        if((t->icon_name != NULL)&&(Scr.PagerFont.height > 0))
+***************
+*** 183,192 ****
+--- 187,199 ----
+    
+    valuemask = CWBorderPixel;
+    attributes.border_pixel = BorderColor;
++ #ifndef FORCEMONO
+    if(Scr.d_depth < 2)
+      {
++ #endif FORCEMONO
+        attributes.background_pixmap = BackPixmap;
+        valuemask |= CWBackPixmap;
++ #ifndef FORCEMONO
+      }
+    else
+      {
+***************
+*** 193,198 ****
+--- 200,206 ----
+        attributes.background_pixel = BackColor;
+        valuemask |= CWBackPixel;
+      }
++ #endif FORCEMONO
+    
+    if(t->flags & (BORDER|TITLE))
+      {
+***************
+*** 315,325 ****
+--- 323,336 ----
+        if(t->boundary_width < 2)
+  	{
+  	  flush_expose (t->frame);
++ #ifndef FORCEMONO
+        	  if(Scr.d_depth <2)
+  	    {
++ #endif FORCEMONO
+  	      XSetWindowBorder(dpy,t->frame,TextColor);
+  	      XSetWindowBorder(dpy,t->Parent,TextColor);
+  	      XSetWindowBorder(dpy,t->w,TextColor);
++ #ifndef FORCEMONO
+  	    }
+  	  else
+  	    {
+***************
+*** 327,332 ****
+--- 338,344 ----
+  	      XSetWindowBorder(dpy,t->Parent,BackColor);
+  	      XSetWindowBorder(dpy,t->w,BackColor);
+  	    }
++ #endif FORCEMONO
+  	}
+        else
+  	{
+***************
+*** 408,415 ****
+--- 420,429 ----
+    
+    /* for mono, we clear an area in the title bar where the window
+     * title goes, so that its more legible. For color, no need */
++ #ifndef FORCEMONO
+    if(Scr.d_depth<2)
+      {
++ #endif FORCEMONO
+        RelieveWindow(t->title_w,0,0,hor_off-2,t->title_height,
+  		    ReliefGC, ShadowGC, BOTTOM_HILITE);
+        RelieveWindow(t->title_w,hor_off+w+2,0,
+***************
+*** 421,426 ****
+--- 435,441 ----
+        
+        XDrawLine(dpy,t->title_w,ShadowGC,hor_off+w+1,0,hor_off+w+1,
+  		t->title_height);
++ #ifndef FORCEMONO
+      }
+    else
+      { 
+***************
+*** 427,433 ****
+        RelieveWindow(t->title_w,0,0,t->title_width,t->title_height,
+  		    ReliefGC, ShadowGC, BOTTOM_HILITE);
+      }
+!   
+    XDrawString (dpy, t->title_w,Scr.FontGC,hor_off, Scr.WindowFont.y+1, 
+  	       t->name, strlen(t->name));
+    XFlush(dpy);
+--- 442,448 ----
+        RelieveWindow(t->title_w,0,0,t->title_width,t->title_height,
+  		    ReliefGC, ShadowGC, BOTTOM_HILITE);
+      }
+! #endif FORCEMONO  
+    XDrawString (dpy, t->title_w,Scr.FontGC,hor_off, Scr.WindowFont.y+1, 
+  	       t->name, strlen(t->name));
+    XFlush(dpy);
+diff -c fvwm/configure.c fvmw-forcemono/configure.c
+*** fvwm/configure.c	Wed Dec  1 14:54:31 1993
+--- fvmw-forcemono/configure.c	Wed Dec  8 13:39:36 1993
+***************
+*** 566,573 ****
+--- 566,575 ----
+    have_em = 1;
+  
+    /* setup default colors */
++ #ifndef FORCEMONO
+    if(Scr.d_depth < 2)
+      {
++ #endif FORCEMONO
+        /* black and white - override user choices */
+        Scr.StdColors.back = GetColor(white);
+        Scr.StdColors.fore = GetColor(black); 
+***************
+*** 589,594 ****
+--- 591,597 ----
+        PagerBackColor     = GetColor(white);
+        PagerForeColor     = GetColor(black);
+  #endif
++ #ifndef FORCEMONO
+      }
+    else
+      {
+***************
+*** 614,619 ****
+--- 617,623 ----
+        PagerForeColor     = GetColor(Pagerfore);
+  #endif
+      }
++ #endif FORCEMONO
+  
+    /* load the font */
+    if ((Scr.StdFont.font = XLoadQueryFont(dpy, Scr.StdFont.name)) == NULL)
+diff -c fvwm/functions.c fvmw-forcemono/functions.c
+*** fvwm/functions.c	Wed Dec  1 10:09:24 1993
+--- fvmw-forcemono/functions.c	Wed Dec  8 13:41:07 1993
+***************
+*** 346,355 ****
+--- 346,359 ----
+  	  BackPixmap = Scr.light_gray_pixmap;
+  	  BackColor = Scr.StdColors.back;
+  	}
++ #ifndef FORCEMONO
+        if(Scr.d_depth < 2)
++ #endif FORCEMONO
+  	XSetWindowBackgroundPixmap(dpy,tmp_win->pager_view,BackPixmap);
++ #ifndef FORCEMONO
+        else
+  	XSetWindowBackground(dpy,tmp_win->pager_view,BackColor);
++ #endif FORCEMONO
+        XClearWindow(dpy,tmp_win->pager_view);
+        if((tmp_win->icon_name != NULL)&&(Scr.PagerFont.height > 0))
+  	{
+diff -c fvwm/fvwm.c fvmw-forcemono/fvwm.c
+*** fvwm/fvwm.c	Thu Dec  2 09:15:29 1993
+--- fvmw-forcemono/fvwm.c	Wed Dec  8 14:07:27 1993
+***************
+*** 240,248 ****
+  
+      /* read config file, set up menus, colors, fonts */
+      MakeMenus();
+! 
+      if(Scr.d_depth<2)
+        {
+  	Scr.gray_pixmap = 
+  	XCreatePixmapFromBitmapData(dpy,Scr.Root,g_bits, g_width,g_height,
+  				    Scr.StdColors.fore,Scr.StdColors.back,
+--- 240,249 ----
+  
+      /* read config file, set up menus, colors, fonts */
+      MakeMenus();
+! #ifndef FORCEMONO
+      if(Scr.d_depth<2)
+        {
++ #endif
+  	Scr.gray_pixmap = 
+  	XCreatePixmapFromBitmapData(dpy,Scr.Root,g_bits, g_width,g_height,
+  				    Scr.StdColors.fore,Scr.StdColors.back,
+***************
+*** 257,263 ****
+--- 258,266 ----
+  				   Scr.StickyColors.fore,Scr.StickyColors.back,
+  				   Scr.d_depth);
+  #endif
++ #ifndef FORCEMONO
+        }
++ #endif
+  
+      /* create a window which will accept the keyboard focus when no other 
+         windows have it */
+Only in fvmw-forcemono: fvwm.man.ps
+Common subdirectories: fvwm/fvwm_icons and fvmw-forcemono/fvwm_icons
+diff -c fvwm/icons.c fvmw-forcemono/icons.c
+*** fvwm/icons.c	Wed Dec  1 15:03:33 1993
+--- fvmw-forcemono/icons.c	Wed Dec  8 14:59:10 1993
+***************
+*** 302,311 ****
+--- 302,315 ----
+  
+    if(Scr.Hilite == Tmp_win)
+      {
++ #ifndef FORCEMONO
+        if(Scr.d_depth < 2)
++ #endif FORCEMONO
+  	Relief = Scr.HiShadowGC;
++ #ifndef FORCEMONO
+        else
+  	Relief = Scr.HiReliefGC;
++ #endif
+        Shadow = Scr.HiShadowGC;
+        XSetWindowBackground(dpy,Tmp_win->icon_w,Scr.HiColors.back);
+        if((Tmp_win->flags & ICON_OURS)&&(Tmp_win->icon_pixmap_w != None))
+Only in fvmw-forcemono: make.out
+diff -c fvwm/menus.c fvmw-forcemono/menus.c
+*** fvwm/menus.c	Mon Nov 29 10:36:03 1993
+--- fvmw-forcemono/menus.c	Wed Dec  8 13:42:42 1993
+***************
+*** 186,195 ****
+--- 186,199 ----
+    text_y = y_offset + Scr.StdFont.y;
+  
+    ShadowGC = Scr.StdShadowGC;
++ #ifndef FORCEMONO
+    if(Scr.d_depth<2)
++ #endif FORCEMONO
+      ReliefGC = Scr.StdShadowGC;
++ #ifndef FORCEMONO
+    else
+      ReliefGC = Scr.StdReliefGC;
++ #endif FORCEMONO
+  
+    if(Scr.flags & MWMMenus)
+      {
+Common subdirectories: fvwm/sample_configs and fvmw-forcemono/sample_configs
+Common subdirectories: fvwm/unsupported_patches and fvmw-forcemono/unsupported_patches
+Common subdirectories: fvwm/xpmroot and fvmw-forcemono/xpmroot

@@ -1,0 +1,147 @@
+From hughes@budgie.eng.uop.edu Tue Nov  2 20:10:17 1993
+Return-Path: <hughes@budgie.eng.uop.edu>
+Received: from eagle.is.lmsc.lockheed.com by rocket.sanders.lockheed.com (4.1/SMI-4.1)
+	id AA13216; Tue, 2 Nov 93 20:10:14 EST
+Received: by eagle.is.lmsc.lockheed.com (5.57/Ultrix3.0-C)
+	id AA25775; Tue, 2 Nov 93 17:11:28 -0800
+Received: from budgie.eng.uop.edu by vms1.cc.uop.edu (MX V3.1B) with SMTP; Tue,
+          02 Nov 1993 17:10:55 PST
+Received: by budgie.eng.uop.edu (5.67/SMI-4.1) id AA02767; Tue, 2 Nov 93
+          17:10:26 -0800
+Date: Tue, 2 Nov 93 17:10:26 -0800
+From: hughes@budgie.eng.uop.edu (Ken Hughes)
+Message-Id: <9311030110.AA02767@budgie.eng.uop.edu>
+To: nation@rocket.sanders.lockheed.com
+Subject: fvwm-0.99: patch for cursors
+Status: RO
+
+I downloaded fvwm-0.99 and have really enjoyed using it so far.  I decided
+last weekend to switch over from twm and generate a new .fvwmrc file but
+discovered that there wasn't any support for user-defined cursors.  It was a
+pretty simple patch so I thought I'd pass it along in case you're interested
+in incorporating it into the next release.  Enjoy!
+
+Ken
+
+--------------------------Cut here--------------------------
+*** fvwm.1.orig	Mon Oct 25 07:50:58 1993
+--- fvwm.1	Fri Oct 29 18:26:45 1993
+***************
+*** 188,189 ****
+--- 188,199 ----
+
++ .IP "CurForeColor \fIcolorname\fP"
++ Sets the foreground color for all user defined cursors
++ to \fIcolorname\fP. When using a monochrome screen, this option is
++ ignored, and black is used.
++
++ .IP "CurBackColor \fIcolorname\fP"
++ Sets the background color for  all user defined cursors
++ to \fIcolorname\fP. When using a monochrome screen, this option is
++ ignored, and white is used.
++
+  .IP "PagerBackColor \fIcolorname\fP"
+***************
+*** 511,512 ****
+--- 521,528 ----
+  .fi
++ .IP "Cursor \fI cursor_num image mask\fP"
++ In this format the \fIimage\fP and \fImask\fP arguments
++ specify the pathnames of  user-specified glyph image and masks in standard
++ X11 bitmap format.  The foreground and background colors of these cursors
++ can be selected with the CurForeColor and CurBackColor configuration options.
++ \fICursor num\fP tells which cursor to change as described above.
+
+*** configure.c.orig	Sun Oct 24 10:53:55 1993
+--- configure.c	Fri Oct 29 18:09:22 1993
+***************
+*** 23,24 ****
+--- 23,25 ----
+  #include <X11/Xatom.h>
++ #include <X11/cursorfont.h>
+  #include "fvwm.h"
+***************
+*** 36,37 ****
+--- 37,40 ----
+  char *Hifore;
++ char *Curback;
++ char *Curfore;
+  #ifndef NO_PAGER
+***************
+*** 100,101 ****
+--- 103,106 ----
+    {"HiBackColor",       assign_string,  &Hiback, (int *)0},
++   {"CurForeColor",      assign_string,  &Curfore, (int *)0},
++   {"CurBackColor",      assign_string,  &Curback, (int *)0},
+  #ifndef NO_ICONS
+***************
+*** 248,249 ****
+--- 253,256 ----
+    Hifore = black;
++   Curback = white;
++   Curfore = black;
+  #ifndef NO_PAGER
+***************
+*** 383,384 ****
+--- 390,396 ----
+    int num,cursor_num,cursor_style;
++   char sourcefile[128],maskfile[128];
++   XColor foreg, backg;
++   unsigned int width, height, xhot, yhot;
++   Pixmap source, mask ;
++   XWindowAttributes attributes;
+
+***************
+*** 385,389 ****
+    num = sscanf(text,"%d %d",&cursor_num, &cursor_style);
+!   if((num != 2)||(cursor_num >= MAX_CURSORS)||(cursor_num<0))
+      {
+!       fvwm_err("Bad cursor in line %s",orig_tline,NULL,NULL);
+        return;
+--- 397,401 ----
+    num = sscanf(text,"%d %d",&cursor_num, &cursor_style);
+!   if( (num == 2 ) && (cursor_num < MAX_CURSORS) && (cursor_num>=0))
+      {
+!       Scr.FvwmCursors[cursor_num] = XCreateFontCursor(dpy,cursor_style);
+        return;
+***************
+*** 390,392 ****
+      }
+!   Scr.FvwmCursors[cursor_num] = XCreateFontCursor(dpy,cursor_style);
+  }
+--- 402,435 ----
+      }
+!
+!   num = sscanf(text,"%d %s %s",&cursor_num, sourcefile, maskfile );
+!   if( (num == 3 ) && (cursor_num < MAX_CURSORS) && (cursor_num>=0))
+!     {
+!       XGetWindowAttributes(dpy,Scr.Root,&attributes);
+!       if (!XParseColor (dpy, attributes.colormap, Curfore, &foreg))
+! 	{
+! 	  nocolor("parse",Curfore);
+! 	}
+!       else if(!XAllocColor (dpy, attributes.colormap, &foreg))
+! 	{
+! 	  nocolor("alloc",Curfore);
+! 	}
+!       if (!XParseColor (dpy, attributes.colormap, Curback, &backg))
+! 	{
+! 	  nocolor("parse",Curback);
+! 	}
+!       else if(!XAllocColor (dpy, attributes.colormap, &backg))
+! 	{
+! 	  nocolor("alloc",Curback);
+! 	}
+!       if ( XReadBitmapFile ( dpy , Scr.Root , maskfile ,
+! 	    &width, &height , &mask , &xhot , &yhot ) == BitmapSuccess &&
+! 	   XReadBitmapFile ( dpy , Scr.Root , sourcefile ,
+! 	    &width, &height , &source , &xhot , &yhot ) == BitmapSuccess )
+! 	{
+! 	  Scr.FvwmCursors[cursor_num] = XCreatePixmapCursor(dpy,source,mask,
+! 			&foreg , &backg, xhot , yhot );
+! 	  return;
+! 	}
+!     }
+!   fvwm_err("Bad cursor in line %s",orig_tline,NULL,NULL);
+  }
+--------------------------Cut here--------------------------
