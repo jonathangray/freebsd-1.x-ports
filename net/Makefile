@@ -19,6 +19,10 @@ SUBDIR += zircon #			depends on tcl, tk & dpwish
 .endif
 .endif
 
+.if exists(/usr/X386)
+SUBDIR += ytalk
+.endif
+
 .include <bsd.subdir_ports.mk>
 
 # End of Makefile.
