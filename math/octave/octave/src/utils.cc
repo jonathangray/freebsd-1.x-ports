@@ -71,7 +71,7 @@ extern "C"
 LOSE! LOSE!
 #endif
 
-extern int ioctl (int, int, ...);
+extern int ioctl (int, unsigned long, ...);
 char *tilde_expand (char *s); /* From readline's tilde.c */
 }
 
@@ -247,7 +247,9 @@ raw_mode (int on)
 
 	s.c_lflag &= ~(ICANON|ECHO|ECHOE|ECHOK|ECHONL);
 	s.c_oflag |=  (OPOST|ONLCR);
+#ifndef __386BSD__
 	s.c_oflag &= ~(OCRNL|ONOCR|ONLRET);
+#endif
 	s.c_cc[VMIN] = 1;
 	s.c_cc[VTIME] = 0;
       }      

@@ -627,7 +627,11 @@ terminal_prep_terminal ()
   tcgetattr (tty, &original_termios);
   tcgetattr (tty, &ttybuff);
   ttybuff.c_iflag &= (~ISTRIP & ~INLCR & ~IGNCR & ~ICRNL & ~IXON);
+#ifdef __386BSD__
+  ttybuff.c_oflag &= (~ONLCR);
+#else
   ttybuff.c_oflag &= (~ONLCR & ~OCRNL);
+#endif
   ttybuff.c_lflag &= (~ICANON & ~ECHO);
 
   ttybuff.c_cc[VMIN] = 1;

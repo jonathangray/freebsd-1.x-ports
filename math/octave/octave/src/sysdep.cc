@@ -31,7 +31,6 @@ Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 
 #ifdef __386BSD__
 # include <floatingpoint.h>
-# define FP_ALL (FP_X_OFL | FP_X_INV | FP_X_DZ | FP_X_UFL| FP_X_DNML | FP_X_IMP)
 #endif
 
 #ifdef NeXT
@@ -45,7 +44,8 @@ static void
 malloc_handler (int code)
 {
   if (code == 5)
-    message ("hopefully recoverable malloc error: freeing wild pointer");
+    message ("malloc_handler",
+	     "hopefully recoverable malloc error: freeing wild pointer");
   else
     {
       panic ("probably irrecoverable malloc error: code %d", code);
@@ -63,8 +63,8 @@ void
 sysdep_init (void)
 {
 #ifdef __386BSD__
-/* disable trapping on all exceptions */
-	fpsetmask(~(FP_ALL));
+/* disable trapping on common exceptions */
+	fpsetmask(~(FP_X_OFL | FP_X_INV | FP_X_DZ | FP_X_DNML | FP_X_UFL | FP_X_IMP));
 #endif
 #ifdef NeXT
   NeXT_init ();

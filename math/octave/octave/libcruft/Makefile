@@ -19,8 +19,8 @@ include $(TOPDIR)/Makeconf
 # added to libcruft.a.  If you add a new directory here, you also need
 # generate a new configure script (edit configure.in and run autoconf).
 
-CRUFT_DIRS = blas dassl fftpack fsqp lapack linpack minpack misc \
-	npsol odepack qpsol quadpack ranlib villad
+CRUFT_DIRS = balgen blas dassl eispack fftpack fsqp lapack linpack \
+	minpack misc npsol odepack qpsol quadpack ranlib villad
 
 SUBDIRS = $(CRUFT_DIRS)
 
@@ -41,7 +41,7 @@ CRUFT_OBJ = $(CRUFT_OBJ1) misc/d1mach.o misc/dostop.o
 
 ../libcruft.a: $(CRUFT_OBJ)
 	rm -f ../libcruft.a
-	$(AR) cTq ../libcruft.a `lorder $(CRUFT_OBJ) | tsort`
+	$(AR) $(ARFLAGS) ../libcruft.a $(CRUFT_OBJ)
 	$(RANLIB) ../libcruft.a
 
 $(CRUFT_OBJ):

@@ -14,27 +14,29 @@ VPATH = .
 
 include $(TOPDIR)/Makeconf
 
-MANFILES = # octave.1 # Don't distribute this -- it's way out of date.
-
 SOURCES =
 
-TEXINFO = ack.texi bugs.texi fn-idx.texi install.texi invoke.texi \
-	vr-idx.texi bugs1.texi fcn.texi install1.texi octave.texi \
-	cp-idx.texi gpl.texi intro.texi var.texi \
-	expr.texi stmt.texi rluser.texi texinfo.tex
+TEXINFO = ack.texi amuse.texi arith.texi bugs.texi bugs1.texi \
+	control.texi cp-idx.texi diffeq.texi expr.texi extend.texi \
+	fcn.texi fn-idx.texi gpl.texi help.texi history.texi \
+	hsuser.texi install.texi install1.texi intro.texi invoke.texi \
+	io.texi linalg.texi matrix.texi nonlin.texi octave.texi \
+	op-idx.texi optim.texi plot.texi program.texi quad.texi \
+	rluser.texi signal.texi special.texi stats.texi stmt.texi \
+	strings.texi system.texi using.texi var.texi vr-idx.texi
+
+FORMATTED =  octave.dvi octave.ps octave.info octave.info-[0-9]*
+
+DISTFILES = Makefile.in $(TEXINFO) $(FORMATTED) texinfo.tex
 
 SPELL = $(patsubst %.texi, %.spell, $(TEXINFO))
-
-DISTFILES = Makefile.in $(TEXINFO) $(MANFILES) octave.info*
-# Maybe distribute these someday, but not now.
-#	octave.dvi octave.ps
 
 %.spell : %.texi
 	rm -f $@
 	sed -e 's/@@/ at /g' -e 's/@[a-zA-Z]*//g' $< | spell > $@.tmp
 	mv $@.tmp $@
 
-all: octave.info # octave.dvi octave.ps
+all: octave.info octave.dvi octave.ps
 .PHONY: all
 
 octave.info: $(TEXINFO)
@@ -75,9 +77,7 @@ install: all
 .PHONY: install
 
 uninstall:
-	for f in $(MANFILES) ; do \
-		rm -f $(mandir)/`basename $$f 1`$(manext) ; \
-	done
+	rm -f $(infodir)/octave.info*
 .PHONY: uninstall
 
 tags: $(SOURCES)
@@ -114,3 +114,7 @@ local-dist: all
 dist: all
 	ln $(DISTFILES) ../`cat ../.fname`/doc
 .PHONY: dist
+
+doc-dist: all
+	ln $(FORMATTED) ../`cat ../.fname`/doc
+.PHONY: doc-dist

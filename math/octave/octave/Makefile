@@ -15,15 +15,15 @@ VPATH = .
 include Makeconf
 
 DISTFILES = COPYING ChangeLog Makefile.in Makeconf.in NEWS README \
-	THANKS INSTALL INSTALL.OCTAVE BUGS PLOTTING PROJECTS \
-	f2c-compat.sh flibs.sh configure configure.in config.guess \
-	octave.sh octave-mode.el doinstall.sh mkpath.c
+	README.NLP THANKS INSTALL INSTALL.OCTAVE BUGS PLOTTING \
+	PROJECTS f2c-compat.sh flibs.sh configure configure.in \
+	config.guess octave.sh octave-mode.el doinstall.sh mkpath.c
 
 # Complete directory trees to distribute.
 DISTDIRS = dld
 
 # Subdirectories to run make in for the primary targets.
-SUBDIRS = libcruft liboctave  readline src doc scripts 
+SUBDIRS = libcruft liboctave  info readline src doc scripts 
 
 # Subdirectories to run `make dist' in
 DISTSUBDIRS = $(SUBDIRS) test
@@ -53,6 +53,10 @@ liboctave:
 dld:
 	cd dld ; $(MAKE) all
 .PHONY: dld
+
+info:
+	cd info ; $(MAKE) all
+.PHONY: info
 
 readline:
 	cd readline ; $(MAKE) all
@@ -120,6 +124,9 @@ realclean:
 	rm -f *.a Makefile config.status
 .PHONY: realclean
 
+# Now that things are under RCS control, we need to do the recursive
+# chmod so that the distributed files end up with reasonable modes.
+
 local-dist: octave.info INSTALL.info BUGS.info
 	echo octave-local-$(version) > .fname
 	rm -rf `cat .fname`
@@ -128,7 +135,10 @@ local-dist: octave.info INSTALL.info BUGS.info
 	for dir in $(DISTDIRS); do ln -s ../$$dir `cat .fname`; done
 	for dir in $(DISTSUBDIRS); do mkdir `cat .fname`/$$dir; cd $$dir; $(MAKE) $@; cd ..; done
 	tar chf `cat .fname`.tar `cat .fname`
-	rm -rf `cat .fname` .fname
+	rm -rf `cat .fname`
+	tar xf `cat .fname`.tar
+	chmod -R a+rwX `cat .fname`
+	tar cf `cat .fname`.tar `cat .fname`
 .PHONY: local-dist
 
 links-for-dist: octave.info INSTALL.info BUGS.info
@@ -152,27 +162,50 @@ binary-dist: links-for-bin-dist .fname
 	strip src/octave
 	ln src/octave `cat .fname`/octave
 	tar chf `cat .fname`.tar `cat .fname`
+	rm -rf `cat .fname`
+	tar xf `cat .fname`.tar
+	chmod -R a+rwX `cat .fname`
+	tar cf `cat .fname`.tar `cat .fname`
 	rm -rf `cat .fname` .fname
 .PHONY: binary-dist
 
 dist: links-for-dist
 	tar chf `cat .fname`.tar `cat .fname`
+	rm -rf `cat .fname`
+	tar xf `cat .fname`.tar
+	chmod -R a+rwX `cat .fname`
+	tar cf `cat .fname`.tar `cat .fname`
 	rm -rf `cat .fname` .fname
 .PHONY: dist
 
+doc-dist:
+	echo octave-$(version) > .fname
+	echo octave-doc-$(version).tar > .tarfname
+	rm -rf `cat .fname`
+	mkdir `cat .fname`
+	ln README.doc COPYING `cat .fname`
+	mkdir `cat .fname`/doc; cd doc; $(MAKE) doc-dist
+	tar chf `cat .tarfname` `cat .fname`
+	rm -rf `cat .fname`
+	tar xf `cat .tarfname`
+	chmod -R a+rwX `cat .fname`
+	tar cf `cat .tarfname` `cat .fname`
+	rm -rf `cat .fname` .fname
+.PHONY: doc-dist
+
 dist-z:
-	echo octave-$(versin).tar > .fname
+	echo octave-$(version).tar > .fname
 	gzip --best `cat .fname`
 .PHONY: dist-z
 
 split-dist:
-	echo octave-$(version).tar.z > .fname
+	echo octave-$(version).tar.gz > .fname
 	split -b 1350k `cat .fname` `cat .fname`-
 	rm -f .fname
 .PHONY: split-dist
 
 split-local-dist:
-	echo octave-local-$(version).tar.z > .fname
+	echo octave-local-$(version).tar.gz > .fname
 	split -b 1350k `cat .fname` `cat .fname`-
 	rm -f .fname
 .PHONY: split-local-dist

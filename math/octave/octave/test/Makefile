@@ -18,24 +18,24 @@ SOURCES =
 
 DISTFILES = Makefile.in $(SOURCES)
 
-SUBDIRS = octave config
+SUBDIRS =
+
+OCTAVE_BINARY = ../src/octave
+
+OCTAVE_SCRIPT_PATH = "$(srcdir)/../scripts"
+
+# Complete directory trees to distribute.
+DISTDIRS = config octave.test
 
 all: check
 .PHONY: all
 
-# This sucks, but it looks like runtest doesn't search in $(srcdir)
-# for the init file and I don't see a better way...
-
 check:
-	@if test "$(srcdir)" = "." ; then \
-	  true ; \
-	else \
-	  cp $(srcdir)/config/unix-octave.exp config/unix-octave.exp ; \
-	fi
 	@if test -n "$(RUNTEST)" ; then \
 	  $(RUNTEST) \
-	    OCTAVE_PATH="$(srcdir)/../scripts" OCTAVE="../src/octave" \
-	    --all --tool octave --srcdir $(srcdir) ; \
+	    OCTAVE="$(OCTAVE_BINARY)" \
+	    OCTAVE_SCRIPT_PATH="$(OCTAVE_SCRIPT_PATH)" \
+	    --tool octave --srcdir $(srcdir) ; \
 	else \
 	  echo "***" ; \
 	  echo "*** Sorry, I can't run tests without DejaGnu" ; \
@@ -71,11 +71,11 @@ realclean: distclean
 .PHONY: realclean
 
 local-dist:
-	for dir in $(SUBDIRS); do mkdir ../`cat ../.fname`/test/$$dir; cd $$dir; $(MAKE) $@; cd ..; done
 	ln $(DISTFILES) ../`cat ../.fname`/test
+	for dir in $(DISTDIRS); do ln -s ../../test/$$dir ../`cat ../.fname`/test; done
 .PHONY: local-dist
 
 dist:
-	for dir in $(SUBDIRS); do mkdir ../`cat ../.fname`/test/$$dir; cd $$dir; $(MAKE) $@; cd ..; done
 	ln $(DISTFILES) ../`cat ../.fname`/test
+	for dir in $(DISTDIRS); do ln -s ../../test/$$dir ../`cat ../.fname`/test; done
 .PHONY: dist
