@@ -5,15 +5,15 @@
 SUBDIR =
 G_SUBDIR =
 
-SUBDIR += blt
 SUBDIR += ghostscript
 SUBDIR += ghostview
 SUBDIR += jpeg
 SUBDIR += pbmplus
 SUBDIR += tiff
 SUBDIR += tk #	depends on tcl, which is made by lang/Makefile
-SUBDIR += ups
-#SUBDIR += urt
+SUBDIR += blt
+#SUBDIR += ups
+SUBDIR += urt
 SUBDIR += xlock
 SUBDIR += xv
 
