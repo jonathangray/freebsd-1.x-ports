@@ -91,7 +91,7 @@
 /* CONFIGURE_DATE
  *	This symbol contains the last date that configure was run for elm -v output.
  */
-#define		CONFIGURE_DATE	"Mon Dec 27 21:31:53 PST 1993"
+#define		CONFIGURE_DATE	"Mon Dec 27 21:56:03 PST 1993"
 
 /* ASCII_CTYPE:
  *	This symbol, if defined, indicates that the ctype functions and

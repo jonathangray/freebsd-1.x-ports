@@ -1,5 +1,5 @@
 #
-# : Makefile.SH,v 1.3 1993/10/09 19:36:02 smace Exp $
+# : Makefile.SH,v 1.7 1993/12/28 05:34:07 smace Exp $
 #
 #  Makefile for the entire ELM mail system
 #
@@ -7,8 +7,11 @@
 #         (C) Copyright 1988-1992, USENET Community Trust
 #
 #  $Log: Makefile,v $
-#  Revision 1.9  1993/12/28 05:34:05  smace
-#  Reran configure to get new Makefile.SH to corretnly substitute variables
+#  Revision 1.10  1993/12/28 05:58:30  smace
+#  Moved + file to pkg directory and re-ran Configure
+#
+# Revision 1.7  1993/12/28  05:34:07  smace
+# Reran configure to get new Makefile.SH to corretnly substitute variables
 #
 # Revision 1.3  1993/10/09  19:36:02  smace
 # Update to elm 2.4 pl23 release version
@@ -115,6 +118,6 @@ _utils:
 
 pkg:	pkg_src
 
-pkg_src: +DESC_S +ONELINE_S +PLIST_S
-	pkg_create -c +ONELINE_S -d +DESC_S -f +PLIST_S elm_src
+pkg_src: pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
+	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S elm_src
 

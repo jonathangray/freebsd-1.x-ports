@@ -11,8 +11,8 @@
 #			dsinc!elm
 #
 #  $Log: Makefile,v $
-#  Revision 1.7  1993/12/28 05:34:33  smace
-#  Reran configure to get new Makefile.SH to corretnly substitute variables
+#  Revision 1.8  1993/12/28 05:58:43  smace
+#  Moved + file to pkg directory and re-ran Configure
 #
 # Revision 1.3  1993/10/09  19:36:54  smace
 # Update to elm 2.4 pl23 release version
