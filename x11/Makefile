@@ -18,6 +18,8 @@ SUBDIR += xlock
 SUBDIR += xv
 SUBDIR += ezd
 SUBDIR += xview
+SUBDIR += xpm
+SUBDIR += fvwm # depends on xpm
 
 .if !defined(AVOID)
 SUBDIR += xxgdb
