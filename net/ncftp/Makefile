@@ -14,7 +14,7 @@ SDEFS =
 # Program definitions.  See the README, part C.
 #--------------------------------------------------------------------------
 
-PDEFS = -DCURSES -DNO_CURSES_H -DSYSLOG -DTRY_ABOR
+PDEFS = -DGZCAT=\"/usr/bin/gzcat\" -DREADLINE -DCURSES -DNO_CURSES_H -DSYSLOG -DTRY_ABOR
 # Don't compile with readline, have ugly bug with SIGTSTP
 
 #PDEFS =
@@ -56,7 +56,7 @@ LFLAGS =
 # You'll need to know where the Rconnect.o object file is if you want
 #   to use Socks.
 #--------------------------------------------------------------------------
-LIBS = -ltermcap
+LIBS = -lreadline -ltermcap
 #LIBS =
 #LIBS = -ldbmalloc
 #LIBS = -lgetline
@@ -69,7 +69,7 @@ LIBS = -ltermcap
 # getline or readline and they aren't installed system-wide, add the
 # extra directories to look in here, using -L's.
 #--------------------------------------------------------------------------
-LIBDIRS =
+LIBDIRS = -L/usr/gnu/lib
 #LIBDIRS = -L../getline
 #LIBDIRS = -L../readline
 
@@ -88,7 +88,7 @@ LIBDIRS =
 #   <getline.h>.  If you had '/usr/local/getline/getline.h' you would use
 #   -I/usr/local/getline.
 #--------------------------------------------------------------------------
-HDRDIRS =
+HDRDIRS =-I/usr/gnu/include
 #HDRDIRS = -I../getline
 #HDRDIRS = -I..
 
@@ -106,7 +106,7 @@ MANDIR = /usr/local/man/man1
 #MANDIR = /usr/man/man1
 #MANDIR = 
 #CATMANDIR = /usr/catman/LOCAL/g1
-CATMANDIR =
+CATMANDIR =/usr/local/man/cat1
 NROFF   = /usr/bin/nroff
 #NROFF   = /usr/ucb/nroff
 PACK    = pack
@@ -143,6 +143,9 @@ v2_Note
 C_COMPILE = $(CC) $(CFLAGS) $(DEFS) $(HDRDIRS)
 C_COMPILE2 = $(CC) $(CFLAGS) $(DEFS) -DMK='"$(MK)"' $(HDRDIRS)
 
+package: install
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST ncftp_bin
+
 all: $(NAME) done
 
 $(NAME): $(OBJS)
@@ -152,8 +155,8 @@ install: $(NAME)
 	$(CP) $(BINST) $(NAME) $(BINDIR)/$(NAME)
 	@if $(TEST) -n '$(MANDIR)'; then \
 		$(MAKE) install_man ; else true ;  fi
-	@if $(TEST) -n '$(CATMANDIR)'; then \
-		$(MAKE) install_catman ; else true ;  fi
+#	@if $(TEST) -n '$(CATMANDIR)'; then \
+#		$(MAKE) install_catman ; else true ;  fi
 
 install_man: 
 	$(CP) $(MINST) $(MAN)  $(MANDIR)/$(MAN)
