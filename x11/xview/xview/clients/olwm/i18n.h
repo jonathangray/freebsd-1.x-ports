@@ -36,7 +36,7 @@ extern wchar_t  *mbstowcsdup();
 #endif /* OW_I18N_L4 */
 
 #ifndef LC_MESSAGES
-#define LC_MESSAGES 7
+#define LC_MESSAGES 0
 #endif
 
 /*

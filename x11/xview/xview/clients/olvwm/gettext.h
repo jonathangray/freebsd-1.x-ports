@@ -7,7 +7,7 @@
 #ident	"@(#)gettext.h	1.4	91/09/14 SMI"
 
 #ifndef LC_MESSAGES
-#define LC_MESSAGES 7
+#define LC_MESSAGES 0
 #endif
 
 #define DEFAULT_DOMAIN	"default"

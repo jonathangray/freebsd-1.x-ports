@@ -8,7 +8,7 @@ static char *sccsid = "@(#)l10n_props.c 1.6 91/09/14";
  */
 
 #ifdef __386BSD__
-#define LC_MESSAGES 7
+#define LC_MESSAGES 0
 #endif /* __386BSD__ */
 #include <locale.h>
 #ifdef OW_I18N

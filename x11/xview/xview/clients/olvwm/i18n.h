@@ -10,7 +10,7 @@
 #define i18n_DEFINED
 
 #ifndef LC_MESSAGES
-#define LC_MESSAGES 7
+#define LC_MESSAGES 0
 #endif
 
 #ifdef OW_I18N_L3
