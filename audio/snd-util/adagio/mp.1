@@ -1,0 +1,165 @@
+.TH MP 1 LOCAL
+.SH NAME
+mp \- midi player
+.SH SYNOPSIS
+.B mp
+[ options ] file [ options ]
+.SH DESCRIPTION
+.I Mp
+plays a
+midi
+file on sound cards under
+.IR Linux ,
+and/or sends
+midi
+commands out through the sound card's
+external port.
+Alternatively, the
+midi
+file can be converted to an adagio score
+(with the
+.B \-a
+flag).
+.PP
+If a file with the name supplied on the command line is not
+found,
+.I mp
+looks for a file by that name with the suffix ".mid".
+Option flags may precede or follow the file name, and single
+letter option flags may be combined.
+.PP
+.I Mp
+requires the sound driver by Hannu Savolainen for access
+to sound cards or a midi port.
+For sound cards (SoundBlaster, PAS16, GUS), instrument
+patches must be loaded into the sound driver before a
+midi file is played.
+These patches and information about them are in files which
+must be in known locations, so that
+.I mp
+can find them.
+The directories where
+.I mp
+will look for these files are configurable at compile time,
+so the specific directories mentioned below are merely the
+defaults -- they may have been changed.
+.PP
+Libraries of patches for sound cards are kept in /etc/std.* and
+and /etc/drums.*, where the "*" is a suffix telling the
+type of patch: "sb" for 2 operator fm cards, "o3" for
+4 operator fm cards, and "gus" for the Gravis Ultrasound.
+Actually, the files /etc/std.gus and /etc/drums.gus contain
+only some information about GUS patches, which are too bulky
+to be kept in libraries.  The GUS patches themselves are
+kept in either the directory /dos/ultrasnd/midi/ or the
+directory /dos/ultrasnd/midi2/ (the latter is searched first).
+.PP
+In addition to patches and libraries of patches, certain
+optional configuration information can be kept in cfg files.
+A file /etc/default.cfg, if it exists, is read before playing
+every file.  This can be used to alter the default GUS or fm
+patch assignments, to prevent playing on one of the
+available devices, and for other purposes -- there is a
+separate document, CFG-FILES, describing cfg files.
+Other cfg files can contain information about playing
+specific files or about playing groups of files in a
+specific directory.
+.PP
+For the GUS, mp can use special patches for tone banks
+and alternate drum sets, but the information about these
+patches has to be supplied in a cfg file (see CFG-FILES).
+.PP
+Both format 0 and format 1 multi-track files can be played.
+The midi damper pedal controller and, for sound cards, the
+chorus depth and reverberation controllers are simulated in
+software.
+Midi main volume and expression controls are approximated by modifying
+patch parameters and volume for the sound cards and the Kawai
+K1, and passed along to the external port if it is in use for
+other external synths.
+Other controllers are also passed along to the external port, but
+ignored for playing on the cards.
+.PP
+The choice of which channels will be passed to the external port is
+a compilation option, unless you happen to have a Kawai K1 synth
+attached, in which case
+.I mp
+can make sensible choices about which channels to send to it, and can
+also approximate the effect of the pan controller by allocating
+voices to left, center, or right positions.
+.PP
+There are the following command line options:
+.TP
+.BR \-adagio \ (or \ \-a )
+send an adagio score to stdout, rather than playing.
+.TP
+.BR \-f
+means don't play anything on the fm card.
+.TP
+.BR \-g
+means don't play anything on the gus.
+.TP
+.BR \-external \ (or \ \-e )
+means don't send any channels to the external midi port.
+(Which channels will be external, if any, in the absence of
+this flag, depends on a compilation option -- see the Makefile.)
+.TP
+.BR \-p
+plays all parts except percussion with piano, ignoring program
+requests.
+.TP
+.BR \-r \ chan[,prog]
+records midi input from the external port in a new file "mpout.mid".
+"Chan" is a number from 1-16, the channel for the midi commands in
+the file, and "prog" is a number from 0-127, for the general midi
+program to be used.  The output midi file contains a single track
+which can be merged with the file being played by the separate
+utility programs
+.IR midt \ and \ tm .
+.TP
+.BR \-R \ reverb
+adds reverberation to all channels; "reverb" is a number from 1-127.
+.TP
+.BR \-C \ depth
+adds chorus depth to all channels; "depth" is a number from 1-127.
+.TP
+.BR \-s
+prevents treating any instruments as "solo" or non-polyphonic instruments.
+A new note on a solo instrument cuts off any previous note (e.g.,
+on a flute as opposed to piano).
+.TP
+.BR \-init \ (or \ \-i )
+prevents a series of initialization commands for
+each channel from being issued at the beginning of
+the track.
+.TP
+.B \-help
+displays a usage summary.
+.TP
+.B \-v
+gives some information about text embedded in the midi file and
+which voices are used for which midi channels.  Voice numbers
+and tone banks are shown using the notation [voice-number,tone-bank].
+.TP
+.B \-vv
+gives even more information than
+.B \-v
+does.
+.TP
+.BR \-tune \ file
+uses tuning information from the file.
+.TP
+.BR \-trace \ (or \ \-t )
+issues tracing information.
+.SH "SEE ALSO"
+ad(1), setfm(1), midt(1), tracks(1), ``The CMU Midi Toolkit'' by Roger Dannenberg
+.SH BUGS
+Slow to start up.  There is no general mechanism for assigning channels
+and programs to output devices.
+.SH AUTHORS
+Roger Dannenberg,
+Roger.Dannenberg@SPICE.CS.CMU.EDU,
+(Adagio and Transcribe interpreter code),
+.br
+Greg Lee, lee@uhunix.uhcc.hawaii.edu
+(the rest).

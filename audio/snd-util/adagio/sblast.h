@@ -1,0 +1,14 @@
+
+#define RESERVESIZE 0
+#define SBDUMPSIZE 52
+#define SBNAMEOFFSET 4
+#define SBNAMELEN 16
+#define SBEDITPROG 128
+
+#define SBVOICESIZE 52
+#define SBOFFSET 0x24
+
+#define O3DUMPSIZE 60
+#define O3VOICESIZE 60
+
+#define GUSVOICESIZE 112

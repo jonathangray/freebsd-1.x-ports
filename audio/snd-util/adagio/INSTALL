@@ -1,0 +1,198 @@
+
+There is some installation information in file README which is
+not repeated here.
+
+Compilation of xmp using Xview 3.2 requires the file ucontext.h
+in /usr/include/sys.  This file is in the patches directory
+in the xview3L5.tar.gz distribution.
+
+For the gus, the patches used for General Midi programs are
+listed in file gusvoice.h.  If they are not what you have or
+want, short of changing gusvoice.h and recompiling, you can
+can customize by creating a file /etc/default.cfg.  See the
+file oldpat.cfg and the explanation and examples in CFG-FORMAT.
+
+You may want or need to customize the playing programs for your
+setup by changing the patch libraries, supplying various compiler
+flags, or editing source.  Here are some notes.
+
+
+PATCH LIBRARIES
+
+To play on an fm sound card or the gus, ad and mp need to read
+the glib patch libraries std.* (for melodic voices) and drums.*
+(for percussion).  Put these in /etc, or possibly soft links to
+them, or compile with the flag
+	-DSBDIR=\"/usr/midi/patches\"
+for example, to keep them in some other location.
+
+The patch libraries std.sb and drums.sb have 2-operator fm patches
+for the SoundBlaster or similar boards, and std.o3 and drums.o3
+have OPL3 4-operator patches for the PAS16 or similar boards.  If you
+want to use the 2-operator patches, don't put the *.o3 files
+in /etc.  Even if you have a board with the OPL3 chip, you might
+still choose to use 2-operator patches, because that way you
+get 18 note polyphony on the PAS16, e.g., while with 4-op
+patches, you only get 6-12 note polyphany. (*.o3 files can have
+a mixture of 2-op and 4-op patches, and the 2-op patches can use
+12 notes, while the 4-op patches can use only 6.)
+
+The patch libraries std.gus and drums.gus have patch information
+for the Gravis Ultrasound -- gus, i.e..  If you don't have a gus,
+no need to put these in the /etc directory.  Actually, these patch
+libraries don't contain the wave patches themselves (that would
+make them too bulky), so the Gravis .pat files have to be in a
+known location so that the playing programs can load the ones
+they need.  The .pat files can be in any of three directories:
+(1) the same directory as a midi file being played, or (2) a
+"first default" directory, or (3) the ordinary default directory.
+The first of these places is intended for special replacement
+patch files used for just one particular midi file; the second
+is intended for the non-Gravis files that have been distributed
+by Franc,ois Dion and others; the last for the Gravis distribution
+files.  These directories are searched in the order (1), (2), (3).
+Unless you change it, the name of the "first default" directory
+is "/dos/ultrasnd/midi2", and the name of the ordinary default
+directory is "/dos/ultrasnd/midi".  If you keep .pat files
+elsewhere and don't care to install soft links,
+you can compile with
+	-DGUSPATDIR=\"/D/ultrasnd/midi\"
+	-DGUSPATDIR2=\"/D/ultrasnd/midi2\"
+or whatever, so that ad and mp can find them.
+
+The patch libraries can be customized by editing them with glib,
+which I've distributed separately.
+
+OUTPUT DEVICES
+
+If you have a single sound card and no external midi port, there
+ought not to be any installation issue, since ad and mp can detect
+which device is available (thanks to Hannu's most excellent
+sound driver).  It's possible that if you have just an external
+midi port (supported by the sound driver) but no gus or fm card,
+ad and mp will still work to send output there, but I can't test this.
+If there aren't enough notes or patches available to play everything
+in the midi or adagio file, ad and mp will just play whatever
+they can -- it might not sound too good.
+
+When there are multiple devices available, ad and mp can split up
+the work among them, although in a rather rigid way.  They will
+choose for melodic voices first an external synth if available,
+then the gus, and then as a last resort an fm card.  For percussion,
+first choice is the gus, second an fm card, and last resort is an
+external synth.  An fm card can be given priority over the gus for
+percussion by adding to the compiler flags:
+	-DFM_PERC_PRIORITY
+Otherwise, these priorities cannot be changed without editing source
+code.  However, there are provisions for disabling or limiting the use
+of an available device so that another with lower priority will be used.
+
+For disabling a device while playing a particular file, you can
+use command line flags -e (no external synth), -f (no fm sound
+card), -g (don't use gus), or using xmp, uncheck the corresponding
+boxes.  To prevent using a device ever, even though it is available,
+you can edit file cardinit.c by adding at the end of the routine
+there, one or more of the statements:
+	ext_dev = -1;	/* disable external output */
+	sb_dev = -1;	/* disable output to fm card */
+	gus_dev = -1;	/* disable output to gus */
+
+Possible reasons for limiting the use of a device are that it doesn't
+have enough polyphonic notes, or doesn't have enough voices,
+or doesn't sound good.  The following compiler flag causes voices
+that would have been played on the gus to be played on an fm card
+(if present) to avoid exceeding the gus's polyphony limit:
+	-DWPOLYPHONY
+and the following compiler flags (using illustrative values) are
+available to limit the use of an external synthesizer:
+	-DXSELECT=0x00ff
+		is a bit mask to limit the channels that are sent
+		off board; this example sends channels 1-8 to the
+		external synth, leaving channels 9-16 to be played on
+		sound card(s).
+	-DXMAXCHAN=4
+		limits the number of voices (midi programs) that
+		are sent to the synth; this value would send the
+		first four voices on different channels found in
+		a given midi piece, of those permitted by XSELECT,
+		off board, and the rest would be played on the card(s).
+	-DXPOLYPHONY=8
+		(for instance) plays voices that would have been sent off
+		board on the card instead, when this is necessary to prevent the
+		number of simultaneously sounding off board notes from exceeding
+		8 (or whatever number is assigned here); the maximum is
+		32 unless you change the MAXCELLS define in allphase.h.
+
+For the particular synthesizer I happen to have, a Kawaii K1, output
+is disabled on a voice-by-voice basis in the array in file vname.h.  This
+and other functions specific to the Kawaii K1 are enabled with the
+compiler flag
+	-DK1
+
+Even though percussion notes on channels 10 and 16 are always sent
+preferentially to an fm card if available, then to the gus if it
+is available, you can still get them sent to an external synth by
+supplying the compiler flag
+	-DPSELECT=0x0000
+which says in effect that there are no percussion channels.  Then
+ad and mp will treat notes on 10 and 16 as if they were melodic
+voices, and they will go to the external synth preferentially.  PSELECT
+is a bit mask that chooses which channels are to count as percussion
+channels, and the default is
+	-DPSELECT=0x8200
+for both channels 10 and 16 (bits 9 and 15) to be considered percussion.
+Setting this to 0 puts the burden of any special interpretation
+required for percussion notes (drum rolls, e.g.) on the output device.
+
+There are no compiler options for limiting use of the gus.  The playing
+programs will use gus melodic voices so long as gus memory can hold
+the patches, then use fm when available for any remaining voices.
+However, you can limit notes sent to the gus by editing source code
+to lie about the amount of memory available on the gus.  In file
+allphase.c, change the program statement
+	int setting_gus_memory = -1;
+to, e.g.,
+	int setting_gus_memory = 256*1024-32;
+if you wish the gus to be considered as having 256k of memory (even
+though it actually has more).
+
+
+OTHER INSTALLATION OPTIONS
+
+The compiler flag
+	-DMIDIIN
+enables code for using the midi input port.  You have to have a midi
+input port, naturally.  This is needed for recording new midi tracks,
+and it is needed for handshaking with the Kawaii K1 synth (at least,
+for dependable use).
+
+The flag
+	-DGUS_MIDI_INTERFACE
+causes the first of several midi ports to be used, whereas the default
+is to use the last of several.  Mp can only deal with one midi port.
+If you have both a pas16 and a gus (as I do), you'd want to define
+this if your external synth is hooked up to the gus midi port, but
+not if it is hooked up to the pas16 midi port.
+
+The flag
+	-DXVOICE
+enables the use of an second voice for certain fm patches, as specified
+in the patch.  It sounds a little better, but the downside is that it
+uses up polyphonic notes faster.
+
+The flag
+	-DHELP_EXT_REVERB
+lets the gus supply echo reverberation notes for an external synth
+that doesn't do reverb.
+
+Also, there are some #defines at the beginning of the file phase2.c
+that you might want to change at some point.  There are brief notes
+about them there in the code.
+
+XMP
+
+There is a #define near the beginning of xmp.c for displaying file
+names in menus without inserting spaces in them.
+
+Default values for some settings could be changed by editing allphase.c.
+

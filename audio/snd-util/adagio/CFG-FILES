@@ -1,0 +1,573 @@
+
+Contents:
+	  0. Introduction.
+	  I. Patch assignments.
+	 II. Track assignments.
+	III. Channel assignments.
+	 IV. Settings.
+	  V. Examples of cfg files.
+	 VI. Tone banks.
+
+
+0. Introduction.
+
+Cfg files hold information about instrument voicing and initialization
+options for the playing programs ad, mp, xmp.  The format of these
+files is modeled after, and is downward compatible with, the Gravis
+cfg files for the GUS.  Cfg files are optional, and the information
+in them may be pertinent to only certain midi or Adagio files, or
+to all files played.  Information about the patches to be used
+for tone banks above #0 or alternate drum sets must be supplied
+in cfg files, since the playing programs have no built-in knowledge
+about such patches.
+
+A cfg file is named either "ultrasnd.ini", "default.cfg", "fm.cfg",
+"external.cfg", or <name>".cfg", where <name> is the name if the midi or
+Adagio file it goes with, but without the ".mid" or ".gio" suffix (if there
+is a suffix).  The playing programs look for "default.cfg" and "fm.cfg" in
+the /etc directory (or whatever alternative directory was given as the
+"SBDIR" at compilation) and always read them, if present.  They read
+and use the information in at most one additional cfg file: first,
+they look for <name>".cfg" in the same directory as the midi or Adagio
+file, then for "ultrasnd.ini" in that directory, then if neither
+of those is found, they look for <name>".cfg" in the directories
+where GUS patches are kept (by default, /dos/ultrasnd/midi2 and
+/dos/ultrasnd/midi).  Consequently, you can configure options
+for single midi or Adagio files (<name>".cfg"), for groups of files
+in the same directory ("ultrasnd.ini"), or for all files played
+("/etc/default.cfg", "/etc/external.cfg", or "/etc/fm.cfg").
+
+Cfg files can have initialization options like "piano only", meaning
+use the piano voice for all instruments, patch assignments for the GUS,
+an external synth (only the Kawaii K1, now) or an fm sound card, and track
+or channel assignments of voices for midi files.  (Track or channel
+assignments don't work for Adagio .gio files.)
+
+Lines beginning with "#" in cfg files are comments.  Lines may end with
+either cr and lf or just lf.
+
+
+I. Patch Assignments.
+
+For assigning patches, the formats of ".cfg" and "ultrasnd.ini"
+files correspond to the formats of the corresponding Gravis cfg files.
+By default, GUS patches are assigned, except in the files "fm.cfg"
+and "external.cfg", where the defaults are fm patches and external
+synth patches, respectively.  To assign patches for a different
+device, put a line "FM", "EXTERNAL", or "GUS" in the cfg file before
+the assignments intended for fm, the external synth, or the GUS.  The
+patches themselves must be in files named with the suffix ".sbi" for fm
+patches, ".k1s" for Kawaii K1 patches, or the suffix ".pat" for
+GUS patches.
+
+As an extension to the Gravis format, tone banks can be assigned patches,
+also.  For instance, in a .cfg file, the line
+
+	26 acguit
+
+assigns the patch in file acguit.pat to General Midi voice 25, "Steel
+Guitar" (or the patch in acguit.sbi if it's an fm patch), but
+
+	26,16 mndln
+
+assigns mndln.pat to voice 25, tone bank 16, which is the GS "Mandolin"
+voice.  (This is a hypothetical example -- I don't have a mandolin
+patch.)  As with the Gravis files, the GM melodic voices are referred to
+by their real program numbers in .ini files, but by the number plus one
+in .cfg files (as in the above examples).  Also, in .ini files, the
+program number is separated from the patch name by an "=" character,
+rather than a blank space:
+
+	25=acguit
+	25,16=mndln
+
+Alternatively, Adagio allows the GM voices to be referred to by name,
+rather than program number:
+
+	Steel Guitar     = acguit
+	Steel Guitar, 16 = mndln
+
+Using this latter notation, there must always be an "=" character, for
+both .cfg and .ini files, and it may be preceded and followed by any
+amount of white space (spaces or tabs).  The names used must be those
+listed for the 128 GM voices in the file vname.h (they all start with
+capital letters).
+
+For the Gravis-compatible numerical notation, drum patch assignments
+must be preceded by one of the following:
+
+	[Drum Patches]
+	129-256 begin_multipatch default blank
+
+Then, for example, in a .cfg file,
+
+	70,8 727marac
+	70,16 808marac
+
+assigns to the GM maraccas drum voice the 727 patch for drum set (tone bank)
+#8 and the 808 maraccas patch for drum set #16.  (The 727 and 808 patches
+were distributed by Francois Dion.)  GM names can be used here, too,
+and using the names of the drums makes it unnecessary to have one
+of the lines mentioned above to say that the numbers refer to drum
+voices rather than melodic voices:
+
+	Maraccas,16	= 808marac
+	Maraccas,8	= 727marac
+
+The names used for the drums must be those listed in the file drum.h.
+
+After the patch name, a volume, or both a volume and a detuning number
+can be given:
+
+	Church Organ	= church_o 127 +6
+
+This example replaces the Gravis church.pat patch for the church
+organ voice with Francois Dion's church_o patch, using the maximum
+volume 127, and transposing up 6 semitones.  (Adagio's default
+voice volume is 64 for melodic voices and 100 for percussion,
+unless otherwise specified in std.gus or drums.gus.)
+
+Adagio does not allow specifying path names for patch files, unlike
+Gravis.  If a patch name includes any backslash characters, the part
+of the name up to and including the last such character is assumed to
+be an msdos path and is ignored.
+
+
+
+II. Track assignments.
+
+The Gravis format is extended by allowing track assignment statements.  These
+are not just for the gus, but for other devices as well (viz. fm cards or
+an external synth).  Track assignments can be used to set the device or
+the midi program used for the notes on a certain track of a midi file.
+
+	A track assignment statement begins with "track" in the left column
+	   followed by white space and a number, which is the number of
+	   a midi track, from 1 to a maximum of 129 (the first track is "1").
+	Optionally following this is "channel", followed by white space,
+	   followed by a number from 1 to 16, which restricts the assignment
+	   to notes played on the midi channel whose number is given.
+	After this is an arrow "->" preceded and followed by white space.
+	Following the arrow is either a device assignment, or a program
+	   assignment, or both.
+	A device assignment is either:
+		"e" followed by zero or more lower case letters
+			(referring to the external synth), or
+		"f" followed by zero or more lower case letters
+			(referring to the fm card), or
+		"w" followed by zero or more lower case letters
+			(referring to the wave card, i.e. gus).
+	A program assignment is either:
+		a number, referring to the GM voice number (0 for
+			Acoustic Grand Piano, etc.), or
+		a GM voice name.
+	The GM voice name in a program assignment must match exactly
+		the first part of one of the GM names given in the array
+		in file vname.h (which implies it must begin with a
+		capital letter).
+
+For example, the following line assigns all notes on the second track of the
+midi file to the GM Flute voice:
+
+track 2 ->  Flute
+
+And either of the following assign all notes on track 5 to be played on the gus with
+the Oboe voice:
+
+track 5 ->  wave Oboe
+track 5 ->  wv 68
+
+In the above example, you will not actually get an oboe if GM voice 68 has
+been assigned some other gus patch by a patch assignment statement.  Track
+assignments (and channel assignments, discussed below) are subject to
+various constraints -- for instance, if you ask for a track or channel
+to be played on the external synth when this would exceed its
+polyphony (as defined at compilation with XPOLYPHONY), then the
+assignment won't be obeyed.
+
+
+III. Channel assignments.
+
+Channels can be assigned in essentially the same way as tracks.  E.g.,
+
+channel 2 -> Flute
+
+causes all notes on channel 2 to be played with the Flute GM voice, or
+
+channel 2 -> fm Bagpipe
+
+causes them to be played on the fm card using Bagpipe, and
+
+channel 2 -> external
+
+sends them to the external port.  A channel assignment to external is
+more likely to be effective if the GM voice is given; otherwise,
+all available external channels may have been used up by the time
+mp/xmp encounters the channel to be redirected.
+
+Channel assignment statements are like track assignment statements, except
+for not having "track" and a track number at the beginning.
+
+In addition, you can change the status of midi channels as percussion channels
+or melodic ones.  The statement:
+
+channel 10 melodic
+
+causes program assignments and notes on channel 10 to be treated as melodic
+rather than as percussion, as they would be ordinarily.
+
+These statements consist of "channel" in the left column, then white space,
+then a number from 1 to 16 for the midi channel, then white space followed
+by either "melodic" or "percussion".
+
+
+IV. Settings.
+
+Setting statements correspond to items in xmp's settings window.  They
+begin in the left column, and some have numeric arguments.
+
+no fm
+no gus
+no external
+no drum rolls
+no pseudo stereo
+no 4 op fm
+piano only
+reverb delay <number>
+chorus spread <number>
+vibrato depth <number>
+vibrato speed <number>
+vibrato sweep <number>
+gus voices <number>
+gus tuning <number>
+
+(Settings done this way are not displayed in xmp's settings window
+-- that's a bug.)
+
+
+V. Examples of cfg files.
+
+The Gravis demo "striving.mid" uses percussion notes above #81
+for real patches, not as drum rolls, and according to notes inside
+the midi file, percussion note #73, Db4, is intended to be
+a Vibraslap, and note #74, D4, is intended to be a Bell-Tree,
+accordingly:
+
+-----begin striving.cfg-----
+[Drum Patches]
+73 vibslap
+74 belltree
+no drum rolls
+-----end striving.cfg-------
+
+The archive chase.zip (as of this writing in the EPAS submit
+directory) has a song chase.mid, "Chasing the Future", and
+accompanying patches with cfg files chase.cfg and ultrasnd.ini.
+It also uses percussion notes above #81 for real patches.
+Put all the files in the same directory, and add to chase.cfg
+the line "no drum rolls" (or else delete chase.cfg and add this
+line to ultrasnd.ini):
+
+-----begin chase.cfg-----
+0 acpiano
+1 almbass
+2 housebas
+3 lfoflut
+4 shaku
+5 future
+6 stdrums
+7 nylon
+8 synstr2
+9 cymbalon
+10 acpiano
+11 sweeper
+
+129-256 begin_multipatch default blank
+40 erasureb
+57 fopsnar2
+58 erasures
+62 elclhh
+63 elcow
+67 tambor2
+73 powrtoml
+82 timbale2
+83 timbale3
+84 castan2
+89 hihatcl
+90 hihatpd
+end_multipatch
+
+no drum rolls
+-----end chase.cfg-------
+
+Here is an fm example: playing the leads in Frederick Ferrer's
+fairmid.mid with fm moogsynt.sbi and jewsharp.sbi patches:
+
+-----begin fairmid.cfg---
+# chan=1 program=Synth Bass 2[39]
+# chan=2 program=Lead4 chiff[83]
+# chan=3 program=Acoustic Bass[32]
+# chan=5 program=Pad3 polysynth[90]
+# chan=6 program=Lead6 voice[85]
+# chan=7 program=Synth Bass 2[39]
+
+	FM
+Pad3 polysynth = moogsynt
+Lead4 chiff = jewsharp
+
+channel 2 -> fm
+channel 5 -> fm
+-----end fairmid.cfg-----
+
+
+Roberto Sierra distributed a midi'd Beethoven's Fifth in
+alt.binaries.sounds.music.  It is unvoiced.  I haven't gotten
+it to sound right -- I think some instruments have to be
+transposed, but here is a first approximation of a cfg file:
+
+-----begin Beet5m1.cfg---
+channel 10 melodic
+track 2 ->  ext Flute
+track 3 ->  wave Flute
+track 4 ->  ext Oboe
+track 5 ->  wave Oboe
+track 6 ->  ext Clarinet
+track 7 ->  wave Clarinet
+track 8 ->  ext Bassoon
+track 9 ->  wave Bassoon
+track 10 -> ext French Horn
+track 11 -> wave French Horn
+track 12 -> ext Trumpet
+track 13 -> wave Trumpet
+track 14 -> ext Timpani
+track 15 -> Violin
+track 16 -> Violin
+track 17 -> Viola
+track 18 -> ext Cello
+track 19 -> Contrabass
+-----end Beet5m1.cfg-----
+
+Here is the /etc/default.cfg I am currently using.  The drum set numbers
+for the 727, 909, and 808 drums should not be taken seriously -- I chose
+them more or less at random.  Francois Dion's patches are available by ftp
+from archive.epas.utoronto.ca in one of the directories
+/pub/pc/ultrasound/patches/files or /pub/pc/ultrasound/submit.
+The guitd.pat file is from Chris Daniello in metal.zip, currently
+in the last mentioned directory above.  The basses are also from
+Daniello (in basses.zip, I think).
+
+-----begin default.cfg---
+no 4 op fm
+
+# from Gravis
+    Church Organ,8	= church
+# from Dion
+    Church Organ	= church_o 127 +6
+    Accordion,8		= accrdeon
+    Steel Guitar,8	= acguit 100
+# from Daniello
+    Distortion Guitar,8	= guitd 64 +1
+    Synth Bass 1,8	= bass1 127
+    Synth Bass 2,8	= bass2 127
+# from Dion
+    Synth Brass 2,8	= prophet1 80 +24
+    Helicopter Blade,8	= machgun1 64 -24
+#
+# 727 patches from Francois Dion
+#
+    High Bongo,8	= 727bongh
+    Low Bongo,8		= 727bongl
+    Mute High Conga,8	= 727congs
+    Open High Conga,8	= 727congh
+    Low Conga,8		= 727congl
+    High Timbale,8	= 727timbh
+    Low Timbale,8	= 727timbl
+    High Agogo,8	= 727hiago
+    Low Agogo,8		= 727loago
+    Cabasa,8		= 727cabas
+    Maraccas,8		= 727marac
+    Short Whistle,8	= 727swhis
+    Long Whistle,8	= 727whist
+    Claves,8		= 727jawbo
+#
+# 808 patches from Francois Dion
+#
+# mid conga = Mute High Conga?
+# there is also a 808kick3
+    Acoustic Bass Drum,16 = 808kick1
+    Bass Drum 1,16	= 808kick2
+# there is also 808rim2
+    Side Stick,16	= 808rim
+# also 808sd3 and 808sd4 (808sd1, 808sd2)
+    Acoustic Snare,16	= 808sd4 32
+    Hand Clap,16	= 808clap
+    Electric Snare,16	= 808sd3 32
+# 808hh2 is also closed hh
+    Closed High Hat,16	= 808hh
+    Low Tom,16		= 808tomlo
+    Open High Hat,16	= 808ho
+    High-Mid Tom,16	= 808tomhi
+    Crash Cymbal 1,16	= 808cymb
+    Cow Bell,16		= 808cbell
+    Mute High Conga,16	= 808congm
+    Open High Conga,16	= 808congh
+    Low Conga,16	= 808cong
+# there is also 808mara2
+    Maraccas,16		= 808marac
+    Claves,16		= 808clave
+#
+# c550 patches from Chris Wilkins
+#
+#Acoustic Snare,32	= c550sn_6
+    Bass Drum 1,24	= c550kc_9 100
+    Bass Drum 1,32	= c550kc_1 127
+    Electric Snare,24	= c550sn13 92
+    Electric Snare,32	= c550sn10 88
+    Cow Bell,32		= c550cow1 76
+    Vibraslap,32	= c550vibs 72
+#
+# 909 patches from Francois Dion
+#
+    Acoustic Bass Drum,40 = 909kick1 100
+    Bass Drum 1,40	= 909kick5 100 0 48
+    Side Stick,40	= 909rim2 100 0 54
+    Acoustic Snare,40	= 909sd1 100
+    Hand Clap,40	= 909clap2 100 0 52
+    Electric Snare,40	= 909sd1 100
+    Closed High Hat,40	= 909hh1 100
+    Closed High Hat,48	= 909hh2 100
+    Low Tom,40		= 909toml 100 0 60
+    Open High Hat,40	= 909oh1 100
+    Open High Hat,48	= 909oh2 100
+    High-Mid Tom,40	= 909toml 100 0 64
+    Crash Cymbal 1,40	= 909cymb1 100
+    Ride Cymbal 1,40	= 909rcym1 100
+    Ride Cymbal 2,40	= 909rcym1 100
+    Claves,40		= 909clav2 100 0 62
+
+	EXTERNAL
+
+    Muted Guitar,8	= MuteGuitar
+-----end default.cfg-----
+
+
+VI. Tone banks.
+
+The tone bank is specified in a GS midi file with midi controller #0.
+Here, courtesy of Matt Skalicky, are the names of some GS tone
+banks:
+
+       |        BANK 1            |        BANK 2                |        BANK 3
+  Prog |  C0#  Tone Name          |  C0#  Tone Name              |  C0#  Tone Name
+-------|--------------------------|------------------------------|-----------------
+   4   |   0   EP 1               |   8   Detuned EP 1           |
+   5   |   0   EP 2               |   8   Detuned EP 2           |
+   6   |   0   Harpsichord        |   8   Coupled Harpsichord    |
+  14   |   0   Tubular Bell       |   8   Church Bell            |
+  16   |   0   Organ 1            |   8   Detuned Organ 1        |
+  17   |   0   Organ 2            |   8   Detuned Organ 2        |
+  19   |   0   Church Organ 1     |   8   Church Organ 2         |
+  21   |   0   Accordion French   |   8   Accordion Italian      |
+  24   |   0   Nylon Str Guitar   |   8   Ukulele                |
+  25   |   0   Steel str Guitar   |   8   12 str Guitar          |   16   Mandolin
+  26   |   0   Jazz Guitar        |   8   Hawaiian Guitar        |
+  27   |   0   Clean Guitar       |   8   Chorus Guitar          |
+  28   |   0   Muted Guitar       |   8   Funk Guitar            |
+  30   |   0   Distortion Guitar  |   8   Dist w/ Feedback Guitar|
+  31   |   0   Gt Harmonics       |   8   Gt Feedback            |
+  38   |   0   Synth Bass 1       |   8   Synth Bass 3           |
+  39   |   0   Synth Bass 2       |   8   Synth Bass 4           |
+  48   |   0   Strings            |   8   Orchestra              |
+  50   |   0   Syn Strings 1      |   8   syn Strings 3          |
+  61   |   0   brass 1            |   8   brass 2                |
+  62   |   0   synth brass 1      |   8   synth brass 3          |
+       |       [synbras1]         |       [anasyn3]              |
+  63   |   0   synth brass 2      |   8   synth brass 4          |
+  80   |   0   Square Wave        |   8   Sine Wave              |
+
+
+
+Examples of melodic tone banks > 0 in midi files.
+
+I do not yet have patches for most of the tone banks used in these
+midi files.
+
+The archive files mentioned below are available by ftp from
+wuarchive.wustl.edu in /systems/msdos/ultrasound/sound/midi/files.
+
+archive file name
+  file name, song
+	controller #0, channel, program # & GM name, tone name
+
+song2.lzh
+  l1002_09.mid, "Anpanmanno March"
+	msb=8, chan=9, 6 Harpsichord, Coupled Harpsichord
+  l1002_10.mid, "Hajimeteno Chu"
+	msb=8, chan=13, 115 Woodblock
+  l1002_08.mid, "Odoru Ponpokori"
+	msb=8, chan=1, 26 Jazz Guitar, Hawaiian Guitar
+	msb=3, chan=8, 126 Applause/Noise
+	msb=8, chan=4, 48 String Ensemble 1, Orchestra
+  l1002_07.mid, "Torino Hito"
+	msb=8, chan=1, 50 Synth Strings 1, Synth Strings 3
+  l1002_03.mid, "Umino Mierumachi"
+	msb=16, chan=13, 25 Steel Guitar, Mandolin
+  l1002_02.mid, "Wapiko Gankiyoh"
+	msb=8, chan=8, 21 Accordion, Accordion Italian
+	msb=1, chan=16, 124 Telephone Ring
+	msb=9, chan=13, 125 Helicopter Blade
+	msb=4, chan=14, 125 Helicopter Blade
+	msb=5, chan=15, 124 Telephone Ring
+
+song5.lzh
+  s1002_06.mid, "Aitai"
+	msb=8, chan=9, 6 Harpsichord, Coupled Harpsichord
+	msb=3, chan=11, 122 Seashore
+	msb=7, chan=12, 31 Guitar Harmonics, Guitar Feedback
+  s1002_08.mid, "Lady Navigation"
+	msb=8, chan=2, 39 Synth Bass 2, Synth Bass 4
+  s1002_07.mid, "Sweet Emotion"
+	msb=8, chan=12, 30 Distortion Guitar, Distortion w. Feedback G.
+  (Note: "Sweet Emotion" has a file error that prevents the special
+   guitar voice from actually sounding.)
+  s1002_02.mid, "Wanderers"
+	msb=8, chan=7, 38 Synth Bass 1, Synth Bass 3
+  s1002_09.mid
+	msb=1, chan=6, 120 Guitar Fret Noise
+	msb=5, chan=11, 124 Telephone Ring
+
+awesome.zip
+  bites.mid, "Another One Bites the Dust"
+	msb=8, chan=1, 28 Muted Guitar, Funk Guitar
+  bad.mid, "Bad"
+	msb=8, chan=9, 29 Overdriven Guitar
+  el.mid, "Easy Lover"
+	msb=8, chan=4, 61 Brass Section, Brass 2
+  esc.mid, "Escapade"
+	msb=8, chan=11, 119 Reverse Cymbal
+  elit.mid, "Every Little Step"
+	msb=8, chan=2, 38 Synth Bass 1, Synth Bass 3
+	msb=8, chan=5, 28 Muted Guitar, Funk Guitar
+  gl1.mid, "Glory of Love"
+	msb=8, chan=12, 63 Synth Brass 2, Synth Brass 4
+  ad.mid, "Paradise City"
+	msb=3, chan=13, 124 Telephone Ring
+	msb=3, chan=14, 124 Telephone Ring
+	msb=8, chan=5, 28 Muted Guitar, Funk Guitar
+  smooth.mid, "Smooth Talker"
+	msb=127, chan=3, 50 Synth Strings 1, Synth Strings 3
+  staying.mid, "Staying Alive"
+	msb=8, chan=7, 28 Muted Guitar, Funk Guitar
+  thatsw.mid, "That's the Way I Like It"
+	msb=8, chan=1, 28 Muted Guitar, Funk Guitar
+  world.mid, "We Are the World"
+	msb=8, chan=11, 14 Tubular Bells, Church Bell
+  built.mid, "We Built This City"
+	msb=8, chan=3, 50 Synth Strings 1, Synth Strings 3
+	msb=8, chan=7, 125 Helicopter Blade
+  won.mid, "Wonderful Tonight"
+	msb=127, chan=4, 10 Music Box
+  walk.mid
+	msb=127, chan=4, 82 Calliope
+	msb=127, chan=5, 45 Pizzicato String
+

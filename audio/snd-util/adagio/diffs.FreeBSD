@@ -1,0 +1,1207 @@
+*** ../adorg/Makefile.orig	Thu Oct 28 06:07:49 1993
+--- Makefile	Tue Feb 22 06:39:16 1994
+***************
+*** 1,9 ****
+  # Makefile for adagio
+  # Greg Lee, 5/6/93
+  
+! DESTDIR = /usr/src/Sound/bin
+  LINK = cc
+! LEX = flex
+  
+  # The value of XSELECT determines which channels get sent
+  # to the external midi port.  If b0 is 1, e.g., channel one
+--- 1,22 ----
+  # Makefile for adagio
+  # Greg Lee, 5/6/93
+  
+! DESTDIR = /usr/local/bin
+! MANDIR1 = /usr/local/man/man1
+! MANDIR3 = /usr/local/man/man3
+! ETCDIR = /usr/local/etc/midi
+! LIBDIR = /usr/local/lib/midi
+! # Change this to the directory where you keep midi files.
+! MIDIHOME = -DMIDIDIR=\"$(LIBDIR)/songs\"
+! # Change this to the directory where you keep fm instruments.
+! PATCHHOME = -DPDIR=\"$(LIBDIR)/sbi\"
+! # Change this to the directory where you keep gus patches.
+! GUSHOME = -DGUSPATDIR=\"$(LIBDIR)/patch\"
+! GUS2HOME = -DGUSPATDIR2=\"$(LIBDIR)/patch2\"
+! 
+! INST_OWNER = -o bin -g bin
+  LINK = cc
+! LEX = lex
+  
+  # The value of XSELECT determines which channels get sent
+  # to the external midi port.  If b0 is 1, e.g., channel one
+***************
+*** 22,45 ****
+  # very succesful with this).
+  # See INSTALL for details on flags.
+  
+- # Change this to the directory where you keep midi files.
+- MIDIHOME = -DMIDIDIR=\"/usr/midi/Songs\"
+- # Change this to the directory where you keep fm patches.
+- PATCHHOME = -DPDIR=\"/usr/midi/Plib\"
+- 
+  # Use this to build an xmp which does not use shared memory:
+! #VERSIONFLAGS = -DXMP
+  # Use this to build an xmp which uses shared memory:
+! VERSIONFLAGS = -DXMP -DUSE_SHM
+  
+  # Distribution default flags:
+! CFLAGS = -Wall -O2 -DUNIX -DXSELECT=0x0000 -DPSELECT=0x8200 \
+! 	-DXVOICE -DSBDIR=\"/etc\" -DWPOLYPHONY $(PATCHHOME)
+  
+  # Flags for use with Kawaii K1:
+  #CFLAGS = -Wall -O2 -DUNIX -DXSELECT=0x00ff -DPSELECT=0x8200 \
+  #	-DK1 -DXMAXCHAN=8 -DMIDIIN -DXVOICE -DXPOLYPHONY=8 \
+! #	-DWPOLYPHONY $(PATCHHOME)
+  
+  
+  # Use these libs to build xmp without shared memory, or if the
+--- 35,54 ----
+  # very succesful with this).
+  # See INSTALL for details on flags.
+  
+  # Use this to build an xmp which does not use shared memory:
+! VERSIONFLAGS = -DXMP
+  # Use this to build an xmp which uses shared memory:
+! #VERSIONFLAGS = -DXMP -DUSE_SHM
+  
+  # Distribution default flags:
+! CFLAGS = -O2 -DUNIX -DREAD_MODS \
+! 	-DXVOICE -DSBDIR=\"$(ETCDIR)\" \
+! 	-DWPOLYPHONY $(PATCHHOME) $(GUSHOME) $(GUS2HOME)
+  
+  # Flags for use with Kawaii K1:
+  #CFLAGS = -Wall -O2 -DUNIX -DXSELECT=0x00ff -DPSELECT=0x8200 \
+  #       -DK1 -DXMAXCHAN=8 -DMIDIIN -DXVOICE -DXPOLYPHONY=8 \
+! #       -DWPOLYPHONY -DREAD_MODS $(PATCHHOME) $(GUSHOME) $(GUS2HOME)
+  
+  
+  # Use these libs to build xmp without shared memory, or if the
+***************
+*** 51,57 ****
+  
+  
+  XCFLAGS = $(CFLAGS) $(VERSIONFLAGS) $(MIDIHOME)
+! LDFLAGS = -s
+  
+  SHROBJ = cardinit.o phase2.o allphase.o gusvoice.o cmdline.o userio.o \
+  	extvoice.o midifile.o cfg.o
+--- 60,66 ----
+  
+  
+  XCFLAGS = $(CFLAGS) $(VERSIONFLAGS) $(MIDIHOME)
+! LDFLAGS =
+  
+  SHROBJ = cardinit.o phase2.o allphase.o gusvoice.o cmdline.o userio.o \
+  	extvoice.o midifile.o cfg.o
+***************
+*** 61,69 ****
+  	extvoice.o midifile.o cfg.o
+  MGROBJ = pmgr.o cardinit.o allphase.o gusvoice.o cmdline.o cfg.o dummyext.o
+  
+! all:	xmp mp ad # pmgr
+  
+! util:	midt tm tracks setfm
+  
+  pmgr:	$(MGROBJ)
+  	$(LINK) $(LDFLAGS) $(MGROBJ) -o $@
+--- 70,80 ----
+  	extvoice.o midifile.o cfg.o
+  MGROBJ = pmgr.o cardinit.o allphase.o gusvoice.o cmdline.o cfg.o dummyext.o
+  
+! EXES    = mp ad midt tm tracks setfm pmgr # xmp
+! MAN1    = mp.1 ad.1 tm.1 tracks.1 setfm.1 # xmp.1
+! MAN3    = midifile.3
+  
+! all:    $(EXES)
+  
+  pmgr:	$(MGROBJ)
+  	$(LINK) $(LDFLAGS) $(MGROBJ) -o $@
+***************
+*** 83,97 ****
+  phase2x.o: phase2.c
+  	$(CC) $(XCFLAGS) -c phase2.c -o phase2x.o
+  
+  cfg.o:	cfg.c
+! 	$(CC) -O2 -c cfg.c
+  cfg.c:	cfg.l
+  
+! tm:	tm.c midifile.o
+! 	$(CC) -O2 $(LDFLAGS) $@.c midifile.o -o $@
+  
+! midt:	midt.c midifile.o allphase.o
+! 	$(CC) -O2 $(LDFLAGS) $@.c allphase.o midifile.o -o $@
+  
+  tracks: tracks.c
+  	$(CC) -O2 $(LDFLAGS) $@.c -o $@
+--- 94,111 ----
+  phase2x.o: phase2.c
+  	$(CC) $(XCFLAGS) -c phase2.c -o phase2x.o
+  
++ _midifile.o: midifile.c
++ 	$(CC) -O2 -c midifile.c -o _midifile.o
++ 
+  cfg.o:	cfg.c
+! 	$(CC) $(CFLAGS) -c cfg.c
+  cfg.c:	cfg.l
+  
+! tm:     tm.c _midifile.o allphase.o
+! 	$(CC) -O2 $(LDFLAGS) $@.c _midifile.o allphase.o -o $@
+  
+! midt:   midt.c _midifile.o allphase.o
+! 	$(CC) -O2 $(LDFLAGS) $@.c _midifile.o allphase.o -o $@
+  
+  tracks: tracks.c
+  	$(CC) -O2 $(LDFLAGS) $@.c -o $@
+***************
+*** 100,119 ****
+  	$(LINK) $(LDFLAGS) setfm.o -o setfm
+  
+  install: all
+! 	install xmp mp ad $(DESTDIR)
+! 
+! installutil: util
+! 	install midt tm tracks $(DESTDIR)
+  
+  clean:
+  	rm -f *.o tm.c cfg.c
+! 	rm -f ad midt xmp mp setfm tm tracks
+  
+  ad.o: adagio.h userio.h cmdline.h allphase.h
+  phase1.o: admp.c adagio.h cmdline.h allphase.h
+  phase2.o: adagio.h userio.h cmdline.h pitch.h midicode.h midi.h \
+  	allphase.h vibrato.h
+! phase2x.o: adagio.h userio.h cmdline.h pitch.h midicode.h midi.h \
+  	allphase.h vibrato.h
+  cardinit.o: allphase.h
+  userio.o: userio.h
+--- 114,139 ----
+  	$(LINK) $(LDFLAGS) setfm.o -o setfm
+  
+  install: all
+! 	install -c -s $(INST_OWNER) $(EXES) $(DESTDIR)
+! 	-@mkdir -p $(MANDIR1) $(MANDIR3) $(ETCDIR) $(LIBDIR)
+! 	install -c $(INST_OWNER) -m 644 std.* drums.* $(ETCDIR)
+! 	install -c $(INST_OWNER) -m 644 oldfm.cfg $(ETCDIR)/fm.cfg
+! 	install -c $(INST_OWNER) -m 644 oldext.cfg $(ETCDIR)/external.cfg
+! 	install -c $(INST_OWNER) -m 644 oldpat.cfg $(ETCDIR)/default.cfg
+! 	install -c $(INST_OWNER) -m 644 $(MAN1) $(MANDIR1)
+! 	-@rm -f $(MANDIR1)/midt.1
+! 	ln $(MANDIR1)/tm.1 $(MANDIR1)/midt.1
+! 	install -c $(INST_OWNER) -m 644 $(MAN3) $(MANDIR3)
+  
+  clean:
+  	rm -f *.o tm.c cfg.c
+! 	rm -f ad midt xmp mp setfm tm tracks pmgr
+  
+  ad.o: adagio.h userio.h cmdline.h allphase.h
+  phase1.o: admp.c adagio.h cmdline.h allphase.h
+  phase2.o: adagio.h userio.h cmdline.h pitch.h midicode.h midi.h \
+  	allphase.h vibrato.h
+! phase2x.o: phase2.c adagio.h userio.h cmdline.h pitch.h midicode.h midi.h \
+  	allphase.h vibrato.h
+  cardinit.o: allphase.h
+  userio.o: userio.h
+***************
+*** 126,128 ****
+--- 146,149 ----
+  extvoice.o: adagio.h allphase.h k1voice.h
+  cfg.o: adagio.h allphase.h
+  midifile.o: midifile.h mp_mod.c
++ _midifile.o: midifile.c midifile.h mp_mod.c
+*** ../adorg/admp.c.orig	Sun Oct 24 18:16:08 1993
+--- admp.c	Tue Feb 22 05:08:47 1994
+***************
+*** 654,670 ****
+  
+  static event_type nalloc()
+  {
+- #ifndef linux
+-     char *malloc();
+- #endif
+      event_type result;
+! #ifndef linux
+      space -= sizeof(struct event_struct);
+  #endif
+      if (space > 0) {
+  	result = ((event_type) malloc(sizeof(struct event_struct)));
+  	if (result == NULL)
+! 	    printf("Internal error: Out of memory, space = %ld.\n", space);
+      } else
+  	result = NULL;
+      return result;
+--- 654,667 ----
+  
+  static event_type nalloc()
+  {
+      event_type result;
+! #ifndef UNIX
+      space -= sizeof(struct event_struct);
+  #endif
+      if (space > 0) {
+  	result = ((event_type) malloc(sizeof(struct event_struct)));
+  	if (result == NULL)
+! 	    fprintf(stderr, "Internal error: Out of memory, space = %ld.\n", space);
+      } else
+  	result = NULL;
+      return result;
+***************
+*** 679,695 ****
+  ****************************************************************************/
+  static event_type ctrlalloc()
+  {
+- #ifndef linux
+-     char *malloc();
+- #endif
+      event_type result;
+! #ifndef linux
+      space -= ctrlsize;
+  #endif
+      if (space > 0) {
+  	result = (event_type) malloc(ctrlsize);
+  	if (result == NULL)	/* this should never happen ... */
+! 	    printf("Internal error: Out of memory, space = %ld.\n", space);
+      } else
+  	result = NULL;
+      return result;
+--- 676,689 ----
+  ****************************************************************************/
+  static event_type ctrlalloc()
+  {
+      event_type result;
+! #ifndef UNIX
+      space -= ctrlsize;
+  #endif
+      if (space > 0) {
+  	result = (event_type) malloc(ctrlsize);
+  	if (result == NULL)	/* this should never happen ... */
+! 	    fprintf(stderr, "Internal error: Out of memory, space = %ld.\n", space);
+      } else
+  	result = NULL;
+      return result;
+*** ../adorg/allphase.h.orig	Sun Oct 24 18:14:16 1993
+--- allphase.h	Sun Feb 20 21:11:21 1994
+***************
+*** 1,5 ****
+! 
+  #include <sys/soundcard.h>
+  #include <sys/param.h>
+  
+  /* MAXCARDS must be at least one greater than nrsynths as returned by driver */
+--- 1,8 ----
+! #ifdef __386BSD__
+! #include <machine/soundcard.h>
+! #else
+  #include <sys/soundcard.h>
++ #endif
+  #include <sys/param.h>
+  
+  /* MAXCARDS must be at least one greater than nrsynths as returned by driver */
+*** ../adorg/cfg.l.orig	Tue Oct 12 04:59:44 1993
+--- cfg.l	Tue Feb 22 03:55:38 1994
+***************
+*** 14,20 ****
+  #include "adagio.h"
+  #include "allphase.h"
+  #undef ECHO
+! #define ECHO
+  
+  #ifndef SBDIR
+  #define SBDIR "/etc"
+--- 14,20 ----
+  #include "adagio.h"
+  #include "allphase.h"
+  #undef ECHO
+! #define ECHO (void) fwrite( (char *) yytext, yyleng, 1, yyout )
+  
+  #ifndef SBDIR
+  #define SBDIR "/etc"
+***************
+*** 57,69 ****
+  	ext_flag = 0;
+  	voice = gus_voice;
+  }
+! ^{owh}"[Melodic Patches]" {
+  	doing_drums = 0;
+  }
+! ^{owh}"[Drum Patches]" {
+  	doing_drums = 1;
+  }
+! "129-256 begin_multipatch default blank" {
+  	doing_drums = 1;
+  }
+  ^.*"use_note".*		;
+--- 57,69 ----
+  	ext_flag = 0;
+  	voice = gus_voice;
+  }
+! ^{owh}"[Melodic"{wh}"Patches]" {
+  	doing_drums = 0;
+  }
+! ^{owh}"[Drum"{wh}"Patches]" {
+  	doing_drums = 1;
+  }
+! "{owh}129-256"{wh}"begin_multipatch"{wh}"default"{wh}"blank" {
+  	doing_drums = 1;
+  }
+  ^.*"use_note".*		;
+***************
+*** 153,164 ****
+  	BEGIN(P);
+  }
+  
+! ^"track"{wh}[0-9]+{wh}"->"{wh} {
+  	track = atoi(yytext+5);
+  	device = prog = 0;
+  	BEGIN(T);
+  }
+! ^"track"{wh}[0-9]+{wh}"channel"{wh}[0-9]+"->"{wh} {
+  	track = atoi(yytext+5);
+  	for (i = 0; yytext[i] != 'l'; i++) ;
+  	channel = atoi(yytext + i + 1);
+--- 153,164 ----
+  	BEGIN(P);
+  }
+  
+! ^{owh}"track"{wh}[0-9]+{wh}"->"{wh} {
+  	track = atoi(yytext+5);
+  	device = prog = 0;
+  	BEGIN(T);
+  }
+! ^{owh}"track"{wh}[0-9]+{wh}"channel"{wh}[0-9]+"->"{wh} {
+  	track = atoi(yytext+5);
+  	for (i = 0; yytext[i] != 'l'; i++) ;
+  	channel = atoi(yytext + i + 1);
+***************
+*** 165,179 ****
+  	device = prog = 0;
+  	BEGIN(T);
+  }
+! ^"channel"{wh}[0-9]+{wh}"melodic" {
+  	i = atoi(yytext + 7) - 1;
+  	if (i >= 0 && i <= 15) percsel &= ~(1 << i);
+  }
+! ^"channel"{wh}[0-9]+{wh}"percussion" {
+  	i = atoi(yytext + 7) - 1;
+  	if (i >= 0 && i <= 15) percsel |= (1 << i);
+  }
+! ^"channel"{wh}[0-9]+{wh}"->"{wh} {
+  	channel = atoi(yytext+7);
+  	device = prog = 0;
+  	BEGIN(T);
+--- 165,179 ----
+  	device = prog = 0;
+  	BEGIN(T);
+  }
+! ^{owh}"channel"{wh}[0-9]+{wh}"melodic" {
+  	i = atoi(yytext + 7) - 1;
+  	if (i >= 0 && i <= 15) percsel &= ~(1 << i);
+  }
+! ^{owh}"channel"{wh}[0-9]+{wh}"percussion" {
+  	i = atoi(yytext + 7) - 1;
+  	if (i >= 0 && i <= 15) percsel |= (1 << i);
+  }
+! ^{owh}"channel"{wh}[0-9]+{wh}"->"{wh} {
+  	channel = atoi(yytext+7);
+  	device = prog = 0;
+  	BEGIN(T);
+***************
+*** 269,288 ****
+  	}
+  	if (i < 128) prog = i + 1;
+  }
+! ^"no fm"			{ exclude_fm = 1; sb_dev = -1; }
+! ^"no gus"			{ exclude_gus = 1; gus_dev = -1; }
+! ^"no external"			{ extflag = 0; ext_dev = ext_index = -1; }
+! ^"piano only"			piano_only = 1;
+! ^"no drum rolls"		setting_drum_rolls = 0;
+! ^"no pseudo stereo"		setting_pstereo = 0;
+! ^"no 4 op fm"			setting_4op_mode = 0;
+! ^"gus tuning"{wh}[0-9]+		setting_gus_tuning = atoi(yytext+10);
+! ^"gus voices"{wh}[0-9]+		setting_gus_voices = atoi(yytext+10);
+! ^"reverb delay"{wh}[0-9]+	setting_reverb = atoi(yytext+6);
+! ^"chorus spread"{wh}[0-9]+	setting_chorus_spread = atoi(yytext+13);
+! ^"vibrato depth"{wh}[0-9]+	setting_vibrato_depth = atoi(yytext+13);
+! ^"vibrato speed"{wh}[0-9]+	setting_vibrato_speed = atoi(yytext+13);
+! ^"vibrato sweep"{wh}[0-9]+	setting_vibrato_sweep = atoi(yytext+13);
+  
+  <P>{wh}[0-9]+	{
+  	if (voice[patchno].volume == -1) {
+--- 269,288 ----
+  	}
+  	if (i < 128) prog = i + 1;
+  }
+! ^{owh}"no"{wh}"fm"                        { exclude_fm = 1; sb_dev = -1; }
+! ^{owh}"no"{wh}"gus"                       { exclude_gus = 1; gus_dev = -1; }
+! ^{owh}"no"{wh}"external"                  { extflag = 0; ext_dev = ext_index = -1; }
+! ^{owh}"piano"{wh}"only"                   piano_only = 1;
+! ^{owh}"no"{wh}"drum"{wh}"rolls"           setting_drum_rolls = 0;
+! ^{owh}"no"{wh}"pseudo"{wh}"stereo"        setting_pstereo = 0;
+! ^{owh}"no"{wh}"4"{wh}"op"{wh}"fm"         setting_4op_mode = 0;
+! ^{owh}"gus"{wh}"tuning"{wh}[0-9]+         setting_gus_tuning = atoi(yytext+10);
+! ^{owh}"gus"{wh}"voices"{wh}[0-9]+         setting_gus_voices = atoi(yytext+10);
+! ^{owh}"reverb"{wh}"delay"{wh}[0-9]+       setting_reverb = atoi(yytext+6);
+! ^{owh}"chorus"{wh}"spread"{wh}[0-9]+      setting_chorus_spread = atoi(yytext+13);
+! ^{owh}"vibrato"{wh}"depth"{wh}[0-9]+      setting_vibrato_depth = atoi(yytext+13);
+! ^{owh}"vibrato"{wh}"speed"{wh}[0-9]+      setting_vibrato_speed = atoi(yytext+13);
+! ^{owh}"vibrato"{wh}"sweep"{wh}[0-9]+      setting_vibrato_sweep = atoi(yytext+13);
+  
+  <P>{wh}[0-9]+	{
+  	if (voice[patchno].volume == -1) {
+*** ../adorg/extvoice.c.orig	Mon Sep  6 06:08:03 1993
+--- extvoice.c	Sun Feb 20 21:20:33 1994
+***************
+*** 38,44 ****
+--- 38,46 ----
+  #include <unistd.h>
+  #include <stdlib.h>
+  #include <ctype.h>
++ #ifndef __386BSD__
+  #include <malloc.h>
++ #endif
+  #include <fcntl.h>
+  #include <string.h>
+  #include "adagio.h"
+*** ../adorg/gusvoice.c.orig	Sun Oct 24 17:26:35 1993
+--- gusvoice.c	Tue Feb 22 06:53:54 1994
+***************
+*** 1,7 ****
+--- 1,11 ----
+  /* gusvoice.c, adapted (slightly) from gusload.c by H. Savolainen, --gl */
+  
+  #include <stdio.h>
++ #ifdef __386BSD__
++ #include <machine/ultrasound.h>
++ #else
+  #include <sys/ultrasound.h>
++ #endif
+  #include <sys/ioctl.h>
+  #include <stdlib.h>
+  #include <strings.h>
+***************
+*** 191,197 ****
+   * check that vdata begins with SBI, 2OP, or 4OP and has name
+   */
+      if (!vdata[0]) return(0);
+!     if (!vdata[SBNAMEOFFSET]) return(0);
+      if (voice_size == O3VOICESIZE &&
+  	strncmp(vdata, "4OP", 3) &&
+  	strncmp(vdata, "2OP", 3)
+--- 195,201 ----
+   * check that vdata begins with SBI, 2OP, or 4OP and has name
+   */
+      if (!vdata[0]) return(0);
+!     /*if (!vdata[SBNAMEOFFSET]) return(0);*/
+      if (voice_size == O3VOICESIZE &&
+  	strncmp(vdata, "4OP", 3) &&
+  	strncmp(vdata, "2OP", 3)
+***************
+*** 686,697 ****
+  
+  	memcpy ((char *) &header, buf, sizeof (header));
+  
+! 	if (strncmp (header.magic, "GF1PATCH110", 12)) {
+  	    fprintf (stderr, "%s: Not a patch file\n", pathname);
+  	    exit (-1);
+  	}
+  
+! 	if (strncmp (header.version, "ID#000002", 10)) {
+  	    fprintf (stderr, "%s: Incompatible patch file version\n", pathname);
+  	    exit (-1);
+  	}
+--- 690,701 ----
+  
+  	memcpy ((char *) &header, buf, sizeof (header));
+  
+! 	if (strncmp ((char *) header.magic, "GF1PATCH110", 12)) {
+  	    fprintf (stderr, "%s: Not a patch file\n", pathname);
+  	    exit (-1);
+  	}
+  
+! 	if (strncmp ((char *) header.version, "ID#000002", 10)) {
+  	    fprintf (stderr, "%s: Incompatible patch file version\n", pathname);
+  	    exit (-1);
+  	}
+*** ../adorg/midifile.c.orig	Sun Oct 24 20:30:18 1993
+--- midifile.c	Tue Feb 22 02:05:37 1994
+***************
+*** 1,4 ****
+- #define READ_MODS
+  /*
+   * midifile 1.11
+   *
+--- 1,3 ----
+***************
+*** 70,76 ****
+--- 69,80 ----
+  #endif
+  
+  #include <stdio.h>
++ #ifndef __386BSD__
+  #include <values.h>
++ #else
++ #include <machine/limits.h>
++ #define MAXINT INT_MAX
++ #endif
+  
+  char *strcpy (), *strcat ();
+  /*void exit(), free();*/
+***************
+*** 243,249 ****
+      }
+    else
+  #ifdef READ_MODS
+!     if (!strncmp(Mf_file_contents, "MThd", 4))
+  #endif
+      {
+        if (readmt ("MThd") == EOF)
+--- 247,253 ----
+      }
+    else
+  #ifdef READ_MODS
+!     if (!strncmp((char *) Mf_file_contents, "MThd", 4))
+  #endif
+      {
+        if (readmt ("MThd") == EOF)
+***************
+*** 1147,1154 ****
+  
+  /* write a single character and abort on error */
+  static int
+! eputc (c)
+!      unsigned char c;
+  {
+    int return_val;
+  
+--- 1151,1157 ----
+  
+  /* write a single character and abort on error */
+  static int
+! eputc (unsigned char c)
+  {
+    int return_val;
+  
+*** ../adorg/midt.c.orig	Sun Sep  5 06:48:09 1993
+--- midt.c	Mon Feb 21 00:24:15 1994
+***************
+*** 6,12 ****
+--- 6,16 ----
+  
+  #include <stdio.h>
+  #include <ctype.h>
++ #ifdef __386BSD__
++ #include <stdlib.h>
++ #else
+  #include <getopt.h>
++ #endif
+  #define NO_LC_DEFINES
+  #include "midifile.h"
+  #include "adagio.h"
+***************
+*** 358,364 ****
+  
+  void
+  txt_sysex(leng,mess)
+! char *mess;
+  {
+  	register int n, c;
+  	register unsigned char *p = mess;
+--- 362,368 ----
+  
+  void
+  txt_sysex(leng,mess)
+! unsigned char *mess;
+  {
+  	register int n, c;
+  	register unsigned char *p = mess;
+*** ../adorg/mp_mod.c.orig	Thu Oct 28 06:39:36 1993
+--- mp_mod.c	Sun Feb 20 23:24:12 1994
+***************
+*** 35,41 ****
+  #define CMD_NOP			0xfe
+  #define CMD_NONOTE		0xff
+  
+! #define MIN(a, b)		((a) < (b) ? (a) : (b))
+  
+  #define MAX_TRACK	8
+  #define MAX_PATTERN	128
+--- 35,41 ----
+  #define CMD_NOP			0xfe
+  #define CMD_NONOTE		0xff
+  
+! #define _MIN(a, b)               ((a) < (b) ? (a) : (b))
+  
+  #define MAX_TRACK	8
+  #define MAX_PATTERN	128
+***************
+*** 394,400 ****
+  	      tmp = (p[0] << 8) | p[1];
+  	      sample = (tmp >> 8) & 0x10;
+  	      period =
+! 		MIN (tmp & 0xFFF, 1023);
+  	      tmp = (p[2] << 8) | p[3];
+  	      sample |= tmp >> 12;
+  	      effect = (tmp >> 8) & 0xF;
+--- 394,400 ----
+  	      tmp = (p[0] << 8) | p[1];
+  	      sample = (tmp >> 8) & 0x10;
+  	      period =
+! 		_MIN (tmp & 0xFFF, 1023);
+  	      tmp = (p[2] << 8) | p[3];
+  	      sample |= tmp >> 12;
+  	      effect = (tmp >> 8) & 0xF;
+***************
+*** 728,734 ****
+        set_slideto (channel, pat);
+        break;
+  
+!     default:
+        /* printf ("Command %x %02x\n", pat->command, pat->parm1);	*/
+      }
+  
+--- 728,734 ----
+        set_slideto (channel, pat);
+        break;
+  
+!     /* default: */
+        /* printf ("Command %x %02x\n", pat->command, pat->parm1);	*/
+      }
+  
+*** ../adorg/oldpat.cfg.orig	Fri Aug 27 10:35:09 1993
+--- oldpat.cfg	Tue Feb 22 04:59:42 1994
+***************
+*** 1,3 ****
+--- 1,5 ----
++ # Gravis Ultrasound configuration
++ #
+  # If you don't have the patches in the
+  # Gravis 2.06 distribution, make this file
+  # /etc/default.cfg to use the older Honky-Tonk
+***************
+*** 4,8 ****
+  # Piano patch and to substitute for the charang
+  # patch.
+  
+! 4 honktonk
+! 85 voxlead
+--- 6,10 ----
+  # Piano patch and to substitute for the charang
+  # patch.
+  
+! #4 honktonk
+! #85 voxlead
+*** ../adorg/phase1.c.orig	Thu Oct  7 21:55:43 1993
+--- phase1.c	Mon Feb 21 18:57:07 1994
+***************
+*** 43,49 ****
+--- 43,51 ----
+  #ifdef UNIX
+  #include <stdio.h>
+  #include <ctype.h>
++ #ifndef __386BSD__
+  #include <malloc.h>
++ #endif
+  #else
+  #include "stdio.h"
+  #include "ctype.h"
+*** ../adorg/phase2.c.orig	Wed Oct 27 12:01:19 1993
+--- phase2.c	Tue Feb 22 12:23:12 1994
+***************
+*** 64,70 ****
+--- 64,72 ----
+  #include <unistd.h>
+  #include <stdlib.h>
+  #include <ctype.h>
++ #ifndef __386BSD__
+  #include <malloc.h>
++ #endif
+  #include <fcntl.h>
+  #include <string.h>
+  #include <sys/time.h>
+***************
+*** 212,230 ****
+  static void show_markers();
+  
+  static int xmp_epoch = -1;
+! static unsigned xxmp_epoch = 0;
+  static unsigned time_expired = 0;
+  static struct timeval tv;
+! static struct timezone tz;
+  static void
+  time_sync()
+  {
+! 	unsigned jiffies;
+  /**
+  static unsigned last_time_expired = 0;
+  **/
+  
+! 	gettimeofday (&tv, &tz);
+  	jiffies = tv.tv_sec*100 + tv.tv_usec/10000;
+  	if (xmp_epoch < 0) {
+  		xxmp_epoch = jiffies;
+--- 214,232 ----
+  static void show_markers();
+  
+  static int xmp_epoch = -1;
+! static unsigned long xxmp_epoch = 0;
+  static unsigned time_expired = 0;
+  static struct timeval tv;
+! 
+  static void
+  time_sync()
+  {
+! 	unsigned long jiffies;
+  /**
+  static unsigned last_time_expired = 0;
+  **/
+  
+! 	gettimeofday (&tv, NULL);
+  	jiffies = tv.tv_sec*100 + tv.tv_usec/10000;
+  	if (xmp_epoch < 0) {
+  		xxmp_epoch = jiffies;
+***************
+*** 344,349 ****
+--- 346,354 ----
+  	 */
+  	if (pptime >= time_expired)
+  	    csec_ahead = (pptime - time_expired) / 2;
++ 	else
++ 	    goto no_sleep;
++ #ifdef THIS_PIECE_OF_CODE_IS_WRONG      /* Ache */
+  	/* if we've gotten behind, it's hopeless, so abort */
+  	else {
+  	    fprintf(stderr, "I've gotten behind by %dcsec at time %d csec\n",
+***************
+*** 352,357 ****
+--- 357,363 ----
+  sz,wbptr,rtpbs,ptime,qroom);
+  	    STOPNOW;
+  	}
++ #endif
+  /**
+  if (vib_switch && csec_ahead <= VIB_THRESH) fprintf(stderr,"vib off\n");
+  if (!vib_switch && csec_ahead > VIB_THRESH) fprintf(stderr,"vib on\n");
+***************
+*** 371,376 ****
+--- 377,383 ----
+  		sleep(sec_ahead);
+  	}
+  	else if (csec_ahead > 0) usleep(csec_ahead * 10000);
++ no_sleep:
+  #endif
+  
+  #ifndef XMP
+***************
+*** 593,605 ****
+  }
+  
+  
+  static void
+  stop_notes(int arg)
+  {
+  	int room;
+  
+! #ifndef XMP
+! 	fprintf(stderr, "stopping ...\n");
+  #endif
+  	note_offs(MAXTIME);
+  	sbflush();
+--- 600,641 ----
+  }
+  
+  
++ static int got_signal = 0;
++ void (*oldhup)();
++ void (*oldint)();
++ void (*oldterm)();
++ #ifdef SIGTSTP
++ void (*oldstp)();
++ #endif
++ 
++ static void
++ set_got_signal(int arg)
++ {
++ 	if (got_signal) {
++ 	    got_signal = arg;
++ #ifndef XMP
++ 	    if (arg == SIGINT
++ #ifdef SIGTSTP
++ 		|| arg == SIGTSTP
++ #endif
++ 	       )
++ 		fprintf(stderr, " be patient ...\n");
++ #endif
++ 	    return;
++ 	}
++ 	got_signal = arg;
++ #ifndef XMP
++ 	fprintf(stderr, " stopping ...\n");
++ #endif
++ }
++ 
+  static void
+  stop_notes(int arg)
+  {
+  	int room;
+  
+! #ifdef SIGTSTP
+! 	if (arg != SIGTSTP)
+  #endif
+  	    note_offs(MAXTIME);
+  	sbflush();
+***************
+*** 612,619 ****
+--- 648,675 ----
+  	    send_meter_packet(false);
+  #endif
+  	}
++ #ifdef SIGTSTP
++ 	if (arg != SIGTSTP)
++ #endif
++ 	{
+  	    if (ext_dev >= 0) (void)ioctl(seq_fd, SNDCTL_SEQ_RESET, 0);
+  	    STOPNOW;
++ 	}
++ #ifdef SIGTSTP
++ 	else {
++ 	    unsigned saved_time;
++ 
++ 	    time_sync();
++ 	    saved_time = time_expired;
++ 	    signal(SIGTSTP, oldstp);
++ 	    kill(0, SIGTSTP);
++ 	    /* ... */
++ 	    got_signal = 0;
++ 	    signal(SIGTSTP, set_got_signal);
++ 	    time_sync();
++ 	    xxmp_epoch += time_expired - saved_time;
++ 	}
++ #endif
+  }
+  
+  
+***************
+*** 655,662 ****
+      initflag = (cl_nswitch(msw, nmsw) == NULL);
+  #endif
+  
+-     signal(SIGINT, stop_notes);
+- 
+      if (ext_dev >= 0 && !recording_track) {
+  	int chan;
+  	for (chan = 0; chan < NUM_CHANS; chan++) if (ext_chan[chan]) break;
+--- 711,716 ----
+***************
+*** 665,671 ****
+      local_extflag = extflag;
+      if (ext_dev < 0 || !playing_music) local_extflag = false;
+      if (local_extflag) playing_music = true;
+!     if (readable) playing_music = false;
+  
+      if (recording_track) {
+  	int i;
+--- 719,725 ----
+      local_extflag = extflag;
+      if (ext_dev < 0 || !playing_music) local_extflag = false;
+      if (local_extflag) playing_music = true;
+!     /*if (readable) playing_music = false;*/
+  
+      if (recording_track) {
+  	int i;
+***************
+*** 698,703 ****
+--- 752,764 ----
+      channel_init();			/* initialize midi controllers and pitch bend */
+      the_score = score;			/* pass note list to play_score */
+  
++     oldhup = signal(SIGHUP, set_got_signal);
++     oldint = signal(SIGINT, set_got_signal);
++     oldterm = signal(SIGTERM, set_got_signal);
++ #ifdef SIGTSTP
++     oldstp = signal(SIGTSTP, set_got_signal);
++ #endif
++ 
+      /* To start playing, either pass call-backs to midifile library,
+       * or if not recording a track, call play_score directly.
+       */
+***************
+*** 709,714 ****
+--- 770,782 ----
+      } else
+  	play_score();
+  
++     signal(SIGINT, oldhup);
++     signal(SIGINT, oldint);
++     signal(SIGTERM, oldterm);
++ #ifdef SIGTSTP
++     signal(SIGTSTP, oldstp);
++ #endif
++ 
+      /* display final diagnostic report */
+      if (verbose) {
+  #ifdef END_DIAGNOSTICS
+***************
+*** 725,738 ****
+  #endif
+  #ifdef END_DIAGNOSTICS
+  	if (really_verbose) {
+! 	    printf("Notes on:  gus %d  fm %d  ext %d\n", stat_note_on[0],
+! 	       stat_note_on[1], stat_note_on[2]);
+! 	    printf("Notes off: gus %d  fm %d  ext %d\n", stat_note_off[0],
+! 	       stat_note_off[1], stat_note_off[2]);
+  	    printf("Chorus notes dropped:\n           gus %d  fm %d  ext %d\n",
+! 		stat_chorus_dropped[0], stat_chorus_dropped[1], stat_chorus_dropped[2]);
+  	    printf("Reverb notes dropped:\n           gus %d  fm %d  ext %d\n",
+! 		stat_echoes_dropped[0], stat_echoes_dropped[1], stat_echoes_dropped[2]);
+  	    hist_report();
+  	}
+  #endif
+--- 793,814 ----
+  #endif
+  #ifdef END_DIAGNOSTICS
+  	if (really_verbose) {
+! 	    printf("Notes on:  gus %d  fm %d  ext %d\n",
+! 	       gus_dev >= 0 ? stat_note_on[gus_dev] : 0,
+! 	       sb_dev >= 0 ? stat_note_on[sb_dev] : 0,
+! 	       ext_dev >= 0 ? stat_note_on[ext_dev] : 0);
+! 	    printf("Notes off: gus %d  fm %d  ext %d\n",
+! 	       gus_dev >= 0 ? stat_note_off[gus_dev] : 0,
+! 	       sb_dev >= 0 ? stat_note_off[sb_dev] : 0,
+! 	       ext_dev >= 0 ? stat_note_off[ext_dev] : 0);
+  	    printf("Chorus notes dropped:\n           gus %d  fm %d  ext %d\n",
+! 	       gus_dev >= 0 ? stat_chorus_dropped[gus_dev] : 0,
+! 	       sb_dev >= 0 ? stat_chorus_dropped[sb_dev] : 0,
+! 	       ext_dev >= 0 ? stat_chorus_dropped[ext_dev] : 0);
+  	    printf("Reverb notes dropped:\n           gus %d  fm %d  ext %d\n",
+! 	       gus_dev >= 0 ? stat_echoes_dropped[gus_dev] : 0,
+! 	       sb_dev >= 0 ? stat_echoes_dropped[sb_dev] : 0,
+! 	       ext_dev >= 0 ? stat_echoes_dropped[ext_dev] : 0);
+  	    hist_report();
+  	}
+  #endif
+***************
+*** 856,862 ****
+  void voices_init()
+  {
+      int n;
+- 
+  #ifdef PSEUDO_STEREO
+  #ifdef USE_SHM
+      setting_pstereo = *shm_setting_pstereo;
+--- 932,937 ----
+***************
+*** 1258,1263 ****
+--- 1333,1342 ----
+  	f_ctrl(card, d, chan + 1, VOLUME, val);
+  	break;
+      case 8:
++ #ifdef USE_SHM
++ 	setting_pstereo = *shm_setting_pstereo;
++ #endif
++ 	if (!setting_pstereo) break;
+  	if (user_ctrl_height[USER_PAN][chan] && !override) break;
+  	ext_pan[chan] = val;
+  	f_ctrl(card, d, chan + 1, PAN, val);
+***************
+*** 1819,1824 ****
+--- 1898,1905 ----
+  	}
+  
+  	event = the_next_event;
++ 	if (got_signal)
++ 		stop_notes(got_signal);
+      }				/* play it, Sam */
+  
+      /* At end of the song, all notes off. */
+***************
+*** 1879,1886 ****
+  		time_expired,
+  		time_expired/6000, (time_expired/100)%60, running_time );
+  **/
+  	usleep(500000);
+! 	if (ext_dev >= 0) (void)ioctl(seq_fd, SNDCTL_SEQ_RESET, 0);
+      }
+  }
+  
+--- 1960,1969 ----
+  		time_expired,
+  		time_expired/6000, (time_expired/100)%60, running_time );
+  **/
++ 	if (ext_dev >= 0) {
+  		usleep(500000);
+! 		(void)ioctl(seq_fd, SNDCTL_SEQ_RESET, 0);
+! 	}
+      }
+  }
+  
+***************
+*** 2319,2325 ****
+--- 2402,2412 ----
+   *
+   */
+  
++ #ifndef __386BSD__
+  #include <sys/ultrasound.h>
++ #else
++ #include <machine/ultrasound.h>
++ #endif
+  
+  /* gus mode bits */
+  #define Bit8 0
+*** ../adorg/phasem.c.orig	Sun Oct 24 18:16:57 1993
+--- phasem.c	Tue Feb 22 05:09:25 1994
+***************
+*** 9,16 ****
+  #define NO_LC_DEFINES
+  #include "midifile.h"
+  #include "midi.h"
+! 
+  #include <malloc.h>
+  #include "midicode.h"
+  #include "adagio.h"
+  #include "userio.h"
+--- 9,17 ----
+  #define NO_LC_DEFINES
+  #include "midifile.h"
+  #include "midi.h"
+! #ifndef __386BSD__
+  #include <malloc.h>
++ #endif
+  #include "midicode.h"
+  #include "adagio.h"
+  #include "userio.h"
+***************
+*** 502,507 ****
+--- 503,509 ----
+  		count_volume_controls++;
+  		break;
+  	case PAN:
++ 		if (!setting_pstereo) break;
+  		ext_pan[chan] = value;
+  		break;
+  	case CHORUS_DEPTH:
+***************
+*** 555,561 ****
+       */
+      if (mess[1] == ID_LINUX && leng == LSYSEX_SIZE) {
+  	int i, chan = mess[2];
+! 	fm_sysex[chan] = (char *) malloc(LSYSEX_SIZE);
+  	for (i = 0; i < LSYSEX_SIZE; i++)
+  	    fm_sysex[chan][i] = mess[i];
+  	program[chan] = chan + 240 + 1;
+--- 557,563 ----
+       */
+      if (mess[1] == ID_LINUX && leng == LSYSEX_SIZE) {
+  	int i, chan = mess[2];
+! 	fm_sysex[chan] = (unsigned char *) malloc(LSYSEX_SIZE);
+  	for (i = 0; i < LSYSEX_SIZE; i++)
+  	    fm_sysex[chan][i] = mess[i];
+  	program[chan] = chan + 240 + 1;
+***************
+*** 1380,1385 ****
+--- 1382,1388 ----
+  		 * only be done statically, before starting to play.
+  		 */
+  		if (thecontrol == PAN && ext_pan[chan] == -1 &&
++ 			setting_pstereo &&
+  			!user_ctrl_height[USER_PAN][chan])
+  		    ext_pan[chan] = thecontrolval;
+  		else if (thecontrol == CHORUS_DEPTH &&
+***************
+*** 1555,1564 ****
+  
+  void rec_init()
+  {
+- #ifndef linux
+-     char *malloc();		/* memory allocation */
+- #endif
+- 
+      if (max_m_notes == -1) {	/* allocate space 1st time rec_init called */
+  	max_m_notes = space / sizeof(m_note_node);
+  	event_buff = (m_note_type) malloc(sizeof(m_note_node) * max_m_notes);
+--- 1558,1563 ----
+*** ../adorg/pmgr.c.orig	Tue Sep 21 06:55:37 1993
+--- pmgr.c	Mon Feb 21 01:17:54 1994
+***************
+*** 28,35 ****
+--- 28,40 ----
+  #include <unistd.h>
+  #include <fcntl.h>
+  #include <sys/ioctl.h>
++ #ifndef __386BSD__
+  #include <sys/soundcard.h>
+  #include <sys/ultrasound.h>
++ #else
++ #include <machine/soundcard.h>
++ #include <machine/ultrasound.h>
++ #endif
+  #include <strings.h>
+  #include <sys/errno.h>
+  
+*** ../adorg/setfm.c.orig	Tue Jul  6 03:59:59 1993
+--- setfm.c	Sun Feb 20 23:40:25 1994
+***************
+*** 6,12 ****
+--- 6,16 ----
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <string.h>
++ #ifdef __386BSD__
++ #include <machine/soundcard.h>
++ #else
+  #include <sys/soundcard.h>
++ #endif
+  #include <fcntl.h>
+  #include "adagio.h"
+  #include "sblast.h"
+*** ../adorg/xmp.c.orig	Wed Oct 27 08:50:07 1993
+--- xmp.c	Tue Feb 22 04:10:50 1994
+***************
+*** 1,4 ****
+- #define READ_MODS
+  /* #define USE_OWN_GUS_VOL */
+  /*
+   * xmp -- play midi files
+--- 1,3 ----
+***************
+*** 1069,1075 ****
+  		case USER_MAIN_VOLUME: main_volume[chan] = v; break;
+  		case USER_CHORUS_DEPTH: chorus_depth[chan] = v; break;
+  		case USER_REVERBERATION: reverberation[chan] = v; break;
+! 		case USER_PAN: ext_pan[chan] = v; break;
+  	}
+  #ifdef USE_SHM
+  	switch (setting_meter_color) {
+--- 1068,1076 ----
+  		case USER_MAIN_VOLUME: main_volume[chan] = v; break;
+  		case USER_CHORUS_DEPTH: chorus_depth[chan] = v; break;
+  		case USER_REVERBERATION: reverberation[chan] = v; break;
+! 		case USER_PAN:
+! 		if (!setting_pstereo) break;
+! 		ext_pan[chan] = v; break;
+  	}
+  #ifdef USE_SHM
+  	switch (setting_meter_color) {
+***************
+*** 1077,1083 ****
+  		case USER_MAIN_VOLUME: shm_main_volume[chan] = v; break;
+  		case USER_CHORUS_DEPTH: shm_chorus_depth[chan] = v; break;
+  		case USER_REVERBERATION: shm_reverberation[chan] = v; break;
+! 		case USER_PAN: shm_ext_pan[chan] = v; break;
+  	}
+  #endif
+  }
+--- 1078,1086 ----
+  		case USER_MAIN_VOLUME: shm_main_volume[chan] = v; break;
+  		case USER_CHORUS_DEPTH: shm_chorus_depth[chan] = v; break;
+  		case USER_REVERBERATION: shm_reverberation[chan] = v; break;
+! 		case USER_PAN:
+! 		if (!setting_pstereo) break;
+! 		shm_ext_pan[chan] = v; break;
+  	}
+  #endif
+  }
