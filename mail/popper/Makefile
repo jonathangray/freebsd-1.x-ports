@@ -75,7 +75,7 @@ install: ${TARGET}
 
 package:    pkg_bin
 
-pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST all
+pkg_bin: install pkg/+DESC pkg/+ONELINE pkg/+PLIST
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST popper_bin
 
 sources: ${SRCS}
