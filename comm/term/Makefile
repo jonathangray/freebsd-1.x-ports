@@ -46,12 +46,14 @@ STATOBJS=tmon.o client.a
 PROGS=term trsh tupload txconn tredir tmon
 
 MANPAGES=term.1 term_clients.1 term_setup.1 tupload.1 tredir.1 \
-	trsh.1 linecheck.1 tmon.1
+	trsh.1 tmon.1
 
 all: $(PROGS)
 	@echo done
 
-install: all
+install: installbin installman
+
+installbin: all
 	if [ ! -d $(DESTDIR)$(BINDIR) ]; then $(MKDIR) $(DESTDIR)$(BINDIR); \
 	else true; fi
 	for i in $(PROGS);\
@@ -108,7 +110,7 @@ myclean:
 	$(RM) *~
 
 clean:
-	$(RM) *.o *.a core compress.debug out *~
+	$(RM) $(PROGS) *.o *.a core compress.debug out *~
 
 realclean: clean
 	$(RM) $(PROGS) test 1 linerem check trcmd linecheck TAGS
