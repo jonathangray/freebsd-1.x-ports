@@ -1,0 +1,1223 @@
+% doc.tex
+
+\documentstyle[]{article}
+
+\def\tty#1{{\tt #1}}
+\def\bold#1{{\bf #1}}
+
+\parindent 0in
+\parskip 0.10in 
+\textwidth 6.5in
+\oddsidemargin 0in
+\evensidemargin 0in
+\textheight 8.175in
+\topmargin -0.25in
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+\vspace*{2in}
+\bf
+\Huge
+Xtrek Version 6.1
+
+\vspace{2in}
+
+\LARGE
+Mike Bolotski $<$mikeb@salmon.ee.ubc.ca$>$ \\
+Jon Bennett $<$jcrb@cs.cmu.edu$>$ \\
+David Gagne $<$daveg@salmon.ee.ubc.ca$>$ \\
+Daniel Lovinger $<$dl2n+@andrew.cmu.edu$>$ \\
+Rob Ryan $<$rr2b+@andrew.cmu.edu$>$
+\end{center}
+\end{titlepage}
+
+
+
+\tableofcontents \newpage
+
+\section{Introduction}
+
+Xtrek is one of the all time classic games for X Windows. This release
+of the game at version 6.0 represents many  months of
+work by various people at Carnegie Mellon University and the University
+of British Columbia, and in our not so humble opinion constitutes a major
+improvement over the previous versions. For those familiar with
+versions 4.0 and 5.4, much of the game remains on the surface the same : you
+still fly a ship 'round the galaxy blowing away your friends and
+conquering planets. However, where the old xtrek was cast in stone (or
+executable), this version is configurable in almost every respect from
+the power of your torpedoes to the number of planets in the galaxy. A
+whole new universe is only a few hours of configuration file hacking
+away...
+
+NOTE: At release 6.1, our involvement with the code ends. If you are interested
+in becoming the next "keeper of the flame", please contact us so we can arrange
+a formal handoff of the code.
+
+The basic object of the game is to conquer sixteen (by default - as
+with almost everything, this is configurable) planets for your empire.
+Of course, everyone else is trying to achieve the same objective, and
+that is where all of the fun comes in.
+
+\section{Getting Started}
+
+Xtrek is split up into two separate programs, xtrek and xtrekd. Xtrekd
+is the main server process for the game and accepts as a command line
+argument the name of a configuration file for the game. For instance
+
+\tty{xtrekd cmu.config}
+
+will start a game with the contents of the cmu.config file. The daemon
+first tries to open the config file as an absolute pathname, and then
+attempts to load the config file from the xtrek library directory.  If
+no config file is specified, a default is read from the library. 
+
+\subsection{Entering the Game}
+
+Once xtrekd is running, players can connect to it by running xtrek with
+the machine name the daemon is running on as the argument on the
+command line. For instance, assume that a player has a running xtrekd
+on ligonier.andrew.cmu.edu.  Then
+
+\tty{xtrek ligonier.andrew.cmu.edu}
+
+would send a request to the daemon on ligonier to open an xtrek window on the local
+machine. Various errors can occur at this point, most of which have to
+do with access protections on your X server - you must first xhost to
+the machine running the daemon.
+
+\subsection{Screen Layout}
+
+When you start the game, you are given a window with five subwindows.  The big
+left window is the local view from your ship updated in real time, and 
+your ship will always appear the center of it.
+Other ships will be displayed with their set ship bitmap, and will additionally
+,on color workstations, also have a
+different color.  The small hex (0-f) character to the right of the ship
+represents the player number.  Round objects with names (which can be turned off) 
+on them are the planets, and they also are the color of the owning team.  Small dots on
+the screen are torpedoes or mines (torpedoes are in straight line motion).  Enemy torpedoes 
+and mines are a small cross while friendly torpedoes and mines are a small dot.  
+Exploding devices are represented by increasingly large explosion bitmaps proportional to
+the kick behind it.  Phaser shots appear as lines emminating from the firing ship.
+
+The large window on the right is a map of the whole galaxy.
+Only ships and planets appear on it, and it is updated in real time.
+Ships are just a player number (in hex) and team letter; however, cloaked
+ships will not appear.
+
+Directly below the galaxy window is a small status message window which will
+occasionally contain warning messages like "Not enough fuel to fire
+torp." 
+
+Directly Below the warning window is the message window.  This window
+will be described later.
+
+The small window on the left side (bottom) is your status window.  
+The status area contains your vessel's 'vital signs.'
+If you are locked onto another ship, in addition to your own you
+will get the status of the other vessel on the second line, minus
+the \bold{Flags} field. There are eleven separate sections to the
+full status line :
+
+\begin{list}{}{
+	\renewcommand{\makelabel}[1]{{\tt #1 \hfill}}
+         \setlength{\leftmargin}{2.75cm}
+         \setlength{\labelwidth}{\leftmargin}
+         \setlength{\labelsep}{0in}
+}
+\item[Flags]
+	This field contains information about ship activities.  There
+	are twelve status characters that can be activated in this
+	section (in order, left to right):
+
+	\begin{tabbing}
+        GYR \= \kill
+	 \tty{S}\> ship has shields up \\
+	 \tty{GYR }\> green, yellow, or red alert \\
+	 \tty{L}\> ship has sensor or planet lock activated \\
+	 \tty{R}\> ship is under repair \\
+	 \tty{B}\> ship is bombing a planet \\
+	 \tty{O}\> ship is orbiting a planet \\
+	 \tty{C}\> ship is cloaked \\
+	 \tty{W}\> ship weapons are over operating temperature \\
+	 \tty{E}\> ship engines are over operating temperature \\
+	 \tty{u}\> ship is beaming armies up from planet surface \\
+	 \tty{d}\> ship is beaming armies down to planet surface \\
+	 \tty{P}\> ship is allowing co-pilots \\
+	\end{tabbing}
+
+\item[Warp] Shows the ship's current warp speed in x.x format
+             Ships move between warps 0 and 9.9.
+
+\item[Damage] Shows the ship's current hull damage.
+	Damage repairs slowly if shields
+	are down, faster if ship is in repair mode.
+
+\item[Shield] Shows the number of damage points your shield
+	generators can absorb.They repair faster than hull damage.
+
+\item[Torpedoes] Shows the number of torpedoes the ship has flying
+
+\item[Kills] Shows the number of kills the ship has prosecuted in x.xx format
+
+\item[Armies] Shows the number of armies currently onboard
+Your ship can carry two times your current number of kills.
+The maximum number of armies it can carry is ten.
+
+\item[Fuel] Shows the current amount of fuel onboard
+
+\item[Weapon Temp] Weapon temperature as a percentage of maximum
+
+\item[Engine Temp] Engine temperature as a percentage of maximum
+
+\item[Failed Systems]
+	This field contains info about which of the ship's systems are currently
+	non-operational due to excessive damage.  If a letter is shown, 
+        the system is down.
+
+	\begin{tabbing}
+        GYR \= \kill
+	 \tty{C}\> cloaking device \\
+	 \tty{L}\> long range sensors \\
+	 \tty{P}\> phaser banks \\
+	 \tty{S}\> short range sensors  \\
+	 \tty{T}\> torpedoes \\
+	 \tty{c}\> cooling system \\
+	 \tty{l}\> sensors (locking ability) \\
+	 \tty{s}\> shields \\
+	 \tty{t}\> transporters \\
+	\end{tabbing}
+\end{list}
+
+
+\subsection{Help Window}
+
+Typing 'h' will pop up a help window below the normal window.  The help
+window lists commands you can type.  Its useful for small problems
+like forgetting how to put your shields up, and for authors who forget
+what command does what.  Typing 'h' again will get rid of it.
+
+\section{Ship Details}
+
+\subsection{Weapons}
+
+Torpedoes move at a configurable warp (which should be higher than the max ship speed)
+ and have a random life of three to five
+seconds.  Torpedoes will detonate and do full damage if
+they get close to a ship, and do less damage to objects at a
+longer distances.  Torpedoes will not be detonated by a non-hostile
+player, but they will do damage if something causes them to explode.
+
+Mines are simply dropped by a player, and remain active until a hostile ship comes
+within range (about one ship length).  They will then detonate and inflict damage
+as per torpedoes to any ship in the local area.  Since their onboard power is finite,
+they will detonate automatically after about 7-10 minutes of life, again doing
+damage to any ship in the local area.
+
+When exploding, torpedoes can damage {\em everyone} who is near them.
+Thus it is possible to kill your own teammates and people you are at
+peace with.
+
+Phasers must be within about 10 degrees of their target to hit (this 'range' is doubled
+if you have a sensor lock on the ship you are attacking).
+Phasers that hit will maintain a line between the two ships.  The damage
+inflicted is again inversely proportional to the distance between the
+ships (linear for the sake of making the things work with reasonable
+damage values).
+It takes one second to recharge your phasers for
+another shot.  As with torpedoes, Your phasers will affect teams 
+you are at war with, or those who are at war with you.
+
+Ships that explode will inflict damage as per a torpedo, albeit more powerful.  
+Don't get too near one.
+
+\subsection{Cooling}
+
+Firing weapons and running your engines generates heat which must be
+dissipated through your ship's interlinked cooling system. As your
+systems heat up toward their maximum of 100% loaded, they try to dump
+their excess heat off into the opposite cooling system. This can be
+extremely useful when you are desperately trying to escape an enemy
+trap, and need just that extra boost to get you into home space. Each
+weapon shot 'costs' given amount of heat which is based on the power of
+the weapon. Warp drive on the other hand costs an amount that increases
+as you increase your warp factor. With all of the above interactions
+taken into account, it is usually possible for a normal ship to pull
+about warp four and fire weapons before starting to accumulate heat.
+
+In addition to these standard sources of heating, if you are playing a
+configuration with the teleport option, teleporting costs a large
+amount.
+
+The cooling systems can only operate at peak efficiency with ship's
+shields down since the entire purpose of the shield system is to repel
+energy. With shields up the cooling system will still operate, but at a
+lower dissipation rate. Similarly, when the ship is cloaked the cooling
+systems operate at a scaled back rate.
+
+If the ships cooling system exceed 100\% capacity, there is a growing
+probability during each time slice that the system being cooled will
+shut off to protect itself from a meltdown. The capacity of the
+cooling system must approach 0\% for the system to be reactivated. When
+a system overheats, a flag is triggered on the status line, W for weapons,
+E for engines.
+
+\subsection{Planets and Armies}
+
+Planets are conquered by first bombing them to reduce the number of
+armies to a manageable level and then beaming down your own armies.  A
+ship must be in orbit to bomb a planet.  A side effect of this
+requirement is that shields are dropped and planetary defensive fire
+damages the hull directly.  Planetary fire causes damage proportional
+to the number of defending armies.  The actual formula is
+$(\mbox{armies}/ 10) + 2$ damage points twice per second.
+
+Planets stats are updated every minute.  There is a random chance that the
+number of armies will increase.  There is also a random chance, that
+there will be a major die-off of armies (more likely on planets with many armies).
+If you have less than three armies
+on the planet, they will not grow as fast.  Planets with no armies are
+owned by the independent team and will have no armies on them until
+someone beams one down.
+
+Enemy planets do damage based on the number of armies they have.
+This means planets with no armies do no damage.  
+
+The teams' planets can provide
+fuel and repair services, which roughly double each operation's speed.  
+Obviously, this makes these planets
+particularly valuable (and hence a lot of battles are fought around them).
+Fuel replenishes at an additional 2x rate when orbiting a planet which is 
+marked as {\em fuel} sources. The same applies for planets marked as {\em repair}
+stations.
+
+You can get information about any planet your team has orbited.
+However, if the planet is taken by any other team, you will
+lose information about the planet until it is reorbited.
+
+
+\section{Xdefaults and options}
+
+You can put the following options into your .Xdefaults file:
+
+\begin{verbatim}
+     xtrek.boldfont:         6x10b
+     xtrek.font:             6x10
+     xtrek.name:             DragonSlayer
+     xtrek.reverseVideo:     off
+     xtrek.showShields:      on
+     xtrek.showStats:        on
+     xtrek.stats.geometry:   +0+655
+     xtrek.GAlertPattern:    0xf
+     xtrek.YAlertPattern:    0xa 0x5
+     xtrek.RAlertPattern:    0x0f 0x0f 0x0f 0x0f 0xf0 0xf0 0xf0 0xf0
+     xtrek.ralert:           red
+     xtrek.yalert:           yellow
+     xtrek.galert:           green
+     xtrek.border:           blue
+     xtrek.background:       black
+     xtrek.text:             white
+     xtrek.warning:          red
+     xtrek.unknown:          light grey
+     xtrek.me:               white
+\end{verbatim}
+
+\begin{list}{}{
+	\renewcommand{\makelabel}[1]{{\tt #1 \hfill}}
+         \setlength{\leftmargin}{2.5cm}
+         \setlength{\labelwidth}{\leftmargin}
+         \setlength{\labelsep}{0in}
+}
+
+\item[Fonts] These options allow you to change fonts used in the game.
+              Our advice: "Don't."
+
+\item[name] This is your playername.
+
+\item[reversevideo] On black and white monitors this can ease eye-strain.
+
+\item[showShields] This causes the shields of you and other players to appear
+                     as a circle around your ship when they are up.
+
+\item[showStats] This option will put up a visual status window above 
+          your display.  Some players find this easier to read than numbers.
+          The stats.geometry uses standard X syntax for a screen position.
+
+\item[Alert Patterns] These patterns are useful for showing your current 
+          alert status based
+on the border pattern.  It is used for black and white monitors only.
+The alert colors are used for color monitors.  I think changing them
+would be silly.
+
+\item[Colors] These options allow you to set colors on various objects
+so you can get much more information from your display.
+Obviously, these only matter for color monitors.
+\end{list}
+
+
+\section{The Commands}
+These are the various key and button commands in the game.
+They are not currently remappable other than through the XKeyMap
+function.
+
+\begin{list}{}{
+	\renewcommand{\makelabel}[1]{{\tt #1 \hfill}}
+         \setlength{\leftmargin}{.5in}
+         \setlength{\labelwidth}{\leftmargin}
+         \setlength{\labelsep}{0in}
+}
+\item[0-9]{\em  Set ship's speed}.
+The numbers zero through nine set your ship's speed.  It takes time for
+your ship to accelerate or decelerate to the desired speed.  Damaged
+ships can't use higher speeds.  When engines freeze, you can't set
+speed.  Setting speed breaks you out of a planet's orbit.
+
+\item[.<digit>]{\em Set fractional warp speed}.
+This will set a fractional warp speed goal for your ship. For instance, if
+you are traveling warp 7.5, hitting .1 would deaccelerate you to warp 7.1.
+
+\item[k]{\em Set course}.
+The letter $k$ or the right mouse button will set your course towards
+the current mouse position.  Turning towards the desired course can
+take time, depending on your current speed and damage.
+
+\item[j]{\em Teleport}.
+This command will randomly teleport you to a position within about a 
+range specified in the configuration file from your current position. 
+This should eat heat and fuel like candy (set
+by config file). This option is only enabled if xtrekd has been compiled
+with \verb|-DTELEPORT_OPTION|.
+
+\item[T]{\em Turbo mode}
+This will set your speed to a turbo speed for a given number of game ticks 
+as defined by your configuration file. Heat and fuel gain/loss rates are
+based on this new speed. This option is only enabled if xtrekd has been 
+compiled with \verb|-DTURBO_OPTION|.
+
+\item[p]{\em Fire phaser}.
+The letter $p$ or the middle mouse button will fire your phasers
+towards the current mouse position if you have enough fuel.  You may
+only fire phasers once per second.
+
+\item[t]{\em Launch torpedo}.
+The letter $t$ or the left mouse button will launch a torpedo towards
+the current mouse position if you have enough fuel and less than thirty
+torpedoes currently out. This max usually isn't significant since there
+is also a reload time built into the firing operation.
+
+\item[m]{\em Drop Mine}.
+This command will cause your ship to lay a mine at the current location.
+This mine will have a lifetime for between 8 and 10 minutes, and will only
+detonate when an enemy ship approaches, doing damage to any ship in range.
+If time runs out, the mine will simply explode.
+
+\item[d]{\em Detonate other torpedoes}.
+This command will detonate other enemy torpedoes near you, doing less
+than maximum damage to you. This costs fuel based on the power of
+the enemy torpedoes.
+
+\item[e]{\em Detonate your own torpedoes}.
+This will turn your own torpedoes off so that you can fire new ones.
+
+\item[D]{\em Detonate your mines}.
+This will explode all of your own mines; however, this capability can be 
+turned off in the configuration file.
+
+\item[R]{\em Repair damage}.
+Hitting this key will decelerate your ship to a stop and will begin
+repairs when the ship is stopped.  Your shields are down when you are
+repairing and you cannot fire weapons.  In a nutshell, you are a
+sitting duck.  Putting your shields up or moving is the best way to get
+out of repair mode.  If your ship is orbiting a friendly repair planet,
+damage will repair at a faster rate.
+
+\item[c]{\em Cloak your ship}.
+This command toggles your cloaking device, and allows you to remain 
+invisible on the windows of every player.  This would be nice except that you cannot
+fire weapons while cloaked, or have shields up while the device is in operation.
+To enforce this, shields will automatically be dropped on entering cloak mode, and
+(since most times you uncloak you will be in battle) raised on exiting.
+In addition, there is a small chance (which is based on range), that an enemy ship
+may see you flicker as their sensors penetrate your device's field.
+
+\item[u]{\em Toggle shields}.
+This key will toggle your shields up and down.
+
+\item[+/-]{\em Put shields up/down}.
+This key will put your shields up or down.
+
+\item[l]{\em Lock onto an object}.
+This will lock your ship onto the object nearest the mouse cursor. If the object
+is a planet, your course will change and you will be placed into orbit around
+the planet when you arrive. If the object is a ship, you will start receiving
+the ships 'vital statistics' as detailed in the {\bold Screen Layout} section.
+This lock will also roughly double you phase's hit angle, and again roughly
+double your chance of getting a sensor penetration of their cloaking device
+if they activate it while you have the lock.
+
+To break the lock, just set course normally.  You cannot lock
+onto cloaked ships.
+
+\item[f]{\em Follow locked ship}.
+If you are currently locked onto a ship via $l$, this command will set your
+ship's autopilot to follow that ship. Your course will automatically be updated.
+The follow may be broken at any time by simply specifying a new course.
+
+\item[b]{\em Bomb a planet}.
+If an enemy planet has more than ten armies, you can bomb them.  With
+four or less armies, you must beam down armies to defeat them.  Your
+shields will go down to bomb, and you will take damage from the
+planet.  You get kills for the armies destroyed.
+
+\item[z]{\em Beam up armies}.
+If the planet you are orbiting is owned by your team and has more than
+four armies, you can beam them to your ship to carry to other planets.
+You must be orbiting to beam up armies.  The number of armies you can
+carry is equal to your kills * 2.  You can never carry more than ten
+armies.
+
+\item[x]{\em Beam down armies}.
+This command will beam the armies that are on your ship down to a
+planet you are orbiting.  If it is an hostile planet, you will kill his
+armies.  If all enemy armies are killed and you land an army, you take
+the planet for your team.  If it is a planet you own, you will simply
+add to the armies already there.  If it is a friendly planet, owned by
+other teams, you cannot beam armies down.
+
+\item[C]{\em Throw a coup}.
+Sometimes players will discover that all their planets have been
+taken, or have been left with no armies.
+In order to allow the team some form of return you can hold a coup
+on your home planet assuming that the following criterion are met:
+\begin{itemize}
+\item Your team must have armies on no planets.
+\item You must have more than one kill.
+\item There must be less than five enemy armies (or zero friendly, should
+you still own it) on your home planet.
+\item You must be orbiting your home planet.
+\end{itemize}
+After the coup, the planet will have four of your armies on it.
+As they come back you can take over more of your occupied worlds.
+When your last planet is taken, you will have to wait from thirty
+minutes to an hour before you can have a coup.
+
+\item[i]{\em Info on object}.
+This will pop up a window near the mouse cursor which contains
+information about the nearest object (planet or ship).
+To remove this window, just type 'i' again.
+
+\item[o]{\em Orbit a planet}.
+If you are near a planet and going warp two or less this will put in
+orbit around it.  You must be in orbit around a planet to bomb it, beam
+armies up or down to it, repair at it, or get fuel from it.  Enemy
+planets will damage you if you get near them.  Setting a speed will
+break out of orbit.
+
+\item[Q]{\em Quit xtrek}.
+This command will start a self-destruct sequence, and return you to the
+entering screen, at which time you may click on the quit box to actually
+terminate the game for your display. The time it takes to self destruct may
+depend on the config file you are playing under (see \bold{Scenario Customization}).
+
+\item[?]{\em repeat all of the previous messages}.
+Message sending is detailed below.  This command allows you to
+review the current set of them.
+
+\item[@]{\em Allow/disallow copilots}.
+This toggles a feature allows more than one player to fly a ship 
+(on separate displays).
+
+\item[L]{\em Get player list}.
+This gives you a quick list of other players in a subwindow on
+the short range screen.
+To remove this window, just type 'L' again.
+
+\item[P]{\em Get planet list}.
+This gives you a list of planets in a subwindow on the short range
+screen.
+You get information only on planets which your team
+owns or has previously orbited.  To remove this window,
+just type 'P' again.
+
+\item[S]{\em List score information}.
+This gives you a list of interesting statistics on each player and
+team currently in the game in a subwindow on the galaxy display window. 
+It may be removed by hitting 'S' again.
+
+\item[s]{\em Toggle visual status window}.
+This will turn a visually oriented status window on and off.
+
+\item[U]{\em Toggle showing of shields}.
+This will toggle whether or not shields are shown around ships in the
+short range view. By default, this is on.
+
+\item[M]{\em Toggle galaxy map updating}.
+This toggles whether or not xtrek is updating the galaxy map each tick.
+
+\item[h]{\em Toggle the help window}.
+Typing $h$ will pop up a help window below the normal window.  The help
+window lists commands you can type.  Its useful for small problems
+like forgetting how to put your shields up, and for authors who forget
+what command does what.  Typing 'h' again will get rid of it.
+
+\item[w]{\em Set war status}.
+This command will give you a window that you can use to declare
+war and peace with other teams.  It will be fully detailed below.
+Hitting $w$ again will remove it.
+
+\item[n]{\em Toggle bell}.
+This toggles whether or not xtrek will try annoy you with beeps when
+interesting things happen to your ship.
+
+\item[N]{\em Toggle naming of planets}.
+This toggles whether or not xtrek will put planet names under the circle
+on the short range view. Depending on whether or not you are running
+under X11R4, X11R3 with or without \verb|-DX11_R3_ENV|, this could speed
+up updates considerably.
+
+\item[G]{\em Turn on hostile mode}.
+This will make you hostile to all ships in the game, and is separate from
+the war mode. It is primarily useful in target practice with robots.
+
+\item[g]{\em Turn off hostile mode}.
+This undoes the effects of $G$.
+
+\item [H]{\em Hose mode}.
+This will start a robot for each empire defined in the config file, and insure
+that at least one robot is always on the game for each. The robots will start
+up in patrol mode, going from planet to planet in their empire.
+\end{list}
+
+\section{Nitty Gritty Details}
+
+This section contains the details on certain features.
+
+\subsection{Messages}
+
+Messages are sent both from the daemon and from other players.
+They appear in the message window at the bottom, right side of the display.
+To send messages, just put the mouse into the message window.
+You must type a character in that represents the recipient of your
+message.  This can be 'A' for everyone,  the first letter of a team name
+ to send to all members
+of a given team, or [0-9abcdef] will send a message to an individual
+player.  When you've typed this in, it will map to a proper address
+and wait for you to type in some text.  When you type in a return,
+your message is sent.
+Typing an escape will abort the message in progress.
+
+This is obviously a non-optimal addressing mode (for instance, a team 'Acturians'
+screws things up), but it is the best we can think of, and also the original.
+
+Now obviously, the next question is, "What if someone starts shooting
+at me while I'm typing in my message?  Am I hosed?"
+Simply move the mouse out of the window to defend yourself.  Messages
+are only dealt with if the mouse is in the window.  You can stop
+in the middle of the input.
+
+
+\subsection{War and Peace}
+
+You can declare war and peace with other teams.
+The greatest use of this is that you can use planets belonging
+to teams you are at peace with for fuel and repair.
+It also allows two teams to gang up on another without risking
+killing each other.
+
+There are three states a player can be in versus any other team:
+Peace, Hostile, and War.  Being at War is irrevocable.  You cannot
+change to any other state until you reenter the game.  You get to
+war when you are hostile to a team and you either bomb one of their
+planets, damage one of their players with weapons, or beam armies
+down to one of their planets.
+
+If you are hostile towards a team, your weapons will hurt all members of
+that team (whether or not they are at peace with you).  As soon as
+you hurt them, you will be at war.
+
+If you are peaceful towards a team, your weapons will only hurt members
+of that team who are not peaceful towards you.  In other words, two
+players who are at peace towards each other cannot fight each other.
+
+Players default to being at peace with their own team and hostile
+towards all the others.  Obviously, they can declare war on their own
+team.
+
+To change your settings, type 'w' and a war window will pop up.
+Click the mouse in the boxes of the teams you want to change.
+Click in "re-program" to save the results.  Teams will be notified
+of your changes.  Finally, there is a ten second delay to declare
+hostility towards another team so don't get too close while you make
+the changes.
+
+The easiest way to know if someone near you is hostile is to use
+the alert status described below.  Info on a player will tell you
+their status towards you.
+
+\section{Scenario Customization}
+
+All parameters are integers unless specified otherwise, and all 
+heat costs and cooling rates are in hundredths of a degree. It should
+be noted that it is far easier to modify an existing config than to
+rewrite one from scratch.
+
+\subsection{Ship Parameters}
+\begin{list}{}{
+	\renewcommand{\makelabel}[1]{{\tt #1 \hfill}}
+         \setlength{\leftmargin}{2.5cm}
+         \setlength{\labelwidth}{\leftmargin}
+         \setlength{\labelsep}{0in}
+         \setlength{\itemsep}{.2em}
+}
+\item[turns]   Ship maneuverability (turn radius).
+\item[torp damage]  Torpedo damage
+\item[torp range]  Torpedo blast radius.
+\item[mine damage] Mine damage
+\item[mine range]  Mine blast radius.
+\item[phaser damage] Phaser damage.
+\item[phaser range] Phaser range.
+\item[phaser pulses]  Number of ticks that a phaser will lock on a target.
+\item[torp speed]  Torpedo speed
+\item[max speed] Maximum ship speed.
+\item[shield repair]  Shield repair rate.
+\item[max fuel]  Maximum fuel capacity.
+\item[torp cost] Torpedo fuel cost.  
+\item[mine cost] Mine fuel cost 
+\item[phaser cost] Phaser fuel cost
+\item[detonate cost] Detonate other torps fuel cost.
+\item[warp cost] Warp engine fuel cost per warp factor.
+\item[cloak cost] Cloak fuel cost.
+\item[recharge]  Fuel recharge rate.
+\item[accint]  Acceleration rate.
+\item[decint]  Deceleration rate.
+\item[max armies]  Maximum army capacity
+\item[weapon cool]  Weapon cooling rate.
+\item[engine cool]  Engine cooling rate.
+\item[max damage] Maximum structural damage sustainable before destruction.
+\item[shield max]  Maximum shield damage. 
+\item[teleport heat]  Teleport engine heat cost.
+\item[teleport cost]  Teleport fuel cost.
+\item[teleport range]  Teleport radius.
+\item[turbo speed]  Turbo warp speed 
+\item[turbo time]  Turbo warp duration 
+\item[reload] time between torp salvos
+\item[burst] number of shots in a torp salvo
+\item[phaser fail]  Probability of phaser failure.  Similarly for 
+{\tt torp fail}, {\tt trans fail}, {\tt shield fail}, 
+ {\tt cloak fail}, {\tt lrsensor fail}, {\tt srsensor fail}, {\tt lock fail},
+{\tt cooling fail} and {\tt warp fail}.
+\end{list}
+
+\subsection{Robot Parameters}
+\begin{list}{}{ \renewcommand{\makelabel}[1]{{\tt #1 \hfill}} 
+\setlength{\leftmargin}{2.5cm} \setlength{\labelwidth}{\leftmargin}
+\setlength{\labelsep}{0in}
+         \setlength{\itemsep}{.2em}
+}
+\item[hscruise] speed robots go when going to assist another robot 
+\item[cruise] speed robots patrol at
+\item[battle] speed robots go in battle
+\item[flee] speed robots run away at
+\item[cloaked] speed robots go when cloaked
+\item[refresh] speed robots go when they want to cool down
+\item[engage] distance at which a robot starts firing at a target
+\item[disengage] distance at which a robot stops firing at a target
+\item[shotdamage] damage a salvo does
+\item[circledist] distance at which a robot would like to stand off it's target
+\item[sneaky] percent chance that a robot will prefer cloaked approaches to battle
+\end{list}
+
+\subsection{Empire Parameters}
+\begin{list}{}{
+	\renewcommand{\makelabel}[1]{{\tt #1 \hfill}}
+         \setlength{\leftmargin}{2.5cm}
+         \setlength{\labelwidth}{\leftmargin}
+         \setlength{\labelsep}{0in}
+         \setlength{\itemsep}{.2em}
+}
+
+\item[icon] String parameter specifies bitmap file name.   The bitmap is
+            automatically rotated through all 16 orientations.  It 
+            should be specified with front pointing upwards.   Some aliasing 
+            will result.  
+
+\item[robot name]  String parameter specifies robot name.  
+\end{list}
+
+\subsection{Planet Parameters}
+\begin{list}{}{
+	\renewcommand{\makelabel}[1]{{\tt #1 \hfill}}
+         \setlength{\leftmargin}{2.5cm}
+         \setlength{\labelwidth}{\leftmargin}
+         \setlength{\labelsep}{0in}
+}
+\item[home]  Boolean flag.  Specifies that planet is the home planet of the
+empire.
+\item[fuel] Boolean flag.  Specifies that planet is a fuel source; fuel is
+replenished at twice normal planetary rates when planet is orbited. 
+\item[repair] Boolean flag.  Specifies that planet is a repair yard; damage is
+repaired at twice normal planetary rates when planet is orbited. 
+\item[(x,  y)]  Specifies planet coordinates. Both {\tt x} and {\tt y} are
+integers.
+\item[armies] Specifies number of armies on planet at start of game.
+Note that a large number of  armies makes the planet an effective obstacle;
+any ship passing through such a planet will be destroyed.
+\end{list}
+
+\subsection{Global Parameters}
+\begin{list}{}{
+	\renewcommand{\makelabel}[1]{{\tt #1 \hfill}}
+         \setlength{\leftmargin}{1.5in} \setlength{\labelwidth}{\leftmargin}
+         \setlength{\labelsep}{0in}
+         \setlength{\itemsep}{.2em}
+}
+\item[death time] Player is dead for this number of seconds.  Defaults to 4. 
+
+\item[torp life min]   Torpedoes live for at least this number of seconds.  
+Defaults to 7.  Similarly for {\tt mine life min} (default is 60).
+
+\item[torp life var]  Torpedoes may live for at least this number of seconds 
+in addition to the minimum lifetime.  Defaults to 2. Similarly for 
+{\tt mine life var} (default is 120).
+
+\item[player explode time] Player explodes for this number of seconds.
+
+\item[weapon lock min] Overheated weapons are unusable for at least
+this number of seconds  up   to an additional {\tt weapon lock var}
+seconds.  Defaults are 10 and 15. Similarly for {\tt engine lock min}
+and {\tt engine lock var}.  Defaults are  identical to those of
+weapons.
+
+\item[self destruct time]  Self-destruct countdown time.
+
+\item[robot giveup time] Robots will give up within this number of
+seconds if no combat is initiated.
+
+\item[orbit speed]   Maximum warp allowed while entering orbit. 
+
+\item[detonate distance]  Effective range of the counter-torpedo batteries. 
+
+\item[orbit distance]  Range at which a ship can enter orbit. Defaults to 900.
+
+\item[planet fire distance]  Range at which a planet can damage a ship.
+Defaults to 1500.
+
+\item[phaser hit angle]  Number of degrees that a phaser will hit.
+
+\item[phaser hit langle]  Number of degrees that a locked phaser will hit.
+
+\item[auto quit]  Auto-logout countdown time.
+
+\item[cool penalty]   Floating point number.  Specifies the increase
+in weapon and engine cooling rate when both shields and cloak are inactive.
+Defaults to 1.25.
+
+\item[fast destruct]  Boolean flag.  If set, self-destruct time does not
+increase with alert level.   Default is to double self-destruct time for
+yellow alert, and double again for red alert.
+
+\item[mine detonate]  Boolean flag.   If set, mines detonate when
+destroyed.  This feature is potentially very nasty.  It also allows instant
+self-destruction, cheating players out of kills.
+
+\item[enable/disable turbo] Boolean flag.  If the game is compiled with
+      \verb|-DTURBO_OPTION|, the flag can be used to enable/disable turbo
+      mode with the configuration file.  Defaults to disabled.
+
+\item[enable/disable teleport] Boolean flag.  If the game is compiled with
+      \verb|-DTELEPORT_OPTION|, the flag can be used to enable/disable teleport
+      mode with the configuration file.  Defaults to enabled.
+
+\item[enable/disable destruct] Boolean flag.  Controls whether self-destruct
+      is allowed.  Defaults to true. 
+
+\item[enable/disable mine] Boolean flag.  Controls whether mines are allowed,
+      for more compatibility with the old xtrek.  Defaults to enabled.
+
+\item[enable/disable cloak] Boolean flag.  Controls whether cloaking is 
+     allowed. Defaults to enabled.
+
+
+\end{list}
+
+\subsection{Sample config file}
+
+\begin{verbatim}
+
+/* The original 4 empire scenario */ 
+
+empire Federation 	F robot name = "M5"	;
+empire Romulan 		R robot name = "Colossus";
+empire Klingon    	K robot name = "Guardian";
+empire Orion 		O robot name = "HAL 9000";
+
+global
+	cool penalty     = 1.25
+	death time = 4
+	phaser fire time = 1
+	torp life min = 7
+	torp life var = 2
+	mine life min = 60
+	mine life var = 120
+	player explode time = 1
+	weapon lock min = 10
+	weapon lock var = 15
+	engine lock min = 10
+	engine lock var = 15
+	self destruct time = 5
+	robot giveup time = 60
+	orbit speed = 20
+	detonate distance = 1500
+	orbit distance = 900
+	planet fire distance = 900
+	phaser hit-angle = 5
+	phaser hit-langle = 10
+	auto-quit = 180
+	// fast destruct  
+	// mine detonate 
+        mine wobble = 128
+     ;
+
+
+/*
+ * Define ship parameters.
+ */
+
+default ship
+
+               detonate cost 	= 100
+               phaser cost 	= 200
+               torp cost 	= 100
+               teleport cost 	= 2000
+               warp cost 	= 7
+               cloak cost 	= 30
+               phaser heat 	= 500	/* 5 degrees */
+               torp heat 	= 200	/* 2 degrees */
+               mine heat 	= 600	/* 6 degrees */
+               detonate heat 	= 300	/* 3 degrees */
+               teleport heat 	= 5000	/* 50 degrees */
+               warp heat 	= 32
+               weapon 	cool   = 25
+               engine   cool = 220	/* warp 7 if shields down */
+               srsensor fail = 1000	/* SRS never fail, always see doom */
+               turbo speed   = 300
+               turbo time    = 10
+               teleport range= 6000
+               recharge      = 45
+               turns         = 27000
+               accint        = 250
+               decint        = 250
+               phaser damage = 30
+               phaser pulses = 2
+               phaser range  = 6000
+               torp damage   = 20
+               torp speed    = 160
+               shield repair = 21
+               max damage    = 200
+               shield max    = 200
+               reload        = 3
+               burst         = 2
+               max speed     = 90
+               max armies    = 10
+               max fuel      = 10000
+               cruise        = 50
+               battle        = 50
+               flee          = 60
+               cloaked       = 50
+               refresh       = 40
+     ;
+
+ship Federation
+
+teleport range		= 0
+teleport cost		= 0
+teleport heat		= 0
+turbo speed		= 0
+turbo time		= 0
+recharge		= 45 
+turns			= 6000
+accint			= 250
+decint			= 180
+phaser damage		= 40
+phaser cost		= 400 
+phaser pulses		= 2
+phaser range		= 6000
+mine cost		= 768
+mine damage		= 48
+mine range		= 1200
+torp damage 		= 24
+torp cost		= 400
+torp speed		= 160
+torp range		= 600
+detonate cost		= 75 
+shield repair		= 21
+warp cost		= 6
+cloak cost		= 60
+max damage		= 200
+shield max		= 200
+reload			= 4
+burst			= 1
+weapon cool 		= 25   
+engine cool 		= 220 
+max speed		= 90
+max armies		= 10
+max fuel		= 10000
+cruise			= 50
+battle			= 50
+flee			= 60
+cloaked			= 50
+refresh			= 40
+engage			= 10000
+disengage		= 20000
+sneaky			= 10
+cloak min		= 4000
+cloak max		= 12000
+shotdamage		= 0
+circledist		= 7000
+;
+
+ship Romulan
+
+teleport range		= 0
+teleport cost		= 0
+teleport heat		= 0
+turbo speed		= 0
+turbo time		= 0
+recharge		= 30
+turns			= 5500
+accint			= 230
+decint			= 150
+phaser damage		= 20
+phaser cost		= 200 
+phaser pulses		= 3
+phaser range		= 6000
+mine cost		= 1024
+mine damage		= 64
+mine range		= 1600
+torp damage		= 32
+torp cost		= 512
+torp speed		= 145
+torp range		= 650
+detonate cost		= 125 
+shield repair		= 18 
+warp cost		= 4
+cloak cost		= 20
+max damage		= 180
+shield max		= 200
+reload			= 4
+burst			= 0
+weapon cool		= 40 
+engine cool		= 100 
+max speed		= 90
+max armies		= 8
+max fuel		= 10000
+cruise			= 50
+battle			= 40
+flee			= 90
+cloaked			= 30
+refresh			= 45
+engage			= 10000
+disengage		= 20000
+sneaky			= 75
+cloak min		= 4000
+cloak max		= 18000
+shotdamage		= 0
+circledist		= 5000
+;
+
+ship Klingon
+
+teleport range		= 0
+teleport cost		= 0
+teleport heat		= 0
+turbo speed		= 0
+turbo time		= 0
+recharge		= 35 
+turns			= 7500
+accint			= 280
+decint			= 190
+phaser damage		= 50
+phaser cost		= 500 
+phaser pulses		= 2
+phaser range		= 8000
+mine cost		= 512
+mine damage		= 32
+mine range		= 1000
+torp damage		= 16
+torp cost		= 256 
+torp speed		= 170
+torp range		= 625
+detonate cost		= 100 
+shield repair		=  20 
+warp cost		= 3
+cloak cost		= 30
+max damage		= 160
+shield max		= 160
+reload			= 2
+burst			= 1
+weapon cool		= 32 
+engine cool		= 90 
+max speed		= 80
+max armies		= 8
+max fuel		= 10000
+cruise			= 40
+battle	        	= 50
+flee			= 80
+cloaked			= 55
+refresh			= 40
+engage			= 10000
+disengage		= 20000
+sneaky			= 30
+cloak min		= 4000
+cloak max		= 13000
+shotdamage		= 0
+circledist		= 7000
+;
+
+ship Orion 
+
+teleport range		= 0
+teleport cost		= 0
+teleport heat		= 0
+turbo speed		= 0
+turbo time		= 0
+recharge		= 40
+turns			= 9100
+accint			= 330
+decint			= 230
+phaser damage		= 10
+phaser cost		= 100 
+phaser pulses		= 6
+phaser range		= 5000
+mine cost		= 512
+mine damage		= 32
+mine range		= 1000
+torp damage		= 20
+torp cost		= 275
+torp speed		= 190
+torp range		= 550
+detonate cost		= 100 
+shield repair		= 19 
+warp cost		= 2
+cloak cost		= 40
+max damage		= 160
+shield max		= 200
+reload			= 1
+burst			= 3
+weapon cool		= 25 
+engine cool		= 70 
+max speed		= 110
+max armies		= 6
+max fuel		= 8000
+cruise			= 80
+battle			= 60
+flee			= 90
+cloaked			= 60
+refresh			= 45
+engage			= 10000
+disengage		= 20000
+sneaky			= 50
+cloak min		= 4000
+cloak max		= 15000
+shotdamage		= 0
+circledist		= 9000
+;
+
+/* Define all the planets. */
+
+default planet armies=30;
+
+planet "Earth"      Federation  (20000, 80000) home fuel repair;
+planet "Sasus"      Federation  (10000, 60000);
+planet "Candeleron" Federation  (25000, 60000);
+planet "Beta III"   Federation  (44000, 81000);
+planet "Janus"      Federation  (33000, 55000);
+planet "Deneb VI"   Federation  (30000, 90000);
+planet "Ceti IV"    Federation  (45000, 66000);
+planet "Altar"      Federation  (11000, 75000);
+planet "Dekar"      Federation  (8000, 93000);
+planet "Daltus"     Federation  (32000, 74000);
+planet "Romulus"    Romulan  (20000, 20000) home fuel repair;
+planet "Ethen"      Romulan  (45000 , 7000);
+planet "Amur"       Romulan  (4000, 12000);
+planet "Remus"      Romulan  (42000, 44000);
+planet "Bal"        Romulan  (13000, 45000);
+planet "Tahndar"    Romulan  (28000 , 8000);
+planet "Dact"       Romulan  (28000, 23000);
+planet "Sirius II"  Romulan  (40000, 25000);
+planet "Rakhir"     Romulan  (25000, 44000);
+planet "Rus"        Romulan  (8000, 29000);
+planet "Klin"       Klingon  (80000, 20000) home fuel repair;
+planet "Malatrakir" Klingon  (70000, 40000);
+planet "Amakron"    Klingon  (60000, 10000);
+planet "Laltir"     Klingon  (54000, 40000);
+planet "Khartair"   Klingon  (93000 , 8000);
+planet "Monpur III" Klingon  (90000, 37000);
+planet "Sectus"     Klingon  (69000, 31000);
+planet "Makus"      Klingon  (83000, 48000);
+planet "Gendus"     Klingon  (73000 , 5000);
+planet "Jakar"      Klingon  (54000, 21000);
+planet "Orion"      Orion  (80000, 80000) home fuel repair;
+planet "Amterion"   Orion  (92000, 59000);
+planet "Lumecis"    Orion  (65000, 55000);
+planet "Bitar V"    Orion  (52000, 60000);
+planet "Prastan"    Orion  (72000, 69000);
+planet "Sorlen"     Orion  (64000, 80000);
+planet "Zetus"      Orion  (56000, 89000);
+planet "Jih"        Orion  (91000, 94000);
+planet "Markus II"  Orion  (70000, 93000);
+planet "Oren"       Orion  (85000, 70000);
+\end{verbatim}
+
+\section{Default Scenario}
+
+This is a very informal description of the scenario described
+in the {\bold default.config} shipped with xtrek.
+
+Klingon : heavy phasers, low torps. normal engines, but they
+can't slow down very fast, so turning is slower than normal. low fuel
+gain-back, but they make up for that by toasting anything that gets
+near with the phasers. best cloaking costwise ...
+
+Romulan : nickname 'garbage scow', pretty accurate. slowest
+turn rate in the game. heavy torps that will rail an opponent that
+gets caught in a stream. best shields, and in terms of how much energy
+they chew, best cloaking since they also have the best energy regen
+rate. hull strength also highest.
+
+Orion : tend to spit torps, which are generally weak but very
+cheap and fast to fire. best acel/decel in the game, and turn on a
+dime. hull pts and shield are the lowest, so they need those engines
+of theirs often. regen is also low, so they need accuracy on those
+torp shots. phasers are also weak, and don't have a very good range.
+mostly useful for annoyance shots and close in fighting.
+
+Federation : this is basically the standard xtrek ship of old
+(we had to keep one of them around :-). All around average ship. High
+cloak cost, but also have a decent regen rate. Best repair rate
+(Scotty factor), and their weapons are both pretty potent. Can get
+out-paced if they don't watch out, though - especially by Orions.
+
+
+\section{Credits}
+
+\begin{itemize}
+\item Original By Chris Guthrie (chris@ic.berkeley.edu) and Ed James (edjames@ic.berkeley.edu)
+\item Later X11R3 Mods by Dan Dickey (ddickey@lotus.cray.com)  
+\item Overhaul and killer robots by Jon Bennett (jcrb@cs.cmu.edu)  
+\item Cleanup/Speedup/Fixes by James Anderson (no email)
+\item Wizardry by John Myers (jgm@cs.cmu.edu)  
+\item Config and more by Mike Bolotski and Dave Gagne (mikeb@ee.ubc.ca and daveg@ee.ubc.ca)
+\item More cleanup by Joe Keane (jgk@osc.osc.com)
+\item Floating point fixes, integer trig, robots fixes, and more cleanup by Rob Ryan (rr2b+@andrew.cmu.edu)
+\item New damage code by Mario Goertzel (mg2p+@andrew.cmu.edu)
+\end{itemize}
+
+\section{Bug Reports}
+
+Bug reports should be sent to \tty{dl2n+xtrek@andrew.cmu.edu}.
+
+\end{document}

@@ -1,0 +1,197 @@
+# Imakefile for xtrek 6.0
+
+#
+# Copyright 1989 Jon Bennett, Mike Bolotski, David Gagne, Dan Lovinger
+# Copyright 1986 Chris Gutherie
+#
+# Permission to use, copy, modify, distribute, and sell this software and its
+# documentation for any purpose is hereby granted without fee, provided that
+# the above copyright notice appear in all copies and that both that
+# copyright notice and this permission notice appear in supporting
+# documentation, and that the name of the copyright holders not be used in
+# advertising or publicity pertaining to distribution of the software
+# without specific, written prior permission.  The copyright holders make no
+# representations about the suitability of this software for any purpose.
+# It is provided "as is" without express or implied warranty.
+#
+# THE COPYRIGHT HOLDERS DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+# INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
+# EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY SPECIAL, INDIRECT OR
+# CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF
+# USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+# OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+# PERFORMANCE OF THIS SOFTWARE.
+
+/* #define ManSuffix n /* For sites where administrators have messed with this */
+PROGRAMS	= xtrek xtrekd
+BINDIR		= /usr/X386/bin
+
+# This is where the xtrek.snf font will be installed
+XTREKFONTDIR	= /usr/X386/lib/X11/fonts/xtrek
+
+# This is where the configs and ship bitmaps will be installed
+XTREKCONFDIR	= /usr/X386/lib/X11/games/xtrek
+
+#DEFINES = -DPROFILE
+
+#CC=gcc
+#CDEBUGFLAGS = -O -finline-functions -fstrength-reduce -fomit-frame-pointer
+#CDEBUGFLAGS = -O
+#LDOPTIONS = -pg
+#LDOPTIONS = -Bstatic
+CONFIGS	= \
+	TV.config \
+	default.config \
+	fed.config\
+	goony.config \
+	motd
+
+SHIPBM = \
+	bomb.b \
+	dart.b \
+	f14.b \
+	fed.b \
+	hawk.b \
+	idiot.b \
+	loon.b \
+	mike.b \
+	rom.b
+
+SRCS1	= \
+	atantab.c\
+	clock.c \
+	colors.c \
+	coup.c \
+	damage.c \
+	data.c \
+	death.c \
+	dmessage.c \
+	enter.c \
+	getship.c \
+	help.c \
+	icon.c \
+	inform.c \
+	input.c \
+	interface.c \
+	list.c \
+	main.c \
+	minisubs.c \
+	newwin.c \
+	parseutil.c \
+	phaser.c \
+	planet.c \
+	rasin.c\
+	redraw.c \
+	resource.c \
+	rmove.c \
+	rotate.c \
+	sintab.c\
+	smessage.c \
+	sqrt.c\
+	statline.c \
+	stats.c \
+	subdaemon.c \
+	teleport.c \
+	torp.c \
+	util.c \
+	war.c \
+	xtparse.c
+
+OBJS1 = \
+	atantab.o\
+	clock.o \
+	colors.o \
+	coup.o \
+	damage.o \
+	data.o \
+	death.o \
+	dmessage.o \
+	enter.o \
+	getship.o \
+	help.o \
+	icon.o \
+	inform.o \
+	input.o \
+	interface.o \
+	list.o \
+	main.o \
+	minisubs.o \
+	newwin.o \
+	parseutil.o \
+	phaser.o \
+	planet.o \
+	rasin.o\
+	redraw.o \
+	resource.o \
+	rmove.o \
+	rotate.o \
+	sintab.o\
+	smessage.o \
+	sqrt.o\
+	statline.o \
+	stats.o \
+	subdaemon.o \
+	teleport.o \
+	torp.o \
+	util.o \
+	war.o \
+	xtparse.o
+
+SRCS2 = \
+	xtrek.c
+
+OBJS2 = \
+	xtrek.o
+
+AllTarget(decl.h $(PROGRAMS))
+
+ComplexProgramTarget_1(xtrekd, -L/usr/local/lib $(XLIB), -lm)
+ComplexProgramTarget_2(xtrek, -L/usr/local/lib $(XLIB),)
+
+# font creation protos in Imake.rules are inappropriate
+FontTarget(xtrek)
+
+FONTARGET = xtrek.bdf
+
+install:: $(FONTARGET)
+.if !exists(${XTREKFONTDIR})
+	mkdir ${XTREKFONTDIR}
+.endif
+	$(INSTALL) -c $(FONTARGET) $(XTREKFONTDIR)
+	(cd $(XTREKFONTDIR); mkfontdir .)
+
+decl.h:   $(SRCS) 
+	@grep GLOBAL *.c > decl.temp	
+	@echo	"/* Machine Generated: DO NOT EDIT */" > decl.h
+	@sed -e "s/.*GLOBAL/extern/" -e  "s/(.*)/();/" decl.temp >> decl.h
+	@$(RM) decl.temp
+
+install:: install.config
+
+install.config:
+.if !exists(${XTREKCONFDIR})
+	mkdir ${XTREKCONFDIR}
+.endif
+	@case '${MFLAGS}' in *[i]*) set +e;; esac; \
+	for i in $(SHIPBM) $(CONFIGS) ; do \
+		(cd config; set -x; $(INSTALL) -c $(INSTDATFLAGS) $$i $(XTREKCONFDIR)); \
+	done
+
+doc:
+	@echo Making first pass with latex
+	latex xtrekguide.doc
+	@echo Making second pass with latex
+	latex xtrekguide.doc
+	dvi2ps xtrekguide.dvi > xtrekguide.ps
+
+clean::
+	rm -f xttoken.c xtparse.c $(FONTARGET)
+
+pkg: pkg_bin
+
+pkg_bin: install 
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST xtrek_bin
+
+xtparse.o: xttoken.c xtparse.c
+xttoken.c: xttoken.l
+xtparse.c: xtparse.y
