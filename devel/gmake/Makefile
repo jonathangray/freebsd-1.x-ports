@@ -78,7 +78,7 @@ prefix = /usr/gnu
 exec_prefix = $(prefix)
 
 # Name under which to install GNU make.
-instname = gmake
+instname = make
 # Directory to install `make' in.
 bindir = $(exec_prefix)/bin
 # Directory to find libraries in for `-lXXX'.
@@ -183,7 +183,8 @@ install: installdirs \
 	 $(mandir)/$(instname).$(manext)
 
 installdirs:
-	$(SHELL) ${srcdir}/mkinstalldirs
+	$(SHELL) ${srcdir}/mkinstalldirs $(bindir) $(libdir) \
+		$(includedir) $(infodir) $(mandir)
 
 $(bindir)/$(instname): make
 	$(INSTALL_PROGRAM) make $@.new
