@@ -578,7 +578,7 @@ atconsole()
     char	*termtype = getenv("TERM");
 
 #ifdef __FreeBSD__
-     return(!strcmp(termtype, "pc3") || !strcmp(termtype, "cons25")
+     return(!strncmp(termtype, "pc3", 3) || !strcmp(termtype, "cons25")
           || !strcmp(termtype, "cons50") || !strcmp(termtype, "xterm"));
 #else
      return(!strcmp(termtype, "AT386") || !strcmp(termtype, "xterm"));
