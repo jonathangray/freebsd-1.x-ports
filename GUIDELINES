@@ -1,0 +1,181 @@
+The following guidelines have been adopted in an attempt to keep the
+contents of the ports collection reasonably sane, and in a semblance of
+order.  If you are adding new ports, or modifying old ones, please take
+a few minutes to read this checklist!  It will potentially save a lot of
+people a lot of grief later on!  If you have any questions, or ammendments
+to this file, please send them to me - jkh@freefall.cdrom.com
+
+					- Jordan
+
+-------------------------------------------------------------------------
+
+
+PORTS CONSTRUCTION:
+
+1.  All ports have a VERSION file giving some idea as to what version the
+    package is.
+
+
+2.  All ports have at least a README file, even if they're small.
+    _Something_ has to identify the contents, and by convention that's a
+    README, LIESEMICH, LESEMOI, *SOMETHING* file.  Just so it's there,
+    and hopefully in english (not my choice, more of an international
+    convention for docs).
+
+
+3.  All ports have a top level Makefile, even if all it does is hand control
+    down to a submakefile.
+
+
+4.  All ports top-level Makefiles support the following targets:
+
+		all:		Build entire package
+		clean:		Clean entire package
+		install:	Install entire package
+		pkg:		[see below]
+
+    Any or all of these targets can be no-ops, but they must at least exist
+    and not cause make to fall over.
+
+
+PACKAGING:
+
+4a. [Optional] All ports have a `pkg' target that builds, at the minimum,
+    a source package for the port.  I'm not going to get pedantic about
+    this one and say it's a hard-and-fast requirement, but it sure will
+    help ensure that your port gets made generally available all throughout
+    its natural lifecycle (if it's hard to package it every time it's updated,
+    you can bet that the package won't get updated and the package form that
+    most people end up seeing will be out-of-date).
+
+    For a good example of a port that builds both "bin" (installed)
+    and "src" packages, look at zircon.
+
+    Source packages should always install themselves into the original
+    /usr/ports location.  Binary packages should follow the rules below.
+
+    For more information, see the "PACKAGE CREATION TIPS" section that
+    follows.
+
+
+INSTALLATION:
+
+5.  If a port is a piece of non-essential GNU software, it should install
+    into the /usr/gnu hierarchy.  This is because GNU utilities happen
+    to be large, frequently inter-dependent, and licensed differently than
+    most other pieces of software.  If something is not officially from the
+    GNU project, but is being released under the GPL and "generally considered"
+    to be a de-facto part of GNU, then it should also go in /usr/gnu though
+    the lines there are a bit more vague.
+
+    If a port is an out-and-out game, it should go into /usr/games.  This
+    makes it easy to blindly nuke the entire /usr/games hierarchy on machines
+    where space is tight or the user community wears suits.
+
+    If a port is an X utility that is Imakefile based, it is OK to distribute
+    default Makefiles that install it into /usr/X386/{bin,lib,...} since by
+    default an Imakefile will generate a Makefile that does this anyway.
+    Some argue that /usr/X386 should be kept "pure" XFree86, but in practice
+    this tends to be impossible anyway due to the defaults chosen by the
+    imake config system.
+
+    All other ports go into /usr/local unless they have a seriously good
+    reason not to.
+
+6.  Man pages go correspondingly into /usr/gnu/man/... or /usr/local/man/...
+    as you'd expect.
+
+    Formatted texinfo files are a bit more difficult, since they need to be
+    referenced from a top-level `dir' file and not all info browsers have
+    standardised on the INFOPATH environment variable, thus not being likely
+    to find a `/usr/local/info' location for other types of info files.
+    For this reason, and that of general historical convention, they should
+    generally be combined into /usr/gnu/info regardless of origin.
+
+
+PACKAGE CREATION TIPS:
+
+In addition to looking at existing examples, the following guidelines
+may be of help:
+
+1. When creating the packing list for a package, please _DO NOT_ use
+   absolute pathnames.  Future versions of the package creation software
+   will disallow this, but for now you need to be sure to create things
+   using relative pathnames, I.E. rather than do this:
+
+	@name vampire_trek
+	/usr/games/vamp
+	/usr/games/lib/blood_bank
+	/usr/games/lib/vamp_cores
+	/usr/games/stake_demon
+
+   Do this:
+
+	@name vampire_trek
+	@cwd /usr/games
+	vamp
+	lib/blood_bank
+	lib/vamp_cores
+	stake_demon
+
+   This keeps things relative, and allows the pkg_add user to actually
+   override the first /usr/games and stick the entire package someplace
+   else, e.g.:
+
+	pkg_add -p /usr/local/games vamptrek_bin.tgz
+
+   Would install the vampire_trek package into /usr/local/games rather
+   /usr/games.
+
+   If your package uses compiled-in paths, or is otherwise unable to work
+   anywhere other than its default location, you can cause this to happen
+   by specifying the default path twice, thus making it "sticky".  In the
+   case of vampire_trek, assuming it couldn't work anywhere but in
+   /usr/games, you'd do this:
+
+	@name vampire_trek
+	@cwd /usr/games
+	@cwd /usr/games
+	vamp
+	lib/blood_bank
+	lib/vamp_cores
+	stake_demon
+
+
+2.  It's become something of a convention to name packages using
+    the prefix name and `_src' for the source package and `_bin'
+    for the binary.  This makes it obvious at a glance which is
+    which.  In our example, the packages would be called
+    vampire_trek_bin and vampire_trek_src.
+    
+    Version numbers are also generally omitted from the name since there's
+    no reasonable way of "canonicalizing" them - does "foo3012" mean
+    "foo vers 30.12," or "foo vers 3.012," or even "foo vers 301.2?"
+    Using underscores helps somewhat, but also tends obscure the
+    package name.  Since this information is already in the comment string
+    for the package (or certainly should be), it has become accepted
+    convention to leave version numbers out unless there's some conflict.
+    I.E. if you've already released gdb_bin.tgz as a package of "gdb 3.5"
+    and you want to make another one for "gdb 4.11" (and assuming that
+    there's any reason to leave the old gdb around), you'd probably then
+    create the new gdb package as gdb4_bin.tgz.  You might even rename the
+    old package to "gdb3_bin.tgz" to eliminate confusion altogether.
+
+
+3.  If a package depends on another, I.E. you have "expect", a package
+    that depends on package "tcl" to work (to cite a real-life example),
+    then you should always be sure to put in a "require" script that tests
+    for the other package and either aborts, emits a warning message or
+    even offers to install the prerequisite package for you (assuming
+    the other package is close at hand).  In the case of source packages,
+    it's generally best to just print out a warning message since the user
+    may want the source for reference purposes, or even to compile on another
+    platform.  It's binary packages that fundamentally won't work without
+    another that probably need to punt.  A require script that returns a
+    non-zero exit status (hopefully after giving some indication of why
+    it's doing so) will achieve this effect.
+
+
+ Again, look at the ports collection entries for zircon, exmh or tk for
+examples of packages that do all of the above.
+
