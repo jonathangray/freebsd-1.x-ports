@@ -1,3 +1,9 @@
+* Note:  You don't need a version later than 1.7.6 unless 1.7.6 or 1.7.7
+  wouldn't compile for you.  If you have either 1.7.7 or 1.7.6 don't bother
+  re-installing the program since no functionality has changed since 1.7.6
+
+v1.7.8 - June 30, 1994.  No longer defining TERMH for linux.
+
 v1.7.7 - June 21, 1994.  Deleted a space in front of an " #endif".
   No functionality change whatsoever...
 

@@ -3,8 +3,8 @@
  */
 
 /*  $RCSfile: sys.h,v $
- *  $Revision: 1.5 $
- *  $Date: 1994/06/26 23:51:42 $
+ *  $Revision: 1.6 $
+ *  $Date: 1994/07/03 06:45:31 $
  */
 
 
@@ -119,9 +119,6 @@
 #	endif
 #	ifndef TERMIOS
 #		define TERMIOS 1
-#	endif
-#	ifndef TERMH
-#		define TERMH 1
 #	endif
 #	ifndef SYSV
 #		define SYSV 1
