@@ -1,6 +1,11 @@
 all: make-octave
 
 make-octave:
+	@echo "###############################################################"
+	@echo "# Expect a number of warning from make when it tries to fopen #"
+	@echo "# dependencs files with extension .d. This is intended behav- #"
+	@echo "# iour and the files will be created as needed.               #"
+	@echo "###############################################################"
 	cd octave; \
 	./configure; \
 	gmake
