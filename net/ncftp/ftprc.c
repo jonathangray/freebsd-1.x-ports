@@ -1,8 +1,8 @@
 /* ftprc.c */
 
 /*  $RCSfile: ftprc.c,v $
- *  $Revision: 1.2 $
- *  $Date: 1994/03/21 18:01:38 $
+ *  $Revision: 1.3 $
+ *  $Date: 1994/04/10 22:14:40 $
  */
 
 #include "sys.h"
@@ -152,7 +152,7 @@ static int RecentCmp(recentsite *a, recentsite *b)
 
 
 
-static siteptr FindNetrcSite(char *host)
+static siteptr FindNetrcSite(char *host, int exact)
 {
 	register siteptr s, s2;
 	string str, host2;
@@ -164,8 +164,12 @@ static siteptr FindNetrcSite(char *host)
 	for (s = firstsite; s != NULL; s2=s->next, s=s2) {
 		(void) Strncpy(str, s->name);
 		StrLCase(str);
-		if (strstr(str, host2) != NULL) {
-			return s;
+		if (exact) {
+			if (strcmp(str, host2) == 0)
+				return s;
+		} else {
+			if (strstr(str, host2) != NULL) 
+				return s;
 		}
 	}
 	return NULL;
@@ -174,7 +178,7 @@ static siteptr FindNetrcSite(char *host)
 
 
 
-static recentsite *FindRecentSite(char *host)
+static recentsite *FindRecentSite(char *host, int exact)
 {
 	register recentsite		*r;
 	register int			i;
@@ -188,8 +192,12 @@ static recentsite *FindRecentSite(char *host)
 		r = &recents[i];
 		(void) Strncpy(str, r->name);
 		StrLCase(str);
-		if (strstr(str, host2) != NULL) {
-			return r;
+		if (exact) {
+			if (strcmp(str, host2) == 0)
+				return r;
+		} else {
+			if (strstr(str, host2) != NULL)
+				return r;
 		}
 	}
 	return NULL;
@@ -287,7 +295,8 @@ void AddRecentSite(char *host, char *lastdir)
 		/* Don't bother if we don't have the memory, or if it is already
 		 * in our NETRC.
 		 */
-		if ((ndir != NULL) && (nhost != NULL) && (FindNetrcSite(host) == NULL)) {
+		if ((ndir != NULL) && (nhost != NULL) &&
+			(FindNetrcSite(host, 1) == NULL)) {
 			if (nRecents == dMAXRECENTS) {
 				SortRecentList();
 				r = &recents[dMAXRECENTS - 1];
@@ -320,7 +329,7 @@ void UpdateRecentSitesList(char *host, char *lastdir)
 	char *ndir;
 
 	if (keep_recent) {	
-		r = FindRecentSite(host);
+		r = FindRecentSite(host, 1);
 		if (r == NULL)
 			AddRecentSite(host, lastdir);
 		else {
@@ -399,15 +408,33 @@ number of the site you want to connect to.\n\n");
  * the number of sites in the recent list, then index into the netrc
  * site list.
  */
+#include <netdb.h>
 void GetFullSiteName(char *host, char *lastdir)
 {
 	register siteptr		s, s2;
 	register recentsite		*r;
 	char					*ndir, *nhost, *cp;
-	int						x, i, isAllDigits;
+	int						x, i, isAllDigits, exact;
+	struct hostent			*hostentp;
 
 	ndir = nhost = NULL;
-	x = 0;
+	x = exact = 0;
+
+	/* First, see if the "abbreviation" is really just the name of
+	 * a machine in the local domain, or if it was a full hostname
+	 * already.  That way we can avoid problems associated with
+	 * short names, such as having "ce" as a machine in the local
+	 * domain, but having "faces.unl.edu", where we would most likely
+	 * want to use ce instead of faces if the user said "open ce".
+	 * This will also prevent problems when you have a host named
+	 * xx.yy.unl.edu, and another host named yy.unl.edu.  If the user
+	 * said "open yy.unl.edu" we should use yy.unl.edu, and not look
+	 * for matches containing yy.unl.edu.
+	 */
+	if ((hostentp = gethostbyname(host)) != NULL) {
+		strcpy(host, hostentp->h_name);
+		exact = 1;
+	}
 
 	/* Don't allow just numbers as abbreviations;  "open 2" could be
 	 * confused between site numbers in the open 'menu,' like
@@ -429,9 +456,9 @@ void GetFullSiteName(char *host, char *lastdir)
 		/* see if 'host' is in our list of favorite sites (in NETRC). */
 
 		if (x == 0) {
-			if ((s = FindNetrcSite(host)) != NULL) {
+			if ((s = FindNetrcSite(host, exact)) != NULL) {
 				nhost = s->name;
-			} else if ((r = FindRecentSite(host)) != NULL) {
+			} else if ((r = FindRecentSite(host, exact)) != NULL) {
 				nhost = r->name;
 				ndir = r->dir;
 			}

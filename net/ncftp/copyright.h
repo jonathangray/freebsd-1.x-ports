@@ -1,8 +1,8 @@
 /* Copyright.h */
 
 /*  $RCSfile: copyright.h,v $
- *  $Revision: 1.2 $
- *  $Date: 1994/03/21 18:01:30 $
+ *  $Revision: 1.3 $
+ *  $Date: 1994/04/10 22:14:36 $
  */
 
 /*

@@ -1,8 +1,8 @@
 /* Util.c */
 
 /*  $RCSfile: util.c,v $
- *  $Revision: 1.2 $
- *  $Date: 1994/03/21 18:02:11 $
+ *  $Revision: 1.3 $
+ *  $Date: 1994/04/10 22:14:54 $
  */
 
 #include "sys.h"
@@ -12,7 +12,11 @@
 #include <pwd.h>
 
 #ifndef NO_VARARGS
-#	include <stdarg.h>
+#	ifdef NO_STDARGH
+#		include <varargs.h>
+#	else
+#		include <stdarg.h>
+#	endif
 #endif
 
 #ifdef READLINE
@@ -51,19 +55,33 @@ extern struct userinfo uinfo;
 
 #ifndef NO_VARARGS
 /*VARARGS*/
-void dbprintf(char *fmt, ...)
+#ifdef NO_STDARGH
+void dbprintf(va_alist)
+	va_dcl
+#else
+void dbprintf(char *fmt0, ...)
+#endif
 {
 	va_list ap;
+	char *fmt;
+
+#ifdef NO_STDARGH
+	va_start(ap);
+	fmt = va_arg(ap, char *);
+#else
+	va_start(ap, fmt0);
+	fmt = fmt0;
+#endif
 
 	if (debug) {
 		(void) fprintf(DB_STREAM, "#DB# ");
-		va_start(ap, fmt);
 		(void) vfprintf(DB_STREAM, fmt, ap);
-		va_end(ap);
 		(void) fflush(DB_STREAM);
 	}
+	va_end(ap);
 }	/* dbprintf */
-#endif
+
+#endif	/* have varargs */
 
 
 
@@ -331,10 +349,10 @@ unsigned long UnLSDate(char *dstr)
 
 
 /*
- * Converts a SIZE date, like "213 19930602204445\n"
+ * Converts a MDTM date, like "213 19930602204445\n"
  * format to a time_t.
  */
-unsigned long UnSIZEDate(char *dstr)
+unsigned long UnMDTMDate(char *dstr)
 {
 #ifdef NO_MKTIME
 	return (MDTM_UNKNOWN);
@@ -362,7 +380,7 @@ unsigned long UnSIZEDate(char *dstr)
 	}
 	return result;
 #endif	/* NO_MKTIME */
-}	/* UnSIZEDate */
+}	/* UnMDTMDate */
 
 
 
@@ -855,7 +873,7 @@ aa:			cp = LocalPath(path);
 #ifdef NO_STRSTR
 
 /*
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor

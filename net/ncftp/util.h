@@ -4,8 +4,8 @@
 #define _util_h_
 
 /*  $RCSfile: util.h,v $
- *  $Revision: 1.2 $
- *  $Date: 1994/03/21 18:02:12 $
+ *  $Revision: 1.3 $
+ *  $Date: 1994/04/10 22:14:55 $
  */
 
 typedef char string[128], str32[32], longstring[512];
@@ -26,12 +26,17 @@ typedef char Hostname[64];
 #endif
 
 #ifdef NO_VARARGS
+	extern int debug;
 #	define dbprintf if (debug) (void) printf
 #else
 #	ifndef DB_STREAM
 #		define DB_STREAM stdout
 #	endif
-	void dbprintf(char *fmt, ...);
+#ifndef NO_STDARGH
+void dbprintf(char *fmt0, ...);
+#else
+void dbprintf(int va_alist);
+#endif
 #endif
 
 /* For 'Getopt.' */
@@ -86,7 +91,7 @@ void Getopt_Reset(void);
 char *Gets(char *promptstr, char *sline, size_t size);
 size_t RemoveTrailingNewline(char *cp, int *stripped);
 unsigned long UnLSDate(char *dstr);
-unsigned long UnSIZEDate(char *dstr);
+unsigned long UnMDTMDate(char *dstr);
 char *Strpcpy(char *dst, char *src);
 int UserLoggedIn(void);
 char *LocalPath(char *path);

@@ -3,8 +3,8 @@
  */
 
 /*  $RCSfile: sys.h,v $
- *  $Revision: 1.2 $
- *  $Date: 1994/03/21 18:02:06 $
+ *  $Revision: 1.3 $
+ *  $Date: 1994/04/10 22:14:52 $
  */
 
 #ifdef SVR4
@@ -35,6 +35,8 @@
 #	ifdef Solaris	/* not predefined. */
 #		define SYSV 1
 #		define System "Solaris"
+#		undef __STDC__
+#		define __STDC__ 0
 #	else
 #		define System "SunOS"
 #		ifndef RINDEX
@@ -174,6 +176,9 @@
 #	ifndef NO_UTIMEH
 #		define NO_UTIMEH
 #	endif
+#	ifndef HAS_DOMAINNAME
+#		define HAS_DOMAINNAME 1
+#	endif
 #endif
 
 #ifdef pyr
@@ -230,6 +235,9 @@ extern int errno;
 #	define System "Ultrix"
 #	ifndef BSD
 #		define BSD 1
+#	endif
+#	ifndef USE_GETPWUID
+#		define USE_GETPWUID 1
 #	endif
 #	ifndef __GNUC__
 #		ifndef NO_CONST
@@ -543,7 +551,9 @@ extern	int     listen(int, int);
 extern	int     getsockname(int, struct sockaddr *, int *);
 #endif
 extern	int     gethostname(char *, int), getdomainname(char *, int);
+#ifndef Select
 extern	int     select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
+#endif
 extern	int     send(int, char *, int, int);
 extern	int     setsockopt(int, int, int, char *, int);
 extern	int     shutdown(int, int);

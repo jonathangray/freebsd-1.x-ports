@@ -1,8 +1,8 @@
 /* cmds.c */
 
 /*  $RCSfile: cmds.c,v $
- *  $Revision: 1.2 $
- *  $Date: 1994/03/21 18:01:23 $
+ *  $Revision: 1.3 $
+ *  $Date: 1994/04/10 22:14:33 $
  */
 
 #include "sys.h"
@@ -226,7 +226,7 @@ long GetDateAndSize(char *fName, unsigned long *mod_time)
 			(void) Strncat(cmd, fName);
 			if (quiet_command(cmd) == 2) {
 				/* Result should look like "213 19930602204445\n" */
-				mdtm = UnSIZEDate(reply_string);
+				mdtm = UnMDTMDate(reply_string);
 				if (mdtm != MDTM_UNKNOWN)
 					have_mdtm = 1;
 			} else if (strncmp(reply_string, "550", (size_t)3) != 0)
@@ -1093,6 +1093,10 @@ int shell(int argc, char **argv)
 		if (strcmp(namep, "sh") != 0)
 			str[0] = '+';
 		dbprintf ("%s\n", theShell);
+#if defined(BSD) || defined(_POSIX_SOURCE)
+		setreuid(-1,getuid());
+		setregid(-1,getgid());
+#endif
 		if (argc > 1)
 			(void) execl(theShell, str, "-c", altarg, (char *)0);
 		else
@@ -1931,6 +1935,9 @@ int show_version(int argc, char **argv)
 #ifdef Solaris
 	DStrs[nDStrs++] = "Solaris";
 #endif
+#ifdef USE_GETPWUID
+	DStrs[nDStrs++] = "USE_GETPWUID";
+#endif
 #ifdef HOSTNAME
 	DStrs[nDStrs++] = "HOSTNAME";
 #endif
@@ -1979,6 +1986,9 @@ int show_version(int argc, char **argv)
 #ifdef _POSIX_SOURCE
 	DStrs[nDStrs++] = "_POSIX_SOURCE";
 #endif
+#ifdef _XOPEN_SOURCE
+	DStrs[nDStrs++] = "_XOPEN_SOURCE";
+#endif
 #ifdef NO_TIPS
 	DStrs[nDStrs++] = "NO_TIPS";
 #endif
@@ -1999,6 +2009,9 @@ int show_version(int argc, char **argv)
 #endif
 #ifdef NO_VARARGS 
 	DStrs[nDStrs++] = "NO_VARARGS";
+#endif
+#ifdef NO_STDARGH
+	DStrs[nDStrs++] = "NO_STDARGH";
 #endif
 #ifdef NO_MKTIME
 	DStrs[nDStrs++] = "NO_MKTIME";

@@ -1,13 +1,13 @@
 /* main.c */
 
 /*  $RCSfile: main.c,v $
- *  $Revision: 1.2 $
- *  $Date: 1994/03/21 18:01:51 $
+ *  $Revision: 1.3 $
+ *  $Date: 1994/04/10 22:14:46 $
  */
 
 #define _main_c_
 
-#define FTP_VERSION "1.7.0 (St. Patrick's Day, 1994)"
+#define FTP_VERSION "1.7.2 (April 5, 1994)"
 
 /* #define BETA 1 */ /* If defined, it prints a little warning message. */
 

@@ -4,8 +4,8 @@
 #define _main_h_
 
 /*  $RCSfile: main.h,v $
- *  $Revision: 1.2 $
- *  $Date: 1994/03/21 18:01:54 $
+ *  $Revision: 1.3 $
+ *  $Date: 1994/04/10 22:14:47 $
  */
 
 struct userinfo {

@@ -1,8 +1,8 @@
 /* ftp.c */
 
 /*  $RCSfile: ftp.c,v $
- *  $Revision: 1.2 $
- *  $Date: 1994/03/21 18:01:34 $
+ *  $Revision: 1.3 $
+ *  $Date: 1994/04/10 22:14:38 $
  */
 
 #include "sys.h"
@@ -28,7 +28,9 @@ struct	utimbuf {time_t actime; time_t modtime;};
 #   include <sys/select.h>
 #else
 #ifdef STRICT_PROTOS
-extern int select (int, void *, void *, void *, struct timeval *);
+#ifndef Select
+extern int select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
+#endif
 #endif
 #endif
 
@@ -104,10 +106,25 @@ extern string				gate_login;
 #endif
 
 #ifdef TERM_FTP
-#include <term/client.h>
+#include <client.h>
 extern int lcompression, rcompression;
 int compress_toggle = 0;
 extern int compress_toggle;
+#endif
+
+#if defined(TERM_FTP) && (defined(BSD) || defined(_POSIX_SOURCE))
+FILE *safeopen(int s, char *lmode){
+  FILE *file;
+
+  setreuid(geteuid(),getuid());
+  setregid(getegid(),getgid());
+  file=fdopen(s, lmode);
+  setreuid(geteuid(),getuid());
+  setregid(getegid(),getgid());
+  return(file);
+}
+#else
+#define safeopen fdopen
 #endif
 
 
@@ -126,11 +143,10 @@ int hookup(char *host, unsigned int port)
 	}
 	send_command(s, C_PORT, 0, "%s:%d", host, ntohs(port));
 	send_command(s, C_DUMB, 1, 0);
-
 	cin = fdopen(s, "r");
 	cout = fdopen(dup(s), "w");
 	if (cin == NULL || cout == NULL) {
-		fprintf(stderr, "ftp: fdopen failed.\n");
+		fprintf(stderr, "ftp: safeopen failed.\n");
 		goto bad;
 	}
 	Strncpy(hostname, host);
@@ -235,10 +251,10 @@ int hookup(char *host, unsigned int port)
 		PERROR("hookup", "getsockname");
 		goto bad;
 	}
-	cin = fdopen(s, "r");
-	cout = fdopen(dup(s), "w");
+	cin = safeopen(s, "r");
+	cout = safeopen(dup(s), "w");
 	if (cin == NULL || cout == NULL) {
-		(void) fprintf(stderr, "ftp: fdopen failed.\n");
+		(void) fprintf(stderr, "ftp: safeopen failed.\n");
 		close_streams(0);
 		goto bad;
 	}
@@ -273,7 +289,7 @@ bad:
 done:
 	return (hErr);
 }	/* hookup */
-#endif
+#endif /* TERM_FTP */
 
 
 /* This registers the user's username, password, and account with the remote
@@ -762,6 +778,7 @@ int progress_report(int finish_up)
 			case pr_percent:
 				perc = (int) (100.0 * (float)bytes / (float)file_size);
 				if (perc > 100) perc = 100;
+				else if (perc < 0) perc = 0;
 				(void) printf("\b\b\b\b%3d%%", perc);
 				(void) fflush(stdout);
 				break;
@@ -769,6 +786,8 @@ int progress_report(int finish_up)
 				frac = (float)bytes / (float)file_size;
 				if (frac > 1.0)
 					frac = 1.0;
+				else if (frac < 0.0)
+					frac = 0.0;
 				size = (int) ((float)barlen * frac);
 				(void) sprintf(spec,
 					"%%3d%%%%  0 %%s%%%ds%%s%%%ds %%ld bytes. ETA:%%3d:%%02d\r",
@@ -858,7 +877,7 @@ void end_progress(char *direction, char *local, char *remote)
         if (bs > 1024.0)
             sprintf(bsstr, "%.2f K/s", bs / 1024.0);
         else
-            sprintf(bsstr, "%.2f Bytes/sec", bs / 1024.0);
+            sprintf(bsstr, "%.2f Bytes/sec", bs);
     }
 
     if (doLastReport) switch(cur_progress_meter) {
@@ -1684,6 +1703,7 @@ xx:
 	dbprintf("recvrequest result = %d.\n", result);
 	if (oldtype >= 0)
 		ResetOldType(oldtype);
+	bytes = 0L;
 	return (result);
 }	/* recvrequest */
 
@@ -1741,7 +1761,7 @@ int initconn(void)
 
 FILE *dataconn(char *lmode)
 {
-	return (fdopen(data, lmode));
+	return (safeopen(data, lmode));
 }									   /* dataconn_term */
 #else /* not TERM_FTP */
 
@@ -1857,7 +1877,7 @@ dataconn(char *mode)
 	} else {
 		(void) close(data);
 		data = s;
-		fp = fdopen(data, mode);
+		fp = safeopen(data, mode);
 	}
 	return (fp);
 }	/* dataconn */

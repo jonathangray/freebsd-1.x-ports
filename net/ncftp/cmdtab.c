@@ -1,8 +1,8 @@
 /* cmdtab.c */
 
 /*  $RCSfile: cmdtab.c,v $
- *  $Revision: 1.2 $
- *  $Date: 1994/03/21 18:01:28 $
+ *  $Revision: 1.3 $
+ *  $Date: 1994/04/10 22:14:35 $
  */
 
 #include "sys.h"
