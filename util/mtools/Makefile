@@ -178,7 +178,7 @@ shar:
 pkg: pkg_bin
 
 pkg_bin: install
-        pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST mtools_bin
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST mtools_bin
 
 buf_read.o:	msdos.h
 buf_write.o:	msdos.h
