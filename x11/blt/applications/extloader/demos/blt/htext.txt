@@ -1,0 +1,599 @@
+        This is a (for lack of a better name) hypertext widget.
+
+This widget combines text and other Tk widgets in the same window. 
+It is sort of a cross between a read-only text widget and the pack command.  
+Any widget can be attached to the hypertext window by the %% 
+label $blt_htext(widget).lab -text "append " -relief sunken \
+        -font *-Courier-Bold-R-Normal-*-120-*
+$blt_htext(widget) append $blt_htext(widget).lab 
+%% command.
+For example, 
+%% message $blt_htext(widget).msg -relief sunken -bd 2 -aspect 10000 -font \
+ *-Courier-Medium-R-Normal-*-120-* -text {set w $blt_htext(widget)
+label $w.face -bitmap @bitmaps/face \ 
+  -relief sunken -borderwidth 2
+$w append $w.face -padx 2 -pady 0.25i}
+$blt_htext(widget) append $blt_htext(widget).msg \
+        -fill both %% added this %%
+global tk_library
+label $blt_htext(widget).face \
+        -bitmap @$tk_library/demos/bitmaps/face  \
+        -relief sunken -borderwidth 2
+$blt_htext(widget) append $blt_htext(widget).face -padx 2 -pady 0.25i -fill both
+%%.
+There can be many types of widgets in the same document.  For example,
+this is a simple %% 
+button $blt_htext(widget).but -bg pink -text { button } \
+        -command { puts stderr { a stupid message } } 
+$blt_htext(widget) append $blt_htext(widget).but
+%%. If you click on the button, it prints a stupid message. 
+Any Tk widget can be used, including %%
+checkbutton $blt_htext(widget).ckbut -bg lightblue -text { check buttons } \
+        -command { puts stderr { check button pressed } } 
+$blt_htext(widget) append $blt_htext(widget).ckbut
+%%, %%
+radiobutton $blt_htext(widget).rdbut -bg mediumseagreen -text { radio buttons } \
+        -command { puts stderr { radio button pressed } } 
+$blt_htext(widget) append $blt_htext(widget).rdbut
+%%, 
+and scales %%
+scale $blt_htext(widget).sc -showvalue true \
+        -length 100 \
+        -sliderforeground powderblue \
+        -sliderlength 10 \
+        -orient horizontal  
+$blt_htext(widget) append $blt_htext(widget).sc
+%%.  
+
+        Widget trees can be also be included. The following example is 
+*borrowed* from the widget demo. It is a couple of frames surrounding a 
+listbox, a message, and a button widget. 
+%%
+    set w $blt_htext(widget).frame 
+    frame $w 
+    message $w.msg -font *times-medium-r-normal--*-120* -aspect 300 \
+            -text "A listbox containing the 50 states is displayed below, along with a scrollbar.  You can scan the list either using the scrollbar or by dragging in the listbox window with button 3 pressed.  Click the \"OK\" button when you've seen enough." -bg lightsteelblue -relief sunken
+    frame $w.frame -borderwidth 10 
+    pack append $w.frame \
+        [scrollbar $w.frame.scroll -relief sunken \
+            -command "$w.frame.list yview"] {right expand filly frame w} \
+        [listbox $w.frame.list -yscroll "$w.frame.scroll set" -relief sunken] \
+            {left expand filly frame e}
+    $w.frame.list insert 0 Alabama Alaska Arizona Arkansas California \
+        Colorado Connecticut Delaware Florida Georgia Hawaii Idaho Illinois \
+        Indiana Iowa Kansas Kentucky Louisiana Maine Maryland \
+        Massachusetts Michigan Minnesota Mississippi Missouri \
+        Montana Nebraska Nevada "New Hampshire" "New Jersey" "New Mexico" \
+        "New York" "North Carolina" "North Dakota" \
+        Ohio Oklahoma Oregon Pennsylvania "Rhode Island" \
+        "South Carolina" "South Dakota" \
+        Tennessee Texas Utah Vermont Virginia Washington \
+        "West Virginia" Wisconsin Wyoming
+    button $w.ok -text OK -command "puts stderr $w; destroy $w"
+
+    pack append $w $w.msg {top fill} $w.frame {top expand fill} \
+        $w.ok {bottom fill}
+    $w config -bg lightsteelblue -relief sunken
+
+$blt_htext(widget) append $w -padx 1.0i -pady 0.25i
+%% 
+
+You can add you own home-grown widgets.  Here's the blt_graph widget.
+Beside it is the "color" demo.  Moving the scales, adjusts the background
+color of the graph.
+%%
+proc makeplot { widget } {
+
+    set X { 
+        2.00000e-01 4.00000e-01 6.00000e-01 8.00000e-01 1.00000e+00 
+        1.20000e+00 1.40000e+00 1.60000e+00 1.80000e+00 2.00000e+00 
+        2.20000e+00 2.40000e+00 2.60000e+00 2.80000e+00 3.00000e+00 
+        3.20000e+00 3.40000e+00 3.60000e+00 3.80000e+00 4.00000e+00 
+        4.20000e+00 4.40000e+00 4.60000e+00 4.80000e+00 5.00000e+00 
+    } 
+
+    $widget element create Y1 -xdata $X -ydata { 
+        1.14471e+01 2.09373e+01 2.84608e+01 3.40080e+01 3.75691e+01 
+        3.91345e+01 3.92706e+01 3.93474e+01 3.94242e+01 3.95010e+01 
+        3.95778e+01 3.96545e+01 3.97313e+01 3.98081e+01 3.98849e+01 
+        3.99617e+01 4.00384e+01 4.01152e+01 4.01920e+01 4.02688e+01 
+        4.03455e+01 4.04223e+01 4.04990e+01 4.05758e+01 4.06526e+01 
+    } -symbol line -linewidth 0 -label VGS=2.0 -fg blue 
+
+    $widget element create a -xdata $X -ydata { 
+        2.61825e+01 5.04696e+01 7.28517e+01 9.33192e+01 1.11863e+02 
+        1.28473e+02 1.43140e+02 1.55854e+02 1.66606e+02 1.75386e+02 
+        1.82185e+02 1.86994e+02 1.89802e+02 1.90683e+02 1.91047e+02 
+        1.91411e+02 1.91775e+02 1.92139e+02 1.92503e+02 1.92867e+02 
+        1.93231e+02 1.93595e+02 1.93958e+02 1.94322e+02 1.94686e+02 
+    } -symbol cross -linewidth 0 -fg brown 
+
+    $widget element create Y2 -xdata $X -ydata { 
+        2.61825e+01 5.04696e+01 7.28517e+01 9.33192e+01 1.11863e+02 
+        1.28473e+02 1.43140e+02 1.55854e+02 1.66606e+02 1.75386e+02 
+        1.82185e+02 1.86994e+02 1.89802e+02 1.90683e+02 1.91047e+02 
+        1.91411e+02 1.91775e+02 1.92139e+02 1.92503e+02 1.92867e+02 
+        1.93231e+02 1.93595e+02 1.93958e+02 1.94322e+02 1.94686e+02 
+    } -symbol line -linewidth 0 -label VGS=3.5 -fg green 
+
+    $widget element create Y3 -xdata $X -ydata { 
+        4.07008e+01 7.95658e+01 1.16585e+02 1.51750e+02 1.85051e+02 
+        2.16479e+02 2.46024e+02 2.73676e+02 2.99427e+02 3.23267e+02 
+        3.45187e+02 3.65177e+02 3.83228e+02 3.99331e+02 4.13476e+02 
+        4.25655e+02 4.35856e+02 4.44073e+02 4.50294e+02 4.54512e+02 
+        4.56716e+02 4.57596e+02 4.58448e+02 4.59299e+02 4.60151e+02 
+   } -symbol line -linewidth 0  -label VGS=5.0 -fg red 
+
+    $widget element create t -xdata $X -ydata { 
+        4.07008e+01 7.95658e+01 1.16585e+02 1.51750e+02 1.85051e+02 
+        2.16479e+02 2.46024e+02 2.73676e+02 2.99427e+02 3.23267e+02 
+        3.45187e+02 3.65177e+02 3.83228e+02 3.99331e+02 4.13476e+02 
+        4.25655e+02 4.35856e+02 4.44073e+02 4.50294e+02 4.54512e+02 
+        4.56716e+02 4.57596e+02 4.58448e+02 4.59299e+02 4.60151e+02 
+   } -symbol plus -linewidth 0  -fg purple 
+}
+
+option add *Blt_graph.title  "Plot Title" 
+option add *Blt_graph.xTitle "X Axis Label"
+option add *Blt_graph.yTitle "Y Axis Label" 
+option add *Blt_graph.legendMapped false 
+option add *Blt_graph.relief ridge
+option add *Blt_graph.borderWidth 2
+
+blt_graph $blt_htext(widget).g -width 200 -height 200 
+#-xlog true -ylog true
+makeplot $blt_htext(widget).g
+$blt_htext(widget) append $blt_htext(widget).g -padx 0.25i -pady 0.25i
+
+%% %%
+#
+# Simple script to change colors of a window.
+#
+global xlabel ylabel red green blue grph
+set xlabel $blt_htext(widget).xlab
+set ylabel $blt_htext(widget).ylab
+set grph $blt_htext(widget).g
+set w $blt_htext(widget).cf
+set red 0
+set green 0
+set blue 0
+
+option add *Scale.sliderForeground "#cdb79e"
+option add *Scale.activeForeground "#ffe4c4"
+frame $w
+scale $w.red -command "color red" -label "Red Intensity" \
+        -from 0 -to 255 -orient horizontal -bg "#ffaeb9" -length 250
+scale $w.green -command "color green" -label "Green Intensity" \
+        -from 0 -to 255 -orient horizontal -bg "#43cd80"
+scale $w.blue -command "color blue" -label "Blue Intensity"  \
+        -from 0 -to 255 -orient horizontal -bg "#7ec0ee"
+pack append $w $w.red {top expand fill}
+pack append $w $w.green {top expand fill}
+pack append $w $w.blue {top expand fill}
+
+proc color {which intensity} {
+    global red green blue grph xlabel ylabel
+    set $which $intensity
+    set rgb [format #%02x%02x%02x $red $green $blue]
+    $grph config -bg $rgb
+    $xlabel config -bg $rgb
+    $ylabel config -bg $rgb
+}
+
+$blt_htext(widget) append $w
+
+%%
+If you click on any button in the graph, you will get the coordinate 
+values at the pointer location.  
+
+The current coordinate values are %%
+label $blt_htext(widget).xlab -text { ??? ??? } -relief sunken
+label $blt_htext(widget).ylab -text { ??? ??? } -relief sunken
+bind $blt_htext(widget).g <ButtonPress> {labelxy [ %W invtransform %x %y ]}
+
+proc labelxy { values } {
+    global xlabel ylabel
+    scan $values "%e %e" x y
+    $xlabel config -text $x
+    $ylabel config -text $y
+}
+$blt_htext(widget) append $blt_htext(widget).xlab -width 100 -fill x
+%% and %%
+$blt_htext(widget) append $blt_htext(widget).ylab -width 100 -fill x
+%%.
+
+
+There are three global variables automatically created when a hypertext
+file is read:
+
+        %% 
+button $blt_htext(widget).l1 -text "\$blt_htext(widget)" -command "puts stdout $blt_htext(widget)" 
+$blt_htext(widget) append $blt_htext(widget).l1 %% is the pathname of the hypertext widget. 
+        %% 
+button $blt_htext(widget).l2 -text "\$blt_htext(file)" -command "puts stdout $blt_htext(file)" 
+$blt_htext(widget) append $blt_htext(widget).l2
+%% is the file being read and 
+        %% 
+button $blt_htext(widget).l3 -text "\$blt_htext(line)"  -command "puts stdout $blt_htext(line)"
+$blt_htext(widget) append l3
+%% is the current line number.
+
+Click on any button and the current value is printed on standard output.
+
+The hypertext widget works with plain text too. If you don't want
+to read it, click on the %% 
+button $blt_htext(widget).goto -text button -fg purple -bg white \
+        -command "global endOfText; $blt_htext(widget) gotoline \$endOfText"
+$blt_htext(widget) append $blt_htext(widget).goto
+%% to jump to the end of the plain text.
+
+         ------------------------------------------------------
+
+This is version 1.4 of the BLT library.  It is an extension to 
+Tk toolkit (it requires no patching of the Tcl or Tk libraries).  
+
+This library works with the following releases of Tcl/Tk ONLY.
+
+	Tcl 7.3 / Tk 3.6
+	Tcl 7.2 / Tk 3.5
+	Tcl 7.1 / Tk 3.4
+	Tcl 7.0 / Tk 3.3
+
+The BLT toolkit contains the following widgets/commands:
+
+1) Drag-n-drop command: blt_drag&drop
+	Updated version of Michael McLennan's drag and drop command
+	(it's still maintained by Michael). 
+
+2) Hypertext widget: blt_htext
+	Allows text and Tk widgets to combined in a single scroll-able 
+	window.
+
+3) Busy window: blt_busy
+	For handling user-interaction when the application is "busy".
+	Manages an invisible "busy" window which prevents further 
+	user device (keyboard, mouse, button, etc.) interactions.
+	Also provides a different cursor which supersedes application
+	cursors.
+
+4) Bitmap command: blt_bitmap
+	Lets you read and write bitmaps from Tcl. Can define X bitmaps  
+	and create bitmaps from text strings.  Other options query any 
+        loaded X bitmap.
+
+5) Background "exec" command: blt_bgexec
+	Like "exec ... &", but collects the output of the detached 
+	UNIX subprocesses and sets a Tcl variable upon their completion.
+	Can be used with "tkwait variable" to handle application's 
+	expose events, etc. while waiting for subprocesses to finish.  
+
+6) Table geometry manager: blt_table
+	Specify window placements as table row,column positions. Also
+	has many options for placing constraints on window resizes.
+
+7) Barchart widget: blt_barchart
+	
+8) XY graph widget: blt_graph
+
+9) Window option command: blt_win
+	Lets you raise, lower, map, or, unmap any window.  
+
+10) Watch commands: blt_watch
+	Lets you specify Tcl procedures to be run before and/or
+	after every Tcl command.  May be used for logging,
+	tracing, profiling, or debugging or Tcl code.
+
+11) Simple command trace: blt_debug
+	Simply prints out each Tcl command before it's executed.  
+
+12) Cutbuffer and bell commands: blt_cutbuffer, blt_bell
+	The commands are derived from the "bellcut" extensions and are 
+	provided as a convenience.  Credit should go to the author(s) 
+	(I can't remember who they are. Sorry) for this work.
+
+---------
+
+Changes since BLT-1.3:
+
+1. Axis not re-scaling when changing log/linear scale.
+
+2. New command: "blt_watch" arranges for Tcl procedures to be 
+   called before and/or after the execution of every Tcl command. 
+   This command may be used in the logging, profiling, or tracing of 
+   Tcl code.
+
+3. Bug fixes:  See the file "ChangeLog" for details.  Thanks to all 
+   those who've sent me their reports and fixes.  
+
+---------
+
+Changes since BLT-1.2:
+
+1. Fixed manual scaling bug (seen in ./demos/graph2)
+
+2. New feature: C interface to reset "blt_graph" element data.
+
+3. Bug fixes:  See the file "ChangeLog" for details.  Again, thanks 
+   to all those who've sent me reports.  
+
+---------
+
+Changes since BLT-1.1:
+
+1. Fixed bug (coredump) in "blt_bgexec" command introduced 
+   last release.
+
+2. Fixed bug (error) in "blt_graph" and "blt_barchart" commands 
+   introduced in last release.  Bug doesn't allow axis -min, -max options 
+   to be reset to autoscale.
+
+3. Fixed bug in Kosherdill installation.
+
+4. New feature in "blt_graph" and "blt_barchart".
+   Added alternate x and y axes (x2, y2).  
+   Moved axis title options to their respective axis commands
+	.graph configure -xtitle "X Axis Title"
+   becomes
+	.graph xaxis configure -title "X Axis Title"
+
+---------
+
+Changes since BLT-1.0:
+
+1. Many changes to configuration and install files.  Hopefully this
+   is an improvement.
+
+2. New options in "blt_graph" to detect closest point and highlight
+   single element data points.
+
+3. New option in "blt_bitmap" command lets you create bitmaps of rotated 
+   text strings.
+
+4. Restructured BLT library to facilitate loading as a shared object.
+
+5. Lots of bug fixes:  See the file "ChangeLog" for details.  Again, thanks 
+   to all those who've sent me reports.  
+
+---------
+
+Changes since BLT-1.0b2:
+
+1. First BLT application.  
+				Kosher Dill
+	    ( KOmprehensive Storage HandlER / Disk ILLustrator )
+
+       ---------------------------------------------------------------
+		  Copyright (c) 1993  AT&T Bell Laboratories
+		Michael J. McLennan (michael.mclennan@att.com)
+       ---------------------------------------------------------------
+
+       Kosher Dill is a simple utility for managing disk usage.  It
+       provides a graphical representation of the system "du" command,
+       along with drag&drop facilities for exploring, compressing
+       and removing files.
+
+   It can be found in the new "blt-1.0/applications" directory.
+
+2. Drag-and-drop facility "blt_drag&drop".  Michael McLennan has updated
+   and added his drag-and-drop command.  
+
+3. Shared library target (for supported systems):  I've been able to test
+   this only on SunOS 4.x, SunOS 5.x, and HP-UX 9.01 systems.
+
+4. Add -updatevar flag to "blt_bgexec":  You can now get partial updates
+   of output as the program is running.  See the script "demos/bgexec".
+
+5. Library directory: This directory contains the drag-n-drop protocols
+   and the PostScript prolog for graph and barchart.  The path can be
+   set in the following ways:
+	
+	- compiled into the library.
+	- set by the environment variable "BLT_LIBRARY"
+	- set by the Tcl variable "blt_library"
+
+6. Lots of bug fixes:  See the file "ChangeLog" for details.  Thanks to 
+   all those who've sent me reports.  I really appreciate it.  
+
+---------
+
+How to get and test BLT:
+
+The following describes how to get and install the BLT library.
+
+0. FTP the distribution from harbor.ecn.purdue.edu
+
+	ftp harbor.ecn.purdue.edu
+	cd pub/tcl/extensions
+	binary 
+	get BLT-1.4.tar.Z
+	quit
+
+1. Uncompress and untar the distribution file.  
+
+	zcat BLT-1.4.tar.Z | tar -xvf - 
+
+
+   This will create a directory "blt-1.4" with the following 
+   subdirectories:
+	
+                        blt-1.4
+	     ______________|_________________
+             |          |       |      |    |
+        applications  demos  library  man  src
+                                            |
+                                          shared
+
+2. Run ./configure
+
+   Go into the "blt-1.4" directory 
+
+	cd blt-1.4
+
+   and run the auto-configuration script "./configure"
+
+	./configure 
+
+   * If you want to use gcc, it's "./configure -with-gcc"
+
+	./configure -with-gcc
+
+   * By default, the demo program, libBLT.a, the library files, and
+     manual pages will be installed in "/usr/local/blt".  You can 
+     change this by giving the -prefix option to ./configure.
+
+	./configure -prefix=/depot/stuff/blt
+    
+  You may be queried for the location of the Tcl and Tk libraries, if
+  "configure" can't find them in the standard locations.
+
+  The configure script creates an include file "src/bltConfig.h".
+  It will also generate new Makefiles from their respective templates 
+  (Makefile.in).
+
+	Makefile.in 	        ==> Makefile
+	src/Makefile.in	        ==> src/Makefile
+	src/shared/Makefile.in	==> src/shared/Makefile
+	man/Makefile.in		==> man/Makefile
+	library/Makefile.in	==> library/Makefile
+
+  If "configure" can't find something (e.g. it can't find the X libraries),
+  edit the file "config.status" and run it.
+
+	./config.status
+
+  Otherwise, you'll have to edit the Makefiles files by hand.
+
+
+3. Compile the demonstation program "blt_wish".
+
+	make 
+
+
+4. Test by running the demos. 
+
+   Go into the demos directory 
+    
+	cd demos
+
+   and run the test scripts.
+	
+	./graph
+
+   If your system doesn't support "#!" in shell scripts, then it's
+
+	../blt_wish -f ./graph
+
+
+5. Installing BLT
+
+   The following directories will be created when BLT is installed.  
+   By default, the top directory is /usr/local/blt.  
+
+       _____________|__________
+       |      |        |      |  
+      bin    lib     library man
+     
+   You can change the top directory by supplying the -prefix option to
+   ./configure.
+
+   * If you don't install BLT, you will need to set the BLT_LIBRARY
+     environment variable or the Tcl variable "blt_library" in your
+     scripts.  Otherwise, you may not be able generate PostScript 
+     output for graphs and barcharts, or use the drag&drop facility 
+     properly.
+
+
+6. BLT Applications
+
+   In the "blt-1.4/applications" directory, there is the first 
+   application called "kosherdill".  It has its own README and
+   configure script.  
+
+7. Creating a shared library.
+
+   This is currently available (and tested) on the following 
+   systems:
+
+	SunOS 4.x
+	SunOS 5.x
+	HP-UX 9.01
+
+   From the "blt-1.4" directory:
+
+	make sharedlib
+
+   This will create a shared library in the directory src/shared.
+
+
+8. Adding BLT to your program.
+
+   Add the following lines to your program's Tcl_AppInit routine 
+
+	if (Blt_Init(interp) != TCL_OK) {
+	    return TCL_ERROR;
+         }
+
+   Link with libBLT.a
+
+   and that's all there's to it.
+
+9. Send bugs reports, correspondence, etc. to
+
+   	george.howlett@att.com
+
+
+
+%%
+global endOfText
+set endOfText [expr $blt_htext(line)-1 ]
+
+global updateInterval count graph
+global Red Green Blue
+set updateInterval 2000
+set count 0
+set Red bb
+set Green 00
+set Blue 33
+
+option add *Blt_barchart.title "Bar Chart" 
+option add *Blt_barchart.xTitle "X"
+option add *Blt_barchart.yTitle "Y"
+option add *Blt_barchart.y2Title "Y"
+option add *Blt_barchart.ySubTicks 0
+option add *Blt_barchart.xTicks 0
+option add *Blt_barchart.legendMapped false
+option add *Blt_barchart.AxisFont *-Courier-Bold-R-Normal-*-80-* 
+option add *Blt_barchart.y2Mapped true
+
+blt_barchart $blt_htext(widget).b 
+
+$blt_htext(widget) append $blt_htext(widget).b \
+        -relwidth 1.0 -relheight 0.5 -fill both
+set graph $blt_htext(widget).b
+
+proc AnimateBarchart {  } {
+    global updateInterval
+    global count graph Red Blue Green
+    
+    if { [info commands $graph] != $graph } {
+        return
+    }   
+    incr count
+    if { $count > 16 } {
+        $graph element delete [lindex [$graph element show] 0]
+    }
+    set color [format "%x" [expr $count%16]]
+    set Green ${color}${color}
+    $graph element create $count -data { $count sin($count*0.1)} \
+        -fg #${Red}${Green}${Blue} -bg brown -mapy both
+    after $updateInterval AnimateBarchart
+}
+AnimateBarchart
+
+%%
+
+        Press %%
+button $blt_htext(widget).quit -command { destroy . } -text {Quit} -bg pink
+$blt_htext(widget) append quit
+%% to remove the window.
+

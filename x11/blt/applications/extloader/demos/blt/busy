@@ -1,0 +1,176 @@
+#!../../wish -f
+
+set env(TCL_EXTMAP) "./extensions.tcl"
+extension add blt
+
+#
+# Script to test the "busy" command.
+# 
+
+#
+# General widget class resource attributes
+#
+option add *Button.padX 	10
+option add *Button.padY 	2
+option add *Scale.relief 	sunken
+option add *Scale.orient	horizontal
+option add *Entry.relief 	sunken
+
+set visual [winfo screenvisual .] 
+if { $visual == "staticgray"  || $visual == "grayscale" } {
+    set activeBg black
+    set normalBg white
+    set bitmapFg black
+    set bitmapBg white
+} else {
+    set activeBg red
+    set normalBg springgreen
+    set bitmapFg blue
+    set bitmapBg green
+}
+
+#
+# Instance specific widget options
+#
+option add Tk.top.relief 	sunken
+option add Tk.top.borderWidth 	4
+option add Tk.top.background 	$normalBg
+option add Tk.b1.text 		"Test"
+option add Tk.b2.text 		"Quit"
+option add Tk.b3.text 		"New button"
+option add Tk.b4.text 		"Hold"
+option add Tk.b4.background 	$activeBg
+option add Tk.b4.foreground 	$normalBg
+option add Tk.b5.text 		"Release"
+option add Tk.b5.background 	$normalBg
+option add Tk.b5.foreground 	$activeBg
+
+#
+# This never gets used; it's reset by the Animate proc. It's 
+# here to just demonstrate how to set busy window options via
+# the host window path name
+#
+option add Tk.top.busyCursor 	bogosity 
+
+#
+# Initialize a list bitmap file names which make up the animated 
+# fish cursor. The bitmap mask files have a "m" appended to them.
+#
+set bitmaps { fc_left fc_left1 fc_mid fc_right1 fc_right }
+
+#
+# Counter for new buttons created by the "New button" button
+#
+set numWin 0
+#
+# Current index into the bitmap list. Indicates the current cursor.
+# If -1, indicates to stop animating the cursor.
+#
+set cnt -1
+
+#
+# Create two frames. The top frame will be the host window for the
+# busy window.  It'll contain widgets to test the effectiveness of
+# the busy window.  The bottom frame will contain buttons to 
+# control the testing.
+#
+frame .top
+frame .bottom
+
+#
+# Create some widgets to test the busy window and its cursor
+#
+button .b1 -command { 
+    puts stdout "Not busy." 
+}
+button .b2 -command { 
+    destroy .
+}
+entry .e1 
+scale .s1
+
+#
+# The following buttons sit in the lower frame to control the demo
+#
+button .b3 -command {
+    global numWin
+    incr numWin
+    set name button#${numWin}
+    button .top.$name -text "$name" \
+	-command [list puts stdout "I am $name"]
+    pack append .top .top.$name { expand padx 10 pady 10 }
+}
+button .b4 -command {
+    blt_busy .top -in .
+    focus none
+    global cnt activeBg
+    if { $cnt < 0 } {
+	.top configure -bg $activeBg
+	set cnt 0
+	Animate .top
+    }
+}
+button .b5 -command {
+    catch {blt_busy release .top} mesg
+    global cnt normalBg
+    set cnt -1
+    .top configure -bg $normalBg
+}
+
+#
+# Notice that the widgets packed in .top and .bottom are not their children
+#
+pack append .top \
+    .b1 { expand padx 10 pady 10 } \
+    .e1 { expand padx 10 pady 10 } \
+    .s1 { expand padx 10 pady 10 } \
+    .b2 { expand padx 10 pady 10 }	
+
+pack append .bottom \
+    .b3 { expand padx 10 pady 10 } \
+    .b4 { expand padx 10 pady 10 } \
+    .b5 { expand padx 10 pady 10 }
+
+#
+# Finally, realize and map the top level window
+#
+pack append . .top { top expand } .bottom { fill expand }
+
+#
+# Simple cursor animation routine: Uses the "after" command to 
+# circulate through a list of cursors every 0.075 seconds. The
+# first pass through the cursor list may appear sluggish because 
+# the bitmaps have to be read from the disk.  Tk's cursor cache
+# takes care of it afterwards.
+#
+proc Animate w {
+    global cnt 
+    if { $cnt >= 0 } {
+	global bitmaps bitmapFg bitmapBg
+	set name [lindex $bitmaps $cnt]
+	set src  @bitmaps/${name}
+	set mask bitmaps/${name}m
+	blt_busy configure $w -cursor [list $src $mask $bitmapFg $bitmapBg]
+	incr cnt
+	if { $cnt > 4 } {
+	    set cnt 0
+	}
+	after 75 Animate $w
+    } else {
+	blt_busy configure $w -cursor watch
+    }
+}
+
+#
+# For testing purposes allow the top level window to be resized 
+#
+wm min . 0 0
+
+#
+# If the "raise" window command exists, force the demo to stay raised
+#
+if { [info commands "raise"] == "raise" } {
+    bind . <Visibility> {
+	raise %W
+    }
+}

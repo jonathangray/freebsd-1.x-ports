@@ -1,0 +1,451 @@
+AC_INIT(src/bltInit.c)
+
+# -----------------------------------------------------------------------
+#
+# 	C compiler and debugging flags
+#
+# -----------------------------------------------------------------------
+AC_WITH(gcc, CC=gcc)
+AC_WITH(acc, CC=acc)
+AC_WITH(lcc, CC=lcc)
+AC_WITH(cc, CC=cc)
+if test -z "$CC" ; then 
+    CC=cc
+fi
+compiler=`basename $CC`
+if test "$compiler" = "gcc" ; then
+    CC="$CC -fwritable-strings -Wall"
+fi
+AC_SUBST(CC)
+
+CDEBUGFLAGS="-O"
+AC_WITH(debug, CDEBUGFLAGS=-g)
+AC_SUBST(CDEBUGFLAGS)
+
+# -----------------------------------------------------------------------
+#
+# 	Set prefix variable if one wasn't provided
+#
+# -----------------------------------------------------------------------
+if test -z "$prefix" ; then
+    prefix=/usr/local/blt
+fi
+AC_SUBST(prefix)
+
+# -----------------------------------------------------------------------
+#
+# 	Set PWD variable if vendor's /bin/sh doesn't
+#
+# -----------------------------------------------------------------------
+if test -z "$PWD" ; then
+    PWD=`pwd`
+fi
+
+# -----------------------------------------------------------------------
+#
+# 	Check for existence of ranlib and install programs
+#
+# -----------------------------------------------------------------------
+AC_PROG_INSTALL
+AC_PROG_RANLIB
+AC_PROG_CPP
+
+AC_CONFIG_HEADER(src/bltConfig.h)
+
+# -----------------------------------------------------------------------
+#
+# 	Check for header files
+#
+# -----------------------------------------------------------------------
+AC_STDC_HEADERS
+AC_HAVE_HEADERS(stdlib.h string.h float.h malloc.h)
+AC_HAVE_HEADERS(errno.h unistd.h memory.h limits.h sys/time.h sys/wait.h)
+AC_TIME_WITH_SYS_TIME
+
+# -----------------------------------------------------------------------
+# 	Check for strerror, strdup, strcasecmp.
+# -----------------------------------------------------------------------
+AC_HAVE_FUNCS(strerror strdup strcasecmp)
+AC_SIZE_T
+
+LOSSAGE=""
+#--------------------------------------------------------------------
+#	The check below checks whether <sys/wait.h> defines the type
+#	"union wait" correctly.  It's needed because of weirdness in
+#	HP-UX where "union wait" is defined in both the BSD and SYS-V
+#	environments.  Checking the usability of WIFEXITED seems to do
+#	the trick.
+#--------------------------------------------------------------------
+
+AC_COMPILE_CHECK([union wait], [#include <sys/types.h> 
+#include <sys/wait.h>], [
+union wait x;
+WIFEXITED(x);		/* Generates compiler error if WIFEXITED
+			 * uses an int. */
+], , [ LOSSAGE="$LOSSAGE -DNO_UNION_WAIT" ])
+
+# -----------------------------------------------------------------------
+# 	Check if postscript prolog can be inlined.
+# -----------------------------------------------------------------------
+echo "checking if postscript prolog can be inlined"
+AC_TEST_PROGRAM([
+#include "$PWD/src/bltGrPS.h"
+int main() { exit(0); }
+],, [ LOSSAGE="$LOSSAGE -DNO_INLINE_PROLOG" ])
+
+AC_SUBST(LOSSAGE)
+    
+# -----------------------------------------------------------------------
+# 	Run xmkmf to check for location of X libraries and includes.
+#	Fill in some default values if we still can't find anything.
+# -----------------------------------------------------------------------
+AC_FIND_X
+
+XINCDIR="$x_includes"
+if test -z "$XINCDIR" ; then
+    AC_TEST_CPP([#include <X11/Intrinsic.h>], [ XINCDIR="default" ], [
+    places="/usr/X11/include \
+	/usr/X386/include \
+	/usr/X11R5/include \
+	/usr/local/X11R5/include \
+	/usr/include/X11R5 \
+	/usr/openwin/include \
+	/usr/local/X11R4/include \
+	/usr/include/X11R4 \
+	/usr/local/include \
+	/usr/unsupported/include \
+	/usr/include"
+    for dir in $places; do
+	if test -r $dir/X11/Intrinsic.h; then
+	    XINCDIR=$dir
+	    break
+	fi
+    done
+    if test -z "$XINCDIR" ; then
+        echo "Warning:  couldn't find any X11 include files."
+        XINCDIR="default"
+    fi ])
+fi
+if test "$XINCDIR" = "/usr/include" ; then
+    XINCDIR="default"
+fi
+
+XLIBDIR="$x_libraries"
+if test -z "$XLIBDIR" ; then
+    AC_HAVE_LIBRARY(X11, [ XLIBDIR="default" ], [
+    places="/usr/X11/lib \
+    	/usr/X386/lib \
+    	/usr/X11R5/lib \
+    	/usr/local/X11R5/lib \
+    	/usr/lib/X11R5 \
+    	/usr/openwin/lib \
+    	/usr/local/X11R4/lib \
+    	/usr/lib/X11R4 \ 
+    	/usr/local/lib \
+    	/usr/unsupported/lib \
+    	/usr/lib \
+    	/lib"
+    for dir in $places; do
+        if test -r $dir/libX11.a; then
+    	    XLIBDIR=$dir
+    	    break
+        fi
+    done
+    if test -z "$XLIBDIR" ; then
+	echo "Warning:  couldn't find the X11 library archive. "
+	XLIBDIR="default"
+    fi ])
+fi
+if test "$XLIBDIR" = "/usr/lib" ; then
+    XLIBDIR="default"
+fi
+
+XINCSW=""
+if test "$XINCDIR" != "default" ; then
+    XINCSW="-I$XINCDIR"
+fi
+AC_SUBST(XINCSW)
+XLIBSW=""
+if test "$XLIBDIR" != "default" ; then
+    XLIBSW="-L$XLIBDIR"
+fi
+AC_SUBST(XLIBSW)
+AC_SUBST(XLIBDIR)
+
+# -----------------------------------------------------------------------
+#
+# 	Make some guesses where the Tcl/Tk include files and 
+#	libraries are.  I'm not crazy about doing it this way.  
+#	It might be better to specify some command-line options
+#	when invoking configure.
+#
+# 	Look first in the Tcl/Tk distributions and then move on 
+#	to the standard include file/library locations.  If it's 
+#	still not found then query for it.
+#
+# -----------------------------------------------------------------------
+
+# -----------------------------------------------------------------------
+#	tcl.h
+# -----------------------------------------------------------------------
+echo "checking for tcl.h"
+TCLINCDIR=""
+places="$PWD/../tcl7.3 \
+    $PWD/../tcl7.2 \
+    $PWD/../tcl7.1 \
+    $PWD/../tcl7.0 \
+    $PWD/../tcl7.0b3 \
+    $prefix/include \
+    $XINCDIR/tk \
+    $XINCDIR \
+    /usr/local/include \
+    /opt/cellar/tcl/tcl7.3/include \
+    /usr/include"
+for dir in $places; do
+    if test -r $dir/tcl.h ; then
+        TCLINCDIR=$dir
+        break
+    fi
+done
+while test -z "$TCLINCDIR" ; do
+    echo "What directory contains tcl.h (absolute path) ?"
+    read TCLINCDIR
+done
+if test "$TCLINCDIR" = "/usr/include" ; then
+    TCLINCDIR= "default"
+fi
+
+TCLINCSW=""
+if test "$TCLINCDIR" != "default" ; then
+    TCLINCSW="-I$TCLINCDIR"
+fi
+AC_SUBST(TCLINCSW)
+
+# -----------------------------------------------------------------------
+#	libtcl.a
+# -----------------------------------------------------------------------
+echo "checking for libtcl.a"
+TCLLIBDIR=""
+places="$PWD/../tcl7.3 \
+    $PWD/../tcl7.2 \
+    $PWD/../tcl7.1 \
+    $PWD/../tcl7.0 \
+    $PWD/../tcl7.0b3 \
+    $prefix/lib \
+    /opt/cellar/tcl/tcl7.3/lib \
+    $XLIBDIR \
+    /usr/local/lib \
+    /usr/lib"
+for dir in $places; do
+    if test -r $dir/libtcl.a ; then
+    	TCLLIBDIR=$dir
+    	break
+    fi
+done
+while test -z "$TCLLIBDIR" ; do
+    echo "What directory contains libtcl.a ?"
+    read TCLLIBDIR
+done
+if test "$TCLLIBDIR" = "/usr/lib" ; then
+    TCLLIBDIR= "default"
+fi
+
+TCLLIBSW=""
+if test "$TCLLIBDIR" != "default" ; then
+    TCLLIBSW="-L$TCLLIBDIR"
+fi
+AC_SUBST(TCLLIBSW)
+AC_SUBST(TCLLIBDIR)
+
+# -----------------------------------------------------------------------
+# 	tk.h
+# -----------------------------------------------------------------------
+echo "checking for tk.h"
+TKINCDIR=""
+places="$PWD/../tk3.6 \
+    $PWD/../tk3.5 \
+    $PWD/../tk3.4 \
+    $PWD/../tk3.3 \
+    $PWD/../tk3.3b3 \
+    $XINCDIR/tk \
+    $XINCDIR \
+    $prefix/include \
+    /opt/cellar/tk/tk3.6/include \
+    /usr/local/include \
+    /usr/include"
+for dir in $places; do
+    if test -r $dir/tk.h ; then
+        TKINCDIR=$dir
+        break
+    fi
+done
+while test -z "$TKINCDIR" ; do
+    echo "What directory contains tk.h (absolute path) ?"
+    read TKINCDIR
+done
+if test "$TKINCDIR" = "/usr/include" ; then
+    TKINCDIR="default"
+fi
+
+TKINCSW=""
+if test "$TKINCDIR" != "default" ; then
+    TKINCSW="-I$TKINCDIR"
+fi
+AC_SUBST(TKINCSW)
+
+# -----------------------------------------------------------------------
+# 	libtk.a
+# -----------------------------------------------------------------------
+echo "checking for libtk.a"
+TKLIBDIR=""
+places="$PWD/../tk3.6 \
+    $PWD/../tk3.5 \
+    $PWD/../tk3.4 \
+    $PWD/../tk3.3 \
+    $PWD/../tk3.3b3 \
+    $prefix/lib \
+    /opt/cellar/tk/tk3.6/lib \
+    $XLIBDIR \
+    /usr/local/lib \
+    /usr/lib"
+for dir in $places; do
+    if test -r $dir/libtk.a ; then
+    	TKLIBDIR=$dir
+    	break
+    fi
+done
+while test -z "$TKLIBDIR" ; do
+    echo "What directory contains libtk.a ?"
+    read TKLIBDIR
+done
+if test "$TKLIBDIR" = "/usr/lib" ; then
+    TKLIBDIR="default"
+fi
+
+TKLIBSW=""
+if test "$TKLIBDIR" != "default" ; then
+    TKLIBSW="-L$TKLIBDIR"
+fi
+AC_SUBST(TKLIBSW)
+AC_SUBST(TKLIBDIR) 
+
+
+#--------------------------------------------------------------------
+#	Check for the existence of various libraries.  The order here
+#	is important, so that then end up in the right order in the
+#	command line generated by Make.
+#--------------------------------------------------------------------
+AC_HAVE_LIBRARY(Xbsd, [LIBS="$LIBS -lXbsd"])
+AC_HAVE_LIBRARY(socket, [LIBS="$LIBS -lsocket"])
+AC_HAVE_LIBRARY(nsl, [LIBS="$LIBS -lnsl"])
+# -----------------------------------------------------------------------
+# 	The library libieee.a is a Linux deal. I don't know what effect 
+#	it will have.
+# -----------------------------------------------------------------------
+AC_HAVE_LIBRARY(-lieee, [LIBS="$LIBS -lieee"])
+AC_HAVE_LIBRARY(-lm, [LIBS="$LIBS -lm"])
+AC_SUBST(LIBS)
+
+#--------------------------------------------------------------------
+#	Set flags to generate shared libraries for systems that we 
+#	know about.
+#--------------------------------------------------------------------
+echo "checking how to make shared libraries"
+SHLIB_CCFLAGS=""
+SHLIB_LDFLAGS=""
+SHLIB_LOADER=""
+SHLIB_SUFFIX=""
+AC_PROGRAM_CHECK(uname_found, uname, 1, 0)
+[ if test $uname_found -eq 1 ; then
+    system=`uname -s`-`uname -r`
+    case $system in 
+      SunOS-4*) 
+        SHLIB_CCFLAGS="-pic"
+        SHLIB_LDFLAGS="-assert pure-text"
+        SHLIB_LOADER="ld"
+        SHLIB_SUFFIX='.so.$(MAJOR_VERSION).$(MINOR_VERSION)'
+        ;;
+      HP-UX-*.09.*)
+        SHLIB_CCFLAGS="+z"
+        SHLIB_LDFLAGS="-b -n"
+        SHLIB_LOADER="ld"
+        SHLIB_SUFFIX=".sl"
+        ;;
+      SunOS-5*)
+        SHLIB_CCFLAGS="-K pic"
+        SHLIB_LDFLAGS='-G -ztext -h $(SHARED_LIBRARY)'
+        SHLIB_LOADER="$CC"
+        SHLIB_SUFFIX='.so.$(MAJOR_VERSION)'
+        ;;
+      OSF-1.*)
+        SHLIB_CCFLAGS="-fpic"
+        SHLIB_LDFLAGS="-shared"
+        SHLIB_LOADER="$CC"
+        SHLIB_SUFFIX='.so.$(MAJOR_VERSION)'
+	;;
+      IRIX-5.*)
+        SHLIB_CCFLAGS="-KPIC"
+        SHLIB_LDFLAGS="-shared"
+        SHLIB_LOADER="$CC"
+        SHLIB_SUFFIX='.so.$(MAJOR_VERSION)'
+        ;;
+      *)
+	echo "Don't know how to make shared libraries for $system"
+	;;
+    esac
+    if test ! -z "SHLIB_CCFLAGS" ; then 
+        if test "$compiler" = "gcc" ; then
+            SHLIB_CCFLAGS="-fpic"
+        fi
+    fi
+fi ]
+
+AC_SUBST(SHLIB_CCFLAGS)
+AC_SUBST(SHLIB_LDFLAGS)
+AC_SUBST(SHLIB_LOADER)
+AC_SUBST(SHLIB_SUFFIX)
+
+#--------------------------------------------------------------------
+#	Propagate prefix argument as installation directory.
+#--------------------------------------------------------------------
+DESTDIR="$prefix"
+BINDIR="$DESTDIR/bin"
+LIBDIR="$DESTDIR/lib"
+MANDIR="$DESTDIR/man"
+BLT_LIBRARY="$DESTDIR/library"
+
+AC_SUBST(DESTDIR)
+AC_SUBST(BINDIR)
+AC_SUBST(LIBDIR)
+AC_SUBST(MANDIR)
+AC_SUBST(BLT_LIBRARY)
+
+#--------------------------------------------------------------------
+#
+#	Generate the following Makefiles
+#
+#	   ./Makefile
+#	   ./src/Makefile
+#	   ./src/shared/Makefile
+#	   ./man/Makefile
+#	   ./library/Makefile
+#
+#--------------------------------------------------------------------
+AC_OUTPUT(Makefile src/Makefile src/shared/Makefile man/Makefile library/Makefile)
+
+#--------------------------------------------------------------------
+#	Print out some of the more important settings 
+#--------------------------------------------------------------------
+echo "
+Configuration results (edit and run ./config.status to modify):
+
+directory containing \"tcl.h\"      => $TCLINCDIR
+directory containing \"tk.h\"       => $TKINCDIR
+directory containing \"X11/Xlib.h\" => $XINCDIR
+directory containing \"libtcl.a\"   => $TCLLIBDIR
+directory containing \"libtk.a\"    => $TKLIBDIR
+directory containing \"libX11.a\"   => $XLIBDIR
+directory to install \"blt_wish\"   => $BINDIR
+directory to install \"libBLT.a\"   => $LIBDIR
+directory to install BLT library files => $BLT_LIBRARY
+"

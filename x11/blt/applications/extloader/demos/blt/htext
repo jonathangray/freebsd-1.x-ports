@@ -1,0 +1,110 @@
+#!../../wish -f
+
+set env(TCL_EXTMAP) "./extensions.tcl"
+extension add blt
+
+option add *Blt_htext.foreground navyblue
+
+proc Blt_HtFindPattern { htext } {
+    toplevel .search
+    wm title .search "Text search"
+    label .search.label1 -text "Enter text string"
+    entry .search.entry -relief sunken
+    label .search.label2 -text "Direction:"
+    set varName direction$htext
+    radiobutton .search.forward -text "forward" -value "forward" \
+	-variable $varName -relief flat
+    radiobutton .search.backward -text "backward" -value "backward" \
+	-variable $varName -relief flat
+    global $varName 
+    set $varName "forward"
+    button .search.cancel -text "dismiss" \
+	-command "destroy .search; focus $htext"
+    button .search.search -text "search" -command "Blt_HtSearch&Move $htext"
+    bind .search.entry <Return> "Blt_HtSearch&Move $htext"
+    blt_table .search \
+	.search.label1 	0,0 -cspan 3 -padx 4 \
+	.search.entry 	1,0 -cspan 3 -pady 4 -padx 4 -reqwidth 3i \
+	.search.label2  2,0  \
+	.search.forward 2,1 -reqwidth 1i -anchor w \
+	.search.backward 2,2 -reqwidth 1i -anchor w \
+	.search.search  3,0 -reqwidth .75i -anchor w -padx 10 -pady 5  \
+	.search.cancel	3,2 -reqwidth .75i -anchor e -padx 10 -pady 5 
+    focus .search.entry
+    bind .search <Visibility> { raise .search }
+}
+       
+
+proc Blt_HtSearch&Move { htext } {
+    set pattern [.search.entry get]
+    if { $pattern == "" } {
+	return
+    }
+    set pattern "*$pattern*"
+    
+    set varName direction$htext
+    global $varName
+    set curPos [$htext gotoline]
+    if { [set $varName] == "forward" } {
+	set last end ; set first [expr $curPos+1]
+    } else {
+	set last 1   ; set first [expr $curPos-1]
+    }
+    set newPos [$htext search $pattern $first $last]
+    if { ($newPos == -1) || ($newPos == $curPos) } {
+	blt_bell
+    } else {
+	$htext gotoline $newPos
+    }
+}
+
+# Create horizonatal and vertical scrollbars
+scrollbar .vscroll -command { .htext yview } -orient vertical 
+scrollbar .hscroll -command { .htext xview } -orient horizontal
+
+# Create the hypertext widget 
+blt_htext .htext -file ./htext.txt \
+    -yscrollcommand { .vscroll set } \
+    -xscrollcommand { .hscroll set } \
+    -height 6i \
+    -yscrollunits 10m \
+    -xscrollunits .25i 
+
+blt_table . \
+    .htext 0,0 -fill both \
+    .vscroll 0,1 -fill y \
+    .hscroll 1,0 -fill x 
+
+blt_table row . configure 1 -resize none
+blt_table column . configure 1 -resize none
+
+bind .htext <B2-Motion> {
+    %W scan dragto %x %y
+}
+bind .htext <2> {
+    %W scan mark %x %y
+}
+
+bind .htext <Control-p> { 
+    %W gotoline [expr [%W gotoline]-1] 
+}
+bind .htext <Control-n> { 
+    %W gotoline [expr [%W gotoline]+1] 
+}
+
+bind .htext <Control-v> { 
+    %W yview [expr [%W yview]+10]
+}
+bind .htext <Meta-v> { 
+    %W yview [expr [%W yview]-10]
+}
+bind .htext <Any-q> {
+    exit 0
+}
+bind .htext <Control-s> {
+    Blt_HtFindPattern %W
+}
+
+focus .htext
+wm min . 0 0
+

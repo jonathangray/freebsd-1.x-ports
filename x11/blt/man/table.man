@@ -1,0 +1,378 @@
+'\"
+'\" Copyright 1991-1994 by AT&T Bell Laboratories.
+'\"
+'\" Permission to use, copy, modify, and distribute this software
+'\" and its documentation for any purpose and without fee is hereby
+'\" granted, provided that the above copyright notice appear in all
+'\" copies and that both that the copyright notice and warranty
+'\" disclaimer appear in supporting documentation, and that the
+'\" names of AT&T Bell Laboratories any of their entities not be used
+'\" in advertising or publicity pertaining to distribution of the
+'\" software without specific, written prior permission.
+'\"
+'\" AT&T disclaims all warranties with regard to this software, including
+'\" all implied warranties of merchantability and fitness.  In no event
+'\" shall AT&T be liable for any special, indirect or consequential
+'\" damages or any damages whatsoever resulting from loss of use, data
+'\" or profits, whether in an action of contract, negligence or other
+'\" tortuous action, arising out of or in connection with the use or
+'\" performance of this software.
+'\"
+'\" Table geometry manager created by George Howlett.
+'\"
+.so man.macros
+.HS blt_table cmds
+.BS
+'\" Note:  do not modify the .SH NAME line immediately below!
+.SH NAME
+blt_table \- Geometry manager that arranges windows in a table
+.SH SYNOPSIS
+.sp
+\fBblt_table \fImaster\fR ?\fIslave index options\fR?...
+.sp
+\fBblt_table column \fImaster option\fR ?\fIargs\fR...?
+.sp
+\fBblt_table configure \fIslave\fR ?\fIslave\fR...? ?\fIoptions\fR...?
+.sp
+\fBblt_table row \fImaster option\fR ?\fIargs\fR...?
+.sp
+\fBblt_table forget \fIslave\fR ?\fIslave\fR...?
+.sp
+\fBblt_table info \fIslave\fR
+.sp
+\fBblt_table slaves \fImaster\fR ?\fIpattern\fR?
+.sp
+\fBblt_table masters\fR ?\fIpattern\fR?
+.BE
+.SH DESCRIPTION
+.PP
+The \fBblt_table\fR command is a geometry manager for Tk. It arranges 
+windows tabularly in
+a window called the \fImaster\fR.  The table consists of individual
+rows and columns whose spacing define its layout. Windows, called 
+\fIslaves\fR, are positioned in the table by specifying the row and column.
+Only one slave can be specified at a single position in the table.  But slaves 
+may span multiple rows and columns.
+.PP
+By default, \fBblt_table\fR tries to arrange all its slaves in the minimum 
+space required. It determines this by querying each slave window for
+its requested size.  The maximum requested height all slaves spanning a 
+particular row is the row's normal size.  Similarly, the maximum 
+requested width of all slaves spanning a particular column is the column's 
+normal size.  This, in turn, specifies the table's size, which 
+is the sum of the normal sizes of the rows and columns.
+The number of rows and columns a table contains
+is determined by the indices specified.  
+There is no mechanism to delete a row or column.
+.SH TABLE INDICES
+An \fIindex\fR references a row,column position in the table.
+It must be in the form "\fIrow\fR,\fIcolumn\fR" where \fIrow\fR and 
+\fIcolumn\fR are the respective row and column
+numbers, starting from zero  (0,0 is the upper leftmost  position). 
+\fIRow\fR and \fIcolumn\fR may also be numeric expressions which are 
+recursively evaluated.  
+.SH SIZE CONSTRAINTS
+You can limit the amount of space requested by a slave window.
+By specifying both a minimum and maximum limit in which the window's 
+requested size must fall, you can bound a window's size.  This affects
+the calculation of the normal size of all rows and columns which
+it spans. In a similar fashion, you can directly control the 
+normal size of any row or column. 
+.PP
+This provides two features.
+Slave windows must be contained within the rows and columns they are 
+defined to span.  By limiting the size of a row or column, you control 
+the size of all windows in spanning it. This overrides whatever
+size the slave has requested.  Secondly, there's no requirement 
+that a row or column contain any slaves. This means you can create 
+horizontal or vertical spacing by simply setting the row or column limits.
+.SH RESIZING
+\fBBlt_table\fR tries to fit itself exactly in the master window.  It first
+tries to change the size of the master to the table's normal size.
+If this fails, it then tries to expand or shrink itself to the size of 
+the master.
+If normal size of the table is smaller than the master window, the 
+extra space is evenly divided among the rows or columns. If it's larger, 
+then the row and columns are shrunk to fit in the master window.  In both 
+cases, the rows and column sizes are changed with respect to their constraints.
+.PP
+You can also specify how an individual row or column is to be resized. 
+For example, a column may be set to one of four modes:
+.RS
+.IP \fBnone\fR
+Don't resize the column.
+.IP \fBexpand\fR
+Allow the column to only grow greater than its normal width.
+.IP \fBshrink\fR
+Allow the column to only shrink less than its normal width.
+.IP \fBboth\fR
+Resize the column in either direction.
+.RE
+.SH CREATING A TABLE
+Tables are created by invoking the \fBblt_table\fR command.
+.DS
+	\fBblt_table\fR \fImaster\fR
+.DE
+\fIMaster\fR is the pathname of a window which must already exist.
+\fBBlt_table\fR will arrange its slave windows inside of \fImaster\fR.
+Slave windows are added by designating the slave window's pathname and 
+table position.
+.DS
+	\fBblt_table\fR \fImaster slave index\fR
+.DE
+.SH TABLE COMMANDS
+The following commands are available for the \fBblt_table\fR:
+.TP
+\fBblt_table \fImaster\fR ?\fIslave index options\fR?...
+Adds the window \fIslave\fR to the table associated with \fImaster\fR.
+If a table doesn't exist for \fImaster\fR, one is created.
+\fIMaster\fR is the pathname of the window in which the slave windows
+will be arranged. \fISlave\fR is the pathname of the window to be arranged
+inside of \fImaster\fR at the position designated by \fIindex\fR.
+This command returns the empty string.  
+\fIOption\fR may have any of the values accepted by the 
+\fBblt_table configure\fR command.
+.TP
+\fBblt_table column \fImaster \fBconfigure \fIcolumnIndex\fR ?\fIoptions...\fR?
+Queries or modifies the configuration options of the columns specified.
+\fIColumnIndex\fR may be in one of two forms; \fBall\fR 
+(indicating all columns) or a list of the column indices to be configured.  
+\fIOptions\fR may have any of the following values:
+.RS
+.TP
+\fB\-padx \fIpixels\fR
+Specifies an extra padding to the normal width of the column.
+\fIPixels\fR can be any value accepted by \fBTk_GetPixels\fR.
+The default padding is \fB0\fR.
+.TP
+\fB\-resize \fImode\fR
+Indicates that the column can expand or shrink from its normal width 
+when the table is resized.
+\fIMode\fR must be one of the following:
+\fBnone\fR, \fBexpand\fR, \fBshrink\fR, or \fBboth\fR.  If \fImode\fR is 
+\fBexpand\fR the width of the column is expanded if there is extra space
+in the master window. If \fIstyle\fR is \fBshrink\fR its width may be
+reduced beyond its normal width if there is not enough space in the master.
+The default is \fBnone\fR.
+.TP
+\fB\-width \fIwidth\fR
+Specifies the limits within which the width of the column may expand or 
+shrink.  
+\fIWidth\fR is a list of bounding values.  See the section 
+.SB BOUNDING LIST FORMAT
+for a description of this list.
+By default there are no constraints.
+.RE
+.TP
+\fBblt_table column \fImaster\fB dimension\fR
+Returns the number of columns in the table.
+.TP
+\fBblt_table column \fImaster \fBinfo\fI columnIndex\fR 
+Returns a list of the configuration options for the columns specified.
+\fIColumnIndex\fR may be in one of two forms; \fBall\fR 
+(indicating all columns) or a list of column indices.
+The column indices may themselves be numeric expressions.
+.TP
+\fBblt_table column \fImaster\fB sizes\fI columnIndex\fR
+Returns the sizes of the given columns in the table.
+\fIColumnIndex\fR may be in one of two forms; \fBall\fR 
+(indicating all columns) or a list of column indices. 
+The column indices may themselves be numeric expressions.
+.TP
+\fBblt_table configure\fR \fIslave\fR ?\fIslave\fR...? ?\fIoptions\fR...? 
+Queries or modifies the configuration options of a slave in a table.  
+If no \fIoption\fR is specified, returns a list describing all of the
+available options for \fIslave\fR (see \fBTk_ConfigureInfo\fR for
+information on the format of this list).  \fISlave\fR must be
+the pathname of a window already managed by the \fBblt_table\fR.
+If \fIoption\fR is specified with no \fIvalue\fR, then the command 
+returns a list describing the
+one named option (this list will be identical to the corresponding
+sublist of the value returned if no \fIoption\fR is specified).  
+If one or more \fIoption\-value\fR pairs are specified, then the command
+modifies the given option(s) to have the given value(s); in
+this case the command returns the empty string.  
+One of more slave windows can be modified (with the 
+same options) at the same time.
+The following configuration 
+options are valid:
+.RS
+.TP
+\fB\-anchor \fIanchorPos\fR
+Specifies how the slave window will be arranged if there is extra space 
+in the span surrounding the window. \fIAnchorpos\fR may have any of the 
+forms accepted by \fBTk_GetAnchor\fR.  For example, if \fIanchorPos\fR is 
+\fBcenter\fR then the window is centered in the rows and columns it spans; 
+if \fIanchorPos\fR is \fBw\fR then the window will be drawn such it touches
+the leftmost edge of the span. This option defaults to \fBcenter\fR.
+.TP
+\fB\-columnspan \fInumber\fR
+Specifies the number of columns spanned by the slave. The default span
+is \fB1\fR.
+.TP
+\fB\-fill \fIstyle\fR
+Indicates if the slave should be expanded to occupy any extra space 
+in the span.  \fIStyle\fR must be one of the following:
+\fBnone\fR, \fBx\fR, \fBy\fR, \fBboth\fR.  If \fIstyle\fR is \fBx\fR,
+the width slave window is expanded.  If \fIstyle\fR is \fBy\fR, the
+height is expanded. The default is \fBnone\fR.
+.TP
+\fB\-ipadx \fIpixels\fR
+Specifies an extra padding in addition to the width requested by the 
+slave window. \fIPixels\fR can be any value accepted by \fBTk_GetPixels\fR.
+The default is \fB0\fR.
+.TP
+\fB\-ipady \fIpixels\fR
+Specifies an extra padding in addition to the height requested by the slave window. \fIPixels\fR can be any value accepted by \fBTk_GetPixels\fR.
+The default is \fB0\fR.
+.TP 
+\fB\-padx \fIpixels\fR
+Specifies an extra padding to the width of the span occupying the slave window. 
+\fIPixels\fR can be any value accepted by \fBTk_GetPixels\fR.
+The default is \fB0\fR.
+.TP
+\fB\-pady \fIpixels\fR
+Specifies an extra padding to the height of the span occupying the slave window.
+\fIPixels\fR can be any value accepted by \fBTk_GetPixels\fR.
+The default is \fB0\fR.
+.TP
+\fB\-reqheight \fIheight\fR
+Specifies limits for the requested height of the slave window. These limits 
+also constrain the amount of internal padding given to the slave. 
+\fIHeight\fR is a list of bounding values.  See the section 
+.SB BOUNDING LIST FORMAT
+for a description of this list.
+By default there are no constraints.
+.TP
+\fB\-reqwidth \fIwidth\fR
+Specifies the limits of the width which a slave may request. These limits 
+also affect the amount of internal padding given to the slave.
+\fIWidth\fR is a list of bounding values.  See the section 
+.SB BOUNDING LIST FORMAT
+for a description of this list.
+By default there are no constraints.
+.TP
+\fB\-rowspan \fInumber\fR
+Specifies the number of rows spanned by the slave window. The default span
+is \fB1\fR.
+.RE
+.TP
+\fBblt_table forget \fIslave\fR 
+Requests that \fIslave\fR no longer have its geometry managed.
+\fISlave\fR is the pathname of the window currently 
+managed by some table. The window will be unmapped so that it no longer 
+appears on the screen.  If \fIslave\fR is not currently managed by any table, 
+an error message is returned, otherwise the empty string.
+.TP
+\fBblt_table info \fIslave\fR 
+Returns a list of the current non-default configuration options of for 
+\fIslave\fR.  \fISlave\fR is the pathname of the window currently managed 
+by some table.  The list is exactly in the form that might be specified to
+\fBblt_table configure\fR command.
+If \fIslave\fR is not currently managed by any table, an error
+message is returned.
+.TP
+\fBblt_table masters \fR?\fIpattern\fR?
+Returns a list of pathnames for all master windows matching \fIpattern\fR.  
+If the \fIpattern\fR argument is not present, then the names of all the master 
+windows are returned.
+.TP
+\fBblt_table row \fImaster\fB configure\fI row\fR ?\fIoptions...\fR?
+Queries or modifies the configuration options of the row specified 
+by \fIrow\fR. \fIRow\fR may be in one of two forms; \fBall\fR 
+(indicating all rows) or a list of the row indices to be configured.  
+\fIOption\fR may have any of the values accepted by the following:
+.RS
+.TP
+\fB\-height \fIheight\fR
+Specifies the limits of the height which the row may expand or shrink to. 
+\fIHeight\fR is a list of bounding values.  See the section 
+.SB BOUNDING LIST FORMAT
+for a description of this list.
+By default there are no constraints.
+.TP
+\fB\-pady \fIpixels\fR
+Specifies an extra padding to the normal height of the row.
+\fIPixels\fR can be any value accepted by \fBTk_GetPixels\fR.
+The default padding is \fB0\fR.
+.TP
+\fB\-resize \fImode\fR
+Indicates that the row can expand or shrink from its normal height 
+when the table is resized.
+\fIMode\fR must be one of the following:
+\fBnone\fR, \fBexpand\fR, \fBshrink\fR, or \fBboth\fR.  If \fImode\fR is 
+\fBexpand\fR the height of the row is expanded if there is extra space
+in the master window. If \fIstyle\fR is \fBshrink\fR its height may be
+reduced beyond its normal height if there is not enough space in the master.
+The default is \fBnone\fR.
+.RE
+.TP
+\fBblt_table row \fImaster\fB dimension\fR
+Returns the number of rows in the table.
+.TP
+\fBblt_table row \fImaster\fB info\fI row\fR ?\fIoptions...\fR?
+Returns a list of the configuration options for the rows specified.
+\fIRowIndex\fR may be in one of two forms; \fBall\fR 
+(indicating all rows) or a list of row indices.
+The row indices may themselves be numeric expressions.
+.TP
+\fBblt_table row \fImaster\fB sizes\fI rowIndex\fR
+Returns the sizes of the given rows in the table.
+\fIRowIndex\fR may be in one of two forms; \fBall\fR 
+(indicating all rows) or a list of the row indices.
+.TP
+\fBblt_table slaves \fImaster\fR ?\fIpattern\fR?
+Returns a list of pathnames for all slave windows managed by 
+\fImaster\fR matching \fIpattern\fR.  If the \fIpattern\fR argument is not
+present, then the names of all the slave windows are returned.
+\fIMaster\fR is the pathname of a master window.
+If \fImaster\fR is not the master window of any table, an error message 
+is returned.
+.SH BOUNDING LIST FORMAT
+Constraints for various options 
+(\fB-reqheight\fR, \fB-reqwidth\fR, \fB-height\fR, and \fB-width\fR) are 
+specified by supplying a bounding list of values.
+Each value must be in a form accepted by \fBTk_GetPixels\fR.
+The interpretation of this list is based upon the number of values it
+contains:
+.RS
+.IP "{\fI\fR}"
+Empty list. No bounding is performed.
+.IP "{\fI x \fR}"
+Set the size of the window or partition at \fIx\fR. The size of the partition 
+or window cannot grow or shrink.
+.IP "{\fI min max \fR}"
+Bound the size of the window or partition between \fImin\fR
+and \fImax\fR.
+.IP "{\fI min max nom\fR}"
+Bound the size of the window or partition between \fImin\fR
+and \fImax\fR.  In addition, set the normal size to \fInom\fR.
+.RE
+The maximum bound \fImax\fR can also be specified as \fCInf\fR
+to indicate a unlimited maximum bound.  This can be useful when you 
+wish only to set the minimum or nominal size of a window or partition.
+.SH EXAMPLE
+The following example arranges a canvas, two scrollbars, and a title
+in a frame.
+.DS
+\f(CWblt_table .frame \\
+	.title 0,0 -columnspan 2 -anchor center \\
+	.canvas 1,0 -fill both \\
+	.vscroll 1,1 -fill y \\
+	.hscroll 2,0 -fill x
+blt_table column .frame configure 1 -resize none
+blt_table row .frame configure 2 -resize none\fR
+.DE
+.sp 1
+The rows and columns containing the scrollbars are frozen at their normal
+size, so that even if the frame is resized, the scrollbars will remain
+the same width.
+.SH BUGS
+.VS
+There is no warning or error if a window is already a slave or master, 
+managed by another geometry manager (there currently is no way to properly 
+detect this).  Typically, the window will be repositioned by both geometry 
+managers, ad infinitum.  The only recourse is to avoid doing this.
+.VE
+.SH KEYWORDS
+frame, geometry manager, location, table, size

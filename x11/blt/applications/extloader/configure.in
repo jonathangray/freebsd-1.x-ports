@@ -1,0 +1,391 @@
+AC_INIT(ext.c)
+
+# -----------------------------------------------------------------------
+#
+# 	C compiler and debugging flags
+#
+# -----------------------------------------------------------------------
+AC_WITH(gcc, CC=gcc)
+AC_WITH(acc, CC=acc)
+AC_WITH(lcc, CC=lcc)
+AC_WITH(cc, CC=cc)
+if test -z "$CC" ; then 
+    CC=cc
+fi
+AC_SUBST(CC)
+
+AC_CONFIG_HEADER(extConfig.h)
+AC_STDC_HEADERS
+AC_HAVE_HEADERS(stdlib.h string.h errno.h)
+AC_HAVE_HEADERS(dl.h dlfcn.h)
+
+CDEBUGFLAGS="-O"
+AC_WITH(debug, CDEBUGFLAGS=-g)
+if test "$CC" = "gcc" ; then
+  CDEBUGFLAGS="$CDEBUGFLAGS -fwritable-strings"
+fi
+AC_SUBST(CDEBUGFLAGS)
+
+# -----------------------------------------------------------------------
+#
+# 	Set prefix variable if one wasn't provided
+#
+# -----------------------------------------------------------------------
+if test -z "$prefix" ; then
+    prefix=/usr/local/blt
+fi
+AC_SUBST(prefix)
+
+# -----------------------------------------------------------------------
+#
+# 	Set PWD variable if vendor's /bin/sh doesn't
+#
+# -----------------------------------------------------------------------
+if test -z "$PWD" ; then
+    PWD=`pwd`
+fi
+
+TOP1=$PWD/../../..
+TOP2=$PWD/../../../..
+
+# -----------------------------------------------------------------------
+#
+# 	Check for existence of ranlib and install programs
+#
+# -----------------------------------------------------------------------
+AC_PROG_INSTALL
+AC_PROG_CPP
+    
+# -----------------------------------------------------------------------
+# 	Run xmkmf to check for location of X libraries and includes.
+#	Fill in some default values if we still can't find anything.
+# -----------------------------------------------------------------------
+AC_FIND_X
+
+XINCDIR="$x_includes"
+if test -z "$XINCDIR" ; then
+    AC_TEST_CPP([#include <X11/Intrinsic.h>], [ XINCDIR="default" ], [
+    places="/usr/X11/include \
+	/usr/X386/include \
+	/usr/X11R5/include \
+	/usr/local/X11R5/include \
+	/usr/include/X11R5 \
+	/usr/openwin/include \
+	/usr/local/X11R4/include \
+	/usr/include/X11R4 \
+	/usr/local/include \
+	/usr/unsupported/include \
+	/usr/include"
+    for dir in $places; do
+	if test -r $dir/X11/Intrinsic.h; then
+	    XINCDIR=$dir
+	    break
+	fi
+    done
+    if test -z "$XINCDIR" ; then
+        echo "Warning:  couldn't find any X11 include files."
+        XINCDIR="default"
+    fi ])
+fi
+if test "$XINCDIR" = "/usr/include" ; then
+    XINCDIR="default"
+fi
+
+XLIBDIR="$x_libraries"
+if test -z "$XLIBDIR" ; then
+    AC_HAVE_LIBRARY(X11, [ XLIBDIR="default" ], [
+    places="/usr/X11/lib \
+    	/usr/X386/lib \
+    	/usr/X11R5/lib \
+    	/usr/local/X11R5/lib \
+    	/usr/lib/X11R5 \
+    	/usr/openwin/lib \
+    	/usr/local/X11R4/lib \
+    	/usr/lib/X11R4 \ 
+    	/usr/local/lib \
+    	/usr/unsupported/lib \
+    	/usr/lib \
+    	/lib"
+    for dir in $places; do
+        if test -r $dir/libX11.a; then
+    	    XLIBDIR=$dir
+    	    break
+        fi
+    done
+    if test -z "$XLIBDIR" ; then
+	echo "Warning:  couldn't find the X11 library archive. "
+	XLIBDIR="default"
+    fi ])
+fi
+if test "$XLIBDIR" = "/usr/lib" ; then
+    XLIBDIR="default"
+fi
+
+XINCSW=""
+if test "$XINCDIR" != "default" ; then
+    XINCSW="-I$XINCDIR"
+fi
+AC_SUBST(XINCSW)
+XLIBSW=""
+if test "$XLIBDIR" != "default" ; then
+    XLIBSW="-L$XLIBDIR"
+fi
+AC_SUBST(XLIBSW)
+AC_SUBST(XLIBDIR)
+
+# -----------------------------------------------------------------------
+#
+# 	Make some guesses where the Tcl/Tk include files and 
+#	libraries are.  I'm not crazy about doing it this way.  
+#	It might be better to specify some command-line options
+#	when invoking configure.
+#
+# 	Look first in the Tcl/Tk distributions and then move on 
+#	to the standard include file/library locations.  If it's 
+#	still not found then query for it.
+#
+# -----------------------------------------------------------------------
+
+# -----------------------------------------------------------------------
+#	tcl.h
+# -----------------------------------------------------------------------
+echo "checking for tcl.h"
+TCLINCDIR=""
+places="$TOP1/tcl7.3 \
+    $TOP1/tcl7.2 \
+    $TOP1/tcl7.1 \
+    $TOP1/tcl7.0 \
+    $TOP1/tcl7.0b3 \
+    $TOP2/tcl7.3 \
+    $TOP2/tcl7.2 \
+    $TOP2/tcl7.1 \
+    $TOP2/tcl7.0 \
+    $TOP2/tcl7.0b3 \
+    $prefix/include \
+    $XINCDIR/tk \
+    $XINCDIR \
+    /usr/local/include \
+    /opt/cellar/tcl/tcl7.3/include \
+    /usr/include"
+for dir in $places; do
+    if test -r $dir/tcl.h ; then
+        TCLINCDIR=$dir
+        break
+    fi
+done
+while test -z "$TCLINCDIR" ; do
+    echo "What directory contains tcl.h (absolute path) ?"
+    read TCLINCDIR
+done
+if test "$TCLINCDIR" = "/usr/include" ; then
+    TCLINCDIR= "default"
+fi
+
+TCLINCSW=""
+if test "$TCLINCDIR" != "default" ; then
+    TCLINCSW="-I$TCLINCDIR"
+fi
+AC_SUBST(TCLINCSW)
+
+# -----------------------------------------------------------------------
+#	libtcl.a
+# -----------------------------------------------------------------------
+echo "checking for libtcl.a"
+TCLLIBDIR=""
+places="$TOP1/tcl7.3 \
+    $TOP1/tcl7.2 \
+    $TOP1/tcl7.1 \
+    $TOP1/tcl7.0 \
+    $TOP1/tcl7.0b3 \
+    $TOP2/tcl7.3 \
+    $TOP2/tcl7.2 \
+    $TOP2/tcl7.1 \
+    $TOP2/tcl7.0 \
+    $TOP2/tcl7.0b3 \
+    $prefix/lib \
+    /opt/cellar/tcl/tcl7.3/lib \
+    $XLIBDIR \
+    /usr/local/lib \
+    /usr/lib"
+for dir in $places; do
+    if test -r $dir/libtcl.a ; then
+    	TCLLIBDIR=$dir
+    	break
+    fi
+done
+while test -z "$TCLLIBDIR" ; do
+    echo "What directory contains libtcl.a ?"
+    read TCLLIBDIR
+done
+if test "$TCLLIBDIR" = "/usr/lib" ; then
+    TCLLIBDIR= "default"
+fi
+
+TCLLIBSW=""
+if test "$TCLLIBDIR" != "default" ; then
+    TCLLIBSW="-L$TCLLIBDIR"
+fi
+AC_SUBST(TCLLIBSW)
+AC_SUBST(TCLLIBDIR)
+
+# -----------------------------------------------------------------------
+# 	tk.h
+# -----------------------------------------------------------------------
+echo "checking for tk.h"
+TKINCDIR=""
+places="$TOP1/tk3.6 \
+    $TOP1/tk3.5 \
+    $TOP1/tk3.4 \
+    $TOP1/tk3.3 \
+    $TOP1/tk3.3b3 \
+    $TOP2/tk3.6 \
+    $TOP2/tk3.5 \
+    $TOP2/tk3.4 \
+    $TOP2/tk3.3 \
+    $TOP2/tk3.3b3 \
+    $XINCDIR/tk \
+    $XINCDIR \
+    $prefix/include \
+    /opt/cellar/tk/tk3.6/include \
+    /usr/local/include \
+    /usr/include"
+for dir in $places; do
+    if test -r $dir/tk.h ; then
+        TKINCDIR=$dir
+        break
+    fi
+done
+while test -z "$TKINCDIR" ; do
+    echo "What directory contains tk.h (absolute path) ?"
+    read TKINCDIR
+done
+if test "$TKINCDIR" = "/usr/include" ; then
+    TKINCDIR="default"
+fi
+
+TKINCSW=""
+if test "$TKINCDIR" != "default" ; then
+    TKINCSW="-I$TKINCDIR"
+fi
+AC_SUBST(TKINCSW)
+
+# -----------------------------------------------------------------------
+# 	libtk.a
+# -----------------------------------------------------------------------
+echo "checking for libtk.a"
+TKLIBDIR=""
+places="$TOP1/tk3.6 \
+    $TOP1/tk3.5 \
+    $TOP1/tk3.4 \
+    $TOP1/tk3.3 \
+    $TOP1/tk3.3b3 \
+    $TOP2/tk3.6 \
+    $TOP2/tk3.5 \
+    $TOP2/tk3.4 \
+    $TOP2/tk3.3 \
+    $TOP2/tk3.3b3 \
+    $prefix/lib \
+    /opt/cellar/tk/tk3.6/lib \
+    $XLIBDIR \
+    /usr/local/lib \
+    /usr/lib"
+for dir in $places; do
+    if test -r $dir/libtk.a ; then
+    	TKLIBDIR=$dir
+    	break
+    fi
+done
+while test -z "$TKLIBDIR" ; do
+    echo "What directory contains libtk.a ?"
+    read TKLIBDIR
+done
+if test "$TKLIBDIR" = "/usr/lib" ; then
+    TKLIBDIR="default"
+fi
+
+TKLIBSW=""
+if test "$TKLIBDIR" != "default" ; then
+    TKLIBSW="-L$TKLIBDIR"
+fi
+AC_SUBST(TKLIBSW)
+AC_SUBST(TKLIBDIR) 
+
+
+#--------------------------------------------------------------------
+#	Check for the existence of various libraries.  The order here
+#	is important, so that then end up in the right order in the
+#	command line generated by Make.
+#--------------------------------------------------------------------
+AC_HAVE_LIBRARY(Xbsd, [LIBS="$LIBS -lXbsd"])
+AC_HAVE_LIBRARY(socket, [LIBS="$LIBS -lsocket"])
+AC_HAVE_LIBRARY(nsl, [LIBS="$LIBS -lnsl"])
+AC_HAVE_LIBRARY(-lm, [LIBS="$LIBS -lm"])
+
+#--------------------------------------------------------------------
+#       Set flags to generate shared libraries for systems that we 
+#       know about.
+#--------------------------------------------------------------------
+echo "checking how to use shared libraries"
+SHLIB_CCFLAGS=""
+SHLIB_LDFLAGS=""
+SHLIB_LOADER=""
+SHLIB_SUFFIX=""
+AC_PROGRAM_CHECK(uname_found, uname, 1, 0)
+if test $uname_found -eq 1 ; then
+    system=`uname -s`-`uname -r`
+    case $system in 
+      SunOS-4*) 
+        LIBS="$LIBS -ldl"
+        ;;
+      HP-UX-*.09.*)
+        LIBS="$LIBS -lshl"
+        ;;
+      SunOS-5*)
+        SHLIB_LDFLAGS='-R $(XLIBDIR):$(TKLIBDIR):$(TCLLIBDIR)'
+        LIBS="$LIBS -ldl"
+        ;;
+      OSF-1.*)
+        LIBS="$LIBS -ldl"
+	;;
+      ISIX-5*)
+        LIBS="$LIBS -ldl"
+        ;;
+      *)
+	echo "Don't know how to use shared libraries for $system"
+	;;
+    esac
+fi
+
+AC_SUBST(SHLIB_CCFLAGS)
+AC_SUBST(SHLIB_LDFLAGS)
+AC_SUBST(SHLIB_LOADER)
+AC_SUBST(SHLIB_SUFFIX)
+AC_SUBST(LIBS)
+
+#--------------------------------------------------------------------
+#	Propagate prefix argument as installation directory.
+#--------------------------------------------------------------------
+DESTDIR="$prefix"
+BINDIR="$DESTDIR/bin"
+MANDIR="$DESTDIR/man"
+
+AC_SUBST(DESTDIR)
+AC_SUBST(BINDIR)
+AC_SUBST(MANDIR)
+
+AC_OUTPUT(Makefile)
+
+#--------------------------------------------------------------------
+#       Print out some of the more important settings
+#--------------------------------------------------------------------
+echo "
+Configuration results (edit config.status to change):
+
+directory containing \"tcl.h\"      => $TCLINCDIR
+directory containing \"tk.h\"       => $TKINCDIR
+directory containing \"X11/Xlib.h\" => $XINCDIR
+directory containing \"libtcl.a\"   => $TCLLIBDIR
+directory containing \"libtk.a\"    => $TKLIBDIR
+directory containing \"libX11.a\"   => $XLIBDIR
+directory to install \"wish\"       => $BINDIR
+"

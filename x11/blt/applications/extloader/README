@@ -1,0 +1,123 @@
+This is version 1.0 of the "extension" command.  It creates a 
+vanilla version of "wish" with one added command to load shared
+libraries as extensions.  This command reflects the proposal
+made last year for an extension loader.  It is not the last word
+on extension loading.  I any welcome comments or suggestions to
+improve this or any other loader.
+
+The command requires no patching of the Tcl or Tk libraries.
+It works with the following releases of Tcl.
+
+	Tcl 7.3
+	Tcl 7.2
+	Tcl 7.1
+	Tcl 7.0
+
+The "extension" command has been tested on HP-UX, SunOS 4.x, and
+SunOS 5.x.  It should work also on ISIX 5.x, OSF1.
+
+---------
+
+How to build and test:
+
+0. Run ./configure
+
+   Run the auto-configuration script "./configure"
+
+	./configure 
+
+   * If you want to use gcc, it's "./configure -with-gcc"
+
+	./configure -with-gcc
+
+   * By default, the "wish" program and manual pages will be installed 
+     in "/usr/local/blt".  You can change this by giving the -prefix 
+     option to ./configure.
+
+	./configure -prefix=/depot/stuff/blt
+    
+  You may be queried for the location of the Tcl and Tk libraries, if
+  "configure" can't find them in the standard locations.
+
+  The configure script creates an include file "./extConfig.h".
+  It will also generate a new Makefile from its template (Makefile.in).
+  If "configure" can't find something (e.g. it can't find the X libraries),
+  edit the file "config.status" and run it.
+
+	./config.status
+
+  Otherwise, you'll have to edit the Makefiles files by hand.
+
+
+1. Compile 
+
+	make 
+
+2. Edit the "extensions.tcl" file.
+
+   The first time the "extension" command is used it tries to source 
+   the file "[tcl library]/extensions.tcl".  This file can be used to 
+   specify the extensions available and their respective libraries.
+   You can always use the low-level commands to load a library too.
+
+   This file sets two global variables which the "extension" command 
+   uses to find shared libraries.
+
+   The first is an associative array "tcl_extensions".  This array
+   maps an extension name (such as "blt") with the proper initialization
+   routine and shared libraries.
+
+           set tcl_extensions(blt) { Blt_Init libBLT.so.1.7 }
+
+   The second variable is "tcl_extloadpath".  This variable is a list
+   of directories to search for the library.  
+
+	   set tcl_extloadpath { 
+	        /usr/local/tcl/extensions/lib 
+		/usr/local/lib 
+           }
+
+   Edit the file "./extensions.tcl" to reflect where things are on
+   your system and install it in the Tcl library directory.
+
+   By default, the "extension" command looks for the file 
+   "[tcl library]/extensions.tcl".  But you can override this by 
+   setting the environment variable TCL_EXTMAP.  
+
+	   set env(TCL_EXTMAP) /u/mydir/my_extensions.tcl
+
+
+3. Test by running the demos. 
+
+   
+   Go into the demos/blt directory
+    
+	cd demos/blt
+
+   and run the test scripts.
+	
+	./graph
+
+   If your system doesn't support "#!" in shell scripts, then it's
+
+	../../wish -f ./graph
+
+   * These demos assume you have previously built a BLT as shared 
+     library and that it still resides in the directory 
+     ../../src/shared.
+   
+4. Install the new "wish" binary and "extensions.tcl" file.
+
+   By default, the "wish" is installed in /usr/local/blt/bin and
+   the manual page for the extension command is installed in
+   /usr/local/blt/man
+   
+   You can change the top directory by supplying the -prefix option to
+   ./configure.
+
+
+5. Send bugs reports, correspondence, etc. to
+
+   	george.howlett@att.com
+
+

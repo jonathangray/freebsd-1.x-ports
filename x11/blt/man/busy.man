@@ -1,0 +1,167 @@
+'\"
+'\" Copyright 1993-1994 by AT&T Bell Laboratories.
+'\"
+'\" Permission to use, copy, modify, and distribute this software
+'\" and its documentation for any purpose and without fee is hereby
+'\" granted, provided that the above copyright notice appear in all
+'\" copies and that both that the copyright notice and warranty
+'\" disclaimer appear in supporting documentation, and that the
+'\" names of AT&T Bell Laboratories any of their entities not be used
+'\" in advertising or publicity pertaining to distribution of the
+'\" software without specific, written prior permission.
+'\"
+'\" AT&T disclaims all warranties with regard to this software, including
+'\" all implied warranties of merchantability and fitness.  In no event
+'\" shall AT&T be liable for any special, indirect or consequential
+'\" damages or any damages whatsoever resulting from loss of use, data
+'\" or profits, whether in an action of contract, negligence or other
+'\" tortuous action, arising out of or in connection with the use or
+'\" performance of this software.
+'\"
+'\" Busy command created by George Howlett.
+'\"
+.so man.macros
+.HS blt_busy cmds
+.BS
+'\" Note:  do not modify the .SH NAME line immediately below!
+.SH NAME
+blt_busy \- Block pointer and keyboard events from a window sub-tree
+.SH SYNOPSIS
+\fBblt_busy hold \fIwindow options\fR ?\fIwindow options \fR...?
+.sp
+\fBblt_busy release \fIwindow\fR ?\fIwindow ...\fR?
+.sp
+\fBblt_busy configure \fIwindow\fR ?\fIoptions...\fR?
+.sp
+\fBblt_busy forget \fIwindow\fR ?\fIwindow ...\fR?
+.sp
+\fBblt_busy hosts \fIpattern\fR
+.sp
+\fBblt_busy status \fIwindow\fR 
+.BE
+.SH DESCRIPTION
+.PP
+This command implements a mechanism to prevent keyboard, button, 
+and pointer events from reaching a window and its descendants.
+Events occurring in this window and its descendants in Tk's window 
+hierarchy  are effectively ignored.
+.PP
+This is particularly useful for temporarily deactivating an hierarchy 
+of widgets (e.g. buttons and entries) while other processing is occurring.
+.PP
+Once a window is made busy using the \fBblt_busy hold\fR command, the window and 
+its descendants are blocked from receiving events.  Please note that only the 
+descendants which exist at the time the \fBhold\fR command was invoked
+are affected.  If a new child window is created following the command, 
+its events are \fInot\fR blocked.  
+.PP
+The blocking feature is implemented by creating and mapping an 
+\f(CWInputOnly\fR class sub-window, obscuring some or all of the parent 
+window.  When the sub-window is mapped, it shields its parent and 
+sibling windows from events (it is always mapped to be the 
+uppermost sibling).  The size and position of the busy window are determined
+by a host window.  Typically the host and parent windows are the same.  
+But in cases where a window is not packed into its parent, the \fB-in\fR option
+may be used to specify a different parent.
+.PP
+The \fBblt_busy\fR command can take any of the following forms:
+.TP
+\fBblt_busy hold \fIwindow\fR ?\fIoption\fR? ?\fIvalue option value ...\fR?
+Creates and activates a busy window associated with \fIwindow\fR.
+\fIWindow\fR must be a valid path name of a Tk window.  It represents
+the host window which determines the position and size of the busy window.
+All device events for the host window and it descendants 
+will be effectively blocked.
+Typically \fBupdate\fR should be called immediately afterward to insure 
+that the busy cursor is updated \fIbefore\fR the application starts its work.
+This command returns the empty string.  The following configuration 
+options are valid:
+.RS
+.TP
+\fB\-cursor \fIcursorName\fR
+Specifies the cursor to be displayed when the busy window is activated.
+\fICursorName\fR can be in any form accepted by \fBTk_GetCursor\fR.
+The default cursor is \fBwatch\fR.
+.TP
+\fB\-in \fIparent\fR
+Specifies the parent window of the busy window. This is needed when
+the parent and host windows are not the same.  \fIParent\fR 
+specifies the path name of a mutual ancestor of both the host window and 
+the window hierarchy. 
+.RE
+.TP
+\fBblt_busy configure \fIwindow\fR ?\fIoption\fR? ?\fIvalue option value
+...\fR?  
+Queries or modifies the configuration options of the busy
+window.  \fIWindow\fR must be the path name of a host window 
+(associated by the \fBhold\fR command).  If no
+\fIoption\fR is specified, a list describing all of the available
+options for \fIwindow\fR (see \fBTk_ConfigureInfo\fR for information
+on the format of this list) is returned.  If \fIoption\fR is specified
+with no \fIvalue\fR, then the command returns a list describing the
+one named option (this list will be identical to the corresponding
+sublist of the value returned if no \fIoption\fR is specified).  If
+one or more \fIoption\-value\fR pairs are specified, then the command
+modifies the given widget option(s) to have the given value(s); in
+this case the command returns the empty string.  \fIOption\fR may have
+any of the values accepted by the \fBhold\fR command.
+Please note that the option database is referenced through \fIwindow\fR.
+For example, if a busy window exists for the window \f(CW.myframe\fR,
+the busy window cursor can be specified for it by either \fBoption\fR 
+command:
+.DS
+	\fBoption add \f(CW*myframe.busyCursor gumby\fR
+	\fBoption add \f(CW*Frame.BusyCursor gumby\fR
+.DE
+.TP
+\fBblt_busy release \fIwindow\fR ?\fIwindow ...\fR?
+Permits events to be received by \fIwindow\fR again. This differs from
+the \fBforget\fR command in that the busy window is retained, but is not 
+active.  An error is reported if \fIwindow\fR is not a host window. 
+This command returns the empty string.
+.TP
+\fBblt_busy forget \fIwindow\fR ?\fIwindow ...\fR?
+Permits events to be received again by \fIwindow\fR by destroying the
+busy window.  An error is reported \fIwindow\fR is not a host window.
+This command returns the empty string.
+.TP
+\fBblt_busy hosts \fI?pattern?\fR
+Returns the pathnames of all host windows which have a busy window 
+associated with them.  If a \fIpattern\fR argument is present, the
+pathnames of hosts matching \fIpattern\fR are returned.
+.TP
+\fBblt_busy status \fIwindow\fR
+Returns the status of the busy window associated with \fIwindow\fR.
+An error is reported if \fIwindow\fR is not a host window.  
+If \fIwindow\fR is currently prevented from receiving
+events, \fB1\fR is returned, otherwise \fB0\fR.
+.sp 1
+.SH KEYBOARD EVENTS
+Since Tk allows for keyboard events to be redirected through windows not 
+in the parent window's hierarchy, care must be taken to turn off
+focus while processing is occurring.
+.DS
+	\fBblt_busy hold \f(CW.frame\fR
+	\fBfocus none\fR
+.DE
+The above example clears the focus immediately after invoking the 
+\fBhold\fR command so that no keyboard events will be relayed to
+windows under the hierarchy of \f(CW.frame\fR.
+.SH BUGS
+.PP
+Creating a busy window will generate Enter/Leave events for 
+windows that it covers.  Please note this when tracking Enter/Leave
+events for windows.
+.PP
+There's no way to exempt particular windows in an hierarchy so that they
+may still receive events.  The busy window is always mapped above its 
+siblings. The work around is to create busy windows for
+each child in the hierarchy (except for the windows where events
+are desired) instead of the parent window.
+.PP
+When busy windows are created, they are automatically mapped; thus
+blocking events from the parent and its descendants.  There is no
+two-step process which allows one to create a busy window, and
+later when convenient, to activate it so that it blocks events.
+.SH KEYWORDS
+busy, keyboard events, pointer events, window, cursor

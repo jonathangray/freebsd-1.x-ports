@@ -1,0 +1,90 @@
+#!../blt_wish -f
+
+if [file exists ../library] {
+    set blt_library ../library
+}
+option add *Calendar.Frame.borderWidth 2
+option add *Calendar.Frame.relief raised
+option add *Calendar.Label.font *-Helvetica-Bold-R-*-14-*
+option add *Calendar*background steelblue
+option add *Calendar*foreground white
+
+set monthInfo(Jan) { January 31 }
+set monthInfo(Feb) { February 28 } 
+set monthInfo(Mar) { March 31 } 
+set monthInfo(Apr) { April 30 } 
+set monthInfo(May) { May 31 } 
+set monthInfo(Jun) { June 30 } 
+set monthInfo(Jul) { July 31 }
+set monthInfo(Aug) { August 31 }
+set monthInfo(Sep) { September 30 }
+set monthInfo(Oct) { October 31 }
+set monthInfo(Nov) { November 30 }
+set monthInfo(Dec) { December 31 }
+
+set abbrDays { Sun Mon Tue Wed Thu Fri Sat }
+
+proc Calendar { weekday day month year } {
+    global monthInfo abbrDays 
+    
+    set wkdayOffset [lsearch $abbrDays $weekday]
+    if { $wkdayOffset < 0 } {
+	error "Invalid week day \"$weekday\""
+    }
+    set dayOffset [expr ($day-1)%7]
+    if { $wkdayOffset < $dayOffset } {
+	set wkdayOffset [expr $wkdayOffset+7]
+    }
+    set wkday [expr $wkdayOffset-$dayOffset]
+    if { [info commands .calendar] == ".calendar" } {
+	destroy .calendar 
+    }
+    frame .calendar -class Calendar
+    if ![info exists monthInfo($month)] {
+	error "Invalid month \"$month\""
+    }
+    set info $monthInfo($month)
+    label .calendar.month \
+	-text "[lindex $info 0] $year"  \
+	-font *-New*Century*Schoolbook-Bold-R-*-18-* 
+    blt_table .calendar .calendar.month 1,1 -cspan 7 
+
+    set cnt 1
+    frame .calendar.weekframe -relief sunken -bd 2
+    blt_table .calendar .calendar.weekframe 2,0 -columnspan 8 -fill both  
+    foreach dayName $abbrDays {
+	set name [string tolower $dayName]
+	label .calendar.$name \
+	    -text $dayName \
+	    -font *-New*Century*Schoolbook-Bold-R-*-14-* 
+	blt_table .calendar .calendar.$name 2,$cnt -pady 2 -padx 2
+	incr cnt
+    }
+    blt_table column .calendar configure all -padx 4 
+    blt_table column .calendar configure 0 -width 0 
+    blt_table row .calendar configure 2 -pady 4 
+    set week 0
+    set numDays [lindex $info 1]
+    for { set cnt 1 } { $cnt <= $numDays } { incr cnt } {
+	label .calendar.day${cnt} -text $cnt
+	if { $cnt == $day } {
+	    .calendar.day${cnt} configure -relief raised 
+	}
+	if { $wkday == 7 } {
+	    incr week
+	    set wkday 0
+	}
+	incr wkday
+	blt_table .calendar .calendar.day${cnt} $week+3,$wkday -fill both
+    }
+    button .calendar.quit -command { destroy . } -text {Quit}
+    blt_table .calendar \
+	.calendar.quit $week+4,6 -cspan 2 -ipadx 10 -pady 4 -ipady 2 -anchor e 
+    pack append . .calendar {fill expand frame center}
+}
+
+set date [exec date]
+scan $date {%s %s %d %*s %*s %s} weekday month day year
+
+Calendar $weekday $day $month $year
+wm minsize . 0 0

@@ -1,0 +1,344 @@
+'\"
+'\" Copyright 1991-1994 by AT&T Bell Laboratories.
+'\"
+'\" Permission to use, copy, modify, and distribute this software
+'\" and its documentation for any purpose and without fee is hereby
+'\" granted, provided that the above copyright notice appear in all
+'\" copies and that both that the copyright notice and warranty
+'\" disclaimer appear in supporting documentation, and that the
+'\" names of AT&T Bell Laboratories any of their entities not be used
+'\" in advertising or publicity pertaining to distribution of the
+'\" software without specific, written prior permission.
+'\"
+'\" AT&T disclaims all warranties with regard to this software, including
+'\" all implied warranties of merchantability and fitness.  In no event
+'\" shall AT&T be liable for any special, indirect or consequential
+'\" damages or any damages whatsoever resulting from loss of use, data
+'\" or profits, whether in an action of contract, negligence or other
+'\" tortuous action, arising out of or in connection with the use or
+'\" performance of this software.
+'\"
+'\" Hypertext widget created by George Howlett.
+'\"
+.so man.macros
+.HS blt_htext cmds
+.BS
+'\" Note:  do not modify the .SH NAME line immediately below!
+.SH NAME
+blt_htext \- Create and manipulate hypertext widgets
+.SH SYNOPSIS
+\fBblt_htext\fP \fIpathName \fR[\fIoptions\fR]
+.SH "STANDARD OPTIONS"
+.LP
+.nf
+.ta 4c 8c 12c
+\fBbackground\fR	\fBcursor\fR	\fBfont\fR	\fBforeground\fR
+\fBtext\fR	\fBxScrollCommand\fR	\fByScrollCommand\fR
+.fi
+.LP
+See the ``options'' manual entry for details on the standard options.
+.ta 4c
+.SH "WIDGET-SPECIFIC OPTIONS"
+.LP
+.nf
+Name:	\fBfileName\fR
+Class:	\fBFileName\fR
+Command-Line Switch:	\fB\-filename\fR
+.fi
+.IP
+Specifies a \fBblt_htext\fP file to be displayed in the window. 
+If the value is the empty string, the \fB-text\fR option is used instead.
+See the section 
+.SB FILE FORMAT
+for a description of the \fBblt_htext\fP 
+file format.
+.LP
+.nf
+Name:	\fBheight\fR
+Class:	\fBHeight\fR
+Command-Line Switch:	\fB\-height\fR
+.fi
+.IP
+Specifies the desired height of the viewport window. The value must be in 
+a form accepted by \fBTk_GetPixels\fR. If the value is less than one, the window will
+grow to accommodate the entire length of text.
+.LP
+.nf
+Name:	\fBspecialChar\fR
+Class:	\fBSpecialChar\fR
+Command-Line Switch:	\fB\-specialchar\fR
+.fi
+.IP
+Specifies the ASCII value of the special double character delimiters.
+In \fBblt_htext\fP files, the text between these special characters is 
+evaluated as a block of Tcl commands. The default special character 
+is the \fIpercent sign\fR.
+.LP
+.nf
+Name:	\fBlineSpacing\fR
+Class:	\fBLineSpacing\fR
+Command-Line Switch:	\fB\-linespacing\fR
+.fi
+.IP
+Specifies the spacing between each line of text.  The value must
+be in a form accepted by \fBTk_GetPixels\fR. The default value is 1 pixel.
+.LP
+.nf
+Name:	\fBwidth\fR
+Class:	\fBWidth\fR
+Command-Line Switch:	\fB\-width\fR
+.fi
+.IP
+Specifies the desired width of the viewport window.  The value must be in a 
+form
+accepted by \fBTk_GetPixels\fR. If the value is less than one, the window will
+grow to accommodate the widest line of text.
+.LP
+.nf
+Name:	\fBxScrollUnits\fR
+Class:	\fBScrollUnits\fR
+Command-Line Switch:	\fB\-xscrollunits\fR
+.fi
+.IP
+Specifies the horizontal scrolling distance. The default is 10 pixels.
+.LP
+.nf
+Name:	\fByScrollUnits\fR
+Class:	\fBScrollUnits\fR
+Command-Line Switch:	\fB\-yscrollunits\fR
+.fi
+.IP
+Specifies the vertical scrolling distance. The default is 10 pixels.
+.BE
+.SH DESCRIPTION
+.PP
+The \fBblt_htext\fR command creates a new window (given by the 
+\fIpathName\fR argument) and makes it into a \fBblt_htext\fP widget.
+Additional options, described above, may be specified on the command line
+or in the option database to configure aspects of the widget such as its 
+color and font.  At the time this command is invoked, there must not 
+exist a window named \fIpathName\fR, but \fIpathName\fR's parent must exist.
+The \fBblt_htext\fR command returns its \fIpathName\fR.   
+.PP
+The \fBblt_htext\fP widget is hybrid of a non-editable text widget and
+a geometry manager (e.g. the packer).  It displays text (optionally read
+from file) in a window.  Text can be scrolled either horizontally or
+vertically using the \fBblt_htext\fR window as a viewport.
+In addition, Tcl commands can be embedded into 
+the text which are evaluated as the text is parsed.  Text between special
+double characters (percent signs "%%") is immediately passed to the Tcl 
+interpreter for evaluation.  
+.PP
+Furthermore, any widget or widget hierarchy can be packed in-line and made 
+to appear on the current line of the text.  Widgets are packed using the 
+\fBblt_htext append\fP command.  All widgets must be children of the 
+\fBblt_htext\fP window and must already exist before packing. 
+Once a widget has been packed it cannot be moved to a different
+position within the text.  Widgets can be resized but they will remain 
+at the same position within the text.
+.PP
+Before a file or text string is parsed by the \fBblt_htext\fR widget,
+all the widget's current children are destroyed.  You can reload files or text 
+without worrying about unmapping or destroying each child window beforehand.
+.PP
+Setting the either the \fB-filename\fR or \fB-text\fR configuration option 
+will adjust the value of the other.  If both options are set, the file 
+takes precedence.  When a new file is read using the \fB-filename\fR option,
+the value of the \fB-text\fR option is reset to the empty string.  Likewise, 
+when the \fB-text\fR option is set, the string representing the 
+\fB-filename\fR option is cleared.
+.SH FILE FORMAT
+The format of \fBblt_htext\fP text file is typically ASCII text.  
+Text enclosed by special double characters (by default, percent signs '%%') 
+is interpreted and executed as Tcl commands.  
+The special character  may be specified by the \fB-specialchar\fP option. 
+In the following example of a \fBblt_htext\fP file,  a button widget 
+is appended to the text between  the words "\fCa\fP" and "\fCwhich\fP".  
+The \fIpathName\fR of the \fBblt_htext\fP widget is "\fC.ht\fP".
+.DS L
+\fCThis will be displayed as normal text. 
+But this will become a %% 
+  button .ht.button -text "button" -fg red
+  .ht append .ht.button 
+%% which can invoke a Tcl command.\fR
+.DE
+.LP
+.SH "VARIABLES"
+.PP
+The following global Tcl variables are maintained when an 
+\fBblt_htext\fR file is parsed.  
+.TP
+\fBblt_htext(widget)\fR 
+is the pathname of the \fBblt_htext\fP widget.
+.TP
+\fBblt_htext(file)\fR 
+is the name of the file the \fBblt_htext\fP widget is currently parsing.  
+It is the empty string when the \fB\-text\fP option is used.
+.TP
+\fBblt_htext(line)\fR 
+is the current line number in the text.  
+.PP
+This information might be used to construct hyper links 
+between different files and/or lines.
+.LP
+.SH "WIDGET COMMAND"
+.PP
+The \fBblt_htext\fP command creates a new Tcl command whose
+name is \fIpathName\fR.  This command may be used to invoke various
+operations on the widget.  It has the following general form:
+.DS C
+\fIpathName option \fR?\fIargs\fR?
+.DE
+\fIOption\fR and \fIargs\fR determine the exact behavior of the command.
+.PP
+The following widget commands are available for \fBblt_htext\fP widgets:
+.TP
+\fIpathName \fBappend \fIchild\fR
+Packs \fIchild\fP at the current position in the text. \fIChild\fP is 
+the name of a window to be packed into the \fBblt_htext\fP window. 
+\fIChild\fR must be a child of the \fBblt_htext\fP window and 
+may be specified by either its \fIpathName\fP or \fIname\fP.
+.TP
+\fIpathName \fBconfigure\fR ?\fIoption\fR? ?\fIvalue option value ...\fR?
+Queries or modifies the configuration options of the widget.  If no
+\fIoption\fR is specified, returns a list describing all of the
+available options for \fIpathName\fR (see \fBTk_ConfigureInfo\fR for
+information on the format of this list).  If \fIoption\fR is specified
+with no \fIvalue\fR, then the command returns a list describing the
+one named option (this list will be identical to the corresponding
+sublist of the value returned if no \fIoption\fR is specified).  If
+one or more \fIoption\-value\fR pairs are specified, then the command
+modifies the given widget option(s) to have the given value(s); in
+this case the command returns the empty string.  \fIOption\fR may have
+any of the values accepted by the \fBblt_htext\fR command.
+.TP
+\fIpathName \fBgotoline \fR?\fIline\fR?
+Scrolls the text to \fIline\fP.  \fILine\fP is the line number of the
+new text position and is bounded by the range of lines in the text.
+If a \fIline\fP argument is not present, the current line number is returned.
+.TP
+\fIpathName \fBchildconfigure \fIchild\fR
+Queries or resets the positioning of \fIchild\fR or the size of the 
+cavity surrounding it. This command is similar to the \fBconfigure\fR 
+command, except that it applies to the options of the child window and its
+cavity, whereas \fBconfigure\fR applies  to the options for the widget as 
+a whole. \fIChild\fP is the name of window packed into the \fBblt_htext\fR 
+window (by the \fBblt_htext append\fR command). The child widget may be
+specified by either its \fIpathName\fP or \fIname\fP.
+The following options are available.
+.RS
+.TP
+\fB\-anchor \fIanchorPos\fR
+Specifies how the child window will be arranged if there is extra space 
+in the cavity surrounding the window. \fIAnchorpos\fR may have any of the 
+forms accepted by \fBTk_GetAnchor\fR.  For example, if \fIanchorPos\fR is 
+\fBcenter\fR then the window is centered in the cavity; 
+if \fIanchorPos\fR is \fBw\fR then the window will be drawn such it touches
+the leftmost edge of the cavity. This option defaults to \fBcenter\fR.
+.TP
+\fB\-fill \fIstyle\fR
+Indicates if the child window should be expanded to occupy any extra space 
+in the cavity surrounding it.  \fIStyle\fR must be one of the following:
+\fBnone\fR, \fBx\fR, \fBy\fR, \fBboth\fR.  If \fIstyle\fR is \fBx\fR,
+the width of the child window is expanded to fill the cavity.  
+If \fIstyle\fR is \fBy\fR, the height is expanded. The default is \fBnone\fR.
+.TP
+\fB\-height \fIvalue\fR
+Species the height of the cavity containing the child window.  
+\fIValue\fP must be in a form accepted by \fBTk_GetPixels\fR.
+If \fIvalue\fP is greater than zero, the cavity is resized to that height.  
+If the requested window height is greater than the cavity's height, the
+window will be reduced to fit the cavity.
+By default, the cavity is requested height of the child window. 
+.TP
+\fB\-ipadx \fIvalue\fR
+Specifies extra padding to the left and right sides of the child window. 
+\fIValue\fR must be in a form accepted by \fBTk_GetPixels\fR.
+.TP
+\fB\-ipady \fIvalue\fR
+Specifies extra padding to the top and bottom sides of the child window.
+\fIValue\fR must be in a form accepted by \fBTk_GetPixels\fR.
+.TP
+\fB\-justify \fIvalue\fR
+Justifies the vertical position of the cavity containing the child widget 
+in relation to the line of text. \fIValue\fR must be either \fBtop\fP, 
+\fBbottom\fR, or  \fBcenter\fR. By default, the child widget is centered 
+along the baseline of the line of text.
+.TP
+\fB\-padx \fIvalue\fR
+Specifies the padding to the left and right sides of the cavity containing
+the child window. 
+\fIValue\fR must be in a form accepted by \fBTk_GetPixels\fR.
+.TP
+\fB\-pady \fIvalue\fR
+Specifies the padding on the top and bottom sides of the cavity containing 
+the child window.
+\fIValue\fR must be in a form accepted by \fBTk_GetPixels\fR.
+.TP
+\fB\-relheight \fIvalue\fR
+Specifies the height of the cavity containing the child window relative to 
+the height of the viewport window.  \fIValue\fP is real number indicating
+the ratio of the height of the cavity to the viewport.  If \fIvalue\fR 
+is 0.0 or less, the request is ignored and the height of the 
+cavity is the requested height of the child window. 
+.TP
+\fB\-relwidth \fIvalue\fR
+Specifies the width of the cavity containing the child window relative to 
+the width of the viewport window.  \fIValue\fP is real number indicating
+the ratio of the width of the cavity to the viewport.  If \fIvalue\fR 
+is 0.0 or less, the request is ignored and the width of the cavity is 
+the requested width of the child window. 
+.TP
+\fB\-width \fIvalue\fR
+Species the width of the cavity containing the child window.  
+\fIValue\fP must be in a form accepted by \fBTk_GetPixels\fR.
+If \fIvalue\fP is greater than zero, the cavity is resized to that width.  
+If the requested window width is greater than the cavity's width, the
+window will be reduced to fit the cavity.
+By default, the cavity is requested width of the child window. 
+.RE
+.TP
+\fIpathName \fBscan\fR \fIoption args\fR
+This command is used to implement scanning on texts.  It has
+two forms, depending on \fIoption\fR:
+.RS
+.TP
+\fIpathName \fBscan mark \fIy\fR
+Records \fIy\fR and the current view in the text window;  used in
+conjunction with later \fBscan dragto\fR commands.  Typically this
+command is associated with a mouse button press in the widget.  It
+returns an empty string.
+.TP
+\fIpathName \fBscan dragto \fIy\fR
+This command computes the difference between its \fIy\fR argument
+and the \fIy\fR argument to the last \fBscan mark\fR command for
+the widget.  It then adjusts the view up or down by 10 times the
+difference in y-coordinates.  This command is typically associated
+with mouse motion events in the widget, to produce the effect of
+dragging the text at high speed through the window.  The return
+value is an empty string.
+.RE
+.TP
+\fIpathName \fBsearch \fIpattern\fR ?\fIfrom\fR? ?\fIto\fR?
+Returns the number of the next line matching \fIpattern\fR.  \fIPattern\fR is
+a string which obeys the matching rules of \fBTcl_StringMatch\fR. 
+\fIFrom\fR and \fIto\fR are text line numbers (inclusive) which 
+bound the search.  
+If no match for \fIpattern\fR can be found, \fB-1\fR is returned.
+.TP
+\fIpathName \fBxview \fR?\fIposition\fR?
+Moves the viewport horizontally to the new text x-coordinate position.  
+\fIPosition\fR is the offset from the left side of the text to the current 
+position and must be in a form accepted by \fBTk_GetPixels\fR. If \fIposition\fR
+is not present, the current text position is returned.
+.TP
+\fIpathName \fByview \fR?\fIposition\fR?
+Moves the viewport vertically to the new text y-coordinate position.  
+\fIPosition\fR is the offset from the top of the text to the current 
+position and must be in a form accepted by \fBTk_GetPixels\fR. If \fIposition\fR
+is not present, the current text position is returned.
+.SH BUGS
+Text with embedded tabs can be obscured by child windows when scrolled 
+horizontally.
+.SH KEYWORDS
+hypertext, widget

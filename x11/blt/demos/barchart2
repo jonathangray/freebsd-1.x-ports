@@ -1,0 +1,141 @@
+#!../blt_wish -f
+
+if [file exists ../library] {
+    set blt_library ../library
+}
+set graph .graph
+
+blt_bitmap define pattern1 { {4 4} {01 02 04 08} }
+blt_bitmap define pattern2 { {4 4} {08 04 02 01} }
+blt_bitmap define pattern3 { {2 2} {01 02 } }
+blt_bitmap define pattern4 { {4 4} {0f 00 00 00} }
+blt_bitmap define pattern5 { {4 4} {01 01 01 01} }
+blt_bitmap define pattern6 { {2 2} {01 00 } }
+blt_bitmap define pattern7 { {4 4} {0f 01 01 01} }
+blt_bitmap define pattern8 { {8 8} {ff 00 ff 00 ff 00 ff 00 } }
+blt_bitmap define pattern9 { {4 4} {03 03 0c 0c} }
+blt_bitmap define hobbes { {25 25} {
+   00 00 00 00 00 00 00 00 00 c0 03 00 78 e0 07 00 fc f8 07 00 cc 07 04 00
+   0c f0 0b 00 7c 1c 06 00 38 00 00 00 e0 03 10 00 e0 41 11 00 20 40 11 00
+   e0 07 10 00 e0 c1 17 00 10 e0 2f 00 20 e0 6f 00 18 e0 2f 00 20 c6 67 00
+   18 84 2b 00 20 08 64 00 70 f0 13 00 80 01 08 00 00 fe 07 00 00 00 00 00
+   00 00 00 00 }
+}
+
+option add *Blt_htext.font *Times-Bold-R*14*
+option add *Blt_barchart*TagFont *Helvetica-Bold-R*14*
+option add *Blt_barchart*xTitle "Simulator"
+option add *Blt_barchart*yTitle "Time (hrs)"
+option add *Blt_barchart*title "A Simple Barchart"
+option add *Blt_barchart*xFont *Times-Bold-R*14*
+option add *Blt_barchart.font *Helvetica-Bold-R*14*
+option add *Blt_barchart*legendMapped false
+option add *Blt_barchart*elemBackground white
+option add *Blt_barchart*elemActiveBackground white
+option add *Blt_barchart*elemRelief raised
+
+set visual [winfo screenvisual .] 
+if { $visual != "staticgray" && $visual != "grayscale" } {
+    option add *print.background yellow
+    option add *quit.background red
+}
+
+blt_htext .header -text \
+{This is an example of the blt_barchart widget.  The barchart has 
+many components; x and y axis, legend, crosshairs, elements, etc.  
+You can configure any component by pressing this %% 
+button $blt_htext(widget).config -text button \
+    -command "exec [list ../blt_wish -f ./grconf.tcl [winfo name .] $graph &]"\
+    -bg green
+$blt_htext(widget) append $blt_htext(widget).config
+%%.
+
+To create a postscript file "bar.ps", press the %%
+button $blt_htext(widget).print -text {Print} -command {
+  $graph postscript bar.ps -pagewidth 6.5i -pageheight 9i -landscape true
+} 
+$blt_htext(widget) append $blt_htext(widget).print
+%% button.}
+
+blt_barchart $graph 
+$graph xaxis configure -rotate 0
+
+blt_htext .footer -text {Hit the %%
+button $blt_htext(widget).quit -text quit -command {destroy .} 
+$blt_htext(widget) append $blt_htext(widget).quit 
+%% button when you've seen enough.%%
+label $blt_htext(widget).logo -bitmap BLT
+$blt_htext(widget) append $blt_htext(widget).logo -padx 20
+%%}
+
+set names { One Two Three Four Five Six Seven Eight }
+if { $visual == "staticgray" || $visual == "grayscale" } {
+    set fgcolors { white white white white white white white white }
+    set bgcolors { black black black black black black black black }
+} else {
+    set fgcolors { red green blue purple orange brown cyan navy }
+    set bgcolors { green blue purple orange brown cyan navy red }
+}
+set numColors [llength $names]
+
+set labels { { Read In } { Setup } { Load } { Solve } { Other } }
+set colors { green orange violet dodgerblue red }
+set stipples { 
+    pattern1 pattern2 pattern3 pattern4 pattern5 
+    pattern6 pattern7 pattern8 pattern9 hobbes
+}
+set stipples { 
+    pattern9 hobbes
+}
+
+set data { 
+    { A1 { 0.729111111 0.003120278 11.534444444 1.015750000 0.022018611 } }
+    { B1 { 0.002250000 0.004638889 3.879722222 0.462888889 0.516333333 } }
+    { A2 { 0.09108333 0.01113889 4.54444444 0.49394444 0.54772222 } }
+    { B2 { 0.006416667 0.048888889 4.460277778 0.429166667 0.177638889 } }
+    { C1 { 0.026509167 0.001814722 2.334055556 1.053694444 0.021703889 } }
+    { D1 { 0.007027778 0.291388889 1.262194444 0.466111111 0.134305556 } }
+    { C2 { 0.1628611 0.0503500 1.8009444 1.4152500 0.5189278 } }
+    { A3 { 0.06405278 0.13876389 4.12194444 2.17538889 0.07957222 } }
+    { E1 { 0.08786667 0.04513333 3.24527778 2.55294444 0.41155556 } }
+}
+
+
+set count 1
+foreach i $data {
+    set name [lindex $i 0]
+    set y-values [lindex $i 1]
+    $graph element create $name \
+	-ydata ${y-values}  \
+	-xdata $count \
+	-fg $colors \
+	-stipple $stipples \
+	-stacked true \
+	-bd 2 
+    set label {}
+    incr count
+}
+
+set count 0
+foreach i $labels {
+    set name [lindex $i 0]
+    set y-values [lindex $i 1]
+    set tag [$graph tag create text "Inf 8+$count" ] 
+    $graph tag configure $tag \
+	-text $i \
+	-bg [lindex $colors $count ] \
+	-fg black \
+	-xoffset -10 \
+	-anchor e
+    incr count
+}
+
+pack append . \
+	.header { padx 20 pady 10 }  \
+	.graph {} \
+	.footer { padx 20 pady 10 }
+	
+wm min . 0 0
+
+source features.tcl
+SetClosestPoint .graph

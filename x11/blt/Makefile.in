@@ -1,0 +1,113 @@
+# ------------------------------------------------------------------------
+#       Makefile for demonstation shell of BLT library
+# ------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------
+#       C Compiler options 
+# ------------------------------------------------------------------------
+
+DEFINES      = @LOSSAGE@
+CFLAGS       = @CDEBUGFLAGS@
+CC 	     = @CC@
+
+TOPDIR	     = @DESTDIR@
+BINDIR       = @BINDIR@
+
+# ------------------------------------------------------------------------
+#       Include directives for Tcl, Tk, and X include files 
+# ------------------------------------------------------------------------
+
+TCL_INCLUDE   = @TCLINCSW@
+TK_INCLUDE    = @TKINCSW@
+X_INCLUDE     = @XINCSW@
+
+# ------------------------------------------------------------------------
+#       Libraries directives for Tcl, Tk, X11, and BLT
+# ------------------------------------------------------------------------
+
+X_LIB        = @XLIBSW@ -lX11
+TK_LIB       = @TKLIBSW@ -ltk
+TCL_LIB      = @TCLLIBSW@ -ltcl
+BLT_LIB      = ./src/libBLT.a
+EXTRA_LIBS   = @LIBS@ #-R@TKLIBDIR@:@TCLLIBDIR@:@XLIBDIR@
+
+
+# ------------------------------------------------------------------------
+#       Don't edit anything beyond this point
+# ------------------------------------------------------------------------
+
+demo 	     = blt_wish
+INCLUDES     = -I. $(TK_INCLUDE) $(TCL_INCLUDE) $(X_INCLUDE)
+CC_SWITCHES  = $(CFLAGS) $(DEFINES) $(INCLUDES)
+LIBRARIES    = $(BLT_LIB) $(TK_LIB) $(TCL_LIB) $(X_LIB) $(EXTRA_LIBS)
+INSTALL      = @INSTALL@
+RANLIB 	     = @RANLIB@
+SHELL 	     = /bin/sh
+RM 	     = rm -f
+srcdir	     = @srcdir@
+
+all: $(demo)
+
+$(demo): normallib
+	@echo "linking BLT demo as \"$(demo)\"..."
+	$(CC) $(CC_SWITCHES) $(srcdir)/tkAppInit.c -o $(demo) $(LIBRARIES)
+	@echo "make finished on `date`"
+
+normallib:
+	@echo "making all in ./src"
+	@(cd src; $(MAKE) CFLAGS="$(CFLAGS)" all)
+
+sharedlib: 
+	@echo "making shared library in ./src/shared"
+	@(cd src/shared; $(MAKE) CFLAGS="$(CFLAGS)" all)
+
+install-top:
+	@if test -d $(TOPDIR); then : ; else mkdir $(TOPDIR); fi
+
+install-bin: $(demo)
+	@if test -d $(BINDIR); then : ; else mkdir $(BINDIR); fi
+	chmod 0755 $(demo)
+	$(INSTALL) $(demo) $(BINDIR)
+
+install-man: 
+	@(cd man; $(MAKE) install)
+
+install-lib:
+	@(cd src; $(MAKE) install)
+	@(cd src/shared; $(MAKE) install)
+
+install-library:
+	@(cd library; $(MAKE) install)
+
+install: install-top install-library install-bin install-lib install-man 
+
+clean:
+	@echo "cleaning in ./src"
+	@(cd src; $(MAKE) clean)
+	@echo "cleaning in ./src/shared"
+	@(cd src/shared; $(MAKE) clean)
+	@echo "cleaning in ./man"
+	@(cd man; $(MAKE) clean)
+	@echo "cleaning in ./library"
+	@(cd library; $(MAKE) clean)
+	$(RM) $(demo) *\~ "#"*
+
+GENERATED_FILES = \
+	config.status \
+	src/bltConfig.h \
+	Makefile \
+	src/Makefile \
+	src/TAGS \
+	src/shared/Makefile \
+	man/Makefile \
+	library/Makefile \
+	demos/*.ps
+
+distclean: clean
+	$(RM) $(GENERATED_FILES)
+
+PUREFLAGS=
+pure: normallib
+	$(PURIFYHOME)/purify $(PUREFLAGS) \
+	$(CC) $(CC_SWITCHES) $(srcdir)/tkAppInit.c -o $(demo) $(LIBRARIES)
+

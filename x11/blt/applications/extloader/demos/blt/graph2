@@ -1,0 +1,90 @@
+#!../../wish -f
+
+set env(TCL_EXTMAP) "./extensions.tcl"
+extension add blt
+
+blt_bitmap define pattern1 { {4 4} {01 02 04 08} }
+blt_bitmap define pattern5 { {4 4} {01 01 01 01} }
+option add *Blt_graph.font *New*Century*Bold*R*14* 
+option add *Blt_htext.Font *Times*Bold-R*14*
+option add *Blt_graph.textFont *new*century*140*
+
+set visual [winfo screenvisual .]
+if { $visual != "staticgray" && $visual != "grayscale" } {
+    option add *Button.Background red
+    option add *Blt_graph.foreground navyblue
+    option add *Blt_graph.borderWidth 2
+    option add *Blt_graph.relief sunken 
+    option add *Blt_graph.textTagForeground black
+    option add *Blt_graph.textTagBackground yellow
+    option add *Blt_graph.lineTagForeground black
+    option add *Blt_graph.lineTagBackground yellow
+    option add *Blt_graph.polyTagForeground lightblue
+    option add *Blt_graph.polyTagStipple pattern5
+    option add *Blt_graph.polyTagBackground {}
+    option add *Blt_graph.elemActiveBackground yellow
+    option add *Blt_graph.elemActiveForeground brown 
+}
+
+option add *Blt_graph.title 		"Another XY Graph"
+option add *Blt_graph.xTitle 		"X Axis Label"
+option add *Blt_graph.yTitle 		"Y Axis Label"
+option add *Blt_graph.elemScale   	0.85
+
+blt_htext .msg -text {\
+In this example, you can sweep out a box to zoom in by clicking with 
+the left button and dragging the pointer.  To restore the original view,
+simply click on the middle button.  
+Hit the %%
+button $blt_htext(widget).quit -text {Quit} -command {exit} 
+$blt_htext(widget) append $blt_htext(widget).quit
+%% button when you've seen enough. %%
+label $blt_htext(widget).logo -bitmap BLT 
+$blt_htext(widget) append $blt_htext(widget).logo
+%%}
+
+blt_graph .graph
+
+.graph xaxis configure -step 90 -command formatXLabels -subticks 0 
+.graph yaxis configure -rotate 90.0 
+
+proc formatXLabels {graph x} {
+     return "[expr int($x)]\260"
+}
+
+.graph element create sin(x) \
+    -symbol circle \
+    -bg powderblue \
+    -fg navyblue \
+    -linewidth 2 
+
+.graph element create cos(x) \
+    -symbol circle \
+    -fg magenta \
+    -bg purple \
+    -borderwidth 1 \
+    -linewidth 2 
+
+pack append .  \
+	.graph { fill expand } \
+	.msg  { padx 20 pady 10 } 
+wm min . 0 0
+
+set x [expr 3.14159265358979323846/180.0]
+puts stderr "Generating data..."
+for { set i -360 } { $i <= 360 } { incr i 5 } {
+    set radians [expr $i*$x]
+    .graph element append sin(x) { $i sin($radians) }
+    .graph element append cos(x) { $i cos($radians) }
+}
+puts stderr "done."
+
+set sine [lindex [.graph element configure sin(x) -data] 4]
+set fill [concat -360 min $sine 360 min]
+.graph tag create polygon $fill
+
+source features.tcl
+SetActiveLegend .graph
+SetClosestPoint .graph
+SetZoom .graph
+SetPrint .graph

@@ -1,0 +1,1303 @@
+'\"
+'\" Copyright 1991-1994 by AT&T Bell Laboratories.
+'\"
+'\" Permission to use, copy, modify, and distribute this software
+'\" and its documentation for any purpose and without fee is hereby
+'\" granted, provided that the above copyright notice appear in all
+'\" copies and that both that the copyright notice and warranty
+'\" disclaimer appear in supporting documentation, and that the
+'\" names of AT&T Bell Laboratories any of their entities not be used
+'\" in advertising or publicity pertaining to distribution of the
+'\" software without specific, written prior permission.
+'\"
+'\" AT&T disclaims all warranties with regard to this software, including
+'\" all implied warranties of merchantability and fitness.  In no event
+'\" shall AT&T be liable for any special, indirect or consequential
+'\" damages or any damages whatsoever resulting from loss of use, data
+'\" or profits, whether in an action of contract, negligence or other
+'\" tortuous action, arising out of or in connection with the use or
+'\" performance of this software.
+'\"
+'\" Barchart created by George Howlett.
+'\"
+.so man.macros
+.HS blt_barchart cmds
+.BS
+'\" Note:  do not modify the .SH NAME line immediately below!
+.SH NAME
+blt_barchart \- Create and manipulate barchart widgets
+.SH SYNOPSIS
+\fBblt_barchart\fI \fIpathName \fR?\fIoptions\fR?
+.SH "STANDARD OPTIONS"
+.LP
+.nf
+.ta 4c 8c 12c
+\fBbackground\fR	\fBcursor\fR	\fBforeground\fR        
+\fBborderWidth\fR	\fBfont\fR	\fBrelief\fR            
+.fi
+.LP
+See the ``options'' manual entry for details on the standard options.
+.ta 4c
+.SH "WIDGET-SPECIFIC OPTIONS"
+.LP
+.nf
+.ta 4c 8c 12c
+\fBbottomMargin\fR	\fBleftMargin\fR	\fBtitle\fR     
+\fBbufferElements\fR	\fBplotBackground\fR	\fBtopMargin\fR 
+\fBhalo\fR	\fBplotBorderWidth\fR	\fBwidth\fR     
+\fBheight\fR	\fBplotRelief\fR        
+\fBinvertxy\fR	\fBrightMargin\fR       
+.fi
+.BE
+.SH DESCRIPTION
+.PP
+The \fBblt_barchart\fR command creates a new window (given by the 
+\fIpathName\fR argument) and makes it into an barchart widget.
+Additional
+options, described above, may be specified on the command line
+or in the option database
+to configure aspects of the graph such as its colors and font.
+The \fBblt_barchart\fR command returns its
+\fIpathName\fR argument.  At the time this command is invoked,
+there must not exist a window named \fIpathName\fR, but
+\fIpathName\fR's parent must exist.
+.PP
+The \fBblt_barchart\fR widget plots two-variable data as
+rectangular bars in a window.  The x-coordinate values designate
+the position of the bar along the x-axis, while the y-coordinate
+values designate the magnitude.
+The \fBblt_barchart\fR has of several components; coordinate axes, 
+crosshairs, a legend, and a collection of elements and tags.
+.SS "COORDINATE AXES"
+The barchart widget has four axes, two standard (x and y) and two alternate
+(x2 and y2).  Graph elements and tags are mapped onto one x-axis and 
+one y-axis (by default, they are mapped onto the standard axes).
+.PP
+Each axis consists of the axis line and major and minor ticks placed 
+at set intervals.  At major ticks, labels (text strings) representing 
+the coordinate value of the tick are drawn.  By default, the tick labels 
+are simply numeric strings.  However, a Tcl procedure may be supplied 
+to format individually each tick label.
+.PP
+The scale of the axis is determined its minimum and maximum limits.
+By default, each axis is auto-scaled using the limits of the data.
+However either limit can be set to manually scale the graph.
+.SS "CROSSHAIRS"
+Crosshairs are a set of two lines (vertical and horizontal) which
+intersect on the graph.  They are implemented using XOR drawing
+primitives, so they do not require the graph to be redrawn when 
+they are moved or redisplayed.
+.SS "ELEMENTS"
+A graph element is a set of data points and configuration options 
+which determine how the bar is displayed in the window.  Elements 
+are created by the \fBelement create\fP widget command.  The configuration 
+options may be specified as the element is created or later by 
+the \fBelement configure\fR 
+widget command.  There is an internal display list of element names which 
+controls the drawing order of the elements. By default, elements are 
+appended to the display list as they are created.  The element display list
+can be managed by the \fBelement show\fR command.  
+.SS "LEGEND"
+The legend consists of a list of entries, where each entry is an element
+symbol and label.  By default, the legend is located in the right
+margin of the graph.  However, the legend may appear anywhere in the
+plotting area of the graph by specifying its window coordinates.
+.SS "TAGS"
+Tags are simple drawing procedures used to annotate or highlight
+areas of the graph. A tag may be either a text string, bitmap,
+line, window, or polygon.  A tag may be associated with a particular 
+element, so that the tag is displayed only if the element is 
+displayed.  Tags are the first items drawn when the graph is displayed, 
+so that elements, symbols, legend, and axes always appear in front of them.  
+.PP
+Tags differ from elements in that they do not affect the auto-scaling of 
+coordinate axes.  Furthermore, tags can have \fIelastic\fR coordinates
+(specified by \fC-Inf\fR and \fCInf\fR respectively) which translate into
+the axis minimum or maximum limit.  For example, to place a tag so it
+always remains in the lower left corner of the plot, use the coordinates
+\fC-Inf\fR,\fC-Inf\fR.
+.SH "WIDGET COMMANDS"
+.PP
+The \fBblt_barchart\fR command creates a new Tcl command whose
+name is \fIpathName\fR.  This
+command may be used to invoke various
+operations on the widget.  It has the general form:
+.DS C
+\fIpathName option \fR?\fIarg arg ...\fR?
+.DE
+\fIOption\fR and the \fIarg\fRs
+determine the exact behavior of the command.  The following
+commands are valid for \fBblt_barchart\fR widgets:
+.TP
+\fIpathName \fBconfigure \fR?\fIoptions...\fR?
+Queries or modifies the configuration options of the widget. 
+Valids options are described in
+.SB WIDGET OPTIONS.
+.TP
+\fIpathName \fBcrosshairs configure\fR ?\fIoptions...\fR?
+Queries or modifies the configuration options of the crosshairs.
+This command is similar to the \fBconfigure\fR command, except that it
+applies to the options of the crosshairs, whereas \fBconfigure\fR applies 
+to the options for the graph as a whole.  See 
+.SB CROSSHAIRS OPTIONS
+for a description of valid options.
+.TP
+\fIpathName \fBcrosshairs toggle\fR
+Toggles the current state of the crosshairs, turning them on or off.
+This command returns an empty string.
+.TP
+\fIpathName \fBelement append \fIname coords\fR
+Appends pairs of x,y data points to element \fIname\fR.  
+\fIcoords\fR is a list of numeric expressions (x,y graph coordinates) 
+representing data points.  It returns the empty string.
+.TP
+\fIpathName \fBelement configure \fIname \fR?\fIoptions...\fR?
+This command is similar to the \fBconfigure\fR command, except that it
+applies to the options of an individual element, whereas
+\fBconfigure\fR applies to the options for the graph as a whole.
+\fIOptions\fR may have any of the values accepted by the
+\fBelement create\fR widget command. See
+.SB ELEMENT OPTIONS
+for a description of valid options.
+.TP
+\fIpathName \fBelement create \fIname \fR?\fIoptions...\fR? 
+Creates a new element \fIname\fP in the graph.  Element names must be
+unique, so \fIname\fR can not already exist in the graph.  
+If additional arguments are present, they specify any of the 
+element options (see 
+.SB ELEMENT OPTIONS
+).
+.TP
+\fIpathName \fBelement delete ?\fIname ...\fR?
+Deletes the element \fIname\fR from the graph.  
+Returns the empty string.
+.TP
+\fIpathName \fBelement names\fR
+Returns a list of all elements. This differs from
+\fBelement show\fR in that it returns the names of all elements, not
+just those in the element display list.
+.TP
+\fIpathName \fBelement show \fR?\fInames\fR?
+Queries or resets the element display list.  
+The element display
+list defines which elements are drawn and in what order.  
+\fINames\fR is a list of the elements to
+be displayed.  If there is no \fInames\fR argument, the list of elements 
+currently being displayed is returned.
+.TP
+\fIpathName \fBinvtransform \fIwinX winY\fP 
+Performs an inverse coordinate transformation, mapping x,y window 
+coordinates to graph coordinates (using the standard x and y axes).  
+Returns a list of containing the x and y graph coordinates.
+.TP
+\fIpathName \fBlegend activate \fIname...\fR
+.VS
+Specifies that the legend entries of the named elements should be drawn 
+with the active legend background and foreground colors.  The entries may 
+also be drawn with a different relief (using the \fB-activerelief\fR and 
+\fB-activeborderwidth\fR options).
+\fIName\fR is the name of an element in the graph.
+.VE
+.TP
+\fIpathName \fBlegend configure \fR?\fIoptions...\fR?
+This command is similar to the \fBconfigure\fR command, except that it
+applies to the options for the legend, whereas \fBconfigure\fR applies
+to the options for the graph as a whole.  See 
+.SB LEGEND OPTIONS
+for a description of valid options.  
+.TP
+\fIpathName \fBlegend deactivate \fIname...\fR
+.VS
+Specifies that the legend enties of the named elements should be drawn 
+with the legend background and foreground colors.  \fIName\fR is the 
+name of an element in the graph.
+.VE
+.TP
+\fIpathName \fBlegend get \fIstring\fR
+.VS
+Returns the name of the graph element at the current screen position
+in the legend.  \fIString\fR must be in the form "\fI@x,y\fR", where 
+\fIx\fR and \fIy\fR are the window coordinates.  If the given screen 
+coordinates do not lie over a legend entry, the empty string is returned.
+.VE
+.SB LEGEND OPTIONS
+for a description of valid options.  
+.TP
+\fIpathName \fBpostscript \fR?\fIfileName\fR? ?\fIoptions...\fR?
+Generates PostScript commands to print the graph. If no \fIfileName\fR
+argument is present, the PostScript output is returned. Otherwise,
+\fIfileName\fR is created and will contain the PostScript output.  In
+this case the empty string is returned.  If any \fIoption-value\fR
+pairs are present, they set configuration options controlling how the
+PostScript is generated. See 
+.SB POSTSCRIPT OPTIONS
+for a description of valid options.
+.TP
+\fIpathName \fBpsconfigure \fR?\fIoptions...\fR?
+Queries or modifies the options of the \fBpostscript\fR command
+(see
+.SB POSTSCRIPT OPTIONS
+).
+.TP
+\fIpathName \fBtag after \fItagId\fR ?\fItagId\fR?
+Reorders the tag display list placing the first tag specified after
+the second.  If no second \fItagId\fR argument is specified, the tag
+is placed at the end of the list.  This command can be used to control
+how tags are displayed since tags are drawn in the order of this
+display list.  The empty string is returned.
+.TP
+\fIpathName \fBtag before \fItagId\fR ?\fItagId\fR?
+Reorders the tag display list placing the first tag specified before
+the second.  If no second \fItagId\fR argument is specified, the tag
+is placed at the beginning of the list.  This command can be used to
+control how tags are displayed since tags are drawn in the order of
+this display list.  The empty string is returned.
+.TP
+\fIpathName \fBtag configure \fItagId\fR ?\fIoptions...\fR? 
+Queries or modifies the configuration options of the particular tag.
+See 
+.SB TAG OPTIONS
+for a description of valid options.
+.TP
+\fIpathName \fBtag coords \fItagId\fR ?\fIcoords\fR? 
+Queries or resets the coordinates of the tag designated by
+\fItagId\fR.  If \fIcoords\fR is present, it is a list of coordinate pairs
+representing the points of the tag.  This list is used to re-position the tag.
+If the \fIcoords\fR argument is not present, the current list of
+coordinates for \fItagId\fR is returned.
+.TP
+\fIpathName \fBtag create \fItype\fR ?\fIcoords\fR? ?\fIoptions...\fR?
+Creates a tag of the selected type. \fIType\fR may be either
+\fCtext\fR, \fCline\fR, \fCbitmap\fR, \fCpolygon\fR, or \fCwindow\fR.
+\fIcoords\fR is a list of coordinate pairs of points used
+to position the tag.  See
+.SB TAG OPTIONS
+for a description of options are valid.  This command returns a
+unique tag identifier, which is used as the \fItagId\fR argument in
+other tag-related commands.
+.TP
+\fIpathName \fBtag delete \fItagId\fR ?\fItagId..\fR?
+Deletes each of the specified tags.  This command returns the empty string.
+.TP
+\fIpathName \fBtag ids\fR ?\fIpattern\fR? 
+Returns a list of IDs of tags created.  If \fIpattern\fR is supplied,
+only those tags whose IDs matching it will be returned.
+.TP
+\fIpathName \fBtag type \fItagId\fR 
+Returns the type of the tag given by \fItagId\fR, such as
+\fCLine\fR or \fCText\fR. 
+If \fItagId\fR is not a valid a tag identifier, the empty string is returned.
+.TP
+\fIpathName \fBtransform \fIx y\fP 
+.VS
+Transforms the graph coordinates into window coordinates, by mapping
+the \fIx\fR and \fIy\fR values onto the standard axes (x and y).
+Returns a list containing the x and y window coordinates.
+Please note that graph coordinates far outside of the axis range are 
+not guarenteed to be accurate.
+.VE
+.TP
+\fIpathName \fBxaxis configure\fR ?\fIoptions...\fR? 
+.TP
+\fIpathName \fByaxis configure\fR ?\fIoptions...\fR? 
+.TP
+\fIpathName \fBx2axis configure\fR ?\fIoptions...\fR? 
+.TP
+\fIpathName \fBy2axis configure\fR ?\fIoptions...\fR? 
+Queries or modifies the configuration options of the coordinate axis.  
+The subsection 
+.SB AXIS OPTIONS
+describes which options are valid.
+.TP
+\fIpathName \fBxaxis limits\fR
+.TP
+\fIpathName \fByaxis limits\fR
+.TP
+\fIpathName \fBx2axis limits\fR
+.TP
+\fIpathName \fBy2axis limits\fR
+Returns a list of two graph coordinates representing the minimum and maximum 
+limits of the x-axis.  The format of the list returned is \fCmin max\fR.
+.sp 1
+.SH "CONFIGURATION OPTIONS"
+.SS "WIDGET OPTIONS"
+The following widget options are valid for the \fBconfigure\fR command.  
+.DS
+\fIpathName \fBconfigure\fR ?\fIoption\fR? ?\fIvalue option value ...\fR?
+.DE
+The \fBconfigure\fR command queries or modifies the configuration options 
+of the widget.  If no \fIoption\fR is specified, returns a list 
+describing all of the
+available options for \fIpathName\fR (see \fBTk_ConfigureInfo\fR for
+information on the format of this list).  
+If \fIoption\fR is specified with no \fIvalue\fR, then the command 
+returns a list describing the one named option (this list will be 
+identical to the corresponding sublist of the value returned if 
+no \fIoption\fR is specified).  If one or more \fIoption\-value\fR 
+pairs are specified, then the command
+modifies the given widget option(s) to have the given value(s); in
+this case the command returns the empty string.  
+.TP
+\fB\-bottommargin \fIpixels\fR
+Specifies the size of the margin from the x-coordinate axis to the 
+bottom of the window.  The x-axis title is displayed in this margin.  
+\fIPixels\fR may be specified in any of the forms described in 
+\fBTk_GetPixels\fR.  If \fIpixels\fR is less than one pixel, the 
+the margin size is selected automatically.
+.TP
+\fB\-bufferelements \fIboolean\fR
+.VS
+Specifies whether to use a pixmap to cache the display of elements.
+This is especially useful when there are many data points or the
+graph is redrawn frequently.  \fBoolean\fR is \fCtrue\fB by default.
+.VE
+.TP
+\fB\-halo \fIpixels\fR
+Specifies a threshold distance when searching for the closest data 
+point (see the \fBelement closest\fR command).  Only data points
+within this distance are considered in the search.
+\fIPixels\fR may be specified in any of the forms described in 
+\fBTk_GetPixels\fR.  If this option isn't specified, 
+it defaults to \fC0.5i\fR.
+.TP
+\fB\-height \fIpixels\fR
+Specifies a desired window height that the barchart widget should 
+request from its geometry manager.  The default height is \fC400\fR.
+.TP
+\fB\-invertxy \fIboolean\fR
+.VS
+Specifies that placement of the x and y axes should be inverted.
+If \fIboolean\fR is \fCtrue\fR, the x-axis is exchanged with the
+y-axis.  By default \fIboolean\fR is \fCfalse\fR.
+.VE
+.TP
+\fB\-leftmargin \fIpixels\fR
+Sets the size of the margin from the left edge of the window to the
+the y-coordinate axis.  The y-axis title is displayed in this
+margin.  If \fIpixels\fR is less than one pixel, 
+the margin size is selected automatically.
+.TP
+\fB\-plotbackground \fIcolor\fR
+Sets the background color of the plotting area.  
+.TP
+\fB\-plotborderwidth \fIpixels\fR
+Sets the width of the 3-D border to draw around the outside of
+the plotting area (if such border is being drawn; the \fBplotrelief\fR option
+determines this).  By default is the plot border width is \fC2\fR.
+.TP
+\fB\-plotrelief \fIstring\fR
+Specifies the 3-D effect desired for the plotting area.  
+\fIString\fR must be in a form accepted by \fBTk_GetRelief\fR. 
+It indicates how the interior of the plotting area should appear 
+relative to rest of the graph; for example, \fCraised\fR means the 
+plot should appear to protrude from the graph, relative to the surface 
+of the graph.  By default, the plot relief is \fCsunken\fR.
+.TP
+\fB\-rightmargin \fIpixels\fR
+Sets the size of marging from the plotting area to the right edge 
+of the window.  By default, the legend is displayed in this margin.  
+If \Ipixels\fR is than 1, the margin size
+is selected automatically.
+.TP
+\fB\-title \fIstring\fR
+Specifies the title of the graph.  If \fIstring\fR is the empty string 
+(the default), no title is displayed.
+.TP
+\fB\-topmargin \fIpixels\fR
+Sets the size of the marging the top edge of the window to the plotting area.
+The graph title is displayed in this margin.  
+If \fIpixels\fR is less than 1, the margin size is selected automatically.
+.TP
+\fB\-width \fIpixels\fR
+Specifies a desired window width that the barchart widget should
+request from its geometry manager.  
+\fIPixels\fR may be specified in any of the forms described 
+in \fBTk_GetPixels\fR.
+The default width is \fC400\fR.
+.sp 1
+.SS "AXIS OPTIONS"
+The following options are valid for the \fBxaxis configure\fR, 
+\fByaxis configure\fR, \fBx2axis configure\fR, 
+and the \fBy2axis configure\fR commands.  
+.DS
+\fIpathName \fBxaxis configure \fR?\fIoptions...\fR?
+
+\fIpathName \fByaxis configure \fR?\fIoptions...\fR?
+
+\fIpathName \fBx2axis configure \fR?\fIoptions...\fR?
+
+\fIpathName \fBy2axis configure \fR?\fIoptions...\fR?
+.DE
+In addition, axis configuration options may be initialized by the
+\fBoption\fR command.  The name fields in the \fBblt_barchart\fR 
+option database are
+prefixed by \fCx\fR, \fCy\fR, \fCx2\fR, or \fCy2\fR while 
+the class fields are prefixed by \fCAxis\fR. The following example sets 
+the color of all axes to blue and the y-axis scale to logarithmic.
+.DS
+\fCoption add *Blt_barchart.AxisColor blue\fR
+\fCoption add *Blt_barchart.yLogscale true\fR
+.DE
+.TP
+\fB\-color \fIcolor\fR
+Sets the color of the axis and its labels.
+The default color is \fCblack\fR.
+.TP
+\fB\-command \fIprefix\fR
+Specifies a Tcl command to be invoked when formatting the axis labels.
+\fIPrefix\fR is typically just the name of a Tcl procedure, but the string
+may also contain extra arguments for the procedure.  When invoked, two
+arguments (the path name of the barchart widget and the numeric value of
+the axis label) are appended to the end of the command.  The procedure
+value should be a string representing the formatted label. If the value is
+the empty string or if \fIprefix\fR is the empty string, the default axis
+label is displayed.  Please note that this procedure is invoked during
+the display of the graph.  Resetting barchart configurations within this 
+procedure can cause unexpected results.
+.TP
+\fB\-descending \fIboolean\fR
+.VS
+Specifies whether the values along the axis are increasing or decreasing.  
+If \fIboolean\fR is true, the axis values will decrease.
+By default, the axis values increase.
+.VE
+.TP
+\fB\-font \fIfontName\fR 
+Specifies the font for axis labels. If
+\fIfontName\fR isn't specified then it defaults to
+\fC*-Courier-Bold-R-Normal-*-100-*\fR.
+.TP
+\fB\-linewidth \fIpixels\fR
+Set the line width of the axis and its ticks.  The default line
+width is \fC0\fR.
+.TP
+\fB\-logscale \fIboolean\fR
+Sets the scale of the coordinate axis (either logarithmically or
+linearly).  If \fIboolean\fR is \fCtrue\fR, the axis will be displayed
+in logarithmic scale.  \fIBoolean\fR must be a value accepted by
+\fBTcl_GetBoolean\fR.  By default, the scale is linear.
+.TP
+\fB\-loose \fIboolean\fR
+Indicates that when auto-scaling the axis, the axis range 
+should fit loosely around the data points at the outer tick intervals.  
+Otherwise the axis range fits tightly at the limits of the data displayed. 
+By default, the range is tight.
+.TP
+\fB\-mapped \fIboolean\fR
+.VS
+Specifies if the axis should be displayed. By default, the standard
+axes are displayed (x and y), but not the alternate (x2 and y2).
+.VE
+.TP
+\fB\-max \fIvalue\fR
+Sets the maximum limit of the axis.  Data points exceeding this
+limit are clipped at this value. If \fIvalue\fR is the empty string
+(the default), the axis is auto-scaled whereby the maximum limit is
+determined from the data points of the displayed elements.
+.TP
+\fB\-min \fIvalue\fR
+Sets the minimum limit of the axis. Data points less than this
+limit are clipped at this value.  If \fIvalue\fR is the empty string
+(the default), the axis is auto-scaled whereby the minimum limit is
+determined from the data points of the displayed elements.
+.TP
+\fB\-rotate \fItheta\fR
+Specifies the rotation of the axis labels.  \fITheta\fR is a
+real number representing the angle of rotation in degrees.
+The default rotation is \fC0.0\fR degrees.
+.TP
+\fB\-showticks \fIboolean\fR
+Indicates if axis ticks should be displayed. If \fIboolean\fR is
+\fCtrue\fR (the default), ticks are displayed.
+.TP
+\fB\-stepsize \fIvalue\fR
+Sets the step size between major axis ticks.  \fIValue\fR must be
+greater than zero and less than the axis range, or the requested step size 
+is ignored and the step size is automatically calculated based
+upon the element data points.
+.TP
+\fB\-subticks \fInumber\fR
+Sets the number of minor axis ticks to be displayed.  By default, the
+number of minor ticks is \fC5\fR.  If \fInumber\fR is zero, no subticks
+will be displayed.
+.TP
+\fB\-ticklength \fIpixels\fR
+.VS
+Sets the length of the ticks and subticks (subticks are one-half \fIpixels\fR).
+If \fIpixels\fR is negative, ticks will point towards the plot, instead
+of away from it.  The tick length is \fC0.1i\fR.  
+.VE
+.TP
+\fB\-title \fIstring\fR
+Sets the title of the axis. If \fIstring\fR is the
+empty string, no axis title will be displayed.  
+.sp 1
+.SS "CROSSHAIRS OPTIONS"
+.PP
+The following options are valid for the \fBcrosshair configure\fR command.
+.DS
+\fIpathName \fBcrosshairs configure\fR ?\fIoptions...\fR?
+.DE
+In addition, crosshairs configuration options may be initialized by the 
+\fBoption\fR command.  The name fields in the \fBblt_barchart\fR option database
+are prefixed by
+by \fCxhairs\fR and classfields are prefixed by \fCXhairs\fR. 
+The following example sets the line width of the crosshairs to \fC2\fR.
+.DS
+\fCoption add *Blt_barchart.xhairsLinewidth 2\fR
+.DE
+.TP
+\fB\-color \fIcolor\fR 
+.VS
+Sets the color of the crosshairs.  
+If this option isn't specified, then it defaults to \fCblack\fR.
+.VE
+.TP
+\fB\-dashes \fIdashes\fR
+Sets the dash style of the crosshairs. \fIdashes\fR
+is the number of alternatingly displayed pixels. If \fIdashes\fR is
+\fC0\fR (the default), the crosshairs will be drawn as a solid line. 
+.TP
+\fB\-linewidth \fIpixels\fR
+Set the line width of crosshairs.  The default line width is \fC0\fR.
+.TP
+\fB\-mapped \fIboolean\fR
+Specifies if the crosshairs should be displayed. By default, 
+the crosshairs are not displayed.  
+.TP
+\fB\-position \fIstring\fR
+Specifies the position of the crosshairs. \fIString\fR must be in the
+format "\fI@x,y\fR", where \fIx\fR and \fIy\fR 
+are window coordinates.  
+.sp 1
+.SS "ELEMENT OPTIONS"
+.PP
+The following options are valid for the \fBelement create\fR and 
+\fBelement configure\fR commands.
+\fIName\fR is the name of the element to be configured.
+.DS
+\fIpathName \fBelement create \fIname\fR ?\fIoptions...\fR?
+
+\fIpathName \fBelement configure \fIname\fR ?\fIoptions...\fR?
+.DE
+In addition, element configuration options may be initialized by the 
+\fBoption\fR command.  The name fields in the \fBblt_barchart\fR 
+option database 
+are prefixed by \fCelem\fR. 
+The following example creates a 3D effect for bars by setting
+the relief and the borderwidth.
+.DS
+\fCoption add *Blt_barchart.elemBorderwidth 2\fR
+\fCoption add *Blt_barchart.Relief sunken\fR
+.DE
+.TP
+\fB\-background \fIcolor\fR
+Specifies the the fill color for the bar.
+The default background color is \fCwhite\fR.
+.TP
+\fB\-borderwidth \fIpixels\fR
+Sets the width of the 3-D border to draw around the outside of
+the bar (if such border is being drawn; the \fBrelief\fR option
+determines this).  \fIPixels\fR may be in any form accepted by
+\fBTk_GetPixel\fR.  By default is the legend border width is \fC2\fR.
+.TP
+\fB\-data \fIvalueList\fR
+Specifies the graph coordinates representing 
+the data points to be plotted.  \fIValueList\fR must be a list of valid
+numeric expressions.  It this option isn't specified, it defaults to
+the empty string.
+.TP
+\fB\-foreground \fIcolor\fR  
+Sets the foreground color of the bar.
+If multiple bar segments are used, \fIcolor\fR may be list of color
+names representing a palette colors from which each bar segments is drawn.  
+The default foreground color is \fCblack\fR.
+.TP
+\fB\-label \fIstring\fR
+Sets the element label.  Labels are displayed in the 
+legend next to the element symbol.  If \fIstring\fR is the empty 
+string, no legend entry will be displayed for the element.  By 
+default, the label is the name of the element.
+.TP
+\fB\-mapx \fItype\fR
+.VS
+Specifies which x-axis to map the element's x-coordinates onto.
+\fIType\fR must be either \fCx\fR, \fCx2\fR, or \fCboth\fR.  The default
+axis is \fCx\fR.
+.VE
+.TP
+\fB\-mapy \fItype\fR
+.VS
+Specifies which y-axis to map the element's y-coordinates onto.
+\fIType\fR must be either \fCy\fR, \fCy2\fR, or \fCboth\fR.  The default
+axis is \fCy\fR.
+.VE
+.TP
+\fB\-relief \fIstring\fR
+Specifies the 3-D effect desired for the bar.  \fIString\fR may be any 
+value accepted by \fBTk_GetRelief\fR.  It indicates how
+the bar should appear relative to the graph; for
+example, \fCraised\fR means the bar should appear to protrude from
+the graph, relative to the surface of the graph.  By default, the
+legend relief is \fCraised\fR.
+.TP
+\fB\-stacked \fIboolean\fR
+Indicates how the bar should be displayed if it has multiple 
+y data points.  If \fIboolean\fR is \fCtrue\fR (the default), the bar
+is drawn in segments, one upon the other.
+.TP
+\fB\-stipple \fIbitmap\fR
+Specifies a stipple pattern with which to draw the bar. \fIBitmap\fR is
+the name of a bitmap in a form accepted by \fBTk_GetBitmap\fR.
+If multiple bar segments are used, \fIbitmap\fR may also be list of bitmap
+names representing a palette of stipples from which each bar segments is 
+drawn.  If a bitmap name is the empty string (the default) then the bar
+is drawn in a solid fashion.
+.TP
+\fB\-xdata \fIvalue\fR
+Specifies the x-coordinate of the bar element.
+\fIValue\fR must be a valid numeric expression.  It this 
+option isn't specified, it defaults to the empty string.
+.TP
+\fB\-ydata \fIvalueList\fR
+Specifies the y-coordinates of the data points to be plotted.  
+\fIValueList\fR must be a valid list of numeric expressions.  It this 
+option isn't specified, it defaults to the empty string.
+.sp 1
+.SS "LEGEND OPTIONS"
+The following options are valid for the \fBlegend configure\fR command.
+.DS
+\fIpathName \fBlegend configure \fR?\fIoptions...\fR?
+.DE
+In addition, legend configuration options may be initialized by the
+\fBoption\fR command.  The name fields in the \fBblt_barchart\fR 
+option database are
+prefixed by \fClegend\fR.  The following example initializes the
+legend foreground color to blue in the option database.
+.DS
+\fCoption add *Blt_barchart.legendForeground blue\fR
+.DE
+.TP
+\fB\-activebackground \fIcolor\fR
+.VS
+Sets the active background color of the legend.  All legend entries
+marked as active (see \fBlegend activate\fR command) are drawn with
+this background color.
+.VE
+.TP
+\fB\-activeborderwidth \fIpixels\fR
+.VS
+Sets the width of the 3-D border to draw around the outside of
+the each active legend entry (if such border is being drawn; 
+the \fB-activerelief\fR option determines this).  By default is the 
+active border width is \fC2\fR.
+.VE
+.TP
+\fB\-activeforeground \fIcolor\fR
+.VS
+Sets the active foreground color of the legend.  All legend entries
+marked as active (see \fBlegend activate\fR command) are drawn with
+this foreground color.
+.VE
+.TP
+\fB\-activerelief \fIstring\fR
+.VS
+Specifies the 3-D effect desired for active legend entries.  \fIString\fR 
+must be in a form accepted by \fBTk_GetRelief\fR. 
+It indicates how  the interior of the entry should appear relative to 
+the legend; for
+example, \fCraised\fR means the entry should appear to protrude from
+the legend, relative to the surface of the legend.  By default, the
+active legend relief is \fCflat\fR.
+.VE
+.TP
+\fB\-anchor \fIanchorPos\fR
+Tells how to position the legend relative to the positioning point for
+the legend; \fIanchorPos\fR may have any of the forms accepted by
+\fBTk_GetAnchor\fR.  For example, if \fIanchorPos\fR is \fCcenter\fR
+then the legend is centered on the point; if \fIanchorPos\fR is
+\fCn\fR then the legend will be drawn such that the top center point
+of the rectangular region occupied by the legend will be at the
+positioning point.  This option defaults to \fCcenter\fR.
+.TP
+\fB\-background \fIcolor\fR
+Sets the background color of the legend. 
+If \fIcolor\fR is the empty string, no background rectangle will be drawn.
+.TP
+\fB\-borderwidth \fIpixels\fR
+Sets the width of the 3-D border to draw around the outside of
+the legend (if such border is being drawn; the \fBrelief\fR option
+determines this).  By default is the legend border width is \fC2\fR.
+.TP
+\fB\-font \fIfontName\fR 
+\fIFontName\fR specifies a font to use when drawing the labels of each
+element into the legend.  If this option isn't specified then it
+defaults to \fC*-Helvetica-Bold-R-Normal-*-120-*\fR.
+.TP
+\fB\-foreground \fIcolor\fR 
+Sets the foreground color of the element labels in the legend.  
+If this option isn't specified, then it defaults to \fCblack\fR.
+.TP
+\fB\-ipadx \fIpixels\fR
+.VS
+Sets the internal padding to the width of the legend. 
+Padding will be added to both the left and right and
+between the elements symbol and label.
+By default is the legend border width is \fC2\fR.
+.VE
+.TP
+\fB\-ipady \fIpixels\fR
+.VS
+Sets the internal padding to the height of the legend. 
+Padding will be added to both the top and bottom and
+between the elements labels.
+By default is the legend border width is \fC2\fR.
+.VE
+.TP
+\fB\-mapped \fIboolean\fR
+Indicates if the legend should be displayed. If \fIboolean\fR is
+\fCtrue\fR (the default), the legend will be mapped.  
+.TP
+\fB\-padx \fIpixels\fR
+.VS
+Specifies extra padding on the left and right of the legend.
+The default is \fC4\fR.
+.VE
+.TP
+\fB\-pady \fIpixels\fR
+.VS
+Specifies extra padding on the top and bottom of the legend.
+The default is \fC0\fR.
+.VE
+.TP
+\fB\-position \fIstring\fR
+Sets the positioning point of the legend in window coordinates.
+This option in conjunction with the \fB-anchor\fR option, determines
+where the legend is positioned. The format of \fIstring\fR is
+"\fI@x,y\fR", where \fIx\fR and \fIy\fR are the window coordinate
+values.  If \fIstring\fR is the empty string (the default), the legend
+will be displayed in the right margin (which is automatically extended
+to accommodate the legend).
+.TP
+\fB\-relief \fIstring\fR
+Specifies the 3-D effect desired for the legend.  \fIString\fR must be
+in a form accepted by \fBTk_GetRelief\fR. 
+It indicates how  the interior of the legend should appear relative to 
+the graph; for
+example, \fCraised\fR means the legend should appear to protrude from
+the graph, relative to the surface of the graph.  By default, the
+legend relief is \fCsunken\fR.
+.sp 1
+.SS "TAG OPTIONS"
+.PP
+The following options are valid for the \fBtag create\fR and \fBtag configure\fR commands.  
+\fITagid\fR is the identifier returned by the \fBtag create\fR command.
+.DS
+\fIpathName \fBtag create \fItype\fR ?\fIcoords\fR? ?\fIoptions...\fR?
+
+\fIpathName \fBtag configure \fItagId\fR ?\fIoptions...\fR?
+.DE
+Tag configuration options may be initialized by the
+\fBoption\fR command.  The name fields in the \fBblt_barchart\fR
+option database are
+prefixed by \fCbmTag\fR, \fCtextTag\fR, \fClineTag\fR,
+\fCpolyTag\fR, or \fCwinTag\fR with respect to the tag type.
+Class fields are prefixed by \fCTag\fR. The following example sets
+the background color of all tags to blue and the foreground color of
+all text tags to white.
+.DS
+\fCoption add *Blt_barchart.TagBackground blue\fR
+\fCoption add *Blt_barchart.textTagForeground white\fR
+.DE
+The description of tag options is broken into subsections for each tag type.
+.sp 1
+.SS "TEXT TAGS"
+A text tag displays a string of characters on a single line.  They may
+be used to annotate regions of the graph.  Text tags are
+created with the following widget command:
+.DS
+\fIpathName \fBtag create text \fR?\fIcoords\fR? ?\fIoptions...\fR?
+.DE
+The argument \fIcoords\fR specifies a list of two numeric
+expressions representing the graph coordinates of a point 
+used to position the text on the graph. 
+.P
+After the coordinate list there may be any number of
+\fIoption\fR-\fIvalue\fR pairs, each of which sets one of the
+configuration options for the tag.  These same
+\fIoption\fR\-\fIvalue\fR pairs may be used in the \fBtag configure\fR
+command to change the tag's configuration.  The following
+options are supported for text tags:
+.TP
+\fB\-anchor \fIanchorPos\fR
+\fIAnchorPos\fR tells how to position the text relative to the
+positioning point for the text; it may have any of the forms accepted
+by \fBTk_GetAnchor\fR.  For example, if \fIanchorPos\fR is
+\fCcenter\fR then the text is centered on the point; if
+\fIanchorPos\fR is \fCn\fR then the text will be drawn such that the
+top center point of the rectangular region occupied by the text will
+be at the positioning point.  This option defaults to \fCcenter\fR.
+.TP
+\fB\-background \fIcolor\fR
+Sets the background color of the text string.  
+If \fIcolor\fR is the empty string, the background will be transparent.
+If this option isn't specified then it defaults to \fCwhite\fR.
+.TP
+\fB\-font \fIfontName\fR
+Specifies the text font.
+If this option isn't specified, it defaults 
+\fC*-Helvetica-Bold-R-Normal-*-120-*\fR.
+.TP
+\fB\-foreground \fIcolor\fR
+Sets the foreground color of the text.  
+If this option isn't specified then it defaults to \fCblack\fR.
+.TP
+\fB\-element \fIname\fR
+Associates the tag with the element \fIname\fR.  If \fIname\fR is not
+the empty string (the default), the tag is displayed only if
+\fIname\fR exists and is currently being displayed (see \fBelement show\fR).
+.TP
+\fB\-mapx \fItype\fR
+.VS
+Specifies which x-axis to map the tag's x-coordinates onto.
+\fIType\fR must be either \fCx\fR, \fCx2\fR, or \fCboth\fR.  The default
+axis is \fCx\fR.
+.VE
+.TP
+\fB\-mapy \fItype\fR
+.VS
+Specifies which y-axis to map the tag's y-coordinates onto.
+\fIType\fR must be either \fCy\fR, \fCy2\fR, or \fCboth\fR.  The default
+axis is \fCy\fR.
+.VE
+.TP
+\fB\-rotate \fItheta\fR
+Specifies how the tag is rotated.
+\fITheta\fR is a real number representing the angle of rotation in degrees.
+The tag is first rotated along its center and is then displayed according 
+to its
+anchor position. The default rotation is \fC0.0\fR degrees.
+.TP
+\fB\-text \fIstring\fR
+Sets the text string.  The exact way
+in which the text string is displayed may be affected by other options
+such as \fB-anchor\fR or \fB-rotate\fR.  This option defaults to the
+empty string.
+.TP
+\fB\-xoffset \fIpixels\fR
+Specifies a x-coordinate offset (in window coordinates) from the
+specified position.  
+.TP
+\fB\-yoffset \fIpixels\fR
+Specifies a y-coordinate offset (in window coordinates) from the
+specified position.  
+.sp 1
+.SS "LINE TAGS"
+A line tag displays one or more connected line segments on the graph.
+Line tags are created with widget commands in the form:
+.DS
+\fIpathName \fBtag create line \fR?\fIcoords\fR? ?\fIoptions...\fR?
+.DE
+The argument \fIcoords\fR specifies a list of numeric
+expressions representing the graph coordinate pairs of the points 
+connecting the line.
+.P
+After the \fIcoords\fR there may be any number of \fIoption\fR-\fIvalue\fR
+pairs, each of which sets one of the configuration options
+for the tag.  These same \fIoption\fR\-\fIvalue\fR pairs may be
+used in the \fBtag configure\fR command to change the tag's
+configuration.
+The following options are supported for line tags:
+.TP
+\fB\-background \fIcolor\fR
+Sets the background color of the line.
+The is only meaningful when used with
+the \fB-stipple\fR option.  
+If this option isn't specified then it defaults to \fCwhite\fR.
+.TP
+\fB\-dashes \fIdashes\fR
+Sets the dash style of the line. \fIDashes\fR
+is the number of alternatingly displayed pixels. If \fIdashes\fR is
+\fC0\fR (the default), the tag will be drawn as a solid line. 
+.TP
+\fB\-element \fIname\fR
+Associates the tag with the element \fIname\fR.  The tag is displayed
+only if an element \fIname\fR exists and is currently displayed (see
+\fBelement show\fR).  If \fIname\fR is the empty
+string (the default), the tag is displayed.
+.TP
+\fB\-foreground \fIcolor\fR
+Sets the foreground color.
+If this option isn't specified then it defaults to \fCblack\fR.
+.TP
+\fB\-linewidth \fIpixels\fR
+Sets the width of the lines.
+The default width is \fC0\fR.
+.TP
+\fB\-mapx \fItype\fR
+.VS
+Specifies which x-axis to map the tag's x-coordinates onto.
+\fIType\fR must be either \fCx\fR, \fCx2\fR, or \fCboth\fR.  The default
+axis is \fCx\fR.
+.VE
+.TP
+\fB\-mapy \fItype\fR
+.VS
+Specifies which y-axis to map the tag's y-coordinates onto.
+\fIType\fR must be either \fCy\fR, \fCy2\fR, or \fCboth\fR.  The default
+axis is \fCy\fR.
+.VE
+.TP
+\fB\-stipple \fIbitmap\fR
+Indicates that the line should be drawn with a stippled pattern rather
+than solid; \fIbitmap\fR specifies the stipple pattern to use, may be
+in any of the forms accepted by \fBTk_GetBitmap\fR.  If \fIbitmap\fR is 
+the empty string (the default) then the line is drawn in a solid fashion.
+.TP
+\fB\-xoffset \fIpixels\fR
+Specifies an offset in the x-coordinate direction
+(in window coordinates) from the specified position.
+The default offset ifs \fC0\fR.
+.TP
+\fB\-yoffset \fIpixels\fR
+Specifies an offset in the y-coordinate direction
+(in window coordinates) from the specified position.
+The default offset ifs \fC0\fR.
+.sp 1
+.SS "BITMAP TAGS"
+A bitmap tag displays a bitmap on the graph.  Bitmap tags are
+created with widget commands in the form:
+.DS
+\fIpathName \fBtag create bitmap \fR?\fIcoords\fR? ?\fIoptions...\fR?
+.DE
+The argument \fIcoords\fR specifies a list containing the graph
+coordinates of a point used to position the bitmap on the display.
+After the coordinate list there may be any number of \fIoption\fR-\fIvalue\fR
+pairs, each of which sets one of the configuration options
+for the tag.  These same \fIoption\fR\-\fIvalue\fR pairs may be
+used in the \fBtag configure\fR command to change the tag's
+configuration.
+The following options are supported for bitmap tags:
+.TP
+\fB\-anchor \fIanchorPos\fR
+\fIAnchorPos\fR tells how to position the bitmap relative to the
+positioning point for the bitmap;  it may have any of the forms
+accepted by \fBTk_GetAnchor\fR.  For example, if \fIanchorPos\fR
+is \fCcenter\fR then the bitmap is centered on the point;  if
+\fIanchorPos\fR is \fCn\fR then the bitmap will be drawn such that
+the top center point of the rectangular region occupied by the
+bitmap will be at the positioning point.
+This option defaults to \fCcenter\fR.
+.TP
+\fB\-background \fIcolor\fR
+Sets the background color of the bitmap.
+If \fIcolor\fR is the empty string,
+the background color will be transparent.
+The default background color is \fCwhite\fR.
+.TP
+\fB\-foreground \fIcolor\fR
+Sets the foreground color of the bitmap.  
+The default foreground color is \fCblack\fR.
+.TP
+\fB\-bitmap \fIbitmap\fR
+Specifies the bitmap to be displayed.
+\fIBitmap\fR may have any of the forms accepted by \fBTk_GetBitmap\fR.
+If \fIbitmap\fR is the empty string (the default), the tag will not be
+displayed.
+.TP
+\fB\-element \fIname\fR
+Associates the tag with the element \fIname\fR.  
+If \fIname\fR is not the empty string (the default), the tag is displayed 
+only if \fIname\fR exists and is being plotted
+(see \fBelement show\fR).  
+.TP
+\fB\-mapx \fItype\fR
+.VS
+Specifies which x-axis to map the tag's x-coordinates onto.
+\fIType\fR must be either \fCx\fR, \fCx2\fR, or \fCboth\fR.  The default
+axis is \fCx\fR.
+.VE
+.TP
+\fB\-mapy \fItype\fR
+.VS
+Specifies which y-axis to map the tag's y-coordinates onto.
+\fIType\fR must be either \fCy\fR, \fCy2\fR, or \fCboth\fR.  The default
+axis is \fCy\fR.
+.VE
+.TP
+\fB\-rotate \fItheta\fR
+Sets the rotation of the bitmap.
+\fITheta\fR is a
+real number representing the angle of rotation in degrees.
+The tag is first rotated and then placed according to its anchor position.
+The default rotation is \fC0.0\fR.
+.TP
+\fB\-xoffset \fIpixels\fR
+Specifies an offset in the x-coordinate direction
+(in window coordinates) from the specified position.
+The default offset is \fC0\fR.
+.TP
+\fB\-yoffset \fIpixels\fR
+Specifies an offset in the y-coordinate direction
+(in window coordinates) from the specified position.
+The default offset is \fC0\fR.
+.sp 1
+.SS "POLYGON TAGS"
+A polygon tag displays a closed region described as two or more 
+connected line segments on the graph. 
+Polygon tags are created with the widget command:
+.DS
+\fIpathName \fBtag create polygon \fR?\fIcoords\fR? ?\fIoptions...\fR?
+.DE
+The argument \fIcoords\fR specifies a list of numeric
+expressions representing graph coordinates which
+describe the closed polygon.
+It is assumed the first and last points are connected.
+.P
+After the coordinate list there may be any number of \fIoption\fR-\fIvalue\fR
+pairs, each of which sets one of the configuration options
+for the tag.  These same \fIoption\fR\-\fIvalue\fR pairs may be
+used in the \fBtag configure\fR command to change the tag's
+configuration.
+The following options are supported for polygon tags:
+.TP
+\fB\-background \fIcolor\fR
+Sets the background color of the polygon.  The default background color 
+is \fCwhite\fR.  If \fIcolor\fR is the empty string, no background color
+.TP
+\fB\-dashes \fIdashes\fR
+.VS
+Sets the dash style of the outline around the polygon. \fIDashes\fR
+is the number of alternatingly displayed pixels. If \fIdashes\fR is
+\fC0\fR (the default), the outline will be drawn as a solid line. 
+.VE
+.TP
+\fB\-element \fIname\fR
+Associates the tag with the element \fIname\fR.  
+If \fIname\fR is not the empty string (the default), the tag is displayed 
+only if \fIname\fR exists and is currently being displayed
+(see \fBelement show\fR).
+.TP
+\fB\-foreground \fIcolor\fR
+Sets the foreground color of the polygon.  
+The default foreground color is \fCblack\fR.
+.TP
+\fB\-linewidth \fIpixels\fR
+.VS
+Sets the width of the outline of the polygon. If \fIpixels\fR is zero, 
+no outline
+is drawn. The default width is \fC0\fR.
+.VE
+.TP
+\fB\-mapx \fItype\fR
+.VS
+Specifies which x-axis to map the tag's x-coordinates onto.
+\fIType\fR must be either \fCx\fR, \fCx2\fR, or \fCboth\fR.  The default
+axis is \fCx\fR.
+.VE
+.TP
+\fB\-mapy \fItype\fR
+.VS
+Specifies which y-axis to map the tag's y-coordinates onto.
+\fIType\fR must be either \fCy\fR, \fCy2\fR, or \fCboth\fR.  The default
+axis is \fCy\fR.
+.VE
+.TP
+\fB\-stipple \fIbitmap\fR
+Indicates that the polygon should be drawn with a stippled pattern
+rather than a solid color;
+\fIbitmap\fR specifies the stipple pattern to use, in any of the
+forms accepted by \fBTk_GetBitmap\fR.
+If \fIbitmap\fR is the empty string (the default), then the polygon
+is filled with a solid (foreground) color.
+.TP
+\fB\-xoffset \fIpixels\fR
+Specifies an x-coordinate offset (in window coordinates)
+from the specified position.  
+The default offset is \fC0\fR.
+.TP
+\fB\-yoffset \fIpixels\fR
+Specifies a y-coordinate offset (in window coordinates)
+from the specified position. 
+The default is offset \fC0\fR.
+.sp 1
+.SS "WINDOW TAGS"
+A window tag displays a particular window at a given position on the graph.
+Window tags are created with the widget command:
+.DS
+\fIpathName \fBtag create window \fR?\fIcoords\fR? ?\fIoptions...\fR?
+.DE
+The argument \fIcoords\fR specifies a list containing the graph
+coordinates of a point used to position the window on the display 
+After \fIcoords\fR, there may be any number of \fIoption\fR-\fIvalue\fR
+pairs, each of which sets one of the configuration options
+for the tag.  These same \fIoption\fR\-\fIvalue\fR pairs may be
+used in the \fBtag configure\fR command to change the tag's
+configuration.
+The following options are supported for window tags:
+.TP
+\fB\-anchor \fIanchorPos\fR
+\fIAnchorPos\fR tells how to position the window relative to the
+positioning point for the window;  it may have any of the forms
+accepted by \fBTk_GetAnchor\fR.  For example, if \fIanchorPos\fR
+is \fCcenter\fR then the window is centered on the point;  if
+\fIanchorPos\fR is \fCn\fR then the window will be displayed such that
+the top center point of the rectangular region occupied by the
+window will be at the positioning point.
+This option defaults to \fCcenter\fR.
+.TP
+\fB\-element \fIname\fR
+Associates the tag with the element \fIname\fR.  
+If \fIname\fR is not the empty string, the tag is displayed 
+only if \fIname\fR exists and is currently being displayed 
+(see \fBelement show\fR).  
+This option defaults to the empty string.
+.TP
+\fB\-height \fIpixels\fR
+Specifies the height to assign to the tag's window.
+If this option isn't specified, or if it is specified as the empty
+string, then the window is given whatever height it requests internally.
+.TP
+\fB\-mapx \fItype\fR
+.VS
+Specifies which x-axis to map the tag's x-coordinates onto.
+\fIType\fR must be either \fCx\fR, \fCx2\fR, or \fCboth\fR.  The default
+axis is \fCx\fR.
+.VE
+.TP
+\fB\-mapy \fItype\fR
+.VS
+Specifies which y-axis to map the tag's y-coordinates onto.
+\fIType\fR must be either \fCy\fR, \fCy2\fR, or \fCboth\fR.  The default
+axis is \fCy\fR.
+.VE
+.TP
+\fB\-width \fIpixels\fR
+Specifies the width to assign to the tag's window.
+If this option isn't specified, or if it is specified as the empty
+string, then the window is given whatever width it requests internally.
+.TP
+\fB\-window \fIpathName\fR
+Specifies the window to be managed by the graph.
+The window specified by \fIpathName\fR must be a child of
+the \fBblt_barchart\fR widget.
+.TP
+\fB\-xoffset \fIpixels\fR
+Specifies an x-coordinate offset (in window coordinates)
+from the specified position. 
+The default offset is \fC0\fR.
+.TP
+\fB\-yoffset \fIpixels\fR
+Specifies a y-coordinate offset (in window coordinates)
+from the specified position.  
+The default offset is \fC0\fR.
+.sp 1
+.SS "POSTSCRIPT OPTIONS"
+The following options are valid for configuring PostScript output using either 
+the \fBpostscript\fR or the \fBpsconfigure\fR command. 
+.DS
+\fIpathName \fBpostscript \fR?\fIfileName\fR? \fIoptions...\fR?
+
+\fIpathName \fBpsconfigure ?\fIoptions...\fR?
+.DE
+.TP
+\fB\-colormap \fIvarName\fR
+\fIVarName\fR must be the name of a global array variable
+that specifies a color mapping from the X color name to PostScript.
+Each element of \fIvarName\fR must consist of PostScript
+code to set a particular color value (e.g. ``\fC1.0 1.0 0.0 setrgbcolor\fR'').
+When outputting color information in PostScript, it checks
+to see if there is an element of \fIvarName\fR with the same
+name as the color. If so, it uses the value of the element as the 
+PostScript command to set the color.
+If this option hasn't been specified, or if there isn't an entry
+in \fIvarName\fR for a given color, then it uses the red, green,
+and blue intensities from the X color.
+.TP
+\fB\-colormode \fImode\fR
+Specifies how to output color information.  \fIMode\fR must be either
+\fBcolor\fR (for full color output), \fCgray\fR (convert all colors
+to their gray-scale equivalents) or \fCmono\fR (convert foreground colors
+to black and background colors to white).  The default mode is \fCcolor\fR.
+.TP
+\fB\-fontmap \fIvarName\fR
+\fIVarName\fR must be the name of a global array variable
+that specifies a font mapping from the X font name to PostScript.
+Each element of \fIvarName\fR must consist of a Tcl list with
+one or two elements, which are the name and point size of a PostScript font.
+When outputting PostScript commands for a particular font, Tk
+checks to see if \fIvarName\fR contains an element with the same
+name as the specified font. 
+If there is such an element, then the font information contained in
+that element is used in the PostScript output.  (If the point size 
+is omitted from the list, the point size of the X font is used).
+Otherwise the X font is examined in an attempt to guess what PostScript 
+font to use.  This works only for fonts whose foundry property is
+\fIAdobe\fR (such as Times, Helvetica, Courier, etc.).  If all of 
+this fails then the font defaults to \fCHelvetica-Bold\fR.
+.TP
+\fB\-landscape \fIboolean\fR
+If \fIboolean\fR is \fCtrue\fR, this specifies the printed area is to 
+be rotated 90 degrees.
+In non-rotated output the \f(BIx\fR axis of the printed area runs along
+the short dimension of the page (``portrait'' orientation);
+in rotated output the \f(BIx\fR axis runs along the long dimension of the
+page (``landscape'' orientation).
+Defaults to \fCfalse\fR.
+.TP
+\fB\-pageanchor \fIanchor\fR
+Specifies which point of the printed area should be appear over
+the positioning point on the page (which is given by the \fB\-pagex\fR
+and \fB\-pagey\fR options).
+For example, \fB\-pageanchor n\fR means that the top center of the
+printed area should be over the positioning point.
+Defaults to \fCnw\fR.
+.TP
+\fB\-pageheight \fIsize\fR
+Specifies that the height of the graph drawn in PostScript.
+The graph is \fInot\fR uniformly scaled since this also scales
+the fonts.  \fISize\fR may be any value accepted by \fBTk_GetPixels\fR.
+The resulting pixel value is then converted to postscript printer
+points.  This means that a height \fI8i\fR will be properly
+converted to 8 inches. This options defaults to the height of the graph window.
+.TP
+\fB\-pagewidth \fIsize\fR
+Specifies that the width of the graph drawn in PostScript.
+The graph is \fInot\fR uniformly scaled since this also scales
+the fonts.  \fISize\fR may be any value accepted by \fBTk_GetPixels\fR.
+The resulting pixel value is then converted to postscript printer
+points.  This means that a width \fI6.5i\fR will be properly
+converted to 6.5 inches. This options defaults to the width of the graph window.
+.TP
+\fB\-pagex \fIposition\fR
+Specifies the x-coordinate of the page positioning point.
+This (with the \fB-pageanchor\fR option) indicates 
+where the graph is placed on the PostScript page.
+\fIPosition\fR may be any value accepted by 
+\fBTk_GetPixels\fR. The resulting pixel value is then converted to 
+postscript printer points.  The default is \fC1i\fR.
+.TP
+\fB\-pagey \fIposition\fR
+Specifies the y-coordinate of the page positioning point.
+This (with the \fB-pageanchor\fR option) indicates 
+where the graph is placed on the PostScript page.
+\fIPosition\fR may be any value accepted by 
+\fBTk_GetPixels\fR. The resulting pixel value is then converted to 
+postscript printer points.  The default is \fC1i\fR.
+.SH BINDINGS
+.PP
+There are no default bindings. 
+.SH BUGS
+.PP
+Auto-scale routines do not use requested min/max limits
+as boundaries when the axis is logarithmically scaled.  
+.PP
+The needs to be a special mapping for undefined log scale values (>= 0.0). 
+Possibly set up a "red zone" of undefined values which divides the 
+positive and negative values.
+.PP
+The PostScript output generated for polygons with more than 1500 points 
+may exceed the limits of some printers (See PostScript Language Reference 
+Manual, page 568).  The work-around is to break the polygon into
+separate pieces.
+.PP
