@@ -1,5 +1,6 @@
 #	@(#)Makefile	5.7 (Berkeley) 6/27/91
 LIBDIR= /usr/local/lib
+NOPROFILE= no
 
 SHLIB_MAJOR= 1
 SHLIB_MINOR= 0
