@@ -1,5 +1,5 @@
-srcdir=.
-VPATH=.
+srcdir=/usr/ports/editor/emacs/src
+VPATH=/usr/ports/editor/emacs/src
 CC=gcc
 CPP=gcc -E
 CFLAGS=-g -O 

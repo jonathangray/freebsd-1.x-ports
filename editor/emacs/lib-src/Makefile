@@ -22,7 +22,7 @@ C_SWITCH_SYSTEM=
 LOADLIBES= -lutil 
 YACC=yacc
 version=19.21
-configname=i386--freebsd
+configname=i386--freebsd1.1.0
 
 # ==================== Where To Install Things ====================
 
@@ -31,7 +31,7 @@ configname=i386--freebsd
 # the variables below are expressed in terms of this one, so you may
 # not need to change them.  This is set with the --prefix option to
 # `../configure'.
-prefix=/usr/gnu
+prefix=/usr/local
 
 # Like `prefix', but used for architecture-specific files.  This is
 # set with the --exec-prefix option to `../configure'.
@@ -52,8 +52,8 @@ libdir=${exec_prefix}/lib
 # script's `--srcdir' option.  However, the value of ${srcdir} in
 # this makefile is not identical to what was specified with --srcdir,
 # since the variable here has `/lib-src' added at the end.
-srcdir=.
-VPATH=.
+srcdir=/usr/ports/editor/emacs/lib-src
+VPATH=/usr/ports/editor/emacs/lib-src
 
 # ==================== Emacs-specific directories ====================
 

@@ -56,7 +56,7 @@ version=19.21
 
 ### This should be the name of the configuration we're building Emacs
 ### for, like `mips-dec-ultrix' or `sparc-sun-sunos'.
-configuration=i386--freebsd
+configuration=i386--freebsd1.1.0
 
 ### Libraries which should be edited into lib-src/Makefile.
 libsrc_libs= -lutil 
@@ -67,7 +67,7 @@ libsrc_libs= -lutil
 # subdirectories of this directory.  The default values for many of
 # the variables below are expressed in terms of this one, so you may
 # not need to change them.  This defaults to /usr/local.
-prefix=/usr/gnu
+prefix=/usr/local
 
 # Like `prefix', but used for architecture-specific files.
 exec_prefix=${prefix}
@@ -105,10 +105,10 @@ infodir=${prefix}/info
 # expected to be in ${srcdir}/src, and the source code for Emacs's
 # utility programs is expected to be in ${srcdir}/lib-src.  This is
 # set by the configure script's `--srcdir' option.
-srcdir=.
+srcdir=/usr/ports/editor/emacs
 
 # Tell make where to find source files; this is needed for the makefiles.
-VPATH=.
+VPATH=/usr/ports/editor/emacs
 
 # ==================== Emacs-specific directories ====================
 
@@ -141,7 +141,7 @@ lisppath=${locallisppath}:${lispdir}
 # entry for the directory containing the installed lisp
 # files has been replaced with ../lisp.  This should be a
 # colon-separated list of directories.
-buildlisppath=../lisp
+buildlisppath=${srcdir}/lisp
 
 # Where to install the other architecture-independent
 # data files distributed with Emacs (like the tutorial,
@@ -188,7 +188,13 @@ SUBDIR_MAKEFILES = lib-src/Makefile src/Makefile oldXMenu/Makefile
 COPYDIR = ${srcdir}/etc ${srcdir}/lisp
 COPYDESTS = ${etcdir} ${lispdir}
 
-all:	src/paths.h ${SUBDIR}
+all:	setup src/paths.h ${SUBDIR}
+
+pkg: install
+	pkg_create -d pkg/+DESC -f pkg/+CONTENTS -c pkg/+COMMENT emacs_bin
+
+setup:
+	@if [ -f src/config.h ]; then touch src/config.h; fi
 
 removenullpaths=sed -e 's/^://' -e 's/:$$//' -e 's/::/:/'
 
