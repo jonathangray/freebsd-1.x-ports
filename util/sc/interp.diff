@@ -1,0 +1,82 @@
+*** interp.c.orig	Mon Jul 12 06:29:48 1993
+--- interp.c	Sun Jul 11 07:38:45 1993
+***************
+*** 51,56 ****
+--- 51,60 ----
+  char *regcmp();
+  char *regex();
+  #endif
++ #if defined(REGEX)
++ #include "regex.h"
++ #endif
++ 
+  
+  #ifdef SIGVOID
+      void doquit();
+***************
+*** 1666,1671 ****
+--- 1670,1679 ----
+      curcol = c;
+  }
+  
++ #if defined(REGEX)
++ regex_t rexp;
++ #endif
++ 
+  /* 'goto' a cell containing a matching string */
+  void
+  str_search(s)
+***************
+*** 1691,1696 ****
+--- 1699,1712 ----
+  	return;
+      }
+  #endif
++ #if defined(REGEX)
++     if (regcomp(&rexp, s, 0) != 0) {
++ 	scxfree(s);
++ 	cellerror = CELLERROR;
++ 	error("Invalid search string");
++ 	return;
++     }
++ #endif
+      g_free();
+      gs.g_type = G_STR;
+      gs.g_s = s;
+***************
+*** 1720,1725 ****
+--- 1736,1745 ----
+  	    error("String not found");
+  #if defined(REGCMP)
+  	    free(tmp);
++ #else
++ #if defined(REGEX)
++ 	    regfree(&rexp);
++ #endif
+  #endif
+  	    return;
+  	}
+***************
+*** 1731,1743 ****
+--- 1751,1771 ----
+  #if defined(REGCMP)
+  				|| (regex(tmp, p->label) == (char *)0));
+  #else
++ #if defined(REGEX)
++ 				|| regexec(&rexp, p->label, 0, NULL, 0) != 0);
++ #else
+  					|| (strcmp(s, p->label) != 0));
+  #endif
+  #endif
++ #endif
+      currow = r;
+      curcol = c;
+  #if defined(REGCMP)
+      free(tmp);
++ #else
++ #if defined(REGEX)
++     regfree(&rexp);
++ #endif
+  #endif
+  }
+  
