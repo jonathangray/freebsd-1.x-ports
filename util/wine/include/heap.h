@@ -1,4 +1,4 @@
-/* $Id: heap.h,v 1.1.1.3 1994/05/19 07:56:06 hsu Exp $
+/* $Id: heap.h,v 1.1.1.4 1994/07/05 08:17:59 hsu Exp $
  */
 /*
  * Copyright  Robert J. Amstadt, 1993
@@ -27,6 +27,7 @@ typedef struct heap_local_heap_s
     MDESC *free_list;
     ATOMTABLE *local_table;
     unsigned short selector;
+    unsigned short delta;		/* Number saved for Windows compat. */
 } LHEAP;
 
 extern void HEAP_Init(MDESC **free_list, void *start, int length);
@@ -35,6 +36,7 @@ extern int  HEAP_Free(MDESC **free_list, void *block);
 extern void *HEAP_ReAlloc(MDESC **free_list, void *old_block, 
 			  int new_size, unsigned int flags);
 extern LHEAP *HEAP_LocalFindHeap(unsigned short owner);
+extern unsigned int HEAP_LocalSize(MDESC **free_list, unsigned int handle);
 
 #define HEAP_OWNER	(Segments[Stack16Frame[11] >> 3].owner)
 #define LOCALHEAP()	(&HEAP_LocalFindHeap(HEAP_OWNER)->free_list)

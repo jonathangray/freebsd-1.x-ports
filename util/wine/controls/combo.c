@@ -78,9 +78,9 @@ LONG ComboBoxWndProc( HWND hwnd, WORD message, WORD wParam, LONG lParam )
 				0, 0, width - bm.bmHeight, bm.bmHeight, 
 				hwnd, 1, wndPtr->hInstance, 0L);
 		lphc->hWndLBox = CreateWindow("LISTBOX", "", 
-			WS_CHILD | WS_CLIPCHILDREN | WS_BORDER | WS_VSCROLL | LBS_NOTIFY,
-			wndPtr->rectClient.left, wndPtr->rectClient.top + bm.bmHeight, 
-			width, height, wndPtr->hwndParent, 1, 
+			WS_POPUP | WS_BORDER | WS_VSCROLL | LBS_NOTIFY,
+			rect.left, rect.top + bm.bmHeight, 
+			width, height, wndPtr->hwndParent, 0, 
 			wndPtr->hInstance, (LPSTR)MAKELONG(0, hwnd));
 		ShowWindow(lphc->hWndLBox, SW_HIDE);
 #ifdef DEBUG_COMBO
@@ -103,6 +103,14 @@ LONG ComboBoxWndProc( HWND hwnd, WORD message, WORD wParam, LONG lParam )
 		printf("Combo WM_DESTROY %lX !\n", lphc);
 #endif
 		return DefWindowProc( hwnd, message, wParam, lParam );
+	case WM_SHOWWINDOW:
+#ifdef DEBUG_COMBO
+		printf("ComboBox WM_SHOWWINDOW hWnd=%04X !\n", hwnd);
+#endif
+		if (!(wParam == 0 && lParam == 0L)) {
+			InvalidateRect(hwnd, NULL, TRUE);
+			}
+	    break;
 	
     case WM_COMMAND:
 		wndPtr = WIN_FindWndPtr(hwnd);
@@ -263,7 +271,9 @@ LONG ComboBoxWndProc( HWND hwnd, WORD message, WORD wParam, LONG lParam )
 		if (lphc == NULL) return 0;
 		return(SendMessage(lphc->hWndLBox, LB_ADDSTRING, wParam, lParam));
     case CB_GETLBTEXT:
+#ifdef DEBUG_COMBO
 		printf("CB_GETLBTEXT #%u !\n", wParam);
+#endif
 		lphc = ComboGetStorageHeader(hwnd);
 		if (lphc == NULL) return 0;
 		return(SendMessage(lphc->hWndLBox, LB_GETTEXT, wParam, lParam));

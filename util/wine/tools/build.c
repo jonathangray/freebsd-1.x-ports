@@ -1,4 +1,4 @@
-static char RCSId[] = "$Id: build.c,v 1.1.1.2 1994/04/22 01:54:20 hsu Exp $";
+static char RCSId[] = "$Id: build.c,v 1.1.1.3 1994/07/05 08:23:33 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
 #include <stdio.h>
@@ -27,7 +27,8 @@ static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 #define EQUATETYPE_ABS	18
 #define TYPE_RETURN	20
 
-#define MAX_ORDINALS	1024
+/*#define MAX_ORDINALS	1024*/
+#define MAX_ORDINALS	1299
 
 #define PUSH_0		"\tpushl\t$0\n"
 #define PUSH_SS		"\tpushw\t$0\n\tpushw\t%%ss\n"
@@ -50,7 +51,7 @@ static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 #define POP_0		"\tadd\t$4,%%esp\n"
 #define POP_SS		"\tpopw\t%%ss\n\tadd\t$2,%%esp\n"
 #define POP_ESP		"\tpopl\t%%esp\n"
-#define POP_EFL		"\tpopfl\n"
+#define POP_EFL		"\tpopl\t%%gs:return_value\n"
 #define POP_CS		"\tpopw\t%%cs\n\tadd\t$2,%%esp\n"
 #define POP_EIP		"\tpopl\t$0\n"
 #define POP_DS		"\tpopw\t%%ds\n\tadd\t$2,%%esp\n"
@@ -728,6 +729,8 @@ main(int argc, char **argv)
     
 	if (add_count > 0)
 	    fprintf(fp, "\tadd\t$%d,%%esp\n", add_count);
+
+	fprintf(fp, "\tpushl\t%%gs:return_value\n\tpopfl\n");
 		
 	fclose(fp);
 	exit(0);

@@ -12,6 +12,7 @@ static char Copyright[] = "Copyright  Alexandre Julliard, 1993";
 #include <X11/Intrinsic.h>
 
 #include "gdi.h"
+#include "metafile.h"
 
 extern const int DC_XROPfunction[];
 
@@ -28,7 +29,15 @@ BOOL PatBlt( HDC hdc, short left, short top,
     int x1, x2, y1, y2;
     
     DC * dc = (DC *) GDI_GetObjPtr( hdc, DC_MAGIC );
-    if (!dc) return FALSE;
+    if (!dc) 
+    {
+	dc = (DC *)GDI_GetObjPtr(hdc, METAFILE_DC_MAGIC);
+	if (!dc) return FALSE;
+	MF_MetaParam6(dc, META_PATBLT, left, top, width, height,
+		      HIWORD(rop), LOWORD(rop));
+	return TRUE;
+    }
+
 #ifdef DEBUG_GDI
     printf( "PatBlt: %d %d,%d %dx%d %06x\n",
 	    hdc, left, top, width, height, rop );
@@ -57,6 +66,7 @@ BOOL BitBlt( HDC hdcDest, short xDest, short yDest, short width, short height,
 {
     int xs1, xs2, ys1, ys2;
     int xd1, xd2, yd1, yd2;
+    DWORD saverop = rop;
     DC *dcDest, *dcSrc;
 
 #ifdef DEBUG_GDI    
@@ -74,10 +84,17 @@ BOOL BitBlt( HDC hdcDest, short xDest, short yDest, short width, short height,
 	return FALSE;
     }
     
-    dcDest = (DC *) GDI_GetObjPtr( hdcDest, DC_MAGIC );
-    if (!dcDest) return FALSE;
     dcSrc = (DC *) GDI_GetObjPtr( hdcSrc, DC_MAGIC );
     if (!dcSrc) return FALSE;
+    dcDest = (DC *) GDI_GetObjPtr( hdcDest, DC_MAGIC );
+    if (!dcDest) 
+    {
+	dcDest = (DC *)GDI_GetObjPtr(hdcDest, METAFILE_DC_MAGIC);
+	if (!dcDest) return FALSE;
+	MF_BitBlt(dcDest, xDest, yDest, width, height,
+		  hdcSrc, xSrc, ySrc, saverop);
+	return TRUE;
+    }
 
     xs1 = dcSrc->w.DCOrgX + XLPTODP( dcSrc, xSrc );
     xs2 = dcSrc->w.DCOrgX + XLPTODP( dcSrc, xSrc + width );
@@ -310,6 +327,7 @@ BOOL StretchBlt( HDC hdcDest, short xDest, short yDest, short widthDest, short h
     int xd1, xd2, yd1, yd2;
     DC *dcDest, *dcSrc;
     XImage *sxi, *dxi;
+    DWORD saverop = rop;
     WORD stretchmode;
 	BOOL	flg;
 
@@ -342,10 +360,17 @@ BOOL StretchBlt( HDC hdcDest, short xDest, short yDest, short widthDest, short h
         return FALSE;
     }
 
-    dcDest = (DC *) GDI_GetObjPtr( hdcDest, DC_MAGIC );
-    if (!dcDest) return FALSE;
     dcSrc = (DC *) GDI_GetObjPtr( hdcSrc, DC_MAGIC );
     if (!dcSrc) return FALSE;
+    dcDest = (DC *) GDI_GetObjPtr( hdcDest, DC_MAGIC );
+    if (!dcDest) 
+    {
+	dcDest = (DC *)GDI_GetObjPtr(hdcDest, METAFILE_DC_MAGIC);
+	if (!dcDest) return FALSE;
+	MF_StretchBlt(dcDest, xDest, yDest, widthDest, heightDest,
+		  hdcSrc, xSrc, ySrc, widthSrc, heightSrc, saverop);
+	return TRUE;
+    }
 
     xs1 = dcSrc->w.DCOrgX + XLPTODP( dcSrc, xSrc );
     xs2 = dcSrc->w.DCOrgX + XLPTODP( dcSrc, xSrc + widthSrc );

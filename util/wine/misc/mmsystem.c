@@ -8,77 +8,207 @@ static char Copyright[] = "Copyright  Martin Ayotte, 1993";
 
 #include "stdio.h"
 #include "win.h"
+#include "driver.h"
 #include "mmsystem.h"
 
 static WORD		mciActiveDev = 0;
+static BOOL		mmTimeStarted = FALSE;
+static MMTIME	mmSysTimeMS;
+static MMTIME	mmSysTimeSMPTE;
+
+typedef struct tagTIMERENTRY {
+	WORD		wDelay;
+	WORD		wResol;
+	FARPROC		lpFunc;
+	DWORD		dwUser;
+	WORD		wFlags;
+	WORD		wTimerID;
+	WORD		wCurTime;
+	struct tagTIMERENTRY	*Next;
+	struct tagTIMERENTRY	*Prev;
+	} TIMERENTRY;
+typedef TIMERENTRY *LPTIMERENTRY;
+
+static LPTIMERENTRY lpTimerList = NULL;
+
+UINT WINAPI midiGetErrorText(UINT uError, LPSTR lpText, UINT uSize);
+UINT WINAPI waveGetErrorText(UINT uError, LPSTR lpText, UINT uSize);
 
 
-int MCI_LibMain(HANDLE hInstance, WORD wDataSeg,
+/**************************************************************************
+* 				MMSYSTEM_WEP		[MMSYSTEM.1]
+*/
+int MMSYSTEM_WEP(HANDLE hInstance, WORD wDataSeg,
 		 WORD cbHeapSize, LPSTR lpCmdLine)
 {
 	printf("MMSYSTEM DLL INIT ... hInst=%04X \n", hInstance);
 	return(TRUE);
 }
 
-
+/**************************************************************************
+* 				sndPlaySound		[MMSYSTEM.2]
+*/
 BOOL WINAPI sndPlaySound(LPCSTR lpszSoundName, UINT uFlags)
 {
-	printf("sndPlaySound // lpszSoundName='%s' uFlags=%04X !\n", 
+	printf("EMPTY STUB !!! sndPlaySound // SoundName='%s' uFlags=%04X !\n", 
 										lpszSoundName, uFlags);
 	return 0;
 }
 
-
-
+/**************************************************************************
+* 				mmsystemGetVersion	[MMSYSTEM.5]
+*/
 WORD WINAPI mmsystemGetVersion()
 {
 	printf("mmsystemGetVersion // 0.4.0 ...?... :-) !\n");
 	return(0x0040);
 }
 
+/**************************************************************************
+* 				DriverProc	[MMSYSTEM.6]
+*/
+LRESULT DriverProc(DWORD dwDevID, HDRVR hDriv, WORD wMsg, 
+						DWORD dwParam1, DWORD dwParam2)
+{
+	return DrvDefDriverProc(dwDevID, hDriv, wMsg, dwParam1, dwParam2);
+}
 
+/**************************************************************************
+* 				OutputDebugStr		[MMSYSTEM.30]
+*/
 void WINAPI OutputDebugStr(LPCSTR str)
 {
-	printf("OutputDebugStr('%s');\n", str);
+	printf("EMPTY STUB !!! OutputDebugStr('%s');\n", str);
+}
+
+/**************************************************************************
+* 				DriverCallback	[MMSYSTEM.31]
+*/
+BOOL DriverCallback(DWORD dwCallBack, UINT uFlags, HANDLE hDev, 
+		WORD wMsg, DWORD dwUser, DWORD dwParam1, DWORD dwParam2)
+{
+	printf("EMPTY STUB !!! DriverCallback() !\n");
+}
+
+/**************************************************************************
+* 				JoyGetNumDevs		[MMSYSTEM.101]
+*/
+WORD JoyGetNumDevs()
+{
+	printf("EMPTY STUB !!! JoyGetNumDevs();\n");
+	return 0;
+}
+
+/**************************************************************************
+* 				JoyGetDevCaps		[MMSYSTEM.102]
+*/
+WORD JoyGetDevCaps(WORD wID, LPJOYCAPS lpCaps, WORD wSize)
+{
+	printf("EMPTY STUB !!! JoyGetDevCaps(%04X, %08X, %d);\n", 
+										wID, lpCaps, wSize);
+	return MMSYSERR_NODRIVER;
+}
+
+/**************************************************************************
+* 				JoyGetPos			[MMSYSTEM.103]
+*/
+WORD JoyGetPos(WORD wID, LPJOYINFO lpInfo)
+{
+	printf("EMPTY STUB !!! JoyGetPos(%04X, %08X);\n", wID, lpInfo);
+	return MMSYSERR_NODRIVER;
+}
+
+/**************************************************************************
+* 				JoyGetThreshold		[MMSYSTEM.104]
+*/
+WORD JoyGetThreshold(WORD wID, LPWORD lpThreshold)
+{
+	printf("EMPTY STUB !!! JoyGetThreshold(%04X, %08X);\n", wID, lpThreshold);
+	return MMSYSERR_NODRIVER;
+}
+
+/**************************************************************************
+* 				JoyReleaseCapture	[MMSYSTEM.105]
+*/
+WORD JoyReleaseCapture(WORD wID)
+{
+	printf("EMPTY STUB !!! JoyReleaseCapture(%04X);\n", wID);
+	return MMSYSERR_NODRIVER;
+}
+
+/**************************************************************************
+* 				JoySetCapture		[MMSYSTEM.106]
+*/
+WORD JoySetCapture(HWND hWnd, WORD wID, WORD wPeriod, BOOL bChanged)
+{
+	printf("EMPTY STUB !!! JoySetCapture(%04X, %04X, %d, %d);\n", 
+							hWnd, wID, wPeriod, bChanged);
+	return MMSYSERR_NODRIVER;
+}
+
+/**************************************************************************
+* 				JoySetThreshold		[MMSYSTEM.107]
+*/
+WORD JoySetThreshold(WORD wID, WORD wThreshold)
+{
+	printf("EMPTY STUB !!! JoySetThreshold(%04X, %d);\n", wID, wThreshold);
+	return MMSYSERR_NODRIVER;
+}
+
+/**************************************************************************
+* 				JoySetCalibration	[MMSYSTEM.109]
+*/
+WORD JoySetCalibration(WORD wID)
+{
+	printf("EMPTY STUB !!! JoySetCalibration(%04X);\n", wID);
+	return MMSYSERR_NODRIVER;
 }
 
 
+/**************************************************************************
+* 				auxGetNumDevs		[MMSYSTEM.350]
+*/
 UINT WINAPI auxGetNumDevs()
 {
 	printf("auxGetNumDevs !\n");
 	return 0;
 }
 
-
+/**************************************************************************
+* 				auxGetDevCaps		[MMSYSTEM.351]
+*/
 UINT WINAPI auxGetDevCaps(UINT uDeviceID, AUXCAPS FAR* lpCaps, UINT uSize)
 {
 	printf("auxGetDevCaps !\n");
 	return 0;
 }
 
-
+/**************************************************************************
+* 				auxGetVolume		[MMSYSTEM.352]
+*/
 UINT WINAPI auxGetVolume(UINT uDeviceID, DWORD FAR* lpdwVolume)
 {
 	printf("auxGetVolume !\n");
 	return 0;
 }
 
-
-
+/**************************************************************************
+* 				auxSetVolume		[MMSYSTEM.353]
+*/
 UINT WINAPI auxSetVolume(UINT uDeviceID, DWORD dwVolume)
 {
 	printf("auxSetVolume !\n");
 	return 0;
 }
 
-
+/**************************************************************************
+* 				auxOutMessage		[MMSYSTEM.354]
+*/
 DWORD WINAPI auxOutMessage(UINT uDeviceID, UINT uMessage, DWORD dw1, DWORD dw2)
 {
 	printf("auxOutMessage !\n");
 	return 0L;
 }
-
-
 
 /**************************************************************************
 * 				mciGetErrorString		[MMSYSTEM.706]
@@ -87,6 +217,7 @@ BOOL mciGetErrorString (DWORD wError, LPSTR lpstrBuffer, UINT uLength)
 {
 	LPSTR	msgptr;
 	int		maxbuf;
+	printf("mciGetErrorString(%04X, %08X, %d);\n", wError, lpstrBuffer, uLength);
 	if ((lpstrBuffer == NULL) || (uLength < 1)) return(FALSE);
 	lpstrBuffer[0] = '\0';
 	switch(wError) {
@@ -358,6 +489,7 @@ DWORD mciWaveOpen(UINT wDevID, DWORD dwParam, LPMCI_WAVE_OPEN_PARMS lpParms)
 */
 DWORD mciOpen(UINT wDevID, DWORD dwParam, LPMCI_OPEN_PARMS lpParms)
 {
+	char	str[128];
 	DWORD	dwDevTyp = 0;
 	if (lpParms == NULL) return MCIERR_INTERNAL;
 	printf("mciOpen(%04X, %08X, %08X)\n", wDevID, dwParam, lpParms);
@@ -368,19 +500,22 @@ DWORD mciOpen(UINT wDevID, DWORD dwParam, LPMCI_OPEN_PARMS lpParms)
 			dwDevTyp = (DWORD)lpParms->lpstrDeviceType;
 			}
 		else {
-			if (strcmp(lpParms->lpstrDeviceType, "cdaudio") == 0) {
+			printf("MCI_OPEN // Dev='%s' !\n", lpParms->lpstrDeviceType);
+			strcpy(str, lpParms->lpstrDeviceType);
+			AnsiUpper(str);
+			if (strcmp(str, "CDAUDIO") == 0) {
 				dwDevTyp = MCI_DEVTYPE_CD_AUDIO;
 				}
 			else
-			if (strcmp(lpParms->lpstrDeviceType, "waveaudio") == 0) {
+			if (strcmp(str, "WAVEAUDIO") == 0) {
 				dwDevTyp = MCI_DEVTYPE_WAVEFORM_AUDIO;
 				}
 			else
-			if (strcmp(lpParms->lpstrDeviceType, "Sequencer") == 0)	{
+			if (strcmp(str, "SEQUENCER") == 0)	{
 				dwDevTyp = MCI_DEVTYPE_SEQUENCER;
 				}
 			else
-			if (strcmp(lpParms->lpstrDeviceType, "Animation1") == 0) {
+			if (strcmp(str, "ANIMATION1") == 0) {
 				dwDevTyp = MCI_DEVTYPE_ANIMATION;
 				}
 			}
@@ -530,7 +665,6 @@ DWORD mciSendCommand(UINT wDevID, UINT wMsg, DWORD dwParam1, DWORD dwParam2)
 	return MCIERR_DEVICE_NOT_INSTALLED;
 }
 
-
 /**************************************************************************
 * 				mciGetDeviceID			[MMSYSTEM.703]
 */
@@ -539,8 +673,6 @@ UINT mciGetDeviceID (LPCSTR lpstrName)
 	printf("mciGetDeviceID(%s)\n", lpstrName);
 	return 0;
 }
-
-
 
 /**************************************************************************
 * 				mciSendString			[MMSYSTEM.702]
@@ -554,55 +686,47 @@ DWORD WINAPI mciSendString (LPCSTR lpstrCommand,
 	return MCIERR_MISSING_COMMAND_STRING;
 }
 
-
-
-HMMIO WINAPI mmioOpen(LPSTR szFileName, MMIOINFO FAR* lpmmioinfo, DWORD dwOpenFlags)
+/**************************************************************************
+* 				mciSetYieldProc		[MMSYSTEM.714]
+*/
+BOOL WINAPI mciSetYieldProc (UINT uDeviceID, 
+		YIELDPROC fpYieldProc, DWORD dwYieldData)
 {
-	printf("mmioOpen('%s', %08X, %08X);\n", szFileName, lpmmioinfo, dwOpenFlags);
-	return 0;
 }
 
-
-    
-UINT WINAPI mmioClose(HMMIO hmmio, UINT uFlags)
+/**************************************************************************
+* 				mciGetDeviceIDFromElementID	[MMSYSTEM.715]
+*/
+UINT WINAPI mciGetDeviceIDFromElementID(DWORD dwElementID, LPCSTR lpstrType)
 {
-	printf("mmioClose(%04X, %04X);\n", hmmio, uFlags);
-	return 0;
 }
 
-
-
-LONG WINAPI mmioRead(HMMIO hmmio, HPSTR pch, LONG cch)
+/**************************************************************************
+* 				mciGetYieldProc		[MMSYSTEM.716]
+*/
+YIELDPROC WINAPI mciGetYieldProc(UINT uDeviceID, DWORD FAR* lpdwYieldData)
 {
-	printf("mmioRead\n");
-	return 0;
 }
 
-
-
-LONG WINAPI mmioWrite(HMMIO hmmio, HPCSTR pch, LONG cch)
+/**************************************************************************
+* 				mciGetCreatorTask	[MMSYSTEM.717]
+*/
+HTASK WINAPI mciGetCreatorTask(UINT uDeviceID)
 {
-	printf("mmioWrite\n");
-	return 0;
 }
 
-
-LONG WINAPI mmioSeek(HMMIO hmmio, LONG lOffset, int iOrigin)
-{
-	printf("mmioSeek\n");
-	return 0;
-}
-
-
-
+/**************************************************************************
+* 				midiOutGetNumDevs	[MMSYSTEM.201]
+*/
 UINT WINAPI midiOutGetNumDevs(void)
 {
 	printf("midiOutGetNumDevs\n");
 	return 0;
 }
 
-
-
+/**************************************************************************
+* 				midiOutGetDevCaps	[MMSYSTEM.202]
+*/
 UINT WINAPI midiOutGetDevCaps(UINT uDeviceID,
     MIDIOUTCAPS FAR* lpCaps, UINT uSize)
 {
@@ -610,21 +734,9 @@ UINT WINAPI midiOutGetDevCaps(UINT uDeviceID,
 	return 0;
 }
 
-
-UINT WINAPI midiOutGetVolume(UINT uDeviceID, DWORD FAR* lpdwVolume)
-{
-	printf("midiOutGetVolume\n");
-	return 0;
-}
-
-
-UINT WINAPI midiOutSetVolume(UINT uDeviceID, DWORD dwVolume)
-{
-	printf("midiOutSetVolume\n");
-	return 0;
-}
-
-
+/**************************************************************************
+* 				midiOutGetErrorText 	[MMSYSTEM.203]
+*/
 UINT WINAPI midiOutGetErrorText(UINT uError, LPSTR lpText, UINT uSize)
 {
 	printf("midiOutGetErrorText\n");
@@ -632,6 +744,9 @@ UINT WINAPI midiOutGetErrorText(UINT uError, LPSTR lpText, UINT uSize)
 }
 
 
+/**************************************************************************
+* 				midiGetErrorText 		[internal]
+*/
 UINT WINAPI midiGetErrorText(UINT uError, LPSTR lpText, UINT uSize)
 {
 	LPSTR	msgptr;
@@ -677,7 +792,9 @@ msg# 343 : There are no MIDI devices installed on the system. Use the Drivers op
 	return(TRUE);
 }
 
-
+/**************************************************************************
+* 				midiOutOpen			[MMSYSTEM.204]
+*/
 UINT WINAPI midiOutOpen(HMIDIOUT FAR* lphMidiOut, UINT uDeviceID,
     DWORD dwCallback, DWORD dwInstance, DWORD dwFlags)
 {
@@ -686,14 +803,18 @@ UINT WINAPI midiOutOpen(HMIDIOUT FAR* lphMidiOut, UINT uDeviceID,
 	return 0;
 }
 
-
+/**************************************************************************
+* 				midiOutClose		[MMSYSTEM.205]
+*/
 UINT WINAPI midiOutClose(HMIDIOUT hMidiOut)
 {
 	printf("midiOutClose\n");
 	return 0;
 }
 
-
+/**************************************************************************
+* 				midiOutPrepareHeader	[MMSYSTEM.206]
+*/
 UINT WINAPI midiOutPrepareHeader(HMIDIOUT hMidiOut,
     MIDIHDR FAR* lpMidiOutHdr, UINT uSize)
 {
@@ -701,7 +822,9 @@ UINT WINAPI midiOutPrepareHeader(HMIDIOUT hMidiOut,
 	return 0;
 }
 
-
+/**************************************************************************
+* 				midiOutUnprepareHeader	[MMSYSTEM.207]
+*/
 UINT WINAPI midiOutUnprepareHeader(HMIDIOUT hMidiOut,
     MIDIHDR FAR* lpMidiOutHdr, UINT uSize)
 {
@@ -709,14 +832,18 @@ UINT WINAPI midiOutUnprepareHeader(HMIDIOUT hMidiOut,
 	return 0;
 }
 
-
+/**************************************************************************
+* 				midiOutShortMsg		[MMSYSTEM.208]
+*/
 UINT WINAPI midiOutShortMsg(HMIDIOUT hMidiOut, DWORD dwMsg)
 {
 	printf("midiOutShortMsg\n");
 	return 0;
 }
 
-
+/**************************************************************************
+* 				midiOutLongMsg		[MMSYSTEM.209]
+*/
 UINT WINAPI midiOutLongMsg(HMIDIOUT hMidiOut,
     MIDIHDR FAR* lpMidiOutHdr, UINT uSize)
 {
@@ -724,14 +851,36 @@ UINT WINAPI midiOutLongMsg(HMIDIOUT hMidiOut,
 	return 0;
 }
 
-
+/**************************************************************************
+* 				midiOutReset		[MMSYSTEM.210]
+*/
 UINT WINAPI midiOutReset(HMIDIOUT hMidiOut)
 {
 	printf("midiOutReset\n");
 	return 0;
 }
 
+/**************************************************************************
+* 				midiOutGetVolume	[MMSYSTEM.211]
+*/
+UINT WINAPI midiOutGetVolume(UINT uDeviceID, DWORD FAR* lpdwVolume)
+{
+	printf("midiOutGetVolume\n");
+	return 0;
+}
 
+/**************************************************************************
+* 				midiOutSetVolume	[MMSYSTEM.212]
+*/
+UINT WINAPI midiOutSetVolume(UINT uDeviceID, DWORD dwVolume)
+{
+	printf("midiOutSetVolume\n");
+	return 0;
+}
+
+/**************************************************************************
+* 				midiOutCachePatches		[MMSYSTEM.213]
+*/
 UINT WINAPI midiOutCachePatches(HMIDIOUT hMidiOut,
     UINT uBank, WORD FAR* lpwPatchArray, UINT uFlags)
 {
@@ -739,7 +888,9 @@ UINT WINAPI midiOutCachePatches(HMIDIOUT hMidiOut,
 	return 0;
 }
 
-
+/**************************************************************************
+* 				midiOutCacheDrumPatches	[MMSYSTEM.214]
+*/
 UINT WINAPI midiOutCacheDrumPatches(HMIDIOUT hMidiOut,
     UINT uPatch, WORD FAR* lpwKeyArray, UINT uFlags)
 {
@@ -747,31 +898,36 @@ UINT WINAPI midiOutCacheDrumPatches(HMIDIOUT hMidiOut,
 	return 0;
 }
 
-
+/**************************************************************************
+* 				midiOutGetID		[MMSYSTEM.215]
+*/
 UINT WINAPI midiOutGetID(HMIDIOUT hMidiOut, UINT FAR* lpuDeviceID)
 {
 	printf("midiOutGetID\n");
 	return 0;
 }
 
-
+/**************************************************************************
+* 				midiOutMessage		[MMSYSTEM.216]
+*/
 DWORD WINAPI midiOutMessage(HMIDIOUT hMidiOut, UINT uMessage, DWORD dw1, DWORD dw2)
 {
 	printf("midiOutMessage\n");
 	return 0;
 }
 
-
-
-
+/**************************************************************************
+* 				midiInGetNumDevs	[MMSYSTEM.301]
+*/
 UINT WINAPI midiInGetNumDevs(void)
 {
 	printf("midiInGetNumDevs\n");
 	return 0;
 }
 
-
-
+/**************************************************************************
+* 				midiInGetDevCaps	[MMSYSTEM.302]
+*/
 UINT WINAPI midiInGetDevCaps(UINT uDeviceID,
     LPMIDIINCAPS lpCaps, UINT uSize)
 {
@@ -779,16 +935,18 @@ UINT WINAPI midiInGetDevCaps(UINT uDeviceID,
 	return 0;
 }
 
-
-
+/**************************************************************************
+* 				midiInGetErrorText 		[MMSYSTEM.303]
+*/
 UINT WINAPI midiInGetErrorText(UINT uError, LPSTR lpText, UINT uSize)
 {
 	printf("midiInGetErrorText\n");
 	return (midiGetErrorText(uError, lpText, uSize));
 }
 
-
-
+/**************************************************************************
+* 				midiInOpen		[MMSYSTEM.304]
+*/
 UINT WINAPI midiInOpen(HMIDIIN FAR* lphMidiIn, UINT uDeviceID,
     DWORD dwCallback, DWORD dwInstance, DWORD dwFlags)
 {
@@ -797,25 +955,18 @@ UINT WINAPI midiInOpen(HMIDIIN FAR* lphMidiIn, UINT uDeviceID,
 	return 0;
 }
 
-
-
+/**************************************************************************
+* 				midiInClose		[MMSYSTEM.305]
+*/
 UINT WINAPI midiInClose(HMIDIIN hMidiIn)
 {
 	printf("midiInClose\n");
 	return 0;
 }
 
-
-
-
-UINT WINAPI midiInGetID(HMIDIIN hMidiIn, UINT FAR* lpuDeviceID)
-{
-	printf("midiInGetID\n");
-	return 0;
-}
-
-
-
+/**************************************************************************
+* 				midiInPrepareHeader	[MMSYSTEM.306]
+*/
 UINT WINAPI midiInPrepareHeader(HMIDIIN hMidiIn,
     MIDIHDR FAR* lpMidiInHdr, UINT uSize)
 {
@@ -823,8 +974,9 @@ UINT WINAPI midiInPrepareHeader(HMIDIIN hMidiIn,
 	return 0;
 }
 
-
-
+/**************************************************************************
+* 				midiInUnprepareHeader	[MMSYSTEM.307]
+*/
 UINT WINAPI midiInUnprepareHeader(HMIDIIN hMidiIn,
     MIDIHDR FAR* lpMidiInHdr, UINT uSize)
 {
@@ -832,8 +984,9 @@ UINT WINAPI midiInUnprepareHeader(HMIDIIN hMidiIn,
 	return 0;
 }
 
-
-
+/**************************************************************************
+* 				midiInAddBuffer		[MMSYSTEM.308]
+*/
 UINT WINAPI midiInAddBuffer(HMIDIIN hMidiIn,
     MIDIHDR FAR* lpMidiInHdr, UINT uSize)
 {
@@ -841,45 +994,74 @@ UINT WINAPI midiInAddBuffer(HMIDIIN hMidiIn,
 	return 0;
 }
 
-
+/**************************************************************************
+* 				midiInStart			[MMSYSTEM.309]
+*/
 UINT WINAPI midiInStart(HMIDIIN hMidiIn)
 {
 	printf("midiInStart\n");
 	return 0;
 }
 
-
+/**************************************************************************
+* 				midiInStop			[MMSYSTEM.310]
+*/
 UINT WINAPI midiInStop(HMIDIIN hMidiIn)
 {
-printf("midiInStop\n");
-return 0;
+	printf("midiInStop\n");
+	return 0;
 }
 
-
-
+/**************************************************************************
+* 				midiInReset			[MMSYSTEM.311]
+*/
 UINT WINAPI midiInReset(HMIDIIN hMidiIn)
 {
-printf("midiInReset\n");
-return 0;
+	printf("midiInReset\n");
+	return 0;
+}
+
+/**************************************************************************
+* 				midiInGetID			[MMSYSTEM.312]
+*/
+UINT WINAPI midiInGetID(HMIDIIN hMidiIn, UINT FAR* lpuDeviceID)
+{
+	printf("midiInGetID\n");
+	return 0;
+}
+
+/**************************************************************************
+* 				midiInMessage		[MMSYSTEM.313]
+*/
+DWORD WINAPI midiInMessage(HMIDIIN hMidiIn, UINT uMessage, 
+							DWORD dwParam1, DWORD dwParam2)
+{
+	printf("midiInMessage\n");
+	return 0;
 }
 
 
-
+/**************************************************************************
+* 				waveOutGetNumDevs		[MMSYSTEM.401]
+*/
 UINT WINAPI waveOutGetNumDevs()
 {
-printf("waveOutGetNumDevs\n");
-return 0;
+	printf("waveOutGetNumDevs\n");
+	return 1;
 }
 
-
-
+/**************************************************************************
+* 				waveOutGetDevCaps		[MMSYSTEM.402]
+*/
 UINT WINAPI waveOutGetDevCaps(UINT uDeviceID, WAVEOUTCAPS FAR* lpCaps, UINT uSize)
 {
-printf("waveOutGetDevCaps\n");
-return 0;
+	printf("waveOutGetDevCaps\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
-
+/**************************************************************************
+* 				waveOutGetErrorText 	[MMSYSTEM.403]
+*/
 UINT WINAPI waveOutGetErrorText(UINT uError, LPSTR lpText, UINT uSize)
 {
    printf("waveOutGetErrorText\n");
@@ -887,6 +1069,9 @@ UINT WINAPI waveOutGetErrorText(UINT uError, LPSTR lpText, UINT uSize)
 }
 
 
+/**************************************************************************
+* 				waveGetErrorText 		[internal]
+*/
 UINT WINAPI waveGetErrorText(UINT uError, LPSTR lpText, UINT uSize)
 {
 	LPSTR	msgptr;
@@ -953,157 +1138,205 @@ UINT WINAPI waveGetErrorText(UINT uError, LPSTR lpText, UINT uSize)
 	return(TRUE);
 }
 
-
+/**************************************************************************
+* 				waveOutOpen			[MMSYSTEM.404]
+*/
 UINT WINAPI waveOutOpen(HWAVEOUT FAR* lphWaveOut, UINT uDeviceID,
-    const WAVEFORMAT FAR* lpFormat, DWORD dwCallback, DWORD dwInstance, DWORD dwFlags)
+    const LPWAVEFORMAT lpFormat, DWORD dwCallback, DWORD dwInstance, DWORD dwFlags)
 {
-printf("waveOutOpen\n");
-if (lphWaveOut != NULL) *lphWaveOut = 0;
-return 0;
+	printf("waveOutOpen(%08X, %d, %08X, %08X, %08X, %08X);\n", 
+		lphWaveOut, uDeviceID, lpFormat, dwCallback, dwInstance, dwFlags);
+	if (dwFlags & WAVE_FORMAT_QUERY) {
+		printf("waveOutOpen	// WAVE_FORMAT_QUERY !\n");
+		if (uDeviceID == (UINT)WAVE_MAPPER) {
+			printf("waveOutOpen	// No WAVE_MAPPER supported yet !\n");
+			return MMSYSERR_BADDEVICEID;
+			}
+		}
+	if (lpFormat == NULL) return WAVERR_BADFORMAT;
+	if (lphWaveOut != NULL) *lphWaveOut = 0;
+	if (lphWaveOut != NULL) *lphWaveOut = ++mciActiveDev;
+	return 0;
+/*	return MMSYSERR_BADDEVICEID;*/
 }
 
-
-
+/**************************************************************************
+* 				waveOutClose		[MMSYSTEM.405]
+*/
 UINT WINAPI waveOutClose(HWAVEOUT hWaveOut)
 {
-printf("waveOutClose\n");
-return 0;
+	printf("waveOutClose\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
-
-
+/**************************************************************************
+* 				waveOutPrepareHeader	[MMSYSTEM.406]
+*/
 UINT WINAPI waveOutPrepareHeader(HWAVEOUT hWaveOut,
      WAVEHDR FAR* lpWaveOutHdr, UINT uSize)
 {
-printf("waveOutPrepareHeader\n");
-return 0;
+	printf("waveOutPrepareHeader\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
-
-
+/**************************************************************************
+* 				waveOutUnprepareHeader	[MMSYSTEM.407]
+*/
 UINT WINAPI waveOutUnprepareHeader(HWAVEOUT hWaveOut,
     WAVEHDR FAR* lpWaveOutHdr, UINT uSize)
 {
-printf("waveOutUnprepareHeader\n");
-return 0;
+	printf("waveOutUnprepareHeader\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
-
-
+/**************************************************************************
+* 				waveOutWrite		[MMSYSTEM.408]
+*/
 UINT WINAPI waveOutWrite(HWAVEOUT hWaveOut, WAVEHDR FAR* lpWaveOutHdr,  UINT uSize)
 {
-printf("waveOutWrite\n");
-return 0;
+	printf("waveOutWrite\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
-
+/**************************************************************************
+* 				waveOutPause		[MMSYSTEM.409]
+*/
 UINT WINAPI waveOutPause(HWAVEOUT hWaveOut)
 {
-printf("waveOutPause\n");
-return 0;
+	printf("waveOutPause\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
-
+/**************************************************************************
+* 				waveOutRestart		[MMSYSTEM.410]
+*/
 UINT WINAPI waveOutRestart(HWAVEOUT hWaveOut)
 {
-printf("waveOutRestart\n");
-return 0;
+	printf("waveOutRestart\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
-
+/**************************************************************************
+* 				waveOutReset		[MMSYSTEM.411]
+*/
 UINT WINAPI waveOutReset(HWAVEOUT hWaveOut)
 {
-printf("waveOutReset\n");
-return 0;
+	printf("waveOutReset\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
-
-
+/**************************************************************************
+* 				waveOutGetPosition	[MMSYSTEM.412]
+*/
 UINT WINAPI waveOutGetPosition(HWAVEOUT hWaveOut, MMTIME FAR* lpInfo, UINT uSize)
 {
-printf("waveOutGetPosition\n");
-return 0;
+	printf("waveOutGetPosition\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
-
-
-UINT WINAPI waveOutGetVolume(UINT uDeviceID, DWORD FAR* lpdwVolume)
-{
-printf("waveOutGetVolume\n");
-return 0;
-}
-
-
-UINT WINAPI waveOutSetVolume(UINT uDeviceID, DWORD dwVolume)
-{
-printf("waveOutSetVolume\n");
-return 0;
-}
-
-
-
-UINT WINAPI waveOutGetID(HWAVEOUT hWaveOut, UINT FAR* lpuDeviceID)
-{
-printf("waveOutGetID\n");
-return 0;
-}
-
-
-
+/**************************************************************************
+* 				waveOutGetPitch		[MMSYSTEM.413]
+*/
 UINT WINAPI waveOutGetPitch(HWAVEOUT hWaveOut, DWORD FAR* lpdwPitch)
 {
-printf("waveOutGetPitch\n");
-return 0;
+	printf("waveOutGetPitch\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
-
-
+/**************************************************************************
+* 				waveOutSetPitch		[MMSYSTEM.414]
+*/
 UINT WINAPI waveOutSetPitch(HWAVEOUT hWaveOut, DWORD dwPitch)
 {
-printf("waveOutSetPitch\n");
-return 0;
+	printf("waveOutSetPitch\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
+/**************************************************************************
+* 				waveOutGetVolume	[MMSYSTEM.415]
+*/
+UINT WINAPI waveOutGetVolume(UINT uDeviceID, DWORD FAR* lpdwVolume)
+{
+	printf("waveOutGetVolume\n");
+	return MMSYSERR_INVALHANDLE;
+}
 
+/**************************************************************************
+* 				waveOutSetVolume	[MMSYSTEM.416]
+*/
+UINT WINAPI waveOutSetVolume(UINT uDeviceID, DWORD dwVolume)
+{
+	printf("waveOutSetVolume\n");
+	return MMSYSERR_INVALHANDLE;
+}
+
+/**************************************************************************
+* 				waveOutGetPlaybackRate	[MMSYSTEM.417]
+*/
 UINT WINAPI waveOutGetPlaybackRate(HWAVEOUT hWaveOut, DWORD FAR* lpdwRate)
 {
-printf("waveOutGetPlaybackRate\n");
-return 0;
+	printf("waveOutGetPlaybackRate\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
-
-
+/**************************************************************************
+* 				waveOutSetPlaybackRate	[MMSYSTEM.418]
+*/
 UINT WINAPI waveOutSetPlaybackRate(HWAVEOUT hWaveOut, DWORD dwRate)
 {
-printf("waveOutSetPlaybackRate\n");
-return 0;
+	printf("waveOutSetPlaybackRate\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
-
-
-
+/**************************************************************************
+* 				waveOutBreakLoop 	[MMSYSTEM.419]
+*/
 UINT WINAPI waveOutBreakLoop(HWAVEOUT hWaveOut)
 {
-printf("waveOutBreakLoop\n");
-return 0;
+	printf("waveOutBreakLoop\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
+/**************************************************************************
+* 				waveOutGetID	 	[MMSYSTEM.420]
+*/
+UINT WINAPI waveOutGetID(HWAVEOUT hWaveOut, UINT FAR* lpuDeviceID)
+{
+	printf("waveOutGetID\n");
+	return MMSYSERR_INVALHANDLE;
+}
 
+/**************************************************************************
+* 				waveOutMessage 		[MMSYSTEM.421]
+*/
+DWORD WINAPI waveOutMessage(HWAVEOUT hWaveOut, UINT uMessage, 
+							DWORD dwParam1, DWORD dwParam2)
+{
+}
 
+/**************************************************************************
+* 				waveInGetNumDevs 		[MMSYSTEM.501]
+*/
 UINT WINAPI waveInGetNumDevs()
 {
-printf("waveInGetNumDevs\n");
-return 0;
+	printf("waveInGetNumDevs\n");
+	return 0;
 }
 
 
+/**************************************************************************
+* 				waveInGetDevCaps 		[MMSYSTEM.502]
+*/
 UINT WINAPI waveInGetDevCaps(UINT uDeviceID, WAVEINCAPS FAR* lpCaps, UINT uSize)
 {
-printf("waveInGetDevCaps\n");
-return 0;
+	printf("waveInGetDevCaps\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
 
+/**************************************************************************
+* 				waveInGetErrorText 	[MMSYSTEM.503]
+*/
 UINT WINAPI waveInGetErrorText(UINT uError, LPSTR lpText, UINT uSize)
 {
    printf("waveInGetErrorText\n");
@@ -1111,117 +1344,498 @@ UINT WINAPI waveInGetErrorText(UINT uError, LPSTR lpText, UINT uSize)
 }
 
 
+/**************************************************************************
+* 				waveInOpen			[MMSYSTEM.504]
+*/
 UINT WINAPI waveInOpen(HWAVEIN FAR* lphWaveIn, UINT uDeviceID,
-    const WAVEFORMAT FAR* lpFormat, DWORD dwCallback, DWORD dwInstance, DWORD dwFlags)
+    const LPWAVEFORMAT lpFormat, DWORD dwCallback, DWORD dwInstance, DWORD dwFlags)
 {
-printf("waveInOpen\n");
-if (lphWaveIn != NULL) *lphWaveIn = 0;
-return 0;
+	printf("waveInOpen(%08X, %d, %08X, %08X, %08X, %08X);\n", 
+		lphWaveIn, uDeviceID, lpFormat, dwCallback, dwInstance, dwFlags);
+	if (dwFlags & WAVE_FORMAT_QUERY) {
+		printf("waveInOpen	// WAVE_FORMAT_QUERY !\n");
+		if (uDeviceID == (UINT)WAVE_MAPPER) {
+			printf("waveInOpen	// No WAVE_MAPPER supported yet !\n");
+			return MMSYSERR_BADDEVICEID;
+			}
+		}
+	if (lphWaveIn != NULL) *lphWaveIn = 0;
+	if (lpFormat == NULL) return WAVERR_BADFORMAT;
+	return MMSYSERR_BADDEVICEID;
 }
 
 
+/**************************************************************************
+* 				waveInClose			[MMSYSTEM.505]
+*/
 UINT WINAPI waveInClose(HWAVEIN hWaveIn)
 {
-printf("waveInClose\n");
-return 0;
+	printf("waveInClose\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
 
+/**************************************************************************
+* 				waveInPrepareHeader		[MMSYSTEM.506]
+*/
 UINT WINAPI waveInPrepareHeader(HWAVEIN hWaveIn,
     WAVEHDR FAR* lpWaveInHdr, UINT uSize)
 {
-printf("waveInPrepareHeader\n");
-return 0;
+	printf("waveInPrepareHeader\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
 
+/**************************************************************************
+* 				waveInUnprepareHeader	[MMSYSTEM.507]
+*/
 UINT WINAPI waveInUnprepareHeader(HWAVEIN hWaveIn,
     WAVEHDR FAR* lpWaveInHdr, UINT uSize)
 {
-printf("waveInUnprepareHeader\n");
-return 0;
+	printf("waveInUnprepareHeader\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
 
 
+/**************************************************************************
+* 				waveInAddBuffer		[MMSYSTEM.508]
+*/
 UINT WINAPI waveInAddBuffer(HWAVEIN hWaveIn,
     WAVEHDR FAR* lpWaveInHdr, UINT uSize)
 {
-printf("waveInAddBuffer\n");
-return 0;
-}
-
-UINT WINAPI waveInReset(HWAVEIN hWaveIn)
-{
-printf("waveInReset\n");
-return 0;
+	printf("waveInAddBuffer\n");
+	return 0;
 }
 
 
+/**************************************************************************
+* 				waveInStart			[MMSYSTEM.509]
+*/
 UINT WINAPI waveInStart(HWAVEIN hWaveIn)
 {
-printf("waveInStart\n");
-return 0;
+	printf("waveInStart\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
 
+/**************************************************************************
+* 				waveInStop			[MMSYSTEM.510]
+*/
 UINT WINAPI waveInStop(HWAVEIN hWaveIn)
 {
-printf("waveInStop\n");
-return 0;
+	printf("waveInStop\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
 
+/**************************************************************************
+* 				waveInReset			[MMSYSTEM.511]
+*/
+UINT WINAPI waveInReset(HWAVEIN hWaveIn)
+{
+	printf("waveInReset\n");
+	return MMSYSERR_INVALHANDLE;
+}
 
+
+/**************************************************************************
+* 				waveInGetPosition	[MMSYSTEM.512]
+*/
 UINT WINAPI waveInGetPosition(HWAVEIN hWaveIn, MMTIME FAR* lpInfo, UINT uSize)
 {
-printf("waveInGetPosition\n");
-return 0;
+	printf("waveInGetPosition\n");
+	return MMSYSERR_INVALHANDLE;
 }
 
 
+/**************************************************************************
+* 				waveInGetID			[MMSYSTEM.513]
+*/
 UINT WINAPI waveInGetID(HWAVEIN hWaveIn, UINT FAR* lpuDeviceID)
 {
-printf("waveInGetID\n");
-return 0;
+	printf("waveInGetID\n");
+	return 0;
 }
 
 
-/*
-UINT WINAPI mciGetDeviceIDFromElementID (DWORD dwElementID,
-    LPCSTR lpstrType);
-
-BOOL WINAPI mciSetYieldProc (UINT uDeviceID, YIELDPROC fpYieldProc,
-    DWORD dwYieldData);
-
-HTASK WINAPI mciGetCreatorTask(UINT uDeviceID);
-YIELDPROC WINAPI mciGetYieldProc (UINT uDeviceID, DWORD FAR* lpdwYieldData);
-
-
-FOURCC WINAPI mmioStringToFOURCC(LPCSTR sz, UINT uFlags);
-LPMMIOPROC WINAPI mmioInstallIOProc(FOURCC fccIOProc, LPMMIOPROC pIOProc,
-    DWORD dwFlags);
-UINT WINAPI mmioGetInfo(HMMIO hmmio, MMIOINFO FAR* lpmmioinfo, UINT uFlags);
-UINT WINAPI mmioSetInfo(HMMIO hmmio, const MMIOINFO FAR* lpmmioinfo, UINT uFlags);
-UINT WINAPI mmioSetBuffer(HMMIO hmmio, LPSTR pchBuffer, LONG cchBuffer,
-    UINT uFlags);
-UINT WINAPI mmioFlush(HMMIO hmmio, UINT uFlags);
-UINT WINAPI mmioAdvance(HMMIO hmmio, MMIOINFO FAR* lpmmioinfo, UINT uFlags);
-LRESULT WINAPI mmioSendMessage(HMMIO hmmio, UINT uMessage,
-    LPARAM lParam1, LPARAM lParam2);
-UINT WINAPI mmioDescend(HMMIO hmmio, MMCKINFO FAR* lpck,
-    const MMCKINFO FAR* lpckParent, UINT uFlags);
-UINT WINAPI mmioAscend(HMMIO hmmio, MMCKINFO FAR* lpck, UINT uFlags);
-UINT WINAPI mmioCreateChunk(HMMIO hmmio, MMCKINFO FAR* lpck, UINT uFlags);
-
-DWORD WINAPI midiInMessage(HMIDIIN hMidiIn, UINT uMessage, DWORD dw1, DWORD dw2);
-
-
-DWORD WINAPI waveOutMessage(HWAVEOUT hWaveOut, UINT uMessage, DWORD dw1, DWORD dw2);
-
-UINT WINAPI waveInAddBuffer(HWAVEIN hWaveIn,
-    WAVEHDR FAR* lpWaveInHdr, UINT uSize);
-DWORD WINAPI waveInMessage(HWAVEIN hWaveIn, UINT uMessage, DWORD dw1, DWORD dw2);
-
+/**************************************************************************
+* 				waveInMessage 		[MMSYSTEM.514]
 */
+DWORD WINAPI waveInMessage(HWAVEIN hWaveIn, UINT uMessage,
+							DWORD dwParam1, DWORD dwParam2)
+{
+}
+
+
+/**************************************************************************
+* 				MMSysTimeCallback	[internal]
+*/
+WORD FAR PASCAL MMSysTimeCallback(HWND hWnd, WORD wMsg, int nID, DWORD dwTime)
+{
+	LPTIMERENTRY	lpTimer = lpTimerList;
+	mmSysTimeMS.u.ms += 33;
+	mmSysTimeSMPTE.u.smpte.frame++;
+	while (lpTimer != NULL) {
+		lpTimer->wCurTime--;
+		if (lpTimer->wCurTime == 0) {
+			lpTimer->wCurTime = lpTimer->wDelay;
+			if (lpTimer->lpFunc != NULL) {
+#ifdef WINELIB
+				(*lpTimer->lpFunc)(lpTimer->wTimerID, (WORD)0, 
+						lpTimer->dwUser, (DWORD)0, (DWORD)0);
+#else
+				CallBack16(lpTimer->lpFunc, 5, 
+					0, (int)lpTimer->wTimerID, 0, (int)0, 
+					2, lpTimer->dwUser, 2, 0, 2, 0);
+#endif
+				}
+			if (lpTimer->wFlags & TIME_ONESHOT)
+				timeKillEvent(lpTimer->wTimerID);
+			}
+		lpTimer = lpTimer->Next;
+		}
+}
+
+/**************************************************************************
+* 				StartMMTime			[internal]
+*/
+void StartMMTime()
+{
+	if (!mmTimeStarted) {
+		mmTimeStarted = TRUE;
+		mmSysTimeMS.wType = TIME_MS;
+		mmSysTimeMS.u.ms = 0;
+		mmSysTimeSMPTE.wType = TIME_SMPTE;
+		mmSysTimeSMPTE.u.smpte.hour = 0;
+		mmSysTimeSMPTE.u.smpte.min = 0;
+		mmSysTimeSMPTE.u.smpte.sec = 0;
+		mmSysTimeSMPTE.u.smpte.frame = 0;
+		mmSysTimeSMPTE.u.smpte.fps = 0;
+		mmSysTimeSMPTE.u.smpte.dummy = 0;
+		SetTimer(0, 1, 33, (FARPROC)MMSysTimeCallback);
+		}
+}
+
+/**************************************************************************
+* 				timeGetSystemTime	[MMSYSTEM.601]
+*/
+WORD timeGetSystemTime(LPMMTIME lpTime, WORD wSize)
+{
+	printf("timeGetSystemTime(%08X, %u);\n", lpTime, wSize);
+	if (!mmTimeStarted) StartMMTime();
+	return 0;
+}
+
+/**************************************************************************
+* 				timeSetEvent		[MMSYSTEM.602]
+*/
+WORD timeSetEvent(WORD wDelay, WORD wResol, 
+				LPTIMECALLBACK lpFunc, 
+				DWORD dwUser, WORD wFlags)
+{
+	WORD			wNewID = 0;
+	LPTIMERENTRY	lpNewTimer;
+	LPTIMERENTRY	lpTimer = lpTimerList;
+	printf("timeSetEvent(%u, %u, %08X, %08X, %04X);\n",
+			wDelay, wResol, lpFunc, dwUser, wFlags);
+	if (!mmTimeStarted) StartMMTime();
+	lpNewTimer = malloc(sizeof(TIMERENTRY));
+	if (lpNewTimer == NULL)	return 0;
+	while (lpTimer != NULL) {
+		wNewID = max(wNewID, lpTimer->wTimerID);
+		if (lpTimer->Next == NULL) break;
+		lpTimer = lpTimer->Next;
+		}
+	if (lpTimerList == NULL) {
+		lpTimerList = lpNewTimer;
+		lpNewTimer->Prev == NULL;
+		}
+	else {
+		lpTimer->Next == lpNewTimer;
+		lpNewTimer->Prev == lpTimer;
+		}
+	lpNewTimer->Next == NULL;
+	lpNewTimer->wTimerID = wNewID + 1;
+	lpNewTimer->wCurTime = wDelay;
+	lpNewTimer->wDelay = wDelay;
+	lpNewTimer->wResol = wResol;
+	lpNewTimer->lpFunc = lpFunc;
+	lpNewTimer->dwUser = dwUser;
+	lpNewTimer->wFlags = wFlags;
+	return lpNewTimer->wTimerID;
+}
+
+/**************************************************************************
+* 				timeKillEvent		[MMSYSTEM.603]
+*/
+WORD timeKillEvent(WORD wID)
+{
+	LPTIMERENTRY	lpTimer = lpTimerList;
+	while (lpTimer != NULL) {
+		if (wID == lpTimer->wTimerID) {
+			if (lpTimer->Prev != NULL) lpTimer->Prev->Next = lpTimer->Next;
+			if (lpTimer->Next != NULL) lpTimer->Next->Prev = lpTimer->Prev;
+			free(lpTimer);
+			return TRUE;
+			}
+		lpTimer = lpTimer->Next;
+		}
+	return 0;
+}
+
+/**************************************************************************
+* 				timeGetDevCaps		[MMSYSTEM.604]
+*/
+WORD timeGetDevCaps(LPTIMECAPS lpCaps, WORD wSize)
+{
+	printf("timeGetDevCaps(%08X, %u) !\n", lpCaps, wSize);
+	return 0;
+}
+
+/**************************************************************************
+* 				timeBeginPeriod		[MMSYSTEM.605]
+*/
+WORD timeBeginPeriod(WORD wPeriod)
+{
+	printf("timeBeginPeriod(%u) !\n", wPeriod);
+	if (!mmTimeStarted) StartMMTime();
+	return 0;
+}
+
+/**************************************************************************
+* 				timeEndPeriod		[MMSYSTEM.606]
+*/
+WORD timeEndPeriod(WORD wPeriod)
+{
+	printf("timeEndPeriod(%u) !\n", wPeriod);
+	return 0;
+}
+
+/**************************************************************************
+* 				timeGetTime			[MMSYSTEM.607]
+*/
+DWORD timeGetTime()
+{
+	printf("timeGetTime(); !\n");
+	if (!mmTimeStarted) StartMMTime();
+	return 0;
+}
+
+
+/**************************************************************************
+* 				mmioOpen			[MMSYSTEM.1210]
+*/
+HMMIO WINAPI mmioOpen(LPSTR szFileName, MMIOINFO FAR* lpmmioinfo, DWORD dwOpenFlags)
+{
+	printf("mmioOpen('%s', %08X, %08X);\n", szFileName, lpmmioinfo, dwOpenFlags);
+	return 0;
+}
+
+
+    
+/**************************************************************************
+* 				mmioClose			[MMSYSTEM.1211]
+*/
+UINT WINAPI mmioClose(HMMIO hmmio, UINT uFlags)
+{
+	printf("mmioClose(%04X, %04X);\n", hmmio, uFlags);
+	return 0;
+}
+
+
+
+/**************************************************************************
+* 				mmioRead			[MMSYSTEM.1212]
+*/
+LONG WINAPI mmioRead(HMMIO hmmio, HPSTR pch, LONG cch)
+{
+	printf("mmioRead\n");
+	return 0;
+}
+
+
+
+/**************************************************************************
+* 				mmioWrite			[MMSYSTEM.1213]
+*/
+LONG WINAPI mmioWrite(HMMIO hmmio, HPCSTR pch, LONG cch)
+{
+	printf("mmioWrite\n");
+	return 0;
+}
+
+/**************************************************************************
+* 				mmioSeek			[MMSYSTEM.1214]
+*/
+LONG WINAPI mmioSeek(HMMIO hmmio, LONG lOffset, int iOrigin)
+{
+	printf("mmioSeek\n");
+	return 0;
+}
+
+/**************************************************************************
+* 				mmioGetInfo			[MMSYSTEM.1215]
+*/
+UINT WINAPI mmioGetInfo(HMMIO hmmio, MMIOINFO FAR* lpmmioinfo, UINT uFlags)
+{
+	printf("mmioGetInfo\n");
+	return 0;
+}
+
+/**************************************************************************
+* 				mmioGetInfo			[MMSYSTEM.1216]
+*/
+UINT WINAPI mmioSetInfo(HMMIO hmmio, const MMIOINFO FAR* lpmmioinfo, UINT uFlags)
+{
+	printf("mmioSetInfo\n");
+	return 0;
+}
+
+/**************************************************************************
+* 				mmioSetBuffer		[MMSYSTEM.1217]
+*/
+UINT WINAPI mmioSetBuffer(HMMIO hmmio, LPSTR pchBuffer, 
+						LONG cchBuffer, UINT uFlags)
+{
+	printf("mmioSetBuffer\n");
+	return 0;
+}
+
+/**************************************************************************
+* 				mmioFlush			[MMSYSTEM.1218]
+*/
+UINT WINAPI mmioFlush(HMMIO hmmio, UINT uFlags)
+{
+	printf("mmioFlush\n");
+	return 0;
+}
+
+/**************************************************************************
+* 				mmioAdvance			[MMSYSTEM.1219]
+*/
+UINT WINAPI mmioAdvance(HMMIO hmmio, MMIOINFO FAR* lpmmioinfo, UINT uFlags)
+{
+	printf("mmioAdvance\n");
+	return 0;
+}
+
+/**************************************************************************
+* 				mmioStringToFOURCC	[MMSYSTEM.1220]
+*/
+FOURCC WINAPI mmioStringToFOURCC(LPCSTR sz, UINT uFlags)
+{
+	printf("mmioStringToFOURCC\n");
+	return 0;
+}
+
+/**************************************************************************
+* 				mmioInstallIOProc	[MMSYSTEM.1221]
+*/
+LPMMIOPROC WINAPI mmioInstallIOProc(FOURCC fccIOProc, 
+				LPMMIOPROC pIOProc, DWORD dwFlags)
+{
+	printf("mmioInstallIOProc\n");
+	return 0;
+}
+
+/**************************************************************************
+* 				mmioSendMessage		[MMSYSTEM.1222]
+*/
+LRESULT WINAPI mmioSendMessage(HMMIO hmmio, UINT uMessage,
+					    LPARAM lParam1, LPARAM lParam2)
+{
+	printf("mmioSendMessage\n");
+	return 0;
+}
+
+/**************************************************************************
+* 				mmioDescend			[MMSYSTEM.1223]
+*/
+UINT WINAPI mmioDescend(HMMIO hmmio, MMCKINFO FAR* lpck,
+		    const MMCKINFO FAR* lpckParent, UINT uFlags)
+{
+	printf("mmioDescend\n");
+	return 0;
+}
+
+/**************************************************************************
+* 				mmioAscend			[MMSYSTEM.1224]
+*/
+UINT WINAPI mmioAscend(HMMIO hmmio, MMCKINFO FAR* lpck, UINT uFlags)
+{
+	printf("mmioAscend\n");
+	return 0;
+}
+
+/**************************************************************************
+* 				mmioCreateChunk		[MMSYSTEM.1225]
+*/
+UINT WINAPI mmioCreateChunk(HMMIO hmmio, MMCKINFO FAR* lpck, UINT uFlags)
+{
+	printf("mmioCreateChunk\n");
+	return 0;
+}
+
+
+/**************************************************************************
+* 				mmioRename			[MMSYSTEM.1226]
+*/
+UINT WINAPI mmioRename(LPCSTR szFileName, LPCSTR szNewFileName,
+     MMIOINFO FAR* lpmmioinfo, DWORD dwRenameFlags)
+{
+	printf("mmioRename('%s', '%s', %08X, %08X);\n",
+			szFileName, szNewFileName, lpmmioinfo, dwRenameFlags);
+	return 0;
+}
+
+/**************************************************************************
+* 				DrvOpen				[MMSYSTEM.1100]
+*/
+HDRVR DrvOpen(LPSTR lpDriverName, LPSTR lpSectionName, LPARAM lParam)
+{
+	printf("DrvOpen('%s', '%s', %08X);\n",
+		lpDriverName, lpSectionName, lParam);
+	return OpenDriver(lpDriverName, lpSectionName, lParam);
+}
+
+
+/**************************************************************************
+* 				DrvClose			[MMSYSTEM.1101]
+*/
+LRESULT DrvClose(HDRVR hDrvr, LPARAM lParam1, LPARAM lParam2)
+{
+	printf("DrvClose(%04X, %08X, %08X);\n", hDrvr, lParam1, lParam2);
+	return CloseDriver(hDrvr, lParam1, lParam2);
+}
+
+
+/**************************************************************************
+* 				DrvSendMessage		[MMSYSTEM.1102]
+*/
+LRESULT WINAPI DrvSendMessage(HDRVR hDriver, WORD msg, LPARAM lParam1, LPARAM lParam2)
+{
+	printf("DrvSendMessage(%04X, %04X, %08X, %08X);\n",
+					hDriver, msg, lParam1, lParam2);
+}
+
+/**************************************************************************
+* 				DrvGetModuleHandle	[MMSYSTEM.1103]
+*/
+HANDLE DrvGetModuleHandle(HDRVR hDrvr)
+{
+	printf("DrvGetModuleHandle(%04X);\n", hDrvr);
+}
+
+
+/**************************************************************************
+* 				DrvDefDriverProc	[MMSYSTEM.1104]
+*/
+LRESULT DrvDefDriverProc(DWORD dwDevID, HDRVR hDriv, WORD wMsg, 
+						DWORD dwParam1, DWORD dwParam2)
+{
+	return DefDriverProc(dwDevID, hDriv, wMsg, dwParam1, dwParam2);
+}
+
+
 

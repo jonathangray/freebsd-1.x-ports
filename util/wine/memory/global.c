@@ -1,6 +1,7 @@
-static char RCSId[] = "$Id: global.c,v 1.1.1.3 1994/05/19 07:58:37 hsu Exp $";
+static char RCSId[] = "$Id: global.c,v 1.1.1.4 1994/07/05 08:19:24 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
+/* #define DEBUG_HEAP /* */
 #define GLOBAL_SOURCE
 
 #include <stdio.h>
@@ -186,7 +187,7 @@ GlobalAlloc(unsigned int flags, unsigned long size)
      */
     if (size > 0x8000 || !(flags & GLOBAL_FLAGS_MOVEABLE))
     {
-	int segments = (size >> 16) + 1;
+	int segments = ((size - 1) >> 16) + 1;
 
 	g = GlobalGetFreeSegments(flags, segments);
 	if (g == NULL)
@@ -406,21 +407,23 @@ GlobalFlags(unsigned int block)
 unsigned int
 GlobalSize(unsigned int block)
 {
-    GDESC *g;
-
-    if (block == 0)
+    GDESC *g = GlobalGetGDesc(block);
+    
+    if (g == NULL)
 	return 0;
 
-    /*
-     * Find GDESC for this block.
-     */
-    for (g = GlobalList; g != NULL; g = g->next)
+    if (g->sequence == 0)
     {
-	if (g->handle == block)
-	    return g->length;
+	MDESC *m = (MDESC *) g->addr - 1;
+	
+	return m->length;
     }
-
-    return 0;
+    else if (g->sequence >= 1)
+    {
+	return g->length * 0x10000;
+    }
+    
+    return g->length;
 }
 
 /**********************************************************************
@@ -663,14 +666,25 @@ GlobalReAlloc(unsigned int block, unsigned int new_size, unsigned int flags)
 	else if (n_segments < g->length)
 	{
 	    GDESC *g_free;
+	    int old_length = g->length;
 	    
 	    g_free = g;
 	    for (i = 0; i < n_segments; i++)
 	    {
 		if (g_free->sequence != i + 1)
 		    return 0;
+		g_free->length = n_segments;
 		g_free = g_free->next;
 	    }
+
+	    for ( ; i < old_length; i++)
+	    {
+		g_free->length = 0x10000;
+		g_free->sequence = -1;
+		g_free = g_free->next;
+	    }
+
+	    return g->handle;
 	}
 	
 	/*
@@ -790,5 +804,6 @@ DWORD GetFreeSpace(UINT wFlags)
 	if (free_map[i] == 1)
 	    total_free++;
     
+    printf("GetFreeSpace // return %ld !\n", total_free << 16);
     return total_free << 16;
 }

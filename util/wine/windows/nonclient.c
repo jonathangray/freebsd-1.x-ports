@@ -16,6 +16,7 @@ static char Copyright[] = "Copyright  Alexandre Julliard, 1994";
 #include "syscolor.h"
 
 static HBITMAP hbitmapClose = 0;
+static HBITMAP hbitmapMDIClose = 0;
 static HBITMAP hbitmapMinimize = 0;
 static HBITMAP hbitmapMinimizeD = 0;
 static HBITMAP hbitmapMaximize = 0;
@@ -68,7 +69,6 @@ static void NC_AdjustRect( LPRECT rect, DWORD style, BOOL menu, DWORD exStyle )
 
     if ((style & WS_CAPTION) == WS_CAPTION)
 	rect->top -= SYSMETRICS_CYCAPTION - 1;
-
     if (menu) rect->top -= SYSMETRICS_CYMENU + 1;
 
     if (style & WS_VSCROLL) rect->right  += SYSMETRICS_CXVSCROLL;
@@ -287,11 +287,15 @@ LONG NC_HandleNCHitTest( HWND hwnd, POINT pt )
 static void NC_DrawSysButton( HWND hwnd, HDC hdc, BOOL down )
 {
     RECT rect;
+    WND *wndPtr = WIN_FindWndPtr( hwnd );
     HDC hdcMem = CreateCompatibleDC( hdc );
     if (hdcMem)
     {
 	NC_GetInsideRect( hwnd, &rect );
-	SelectObject( hdcMem, hbitmapClose );
+	if (wndPtr->dwStyle & WS_CHILD)
+		SelectObject( hdcMem, hbitmapMDIClose );
+	else
+		SelectObject( hdcMem, hbitmapClose );
 	BitBlt( hdc, rect.left, rect.top, SYSMETRICS_CXSIZE,
 	       SYSMETRICS_CYSIZE, hdcMem, 1, 1, down ? NOTSRCCOPY : SRCCOPY );
 	DeleteDC( hdcMem );
@@ -457,6 +461,8 @@ static void NC_DrawCaption( HDC hdc, RECT *rect, HWND hwnd,
     {
 	if (!(hbitmapClose = LoadBitmap( 0, MAKEINTRESOURCE(OBM_CLOSE) )))
 	    return;
+	if (!(hbitmapMDIClose = LoadBitmap( 0, MAKEINTRESOURCE(OBM_OLD_CLOSE) )))
+	    return;
 	hbitmapMinimize  = LoadBitmap( 0, MAKEINTRESOURCE(OBM_REDUCE) );
 	hbitmapMinimizeD = LoadBitmap( 0, MAKEINTRESOURCE(OBM_REDUCED) );
 	hbitmapMaximize  = LoadBitmap( 0, MAKEINTRESOURCE(OBM_ZOOM) );
@@ -585,47 +591,101 @@ void NC_DoNCPaint( HWND hwnd, HRGN hrgn, BOOL active, BOOL suppress_menupaint )
 
     if (wndPtr->wIDmenu != 0 &&
 	(wndPtr->dwStyle & WS_CHILD) != WS_CHILD) {
-	int oldbottom;
-	CopyRect(&rect2, &rect);
-	/* Default MenuBar height */
-	oldbottom = rect2.bottom = rect2.top + SYSMETRICS_CYMENU; 
-	StdDrawMenuBar(hdc, &rect2, (LPPOPUPMENU)GlobalLock(wndPtr->wIDmenu),
-		       suppress_menupaint);
-	GlobalUnlock(wndPtr->wIDmenu);
-	/* Reduce ClientRect according to MenuBar height */
-	rect.top += rect2.bottom - oldbottom;
+	LPPOPUPMENU	lpMenu = (LPPOPUPMENU) GlobalLock(wndPtr->wIDmenu);
+	if (lpMenu != NULL) {
+		int oldHeight;
+		CopyRect(&rect2, &rect);
+		/* Default MenuBar height */
+		if (lpMenu->Height == 0) lpMenu->Height = SYSMETRICS_CYMENU + 1;
+		oldHeight = lpMenu->Height;
+		rect2.bottom = rect2.top + oldHeight; 
+		StdDrawMenuBar(hdc, &rect2, lpMenu, suppress_menupaint);
+		if (oldHeight != lpMenu->Height) {
+			printf("NC_DoNCPaint // menubar changed oldHeight=%d != lpMenu->Height=%d\n",
+									oldHeight, lpMenu->Height);
+			/* Reduce ClientRect according to MenuBar height */
+			wndPtr->rectClient.top -= oldHeight;
+			wndPtr->rectClient.top += lpMenu->Height;
+			}
+		GlobalUnlock(wndPtr->wIDmenu);
+		}
 	}
 
     if (wndPtr->dwStyle & (WS_VSCROLL | WS_HSCROLL)) {
- 	if (wndPtr->dwStyle & WS_VSCROLL) {
+ 	if ((wndPtr->dwStyle & WS_VSCROLL) && (wndPtr->VScroll != NULL) &&
+	    (wndPtr->scroll_flags & 0x0001)) {
  	    int bottom = rect.bottom;
- 	    if (wndPtr->dwStyle & WS_HSCROLL) bottom -= SYSMETRICS_CYHSCROLL;
+ 	    if ((wndPtr->dwStyle & WS_HSCROLL) && (wndPtr->scroll_flags & 0x0001))
+			bottom -= SYSMETRICS_CYHSCROLL;
 	    SetRect(&rect2, rect.right - SYSMETRICS_CXVSCROLL, 
 	    	rect.top, rect.right, bottom); 
 	    if (wndPtr->dwStyle & WS_CAPTION) rect.top += SYSMETRICS_CYSIZE;
 	    if (wndPtr->wIDmenu != 0 && (wndPtr->dwStyle & WS_CHILD) != WS_CHILD) 
-	    	rect2.top += SYSMETRICS_CYMENU;
+	    	rect2.top += SYSMETRICS_CYMENU + 1;
  	    StdDrawScrollBar(hwnd, hdc, SB_VERT, &rect2, (LPHEADSCROLL)wndPtr->VScroll);
  	    }
-	if (wndPtr->dwStyle & WS_HSCROLL) {
+ 	if ((wndPtr->dwStyle & WS_HSCROLL) && wndPtr->HScroll != NULL &&
+	    (wndPtr->scroll_flags & 0x0002)) {
 	    int right = rect.right;
-	    if (wndPtr->dwStyle & WS_VSCROLL) right -= SYSMETRICS_CYVSCROLL;
+	    if ((wndPtr->dwStyle & WS_VSCROLL) && (wndPtr->scroll_flags & 0x0001))
+			right -= SYSMETRICS_CYVSCROLL;
 	    SetRect(&rect2, rect.left, rect.bottom - SYSMETRICS_CYHSCROLL,
 		    right, rect.bottom);
 	    StdDrawScrollBar(hwnd, hdc, SB_HORZ, &rect2, (LPHEADSCROLL)wndPtr->HScroll);
 	    }
 
-	if ((wndPtr->dwStyle & WS_VSCROLL) && (wndPtr->dwStyle & WS_HSCROLL))
-	{
-	    RECT r = rect;
-	    r.left = r.right - SYSMETRICS_CXVSCROLL;
-	    r.top  = r.bottom - SYSMETRICS_CYHSCROLL;
-	    FillRect( hdc, &r, sysColorObjects.hbrushScrollbar );
-	}
+	if ((wndPtr->dwStyle & WS_VSCROLL) && (wndPtr->dwStyle & WS_HSCROLL) &&
+	    (wndPtr->scroll_flags & 0x0003) == 0x0003) {
+		RECT r = rect;
+		r.left = r.right - SYSMETRICS_CXVSCROLL;
+		r.top  = r.bottom - SYSMETRICS_CYHSCROLL;
+		FillRect( hdc, &r, sysColorObjects.hbrushScrollbar );
+		}
     }    
 
     ReleaseDC( hwnd, hdc );
 }
+
+
+NC_DoNCPaintIcon(HWND hwnd)
+{
+      WND *wndPtr = WIN_FindWndPtr(hwnd);
+      PAINTSTRUCT ps;
+      HDC hdc;
+      int ret;
+      DC *dc;
+      GC testgc;
+      int s;
+      char buffer[256];
+
+      printf("painting icon\n");
+      if (wndPtr == NULL) {
+              printf("argh, can't find an icon to draw\n");
+              return;
+      }
+      hdc = BeginPaint(hwnd, &ps);
+
+      ret = DrawIcon(hdc, 100/2 - 16, 0, wndPtr->hIcon);
+      printf("ret is %d\n", ret);
+
+      if (s=GetWindowText(hwnd, buffer, 256))
+      {
+          /*SetBkColor(hdc, TRANSPARENT); */
+          TextOut(hdc, 0, 32, buffer, s);
+      }
+      EndPaint(hwnd, &ps);
+
+      printf("done painting icon\n");
+      
+}
+
+
+LONG NC_HandleNCPaintIcon( HWND hwnd )
+{
+    NC_DoNCPaintIcon(hwnd);
+    return 0;
+}
+
 
 
 /***********************************************************************
@@ -1164,7 +1224,8 @@ LONG NC_HandleSysCommand( HWND hwnd, WORD wParam, POINT pt )
 	break;
 
     case SC_MINIMIZE:
-	ShowWindow( hwnd, SW_MINIMIZE );
+	ICON_Iconify( hwnd );
+	/*ShowWindow( hwnd, SW_MINIMIZE );*/
 	break;
 
     case SC_MAXIMIZE:
@@ -1172,6 +1233,7 @@ LONG NC_HandleSysCommand( HWND hwnd, WORD wParam, POINT pt )
 	break;
 
     case SC_RESTORE:
+	ICON_Deiconify(hwnd);
 	ShowWindow( hwnd, SW_RESTORE );
 	break;
 

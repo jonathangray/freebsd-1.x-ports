@@ -9,6 +9,7 @@ static char Copyright[] = "Copyright  Alexandre Julliard, 1994";
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <locale.h>
 #include <X11/Xlib.h>
 #include <X11/Xresource.h>
 #include <X11/Xutil.h>
@@ -17,11 +18,22 @@ static char Copyright[] = "Copyright  Alexandre Julliard, 1994";
 #include "windows.h"
 #include "options.h"
 #include "prototypes.h"
+#include "texts.h"
 
 #define WINE_CLASS    "Wine"    /* Class name for resources */
 
+typedef struct tagENVENTRY {
+	LPSTR				Name;
+	LPSTR				Value;
+	WORD				wSize;
+	struct tagENVENTRY	*Prev;
+	struct tagENVENTRY	*Next;
+	} ENVENTRY;
+typedef ENVENTRY *LPENVENTRY;
+
+LPENVENTRY	lpEnvList = NULL;
+
 Display * XT_display;  /* To be removed */
-Screen * XT_screen;    /* To be removed */
 
 Display *display;
 Screen *screen;
@@ -31,6 +43,7 @@ int screenDepth = 0;  /* Screen depth to use */
 int desktopX = 0, desktopY = 0;  /* Desktop window position (if any) */
 
 char *ProgramName;		/* Used by resource.c with WINELIB */
+extern ButtonTexts ButtonText;
 
 struct options Options =
 {  /* default options */
@@ -39,6 +52,8 @@ struct options Options =
     NULL,           /* programName */
     FALSE,          /* usePrivateMap */
     FALSE,          /* synchronous */
+    FALSE,          /* no backing store */
+    FALSE,          /* no save unders */
     SW_SHOWNORMAL,  /* cmdShow */
     FALSE
 };
@@ -46,16 +61,18 @@ struct options Options =
 
 static XrmOptionDescRec optionsTable[] =
 {
-    { "-desktop",     ".desktop",     XrmoptionSepArg, (caddr_t)NULL },
-    { "-depth",       ".depth",       XrmoptionSepArg, (caddr_t)NULL },
-    { "-display",     ".display",     XrmoptionSepArg, (caddr_t)NULL },
-    { "-iconic",      ".iconic",      XrmoptionNoArg,  (caddr_t)"on" },
-    { "-name",        ".name",        XrmoptionSepArg, (caddr_t)NULL },
-    { "-privatemap",  ".privatemap",  XrmoptionNoArg,  (caddr_t)"on" },
-    { "-synchronous", ".synchronous", XrmoptionNoArg,  (caddr_t)"on" },
-    { "-spy",         ".spy",         XrmoptionSepArg, (caddr_t)NULL },
-    { "-debug",       ".debug",       XrmoptionNoArg,  (caddr_t)"on" },
-    { "-relaydbg",    ".relaydbg",    XrmoptionNoArg,  (caddr_t)"on" }
+    { "-desktop",       ".desktop",         XrmoptionSepArg, (caddr_t)NULL },
+    { "-depth",         ".depth",           XrmoptionSepArg, (caddr_t)NULL },
+    { "-display",       ".display",         XrmoptionSepArg, (caddr_t)NULL },
+    { "-iconic",        ".iconic",          XrmoptionNoArg,  (caddr_t)"on" },
+    { "-name",          ".name",            XrmoptionSepArg, (caddr_t)NULL },
+    { "-privatemap",    ".privatemap",      XrmoptionNoArg,  (caddr_t)"on" },
+    { "-synchronous",   ".synchronous",     XrmoptionNoArg,  (caddr_t)"on" },
+    { "-nobackingstore",".nobackingstore",  XrmoptionNoArg,  (caddr_t)"on" },
+    { "-nosaveunders",  ".nosaveunders",    XrmoptionNoArg,  (caddr_t)"on" },
+    { "-spy",           ".spy",             XrmoptionSepArg, (caddr_t)NULL },
+    { "-debug",         ".debug",           XrmoptionNoArg,  (caddr_t)"on" },
+    { "-relaydbg",      ".relaydbg",        XrmoptionNoArg,  (caddr_t)"on" }
 };
 
 #define NB_OPTIONS  (sizeof(optionsTable) / sizeof(optionsTable[0]))
@@ -72,6 +89,8 @@ static XrmOptionDescRec optionsTable[] =
   "    -name name      Set the application name\n" \
   "    -privatemap     Use a private color map\n" \
   "    -synchronous    Turn on synchronous display mode\n" \
+  "    -nobackingstore Turn off backing store\n" \
+  "    -nosaveunders   Turn off saveunders\n" \
   "    -spy file       Turn on message spying to the specified file\n" \
   "    -relaydbg       Display call relay information\n"
 
@@ -134,6 +153,54 @@ static int MAIN_GetResource( XrmDatabase db, char *name, XrmValue *value )
 
 
 /***********************************************************************
+ *           MAIN_GetButtonText
+ *
+ * Fetch the value of resource 'name' using the correct instance name.
+ * 'name' must begin with '.' or '*'
+ *
+ * The address of the string got from the XResoure is stored in Button.Label.
+ * The corresponding hotkey is taken from this string.
+ */
+
+static void MAIN_GetButtonText( XrmDatabase db, char *name, ButtonDesc *Button)
+{
+    XrmValue value;
+    char Hotkey;
+    char *i;
+
+    if (MAIN_GetResource( db, name, &value))
+      {
+       Button->Label = value.addr;
+       i = strchr(Button->Label,'&');
+       if ( i == NULL )
+         Button->Hotkey = '\0';
+       else if ( i++ == '\0' )
+         Button->Hotkey = '\0';
+       else
+         Button->Hotkey = *i;
+      }
+    Button->Hotkey = toupper(Button->Hotkey);
+}
+
+/***********************************************************************
+ *           MAIN_GetAllButtonTexts
+ *
+ * Read all Button-labels from X11-resources if they exist.
+ */
+
+static void MAIN_GetAllButtonTexts(XrmDatabase db)
+{
+  MAIN_GetButtonText(db, ".YesLabel",    &ButtonText.Yes);
+  MAIN_GetButtonText(db, ".NoLabel",     &ButtonText.No);
+  MAIN_GetButtonText(db, ".OkLabel",     &ButtonText.Ok);
+  MAIN_GetButtonText(db, ".CancelLabel", &ButtonText.Cancel);
+  MAIN_GetButtonText(db, ".AbortLabel",  &ButtonText.Abort);
+  MAIN_GetButtonText(db, ".RetryLabel",  &ButtonText.Retry);
+  MAIN_GetButtonText(db, ".IgnoreLabel", &ButtonText.Ignore);
+  MAIN_GetButtonText(db, ".CancelLabel", &ButtonText.Cancel);
+}
+
+/***********************************************************************
  *           MAIN_ParseOptions
  *
  * Parse command line options and open display.
@@ -145,10 +212,10 @@ static void MAIN_ParseOptions( int *argc, char *argv[] )
     XrmDatabase db = NULL;
 
       /* Parse command line */
-
     Options.programName = MAIN_GetProgramName( *argc, argv );
     XrmParseCommand( &db, optionsTable, NB_OPTIONS,
 		     Options.programName, argc, argv );
+
 #ifdef WINELIB
     /* Need to assemble command line and pass it to WinMain */
 #else
@@ -168,14 +235,20 @@ static void MAIN_ParseOptions( int *argc, char *argv[] )
 	exit(1);
     }
 
-      /* Get all options */
+      /* Use app-defaults */
+    display->db = db;
 
+      /* Get all options */
     if (MAIN_GetResource( db, ".iconic", &value ))
 	Options.cmdShow = SW_SHOWMINIMIZED;
     if (MAIN_GetResource( db, ".privatemap", &value ))
 	Options.usePrivateMap = TRUE;
     if (MAIN_GetResource( db, ".synchronous", &value ))
 	Options.synchronous = TRUE;
+    if (MAIN_GetResource( db, ".nosaveunders", &value ))
+	Options.nosaveunders = TRUE;
+    if (MAIN_GetResource( db, ".nobackingstore", &value ))
+	Options.nobackingstore = TRUE;	
     if (MAIN_GetResource( db, ".relaydbg", &value ))
 	Options.relay_debug = TRUE;
     if (MAIN_GetResource( db, ".debug", &value ))
@@ -186,6 +259,9 @@ static void MAIN_ParseOptions( int *argc, char *argv[] )
 	screenDepth = atoi( value.addr );
     if (MAIN_GetResource( db, ".desktop", &value))
 	Options.desktopGeometry = value.addr;
+
+/*    MAIN_GetAllButtonTexts(db); */
+ 
 }
 
 
@@ -216,10 +292,21 @@ static void MAIN_CreateDesktop( int argc, char *argv[] )
 			 StructureNotifyMask;
     win_attr.cursor = XCreateFontCursor( display, XC_top_left_arrow );
 
+    if (Options.nobackingstore)
+       win_attr.backing_store = NotUseful;
+    else
+       win_attr.backing_store = Always;
+
+    if (Options.nosaveunders)
+       win_attr.save_under = FALSE;
+    else
+       win_attr.save_under = TRUE;        
+
     rootWindow = XCreateWindow( display, DefaultRootWindow(display),
 			        desktopX, desktopY, width, height, 0,
 			        CopyFromParent, InputOutput, CopyFromParent,
-			        CWEventMask | CWCursor, &win_attr );
+			        CWEventMask | CWCursor | CWSaveUnder |
+				CWBackingStore, &win_attr );
 
       /* Set window manager properties */
 
@@ -289,7 +376,9 @@ int main( int argc, char *argv[] )
     int ret_val;
     int depth_count, i;
     int *depth_list;
-    
+
+    setlocale(LC_CTYPE,"");
+
     XrmInitialize();
     
     MAIN_ParseOptions( &argc, argv );
@@ -298,7 +387,6 @@ int main( int argc, char *argv[] )
     screenWidth  = WidthOfScreen( screen );
     screenHeight = HeightOfScreen( screen );
     XT_display   = display;
-    XT_screen    = screen;
     if (screenDepth)  /* -depth option specified */
     {
 	depth_list = XListDepths(display,DefaultScreen(display),&depth_count);
@@ -321,16 +409,16 @@ int main( int argc, char *argv[] )
     MAIN_SaveSetup();
     DOS_InitFS();
     Comm_Init();
-    
-#ifndef sunos
+#ifndef WINELIB
+    INT21_Init();
+#endif
+#ifndef sparc
     atexit(called_at_exit);
+#else
+    on_exit (called_at_exit, 0);
 #endif
 
     ret_val = _WinMain( argc, argv );
-
-#ifdef sunos
-    called_at_exit();
-#endif
 
     return ret_val;
 }
@@ -357,6 +445,95 @@ LONG GetVersion(void)
 LONG GetWinFlags(void)
 {
 	return (WF_STANDARD | WF_CPU286 | WF_PMODE | WF_80x87);
+}
+
+/***********************************************************************
+ *	SetEnvironment (GDI.132)
+ */
+int SetEnvironment(LPSTR lpPortName, LPSTR lpEnviron, WORD nCount)
+{
+	LPENVENTRY	lpNewEnv;
+	LPENVENTRY	lpEnv = lpEnvList;
+	printf("SetEnvironnement('%s', '%s', %d) !\n", 
+				lpPortName, lpEnviron, nCount);
+	if (lpPortName == NULL) return -1;
+	while (lpEnv != NULL) {
+		if (lpEnv->Name != NULL && strcmp(lpEnv->Name, lpPortName) == 0) {
+			if (nCount == 0 || lpEnviron == NULL) {
+				if (lpEnv->Prev != NULL) lpEnv->Prev->Next = lpEnv->Next;
+				if (lpEnv->Next != NULL) lpEnv->Next->Prev = lpEnv->Prev;
+				free(lpEnv->Value);
+				free(lpEnv->Name);
+				free(lpEnv);
+				printf("SetEnvironnement() // entry deleted !\n");
+				return -1;
+				}
+			free(lpEnv->Value);
+			lpEnv->Value = malloc(nCount);
+			if (lpNewEnv->Value == NULL) {
+				printf("SetEnvironment() // Error allocating entry value !\n");
+				return 0;
+			}
+			memcpy(lpEnv->Value, lpEnviron, nCount);
+			lpEnv->wSize = nCount;
+			printf("SetEnvironnement() // entry modified !\n");
+			return nCount;
+			}
+		if (lpEnv->Next == NULL) break;
+		lpEnv = lpEnv->Next;
+		}
+	if (nCount == 0 || lpEnviron == NULL) return -1;
+	printf("SetEnvironnement() // new entry !\n");
+	lpNewEnv = malloc(sizeof(ENVENTRY));
+	if (lpNewEnv == NULL) {
+		printf("SetEnvironment() // Error allocating new entry !\n");
+		return 0;
+		}
+	if (lpEnvList == NULL) {
+		lpEnvList = lpNewEnv;
+		lpNewEnv->Prev = NULL;
+		}
+	else {
+		lpEnv->Next = lpNewEnv;
+		lpNewEnv->Prev = lpEnv;
+		}
+	lpNewEnv->Next = NULL;
+	lpNewEnv->Name = malloc(strlen(lpPortName) + 1);
+	if (lpNewEnv->Name == NULL) {
+		printf("SetEnvironment() // Error allocating entry name !\n");
+		return 0;
+		}
+	strcpy(lpNewEnv->Name, lpPortName);
+	lpNewEnv->Value = malloc(nCount);
+	if (lpNewEnv->Value == NULL) {
+		printf("SetEnvironment() // Error allocating entry value !\n");
+		return 0;
+		}
+	memcpy(lpNewEnv->Value, lpEnviron, nCount);
+	lpNewEnv->wSize = nCount;
+	return nCount;
+}
+
+/***********************************************************************
+ *	GetEnvironment (GDI.134)
+ */
+int GetEnvironment(LPSTR lpPortName, LPSTR lpEnviron, WORD nMaxSiz)
+{
+	WORD		nCount;
+	LPENVENTRY	lpEnv = lpEnvList;
+	printf("GetEnvironnement('%s', '%s', %d) !\n",
+					lpPortName, lpEnviron, nMaxSiz);
+	while (lpEnv != NULL) {
+		if (lpEnv->Name != NULL && strcmp(lpEnv->Name, lpPortName) == 0) {
+			nCount = min(nMaxSiz, lpEnv->wSize);
+			memcpy(lpEnviron, lpEnv->Value, nCount);
+			printf("GetEnvironnement() // found '%s' !\n", lpEnviron);
+			return nCount;
+			}
+		lpEnv = lpEnv->Next;
+		}
+	printf("GetEnvironnement() // not found !\n");
+	return 0;
 }
 
 /***********************************************************************
@@ -518,3 +695,13 @@ BOOL SwapMouseButton(BOOL fSwap)
 	return 0;	/* don't swap */
 }
 
+/***********************************************************************
+*	ISROMMODULE (KERNEL.323)
+*/
+BOOL IsRomModule(HANDLE x)
+{
+	/* I don't know the prototype, I assume that it returns true
+	   if the dll is located in rom */
+	   
+	return FALSE;
+}

@@ -1,4 +1,4 @@
-static char RCSId[] = "$Id: user.c,v 1.1 1994/04/22 01:53:19 hsu Exp $";
+static char RCSId[] = "$Id: user.c,v 1.1.1.2 1994/07/05 08:20:19 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
 #include <stdio.h>
@@ -80,11 +80,9 @@ USER_InitApp(int hInstance)
       /* Create desktop window */
     if (!WIN_CreateDesktopWindow()) return 0;
 
-#if 1
 #ifndef WINELIB
     /* Initialize DLLs */
-    InitializeLoadedDLLs();
-#endif
+    InitializeLoadedDLLs(NULL);
 #endif
         
     return 1;

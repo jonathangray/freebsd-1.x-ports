@@ -1,4 +1,4 @@
-static char RCSId[] = "$Id: relay.c,v 1.1.1.3 1994/05/19 07:54:59 hsu Exp $";
+static char RCSId[] = "$Id: relay.c,v 1.1.1.4 1994/07/05 08:17:25 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
 #include <stdio.h>
@@ -24,8 +24,6 @@ static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
 #define DEBUG_RELAY /* */
 
-#define N_BUILTINS	11
-
 struct dll_name_table_entry_s dll_builtin_table[N_BUILTINS] =
 {
     { "KERNEL",  KERNEL_table, 	410, 1 },
@@ -38,8 +36,11 @@ struct dll_name_table_entry_s dll_builtin_table[N_BUILTINS] =
     { "KEYBOARD",KEYBOARD_table,137, 8 },
     { "WINSOCK", WINSOCK_table, 155, 9 },
     { "STRESS",  STRESS_table,   15, 10},
-    { "MMSYSTEM",MMSYSTEM_table,1023,11},
+    { "MMSYSTEM",MMSYSTEM_table,1226,11},
+    { "SYSTEM",  SYSTEM_table,   20 ,12},
+    { "TOOLHELP",TOOLHELP_table, 83, 13},
 };
+/* don't forget to increase N_BUILTINS in dll.h if you add a dll */
 
 unsigned short *Stack16Frame;
 
@@ -220,7 +221,7 @@ FindDLLTable(char *dll_name)
     int i;
 
     for (i = 0; i < N_BUILTINS; i++)
-	if (strcmp(dll_builtin_table[i].dll_name, dll_name) == 0)
+	if (strcasecmp(dll_builtin_table[i].dll_name, dll_name) == 0)
 	    return dll_builtin_table[i].dll_table;
     
     return NULL;
@@ -287,9 +288,9 @@ void winestat(){
 		    perc = implemented * 100.00 / used;
 	    else
 		    perc = 0.0;
-	    printf("%s: %d %d %3.1f\n", dll_builtin_table[i].dll_name, implemented, used, perc);
+	    printf("%s: %d of %d (%3.1f %%)\n", dll_builtin_table[i].dll_name, implemented, used, perc);
     };
 	perc = timplemented * 100.00 / tused;
-	printf("TOTAL: %d %d %3.1f\n",timplemented, tused, perc);
+	printf("TOTAL: %d of %d implemented (%3.1f %%)\n",timplemented, tused, perc);
 }
 #endif /* WINESTAT */

@@ -1,4 +1,4 @@
-/* $Id: dlls.h,v 1.1.1.3 1994/05/19 07:56:01 hsu Exp $
+/* $Id: dlls.h,v 1.1.1.4 1994/07/05 08:17:53 hsu Exp $
  */
 /*
  * Copyright  Robert J. Amstadt, 1993
@@ -6,6 +6,35 @@
 
 #ifndef DLLS_H
 #define DLLS_H
+
+#define MAX_NAME_LENGTH		64
+
+typedef struct resource_name_table
+{
+    struct resource_name_table *next;
+    unsigned short type_ord;
+    unsigned short id_ord;
+    char id[MAX_NAME_LENGTH];
+} RESNAMTAB;
+
+struct w_files
+{
+    struct w_files  * next;
+    char * name;   /* Name, as it appears in the windows binaries */
+    char * filename; /* Actual name of the unix file that satisfies this */
+    int fd;
+    struct mz_header_s *mz_header;
+    struct ne_header_s *ne_header;
+    struct ne_segment_table_entry_s *seg_table;
+    struct segment_descriptor_s *selector_table;
+    char * lookup_table;
+    char * nrname_table;
+    char * rname_table;
+    unsigned short hinstance;
+    RESNAMTAB *resnamtab;
+};
+
+extern struct  w_files *wine_files;
 
 typedef struct dll_arg_relocation_s
 {
@@ -65,5 +94,9 @@ extern struct dll_table_entry_s SOUND_table[];
 extern struct dll_table_entry_s KEYBOARD_table[];
 extern struct dll_table_entry_s WINSOCK_table[];
 extern struct dll_table_entry_s STRESS_table[];
+extern struct dll_table_entry_s SYSTEM_table[];
+extern struct dll_table_entry_s TOOLHELP_table[];
+
+#define N_BUILTINS	13
 
 #endif /* DLLS_H */

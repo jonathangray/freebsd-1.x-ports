@@ -1,4 +1,4 @@
-# $Id: gdi.spec,v 1.1.1.3 1994/05/19 07:54:31 hsu Exp $
+# $Id: gdi.spec,v 1.1.1.4 1994/07/05 08:17:09 hsu Exp $
 #
 name	gdi
 id	3
@@ -50,7 +50,7 @@ length	490
            StretchBlt(1 2 3 4 5 6 7 8 9 10 11)
 36  pascal Polygon (word ptr word) Polygon (1 2 3)
 37  pascal Polyline (word ptr word) Polyline (1 2 3)
-#38  pascal Escape
+38  pascal Escape(word word word ptr ptr) Escape(1 2 3 4 5)
 39  pascal RestoreDC(word s_word) RestoreDC(1 2)
 40  pascal FillRgn(word word word) FillRgn(1 2 3)
 #41  pascal FrameRgn
@@ -85,7 +85,7 @@ length	490
 68  pascal DeleteDC(word) DeleteDC(1)
 69  pascal DeleteObject(word) DeleteObject(1)
 70  pascal EnumFonts(word ptr ptr ptr) EnumFonts(1 2 3 4)
-#71  pascal EnumObjects
+71  pascal EnumObjects(word word ptr ptr) EnumObjects(1 2 3 4)
 72  pascal EqualRgn(word word) EqualRgn(1 2)
 73  pascal ExcludeVisRect(word s_word s_word s_word s_word)
 	   ExcludeVisRect(1 2 3 4 5)
@@ -127,7 +127,7 @@ length	490
 117 pascal SetDCOrg(word s_word s_word) SetDCOrg(1 2 3)
 #121 pascal Death
 #122 pascal ReSurRection
-#123 pascal PlayMetaFile
+123 pascal PlayMetaFile(word word) PlayMetaFile(1 2)
 #124 pascal GetMetaFile
 125 pascal CreateMetaFile(ptr) CreateMetaFile(1)
 126 pascal CloseMetaFile(word) CloseMetaFile(1)
@@ -136,8 +136,8 @@ length	490
 129 pascal SaveVisRgn(word) SaveVisRgn(1)
 130 pascal RestoreVisRgn(word) RestoreVisRgn(1)
 131 pascal InquireVisRgn(word) InquireVisRgn(1)
-#132 pascal SetEnvironment
-#133 pascal GetEnvironment
+132 pascal SetEnvironment(ptr ptr word) SetEnvironment(1 2 3)
+133 pascal GetEnvironment(ptr ptr word) GetEnvironment(1 2 3)
 134 pascal GetRgnBox(word ptr) GetRgnBox(1 2)
 #135 pascal ScanLr
 #136 pascal RemoveFontResource
@@ -148,7 +148,8 @@ length	490
 153 pascal CreateIC(ptr ptr ptr ptr) CreateIC(1 2 3 4)
 154 pascal GetNearestColor(word long) GetNearestColor(1 2)
 #155 pascal QueryAbort
-#156 pascal CreateDiscardableBitmap
+156 pascal CreateDiscardableBitmap(word word word) 
+	   CreateDiscardableBitmap(1 2 3)
 #159 pascal GetMetaFileBits
 #160 pascal SetMetaFileBits
 161 pascal PtInRegion(word s_word s_word) PtInRegion(1 2 3)
@@ -159,6 +160,7 @@ length	490
 172 pascal SetRectRgn(word s_word s_word s_word s_word) SetRectRgn(1 2 3 4 5)
 173 pascal GetClipRgn(word) GetClipRgn(1)
 #175 pascal EnumMetaFile
+176 pascal PlayMetaFileRecord(word ptr ptr word) PlayMetaFileRecord(1 2 3 4)
 179 pascal GetDCState(word) GetDCState(1)
 180 pascal SetDCState(word word) SetDCState(1 2)
 181 pascal RectInRegionOld(word ptr) RectInRegion(1 2)
@@ -276,8 +278,8 @@ length	490
 	   CreatePolyPolygonRgn(1 2 3 4)
 #452 pascal GDISEEGDIDO
 #460 pascal GDITASKTERMINATION
-#461 pascal SETOBJECTOWNER
-#462 pascal ISGDIOBJECT
+461 return SetObjectOwner 4 0
+462 pascal IsGDIObject(word) IsGDIObject(1)
 #463 pascal MAKEOBJECTPRIVATE
 #464 pascal FIXUPBOGUSPUBLISHERMETAFILE
 465 pascal RectVisible(word ptr) RectVisible(1 2)

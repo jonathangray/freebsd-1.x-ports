@@ -1,4 +1,4 @@
-static char RCSId[] = "$Id: callback.c,v 1.1.1.3 1994/05/19 07:55:02 hsu Exp $";
+static char RCSId[] = "$Id: callback.c,v 1.1.1.4 1994/07/05 08:17:29 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
 #include <stdio.h>
@@ -8,7 +8,7 @@ static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 #include "wine.h"
 #include "segmem.h"
 #include <setjmp.h>
-
+#include "dlls.h"
 extern SEGDESC Segments[];
 extern unsigned short IF1632_Saved16_ss;
 extern unsigned long  IF1632_Saved16_ebp;
@@ -155,7 +155,7 @@ LONG CallWindowProc( FARPROC func, HWND hwnd, WORD message,
 	    user_tab = FindDLLTable("USER");
 
 	/* DefWindowProc */
-	if (user_tab[104].address == address)
+	if (user_tab[107].address == address)
 	    return DefWindowProc(hwnd, message, wParam, lParam);
 	
 	/* DefDlgProc */

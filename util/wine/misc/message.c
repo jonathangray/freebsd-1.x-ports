@@ -19,6 +19,21 @@ static char Copyright[] = "Copyright Martin Ayotte, 1993";
 #include "prototypes.h"
 #include "heap.h"
 #include "win.h"
+#include "texts.h"
+ 
+/*
+ * Defaults for button-texts
+ */
+
+ButtonTexts ButtonText = {
+  "&Yes",    'Y',
+  "&No",     'N',
+  "&Ok",     'O',
+  "&Cancel", 'C',
+  "&Abort",  'A',
+  "&Retry",  'R',
+  "&Ignore", 'I'
+};
 
 extern HINSTANCE hSysRes;
 extern HBITMAP hUpArrow;
@@ -54,17 +69,22 @@ int MessageBox(HWND hWnd, LPSTR str, LPSTR title, WORD type)
 	DWORD		dwStyle;
 	HINSTANCE	hInst;
 	int			nRet;
+
+	if (title == NULL)
+		title = "Error";
 	wndPtr = WIN_FindWndPtr(hWnd);
 	if (wndPtr == NULL) {
 		hInst = hSysRes;
 #ifdef DEBUG_MSGBOX
-		printf("MessageBox(NULL, '%s', '%s', %04X)\n", str, title, type);
+		printf("MessageBox(NULL, %08X='%s', %08X='%s', %04X)\n", 
+									str, str, title, title, type);
 #endif
 		}
 	else {
 		hInst = wndPtr->hInstance;
 #ifdef DEBUG_MSGBOX
-		printf("MessageBox(%04X, '%s', '%s', %04X)\n", hWnd, str, title, type);
+		printf("MessageBox(%04X, %08X='%s', %08X='%s', %04X)\n", 
+							hWnd, str, str, title, title, type);
 #endif
 		}
     lpmb = (LPMSGBOX) malloc(sizeof(MSGBOX));
@@ -170,7 +190,7 @@ LONG SystemMessageBoxProc(HWND hWnd, WORD message, WORD wParam, LONG lParam)
 	switch(message) {
 	case WM_CREATE:
 #ifdef DEBUG_MSGBOX
-		printf("MessageBox WM_CREATE !\n");
+		printf("MessageBox WM_CREATE hWnd=%04X !\n", hWnd);
 #endif
 		wndPtr = WIN_FindWndPtr(hWnd);
 		createStruct = (CREATESTRUCT *)lParam;
@@ -186,55 +206,55 @@ LONG SystemMessageBoxProc(HWND hWnd, WORD message, WORD wParam, LONG lParam)
 		lpmb->rectStr.bottom -= 32;
 		switch(lpmb->wType & MB_TYPEMASK) {
 		case MB_OK :
-			lpmb->hWndYes = CreateWindow("BUTTON", "&Ok", 
+		        lpmb->hWndYes = CreateWindow("BUTTON", ButtonText.Ok.Label,
 				WS_CHILD | WS_CLIPCHILDREN | WS_VISIBLE | BS_PUSHBUTTON,
 				rect.right / 2 - 30, rect.bottom - 25, 
 				60, 18, hWnd, IDOK, wndPtr->hInstance, 0L);
 			break;
 		case MB_OKCANCEL :
-			lpmb->hWndYes = CreateWindow("BUTTON", "&Ok", 
+			lpmb->hWndYes = CreateWindow("BUTTON", ButtonText.Ok.Label,
 				WS_CHILD | WS_CLIPCHILDREN | WS_VISIBLE | BS_PUSHBUTTON,
 				rect.right / 2 - 65, rect.bottom - 25, 
 				60, 18, hWnd, IDOK, wndPtr->hInstance, 0L);
-			lpmb->hWndCancel = CreateWindow("BUTTON", "&Cancel", 
+			lpmb->hWndCancel = CreateWindow("BUTTON", ButtonText.Cancel.Label,
 				WS_CHILD | WS_CLIPCHILDREN | WS_VISIBLE | BS_PUSHBUTTON,
 				rect.right / 2 + 5, rect.bottom - 25, 
 				60, 18, hWnd, IDCANCEL, wndPtr->hInstance, 0L);
 			break;
 		case MB_ABORTRETRYIGNORE :
-			lpmb->hWndYes = CreateWindow("BUTTON", "&Retry", 
+			lpmb->hWndYes = CreateWindow("BUTTON", ButtonText.Retry.Label,
 				WS_CHILD | WS_CLIPCHILDREN | WS_VISIBLE | BS_PUSHBUTTON,
 				rect.right / 2 - 100, rect.bottom - 25, 
 				60, 18, hWnd, IDRETRY, wndPtr->hInstance, 0L);
-			lpmb->hWndNo = CreateWindow("BUTTON", "&Ignore", 
+			lpmb->hWndNo = CreateWindow("BUTTON", ButtonText.Ignore.Label,
 				WS_CHILD | WS_CLIPCHILDREN | WS_VISIBLE | BS_PUSHBUTTON,
 				rect.right / 2 - 30, rect.bottom - 25, 
 				60, 18, hWnd, IDIGNORE, wndPtr->hInstance, 0L);
-			lpmb->hWndCancel = CreateWindow("BUTTON", "&Abort", 
+			lpmb->hWndCancel = CreateWindow("BUTTON", ButtonText.Abort.Label,
 				WS_CHILD | WS_CLIPCHILDREN | WS_VISIBLE | BS_PUSHBUTTON,
 				rect.right / 2 + 40, rect.bottom - 25, 
 				60, 18, hWnd, IDABORT, wndPtr->hInstance, 0L);
 			break;
 		case MB_YESNO :
-			lpmb->hWndYes = CreateWindow("BUTTON", "&Yes", 
+			lpmb->hWndYes = CreateWindow("BUTTON", ButtonText.Yes.Label,
 				WS_CHILD | WS_CLIPCHILDREN | WS_VISIBLE | BS_PUSHBUTTON,
 				rect.right / 2 - 65, rect.bottom - 25, 
 				60, 18, hWnd, IDYES, wndPtr->hInstance, 0L);
-			lpmb->hWndNo = CreateWindow("BUTTON", "&No", 
+			lpmb->hWndNo = CreateWindow("BUTTON", ButtonText.No.Label,
 				WS_CHILD | WS_CLIPCHILDREN | WS_VISIBLE | BS_PUSHBUTTON,
 				rect.right / 2 + 5, rect.bottom - 25, 
 				60, 18, hWnd, IDNO, wndPtr->hInstance, 0L);
 			break;
 		case MB_YESNOCANCEL :
-			lpmb->hWndYes = CreateWindow("BUTTON", "&Yes", 
+			lpmb->hWndYes = CreateWindow("BUTTON", ButtonText.Yes.Label,
 				WS_CHILD | WS_CLIPCHILDREN | WS_VISIBLE | BS_PUSHBUTTON,
 				rect.right / 2 - 100, rect.bottom - 25, 
 				60, 18, hWnd, IDYES, wndPtr->hInstance, 0L);
-			lpmb->hWndNo = CreateWindow("BUTTON", "&No", 
+			lpmb->hWndNo = CreateWindow("BUTTON", ButtonText.No.Label,
 				WS_CHILD | WS_CLIPCHILDREN | WS_VISIBLE | BS_PUSHBUTTON,
 				rect.right / 2 - 30, rect.bottom - 25, 
 				60, 18, hWnd, IDNO, wndPtr->hInstance, 0L);
-			lpmb->hWndCancel = CreateWindow("BUTTON", "&Cancel", 
+			lpmb->hWndCancel = CreateWindow("BUTTON", ButtonText.Cancel.Label,
 				WS_CHILD | WS_CLIPCHILDREN | WS_VISIBLE | BS_PUSHBUTTON,
 				rect.right / 2 + 40, rect.bottom - 25, 
 				60, 18, hWnd, IDCANCEL, wndPtr->hInstance, 0L);
@@ -265,14 +285,29 @@ LONG SystemMessageBoxProc(HWND hWnd, WORD message, WORD wParam, LONG lParam)
 			lpmb->rectStr.left += 64;
 			}
 	    break;
+	case WM_SHOWWINDOW:
+#ifdef DEBUG_MSGBOX
+		printf("MessageBox WM_SHOWWINDOW hWnd=%04X !\n", hWnd);
+#endif
+		if (!(wParam == 0 && lParam == 0L)) {
+			InvalidateRect(hWnd, NULL, TRUE);
+			}
+	    break;
 	case WM_PAINT:
 #ifdef DEBUG_MSGBOX
-		printf("MessageBox WM_PAINT !\n");
+		printf("MessageBox WM_PAINT hWnd=%04X !\n", hWnd);
 #endif
 		lpmb = MsgBoxGetStorageHeader(hWnd);
 		if (lpmb == NULL) break;
-		CopyRect(&rect, &lpmb->rectStr);
+		if (!lpmb->ActiveFlg) break;
 		hDC = BeginPaint(hWnd, &ps);
+		if (hDC == 0) {
+			printf("MessageBox WM_PAINT // BeginPaint returned BAD hDC !\n");
+			break;
+			}
+		GetClientRect(hWnd, &rect);
+		FillRect(hDC, &rect, GetStockObject(WHITE_BRUSH));
+		CopyRect(&rect, &lpmb->rectStr);
 		OldTextColor = SetTextColor(hDC, 0x00000000);
 		if (lpmb->hIcon) 
 			DrawIcon(hDC, lpmb->rectIcon.left,
@@ -295,7 +330,6 @@ LONG SystemMessageBoxProc(HWND hWnd, WORD message, WORD wParam, LONG lParam)
 	    ReleaseCapture();
 	    lpmb = MsgBoxGetStorageHeader(hWnd);
 		if (lpmb == NULL) break;
-	    lpmb->ActiveFlg = FALSE;
 	    if (lpmb->hIcon) DestroyIcon(lpmb->hIcon);
 	    if (lpmb->hWndYes) DestroyWindow(lpmb->hWndYes);
 	    if (lpmb->hWndNo) DestroyWindow(lpmb->hWndNo);
@@ -303,6 +337,7 @@ LONG SystemMessageBoxProc(HWND hWnd, WORD message, WORD wParam, LONG lParam)
 #ifdef DEBUG_MSGBOX
 	    printf("MessageBox WM_DESTROY end !\n");
 #endif
+	    lpmb->ActiveFlg = FALSE;
 	    break;
 	case WM_COMMAND:
 	    lpmb = MsgBoxGetStorageHeader(hWnd);
@@ -316,36 +351,28 @@ LONG SystemMessageBoxProc(HWND hWnd, WORD message, WORD wParam, LONG lParam)
 	    break;
 	case WM_CHAR:
 	    lpmb = MsgBoxGetStorageHeader(hWnd);
+/*          if (wParam >= 'a' || wParam <= 'z') wParam -= 'a' - 'A'; */
+		wParam = toupper(wParam);
+	    if (wParam == ButtonText.Yes.Hotkey)
+                lpmb->wRetVal = IDYES;
+            else if (wParam == ButtonText.Ok.Hotkey)
+                lpmb->wRetVal = IDOK;
+            else if (wParam == ButtonText.Retry.Hotkey)
+                lpmb->wRetVal = IDRETRY;
+            else if (wParam == ButtonText.Abort.Hotkey)
+                lpmb->wRetVal = IDABORT;
+            else if (wParam == ButtonText.No.Hotkey)
+                lpmb->wRetVal = IDNO;
+            else if (wParam == ButtonText.Ignore.Hotkey)
+                 lpmb->wRetVal = IDIGNORE;
+            else if ((wParam == ButtonText.Ok.Hotkey) || (wParam == VK_ESCAPE))
+                lpmb->wRetVal = IDCANCEL;
+	    else
+		return 0;
 		if (lpmb == NULL) break;
-		if (wParam >= 'a' || wParam <= 'z') wParam -= 'a' - 'A';
-		switch(wParam) {
-			case 'Y':
-			    lpmb->wRetVal = IDYES;
-				break;
-			case 'O':
-			    lpmb->wRetVal = IDOK;
-				break;
-			case 'R':
-			    lpmb->wRetVal = IDRETRY;
-				break;
-			case 'A':
-			    lpmb->wRetVal = IDABORT;
-				break;
-			case 'N':
-			    lpmb->wRetVal = IDNO;
-				break;
-			case 'I':
-			    lpmb->wRetVal = IDIGNORE;
-				break;
-			case 'C':
-			case VK_ESCAPE:
-			    lpmb->wRetVal = IDCANCEL;
-				break;
-			default:
-			    return 0;
-			}
-	    PostMessage(hWnd, WM_CLOSE, 0, 0L);
-	    break;
+		ShowWindow(hWnd, SW_HIDE);
+		PostMessage(hWnd, WM_CLOSE, 0, 0L);
+		break;
 	default:
 	    return DefWindowProc(hWnd, message, wParam, lParam );
     }
@@ -379,7 +406,7 @@ BOOL FAR PASCAL AboutWine_Proc(HWND hDlg, WORD msg, WORD wParam, LONG lParam)
 	strcpy(str, "WINELOGO");
 	hBitMap = LoadBitmap((HINSTANCE)NULL, (LPSTR)str);
 
-	strcpy(str, "PROPOSED_LICENSE");
+	strcpy(str, "LICENSE");
 	printf("str = '%s'\n", str);
 	hFile = OpenFile((LPSTR)str, &ofstruct, OF_READ);
 	ptr = (LPSTR)malloc(2048);

@@ -127,6 +127,13 @@ HCURSOR LoadCursor(HANDLE instance, LPSTR cursor_name)
 		break;
 	    }
 	}
+
+#if 1
+    lpcur->xcursor = XCreateFontCursor(XT_display, XC_top_left_arrow);
+    GlobalUnlock(hCursor);
+    return hCursor;
+#endif
+
     if (!(hdc = GetDC(GetDesktopWindow()))) return 0;
     rsc_mem = RSC_LoadResource(instance, cursor_name, NE_RSCTYPE_GROUP_CURSOR, 
 			       &image_size);
@@ -171,7 +178,7 @@ HCURSOR LoadCursor(HANDLE instance, LPSTR cursor_name)
 	ReleaseDC(GetDesktopWindow(), hdc); 
 	return 0;
  	}
-	(char *)lp += 2;
+	lp++;
     for (j = 0; j < 16; j++)
     	printf("%04X ", *(lp + j));
 /*

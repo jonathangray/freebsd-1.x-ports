@@ -20,6 +20,15 @@ static char Copyright[] = "Copyright  Alexandre Julliard, 1993";
 
 extern int COLOR_ToPhysical( DC *dc, COLORREF color );
 
+static inline swap_int(int *a, int *b)
+{
+	int c;
+	
+	c = *a;
+	*a = *b;
+	*b = c;
+}
+
 /***********************************************************************
  *           LineTo    (GDI.19)
  */
@@ -35,7 +44,7 @@ BOOL LineTo( HDC hdc, short x, short y )
     }
 
     if (DC_SetupGCForPen( dc ))
-	XDrawLine(XT_display, dc->u.x.drawable, dc->u.x.gc, 
+	XDrawLine(display, dc->u.x.drawable, dc->u.x.gc, 
 		  dc->w.DCOrgX + XLPTODP( dc, dc->w.CursPosX ),
 		  dc->w.DCOrgY + YLPTODP( dc, dc->w.CursPosY ),
 		  dc->w.DCOrgX + XLPTODP( dc, x ),
@@ -145,7 +154,7 @@ BOOL GRAPH_DrawArc( HDC hdc, int left, int top, int right, int bottom,
     diff_angle  = end_angle - start_angle;
     if (diff_angle < 0.0) diff_angle += 2*PI;
 
-    XDrawArc( XT_display, dc->u.x.drawable, dc->u.x.gc,
+    XDrawArc( display, dc->u.x.drawable, dc->u.x.gc,
 	      dc->w.DCOrgX + left, dc->w.DCOrgY + top,
 	      right-left-1, bottom-top-1,
 	      (int)(start_angle * 180 * 64 / PI),
@@ -162,7 +171,7 @@ BOOL GRAPH_DrawArc( HDC hdc, int left, int top, int right, int bottom,
 	points[1].x = dc->w.DCOrgX + xcenter;
 	points[1].y = dc->w.DCOrgY + ycenter;
     }
-    XDrawLines( XT_display, dc->u.x.drawable, dc->u.x.gc,
+    XDrawLines( display, dc->u.x.drawable, dc->u.x.gc,
 	        points, lines+1, CoordModeOrigin );
     return TRUE;
 }
@@ -220,13 +229,19 @@ BOOL Ellipse( HDC hdc, int left, int top, int right, int bottom )
     right  = XLPTODP( dc, right );
     bottom = YLPTODP( dc, bottom );
     if ((left == right) || (top == bottom)) return FALSE;
+
+    if (right < left)
+    	swap_int(&right, &left);
+
+    if (bottom < top)
+    	swap_int(&bottom, &top);
     
     if (DC_SetupGCForBrush( dc ))
-	XFillArc( XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XFillArc( display, dc->u.x.drawable, dc->u.x.gc,
 		  dc->w.DCOrgX + left, dc->w.DCOrgY + top,
 		  right-left-1, bottom-top-1, 0, 360*64 );
     if (DC_SetupGCForPen( dc ))
-	XDrawArc( XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XDrawArc( display, dc->u.x.drawable, dc->u.x.gc,
 		  dc->w.DCOrgX + left, dc->w.DCOrgY + top,
 		  right-left-1, bottom-top-1, 0, 360*64 );
     return TRUE;
@@ -246,18 +261,33 @@ BOOL Rectangle( HDC hdc, int left, int top, int right, int bottom )
 	MF_MetaParam4(dc, META_RECTANGLE, left, top, right, bottom);
 	return TRUE;
     }
-
     left   = XLPTODP( dc, left );
     top    = YLPTODP( dc, top );
     right  = XLPTODP( dc, right );
     bottom = YLPTODP( dc, bottom );
+
+    if (right < left)
+    	swap_int(&right, &left);
+
+    if (bottom < top)
+    	swap_int(&bottom, &top);
+
+    if ((left == right) || (top == bottom)) {
+	if (DC_SetupGCForPen( dc ))
+	    XDrawLine(display, dc->u.x.drawable, dc->u.x.gc, 
+		  dc->w.DCOrgX + left,
+		  dc->w.DCOrgY + top,
+		  dc->w.DCOrgX + right,
+		  dc->w.DCOrgY + bottom);
+	return TRUE;
+    }
     
     if (DC_SetupGCForBrush( dc ))
-	XFillRectangle( XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XFillRectangle( display, dc->u.x.drawable, dc->u.x.gc,
 		        dc->w.DCOrgX + left, dc->w.DCOrgY + top,
-		        right-left-1, bottom-top-1 );
+		        right-left, bottom-top );
     if (DC_SetupGCForPen( dc ))
-	XDrawRectangle( XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XDrawRectangle( display, dc->u.x.drawable, dc->u.x.gc,
 		        dc->w.DCOrgX + left, dc->w.DCOrgY + top,
 		        right-left-1, bottom-top-1 );
     return TRUE;
@@ -289,41 +319,41 @@ BOOL RoundRect( HDC hDC, short left, short top, short right, short bottom,
     x2 = XLPTODP(dc, right - ell_width);
     y2 = YLPTODP(dc, bottom - ell_height);
     if (DC_SetupGCForBrush(dc)) {
-	XFillArc(XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XFillArc(display, dc->u.x.drawable, dc->u.x.gc,
 		        dc->w.DCOrgX + x1, dc->w.DCOrgY + y1,
 		        ell_width, ell_height, 90 * 64, 90 * 64);
-	XFillArc(XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XFillArc(display, dc->u.x.drawable, dc->u.x.gc,
 		        dc->w.DCOrgX + x1, dc->w.DCOrgY + y2,
 		        ell_width, ell_height, 180 * 64, 90 * 64);
-	XFillArc(XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XFillArc(display, dc->u.x.drawable, dc->u.x.gc,
 		        dc->w.DCOrgX + x2, dc->w.DCOrgY + y2,
 		        ell_width, ell_height, 270 * 64, 90 * 64);
-	XFillArc(XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XFillArc(display, dc->u.x.drawable, dc->u.x.gc,
 		        dc->w.DCOrgX + x2, dc->w.DCOrgY + y1,
 		        ell_width, ell_height, 0, 90 * 64);
 	ell_width /= 2;  ell_height /= 2;
-	XFillRectangle(XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XFillRectangle(display, dc->u.x.drawable, dc->u.x.gc,
 		dc->w.DCOrgX + left + ell_width, dc->w.DCOrgY + top,
 		right - left - 2 * ell_width, bottom - top);
-	XFillRectangle(XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XFillRectangle(display, dc->u.x.drawable, dc->u.x.gc,
 		dc->w.DCOrgX + left, dc->w.DCOrgY + top + ell_height,
 		ell_width, bottom - top - 2 * ell_height);
-	XFillRectangle(XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XFillRectangle(display, dc->u.x.drawable, dc->u.x.gc,
 		dc->w.DCOrgX + right - ell_width, dc->w.DCOrgY + top + ell_height,
 		ell_width, bottom - top - 2 * ell_height);
 	ell_width *= 2;  ell_height *= 2;
 	}    	
     if (DC_SetupGCForPen(dc)) {
-	XDrawArc(XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XDrawArc(display, dc->u.x.drawable, dc->u.x.gc,
 		        dc->w.DCOrgX + x1, dc->w.DCOrgY + y1,
 		        ell_width, ell_height, 90 * 64, 90 * 64);
-	XDrawArc(XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XDrawArc(display, dc->u.x.drawable, dc->u.x.gc,
 		        dc->w.DCOrgX + x1, dc->w.DCOrgY + y2,
 		        ell_width, ell_height, 180 * 64, 90 * 64);
-	XDrawArc(XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XDrawArc(display, dc->u.x.drawable, dc->u.x.gc,
 		        dc->w.DCOrgX + x2, dc->w.DCOrgY + y2,
 		        ell_width, ell_height, 270 * 64, 90 * 64);
-	XDrawArc(XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XDrawArc(display, dc->u.x.drawable, dc->u.x.gc,
 		        dc->w.DCOrgX + x2, dc->w.DCOrgY + y1,
 		        ell_width, ell_height, 0, 90 * 64);
 	}
@@ -423,9 +453,9 @@ COLORREF SetPixel( HDC hdc, short x, short y, COLORREF color )
     pixel = COLOR_ToPhysical( dc, color );
     GetPaletteEntries( dc->w.hPalette, pixel, 1, &entry );
     
-    XSetForeground( XT_display, dc->u.x.gc, pixel );
-    XSetFunction( XT_display, dc->u.x.gc, GXcopy );
-    XDrawPoint( XT_display, dc->u.x.drawable, dc->u.x.gc, x, y );
+    XSetForeground( display, dc->u.x.gc, pixel );
+    XSetFunction( display, dc->u.x.gc, GXcopy );
+    XDrawPoint( display, dc->u.x.drawable, dc->u.x.gc, x, y );
 
     return RGB( entry.peRed, entry.peGreen, entry.peBlue );
 }
@@ -450,13 +480,13 @@ COLORREF GetPixel( HDC hdc, short x, short y )
     {
 	XWindowAttributes win_attr;
 	
-	if (!XGetWindowAttributes( XT_display, dc->u.x.drawable, &win_attr ))
+	if (!XGetWindowAttributes( display, dc->u.x.drawable, &win_attr ))
 	    return 0;
 	if (win_attr.map_state != IsViewable) return 0;
 	if ((x >= win_attr.width) || (y >= win_attr.height)) return 0;
     }
     
-    image = XGetImage( XT_display, dc->u.x.drawable, x, y,
+    image = XGetImage( display, dc->u.x.drawable, x, y,
 		       1, 1, AllPlanes, ZPixmap );
     GetPaletteEntries( dc->w.hPalette, XGetPixel( image, 0, 0 ), 1, &entry );
     XDestroyImage( image );
@@ -494,7 +524,7 @@ BOOL PaintRgn( HDC hdc, HRGN hrgn )
 
     GetClipBox( hdc, &box );
     if (DC_SetupGCForBrush( dc ))
-	XFillRectangle( XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XFillRectangle( display, dc->u.x.drawable, dc->u.x.gc,
 		        dc->w.DCOrgX + box.left, dc->w.DCOrgY + box.top,
 		        box.right-box.left, box.bottom-box.top );
 
@@ -541,7 +571,7 @@ void DrawFocusRect( HDC hdc, LPRECT rc )
     oldBkMode = SetBkMode(hdc, TRANSPARENT);
 
     if (DC_SetupGCForPen( dc ))
-	XDrawRectangle( XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XDrawRectangle( display, dc->u.x.drawable, dc->u.x.gc,
 		        dc->w.DCOrgX + left, dc->w.DCOrgY + top,
 		        right-left-1, bottom-top-1 );
 
@@ -601,12 +631,12 @@ BOOL Polyline (HDC hdc, LPPOINT pt, int count)
     if (DC_SetupGCForPen( dc ))
     {
 	for (i = 0; i < count-1; i ++)
-	    XDrawLine (XT_display, dc->u.x.drawable, dc->u.x.gc,  
+	    XDrawLine (display, dc->u.x.drawable, dc->u.x.gc,  
 		       dc->w.DCOrgX + XLPTODP(dc, pt [i].x),
 		       dc->w.DCOrgY + YLPTODP(dc, pt [i].y),
 		       dc->w.DCOrgX + XLPTODP(dc, pt [i+1].x),
 		       dc->w.DCOrgY + YLPTODP(dc, pt [i+1].y));
-	XDrawLine (XT_display, dc->u.x.drawable, dc->u.x.gc,  
+	XDrawLine (display, dc->u.x.drawable, dc->u.x.gc,  
 		   dc->w.DCOrgX + XLPTODP(dc, pt [count-1].x),
 		   dc->w.DCOrgY + YLPTODP(dc, pt [count-1].y),
 		   dc->w.DCOrgX + XLPTODP(dc, pt [0].x),
@@ -644,12 +674,12 @@ BOOL Polygon (HDC hdc, LPPOINT pt, int count)
 	}
 	points [count] = points [0];
 		
-	XFillPolygon( XT_display, dc->u.x.drawable, dc->u.x.gc,
+	XFillPolygon( display, dc->u.x.drawable, dc->u.x.gc,
 		     points, count, Complex, CoordModeOrigin);
 		
 	if (DC_SetupGCForPen ( dc ))
 	{
-	    XDrawLines( XT_display, dc->u.x.drawable, dc->u.x.gc,
+	    XDrawLines( display, dc->u.x.drawable, dc->u.x.gc,
 		       points, count, CoordModeOrigin );
 	}
     }
@@ -673,24 +703,31 @@ static BOOL FloodFill_rec(XImage *image, int x, int y,
 	if (x > endx || x < orgx || y > endy || y < orgy)
 		return FALSE;
 	XPutPixel(image, x, y, fillp);
-
-	testp = XGetPixel(image, x+1, y+1);
-	if (testp != borderp && testp != fillp)
-		FloodFill_rec(image, x+1, y+1, orgx, orgy, 
-				endx, endy, borderp, fillp);
-
-	testp = XGetPixel(image, x+1, y-1);
-	if (testp != borderp && testp != fillp)
+	
+	if ((x+1 <= endx) && (y+1 <= endy)) {
+	  testp = XGetPixel(image, x+1, y+1);
+	  if (testp != borderp && testp != fillp)
+	    FloodFill_rec(image, x+1, y+1, orgx, orgy, 
+			  endx, endy, borderp, fillp);
+	}
+	if ((x+1 <= endx) && (y-1 >= orgy)) {
+	  testp = XGetPixel(image, x+1, y-1);
+	  if (testp != borderp && testp != fillp)
 		FloodFill_rec(image, x+1, y-1, orgx, orgy, 
 				endx, endy, borderp, fillp);
-	testp = XGetPixel(image, x-1, y+1); 
-	if (testp != borderp && testp != fillp)
-		FloodFill_rec(image, x-1, y+1, orgx, orgy,
-				endx, endy, borderp, fillp);
-	testp = XGetPixel(image, x-1, y-1);
- 	if (testp != borderp && testp != fillp) 
-		FloodFill_rec(image, x-1, y-1, orgx, orgy, 
-				endx, endy, borderp, fillp);
+	}
+	if ((x-1 >= orgx) && (y+1 <= endy)) {
+	  testp = XGetPixel(image, x-1, y+1); 
+	  if (testp != borderp && testp != fillp)
+	    FloodFill_rec(image, x-1, y+1, orgx, orgy,
+			  endx, endy, borderp, fillp);
+	}
+	if ((x-1 >= orgx) && (y-1 >= orgy)) {
+	  testp = XGetPixel(image, x-1, y-1);
+	  if (testp != borderp && testp != fillp) 
+	    FloodFill_rec(image, x-1, y-1, orgx, orgy, 
+			  endx, endy, borderp, fillp);
+	}
 	return TRUE;
 }
 
@@ -737,8 +774,8 @@ BOOL FloodFill(HDC hdc, short x, short y, DWORD crColor)
 	return FALSE;
     if (!FloodFill_rec(image, x, y, 
 		       0, 0, 
-		       dc->w.DCOrgX + dc->w.DCSizeX, 
-		       dc->w.DCOrgY + dc->w.DCSizeY, 
+		       dc->w.DCSizeX-1, 
+		       dc->w.DCSizeY-1, 
 		       boundrypixel, dc->u.x.brush.pixel)) {
 	XDestroyImage(image);
 	return FALSE;

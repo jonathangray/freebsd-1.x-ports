@@ -10,12 +10,14 @@ static char Copyright[] = "Copyright  Alexandre Julliard, 1993";
 #include <stdio.h>
 #include <string.h>
 
+#include "options.h"
 #include "class.h"
 #include "win.h"
 #include "user.h"
 #include "dce.h"
 #include "sysmetrics.h"
 #include "scroll.h"
+#include "icon.h"
 
 extern Colormap COLOR_WinColormap;
 
@@ -200,6 +202,7 @@ BOOL WIN_CreateDesktopWindow()
     wndPtr->hdce              = 0;
     wndPtr->VScroll           = NULL;
     wndPtr->HScroll           = NULL;
+    wndPtr->scroll_flags      = 0;
     wndPtr->wIDmenu           = 0;
     wndPtr->hText             = 0;
     wndPtr->flags             = 0;
@@ -242,7 +245,8 @@ HWND CreateWindowEx( DWORD exStyle, LPSTR className, LPSTR windowName,
     CREATESTRUCT *createStruct;
     HANDLE hcreateStruct;
     int wmcreate;
-    XSetWindowAttributes win_attr;
+    XSetWindowAttributes win_attr, icon_attr;
+    int iconWidth, iconHeight;
 
 #ifdef DEBUG_WIN
     printf( "CreateWindowEx: %04X '%s' '%s' %04X %d,%d %dx%d %04X %04X %04X %08X\n",
@@ -289,6 +293,7 @@ HWND CreateWindowEx( DWORD exStyle, LPSTR className, LPSTR windowName,
     wndPtr = (WND *) USER_HEAP_ADDR( hwnd );
     wndPtr->hwndNext   = 0;
     wndPtr->hwndChild  = 0;
+	wndPtr->window 	   = 0;
     wndPtr->dwMagic    = WND_MAGIC;
     wndPtr->hwndParent = (style & WS_CHILD) ? parent : hwndDesktop;
     wndPtr->hwndOwner  = (style & WS_CHILD) ? 0 : parent;
@@ -311,26 +316,12 @@ HWND CreateWindowEx( DWORD exStyle, LPSTR className, LPSTR windowName,
     wndPtr->lpfnWndProc       = classPtr->wc.lpfnWndProc;
     wndPtr->dwStyle           = style;
     wndPtr->dwExStyle         = exStyle;
-#ifdef DEBUG_MENU
-    printf("CreateWindowEx // menu=%04X instance=%04X classmenu=%08X !\n", 
-    	menu, instance, classPtr->wc.lpszMenuName); 
-#endif
-	if ((style & WS_CAPTION) && (style & WS_CHILD) == 0) {
-		if (menu != 0)
-			SetMenu(hwnd, menu);
-		else {
-			if (classPtr->wc.lpszMenuName != NULL)
-				SetMenu(hwnd, LoadMenu(instance, classPtr->wc.lpszMenuName));
-			else
-				wndPtr->wIDmenu   = 0;
-			}
-		}
-	else
-		wndPtr->wIDmenu   = menu;
+	wndPtr->wIDmenu   		  = 0;
     wndPtr->hText             = 0;
     wndPtr->flags             = 0;
     wndPtr->VScroll           = NULL;
     wndPtr->HScroll           = NULL;
+    wndPtr->scroll_flags      = 0;
     wndPtr->hSysMenu          = 0;
     wndPtr->hProp	          = 0;
     wndPtr->hTask	          = 0;
@@ -370,13 +361,82 @@ HWND CreateWindowEx( DWORD exStyle, LPSTR className, LPSTR windowName,
 	  /* Only select focus events on top-level override-redirect windows */
 	if (win_attr.override_redirect) win_attr.event_mask |= FocusChangeMask;
     }
+    if (Options.nobackingstore)
+       win_attr.backing_store = NotUseful;
+    else
+       win_attr.backing_store = Always;
+
+    if (Options.nosaveunders)
+       win_attr.save_under = FALSE;
+    else
+       win_attr.save_under = TRUE;        
+
+
+    /* set the background of all windows to be white, just like
+     * MS-Windows does (hopefully!)
+     */   
+    win_attr.background_pixel = WhitePixelOfScreen(screen);
+    
     wndPtr->window = XCreateWindow( display, parentPtr->window,
 		   x + parentPtr->rectClient.left - parentPtr->rectWindow.left,
 		   y + parentPtr->rectClient.top - parentPtr->rectWindow.top,
 		   width, height, 0,
 		   CopyFromParent, InputOutput, CopyFromParent,
-		   CWEventMask | CWOverrideRedirect | CWColormap, &win_attr );
+		   CWEventMask | CWOverrideRedirect | CWColormap |
+		   CWSaveUnder | CWBackingStore | CWBackPixel, &win_attr );
     XStoreName( display, wndPtr->window, windowName );
+
+
+    /* create icon window */
+
+    icon_attr.override_redirect = rootWindow==DefaultRootWindow(display);
+    icon_attr.background_pixel = WhitePixelOfScreen(screen);
+    icon_attr.event_mask = ExposureMask | KeyPressMask |
+                            ButtonPressMask | ButtonReleaseMask;
+
+    wndPtr->hIcon = classPtr->wc.hIcon;
+    if (wndPtr->hIcon != (HICON)NULL) {
+      ICONALLOC   *lpico;
+      lpico = (ICONALLOC *)GlobalLock(wndPtr->hIcon);
+      printf("icon is %d x %d\n", 
+              (int)lpico->descriptor.Width,
+              (int)lpico->descriptor.Height);
+      iconWidth = (int)lpico->descriptor.Width;
+      iconHeight = (int)lpico->descriptor.Height;
+    } else {
+      printf("icon was NULL\n");
+      iconWidth = 64;
+      iconHeight = 64;
+    }
+
+    wndPtr->icon = XCreateWindow(display, parentPtr->window,
+                    10, 10, 100, iconHeight+20, 
+                    0, CopyFromParent,
+                    InputOutput, CopyFromParent,
+                    CWBorderPixel | CWEventMask | CWOverrideRedirect, 
+                    &icon_attr);
+   
+    if (style & WS_MINIMIZE) 
+    {
+      style &= ~WS_MINIMIZE;
+    }
+ 
+
+
+#ifdef DEBUG_MENU
+    printf("CreateWindowEx // menu=%04X instance=%04X classmenu=%08X !\n", 
+    	menu, instance, classPtr->wc.lpszMenuName); 
+#endif
+	if ((style & WS_CAPTION) && (style & WS_CHILD) == 0) {
+		if (menu != 0)
+			SetMenu(hwnd, menu);
+		else {
+			if (classPtr->wc.lpszMenuName != NULL)
+				SetMenu(hwnd, LoadMenu(instance, classPtr->wc.lpszMenuName));
+			}
+		}
+	else
+		wndPtr->wIDmenu   = menu;
 
       /* Send the WM_CREATE message */
 
@@ -440,10 +500,14 @@ HWND CreateWindowEx( DWORD exStyle, LPSTR className, LPSTR windowName,
     else CURSOR_SetWinCursor( hwnd, LoadCursor( 0, IDC_ARROW ));
 
     EVENT_RegisterWindow( wndPtr->window, hwnd );
+    EVENT_RegisterWindow( wndPtr->icon, hwnd );
 
     WIN_SendParentNotify( hwnd, WM_CREATE, MAKELONG( hwnd, wndPtr->wIDmenu ) );
     
     if (style & WS_VISIBLE) ShowWindow( hwnd, SW_SHOW );
+#ifdef DEBUG_WIN
+    printf( "CreateWindowEx: return %04X \n", hwnd);
+#endif
     return hwnd;
 }
 
@@ -676,8 +740,11 @@ LONG SetWindowLong( HWND hwnd, short offset, LONG newval )
     else switch(offset)
     {
 	case GWL_STYLE:   ptr = &wndPtr->dwStyle;
+	  break;
         case GWL_EXSTYLE: ptr = &wndPtr->dwExStyle;
+	  break;
 	case GWL_WNDPROC: ptr = (LONG *)(&wndPtr->lpfnWndProc);
+	  break;
 	default: return 0;
     }
     retval = *ptr;

@@ -6,6 +6,7 @@
  */
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #include "windows.h"
 #include "win.h"
 #include "mdi.h"
@@ -13,7 +14,7 @@
 #include "sysmetrics.h"
 #include "menu.h"
 
-/* #define DEBUG_MDI /* */
+#define DEBUG_MDI /* */
 
 /**********************************************************************
  *					MDIRecreateMenuList
@@ -294,6 +295,8 @@ LONG MDIRestoreChild(HWND parent, MDICLIENTINFO *ci)
     HWND    child;
     WND    *w      = WIN_FindWndPtr(child);
     LPRECT  lprect = &ci->rectRestore;
+
+    printf("restoring mdi child\n");
 
     child = ci->hwndActiveChild;
     
@@ -682,32 +685,37 @@ LONG
 DefFrameProc(HWND hwnd, HWND hwndMDIClient, WORD message, 
 	     WORD wParam, LONG lParam)
 {
-    switch (message)
+    if (hwndMDIClient)
     {
-      case WM_COMMAND:
-	MDIBringChildToTop(hwndMDIClient, wParam, TRUE, FALSE);
-	break;
+	switch (message)
+	{
+	  case WM_COMMAND:
+	    MDIBringChildToTop(hwndMDIClient, wParam, TRUE, FALSE);
+	    break;
 
-      case WM_NCLBUTTONDOWN:
-	if (MDIHandleLButton(hwnd, hwndMDIClient, wParam, lParam))
-	    return 0;
-	break;
+	  case WM_NCLBUTTONDOWN:
+	    if (MDIHandleLButton(hwnd, hwndMDIClient, wParam, lParam))
+		return 0;
+	    break;
+	    
+	  case WM_NCACTIVATE:
+	    SendMessage(hwndMDIClient, message, wParam, lParam);
+	    return MDIPaintMaximized(hwnd, hwndMDIClient, 
+				     message, wParam, lParam);
 
-      case WM_NCACTIVATE:
-	SendMessage(hwndMDIClient, message, wParam, lParam);
-	return MDIPaintMaximized(hwnd, hwndMDIClient, message, wParam, lParam);
-
-      case WM_NCPAINT:
-	return MDIPaintMaximized(hwnd, hwndMDIClient, message, wParam, lParam);
+	  case WM_NCPAINT:
+	    return MDIPaintMaximized(hwnd, hwndMDIClient, 
+				     message, wParam, lParam);
 	
-      case WM_SETFOCUS:
-	SendMessage(hwndMDIClient, WM_SETFOCUS, wParam, lParam);
-	break;
+	  case WM_SETFOCUS:
+	    SendMessage(hwndMDIClient, WM_SETFOCUS, wParam, lParam);
+	    break;
 
-      case WM_SIZE:
-	MoveWindow(hwndMDIClient, 0, 0, LOWORD(lParam), HIWORD(lParam), TRUE);
-	break;
-
+	  case WM_SIZE:
+	    MoveWindow(hwndMDIClient, 0, 0, 
+		       LOWORD(lParam), HIWORD(lParam), TRUE);
+	    break;
+	}
     }
     
     return DefWindowProc(hwnd, message, wParam, lParam);
@@ -743,6 +751,8 @@ DefMDIChildProc(HWND hwnd, WORD message, WORD wParam, LONG lParam)
 	    return SendMessage(GetParent(hwnd), WM_MDIMAXIMIZE, hwnd, 0);
 
 	  case SC_RESTORE:
+	    if (IsIconic(hwnd))
+	        ICON_Deiconify(hwnd);
 	    return SendMessage(GetParent(hwnd), WM_MDIRESTORE, hwnd, 0);
 	}
 	break;

@@ -1,6 +1,3 @@
-static char RCSId[] = "$Id: emulate.c,v 1.1.1.3 1994/05/19 08:00:38 hsu Exp $";
-static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
-
 #include <stdlib.h>
 #include <stdio.h>
 #include "prototypes.h"
@@ -19,9 +16,9 @@ int
 WIN87_fpmath()
 {
   printf( "_fpmath: (%x:%x %x %x)\n",_CONTEXT->sc_cs, _CONTEXT->sc_eip, 
-	 _CONTEXT->sc_es, _BX);
+	 _CONTEXT->sc_es, _BX & 0xffff);
 
-  switch(_BX )
+  switch(_BX & 0xffff)
     {
     case 11:
       return 1;

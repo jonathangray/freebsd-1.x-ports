@@ -1,4 +1,4 @@
-# $Id: user.spec,v 1.1.1.3 1994/05/19 07:54:55 hsu Exp $
+# $Id: user.spec,v 1.1.1.4 1994/07/05 08:17:20 hsu Exp $
 #
 name	user
 id	2
@@ -163,8 +163,8 @@ length	540
 158 pascal SetMenu(word word) SetMenu(1 2)
 159 pascal GetSubMenu(word word) GetSubMenu(1 2)
 160 pascal DrawMenuBar(word) DrawMenuBar(1)
-#161 GETMENUSTRING
-#162 HILITEMENUITEM
+161 pascal GetMenuString(word word ptr s_word word) GetMenuString(1 2 3 4 5)
+162 pascal HiliteMenuItem(word word word word) HiliteMenuItem(1 2 3 4)
 163 pascal CreateCaret(word word word word) CreateCaret(1 2 3 4)
 164 pascal DestroyCaret() DestroyCaret()
 165 pascal SetCaretPos(word word) SetCaretPos(1 2)
@@ -199,7 +199,8 @@ length	540
 193 pascal IsClipboardFormatAvailable(word) IsClipboardFormatAvailable(1)
 194  pascal DlgDirSelectComboBox(word ptr word) DlgDirSelectComboBox(1 2 3)
 195 pascal DlgDirListComboBox(word ptr word word word) DlgDirListComboBox(1 2 3 4 5)
-#196 TABBEDTEXTOUT
+196 pascal TabbedTextOut(word s_word s_word ptr s_word s_word ptr s_word)
+		TabbedTextOut(1 2 3 4 5 6 7 8)
 #197 GETTABBEDTEXTEXTENT
 #198 CASCADECHILDWINDOWS
 #199 TILECHILDWINDOWS
@@ -227,7 +228,7 @@ length	540
 220 pascal LoadMenuIndirect(ptr) LoadMenuIndirect(1)
 221 pascal ScrollDC(word s_word s_word ptr ptr word ptr) 
 	   ScrollDC(1 2 3 4 5 6 7)
-#222 GETKEYBOARDSTATE
+222 pascal GetKeyboardState(ptr) GetKeyboardState(1)
 #223 SETKEYBOARDSTATE
 224 pascal GetWindowTask(word) GetWindowTask(1)
 225 pascal EnumTaskWindows(word ptr long) EnumTaskWindows(1 2 3)
@@ -258,8 +259,8 @@ length	540
 #246 EXITWINDOWSEXEC
 247 pascal GetCursor() GetCursor()
 248 pascal GetOpenClipboardWindow() GetOpenClipboardWindow()
-#249 GETASYNCKEYSTATE
-#250 GETMENUSTATE
+249 pascal GetAsyncKeyState(word) GetAsyncKeyState(1)
+250 pascal GetMenuState(word word word) GetMenuState(1 2 3)
 #251 SENDDRIVERMESSAGE
 #252 OPENDRIVER
 #253 CLOSEDRIVER
@@ -272,8 +273,8 @@ length	540
 #260 DEFERWINDOWPOS
 #261 ENDDEFERWINDOWPOS
 262 pascal GetWindow(word word) GetWindow(1 2)
-#263 GETMENUITEMCOUNT
-#264 GETMENUITEMID
+263 pascal GetMenuItemCount(word) GetMenuItemCount(1)
+264 pascal GetMenuItemID(word word) GetMenuItemID(1 2)
 #265 SHOWOWNEDPOPUPS
 266 pascal SetMessageQueue(word) SetMessageQueue(1)
 267 pascal ShowScrollBar(word word word) ShowScrollBar(1 2 3)
@@ -328,7 +329,7 @@ length	540
 #343 GETFILEPORTNAME
 #356 LOADDIBCURSORHANDLER
 #357 LOADDIBICONHANDLER
-#358 ISMENU
+358 pascal IsMenu(word) IsMenu(1)
 359 pascal GetDCEx(word word long) GetDCEx(1 2 3)
 #362 DCHOOK
 #368 COPYICON
@@ -413,13 +414,13 @@ length	540
 #509 WNETUNWATCHQUEUE
 #510 WNETLOCKQUEUEDATA
 #511 WNETUNLOCKQUEUEDATA
-#512 WNETGETCONNECTION
-#513 WNETGETCAPS
+512 pascal WNetGetConnection(ptr ptr ptr) WNetGetConnection(1 2 3)
+513 pascal WNetGetCaps(word) WNetGetCaps(1)
 #514 WNETDEVICEMODE
 #515 WNETBROWSEDIALOG
-#516 WNETGETUSER
-#517 WNETADDCONNECTION
-#518 WNETCANCELCONNECTION
+516 pascal WNetGetUser(ptr ptr ptr) WNetGetUser(1 2 3)
+517 pascal WNetAddConnection(ptr ptr ptr) WNetAddConnection(1 2 3)
+518 pascal WNetCancelConnection(ptr word) WNetCancelConnection(1 2)
 #519 WNETGETERROR
 #520 WNETGETERRORTEXT
 #521 WNETENABLE

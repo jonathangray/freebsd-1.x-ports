@@ -1,4 +1,4 @@
-# $Id: kernel.spec,v 1.1.1.3 1994/05/19 07:54:34 hsu Exp $
+# $Id: kernel.spec,v 1.1.1.4 1994/07/05 08:17:14 hsu Exp $
 #
 name	kernel
 id	1
@@ -18,7 +18,7 @@ length	415
 12  pascal LocalFlags(word) WIN16_LocalFlags(1)
 13  pascal LocalCompact(word) WIN16_LocalCompact(1)
 14  return LocalNotify 4 0
-15  pascal GlobalAlloc(word long) GlobalAlloc(1 2)
+15  pascal GlobalAlloc(word long) WIN16_GlobalAlloc(1 2)
 16  pascal GlobalReAlloc(word long word) GlobalReAlloc(1 2 3)
 17  pascal GlobalFree(word) GlobalFree(1)
 18  pascal GlobalLock(word) GlobalLock(1)
@@ -39,12 +39,12 @@ length	415
 34  pascal SetTaskQueue(word word) SetTaskQueue(1 2)
 35  pascal GetTaskQueue(word) GetTaskQueue(1)
 36  pascal GetCurrentTask() GetCurrentTask()
-#37 GETCURRENTPDB
+37  pascal GetCurrentPDB() GetCurrentPDB()
 #38 SETTASKSIGNALPROC
 #41 ENABLEDOS
 #42 DISABLEDOS
 45  pascal LoadModule(ptr ptr) LoadModule(1 2)
-#46 FREEMODULE
+46  pascal FreeModule(word) FreeLibrary(1)
 47  pascal GetModuleHandle(ptr) GetModuleHandle(1)
 48  pascal GetModuleUsage(word) GetModuleUsage(1)
 49  pascal GetModuleFileName(word ptr s_word) GetModuleFileName(1 2 3)
@@ -63,8 +63,8 @@ length	415
 62  pascal LockResource(word) LockResource(1)
 63  pascal FreeResource(word) FreeResource(1)
 64  pascal AccessResource(word word) AccessResource(1 2)
-#65 SIZEOFRESOURCE
-#66 ALLOCRESOURCE
+65  pascal SizeofResource(word word) SizeofResource(1 2)
+66  pascal AllocResource(word word long) AllocResource(1 2 3)
 #67 SETRESOURCEHANDLER
 68  pascal InitAtomTable(word) InitAtomTable(1)
 69  pascal FindAtom(ptr) FindAtom(1)
@@ -143,7 +143,8 @@ length	415
 135 pascal GetSystemDirectory(ptr word) GetSystemDirectory(1 2)
 136 pascal GetDriveType(byte) GetDriveType(1)
 137 pascal FatalAppExit(word ptr) FatalAppExit(1 2)
-#138 GETHEAPSPACES
+#138 GETHEAPSPACES - This is not correct but may fake out most apps
+138 return GetHeapSpaces 2 0x80004000
 #139 DOSIGNAL
 #140 SETSIGHANDLER
 #141 INITTASK1
@@ -182,10 +183,10 @@ length	415
 #183 __0000H
 184 return GlobalDOSAlloc 4 0
 185 return GlobalDOSFree 2 0
-#186 GETSELECTORBASE
-#187 SETSELECTORBASE
-#188 GETSELECTORLIMIT
-#189 SETSELECTORLIMIT
+186 pascal GetSelectorBase(word) GetSelectorBase(1)
+187 pascal SetSelectorBase(word long) SetSelectorBase(1 2)
+188 pascal GetSelectorLimit(word) GetSelectorLimit(1)
+189 pascal SetSelectorLimit(word long) SetSelectorLimit(1 2)
 #190 __E000H
 191 pascal GlobalPageLock(word) GlobalLock(1)
 192 pascal GlobalPageUnlock(word) GlobalUnlock(1)
@@ -203,8 +204,8 @@ length	415
 #204 SWAPRECORDING
 #205 CVWBREAK
 #206 ALLOCSELECTORARRAY
-#207 ISDBCSLEADBYTE
-#310 LOCALHANDLEDELTA
+207 return IsDBCSLeadByte 2 0
+310 pascal LocalHandleDelta(word) WIN16_LocalHandleDelta(1)
 #311 GETSETKERNELDOSPROC
 #314 DEBUGDEFINESEGMENT
 315 pascal WriteOutProfiles() sync_profiles()
@@ -212,7 +213,7 @@ length	415
 #318 FATALEXITHOOK
 #319 FLUSHCACHEDFILEHANDLE
 #320 ISTASK
-#323 ISROMMODULE
+323 pascal IsRomModule() IsRomModule()
 #324 LOGERROR
 #325 LOGPARAMERROR
 #326 ISROMFILE

@@ -11,22 +11,26 @@ typedef unsigned short WORD;
 typedef unsigned long DWORD;
 typedef unsigned short BOOL;
 typedef unsigned char BYTE;
-typedef char *LPSTR;
-typedef const char *LPCSTR;
-typedef char *NPSTR;
-typedef INT *LPINT;
-typedef void *LPVOID;
-typedef long (*FARPROC)();
-typedef FARPROC DLGPROC;
-typedef int CATCHBUF[9];
-typedef int *LPCATCHBUF;
-typedef FARPROC HOOKPROC;
 typedef long LONG;
 typedef UINT WPARAM;
 typedef LONG LPARAM;
 typedef LONG LRESULT;
 typedef WORD HANDLE;
 typedef DWORD HHOOK;
+typedef char *LPSTR;
+typedef const char *LPCSTR;
+typedef char *NPSTR;
+typedef INT *LPINT;
+typedef UINT *LPUINT;
+typedef WORD *LPWORD;
+typedef DWORD *LPDWORD;
+typedef LONG *LPLONG;
+typedef void *LPVOID;
+typedef long (*FARPROC)();
+typedef FARPROC DLGPROC;
+typedef int CATCHBUF[9];
+typedef int *LPCATCHBUF;
+typedef FARPROC HOOKPROC;
 #define DECLARE_HANDLE(a) typedef HANDLE a;
 
 DECLARE_HANDLE(HTASK);
@@ -157,7 +161,7 @@ typedef PAINTSTRUCT *LPPAINTSTRUCT;
 #ifdef WINELIB
 typedef LONG (*WNDPROC)(HWND, UINT, WPARAM, LPARAM);
 #else
-typedef LONG	(* WNDPROC)() WINE_PACKED;
+typedef LONG	(* WNDPROC)();
 #endif
 
 typedef struct {
@@ -2975,7 +2979,7 @@ Fe(int,DlgDirListComboBox,HWND,a,LPSTR,b,int,c,int,d,WORD,e)
 Fe(int,Escape,HDC,a,int,b,int,c,LPSTR,d,LPSTR,e)
 Fe(int,ExcludeClipRect,HDC,a,short,b,short,c,short,d,short,e)
 Fe(int,ExcludeVisRect,HDC,a,short,b,short,c,short,d,short,e)
-Fe(int,GetMenuString,HMENU,a,WORD,b,LPSTR,c,int,d,WORD,e)
+Fe(int,GetMenuString,HMENU,a,WORD,b,LPSTR,c,short,d,WORD,e)
 Fe(int,GetProfileString,LPSTR,a,LPSTR,b,LPSTR,c,LPSTR,d,int,e)
 Fe(int,IntersectClipRect,HDC,a,short,b,short,c,short,d,short,e)
 Fe(int,IntersectVisRect,HDC,a,short,b,short,c,short,d,short,e)
@@ -3004,7 +3008,7 @@ Fg(int,SetDIBits,HDC,a,HANDLE,a2,WORD,b,WORD,c,LPSTR,d,LPBITMAPINFO,e,WORD,f)
 Fg(BOOL,SetWindowPos,HWND,a,HWND,b,short,c,short,d,short,e,short,f,WORD,g)
 Fh(BOOL,ExtTextOut,HDC,a,short,b,short,c,WORD,d,LPRECT,e,LPSTR,f,WORD,g,LPINT,h)
 Fh(HANDLE,DeferWindowPos,HANDLE,hWinPosInfo,HWND,hWnd,HWND,hWndInsertAfter,int,x,int,y,int,cx,int,cy,WORD,wFlags)
-Fh(LONG,TabbedTextOut,HDC,a,int,b,int,c,LPSTR,d,int,e,int,f,LPINT,g,int,h)
+Fh(LONG,TabbedTextOut,HDC,a,short,b,short,c,LPSTR,d,short,e,short,f,LPINT,g,short,h)
 Fh(int,ScrollWindowEx,HWND,a,short,b,short,c,LPRECT,d,LPRECT,e,HRGN,f,LPRECT,g,WORD,h)
 Fi(BOOL,Arc,HDC,a,int,xLeft,int,yTop,int,xRight,int,yBottom,int,xStart,int,yStart,int,xEnd,int,yEnd)
 Fi(BOOL,Chord,HDC,a,int,xLeft,int,yTop,int,xRight,int,yBottom,int,xStart,int,yStart,int,xEnd,int,yEnd)

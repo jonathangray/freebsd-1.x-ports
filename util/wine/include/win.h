@@ -44,10 +44,14 @@ typedef struct tagWND
     HANDLE       hdce;           /* Window DCE (if CS_OWNDC or CS_CLASSDC) */
     void		 *VScroll;		 /* Vertical ScrollBar Struct Pointer */
     void		 *HScroll;		 /* Horizontal ScrollBar Struct Pointer */
+    WORD         scroll_flags;   /* scrolls flags (vert & horz visible) */
     WORD         wIDmenu;        /* ID or hmenu (from CreateWindow) */
     HANDLE       hText;          /* Handle of window text */
     WORD         flags;          /* Misc. flags (see below) */
     Window       window;         /* X window */
+    Window       icon;           /* icon's X window */
+    HICON        hIcon;          /* icon's MS-windows handle */
+    RECT         rectClientSave;       /* where client rect is saved when icon*/
     HMENU		 hSysMenu;		 /* window's copy of System Menu */
     HANDLE       hProp;          /* Handle of Properties List */
     HTASK 		 hTask;          /* Task Handle of the owner */

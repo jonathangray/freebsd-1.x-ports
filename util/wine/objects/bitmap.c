@@ -61,7 +61,7 @@ static XImage *BITMAP_BmpToImage( BITMAP * bmp, void * bmpData )
     extern void _XInitImageFuncPtrs( XImage* );
     XImage * image;
 
-    image = XCreateImage( XT_display, DefaultVisualOfScreen(XT_screen),
+    image = XCreateImage( XT_display, DefaultVisualOfScreen(screen),
 			  bmp->bmBitsPixel, ZPixmap, 0, bmpData,
 			  bmp->bmWidth, bmp->bmHeight, 16, bmp->bmWidthBytes );
     if (!image) return 0;
@@ -114,6 +114,13 @@ HBITMAP CreateBitmapIndirect( BITMAP * bmp )
     if (!bmp->bmHeight || !bmp->bmWidth) return 0;
     if (bmp->bmPlanes != 1) return 0;
     if ((bmp->bmBitsPixel != 1) && (bmp->bmBitsPixel != screenDepth)) return 0;
+
+    if (bmp->bmHeight < 0)
+	bmp->bmHeight = -bmp->bmHeight;
+    
+    if (bmp->bmWidth < 0)
+	bmp->bmWidth = -bmp->bmWidth;
+    
 
       /* Create the BITMAPOBJ */
     hbitmap = GDI_AllocObject( sizeof(BITMAPOBJ), BITMAP_MAGIC );
@@ -251,6 +258,16 @@ HBITMAP BITMAP_SelectObject( HDC hdc, DC * dc, HBITMAP hbitmap,
     return prevHandle;
 }
 
+/***********************************************************************
+ *           CreateDiscardableBitmap    (GDI.156)
+ */
+HBITMAP CreateDiscardableBitmap(HDC hdc, short width, short height)
+{
+    printf("CreateDiscardableBitmap(%04X, %d, %d); "
+	   "// call CreateCompatibleBitmap() for now!\n",
+	   hdc, width, height);
+    return CreateCompatibleBitmap(hdc, width, height);
+}
 
 /***********************************************************************
  *           GetBitmapDimensionEx    (GDI.468)
