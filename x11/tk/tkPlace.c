@@ -4,18 +4,29 @@
  *	This file contains code to implement a simple geometry manager
  *	for Tk based on absolute placement or "rubber-sheet" placement.
  *
- * Copyright 1992 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that this copyright
- * notice appears in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1992-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkPlace.c,v 1.1 1993/08/09 01:20:47 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkPlace.c,v 1.2 1993/12/27 07:34:27 rich Exp $ SPRITE (Berkeley)";
 #endif /* not lint */
 
 #include "tkConfig.h"
@@ -300,7 +311,7 @@ Tk_PlaceCmd(clientData, interp, argc, argv)
 	    masterPtr = (Master *) Tcl_GetHashValue(hPtr);
 	    for (slavePtr = masterPtr->slavePtr; slavePtr != NULL;
 		    slavePtr = slavePtr->nextPtr) {
-		Tcl_AppendElement(interp, Tk_PathName(slavePtr->tkwin), 0);
+		Tcl_AppendElement(interp, Tk_PathName(slavePtr->tkwin));
 	    }
 	}
     } else {

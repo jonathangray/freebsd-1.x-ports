@@ -4,23 +4,34 @@
  *	This module provides procedures that manipulate indices for
  *	text widgets.
  *
- * Copyright 1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1992-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkTextIndex.c,v 1.1 1993/08/09 01:20:52 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkTextIndex.c,v 1.2 1993/12/27 07:34:44 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "default.h"
 #include "tkConfig.h"
-#include "tk.h"
+#include "tkInt.h"
 #include "tkText.h"
 
 /*
@@ -103,7 +114,7 @@ TkTextGetIndex(interp, textPtr, string, lineIndexPtr, chPtr)
 		y, chPtr));
 	endOfBase = end;
 	goto gotBase; 
-    } else if (isdigit(string[0]) || (string[0] == '-')) {
+    } else if (isdigit(UCHAR(string[0])) || (string[0] == '-')) {
 	/*
 	 * Base is identified with line and character indices.
 	 */
@@ -134,7 +145,7 @@ TkTextGetIndex(interp, textPtr, string, lineIndexPtr, chPtr)
     }
 
     for (p = string; *p != 0; p++) {
-	if (isspace(*p) || (*p == '+') || (*p == '-')) {
+	if (isspace(UCHAR(*p)) || (*p == '+') || (*p == '-')) {
 	    break;
 	}
     }
@@ -222,7 +233,7 @@ TkTextGetIndex(interp, textPtr, string, lineIndexPtr, chPtr)
     gotBase:
     p = endOfBase;
     while (1) {
-	while (isspace(*p)) {
+	while (isspace(UCHAR(*p))) {
 	    p++;
 	}
 	if (*p == 0) {
@@ -383,7 +394,7 @@ ForwBack(textPtr, string, lineIndexPtr, chPtr)
      */
 
     p = string+1;
-    while (isspace(*p)) {
+    while (isspace(UCHAR(*p))) {
 	p++;
     }
     count = strtoul(p, &end, 0);
@@ -391,7 +402,7 @@ ForwBack(textPtr, string, lineIndexPtr, chPtr)
 	return NULL;
     }
     p = end;
-    while (isspace(*p)) {
+    while (isspace(UCHAR(*p))) {
 	p++;
     }
 
@@ -402,7 +413,7 @@ ForwBack(textPtr, string, lineIndexPtr, chPtr)
      */
 
     units = p; 
-    while ((*p != 0) && !isspace(*p) && (*p != '+') && (*p != '-')) {
+    while ((*p != 0) && !isspace(UCHAR(*p)) && (*p != '+') && (*p != '-')) {
 	p++;
     }
     length = p - units;
@@ -587,7 +598,7 @@ StartEnd(textPtr, string, lineIndexPtr, chPtr)
      * Find the end of the modifier word.
      */
 
-    for (p = string; isalnum(*p); p++) {
+    for (p = string; isalnum(UCHAR(*p)); p++) {
 	/* Empty loop body. */
     }
     length = p-string;
@@ -601,7 +612,7 @@ StartEnd(textPtr, string, lineIndexPtr, chPtr)
     } else if ((*string == 'w') && (strncmp(string, "wordend", length) == 0)
 	    && (length >= 5)) {
 	c = linePtr->bytes[*chPtr];
-	if (!isalnum(c) && (c != '_')) {
+	if (!isalnum(UCHAR(c)) && (c != '_')) {
 	    if (*chPtr >= (linePtr->numBytes - 1)) {
 		/*
 		 * End of line:  go to start of next line unless this is the
@@ -619,15 +630,15 @@ StartEnd(textPtr, string, lineIndexPtr, chPtr)
 	    do {
 		*chPtr += 1;
 		c = linePtr->bytes[*chPtr];
-	    } while (isalnum(c) || (c == '_'));
+	    } while (isalnum(UCHAR(c)) || (c == '_'));
 	}
     } else if ((*string == 'w') && (strncmp(string, "wordstart", length) == 0)
 	    && (length >= 5)) {
 	c = linePtr->bytes[*chPtr];
-	if (isalnum(c) || (c == '_')) {
+	if (isalnum(UCHAR(c)) || (c == '_')) {
 	    while (*chPtr > 0) {
 		c = linePtr->bytes[(*chPtr) - 1];
-		if (!isalnum(c) && (c != '_')) {
+		if (!isalnum(UCHAR(c)) && (c != '_')) {
 		    break;
 		}
 		*chPtr -= 1;

@@ -5,18 +5,29 @@
  *	toolkit.  A message widget displays a multi-line string
  *	in a window according to a particular aspect ratio.
  *
- * Copyright 1990 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkMessage.c,v 1.1 1993/08/09 01:20:46 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkMessage.c,v 1.2 1993/12/27 07:34:22 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "tkConfig.h"
@@ -204,17 +215,21 @@ Tk_MessageCmd(clientData, interp, argc, argv)
     msgPtr->display = Tk_Display(new);
     msgPtr->interp = interp;
     msgPtr->string = NULL;
+    msgPtr->numChars = 0;
     msgPtr->textVarName = NULL;
     msgPtr->border = NULL;
     msgPtr->borderWidth = 0;
     msgPtr->relief = TK_RELIEF_FLAT;
     msgPtr->fontPtr = NULL;
     msgPtr->fgColorPtr = NULL;
-    msgPtr->textGC = NULL;
+    msgPtr->textGC = None;
     msgPtr->padX = 0;
     msgPtr->padY = 0;
+    msgPtr->anchor = TK_ANCHOR_CENTER;
     msgPtr->width = 0;
     msgPtr->aspect = 150;
+    msgPtr->lineLength = 0;
+    msgPtr->msgHeight = 0;
     msgPtr->justify = TK_JUSTIFY_LEFT;
     msgPtr->cursor = None;
     msgPtr->flags = 0;
@@ -314,30 +329,21 @@ DestroyMessage(clientData)
 {
     register Message *msgPtr = (Message *) clientData;
 
-    if (msgPtr->string != NULL) {
-	ckfree(msgPtr->string);
-    }
+    /*
+     * Free up all the stuff that requires special handling, then
+     * let Tk_FreeOptions handle all the standard option-related
+     * stuff.
+     */
+
     if (msgPtr->textVarName != NULL) {
 	Tcl_UntraceVar(msgPtr->interp, msgPtr->textVarName,
 		TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		MessageTextVarProc, (ClientData) msgPtr);
-	ckfree(msgPtr->textVarName);
-    }
-    if (msgPtr->border != NULL) {
-	Tk_Free3DBorder(msgPtr->border);
-    }
-    if (msgPtr->fontPtr != NULL) {
-	Tk_FreeFontStruct(msgPtr->fontPtr);
-    }
-    if (msgPtr->fgColorPtr != NULL) {
-	Tk_FreeColor(msgPtr->fgColorPtr);
     }
     if (msgPtr->textGC != None) {
 	Tk_FreeGC(msgPtr->display, msgPtr->textGC);
     }
-    if (msgPtr->cursor != None) {
-	Tk_FreeCursor(msgPtr->display, msgPtr->cursor);
-    }
+    Tk_FreeOptions(configSpecs, (char *) msgPtr, msgPtr->display, 0);
     ckfree((char *) msgPtr);
 }
 
@@ -537,7 +543,7 @@ ComputeMessageGeometry(msgPtr)
 	     * they follow a user-requested newline.
 	     */
 
-	    while (isspace(*p)) {
+	    while (isspace(UCHAR(*p))) {
 		if (*p == '\n') {
 		    p++;
 		    break;
@@ -667,7 +673,7 @@ DisplayMessage(clientData)
 	 * a user-requested newline.
 	 */
 
-	while (isspace(*p)) {
+	while (isspace(UCHAR(*p))) {
 	    charsLeft--;
 	    if (*p == '\n') {
 		p++;

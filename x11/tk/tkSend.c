@@ -5,18 +5,29 @@
  *	command, allowing commands to be passed from interpreter
  *	to interpreter.
  *
- * Copyright 1989-1992 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1989-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkSend.c,v 1.1 1993/08/09 01:20:47 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkSend.c,v 1.2 1993/12/27 07:34:35 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "tkConfig.h"
@@ -362,7 +373,7 @@ Tk_SendCmd(clientData, interp, argc, argv)
 
     w = LookupName(dispPtr, argv[1], 0);
     if (w == 0) {
-	Tcl_AppendResult(interp, "no registered interpeter named \"",
+	Tcl_AppendResult(interp, "no registered interpreter named \"",
 		argv[1], "\"", (char *) NULL);
 	if (cmd != argv[2]) {
 	    ckfree(cmd);
@@ -476,7 +487,7 @@ TkGetInterpNames(interp, tkwin)
 				 * for the lookup. */
 {
     TkDisplay *dispPtr = ((TkWindow *) tkwin)->dispPtr;
-    char *regProp, *separator, *name;
+    char *regProp;
     register char *p;
     int result, actualFormat;
     unsigned long numItems, bytesAfter;
@@ -515,20 +526,15 @@ TkGetInterpNames(interp, tkwin)
      * Scan all of the names out of the property.
      */
 
-    separator = "";
     for (p = regProp; (p-regProp) < numItems; p++) {
-	name = p;
-	while ((*p != 0) && (!isspace(*p))) {
+	while ((*p != 0) && (!isspace(UCHAR(*p)))) {
 	    p++;
 	}
 	if (*p != 0) {
-	    name = p+1;
-	    name = Tcl_Merge(1, &name);
-	    Tcl_AppendResult(interp, separator, name, (char *) NULL);
+	    Tcl_AppendElement(interp, p+1);
 	    while (*p != 0) {
 		p++;
 	    }
-	    separator = " ";
 	}
     }
     XFree(regProp);
@@ -564,6 +570,11 @@ SendInit(interp, dispPtr)
 
 {
     XSetWindowAttributes atts;
+#ifndef TK_NO_SECURITY
+    XHostAddress *addrPtr;
+    int numHosts;
+    Bool enabled;
+#endif
 
     /*
      * Create the window used for communication, and set up an
@@ -590,6 +601,29 @@ SendInit(interp, dispPtr)
 	    "Comm", False);
     dispPtr->registryProperty = XInternAtom(dispPtr->display,
 	    "InterpRegistry", False);
+
+    /*
+     * See if the server appears to be reasonably secure.  It is
+     * considered to be secure if host-based access control is
+     * enabled but no hosts are on the access list;  this means
+     * that some other form (presumably more secure) form of
+     * authorization (such as xauth) must be in use.
+     */
+
+#ifdef TK_NO_SECURITY
+    dispPtr->serverSecure = 1;
+#else
+    dispPtr->serverSecure = 0;
+    addrPtr = XListHosts(dispPtr->display, &numHosts, &enabled);
+    if (enabled && (numHosts == 0)) {
+	dispPtr->serverSecure = 1;
+    }
+    if (addrPtr != NULL) {
+	XFree((char *) addrPtr);
+    }
+#endif /* TK_NO_SECURITY */
+
+
     return TCL_OK;
 }
 
@@ -667,7 +701,7 @@ LookupName(dispPtr, name, delete)
     entry = NULL;	/* Not needed, but eliminates compiler warning. */
     for (p = regProp; (p-regProp) < numItems; ) {
 	entry = p;
-	while ((*p != 0) && (!isspace(*p))) {
+	while ((*p != 0) && (!isspace(UCHAR(*p)))) {
 	    p++;
 	}
 	if ((*p != 0) && (strcmp(name, p+1) == 0)) {
@@ -825,6 +859,11 @@ SendEventProc(clientData, eventPtr)
 	    if (*p != '|') {
 		result = TCL_ERROR;
 		resultString = "bad property format for sent command";
+		goto returnResult;
+	    }
+	    if (!dispPtr->serverSecure) {
+		result = TCL_ERROR;
+		resultString = "X server insecure (must use xauth-style authorization); command ignored";
 		goto returnResult;
 	    }
 	    *p = 0;

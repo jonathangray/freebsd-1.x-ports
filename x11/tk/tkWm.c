@@ -6,22 +6,34 @@
  *	implements the "wm" command and passes geometry information
  *	to the window manager.
  *
- * Copyright 1991-1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1991-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkWm.c,v 1.1 1993/08/09 01:20:48 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkWm.c,v 1.2 1993/12/27 07:34:50 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "tkConfig.h"
 #include "tkInt.h"
+#include <errno.h>
 
 /*
  * A data structure of the following type holds information for
@@ -81,6 +93,7 @@ typedef struct TkWmInfo {
 				 * in "wm transient" command, or NULL.
 				 * Note:  this field doesn't get updated if
 				 * masterWindowName is destroyed. */
+    int withdrawn;		/* Non-zero means window has been withdrawn. */
 
     /*
      * Information used to construct an XSizeHints structure for
@@ -143,9 +156,6 @@ typedef struct TkWmInfo {
 				/* Dimensions passed to last request that we
 				 * issued to change geometry of window.  Used
 				 * to eliminate redundant resize operations. */
-    int xAdjust, yAdjust;	/* Offsets to add to x and y values when
-				 * repositioning window.  Used to compensate
-				 * for errors in window managers. */
 
     /*
      * Information about the virtual root window for this top-level,
@@ -159,11 +169,11 @@ typedef struct TkWmInfo {
 				 * root window.  If the WM_VROOT_OFFSET_STALE
 				 * flag is set then this information may be
 				 * incorrect and needs to be refreshed from
-				 * the X server.  If vRoot is NULL then these
+				 * the X server.  If vRoot is None then these
 				 * values are both 0. */
     unsigned int vRootWidth, vRootHeight;
 				/* Dimensions of the virtual root window.
-				 * If vRoot is NULL, gives the dimensions
+				 * If vRoot is None, gives the dimensions
 				 * of the containing screen.  This information
 				 * is never stale, even though vRootX and
 				 * vRootY can be. */
@@ -209,6 +219,10 @@ typedef struct TkWmInfo {
  * WM_ABOUT_TO_MAP -		non-zero means that the window is about to
  *				be mapped by TkWmMapWindow.  This is used
  *				by UpdateGeometryInfo to modify its behavior.
+ * WM_MOVE_PENDING -		non-zero means the application has requested
+ *				a new position for the window, but it hasn't
+ *				been reflected through the window manager
+ *				yet.
  */
 
 #define WM_NEVER_MAPPED		1
@@ -219,6 +233,7 @@ typedef struct TkWmInfo {
 #define WM_SYNC_PENDING		0x20
 #define WM_VROOT_OFFSET_STALE	0x40
 #define WM_ABOUT_TO_MAP		0x100
+#define WM_MOVE_PENDING		0x200
 
 /*
  * This module keeps a list of all top-level windows, primarily to
@@ -242,8 +257,6 @@ static int wmTracing = 0;
  * Forward declarations for procedures defined in this file:
  */
 
-static void		AdjustPosition _ANSI_ARGS_((TkWindow *winPtr,
-			    int x, int y, int flags));
 static int		ComputeReparentGeometry _ANSI_ARGS_((TkWindow *winPtr));
 static void		ConfigureEvent _ANSI_ARGS_((TkWindow *winPtr,
 			    XConfigureEvent *eventPtr));
@@ -263,6 +276,8 @@ static void		UpdateVRootGeometry _ANSI_ARGS_((WmInfo *wmPtr));
 static void		UpdateWmProtocols _ANSI_ARGS_((WmInfo *wmPtr));
 static void		WaitForConfigureNotify _ANSI_ARGS_((TkWindow *winPtr,
 			    unsigned long serial));
+static int		WaitForEvent _ANSI_ARGS_((Display *display,
+			    Window window, long mask, XEvent *eventPtr));
 static void		WaitForMapNotify _ANSI_ARGS_((TkWindow *winPtr,
 			    int mapped));
 
@@ -307,6 +322,7 @@ TkWmNewWindow(winPtr)
     wmPtr->leaderName = NULL;
     wmPtr->iconWindowName = NULL;
     wmPtr->masterWindowName = NULL;
+    wmPtr->withdrawn = 0;
     wmPtr->sizeHintsFlags = 0;
     wmPtr->minWidth = wmPtr->minHeight = 0;
     wmPtr->maxWidth = wmPtr->maxHeight = 10000;
@@ -326,10 +342,7 @@ TkWmNewWindow(winPtr)
     wmPtr->xInParent = wmPtr->yInParent = 0;
     wmPtr->configWidth = -1;
     wmPtr->configHeight = -1;
-    wmPtr->xAdjust = 0;
-    wmPtr->yAdjust = 0;
     wmPtr->vRoot = None;
-    UpdateVRootGeometry(wmPtr);
     wmPtr->protPtr = NULL;
     wmPtr->cmdArgv = NULL;
     wmPtr->clientMachine = NULL;
@@ -337,6 +350,8 @@ TkWmNewWindow(winPtr)
     wmPtr->nextPtr = firstWmPtr;
     firstWmPtr = wmPtr;
     winPtr->wmInfoPtr = wmPtr;
+
+    UpdateVRootGeometry(wmPtr);
 
     /*
      * Tk must monitor structure events for top-level windows, in order
@@ -384,7 +399,6 @@ TkWmMapWindow(winPtr)
 {
     register WmInfo *wmPtr = winPtr->wmInfoPtr;
     XTextProperty textProp;
-    int savedX, savedY, savedFlags;
 
     if (wmPtr->flags & WM_NEVER_MAPPED) {
 	wmPtr->flags &= ~WM_NEVER_MAPPED;
@@ -434,23 +448,58 @@ TkWmMapWindow(winPtr)
 	return;
     }
     wmPtr->flags |= WM_ABOUT_TO_MAP;
+    if (wmPtr->flags & WM_UPDATE_PENDING) {
+	Tk_CancelIdleCall(UpdateGeometryInfo, (ClientData) winPtr);
+    }
     UpdateGeometryInfo((ClientData) winPtr);
     wmPtr->flags &= ~WM_ABOUT_TO_MAP;
 
     /*
-     * Map the window, wait to be sure that the window manager has
-     * processed the map operation, then correct the x- and y-locations
-     * if there were explicit positions asked for.
+     * Map the window, then wait to be sure that the window manager has
+     * processed the map operation.
      */
 
     XMapWindow(winPtr->display, winPtr->window);
-    savedX = wmPtr->x;
-    savedY = wmPtr->y;
-    savedFlags = wmPtr->flags;
-    WaitForMapNotify(winPtr, 1);
-    if (wmPtr->sizeHintsFlags & (USPosition|PPosition)) {
-	AdjustPosition(winPtr, savedX, savedY, savedFlags);
+    if (wmPtr->hints.initial_state == NormalState) {
+	WaitForMapNotify(winPtr, 1);
     }
+}
+
+/*
+ *--------------------------------------------------------------
+ *
+ * TkWmUnmapWindow --
+ *
+ *	This procedure is invoked to unmap a top-level window.  The
+ *	only thing it does special is to wait for the window actually
+ *	to be unmapped.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	Unmaps the window.
+ *
+ *--------------------------------------------------------------
+ */
+
+void
+TkWmUnmapWindow(winPtr)
+    TkWindow *winPtr;		/* Top-level window that's about to
+				 * be mapped. */
+{
+    /*
+     * It seems to be important to wait after unmapping a top-level
+     * window until the window really gets unmapped.  I don't completely
+     * understand all the interactions with the window manager, but if
+     * we go on without waiting, and if the window is then mapped again
+     * quickly, events seem to get lost so that we think the window isn't
+     * mapped when in fact it is mapped.  I suspect that this has something
+     * to do with the window manager filtering Map events (and possily not
+     * filtering Unmap events?).
+     */ 
+    XUnmapWindow(winPtr->display, winPtr->window);
+    WaitForMapNotify(winPtr, 0);
 }
 
 /*
@@ -754,26 +803,14 @@ Tk_WmCmd(clientData, interp, argc, argv)
 	    return TCL_ERROR;
 	}
 	wmPtr->hints.initial_state = NormalState;
-	if (wmPtr->flags & WM_NEVER_MAPPED) {
-	    return TCL_OK;
-	}
-	Tk_MapWindow((Tk_Window) winPtr);
-/*$ioishere*/
-    } else if ((c == 'r') && (strncmp(argv[1], "raise", length) == 0)) {
-	if (argc != 3) {
-	    Tcl_AppendResult(interp, "wrong # arguments: must be \"",
-		    argv[0], " raise window\"", (char *) NULL);
-	    return TCL_ERROR;
-	}
-	wmPtr->hints.initial_state = NormalState;
+	wmPtr->withdrawn = 0;
 	if (wmPtr->flags & WM_NEVER_MAPPED) {
 	    return TCL_OK;
 	}
 	UpdateHints(winPtr);
 	Tk_MapWindow((Tk_Window) winPtr);
-	XRaiseWindow(winPtr->display, winPtr->window);
-/*$ioiend*/
-    } else if ((c == 'f') && (strncmp(argv[1], "focusmodel", length) == 0)) {
+    } else if ((c == 'f') && (strncmp(argv[1], "focusmodel", length) == 0)
+	    && (length >= 2)) {
 	if ((argc != 3) && (argc != 4)) {
 	    Tcl_AppendResult(interp, "wrong # arguments: must be \"",
 		    argv[0], " focusmodel window ?active|passive?\"",
@@ -796,6 +833,20 @@ Tk_WmCmd(clientData, interp, argc, argv)
 	    return TCL_ERROR;
 	}
 	UpdateHints(winPtr);
+    } else if ((c == 'f') && (strncmp(argv[1], "frame", length) == 0)
+	    && (length >= 2)) {
+	Window window;
+
+	if (argc != 3) {
+	    Tcl_AppendResult(interp, "wrong # arguments: must be \"",
+		    argv[0], " frame window\"", (char *) NULL);
+	    return TCL_ERROR;
+	}
+	window = wmPtr->reparent;
+	if (window == None) {
+	    window = Tk_WindowId((Tk_Window) winPtr);
+	}
+	sprintf(interp->result, "0x%x", window);
     } else if ((c == 'g') && (strncmp(argv[1], "geometry", length) == 0)
 	    && (length >= 2)) {
 	char xSign, ySign;
@@ -960,20 +1011,31 @@ Tk_WmCmd(clientData, interp, argc, argv)
 	}
 	if (Tk_Attributes((Tk_Window) winPtr)->override_redirect) {
 	    Tcl_AppendResult(interp, "can't iconify \"", winPtr->pathName,
-		    "\": override-redirect flag is set");
+		    "\": override-redirect flag is set", (char *) NULL);
+	    return TCL_ERROR;
+	}
+	if (wmPtr->master != None) {
+	    Tcl_AppendResult(interp, "can't iconify \"", winPtr->pathName,
+		    "\": it is a transient", (char *) NULL);
 	    return TCL_ERROR;
 	}
 	wmPtr->hints.initial_state = IconicState;
 	if (wmPtr->flags & WM_NEVER_MAPPED) {
 	    return TCL_OK;
 	}
-	if (XIconifyWindow(winPtr->display, winPtr->window,
+	if (wmPtr->withdrawn) {
+	    UpdateHints(winPtr);
+	    Tk_MapWindow((Tk_Window) winPtr);
+	    wmPtr->withdrawn = 0;
+	} else {
+	    if (XIconifyWindow(winPtr->display, winPtr->window,
 		winPtr->screenNum) == 0) {
 	    interp->result =
 		    "couldn't send iconify message to window manager";
 	    return TCL_ERROR;
+	    }
+	    WaitForMapNotify(winPtr, 0);
 	}
-	WaitForMapNotify(winPtr, 0);
     } else if ((c == 'i') && (strncmp(argv[1], "iconmask", length) == 0)
 	    && (length >= 5)) {
 	Pixmap pixmap;
@@ -1215,8 +1277,7 @@ Tk_WmCmd(clientData, interp, argc, argv)
 	    for (protPtr = wmPtr->protPtr; protPtr != NULL;
 		    protPtr = protPtr->nextPtr) {
 		Tcl_AppendElement(interp,
-			Tk_GetAtomName((Tk_Window) winPtr, protPtr->protocol),
-			0);
+			Tk_GetAtomName((Tk_Window) winPtr, protPtr->protocol));
 	    }
 	    return TCL_OK;
 	}
@@ -1265,7 +1326,8 @@ Tk_WmCmd(clientData, interp, argc, argv)
 	if (!(wmPtr->flags & WM_NEVER_MAPPED)) {
 	    UpdateWmProtocols(wmPtr);
 	}
-    } else if ((c == 's') && (strncmp(argv[1], "sizefrom", length) == 0)) {
+    } else if ((c == 's') && (strncmp(argv[1], "sizefrom", length) == 0)
+	    && (length >= 2)) {
 	if ((argc != 3) && (argc != 4)) {
 	    Tcl_AppendResult(interp, "wrong # arguments: must be \"",
 		    argv[0], " sizefrom window ?user|program?\"",
@@ -1300,6 +1362,20 @@ Tk_WmCmd(clientData, interp, argc, argv)
 	}
 	wmPtr->flags |= WM_UPDATE_SIZE_HINTS;
 	goto updateGeom;
+    } else if ((c == 's') && (strncmp(argv[1], "state", length) == 0)
+	    && (length >= 2)) {
+	if (argc != 3) {
+	    Tcl_AppendResult(interp, "wrong # arguments: must be \"",
+		    argv[0], " state window\"", (char *) NULL);
+	    return TCL_ERROR;
+	}
+	if (wmPtr->withdrawn) {
+	    interp->result = "withdrawn";
+	} else if (Tk_IsMapped((Tk_Window) winPtr)) {
+	    interp->result = "normal";
+	} else {
+	    interp->result = "iconic";
+	}
     } else if ((c == 't') && (strncmp(argv[1], "title", length) == 0)
 	    && (length >= 2)) {
 	if (argc > 4) {
@@ -1361,6 +1437,7 @@ Tk_WmCmd(clientData, interp, argc, argv)
 	    return TCL_ERROR;
 	}
 	wmPtr->hints.initial_state = WithdrawnState;
+	wmPtr->withdrawn = 1;
 	if (wmPtr->flags & WM_NEVER_MAPPED) {
 	    return TCL_OK;
 	}
@@ -1374,10 +1451,10 @@ Tk_WmCmd(clientData, interp, argc, argv)
     } else {
 	Tcl_AppendResult(interp, "unknown or ambiguous option \"", argv[1],
 		"\": must be aspect, client, command, deiconify, ",
-		"focusmodel, geometry, grid, group, iconbitmap, ",
+		"focusmodel, frame, geometry, grid, group, iconbitmap, ",
 		"iconify, iconmask, iconname, iconposition, ",
 		"iconwindow, maxsize, minsize, overrideredirect, ",
-		"positionfrom, protocol, sizefrom,  title, ",
+		"positionfrom, protocol, sizefrom, state, title, ",
 		"trace, transient, or withdraw",
 		(char *) NULL);
 	return TCL_ERROR;
@@ -1575,25 +1652,18 @@ ConfigureEvent(winPtr, configEventPtr)
      */
 
     if ((wmPtr->reparent == None) || !ComputeReparentGeometry(winPtr)) {
-	winPtr->changes.x = configEventPtr->x;
-	winPtr->changes.y = configEventPtr->y;
 	wmPtr->parentWidth = configEventPtr->width
 		+ 2*configEventPtr->border_width;
 	wmPtr->parentHeight = configEventPtr->height
 		+ 2*configEventPtr->border_width;
-    }
-
-    wmPtr->x = winPtr->changes.x - wmPtr->xInParent;
-    if (wmPtr->flags & WM_NEGATIVE_X) {
-	wmPtr->x = wmPtr->vRootWidth - (wmPtr->x + wmPtr->parentWidth);
-    }
-    wmPtr->y = winPtr->changes.y - wmPtr->yInParent;
-    if (wmPtr->flags & WM_NEGATIVE_Y) {
-	wmPtr->y = wmPtr->vRootHeight - (wmPtr->y + wmPtr->parentHeight);
-    }
-    if (wmTracing) {
-	printf("winPtr coords %d,%d, wmPtr coords %d,%d\n",
-		winPtr->changes.x, winPtr->changes.y, wmPtr->x, wmPtr->y);
+	winPtr->changes.x = wmPtr->x = configEventPtr->x;
+	winPtr->changes.y = wmPtr->y = configEventPtr->y;
+	if (wmPtr->flags & WM_NEGATIVE_X) {
+	    wmPtr->x = wmPtr->vRootWidth - (wmPtr->x + wmPtr->parentWidth);
+	}
+	if (wmPtr->flags & WM_NEGATIVE_Y) {
+	    wmPtr->y = wmPtr->vRootHeight - (wmPtr->y + wmPtr->parentHeight);
+	}
     }
 }
 
@@ -1775,8 +1845,50 @@ ComputeReparentGeometry(winPtr)
     wmPtr->yInParent = yOffset + bd - winPtr->changes.border_width;
     wmPtr->parentWidth = width + 2*bd;
     wmPtr->parentHeight = height + 2*bd;
+
+    /*
+     * Some tricky issues in updating wmPtr->x and wmPtr->y:
+     *
+     * 1. Don't update them if the event occurred because of something
+     * we did (i.e. WM_SYNC_PENDING and WM_MOVE_PENDING are both set).
+     * This is because window managers treat coords differently than Tk,
+     * and no two window managers are alike. If the window manager moved
+     * the window because we told it to, remember the coordinates we told
+     * it, not the ones it actually moved it to.  This allows us to move
+     * the window back to the same coordinates later and get the same
+     * result. Without this check, windows can "walk" across the screen
+     * under some conditions.
+     *
+     * 2. Don't update wmPtr->x and wmPtr->y unless winPtr->changes.x
+     * or winPtr->changes.y has changed (otherwise a size change can
+     * spoof us into thinking that the position changed too and defeat
+     * the intent of (1) above.
+     *
+     * 3. Ignore size changes coming from the window system if we're
+     * about to change the size ourselves but haven't seen the event for
+     * it yet:  our size change is supposed to take priority.
+     */
+
+    if (!(wmPtr->flags & WM_MOVE_PENDING)
+	    && ((winPtr->changes.x != (x + wmPtr->xInParent))
+	    || (winPtr->changes.y != (y + wmPtr->yInParent)))) {
+	wmPtr->x = x;
+	if (wmPtr->flags & WM_NEGATIVE_X) {
+	    wmPtr->x = wmPtr->vRootWidth - (wmPtr->x + wmPtr->parentWidth);
+	}
+	wmPtr->y = y;
+	if (wmPtr->flags & WM_NEGATIVE_Y) {
+	    wmPtr->y = wmPtr->vRootHeight - (wmPtr->y + wmPtr->parentHeight);
+	}
+    }
+
     winPtr->changes.x = x + wmPtr->xInParent;
     winPtr->changes.y = y + wmPtr->yInParent;
+    if (wmTracing) {
+	printf("winPtr coords %d,%d, wmPtr coords %d,%d, offsets %d %d\n",
+		winPtr->changes.x, winPtr->changes.y, wmPtr->x, wmPtr->y,
+		wmPtr->xInParent, wmPtr->yInParent);
+    }
     return 1;
 }
 
@@ -1929,25 +2041,24 @@ UpdateGeometryInfo(clientData)
     }
 
     /*
-     * Compute the new position for the window.  This is tricky, because
-     * we need to include the border widths supplied by a reparented
-     * parent in this calculation, but can't use the parent's current
-     * overall size since that may change as a result of this code.
+     * Compute the new position for the upper-left pixel of the window's
+     * decorative frame.  This is tricky, because we need to include the
+     * border widths supplied by a reparented parent in this calculation,
+     * but can't use the parent's current overall size since that may
+     * change as a result of this code.
      */
 
     if (wmPtr->flags & WM_NEGATIVE_X) {
 	x = wmPtr->vRootWidth - wmPtr->x
-		- (width + (wmPtr->parentWidth - winPtr->changes.width))
-		+ wmPtr->xInParent;
+		- (width + (wmPtr->parentWidth - winPtr->changes.width));
     } else {
-	x =  wmPtr->x + wmPtr->xInParent;
+	x =  wmPtr->x;
     }
     if (wmPtr->flags & WM_NEGATIVE_Y) {
 	y = wmPtr->vRootHeight - wmPtr->y
-		- (height + (wmPtr->parentHeight - winPtr->changes.height))
-		+ wmPtr->yInParent;
+		- (height + (wmPtr->parentHeight - winPtr->changes.height));
     } else {
-	y =  wmPtr->y + wmPtr->yInParent;
+	y =  wmPtr->y;
     }
 
     /*
@@ -1968,51 +2079,54 @@ UpdateGeometryInfo(clientData)
     }
 
     /*
-     * Reconfigure the window, if it isn't already configured correctly.
-     * Note: sometimes the window manager will give us a different size
-     * than we asked for (e.g. mwm has a minimum size for windows), so
-     * base the size check on what we *asked for* last time, not what we
-     * got.  Can't just reconfigure always, because we may not get a
-     * ConfigureNotify event back if nothing changed, so WaitForConfigureNotify
-     * will hang.
+     * Reconfigure the window if it isn't already configured correctly.
+     * A few tricky points:
+     *
+     * 1. Sometimes the window manager will give us a different size
+     *    than we asked for (e.g. mwm has a minimum size for windows), so
+     *    base the size check on what we *asked for* last time, not what we
+     *    got.
+     * 2. Can't just reconfigure always, because we may not get a
+     *    ConfigureNotify event back if nothing changed, so
+     *    WaitForConfigureNotify will hang a long time.
+     * 3. Don't move window unless a new position has been requested for
+     *	  it.  This is because of "features" in some window managers (e.g.
+     *    twm, as of 4/24/91) where they don't interpret coordinates
+     *    according to ICCCM.  Moving a window to its current location may
+     *    cause it to shift position on the screen.
      */
 
     serial = NextRequest(winPtr->display);
-    if ((x != winPtr->changes.x) || (y != winPtr->changes.y)
-	    || (width != wmPtr->configWidth)
-	    || (height != wmPtr->configHeight)) {
+    if (wmPtr->flags & WM_MOVE_PENDING) {
 	wmPtr->configWidth = width;
 	wmPtr->configHeight = height;
 	if (wmTracing) {
 	    printf("UpdateGeometryInfo moving to %d %d, resizing to %d x %d,\n",
-		    x + wmPtr->xAdjust, y + wmPtr->yAdjust,
-		    width, height);
-	    printf("    adjustments are %d and %d, inParent offset %d %d\n",
-		    wmPtr->xAdjust, wmPtr->yAdjust, wmPtr->xInParent,
-		    wmPtr->yInParent);
+		    x, y, width, height);
 	}
-	Tk_MoveResizeWindow((Tk_Window) winPtr, x + wmPtr->xAdjust,
-		y + wmPtr->yAdjust, (unsigned) width,
+	Tk_MoveResizeWindow((Tk_Window) winPtr, x, y, (unsigned) width,
+		(unsigned) height);
+    } else if ((width != wmPtr->configWidth)
+	    || (height != wmPtr->configHeight)) {
+	wmPtr->configWidth = width;
+	wmPtr->configHeight = height;
+	if (wmTracing) {
+	    printf("UpdateGeometryInfo resizing to %d x %d\n", width, height);
+	}
+	Tk_ResizeWindow((Tk_Window) winPtr, (unsigned) width,
 		(unsigned) height);
     } else {
 	return;
     }
 
     /*
-     * Wait for the configure operation to complete, then verify that the
-     * window was positioned where it was supposed to be and adjust it if
-     * it wasn't.  Don't need to do this, however, if the window is about
-     * to be mapped:  it will be taken care of elsewhere.
+     * Wait for the configure operation to complete.  Don't need to do
+     * this, however, if the window is about to be mapped:  it will be
+     * taken care of elsewhere.
      */
 
     if (!(wmPtr->flags & WM_ABOUT_TO_MAP)) {
-	int savedX, savedY, savedFlags;
-
-	savedX = wmPtr->x;
-	savedY = wmPtr->y;
-	savedFlags = wmPtr->flags;
 	WaitForConfigureNotify(winPtr, serial);
-	AdjustPosition(winPtr, savedX, savedY, savedFlags);
     }
 }
 
@@ -2141,7 +2255,7 @@ UpdateSizeHints(winPtr)
 /*
  *----------------------------------------------------------------------
  *
- * WaitForConfigNotify --
+ * WaitForConfigureNotify --
  *
  *	This procedure is invoked in order to synchronize with the
  *	window manager.  It waits for a ConfigureNotify event to
@@ -2190,9 +2304,23 @@ WaitForConfigureNotify(winPtr, serial)
     int diff;
     int gotConfig = 0;
 
+    /*
+     * One more tricky detail about this procedure.  In some cases the
+     * window manager will decide to ignore a configure request (e.g.
+     * because it thinks the window is already in the right place).
+     * To avoid hanging in this situation, only wait for a few seconds,
+     * then give up.
+     */
+
     while (!gotConfig) {
-	XWindowEvent(winPtr->display, winPtr->window, StructureNotifyMask,
-		&event);
+	if (WaitForEvent(winPtr->display, winPtr->window, StructureNotifyMask,
+		&event) != TCL_OK) {
+	    if (wmTracing) {
+		printf("WaitForConfigureNotify giving up on %s\n",
+			winPtr->pathName);
+	    }
+	    break;
+	}
 	wmPtr->flags |= WM_SYNC_PENDING;
 	Tk_HandleEvent(&event);
 	wmPtr->flags &= ~WM_SYNC_PENDING;
@@ -2203,8 +2331,70 @@ WaitForConfigureNotify(winPtr, serial)
 	    }
 	}
     }
+    wmPtr->flags &= ~WM_MOVE_PENDING;
     if (wmTracing) {
-	printf("WaitForConfigureNotify finished, serial %d\n", serial);
+	printf("WaitForConfigureNotify finished with %s, serial %d\n",
+		winPtr->pathName, serial);
+    }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * WaitForEvent --
+ *
+ *	This procedure is used by WaitForConfigureNotify and
+ *	WaitForMapNotify to wait for an event of a certain type
+ *	to arrive.
+ *
+ * Results:
+ *	Under normal conditions, TCL_OK is returned and an event for
+ *	display and window that matches "mask" is stored in *eventPtr.
+ *	If a long time goes by with no event of the right type arriving,
+ *	or if an error occurs while waiting for the event to arrive,
+ *	then TCL_ERROR is returned.
+ *
+ * Side effects:
+ *	Events are removed from the display's event queue.  Time goes by.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static int
+WaitForEvent(display, window, mask, eventPtr)
+    Display *display;		/* Display event is coming from. */
+    Window window;		/* Window for which event is desired. */
+    long mask;			/* Selects events of interest. */
+    XEvent *eventPtr;		/* Place to store event. */
+{
+#define TIMEOUT_SECS 5
+    fd_mask masks[MASK_SIZE];
+    struct timeval timeout, startTime, curTime;
+    int i, numFound, fd;
+
+    for (i = 0; i < MASK_SIZE; i++) {
+	masks[i] = 0;
+    }
+    fd = ConnectionNumber(display);
+    (void) gettimeofday(&startTime, (struct timezone *) NULL);
+    while (1) {
+	if (XCheckWindowEvent(display, window, mask, eventPtr)) {
+	    return TCL_OK;
+	}
+	masks[fd/(NBBY*sizeof(fd_mask))] = 1 << fd%(NBBY*sizeof(fd_mask));
+	timeout.tv_sec = 1;
+	timeout.tv_usec = 0;
+	numFound = select(fd+1, (SELECT_MASK *) masks,
+		(SELECT_MASK *) NULL, (SELECT_MASK *) NULL,
+		&timeout);
+	if ((numFound == -1) && (errno != EINTR)) {
+	    return TCL_ERROR;
+	}
+	(void) gettimeofday(&curTime, (struct timezone *) NULL);
+	i = curTime.tv_sec - startTime.tv_sec;
+	if (i >= 5) {
+	    return TCL_ERROR;
+	}
     }
 }
 
@@ -2253,115 +2443,27 @@ WaitForMapNotify(winPtr, mapped)
 	} else if (!(winPtr->flags & TK_MAPPED)) {
 	    break;
 	}
-	XWindowEvent(winPtr->display, winPtr->window, StructureNotifyMask,
-		&event);
+	if (WaitForEvent(winPtr->display, winPtr->window, StructureNotifyMask,
+		&event) != TCL_OK) {
+	    /*
+	     * There are some bizarre situations in which the window
+	     * manager can't respond or chooses not to (e.g. if we've
+	     * got a grab set it can't respond).  If this happens then
+	     * just quit.
+	     */
+
+	    if (wmTracing) {
+		printf("WaitForMapNotify giving up on %s\n", winPtr->pathName);
+	    }
+	    break;
+	}
 	wmPtr->flags |= WM_SYNC_PENDING;
 	Tk_HandleEvent(&event);
 	wmPtr->flags &= ~WM_SYNC_PENDING;
     }
+    wmPtr->flags &= ~WM_MOVE_PENDING;
     if (wmTracing) {
-	printf("WaitForMapNotify finished\n");
-    }
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * AdjustPosition --
- *
- *	This procedure is invoked after a window's position has been
- *	set to make sure that the window manager put the window where
- *	we wanted it to go.  If not, we move it to put it where it's
- *	supposed to be.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	If the window didn't go where it was supposed to then this
- *	procedure modifies the xAdjust and yAdjust values for the
- *	display and tries again to position it correctly.
- *
- *----------------------------------------------------------------------
- */
-
-static void
-AdjustPosition(winPtr, x, y, flags)
-    TkWindow *winPtr;		/* Top-level window whose position was
-				 * just set. */
-    int x, y;			/* Copies of the x and y fields from
-				 * winPtr->wmInfoPtr, which reflect the
-				 * desired position of the window. */
-    int flags;			/* Copies of the WM_NEGATIVE_X and
-				 * WM_NEGATIVE_Y flags that indicate the
-				 * desired position of the window. */
-{
-    WmInfo *wmPtr = winPtr->wmInfoPtr;
-    int xWanted, yWanted, i;
-    unsigned long serial;
-#define MAX_TRIES 3
-
-    /*
-     * The reason for this procedure is that there isn't general
-     * agreement among window managers about what x and y mean when
-     * an application set's its window's position:  do they refer
-     * to the desired location of the upper-left corner of the window's
-     * decorative frame?  the upper-left corner of the window itself?
-     * As of 10/30/92, twm and mwm disagree on this and neither uses
-     * a particularly intuitive choice (e.g. neither uses either of
-     * the possibilities above).
-     *
-     * Tk deals with this problem by using x- and y-coordinates
-     * corresponding to the upper-left corner of the internal border
-     * for the top-level window, offset by adjustment factors for
-     * whatever window manager is currently in use (wmPtr->xAdjust
-     * and wmPtr->yAdjust).  After mapping the window for the first
-     * time, and after each location change coming from the application,
-     * this procedure is invoked to see where the wm actually put the
-     * window.  If the wm didn't put the window where we wanted, then
-     * this procedure modifies xAdjust and yAdjust so that things should
-     * work right the next time.  In addition, it repositions the window
-     * according to the new adjustment factors.  This whole process gets
-     * repeated a few times to allow the system to stabilize (clever
-     * window managers may handle the window differently when it's first
-     * created than after it's been around a while) and we give up if
-     * things don't work after a few tries.
-     */
-
-    for (i = 0; i < MAX_TRIES; i++) {
-	if (flags & WM_NEGATIVE_X) {
-	    xWanted = wmPtr->vRootWidth - x - wmPtr->parentWidth
-		    + wmPtr->xInParent;
-	} else {
-	    xWanted =  x + wmPtr->xInParent;
-	}
-	if (flags & WM_NEGATIVE_Y) {
-	    yWanted = wmPtr->vRootHeight - y - wmPtr->parentHeight
-		    + wmPtr->yInParent;
-	} else {
-	    yWanted =  y + wmPtr->yInParent;
-	}
-	if (wmTracing) {
-	    printf("AdjustPosition wanted %d,%d and got %d,%d\n",
-		    xWanted, yWanted, winPtr->changes.x, winPtr->changes.y);
-	}
-	if ((xWanted == winPtr->changes.x) && (yWanted == winPtr->changes.y)) {
-	    return;
-	}
-	wmPtr->xAdjust += xWanted - winPtr->changes.x;
-	wmPtr->yAdjust += yWanted - winPtr->changes.y;
-	if (wmTracing) {
-	    printf("AdjustPosition setting adjustments to %d and %d\n",
-		    wmPtr->xAdjust, wmPtr->yAdjust);
-	}
-	serial = NextRequest(winPtr->display);
-	Tk_MoveWindow((Tk_Window) winPtr, xWanted + wmPtr->xAdjust,
-		yWanted + wmPtr->yAdjust);
-	if (wmTracing) {
-	    printf("AdjustPosition moving to %d, %d\n",
-		    xWanted + wmPtr->xAdjust, yWanted + wmPtr->yAdjust);
-	}
-	WaitForConfigureNotify(winPtr, serial);
+	printf("WaitForMapNotify finished with %s\n", winPtr->pathName);
     }
 }
 
@@ -2446,14 +2548,14 @@ ParseGeometry(interp, string, winPtr)
     x = wmPtr->x;
     y = wmPtr->y;
     flags = wmPtr->flags;
-    if (isdigit(*p)) {
+    if (isdigit(UCHAR(*p))) {
 	width = strtoul(p, &end, 10);
 	p = end;
 	if (*p != 'x') {
 	    goto error;
 	}
 	p++;
-	if (!isdigit(*p)) {
+	if (!isdigit(UCHAR(*p))) {
 	    goto error;
 	}
 	height = strtoul(p, &end, 10);
@@ -2504,8 +2606,13 @@ ParseGeometry(interp, string, winPtr)
 
     wmPtr->width = width;
     wmPtr->height = height;
-    wmPtr->x = x;
-    wmPtr->y = y;
+    if ((x != wmPtr->x) || (y != wmPtr->y)
+	    || ((flags & (WM_NEGATIVE_X|WM_NEGATIVE_Y))
+	    != (wmPtr->flags & (WM_NEGATIVE_X|WM_NEGATIVE_Y)))) {
+	wmPtr->x = x;
+	wmPtr->y = y;
+	flags |= WM_MOVE_PENDING;
+    }
     wmPtr->flags = flags;
 
     if (!(wmPtr->flags & (WM_UPDATE_PENDING|WM_NEVER_MAPPED))) {
@@ -2574,7 +2681,7 @@ Tk_GetRootCoords(tkwin, xPtr, yPtr)
  *
  * Tk_CoordsToWindow --
  *
- *	Given the root coordinates of a point, this procedure
+ *	Given the (virtual) root coordinates of a point, this procedure
  *	returns the token for the top-most window covering that point,
  *	if there exists such a window in this application.
  *
@@ -2591,11 +2698,14 @@ Tk_GetRootCoords(tkwin, xPtr, yPtr)
 
 Tk_Window
 Tk_CoordsToWindow(rootX, rootY, tkwin)
-    int rootX, rootY;		/* Coordinates of point in root window. */
+    int rootX, rootY;		/* Coordinates of point in root window.  If
+				 * a virtual-root window manager is in use,
+				 * these coordinates refer to the virtual
+				 * root, not the real root. */
     Tk_Window tkwin;		/* Token for any window in application;
-				 * used to identify the application. */
+				 * used to identify the display. */
 {
-    Window rootChild, dummy3, dummy4;
+    Window rootChild, dummy3, dummy4, vRoot;
     int i, dummy1, dummy2;
     register WmInfo *wmPtr;
     register TkWindow *winPtr, *childPtr;
@@ -2607,14 +2717,26 @@ Tk_CoordsToWindow(rootX, rootY, tkwin)
     unsigned int numChildren;	/* Size of children array. */
 
     /*
-     * Step 1:  find the top-level window that contains the desired
+     * Step 1: find any top-level window for the right screen, then
+     * use it to find the virtual root.
+     */
+
+
+    while (!Tk_IsTopLevel(tkwin)) {
+	tkwin = Tk_Parent(tkwin);
+    }
+    vRoot = ((TkWindow *) tkwin)->wmInfoPtr->vRoot;
+    if (vRoot == None) {
+	vRoot = RootWindowOfScreen(Tk_Screen(tkwin));
+    }
+
+    /*
+     * Step 2:  find the top-level window that contains the desired
      * coordinates.
      */
 
-    if (XTranslateCoordinates(Tk_Display(tkwin),
-	    RootWindowOfScreen(Tk_Screen(tkwin)),
-	    RootWindowOfScreen(Tk_Screen(tkwin)), rootX, rootY, &dummy1,
-	    &dummy2, &rootChild) == False) {
+    if (XTranslateCoordinates(Tk_Display(tkwin), vRoot, vRoot, rootX,
+	    rootY, &dummy1, &dummy2, &rootChild) == False) {
 	panic("Tk_CoordsToWindow get False return from XTranslateCoordinates");
     }
     for (wmPtr = firstWmPtr; ; wmPtr = wmPtr->nextPtr) {
@@ -2632,7 +2754,7 @@ Tk_CoordsToWindow(rootX, rootY, tkwin)
     }
 
     /*
-     * Step 2: work down through the hierarchy underneath this window.
+     * Step 3: work down through the hierarchy underneath this window.
      * At each level, scan through all the children to see if any contain
      * the point.  If none do, then we're done.  If one does, then do the
      * same thing on that child.  If two or more do, then fetch enough
@@ -2861,6 +2983,7 @@ Tk_MoveToplevelWindow(tkwin, x, y)
     }
     wmPtr->x = x;
     wmPtr->y = y;
+    wmPtr->flags |= WM_MOVE_PENDING;
     wmPtr->flags &= ~(WM_NEGATIVE_X|WM_NEGATIVE_Y);
     if ((wmPtr->sizeHintsFlags & (USPosition|PPosition)) == 0) {
 	wmPtr->sizeHintsFlags |= USPosition;
@@ -2874,12 +2997,10 @@ Tk_MoveToplevelWindow(tkwin, x, y)
      * new position.
      */
 
-    if (wmPtr->flags & WM_NEVER_MAPPED) {
-	if (!(wmPtr->flags & WM_UPDATE_PENDING)) {
-	    Tk_DoWhenIdle(UpdateGeometryInfo, (ClientData) winPtr);
-	    wmPtr->flags |= WM_UPDATE_PENDING;
+    if (!(wmPtr->flags & WM_NEVER_MAPPED)) {
+	if (wmPtr->flags & WM_UPDATE_PENDING) {
+	    Tk_CancelIdleCall(UpdateGeometryInfo, (ClientData) winPtr);
 	}
-    } else {
 	UpdateGeometryInfo((ClientData) winPtr);
     }
 }
@@ -3000,5 +3121,137 @@ TkWmProtocolEventProc(winPtr, eventPtr)
 
     if (protocol == Tk_InternAtom((Tk_Window) winPtr, "WM_DELETE_WINDOW")) {
 	Tk_DestroyWindow((Tk_Window) winPtr);
+    }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * TkWmRestackToplevel --
+ *
+ *	This procedure restacks a top-level window.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	WinPtr gets restacked  as specified by aboveBelow and otherPtr.
+ *	This procedure doesn't return until the restack has taken
+ *	effect and the ConfigureNotify event for it has been received.
+ *
+ *----------------------------------------------------------------------
+ */
+
+void
+TkWmRestackToplevel(winPtr, aboveBelow, otherPtr)
+    TkWindow *winPtr;		/* Window to restack. */
+    int aboveBelow;		/* Gives relative position for restacking;
+				 * must be Above or Below. */
+    TkWindow *otherPtr;		/* Window relative to which to restack;
+				 * if NULL, then winPtr gets restacked
+				 * above or below *all* siblings. */
+{
+    XWindowChanges changes;
+    unsigned int mask;
+    Window window, dummy1, dummy2, vRoot;
+    Window *children;
+    unsigned int numChildren;
+    int i;
+    unsigned long serial;
+    XEvent event;
+    int diff;
+
+    changes.stack_mode = aboveBelow;
+    mask = CWStackMode;
+    if (winPtr->window == None) {
+	Tk_MakeWindowExist((Tk_Window) winPtr);
+    }
+    window = (winPtr->wmInfoPtr->reparent != None)
+	    ? winPtr->wmInfoPtr->reparent : winPtr->window;
+    if (otherPtr != NULL) {
+	if (otherPtr->window == None) {
+	    Tk_MakeWindowExist((Tk_Window) otherPtr);
+	}
+	changes.sibling = (otherPtr->wmInfoPtr->reparent != None)
+		? otherPtr->wmInfoPtr->reparent : otherPtr->window;
+	mask = CWStackMode|CWSibling;
+    }
+
+    /*
+     * Before actually reconfiguring the window, see if it's already
+     * in the right place.  If so then don't reconfigure it.  The
+     * reason for this extra work is that some window managers will
+     * ignore the reconfigure request if the window is already in
+     * the right place, causing a long delay in WaitForConfigureNotify
+     * while it times out.
+     */
+
+    vRoot = winPtr->wmInfoPtr->vRoot;
+    if (vRoot == None) {
+	vRoot = RootWindowOfScreen(Tk_Screen((Tk_Window) winPtr));
+    }
+    if (XQueryTree(winPtr->display, vRoot, &dummy1, &dummy2,
+	    &children, &numChildren) != 0) {
+	if (mask & CWSibling) {
+	    if (aboveBelow == Above) {
+		for (i = 1; i < numChildren; i++) {
+		    if ((children[i] == window)
+			    && (children[i-1] == changes.sibling)) {
+			alreadyOK:
+			XFree((char *) children);
+			return;
+		    }
+		}
+	    } else {
+		for (i = 1; i < numChildren; i++) {
+		    if ((children[i] == changes.sibling)
+			    && (children[i-1] == window)) {
+			goto alreadyOK;
+		    }
+		}
+	    }
+	} else {
+	    if (aboveBelow == Above) {
+		if (window == children[numChildren-1]) {
+		    goto alreadyOK;
+		}
+	    } else {
+		if (window == children[0]) {
+		    goto alreadyOK;
+		}
+	    }
+	}
+	XFree((char *) children);
+    }
+
+    /*
+     * Reconfigure the window and wait for the reconfiguration to be
+     * complete.  If we don't wait, then the window may not restack
+     * for a while and the application might observe it before it has
+     * restacked.  Waiting for the reconfiguration is tricky if winPtr
+     * has been reparented, since the window getting the event isn't
+     * one that Tk owns.
+     */
+
+    serial = NextRequest(winPtr->display);
+    XConfigureWindow(winPtr->display, window, mask, &changes);
+    if (window == winPtr->window) {
+	WaitForConfigureNotify(winPtr, serial);
+    } else {
+	XSelectInput(winPtr->display, window, StructureNotifyMask);
+	while (1) {
+	    if (WaitForEvent(winPtr->display, window, StructureNotifyMask,
+		    &event) != TCL_OK) {
+		break;
+	    }
+	    if ((event.type == ConfigureNotify)
+		    && (event.xconfigure.window == window)) {
+		diff = event.xconfigure.serial - serial;
+		if (diff >= 0) {
+		    break;
+		}
+	    }
+	}
+	XSelectInput(winPtr->display, window, (long) 0);
     }
 }

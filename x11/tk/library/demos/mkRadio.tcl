@@ -14,40 +14,45 @@ proc mkRadio {{w .r1}} {
     message $w.msg -font -Adobe-times-medium-r-normal--*-180* -aspect 300 \
 	    -text "Two groups of radiobuttons are displayed below.  If you click on a button then the button will become selected exclusively among all the buttons in its group.  A Tcl variable is associated with each group to indicate which of the group's buttons is selected.  Click the \"See Variables\" button to see the current values of the variables.  Click the \"OK\" button when you've seen enough."
     frame $w.frame -borderwidth 10
-    pack append $w.frame \
-	[frame $w.frame.left] {left expand} \
-	[frame $w.frame.right] {right expand}
-    pack append $w.frame.left \
-	[radiobutton $w.frame.left.b1 -text "Point Size 10" -variable size \
-	    -relief flat -value 10] {top pady 4 frame w} \
-	[radiobutton $w.frame.left.b2 -text "Point Size 12" -variable size \
-	    -relief flat -value 12] {top pady 4 frame w} \
-	[radiobutton $w.frame.left.b3 -text "Point Size 18" -variable size \
-	    -relief flat -value 18] {top pady 4 frame w} \
-	[radiobutton $w.frame.left.b4 -text "Point Size 24" -variable size \
-	    -relief flat -value 24] {top pady 4 frame w}
-    pack append $w.frame.right \
-	[radiobutton $w.frame.right.b1 -text "Red" -variable color \
-	    -relief flat -value red] {top pady 4 frame w} \
-	[radiobutton $w.frame.right.b2 -text "Green" -variable color \
-	    -relief flat -value green] {top pady 4 frame w} \
-	[radiobutton $w.frame.right.b3 -text "Blue" -variable color \
-	    -relief flat -value blue] {top pady 4 frame w} \
-	[radiobutton $w.frame.right.b4 -text "Yellow" -variable color \
-	    -relief flat -value yellow] {top pady 4 frame w} \
-	[radiobutton $w.frame.right.b5 -text "Orange" -variable color \
-	    -relief flat -value orange] {top pady 4 frame w} \
-	[radiobutton $w.frame.right.b6 -text "Purple" -variable color \
-	    -relief flat -value purple] {top pady 4 frame w}
     frame $w.frame2
-    pack append $w.frame2 \
-	[button $w.frame2.ok -text OK -command "destroy $w"] \
-	    {left expand fill} \
-	[button $w.frame2.vars -text "See Variables" \
-	    -command "showVars $w.dialog size color"] \
-	    {left expand fill}
-    button $w.ok -text OK -command "destroy $w"
+    pack $w.msg -side top
+    pack $w.msg -side top
+    pack $w.frame -side top -fill x -pady 10
+    pack $w.frame2 -side bottom -fill x
 
-    pack append $w $w.msg {top fill} $w.frame {top expand fill} \
-	    $w.frame2 {bottom fill}
+    frame $w.frame.left
+    frame $w.frame.right
+    pack $w.frame.left $w.frame.right -side left -expand yes
+
+    radiobutton $w.frame.left.b1 -text "Point Size 10" -variable size \
+	    -relief flat -value 10
+    radiobutton $w.frame.left.b2 -text "Point Size 12" -variable size \
+	    -relief flat -value 12
+    radiobutton $w.frame.left.b3 -text "Point Size 18" -variable size \
+	    -relief flat -value 18
+    radiobutton $w.frame.left.b4 -text "Point Size 24" -variable size \
+	    -relief flat -value 24
+    pack $w.frame.left.b1 $w.frame.left.b2 $w.frame.left.b3 $w.frame.left.b4 \
+	    -side top -pady 2 -anchor w
+
+    radiobutton $w.frame.right.b1 -text "Red" -variable color \
+	    -relief flat -value red
+    radiobutton $w.frame.right.b2 -text "Green" -variable color \
+	    -relief flat -value green
+    radiobutton $w.frame.right.b3 -text "Blue" -variable color \
+	    -relief flat -value blue
+    radiobutton $w.frame.right.b4 -text "Yellow" -variable color \
+	    -relief flat -value yellow
+    radiobutton $w.frame.right.b5 -text "Orange" -variable color \
+	    -relief flat -value orange
+    radiobutton $w.frame.right.b6 -text "Purple" -variable color \
+	    -relief flat -value purple
+    pack $w.frame.right.b1 $w.frame.right.b2 $w.frame.right.b3 \
+	    $w.frame.right.b4 $w.frame.right.b5 $w.frame.right.b6 \
+	    -side top -pady 2 -anchor w
+
+    button $w.frame2.ok -text OK -command "destroy $w" -width 12
+    button $w.frame2.vars -text "See Variables" -width 12\
+	    -command "showVars $w.dialog size color"
+    pack $w.frame2.ok $w.frame2.vars -side left -expand yes -fill x
 }

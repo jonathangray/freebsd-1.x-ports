@@ -1,5 +1,7 @@
 % This file contains the standard Postscript prolog used when
 % generating Postscript from canvas widgets.
+%
+% $Header: /a/cvs/386BSD/ports/x11/tk/library/prolog.ps,v 1.2 1993/12/27 07:37:27 rich Exp $ SPRITE (Berkeley);
 
 %%BeginProlog
 50 dict begin
@@ -19,6 +21,18 @@
 /strings 0 def
 /xoffset 0 def
 /yoffset 0 def
+/tmpstip null def
+/encoding {ISOLatin1Encoding} def
+
+% Override setfont to automatically encode the font in the style defined by 
+% by 'encoding' (ISO Latin1 by default).
+
+systemdict /encodefont known {
+    /realsetfont /setfont load def
+    /setfont {
+	encoding encodefont realsetfont
+    } def
+} if
 
 % desiredSize EvenPixels closestSize
 %
@@ -57,6 +71,8 @@
     % some Postscript interpreters get errors during strokepath for
     % dashed lines.  If this happens, turn off dashes and try again.
 
+    1 index /tmpstip exch def %% Works around NeWSprint bug
+
     gsave
     {eoclip}
     {{strokepath} stopped {grestore gsave [] 0 setdash strokepath} if clip}
@@ -87,7 +103,7 @@
 
 	    gsave
 	    1 index exch translate
-	    5 index 5 index true matrix {3 index} imagemask
+	    5 index 5 index true matrix tmpstip imagemask
 	    grestore
 	} for
 	pop
@@ -146,8 +162,7 @@
 
     /maxwidth 0 def
     strings {
-	0 0 moveto false charpath
-	pathbbox pop exch pop exch sub
+	stringwidth pop
 	dup maxwidth gt {/maxwidth exch def} {pop} ifelse
 	newpath
     } forall
@@ -178,13 +193,11 @@
     % display it.
 
     strings {
-	dup 0 0 moveto false charpath
-	pathbbox newpath
-	pop exch pop 1 index sub justify mul add neg 0 moveto
+	dup stringwidth pop
+	justify neg mul 0 moveto
 	show
 	0 spacing neg translate
     } forall
 } bind def
 
 %%EndProlog
-

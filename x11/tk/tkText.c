@@ -7,18 +7,29 @@
  *	the display code.  The B-tree representation of text is
  *	implemented elsewhere.
  *
- * Copyright 1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1992-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkText.c,v 1.1 1993/08/09 01:20:52 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkText.c,v 1.2 1993/12/27 07:34:38 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "default.h"
@@ -75,7 +86,7 @@ static Tk_ConfigSpec configSpecs[] = {
     {TK_CONFIG_RELIEF, "-relief", "relief", "Relief",
 	DEF_TEXT_RELIEF, Tk_Offset(TkText, relief), 0},
     {TK_CONFIG_BORDER, "-selectbackground", "selectBackground", "Foreground",
-	DEF_ENTRY_SELECT_COLOR, Tk_Offset(TkText, selBorder),
+	DEF_TEXT_SELECT_COLOR, Tk_Offset(TkText, selBorder),
 	TK_CONFIG_COLOR_ONLY},
     {TK_CONFIG_BORDER, "-selectbackground", "selectBackground", "Foreground",
 	DEF_TEXT_SELECT_MONO, Tk_Offset(TkText, selBorder),
@@ -213,22 +224,39 @@ Tk_TextCmd(clientData, interp, argc, argv)
     Tcl_InitHashTable(&textPtr->markTable, TCL_STRING_KEYS);
     textPtr->state = tkTextNormalUid;
     textPtr->border = NULL;
+    textPtr->borderWidth = 0;
+    textPtr->padX = 0;
+    textPtr->padY = 0;
+    textPtr->relief = TK_RELIEF_FLAT;
     textPtr->cursor = None;
     textPtr->fgColor = NULL;
     textPtr->fontPtr = NULL;
+    textPtr->wrapMode = tkTextCharUid;
+    textPtr->width = 0;
+    textPtr->height = 0;
+    textPtr->setGrid = 0;
     textPtr->prevWidth = Tk_Width(new);
     textPtr->prevHeight = Tk_Height(new);
     textPtr->topLinePtr = NULL;
     TkTextCreateDInfo(textPtr);
     TkTextSetView(textPtr, 0, 0);
+    textPtr->selTagPtr = NULL;
     textPtr->selBorder = NULL;
+    textPtr->selBorderWidth = 0;
     textPtr->selFgColorPtr = NULL;
     textPtr->exportSelection = 1;
+    textPtr->selLine = 0;
+    textPtr->selCh = 0;
     textPtr->selOffset = -1;
     textPtr->insertAnnotPtr = NULL;
     textPtr->insertBorder = NULL;
+    textPtr->insertWidth = 0;
+    textPtr->insertBorderWidth = 0;
+    textPtr->insertOnTime = 0;
+    textPtr->insertOffTime = 0;
     textPtr->insertBlinkHandler = (Tk_TimerToken) NULL;
     textPtr->bindingTable = NULL;
+    textPtr->currentAnnotPtr = NULL;
     textPtr->pickEvent.type = LeaveNotify;
     textPtr->yScrollCmd = NULL;
     textPtr->scanMarkLine = 0;
@@ -497,7 +525,7 @@ TextWidgetCmd(clientData, interp, argc, argv)
     } else if ((c == 't') && (strcmp(argv[1], "tag") == 0)) {
 	result = TkTextTagCmd(textPtr, interp, argc, argv);
     } else if ((c == 'y') && (strncmp(argv[1], "yview", length) == 0)) {
-	int numLines, pickPlace;
+	int pickPlace;
 
 	if (argc < 3) {
 	    yviewSyntax:
@@ -527,13 +555,6 @@ TextWidgetCmd(clientData, interp, argc, argv)
 		result = TCL_ERROR;
 		goto done;
 	    }
-	}
-	numLines = TkBTreeNumLines(textPtr->tree);
-	if (line1 >= numLines) {
-	    line1 = numLines-1;
-	}
-	if (line1 < 0) {
-	    line1 = 0;
 	}
 	TkTextSetView(textPtr, line1, pickPlace);
     } else {
@@ -576,6 +597,12 @@ DestroyText(clientData)
     Tcl_HashEntry *hPtr;
     TkTextTag *tagPtr;
 
+    /*
+     * Free up all the stuff that requires special handling, then
+     * let Tk_FreeOptions handle all the standard option-related
+     * stuff.
+     */
+
     TkBTreeDestroy(textPtr->tree);
     for (hPtr = Tcl_FirstHashEntry(&textPtr->tagTable, &search);
 	    hPtr != NULL; hPtr = Tcl_NextHashEntry(&search)) {
@@ -588,19 +615,13 @@ DestroyText(clientData)
 	ckfree((char *) Tcl_GetHashValue(hPtr));
     }
     Tcl_DeleteHashTable(&textPtr->markTable);
-    if (textPtr->border != NULL) {
-	Tk_Free3DBorder(textPtr->border);
-    }
-    if (textPtr->cursor != None) {
-	Tk_FreeCursor(textPtr->display, textPtr->cursor);
-    }
-    if (textPtr->fgColor != NULL) {
-	Tk_FreeColor(textPtr->fgColor);
-    }
-    if (textPtr->fontPtr != NULL) {
-	Tk_FreeFontStruct(textPtr->fontPtr);
-    }
     TkTextFreeDInfo(textPtr);
+    if (textPtr->insertBlinkHandler != NULL) {
+	Tk_DeleteTimerHandler(textPtr->insertBlinkHandler);
+    }
+    if (textPtr->bindingTable != NULL) {
+	Tk_DeleteBindingTable(textPtr->bindingTable);
+    }
 
     /*
      * NOTE: do NOT free up selBorder or selFgColorPtr:  they are
@@ -608,18 +629,9 @@ DestroyText(clientData)
      * up as part of deleting the tags above.
      */
 
-    if (textPtr->insertBorder != NULL) {
-	Tk_Free3DBorder(textPtr->insertBorder);
-    }
-    if (textPtr->insertBlinkHandler != NULL) {
-	Tk_DeleteTimerHandler(textPtr->insertBlinkHandler);
-    }
-    if (textPtr->bindingTable != NULL) {
-	Tk_DeleteBindingTable(textPtr->bindingTable);
-    }
-    if (textPtr->yScrollCmd != NULL) {
-	ckfree(textPtr->yScrollCmd);
-    }
+    textPtr->selBorder = NULL;
+    textPtr->selFgColorPtr = NULL;
+    Tk_FreeOptions(configSpecs, (char *) textPtr, textPtr->display, 0);
     ckfree((char *) textPtr);
 }
 
@@ -995,8 +1007,7 @@ DeleteChars(textPtr, line1, ch1, line2, ch2)
     TkBTreeDeleteChars(textPtr->tree, line1Ptr, ch1, line2Ptr, ch2);
     if ((topLine >= line1) && (topLine <= line2)) {
 	numLines = TkBTreeNumLines(textPtr->tree);
-	TkTextSetView(textPtr, (line1 > (numLines-1)) ? (numLines-1) : line1,
-		0);
+	TkTextSetView(textPtr, line1, 0);
     }
 
     /*
@@ -1228,7 +1239,7 @@ TextMarkCmd(textPtr, interp, argc, argv)
 	for (hPtr = Tcl_FirstHashEntry(&textPtr->markTable, &search);
 		hPtr != NULL; hPtr = Tcl_NextHashEntry(&search)) {
 	    Tcl_AppendElement(interp,
-		    Tcl_GetHashKey(&textPtr->markTable, hPtr), 0);
+		    Tcl_GetHashKey(&textPtr->markTable, hPtr));
 	}
     } else if ((c == 's') && (strncmp(argv[2], "set", length) == 0)) {
 	if (argc != 5) {

@@ -3,18 +3,29 @@
  *
  *	This file contains the Tk_ConfigureWidget procedure.
  *
- * Copyright 1990-1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkConfig.c,v 1.1 1993/08/09 01:20:48 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkConfig.c,v 1.2 1993/12/27 07:33:58 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "tkConfig.h"
@@ -41,8 +52,9 @@ static int		DoConfig _ANSI_ARGS_((Tcl_Interp *interp,
 static Tk_ConfigSpec *	FindConfigSpec _ANSI_ARGS_ ((Tcl_Interp *interp,
 			    Tk_ConfigSpec *specs, char *argvName,
 			    int needFlags, int hateFlags));
-static char *		FormatConfigInfo _ANSI_ARGS_ ((Tk_Window tkwin,
-			    Tk_ConfigSpec *specPtr, char *widgRec));
+static char *		FormatConfigInfo _ANSI_ARGS_ ((Tcl_Interp *interp,
+			    Tk_Window tkwin, Tk_ConfigSpec *specPtr,
+			    char *widgRec));
 
 /*
  *--------------------------------------------------------------
@@ -623,7 +635,7 @@ Tk_ConfigureInfo(interp, tkwin, specs, widgRec, argvName, flags)
 	if (specPtr == NULL) {
 	    return TCL_ERROR;
 	}
-	interp->result = FormatConfigInfo(tkwin, specPtr, widgRec);
+	interp->result = FormatConfigInfo(interp, tkwin, specPtr, widgRec);
 	interp->freeProc = TCL_DYNAMIC;
 	return TCL_OK;
     }
@@ -644,7 +656,7 @@ Tk_ConfigureInfo(interp, tkwin, specs, widgRec, argvName, flags)
 	if (specPtr->argvName == NULL) {
 	    continue;
 	}
-	list = FormatConfigInfo(tkwin, specPtr, widgRec);
+	list = FormatConfigInfo(interp, tkwin, specPtr, widgRec);
 	Tcl_AppendResult(interp, leader, list, "}", (char *) NULL);
 	ckfree(list);
 	leader = " {";
@@ -671,7 +683,9 @@ Tk_ConfigureInfo(interp, tkwin, specs, widgRec, argvName, flags)
  */
 
 static char *
-FormatConfigInfo(tkwin, specPtr, widgRec)
+FormatConfigInfo(interp, tkwin, specPtr, widgRec)
+    Tcl_Interp *interp;			/* Interpreter to use for things
+					 * like floating-point precision. */
     Tk_Window tkwin;			/* Window corresponding to widget. */
     register Tk_ConfigSpec *specPtr;	/* Pointer to information describing
 					 * option. */
@@ -704,7 +718,7 @@ FormatConfigInfo(tkwin, specPtr, widgRec)
 	    argv[4] = buffer;
 	    break;
 	case TK_CONFIG_DOUBLE:
-	    sprintf(buffer, "%g", *((double *) ptr));
+	    Tcl_PrintDouble(interp, *((double *) ptr), buffer);
 	    argv[4] = buffer;
 	    break;
 	case TK_CONFIG_STRING:
@@ -773,7 +787,7 @@ FormatConfigInfo(tkwin, specPtr, widgRec)
 	    argv[4] = buffer;
 	    break;
 	case TK_CONFIG_MM:
-	    sprintf(buffer, "%gm", *((double *) ptr));
+	    Tcl_PrintDouble(interp, *((double *) ptr), buffer);
 	    argv[4] = buffer;
 	    break;
 	case TK_CONFIG_WINDOW: {
@@ -814,4 +828,83 @@ FormatConfigInfo(tkwin, specPtr, widgRec)
 	}
     }
     return result;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tk_FreeOptions --
+ *
+ *	Free up all resources associated with configuration options.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	Any resource in widgRec that is controlled by a configuration
+ *	option (e.g. a Tk_3DBorder or XColor) is freed in the appropriate
+ *	fashion.
+ *
+ *----------------------------------------------------------------------
+ */
+
+	/* ARGSUSED */
+void
+Tk_FreeOptions(specs, widgRec, display, needFlags)
+    Tk_ConfigSpec *specs;	/* Describes legal options. */
+    char *widgRec;		/* Record whose fields contain current
+				 * values for options. */
+    Display *display;		/* X display; needed for freeing some
+				 * resources. */
+    int needFlags;		/* Used to specify additional flags
+				 * that must be present in config specs
+				 * for them to be considered. */
+{
+    register Tk_ConfigSpec *specPtr;
+    char *ptr;
+
+    for (specPtr = specs; specPtr->type != TK_CONFIG_END; specPtr++) {
+	if ((specPtr->specFlags & needFlags) != needFlags) {
+	    continue;
+	}
+	ptr = widgRec + specPtr->offset;
+	switch (specPtr->type) {
+	    case TK_CONFIG_STRING:
+		if (*((char **) ptr) != NULL) {
+		    ckfree(*((char **) ptr));
+		    *((char **) ptr) = NULL;
+		}
+		break;
+	    case TK_CONFIG_COLOR:
+		if (*((XColor **) ptr) != NULL) {
+		    Tk_FreeColor(*((XColor **) ptr));
+		    *((XColor **) ptr) = NULL;
+		}
+		break;
+	    case TK_CONFIG_FONT:
+		if (*((XFontStruct **) ptr) != NULL) {
+		    Tk_FreeFontStruct(*((XFontStruct **) ptr));
+		    *((XFontStruct **) ptr) = NULL;
+		}
+		break;
+	    case TK_CONFIG_BITMAP:
+		if (*((Pixmap *) ptr) != None) {
+		    Tk_FreeBitmap(display, *((Pixmap *) ptr));
+		    *((Pixmap *) ptr) = None;
+		}
+		break;
+	    case TK_CONFIG_BORDER:
+		if (*((Tk_3DBorder *) ptr) != NULL) {
+		    Tk_Free3DBorder(*((Tk_3DBorder *) ptr));
+		    *((Tk_3DBorder *) ptr) = NULL;
+		}
+		break;
+	    case TK_CONFIG_CURSOR:
+	    case TK_CONFIG_ACTIVE_CURSOR:
+		if (*((Cursor *) ptr) != None) {
+		    Tk_FreeCursor(display, *((Cursor *) ptr));
+		    *((Cursor *) ptr) = None;
+		}
+	}
+    }
 }

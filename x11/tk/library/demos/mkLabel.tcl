@@ -14,20 +14,21 @@ proc mkLabel {{w .l1}} {
     wm iconname $w "Labels"
     message $w.msg -font -Adobe-times-medium-r-normal--*-180* -aspect 300 \
 	    -text "Five labels are displayed below: three textual ones on the left, and a bitmap label and a text label on the right.  Labels are pretty boring because you can't do anything with them.  Click the \"OK\" button when you've seen enough."
-    frame $w.frame -borderwidth 10
-    pack append $w.frame \
-	[frame $w.frame.right -borderwidth 10] {right} \
-	[label $w.frame.l1 -text "First label"] {top frame w pady 4 expand} \
-	[label $w.frame.l2 -text "Second label, raised just for fun" \
-	    -relief raised] {top frame w pady 4 expand} \
-	[label $w.frame.l3 -text "Third label, sunken" -relief sunken ] \
-	    {top frame w pady 4 expand}
-    pack append $w.frame.right \
-	[label $w.frame.right.bitmap -bitmap @$tk_library/demos/bitmaps/face \
-	    -borderwidth 2 -relief sunken] top \
-	[label $w.frame.right.caption -text "Tcl/Tk Proprietor"] bottom
+    frame $w.left
+    frame $w.right
     button $w.ok -text OK -command "destroy $w"
+    pack $w.msg -side top
+    pack $w.ok -side bottom -fill x
+    pack $w.left $w.right -side left -expand yes -padx 10 -pady 10 -fill both
 
-    pack append $w $w.msg {top frame c} $w.frame {top expand fill} \
-	    $w.ok {bottom fill}
+    label $w.left.l1 -text "First label"
+    label $w.left.l2 -text "Second label, raised just for fun" -relief raised
+    label $w.left.l3 -text "Third label, sunken" -relief sunken
+    pack $w.left.l1 $w.left.l2 $w.left.l3 \
+	    -side top -expand yes -pady 2 -anchor w
+
+    label $w.right.bitmap -bitmap @$tk_library/demos/bitmaps/face \
+	    -borderwidth 2 -relief sunken
+    label $w.right.caption -text "Tcl/Tk Proprietor"
+    pack $w.right.bitmap $w.right.caption -side top
 }

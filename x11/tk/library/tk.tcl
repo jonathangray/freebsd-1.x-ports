@@ -3,32 +3,43 @@
 # Initialization script normally executed in the interpreter for each
 # Tk-based application.  Arranges class bindings for widgets.
 #
-# $Header: /a/cvs/386BSD/ports/x11/tk/library/tk.tcl,v 1.1 1993/08/09 01:21:08 jkh Exp $ SPRITE (Berkeley)
+# $Header: /a/cvs/386BSD/ports/x11/tk/library/tk.tcl,v 1.2 1993/12/27 07:37:30 rich Exp $ SPRITE (Berkeley)
 #
-# Copyright 1992 Regents of the University of California
-# Permission to use, copy, modify, and distribute this
-# software and its documentation for any purpose and without
-# fee is hereby granted, provided that this copyright
-# notice appears in all copies.  The University of California
-# makes no representations about the suitability of this
-# software for any purpose.  It is provided "as is" without
-# express or implied warranty.
+# Copyright (c) 1992-1993 The Regents of the University of California.
+# All rights reserved.
+#
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the
+# above copyright notice and the following two paragraphs appear in
+# all copies of this software.
+#
+# IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+# OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+# CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+# AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+# ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+# PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
 # Insist on running with compatible versions of Tcl and Tk.
 
 scan [info tclversion] "%d.%d" a b
-if {($a != 6) || ($b < 5)} {
-    error "wrong version of Tcl loaded ([info tclversion]): need 6.5 or later"
+if {$a != 7} {
+    error "wrong version of Tcl loaded ([info tclversion]): need 7.x"
 }
 scan $tk_version "%d.%d" a b
-if {($a != 3) || ($b < 1)} {
-    error "wrong version of Tk loaded ($tk_version): need 3.1 or later"
+if {($a != 3) || ($b < 4)} {
+    error "wrong version of Tk loaded ($tk_version): need 3.4 or later"
 }
+unset a b
 
-# Initialize the auto-load path to include Tk's directory as well as
-# Tcl's directory:
+# Add Tk's directory to the end of the auto-load search path:
 
-set auto_path "$tk_library [info library]"
+lappend auto_path $tk_library
 
 # Turn off strict Motif look and feel as a default.
 
@@ -36,9 +47,10 @@ set tk_strictMotif 0
 
 # ----------------------------------------------------------------------
 # Class bindings for various flavors of button widgets.  $tk_priv(window)
-# keeps track of the button containing the mouse, and $tk_priv(relief)
-# saves the original relief of the button so it can be restored when
-# the mouse button is released.
+# keeps track of the button containing the mouse $tk_priv(relief) saves
+# the original relief of the button so it can be restored when the mouse
+# button is released, and $tk_priv(buttonWindow) keeps track of the
+# window in which the mouse button was pressed.
 # ----------------------------------------------------------------------
 
 bind Button <Any-Enter> {tk_butEnter %W}
@@ -177,9 +189,17 @@ bind Menubutton <Any-ButtonRelease-1> {
     }
 }
 
+# The binding below is trickier than it looks.  It's important to check
+# to see that another menu is posted in the "if" statement below.
+# The check is needed because some window managers (e.g. mwm in
+# click-to-focus mode) cause a button-press event to be preceded by
+# a B1-Enter event;  we don't want to process that B1-Enter event (if
+# we do, the grab may get mis-set so that the menu is non-responsive).
+
 bind Menubutton <B1-Enter> {
     set tk_priv(inMenuButton) %W
-    if {[lindex [%W config -state] 4] != "disabled"} {
+    if {([lindex [%W config -state] 4] != "disabled")
+	    && ($tk_priv(posted) != "")} {
 	if {!$tk_strictMotif} {
 	    %W config -state active
 	}
@@ -209,7 +229,16 @@ bind Menubutton <ButtonRelease-2> {set tk_priv(dragging) ""}
 
 bind Menu <Any-Enter> {set tk_priv(window) %W; %W activate @%y}
 bind Menu <Any-Leave> {set tk_priv(window) {}; %W activate none}
-bind Menu <Any-Motion> {%W activate @%y}
+bind Menu <Any-Motion> {
+    if {$tk_priv(window) == "%W"} {
+	%W activate @%y
+    }
+}
+bind Menu <1> {
+    if {$tk_priv(grab) != ""} {
+	grab $tk_priv(grab)
+    }
+}
 bind Menu <ButtonRelease-1> {tk_invokeMenu %W}
 bind Menu <2> {set tk_priv(x) %x; set tk_priv(y) %y}
 bind Menu <B2-Motion> {
@@ -276,6 +305,7 @@ tk_bindForTraversal Text
 # Initialize the elements of tk_priv that require initialization.
 
 set tk_priv(buttons) 0
+set tk_priv(buttonWindow) {}
 set tk_priv(dragging) {}
 set tk_priv(focus) {}
 set tk_priv(grab) {}

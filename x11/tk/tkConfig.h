@@ -5,16 +5,27 @@
  *	information that may be configuration-dependent, such as
  *	#includes for system include files and a few other things.
  *
- * Copyright 1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that this copyright
- * notice appears in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1991-1993 The Regents of the University of California.
+ * All rights reserved.
  *
- * $Header: /a/cvs/386BSD/ports/x11/tk/tkConfig.h,v 1.1 1993/08/09 01:20:56 jkh Exp $ SPRITE (Berkeley)
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+ *
+ * $Header: /a/cvs/386BSD/ports/x11/tk/tkConfig.h,v 1.2 1993/12/27 07:33:59 rich Exp $ SPRITE (Berkeley)
  */
 
 #ifndef _TKCONFIG
@@ -40,17 +51,26 @@
 #include <fcntl.h>
 #include <math.h>
 #include <pwd.h>
-#include <stdlib.h>
+#ifdef NO_STDLIB_H
+#   include "compat/stdlib.h"
+#else
+#   include <stdlib.h>
+#endif
 #include <string.h>
 #include <sys/types.h>
 #include <sys/file.h>
+#ifdef HAVE_SYS_SELECT_H
+#   include <sys/select.h>
+#endif
 #include <sys/stat.h>
 #include <sys/time.h>
 #ifndef _TCL
 #   include <tcl.h>
 #endif
-#ifndef _TCLHASH
-#   include <tclHash.h>
+#ifdef HAVE_UNISTD_H
+#   include <unistd.h>
+#else
+#   include "compat/unistd.h"
 #endif
 #include <X11/Xlib.h>
 #include <X11/cursorfont.h>
@@ -59,20 +79,6 @@
 #include <X11/Xproto.h>
 #include <X11/Xresource.h>
 #include <X11/Xutil.h>
-
-/*
- * Macro to use instead of "void" for arguments that must have
- * type "void *" in ANSI C;  maps them to type "char *" in
- * non-ANSI systems.
- */
-
-#ifndef VOID
-#   ifdef __STDC__
-#       define VOID void
-#   else
-#       define VOID char
-#   endif
-#endif
 
 /*
  * Not all systems declare the errno variable in errno.h. so this
@@ -94,9 +100,12 @@ extern int errno;
  * select:
  */
 
-#if (defined(sun) && !defined(sprite)) || defined(linux)
+#ifndef NO_FD_SET
 #   define SELECT_MASK fd_set
 #else
+#   ifndef _AIX
+	typedef long fd_mask;
+#   endif
 #   if defined(_IBMR2)
 #	define SELECT_MASK void
 #   else
@@ -105,21 +114,52 @@ extern int errno;
 #endif
 
 /*
- * Declarations for various library procedures that aren't declared
- * in a header file.
+ * Define "NBBY" (number of bits per byte) if it's not already defined.
  */
 
-extern int		close _ANSI_ARGS_((int fd));
-extern int		gettimeofday _ANSI_ARGS_((struct timeval *tp,
-			    struct timezone *tzp));
-extern uid_t		getuid _ANSI_ARGS_((void));
-#if !(defined(_CRAY) || defined(sparc) || defined(_IBMR2))
-extern int		open _ANSI_ARGS_((CONST char *path, int flags, ...));
+#ifndef NBBY
+#   define NBBY 8
 #endif
-extern void		panic _ANSI_ARGS_(VARARGS);
-extern int		read _ANSI_ARGS_((int fd, char *buf, int numBytes));
+
+/*
+ * The following macro defines the number of fd_masks in an fd_set:
+ */
+
+#if !defined(howmany)
+#   define howmany(x, y) (((x)+((y)-1))/(y))
+#endif
+#ifdef NFDBITS
+#   define MASK_SIZE howmany(FD_SETSIZE, NFDBITS)
+#else
+#   define MASK_SIZE howmany(OPEN_MAX, NBBY*sizeof(fd_mask))
+#endif
+
+/*
+ * Substitute Tcl's own versions for several system calls.  The
+ * Tcl versions retry automatically if interrupted by signals.
+ */
+
+#define open(a,b,c) TclOpen(a,b,c)
+#define read(a,b,c) TclRead(a,b,c)
+#define waitpid(a,b,c) TclWaitpid(a,b,c)
+#define write(a,b,c) TclWrite(a,b,c)
+EXTERN int	TclOpen _ANSI_ARGS_((char *path, int oflag, mode_t mode));
+EXTERN int	TclRead _ANSI_ARGS_((int fd, VOID *buf,
+		    unsigned int numBytes));
+EXTERN int	TclWaitpid _ANSI_ARGS_((pid_t pid, int *statPtr, int options));
+EXTERN int	TclWrite _ANSI_ARGS_((int fd, VOID *buf,
+		    unsigned int numBytes));
+
+/*
+ * Declarations for various library procedures that may not be declared
+ * in any other header file.
+ */
+
+extern void		panic();
+#ifndef HAVE_SYS_SELECT_H
 extern int		select _ANSI_ARGS_((int nfds, SELECT_MASK *readfds,
 			    SELECT_MASK *writefds, SELECT_MASK *exceptfds,
 			    struct timeval *timeout));
+#endif
 
 #endif /* _TKCONFIG */

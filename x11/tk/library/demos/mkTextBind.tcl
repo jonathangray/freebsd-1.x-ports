@@ -17,7 +17,9 @@ proc mkTextBind {{w .bindings}} {
 	    -width 60 -height 28 \
 	    -font "-Adobe-Helvetica-Bold-R-Normal-*-120-*"
     scrollbar $w.s -relief flat -command "$w.t yview"
-    pack append $w $w.ok {bottom fillx} $w.s {right filly} $w.t {expand fill}
+    pack $w.ok -side bottom -fill x
+    pack $w.s -side right -fill y
+    pack $w.t -expand yes -fill both
 
     # Set up display styles
 

@@ -3,18 +3,29 @@
  *
  *	This file implements text items for canvas widgets.
  *
- * Copyright 1991-1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1991-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkCanvText.c,v 1.1 1993/08/09 01:20:54 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkCanvText.c,v 1.2 1993/12/27 07:33:48 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include <stdio.h>
@@ -210,8 +221,8 @@ CreateText(canvasPtr, itemPtr, argc, argv)
 
     if (argc < 2) {
 	Tcl_AppendResult(canvasPtr->interp, "wrong # args:  should be \"",
-		Tk_PathName(canvasPtr->tkwin),
-		"\" create text x y [options]", (char *) NULL);
+		Tk_PathName(canvasPtr->tkwin), "\" create ",
+		itemPtr->typePtr->name, " x y [options]", (char *) NULL);
 	return TCL_ERROR;
     }
 
@@ -221,9 +232,11 @@ CreateText(canvasPtr, itemPtr, argc, argv)
      */
 
     textPtr->text = NULL;
+    textPtr->numChars = 0;
     textPtr->anchor = TK_ANCHOR_CENTER;
     textPtr->width = 0;
     textPtr->justify = TK_JUSTIFY_LEFT;
+    textPtr->rightEdge = 0;
     textPtr->fontPtr = NULL;
     textPtr->color = NULL;
     textPtr->stipple = None;
@@ -278,9 +291,12 @@ TextCoords(canvasPtr, itemPtr, argc, argv)
 					 * x2, y2, ... */
 {
     register TextItem *textPtr = (TextItem *) itemPtr;
+    char x[TCL_DOUBLE_SPACE], y[TCL_DOUBLE_SPACE];
 
     if (argc == 0) {
-	sprintf(canvasPtr->interp->result, "%g %g", textPtr->x, textPtr->y);
+	Tcl_PrintDouble(canvasPtr->interp, textPtr->x, x);
+	Tcl_PrintDouble(canvasPtr->interp, textPtr->y, y);
+	Tcl_AppendResult(canvasPtr->interp, x, " ", y, (char *) NULL);
     } else if (argc == 2) {
 	if ((TkGetCanvasCoord(canvasPtr, argv[0], &textPtr->x) != TCL_OK)
 		|| (TkGetCanvasCoord(canvasPtr, argv[1],
@@ -510,7 +526,7 @@ ComputeTextBbox(canvasPtr, textPtr)
 	 * displayed when it is in the middle of a multi-space.
 	 */
 
-	if (isspace(*p)) {
+	if (isspace(UCHAR(*p))) {
 	    p++;
 	} else if (*p == 0) {
 	    /*
@@ -607,10 +623,9 @@ ComputeTextBbox(canvasPtr, textPtr)
 		break;
 	}
 	linePtr->y = y + textPtr->fontPtr->ascent;
-	linePtr->x1 = linePtr->x - maxBoundsPtr->lbearing;
+	linePtr->x1 = linePtr->x + maxBoundsPtr->lbearing;
 	linePtr->y1 = y;
-	linePtr->x2 = linePtr->x + linePixels[i] + maxBoundsPtr->rbearing
-		- textPtr->fontPtr->min_bounds.rbearing;
+	linePtr->x2 = linePtr->x + linePixels[i];
 	linePtr->y2 = linePtr->y + textPtr->fontPtr->descent - 1;
     }
 
@@ -635,7 +650,7 @@ ComputeTextBbox(canvasPtr, textPtr)
 	}
     }
 
-    fudge = canvasPtr->insertWidth/2;
+    fudge = (canvasPtr->insertWidth+1)/2;
     if (canvasPtr->selBorderWidth > fudge) {
 	fudge = canvasPtr->selBorderWidth;
     }
@@ -677,6 +692,18 @@ DisplayText(canvasPtr, itemPtr, drawable)
     if (textPtr->gc == None) {
 	return;
     }
+
+    /*
+     * If we're stippling, then modify the stipple offset in the GC.  Be
+     * sure to reset the offset when done, since the GC is supposed to be
+     * read-only.
+     */
+
+    if (textPtr->stipple != None) {
+	XSetTSOrigin(display, textPtr->gc,
+		-canvasPtr->drawableXOrigin, -canvasPtr->drawableYOrigin);
+    }
+
     focusHere = (canvasPtr->focusItemPtr == itemPtr) &&
 	    (canvasPtr->flags & GOT_FOCUS);
     for (linePtr = textPtr->linePtr, i = textPtr->numLines;
@@ -804,6 +831,9 @@ DisplayText(canvasPtr, itemPtr, drawable)
 		    afterSelect, selEndX - canvasPtr->drawableXOrigin,
 		    linePtr->y - canvasPtr->drawableYOrigin, 0);
 	}
+    }
+    if (textPtr->stipple != None) {
+	XSetTSOrigin(display, textPtr->gc, 0, 0);
     }
 }
 
@@ -1432,7 +1462,8 @@ TextToPostscript(canvasPtr, itemPtr, psInfoPtr)
     if (TkCanvPsColor(canvasPtr, psInfoPtr, textPtr->color) != TCL_OK) {
 	return TCL_ERROR;
     }
-    sprintf(buffer, "%g %g [\n", textPtr->x, TkCanvPsY(psInfoPtr, textPtr->y));
+    sprintf(buffer, "%.15g %.15g [\n", textPtr->x,
+	    TkCanvPsY(psInfoPtr, textPtr->y));
     Tcl_AppendResult(canvasPtr->interp, buffer, (char *) NULL);
     for (i = textPtr->numLines, linePtr = textPtr->linePtr;
 	    i > 0; i--, linePtr++) {
@@ -1500,7 +1531,13 @@ LineToPostscript(interp, string, numChars)
 	c = (*string) & 0xff;
 	if ((c == '(') || (c == ')') || (c == '\\') || (c < 0x20)
 		|| (c >= 0x7f)) {
-	    sprintf(buffer+used, "\\%o", c);
+	    /*
+	     * Tricky point:  the "03" is necessary in the sprintf below,
+	     * so that a full three digits of octal are always generated.
+	     * Without the "03", a number following this sequence could
+	     * be interpreted by Postscript as part of this sequence.
+	     */
+	    sprintf(buffer+used, "\\%03o", c);
 	    used += strlen(buffer+used);
 	} else {
 	    buffer[used] = c;

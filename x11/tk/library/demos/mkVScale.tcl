@@ -14,19 +14,20 @@ proc mkVScale {{w .scale1}} {
     message $w.msg -font -Adobe-times-medium-r-normal--*-180* -aspect 300 \
 	    -text "A bar and a vertical scale are displayed below.  If you click or drag mouse button 1 in the scale, you can change the height of the bar.  Click the \"OK\" button when you're finished."
     frame $w.frame -borderwidth 10
-    pack append $w.frame \
-	[scale $w.frame.scale -orient vertical -length 280 -from 0 -to 250 \
-	    -command "setHeight $w.frame.right.inner" -tickinterval 50 \
-	    -bg Bisque1] {left expand frame ne} \
-	[frame $w.frame.right -borderwidth 15] {right expand frame nw}
-    pack append $w.frame.right \
-	[frame $w.frame.right.inner -geometry 40x20 -relief raised \
-	    -borderwidth 2 -bg SteelBlue1] {expand frame nw}
-    $w.frame.scale set 20
     button $w.ok -text OK -command "destroy $w"
+    pack $w.msg $w.frame $w.ok
 
-    pack append $w $w.msg {top fill} $w.frame {top expand fill} \
-	$w.ok {bottom fill}
+    scale $w.frame.scale -orient vertical -length 280 -from 0 -to 250 \
+	    -command "setHeight $w.frame.right.inner" -tickinterval 50 \
+	    -bg Bisque1
+    frame $w.frame.right -borderwidth 15
+    pack $w.frame.scale -side left -anchor ne
+    pack $w.frame.right -side left -anchor nw
+    $w.frame.scale set 20
+
+    frame $w.frame.right.inner -geometry 40x20 -relief raised \
+	    -borderwidth 2 -bg SteelBlue1
+    pack $w.frame.right.inner -expand yes -anchor nw
 }
 
 proc setHeight {w height} {

@@ -5,18 +5,29 @@
  *	toolkit.  An entry displays a string and allows
  *	the string to be edited.
  *
- * Copyright 1990 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkEntry.c,v 1.1 1993/08/09 01:20:47 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkEntry.c,v 1.2 1993/12/27 07:34:02 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "default.h"
@@ -77,8 +88,8 @@ typedef struct {
     int avgWidth;		/* Width of average character. */
     int prefWidth;		/* Desired width of window, measured in
 				 * average characters. */
-    int offset;			/* 0 if window is flat, or borderWidth if
-				 * raised or sunken. */
+    int offset;			/* XPAD if window is flat, or borderWidth+XPAD
+				 * if raised or sunken. */
     int leftIndex;		/* Index of left-most character visible in
 				 * window. */
     int insertPos;		/* Index of character before which next
@@ -132,12 +143,23 @@ typedef struct {
  *				present.  0 means it isn't displayed.
  * GOT_FOCUS:			Non-zero means this window has the input
  *				focus.
+ * UPDATE_SCROLLBAR:		Non-zero means scrollbar should be updated
+ *				during next redisplay operation.
  */
 
 #define REDRAW_PENDING		1
 #define BORDER_NEEDED		2
 #define CURSOR_ON		4
 #define GOT_FOCUS		8
+#define UPDATE_SCROLLBAR	16
+
+/*
+ * The following macro defines how many extra pixels to leave on each
+ * side of the text in the entry.
+ */
+
+#define XPAD 1
+#define YPAD 1
 
 /*
  * Information used for argv parsing.
@@ -184,7 +206,8 @@ static Tk_ConfigSpec configSpecs[] = {
     {TK_CONFIG_RELIEF, "-relief", "relief", "Relief",
 	DEF_ENTRY_RELIEF, Tk_Offset(Entry, relief), 0},
     {TK_CONFIG_STRING, "-scrollcommand", "scrollCommand", "ScrollCommand",
-	DEF_ENTRY_SCROLL_COMMAND, Tk_Offset(Entry, scrollCmd), 0},
+	DEF_ENTRY_SCROLL_COMMAND, Tk_Offset(Entry, scrollCmd),
+	TK_CONFIG_NULL_OK},
     {TK_CONFIG_BORDER, "-selectbackground", "selectBackground", "Foreground",
 	DEF_ENTRY_SELECT_COLOR, Tk_Offset(Entry, selBorder),
 	TK_CONFIG_COLOR_ONLY},
@@ -315,14 +338,24 @@ Tk_EntryCmd(clientData, interp, argc, argv)
     entryPtr->textVarName = NULL;
     entryPtr->state = tkNormalUid;
     entryPtr->normalBorder = NULL;
+    entryPtr->borderWidth = 0;
+    entryPtr->relief = TK_RELIEF_FLAT;
     entryPtr->fontPtr = NULL;
     entryPtr->fgColorPtr = NULL;
     entryPtr->textGC = None;
     entryPtr->selBorder = NULL;
+    entryPtr->selBorderWidth = 0;
     entryPtr->selFgColorPtr = NULL;
-    entryPtr->selTextGC = NULL;
+    entryPtr->selTextGC = None;
     entryPtr->insertBorder = NULL;
+    entryPtr->insertWidth = 0;
+    entryPtr->insertBorderWidth = 0;
+    entryPtr->insertOnTime = 0;
+    entryPtr->insertOffTime = 0;
     entryPtr->insertBlinkHandler = (Tk_TimerToken) NULL;
+    entryPtr->avgWidth = 1;
+    entryPtr->prefWidth = 0;
+    entryPtr->offset = XPAD;
     entryPtr->leftIndex = 0;
     entryPtr->insertPos = 0;
     entryPtr->selectFirst = -1;
@@ -330,6 +363,7 @@ Tk_EntryCmd(clientData, interp, argc, argv)
     entryPtr->selectAnchor = 0;
     entryPtr->exportSelection = 1;
     entryPtr->scanMarkX = 0;
+    entryPtr->scanMarkIndex = 0;
     entryPtr->cursor = None;
     entryPtr->scrollCmd = NULL;
     entryPtr->flags = 0;
@@ -578,8 +612,8 @@ EntryWidgetCmd(clientData, interp, argc, argv)
 	    index = entryPtr->numChars;
 	}
 	entryPtr->leftIndex = index;
+	entryPtr->flags |= UPDATE_SCROLLBAR;
 	EventuallyRedraw(entryPtr);
-	EntryUpdateScrollbar(entryPtr);
     } else {
 	Tcl_AppendResult(interp, "bad option \"", argv[1],
 		"\": must be configure, delete, get, icursor, index, ",
@@ -619,44 +653,26 @@ DestroyEntry(clientData)
 {
     register Entry *entryPtr = (Entry *) clientData;
 
+    /*
+     * Free up all the stuff that requires special handling, then
+     * let Tk_FreeOptions handle all the standard option-related
+     * stuff.
+     */
+
     ckfree(entryPtr->string);
-    if (entryPtr->normalBorder != NULL) {
-	Tk_Free3DBorder(entryPtr->normalBorder);
-    }
     if (entryPtr->textVarName != NULL) {
 	Tcl_UntraceVar(entryPtr->interp, entryPtr->textVarName,
 		TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		EntryTextVarProc, (ClientData) entryPtr);
-	ckfree(entryPtr->textVarName);
-    }
-    if (entryPtr->fontPtr != NULL) {
-	Tk_FreeFontStruct(entryPtr->fontPtr);
-    }
-    if (entryPtr->fgColorPtr != NULL) {
-	Tk_FreeColor(entryPtr->fgColorPtr);
     }
     if (entryPtr->textGC != None) {
 	Tk_FreeGC(entryPtr->display, entryPtr->textGC);
     }
-    if (entryPtr->selBorder != NULL) {
-	Tk_Free3DBorder(entryPtr->selBorder);
-    }
-    if (entryPtr->selFgColorPtr != NULL) {
-	Tk_FreeColor(entryPtr->selFgColorPtr);
-    }
     if (entryPtr->selTextGC != None) {
 	Tk_FreeGC(entryPtr->display, entryPtr->selTextGC);
     }
-    if (entryPtr->insertBorder != NULL) {
-	Tk_Free3DBorder(entryPtr->insertBorder);
-    }
     Tk_DeleteTimerHandler(entryPtr->insertBlinkHandler);
-    if (entryPtr->cursor != None) {
-	Tk_FreeCursor(entryPtr->display, entryPtr->cursor);
-    }
-    if (entryPtr->scrollCmd != NULL) {
-        ckfree(entryPtr->scrollCmd);
-    }
+    Tk_FreeOptions(configSpecs, (char *) entryPtr, entryPtr->display, 0);
     ckfree((char *) entryPtr);
 }
 
@@ -800,17 +816,18 @@ ConfigureEntry(interp, entryPtr, argc, argv, flags)
 
     fontHeight = entryPtr->fontPtr->ascent + entryPtr->fontPtr->descent;
     entryPtr->avgWidth = XTextWidth(entryPtr->fontPtr, "0", 1);
-    width = entryPtr->prefWidth*entryPtr->avgWidth + (15*fontHeight)/10;
-    height = fontHeight + 2*entryPtr->borderWidth + 2;
+    width = entryPtr->prefWidth*entryPtr->avgWidth + 2*entryPtr->borderWidth
+	    + 2*XPAD;
+    height = fontHeight + 2*entryPtr->borderWidth + 2*YPAD;
     Tk_GeometryRequest(entryPtr->tkwin, width, height);
     Tk_SetInternalBorder(entryPtr->tkwin, entryPtr->borderWidth);
     if (entryPtr->relief != TK_RELIEF_FLAT) {
-	entryPtr->offset = entryPtr->borderWidth;
+	entryPtr->offset = entryPtr->borderWidth + XPAD;
     } else {
-	entryPtr->offset = 0;
+	entryPtr->offset = XPAD;
     }
+    entryPtr->flags |= UPDATE_SCROLLBAR;
     EventuallyRedraw(entryPtr);
-    EntryUpdateScrollbar(entryPtr);
     return TCL_OK;
 }
 
@@ -843,6 +860,14 @@ DisplayEntry(clientData)
     entryPtr->flags &= ~REDRAW_PENDING;
     if ((entryPtr->tkwin == NULL) || !Tk_IsMapped(tkwin)) {
 	return;
+    }
+
+    /*
+     * Update the scrollbar if that's needed.
+     */
+
+    if (entryPtr->flags & UPDATE_SCROLLBAR) {
+	EntryUpdateScrollbar(entryPtr);
     }
 
     /*
@@ -886,7 +911,7 @@ DisplayEntry(clientData)
 		    xBound, TK_PARTIAL_OK|TK_NEWLINES_NOT_SPECIAL, &selStartX);
 	    index = entryPtr->selectFirst;
 	}
-	if (selStartX < xBound) {
+	if ((selStartX - entryPtr->selBorderWidth) < xBound) {
 	    (void) TkMeasureChars(entryPtr->fontPtr,
 		    entryPtr->string + index, entryPtr->selectLast +1 - index,
 		    selStartX, xBound, TK_PARTIAL_OK|TK_NEWLINES_NOT_SPECIAL,
@@ -918,20 +943,20 @@ DisplayEntry(clientData)
 	(void) TkMeasureChars(entryPtr->fontPtr,
 		entryPtr->string + entryPtr->leftIndex,
 		entryPtr->insertPos - entryPtr->leftIndex, startX,
-		xBound, TK_PARTIAL_OK|TK_NEWLINES_NOT_SPECIAL, &cursorX);
+		xBound + entryPtr->insertWidth,
+		TK_PARTIAL_OK|TK_NEWLINES_NOT_SPECIAL, &cursorX);
+	cursorX -= (entryPtr->insertWidth)/2;
 	if (cursorX < xBound) {
 	    if (entryPtr->flags & CURSOR_ON) {
 		Tk_Fill3DRectangle(entryPtr->display, pixmap,
-			entryPtr->insertBorder,
-			cursorX - (entryPtr->insertWidth)/2,
+			entryPtr->insertBorder, cursorX,
 			baseY - entryPtr->fontPtr->ascent,
 			entryPtr->insertWidth,
 			entryPtr->fontPtr->ascent + entryPtr->fontPtr->descent,
 			entryPtr->insertBorderWidth, TK_RELIEF_RAISED);
 	    } else if (Tk_GetColorModel(tkwin) != TK_COLOR) {
 		Tk_Fill3DRectangle(entryPtr->display, pixmap,
-			entryPtr->normalBorder,
-			cursorX - (entryPtr->insertWidth)/2,
+			entryPtr->normalBorder, cursorX,
 			baseY - entryPtr->fontPtr->ascent,
 			entryPtr->insertWidth,
 			entryPtr->fontPtr->ascent + entryPtr->fontPtr->descent,
@@ -1066,8 +1091,8 @@ InsertChars(entryPtr, index, string)
 	Tcl_SetVar(entryPtr->interp, entryPtr->textVarName, entryPtr->string,
 		TCL_GLOBAL_ONLY);
     }
+    entryPtr->flags |= UPDATE_SCROLLBAR;
     EventuallyRedraw(entryPtr);
-    EntryUpdateScrollbar(entryPtr);
 }
 
 /*
@@ -1157,8 +1182,8 @@ DeleteChars(entryPtr, index, count)
 	Tcl_SetVar(entryPtr->interp, entryPtr->textVarName, entryPtr->string,
 		TCL_GLOBAL_ONLY);
     }
+    entryPtr->flags |= UPDATE_SCROLLBAR;
     EventuallyRedraw(entryPtr);
-    EntryUpdateScrollbar(entryPtr);
 }
 
 /*
@@ -1193,12 +1218,12 @@ EntrySetValue(entryPtr, value)
     entryPtr->numChars = strlen(value);
     entryPtr->string = (char *) ckalloc((unsigned) (entryPtr->numChars + 1));
     strcpy(entryPtr->string, value);
-    entryPtr->selectFirst = -1;
+    entryPtr->selectFirst = entryPtr->selectLast = -1;
     entryPtr->leftIndex = 0;
     entryPtr->insertPos = entryPtr->numChars;
 
+    entryPtr->flags |= UPDATE_SCROLLBAR;
     EventuallyRedraw(entryPtr);
-    EntryUpdateScrollbar(entryPtr);
 }
 
 /*
@@ -1237,8 +1262,8 @@ EntryEventProc(clientData, eventPtr)
 	Tk_EventuallyFree((ClientData) entryPtr, DestroyEntry);
     } else if (eventPtr->type == ConfigureNotify) {
 	Tk_Preserve((ClientData) entryPtr);
+	entryPtr->flags |= UPDATE_SCROLLBAR;
 	EventuallyRedraw(entryPtr);
-	EntryUpdateScrollbar(entryPtr);
 	Tk_Release((ClientData) entryPtr);
     } else if (eventPtr->type == FocusIn) {
 	EntryFocusProc(entryPtr, 1);
@@ -1329,7 +1354,8 @@ GetEntryIndex(interp, entryPtr, string, indexPtr)
 	    *indexPtr = entryPtr->leftIndex + TkMeasureChars(entryPtr->fontPtr,
 		    entryPtr->string + entryPtr->leftIndex,
 		    entryPtr->numChars - entryPtr->leftIndex,
-		    entryPtr->offset, x, TK_NEWLINES_NOT_SPECIAL, &dummy);
+		    entryPtr->offset, x, TK_NEWLINES_NOT_SPECIAL,
+		    &dummy);
 	}
     } else {
 	if (Tcl_GetInt(interp, string, indexPtr) != TCL_OK) {
@@ -1392,8 +1418,8 @@ EntryScanTo(entryPtr, x)
     } 
     if (newLeftIndex != entryPtr->leftIndex) {
 	entryPtr->leftIndex = newLeftIndex;
+	entryPtr->flags |= UPDATE_SCROLLBAR;
 	EventuallyRedraw(entryPtr);
-	EntryUpdateScrollbar(entryPtr);
     }
 }
 
@@ -1600,7 +1626,7 @@ EventuallyRedraw(entryPtr)
  *
  *	This procedure is invoked whenever information has changed in
  *	an entry in a way that would invalidate a scrollbar display.
- *	If there is an associated scrollbar, then this command updates
+ *	If there is an associated scrollbar, then this procedure updates
  *	it by invoking a Tcl command.
  *
  * Results:
@@ -1648,6 +1674,8 @@ EntryUpdateScrollbar(entryPtr)
     result = Tcl_VarEval(entryPtr->interp, entryPtr->scrollCmd, args,
 	    (char *) NULL);
     if (result != TCL_OK) {
+	Tcl_AddErrorInfo(entryPtr->interp,
+		"\n    (horizontal scrolling command executed by entry)");
 	Tk_BackgroundError(entryPtr->interp);
     }
     Tcl_SetResult(entryPtr->interp, (char *) NULL, TCL_STATIC);

@@ -6,18 +6,29 @@
  *	value;  it also displays numeric labels and a textual label,
  *	if desired.
  *
- * Copyright 1990 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkScale.c,v 1.1 1993/08/09 01:20:51 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkScale.c,v 1.2 1993/12/27 07:34:30 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "tkConfig.h"
@@ -116,6 +127,10 @@ typedef struct {
  * BUTTON_PRESSED -		1 means a button press is in progress, so
  *				slider should appear depressed and should be
  *				draggable.
+ * INVOKE_COMMAND -		1 means the scale's command needs to be
+ *				invoked during the next redisplay (the
+ *				value of the scale has changed since the
+ *				last time the command was invoked).
  */
 
 #define REDRAW_SLIDER		1
@@ -123,6 +138,7 @@ typedef struct {
 #define REDRAW_ALL		3
 #define ACTIVE			4
 #define BUTTON_PRESSED		8
+#define INVOKE_COMMAND		16
 
 /*
  * Space to leave between scale area and text.
@@ -155,7 +171,7 @@ static Tk_ConfigSpec configSpecs[] = {
     {TK_CONFIG_PIXELS, "-borderwidth", "borderWidth", "BorderWidth",
 	DEF_SCALE_BORDER_WIDTH, Tk_Offset(Scale, borderWidth), 0},
     {TK_CONFIG_STRING, "-command", "command", "Command",
-	(char *) NULL, Tk_Offset(Scale, command), 0},
+	DEF_SCALE_COMMAND, Tk_Offset(Scale, command), TK_CONFIG_NULL_OK},
     {TK_CONFIG_ACTIVE_CURSOR, "-cursor", "cursor", "Cursor",
 	DEF_SCALE_CURSOR, Tk_Offset(Scale, cursor), TK_CONFIG_NULL_OK},
     {TK_CONFIG_SYNONYM, "-fg", "foreground", (char *) NULL,
@@ -172,7 +188,7 @@ static Tk_ConfigSpec configSpecs[] = {
     {TK_CONFIG_INT, "-from", "from", "From",
 	DEF_SCALE_FROM, Tk_Offset(Scale, fromValue), 0},
     {TK_CONFIG_STRING, "-label", "label", "Label",
-	DEF_SCALE_LABEL, Tk_Offset(Scale, label), 0},
+	DEF_SCALE_LABEL, Tk_Offset(Scale, label), TK_CONFIG_NULL_OK},
     {TK_CONFIG_PIXELS, "-length", "length", "Length",
 	DEF_SCALE_LENGTH, Tk_Offset(Scale, length), 0},
     {TK_CONFIG_UID, "-orient", "orient", "Orient",
@@ -283,16 +299,33 @@ Tk_ScaleCmd(clientData, interp, argc, argv)
     scalePtr->tkwin = new;
     scalePtr->display = Tk_Display(new);
     scalePtr->interp = interp;
+    scalePtr->orientUid = NULL;
+    scalePtr->vertical = 0;
     scalePtr->value = 0;
+    scalePtr->fromValue = 0;
+    scalePtr->toValue = 0;
+    scalePtr->tickInterval = 0;
     scalePtr->command = NULL;
+    scalePtr->commandLength = 0;
     scalePtr->label = NULL;
+    scalePtr->labelLength = 0;
     scalePtr->state = tkNormalUid;
+    scalePtr->borderWidth = 0;
     scalePtr->bgBorder = NULL;
     scalePtr->sliderBorder = NULL;
     scalePtr->activeBorder = NULL;
     scalePtr->fontPtr = NULL;
     scalePtr->textColorPtr = NULL;
     scalePtr->textGC = None;
+    scalePtr->width = 0;
+    scalePtr->length = 0;
+    scalePtr->relief = TK_RELIEF_FLAT;
+    scalePtr->offset = 0;
+    scalePtr->sliderLength = 0;
+    scalePtr->showValue = 0;
+    scalePtr->tickPixels = 0;
+    scalePtr->valuePixels = 0;
+    scalePtr->labelPixels = 0;
     scalePtr->cursor = None;
     scalePtr->flags = 0;
 
@@ -432,33 +465,16 @@ DestroyScale(clientData)
 {
     register Scale *scalePtr = (Scale *) clientData;
 
-    if (scalePtr->command != NULL) {
-	ckfree(scalePtr->command);
-    }
-    if (scalePtr->label != NULL) {
-	ckfree(scalePtr->label);
-    }
-    if (scalePtr->bgBorder != NULL) {
-	Tk_Free3DBorder(scalePtr->bgBorder);
-    }
-    if (scalePtr->sliderBorder != NULL) {
-	Tk_Free3DBorder(scalePtr->sliderBorder);
-    }
-    if (scalePtr->activeBorder != NULL) {
-	Tk_Free3DBorder(scalePtr->activeBorder);
-    }
-    if (scalePtr->fontPtr != NULL) {
-	Tk_FreeFontStruct(scalePtr->fontPtr);
-    }
-    if (scalePtr->textColorPtr != NULL) {
-	Tk_FreeColor(scalePtr->textColorPtr);
-    }
+    /*
+     * Free up all the stuff that requires special handling, then
+     * let Tk_FreeOptions handle all the standard option-related
+     * stuff.
+     */
+
     if (scalePtr->textGC != None) {
 	Tk_FreeGC(scalePtr->display, scalePtr->textGC);
     }
-    if (scalePtr->cursor != None) {
-	Tk_FreeCursor(scalePtr->display, scalePtr->cursor);
-    }
+    Tk_FreeOptions(configSpecs, (char *) scalePtr, scalePtr->display, 0);
     ckfree((char *) scalePtr);
 }
 
@@ -651,12 +667,12 @@ ComputeScaleGeometry(scalePtr)
     sprintf(valueString, "%d", scalePtr->fromValue);
     XTextExtents(scalePtr->fontPtr, valueString, strlen(valueString),
 	    &dummy, &dummy, &dummy, &bbox);
-    scalePtr->tickPixels = bbox.rbearing + bbox.lbearing;
+    scalePtr->tickPixels = bbox.rbearing - bbox.lbearing;
     sprintf(valueString, "%d", scalePtr->toValue);
     XTextExtents(scalePtr->fontPtr, valueString, strlen(valueString),
 	    &dummy, &dummy, &dummy, &bbox);
-    if (scalePtr->tickPixels < bbox.rbearing + bbox.lbearing) {
-	scalePtr->tickPixels = bbox.rbearing + bbox.lbearing;
+    if (scalePtr->tickPixels < bbox.rbearing - bbox.lbearing) {
+	scalePtr->tickPixels = bbox.rbearing - bbox.lbearing;
     }
 
     /*
@@ -677,7 +693,7 @@ ComputeScaleGeometry(scalePtr)
     } else {
 	XTextExtents(scalePtr->fontPtr, scalePtr->label,
 		scalePtr->labelLength, &dummy, &dummy, &dummy, &bbox);
-	scalePtr->labelPixels = bbox.rbearing + bbox.lbearing
+	scalePtr->labelPixels = bbox.rbearing - bbox.lbearing
 		+ scalePtr->fontPtr->ascent;
     }
     Tk_GeometryRequest(scalePtr->tkwin, 4*scalePtr->borderWidth
@@ -713,12 +729,29 @@ DisplayVerticalScale(clientData)
     register Tk_Window tkwin = scalePtr->tkwin;
     int tickRightEdge, valueRightEdge, labelLeftEdge, scaleLeftEdge;
     int totalPixels, x, y, width, height, shadowWidth, tickValue;
-    int relief;
+    int relief, result;
     Tk_3DBorder sliderBorder;
+    char string[20];
 
     if ((scalePtr->tkwin == NULL) || !Tk_IsMapped(tkwin)) {
 	goto done;
     }
+
+    /*
+     * Invoke the scale's command if needed.
+     */
+
+    if ((scalePtr->flags & INVOKE_COMMAND) && (scalePtr->command != NULL)) {
+	sprintf(string, " %d", scalePtr->value);
+	result = Tcl_VarEval(scalePtr->interp, scalePtr->command, string,
+		(char *) NULL);
+	if (result != TCL_OK) {
+	    Tcl_AddErrorInfo(scalePtr->interp,
+		    "\n    (command executed by scale)");
+	    Tk_BackgroundError(scalePtr->interp);
+	}
+    }
+    scalePtr->flags &= ~INVOKE_COMMAND;
 
     /*
      * Scanning from left to right across the window, the window
@@ -933,12 +966,29 @@ DisplayHorizontalScale(clientData)
     register Tk_Window tkwin = scalePtr->tkwin;
     int tickBottom, valueBottom, labelBottom, scaleBottom;
     int totalPixels, x, y, width, height, shadowWidth, tickValue;
-    int relief;
+    int relief, result;
     Tk_3DBorder sliderBorder;
+    char string[20];
 
     if ((scalePtr->tkwin == NULL) || !Tk_IsMapped(tkwin)) {
 	goto done;
     }
+
+    /*
+     * Invoke the scale's command if needed.
+     */
+
+    if ((scalePtr->flags & INVOKE_COMMAND) && (scalePtr->command != NULL)) {
+	sprintf(string, " %d", scalePtr->value);
+	result = Tcl_VarEval(scalePtr->interp, scalePtr->command, string,
+		(char *) NULL);
+	if (result != TCL_OK) {
+	    Tcl_AddErrorInfo(scalePtr->interp,
+		    "\n    (command executed by scale)");
+	    Tk_BackgroundError(scalePtr->interp);
+	}
+    }
+    scalePtr->flags &= ~INVOKE_COMMAND;
 
     /*
      * Scanning from bottom to top across the window, the window
@@ -1151,6 +1201,7 @@ PixelToValue(scalePtr, x, y)
 					 * window. */
 {
     int value, pixelRange;
+    double dtmp;
 
     if (scalePtr->vertical) {
 	pixelRange = Tk_Height(scalePtr->tkwin) - scalePtr->sliderLength
@@ -1178,15 +1229,19 @@ PixelToValue(scalePtr, x, y)
     if (value > pixelRange) {
 	value = pixelRange;
     }
-    if (scalePtr->toValue > scalePtr->fromValue) {
-	value = scalePtr->fromValue +
-		((value * (scalePtr->toValue - scalePtr->fromValue))
-		+ pixelRange/2)/pixelRange;
+
+    /*
+     * The mathematics below is a bit tricky.  To avoid integer overflow
+     * during the multiplication and division steps, do the arithmetic
+     * using doubles.
+     */
+
+    dtmp = value * ((double) (scalePtr->toValue - scalePtr->fromValue));
+    dtmp = scalePtr->fromValue + dtmp/pixelRange;
+    if (dtmp < 0) {
+	value = dtmp - 0.5;
     } else {
-	value = scalePtr->toValue +
-		(((pixelRange - value)
-		* (scalePtr->fromValue - scalePtr->toValue))
-		+ pixelRange/2)/pixelRange;
+	value = dtmp + 0.5;
     }
     return value;
 }
@@ -1217,6 +1272,7 @@ ValueToPixel(scalePtr, value)
     int value;				/* Reading of the widget. */
 {
     int y, pixelRange, valueRange;
+    double dtmp;
 
     valueRange = scalePtr->toValue - scalePtr->fromValue;
     pixelRange = (scalePtr->vertical ? Tk_Height(scalePtr->tkwin)
@@ -1225,8 +1281,14 @@ ValueToPixel(scalePtr, value)
     if (valueRange == 0) {
 	y = 0;
     } else {
-	y = ((value - scalePtr->fromValue) * pixelRange
-		+ valueRange/2) / valueRange;
+	/*
+	 * Do arithmetic with doubles to avoid integer overflow if the
+	 * scale has a large range.
+	 */
+
+	dtmp = (value - scalePtr->fromValue);
+	dtmp = (dtmp * pixelRange)/valueRange;
+	y = dtmp + 0.5;
 	if (y < 0) {
 	    y = 0;
 	} else if (y > pixelRange) {
@@ -1363,9 +1425,6 @@ SetScaleValue(scalePtr, value)
     int value;			/* New value for scale.  Gets
 				 * adjusted if it's off the scale. */
 {
-    int result;
-    char string[20];
-
     if ((value < scalePtr->fromValue)
 	    ^ (scalePtr->toValue < scalePtr->fromValue)) {
 	value = scalePtr->fromValue;
@@ -1378,14 +1437,8 @@ SetScaleValue(scalePtr, value)
 	return;
     }
     scalePtr->value = value;
+    scalePtr->flags |= INVOKE_COMMAND;
     EventuallyRedrawScale(scalePtr, REDRAW_SLIDER);
-
-    sprintf(string, " %d", scalePtr->value);
-    result = Tcl_VarEval(scalePtr->interp, scalePtr->command, string,
-	    (char *) NULL);
-    if (result != TCL_OK) {
-	Tk_BackgroundError(scalePtr->interp);
-    }
 }
 
 /*

@@ -6,28 +6,46 @@
  *	invoke them) but also maintain the local Tk_Window
  *	structure.
  *
- * Copyright 1989-1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1989-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkWindow.c,v 1.1 1993/08/09 01:20:48 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkWindow.c,v 1.2 1993/12/27 07:34:48 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "tkConfig.h"
 #include "tkInt.h"
+#include "patchlevel.h"
 
 /*
  * Count of number of main windows currently open in this process.
  */
 
 int tk_NumMainWindows;
+
+/*
+ * First in list of all main windows managed by this process.
+ */
+
+TkMainInfo *tkMainWindowList = NULL;
 
 /*
  * List of all displays currently in use.
@@ -109,11 +127,14 @@ TkCmd commands[] = {
     {"after",		Tk_AfterCmd},
     {"bind",		Tk_BindCmd},
     {"destroy",		Tk_DestroyCmd},
+    {"exit",		Tk_ExitCmd},
     {"focus",		Tk_FocusCmd},
     {"grab",		Tk_GrabCmd},
+    {"lower",		Tk_LowerCmd},
     {"option",		Tk_OptionCmd},
     {"pack",		Tk_PackCmd},
     {"place",		Tk_PlaceCmd},
+    {"raise",		Tk_RaiseCmd},
     {"selection",	Tk_SelectionCmd},
     {"tk",		Tk_TkCmd},
     {"tkwait",		Tk_TkwaitCmd},
@@ -156,6 +177,7 @@ static int		NameWindow _ANSI_ARGS_((Tcl_Interp *interp,
 			    char *name));
 static TkWindow	*	NewWindow _ANSI_ARGS_((TkDisplay *dispPtr,
 			    int screenNum, TkWindow *parentPtr));
+static void		UnlinkWindow _ANSI_ARGS_((TkWindow *winPtr));
 
 /*
  *----------------------------------------------------------------------
@@ -297,7 +319,7 @@ GetScreen(interp, screenName, screenPtr)
     length = strlen(screenName);
     screenId = 0;
     p = screenName+length-1;
-    while (isdigit(*p) && (p != screenName)) {
+    while (isdigit(UCHAR(*p)) && (p != screenName)) {
 	p--;
     }
     if ((*p == '.') && (p[1] != '\0')) {
@@ -330,9 +352,13 @@ GetScreen(interp, screenName, screenPtr)
 	    dispPtr->focussedOnEnter = 0;
 	    dispPtr->name[length] = '\0';
 	    dispPtr->bindInfoStale = 1;
+	    dispPtr->numModKeyCodes = 0;
+	    dispPtr->modKeyCodes = NULL;
 	    dispPtr->errorPtr = NULL;
 	    dispPtr->deleteCount = 0;
+	    dispPtr->defaultHandler = NULL;
 	    dispPtr->commWindow = NULL;
+	    dispPtr->serverSecure = 0;
 	    dispPtr->selectionOwner = NULL;
 	    dispPtr->selectionSerial = 0;
 	    dispPtr->multipleAtom = None;
@@ -356,7 +382,7 @@ GetScreen(interp, screenName, screenPtr)
 	    }
 	    tkDisplayList = dispPtr;
 	    Tk_CreateFileHandler(ConnectionNumber(display),
-		    TK_READABLE, (void (*)()) NULL,
+		    TK_READABLE|TK_IS_DISPLAY, (void (*)()) NULL,
 		    (ClientData) display);
 	    break;
 	}
@@ -395,7 +421,7 @@ NewWindow(dispPtr, screenNum, parentPtr)
     TkDisplay *dispPtr;		/* Display associated with new window. */
     int screenNum;		/* Index of screen for new window. */
     TkWindow *parentPtr;	/* Parent from which this window should
-				 * inherit visual inforamtion.  NULL means
+				 * inherit visual information.  NULL means
 				 * use screen defaults instead of
 				 * inheriting. */
 {
@@ -405,7 +431,8 @@ NewWindow(dispPtr, screenNum, parentPtr)
     winPtr->display = dispPtr->display;
     winPtr->dispPtr = dispPtr;
     winPtr->screenNum = screenNum;
-    if (parentPtr != NULL) {
+    if ((parentPtr != NULL) && (parentPtr->display == winPtr->display)
+	    && (parentPtr->screenNum == winPtr->screenNum)) {
 	winPtr->visual = parentPtr->visual;
 	winPtr->depth = parentPtr->depth;
     } else {
@@ -414,6 +441,7 @@ NewWindow(dispPtr, screenNum, parentPtr)
     }
     winPtr->window = None;
     winPtr->childList = NULL;
+    winPtr->lastChildPtr = NULL;
     winPtr->parentPtr = NULL;
     winPtr->nextPtr = NULL;
     winPtr->mainPtr = NULL;
@@ -423,7 +451,8 @@ NewWindow(dispPtr, screenNum, parentPtr)
     winPtr->changes = defChanges;
     winPtr->dirtyChanges = CWX|CWY|CWWidth|CWHeight|CWBorderWidth;
     winPtr->atts = defAtts;
-    if (parentPtr != NULL) {
+    if ((parentPtr != NULL) && (parentPtr->display == winPtr->display)
+	    && (parentPtr->screenNum == winPtr->screenNum)) {
 	winPtr->atts.colormap = parentPtr->atts.colormap;
     } else {
 	winPtr->atts.colormap = DefaultColormap(dispPtr->display, screenNum);
@@ -439,7 +468,7 @@ NewWindow(dispPtr, screenNum, parentPtr)
     winPtr->selClearData = NULL;
     winPtr->geomProc = NULL;
     winPtr->geomData = NULL;
-    winPtr->reqWidth = winPtr->reqHeight = 0;
+    winPtr->reqWidth = winPtr->reqHeight = 1;
     winPtr->internalBorderWidth = 0;
     winPtr->wmInfoPtr = NULL;
 
@@ -487,8 +516,13 @@ NameWindow(interp, winPtr, parentPtr, name)
      * after the naming failure).
      */
     winPtr->parentPtr = parentPtr;
-    winPtr->nextPtr = parentPtr->childList;
-    parentPtr->childList = winPtr;
+    winPtr->nextPtr = NULL;
+    if (parentPtr->childList == NULL) {
+	parentPtr->childList = winPtr;
+    } else {
+	parentPtr->lastChildPtr->nextPtr = winPtr;
+    }
+    parentPtr->lastChildPtr = winPtr;
     winPtr->mainPtr = parentPtr->mainPtr;
     winPtr->nameUid = Tk_GetUid(name);
 
@@ -497,7 +531,7 @@ NameWindow(interp, winPtr, parentPtr, name)
      * will just cause confusion with class names in the option database.
      */
 
-    if (isupper(name[0])) {
+    if (isupper(UCHAR(name[0]))) {
 	Tcl_AppendResult(interp,
 		"window name starts with an upper-case letter: \"",
 		name, "\"", (char *) NULL);
@@ -560,21 +594,23 @@ NameWindow(interp, winPtr, parentPtr, name)
  *	associated with the window and registered for "send" commands
  *	under "baseName".  BaseName may be extended with an instance
  *	number in the form "#2" if necessary to make it globally
- *	unique.  Tk-related commands are bound into interp.  An X
- *	window is NOT initially created, but will be created the
- *	first time the window is mapped.
+ *	unique.  Tk-related commands are bound into interp.  The main
+ *	window becomes a "toplevel" widget and its X window will be
+ *	created and mapped as an idle handler.
  *
  *----------------------------------------------------------------------
  */
 
 Tk_Window
-Tk_CreateMainWindow(interp, screenName, baseName)
+Tk_CreateMainWindow(interp, screenName, baseName, className)
     Tcl_Interp *interp;		/* Interpreter to use for error reporting. */
     char *screenName;		/* Name of screen on which to create
 				 * window.  Empty or NULL string means
 				 * use DISPLAY environment variable. */
     char *baseName;		/* Base name for application;  usually of the
 				 * form "prog instance". */
+    char *className;		/* Class to use for application (same as class
+				 * for main window). */
 {
     Tk_Window tkwin;
     int result, dummy;
@@ -583,6 +619,7 @@ Tk_CreateMainWindow(interp, screenName, baseName)
     register TkWindow *winPtr;
     register TkCmd *cmdPtr;
     char *libDir;
+    static char *argv[] = {"-width", "200", "-height", "200", (char *) NULL};
 
     /*
      * Create the basic TkWindow structure.
@@ -608,6 +645,8 @@ Tk_CreateMainWindow(interp, screenName, baseName)
     mainPtr->focusPtr = winPtr;
     mainPtr->focusDefaultPtr = NULL;
     mainPtr->optionRootPtr = NULL;
+    mainPtr->nextPtr = tkMainWindowList;
+    tkMainWindowList = mainPtr;
     winPtr->mainPtr = mainPtr;
     hPtr = Tcl_CreateHashEntry(&mainPtr->nameTable, ".", &dummy);
     Tcl_SetHashValue(hPtr, winPtr);
@@ -661,11 +700,57 @@ Tk_CreateMainWindow(interp, screenName, baseName)
 	libDir = TK_LIBRARY;
     }
     Tcl_SetVar(interp, "tk_library", libDir, TCL_GLOBAL_ONLY);
+    Tcl_SetVar(interp, "tk_patchLevel", TK_PATCH_LEVEL, TCL_GLOBAL_ONLY);
     Tcl_SetVar(interp, "tk_version", TK_VERSION, TCL_GLOBAL_ONLY);
     Tcl_SetVar(interp, "tkVersion", TK_VERSION, TCL_GLOBAL_ONLY);
 
+    /*
+     * Make the main window into a toplevel widget.
+     */
+
+    Tk_SetClass(tkwin, className);
+    if (TkInitFrame(interp, tkwin, 1, 4, argv) != TCL_OK) {
+	return NULL;
+    }
+
     tk_NumMainWindows++;
     return tkwin;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tk_Init --
+ *
+ *	This procedure is typically invoked by Tcl_AppInit procedures
+ *	to perform additional Tk initialization for a Tcl interpreter,
+ *	such as sourcing the "tk.tcl" script.
+ *
+ * Results:
+ *	Returns a standard Tcl completion code and sets interp->result
+ *	if there is an error.
+ *
+ * Side effects:
+ *	Depends on what's in the tk.tcl script.
+ *
+ *----------------------------------------------------------------------
+ */
+
+int
+Tk_Init(interp)
+    Tcl_Interp *interp;		/* Interpreter to initialize. */
+{
+    static char initCmd[] =
+	"if [file exists $tk_library/tk.tcl] {\n\
+	    source $tk_library/tk.tcl\n\
+	} else {\n\
+	    set msg \"can't find $tk_library/tk.tcl; perhaps you \"\n\
+	    append msg \"need to\\ninstall Tk or set your TK_LIBRARY \"\n\
+	    append msg \"environment variable?\"\n\
+	    error $msg\n\
+	}";
+
+    return Tcl_Eval(interp, initCmd);
 }
 
 /*
@@ -727,9 +812,9 @@ Tk_CreateWindow(interp, parent, name, screenName)
  *
  * Tk_CreateWindowFromPath --
  *
- *	This procedure is similar to Tk_CreateInternalWindow except
- *	that it uses a path name to create the window, rather than
- *	a parent and a child name.
+ *	This procedure is similar to Tk_CreateWindow except that
+ *	it uses a path name to create the window, rather than a
+ *	parent and a child name.
  *
  * Results:
  *	The return value is a token for the new window.  This
@@ -866,6 +951,7 @@ Tk_DestroyWindow(tkwin)
 
 	return;
     }
+    winPtr->flags |= TK_ALREADY_DEAD;
 
     /*
      * Recursively destroy children.  The TK_RECURSIVE_DESTROY
@@ -891,7 +977,6 @@ Tk_DestroyWindow(tkwin)
     if (winPtr->window == None) {
 	Tk_MakeWindowExist(tkwin);
     }
-    winPtr->flags |= TK_ALREADY_DEAD;
     event.type = DestroyNotify;
     event.xdestroywindow.serial =
 	    LastKnownRequestProcessed(winPtr->display);
@@ -917,25 +1002,7 @@ Tk_DestroyWindow(tkwin)
 	XDeleteContext(winPtr->display, winPtr->window, tkWindowContext);
 	winPtr->window = None;
     }
-    if (winPtr->parentPtr != NULL) {
-	if (winPtr->parentPtr->childList == winPtr) {
-	    winPtr->parentPtr->childList = winPtr->nextPtr;
-	} else {
-	    register TkWindow *winPtr2;
-    
-	    for (winPtr2 = winPtr->parentPtr->childList; ;
-		    winPtr2 = winPtr2->nextPtr) {
-		if (winPtr2 == NULL) {
-		    panic("Tk_DestroyWindow couldn't find child in parent (deleted twice?)");
-		    break;
-		}
-		if (winPtr2->nextPtr == winPtr) {
-		    winPtr2->nextPtr = winPtr->nextPtr;
-		    break;
-		}
-	    }
-	}
-    }
+    UnlinkWindow(winPtr);
     TkEventDeadWindow(winPtr);
     TkFocusDeadWindow(winPtr);
     TkOptionDeadWindow(winPtr);
@@ -957,18 +1024,34 @@ Tk_DestroyWindow(tkwin)
 	    /*
 	     * Deleting a main window.  Delete the TkMainInfo structure too
 	     * and replace all of Tk's commands with dummy commands that
-	     * return errors.  Also delete the "send" command to unregister
-	     * the interpreter.
+	     * return errors (except don't replace the "exit" command, since
+	     * it may be needed for the application to exit).  Also delete
+	     * the "send" command to unregister the interpreter.
 	     */
 
 	    for (cmdPtr = commands; cmdPtr->name != NULL; cmdPtr++) {
-		Tcl_CreateCommand(winPtr->mainPtr->interp, cmdPtr->name,
-			TkDeadAppCmd, (ClientData) NULL, (void (*)()) NULL);
+		if (cmdPtr->cmdProc != Tk_ExitCmd) {
+		    Tcl_CreateCommand(winPtr->mainPtr->interp, cmdPtr->name,
+			    TkDeadAppCmd, (ClientData) NULL,
+			    (void (*)()) NULL);
+		}
 	    }
 	    Tcl_CreateCommand(winPtr->mainPtr->interp, "send",
 		    TkDeadAppCmd, (ClientData) NULL, (void (*)()) NULL);
 	    Tcl_DeleteHashTable(&winPtr->mainPtr->nameTable);
 	    Tk_DeleteBindingTable(winPtr->mainPtr->bindingTable);
+	    if (tkMainWindowList == winPtr->mainPtr) {
+		tkMainWindowList = winPtr->mainPtr->nextPtr;
+	    } else {
+		TkMainInfo *prevPtr;
+
+		for (prevPtr = tkMainWindowList;
+			prevPtr->nextPtr != winPtr->mainPtr;
+			prevPtr = prevPtr->nextPtr) {
+		    /* Empty loop body. */
+		}
+		prevPtr->nextPtr = winPtr->mainPtr->nextPtr;
+	    }
 	    ckfree((char *) winPtr->mainPtr);
 	    tk_NumMainWindows--;
 	}
@@ -1054,6 +1137,7 @@ Tk_MakeWindowExist(tkwin)
     Tk_Window tkwin;		/* Token for window. */
 {
     register TkWindow *winPtr = (TkWindow *) tkwin;
+    TkWindow *winPtr2;
     Window parent;
 
     if (winPtr->window != None) {
@@ -1078,11 +1162,31 @@ Tk_MakeWindowExist(tkwin)
     XSaveContext(winPtr->display, winPtr->window, tkWindowContext,
 	    (caddr_t) winPtr);
     winPtr->dirtyAtts = 0;
-    winPtr->dirtyChanges &= ~(CWX|CWY|CWWidth|CWHeight|CWBorderWidth);
-    if (winPtr->dirtyChanges != 0) {
-	XConfigureWindow(winPtr->display, winPtr->window,
-		winPtr->dirtyChanges, &winPtr->changes);
-	winPtr->dirtyChanges = 0;
+    winPtr->dirtyChanges = 0;
+
+    /*
+     * If any siblings higher up in the stacking order have already
+     * been created then move this window to its rightful position
+     * in the stacking order.
+     *
+     * NOTE: this code ignores any changes anyone might have made
+     * to the sibling and stack_mode field of the window's attributes,
+     * so it really isn't safe for these to be manipulated except
+     * by calling Tk_RestackWindow.
+     */
+
+    if (!(winPtr->flags & TK_TOP_LEVEL)) {
+	for (winPtr2 = winPtr->nextPtr; winPtr2 != NULL;
+		winPtr2 = winPtr2->nextPtr) {
+	    if ((winPtr2->window != None) && !(winPtr2->flags & TK_TOP_LEVEL)) {
+		XWindowChanges changes;
+		changes.sibling = winPtr2->window;
+		changes.stack_mode = Below;
+		XConfigureWindow(winPtr->display, winPtr->window,
+			CWSibling|CWStackMode, &changes);
+		break;
+	    }
+	}
     }
 
     /*
@@ -1126,6 +1230,15 @@ Tk_UnmapWindow(tkwin)
     if (!(winPtr->flags & TK_MAPPED)) {
 	return;
     }
+    if (winPtr->flags & TK_TOP_LEVEL) {
+	/*
+	 * Special processing has to be done for top-level windows.  Let
+	 * tkWm.c handle everything itself.
+	 */
+
+	TkWmUnmapWindow(winPtr);
+	return;
+    }
     winPtr->flags &= ~TK_MAPPED;
     XUnmapWindow(winPtr->display, winPtr->window);
     if (!(winPtr->flags & TK_TOP_LEVEL)) {
@@ -1166,11 +1279,8 @@ Tk_ConfigureWindow(tkwin, valueMask, valuePtr)
     if (valueMask & CWBorderWidth) {
 	winPtr->changes.border_width = valuePtr->border_width;
     }
-    if (valueMask & CWSibling) {
-	winPtr->changes.sibling = valuePtr->sibling;
-    }
-    if (valueMask & CWStackMode) {
-	winPtr->changes.stack_mode = valuePtr->stack_mode;
+    if (valueMask & (CWSibling|CWStackMode)) {
+	panic("Can't set sibling or stack mode from Tk_ConfigureWindow.");
     }
 
     if (winPtr->window != None) {
@@ -1687,4 +1797,205 @@ Tk_GetColorModel(tkwin)
 {
     TkWindow *winPtr = (TkWindow *) tkwin;
     return winPtr->dispPtr->colorModels[winPtr->screenNum];
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * UnlinkWindow --
+ *
+ *	This procedure removes a window from the childList of its
+ *	parent.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	The window is unlinked from its childList.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void
+UnlinkWindow(winPtr)
+    TkWindow *winPtr;			/* Child window to be unlinked. */
+{
+    TkWindow *prevPtr;
+
+    if (winPtr->parentPtr == NULL) {
+	return;
+    }
+    prevPtr = winPtr->parentPtr->childList;
+    if (prevPtr == winPtr) {
+	winPtr->parentPtr->childList = winPtr->nextPtr;
+	if (winPtr->nextPtr == NULL) {
+	    winPtr->parentPtr->lastChildPtr = NULL;
+	}
+    } else {
+	while (prevPtr->nextPtr != winPtr) {
+	    prevPtr = prevPtr->nextPtr;
+	    if (prevPtr == NULL) {
+		panic("UnlinkWindow couldn't find child in parent");
+	    }
+	}
+	prevPtr->nextPtr = winPtr->nextPtr;
+	if (winPtr->nextPtr == NULL) {
+	    winPtr->parentPtr->lastChildPtr = prevPtr;
+	}
+    }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tk_RestackWindow --
+ *
+ *	Change a window's position in the stacking order.
+ *
+ * Results:
+ *	TCL_OK is normally returned.  If other is not a descendant
+ *	of tkwin's parent then TCL_ERROR is returned and tkwin is
+ *	not repositioned.
+ *
+ * Side effects:
+ *	Tkwin is repositioned in the stacking order.
+ *
+ *----------------------------------------------------------------------
+ */
+
+int
+Tk_RestackWindow(tkwin, aboveBelow, other)
+    Tk_Window tkwin;		/* Token for window whose position in
+				 * the stacking order is to change. */
+    int aboveBelow;		/* Indicates new position of tkwin relative
+				 * to other;  must be Above or Below. */
+    Tk_Window other;		/* Tkwin will be moved to a position that
+				 * puts it just above or below this window.
+				 * If NULL then tkwin goes above or below
+				 * all windows in the same parent. */
+{
+    TkWindow *winPtr = (TkWindow *) tkwin;
+    TkWindow *otherPtr = (TkWindow *) other;
+    XWindowChanges changes;
+    unsigned int mask;
+
+    /*
+     * Special case:  if winPtr is a top-level window then just find
+     * the top-level ancestor of otherPtr and restack winPtr above
+     * otherPtr without changing any of Tk's childLists.
+     */
+
+    changes.stack_mode = aboveBelow;
+    mask = CWStackMode;
+    if (winPtr->flags & TK_TOP_LEVEL) {
+	if (otherPtr != NULL) {
+	    while (!(otherPtr->flags & TK_TOP_LEVEL)) {
+		otherPtr = otherPtr->parentPtr;
+	    }
+	}
+	TkWmRestackToplevel(winPtr, aboveBelow, otherPtr);
+	return TCL_OK;
+    }
+
+    /*
+     * Find an ancestor of otherPtr that is a sibling of winPtr.
+     */
+
+    if (otherPtr == NULL) {
+	if (aboveBelow == Above) {
+	    otherPtr = winPtr->parentPtr->lastChildPtr;
+	} else {
+	    otherPtr = winPtr->parentPtr->childList;
+	}
+    } else {
+	while (winPtr->parentPtr != otherPtr->parentPtr) {
+	    if (otherPtr->flags & TK_TOP_LEVEL) {
+		return TCL_ERROR;
+	    }
+	    otherPtr = otherPtr->parentPtr;
+	}
+    }
+    if (otherPtr == winPtr) {
+	return TCL_OK;
+    }
+
+    /*
+     * Reposition winPtr in the stacking order.
+     */
+
+    UnlinkWindow(winPtr);
+    if (aboveBelow == Above) {
+	winPtr->nextPtr = otherPtr->nextPtr;
+	if (winPtr->nextPtr == NULL) {
+	    winPtr->parentPtr->lastChildPtr = winPtr;
+	}
+	otherPtr->nextPtr = winPtr;
+    } else {
+	TkWindow *prevPtr;
+
+	prevPtr = winPtr->parentPtr->childList;
+	if (prevPtr == otherPtr) {
+	    winPtr->parentPtr->childList = winPtr;
+	} else {
+	    while (prevPtr->nextPtr != otherPtr) {
+		prevPtr = prevPtr->nextPtr;
+	    }
+	    prevPtr->nextPtr = winPtr;
+	}
+	winPtr->nextPtr = otherPtr;
+    }
+
+    /*
+     * Notify the X server of the change.  If winPtr hasn't yet been
+     * created then there's no need to tell the X server now, since
+     * the stacking order will be handled properly when the window
+     * is finally created.
+     */
+
+    if (winPtr->window != None) {
+	changes.stack_mode = Above;
+	for (otherPtr = winPtr->nextPtr; otherPtr != NULL;
+		otherPtr = otherPtr->nextPtr) {
+	    if ((otherPtr->window != None)
+		    && !(otherPtr->flags & TK_TOP_LEVEL)){
+		changes.sibling = otherPtr->window;
+		changes.stack_mode = Below;
+		mask = CWStackMode|CWSibling;
+		break;
+	    }
+	}
+	XConfigureWindow(winPtr->display, winPtr->window, mask, &changes);
+    }
+    return TCL_OK;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tk_MainWindow --
+ *
+ *	Returns the main window for an application.
+ *
+ * Results:
+ *	If interp has a Tk application associated with it, the main
+ *	window for the application is returned.  Otherwise NULL is
+ *	returned and an error message is left in interp->result.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+Tk_Window
+Tk_MainWindow(interp)
+    Tcl_Interp *interp;			/* Interpreter that embodies the
+					 * application. */
+{
+    Tcl_CmdInfo info;
+    if (Tcl_GetCommandInfo(interp, "winfo", &info) == 0) {
+	interp->result = "this isn't a Tk application";
+	return NULL;
+    }
+    return (Tk_Window) info.clientData;
 }

@@ -3,23 +3,34 @@
  *
  *	This file implements bitmap items for canvas widgets.
  *
- * Copyright 1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1992-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkCanvBmap.c,v 1.1 1993/08/09 01:20:53 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkCanvBmap.c,v 1.2 1993/12/27 07:33:42 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include <stdio.h>
-#include <math.h>
 #include "tkInt.h"
+#include "tkConfig.h"
 #include "tkCanvas.h"
 
 /*
@@ -211,9 +222,12 @@ BitmapCoords(canvasPtr, itemPtr, argc, argv)
 					 * x2, y2, ... */
 {
     register BitmapItem *bmapPtr = (BitmapItem *) itemPtr;
+    char x[TCL_DOUBLE_SPACE], y[TCL_DOUBLE_SPACE];
 
     if (argc == 0) {
-	sprintf(canvasPtr->interp->result, "%g %g", bmapPtr->x, bmapPtr->y);
+	Tcl_PrintDouble(canvasPtr->interp, bmapPtr->x, x);
+	Tcl_PrintDouble(canvasPtr->interp, bmapPtr->y, y);
+	Tcl_AppendResult(canvasPtr->interp, x, " ", y, (char *) NULL);
     } else if (argc == 2) {
 	if ((TkGetCanvasCoord(canvasPtr, argv[0], &bmapPtr->x) != TCL_OK)
 		|| (TkGetCanvasCoord(canvasPtr, argv[1],
@@ -274,7 +288,7 @@ ConfigureBitmap(canvasPtr, itemPtr, argc, argv, flags)
     if (bmapPtr->bgColor != NULL) {
 	gcValues.background = bmapPtr->bgColor->pixel;
     } else {
-	gcValues.background = canvasPtr->bgColor->pixel;
+	gcValues.background = Tk_3DBorderColor(canvasPtr->bgBorder)->pixel;
     }
     newGC = Tk_GetGC(canvasPtr->tkwin, GCForeground|GCBackground, &gcValues);
     if (bmapPtr->gc != None) {
@@ -657,6 +671,10 @@ BitmapToPostscript(canvasPtr, itemPtr, psInfoPtr)
     unsigned int width, height;
     char buffer[200];
 
+    if (bmapPtr->bitmap == None) {
+	return TCL_OK;
+    }
+
     /*
      * Compute the coordinates of the lower-left corner of the bitmap,
      * taking into account the anchor position for the bitmp.
@@ -683,7 +701,7 @@ BitmapToPostscript(canvasPtr, itemPtr, psInfoPtr)
 
     if (bmapPtr->bgColor != NULL) {
 	sprintf(buffer,
-		"%g %g moveto %d 0 rlineto 0 %d rlineto %d %s\n",
+		"%.15g %.15g moveto %d 0 rlineto 0 %d rlineto %d %s\n",
 		x, y, width, height, -width,"0 rlineto closepath");
 	Tcl_AppendResult(canvasPtr->interp, buffer, (char *) NULL);
 	if (TkCanvPsColor(canvasPtr, psInfoPtr, bmapPtr->bgColor) != TCL_OK) {
@@ -696,12 +714,11 @@ BitmapToPostscript(canvasPtr, itemPtr, psInfoPtr)
      * Draw the bitmap, if there is a foreground color.
      */
 
-
     if (bmapPtr->fgColor != NULL) {
 	if (TkCanvPsColor(canvasPtr, psInfoPtr, bmapPtr->fgColor) != TCL_OK) {
 	    return TCL_ERROR;
 	}
-	sprintf(buffer, "%g %g translate\n %d %d true matrix {\n",
+	sprintf(buffer, "%.15g %.15g translate\n %d %d true matrix {\n",
 		x, y, width, height);
 	Tcl_AppendResult(canvasPtr->interp, buffer, (char *) NULL);
 	if (TkCanvPsBitmap(canvasPtr, psInfoPtr, bmapPtr->bitmap) != TCL_OK) {

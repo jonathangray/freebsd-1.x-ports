@@ -1,21 +1,32 @@
 /* 
- * tk3D.c --
+ * tk3d.c --
  *
  *	This module provides procedures to draw borders in
  *	the three-dimensional Motif style.
  *
- * Copyright 1990 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tk3d.c,v 1.1 1993/08/09 01:20:45 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tk3d.c,v 1.2 1993/12/27 07:33:31 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "tkConfig.h"
@@ -190,24 +201,24 @@ Tk_Get3DBorder(interp, tkwin, colormap, colorName)
 	     * and shaded portions of the border.
 	     */
     
-	    tmp = (14*borderPtr->bgColorPtr->red)/10;
+	    tmp = (14 * (int) borderPtr->bgColorPtr->red)/10;
 	    if (tmp > MAX_INTENSITY) {
 		tmp = MAX_INTENSITY;
 	    }
 	    lightColor.red = tmp;
-	    tmp = (14*borderPtr->bgColorPtr->green)/10;
+	    tmp = (14 * (int) borderPtr->bgColorPtr->green)/10;
 	    if (tmp > MAX_INTENSITY) {
 		tmp = MAX_INTENSITY;
 	    }
 	    lightColor.green = tmp;
-	    tmp = (14*borderPtr->bgColorPtr->blue)/10;
+	    tmp = (14 * (int) borderPtr->bgColorPtr->blue)/10;
 	    if (tmp > MAX_INTENSITY) {
 		tmp = MAX_INTENSITY;
 	    }
 	    lightColor.blue = tmp;
-	    darkColor.red = (60*borderPtr->bgColorPtr->red)/100;
-	    darkColor.green = (60*borderPtr->bgColorPtr->green)/100;
-	    darkColor.blue = (60*borderPtr->bgColorPtr->blue)/100;
+	    darkColor.red = (60 * (int) borderPtr->bgColorPtr->red)/100;
+	    darkColor.green = (60 * (int) borderPtr->bgColorPtr->green)/100;
+	    darkColor.blue = (60 * (int) borderPtr->bgColorPtr->blue)/100;
 	    borderPtr->lightColorPtr = Tk_GetColorByValue(interp, tkwin,
 		    key.colormap, &lightColor);
 	    if (borderPtr->lightColorPtr == NULL) {
@@ -289,16 +300,34 @@ Tk_Draw3DRectangle(display, drawable, border, x, y, width, height,
 				 * which border will be drawn. */
     int borderWidth;		/* Desired width for border, in
 				 * pixels. */
-    int relief;			/* Should be either TK_RELIEF_RAISED
-				 * or TK_RELIEF_SUNKEN;  indicates
-				 * position of interior of window relative
-				 * to exterior. */
+    int relief;			/* Type of relief: TK_RELIEF_RAISED,
+				 * TK_RELIEF_SUNKEN, TK_RELIEF_GROOVE, etc. */
 {
     register Border *borderPtr = (Border *) border;
     GC top, bottom;
     XPoint points[7];
 
     if ((width < 2*borderWidth) || (height < 2*borderWidth)) {
+	return;
+    }
+
+    /*
+     * Handle grooves and ridges with recursive calls.
+     */
+
+    if ((relief == TK_RELIEF_GROOVE) || (relief == TK_RELIEF_RIDGE)) {
+	int halfWidth, insideOffset;
+	
+	halfWidth = borderWidth/2;
+	insideOffset = borderWidth - halfWidth;
+	Tk_Draw3DRectangle(display, drawable, border, x, y, width, height,
+		 halfWidth, (relief == TK_RELIEF_GROOVE) ? TK_RELIEF_SUNKEN
+		 : TK_RELIEF_RAISED);
+	Tk_Draw3DRectangle(display, drawable, border, x + insideOffset,
+		 y + insideOffset, width - insideOffset*2,
+		 height - insideOffset*2, halfWidth, 
+		 (relief == TK_RELIEF_GROOVE) ? TK_RELIEF_RAISED
+		 : TK_RELIEF_SUNKEN);
 	return;
     }
 
@@ -490,13 +519,19 @@ Tk_GetRelief(interp, name, reliefPtr)
     length = strlen(name);
     if ((c == 'f') && (strncmp(name, "flat", length) == 0)) {
 	*reliefPtr = TK_RELIEF_FLAT;
-    } else if ((c == 'r') && (strncmp(name, "raised", length) == 0)) {
+    } else if ((c == 'g') && (strncmp(name, "groove", length) == 0)
+	    && (length >= 2)) {
+        *reliefPtr = TK_RELIEF_GROOVE;
+    } else if ((c == 'r') && (strncmp(name, "raised", length) == 0)
+	    && (length >= 2)) {
 	*reliefPtr = TK_RELIEF_RAISED;
+    } else if ((c == 'r') && (strncmp(name, "ridge", length) == 0)) {
+        *reliefPtr = TK_RELIEF_RIDGE;
     } else if ((c == 's') && (strncmp(name, "sunken", length) == 0)) {
 	*reliefPtr = TK_RELIEF_SUNKEN;
     } else {
 	sprintf(interp->result, "bad relief type \"%.50s\":  must be %s",
-		name, "flat, raised, or sunken");
+		name, "flat, groove, raised, ridge, or sunken");
 	return TCL_ERROR;
     }
     return TCL_OK;
@@ -531,6 +566,10 @@ Tk_NameOfRelief(relief)
 	return "sunken";
     } else if (relief == TK_RELIEF_RAISED) {
 	return "raised";
+    } else if (relief == TK_RELIEF_GROOVE) {
+	return "groove";
+    } else if (relief == TK_RELIEF_RIDGE) {
+	return "ridge";
     } else {
 	return "unknown relief";
     }
@@ -552,7 +591,7 @@ Tk_NameOfRelief(relief)
  *	3-D border borderWidth units width wide on the left
  *	of the trajectory given by pointPtr and numPoints (or
  *	-borderWidth units wide on the right side, if borderWidth
- *	is negative.
+ *	is negative).
  *
  *--------------------------------------------------------------
  */
@@ -581,6 +620,23 @@ Tk_Draw3DPolygon(display, drawable, border, pointPtr, numPoints,
     Border *borderPtr = (Border *) border;
     GC gc;
     int i, lightOnLeft, dx, dy, parallel, pointsSeen;
+
+    /*
+     * Handle grooves and ridges with recursive calls.
+     */
+
+    if ((leftRelief == TK_RELIEF_GROOVE) || (leftRelief == TK_RELIEF_RIDGE)) {
+	int halfWidth;
+
+	halfWidth = borderWidth/2;
+	Tk_Draw3DPolygon(display, drawable, border, pointPtr, numPoints,
+		halfWidth, (leftRelief == TK_RELIEF_GROOVE) ? TK_RELIEF_RAISED
+		: TK_RELIEF_SUNKEN);
+	Tk_Draw3DPolygon(display, drawable, border, pointPtr, numPoints,
+		-halfWidth, (leftRelief == TK_RELIEF_GROOVE) ? TK_RELIEF_SUNKEN
+		: TK_RELIEF_RAISED);
+	return;
+    }
 
     /*
      * If the polygon is already closed, drop the last point from it

@@ -12,11 +12,14 @@ proc mkStyles {{w .styles}} {
     dpos $w
     wm title $w "Text Demonstration - Display Styles"
     wm iconname $w "Text Styles"
+
     button $w.ok -text OK -command "destroy $w"
     text $w.t -relief raised -bd 2 -yscrollcommand "$w.s set" -setgrid true \
 	    -width 70 -height 28
     scrollbar $w.s -relief flat -command "$w.t yview"
-    pack append $w $w.ok {bottom fillx} $w.s {right filly} $w.t {expand fill}
+    pack $w.ok -side bottom -fill x
+    pack $w.s -side right -fill y
+    pack $w.t -expand yes -fill both
 
     # Set up display styles
 

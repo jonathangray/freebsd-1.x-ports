@@ -6,18 +6,29 @@
  *	mouse clicks on features within the scrollbar cause
  *	scrolling commands to be invoked.
  *
- * Copyright 1990-1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkScrollbar.c,v 1.1 1993/08/09 01:20:54 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkScrollbar.c,v 1.2 1993/12/27 07:34:32 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "tkConfig.h"
@@ -138,9 +149,15 @@ typedef struct {
 #define REDRAW_PENDING		1
 
 /*
- * Information used for argv parsing.
+ * Minimum slider length, in pixels (designed to make sure that the slider
+ * is always easy to grab with the mouse).
  */
 
+#define MIN_SLIDER_LENGTH	5
+
+/*
+ * Information used for argv parsing.
+ */
 
 static Tk_ConfigSpec configSpecs[] = {
     {TK_CONFIG_BORDER, "-activeforeground", "activeForeground", "Background",
@@ -162,7 +179,8 @@ static Tk_ConfigSpec configSpecs[] = {
     {TK_CONFIG_PIXELS, "-borderwidth", "borderWidth", "BorderWidth",
 	DEF_SCROLLBAR_BORDER_WIDTH, Tk_Offset(Scrollbar, borderWidth), 0},
     {TK_CONFIG_STRING, "-command", "command", "Command",
-	DEF_SCROLLBAR_COMMAND, Tk_Offset(Scrollbar, command), 0},
+	DEF_SCROLLBAR_COMMAND, Tk_Offset(Scrollbar, command),
+	TK_CONFIG_NULL_OK},
     {TK_CONFIG_ACTIVE_CURSOR, "-cursor", "cursor", "Cursor",
 	DEF_SCROLLBAR_CURSOR, Tk_Offset(Scrollbar, cursor), TK_CONFIG_NULL_OK},
     {TK_CONFIG_SYNONYM, "-fg", "foreground", (char *) NULL,
@@ -265,13 +283,27 @@ Tk_ScrollbarCmd(clientData, interp, argc, argv)
     scrollPtr->tkwin = new;
     scrollPtr->display = Tk_Display(new);
     scrollPtr->interp = interp;
+    scrollPtr->orientUid = NULL;
+    scrollPtr->vertical = 0;
+    scrollPtr->width = 0;
     scrollPtr->command = NULL;
+    scrollPtr->commandSize = 0;
+    scrollPtr->repeatDelay = 0;
+    scrollPtr->repeatInterval = 0;
+    scrollPtr->borderWidth = 0;
     scrollPtr->bgBorder = NULL;
     scrollPtr->fgBorder = NULL;
     scrollPtr->activeBorder = NULL;
     scrollPtr->copyGC = None;
+    scrollPtr->relief = TK_RELIEF_FLAT;
+    scrollPtr->offset = 0;
+    scrollPtr->arrowLength = 0;
+    scrollPtr->sliderFirst = 0;
+    scrollPtr->sliderLast = 0;
     scrollPtr->mouseField = OUTSIDE;
     scrollPtr->pressField = -1;
+    scrollPtr->pressPos = 0;
+    scrollPtr->pressFirstUnit = 0;
     scrollPtr->totalUnits = 0;
     scrollPtr->windowUnits = 0;
     scrollPtr->firstUnit = 0;
@@ -440,24 +472,16 @@ DestroyScrollbar(clientData)
 {
     register Scrollbar *scrollPtr = (Scrollbar *) clientData;
 
-    if (scrollPtr->command != NULL) {
-	ckfree(scrollPtr->command);
-    }
-    if (scrollPtr->bgBorder != NULL) {
-	Tk_Free3DBorder(scrollPtr->bgBorder);
-    }
-    if (scrollPtr->fgBorder != NULL) {
-	Tk_Free3DBorder(scrollPtr->fgBorder);
-    }
-    if (scrollPtr->activeBorder != NULL) {
-	Tk_Free3DBorder(scrollPtr->activeBorder);
-    }
+    /*
+     * Free up all the stuff that requires special handling, then
+     * let Tk_FreeOptions handle all the standard option-related
+     * stuff.
+     */
+
     if (scrollPtr->copyGC != None) {
 	Tk_FreeGC(scrollPtr->display, scrollPtr->copyGC);
     }
-    if (scrollPtr->cursor != None) {
-	Tk_FreeCursor(scrollPtr->display, scrollPtr->cursor);
-    }
+    Tk_FreeOptions(configSpecs, (char *) scrollPtr, scrollPtr->display, 0);
     ckfree((char *) scrollPtr);
 }
 
@@ -569,7 +593,7 @@ DisplayScrollbar(clientData)
     register Tk_Window tkwin = scrollPtr->tkwin;
     XPoint points[7];
     Tk_3DBorder border;
-    int relief, width, fieldLength;
+    int relief, width;
     Pixmap pixmap;
 
     if ((scrollPtr->tkwin == NULL) || !Tk_IsMapped(tkwin)) {
@@ -677,11 +701,6 @@ DisplayScrollbar(clientData)
     } else {
 	border = scrollPtr->fgBorder;
 	relief = TK_RELIEF_RAISED;
-    }
-    fieldLength = (scrollPtr->vertical ? Tk_Height(tkwin) : Tk_Width(tkwin))
-	    - 2*(scrollPtr->arrowLength + scrollPtr->offset);
-    if (fieldLength < 0) {
-	fieldLength = 0;
     }
     if (scrollPtr->vertical) {
 	Tk_Fill3DRectangle(scrollPtr->display, pixmap, border,
@@ -809,9 +828,8 @@ ComputeScrollbarGeometry(scrollPtr)
 	    scrollPtr->sliderFirst = 0;
 	}
 	if (scrollPtr->sliderLast < (scrollPtr->sliderFirst
-		+ 2*scrollPtr->borderWidth)) {
-	    scrollPtr->sliderLast = scrollPtr->sliderFirst
-		    + 2*scrollPtr->borderWidth;
+		+ MIN_SLIDER_LENGTH)) {
+	    scrollPtr->sliderLast = scrollPtr->sliderFirst + MIN_SLIDER_LENGTH;
 	}
 	if (scrollPtr->sliderLast > fieldLength) {
 	    scrollPtr->sliderLast = fieldLength;
@@ -1084,6 +1102,8 @@ ScrollCmd(scrollPtr, unit)
     result = Tcl_VarEval(scrollPtr->interp, scrollPtr->command, string,
 	    (char *) NULL);
     if (result != TCL_OK) {
+	Tcl_AddErrorInfo(scrollPtr->interp,
+		"\n    (scrolling command executed by scrollbar)");
 	Tk_BackgroundError(scrollPtr->interp);
     }
 }

@@ -14,7 +14,9 @@ proc mkBasic {{w .basic}} {
     button $w.ok -text OK -command "destroy $w"
     text $w.t -relief raised -bd 2 -yscrollcommand "$w.s set" -setgrid true
     scrollbar $w.s -relief flat -command "$w.t yview"
-    pack append $w $w.ok {bottom fillx} $w.s {right filly} $w.t {expand fill}
+    pack $w.ok -side bottom -fill x
+    pack $w.s -side right -fill y
+    pack $w.t -expand yes -fill both
     $w.t insert 0.0 {\
 This window is a text widget.  It displays one or more lines of text
 and allows you to edit the text.  Here is a summary of the things you

@@ -1,3 +1,4 @@
+
 /* 
  * tkCanvas.c --
  *
@@ -5,23 +6,31 @@
  *	A canvas displays a background and a collection of graphical
  *	objects such as rectangles, lines, and texts.
  *
- * Copyright 1991-1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1991-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkCanvas.c,v 1.1 1993/08/09 01:20:50 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkCanvas.c,v 1.2 1993/12/27 07:33:52 rich Exp $ SPRITE (Berkeley)";
 #endif
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "default.h"
 #include "tkInt.h"
 #include "tkConfig.h"
@@ -58,14 +67,8 @@ static Tk_ConfigSpec configSpecs[] = {
     {TK_CONFIG_BORDER, "-background", "background", "Background",
 	DEF_CANVAS_BG_COLOR, Tk_Offset(Tk_Canvas, bgBorder),
 	TK_CONFIG_COLOR_ONLY},
-    {TK_CONFIG_COLOR, (char *) NULL, (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(Tk_Canvas, bgColor),
-	TK_CONFIG_COLOR_ONLY},
     {TK_CONFIG_BORDER, "-background", "background", "Background",
 	DEF_CANVAS_BG_MONO, Tk_Offset(Tk_Canvas, bgBorder),
-	TK_CONFIG_MONO_ONLY},
-    {TK_CONFIG_COLOR, (char *) NULL, (char *) NULL, (char *) NULL,
-	(char *) NULL, Tk_Offset(Tk_Canvas, bgColor),
 	TK_CONFIG_MONO_ONLY},
     {TK_CONFIG_SYNONYM, "-bd", "borderWidth", (char *) NULL,
 	(char *) NULL, 0, 0},
@@ -100,7 +103,8 @@ static Tk_ConfigSpec configSpecs[] = {
     {TK_CONFIG_PIXELS, "-scrollincrement", "scrollIncrement", "ScrollIncrement",
 	DEF_CANVAS_SCROLL_INCREMENT, Tk_Offset(Tk_Canvas, scrollIncrement), 0},
     {TK_CONFIG_STRING, "-scrollregion", "scrollRegion", "ScrollRegion",
-	DEF_CANVAS_SCROLL_REGION, Tk_Offset(Tk_Canvas, regionString), 0},
+	DEF_CANVAS_SCROLL_REGION, Tk_Offset(Tk_Canvas, regionString),
+	TK_CONFIG_NULL_OK},
     {TK_CONFIG_BORDER, "-selectbackground", "selectBackground", "Foreground",
 	DEF_CANVAS_SELECT_COLOR, Tk_Offset(Tk_Canvas, selBorder),
 	TK_CONFIG_COLOR_ONLY},
@@ -122,9 +126,11 @@ static Tk_ConfigSpec configSpecs[] = {
     {TK_CONFIG_PIXELS, "-width", "width", "Width",
 	DEF_CANVAS_WIDTH, Tk_Offset(Tk_Canvas, width), 0},
     {TK_CONFIG_STRING, "-xscrollcommand", "xScrollCommand", "ScrollCommand",
-	DEF_CANVAS_X_SCROLL_CMD, Tk_Offset(Tk_Canvas, xScrollCmd), 0},
+	DEF_CANVAS_X_SCROLL_CMD, Tk_Offset(Tk_Canvas, xScrollCmd),
+	TK_CONFIG_NULL_OK},
     {TK_CONFIG_STRING, "-yscrollcommand", "yScrollCommand", "ScrollCommand",
-	DEF_CANVAS_Y_SCROLL_CMD, Tk_Offset(Tk_Canvas, yScrollCmd), 0},
+	DEF_CANVAS_Y_SCROLL_CMD, Tk_Offset(Tk_Canvas, yScrollCmd),
+	TK_CONFIG_NULL_OK},
     {TK_CONFIG_END, (char *) NULL, (char *) NULL, (char *) NULL,
 	(char *) NULL, 0, 0}
 };
@@ -282,29 +288,52 @@ Tk_CanvasCmd(clientData, interp, argc, argv)
     canvasPtr->interp = interp;
     canvasPtr->firstItemPtr = NULL;
     canvasPtr->lastItemPtr = NULL;
+    canvasPtr->borderWidth = 0;
     canvasPtr->bgBorder = NULL;
-    canvasPtr->bgColor = NULL;
+    canvasPtr->relief = TK_RELIEF_FLAT;
     canvasPtr->pixmapGC = None;
+    canvasPtr->width = None;
+    canvasPtr->height = None;
+    canvasPtr->confine = 0;
     canvasPtr->selBorder = NULL;
+    canvasPtr->selBorderWidth = 0;
     canvasPtr->selFgColorPtr = NULL;
     canvasPtr->selItemPtr = NULL;
     canvasPtr->selectFirst = -1;
     canvasPtr->selectLast = -1;
+    canvasPtr->anchorItemPtr = NULL;
+    canvasPtr->selectAnchor = 0;
     canvasPtr->insertBorder = NULL;
+    canvasPtr->insertWidth = 0;
+    canvasPtr->insertBorderWidth = 0;
+    canvasPtr->insertOnTime = 0;
+    canvasPtr->insertOffTime = 0;
     canvasPtr->insertBlinkHandler = (Tk_TimerToken) NULL;
     canvasPtr->focusItemPtr = NULL;
     canvasPtr->xOrigin = canvasPtr->yOrigin = 0;
     canvasPtr->drawableXOrigin = canvasPtr->drawableYOrigin = 0;
     canvasPtr->bindingTable = NULL;
     canvasPtr->currentItemPtr = NULL;
+    canvasPtr->closeEnough = 0.0;
     canvasPtr->pickEvent.type = LeaveNotify;
+    canvasPtr->state = 0;
     canvasPtr->xScrollCmd = NULL;
     canvasPtr->yScrollCmd = NULL;
+    canvasPtr->scrollX1 = 0;
+    canvasPtr->scrollY1 = 0;
+    canvasPtr->scrollX2 = 0;
+    canvasPtr->scrollY2 = 0;
     canvasPtr->regionString = NULL;
+    canvasPtr->scrollIncrement = 1;
+    canvasPtr->scanX = 0;
+    canvasPtr->scanXOrigin = 0;
+    canvasPtr->scanY = 0;
+    canvasPtr->scanYOrigin = 0;
     canvasPtr->hotPtr = NULL;
+    canvasPtr->hotPrevPtr = NULL;
     canvasPtr->cursor = None;
-    canvasPtr->pixelsPerMM = WidthOfScreen(Tk_Screen(tkwin));
-    canvasPtr->pixelsPerMM /= WidthMMOfScreen(Tk_Screen(tkwin));
+    canvasPtr->pixelsPerMM = WidthOfScreen(Tk_Screen(new));
+    canvasPtr->pixelsPerMM /= WidthMMOfScreen(Tk_Screen(new));
     canvasPtr->flags = 0;
     canvasPtr->nextId = 1;
 
@@ -442,7 +471,7 @@ CanvasWidgetCmd(clientData, interp, argc, argv)
 	 */
 
 	object = 0;
-	if (isdigit(argv[2][0])) {
+	if (isdigit(UCHAR(argv[2][0]))) {
 	    int id;
 	    char *end;
 
@@ -540,7 +569,7 @@ CanvasWidgetCmd(clientData, interp, argc, argv)
 	    grid = 0.0;
 	}
 	x += canvasPtr->xOrigin;
-	sprintf(interp->result, "%g", GridAlign((double) x, grid));
+	Tcl_PrintDouble(interp, GridAlign((double) x, grid), interp->result);
     } else if ((c == 'c') && (strcmp(argv[1], "canvasy") == 0)) {
 	int y;
 	double grid;
@@ -562,7 +591,7 @@ CanvasWidgetCmd(clientData, interp, argc, argv)
 	    grid = 0.0;
 	}
 	y += canvasPtr->yOrigin;
-	sprintf(interp->result, "%g", GridAlign((double) y, grid));
+	Tcl_PrintDouble(interp, GridAlign((double) y, grid), interp->result);
     } else if ((c == 'c') && (strncmp(argv[1], "configure", length) == 0)
 	    && (length >= 3)) {
 	if (argc == 2) {
@@ -707,6 +736,10 @@ CanvasWidgetCmd(clientData, interp, argc, argv)
 		itemPtr != NULL; itemPtr = NextItem(&search)) {
 		EventuallyRedrawArea(canvasPtr, itemPtr->x1, itemPtr->y1,
 		    itemPtr->x2, itemPtr->y2);
+		if (canvasPtr->bindingTable != NULL) {
+		    Tk_DeleteAllBindings(canvasPtr->bindingTable,
+			    (ClientData) itemPtr);
+		}
 		(*itemPtr->typePtr->deleteProc)(canvasPtr, itemPtr);
 		if (itemPtr->tagPtr != itemPtr->staticTagSpace) {
 		    ckfree((char *) itemPtr->tagPtr);
@@ -821,7 +854,7 @@ CanvasWidgetCmd(clientData, interp, argc, argv)
 	if (itemPtr != NULL) {
 	    int i;
 	    for (i = 0; i < itemPtr->numTags; i++) {
-		Tcl_AppendElement(interp, (char *) itemPtr->tagPtr[i], 0);
+		Tcl_AppendElement(interp, (char *) itemPtr->tagPtr[i]);
 	    }
 	}
     } else if ((c == 'i') && (strncmp(argv[1], "icursor", length) == 0)
@@ -1044,8 +1077,8 @@ CanvasWidgetCmd(clientData, interp, argc, argv)
 		|| (Tcl_GetDouble(interp, argv[6], &yScale) != TCL_OK)) {
 	    goto error;
 	}
-	if ((xScale <= 0.0) || (yScale <= 0.0)) {
-	    interp->result = "scale factors must be greater than zero";
+	if ((xScale == 0.0) || (yScale == 0.0)) {
+	    interp->result = "scale factor cannot be zero";
 	    goto error;
 	}
 	for (itemPtr = StartTagSearch(canvasPtr, argv[2], &search);
@@ -1289,6 +1322,10 @@ DestroyCanvas(clientData)
     register Tk_Canvas *canvasPtr = (Tk_Canvas *) clientData;
     register Tk_Item *itemPtr;
 
+    /*
+     * Free up all of the items in the canvas.
+     */
+
     for (itemPtr = canvasPtr->firstItemPtr; itemPtr != NULL;
 	    itemPtr = canvasPtr->firstItemPtr) {
 	canvasPtr->firstItemPtr = itemPtr->nextPtr;
@@ -1299,40 +1336,20 @@ DestroyCanvas(clientData)
 	ckfree((char *) itemPtr);
     }
 
-    if (canvasPtr->bgBorder != NULL) {
-	Tk_Free3DBorder(canvasPtr->bgBorder);
-    }
-    if (canvasPtr->bgColor != NULL) {
-	Tk_FreeColor(canvasPtr->bgColor);
-    }
+    /*
+     * Free up all the stuff that requires special handling,
+     * then let Tk_FreeOptions handle all the standard option-related
+     * stuff.
+     */
+
     if (canvasPtr->pixmapGC != None) {
 	Tk_FreeGC(canvasPtr->display, canvasPtr->pixmapGC);
-    }
-    if (canvasPtr->selBorder != NULL) {
-	Tk_Free3DBorder(canvasPtr->selBorder);
-    }
-    if (canvasPtr->selFgColorPtr != NULL) {
-	Tk_FreeColor(canvasPtr->selFgColorPtr);
-    }
-    if (canvasPtr->insertBorder != NULL) {
-	Tk_Free3DBorder(canvasPtr->insertBorder);
     }
     Tk_DeleteTimerHandler(canvasPtr->insertBlinkHandler);
     if (canvasPtr->bindingTable != NULL) {
 	Tk_DeleteBindingTable(canvasPtr->bindingTable);
     }
-    if (canvasPtr->xScrollCmd != NULL) {
-	ckfree(canvasPtr->xScrollCmd);
-    }
-    if (canvasPtr->yScrollCmd != NULL) {
-	ckfree(canvasPtr->yScrollCmd);
-    }
-    if (canvasPtr->regionString != NULL) {
-	ckfree(canvasPtr->regionString);
-    }
-    if (canvasPtr->cursor != None) {
-	Tk_FreeCursor(canvasPtr->display, canvasPtr->cursor);
-    }
+    Tk_FreeOptions(configSpecs, (char *) canvasPtr, canvasPtr->display, 0);
     ckfree((char *) canvasPtr);
 }
 
@@ -1383,7 +1400,7 @@ ConfigureCanvas(interp, canvasPtr, argc, argv, flags)
     Tk_SetBackgroundFromBorder(canvasPtr->tkwin, canvasPtr->bgBorder);
 
     gcValues.function = GXcopy;
-    gcValues.foreground = canvasPtr->bgColor->pixel;
+    gcValues.foreground = Tk_3DBorderColor(canvasPtr->bgBorder)->pixel;
     gcValues.graphics_exposures = False;
     new = Tk_GetGC(canvasPtr->tkwin,
 	    GCFunction|GCForeground|GCGraphicsExposures, &gcValues);
@@ -1556,22 +1573,18 @@ DisplayCanvas(clientData)
      *    in the X server for large objects that cover much
      *    more than the area being redisplayed:  only the area
      *    of the pixmap will actually have to be redrawn.
-     * 2. The origin of the pixmap is adjusted to an even multiple
-     *    of 32 bits.  This is so that stipple patterns with a size
-     *    of 8 or 16 or 32 bits will always line up when information
-     *    is copied back to the screen.
-     * 3. Some X servers (e.g. the one for DECstations) have troubles
+     * 2. Some X servers (e.g. the one for DECstations) have troubles
      *    with characters that overlap an edge of the pixmap (on the
      *    DEC servers, as of 8/18/92, such characters are drawn one
      *    pixel too far to the right).  To handle this problem,
      *    make the pixmap a bit larger than is absolutely needed
-     *    so that for normal-sized fonts the characters that ovelap
+     *    so that for normal-sized fonts the characters that overlap
      *    the edge of the pixmap will be outside the area we care
      *    about.
      */
 
-    canvasPtr->drawableXOrigin = (screenX1 - 30) & ~0x1f;
-    canvasPtr->drawableYOrigin = (screenY1 - 30) & ~0x1f;
+    canvasPtr->drawableXOrigin = screenX1 - 30;
+    canvasPtr->drawableYOrigin = screenY1 - 30;
     pixmap = XCreatePixmap(Tk_Display(tkwin), Tk_WindowId(tkwin),
 	screenX2 + 30 - canvasPtr->drawableXOrigin,
 	screenY2 + 30 - canvasPtr->drawableYOrigin,
@@ -1699,6 +1712,21 @@ CanvasEventProc(clientData, eventPtr)
 	CanvasFocusProc(canvasPtr, 1);
     } else if (eventPtr->type == FocusOut) {
 	CanvasFocusProc(canvasPtr, 0);
+    } else if (eventPtr->type == UnmapNotify) {
+	register Tk_Item *itemPtr;
+
+	/*
+	 * Special hack:  if the canvas is unmapped, then must notify
+	 * all items with "alwaysRedraw" set, so that they know that
+	 * they are no longer displayed.
+	 */
+
+	for (itemPtr = canvasPtr->firstItemPtr; itemPtr != NULL;
+		itemPtr = itemPtr->nextPtr) {
+	    if (itemPtr->typePtr->alwaysRedraw) {
+		(*itemPtr->typePtr->displayProc)(canvasPtr, itemPtr, None);
+	    }
+	}
     }
 }
 
@@ -1879,7 +1907,7 @@ StartTagSearch(canvasPtr, tag, searchPtr)
      * hot item, in which case the search can be skipped.
      */
 
-    if (isdigit(*tag)) {
+    if (isdigit(UCHAR(*tag))) {
 	char *end;
 
 	numIdSearches++;
@@ -2066,7 +2094,7 @@ DoItem(interp, itemPtr, tag)
     if (tag == NULL) {
 	char msg[30];
 	sprintf(msg, "%d", itemPtr->id);
-	Tcl_AppendElement(interp, msg, 0);
+	Tcl_AppendElement(interp, msg);
 	return;
     }
 

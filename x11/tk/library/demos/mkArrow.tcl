@@ -24,12 +24,12 @@ proc mkArrow {{w .arrow}} {
     frame $w.frame1 -relief raised -bd 2
     canvas $c -width 500 -height 350 -relief raised
     button $w.ok -text "OK" -command "destroy $w"
-    pack append $w $w.frame1 {top fill} $w.ok {bottom pady 10 frame center} \
-	    $c {expand fill}
+    pack $w.frame1 -side top -fill both
+    pack $w.ok -side bottom -pady 5
+    pack $c -expand yes -fill both
     message $w.frame1.m -font -Adobe-Times-Medium-R-Normal-*-180-* -aspect 300 \
 	    -text "This widget allows you to experiment with different widths and arrowhead shapes for lines in canvases.  To change the line width or the shape of the arrowhead, drag any of the three boxes attached to the oversized arrow.  The arrows on the right give examples at normal scale.  The text at the bottom shows the configuration options as you'd enter them for a line."
-    pack append $w.frame1 $w.frame1.m {frame center}
-
+    pack $w.frame1.m
 
     set v(a) 8
     set v(b) 10

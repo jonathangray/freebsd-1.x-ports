@@ -5,18 +5,29 @@
  *	the only place where information is kept about the screen layout
  *	of text widgets.
  *
- * Copyright 1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1992-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkTextDisp.c,v 1.1 1993/08/09 01:20:54 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkTextDisp.c,v 1.2 1993/12/27 07:34:43 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "tkConfig.h"
@@ -651,7 +662,7 @@ LayoutLine(textPtr, line, linePtr, tInfoPtr)
 			chunkPtr->numChars = 1;
 			ch++;
 		    } else if (textPtr->wrapMode == tkTextWordUid) {
-			if (isspace(chunkPtr->text[charsThatFit])) {
+			if (isspace(UCHAR(chunkPtr->text[charsThatFit]))) {
 			    ch += 1;	/* Include space on this line. */
 			} else {
 			    register Chunk *chunkPtr2;
@@ -667,7 +678,7 @@ LayoutLine(textPtr, line, linePtr, tInfoPtr)
 				for (count = chunkPtr2->numChars - 1,
 					p = chunkPtr2->text + count;
 					count >= 0; count--, p--) {
-				    if (isspace(*p)) {
+				    if (isspace(UCHAR(*p))) {
 					spaceChunkPtr = chunkPtr2;
 					space = count;
 					break;
@@ -919,48 +930,10 @@ UpdateDisplayInfo(textPtr)
     }
 
     /*
-     * Update the vertical scrollbar, if there is one.
+     * Arrange for scrollbars to be updated.
      */
 
-    if (textPtr->yScrollCmd != NULL) {
-	int numLines, first, result, maxY, height;
-	char string[60];
-
-	/*
-	 * Count the number of text lines on the screen.
-	 */
-
-	maxY = 0;
-	for (numLines = 0, linePtr = NULL, dlPtr = dInfoPtr->dLinePtr;
-		dlPtr != NULL; dlPtr = dlPtr->nextPtr) {
-	    if (dlPtr->linePtr != linePtr) {
-		numLines++;
-		linePtr = dlPtr->linePtr;
-	    }
-	    maxY = dlPtr->y + dlPtr->height;
-	}
-
-	/*
-	 * If the screen isn't completely full, then estimate the number of
-	 * lines that would fit on it if it were full.
-	 */
-
-	height = dInfoPtr->maxY - dInfoPtr->y;
-	if (numLines == 0) {
-	    numLines = height /
-		    (textPtr->fontPtr->ascent + textPtr->fontPtr->descent);
-	} else if (maxY < height) {
-	    numLines = (numLines * height)/maxY;
-	}
-	first = TkBTreeLineIndex(dInfoPtr->dLinePtr->linePtr);
-	sprintf(string, " %d %d %d %d", TkBTreeNumLines(textPtr->tree),
-		numLines, first, first+numLines-1);
-	result = Tcl_VarEval(textPtr->interp, textPtr->yScrollCmd, string,
-		(char *) NULL);
-	if (result != TCL_OK) {
-	    Tk_BackgroundError(textPtr->interp);
-	}
-    }
+    textPtr->flags |= UPDATE_SCROLLBARS;
 }
 
 /*
@@ -1096,7 +1069,7 @@ DisplayDLine(textPtr, dlPtr, pixmap)
 	    } else {
 		width = Tk_Width(textPtr->tkwin) - chunkPtr->x;
 	    }
-	    if (stylePtr->bgGC != NULL) {
+	    if (stylePtr->bgGC != None) {
 		XFillRectangle(display, pixmap, stylePtr->bgGC, chunkPtr->x,
 			0, (unsigned int) width, (unsigned int) dlPtr->height);
 		Tk_Draw3DRectangle(display, pixmap, sValuePtr->border,
@@ -1244,7 +1217,8 @@ DisplayText(clientData)
     if ((textPtr->tkwin == NULL) || !Tk_IsMapped(textPtr->tkwin)
 	    || (dInfoPtr->maxX <= dInfoPtr->x)
 	    || (dInfoPtr->maxY <= dInfoPtr->y)) {
-	goto done;
+	UpdateDisplayInfo(textPtr);
+	goto doScrollbars;
     }
     numRedisplays++;
 
@@ -1291,7 +1265,7 @@ DisplayText(clientData)
 
     for (dlPtr = dInfoPtr->dLinePtr; dlPtr != NULL; dlPtr = dlPtr->nextPtr) {
 	register DLine *dlPtr2;
-	int offset, height;
+	int offset, height, y;
 
 	if ((dlPtr->oldY == -1) || (dlPtr->y == dlPtr->oldY)
 		|| ((dlPtr->oldY + dlPtr->height) > dInfoPtr->maxY)) {
@@ -1306,6 +1280,7 @@ DisplayText(clientData)
 
 	offset = dlPtr->y - dlPtr->oldY;
 	height = dlPtr->height;
+	y = dlPtr->y;
 	for (dlPtr2 = dlPtr->nextPtr; dlPtr2 != NULL;
 		dlPtr2 = dlPtr2->nextPtr) {
 	    if ((dlPtr2->oldY == -1)
@@ -1322,14 +1297,14 @@ DisplayText(clientData)
 	 * necessary to avoid overwriting the border area.
 	 */
 
-	if ((dlPtr->y + height) > dInfoPtr->maxY) {
-	    height = dInfoPtr->maxY - dlPtr->y;
+	if ((y + height) > dInfoPtr->maxY) {
+	    height = dInfoPtr->maxY -y;
 	}
 	XCopyArea(Tk_Display(textPtr->tkwin), Tk_WindowId(textPtr->tkwin),
 		Tk_WindowId(textPtr->tkwin), dInfoPtr->scrollGC,
 		dInfoPtr->x - textPtr->padX, dlPtr->oldY,
 		dInfoPtr->maxX - (dInfoPtr->x - textPtr->padX),
-		height, dInfoPtr->x - textPtr->padX, dlPtr->y);
+		height, dInfoPtr->x - textPtr->padX, y);
 	numCopies++;
 	while (1) {
 	    dlPtr->oldY = dlPtr->y;
@@ -1337,6 +1312,20 @@ DisplayText(clientData)
 		break;
 	    }
 	    dlPtr = dlPtr->nextPtr;
+	}
+
+	/*
+	 * Scan through the lines following the copied ones to see if
+	 * we just overwrote them with the copy operation.  If so, mark
+	 * them for redisplay.
+	 */
+
+	for ( ; dlPtr2 != NULL; dlPtr2 = dlPtr2->nextPtr) {
+	    if ((dlPtr2->oldY != -1)
+		    && ((dlPtr2->oldY + dlPtr2->height) > y)
+		    && (dlPtr2->oldY < (y + height))) {
+		dlPtr2->oldY = -1;
+	    }
 	}
 
 	/*
@@ -1391,12 +1380,15 @@ DisplayText(clientData)
      */
 
     maxHeight = -1;
-    for (dlPtr = textPtr->dInfoPtr->dLinePtr; dlPtr != NULL;
+    for (dlPtr = dInfoPtr->dLinePtr; dlPtr != NULL;
 	    dlPtr = dlPtr->nextPtr) {
 	if ((dlPtr->height > maxHeight) && (dlPtr->oldY != dlPtr->y)) {
 	    maxHeight = dlPtr->height;
 	}
 	bottomY = dlPtr->y + dlPtr->height;
+    }
+    if (maxHeight > dInfoPtr->maxY) {
+	maxHeight = dInfoPtr->maxY;
     }
     if (maxHeight >= 0) {
 	pixmap = XCreatePixmap(Tk_Display(textPtr->tkwin),
@@ -1415,7 +1407,9 @@ DisplayText(clientData)
 
     /*
      * Lastly, see if we need to refresh the part of the window below
-     * the last line of text (if there is any such area).
+     * the last line of text (if there is any such area).  Refresh the
+     * padding area on the left too, since the insertion cursor might
+     * have been displayed there previously).
      */
 
     if (dInfoPtr->topOfEof > dInfoPtr->maxY) {
@@ -1424,7 +1418,8 @@ DisplayText(clientData)
     if (bottomY < dInfoPtr->topOfEof) {
 	Tk_Fill3DRectangle(Tk_Display(textPtr->tkwin),
 		Tk_WindowId(textPtr->tkwin), textPtr->border,
-		dInfoPtr->x, bottomY, dInfoPtr->maxX - dInfoPtr->x,
+		dInfoPtr->x - textPtr->padX, bottomY,
+		dInfoPtr->maxX - (dInfoPtr->x - textPtr->padX),
 		dInfoPtr->topOfEof-bottomY, 0, TK_RELIEF_FLAT);
     }
     dInfoPtr->topOfEof = bottomY;
@@ -1432,7 +1427,56 @@ DisplayText(clientData)
 	dInfoPtr->topOfEof = dInfoPtr->maxY;
     }
 
-    done:
+    doScrollbars:
+
+    /*
+     * Update the vertical scrollbar, if there is one.
+     */
+
+    if ((textPtr->flags & UPDATE_SCROLLBARS) && (textPtr->yScrollCmd != NULL)) {
+	int numLines, first, result, maxY, height;
+	TkTextLine *linePtr;
+	char string[60];
+
+	/*
+	 * Count the number of text lines on the screen.
+	 */
+
+	textPtr->flags &= ~UPDATE_SCROLLBARS;
+	maxY = 0;
+	for (numLines = 0, linePtr = NULL, dlPtr = dInfoPtr->dLinePtr;
+		dlPtr != NULL; dlPtr = dlPtr->nextPtr) {
+	    if (dlPtr->linePtr != linePtr) {
+		numLines++;
+		linePtr = dlPtr->linePtr;
+	    }
+	    maxY = dlPtr->y + dlPtr->height;
+	}
+
+	/*
+	 * If the screen isn't completely full, then estimate the number of
+	 * lines that would fit on it if it were full.
+	 */
+
+	height = dInfoPtr->maxY - dInfoPtr->y;
+	if (numLines == 0) {
+	    numLines = height /
+		    (textPtr->fontPtr->ascent + textPtr->fontPtr->descent);
+	} else if (maxY < height) {
+	    numLines = (numLines * height)/maxY;
+	}
+	first = TkBTreeLineIndex(dInfoPtr->dLinePtr->linePtr);
+	sprintf(string, " %d %d %d %d", TkBTreeNumLines(textPtr->tree),
+		numLines, first, first+numLines-1);
+	result = Tcl_VarEval(textPtr->interp, textPtr->yScrollCmd, string,
+		(char *) NULL);
+	if (result != TCL_OK) {
+	    Tcl_AddErrorInfo(textPtr->interp,
+		    "\n    (horizontal scrolling command executed by text)");
+	    Tk_BackgroundError(textPtr->interp);
+	}
+    }
+
     dInfoPtr->flags &= ~(REDRAW_PENDING|REDRAW_BORDERS);
 }
 
@@ -1761,8 +1805,7 @@ void
 TkTextSetView(textPtr, line, pickPlace)
     TkText *textPtr;		/* Widget record for text widget. */
     int line;			/* Number of line that is to appear somewhere
-				 * in the window.  This line number must
-				 * be a valid one in the file. */
+				 * in the window. */
     int pickPlace;		/* 0 means topLine must appear at top of
 				 * screen.  1 means we get to pick where it
 				 * appears:  minimize screen motion or else
@@ -1771,10 +1814,19 @@ TkTextSetView(textPtr, line, pickPlace)
     DInfo *dInfoPtr = textPtr->dInfoPtr;
     register DLine *dlPtr, *dlPtr2;
     TkTextLine *linePtr;
-    int curTopLine, curBotLine;
+    int curTopLine, curBotLine, numLines;
     int bottomY;
     TagInfo tagInfo;
 #define CLOSE_LINES 5
+
+    numLines = TkBTreeNumLines(textPtr->tree);
+    if (line >= numLines) {
+	line = numLines-1;
+    }
+    if (line < 0) {
+	line = 0;
+    }
+    linePtr = TkBTreeFindLine(textPtr->tree, line);
 
     if (!pickPlace) {
 	/*
@@ -1793,7 +1845,7 @@ TkTextSetView(textPtr, line, pickPlace)
 	    FreeDLines(textPtr, dInfoPtr->dLinePtr, dlPtr, 1);
 	}
     
-	textPtr->topLinePtr = TkBTreeFindLine(textPtr->tree, line);
+	textPtr->topLinePtr = linePtr;
 	goto scheduleUpdate;
     }
 
@@ -1807,7 +1859,6 @@ TkTextSetView(textPtr, line, pickPlace)
     if (dInfoPtr->flags & DINFO_OUT_OF_DATE) {
 	UpdateDisplayInfo(textPtr);
     }
-    linePtr = TkBTreeFindLine(textPtr->tree, line);
     for (dlPtr = dInfoPtr->dLinePtr; ; dlPtr = dlPtr->nextPtr) {
 	if (dlPtr->nextPtr == NULL) {
 	    break;

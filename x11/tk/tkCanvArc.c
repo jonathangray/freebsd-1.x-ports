@@ -3,22 +3,33 @@
  *
  *	This file implements arc items for canvas widgets.
  *
- * Copyright 1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1992-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkCanvArc.c,v 1.1 1993/08/09 01:20:53 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkCanvArc.c,v 1.2 1993/12/27 07:33:41 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include <stdio.h>
-#include <math.h>
+#include "tkConfig.h"
 #include "tkInt.h"
 #include "tkCanvas.h"
 
@@ -54,6 +65,10 @@ typedef struct ArcItem  {
     Tk_Uid style;		/* How to draw arc: arc, chord, or pieslice. */
     GC outlineGC;		/* Graphics context for outline. */
     GC fillGC;			/* Graphics context for filling item. */
+    GC *stippleGCPtr;		/* If not NULL, points to a GC (either
+				 * outlineGC or fillGC) containing a stipple
+				 * offset that must be adjusted on each
+				 * redisplay. */
     double center1[2];		/* Coordinates of center of arc outline at
 				 * start (see ComputeArcOutline). */
     double center2[2];		/* Coordinates of center of arc outline at
@@ -160,7 +175,9 @@ Tk_ItemType TkArcType = {
     (Tk_ItemType *) NULL		/* nextPtr */
 };
 
-#define PI 3.14159265358979323846
+#ifndef PI
+#    define PI 3.14159265358979323846
+#endif
 
 /*
  * The uid's below comprise the legal values for the "-style"
@@ -236,6 +253,7 @@ CreateArc(canvasPtr, itemPtr, argc, argv)
     arcPtr->style = pieSliceUid;
     arcPtr->outlineGC = None;
     arcPtr->fillGC = None;
+    arcPtr->stippleGCPtr = NULL;
 
     /*
      * Process the arguments to fill in the item record.
@@ -287,13 +305,16 @@ ArcCoords(canvasPtr, itemPtr, argc, argv)
 					 * x2, y2, ... */
 {
     register ArcItem *arcPtr = (ArcItem *) itemPtr;
-    char buffer[500];
+    char c0[TCL_DOUBLE_SPACE], c1[TCL_DOUBLE_SPACE];
+    char c2[TCL_DOUBLE_SPACE], c3[TCL_DOUBLE_SPACE];
 
     if (argc == 0) {
-	sprintf(buffer, "%g %g %g %g", arcPtr->bbox[0],
-		arcPtr->bbox[1], arcPtr->bbox[2],
-		arcPtr->bbox[3]);
-	Tcl_SetResult(canvasPtr->interp, buffer, TCL_VOLATILE);
+	Tcl_PrintDouble(canvasPtr->interp, arcPtr->bbox[0], c0);
+	Tcl_PrintDouble(canvasPtr->interp, arcPtr->bbox[1], c1);
+	Tcl_PrintDouble(canvasPtr->interp, arcPtr->bbox[2], c2);
+	Tcl_PrintDouble(canvasPtr->interp, arcPtr->bbox[3], c3);
+	Tcl_AppendResult(canvasPtr->interp, c0, " ", c1, " ",
+		c2, " ", c3, (char *) NULL);
     } else if (argc == 4) {
 	if ((TkGetCanvasCoord(canvasPtr, argv[0],
 		    &arcPtr->bbox[0]) != TCL_OK)
@@ -378,6 +399,7 @@ ConfigureArc(canvasPtr, itemPtr, argc, argv, flags)
     if (arcPtr->width < 0) {
 	arcPtr->width = 1;
     }
+    arcPtr->stippleGCPtr = NULL;
     if (arcPtr->style == arcUid) {
 	if (arcPtr->fillColor == NULL) {
 	    newGC = None;
@@ -390,6 +412,7 @@ ConfigureArc(canvasPtr, itemPtr, argc, argv, flags)
 		gcValues.stipple = arcPtr->fillStipple;
 		gcValues.fill_style = FillStippled;
 		mask |= GCStipple|GCFillStyle;
+		arcPtr->stippleGCPtr = &arcPtr->outlineGC;
 	    }
 	    newGC = Tk_GetGC(canvasPtr->tkwin, mask, &gcValues);
 	}
@@ -421,6 +444,7 @@ ConfigureArc(canvasPtr, itemPtr, argc, argv, flags)
 	    gcValues.stipple = arcPtr->fillStipple;
 	    gcValues.fill_style = FillStippled;
 	    mask |= GCStipple|GCFillStyle;
+	    arcPtr->stippleGCPtr = &arcPtr->fillGC;
 	}
 	newGC = Tk_GetGC(canvasPtr->tkwin, mask, &gcValues);
     }
@@ -640,16 +664,34 @@ DisplayArc(canvasPtr, itemPtr, drawable)
     extent = (64*arcPtr->extent) + 0.5;
 
     /*
-     * Display filled arc first (if wanted), then outline.
+     * If the arc is being filled with a stipple pattern, modify the
+     * stipple offset in the GC.  Be sure to reset the offset when done,
+     * since the GC is supposed to be read-only.
      */
 
-    if (arcPtr->fillGC != None) {
+    if (arcPtr->stippleGCPtr != NULL) {
+	XSetTSOrigin(display, *arcPtr->stippleGCPtr,
+		-canvasPtr->drawableXOrigin, -canvasPtr->drawableYOrigin);
+    }
+
+    /*
+     * Display filled arc first (if wanted), then outline.  If the extent
+     * is zero then don't invoke XFillArc or XDrawArc, since this causes
+     * some window servers to crash and should be a no-op anyway.
+     */
+
+    if ((arcPtr->fillGC != None) && (extent != 0)) {
 	XFillArc(display, drawable, arcPtr->fillGC, x1, y1, (x2-x1),
 		(y2-y1), start, extent);
+	if (arcPtr->fillStipple != None) {
+	    XSetTSOrigin(display, arcPtr->fillGC, 0, 0);
+	}
     }
     if (arcPtr->outlineGC != None) {
-	XDrawArc(display, drawable, arcPtr->outlineGC, x1, y1, (x2-x1),
-		(y2-y1), start, extent);
+	if (extent != 0) {
+	    XDrawArc(display, drawable, arcPtr->outlineGC, x1, y1, (x2-x1),
+		    (y2-y1), start, extent);
+	}
 
 	/*
 	 * If the outline width is very thin, don't use polygons to draw
@@ -689,6 +731,9 @@ DisplayArc(canvasPtr, itemPtr, drawable)
 	    }
 	}
     }
+    if (arcPtr->stippleGCPtr != NULL) {
+	XSetTSOrigin(display, *arcPtr->stippleGCPtr, 0, 0);
+    }
 }
 
 /*
@@ -723,7 +768,7 @@ ArcToPoint(canvasPtr, itemPtr, pointPtr)
 {
     register ArcItem *arcPtr = (ArcItem *) itemPtr;
     double vertex[2], pointAngle, diff, dist, newDist;
-    double poly[8], polyDist, width;
+    double poly[8], polyDist, width, t1, t2;
     int filled, angleInRange;
 
     if ((arcPtr->fillGC != None) || (arcPtr->outlineGC == None)) {
@@ -741,10 +786,13 @@ ArcToPoint(canvasPtr, itemPtr, pointPtr)
 
     vertex[0] = (arcPtr->bbox[0] + arcPtr->bbox[2])/2.0;
     vertex[1] = (arcPtr->bbox[1] + arcPtr->bbox[3])/2.0;
-    pointAngle = -atan2((pointPtr[1] - vertex[1])
-	    /(arcPtr->bbox[3] - arcPtr->bbox[1]),
-	    (pointPtr[0] - vertex[0])/(arcPtr->bbox[2] - arcPtr->bbox[0]));
-    pointAngle *= 180/PI;
+    t1 = (pointPtr[1] - vertex[1])/(arcPtr->bbox[3] - arcPtr->bbox[1]);
+    t2 = (pointPtr[0] - vertex[0])/(arcPtr->bbox[2] - arcPtr->bbox[0]);
+    if ((t1 == 0.0) && (t2 == 0.0)) {
+	pointAngle = 0;
+    } else {
+	pointAngle = -atan2(t1, t2)*180/PI;
+    }
     diff = pointAngle - arcPtr->start;
     diff -= ((int) (diff/360.0) * 360.0);
     if (diff < 0) {
@@ -1514,6 +1562,9 @@ AngleInRange(x, y, start, extent)
     double diff;
 
     diff = -atan2(y, x);
+    if ((x == 0.0) && (y == 0.0)) {
+	return 1;
+    }
     diff = diff*(180.0/PI) - start;
     while (diff > 360.0) {
 	diff -= 360.0;
@@ -1576,16 +1627,16 @@ ArcToPostscript(canvasPtr, itemPtr, psInfoPtr)
      */
 
     if (arcPtr->fillGC != None) {
-	sprintf(buffer, "matrix currentmatrix\n%g %g translate %g %g scale\n",
+	sprintf(buffer, "matrix currentmatrix\n%.15g %.15g translate %.15g %.15g scale\n",
 		(arcPtr->bbox[0] + arcPtr->bbox[2])/2, (y1 + y2)/2,
 		(arcPtr->bbox[2] - arcPtr->bbox[0])/2, (y1 - y2)/2);
 	Tcl_AppendResult(canvasPtr->interp, buffer, (char *) NULL);
 	if (arcPtr->style == chordUid) {
-	    sprintf(buffer, "0 0 1 %g %g arc closepath\nsetmatrix\n",
+	    sprintf(buffer, "0 0 1 %.15g %.15g arc closepath\nsetmatrix\n",
 		    ang1, ang2);
 	} else {
 	    sprintf(buffer,
-		    "0 0 moveto 0 0 1 %g %g arc closepath\nsetmatrix\n",
+		    "0 0 moveto 0 0 1 %.15g %.15g arc closepath\nsetmatrix\n",
 		    ang1, ang2);
 	}
 	Tcl_AppendResult(canvasPtr->interp, buffer, (char *) NULL);
@@ -1607,11 +1658,11 @@ ArcToPostscript(canvasPtr, itemPtr, psInfoPtr)
      */
 
     if (arcPtr->outlineGC != None) {
-	sprintf(buffer, "matrix currentmatrix\n%g %g translate %g %g scale\n",
+	sprintf(buffer, "matrix currentmatrix\n%.15g %.15g translate %.15g %.15g scale\n",
 		(arcPtr->bbox[0] + arcPtr->bbox[2])/2, (y1 + y2)/2,
 		(arcPtr->bbox[2] - arcPtr->bbox[0])/2, (y1 - y2)/2);
 	Tcl_AppendResult(canvasPtr->interp, buffer, (char *) NULL);
-	sprintf(buffer, "0 0 1 %g %g arc\nsetmatrix\n", ang1, ang2);
+	sprintf(buffer, "0 0 1 %.15g %.15g arc\nsetmatrix\n", ang1, ang2);
 	Tcl_AppendResult(canvasPtr->interp, buffer, (char *) NULL);
 	sprintf(buffer, "%d setlinewidth\n0 setlinecap\n", arcPtr->width);
 	Tcl_AppendResult(canvasPtr->interp, buffer, (char *) NULL);

@@ -4,16 +4,27 @@
  *	This file defines the defaults for all options for all of
  *	the Tk widgets.
  *
- * Copyright 1991-1992 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that this copyright
- * notice appears in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1991-1993 The Regents of the University of California.
+ * All rights reserved.
  *
- * $Header: /a/cvs/386BSD/ports/x11/tk/default.h,v 1.1 1993/08/09 01:20:55 jkh Exp $ SPRITE (Berkeley)
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+ *
+ * $Header: /a/cvs/386BSD/ports/x11/tk/default.h,v 1.2 1993/12/27 07:33:26 rich Exp $ SPRITE (Berkeley)
  */
 
 #ifndef _DEFAULT
@@ -51,12 +62,12 @@
 #define DEF_BUTTON_ACTIVE_FG_MONO	WHITE
 #define DEF_BUTTON_BG_COLOR		BISQUE1
 #define DEF_BUTTON_BG_MONO		WHITE
-#define DEF_BUTTON_BITMAP		((char *) NULL)
+#define DEF_BUTTON_BITMAP		""
 #define DEF_BUTTON_BORDER_WIDTH		"2"
-#define DEF_BUTTON_CURSOR		((char *) NULL)
-#define DEF_BUTTON_COMMAND		((char *) NULL)
+#define DEF_BUTTON_CURSOR		""
+#define DEF_BUTTON_COMMAND		""
 #define DEF_BUTTON_DISABLED_FG_COLOR	GRAY
-#define DEF_BUTTON_DISABLED_FG_MONO	((char *) NULL)
+#define DEF_BUTTON_DISABLED_FG_MONO	""
 #define DEF_BUTTON_FONT			"-Adobe-Helvetica-Bold-R-Normal--*-120-*"
 #define DEF_BUTTON_FG			BLACK
 #define DEF_BUTTON_HEIGHT		"0"
@@ -70,11 +81,11 @@
 #define DEF_BUTTON_SELECTOR_MONO	BLACK
 #define DEF_BUTTON_STATE		"normal"
 #define DEF_BUTTON_TEXT			" "
-#define DEF_BUTTON_TEXT_VARIABLE	((char *) NULL)
-#define DEF_BUTTON_VALUE		((char *) NULL)
+#define DEF_BUTTON_TEXT_VARIABLE	""
+#define DEF_BUTTON_VALUE		""
 #define DEF_BUTTON_WIDTH		"0"
 #define DEF_RADIOBUTTON_VARIABLE	"selectedButton"
-#define DEF_CHECKBUTTON_VARIABLE	((char *) NULL)
+#define DEF_CHECKBUTTON_VARIABLE	""
 
 /*
  * Defaults for canvases:
@@ -85,7 +96,7 @@
 #define DEF_CANVAS_BORDER_WIDTH		"2"
 #define DEF_CANVAS_CLOSE_ENOUGH		"1"
 #define DEF_CANVAS_CONFINE		"1"
-#define DEF_CANVAS_CURSOR		((char *) NULL)
+#define DEF_CANVAS_CURSOR		""
 #define DEF_CANVAS_HEIGHT		"7c"
 #define DEF_CANVAS_INSERT_BG		BLACK
 #define DEF_CANVAS_INSERT_BD_COLOR	"0"
@@ -95,7 +106,7 @@
 #define DEF_CANVAS_INSERT_WIDTH		"2"
 #define DEF_CANVAS_RELIEF		"flat"
 #define DEF_CANVAS_SCROLL_INCREMENT	"10"
-#define DEF_CANVAS_SCROLL_REGION	((char *) NULL)
+#define DEF_CANVAS_SCROLL_REGION	""
 #define DEF_CANVAS_SELECT_COLOR		LIGHTBLUE2
 #define DEF_CANVAS_SELECT_MONO		BLACK
 #define DEF_CANVAS_SELECT_BD_COLOR	"1"
@@ -103,8 +114,8 @@
 #define DEF_CANVAS_SELECT_FG_COLOR	BLACK
 #define DEF_CANVAS_SELECT_FG_MONO	WHITE
 #define DEF_CANVAS_WIDTH		"10c"
-#define DEF_CANVAS_X_SCROLL_CMD		((char *) NULL)
-#define DEF_CANVAS_Y_SCROLL_CMD		((char *) NULL)
+#define DEF_CANVAS_X_SCROLL_CMD		""
+#define DEF_CANVAS_Y_SCROLL_CMD		""
 
 /*
  * Defaults for entries:
@@ -124,7 +135,7 @@
 #define DEF_ENTRY_INSERT_ON_TIME	"600"
 #define DEF_ENTRY_INSERT_WIDTH		"2"
 #define DEF_ENTRY_RELIEF		"flat"
-#define DEF_ENTRY_SCROLL_COMMAND	((char *) NULL)
+#define DEF_ENTRY_SCROLL_COMMAND	""
 #define DEF_ENTRY_SELECT_COLOR		LIGHTBLUE2
 #define DEF_ENTRY_SELECT_MONO		BLACK
 #define DEF_ENTRY_SELECT_BD_COLOR	"1"
@@ -132,7 +143,7 @@
 #define DEF_ENTRY_SELECT_FG_COLOR	BLACK
 #define DEF_ENTRY_SELECT_FG_MONO	WHITE
 #define DEF_ENTRY_STATE			"normal"
-#define DEF_ENTRY_TEXT_VARIABLE		((char *) NULL)
+#define DEF_ENTRY_TEXT_VARIABLE		""
 #define DEF_ENTRY_WIDTH			"20"
 
 /*
@@ -142,8 +153,8 @@
 #define DEF_FRAME_BG_COLOR		BISQUE1
 #define DEF_FRAME_BG_MONO		WHITE
 #define DEF_FRAME_BORDER_WIDTH		"0"
-#define DEF_FRAME_CURSOR		((char *) NULL)
-#define DEF_FRAME_GEOMETRY		((char *) NULL)
+#define DEF_FRAME_CURSOR		""
+#define DEF_FRAME_GEOMETRY		""
 #define DEF_FRAME_HEIGHT		"0"
 #define DEF_FRAME_RELIEF		"flat"
 #define DEF_FRAME_WIDTH			"0"
@@ -155,13 +166,13 @@
 #define DEF_LISTBOX_BG_COLOR		BISQUE1
 #define DEF_LISTBOX_BG_MONO		WHITE
 #define DEF_LISTBOX_BORDER_WIDTH	"2"
-#define DEF_LISTBOX_CURSOR		((char *) NULL)
+#define DEF_LISTBOX_CURSOR		""
 #define DEF_LISTBOX_EXPORT_SELECTION	"1"
 #define DEF_LISTBOX_FONT		"-Adobe-Helvetica-Bold-R-Normal--*-120-*"
 #define DEF_LISTBOX_FG			BLACK
 #define DEF_LISTBOX_GEOMETRY		"20x10"
 #define DEF_LISTBOX_RELIEF		"flat"
-#define DEF_LISTBOX_SCROLL_COMMAND	((char *) NULL)
+#define DEF_LISTBOX_SCROLL_COMMAND	""
 #define DEF_LISTBOX_SELECT_COLOR	LIGHTBLUE2
 #define DEF_LISTBOX_SELECT_MONO		BLACK
 #define DEF_LISTBOX_SELECT_BD		"1"
@@ -173,18 +184,18 @@
  * Defaults for individual entries of menus:
  */
 
-#define DEF_MENU_ENTRY_ACTIVE_BG	((char *) NULL)
-#define DEF_MENU_ENTRY_ACCELERATOR	((char *) NULL)
-#define DEF_MENU_ENTRY_BG		((char *) NULL)
-#define DEF_MENU_ENTRY_BITMAP		((char *) NULL)
-#define DEF_MENU_ENTRY_COMMAND		((char *) NULL)
-#define DEF_MENU_ENTRY_FONT		((char *) NULL)
+#define DEF_MENU_ENTRY_ACTIVE_BG	""
+#define DEF_MENU_ENTRY_ACCELERATOR	""
+#define DEF_MENU_ENTRY_BG		""
+#define DEF_MENU_ENTRY_BITMAP		""
+#define DEF_MENU_ENTRY_COMMAND		""
+#define DEF_MENU_ENTRY_FONT		""
 #define DEF_MENU_ENTRY_LABEL		""
-#define DEF_MENU_ENTRY_MENU		((char *) NULL)
+#define DEF_MENU_ENTRY_MENU		""
 #define DEF_MENU_ENTRY_OFF_VALUE	"0"
 #define DEF_MENU_ENTRY_ON_VALUE		"1"
-#define DEF_MENU_ENTRY_VALUE		((char *) NULL)
-#define DEF_MENU_ENTRY_CHECK_VARIABLE	((char *) NULL)
+#define DEF_MENU_ENTRY_VALUE		""
+#define DEF_MENU_ENTRY_CHECK_VARIABLE	""
 #define DEF_MENU_ENTRY_RADIO_VARIABLE	"selectedButton"
 #define DEF_MENU_ENTRY_STATE		"normal"
 #define DEF_MENU_ENTRY_UNDERLINE	"-1"
@@ -201,10 +212,10 @@
 #define DEF_MENU_BG_COLOR		BISQUE1
 #define DEF_MENU_BG_MONO		WHITE
 #define DEF_MENU_BORDER_WIDTH		"2"
-#define DEF_MENU_POST_COMMAND		((char *) NULL)
+#define DEF_MENU_POST_COMMAND		""
 #define DEF_MENU_CURSOR			"arrow"
 #define DEF_MENU_DISABLED_FG_COLOR	GRAY
-#define DEF_MENU_DISABLED_FG_MONO	((char *) NULL)
+#define DEF_MENU_DISABLED_FG_MONO	""
 #define DEF_MENU_FONT			"-Adobe-Helvetica-Bold-R-Normal--*-120-*"
 #define DEF_MENU_FG			BLACK
 #define DEF_MENU_SELECTOR_COLOR		MAROON
@@ -221,22 +232,21 @@
 #define DEF_MENUBUTTON_ACTIVE_FG_MONO	WHITE
 #define DEF_MENUBUTTON_BG_COLOR		BISQUE1
 #define DEF_MENUBUTTON_BG_MONO		WHITE
-#define DEF_MENUBUTTON_BITMAP		((char *) NULL)
+#define DEF_MENUBUTTON_BITMAP		""
 #define DEF_MENUBUTTON_BORDER_WIDTH	"2"
-#define DEF_MENUBUTTON_CURSOR		((char *) NULL)
+#define DEF_MENUBUTTON_CURSOR		""
 #define DEF_MENUBUTTON_DISABLED_FG_COLOR GRAY
-#define DEF_MENUBUTTON_DISABLED_FG_MONO	((char *) NULL)
+#define DEF_MENUBUTTON_DISABLED_FG_MONO	""
 #define DEF_MENUBUTTON_FONT		"-Adobe-Helvetica-Bold-R-Normal--*-120-*"
 #define DEF_MENUBUTTON_FG		BLACK
-#define DEF_MENUBUTTON_GRAB		((char *) NULL)
 #define DEF_MENUBUTTON_HEIGHT		"0"
-#define DEF_MENUBUTTON_MENU		((char *) NULL)
+#define DEF_MENUBUTTON_MENU		""
 #define DEF_MENUBUTTON_PADX		"2"
 #define DEF_MENUBUTTON_PADY		"2"
 #define DEF_MENUBUTTON_RELIEF		"flat"
 #define DEF_MENUBUTTON_STATE		"normal"
 #define DEF_MENUBUTTON_TEXT		" "
-#define DEF_MENUBUTTON_TEXT_VARIABLE	((char *) NULL)
+#define DEF_MENUBUTTON_TEXT_VARIABLE	""
 #define DEF_MENUBUTTON_UNDERLINE	"-1"
 #define DEF_MENUBUTTON_WIDTH		"0"
 
@@ -249,15 +259,15 @@
 #define DEF_MESSAGE_BG_COLOR		BISQUE1
 #define DEF_MESSAGE_BG_MONO		WHITE
 #define DEF_MESSAGE_BORDER_WIDTH	"2"
-#define DEF_MESSAGE_CURSOR		((char *) NULL)
+#define DEF_MESSAGE_CURSOR		""
 #define DEF_MESSAGE_FONT		"-Adobe-Helvetica-Bold-R-Normal--*-120-*"
 #define DEF_MESSAGE_FG			BLACK
-#define DEF_MESSAGE_JUSTIFY		((char *) NULL)
+#define DEF_MESSAGE_JUSTIFY		"left"
 #define DEF_MESSAGE_PADX		"-1"
 #define DEF_MESSAGE_PADY		"-1"
 #define DEF_MESSAGE_RELIEF		"flat"
 #define DEF_MESSAGE_TEXT		" "
-#define DEF_MESSAGE_TEXT_VARIABLE	((char *) NULL)
+#define DEF_MESSAGE_TEXT_VARIABLE	""
 #define DEF_MESSAGE_WIDTH		"0"
 
 /*
@@ -269,12 +279,13 @@
 #define DEF_SCALE_BG_COLOR		BISQUE2
 #define DEF_SCALE_BG_MONO		WHITE
 #define DEF_SCALE_BORDER_WIDTH		"2"
-#define DEF_SCALE_CURSOR		((char *) NULL)
+#define DEF_SCALE_COMMAND		""
+#define DEF_SCALE_CURSOR		""
 #define DEF_SCALE_FONT			"-Adobe-Helvetica-Bold-R-Normal--*-120-*"
 #define DEF_SCALE_FG_COLOR		BLACK
 #define DEF_SCALE_FG_MONO		BLACK
 #define DEF_SCALE_FROM			"0"
-#define DEF_SCALE_LABEL			((char *) NULL)
+#define DEF_SCALE_LABEL			""
 #define DEF_SCALE_LENGTH		"100"
 #define DEF_SCALE_ORIENT		"vertical"
 #define DEF_SCALE_RELIEF		"flat"
@@ -296,8 +307,8 @@
 #define DEF_SCROLLBAR_BG_COLOR		BISQUE3
 #define DEF_SCROLLBAR_BG_MONO		WHITE
 #define DEF_SCROLLBAR_BORDER_WIDTH	"2"
-#define DEF_SCROLLBAR_COMMAND		((char *) NULL)
-#define DEF_SCROLLBAR_CURSOR		((char *) NULL)
+#define DEF_SCROLLBAR_COMMAND		""
+#define DEF_SCROLLBAR_CURSOR		""
 #define DEF_SCROLLBAR_FG_COLOR		BISQUE1
 #define DEF_SCROLLBAR_FG_MONO		WHITE
 #define DEF_SCROLLBAR_ORIENT		"vertical"
@@ -338,6 +349,6 @@
 #define DEF_TEXT_STATE			"normal"
 #define DEF_TEXT_WIDTH			"80"
 #define DEF_TEXT_WRAP			"char"
-#define DEF_TEXT_YSCROLL_COMMAND	((char *) NULL)
+#define DEF_TEXT_YSCROLL_COMMAND	""
 
 #endif /* _DEFAULT */

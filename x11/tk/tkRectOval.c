@@ -4,22 +4,32 @@
  *	This file implements rectangle and oval items for canvas
  *	widgets.
  *
- * Copyright 1991-1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1991-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkRectOval.c,v 1.1 1993/08/09 01:20:55 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkRectOval.c,v 1.2 1993/12/27 07:34:29 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include <stdio.h>
-#include <math.h>
 #include "tkConfig.h"
 #include "tkInt.h"
 #include "tkCanvas.h"
@@ -246,13 +256,16 @@ RectOvalCoords(canvasPtr, itemPtr, argc, argv)
 					 * x2, y2, ... */
 {
     register RectOvalItem *rectOvalPtr = (RectOvalItem *) itemPtr;
-    char buffer[500];
+    char c0[TCL_DOUBLE_SPACE], c1[TCL_DOUBLE_SPACE];
+    char c2[TCL_DOUBLE_SPACE], c3[TCL_DOUBLE_SPACE];
 
     if (argc == 0) {
-	sprintf(buffer, "%g %g %g %g", rectOvalPtr->bbox[0],
-		rectOvalPtr->bbox[1], rectOvalPtr->bbox[2],
-		rectOvalPtr->bbox[3]);
-	Tcl_SetResult(canvasPtr->interp, buffer, TCL_VOLATILE);
+	Tcl_PrintDouble(canvasPtr->interp, rectOvalPtr->bbox[0], c0);
+	Tcl_PrintDouble(canvasPtr->interp, rectOvalPtr->bbox[1], c1);
+	Tcl_PrintDouble(canvasPtr->interp, rectOvalPtr->bbox[2], c2);
+	Tcl_PrintDouble(canvasPtr->interp, rectOvalPtr->bbox[3], c3);
+	Tcl_AppendResult(canvasPtr->interp, c0, " ", c1, " ",
+		c2, " ", c3, (char *) NULL);
     } else if (argc == 4) {
 	if ((TkGetCanvasCoord(canvasPtr, argv[0],
 		    &rectOvalPtr->bbox[0]) != TCL_OK)
@@ -496,10 +509,17 @@ DisplayRectOval(canvasPtr, itemPtr, drawable)
     }
 
     /*
-     * Display filled box first (if wanted), then outline.
+     * Display filled part first (if wanted), then outline.  If we're
+     * stippling, then modify the stipple offset in the GC.  Be sure to
+     * reset the offset when done, since the GC is supposed to be
+     * read-only.
      */
 
     if (rectOvalPtr->fillGC != None) {
+	if (rectOvalPtr->fillStipple != None) {
+	    XSetTSOrigin(display, rectOvalPtr->fillGC,
+		    -canvasPtr->drawableXOrigin, -canvasPtr->drawableYOrigin);
+	}
 	if (rectOvalPtr->header.typePtr == &TkRectangleType) {
 	    XFillRectangle(display, drawable, rectOvalPtr->fillGC,
 		    x1, y1, (unsigned int) (x2-x1), (unsigned int) (y2-y1));
@@ -507,14 +527,17 @@ DisplayRectOval(canvasPtr, itemPtr, drawable)
 	    XFillArc(display, drawable, rectOvalPtr->fillGC,
 		    x1, y1, (x2-x1), (y2-y1), 0, 360*64);
 	}
+	if (rectOvalPtr->fillStipple != None) {
+	    XSetTSOrigin(display, rectOvalPtr->fillGC, 0, 0);
+	}
     }
     if (rectOvalPtr->outlineGC != None) {
 	if (rectOvalPtr->header.typePtr == &TkRectangleType) {
 	    XDrawRectangle(display, drawable, rectOvalPtr->outlineGC,
-		    x1, y1, (x2-x1-1), (y2-y1-1));
+		    x1, y1, (x2-x1), (y2-y1));
 	} else {
 	    XDrawArc(display, drawable, rectOvalPtr->outlineGC,
-		    x1, y1, (x2-x1-1), (y2-y1-1), 0, 360*64);
+		    x1, y1, (x2-x1), (y2-y1), 0, 360*64);
 	}
     }
 }
@@ -781,8 +804,8 @@ OvalToArea(canvasPtr, itemPtr, areaPtr)
      * unfilled center, in which case we should return "outside".
      */
 
-    if ((result == 0) && (ovalPtr->outlineGC != NULL)
-	    && (ovalPtr->fillGC == NULL)) {
+    if ((result == 0) && (ovalPtr->outlineGC != None)
+	    && (ovalPtr->fillGC == None)) {
 	double centerX, centerY, width, height;
 	double xDelta1, yDelta1, xDelta2, yDelta2;
 
@@ -926,12 +949,12 @@ RectOvalToPostscript(canvasPtr, itemPtr, psInfoPtr)
 
 
     if (rectOvalPtr->header.typePtr == &TkRectangleType) {
-	sprintf(pathCmd, "%g %g moveto %g 0 rlineto 0 %g rlineto %g 0 rlineto closepath\n",
+	sprintf(pathCmd, "%.15g %.15g moveto %.15g 0 rlineto 0 %.15g rlineto %.15g 0 rlineto closepath\n",
 		rectOvalPtr->bbox[0], y1,
 		rectOvalPtr->bbox[2]-rectOvalPtr->bbox[0], y2-y1,
 		rectOvalPtr->bbox[0]-rectOvalPtr->bbox[2]);
     } else {
-	sprintf(pathCmd, "matrix currentmatrix\n%g %g translate %g %g scale 1 0 moveto 0 0 1 0 360 arc\nsetmatrix\n",
+	sprintf(pathCmd, "matrix currentmatrix\n%.15g %.15g translate %.15g %.15g scale 1 0 moveto 0 0 1 0 360 arc\nsetmatrix\n",
 		(rectOvalPtr->bbox[0] + rectOvalPtr->bbox[2])/2, (y1 + y2)/2,
 		(rectOvalPtr->bbox[2] - rectOvalPtr->bbox[0])/2, (y1 - y2)/2);
     }

@@ -4,18 +4,29 @@
  *	This module implements button-like widgets that are used
  *	to invoke pull-down menus.
  *
- * Copyright 1990-1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkMenubutton.c,v 1.1 1993/08/09 01:20:55 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkMenubutton.c,v 1.2 1993/12/27 07:34:21 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "tkConfig.h"
@@ -88,8 +99,8 @@ typedef struct {
 				 * text or icon is drawn with normalGC and
 				 * this GC is used to stipple background
 				 * across it. */
-    int leftBearing;		/* Amount text sticks left from its origin,
-				 * in pixels. */
+    int leftBearing;		/* Distance from text origin to leftmost drawn
+				 * pixel (positive means to right). */
     int rightBearing;		/* Amount text sticks right from its origin. */
     int width, height;		/* If > 0, these specify dimensions to request
 				 * for window, in characters for text and in
@@ -178,7 +189,8 @@ static Tk_ConfigSpec configSpecs[] = {
     {TK_CONFIG_INT, "-height", "height", "Height",
 	DEF_MENUBUTTON_HEIGHT, Tk_Offset(MenuButton, height), 0},
     {TK_CONFIG_STRING, "-menu", "menu", "Menu",
-	DEF_MENUBUTTON_MENU, Tk_Offset(MenuButton, menuName), 0},
+	DEF_MENUBUTTON_MENU, Tk_Offset(MenuButton, menuName),
+	TK_CONFIG_NULL_OK},
     {TK_CONFIG_PIXELS, "-padx", "padX", "Pad",
 	DEF_MENUBUTTON_PADX, Tk_Offset(MenuButton, padX), 0},
     {TK_CONFIG_PIXELS, "-pady", "padY", "Pad",
@@ -274,6 +286,7 @@ Tk_MenubuttonCmd(clientData, interp, argc, argv)
     mbPtr->interp = interp;
     mbPtr->menuName = NULL;
     mbPtr->text = NULL;
+    mbPtr->textLength = 0;
     mbPtr->underline = -1;
     mbPtr->textVarName = NULL;
     mbPtr->bitmap = None;
@@ -286,10 +299,17 @@ Tk_MenubuttonCmd(clientData, interp, argc, argv)
     mbPtr->normalFg = NULL;
     mbPtr->activeFg = NULL;
     mbPtr->disabledFg = NULL;
-    mbPtr->normalTextGC = NULL;
-    mbPtr->activeTextGC = NULL;
+    mbPtr->normalTextGC = None;
+    mbPtr->activeTextGC = None;
     mbPtr->gray = None;
-    mbPtr->disabledGC = NULL;
+    mbPtr->disabledGC = None;
+    mbPtr->leftBearing = 0;
+    mbPtr->rightBearing = 0;
+    mbPtr->width = 0;
+    mbPtr->width = 0;
+    mbPtr->padX = 0;
+    mbPtr->padY = 0;
+    mbPtr->anchor = TK_ANCHOR_CENTER;
     mbPtr->cursor = None;
     mbPtr->flags = 0;
 
@@ -424,38 +444,17 @@ DestroyMenuButton(clientData)
     ClientData clientData;	/* Info about button widget. */
 {
     register MenuButton *mbPtr = (MenuButton *) clientData;
-    if (mbPtr->menuName != NULL) {
-        ckfree(mbPtr->menuName);
-    }
-    if (mbPtr->text != NULL) {
-	ckfree(mbPtr->text);
-    }
+
+    /*
+     * Free up all the stuff that requires special handling, then
+     * let Tk_FreeOptions handle all the standard option-related
+     * stuff.
+     */
+
     if (mbPtr->textVarName != NULL) {
 	Tcl_UntraceVar(mbPtr->interp, mbPtr->textVarName,
 		TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		MenuButtonTextVarProc, (ClientData) mbPtr);
-	ckfree(mbPtr->textVarName);
-    }
-    if (mbPtr->bitmap != None) {
-	Tk_FreeBitmap(mbPtr->display, mbPtr->bitmap);
-    }
-    if (mbPtr->normalBorder != NULL) {
-	Tk_Free3DBorder(mbPtr->normalBorder);
-    }
-    if (mbPtr->activeBorder != NULL) {
-	Tk_Free3DBorder(mbPtr->activeBorder);
-    }
-    if (mbPtr->fontPtr != NULL) {
-	Tk_FreeFontStruct(mbPtr->fontPtr);
-    }
-    if (mbPtr->normalFg != NULL) {
-	Tk_FreeColor(mbPtr->normalFg);
-    }
-    if (mbPtr->activeFg != NULL) {
-	Tk_FreeColor(mbPtr->activeFg);
-    }
-    if (mbPtr->disabledFg != NULL) {
-	Tk_FreeColor(mbPtr->disabledFg);
     }
     if (mbPtr->normalTextGC != None) {
 	Tk_FreeGC(mbPtr->display, mbPtr->normalTextGC);
@@ -469,9 +468,7 @@ DestroyMenuButton(clientData)
     if (mbPtr->disabledGC != None) {
 	Tk_FreeGC(mbPtr->display, mbPtr->disabledGC);
     }
-    if (mbPtr->cursor != None) {
-	Tk_FreeCursor(mbPtr->display, mbPtr->cursor);
-    }
+    Tk_FreeOptions(configSpecs, (char *) mbPtr, mbPtr->display, 0);
     ckfree((char *) mbPtr);
 }
 
@@ -740,10 +737,10 @@ DisplayMenuButton(clientData)
     } else {
 	switch (mbPtr->anchor) {
 	    case TK_ANCHOR_NW: case TK_ANCHOR_W: case TK_ANCHOR_SW:
-		x = mbPtr->borderWidth + mbPtr->padX + mbPtr->leftBearing;
+		x = mbPtr->borderWidth + mbPtr->padX - mbPtr->leftBearing;
 		break;
 	    case TK_ANCHOR_N: case TK_ANCHOR_CENTER: case TK_ANCHOR_S:
-		x = (Tk_Width(tkwin) + mbPtr->leftBearing
+		x = (Tk_Width(tkwin) - mbPtr->leftBearing
 			- mbPtr->rightBearing)/2;
 		break;
 	    default:
@@ -886,7 +883,7 @@ ComputeMenuButtonGeometry(mbPtr)
 		&dummy, &dummy, &dummy, &bbox);
 	mbPtr->leftBearing = bbox.lbearing;
 	mbPtr->rightBearing = bbox.rbearing;
-	width = bbox.lbearing + bbox.rbearing;
+	width = bbox.rbearing - bbox.lbearing;
 	height = mbPtr->fontPtr->ascent + mbPtr->fontPtr->descent;
 	if (mbPtr->width > 0) {
 	    width = mbPtr->width * XTextWidth(mbPtr->fontPtr, "0", 1);

@@ -5,18 +5,29 @@
  *	whereby procedure callbacks may be attached to
  *	certain events.
  *
- * Copyright 1990-1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkEvent.c,v 1.1 1993/08/09 01:20:45 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkEvent.c,v 1.2 1993/12/27 07:34:05 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "tkConfig.h"
@@ -51,17 +62,18 @@ static TimerEvent *timerQueue;	/* First event in queue. */
 static int readCount;		/* Number of files for which we */
 static int writeCount;		/* care about each event type. */
 static int exceptCount;
-#define MASK_SIZE ((OPEN_MAX+(8*sizeof(int))-1)/(8*sizeof(int)))
-static int masks[3*MASK_SIZE];	/* Integer array containing official
+static fd_mask masks[3*MASK_SIZE];
+				/* Integer array containing official
 				 * copies of the three sets of
 				 * masks. */
-static int ready[3*MASK_SIZE];	/* Temporary copy of masks, passed
+static fd_mask ready[3*MASK_SIZE];
+				/* Temporary copy of masks, passed
 				 * to select and modified by kernel
 				 * to indicate which files are
 				 * actually ready. */
-static int *readPtr;		/* Pointers to the portions of */
-static int *writePtr;		/* *readyPtr for reading, writing, */
-static int *exceptPtr;		/* and excepting.  Will be NULL if
+static fd_mask *readPtr;	/* Pointers to the portions of */
+static fd_mask *writePtr;	/* *readyPtr for reading, writing, */
+static fd_mask *exceptPtr;	/* and excepting.  Will be NULL if
 				 * corresponding count (e.g. readCount
 				 * is zero. */
 static int numFds = 0;		/* Number of valid bits in mask
@@ -77,11 +89,14 @@ static int numFds = 0;		/* Number of valid bits in mask
 
 typedef struct FileEvent {
     int fd;			/* Descriptor number for this file. */
-    int *readPtr;		/* Pointer to word in ready array
+    int isDisplay;		/* Non-zero means that this file descriptor
+				 * corresponds to a display and should be
+				 * treated specially. */
+    fd_mask *readPtr;		/* Pointer to word in ready array
 				 * for this file's read mask bit. */
-    int *writePtr;		/* Same for write mask bit. */
-    int *exceptPtr;		/* Same for except mask bit. */
-    int mask;			/* Value to AND with mask word to
+    fd_mask *writePtr;		/* Same for write mask bit. */
+    fd_mask *exceptPtr;		/* Same for except mask bit. */
+    fd_mask mask;		/* Value to AND with mask word to
 				 * select just this file's bit. */
     void (*proc)  _ANSI_ARGS_((ClientData clientData, int mask));
 				/* Procedure to call.  NULL means
@@ -539,6 +554,9 @@ Tk_HandleEvent(eventPtr)
 		} else {
 		    genPrevPtr->nextPtr = tmpPtr;
 		}
+		if (tmpPtr == NULL) {
+		    lastGenericPtr = genPrevPtr;
+		}
 		(void) ckfree((char *) genericPtr);
 		genericPtr = tmpPtr;
 		continue;
@@ -754,13 +772,13 @@ Tk_CreateFileHandler(fd, mask, proc, clientData)
     int mask;			/* OR'ed combination of TK_READABLE,
 				 * TK_WRITABLE, and TK_EXCEPTION:
 				 * indicates conditions under which
-				 * proc should be called. */
+				 * proc should be called.  TK_IS_DISPLAY
+				 * indicates that this is a display and that
+				 * clientData is the (Display *) for it,
+				 * and that events should be handled
+				 * automatically.*/
     Tk_FileProc *proc;		/* Procedure to call for each
-				 * selected event.  NULL means that
-				 * this is a display, and that
-				 * clientData is the (Display *)
-				 * for it, and that events should
-				 * be handled automatically. */
+				 * selected event. */
     ClientData clientData;	/* Arbitrary data to pass to proc. */
 {
     register FileEvent *filePtr;
@@ -782,14 +800,15 @@ Tk_CreateFileHandler(fd, mask, proc, clientData)
 	    break;
 	}
     }
-    index = fd/(8*sizeof(int));
+    index = fd/(NBBY*sizeof(fd_mask));
     if (filePtr == NULL) {
 	filePtr = (FileEvent *) ckalloc(sizeof(FileEvent));
 	filePtr->fd = fd;
+	filePtr->isDisplay = 0;
 	filePtr->readPtr = &ready[index];
 	filePtr->writePtr = &ready[index+MASK_SIZE];
 	filePtr->exceptPtr = &ready[index+2*MASK_SIZE];
-	filePtr->mask = 1 << (fd%(8*sizeof(int)));
+	filePtr->mask = 1 << (fd%(NBBY*sizeof(fd_mask)));
 	filePtr->nextPtr = fileList;
 	fileList = filePtr;
     } else {
@@ -820,19 +839,25 @@ Tk_CreateFileHandler(fd, mask, proc, clientData)
 	masks[index] |= filePtr->mask;
 	readCount++;
     }
-    readPtr = (readCount == 0) ? (int *) NULL : &ready[0];
+    readPtr = (readCount == 0) ? (fd_mask *) NULL : &ready[0];
 
     if (mask & TK_WRITABLE) {
 	masks[index+MASK_SIZE] |= filePtr->mask;
 	writeCount++;
     }
-    writePtr = (writeCount == 0) ? (int *) NULL : &ready[MASK_SIZE];
+    writePtr = (writeCount == 0) ? (fd_mask *) NULL : &ready[MASK_SIZE];
 
     if (mask & TK_EXCEPTION) {
 	masks[index+2*MASK_SIZE] |= filePtr->mask;
 	exceptCount++;
     }
-    exceptPtr = (exceptCount == 0) ? (int *) NULL : &ready[2*MASK_SIZE];
+    exceptPtr = (exceptCount == 0) ? (fd_mask *) NULL : &ready[2*MASK_SIZE];
+
+    if (mask & TK_IS_DISPLAY) {
+	filePtr->isDisplay = 1;
+    } else {
+	filePtr->isDisplay = 0;
+    }
 
     filePtr->proc = proc;
     filePtr->clientData = clientData;
@@ -887,7 +912,7 @@ Tk_DeleteFileHandler(fd)
      * Clean up information in the callback record.
      */
 
-    index = filePtr->fd/(8*sizeof(int));
+    index = filePtr->fd/(NBBY*sizeof(fd_mask));
     if (masks[index] & filePtr->mask) {
 	readCount--;
 	*filePtr->readPtr &= ~filePtr->mask;
@@ -1177,6 +1202,10 @@ Tk_DoOneEvent(flags)
      */
 
     checkFiles:
+    if (tcl_AsyncReady) {
+	(void) Tcl_AsyncInvoke((Tcl_Interp *) NULL, 0);
+	return 1;
+    }
     for (filePtr = fileList; filePtr != NULL;
 	    filePtr = filePtr->nextPtr) {
 	int mask;
@@ -1188,10 +1217,13 @@ Tk_DoOneEvent(flags)
 	 * return.
 	 */
 
-	if ((filePtr->proc == NULL) && (flags & TK_X_EVENTS)) {
+	if (filePtr->isDisplay) {
 	    Display *display = (Display *) filePtr->clientData;
 	    XEvent event;
 
+	    if (!(flags & TK_X_EVENTS)) {
+		continue;
+	    }
 	    XFlush(display);
 	    if ((*filePtr->readPtr) & filePtr->mask) {
 		*filePtr->readPtr &= ~filePtr->mask;
@@ -1377,14 +1409,21 @@ Tk_DoOneEvent(flags)
     if (((idleList != NULL) && (flags & TK_IDLE_EVENTS))
 	    || (flags & TK_DONT_WAIT)) {
 	if (flags & (TK_X_EVENTS|TK_FILE_EVENTS)) {
-	    memcpy((VOID *) ready, (VOID *) masks, 3*MASK_SIZE*sizeof(int));
+	    memcpy((VOID *) ready, (VOID *) masks,
+		    3*MASK_SIZE*sizeof(fd_mask));
 	    timeout.tv_sec = timeout.tv_usec = 0;
-	    do {
-		numFound = select(numFds, (SELECT_MASK *) readPtr,
-			(SELECT_MASK *) writePtr, (SELECT_MASK *) exceptPtr,
+	    numFound = select(numFds, (SELECT_MASK *) readPtr,
+		    (SELECT_MASK *) writePtr, (SELECT_MASK *) exceptPtr,
 		    &timeout);
-	    } while ((numFound == -1) && (errno == EINTR));
-	    if (numFound > 0) {
+	    if (numFound == -1) {
+		/*
+		 * Some systems don't clear the masks after an error, so
+		 * we have to do it here.
+		 */
+
+		memset((VOID *) ready, 0, 3*MASK_SIZE*sizeof(fd_mask));
+	    }
+	    if ((numFound > 0) || ((numFound == -1) && (errno == EINTR))) {
 		goto checkFiles;
 	    }
 	}
@@ -1454,12 +1493,18 @@ Tk_DoOneEvent(flags)
 	    timeout.tv_usec += 1000000;
 	}
     }
-    memcpy((VOID *) ready, (VOID *) masks, 3*MASK_SIZE*sizeof(int));
-    do {
-	numFound = select(numFds, (SELECT_MASK *) readPtr,
-		(SELECT_MASK *) writePtr, (SELECT_MASK *) exceptPtr,
-		timeoutPtr);
-    } while ((numFound == -1) && (errno == EINTR));
+    memcpy((VOID *) ready, (VOID *) masks, 3*MASK_SIZE*sizeof(fd_mask));
+    numFound = select(numFds, (SELECT_MASK *) readPtr,
+	    (SELECT_MASK *) writePtr, (SELECT_MASK *) exceptPtr,
+	    timeoutPtr);
+    if (numFound == -1) {
+	/*
+	 * Some systems don't clear the masks after an error, so
+	 * we have to do it here.
+	 */
+
+	memset((VOID *) ready, 0, 3*MASK_SIZE*sizeof(fd_mask));
+    }
     if (numFound == 0) {
 	goto checkTime;
     }

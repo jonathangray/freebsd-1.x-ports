@@ -5,18 +5,29 @@
  *	for text widgets, plus most of the other high-level functions
  *	related to tags.
  *
- * Copyright 1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1992-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkTextTag.c,v 1.1 1993/08/09 01:20:52 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkTextTag.c,v 1.2 1993/12/27 07:34:45 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "default.h"
@@ -361,7 +372,7 @@ TkTextTagCmd(textPtr, interp, argc, argv)
 	SortTags(arraySize, arrayPtr);
 	for (i = 0; i < arraySize; i++) {
 	    tagPtr = arrayPtr[i];
-	    Tcl_AppendElement(interp, tagPtr->name, 0);
+	    Tcl_AppendElement(interp, tagPtr->name);
 	}
 	ckfree((char *) arrayPtr);
     } else if ((c == 'n') && (strncmp(argv[2], "nextrange", length) == 0)
@@ -415,10 +426,10 @@ TkTextTagCmd(textPtr, interp, argc, argv)
 	    return TCL_OK;
 	}
 	TkTextPrintIndex(tSearch.line1, tSearch.ch1, position);
-	Tcl_AppendElement(interp, position, 0);
+	Tcl_AppendElement(interp, position);
 	TkBTreeNextTag(&tSearch);
 	TkTextPrintIndex(tSearch.line1, tSearch.ch1, position);
-	Tcl_AppendElement(interp, position, 0);
+	Tcl_AppendElement(interp, position);
     } else if ((c == 'r') && (strncmp(argv[2], "raise", length) == 0)
 	    && (length >= 3)) {
 	TkTextTag *tagPtr2;
@@ -468,7 +479,7 @@ TkTextTagCmd(textPtr, interp, argc, argv)
 		0, tagPtr, &tSearch);
 	while (TkBTreeNextTag(&tSearch)) {
 	    TkTextPrintIndex(tSearch.line1, tSearch.ch1, position);
-	    Tcl_AppendElement(interp, position, 0);
+	    Tcl_AppendElement(interp, position);
 	}
     } else if ((c == 'r') && (strncmp(argv[2], "remove", length) == 0)
 	    && (length >= 2)) {

@@ -5,18 +5,29 @@
  *	toolkit.  A listbox displays a collection of strings,
  *	one per line, and provides scrolling and selection.
  *
- * Copyright 1990-1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkListbox.c,v 1.1 1993/08/09 01:20:53 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkListbox.c,v 1.2 1993/12/27 07:34:16 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "tkConfig.h"
@@ -210,9 +221,11 @@ static Tk_ConfigSpec configSpecs[] = {
     {TK_CONFIG_BOOLEAN, "-setgrid", "setGrid", "SetGrid",
 	DEF_LISTBOX_SET_GRID, Tk_Offset(Listbox, setGrid), 0},
     {TK_CONFIG_STRING, "-xscrollcommand", "xScrollCommand", "ScrollCommand",
-	DEF_LISTBOX_SCROLL_COMMAND, Tk_Offset(Listbox, xScrollCmd), 0},
+	DEF_LISTBOX_SCROLL_COMMAND, Tk_Offset(Listbox, xScrollCmd),
+	TK_CONFIG_NULL_OK},
     {TK_CONFIG_STRING, "-yscrollcommand", "yScrollCommand", "ScrollCommand",
-	DEF_LISTBOX_SCROLL_COMMAND, Tk_Offset(Listbox, yScrollCmd), 0},
+	DEF_LISTBOX_SCROLL_COMMAND, Tk_Offset(Listbox, yScrollCmd),
+	TK_CONFIG_NULL_OK},
     {TK_CONFIG_END, (char *) NULL, (char *) NULL, (char *) NULL,
 	(char *) NULL, 0, 0}
 };
@@ -233,7 +246,8 @@ static void		DeleteEls _ANSI_ARGS_((Listbox *listPtr, int first,
 static void		DestroyListbox _ANSI_ARGS_((ClientData clientData));
 static void		DisplayListbox _ANSI_ARGS_((ClientData clientData));
 static int		GetListboxIndex _ANSI_ARGS_((Tcl_Interp *interp,
-			    Listbox *listPtr, char *string, int *indexPtr));
+			    Listbox *listPtr, char *string, int endAfter,
+			    int *indexPtr));
 static void		InsertEls _ANSI_ARGS_((Listbox *listPtr, int index,
 			    int argc, char **argv));
 static void		ListboxComputeWidths _ANSI_ARGS_((Listbox *listPtr,
@@ -314,21 +328,34 @@ Tk_ListboxCmd(clientData, interp, argc, argv)
     listPtr->numElements = 0;
     listPtr->elementPtr = NULL;
     listPtr->normalBorder = NULL;
+    listPtr->borderWidth = 0;
+    listPtr->relief = TK_RELIEF_RAISED;
     listPtr->fontPtr = NULL;
     listPtr->fgColorPtr = NULL;
     listPtr->textGC = None;
     listPtr->selBorder = NULL;
-    listPtr->selFgColorPtr = NULL;
-    listPtr->selTextGC = NULL;
+    listPtr->selBorderWidth = 0;
+    listPtr->selFgColorPtr = None;
+    listPtr->selTextGC = None;
     listPtr->geometry = NULL;
+    listPtr->lineHeight = 0;
     listPtr->topIndex = 0;
+    listPtr->numLines = 0;
+    listPtr->setGrid = 0;
+    listPtr->maxWidth = 0;
+    listPtr->xScrollUnit = 0;
     listPtr->xOffset = 0;
     listPtr->selectFirst = -1;
     listPtr->selectLast = -1;
+    listPtr->selectAnchor = 0;
     listPtr->exportSelection = 1;
+    listPtr->scanMarkX = 0;
+    listPtr->scanMarkY = 0;
+    listPtr->scanMarkXOffset = 0;
+    listPtr->scanMarkYIndex = 0;
     listPtr->cursor = None;
-    listPtr->yScrollCmd = NULL;
     listPtr->xScrollCmd = NULL;
+    listPtr->yScrollCmd = NULL;
     listPtr->flags = 0;
 
     Tk_SetClass(listPtr->tkwin, "Listbox");
@@ -414,7 +441,7 @@ ListboxWidgetCmd(clientData, interp, argc, argv)
 	if (listPtr->selectFirst != -1) {
 	    for (i = listPtr->selectFirst; i <= listPtr->selectLast; i++) {
 		sprintf(index, "%d", i);
-		Tcl_AppendElement(interp, index, 0);
+		Tcl_AppendElement(interp, index);
 	    }
 	}
     } else if ((c == 'd') && (strncmp(argv[1], "delete", length) == 0)) {
@@ -426,13 +453,13 @@ ListboxWidgetCmd(clientData, interp, argc, argv)
 		    (char *) NULL);
 	    goto error;
 	}
-	if (GetListboxIndex(interp, listPtr, argv[2], &first) != TCL_OK) {
+	if (GetListboxIndex(interp, listPtr, argv[2], 0, &first) != TCL_OK) {
 	    goto error;
 	}
 	if (argc == 3) {
 	    last = first;
 	} else {
-	    if (GetListboxIndex(interp, listPtr, argv[3], &last) != TCL_OK) {
+	    if (GetListboxIndex(interp, listPtr, argv[3], 0, &last) != TCL_OK) {
 		goto error;
 	    }
 	}
@@ -446,7 +473,7 @@ ListboxWidgetCmd(clientData, interp, argc, argv)
 		    argv[0], " get index\"", (char *) NULL);
 	    goto error;
 	}
-	if (GetListboxIndex(interp, listPtr, argv[2], &index) != TCL_OK) {
+	if (GetListboxIndex(interp, listPtr, argv[2], 0, &index) != TCL_OK) {
 	    goto error;
 	}
 	if (index < 0) {
@@ -467,16 +494,15 @@ ListboxWidgetCmd(clientData, interp, argc, argv)
 
 	if (argc < 3) {
 	    Tcl_AppendResult(interp, "wrong # args: should be \"",
-		    argv[0], " insert index ?element? ?element ...?\"",
+		    argv[0], " insert index ?element element ...?\"",
 		    (char *) NULL);
 	    goto error;
 	}
-	if (argc > 3) {
-	    if (GetListboxIndex(interp, listPtr, argv[2], &index) != TCL_OK) {
-		goto error;
-	    }
-	    InsertEls(listPtr, index, argc-3, argv+3);
+	if (GetListboxIndex(interp, listPtr, argv[2], 1, &index)
+		!= TCL_OK) {
+	    goto error;
 	}
+	InsertEls(listPtr, index, argc-3, argv+3);
     } else if ((c == 'n') && (strncmp(argv[1], "nearest", length) == 0)) {
 	int index, y;
 
@@ -547,10 +573,11 @@ ListboxWidgetCmd(clientData, interp, argc, argv)
 		    argv[0], " select option index\"", (char *) NULL);
 	    goto error;
 	}
-	if (GetListboxIndex(interp, listPtr, argv[3], &index) != TCL_OK) {
-	    goto error;
-	}
 	if ((c == 'a') && (strncmp(argv[2], "adjust", length) == 0)) {
+	    if (GetListboxIndex(interp, listPtr, argv[3], 1, &index)
+		    != TCL_OK) {
+		goto error;
+	    }
 	    if (index < (listPtr->selectFirst + listPtr->selectLast)/2) {
 		listPtr->selectAnchor = listPtr->selectLast;
 	    } else {
@@ -558,8 +585,16 @@ ListboxWidgetCmd(clientData, interp, argc, argv)
 	    }
 	    ListboxSelectTo(listPtr, index);
 	} else if ((c == 'f') && (strncmp(argv[2], "from", length) == 0)) {
+	    if (GetListboxIndex(interp, listPtr, argv[3], 0, &index)
+		    != TCL_OK) {
+		goto error;
+	    }
 	    ListboxSelectFrom(listPtr, index);
 	} else if ((c == 't') && (strncmp(argv[2], "to", length) == 0)) {
+	    if (GetListboxIndex(interp, listPtr, argv[3], 1, &index)
+		    != TCL_OK) {
+		goto error;
+	    }
 	    ListboxSelectTo(listPtr, index);
 	} else {
 	    Tcl_AppendResult(interp, "bad select option \"", argv[2],
@@ -589,7 +624,7 @@ ListboxWidgetCmd(clientData, interp, argc, argv)
 		    argv[0], " yview index\"", (char *) NULL);
 	    goto error;
 	}
-	if (GetListboxIndex(interp, listPtr, argv[2], &index) != TCL_OK) {
+	if (GetListboxIndex(interp, listPtr, argv[2], 0, &index) != TCL_OK) {
 	    goto error;
 	}
 	ChangeListboxView(listPtr, index);
@@ -634,44 +669,29 @@ DestroyListbox(clientData)
     register Listbox *listPtr = (Listbox *) clientData;
     register Element *elPtr, *nextPtr;
 
+    /*
+     * Free up all of the list elements.
+     */
+
     for (elPtr = listPtr->elementPtr; elPtr != NULL; ) {
 	nextPtr = elPtr->nextPtr;
 	ckfree((char *) elPtr);
 	elPtr = nextPtr;
     }
-    if (listPtr->normalBorder != NULL) {
-	Tk_Free3DBorder(listPtr->normalBorder);
-    }
-    if (listPtr->fontPtr != NULL) {
-	Tk_FreeFontStruct(listPtr->fontPtr);
-    }
-    if (listPtr->fgColorPtr != NULL) {
-	Tk_FreeColor(listPtr->fgColorPtr);
-    }
+
+    /*
+     * Free up all the stuff that requires special handling, then
+     * let Tk_FreeOptions handle all the standard option-related
+     * stuff.
+     */
+
     if (listPtr->textGC != None) {
 	Tk_FreeGC(listPtr->display, listPtr->textGC);
-    }
-    if (listPtr->selBorder != NULL) {
-	Tk_Free3DBorder(listPtr->selBorder);
-    }
-    if (listPtr->selFgColorPtr != NULL) {
-	Tk_FreeColor(listPtr->selFgColorPtr);
     }
     if (listPtr->selTextGC != None) {
 	Tk_FreeGC(listPtr->display, listPtr->selTextGC);
     }
-    if (listPtr->geometry != NULL) {
-	ckfree(listPtr->geometry);
-    }
-    if (listPtr->cursor != None) {
-	Tk_FreeCursor(listPtr->display, listPtr->cursor);
-    }
-    if (listPtr->yScrollCmd != NULL) {
-	ckfree(listPtr->yScrollCmd);
-    }
-    if (listPtr->xScrollCmd != NULL) {
-	ckfree(listPtr->xScrollCmd);
-    }
+    Tk_FreeOptions(configSpecs, (char *) listPtr, listPtr->display, 0);
     ckfree((char *) listPtr);
 }
 
@@ -949,7 +969,7 @@ InsertEls(listPtr, index, argc, argv)
 	XTextExtents(listPtr->fontPtr, newPtr->text, newPtr->textLength,
 		&dummy, &dummy, &dummy, &bbox);
 	newPtr->lBearing = bbox.lbearing;
-	newPtr->pixelWidth = bbox.lbearing + bbox.rbearing;
+	newPtr->pixelWidth = bbox.rbearing - bbox.lbearing;
 	if (newPtr->pixelWidth > listPtr->maxWidth) {
 	    listPtr->maxWidth = newPtr->pixelWidth;
 	}
@@ -1157,12 +1177,15 @@ ListboxEventProc(clientData, eventPtr)
  */
 
 static int
-GetListboxIndex(interp, listPtr, string, indexPtr)
+GetListboxIndex(interp, listPtr, string, endAfter, indexPtr)
     Tcl_Interp *interp;		/* For error messages. */
     Listbox *listPtr;		/* Listbox for which the index is being
 				 * specified. */
     char *string;		/* Numerical index into listPtr's element
 				 * list, or "end" to refer to last element. */
+    int endAfter;		/* 0 means "end" refers to the index of the
+				 * last element, 1 means it refers to the
+				 * element after the last one. */
     int *indexPtr;		/* Where to store converted index. */
 {
     if (string[0] == 'e') {
@@ -1173,6 +1196,9 @@ GetListboxIndex(interp, listPtr, string, indexPtr)
 	    return TCL_ERROR;
 	}
 	*indexPtr = listPtr->numElements;
+	if (!endAfter) {
+	    *indexPtr -= 1;
+	}
 	if (listPtr->numElements <= 0) {
 	    *indexPtr = 0;
 	}
@@ -1690,6 +1716,8 @@ ListboxUpdateVScrollbar(listPtr)
     result = Tcl_VarEval(listPtr->interp, listPtr->yScrollCmd, string,
 	    (char *) NULL);
     if (result != TCL_OK) {
+	Tcl_AddErrorInfo(listPtr->interp,
+		"\n    (vertical scrolling command executed by listbox)");
 	Tk_BackgroundError(listPtr->interp);
     }
 }
@@ -1737,6 +1765,8 @@ ListboxUpdateHScrollbar(listPtr)
     result = Tcl_VarEval(listPtr->interp, listPtr->xScrollCmd, string,
 	    (char *) NULL);
     if (result != TCL_OK) {
+	Tcl_AddErrorInfo(listPtr->interp,
+		"\n    (horizontal scrolling command executed by listbox)");
 	Tk_BackgroundError(listPtr->interp);
     }
 }
@@ -1780,7 +1810,7 @@ ListboxComputeWidths(listPtr, fontChanged)
 	    XTextExtents(listPtr->fontPtr, elPtr->text, elPtr->textLength,
 		    &dummy, &dummy, &dummy, &bbox);
 	    elPtr->lBearing = bbox.lbearing;
-	    elPtr->pixelWidth = bbox.lbearing + bbox.rbearing;
+	    elPtr->pixelWidth = bbox.rbearing - bbox.lbearing;
 	}
 	if (elPtr->pixelWidth > listPtr->maxWidth) {
 	    listPtr->maxWidth = elPtr->pixelWidth;

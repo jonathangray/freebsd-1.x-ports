@@ -6,18 +6,23 @@
 #    w -	Name to use for new top-level window.
 
 proc mkPuzzle {{w .p1}} {
+    global xpos ypos
     catch {destroy $w}
     toplevel $w
     dpos $w
     wm title $w "15-Puzzle Demonstration"
     wm iconname $w "15-Puzzle"
+
     message $w.msg -font -Adobe-times-medium-r-normal--*-180* -aspect 300 \
 	    -text "A 15-puzzle appears below as a collection of buttons.  Click on any of the pieces next to the space, and that piece will slide over the space.  Continue this until the pieces are arranged in numerical order from upper-left to lower-right.  Click the \"OK\" button when you've finished playing."
-    set order {3 1 6 2 5 7 15 13 4 11 8 9 14 10 12}
-    global xpos ypos
     frame $w.frame -geometry 120x120 -borderwidth 2 -relief sunken \
 	-bg Bisque3
+    button $w.ok -text OK -command "destroy $w"
+    pack $w.msg -side top
+    pack $w.frame -side top -padx 5 -pady 5
+    pack $w.ok -side bottom -fill x
 
+    set order {3 1 6 2 5 7 15 13 4 11 8 9 14 10 12}
     for {set i 0} {$i < 15} {set i [expr $i+1]} {
 	set num [lindex $order $i]
 	set xpos($num) [expr ($i%4)*.25]
@@ -29,13 +34,7 @@ proc mkPuzzle {{w .p1}} {
     }
     set xpos(space) .75
     set ypos(space) .75
-
-    button $w.ok -text OK -command "destroy $w"
-
-    pack append $w $w.msg {top fill} $w.frame {top expand padx 10 pady 10} \
-	    $w.ok {bottom fill}
 }
-
 
 # Procedure invoked by buttons in the puzzle to resize the puzzle entries:
 

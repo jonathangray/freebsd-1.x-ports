@@ -5,18 +5,29 @@
  *	toolkit.  This allows bitmaps to be shared between widgets and
  *	also avoids interactions with the X server.
  *
- * Copyright 1990-1992 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkBitmap.c,v 1.1 1993/08/09 01:20:49 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkBitmap.c,v 1.2 1993/12/27 07:33:38 rich Exp $ SPRITE (Berkeley)";
 #endif /* not lint */
 
 #include "tkConfig.h"
@@ -26,8 +37,14 @@ static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkBitmap.c,v 1.1 1993
  * The includes below are for pre-defined bitmaps.
  */
 
-#include "bitmaps/gray50"
+#include "bitmaps/error"
 #include "bitmaps/gray25"
+#include "bitmaps/gray50"
+#include "bitmaps/hourglass"
+#include "bitmaps/info"
+#include "bitmaps/questhead"
+#include "bitmaps/question"
+#include "bitmaps/warning"
 
 /*
  * One of the following data structures exists for each bitmap that is
@@ -173,13 +190,18 @@ Tk_GetBitmap(interp, tkwin, string)
      */
 
     if (*string == '@') {
-	string = Tcl_TildeSubst(interp, string + 1);
+	Tcl_DString buffer;
+	int result;
+
+	string = Tcl_TildeSubst(interp, string + 1, &buffer);
 	if (string == NULL) {
 	    goto error;
 	}
-	if (XReadBitmapFile(nameKey.display, RootWindowOfScreen(Tk_Screen(tkwin)),
-		string, &width, &height, &bitmap, &dummy2, &dummy2)
-		!= BitmapSuccess) {
+	result = XReadBitmapFile(nameKey.display,
+		RootWindowOfScreen(Tk_Screen(tkwin)), string, &width,
+		&height, &bitmap, &dummy2, &dummy2);
+	Tcl_DStringFree(&buffer);
+	if (result != BitmapSuccess) {
 	    Tcl_AppendResult(interp, "error reading bitmap file \"", string,
 		    "\"", (char *) NULL);
 	    goto error;
@@ -269,7 +291,7 @@ Tk_DefineBitmap(interp, name, source, width, height)
 		"\" is already defined", (char *) NULL);
 	return TCL_ERROR;
     }
-    predefPtr = (PredefBitmap *) malloc(sizeof(PredefBitmap));
+    predefPtr = (PredefBitmap *) ckalloc(sizeof(PredefBitmap));
     predefPtr->source = source;
     predefPtr->width = width;
     predefPtr->height = height;
@@ -515,9 +537,21 @@ BitmapInit()
     Tcl_InitHashTable(&idTable, (sizeof(Display *) + sizeof(Pixmap))
 	    /sizeof(int));
 
-    Tk_DefineBitmap(dummy, Tk_GetUid("gray50"), gray50_bits, gray50_width,
-	    gray50_height);
-    Tk_DefineBitmap(dummy, Tk_GetUid("gray25"), gray25_bits, gray25_width,
-	    gray25_height);
+    Tk_DefineBitmap(dummy, Tk_GetUid("error"), error_bits,
+	    error_width, error_height);
+    Tk_DefineBitmap(dummy, Tk_GetUid("gray50"), gray50_bits,
+	    gray50_width, gray50_height);
+    Tk_DefineBitmap(dummy, Tk_GetUid("gray25"), gray25_bits,
+	    gray25_width, gray25_height);
+    Tk_DefineBitmap(dummy, Tk_GetUid("hourglass"), hourglass_bits,
+	    hourglass_width, hourglass_height);
+    Tk_DefineBitmap(dummy, Tk_GetUid("info"), info_bits,
+	    info_width, info_height);
+    Tk_DefineBitmap(dummy, Tk_GetUid("questhead"), questhead_bits,
+	    questhead_width, questhead_height);
+    Tk_DefineBitmap(dummy, Tk_GetUid("question"), question_bits,
+	    question_width, question_height);
+    Tk_DefineBitmap(dummy, Tk_GetUid("warning"), warning_bits,
+	    warning_width, warning_height);
     Tcl_DeleteInterp(dummy);
 }

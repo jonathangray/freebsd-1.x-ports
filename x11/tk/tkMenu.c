@@ -6,18 +6,29 @@
  *	buttons, iconic forms of all of the above, and separator
  *	entries.
  *
- * Copyright 1990-1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkMenu.c,v 1.1 1993/08/09 01:20:51 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkMenu.c,v 1.2 1993/12/27 07:34:19 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "tkConfig.h"
@@ -142,7 +153,8 @@ static Tk_ConfigSpec entryConfigSpecs[] = {
 	|TK_CONFIG_NULL_OK},
     {TK_CONFIG_STRING, "-accelerator", (char *) NULL, (char *) NULL,
 	DEF_MENU_ENTRY_ACCELERATOR, Tk_Offset(MenuEntry, accel),
-	COMMAND_MASK|CHECK_BUTTON_MASK|RADIO_BUTTON_MASK|CASCADE_MASK},
+	COMMAND_MASK|CHECK_BUTTON_MASK|RADIO_BUTTON_MASK|CASCADE_MASK
+	|TK_CONFIG_NULL_OK},
     {TK_CONFIG_BORDER, "-background", (char *) NULL, (char *) NULL,
 	DEF_MENU_ENTRY_BG, Tk_Offset(MenuEntry, border),
 	COMMAND_MASK|CHECK_BUTTON_MASK|RADIO_BUTTON_MASK|CASCADE_MASK
@@ -153,7 +165,8 @@ static Tk_ConfigSpec entryConfigSpecs[] = {
 	|TK_CONFIG_NULL_OK},
     {TK_CONFIG_STRING, "-command", (char *) NULL, (char *) NULL,
 	DEF_MENU_ENTRY_COMMAND, Tk_Offset(MenuEntry, command),
-	COMMAND_MASK|CHECK_BUTTON_MASK|RADIO_BUTTON_MASK|CASCADE_MASK},
+	COMMAND_MASK|CHECK_BUTTON_MASK|RADIO_BUTTON_MASK|CASCADE_MASK
+	|TK_CONFIG_NULL_OK},
     {TK_CONFIG_FONT, "-font", (char *) NULL, (char *) NULL,
 	DEF_MENU_ENTRY_FONT, Tk_Offset(MenuEntry, fontPtr),
 	COMMAND_MASK|CHECK_BUTTON_MASK|RADIO_BUTTON_MASK|CASCADE_MASK
@@ -162,7 +175,8 @@ static Tk_ConfigSpec entryConfigSpecs[] = {
 	DEF_MENU_ENTRY_LABEL, Tk_Offset(MenuEntry, label),
 	COMMAND_MASK|CHECK_BUTTON_MASK|RADIO_BUTTON_MASK|CASCADE_MASK},
     {TK_CONFIG_STRING, "-menu", (char *) NULL, (char *) NULL,
-	DEF_MENU_ENTRY_MENU, Tk_Offset(MenuEntry, name), CASCADE_MASK},
+	DEF_MENU_ENTRY_MENU, Tk_Offset(MenuEntry, name),
+	CASCADE_MASK|TK_CONFIG_NULL_OK},
     {TK_CONFIG_STRING, "-offvalue", (char *) NULL, (char *) NULL,
 	DEF_MENU_ENTRY_OFF_VALUE, Tk_Offset(MenuEntry, offValue),
 	CHECK_BUTTON_MASK},
@@ -175,10 +189,10 @@ static Tk_ConfigSpec entryConfigSpecs[] = {
 	CHECK_BUTTON_MASK},
     {TK_CONFIG_STRING, "-value", (char *) NULL, (char *) NULL,
 	DEF_MENU_ENTRY_VALUE, Tk_Offset(MenuEntry, onValue),
-	RADIO_BUTTON_MASK},
+	RADIO_BUTTON_MASK|TK_CONFIG_NULL_OK},
     {TK_CONFIG_STRING, "-variable", (char *) NULL, (char *) NULL,
 	DEF_MENU_ENTRY_CHECK_VARIABLE, Tk_Offset(MenuEntry, name),
-	CHECK_BUTTON_MASK},
+	CHECK_BUTTON_MASK|TK_CONFIG_NULL_OK},
     {TK_CONFIG_STRING, "-variable", (char *) NULL, (char *) NULL,
 	DEF_MENU_ENTRY_RADIO_VARIABLE, Tk_Offset(MenuEntry, name),
 	RADIO_BUTTON_MASK},
@@ -330,6 +344,14 @@ static Tk_ConfigSpec configSpecs[] = {
 };
 
 /*
+ * Various geometry definitions:
+ */
+
+#define CASCADE_ARROW_HEIGHT 10
+#define CASCADE_ARROW_WIDTH 8
+#define MARGIN_WIDTH 2
+
+/*
  * Forward declarations for procedures defined later in this file:
  */
 
@@ -347,7 +369,7 @@ static void		DestroyMenu _ANSI_ARGS_((ClientData clientData));
 static void		DestroyMenuEntry _ANSI_ARGS_((ClientData clientData));
 static void		DisplayMenu _ANSI_ARGS_((ClientData clientData));
 static void		EventuallyRedrawMenu _ANSI_ARGS_((Menu *menuPtr,
-			    int index));
+			    MenuEntry *mePtr));
 static int		GetMenuIndex _ANSI_ARGS_((Tcl_Interp *interp,
 			    Menu *menuPtr, char *string, int *indexPtr));
 static void		MenuEventProc _ANSI_ARGS_((ClientData clientData,
@@ -424,7 +446,9 @@ Tk_MenuCmd(clientData, interp, argc, argv)
     menuPtr->numEntries = 0;
     menuPtr->active = -1;
     menuPtr->border = NULL;
+    menuPtr->borderWidth = 0;
     menuPtr->activeBorder = NULL;
+    menuPtr->activeBorderWidth = 0;
     menuPtr->fontPtr = NULL;
     menuPtr->fg = NULL;
     menuPtr->textGC = None;
@@ -435,6 +459,8 @@ Tk_MenuCmd(clientData, interp, argc, argv)
     menuPtr->activeGC = None;
     menuPtr->selectorFg = NULL;
     menuPtr->selectorGC = None;
+    menuPtr->selectorSpace = 0;
+    menuPtr->labelWidth = 0;
     menuPtr->cursor = None;
     menuPtr->postCommand = NULL;
     menuPtr->postedCascade = NULL;
@@ -558,7 +584,11 @@ MenuWidgetCmd(clientData, interp, argc, argv)
 
 	/*
 	 * Add a new entry to the end of the menu's array of entries,
-	 * and process options for it.
+	 * and process options for it.  Be sure to initialize even
+	 * fields that look like they should be initialized by
+	 * Tk_ConfigureWidget, because not all fields are processed
+	 * for all kinds of entries, yet they all need to be
+	 * initialized.
 	 */
 
 	mePtr = (MenuEntry *) ckalloc(sizeof(MenuEntry));
@@ -575,10 +605,15 @@ MenuWidgetCmd(clientData, interp, argc, argv)
 	mePtr->type = type;
 	mePtr->menuPtr = menuPtr;
 	mePtr->label = NULL;
+	mePtr->labelLength = 0;
 	mePtr->underline = -1;
 	mePtr->bitmap = None;
 	mePtr->accel = NULL;
+	mePtr->accelLength = 0;
 	mePtr->state = tkNormalUid;
+	mePtr->height = 0;
+	mePtr->y = 0;
+	mePtr->selectorDiameter = 0;
 	mePtr->border = NULL;
 	mePtr->activeBorder = NULL;
 	mePtr->fontPtr = NULL;
@@ -666,7 +701,7 @@ MenuWidgetCmd(clientData, interp, argc, argv)
 	if (menuPtr->active == index) {
 	    menuPtr->active = -1;
 	}
-	EventuallyRedrawMenu(menuPtr, index);
+	EventuallyRedrawMenu(menuPtr, menuPtr->entries[index]);
     } else if ((c == 'e') && (length >= 3)
 	    && (strncmp(argv[1], "enable", length) == 0)) {
 	int index;
@@ -683,7 +718,7 @@ MenuWidgetCmd(clientData, interp, argc, argv)
 	    goto done;
 	}
 	menuPtr->entries[index]->state = tkNormalUid;
-	EventuallyRedrawMenu(menuPtr, index);
+	EventuallyRedrawMenu(menuPtr, menuPtr->entries[index]);
     } else if ((c == 'e') && (length >= 3)
 	    && (strncmp(argv[1], "entryconfigure", length) == 0)) {
 	int index;
@@ -763,7 +798,7 @@ MenuWidgetCmd(clientData, interp, argc, argv)
 	    Tcl_SetVar(interp, mePtr->name, mePtr->onValue, TCL_GLOBAL_ONLY);
 	}
 	if ((mePtr->command != NULL) && (mePtr->type != CASCADE_ENTRY)) {
-	    result = Tcl_GlobalEval(interp, mePtr->command);
+	    result = TkCopyAndGlobalEval(interp, mePtr->command);
 	}
 	Tk_Release((ClientData) mePtr);
     } else if ((c == 'p') && (strncmp(argv[1], "post", length) == 0)) {
@@ -785,7 +820,8 @@ MenuWidgetCmd(clientData, interp, argc, argv)
 	 */
 
 	if (menuPtr->postCommand != NULL) {
-	    result = Tcl_GlobalEval(menuPtr->interp, menuPtr->postCommand);
+	    result = TkCopyAndGlobalEval(menuPtr->interp,
+		    menuPtr->postCommand);
 	    if (result != TCL_OK) {
 		return result;
 	    }
@@ -904,29 +940,20 @@ DestroyMenu(clientData)
     register Menu *menuPtr = (Menu *) clientData;
     int i;
 
+    /*
+     * Free up all the stuff that requires special handling, then
+     * let Tk_FreeOptions handle all the standard option-related
+     * stuff.
+     */
+
     for (i = 0; i < menuPtr->numEntries; i++) {
 	DestroyMenuEntry((ClientData) menuPtr->entries[i]);
     }
     if (menuPtr->entries != NULL) {
 	ckfree((char *) menuPtr->entries);
     }
-    if (menuPtr->border != NULL) {
-	Tk_Free3DBorder(menuPtr->border);
-    }
-    if (menuPtr->activeBorder != NULL) {
-	Tk_Free3DBorder(menuPtr->activeBorder);
-    }
-    if (menuPtr->fontPtr != NULL) {
-	Tk_FreeFontStruct(menuPtr->fontPtr);
-    }
-    if (menuPtr->fg != NULL) {
-	Tk_FreeColor(menuPtr->fg);
-    }
     if (menuPtr->textGC != None) {
 	Tk_FreeGC(menuPtr->display, menuPtr->textGC);
-    }
-    if (menuPtr->disabledFg != NULL) {
-	Tk_FreeColor(menuPtr->disabledFg);
     }
     if (menuPtr->gray != None) {
 	Tk_FreeBitmap(menuPtr->display, menuPtr->gray);
@@ -934,24 +961,13 @@ DestroyMenu(clientData)
     if (menuPtr->disabledGC != None) {
 	Tk_FreeGC(menuPtr->display, menuPtr->disabledGC);
     }
-    if (menuPtr->activeFg != NULL) {
-	Tk_FreeColor(menuPtr->activeFg);
-    }
     if (menuPtr->activeGC != None) {
 	Tk_FreeGC(menuPtr->display, menuPtr->activeGC);
-    }
-    if (menuPtr->selectorFg != NULL) {
-	Tk_FreeColor(menuPtr->selectorFg);
     }
     if (menuPtr->selectorGC != None) {
 	Tk_FreeGC(menuPtr->display, menuPtr->selectorGC);
     }
-    if (menuPtr->cursor != None) {
-	Tk_FreeCursor(menuPtr->display, menuPtr->cursor);
-    }
-    if (menuPtr->postCommand != NULL) {
-	ckfree(menuPtr->postCommand);
-    }
+    Tk_FreeOptions(configSpecs, (char *) menuPtr, menuPtr->display, 0);
     ckfree((char *) menuPtr);
 }
 
@@ -980,56 +996,37 @@ DestroyMenuEntry(clientData)
     register MenuEntry *mePtr = (MenuEntry *) clientData;
     Menu *menuPtr = mePtr->menuPtr;
 
+    /*
+     * Free up all the stuff that requires special handling, then
+     * let Tk_FreeOptions handle all the standard option-related
+     * stuff.
+     */
+
     if (mePtr->name != NULL) {
 	Tcl_UntraceVar(menuPtr->interp, mePtr->name,
 		TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		MenuVarProc, (ClientData) mePtr);
     }
     if (menuPtr->postedCascade == mePtr) {
-	if (PostSubmenu(menuPtr->interp, menuPtr, (MenuEntry *) NULL)
-		!= TCL_OK) {
-	    Tk_BackgroundError(menuPtr->interp);
-	}
+	/*
+	 * Ignore errors while unposting the menu, since it's possible
+	 * that the menu has already been deleted and the unpost will
+	 * generate an error.
+	 */
+
+	PostSubmenu(menuPtr->interp, menuPtr, (MenuEntry *) NULL);
     }
-    if (mePtr->label != NULL) {
-	ckfree(mePtr->label);
-    }
-    if (mePtr->bitmap != None) {
-	Tk_FreeBitmap(menuPtr->display, mePtr->bitmap);
-    }
-    if (mePtr->accel != NULL) {
-	ckfree(mePtr->accel);
-    }
-    if (mePtr->border != NULL) {
-	Tk_Free3DBorder(mePtr->border);
-    }
-    if (mePtr->activeBorder != NULL) {
-	Tk_Free3DBorder(mePtr->activeBorder);
-    }
-    if (mePtr->fontPtr != NULL) {
-	Tk_FreeFontStruct(mePtr->fontPtr);
-    }
-    if (mePtr->textGC != NULL) {
+    if (mePtr->textGC != None) {
 	Tk_FreeGC(menuPtr->display, mePtr->textGC);
     }
-    if (mePtr->activeGC != NULL) {
+    if (mePtr->activeGC != None) {
 	Tk_FreeGC(menuPtr->display, mePtr->activeGC);
     }
-    if (mePtr->disabledGC != NULL) {
+    if (mePtr->disabledGC != None) {
 	Tk_FreeGC(menuPtr->display, mePtr->disabledGC);
     }
-    if (mePtr->command != NULL) {
-	ckfree(mePtr->command);
-    }
-    if (mePtr->name != NULL) {
-	ckfree(mePtr->name);
-    }
-    if (mePtr->onValue != NULL) {
-	ckfree(mePtr->onValue);
-    }
-    if (mePtr->offValue != NULL) {
-	ckfree(mePtr->offValue);
-    }
+    Tk_FreeOptions(entryConfigSpecs, (char *) mePtr, menuPtr->display, 
+	    (COMMAND_MASK << mePtr->type));
     ckfree((char *) mePtr);
 }
 
@@ -1293,19 +1290,19 @@ ConfigureMenuEntry(interp, menuPtr, mePtr, index, argc, argv, flags)
 		GCForeground|GCBackground|GCFont|GCGraphicsExposures,
 		&gcValues);
     } else {
-	newGC = NULL;
-	newActiveGC = NULL;
-	newDisabledGC = NULL;
+	newGC = None;
+	newActiveGC = None;
+	newDisabledGC = None;
     }
-    if (mePtr->textGC != NULL) {
+    if (mePtr->textGC != None) {
 	    Tk_FreeGC(menuPtr->display, mePtr->textGC);
     }
     mePtr->textGC = newGC;
-    if (mePtr->activeGC != NULL) {
+    if (mePtr->activeGC != None) {
 	    Tk_FreeGC(menuPtr->display, mePtr->activeGC);
     }
     mePtr->activeGC = newActiveGC;
-    if (mePtr->disabledGC != NULL) {
+    if (mePtr->disabledGC != None) {
 	    Tk_FreeGC(menuPtr->display, mePtr->disabledGC);
     }
     mePtr->disabledGC = newDisabledGC;
@@ -1382,7 +1379,7 @@ ComputeMenuGeometry(clientData)
     register MenuEntry *mePtr;
     XFontStruct *fontPtr;
     int maxLabelWidth, maxSelectorWidth, maxAccelWidth;
-    int width, height, selectorSpace, horizMargin;
+    int width, height, selectorSpace;
     int i, y;
 
     if (menuPtr->tkwin == NULL) {
@@ -1445,12 +1442,16 @@ ComputeMenuGeometry(clientData)
 	if (width > maxLabelWidth) {
 	    maxLabelWidth = width;
 	}
-	if (mePtr->accel != NULL) {
+	if (mePtr->type == CASCADE_ENTRY) {
+	    width = 2*CASCADE_ARROW_WIDTH;
+	} else if (mePtr->accel != NULL) {
 	    (void) TkMeasureChars(fontPtr, mePtr->accel, mePtr->accelLength,
 		    0, (int) 100000, TK_NEWLINES_NOT_SPECIAL, &width);
-	    if (width > maxAccelWidth) {
-		maxAccelWidth = width;
-	    }
+	} else {
+	    width = 0;
+	}
+	if (width > maxAccelWidth) {
+	    maxAccelWidth = width;
 	}
 	if (mePtr->type == SEPARATOR_ENTRY) {
 	    mePtr->height = 4*menuPtr->borderWidth;
@@ -1470,16 +1471,15 @@ ComputeMenuGeometry(clientData)
      * another margin to the right of the accelerator (if there is one).
      */
 
-    horizMargin = 2;
-    menuPtr->selectorSpace = maxSelectorWidth + horizMargin;
+    menuPtr->selectorSpace = maxSelectorWidth + MARGIN_WIDTH;
     if (maxSelectorWidth != 0) {
-	menuPtr->selectorSpace += horizMargin;
+	menuPtr->selectorSpace += MARGIN_WIDTH;
     }
-    menuPtr->labelWidth = maxLabelWidth + horizMargin;
+    menuPtr->labelWidth = maxLabelWidth + MARGIN_WIDTH;
     width = menuPtr->selectorSpace + menuPtr->labelWidth + maxAccelWidth
-	    + 2*menuPtr->borderWidth + 2*menuPtr->activeBorderWidth + 2;
+	    + 2*menuPtr->borderWidth + 2*menuPtr->activeBorderWidth;
     if (maxAccelWidth != 0) {
-	width += horizMargin;
+	width += MARGIN_WIDTH;
     }
     height = y + menuPtr->borderWidth;
 
@@ -1505,7 +1505,7 @@ ComputeMenuGeometry(clientData)
 	 * resize will force a redisplay above.
 	 */
 
-	EventuallyRedrawMenu(menuPtr, -1);
+	EventuallyRedrawMenu(menuPtr, (MenuEntry *) NULL);
     }
 
     menuPtr->flags &= ~RESIZE_PENDING;
@@ -1535,9 +1535,11 @@ DisplayMenu(clientData)
     register Menu *menuPtr = (Menu *) clientData;
     register MenuEntry *mePtr;
     register Tk_Window tkwin = menuPtr->tkwin;
+    Tk_3DBorder bgBorder, activeBorder;
     XFontStruct *fontPtr;
     int index, baseline;
     GC gc;
+    XPoint points[3];
 
     menuPtr->flags &= ~REDRAW_PENDING;
     if ((menuPtr->tkwin == NULL) || !Tk_IsMapped(tkwin)) {
@@ -1559,10 +1561,15 @@ DisplayMenu(clientData)
 	 * Background.
 	 */
 
-	if (mePtr->state == tkActiveUid) {
+	activeBorder = mePtr->activeBorder;
+	if (activeBorder == NULL) {
+	    activeBorder = menuPtr->activeBorder;
+	}
+	if ((mePtr->state == tkActiveUid)
+		|| (menuPtr->postedCascade == mePtr))  {
+	    bgBorder = activeBorder;
 	    Tk_Fill3DRectangle(menuPtr->display, Tk_WindowId(tkwin),
-		    (mePtr->activeBorder != NULL) ? mePtr->activeBorder
-		    : menuPtr->activeBorder, menuPtr->borderWidth, mePtr->y,
+		    bgBorder, menuPtr->borderWidth, mePtr->y,
 		    Tk_Width(tkwin) - 2*menuPtr->borderWidth, mePtr->height,
 		    menuPtr->activeBorderWidth, TK_RELIEF_RAISED);
 	    gc = mePtr->activeGC;
@@ -1570,9 +1577,12 @@ DisplayMenu(clientData)
 		gc = menuPtr->activeGC;
 	    }
 	} else {
+	    bgBorder = mePtr->border;
+	    if (bgBorder == NULL) {
+		bgBorder = menuPtr->border;
+	    }
 	    Tk_Fill3DRectangle(menuPtr->display, Tk_WindowId(tkwin),
-		    (mePtr->border != NULL) ? mePtr->border
-		    : menuPtr->border, menuPtr->borderWidth, mePtr->y,
+		    bgBorder, menuPtr->borderWidth, mePtr->y,
 		    Tk_Width(tkwin) - 2*menuPtr->borderWidth, mePtr->height,
 		    0, TK_RELIEF_FLAT);
 	    if ((mePtr->state == tkDisabledUid)
@@ -1626,10 +1636,22 @@ DisplayMenu(clientData)
 	}
 
 	/*
-	 * Draw accelerator.
+	 * Draw accelerator or cascade arrow.
 	 */
 
-	if (mePtr->accel != NULL) {
+	if (mePtr->type == CASCADE_ENTRY) {
+	    points[0].x = Tk_Width(tkwin) - 2*menuPtr->borderWidth
+		    - MARGIN_WIDTH - CASCADE_ARROW_WIDTH;
+	    points[0].y = mePtr->y + (mePtr->height - CASCADE_ARROW_HEIGHT)/2;
+	    points[1].x = points[0].x;
+	    points[1].y = points[0].y + CASCADE_ARROW_HEIGHT;
+	    points[2].x = points[0].x + CASCADE_ARROW_WIDTH;
+	    points[2].y = points[0].y + CASCADE_ARROW_HEIGHT/2;
+	    Tk_Fill3DPolygon(menuPtr->display, Tk_WindowId(tkwin), activeBorder,
+		    points, 3, menuPtr->activeBorderWidth,
+		    (menuPtr->postedCascade == mePtr) ? TK_RELIEF_SUNKEN
+		    : TK_RELIEF_RAISED);
+	} else if (mePtr->accel != NULL) {
 	    TkDisplayChars(menuPtr->display, Tk_WindowId(tkwin), gc,
 		    fontPtr, mePtr->accel, mePtr->accelLength,
 		    menuPtr->borderWidth + menuPtr->selectorSpace
@@ -1795,7 +1817,7 @@ GetMenuIndex(interp, menuPtr, string, indexPtr)
 	}
     }
 
-    if (isdigit(string[0])) {
+    if (isdigit(UCHAR(string[0]))) {
 	if (Tcl_GetInt(interp, string,  &i) == TCL_OK) {
 	    if (i >= menuPtr->numEntries) {
 		i = menuPtr->numEntries - 1;
@@ -1849,7 +1871,7 @@ MenuEventProc(clientData, eventPtr)
 {
     Menu *menuPtr = (Menu *) clientData;
     if ((eventPtr->type == Expose) && (eventPtr->xexpose.count == 0)) {
-	EventuallyRedrawMenu(menuPtr, -1);
+	EventuallyRedrawMenu(menuPtr, (MenuEntry *) NULL);
     } else if (eventPtr->type == DestroyNotify) {
 	Tcl_DeleteCommand(menuPtr->interp, Tk_PathName(menuPtr->tkwin));
 	menuPtr->tkwin = NULL;
@@ -1909,7 +1931,7 @@ MenuVarProc(clientData, interp, name1, name2, flags)
 		    TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		    MenuVarProc, clientData);
 	}
-	EventuallyRedrawMenu(menuPtr, -1);
+	EventuallyRedrawMenu(menuPtr, (MenuEntry *) NULL);
 	return (char *) NULL;
     }
 
@@ -1929,7 +1951,7 @@ MenuVarProc(clientData, interp, name1, name2, flags)
     } else {
 	return (char *) NULL;
     }
-    EventuallyRedrawMenu(menuPtr, -1);
+    EventuallyRedrawMenu(menuPtr, (MenuEntry *) NULL);
     return (char *) NULL;
 }
 
@@ -1952,19 +1974,20 @@ MenuVarProc(clientData, interp, name1, name2, flags)
  */
 
 static void
-EventuallyRedrawMenu(menuPtr, index)
+EventuallyRedrawMenu(menuPtr, mePtr)
     register Menu *menuPtr;	/* Information about menu to redraw. */
-    int index;			/* Which entry to redraw.  If -1, then
-				 * all the entries in the menu are redrawn. */
+    register MenuEntry *mePtr;	/* Entry to redraw.  NULL means redraw
+				 * all the entries in the menu. */
 {
+    int i;
     if (menuPtr->tkwin == NULL) {
 	return;
     }
-    if (index != -1) {
-	menuPtr->entries[index]->flags |= ENTRY_NEEDS_REDISPLAY;
+    if (mePtr != NULL) {
+	mePtr->flags |= ENTRY_NEEDS_REDISPLAY;
     } else {
-	for (index = 0; index < menuPtr->numEntries; index++) {
-	    menuPtr->entries[index]->flags |= ENTRY_NEEDS_REDISPLAY;
+	for (i = 0; i < menuPtr->numEntries; i++) {
+	    menuPtr->entries[i]->flags |= ENTRY_NEEDS_REDISPLAY;
 	}
     }
     if ((menuPtr->tkwin == NULL) || !Tk_IsMapped(menuPtr->tkwin)
@@ -2012,6 +2035,7 @@ PostSubmenu(interp, menuPtr, mePtr)
     }
 
     if (menuPtr->postedCascade != NULL) {
+	EventuallyRedrawMenu(menuPtr, menuPtr->postedCascade);
 	result = Tcl_VarEval(interp, menuPtr->postedCascade->name,
 		" unpost", (char *) NULL);
 	menuPtr->postedCascade = NULL;
@@ -2075,17 +2099,17 @@ ActivateMenuEntry(menuPtr, index)
 	if (mePtr->state == tkActiveUid) {
 	    mePtr->state = tkNormalUid;
 	}
-	EventuallyRedrawMenu(menuPtr, menuPtr->active);
+	EventuallyRedrawMenu(menuPtr, menuPtr->entries[menuPtr->active]);
     }
     menuPtr->active = index;
     if (index >= 0) {
 	mePtr = menuPtr->entries[index];
 	mePtr->state = tkActiveUid;
-	EventuallyRedrawMenu(menuPtr, index);
+	EventuallyRedrawMenu(menuPtr, mePtr);
 	Tk_Preserve((ClientData) mePtr);
 	if (mePtr->type == CASCADE_ENTRY) {
 	    if (mePtr->command != NULL) {
-		result = Tcl_GlobalEval(menuPtr->interp, mePtr->command);
+		result = TkCopyAndGlobalEval(menuPtr->interp, mePtr->command);
 	    }
 	    if (result == TCL_OK) {
 		result = PostSubmenu(menuPtr->interp, menuPtr, mePtr);

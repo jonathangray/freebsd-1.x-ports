@@ -3,21 +3,50 @@
 # facilities in particular.  This file is organized in the standard
 # fashion for Tcl tests.
 #
-# Don't "source" definitions if they're already been "sourced".
-# This allows manual users the flexibility to run only those
-# tests which they wish to and in the verbosity they wish, while 
-# at the same time allowing automated scripts to execute commands 
-# of the form:       tclTest < expr.test 
+# Copyright (c) 1992-1993 The Regents of the University of California.
+# All rights reserved.
+#
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the
+# above copyright notice and the following two paragraphs appear in
+# all copies of this software.
+#
+# IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+# OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+# CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+# AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+# ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+# PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+#
+# $Header: /a/cvs/386BSD/ports/x11/tk/tests/text.test,v 1.2 1993/12/27 07:38:59 rich Exp $ (Berkeley)
 
 if {[string compare test [info procs test]] == 1} then \
   {source defs}
 
 catch {destroy .t}
-text .t -font -adobe-courier-medium-r-normal--12-120-75-75-m-70-iso8859-1 \
-	-width 80 -height 24
+if [catch {text .t \
+	-font -adobe-courier-medium-r-normal--12-120-75-75-m-70-iso8859-1 \
+	-width 80 -height 24}] {
+    puts "The font needed by the text tests isn't available, so I'm"
+    puts "going to skip these tests."
+    return
+}
 pack append . .t {top expand fill}
 .t debug on
 wm geometry . {}
+
+# The statements below reset the main window;  it's needed if the window
+# manager is mwm to make mwm forget about a previous minimum size setting.
+
+wm withdraw .
+wm minsize . 1 1
+wm positionfrom . user
+wm deiconify .
 
 proc setup {} {
     .t delete 1.0 end
@@ -945,6 +974,24 @@ test text-25.15 {"yview" option} {
 test text-25.16 {"yview" option} {
     list [catch {.t yview @bogus} msg] $msg
 } {1 {bad text index "@bogus"}}
+proc bizarre_scroll args {
+    .t2.t delete 5.0 end
+}
+test text-25.17 {"yview" option with bizarre scroll command} {
+    catch {destroy .t2}
+    toplevel .t2
+    text .t2.t -width 40 -height 4
+    .t2.t insert end "1\n2\n3\n4\n5\n6\n7\n8\n"
+    pack .t2.t
+    wm geometry .t2 +0+0
+    update
+    .t2.t configure -yscrollcommand bizarre_scroll
+    .t2.t yview 100
+    set result [.t2.t index @0,0]
+    update
+    lappend result [.t2.t index @0,0]
+} {9.0 5.0}
+catch {destroy .t2}
 
 test text-26.1 {ambiguous options, other errors} {
     list [catch {.t badOption} msg] $msg

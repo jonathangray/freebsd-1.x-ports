@@ -4,16 +4,27 @@
 # menubuttons.  Most of the code here is dedicated to support for
 # pulling down menus and menu traversal via the keyboard.
 #
-# $Header: /a/cvs/386BSD/ports/x11/tk/library/menu.tcl,v 1.1 1993/08/09 01:21:07 jkh Exp $ SPRITE (Berkeley)
+# $Header: /a/cvs/386BSD/ports/x11/tk/library/menu.tcl,v 1.2 1993/12/27 07:37:25 rich Exp $ SPRITE (Berkeley)
 #
-# Copyright 1992 Regents of the University of California
-# Permission to use, copy, modify, and distribute this
-# software and its documentation for any purpose and without
-# fee is hereby granted, provided that this copyright
-# notice appears in all copies.  The University of California
-# makes no representations about the suitability of this
-# software for any purpose.  It is provided "as is" without
-# express or implied warranty.
+# Copyright (c) 1992-1993 The Regents of the University of California.
+# All rights reserved.
+#
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the
+# above copyright notice and the following two paragraphs appear in
+# all copies of this software.
+#
+# IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+# OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+# CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+# AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+# ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+# PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 #
 
 # The procedure below is publically available.  It is used to identify
@@ -49,6 +60,8 @@ proc tk_menuBar {w args} {
     }
     set tk_priv(menusFor$w) $args
     set tk_priv(menuBarFor[winfo toplevel $w]) $w
+    bind $w <Any-Alt-KeyPress> {tk_traverseToMenu %W %A}
+    bind $w <F10> {tk_firstMenu %W}
     bind $w <Any-ButtonRelease-1> tk_mbUnpost
 }
 
@@ -63,7 +76,7 @@ proc tk_menus {w args} {
 
 proc tk_bindForTraversal args {
     foreach w $args {
-	bind $w <Alt-KeyPress> {tk_traverseToMenu %W %A}
+	bind $w <Any-Alt-KeyPress> {tk_traverseToMenu %W %A}
 	bind $w <F10> {tk_firstMenu %W}
     }
 }
@@ -75,8 +88,11 @@ proc tk_bindForTraversal args {
 
 proc tk_mbPost {w} {
     global tk_priv tk_strictMotif
-    if {([lindex [$w config -state] 4] == "disabled")
-	    || ($w == $tk_priv(posted))} {
+    if {[lindex [$w config -state] 4] == "disabled"} {
+	return
+    }
+    if {$w == $tk_priv(posted)} {
+	grab -global $tk_priv(grab)
 	return
     }
     set menu [lindex [$w config -menu] 4]
@@ -117,21 +133,30 @@ proc tk_mbPost {w} {
 }
 
 # The procedure below does all the work of unposting the menubutton that's
-# currently posted.  It takes no arguments.
+# currently posted.  It takes no arguments.  Special notes:
+# 1. It's important to unpost the menu before releasing the grab, so
+#    that any Enter-Leave events (e.g. from menu back to main
+#    application) have mode NotifyGrab.
+# 2. Be sure to enclose various groups of commands in "catch" so that
+#    the procedure will complete even if the menubutton or the menu
+#    or the grab window has been deleted.
 
 proc tk_mbUnpost {} {
     global tk_priv
     set w $tk_priv(posted)
     if {$w != ""} {
-	$w config -relief $tk_priv(relief)
-	$tk_priv(grab) config -cursor $tk_priv(cursor)
+	catch {
+	    set menu [lindex [$w config -menu] 4]
+	    $menu unpost
+	    $menu config -activebackground $tk_priv(activeBg)
+	    $menu config -activeforeground $tk_priv(activeFg)
+	    $w config -relief $tk_priv(relief)
+	}
+	catch {$tk_priv(grab) config -cursor $tk_priv(cursor)}
+	catch {focus $tk_priv(focus)}
 	grab release $tk_priv(grab)
-	focus $tk_priv(focus)
+	set tk_priv(grab) ""
 	set tk_priv(focus) ""
-	set menu [lindex [$w config -menu] 4]
-	$menu unpost
-	$menu config -activebackground $tk_priv(activeBg)
-	$menu config -activeforeground $tk_priv(activeFg)
 	set tk_priv(posted) {}
     }
 }
@@ -177,6 +202,9 @@ proc tk_traverseWithinMenu {w char} {
     }
     set char [string tolower $char]
     set last [$w index last]
+    if {$last == "none"} {
+	return
+    }
     for {set i 0} {$i <= $last} {incr i} {
 	if [catch {set char2 [string index \
 		[lindex [$w entryconfig $i -label] 4] \
@@ -255,6 +283,9 @@ proc tk_nextMenuEntry count {
 	return
     }
     set menu [lindex [$tk_priv(posted) config -menu] 4]
+    if {[$menu index last] == "none"} {
+	return
+    }
     set length [expr [$menu index last]+1]
     set i [$menu index active]
     if {$i == "none"} {

@@ -6,18 +6,29 @@
  *	include labels, buttons, check buttons, and radio
  *	buttons.
  *
- * Copyright 1990-1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkButton.c,v 1.1 1993/08/09 01:20:49 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkButton.c,v 1.2 1993/12/27 07:33:39 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "default.h"
@@ -88,8 +99,9 @@ typedef struct {
 				 * text or icon is drawn with normalGC and
 				 * this GC is used to stipple background
 				 * across it. */
-    int leftBearing;		/* Amount text sticks left from its origin,
-				 * in pixels. */
+    int leftBearing;		/* Distance from origin of text to its leftmost
+				 * drawn pixel, in pixels (positive measures
+				 * to the right). */
     int rightBearing;		/* Amount text sticks right from its origin. */
     int width, height;		/* If > 0, these specify dimensions to request
 				 * for window, in characters for text and in
@@ -220,7 +232,7 @@ static Tk_ConfigSpec configSpecs[] = {
 	DEF_BUTTON_BORDER_WIDTH, Tk_Offset(Button, borderWidth), ALL_MASK},
     {TK_CONFIG_STRING, "-command", "command", "Command",
 	DEF_BUTTON_COMMAND, Tk_Offset(Button, command),
-	BUTTON_MASK|CHECK_BUTTON_MASK|RADIO_BUTTON_MASK},
+	BUTTON_MASK|CHECK_BUTTON_MASK|RADIO_BUTTON_MASK|TK_CONFIG_NULL_OK},
     {TK_CONFIG_ACTIVE_CURSOR, "-cursor", "cursor", "Cursor",
 	DEF_BUTTON_CURSOR, Tk_Offset(Button, cursor),
 	ALL_MASK|TK_CONFIG_NULL_OK},
@@ -274,13 +286,13 @@ static Tk_ConfigSpec configSpecs[] = {
 	ALL_MASK|TK_CONFIG_NULL_OK},
     {TK_CONFIG_STRING, "-value", "value", "Value",
 	DEF_BUTTON_VALUE, Tk_Offset(Button, onValue),
-	RADIO_BUTTON_MASK},
+	RADIO_BUTTON_MASK|TK_CONFIG_NULL_OK},
     {TK_CONFIG_STRING, "-variable", "variable", "Variable",
 	DEF_RADIOBUTTON_VARIABLE, Tk_Offset(Button, selVarName),
 	RADIO_BUTTON_MASK},
     {TK_CONFIG_STRING, "-variable", "variable", "Variable",
 	DEF_CHECKBUTTON_VARIABLE, Tk_Offset(Button, selVarName),
-	CHECK_BUTTON_MASK},
+	CHECK_BUTTON_MASK|TK_CONFIG_NULL_OK},
     {TK_CONFIG_INT, "-width", "width", "Width",
 	DEF_BUTTON_WIDTH, Tk_Offset(Button, width), ALL_MASK},
     {TK_CONFIG_END, (char *) NULL, (char *) NULL, (char *) NULL,
@@ -396,6 +408,7 @@ Tk_ButtonCmd(clientData, interp, argc, argv)
     butPtr->interp = interp;
     butPtr->type = type;
     butPtr->text = NULL;
+    butPtr->textLength = 0;
     butPtr->textVarName = NULL;
     butPtr->bitmap = None;
     butPtr->state = tkNormalUid;
@@ -411,8 +424,17 @@ Tk_ButtonCmd(clientData, interp, argc, argv)
     butPtr->activeTextGC = None;
     butPtr->gray = None;
     butPtr->disabledGC = None;
+    butPtr->leftBearing = 0;
+    butPtr->rightBearing = 0;
+    butPtr->width = 0;
+    butPtr->height = 0;
+    butPtr->padX = 0;
+    butPtr->padY = 0;
+    butPtr->anchor = TK_ANCHOR_CENTER;
     butPtr->selectorFg = NULL;
     butPtr->selectorGC = None;
+    butPtr->selectorSpace = 0;
+    butPtr->selectorDiameter = 0;
     butPtr->selVarName = NULL;
     butPtr->onValue = NULL;
     butPtr->offValue = NULL;
@@ -627,35 +649,16 @@ DestroyButton(clientData)
 {
     register Button *butPtr = (Button *) clientData;
 
-    if (butPtr->text != NULL) {
-	ckfree(butPtr->text);
-    }
+    /*
+     * Free up all the stuff that requires special handling, then
+     * let Tk_FreeOptions handle all the standard option-related
+     * stuff.
+     */
+
     if (butPtr->textVarName != NULL) {
 	Tcl_UntraceVar(butPtr->interp, butPtr->textVarName,
 		TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		ButtonTextVarProc, (ClientData) butPtr);
-	ckfree(butPtr->textVarName);
-    }
-    if (butPtr->bitmap != None) {
-	Tk_FreeBitmap(butPtr->display, butPtr->bitmap);
-    }
-    if (butPtr->normalBorder != NULL) {
-	Tk_Free3DBorder(butPtr->normalBorder);
-    }
-    if (butPtr->activeBorder != NULL) {
-	Tk_Free3DBorder(butPtr->activeBorder);
-    }
-    if (butPtr->fontPtr != NULL) {
-	Tk_FreeFontStruct(butPtr->fontPtr);
-    }
-    if (butPtr->normalFg != NULL) {
-	Tk_FreeColor(butPtr->normalFg);
-    }
-    if (butPtr->disabledFg != NULL) {
-	Tk_FreeColor(butPtr->disabledFg);
-    }
-    if (butPtr->activeFg != NULL) {
-	Tk_FreeColor(butPtr->activeFg);
     }
     if (butPtr->normalTextGC != None) {
 	Tk_FreeGC(butPtr->display, butPtr->normalTextGC);
@@ -669,9 +672,6 @@ DestroyButton(clientData)
     if (butPtr->disabledGC != None) {
 	Tk_FreeGC(butPtr->display, butPtr->disabledGC);
     }
-    if (butPtr->selectorFg != NULL) {
-	Tk_FreeColor(butPtr->selectorFg);
-    }
     if (butPtr->selectorGC != None) {
 	Tk_FreeGC(butPtr->display, butPtr->selectorGC);
     }
@@ -679,20 +679,9 @@ DestroyButton(clientData)
 	Tcl_UntraceVar(butPtr->interp, butPtr->selVarName,
 		TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		ButtonVarProc, (ClientData) butPtr);
-	ckfree(butPtr->selVarName);
     }
-    if (butPtr->onValue != NULL) {
-	ckfree(butPtr->onValue);
-    }
-    if (butPtr->offValue != NULL) {
-	ckfree(butPtr->offValue);
-    }
-    if (butPtr->cursor != None) {
-	Tk_FreeCursor(butPtr->display, butPtr->cursor);
-    }
-    if (butPtr->command != NULL) {
-	ckfree(butPtr->command);
-    }
+    Tk_FreeOptions(configSpecs, (char *) butPtr, butPtr->display,
+	    configFlags[butPtr->type]);
     ckfree((char *) butPtr);
 }
 
@@ -1022,11 +1011,11 @@ DisplayButton(clientData)
 	switch (butPtr->anchor) {
 	    case TK_ANCHOR_NW: case TK_ANCHOR_W: case TK_ANCHOR_SW:
 		x = butPtr->borderWidth + butPtr->padX + butPtr->selectorSpace
-			+ butPtr->leftBearing + 1;
+			- butPtr->leftBearing + 1;
 		break;
 	    case TK_ANCHOR_N: case TK_ANCHOR_CENTER: case TK_ANCHOR_S:
 		x = (Tk_Width(tkwin) + butPtr->selectorSpace
-			+ butPtr->leftBearing - butPtr->rightBearing)/2;
+			- butPtr->leftBearing - butPtr->rightBearing)/2;
 		break;
 	    default:
 		x = Tk_Width(tkwin) - butPtr->borderWidth - butPtr->padX
@@ -1057,7 +1046,7 @@ DisplayButton(clientData)
 	XDrawString(butPtr->display, pixmap, gc, x, y,
 		butPtr->text, butPtr->textLength);
 	y -= (butPtr->fontPtr->ascent - butPtr->fontPtr->descent)/2;
-	x -= butPtr->leftBearing;
+	x += butPtr->leftBearing;
     }
 
     /*
@@ -1069,7 +1058,7 @@ DisplayButton(clientData)
 	int dim;
 
 	dim = butPtr->selectorDiameter;
-	x -= (butPtr->selectorSpace + butPtr->padX + dim)/2;
+	x -= butPtr->selectorSpace;
 	y -= dim/2;
 	Tk_Draw3DRectangle(butPtr->display, pixmap, border, x, y,
 		dim, dim, butPtr->borderWidth, TK_RELIEF_SUNKEN);
@@ -1092,8 +1081,7 @@ DisplayButton(clientData)
 	int radius;
 
 	radius = butPtr->selectorDiameter/2;
-	points[0].x = x - (butPtr->selectorSpace + butPtr->padX
-		+ butPtr->selectorDiameter)/2;
+	points[0].x = x - butPtr->selectorSpace;
 	points[0].y = y;
 	points[1].x = points[0].x + radius;
 	points[1].y = points[0].y + radius;
@@ -1221,7 +1209,7 @@ ComputeButtonGeometry(butPtr)
 	}
 	if ((butPtr->type >= TYPE_CHECK_BUTTON)
 		&& (butPtr->selectorGC != None)) {
-	    butPtr->selectorSpace = (14*height)/10;
+	    butPtr->selectorSpace = height;
 	    if (butPtr->type == TYPE_CHECK_BUTTON) {
 		butPtr->selectorDiameter = (65*height)/100;
 	    } else {
@@ -1234,7 +1222,7 @@ ComputeButtonGeometry(butPtr)
 		&dummy, &dummy, &dummy, &bbox);
 	butPtr->leftBearing = bbox.lbearing;
 	butPtr->rightBearing = bbox.rbearing;
-	width = bbox.lbearing + bbox.rbearing;
+	width = bbox.rbearing - bbox.lbearing;
 	height = butPtr->fontPtr->ascent + butPtr->fontPtr->descent;
 	if (butPtr->width > 0) {
 	    width = butPtr->width * XTextWidth(butPtr->fontPtr, "0", 1);
@@ -1249,7 +1237,8 @@ ComputeButtonGeometry(butPtr)
 	    if (butPtr->type == TYPE_CHECK_BUTTON) {
 		butPtr->selectorDiameter = (80*butPtr->selectorDiameter)/100;
 	    }
-	    butPtr->selectorSpace = butPtr->selectorDiameter + butPtr->padX;
+	    butPtr->selectorSpace = butPtr->selectorDiameter
+		+ XTextWidth(butPtr->fontPtr, "0", 1);
 	}
     }
 
@@ -1305,7 +1294,7 @@ InvokeButton(butPtr)
 		TCL_GLOBAL_ONLY);
     }
     if ((butPtr->type != TYPE_LABEL) && (butPtr->command != NULL)) {
-	return Tcl_GlobalEval(butPtr->interp, butPtr->command);
+	return TkCopyAndGlobalEval(butPtr->interp, butPtr->command);
     }
     return TCL_OK;
 }

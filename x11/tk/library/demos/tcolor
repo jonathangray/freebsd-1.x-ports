@@ -1,4 +1,4 @@
-#!/usr/local/wish -f
+#!/usr/local/bin/wish -f
 #
 # This script implements a simple color editor, where you can
 # create colors using either the RGB, HSB, or CYM color spaces
@@ -41,7 +41,7 @@ set name ""
 # Create the menu bar at the top of the window.
 
 frame .menu -relief raised -borderwidth 2
-pack append . .menu {top fillx}
+pack .menu -side top -fill x
 menubutton .menu.file -text File -menu .menu.file.m -underline 0
 menu .menu.file.m
 .menu.file.m add radio -label "RGB color space" -variable colorSpace \
@@ -58,26 +58,27 @@ menu .menu.file.m
 .menu.file.m add separator
 .menu.file.m add command -label "Exit program" -underline 0 \
 	-command "destroy ."
-pack append .menu .menu.file left
+pack .menu.file -side left
 tk_menuBar .menu .menu.file
 
 # Create the command entry window at the bottom of the window, along
 # with the update button.
 
 frame .bot -relief raised -borderwidth 2
-pack append . .bot {bottom fillx}
+pack .bot -side bottom -fill x
 label .commandLabel -text "Command:"
 entry .command -relief sunken -borderwidth 2 -textvariable command \
 	-font -Adobe-Courier-Medium-R-Normal-*-120-*
 button .update -text Update -command doUpdate
-pack append .bot .commandLabel left .update {right pady .2c padx .5c} \
-	.command {expand fillx padx .5c}
+pack .commandLabel -in .bot -side left
+pack .update -in .bot -side right -pady .1c -padx .25c
+pack .command -in .bot -expand yes -fill x -ipadx 0.25c
 
 # Create the listbox that holds all of the color names in rgb.txt,
 # if an rgb.txt file can be found.
 
 frame .middle -relief raised -borderwidth 2
-pack append . .middle {top fill}
+pack .middle -side top -fill both
 foreach i {/usr/local/lib/X11/rgb.txt /usr/lib/X11/rgb.txt
 	/X11/R5/lib/X11/rgb.txt /X11/R4/lib/rgb/rgb.txt} {
     if ![file readable $i] {
@@ -85,7 +86,7 @@ foreach i {/usr/local/lib/X11/rgb.txt /usr/lib/X11/rgb.txt
     }
     set f [open $i]
     frame .middle.left
-    pack append .middle .middle.left {left padx .5c pady .5c}
+    pack .middle.left -side left -padx .25c -pady .25c
     listbox .names -geometry 20x12 -yscrollcommand ".scroll set" \
 	    -relief sunken -borderwidth 2 -exportselection false
     tk_listboxSingleSelect .names
@@ -94,7 +95,8 @@ foreach i {/usr/local/lib/X11/rgb.txt /usr/lib/X11/rgb.txt
     }
     scrollbar .scroll -orient vertical -command ".names yview" \
 	    -relief sunken -borderwidth 2
-    pack append .middle.left .names left .scroll {right filly}
+    pack .names -in .middle.left -side left
+    pack .scroll -in .middle.left -side right -fill y
     while {[gets $f line] >= 0} {
 	if {[llength $line] == 4} {
 	    .names insert end [lindex $line 3]
@@ -108,37 +110,39 @@ foreach i {/usr/local/lib/X11/rgb.txt /usr/lib/X11/rgb.txt
 # typing in a color value.
 
 frame .middle.middle
-pack append .middle .middle.middle {left expand filly}
+pack .middle.middle -side left -expand yes -fill y
 frame .middle.middle.1
 frame .middle.middle.2
 frame .middle.middle.3
 frame .middle.middle.4
-pack append .middle.middle .middle.middle.1 {top expand} \
-	.middle.middle.2 {top expand} .middle.middle.3 {top expand} \
-	.middle.middle.4 {top expand fillx}
+pack .middle.middle.1 .middle.middle.2 .middle.middle.3 -side top -expand yes
+pack .middle.middle.4 -side top -expand yes -fill x
 foreach i {1 2 3} {
     label .label$i -textvariable label$i
     scale .scale$i -from 0 -to 1000 -length 10c -orient horizontal \
 	    -command tc_scaleChanged
     button .up$i -width 2 -text + -command "tc_inc $i 1"
     button .down$i -width 2 -text - -command "tc_inc $i -1"
-    pack append .middle.middle.$i .label$i {top frame w} \
-	.down$i {left padx .5c} .scale$i left .up$i {left padx .5c}
+    pack .label$i -in .middle.middle.$i -side top -anchor w
+    pack .down$i -in .middle.middle.$i -side left -padx .25c
+    pack .scale$i -in .middle.middle.$i -side left
+    pack .up$i -in .middle.middle.$i -side left -padx .25c
 }
 label .nameLabel -text "Name of new color:"
 entry .name -relief sunken -borderwidth 2 -textvariable name -width 30 \
 	-font -Adobe-Courier-Medium-R-Normal-*-120-*
-pack append .middle.middle.4 .nameLabel left .name left
+pack .nameLabel .name -in .middle.middle.4 -side left
 bind .name <Return> {tc_loadNamedColor $name}
 
 # Create the color display swatch on the right side of the window.
 
 frame .middle.right
-pack append .middle .middle.right {left pady .5c padx .5c frame s}
+pack .middle.right -side left -pady .25c -padx .25c -anchor s
 frame .swatch -width 2c -height 5c -background $color
 label .value -textvariable color -width 13 \
 	-font -Adobe-Courier-Medium-R-Normal-*-120-*
-pack append .middle.right .swatch {top expand fill} .value {bottom pady .5c}
+pack .swatch -in .middle.right -side top -expand yes -fill both
+pack .value -in .middle.right -side bottom -pady .25c
 
 # The procedure below handles the "+" and "-" buttons next to
 # the adjustor scales.  They just increment or decrement the

@@ -6,18 +6,29 @@
  *	around and resized.  This file is intended as an example
  *	of how to build a widget.
  *
- * Copyright 1991-1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1991-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/library/demos/tkSquare.c,v 1.1 1993/08/09 01:21:14 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/library/demos/tkSquare.c,v 1.2 1993/12/27 07:38:41 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "tkConfig.h"
@@ -30,15 +41,13 @@ static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/library/demos/tkSquar
 
 typedef struct {
     Tk_Window tkwin;		/* Window that embodies the square.  NULL
-				 * means that the window has been destroyed
-				 * but the data structures haven't yet been
-				 * cleaned up.*/
+				 * means window has been deleted but
+				 * widget record hasn't been cleaned up yet. */
+    Display *display;		/* X's token for the window's display. */
     Tcl_Interp *interp;		/* Interpreter associated with widget. */
     int x, y;			/* Position of square's upper-left corner
 				 * within widget. */
     int size;			/* Width and height of square. */
-    int flags;			/* Various flags;  see below for
-				 * definitions. */
 
     /*
      * Information used when displaying widget:
@@ -49,18 +58,14 @@ typedef struct {
     Tk_3DBorder fgBorder;	/* For drawing square. */
     int relief;			/* Indicates whether window as a whole is
 				 * raised, sunken, or flat. */
+    GC gc;			/* Graphics context for copying from
+				 * off-screen pixmap onto screen. */
     int doubleBuffer;		/* Non-zero means double-buffer redisplay
 				 * with pixmap;  zero means draw straight
 				 * onto the display. */
+    int updatePending;		/* Non-zero means a call to SquareDisplay
+				 * has already been scheduled. */
 } Square;
-
-/*
- * Flag bits for squares:
- *
- * REDRAW_PENDING -		1 means redraw has already been scheduled.
- */
-
-#define REDRAW_PENDING		1
 
 /*
  * Information used for argv parsing.
@@ -75,7 +80,7 @@ static Tk_ConfigSpec configSpecs[] = {
 	(char *) NULL, 0, 0},
     {TK_CONFIG_SYNONYM, "-bg", "background", (char *) NULL,
 	(char *) NULL, 0, 0},
-    {TK_CONFIG_INT, "-borderwidth", "borderWidth", "BorderWidth",
+    {TK_CONFIG_PIXELS, "-borderwidth", "borderWidth", "BorderWidth",
 	"2", Tk_Offset(Square, borderWidth), 0},
     {TK_CONFIG_INT, "-dbl", "doubleBuffer", "DoubleBuffer",
 	"1", Tk_Offset(Square, doubleBuffer), 0},
@@ -95,11 +100,11 @@ static Tk_ConfigSpec configSpecs[] = {
  * Forward declarations for procedures defined later in this file:
  */
 
-static int		ConfigureSquare _ANSI_ARGS_((Tcl_Interp *interp,
+static int		SquareConfigure _ANSI_ARGS_((Tcl_Interp *interp,
 			    Square *squarePtr, int argc, char **argv,
 			    int flags));
-static void		DestroySquare _ANSI_ARGS_((ClientData clientData));
-static void		DisplaySquare _ANSI_ARGS_((ClientData clientData));
+static void		SquareDestroy _ANSI_ARGS_((ClientData clientData));
+static void		SquareDisplay _ANSI_ARGS_((ClientData clientData));
 static void		KeepInWindow _ANSI_ARGS_((Square *squarePtr));
 static void		SquareEventProc _ANSI_ARGS_((ClientData clientData,
 			    XEvent *eventPtr));
@@ -109,7 +114,7 @@ static int		SquareWidgetCmd _ANSI_ARGS_((ClientData clientData,
 /*
  *--------------------------------------------------------------
  *
- * Tk_SquareCmd --
+ * SquareCmd --
  *
  *	This procedure is invoked to process the "square" Tcl
  *	command.  It creates a new "square" widget.
@@ -124,7 +129,7 @@ static int		SquareWidgetCmd _ANSI_ARGS_((ClientData clientData,
  */
 
 int
-Tk_SquareCmd(clientData, interp, argc, argv)
+SquareCmd(clientData, interp, argc, argv)
     ClientData clientData;	/* Main window associated with
 				 * interpreter. */
     Tcl_Interp *interp;		/* Current interpreter. */
@@ -132,7 +137,7 @@ Tk_SquareCmd(clientData, interp, argc, argv)
     char **argv;		/* Argument strings. */
 {
     Tk_Window main = (Tk_Window) clientData;
-    register Square *squarePtr;
+    Square *squarePtr;
     Tk_Window tkwin;
 
     if (argc < 2) {
@@ -145,29 +150,32 @@ Tk_SquareCmd(clientData, interp, argc, argv)
     if (tkwin == NULL) {
 	return TCL_ERROR;
     }
+    Tk_SetClass(tkwin, "Square");
 
     /*
-     * Initialize fields that won't be initialized by ConfigureSquare,
-     * or which ConfigureSquare expects to have reasonable values
-     * (e.g. resource pointers).
+     * Allocate and initialize the widget record.
      */
 
     squarePtr = (Square *) ckalloc(sizeof(Square));
     squarePtr->tkwin = tkwin;
+    squarePtr->display = Tk_Display(tkwin);
     squarePtr->interp = interp;
     squarePtr->x = 0;
     squarePtr->y = 0;
     squarePtr->size = 20;
+    squarePtr->borderWidth = 0;
     squarePtr->bgBorder = NULL;
     squarePtr->fgBorder = NULL;
-    squarePtr->flags = 0;
+    squarePtr->relief = TK_RELIEF_FLAT;
+    squarePtr->gc = None;
+    squarePtr->doubleBuffer = 1;
+    squarePtr->updatePending = 0;
 
-    Tk_SetClass(squarePtr->tkwin, "Square");
     Tk_CreateEventHandler(squarePtr->tkwin, ExposureMask|StructureNotifyMask,
 	    SquareEventProc, (ClientData) squarePtr);
     Tcl_CreateCommand(interp, Tk_PathName(squarePtr->tkwin), SquareWidgetCmd,
 	    (ClientData) squarePtr, (void (*)()) NULL);
-    if (ConfigureSquare(interp, squarePtr, argc-2, argv+2, 0) != TCL_OK) {
+    if (SquareConfigure(interp, squarePtr, argc-2, argv+2, 0) != TCL_OK) {
 	Tk_DestroyWindow(squarePtr->tkwin);
 	return TCL_ERROR;
     }
@@ -177,9 +185,111 @@ Tk_SquareCmd(clientData, interp, argc, argv)
 }
 
 /*
+ *--------------------------------------------------------------
+ *
+ * SquareWidgetCmd --
+ *
+ *	This procedure is invoked to process the Tcl command
+ *	that corresponds to a widget managed by this module.
+ *	See the user documentation for details on what it does.
+ *
+ * Results:
+ *	A standard Tcl result.
+ *
+ * Side effects:
+ *	See the user documentation.
+ *
+ *--------------------------------------------------------------
+ */
+
+static int
+SquareWidgetCmd(clientData, interp, argc, argv)
+    ClientData clientData;		/* Information about square widget. */
+    Tcl_Interp *interp;			/* Current interpreter. */
+    int argc;				/* Number of arguments. */
+    char **argv;			/* Argument strings. */
+{
+    Square *squarePtr = (Square *) clientData;
+    int result = TCL_OK;
+    int length;
+    char c;
+
+    if (argc < 2) {
+	Tcl_AppendResult(interp, "wrong # args: should be \"",
+		argv[0], " option ?arg arg ...?\"", (char *) NULL);
+	return TCL_ERROR;
+    }
+    Tk_Preserve((ClientData) squarePtr);
+    c = argv[1][0];
+    length = strlen(argv[1]);
+    if ((c == 'c') && (strncmp(argv[1], "configure", length) == 0)) {
+	if (argc == 2) {
+	    result = Tk_ConfigureInfo(interp, squarePtr->tkwin, configSpecs,
+		    (char *) squarePtr, (char *) NULL, 0);
+	} else if (argc == 3) {
+	    result = Tk_ConfigureInfo(interp, squarePtr->tkwin, configSpecs,
+		    (char *) squarePtr, argv[2], 0);
+	} else {
+	    result = SquareConfigure(interp, squarePtr, argc-2, argv+2,
+		    TK_CONFIG_ARGV_ONLY);
+	}
+    } else if ((c == 'p') && (strncmp(argv[1], "position", length) == 0)) {
+	if ((argc != 2) && (argc != 4)) {
+	    Tcl_AppendResult(interp, "wrong # args: should be \"",
+		    argv[0], " position ?x y?\"", (char *) NULL);
+	    goto error;
+	}
+	if (argc == 4) {
+	    if ((Tk_GetPixels(interp, squarePtr->tkwin, argv[2],
+		    &squarePtr->x) != TCL_OK) || (Tk_GetPixels(interp,
+		    squarePtr->tkwin, argv[3], &squarePtr->y) != TCL_OK)) {
+		goto error;
+	    }
+	    KeepInWindow(squarePtr);
+	}
+	sprintf(interp->result, "%d %d", squarePtr->x, squarePtr->y);
+    } else if ((c == 's') && (strncmp(argv[1], "size", length) == 0)) {
+	if ((argc != 2) && (argc != 3)) {
+	    Tcl_AppendResult(interp, "wrong # args: should be \"",
+		    argv[0], " size ?amount?\"", (char *) NULL);
+	    goto error;
+	}
+	if (argc == 3) {
+	    int i;
+
+	    if (Tk_GetPixels(interp, squarePtr->tkwin, argv[2], &i) != TCL_OK) {
+		goto error;
+	    }
+	    if ((i <= 0) || (i > 100)) {
+		Tcl_AppendResult(interp, "bad size \"", argv[2],
+			"\"", (char *) NULL);
+		goto error;
+	    }
+	    squarePtr->size = i;
+	    KeepInWindow(squarePtr);
+	}
+	sprintf(interp->result, "%d", squarePtr->size);
+    } else {
+	Tcl_AppendResult(interp, "bad option \"", argv[1],
+		"\":  must be configure, position, or size", (char *) NULL);
+	goto error;
+    }
+    if (!squarePtr->updatePending) {
+	Tk_DoWhenIdle(SquareDisplay, (ClientData) squarePtr);
+	squarePtr->updatePending = 1;
+    }
+    Tk_Release((ClientData) squarePtr);
+    return result;
+
+    error:
+    Tk_Release((ClientData) squarePtr);
+    return TCL_ERROR;
+}
+
+/*
  *----------------------------------------------------------------------
  *
- * ConfigureSquare --
+ * SquareConfigure --
  *
  *	This procedure is called to process an argv/argc list in
  *	conjunction with the Tk option database to configure (or
@@ -198,9 +308,9 @@ Tk_SquareCmd(clientData, interp, argc, argv)
  */
 
 static int
-ConfigureSquare(interp, squarePtr, argc, argv, flags)
+SquareConfigure(interp, squarePtr, argc, argv, flags)
     Tcl_Interp *interp;			/* Used for error reporting. */
-    register Square *squarePtr;		/* Information about widget. */
+    Square *squarePtr;			/* Information about widget. */
     int argc;				/* Number of valid entries in argv. */
     char **argv;			/* Arguments. */
     int flags;				/* Flags to pass to
@@ -212,11 +322,19 @@ ConfigureSquare(interp, squarePtr, argc, argv, flags)
     }
 
     /*
-     * A few options need special processing, such as setting the
-     * background from a 3-D border.
+     * Set the background for the window and create a graphics context
+     * for use during redisplay.
      */
 
-    Tk_SetBackgroundFromBorder(squarePtr->tkwin, squarePtr->bgBorder);
+    Tk_SetWindowBackground(squarePtr->tkwin,
+	    Tk_3DBorderColor(squarePtr->bgBorder)->pixel);
+    if ((squarePtr->gc == None) && (squarePtr->doubleBuffer)) {
+	XGCValues gcValues;
+	gcValues.function = GXcopy;
+	gcValues.graphics_exposures = False;
+	squarePtr->gc = Tk_GetGC(squarePtr->tkwin,
+		GCFunction|GCGraphicsExposures, &gcValues);
+    }
 
     /*
      * Register the desired geometry for the window.  Then arrange for
@@ -225,9 +343,9 @@ ConfigureSquare(interp, squarePtr, argc, argv, flags)
 
     Tk_GeometryRequest(squarePtr->tkwin, 200, 150);
     Tk_SetInternalBorder(squarePtr->tkwin, squarePtr->borderWidth);
-    if (!(squarePtr->flags & REDRAW_PENDING)) {
-	Tk_DoWhenIdle(DisplaySquare, (ClientData) squarePtr);
-	squarePtr->flags |= REDRAW_PENDING;
+    if (!squarePtr->updatePending) {
+	Tk_DoWhenIdle(SquareDisplay, (ClientData) squarePtr);
+	squarePtr->updatePending = 1;
     }
     return TCL_OK;
 }
@@ -235,7 +353,53 @@ ConfigureSquare(interp, squarePtr, argc, argv, flags)
 /*
  *--------------------------------------------------------------
  *
- * DisplaySquare --
+ * SquareEventProc --
+ *
+ *	This procedure is invoked by the Tk dispatcher for various
+ *	events on squares.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	When the window gets deleted, internal structures get
+ *	cleaned up.  When it gets exposed, it is redisplayed.
+ *
+ *--------------------------------------------------------------
+ */
+
+static void
+SquareEventProc(clientData, eventPtr)
+    ClientData clientData;	/* Information about window. */
+    XEvent *eventPtr;		/* Information about event. */
+{
+    Square *squarePtr = (Square *) clientData;
+
+    if (eventPtr->type == Expose) {
+	if (!squarePtr->updatePending) {
+	    Tk_DoWhenIdle(SquareDisplay, (ClientData) squarePtr);
+	    squarePtr->updatePending = 1;
+	}
+    } else if (eventPtr->type == ConfigureNotify) {
+	KeepInWindow(squarePtr);
+	if (!squarePtr->updatePending) {
+	    Tk_DoWhenIdle(SquareDisplay, (ClientData) squarePtr);
+	    squarePtr->updatePending = 1;
+	}
+    } else if (eventPtr->type == DestroyNotify) {
+	Tcl_DeleteCommand(squarePtr->interp, Tk_PathName(squarePtr->tkwin));
+	squarePtr->tkwin = NULL;
+	if (squarePtr->updatePending) {
+	    Tk_CancelIdleCall(SquareDisplay, (ClientData) squarePtr);
+	}
+	Tk_EventuallyFree((ClientData) squarePtr, SquareDestroy);
+    }
+}
+
+/*
+ *--------------------------------------------------------------
+ *
+ * SquareDisplay --
  *
  *	This procedure redraws the contents of a square window.
  *	It is invoked as a do-when-idle handler, so it only runs
@@ -251,16 +415,16 @@ ConfigureSquare(interp, squarePtr, argc, argv, flags)
  */
 
 static void
-DisplaySquare(clientData)
+SquareDisplay(clientData)
     ClientData clientData;	/* Information about window. */
 {
-    register Square *squarePtr = (Square *) clientData;
-    register Tk_Window tkwin = squarePtr->tkwin;
+    Square *squarePtr = (Square *) clientData;
+    Tk_Window tkwin = squarePtr->tkwin;
     Pixmap pm = None;
     Drawable d;
 
-    squarePtr->flags &= ~REDRAW_PENDING;
-    if ((tkwin == NULL) || !Tk_IsMapped(tkwin)) {
+    squarePtr->updatePending = 0;
+    if (!Tk_IsMapped(tkwin)) {
 	return;
     }
 
@@ -298,164 +462,16 @@ DisplaySquare(clientData)
      */
 
     if (squarePtr->doubleBuffer) {
-	XCopyArea(Tk_Display(tkwin), pm, Tk_WindowId(tkwin),
-		DefaultGCOfScreen(Tk_Screen(tkwin)), 0, 0,
-		Tk_Width(tkwin), Tk_Height(tkwin), 0, 0);
+	XCopyArea(Tk_Display(tkwin), pm, Tk_WindowId(tkwin), squarePtr->gc,
+		0, 0, Tk_Width(tkwin), Tk_Height(tkwin), 0, 0);
 	XFreePixmap(Tk_Display(tkwin), pm);
-    }
-}
-
-/*
- *--------------------------------------------------------------
- *
- * SquareWidgetCmd --
- *
- *	This procedure is invoked to process the Tcl command
- *	that corresponds to a widget managed by this module.
- *	See the user documentation for details on what it does.
- *
- * Results:
- *	A standard Tcl result.
- *
- * Side effects:
- *	See the user documentation.
- *
- *--------------------------------------------------------------
- */
-
-static int
-SquareWidgetCmd(clientData, interp, argc, argv)
-    ClientData clientData;		/* Information about square widget. */
-    Tcl_Interp *interp;			/* Current interpreter. */
-    int argc;				/* Number of arguments. */
-    char **argv;			/* Argument strings. */
-{
-    register Square *squarePtr = (Square *) clientData;
-    int result = TCL_OK;
-    int length;
-    char c;
-
-    if (argc < 2) {
-	Tcl_AppendResult(interp, "wrong # args: should be \"",
-		argv[0], " option ?arg arg ...?\"", (char *) NULL);
-	return TCL_ERROR;
-    }
-    Tk_Preserve((ClientData) squarePtr);
-    c = argv[1][0];
-    length = strlen(argv[1]);
-    if ((c == 'c') && (strncmp(argv[1], "configure", length) == 0)) {
-	if (argc == 2) {
-	    result = Tk_ConfigureInfo(interp, squarePtr->tkwin, configSpecs,
-		    (char *) squarePtr, (char *) NULL, 0);
-	} else if (argc == 3) {
-	    result = Tk_ConfigureInfo(interp, squarePtr->tkwin, configSpecs,
-		    (char *) squarePtr, argv[2], 0);
-	} else {
-	    result = ConfigureSquare(interp, squarePtr, argc-2, argv+2,
-		    TK_CONFIG_ARGV_ONLY);
-	}
-    } else if ((c == 'p') && (strncmp(argv[1], "position", length) == 0)) {
-	if ((argc != 2) && (argc != 4)) {
-	    Tcl_AppendResult(interp, "wrong # args: should be \"",
-		    argv[0], " position ?x y?\"", (char *) NULL);
-	    goto error;
-	}
-	if (argc == 4) {
-	    if ((Tcl_GetInt(interp, argv[2], &squarePtr->x) != TCL_OK)
-		    || (Tcl_GetInt(interp, argv[3], &squarePtr->y) != TCL_OK)) {
-		goto error;
-	    }
-	    KeepInWindow(squarePtr);
-	}
-	sprintf(interp->result, "%d %d", squarePtr->x, squarePtr->y);
-    } else if ((c == 's') && (strncmp(argv[1], "size", length) == 0)) {
-	if ((argc != 2) && (argc != 3)) {
-	    Tcl_AppendResult(interp, "wrong # args: should be \"",
-		    argv[0], " size ?amount?\"", (char *) NULL);
-	    goto error;
-	}
-	if (argc == 3) {
-	    int i;
-
-	    if (Tcl_GetInt(interp, argv[2], &i) != TCL_OK) {
-		goto error;
-	    }
-	    if ((i <= 0) || (i > 100)) {
-		Tcl_AppendResult(interp, "bad size \"", argv[2],
-			"\"", (char *) NULL);
-		goto error;
-	    }
-	    squarePtr->size = i;
-	    KeepInWindow(squarePtr);
-	}
-	sprintf(interp->result, "%d", squarePtr->size);
-    } else {
-	Tcl_AppendResult(interp, "bad option \"", argv[1],
-		"\":  must be configure, position, or size", (char *) NULL);
-	goto error;
-    }
-    if (!(squarePtr->flags & REDRAW_PENDING)) {
-	Tk_DoWhenIdle(DisplaySquare, (ClientData) squarePtr);
-	squarePtr->flags |= REDRAW_PENDING;
-    }
-    Tk_Release((ClientData) squarePtr);
-    return result;
-
-    error:
-    Tk_Release((ClientData) squarePtr);
-    return TCL_ERROR;
-}
-
-/*
- *--------------------------------------------------------------
- *
- * SquareEventProc --
- *
- *	This procedure is invoked by the Tk dispatcher for various
- *	events on squares.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	When the window gets deleted, internal structures get
- *	cleaned up.  When it gets exposed, it is redisplayed.
- *
- *--------------------------------------------------------------
- */
-
-static void
-SquareEventProc(clientData, eventPtr)
-    ClientData clientData;	/* Information about window. */
-    XEvent *eventPtr;		/* Information about event. */
-{
-    Square *squarePtr = (Square *) clientData;
-
-    if ((eventPtr->type == Expose) && (eventPtr->xexpose.count == 0)) {
-	if (!(squarePtr->flags & REDRAW_PENDING)) {
-	    Tk_DoWhenIdle(DisplaySquare, (ClientData) squarePtr);
-	    squarePtr->flags |= REDRAW_PENDING;
-	}
-    } else if (eventPtr->type == ConfigureNotify) {
-	KeepInWindow(squarePtr);
-	if (!(squarePtr->flags & REDRAW_PENDING)) {
-	    Tk_DoWhenIdle(DisplaySquare, (ClientData) squarePtr);
-	    squarePtr->flags |= REDRAW_PENDING;
-	}
-    } else if (eventPtr->type == DestroyNotify) {
-	Tcl_DeleteCommand(squarePtr->interp, Tk_PathName(squarePtr->tkwin));
-	squarePtr->tkwin = NULL;
-	if (squarePtr->flags & REDRAW_PENDING) {
-	    Tk_CancelIdleCall(DisplaySquare, (ClientData) squarePtr);
-	}
-	Tk_EventuallyFree((ClientData) squarePtr, DestroySquare);
     }
 }
 
 /*
  *----------------------------------------------------------------------
  *
- * DestroySquare --
+ * SquareDestroy --
  *
  *	This procedure is invoked by Tk_EventuallyFree or Tk_Release
  *	to clean up the internal structure of a square at a safe time
@@ -471,16 +487,14 @@ SquareEventProc(clientData, eventPtr)
  */
 
 static void
-DestroySquare(clientData)
+SquareDestroy(clientData)
     ClientData clientData;	/* Info about square widget. */
 {
-    register Square *squarePtr = (Square *) clientData;
+    Square *squarePtr = (Square *) clientData;
 
-    if (squarePtr->bgBorder != NULL) {
-	Tk_Free3DBorder(squarePtr->bgBorder);
-    }
-    if (squarePtr->fgBorder != NULL) {
-	Tk_Free3DBorder(squarePtr->fgBorder);
+    Tk_FreeOptions(configSpecs, (char *) squarePtr, squarePtr->display, 0);
+    if (squarePtr->gc != None) {
+	Tk_FreeGC(squarePtr->display, squarePtr->gc);
     }
     ckfree((char *) squarePtr);
 }
@@ -508,10 +522,8 @@ KeepInWindow(squarePtr)
     register Square *squarePtr;		/* Pointer to widget record. */
 {
     int i, bd;
-
-    if (squarePtr->relief == TK_RELIEF_FLAT) {
-	bd = 0;
-    } else {
+    bd = 0;
+    if (squarePtr->relief != TK_RELIEF_FLAT) {
 	bd = squarePtr->borderWidth;
     }
     i = (Tk_Width(squarePtr->tkwin) - bd) - (squarePtr->x + squarePtr->size);

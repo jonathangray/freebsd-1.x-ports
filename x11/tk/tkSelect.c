@@ -5,18 +5,29 @@
  *	translating between the standard X ICCCM conventions
  *	and Tcl commands.
  *
- * Copyright 1990 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkSelect.c,v 1.1 1993/08/09 01:20:46 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkSelect.c,v 1.2 1993/12/27 07:34:34 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "tkConfig.h"
@@ -1155,7 +1166,7 @@ SelCvtToX(string, type, tkwin, numLongsPtr)
 
     numFields = 1;
     for (p = string; *p != 0; p++) {
-	if (isspace(*p)) {
+	if (isspace(UCHAR(*p))) {
 	    numFields++;
 	}
     }
@@ -1167,14 +1178,14 @@ SelCvtToX(string, type, tkwin, numLongsPtr)
 
     for (longPtr = propPtr, *numLongsPtr = 0, p = string;
 	    ; longPtr++, (*numLongsPtr)++) {
-	while (isspace(*p)) {
+	while (isspace(UCHAR(*p))) {
 	    p++;
 	}
 	if (*p == 0) {
 	    break;
 	}
 	field = p;
-	while ((*p != 0) && !isspace(*p)) {
+	while ((*p != 0) && !isspace(UCHAR(*p))) {
 	    p++;
 	}
 	if (type == XA_ATOM) {
@@ -1415,7 +1426,7 @@ ConvertSelection(winPtr, eventPtr)
 
 		numItems = DefaultSelection(winPtr, target, (char *) buffer,
 			TK_SEL_BYTES_AT_ONCE, &type);
-		if (numItems != 0) {
+		if (numItems >= 0) {
 		    goto gotStuff;
 		}
 		info.multAtoms[2*i + 1] = None;
@@ -1841,7 +1852,7 @@ HandleTclCommand(clientData, offset, buffer, maxBytes)
 	oldFreeProc = TCL_DYNAMIC;
     }
     cmdInfoPtr->interp->freeProc = 0;
-    if (Tcl_GlobalEval(cmdInfoPtr->interp, command) == TCL_OK) {
+    if (TkCopyAndGlobalEval(cmdInfoPtr->interp, command) == TCL_OK) {
 	length = strlen(cmdInfoPtr->interp->result);
 	if (length > maxBytes) {
 	    length = maxBytes;
@@ -2091,7 +2102,7 @@ LostSelection(clientData)
 	oldFreeProc = TCL_DYNAMIC;
     }
     lostPtr->interp->freeProc = 0;
-    if (Tcl_GlobalEval(lostPtr->interp, lostPtr->command) != TCL_OK) {
+    if (TkCopyAndGlobalEval(lostPtr->interp, lostPtr->command) != TCL_OK) {
 	Tk_BackgroundError(lostPtr->interp);
     }
     Tcl_FreeResult(lostPtr->interp);

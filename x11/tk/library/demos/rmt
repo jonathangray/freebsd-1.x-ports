@@ -1,4 +1,4 @@
-#!/usr/local/wish -f
+#!/usr/local/bin/wish -f
 #
 # This script implements a simple remote-control mechanism for
 # Tk applications.  It allows you to select an application and
@@ -13,7 +13,6 @@ wm minsize . 1 1
 # the commands locally.
 
 set app "local"
-set promptLength 7
 
 # The global variable below keeps track of whether we're in the
 # middle of executing a command entered via the text.
@@ -29,14 +28,14 @@ set lastCommand ""
 # applications sub-menu whenever it is cascaded to.
 
 frame .menu -relief raised -bd 2
-pack append . .menu {top fillx}
+pack .menu -side top -fill x
 menubutton .menu.file -text "File" -menu .menu.file.m -underline 0
 menu .menu.file.m
 .menu.file.m add cascade -label "Select Application" -command fillAppsMenu \
-	-menu .menu.file.m.apps -underline 0 -accelerator =>
+	-menu .menu.file.m.apps -underline 0
 .menu.file.m add command -label "Quit" -command "destroy ." -underline 0
 menu .menu.file.m.apps
-pack append .menu .menu.file left
+pack .menu.file -side left
 tk_menuBar .menu .menu.file
 
 # Create text window and scrollbar, and set up bindings for text
@@ -44,7 +43,8 @@ tk_menuBar .menu .menu.file
 
 text .t -relief raised -bd 2 -yscrollcommand ".s set" -setgrid true
 scrollbar .s -relief flat -command ".t yview"
-pack append . .s {right fill} .t left
+pack .s -side right -fill both
+pack .t -side left
 
 bind .t <1> {
     set tk_priv(selectMode) char
@@ -60,7 +60,7 @@ bind .t <Triple-1> {
     tk_textSelectTo %W @%x,%y
 }
 bind .t <Control-u> {
-    .t delete "insert linestart + $promptLength chars" "insert lineend"
+    .t delete {promptEnd + 1 char} insert
     .t yview -pickplace insert
 }
 bind .t <Return> {.t insert insert \n; invoke}
@@ -82,10 +82,10 @@ bind .t <Control-v> {
 # right now).
 
 proc prompt {} {
-    global app promptLength
-    .t insert "insert linestart" "$app: "
-    .t tag add bold "insert linestart" \
-	    "insert linestart + [expr $promptLength-1] chars"
+    global app
+    .t insert insert "$app: "
+    .t mark set promptEnd {insert - 1 char}
+    .t tag add bold {promptEnd linestart} promptEnd
 }
 
 # The procedure below executes a command (it takes everything on the
@@ -93,8 +93,8 @@ proc prompt {} {
 # application or executes it locally, depending on "app".
 
 proc invoke {} {
-    global app promptLength executing lastCommand
-    set cmd [.t get cmdStart+1c insert]
+    global app executing lastCommand
+    set cmd [.t get promptEnd+1c insert]
     incr executing 1
     if [info complete $cmd] {
 	if {$cmd == "!!\n"} {
@@ -115,7 +115,7 @@ proc invoke {} {
 	    }
 	}
 	prompt
-	.t mark set cmdStart insert-1c
+	.t mark set promptEnd insert-1c
     }
     incr executing -1
     .t yview -pickplace insert
@@ -128,13 +128,12 @@ proc invoke {} {
 # so there's no need to change the old one).
 
 proc newApp appName {
-    global app promptLength executing
+    global app executing
     set app $appName
-    set promptLength [expr [string length $appName]+2]
     if !$executing {
-	.t delete "cmdStart linestart" cmdStart
-	.t insert cmdStart "$appName:"
-	.t tag add bold "cmdStart linestart" cmdStart
+	.t delete "promptEnd linestart" promptEnd
+	.t insert promptEnd "$appName:"
+	.t tag add bold "promptEnd linestart" promptEnd
     }
     return {}
 }
@@ -143,9 +142,7 @@ proc newApp appName {
 # to backspace over the prompt.
 
 proc backspace {} {
-    global promptLength
-    scan [.t index insert] %*d.%d char
-    if {$char > $promptLength} {
+    if {[.t index promptEnd] != [.t index {insert - 1 char}]} {
 	.t delete insert-1c insert
 	.t yview -pickplace insert
     }
@@ -162,12 +159,6 @@ proc fillAppsMenu {} {
     .menu.file.m.apps add command -label local -command {newApp local}
 }
 
+set app [winfo name .]
 prompt
 focus .t
-
-# The "cmdStart" mark records the position of the space character just
-# after the most recent prompt.  It turns out to be important to use
-# this position, so that the mark floats correctly as characters are
-# typed in the command as as the prompt is changed.
-
-.t mark set cmdStart "insert-1c"

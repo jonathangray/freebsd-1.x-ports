@@ -1,502 +1,828 @@
 # This file is a Tcl script to test out the "pack" command
 # of Tk.  It is organized in the standard fashion for Tcl tests.
 #
-# Don't "source" definitions if they're already been "sourced".
-# This allows manual users the flexibility to run only those
-# tests which they wish to and in the verbosity they wish, while 
-# at the same time allowing automated scripts to execute commands 
-# of the form:       tclTest < expr.test 
+# Copyright (c) 1993 The Regents of the University of California.
+# All rights reserved.
+#
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the
+# above copyright notice and the following two paragraphs appear in
+# all copies of this software.
+#
+# IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+# OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+# CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+# AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+# ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+# PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+#
+# $Header: /a/cvs/386BSD/ports/x11/tk/tests/pack.test,v 1.2 1993/12/27 07:38:56 rich Exp $ (Berkeley)
 
 if {[string compare test [info procs test]] == 1} then \
   {source defs}
 
-# First, test a single window packed in various ways in a parent
+# Utility procedures:
+
+proc pack1 {args} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    eval pack .pack.a $args
+    pack .pack.b -expand yes -fill both
+    update
+    list [winfo geometry .pack.a] [winfo geometry .pack.b]
+}
+proc pack2 {args} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    eval pack .pack.a $args
+    update
+    winfo geometry .pack.a
+}
+proc pack3 {args} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -side  top
+    pack .pack.c -side left
+    eval pack .pack.b $args
+    update
+    winfo geometry .pack.b
+}
+proc pack4 {option value} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a $option $value
+    set i [pack newinfo .pack.a]
+    lindex $i [expr [lsearch -exact $i $option]+1]
+}
+
+# Create some test windows.
 
 catch {destroy .pack}
-frame .pack
-place .pack -width 100 -height 100
-frame .pack.red -width 10 -height 20
-label .pack.red.l -text R -bd 2 -relief raised
-place .pack.red.l -relwidth 1.0 -relheight 1.0
-frame .pack.green -width 30 -height 40
-label .pack.green.l -text G -bd 2 -relief raised
-place .pack.green.l -relwidth 1.0 -relheight 1.0
-frame .pack.blue -width 40 -height 40
-label .pack.blue.l -text B -bd 2 -relief raised
-place .pack.blue.l -relwidth 1.0 -relheight 1.0
-frame .pack.purple -width 80 -height 20
-label .pack.purple.l -text P -bd 2 -relief raised
-place .pack.purple.l -relwidth 1.0 -relheight 1.0
+toplevel .pack
+wm geom .pack 300x200+0+0
+wm minsize .pack 1 1
+update idletasks
+foreach i {a b c d} {
+    frame .pack.$i
+    label .pack.$i.label -text $i -relief raised
+    place .pack.$i.label -relwidth 1.0 -relheight 1.0
+}
+.pack.a config -width 20 -height 40
+.pack.b config -width 50 -height 30
+.pack.c config -width 80 -height 80
+.pack.d config -width 40 -height 30
 
-test pack-1.1 {basic positioning} {
-    pack ap .pack .pack.red top
-    update
-    winfo geometry .pack.red
-} 10x20+45+0
-test pack-1.2 {basic positioning} {
-    pack append .pack .pack.red bottom
-    update
-    winfo geometry .pack.red
-} 10x20+45+80
-test pack-1.3 {basic positioning} {
-    pack append .pack .pack.red left
-    update
-    winfo geometry .pack.red
-} 10x20+0+40
-test pack-1.4 {basic positioning} {
-    pack append .pack .pack.red right
-    update
-    winfo geometry .pack.red
-} 10x20+90+40
+test pack-1.1 {-side option} {
+    pack1 -side top
+} {20x40+140+0 300x160+0+40}
+test pack-1.2 {-side option} {
+    pack1 -side bottom
+} {20x40+140+160 300x160+0+0}
+test pack-1.3 {-side option} {
+    pack1 -side left
+} {20x40+0+80 280x200+20+0}
+test pack-1.4 {-side option} {
+    pack1 -side right
+} {20x40+280+80 280x200+0+0}
 
-# Try adding padding around the window and make sure that the
-# window gets a larger frame.
+test pack-2.1 {x padding and filling} {
+    pack1 -side right -padx 20
+} {20x40+260+80 240x200+0+0}
+test pack-2.2 {x padding and filling} {
+    pack1 -side right -ipadx 20
+} {60x40+240+80 240x200+0+0}
+test pack-2.3 {x padding and filling} {
+    pack1 -side right -ipadx 5 -padx 10
+} {30x40+260+80 250x200+0+0}
+test pack-2.4 {x padding and filling} {
+    pack1 -side right -padx 20 -fill x
+} {20x40+260+80 240x200+0+0}
+test pack-2.5 {x padding and filling} {
+    pack1 -side right -ipadx 20 -fill x
+} {60x40+240+80 240x200+0+0}
+test pack-2.6 {x padding and filling} {
+    pack1 -side right -ipadx 5 -padx 10 -fill x
+} {30x40+260+80 250x200+0+0}
+test pack-2.7 {x padding and filling} {
+    pack1 -side top -padx 20
+} {20x40+140+0 300x160+0+40}
+test pack-2.8 {x padding and filling} {
+    pack1 -side top -ipadx 20
+} {60x40+120+0 300x160+0+40}
+test pack-2.9 {x padding and filling} {
+    pack1 -side top -ipadx 5 -padx 10
+} {30x40+135+0 300x160+0+40}
+test pack-2.10 {x padding and filling} {
+    pack1 -side top -padx 20 -fill x
+} {260x40+20+0 300x160+0+40}
+test pack-2.11 {x padding and filling} {
+    pack1 -side top -ipadx 20 -fill x
+} {300x40+0+0 300x160+0+40}
+test pack-2.12 {x padding and filling} {
+    pack1 -side top -ipadx 5 -padx 10 -fill x
+} {280x40+10+0 300x160+0+40}
+set pad [winfo pixels .pack 1c]
+test pack-2.13 {x padding and filling} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -padx 1c
+    set x [pack newinfo .pack.a]
+    lindex $x [expr [lsearch -exact $x -padx]+1]
+} $pad
+test pack-2.14 {x padding and filling} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -ipadx 1c
+    set x [pack newinfo .pack.a]
+    lindex $x [expr [lsearch -exact $x -ipadx]+1]
+} $pad
 
-test pack-2.1 {padding} {
-    pack append .pack .pack.red {t padx 20}
-    update
-    winfo geometry .pack.red
-} 10x20+45+0
-test pack-2.2 {padding} {
-    pack append .pack .pack.red {top pady 20}
-    update
-    winfo geometry .pack.red
-} 10x20+45+10
-test pack-2.3 {padding} {
-    pack append .pack .pack.red {l padx 20}
-    update
-    winfo geometry .pack.red
-} 10x20+10+40
-test pack-2.4 {padding} {
-    pack append .pack .pack.red {left pady 20}
-    update
-    winfo geometry .pack.red
-} 10x20+0+40
+test pack-3.1 {y padding and filling} {
+    pack1 -side right -pady 20
+} {20x40+280+80 280x200+0+0}
+test pack-3.2 {y padding and filling} {
+    pack1 -side right -ipady 20
+} {20x80+280+60 280x200+0+0}
+test pack-3.3 {y padding and filling} {
+    pack1 -side right -ipady 5 -pady 10
+} {20x50+280+75 280x200+0+0}
+test pack-3.4 {y padding and filling} {
+    pack1 -side right -pady 20 -fill y
+} {20x160+280+20 280x200+0+0}
+test pack-3.5 {y padding and filling} {
+    pack1 -side right -ipady 20 -fill y
+} {20x200+280+0 280x200+0+0}
+test pack-3.6 {y padding and filling} {
+    pack1 -side right -ipady 5 -pady 10 -fill y
+} {20x180+280+10 280x200+0+0}
+test pack-3.7 {y padding and filling} {
+    pack1 -side top -pady 20
+} {20x40+140+20 300x120+0+80}
+test pack-3.8 {y padding and filling} {
+    pack1 -side top -ipady 20
+} {20x80+140+0 300x120+0+80}
+test pack-3.9 {y padding and filling} {
+    pack1 -side top -ipady 5 -pady 10
+} {20x50+140+10 300x130+0+70}
+test pack-3.10 {y padding and filling} {
+    pack1 -side top -pady 20 -fill y
+} {20x40+140+20 300x120+0+80}
+test pack-3.11 {y padding and filling} {
+    pack1 -side top -ipady 20 -fill y
+} {20x80+140+0 300x120+0+80}
+test pack-3.12 {y padding and filling} {
+    pack1 -side top -ipady 5 -pady 10 -fill y
+} {20x50+140+10 300x130+0+70}
+set pad [winfo pixels .pack 1c]
+test pack-3.13 {y padding and filling} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -pady 1c
+    set x [pack newinfo .pack.a]
+    lindex $x [expr [lsearch -exact $x -pady]+1]
+} $pad
+test pack-3.14 {y padding and filling} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -ipady 1c
+    set x [pack newinfo .pack.a]
+    lindex $x [expr [lsearch -exact $x -ipady]+1]
+} $pad
 
-# Position the window at different positions in its frame to
-# make sure they all work.  Try two differenet frame locations,
-# to make sure that frame offsets are being added in correctly.
+test pack-4.1 {anchors} {
+    pack2 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor n
+} {30x70+135+20}
+test pack-4.2 {anchors} {
+    pack2 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor ne
+} {30x70+260+20}
+test pack-4.3 {anchors} {
+    pack2 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor e
+} {30x70+260+65}
+test pack-4.4 {anchors} {
+    pack2 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor se
+} {30x70+260+110}
+test pack-4.5 {anchors} {
+    pack2 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor s
+} {30x70+135+110}
+test pack-4.6 {anchors} {
+    pack2 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor sw
+} {30x70+10+110}
+test pack-4.7 {anchors} {
+    pack2 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor w
+} {30x70+10+65}
+test pack-4.8 {anchors} {
+    pack2 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor nw
+} {30x70+10+20}
+test pack-4.9 {anchors} {
+    pack2 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor center
+} {30x70+135+65}
 
-test pack-3.1 {framing} {
-    pack append .pack .pack.red {b padx 20 pady 30}
-    update
-    winfo geometry .pack.red
-} 10x20+45+65
-test pack-3.2 {framing} {
-    pack append .pack .pack.red {bottom padx 20 pady 30 fr n}
-    update
-    winfo geometry .pack.red
-} 10x20+45+50
-test pack-3.3 {framing} {
-    pack append .pack .pack.red {bottom padx 20 pady 30 frame ne}
-    update
-    winfo geometry .pack.red
-} 10x20+90+50
-test pack-3.4 {framing} {
-    pack append .pack .pack.red {bottom padx 20 pady 30 frame e}
-    update
-    winfo geometry .pack.red
-} 10x20+90+65
-test pack-3.5 {framing} {
-    pack append .pack .pack.red {bottom padx 20 pady 30 frame se}
-    update
-    winfo geometry .pack.red
-} 10x20+90+80
-test pack-3.6 {framing} {
-    pack append .pack .pack.red {bottom padx 20 pady 30 frame s}
-    update
-    winfo geometry .pack.red
-} 10x20+45+80
-test pack-3.7 {framing} {
-    pack append .pack .pack.red {bottom padx 20 pady 30 frame sw}
-    update
-    winfo geometry .pack.red
-} 10x20+0+80
-test pack-3.8 {framing} {
-    pack append .pack .pack.red {bottom padx 20 pady 30 frame w}
-    update
-    winfo geometry .pack.red
-} 10x20+0+65
-test pack-3.9 {framing} {
-    pack append .pack .pack.red {bottom padx 20 pady 30 frame nw}
-    update
-    winfo geometry .pack.red
-} 10x20+0+50
-test pack-3.10 {framing} {
-    pack append .pack .pack.red {bottom padx 20 pady 30 frame c}
-    update
-    winfo geometry .pack.red
-} 10x20+45+65
-test pack-3.11 {framing} {
-    pack append .pack .pack.red {r padx 20 pady 30}
-    update
-    winfo geometry .pack.red
-} 10x20+80+40
-test pack-3.12 {framing} {
-    pack append .pack .pack.red {right padx 20 pady 30 frame n}
-    update
-    winfo geometry .pack.red
-} 10x20+80+0
-test pack-3.13 {framing} {
-    pack append .pack .pack.red {right padx 20 pady 30 frame ne}
-    update
-    winfo geometry .pack.red
-} 10x20+90+0
-test pack-3.14 {framing} {
-    pack append .pack .pack.red {right padx 20 pady 30 frame e}
-    update
-    winfo geometry .pack.red
-} 10x20+90+40
-test pack-3.15 {framing} {
-    pack append .pack .pack.red {right padx 20 pady 30 frame se}
-    update
-    winfo geometry .pack.red
-} 10x20+90+80
-test pack-3.16 {framing} {
-    pack append .pack .pack.red {right padx 20 pady 30 frame s}
-    update
-    winfo geometry .pack.red
-} 10x20+80+80
-test pack-3.17 {framing} {
-    pack append .pack .pack.red {right padx 20 pady 30 frame sw}
-    update
-    winfo geometry .pack.red
-} 10x20+70+80
-test pack-3.18 {framing} {
-    pack append .pack .pack.red {right padx 20 pady 30 frame w}
-    update
-    winfo geometry .pack.red
-} 10x20+70+40
-test pack-3.19 {framing} {
-    pack append .pack .pack.red {right padx 20 pady 30 frame nw}
-    update
-    winfo geometry .pack.red
-} 10x20+70+0
-test pack-3.20 {framing} {
-    pack append .pack .pack.red {right padx 20 pady 30 frame center}
-    update
-    winfo geometry .pack.red
-} 10x20+80+40
+# Repeat above tests, but with a frame that isn't at (0,0), so that
+# we can be sure that the frame offset is being added in correctly.
 
-# Try out various filling combinations in a couple of different
-# frame locations.
+test pack-5.1 {more anchors} {
+    pack3 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor n
+} {60x60+160+60}
+test pack-5.2 {more anchors} {
+    pack3 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor ne
+} {60x60+230+60}
+test pack-5.3 {more anchors} {
+    pack3 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor e
+} {60x60+230+90}
+test pack-5.4 {more anchors} {
+    pack3 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor se
+} {60x60+230+120}
+test pack-5.5 {more anchors} {
+    pack3 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor s
+} {60x60+160+120}
+test pack-5.6 {more anchors} {
+    pack3 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor sw
+} {60x60+90+120}
+test pack-5.7 {more anchors} {
+    pack3 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor w
+} {60x60+90+90}
+test pack-5.8 {more anchors} {
+    pack3 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor nw
+} {60x60+90+60}
+test pack-5.9 {more anchors} {
+    pack3 -side top -ipadx 5 -padx 10 -ipady 15 -pady 20 -expand y -anchor center
+} {60x60+160+90}
 
-test pack-4.1 {filling} {
-    pack append .pack .pack.red {bottom padx 20 pady 30 fillx}
+test pack-6.1 {-expand option} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d -side left
     update
-    winfo geometry .pack.red
-} 100x20+0+65
-test pack-4.2 {filling} {
-    pack append .pack .pack.red {bottom padx 20 pady 30 filly}
+    list [winfo geometry .pack.a] [winfo geometry .pack.b] \
+	    [winfo geometry .pack.c] [winfo geometry .pack.d]
+} {20x40+0+80 50x30+20+85 80x80+70+60 40x30+150+85}
+test pack-6.2 {-expand option} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -side left -expand yes
+    pack .pack.b -side left
+    pack .pack.c .pack.d -side left -expand 1
     update
-    winfo geometry .pack.red
-} 10x50+45+50
-test pack-4.3 {filling} {
-    pack append .pack .pack.red {bottom padx 20 pady 30 fill}
+    list [winfo geometry .pack.a] [winfo geometry .pack.b] \
+	    [winfo geometry .pack.c] [winfo geometry .pack.d]
+} {20x40+18+80 50x30+56+85 80x80+124+60 40x30+241+85}
+test pack-6.3 {-expand option} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d -side top
     update
-    winfo geometry .pack.red
-} 100x50+0+50
-test pack-4.4 {filling} {
-    pack append .pack .pack.red {right padx 20 pady 30 fillx}
+    list [winfo geometry .pack.a] [winfo geometry .pack.b] \
+	    [winfo geometry .pack.c] [winfo geometry .pack.d]
+} {20x40+140+0 50x30+125+40 80x80+110+70 40x30+130+150}
+test pack-6.4 {-expand option} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -side top -expand yes
+    pack .pack.b -side top
+    pack .pack.c .pack.d -side top -expand 1
     update
-    winfo geometry .pack.red
-} 30x20+70+40
-test pack-4.5 {filling} {
-    pack append .pack .pack.red {right padx 20 pady 30 filly}
+    list [winfo geometry .pack.a] [winfo geometry .pack.b] \
+	    [winfo geometry .pack.c] [winfo geometry .pack.d]
+} {20x40+140+3 50x30+125+46 80x80+110+79 40x30+130+166}
+test pack-6.5 {-expand option} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d -side right
     update
-    winfo geometry .pack.red
-} 10x100+80+0
-test pack-4.6 {filling} {
-    pack append .pack .pack.red {right padx 20 pady 30 fill}
+    list [winfo geometry .pack.a] [winfo geometry .pack.b] \
+	    [winfo geometry .pack.c] [winfo geometry .pack.d]
+} {20x40+280+80 50x30+230+85 80x80+150+60 40x30+110+85}
+test pack-6.6 {-expand option} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -side right -expand yes
+    pack .pack.b -side right
+    pack .pack.c .pack.d -side right -expand 1
     update
-    winfo geometry .pack.red
-} 30x100+70+0
+    list [winfo geometry .pack.a] [winfo geometry .pack.b] \
+	    [winfo geometry .pack.c] [winfo geometry .pack.d]
+} {20x40+262+80 50x30+194+85 80x80+95+60 40x30+18+85}
+test pack-6.7 {-expand option} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d -side bottom
+    update
+    list [winfo geometry .pack.a] [winfo geometry .pack.b] \
+	    [winfo geometry .pack.c] [winfo geometry .pack.d]
+} {20x40+140+160 50x30+125+130 80x80+110+50 40x30+130+20}
+test pack-6.8 {-expand option} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -side bottom -expand yes
+    pack .pack.b -side bottom
+    pack .pack.c .pack.d -side bottom -expand 1
+    update
+    list [winfo geometry .pack.a] [winfo geometry .pack.b] \
+	    [winfo geometry .pack.c] [winfo geometry .pack.d]
+} {20x40+140+157 50x30+125+124 80x80+110+40 40x30+130+3}
+test pack-6.9 {-expand option} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -side bottom -expand yes -fill both
+    pack .pack.b -side right
+    pack .pack.c -side top -expand 1 -fill both
+    pack .pack.d -side left
+    update
+    list [winfo geometry .pack.a] [winfo geometry .pack.b] \
+	    [winfo geometry .pack.c] [winfo geometry .pack.d]
+} {300x65+0+135 50x30+250+52 250x105+0+0 40x30+0+105}
+test pack-6.10 {-expand option} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -side left -expand yes -fill both
+    pack .pack.b -side top
+    pack .pack.c -side right -expand 1 -fill both
+    pack .pack.d -side bottom
+    update
+    list [winfo geometry .pack.a] [winfo geometry .pack.b] \
+	    [winfo geometry .pack.c] [winfo geometry .pack.d]
+} {100x200+0+0 50x30+175+0 160x170+140+30 40x30+100+170}
+test pack-6.11 {-expand option} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -side left -expand yes -fill both
+    pack .pack.b -side top -expand yes -fill both
+    pack .pack.c -side right -expand 1 -fill both
+    pack .pack.d -side bottom -expand yes -fill both
+    update
+    list [winfo geometry .pack.a] [winfo geometry .pack.b] \
+	    [winfo geometry .pack.c] [winfo geometry .pack.d]
+} {100x200+0+0 200x100+100+0 160x100+140+100 40x100+100+100}
+catch {destroy .pack2}
+toplevel .pack2 -height 400 -width 400
+wm geometry .pack2 +0+0
+pack propagate .pack2 0
+pack forget .pack2.a .pack2.b .pack2.c .pack2.d
+foreach i {w1 w2 w3} {
+    frame .pack2.$i -width 30 -height 30 -bd 2 -relief raised
+    label .pack2.$i.l -text $i
+    place .pack2.$i.l -relwidth 1.0 -relheight 1.0
+}
+test pack-6.11 {-expand option} {
+    pack .pack2.w1 .pack2.w2 .pack2.w3 -padx 5 -ipadx 4 -pady 2 -ipady 6 -expand 1 -side left
+    update
+    list [winfo geometry .pack2.w1] [winfo geometry .pack2.w2] [winfo geometry .pack2.w3]
+} {38x42+47+179 38x42+180+179 38x42+314+179}
+test pack-6.12 {-expand option} {
+    pack forget .pack2.w1 .pack2.w2 .pack2.w3
+    pack .pack2.w1 .pack2.w2 .pack2.w3 -padx 5 -ipadx 4 -pady 2 \
+	    -ipady 6 -expand 1 -side top
+    update
+    list [winfo geometry .pack2.w1] [winfo geometry .pack2.w2] [winfo geometry .pack2.w3]
+} {38x42+181+45 38x42+181+178 38x42+181+312}
+catch {destroy .pack2}
 
-# Multiple windows:  make sure that space is properly subtracted
-# from the cavity as windows are positioned inwards from all
-# different sides.  Also make sure that windows get unmapped if
-# there isn't enough space for them.
+wm geometry .pack {}
+test pack-7.1 {requesting size for parent} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d -side left -padx 5 -pady 10
+    update
+    list [winfo reqwidth .pack] [winfo reqheight .pack]
+} {230 100}
+test pack-7.2 {requesting size for parent} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d -side top -padx 5 -pady 10
+    update
+    list [winfo reqwidth .pack] [winfo reqheight .pack]
+} {90 260}
+test pack-7.3 {requesting size for parent} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d -side right -padx 5 -pady 10
+    update
+    list [winfo reqwidth .pack] [winfo reqheight .pack]
+} {230 100}
+test pack-7.4 {requesting size for parent} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d -side bottom -padx 5 -pady 10
+    update
+    list [winfo reqwidth .pack] [winfo reqheight .pack]
+} {90 260}
+test pack-7.5 {requesting size for parent} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -side top -padx 5 -pady 10
+    pack .pack.b -side right -padx 5 -pady 10
+    pack .pack.c -side bottom -padx 5 -pady 10
+    pack .pack.d -side left -padx 5 -pady 10
+    update
+    list [winfo reqwidth .pack] [winfo reqheight .pack]
+} {150 210}
+test pack-7.6 {requesting size for parent} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -side top
+    pack .pack.c -side left
+    pack .pack.d -side bottom
+    update
+    list [winfo reqwidth .pack] [winfo reqheight .pack]
+} {120 120}
+test pack-7.7 {requesting size for parent} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -side right
+    pack .pack.c -side bottom
+    pack .pack.d -side top
+    update
+    list [winfo reqwidth .pack] [winfo reqheight .pack]
+} {100 110}
 
-pack append .pack .pack.red top .pack.green top .pack.blue top \
-	.pack.purple top
+
+# For the tests below, create a couple of "pad" windows to shrink
+# the available space for the remaining windows.  The tests have to
+# be done this way rather than shrinking the whole window, because
+# some window managers like mwm won't let a top-level window get
+# very small.
+
+pack forget .pack.a .pack.b .pack.c .pack.d
+frame .pack.right -width 200 -height 10 -bd 2 -relief raised
+frame .pack.bottom -width 10 -height 150 -bd 2 -relief raised
+pack .pack.right -side right
+pack .pack.bottom -side bottom
+pack .pack.a .pack.b .pack.c -side top
 update
-test pack-5.1 {multiple windows} {winfo geometry .pack.red} 10x20+45+0
-test pack-5.2 {multiple windows} {winfo geometry .pack.green} 30x40+35+20
-test pack-5.3 {multiple windows} {winfo geometry .pack.blue} 40x40+30+60
-test pack-5.4 {multiple windows} {winfo ismapped .pack.purple} 0
-pack b .pack.blue .pack.purple top
+test pack-8.1 {insufficient space} {
+    list [winfo geometry .pack.a] [winfo ismapped .pack.a] \
+	    [winfo geometry .pack.b] [winfo ismapped .pack.b] \
+	    [winfo geometry .pack.c] [winfo ismapped .pack.c]
+} {20x40+30+0 1 50x30+15+40 1 80x80+0+70 1}
+wm geom .pack 270x250
 update
-test pack-5.6 {multiple windows} {winfo ismapped .pack.purple} 1
-test pack-5.7 {multiple windows} {winfo geometry .pack.purple} 80x20+10+60
-test pack-5.8 {multiple windows} {winfo geometry .pack.blue} 40x20+30+80
-pack after .pack.blue .pack.red top
+test pack-8.2 {insufficient space} {
+    list [winfo geometry .pack.a] [winfo ismapped .pack.a] \
+	    [winfo geometry .pack.b] [winfo ismapped .pack.b] \
+	    [winfo geometry .pack.c] [winfo ismapped .pack.c]
+} {20x40+25+0 1 50x30+10+40 1 70x30+0+70 1}
+wm geom .pack 240x220
 update
-test pack-5.9 {multiple windows} {winfo geometry .pack.green} 30x40+35+0
-test pack-5.10 {multiple windows} {winfo geometry .pack.purple} 80x20+10+40
-test pack-5.11 {multiple windows} {winfo geometry .pack.blue} 40x40+30+60
-test pack-5.12 {multiple windows} {winfo ismapped .pack.red} 0
-pack before .pack.green .pack.red right .pack.blue left
+test pack-8.3 {insufficient space} {
+    list [winfo geometry .pack.a] [winfo ismapped .pack.a] \
+	    [winfo geometry .pack.b] [winfo ismapped .pack.b] \
+	    [winfo geometry .pack.c] [winfo ismapped .pack.c]
+} {20x40+10+0 1 40x30+0+40 1 70x30+0+70 0}
+wm geom .pack 350x350
 update
-test pack-5.12 {multiple windows} {winfo ismapped .pack.red} 1
-test pack-5.13 {multiple windows} {winfo geometry .pack.red} 10x20+90+40
-test pack-5.14 {multiple windows} {winfo geometry .pack.blue} 40x40+0+30
-test pack-5.15 {multiple windows} {winfo geometry .pack.green} 30x40+50+0
-test pack-5.16 {multiple windows} {winfo geometry .pack.purple} 50x20+40+40
-pack append .pack .pack.purple left .pack.green bottom .pack.red bottom \
-	.pack.blue bottom
+test pack-8.4 {insufficient space} {
+    list [winfo geometry .pack.a] [winfo ismapped .pack.a] \
+	    [winfo geometry .pack.b] [winfo ismapped .pack.b] \
+	    [winfo geometry .pack.c] [winfo ismapped .pack.c]
+} {20x40+65+0 1 50x30+50+40 1 80x80+35+70 1}
+wm geom .pack {}
+pack .pack.a -side left
+pack .pack.b -side right
+pack .pack.c -side left
 update
-test pack-5.17 {multiple windows} {winfo geometry .pack.purple} 80x20+0+40
-test pack-5.18 {multiple windows} {winfo geometry .pack.green} 20x40+80+60
-test pack-5.19 {multiple windows} {winfo geometry .pack.red} 10x20+85+40
-test pack-5.20 {multiple windows} {winfo geometry .pack.blue} 20x40+80+0
-pack after .pack.blue .pack.blue top .pack.red right .pack.green right \
-	.pack.purple right
+test pack-8.5 {insufficient space} {
+    list [winfo geometry .pack.a] [winfo ismapped .pack.a] \
+	    [winfo geometry .pack.b] [winfo ismapped .pack.b] \
+	    [winfo geometry .pack.c] [winfo ismapped .pack.c]
+} {20x40+0+20 1 50x30+100+25 1 80x80+20+0 1}
+wm geom .pack 320x180
 update
-test pack-5.21 {multiple windows} {winfo geometry .pack.blue} 40x40+30+0
-test pack-5.22 {multiple windows} {winfo geometry .pack.red} 10x20+90+60
-test pack-5.23 {multiple windows} {winfo geometry .pack.green} 30x40+60+50
-test pack-5.24 {multiple windows} {winfo geometry .pack.purple} 60x20+0+60
-pack after .pack.blue .pack.red left .pack.green left .pack.purple left
+test pack-8.6 {insufficient space} {
+    list [winfo geometry .pack.a] [winfo ismapped .pack.a] \
+	    [winfo geometry .pack.b] [winfo ismapped .pack.b] \
+	    [winfo geometry .pack.c] [winfo ismapped .pack.c]
+} {20x30+0+0 1 50x30+70+0 1 50x30+20+0 1}
+wm geom .pack 250x180
 update
-test pack-5.25 {multiple windows} {winfo geometry .pack.blue} 40x40+30+0
-test pack-5.26 {multiple windows} {winfo geometry .pack.red} 10x20+0+60
-test pack-5.27 {multiple windows} {winfo geometry .pack.green} 30x40+10+50
-test pack-5.28 {multiple windows} {winfo geometry .pack.purple} 60x20+40+60
-pack append .pack .pack.purple left .pack.green left .pack.blue left \
-	.pack.red left
+test pack-8.7 {insufficient space} {
+    list [winfo geometry .pack.a] [winfo ismapped .pack.a] \
+	    [winfo geometry .pack.b] [winfo ismapped .pack.b] \
+	    [winfo geometry .pack.c] [winfo ismapped .pack.c]
+} {20x30+0+0 1 30x30+20+0 1 50x30+20+0 0}
+pack forget .pack.b
 update
-test pack-5.29 {multiple windows} {winfo geometry .pack.purple} 80x20+0+40
-test pack-5.30 {multiple windows} {winfo geometry .pack.green} 20x40+80+30
-test pack-5.31 {multiple windows} {winfo ismapped .pack.blue} 0
-test pack-5.32 {multiple windows} {winfo ismapped .pack.red} 0
+test pack-8.8 {insufficient space} {
+    list [winfo geometry .pack.a] [winfo ismapped .pack.a] \
+	    [winfo geometry .pack.b] [winfo ismapped .pack.b] \
+	    [winfo geometry .pack.c] [winfo ismapped .pack.c]
+} {20x30+0+0 1 30x30+20+0 0 30x30+20+0 1}
+pack .pack.b -side right -after .pack.a
+wm geom .pack {}
+update
+test pack-8.9 {insufficient space} {
+    list [winfo geometry .pack.a] [winfo ismapped .pack.a] \
+	    [winfo geometry .pack.b] [winfo ismapped .pack.b] \
+	    [winfo geometry .pack.c] [winfo ismapped .pack.c]
+} {20x40+0+20 1 50x30+100+25 1 80x80+20+0 1}
+pack forget .pack.right .pack.bottom
 
+test pack-10.1 {window ordering} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d -side top
+    pack .pack.a -after .pack.b
+    pack slaves .pack
+} {.pack.b .pack.a .pack.c .pack.d}
+test pack-10.2 {window ordering} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d -side top
+    pack .pack.a -after .pack.a
+    pack slaves .pack
+} {.pack.a .pack.b .pack.c .pack.d}
+test pack-10.3 {window ordering} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d -side top
+    pack .pack.a -before .pack.d
+    pack slaves .pack
+} {.pack.b .pack.c .pack.a .pack.d}
+test pack-10.4 {window ordering} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d -side top
+    pack .pack.d -before .pack.a
+    pack slaves .pack
+} {.pack.d .pack.a .pack.b .pack.c}
+test pack-10.5 {window ordering} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d -side top
+    pack propagate .pack.c 0
+    pack .pack.a -in .pack.c
+    list [pack slaves .pack] [pack slaves .pack.c]
+} {{.pack.b .pack.c .pack.d} .pack.a}
+test pack-10.6 {window ordering} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d -side top
+    pack .pack.a -in .pack
+    pack slaves .pack
+} {.pack.b .pack.c .pack.d .pack.a}
+test pack-10.7 {window ordering} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d -side top
+    pack .pack.a -padx 0
+    pack slaves .pack
+} {.pack.a .pack.b .pack.c .pack.d}
+test pack-10.8 {window ordering} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c
+    pack .pack.d
+    pack slaves .pack
+} {.pack.a .pack.b .pack.c .pack.d}
+test pack-10.9 {window ordering} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d
+    pack .pack.b .pack.d .pack.c -before .pack.a
+    pack slaves .pack
+} {.pack.b .pack.d .pack.c .pack.a}
+test pack-10.10 {window ordering} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.c .pack.d .pack.b -after .pack.a
+    pack slaves .pack
+} {.pack.a .pack.c .pack.d .pack.b}
 
-# Test the ability of the packer to propagate geometry information
-# to its parent.  Make sure it computes the parent's needs both in
-# the direction of packing (width for "left" and "right" windows,
-# for example), and perpendicular to the pack direction (height for
-# "left" and "right" windows).
+test pack-11.1 {retaining/clearing configuration state} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -side bottom -anchor n -padx 1 -pady 2 -ipadx 3 -ipady 4 \
+	-fill both -expand 1
+    pack forget .pack.a
+    pack .pack.a
+    pack newinfo .pack.a
+} {-in .pack -anchor center -expand 0 -fill none -ipadx 0 -ipady 0 -padx 0 -pady 0 -side top}
+test pack-11.2 {retaining/clearing configuration state} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a -side bottom -anchor n -padx 1 -pady 2 -ipadx 3 -ipady 4 \
+	-fill both -expand 1
+    pack .pack.a -pady 14
+    pack newinfo .pack.a
+} {-in .pack -anchor n -expand 1 -fill both -ipadx 3 -ipady 4 -padx 1 -pady 14 -side bottom}
 
-pack append .pack .pack.red top .pack.green top .pack.blue top \
-	.pack.purple top
-update
-test pack-6.1 {geometry propagation} {winfo reqwidth .pack} 80
-test pack-6.2 {geometry propagation} {winfo reqheight .pack} 120
-destroy .pack.purple
-update
-test pack-6.3 {geometry propagation} {winfo reqwidth .pack} 40
-test pack-6.4 {geometry propagation} {winfo reqheight .pack} 100
-frame .pack.purple -geometry 80x20 -bg purple
-label .pack.purple.l -text P -bd 2 -relief raised
-place .pack.purple.l -relwidth 1.0 -relheight 1.0
-pack append .pack .pack.red left .pack.green right .pack.blue bottom \
-	.pack.purple top
-update
-test pack-6.5 {geometry propagation} {winfo reqwidth .pack} 120
-test pack-6.6 {geometry propagation} {winfo reqheight .pack} 60
-pack append .pack .pack.purple top .pack.green top .pack.blue left \
-	.pack.red left
-update
-test pack-6.7 {geometry propagation} {winfo reqwidth .pack} 80
-test pack-6.8 {geometry propagation} {winfo reqheight .pack} 100
+test pack-12.1 {info option} {
+    pack4 -in .pack
+} .pack
+test pack-12.2 {info option} {
+    pack4 -anchor n
+} n
+test pack-12.3 {info option} {
+    pack4 -anchor sw
+} sw
+test pack-12.4 {info option} {
+    pack4 -expand yes
+} 1
+test pack-12.5 {info option} {
+    pack4 -expand no
+} 0
+test pack-12.6 {info option} {
+    pack4 -fill x
+} x
+test pack-12.7 {info option} {
+    pack4 -fill y
+} y
+test pack-12.8 {info option} {
+    pack4 -fill both
+} both
+test pack-12.9 {info option} {
+    pack4 -fill none
+} none
+test pack-12.10 {info option} {
+    pack4 -ipadx 14
+} 14
+test pack-12.11 {info option} {
+    pack4 -ipady 22
+} 22
+test pack-12.12 {info option} {
+    pack4 -padx 2
+} 2
+test pack-12.13 {info option} {
+    pack4 -pady 3
+} 3
+test pack-12.14 {info option} {
+    pack4 -side top
+} top
+test pack-12.15 {info option} {
+    pack4 -side bottom
+} bottom
+test pack-12.16 {info option} {
+    pack4 -side left
+} left
+test pack-12.17 {info option} {
+    pack4 -side right
+} right
 
-# Test the "expand" option, and make sure space is evenly divided
-# when several windows request expansion.
-
-pack append .pack .pack.purple top .pack.green {left e} \
-	.pack.blue {left expand} .pack.red {left expand}
-update
-test pack-7.1 {multiple expanded windows} {
-    pack append .pack .pack.purple top .pack.green {left e} \
-	    .pack.blue {left expand} .pack.red {left expand}
+test pack-13.1 {command options and errors} {
+    list [catch {pack} msg] $msg
+} {1 {wrong # args: should be "pack option arg ?arg ...?"}}
+test pack-13.2 {command options and errors} {
+    list [catch {pack foo} msg] $msg
+} {1 {wrong # args: should be "pack option arg ?arg ...?"}}
+test pack-13.3 {command options and errors} {
+    list [catch {pack configure x} msg] $msg
+} {1 {bad argument "x": must be name of window}}
+test pack-13.4 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack configure .pack.b .pack.c
+    pack slaves .pack
+} {.pack.b .pack.c}
+test pack-13.5 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .foo} msg] $msg
+} {1 {bad window path name ".foo"}}
+test pack-13.6 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack} msg] $msg
+} {1 {can't pack ".pack": it's a top-level window}}
+test pack-13.7 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -after .foo} msg] $msg
+} {1 {bad window path name ".foo"}}
+test pack-13.8 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -after .pack.b} msg] $msg
+} {1 {window ".pack.b" isn't packed}}
+test pack-13.9 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -anchor gorp} msg] $msg
+} {1 {bad anchor position "gorp": must be n, ne, e, se, s, sw, w, nw, or center}}
+test pack-13.10 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -before gorp} msg] $msg
+} {1 {bad window path name "gorp"}}
+test pack-13.11 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -before .pack.b} msg] $msg
+} {1 {window ".pack.b" isn't packed}}
+test pack-13.12 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -expand "who cares?"} msg] $msg
+} {1 {expected boolean value but got "who cares?"}}
+test pack-13.13 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -fill z} msg] $msg
+} {1 {bad fill style "z": must be none, x, y, or both}}
+test pack-13.14 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -in z} msg] $msg
+} {1 {bad window path name "z"}}
+set pad [winfo pixels .pack 1c]
+test pack-13.15 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -padx abc} msg] $msg
+} {1 {bad pad value "abc": must be positive screen distance}}
+test pack-13.16 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -padx -1} msg] $msg
+} {1 {bad pad value "-1": must be positive screen distance}}
+test pack-13.17 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -pady abc} msg] $msg
+} {1 {bad pad value "abc": must be positive screen distance}}
+test pack-13.18 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -pady -1} msg] $msg
+} {1 {bad pad value "-1": must be positive screen distance}}
+test pack-13.19 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -ipadx abc} msg] $msg
+} {1 {bad pad value "abc": must be positive screen distance}}
+test pack-13.20 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -ipadx -1} msg] $msg
+} {1 {bad pad value "-1": must be positive screen distance}}
+test pack-13.21 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -ipady abc} msg] $msg
+} {1 {bad pad value "abc": must be positive screen distance}}
+test pack-13.22 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -ipady -1} msg] $msg
+} {1 {bad pad value "-1": must be positive screen distance}}
+test pack-13.23 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -side bac} msg] $msg
+} {1 {bad side "bac": must be top, bottom, left, or right}}
+test pack-13.24 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -lousy bac} msg] $msg
+} {1 {unknown or ambiguous option "-lousy": must be -after, -anchor, -before, -expand, -fill, -in, -ipadx, -ipady, -padx, -pady, or -side}}
+test pack-13.25 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -padx} msg] $msg
+} {1 {extra option "-padx" (option with no value?)}}
+test pack-13.26 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a {} 22} msg] $msg
+} {1 {unknown or ambiguous option "": must be -after, -anchor, -before, -expand, -fill, -in, -ipadx, -ipady, -padx, -pady, or -side}}
+test pack-13.27 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack .pack.a -in .} msg] $msg
+} {1 {can't pack .pack.a inside .}}
+test pack-13.28 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    frame .pack.a.a
+    list [catch {pack .pack.a.a -in .pack.b} msg] $msg
+} {1 {can't pack .pack.a.a inside .pack.b}}
+test pack-13.29 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.a .pack.b .pack.c .pack.d
+    pack forget .pack.a .pack.d
+    pack slaves .pack
+} {.pack.b .pack.c}
+test pack-13.30 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    .pack configure -width 300 -height 200
+    pack propagate .pack 0
+    pack .pack.a
     update
-    list [winfo geometry .pack.green] [winfo geometry .pack.blue] \
-	    [winfo geometry .pack.red]
-} {30x40+3+40 40x40+39+40 10x20+86+50}
-test pack-7.2 {multiple expanded windows} {
-    pack append .pack .pack.green left .pack.purple {bottom expand} \
-	    .pack.blue {bottom expand} .pack.red {bottom expand}
+    set result [list [winfo reqwidth .pack] [winfo reqheight .pack]]
+    pack propagate .pack 1
     update
-    list [winfo geometry .pack.purple] [winfo geometry .pack.blue] \
-	    [winfo geometry .pack.red]
-} {70x20+30+77 40x40+45+30 10x20+60+3}
-test pack-7.3 {multiple expanded windows} {
-    foreach i [winfo child .pack] {
-	pack unpack $i
-    }
-    pack append .pack .pack.green {left e fill} .pack.red {left expand fill} \
-	    .pack.blue {top fill}
+    lappend result [winfo reqwidth .pack] [winfo reqheight .pack]
+    set result
+} {300 200 20 40}
+test pack-13.31 {command options and errors} {
+    set result [pack propagate .pack.d]
+    pack propagate .pack.d 0
+    lappend result [pack propagate .pack.d]
+    pack propagate .pack.d 1
+    lappend result [pack propagate .pack.d]
+    set result
+} {1 0 1}
+test pack-13.32 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack propagate .dum} msg] $msg
+} {1 {bad window path name ".dum"}}
+test pack-13.33 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack propagate .pack foo} msg] $msg
+} {1 {expected boolean value but got "foo"}}
+test pack-13.34 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack propagate .pack foo bar} msg] $msg
+} {1 {wrong # args: should be "pack propagate window ?boolean?"}}
+test pack-13.35 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack slaves} msg] $msg
+} {1 {wrong # args: should be "pack option arg ?arg ...?"}}
+test pack-13.36 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack slaves a b} msg] $msg
+} {1 {wrong # args: should be "pack slaves window"}}
+test pack-13.37 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack slaves .x} msg] $msg
+} {1 {bad window path name ".x"}}
+test pack-13.38 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack slaves .pack.a} msg] $msg
+} {0 {}}
+test pack-13.39 {command options and errors} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    list [catch {pack lousy .pack} msg] $msg
+} {1 {bad option "lousy":  must be configure, forget, info, newinfo, propagate, or slaves}}
+
+test pack-14.1 {window deletion} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    pack .pack.right -side right
+    pack .pack.bottom -side bottom
+    pack .pack.a .pack.d .pack.b .pack.c -side top
     update
-    list [winfo geometry .pack.green] [winfo geometry .pack.red] \
-	    [winfo geometry .pack.blue]
-} {40x100+0+0 20x100+40+0 40x40+60+0}
-test pack-7.4 {multiple expanded windows} {
-    foreach i [winfo child .pack] {
-	pack unpack $i
-    }
-    pack append .pack .pack.red {top expand} .pack.purple {top expand} \
-	    .pack.blue {right fill}
+    destroy .pack.d
     update
-    list [winfo geometry .pack.red] [winfo geometry .pack.purple] \
-	    [winfo geometry .pack.blue]
-} {10x20+45+5 80x20+10+35 40x40+60+60}
-test pack-7.5 {multiple expanded windows} {
-    foreach i [winfo child .pack] {
-	pack unpack $i
-    }
-    pack append .pack .pack.green {right frame s} .pack.red {top expand}
+    set result [list [pack slaves .pack] [winfo geometry .pack.a] \
+	    [winfo geometry .pack.b] [winfo geometry .pack.c]]
+} {{.pack.right .pack.bottom .pack.a .pack.b .pack.c} 20x40+30+0 50x30+15+40 80x80+0+70}
+
+test pack-15.1 {respond to changes in expansion} {
+    pack forget .pack.a .pack.b .pack.c .pack.d
+    wm geom .pack {}
+    pack .pack.a
     update
-    list [winfo geometry .pack.green] [winfo geometry .pack.red]
-} {30x40+70+60 10x20+30+40}
-test pack-7.6 {multiple expanded windows} {
-    foreach i [winfo child .pack] {
-	pack unpack $i
-    }
-    pack append .pack .pack.purple {bottom frame e} .pack.red {right expand}
+    set result [winfo geom .pack.a]
+    wm geom .pack 400x300
     update
-    list [winfo geometry .pack.purple] [winfo geometry .pack.red]
-} {80x20+20+80 10x20+45+30}
+    lappend result [winfo geom .pack.a]
+    pack .pack.a -expand true -fill both
+    update
+    lappend result [winfo geom .pack.a]
+} {20x40+0+0 20x40+90+0 200x150+0+0}
 
-# Need more bizarre tests with combinations of expanded windows and
-# windows in opposing directions!  Also, include padding in expanded
-# (and unexpanded) windows.
-
-# Syntax errors on pack commands
-
-test pack-8.1 {syntax errors} {
-    set msg ""
-    set result [catch {pack} msg]
-    concat $result $msg
-} {1 wrong # args: should be "pack option arg ?arg ...?"}
-test pack-8.2 {syntax errors} {
-    set msg ""
-    set result [catch {pack append} msg]
-    concat $result $msg
-} {1 wrong # args: should be "pack option arg ?arg ...?"}
-test pack-8.3 {syntax errors} {
-    set msg ""
-    set result [catch {pack gorp foo} msg]
-    concat $result $msg
-} {1 bad option "gorp":  must be after, append, before, or info}
-test pack-8.4 {syntax errors} {
-    set msg ""
-    set result [catch {pack a .pack} msg]
-    concat $result $msg
-} {1 bad option "a":  must be after, append, before, or info}
-test pack-8.5 {syntax errors} {
-    set msg ""
-    set result [catch {pack after foobar} msg]
-    concat $result $msg
-} {1 bad window path name "foobar"}
-test pack-8.6 {syntax errors} {
-    frame .pack.yellow -bg yellow
-    set msg ""
-    set result [catch {pack after .pack.yellow} msg]
-    destroy .pack.yellow
-    concat $result $msg
-} {1 window ".pack.yellow" isn't packed}
-test pack-8.7 {syntax errors} {
-    set msg ""
-    set result [catch {pack append foobar} msg]
-    concat $result $msg
-} {1 bad window path name "foobar"}
-test pack-8.8 {syntax errors} {
-    set msg ""
-    set result [catch {pack before foobar} msg]
-    concat $result $msg
-} {1 bad window path name "foobar"}
-test pack-8.9 {syntax errors} {
-    frame .pack.yellow -bg yellow
-    set msg ""
-    set result [catch {pack before .pack.yellow} msg]
-    destroy .pack.yellow
-    concat $result $msg
-} {1 window ".pack.yellow" isn't packed}
-test pack-8.10 {syntax errors} {
-    set msg ""
-    set result [catch {pack info .pack help} msg]
-    concat $result $msg
-} {1 wrong # args: should be "pack info window"}
-test pack-8.11 {syntax errors} {
-    set msg ""
-    set result [catch {pack info foobar} msg]
-    concat $result $msg
-} {1 bad window path name "foobar"}
-test pack-8.12 {syntax errors} {
-    set msg ""
-    set result [catch {pack append .pack .pack.blue} msg]
-    concat $result $msg
-} {1 wrong # args: window ".pack.blue" should be followed by options}
-test pack-8.13 {syntax errors} {
-    set msg ""
-    set result [catch {pack append . .pack.blue top} msg]
-    concat $result $msg
-} {1 can't pack .pack.blue inside .}
-test pack-8.14 {syntax errors} {
-    set msg ""
-    set result [catch {pack append .pack .pack.blue f} msg]
-    concat $result $msg
-} {1 bad option "f":  should be top, bottom, left, right, expand, fill, fillx, filly, padx, pady, or frame}
-test pack-8.15 {syntax errors} {
-    set msg ""
-    set result [catch {pack append .pack .pack.blue pad} msg]
-    concat $result $msg
-} {1 bad option "pad":  should be top, bottom, left, right, expand, fill, fillx, filly, padx, pady, or frame}
-test pack-8.16 {syntax errors} {
-    set msg ""
-    set result [catch {pack append .pack .pack.blue {frame south}} msg]
-    concat $result $msg
-} {1 bad anchor position "south": must be n, ne, e, se, s, sw, w, nw, or center}
-test pack-8.17 {syntax errors} {
-    set msg ""
-    set result [catch {pack append .pack .pack.blue {padx -2}} msg]
-    concat $result $msg
-} {1 bad pad value "-2":  must be positive screen distance}
-test pack-8.18 {syntax errors} {
-    set msg ""
-    set result [catch {pack append .pack .pack.blue {padx}} msg]
-    concat $result $msg
-} {1 wrong # args: "padx" option must be followed by screen distance}
-test pack-8.19 {syntax errors} {
-    set msg ""
-    set result [catch {pack append .pack .pack.blue {pady -2}} msg]
-    concat $result $msg
-} {1 bad pad value "-2":  must be positive screen distance}
-test pack-8.20 {syntax errors} {
-    set msg ""
-    set result [catch {pack append .pack .pack.blue {pady}} msg]
-    concat $result $msg
-} {1 wrong # args: "pady" option must be followed by screen distance}
-test pack-8.21 {syntax errors} {
-    set msg ""
-    set result [catch {pack append .pack .pack.blue "\{abc"} msg]
-    concat $result $msg
-} {1 unmatched open brace in list}
-test pack-8.22 {syntax errors} {
-    set msg ""
-    set result [catch {pack append .pack .pack.blue frame} msg]
-    concat $result $msg
-} {1 wrong # args: "frame" option must be followed by anchor point}
-
-# Test "pack info" command output.
-
-test pack-9.1 {information output} {
-    pack append .pack .pack.blue {top fillx frame n} \
-	.pack.red {bottom filly frame s} .pack.green {left fill frame w} \
-	.pack.purple {right expand frame e}
-    pack info .pack
-} {.pack.blue {top frame n fillx} .pack.red {bottom frame s filly} .pack.green {left frame w fill} .pack.purple {right frame e expand}}
-test pack-9.2 {information output} {
-    pack append .pack .pack.blue {padx 10 frame nw} \
-	.pack.red {pady 20 frame ne} .pack.green {frame se} \
-	.pack.purple {frame sw}
-    pack info .pack
-} {.pack.blue {top frame nw padx 10} .pack.red {top frame ne pady 20} .pack.green {top frame se} .pack.purple {top frame sw}}
-test pack-9.3 {information output} {
-    pack append .pack .pack.blue {frame center} .pack.red {frame center} \
-	.pack.green {frame c} .pack.purple {frame c}
-    pack info .pack
-} {.pack.blue {top frame center} .pack.red {top frame center} .pack.green {top frame center} .pack.purple {top frame center}}
-
-catch {destroy .pack}
-concat {}
+destroy .pack
+foreach i {pack1 pack2 pack3 pack4} {
+    rename $i {}
+}

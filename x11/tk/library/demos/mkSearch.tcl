@@ -18,8 +18,8 @@ proc mkTextSearch {{w .search}} {
     entry $w.file.entry -width 40 -relief sunken -bd 2 -textvariable fileName
     button $w.file.button -text "Load File" \
 	    -command "TextLoadFile $w.t \$fileName"
-    pack append $w.file $w.file.label left $w.file.entry left \
-	    $w.file.button {left pady 10 padx 20}
+    pack $w.file.label $w.file.entry -side left
+    pack $w.file.button -side left -pady 5 -padx 10
     bind $w.file.entry <Return> "
 	TextLoadFile $w.t \$fileName
 	focus $w.string.entry
@@ -31,15 +31,17 @@ proc mkTextSearch {{w .search}} {
 	    -textvariable searchString
     button $w.string.button -text "Highlight" \
 	    -command "TextSearch $w.t \$searchString search"
-    pack append $w.string $w.string.label left $w.string.entry left \
-	    $w.string.button  {left pady 10 padx 20}
+    pack $w.string.label $w.string.entry -side left
+    pack $w.string.button -side left -pady 5 -padx 10
     bind $w.string.entry <Return> "TextSearch $w.t \$searchString search"
 
     button $w.ok -text OK -command "destroy $w"
     text $w.t -relief raised -bd 2 -yscrollcommand "$w.s set" -setgrid true
     scrollbar $w.s -relief flat -command "$w.t yview"
-    pack append $w $w.file {top fill} $w.string {top fill} \
-	    $w.ok {bottom fillx} $w.s {right filly} $w.t {expand fill}
+    pack $w.file $w.string -side top -fill x
+    pack $w.ok -side bottom -fill x
+    pack $w.s -side right -fill y
+    pack $w.t -expand yes -fill both
 
     # Set up display styles for text highlighting.
 
@@ -113,7 +115,7 @@ proc TextSearch {w string tag} {
 	    incr offset $index
 	    $w tag add $tag $i.[expr $offset] $i.[expr $offset+$l]
 	    incr offset $l
-	    set line [string range $line $offset 1000]
+	    set line [string range $line [expr $index+$l] 1000]
 	}
     }
 }

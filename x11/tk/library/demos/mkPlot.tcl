@@ -14,14 +14,12 @@ proc mkPlot {{w .plot}} {
     wm iconname $w "Plot"
     set c $w.c
 
-    frame $w.frame1 -relief raised -bd 2
+    message $w.msg -font -Adobe-Times-Medium-R-Normal-*-180-* -width 400 \
+	    -bd 2 -relief raised -text "This window displays a canvas widget containing a simple 2-dimensional plot.  You can doctor the data by dragging any of the points with mouse button 1."
     canvas $c -relief raised -width 450 -height 300
     button $w.ok -text "OK" -command "destroy $w"
-    pack append $w $w.frame1 {top fill} $w.c {expand fill} \
-	    $w.ok {bottom pady 10 frame center}
-    message $w.frame1.m -font -Adobe-Times-Medium-R-Normal-*-180-* -aspect 300 \
-	    -text "This window displays a canvas widget containing a simple 2-dimensional plot.  You can doctor the data by dragging any of the points with mouse button 1."
-    pack append $w.frame1 $w.frame1.m {frame center}
+    pack $w.msg $w.c -side top -fill x
+    pack $w.ok -side bottom -pady 5
 
     set font -Adobe-helvetica-medium-r-*-180-*
 

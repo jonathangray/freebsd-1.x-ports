@@ -4,22 +4,34 @@
  *	This file contains a collection of Tk-related Tcl commands
  *	that didn't fit in any particular file of the toolkit.
  *
- * Copyright 1990-1992 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkCmds.c,v 1.1 1993/08/09 01:20:48 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkCmds.c,v 1.2 1993/12/27 07:33:55 rich Exp $ SPRITE (Berkeley)";
 #endif /* not lint */
 
 #include "tkConfig.h"
 #include "tkInt.h"
+#include <errno.h>
 
 /*
  * The data structure below is used by the "after" command to remember
@@ -29,11 +41,7 @@ static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkCmds.c,v 1.1 1993/0
 typedef struct {
     Tcl_Interp *interp;		/* Interpreter in which to execute command. */
     char *command;		/* Command to execute.  Malloc'ed, so must
-				 * be freed when structure is deallocated. 
-				 * NULL means nothing to execute. */
-    int *donePtr;		/* If non-NULL indicates address of word to
-				 * set to 1 when command has finally been
-				 * executed. */
+				 * be freed when structure is deallocated. */
 } AfterInfo;
 
 /*
@@ -77,7 +85,6 @@ Tk_AfterCmd(clientData, interp, argc, argv)
 {
     int ms;
     AfterInfo *afterPtr;
-    int done;
 
     if (argc < 2) {
 	Tcl_AppendResult(interp, "wrong # args: should be \"",
@@ -86,38 +93,27 @@ Tk_AfterCmd(clientData, interp, argc, argv)
 	return TCL_ERROR;
     }
 
-    if ((Tcl_GetInt(interp, argv[1], &ms) != TCL_OK) || (ms <= 0)) {
+    if (Tcl_GetInt(interp, argv[1], &ms) != TCL_OK) {
 	Tcl_AppendResult(interp, "bad milliseconds value \"",
 		argv[1], "\"", (char *) NULL);
 	return TCL_ERROR;
     }
+    if (ms < 0) {
+	ms = 0;
+    }
+    if (argc == 2) {
+	Tk_Sleep(ms);
+	return TCL_OK;
+    }
     afterPtr = (AfterInfo *) ckalloc((unsigned) (sizeof(AfterInfo)));
     afterPtr->interp = interp;
-    if (argc == 2) {
-	afterPtr->command = (char *) NULL;
-	done = 0;
-	afterPtr->donePtr = &done;
-    } else if (argc == 3) {
+    if (argc == 3) {
 	afterPtr->command = (char *) ckalloc((unsigned) (strlen(argv[2]) + 1));
 	strcpy(afterPtr->command, argv[2]);
-	afterPtr->donePtr = (int *) NULL;
     } else {
 	afterPtr->command = Tcl_Concat(argc-2, argv+2);
-	afterPtr->donePtr = (int *) NULL;
     }
     Tk_CreateTimerHandler(ms, AfterProc, (ClientData) afterPtr);
-    if (argc == 2) {
-	while (!done) {
-	    Tk_DoOneEvent(0);
-	}
-    }
-
-    /*
-     * Must reset interpreter result because it could have changed as
-     * part of events processed by Tk_DoOneEvent.
-     */
-
-    Tcl_ResetResult(interp);
     return TCL_OK;
 }
 
@@ -154,9 +150,6 @@ AfterProc(clientData)
 	    Tk_BackgroundError(afterPtr->interp);
 	}
 	ckfree(afterPtr->command);
-    }
-    if (afterPtr->donePtr != NULL) {
-	*afterPtr->donePtr = 1;
     }
     ckfree((char *) afterPtr);
 }
@@ -320,6 +313,167 @@ Tk_DestroyCmd(clientData, interp, argc, argv)
 /*
  *----------------------------------------------------------------------
  *
+ * Tk_ExitCmd --
+ *
+ *	This procedure is invoked to process the "exit" Tcl command.
+ *	See the user documentation for details on what it does.
+ *	Note: this command replaces the Tcl "exit" command in order
+ *	to properly destroy all windows.
+ *
+ * Results:
+ *	A standard Tcl result.
+ *
+ * Side effects:
+ *	See the user documentation.
+ *
+ *----------------------------------------------------------------------
+ */
+
+	/*ARGSUSED*/
+int
+Tk_ExitCmd(clientData, interp, argc, argv)
+    ClientData clientData;		/* Main window associated with
+				 * interpreter. */
+    Tcl_Interp *interp;		/* Current interpreter. */
+    int argc;			/* Number of arguments. */
+    char **argv;		/* Argument strings. */
+{
+    int value;
+
+    if ((argc != 1) && (argc != 2)) {
+	Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
+		" ?returnCode?\"", (char *) NULL);
+	return TCL_ERROR;
+    }
+    if (argc == 1) {
+	value = 0;
+    } else {
+	if (Tcl_GetInt(interp, argv[1], &value) != TCL_OK) {
+	    return TCL_ERROR;
+	}
+    }
+
+    while (tkMainWindowList != NULL) {
+	Tk_DestroyWindow((Tk_Window) tkMainWindowList->winPtr);
+    }
+    exit(value);
+    /* NOTREACHED */
+    return TCL_OK;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tk_LowerCmd --
+ *
+ *	This procedure is invoked to process the "lower" Tcl command.
+ *	See the user documentation for details on what it does.
+ *
+ * Results:
+ *	A standard Tcl result.
+ *
+ * Side effects:
+ *	See the user documentation.
+ *
+ *----------------------------------------------------------------------
+ */
+
+	/* ARGSUSED */
+int
+Tk_LowerCmd(clientData, interp, argc, argv)
+    ClientData clientData;	/* Main window associated with
+				 * interpreter. */
+    Tcl_Interp *interp;		/* Current interpreter. */
+    int argc;			/* Number of arguments. */
+    char **argv;		/* Argument strings. */
+{
+    Tk_Window main = (Tk_Window) clientData;
+    Tk_Window tkwin, other;
+
+    if ((argc != 2) && (argc != 3)) {
+	Tcl_AppendResult(interp, "wrong # args: should be \"",
+		argv[0], " window ?belowThis?\"", (char *) NULL);
+	return TCL_ERROR;
+    }
+
+    tkwin = Tk_NameToWindow(interp, argv[1], main);
+    if (tkwin == NULL) {
+	return TCL_ERROR;
+    }
+    if (argc == 2) {
+	other = NULL;
+    } else {
+	other = Tk_NameToWindow(interp, argv[2], main);
+	if (other == NULL) {
+	    return TCL_ERROR;
+	}
+    }
+    if (Tk_RestackWindow(tkwin, Below, other) != TCL_OK) {
+	Tcl_AppendResult(interp, "can't lower \"", argv[1], "\" below \"",
+		argv[2], "\"", (char *) NULL);
+	return TCL_ERROR;
+    }
+    return TCL_OK;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tk_RaiseCmd --
+ *
+ *	This procedure is invoked to process the "raise" Tcl command.
+ *	See the user documentation for details on what it does.
+ *
+ * Results:
+ *	A standard Tcl result.
+ *
+ * Side effects:
+ *	See the user documentation.
+ *
+ *----------------------------------------------------------------------
+ */
+
+	/* ARGSUSED */
+int
+Tk_RaiseCmd(clientData, interp, argc, argv)
+    ClientData clientData;	/* Main window associated with
+				 * interpreter. */
+    Tcl_Interp *interp;		/* Current interpreter. */
+    int argc;			/* Number of arguments. */
+    char **argv;		/* Argument strings. */
+{
+    Tk_Window main = (Tk_Window) clientData;
+    Tk_Window tkwin, other;
+
+    if ((argc != 2) && (argc != 3)) {
+	Tcl_AppendResult(interp, "wrong # args: should be \"",
+		argv[0], " window ?aboveThis?\"", (char *) NULL);
+	return TCL_ERROR;
+    }
+
+    tkwin = Tk_NameToWindow(interp, argv[1], main);
+    if (tkwin == NULL) {
+	return TCL_ERROR;
+    }
+    if (argc == 2) {
+	other = NULL;
+    } else {
+	other = Tk_NameToWindow(interp, argv[2], main);
+	if (other == NULL) {
+	    return TCL_ERROR;
+	}
+    }
+    if (Tk_RestackWindow(tkwin, Above, other) != TCL_OK) {
+	Tcl_AppendResult(interp, "can't raise \"", argv[1], "\" above \"",
+		argv[2], "\"", (char *) NULL);
+	return TCL_ERROR;
+    }
+    return TCL_OK;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
  * Tk_TkCmd --
  *
  *	This procedure is invoked to process the "tk" Tcl command.
@@ -407,7 +561,7 @@ Tk_TkCmd(clientData, interp, argc, argv)
  *
  * Tk_TkwaitCmd --
  *
- *	This procedure is invoked to process the "wait" Tcl command.
+ *	This procedure is invoked to process the "tkwait" Tcl command.
  *	See the user documentation for details on what it does.
  *
  * Results:
@@ -514,10 +668,11 @@ WaitVariableProc(clientData, interp, name1, name2, flags)
     return (char *) NULL;
 }
 
+	/*ARGSUSED*/
 static void
 WaitVisibilityProc(clientData, eventPtr)
     ClientData clientData;	/* Pointer to integer to set to 1. */
-    XEvent *eventPtr;		/* Information about event. */
+    XEvent *eventPtr;		/* Information about event (not used). */
 {
     int *donePtr = (int *) clientData;
     *donePtr = 1;
@@ -684,16 +839,10 @@ Tk_WinfoCmd(clientData, interp, argc, argv)
 	sprintf(interp->result, "%d", 1<<Tk_Depth(window));
     } else if ((c == 'c') && (strncmp(argv[1], "children", length) == 0)
 	    && (length >= 2)) {
-	char *separator, *childName;
-
 	SETUP("children");
-	separator = "";
 	for (winPtr = ((TkWindow *) window)->childList; winPtr != NULL;
 		winPtr = winPtr->nextPtr) {
-	    childName = Tcl_Merge(1, &winPtr->pathName);
-	    Tcl_AppendResult(interp, separator, childName, (char *) NULL);
-	    ckfree(childName);
-	    separator = " ";
+	    Tcl_AppendElement(interp, winPtr->pathName);
 	}
     } else if ((c == 'c') && (strncmp(argv[1], "class", length) == 0)
 	    && (length >= 2)) {
@@ -747,7 +896,7 @@ Tk_WinfoCmd(clientData, interp, argc, argv)
 	}
 	pixels = mm * WidthOfScreen(Tk_Screen(window))
 		/ WidthMMOfScreen(Tk_Screen(window));
-	sprintf(interp->result, "%g", pixels);
+	Tcl_PrintDouble(interp, pixels, interp->result);
     } else if ((c == 'g') && (strncmp(argv[1], "geometry", length) == 0)) {
 	SETUP("geometry");
 	sprintf(interp->result, "%dx%d+%d+%d", Tk_Width(window),
@@ -762,7 +911,7 @@ Tk_WinfoCmd(clientData, interp, argc, argv)
 	    && (length >= 2)) {
 	if (argc != 2) {
 	    Tcl_AppendResult(interp, "wrong # args:  should be \"",
-		    argv[1], " interps\"", (char *) NULL);
+		    argv[0], " interps\"", (char *) NULL);
 	    return TCL_ERROR;
 	}
 	return TkGetInterpNames(interp, tkwin);
@@ -771,10 +920,10 @@ Tk_WinfoCmd(clientData, interp, argc, argv)
 	SETUP("ismapped");
 	interp->result = Tk_IsMapped(window) ? "1" : "0";
     } else if ((c == 'n') && (strncmp(argv[1], "name", length) == 0)) {
-	SETUP("geometry");
+	SETUP("name");
 	interp->result = Tk_Name(window);
     } else if ((c == 'p') && (strncmp(argv[1], "parent", length) == 0)) {
-	SETUP("geometry");
+	SETUP("parent");
 	winPtr = (TkWindow *) window;
 	if (winPtr->parentPtr != NULL) {
 	    interp->result = winPtr->parentPtr->pathName;

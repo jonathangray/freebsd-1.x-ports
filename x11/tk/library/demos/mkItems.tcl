@@ -18,21 +18,21 @@ proc mkItems {{w .citems}} {
     wm minsize $w 100 100
     set c $w.frame2.c
 
-    frame $w.frame1 -relief raised -bd 2
+    message $w.msg -font -Adobe-Times-Medium-R-Normal--*-180-* -width 13c \
+	    -bd 2 -relief raised -text "This window contains a canvas widget with examples of the various kinds of items supported by canvases.  The following operations are supported:\n  Button-1 drag:\tmoves item under pointer.\n  Button-2 drag:\trepositions view.\n  Button-3 drag:\tstrokes out area.\n  Ctrl+f:\t\tprints items under area."
     frame $w.frame2 -relief raised -bd 2
     button $w.ok -text "OK" -command "destroy $w"
-    pack append $w $w.frame1 {top fill} $w.frame2 {top fill expand} \
-	    $w.ok {bottom pady 10 frame center}
-    message $w.frame1.m -font -Adobe-Times-Medium-R-Normal-*-180-* -aspect 300 \
-	    -text "This window contains a canvas widget with examples of the various kinds of items supported by canvases.  The following operations are supported:\n  Button-1 drag:\tmoves item under pointer.\n  Button-2 drag:\trepositions view.\n  Button-3 drag:\tstrokes out area.\n  Ctrl+f:\t\tprints items under area."
-    pack append $w.frame1 $w.frame1.m {frame center}
+    pack $w.msg -side top -fill x
+    pack $w.frame2 -side top -fill both -expand yes
+    pack $w.ok -side bottom -pady 5 -anchor center
 
-    canvas $c -scrollregion {0c 0c 30c 24c} -width 15c -height 10c
+    canvas $c -scrollregion {0c 0c 30c 24c} -width 15c -height 10c \
+	    -xscroll "$w.frame2.hscroll set" -yscroll "$w.frame2.vscroll set"
     scrollbar $w.frame2.vscroll  -relief sunken -command "$c yview"
     scrollbar $w.frame2.hscroll -orient horiz -relief sunken -command "$c xview"
-    pack append $w.frame2 $w.frame2.hscroll {bottom fillx} \
-	    $w.frame2.vscroll {right filly} $c {expand fill}
-    $c config -xscroll "$w.frame2.hscroll set" -yscroll "$w.frame2.vscroll set"
+    pack $w.frame2.hscroll -side bottom -fill x
+    pack $w.frame2.vscroll -side right -fill y
+    pack $c -in $w.frame2 -expand yes -fill both
 
     # Display a 3x3 rectangular grid.
 
@@ -42,8 +42,8 @@ proc mkItems {{w .citems}} {
     $c create line 10c 0c 10c 24c -width 2
     $c create line 20c 0c 20c 24c -width 2
 
-    set font1 -Adobe-Helvetica-Medium-R-Normal-*-120-*
-    set font2 -Adobe-Helvetica-Bold-R-Normal-*-240-*
+    set font1 -Adobe-Helvetica-Medium-R-Normal--*-120-*
+    set font2 -Adobe-Helvetica-Bold-R-Normal--*-240-*
     if {[tk colormodel $c] == "color"} {
 	set blue DeepSkyBlue3
 	set red red

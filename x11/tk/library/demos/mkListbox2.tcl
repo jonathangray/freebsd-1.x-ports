@@ -13,14 +13,20 @@ proc mkListbox2 {{w .l2}} {
     wm title $w "Listbox Demonstration (colors)"
     wm iconname $w "Listbox"
     wm minsize $w 1 1
+
     message $w.msg -font -Adobe-times-medium-r-normal--*-180* -aspect 300 \
 	    -text "A listbox containing several color values is displayed below, along with a scrollbar.  You can scan the list either using the scrollbar or by dragging in the listbox window with button 2 pressed.  If you double-click button 1 on a color, then the background for the window will be changed to that color.  Click the \"OK\" button when you've seen enough."
     frame $w.frame -borderwidth 10
+    button $w.ok -text OK -command "destroy $w"
+    pack $w.msg -side top
+    pack $w.ok -side bottom -fill x
+    pack $w.frame -side top -expand yes -fill y
+
     scrollbar $w.frame.scroll -relief sunken -command "$w.frame.list yview"
     listbox $w.frame.list -yscroll "$w.frame.scroll set" -relief sunken \
 	    -geometry 20x20 -setgrid 1
-    pack append $w.frame $w.frame.scroll {right filly} \
-	    $w.frame.list {left expand fill}
+    pack $w.frame.list $w.frame.scroll -side left -fill y
+
     $w.frame.list insert 0 snow1 snow2 snow3 snow4 seashell1 seashell2 \
 	seashell3 seashell4 AntiqueWhite1 AntiqueWhite2 AntiqueWhite3 \
 	AntiqueWhite4 bisque1 bisque2 bisque3 bisque4 PeachPuff1 \
@@ -86,8 +92,4 @@ proc mkListbox2 {{w .l2}} {
 	"$w config -bg \[lindex \[selection get\] 0\]
 	$w.frame config -bg \[lindex \[selection get\] 0\]
 	$w.msg config -bg \[lindex \[selection get\] 0\]"
-    button $w.ok -text OK -command "destroy $w"
-
-    pack append $w $w.msg {top fill} $w.frame {top expand filly frame center} \
-	$w.ok {bottom fill}
 }

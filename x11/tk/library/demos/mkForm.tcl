@@ -21,15 +21,14 @@ proc mkForm {{w .form}} {
 	bind $w.$i.entry <Tab> "Tab \$tabList"
 	bind $w.$i.entry <Return> "destroy $w"
 	label $w.$i.label
-	pack append $w.$i $w.$i.entry right $w.$i.label left
+	pack $w.$i.entry -side right
+	pack $w.$i.label -side left
     }
     $w.f1.label config -text Name:
     $w.f2.label config -text Address:
     $w.f5.label config -text Phone:
     button $w.ok -text OK -command "destroy $w"
-    pack append $w $w.msg {top fill} $w.f1 {top fillx} $w.f2 \
-	    {top fillx} $w.f3 {top fillx} $w.f4 {top fillx} \
-	    $w.f5 {top fillx} $w.ok {bottom fill}
+    pack $w.msg $w.f1 $w.f2 $w.f3 $w.f4 $w.f5 $w.ok -side top -fill x
     set tabList "$w.f1.entry $w.f2.entry $w.f3.entry $w.f4.entry $w.f5.entry"
 }
 

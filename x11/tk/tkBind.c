@@ -4,18 +4,29 @@
  *	This file provides procedures that associate Tcl commands
  *	with X events or sequences of X events.
  *
- * Copyright 1989-1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1989-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkBind.c,v 1.1 1993/08/09 01:20:47 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkBind.c,v 1.2 1993/12/27 07:33:36 rich Exp $ SPRITE (Berkeley)";
 #endif /* not lint */
 
 #include "tkConfig.h"
@@ -325,7 +336,7 @@ static Tcl_HashTable eventTable;
 #define CONFIG_REQ		0x200
 #define RESIZE_REQ		0x400
 #define GRAVITY			0x800
-#define PROP			0x0100
+#define PROP			0x1000
 #define SEL_CLEAR		0x2000
 #define SEL_REQ			0x4000
 #define SEL_NOTIFY		0x8000
@@ -502,8 +513,7 @@ Tk_DeleteBindingTable(bindingTable)
 	for (psPtr = (PatSeq *) Tcl_GetHashValue(hPtr);
 		psPtr != NULL; psPtr = nextPtr) {
 	    nextPtr = psPtr->nextSeqPtr;
-	    Tk_EventuallyFree((ClientData) psPtr->command,
-		    (Tk_FreeProc *) free);
+	    ckfree((char *) psPtr->command);
 	    ckfree((char *) psPtr);
 	}
     }
@@ -571,12 +581,11 @@ Tk_CreateBinding(interp, bindingTable, object, eventString, command, append)
 	length = strlen(psPtr->command) + strlen(command) + 3;
 	new = (char *) ckalloc((unsigned) length);
 	sprintf(new, "%s; %s", psPtr->command, command);
-	Tk_EventuallyFree((ClientData) psPtr->command, (Tk_FreeProc *) free);
+	ckfree((char *) psPtr->command);
 	psPtr->command = new;
     } else {
 	if (psPtr->command != NULL) {
-	    Tk_EventuallyFree((ClientData) psPtr->command,
-		    (Tk_FreeProc *) free);
+	    ckfree((char *) psPtr->command);
 	}
 	psPtr->command = (char *) ckalloc((unsigned) (strlen(command) + 1));
 	strcpy(psPtr->command, command);
@@ -672,7 +681,7 @@ Tk_DeleteBinding(interp, bindingTable, object, eventString)
 	    }
 	}
     }
-    Tk_EventuallyFree((ClientData) psPtr->command, (Tk_FreeProc *) free);
+    ckfree((char *) psPtr->command);
     ckfree((char *) psPtr);
     return TCL_OK;
 }
@@ -784,8 +793,9 @@ Tk_GetAllBindings(interp, bindingTable, object)
 
 	    if ((patPtr->eventType == KeyPress)
 		    && (patPtr->needMods == 0)
-		    && (patPtr->hateMods == ~ShiftMask)
-		    && isascii(patPtr->detail) && isprint(patPtr->detail)
+		    && (patPtr->hateMods == ~LockMask)
+		    && (patPtr->detail < 128)
+		    && isprint(UCHAR(patPtr->detail))
 		    && (patPtr->detail != '<')
 		    && (patPtr->detail != ' ')) {
 
@@ -869,7 +879,7 @@ Tk_GetAllBindings(interp, bindingTable, object)
 	if ((p - string) >= sizeof(string)) {
 	    panic("Tk_GetAllBindings overflowed buffer");
 	}
-	Tcl_AppendElement(interp, string, 0);
+	Tcl_AppendElement(interp, string);
     }
 }
 
@@ -934,7 +944,7 @@ Tk_DeleteAllBindings(bindingTable, object)
 		}
 	    }
 	}
-	Tk_EventuallyFree((ClientData) psPtr->command, (Tk_FreeProc *) free);
+	ckfree((char *) psPtr->command);
 	ckfree((char *) psPtr);
     }
     Tcl_DeleteHashEntry(hPtr);
@@ -1069,20 +1079,8 @@ Tk_BindEvent(bindingTable, eventPtr, tkwin, numObjects, objectPtr)
 		    ckfree(p);
 		}
 	    } else {
-		/*
-		 * The code below is tricky in order allow the binding to
-		 * be modified or deleted as part of the command that the
-		 * binding invokes.  Must make sure that the actual command
-		 * string isn't freed until the command completes, and must
-		 * copy the address of this string into a local variable
-		 * in case it's modified by the command.
-		 */
-
-		char *cmd = matchPtr->command;
-
-		Tk_Preserve((ClientData) cmd);
-		result = Tcl_GlobalEval(bindPtr->interp, cmd);
-		Tk_Release((ClientData) cmd);
+		result = TkCopyAndGlobalEval(bindPtr->interp,
+			matchPtr->command);
 	    }
 	    if (result != TCL_OK) {
 		Tcl_AddErrorInfo(bindPtr->interp,
@@ -1167,9 +1165,17 @@ FindSequence(interp, bindPtr, object, eventString, create, maskPtr)
 	    numPats++, patPtr--) {
 	patPtr->eventType = -1;
 	patPtr->needMods = 0;
-	patPtr->hateMods = ~0;
+
+	/*
+	 * Note: the presence of Caps Lock should not prevent bindings
+	 * from triggering (unless it is explicitly asked for and it
+	 * isn't present);  it should only affect the keysym that's
+	 * generated for key events (and that is handled elsewhere.
+	 */
+
+	patPtr->hateMods = ~LockMask;
 	patPtr->detail = 0;
-	while (isspace(*p)) {
+	while (isspace(UCHAR(*p))) {
 	    p++;
 	}
 	if (*p == '\0') {
@@ -1191,7 +1197,7 @@ FindSequence(interp, bindPtr, object, eventString, create, maskPtr)
 	    if (hPtr != NULL) {
 		patPtr->detail = (int) Tcl_GetHashValue(hPtr);
 	    } else {
-		if (isprint(*p)) {
+		if (isprint(UCHAR(*p))) {
 		    patPtr->detail = *p;
 		} else {
 		    sprintf(interp->result,
@@ -1238,14 +1244,14 @@ FindSequence(interp, bindPtr, object, eventString, create, maskPtr)
 	    if (modPtr->flags & ANY) {
 		any = 1;
 	    }
-	    while ((*p == '-') || isspace(*p)) {
+	    while ((*p == '-') || isspace(UCHAR(*p))) {
 		p++;
 	    }
 	}
 	if (any) {
 	    patPtr->hateMods = 0;
 	} else {
-	    patPtr->hateMods = ~patPtr->needMods;
+	    patPtr->hateMods = ~(patPtr->needMods | LockMask);
 	}
 	hPtr = Tcl_FindHashEntry(&eventTable, field);
 	if (hPtr != NULL) {
@@ -1253,7 +1259,7 @@ FindSequence(interp, bindPtr, object, eventString, create, maskPtr)
 	    eiPtr = (EventInfo *) Tcl_GetHashValue(hPtr);
 	    patPtr->eventType = eiPtr->type;
 	    eventMask |= eiPtr->eventMask;
-	    while ((*p == '-') || isspace(*p)) {
+	    while ((*p == '-') || isspace(UCHAR(*p))) {
 		p++;
 	    }
 	    p = GetField(p, field, FIELD_SIZE);
@@ -1307,7 +1313,7 @@ FindSequence(interp, bindPtr, object, eventString, create, maskPtr)
 	    interp->result = "no event type or button # or keysym";
 	    return NULL;
 	}
-	while ((*p == '-') || isspace(*p)) {
+	while ((*p == '-') || isspace(UCHAR(*p))) {
 	    p++;
 	}
 	if (*p != '>') {
@@ -1427,7 +1433,7 @@ GetField(p, copy, size)
     int size;			/* Maximum number of characters to
 				 * copy. */
 {
-    while ((*p != '\0') && !isspace(*p) && (*p != '>')
+    while ((*p != '\0') && !isspace(UCHAR(*p)) && (*p != '>')
 	    && (*p != '-') && (size > 1)) {
 	*copy = *p;
 	p++;
@@ -1584,12 +1590,29 @@ MatchPatterns(dispPtr, bindPtr, psPtr)
 		 * in that they are ignored if they occur in the middle
 		 * of a pattern sequence and have mismatching types.  The
 		 * only ones that cannot be ignored are ButtonPress and
-		 * KeyPress events.
+		 * ButtonRelease events (unless the next event in the pattern
+		 * is a KeyPress or KeyRelease) and KeyPress and KeyRelease
+		 * events (unless the next pattern event is a KeyPress or
+		 * KeyRelease).  Here are some tricky cases to consider:
+		 * 1. Double-Button or Double-Key events.
+		 * 2. Double-ButtonRelease or Double-KeyRelease events.
+		 * 3. The arrival of various events like Enter and Leave
+		 *    and FocusIn and GraphicsExpose between two button
+		 *    presses or key presses.
 		 */
 
-		if ((eventPtr->xany.type == ButtonPress)
-			|| (eventPtr->xany.type == KeyPress)) {
-		    goto nextSequence;
+		if ((patPtr->eventType == KeyPress)
+			|| (patPtr->eventType == KeyRelease)) {
+		    if ((eventPtr->xany.type == ButtonPress)
+			    || (eventPtr->xany.type == ButtonRelease)) {
+			goto nextSequence;
+		    }
+		} else if ((patPtr->eventType == ButtonPress)
+			|| (patPtr->eventType == ButtonRelease)) {
+		    if ((eventPtr->xany.type == KeyPress)
+			    || (eventPtr->xany.type == KeyRelease)) {
+			goto nextSequence;
+		    }
 		}
 		goto nextEvent;
 	    }
@@ -1612,20 +1635,37 @@ MatchPatterns(dispPtr, bindPtr, psPtr)
 	    if ((state & patPtr->hateMods) != 0) {
 		/*
 		 * There appear to be unwanted modifiers.  However, if this
-		 * is a KeyPress or KeyRelease event then ignore the shift,
-		 * lock, and mode_switch modifiers since they are already
-		 * included in the keysym spec.
+		 * is a KeyPress or KeyRelease event then ignore modifiers
+		 * such as shift, lock, and mode_switch, since they are
+		 * already included in the keysym spec.
 		 */
 
 		if (((patPtr->eventType != KeyPress)
 			&& (patPtr->eventType != KeyRelease))
 			|| ((state & patPtr->hateMods
-			& ~(ShiftMask|LockMask|dispPtr->modeModMask)) != 0)) {
+			& ~dispPtr->ignoreModMask) != 0)) {
 		    goto nextSequence;
 		}
 	    }
 	    if ((patPtr->detail != 0)
 		    && (patPtr->detail != *detailPtr)) {
+		/*
+		 * The detail appears not to match.  However, if the event
+		 * is a KeyPress for a modifier key then just ignore the
+		 * event.  Otherwise event sequences like "aD" never match
+		 * because the shift key goes down between the "a" and the
+		 * "D".
+		 */
+
+		if (eventPtr->xany.type == KeyPress) {
+		    int i;
+
+		    for (i = 0; i < dispPtr->numModKeyCodes; i++) {
+			if (dispPtr->modKeyCodes[i] == eventPtr->xkey.keycode) {
+			    goto nextEvent;
+			}
+		    }
+		}
 		goto nextSequence;
 	    }
 	    if (psPtr->flags & PAT_NEARBY) {
@@ -2145,6 +2185,15 @@ Tk_BackgroundError(interp)
     char *errorInfo, *tmp;
     int result;
 
+    /*
+     * The Tcl_AddErrorInfo call below (with an empty string) ensures that
+     * errorInfo gets properly set.  It's needed in cases where the error
+     * came from a utility procedure like Tcl_GetVar instead of Tcl_Eval;
+     * in these cases errorInfo still won't have been set when this
+     * procedure is called.
+     */
+
+    Tcl_AddErrorInfo(interp, "");
     error = (char *) ckalloc((unsigned) (strlen(interp->result) + 1));
     strcpy(error, interp->result);
     tmp = Tcl_GetVar(interp, "errorInfo", TCL_GLOBAL_ONLY);
@@ -2176,6 +2225,41 @@ Tk_BackgroundError(interp)
 }
 
 /*
+ *----------------------------------------------------------------------
+ *
+ * TkCopyAndGlobalEval --
+ *
+ *	This procedure makes a copy of a script then calls Tcl_GlobalEval
+ *	to evaluate it.  It's used in situations where the execution of
+ *	a command may cause the original command string to be reallocated.
+ *
+ * Results:
+ *	Returns the result of evaluating script, including both a standard
+ *	Tcl completion code and a string in interp->result.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+int
+TkCopyAndGlobalEval(interp, script)
+    Tcl_Interp *interp;			/* Interpreter in which to evaluate
+					 * script. */
+    char *script;			/* Script to evaluate. */
+{
+    Tcl_DString buffer;
+    int code;
+
+    Tcl_DStringInit(&buffer);
+    Tcl_DStringAppend(&buffer, script, -1);
+    code = Tcl_GlobalEval(interp, Tcl_DStringValue(&buffer));
+    Tcl_DStringFree(&buffer);
+    return code;
+}
+
+/*
  *--------------------------------------------------------------
  *
  * InitKeymapInfo --
@@ -2202,7 +2286,8 @@ InitKeymapInfo(dispPtr)
     XModifierKeymap *modMapPtr;
     register KeyCode *codePtr;
     KeySym keysym;
-    int count, i, max;
+    int count, i, j, max, arraySize;
+#define KEYCODE_ARRAY_SIZE 20
 
     dispPtr->bindInfoStale = 0;
     modMapPtr = XGetModifierMapping(dispPtr->display);
@@ -2233,10 +2318,13 @@ InitKeymapInfo(dispPtr)
     /*
      * See if the "mode switch" keysym is associated with any keycode
      * associated with any modifier.  If so, store a mask for all such
-     * modifiers in dispPtr->modeModMask;
+     * modifiers in dispPtr->modeModMask.  At the same time, see if
+     * there is a Num_Lock key that generates a modifier, and if so
+     * save its modifier mask too.
      */
 
     dispPtr->modeModMask = 0;
+    dispPtr->ignoreModMask = 0;
     codePtr = modMapPtr->modifiermap;
     max = 8*modMapPtr->max_keypermod;
     for (i = 0; i < max; i++, codePtr++) {
@@ -2247,5 +2335,59 @@ InitKeymapInfo(dispPtr)
 		== XK_Mode_switch) {
 	    dispPtr->modeModMask |= ShiftMask << (i/modMapPtr->max_keypermod);
 	}
+	if (XKeycodeToKeysym(dispPtr->display, *codePtr, 0)
+		== XK_Num_Lock) {
+	    dispPtr->ignoreModMask |= ShiftMask << (i/modMapPtr->max_keypermod);
+	}
     }
+    dispPtr->ignoreModMask |= ShiftMask|LockMask|dispPtr->modeModMask;
+
+    /*
+     * Create an array of the keycodes for all modifier keys.
+     */
+
+    if (dispPtr->modKeyCodes != NULL) {
+	ckfree((char *) dispPtr->modKeyCodes);
+    }
+    dispPtr->numModKeyCodes = 0;
+    arraySize = KEYCODE_ARRAY_SIZE;
+    dispPtr->modKeyCodes = (KeyCode *) ckalloc((unsigned)
+	    (KEYCODE_ARRAY_SIZE * sizeof(KeyCode)));
+    for (i = 0, codePtr = modMapPtr->modifiermap; i < max; i++, codePtr++) {
+	if (*codePtr == 0) {
+	    continue;
+	}
+
+	/*
+	 * Make sure that the keycode isn't already in the array.
+	 */
+
+	for (j = 0; ; j++) {
+	    if (dispPtr->modKeyCodes[j] == *codePtr) {
+		break;
+	    }
+	    if (j < dispPtr->numModKeyCodes) {
+		continue;
+	    }
+	    if (dispPtr->numModKeyCodes >= arraySize) {
+		KeyCode *new;
+
+		/*
+		 * Ran out of space in the array;  grow it.
+		 */
+
+		arraySize *= 2;
+		new = (KeyCode *) ckalloc((unsigned)
+			(arraySize * sizeof(KeyCode)));
+		memcpy((VOID *) new, (VOID *) dispPtr->modKeyCodes,
+			(dispPtr->numModKeyCodes * sizeof(KeyCode)));
+		ckfree((char *) dispPtr->modKeyCodes);
+		dispPtr->modKeyCodes = new;
+	    }
+	    dispPtr->modKeyCodes[dispPtr->numModKeyCodes] = *codePtr;
+	    dispPtr->numModKeyCodes++;
+	    break;
+	}
+    }
+    XFreeModifiermap(modMapPtr);
 }

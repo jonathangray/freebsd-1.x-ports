@@ -5,23 +5,34 @@
  *	toolkit.  Frames are windows with a background color
  *	and possibly a 3-D effect, but no other attributes.
  *
- * Copyright 1990 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkFrame.c,v 1.1 1993/08/09 01:20:53 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkFrame.c,v 1.2 1993/12/27 07:34:09 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include "default.h"
 #include "tkConfig.h"
-#include "tk.h"
+#include "tkInt.h"
 
 /*
  * A data structure of the following type is kept for each
@@ -39,10 +50,6 @@ typedef struct {
     Tcl_Interp *interp;		/* Interpreter associated with
 				 * widget.  Used to delete widget
 				 * command.  */
-    Tk_Uid screenName;		/* If this window isn't a toplevel window
-				 * then this is NULL;  otherwise it gives
-				 * the name of the screen on which window
-				 * is displayed. */
     Tk_3DBorder border;		/* Structure used to draw 3-D border and
 				 * background. */
     int borderWidth;		/* Width of 3-D border (if any). */
@@ -138,7 +145,6 @@ Tk_FrameCmd(clientData, interp, argc, argv)
 {
     Tk_Window tkwin = (Tk_Window) clientData;
     Tk_Window new;
-    register Frame *framePtr;
     Tk_Uid screenUid;
     char *className, *screen;
     int src, dst;
@@ -192,21 +198,61 @@ Tk_FrameCmd(clientData, interp, argc, argv)
     }
 
     /*
-     * Create the window.
+     * Create the window and initialize our structures and event handlers.
      */
 
     new = Tk_CreateWindowFromPath(interp, tkwin, argv[1], screenUid);
     if (new == NULL) {
 	return TCL_ERROR;
     }
-
     Tk_SetClass(new, className);
+    return TkInitFrame(interp, new, (screenUid != NULL), argc-2, argv+2);
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * TkInitFrame --
+ *
+ *	This procedure initializes a frame or toplevel widget.  It's
+ *	separate from Tk_FrameCmd so that it can be used for the
+ *	main window, which has already been created elsewhere.
+ *
+ * Results:
+ *	A standard Tcl completion code.
+ *
+ * Side effects:
+ *	A widget record gets allocated, handlers get set up, etc..
+ *
+ *----------------------------------------------------------------------
+ */
+
+int
+TkInitFrame(interp, tkwin, toplevel, argc, argv)
+    Tcl_Interp *interp;			/* Interpreter associated with the
+					 * application. */
+    Tk_Window tkwin;			/* Window to use for frame or
+					 * top-level.   Caller must already
+					 * have set window's class. */
+    int toplevel;			/* Non-zero means that this is a
+					 * top-level window, 0 means it's a
+					 * frame. */
+    int argc;				/* Number of configuration arguments
+					 * (not including class command and
+					 * window name). */
+    char *argv[];			/* Configuration arguments. */
+{
+    register Frame *framePtr;
+
     framePtr = (Frame *) ckalloc(sizeof(Frame));
-    framePtr->tkwin = new;
-    framePtr->display = Tk_Display(new);
+    framePtr->tkwin = tkwin;
+    framePtr->display = Tk_Display(tkwin);
     framePtr->interp = interp;
-    framePtr->screenName = screenUid;
     framePtr->border = NULL;
+    framePtr->borderWidth = 0;
+    framePtr->relief = TK_RELIEF_FLAT;
+    framePtr->width = 0;
+    framePtr->height = 0;
     framePtr->geometry = NULL;
     framePtr->cursor = None;
     framePtr->flags = 0;
@@ -215,11 +261,11 @@ Tk_FrameCmd(clientData, interp, argc, argv)
     Tcl_CreateCommand(interp, Tk_PathName(framePtr->tkwin),
 	    FrameWidgetCmd, (ClientData) framePtr, (void (*)()) NULL);
 
-    if (ConfigureFrame(interp, framePtr, argc-2, argv+2, 0) != TCL_OK) {
+    if (ConfigureFrame(interp, framePtr, argc, argv, 0) != TCL_OK) {
 	Tk_DestroyWindow(framePtr->tkwin);
 	return TCL_ERROR;
     }
-    if (screenUid != NULL) {
+    if (toplevel) {
 	Tk_DoWhenIdle(MapFrame, (ClientData) framePtr);
     }
     interp->result = Tk_PathName(framePtr->tkwin);
@@ -308,15 +354,7 @@ DestroyFrame(clientData)
 {
     register Frame *framePtr = (Frame *) clientData;
 
-    if (framePtr->border != NULL) {
-	Tk_Free3DBorder(framePtr->border);
-    }
-    if (framePtr->geometry != NULL) {
-	ckfree(framePtr->geometry);
-    }
-    if (framePtr->cursor != None) {
-	Tk_FreeCursor(framePtr->display, framePtr->cursor);
-    }
+    Tk_FreeOptions(configSpecs, (char *) framePtr, framePtr->display, 0);
     ckfree((char *) framePtr);
 }
 
@@ -366,7 +404,7 @@ ConfigureFrame(interp, framePtr, argc, argv, flags)
 	    return TCL_ERROR;
 	}
 	Tk_GeometryRequest(framePtr->tkwin, width, height);
-    } else if ((framePtr->width > 0) && (framePtr->height > 0)) {
+    } else if ((framePtr->width > 0) || (framePtr->height > 0)) {
 	Tk_GeometryRequest(framePtr->tkwin, framePtr->width,
 		framePtr->height);
     }

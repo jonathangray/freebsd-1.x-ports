@@ -14,14 +14,13 @@ proc mkCanvText {{w .ctext}} {
     wm iconname $w "Text"
     set c $w.c
 
-    frame $w.frame1 -relief raised -bd 2
+    message $w.msg -font -Adobe-Times-Medium-R-Normal-*-180-* -width 420 \
+	    -relief raised -bd 2 -text "This window displays a string of text to demonstrate the text facilities of canvas widgets.  You can point, click, and type.  You can also select and then delete with Control-d.  You can copy the selection with Control-v.  You can click in the boxes to adjust the position of the text relative to its positioning point or change its justification."
     canvas $c -relief raised -width 500 -height 400
     button $w.ok -text "OK" -command "destroy $w"
-    pack append $w $w.frame1 {top fill} $w.c {expand fill} \
-	    $w.ok {bottom pady 10 frame center}
-    message $w.frame1.m -font -Adobe-Times-Medium-R-Normal-*-180-* -aspect 300 \
-	    -text "This window displays a string of text to demonstrate the text facilities of canvas widgets.  You can point, click, and type.  You can also select and then delete with Control-d.  You can copy the selection with Control-v.  You can click in the boxes to adjust the position of the text relative to its positioning point or change its justification."
-    pack append $w.frame1 $w.frame1.m {frame center}
+    pack $w.msg -side top -fill both
+    pack $w.c -side top -expand yes -fill both
+    pack $w.ok -side bottom -pady 5 -anchor center
 
     set font -Adobe-helvetica-medium-r-*-240-*
 

@@ -6,22 +6,32 @@
  *	canvas code.  It also has miscellaneous geometry functions
  *	used by canvases.
  *
- * Copyright 1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1992-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkTrig.c,v 1.1 1993/08/09 01:20:53 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkTrig.c,v 1.2 1993/12/27 07:34:47 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include <stdio.h>
-#include <math.h>
 #include "tkInt.h"
 #include "tkConfig.h"
 #include "tkCanvas.h"
@@ -30,7 +40,9 @@ static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkTrig.c,v 1.1 1993/0
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 #undef MAX
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
-#define PI 3.14159265358979323846
+#ifndef PI
+#   define PI 3.14159265358979323846
+#endif /* PI */
 
 /*
  *--------------------------------------------------------------
@@ -534,6 +546,7 @@ TkOvalToPoint(ovalPtr, width, filled, pointPtr)
     double pointPtr[2];		/* Coordinates of point. */
 {
     double xDelta, yDelta, scaledDistance, distToOutline, distToCenter;
+    double xDiam, yDiam;
 
     /*
      * Compute the distance between the center of the oval and the
@@ -574,8 +587,25 @@ TkOvalToPoint(ovalPtr, width, filled, pointPtr)
     if (filled) {
 	return 0.0;
     }
-    distToOutline = (distToCenter/scaledDistance) * (1.0 - scaledDistance)
-	    - width;
+    if (scaledDistance > 1E-10) {
+	distToOutline = (distToCenter/scaledDistance) * (1.0 - scaledDistance)
+		- width;
+    } else {
+	/*
+	 * Avoid dividing by a very small number (it could cause an
+	 * arithmetic overflow).  This problem occurs if the point is
+	 * very close to the center of the oval.
+	 */
+
+	xDiam = ovalPtr[2] - ovalPtr[0];
+	yDiam = ovalPtr[3] - ovalPtr[1];
+	if (xDiam < yDiam) {
+	    distToOutline = (xDiam - width)/2;
+	} else {
+	    distToOutline = (yDiam - width)/2;
+	}
+    }
+
     if (distToOutline < 0.0) {
 	return 0.0;
     }
@@ -1066,7 +1096,7 @@ TkMakeBezierPostscript(interp, pointPtr, numPoints, psInfoPtr)
 	control[5] = 0.833*pointPtr[1] + 0.167*pointPtr[3];
 	control[6] = 0.5*pointPtr[0] + 0.5*pointPtr[2];
 	control[7] = 0.5*pointPtr[1] + 0.5*pointPtr[3];
-	sprintf(buffer, "%g %g moveto\n%g %g %g %g %g %g curveto\n",
+	sprintf(buffer, "%.15g %.15g moveto\n%.15g %.15g %.15g %.15g %.15g %.15g curveto\n",
 		control[0], TkCanvPsY(psInfoPtr, control[1]),
 		control[2], TkCanvPsY(psInfoPtr, control[3]),
 		control[4], TkCanvPsY(psInfoPtr, control[5]),
@@ -1075,7 +1105,7 @@ TkMakeBezierPostscript(interp, pointPtr, numPoints, psInfoPtr)
 	closed = 0;
 	control[6] = pointPtr[0];
 	control[7] = pointPtr[1];
-	sprintf(buffer, "%g %g moveto\n",
+	sprintf(buffer, "%.15g %.15g moveto\n",
 		control[6], TkCanvPsY(psInfoPtr, control[7]));
     }
     Tcl_AppendResult(interp, buffer, (char *) NULL);
@@ -1105,7 +1135,7 @@ TkMakeBezierPostscript(interp, pointPtr, numPoints, psInfoPtr)
 	control[4] = 0.333*control[6] + 0.667*pointPtr[0];
 	control[5] = 0.333*control[7] + 0.667*pointPtr[1];
 
-	sprintf(buffer, "%g %g %g %g %g %g curveto\n",
+	sprintf(buffer, "%.15g %.15g %.15g %.15g %.15g %.15g curveto\n",
 		control[2], TkCanvPsY(psInfoPtr, control[3]),
 		control[4], TkCanvPsY(psInfoPtr, control[5]),
 		control[6], TkCanvPsY(psInfoPtr, control[7]));

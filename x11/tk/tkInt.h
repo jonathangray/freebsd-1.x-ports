@@ -4,16 +4,27 @@
  *	Declarations for things used internally by the Tk
  *	procedures but not exported outside the module.
  *
- * Copyright 1990-1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
  *
- * $Header: /a/cvs/386BSD/ports/x11/tk/tkInt.h,v 1.1 1993/08/09 01:20:56 jkh Exp $ SPRITE (Berkeley)
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+ *
+ * $Header: /a/cvs/386BSD/ports/x11/tk/tkInt.h,v 1.2 1993/12/27 07:34:15 rich Exp $ SPRITE (Berkeley)
  */
 
 #ifndef _TKINT
@@ -30,9 +41,6 @@
 #endif
 #ifndef _TCL
 #include "tcl.h"
-#endif
-#ifndef _TCLHASH
-#include "tclHash.h"
 #endif
 
 /*
@@ -79,8 +87,18 @@ typedef struct TkDisplay {
     unsigned int modeModMask;	/* Has one bit set to indicate the modifier
 				 * corresponding to "mode shift".  If no
 				 * such modifier, than this is zero. */
+    unsigned int ignoreModMask;	/* If any of the following modifiers are
+				 * present in an event but not in the
+				 * corresponding pattern, they don't prevent
+				 * the pattern from matching the event. */
     enum {IGNORE, CAPS, SHIFT} lockUsage;
 				/* Indicates how to interpret lock modifier. */
+    int numModKeyCodes;		/* Number of entries in modKeyCodes array
+				 * below. */
+    KeyCode *modKeyCodes;	/* Pointer to an array giving keycodes for
+				 * all of the keys that have modifiers
+				 * associated with them.  Malloc'ed, but
+				 * may be NULL. */
 
     /*
      * Information used by tkError.c only:
@@ -94,6 +112,11 @@ typedef struct TkDisplay {
 				 * last time inactive handlers were
 				 * garbage-collected.  When this number
 				 * gets big, handlers get cleaned up. */
+    int (*defaultHandler) _ANSI_ARGS_((Display *display,
+	    XErrorEvent *eventPtr));
+				/* X's default event handler:  invoked
+				 * if an error occurs that we can't handle
+				 * ourselves. */
 
     /*
      * Information used by tkSend.c only:
@@ -106,6 +129,10 @@ typedef struct TkDisplay {
     Atom commProperty;		/* X's name for comm property. */
     Atom registryProperty;	/* X's name for property containing
 				 * registry of interpreter names. */
+    int serverSecure;		/* Non-zero means the server appears to
+				 * be reasonably secure;  zero means we
+				 * should reject incoming sends because
+				 * they can't be trusted. */
 
     /*
      * Information used by tkSelect.c only:
@@ -298,6 +325,8 @@ typedef struct TkMainInfo {
 				/* Top level of option hierarchy for this
 				 * main window.  NULL means uninitialized.
 				 * Managed by tkOption.c. */
+    struct TkMainInfo *nextPtr;	/* Next in list of all main windows managed by
+				 * this process. */
 } TkMainInfo;
 
 /*
@@ -330,6 +359,9 @@ typedef struct TkWindow {
 				 * been deleted. */
     struct TkWindow *childList;	/* First in list of child windows,
 				 * or NULL if no children. */
+    struct TkWindow *lastChildPtr;
+				/* Last in list of child windows, or NULL
+				 * if no children. */
     struct TkWindow *parentPtr;	/* Pointer to parent window (logical
 				 * parent, not necessarily X parent), or
 				 * NULL if this is a main window. */
@@ -475,12 +507,41 @@ extern TkDisplay *tkDisplayList;
 #endif
 
 /*
+ * Special flag to pass to Tk_CreateFileHandler to indicate that
+ * the file descriptor is actually for a display, not a file, and
+ * should be treated specially.  Make sure that this value doesn't
+ * conflict with TK_READABLE, TK_WRITABLE, or TK_EXCEPTION from tk.h.
+ */
+
+#define TK_IS_DISPLAY	32
+
+/*
+ * The macro below is used to modify a "char" value (e.g. by casting
+ * it to an unsigned character) so that it can be used safely with
+ * macros such as isspace.
+ */
+
+#define UCHAR(c) ((unsigned char) (c))
+
+/*
+ * SPECIAL HACK!!!  I've started changing Tk over to use
+ * Tcl_PrintDouble instead of sprintf(... %g ...), but the change
+ * is not backwards-compatible.  So, until the next incompatible
+ * release of Tk, the following macro replaces the Tcl_PrintDouble
+ * calls with sprintf again.
+ */
+
+#define Tcl_PrintDouble(interp, value, dst) \
+	sprintf(dst, "%g", value)
+
+/*
  * Miscellaneous variables shared among Tk modules but not exported
  * to the outside world:
  */
 
 extern Tk_Uid		tkActiveUid;
 extern Tk_Uid		tkDisabledUid;
+extern TkMainInfo	*tkMainWindowList;
 extern Tk_Uid		tkNormalUid;
 
 /*
@@ -494,6 +555,8 @@ extern void		TkBezierPoints _ANSI_ARGS_((double control[],
 			    int numSteps, double *coordPtr));
 extern void		TkBindEventProc _ANSI_ARGS_((TkWindow *winPtr,
 			    XEvent *eventPtr));
+extern int		TkCopyAndGlobalEval _ANSI_ARGS_((Tcl_Interp *interp,
+			    char *script));
 extern Time		TkCurrentTime _ANSI_ARGS_((TkDisplay *dispPtr));
 extern int		TkDeadAppCmd _ANSI_ARGS_((ClientData clientData,
 			    Tcl_Interp *interp, int argc, char **argv));
@@ -515,6 +578,9 @@ extern int		TkGetMiterPoints _ANSI_ARGS_((double p1[], double p2[],
 			    double m2[]));
 extern void		TkGrabDeadWindow _ANSI_ARGS_((TkWindow *winPtr));
 extern void		TkGrabTriggerProc _ANSI_ARGS_((XEvent *eventPtr));
+extern int		TkInitFrame _ANSI_ARGS_((Tcl_Interp *interp,
+			    Tk_Window tkwin, int toplevel, int argc,
+			    char *argv[]));
 extern int		TkLineToArea _ANSI_ARGS_((double end1Ptr[2],
 			    double end2Ptr[2], double rectPtr[4]));
 extern double		TkLineToPoint _ANSI_ARGS_((double end1Ptr[2],
@@ -536,6 +602,8 @@ extern int		TkPolygonToArea _ANSI_ARGS_((double *polyPtr,
 			    int numPoints, double *rectPtr));
 extern double		TkPolygonToPoint _ANSI_ARGS_((double *polyPtr,
 			    int numPoints, double *pointPtr));
+extern void		TkQueueEvent _ANSI_ARGS_((TkDisplay *dispPtr,
+			    XEvent *eventPtr));
 extern void		TkSelDeadWindow _ANSI_ARGS_((TkWindow *winPtr));
 extern void		TkSelEventProc _ANSI_ARGS_((Tk_Window tkwin,
 			    XEvent *eventPtr));
@@ -547,9 +615,12 @@ extern void		TkUnderlineChars _ANSI_ARGS_((Display *display,
 			    int lastChar));
 extern void		TkWmDeadWindow _ANSI_ARGS_((TkWindow *winPtr));
 extern void		TkWmMapWindow _ANSI_ARGS_((TkWindow *winPtr));
+extern void		TkWmNewWindow _ANSI_ARGS_((TkWindow *winPtr));
 extern void		TkWmProtocolEventProc _ANSI_ARGS_((TkWindow *winPtr,
 			    XEvent *evenvPtr));
+extern void		TkWmRestackToplevel _ANSI_ARGS_((TkWindow *winPtr,
+			    int aboveBelow, TkWindow *otherPtr));
 extern void		TkWmSetClass _ANSI_ARGS_((TkWindow *winPtr));
-extern void		TkWmNewWindow _ANSI_ARGS_((TkWindow *winPtr));
+extern void		TkWmUnmapWindow _ANSI_ARGS_((TkWindow *winPtr));
 
 #endif  /* _TKINT */

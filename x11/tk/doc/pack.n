@@ -1,207 +1,280 @@
 '\"
-'\" Copyright 1990-1992 Regents of the University of California
-'\" Permission to use, copy, modify, and distribute this
-'\" documentation for any purpose and without fee is hereby
-'\" granted, provided that this notice appears in all copies.
-'\" The University of California makes no representations about
-'\" the suitability of this material for any purpose.  It is
-'\" provided "as is" without express or implied warranty.
+'\" Copyright (c) 1990-1992 The Regents of the University of California.
+'\" All rights reserved.
+'\"
+'\" Permission is hereby granted, without written agreement and without
+'\" license or royalty fees, to use, copy, modify, and distribute this
+'\" documentation for any purpose, provided that the above copyright
+'\" notice and the following two paragraphs appear in all copies.
+'\"
+'\" IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY
+'\" FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+'\" ARISING OUT OF THE USE OF THIS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+'\" CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+'\"
+'\" THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+'\" INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+'\" AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+'\" ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+'\" PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 '\" 
-'\" $Header: /a/cvs/386BSD/ports/x11/tk/doc/pack.n,v 1.1 1993/08/09 01:21:05 jkh Exp $ SPRITE (Berkeley)
+'\" $Header: /a/cvs/386BSD/ports/x11/tk/doc/pack.n,v 1.2 1993/12/27 07:36:56 rich Exp $ SPRITE (Berkeley)
 '/" 
 .so man.macros
-.HS pack cmds
+.HS pack tk
 .BS
 '\" Note:  do not modify the .SH NAME line immediately below!
 .SH NAME
 pack \- Geometry manager that packs around edges of cavity
 .SH SYNOPSIS
-\fBpack after \fIsibling \fIwindow options\fR ?\fIwindow options \fR...?
-.sp
-\fBpack append \fIparent \fIwindow options\fR ?\fIwindow options \fR...?
-.sp
-\fBpack before \fIsibling \fIwindow options\fR ?\fIwindow options \fR...?
-.sp
-\fBpack info \fIparent\fR
-.sp
-\fBpack unpack \fIwindow\fR
+\fBpack \fIoption arg \fR?\fIarg ...\fR?
 .BE
 
 .SH DESCRIPTION
 .PP
-The packer is a geometry manager that arranges the
-children of a parent by packing them in order around the edges of
-the parent.  The first child is placed against one side of
-the window, occupying the entire span of the window along that
-side.  This reduces the space remaining for other children as
-if the side had been moved in by the size of the first child.
-Then the next child is placed against one side of the remaining
-cavity, and so on until all children have been placed or there
-is no space left in the cavity.
-.PP
-The \fBbefore\fR, \fBafter\fR, and \fBappend\fR forms of the \fBpack\fR
-command are used to insert one or more children into the packing order
-for their parent.  The \fBbefore\fR form inserts the children before
-window \fIsibling\fR in the order;  all of the other windows must be
-siblings of \fIsibling\fR.  The \fBafter\fR form inserts the windows
-after \fIsibling\fR, and the \fBappend\fR form appends one or more
-windows to the end of the packing order for \fIparent\fR.  If a
-\fIwindow\fR named in any of these commands is already packed in
-its parent, it is removed from its current position in the packing
-order and repositioned as indicated by the command.  All of these
-commands return an empty string as result.
-.PP
-.VS
-The \fBunpack\fR form of the \fBpack\fR command removes \fIwindow\fR
-from the packing order of its parent and unmaps it.  After the
-execution of this command the packer will no longer manage
-\fIwindow\fR's geometry.
-.VE
-.PP
-The placement of each child is actually a four-step process;
-the \fIoptions\fR argument following each \fIwindow\fR consists of
-a list of one or more fields that govern the placement of that
-window.  In the discussion below, the term \fIcavity\fR refers
-to the space left in a parent when a particular child is placed
-(i.e. all the space that wasn't claimed by earlier children in
-the packing order).  The term \fIframe\fR refers to the space
-allocated to a particular child;  this is not necessarily the
-same as the child window's final geometry.
-.PP
-The first step in placing a child is to determine which side of
-the cavity it will lie against.  Any one of the following options
-may be used to specify a side:
+The \fBpack\fR command is used to communicate with the packer,
+a geometry manager that arranges the children of a parent by
+packing them in order around the edges of the parent.
+The \fBpack\fR command can have any of several forms, depending
+on the \fIoption\fR argument:
 .TP
-\fBtop\fR
-Position the child's frame against the top of the cavity,
-occupying the full width of the cavity.
+\fBpack \fIslave \fR?\fIslave ...\fR? ?\fIoptions\fR?
+If the first argument to \fBpack\fR is a window name (any value
+starting with ``.''), then the command is processed in the same
+way as \fBpack configure\fR.
 .TP
-\fBbottom\fR
-Position the child's frame against the bottom of the cavity,
-occupying the full width of the cavity.
+\fBpack configure \fIslave \fR?\fIslave ...\fR? ?\fIoptions\fR?
+The arguments consist of the names of one or more slave windows
+followed by pairs of arguments that specify how
+to manage the slaves.
+See ``THE PACKER ALGORITHM'' below for details on how the options
+are used by the packer.
+The following options are supported:
+.RS
 .TP
-\fBleft\fR
-Position the child's frame against the left side of the cavity,
-occupying the full height of the cavity.
+\fB\-after \fIother\fR
+\fIOther\fR must the name of another window.
+Use its master as the master for the slaves, and insert
+the slaves just after \fIother\fR in the packing order.
 .TP
-\fBright\fR
-Position the child's frame against the right side of the cavity,
-occupying the full height of the cavity.
+\fB\-anchor \fIanchor\fR
+\fIAnchor\fR must be a valid anchor position such as \fBn\fR
+or \fBsw\fR; it specifies where to position each slave in its
+parcel.
+Defaults to \fBcenter\fR.
+.TP
+\fB\-before \fIother\fR
+\fIOther\fR must the name of another window.
+Use its master as the master for the slaves, and insert
+the slaves just before \fIother\fR in the packing order.
+.TP
+\fB\-expand \fIboolean\fR
+Specifies whether the slaves should be expanded to consume
+extra space in their master.
+\fIBoolean\fR may have any proper boolean value, such as \fB1\fR
+or \fBno\fR.
+Defaults to 0.
+.TP
+\fB\-fill \fIstyle\fR
+If a slave's parcel is larger than its requested dimensions, this
+option may be used to stretch the slave.
+\fIStyle\fR must have one of the following values:
+.RS
+.TP
+\fBnone\fR
+Give the slave its requested dimensions plus any internal padding
+requested with \fB\-ipadx\fR or \fB\-ipady\fR.  This is the default.
+.TP
+\fBx\fR
+Stretch the slave horizontally to fill the entire width of its
+parcel (except leave external padding as specified by \fB\-padx\fR).
+.TP
+\fBy\fR
+Stretch the slave vertically to fill the entire height of its
+parcel (except leave external padding as specified by \fB\-pady\fR).
+.TP
+\fBboth\fR
+Stretch the slave both horizontally and vertically.
+.RE
+.TP
+\fB\-in \fIother\fR
+Insert the slave(s) at the end of the packing order for the master
+window given by \fIother\fR.
+.TP
+\fB\-ipadx \fIamount\fR
+\fIAmount\fR specifies how much horizontal internal padding to
+leave on each side of the slave(s).
+\fIAmount\fR must be a valid screen distance, such as \fB2\fR or \fB.5c\fR.
+It defaults to 0.
+.TP
+\fB\-ipady \fIamount\fR
+\fIAmount\fR specifies how much vertical internal padding to
+leave on each side of the slave(s).
+\fIAmount\fR  defaults to 0.
+.TP
+\fB\-padx \fIamount\fR
+\fIAmount\fR specifies how much horizontal external padding to
+leave on each side of the slave(s).
+\fIAmount\fR defaults to 0.
+.TP
+\fB\-pady \fIamount\fR
+\fIAmount\fR specifies how much vertical external padding to
+leave on each side of the slave(s).
+\fIAmount\fR defaults to 0.
+.TP
+\fB\-side \fIside\fR
+Specifies which side of the master the slave(s) will be packed against.
+Must be \fBleft\fR, \fBright\fR, \fBtop\fR, or \fBbottom\fR.
+Defaults to \fBtop\fR.
 .LP
-At most one of these options should be specified for any given window.
-If no side is specified, then the default is \fBtop\fR.
-.PP
-The second step is to decide on a frame for the child.  For \fBtop\fR
-and \fBbottom\fR windows, the desired frame width is normally the cavity
-width and the desired frame height is the window's requested height,
-as passed to \fBTk_GeometryRequest\fR. For \fBleft\fR and \fBright\fR
-windows, the desired frame height is normally the cavity height and the
-desired width is the window's requested width.  However, extra
-space may be requested for the window using any of the following
-options:
-.TP 12
-\fBpadx \fInum\fR
-Add \fInum\fR pixels to the window's requested width before computing
-the frame size as described above.
-.TP 12
-\fBpady \fInum\fR
-Add \fInum\fR pixels to the window's requested height before computing
-the frame size as described above.
-.TP 12
-\fBexpand\fR
-This option requests that the window's frame absorb any extra space left over
-in the parent's cavity after packing all the children.
-The amount of space left over depends on the sizes requested by the
-other children, and may be zero.  If several windows have all specified
-\fBexpand\fR then the extra width will be divided equally among all the
-\fBleft\fR and \fBright\fR windows that specified \fBexpand\fR and
-the extra height will be divided equally among all the \fBtop\fR and
-\fBbottom\fR windows that specified \fBexpand.
-.LP
-If the desired width or height for a frame is larger than the corresponding
-dimension of the cavity, then the cavity's dimension is used instead.
-.PP
-The third step in placing the window is to decide on the window's
-width and height.  The default is for the window to receive either
-its requested width and height or the those of the frame, whichever
-is smaller.  If the frame is larger than the window's requested
-size, then the following options may be used to expand the
-window to partially or completely fill the frame:
+If no \fB\-in\fR, \fB\-after\fR or \fB\-before\fR option is specified
+then each of the slaves will be inserted at the end of the packing list
+for its parent unless it is already managed by the packer (in which
+case it will be left where it is).
+If one of these options is specified then all the slaves will be
+inserted at the specified point.
+If any of the slaves are already managed by the geometry manager
+then any unspecified options for them retain their previous values rather
+than receiving default values.
+.RE
 .TP
-\fBfill\fR
-Set the window's size to equal the frame size.
+\fBpack forget \fIslave \fR?\fIslave ...\fR?
+Removes each of the \fIslave\fRs from the packing order for its
+master and unmaps their windows.
+The slaves will no longer be managed by the packer.
 .TP
-\fBfillx\fR
-Increase the window's width to equal the frame's width, but retain
-the window's requested height.
+\fBpack newinfo \fIslave\fR
+Returns a list whose elements are the current configuration state of
+the slave given by \fIslave\fR in the same option-value form that
+might be specified to \fBpack configure\fR.
+The first two elements of the list are ``\fB\-in \fImaster\fR'' where
+\fImaster\fR is the slave's master.
+Starting with Tk 4.0 this option will be renamed "pack info".
 .TP
-\fBfilly\fR
-Increase the window's height to equal the frame's height, but retain
-the window's requested width.
+\fBpack propagate \fImaster\fR ?\fIboolean\fR?
+If \fIboolean\fR has a true boolean value such as \fB1\fR or \fBon\fR
+then propagation is enabled for \fImaster\fR, which must be a window
+name (see ``GEOMETRY PROPAGATION'' below).
+If \fIboolean\fR has a false boolean value then propagation is
+disabled for \fImaster\fR.
+In either of these cases an empty string is returned.
+If \fIboolean\fR is omitted then the command returns \fB0\fR or
+\fB1\fR to indicate whether propagation is currently enabled
+for \fImaster\fR.
+Propagation is enabled by default.
+.TP
+\fBpack slaves \fImaster\fR
+Returns a list of all of the slaves in the packing order for \fImaster\fR.
+The order of the slaves in the list is the same as their order in
+the packing order.
+If \fImaster\fR has no slaves then an empty string is returned.
+
+.SH "THE PACKER ALGORITHM"
 .PP
-The last step is to decide the window's location within its frame.
-If the window's size equals the frame's size, then the window simply
-fills the entire frame.  If the frame is larger than the window,
-then one of
-the following options may be used to specify where the window should
-be positioned within its frame:
-.TP 15
-\fBframe center\fR
-Center the window in its frame.  This is the default if no framing
-option is specified.
-.TP 15
-\fBframe n\fR
-Position the window with its top edge centered on the top edge of
-the frame.
-.TP 15
-\fBframe ne\fR
-Position the window with its upper-right corner at the upper-right corner
-of the frame.
-.TP 15
-\fBframe e\fR
-Position the window with its right edge centered on the right edge of
-the frame.
-.TP 15
-\fBframe se\fR
-Position the window with its lower-right corner at the lower-right corner
-of the frame.
-.TP 15
-\fBframe s\fR
-Position the window with its bottom edge centered on the bottom edge of
-the frame.
-.TP 15
-\fBframe sw\fR
-Position the window with its lower-left corner at the lower-left corner
-of the frame.
-.TP 15
-\fBframe w\fR
-Position the window with its left edge centered on the left edge of
-the frame.
-.TP 15
-\fBframe nw\fR
-Position the window with its upper-left corner at the upper-left corner
-of the frame.
+For each master the packer maintains an ordered list of slaves
+called the \fIpacking list\fR.
+The \fB\-in\fR, \fB\-after\fR, and \fB\-before\fR configuration
+options are used to specify the master for each slave and the slave's
+position in the packing list.
+If none of these options is given for a slave then the slave
+is added to the end of the packing list for its parent.
 .PP
-The \fBpack info\fR command may be used to retrieve information about
-the packing order for a parent.  It returns a list in the form
-.DS C
-\fIwindow options window options ...\fR
-.DE
-Each \fIwindow\fR is a name of a window packed in \fIparent\fR,
-and the following \fIoptions\fR describes all of the options for that
-window, just as they would be typed to \fBpack append\fR.
-The order of the list is the same as the packing order for
-\fIparent\fR.
+The packer arranges the slaves for a master by scanning the
+packing list in order.
+At the time it processes each slave, a rectangular area within
+the master is still unallocated.
+This area is called the \fIcavity\fR;  for the first slave it
+is the entire area of the master.
 .PP
-The packer manages the mapped/unmapped state of all the packed
-children windows.  It automatically maps the windows when it packs
-them, and it unmaps any windows for which there was no space left
-in the cavity.
+For each slave the packer carries out the following steps:
+.IP [1]
+The packer allocates a rectangular \fIparcel\fR for the slave
+along the side of the cavity given by the slave's \fB\-side\fR option.
+If the side is top or bottom then the width of the parcel is
+the width of the cavity and its height is the requested height
+of the slave plus the \fB\-ipady\fR and \fB\-pady\fR options.
+For the left or right side the height of the parcel is
+the height of the cavity and the width is the requested width
+of the slave plus the \fB\-ipadx\fR and \fB\-padx\fR options.
+The parcel may be enlarged further because of the \fB\-expand\fR
+option (see ``EXPANSION'' below)
+.IP [2]
+The packer chooses the dimensions of the slave.
+The width will normally be the slave's requested width plus
+twice its \fB\-ipadx\fR option and the height will normally be
+the slave's requested height plus twice its \fB\-ipady\fR
+option.
+However, if the \fB\-fill\fR option is \fBx\fR or \fBboth\fR
+then the width of the slave is expanded to fill the width of the parcel,
+minus twice the \fB\-padx\fR option.
+If the \fB\-fill\fR option is \fBy\fR or \fBboth\fR
+then the height of the slave is expanded to fill the width of the parcel,
+minus twice the \fB\-pady\fR option.
+.IP [3]
+The packer positions the slave over its parcel.
+If the slave is smaller than the parcel then the \fB\-anchor\fR
+option determines where in the parcel the slave will be placed.
+If \fB\-padx\fR or \fB\-pady\fR is non-zero, then the given
+amount of external padding will always be left between the
+slave and the edges of the parcel.
 .PP
-The packer makes geometry requests on behalf of the parent windows
-it manages.  For each parent window it requests a size large enough
-to accommodate all the options specified by all the packed children,
-such that zero space would be leftover for \fBexpand\fR options.
+Once a given slave has been packed, the area of its parcel
+is subtracted from the cavity, leaving a smaller rectangular
+cavity for the next slave.
+If a slave doesn't use all of its parcel, the unused space
+in the parcel will not be used by subsequent slaves.
+If the cavity should become too small to meet the needs of
+a slave then the slave will be given whatever space is
+left in the cavity.
+If the cavity shrinks to zero size, then all remaining slaves
+on the packing list will be unmapped from the screen until
+the master window becomes large enough to hold them again.
+
+.SH "EXPANSION"
+.PP
+If a master window is so large that there will be extra space
+left over after all of its slaves have been packed, then the
+extra space is distributed uniformly among all of the slaves
+for which the \fB\-expand\fR option is set.
+Extra horizontal space is distributed among the expandable
+slaves whose \fB\-side\fR is \fBleft\fR or \fBright\fR,
+and extra vertical space is distributed among the expandable
+slaves whose \fB\-side\fR is \fBtop\fR or \fBbottom\fR.
+
+.SH "GEOMETRY PROPAGATION"
+.PP
+The packer normally computes how large a master must be to
+just exactly meet the needs of its slaves, and it sets the
+requested width and height of the master to these dimensions.
+This causes geometry information to propagate up through a
+window hierarchy to a top-level window so that the entire
+sub-tree sizes itself to fit the needs of the leaf windows.
+However, the \fBpack propagate\fR command may be used to
+turn off propagation for one or more masters.
+If propagation is disabled then the packer will not set
+the requested width and height of the packer.
+This may be useful if, for example, you wish for a master
+window to have a fixed size that you specify.
+
+.SH "RESTRICTIONS ON MASTER WINDOWS"
+.PP
+The master for each slave must either be the slave's parent
+(the default) or a descendant of the slave's parent.
+This restriction is necessary to guarantee that the
+slave can be placed over any part of its master that is
+visible without danger of the slave being clipped by its parent.
+
+.SH "PACKING ORDER"
+.PP
+If the master for a slave is not its parent then you must make sure
+that the slave is higher in the stacking order than the master.
+Otherwise the master will obscure the slave and it will appear as
+if the slave hasn't been packed correctly.
+The easiest way to make sure the slave is higher than the master is
+to create the master window first:  the most recently created window
+will be highest in the stacking order.
+Or, you can use the \fBraise\fR and \fBlower\fR commands to change
+the stacking order of either the master or the slave.
 
 .SH KEYWORDS
-frame, geometry manager, location, packer, size
+geometry manager, location, packer, parcel, propagation, size

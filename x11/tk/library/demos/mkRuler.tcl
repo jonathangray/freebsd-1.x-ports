@@ -18,14 +18,12 @@ proc mkRuler {{w .ruler}} {
     wm iconname $w "Ruler"
     set c $w.c
 
-    frame $w.frame1 -relief raised -bd 2
+    message $w.msg -font -Adobe-Times-Medium-R-Normal-*-180-* -width 13c \
+	    -relief raised -bd 2 -text "This canvas widget shows a mock-up of a ruler.  You can create tab stops by dragging them out of the well to the right of the ruler.  You can also drag existing tab stops.  If you drag a tab stop far enough up or down so that it turns dim, it will be deleted when you release the mouse button."
     canvas $c -width 14.8c -height 2.5c -relief raised
     button $w.ok -text "OK" -command "destroy $w"
-    pack append $w $w.frame1 {top fill} $w.ok {bottom pady 10 frame center} \
-	    $c {expand fill}
-    message $w.frame1.m -font -Adobe-Times-Medium-R-Normal-*-180-* -aspect 300 \
-	    -text "This canvas widget shows a mock-up of a ruler.  You can create tab stops by dragging them out of the well to the right of the ruler.  You can also drag existing tab stops.  If you drag a tab stop far enough up or down so that it turns dim, it will be deleted when you release the mouse button."
-    pack append $w.frame1 $w.frame1.m {frame center}
+    pack $w.msg $w.c -side top -fill x
+    pack $w.ok -side bottom -pady 5
 
     set v(grid) .25c
     set v(left) [winfo fpixels $c 1c]

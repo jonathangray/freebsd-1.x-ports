@@ -13,23 +13,23 @@ proc mkScroll {{w .cscroll}} {
     wm title $w "Scrollable Canvas Demonstration"
     wm iconname $w "Canvas"
     wm minsize $w 100 100
-    set c $w.frame2.c
+    set c $w.frame.c
 
-    frame $w.frame1 -relief raised -bd 2
-    frame $w.frame2 -relief raised -bd 2
+    message $w.msg -font -Adobe-Times-Medium-R-Normal-*-180-* -aspect 300 \
+	    -relief raised -bd 2 -text "This window displays a canvas widget that can be scrolled either using the scrollbars or by dragging with button 2 in the canvas.  If you click button 1 on one of the rectangles, its indices will be printed on stdout."
+    frame $w.frame -relief raised -bd 2
     button $w.ok -text "OK" -command "destroy $w"
-    pack append $w $w.frame1 {top fill} $w.ok {bottom pady 10 frame center} \
-	    $w.frame2 {top expand fill}
-    message $w.frame1.m -font -Adobe-Times-Medium-R-Normal-*-180-* -aspect 300 \
-	    -text "This window displays a canvas widget that can be scrolled either using the scrollbars or by dragging with button 2 in the canvas.  If you click button 1 on one of the rectangles, its indices will be printed on stdout."
-    pack append $w.frame1 $w.frame1.m {frame center}
+    pack $w.msg -side top -fill x
+    pack $w.ok -side bottom -pady 5
+    pack $w.frame -side top -expand yes -fill both
 
-    canvas $c -scrollregion {-10c -10c 50c 20c}
-    scrollbar $w.frame2.vscroll  -relief sunken -command "$c yview"
-    scrollbar $w.frame2.hscroll -orient horiz -relief sunken -command "$c xview"
-    pack append $w.frame2 $w.frame2.hscroll {bottom fillx} \
-	    $w.frame2.vscroll {right filly} $c {expand fill}
-    $c config -xscroll "$w.frame2.hscroll set" -yscroll "$w.frame2.vscroll set"
+    canvas $c -scrollregion {-10c -10c 50c 20c} \
+	    -xscroll "$w.frame.hscroll set" -yscroll "$w.frame.vscroll set"
+    scrollbar $w.frame.vscroll  -relief sunken -command "$c yview"
+    scrollbar $w.frame.hscroll -orient horiz -relief sunken -command "$c xview"
+    pack $w.frame.vscroll -side right -fill y
+    pack $w.frame.hscroll -side bottom -fill x
+    pack $c -expand yes -fill both
 
     set bg [lindex [$c config -bg] 4]
     for {set i 0} {$i < 20} {incr i} {

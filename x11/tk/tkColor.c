@@ -5,18 +5,29 @@
  *	toolkit, in order to avoid round-trips to the server to
  *	map color names to pixel values.
  *
- * Copyright 1990 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkColor.c,v 1.1 1993/08/09 01:20:48 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkColor.c,v 1.2 1993/12/27 07:33:57 rich Exp $ SPRITE (Berkeley)";
 #endif /* not lint */
 
 #include "tkConfig.h"
@@ -221,7 +232,8 @@ Tk_GetColor(interp, tkwin, colormap, name)
 	}
 	if (Tk_GetColorModel(tkwin) != TK_COLOR) {
 	    useMonoApproximation:
-	    if ((color.red + color.green + color.blue) > (3*65535)/2) {
+	    if ((((int) color.red) + ((int) color.green) + ((int) color.blue))
+		    > (3*65535)/2) {
 		color.pixel = WhitePixelOfScreen(Tk_Screen(tkwin));
 	    } else {
 		color.pixel = BlackPixelOfScreen(Tk_Screen(tkwin));
@@ -325,8 +337,8 @@ Tk_GetColorByValue(interp, tkwin, colormap, colorPtr)
     tkColPtr->color.blue = valueKey.blue;
     if (Tk_GetColorModel(tkwin) != TK_COLOR) {
 	useMonoApproximation:
-	if ((tkColPtr->color.red + tkColPtr->color.green
-		+ tkColPtr->color.blue) > (3*65535)/2) {
+	if ((((int) tkColPtr->color.red) + ((int) tkColPtr->color.green)
+		+ ((int) tkColPtr->color.blue)) > (3*65535)/2) {
 	    tkColPtr->color.pixel = WhitePixelOfScreen(Tk_Screen(tkwin));
 	} else {
 	    tkColPtr->color.pixel = BlackPixelOfScreen(Tk_Screen(tkwin));

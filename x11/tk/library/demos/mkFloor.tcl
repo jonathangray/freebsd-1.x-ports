@@ -16,21 +16,21 @@ proc mkFloor {{w .cfloor}} {
     wm minsize $w 100 100
     set c $w.frame2.c
 
-    frame $w.frame1 -relief raised -bd 2
+    message $w.msg -font *-Times-Medium-R-Normal-*-180-* -width 800 \
+	    -relief raised -bd 2 -text "This window contains a canvas widget showing the floorplan of Digital Equipment Corporation's Western Research Laboratory.  It has three levels.  At any given time one of the levels is active, meaning that you can see its room structure.  To activate a level, click the left mouse button anywhere on it.  As the mouse moves over the active level, the room under the mouse lights up and its room number appears in the \"Room:\" entry.  You can also type a room number in the entry and the room will light up."
     frame $w.frame2 -relief raised -bd 2
     button $w.ok -text "OK" -command "destroy $w"
-    pack append $w $w.frame1 {top fill} $w.frame2 {top fill expand} \
-	    $w.ok {bottom pady 10 frame center}
-    message $w.frame1.m -font *-Times-Medium-R-Normal-*-180-* -width 800 \
-	    -text "This window contains a canvas widget showing the floorplan of Digital Equipment Corporation's Western Research Laboratory.  It has three levels.  At any given time one of the levels is active, meaning that you can see its room structure.  To activate a level, click the left mouse button anywhere on it.  As the mouse moves over the active level, the room under the mouse lights up and its room number appears in the \"Room:\" entry.  You can also type a room number in the entry and the room will light up."
-    pack append $w.frame1 $w.frame1.m {frame center}
+    pack $w.msg -side top -fill both
+    pack $w.frame2 -side top -fill both -expand yes
+    pack $w.ok -side bottom -pady 5
 
     scrollbar $w.frame2.vscroll  -relief sunken -command "$c yview"
     scrollbar $w.frame2.hscroll -orient horiz -relief sunken -command "$c xview"
-    canvas $c -width 900 -height 500
-    pack append $w.frame2 $w.frame2.hscroll {bottom fillx} \
-	    $w.frame2.vscroll {right filly} $c {expand fill}
-    $c config -xscroll "$w.frame2.hscroll set" -yscroll "$w.frame2.vscroll set"
+    canvas $c -width 900 -height 500 -xscroll "$w.frame2.hscroll set" \
+	    -yscroll "$w.frame2.vscroll set"
+    pack $w.frame2.hscroll -side bottom -fill x
+    pack $w.frame2.vscroll -side right -fill y
+    pack $c -in $w.frame2 -expand yes -fill both
 
     # Create an entry for displaying and typing in current room.
 
@@ -70,7 +70,6 @@ proc mkFloor {{w .cfloor}} {
     $c bind room <Leave> {set currentRoom ""}
     bind $c <2> "$c scan mark %x %y"
     bind $c <B2-Motion> "$c scan dragto %x %y"
-    bind $c <3> "floorRaise $c current lower"
     bind $c <Destroy> "unset currentRoom"
     bind $c <Enter> "focus $c.entry"
     set currentRoom ""

@@ -5,18 +5,29 @@
  *	including the "postscript" widget command plus a few utility
  *	procedures used for generating Postscript.
  *
- * Copyright 1991-1992 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1991-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkCanvPs.c,v 1.1 1993/08/09 01:20:55 jkh Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tk/tkCanvPs.c,v 1.2 1993/12/27 07:33:47 rich Exp $ SPRITE (Berkeley)";
 #endif
 
 #include <stdio.h>
@@ -117,6 +128,7 @@ static Tk_ConfigSpec configSpecs[] = {
  * Forward declarations for procedures defined later in this file:
  */
 
+static int		CaseCmp _ANSI_ARGS_((char *s1, char *s2, int length));
 static int		GetPostscriptPoints _ANSI_ARGS_((Tcl_Interp *interp,
 			    char *string, double *doublePtr));
 
@@ -167,6 +179,7 @@ TkCanvPostscriptCmd(canvasPtr, interp, argc, argv)
 					 * warnings. */
     Tcl_HashSearch search;
     Tcl_HashEntry *hPtr;
+    Tcl_DString buffer;
     char *libDir;
 
     /*
@@ -186,11 +199,13 @@ TkCanvPostscriptCmd(canvasPtr, interp, argc, argv)
     psInfo.pageY = 72*5.5;
     psInfo.pageWidthString = NULL;
     psInfo.pageHeightString = NULL;
+    psInfo.scale = 1.0;
     psInfo.pageAnchor = TK_ANCHOR_CENTER;
     psInfo.rotate = 0;
     psInfo.fontVar = NULL;
     psInfo.colorVar = NULL;
     psInfo.colorMode = NULL;
+    psInfo.colorLevel = 0;
     psInfo.fileName = NULL;
     psInfo.f = NULL;
     psInfo.prepass = 0;
@@ -293,15 +308,16 @@ TkCanvPostscriptCmd(canvasPtr, interp, argc, argv)
     }
 
     if (psInfo.fileName != NULL) {
-	p = Tcl_TildeSubst(canvasPtr->interp, psInfo.fileName);
+	p = Tcl_TildeSubst(canvasPtr->interp, psInfo.fileName, &buffer);
 	if (p == NULL) {
 	    goto cleanup;
 	}
 	psInfo.f = fopen(p, "w");
+	Tcl_DStringFree(&buffer);
 	if (psInfo.f == NULL) {
 	    Tcl_AppendResult(canvasPtr->interp, "couldn't write file \"",
 		    psInfo.fileName, "\": ",
-		    Tcl_UnixError(canvasPtr->interp), (char *) NULL);
+		    Tcl_PosixError(canvasPtr->interp), (char *) NULL);
 	    goto cleanup;
 	}
     }
@@ -404,12 +420,12 @@ TkCanvPostscriptCmd(canvasPtr, interp, argc, argv)
 		"tk_library variable doesn't exist", (char *) NULL);
 	goto cleanup;
     }
-    sprintf(string, "%.350s/prolog.ps", TK_LIBRARY);
+    sprintf(string, "%.350s/prolog.ps", libDir);
     f = fopen(string, "r");
     if (f == NULL) {
 	Tcl_ResetResult(canvasPtr->interp);
 	Tcl_AppendResult(canvasPtr->interp, "couldn't open prolog file \"",
-		string, "\": ", Tcl_UnixError(canvasPtr->interp),
+		string, "\": ", Tcl_PosixError(canvasPtr->interp),
 		(char *) NULL);
 	goto cleanup;
     }
@@ -420,8 +436,8 @@ TkCanvPostscriptCmd(canvasPtr, interp, argc, argv)
 	fclose(f);
 	Tcl_ResetResult(canvasPtr->interp);
 	Tcl_AppendResult(canvasPtr->interp, "error reading prolog file \"",
-		TK_LIBRARY, "/prolog.ps: ",
-		Tcl_UnixError(canvasPtr->interp), (char *) NULL);
+		string, "\": ",
+		Tcl_PosixError(canvasPtr->interp), (char *) NULL);
 	goto cleanup;
     }
     fclose(f);
@@ -465,7 +481,7 @@ TkCanvPostscriptCmd(canvasPtr, interp, argc, argv)
     Tcl_AppendResult(canvasPtr->interp, string, (char *) NULL);
     sprintf(string, "%d %d translate\n", deltaX - psInfo.x, deltaY);
     Tcl_AppendResult(canvasPtr->interp, string, (char *) NULL);
-    sprintf(string, "%d %g moveto %d %g lineto %d %g lineto %d %g",
+    sprintf(string, "%d %.15g moveto %d %.15g lineto %d %.15g lineto %d %.15g",
 	    psInfo.x,
 	    TkCanvPsY((Tk_PostscriptInfo *) &psInfo, (double) psInfo.y),
 	    psInfo.x2,
@@ -615,7 +631,8 @@ TkCanvPsColor(canvasPtr, handle, colorPtr)
 	cmdString = Tcl_GetVar2(canvasPtr->interp, psInfoPtr->colorVar,
 		Tk_NameOfColor(colorPtr), 0);
 	if (cmdString != NULL) {
-	    Tcl_AppendResult(canvasPtr->interp, cmdString, (char *) NULL);
+	    Tcl_AppendResult(canvasPtr->interp, cmdString, "\n",
+		    (char *) NULL);
 	    return TCL_OK;
 	}
     }
@@ -710,7 +727,7 @@ TkCanvPsFont(canvasPtr, handle, fontStructPtr)
 	    if ((size <= 0) || (*end != 0)) {
 		goto badMapEntry;
 	    }
-	    sprintf(pointString, "%g", size);
+	    sprintf(pointString, "%.15g", size);
 	    Tcl_AppendResult(canvasPtr->interp, "/", argv[0], " findfont ",
 		    pointString, " scalefont setfont\n", (char *) NULL);
 	    Tcl_CreateHashEntry(&psInfoPtr->fontTable, argv[0], &i);
@@ -756,11 +773,11 @@ TkCanvPsFont(canvasPtr, handle, fontStructPtr)
 	goto error;
     }
     strncpy(fontName, fieldPtrs[FAMILY_FIELD], nameSize);
-    if (islower(fontName[0])) {
+    if (islower(UCHAR(fontName[0]))) {
 	fontName[0] = toupper(fontName[0]);
     }
     for (p = fontName+1, i = nameSize-1; i > 0; p++, i--) {
-	if (isupper(*p)) {
+	if (isupper(UCHAR(*p))) {
 	    *p = tolower(*p);
 	}
     }
@@ -769,9 +786,9 @@ TkCanvPsFont(canvasPtr, handle, fontStructPtr)
     if (weightSize == 0) {
 	goto error;
     }
-    if (strncasecmp(fieldPtrs[WEIGHT_FIELD], "medium", weightSize) == 0) {
+    if (CaseCmp(fieldPtrs[WEIGHT_FIELD], "medium", weightSize) == 0) {
 	weightString = "";
-    } else if (strncasecmp(fieldPtrs[WEIGHT_FIELD], "bold", weightSize) == 0) {
+    } else if (CaseCmp(fieldPtrs[WEIGHT_FIELD], "bold", weightSize) == 0) {
 	weightString = "Bold";
     } else {
 	goto error;
@@ -800,7 +817,7 @@ TkCanvPsFont(canvasPtr, handle, fontStructPtr)
     if (points == 0) {
 	goto error;
     }
-    sprintf(pointString, "%g", ((double) points)/10.0);
+    sprintf(pointString, "%.15g", ((double) points)/10.0);
     Tcl_AppendResult(canvasPtr->interp, "/", fontName, " findfont ",
 	    pointString, " scalefont setfont\n", (char *) NULL);
     Tcl_CreateHashEntry(&psInfoPtr->fontTable, fontName, &i);
@@ -1007,12 +1024,12 @@ TkCanvPsPath(interp, coordPtr, numPoints, handle)
     if (psInfoPtr->prepass) {
 	return;
     }
-    sprintf(buffer, "%g %g moveto\n", coordPtr[0],
+    sprintf(buffer, "%.15g %.15g moveto\n", coordPtr[0],
 	    TkCanvPsY(handle, coordPtr[1]));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
     for (numPoints--, coordPtr += 2; numPoints > 0;
 	    numPoints--, coordPtr += 2) {
-	sprintf(buffer, "%g %g lineto\n", coordPtr[0],
+	sprintf(buffer, "%.15g %.15g lineto\n", coordPtr[0],
 		TkCanvPsY(handle, coordPtr[1]));
 	Tcl_AppendResult(interp, buffer, (char *) NULL);
     }
@@ -1055,7 +1072,7 @@ GetPostscriptPoints(interp, string, doublePtr)
 		"\"", (char *) NULL);
 	return TCL_ERROR;
     }
-    while ((*end != '\0') && isspace(*end)) {
+    while ((*end != '\0') && isspace(UCHAR(*end))) {
 	end++;
     }
     switch (*end) {
@@ -1078,7 +1095,7 @@ GetPostscriptPoints(interp, string, doublePtr)
 	default:
 	    goto error;
     }
-    while ((*end != '\0') && isspace(*end)) {
+    while ((*end != '\0') && isspace(UCHAR(*end))) {
 	end++;
     }
     if (*end != 0) {
@@ -1086,4 +1103,86 @@ GetPostscriptPoints(interp, string, doublePtr)
     }
     *doublePtr = d;
     return TCL_OK;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * CaseCmp --
+ *
+ *	Compares two strings, ignoring case differences.
+ *
+ * Results:
+ *	Compares up to length chars of s1 and s2, returning -1, 0, or 1
+ *	if s1 is lexicographically less than, equal to, or greater
+ *	than s2 over those characters.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static int
+CaseCmp(s1, s2, length)
+    char *s1;			/* First string. */
+    char *s2;			/* Second string. */
+    int length;			/* Maximum number of characters to compare
+				 * (stop earlier if the end of either string
+				 * is reached). */
+{
+    register unsigned char u1, u2;
+
+    /*
+     * This array is designed for mapping upper and lower case letter
+     * together for a case independent comparison.  The mappings are
+     * based upon ASCII character sequences.
+     */
+
+    static unsigned char charmap[] = {
+	    '\000', '\001', '\002', '\003', '\004', '\005', '\006', '\007',
+	    '\010', '\011', '\012', '\013', '\014', '\015', '\016', '\017',
+	    '\020', '\021', '\022', '\023', '\024', '\025', '\026', '\027',
+	    '\030', '\031', '\032', '\033', '\034', '\035', '\036', '\037',
+	    '\040', '\041', '\042', '\043', '\044', '\045', '\046', '\047',
+	    '\050', '\051', '\052', '\053', '\054', '\055', '\056', '\057',
+	    '\060', '\061', '\062', '\063', '\064', '\065', '\066', '\067',
+	    '\070', '\071', '\072', '\073', '\074', '\075', '\076', '\077',
+	    '\100', '\141', '\142', '\143', '\144', '\145', '\146', '\147',
+	    '\150', '\151', '\152', '\153', '\154', '\155', '\156', '\157',
+	    '\160', '\161', '\162', '\163', '\164', '\165', '\166', '\167',
+	    '\170', '\171', '\172', '\133', '\134', '\135', '\136', '\137',
+	    '\140', '\141', '\142', '\143', '\144', '\145', '\146', '\147',
+	    '\150', '\151', '\152', '\153', '\154', '\155', '\156', '\157',
+	    '\160', '\161', '\162', '\163', '\164', '\165', '\166', '\167',
+	    '\170', '\171', '\172', '\173', '\174', '\175', '\176', '\177',
+	    '\200', '\201', '\202', '\203', '\204', '\205', '\206', '\207',
+	    '\210', '\211', '\212', '\213', '\214', '\215', '\216', '\217',
+	    '\220', '\221', '\222', '\223', '\224', '\225', '\226', '\227',
+	    '\230', '\231', '\232', '\233', '\234', '\235', '\236', '\237',
+	    '\240', '\241', '\242', '\243', '\244', '\245', '\246', '\247',
+	    '\250', '\251', '\252', '\253', '\254', '\255', '\256', '\257',
+	    '\260', '\261', '\262', '\263', '\264', '\265', '\266', '\267',
+	    '\270', '\271', '\272', '\273', '\274', '\275', '\276', '\277',
+	    '\300', '\341', '\342', '\343', '\344', '\345', '\346', '\347',
+	    '\350', '\351', '\352', '\353', '\354', '\355', '\356', '\357',
+	    '\360', '\361', '\362', '\363', '\364', '\365', '\366', '\367',
+	    '\370', '\371', '\372', '\333', '\334', '\335', '\336', '\337',
+	    '\340', '\341', '\342', '\343', '\344', '\345', '\346', '\347',
+	    '\350', '\351', '\352', '\353', '\354', '\355', '\356', '\357',
+	    '\360', '\361', '\362', '\363', '\364', '\365', '\366', '\367',
+	    '\370', '\371', '\372', '\373', '\374', '\375', '\376', '\377',
+    };
+
+    for (; length != 0; length--, s1++, s2++) {
+	u1 = (unsigned char) *s1;
+	u2 = (unsigned char) *s2;
+	if (charmap[u1] != charmap[u2]) {
+	    return charmap[u1] - charmap[u2];
+	}
+	if (u1 == '\0') {
+	    return 0;
+	}
+    }
+    return 0;
 }
