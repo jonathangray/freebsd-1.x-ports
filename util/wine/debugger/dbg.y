@@ -148,10 +148,11 @@ void
 wine_debug(int signal, int * regs)
 {
 	int i;
+	static int dummy_regs[32];
+
 #if YYDEBUG
 	yydebug = 0;
 #endif
-	static int dummy_regs[32];
 
 	yyin = stdin;
 	regval = regs ? regs : dummy_regs;
