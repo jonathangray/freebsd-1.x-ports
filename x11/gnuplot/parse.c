@@ -1,5 +1,5 @@
 #ifndef lint
-static char    *RCSid = "$Id: parse.c,v 1.1 1994/06/01 06:51:40 asami Exp $";
+static char    *RCSid = "$Id: parse.c,v 1.2 1994/06/01 07:09:22 asami Exp $";
 #endif
 
 
@@ -104,7 +104,7 @@ fpe()
 #ifdef OS2
 	(void) signal(an_int, SIG_ACK);
 #else
-	(void)signal(SIGFPE, fpe);
+	(void)signal(SIGFPE, (void (*)())fpe);
 #endif
 #endif
 #endif
@@ -167,7 +167,7 @@ evaluate_at(at_ptr, val_ptr)
 #if DJGPP
 	(void)signal(SIGFPE, (SignalHandler)fpe);
 #else
-	(void)signal(SIGFPE, fpe);	/* catch core dumps on FPEs */
+	(void)signal(SIGFPE, (void (*)())fpe);	/* catch core dumps on FPEs */
 #endif
 #endif
 #endif

@@ -1,5 +1,5 @@
 #ifndef lint
-static char *RCSid = "$Id: plot.c,v 1.1 1994/06/01 06:51:40 asami Exp $";
+static char *RCSid = "$Id: plot.c,v 1.2 1994/06/01 07:09:23 asami Exp $";
 #endif
 
 
@@ -244,7 +244,7 @@ inter()
 #ifdef OS2
 	(void) signal(an_int, SIG_ACK);
 #else
-	(void) signal(SIGINT, inter);
+	(void) signal(SIGINT, (void (*)())inter);
 #endif  /* OS2 */
 #endif  /* MSDOS */
 #ifndef DOSX286
@@ -428,7 +428,7 @@ interrupt_setup()
 #endif
 #endif
 #else /* MSDOS */
-		(void) signal(SIGINT, inter);	/* go there on interrupt char */
+		(void) signal(SIGINT, (void (*)())inter);	/* go there on interrupt char */
 #endif /* MSDOS */
 }
 
