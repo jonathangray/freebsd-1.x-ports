@@ -18,7 +18,6 @@ int num;
 struct directory *dir;
 {
 	unsigned char *offset;
-	char *memcpy();
 
 	offset = dir_buf + (num * MDIR_SIZE);
 	memcpy((char *) offset, (char *) dir, MDIR_SIZE);

@@ -23,7 +23,6 @@ int len;
 	register long i;
 	int length;
 	unsigned char *buf_ptr, *disk_ptr;
-	char *memcpy();
 	long where, tail, lseek();
 	void perror(), exit(), disk_flush();
 

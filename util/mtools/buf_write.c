@@ -21,7 +21,6 @@ int len;
 	register long i;
 	int length;
 	unsigned char *buf_ptr, *disk_ptr;
-	char *memcpy();
 	void perror(), exit(), disk_flush();
 	long where, tail, lseek();
 

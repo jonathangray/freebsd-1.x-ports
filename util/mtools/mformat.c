@@ -32,7 +32,7 @@ char *argv[];
 	int tot_sectors, num_clus, fat_guess;
 	long time(), now, lseek();
 	char drive, *name, *expand();
-	char *strncpy(), *memset(), *memcpy();
+	char *strncpy(), *memset();
 	unsigned char media, label[12], buf[MSECTOR_SIZE];
 	struct device *dev;
 	struct directory *dir, *mk_entry();

@@ -180,7 +180,7 @@ unsigned int dot, dot_dot;
 {
 	int buflen;
 	long start;
-	char buf[MAX_CLUSTER], *memcpy(), *memset();
+	char buf[MAX_CLUSTER], *memset();
 	struct directory *dir, *mk_entry();
 	void disk_write();
 	long time(), now;

@@ -16,7 +16,6 @@ struct directory *
 dir_read(num)
 int num;
 {
-	char *memcpy();
 	unsigned char *offset;
 	static struct directory dir;
 
