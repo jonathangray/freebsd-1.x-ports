@@ -12,17 +12,14 @@
 #	Tritonvej 36		UUCP:	...uunet!dkuug!kmd-ac!sos
 #	DK9210 Aalborg SO	Phone:  +45 9814 8076
 
-CC=	gcc -pipe
+CC=     cc -O
 
-all:	80x25 80x50 blank keyrate setfkey mapkbd getkbdmap setfont kbfiles \
+all:    80x25 80x50 blank keyrate setfkey mapkbd getkbdmap getscrmap setfont \
 	setmode getmode switchto reldisp
 
 install: all
-	install -s -m 755 80x25 80x50 blank keyrate setfkey mapkbd getkbdmap /usr/local/bin
+	install -s -m 755 80x25 80x50 blank keyrate setfkey mapkbd getkbdmap getscrmap /usr/local/bin
 	install -s -m 755 setfont setmode getmode switchto reldisp /usr/local/bin
-	-mkdir /usr/local/lib/syscons
-	cp *.map /usr/local/lib/syscons
-	cp ../fonts/* /usr/local/lib/syscons
 
 80x25:  	80x25.c
 	$(CC) -o 80x25 80x25.c
@@ -45,6 +42,9 @@ mapkbd:		mapkbd.c
 getkbdmap:	getkbdmap.c
 	$(CC) -o getkbdmap getkbdmap.c
 
+getscrmap:      getscrmap.c
+	$(CC) -o getscrmap getscrmap.c
+
 setfont:	setfont.c
 	$(CC) -o setfont setfont.c
 
@@ -60,17 +60,7 @@ switchto:	switchto.c
 reldisp:	reldisp.c
 	$(CC) -o reldisp reldisp.c
 
-kbfiles: 
-	@for f in ../kbdmaps/*;\
-	do \
-	echo $(CC) -o mkfil -I../kbdmaps -DFIL=\<`basename $$f`\> mkkbdfil.c;\
-	$(CC) -o mkfil -I../kbdmaps -DFIL=\<`basename $$f`\> mkkbdfil.c;\
-	echo ./mkfil `basename $$f`.map;\
-	./mkfil `basename $$f`.map;\
-	done
-	rm mkfil
-
 clean:
-	rm -f 80x25 80x50 blank keyrate setfkey mapkbd getkbdmap \
-	      setmode getmode switchto reldisp setfont *.o *.map
+	rm -f 80x25 80x50 blank keyrate setfkey mapkbd getkbdmap getscrmap \
+	      setmode getmode switchto reldisp setfont *.o
 
