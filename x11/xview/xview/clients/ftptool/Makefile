@@ -270,7 +270,7 @@ _percentC_ = %C
 # -------------------------------------------------------------------------
 # start of Imakefile
 
-#OPENWINHOME = /usr/local/OW3
+OPENWINHOME = /usr/X386
 
 #Uncomment the appropriate one if necessary. You should not need
 #either, as it should be determined by the program.
