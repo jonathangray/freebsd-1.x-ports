@@ -1,7 +1,10 @@
 # : Makefile.SH,v 5501Revision: 1.1.1.1 5501Date: 1993/08/23 21:29:33 $
 #
 # $Log: Makefile,v $
-# Revision 1.3  1993/12/30 01:32:15  smace
+# Revision 1.4  1993/12/30 05:00:07  smace
+# Changed default install path back to /usr/local per Nate's request
+#
+# Revision 1.3  1993/12/30  01:32:15  smace
 # correct pkg target to make src packages build first
 #
 # Revision 1.2  1993/12/29  23:50:39  smace
@@ -38,10 +41,10 @@
 
 CC = cc
 YACC = /usr/bin/yacc
-bin = /usr/gnu/bin
-scriptdir = /usr/gnu/bin
-privlib = /usr/gnu/lib/perl
-mansrc = /usr/gnu/man/man1
+bin = /usr/local/bin
+scriptdir = /usr/local/bin
+privlib = /usr/local/lib/perl
+mansrc = /usr/local/man/man1
 manext = 1
 LDFLAGS = 
 CLDFLAGS = 
