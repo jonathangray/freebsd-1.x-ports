@@ -1,5 +1,5 @@
 #ifndef lint
-static const char *rcsid = "$Id: plist.c,v 1.3 1993/09/05 04:54:24 jkh Exp $";
+static const char *rcsid = "$Id: plist.c,v 1.4 1993/09/12 20:45:53 jkh Exp $";
 #endif
 
 /*
@@ -247,17 +247,17 @@ write_plist(Package *pkg, FILE *fp)
 	    break;
 
 	case PLIST_CHMOD:
-	    fprintf(fp, "%cchmod %s\n", CMD_CHAR,
+	    fprintf(fp, "%cmode %s\n", CMD_CHAR,
 		    plist->name ? plist->name : "");
 	    break;
 
 	case PLIST_CHOWN:
-	    fprintf(fp, "%cchown %s\n", CMD_CHAR,
+	    fprintf(fp, "%cowner %s\n", CMD_CHAR,
 		    plist->name ? plist->name : "");
 	    break;
 
 	case PLIST_CHGRP:
-	    fprintf(fp, "%cchgrp %s\n", CMD_CHAR,
+	    fprintf(fp, "%cgroup %s\n", CMD_CHAR,
 		    plist->name ? plist->name : "");
 	    break;
 
