@@ -1,7 +1,11 @@
 # : Makefile.SH,v 5501Revision: 1.1.1.1 5501Date: 1993/08/23 21:29:33 $
 #
 # $Log: Makefile,v $
-# Revision 1.1  1993/12/29 21:01:07  smace
+# Revision 1.2  1993/12/29 23:50:39  smace
+# 1. added pkg target and datafiles made perl install in /usr/gnu
+# 2. removed perly.h (build during make process)
+#
+# Revision 1.1  1993/12/29  21:01:07  smace
 # Ran Configure
 #
 # Revision 1.1.1.1  1993/08/23  21:29:33  nate
@@ -334,6 +338,15 @@ hlist:
 
 shlist:
 	echo $(sh) | tr ' ' '\012' >.shlist
+
+
+pkg:	pkg_bin pkg_src
+
+pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
+	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S perl_src
+
+pkg_bin: install pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_S
+	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B perl_bin
 
 # AUTOMATICALLY GENERATED MAKE DEPENDENCIES--PUT NOTHING BELOW THIS LINE
 $(obj) hash.o:

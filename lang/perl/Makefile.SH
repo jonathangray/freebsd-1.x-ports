@@ -26,11 +26,15 @@ esac
 echo "Extracting Makefile (with variable substitutions)"
 rm -f Makefile
 cat >Makefile <<!GROK!THIS!
-# $RCSfile: Makefile.SH,v $$Revision: 1.1 $$Date: 1993/08/23 21:29:32 $
+# $RCSfile: Makefile.SH,v $$Revision: 1.2 $$Date: 1993/12/29 23:50:40 $
 #
 # $Log: Makefile.SH,v $
-# Revision 1.1  1993/08/23 21:29:32  nate
-# Initial revision
+# Revision 1.2  1993/12/29 23:50:40  smace
+# 1. added pkg target and datafiles made perl install in /usr/gnu
+# 2. removed perly.h (build during make process)
+#
+# Revision 1.1.1.1  1993/08/23  21:29:33  nate
+# PERL!
 #
 # Revision 4.0.1.4  92/06/08  11:40:43  lwall
 # patch20: cray didn't give enough memory to /bin/sh
@@ -362,6 +366,15 @@ hlist:
 
 shlist:
 	echo $(sh) | tr ' ' '\012' >.shlist
+
+
+pkg:	pkg_bin pkg_src
+
+pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
+	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S perl_src
+
+pkg_bin: install pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B
+	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B perl_bin
 
 # AUTOMATICALLY GENERATED MAKE DEPENDENCIES--PUT NOTHING BELOW THIS LINE
 $(obj) hash.o:
