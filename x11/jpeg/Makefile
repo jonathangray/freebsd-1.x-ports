@@ -104,7 +104,7 @@ jmemsys.c:
 	exit 1
 
 clean:
-	$(RM) *.o cjpeg djpeg libjpeg.a core testout.*
+	$(RM) *.o cjpeg djpeg libjpeg.so.$(SOVERSION) libjpeg.a core testout.*
 
 distribute:
 	$(RM) jpegsrc.tar*
