@@ -111,7 +111,7 @@ libextra.a: ${EXTRA}
 clean:
 	rm -f ${PROGRAMS} libextra.a netcrypt.c *.o core a.out
 
-install: ${PROGRAMS}
+install:
 	install -cs -m 555 -o bin -g bin ${PROGRAMS} ${NETBSD_BINDIR}
 	install -c -m 444 -o bin -g bin ${MAN1} ${NETBSD_MAN1}
 	install -c -m 444 -o bin -g bin ${MAN8} ${NETBSD_MAN8}
