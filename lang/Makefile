@@ -22,6 +22,7 @@ SUBDIR += gcc1 #	Not in sup ports dir, but was on Gary's ports CD
 SUBDIR += perl
 SUBDIR += sather
 SUBDIR += scm
+SUBDIR += schemetoc
 SUBDIR += sml	# (cd src; makeml -i386 FreeBSD) cd: can't cd to src
 SUBDIR += tcl
 SUBDIR += tclX
