@@ -1,0 +1,604 @@
+.\" @(#)ukcprog.3	1.14 25/6/92 UKC
+.\" .fX - print the argument in a fixed font
+.de fX
+\&\\$3\f(CR\\$1\fP\\$2
+..
+.\" .Vs - start example
+.de Vs
+.LP
+.ne 1i
+.RS
+.nf
+.ft CR
+..
+.\" .Ve - end example
+.de Ve
+.ft P
+.fi
+.hy 0
+.RE
+.LP
+..
+.TH UKCPROG 3  "February 1991" "UKC Local"
+.SH NAME
+ukcprog \- Library of utilities for C programmers
+.SH SYNOPSIS
+.nf
+.LP
+In source code,
+.Vs
+#include <local/ukcprog.h>
+.Ve
+and link with
+.Vs
+cc ... -lukcprog
+.Ve
+.SH AVAILABILITY
+.LP
+.\"
+.\" The following sentence motivated the port to MS-DOG.
+.\"
+This is a UKC library, available for the \s-1UNIX\s0 and \s-1VMS\s0
+operating systems, and for MS-DOS.
+.\"
+.\" It was worth it ...
+.\"
+The source code is freely available so if you want to make
+a source release of your application you can include a copy of the
+source of this library as well.
+To obtain a copy of the source code contact either of the authors
+named below.
+.SH DESCRIPTION
+.LP
+The ukcprog library contains generally useful low level routines.
+The
+.fX ukcprog.h
+header file contains prototypes for the
+routines as well as defining some useful macros and types.
+.Vs
+#ifdef __STDC__
+#define PROTO(a)	a
+typedef void *voidptr;
+#else
+#define PROTO(a)	()
+#define const
+#define volatile
+#define signed
+typedef char *voidptr;
+#endif
+.Ve
+.LP
+The definitions of
+.fX const ,
+.fX volatile
+and
+.fX signed
+allow these ANSI C keywords to be used in code which must be portable
+to pre-ANSI C compilers.
+.LP
+The
+.fX voidptr
+typedef is similarly there to help with code for pre-ANSI compilers
+which do not support the
+.fX "void *" ' `
+type.
+Functions which are documented here as returning
+.fX "void *" ' `
+return
+.fX "char *" ' `
+when compiling with a non-ANSI C compiler.
+.LP
+The
+.fX PROTO
+macro is useful for declaring function prototypes
+for use with ANSI C while still allowing the code to be compiled with
+K&R compilers.
+It is used thus:
+.Vs
+int myfunc PROTO((int arg1, char *arg2));
+.Ve
+With an ANSI C compiler this expands to
+.Vs
+int myfunc (int arg1, char *arg2);
+.Ve
+whereas a pre-ANSI compiler sees:
+.Vs
+int myfunc ();
+.Ve
+.LP
+Note the double brackets; these are necessary to make all the parameters
+a single argument to the
+.fX PROTO
+macro.
+.Vs
+#ifndef FALSE
+#define FALSE   0
+#endif
+#ifndef TRUE
+#define TRUE    1
+#endif
+#ifndef bool
+#define bool int
+#endif
+.Ve
+These define the commonly used
+.fX TRUE
+and
+.fX FALSE
+macros to their usual values.
+The definitions are protected in case these are already defined.
+The
+.fX bool
+macro is intended to be used to declared variables
+that are conceptually boolean.
+A
+.fX #define
+is used rather than a typedef because there might already be a typedef
+for
+.fX bool .
+.Vs
+#ifdef __STDC__
+#define CAT(a,b)        a ## b
+#else
+#define _IDENT(a) a
+#define CAT(a,b) _IDENT(a)b
+#endif /* !__STDC__ */
+.Ve
+The
+.fX CAT
+macro can be used to glue two tokens together in the same way as
+the ANSI C
+.fX ##
+operator.
+.fX CAT
+also works with many (but not all) pre-ANSI C preprocessors.
+.Vs
+void panic(const char *message)
+.sp
+typedef void (*panic_handler_t)(const char *message);
+panic_handler_t install_panic_handler(panic_hander_t handler)
+.Ve
+By default
+.fX panic()
+produces a message on stderr of the form
+.Vs
+fatal internal error: \fIsomething\fP (aborting)...
+.Ve
+It then calls
+.fX abort(3)
+to produce a core dump.
+Alternative `panic handlers' can be installed using
+.fX install_panic_handler()
+which returns the previous handler.
+Panic handlers can perform tidy-up tasks, such as
+removing temporary files or calling
+.fX chdir(2)
+to arrange for
+the core to land in a safe place.
+If a panic handler is called and returns then the default
+action is carried out.
+.Vs
+void *e_malloc(size_t size)
+void *e_realloc(void *old, size_t size)
+char *strsave(const char *str)
+.Ve
+.fX e_malloc()
+and
+.fX e_realloc()
+are error-checking versions
+of the corresponding routines in the standard C library.
+They call
+.fX panic()
+if the request fails.
+.fX e_realloc()
+behaves according to the ANSI specification for
+.fX realloc() ;
+that is, if
+.fX old
+is NULL it behaves like
+.fX malloc()
+and if size is 0, it behaves like
+.fX free() .
+.fX strsave()
+allocates some memory using
+.fX e_malloc() ,
+copies
+.fX str
+into it, and returns a pointer to the copy.
+.Vs
+char *fpgetline(FILE *fp)
+.Ve
+.fX fpgetline()
+reads characters from the standard IO stream
+.fX fp
+until a newline character or EOF is encountered.
+.fX fpgetline()
+returns
+.fX NULL
+if EOF or an error occured before any characters were read;
+otherwise it returns a pointer to the NUL terminated line.
+.fX fpgetline()
+never adds a newline to the buffer.
+The user can check for a missing final newline in a file by checking
+the EOF flag of the stream pointer when
+.fX fpgetline()
+returns a non-NULL pointer.
+.LP
+When
+.fX fpgetline()
+returns 
+.fX NULL
+the caller should check with
+.fX ferror(3)
+whether the cause was EOF or an error reading the stream
+.fX fp .
+.LP
+.fX fpgetline()
+returns a pointer to a static buffer that is resized as necessary
+to handle long lines.
+The caller can modify the contents of the buffer but must not free
+it or realloc it.
+The buffer is valid only until the next call of
+.fX fpgetline() .
+.Vs
+char *config_trim_line(char *line)
+.Ve
+.fX config_trim_line()
+trims comments and white space in place from a line.
+First it scans for the first
+.fX # ' `
+character in the line.
+If there is one it is removed along with any following characters.
+Then leading and trailing whitespace characters (as defined by
+.IR isspace (3))
+are removed.
+.fX config_trim_line()
+returns a pointer to the trimmed line (which will point into the line
+that it was given).
+.LP
+A typical use of this routine is to skip blank lines and comments from
+a configuration file.
+.Vs
+typedef void (*errf_ofunc_t)(const char *string);
+.sp
+void errf(const char *fmt, ...)
+char *strf(const char *fmt, ...)
+.sp
+errf_ofunc_t errf_set_ofunc(errf_ofunc_t func)
+const char *errf_set_prefix(const char *prefix)
+const char *errf_get_prefix(void)
+void_errf_set_progname(const char *progname)
+const char *errf_get_progname(void)
+char *formf(char *buffer, int buffer_size,
+            const char *format, va_list args)
+void errf_usage(const char *usage)
+.Ve
+These routines form the basis of a generalised error handling system.
+.fX errf()
+formats an error message, much like
+.fX printf(3) ,
+but then passes the formatted text to the `current output function'.
+The default output function appends a newline to the message and
+sends it to stderr.
+An alternative output function can be installed with
+.fX errf_set_ofunc() ;
+it returns the old one which can be re-installed as required.
+The default output function can optionally prefix the message with
+a fixed string; this can be inserted with
+.fX errf_set_prefix() .
+A pointer to the current prefix is returned by
+.fX errf_get_prefix() .
+By convention, this prefix is derived from the name of the program.
+.fX errf_set_progname()
+is a convenience routine which, when passed
+.fX argv[0] ,
+munges it in an operating system specific way to produce the program name
+and sets the prefix to something that looks `nice'.
+A pointer to the program name (after munging) can be obtained by
+.fX errf_get_progname().
+A usage line can be sent to the current output function by
+.fX errf_usage() ;
+it prefixes
+.Vs
+Usage: \fIprogname\fP
+.Ve
+to its argument, and exits with status 1.
+.LP
+.fX strf()
+formats a string in the same way as
+.fX errf() ,
+but returns a pointer to a buffer obtained from
+.fX malloc(3)
+that
+contains the result.
+.LP
+.fX formf()
+is used in the internal implementation of
+.fX errf()
+and
+.fX strf() ,
+and is not for the faint-hearted.
+It is made visible because it can be useful (it could for example
+be used to implement a
+.fX logf()
+function).
+In addition to the normal format conversions,
+.fX formf()
+provides
+.fX %m ' `
+which inserts an error message
+corresponding to the current value of
+.fX errno
+into the output string.
+.Vs
+char **ssplit(const char *line, const char *delimiters)
+.Ve
+.fX ssplit()
+splits a string into a vector of words, treating
+occurences in the string of any of the characters in the
+.fX delimiters
+string as word separators.
+.LP
+If the delimiters string starts with a NUL character then multiple
+adjacent delimiters and leading delimiters generate zero length fields.
+Otherwise, leading delimiter characters are skipped and multiple adjacent
+delimiters are treated as a single delimiter.
+Thus
+.Vs
+char **words = ssplit(line, " \\t");
+.Ve
+will to a shell-like split of a command line into words, and
+.Vs
+char **fields = ssplit(pwline, "\\0:");
+.Ve
+would be good for splitting lines from the password file.
+.LP
+.fX ssplit()
+returns a
+.fX NULL
+terminated vector of words.
+The space for this vector and the pointed to words is allocated with
+a (single) call to
+.fX e_malloc() .
+.fX ssplit()
+thus never returns
+.fX NULL ;
+it aborts the program
+by calling
+.fX panic()
+if memory runs out.
+.LP
+The vector returned by
+.fX ssplit()
+should be freed when it is finished
+with by passing it to
+.fX free() .
+.Vs
+int get_host_addr(const char *hostname, struct in_addr *p_addr)
+.Ve
+.fX get_host_addr()
+looks up the IP address of
+.fX hostname
+using
+.IR gethostbyaddr (3).
+If the lookup succeeds it sets
+.fX *p_addr
+to the IP address of the host in network byte order.
+If the lookup fails it gives an error message with
+.fX errf()
+and returns -1.
+If
+.fX hostname
+consists of four decimal numbers separated by dots then
+.fX get_host_addr
+parses this as an IP quad and does not call
+.IR gethostbyname .
+.Vs
+int get_service_port(const char *servname, int *p_port)
+.Ve
+.fX get_service_port
+looks up the port number of the TCP service
+.fX servname
+using
+.IR getservbyname (3).
+If it succeeds it sets
+.fX *p_port
+to the port number in network byte order.
+Otherwise it gives an error message with
+.fX errf()
+and returns -1.
+If
+.fX servname
+is an \s-2ASCII\s0 decimal number then
+.fX get_service_port()
+returns that number (again in network byte order).
+.Vs
+alloc_id_t alloc_create_pool(void)
+.sp
+void *alloc(alloc_id_t alloc_id, int nbytes)
+void *alloc_ck(alloc_id_t alloc_id, int nbytes)
+.Ve
+.fX alloc_create_pool()
+creates a memory allocation `pool' and
+returns a handle referring to it.
+.fX alloc()
+allocates memory like
+.fX malloc(3)
+but from the
+specified pool rather from the general malloc arena.
+.fX alloc()
+calls
+.fX e_malloc()
+to obtain memory in reasonably
+large chunks when necessary.
+This means that it never returns
+.fX NULL ;
+the program is aborted
+via
+.fX panic()
+if there is insufficient memory to satisfy the
+request.
+The alternative interface
+.fX alloc_ck()
+returns
+.fX NULL
+if
+it runs out of memory; it is otherwise identical to
+.fX alloc() .
+Memory obtained with
+.fX alloc()
+cannot be freed individually; only
+entire pools can be freed.
+.Vs
+void alloc_free_pool(alloc_id_t alloc_id)
+void alloc_reset_pool(alloc_id_t alloc_id)
+.Ve
+.fX alloc_free_pool()
+frees an alloc pool, releasing all memory
+allocated from it with
+.fX alloc() .
+The pool is no longer valid after this call.
+.fX alloc_reset_pool()
+conceptually frees all the memory associated with
+a pool but does not return it via
+.fX free() .
+The pool remains valid and subsequent calls to
+.fX alloc()
+allocate
+memory from the existing memory associated with the pool if possible.
+.LP
+These routines are suitable for applications which make lots of small
+allocations for a data structure which is to be freed in one go.
+.fX alloc()
+is much faster than
+.fX malloc()
+as it does not do
+the bookkeeping to support individual freeing of allocated memory.
+It also has no space overhead other than that necessary to correctly
+align objects in memory.
+.LP
+.fX alloc_create_pool()
+is a lightweight routine \- it involves a
+single call to
+.fX malloc()
+plus some assignments to initialise the
+pool header structure.
+It is thus reasonable to use the
+.fX alloc()
+routines in situations where
+there are only going to be a few tens of calls to
+.fX alloc() .
+.Vs
+bool alloc_set_default_debug_flag(bool val)
+bool alloc_set_debug_flag(alloc_id_t alloc_id, bool val)
+.Ve
+By default all memory obtained with
+.fX alloc()
+and related routines
+is initialised to the repeated byte
+.fX 0x53 .
+When memory is freed (with
+.fX alloc_free_pool() ,
+.fX alloc_reset_pool()
+or
+.fX alloc_release() )
+it is set
+to the repeated byte
+.fX 0x42 .
+This is intended to trap erroneous use of uninitialised data and data
+that has been freed \- newly allocated memory contains obvious garbage
+and freed memory is immediately stamped on.
+.LP
+Of course these safety features cost speed, so they can be turned off
+globally or per-pool.
+.fX alloc_set_debug_flag()
+sets the debugging flag for a pool; memory
+will be initialised to garbage and stamped on when freed only of the flag
+is non-zero.
+.fX alloc_set_default_debug_flag()
+sets the value of the flag used
+for pools created from then on with
+.fX alloc_create_pool() .
+Both routines return the previous value of the flag they set.
+.Vs
+char *allocstr(alloc_id_t alloc_id, int nbytes)
+char *allocstr_ck(alloc_id_t alloc_id, int nbytes)
+.Ve
+.fX allocstr()
+is like
+.fX alloc()
+except that it assumes that
+no alignment is required.
+It is thus suitable only for allocating space for strings.
+.fX allocstr()
+is implemented such that interspersed calls to
+.fX alloc()
+and
+.fX allocstr()
+will pack both
+the strings and the other objects tightly in memory with no space
+wasted on alignment.
+.fX allocstr()
+never returns
+.fX NULL
+\- it panics like
+.fX alloc()
+if there is no memory.
+.fX allocstr_ck()
+is the same as
+.fX allocstr()
+except that
+it returns
+.fX NULL
+if there is no memory.
+.Vs
+char *alloc_strdup(alloc_id_t alloc_id, const char *s)
+.Ve
+.fX alloc_strdup()
+is a convenience routine that returns a pointer
+to a copy of a string allocated using
+.fX allocstr() .
+Note that it will never return
+.fX NULL
+as it uses
+.fX allocstr()
+rather than
+.fX allocstr_ck() .
+.Vs
+alloc_mark_id_t alloc_mark(alloc_id_t alloc_id)
+void alloc_release(alloc_id_t alloc_id,
+alloc_mark_id_t alloc_mark_id)
+.Ve
+.fX alloc_mark()
+returns an opaque handle that `remembers' the
+current position in an alloc pool.
+A subsequent call to
+.fX alloc_release()
+conceptually frees all
+memory allocated from the pool since the corresponding call of
+.fX alloc_mark() .
+Subsequent calls to
+.fX alloc()
+et al will reuse the freed memory.
+A call to
+.fX alloc_release()
+renders invalid any marks that were
+returned after the
+.fX alloc_mark()
+call that returned the mark
+being passed to
+.fX alloc_release() .
+.Vs
+const char *ukcprog_version(void)
+.Ve
+.fX ukcprog_version()
+returns a string giving the current version number of the library.
+.SH BUGS
+This library treads rather freely on the name space.
+.SH AUTHORS
+.LP
+Godfrey Paul (gjap@ukc.ac.uk)
+.br
+Mark Russell (mtr@ukc.ac.uk)
+.sp
+Computing Laboratory, University of Kent at Canterbury.

@@ -1,0 +1,255 @@
+# @(#)README	1.10 18/9/92 (UKC)
+
+This directory contains the source code of the ups debugger.
+This file describes what ups is, what it runs on and how to build
+and install it.  The file CHANGES in this directory summarises
+the changes between this release and previous public releases.
+
+
+WHAT IS UPS?
+------------
+
+Ups is a source level C debugger that runs under X11 or SunView.
+It runs in a window with two major regions: one showing the
+current state of the target program data and the other showing
+the currently executing source code.  A key feature of ups is
+that the variables display is persistent: when you add a variable
+to the display it stays there as you step through the code.  The
+current stack trace (which function called which) is always visible.
+
+Ups includes a C interpreter which allows you to add fragments
+of code simply by editing them into the source window (the source
+file itself is not modified).  This lets you add debugging printf
+calls without recompiling, relinking (or even restarting) the
+target program.  You can also add conditional breakpoints in a
+natural way - you just add a statement like "if (i == 73) #stop"
+at the appropriate place in the source window.
+
+Some things you can do with ups:
+
+   + Add variables to the display by simply clicking on them
+     in the source window.
+
+   + Expand (recursively) structures and unions to show their
+     members.
+	
+   + Assign to variables by editing the displayed value.
+
+   + Add breakpoints by pointing with the mouse at the line
+     where you want execution to stop.
+	
+   + Add interpreted code at any breakpoint, including code that
+     calls compiled functions and assigns to variables.
+
+It's hard to describe an interactive application in a few paragraphs of
+text - the best way to see what ups is like grab a copy and try it.
+There's a walkthrough debugging session in the manual page: if you work
+through this and aren't hooked at the end of it then I'll give you
+your money back :-)
+
+
+HOW UPS DIFFERS FROM XXGDB, XDBX AND DBXTOOL
+--------------------------------------------
+
+The key implementation difference between ups and the various X front
+ends for dbx and gdb is that ups is not a front end for a command based
+debugger.  Xdbx and xgdb give you a convenient way to invoke the
+underlying debugger's commands, but it is fairly clear in both that
+you are talking to a text based debugger.  Ups in the other hand is
+a complete native debugger implementation; there is no underlying
+command language.
+
+An example: to print the value of a variable in xgdb you select (by
+dragging) a variable name and then click on `print' in the menu.  Xgdb
+passes the print command with the selection to gdb and displays the
+result.  By contract in ups you click the mouse over a variable name
+and it is added to the display.  Once the variable is added to the
+display it stays there, so you can watch it change as you step through
+the code.  If the variable happens to be a structure or a pointer to a
+structure you can `expand' it to show its members.  Again, the
+structure members thus added remain in the display until you get rid of
+them so you can watch their values change as you execute the code.
+
+Of course there is a downside to not talking to an existing debugger: you
+lose portability.  Ups is machine dependent - a port to a new architecture
+is a significant effort.  I think the benefits outweigh the cost.
+
+
+SUPPORTED CONFIGURATIONS
+------------------------
+
+The current list of supported configurations is:
+
+	Architecture		OS version		Window system
+	------------		----------		-------------
+	SPARC			SunOS 4.X		X11 or SunView 1
+	Sun 3			SunOS 4.X		X11 or SunView 1
+	Sun 386i		SunOS 4.0.X		X11 or SunView 1
+	DECstation		Ultrix 3.X and 4.2	X11
+	Intel 386		BSDI BSD/386 0.3 Beta	X11
+	HLH Clipper		4.3BSD			X11
+
+[ You've never heard of the HLH Clipper.  Don't worry, you're not alone. ]
+
+Ups has also been ported to the Sony NEWS (MIPS) workstation (by Nobuyuki
+Hikichi) and to the MIPS Magnum 3000 (by Hal R. Brand and Conor Doherty).
+I have folded these changes into the code but I don't have access to the
+machines to test them directly.
+
+Ups has FORTRAN support on the Sun 3 and SPARC but this is not as
+stable or complete as the C support.  Ups should also work with gcc (even
+with the -O flag).  This is known to work pretty well on the SPARC; your
+mileage may vary on other systems.  Unlike earlier releases, the current
+version of ups works with gcc 2.X (except on the DECstation).
+
+Ups will probably work on OS releases other than these; the list above
+describes the OS versions on the machines that I have access too.  In
+particular I have built ups for a VAX 750 running 4.3BSD and X11 - it
+appeared to work OK but wasn't tested thoroughly or used in anger.
+
+Ups is unavoidably architecture and OS dependent as it knows about things
+like the ptrace() system call interface and object file symbol table formats.
+A port to a new architecture is likely to take several weeks.
+
+
+INSTALLATION
+------------
+
+Ups should be reasonably simple to install.  It has no library files,
+just a binary and manual page.  You can put the binary and manual
+pages where you like.  There is no need to be root to do any part of
+the installation (although you must obviously have permission to
+create files in the directories where you put the binary and manual page).
+
+The steps are:
+
+1)  Unpack the distribution. You should have a compressed tar file called
+    ups-2.XX.tar.Z (where 2.XX is the version number of the release).
+    Change directory to a disk with a three or more megabytes of free
+    space and say:
+ 
+ 	zcat ups-2.XX.tar | tar xfp -
+ 
+    This will create a directory tree called ups-2.XX.  Change directory
+    into it.
+ 
+2)  If you wish to use imake then say "sh imake.sh" at this point
+    and skip to step 4.  This will unpack Imakefiles from the file
+    imakefiles.tar and run xmkmf to build makefiles.  The Imakefiles
+    were written by Rainer Klute (klute@irb.informatik.uni-dortmund.de).
+
+    If you are building the SunView version of ups, or do not have imake
+    or xmkmf then skip this step and use the supplied makefiles.
+
+3)  Optionally edit the Makefile in this root directory.  You might want
+    to do this if you want to specify special flags to to compiler (for
+    example if your X header files live somewhere other that /usr/include/X11).
+    You might also want to change the default locations of the installed
+    binary and manual page.
+
+3a) If you are building ups on a Sun (of any architecture) running
+    SunOS 4.0.3 or earlier, uncomment the line in the Makefile in this
+    directory that sets SUBMAKEFLAGS to ARCH_CFLAGS=-DFIX_SHORT_PARAMS.
+    See the comment in the Makefile for more information.
+
+3b) If you are using a MIPS RISC/os machine, uncomment the SUBMAKEFLAGS
+    line for RISC/os.  If you are running RISCwindows then uncomment
+    the X11LIB line just below the SUBMAKEFLAGS line.
+
+4)  Type "make".  If all goes well this should build you a binary called
+    ups/ups.  If you want the SunView binary, say "make sunviewups".
+    This will produce a binary called ups/sunviewups.
+
+    The BSDI make and sh (at least on the Beta 0.3 release) have some
+    bugs which are triggered by the ups makefiles.  If you are not using
+    imake (which also failed for me on BSDI), you can use the following
+    evil runes to make ups build:
+
+         make ups/develhdrs libx11wn
+	 make SUBMAKEFLAGS="-n | sh -x"
+
+    If you want you can experiment with ups at this point.  The manual
+    page (in ups/doc/ups.man) has a "GETTING STARTED" section which
+    should get you going.
+
+5)  Type "make install".  By default this will install ups/ups as
+    /usr/local/X11/ups and the manual page as /usr/man/manl/ups.l.
+    To install the Sunview version of ups say "make sunviewinstall".
+    By default this will install ups/sunviewups as /usr/local/Sunview/ups.
+
+    If you don't wish to run "make install" you can install ups simply by
+    copying the binary and manual page into place.
+
+
+DOCUMENTATION
+-------------
+
+The following files contain documentation on ups:
+
+	ups/doc/ups.man     The user manual page
+
+	ups/doc/porting.ms  A guide to porting ups to a new architecture.
+
+	README.multiarch    Description of a scheme for doing simultaneous
+			    builds of ups in one NFS mounted source
+			    directory on multiple architectures.
+
+	lib/*/README	    Brief overviews of the various libraries
+			    used to build ups.  Some have pointers to
+			    more documentation.
+				
+
+COPYING THE CODE
+----------------
+
+Feel free to copy bits of ups for your own use (caveat: you must contact
+me first if you want to incorporate the code into a commercial product).
+You must preserve the copyright notices.
+
+Things you might find useful (despite the lack of documentation):
+
+ups/ci_*.[cy]	A reasonably complete ANSI C interpreter.  There are many
+		details that it gets wrong (e.g. the exact type of integer
+		constants and the subtler aspects of typedefs).  There is
+		a test driver in ups/cx.c.  The grammar is in ups/ci_parse.y.
+		This was derived from the grammar at the back of K&R2.
+
+ups/as_*.c	Disassemblers for the 68020, SPARC, VAX and MIPS chips.
+
+lib/libmtrprog/genmergesort.h
+		A macro to implement a merge sort function for any linked list.
+
+lib/libukcprog/*.c
+		Various low level routines that aren't in the standard
+		C library.
+
+lib/libarg/*.c	General purpose command line parsing, including filename
+		globbing and I/O redirection.
+
+One day I might get round to documenting all this stuff ...
+
+
+FEEDBACK
+--------
+
+I hope you find ups a useful tool.  If you have problems building
+or using it, find bugs or have suggestions for improvements please
+send me mail (I am mtr@ukc.ac.uk).  Paeans of praise describing how
+wonderful ups is are also appreciated :-)
+
+There is a mailing list for discussion of ups and for announcements
+of bug fixes and new features.  The list is ups-users@ukc.ac.uk -
+send requests to be added to the list to ups-users-request@ukc.ac.uk.
+
+I'm especially interested in ports to new architectures.  There is
+a document (ups/doc/porting.ms) giving an overview of the implementation
+of ups and how to port it.  I'll be happy to give advice and help
+to anyone doing a port, and even happier to incorporate completed
+ports back into the standard release.
+
+A personal note: I have benefited enormously from free software
+that others have contributed (things like perl, gcc, X and BSD).
+Ups is my attempt to give something back.  Long live free software.
+
+Mark Russell
+mtr@ukc.ac.uk

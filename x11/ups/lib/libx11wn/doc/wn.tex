@@ -1,0 +1,2130 @@
+% @(#)wn.tex	1.1 4/11/91 (UKC)
+% This document was written by John Bovey, University of Kent
+%
+\documentstyle[11pt]{article}
+\oddsidemargin 0in
+\evensidemargin 0in
+\topmargin 0in
+\textwidth 6.25in
+\textheight 8.75in
+\parindent 0in
+\parskip 0.1in
+\title{Using the wn graphics library}
+\author{J D Bovey \and M T Russell}
+\pagestyle{headings}
+\newcommand{\funclabel}[1]{\label{#1}}
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction}
+{\em Wn} is a library of low level graphical input and output routines
+which is principally intended for writing graphical interactive applications
+programs. There are versions of {\em wn} which run under X11 \cite{xlib}, X10
+and Suntools (see \cite{sunviewprog,sunviewsysprog,pixrect}).
+Although {\em wn} does not provide menus or any other high-level
+graphical input device, it is compatible with the {\em med3} menu package \cite{med3doc}.
+The remainder of this section is a general introduction
+to the sort of graphical input and output supported by {\em wn}
+and can probably be skipped by a reader who is familiar with workstation
+programming.
+The later sections describe the {\em wn} functions in detail.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Windows}
+All input and output handled by {\em wn} is assumed to go via a window
+on the screen. A program using {\em wn} does not need to know where the
+window is or whether it is partially obscured by other windows
+(although it does often need to know how large the window is); the position
+of the window on the screen and its relationship to other windows 
+will be handled by the window manager.
+As far as the program using {\em wn} is concerned it has a rectangular
+area of screen in which it can draw, and through which it can detect input
+events like cursor movements and mouse button presses.
+Under some window systems the program will be asked occasionally to
+redraw the entire contents of its window.
+This happens when parts of the window which had been obscured by
+other windows are exposed.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Graphical output}
+A window used for output can be considered as
+a rectangular array of pixels with each pixel having a pair of
+non-negative coordinates ({\em x},{\em y}).
+Pixel (0,0) is in the top left hand corner of the window and {\em x} runs
+from 0 to one less than the window width, {\em y} from 0 to one less than
+the window height. Any graphical output addressed to pixels outside the
+window will be {\em clipped} at the window boundary.
+
+The number of {\em planes} used by the display is the number of bits used
+to store a pixel.
+A monochrome display will have one bit per pixel, whereas a color display
+will typically have 8 bits per pixel giving a total of 256 possible pixel
+values.
+A pixel value does not represent a color directly but is used as an index
+into a table of actual colors called the {\em colormap}.
+An actual color is represented by a
+triple of intensities, one for each of the three primary colors red, green and blue.
+A color intensity normally runs from 0 to 255 and so there is a palette of $256^{3}$
+or nearly 17 million different colors available (although there can be at
+most 256 different colors on the screen at one time).
+Since the same pixel value represents the same color, wherever it is on the
+screen, and since there may be several programs simultaneously trying
+to produce colored images in different windows,
+the 256 different pixel values have to be thought of as a resource.
+A program which wants to display {\em n} different colors will
+request {\em n} pixel values from the window system and if successful will
+set the colormap entries for the allocated pixel values to the desired colors.
+The request will fail if there are currently less than {\em n} unused pixel values.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Graphical output primitives}
+There are four major output primitives provided by functions in the
+{\em wn} library.
+More complex output operations can be built using these primitives
+which are:
+\begin{description}
+\item[Draw a line.]
+The application specifies the coordinates of the end points and the pixel
+value of the line.
+\item[Display a piece of text.]
+The application specifies the location within the window, the string to be
+displayed, the font used to display it and the pixel values.
+The font is a data structure describing how each ASCII character will be drawn
+on the screen.
+In addition to the font height and character widths the font contains
+an array of rectangular binary images with
+one image for each ASCII character value.
+Font character images are binary with the bit values describing which pixels
+are drawn as foreground and which are drawn as background.
+This means that in general the text drawing function needs to be given
+two pixel values, one for the foreground and one for the background, although
+the background color can be specified as {\em transparent}, in which case
+background pixels are left unchanged.
+\item[Copy a rectangular image]
+This operation is often called a {\em rasterop}.
+The application needs to specify the top left hand corner and the width and height
+of the area to be copied as well as the coordinates of the destination
+area. 
+There are two {\em wn} rasterop functions: one intended for color
+displays which simply copies the source on top of the destination,
+and one intended for monochrome displays which allows the source
+and destination pixel values to be combined logically.
+On a monochrome display the pixels can be thought of as having the logical
+values {\em true} and {\em false} representing foreground and background
+respectively
+and the source and destination can be combined using logical operators
+like {\bf and} and {\bf or}.
+\item[Painting a rectangle]
+The rectangle's top left hand corner, width and height need to be specified
+along with the new pixel value.
+Painting an area with the background color is used to clear a window, erase
+displayed text etc. If the intention is to highlight an area of the screen then
+a grey pattern of set pixels can be used as shading.
+\end{description}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Reading input}
+Since input to an interactive workstation program comes from two distinct
+physical sources (keyboard and mouse), it is presented to the program
+as a series of events. An input event is represented by a C structure
+with fields describing the cause of the event (called the event type)
+and various event parameters.
+Among the possible causes of an event are:
+\begin{itemize}
+\item A mouse button was pressed.
+\item A keyboard key was pressed.
+\item The mouse has moved.
+\item The window size has changed and so it needs redrawing.
+\end{itemize}
+Not every event parameter is valid for every event type.
+Some typical event parameters are:
+\begin{itemize}
+\item The cursor coordinates at the time of the event.
+\item the state of the mouse buttons, i.e. which ones are up and which are down.
+\item The keyboard character if the event was a key press.
+\end{itemize}
+The {\em wn} library function which obtains the next event also takes
+an argument which can be used to specify which event types are of interest.
+Hence if a program does not need to know about mouse movement but only
+needs to know the mouse position when a button is pressed then it can
+ask not to be told about mouse movement events.
+Similarly a program which does not read the keyboard can elect not
+to be informed of keyboard events.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Setting the cursor}
+The cursor is a small binary image which tracks the mouse and is
+used for pointing at and selecting objects from the display.
+The displayed cursor image can be changed at any time (see section \ref{setcurs});
+changing the cursor is a useful way of providing the user with feedback.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Special cursors}
+{\em Wn} provides a selection of cursor-tracking rubber lines, rubber boxes
+and cross-hairs. These devices, which are collectively known as {\em special cursors},
+are discussed in detail in section \ref{spcurs}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Using the wn library}
+In every file that uses routines in this library you should have the
+line
+\begin{verbatim}
+#include <local/wn.h>
+\end{verbatim}
+near the beginning.
+This includes a header file which defines various structures
+and constants used by {\em wn}.
+
+You should link programs against the {\em wn} library by
+including the argument {\tt -l}{\it $<$windowsystem$>$}{\tt wn} in the loader
+command line, where {\it $<$windowsystem$>$} depends on the window
+system you are using.
+This argument should appear after your `.o' files but before any
+machine dependent graphical libraries.
+The following are example linking commands for the window systems that
+{\em wn} runs over:
+
+\begin{tabular}{ll}
+
+{\bf X11:}&{\tt cc <options> <your .o files> -lx11wn -lX11}\\
+{\bf X10:}&{\tt cc <options> <your .o files> -lx10wn -lX10}\\[0.1in]
+
+{\bf Sunview:}&{\tt cc <options> <your .o files> -lsunviewwn -lsunwindow -lpixrect}\\
+\end{tabular}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Windows}
+A window used by {\em wn} is identified by a {\em window number} which
+is a small positive integer.
+Most {\em wn} functions need a window number as an argument.
+An application normally has a single top level window, although you can
+create more than one top level window with {\em wn}.
+A top level window is a fairly heavyweight object -- creating one is
+usually relatively slow.
+\subsection {Top level windows}
+The function:
+\funclabel{wn_open_stdwin}
+\begin{verbatim}
+int wn_open_stdwin()
+\end{verbatim}
+opens the `standard window' and returns its window number.
+Under some window managers the created window will be the one the application was started
+in; on others, the user will be prompted for a window.
+In any case, the usual local  conventions for creating the main window of a
+graphical program will be followed.
+
+{\tt Wn\_open\_stdwin} returns $-1$ if the window cannot be created (usually
+because the window manager is not running).
+If the window is opened successfully, it returns the window number of
+the opened window and this value is used to specify the window by passing it as the
+{\tt wn} argument to
+any graphical input or output routine.
+
+\funclabel{wn_create_window}
+\begin{verbatim}
+int wn_create_window()
+\end{verbatim}
+This function is similar to {\tt wn\_open\_stdwin}; it creates a new
+top level window and returns a window number for it.
+Applications which use more than one top level windows should use this
+function to create windows other than their main one.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Obtaining information about a window}
+The size of a window can be obtained using the function
+\funclabel{wn_get_window_size}
+\begin{verbatim}
+void wn_get_window_size(wn, p_width, p_height)
+int wn;
+int *p_width, *p_height;
+\end{verbatim}
+which sets {\tt *p\_width} and {\tt *p\_height} to the current width
+and height of window {\tt wn} in pixels.
+
+The functions {\tt wn\_get\_width} and {\tt wn\_get\_height} return the
+current width and height respectively of the window:
+\funclabel{wn_get_width}
+\begin{verbatim}
+int wn_get_width(wn)
+int wn;
+\end{verbatim}
+\funclabel{wn_get_height}
+\begin{verbatim}
+int wn_get_height(wn)
+int wn;
+\end{verbatim}
+
+The function {\tt wn\_is\_open} can be used to check whether a window
+number refers to an open window:
+\funclabel{wn_is_open}
+\begin{verbatim}
+int wn_is_open(wn)
+int wn;
+\end{verbatim}
+{\tt Wn\_is\_open} returns non zero if window {\tt wn} is open.
+
+A program which takes advantage of color when available but also
+runs on a monochrome display needs to determine whether the
+current display is monochrome or color. The function
+\funclabel{wn_get_nplanes}
+\begin{verbatim}
+int wn_get_nplanes()
+\end{verbatim}
+\sloppy{returns the number of planes supported by the current display.
+{\tt Wn\_get\_nplanes} is also needed in order to determine the amount
+of memory needed to store an off-screen copy of an image
+(see section \ref{image}).}
+
+A program which needs to know which windowing system it is running under can
+find out using the function:
+\funclabel{wn_get_wm_type}
+\begin{verbatim}
+int wn_get_wm_type()
+\end{verbatim}
+The value returned is one of:
+\begin{center}
+\begin{tabular}{|l|p{2in}|} \hline
+{\tt WN\_SUNVIEW} & Sun running SunView \\ \hline
+{\tt WN\_X10} & X version 10 \\ \hline
+{\tt WN\_X11} & X version 11 \\ \hline
+\end{tabular}\\
+\end{center}
+It should be stressed that most programs which use {\em wn} do not need to
+know which window system they are running under and so never need to call
+{\tt wn\_get\_wm\_type}.
+\subsection{Closing on windows}
+The function
+\funclabel{wn_close_window}
+\begin{verbatim}
+void wn_close_window(wn)
+int wn;
+\end{verbatim}
+closes window {\tt wn}, and does any tidying up needed if {\tt wn}
+is a top level window.
+Any subwindows of {\tt wn} are also closed.
+This function must be called for any open top level windows before exiting.
+Failure to do so can leave unusable windows on the screen.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Graphical output}
+{\em Wn} supports four kinds of graphical output: line, text, rectangle and rasterop.
+Each of the first three drawing functions takes a pixel value argument (two pixel values
+for text). {\em Wn} provides two pre-defined pixel values {\tt WN\_FG} and {\tt WN\_BG}
+representing the foreground and background colors.
+These should be used by monochrome software which might be
+run on a monochrome display or 
+color display. On a monochrome display {\tt WN\_FG} is usually black and {\tt WN\_BG}
+is white whereas on a color display they will have preset values which depend
+on the windowing environment. On a color display
+running X the colors represented by {\tt WN\_FG} and {\tt WN\_BG} can be set using
+the standard command line arguments or defaults database entries
+(see section \ref{munge_args}).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\pagebreak[1]
+\subsection{Lines}
+\funclabel{wn_draw_line}
+\begin{verbatim}
+void wn_draw_line(wn, x1, y1, x2, y2, value)
+int wn;
+int x1, y1, x2, y2, value;
+\end{verbatim}
+{\tt Wn\_draw\_line} draws a single pixel wide line from
+{\tt x1}, {\tt y1} to {\tt x2}, {\tt y2} 
+using {\tt value} as the pixel value. When working in monochrome the globally
+defined pixel value {\tt WN\_FG} can be used to draw a line in the foreground
+color. When working in color {\tt value} should be a pixel value whose colormap
+entry has been allocated and initialised by the application
+(see section \ref{color}).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Text}
+\funclabel{wn_text}
+\begin{verbatim}
+void wn_text(wn, font, s, x, y, fg_value, bg_value, use_which)
+int wn;
+font_t *font;
+char *s;
+int x, y, value, use_which;
+\end{verbatim}
+{\tt Wn\_text} prints the NUL terminated string {\tt s} in font {\tt font}
+at position {\tt x},{\tt y} in window {\tt wn}.
+{\tt Font} is a {\tt font\_t} structure as described in the section on fonts
+(section \ref{fonts}); using a {\tt NULL} pointer for {\tt font} will cause
+the system font to be used. Alternatively there are several predefined macros
+which provide an easy way of displaying text in the system font
+(see section \ref{othergraph}).
+The system font will by default be a standard font built into the windowing
+system but most windowing systems provide some way for the user to specify the
+system font associated with a particular window (see section \ref{munge_args} for
+an explanation of the way this is done under X).
+
+Set bits in a character image are drawn using pixel value {\tt fg\_value},
+clear bits using {\tt bg\_value}.
+The special background value {\tt WN\_TRANSPARENT} specifies that clear pixels
+in the font should not modify the display.
+This is sometimes useful for color displays but usually involves a high processing
+overhead.
+
+{\tt Use\_which} should be {\tt WN\_USE\_BASELINE} or {\tt WN\_USE\_TOP}\@.
+{\tt WN\_USE\_BASELINE} specifies that the {\tt y} coordinate given
+is where the baseline of the text printed should appear.
+{\tt WN\_USE\_TOP} says that the given
+{\tt y} coordinate is where the top of the displayed text should appear.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Painting a rectangle}
+\funclabel{wn_set_area}
+\begin{verbatim}
+void wn_set_area(wn, x, y, width, height, value)
+int wn;
+int x, y, width, height, value;
+\end{verbatim}
+The value of each of the pixels in the given rectangle is set to {\tt value}.
+Even for monochrome software, {\tt wn\_set\_area} is preferable to rasterop
+as a way to clear ({\tt value == WN\_BG}) or set ({\tt value == WN\_FG}) areas
+of the window, as it will work on color displays.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Rasterops}
+\funclabel{wn_rop}
+\begin{verbatim}
+void wn_rop(wn, src_x, src_y, width, height, dst_x, dst_y)
+int wn;
+int src_x, src_y, width, height, dst_x, dst_y;
+\end{verbatim}
+Copies the area in window {\tt wn} given by {\tt src\_x, src\_y, width, height}
+to {\tt dst\_x, dst\_y}.
+
+Under the X window system, this operation can fail if any part of the source
+area is not visible on the screen (i.e. off the edge of the screen or
+obscured by another window).
+You can check for this with the {\tt wn\_last\_rop\_was\_damaged} function:
+\funclabel{wn_last_rop_was_damaged}
+\begin{verbatim}
+int wn_last_rop_was_damaged(wn)
+int wn;
+\end{verbatim}
+This returns true if this happened the last time {\tt wn\_rop} was called
+on window {\tt wn}.
+If this happens the application should repaint the destination area.
+The easiest way to do this is to repaint the entire window as if
+the window had been exposed, but this usually looks messy.
+It is better just to repaint the destination area if possible.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Other graphical output functions}
+\label{othergraph}
+{\em Wn} provides a few other graphical output functions.
+These are built on the routines described above.
+\funclabel{wn_move_area}
+\begin{verbatim}
+void wn_move_area(wn, src_x, src_y, width, height, dst_x, dst_y, value)
+int wn;
+int src_x, src_y, width, height, dst_x, dst_y, value;
+\end{verbatim}
+{\tt Wn\_move\_area} is useful for scrolling; it
+copies the area in window {\tt wn} given by {\tt src\_x, src\_y, width, height}
+to {\tt dst\_x, dst\_y}, and sets pixels in the area vacated to {\tt value}.
+The current version of {\tt wn\_move\_area} is restricted to horizontal
+or vertical motion.
+As with {\tt wn\_rop}, you should check for damage with
+{\tt wn\_last\_rop\_was\_damaged}.
+\funclabel{wn_box_round}
+\begin{verbatim}
+void wn_box_round(wn, x, y, width, height, value)
+int wn;
+int x, y, width, height, value;
+\end{verbatim}
+A rectangle is drawn round the given area using the pixel value given.
+Note that the rectangle drawn surrounds the area -- the top left
+hand corner is at {\tt x-1}, {\tt y-1}.
+
+The following four functions are simpler than {\tt wn\_text} if only the system
+font is being used.
+\funclabel{wn_btext}
+\begin{verbatim}
+void wn_btext(wn, s, x, y, fg_value, bg_value)
+int wn;
+char *s;
+int x, y;
+int fg_value, bg_value;
+\end{verbatim}
+\funclabel{wn_ttext}
+\begin{verbatim}
+void wn_ttext(wn, s, x, y, fg_value, bg_value)
+int wn;
+char *s;
+int x, y;
+int fg_value, bg_value;
+\end{verbatim}
+\funclabel{wn_bputs}
+\begin{verbatim}
+void wn_bputs(wn, s, x, y)
+int wn;
+char *s;
+int x, y;
+\end{verbatim}
+\funclabel{wn_tputs}
+\begin{verbatim}
+void wn_tputs(wn, s, x, y)
+int wn;
+char *s;
+int x, y;
+\end{verbatim}
+
+{\tt Wn\_btext} uses {\tt WN\_USE\_BASELINE} as the {\tt use\_which} argument
+so that the {\tt y} coordinate is that of the baseline.
+{\tt Wn\_ttext} uses {\tt WN\_USE\_TOP}, so the {\tt y} coordinate is that
+of the top left pixel of the first character.
+
+{\tt Wn\_tputs} and {\tt wn\_bputs} correspond to {\tt wn\_ttext} and
+{\tt wn\_btext}, but default the foreground and background pixels to
+{\tt WN\_FG} and {\tt WN\_BG}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Additional functions available for monochrome displays}
+If only two colors are being used then it is possible to regard the display as a
+rectangular array of bits which can be set and cleared.
+In particular rasterops can be used to do things like clearing or
+inverting an area.
+
+These techniques do not in general work on color displays,
+as a pixel has a value rather than simply being a set or clear bit.
+Using logical functions on a pixel value will quite likely set the
+pixel to some value for which the colormap entry is undefined, and
+unpredictable colors will be displayed.
+
+{\em Wn} provides some functions to allow applications which treat the
+display as an array of bits to run on monochrome or color displays.
+So long as the only pixel values used are {\tt WN\_FG} and {\tt WN\_BG} the
+display behaves as if it were monochrome -- you can use {\bf xor} rasterops to
+clear areas and do other similar tricks.
+
+The effect of these functions on pixels with values other than {\tt WN\_FG}
+and {\tt WN\_BG} is undefined --- the pixels will usually be set to some
+random value (and hence color).
+\funclabel{wn_mono_rop}
+\begin{verbatim}
+void wn_mono_rop(wn, sx, sy, width, height, dx, dy, ropfunc)
+int wn;
+int sx, sy, width, height, dx, dy, ropfunc;
+\end{verbatim}
+Like {\tt wn\_rop} above, except that the rasterop acts on foreground and
+background pixels as if the pixel values were 1 and 0 respectively.
+As with {\tt wn\_rop}, you should check for damage with
+{\tt wn\_last\_rop\_was\_damaged}.
+
+The {\tt ropfunc} argument determines how the source and destination
+are combined. The available values are:
+\pagebreak[3]
+\begin{verbatim}
+R_RPL           Dest = Source
+R_NOT           Dest = NOT Source
+R_AND           Dest = Dest AND Source
+R_ANDNOT        Dest = Dest AND NOT Source
+R_OR            Dest = Dest OR Source
+R_ORNOT         Dest = Dest OR NOT Source
+R_XOR           Dest = Dest XOR Source
+R_XNOR          Dest = Dest XOR NOT Source
+\end{verbatim}
+Of these functions, only {\tt R\_RPL} will have predictable results on color
+displays.
+The other functions are useful with single plane bitmaps.
+
+The following function can be used to invert all the pixels in a rectangle:
+\funclabel{wn_invert_area}
+\begin{verbatim}
+void wn_invert_area(wn, x, y, width, height)
+int wn;
+int x, y, width, height;
+\end{verbatim}
+{\tt Wn\_invert\_area} swaps the values of all the
+foreground ({\tt WN\_FG}) and background ({\tt WN\_BG}) pixels.
+A second call specifying the same area will restore all pixels
+to their former values.
+On color displays, pixels with values other than {\tt WN\_FG} or {\tt WN\_BG}
+will be set to unpredictable colors.
+
+There is also a function to invert a hollow rectangle of pixels:
+\funclabel{wn_invert_box}
+\begin{verbatim}
+void wn_invert_box(wn, x, y, width, height)
+int wn;
+int x, y, width, height;
+\end{verbatim}
+This function has the same effect as {\tt wn\_box\_round}
+(see section \ref{wn_box_round}) except that
+it inverts pixels rather than setting them to a pixel value.
+
+When working in monochrome it is often useful to be able to highlight an area of
+the display by shading the background. The {\em wn} function to do this is:
+\funclabel{wn_shade_area}
+\begin{verbatim}
+void wn_shade_area(wn, x, y, width, height, shade, ropfunc)
+int wn;
+int x, y, width, height, ropfunc;
+short shade;
+\end{verbatim}
+{\tt Shade} is interpreted as a 4 by 4 rectangle of pixels which is painted
+into the given area using the rasterop function {\tt ropfunc}.
+There are a number of predefined patterns
+named {\tt WN\_GREY2}, {\tt WN\_GREY4}, \ldots, {\tt WN\_GREY14} in which the numerical
+part of the name is the number of set bits and thus the density of the grey shading.
+The combination of shading density and rasterop function will depend on the application;
+it is sometimes convenient to shade using {\tt R\_XOR} because the effect can be removed
+simply by repeating the operation but this will only work with a very light or very dense shade.
+As with other graphical functions having a rasterop argument, the only safe rasterop
+function to use in conjunction with color is {\tt R\_RPL}.
+
+{\tt Wn\_bold} provides a crude way of highlighting a piece of displayed text:
+\funclabel{wn_bold}
+\begin{verbatim}
+void wn_bold(wn, x, y, width, height)
+int wn;
+int x, y, width, height;
+\end{verbatim}
+The given area is combined with itself shifted one pixel to the right,
+using rasterop function {\tt R\_OR}.
+{\tt Wn\_bold} has the effect of emboldening text in the area if the text is displayed
+with color {\tt WN\_FG}.
+The effect on pixels with values other than {\tt WN\_FG} or {\tt WN\_BG} is
+unpredictable.
+\funclabel{wn_mono_text}
+\begin{verbatim}
+void wn_mono_text(wn, font, s, x, y, ropfunc, use_which)
+int wn;
+font_t font;
+char *s;
+int x, y, ropfunc, use_which;
+\end{verbatim}
+Monochrome version of {\tt wn\_text}.
+Pixels are drawn using the foreground pixel value ({\tt WN\_FG}),
+using rasterop function {\tt ropfunc}.
+Code which does things like using {\tt R\_NOT} to draw inverted text should
+use this function.
+\funclabel{wn_invert_line}
+\begin{verbatim}
+void wn_invert_line(wn, x1, y1, x2, y2)
+int wn;
+int x1, x2, y1, y2;
+\end{verbatim}
+Like {\tt wn\_draw\_line}, but it inverts the pixels under the line.
+That is, {\tt WN\_FG} pixels become {\tt WN\_BG} pixels and vice versa.
+On color displays, pixels with values other than {\tt WN\_FG} or
+{\tt WN\_BG} have unpredictable values after this call.
+
+A second {\tt wn\_invert\_line} with the same coordinates will restore all
+pixels to their former values, even on color displays.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Batching of window output}
+A series of graphical output requests are said to be batched
+if none of them are executed until the last one has been sent.
+Ideally this should result in the intermediate, partially
+redrawn, states not being displayed (so that, for example, an erase followed by
+a redrawing with minor changes leaves the unchanged parts of the display
+continuously displayed).
+Unfortunately this is not possible under current versions of X.
+Batching usually produces a performance improvement
+and so it is still worth batching a series of related graphical
+output requests even if the underlying window system does not suppress intermediate
+redrawing.
+A sequence of graphical function calls are batched by bracketing
+them by the functions:
+\label{wn_updating_off}
+\begin{verbatim}
+wn_updating_off(wn)
+int wn;
+\end{verbatim}
+\funclabel{wn_updating_on}
+\begin{verbatim}
+wn_updating_on(wn)
+int wn;
+\end{verbatim}
+A typical sequence of calls is:
+
+\hspace{0.5in}{\tt wn\_updating\_off(wn);}
+
+\hspace{0.5in}{\em lots of graphical output to the window}
+
+\hspace{0.5in}{\tt wn\_updating\_on(wn);}
+
+The output batching functions can be nested.
+This means that only the first of a set of nested of calls
+to {\tt wn\_updating\_off} turns off updating, and only the last call
+of {\tt wn\_updating\_on} (the one corresponding to the outermost call of
+{\tt wn\_updating\_off}) turns updating on again.
+
+Occasionally you want to show the latest updates to the window without
+affecting the updating state. The function
+\funclabel{wn_show_updates}
+\begin{verbatim}
+void wn_show_updates(wn)
+int wn;
+\end{verbatim}
+refreshes the window (shows the latest changes) without affecting the
+updating level.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Outputting a beep}
+\funclabel{wn_bell}
+\begin{verbatim}
+void wn_bell(wn)
+int wn;
+\end{verbatim}
+Makes a beep.
+On some machines the `beep' may be visual, hence the need for the
+{\tt wn} argument.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Input}
+{\em Wn} formats input into a stream of events.
+The input routine {\tt wn\_next\_event} gets the next event for a window.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Events}
+The event types are:
+\begin{center}
+\begin{tabular}{|l|p{4in}|} \hline
+{\tt EV\_KEY} & Keyboard key pressed \\ \hline
+{\tt EV\_BUTTON\_DOWN} & Mouse button pressed \\ \hline
+{\tt EV\_BUTTON\_UP} & Mouse button released \\ \hline
+{\tt EV\_MOUSE\_MOVED} & Mouse moved.
+There is no guarantee that the returned coordinates have changed since the
+last event. \\ \hline
+{\tt EV\_WINDOW\_RESIZED} & The window's size has been changed. \\ \hline
+{\tt EV\_WINDOW\_EXPOSED} & The window's size has not changed, but it needs
+repainting (this event never happens on some machines).
+Most applications can treat it in the same way as {\tt EV\_WINDOW\_RESIZED}. \\ \hline
+{\tt EV\_WINDOW\_SELECTED} & The user selected the window. \\ \hline
+{\tt EV\_WINDOW\_DESELECTED} & The user deselected the window.
+Most applications can ignore this and {\tt EV\_WINDOW\_SELECTED}. \\ \hline
+{\tt EV\_INTERRUPT} & A signal (such as {\tt SIGALRM}) occurred. \\ \hline
+{\tt EV\_OTHER\_INPUT} &
+Input is pending on a user specified file descriptor -- see the description
+of multiplexed input below. \\ \hline
+{\tt EV\_OTHER} & An event that {\em wn} did not recognise was generated by the machine. \\ \hline
+\end{tabular}\\[0.1in]
+{\em Wn event types}
+\end{center}
+The structure defining an event is:
+\begin{verbatim}
+typedef struct {
+        unsigned long ev_type;
+        char ev_flags;
+        char ev_char;
+        short ev_x;
+        short ev_y;
+        short ev_buttons;
+        long ev_time;
+        int ev_wn;
+        int ev_fdmask;
+} event_t;
+\end{verbatim}
+The meanings of the fields are as follows:
+\begin{center}
+\begin{tabular}{|l|p{4.75in}|} \hline
+{\tt ev\_type} & the type of this event --- see section \ref{evtype}. \\ \hline
+
+{\tt ev\_flags} & flag bits for this event.
+For {\tt EV\_BUTTON\_UP} and {\tt EV\_BUTTON\_DOWN} events, {\tt ev\_flags}
+has exactly one of {\tt B\_LEFT}, {\tt B\_MIDDLE} or
+{\tt B\_RIGHT} set, saying which mouse button went up or down.
+If the event was pushed back (see {\tt wn\_pushback\_event} below), the
+{\tt EV\_WAS\_PUSHED\_BACK} bit is set. \\ \hline
+
+{\tt ev\_char} &
+On {\tt EV\_KEY} events, the ASCII code of the key that was pressed.
+This field is only valid on {\tt EV\_KEY} events. \\ \hline
+
+{\tt ev\_x, ev\_y} &
+the latest coordinates of the mouse,
+relative to the top left corner of the window.
+They are valid on all events. \\ \hline
+
+{\tt ev\_buttons} &
+a bit mask representing the current state of the mouse buttons.
+Zero or more of the button bit values {\tt B\_LEFT}, {\tt B\_MIDDLE} and
+{\tt B\_RIGHT} may be set.
+Like {\tt ev\_x} and {\tt ev\_y}, this field is valid for all events. \\ \hline
+
+{\tt ev\_time} &
+a timestamp, saying when the event happened.
+[ Not yet implemented ]. \\ \hline
+
+{\tt ev\_fdmask} &
+On {\tt WN\_OTHER\_INPUT} events,
+a bitmap of the file descriptors for which input is pending.
+See the description of multiplexed input below. \\ \hline
+
+{\tt ev\_wn} &
+the window the event occurred in.
+This is useful when you ask for an event from any window. \\ \hline
+\end{tabular}\\[0.1in]
+{\em Wn event structure fields}
+\end{center}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Event types}
+\label{evtype}
+The event types listed above ({\tt EV\_KEY}, {\tt EV\_BUTTON\_DOWN}, etc) are
+used in two contexts:
+
+In the {\tt ev\_type} field of a returned event, only one of the bits is
+ever set, indicating which event occurred.
+Normally in an event handling routine the application will switch on
+{\tt ev\_type}, with the {\tt EV\_*} event types as the case labels.
+
+In the mask passed to {\tt wn\_next\_event} (below) one or more of the
+event types are ORed together to form a mask, indicating which events are
+of interest.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Getting events}
+\funclabel{wn_next_event}
+\begin{verbatim}
+void wn_next_event(wn, mask, event)
+int wn, mask;
+event_t *event;
+\end{verbatim}
+Fills in {\tt event} with the next event for window {\tt wn} whose
+type matched {\tt mask}.
+If {\tt wn} is {\tt WN\_ANY}, the next event from any of the currently
+open windows or subwindows is generated (see section \ref{events_and_subwindows}
+below).
+
+{\tt Mask} gives the events of interest, and is constructed by
+ORing together the event codes of the events of interest.
+Events that do not match {\tt mask} are discarded.
+
+\funclabel{wn_get_resize_event}
+\begin{verbatim}
+int wn_get_resize_event(wn)
+int wn;
+\end{verbatim}
+This routine returns {\tt EV\_WINDOW\_RESIZED} if there have been one or
+more resize or expose events for window {\tt wn} since the last call of
+this routine on that window.
+If there have been no resize events but one or more expose
+event have occurred, then {\tt EV\_WINDOW\_EXPOSED} is returned.
+If there have been no resize or expose events zero is returned.
+
+This routine is useful if you don't want to check for window size changes
+on every event.
+The application can just call {\tt wn\_get\_resize\_event} at suitably
+frequent intervals.
+\funclabel{wn_pushback_event}
+\begin{verbatim}
+void wn_pushback_event(event)
+event_t *event;
+\end{verbatim}
+Arranges that the next call of {\tt wn\_next\_event} will return an
+event identical to {\tt event}, except that the {\tt EV\_WAS\_PUSHED\_BACK}
+bit will be set in {\tt ev\_flags}.
+This is useful when you read an event and then decide that you want to process it
+later.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Events and Subwindows}
+\label{events_and_subwindows}
+Many applications have a main window that is divided into a number of
+rectangular regions --- a menu, one or more scroll bars, a main display
+area, etc.
+The first task in such applications when an event is received is to
+determine which region of the main window the mouse was in when the
+event occurred.
+
+One way of doing this is to make each region of the window a
+subwindow (see section \ref{subwindows}), and to give a window
+number of {\tt WN\_ANY} to {\tt wn\_next\_event}.
+In this case the {\tt ev\_wn} field of the event will be set to the
+smallest window or subwindow that contains the mouse.
+The application can use this to determine which region of the main
+window the event occurred in.
+
+{\em Wn} provides a way of directly converting from a window number
+to a application defined integer or pointer.
+The function:
+\funclabel{wn_set_win_data}
+\begin{verbatim}
+long wn_set_win_data(wn, data)
+int wn;
+long data;
+\end{verbatim}
+associates {\tt data} with window {\tt wn} and returns the previous
+value of the data (zero if no value has been set).
+
+The data stored can be retrieved with the function:
+\funclabel{wn_get_win_data}
+\begin{verbatim}
+long wn_get_win_data(wn)
+int wn;
+\end{verbatim}
+This returns the value previously stored by {\tt wn\_set\_win\_data}.
+
+Normally the application will set up a data structure representing
+the various regions of the main window.
+It will then create subwindows for each region, and use {\tt wn\_set\_win\_data}
+to store a pointer to the structure describing the region with its
+subwindow.
+It then passes the window number {\tt WN\_ANY} to {\tt wn\_next\_event}
+and uses {\tt wn\_get\_win\_data} to convert from the window number
+of the event ({\tt ev\_wn}) to a pointer the structure describing the region.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Setting the input mode}
+{\tt Wn\_next\_event} usually blocks when there is no input pending ---
+that is, it does not return until an event arrives.
+This is nearly always the correct behaviour, but it is sometimes
+necessary to do input in non blocking mode. The function:
+\funclabel{wn_inmode}
+\begin{verbatim}
+void wn_inmode(wn, mode)
+int wn, mode;
+\end{verbatim}
+sets the input mode for window {\tt wn} to {\tt mode}, which should be
+{\tt WN\_SAMPLE}, {\tt WN\_REQUEST}, or {\tt WN\_NOINPUT}.
+{\tt Wn\_inmode} returns the previous input mode.
+
+In sample mode, {\tt wn\_next\_event} will always return immediately 
+(unless the window is deselected, when it will block until the window
+is selected again).
+If there are no events pending for the window, 
+an {\tt EV\_MOUSE\_MOVED} event is returned,
+even though the mouse coordinates will not in fact have changed.
+
+{\tt WN\_NOINPUT} mode is useful when you will be busy processing for
+some time and hence ignoring events.
+All events are discarded until a subsequent change to sample or request
+mode.
+The X servers kill a client if too many events are queued up so you
+should go into {\tt WN\_NOINPUT} mode whenever you will be ignoring
+events for a long time.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Multiplexed input}
+On some machines it is possible to check for input on many file descriptors
+with a single system call (see {\tt select(2)}).
+On these machines, {\em wn} gives you some access to this capability with the
+{\tt EV\_OTHER\_INPUT} event.
+When this event is returned, the {\tt ev\_fdmask} event field is a bit mask,
+with bit {\tt n} set if there is input pending on file descriptor {\tt n}.
+
+{\em Wn} maintains internally a mask of file descriptors which could have
+input pending; this mask is initially zero.
+Two functions are defined to let you examine and set this mask:
+\funclabel{wn_get_fd_mask}
+\begin{verbatim}
+int wn_get_fd_mask()
+\end{verbatim}
+\funclabel{wn_set_fd_mask}
+\begin{verbatim}
+void wn_set_fd_mask(mask)
+int mask;
+\end{verbatim}
+To add a file descriptor {\tt fd} to the mask, use:
+\begin{verbatim}
+wn_set_fd_mask(wn_get_fd_mask() | (1 << fd));
+\end{verbatim}
+To remove a file descriptor, use:
+\begin{verbatim}
+wn_set_fd_mask(wn_get_fd_mask() & ~(1 << fd));
+\end{verbatim}
+
+If you add a non valid file descriptor to the mask, or a file descriptor in the
+mask becomes invalid, the next call of {\tt wn\_next\_event} will abort with
+an error message.
+The application must remove file descriptors from the mask {\em before}
+closing them.
+
+It is important to note that this facility is only available on machines
+which have the {\tt select(2)} system call, or something similar in
+functionality.
+
+On machines without {\tt select}, no {\tt EV\_OTHER\_INPUT} events are ever
+generated, and {\tt wn\_set\_fd\_mask} writes a warning message to the
+standard error whenever it is called.
+
+Some applications may want to do their own {\tt select} call.
+To allow this style of input, there is a function to obtain a mask
+containing all file descriptors used by {\em wn}:
+\funclabel{wn_get_wm_fds}
+\begin{verbatim}
+int wn_get_wm_fds()
+\end{verbatim}
+This mask can be {\em or}ed with the application's file descriptors to
+form a mask for {\tt select}.
+In this way an application can check itself whether there is
+graphical input pending.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Other event routines}
+There are a few routines built on top of {\tt wn\_next\_event}:
+\funclabel{wn_wait_for_release_of}
+\begin{verbatim}
+void wn_wait_for_release_of(wn, button)
+int wn, button;
+\end{verbatim}
+This repeatedly calls {\tt wn\_next\_event} until the button specified
+in {\tt button} is no longer pressed.
+Multiple buttons can be specified by ORing together button masks.
+\funclabel{wn_await_window_size_change}
+\begin{verbatim}
+void wn_await_window_size_change(wn)
+int wn;
+\end{verbatim}
+This waits for an {\tt EV\_WINDOW\_RESIZED} event from window {\tt wn}.
+Useful if a window has been made too small for the application to run
+in.
+This calls {\tt wn\_next\_event} with just {\tt EV\_WINDOW\_RESIZE}
+in the event mask, so all other events on the window are discarded until
+the resize event.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Asynchronous input}
+\funclabel{wn_set_abort_func}
+\begin{verbatim}
+int (*wn_set_abort_func(wn, func))()
+int wn;
+int (*func)();
+\end{verbatim}
+A graphical program often needs to provide some way for the user to
+interrupt long running commands. {\tt Wn\_set\_abort\_func}
+sets the user abort function for window {\tt wn} to {\tt func}.
+This arranges that the function {\tt func} will be called asynchronously
+when the user presses an interrupt key.
+When running under SunView typing the {\bf stop} key (conventionally the
+key labeled {\tt L1}) into the graphical window will
+cause {\tt func} to be called. When running under X a program can be
+interrupted by typing CONTROL-C into the window from which the program was
+started. This is intended as a stop-gap and will be replaced by something
+better in the future.
+
+The arrangement is cancelled by calling {\tt wn\_set\_abort\_func} with
+a {\tt NULL} {\tt func}.
+
+You should probably go into {\tt WN\_NOINPUT} mode (see section \ref{wn_inmode})
+before setting up the handler, and back to request mode after clearing it.
+Even if you don't do this, you should not call any input routines
+while the interrupt handler is set up.
+\subsection{Warping the mouse}
+In certain rare situations it is useful for the application to move the
+cursor itself.  This is known as {\em warping} the mouse.
+Doing this is almost always a bad idea, but in the same way that C
+provides {\tt goto}, {\em wn} provides a function to warp the mouse:
+\funclabel{wn_warp_mouse}
+\begin{verbatim}
+void wn_warp_mouse(wn, x, y)
+int wn;
+int x, y;
+\end{verbatim}
+Moves the cursor to {\tt x}, {\tt y} in window {\tt wn}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Using color displays}
+Most graphical output routines take a {\tt value} argument which specifies
+the pixel value to be used for modified pixels. The workstation display
+hardware then uses a {\it colormap} table to convert the pixel value
+into a true color which it displays on the screen. It follows from this that
+a program which wants to produce color images must set up the colormap
+entries it needs before it attempts to draw on the screen.
+Since there are a fixed number (usually 256) of available pixel values
+and there may be
+several programs each wanting to display a color image in its own window, the
+pixel values and their corresponding colormap entries are treated by
+{\em wn} as a shareable resource.
+
+A program which produces a monochrome display but which wants to run consistently
+on monochrome and color displays should use the two pre-assigned pixel values
+{\tt WN\_FG} and {\tt WN\_BG} for its foreground and background colors.  A program
+which wants to use more than two colors must request a set of pixel values from {\em wn}
+and install the corresponding colormap entries.
+
+Some applications simply want a given set of colors, and don't require
+any relationship between the pixel values of the colors.
+{\em Wn} provides a set of basic colormap allocation functions for this.
+Other applications need to be able to do logical operations on already
+displayed pixels which result in other pixel values.
+These applications use a more sophisticated colormap allocation
+routine.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Colormap entries}
+\label{color}
+The colormap functions operate on arrays of the following structure:
+\begin{verbatim}
+typedef struct {
+        short co_pixel;
+        unsigned short co_red;
+        unsigned short co_green;
+        unsigned short co_blue;
+} color_t;
+\end{verbatim}
+\begin{list}{}{}
+\item[\tt co\_pixel]
+specifies the pixel value associated with the color definition
+\item[{\tt co\_red, co\_green} and  {\tt co\_blue}]
+give the levels of red, green and blue for this color.
+The values range from 0 (off) to 65535 (full brightness).
+Thus (0, 0, 0) is black and (65535, 65535, 65535) is white.
+In practice only the top byte of each color level is significant since available
+display hardware only provides 256 different intensities for each primary color.
+\end{list}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection {Simple colormap manipulation}
+The following functions are used to request a set of pixel values and
+set their colormap entries.
+\funclabel{wn_get_pixels}
+\begin{verbatim}
+int wn_get_pixels(colors, ncolors)
+color_t *colors;
+int ncolors;
+\end{verbatim}
+\funclabel{wn_set_pixel_colors}
+\begin{verbatim}
+void wn_set_pixel_colors(colors, ncolors)
+color_t *colors;
+int ncolors;
+\end{verbatim}
+\funclabel{wn_get_pixels_by_color}
+\begin{verbatim}
+int wn_get_pixels_by_color(colors, ncolors)
+color_t *colors;
+int ncolors;
+\end{verbatim}
+The function {\tt wn\_get\_pixels}
+allocates {\tt ncolors} colormap cells, and sets the {\tt co\_pixel} field
+of each element of the {\tt colors} array to the allocated pixel value.
+The {\tt co\_red}, {\tt co\_green} and {\tt co\_blue} fields are ignored and
+are not altered; the colors of the pixels are undefined on return.
+This routine will fail if there are not enough free colormap entries ---
+it returns $-1$ for failure, 0 for success.
+
+The function {\tt wn\_set\_pixel\_colors} is used to set the colors
+corresponding to a set of pixel values which have been allocated using
+{\tt wn\_get\_pixels}.
+For each of the {\tt ncolors} structures, {\tt wn\_set\_pixel\_colors} uses the color
+levels {\tt co\_red}, {\tt co\_green} and {\tt co\_blue} to set the color
+corresponding to the pixel value {\tt co\_pixel}.
+The special pixel values {\tt WN\_FG} and {\tt WN\_BG} can be used with this
+call to change the colors of the foreground and background pixels.
+
+\sloppy{{\tt Wn\_get\_pixels\_by\_color}
+is equivalent to {\tt wn\_get\_pixels} followed by {\tt wn\_set\_pixel\_colors}.
+It allocates {\tt ncolors} colormap entries and sets the colors of the entries.}
+
+The following function can be used to determine the colors currently
+being used for each of a set of pixel values:
+\funclabel{wn_get_pixel_colors}
+\begin{verbatim}
+void wn_get_pixel_colors(colors, ncolors)
+color_t *colors;
+int ncolors;
+\end{verbatim}
+For each of the {\tt ncolors} elements of the {\tt colors} array,
+{\tt wn\_get\_pixel\_colors} sets {\tt co\_red}, {\tt co\_green} and {\tt co\_blue} to
+the current color of a pixel with value {\tt co\_pixel}.
+This call can be used to find the current foreground and background pixel
+colors.
+
+The final function should be used to free colormap entries
+which are no longer needed
+\funclabel{wn_free_pixels}
+\begin{verbatim}
+void wn_free_pixels(colors, ncolors)
+color_t *colors;
+int ncolors;
+\end{verbatim}
+For each of the {\tt ncolors} elements of the {\tt colors} array,
+{\tt wn\_free\_pixels} frees the colormap entry specified by {\tt co\_pixel}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection {Advanced colormap manipulation}
+The {\tt wn\_get\_pixels} function simply allocates a given number of
+colormap entries or pixels.  The pixel values chosen are random
+as far as the application is concerned.
+{\tt Wn} provides a more sophisticated colormap allocation function for
+applications which do logical operations on pixels:
+\funclabel{wn_get_pixels_and_planes}
+\begin{verbatim}
+int wn_get_pixels_and_planes(npixels, nplanes, contig, pixels, p_planes)
+int npixels, nplanes, contig;
+int *pixels, *p_planes;
+\end{verbatim}
+This function is almost identical to the X {\tt XAllocColorCells} function.
+It allocates {\tt npixels} base pixel values and {\tt nplanes} planes.
+The pixel values allocated are stored in the {\tt pixels} array, which
+should have at least {\tt npixels} elements.
+For each of the {\tt nplanes} planes requested, one bit will be set
+in {\tt *p\_planes}.
+If {\tt contig} is non zero, all the bits set in {\tt *p\_planes} will be
+contiguous, otherwise they might not be.
+
+For each base pixel value in {\tt pixels}, $2^{nplanes}$ pixel values
+can be formed by {\tt or}ing in bits from {\tt *p\_planes}.
+
+[ More explanation here ? ]
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Use of color hints}
+On some color Suns the display has color planes and
+a monochrome plane.  Displaying in the monochrome plane is much faster
+than displaying the the color plane on these machines.
+By default {\em wn} will run in the monochrome plane, which means
+that the application will see a monochrome machine.
+
+There is a function to override this and make {\em wn} use the color
+planes if color is available:
+\funclabel{wn_use_color_hint}
+\begin{verbatim}
+void wn_use_color_hint(use_color)
+int use_color;
+\end{verbatim}
+If {\tt use\_color} is non zero, {\em wn} will use the color planes if
+there is a choice of color on monochrome.  If {\tt use\_color} is zero,
+{\tt wn} will go for monochrome if there is a choice (this is the default).
+
+There are two other ways that the choice can be affected.
+The environment variables {\tt USE\_COLOR} or {\tt USE\_MONO} can be set
+to force the use of color or monochrome respectively, or the flags
+{\tt -color} or {\tt -mono} can be given at run time to have the same effect
+(see section \ref{munge_args}).
+Both of these override any hint given by {\tt wn\_use\_color\_hint}.
+
+Another idiosyncrasy of Suns is that allocating extra colormap cells can
+cause glitches on the display.  An application which knows how many
+colors it will need can avoid this by specifying in advance how many
+cells it will request:
+\funclabel{wn_npixels_hint}
+\begin{verbatim}
+void wn_npixels_hint(npixels)
+int npixels;
+\end{verbatim}
+This indicates to {\em wn} that the application will need {\tt npixels}
+pixels.
+This function must be called before {\tt wn\_munge\_args} or
+{\tt wn\_open\_stdwin}.
+Note that this is only a hint -- it does not actually allocate the pixels
+or guarantee that a request for this many pixels will succeed.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Subwindows}
+You can create subwindows of top level windows.
+In contrast to top level windows these are very lightweight objects.
+They are usually used to divide up the application's main window into
+regions, such as menus, scroll bars, etc.
+\label{subwindows}
+The function:
+\funclabel{wn_create_subwin}
+\begin{verbatim}
+int wn_create_subwin(parwn, x, y, width, height, type)
+int parwn;
+int x, y, width, height, type;
+\end{verbatim}
+creates a subwindow of window {\tt parwn}, which can be either a
+top level window or another subwindow (the second case allows
+a hierarchy of subwindows to be built).
+The subwindow's origin is {\tt x},{\tt y} relative to the origin
+of {\tt parwn}, and its width and height are {\tt width} and {\tt height}.
+{\tt Wn} only supports subwindows that are completely contained within
+their parent windows -- you will get unpredictable results if any part
+of the subwindow extends outside {\tt parwn}.
+The {\tt type} argument specifies the type of the subwindow -- it is
+either {\tt WN\_INPUT\_OUTPUT} or {\tt WN\_OUTPUT\_ONLY}.  More below.
+
+Subwindows are mainly used for coordinate translation.  If you have, say,
+a thumb bar at position {\em x},{\em y} in a window it can get 
+tedious adding {\em x} and {\em y} to all coordinates when doing
+graphical output to the thumb bar.
+To avoid this you can create a subwindow at {\em x},{\em y} in the main
+window and use its window number for graphical output in the thumb bar.
+Subwindows do not do clipping, so the application still has to ensure that
+output is restricted to the area of the subwindow.
+
+There are two types of subwindow -- output only and input output.
+If you just want to use the subwindow for output coordinate translation
+as just described then you should use an output only subwindow,
+created by giving {\tt wn\_create\_subwin} a {\tt type} argument of
+{\tt WN\_OUTPUT\_ONLY}.
+Subwindows can also be used to identify where graphical input occurred.
+This is described in section \ref{events_and_subwindows}.
+These subwindows should be created with a {\tt type} argument of
+{\tt WN\_INPUT\_OUTPUT}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Operations on subwindows}
+There are several functions for changing the position and size of
+subwindows:
+\funclabel{wn_set_win_size}
+\begin{verbatim}
+void wn_set_win_size(wn, width, height)
+int wn;
+int width, height;
+\end{verbatim}
+Sets the size of {\tt wn} (which must refer to a subwindow) to {\tt width}
+and {\tt height}.
+\funclabel{wn_adjust_win_size}
+\begin{verbatim}
+void wn_adjust_win_size(wn, x_delta, y_delta, width_delta, height_delta)
+int wn;
+int x_delta, y_delta, width_delta, height_delta;
+\end{verbatim}
+Adjusts the position and offsets of subwindow {\tt wn} by the deltas
+given, which may be positive or negative.  Use a zero delta for any
+element which you don't want to change.
+If window {\tt wn} has subwindows, their position relative to {\tt wn}
+does not change (i.e. the children and parent move together as a unit).
+
+Sometimes the application needs to translate coordinates from one
+subwindow to another.
+Use {\tt wn\_trans\_coords} to do this:
+\funclabel{wn_trans_coords}
+\begin{verbatim}
+int wn_trans_coords(oldwn, x, y, newwn, p_x, p_y)
+int oldwn;
+int x, y;
+int newwn;
+int *p_x, *p_y;
+\end{verbatim}
+This function takes a pair of coordinates {\tt x},{\tt y} in window {\tt oldwn},
+and sets {\tt *p\_x} and {\tt *p\_y} to the corresponding coordinates
+in window {\tt newwn}.  It returns true if the point lies within window
+{\tt newwn}.  Either or both of {\tt *p\_x} and {\tt *p\_y} may be {\tt NULL},
+in which case they are not set.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Window system command line arguments}
+\label{munge_args}
+Most window systems define set of command line arguments which can
+be used with any application run under the window system to control
+things like the size of application's window, the standard font etc.
+The set of these arguments for Sunview applications is listed
+in the {\em Sunview} manual page.
+
+Under X these arguments are less clearly defined --- the ones recognised
+by {\em wn} are listed below.
+The exact form of the arguments differs slightly between X10 and X11
+for some arguments.
+The table below shows the arguments recognised by {\em wn} with the
+X10 and X11 forms.
+%
+%  Macro that produces an X geometry string
+%
+\newcommand{\xgeom}{{\it w}{\tt x}{\it h}{\tt +}{\it x}{\tt +}{\it y}}
+%
+\begin{center}
+\begin{tabular}{|c|c|p{3.5in}|} \hline
+{\bf X10} & {\bf X11} & {\bf Meaning} \\ \hline \hline
+=\xgeom & {\tt -geometry} \xgeom & The initial
+window size and position \\ \hline
+\#\xgeom & -- & The initial icon size and position \\ \hline
+{\it host}:0 & {\tt -display} {\it host}:0.0 & the host and display
+where the program is to be run. The default display can also
+be specified using the {\tt DISPLAY} environment variable. \\ \hline
+\multicolumn{2}{|c|}{{\tt -fn} {\it font}} & The default font which will be used
+when {\tt NULL} is used as a font pointer. {\it Font} should be
+the name of a font which is available on the X server being used. \\ \hline
+\multicolumn{2}{|c|}{{\tt -fg} {\it color}} & The foreground color when running
+on a color display. This sets the color associated with the pixel value {\tt WN\_FG}
+and can be either a named color (e.g. red) or an rgb color
+value. \\ \hline
+\multicolumn{2}{|c|}{{\tt -bg} {\it color}} &  The background color associated with the
+pixel value {\tt WN\_BG}. \\ \hline
+\end{tabular}\\
+\end{center}
+In order to make use of the command line entries the
+application must call the function:
+\funclabel{wn_munge_args}
+\begin{verbatim}
+int wn_munge_args(argc,argv)
+int argc;
+char **argv;
+\end{verbatim}
+{\tt Wn\_munge\_args} interprets any standard arguments and removes them from
+the {\tt argv} array. The new value of {\tt argc} is returned and so the
+arguments are given to {\em wn} by inserting the line
+\begin{verbatim}
+        argc = wn_munge_args(argc,argv);
+\end{verbatim}
+This must be positioned {\em before} the call to {\tt wn\_open\_stdwin}.
+
+Most X applications also read configuration information from a defaults
+database.
+This database is stored in a file under X10, and in the server under X11.
+See the X documentation for details on how to set up these databases.
+{\em Wn} looks in the defaults database for the strings {\tt "Font"},
+{\tt "Geometry"}, {\tt "Foreground"} and {\tt "Background"}.
+These set the default font, window geometry, foreground color and
+background color respectively.
+Things specified via the argument list override things found in the
+defaults database.
+
+A program which uses its own parameters from the defaults database can
+access them using the function:
+\funclabel{wn_get_default}
+\begin{verbatim}
+char *wn_get_default(name)
+char *name;
+\end{verbatim}
+where {\tt name} is the parameter name and the parameter value is returned.
+If {\tt name} is not found in the defaults database {\tt wn\_get\_default}
+returns {\tt NULL}.
+For example suppose the defaults database contains the line
+\begin{verbatim}
+        foo.menuwidth:       34
+\end{verbatim}
+then a call of {\tt wn\_get\_default("menuwidth")} from within a program called
+{\tt foo} will return the string {\tt "34"}. Note that {\tt wn\_munge\_args}
+must be called before any attempt to obtain parameters from the defaults
+database.
+
+Under Sunview there is no defaults database and {\tt wn\_get\_default}
+always returns {\tt NULL}.
+
+Some applications invoke other graphical applications.
+These child applications should be passed certain of the arguments
+stripped out by {\tt wn\_munge\_args} (e.g. the display argument, if present).
+To allow this {\em wn} saves arguments of this type that have been
+removed by {\tt wn\_munge\_args}.  These saved arguments can be reinserted
+into an array of arguments using {\tt wn\_unmunge\_args}:
+\funclabel{wn_unmunge_args}
+\begin{verbatim}
+char **wn_unmunge_args(argv, pos)
+char **argv;
+int pos;
+\end{verbatim}
+This inserts the saved arguments {\tt argv} between {\tt argv[pos - 1]}
+and {\tt argv[pos]}, and returns a new argument array.
+The returned value should be passed to {\tt free} when it is finished with.
+A typical code fragment for invoking a graphical child application
+would be:
+\begin{verbatim}
+        < set up the child argument vector in child_argv >
+        new_argv = wn_unmunge_args(child_argv, 1);
+        < fork and exec child with new_argv >
+        free((char *)new_argv);
+\end{verbatim}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Fonts}
+\label{fonts}
+The {\em wn} font structure is defined in {\tt wn.h} as:
+\begin{verbatim}
+typedef struct {
+        short ft_is_fixed_width;
+        short ft_baseline;
+        short ft_width;
+        short ft_height;
+        short ft_nchars;
+        short *ft_width_tab
+        mdfont_t ft_mdfont;
+} font_t;
+\end{verbatim}
+The meanings of the fields are as follows:
+
+\begin{center}
+\begin{tabular}{|l|p{4in}|}
+\hline
+{\tt ft\_is\_fixed\_width} &
+non zero if all the printable characters in the font have the same width. \\ \hline
+{\tt ft\_baseline} &
+the offset from the top of the font of the baseline. \\ \hline
+{\tt ft\_width, ft\_height} &
+the width and height of characters in the font.
+For a variable width font, {\tt ft\_width} is the width of the widest
+character in the font. \\ \hline
+{\tt ft\_nchars} &
+The number of characters in the font.
+This will usually be at least 128, sometimes 256. \\ \hline
+{\tt ft\_width\_tab} &
+a table of individual widths of characters.
+{\tt ft\_width\_tab{[i]}} is the width in pixels of the character with
+ASCII code {\tt i}.
+The table has {\tt ft\_nchars} elements, so the largest legal index is
+{\tt ft\_nchars - 1}. \\ \hline
+{\tt ft\_mdfont} &
+a pointer to the machine dependent structure defining the font.
+It is provided for applications that need to access local font structures
+(e.g. library packages). \\ \hline
+\end{tabular}\\[0.1in]
+\nopagebreak
+{\em The font structure fields}
+\end{center}
+
+A {\tt font\_t} pointer is returned by {\tt wn\_open\_font}, and can then be
+used in calls to {\tt wn\_xputs} and other functions which use fonts.
+The store occupied by a font can be released by calling {\tt wn\_close\_font}.
+
+A {\tt NULL} {\tt font\_t} pointer refers to the system, or default, font.
+It can be used in the same way as fonts obtained from {\tt wn\_open\_font}.
+Thus programs using only the system font do not need to open fonts.
+\label{wn_open_font}
+\begin{verbatim}
+font_t *wn_open_font(fontfile)
+char *fontfile;
+\end{verbatim}
+{\tt Wn\_open\_font} reads the font in {\tt fontfile} and returns a pointer to a 
+font structure.
+The format of the font in {\tt fontfile} is machine dependent.
+{\tt NULL} is returned if {\tt fontfile} cannot be read or does not contain a font
+in an appropriate format.
+\funclabel{wn_close_font}
+\begin{verbatim}
+void wn_close_font(font)
+font_t *font;
+\end{verbatim}
+Closes (i.e. releases the store occupied by) the font referred
+to by {\tt font}, which must have been obtained using {\tt wn\_open\_font}.
+{\tt font} is no longer valid after this call.
+\funclabel{wn_install_mdfont}
+\begin{verbatim}
+font_t *wn_install_mdfont(mdfont)
+mdfont_t mdfont;
+\end{verbatim}
+Installs the font pointed to by {\tt mdfont} and returns a pointer to a
+{\tt font\_t} structure for it.
+{\tt mdfont} is assumed to point to a machine dependent structure
+describing the font.
+\funclabel{wn_get_sysfont}
+\begin{verbatim}
+font_t *wn_get_sysfont()
+\end{verbatim}
+Returns a font structure describing the system font.
+Useful if you need information about the system font.
+\funclabel{wn_set_sysfont}
+\begin{verbatim}
+void wn_set_sysfont(font)
+font_t *font;
+\end{verbatim}
+Sets the system font to {\tt font}. 
+Future calls to {\tt wn\_xputs} with a {\tt NULL} font structure pointer will
+use this font.
+If {\tt font} is {\tt NULL}, the system font is reset to its value before
+any calls to {\tt wn\_set\_sysfont}.
+
+There are some utility functions for converting character indexes
+in strings in a given font to pixel offsets and vice versa.
+All these functions work with variable width fonts as well as
+fixed width fonts.
+\funclabel{wn_strnwidth}
+\begin{verbatim}
+int wn_strnwidth(s, nchars, font)
+char *s;
+int nchars;
+font_t *font;
+\end{verbatim}
+This function returns the width in pixels occupied by 
+the first {\tt nchars} characters of string {\tt s}
+were it to be drawn in font {\tt font}.
+A {\tt NUL} character terminates the string if one occurs in the
+first {\tt nchars} characters.
+If {\tt nchars} is $-1$, characters up to the first {\tt NUL} are used.
+\funclabel{wn_strwidth}
+\begin{verbatim}
+int wn_strwidth(s, font)
+char *s;
+font_t *font;
+\end{verbatim}
+This is equivalent to {\tt wn\_strnwidth(s, -1, font)}.
+
+\funclabel{wn_strpos}
+\begin{verbatim}
+int wn_strpos(s, x, font, halfshift)
+char *s;
+int x;
+font_t *font;
+int halfshift;
+\end{verbatim}
+This function converts a pixel offset {\tt x} from the start of a string {\tt s}
+rendered in font {\tt font} to an offset in bytes from the start of {\tt s}.
+It can be used to determine which character of a string the user is pointing at.
+If {\tt halfshift} is zero, a pixel is considered to be over a character if
+it lies within the character.  If {\tt halfshift} is non zero, a pixel lies
+over a character if is to the left of the horizontal midline of the character
+and to the right of the horizontal midline of the previous character.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Cut and paste}
+Most window systems support cutting and pasting of text between applications.
+This means selecting a chunk of text within a window and clicking on a
+mouse button to insert it as if it had been typed in the same or another
+window.
+
+At the application level, the window system usually maintains a global
+object known as the {\em selection}, which contains the text that the
+user last cut.  Some window systems have the concept of a selection type,
+which allows more than just text to be cut and pasted.
+{\em Wn} only has support for treating the selection as an array of bytes:
+\funclabel{wn_get_selection}
+\begin{verbatim}
+void wn_get_selection(p_buf, p_nbytes)
+char **p_buf;
+int *p_nbytes;
+\end{verbatim}
+
+\funclabel{wn_set_selection}
+\begin{verbatim}
+void wn_set_selection(buf, nbytes)
+char *buf;
+int nbytes;
+\end{verbatim}
+{\tt Wn\_get\_selection} sets {\tt *p\_buf} to point at an array of bytes
+containing the current selection, and sets {\tt *p\_nbytes} to the
+number of bytes in the array.
+The selection may contain embedded NUL characters.
+The application should not modify the contents of the array.
+If the user has not yet made any selection,
+or the window manager does not support cut and paste, a zero size
+selection will be returned.  
+
+{\tt wn\_set\_selection} sets the current selection to the
+first {\tt nbytes} bytes of array {\tt buf}.
+If the window manager does not support cut and paste this function has
+no effect.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Offscreen images}
+\label{image}
+Some applications need to manipulate off screen images, for example to
+display an image loaded from a file, or to save a screen image to a
+file.
+The problem with doing this portably is that while most machines
+support rasterops between the display and off screen memory,
+different machines have different formats for the layout of an image
+in memory.
+
+We will use the term {\em bitmap} to denote any saved screen image,
+whether binary or multi-plane.
+{\em Wn} does not define a standard bitmap format; rather it supports
+many formats and provides a function to convert between formats.
+It is possible to ask for a bitmap to be converted to a format that is
+efficient for the machine you are currently running on.
+An application can create a bitmap in a format convenient for it, then
+convert the bitmap to an efficient format for display.
+
+A bitmap consists of a structure which describes the size and format
+of the bitmap (the {\it bitmap header}) and a block of memory
+containing the image (the {\it bitmap data}).
+A field in the header points to the data.
+The bitmap header is described by the following structure:
+\begin{verbatim}
+typedef struct {
+        unsigned short *bm_data;
+        char bm_bit_order;
+        char bm_byte_order;
+        char bm_pixel_format;
+        unsigned char bm_flags;
+        unsigned char bm_pflags;
+        short bm_width;
+        short bm_height;
+        short bm_nplanes;
+        short bm_xhot;
+        short bm_yhot;
+        short bm_lineinc;
+        cmap_t *bm_colormap;
+        long bm_cache_data;
+} bitmap_t;
+\end{verbatim}
+The meanings of the fields are as follows:
+\begin{tabbing}
+\hspace{1.5in}\=\hspace{1.25in}\= \kill
+
+{\tt bm\_data} \>
+\parbox[t]{4.75in}{a pointer to the bitmap data
+(an array of 16 bit unsigned integers defining the image)} \\[0.1in]
+
+{\tt bm\_byte\_order} \>
+\parbox[t]{4.75in}{the byte order for the image data.
+The image data consists of 16 bit shorts, and there are two possible
+ways of ordering the bytes in each short --- big endian or little
+endian.
+The possible values are:} \\[0.1in]
+
+\> {\tt BM\_MSB\_FIRST} \>
+\parbox[t]{3.5in}{Big endian order.
+If the short is treated as an array of two bytes, the most significant byte
+appears first.} \\[0.1in]
+
+\>{\tt BM\_LSB\_FIRST} \>
+\parbox[t]{3.5in}{Little endian order.
+The least significant byte of the short appears first.} \\[0.1in]
+
+\>{\tt BM\_MACHINE\_BYTE\_ORDER} \\ \>\>
+\parbox[t]{3.5in}{The byte order of the shorts is that of the machine.
+Use this for static bitmaps constructed from arrays of short constants in
+the source.} \\[0.1in]
+
+{\tt bm\_bit\_order} \>
+\parbox[t]{4.75in}{the bit order for the image data.
+The image data consists of 16 bit shorts, and there are two possible
+ways of displaying the bits in each short --- big endian or little
+endian.
+The possible values are:} \\[0.1in]
+
+\> {\tt BM\_BIT0\_RIGHT} \>
+\parbox[t]{3.5in}{Big endian order. As the image is scanned from left to right,
+the first bit displayed from a word is
+the most significant bit (bit 15),
+and the last is the least significant (bit 0).
+Thus bit 0 of each word appears as the rightmost displayed.} \\[0.1in]
+
+\>{\tt BM\_BIT0\_LEFT} \>
+\parbox[t]{3.5in}{Little endian order.
+The first bit displayed from a word, reading from left to right,
+is the least significant bit.} \\[0.1in]
+
+{\tt bm\_pixel\_format} \>
+\parbox[t]{4.5in}{the pixel format of the bitmap.
+The possible values are:} \\[0.1in]
+
+\> {\tt BM\_XY\_PIXELS} \>
+\parbox[t]{3.5in}{The bitmap data is organised as a set of planes (with the number of
+planes being the same as the number of bits per pixel).
+The most significant bits of all the pixels appear in the first plane,
+the next most significant bit in the following plane, and so on until
+the least significant bit.
+Within each plane the pixels are packed 16 to a word. }\\[0.1in]
+
+\>{\tt BM\_BYTE\_PIXELS} \>
+\parbox[t]{3.5in}{This format is only supported for eight bit pixels.
+Successive pixels are stored consecutively, with a single pixel in
+each byte.
+The bitmap data should be accessed in this case as an array of unsigned char.}\\[0.1in]
+
+{\tt bm\_flags} \>
+\parbox[t]{4.75in}{a set of flag bits --- see the description below. }\\[0.1in]
+
+{\tt bm\_pflags} \>
+\parbox[t]{4.75in}{a set of flag bits used internally by {\em wn}.
+Don't change these.  In static bitmaps, or bitmaps created by
+hand this field should be set to zero.}\\[0.1in]
+
+{\tt bm\_width,bm\_height} \>
+\parbox[t]{4.75in}{the width and height of the image in pixels. }\\[0.1in]
+
+{\tt bm\_nplanes} \>
+\parbox[t]{4.75in}{the number of bits per pixel for the bitmap. }\\[0.1in]
+
+{\tt bm\_xhot, bm\_yhot} \>
+\parbox[t]{4.75in}{the hotspot, if any, of the bitmap.
+These are useful if the bitmap represents a cursor. }\\[0.1in]
+
+{\tt bm\_lineinc} \>
+\parbox[t]{4.75in}{the number of bytes between pixels
+on adjacent lines and with the same x coordinate.
+For example, if a bitmap in {\tt BM\_XY\_PIXELS} format has each line
+of pixels padded to a whole number of
+shorts, {\tt bm\_lineinc} will be {\tt ((bm\_width + 15) / 16) * 2}.
+A {\tt BM\_BYTE\_PIXEL} bitmap will usually have {\tt bm\_lineinc} equal
+to {\tt bm\_width}, although some machines require the line increment
+for these bitmaps to be even. }\\[0.1in]
+
+{\tt bm\_colormap} \>
+\parbox[t]{4.75in}{This field is not used by {\em wn}.
+It can be used by applications to store a colormap for a multiplane
+bitmap.}\\[0.1in]
+
+{\tt bm\_cache\_data} \>
+\parbox[t]{4.75in}{used internally by {\em wn}.
+It should not be examined or changed by the application.
+In static bitmaps, or bitmaps created by hand,
+this field should be set to zero. }\\[0.1in]
+\end{tabbing}
+The {\tt bm\_flags} field in a bitmap header contains a number of flag
+bits which the application can set to modify the treatment of a bitmap.
+The flags and their meanings are:
+\begin{center}
+\begin{tabular}{|l|p{4in}|} \hline
+
+{\tt BM\_CAN\_FREE\_DATA} &
+The bitmap data for this bitmap was obtained by calling {\tt malloc(3)}.
+This flag is set by {\tt wn\_new\_bitmap}, and should be set by the
+application if it constructs a bitmap with data obtained via {\tt malloc}.
+The flag is checked by {\tt wn\_free\_bitmap} (see below).\\ \hline
+
+{\tt BM\_CAN\_FREE\_HEADER} &
+Similar to {\tt BM\_CAN\_FREE\_DATA}, but referring to the bitmap header.
+This flag is set by {\tt wn\_new\_bitmap} and
+{\tt wn\_data\_to\_bitmap}, and checked by {\tt wn\_free\_bitmap}.\\ \hline
+
+{\tt BM\_CHOOSE\_FORMAT} &
+{\em Wn} routines which do rasterops on bitmaps will convert a bitmap
+to a format suitable for the machine before doing the operation,
+and convert the format back afterwards.
+If this flag is set, the bitmap format is not converted back afterwards,
+so the expense of converting the format is only incurred on the first call.
+Subsequent rasterop routines will find the bitmap already in the
+correct format.\\ \hline
+
+{\tt BM\_HAS\_HOTSPOT} &
+This flag is ignored by {\em wn} --- it can be used by applications
+to indicate whether a bitmap has a hotspot.\\ \hline
+\end{tabular}\\[0.1in]
+{\em Bitmap flags}
+\end{center}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Changing the format of a bitmap}
+\funclabel{wn_change_bitmap_format}
+\begin{verbatim}
+int wn_change_bitmap_format(bm, bit_order, byte_order, pixel_format, lineinc)
+bitmap_t *bm;
+int bit_order, byte_order, pixel_format, lineinc;
+\end{verbatim}
+Sets the {\tt bm\_bit\_order}, {\tt bm\_byte\_order},
+{\tt bm\_pixel\_format} and {\tt bm\_lineinc}
+fields of bitmap {\tt bm} to the values given, and reformats the bitmap
+data accordingly.
+See the descriptions above of the meanings of these fields.
+
+A {\tt bit\_order} of {\tt BM\_NATURAL\_BIT\_ORDER} specifies the `natural' bit
+order for the machine --- i.e. the bit order the machine uses.
+The {\tt bm\_bit\_order} field will be set to {\tt BM\_BIT0\_RIGHT} or
+{\tt BM\_BIT0\_LEFT}, depending on the machine.
+Similarly, {\tt BM\_NATURAL\_BYTE\_ORDER} specifies the normal
+byte order, {\tt BM\_NATURAL\_PIXEL\_FORMAT} specifies the machine's preferred
+pixel format, and {\tt BM\_NATURAL\_LINEINC} the natural line increment for
+the width and pixel format of the bitmap.
+
+This routine is called implicitly by the bitmap rasterop routines for
+bitmaps which are not in a format suitable for the machine.
+This is expensive for large bitmaps, so you should ensure that a bitmap is
+in the right order for the machine before doing lots of rasterops on it.
+An easy way to do this is to set the {\tt BM\_CHOOSE\_FORMAT} bit in
+{\tt bm\_flags} --- see the description of this flag above.
+Alternatively you can call {\tt wn\_change\_bitmap\_format} with
+{\tt BM\_NATURAL\_BIT\_ORDER}, {\tt BM\_NATURAL\_BYTE\_ORDER},
+{\tt BM\_NATURAL\_PIXEL\_FORMAT} and {\tt BM\_NATURAL\_LINEINC}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Creation and destruction of bitmaps}
+\funclabel{wn_make_bitmap}
+\begin{verbatim}
+bitmap_t *wn_make_bitmap(width, height, nplanes, bit_order, pixel_format)
+int width, height, nplanes, format;
+\end{verbatim}
+Creates a new bitmap and returns a pointer to it.
+The new bitmap is {\tt width} pixels wide, {\tt height} pixels high, and has
+{\tt nplanes} planes.
+The bit order and pixel format of the bitmap are set to the values given.
+The bitmap data is initialised to zero. 
+\funclabel{wn_make_bitmap_from_data}
+\begin{verbatim}
+bitmap_t *wn_make_bitmap_from_data(width, height, nplanes, data, bit_order,
+                                                 pixel_format, lineinc)
+int width, height, nplanes;
+unsigned short *data;
+int bit_order, pixel_format, lineinc;
+\end{verbatim}
+Creates a bitmap header and sets the {\tt bm\_data} field of the new header
+to {\tt data}.
+{\tt bit\_order}, {\tt pixel\_format} and {\tt lineinc} should correspond
+to the format of the data.
+\funclabel{wn_static_bm}
+\begin{verbatim}
+bitmap_t wn_static_bm(width, height, nplanes, xhot, yhot, bit_order, data)
+int width, height, nplanes, xhot, yhot, bit_order;
+unsigned short data[];
+\end{verbatim}
+This macro generates a declaration for a static bitmap.
+{\tt data} must be an array of {\tt (width + 15) / 16 * height} shorts.
+{\tt bit\_order} should be one of {\tt BM\_BIT0\_LEFT} or {\tt BM\_BIT0\_RIGHT}.
+
+The macro generates a declaration of the form:
+\begin{verbatim}
+{ field0, field1, ... }
+\end{verbatim}
+where {\tt field0}, {\tt field1} etc are initialisers for the various
+fields of a bitmap header ({\tt bitmap\_t}, as described above).
+
+For example, to statically define a 16 pixel square cursor called
+{\tt cross\_cursor} with a hotspot at 4, 4 use something like:
+\begin{verbatim}
+unsigned short cross_cursor_data[16] = { num0, num1, ..., num15 };
+
+bitmap_t cross_cursor = wn_static_bm(16, 16, 1, 4, 4, BM_BIT0_LEFT,
+                                                        cross_cursor_data);
+\end{verbatim}
+Then {\tt \&cross\_cursor} (note the address operator) is a bitmap pointer
+and can be passed to any of the bitmap routines.
+{\tt wn\_static\_bm} sets the {\tt BM\_CHOOSE\_FORMAT} bit in {\tt bm\_flags},
+which means that the bitmap will be converted to the natural format for the
+machine on first use.
+\funclabel{wn_free_bitmap}
+\begin{verbatim}
+void wn_free_bitmap(bm)
+bitmap_t *bm;
+\end{verbatim}
+Frees a bitmap.
+The bitmap data is freed (i.e. passed to {\tt free(3)}) if the
+{\tt BM\_CAN\_FREE\_DATA} bit is set.
+Similarly, the bitmap header is freed if the {\tt BM\_CAN\_FREE\_HEADER} bit is set.
+If neither bit is set (as is the case with static bitmaps), this routine
+has no effect.
+\funclabel{wn_get_image}
+\begin{verbatim}
+void wn_get_image(wn, src_x, src_y, width, height, dbm, dst_x, dst_y, ropfunc)
+int wn, src_x, src_y, width, height;
+bitmap_t *dbm;
+int dst_x, dst_y, ropfunc;
+\end{verbatim}
+Copies the area of window {\tt wn} given by {\tt src\_x}, {\tt src\_y},
+{\tt width}, {\tt height} to {\tt dst\_x}, {\tt dst\_y} in bitmap {\tt dbm},
+using rasterop function {\tt ropfunc}.
+
+The destination is clipped to fit inside the bitmap given - i.e. there
+is no danger of corrupting memory if the destination bitmap is too small or
+if {\tt (dst\_x, dst\_y)} lies outside {\tt dbm}.
+
+The destination bitmap {\tt dbm} must have the same depth (number of bits
+per pixel) as the display, otherwise a fatal error results.
+You can use {\tt wn\_get\_nplanes} (section \ref{wn_get_nplanes}
+to find out the number of planes of the display.
+\funclabel{wn_put_image}
+\begin{verbatim}
+void wn_put_image(sbm, src_x, src_y, width, height, wn, dst_x, dst_y, ropfunc, fg, bg)
+bitmap_t *sbm;
+int src_x, src_y, width, height;
+int wn;
+int dst_x, dst_y, ropfunc, fg, bg;
+\end{verbatim}
+Copies the area of bitmap {\tt sbm} given by {\tt src\_x}, {\tt src\_y},
+{\tt width}, {\tt height} to {\tt dst\_x}, {\tt dst\_y} in window {\tt wn},
+using rasterop function {\tt ropfunc}.
+
+The source bitmap {\tt sbm} must have either the same number of planes as
+the display, or one plane.
+In the latter case, pixels on the display are set to {\tt fg} for set (1)
+bits in the bitmap, and {\tt bg} for clear (0) bits (modulo {\tt ropfunc}).
+\funclabel{wn_copy_image}
+\begin{verbatim}
+void wn_copy_image(sbm, src_x, src_y, width, height, dbm, dst_x, dst_y, ropfunc)
+bitmap_t *sbm;
+src_x, src_y, width, height;
+bitmap_t *dbm;
+int dst_x, dst_y, ropfunc;
+\end{verbatim}
+Copies the area of bitmap {\tt sbm} given by {\tt src\_x}, {\tt src\_y},
+{\tt width}, {\tt height} to {\tt dst\_x}, {\tt dst\_y} in bitmap {\tt dbm},
+using rasterop function {\tt ropfunc}.
+The source and destination are clipped to fit {\tt sbm} and {\tt dbm} as in
+{\tt wn\_get\_image}.
+
+The source and destination bitmaps must have the same number of planes, and
+the same pixel format.
+
+\funclabel{wn_tile_area}
+\begin{verbatim}
+void wn_tile_area(wn, x, y, width, height, bm, ropfunc)
+int wn;
+int x, y, width, height, ropfunc;
+\end{verbatim}
+
+This function tiles an area specified by {\tt x}, {\tt y}, {\tt width} and
+{\tt height} in window {\tt wn} with the image in bitmap {\tt bm}.
+{\tt Bm} must be a 16 bit by 16 bit single plane bitmap.
+
+The {\tt wn\_get\_image} and {\tt wn\_put\_image} functions make the bits
+of the image available to the application.
+This is slow for large images under X and is overkill if the application
+just wants to save and restore an
+area of the window without looking at the bits (for example, when
+temporarily displaying a popup menu or dialog box).
+For this reason a pair of specialised functions are provided to save
+and restore an area of the window:
+\funclabel{wn_save_area}
+\begin{verbatim}
+long wn_save_area(wn, x, y, width, height)
+int wn;
+int x, y, width, height;
+\end{verbatim}
+\funclabel{wn_restore_area}
+\begin{verbatim}
+void wn_restore_area(area_id)
+long area_id;
+\end{verbatim}
+{\tt wn\_save\_area} saves the area of window {\tt wn} specified by
+{\tt x}, {\tt y}, {\tt width} {\tt height} and returns a handle on the
+saved area.
+The returned handle can later be passed to {\tt wn\_restore\_area} which
+restores the area to its state at the time {\tt wn\_save\_area} was called.
+{\tt Wn\_restore\_area} can be called more than once, but it always puts
+the image back in the same place.
+
+When you have finished with an area (usually immediately after calling
+{\tt wn\_restore\_area}) you should pass its area id to {\tt wn\_free\_area},
+which frees the resources used by the area:
+\funclabel{wn_free_area}
+\begin{verbatim}
+void wn_free_area(area_id)
+long area_id;
+\end{verbatim}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Cursors}
+These are the images that track the mouse.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Creating a cursor}
+\label{setcurs}
+The following function creates a cursor from a pair of bitmaps:
+\funclabel{wn_create_cursor}
+\begin{verbatim}
+cursor_t wn_create_cursor(cursor_bitmap, mask_bitmap)
+bitmap_t *cursor_bitmap, *mask_bitmap;
+\end{verbatim}
+This function does not cause the cursor to be displayed; it just
+creates the cursor and returns a {\em cursor identifier} which
+can be used to display the cursor.
+
+{\tt Cursor\_bitmap} contains the image of the cursor.
+{\tt Mask\_bitmap} acts as a stencil through which the image in
+{\tt cursor\_bitmap} is painted.  If {\tt mask\_bitmap} is {\tt NULL}
+then all bits of {\tt cursor\_bitmap} show.
+
+Some window systems impose restrictions on the size of cursor that can be used.
+A 16 bit by 16 bit cursor currently works on all window systems that {\em wn}
+runs over.
+A bitmap s clipped if it is too large to be used as a cursor.
+
+\funclabel{wn_define_cursor}
+\begin{verbatim}
+void wn_define_cursor(wn, cursor_id)
+int wn;
+cursor_t cursor_id;
+\end{verbatim}
+Causes cursor {\tt cursor\_id} to be displayed in window {\tt wn}
+whenever the mouse is in window {\tt wn}.
+{\tt Cursor\_id} should be a cursor identifier returned by
+{\tt wn\_create\_cursor}.
+
+There is only one cursor for each top level window -- if {\tt wn}
+is a subwindow (see section \ref{subwindows}) then the cursor is
+set for the whole of the top level window that contains that
+subwindow.
+If you want subwindows to have individual cursors you will have to
+change the cursor yourself when the mouse crosses a subwindow
+boundary.
+
+\funclabel{wn_get_window_cursor}
+\begin{verbatim}
+cursor_t wn_get_window_cursor(wn)
+int wn;
+\end{verbatim}
+This function returns the cursor identifier of the cursor that is
+currently defined for window {\tt wn}.
+As with {\tt wn\_define\_cursor}, if {\tt wn} is a subwindow, the
+cursor for its top level window is returned.
+If no cursor has been defined for the window, {\tt wn\_get\_window\_cursor}
+returns zero.
+
+\funclabel{wn_free_cursor}
+\begin{verbatim}
+void wn_free_cursor(cursor)
+cursor_t cursor;
+\end{verbatim}
+This function frees cursor {\tt cursor}.  {\tt Cursor} should not be used
+after this call.  The effect of freeing a cursor that is currently in
+use in a window is undefined.
+
+Normally the application will create all of its cursors from bitmaps on
+startup with {\tt wn\_create\_cursor}, then use {\tt wn\_define\_cursor} to
+change cursors.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Special cursors}
+\label{spcurs}
+{\em Wn} provides special cursors --- rubber lines and boxes, and crosshairs.
+\funclabel{wn_spcu}
+\begin{verbatim}
+void wn_spcu(wn, type_and_flags, x1, y1, x2, y2)
+int wn;
+unsigned type_and_flags;
+int x1, y2, x2, y2;
+\end{verbatim}
+Sets or turns off a special cursor for window wn.
+The normal cursor for the window is unaffected and appears as well
+as the special cursor.
+The {\tt type\_and\_flags} argument is made up of the bitwise OR of a
+cursor type and zero or more flags.
+
+The type part of {\tt type\_and\_flags} is one of:
+\begin{list}{}{}
+\item[\tt WN\_SC\_OFF]
+Turn off any special cursor.
+\item[\tt WN\_SC\_RECT]
+A rectangle with one corner at {\tt x1, y1} and the diagonally opposite 
+one at {\tt x2, y2}.
+\item[\tt WN\_SC\_LINE]
+A line from {\tt x1, y1} to {\tt x2, y2}.
+\item[\tt WN\_SC\_CROSS]
+Crosshairs centred on {\tt x1, y1}, made up of a horizontal and a vertical
+line.
+The {\tt x2, y2} arguments give the length and width of the lines.
+\end{list}
+The following flags may be ORed into the type argument:
+\begin{list}{}{}
+\item[\tt WN\_SC\_X1REL]
+Make {\tt x1} relative to the cursor position (i.e. where the mouse is pointing).
+\item[\tt WN\_SC\_Y1REL]
+Make {\tt y1} cursor relative.
+\item[\tt WN\_SC\_X2REL]
+Make {\tt x2} cursor relative.
+\item[\tt WN\_SC\_Y2REL]
+Make {\tt y1} cursor relative.
+\end{list}
+As an example, to get a rubber line with one end fixed at 100, 150 and the
+other tracking the cursor, use
+\begin{verbatim}
+wn_spcu(wn, WN_SC_LINE | WN_SC_X2REL | WN_SC_Y2REL, 100, 150, 0, 0);
+\end{verbatim}
+There are also some common combinations of type and flags defined:
+\begin{list}{}{}
+\item[\tt WN\_SC\_P1REL]
+Equivalent to {\tt WN\_SC\_X1REL | WN\_SC\_Y1REL}.
+\item[\tt WN\_SC\_P2REL]
+Equivalent to {\tt WN\_SC\_X2REL | WN\_SC\_Y2REL}.
+\item[\tt WN\_SC\_FRAME]
+Wire frame --- {\tt x1, y1} and {\tt x2, y2} relative to the cursor.
+\item[\tt WN\_SC\_RBOX]
+Rubber box --- {\tt x1, y1} relative to the cursor, {\tt x2, y2} fixed.
+\item[\tt WN\_SC\_RLINE]
+Rubber line --- {\tt x1, y1} relative to the cursor, {\tt x2, y2} fixed.
+\item[\tt WN\_SC\_XHAIR]
+Crosshair on {\tt x1, y1}, relative to the cursor.
+\end{list}
+There are a number of macros defined for the more common special cursors.
+They all call {\tt wn\_spcu}.
+\funclabel{wn_sc_rbox}
+\begin{verbatim}
+void wn_sc_rbox(wn, x, y)
+int wn, x, y;
+\end{verbatim}
+Sets a rubber box special cursor with one corner at {\tt x},{\tt y} and the
+other tracking the cursor.
+\funclabel{wn_sc_rline}
+\begin{verbatim}
+void wn_sc_rline(wn, x, y)
+int wn, x, y;
+\end{verbatim}
+Sets a rubber line special cursor in window {\tt wn} with one end tracking
+the cursor and the other fixed at {\tt x},{\tt y}.
+\funclabel{wn_sc_hline}
+\begin{verbatim}
+void wn_sc_hline(wn, x)
+int wn, x;
+\end{verbatim}
+Sets a horizontal rubber line special cursor for window {\tt wn}.
+The {\em x} coordinate of one end of the line is fixed at {\tt x}.
+The {\em x} coordinate of the other end tracks the cursor.
+The {\em y} coordinate of both ends tracks the {\em y} coordinate of the
+cursor.
+\funclabel{wn_sc_vline}
+\begin{verbatim}
+void wn_sc_vline(wn, y)
+int wn, y;
+\end{verbatim}
+As {\tt wn\_sc\_hline}, but the line is vertical, with the {\em y} coordinate of
+both ends at {\tt y}.
+\funclabel{wn_sc_off}
+\begin{verbatim}
+void wn_sc_off(wn)
+int wn;
+\end{verbatim}
+Turns off any special cursor.
+\begin{thebibliography}{99}
+\bibitem{med3doc}  J D Bovey,
+{\em A Tool for Providing Programs with Menus},
+UKC Computing Laboratory internal document.
+
+\bibitem{sunviewprog}
+{\em The SunView Programmer's Guide},
+Sun Microsystems Inc.
+
+\bibitem{sunviewsysprog}
+{\em The Sunview System Programmer's Guide},
+Sun Microsystems Inc.
+
+\bibitem{pixrect}
+{\em The Pixrect Reference Manual},
+Sun Microsystems Inc.
+
+\bibitem{xlib} Robert Scheifler et. al.
+{\em Xlib(1) -- C language interface to the X11 protocol},
+Massachusetts Institute of Technology.
+
+\end{thebibliography}
+\newpage
+\section{Index of functions}
+\begin{small}
+\begin{tabbing}
+\hspace{5.25in}\={\bf \normalsize Page}\\
+\input{wn-list}
+\end{tabbing}
+\end{small}
+\end{document}
