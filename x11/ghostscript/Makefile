@@ -8,7 +8,7 @@ ghostscript:
 	cd gs; \
 	make
 
-install: 
+install:
 	-mkdir -p ${lib}/fonts
 	install -c -o bin -g bin -m 444  fonts/[a-z]* ${lib}/fonts
 	cd gs; \
@@ -20,6 +20,6 @@ clean:
 	cd gs; \
 	make clean
 
-package:
+pkg:	ghostscript install pkg/+DESC pkg/+ONELINE pkg/+PLIST
 	strip /usr/gnu/bin/gs
-	pkg_create -v -c bin-desc -d README.FreeBSD -f bin-list ghostscript_bin.tgz
+	pkg_create -v -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST ghostscript_bin
