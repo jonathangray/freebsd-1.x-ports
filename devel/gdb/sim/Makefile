@@ -1,16 +1,16 @@
 # This file was generated automatically by configure.  Do not edit.
 VPATH = .
 links = 
-host_alias = i386--386bsd
+host_alias = i386--netbsd
 host_cpu = i386
 host_vendor = 
-host_os = bsd
-host_canonical = i386--bsd
-target_alias = i386--386bsd
+host_os = netbsd
+host_canonical = i386--netbsd
+target_alias = i386--netbsd
 target_cpu = i386
 target_vendor = 
-target_os = bsd
-target_canonical = i386--bsd
+target_os = netbsd
+target_canonical = i386--netbsd
 #    Makefile template for Configure for the sim library.
 #    Copyright (C) 1993 Free Software Foundation, Inc.
 #    Written by Cygnus Support.
@@ -33,7 +33,7 @@ target_canonical = i386--bsd
 
 srcdir = .
 srcroot = $(srcdir)/..
-prefix = /usr/gnu
+prefix = /usr/local
 program_transform_name = 
 
 exec_prefix = $(prefix)
