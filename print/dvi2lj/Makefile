@@ -10,10 +10,10 @@ pkg:	install pkg/+DESC pkg/+ONELINE pkg/+PLIST
 
 afterinstall:
 	install -c -o bin -g bin -m 555 \
-	${.CURDIR}/df_lj ${DESTDIR}/df_lj
+	${.CURDIR}/df_lj ${DESTDIR}${BINDIR}/df_lj
 	install -c -o bin -g bin -m 555 \
-	${.CURDIR}/df_lj ${DESTDIR}/gf_lj
+	${.CURDIR}/df_lj ${DESTDIR}${BINDIR}/gf_lj
 	install -c -o bin -g bin -m 555 \
-	${.CURDIR}/df_lj ${DESTDIR}/if_lj
+	${.CURDIR}/df_lj ${DESTDIR}${BINDIR}/if_lj
 
 .include <bsd.prog.mk>
