@@ -5,9 +5,11 @@
 SUBDIR =
 G_SUBDIR =
 
-SUBDIR = golddig
-SUBDIR = seahaven
-SUBDIR = xjewel
+SUBDIR += golddig
+SUBDIR += seahaven
+SUBDIR += xjewel
+SUBDIR += xboing
+SUBDIR += xpilot
 
 .include <bsd.subdir_ports.mk>
 
