@@ -1,0 +1,3894 @@
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+NAME
+     zsh - the Z shell
+
+SYNOPSIS
+     zsh [ +__o_p_t_i_o_n_s ] [ +_o _o_p_t_i_o_n ] ...  [ -c _s_t_r_i_n_g ] [ _a_r_g  ...
+     ]
+
+SHELL GRAMMAR
+     A _s_i_m_p_l_e _c_o_m_m_a_n_d is a sequence of optional parameter assign-
+     ments  followed  by  blank-separated  words,  with  optional
+     redirections interspersed.  The first word is the command to
+     be  executed, and the remaining words, if any, are arguments
+     to the command.  If a command name is given,  the  parameter
+     assignments modify the environment of the command when it is
+     executed.  The value of a simple command is its exit status,
+     or 128 plus the signal number if terminated by a signal.
+
+     If a simple command is preceded by the word exec, it is exe-
+     cuted  in  the parent shell without forking.  If preceded by
+     command, the command word is taken to  be  the  name  of  an
+     external  command,  rather than a shell function or builtin.
+     If preceded by noglob, filename generation is not  performed
+     on  any  of  the  words.  If preceded by a -, the command is
+     executed with a - prepended to its argv[0] string.  If  pre-
+     ceded  by  nocorrect, spelling correction is not done on any
+     of the words.
+
+     A _p_i_p_e_l_i_n_e is a sequence of one or more  commands  separated
+     by  | or |&.  |& is shorthand for 2>&1 |.  The standard out-
+     put of each command is connected to the  standard  input  of
+     the next command in the pipeline.
+
+     The value of a pipeline is the value of  the  last  command.
+     If a pipeline is preceded by a !, the value of that pipeline
+     is the logical NOT of the value of the last command.
+
+     If a pipeline is preceded by coproc, it  is  executed  as  a
+     coprocess;  a two-way pipe is established between it and the
+     parent shell.  The shell can  read  from  or  write  to  the
+     coprocess by means of the >&p and <&p redirection operators.
+
+     A _s_u_b_l_i_s_t is a sequence of one or more  pipelines  separated
+     by  &&  or  ||.   If  two pipelines are separated by &&, the
+     second pipeline is executed only if the first is  successful
+     (returns  a  zero value).  If two pipelines are separated by
+     ||, the second is executed only if the first is unsuccessful
+     (returns a nonzero value).
+
+     A _l_i_s_t is a sequence of one or more sublists  separated  by,
+     and  optionally terminated by, ;, &, or a newline.  Normally
+     the shell waits for each list to finish before executing the
+     next  one.   If  a  list  is  terminated  by  a &, the shell
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                  1
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     executes it in the background, and does not wait for  it  to
+     finish.
+
+     A _c_o_m_p_l_e_x _c_o_m_m_a_n_d is one of the following:
+
+          for _n_a_m_e [ in _w_o_r_d ... ]
+          do _l_i_s_t
+          done Expand the list of _w_o_r_ds, and  set  the  parameter
+               _n_a_m_e  to each of them in turn, executing _l_i_s_t each
+               time.  If the in _w_o_r_d is omitted,  use  the  posi-
+               tional parameters instead of the _w_o_r_ds.
+
+          for _n_a_m_e [ in _w_o_r_d ... ] ; _s_u_b_l_i_s_t
+               This is a shorthand for for.  Though it may  cause
+               confusion, it is included for convenience; its use
+               in scripts is discouraged,  unless  _s_u_b_l_i_s_t  is  a
+               command of the form { _l_i_s_t }.
+
+          foreach _n_a_m_e ( _w_o_r_d ... )
+          _l_i_s_t
+          end  Another form of for.
+
+          for _n_a_m_e in _w_o_r_d ...
+          {
+          _l_i_s_t
+          }    Another form of for.
+
+          for _n_a_m_e ( _w_o_r_d ... ) {
+          _l_i_s_t
+          }    Another form of for.
+
+          for _n_a_m_e ( _w_o_r_d ... ) _s_u_b_l_i_s_t
+               Another form of for.
+
+          select _n_a_m_e [ in _w_o_r_d ... ]
+          do _l_i_s_t
+          done Print the set of _w_o_r_ds, each preceded by a number.
+               If  the  in  _w_o_r_d  is  omitted, use the positional
+               parameters.  The PROMPT3 prompt is printed  and  a
+               line  is  read  from standard input.  If this line
+               consists of the number of one of the listed _w_o_r_ds,
+               then  the  parameter  _n_a_m_e  is  set  to  the  _w_o_r_d
+               corresponding to this number.   If  this  line  is
+               empty,  the selection list is printed again.  Oth-
+               erwise, the value of the parameter _n_a_m_e is set  to
+               null.  The contents of the line read from standard
+               input is saved in the parameter  REPLY.   _l_i_s_t  is
+               executed  for each selection until a break or end-
+               of-file is encountered.
+
+          select _n_a_m_e [ in _w_o_r_d ] ; _s_u_b_l_i_s_t
+               A short form of select.
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                  2
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          case _w_o_r_d in [ _p_a_t_t_e_r_n ) _l_i_s_t ;; ] ...  esac
+               Execute the _l_i_s_t associated with the first _p_a_t_t_e_r_n
+               that  matches  _w_o_r_d, if any.  The form of the pat-
+               terns is the same as that used for  filename  gen-
+               eration.  See _F_i_l_e_n_a_m_e _G_e_n_e_r_a_t_i_o_n below.
+
+          case _w_o_r_d { [ _p_a_t_t_e_r_n ) _l_i_s_t ;; ] ...  }
+               Another form of case.
+
+          if _l_i_s_t
+          then _l_i_s_t
+          [ elif _l_i_s_t ; then _l_i_s_t ] ...
+          [ else _l_i_s_t ]
+          fi   The if _l_i_s_t is executed, and, if it returns a zero
+               exit  status,  the  then _l_i_s_t is executed.  Other-
+               wise, the elif _l_i_s_t is executed and, if its  value
+               is  zero, the then _l_i_s_t is executed.  If each elif
+               _l_i_s_t returns nonzero, the else _l_i_s_t is executed.
+
+          if ( _l_i_s_t ) _s_u_b_l_i_s_t
+               A short form of if.
+
+          if ( _l_i_s_t ) {
+          _l_i_s_t
+          } elif ( _l_i_s_t ) {
+          _l_i_s_t
+          } ... else {
+          _l_i_s_t
+          }    An alternate form of if.
+
+          while _l_i_s_t
+          do _l_i_s_t
+          done Execute the do _l_i_s_t as  long  as  the  while  _l_i_s_t
+               returns a zero exit status.
+
+          while ( _l_i_s_t ) {
+          _l_i_s_t
+          }    An alternate form of while.
+
+          until _l_i_s_t
+          do _l_i_s_t
+          done Execute the do _l_i_s_t as long as until _l_i_s_t  returns
+               a nonzero exit status.
+
+          repeat _w_o_r_d
+          do _l_i_s_t
+          done _w_o_r_d is expanded  and  treated  as  an  arithmetic
+               expression,  which  must  evaluate  to a number _n.
+               _l_i_s_t is then executed n times.
+
+          repeat _w_o_r_d _s_u_b_l_i_s_t
+               This is a short form of repeat.
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                  3
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          ( _l_i_s_t )
+               Execute _l_i_s_t in a subshell.
+
+          { _l_i_s_t }
+               Execute _l_i_s_t.
+
+          function _w_o_r_d [ () ] ... { _l_i_s_t }
+          _w_o_r_d ... () { _l_i_s_t }
+          _w_o_r_d ... () _s_u_b_l_i_s_t
+               Define a function which is referenced by  any  one
+               of  _w_o_r_d.   Normally,  only  one _w_o_r_d is provided;
+               multiple _w_o_r_ds are usually only useful for setting
+               traps.   The  body  of  the  function  is the _l_i_s_t
+               between the { and }.  See FUNCTIONS below.
+
+          time [ _p_i_p_e_l_i_n_e ]
+               The _p_i_p_e_l_i_n_e is executed,  and  timing  statistics
+               are  reported  on  the  standard error in the form
+               specified by the TIMEFMT parameter.   If  _p_i_p_e_l_i_n_e
+               is  omitted, print statistics about the shell pro-
+               cess and its children.
+
+          [[ _e_x_p ]]
+               Evaluates  the  conditional  expression  _e_x_p   and
+               return a zero exit status if it is true.  See Con-
+               ditional Expressions below for  a  description  of
+               _e_x_p.
+
+RESERVED WORDS
+     The following words are recognized as  reserved  words  when
+     used as the first word of a command unless quoted or removed
+     using the unalias builtin:
+
+          do done esac then elif else fi for case if while  func-
+          tion  repeat  time  until  exec  command  select coproc
+          noglob - nocorrect foreach end
+
+COMMENTS
+     In noninteractive shells, or in interactive shells with  the
+     INTERACTIVE_COMMENTS  option  set, a word beginning with the
+     third character of the HISTCHARS parameter (`#' by  default)
+     causes  that  word  and all the following characters up to a
+     newline to be ignored.
+
+ALIASING
+     Every token in the shell input is checked to see if there is
+     an  alias defined for it.  If so, it is replaced by the text
+     of the alias if it is in command position (if  it  could  be
+     the first word of a simple command), or if the alias is glo-
+     bal.  If the text ends with a space, the next  word  in  the
+     shell input is treated as though it were in command position
+     for purposes of alias expansion.  An alias is defined  using
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                  4
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     the  alias  builtin; global aliases may be defined using the
+     -g option to that bulitin.
+
+     Alias substitution is done on the  shell  input  before  any
+     other  substitution except history substitution.  Therefore,
+     if an alias is defined for the word foo, alias  substitution
+     may  be avoided by quoting part of the word, e.g. \foo.  But
+     there is nothing to prevent an alias being defined for  \foo
+     as well.
+
+QUOTING
+     A character may be  _q_u_o_t_e_d  (that  is,  made  to  stand  for
+     itself)  by  preceding it with a \.  \ followed by a newline
+     is ignored.  All characters enclosed between a pair of  sin-
+     gle  quotes  ('')  are quoted.  A single quote cannot appear
+     within single quotes.  Inside double quotes (""),  parameter
+     and command substitution occurs, and \ quotes the characters
+     \, `, ", and $.
+
+EXPANSION
+     Expansion is performed on the command line after it has been
+     parsed.   The  types  of  expansions  performed are _f_i_l_e_n_a_m_e
+     _e_x_p_a_n_s_i_o_n, _p_r_o_c_e_s_s _s_u_b_s_t_i_t_u_t_i_o_n, _p_a_r_a_m_e_t_e_r  _e_x_p_a_n_s_i_o_n,  _c_o_m_-
+     _m_a_n_d  _s_u_b_s_t_i_t_u_t_i_o_n,  _a_r_i_t_h_m_e_t_i_c  _e_x_p_a_n_s_i_o_n, _b_r_a_c_e _e_x_p_a_n_s_i_o_n,
+     and _f_i_l_e_n_a_m_e _g_e_n_e_r_a_t_i_o_n.
+
+  Filename Expansion
+     Each word is checked to see if it begins with an unquoted ~.
+     If  it does, then the word up to a / is checked to see if it
+     matches the name of a named directory.  If so,  then  the  ~
+     and  the  matched portion are replaced with the value of the
+     named directory.  A ~ by  itself  or  followed  by  a  /  is
+     replaced  by  the value of the HOME parameter.  A ~ followed
+     by a + or a - is replaced by the value  of  PWD  or  OLDPWD,
+     respectively.
+
+     Named directories are typically login directories for  users
+     on  the  system.  They may also be defined if the text after
+     the ~ is the name of a string shell  parameter  whose  value
+     begins  with a /.  In certain circumstances (in prompts, for
+     instance), when the shell prints a path, the path is checked
+     to  see  if  it has a named directory as its prefix.  If so,
+     then the prefix portion is replaced with a ~ followed by the
+     name of the directory.  The longest match is preferred.
+
+     If a word begins with an unquoted = and the NO_EQUALS option
+     is  not  set, the remainder of the word is taken as the name
+     of a command or alias.  If a command exists  by  that  name,
+     the  word  is  replaced by the full pathname of the command.
+     If an alias exists by that name, the word is  replaced  with
+     the  text of the alias.  Otherwise the word is checked up to
+     a / to see if it is a number or a -.   If  so,  the  matched
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                  5
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     portion  is replaced with the _nth directory in the directory
+     stack, where _n is the number matched, or the last  directory
+     in the directory stack if a - is matched.
+
+  Process Substitution
+     Each command argument of the  form  <(_l_i_s_t)  or  >(_l_i_s_t)  or
+     =(_l_i_s_t)  is subject to process substitution.  In the case of
+     the < or > forms, the shell will run process _l_i_s_t  asynchro-
+     nously  connected  to a named pipe (FIFO).  The name of this
+     pipe will become the argument to the command.  If  the  form
+     with  >  is  selected then writing on this file will provide
+     input for _l_i_s_t.  If < is used, then the file  passed  as  an
+     argument will be a named pipe connected to the output of the
+     _l_i_s_t process.  For example,
+
+          paste <(cut -f1 _f_i_l_e_1) <(cut -f3 _f_i_l_e_2)  |  tee  >(_p_r_o_-
+          _c_e_s_s_1) >(_p_r_o_c_e_s_s_2) >/dev/null
+
+     cuts fields 1 and 3 from the files _f_i_l_e_1 and  _f_i_l_e_2  respec-
+     tively,  pastes  the  results  together, and sends it to the
+     processes _p_r_o_c_e_s_s_1 and _p_r_o_c_e_s_s_2.  Note that the file,  which
+     is passed as an argument to the command, is a system pipe so
+     programs that expect to lseek(2) on the file will not  work.
+     Also  note  that  the previous example can be more compactly
+     and efficiently written as:
+
+          paste <(cut -f1 _f_i_l_e_1) <(cut -f3 _f_i_l_e_2) > >(_p_r_o_c_e_s_s_1) >
+          >(_p_r_o_c_e_s_s_2)
+
+     The shell uses pipes  instead  of  FIFOs  to  implement  the
+     latter two process substitutions in the above example.
+
+     If = is used, then the file passed as an  argument  will  be
+     the  name  of  a temporary file containing the output of the
+     _l_i_s_t process.  This may be used instead of the < form for  a
+     program that expects to lseek(2) on the input file.
+
+  Parameter Expansion
+     The character $ is used to introduce  parameter  expansions.
+     See PARAMETERS below for a description of parameters.
+
+          ${_n_a_m_e}
+               The value, if any, of the parameter _n_a_m_e  is  sub-
+               stituted.  The braces are required if _n_a_m_e is fol-
+               lowed by a letter, digit, or  underscore  that  is
+               not  to  be  interpreted  as part of its name.  If
+               _n_a_m_e is an array parameter,  then  the  values  of
+               each  element  of _n_a_m_e is substituted, one element
+               per word.  Otherwise, the expansion results in one
+               word  only;  no  word  splitting  is  done  on the
+               result.
+
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                  6
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          ${_n_a_m_e:-_w_o_r_d}
+               If _n_a_m_e is set and is non-null then substitute its
+               value; otherwise substitute _w_o_r_d.
+
+          ${_n_a_m_e:=_w_o_r_d}
+               If _n_a_m_e is unset or is null then set it  to  _w_o_r_d;
+               the value of the parameter is then substituted.
+
+          ${_n_a_m_e:?_w_o_r_d}
+               If _n_a_m_e is set and is  non-null,  then  substitute
+               its value; otherwise, print _w_o_r_d and exit from the
+               shell.  If _w_o_r_d is omitted, then a  standard  mes-
+               sage is printed.
+
+          ${_n_a_m_e:+_w_o_r_d}
+               If _n_a_m_e is set and  is  non-null  then  substitute
+               _w_o_r_d; otherwise substitute nothing.
+          ${_n_a_m_e#_p_a_t_t_e_r_n}
+          ${_n_a_m_e##_p_a_t_t_e_r_n}
+               If the _p_a_t_t_e_r_n matches the beginning of the  value
+               of  _n_a_m_e,  then  substitute the value of _n_a_m_e with
+               the matched portion deleted; otherwise, just  sub-
+               stitute the value of _n_a_m_e.  In the first form, the
+               smallest matching pattern  is  preferred;  in  the
+               second  form, the largest matching pattern is pre-
+               ferred.
+          ${_n_a_m_e%_p_a_t_t_e_r_n}
+          ${_n_a_m_e%%_p_a_t_t_e_r_n}
+               If the _p_a_t_t_e_r_n matches the end  of  the  value  of
+               _n_a_m_e,  then  substitute the value of _n_a_m_e with the
+               matched portion deleted; otherwise,  just  substi-
+               tute  the  value  of _n_a_m_e.  In the first form, the
+               smallest matching pattern  is  preferred;  in  the
+               second  form, the largest matching pattern is pre-
+               ferred.
+
+          ${#_s_p_e_c}
+               If _s_p_e_c is one of the above substitutions, substi-
+               tute  the  length  in  characters  of  the  result
+               instead of the result itself.  If _s_p_e_c is an array
+               expression,  substitute  the number of elements of
+               the result.
+
+          ${^_s_p_e_c}
+               Toggle the value of the RC_EXPAND_PARAM option for
+               the  evaluation of _s_p_e_c.  When this option is set,
+               array expansions of the  form  _f_o_o${_x_x}_b_a_r,  where
+               the  parameter  _x_x  is set to (_a _b _c), are substi-
+               tuted with _f_o_o_a_b_a_r _f_o_o_b_b_a_r _f_o_o_c_b_a_r instead of  the
+               default _f_o_o_a _b _c_b_a_r.
+
+          ${=_s_p_e_c}
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                  7
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+               Toggle the value of the SH_WORD_SPLIT  option  for
+               the  evaluation of _s_p_e_c.  When this option is set,
+               parameter values are  split  into  separate  words
+               using  IFS  as  a  delimiter  before substitution.
+               This is done by default in most other shells.
+
+     If the colon is omitted from one of  the  above  expressions
+     containing  a colon, then the shell only checks whether _n_a_m_e
+     is set or not, not whether it is null.
+
+  Command Substitution
+     A command enclosed in parentheses preceded by a dollar sign,
+     like  so:  $(...)  or  quoted  with  grave accents: `...` is
+     replaced with its standard output.  If the  substitution  is
+     not  enclosed  in  double  quotes, the output is broken into
+     words using the IFS parameter.  The substitution $(cat  foo)
+     may be replaced by the equivalent but faster $(<foo).
+
+  Arithmetic Expansion
+     A string of the form $[_e_x_p] is substituted with the value of
+     the arithmetic expression _e_x_p.  _e_x_p is treated as if it were
+     within single quotes.  See ARITHMETIC EVALUATION below.
+
+  Brace Expansion
+     A string of the form _f_o_o{_x_x,_y_y,_z_z}_b_a_r  is  expanded  to  the
+     individual  words  _f_o_o_x_x_b_a_r,  _f_o_o_y_y_b_a_r, and _f_o_o_z_z_b_a_r.  Left-
+     to-right order is preserved.  This construct may be  nested.
+     Malformed brace expansion expressions, including expressions
+     without a comma, are left unchanged by the shell.
+
+     An expression of the form {_x-_y}, where _x and  _y  are  single
+     characters,  is expanded to every character between _x and _y,
+     inclusive.
+
+  Filename Generation
+     If a word contains an unquoted instance of one of the  char-
+     acters  *,  |,  <,  [, or ?, it is regarded as a pattern for
+     filename generation, unless the NOGLOB option  is  set.   If
+     the EXTENDED_GLOB option is set, the ^ and # characters also
+     denote a pattern; otherwise they are not  treated  specially
+     by  the  shell.   The word is replaced with a list of sorted
+     filenames that match the pattern.  If no matching pattern is
+     found, the shell gives an error message, unless the NULLGLOB
+     option is set, in which case the word is deleted; or  unless
+     the NO_NOMATCH option is set, in which case the word is left
+     unchanged.  In filename generation, the character / must  be
+     matched  explicitly; also, a . must be matched explicitly at
+     the beginning of a pattern or after a /, unless the GLOBDOTS
+     option  is  set.  No filename generation pattern matches the
+     files "." or "..".  In other instances of pattern  matching,
+     the / and . are not treated specially.
+
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                  8
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          *    matches any string, including the null string.
+          ?    matches any character.
+          [ ... ]
+               matches any of the enclosed characters.
+          [^ ... ]
+               matches any character except the enclosed  charac-
+               ters.
+          <x-y>
+               matches any number in the range x to y, inclusive.
+               If  x  is omitted, the number must be less than or
+               equal to y.  If y is omitted, the number  must  be
+               greater than or equal to x.  A pattern of the form
+               <-> or simply <> matches any number.
+          ^x   matches anything except the pattern x.
+          x|y  matches either x or y.
+          x#   matches zero or more occurrences of the pattern x.
+          x##  matches one or more occurrences of the pattern x.
+
+     Parentheses may be used for grouping.  Note that the | char-
+     acter  must  be  within  parentheses,  so  that  the lexical
+     analyzer does not think it is a pipe character.   Also  note
+     that "/" has a higher precedence than "^"; that is:
+
+          ls ^_f_o_o/_b_a_r
+
+     will search directories in "." except  "./foo"  for  a  file
+     named bar.
+
+     A pathname component of the form (_f_o_o/)# matches a path con-
+     sisting  of  zero  or  more directories matching the pattern
+     foo.  As a shorthand, **/ is equivalent to (*/)#.  Thus:
+
+          ls (*/)#_b_a_r
+
+     or
+
+          ls **/_b_a_r
+
+     does a recursive directory search for files named bar.
+
+     If used for filename generation, a pattern  may  contain  an
+     exclusion   specifier.    Such  patterns  are  of  the  form
+     _p_a_t_1~_p_a_t_2.  This pattern will generate  all  files  matching
+     _p_a_t_1,  but  which do not match _p_a_t_2.  For example, *.c~lex.c
+     will match all files ending in .c, except the file lex.c.
+
+     Patterns used for filename generation may also end in a list
+     of  qualifiers  enclosed  in  parentheses.   The  qualifiers
+     specify which filenames that otherwise match the given  pat-
+     tern will be inserted in the argument list.  A qualifier may
+     be any one of the following:
+          /    directories
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                  9
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          .    plain files
+          @    symbolic links
+          =    sockets
+          p    named pipes (FIFOs)
+          *    executable plain files (0100)
+          %    device files (character or block special)
+          r    readable files (0400)
+          w    writable files (0200)
+          x    executable files (0100)
+          R    world-readable files (0004)
+          W    world-writable files (0002)
+          X    world-executable files (0001)
+          s    setuid files (04000)
+          S    setgid files (02000)
+          d_d_e_v files on the device _d_e_v
+          l_c_t  files having a link count of _c_t
+          U    files owned by the effective user id
+          G    files owned by the effective group id
+          u_n_u_m files owned by user id _n_u_m
+          g_n_u_m files owned by group id _n_u_m
+          a[-|+]_n
+               files accessed within last n days (-), more than n
+               days ago (+), or n days ago.
+          m[-|+]_n
+               files modified within last n days (-), more than n
+               days ago (+), or n days ago.
+          c[-|+]_n
+               files whose inode changed within last n days  (-),
+               more than n days ago (+), or n days ago.
+          L[+|-]_n
+               files less than n bytes (-),  more  than  n  bytes
+               (+), or exactly n bytes in length.
+          ^    negates all qualifiers following it
+          M    sets the MARKDIRS option for the current pattern
+          N    sets the NULLGLOB option for the current pattern
+          D    sets the GLOBDOTS option for the current pattern
+
+     Thus:
+
+          ls *(%W)
+
+     lists all world-writable device files in the current  direc-
+     tory, and
+
+          ls /tmp/foo*(u0^@)
+
+     lists all root-owned files beginning with the  string  "foo"
+     in /tmp, ignoring symlinks, and
+
+          ls *.*~(lex|parse).[ch](^D^l1)
+
+
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 10
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     lists all files having a link count of one whose names  con-
+     tain  a  dot (but not those starting with a dot, since GLOB-
+     DOTS is explicitly switched off) except  for  lex.c,  lex.h,
+     parse.c,  and  parse.h.   A  "/"  at the end of a pattern is
+     equivalent to "(/)".
+
+REDIRECTION
+     Before a command is executed, its input and  output  may  be
+     redirected.   The following may appear anywhere in a simple-
+     command or may precede or follow a complex command.  Substi-
+     tution occurs before _w_o_r_d is used except as noted below.  If
+     the result of substitution on _w_o_r_d produces  more  than  one
+     filename,  redirection  occurs for each separate filename in
+     turn.
+
+     <_w_o_r_d
+          Open file _w_o_r_d as standard input.
+
+     >_w_o_r_d
+          Open file _w_o_r_d as standard output.  If  the  file  does
+          not  exist then it is created.  If the file exists, and
+          the NOCLOBBER option is set, this causes an error; oth-
+          erwise, it is truncated to zero length.
+
+     >! _w_o_r_d
+          Same as >, except that the file is  truncated  to  zero
+          length if it exists, even if NOCLOBBER is set.
+
+     >>_w_o_r_d
+          Open file _w_o_r_d as standard output.  If the file  exists
+          then  output  is  appended to it.  If the file does not
+          exist, and the NOCLOBBER option is set, this causes  an
+          error; otherwise, the file is created.
+
+     >>! _w_o_r_d
+          Same as >>, except that the file is created if it  does
+          not exist, even if NOCLOBBER is set.
+
+     <<[-] _w_o_r_d
+          The shell input is read up to a line that is  the  same
+          as  _w_o_r_d, or to an end-of-file.  No parameter substitu-
+          tion, command substitution or  filename  generation  is
+          performed  on  _w_o_r_d.   The resulting document, called a
+          _h_e_r_e-_d_o_c_u_m_e_n_t, becomes  the  standard  input.   If  any
+          character  of  _w_o_r_d  is  quoted  with  single or double
+          quotes or a \, no interpretation  is  placed  upon  the
+          characters  of  the document.  Otherwise, parameter and
+          command substitution occurs, \ followed by a newline is
+          removed,  and \ must be used to quote the characters \,
+          $, `, and the first character of _w_o_r_d.  If <<- is used,
+          then  all  leading tabs are stripped from _w_o_r_d and from
+          the document.
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 11
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     <<<_w_o_r_d
+          Open a file containing _w_o_r_d, after expansion, as  stan-
+          dard input.
+
+     <&_d_i_g_i_t
+          The standard input is duplicated from  file  descriptor
+          _d_i_g_i_t  (see  _d_u_p(2)).   Similarly  for  standard output
+          using >&_d_i_g_i_t.
+
+     >&_w_o_r_d
+          Same as >_w_o_r_d 2>&1.
+
+     >>&_w_o_r_d
+          Same as >>_w_o_r_d 2>&1.
+
+     <&-  Close the standard input.
+
+     >&-  Close the standard output.
+
+     <&p  The input from the coprocess is moved to  the  standard
+          input.
+
+     >&p  The output to the coprocess is moved  to  the  standard
+          output.
+
+     If one of the above is preceded by a digit,  then  the  file
+     descriptor  referred  to  is  that  specified  by  the digit
+     (instead of the  default  0  or  1).   The  order  in  which
+     redirections are specified is significant.  The shell evalu-
+     ates each redirection in  terms  of  the  (_f_i_l_e  _d_e_s_c_r_i_p_t_o_r,
+     _f_i_l_e) association at the time of evaluation.  For example:
+
+          ... 1>_f_n_a_m_e 2>&1
+
+     first associates file descriptor 1 with file _f_n_a_m_e.  It then
+     associates  file  descriptor 2 with the file associated with
+     file descriptor  1  (that  is,  _f_n_a_m_e).   If  the  order  of
+     redirections were reversed, file descriptor 2 would be asso-
+     ciated with the terminal (assuming  file  descriptor  1  had
+     been)  and  then  file descriptor 1 would be associated with
+     file _f_n_a_m_e.
+
+     If the user tries to open a file descriptor for writing more
+     than  once, the shell opens the file descriptor as a pipe to
+     a process that copies its input to all  the  specified  out-
+     puts, similar to tee(1).  Thus:
+
+          date >foo >bar
+
+     writes the date to two files, named "foo" and  "bar".   Note
+     that a pipe is an implicit indirection; thus
+
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 12
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          date >foo | cat
+
+     writes the date to the file "foo", and also pipes it to cat.
+
+     If the user tries to open a file descriptor for reading more
+     than  once, the shell opens the file descriptor as a pipe to
+     a process that copies all the specified inputs to its output
+     in the order specified, similar to cat(1).  Thus
+
+          sort <foo <fubar
+
+     or even
+
+          sort <f{oo,ubar}
+
+     is equivalent to "cat foo bar | sort".  Note that a pipe  is
+     in implicit indirection; thus
+
+          cat bar | sort <foo
+
+     is equivalent to "cat bar foo | sort" (note the order of the
+     inputs).
+
+     If a simple command consists  of  one  or  more  redirection
+     operators  and  zero  or  more parameter assignments, but no
+     command name, the command cat is assumed.  Thus
+
+          < file
+
+     prints the contents of file.
+
+     If a command is followed by & and job control is not active,
+     then the default standard input for the command is the empty
+     file /dev/null.  Otherwise, the environment for  the  execu-
+     tion  of  a  command  contains  the  file descriptors of the
+     invoking shell as modified by input/output specifications.
+
+COMMAND EXECUTION
+     If a command name contains no slashes, the shell attempts to
+     locate  it.   If there exists a shell function by that name,
+     the function is invoked as described below in FUNCTIONS.  If
+     there  exists  a  shell builtin by that name, the builtin is
+     invoked.
+
+     Otherwise, the shell searches each element  of  path  for  a
+     directory  containing  an  executable file by that name.  If
+     the search is unsuccessful, the shell prints an  error  mes-
+     sage and returns a nonzero exit status.
+
+     If execution fails because the file  is  not  in  executable
+     format, and the file is not a directory, it is assumed to be
+     a shell script.  /bin/sh is spawned to execute it.   If  the
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 13
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     program  is  a  file beginning with #!, the remainder of the
+     first line specifies an interpreter for  the  program.   The
+     shell  will  execute  the specified interpreter on operating
+     systems that do not handle this  executable  format  in  the
+     kernel.
+
+FUNCTIONS
+     The function reserved word is used  to  define  shell  func-
+     tions.   Shell  functions are read in and stored internally.
+     Alias names are resolved when the function is  read.   Func-
+     tions  are  executed like commands with the arguments passed
+     as positional parameters.  (See _E_x_e_c_u_t_i_o_n below).
+
+     Functions execute in the same  process  as  the  caller  and
+     share  all  files  and  present  working  directory with the
+     caller.  A trap on EXIT set inside a  function  is  executed
+     after  the  function  completes  in  the  environment of the
+     caller.
+
+     The return builtin is used to return from function calls.
+
+     Function identifiers can be listed with the functions  buil-
+     tin.   Functions  can be undefined with the unfunction buil-
+     tin.
+
+     The following functions, if defined, have special meaning to
+     the shell:
+
+     chpwd
+          Executed whenever  the  current  working  directory  is
+          changed.
+     precmd
+          Executed before each prompt.
+     periodic
+          If the parameter PERIOD is set, this function  is  exe-
+          cuted every PERIOD seconds, just before a prompt.
+     TRAPxxx
+          If defined and non-null, this function will be executed
+          whenever  the  shell catches a signal SIGxxx, where xxx
+          is a signal name as specified for the kill builtin (see
+          below).   In  addition,  TRAPERR is executed whenever a
+          command has a non-zero exit status, TRAPDEBUG  is  exe-
+          cuted after each command, and TRAPEXIT is executed when
+          the shell exits, or when the current function exits  if
+          defined  inside a function.  If a function of this form
+          is defined and null, the shell and processes spawned by
+          it will ignore SIGxxx.
+
+JOBS
+     If the MONITOR option is set, an interactive  shell  associ-
+     ates  a _j_o_b with each pipeline.  It keeps a table of current
+     jobs, printed by the jobs command, and  assigns  them  small
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 14
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     integer  numbers.  When a job is started asynchronously with
+     &, the shell prints a line which looks like:
+
+          [1] 1234
+
+     indicating that the job which was started asynchronously was
+     job  number 1 and had one (top-level) process, whose process
+     id was 1234.
+
+     If you are running a job and wish to do something  else  you
+     may  hit the key ^Z (control-Z) which sends a STOP signal to
+     the current job.  The shell will then normally indicate that
+     the job has been `suspended', and print another prompt.  You
+     can then manipulate the state of this job, putting it in the
+     background  with  the bg command, or run some other commands
+     and then eventually bring the job back into  the  foreground
+     with  the  foreground command fg.  A ^Z takes effect immedi-
+     ately and is like an interrupt in that  pending  output  and
+     unread input are discarded when it is typed.
+
+     A job being run in the background will suspend if  it  tries
+     to  read  from  the  terminal.  Background jobs are normally
+     allowed to produce output, but this can be disabled by  giv-
+     ing  the  command  ``stty  tostop''.   If  you  set this tty
+     option, then background jobs will suspend when they  try  to
+     produce output like they do when they try to read input.
+
+     There are several ways to refer to jobs in the shell.  A job
+     can  be  referred to by the process id of any process of the
+     job or by one of the following:
+     %_n_u_m_b_e_r
+          The job with the given number.
+     %_s_t_r_i_n_g
+          Any job whose command line begins with _s_t_r_i_n_g.
+     %?_s_t_r_i_n_g
+          Any job whose command line contains _s_t_r_i_n_g.
+     %%   Current job.
+     %+   Equivalent to %%.
+     %-   Previous job.
+
+     The shell learns  immediately  whenever  a  process  changes
+     state.   It  normally  informs  you  whenever  a job becomes
+     blocked so that no further progress is possible.  If  notify
+     is  not  set,  it waits until just before it prints a prompt
+     before it informs you.
+
+     When the monitor mode is on, each background job  that  com-
+     pletes triggers any trap set for CHLD.
+
+     When you try to leave the shell while jobs  are  running  or
+     suspended, you will be warned that `You have suspended (run-
+     ning) jobs.' You may use the jobs command to see  what  they
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 15
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     are.   If  you do this or immediately try to exit again, the
+     shell will not warn you a second time;  the  suspended  jobs
+     will  be  terminated,  and  the  running jobs will be sent a
+     SIGHUP signal.  To avoid having the shell terminate the run-
+     ning  jobs,  either  use  the nohup(1) command or the disown
+     builtin (see below).
+
+SIGNALS
+     The INT and QUIT signals for an invoked command are  ignored
+     if  the  command is followed by & and the job monitor option
+     is not active.  Otherwise, signals have the values inherited
+     by  the  shell  from its parent (but see the TRAPxxx special
+     function above).
+
+HISTORY
+     History substitution allows you to use words  from  previous
+     command lines in the command line you are typing.  This sim-
+     plifies spelling corrections and the repetition  of  compli-
+     cated commands or arguments.  Command lines are saved in the
+     history list, the size of which is controlled by  the  HIST-
+     SIZE  variable.   The most recent command is retained in any
+     case.  A history substitution begins with a ! and may  occur
+     anywhere  on  the command line; history substitutions do not
+     nest.  The ! can be escaped with \ to suppress  its  special
+     meaning.  Single or double quotes will _n_o_t work for this.
+
+     Input lines containing history substitutions are  echoed  on
+     the terminal after being expanded, but before any other sub-
+     stitutions take place or the command gets executed.
+
+  Event Designators
+     An event designator is a reference to a  command-line  entry
+     in the history list.
+          !    Start a history substitution, except when followed
+               by a blank, newline, =, or (.
+          !!   Refer to the previous  command.  By  itself,  this
+               substitution repeats the previous command.
+          !_n   Refer to command-line _n.
+          !-_n  Refer to the current command-line minus _n.
+          !_s_t_r Refer to the most  recent  command  starting  with
+               _s_t_r.
+          !?_s_t_r[?]
+               Refer to the most recent command containing _s_t_r.
+          !#   Refer to the current command line typed in so far.
+          !{...}
+               Insulate a history reference from adjacent charac-
+               ters (if necessary).
+
+  Word Designators
+     A `:' separates the event specification from the word desig-
+     nator.  It can be omitted if the word designator begins with
+     a , $, *, - or %.  If the word is to be  selected  from  the
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 16
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     previous command, the second ! character can be omitted from
+     the event specification.  For instance, !!:1  and  !:1  both
+     refer  to  the first word of the previous command, while !!$
+     and !$ both refer to the last word in the previous  command.
+     Word designators include:
+          0    The first input word (command).
+          _n    The _n'th argument.
+          ^    The first argument, that is, 1.
+          $    The last argument.
+          %    The word matched by (the most recent) ?_s search.
+          _x-_y  A range of words; -_y abbreviates 0-_y.
+          *    All the arguments, or a null  value  if  there  is
+               just one word in the event.
+          _x*   Abbreviates _x-$.
+          _x-   Like _x* but omitting word $.
+
+  Modifiers
+     After the optional word designator, you can add  a  sequence
+     of  one or more of the following modifiers, each preceded by
+     a :.  These modifiers also work on the  result  of  filename
+     and parameter expansion.
+
+          h    Remove a trailing pathname component, leaving  the
+               head.
+          r    Remove a trailing suffix of the form `._x_x_x', leav-
+               ing the basename.
+          e    Remove all but the suffix.
+          t    Remove all leading  pathname  components,  leaving
+               the tail.
+          &    Repeat the previous substitution.
+          g    Apply the change to  the  first  occurrence  of  a
+               match  in  each  word, by prefixing the above (for
+               example, g&).
+          p    Print the new command but do not execute it.
+          q    Quote the substituted words, escaping further sub-
+               stitutions.
+          x    Like q, but break into words at each blank.
+          l    Convert the words to all lowercase.
+          u    Convert the words to all uppercase.
+          s/_l/_r[/]
+               Substitute _r for _l.
+
+     Unless preceded by a g, the substitution is  done  only  for
+     the first string that matches _l.
+
+     The left-hand side of substitutions are not regular  expres-
+     sions,  but character strings.  Any character can be used as
+     the delimiter in place of /.  A backslash quotes the  delim-
+     iter character.  The character &, in the right hand side, is
+     replaced by the text from the left-hand-side. The &  can  be
+     quoted  with  a backslash. A null _l uses the previous string
+     either from a _l or from a contextual scan string _s from !?_s.
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 17
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     You  can  omit  the rightmost delimiter if a newline immedi-
+     ately follows _r; the rightmost ? in a context scan can simi-
+     larly be omitted.
+
+     Without an event specification, a history  reference  refers
+     either  to  the  previous  command, or to a previous history
+     reference on the command line (if any).
+
+     The character sequence ^_f_o_o^_b_a_r repeats  the  last  command,
+     replacing the string "foo" with the string "bar".
+
+     If the shell encounters the character  sequence  !"  in  the
+     input,  the  history mechanism is temporarily disabled until
+     the current list is fully parsed.  The !"  is  removed  from
+     the  input,  and any subsequent ! characters have no special
+     significance.
+
+     A less convenient but more comprehensible  form  of  command
+     history support is provided by the fc builtin (see below).
+
+ARITHMETIC EVALUATION
+     An ability to perform integer arithmetic  is  provided  with
+     the  builtin  let.   Evaluations  are  performed  using _l_o_n_g
+     arithmetic.  Constants are of the form [_b_a_s_e#]_n  where  _b_a_s_e
+     is  a decimal number between two and thirty-six representing
+     the arithmetic base and _n is a number in that base.  If _b_a_s_e
+     is omitted then base 10 is used.
+
+     An arithmetic expression uses nearly the same  syntax,  pre-
+     cedence, and associativity of expressions in C.  The follow-
+     ing operators are supported (listed in decreasing  order  of
+     precedence):
+
+          + - ! 9~8 ++ --
+               unary   plus/minus,   logical   NOT,   complement,
+               {pre,post}{in,de}crement
+          &    logical AND
+          ^    logical XOR
+          |    logical OR
+          * / %
+               multiplication, division, remainder
+          + -  addition, subtraction
+          << >>
+               logical shift left, shift right
+          < > <= >=
+               comparison
+          == !=
+               equality and inequality
+          &&   boolean AND
+          || ^^
+               boolean OR, XOR
+          ? :  ternary operator
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 18
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          = += -= *= /= %= &= ^= |= <<= >>= &&= ||= ^^=
+               assignment
+          ,    comma operator
+
+     The operators &&, ||, &&=, and ||= are short-circuiting, and
+     only one of the latter two expressions in a ternary operator
+     is evaluated.  Note the precedence of the logical  AND,  OR,
+     and XOR operators.
+
+     Named parameters can be referenced by name within an  arith-
+     metic  expression  without  using the parameter substitution
+     syntax.
+
+     An internal integer representation of a named parameter  can
+     be  specified  with the integer builtin.  Arithmetic evalua-
+     tion is performed on the value of each assignment to a named
+     parameter declared integer in this manner.
+
+     Since many of the arithmetic operators require  quoting,  an
+     alternative  form  of  the let command is provided.  For any
+     command which begins with a ((, all the characters  until  a
+     matching  ))  are treated as a quoted expression.  More pre-
+     cisely, ((...)) is equivalent to let "...".
+
+CONDITIONAL EXPRESSIONS
+     A _c_o_n_d_i_t_i_o_n_a_l _e_x_p_r_e_s_s_i_o_n is used with the [[  compound  com-
+     mand  to  test  attributes  of files and to compare strings.
+     Each expression can be constructed from one or more  of  the
+     following unary or binary expressions:
+     -a _f_i_l_e
+          true if _f_i_l_e exists.
+     -b _f_i_l_e
+          true if _f_i_l_e exists and is a block special file.
+     -c _f_i_l_e
+          true if _f_i_l_e exists and is a character special file.
+     -d _f_i_l_e
+          true if _f_i_l_e exists and is a directory.
+     -e _f_i_l_e
+          true if _f_i_l_e exists.
+     -f _f_i_l_e
+          true if _f_i_l_e exists and is an ordinary file.
+     -g _f_i_l_e
+          true if _f_i_l_e exists and has its setgid bit set.
+     -h _f_i_l_e
+          true if _f_i_l_e exists and is a symbolic link.
+     -k _f_i_l_e
+          true if _f_i_l_e exists and has its sticky bit set.
+     -n _s_t_r_i_n_g
+          true if length of _s_t_r_i_n_g is non-zero.
+     -o _o_p_t_i_o_n
+          true if option named _o_p_t_i_o_n is on.
+     -p _f_i_l_e
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 19
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          true if _f_i_l_e exists and is a fifo  special  file  or  a
+          pipe.
+     -r _f_i_l_e
+          true if _f_i_l_e exists and is readable by current process.
+     -s _f_i_l_e
+          true if _f_i_l_e exists and has size greater than zero.
+     -t _f_d
+          true if file descriptor number _f_d is open  and  associ-
+          ated   with  a  terminal  device.   (note:  _f_d  is  not
+          optional)
+     -u _f_i_l_e
+          true if _f_i_l_e exists and has its setuid bit set.
+     -w _f_i_l_e
+          true if _f_i_l_e exists and is writable by current process.
+     -x _f_i_l_e
+          true if _f_i_l_e exists and is executable by  current  pro-
+          cess.   If  _f_i_l_e  exists  and  is a directory, then the
+          current process has permission to search in the  direc-
+          tory.
+     -z _s_t_r_i_n_g
+          true if length of _s_t_r_i_n_g is zero.
+     -L _f_i_l_e
+          true if _f_i_l_e exists and is a symbolic link.
+     -O _f_i_l_e
+          true if _f_i_l_e exists and is owned by the effective  user
+          id of this process.
+     -G _f_i_l_e
+          true if _f_i_l_e exists and its group matches the effective
+          group id of this process.
+     -S _f_i_l_e
+          true if _f_i_l_e exists and is a socket.
+     _f_i_l_e_1 -nt _f_i_l_e_2
+          true if _f_i_l_e_1 exists and is newer than _f_i_l_e_2.
+     _f_i_l_e_1 -ot _f_i_l_e_2
+          true if _f_i_l_e_1 exists and is older than _f_i_l_e_2.
+     _f_i_l_e_1 -ef _f_i_l_e_2
+          true if _f_i_l_e_1 and _f_i_l_e_2 exist and  refer  to  the  same
+          file.
+     _s_t_r_i_n_g = _p_a_t_t_e_r_n
+          true if _s_t_r_i_n_g matches _p_a_t_t_e_r_n.
+     _s_t_r_i_n_g != _p_a_t_t_e_r_n
+          true if _s_t_r_i_n_g does not match _p_a_t_t_e_r_n.
+     _s_t_r_i_n_g_1 < _s_t_r_i_n_g_2
+          true if _s_t_r_i_n_g_1 comes before  _s_t_r_i_n_g_2  based  on  ASCII
+          value of their characters.
+     _s_t_r_i_n_g_1 > _s_t_r_i_n_g_2
+          true if _s_t_r_i_n_g_1 comes  after  _s_t_r_i_n_g_2  based  on  ASCII
+          value of their characters.
+     _e_x_p_1 -eq _e_x_p_2
+          true if _e_x_p_1 is equal to _e_x_p_2.
+     _e_x_p_1 -ne _e_x_p_2
+          true if _e_x_p_1 is not equal to _e_x_p_2.
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 20
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     _e_x_p_1 -lt _e_x_p_2
+          true if _e_x_p_1 is less than _e_x_p_2.
+     _e_x_p_1 -gt _e_x_p_2
+          true if _e_x_p_1 is greater than _e_x_p_2.
+     _e_x_p_1 -le _e_x_p_2
+          true if _e_x_p_1 is less than or equal to _e_x_p_2.
+     _e_x_p_1 -ge _e_x_p_2
+          true if _e_x_p_1 is greater than or equal to _e_x_p_2.
+     ( _e_x_p )
+          true if _e_x_p is true.
+     ! _e_x_p
+          true if _e_x_p is false.
+     _e_x_p_1 && _e_x_p_2
+          true if _e_x_p_1 and _e_x_p_2 are both true.
+     _e_x_p_1 || _e_x_p_2
+          true if either _e_x_p_1 or _e_x_p_2 is true.
+
+     In each of the above expressions, if _f_i_l_e  is  of  the  form
+     /dev/fd/_n,  where  _n is an integer, then the test applied to
+     the open file whose descriptor number  is  _n,  even  if  the
+     underlying system does not support the /dev/fd directory.
+
+ZSH LINE EDITOR
+     If the ZLE option is set (it is by default)  and  the  shell
+     input  is  attached  to the terminal, the user is allowed to
+     edit command lines.
+
+     There are two display modes.  The first, multiline mode,  is
+     the  default.  It only works if the TERM parameter is set to
+     a valid terminal type that can  move  the  cursor  up.   The
+     second,  single  line  mode,  is  used if TERM is invalid or
+     incapable of moving the cursor up, or if the SINGLE_LINE_ZLE
+     option  is  set.   This  mode is similar to ksh, and uses no
+     termcap sequences.
+
+  Bindings
+     Command bindings may  be  set  using  the  bindkey  builtin.
+     There are two keymaps-the main keymap and the alternate key-
+     map.  The alternate keymap is bound to vi command mode.  The
+     main  keymap is bound to emacs mode by default.  To bind the
+     main keymap to vi insert mode, use bindkey -v, or set one of
+     the  VISUAL or EDITOR environment variables to a string con-
+     taining vi.
+
+     The following is a list of all the key  commands  and  their
+     default bindings in emacs and vi command mode.
+
+  Movement
+     vi-backward-blank-word (unbound) (B)
+          Move backward one word, where a word is  defined  as  a
+          series of non-blank characters.
+
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 21
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     backward-char (^B ESC-[D) ()
+          Move backward one character.
+
+     vi-backward-char () (h)
+          Move backward one character, without changing lines.
+
+     backward-word (ESC-B ESC-b) (unbound)
+          Move to the beginning of the previous word.
+
+     emacs-backward-word
+          Move to the beginning of the previous word.
+
+     vi-backward-word (unbound) (b)
+          Move to the beginning of the previous word, vi-style.
+
+     beginning-of-line (^A) (0)
+          Move to the beginning of the line.  If already  at  the
+          beginning  of  the  line,  move to the beginning of the
+          previous line, if any.
+
+     vi-beginning-of-line
+          Move to the beginning of  the  line,  without  changing
+          lines.
+
+     end-of-line (^E)
+          Move to the end of the line.  If already at the end  of
+          the line, move to the end of the next line, if any.
+
+     vi-end-of-line (unbound) ($)
+          Move to the end of the line.
+
+     vi-forward-blank-word (unbound) (W)
+          Move forward one word, where a word  is  defined  as  a
+          series of non-blank characters.
+
+     vi-forward-blank-word-end (unbound) (E)
+          Move to the end of the current word, or, if at the  end
+          of the current word, to the end of the next word, where
+          a word is defined as a series of non-blank characters.
+
+     forward-char (^F ESC-[C)
+          Move forward one character.
+
+     vi-forward-char (unbound) (space l)
+          Move forward one character.
+
+     vi-find-next-char (^X^F) (f)
+          Read a character from the keyboard,  and  move  to  the
+          next occurrence of it in the line.
+
+     vi-find-next-char-skip (unbound) (t)
+          Read a character from the keyboard,  and  move  to  the
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 22
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          position  just  before the next occurrence of it in the
+          line.
+
+     vi-find-prev-char (unbound) (F)
+          Read a character from the keyboard,  and  move  to  the
+          previous occurrence of it in the line.
+
+     vi-find-prev-char-skip (unbound) (T)
+          Read a character from the keyboard,  and  move  to  the
+          position  just  after  the previous occurrence of it in
+          the line.
+
+     vi-first-non-blank (unbound) (^)
+          Move to the first non-blank character in the line.
+
+     vi-forward-word (unbound) (w)
+          Move forward one word, vi-style.
+
+     forward-word (ESC-F ESC-f) (unbound)
+          Move to the beginning of the next word.   The  editor's
+          idea  of a word is specified with the WORDCHARS parame-
+          ter.
+
+     emacs-forward-word
+          Move to the end of the next word.
+
+     vi-forward-word-end (unbound) (e)
+          Move to the end of the next word.
+
+     vi-goto-column (ESC-|) (|)
+          Move to the column specified by the numeric argument.
+
+     vi-goto-mark (unbound) (`)
+          Move to the specified mark.
+
+     vi-goto-mark-line (unbound) (')
+          Move to beginning of the line containing the  specified
+          mark.
+
+     vi-repeat-find (unbound) (;)
+          Repeat the last vi-find command.
+
+     vi-rev-repeat-find (unbound) (,)
+          Repeat the last vi-find command in the opposite  direc-
+          tion.
+
+  History
+     beginning-of-buffer-or-history (ESC-<)
+          Move to the beginning of  the  buffer,  or  if  already
+          there, move to the first event in the history list.
+
+     beginning-of-line-hist
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 23
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          Move to the beginning of the line.  If already  at  the
+          beginning  of  the buffer, move to the previous history
+          line.
+
+     beginning-of-history
+          Move to the first event in the history list.
+
+     down-line-or-history (^N ESC-[B) (+ j)
+          Move down a line in the buffer, or if  already  at  the
+          bottom  line,  move  to  the  next event in the history
+          list.
+
+     down-line-or-search
+          Move down a line in the buffer, or if  already  at  the
+          bottom  line,  search forward in the history for a line
+          beginning with the first word in the buffer.
+
+     down-history (unbound) (^N)
+          Move to the next event in the history list.
+
+     end-of-buffer-or-history (ESC->)
+          Move to the end of the buffer,  or  if  already  there,
+          move to the last event in the history list.
+
+     end-of-line-hist
+          Move to the end of the line.  If already at the end  of
+          the buffer, move to the next history line.
+
+     end-of-history
+          Move to the last event in the history list.
+
+     vi-fetch-history (unbound) (G)
+          Fetch the history line specified by the  numeric  argu-
+          ment.
+
+     history-incremental-search-backward (^R ^Xr)
+          Search backward incrementally for a  specified  string.
+          The  string  may begin with `^' to anchor the search to
+          the beginning of the line.
+
+     history-incremental-search-forward (^Xs)
+          Search forward incrementally for  a  specified  string.
+          The  string  may begin with `^' to anchor the search to
+          the beginning of the line.
+
+     history-search-backward (ESC-P ESC-p) (K)
+          Search backward in the history  for  a  line  beginning
+          with the first word in the buffer.
+
+     vi-history-search-backward (unbound) (/)
+          Search backward in the history for a specified  string.
+          The  string  may begin with `^' to anchor the search to
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 24
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          the beginning of the line.
+
+     history-search-forward (ESC-N ESC-n) (J)
+          Search forward in the history for a line beginning with
+          the first word in the buffer.
+
+     vi-history-search-forward (unbound) (?)
+          Search forward in the history for a  specified  string.
+          The  string  may begin with `^' to anchor the search to
+          the beginning of the line.
+
+     infer-next-history (^X^N)
+          Search in the history list  for  a  line  matching  the
+          current one and fetch the event following it.
+
+     insert-last-word (ESC-_ ESC-.)
+          Insert the last word from the previous history event at
+          the cursor position.
+
+     vi-repeat-search (unbound) (n)
+          Repeat the last vi history search.
+
+     vi-rev-repeat-search (unbound) (N)
+          Repeat the last vi history search, but in reverse.
+
+     toggle-literal-history (ESC-R ESC-r)
+          Toggle  between  literal  and  lexical  history.    The
+          default is lexical history unless the HISTLIT option is
+          set.
+
+     up-line-or-history (^P ESC-[A) (- k)
+          Move up a line in the buffer, or if already at the  top
+          line, move to the previous event in the history list.
+
+     up-line-or-search
+          Move up a line in the buffer, or if already at the  top
+          line,  search backward in the history for a line begin-
+          ning with the first word in the buffer.
+
+     up-history (unbound) (^P)
+          Move to the previous event in the history list.
+
+  Modifying Text
+     vi-add-eol (unbound) (A)
+          Move to the end of the line and enter insert mode.
+
+     vi-add-next (unbound) (a)
+          Move forward one character and enter insert mode.
+
+     backward-delete-char (^H ^?) (^?)
+          Delete the character behind the cursor.
+
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 25
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     vi-backward-delete-char (unbound) (X)
+          Delete the character behind the cursor, without  chang-
+          ing lines.
+
+     backward-delete-word
+          Delete the word behind the cursor.
+
+     backward-kill-line
+          Kill from the beginning of the line to the cursor posi-
+          tion.
+
+     backward-kill-word (^W ESC-^H ESC-^?)
+          Kill the word behind the cursor.
+
+     vi-backward-kill-word (unbound) (^W)
+          Kill the word behind the cursor.
+
+     capitalize-word (ESC-C ESC-c)
+          Capitalize the current word and move past it.
+
+     vi-change (unbound) (c)
+          Read a movement command from  the  keyboard,  and  kill
+          from  the  cursor position to the endpoint of the move-
+          ment.  Then enter insert mode.  If the command  is  vi-
+          change, kill the current line.
+
+     vi-change-eol (unbound) (C)
+          Kill to the end of the line and enter insert mode.
+
+     vi-change-whole-line (unbound) (S s)
+          Kill the current line and enter insert mode.
+
+     copy-region-as-kill (ESC-W ESC-w)
+          Copy the area from the cursor to the mark to  the  kill
+          buffer.
+
+     copy-prev-word (ESC-^_)
+          Duplicate the word behind the cursor.
+
+     vi-delete (unbound) (d)
+          Read a movement command from  the  keyboard,  and  kill
+          from  the  cursor position to the endpoint of the move-
+          ment.  If the command is vi-delete,  kill  the  current
+          line.
+
+     delete-char (unbound) (x)
+          Delete the character under the cursor.
+
+     vi-delete-char (unbound) (x)
+          Delete the character under the cursor.
+
+     delete-word (ESC-D ESC-d)
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 26
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          Delete the current word.
+
+     down-case-word (ESC-L ESC-l)
+          Convert the current word to all lowercase and move past
+          it.
+
+     kill-word
+          Kill the current word.
+
+     gosmacs-transpose-chars
+          Exchange the two characters behind the cursor.
+
+     vi-indent (unbound) (>)
+          Indent a number of lines.
+
+     vi-insert (unbound) (i)
+          Enter insert mode.
+
+     vi-insert-bol (unbound) (I)
+          Move to the beginning of  the  line  and  enter  insert
+          mode.
+
+     vi-join (^X^J)
+          Join the current line with the next one.
+
+     kill-line (^K) (D)
+          Kill from the cursor to the end of the line.
+
+     kill-region
+          Kill from the cursor to the mark.
+
+     kill-buffer (^X^U) (^U)
+          Kill the entire buffer.
+
+     kill-whole-line (^U) (unbound)
+          Kill the current line.
+
+     vi-match-bracket (^X^B) (%)
+          Move to the bracket character (one of {},  (),  or  [])
+          that matches the one under the cursor.
+
+     vi-open-line-above (unbound) (O)
+          Open a line above the cursor and enter insert mode.
+
+     vi-open-line-below (unbound) (o)
+          Open a line below the cursor and enter insert mode.
+
+     vi-oper-swap-case
+          Read a movement command from the keyboard, and swap the
+          case  of all characters from the cursor position to the
+          endpoint of the movement.  If the movement  command  is
+          vi-oper-swap-case,  swap  the case of all characters on
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 27
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          the current line.
+
+     overwrite-mode (^X^O)
+          Toggle between overwrite mode and insert mode.
+
+     vi-put-after (unbound) (p)
+          Insert the contents of the kill buffer after  the  cur-
+          sor.
+
+     quoted-insert (^V)
+          Insert  the  next  character  typed  into  the   buffer
+          literally.
+
+     quote-line (ESC-')
+          Quote the current line; that is, put a '  character  at
+          the beginning and the end, and convert all ' characters
+          to '\''.
+
+     quote-region (ESC-")
+          Quote the region from the cursor to the mark.
+
+     vi-replace (unbound) (R)
+          Enter overwrite mode.
+
+     vi-repeat-change (unbound) (.)
+          Repeat the last vi mode text modification.
+
+     vi-replace-chars (unbound) (r)
+          Replace the character under the cursor with a character
+          read from the keyboard.
+
+     self-insert (printable characters)
+          Put a character in the buffer at the cursor position.
+
+     self-insert-unmeta (ESC-^I ESC-^J ESC-^M)
+          Put a character in the buffer after stripping the  meta
+          bit and converting ^M to ^J.
+
+     vi-substitute (unbound) (s)
+          Substitute the next character(s).
+
+     vi-swap-case (unbound) (~)
+          Swap the case of the character  under  the  cursor  and
+          move past it.
+
+     transpose-chars (^T)
+          Exchange the two characters to the left of  the  cursor
+          if  at  end  of line, else exchange the character under
+          the cursor with the character to the left.
+
+     transpose-words (ESC-T ESC-t)
+          Exchange the current word with the one before it.
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 28
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     vi-unindent (unbound) (<)
+          Unindent a number of lines.
+
+     up-case-word (ESC-U ESC-u)
+          Convert the current word to all caps and move past it.
+
+     yank (^Y) (P)
+          Insert the contents of the kill buffer  at  the  cursor
+          position.
+
+     yank-pop (ESC-y) (unbound)
+          Remove the text just yanked, rotate the kill-ring,  and
+          yank  the  new top.  Only works following yank or yank-
+          pop.
+
+     vi-yank (unbound) (y)
+          Read a movement command from the keyboard, and copy the
+          region  from the cursor position to the endpoint of the
+          movement into the kill buffer.  If the command  is  vi-
+          yank, copy the current line.
+
+     vi-yank-eol (unbound) (Y)
+          Copy the region from the cursor position to the end  of
+          the line into the kill buffer.
+
+  Arguments
+     digit-argument (ESC-0..ESC-9) (0-9)
+          Start a new numeric argument, or  add  to  the  current
+          one.
+
+     universal-argument
+          Multiply the argument of the next command by 4.
+
+  Completion
+     accept-and-menu-complete
+          In a menu completion,  insert  the  current  completion
+          into  the buffer, and advance to the next possible com-
+          pletion.
+
+     complete-word (unbound) (\)
+          Attempt completion on the current word.
+
+     delete-char-or-list (^D)
+          Delete the character under the cursor.  If  the  cursor
+          is  at  the  end of the line, list possible completions
+          for the current word.
+
+     execute-named-cmd (ESC-x)
+          Read the name of a editor command and execute it.
+
+     execute-last-named-cmd (ESC-z)
+          Redo the last function executed with execute-named-cmd.
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 29
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     expand-cmd-path
+          Expand the current command to its full pathname.
+
+     expand-or-complete (TAB) (TAB ^X)
+          Attempt shell expansion on the current word.   If  that
+          fails, attempt completion.
+
+     expand-history (ESC-space ESC-!)
+          Perform history expansion on the edit buffer.
+
+     expand-word (^X*)
+          Attempt shell expansion on the current word.
+
+     list-choices (ESC-^D) (^D =)
+          List possible completions for the current word.
+
+     list-expand (^Xg ^XG) (^G)
+          List the expansion of the current word.
+
+     magic-space
+          Perform history expansion and insert a space  into  the
+          buffer.  This is intended to be bound to space.
+
+     menu-complete
+          Like complete-word,  except  that  menu  completion  is
+          used.  See the MENU_COMPLETE option below.
+
+     menu-expand-or-complete
+          Like expand-or-complete, except that menu completion is
+          used.
+
+     reverse-menu-complete
+          See the MENU_COMPLETE option below.
+
+  Miscellaneous
+     accept-and-hold (ESC-A ESC-a)
+          Push the contents of the buffer on the buffer stack and
+          execute it.
+
+     accept-and-infer-next-history
+          Execute the contents of the buffer.   Then  search  the
+          history  list  for  a line matching the current one and
+          push the event following onto the buffer stack.
+
+     accept-line (^J ^M)
+          Execute the contents of the buffer.
+
+     accept-line-and-down-history (^O)
+          Execute the current line, and  push  the  next  history
+          event on the the buffer stack.
+
+     vi-cmd-mode (^X^V) (^[)
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 30
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          Enter command mode; that is, use the alternate  keymap.
+          Yes, this is bound by default in emacs mode.
+
+     vi-caps-lock-panic (unbound) (H K)
+          Hang until any lowercase key is pressed.  This  is  for
+          vi  users  without the mental capacity to keep track of
+          their caps lock key (like the author).
+
+     clear-screen (^L ESC-^L)
+          Clear the screen and redraw the prompt.
+
+     exchange-point-and-mark (^X^X)
+          Exchange the cursor position with the position  of  the
+          mark.
+
+     get-line (ESC-G ESC-g)
+          Pop the top line off the buffer stack and insert it  at
+          the cursor position.
+
+     pound-insert (unbound) (#)
+          If there is no # character  at  the  beginning  of  the
+          current line, add one.  If there is one, remove it.  In
+          either   case,   accept   the   current   line.     The
+          INTERACTIVE_COMMENTS  option  must  be  set for this to
+          have any usefulness.
+
+     push-line (^Q ESC-Q ESC-q)
+          Push the current buffer onto the buffer stack and clear
+          the buffer.  Next time the editor starts up, the buffer
+          will be popped off the top  of  the  buffer  stack  and
+          loaded into the editing buffer.
+
+     redisplay (unbound) (^R)
+          Redisplays the edit buffer.
+
+     run-help (ESC-H ESC-h)
+          Push the buffer onto the buffer stack, and execute  the
+          command  "run-help  _c_m_d", where _c_m_d is the current com-
+          mand.  run-help is normally aliased to man.
+
+     send-break (^C)
+          Abort the parsing of the current line.
+
+     vi-set-buffer (unbound) (")
+          Specify a buffer to be used in the following command.
+
+     vi-set-mark (unbound) (m)
+          Set the specified mark at the cursor position.
+
+     set-mark-command (^@)
+          Set the mark at the cursor position.
+
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 31
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     spell-word (ESC-$ ESC-S ESC-s)
+          Attempt spelling correction on the current word.
+
+     undefined-key
+          Beep.
+
+     undo (^_ ^X^U) (u)
+          Incrementally undo the last text modification.
+
+     which-command (ESC-?)
+          Push the buffer onto the buffer stack, and execute  the
+          command  "which-command  _c_m_d", where _c_m_d is the current
+          command.  which-command is normally aliased to whence.
+
+PARAMETERS
+     A parameter has a name, a value, and a number of attributes.
+     A  name  may  be any sequence of alphanumeric characters and
+     _'s, or the single characters *, @, #, ?, -, $, or  !.   The
+     value  may  be either a _s_c_a_l_a_r (a string), an integer, or an
+     array.  To assign a scalar or integer value to a  parameter,
+     use  the typeset builtin.  To assign an array value, use set
+     -A _n_a_m_e _v_a_l_u_e ....  The value of a  parameter  may  also  be
+     assigned by writing:
+
+          _n_a_m_e=_v_a_l_u_e ...
+
+     If the integer attribute, -i, is set for _n_a_m_e, the _v_a_l_u_e  is
+     subject to arithmetic evaluation.
+
+     The value of an array parameter may be assigned by writing:
+
+          _n_a_m_e=(_v_a_l_u_e ...) ...
+     Individual elements of an array may be selected using a sub-
+     script.   A  subscript  of the form [_e_x_p] selects the single
+     element _e_x_p, where _e_x_p is  an  arithmetic  expression.   The
+     elements  are numbered beginning with 1.  A subscript of the
+     form [*] or [@] evaluates to all elements of an array; there
+     is  no  difference  between  the two except when they appear
+     within  double  quotes.   "$foo[*]"  evaluates  to  "$foo[1]
+     $foo[2]   ...",   while  "$foo[@]"  evaluates  to  "$foo[1]"
+     "$foo[2]", etc.  A subscript of the form [_e_x_p_1,_e_x_p_2] selects
+     all  elements  in the range _e_x_p_1 to _e_x_p_2, inclusive.  If one
+     of the subscripts evaluates to a negative  number,  say  -_n,
+     then  the  _nth  element  from  the end of the array is used.
+     Thus "$foo[-3]" is the third element from  the  end  of  the
+     array _f_o_o, and "$foo[1,-1]" is the same as "$foo[*]".
+
+     Subscripting may also be performed on non-array  values,  in
+     which   case  the  subscripts  specify  a  substring  to  be
+     extracted.  For example, if FOO is set to foobar, then  echo
+     $FOO[2,5] prints ooba.
+
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 32
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+  Positional Parameters
+     Positional parameters are set by the shell on invocation, by
+     the  set builtin, or by direct assignment.  The parameter _n,
+     where _n is a number, is the _nth positional  parameter.   The
+     parameters  *,  @,  and  argv  are arrays containing all the
+     positional parameters; thus argv[_n], etc. is  equivalent  to
+     simply _n.
+
+  Special Parameters
+     The following parameters are automatically set by the shell:
+
+          !    The process id  of  the  last  background  command
+               invoked.
+          #    The number of positional parameters in decimal.
+          ARGC Same as #.
+          $    The process id of this shell.
+          -    Flags supplied to the shell on  invocation  or  by
+               the set or setopt commands.
+          *    An array containing the positional parameters.
+          argv Same as *.
+          @    Same as argv[@].
+          ?    The exit value returned by the last command.
+          status
+               Same as ?.
+          _    The last argument of the previous command.   Also,
+               this  parameter is set in the environment of every
+               command executed to the full pathname of the  com-
+               mand.
+          ERRNO
+               The value of errno as set  by  the  most  recently
+               failed  system  call.  This value is system depen-
+               dent and is intended for debugging purposes.
+          GID  The group id of the shell process.
+          HOST The current hostname.
+          HOSTTYPE
+               A string corresponding to the type of the host the
+               shell is running on.
+          LINENO
+               The line number of the  current  line  within  the
+               current script being executed.
+          OLDPWD
+               The previous working directory.
+          OPTARG
+               The value of the last option argument processed by
+               the getopts command.
+          OPTIND
+               The index of the last option argument processed by
+               the getopts command.
+          PPID The process id of the parent of the shell.
+          PWD  The present working directory.
+          RANDOM
+               A random integer from 0 to 32767, newly  generated
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 33
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+               each  time this parameter is referenced.  The ran-
+               dom number generator can be seeded by assigning  a
+               numeric value to RANDOM.
+          SECONDS
+               The number of seconds since shell invocation.   If
+               this parameter is assigned a value, then the value
+               returned upon reference will be the value that was
+               assigned  plus  the  number  of  seconds since the
+               assignment.
+          SHLVL
+               Incremented by  one  each  time  a  new  shell  is
+               started.
+          signals
+               An array containing the names of the signals.
+          TTY  The name of the tty associated with the shell,  if
+               any.
+          UID  The user id of the shell process.
+          USERNAME
+          LOGNAME
+               The username corresponding to the user id  of  the
+               shell process.
+          VERSION
+               The version number of this zsh.
+
+     The following parameters are used by the shell:
+
+          BAUD The baud rate of the current connection.  Used  by
+               the line editor update mechanism to compensate for
+               a slow terminal by delaying updates  until  neces-
+               sary.  This may be profitably set to a lower value
+               in some circumstances, e.g.  for slow modems dial-
+               ing  into  a  communications  server which is con-
+               nected to a host via a fast link;  in  this  case,
+               this variable would be set by default to the speed
+               of the fast link, and not the modem.  This parame-
+               ter  should be set to the baud rate of the slowest
+               part of the link for best performance.
+          bindcmds
+               An write-only array of command  names  which  take
+               line editor function names as arguments, and which
+               therefore should allow binding completion.
+          cdpath (CDPATH)
+               An array  (colon-separated  list)  of  directories
+               specifying the search path for the cd command.
+          COLUMNS
+               The number of columns for this  terminal  session.
+               Used  for  printing  select lists and for the line
+               editor.
+          DIRSTACKSIZE
+               The maximum size of the directory stack.   If  the
+               stack  gets larger than this, it will be truncated
+               automatically.  This is useful with the AUTO_PUSHD
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 34
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+               option.
+          FCEDIT
+               The default editor for the fc builtin.
+          fignore (FIGNORE)
+               An array (colon  separated  list)  containing  the
+               suffixes  of  files  to be ignored during filename
+               completion.
+          fpath (FPATH)
+               An array (colon  separated  list)  of  directories
+               specifying  the  search  path for function defini-
+               tions.  This path is searched when a function with
+               the  -u attribute is referenced.  If an executable
+               file is found, then it is read and executed in the
+               current environment.
+          HISTCHARS
+               Three characters used by the shell's  history  and
+               lexical  analysis  mechanism.  The first character
+               signals  the  start  of  a  history   substitution
+               (default  `!').   The second character signals the
+               start of a  quick  history  substitution  (default
+               `^').   The third character is the comment charac-
+               ter (default `#').
+          HISTFILE
+               The file to save the history in when  an  interac-
+               tive  shell  exits.   If unset, the history is not
+               saved.
+          HISTSIZE
+               The maximum size of the history list.
+          HOME The default argument for the cd command.
+          hostcmds
+               An write-only array of command  names  which  take
+               hostnames as arguments, and which should therefore
+               allow hostname completion.  This sort  of  comple-
+               tion  is also used in words containing a @ charac-
+               ter.
+          hosts (HOSTS)
+               An array (colon separated list)  of  hostnames  to
+               use for hostname completion.
+          IFS  Internal field separators,  normally  space,  tab,
+               and newline, that are used to separate words which
+               result from command or parameter substitution  and
+               words read by the read builtin.
+          LINES
+               The number of lines  for  this  terminal  session.
+               Used  for  printing  select lists and for the line
+               editor.
+          LISTMAX
+               In the line editor, the  number  of  filenames  to
+               list without asking first.
+          LITHISTSIZE
+               The maximum  size  of  the  literal  history  list
+               (before history expansion).
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 35
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          LOGCHECK
+               The  interval  in  seconds  between   checks   for
+               login/logout activity using the watch parameter.
+          MAIL If this parameter is set and mailpath is not  set,
+               the shell looks for mail in the specified file.
+          MAILCHECK
+               The interval in seconds  between  checks  for  new
+               mail.
+          mailpath (MAILPATH)
+               An array (colon-separated list)  of  filenames  to
+               check for new mail.  Each filename can be followed
+               by a ? and a message that will  be  printed.   The
+               sequence $_ in the message will be replaced by the
+               name of the mail file.   The  default  message  is
+               "You have new mail."
+          manpath (MANPATH)
+               An array (colon-separated list) whose value is not
+               used  by the shell.  The manpath array can be use-
+               ful, however, since setting it also sets  MANPATH,
+               and vice versa.
+          NULLCMD
+               The command name to assume  if  a  redirection  is
+               specified  with no command.  Defaults to cat.  For
+               sh/ksh-like behavior, change this to :.  For  csh-
+               like  behavior,  unset  this  parameter; the shell
+               will print an error message if null  commands  are
+               entered.
+          optcmds
+               An write-only array of commands which take options
+               as  arguments,  and  which  therefore should allow
+               option completion.
+          path (PATH)
+               An array (colon-separated list) of directories  to
+               search  for commands.  When this parameter is set,
+               each directory is scanned and all files found  are
+               put in a hash table.
+          POSTEDIT
+               This string is output  whenever  the  line  editor
+               exits.   It  usually  contains  termcap strings to
+               reset the terminal.
+          PROMPT
+               The primary prompt string, printed before  a  com-
+               mand  is  read;  the  default  is "%m%# ".  If the
+               escape sequence  takes  an  optional  integer,  it
+               should appear between the '%' and the next charac-
+               ter  of  the  sequence.   The   following   escape
+               sequences are recognized:
+
+               %d
+               %/   Present working directory ($PWD).
+               %~   $PWD.  If it has a  named  directory  as  its
+                    prefix, that part is replaced by a ~ followed
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 36
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+                    by the name of the directory.  If  it  starts
+                    with $HOME, that part is replaced by a ~.
+               %c
+               %.
+               %C   Trailing component of $PWD.  An  integer  may
+                    follow  the  '%'  to  get  more than one com-
+                    ponent.  Unless %C is used,  tilde  expansion
+                    is performed first.
+               !
+               %h
+               %!   Current history event number
+               %M   The full machine hostname.
+               %m   The hostname up to the first '.'.  An integer
+                    may  follow  the '%' to specify how many com-
+                    ponents of the hostname are desired.
+               %S (%s)
+                    Start (stop) standout mode.
+               %U (%u)
+                    Start (stop) underline mode.
+               %B (%b)
+                    Start (stop) boldface mode.
+               %t
+               %@   Current time of day, in 12-hour,  am/pm  for-
+                    mat.
+               %T   Current time of day, in 24-hour format.
+               %*   Current time of day in 24-hour  format,  with
+                    seconds.
+               %n   $USERNAME.
+               %w   The date in day-dd format.
+               %W   The date in mm/dd/yy format.
+               %D   The date in yy-mm-dd format.
+               %D{_s_t_r_i_n_g}
+                    _s_t_r_i_n_g is formatted using the strftime  func-
+                    tion.   See  strftime(3) for more details, if
+                    your system has it.
+               %l   The line (tty) the user is logged in on.
+               %?   The return code of the last command  executed
+                    just before the prompt.
+               %#   A '#' if the shell is running as root, a  '%'
+                    if not.
+               %v   The value of the first element of the  $psvar
+                    array  parameter.   Following the '%' with an
+                    integer gives that element of the array.
+               %{...%}
+                    Include  a  string  as   a   literal   escape
+                    sequence.    The  string  within  the  braces
+                    should not change the cursor position.
+
+          PROMPT2
+               The secondary prompt, printed when the shell needs
+               more  information  to  complete a command.  Recog-
+               nizes the same escape sequences as  $PROMPT.   The
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 37
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+               default is "> ".
+          PROMPT3
+               Selection  prompt  used  within  a  select   loop.
+               Recognizes  the  same escape sequences as $PROMPT.
+               The default is "?# ".
+          PROMPT4
+               The execution trace prompt.  Default is "+ ".
+          PS1
+          PS2
+          PS3
+          PS4  Same as PROMPT,  PROMPT2,  PROMPT3,  and  PROMPT4,
+               respectively.
+          psvar (PSVAR)
+               An array (colon-separated list) whose  first  nine
+               values  can  be  used  in PROMPT strings.  Setting
+               psvar also sets PSVAR, and vice versa.
+          prompt
+               Same as PROMPT.
+          READNULLCMD
+               The command name  to  assume  if  a  single  input
+               redirection   is   specified   with   no  command.
+               Defaults to more.
+          REPORTTIME
+               If nonzero, commands whose combined user and  sys-
+               tem  execution  times  (measured  in  seconds) are
+               greater than this  value  have  timing  statistics
+               printed for them.
+          RPROMPT
+          RPS1 This prompt is displayed on the right-hand side of
+               the  screen  when  the  primary  prompt  is  being
+               displayed on the left.  This does not work if  the
+               SINGLELINEZLE  option is set.  Recognizes the same
+               escape sequences as PROMPT,  except  that  termcap
+               sequences like %s, etc. will not work.
+          SAVEHIST
+               The maximum number of history events  to  save  in
+               the history file.
+          SPROMPT
+               The prompt  used  for  spelling  correction.   The
+               sequence %R expands to the string which presumably
+               needs spelling correction, and %r expands  to  the
+               proposed correction.  All other PROMPT escapes are
+               also allowed.
+          STTY If this parameter is set in a  command's  environ-
+               ment,  the  shell  runs  the stty command with the
+               value of this parameter as arguments in  order  to
+               set up the terminal before executing the command.
+          TIMEFMT
+               The format of process time reports with  the  time
+               keyword.   The  default  is  "%E real  %U user  %S
+               system   %P".   Recognizes  the  following  escape
+               sequences:
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 38
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+               %U   CPU seconds spent in user mode.
+               %S   CPU seconds spent in kernel mode.
+               %E   Elapsed time in seconds.
+               %P   The CPU percentage, computed as (%U+%S)/%E.
+               %W   Number of times the process was swapped.
+               %X   The average amount  in  (shared)  text  space
+                    used in Kbytes.
+               %D   The average amount in  (unshared)  data/stack
+                    space used in Kbytes.
+               %K   The total space used (%X+%D) in Kbytes.
+               %M   The maximum memory the process had in use  at
+                    any time in Kbytes.
+               %F   The number of major page faults (page  needed
+                    to be brought from disk).
+               %R   The number of minor page faults.
+               %I   The number of input operations.
+               %O   The number of output operations.
+               %r   The number of socket messages received.
+               %s   The number of socket messages sent.
+               %k   The number of signals received.
+               %w   Number of voluntary context switches (waits).
+               %c   Number of involuntary context switches.
+               %J   The name of this job.
+
+          TMOUT
+               If this parameter is nonzero, the shell will  ter-
+               minate  if  a  command  is  not entered within the
+               specified  number  of  seconds  after  issuing   a
+               prompt.
+          TMPPREFIX
+               A pathname prefix which the shell will use for all
+               temporary files.
+          varcmds
+               An write-only array of command  names  which  take
+               parameter  names as arguments, and which therefore
+               should allow parameter completion.
+          watch (WATCH)
+               An array (colon-separated  list)  of  login/logout
+               events  to report.  If it contains the single word
+               "all", then all login/logout events are  reported.
+               If  it  contains the single word "notme", then all
+               events are reported as with  "all"  except  $USER-
+               NAME.   An  entry  in  this  list may consist of a
+               username, an `@' followed by  a  remote  hostname,
+               and a `%' followed by a line (tty).  Any or all of
+               these components may be present in an entry; if  a
+               login/logout  event  matches  all  of  them, it is
+               reported.
+          WATCHFMT
+               The format of login/logout reports  if  the  watch
+               parameter  is  set.  Default is "%n has %a %l from
+               %m." Recognizes the following escape sequences:
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 39
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+               %n   The name of the user that logged in/out.
+               %a   The observed  action,  i.e.  "logged  on"  or
+                    "logged off".
+               %l   The line (tty) the user is logged in on.
+               %M   The full hostname of the remote host.
+               %m   The hostname up to the first  ".".   If  only
+                    the ip address is available or the utmp field
+                    contains the name of  an  X-windows  display,
+                    the whole name is printed.
+               %S (%s)
+                    Start (stop) standout mode.
+               %U (%u)
+                    Start (stop) underline mode.
+               %B (%b)
+                    Start (stop) boldface mode.
+               %t
+               %@   The time, in 12-hour, am/pm format.
+               %T   The time, in 24-hour format.
+               %w   The date in day-dd format.
+               %W   The date in mm/dd/yy format.
+               %D   The date in yy-mm-dd format.
+
+          WORDCHARS
+               A list of  nonalphanumeric  characters  considered
+               part of a word by the line editor.
+          ZDOTDIR
+               The directory to search for  shell  startup  files
+               (.zshrc, etc), if not $HOME.
+
+OPTIONS
+     The following options may be  set  upon  invocation  of  the
+     shell, or with the set or setopt builtins:
+          ALLEXPORT (-a)
+               All parameters subsequently defined are  automati-
+               cally exported.
+          APPEND_HISTORY
+               If this is set, zsh  sessions  will  append  their
+               history  list  to  the  history  file, rather than
+               overwrite it. Thus, multiple parallel zsh sessions
+               will  all  have  their  history lists added to the
+               history file, in the order they are killed.
+          AUTO_CD (-J)
+               If a command is not in the hash table,  and  there
+               exists  an executable directory by that name, per-
+               form the cd command to that directory.
+          AUTOLIST (-9)
+               Automatically list choices on an ambiguous comple-
+               tion.
+          AUTOMENU
+               Automatically use menu completion if the  TAB  key
+               is pressed repeatedly.
+          AUTO_PUSHD (-N)
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 40
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+               Make cd act like pushd.
+          AUTO_REMOVE_SLASH
+               When the last character resulting from  a  comple-
+               tion  is a slash and the next character typed is a
+               word delimiter, remove the slash.
+          AUTO_RESUME (-W)
+               Treat single word simple commands without redirec-
+               tion  as  candidates for resumption of an existing
+               job.
+          BGNICE (-6)
+               Run all background jobs at a lower priority.  This
+               option is set by default.
+          BRACECCL
+               Allow brace expansions of the form {a-zA-Z}, etc.
+          CDABLEVARS (-T)
+               If the argument to a cd command is  not  a  direc-
+               tory,  but  a  parameter  exists  by the same name
+               whose value begins with a /, try to change to  the
+               directory specified by the parameter's value.
+          CHASELINKS (-w)
+               Resolve symbolic links to their true values.
+          CORRECT (-0)
+               Try to correct the spelling of commands.
+          CORRECT_ALL (-O)
+               Try to correct the spelling of all arguments in  a
+               line.
+          CSH_JUNKIE_LOOPS
+               Allow loop bodies to take  the  form  "_l_i_s_t;  end"
+               instead of "do _l_i_s_t; done".
+          CSH_JUNKIE_QUOTES
+               Complain if a quoted expression runs off  the  end
+               of  a  line;  prevent quoted expressions from con-
+               taining unescaped newlines.
+          CSH_NULL_GLOB
+               If  a  pattern  for  filename  generation  has  no
+               matches,  delete  the  pattern  from  the argument
+               list; do not report an error unless all  the  pat-
+               terns  in  a  command  have no matches.  Overrides
+               NULLGLOB.
+          ERREXIT (-e)
+               If a command has a non-zero exit  status,  execute
+               the ERR trap, if set, and exit.
+          EXTENDED_GLOB
+               Treat the # and ^ characters as part  of  patterns
+               for filename generation, etc.
+          EXTENDED_HISTORY
+               Save beginning and ending timestamps to  the  his-
+               tory  file.   The  format  of  these timestamps is
+               :<_b_e_g_i_n_n_i_n_g _t_i_m_e>:<_e_n_d_i_n_g _t_i_m_e>:<_c_o_m_m_a_n_d>.
+          GLOB_COMPLETE
+               Like MENU_COMPLETE, except that the  current  word
+               is  expanded  using normal shell expansion instead
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 41
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+               of completion.  If no matches are found,  a  *  is
+               added  to  the  end  of the word, and expansion is
+               attempted again.
+          GLOB_DOTS (-4)
+               Do not require a leading . in  a  filename  to  be
+               matched explicitly.
+          HASH_CMDS
+               Place the location of each  command  in  the  hash
+               table  the  first  time  it  is executed.  If this
+               option is unset, no path hashing will be  done  at
+               all.
+          HASH_DIRS
+               Whenever a command is executed, hash the directory
+               containing  it,  as  well  as all directories that
+               occur earlier in  the  path.   Has  no  effect  if
+               HASH_CMDS is unset.
+          HASH_LIST_ALL
+               Whenever a command completion is  attempted,  make
+               sure  the  entire  command  path  is hashed first.
+               This makes the first completion slower.
+          HIST_IGNORE_DUPS (-h)
+               Do not enter command lines into the  history  list
+               if they are duplicates of the previous event.
+          HIST_IGNORE_SPACE (-g)
+               Do not enter command lines into the  history  list
+               if they begin with a blank.
+          HISTLIT (-j)
+               Use literal (unparsed)  versions  of  the  history
+               lines in the editor.
+          HIST_NO_STORE
+               Remove the history (fc -l) command from  the  his-
+               tory when invoked.
+          HIST_VERIFY
+               Whenever the user enters a line with history  sub-
+               stitution,   don't   execute  the  line  directly;
+               instead, perform history substitution  and  reload
+               the line into the editing buffer.
+          IGNORE_BRACES (-I)
+               Do not perform brace expansion.
+          IGNOREEOF (-7)
+               Do not exit on end-of-file.  Require  the  use  of
+               exit or logout instead.
+          INTERACTIVE (-i)
+               This is an interactive shell.
+          INTERACTIVE_COMMENTS (-k)
+               Allow comments even in interactive shells.
+          KSH_OPTION_PRINT
+               Alters the way options settings are printed.
+          LIST_TYPES (-X)
+               When listing files that are possible  completions,
+               show the type of each file with a trailing identi-
+               fying mark.
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 42
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          LOGIN (-l)
+               This is a login shell.
+          LONG_LIST_JOBS (-R)
+               List jobs in the long format by default.
+          MAIL_WARNING (-U)
+               Print a warning message if a mail  file  has  been
+               accessed since the shell last checked.
+          MARKDIRS (-8)
+               Append a trailing / to all directory names result-
+               ing from filename generation (globbing).
+          MENU_COMPLETE (-Y)
+               On an ambiguous  completion,  instead  of  listing
+               possibilities,  insert the first match.  Then when
+               completion is requested again,  remove  the  first
+               match  and  insert  the  second  match, etc.  When
+               there are no more matches, go back  to  the  first
+               one  again.   reverse-menu-complete may be used to
+               loop through the list in the other direction.
+          MENU_COMPLETE_BEEP
+               Beep on an ambiguous menu completion.
+          MONITOR (-m)
+               Allow job control.  Set by default in  interactive
+               shells.
+          NO_BAD_PATTERN (-2)
+               If a pattern  for  filename  generation  is  badly
+               formed,  leave  it  unchanged in the argument list
+               instead of printing an error.
+          NO_BANG_HIST (-K)
+               Do not perform textual history  substitution.   Do
+               not treat the ! character specially.
+          NOBEEP (-B)
+               Do not beep.
+          NO_CLOBBER (-1)
+               Prevents > redirection  from  truncating  existing
+               files.  >! may be used to truncate a file instead.
+               Also prevents >> from creating files.  >>! may  be
+               used instead.
+          NO_EQUALS
+               Don't perform = filename substitution.
+          NOEXEC (-n)
+               Read commands and check them  for  syntax  errors,
+               but do not execute them.
+          NOGLOB (-F)
+               Disable filename generation.
+          NO_HIST_BEEP
+               Don't beep when an attempt is  made  to  access  a
+               history entry which isn't there.
+          NOHUP
+               Don't send the HUP signal to running jobs when the
+               shell exits.
+          NO_LIST_BEEP
+               Don't beep on an ambiguous completion.
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 43
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          NO_NOMATCH (-3)
+               If  a  pattern  for  filename  generation  has  no
+               matches,  leave  it unchanged in the argument list
+               instead of printing an error.
+          NO_PROMPT_CR (-V)
+               Don't print a carriage return just before printing
+               a prompt in the line editor.
+          NO_RCS (-f)
+               Source only the /etc/zshenv file.  Do  not  source
+               the .zshenv, /etc/zprofile, .zprofile, /etc/zshrc,
+               .zshrc, /etc/zlogin, .zlogin, or .zlogout files.
+          NO_SHORT_LOOPS
+               Disallow the short forms of for, select,  if,  and
+               function constructs.
+          NOTIFY (-5)
+               Report the status of background jobs  immediately,
+               rather  than  waiting until just before printing a
+               prompt.
+          NOUNSET (-u)
+               Treat unset parameters as an error when substitut-
+               ing.
+          NULLGLOB (-G)
+               If  a  pattern  for  filename  generation  has  no
+               matches, delete the pattern from the argument list
+               instead  of   reporting   an   error.    Overrides
+               NO_NOMATCH.
+          NUMERICGLOBSORT
+               If numeric filenames are  matched  by  a  filename
+               generation pattern, sort the filenames numerically
+               rather than lexicographically.
+          OVERSTRIKE
+               Start up the line editor in overstrike mode.
+          PATH_DIRS (-Q)
+               Perform a path search even on command  names  with
+               slashes  in  them.  Thus if "/usr/local/bin" is in
+               the user's path, and  he  types  "X11/xinit",  the
+               command  "/usr/local/bin/X11/xinit"  will  be exe-
+               cuted (assuming it exists).
+          PRINT_EXIT_VALUE (-C)
+               Print the exit value  of  programs  with  non-zero
+               exit status.
+          PUSHD_IGNORE_DUPS
+               Don't push multiple copies of the  same  directory
+               onto the directory stack.
+          PUSHD_MINUS
+               See popd below.
+          PUSHD_SILENT (-E)
+               Do not print the directory stack  after  pushd  or
+               popd.
+          PUSHD_TO_HOME (-D)
+               Have pushd with no arguments act like pushd $HOME.
+          RC_EXPAND_PARAM (-P)
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 44
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+               See _P_a_r_a_m_e_t_e_r _E_x_p_a_n_s_i_o_n.
+          RC_QUOTES
+               Allow the character sequence '' to signify a  sin-
+               gle quote within singly quoted strings.
+          RECEXACT (-S)
+               In completion, recognize  exact  matches  even  if
+               they are ambiguous.
+          RMSTARSILENT (-H)
+               Do not query the user before executing "rm  *"  or
+               "rm path/*".
+          SHINSTDIN (-s)
+               Read commands from the standard input.
+          SH_WORD_SPLIT (-y)
+               See _P_a_r_a_m_e_t_e_r _E_x_p_a_n_s_i_o_n.
+          SINGLE_LINE_ZLE (-M)
+               Use single-line command line  editing  instead  of
+               multi-line.
+          SUN_KEYBOARD_HACK (-L)
+               If a line ends with a backquote, and there are  an
+               odd  number  of backquotes on the line, ignore the
+               trailing backquote.  This is useful on  some  key-
+               boards  where the return key is too small, and the
+               backquote key lies annoyingly close to it.
+          VERBOSE (-v)
+               Print shell input lines as they are read.
+          XTRACE (-x)
+               Print commands and their  arguments  as  they  are
+               executed.
+          ZLE (-Z)
+               Use the zsh line editor.
+
+SHELL BUILTIN COMMANDS
+     . _f_i_l_e [ _a_r_g ... ]
+          Read and execute commands  from  _f_i_l_e  in  the  current
+          shell  environment.   If _f_i_l_e does not contain a slash,
+          the shell looks in the components of path to  find  the
+          directory  containing  _f_i_l_e.   If any arguments _a_r_g are
+          given, they become the positional parameters;  the  old
+          positional  parameters  are  restored  when the _f_i_l_e is
+          done executing.  The exit status is the exit status  of
+          the last command executed.
+
+     : [ _a_r_g ... ]
+          This command only expands parameters.  A zero exit code
+          is returned.
+
+     alias [ -g ] [ _n_a_m_e[=_v_a_l_u_e] ] ...
+          With no arguments, print the list  of  aliases  in  the
+          form  _n_a_m_e=value on the standard output.  For each _n_a_m_e
+          with a corresponding _v_a_l_u_e, define an alias  with  that
+          value.   A trailing space in _v_a_l_u_e causes the next word
+          to be checked for alias substitution.  If the  -g  flag
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 45
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          is  present,  define a global alias; global aliases are
+          expanded even if they do not occur in command position.
+          For  each  _n_a_m_e with no _v_a_l_u_e, print the value of _n_a_m_e,
+          if any.  The exit status is nonzero if a _n_a_m_e (with  no
+          _v_a_l_u_e) given for which no alias has been defined.
+
+     autoload [ _n_a_m_e ... ]
+          For each of the _n_a_m_es (which are names  of  functions),
+          create a function marked undefined.  The fpath variable
+          will be searched to find the actual function definition
+          when the function is first referenced.
+
+     bg [ _j_o_b ... ]
+     _j_o_b ... &
+          Put each  specified  _j_o_b  in  the  background,  or  the
+          current job if none is specified.
+
+     bindkey -mevd
+     bindkey -r _i_n-_s_t_r_i_n_g ...
+     bindkey [ -a ] _i_n-_s_t_r_i_n_g [ _c_o_m_m_a_n_d ] ...
+     bindkey -s [ -a ] _i_n-_s_t_r_i_n_g _o_u_t-_s_t_r_i_n_g ...
+          If one of the -e, -v, or -d options is given, reset the
+          keymaps  for  emacs mode, vi mode, or the default mode,
+          respectively; if the -m option is also given, allow the
+          use  of  a meta key.  If the -r option is given, remove
+          any binding for each _i_n-_s_t_r_i_n_g.  If the  -s  option  is
+          not  specified, bind each _i_n-_s_t_r_i_n_g to a specified _c_o_m_-
+          _m_a_n_d.  If no _c_o_m_m_a_n_d is specified, print the binding of
+          _i_n-_s_t_r_i_n_g if it is bound, or return a nonzero exit code
+          if it is not bound.  If the  -s  option  is  specified,
+          bind each _i_n-_s_t_r_i_n_g to each specified _o_u_t-_s_t_r_i_n_g.  When
+          _i_n-_s_t_r_i_n_g is typed, _o_u_t-_s_t_r_i_n_g will be pushed back  and
+          treated  as input to the line editor.  If the -a option
+          is specified, bind the _i_n-_s_t_r_i_n_gs  in  the  alternative
+          keymap  instead  of  the standard one.  The alternative
+          keymap is used in vi command mode.
+
+          For either _i_n-_s_t_r_i_n_g or _o_u_t-_s_t_r_i_n_g, control  characters
+          may  be specified in the form ^X, and the backslash may
+          be used  to  introduce  one  of  the  following  escape
+          sequences:
+               \a   bell character
+               \n   linefeed (newline)
+               \b   backspace
+               \t   horizontal tab
+               \v   vertical tab
+               \f   form feed
+               \r   carriage return
+               \e   escape
+               \nnn character code in octal
+               \M-xxx
+                    character or escape sequence  with  meta  bit
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 46
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+                    set
+
+          In all other cases, \ escapes the following  character.
+          Delete is written as `^?'.
+
+     break [ _n ]
+          Exit from an enclosing for, while,  until,  select,  or
+          repeat  loop.   If  _n is specified, then break _n levels
+          instead of just one.
+
+     builtin _n_a_m_e [ _a_r_g_s ] ...
+          Executes the builtin _n_a_m_e, with the given _a_r_g_s.
+
+     bye  Same as exit.
+
+     cd [ _a_r_g ]
+     cd _o_l_d _n_e_w
+     cd +_n
+          Change the  current  directory.   In  the  first  form,
+          change the current directory to _a_r_g, or to the value of
+          HOME if _a_r_g is not specified.  If _a_r_g is -,  change  to
+          the  value  of  OLDPWD,  the  previous directory.  If a
+          directory named _a_r_g is not found in the current  direc-
+          tory  and  _a_r_g does not begin with a slash, search each
+          component of the shell parameter cdpath.  If the option
+          CDABLEVARS  is  set,  and  a parameter named _a_r_g exists
+          whose value begins with a slash, treat its value as the
+          directory.
+
+          The second form of cd substitutes the  string  _n_e_w  for
+          the  string  _o_l_d  in the name of the current directory,
+          and tries to change to this new directory.
+
+          The third form of cd is equivalent to popd.
+
+     chdir
+          Same as cd.
+
+     compctl [ -cfhovbCD ] [ -k _n_a_m_e ] [ _a_r_g ... ]
+          Control the editor's completion behavior  when  one  of
+          _a_r_g  is the current command.  With the -D flag, control
+          default completion behavior for commands  not  assigned
+          any  special behavior; with -C, control completion when
+          there is no current  command.   The  remaining  options
+          specify  the type of command arguments to look for dur-
+          ing completion.  For  example,  compctl  -h  rlogin  is
+          equivalent to hostcmds=(rlogin).
+          -c   Expect command names.
+          -f   Expect filenames, named directories and filesystem
+               paths.
+          -h   Expect hostnames taken from the $hosts variable.
+          -o   Expect option names.
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 47
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          -v   Expect variable names.
+          -b   Expect key binding names.
+          -k _n_a_m_e
+               Expect names taken from the elements of $name.
+
+     continue [ _n_u_m ]
+          Resume the next iteration of the enclosing for,  while,
+          until,  select,  or  repeat  loop.   If _n is specified,
+          break out of _n - 1 loops and resume at the _nth  enclos-
+          ing loop.
+
+     declare [ _a_r_g ... ]
+          Same as typeset.
+
+     dirs [ -v ] [ _a_r_g ... ]
+          With no arguments, print the contents of the  directory
+          stack.   If  the  -v option is given, number the direc-
+          tories in the stack  when  printing.   Directories  are
+          added to this stack with the pushd command, and removed
+          with the cd or popd commands.  If arguments are  speci-
+          fied,  load  them  onto  the directory stack, replacing
+          anything that was there, and push the current directory
+          onto the stack.
+
+     disable _a_r_g ...
+          Disable the builtin _a_r_g temporarily.  This  allows  you
+          to  use  an  external  command  with the same name as a
+          shell builtin.  Actually the same as unhash.   Builtins
+          can be enabled with the enable command.
+
+     disown _j_o_b ...
+          Remove the specified jobs from the job table; the shell
+          will  no  longer report their status, and will not com-
+          plain if you try to exit an interactive shell with them
+          running or stopped.
+
+     echo [ -n ] [ _a_r_g ... ]
+          Write each _a_r_g on the standard  output,  with  a  space
+          separating  each  one.   If the -n flag is not present,
+          print a newline at the end.  echo recognizes  the  fol-
+          lowing escape sequences:
+          \b   backspace
+          \c   don't print an ending newline
+          \e   escape
+          \f   form feed
+          \n   newline
+          \r   carriage return
+          \t   horizontal tab
+          \v   vertical tab
+          \\   backslash
+          \xxx character code in octal
+
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 48
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     echotc _c_a_p [ _a_r_g ... ]
+          Output the termcap string corresponding to the capabil-
+          ity _c_a_p, with optional arguments.
+
+     enable _a_r_g ...
+          Enable the specified builtin commands, presumably  dis-
+          abled earlier with disable.
+
+     eval [ _a_r_g ... ]
+          Read the arguments as input to the  shell  and  execute
+          the resulting command(s) in the current shell process.
+
+     exit [ _n ]
+          Exit the shell with the exit code specified  by  _n;  if
+          none is specified, use the exit code from the last com-
+          mand executed.  An EOF condition will  also  cause  the
+          shell to exit, unless the IGNOREEOF option is set.
+
+     export [ _n_a_m_e[=_v_a_l_u_e] ... ]
+          The specified _n_a_m_es are marked for automatic export  to
+          the environment of subsequently executed commands.
+
+     false
+          Do nothing and return an exit code of 1.
+
+     fc [ -e _e_n_a_m_e ] [ -nlrdDfE ] [ _o_l_d=_n_e_w ... ] [ _f_i_r_s_t [ _l_a_s_t ] ]
+     fc -ARWI [ _f_i_l_e_n_a_m_e ]
+          Select a range of commands from _f_i_r_s_t to _l_a_s_t from  the
+          history  list.   The  arguments  _f_i_r_s_t  and _l_a_s_t may be
+          specified as a number  or  as  a  string.   A  negative
+          number  is  used  as  an  offset to the current history
+          event number.  A string specifies the most recent event
+          beginning  with  the  given  string.  All substitutions
+          _o_l_d=_n_e_w, if any, are then performed  on  the  commands.
+          If  the  -l  flag  is given, the resulting commands are
+          listed on standard output.  Otherwise the  editor  pro-
+          gram  _e_n_a_m_e  is invoked on a file containing these his-
+          tory events.  If _e_n_a_m_e is not given, the value  of  the
+          parameter  FCEDIT  is used.  If _e_n_a_m_e is "-", no editor
+          is invoked.   When  editing  is  complete,  the  edited
+          command(s)  is  executed. If _f_i_r_s_t is not specified, it
+          will be set to -1 (the most recent event), or to -16 if
+          the  -l  flag  is  given.  If _l_a_s_t is not specified, it
+          will be set to _f_i_r_s_t, or to -1 if the -l flag is given.
+          The  flag -r reverses the order of the commands and the
+          flag -n suppresses command numbers when listing.   Also
+          when  listing,  -d  prints timestamps for each command,
+          and -f prints full time-date stamps. Adding the -E flag
+          causes  the  dates to be printed as `dd.mm.yyyy'.  With
+          the -D flag, fc prints elapsed times.
+
+
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 49
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          fc -R reads the history from  the  given  file,  fc  -W
+          writes  the  history  out  to the given file, and fc -A
+          appends the history out to the given file.   fc  -AI  (
+          -WI ) appends ( writes ) only those events that are new
+          since last incremental append ( write ) to the  history
+          file.
+
+     fg [ _j_o_b ... ]
+     _j_o_b ...
+          Bring the specified _j_o_bs to the foreground.  If no  _j_o_b
+          is specified, use the current job.
+
+     functions [ +_tu ] [ _n_a_m_e ... ]
+          Equivalent to typeset -f.
+
+     getln _n_a_m_e ...
+          Read the top value from the buffer stack and put it  in
+          the shell parameter _n_a_m_e.  Equivalent to read -zr.
+
+     getopts _o_p_t_s_t_r_i_n_g _n_a_m_e [ _a_r_g ... ]
+          Checks arg for legal options.  If _a_r_g is  omitted,  use
+          the  positional  parameters.   A  valid option argument
+          begins with a + or a -.  An argument not beginning with
+          a + or a -, or the argument --, ends the options.  _o_p_t_-
+          _s_t_r_i_n_g contains the letters  that  getopts  recognizes.
+          If  a  letter  is  followed  by  a  `:', that option is
+          expected to have  an  argument.   The  options  can  be
+          separated from the argument by blanks.
+
+          Each time it is  invoked,  getopts  places  the  option
+          letter  it finds in the shell parameter _n_a_m_e, prepended
+          with a + when _a_r_g begins with a +.  The  index  of  the
+          next  _a_r_g is stored in OPTIND.  The option argument, if
+          any, is stored in OPTARG.
+
+          A leading : in _o_p_t_s_t_r_i_n_g causes getopts  to  store  the
+          letter of the invalid option in OPTARG, and to set _n_a_m_e
+          to `?' for an unknown option and to `:' when a required
+          option  is missing.  Otherwise, getopts prints an error
+          message.  The exit status is nonzero when there are  no
+          more options.
+
+     hash _n_a_m_e _p_a_t_h
+          Puts _n_a_m_e in the command  hash  table,  associating  it
+          with  the  pathname  _p_a_t_h.   Whenever _n_a_m_e is used as a
+          command argument, the shell will  try  to  execute  the
+          file given by _p_a_t_h.
+
+     history [ -nr ] [ _f_i_r_s_t [ _l_a_s_t ] ]
+          Same as fc -l.
+
+     integer
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 50
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          Same as typeset -i.
+
+     jobs [ -lp ] [ _j_o_b ... ]
+          Lists information about each given job, or all jobs  if
+          _j_o_b is omitted.  The -l flag lists process ids, and the
+          -p flag lists process groups.
+
+     kill [ -_s_i_g ] _j_o_b ...
+     kill -l
+          Sends either SIGTERM or the  specified  signal  to  the
+          given  jobs  or processes.  Signals are given by number
+          or by names (with the prefix "SIG"  removed).   If  the
+          signal  being  sent  is  not KILL or CONT, then the job
+          will be sent a CONT signal if it is stopped.  The argu-
+          ment  _j_o_b can be the process id of a job not in the job
+          list.  In the second form, kill -l,  the  signal  names
+          are listed.
+
+     let _a_r_g ...
+          Evaluate each _a_r_g as  an  arithmetic  expression.   See
+          ARITHMETIC EVALUATION above for a description of arith-
+          metic expressions.  The exit status is 0 if  the  value
+          of the last expression is nonzero, and 1 otherwise.
+
+     limit [ -h ] [ _r_e_s_o_u_r_c_e [ _l_i_m_i_t ] ] ...
+     limit -s
+          Limit the  resource  consumption  of  children  of  the
+          current  shell.   If  _l_i_m_i_t is not specified, print the
+          current limit placed on  _r_e_s_o_u_r_c_e;  otherwise  set  the
+          limit to the specified value.  If the -h flag is given,
+          use hard limits instead of soft limits.  If no _r_e_s_o_u_r_c_e
+          is given, print all limits.
+
+          _r_e_s_o_u_r_c_e is one of:
+
+          cputime
+               Maximum CPU seconds per process.
+          filesize
+               Largest single file allowed.
+          datasize
+               Maximum data size (including stack) for each  pro-
+               cess.
+          stacksize
+               Maximum stack size for each process.
+          coredumpsize
+               Maximum size of a core dump.
+          resident
+               Maximum resident set size.
+          descriptors
+               Maximum value for a file descriptor.
+
+
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 51
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          _l_i_m_i_t is a number, with an optional scaling factor,  as
+          follows:
+
+          _nh   hours.
+          _nk   kilobytes. This is the default for  all  but  cpu-
+               time.
+          _nm   megabytes or minutes.
+          _m_m:ss
+               minutes and seconds.
+
+     local
+          Same as typeset.
+
+     log  List all users currently logged in who are affected  by
+          the current setting of the watch parameter.
+
+     logout
+          Exit the shell, if this is a login shell.
+
+     popd [ +__n ]
+          Removes entries from  the  directory  stack.   With  no
+          arguments,  removes  the  top directory from the stack,
+          and performs a cd to the new top  directory.   With  an
+          argument  of the form +_n, remove the _nth entry counting
+          from the left of the list shown by  the  dirs  command,
+          starting with zero, and change to that directory.  With
+          an argument of the form -_n, remove the _nth entry count-
+          ing  from the right.  If the PUSHD_MINUS option is set,
+          the meanings of + and - in this context are swapped.
+
+     print [ -RnrslzpNDP ] [ -u_n ] [ _a_r_g ... ]
+          With no flags or with flag -, the arguments are printed
+          on the standard output as described by echo.
+          -R, -r
+               ignore the escape conventions  of  echo.   The  -R
+               option  will  print  all  subsequent arguments and
+               options.
+          -s   place the results in the history list  instead  of
+               on the standard output.
+          -n   do not add a newline to the output.
+          -l   print the arguments separated by newlines  instead
+               of spaces.
+          -N   print the arguments separated  and  terminated  by
+               nulls.
+          -u_n  print the arguments to file descriptor _n.
+          -p   print the arguments to the input of the coprocess.
+          -z   push the arguments onto the editing buffer  stack,
+               separated  by  spaces;  no  escape  sequences  are
+               recognized.
+          -D   treat the arguments as directory names,  replacing
+               prefixes with ~ expressions, as appropriate.
+          -P   recognize the same  escape  sequences  as  in  the
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 52
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+               PROMPT parameter.
+
+     pushd [ _a_r_g ]
+     pushd _o_l_d _n_e_w
+     pushd +_n
+          Change the current directory, and push the old  current
+          directory onto the directory stack.  In the first form,
+          change the current directory to _a_r_g.   If  _a_r_g  is  not
+          specified,  change to the second directory on the stack
+          (that is, exchange the top two entries), or  change  to
+          the value of HOME if the PUSHD_TO_HOME option is set or
+          if there is only one entry on the stack.  If _a_r_g is  -,
+          change  to the value of OLDPWD, the previous directory.
+          If a directory named _a_r_g is not found  in  the  current
+          directory and _a_r_g does not contain a slash, search each
+          component of the shell parameter cdpath.  If the option
+          CDABLEVARS  is  set,  and  a parameter named _a_r_g exists
+          whose value begins with a slash, treat its value as the
+          directory.   If the option PUSHD_SILENT is not set, the
+          directory stack will be printed after a pushd  is  per-
+          formed.
+
+          The second form of pushd substitutes the string _n_e_w for
+          the  string  _o_l_d  in the name of the current directory,
+          and tries to change to this new directory.
+
+          The third form of pushd is equivalent to popd.
+
+     pwd  Equivalent to print -R $PWD.
+
+     r    Equivalent to fc -e -.
+
+     read [ -rzp ] [ -u_n ] [ _n_a_m_e?_p_r_o_m_p_t ] [ _n_a_m_e ...  ]
+          Read one line and break it into fields using the  char-
+          acters  in  IFS as separators.  In raw mode, -r, a \ at
+          the end of a line does not signify  line  continuation.
+          If  the  -z  flag  is  set, read from the editor buffer
+          stack.  The first field is assigned to the first  _n_a_m_e,
+          the  second  field to the second _n_a_m_e, etc., with left-
+          over fields assigned to the  last  _n_a_m_e.   If  _n_a_m_e  is
+          omitted  then REPLY is used.  If -u_n is specified, then
+          input is read from file descriptor _n; if -p  is  speci-
+          fied,  then input is read from the coprocess.  The exit
+          status is 0 unless end-of-file is encountered.  If  the
+          first argument contains a ?, the remainder of this word
+          is used as a _p_r_o_m_p_t on standard error when the shell is
+          interactive.   The  exit  status is 0 unless an end-of-
+          file is encountered.
+
+     readonly [ _n_a_m_e[=_v_a_l_u_e] ] ...
+          The given _n_a_m_e_s are marked readonly; these names cannot
+          be changed by subsequent assignment.
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 53
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     rehash [ -f ]
+          Throw out the command hash table and  start  over.   If
+          the  -f  option is set, rescan the command path immedi-
+          ately, instead of rebuilding the hash  table  incremen-
+          tally.
+
+     return [ _n ]
+          Causes a shell function or . script to  return  to  the
+          invoking  script with the return status specified by _n.
+          If _n is omitted then the return status is that  of  the
+          last command executed.
+
+     sched [+]_h_h:_m_m _c_o_m_m_a_n_d ...
+     sched [ -_i_t_e_m ]
+          Make an entry in the scheduled list of commands to exe-
+          cute.   The time may be specified in either absolute or
+          relative time.  With no arguments, prints the  list  of
+          scheduled  commands.   With the argument -_i_t_e_m, removes
+          the given item from the list.
+
+     set [ +__o_p_t_i_o_n_s ] [ +_o _o_p_t_i_o_n _n_a_m_e ] ... [ -A _n_a_m_e ] [ _a_r_g ] ...
+          Set the options for the shell and/or set the positional
+          parameters, or declare an array.  For  the  meaning  of
+          the  flags,  see OPTIONS above.  Flags may be specified
+          by name using the -o option.  If the -A flag is  speci-
+          fied,  _n_a_m_e  is  set  to  an array containing the given
+          _a_r_gs.  Otherwise the positional parameters are set.  If
+          no  arguments  are  given, then the names and values of
+          all parameters are printed on the standard output.   If
+          the only argument is +, the names of all parameters are
+          printed.
+
+     setopt [ +__o_p_t_i_o_n_s ] [ _n_a_m_e ... ]
+          Set the options for the shell.  All  options  specified
+          either  with flags or by name are set.  If no arguments
+          are supplied, the names of all  options  currently  set
+          are  printed.   In option names, case is insignificant,
+          and all underscore characters are ignored.
+
+     shift [ _n ]
+          The positional parameters from $_n+1 ... are renamed $1,
+          where _n is an arithmetic expression that defaults to 1.
+
+     source
+          Same as ..
+
+     suspend [ -f ]
+          Suspend the execution of the shell (send it a  SIGTSTP)
+          until  it  receives a SIGCONT.  If the -f option is not
+          given, complain if this is a login shell.
+
+     test _a_r_g ...
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 54
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+     [ _a_r_g ... ]
+          Like the system version of test.  Added for compatibil-
+          ity; use conditional expressions instead.
+
+     times
+          Print the accumulated user and  system  times  for  the
+          shell and for processes run from the shell.
+
+     trap [ _a_r_g ] [ _s_i_g ] ...
+          _a_r_g is a command to be read and executed when the shell
+          receives  _s_i_g.  Each _s_i_g can be given as a number or as
+          the name of a signal.  If _a_r_g is -, then all traps  _s_i_g
+          are  reset to their default values.  If _a_r_g is the null
+          string, then this signal is ignored by the shell and by
+          the  commands  it invokes.  If _s_i_g is ERR then _a_r_g will
+          be executed after each command.  If _s_i_g is  0  or  EXIT
+          and the trap statement is executed inside the body of a
+          function, then the command _a_r_g is  executed  after  the
+          function  completes.   If _s_i_g is 0 or EXIT and the trap
+          statement is not executed inside the body  of  a  func-
+          tion,  then  the command _a_r_g is executed when the shell
+          terminates.  The trap command with no arguments  prints
+          a list of commands associated with each signal.
+
+     true Do nothing and return an exit code of 0.
+
+     ttyctl -fu
+          The -f option freezes the tty,  and  -u  unfreezes  it.
+          When the tty is frozen, no changes made to the tty set-
+          tings by external  programs  will  be  honored  by  the
+          shell;  the  shell  will  simply  reset the settings to
+          their previous values as soon as  each  command  exits.
+          Thus, stty and similar programs have no effect when the
+          tty is frozen.
+
+     type Same as whence -v.
+
+     typeset [ +_LRZfilrtux [_n]] [ _n_a_m_e[=_v_a_l_u_e] ] ...
+          Set attributes and values for shell  parameters.   When
+          invoked  inside  a  function,  if  _n_a_m_e  is not already
+          defined, a new parameter is created which will be unset
+          when  the function completes.  The following attributes
+          are valid:
+          -L   Left justify and remove leading blanks from _v_a_l_u_e.
+               If  _n  is  nonzero,  it  defines  the width of the
+               field; otherwise it is determined by the width  of
+               the  value  of  the  first  assignment.   When the
+               parameter is printed, it is filled  on  the  right
+               with  blanks  or truncated if necessary to fit the
+               field.  Leading zeros are removed if the  -Z  flag
+               is also set.
+          -R   Right justify and fill with leading blanks.  If  _n
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 55
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+               is nonzero if defines the width of the field; oth-
+               erwise it is determined by the width of the  value
+               of  the  first  assignment.  When the parameter is
+               printed, the field is left filled with  blanks  or
+               truncated from the end.
+          -Z   Right justify and fill with leading zeros  if  the
+               first  non-blank  character  is a digit and the -L
+               flag has not been set.  If _n is nonzero it defines
+               the width of the field; otherwise it is determined
+               by the width of the value of the first assignment.
+          -f   The names refer to functions rather  than  parame-
+               ters.   No  assignments  can be made, and the only
+               other valid flags are -t  and  -u.   The  flag  -t
+               turns on execution tracing for this function.  The
+               flag -u causes this  function  to  be  marked  for
+               autoloading.  The fpath parameter will be searched
+               to find the function definition when the  function
+               is first referenced.
+          -i   Use an internal integer representation.  If  i  is
+               nonzero  it  defines  the  output arithmetic base,
+               otherwise it is determined by  the  first  assign-
+               ment.
+          -l   Convert to lower case.
+          -r   The given _n_a_m_es are marked readonly.
+          -t   Tags the named parameters.  Tags have  no  special
+               meaning to the shell.
+          -u   Convert to upper case.
+          -x   Mark for automatic export to  the  environment  of
+               subsequently executed commands.
+
+     Using + rather than - causes these flags to be  turned  off.
+     If no arguments are given but flags are specified, a list of
+     named parameters which have  these  flags  set  is  printed.
+     Using  + instead of - keeps their values from being printed.
+     If no arguments or options are given, the names  and  attri-
+     butes of all parameters are printed.
+
+     ulimit [ -HSacdfmnt ] [ _l_i_m_i_t ]
+          Set or display a resource limit.  The  value  of  limit
+          can  be  a  number  in  the unit specified below or the
+          value unlimited.  The H and S flags specify whether the
+          hard  limit or the soft limit for the given resource is
+          set.
+          -a   Lists all of the current resource limits.
+          -c   The number of 512-byte blocks on the size of  core
+               dumps.
+          -d   The number of K-bytes on the size of the data seg-
+               ment.
+          -f   The number of 512-byte blocks on the size of files
+               written.
+          -m   The number of K-bytes  on  the  size  of  physical
+               memory.
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 56
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          -n   The number of file descriptors.
+          -s   The number of K-bytes on the size of the stack.
+          -t   The number of CPU seconds to be used.
+
+     umask [ _m_a_s_k ]
+          The umask is set to _m_a_s_k.  _m_a_s_k can be either an  octal
+          number  or  a  symbolic value as described in chmod(1).
+          If _m_a_s_k is omitted, the current value is printed.
+
+     unalias _n_a_m_e ...
+          The alias definition, if any, for each _n_a_m_e is removed.
+
+     unfunction _n_a_m_e ...
+          The function definition,  if  any,  for  each  _n_a_m_e  is
+          removed.
+
+     unhash _n_a_m_e ...
+          The entry in the command hash table, if any,  for  each
+          _n_a_m_e is removed.
+
+     unlimit [ -h ] _r_e_s_o_u_r_c_e ...
+          The resource limit for each _r_e_s_o_u_r_c_e is set to the hard
+          limit.   If  the -h flag is given and the shell is run-
+          ning as root, the hard resource limit for each _r_e_s_o_u_r_c_e
+          is removed.
+
+     unset _n_a_m_e ...
+          Each named parameter is unset.
+
+     unsetopt [ +__o_p_t_i_o_n_s ] [ _n_a_m_e ... ]
+          Unset the options for the shell.  All options specified
+          either with flags or by name are unset.
+
+     vared _n_a_m_e
+          The value of the parameter _n_a_m_e is loaded into the edit
+          buffer,  and the line editor is invoked.  When the edi-
+          tor exits, _n_a_m_e is set to the string value returned  by
+          the editor.
+
+     wait [ _j_o_b ... ]
+          Wait for the specified jobs or processes.   If  _j_o_b  is
+          not given then all currently active child processes are
+          waited for.  Each _j_o_b can be either a job specification
+          or  the process-id of a job in the job table.  The exit
+          status from this command is that of the job waited for.
+
+     whence [ -acpv ] _n_a_m_e ...
+          For each name, indicate how it would be interpreted  if
+          used  as  a  command name.  The -v flag produces a more
+          verbose report.  The -p flag does  a  path  search  for
+          _n_a_m_e even if it is a shell function, alias, or reserved
+          word.  The -c flag prints the  results  in  a  csh-like
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 57
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+          format.   The  -a flag does a search for all occurences
+          of _n_a_m_e throughout the command path.
+
+     which
+          Same as whence -c.
+
+INVOCATION
+     Commands are first read  from  /etc/zshenv.   Then,  if  the
+     NO_RCS   option   is   unset,   commands   are   read   from
+     $ZDOTDIR/.zshenv.   (If  ZDOTDIR  is  unset,  HOME  is  used
+     instead).  If the first character of argument zero passed to
+     the shell is -, or if the -l flag is present, then the shell
+     is  assumed  to be a login shell, and commands are read from
+     /etc/zprofile and then  $ZDOTDIR/.zprofile.   Then,  if  the
+     shell  is  interactive  and the NO_RCS option is unset, com-
+     mands are read from  /etc/zshrc  and  then  $ZDOTDIR/.zshrc.
+     Finally,  if  the  shell  is  a login shell, /etc/zlogin and
+     $ZDOTDIR/.zlogin are read.
+
+     If the NO_RCS option is set within  /etc/zshenv,  then  only
+     /etc/zprofile, /etc/zshrc, and /etc/zlogin are read, and the
+     $ZDOTDIR files are skipped.  If the -f flag is present, only
+     /etc/zshenv  is read, and all other initialization files are
+     skipped.
+
+     If the -s flag is not present and an argument is given,  the
+     first  argument  is  taken to be the pathname of a script to
+     execute.  The remaining arguments are assigned to the  posi-
+     tional  parameters.   The following flags are interpreted by
+     the shell when invoked:
+
+     -c _s_t_r_i_n_g
+          Read commands from _s_t_r_i_n_g.
+     -s   Read command from the standard input.
+     -i   If this flag is present or the shell input  and  output
+          are attached to a terminal, this shell is interactive.
+
+SEE ALSO
+     sh(1), csh(1), tcsh(1), itcsh(1),  rc(1),  bash(1),  ash(1),
+     ksh(1), clam(1), strftime(3).
+
+FILES
+     $ZDOTDIR/.zshenv
+     $ZDOTDIR/.zprofile
+     $ZDOTDIR/.zshrc
+     $ZDOTDIR/.zlogin
+     $ZDOTDIR/.zlogout
+     /tmp/zsh*
+     /etc/zshenv
+     /etc/zprofile
+     /etc/zshrc
+     /etc/zlogin
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 58
+
+
+
+
+
+
+ZSH(1)                   USER COMMANDS                     ZSH(1)
+
+
+
+AUTHOR
+     Paul Falstad (pf@ttisms.com)
+
+AVAILABILITY
+     The  latest  official  release  of  zsh  is  available   via
+     anonymous ftp from cs.ucsd.edu (132.239.51.3), in the direc-
+     tory pub/zsh.  The beta release of zsh 2.4 is available from
+     carlo.phys.uva.nl    (145.18.220.25),   in   the   directory
+     pub/bas/zsh.  This man page is current to zsh 2.3.1.
+
+UNDOCUMENTED FEATURES
+     Known only to the recipients of the zsh mailing  list,  zsh-
+     list@cs.uow.edu.au.  If  you  run into problems, please send
+     your questions and patches to the mailing list.  To join the
+     list, send email to zsh-request@cs.uow.edu.au.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+zsh version 2.3.1 Last change: 5 February 1993                 59
+
+
+
