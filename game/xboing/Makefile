@@ -440,8 +440,8 @@ backup:
 
 pkg: pkg_bin
 
-pkg_bin: install
-	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST xboing_bin
+pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST pkg/+REQ all install
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST -r pkg/+REQ xboing_bin
 
 # End of the XBoing Imakefile :-)
 
