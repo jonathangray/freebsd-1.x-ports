@@ -10,7 +10,6 @@ SUBDIR += expect # requires `tcl' which gets made from ports/lang/Makefile
 SUBDIR += ile
 SUBDIR += iozone
 SUBDIR += less
-SUBDIR += md5
 SUBDIR += mtools
 SUBDIR += pkg_install
 SUBDIR += sc
