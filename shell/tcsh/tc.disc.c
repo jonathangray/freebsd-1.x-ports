@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.disc.c,v 1.2 1993/11/12 21:38:24 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.disc.c,v 1.3 1993/11/13 00:58:20 ache Exp $ */
 /*
  * tc.disc.c: Functions to set/clear line disciplines
  *
@@ -37,16 +37,11 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.disc.c,v 1.2 1993/11/12 21:38:24 smace Exp $")
+RCSID("$Id: tc.disc.c,v 1.3 1993/11/13 00:58:20 ache Exp $")
 
 #ifdef OREO
 #include <compat.h>
 #endif	/* OREO */
-
-/* XXX kludge to get job control working */
-#ifdef __386BSD__
-#undef NTTYDISC
-#endif
 
 #include "ed.term.h"
 
