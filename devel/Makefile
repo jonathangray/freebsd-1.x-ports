@@ -20,8 +20,8 @@ SUBDIR += gdb
 SUBDIR += gic
 .endif
 SUBDIR += gmake
-SUBDIR += mprof30	# name told me by jkh ?
-SUBDIR += mprof		# probable proper name
+#SUBDIR += mprof30	# name told me by jkh ?
+#SUBDIR += mprof		# probable proper name
 
 .include <bsd.subdir_ports.mk>
 
