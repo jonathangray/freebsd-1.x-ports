@@ -192,7 +192,14 @@ trad_unix_core_file_p (abfd)
 #else
   core_datasec (abfd)->vma = HOST_TEXT_START_ADDR + (NBPG * u.u_tsize);
 #endif
-
+/* a hack, but it works for FreeBSD !! */
+#include <vm/vm_param.h>
+/* this should really be in <vm/vm_param.h>, but somebody forgot it */
+#ifndef vm_page_size
+#define vm_page_size 4096
+#endif
+#define HOST_STACK_START_ADDR trunc_page(u.u_kproc.kp_eproc.e_vm.vm_maxsaddr \
++ MAXSSIZ - ctob(u.u_ssize))
 #ifdef HOST_STACK_START_ADDR
   core_stacksec (abfd)->vma = HOST_STACK_START_ADDR;
 #else

@@ -354,6 +354,7 @@ extern bfd_target hppa_vec;
 extern bfd_target i386aout_vec;
 extern bfd_target i386bsd_vec;
 extern bfd_target netbsd386_vec;
+extern bfd_target freebsd386_vec;
 extern bfd_target i386coff_vec;
 extern bfd_target i386linux_vec;
 extern bfd_target i386lynx_aout_vec;
@@ -459,6 +460,7 @@ bfd_target *target_vector[] = {
 	&i386aout_vec,
 	&i386bsd_vec,
 	&netbsd386_vec,
+	&freebsd386_vec,
 	&i386coff_vec,
 #if 0
 	&i386linux_vec,
