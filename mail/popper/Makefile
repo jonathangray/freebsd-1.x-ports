@@ -48,7 +48,8 @@ MANPAGE		=	popper.8
 
 MANDIR		=	/usr/local/man/man8
 
-
+all:	${TARGET}
+	
 
 ${TARGET}: ${OBJS}
 	cc  ${OBJS} -o ${TARGET} -lresolv -lcrypt
@@ -75,7 +76,7 @@ install: ${TARGET}
 pkg:    pkg_bin
 
 pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST all
-        pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST popper_bin
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST popper_bin
 
 sources: ${SRCS}
 
