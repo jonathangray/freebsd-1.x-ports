@@ -17,35 +17,35 @@
  *
  ************************************************************************/
 
-#define DEBUG_FILE
+/* #define DEBUG_FILE */
 
-#include <windows.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <unistd.h>
+#include <time.h>
+#include <windows.h>
 #include "prototypes.h"
 
 char WindowsDirectory[256], SystemDirectory[256], TempDirectory[256];
-
 
 /***************************************************************************
  _lopen 
 
  Emulate the _lopen windows call
  ***************************************************************************/
-int _lopen (LPSTR lpPathName, int iReadWrite)
+INT _lopen (LPSTR lpPathName, INT iReadWrite)
 {
   int  handle;
   char *UnixFileName;
 
 #ifdef DEBUG_FILE
-  fprintf (stderr, "_lopen: open %s\n", lpPathName);
+  fprintf (stderr, "_lopen: open('%s', %X);\n", lpPathName, iReadWrite);
 #endif
 
   if ((UnixFileName = GetUnixFileName(lpPathName)) == NULL)
   	return HFILE_ERROR;
-
+  iReadWrite &= 0x000F;
   handle =  open (UnixFileName, iReadWrite);
 
 #ifdef DEBUG_FILE
@@ -61,13 +61,13 @@ int _lopen (LPSTR lpPathName, int iReadWrite)
 /***************************************************************************
  _lread
  ***************************************************************************/
-WORD _lread (int hFile, LPSTR lpBuffer, int wBytes)
+WORD _lread (INT hFile, LPSTR lpBuffer, INT wBytes)
 {
   int result;
 
 #ifdef DEBUG_FILE
   fprintf(stderr, "_lread: handle %d, buffer = %ld, length = %d\n",
-	  		hFile, lpBuffer, wBytes);
+	  		hFile, (int) lpBuffer, wBytes);
 #endif
   
   result = read (hFile, lpBuffer, wBytes);
@@ -81,13 +81,13 @@ WORD _lread (int hFile, LPSTR lpBuffer, int wBytes)
 /****************************************************************************
  _lwrite
 ****************************************************************************/
-WORD _lwrite (int hFile, LPSTR lpBuffer, int wBytes)
+WORD _lwrite (INT hFile, LPSTR lpBuffer, INT wBytes)
 {
 	int result;
 
 #ifdef DEBUG_FILE
   fprintf(stderr, "_lwrite: handle %d, buffer = %ld, length = %d\n",
-	  		hFile, lpBuffer, wBytes);
+	  		hFile, (int) lpBuffer, wBytes);
 #endif
 	result = write (hFile, lpBuffer, wBytes);
 
@@ -100,13 +100,15 @@ WORD _lwrite (int hFile, LPSTR lpBuffer, int wBytes)
 /***************************************************************************
  _lclose
  ***************************************************************************/
-int _lclose (int hFile)
+INT _lclose (INT hFile)
 {
 #ifdef DEBUG_FILE
-  fprintf(stderr, "_lclose: handle %d\n", hFile);
+	fprintf(stderr, "_lclose: handle %d\n", hFile);
 #endif
-  
-  close (hFile);
+	if (close (hFile))
+  		return HFILE_ERROR;
+  	else
+  		return 0;
 }
 
 /**************************************************************************
@@ -115,7 +117,7 @@ int _lclose (int hFile)
  Warning:  This is nearly totally untested.  It compiles, that's it...
                                             -SL 9/13/93
  **************************************************************************/
-int OpenFile (LPSTR lpFileName, LPOFSTRUCT ofs, WORD wStyle)
+INT OpenFile (LPSTR lpFileName, LPOFSTRUCT ofs, WORD wStyle)
 {
   int base,flags;
 
@@ -166,7 +168,7 @@ WORD SetHandleCount (WORD wNumber)
 /***************************************************************************
  _llseek
  ***************************************************************************/
-LONG _llseek (int hFile, LONG lOffset, int nOrigin)
+LONG _llseek (INT hFile, LONG lOffset, INT nOrigin)
 {
 	int origin;
 	
@@ -189,7 +191,7 @@ LONG _llseek (int hFile, LONG lOffset, int nOrigin)
 /***************************************************************************
  _lcreate
  ***************************************************************************/
-LONG _lcreate (LPSTR lpszFilename, int fnAttribute)
+INT _lcreate (LPSTR lpszFilename, INT fnAttribute)
 {
 	int handle;
 	char *UnixFileName;
@@ -213,7 +215,7 @@ LONG _lcreate (LPSTR lpszFilename, int fnAttribute)
 /***************************************************************************
  GetDriveType
  ***************************************************************************/
-UINT GetDriveType(int drive)
+UINT GetDriveType(INT drive)
 {
 
 #ifdef DEBUG_FILE
@@ -221,12 +223,12 @@ UINT GetDriveType(int drive)
 #endif
 
 	if (!DOS_ValidDrive(drive))
-		return 0;
+		return DRIVE_DOESNOTEXIST;
 
 	if (drive == 0 || drive == 1)
 		return DRIVE_REMOVABLE;
 		 
-	return DRIVE_REMOTE;
+	return DRIVE_FIXED;
 }
 
 /***************************************************************************
@@ -254,6 +256,7 @@ UINT GetWindowsDirectory(LPSTR lpszSysPath, UINT cbSysPath)
 	fprintf(stderr,"GetWindowsDirectory (%s)\n",lpszSysPath);
 #endif
 
+	ChopOffSlash(lpszSysPath);
 	return(strlen(lpszSysPath));
 }
 /***************************************************************************
@@ -270,12 +273,13 @@ UINT GetSystemDirectory(LPSTR lpszSysPath, UINT cbSysPath)
 	fprintf(stderr,"GetSystemDirectory (%s)\n",lpszSysPath);
 #endif
 
+	ChopOffSlash(lpszSysPath);
 	return(strlen(lpszSysPath));
 }
 /***************************************************************************
  GetTempFileName
  ***************************************************************************/
-int GetTempFileName(BYTE bDriveLetter, LPCSTR lpszPrefixString, UINT uUnique, LPSTR lpszTempFileName)
+INT GetTempFileName(BYTE bDriveLetter, LPCSTR lpszPrefixString, UINT uUnique, LPSTR lpszTempFileName)
 {
 	int unique;
 	char tempname[256];
@@ -288,7 +292,7 @@ int GetTempFileName(BYTE bDriveLetter, LPCSTR lpszPrefixString, UINT uUnique, LP
 	strcpy(tempname,lpszPrefixString);
 	tempname[3]='\0';
 
-	sprintf(lpszTempFileName,"%s\%s%d.tmp",WindowsDirectory, tempname, 
+	sprintf(lpszTempFileName,"%s\\%s%d.tmp", TempDirectory, tempname, 
 		unique);
 
 	ToDos(lpszTempFileName);
@@ -307,4 +311,19 @@ int GetTempFileName(BYTE bDriveLetter, LPCSTR lpszPrefixString, UINT uUnique, LP
 WORD SetErrorMode(WORD x)
 {
 	fprintf(stderr,"wine: SetErrorMode %4x (ignored)\n",x);
+}
+
+/***************************************************************************
+ _hread
+ ***************************************************************************/
+long _hread(int hf, void FAR *hpvBuffer, long cbBuffer)
+{
+	return read(hf, hpvBuffer, cbBuffer);
+}
+/***************************************************************************
+ _hwrite
+ ***************************************************************************/
+long _hwrite(int hf, const void FAR *hpvBuffer, long cbBuffer)
+{
+	return write(hf, hpvBuffer, cbBuffer);
 }

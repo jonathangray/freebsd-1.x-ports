@@ -1,6 +1,8 @@
-static char RCSId[] = "$Id: sound.c,v 1.1 1994/02/24 08:05:50 hsu Exp $";
+static char RCSId[] = "$Id: sound.c,v 1.1.1.2 1994/04/22 01:53:18 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
+#include <stdlib.h>
+#include <stdio.h>
 #include "prototypes.h"
 
 int OpenSound(void)

@@ -9,8 +9,7 @@ static char Copyright[] = "Copyright  Alexandre Julliard, 1993";
 #include "sysmetrics.h"
 #include "user.h"
 #include "win.h"
-
-extern Display * display;
+#include "message.h"
 
 static HWND hwndActive = 0;  /* Currently active window */
 
@@ -24,7 +23,7 @@ void GetWindowRect( HWND hwnd, LPRECT rect )
     if (!wndPtr) return;
     
     *rect = wndPtr->rectWindow;
-    if (wndPtr->hwndParent)
+    if (wndPtr->dwStyle & WS_CHILD)
 	MapWindowPoints( wndPtr->hwndParent, 0, (POINT *)rect, 2 );
 }
 
@@ -68,15 +67,32 @@ void ScreenToClient( HWND hwnd, LPPOINT lppnt )
  */
 HWND WindowFromPoint( POINT pt )
 {
-    RECT rect;
-    HWND hwnd = firstWindow;
-    while (hwnd)
+    HWND hwndRet = 0;
+    HWND hwnd = GetDesktopWindow();
+
+    while(hwnd)
     {
-	GetWindowRect( hwnd, &rect );
-	if (PtInRect( &rect, pt )) return hwnd;
-	hwnd = GetWindow( hwnd, GW_HWNDNEXT );
+	  /* If point is in window, and window is visible,   */
+	  /* not disabled and not transparent, then explore  */
+	  /* its children. Otherwise, go to the next window. */
+
+	WND *wndPtr = WIN_FindWndPtr( hwnd );
+	if ((pt.x >= wndPtr->rectWindow.left) &&
+	    (pt.x < wndPtr->rectWindow.right) &&
+	    (pt.y >= wndPtr->rectWindow.top) &&
+	    (pt.y < wndPtr->rectWindow.bottom) &&
+	    !(wndPtr->dwStyle & WS_DISABLED) &&
+	    (wndPtr->dwStyle & WS_VISIBLE) &&
+	    !(wndPtr->dwExStyle & WS_EX_TRANSPARENT))
+	{
+	    pt.x -= wndPtr->rectClient.left;
+	    pt.y -= wndPtr->rectClient.top;
+	    hwndRet = hwnd;
+	    hwnd = wndPtr->hwndChild;
+	}
+	else hwnd = wndPtr->hwndNext;
     }
-    return 0;
+    return hwndRet;
 }
 
 
@@ -97,7 +113,7 @@ HWND ChildWindowFromPoint( HWND hwndParent, POINT pt )
 	if (PtInRect( &rect, pt )) return hwnd;
 	hwnd = GetWindow( hwnd, GW_HWNDNEXT );
     }
-    return 0;
+    return hwndParent;
 }
 
 
@@ -117,7 +133,7 @@ void MapWindowPoints( HWND hwndFrom, HWND hwndTo, LPPOINT lppt, WORD count )
 	wndPtr = WIN_FindWndPtr( hwndFrom );
 	origin.x += wndPtr->rectClient.left;
 	origin.y += wndPtr->rectClient.top;
-	hwndFrom = wndPtr->hwndParent;
+	hwndFrom = (wndPtr->dwStyle & WS_CHILD) ? wndPtr->hwndParent : 0;
     }
 
       /* Translate origin to destination window coords */
@@ -126,7 +142,7 @@ void MapWindowPoints( HWND hwndFrom, HWND hwndTo, LPPOINT lppt, WORD count )
 	wndPtr = WIN_FindWndPtr( hwndTo );
 	origin.x -= wndPtr->rectClient.left;
 	origin.y -= wndPtr->rectClient.top;
-	hwndTo = wndPtr->hwndParent;
+	hwndTo = (wndPtr->dwStyle & WS_CHILD) ? wndPtr->hwndParent : 0;
     }    
 
       /* Translate points */
@@ -167,7 +183,6 @@ HWND GetActiveWindow()
 {
     return hwndActive;
 }
-
 
 /*******************************************************************
  *         SetActiveWindow    (USER.59)
@@ -410,6 +425,9 @@ HWND WINPOS_ChangeActiveWindow( HWND hwnd, BOOL mouseMsg )
     hwndActive = hwnd;
     if (hwndActive)
     {
+	WND *wndPtr = WIN_FindWndPtr( hwndActive );
+	wndPtr->hwndPrevActive = prevActive;
+
 	/* Send WM_ACTIVATEAPP here */
 	SendMessage( hwnd, WM_NCACTIVATE, TRUE, 0 );
 	SendMessage( hwnd, WM_ACTIVATE, mouseMsg ? WA_CLICKACTIVE : WA_ACTIVE,
@@ -421,8 +439,6 @@ HWND WINPOS_ChangeActiveWindow( HWND hwnd, BOOL mouseMsg )
 
 /***********************************************************************
  *           SetWindowPos   (USER.232)
- */
-/* Unimplemented flags: SWP_NOREDRAW
  */
 /* Note: all this code should be in the DeferWindowPos() routines,
  * and SetWindowPos() should simply call them.  This will be implemented
@@ -461,6 +477,20 @@ BOOL SetWindowPos( HWND hwnd, HWND hwndInsertAfter, short x, short y,
     winPos->cy = cy;
     winPos->flags = flags;
     SendMessage( hwnd, WM_WINDOWPOSCHANGING, 0, (LONG)winPos );
+    hwndInsertAfter = winPos->hwndInsertAfter;
+
+      /* Some sanity checks */
+
+    if (!IsWindow( hwnd ) || (hwnd == GetDesktopWindow())) goto Abort;
+    if (flags & (SWP_SHOWWINDOW | SWP_HIDEWINDOW))
+	flags |= SWP_NOMOVE | SWP_NOSIZE;
+    if (!(flags & (SWP_NOZORDER | SWP_NOACTIVATE)))
+    {
+	if (hwnd != hwndActive) hwndInsertAfter = HWND_TOP;
+	else if ((hwndInsertAfter == HWND_TOPMOST) ||
+		 (hwndInsertAfter == HWND_NOTOPMOST))
+	    hwndInsertAfter = HWND_TOP;	
+    }
 
       /* Calculate new position and size */
 
@@ -485,15 +515,13 @@ BOOL SetWindowPos( HWND hwnd, HWND hwndInsertAfter, short x, short y,
 
     if (!(winPos->flags & SWP_NOZORDER))
     {
-	hwndInsertAfter = winPos->hwndInsertAfter;
-
 	  /* TOPMOST not supported yet */
 	if ((hwndInsertAfter == HWND_TOPMOST) ||
 	    (hwndInsertAfter == HWND_NOTOPMOST)) hwndInsertAfter = HWND_TOP;
 
 	  /* Make sure hwndInsertAfter is a sibling of hwnd */
 	if ((hwndInsertAfter != HWND_TOP) && (hwndInsertAfter != HWND_BOTTOM))
-	    if (wndPtr->hwndParent != GetParent(hwndInsertAfter)) goto Abort;
+	    if (GetParent(hwnd) != GetParent(hwndInsertAfter)) goto Abort;
 
 	WIN_UnlinkWindow( hwnd );
 	WIN_LinkWindow( hwnd, hwndInsertAfter );
@@ -538,7 +566,7 @@ BOOL SetWindowPos( HWND hwnd, HWND hwndInsertAfter, short x, short y,
 	WND * parentPtr;
 	winChanges.x = newWindowRect.left;
 	winChanges.y = newWindowRect.top;
-	if (wndPtr->hwndParent)
+	if (wndPtr->dwStyle & WS_CHILD)
 	{
 	    parentPtr = WIN_FindWndPtr(wndPtr->hwndParent);
 	    winChanges.x += parentPtr->rectClient.left-parentPtr->rectWindow.left;
@@ -571,11 +599,27 @@ BOOL SetWindowPos( HWND hwnd, HWND hwndInsertAfter, short x, short y,
     {
 	wndPtr->dwStyle |= WS_VISIBLE;
 	XMapWindow( display, wndPtr->window );
+	MSG_Synchronize();
+	if (winPos->flags & SWP_NOREDRAW)
+	    RedrawWindow( hwnd, NULL, 0, RDW_VALIDATE );
     }
     else if (winPos->flags & SWP_HIDEWINDOW)
     {
 	wndPtr->dwStyle &= ~WS_VISIBLE;
 	XUnmapWindow( display, wndPtr->window );
+	if ((hwnd == GetFocus()) || IsChild( hwnd, GetFocus() ))
+	    SetFocus( GetParent(hwnd) );  /* Revert focus to parent (if any) */
+	if (hwnd == hwndActive)
+	{
+	      /* Activate previously active window if possible */
+	    HWND newActive = wndPtr->hwndPrevActive;
+	    if (!IsWindow(newActive) || (newActive == hwnd))
+	    {
+		newActive = GetTopWindow(GetDesktopWindow());
+		if (newActive == hwnd) newActive = wndPtr->hwndNext;
+	    }	    
+	    WINPOS_ChangeActiveWindow( newActive, FALSE );
+	}
     }
 
     if (!(winPos->flags & SWP_NOACTIVATE))

@@ -1,11 +1,12 @@
-static char RCSId[] = "$Id: ldt.c,v 1.1 1994/02/24 08:05:41 hsu Exp $";
+#ifndef WINELIB
+static char RCSId[] = "$Id: ldt.c,v 1.1.1.2 1994/04/22 01:52:28 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-
 #include "prototypes.h"
+
 #if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <machine/segments.h>
 #endif
@@ -84,3 +85,5 @@ print_ldt()
 	}
     }
 }
+
+#endif /* ifndef WINELIB */

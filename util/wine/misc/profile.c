@@ -14,9 +14,12 @@
 static char Copyright [] = "Copyright (C) 1993 Miguel de Icaza";
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include "windows.h"
+
 #include "wine.h"
+#include "windows.h"
+#include "prototypes.h"
 
 /* #define DEBUG */
 
@@ -61,15 +64,34 @@ static TSecHeader *is_loaded (char *FileName)
     return 0;
 }
 
-static TSecHeader *load (char *file)
+static char *GetIniFileName(char *name)
+{
+	char temp[256];
+
+	if (strchr(name, '/'))
+		return name;
+
+	if (strchr(name, '\\'))
+		return GetUnixFileName(name);
+		
+	GetWindowsDirectory(temp, sizeof(temp) );
+	strcat(temp, "\\");
+	strcat(temp, name);
+	
+	return GetUnixFileName(name);
+}
+
+static TSecHeader *load (char *filename)
 {
     FILE *f;
     int state;
     TSecHeader *SecHeader = 0;
     char CharBuffer [STRSIZE];
-    char *next;
+    char *next, *file;
     char c;
-    
+
+    file = GetIniFileName(filename);
+
 #ifdef DEBUG
     printf("Load %s\n", file);
 #endif		
@@ -79,6 +101,8 @@ static TSecHeader *load (char *file)
 #ifdef DEBUG
     printf("Loading %s\n", file);
 #endif		
+
+
     state = FirstBrace;
     while ((c = getc (f)) != EOF){
 	if (c == '\r')		/* Ignore Carriage Return */
@@ -121,12 +145,18 @@ static TSecHeader *load (char *file)
 	    }
 	    if (state == FirstBrace) /* On first pass, don't allow dangling keys */
 		break;
-	    
+
 	    if (c == ' ' || c == '\t')
 		break;
 	    
 	    if (c == '\n' || c == ';' || overflow) /* Abort Definition */
 		next = CharBuffer;
+
+	    if (c == ';')
+	    {
+		state = IgnoreToEOL;
+		break;
+	    }
 	    
 	    if (c == '=' || overflow){
 		TKeys *temp;
@@ -165,7 +195,7 @@ static TSecHeader *load (char *file)
     return SecHeader;
 }
 
-static new_key (TSecHeader *section, char *KeyName, char *Value)
+static void new_key (TSecHeader *section, char *KeyName, char *Value)
 {
     TKeys *key;
     
@@ -328,13 +358,13 @@ static void dump_profile (TProfile *p)
     if (!p)
 	return;
     dump_profile (p->link);
-    if ((profile = fopen (p->FileName, "w")) != NULL){
+    if ((profile = fopen (GetIniFileName(p->FileName), "w")) != NULL){
 	dump_sections (profile, p->Section);
 	fclose (profile);
     }
 }
 
-void sync_profiles ()
+void sync_profiles (void)
 {
     dump_profile (Base);
 }

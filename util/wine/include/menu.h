@@ -1,4 +1,4 @@
-/* $Id: menu.h,v 1.1 1994/02/24 08:05:37 hsu Exp $
+/* $Id: menu.h,v 1.1.1.2 1994/04/22 01:52:08 hsu Exp $
  *
  * Menu definitions
  */
@@ -28,15 +28,17 @@ typedef struct tagMENUITEM
 
 typedef struct tagPOPUPMENU
 {
-    HWND	hWnd;			/* PopupMenu window handle	  */
-    HWND	hWndParent;		/* Parent opupMenu window handle  */
-    HWND	ownerWnd;		/* Owner window			  */
-    WORD	nItems;    		/* Number of items on menu	  */
+    HWND	hWnd;			/* PopupMenu window handle	  		*/
+    HWND	hWndParent;		/* Parent PopupMenu window handle  	*/
+    HWND	ownerWnd;		/* Owner window			  			*/
+    HWND	hWndPrev;		/* Previous Window Focus Owner 		*/
+    WORD	nItems;    		/* Number of items on menu			*/
     MENUITEM   *firstItem;
     WORD	FocusedItem;
     WORD	MouseFlags;
-    WORD	BarFlags;
-    BOOL	SysFlag;
+    BOOL	BarFlag;		/* TRUE if menu is a MENUBAR		*/
+    BOOL	SysFlag; 		/* TRUE if menu is a SYSMENU		*/
+    BOOL	ChildFlag;		/* TRUE if child of other menu		*/
     WORD	Width;
     WORD	Height;
     WORD	CheckWidth;
@@ -61,10 +63,11 @@ typedef struct
     WORD	item_flags;		/* See windows.h		  */
     WORD	item_id;		/* Control Id for menu item	  */
     char	item_text[1];		/* Text for menu item		  */
-} MENU_NORMALITEM;
+} MENUITEMTEMPLATE;
 
-void StdDrawMenuBar(HDC hDC, LPRECT lprect, LPPOPUPMENU lppop);
-void MenuButtonDown(HWND hWnd, LPPOPUPMENU lppop, int x, int y);
+void StdDrawMenuBar(HDC hDC, LPRECT lprect, LPPOPUPMENU lppop, 
+		    BOOL suppress_draw);
+BOOL MenuButtonDown(HWND hWnd, LPPOPUPMENU lppop, int x, int y);
 void MenuButtonUp(HWND hWnd, LPPOPUPMENU lppop, int x, int y);
 void MenuMouseMove(HWND hWnd, LPPOPUPMENU lppop, WORD wParam, int x, int y);
 extern void NC_TrackSysMenu(HWND hwnd);

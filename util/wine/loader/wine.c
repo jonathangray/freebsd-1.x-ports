@@ -1,4 +1,4 @@
-static char RCSId[] = "$Id: wine.c,v 1.1 1994/02/24 08:05:42 hsu Exp $";
+static char RCSId[] = "$Id: wine.c,v 1.1.1.2 1994/04/22 01:52:33 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
 #include <stdio.h>
@@ -22,9 +22,11 @@ static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 #include "wine.h"
 #include "windows.h"
 #include "wineopts.h"
+#include "arch.h"
 
 /* #define DEBUG_FIXUP */
 
+extern HANDLE CreateNewTask(HINSTANCE hInst);
 extern int CallToInit16(unsigned long csip, unsigned long sssp, 
 			unsigned short ds);
 extern void CallTo32();
@@ -46,8 +48,8 @@ struct ne_header_s *CurrentNEHeader;
 int CurrentNEFile;
 HINSTANCE hSysRes;
 
-static char *Extensions[] = { "dll", "exe", NULL };
-static char *WinePath = NULL;
+static char *DLL_Extensions[] = { "dll", NULL };
+static char *EXE_Extensions[] = { "exe", NULL };
 
 FILE *SpyFp = NULL;
 
@@ -93,11 +95,49 @@ GetFileInfo(unsigned short instance)
     return w;
 }
 
+#ifndef WINELIB
+/**********************************************************************
+ *
+ * Load MZ Header
+ */
+void load_mz_header(int fd, struct mz_header_s *mz_header)
+{
+    if (read(fd, mz_header, sizeof(struct mz_header_s)) !=
+	sizeof(struct mz_header_s))
+    {
+	myerror("Unable to read MZ header from file");
+    }
+}
+
+void load_ne_header (int fd, struct ne_header_s *ne_header)
+{
+    if (read(fd, ne_header, sizeof(struct ne_header_s)) 
+	!= sizeof(struct ne_header_s))
+    {
+	myerror("Unable to read NE header from file");
+    }
+}
+#endif
+
+int IsDLLLoaded(char *name)
+{
+	struct w_files *wpnt;
+
+	if(FindDLLTable(name))
+		return 1;
+
+	for(wpnt = wine_files; wpnt; wpnt = wpnt->next)
+		if(strcmp(wpnt->name, name) == 0)
+			return 1;
+
+	return 0;
+}
+
 /**********************************************************************
  *					LoadImage
  * Load one NE format executable into memory
  */
-HINSTANCE LoadImage(char *modulename)
+HINSTANCE LoadImage(char *modulename, int filetype)
 {
     unsigned int read_size;
     int i;
@@ -108,12 +148,10 @@ HINSTANCE LoadImage(char *modulename)
     /*
      * search file
      */
-    if (FindFile(buffer, sizeof(buffer), modulename, Extensions, WindowsPath)
-    	==NULL)
+    if (FindFile(buffer, sizeof(buffer), modulename, (filetype == EXE ? 
+    	EXE_Extensions : DLL_Extensions), WindowsPath) ==NULL)
     {
-	
-
-    	fprintf(stderr,"LoadImage: I can't find %s !\n",modulename);
+    	fprintf(stderr, "LoadImage: I can't find %s.dll | %s.exe !\n",modulename, modulename);
 	return (HINSTANCE) NULL;
     }
     fprintf(stderr,"LoadImage: loading %s (%s)\n", modulename, buffer);
@@ -131,6 +169,7 @@ HINSTANCE LoadImage(char *modulename)
       wpnt1->next  = wpnt;
     };
     wpnt->next = NULL;
+    wpnt->resnamtab = (RESNAMTAB *) -1;
 
     /*
      * Open file for reading.
@@ -145,25 +184,24 @@ HINSTANCE LoadImage(char *modulename)
      */
     wpnt->filename = strdup(buffer);
     wpnt->name = NULL;
-    if(modulename)  wpnt->name = strdup(modulename);
+    if(modulename) {
+    	wpnt->name = strdup(modulename);
+	ToDos(wpnt->name);
+    }
 
     wpnt->mz_header = (struct mz_header_s *) malloc(sizeof(struct mz_header_s));;
     status = lseek(wpnt->fd, 0, SEEK_SET);
-    if (read(wpnt->fd, wpnt->mz_header, sizeof(struct mz_header_s)) !=
-	sizeof(struct mz_header_s))
-    {
-	myerror("Unable to read MZ header from file");
-    }
+    load_mz_header (wpnt->fd, wpnt->mz_header);
     if (wpnt->mz_header->must_be_0x40 != 0x40)
 	myerror("This is not a Windows program");
     
     wpnt->ne_header = (struct ne_header_s *) malloc(sizeof(struct ne_header_s));
     status = lseek(wpnt->fd, wpnt->mz_header->ne_offset, SEEK_SET);
-    if (read(wpnt->fd, wpnt->ne_header, sizeof(struct ne_header_s)) 
-	!= sizeof(struct ne_header_s))
-    {
-	myerror("Unable to read NE header from file");
-    }
+    load_ne_header (wpnt->fd, wpnt->ne_header);
+    if (wpnt->ne_header->header_type[0] == 'P' && 
+	wpnt->ne_header->header_type[1] == 'E')
+      myerror("win32 applications are not supported");
+
     if (wpnt->ne_header->header_type[0] != 'N' || 
 	wpnt->ne_header->header_type[1] != 'E')
       myerror("This is not a Windows program");
@@ -180,6 +218,7 @@ HINSTANCE LoadImage(char *modulename)
     /*
      * Create segment selectors.
      */
+#ifndef WINELIB
     status = lseek(wpnt->fd, wpnt->mz_header->ne_offset + 
 		   wpnt->ne_header->segment_tab_offset,
 		   SEEK_SET);
@@ -220,24 +259,29 @@ HINSTANCE LoadImage(char *modulename)
     if (read(wpnt->fd, wpnt->rname_table, read_size) != read_size)
 	myerror("Unable to read rname table header from file");
 
-    /* Now get the module name */
+    /* Now get the module name, if the current one is a filename */
 
-    wpnt->name  = (char*) malloc(*wpnt->rname_table + 1);
-    memcpy(wpnt->name, wpnt->rname_table+1, *wpnt->rname_table);
+    if (strchr(wpnt->name, '\\') || strchr(wpnt->name, '/') ) {
+	wpnt->name  = (char*) malloc(*wpnt->rname_table + 1);
+	memcpy(wpnt->name, wpnt->rname_table+1, *wpnt->rname_table);
+    }
+    
     wpnt->name[*wpnt->rname_table] =  0;
-
+#endif
     /*
      * Now load any DLLs that  this module refers to.
      */
-    for(i=0; i<wpnt->ne_header->n_mod_ref_tab; i++){
+    for(i=0; i<wpnt->ne_header->n_mod_ref_tab; i++)
+    {
       char buff[14];
-      char buff2[256];
-      int  fd, j;
       GetModuleName(wpnt, i + 1, buff);
       
-      if(FindDLLTable(buff)) continue;  /* This module already loaded */
+#ifndef WINELIB
+      if (IsDLLLoaded(buff) || strcmp(buff, wpnt->name) == 0 )
+      	continue;
+#endif
 
-      LoadImage(buff);
+      LoadImage(buff, DLL);
 /*
       fprintf(stderr,"Unable to load:%s\n",  buff);
 */
@@ -245,69 +289,52 @@ HINSTANCE LoadImage(char *modulename)
 return(wpnt->hinstance);
 }
 
-/**********************************************************************
- *					ParseArgs
- */
-void
-ParseArgs(int argc, char **argv)
-{
-    if (argc < 2)
-    {
-	fprintf(stderr, "usage: %s [-spy FILENAME] FILENAME\n", argv[0]);
-	exit(1);
-    }
 
-    Argc = argc - 1;
-    
-    for (Argv = argv + 1; **Argv == '-' && Argc > 0; Argv++)
-    {
-	if (strcmp(*Argv, "-spy") == 0)
-	{
-	    if (strcmp(*(++Argv), "-") == 0)
-		SpyFp = stdout;
-	    else
-		SpyFp = fopen(*Argv, "a");
-	}
-    }
-}
-
+#ifndef WINELIB
 /**********************************************************************
  *					main
  */
-_WinMain(int argc, char **argv)
+int _WinMain(int argc, char **argv)
 {
 	int segment;
 	char *p;
 	char *sysresname;
-	char filename[100];
-	char syspath[256];
-	char exe_path[256];
+	char filename[256];
+	HANDLE		hTaskMain;
+	HINSTANCE	hInstMain;
 #ifdef WINESTAT
 	char * cp;
 #endif
 	struct w_files * wpnt;
 	int cs_reg, ds_reg, ss_reg, ip_reg, sp_reg;
-	int i;
 	int rv;
 
-	ParseArgs(argc, argv);
+	Argc = argc - 1;
+	Argv = argv + 1;
 
-	WinePath = malloc(1024);
-	
-	getcwd(WinePath, 512);
-	
-	if ((p = getenv("WINEPATH")) != NULL) { 
-		strcat(WinePath, ";");
-		strcat(WinePath, p);
+	if (strchr(Argv[0], '\\') || strchr(Argv[0],'/')) {
+            for (p = Argv[0] + strlen(Argv[0]); *p != '\\' && *p !='/'; p--)
+		/* NOTHING */;
+		
+	    strncpy(filename, Argv[0], p - Argv[0]);
+	    filename[p - Argv[0]] = '\0';
+	    strcat(WindowsPath, ";");
+	    strcat(WindowsPath, filename);
 	}
 	
-	LoadImage(Argv[0]);
+	if ((hInstMain = LoadImage(Argv[0], EXE)) == (HINSTANCE) NULL ) {
+		fprintf(stderr, "wine: can't find %s!.\n", Argv[0]);
+		exit(1);
+	}
+	hTaskMain = CreateNewTask(hInstMain);
+	printf("_WinMain // hTaskMain=%04X hInstMain=%04X !\n", hTaskMain, hInstMain);
 
 	GetPrivateProfileString("wine", "SystemResources", "sysres.dll", 
 				filename, sizeof(filename), WINE_INI);
-	hSysRes = LoadImage(filename);
+
+	hSysRes = LoadLibrary(filename);
 	if (hSysRes == (HINSTANCE)NULL)
- 	    printf("Error Loading System Resources !!!\n");
+		fprintf(stderr, "wine: can't find %s!.\n", filename);
  	else
  	    printf("System Resources Loaded // hSysRes='%04X'\n", hSysRes);
 	
@@ -316,22 +343,15 @@ _WinMain(int argc, char **argv)
      */
     wpnt = wine_files;
     for(wpnt = wine_files; wpnt; wpnt = wpnt->next)
-      for (segment = 0; segment < wpnt->ne_header->n_segment_tab; segment++)
+    {
+	for (segment = 0; segment < wpnt->ne_header->n_segment_tab; segment++)
 	{
-	  if (FixupSegment(wpnt, segment) < 0)
+	    if (FixupSegment(wpnt, segment) < 0)
 	    {
-	      myerror("fixup failed.");
+		myerror("fixup failed.");
 	    }
 	}
-
-    /*
-     * Fixup stack and jump to start.
-     */
-    ds_reg = wine_files->selector_table[wine_files->ne_header->auto_data_seg-1].selector;
-    cs_reg = wine_files->selector_table[wine_files->ne_header->cs-1].selector;
-    ip_reg = wine_files->ne_header->ip;
-    ss_reg = wine_files->selector_table[wine_files->ne_header->ss-1].selector;
-    sp_reg = wine_files->ne_header->sp;
+    }
 
 #ifdef WINESTAT
     cp = strrchr(argv[0], '/');
@@ -343,26 +363,65 @@ _WinMain(int argc, char **argv)
     };
 #endif
 
+    /*
+     * Initialize signal handling.
+     */
     init_wine_signals();
 
-    if (WineForceFail)
-    {
-	p = (char *) ((cs_reg << 16) | ip_reg);
-	
-	*p++ = 0xcd;
-	*p++ = 0x20;
-    }
-
-    if (ss_reg == 0)
-    {
-	fprintf(stderr, "SS is 0\n");
-    }
-
-    LinearTest();
+    /*
+     * Fixup stack and jump to start.
+     */
+    ds_reg = (wine_files->
+	      selector_table[wine_files->ne_header->auto_data_seg-1].selector);
+    cs_reg = wine_files->selector_table[wine_files->ne_header->cs-1].selector;
+    ip_reg = wine_files->ne_header->ip;
+    ss_reg = wine_files->selector_table[wine_files->ne_header->ss-1].selector;
+    sp_reg = wine_files->ne_header->sp;
 
     rv = CallToInit16(cs_reg << 16 | ip_reg, ss_reg << 16 | sp_reg, ds_reg);
     printf ("rv = %x\n", rv);
 }
+
+void InitializeLoadedDLLs()
+{
+    struct w_files * wpnt;
+    int cs_reg, ds_reg, ip_reg;
+    int rv;
+
+    fprintf(stderr, "Initializing DLLs\n");
+
+    /*
+     * Initialize libraries
+     */
+    wpnt = wine_files;
+    for(wpnt = wine_files; wpnt; wpnt = wpnt->next)
+    {
+	/* 
+	 * Is this a library? 
+	 */
+	if (wpnt->ne_header->format_flags & 0x8000)
+	{
+	    if (!(wpnt->ne_header->format_flags & 0x0001))
+	    {
+		/* Not SINGLEDATA */
+		fprintf(stderr, "Library is not marked SINGLEDATA\n");
+		exit(1);
+	    }
+
+	    ds_reg = wpnt->selector_table[wpnt->
+					  ne_header->auto_data_seg-1].selector;
+	    cs_reg = wpnt->selector_table[wpnt->ne_header->cs-1].selector;
+	    ip_reg = wpnt->ne_header->ip;
+
+	    fprintf(stderr, "Initializing %s, cs:ip %04x:%04x, ds %04x\n", 
+		    wpnt->name, cs_reg, ip_reg, ds_reg);
+
+	    rv = CallTo16(cs_reg << 16 | ip_reg, ds_reg);
+	    printf ("rv = %x\n", rv);
+	}
+    }
+}
+#endif
 
 
 /**********************************************************************
@@ -372,15 +431,14 @@ char *
 GetImportedName(int fd, struct mz_header_s *mz_header, 
 		struct ne_header_s *ne_header, int name_offset, char *buffer)
 {
-    char *p;
     int length;
     int status;
-    int i;
     
     status = lseek(fd, mz_header->ne_offset + ne_header->iname_tab_offset +
 		   name_offset, SEEK_SET);
     length = 0;
     read(fd, &length, 1);  /* Get the length byte */
+    length = CONV_CHAR_TO_LONG (length);
     read(fd, buffer, length);
     buffer[length] = 0;
     return buffer;
@@ -395,19 +453,20 @@ GetModuleName(struct w_files * wpnt, int index, char *buffer)
     int fd = wpnt->fd;
     struct mz_header_s *mz_header = wpnt->mz_header; 
     struct ne_header_s *ne_header = wpnt->ne_header;
-    char *p;
     int length;
-    int name_offset, status;
+    WORD name_offset, status;
     int i;
     
     status = lseek(fd, mz_header->ne_offset + ne_header->moduleref_tab_offset +
 		   2*(index - 1), SEEK_SET);
     name_offset = 0;
     read(fd, &name_offset, 2);
+    name_offset = CONV_SHORT (name_offset);
     status = lseek(fd, mz_header->ne_offset + ne_header->iname_tab_offset +
 		   name_offset, SEEK_SET);
     length = 0;
     read(fd, &length, 1);  /* Get the length byte */
+    length = CONV_CHAR_TO_LONG (length);
     read(fd, buffer, length);
     buffer[length] = 0;
 
@@ -419,6 +478,7 @@ GetModuleName(struct w_files * wpnt, int index, char *buffer)
 }
 
 
+#ifndef WINELIB
 /**********************************************************************
  *					FixupSegment
  */
@@ -680,15 +740,4 @@ FixupSegment(struct w_files * wpnt, int segment_num)
     return 0;
 }
 
-/**********************************************************************
- *					GetProcAddress
- */
-FARPROC GetProcAddress(HINSTANCE hinstance, char *proc_name)
-{
-    if ((int) proc_name & 0xffff0000)
-	printf("GetProcAddress: %#04x, '%s'\n", hinstance, proc_name);
-    else
-	printf("GetProcAddress: %#04x, %d\n", hinstance, (int) proc_name);
-
-    return NULL;
-}
+#endif

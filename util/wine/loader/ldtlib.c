@@ -1,4 +1,5 @@
-static char RCSId[] = "$Id: ldtlib.c,v 1.1 1994/02/24 08:05:41 hsu Exp $";
+#ifndef WINELIB
+static char RCSId[] = "$Id: ldtlib.c,v 1.1.1.2 1994/04/22 01:52:30 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
 #include <stdio.h>
@@ -90,3 +91,4 @@ set_ldt_entry(int entry, unsigned long base, unsigned int limit,
     
 #endif
 }
+#endif /* ifndef WINELIB */

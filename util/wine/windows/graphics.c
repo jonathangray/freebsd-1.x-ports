@@ -10,11 +10,15 @@ static char Copyright[] = "Copyright  Alexandre Julliard, 1993";
 #include <stdlib.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/Intrinsic.h>
 #ifndef PI
 #define PI M_PI
 #endif
 
 #include "gdi.h"
+#include "syscolor.h"
+
+extern int COLOR_ToPhysical( DC *dc, COLORREF color );
 
 /***********************************************************************
  *           LineTo    (GDI.19)
@@ -350,7 +354,7 @@ COLORREF SetPixel( HDC hdc, short x, short y, COLORREF color )
 
     x = dc->w.DCOrgX + XLPTODP( dc, x );
     y = dc->w.DCOrgY + YLPTODP( dc, y );
-    pixel = GetNearestPaletteIndex( dc->w.hPalette, color );
+    pixel = COLOR_ToPhysical( dc, color );
     GetPaletteEntries( dc->w.hPalette, pixel, 1, &entry );
     
     XSetForeground( XT_display, dc->u.x.gc, pixel );
@@ -455,7 +459,7 @@ BOOL FillRgn( HDC hdc, HRGN hrgn, HBRUSH hbrush )
  */
 void DrawFocusRect( HDC hdc, LPRECT rc )
 {
-    HPEN hPen, hOldPen;
+    HPEN hOldPen;
     int oldDrawMode, oldBkMode;
     int left, top, right, bottom;
     DC * dc = (DC *) GDI_GetObjPtr( hdc, DC_MAGIC );
@@ -466,8 +470,7 @@ void DrawFocusRect( HDC hdc, LPRECT rc )
     right  = XLPTODP( dc, rc->right );
     bottom = YLPTODP( dc, rc->bottom );
     
-    hPen = CreatePen(PS_DOT, 1, GetSysColor(COLOR_WINDOWTEXT)); 
-    hOldPen = (HPEN)SelectObject(hdc, (HANDLE)hPen);
+    hOldPen = (HPEN)SelectObject(hdc, sysColorObjects.hpenWindowText );
     oldDrawMode = SetROP2(hdc, R2_XORPEN);
     oldBkMode = SetBkMode(hdc, TRANSPARENT);
 
@@ -479,7 +482,6 @@ void DrawFocusRect( HDC hdc, LPRECT rc )
     SetBkMode(hdc, oldBkMode);
     SetROP2(hdc, oldDrawMode);
     SelectObject(hdc, (HANDLE)hOldPen);
-    DeleteObject((HANDLE)hPen);
 }
 
 
@@ -488,15 +490,11 @@ void DrawFocusRect( HDC hdc, LPRECT rc )
  */
 void DrawReliefRect( HDC hdc, RECT rect, int thickness, BOOL pressed )
 {
-    HBRUSH hbrushOld, hbrushShadow, hbrushHighlight;
+    HBRUSH hbrushOld;
     int i;
 
-    hbrushShadow = CreateSolidBrush( GetSysColor(COLOR_BTNSHADOW) );
-    hbrushHighlight = CreateSolidBrush( GetSysColor(COLOR_BTNHIGHLIGHT) );
-
-    if (pressed) hbrushOld = SelectObject( hdc, hbrushShadow );
-    else hbrushOld = SelectObject( hdc, hbrushHighlight );
-
+    hbrushOld = SelectObject( hdc, pressed ? sysColorObjects.hbrushBtnShadow :
+			                  sysColorObjects.hbrushBtnHighlight );
     for (i = 0; i < thickness; i++)
     {
 	PatBlt( hdc, rect.left + i, rect.top,
@@ -505,9 +503,8 @@ void DrawReliefRect( HDC hdc, RECT rect, int thickness, BOOL pressed )
 	        rect.right - rect.left - i, 1, PATCOPY );
     }
 
-    if (pressed) hbrushOld = SelectObject( hdc, hbrushHighlight );
-    else hbrushOld = SelectObject( hdc, hbrushShadow );
-
+    SelectObject( hdc, pressed ? sysColorObjects.hbrushBtnHighlight :
+		                 sysColorObjects.hbrushBtnShadow );
     for (i = 0; i < thickness; i++)
     {
 	PatBlt( hdc, rect.right - i - 1, rect.top + i,
@@ -517,8 +514,6 @@ void DrawReliefRect( HDC hdc, RECT rect, int thickness, BOOL pressed )
     }
 
     SelectObject( hdc, hbrushOld );
-    DeleteObject( hbrushShadow );
-    DeleteObject( hbrushHighlight );
 }
 
 
@@ -580,5 +575,95 @@ BOOL Polygon (HDC hdc, LPPOINT pt, int count)
     	free ((void *) points);
 	return (TRUE);
 }
+
+/**********************************************************************
+ *          FloodFill_rec -- FloodFill helper function
+ *
+ * Just does a recursive flood fill:
+ * this is /not/ efficent -- a better way would be to draw
+ * an entire line at a time, but this will do for now.
+ */
+static BOOL FloodFill_rec(XImage *image, int x, int y, 
+		int orgx, int orgy, int endx, int endy, 
+		Pixel borderp, Pixel fillp)
+{
+	Pixel testp;
+
+	if (x > endx || x < orgx || y > endy || y < orgy)
+		return FALSE;
+	XPutPixel(image, x, y, fillp);
+
+	testp = XGetPixel(image, x+1, y+1);
+	if (testp != borderp && testp != fillp)
+		FloodFill_rec(image, x+1, y+1, orgx, orgy, 
+				endx, endy, borderp, fillp);
+
+	testp = XGetPixel(image, x+1, y-1);
+	if (testp != borderp && testp != fillp)
+		FloodFill_rec(image, x+1, y-1, orgx, orgy, 
+				endx, endy, borderp, fillp);
+	testp = XGetPixel(image, x-1, y+1); 
+	if (testp != borderp && testp != fillp)
+		FloodFill_rec(image, x-1, y+1, orgx, orgy,
+				endx, endy, borderp, fillp);
+	testp = XGetPixel(image, x-1, y-1);
+ 	if (testp != borderp && testp != fillp) 
+		FloodFill_rec(image, x-1, y-1, orgx, orgy, 
+				endx, endy, borderp, fillp);
+	return TRUE;
+}
+
  
+/**********************************************************************
+ *          FloodFill (GDI.25)
+ */
+BOOL FloodFill(HDC hdc, short x, short y, DWORD crColor)
+{
+	Pixel boundrypixel;
+	int imagex, imagey;
+	XImage *image;
+    	DC *dc;
+
+#ifdef DEBUG_GRAPHICS
+	printf("FloodFill %x %d,%d %x\n", hdc, x, y, crColor);
+#endif
+    	dc = (DC *) GDI_GetObjPtr(hdc, DC_MAGIC);
+
+	if (!dc) return 0;
+
+	x = dc->w.DCOrgX + XLPTODP(dc, x);
+	y = dc->w.DCOrgY + YLPTODP(dc, y);
+
+	if (x < dc->w.DCOrgX || x > dc->w.DCOrgX + dc->w.DCSizeX ||
+	    y < dc->w.DCOrgY || y > dc->w.DCOrgY + dc->w.DCSizeY)
+		return 0;
+
+    	if (!DC_SetupGCForBrush(dc)) 
+		return FALSE;
+
+	boundrypixel = GetNearestPaletteIndex( dc->w.hPalette, crColor );	
+
+	image = XGetImage(display, dc->u.x.drawable,  
+			dc->w.DCOrgX, dc->w.DCOrgY,
+			dc->w.DCSizeX, dc->w.DCSizeY, AllPlanes, ZPixmap);
+	if (XGetPixel(image, x, y) == boundrypixel) 
+		return FALSE;
+	if (!FloodFill_rec(image, x, y, 
+				0,0, 
+				dc->w.DCOrgX + dc->w.DCSizeX, 
+				dc->w.DCOrgY + dc->w.DCSizeY, 
+				boundrypixel, dc->u.x.brush.pixel)) {
+		XDestroyImage(image);
+		return 0;
+	}
+
+	XPutImage(display, dc->u.x.drawable, dc->u.x.gc, image,
+			0, 0,
+			dc->w.DCOrgX, dc->w.DCOrgY,
+                        dc->w.DCSizeX, dc->w.DCSizeY);
+	XDestroyImage(image);
+
+	return TRUE;
+}
+
 

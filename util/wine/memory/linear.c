@@ -1,8 +1,9 @@
-static char RCSId[] = "$Id: linear.c,v 1.1 1994/02/24 08:05:45 hsu Exp $";
+static char RCSId[] = "$Id: linear.c,v 1.1.1.2 1994/04/22 01:52:44 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1994";
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "prototypes.h"
 #include "heap.h"
 #include "segmem.h"

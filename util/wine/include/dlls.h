@@ -1,4 +1,4 @@
-/* $Id: dlls.h,v 1.1 1994/02/24 08:05:34 hsu Exp $
+/* $Id: dlls.h,v 1.1.1.2 1994/04/22 01:51:49 hsu Exp $
  */
 /*
  * Copyright  Robert J. Amstadt, 1993
@@ -12,6 +12,9 @@ typedef struct dll_arg_relocation_s
     unsigned short dst_arg;	/* Offset to argument on stack		*/
     unsigned char src_type;	/* Argument type			*/
 } DLL_ARG;
+
+#define DLL	0
+#define EXE	1
 
 #define DLL_ARGTYPE_SIGNEDWORD	0
 #define DLL_ARGTYPE_WORD	1
@@ -60,5 +63,6 @@ extern struct dll_table_entry_s SHELL_table[];
 extern struct dll_table_entry_s SOUND_table[];
 extern struct dll_table_entry_s KEYBOARD_table[];
 extern struct dll_table_entry_s WINSOCK_table[];
+extern struct dll_table_entry_s STRESS_table[];
 
 #endif /* DLLS_H */

@@ -1,6 +1,8 @@
-static char RCSId[] = "$Id: emulate.c,v 1.1 1994/02/24 08:05:20 hsu Exp $";
+static char RCSId[] = "$Id: emulate.c,v 1.1.1.2 1994/04/22 01:53:26 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
+#include <stdlib.h>
+#include <stdio.h>
 #include "prototypes.h"
 #include "regfunc.h"
 
@@ -12,9 +14,6 @@ struct Win87EmInfoStruct {
   unsigned short Have80x87;
   unsigned short Unused;
 };
-
-
-
 
 int
 WIN87_fpmath()
@@ -49,5 +48,3 @@ WIN87_WinEm87Save(void *pWin87EmSaveArea, int cbWin87EmSaveArea)
 {
   printf( "__WinEm87Save(%p,%d)\n",pWin87EmSaveArea,cbWin87EmSaveArea);
 }
-
-

@@ -7,7 +7,7 @@
 static char Copyright[] = "Copyright  Alexandre Julliard, 1993";
 
 #include <X11/Xatom.h>
-
+#include "windows.h"
 #include "gdi.h"
 
 #define TAB     9
@@ -221,7 +221,6 @@ int DrawText( HDC hdc, LPSTR str, int count, LPRECT rect, WORD flags )
 	    	(rect->bottom - rect->top) / 2 - size.cy / 2;
 	    else if (flags & DT_BOTTOM) y = rect->bottom - size.cy;
 	}
-
 	if (!(flags & DT_CALCRECT))
 	    if (!TextOut(hdc, x, y, line, len)) return 0;
 	if (prefix_offset != -1)
@@ -266,7 +265,7 @@ BOOL TextOut( HDC hdc, short x, short y, LPSTR str, short count )
 	y = dc->w.CursPosY;
     }
 #ifdef DEBUG_TEXT
-    printf( "TextOut: %d,%d '%s'\n", x, y, str );
+    printf( "TextOut: %d,%d '%s', %d\n", x, y, str, count );
 #endif
     x = XLPTODP( dc, x );
     y = YLPTODP( dc, y );
@@ -381,4 +380,26 @@ BOOL TextOut( HDC hdc, short x, short y, LPSTR str, short count )
     }
     
     return TRUE;
+}
+
+/***********************************************************************
+ *		GrayString (USER.185)
+ */
+BOOL GrayString(HDC hdc, HBRUSH hbr, FARPROC gsprc, LPARAM lParam, 
+		INT cch, INT x, INT y, INT cx, INT cy)
+{
+	int s, current_color;
+
+	if (gsprc) {
+		return CallGrayStringProc(gsprc, hdc, lParam, 
+					cch ? cch : lstrlen((LPCSTR) lParam) );
+	} else {
+		current_color = GetTextColor(hdc);
+		SetTextColor(hdc, GetSysColor(COLOR_GRAYTEXT) );
+		s = TextOut(hdc, x, y, (LPSTR) lParam, 
+				cch ? cch : lstrlen((LPCSTR) lParam) );
+		SetTextColor(hdc, current_color);
+		
+		return s;
+	}
 }

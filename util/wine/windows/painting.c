@@ -25,8 +25,10 @@ HDC BeginPaint( HWND hwnd, LPPAINTSTRUCT lps )
     if (!wndPtr) return 0;
 
     hrgnUpdate = wndPtr->hrgnUpdate;  /* Save update region */
-
-    if (!(lps->hdc = GetDCEx( hwnd, wndPtr->hrgnUpdate,
+    if (!hrgnUpdate)    /* Create an empty region */
+	if (!(hrgnUpdate = CreateRectRgn( 0, 0, 0, 0 ))) return 0;
+    
+    if (!(lps->hdc = GetDCEx( hwnd, hrgnUpdate,
 			      DCX_INTERSECTRGN | DCX_USESTYLE ))) return 0;
     GetRgnBox( InquireVisRgn(lps->hdc), &lps->rcPaint );
 
@@ -37,7 +39,7 @@ HDC BeginPaint( HWND hwnd, LPPAINTSTRUCT lps )
     wndPtr->flags &= ~(WIN_NEEDS_BEGINPAINT | WIN_INTERNAL_PAINT);
 
     SendMessage( hwnd, WM_NCPAINT, hrgnUpdate, 0 );
-    if (hrgnUpdate) DeleteObject( hrgnUpdate );
+    DeleteObject( hrgnUpdate );
 
     if (!(wndPtr->flags & WIN_ERASE_UPDATERGN)) lps->fErase = TRUE;
     else lps->fErase = !SendMessage( hwnd, WM_ERASEBKGND, lps->hdc, 0 );
@@ -105,8 +107,8 @@ BOOL RedrawWindow( HWND hwnd, LPRECT rectUpdate, HRGN hrgnUpdate, UINT flags )
 
 	if (hrgnUpdate)  /* Invalidate a region */
 	{
-	    if (flags & RDW_FRAME) tmpRgn = CreateRectRgnIndirect(&rectClient);
-	    else tmpRgn = CreateRectRgnIndirect( &rectWindow );
+	    if (flags & RDW_FRAME) tmpRgn = CreateRectRgnIndirect(&rectWindow);
+	    else tmpRgn = CreateRectRgnIndirect( &rectClient );
 	    if (!tmpRgn) return FALSE;
 	    hrgn = CreateRectRgn( 0, 0, 0, 0 );
 	    if (CombineRgn( hrgn, hrgnUpdate, tmpRgn, RGN_AND ) == NULLREGION)
@@ -116,7 +118,7 @@ BOOL RedrawWindow( HWND hwnd, LPRECT rectUpdate, HRGN hrgnUpdate, UINT flags )
 	    }
 	    DeleteObject( tmpRgn );
 	}
-	else if (rectUpdate)  /* Invalidate a rectangle */
+	else  /* Invalidate a rectangle */
 	{
 	    RECT rect;
 	    if (flags & RDW_FRAME)
@@ -378,5 +380,26 @@ int GetUpdateRgn( HWND hwnd, HRGN hrgn, BOOL erase )
 	}	
     }
     DeleteObject( hrgnClip );
+    return retval;
+}
+
+
+/***********************************************************************
+ *           ExcludeUpdateRgn   (USER.238)
+ */
+int ExcludeUpdateRgn( HDC hdc, HWND hwnd )
+{
+    int retval;
+    HRGN hrgn;
+    WND * wndPtr;
+
+    if (!(wndPtr = WIN_FindWndPtr( hwnd ))) return ERROR;
+    if ((hrgn = CreateRectRgn( 0, 0, 0, 0 )) != 0)
+    {
+	retval = CombineRgn( hrgn, InquireVisRgn(hdc),
+			     wndPtr->hrgnUpdate, RGN_DIFF );
+	if (retval) SelectVisRgn( hdc, hrgn );
+	DeleteObject( hrgn );
+    }
     return retval;
 }

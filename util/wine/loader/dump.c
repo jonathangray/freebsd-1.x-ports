@@ -1,4 +1,5 @@
-static char RCSId[] = "$Id: dump.c,v 1.1 1994/02/24 08:05:40 hsu Exp $";
+#ifndef WINELIB
+static char RCSId[] = "$Id: dump.c,v 1.1.1.2 1994/04/22 01:52:27 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
 #include <stdio.h>
@@ -89,3 +90,4 @@ PrintRelocationTable(char *exe_ptr,
 	printf("TARGET %04.4x %04.4x\n", rep->target1, rep->target2);
     }
 }
+#endif /* ifndef WINELIB */

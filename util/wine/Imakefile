@@ -1,9 +1,12 @@
+#include "autoconf.h"
 #include "Wine.tmpl"
 
 #if defined(i386FreeBsd)
 MAKE = gmake
 CC = gcc -D__FreeBSD__
 #endif
+
+DEFINES = AutoDefines -DUSE_READLINE -DWINESTAT
 
 /*
  * This is the second try at using Imakefiles. There are probably many
@@ -17,12 +20,14 @@ CC = gcc -D__FreeBSD__
  */
 
 #define IHaveSubdirs
-#define	PassCDebugFlags 'CDEBUGFLAGS=$(CDEBUGFLAGS)' 'CC=$(CC)' 'MAKE=$(MAKE)'
+#define	PassCDebugFlags 'CDEBUGFLAGS=$(CDEBUGFLAGS)' 'CC=$(CC)' 'MAKE=$(MAKE)'\
+			'DEFINES=$(DEFINES)'
 
 COMMONSUBDIRS = \
 	controls \
 	etc \
 	include \
+	loader \
 	misc \
 	objects \
 	test \
@@ -32,34 +37,17 @@ EMUSUBDIRS = \
 	tools \
 	debugger \
 	if1632 \
-	loader \
 	memory \
 	miscemu
 
 LIBSUBDIRS = \
 	toolkit
 
-SUBDIRS = $(COMMONSUBDIRS) $(EMUSUBDIRS) $(LIBSUBDIRS)
-
-/*
- * due to me not having the time and resources to test this, debugging
- * has been left out by for now of the Imakefiles. To put it back you have
- * to add:
- *	debugger
- * to the SUBDIRS list and:
- *	debugger
- *	readline.o
- * to the OBJS list.
- *
- * Not doing this will make the build fail in loader/signal.c, with an
- * unresolved reference to wine_debug. Comment out the line for now...
- * sigh. Fixed soon.
- */
-
 WINEDIR = $(LIBDIR)/wine
 
 COMMONOBJS = \
 	controls.o \
+	loader.o \
 	misc.o \
 	objects.o \
 	windows.o
@@ -71,7 +59,6 @@ COMMONOBJS = \
 EMUOBJS = \
 	if1632.o \
 	debugger.o \
-	loader.o \
 	memory.o \
 	miscemu.o \
 	readline.o
@@ -79,32 +66,32 @@ EMUOBJS = \
 LIBOBJS = \
 	toolkit.o
 
-OBJS = $(COMMONOBJS) $(EMUOBJS) $(LIBOBJS)
+#ifndef WINELIB
+SUBDIRS = $(COMMONSUBDIRS) $(EMUSUBDIRS)
+OBJS = $(COMMONOBJS) $(EMUOBJS)
+#else
+SUBDIRS = $(COMMONSUBDIRS) $(LIBSUBDIRS)
+OBJS = $(COMMONOBJS) $(LIBOBJS)
+#endif
 
 #ifdef i386BsdArchitecture
-#if defined(i386NetBsd)
 SYSLIBS = -ll -lm -li386 -lgnumalloc
-#elif defined(i386FreeBsd)
+#endif
+#ifdef i386FreeBsd
 SYSLIBS = -ll -lm -lgnumalloc
 #endif
-#else
 #ifdef LinuxArchitecture
-SYSLIBS = -lm
-#endif
+SYSLIBS = -lm -lg
 #endif
 
 MakeSubdirs($(SUBDIRS))
 DependSubdirs($(SUBDIRS))
-
-#ifdef i386BsdArchitecture
 AllTarget(wine)
-#endif
 
-NormalProgramTarget(wine,$(EMUOBJS) $(COMMONOBJS),XawClientDepLibs,XawClientLibs,$(SYSLIBS))
+#ifndef WINELIB
+NormalProgramTarget(wine,$(EMUOBJS) $(COMMONOBJS),$(DEPXLIB),$(XLIB),$(SYSLIBS))
+#else
 NormalLibraryTarget(wine,$(LIBOBJS) $(COMMONOBJS))
-
-#ifdef LinuxArchitecture
-AllTarget(wine)
 #endif
 
 depend::

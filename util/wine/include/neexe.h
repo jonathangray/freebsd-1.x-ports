@@ -1,4 +1,4 @@
-/* $Id: neexe.h,v 1.1 1994/02/24 08:05:35 hsu Exp $
+/* $Id: neexe.h,v 1.1.1.2 1994/04/22 01:51:55 hsu Exp $
  */
 /*
  * Copyright  Robert J. Amstadt, 1993
@@ -27,9 +27,9 @@ struct ne_header_s
     u_char  linker_version;	/* Linker version number		*/
     u_char  linker_revision;	/* Linker revision number		*/
     u_short entry_tab_offset;	/* Offset to entry table relative to NE */
-    u_short entry_tab_length;	/* Length of etnry table in bytes	*/
+    u_short entry_tab_length;	/* Length of entry table in bytes	*/
     u_long  reserved1;		/* Reserved by Microsoft		*/
-    u_short format_flags;	/* Flags that segments in this file	*/
+    u_short format_flags;	/* Flags about segments in this file	*/
     u_short auto_data_seg;	/* Automatic data segment number	*/
     u_short local_heap_length;	/* Initial size of local heap		*/
     u_short stack_length;	/* Initial size of stack		*/
@@ -219,5 +219,8 @@ struct resource_typeinfo_s
 #define NE_RSCTYPE_MENU			0x8004
 #define NE_RSCTYPE_RCDATA		0x800a
 #define NE_RSCTYPE_STRING		0x8006
+
+int  load_typeinfo  (int, struct resource_typeinfo_s *);
+int  load_nameinfo  (int, struct resource_nameinfo_s *);
 
 #endif /* NEEXE_H */

@@ -13,6 +13,7 @@ static char Copyright[] = "Copyright  Alexandre Julliard, 1994";
 #include "user.h"
 #include "scroll.h"
 #include "menu.h"
+#include "syscolor.h"
 
 static HBITMAP hbitmapClose = 0;
 static HBITMAP hbitmapMinimize = 0;
@@ -134,7 +135,7 @@ LONG NC_HandleNCCalcSize( HWND hwnd, NCCALCSIZE_PARAMS *params )
  * but without the borders (if any).
  * The rectangle is in window coordinates (for drawing with GetWindowDC()).
  */
-static void NC_GetInsideRect( HWND hwnd, RECT *rect )
+void NC_GetInsideRect( HWND hwnd, RECT *rect )
 {
     WND * wndPtr = WIN_FindWndPtr( hwnd );
 
@@ -449,7 +450,6 @@ static void NC_DrawCaption( HDC hdc, RECT *rect, HWND hwnd,
 			    DWORD style, BOOL active )
 {
     RECT r = *rect;
-    HBRUSH hbrushCaption;
     WND * wndPtr = WIN_FindWndPtr( hwnd );
     char buffer[256];
 
@@ -467,20 +467,14 @@ static void NC_DrawCaption( HDC hdc, RECT *rect, HWND hwnd,
     
     if (wndPtr->dwExStyle & WS_EX_DLGMODALFRAME)
     {
-	HBRUSH hbrushWindow = CreateSolidBrush(GetSysColor(COLOR_WINDOW));
-	HBRUSH hbrushOld = SelectObject( hdc, hbrushWindow );
+	HBRUSH hbrushOld = SelectObject( hdc, sysColorObjects.hbrushWindow );
 	PatBlt( hdc, r.left, r.top, 1, r.bottom-r.top+1,PATCOPY );
 	PatBlt( hdc, r.right-1, r.top, 1, r.bottom-r.top+1, PATCOPY );
 	PatBlt( hdc, r.left, r.top-1, r.right-r.left, 1, PATCOPY );
 	r.left++;
 	r.right--;
 	SelectObject( hdc, hbrushOld );
-	DeleteObject( hbrushWindow );
     }
-
-    if (active)
-	hbrushCaption = CreateSolidBrush( GetSysColor(COLOR_ACTIVECAPTION) );
-    else hbrushCaption = CreateSolidBrush( GetSysColor(COLOR_INACTIVECAPTION));
 
     MoveTo( hdc, r.left, r.bottom );
     LineTo( hdc, r.right-1, r.bottom );
@@ -503,8 +497,8 @@ static void NC_DrawCaption( HDC hdc, RECT *rect, HWND hwnd,
 	r.right -= SYSMETRICS_CXSIZE + 1;
     }
 
-    FillRect( hdc, &r, hbrushCaption );
-    DeleteObject( hbrushCaption );
+    FillRect( hdc, &r, active ? sysColorObjects.hbrushActiveCaption : 
+	                        sysColorObjects.hbrushInactiveCaption );
 
     if (GetWindowText( hwnd, buffer, 256 ))
     {
@@ -520,13 +514,12 @@ static void NC_DrawCaption( HDC hdc, RECT *rect, HWND hwnd,
  *           NC_DoNCPaint
  *
  * Paint the non-client area.
+ * 'hrgn' is the update rgn to use (in client coords) or 1 if no update rgn.
  */
-static void NC_DoNCPaint( HWND hwnd, HRGN hrgn, BOOL active )
+void NC_DoNCPaint( HWND hwnd, HRGN hrgn, BOOL active, BOOL suppress_menupaint )
 {
     HDC hdc;
     RECT rect, rect2;
-    HBRUSH hbrushBorder = 0;
-    HPEN hpenFrame = 0;
 
     WND *wndPtr = WIN_FindWndPtr( hwnd );
 
@@ -539,7 +532,15 @@ static void NC_DoNCPaint( HWND hwnd, HRGN hrgn, BOOL active )
 	return;  /* Nothing to do! */
 
     if (hrgn == 1) hdc = GetDCEx( hwnd, 0, DCX_CACHE | DCX_WINDOW );
-    else hdc = GetDCEx( hwnd, hrgn, DCX_CACHE | DCX_WINDOW | DCX_INTERSECTRGN);
+    else
+    {
+	  /* Make region relative to window area */
+	int xoffset = wndPtr->rectWindow.left - wndPtr->rectClient.left;
+	int yoffset = wndPtr->rectWindow.top - wndPtr->rectClient.top;
+	OffsetRgn( hrgn, -xoffset, -yoffset );
+	hdc = GetDCEx( hwnd, hrgn, DCX_CACHE | DCX_WINDOW | DCX_INTERSECTRGN);
+	OffsetRgn( hrgn, xoffset, yoffset );  /* Restore region */
+    }
     if (!hdc) return;
     if (ExcludeVisRect( hdc, wndPtr->rectClient.left-wndPtr->rectWindow.left,
 		        wndPtr->rectClient.top-wndPtr->rectWindow.top,
@@ -555,12 +556,9 @@ static void NC_DoNCPaint( HWND hwnd, HRGN hrgn, BOOL active )
     rect.right  = wndPtr->rectWindow.right - wndPtr->rectWindow.left;
     rect.bottom = wndPtr->rectWindow.bottom - wndPtr->rectWindow.top;
 
-    hpenFrame = CreatePen( PS_SOLID, 1, GetSysColor(COLOR_WINDOWFRAME) );
-    SelectObject( hdc, hpenFrame );
-    if (active)
-	hbrushBorder = CreateSolidBrush( GetSysColor(COLOR_ACTIVEBORDER) );
-    else hbrushBorder = CreateSolidBrush( GetSysColor(COLOR_INACTIVEBORDER) );
-    SelectObject( hdc, hbrushBorder );
+    SelectObject( hdc, sysColorObjects.hpenWindowFrame );
+    SelectObject( hdc, active ? sysColorObjects.hbrushActiveBorder :
+		                sysColorObjects.hbrushInactiveBorder );
 
     if ((wndPtr->dwStyle & WS_BORDER) || (wndPtr->dwStyle & WS_DLGFRAME))
     {
@@ -591,7 +589,8 @@ static void NC_DoNCPaint( HWND hwnd, HRGN hrgn, BOOL active )
 	CopyRect(&rect2, &rect);
 	/* Default MenuBar height */
 	oldbottom = rect2.bottom = rect2.top + SYSMETRICS_CYMENU; 
-	StdDrawMenuBar(hdc, &rect2, (LPPOPUPMENU)GlobalLock(wndPtr->wIDmenu));
+	StdDrawMenuBar(hdc, &rect2, (LPPOPUPMENU)GlobalLock(wndPtr->wIDmenu),
+		       suppress_menupaint);
 	GlobalUnlock(wndPtr->wIDmenu);
 	/* Reduce ClientRect according to MenuBar height */
 	rect.top += rect2.bottom - oldbottom;
@@ -618,17 +617,14 @@ static void NC_DoNCPaint( HWND hwnd, HRGN hrgn, BOOL active )
 
 	if ((wndPtr->dwStyle & WS_VSCROLL) && (wndPtr->dwStyle & WS_HSCROLL))
 	{
-	    HBRUSH hbrushScroll = CreateSolidBrush( GetSysColor(COLOR_SCROLLBAR) );
 	    RECT r = rect;
 	    r.left = r.right - SYSMETRICS_CXVSCROLL;
 	    r.top  = r.bottom - SYSMETRICS_CYHSCROLL;
-	    FillRect( hdc, &r, hbrushScroll );
+	    FillRect( hdc, &r, sysColorObjects.hbrushScrollbar );
 	}
     }    
 
     ReleaseDC( hwnd, hdc );
-    if (hbrushBorder) DeleteObject( hbrushBorder );
-    if (hpenFrame) DeleteObject( hpenFrame );    
 }
 
 
@@ -639,7 +635,7 @@ static void NC_DoNCPaint( HWND hwnd, HRGN hrgn, BOOL active )
  */
 LONG NC_HandleNCPaint( HWND hwnd, HRGN hrgn )
 {
-    NC_DoNCPaint( hwnd, hrgn, (hwnd == GetActiveWindow()) );
+    NC_DoNCPaint( hwnd, hrgn, hwnd == GetActiveWindow(), FALSE );
     return 0;
 }
 
@@ -651,7 +647,7 @@ LONG NC_HandleNCPaint( HWND hwnd, HRGN hrgn )
  */
 LONG NC_HandleNCActivate( HWND hwnd, WORD wParam )
 {
-    NC_DoNCPaint( hwnd, (HRGN)1, wParam );
+    NC_DoNCPaint( hwnd, (HRGN)1, wParam, FALSE );
     return TRUE;
 }
 
@@ -875,9 +871,9 @@ static void NC_DoSizeMove( HWND hwnd, WORD wParam, POINT pt )
 
     if (wndPtr->dwStyle & WS_CHILD) hdc = GetDC( wndPtr->hwndParent );
     else
-    {  /* Grab the server only when moving top-level windows */
+    {  /* Grab the server only when moving top-level windows without desktop */
 	hdc = GetDC( 0 );
-	XGrabServer( display );
+	if (rootWindow == DefaultRootWindow(display)) XGrabServer( display );
     }
     NC_DrawMovingFrame( hdc, &sizingRect, thickframe );
 
@@ -942,7 +938,7 @@ static void NC_DoSizeMove( HWND hwnd, WORD wParam, POINT pt )
     else
     {
 	ReleaseDC( 0, hdc );
-	XUngrabServer( display );
+	if (rootWindow == DefaultRootWindow(display)) XUngrabServer( display );
     }
     SendMessage( hwnd, WM_EXITSIZEMOVE, 0, 0 );
 
@@ -1009,9 +1005,8 @@ static void NC_TrackMinMaxBox( HWND hwnd, WORD wParam )
  */
 static void NC_TrackScrollBar( HWND hwnd, WORD wParam, POINT pt )
 {
-    MSG msg;
-    WORD scrollbar;
-
+    MSG 	msg;
+    WORD 	scrollbar;
     if ((wParam & 0xfff0) == SC_HSCROLL)
     {
 	if ((wParam & 0x0f) != HTHSCROLL) return;
@@ -1062,26 +1057,27 @@ static void NC_TrackMouseMenuBar( HWND hwnd, WORD wParam, POINT pt )
 #endif
     ScreenToClient(hwnd, &pt);
     pt.y += lppop->rect.bottom;
-    MenuButtonDown(hwnd, lppop, pt.x, pt.y);
     SetCapture(hwnd);
-    do {
-	if (!GetMessage(&msg, (HWND)NULL, 0, 0)) break;
-	ScreenToClient(hwnd, &msg.pt);
-	msg.pt.y += lppop->rect.bottom;
-	switch(msg.message) {
-	case WM_LBUTTONUP:
-	    MenuButtonUp(hwnd, lppop, msg.pt.x, msg.pt.y);
-	    break;
-	case WM_MOUSEMOVE:
-	    MenuMouseMove(hwnd, lppop, msg.wParam, msg.pt.x, msg.pt.y);
-	    break;
-	default:
-	    TranslateMessage(&msg);
-	    DispatchMessage(&msg);
-	    break;
+    if (!MenuButtonDown(hwnd, lppop, pt.x, pt.y)) {
+	    do {
+		if (!GetMessage(&msg, (HWND)NULL, 0, 0)) break;
+		ScreenToClient(hwnd, &msg.pt);
+		msg.pt.y += lppop->rect.bottom;
+		switch(msg.message) {
+		case WM_LBUTTONUP:
+		    MenuButtonUp(hwnd, lppop, msg.pt.x, msg.pt.y);
+		    break;
+		case WM_MOUSEMOVE:
+		    MenuMouseMove(hwnd, lppop, msg.wParam, msg.pt.x, msg.pt.y);
+		    break;
+		default:
+		    TranslateMessage(&msg);
+		    DispatchMessage(&msg);
+		    break;
+		}
+	    } while (msg.message != WM_LBUTTONUP);
+	    ReleaseCapture();
 	}
-    } while (msg.message != WM_LBUTTONUP);
-    ReleaseCapture();
     GlobalUnlock(wndPtr->wIDmenu);
 }
 
@@ -1207,6 +1203,7 @@ LONG NC_HandleSysCommand( HWND hwnd, WORD wParam, POINT pt )
 
     case SC_VSCROLL:
     case SC_HSCROLL:
+    if (wndPtr->dwStyle & WS_CHILD) ClientToScreen(wndPtr->hwndParent, &pt);
 	NC_TrackScrollBar( hwnd, wParam, pt );
 	break;
 

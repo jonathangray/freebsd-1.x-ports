@@ -9,8 +9,6 @@
 
 #include "windows.h"
 
-#define DIALOG_CLASS_NAME    "#32770"  /* Integer atom */
-
 
   /* Dialog info structure.
    * This structure is stored into the window extra bytes (cbWndExtra).

@@ -9,6 +9,7 @@ static char Copyright[] = "Copyright  Alexandre Julliard, 1993";
 #include <stdio.h>
 #include <stdlib.h>
 #include <X11/Xlib.h>
+#include <X11/Intrinsic.h>
 
 #include "gdi.h"
 
@@ -113,6 +114,138 @@ BOOL BitBlt( HDC hdcDest, short xDest, short yDest, short width, short height,
 
 
 /***********************************************************************
+ *           black on white stretch -- favors color pixels over white
+ * 
+ */
+static void bonw_stretch(XImage *sxi, XImage *dxi, 
+	short widthSrc, short heightSrc, short widthDest, short heightDest)
+{
+    float deltax, deltay, sourcex, sourcey, oldsourcex, oldsourcey;
+    register int x, y;
+    Pixel whitep;
+    int totalx, totaly, xavgwhite, yavgwhite;
+    register int i;
+    int endx, endy;
+    
+    deltax = (float)widthSrc/widthDest;
+    deltay = (float)heightSrc/heightDest;
+    whitep  = WhitePixel(display, DefaultScreen(display));
+
+    oldsourcex = 0;
+    for (x=0, sourcex=0.0; x<widthDest; 
+			x++, oldsourcex=sourcex, sourcex+=deltax) {
+        xavgwhite = 0;
+	if (deltax > 1.0) {
+            totalx = 0;
+	    endx = (int)sourcex;
+	    for (i=(int)oldsourcex; i<=endx; i++)
+	        if (XGetPixel(sxi, i, (int)sourcey) == whitep)
+	            totalx++;
+  	    xavgwhite = (totalx > (int)(deltax / 2.0));
+	} else {
+	    xavgwhite = 0;
+	}
+
+        oldsourcey = 0;
+        for (y=0, sourcey=0.0; y<heightDest; 
+				y++, oldsourcey=sourcey, sourcey+=deltay) {
+	    yavgwhite = 0;
+	    if (deltay > 1.0) {
+	        totaly = 0;
+	        endy = (int)sourcey;
+	        for (i=(int)oldsourcey; i<=endy; i++) 
+	            if (XGetPixel(sxi, (int)sourcex, i) == whitep)
+		        totaly++;
+	        yavgwhite = (totaly > ((int)deltay / 2));
+	    } else {
+		yavgwhite = 0;
+	    }
+	    if (xavgwhite && yavgwhite)
+	        XPutPixel(dxi, x, y, whitep);
+	    else
+	        XPutPixel(dxi, x, y, XGetPixel(sxi, (int)sourcex, (int)sourcey));
+
+	} /* for all y in dest */
+    } /* for all x in dest */
+
+}
+
+/***********************************************************************
+ *           white on black stretch -- favors color pixels over black
+ * 
+ */
+static void wonb_stretch(XImage *sxi, XImage *dxi, 
+	short widthSrc, short heightSrc, short widthDest, short heightDest)
+{
+    float deltax, deltay, sourcex, sourcey, oldsourcex, oldsourcey;
+    register int x, y;
+    Pixel blackp;
+    int totalx, totaly, xavgblack, yavgblack;
+    register int i;
+    int endx, endy;
+    
+    deltax = (float)widthSrc/widthDest;
+    deltay = (float)heightSrc/heightDest;
+    blackp  = WhitePixel(display, DefaultScreen(display));
+
+    oldsourcex = 0;
+    for (x=0, sourcex=0.0; x<widthDest; 
+			x++, oldsourcex=sourcex, sourcex+=deltax) {
+        xavgblack = 0;
+	if (deltax > 1.0) {
+            totalx = 0;
+	    endx = (int)sourcex;
+	    for (i=(int)oldsourcex; i<=endx; i++)
+	        if (XGetPixel(sxi, i, (int)sourcey) == blackp)
+	            totalx++;
+  	    xavgblack = (totalx > (int)(deltax / 2.0));
+	} else {
+	    xavgblack = 0;
+	}
+
+        oldsourcey = 0;
+        for (y=0, sourcey=0.0; y<heightDest; 
+				y++, oldsourcey=sourcey, sourcey+=deltay) {
+	    yavgblack = 0;
+	    if (deltay > 1.0) {
+	        totaly = 0;
+	        endy = (int)sourcey;
+	        for (i=(int)oldsourcey; i<=endy; i++) 
+	            if (XGetPixel(sxi, (int)sourcex, i) == blackp)
+		        totaly++;
+	        yavgblack = (totaly > ((int)deltay / 2));
+	    } else {
+		yavgblack = 0;
+	    }
+	    if (xavgblack && yavgblack)
+	        XPutPixel(dxi, x, y, blackp);
+	    else
+	        XPutPixel(dxi, x, y, XGetPixel(sxi, (int)sourcex, (int)sourcey));
+
+	} /* for all y in dest */
+    } /* for all x in dest */
+}
+
+/***********************************************************************
+ *          color stretch -- deletes unused pixels
+ * 
+ */
+static void color_stretch(XImage *sxi, XImage *dxi, 
+	short widthSrc, short heightSrc, short widthDest, short heightDest)
+{
+    float deltax, deltay, sourcex, sourcey;
+    register int x, y;
+
+    deltax = (float)widthSrc/widthDest;
+    deltay = (float)heightSrc/heightDest;
+
+    for (x=0, sourcex=0.0; x<widthDest; x++, sourcex+=deltax)
+        for (y=0, sourcey=0.0; y<heightDest; y++, sourcey+=deltay)
+            XPutPixel(dxi, x, y, XGetPixel(sxi, (int)sourcex, (int)sourcey));
+
+}
+
+/***********************************************************************
  *           StretchBlt    (GDI.35)
  * 
  * 	o StretchBlt is CPU intensive so we only call it if we have
@@ -121,9 +254,7 @@ BOOL BitBlt( HDC hdcDest, short xDest, short yDest, short width, short height,
  * 	o the stretching is slowish, some integer interpolation would
  *        speed it up.
  *
- *      o a this point stretch mode isn't used when compressing
- *        bitmaps this results in a color copy all the time
- *
+ *      o only black on white and color copy have been tested
  */
 BOOL StretchBlt( HDC hdcDest, short xDest, short yDest, short widthDest, short heightDest,
                HDC hdcSrc, short xSrc, short ySrc, short widthSrc, short heightSrc, DWORD rop )
@@ -132,15 +263,14 @@ BOOL StretchBlt( HDC hdcDest, short xDest, short yDest, short widthDest, short h
     int xd1, xd2, yd1, yd2;
     DC *dcDest, *dcSrc;
     XImage *sxi, *dxi;
-    register int x, y; 
-    float deltax, deltay, sourcex, sourcey;
+    WORD stretchmode;
 
 #ifdef DEBUG_GDI     
     printf( "StretchBlt: %d %d,%d %dx%d %d %d,%d %dx%d %08x\n",
            hdcDest, xDest, yDest, widthDest, heightDest, hdcSrc, xSrc, 
            ySrc, widthSrc, heightSrc, rop );
     printf("StretchMode is %x\n", 
-	((DC *)GDI_GetObjPtr(hdcDest, DC_MAGIC))->w.stretchBltMode);
+           ((DC *)GDI_GetObjPtr(hdcDest, DC_MAGIC))->w.stretchBltMode);	
 #endif 
 
     if ((rop & 0xcc0000) == ((rop & 0x330000) << 2))
@@ -184,23 +314,36 @@ BOOL StretchBlt( HDC hdcDest, short xDest, short yDest, short widthDest, short h
     sxi = XGetImage(display, dcSrc->u.x.drawable, xs1, ys1, 
 	     widthSrc, heightSrc, AllPlanes, ZPixmap);
     dxi = XCreateImage(display, DefaultVisualOfScreen(screen),
-	  		    DefaultDepthOfScreen(screen), ZPixmap, 
+	  		    screenDepth, ZPixmap,
 			    0, NULL, widthDest, heightDest,
 			    32, 0);
     dxi->data = malloc(dxi->bytes_per_line * heightDest);
 
+    stretchmode = ((DC *)GDI_GetObjPtr(hdcDest, DC_MAGIC))->w.stretchBltMode;
 
      /* the actual stretching is done here, we'll try to use
       * some interolation to get some speed out of it in
       * the future
       */
 
-    deltax = (float)widthSrc/widthDest;
-    deltay = (float)heightSrc/heightDest;
-
-    for (x=0, sourcex=0.0; x<widthDest; x++, sourcex+=deltax) 
-        for (y=0, sourcey=0.0; y<heightDest; y++, sourcey+=deltay)
-	    XPutPixel(dxi, x, y, XGetPixel(sxi, (int)sourcex, (int)sourcey));
+    switch (stretchmode) {
+	case BLACKONWHITE:
+		bonw_stretch(sxi, dxi, widthSrc, heightSrc,
+				widthDest, heightDest);
+		break;
+	case WHITEONBLACK:
+		wonb_stretch(sxi, dxi, widthSrc, heightSrc, 
+				widthDest, heightDest);
+		break;
+	case COLORONCOLOR:
+		color_stretch(sxi, dxi, widthSrc, heightSrc, 
+				widthDest, heightDest);
+		break;
+	default:
+		fprintf(stderr, "StretchBlt: unknown stretchmode '%d'\n",
+			stretchmode);
+		break;
+    }
 
     DC_SetupGCForText(dcDest);
     XSetFunction(display, dcDest->u.x.gc, DC_XROPfunction[rop & 0x0f]);

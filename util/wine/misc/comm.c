@@ -8,11 +8,14 @@
 #include <fcntl.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 #include <sys/stat.h>
 #if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <errno.h>
 #include <sys/ioctl.h>
 #endif
+#include <unistd.h>
+
 #include "wine.h"
 #include "windows.h"
 
@@ -38,7 +41,7 @@ void Comm_DeInit(void);
 void Comm_Init(void)
 {
 	int x, serial = 0, parallel = 0;
-	char option[10], temp[256], *ptr;
+	char option[10], temp[256];
 	struct stat st;
 
 	for (x=0; x!=MAX_PORTS; x++) {
@@ -54,12 +57,12 @@ void Comm_Init(void)
 			if (!S_ISCHR(st.st_mode)) 
 				fprintf(stderr,"comm: can 't use `%s' as COM%d !\n", temp, x);
 			else
-				if ((ptr = malloc(strlen(temp)+1)) == NULL) 
+				if ((COM[serial].devicename = malloc(strlen(temp)+1)) == NULL) 
 					fprintf(stderr,"comm: can't malloc for device info!\n");
 				else {
 					COM[serial].fd = 0;
-					COM[serial].devicename = ptr;
-					strcpy(COM[serial++].devicename, temp);
+					strcpy(COM[serial].devicename, temp);
+					serial++;
 				}
 		}
 
@@ -75,12 +78,12 @@ void Comm_Init(void)
 			if (!S_ISCHR(st.st_mode)) 
 				fprintf(stderr,"comm: can 't use `%s' as LPT%d !\n", temp, x);
 			else 
-				if ((ptr = malloc(strlen(temp)+1)) == NULL) 
+				if ((LPT[parallel].devicename = malloc(strlen(temp)+1)) == NULL) 
 					fprintf(stderr,"comm: can't malloc for device info!\n");
 				else {
-					LPT[serial].fd = 0;
-					LPT[serial].devicename = ptr;
-					strcpy(LPT[serial++].devicename, temp);
+					LPT[parallel].fd = 0;
+					strcpy(LPT[parallel].devicename, temp);
+					parallel++;
 				}
 		}
 
@@ -145,16 +148,22 @@ int BuildCommDCB(LPSTR device, DCB FAR *lpdcb)
 	/*  012345		*/
 
 	int port;
-	char *ptr, *ptr2, temp[256],temp2[10];
+	char *ptr, temp[256];
 
 #ifdef DEBUG_COMM
-fprintf(stderr,"BuildCommDCB: (%s), ptr %d\n", device, lpdcb);
+fprintf(stderr,"BuildCommDCB: (%s), ptr %d\n", device, (long) lpdcb);
 #endif
 	commerror = 0;
 
 	if (!strncmp(device,"COM",3)) {
 		port = device[3] - '0';
 	
+
+		if (port-- == 0) {
+			fprintf(stderr, "comm: BUG ! COM0 can't exists!.\n");
+			commerror = IE_BADID;
+		}
+
 		if (!ValidCOMPort(port)) {
 			commerror = IE_BADID;
 			return -1;
@@ -240,6 +249,11 @@ fprintf(stderr,"OpenComm: %s, %d, %d\n", device, cbInQueue, cbOutQueue);
 	if (!strncmp(device,"COM",3)) {
 		port = device[3] - '0';
 
+		if (port-- == 0) {
+			fprintf(stderr, "comm: BUG ! COM0 doesn't exists!.\n");
+			commerror = IE_BADID;
+		}
+
 		if (!ValidCOMPort(port)) {
 			commerror = IE_BADID;
 			return -1;
@@ -252,7 +266,7 @@ fprintf(stderr,"OpenComm: %s, %d, %d\n", device, cbInQueue, cbOutQueue);
 		fd = open(COM[port].devicename, O_RDWR | O_NONBLOCK, 0);
 		if (fd == -1) {
 			commerror = WinError();
-			return -1;	
+			return -1;
 		} else {
 			COM[port].fd = fd;	
 			return fd;
@@ -285,8 +299,6 @@ fprintf(stderr,"OpenComm: %s, %d, %d\n", device, cbInQueue, cbOutQueue);
 
 int CloseComm(int fd)
 {
-	int status;
-
 #ifdef DEBUG_COMM
 fprintf(stderr,"CloseComm: fd %d\n", fd);
 #endif	
@@ -466,7 +478,7 @@ int SetCommState(DCB FAR *lpdcb)
 	struct termios port;
 
 #ifdef DEBUG_COMM
-fprintf(stderr,"SetCommState: fd %d, ptr %d\n", lpdcb->Id, lpdcb);
+fprintf(stderr,"SetCommState: fd %d, ptr %d\n", lpdcb->Id, (long) lpdcb);
 #endif	
 
 	if (tcgetattr(lpdcb->Id, &port) == -1) {
@@ -655,7 +667,7 @@ int GetCommState(int fd, DCB FAR *lpdcb)
 	struct termios port;
 
 #ifdef DEBUG_COMM
-fprintf(stderr,"GetCommState: fd %d, ptr %d\n", fd, lpdcb);
+fprintf(stderr,"GetCommState: fd %d, ptr %d\n", fd, (long) lpdcb);
 #endif
 
 	if (tcgetattr(fd, &port) == -1) {
@@ -825,7 +837,7 @@ int ReadComm(int fd, LPSTR lpvBuf, int cbRead)
 	struct DosDeviceStruct *ptr;
 
 #ifdef DEBUG_COMM
-fprintf(stderr,"ReadComm: fd %d, ptr %d, length %d\n", fd, lpvBuf, cbRead);
+fprintf(stderr,"ReadComm: fd %d, ptr %d, length %d\n", fd, (long) lpvBuf, cbRead);
 #endif	
 
 	if ((ptr = GetDeviceStruct(fd)) == NULL) {
@@ -864,7 +876,7 @@ int WriteComm(int fd, LPSTR lpvBuf, int cbWrite)
 	struct DosDeviceStruct *ptr;
 
 #ifdef DEBUG_COMM
-fprintf(stderr,"WriteComm: fd %d, ptr %d, length %d\n", fd, lpvBuf, cbWrite);
+fprintf(stderr,"WriteComm: fd %d, ptr %d, length %d\n", fd, (long) lpvBuf, cbWrite);
 #endif
 	
 	if ((ptr = GetDeviceStruct(fd)) == NULL) {

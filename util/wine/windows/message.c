@@ -19,13 +19,17 @@ static char Copyright[] = "Copyright  Alexandre Julliard, 1993";
 #include "win.h"
 #include "wineopts.h"
 #include "sysmetrics.h"
+#include "hook.h"
 
 #define MAX_QUEUE_SIZE   120  /* Max. size of a message queue */
 
-extern BOOL TIMER_CheckTimer( DWORD *next );      /* timer.c */
+extern BOOL TIMER_CheckTimer( LONG *next, MSG *msg,
+			      HWND hwnd, BOOL remove );  /* timer.c */
 extern void EVENT_ProcessEvent( XEvent *event );  /* event.c */
 extern void WINPOS_ChangeActiveWindow( HWND hwnd, BOOL mouseMsg ); /*winpos.c*/
-  
+extern void WIN_SendParentNotify( HWND hwnd, WORD event,
+				  LONG lParam );  /* win.c */
+
 extern Display * display;
 
   /* System message queue (for hardware events) */
@@ -106,8 +110,6 @@ static int MSG_AddMsg( MESSAGEQUEUE * msgQueue, MSG * msg, DWORD extraInfo )
 {
     int pos;
   
-    SpyMessage(msg->hwnd, msg->message, msg->wParam, msg->lParam);
-    
     if (!msgQueue) return FALSE;
     pos = msgQueue->nextFreeMessage;
 
@@ -214,6 +216,11 @@ static BOOL MSG_TranslateMouseMsg( MSG *msg )
     LONG hittest_result = SendMessage( msg->hwnd, WM_NCHITTEST, 0,
 				       MAKELONG( msg->pt.x, msg->pt.y ) );
 
+      /* Send the WM_PARENTNOTIFY message */
+
+    if (mouseClick) WIN_SendParentNotify( msg->hwnd, msg->message,
+					  MAKELONG( msg->pt.x, msg->pt.y ) );
+
       /* Activate the window if needed */
 
     if (mouseClick)
@@ -285,6 +292,7 @@ static BOOL MSG_TranslateMouseMsg( MSG *msg )
 	msg->wParam = hittest_result;
 	msg->message += WM_NCLBUTTONDOWN - WM_LBUTTONDOWN;
     }
+    
     return TRUE;
 }
 
@@ -360,20 +368,51 @@ void MSG_DecTimerCount( HANDLE hQueue )
  *           hardware_event
  *
  * Add an event to the system message queue.
- * Note: the position is in screen coordinates.
+ * Note: the position is relative to the desktop window.
  */
-void hardware_event( HWND hwnd, WORD message, WORD wParam, LONG lParam,
-		     WORD xPos, WORD yPos, DWORD time, DWORD extraInfo )
+void hardware_event( WORD message, WORD wParam, LONG lParam,
+		     int xPos, int yPos, DWORD time, DWORD extraInfo )
 {
     MSG msg;
 
-    msg.hwnd    = hwnd;
+    msg.hwnd    = 0;
     msg.message = message;
     msg.wParam  = wParam;
     msg.lParam  = lParam;
     msg.time    = time;
-    msg.pt.x    = xPos;
-    msg.pt.y    = yPos;    
+    msg.pt.x    = xPos & 0xffff;
+    msg.pt.y    = yPos & 0xffff;
+
+      /* Determine the hwnd for this message */
+      /* Maybe this should be done in GetMessage() */
+
+    if ((message >= WM_MOUSEFIRST) && (message <= WM_MOUSELAST))
+    {
+	  /* Mouse event */
+	if (GetCapture()) msg.hwnd = GetCapture();
+	else msg.hwnd = WindowFromPoint( msg.pt );
+    }
+    else if ((message >= WM_KEYFIRST) && (message <= WM_KEYLAST))
+    {
+	  /* Keyboard event */
+	msg.hwnd = GetFocus();
+	if (!msg.hwnd && ((message==WM_KEYDOWN) || (message==WM_SYSKEYDOWN)))
+	    MessageBeep(0);  /* Beep on key press if no focus */
+    }
+    if (!msg.hwnd) return;  /* No window for this message */
+
+      /* Merge with previous event if possible */
+
+    if (sysMsgQueue->msgCount && (message == WM_MOUSEMOVE))
+    {
+	MSG *prevMsg = &sysMsgQueue->messages[sysMsgQueue->nextMessage].msg;
+	if ((prevMsg->message == message) && (prevMsg->wParam == wParam))
+	{
+	    *prevMsg = msg;  /* Overwrite previous message */
+	    return;
+	}
+    }
+
     if (!MSG_AddMsg( sysMsgQueue, &msg, extraInfo ))
 	printf( "hardware_event: Queue is full\n" );
 }
@@ -481,13 +520,31 @@ BOOL GetInputState()
 
 
 /***********************************************************************
+ *           MSG_Synchronize
+ *
+ * Synchronize with the X server. Should not be used too often.
+ */
+void MSG_Synchronize()
+{
+    XEvent event;
+
+    XSync( display, False );
+    while (XPending( display ))
+    {
+	XNextEvent( display, &event );
+	EVENT_ProcessEvent( &event );
+    }    
+}
+
+
+/***********************************************************************
  *           MSG_PeekMessage
  */
 static BOOL MSG_PeekMessage( MESSAGEQUEUE * msgQueue, LPMSG msg, HWND hwnd,
 			     WORD first, WORD last, WORD flags, BOOL peek )
 {
     int pos, mask;
-    DWORD nextExp;  /* Next timer expiration time */
+    LONG nextExp;  /* Next timer expiration time */
     XEvent event;
 
     if (first || last)
@@ -495,9 +552,9 @@ static BOOL MSG_PeekMessage( MESSAGEQUEUE * msgQueue, LPMSG msg, HWND hwnd,
 	mask = QS_POSTMESSAGE;  /* Always selectioned */
 	if ((first <= WM_KEYLAST) && (last >= WM_KEYFIRST)) mask |= QS_KEY;
 	if ((first <= WM_MOUSELAST) && (last >= WM_MOUSEFIRST)) mask |= QS_MOUSE;
-	if ((first <= WM_TIMER) && (last >= WM_TIMER)) mask |= WM_TIMER;
-	if ((first <= WM_SYSTIMER) && (last >= WM_SYSTIMER)) mask |= WM_TIMER;
-	if ((first <= WM_PAINT) && (last >= WM_PAINT)) mask |= WM_PAINT;
+	if ((first <= WM_TIMER) && (last >= WM_TIMER)) mask |= QS_TIMER;
+	if ((first <= WM_SYSTIMER) && (last >= WM_SYSTIMER)) mask |= QS_TIMER;
+	if ((first <= WM_PAINT) && (last >= WM_PAINT)) mask |= QS_PAINT;
     }
     else mask = QS_MOUSE | QS_KEY | QS_POSTMESSAGE | QS_TIMER | QS_PAINT;
 
@@ -584,8 +641,11 @@ static BOOL MSG_PeekMessage( MESSAGEQUEUE * msgQueue, LPMSG msg, HWND hwnd,
 
 	  /* Finally handle WM_TIMER messages */
 	if ((msgQueue->status & QS_TIMER) && (mask & QS_TIMER))
-	    if (TIMER_CheckTimer( &nextExp ))
-		continue;  /* Restart the whole search */
+	{
+	    if (TIMER_CheckTimer( &nextExp, msg, hwnd, flags & PM_REMOVE ))
+		break;  /* Got a timer msg */
+	}
+	else nextExp = -1;  /* No timeout needed */
 
 	  /* Wait until something happens */
 	if (peek) return FALSE;
@@ -612,6 +672,31 @@ static BOOL MSG_PeekMessage( MESSAGEQUEUE * msgQueue, LPMSG msg, HWND hwnd,
 
 
 /***********************************************************************
+ *           MSG_InternalGetMessage
+ *
+ * GetMessage() function for internal use. Behave like GetMessage(),
+ * but also call message filters and optionally send WM_ENTERIDLE messages.
+ * 'hwnd' must be the handle of the dialog or menu window.
+ * 'code' is the message filter value (MSGF_??? codes).
+ */
+BOOL MSG_InternalGetMessage( LPMSG msg, HWND hwnd, short code, BOOL sendIdle ) 
+{
+    do
+    {
+	if (sendIdle)
+	{
+	    if (MSG_PeekMessage(appMsgQueue, msg, 0, 0, 0, PM_REMOVE, TRUE))
+		continue;
+	    /* FIXME: to which window should we send this? */
+	    /* SendMessage( hwnd, WM_ENTERIDLE, code, (LPARAM)hwnd ); */
+	}
+	MSG_PeekMessage( appMsgQueue, msg, 0, 0, 0, PM_REMOVE, FALSE );
+    } while (CallMsgFilter( msg, code ) != 0);
+    return (msg->message != WM_QUIT);
+}
+
+
+/***********************************************************************
  *           PeekMessage   (USER.109)
  */
 BOOL PeekMessage( LPMSG msg, HWND hwnd, WORD first, WORD last, WORD flags )
@@ -625,7 +710,10 @@ BOOL PeekMessage( LPMSG msg, HWND hwnd, WORD first, WORD last, WORD flags )
  */
 BOOL GetMessage( LPMSG msg, HWND hwnd, WORD first, WORD last ) 
 {
-    return MSG_PeekMessage( appMsgQueue, msg, hwnd, first, last, PM_REMOVE, FALSE );
+    MSG_PeekMessage( appMsgQueue, msg, hwnd, first, last, PM_REMOVE, FALSE );
+    CALL_SYSTEM_HOOK( WH_GETMESSAGE, 0, 0, (LPARAM)msg );
+    CALL_TASK_HOOK( WH_GETMESSAGE, 0, 0, (LPARAM)msg );
+    return (msg->message != WM_QUIT);
 }
 
 
@@ -635,7 +723,10 @@ BOOL GetMessage( LPMSG msg, HWND hwnd, WORD first, WORD last )
 BOOL PostMessage( HWND hwnd, WORD message, WORD wParam, LONG lParam )
 {
     MSG msg;
-    
+    WND *wndPtr = WIN_FindWndPtr( hwnd );
+
+    if (!wndPtr || !wndPtr->hmemTaskQ) return FALSE;
+
     msg.hwnd    = hwnd;
     msg.message = message;
     msg.wParam  = wParam;
@@ -643,7 +734,7 @@ BOOL PostMessage( HWND hwnd, WORD message, WORD wParam, LONG lParam )
     msg.time    = GetTickCount();
     msg.pt.x    = 0;
     msg.pt.y    = 0;
-    
+
     return MSG_AddMsg( appMsgQueue, &msg, 0 );
 }
 
@@ -655,8 +746,6 @@ LONG SendMessage( HWND hwnd, WORD msg, WORD wParam, LONG lParam )
 {
     WND * wndPtr;
 
-    SpyMessage(hwnd, msg, wParam, lParam);
-    
     wndPtr = WIN_FindWndPtr( hwnd );
     if (!wndPtr) return 0;
     return CallWindowProc( wndPtr->lpfnWndProc, hwnd, msg, wParam, lParam );

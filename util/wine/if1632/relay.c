@@ -1,8 +1,9 @@
-static char RCSId[] = "$Id: relay.c,v 1.1 1994/02/24 08:05:33 hsu Exp $";
+static char RCSId[] = "$Id: relay.c,v 1.1.1.2 1994/04/22 01:51:35 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -14,14 +15,16 @@ static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 #include <linux/segment.h>
 #endif
 #include <errno.h>
+
 #include "neexe.h"
 #include "segmem.h"
 #include "prototypes.h"
 #include "dlls.h"
+#include "options.h"
 
-/* #define DEBUG_RELAY /* */
+#define DEBUG_RELAY /* */
 
-#define N_BUILTINS	9
+#define N_BUILTINS	10
 
 struct dll_name_table_entry_s dll_builtin_table[N_BUILTINS] =
 {
@@ -34,6 +37,7 @@ struct dll_name_table_entry_s dll_builtin_table[N_BUILTINS] =
     { "SOUND",   SOUND_table,    20, 7 },
     { "KEYBOARD",KEYBOARD_table,137, 8 },
     { "WINSOCK", WINSOCK_table, 155, 9 },
+    { "STRESS",  STRESS_table,   15,10 },
 };
 
 unsigned short *Stack16Frame;
@@ -64,6 +68,7 @@ int
 DLLRelay(unsigned int func_num, unsigned int seg_off)
 {
     struct dll_table_entry_s *dll_p;
+    unsigned short *saved_Stack16Frame;
     unsigned int segment;
     unsigned int offset;
     unsigned int dll_id;
@@ -77,6 +82,7 @@ DLLRelay(unsigned int func_num, unsigned int seg_off)
     /*
      * Determine address of arguments.
      */
+    saved_Stack16Frame = Stack16Frame;
     Stack16Frame = (unsigned short *) seg_off;
     arg_ptr = (void *) (seg_off + 0x18);
 
@@ -88,6 +94,7 @@ DLLRelay(unsigned int func_num, unsigned int seg_off)
     dll_p   = &dll_builtin_table[dll_id].dll_table[ordinal];
 
 #ifdef DEBUG_RELAY
+    if (Options.relay_debug)
     {
 	unsigned int *ret_addr;
 	unsigned short *stack_p;
@@ -136,7 +143,11 @@ DLLRelay(unsigned int func_num, unsigned int seg_off)
      * if we choose.
      */
     if (dll_p->n_args == 0)
-	return (*func_ptr)(arg_ptr);
+    {
+	ret_val = (*func_ptr)(arg_ptr);
+	Stack16Frame = saved_Stack16Frame;
+	return ret_val;
+    }
 
     /*
      * Getting this far means we need to convert the 16-bit argument stack.
@@ -186,12 +197,16 @@ DLLRelay(unsigned int func_num, unsigned int seg_off)
 			  arg_table[15]);
 
 #ifdef DEBUG_RELAY
-    printf("Returning %08.8x from %s (%s.%d)\n",
-	   ret_val,
-	   dll_p->export_name,
-	   dll_builtin_table[dll_id].dll_name, ordinal);
+    if (Options.relay_debug)
+    {
+	printf("Returning %08.8x from %s (%s.%d)\n",
+	       ret_val,
+	       dll_p->export_name,
+	       dll_builtin_table[dll_id].dll_name, ordinal);
+    }
 #endif
 
+    Stack16Frame = saved_Stack16Frame;
     return ret_val;
 }
 
