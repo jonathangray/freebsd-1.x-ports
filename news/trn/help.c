@@ -1,4 +1,4 @@
-/* $Id: help.c,v 1.1 1993/07/19 20:07:02 nate Exp $
+/* $Id: help.c,v 1.2 1993/07/26 19:12:27 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -264,6 +264,7 @@ g name	Go to the named newsgroup.  Subscribe to new newsgroups this way too.\n\
 l pat	List unsubscribed newsgroups containing pattern.\n\
 m name	Move named newsgroup elsewhere (no name moves current newsgroup).\n\
 o pat	Only display newsgroups matching pattern.  Omit pat to unrestrict.\n\
+O pat	Like o, but skip empty groups.\n\
 a pat	Like o, but also scans for unsubscribed newsgroups matching pattern.\n\
 L	List current .newsrc.\n\
 ",NOMARKING)) ||

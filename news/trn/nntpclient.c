@@ -1,5 +1,9 @@
-/* $Id: nntpclient.c,v 1.1 1993/07/19 20:07:05 nate Exp $
+/* $Id: nntpclient.c,v 1.2 1993/07/26 19:13:01 nate Exp $
 */
+/* The authors make no claims as to the fitness or correctness of this software
+ * for any use whatsoever, and it is provided as is. Any use of this software
+ * is at the user's own risk. 
+ */
 
 #include "EXTERN.h"
 #include "common.h"
@@ -17,7 +21,7 @@
 void
 nntp_connect()
 {
-    char *server;
+    char *server, filebuf[128];
     int response;
 
     if ((server = getenv("NNTPSERVER")) == Nullch)
@@ -26,12 +30,12 @@ nntp_connect()
 	register FILE *fp;
 	if ((fp = fopen(server, "r")) != Nullfp) {
 	    server = Nullch;
-	    while (fgets(ser_line, sizeof ser_line, fp) != Nullch) {
-		if (*ser_line == '\n' || *ser_line == '#')
+	    while (fgets(filebuf, sizeof filebuf, fp) != Nullch) {
+		if (*filebuf == '\n' || *filebuf == '#')
 		    continue;
-		if ((server = index(ser_line, '\n')) != Nullch)
+		if ((server = index(filebuf, '\n')) != Nullch)
 		    *server = '\0';
-		server = ser_line;
+		server = filebuf;
 		break;
 	    }
 	    fclose(fp);

@@ -1,4 +1,4 @@
-/* $Id: artsrch.c,v 1.1 1993/07/19 20:06:59 nate Exp $
+/* $Id: artsrch.c,v 1.2 1993/07/26 19:12:02 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -38,10 +38,8 @@ void
 artsrch_init()
 {
 #ifdef ARTSEARCH
-#ifdef ZEROGLOB
     init_compex(&sub_compex);
     init_compex(&art_compex);
-#endif
 #endif
 }
 
@@ -63,7 +61,8 @@ int get_cmd;				/*   be set to FALSE!!! */
     char *cmdlst = Nullch;		/* list of commands to do */
     int normal_return = SRCH_NOTFOUND;	/* assume no commands */
     bool saltaway = FALSE;		/* store in KILL file? */
-    char howmuch;			/* search scope: subj/from/head/art */
+    char howmuch;		/* search scope: subj/from/Hdr/head/art */
+    char *srchhdr;		/* header to search if Hdr scope */
     bool doread;			/* search read articles? */
     bool foldcase = TRUE;		/* fold upper and lower case? */
     ART_NUM srchfirst;
@@ -75,11 +74,13 @@ int get_cmd;				/*   be set to FALSE!!! */
 		return SRCH_ABORT;
 	compex = &art_compex;
 	if (patbuf[1]) {
-	    howmuch = 0;
+	    howmuch = ARTSCOPE_SUBJECT;
+	    srchhdr = Nullch;
 	    doread = FALSE;
 	}
 	else {
 	    howmuch = art_howmuch;
+	    srchhdr = art_srchhdr;
 	    doread = art_doread;
 	}
 	s = cpytill(buf,patbuf+1,cmdchr);/* ok to cpy buf+1 to buf */
@@ -90,13 +91,25 @@ int get_cmd;				/*   be set to FALSE!!! */
 	    lastpat = savestr(pattern);
 	}
 	if (*s) {			/* modifiers or commands? */
-	    for (s++; *s && index("Karchf",*s); s++) {
+	    for (s++; *s && index("KarchHf",*s); s++) {
 		if (*s == 'f')		/* scan from line */
-		    howmuch = 1;
-		else if (*s == 'h')	/* scan header */
-		    howmuch = 2;
+		    howmuch = ARTSCOPE_FROM;
+		else if (*s == 'H') {	/* scan a specific header */
+		    howmuch = ARTSCOPE_ONEHDR;
+		    srchhdr = s + 1;
+		    if (!(s = index(srchhdr, ':'))) {
+			s = buf + strlen(buf);
+			*s++ = ':';
+			*s = '\0';
+		    }
+		    else
+			s++;
+		    srchhdr = savestr(srchhdr);
+		    break;
+		} else if (*s == 'h')	/* scan header */
+		    howmuch = ARTSCOPE_HEAD;
 		else if (*s == 'a')	/* scan article */
-		    howmuch = 3;
+		    howmuch = ARTSCOPE_ARTICLE;
 		else if (*s == 'r')	/* scan read articles */
 		    doread = TRUE;
 		else if (*s == 'K')	/* put into KILL file */
@@ -116,6 +129,11 @@ int get_cmd;				/*   be set to FALSE!!! */
 	    normal_return = SRCH_DONE;
 	}
 	art_howmuch = howmuch;
+	if (art_srchhdr != srchhdr) {
+	    if (art_srchhdr)
+		free(art_srchhdr);
+	    art_srchhdr = srchhdr;
+	}
 	art_doread = doread;
 	if (srchahead)
 	    srchahead = -1;
@@ -123,7 +141,7 @@ int get_cmd;				/*   be set to FALSE!!! */
     else {
 	register char *h;
 
-	howmuch = 0;			/* just search subjects */
+	howmuch = ARTSCOPE_SUBJECT;	/* just search subjects */
 	doread = (cmdchr == Ctl('p'));
 	if (cmdchr == Ctl('n'))
 	    normal_return = SRCH_SUBJDONE;
@@ -132,19 +150,24 @@ int get_cmd;				/*   be set to FALSE!!! */
 	strcpy(pattern,": *");
 	h = pattern + strlen(pattern);
 	interp(h,patbufsiz - (h-patbuf),"%\\s");  /* fetch current subject */
-	if (cmdchr == 'k' || cmdchr == 'K' || cmdchr == '+' || cmdchr == ',') {
+	if (cmdchr == 'k' || cmdchr == 'K' || cmdchr == ','
+	 || cmdchr == '+' || cmdchr == '.') {
 	    if (cmdchr != 'k')
 		saltaway = TRUE;
 	    normal_return = SRCH_DONE;
 	    if (cmdchr == '+')
 		cmdlst = savestr("++");
-	    else if (cmdchr == ',')
-		cmdlst = savestr(",");
-	    mark_as_read();		/* this article has this subject */
+	    else if (cmdchr == '.')
+		cmdlst = savestr(".");
+	    else {
+		if (cmdchr == ',')
+		    cmdlst = savestr(",");
+		mark_as_read();		/* this article has this subject */
+	    }
 	    if (!*h) {
 #ifdef VERBOSE
 		IF(verbose)
-		    fputs("\nCannot delete null subject.\n",stdout) FLUSH;
+		    fputs("\nCannot process a null subject.\n",stdout) FLUSH;
 		ELSE
 #endif
 #ifdef TERSE
@@ -154,11 +177,15 @@ int get_cmd;				/*   be set to FALSE!!! */
 	    }
 #ifdef VERBOSE
 	    else if (verbose)
-		printf("\nMarking subject \"%s\" as read.\n",h) FLUSH;
+		if (cmdchr != '+' && cmdchr != '.')
+		    printf("\nMarking subject \"%s\" as read.\n",h) FLUSH;
+		else
+		    printf("\nSelecting subject \"%s\".\n",h) FLUSH;
 #endif
 	}
 	else if (!srchahead)
 	    srchahead = -1;
+
 	{			/* compensate for notesfiles */
 	    register int i;
 	    for (i = 24; *h && i--; h++)
@@ -180,15 +207,20 @@ int get_cmd;				/*   be set to FALSE!!! */
 #ifdef KILLFILES
     if (saltaway) {
 	char saltbuf[LBUFLEN];
-	static char *scopestr = "fha";
 
 	s = saltbuf;
 	sprintf(s,"/%s/",pattern);
 	s += strlen(s);
 	if (doread)
 	    *s++ = 'r';
-	if (howmuch > 0)
+	if (howmuch != ARTSCOPE_SUBJECT) {
 	    *s++ = scopestr[howmuch];
+	    if (howmuch == ARTSCOPE_ONEHDR)
+		safecpy(s,srchhdr,LBUFLEN-(s-saltbuf));
+	    s = index(s,':');
+	    if (!s)
+		s = saltbuf+LBUFLEN-2;
+	}
 	*s++ = ':';
 	if (!cmdlst)
 	    cmdlst = savestr("j");
@@ -213,8 +245,8 @@ int get_cmd;				/*   be set to FALSE!!! */
 	normal_return = SRCH_DONE;
     }
     srchfirst = (doread? absfirst :
-		 (mode == 'k' && (howmuch > 1 || lastart - last_cached > 25)
-		  ? killfirst : firstart));
+	(mode == 'k' && (howmuch > ARTSCOPE_FROM || lastart - last_cached > 25)
+	 ? killfirst : firstart));
     if (backward) {
 	if (cmdlst && art <= lastart)
 	    art++;			/* include current article */
@@ -284,37 +316,53 @@ char_int scope;
     if (!ap || (ap->flags & AF_MISSING))
 	return FALSE;
 
-    if (scope <= 1) {
-	if (!scope) {
-	    strcpy(buf,"Subject: ");
-	    strncpy(buf+9,fetchsubj(artnum,FALSE),256);
+    switch (scope) {
+    case ARTSCOPE_SUBJECT:
+	strcpy(buf,"Subject: ");
+	strncpy(buf+9,fetchsubj(artnum,FALSE),256);
 #ifdef DEBUG
-	    if (debug & DEB_SEARCH_AHEAD)
-		printf("%s\n",buf) FLUSH;
+	if (debug & DEB_SEARCH_AHEAD)
+	    printf("%s\n",buf) FLUSH;
 #endif
-	} else {
-	    strcpy(buf, "From: ");
-	    strncpy(buf+6,fetchfrom(artnum,FALSE),256);
+	break;
+    case ARTSCOPE_FROM:
+	strcpy(buf, "From: ");
+	strncpy(buf+6,fetchfrom(artnum,FALSE),256);
+	break;
+    case ARTSCOPE_ONEHDR:
+    {
+	int header_num;
+	char *s;
+	assert(art_srchhdr != Nullch);
+	s = index(art_srchhdr,':');
+	header_num = set_line_type(art_srchhdr, s);
+	if (header_num == SOME_LINE)
+	    return FALSE;  /* FIX ME */
+	untrim_cache = TRUE;
+	strcpy(buf, art_srchhdr);
+	sprintf(buf + (s-art_srchhdr), ": %s",
+		prefetchlines(artnum,header_num,FALSE));
+	untrim_cache = FALSE;
+	break;
+    }
+    default:
+	if (!parseheader(artnum))
+	    return FALSE;
+	/* see if it's in the header */
+	if (execute(compex,headbuf) != Nullch)	/* does it match? */
+	    return TRUE;			/* say, "Eureka!" */
+	if (scope < ARTSCOPE_ARTICLE)
+	    return FALSE;
+	if (!artopen(artnum))		/* ensure we have the body */
+	    return FALSE;
+	/* loop through each line of the article */
+	while (fgets(buf,LBUFLEN,artfp) != Nullch) {
+	    if (execute(compex,buf) != Nullch)	/* does it match? */
+		return TRUE;			/* say, "Eureka!" */
 	}
-	return execute(compex,buf) != Nullch;
+	return FALSE;			/* out of article, so no match */
     }
-    
-    if (!parseheader(artnum))
-	return FALSE;
-    /* see if it's in the header */
-    if (execute(compex,headbuf) != Nullch)	/* does it match? */
-	return TRUE;				/* say, "Eureka!" */
-    if (scope < 3)
-	return FALSE;
-
-    if (!artopen(artnum))		/* ensure we have the body */
-	return FALSE;
-    /* loop through each line of the article */
-    while (fgets(buf,LBUFLEN,artfp) != Nullch) {
-	if (execute(compex,buf) != Nullch) /* does it match? */
-	    return TRUE;		   /* say, "Eureka!" */
-    }
-    return FALSE;			/* out of article, so no match */
+    return execute(compex,buf) != Nullch;
 }
 #endif
 

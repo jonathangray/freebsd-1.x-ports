@@ -1,4 +1,8 @@
-/* $Id: decode.c,v 1.1 1993/07/19 20:07:00 nate Exp $
+/* $Id: decode.c,v 1.2 1993/07/26 19:12:16 nate Exp $
+ */
+/* The authors make no claims as to the fitness or correctness of this software
+ * for any use whatsoever, and it is provided as is. Any use of this software
+ * is at the user's own risk. 
  */
 
 #include "EXTERN.h"

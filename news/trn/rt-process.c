@@ -1,5 +1,9 @@
-/* $Id: rt-process.c,v 1.1 1993/07/19 20:07:06 nate Exp $
+/* $Id: rt-process.c,v 1.2 1993/07/26 19:13:23 nate Exp $
 */
+/* The authors make no claims as to the fitness or correctness of this software
+ * for any use whatsoever, and it is provided as is. Any use of this software
+ * is at the user's own risk. 
+ */
 
 #include "EXTERN.h"
 #include "common.h"
@@ -7,6 +11,7 @@
 #include "trn.h"
 #include "cache.h"
 #include "bits.h"
+#include "final.h"
 #include "ng.h"
 #include "ngdata.h"
 #include "rcln.h"
@@ -106,7 +111,7 @@ ARTICLE *article;
 	    fake_had_subj = fake_ap->subj;
 	    if (fake_ap->flags & AF_AUTOFLAGS) {
 		article->flags |= fake_ap->flags & AF_AUTOFLAGS;
-		save_ids = TRUE;
+		localkf_changes = 2;
 	    }
 	    if (curr_artp == fake_ap) {
 		curr_artp = article;
@@ -140,11 +145,6 @@ ARTICLE *article;
 			ap = ap->sibling;
 		    }
 		}
-#if 1
-		for (ap = fake_had_subj->articles; ap; ap = ap->subj_next) {
-		    assert(ap != fake_ap);
-		}
-#endif
 	    }
 	    for (ap = article->child1; ap; ap = ap->sibling)
 		ap->parent = article;
@@ -197,9 +197,8 @@ ARTICLE *article;
     register ARTICLE *ap, *last;
     register char *cp, *end;
     ARTICLE *kill_ap = ((article->flags & AF_AUTOKILL)? article : Nullart);
-    int select_this_art = (article->subj->flags & SF_AUTOSELECT)
-	|| (article->flags & AF_AUTOSELECTALL)? AF_AUTOSELECTALL
-	: (article->flags & AF_AUTOSELECT);
+    int select_this_art = article->flags
+	| (article->subj->articles? article->subj->articles->flags : 0);
 
     /* We're definitely not a fake anymore */
     article->flags = (article->flags & ~AF_FAKE) | AF_THREADED;
@@ -270,7 +269,7 @@ ARTICLE *article;
 		break;
 	    ap = get_article(cp);
 	    *cp = '\0';
-	    select_this_art |= ap->flags & (AF_AUTOSELECT|AF_AUTOSELECTALL);
+	    select_this_art |= ap->flags;
 	    if (ap->flags & AF_AUTOKILL)
 		kill_ap = ap;
 
@@ -346,7 +345,7 @@ exit:
 	    select_thread(article->subj->thread, AF_AUTOSELECTALL);
 	else
 	    select_subject(article->subj, AF_AUTOSELECTALL);
-    } else if (select_this_art)
+    } else if (select_this_art & AF_AUTOSELECT)
 	select_subthread(article, AF_AUTOSELECT);
     if (kill_ap)
 	kill_subthread(kill_ap, KF_ALL|KF_KILLFILE);

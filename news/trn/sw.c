@@ -1,4 +1,4 @@
-/* $Id: sw.c,v 1.1 1993/07/19 20:07:08 nate Exp $
+/* $Id: sw.c,v 1.2 1993/07/26 19:13:39 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -193,8 +193,8 @@ register char *s;
 	    if (checkflag)
 		break;
 #ifdef SETENV
-	    setenv("SAVEDIR",  upordown ? "%p/%c" : "%p" );
-	    setenv("SAVENAME", upordown ? "%a"    : "%^C");
+	    export("SAVEDIR",  upordown ? "%p/%c" : "%p" );
+	    export("SAVENAME", upordown ? "%a"    : "%^C");
 #else
 	    notincl("-/");
 #endif
@@ -259,10 +259,10 @@ register char *s;
 	    s = index(tmpbuf,'=');
 	    if (s) {
 		*s++ = '\0';
-		setenv(tmpbuf,s);
+		export(tmpbuf,s);
 	    }
 	    else
-		setenv(tmpbuf,nullstr);
+		export(tmpbuf,nullstr);
 #else
 	    notincl("-E");
 #endif
@@ -381,6 +381,9 @@ register char *s;
 	case 'p':
 	    auto_select_postings = upordown;
 	    break;
+	case 'q':
+	    quickstart = upordown;
+	    break;
 	case 'r':
 	    findlast = upordown;
 	    break;
@@ -428,6 +431,9 @@ register char *s;
 	case 'u':
 	    unbroken_subjects = upordown;
 	    break;
+	case 'U':
+	    unsafe_rc_saves = upordown;
+	    break;
 	case 'v':
 #ifdef VERIFY
 	    verify = upordown;
@@ -465,12 +471,14 @@ register char *s;
 	    if (*s)
 		page_select = *s;
 	    break;
-	/*
-	 * People want a way to avoid checking for new newsgroups on startup.
-	 */
-	case 'q':
-		quickstart = upordown;
-		break;
+	case 'z':
+	    s++;
+	    if (*s == '=') s++;
+	    if (*s)
+		actFetchTime = atoi(s) * 60L;
+	    else
+		actFetchTime = upordown * 5L * 60L;
+	    break;
 	default:
 #ifdef VERBOSE
 	    IF(verbose)
@@ -510,7 +518,7 @@ pr_switches()
     printf("%cf ", mp[!novice_delays]);
     printf("-F\"%s\" ", indstr);
 #ifdef INNERSEARCH
-    printf("-g%d ", gline);
+    printf("-g%d ", gline+1);
 #endif
     printf("%cG", mp[fuzzyGet]);
     putchar('\n');
@@ -541,6 +549,7 @@ pr_switches()
     else
 	printf("+o ");
     printf("%cp ", mp[auto_select_postings]);
+    printf("%cq ", mp[quickstart]);
     printf("%cr ", mp[findlast]);
     if (countdown)
 	printf("-s%d ", countdown);
@@ -559,6 +568,7 @@ pr_switches()
 #endif
     printf("%cT ", mp[typeahead]);
     printf("%cu ", mp[unbroken_subjects]);
+    printf("%cU ", mp[unsafe_rc_saves]);
 #ifdef VERIFY
     printf("%cv ", mp[verify]);
 #endif
@@ -570,6 +580,10 @@ pr_switches()
 	printf("-X%d%c%c ",select_on,end_select,page_select);
     else
 	printf("+X ");
+    if (actFetchTime)
+	printf("-z%ld ",(long)actFetchTime / 60);
+    else
+	printf("+z ");
     fputs("\n\n",stdout) FLUSH;
 #ifdef ONLY
     if (maxngtodo) {

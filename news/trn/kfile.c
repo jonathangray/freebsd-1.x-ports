@@ -1,4 +1,4 @@
-/* $Id: kfile.c,v 1.1 1993/07/19 20:07:03 nate Exp $
+/* $Id: kfile.c,v 1.2 1993/07/26 19:12:33 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -31,6 +31,8 @@
 #include "rt-select.h"
 #include "INTERN.h"
 #include "kfile.h"
+
+extern HASHTABLE *msgid_hash;
 
 static bool exitcmds = FALSE;
 
@@ -75,7 +77,7 @@ char *str;
     fflush(stdout);
 }
 
-bool kill_mentioned;
+static bool kill_mentioned;
 
 int
 do_kfile(kfp,entering)
@@ -95,6 +97,12 @@ int entering;
 	buf[strlen(buf)-1] = '\0';
 	if (strnEQ(buf,"THRU",4)) {
 	    killfirst = atol(buf+4)+1;
+	    if (killfirst < absfirst)
+		killfirst = absfirst;
+	    if (killfirst > lastart)
+		killfirst = lastart+1;
+	    if (entering)
+		localkf_changes |= 1;
 	    continue;
 	}
 	if (*buf == 'X') {		/* exit command? */
@@ -111,10 +119,12 @@ int entering;
 	    mention(buf);
 	    switcheroo();
 	}
-	else if (*buf == '/' && firstart <= lastart) {
+	else if (*buf == '/') {
+	    has_normal_kills = TRUE;
+	    if (firstart > lastart)
+		continue;
 	    mention(buf);
 	    kill_mentioned = TRUE;
-	    has_normal_kills = TRUE;
 	    switch (art_search(buf, (sizeof buf), FALSE)) {
 	    case SRCH_ABORT:
 		continue;
@@ -148,7 +158,6 @@ int entering;
 		cp = "T,";
 	    else
 		*cp++ = '\0';
-	    art = 0;
 	    if ((ap = get_article(buf)) != Nullart) {
 		if ((ap->flags & AF_FAKE) == AF_FAKE) {
 		    if (*cp == 'T')
@@ -162,6 +171,7 @@ int entering;
 			ap->flags |= AF_AUTOSELECT;
 			thread_select_cnt++;
 			break;
+		    case 'J':
 		    case 'j':
 			ap->flags |= AF_AUTOKILLALL;
 			thread_kill_cnt++;
@@ -182,6 +192,24 @@ int entering;
 		}
 	    }
 	    art = lastart+1;
+	} else if (*buf == '*') {
+	    register ARTICLE *ap;
+	    register int killmask = AF_READ;
+	    switch (buf[1]) {
+	    case 'X':
+		killmask |= sel_mask;	/* don't kill selected articles */
+		/* FALL THROUGH */
+	    case 'j':
+		for (art = killfirst, ap = article_ptr(killfirst);
+		     art <= lastart;
+		     art++, ap++
+		) {
+		    if (!(ap->flags & killmask))
+			set_read(ap);
+		}
+		break;
+	    }
+	    has_normal_kills = TRUE;
 	}
     }
     if (thread_kill_cnt) {
@@ -264,23 +292,47 @@ int entering;
 	    forcelast = FALSE;		/* allow for having killed it all */
 	firstart = oldfirst;
     }
-    if (!entering && (localkfp || save_ids) && !intr)
-	setthru(lastart);
+    if (!entering && localkf_changes && !intr)
+	rewrite_kfile(lastart);
     mode = oldmode;
 }
 
+static FILE *newkfp;
+
+static void write_thread_commands(data, extra)
+HASHDATUM *data;
+int extra;
+{
+    register ARTICLE *ap = (data->dat_ptr? (ARTICLE*)data->dat_ptr
+					: article_ptr(data->dat_len));
+    register int flags;
+    char ch;
+
+    if (flags = (ap->flags & AF_AUTOFLAGS)) {
+	if (!(ap->flags & AF_MISSING) || ap->child1) {
+	    if (flags & AF_AUTOKILLALL)
+		ch = 'J';
+	    else if (flags & AF_AUTOKILL)
+		ch = ',';
+	    else if (flags & AF_AUTOSELECTALL)
+		ch = '+';
+	    else if (flags & AF_AUTOSELECT)
+		ch = '.';
+	    fprintf(newkfp,"%s T%c\n", ap->msgid, ch);
+	}
+    }
+}
+
 void
-setthru(thru)
+rewrite_kfile(thru)
 ART_NUM thru;
 {
-    register ARTICLE *ap;
-    register ART_NUM an;
-    FILE *newkfp;
-    bool no_kills = 0;
+    bool no_kills = 0, has_star_commands = FALSE;
 
     if (localkfp) {
 	fseek(localkfp,0L,0);		/* rewind current file */
-	if (save_ids)
+	/* If we're writing ids, we know the file is not null */
+	if (localkf_changes > 1)
 	    ;
 	else if (fgets(buf,LBUFLEN,localkfp) != Nullch
 	 && (strnNE(buf,"THRU",4) || fgets(buf,LBUFLEN,localkfp) != Nullch))
@@ -299,24 +351,31 @@ ART_NUM thru;
 	while (localkfp && fgets(buf,LBUFLEN,localkfp) != Nullch) {
 	    if (strnEQ(buf,"THRU",4))
 		continue;
+	    /* Write star commands after other kill commands */
+	    if (*buf == '*') {
+		has_star_commands = TRUE;
+		continue;
+	    }
 	    /* Leave out any outdated thread commands */
 	    if (*buf != 'T' && *buf != '<')
 		fputs(buf,newkfp);
 	}
-	/* Append all the still-valid thread commands */
-	for (an = absfirst, ap = article_ptr(an); an <= lastart; an++, ap++) {
-	    if (ap->flags & (AF_AUTOKILLALL|AF_AUTOSELECTALL))
-		fprintf(newkfp,"%s T%c\n",ap->msgid,
-			(ap->flags & AF_AUTOKILLALL)? 'j' : '+');
-	    else if (ap->flags & (AF_AUTOKILL|AF_AUTOSELECT))
-		fprintf(newkfp,"%s T%c\n",ap->msgid,
-			(ap->flags & AF_AUTOKILL)? ',' : '.');
+	if (has_star_commands) {
+	    fseek(localkfp,0L,0);			/* rewind file */
+	    while (fgets(buf,LBUFLEN,localkfp) != Nullch) {
+		if (*buf == '*')
+		    fputs(buf,newkfp);
+	    }
 	}
+	/* Append all the still-valid thread commands */
+	hashwalk(msgid_hash, write_thread_commands, 0);
 	fclose(newkfp);
 	open_kfile(KF_LOCAL);		/* and reopen local file */
     }
     else
 	printf(cantcreate,buf) FLUSH;
+    localkf_changes = 0;
+    has_normal_kills = FALSE;
 }
 
 /* edit KILL file for newsgroup */
@@ -326,9 +385,16 @@ edit_kfile()
 {
     int r = -1;
 
-    if (in_ng)
+    if (in_ng) {
+	register SUBJECT *sp;
+
+	if (localkf_changes)
+	    rewrite_kfile(lastart);
+	for (sp = first_subject; sp; sp = sp->next)
+	    clear_subject(sp);
+	localkf_changes = 0;
 	strcpy(buf,filexp(getval("KILLLOCAL",killlocal)));
-    else
+    } else
 	strcpy(buf,filexp(getval("KILLGLOBAL",killglobal)));
     if ((r = makedir(buf,MD_FILE)) >= 0) {
 	sprintf(cmd_buf,"%s %s",
@@ -340,6 +406,41 @@ edit_kfile()
 	noecho();			/* and make terminal */
 	crmode();			/*   unfriendly again */
 	open_kfile(in_ng);
+	if (localkfp) {
+	    fseek(localkfp,0L,0);			/* rewind file */
+	    has_normal_kills = FALSE;
+	    while (fgets(buf,LBUFLEN,localkfp) != Nullch) {
+		if (*buf == '/' || *buf == '*')
+		    has_normal_kills = TRUE;
+		else if (*buf == '<') {
+		    register ARTICLE *ap;
+		    char *cp = index(buf,' ');
+		    if (!cp)
+			cp = ",";
+		    else
+			*cp++ = '\0';
+		    if ((ap = get_article(buf)) != Nullart) {
+			if (*cp == 'T')
+			    cp++;
+			switch (*cp) {
+			case '+':
+			    ap->flags |= AF_AUTOSELECTALL;
+			    break;
+			case '.':
+			    ap->flags |= AF_AUTOSELECT;
+			    break;
+			case 'J':
+			case 'j':
+			    ap->flags |= AF_AUTOKILLALL;
+			    break;
+			case ',':
+			    ap->flags |= AF_AUTOKILL;
+			    break;
+			}
+		    }
+		}
+	    }
+	}
     }
     else
 	printf("Can't make %s\n",buf) FLUSH;

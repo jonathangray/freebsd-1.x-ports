@@ -4,11 +4,11 @@ esac
 echo "Extracting makedir (with variable substitutions)"
 $spitshell >makedir <<!GROK!THIS!
 $startsh
-# $Id: makedir.SH,v 1.1 1993/07/19 20:07:03 nate Exp $
+# $Id: makedir.SH,v 1.2 1993/07/26 19:12:38 nate Exp $
 # 
 # $Log: makedir.SH,v $
-# Revision 1.1  1993/07/19 20:07:03  nate
-# Initial revision
+# Revision 1.2  1993/07/26 19:12:38  nate
+# Updated trn3.0 to trn3.1
 #
 # Revision 2.11  90/09/17  17:03:55  hokey
 # 2.11 alpha baseline

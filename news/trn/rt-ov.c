@@ -1,5 +1,9 @@
-/* $Id: rt-ov.c,v 1.1 1993/07/19 20:07:06 nate Exp $
+/* $Id: rt-ov.c,v 1.2 1993/07/26 19:13:19 nate Exp $
 */
+/* The authors make no claims as to the fitness or correctness of this software
+ * for any use whatsoever, and it is provided as is. Any use of this software
+ * is at the user's own risk. 
+ */
 
 #include "EXTERN.h"
 #include "common.h"
@@ -133,7 +137,7 @@ beginning:
 		register ART_UNREAD i;
 		register ARTICLE *ap2;
 		ap2 = article_ptr(first);
-		for (i = artnum-first+1; i; ap2++, i--)
+		for (i = artnum-first; i; ap2++, i--)
 		    ap2->xrefs = nullstr;
 		ov_files_have_xrefs = TRUE;
 	    }
@@ -257,7 +261,7 @@ ART_NUM artnum;
 
 #ifdef OV_XREFS
 # ifdef OV_LAX_XREFS
-    if (!strnCASEcmp("xref: ", fields[OV_XREFS], 6))
+    if (!strncasecmp("xref: ", fields[OV_XREFS], 6))
 	article->xrefs = savestr(fields[OV_XREFS]+6);
     else
 	article->xrefs = savestr(fields[OV_XREFS]);
@@ -273,7 +277,7 @@ ART_NUM artnum;
 	    fld = cp;
 	    if ((cp = index(cp, '\t')) != Nullch)
 		*cp++ = '\0';
-	    if (!strnCASEcmp("xref: ", fld, 6)) {
+	    if (!strncasecmp("xref: ", fld, 6)) {
 		article->xrefs = savestr(fld+6);
 		break;
 	    }

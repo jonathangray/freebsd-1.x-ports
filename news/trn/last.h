@@ -1,4 +1,4 @@
-/* $Id: last.h,v 1.1 1993/07/19 20:07:03 nate Exp $
+/* $Id: last.h,v 1.2 1993/07/26 19:12:36 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,15 +8,15 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
 
 EXT char *lastngname INIT(Nullch);	/* last newsgroup read, from .rnlast file */
-EXT long lasttime INIT(0);	/* time last rn was started up */
+EXT time_t lasttime INIT(0);	/* time last rn was started up */
 EXT long lastactsiz INIT(0);	/* size of active file when rn last started up */
-EXT long lastnewtime INIT(0);	/* time last new group was found */
+EXT time_t lastnewtime INIT(0);	/* time last new group was found */
 EXT long lastnewsize INIT(0);	/* size of active.times file when rn last started up */
 
 void	last_init _((char*));

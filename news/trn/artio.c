@@ -1,4 +1,4 @@
-/* $Id: artio.c,v 1.1 1993/07/19 20:06:59 nate Exp $
+/* $Id: artio.c,v 1.2 1993/07/26 19:12:00 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -22,6 +22,7 @@
 #include "art.h"
 #include "bits.h"
 #include "final.h"
+#include "ngdata.h"
 #include "INTERN.h"
 #include "artio.h"
 
@@ -62,7 +63,11 @@ retry_open:
     artfp = fopen(artname,"r");
 #endif
     if (!artfp) {
+#ifdef ETIMEDOUT
 	if (errno == ETIMEDOUT)
+	    goto retry_open;
+#endif
+	if (errno == EINTR)
 	    goto retry_open;
 	uncache_article(ap,FALSE);
     } else {

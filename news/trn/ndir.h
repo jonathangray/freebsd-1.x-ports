@@ -1,4 +1,4 @@
-/* $Id: ndir.h,v 1.1 1993/07/19 20:07:03 nate Exp $
+/* $Id: ndir.h,v 1.2 1993/07/26 19:12:41 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -16,15 +16,15 @@
 #ifdef I_NDIR
 #include <ndir.h>
 #else
+#ifdef I_DIRENT
+#include <dirent.h>
+#define direct dirent
+#else
 #ifdef I_SYS_NDIR
 #include <sys/ndir.h>
 #else
 #ifdef I_SYS_DIR
 #include <sys/dir.h>
-#else
-#ifdef I_DIRENT
-#include <dirent.h>
-#define direct dirent
 #else
 
 #ifndef DEV_BSIZE

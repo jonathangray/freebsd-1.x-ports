@@ -1,5 +1,9 @@
-/* $Id: rt-select.c,v 1.1 1993/07/19 20:07:06 nate Exp $
+/* $Id: rt-select.c,v 1.2 1993/07/26 19:13:25 nate Exp $
 */
+/* The authors make no claims as to the fitness or correctness of this software
+ * for any use whatsoever, and it is provided as is. Any use of this software
+ * is at the user's own risk. 
+ */
 
 #include "EXTERN.h"
 #include "common.h"
@@ -50,6 +54,7 @@ char_int cmd;
     char *in_select;
 
     mode = 't';
+    art = lastart+1;
     sel_rereading = (cmd == 'U');
     clear_on_stop = TRUE;
     empty_ok = FALSE;
@@ -92,8 +97,18 @@ char_int cmd;
     *promptbuf = '\0';
     disp_status_line = FALSE;
     if (added_articles > 0) {
-	sprintf(promptbuf, "** %ld new article%s arrived **  ",
+	register long i = added_articles, j;
+	register ARTICLE *ap = article_ptr(lastart - i + 1);
+	for (j = 0; j < added_articles; j++, ap++) {
+	    if (ap->flags & AF_READ)
+		i--;
+	}
+	if (i == added_articles)
+	    sprintf(promptbuf, "** %ld new article%s arrived **  ",
 		(long)added_articles, added_articles == 1? nullstr : "s");
+	else
+	    sprintf(promptbuf, "** %ld of %ld new articles unread **  ",
+		i, (long)added_articles);
 	disp_status_line = TRUE;
     }
     added_articles = 0;
@@ -407,7 +422,8 @@ sel_exit:
     else
 	srchahead = 0;
 #endif
-    selected_only = (selected_count || !article_count);
+/*    selected_only = (selected_count || !article_count);*/
+    selected_only = (selected_count != 0);
     if (sel_ret != '#')
 	count_subjects(sel_ret == '+'? CS_RESELECT : CS_UNSELECT);
     clear_on_stop = FALSE;
@@ -699,13 +715,8 @@ q does nothing.\n\n\
 	}
 	set_sel_sort(*buf);
 	count_subjects(CS_NORM);
-#if 0
-	sel_last_sp = (SUBJECT*)sel_items[sel_item_index].ptr;
-	sel_last_ap = sel_page_app[sel_item_index];
-#else
 	sel_page_sp = Nullsubj;
 	sel_page_app = Null(ARTICLE**);
-#endif
 	init_pages();
 	return DS_DISPLAY;
     case 'R':
@@ -713,13 +724,8 @@ q does nothing.\n\n\
 	    sel_cleanup();
 	sel_direction *= -1;
 	count_subjects(CS_NORM);
-#if 0
-	sel_last_sp = (SUBJECT*)sel_items[sel_item_index].ptr;
-	sel_last_ap = sel_page_app[sel_item_index];
-#else
 	sel_page_sp = Nullsubj;
 	sel_page_app = Null(ARTICLE**);
-#endif
 	init_pages();
 	return DS_DISPLAY;
     case 'E':
@@ -736,7 +742,7 @@ q does nothing.\n\n\
 	if (!sel_rereading) {
 	    if (sel_mode == SM_ARTICLE) {
 		register ARTICLE *ap, **app, **limit;
-		limit = artptr_list + article_count;
+		limit = artptr_list + artptr_list_size;
 		if (ch == 'D')
 		    app = sel_page_app;
 		else
@@ -771,10 +777,6 @@ q does nothing.\n\n\
 	    count_subjects(CS_UNSELECT);
 	    if (article_count
 	     && (ch == 'J' || (ch == 'D' && !selected_count))) {
-		if (ch == 'D') {
-		    sel_page_sp = sel_next_sp;
-		    sel_page_app = sel_next_app;
-		}
 		init_pages();
 		sel_item_index = 0;
 		return DS_DISPLAY;
@@ -801,8 +803,14 @@ q does nothing.\n\n\
 	erase_eol();		/* erase the prompt */
 	if (sel_mode == SM_ARTICLE)
 	    artp = (ARTICLE*)sel_items[sel_item_index].ptr;
-	else
-	    artp = ((SUBJECT*)sel_items[sel_item_index].ptr)->articles;
+	else {
+	    register SUBJECT *sp = (SUBJECT*)sel_items[sel_item_index].ptr;
+	    if (sel_mode == SM_THREAD) {
+		while (!sp->misc)
+		    sp = sp->next;
+	    }
+	    artp = sp->articles;
+	}
 	art = article_num(artp);
 	/* This call executes the action too */
 	switch (ask_memorize(ch)) {

@@ -1,5 +1,9 @@
-/* $Id: rt-ov.h,v 1.1 1993/07/19 20:07:06 nate Exp $
+/* $Id: rt-ov.h,v 1.2 1993/07/26 19:13:20 nate Exp $
 */
+/* The authors make no claims as to the fitness or correctness of this software
+ * for any use whatsoever, and it is provided as is. Any use of this software
+ * is at the user's own risk. 
+ */
 
 bool ov_init _((void));
 bool ov_data _((ART_NUM,ART_NUM,bool_int));

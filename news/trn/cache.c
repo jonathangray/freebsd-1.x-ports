@@ -1,4 +1,4 @@
-/* $Id: cache.c,v 1.1 1993/07/19 20:07:00 nate Exp $
+/* $Id: cache.c,v 1.2 1993/07/26 19:12:11 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -49,6 +49,11 @@ int subject_cmp _((char *,int,HASHDATUM));
 void
 cache_init()
 {
+#ifdef PENDING
+# ifdef ARTSEARCH
+    init_compex(&srchcompex)
+# endif
+#endif
     ;
 }
 
@@ -225,12 +230,12 @@ register ARTICLE *ap;
 	}
 	if (!(ap->flags & AF_FROMTRUNCED)) {
 	    if (instr(ap->from,phostname,FALSE)) {
-		if (instr(ap->from,logname,TRUE))
+		if (instr(ap->from,loginName,TRUE))
 		    select_subthread(ap,AF_AUTOSELECT);
 		else {
 #ifdef SLOW_BUT_COMPLETE_POSTER_CHECKING
 		    char *reply_buf = fetchlines(article_num(ap),REPLY_LINE);
-		    if (instr(reply_buf,logname,TRUE))
+		    if (instr(reply_buf,loginName,TRUE))
 			select_subthread(ap,AF_AUTOSELECT);
 		    free(reply_buf);
 #endif
@@ -344,35 +349,47 @@ bool_int no_truncs;
 }
 
 void
-set_subj_line(ap, s, size)
+set_subj_line(ap, subj, size)
 register ARTICLE *ap;
-register char *s;	/* not yet allocated, so we can tweak it first */
+register char *subj;	/* not yet allocated, so we can tweak it first */
 register int size;
 {
     HASHDATUM data;
     SUBJECT *sp;
-    char *s2, *subj_start = get_subject_start(s);
+    char *newsubj, *subj_start = get_subject_start(subj);
+    char *t, *f;
+    int i;
 
-    if (s != subj_start) {
-	size -= subj_start - s;
+    if (subj != subj_start) {
+	size -= subj_start - subj;
 	ap->flags |= AF_HAS_RE;
     }
     if (ap->subj && strnEQ(ap->subj->str+4, subj_start, size))
 	return;
 
-    s2 = safemalloc(size + 4 + 1);
-    strcpy(s2, "Re:");
-    safecat(s2, subj_start, size+5);
+    newsubj = safemalloc(size + 4 + 1);
+    strcpy(newsubj, "Re: ");
+    for (t = newsubj + 4, f = subj_start, i = size; i--; ) {
+	if (*f == ' ' || *f == '\t') {
+	    while (i && (*++f == ' ' || *f == '\t'))
+		i--, size--;
+	    *t++ = ' ';
+	} else if (*f != '\n')
+	    *t++ = *f++;
+	else
+	    f++;
+    }
+    *t = '\0';
 
     if (ap->subj) {
 	/* This only happens when we freshen truncated subjects */
 	hashdelete(subj_hash, ap->subj->str+4, strlen(ap->subj->str+4));
 	free(ap->subj->str);
-	ap->subj->str = s2;
+	ap->subj->str = newsubj;
 	data.dat_ptr = (char*)ap->subj;
-	hashstore(subj_hash, s2 + 4, size, data);
+	hashstore(subj_hash, newsubj + 4, size, data);
     } else {
-	data = hashfetch(subj_hash, s2 + 4, size);
+	data = hashfetch(subj_hash, newsubj + 4, size);
 	if (!(sp = (SUBJECT*)data.dat_ptr)) {
 	    sp = (SUBJECT*)safemalloc(sizeof (SUBJECT));
 	    bzero((char*)sp, sizeof (SUBJECT));
@@ -382,14 +399,14 @@ register int size;
 	    else
 		first_subject = sp;
 	    last_subject = sp;
-	    sp->str = s2;
+	    sp->str = newsubj;
 	    sp->thread_link = sp;
 	    sp->flags = SF_THREAD;
 
 	    data.dat_ptr = (char*)sp;
 	    hashstorelast(data);
 	} else
-	    free(s2);
+	    free(newsubj);
 	ap->subj = sp;
     }
 }

@@ -1,5 +1,9 @@
-/* $Id: rt-util.c,v 1.1 1993/07/19 20:07:07 nate Exp $
+/* $Id: rt-util.c,v 1.2 1993/07/26 19:13:28 nate Exp $
 */
+/* The authors make no claims as to the fitness or correctness of this software
+ * for any use whatsoever, and it is provided as is. Any use of this software
+ * is at the user's own risk. 
+ */
 
 #include "EXTERN.h"
 #include "common.h"
@@ -480,7 +484,7 @@ static unsigned char casemap[256] = {
 };
 
 int
-strCASEcmp(s1, s2)
+strcasecmp(s1, s2)
 register char *s1, *s2;
 {
     do {
@@ -491,7 +495,7 @@ register char *s1, *s2;
 }
 
 int
-strnCASEcmp(s1, s2, len)
+strncasecmp(s1, s2, len)
 register char *s1, *s2;
 register int len;
 {

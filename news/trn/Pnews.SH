@@ -4,7 +4,7 @@ esac
 echo "Extracting Pnews (with variable substitutions)"
 $spitshell >Pnews <<!GROK!THIS!
 $startsh
-# $Id: Pnews.SH,v 1.1 1993/07/19 20:06:58 nate Exp $
+# $Id: Pnews.SH,v 1.2 1993/07/26 19:11:51 nate Exp $
 # 
 # This software is Copyright 1991 by Stan Barber. 
 #
@@ -27,7 +27,7 @@ export PATH || (echo "OOPS, this isn't sh.  Desperation time.  I will feed mysel
 
 # System dependencies
 
-mailer="${mailer-/bin/mail}"
+mailer="\${RNMAILER-${mailer-/bin/mail}}"
 # if you change this to something that does signatures, take out signature code
 
 case $d_portable in
@@ -69,6 +69,7 @@ state="$statedist"
 cntry="$cntrydist"
 cont="$contdist"
 
+active=${active-$lib/active}
 test=${test-test}
 sed=${sed-sed}
 echo=${echo-echo}
@@ -81,7 +82,7 @@ nidump=${nidump}
 ypmatch=${ypmatch}
 
 !GROK!THIS!
-case "$ignoreorg" in
+case "$d_ignoreorg" in
 define) $spitshell >>Pnews <<'!NO!SUBS!'
 orgname=${NEWSORG-$orgname}
 !NO!SUBS!
@@ -96,6 +97,22 @@ dotdir=${DOTDIR-${HOME-$LOGDIR}}
 tmpart=$dotdir/.article
 artcheck=$rnlib/artcheck
 speller=$rnlib/Speller
+
+tmp="${TMPDIR-/tmp}"
+newsgroups=${NEWSGROUPS-$lib/newsgroups}
+active=${NEWSACTIVE-$active}
+news_sig=${NEWSSIGNATURE-$dotdir/.news_sig}
+
+if $test ! -f $newsgroups -a -x $rnlib/getactive; then
+    newsgroups="$tmp/Pnng.$$";
+    rmlist="$newsgroups";
+    cmdlist="$rnlib/getactive newsgroups $tmp/Pnng.$$ ; ";
+fi
+if $test ! -f $active -a -x $rnlib/getactive; then
+    active="$tmp/Pnact.$$";
+    rmlist="$rmlist $active";
+    cmdlist="$cmdlist $rnlib/getactive active $tmp/Pnact.$$";
+fi
 
 if $test -f $dotdir/.pnewsexpert; then
     expertise=expert
@@ -156,8 +173,11 @@ case $headerfile in
     $cat < $headerfile  > $tmpart
     ;;
 esac
-    rescue="sleep 1; $cat $tmpart >>${HOME-$LOGDIR}/dead.article ; $echo Article appended to ${HOME-$LOGDIR}/dead.article ; exit"
-    trap "$rescue" 1
+    rescue="sleep 1; $cat $tmpart >>${HOME-$LOGDIR}/dead.article ; rm -f $rmlist ; $echo Article appended to ${HOME-$LOGDIR}/dead.article ; exit"
+    if $test "$rmlist" ; then
+	trap "rm -f $rmlist" 0
+    fi
+    trap "trap : 1; $rescue" 1
     trap "$rescue" 2
 
 $echo ""
@@ -279,7 +299,7 @@ to.*)
     ;;
 esac
 ans=""
-while $test "$ans" = "" ; do
+while $test "X$ans" = X ; do
     $echo $n "Are you absolutely sure that you want to do this? [ny] $c"
     read ans
     case $ans in
@@ -295,8 +315,13 @@ EOH
     esac
 done
 
+# run getactive in the background, if necessary
+if $test "$cmdlist"; then
+    ( eval $cmdlist ) &
+fi
+
 file=h
-while $test "$file" = h ; do
+while $test "X$file" = Xh ; do
     $echo ""
     $echo $n "Prepared file to include [none]: $c"
     read file
@@ -322,6 +347,11 @@ EOH
 done
 
 $echo ""
+
+if $test -r $news_sig; then
+    $echo "-- " >> $tmpart
+    $sed 4q $news_sig >> $tmpart
+fi
 
 while true ; do
     case $state in
@@ -353,7 +383,7 @@ EOMessage
 	    tmp=''
 	    ;;
 	esac
-	while $test "$tmp" = h ; do
+	while $test "X$tmp" = Xh ; do
 	    $echo $n "Editor [${VISUAL-${EDITOR-$defeditor}}]: $c"
 	    read tmp
 	    case $tmp in
@@ -381,8 +411,10 @@ EOH
 	;;
 	
     check)
+	# wait for possible background getactive
+	wait
 	# warn about long lines, malformed headers, misspelled newsgroups
-	$artcheck $tmpart 79 $lib/newsgroups
+	$artcheck $tmpart 79 $newsgroups $active
 	state=ask
 	;;
 
@@ -390,30 +422,30 @@ EOH
 	$echo ""
 	$echo $n "Check spelling, Send, Abort, Edit, or List? $c"
 	read ans
-	
+
 	case "$ans" in
-	a*)
+	[aA]*)
 	    state=rescue
 	    ;;
-	e*)
+	[eE]*)
 	    set $ans
 	    case $# in
 	    2)  VISUAL="$2" ;;
 	    esac
 	    state=edit
 	    ;;
-	l*)
+	[lL]*)
 	    $pager $tmpart
 	    state=ask
 	    ;;
-	s*)
-	    state=send
-	    ;;
-	c*)
+	[cC]*|[sS][pP]*)
 	    $speller $tmpart
 	    state=ask
 	    ;;
-	h*)
+	[sS]*)
+	    state=send
+	    ;;
+	[hH]*)
 	    $cat <<'EOH'
 
 Type c to check the article's spelling, s to send the article, a to abort
@@ -435,7 +467,7 @@ EOH
 		tryinews=no
 		shift
 		case "$1" in
-		*,*) set `$echo $1 | tr ',' ' '`;;
+		*,*) set `$echo $1 | $tr ',' ' '`;;
 		esac
 		for newsgroup in $*; do
 # the following screwy sed should prevent Eunice from hanging on no match
@@ -486,24 +518,29 @@ EOH
 	    fi
 	    case "$tryinews" in
 	    yes)
-		if $sed '1,/^[	 ]*$/{/^[A-Z][-A-Za-z0-9]*:[	 ]*$/d;
+		headerstrip='1,/^[	 ]*$/{/^[A-Z][-A-Za-z0-9]*:[	 ]*$/d;
 			/^X-ORIGINAL-NEWSGROUPS:.*$/d;
-			/^[Cc][Cc]:/d;}' $tmpart | $inews -h ; then
+			/^[Cc][Cc]:/d;
+			/^Distribution: world/d;}'
+		if $sed "$headerstrip" $tmpart | $inews -h ; then
 		    : null
 		else
 		    state=rescue
 		fi
 		cc=`$sed -n '1,/^[	 ]*$/{/^[Cc][Cc]:[	 ][^	 ]/p;}' $tmpart|
 		 $sed 's/^[Cc][Cc]:[	 ][	 ]*//'`
-		if $test "$cc " != " " ; then
-		    set -- $cc
+		if $test "X$cc" != X ; then
+		    set X $cc
+		    shift
 		    case "$mailer" in
 		    *recmail)
-			$echo To: $cc | $cat - $tmpart | $mailer
+			($echo To: $cc
+			 $sed "$headerstrip" $tmpart) | $mailer
 			;;
 		    *)
-			set -- `echo $cc | sed 's/,/ /g'`
-			$mailer $@ < $tmpart
+			set X `echo $cc | sed 's/,/ /g'`
+			shift
+			$sed "$headerstrip" $tmpart | $mailer $@
 			;;
 		    esac
 		fi
@@ -555,7 +592,7 @@ $spitshell >Pnews.header <<'!NO!SUBS!'
 case $# in
 0)
     ng=h
-    while $test "$ng" = h ; do
+    while $test "X$ng" = Xh ; do
 	$echo ""
 	$echo $n "Newsgroup(s): $c"
 	read ng
@@ -599,7 +636,7 @@ ddn.*)
     ;;
 esac
 
-while $test "$dist" = h ; do
+while $test "X$dist" = Xh ; do
     if $test -f $lib/distributions; then
 	$echo " "
 	$echo "Your local distribution prefixes are:"
@@ -666,7 +703,7 @@ do
   case $# in
   0)
     title=h
-    while $test "$title" = h ; do
+    while $test "X$title" = Xh ; do
 	$echo ""
 	$echo $n "Title/Subject: $c"
 	read title
@@ -715,12 +752,12 @@ case $logname in
 esac
 case ${NAME-$nametype} in
 bsd)
-	if $test "$ypmatch" != ""; then
+	if $test "X$ypmatch" != X; then
 		fullname=`$ypmatch $logname passwd 2>/dev/null | $sed -e "s/^[^:]*:[^:]*:[^:]*:[^:]*:\([^,:;]*\).*"'$'"/\1/"`
-	elif $test "$nidump" != ""; then
+	elif $test "X$nidump" != X; then
 		fullname=`$nidump passwd / | $sed -e "/^$logname:/{s/^[^:]*:[^:]*:[^:]*:[^:]*:\([^,:;]*\).*"'$'"/\1/" -e "q" -e "}" -e "d"`
 	fi
-     if $test "$fullname" = ""; then
+	if $test "X$fullname" = X; then
 		fullname=`$sed </etc/passwd -e "/^$logname:/{s/^[^:]*:[^:]*:[^:]*:[^:]*:\([^,:;]*\).*"'$'"/\1/" -e "q" -e "}" -e "d"`
 	fi
     case $fullname in
@@ -732,12 +769,12 @@ bsd)
     esac
     ;;
 usg)
-	if $test "$ypmatch" != ""; then
-		fullname=`$ypmatch $logname passwd 2>/dev/null | $sed -e "s/^[^:]*:[^:]*:[^:]*:[^:]*:\([^(:]*\).*"'$'"/\1/" -e "s/^.*-//" -e "q"`
-	fi
-     if $test "$fullname" = ""; then
-    fullname=`$sed </etc/passwd -e "/^$logname:/{s/^[^:]*:[^:]*:[^:]*:[^:]*:\([^(:]*\).*"'$'"/\1/" -e "s/^.*-//" -e "q" -e "}" -e "d"`
-	fi
+    if $test "X$ypmatch" != X; then
+	fullname=`$ypmatch $logname passwd 2>/dev/null | $sed -e "s/^[^:]*:[^:]*:[^:]*:[^:]*:\([^(:]*\).*"'$'"/\1/" -e "s/^.*-//" -e "q"`
+    fi
+    if $test "X$fullname" = X; then
+	fullname=`$sed </etc/passwd -e "/^$logname:/{s/^[^:]*:[^:]*:[^:]*:[^:]*:\([^(:]*\).*"'$'"/\1/" -e "s/^.*-//" -e "q" -e "}" -e "d"`
+    fi
     ;;
 *)
     fullname=${NAME-`$cat $dotdir/.fullname`}

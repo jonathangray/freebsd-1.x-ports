@@ -15,7 +15,7 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  * that running config.h.SH again will wipe out any changes you've made.
  * For a more permanent change edit config.sh and rerun config.h.SH.
  *
- * \$Id: config.h.SH,v 1.1 1993/07/19 20:07:00 nate Exp $
+ * \$Id: config.h.SH,v 1.2 1993/07/26 19:12:15 nate Exp $
  */
 
 /* Configuration time: $cf_time
@@ -41,8 +41,8 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
 #$d_eunice VMS		/**/
 
 /* bcmp:
- *	This symbol is maped to memcmp if the bcmp() routine is not
- *	available to compare strings.
+ *	This symbol is maped to memcmp if the memcmp() routine is
+ *	available to compare byte sequences.
  */
 #$d_bcmp bcmp(s,d,l) memcmp((s),(d),(l))	/* mapped to memcmp */
 
@@ -88,6 +88,12 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  */
 #$d_normsig NORMSIG		/**/
 
+/* vfork:
+ *	This symbol, if defined, remaps the vfork routine to fork if the
+ *	vfork() routine isn't supported here.
+ */
+#$d_novfork vfork fork	/**/
+
 /* HAS_RDCHK
  *	This symbol, if defined, indicates that the rdchk routine is available
  *	to find out if there is input pending on an IO channel.  Generally
@@ -102,11 +108,23 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  */
 #$d_rename HAS_RENAME	/**/
 
+/* HAS_SIGBLOCK:
+ *	This symbol, if defined, indicates that the sigblock routine is
+ *	available to block signal reception.
+ */
+#$d_sigblock HAS_SIGBLOCK	/**/
+
 /* HAS_SIGHOLD:
  *	This symbol, if defined, indicates that the sighold routine is
  *	available to hold signals.
  */
 #$d_sighold HAS_SIGHOLD	/**/
+
+/* HAS_STRCASECMP:
+ *	This symbol, if defined, indicates that the strcasecmp routine is
+ *	available for case-insensitive string compares.
+ */
+#$d_strcasecmp HAS_STRCASECMP	/**/
 
 /* Signal_t
  *	This symbol's value is either "void" or "int", corresponding to the
@@ -122,10 +140,11 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  */
 #$i_dirent I_DIRENT		/**/
 
-/* I_FCNTL
- *	This manifest constant tells the C program to include <fcntl.h>.
+/* I_STDLIB:
+ *	This symbol, if defined, indicates that <stdlib.h> exists and should
+ *	be included.
  */
-#$i_fcntl I_FCNTL	/**/
+#$i_stdlib I_STDLIB		/**/
 
 /* I_SYS_DIR
  *	This symbol, if defined, indicates to the C program that it should
@@ -144,6 +163,32 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  *	include <sys/ndir.h>.
  */
 #$i_sysndir I_SYS_NDIR	/**/
+
+/* I_TERMIO:
+ *	This symbol, if defined, indicates that the program should include
+ *	<termio.h> rather than <sgtty.h>.  There are also differences in
+ *	the ioctl() calls that depend on the value of this symbol.
+ */
+/* I_TERMIOS:
+ *	This symbol, if defined, indicates that the program should include
+ *	the POSIX termios.h rather than sgtty.h or termio.h.
+ *	There are also differences in the ioctl() calls that depend on the
+ *	value of this symbol.
+ */
+/* I_SGTTY:
+ *	This symbol, if defined, indicates that the program should include
+ *	<sgtty.h> rather than <termio.h>.  There are also differences in
+ *	the ioctl() calls that depend on the value of this symbol.
+ */
+#$i_termio I_TERMIO		/**/
+#$i_termios I_TERMIOS		/**/
+#$i_sgtty I_SGTTY		/**/
+
+/* I_UNISTD:
+ *	This symbol, if defined, indicates to the C program that it should
+ *	include <unistd.h>.
+ */
+#$i_unistd	I_UNISTD		/**/
 
 /* I_VFORK:
  *	This symbol, if defined, indicates to the C program that it should
@@ -264,12 +309,6 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
 #$d_xdata USE_XTHREAD  	/**/
 #$d_xdata USE_XOVER	/**/
 
-/* vfork:
- *	This symbol, if defined, remaps the vfork routine to fork if the
- *	vfork() routine isn't supported here.
- */
-#$d_novfork vfork fork	/**/
-
 /* void:
  *	This symbol is used for void functions.  On implementations which
  *	support void appropriately, its value is "void".  Otherwise, its
@@ -277,31 +316,20 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  */
 #$d_novoid void int	/**/
 
-/* HAS_SIGBLOCK:
- *	This symbol, if defined, indicates that the sigblock routine is
- *	available to block signal reception.
- */
-#$d_sigblock HAS_SIGBLOCK	/**/
-
 /* size_t:
  *	This symbol is defined as an int if no size_t definition exists.
  */
 #$d_sizet	size_t int		/**/
 
-/* index:
- *	This preprocessor symbol is defined, along with rindex, if the system
- *	uses the strchr and strrchr routines instead.
+/* HAS_STRCHR:
+ *	This symbol is defined to indicate that the strchr()/strrchr()
+ *	functions are available for string searching.
  */
-/* rindex:
- *	This preprocessor symbol is defined, along with index, if the system
- *	uses the strchr and strrchr routines instead.
- */
-#$d_strchr	index strchr	/**/
-#$d_strchr	rindex strrchr	/**/
+#$d_strchr	HAS_STRCHR	/**/
 
 /* HAS_STRFTIME:
  *	This symbol, if defined, indicates that the strftime routine is
- *	available.
+ *	available to format locale-specific times.
  */
 #$d_strftime	HAS_STRFTIME		/**/
 
@@ -327,25 +355,22 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  */
 #$i_ptem I_PTEM		/**/
 
-/* I_TERMIO:
- *	This symbol, if defined, indicates that the program should include
- *	<termio.h> rather than <sgtty.h>.  There are also differences in
- *	the ioctl() calls that depend on the value of this symbol.
+/* I_STRING:
+ *	This symbol, if defined, indicates to the C program that it should
+ *	include <string.h> (USG systems) instead of <strings.h> (BSD systems).
  */
-/* I_TERMIOS:
- *	This symbol, if defined, indicates that the program should include
- *	the POSIX termios.h rather than sgtty.h or termio.h.
- *	There are also differences in the ioctl() calls that depend on the
- *	value of this symbol.
+#$i_string I_STRING		/**/
+
+/* I_TIME
+ *	This symbol, if defined, indicates to the C program that it should
+ *	include <time.h>.
  */
-/* I_SGTTY:
- *	This symbol, if defined, indicates that the program should include
- *	<sgtty.h> rather than <termio.h>.  There are also differences in
- *	the ioctl() calls that depend on the value of this symbol.
+/* I_SYS_TIME
+ *	This symbol, if defined, indicates to the C program that it should
+ *	include <sys/time.h>.
  */
-#$i_termio I_TERMIO		/**/
-#$i_termios I_TERMIOS		/**/
-#$i_sgtty I_SGTTY		/**/
+#$i_time I_TIME		/**/
+#$i_systime I_SYS_TIME		/**/
 
 /* PASSNAMES:
  *	This symbol, if defined, indicates that full names are stored in

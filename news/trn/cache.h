@@ -1,4 +1,4 @@
-/* $Id: cache.h,v 1.1 1993/07/19 20:07:00 nate Exp $
+/* $Id: cache.h,v 1.2 1993/07/26 19:12:12 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -38,7 +38,6 @@ typedef struct rt_subj {
 #define SF_THREAD	0x0100
 #define SF_VISIT	0x0200
 #define SF_WASSELECTED  0x0400
-#define SF_AUTOSELECT	0x0800
 #define SF_SUBJTRUNCED	0x1000
 
 /* This is our article-caching structure */
@@ -94,11 +93,14 @@ typedef struct rt_art {
 
 /* These must never use their args more than once in the definition */
 #define article_num(ap)      (((ap)-article_list)+absfirst)
-#define article_ptr(artnum)  (article_list+((artnum)-absfirst))
+#define article_ptr(an)      (article_list+((an)-absfirst))
+#define find_article(an)     ((an < absfirst || an > lastart)? \
+			      Nullart : article_ptr(an))
 
 EXT ARTICLE *article_list INIT(Nullart);
 EXT ARTICLE **artptr_list INIT(0);
 EXT ARTICLE **artptr;
+EXT ART_NUM artptr_list_size INIT(0);
 
 #ifdef ARTSEARCH
 EXT ART_NUM srchahead INIT(0); 	/* are we in subject scan mode? */

@@ -1,4 +1,4 @@
-/* $Id: final.c,v 1.1 1993/07/19 20:07:02 nate Exp $
+/* $Id: final.c,v 1.2 1993/07/26 19:12:20 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -49,12 +49,6 @@ final_init()
 #endif
 #ifdef SIGWINCH
     sigset(SIGWINCH, winch_catcher);
-#endif
-
-#ifndef lint
-#ifdef SIGEMT
-    sigignore(SIGEMT);
-#endif
 #endif
 
 #ifdef DEBUG
@@ -245,10 +239,10 @@ int signo;
     	if (!panic) {
 	    if (!waiting) {
 		termlib_init();
-	    	noecho();			/* set no echo */
-	    	crmode();			/* set cbreak mode */
-	    	forceme("\f");		/* cause a refresh */
-					/* (defined only if TIOCSTI defined) */
+		noecho();			/* set no echo */
+		crmode();			/* set cbreak mode */
+		forceme("\f");			/* cause a refresh */
+						/* (defined only if TIOCSTI defined) */
 		errno = 0;			/* needed for getcmd */
 	    }
     	}

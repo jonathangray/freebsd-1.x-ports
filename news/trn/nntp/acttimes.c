@@ -1,8 +1,8 @@
-/* $Header: /a/cvs/386BSD/ports/news/trn/nntp/Attic/acttimes.c,v 1.1 1993/07/19 20:07:10 nate Exp $
+/* $Header: /a/cvs/386BSD/ports/news/trn/nntp/Attic/acttimes.c,v 1.2 1993/07/26 19:14:52 nate Exp $
 **
 ** $Log: acttimes.c,v $
-** Revision 1.1  1993/07/19 20:07:10  nate
-** Initial revision
+** Revision 1.2  1993/07/26 19:14:52  nate
+** Updated trn3.0 to trn3.1
 **
 */
 

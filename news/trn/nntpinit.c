@@ -1,4 +1,4 @@
-/* $Id: nntpinit.c,v 1.1 1993/07/19 20:07:05 nate Exp $
+/* $Id: nntpinit.c,v 1.2 1993/07/26 19:13:03 nate Exp $
 */
 /* This software is Copyright 1992 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -88,13 +88,14 @@ char *server;
     /* Now get the server's signon message */
     nntp_check(FALSE);
 
-    /* Send a MODE READER command in case we're talking to innd.
-    ** If understood, use that reply. */
-    nntp_command("MODE READER");
-    if (nntp_gets(line2, sizeof line2) < 0)
-	return -1;
-    if (atoi(line2) != NNTP_BAD_COMMAND_VAL)
-	strcpy(ser_line, line2);
+    if (*ser_line == NNTP_CLASS_OK) {
+	/* Send a MODE READER command in case we're talking to innd.
+	** If understood, use that reply. */
+	nntp_command("MODE READER");
+	nntp_gets(line2, sizeof line2);
+	if (atoi(line2) != NNTP_BAD_COMMAND_VAL)
+	    strcpy(ser_line, line2);
+    }
     return atoi(ser_line);
 }
 

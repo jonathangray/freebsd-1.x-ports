@@ -1,5 +1,5 @@
-.\" $Id: trn.1,v 1.1 1993/07/19 20:07:08 nate Exp $
-.\" 
+.\" $Id: trn.1,v 1.2 1993/07/26 19:13:46 nate Exp $
+.\"
 .\" This software is Copyright 1991 by Stan Barber. 
 .\"
 .\" Permission is hereby granted to copy, reproduce, redistribute or otherwise
@@ -8,10 +8,10 @@
 .\" sold, rented, traded or otherwise marketed, and this copyright notice is
 .\" included prominently in any copy made. 
 .\"
-.\" The author make no claims as to the fitness or correctness of this software
+.\" The authors make no claims as to the fitness or correctness of this software
 .\" for any use whatsoever, and it is provided as is. Any use of this software
 .\" is at the user's own risk. 
-.\" 
+.\"
 .de Sh
 .br
 .ne 5
@@ -71,9 +71,10 @@ even lets you see at a glance when an article has replies \*(-- a good
 thing to check before posting.
 In addition,
 .I trn
-has an thread selector that allows you to quickly browse through a
+has a thread selector that allows you to quickly browse through a
 list of subjects and choose the ones you find interesting.
-This thread selector can be sorted by in a variety of orders and switched
+This thread selector sorts articles according to various criteria
+and can be switched
 into various display modes that allows you to pick all the subjects
 separately (threads can have multiple subjects) or even pick individual
 articles.
@@ -307,6 +308,7 @@ Abandon the changes made to the current newsgroup since
 was started.
 Useful when you accidentally mark a group as read.
 .Ip "o {pattern}" 8
+.Ip "O {pattern}" 8
 Only display those newsgroups whose name matches
 .IR pattern .
 Patterns are the same as for the \*(L'/\*(R' command.
@@ -319,6 +321,7 @@ Since
 .I pattern
 is optional, \*(L'o\*(R' by itself will remove the
 restriction.
+Using \*(L'O\*(R' will omit empty groups from the cycle.
 .Ip "a pattern" 8
 Add unsubscribed newsgroups matching
 .IR pattern .
@@ -526,7 +529,7 @@ A detailed description of memorized commands is found in the Article Selection
 section.
 .Ip ":command" 8
 Apply a command to all selected articles.
-If nothing is selected, apply the command to all the unread articles.
+If nothing is selected, nothing is done.
 .Sp
 Applicable commands include \*(L'+\*(R'/\*(L'-\*(R' (select/deselect
 an article), \*(L"++\*(R"/\*(L"--\*(R" (select/deselect a thread),
@@ -724,6 +727,22 @@ is omitted, the previous pattern is assumed.
 Scan forward for article containing
 .I pattern
 in the from line.
+If you are using thread files the article data you are matching against
+MAY contain only the real name of the user.
+If you want to always match the full from line, see the following
+header-matching option that will read in the full from-line data if
+it is not already available.
+.Ip /pattern/Hheader 8
+Scan forward for article containing
+.I pattern
+in the indicated
+.Ip header .
+Because we scan the entire string up to the end of the modifiers, this
+modifier must be the last one.
+For example, \*(L"/jsmoe@somesite.com/rHfrom:m+\*(R" will mark all
+articles from \*(L"jsmoe@somesite.com\*(R" as unread and select them.
+Note that if the header line isn't one that trn recognizes in its
+header parser, you'll have to use the following full-header matching.
 .Ip /pattern/h 8
 Scan forward for article containing
 .I pattern
@@ -821,7 +840,13 @@ If either of the environment variables VISUAL or EDITOR is set, the
 specified editor will be invoked; otherwise a default editor (normally vi)
 is invoked on the KILL file.
 .Sp
-The KILL file may also contain switch-setting lines beginning with \*(L'&\*(R'.
+The KILL file may also contain switch-setting lines beginning with \*(L'&\*(R'
+(see the section on \*(L"Options\*(R") and special commands beginning
+with \*(L'*\*(R'.
+There are two such commands at the moment:  \*(L"*j\*(R" (junk all articles
+from THRU to the end of the group) and \*(L"*X\*(R" (junk all
+.I unselected
+articles from THRU to the end of the group).
 Additionally, any line beginning with \*(L'X\*(R' is executed on exit
 from the newsgroup rather than on entrance.
 This can be used to set switches back to a default value.
@@ -1344,11 +1369,13 @@ to type, but it can be a little slow about it, so it's not on by default.
 .TP 5
 .B \-h<string>
 hides (disables the printing of) all header lines beginning with
-.I string.
+.I string
+that trn recognizes.
 For instance, \-hexp will disable the printing of the \*(L"Expires:\*(R" line.
 Case is insignificant.
-If <string> is null, all header lines except Subject are hidden, and you
-may then use
+Headers unknown to trn cannot be disabled except by turning them all off
+(\-h without a string will disable all headers except the Subject)
+and then using
 .B +h
 to select those lines you want to see.
 You may wish to use the baud-rate switch modifier below to hide more lines
@@ -1538,6 +1565,11 @@ sets the unbroken-subject-line mode in the selector, which simply truncates
 subjects that are too long instead of dumping the middle portion prior to
 the last two words of the subject.
 .TP 5
+.B \-U
+tells trn to not write the .newsrc file out after visiting each group.
+While this is \*(L"unsafe\*(R" it can be faster if you have a really
+huge .newsrc.
+.TP 5
 .B \-v
 sets verification mode for commands.
 When set, the command being executed is displayed to give some feedback that
@@ -1594,6 +1626,11 @@ if just
 is specified.
 To set the default selector commands without having \*(L'+\*(R' be the
 default entry into a newsgroup, specify a high number, like 9999.
+.TP 5
+.B \-z
+sets the minimum number of minutes that must elaps before the active file
+is refetched to look for new articles.
+A value of 0 or using +z turns this off.
 .TP 5
 .B \-/
 sets SAVEDIR to \*(L"%p/%c\*(R" and SAVENAME to \*(L"%a\*(R", which means
@@ -1819,6 +1856,9 @@ single command.
 Current process number.
 .Ip %/ 8
 Last search string.
+.Ip %? 8
+A space unless the current interp string is > 79 characters, at which point
+it turns into a newline.
 .Ip %% 8
 A percent sign.
 .Ip "%{name} or %{name\-default}" 8
@@ -1884,7 +1924,7 @@ Those variables marked (%) are subject to % interpolation, and those marked
 Gives the format of the attribution line in front of the quoted article
 included by an F command.
 .Sp
-Default: In article %i %f writes:
+Default: In article %i,%?%)f <%>f> wrote:
 .Ip "AUTOSUBSCRIBE" 8
 When
 .I trn

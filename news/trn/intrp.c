@@ -1,4 +1,4 @@
-/* $Id: intrp.c,v 1.1 1993/07/19 20:07:03 nate Exp $
+/* $Id: intrp.c,v 1.2 1993/07/26 19:12:31 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -32,6 +32,7 @@
 #include "final.h"
 #include "rthread.h"
 #include "rt-select.h"
+#include "rt-util.h"
 #include "nntp.h"
 #include "INTERN.h"
 #include "intrp.h"
@@ -51,6 +52,7 @@ static char *tildedir = Nullch;
 #endif
 
 #ifdef CONDSUB
+COMPEX cond_compex;
 char *skipinterp _((char *,char *));
 #endif
 
@@ -61,6 +63,10 @@ intrp_init(tcbuf)
 char *tcbuf;
 {
     char *getlogin();
+
+#ifdef CONDSUB
+    init_compex(&cond_compex);
+#endif
     
     /* get environmental stuff */
 
@@ -94,12 +100,12 @@ char *tcbuf;
 
     /* get login name */
 
-    logname = getenv("USER");
-    if (logname == Nullch)
-	logname = getenv("LOGNAME");
+    loginName = getenv("USER");
+    if (loginName == Nullch)
+	loginName = getenv("LOGNAME");
 #ifdef GETLOGIN
-    if (logname == Nullch)
-	logname = savestr(getlogin());
+    if (loginName == Nullch)
+	loginName = savestr(getlogin());
 #endif
 
     spool = savestr(filexp(NEWSSPOOL));	/* usually /usr/spool/news */
@@ -115,9 +121,9 @@ char *tcbuf;
 	overviewdir = savestr(overviewdir);
 
 #ifdef NEWS_ADMIN
-    /* if this is the news admin than load his UID into newsuid */
+    /* if this is the news admin then load his UID into newsuid */
 
-    if ( strEQ(logname,NEWS_ADMIN) )
+    if (strEQ(loginName,NEWS_ADMIN))
 	newsuid = getuid();
 #endif
 
@@ -127,7 +133,7 @@ char *tcbuf;
     origdir = savestr(tcbuf);		/* and remember it */
 
     /* get the real name of the person (%N) */
-    /* Must be done after logname is read in because BERKNAMES uses that */
+    /* Must be done after loginName is read in because BERKNAMES uses that */
 
     strcpy(tcbuf,getrealname((long)getuid()));
     realname = savestr(tcbuf);
@@ -149,6 +155,7 @@ char *tcbuf;
 	if (buf[strlen(buf)-1] == '\n')
 	    buf[strlen(buf)-1] = 0;
 	fclose(tmpfp);
+	phostname = savestr(buf);
     }
     else {
 #ifdef HAS_GETHOSTNAME
@@ -249,9 +256,9 @@ register char *s;
 		    struct passwd *getpwnam _((char*));
 #endif
 		    struct passwd *pwd = getpwnam(tildename);
-		    if ( pwd == NULL){
+		    if (pwd == NULL) {
 			printf("%s is an unknown user. Using default.\n",tildename) FLUSH;
-			return(Nullch);
+			return Nullch;
 		    }
 		    sprintf(scrbuf,"%s%s",pwd->pw_dir,s);
 		    tildedir = savestr(pwd->pw_dir);
@@ -422,6 +429,8 @@ char *stoppers;
     char *follow_buf = Nullch;
     char *dist_buf = Nullch;
     char *line_buf = Nullch;
+    char *line_split = Nullch;
+    char *orig_dest = dest;
     register char *s, *h;
     register int i;
     char scrbuf[512];
@@ -429,6 +438,8 @@ char *stoppers;
     bool upper = FALSE;
     bool lastcomp = FALSE;
     bool re_quote = FALSE;
+    bool address_parse = FALSE;
+    bool comment_parse = FALSE;
     bool proc_sprintf = FALSE;
     int metabit = 0;
 
@@ -441,6 +452,8 @@ char *stoppers;
 	    upper = FALSE;
 	    lastcomp = FALSE;
 	    re_quote = FALSE;
+	    address_parse = FALSE;
+	    comment_parse = FALSE;
 	    proc_sprintf = FALSE;
 	    for (s=Nullch; !s; ) {
 		switch (*++pattern) {
@@ -452,6 +465,12 @@ char *stoppers;
 		    break;
 		case '\\':
 		    re_quote = TRUE;
+		    break;
+		case '>':
+		    address_parse = TRUE;
+		    break;
+		case ')':
+		    comment_parse = TRUE;
 		    break;
 		case ':':
 		    proc_sprintf = TRUE;
@@ -467,7 +486,7 @@ char *stoppers;
 		    pattern--;
 		    break;
 		case '/':
-#ifdef ARTSRCH
+#ifdef ARTSEARCH
 		    s = scrbuf;
 		    if (!index("/?g",pattern[-2]))
 			*s++ = '/';
@@ -478,12 +497,17 @@ char *stoppers;
 			    *s++ = pattern[-2];
 			else
 			    *s++ = '/';
-			if (art_howmuch == 1)
-			    *s++ = 'h';
-			else if (art_howmuch == 2)
-			    *s++ = 'a';
 			if (art_doread)
 			    *s++ = 'r';
+			if (art_howmuch != ARTSCOPE_SUBJECT) {
+			    *s++ = scopestr[art_howmuch];
+			    if (art_howmuch == ARTSCOPE_ONEHDR)
+				safecpy(s,art_srchhdr,
+					(sizeof scrbuf) - (s-scrbuf));
+			    s = index(s,':') + 1;
+			    if (!s)
+				s = scrbuf+(sizeof scrbuf)-1;
+			}
 		    }
 		    *s = '\0';
 		    s = scrbuf;
@@ -509,11 +533,9 @@ char *stoppers;
 #ifdef CONDSUB
 		case '(': {
 		    COMPEX *oldbra_compex = bra_compex;
-		    COMPEX cond_compex;
 		    char rch;
 		    bool matched;
 		    
-		    init_compex(&cond_compex);
 		    pattern = dointerp(dest,destsize,pattern+1,"!=");
 		    rch = *pattern;
 		    if (rch == '!')
@@ -526,10 +548,11 @@ char *stoppers;
 		    if (s = compile(&cond_compex,scrbuf,TRUE,TRUE)) {
 			printf("%s: %s\n",scrbuf,s) FLUSH;
 			pattern += strlen(pattern);
+			free_compex(&cond_compex);
 			goto getout;
 		    }
 		    matched = (execute(&cond_compex,dest) != Nullch);
-		    if (cond_compex.nbra)	/* were there brackets? */
+		    if (getbracket(&cond_compex, 0)) /* were there brackets? */
 			bra_compex = &cond_compex;
 		    if (matched==(rch == '=')) {
 			pattern = dointerp(dest,destsize,pattern+1,":)");
@@ -603,6 +626,10 @@ char *stoppers;
 		    s = scrbuf;
 		    sprintf(s,"%d",perform_cnt);
 		    break;
+		case '?':
+		    s = " ";
+		    line_split = dest;
+		    break;
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9':
 #ifdef CONDSUB
@@ -655,7 +682,7 @@ char *stoppers;
 		    break;
 		case 'f':			/* from line */
 		    parseheader(art);
-		    if (htype[REPLY_LINE].ht_minpos >= 0) {
+		    if (htype[REPLY_LINE].ht_minpos >= 0 && !comment_parse) {
 						/* was there a reply line? */
 			if (!(s=reply_buf))
 			    s = reply_buf = fetchlines(art,REPLY_LINE);
@@ -697,7 +724,7 @@ char *stoppers;
 #endif
 		    break;
 		case 'L':			/* login id */
-		    s = logname;
+		    s = loginName;
 		    break;
 		case 'm':		/* current mode */
 		    s = scrbuf;
@@ -834,15 +861,7 @@ char *stoppers;
 			if (strnEQ(phostname,s,i) && s[i] == '!')
 			    s += i + 1;
 		    }
-		    if ((h=index(s,'(')) != Nullch)
-						/* strip garbage from end */
-			*(h-1) = '\0';
-		    else if ((h=index(s,'<')) != Nullch) {
-						/* or perhaps from beginning */
-			s = h+1;
-			if ((h=index(s,'>')) != Nullch)
-			    *h = '\0';
-		    }
+		    address_parse = TRUE;	/* just the good part */
 		    break;
 		case 'u':
 		    sprintf(scrbuf,"%ld",(long)toread[ng]);
@@ -935,6 +954,26 @@ char *stoppers;
 	    destsize -= i;	/* adjust the size now. */
 
 	    /* A maze of twisty little conditions, all alike... */
+	    if (address_parse || comment_parse) {
+		if (s != scrbuf) {
+		    safecpy(scrbuf,s,(sizeof scrbuf));
+		    s = scrbuf;
+		}
+		if (address_parse) {
+		    if ((h=index(s,'<')) != Nullch) { /* grab the good part */
+			s = h+1;
+			if ((h=index(s,'>')) != Nullch)
+			    *h = '\0';
+		    } else if ((h=index(s,'(')) != Nullch) {
+			while (h-- != s && *h == ' ')
+			    ;
+			h[1] = '\0';		/* or strip the comment */
+		    }
+		} else {
+		    if (!(s = extract_name(s)))
+			s = nullstr;
+		}
+	    }
 	    if (metabit) {
 		/* set meta bit while copying. */
 		i = metabit;		/* maybe get into register */
@@ -1026,6 +1065,9 @@ char *stoppers;
 	}
     }
     *dest = '\0';
+    if (line_split != Nullch)
+	if (strlen(orig_dest) > 79)
+	    *line_split = '\n';
 getout:
     if (subj_buf != Nullch)	/* return any checked out storage */
 	free(subj_buf);
@@ -1165,7 +1207,7 @@ long uid;
     s = cpytill(buf,s,'&');
     if (*s == '&') {			/* whoever thought this one up was */
 	c = buf + strlen(buf);		/* in the middle of the night */
-	strcat(c,logname);		/* before the morning after */
+	strcat(c,loginName);		/* before the morning after */
 	strcat(c,s+1);
 	if (islower(*c))
 	    *c = toupper(*c);		/* gack and double gack */

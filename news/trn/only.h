@@ -1,4 +1,4 @@
-/* $Id: only.h,v 1.1 1993/07/19 20:07:05 nate Exp $
+/* $Id: only.h,v 1.2 1993/07/26 19:13:06 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -26,6 +26,7 @@
 
 EXT int maxngtodo INIT(0);			/*  0 => no restrictions */
 					/* >0 => # of entries in ngtodo */
+EXT bool emptyOnly INIT(FALSE);
 
 void	only_init _((void));
 bool	inlist _((char*));	/* return TRUE if ngname is in command line list */

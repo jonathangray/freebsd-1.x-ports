@@ -1,5 +1,9 @@
-/* $Id: rt-page.c,v 1.1 1993/07/19 20:07:06 nate Exp $
+/* $Id: rt-page.c,v 1.2 1993/07/26 19:13:21 nate Exp $
 */
+/* The authors make no claims as to the fitness or correctness of this software
+ * for any use whatsoever, and it is provided as is. Any use of this software
+ * is at the user's own risk. 
+ */
 
 #include "EXTERN.h"
 #include "common.h"
@@ -148,11 +152,32 @@ try_again:
     if (sel_mode == SM_ARTICLE) {
 	ARTICLE *ap, **app, **limit;
 
-	sort_articles();
+	if (sel_page_app) {
+	    int desired_flags = (sel_rereading? AF_READ : 0);
+	    limit = artptr_list + artptr_list_size;
+	    for (app = sel_page_app; app < limit; app++) {
+		ap = *app;
+		if ((ap->flags & (AF_MISSING|AF_READ)) == desired_flags)
+		    break;
+	    }
+	    sort_articles();
+	    if (app == limit)
+		sel_page_app = artptr_list + artptr_list_size;
+	    else {
+		for (app = artptr_list; app < limit; app++) {
+		    if (*app == ap) {
+			sel_page_app = app;
+			break;
+		    }
+		}
+	    }
+	} else
+	    sort_articles();
+
 	while (sel_page_sp && sel_page_sp->misc == 0)
 	    sel_page_sp = sel_page_sp->next;
 	/* The artptr_list contains only unread or read articles, never both */
-	limit = artptr_list + article_count;
+	limit = artptr_list + artptr_list_size;
 	for (app = artptr_list; app < limit; app++) {
 	    ap = *app;
 	    if (sel_rereading && !(ap->flags & sel_mask))
@@ -174,11 +199,20 @@ try_again:
 	}
 	if (!sel_page_app)
 	    (void) first_page();
+	else if (sel_page_app >= limit)
+	    (void) last_page();
     } else {
 	SUBJECT *sp, *group_sp;
 	int group_arts;
 
-	sort_subjects();
+	if (sel_page_sp) {
+	    while (sel_page_sp && sel_page_sp->misc == 0)
+		sel_page_sp = sel_page_sp->next;
+	    sort_subjects();
+	    if (!sel_page_sp)
+		sel_page_sp = last_subject;
+	} else
+	    sort_subjects();
 	for (sp = first_subject; sp; sp = sp->next) {
 	    if (sel_rereading && !(sp->flags & sel_mask))
 		sp->flags |= SF_DEL;
@@ -217,6 +251,8 @@ try_again:
 	}
 	if (!sel_page_sp)
 	    (void) first_page();
+	else if (sel_page_sp == last_subject)
+	    (void) last_page();
     }
 }
 
@@ -228,7 +264,7 @@ first_page()
     if (sel_mode == SM_ARTICLE) {
 	ARTICLE **app, **limit;
 
-	limit = artptr_list + article_count;
+	limit = artptr_list + artptr_list_size;
 	for (app = artptr_list; app < limit; app++) {
 	    if ((*app)->flags & AF_INCLUDED) {
 		if (sel_page_app != app) {
@@ -261,7 +297,7 @@ last_page()
 
     if (sel_mode == SM_ARTICLE) {
 	ARTICLE **app = sel_page_app;
-	sel_page_app = artptr_list + article_count;
+	sel_page_app = artptr_list + artptr_list_size;
 	if (!prev_page())
 	    sel_page_app = app;
 	else if (app != sel_page_app)
@@ -281,7 +317,7 @@ bool
 next_page()
 {
     if (sel_mode == SM_ARTICLE) {
-	if (sel_next_app < artptr_list + article_count) {
+	if (sel_next_app < artptr_list + artptr_list_size) {
 	    sel_page_app = sel_next_app;
 	    sel_prior_arts += sel_page_arts;
 	    return TRUE;
@@ -403,7 +439,7 @@ try_again:
     else if (sel_mode == SM_ARTICLE) {
 	ARTICLE *ap, **app, **limit;
 
-	limit = artptr_list + article_count;
+	limit = artptr_list + artptr_list_size;
 	app = sel_page_app;
 	do {
 	    ap = *app;

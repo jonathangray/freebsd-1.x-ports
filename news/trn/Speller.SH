@@ -4,7 +4,7 @@ esac
 echo "Extracting Speller (with variable substitutions)"
 $spitshell >Speller <<!GROK!THIS!
 $startsh
-# $Id: Speller.SH,v 1.1 1993/07/19 20:06:59 nate Exp $
+# $Id: Speller.SH,v 1.2 1993/07/26 19:11:54 nate Exp $
 #	Speller - a script to disassemble a posting; use ispell to spell-
 #	check the body along with the Subject, Keywords, and Summary lines;
 #	and put it all back together again.
@@ -14,12 +14,11 @@ $startsh
 
 export PATH || (echo "OOPS, this isn't sh.  Desperation time.  I will feed myself to sh."; sh \$0; kill \$\$)
 
-# temporary, or is it?
-tmpdir=/tmp
+tmpdir="${TMPDIR-/tmp}"
 # what pager you use--if you have kernal paging use cat
 pager="\${PAGER-$pager}"
 # either the ispell program or "none"
-ispell=$ispell_path
+ispell=$ispell_prg
 ispell_options=$ispell_options
 test=${test-test}
 sed=${sed-sed}
@@ -129,7 +128,7 @@ while $test "$1" != ""; do
     # the guts of the article..
 
     if $test "$ispell " = "none "; then
-	($echo ---- mispelled words --------------------------------------
+	($echo ---- misspelled words -------------------------------------
 	 spell $mine | fmt
 	 $echo -----------------------------------------------------------
 	) | $pager

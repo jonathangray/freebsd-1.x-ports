@@ -4,7 +4,7 @@ esac
 echo "Extracting mbox.saver (with variable substitutions)"
 $spitshell >mbox.saver <<!GROK!THIS!
 $startsh
-# $Id: mbox.saver.SH,v 1.1 1993/07/19 20:07:03 nate Exp $
+# $Id: mbox.saver.SH,v 1.2 1993/07/26 19:12:39 nate Exp $
 # 
 # This software is Copyright 1991 by Stan Barber. 
 #

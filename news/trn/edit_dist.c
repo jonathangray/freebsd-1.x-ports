@@ -1,3 +1,8 @@
+/* The authors make no claims as to the fitness or correctness of this software
+ * for any use whatsoever, and it is provided as is. Any use of this software
+ * is at the user's own risk. 
+ */
+
 #include "EXTERN.h"
 #include "common.h"		/* Declare MEM_SIZE */
 #include "util.h"		/* Declare safemalloc() */

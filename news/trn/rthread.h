@@ -1,5 +1,9 @@
-/* $Id: rthread.h,v 1.1 1993/07/19 20:07:08 nate Exp $
+/* $Id: rthread.h,v 1.2 1993/07/26 19:13:34 nate Exp $
 */
+/* The authors make no claims as to the fitness or correctness of this software
+ * for any use whatsoever, and it is provided as is. Any use of this software
+ * is at the user's own risk. 
+ */
 
 EXT ART_NUM article_count INIT(0);
 EXT int subject_count INIT(0);
@@ -13,7 +17,6 @@ void thread_grow _((void));
 void thread_close _((void));
 
 void top_article _((void));
-ARTICLE *find_article _((ART_NUM));
 ARTICLE *first_art _((SUBJECT*));
 ARTICLE *last_art _((SUBJECT*));
 ARTICLE *bump_art _((ARTICLE*));

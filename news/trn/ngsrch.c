@@ -1,4 +1,4 @@
-/* $Id: ngsrch.c,v 1.1 1993/07/19 20:07:04 nate Exp $
+/* $Id: ngsrch.c,v 1.2 1993/07/26 19:12:52 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -25,16 +25,16 @@
 #include "INTERN.h"
 #include "ngsrch.h"
 
-#ifdef NGSORONLY
-    COMPEX ngcompex;
+#ifdef NGSEARCH
+COMPEX ngcompex;
 #endif
 
 void
 ngsrch_init()
 {
-#ifdef ZEROGLOB
-    init_compex(&ngcompex);
-#endif	/* ZEROGLOB */
+#ifdef NGSEARCH
+    init_compex(&ngcompex)
+#endif
     ;
 }
 
@@ -109,7 +109,7 @@ ng_wanted()
 {
     return execute(&ngcompex,rcline[ng]) != Nullch;
 }
-#endif
+#endif /* NGSEARCH */
 
 #ifdef NGSORONLY
 char *
@@ -123,10 +123,10 @@ bool_int fold;
     register char *s = pattern, *d = ng_pattern;
 
     if (!*s) {
-	if(compex->expbuf)
-	    return Nullch;			/* reuse old pattern */
-	else
+	if (compile(compex, "", RE, fold))
 	    return "No previous search pattern";
+	else
+	    return Nullch;			/* reuse old pattern */
     }
     for (; *s; s++) {
 	if (*s == '.') {

@@ -1,5 +1,9 @@
-/* $Id: rt-select.h,v 1.1 1993/07/19 20:07:07 nate Exp $
+/* $Id: rt-select.h,v 1.2 1993/07/26 19:13:27 nate Exp $
 */
+/* The authors make no claims as to the fitness or correctness of this software
+ * for any use whatsoever, and it is provided as is. Any use of this software
+ * is at the user's own risk. 
+ */
 
 #define MAX_SEL 64
 

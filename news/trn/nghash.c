@@ -1,7 +1,6 @@
-/* $Id: nghash.c,v 1.1 1993/07/19 20:07:04 nate Exp $
+/* $Id: nghash.c,v 1.2 1993/07/26 19:12:51 nate Exp $
  */
-/*
- * This software is Copyright 1991 by Stan Barber.
+/* This software is Copyright 1991 by Stan Barber.
  *
  * Permission is hereby granted to copy, reproduce, redistribute or otherwise
  * use this software as long as: there is no monetary profit gained
@@ -9,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made.
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk.
  */
@@ -32,23 +31,54 @@ static HASHTABLE *acthash;
 static char *actfile;
 
 void
-ngdatansrv_init()		/* non-NNTP initialisation */
+ngdatahash_init()
 {
     register long offset;
     char *cp = filexp(ACTIVE);
     struct stat actstat;
 
+#ifdef USE_NNTP
+    nntp_command("LIST");	/* tell server we want the active file */
+    if (nntp_check(TRUE) != NNTP_CLASS_OK) { /* and then see if that's ok */
+	printf("Can't get active file from server: \n%s\n", ser_line);
+	finalize(1);
+    }
+    time(&lastactfetch);
+
+    strcpy(active_name, cp);
+    actfp = fopen(active_name, "w+");	/* and get ready */
+    if (actfp == Nullfp) {
+	printf(cantopen,active_name) FLUSH;
+	finalize(1);
+    }
+
+    while (1) {
+	nntp_gets(ser_line, sizeof ser_line);
+	if (ser_line[0] == '.')		/* while there's another line */
+	    break;			/* get it and write it to */
+	fputs(ser_line, actfp);
+	putc('\n', actfp);
+    }
+
+    if (ferror(actfp)) {
+	printf("Error writing to active file %s.\n", active_name) FLUSH;
+	finalize(1);
+    }
+    fseek(actfp,0L,0);			/* rewind file */
+
+#else /* !USE_NNTP */
     actfp = fopen(cp, "r");
     if (actfp == Nullfp) {
 	printf(cantopen, cp) FLUSH;
 	finalize(1);
     }
+#endif
 
     /* rn was being a slug about rereading the active file over and
      * over; try using a really big buffer to keep it in core. */
     (void) fstat(fileno(actfp), &actstat);
     actfile = safemalloc(actstat.st_size + 1);
-    rewind(actfp);
+
     /*
      * NOTE: this won't work on machines with ints too small to hold
      * the size of the active file.
@@ -57,7 +87,6 @@ ngdatansrv_init()		/* non-NNTP initialisation */
 	fprintf(stderr, "active file not read\n");
 	actfile[0] = '\0';
     }
-    rewind(actfp);
     actfile[actstat.st_size] = '\0';
 
     acthash = hashcreate((int)(actstat.st_size/40), (int (*)())NULL);

@@ -1,4 +1,4 @@
-/* $Id: init.c,v 1.1 1993/07/19 20:07:03 nate Exp $
+/* $Id: init.c,v 1.2 1993/07/26 19:12:29 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -53,7 +53,6 @@ char *argv[];
 {
     char *tcbuf;
     register bool foundany = FALSE;
-    long time();
 #ifdef NOLINEBUF
     static char std_out_buf[BUFSIZ];	/* must be static or malloced */
 
@@ -71,6 +70,10 @@ char *argv[];
 					/* ospeed is set for baud-rate */
 					/* switches.  Actually terminal */
 					/* mode setting is in term_set() */
+
+    /* init syntax etc. for searching (must also precede sw_init()) */
+
+    search_init();
 
     /* we have to know rnlib to look up global switches in %X/INIT */
 
@@ -158,7 +161,6 @@ char *argv[];
     rcln_init();
     respond_init();
     rn_init();
-    search_init();
     decode_init();
     thread_init();
     util_init();
@@ -188,10 +190,6 @@ char *argv[];
     return foundany;
 }
 
-#ifndef SIGEMT
-#define SIGEMT 0
-#endif
-
 /* make sure there is no rn out there already */
 
 void
@@ -215,9 +213,7 @@ lock_check()
 #ifdef TERSE
 		printf("Trn left running, #%d.\n", processnum) FLUSH;
 #endif
-	    if (kill(processnum, SIGEMT)) {
-				    /* does process not exist? */
-				    /* (rn ignores SIGEMT) */
+	    if (kill(processnum, 0)) {    /* does process not exist? */
 		sleep(2);
 #ifdef VERBOSE
 		IF(verbose)

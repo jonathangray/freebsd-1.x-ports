@@ -1,4 +1,4 @@
-/* $Id: addng.c,v 1.1 1993/07/19 20:06:59 nate Exp $
+/* $Id: addng.c,v 1.2 1993/07/26 19:11:55 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -44,9 +44,6 @@ bool_int checkinlist;
     char *tmpname;
     register char *s, *status;
     register NG_NUM ngnum;
-#ifndef ACTIVE_TIMES
-    long birthof();
-#endif
 
     tmpname = filexp(RNEWNAME);
     tmpfp = fopen(tmpname,"w+");
@@ -174,7 +171,7 @@ bool
 find_new_groups()
 {
     register char *s;
-    long lastone;
+    time_t lastone;
     NG_NUM oldnext = nextrcline;	/* remember # lines in newsrc */
 
     fstat(fileno(actfp),&filestat);	/* find active file size */
@@ -248,7 +245,7 @@ bugout:
 
 /* return creation time of newsgroup */
 
-long
+time_t
 birthof(ngnam,ngsize)
 char *ngnam;
 ART_NUM ngsize;
@@ -256,11 +253,11 @@ ART_NUM ngsize;
 #ifdef USE_NNTP		/* ngsize not used */
     long tot;
 
-    if (!nntp_group(ngnam))
+    if (!nntp_group(ngnam,0))
 	return 0;	/* not a real group */
     (void) sscanf(ser_line,"%*d%ld",&tot);
     if (tot > 0)
-	return time(Null(long *));
+	return time(Null(time_t*));
     return 0;
 
 #else /* !USE_NNTP */
@@ -268,7 +265,7 @@ ART_NUM ngsize;
 
     sprintf(tst, ngsize ? "%s/%s/1" : "%s/%s" ,spool,getngdir(ngnam));
     if (stat(tst,&filestat) < 0)
-	return (ngsize ? 0L : time(Null(long *)));
+	return (ngsize ? 0L : time(Null(time_t*)));
     /* not there, assume something good */
     return filestat.st_mtime;
 

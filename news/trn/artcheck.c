@@ -1,14 +1,19 @@
-/* $Id: artcheck.c,v 1.1 1993/07/19 20:06:59 nate Exp $
+/* $Id: artcheck.c,v 1.2 1993/07/26 19:11:59 nate Exp $
 */
+/* The authors make no claims as to the fitness or correctness of this software
+ * for any use whatsoever, and it is provided as is. Any use of this software
+ * is at the user's own risk. 
+ */
 
 /* A program to check an article's validity and print warnings if problems
 ** are found.
 **
-** Usage: artcheck <article> <maxLineLen> <newsgroupsFile>
+** Usage: artcheck <article> <maxLineLen> <newsgroupsFile> <activeFile>
 */
 
 #include "EXTERN.h"
 #include "common.h"
+#include "config.h"
 
 #define MAXNGS 100
 
@@ -17,16 +22,17 @@ main(argc, argv)
 int argc;
 char *argv[];
 {
-    FILE *fp, *fp2;
+    FILE *fp, *fp_active = NULL, *fp_ng = NULL;
     char buff[LBUFLEN], *cp, *cp2;
     char *ngptrs[MAXNGS];
     int nglens[MAXNGS];
-    int i, col, max_col_len, line_num = 0, ngcnt = 0;
+    int foundactive[MAXNGS];
+    int i, col, max_col_len, line_num = 0, ngcnt = 0, ngleft;
     int found_newsgroups = 0;
 
-    if (argc != 4 || !(max_col_len = atoi(argv[2]))) {
+    if (argc != 5 || !(max_col_len = atoi(argv[2]))) {
 	fprintf(stderr, "\
-Usage: artcheck <article> <maxLineLen> <newsgroupsFile>\n");
+Usage: artcheck <article> <maxLineLen> <newsgroupsFile> <activeFile>\n");
 	exit(1);
     }
 
@@ -48,7 +54,7 @@ Usage: artcheck <article> <maxLineLen> <newsgroupsFile>\n");
 		   line_num, buff);
 	    break;
 	}
-	if (cp[1] != ' ') {
+	if (cp[1] != ' ' && cp[1] != '\0') {
 	    printf("\n\
 ERROR: header on line %d does not have a space after the colon:\n%s\n",
 		   line_num, buff);
@@ -71,6 +77,7 @@ Use a comma (,) to separate multiple newsgroup names.\n");
 		    *cp2++ = '\0';
 		if (ngcnt < MAXNGS) {
 		    nglens[ngcnt] = strlen(cp);
+		    foundactive[ngcnt] = 0;
 		    ngptrs[ngcnt] = malloc(nglens[ngcnt]+1);
 		    if (!ngptrs[ngcnt]) {
 			fprintf(stderr,"Out of memory.\n");
@@ -111,25 +118,68 @@ Warning: posting exceeds %d columns.  Line %d is the first long one:\n%s\n",
 	}
     }
     if (ngcnt) {
+	struct stat st;
+	if (stat(argv[3], &st) != -1 && st.st_size > 0)
+	    fp_ng = fopen(argv[3], "r");
+	if (stat(argv[4], &st) != -1 && st.st_size > 0)
+	    fp_active = fopen(argv[4], "r");
+    }
+    if (ngcnt && (fp_ng != NULL || fp_active != NULL)) {
 	/* Print a note about each newsgroup */
 	printf("\nYour article's newsgroup%s:\n", ngcnt == 1? "" : "s");
-	if ((fp2 = fopen(argv[3], "r")) != NULL) {
-	    while (fgets(buff, LBUFLEN, fp2)) {
+	if (fp_active == NULL) {
+	    for (i = 0; i < ngcnt; i++) {
+		foundactive[i] = 1;
+	    }
+	} else {
+	    ngleft = ngcnt;
+	    while (fgets(buff, LBUFLEN, fp_active)) {
+		if (!ngleft)
+		    break;
 		for (i = 0; i < ngcnt; i++) {
-		    if (ngptrs[i]) {
+		    if (!foundactive[i]) {
 			if ((buff[nglens[i]] == '\t' || buff[nglens[i]] == ' ')
 			  && strnEQ(ngptrs[i], buff, nglens[i])) {
-			    printf("%s", buff);
-			    free(ngptrs[i]);
-			    ngptrs[i] = 0;
+			    foundactive[i] = 1;
+			    ngleft--;
 			}
 		    }
 		}
 	    }
 	}
+	fclose(fp_active);
+	if (fp_ng != NULL) {
+	    ngleft = ngcnt;
+	    while (fgets(buff, LBUFLEN, fp_ng)) {
+		if (!ngleft)
+		    break;
+		for (i = 0; i < ngcnt; i++) {
+		    if (foundactive[i] && ngptrs[i]) {
+			if ((buff[nglens[i]] == '\t' || buff[nglens[i]] == ' ')
+			  && strnEQ(ngptrs[i], buff, nglens[i])) {
+			    cp = &buff[nglens[i]];
+			    *cp++ = '\0';
+			    while (*cp == ' ' || *cp == '\t')
+				cp++;
+			    if (cp[0] == '?' && cp[1] == '?')
+				cp = "[no description available]\n";
+			    printf("%-23s %s", buff, cp);
+			    free(ngptrs[i]);
+			    ngptrs[i] = 0;
+			    ngleft--;
+			}
+		    }
+		}
+	    }
+	}
+	fclose(fp_ng);
 	for (i = 0; i < ngcnt; i++) {
-	    if (ngptrs[i]) {
-		printf("%s\t[no description available]\n", ngptrs[i]);
+	    if (!foundactive[i]) {
+		printf("%-23s ** invalid news group -- check spelling **\n",
+		   ngptrs[i]);
+		free(ngptrs[i]);
+	    } else if (ngptrs[i]) {
+		printf("%-23s [no description available]\n", ngptrs[i]);
 		free(ngptrs[i]);
 	    }
 	}

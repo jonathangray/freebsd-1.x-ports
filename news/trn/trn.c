@@ -27,13 +27,13 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
 
 #include "patchlevel.h"
-static char rnid[] = "@(#)$Id: trn.c,v 1.1 1993/07/19 20:07:09 nate Exp $";
+static char rnid[] = "@(#)$Id: trn.c,v 1.2 1993/07/26 19:13:48 nate Exp $";
 static char patchlevel[] = PATCHLEVEL;
 
 #include "INTERN.h"
@@ -180,7 +180,7 @@ newsgroup use the g<newsgroup> command.\n\
 			    set_ngname(rcline[ng]);
 			}
 		    }
-		    if (toread[ng] < (maxngtodo||special ? TR_NONE : TR_ONE)
+		    if (toread[ng] < (emptyOnly || special ? TR_NONE : TR_ONE)
 		     || !shoe_fits) {		/* unwanted newsgroup? */
 			ng += direction;	/* then skip it */
 			if (ng < 0) {
@@ -200,7 +200,8 @@ newsgroup use the g<newsgroup> command.\n\
 		unflush_output();	/* disable any ^O in effect */
 		if (ng >= nextrcline) {
 #ifdef USE_NNTP
-		    if (time(Null(time_t*)) - lastactfetch > MINFETCHTIME) {
+		    if (actFetchTime
+		     && time(Null(time_t*)) - lastactfetch > actFetchTime) {
 			fclose(actfp);
 			ngdata_init();	/* re-grab the active file */
 		    }
@@ -349,11 +350,13 @@ newsgroup use the g<newsgroup> command.\n\
 		    if (!*s && *buf == 'm' && ngname && ng < nextrcline)
 			strcpy(s,ngname);
 #endif
-		    if (isalnum(*s)) {
+		    {
 		        char *_s;
 			for (_s=s; isdigit(*_s); _s++)
 			    ;
-		        if (*_s && !isspace(*_s))
+			if (isspace(*_s))
+			    *_s = '\0';
+		        if (*_s)
 			    /* found non-digit before hitting end */
 			    set_ngname(s);
 			else {
@@ -367,9 +370,6 @@ newsgroup use the g<newsgroup> command.\n\
 				goto reask_newsgroup;
 			    }
 			}
-		    } else {
-			printf("\nPlease specify a newsgroup.\n") FLUSH;
-			goto reask_newsgroup;
 		    }
 		    /* try to find newsgroup */
 #ifdef RELOCATE
@@ -475,6 +475,7 @@ reask_abandon:
 		    /* FALL THROUGH */
 #endif
 		case 'o':
+		case 'O':
 #ifdef ONLY
 		{
 #ifdef FINDNEWNG
@@ -495,6 +496,7 @@ reask_abandon:
 			if (doscan && maxngtodo)
 			    scanactive();
 #endif
+			emptyOnly = (*buf == 'o' && maxngtodo);
 		    }
 		    ng = 0;		/* simulate ^ */
 		    retry = FALSE;

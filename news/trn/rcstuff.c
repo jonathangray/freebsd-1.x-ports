@@ -1,4 +1,4 @@
-/* $Id: rcstuff.c,v 1.1 1993/07/19 20:07:05 nate Exp $
+/* $Id: rcstuff.c,v 1.2 1993/07/26 19:13:12 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -316,7 +316,7 @@ int flags;
 	    grow_rc_arrays(maxrcline + 25);
 #ifdef USE_NNTP
 	softptr[ng] = 0;
-	if (!nntp_group(ngname))
+	if (!nntp_group(ngname,ng))
 #else /* !USE_NNTP */
 	if ((softptr[ng] = findact(buf,ngname,strlen(ngname),0L)) < 0)
 #endif /* !USE_NNTP */
@@ -927,7 +927,7 @@ newsrc_check()
     }
     else {
 	UNLINK(rcbname);		/* unlink backup file name */
-	link(rcname,rcbname);		/* and backup current name */
+	safelink(rcname,rcbname);	/* and backup current name */
     }
 }
 
@@ -1009,7 +1009,7 @@ write_rc()
 #ifdef HAS_RENAME
     rename(rctname,rcname);
 #else
-    link(rctname,rcname);
+    safelink(rctname,rcname);
     UNLINK(rctname);
 #endif
 
@@ -1034,9 +1034,9 @@ get_old_rc()
     rename(rcname,rctname);
     rename(rcbname,rcname);
 #else
-    link(rcname,rctname);
+    safelink(rcname,rctname);
     UNLINK(rcname);
-    link(rcbname,rcname);
+    safelink(rcbname,rcname);
     UNLINK(rcbname);
 #endif
 }

@@ -2,6 +2,11 @@
 /* Based on ship.c -- Not copyrighted 1991 Mark Adler. */
 /* Modified by Wayne Davison, but still not copyrighted. */
 
+/* The authors make no claims as to the fitness or correctness of this software
+ * for any use whatsoever, and it is provided as is. Any use of this software
+ * is at the user's own risk. 
+ */
+
 #include "EXTERN.h"
 #include "common.h"
 #include "respond.h"

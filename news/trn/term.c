@@ -1,4 +1,4 @@
-/* $Id: term.c,v 1.1 1993/07/19 20:07:08 nate Exp $
+/* $Id: term.c,v 1.2 1993/07/26 19:13:41 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -82,7 +82,9 @@ term_init()
     outspeed = cfgetospeed(&_tty);	/* for tputs() (output) */
     ERASECH = _tty.c_cc[VERASE];	/* for finish_command() */
     KILLCH = _tty.c_cc[VKILL];		/* for finish_command() */
-/*    _tty.c_oflag &= ~OXTABS;		/* turn off kernel tabbing-done in rn */
+#if 0
+    _tty.c_oflag &= ~OXTABS;	/* turn off kernel tabbing-done in rn */
+#endif
 # else /* !I_TERMIOS */
     outspeed = _tty.sg_ospeed;		/* for tputs() */
     ERASECH = _tty.sg_erase;		/* for finish_command() */
@@ -190,7 +192,8 @@ char *tcbuf;		/* temp area for "uncompiled" termcap entry */
     CD = Tgetstr("cd");			/* clear to end of display */
     if (!*CE || !*CD || !can_home)	/* can we CE, CD, and home? */
 	can_home_clear = FALSE;		/*  no, so disable use of clear eol */
-    if (!*CE) CE = CD;
+    if (!*CE)
+	CE = CD;
 #endif /* CLEAREOL */
     upcost = strlen(UP);
     SO = Tgetstr("so");			/* begin standout */
@@ -237,9 +240,11 @@ char *tcbuf;		/* temp area for "uncompiled" termcap entry */
 	    CR = "\r";
     }
 #ifdef TIOCGWINSZ
-	if (ioctl(1, TIOCGWINSZ, &winsize)>=0) {
-		if (winsize.ws_row>0) LINES=winsize.ws_row;
-		if (winsize.ws_col>0) COLS=winsize.ws_col;
+	if (ioctl(1, TIOCGWINSZ, &winsize) >= 0) {
+		if (winsize.ws_row > 0)
+		    LINES = winsize.ws_row;
+		if (winsize.ws_col > 0)
+		    COLS = winsize.ws_col;
 	}
 #endif
 #else
@@ -264,13 +269,13 @@ char *def;	/* definition */
      * (This happens on the local xterm definitions.)
      * Try to recognize and adjust for this case.
      */
-    if ((seq[0]==(char)27) && (seq[1]=='[') && seq[2]) {
+    if (seq[0] == '\033' && seq[1] == '[' && seq[2]) {
 	char lbuf[LBUFLEN];	/* copy of possibly non-writable string */
 	strcpy(lbuf,seq);
 	lbuf[1] = 'O';
 	mac_line(def,lbuf,0);
     }
-    if ((seq[0]==(char)27) && (seq[1]=='O') && seq[2]) {
+    if (seq[0] == '\033' && seq[1] == 'O' && seq[2]) {
 	char lbuf[LBUFLEN];	/* copy of possibly non-writable string */
 	strcpy(lbuf,seq);
 	lbuf[1] = '[';
@@ -1165,14 +1170,14 @@ home_cursor()
 
     if (!*HO) {			/* no home sequence? */
 	if (!*CM) {		/* no cursor motion either? */
-	    fputs ("\n\n\n", stdout);
+	    fputs("\n\n\n", stdout);
 	    return;		/* forget it. */
 	}
-	tputs (tgoto (CM, 0, 0), 1, putchr);	/* go to home via CM */
+	tputs(tgoto(CM, 0, 0), 1, putchr);	/* go to home via CM */
 	return;
     }
     else {			/* we have home sequence */
-	tputs (HO, 1, putchr);	/* home via HO */
+	tputs(HO, 1, putchr);	/* home via HO */
     }
 }
 
@@ -1214,7 +1219,7 @@ void
 line_col_calcs()
 {
      if (LINES > 0) {			/* is this a crt? */
-	  if ((!initlines) || (!initlines_specified))
+	  if (!initlines || !initlines_specified)
 	       /* no -i or unreasonable value for initlines */
 	       if (outspeed >= B9600) 	/* whole page at >= 9600 baud */
 		    initlines = LINES;
@@ -1226,7 +1231,7 @@ line_col_calcs()
      else {				/* not a crt */
 	  LINES = 30000;		/* so don't page */
 	  CL = "\n\n";			/* put a couple of lines between */
-	  if ((!initlines) || (!initlines_specified))
+	  if (!initlines || !initlines_specified)
 	       /* make initlines reasonable */
 	       initlines = 8;
      }
@@ -1246,34 +1251,43 @@ int dummy;
      /* Come here if window size change signal received */
 #ifdef TIOCGWINSZ
      { struct winsize ws;
+       char lines[10], cols[10];
        if (ioctl(0, TIOCGWINSZ, &ws) >= 0 && ws.ws_row > 0 && ws.ws_col > 0) {
 	 LINES = ws.ws_row;
 	 COLS = ws.ws_col;
 	 line_col_calcs();
+	 sprintf(lines, "%d", LINES);
+	 sprintf(cols, "%d", COLS);
+	 export("LINES",lines);
+	 export("COLUMNS",cols);
+	 forceme("\f");			/* cause a refresh */
+					/* (defined only if TIOCSTI defined) */
        }
      }
 #else
      /* Well, if SIGWINCH is defined, but TIOCGWINSZ isn't, there's    */
      /* almost certainly something wrong.  Figure it out for yourself, */
-     /* because I don't know now to deal :-)                           */
+     /* because I don't know how to deal with it :-)                   */
 #endif
 }
 #endif
+
 void
 termlib_init()
 {
 #ifdef USETITE
     if (TI && *TI)
-	tputs (TI,1,putchr);
+	tputs(TI,1,putchr);
 #endif
     return;
 }
+
 void
 termlib_reset()
 {
 #ifdef USETITE
     if (TE && *TE)
-	tputs (TE,1,putchr);
+	tputs(TE,1,putchr);
 #endif
     return;
 }

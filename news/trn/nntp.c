@@ -1,5 +1,9 @@
-/* $Id: nntp.c,v 1.1 1993/07/19 20:07:05 nate Exp $
+/* $Id: nntp.c,v 1.2 1993/07/26 19:12:59 nate Exp $
 */
+/* The authors make no claims as to the fitness or correctness of this software
+ * for any use whatsoever, and it is provided as is. Any use of this software
+ * is at the user's own risk. 
+ */
 
 #include "EXTERN.h"
 #include "common.h"
@@ -19,8 +23,9 @@
 /* try to access the specified group */
 
 bool
-nntp_group(group)
+nntp_group(group, num)
 char *group;
+NG_NUM num;
 {
     sprintf(ser_line, "GROUP %s", group);
     nntp_command(ser_line);
@@ -37,6 +42,19 @@ char *group;
 	}
 	return FALSE;
     }
+    if (num) {
+	long count, first, last;
+
+	(void) sscanf(ser_line,"%*d%ld%ld%ld",&count,&first,&last);
+	/* NNTP mangles the high/low values when no articles are present. */
+	if (!count)
+	    abs1st[num] = ngmax[num]+1;
+	else {
+	    abs1st[num] = (ART_NUM)first;
+	    if (last > ngmax[num])
+		ngmax[num] = (ART_NUM)last;
+	}
+    }
     return TRUE;
 }
 
@@ -47,7 +65,7 @@ nntp_stat(artnum)
 ART_NUM artnum;
 {
     sprintf(ser_line, "STAT %ld", (long)artnum);
-    nntp_command(ser_line);		/* ask the server for the header */
+    nntp_command(ser_line);
     return (nntp_check(TRUE) == NNTP_CLASS_OK);
 }
 
@@ -58,7 +76,7 @@ nntp_header(artnum)
 ART_NUM artnum;
 {
     sprintf(ser_line, "HEAD %ld", (long)artnum);
-    nntp_command(ser_line);		/* ask the server for the header */
+    nntp_command(ser_line);
     return (nntp_check(TRUE) == NNTP_CLASS_OK);
 }
 
@@ -80,7 +98,7 @@ ART_NUM artnum;
 	finalize(1);
     }
     sprintf(ser_line, "BODY %ld", (long)artnum);
-    nntp_command(ser_line);		/* ask the server for the article */
+    nntp_command(ser_line);
     if (nntp_check(TRUE) != NNTP_CLASS_OK) {	/* and get it's reaction */
 	fclose(fp);
 	errno = ENOENT;			/* Simulate file-not-found */
@@ -105,11 +123,8 @@ time_t
 nntp_time()
 {
     char *s;
-    int year, month, day, hh, mm, ss;
-#ifdef DEBUG
-    struct tm *ts;
-    char ch;
-#endif
+    int year, month, day, hh, mm;
+    time_t ss;
 
     nntp_command("DATE");
     if (nntp_check(FALSE) != NNTP_CLASS_INF)
@@ -122,14 +137,8 @@ nntp_time()
     hh = (*--s - '0') + (*--s - '0') * 10;
     day = (*--s - '0') + (*--s - '0') * 10;
     month = (*--s - '0') + (*--s - '0') * 10;
-#ifdef DEBUG
-    ch = *s;
-#endif
     *s = '\0';
     year = atoi(s-4);
-#ifdef DEBUG
-    *s = ch;
-#endif
 
     /* This simple algorithm will be valid until the year 2400 */
     if (year % 4)
@@ -147,14 +156,6 @@ nntp_time()
     ss = ((((year-1970) * 365 + (year-1968)/4 + day - 1) * 24L + hh) * 60
 	  + mm) * 60 + ss;
 
-#ifdef DEBUG
-    ts = gmtime(&ss);
-    sprintf(buf,"19%02d%02d%02d%02d%02d%02d",
-	    ts->tm_year % 100, ts->tm_mon+1, ts->tm_mday,
-	    ts->tm_hour, ts->tm_min, ts->tm_sec) FLUSH;
-    if (strNE(ser_line+4,buf))
-	printf("\n** Tell Wayne:  %s != %s **\n",ser_line+4,buf);
-#endif
     return ss;
 }
 

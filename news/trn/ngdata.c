@@ -1,4 +1,4 @@
-/* $Id: ngdata.c,v 1.1 1993/07/19 20:07:04 nate Exp $
+/* $Id: ngdata.c,v 1.2 1993/07/26 19:12:49 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -39,74 +39,28 @@
 void
 ngdata_init()
 {
-#ifdef USE_NNTP
-    char *cp;
-
-    nntp_command("LIST");	/* tell server we want the active file */
-    if (nntp_check(TRUE) != NNTP_CLASS_OK) { /* and then see if that's ok */
-	printf("Can't get active file from server: \n%s\n", ser_line);
-	finalize(1);
-    }
-    time(&lastactfetch);
-
-    cp = filexp("%P/rrnact.%$");	/* make a temporary name */
-    strcpy(active_name, cp);
-    actfp = fopen(active_name, "w+");	/* and get ready */
-    if (actfp == Nullfp) {
-	printf(cantopen,active_name) FLUSH;
-	finalize(1);
-    }
-
-    activeitems = 0;
-    while (1) {
-	nntp_gets(ser_line, sizeof ser_line);
-	if (ser_line[0] == '.')		/* while there's another line */
-	    break;			/* get it and write it to */
-	activeitems++;
-	fputs(ser_line, actfp);
-	putc('\n', actfp);
-    }
-
-    if (ferror(actfp)) {
-	printf("Error writing to active file %s.\n", active_name) FLUSH;
-	finalize(1);
-    }
-#else /* !USE_NNTP */
-    ngdatansrv_init();
-#endif
+    ngdatahash_init();
     if (fseek(actfp,0L,0) == -1) {	/* just get to the beginning */
 	printf("Error seeking in active file.\n") FLUSH;
 	finalize(1);
     }
-    return;
 }
 
 bool
 access_ng()
 {
 #ifdef USE_NNTP
-    long unread, first, last;
+    ART_NUM old_first = abs1st[ng];
 
-    if (!nntp_group(ngname)) {
+    if (!nntp_group(ngname,ng)) {
 	toread[ng] = TR_BOGUS;
 	return FALSE;
     }
     if ((lastart = getngsize(ng)) < 0)	/* this cannot happen (laugh here) */
 	return FALSE;
-    (void) sscanf(ser_line,"%*d%ld%ld%ld",&unread,&first,&last);
-
-    /* NNTP mangles the high/low values when no articles are present. */
-    if (!unread)
-	absfirst = lastart+1;
-    else {
-	absfirst = (ART_NUM)first;
-	if (last > lastart)
-	    lastart = (ART_NUM)last;
-    }
-    ngmax[ng] = lastart;	/* ensure getngsize() knows the new maximum */
-    first = abs1st[ng];
-    abs1st[ng] = absfirst;
-    if (absfirst > first)
+    absfirst = abs1st[ng];
+    lastart = ngmax[ng];
+    if (absfirst > old_first)
 	checkexpired(ng);
 #else /* !USE_NNTP */
 
@@ -268,7 +222,7 @@ register NG_NUM num;
 #endif
     oldsoft = softptr[num];
 #ifndef USE_NNTP
-    fseek(actfp,100000L,1);    /* hopefully this forces a reread */
+    fseek(actfp,100000L,1);	/* hopefully this forces a reread */
 #endif
     if ((softptr[num] = findact(tmpbuf, nam, len, (long)oldsoft)) >= 0) {
 	if (softptr[num] != oldsoft) {
@@ -280,7 +234,7 @@ register NG_NUM num;
 	softptr[num] = 0;
 	if (RCCHAR(rcchar[num]) == ':')
 	    rcchar[num] = NEGCHAR;
-	return TR_BOGUS;		/* well, not so quietly, actually */
+	return TR_BOGUS;
     }
 	
 #ifdef DEBUG

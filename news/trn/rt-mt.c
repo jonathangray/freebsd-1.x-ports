@@ -1,5 +1,9 @@
-/* $Id: rt-mt.c,v 1.1 1993/07/19 20:07:06 nate Exp $
+/* $Id: rt-mt.c,v 1.2 1993/07/26 19:13:17 nate Exp $
 */
+/* The authors make no claims as to the fitness or correctness of this software
+ * for any use whatsoever, and it is provided as is. Any use of this software
+ * is at the user's own risk. 
+ */
 
 #include "EXTERN.h"
 #include "common.h"
@@ -132,7 +136,11 @@ mt_data()
 	goto exit;
     }
     if (total.last > lastart)
+#ifdef USE_NNTP
+	total.last = lastart;
+#else
 	grow_cache(total.last);
+#endif
 
     if (read_authors()
      && read_subjects()
@@ -191,11 +199,11 @@ char *group;
     strcpy(cp, group);
     while ((cp = index(cp, '.')))
 	*cp = '/';
-#endif
     if (threaddir == spool)
 	strcat(buf, "/.thread");
     else
 	strcat(buf, ".th");
+#endif
     return buf;
 }
 #endif
@@ -424,7 +432,12 @@ read_articles()
 	lp_bmap(&p_article.num, 2);
 	wp_bmap(&p_article.subject, 8);
 
+#ifdef USE_NNTP
+	article = *art_ptr++ = allocate_article(p_article.num > lastart?
+						0 : p_article.num);
+#else
 	article = *art_ptr++ = allocate_article(p_article.num);
+#endif
 	article->date = p_article.date;
 #ifndef DBM_XREFS
 	if (olden_days < 2 && !(p_article.flags & HAS_XREFS))

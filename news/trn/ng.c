@@ -1,4 +1,4 @@
-/* $Id: ng.c,v 1.1 1993/07/19 20:07:04 nate Exp $
+/* $Id: ng.c,v 1.2 1993/07/26 19:12:47 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -110,7 +110,7 @@ char *start_command;			/* command to fake up first */
 #endif
     
     exit_code = NG_NORM;
-    save_ids = FALSE;
+    localkf_changes = 0;
     killfirst = 0;
 
     if (extractdest) {
@@ -173,7 +173,8 @@ char *start_command;			/* command to fake up first */
     /* now read each unread article */
 
     rc_changed = doing_ng = TRUE;	/* enter the twilight zone */
-    checkcount = 0;			/* do not checkpoint for a while */
+    if (!unsafe_rc_saves)
+	checkcount = 0;			/* do not checkpoint for a while */
     do_fseek = FALSE;			/* start 1st article at top */
     for (; art<=lastart+1; ) {		/* for each article */
 	mode = 'a';
@@ -183,12 +184,13 @@ char *start_command;			/* command to fake up first */
 	if (art > lastart || forcegrow) {
 	    ART_NUM oldlast = lastart;
 #ifdef USE_NNTP
-	    ART_NUM newlast = lastart;
-	    while (nntp_stat(newlast+1))
-		newlast++;
-	    if (newlast > oldlast) {
-		ngmax[ng] = newlast;
-		grow_ng(newlast);
+	    if (!nntp_group(ngname,ng)) {
+		fprintf(stderr,"Your server went south for the winter:\n%s\n",
+			ser_line);
+		finalize(1);
+	    }
+	    if (ngmax[ng] > lastart) {
+		grow_ng(ngmax[ng]);
 	    }
 #else
 	    grow_ng(getngsize(ng));
@@ -196,7 +198,8 @@ char *start_command;			/* command to fake up first */
 	    if (forcelast && art > oldlast)
 		art = lastart+1;
 	}
-	find_article(art);		/* sets artp */
+	if (!artp || (artp->flags & AF_TMPMEM) != AF_TMPMEM || art != 0)
+	    artp = find_article(art);
 	if (start_command) {		/* do we have an initial command? */
 	    pushstring(start_command, 0);
 	    free(start_command);
@@ -392,7 +395,8 @@ cleanup:
     yankback();				/* do a Y command */
     bits_to_rc();			/* reconstitute .newsrc line */
     doing_ng = FALSE;			/* tell sig_catcher to cool it */
-    write_rc();				/* and update .newsrc */
+    if (!unsafe_rc_saves)
+	write_rc();			/* and update .newsrc */
     rc_changed = FALSE;			/* tell sig_catcher it is ok */
     if (chdir(spool)) {
 	printf(nocd,spool) FLUSH;
@@ -549,14 +553,14 @@ n to change nothing.\n\
 	    return AS_NORM;
 	}
 not_threaded:
-	if (ThreadedGroup) {
+	if (!artp) {
 #ifdef VERBOSE
 	    IF(verbose)
-		fputs("\nThis article is not threaded.\n",stdout) FLUSH;
+		fputs("\nYou're at the end of the group.\n",stdout) FLUSH;
 	    ELSE
 #endif
 #ifdef TERSE
-		fputs("\nUnthreaded article.\n",stdout) FLUSH;
+		fputs("\nEnd of group.\n",stdout) FLUSH;
 #endif
 	    return AS_ASK;
 	}
@@ -612,20 +616,16 @@ This is the last leaf in this tree.\n",stdout) FLUSH;
 	    goto not_threaded;
 	/* FALL THROUGH */
     case 'A':
-	if (!artp) {
-	    printf("You're not at an article.\n");
-	    return AS_ASK;
-	}
+	if (!artp)
+	    goto not_threaded;
 	switch (ask_memorize(*buf)) {
 	case ',':  case 'j':
 	    return AS_NORM;
 	}
 	return AS_ASK;
     case 'K':
-	if (!artp) {
-	    printf("You're not at an article.\n");
-	    return AS_ASK;
-	}
+	if (!artp)
+	    goto not_threaded;
 	/* first, write kill-subject command */
 	(void)art_search(buf, (sizeof buf), TRUE);
 	art = curr_art;
@@ -633,18 +633,24 @@ This is the last leaf in this tree.\n",stdout) FLUSH;
 	kill_subject(artp->subj,KF_ALL);/* take care of any prior subjects */
 	return AS_NORM;
     case ',':		/* kill this node and all descendants */
+	if (!artp)
+	    goto not_threaded;
 	if (ThreadedGroup)
 	    kill_subthread(artp,KF_ALL);
 	else if (art >= absfirst && art <= lastart)
 	    mark_as_read();
 	return AS_NORM;
     case 'J':		/* Junk all nodes in this thread */
+	if (!artp)
+	    goto not_threaded;
 	if (ThreadedGroup) {
 	    kill_thread(artp->subj->thread,KF_ALL);
 	    return AS_NORM;
 	}
 	/* FALL THROUGH */
     case 'k':		/* kill current subject */
+	if (!artp)
+	    goto not_threaded;
 	kill_subject(artp->subj,KF_ALL);
 	if (last_cached < lastart) {
 	    *buf = 'k';
@@ -865,10 +871,10 @@ normal_search:
 	}
 	return AS_NORM;
     }
-#else
-    buf[1] = '\0';
-    notincl(buf);
-    return AS_ASK;
+#else /* !ARTSEARCH */
+	buf[1] = '\0';
+	notincl(buf);
+	return AS_ASK;
 #endif
     case 'u':			/* unsubscribe from this newsgroup? */
 	rcchar[ng] = NEGCHAR;

@@ -1,4 +1,4 @@
-/* $Id: common.h,v 1.1 1993/07/19 20:07:00 nate Exp $
+/* $Id: common.h,v 1.2 1993/07/26 19:12:13 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -37,6 +37,9 @@
 #else
 # ifdef I_TERMIOS
 #   include <termios.h>
+#   if !defined (O_NDELAY)
+#     define O_NDELAY O_NONBLOCK	/* Posix-style non-blocking i/o */
+#   endif
 # else
 #   include <sgtty.h>
 # endif
@@ -51,7 +54,28 @@
 #include <sys/ptem.h>
 #endif
 
+#ifdef I_UNISTD
+#include <unistd.h>
+#endif
+#ifdef I_STDLIB
+#include <stdlib.h>
+#else
+char	*malloc();
+char	*realloc();
+#endif
+
+#ifdef I_STRING
+#include <string.h>
+#else
+#include <strings.h>
+#endif
+
+#ifdef I_TIME
 #include <time.h>
+#endif
+#ifdef I_SYS_TIME
+#include <sys/time.h>
+#endif
 
 #define BITSPERBYTE 8
 #define LBUFLEN 1024	/* line buffer length */
@@ -166,6 +190,8 @@
  *	Put ^ in the middle to capitalize the first letter: %^C = Rec.humor
  *	Put _ in the middle to capitalize last component: %_c = net/Jokes
  *	Put \ in the middle to quote regexp and % characters in the result
+ *	Put > in the middle to return the address portion of a name.
+ *	Put ) in the middle to return the comment portion of a name.
  *	Put :FMT in the middle to format the result: %:-30.30t
  *
  *	~ interpretation in filename expansion happens after % expansion, so
@@ -269,6 +295,7 @@
 #define ARTSEARCH	/* pattern searches among articles */
 			/* /, ?, ^N, ^P, k, K */
 #define EDIT_DISTANCE	/* Allow -G to specify a fuzzy 'go' command */
+#undef	VALIDATE_XREF_SITE /* are xrefs possibly invalid? */
 #undef	METAMAIL	/* use metamail to process mime articles */
 
 /* some dependencies among options */
@@ -381,8 +408,13 @@
 #endif
 
 /* file containing list of active newsgroups and max article numbers */
-#ifndef ACTIVE			/* % and ~ */
+#ifdef USE_NNTP
+#   undef ACTIVE
+#   define ACTIVE "%P/rrnact.%$"
+#else
+# ifndef ACTIVE			/* % and ~ */
 #   define ACTIVE "%x/active"
+# endif
 #endif
 #ifndef DBINIT
 #   define DBINIT "%W/db.init"
@@ -569,7 +601,7 @@
 #endif
 
 #ifndef ATTRIBUTION		/* % */
-#   define ATTRIBUTION "In article %i %f writes:"
+#   define ATTRIBUTION "In article %i,%?%)f <%>f> wrote:"
 #endif
 
 #ifndef PIPESAVER		/* % */
@@ -701,6 +733,12 @@ typedef int		ART_LINE;	/* line position in article file */
 typedef long		ACT_POS;	/* char position in active file */
 typedef unsigned int	MEM_SIZE;	/* for passing to malloc */
 
+/* index/strchr slight-of-hand */
+
+#ifdef HAS_STRCHR
+#   define index strchr
+#   define rindex strrchr
+#endif
 
 /* *** end of the machine dependent stuff *** */
 
@@ -712,13 +750,13 @@ EXT struct stat filestat;
 
 /* various things of type char */
 
+#ifdef SUPPLIMENT_STRING_H
 char	*index();
 char	*rindex();
 char	*getenv();
 char	*strcat();
 char	*strcpy();
-char	*malloc();
-char	*realloc();
+#endif
 
 EXT char buf[LBUFLEN+1];	/* general purpose line buffer */
 EXT char cmd_buf[CBUFLEN];	/* buffer for formatting system commands */
@@ -784,14 +822,21 @@ EXT bool fuzzyGet INIT(FALSE);			/* -G */
 #endif
 #ifdef VERBOSE
 #   ifdef TERSE
-	EXT bool verbose INIT(TRUE);			/* +t */
+EXT bool verbose INIT(TRUE);				/* +t */
 #   endif
 #endif
 EXT bool unbroken_subjects INIT(FALSE);			/* -u */
+EXT bool unsafe_rc_saves INIT(FALSE);			/* -U */
 #ifdef VERIFY
-    EXT bool verify INIT(FALSE);			/* -v */
+EXT bool verify INIT(FALSE);				/* -v */
 #endif
-    EXT bool quickstart INIT(FALSE);			/* -q */
+EXT bool quickstart INIT(FALSE);			/* -q */
+EXT time_t actFetchTime					/* -z */
+#ifdef USE_NNTP
+	INIT(5*60);
+#else
+	INIT(0);
+#endif
 
 #define NOMARKING 0
 #define STANDOUT 1
@@ -808,17 +853,20 @@ EXT bool append_unsub INIT(0);
 
 /* miscellania */
 
+#ifndef __STDC__
 int fseek();
 long atol(), ftell();
+extern int errno;
+#endif
+
 EXT bool in_ng INIT(FALSE);		/* current state of trn */
 EXT char mode INIT('i');		/* current state of trn */
 
 EXT FILE *tmpfp INIT(Nullfp);	/* scratch fp used for .rnlock, .rnlast, etc. */
 
 EXT NG_NUM nextrcline INIT(0);	/* 1st unused slot in rcline array */
-			/* startup to avoid checking twice in a row */
+				/* startup to avoid checking twice in a row */
 
-extern errno;
 /* Factored strings */
 
 EXT char nullstr[1] INIT("");

@@ -3,7 +3,7 @@ case $CONFIG in
 esac
 echo "Extracting Makefile (with variable substitutions)"
 $cat >Makefile <<!GROK!THIS!
-# $Id: Makefile.SH,v 1.1 1993/07/19 20:06:58 nate Exp $
+# $Id: Makefile.SH,v 1.2 1993/07/26 19:11:47 nate Exp $
 #
 # This software is Copyright 1991 by Stan Barber. 
 #
@@ -30,6 +30,8 @@ LDFLAGS = $ldflags
 #NNTPNNTPFLAGS = $nntpflags
 ndirc = $ndirc
 ndiro = $ndiro
+strftimec = $strftimec
+strftimeo = $strftimeo
 
 libs = $libndir $termlib $jobslib -lm $libs
 !GROK!THIS!
@@ -55,18 +57,20 @@ c2 = decode.c edit_dist.c final.c hash.c head.c help.c init.c intrp.c
 c3 = kfile.c last.c $(ndirc) ng.c ngdata.c nghash.c ngsrch.c ngstuff.c
 c4 = only.c rcln.c rcstuff.c respond.c rthread.c rt-mt.c rt-ov.c
 c5 = rt-process.c rt-page.c rt-select.c rt-util.c rt-wumpus.c search.c
-c6 = sw.c term.c trn.c util.c unship.c uudecode.c $(nntpsrc)
+c6 = $(strftimec) sw.c term.c trn.c util.c unship.c uudecode.c
+c7 = $(nntpsrc)
 
-c = $(c1) $(c2) $(c3) $(c4) $(c5) $(c6)
+c = $(c1) $(c2) $(c3) $(c4) $(c5) $(c6) $(c7)
 
 obj1 = addng.o art.o artio.o artsrch.o autosub.o backpage.o bits.o cache.o
 obj2 = decode.o edit_dist.o final.o hash.o head.o help.o init.o intrp.o
 obj3 = kfile.o last.o $(ndiro) ng.o ngdata.o nghash.o ngsrch.o ngstuff.o
 obj4 = only.o rcln.o rcstuff.o respond.o rthread.o rt-mt.o rt-ov.o
 obj5 = rt-process.o rt-page.o rt-select.o rt-util.o rt-wumpus.o search.o
-obj6 = sw.o term.o trn.o util.o unship.o uudecode.o parsedate.o $(nntpobj)
+obj6 = $(strftimeo) sw.o term.o trn.o util.o unship.o uudecode.o parsedate.o
+obj7 = $(nntpobj)
 
-obj = $(obj1) $(obj2) $(obj3) $(obj4) $(obj5) $(obj6)
+obj = $(obj1) $(obj2) $(obj3) $(obj4) $(obj5) $(obj6) $(obj7)
 
 lintflags = -phbvxac
 
@@ -91,16 +95,25 @@ trn: $(obj)
 #NNTPgetactive: getactive.o nntpinit.o nntpclient.o
 #NNTP	$(CC) $(LDFLAGS) getactive.o nntpinit.o nntpclient.o -o getactive $(libs)
 
+artcheck: artcheck.o
+	$(CC) $(LDFLAGS) artcheck.o -o artcheck $(libs)
+
 parsedate.o: parsedate.y
 	@echo 'Expect 6 shift/reduce conflicts'
 	yacc parsedate.y
 	mv -f y.tab.c parsedate.c
 	$(CC) -c $(CFLAGS) parsedate.c
 	rm -f parsedate.c
+#STRFTIME
+#STRFTIME$(strftimeo): $(strftimec)
+#STRFTIME	$(CC) -c $(CFLAGS) $(strftimec)
+
+unipatch: unipatch.o
+	$(CC) $(LDFLAGS) unipatch.o -o unipatch
 
 # if a .h file depends on another .h file...
 $(h):
-	touch $@
+	-touch $@
 
 install: $(public) $(private) $(manpages)
 # won't work with csh
@@ -150,15 +163,15 @@ depend: config.h Makefile makedepend
 	./makedepend
 
 # AUTOMATICALLY GENERATED MAKE DEPENDENCIES--PUT NOTHING BELOW THIS LINE
-config.h: config.h.SH config.sh ; sh config.h.SH
-Makefile: Makefile.SH config.sh ; sh Makefile.SH
-makedepend: makedepend.SH config.sh ; sh makedepend.SH
-$(obj1):
-	@echo "You haven't done a "'"make depend" yet!'; exit 1
 !NO!SUBS!
+$cat dependencies >>Makefile
 case "$d_nntp" in
 define)	sed < Makefile -e '/^#NNTP/s/^#NNTP//' > Makefile.new ;;
 *)	sed < Makefile -e '/^#NNTP/d' > Makefile.new ;;
 esac
-mv Makefile.new Makefile
+case "$strftimec" in
+'')	sed < Makefile.new -e '/^#STRFTIME/d' > Makefile ;;
+*)	sed < Makefile.new -e '/^#STRFTIME/s/^#STRFTIME//' > Makefile ;;
+esac
+rm Makefile.new
 $eunicefix Makefile

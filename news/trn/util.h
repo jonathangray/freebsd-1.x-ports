@@ -1,4 +1,4 @@
-/* $Id: util.h,v 1.1 1993/07/19 20:07:09 nate Exp $
+/* $Id: util.h,v 1.2 1993/07/26 19:13:52 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -40,12 +40,10 @@ char	*getwd _((char*));
 char	*get_a_line _((char*,int,FILE*));
 char	*savestr _((char*));
 int	makedir _((char*,int));
-void	setenv _((char*,char*));
+void	export _((char*,char*));
 int	envix _((char*));
 void	notincl _((char*));
 char	*getval _((char*,char*));
 void	growstr _((char**,int*,int));
 void	setdef _((char*,char*));
-#ifndef HAS_STRFTIME
-size_t	strftime _((char*, size_t, CONST char*, CONST struct tm*));
-#endif
+void	safelink _((char*,char*));

@@ -4,7 +4,7 @@ esac
 echo "Extracting newsetup (with variable substitutions)"
 $spitshell >newsetup <<!GROK!THIS!
 $startsh
-# $Id: newsetup.SH,v 1.1 1993/07/19 20:07:04 nate Exp $
+# $Id: newsetup.SH,v 1.2 1993/07/26 19:12:42 nate Exp $
 # 
 # This software is Copyright 1991 by Stan Barber. 
 #

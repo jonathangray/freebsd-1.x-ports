@@ -1,4 +1,4 @@
-/* $Id: ngdata.h,v 1.1 1993/07/19 20:07:04 nate Exp $
+/* $Id: ngdata.h,v 1.2 1993/07/26 19:12:50 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -24,7 +24,6 @@ EXT ART_NUM lastart INIT(0);	/* maximum article number in newsgroup */
 #ifdef USE_NNTP
 EXT char active_name[MAXFILENAME];
 EXT time_t lastactfetch INIT(0);
-#define MINFETCHTIME (2 * 60 * 60)
 #endif
 
 EXT ART_NUM *abs1st INIT(NULL);	/* 1st real article in newsgroup */
@@ -41,4 +40,4 @@ ART_NUM	getngsize _((NG_NUM));
 void	getngmissing _((void));
 
 ACT_POS findact _((char*,char*,int,long));
-void ngdatansrv_init _(());
+void ngdatahash_init _((void));

@@ -1,5 +1,9 @@
-/* $Id: rt-page.h,v 1.1 1993/07/19 20:07:06 nate Exp $
+/* $Id: rt-page.h,v 1.2 1993/07/26 19:13:22 nate Exp $
 */
+/* The authors make no claims as to the fitness or correctness of this software
+ * for any use whatsoever, and it is provided as is. Any use of this software
+ * is at the user's own risk. 
+ */
 
 bool set_sel_mode _((char_int));
 bool set_sel_sort _((char_int));

@@ -1,4 +1,4 @@
-/* $Id: bits.c,v 1.1 1993/07/19 20:06:59 nate Exp $
+/* $Id: bits.c,v 1.2 1993/07/26 19:12:09 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -457,7 +457,9 @@ chase_xrefs(artnum,markread)	/* The Xref-line-using version */
 ART_NUM artnum;
 int markread;
 {
+# ifdef VALIDATE_XREF_SITE
     bool valid_xref_site();
+# endif
     register char *xartnum;
     register ART_NUM x;
     char *xref_buf, *curxref;
@@ -473,7 +475,10 @@ int markread;
 	printf("Xref: %s\n",xref_buf) FLUSH;
 # endif
     curxref = cpytill(tmpbuf,xref_buf,' ') + 1;
-    if (valid_xref_site(artnum,tmpbuf)) {
+# ifdef VALIDATE_XREF_SITE
+    if (valid_xref_site(artnum,tmpbuf))
+# endif
+    {
 	while (*curxref) {		/* for each newsgroup */
 	    curxref = cpytill(tmpbuf,curxref,' ');
 	    xartnum = index(tmpbuf,':');
@@ -509,6 +514,7 @@ int markread;
     return 0;
 }
 
+# ifdef VALIDATE_XREF_SITE
 /* Make sure the site name on Xref matches what inews thinks the site
  * is.  Check first against last inews_site.  If it matches, fine.
  * If not, fetch inews_site from current Path or Relay-Version line and
@@ -559,6 +565,7 @@ char *site;
 #endif
     return FALSE;
 }
+# endif /* VALIDATE_XREF_SITE */
 
 #else /* DBM_XREFS */
 

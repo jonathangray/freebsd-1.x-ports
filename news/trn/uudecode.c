@@ -1,4 +1,4 @@
-/* $Id: uudecode.c,v 1.1 1993/07/19 20:07:09 nate Exp $
+/* $Id: uudecode.c,v 1.2 1993/07/26 19:13:53 nate Exp $
  * 
  * Decode one or more uuencoded articles back to binary form.
  * Trn version created by Wayne Davison.
@@ -14,7 +14,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */

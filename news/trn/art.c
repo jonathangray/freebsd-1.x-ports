@@ -1,4 +1,4 @@
-/* $Id: art.c,v 1.1 1993/07/19 20:06:59 nate Exp $
+/* $Id: art.c,v 1.2 1993/07/26 19:11:57 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -72,6 +72,9 @@ char art_buf[LBUFLEN];		/* place for article lines */
 void
 art_init()
 {
+#ifdef INNERSEARCH
+    init_compex(&gcompex)
+#endif
     ;
 }
 
@@ -80,19 +83,36 @@ art_init()
 int
 display_mime()
 {
+    int code = 1;
+
     if (!getenv("NOMETAMAIL")) {
-	int code;
+	char oldmode = mode;
 
 	interp(cmd_buf,(sizeof cmd_buf),getval("MIMESHOW",MIMESHOW));
-	termlib_reset();
-	resetty();
-	code = doshell(SH,cmd_buf);
-	noecho();
-	crmode();
-	termlib_init();
-	return code;
+	fputs("Display MIME article with metamail? [yn]",stdout);
+	fflush(stdout);
+	eat_typeahead();
+#ifdef PENDING
+	cache_until_key();
+#endif
+	mode = 'p';
+	getcmd(buf);
+	mode = oldmode;
+	setdef(buf,"y");
+#ifdef VERIFY
+	printcmd();
+#endif
+	putchar('\n') FLUSH;
+	if (*buf == 'y') {
+	    termlib_reset();
+	    resetty();
+	    code = doshell(SH,cmd_buf);
+	    noecho();
+	    crmode();
+	    termlib_init();
+	}
     }
-    return 1;
+    return code;
 }
 #endif
 
@@ -269,12 +289,14 @@ do_article()
 		    if (do_hiding && (s = extract_name(art_buf+6)) != Nullch)
 			strcpy(art_buf+6,s);
 		}
+#ifdef HAS_STRFTIME
 		else if (in_header == DATE_LINE) {
 		    if (do_hiding && curr_artp->date != -1)
 			strftime(art_buf+6, sizeof(art_buf)-6,
 				 getval("LOCALTIMEFMT", LOCALTIMEFMT),
 				 localtime(&curr_artp->date));
 		}
+#endif
 #ifdef METAMAIL
 		else if (in_header == CONTENT_LINE) {
 		    mime_article = nontext(art_buf+14);
@@ -309,7 +331,7 @@ do_article()
 	    }
 	    else {			/* just a normal line */
 #ifdef METAMAIL
-		if (mime_article && !tried_display_mime) {
+		if (mime_article && do_hiding && !tried_display_mime) {
 		    if (display_mime() == 0)
 			return DA_NORM;
 		    else
@@ -559,7 +581,6 @@ reask_pager:
  	maybe_eol();
 #endif
 	fflush(stdout);
-/* reinp_pager:     			/* unused, commented for lint */
 	eat_typeahead();
 #ifdef DEBUG
 	if (debug & DEB_CHECKPOINTING) {
@@ -820,8 +841,7 @@ page_switch()
     case '\0':		/* treat del,break as 'n' */
 	*buf = 'n';
 	/* FALL THROUGH */
-    case 'k':	case 'K':
-    case 'T':	case 'J':
+    case 'k':	case 'K':	case 'J':
     case 'n':	case 'N':	case Ctl('n'):
     case 's':	case 'S':
     case 'e':
@@ -846,6 +866,7 @@ page_switch()
     case '6': case '7': case '8': case '9':
     case '=':
     case '?':
+    case 'A':	case 'T':
     case 'c':	case 'C':	
 #ifdef DEBUG
     case 'D':

@@ -1,4 +1,4 @@
-/* $Id: search.c,v 1.1 1993/07/19 20:07:08 nate Exp $
+/* $Id: search.c,v 1.2 1993/07/26 19:13:35 nate Exp $
  */
 
 /* string search routines */
@@ -126,7 +126,9 @@ int n;
 {
     int length = compex->braelist[n] - compex->braslist[n];
 
-    if (!compex->nbra || n > compex->nbra || !compex->braelist[n] || length<0)
+    if (!compex->nbra)
+	return Nullch;
+    if (n > compex->nbra || !compex->braelist[n] || length < 0)
 	return nullstr;
     growstr(&gbr_str, &gbr_siz, length+1);
     safecpy(gbr_str, compex->braslist[n], length+1);
@@ -185,7 +187,7 @@ int fold;
     compex->nbra = 0;			/* no brackets yet */
     lastep = 0;
     for (;;) {
-	if (ep - compex->expbuf >= compex->eblen)
+	if (ep + 4 - compex->expbuf >= compex->eblen)
 	    ep = grow_eb(compex, ep, alt);
 	c = *strp++;			/* fetch next char of pattern */
 	if (c == 0) {			/* end of pattern? */

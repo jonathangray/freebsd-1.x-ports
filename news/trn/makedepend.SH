@@ -4,7 +4,7 @@ esac
 echo "Extracting makedepend (with variable substitutions)"
 $spitshell >makedepend <<!GROK!THIS!
 $startsh
-# $Id: makedepend.SH,v 1.1 1993/07/19 20:07:03 nate Exp $
+# $Id: makedepend.SH,v 1.2 1993/07/26 19:12:37 nate Exp $
 # 
 # This software is Copyright 1991 by Stan Barber. 
 #
@@ -21,26 +21,24 @@ export PATH || (echo "OOPS, this isn't sh.  Desperation time.  I will feed mysel
 
 $cat /dev/null >.deptmp
 $echo "(Note: this is going to take a while.)"
-$rm -f X*.[cy]
 for file in *.[cy]; do
     case "\$file" in
     *.c) filebase=\`basename \$file .c\`;;
     *.y) filebase=\`basename \$file .y\`;;
     esac
     $echo "Finding dependencies for \$filebase.o."
-    $sed -n <\$file >X\$file \\
+    $sed -n <\$file \\
 	-e "/^\${filebase}_init(/q" \\
 	-e '/^#/{' \\
 	-e 's|/\*.*$||' \\
 	-e 's/\\\\[ 	]*$//' \\
 	-e p \\
-	-e '}'
-    $cpp -I/usr/local/include X\$file | $sed  \\
+	-e '}' | $cppstdin -I/usr/local/include | $sed \\
 	-e '/^# *line/s/line//' \
 	-e '/^# *[0-9]/!d' \\
 	-e 's/^.*"\(.*\)".*\$/'\$filebase'.o: \1/' \\
 	-e 's|: \./|: |' \\
-	-e 's|: X|: |' | \\
+	-e 's/: .*\.c/: '\$file'/' | \\
 	$uniq | $sort | $uniq >> .deptmp
 done
 
@@ -52,24 +50,20 @@ $sed <Makefile >Makefile.new -e '1,/^# AUTOMATICALLY/!d'
 
 if $test -s .deptmp; then
     echo "Updating Makefile..."
-    echo "# If this runs make out of memory, delete /usr/include lines." >>Makefile.new
-    $sed -e 's/\\\$/\$\$/g' .deptmp >>Makefile.new
+    $sed -e 's/\\\$/\$\$/g' .deptmp | $egrep -v $usrinc >dependencies
 else
     $echo "You don't seem to have a proper C preprocessor.  Using grep instead."
-    $egrep '^#include ' *.[cyh] >.deptmp
+    $egrep '^#include ' *.[cyh] ?.[cyh] >.deptmp
     echo "Updating Makefile..."
-    <.deptmp $sed -n 's|c:#include "\(.*\)".*\$\$|o: \1|p' >> Makefile.new
-    <.deptmp $sed -n 's|c:#include <\(.*\)>.*\$\$|o: /usr/include/\1|p' >> Makefile.new
-    <.deptmp $sed -n 's|y:#include "\(.*\)".*\$\$|o: \1|p' >> Makefile.new
-    <.deptmp $sed -n 's|y:#include <\(.*\)>.*\$\$|o: /usr/include/\1|p' >> Makefile.new
-    <.deptmp $sed -n 's|h:#include "\(.*\)".*\$\$|h: \1|p' >> Makefile.new
-    <.deptmp $sed -n 's|h:#include <\(.*\)>.*\$\$|h: /usr/include/\1|p' >> Makefile.new
+    <.deptmp $sed -n 's|c:#include "\(.*\)".*\$\$|o: \1|p' > dependencies
+    <.deptmp $sed -n 's|y:#include "\(.*\)".*\$\$|o: \1|p' >> dependencies
+    <.deptmp $sed -n 's|h:#include "\(.*\)".*\$\$|h: \1|p' >> dependencies
 fi
+$echo "# WARNING: Put nothing here or make depend will gobble it up!" >> dependencies
 $mv Makefile Makefile.old
 $mv Makefile.new Makefile
-$echo "# WARNING: Put nothing here or make depend will gobble it up!" >> Makefile
-rm .deptmp X*.[cy]
-
+$cat dependencies >>Makefile
+rm .deptmp
 !GROK!THIS!
 $eunicefix makedepend
 chmod 755 makedepend

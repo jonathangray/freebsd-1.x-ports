@@ -4,7 +4,7 @@ esac
 echo "Extracting newsgroups (with variable substitutions)"
 $spitshell >newsgroups <<!GROK!THIS!
 $startsh
-# $Id: newsgroups.SH,v 1.1 1993/07/19 20:07:04 nate Exp $
+# $Id: newsgroups.SH,v 1.2 1993/07/26 19:12:45 nate Exp $
 # 
 # This software is Copyright 1991 by Stan Barber. 
 #

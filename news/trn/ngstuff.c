@@ -1,4 +1,4 @@
-/* $Id: ngstuff.c,v 1.1 1993/07/19 20:07:04 nate Exp $
+/* $Id: ngstuff.c,v 1.2 1993/07/26 19:12:54 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -144,7 +144,7 @@ numnum()
 	    fputs("\nNo articles\n",stdout) FLUSH;
 	    return NN_ASK;
 	}
-#ifdef ARTSRCH
+#ifdef ARTSEARCH
     if (srchahead)
 	srchahead = -1;
 #endif
@@ -275,7 +275,7 @@ use_selected()
 	/* The rest loop through all (selected) articles. */
 	/* Use the explicit article-order if it exists */
 	if (artptr_list) {
-	    ARTICLE **app, **limit = artptr_list + article_count;
+	    ARTICLE **app, **limit = artptr_list + artptr_list_size;
 	    for (app = artptr_list; app < limit; app++)
 		if ((!((ap = *app)->flags & AF_READ) ^ want_read)
 		 && (ap->flags & sel_mask)) {
@@ -333,7 +333,7 @@ int toplevel;
 	    if (sel_rereading)
 		deselect_article(artp);
 	} else if (ch == '+') {
-	    if (cmdlst[1] == '+') {
+	    if ((saveit || cmdlst[1] == '+') && artp->subj) {
 		if (sel_mode == SM_THREAD)
 		    select_thread(artp->subj->thread,
 				  saveit? AF_AUTOSELECTALL : 0);
@@ -341,11 +341,11 @@ int toplevel;
 		    select_subject(artp->subj, saveit? AF_AUTOSELECTALL : 0);
 		cmdlst++;
 	    } else
-		select_article(artp, (saveit? AF_AUTOSELECT : 0) | AF_ECHO);
+		select_article(artp, (saveit? AF_AUTOSELECTALL : 0) | AF_ECHO);
 	} else if (ch == '.') {
 	    select_subthread(artp, saveit? AF_AUTOSELECT : 0);
 	} else if (ch == '-') {
-	    if (cmdlst[1] == '-') {
+	    if (cmdlst[1] == '-' && artp->subj) {
 		if (sel_mode == SM_THREAD)
 		    deselect_thread(artp->subj->thread);
 		else
@@ -356,14 +356,21 @@ int toplevel;
 	} else if (ch == ',') {
 	    kill_subthread(artp, saveit? (KF_ALL|KF_KILLFILE) : KF_ALL);
 	} else if (ch == 'J' || ch == 'j') {
-	    kill_thread(artp->subj->thread,
+	    if (!artp->subj) {
+		set_read(artp);
+		artp->flags |= AF_AUTOKILLALL;
+	    } else if (sel_mode == SM_THREAD)
+		kill_thread(artp->subj->thread,
+			saveit? (KF_ALL|KF_KILLFILE) : KF_ALL);
+	    else
+		kill_subject(artp->subj,
 			saveit? (KF_ALL|KF_KILLFILE) : KF_ALL);
 	} else if (ch == 't') {
 	    entire_tree(artp);
 	} else if (ch == 'T') {
 	    saveit = TRUE;
 	} else if (ch == 'm') {
-	    if (was_read(art)) {
+	    if ((article_ptr(art)->flags & (AF_READ|AF_MISSING)) == AF_READ) {
 		unmark_as_read();
 #ifdef VERBOSE
 		IF(verbose)

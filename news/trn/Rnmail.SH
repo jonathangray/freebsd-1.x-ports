@@ -4,7 +4,7 @@ esac
 echo "Extracting Rnmail (with variable substitutions)"
 $spitshell >Rnmail <<!GROK!THIS!
 $startsh
-# $Id: Rnmail.SH,v 1.1 1993/07/19 20:06:59 nate Exp $
+# $Id: Rnmail.SH,v 1.2 1993/07/26 19:11:53 nate Exp $
 # 
 # This software is Copyright 1991 by Stan Barber. 
 #
@@ -27,7 +27,7 @@ export PATH || (echo "OOPS, this isn't sh.  Desperation time.  I will feed mysel
 
 # System dependencies
 
-mailer="${mailer-/bin/mail}"
+mailer="\${RNMAILER-${mailer-/bin/mail}}"
 # if you change this to something that does signatures, take out signature code
 
 # your organization name
@@ -39,7 +39,10 @@ nametype="$nametype"
 # default editor
 defeditor="$defeditor"
 # where the non-publics are
-rnlib=$privlib
+case $d_portable in
+define)  rnlib=\`$filexp $privlib\` ;;
+undef)   rnlib="$privlib" ;;
+esac
 # how not to do a newline with echo
 n="$n"
 c="$c"
@@ -52,7 +55,7 @@ grep=${grep-grep}
 rm=${rm-rm}
 
 !GROK!THIS!
-case "$ignoreorg" in
+case "$d_ignoreorg" in
 define) $spitshell >>Rnmail <<'!NO!SUBS!'
 orgname=${NEWSORG-$orgname}
 !NO!SUBS!
@@ -66,6 +69,7 @@ $spitshell >>Rnmail <<'!NO!SUBS!'
 dotdir=${DOTDIR-${HOME-$LOGDIR}}
 tmpart=$dotdir/.letter
 speller=$rnlib/Speller
+mail_sig=${MAILSIGNATURE-$dotdir/.mail_sig}
 
 headerfile=""
 case $# in
@@ -149,7 +153,7 @@ esac
 
 
 file=h
-while $test "$file" = h ; do
+while $test X$file = Xh ; do
     $echo ""
     $echo $n "Prepared file to include [none]: $c"
     read file
@@ -175,6 +179,11 @@ EOH
 done
 
 $echo ""
+
+if $test -r $mail_sig; then
+    $echo "-- " >> $tmpart
+    $cat $mail_sig >> $tmpart
+fi
 
 while true ; do
     case $state in
@@ -220,30 +229,30 @@ EOH
 	$echo ""
 	$echo $n "Check spelling, Send, Abort, Edit, or List? $c"
 	read ans
-	
+
 	case $ans in
-	a*)
+	[aA]*)
 	    state=rescue
 	    ;;
-	e*)
+	[eE]*)
 	    set $ans
 	    case $# in
 	    2)  VISUAL="$2" ;;
 	    esac
 	    state=edit
 	    ;;
-	l*)
+	[lL]*)
 	    $pager $tmpart
 	    state=ask
 	    ;;
-	s*)
-	    state=send
-	    ;;
-	c*)
+	[cC]*|[sS][pP]*)
 	    $speller $tmpart
 	    state=ask
 	    ;;
-	h*)
+	[sS]*)
+	    state=send
+	    ;;
+	[hH]*)
 	    $cat <<'EOH'
 
 Type c to check the message's spelling, s to send the message, a to abort

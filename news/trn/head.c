@@ -1,4 +1,4 @@
-/* $Id: head.c,v 1.1 1993/07/19 20:07:02 nate Exp $
+/* $Id: head.c,v 1.2 1993/07/26 19:12:25 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -8,7 +8,7 @@
  * sold, rented, traded or otherwise marketed, and this copyright notice is
  * included prominently in any copy made. 
  *
- * The author make no claims as to the fitness or correctness of this software
+ * The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
  * is at the user's own risk. 
  */
@@ -90,7 +90,6 @@ register char *colon;
      * extra terminating value, using first letter as index, and length as
      * optimization to avoid calling subroutine strEQ unnecessarily.  Hauls.
      */
-    
     if (islower(*f)) {
 	for (i = htypeix[*f - 'a']; *htype[i].ht_name == *f; --i) {
 	    if (len == htype[i].ht_length && strEQ(f, htype[i].ht_name)) {
@@ -162,9 +161,16 @@ int newhide, oldhide;
 	char *s;
 	end_header_line();
 	s = index(art_buf,':');
-	if (s == Nullch)	/* is it the end of the header? */
+	if (s == Nullch) {	/* is it the end of the header? */
+#ifdef USE_NNTP
+	    /* Did NNTP ship us a mal-formed header line? */
+	    if (*art_buf && *art_buf != '\n') {
+		in_header = SOME_LINE;
+		return newhide;
+	    }
+#endif
 	    in_header = PAST_HEADER;
-	else {	/* it is a new header line */
+	} else {		/* it is a new header line */
 	    in_header = set_line_type(art_buf,s);
 	    first_one = (htype[in_header].ht_minpos < 0);
 	    if (first_one) {
@@ -204,7 +210,7 @@ end_header()
 	article_ptr(parsed_art)->xrefs = nullstr;
 #endif
 #ifdef USE_NNTP
-    htype[PAST_HEADER].ht_minpos = artpos;    /* remember where body starts */
+    htype[PAST_HEADER].ht_minpos = artpos+1;  /* remember where body starts */
 #else
     htype[PAST_HEADER].ht_minpos = ftell(artfp);
 #endif
@@ -258,7 +264,6 @@ ART_NUM artnum;
 	if (*bp == '.') {
 	    if (!bp[1]) {
 		*bp++ = '\n';		/* tag the end with an empty line */
-		artpos++;
 		break;
 	    }
 	    strcpy(bp,bp+1);
@@ -292,9 +297,12 @@ int which_line;				/* type of line desired */
     register ART_POS lastpos;
     int size;
 
-    s = fetchcache(artnum,which_line);
-    if (s)
-	return savestr(s);
+    /* Only return a cached subject line if it isn't the current article */
+    if (which_line != SUBJ_LINE || parsed_art != artnum) {
+	s = fetchcache(artnum,which_line);
+	if (s)
+	    return savestr(s);
+    }
     if ((firstpos = htype[which_line].ht_minpos) < 0)
 	return savestr(nullstr);
 
@@ -333,7 +341,7 @@ bool_int copy;				/* do you want it savestr()ed? */
     /* find_article() returns a Nullart if the artnum value is invalid */
     if (!(ap = find_article(artnum)) || (ap->flags & AF_MISSING))
 	s = nullstr;
-    else if (cached)
+    else if (cached && (which_line != SUBJ_LINE || parsed_art != artnum))
 	s = get_cached_line(ap, which_line, untrim_cache);
     else
 	s = Nullch;
