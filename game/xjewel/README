@@ -1,0 +1,219 @@
+==============================================================================
+
+			    #
+			   #  ######  #    #  ######  #
+			  #  #       #    #  #       #
+			 #  #####   #    #  #####   #
+		  #     #  #       # ## #  #       #
+		 #     #  #       ##  ##  #       #
+		 #####   ######  #    #  ######  ######
+
+==============================================================================
+
+This game was originally written by Yoshihiro Satoh of HP.  I have made a
+modest attempt to replicate Domain/JewelBox under X.
+
+I have somewhat rudely taken the bitmaps from the original game and
+created this version.  I hold the copyright for the code, as I created
+it, but I hold no claim to the bitmaps which were freely
+distributed with the Domain version.
+
+REDISTRIBUTION in source or binary from is permited as long as adequate
+notation of the originators is retained, including the developer of the 
+original Domain/Jewlbox, Yoshihiro Satoh.
+NOTE: I do not claim to hold any copyright on columns games, Jewelbox, or any
+related name or icon.  I have written the source and thats all I hold claim to.
+
+USE AT YOUR OWN RISK AND PERIL, I MAKE NO CLAIM OF USEABILITY OR WARANTY.
+
+BUILDING
+========
+
+Jewel SHOULD compile on any UNIX or VMS machines:
+
+UNIX:
+In order to build xjewel:
+    1) edit the Imakefile to taste.
+        NOTE if you do not have imake use the file Makefile.simple and skip 2)
+            Worthwhile defines:
+                USE_SELECT - for the BSD crowd
+                        (define if build fails to find the poll system call)
+                ICON_WINDOW - for a dynamic icon window rather than static
+                DECWM - for a site using the DECwindows session manager
+    2) build the make file -> xmkmf or imake...
+    3) build the font: ( NOTE: only if desired, the game will run with out it )
+        % make bitmaps/seven_seg.snf
+	% xset +fp <curr path>
+	NOTE:   the xset will work only when you are local to the X-server,
+		on networked machines you have to add the font to the servers
+		font directories as appropriate...
+		AGAIN: The game will play without it.
+    4) make the program:
+        % make 
+    5) install and make the scorefile:
+	% copy xjewel ``your exec dir''/xjewel
+	% chmod a-w ``your exec dir''/xjewel
+        % touch ``your scorefile dir''/xjewel.scores
+        % chmod a+w ``your scorefile dir''/xjewel.scores
+	OR:
+	% make install
+    6) and enjoy....
+also:
+    7) Please edit the man page to show the exe path if desired, and install.
+	% copy xjewel.man /usr/local/man/man6/xjewel.6
+	OR:
+	% make install.man
+
+I have been able to build this on ISC 3.0, HP-UX 8.02, Ultrix 4.2, Solaris 1.0,
+Domain X11R4, and OSF1.0.  All have functioned as expected.
+
+It reportedly builds on Dell SVR4 v2.1, and several other un-named machines.
+
+VMS:
+    1) edit make.com to setup HSCORE_FILE
+    2) build both the font and executable:
+        @make.com
+    3) install the program and font
+	% copy xjewel.exe ``your local exec area''
+	% copy xjewel.hlb ``your local help area''
+	% copy [.bitmaps]seven_seg.* ``your local font area''
+		NOTE: new fonts may require restarting your x-server
+    4) and enjoy....
+
+I have been able to build this on VMS V5.5 and run with DECwindows.
+
+There is a man page in xjewel.man and a ps version in xjewel.ps.
+
+PLAYING
+=======
+
+Jewel is a game much like Domain/Jewelbox which is a puzzle game like
+Tetris.
+
+It is played by controling the motion of blocks which continue to fall from
+the top of the screen.  One can move them left and right, as well as
+rotate the jewel segements.  The object is to get the most points before
+the grim reaper ends the fun.
+
+Death happens when the screen is no longer capable of holding any more
+blocks.  To make high scores more interesting, you are given but three
+attempts to get points -- use them wisely.
+
+As the game progresses, and more jewels are removed, the speed of the game
+will increase.  This is measured in seconds of delay between steps of
+block motion.
+
+Keys
+----
+There are three sets of keys that can be used:
+( or any combination )
+
+Option 1:
+         +---+ +---+ +---+
+         | j | | k | | l |
+         +---+ +---+ +---+
+           ^     ^     ^
+           |     |     |__ move block right
+           |     |________ rotate block
+           |______________ move block left
+
+         +---------+
+         |  SPACE  | <---- drop block
+         +---------+
+
+Option 2:
+         +---+ +---+ +---+
+         | 4 | | 5 | | 6 |
+         +---+ +---+ +---+
+           ^     ^     ^
+           |     |     |__ move block right
+           |     |________ rotate block
+           |______________ move block left
+
+         +---------+
+         |    0    | <---- drop block
+         +---------+
+
+Option 3: (cursor keypad)
+                
+               +---+
+               | ^ | <----  rotate block
+               +---+
+         +---+ +---+ +---+
+         | < | | V | | > |
+         +---+ +---+ +---+
+           ^     ^     ^
+           |     |     |__ move block right
+           |     |________ drop block
+           |______________ move block left
+
+
+Rotations
+---------
+The folowing rotations are possible:
+( there are no others )
+
+              +---+       +---+       +---+
+              | 1 |       | 3 |       | 2 |
+              +---+       +---+       +---+
+              | 2 |  ==>  | 1 | ==>   | 3 |
+              +---+       +---+       +---+
+              | 3 |       | 2 |       | 1 |
+              +---+       +---+       +---+
+
+
+
+SCORING
+=======
+
+The basic way to get points is to unite the jewels to form triplet (or
+higher) matches.  This can be done in any direction, and can be
+accomplished in more than one part of the board at one time.  As the
+jewels are removed, the board falls to fill the spaces -- matches may
+again occur.
+
+These teritiary matches provide an interesting part to the game due to the
+formula for calculating points:
+    
+    ( 300 (for base triplet) + 150 * (each additional jewel) ) * 2^order
+
+    where order is the number of the repeition from which the match
+    occured.
+
+As a light at the end of the bleak tunnel, a WILD CARD is available.  The
+wild block will be given at infrequent intervals, and will give the user
+the points for one triplet by removing all the jewels of a particular
+shape/color.
+
+To add some interest to the game, points are awarded for dropping the
+block from a height above its resting place.  This is accumlated at 10
+points per level above the place it will rest.
+
+Stages
+------
+There are no changes for the higher levels, although the speed increases,
+proportionaly to the level.  Stage increases with the successful
+completion of the 50 jewels required per level.  The current status is
+shown in the REST field.
+
+
+ORIGINAL NOTATIONS
+==================
+>Authors
+>-------
+>
+>   Programming       Yoshihiro Satoh
+>   Font Design       Yoshiharu Minami
+>   Document Writing  Nancy Paisner
+>
+>Copyright
+>---------
+>
+>  This software is in the Yoshihiro's Arcade Collections.
+>  Domain/JewelBox is a trade mark of Yoshihiro Satoh.
+>
+>  Copyright @ 1990 by Yoshihiro Satoh
+>  All rights are reserved by Yoshihiro Satoh.
+
+xjewel - Jewel for X11 Copyright 1992 by David Cooper
+

@@ -1,0 +1,65 @@
+# A Simple makefile which will satisfy most users
+
+# Edit the following to the solid line:
+INSTDIR = /usr/local
+#HSCORE_FILE = $(INSTDIR)/lib/xjewel.scores
+HSCORE_FILE = xjewel.scores
+
+# DEFINE 'DECWM' if you use DECwindows session manager
+# DEFINE 'ICON_WINDOW' if you want dynamic icons
+# DEFINE 'LEAVE_PAUSE' if you auto pause if the pointer leaves the window
+# DEFINE 'GETPWENT' if you dont have the cuserid ftn (hscore.c)
+# DEFINE 'SLOW_FONTS=n' if your server is overly fast on fonts
+# DEFINE 'SLOW_DRAW=n' if your server is overly fast on drawing
+USERDEFS = -DICON_WINDOW
+
+# Declare what is necessary to build an X client
+#	POLL - define to USE_SELECT for bsdish systems
+#	LDFLAGS - the X11 libraries as reqd
+
+# the basic: (OSF, generic BSD)
+POLL = -DUSE_SELECT
+LDFLAGS = -lX11
+
+# IF SUN ->
+#INCLUDES = -I/usr/openwin/include
+#LDFLAGS = -L/usr/openwin/lib -lX11
+
+# IF HPUX ->
+#POLL = -DUSE_SELECT
+INCLUDES = -I/usr/include/X11R4
+LDFLAGS = -L/usr/lib/X11R4 -lX11
+
+# IF ISC3.0 ->
+#POLL =
+#INCLUDES = 
+#LDFLAGS = -lX11 -lXmalloc -lnsl_s -lc_s
+
+##############################################################################
+
+CFLAGS  = -O -DHSCORE_FILE=\"$(HSCORE_FILE)\" $(USERDEFS) $(INCLUDES) $(POLL)
+
+SHELL = /bin/sh
+
+HDRS    = general.h xw.h jewel.h logic.h panel.h xhscore.h hscore.h \
+		game.h intro.h help.h
+
+OBJS    = xw.o jewel.o logic.o panel.o xhscore.o hscore.o game.o intro.o help.o
+SRCS    = xw.c jewel.c logic.c panel.c xhscore.c hscore.c game.c intro.c help.c
+
+xjewel: $(OBJS)
+	rm -f $@
+	$(CC) -o $@ $(OBJS) $(LDFLAGS) $(MALLOC_LIB) 
+
+# IF YOUR SYSTEM USES .pcf OR .scr FILES, CHANGE THE FOLLOWING
+FFILE = snf
+
+bitmaps/seven_seg.$(FFILE): bitmaps/seven_seg.bdf
+	bdfto$(FFILE) bitmaps/seven_seg.bdf >bitmaps/seven_seg.$(FFILE)
+	(cd bitmaps ; mkfontdir)
+
+install: xjewel bitmaps/seven_seg.$(FFILE)
+	touch $(HSCORE_FILE)
+	chmod a+w $(HSCORE_FILE)
+	cp xjewel $(INSTDIR)/bin
+

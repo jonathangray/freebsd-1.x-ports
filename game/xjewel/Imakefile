@@ -1,0 +1,60 @@
+# A little makeyfile edit up to the solid line...
+
+# EDIT THE CDEBUGFLAGS IF -O GIVES A PROBLEM
+CDEBUGFLAGS = -O  
+
+# CHANGE HSCORE_FILE TO SUIT
+HSCORE_FILE=/usr/X386/lib/X11/games/xjewel.scores
+
+# ADD YOUR ARCHITECTURE IF YOU USE SELECT INSTEAD OF POLL
+#if defined(HPArchitecture) || defined(ApolloArchitecture) || \
+ 	defined(UltrixArchitecture) || defined(i386BsdArchitecture)
+#define sel -DUSE_SELECT
+#else
+#define sel 
+#endif
+
+# DEFINE 'DECWM' if you use DECwindows session manager
+# DEFINE 'ICON_WINDOW if you want dynamic icons
+# DEFINE 'LEAVE_PAUSE' if you auto pause if the pointer leaves the window
+# DEFINE 'GETPWENT' if you dont have the cuserid ftn (hscore.c)
+# DEFINE 'SLOW_FONTS=n' if your server is overly fast on fonts
+# DEFINE 'SLOW_DRAW=n' if your server is overly fast on drawing
+USERDEFS = -DICON_WINDOW -DLEAVE_PAUSE
+
+# CHANGE FFILE TO REFLECT THE EXTENSION USED FOR COMPILED FONTS
+FFILE = pcf.Z
+
+##############################################################################
+# X-STUFF...
+LOCAL_LIBRARIES = $(XLIB)
+DEPLIBS =
+
+DEFINES = -DHSCORE_FILE=\"$(HSCORE_FILE)\" sel $(USERDEFS)
+# MY CODE...
+HDRS    = general.h xw.h jewel.h logic.h panel.h xhscore.h hscore.h \
+		game.h intro.h help.h
+OBJS    = xw.o jewel.o logic.o panel.o xhscore.o hscore.o game.o intro.o help.o
+SRCS    = xw.c jewel.c logic.c panel.c xhscore.c hscore.c game.c intro.c help.c
+FONT   = bitmaps/seven_seg
+CFONT   = bitmaps/seven_seg.$(FFILE)
+
+
+# LETS GET TO IT...
+ComplexProgramTarget(xjewel)
+
+# IF YOUR SERVER DOES NOT LIKE THE DEFAULT FONT COMPILER, EDIT HERE...
+FontTarget($(FONT))
+	$(MKFONTDIR) bitmaps/
+
+# FORCE FONT TO BE BUILT
+all:: $(CFONT)
+
+install::
+	touch  $(HSCORE_FILE)
+	chmod a+w $(HSCORE_FILE)
+
+pkg: pkg_bin
+
+pkg_bin: install install.man
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST xjewel_bin
