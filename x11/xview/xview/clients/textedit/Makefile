@@ -47,8 +47,8 @@
 
             SHELL = 	/bin/sh
 
-              TOP = ../.
-      CURRENT_DIR = ./clients
+              TOP = ../../.
+      CURRENT_DIR = ./clients/textedit
 
                AR = ar clq
   BOOTSTRAPCFLAGS =
@@ -363,50 +363,81 @@ _percentC_ = %C
 # XView.rules for XView release 3.0.  Imake rules needed by distribution.
 
 ##########################################################################
-# @(#)Imakefile	1.6 28 Apr 1993 SMI
-# Imakefile for contrib directory.
+# @(#)Imakefile 1.6 90/07/17 SMI
+# Imakefile for textedit
 
-SUBDIRS = clock cmdtool olwm olwmslave olvwm textedit props ftptool
+DEFINES = -DSTANDALONE
+INCLUDES = -I$(HEADER_DEST) -I$(TOP)
+SYS_LIBRARIES =
+DEPLIBS =
+LOCAL_LIBRARIES = $(XVIEWLIB) $(OLGXLIB) $(XLIB) $(XVCLIENTMISCLIB) -lrpc -lgnuregex
 
-DIRS_TO_CREATE = $(SRC_DEST)
+HEADERS =
+INFOFILES = textedit.info
+MANPAGES = textedit.man
+ICONS = textedit.icon textedit.mask.icon
+SRCS = textedit.c
+OBJS = textedit.o
 
-all::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "making" all "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS) 'CDEBUGFLAGS=$(CDEBUGFLAGS)' all); \
-	done
+ALLFILES = ${HEADERS} ${INFOFILES} ${MANPAGES} ${ICONS} ${SRCS}
+
+ PROGRAM = textedit
+
+all:: textedit
+
+textedit: $(OBJS) $(DEPLIBS)
+	$(RM) $@
+	$(CC) -o $@ $(OBJS) $(LDOPTIONS) $(LOCAL_LIBRARIES) $(LDLIBS) $(EXTRA_LOAD_FLAGS)
+
+install:: textedit
+	@if [ -d $(DESTDIR)$(BINDIR) ]; then set +x; \
+	else (set -x; $(MKDIRHIER) $(DESTDIR)$(BINDIR)); fi
+	$(INSTALL) -c $(INSTPGMFLAGS)  textedit $(DESTDIR)$(BINDIR)
+
+install.man:: textedit.man
+	@if [ -d $(DESTDIR)$(MANDIR) ]; then set +x; \
+	else (set -x; $(MKDIRHIER) $(DESTDIR)$(MANDIR)); fi
+	$(RM) $(DESTDIR)$(MANDIR)/textedit.$(MANSUFFIX)*
+	$(INSTALL) -c $(INSTMANFLAGS) textedit.man $(DESTDIR)$(MANDIR)/textedit.$(MANSUFFIX)
 
 depend::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "depending" "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS)  depend); \
-	done
+	$(DEPEND) $(DEPENDFLAGS) -s "# DO NOT DELETE" -- $(ALLDEFINES) -- $(SRCS)
 
-install::
-	@case '${MFLAGS}' in *[i]*) set +e;; esac;
-	@for i in  $(DIRS_TO_CREATE); do if [ -d $(DESTDIR)$$i ]; then \
-	set +x; else (set -x; $(MKDIRHIER) $(DESTDIR)$$i); fi \
-	done
+lint:
+	$(LINT) $(LINTFLAGS) $(SRCS) $(LINTLIBS)
+lint1:
+	$(LINT) $(LINTFLAGS) $(FILE) $(LINTLIBS)
 
-install.srcs::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "installing srcs" "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS)   install.srcs); \
-	done
+clean::
+	$(RM) $(PROGRAM)
+
+# @(#)XView.prog	1.6 28 Jun 1993 SMI
 
 populate::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "populating" "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS)   populate); \
-	done
+	@case '${MFLAGS}' in *[i]*) set +e;; esac;
+	-@if [ -h SCCS ]; then \
+	for i in $(ALLFILES) ; do sccs get $$i ; done ; \
+	elif [ -h SCCS- ]; then \
+	$(MV) SCCS- SCCS ; \
+	for i in $(ALLFILES) ; do sccs get $$i ; done ; \
+	$(MV) SCCS SCCS- ; \
+	else \
+	echo "SCCS or SCCS- do not exist" ; \
+	fi
+
+install.srcs::
+
+includes::
+
+install.man::
+
+depend::
+	$(DEPEND) $(DEPENDFLAGS) -s "# DO NOT DELETE" -- $(ALLDEFINES) -- $(SRCS)
+
+lint:
+	$(LINT) $(LINTFLAGS) $(SRCS) $(LINTLIBS)
+lint1:
+	$(LINT) $(LINTFLAGS) $(FILE) $(LINTLIBS)
 
 # -------------------------------------------------------------------------
 # common rules for all Makefiles - do not edit
@@ -427,110 +458,20 @@ tags::
 	$(TAGS) -xw *.[ch] > TAGS
 
 # -------------------------------------------------------------------------
-# rules for building in SUBDIRS - do not edit
+# empty rules for directories that do not have SUBDIRS - do not edit
 
 install::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "installing" "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS) DESTDIR='$(DESTDIR)' install); \
-	done
+	@echo "install in $(CURRENT_DIR) done"
 
 install.man::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "installing man pages" "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS) DESTDIR='$(DESTDIR)' install.man); \
-	done
+	@echo "install.man in $(CURRENT_DIR) done"
 
 install.linkkit::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "installing link kit" "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS) DESTDIR='$(DESTDIR)' install.linkkit); \
-	done
-
-clean::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "cleaning" "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS) RM_CMD='$(RM_CMD)' clean); \
-	done
-
-tags::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "tagging" "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS) TAGS='$(TAGS)' tags); \
-	done
+	@echo "install.linkkit in $(CURRENT_DIR) done"
 
 Makefiles::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	echo "making Makefiles in $(CURRENT_DIR)/$$i..."; \
-	case "$$i" in \
-	./?*/?*/?*/?*) newtop=../../../../ sub=subsubsubsub;; \
-	./?*/?*/?*) newtop=../../../ sub=subsubsub;; \
-	./?*/?*)    newtop=../../ sub=subsub;; \
-	./?*)       newtop=../ sub=sub;; \
-	*/?*/?*/?*)    newtop=../../../../ sub=subsubsubsub;; \
-	*/?*/?*)    newtop=../../../ sub=subsubsub;; \
-	*/?*)       newtop=../../ sub=subsub;; \
-	*)	    newtop=../ sub=sub;; \
-	esac; \
-	case "$(TOP)" in \
-	/?*) newtop=  upprefix=  ;; \
-	*) upprefix=../ ;; \
-	esac; \
-	$(MAKE) $${sub}dirMakefiles UPPREFIX=$$upprefix NEWTOP=$$newtop \
-	MAKEFILE_SUBDIR=$$i NEW_CURRENT_DIR=$(CURRENT_DIR)/$$i;\
-	done
-
-subdirMakefiles:
-	$(RM) $(MAKEFILE_SUBDIR)/Makefile.bak
-	-@if [ -f $(MAKEFILE_SUBDIR)/Makefile ]; then set -x; \
-	$(MV) $(MAKEFILE_SUBDIR)/Makefile $(MAKEFILE_SUBDIR)/Makefile.bak; \
-	else exit 0; fi
-	cd $(MAKEFILE_SUBDIR); $(IMAKE_CMD) -DTOPDIR=$(UPPREFIX)$(TOP) -DCURDIR=$(NEW_CURRENT_DIR); \
-	$(MAKE) $(MFLAGS) Makefiles
-
-subsubdirMakefiles:
-	$(RM) $(MAKEFILE_SUBDIR)/Makefile.bak
-	-@if [ -f $(MAKEFILE_SUBDIR)/Makefile ]; then set -x; \
-	$(MV) $(MAKEFILE_SUBDIR)/Makefile $(MAKEFILE_SUBDIR)/Makefile.bak; \
-	else exit 0; fi
-	cd $(MAKEFILE_SUBDIR); $(IMAKE_CMD) -DTOPDIR=$(UPPREFIX)$(UPPREFIX)$(TOP) -DCURDIR=$(NEW_CURRENT_DIR); \
-	$(MAKE) $(MFLAGS) Makefiles
-
-subsubsubdirMakefiles:
-	$(RM) $(MAKEFILE_SUBDIR)/Makefile.bak
-	-@if [ -f $(MAKEFILE_SUBDIR)/Makefile ]; then set -x; \
-	$(MV) $(MAKEFILE_SUBDIR)/Makefile $(MAKEFILE_SUBDIR)/Makefile.bak; \
-	else exit 0; fi
-	cd $(MAKEFILE_SUBDIR); $(IMAKE_CMD) -DTOPDIR=$(UPPREFIX)$(UPPREFIX)$(UPPREFIX)$(TOP) -DCURDIR=$(NEW_CURRENT_DIR); \
-	$(MAKE) $(MFLAGS) Makefiles
-
-subsubsubsubdirMakefiles:
-	$(RM) $(MAKEFILE_SUBDIR)/Makefile.bak
-	-@if [ -f $(MAKEFILE_SUBDIR)/Makefile ]; then set -x; \
-	$(MV) $(MAKEFILE_SUBDIR)/Makefile $(MAKEFILE_SUBDIR)/Makefile.bak; \
-	else exit 0; fi
-	cd $(MAKEFILE_SUBDIR); $(IMAKE_CMD) -DTOPDIR=$(UPPREFIX)$(UPPREFIX)$(UPPREFIX)$(UPPREFIX)$(TOP) -DCURDIR=$(NEW_CURRENT_DIR); \
-	$(MAKE) $(MFLAGS) Makefiles
 
 includes::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo including "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS)  includes); \
-	done
 
 # -------------------------------------------------------------------------
 # dependencies generated by makedepend

@@ -2,7 +2,7 @@
 # $XConsortium: imake.c,v 1.65 91/07/25 17:50:17 rws Exp $
 
 # -------------------------------------------------------------------------
-# Makefile generated from "Imake.tmpl" and <Imakefile>
+# Makefile generated from "Imake.tmpl" and </tmp/IIf.013067>
 # $XFree86: mit/config/Imake.tmpl,v 1.17 1993/06/03 15:26:36 dawes Exp $
 # $XConsortium: Imake.tmpl,v 1.139 91/09/16 08:52:48 rws Exp $
 #
@@ -47,8 +47,8 @@
 
             SHELL = 	/bin/sh
 
-              TOP = ../.
-      CURRENT_DIR = ./clients
+              TOP = ../../.
+      CURRENT_DIR = ./clients/ftptool
 
                AR = ar clq
   BOOTSTRAPCFLAGS =
@@ -270,143 +270,91 @@ _percentC_ = %C
 # -------------------------------------------------------------------------
 # start of Imakefile
 
-###########################################################################
-# @(#)XView.cf	1.10 09 Feb 1992 SMI
-# XView.cf for XView release 3.0.  Specify site preferences here.
+#OPENWINHOME = /usr/local/OW3
 
-###########################################################################
-# @(#)XView.tmpl	1.15 12 May 1993 SMI
-# XView.tmpl for XView release 3.2.  Template to add additional config
-# rules to those supplied with X Version 11 release 5.
+#Uncomment the appropriate one if necessary. You should not need
+#either, as it should be determined by the program.
+#XVIEW= -DXVIEW3
+#XVIEW= -DXVIEW2
 
-              MKDIRHIER = 	/bin/sh 	/usr/X386/bin/mkdirhier
+#Uncomment the following line for SunOS 4.X
+#DEFINES= $(XVIEW)
+#Choose a CC (only tested under cc and gcc though)
+#CC=cc
+#CC=gcc -ansi
 
-           XV_CFLAGS.optimized = -DOPTIMIZED
-           XV_CFLAGS.shared =
+#Uncomment the following lines for SunOS 5.0 with Sun cc.
+DEFINES=
+LIBSUNOS5= -L/usr/X386/lib
 
-                DEFINES = $(LOCALE_DEFINES) $(MMAP_DEFINES) $(XV_ALLOC_DEFINES) 			  $(XV_STRDUP_DEFINES) $(XV_CFLAGS.optimized) $(XV_CFLAGS.shared)
+#Uncomment the following lines for SunOS 5.0 with gcc
+#Don't use -ansi, there seems to be a header file problem with that.
+#DEFINES= -DSYSV -DSVR4 $(XVIEW)
+#LIBSUNOS5= -L${OPENWINHOME}/lib -lsocket -lnsl -lm
+#CC=gcc -g
 
-              XVDESTDIR = /usr/X386
-           LIBRARY_DEST = $(XVDESTDIR)/lib
-      LINT_LIBRARY_DEST = $(XVDESTDIR)/lib/lint
-                 BINDIR = $(XVDESTDIR)/bin
-                MANPATH = $(XVDESTDIR)/man
-            HEADER_DEST = $(XVDESTDIR)/include
-               SRC_DEST = $(XVDESTDIR)/share/src/xview
-               DOC_DEST = $(XVDESTDIR)/share/doc/xview
+#Uncomment the following line for 386 SVR4.
+#DEFINES= -DSYSV386 -DSYSV -DSVR4
 
-               XVLIBSRC = $(TOP)/lib
-              HELP_DEST = $(LIBRARY_DEST)/help
-    LIBRARY_DEST_EXTRAS = $(LIBRARY_DEST)
-       TEXT_EXTRAS_MENU = $(LIBRARY_DEST)/.text_extras_menu
-                     AR = ar ruv
-                  CHMOD = chmod
+SYS_LIBRARIES 	= -lm -lrpc -lgnuregex
+LOCAL_LIBRARIES = -lxview -lolgx $(XLIB) $(LIBSUNOS5)
+LDOPTIONS 		= -L$(OPENWINHOME)/lib
+INCLUDES 		= -I$(OPENWINHOME)/include -I/usr/include
 
-                DEPXLIB =
+HELPDIR			= $(OPENWINHOME)/lib/help
 
-            BUILDINCDIR = $(TOP)/build
-            BUILDINCTOP = ../../..
+ICONS = busy1.ftptool.icon busy2.ftptool.icon busy3.ftptool.icon 	busy4.ftptool.icon ftptool.icon tar.viewer.icon
 
-                 INCDIR = /include
+HEADERS = ftptool.h
 
-               XVPUBINC = xview
-               XVPRIINC = xview_private
-               OLPUBINC = olgx
-               OLPRIINC = olgx_private
-               PSPUBINC = xvps
-               PSPRIINC = xvps_private
-               IMAGEINC = images
-              BITMAPINC = bitmaps
-         PIXRECT_INCDIR = $(INCDIR)/pixrect
-           XVPUB_INCDIR = $(INCDIR)/$(XVPUBINC)
-           XVPRI_INCDIR = $(INCDIR)/$(XVPRIINC)
-           OLPUB_INCDIR = $(INCDIR)/$(OLPUBINC)
-           OLPRI_INCDIR = $(INCDIR)/$(OLPRIINC)
-           PSPUB_INCDIR = $(INCDIR)/$(PSPUBINC)
-           PSPRI_INCDIR = $(INCDIR)/$(PSPRIINC)
-           IMAGE_INCDIR = $(INCDIR)/$(IMAGEINC)
-          BITMAP_INCDIR = $(INCDIR)/$(BITMAPINC)
-    PIXRECT_HEADER_DEST = $(HEADER_DEST)/pixrect
-      XVPUB_HEADER_DEST = $(HEADER_DEST)/$(XVPUBINC)
-      XVPRI_HEADER_DEST = $(HEADER_DEST)/$(XVPRIINC)
-      OLPUB_HEADER_DEST = $(HEADER_DEST)/$(OLPUBINC)
-      OLPRI_HEADER_DEST = $(HEADER_DEST)/$(OLPRIINC)
-      PSPUB_HEADER_DEST = $(HEADER_DEST)/$(PSPUBINC)
-      PSPRI_HEADER_DEST = $(HEADER_DEST)/$(PSPRIINC)
-            IMAGES_DEST = $(HEADER_DEST)/$(IMAGEINC)
-            BITMAP_DEST = $(HEADER_DEST)/$(BITMAPINC)
+SUBHEADERS= batch.h batch_struct.h button_funcs.h change_dir.h config.h 	create_main.h create_other.h dircache.h dircache_struct.h dirlist.h 	dirlist_struct.h dofuncs.h dnd.h event.h ftp_var.h host_list.h 	host_list_struct.h main.h menu_funcs.h misc.h patchlevel.h readdir.h 	schedule.h schedule_struct.h tar_view.h transfer.h view_file.h 	view_file_struct.h
 
-                LINTDIR = $(LINT_LIBRARY_DEST)
+INFOFILES = ftptool.info
 
-            DEPXVIEWLIB = $(LIBRARY_DEST)/libxview.a
-               XVIEWLIB = 			 -L$(LIBRARY_DEST) -lxview
+MANPAGES = ftptool.man
 
-            DEPOLGXLIB = $(LIBRARY_DEST)/libolgx.a
-               OLGXLIB = 			 -L$(LIBRARY_DEST) -lolgx
+SRCS = batch.c button_funcs.c change_dir.c create_main.c create_other.c 	dircache.c dirlist.c dofuncs.c dnd.c event.c ftp.c host_list.c 	lex.l main.c menu_funcs.c misc.c readdir.c schedule.c tar_view.c 	transfer.c view_file.c
 
-            DEPXVPSLIB = $(LIBRARY_DEST)/libxvps.a
-               XVPSLIB = 			 -L$(LIBRARY_DEST) -lxvps
+OBJS = batch.o button_funcs.o change_dir.o create_main.o create_other.o 	dircache.o dirlist.o dofuncs.o dnd.o event.o ftp.o host_list.o 	lex.o main.o menu_funcs.o misc.o readdir.o schedule.o tar_view.o 	transfer.o view_file.o
 
-             XLIB = $(EXTENSIONLIB) 			 -lX11
+ALLFILES = ${HEADERS} ${INFOFILES} ${MANPAGES} ${ICONS} ${SRCS}
 
-             SYSV_CLIENT_LIB =
-             XVCLIENTSYSDEFINES = -DSUNOS41
+all:: ftptool
 
-        XVCLIENTI18NDEFINES = -DOW_I18N_L3
-        XVCLIENTMISCLIB =
-        XVCLIENTINCLUDES =
+$(OBJS): $(HEADERS) $(SUBHEADERS)
 
-        XVCLIENTDEFINES = $(XVCLIENTSYSDEFINES) $(XVCLIENTI18NDEFINES)
+ PROGRAM = ftptool
 
-###########################################################################
-# @(#)XView.rules	1.8 12 May 1993 SMI
-# XView.rules for XView release 3.0.  Imake rules needed by distribution.
+all:: ftptool
 
-##########################################################################
-# @(#)Imakefile	1.6 28 Apr 1993 SMI
-# Imakefile for contrib directory.
+ftptool: $(OBJS) $(DEPLIBS)
+	$(RM) $@
+	$(CC) -o $@ $(OBJS) $(LDOPTIONS) $(LOCAL_LIBRARIES) $(LDLIBS) $(EXTRA_LOAD_FLAGS)
 
-SUBDIRS = clock cmdtool olwm olwmslave olvwm textedit props ftptool
+install:: ftptool
+	@if [ -d $(DESTDIR)$(BINDIR) ]; then set +x; \
+	else (set -x; $(MKDIRHIER) $(DESTDIR)$(BINDIR)); fi
+	$(INSTALL) -c $(INSTPGMFLAGS)  ftptool $(DESTDIR)$(BINDIR)
 
-DIRS_TO_CREATE = $(SRC_DEST)
-
-all::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "making" all "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS) 'CDEBUGFLAGS=$(CDEBUGFLAGS)' all); \
-	done
+install.man:: ftptool.man
+	@if [ -d $(DESTDIR)$(MANDIR) ]; then set +x; \
+	else (set -x; $(MKDIRHIER) $(DESTDIR)$(MANDIR)); fi
+	$(RM) $(DESTDIR)$(MANDIR)/ftptool.$(MANSUFFIX)*
+	$(INSTALL) -c $(INSTMANFLAGS) ftptool.man $(DESTDIR)$(MANDIR)/ftptool.$(MANSUFFIX)
 
 depend::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "depending" "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS)  depend); \
-	done
+	$(DEPEND) $(DEPENDFLAGS) -s "# DO NOT DELETE" -- $(ALLDEFINES) -- $(SRCS)
+
+lint:
+	$(LINT) $(LINTFLAGS) $(SRCS) $(LINTLIBS)
+lint1:
+	$(LINT) $(LINTFLAGS) $(FILE) $(LINTLIBS)
+
+clean::
+	$(RM) $(PROGRAM)
 
 install::
-	@case '${MFLAGS}' in *[i]*) set +e;; esac;
-	@for i in  $(DIRS_TO_CREATE); do if [ -d $(DESTDIR)$$i ]; then \
-	set +x; else (set -x; $(MKDIRHIER) $(DESTDIR)$$i); fi \
-	done
-
-install.srcs::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "installing srcs" "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS)   install.srcs); \
-	done
-
-populate::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "populating" "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS)   populate); \
-	done
+	$(INSTALL) -c $(INSTMANFLAGS) ftptool.info $(HELPDIR)/ftptool.info
 
 # -------------------------------------------------------------------------
 # common rules for all Makefiles - do not edit
@@ -427,110 +375,20 @@ tags::
 	$(TAGS) -xw *.[ch] > TAGS
 
 # -------------------------------------------------------------------------
-# rules for building in SUBDIRS - do not edit
+# empty rules for directories that do not have SUBDIRS - do not edit
 
 install::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "installing" "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS) DESTDIR='$(DESTDIR)' install); \
-	done
+	@echo "install in $(CURRENT_DIR) done"
 
 install.man::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "installing man pages" "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS) DESTDIR='$(DESTDIR)' install.man); \
-	done
+	@echo "install.man in $(CURRENT_DIR) done"
 
 install.linkkit::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "installing link kit" "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS) DESTDIR='$(DESTDIR)' install.linkkit); \
-	done
-
-clean::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "cleaning" "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS) RM_CMD='$(RM_CMD)' clean); \
-	done
-
-tags::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo "tagging" "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS) TAGS='$(TAGS)' tags); \
-	done
+	@echo "install.linkkit in $(CURRENT_DIR) done"
 
 Makefiles::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	echo "making Makefiles in $(CURRENT_DIR)/$$i..."; \
-	case "$$i" in \
-	./?*/?*/?*/?*) newtop=../../../../ sub=subsubsubsub;; \
-	./?*/?*/?*) newtop=../../../ sub=subsubsub;; \
-	./?*/?*)    newtop=../../ sub=subsub;; \
-	./?*)       newtop=../ sub=sub;; \
-	*/?*/?*/?*)    newtop=../../../../ sub=subsubsubsub;; \
-	*/?*/?*)    newtop=../../../ sub=subsubsub;; \
-	*/?*)       newtop=../../ sub=subsub;; \
-	*)	    newtop=../ sub=sub;; \
-	esac; \
-	case "$(TOP)" in \
-	/?*) newtop=  upprefix=  ;; \
-	*) upprefix=../ ;; \
-	esac; \
-	$(MAKE) $${sub}dirMakefiles UPPREFIX=$$upprefix NEWTOP=$$newtop \
-	MAKEFILE_SUBDIR=$$i NEW_CURRENT_DIR=$(CURRENT_DIR)/$$i;\
-	done
-
-subdirMakefiles:
-	$(RM) $(MAKEFILE_SUBDIR)/Makefile.bak
-	-@if [ -f $(MAKEFILE_SUBDIR)/Makefile ]; then set -x; \
-	$(MV) $(MAKEFILE_SUBDIR)/Makefile $(MAKEFILE_SUBDIR)/Makefile.bak; \
-	else exit 0; fi
-	cd $(MAKEFILE_SUBDIR); $(IMAKE_CMD) -DTOPDIR=$(UPPREFIX)$(TOP) -DCURDIR=$(NEW_CURRENT_DIR); \
-	$(MAKE) $(MFLAGS) Makefiles
-
-subsubdirMakefiles:
-	$(RM) $(MAKEFILE_SUBDIR)/Makefile.bak
-	-@if [ -f $(MAKEFILE_SUBDIR)/Makefile ]; then set -x; \
-	$(MV) $(MAKEFILE_SUBDIR)/Makefile $(MAKEFILE_SUBDIR)/Makefile.bak; \
-	else exit 0; fi
-	cd $(MAKEFILE_SUBDIR); $(IMAKE_CMD) -DTOPDIR=$(UPPREFIX)$(UPPREFIX)$(TOP) -DCURDIR=$(NEW_CURRENT_DIR); \
-	$(MAKE) $(MFLAGS) Makefiles
-
-subsubsubdirMakefiles:
-	$(RM) $(MAKEFILE_SUBDIR)/Makefile.bak
-	-@if [ -f $(MAKEFILE_SUBDIR)/Makefile ]; then set -x; \
-	$(MV) $(MAKEFILE_SUBDIR)/Makefile $(MAKEFILE_SUBDIR)/Makefile.bak; \
-	else exit 0; fi
-	cd $(MAKEFILE_SUBDIR); $(IMAKE_CMD) -DTOPDIR=$(UPPREFIX)$(UPPREFIX)$(UPPREFIX)$(TOP) -DCURDIR=$(NEW_CURRENT_DIR); \
-	$(MAKE) $(MFLAGS) Makefiles
-
-subsubsubsubdirMakefiles:
-	$(RM) $(MAKEFILE_SUBDIR)/Makefile.bak
-	-@if [ -f $(MAKEFILE_SUBDIR)/Makefile ]; then set -x; \
-	$(MV) $(MAKEFILE_SUBDIR)/Makefile $(MAKEFILE_SUBDIR)/Makefile.bak; \
-	else exit 0; fi
-	cd $(MAKEFILE_SUBDIR); $(IMAKE_CMD) -DTOPDIR=$(UPPREFIX)$(UPPREFIX)$(UPPREFIX)$(UPPREFIX)$(TOP) -DCURDIR=$(NEW_CURRENT_DIR); \
-	$(MAKE) $(MFLAGS) Makefiles
 
 includes::
-	@case '${MFLAGS}' in *[ik]*) set +e;; esac; \
-	for i in $(SUBDIRS) ;\
-	do \
-	(cd $$i ; echo including "in $(CURRENT_DIR)/$$i..."; \
-	$(MAKE) $(MFLAGS)  includes); \
-	done
 
 # -------------------------------------------------------------------------
 # dependencies generated by makedepend
