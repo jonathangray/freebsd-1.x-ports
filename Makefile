@@ -113,6 +113,7 @@ SUBDIR += print
 SUBDIR += shell
 SUBDIR += util
 SUBDIR += x11
+SUBDIR += game
 .if defined(MAKE_X_MIT)
 SUBDIR += x-mit		# Done last, as Very big, & time consuming
 .endif
