@@ -3,7 +3,7 @@
  */
 
 #ifndef lint
-static char *RCSid = "$Id: misc.c,v 1.1 1994/04/16 21:38:47 sean Exp $";
+static char *RCSid = "$Id: misc.c,v 1.2 1994/04/17 00:59:47 sean Exp $";
 #endif
 
 #include "stdh.h"
@@ -384,6 +384,24 @@ xstrcmp(p1, p2)
 	return (strcmp((char *)p1, (char *)p2));
 }
 
+/* cleanpath constructs a path in clean from two input paths: pwd and dir.
+ * Semantics:
+ *   If dir begins with '/', ie is an absolute path, then
+ *     x := dir
+ *   else if pwd is not NULL then
+ *     x := concatenation of pwd and dir
+ *   else
+ *     x := concatenation of "./" and dir
+ *
+ *   clean := dir with double slashes converted to single slashes,
+ *              "/./" strings converted to "/", and "dir1/dir2/../" converted
+ *              to dir1
+ *     ie clean is nice and tidy
+ * Preconditions:
+ *   Neither dir or clean are NULL.
+ *   If pwd is not NULL, then it must be 'clean' according to the criteria
+ *     above.
+ */
 void
 cleanpath(pwd, dir, clean)
 	char *pwd, *dir, *clean;
@@ -391,10 +409,11 @@ cleanpath(pwd, dir, clean)
 	register char  *s, *d, *p;
 	char *slash = "/";
 	register int inslash = 0;
+	static char dot[] = ".";
 
 	d = clean;
 	if (*dir != '/') {
-		s = pwd;
+		s = pwd != NULL ? pwd : dot;
 		while (*d++ = *s++)
 			;
 		if (d >= clean + 2 && *(d - 2) == '/')

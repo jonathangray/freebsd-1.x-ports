@@ -3,7 +3,7 @@
  */
 
 #ifndef lint
-static char *RCSid = "$Id: c_ksh.c,v 1.1 1994/04/16 21:38:44 sean Exp $";
+static char *RCSid = "$Id: c_ksh.c,v 1.2 1994/04/17 00:59:19 sean Exp $";
 #endif
 
 #include "stdh.h"
@@ -49,18 +49,22 @@ c_cd(wp)
 	register struct tbl *v_pwd = NULL, *v_oldpwd = NULL;
 
 	if ((dir = wp[1]) == NULL && (dir = strval(global("HOME"))) == NULL)
-		errorf("no home directory");
+		errorf("no home directory\n");
 
 	v_pwd = global("PWD");
 	if ((pwd = strval(v_pwd)) == null) {
-		setstr(v_pwd, getcwd(path, (size_t)PATH));
-		pwd = strval(v_pwd);
+		if (getcwd(path, (size_t)PATH) != NULL) {
+			setstr(v_pwd, path);
+			pwd = strval(v_pwd);
+		}
 	}
 
 	if (wp[1] != NULL && (rep = wp[2]) != NULL) {
 		/*
 		 * Two arg version: cd pat rep
 		 */
+		if (pwd == null)
+			errorf("cannot substitute: no current directory\n");
 		if (strlen(pwd) - strlen(dir) + strlen(rep) >= PATH)
 			errorf("substitution too long\n");
 		cp = strstr(pwd, dir);
@@ -76,6 +80,8 @@ c_cd(wp)
 		 * Change to previous dir: cd -
 		 */
 		dir = strval(v_oldpwd = global("OLDPWD"));
+		if (dir == null)
+			errorf("no previous directory\n");
 		prt = 1;
 	}
 	if (dir[0] == '/' ||
@@ -85,7 +91,7 @@ c_cd(wp)
 		/*
 		 * dir is an explicitly named path, so no CDPATH search
 		 */
-		cleanpath(pwd, dir, newd);
+		cleanpath(pwd != null ? pwd : NULL, dir, newd);
 		if (chdir(newd) < 0)
 			errorf("%s: bad directory\n", newd);
 		else if (prt)
@@ -111,10 +117,10 @@ c_cd(wp)
 			} else
 				cp = dir;
 
-			cleanpath(pwd, cp, newd);
+			cleanpath(pwd != null ? pwd : NULL, cp, newd);
 			if (chdir(newd) == 0)
 				done = 1;
-		} while (!done && cdpath != NULL);
+		}
 		if (!done)
 			errorf("%s: bad directory\n", dir);
 		if (prt)

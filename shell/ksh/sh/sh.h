@@ -2,9 +2,11 @@
  * Public Domain Bourne/Korn shell
  */
 
-/* $Id: sh.h,v 1.1 1994/04/16 21:38:47 sean Exp $ */
+/* $Id: sh.h,v 1.2 1994/04/17 00:59:55 sean Exp $ */
 
 #include "config.h"
+
+#include <sys/param.h>
 
 /* some useful #defines */
 #ifdef EXTERN
@@ -63,7 +65,7 @@ typedef int bool_t;
 #define	NOT	'!'	/* might use ^ */
 
 #define	LINE	256		/* input line size */
-#define	PATH	256		/* pathname size */
+#define	PATH	MAXPATHLEN	/* pathname size */
 
 EXTERN	int	kshpid;		/* $$, shell pid */
 EXTERN	int	exstat;		/* exit status */

@@ -1,7 +1,7 @@
 #
 # Makefile for the compatibility libraries
 #
-# $Id: Makefile,v 1.1 1994/04/16 21:38:52 sean Exp $
+# $Id: Makefile,v 1.2 1994/04/17 01:00:04 sean Exp $
 #
 
 SHELL = /bin/sh
@@ -12,7 +12,7 @@ CONFIG = -D_BSD
 
 LN = ln
 
-libs:	h libstdc.a libposix.a
+libs:	h # libstdc.a libposix.a
 
 h:
 	mkdir h

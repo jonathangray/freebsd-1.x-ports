@@ -2,7 +2,7 @@
  * Process and job control
  */
 #ifndef lint
-static char *RCSid = "$Id: jobs.c,v 1.1 1994/04/16 21:38:44 sean Exp $";
+static char *RCSid = "$Id: jobs.c,v 1.2 1994/04/17 00:59:33 sean Exp $";
 #endif
 
 /*
@@ -476,6 +476,7 @@ j_waitj(aj, intr)
 			    sigpause(sm_default);
 			    _TRACE(4, ("j_waitj: sigpause() returned %d, sigchld_caught==%d", errno, sigchld_caught));
 # endif /* USE_SIGACT */
+			    errno = 0;
 			  }
 			}
 			else
@@ -604,10 +605,10 @@ j_reapchld()
 		WAIT_T status;
 #ifdef JOBS
 		if (flag[FMONITOR])
-			pid = waitpid(-1, &status, (WNOHANG|WUNTRACED));
+			pid = waitpid(-1, (int *)&status, (WNOHANG|WUNTRACED));
 		else
 #endif
-			pid = wait(&status);
+			pid = wait((int *)&status);
 		if (pid == 0 || pid < 0 && errno == ECHILD)
 		{
 		  /* no children - what are we doing here? */

@@ -1,5 +1,5 @@
 # PD Bourne/Korn Shell
-# $Id: Makefile,v 1.1 1994/04/16 21:38:47 sean Exp $
+# $Id: Makefile,v 1.2 1994/04/17 00:59:13 sean Exp $
 
 # Makefile is setup for 386bsd
 
@@ -83,7 +83,7 @@ LDOPTS=-L$(STD)
 XOBJS=
 
 # use -O if you trust it :-)
-DBG=-g -O
+DBG=
 CFLAGS = $(DBG) $(CONFIG) $(XINCL) $(XOPTS)
 
 LDFLAGS = $(DBG) 
@@ -112,10 +112,10 @@ ksh: $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LDLIBS)
 
 clean:
-	rm -f *.o *.out core
+	rm -f *.o *.out core ksh
 
 clobber: clean
-	rm -f ksh
+#	rm -f ksh
 
 link:
 	($(SHELL) ../std/mklinks ../std/h stdh.h)

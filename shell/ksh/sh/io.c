@@ -3,7 +3,7 @@
  */
 
 #ifndef lint
-static char *RCSid = "$Id: io.c,v 1.1 1994/04/16 21:38:48 sean Exp $";
+static char *RCSid = "$Id: io.c,v 1.2 1994/04/17 00:59:26 sean Exp $";
 #endif
 
 #include "stdh.h"
@@ -96,6 +96,8 @@ void
 fopenshf(fd)
 	int fd;
 {
+	int file_flags;
+
 	if (shf[fd] != NULL)
 		return;
 	if (fd <= 2)
@@ -109,7 +111,11 @@ fopenshf(fd)
 		_iob[fd]._flag = 0; /* re-use stdin, stdout, stderr */
 #endif
 #endif
-	shf[fd] = fdopen(fd, "r+");
+	if ((file_flags = fcntl(fd, F_GETFL, 0)) == -1)
+		return;
+	file_flags &= O_ACCMODE;
+	shf[fd] = fdopen(fd,
+		file_flags == O_RDONLY ? "r" : file_flags == O_WRONLY ? "w" : "r+");
 	if (shf[fd] == NULL)
 		return;
 	setvbuf(shf[fd], (char*)NULL, _IOFBF, (size_t)BUFSIZ);

@@ -3,7 +3,7 @@
  */
 
 #ifndef lint
-static char *RCSid = "$Id: main.c,v 1.1 1994/04/16 21:38:46 sean Exp $";
+static char *RCSid = "$Id: main.c,v 1.2 1994/04/17 00:59:43 sean Exp $";
 #endif
 
 #define	EXTERN				/* define EXTERNs in sh.h */
@@ -43,7 +43,6 @@ static	const	char   initsubs [] =
 #endif
 
 static	const	char *initcoms [] = {
-	"cd", ".", NULL,		/* set up $PWD */
 	"typeset", "-x", "SHELL", "PATH", "HOME", NULL,
 	"typeset", "-r", "PWD", "OLDPWD", NULL,
 	"typeset", "-i", "SECONDS=0", "OPTIND=1", NULL,
@@ -103,6 +102,8 @@ main(argc, argv, envp)
 	register char **wp0, **wp;
 	extern char ksh_version [];
 	extern time_t time();
+	char path[PATH];
+	struct tbl *v_pwd, *v_oldpwd;
 
 #ifdef USE_SIGACT
 	sigemptyset(&Sigact.sa_mask);
@@ -175,6 +176,16 @@ main(argc, argv, envp)
 	setint(typeset("PPID", INTEGER, 0), (long) getppid());
 	typeset("PPID", RDONLY, 0);
 	setint(typeset("RANDOM", INTEGER, 0), (long) time((time_t *)0));
+	/* assign initial PWD and OLDPWD if possible */
+	v_pwd = global("PWD"); v_oldpwd = global("OLDPWD");
+	if (getcwd(path, sizeof path) != NULL) {
+		setstr(v_pwd, path);
+		setstr(v_oldpwd, path);
+	}
+	else {
+		unset(v_pwd);
+		unset(v_oldpwd);
+	}
 	/* execute initialization statements */
 	for (wp0 = (char**) initcoms; *wp0 != NULL; wp0 = wp+1) {
 		/* copy because the alias initializers are readonly */
