@@ -9,3 +9,6 @@ all install:
 	@echo "wish -f " ${TK_LIBRARY}/gic-start.tcl >> gic
 	@chmod +x gic
 	@mv gic /usr/local/bin
+
+clean:
+	rm -f gic
