@@ -47,6 +47,9 @@ ezd-for-DECstation:
 clean:
 	rm -f ${OBJS} ezdmain.o DECstation-ezd.o
 
+pkg: install
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST ezd_bin
+
 noprogs:
 	rm -f ezd libezd.a
 
@@ -62,4 +65,4 @@ tartape:
 install:
 	install -c libezd.a /usr/local/lib
 	install -cs ezd /usr/local/bin
-	install -c -m 655 doc/ezd.1 /usr/local/man/man1
+	install -c -m 644 doc/ezd.1 /usr/local/man/man1
