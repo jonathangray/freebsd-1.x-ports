@@ -14,7 +14,7 @@
 # software for any purpose.  It is provided "as is" without express or
 # implied warranty.
 #------------------------------------------------------------------------------
-# $Id: Makefile,v 1.1 1994/02/09 01:53:36 jkh Exp $
+# $Id: Makefile,v 1.2 1994/02/10 23:36:48 jkh Exp $
 #------------------------------------------------------------------------------
 #
 SHELL=/bin/sh
@@ -98,7 +98,7 @@ ${LIBTCL.A}: ${TCL_UCB_LIB}/libtcl.a
 
 ${TCL_UCB_LIB}/libtcl.a:
 	@echo "tcl port not made - making tcl first"
-	@(cd ${TCL_UCB_LIB}; ${MAKE} -${MAKEFLAGS} ${PASS_FLAGS} all)
+	@(cd ${TCL_UCB_LIB}; ${MAKE} all)
 
 ${TCL.H}: ${TCL_UCB_SRC}/tcl.h
 	rm -f ${TCL.H}
@@ -133,7 +133,7 @@ ${LIBTK.A}: ${TK_UCB_LIB}/libtk.a
 
 ${TK_UCB_LIB}/libtk.a:
 	@echo "tk library not made - making tk first"
-	@(cd ${TK_UCB_LIB}; ${MAKE} -${MAKEFLAGS} ${PASS_FLAGS} all)
+	@(cd ${TK_UCB_LIB}; ${MAKE} all)
 
 ${TK.H}: ${TK_UCB_SRC}/tk.h
 	rm -f ${TK.H}
