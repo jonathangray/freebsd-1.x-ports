@@ -33,7 +33,7 @@ CLEANFILES+= ckcpro.c wart
 
 pkg:	pkg_src pkg_bin
 
-pkg_src: pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
+pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
 	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S kermit_src
 
 pkg_bin: pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B

@@ -7,8 +7,11 @@
 #         (C) Copyright 1988-1992, USENET Community Trust
 #
 #  $Log: Makefile,v $
-#  Revision 1.10  1993/12/28 05:58:30  smace
-#  Moved + file to pkg directory and re-ran Configure
+#  Revision 1.11  1993/12/28 17:36:18  smace
+#  Added clean dependency for the pkg_src target
+#
+# Revision 1.10  1993/12/28  05:58:30  smace
+# Moved + file to pkg directory and re-ran Configure
 #
 # Revision 1.7  1993/12/28  05:34:07  smace
 # Reran configure to get new Makefile.SH to corretnly substitute variables
@@ -118,6 +121,6 @@ _utils:
 
 pkg:	pkg_src
 
-pkg_src: pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
+pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
 	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S elm_src
 
