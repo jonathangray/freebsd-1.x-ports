@@ -1,5 +1,5 @@
 #
-# : Makefile.SH,v 1.3 1993/10/09 19:36:02 smace Exp $
+# : Makefile.SH,v 1.4 1993/12/28 03:40:43 smace Exp $
 #
 #  Makefile for the entire ELM mail system
 #
@@ -7,9 +7,12 @@
 #         (C) Copyright 1988-1992, USENET Community Trust
 #
 #  $Log: Makefile,v $
-#  Revision 1.7  1993/12/28 03:40:40  smace
-#  added elm_src.tgz target (we don't make elm binaries yet)
-#  added elm-src-desc and elm-src-list files for pkg_create
+#  Revision 1.8  1993/12/28 04:19:45  smace
+#  corrected `pkg' targets and added necessary datafiles
+#
+# Revision 1.4  1993/12/28  03:40:43  smace
+# added elm_src.tgz target (we don't make elm binaries yet)
+# added elm-src-desc and elm-src-list files for pkg_create
 #
 # Revision 1.3  1993/10/09  19:36:02  smace
 # Update to elm 2.4 pl23 release version
@@ -113,8 +116,9 @@ utils: _utils
 _utils:
 	cd utils; $(MAKE) $(MJ) -$(MAKEFLAGS) all
 
-elm_src.tgz: clean
-	(cd ..; pkg_create -v -c $(.CURDIR)/elm-src-desc -d $(.CURDIR)/README -f $(.CURDIR)/elm-src-list elm_src.tgz)
-	mv ../elm_src.tgz .
+pkg:    pkg_src
+
+pkg_src: +DESC_S +ONELINE_S +PLIST_S +REQ_S
+        pkg_create -c +ONELINE_S -d +DESC_S -f +PLIST_S -r +REQ_S elm_src
 
 
