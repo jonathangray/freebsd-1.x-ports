@@ -112,6 +112,9 @@ clean:
 	(cd doc; 	$(MAKE) $(MFLAGS) clean)
 	-rm -f "examples/Sample Directory/wais-index/index."*
 
+pkg: install
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST gopher_bin
+
 spotless: clean
 	-rm -f *~
 
