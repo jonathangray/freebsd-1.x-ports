@@ -31,11 +31,13 @@
  */
 
 extern "C" {
+#ifndef __FreeBSD__
 #ifndef tolower
     extern int tolower(int);
 #endif
 #ifndef toupper
     extern int toupper(int);
+#endif
 #endif
     extern long int strtol(const char*, char**, int);
     extern double strtod(const char*, char**);

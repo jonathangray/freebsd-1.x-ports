@@ -1,6 +1,6 @@
 CPU=FREEBSD
 
-all:
+all: src/Makefile
 	@$(MAKE) $(.MAKEFLAGS) -f Makefile 'CPU=$(CPU)'
 
 # simple but brutal. Will not install to multiple destinations simultaneously.
@@ -12,5 +12,8 @@ install:
 package: all install
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST iv_bin
 
-.DEFAULT:
+src/Makefile:
+	@$(MAKE) Makefiles
+
+.DEFAULT: src/Makefile
 	@$(MAKE) $(.MAKEFLAGS) -f Makefile 'CPU=$(CPU)' $@
