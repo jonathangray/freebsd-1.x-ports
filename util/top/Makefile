@@ -127,7 +127,7 @@ installmeta: top top.1
 		top $(BINDIR)/top-`uname -m`-`uname -r`
 	$(INSTALL) -c top.1 $(MANDIR)/top.$(MANEXT)
 
-package:	pkg_bin
+pkg:	pkg_bin
 
 pkg_bin: install pkg/+DESC pkg/+ONELINE pkg/+PLIST
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST top_bin
