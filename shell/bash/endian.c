@@ -1,4 +1,5 @@
 /* endian.c -- A trick for determining the byte order of a machine. */
+#include <sys/types.h>
 #include <stdio.h>
 #include "bashansi.h"
 

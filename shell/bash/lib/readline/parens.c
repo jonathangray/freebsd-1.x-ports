@@ -22,7 +22,9 @@
 
 #include <stdio.h>
 #include <sys/types.h>
+#if defined (FD_SET)
 #include <sys/time.h>
+#endif
 #include "readline.h"
 
 /* Non-zero means try to blink the matching open parenthesis when the

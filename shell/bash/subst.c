@@ -66,6 +66,9 @@ extern int posixly_correct;
 extern char *glob_error_return;
 #endif
 
+static WORD_LIST expand_word_error, expand_word_fatal;
+static char expand_param_error;
+
 static WORD_LIST *expand_string_internal ();
 static WORD_LIST *expand_word_internal (), *expand_words_internal ();
 static WORD_LIST *word_list_split ();
@@ -849,6 +852,9 @@ list_string (string, separators, quoted)
 	return ((WORD_LIST *)NULL);
 
       string = s;
+#if 0
+      /* XXX - this does not handle quoted whitespace at the end of a
+	       word correctly. */
       s += strlen (s) - 1;
 
       for ( ; s > string && *s && spctabnl (*s) && issep (*s); s--);
@@ -857,6 +863,7 @@ list_string (string, separators, quoted)
 	return ((WORD_LIST *)NULL);
 
       *++s = '\0';
+#endif
     }
 
   /* OK, now STRING points to a word that does not begin with white space.
@@ -917,6 +924,64 @@ list_string (string, separators, quoted)
 
     }
   return (REVERSE_LIST (result, WORD_LIST *));
+}
+
+/* Parse a single word from STRING, using SEPARATORS to separate fields.
+   ENDPTR is set to the first character after the word.  This is used by
+   the `read' builtin.
+   XXX - this function is very similar to list_string; they should be
+	 combined - XXX */
+char *
+get_word_from_string (stringp, separators, endptr)
+     char **stringp, *separators, **endptr;
+{
+  register char *s;
+  char *current_word;
+  int sindex, sh_style_split;
+
+  if (!stringp || !*stringp || !**stringp)
+    return ((char *)NULL);
+    
+  s = *stringp;
+
+  sh_style_split =
+    separators && *separators && (!strcmp (separators, " \t\n"));
+
+  /* Remove sequences of whitespace at the beginning of STRING, as
+     long as those characters appear in IFS. */
+  if (sh_style_split || !separators || !*separators)
+    {
+      for (; *s && spctabnl (*s) && issep (*s); s++);
+
+      if (!*s)
+	return ((char *)NULL);
+    }
+
+  /* OK, S points to a word that does not begin with white space.
+     Now extract a word, stopping at a separator, save a pointer to
+     the first character after the word, then skip sequences of spc,
+     tab, or nl as long as they are separators.
+     
+     This obeys the field splitting rules in Posix.2. */
+  sindex = 0;
+  current_word = string_extract_verbatim (s, &sindex, separators);
+
+  /* Set ENDPTR to the first character after the end of the word. */
+  if (endptr)
+    *endptr = s + sindex;
+
+  /* Move past the current separator character. */
+  if (s[sindex])
+    sindex++;
+
+  /* Now skip sequences of space, tab, or newline characters if they are
+     in the list of separators. */
+  while (s[sindex] && spctabnl (s[sindex]) && issep (s[sindex]))
+    sindex++;
+
+  /* Update STRING to point to the next field. */
+  *stringp = s + sindex;
+  return (current_word);
 }
 
 /* Given STRING, an assignment string, get the value of the right side
@@ -1100,6 +1165,26 @@ string_rest_of_args (dollar_star)
  *	   Functions to Expand a String		   *
  *						   *
  ***************************************************/
+/* Call expand_word_internal to expand W and handle error returns.
+   A convenience function for functions that don't want to handle
+   any errors or free any memory before aborting. */
+static WORD_LIST *
+call_expand_word_internal (w, q, c, e)
+     WORD_DESC *w;
+     int q, *c, *e;
+{
+  WORD_LIST *result;
+
+  result = expand_word_internal (w, q, c, e);
+  if (result == &expand_word_error || result == &expand_word_fatal)
+    {
+      if (result == &expand_word_error)
+	longjmp (top_level, DISCARD);
+      else
+	longjmp (top_level, FORCE_EOF);
+    }
+  return (result);
+}
 
 /* Perform parameter expansion, command substitution, and arithmetic
    expansion on STRING, as if it were a word.  Leave the result quoted. */
@@ -1108,11 +1193,15 @@ expand_string_internal (string, quoted)
      char *string;
      int quoted;
 {
-  WORD_DESC *temp = make_word (string);
+  WORD_DESC td;
   WORD_LIST *tresult;
 
-  tresult = expand_word_internal (temp, quoted, (int *)NULL, (int *)NULL);
-  dispose_word (temp);
+  if (!string || !*string)
+    return ((WORD_LIST *)NULL);
+
+  bzero (&td, sizeof (td));
+  td.word = string;
+  tresult = call_expand_word_internal (&td, quoted, (int *)NULL, (int *)NULL);
   return (tresult);
 }
 
@@ -1403,7 +1492,7 @@ expand_word (word, quoted)
 {
   WORD_LIST *result, *tresult;
 
-  tresult = expand_word_internal (word, quoted, (int *)NULL, (int *)NULL);
+  tresult = call_expand_word_internal (word, quoted, (int *)NULL, (int *)NULL);
   result = word_list_split (tresult);
   dispose_words (tresult);
   if (result)
@@ -1421,7 +1510,7 @@ expand_word_no_split (word, quoted)
 {
   WORD_LIST *result;
 
-  result = expand_word_internal (word, quoted, (int *)NULL, (int *)NULL);
+  result = call_expand_word_internal (word, quoted, (int *)NULL, (int *)NULL);
   if (result)
     dequote_list (result);
   return (result);
@@ -1436,7 +1525,7 @@ expand_word_leave_quoted (word, quoted)
 {
   WORD_LIST *result;
 
-  result = expand_word_internal (word, quoted, (int *)NULL, (int *)NULL);
+  result = call_expand_word_internal (word, quoted, (int *)NULL, (int *)NULL);
   return (result);
 }
 
@@ -1786,7 +1875,6 @@ command_substitute (string, quoted)
   char *istring = (char *)NULL;
   int istring_index, istring_size, c = 1;
   int result;
-  extern jmp_buf top_level;
 
   istring_index = istring_size = 0;
 
@@ -2158,7 +2246,7 @@ parameter_brace_expand_error (name, value)
     {
       WORD_LIST *l = expand_string (value, 0);
       char *temp1 =  string_list (l);
-      fprintf (stderr, "%s: %s\n", name, temp1 ? temp1 : value);
+      report_error ("%s: %s", name, temp1 ? temp1 : value);
       if (temp1)
 	free (temp1);
       dispose_words (l);
@@ -2171,11 +2259,6 @@ parameter_brace_expand_error (name, value)
   free (name);
   if (value)
     free (value);
-
-  if (!interactive)
-    longjmp (top_level, FORCE_EOF);
-  else
-    longjmp (top_level, DISCARD);
 }
 
 /* Return 1 if NAME is something for which parameter_brace_expand_length is
@@ -2305,13 +2388,6 @@ expand_word_internal (word, quoted, contains_dollar_at, expanded_something)
   /* This gets 1 if we see a $@ while quoted. */
   int quoted_dollar_at = 0;
 
-  /* This gets 1 if we are to treat backslashes as if we are within double
-     quotes, but not otherwise behave as if the word is quoted.  This is
-     used for things like expansion of patterns in case statement pattern
-     lists.  This is a private variable, but the incoming value of
-     Q_KEEP_BACKSLASH is passed to recursive invocations of this function. */
-  int preserve_backslashes = 0;
-
   /* One of UNQUOTED, PARTIALLY_QUOTED, or WHOLLY_QUOTED, depending on
      whether WORD contains no quoting characters, a partially quoted
      string (e.g., "xx"ab), or is fully quoted (e.g., "xxab"). */
@@ -2325,12 +2401,6 @@ expand_word_internal (word, quoted, contains_dollar_at, expanded_something)
   istring[0] = '\0';
 
   if (!string) goto final_exit;
-
-  if (quoted & Q_KEEP_BACKSLASH)
-    {
-      preserve_backslashes = 1;
-      quoted &= ~Q_KEEP_BACKSLASH;
-    }
 
   if (contains_dollar_at)
     *contains_dollar_at = 0;
@@ -2521,6 +2591,7 @@ expand_word_internal (word, quoted, contains_dollar_at, expanded_something)
 
 		t_index = ++sindex;
 		name = string_extract (string, &t_index, "#%:-=?+}");
+		value = (char *)NULL;
 
 		/* If the name really consists of a special variable, then
 		   make sure that we have the entire name. */
@@ -2657,9 +2728,6 @@ expand_word_internal (word, quoted, contains_dollar_at, expanded_something)
 		      sindex++;
 		    else
 		      {
-			if (value)
-			  free (value);
-
 			free (name);
 			name = string;
 			goto bad_substitution;
@@ -2680,16 +2748,25 @@ expand_word_internal (word, quoted, contains_dollar_at, expanded_something)
 		  case '\0':
 		  bad_substitution:
 		    report_error ("%s: bad substitution", name ? name : "??");
+		    if (value)
+		      free (value);
+		    free (temp);
 		    free (name);
-		    longjmp (top_level, DISCARD);
+		    free (istring);
+		    return &expand_word_error;
 
 		  case '}':
 		    if (!var_is_set && unbound_vars_is_error)
 		      {
 			report_error ("%s: unbound variable", name);
+			if (value)
+			  free (value);
+			free (temp);
 			free (name);
+			free (string);
 			last_command_exit_value = 1;
-			longjmp (top_level, DISCARD);
+			free (istring);
+			return &expand_word_error;
 		      }
 		    break;
 
@@ -2745,10 +2822,20 @@ expand_word_internal (word, quoted, contains_dollar_at, expanded_something)
 			      ("$%s: cannot assign in this way", name);
 			    free (name);
 			    free (value);
-			    longjmp (top_level, DISCARD);
+			    free (string);
+			    free (istring);
+			    return &expand_word_error;
 			  }
 			else if (c == '?')
-			  parameter_brace_expand_error (name, value);
+			  {
+			    free (string);
+			    free (istring);
+			    parameter_brace_expand_error (name, value);
+			    if (!interactive)
+			      return &expand_word_fatal;
+			    else
+			      return &expand_word_error;
+			  }
 			else if (c != '+')
 			  temp = parameter_brace_expand_rhs
 			    (name, value, c, 0); /* XXX was quoted, not 0 */
@@ -2782,9 +2869,9 @@ expand_word_internal (word, quoted, contains_dollar_at, expanded_something)
 		      {
 			report_error ("%s: bad arithmetic substitution", temp);
 			free (temp);
-			if (istring)
-			  free (istring);
-			longjmp (top_level, DISCARD);
+			free (string);
+			free (istring);
+			return &expand_word_error;
 		      }
 
 		    /* Cut off ending `)' */
@@ -2862,7 +2949,8 @@ expand_word_internal (word, quoted, contains_dollar_at, expanded_something)
 		/* If this isn't a variable name, then just output the `$'. */
 		if (!name || !*name)
 		  {
-		    free (name);
+		    if (name)
+		     free (name);
 		    temp = savestring ("$");
 		    if (expanded_something)
 		      *expanded_something = 0;
@@ -2890,8 +2978,10 @@ expand_word_internal (word, quoted, contains_dollar_at, expanded_something)
 		  }
 
 		free (name);
+		free (string);
 		last_command_exit_value = 1;
-		longjmp (top_level, DISCARD);
+		free (istring);
+		return &expand_word_error;
 	      }
 	    }
 	  break;		/* End case '$': */
@@ -2937,8 +3027,7 @@ expand_word_internal (word, quoted, contains_dollar_at, expanded_something)
 	      else if (quoted == Q_DOUBLE_QUOTES)
 		slashify_chars = slashify_in_quotes;
 
-	      if (preserve_backslashes ||
-		  (quoted && !member (c, slashify_chars)))
+	      if (quoted && !member (c, slashify_chars))
 		{
 		  temp = (char *)xmalloc (3);
 		  temp[0] = '\\'; temp[1] = c; temp[2] = '\0';
@@ -2981,10 +3070,19 @@ expand_word_internal (word, quoted, contains_dollar_at, expanded_something)
 
 		free (temp);
 
-		if (preserve_backslashes)
-		  quoting_flags |= Q_KEEP_BACKSLASH;
 		tresult = expand_word_internal
 		  (temp_word, quoting_flags, &dollar_at_flag, (int *)NULL);
+
+		if (tresult == &expand_word_error || tresult == &expand_word_fatal)
+		  {
+		    free (istring);
+		    free (string);
+		    /* expand_word_internal has already freed temp_word->word
+		       for us because of the way it prints error messages. */
+		    temp_word->word = (char *)NULL;
+		    dispose_word (temp_word);
+		    return tresult;
+		  }
 
 		dispose_word (temp_word);
 
@@ -3759,11 +3857,28 @@ expand_words_internal (list, do_vars)
       expanded = expand_word_internal
 	(tlist->word, 0, (int *)NULL, &expanded_something);
 
-      if (expanded_something)
+      if (expanded == &expand_word_error || expanded == &expand_word_fatal)
         {
-          t = word_list_split (expanded);
-          dispose_words (expanded);
-        }
+	  /* By convention, each time this error is returned,
+	     tlist->word->word has already been freed. */
+          tlist->word->word = (char *)NULL;
+          
+	  /* Dispose our copy of the original list. */
+	  dispose_words (orig_list);
+	  /* Dispose the  new list we're building. */
+	  dispose_words (new_list);
+
+	  if (expanded == &expand_word_error)
+	    longjmp (top_level, DISCARD);
+	  else
+	    longjmp (top_level, FORCE_EOF);
+	}
+
+      if (expanded_something)
+	{
+	  t = word_list_split (expanded);
+	  dispose_words (expanded);
+	}
       else
 	{
 	  /* If no parameter expansion, command substitution, process
@@ -4101,6 +4216,7 @@ struct name_and_function {
   { "MAILCHECK", sv_mail },
 
   { "POSIXLY_CORRECT", sv_strict_posix },
+  { "POSIX_PEDANTIC", sv_strict_posix },
   /* Variables which only do something special when READLINE is defined. */
 #if defined (READLINE)
   { "TERM", sv_terminal },

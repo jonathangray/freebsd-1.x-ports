@@ -45,6 +45,8 @@
 static int sigmodes[NSIG];
 
 static void change_signal (), restore_signal ();
+
+extern int interactive, interactive_shell;
 extern int last_command_exit_value;
 
 /* The list of things to do originally, before we started trapping. */
@@ -65,7 +67,6 @@ int pending_traps[NSIG];
 
 initialize_traps ()
 {
-  extern int interactive;
   register int i;
 
   trap_list[0] = (char *)NULL;
@@ -268,7 +269,6 @@ set_sigint_trap (command)
 SigHandler *
 set_sigint_handler ()
 {
-  extern int interactive_shell;
   extern sighandler sigint_sighandler (), termination_unwind_protect ();
 
   if (sigmodes[SIGINT] & SIG_HARD_IGNORE)
@@ -284,7 +284,7 @@ set_sigint_handler ()
 
   /* The signal is not trapped, so set the handler to the shell's special
      interrupt handler. */
-  if (interactive_shell)
+  if (interactive)	/* XXX - was interactive_shell */
     return (set_signal_handler (SIGINT, sigint_sighandler));
   else
     return (set_signal_handler (SIGINT, termination_unwind_protect));

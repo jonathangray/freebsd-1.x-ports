@@ -28,9 +28,10 @@ if [ -f /usr/bin/uname ] || [ -f /bin/uname ]; then
 	UNAME=`uname`
 	UNAME_R=`uname -r 2>/dev/null`
 	UNAME_M=`uname -m 2>/dev/null`
-	RELEASE=`expr $UNAME_R : '[^0-9]*\([0-9]*\)'`
-	RELEASE=`expr $RELEASE + 0`
-	LEVEL=`expr $UNAME_R : '[^0-9]*[0-9]*.\([0-9]*\)'`
+	UNAME_V=`uname -v 2>/dev/null`
+	RELEASE=`expr "$UNAME_R" : '[^0-9]*\([0-9]*\)'`
+	RELEASE=`expr "$RELEASE" + 0`
+	LEVEL=`expr "$UNAME_R" : '[^0-9]*[0-9]*.\([0-9]*\)'`
 fi
 
 # Test for shared libraries (this is pretty Sunish).
@@ -155,6 +156,7 @@ if [ -f /unix ]; then
     case "$UNAME_R" in
       3.*) SYSDEF="Irix3" ;;
       4.*) SYSDEF="Irix4" ;;
+      5.*) SYSDEF="Irix5" ;;
       *)   SYSDEF="Irix3" ;;
     esac
   elif [ -d /usr/amiga ]; then
@@ -196,7 +198,7 @@ if [ -f /unicos ]; then
    if [ "$UnicosMachine" ]; then
       echo "#if !defined ($UnicosMachine)"	>>$sysdefs
       echo "#  define $UnicosMachine"		>>$sysdefs
-      echo "#endif /* !$UnicosMachine"		>>$sysdefs
+      echo "#endif /* !$UnicosMachine */"	>>$sysdefs
    fi
 fi
 
@@ -218,8 +220,8 @@ fi
 # What release of SCO Unix is this?
 if [ "$SYSDEF" = "" -a -f /bin/uname ]; then
   case `uname -X 2>/dev/null | grep '^Release' 2>/dev/null` in
-    *3.2v4.0*) SCOREL=SCOv4 ;;
-	    *) SCOREL= ;;
+    *3.2v4.*) SCOREL=SCOv4 ;;
+	   *) SCOREL= ;;
   esac
 
   if [ "$SCOREL" ]; then
@@ -246,48 +248,84 @@ if [ "$SYSDEF" != "" ]; then
   echo "#endif /* $SYSDEF */"			>>$sysdefs
 fi
 
-if [ -f /usr/include/sys/ptem.h ]; then
+# Now look for certain include files in a list of directories
+# Poor substitute for autoconf
+
+# Add any other directories where include files are found to this list
+dirlist="/usr/include /usr/include/bsd /usr/include/ansi /bsd43/usr/include"
+
+# Code fragment to be executed to find a particular include file.  Make sure
+# to set `file' to the pathname of the file you want, relative to /usr/include,
+# before calling `eval $findf'.
+findf="
+found='';
+for d in \$dirlist;
+do
+	if test -f \$d/\$file;
+	then
+		found=yes;
+		break;
+	fi;
+done
+"
+
+found=
+file=sys/ptem.h
+eval $findf
+if [ -n "$found" ]; then
   echo ""					>>$sysdefs
   echo "#if !defined (HAVE_SYS_PTEM_H)"		>>$sysdefs
   echo "#  define HAVE_SYS_PTEM_H"		>>$sysdefs
   echo "#endif /* HAVE_SYS_PTEM_H */"		>>$sysdefs
 fi
 
-if [ -f /usr/include/sys/pte.h ]; then
+file=sys/pte.h
+eval $findf
+if [ -n "$found" ]; then
   echo ""					>>$sysdefs
   echo "#if !defined (HAVE_SYS_PTE_H)"		>>$sysdefs
   echo "#  define HAVE_SYS_PTE_H"		>>$sysdefs
   echo "#endif /* HAVE_SYS_PTE_H */"		>>$sysdefs
 fi
 
-if [ -f /usr/include/unistd.h ]; then
+file=unistd.h
+eval $findf
+if [ -n "$found" ]; then
   echo ""					>>$sysdefs
   echo "#if !defined (HAVE_UNISTD_H)"		>>$sysdefs
   echo "#  define HAVE_UNISTD_H"		>>$sysdefs
   echo "#endif /* HAVE_UNISTD_H */"		>>$sysdefs
 fi
 
-if [ -f /usr/include/stdlib.h ]; then
+file=stdlib.h
+eval $findf
+if [ -n "$found" ]; then
   echo ""					>>$sysdefs
   echo "#if !defined (HAVE_STDLIB_H)"		>>$sysdefs
   echo "#  define HAVE_STDLIB_H"		>>$sysdefs
   echo "#endif /* HAVE_STDLIB_H */"		>>$sysdefs
 fi
 
-if [ -f /usr/include/limits.h ]; then
+file=limits.h
+eval $findf
+if [ -n "$found" ]; then
   echo ""					>>$sysdefs
   echo "#if !defined (HAVE_LIMITS_H)"		>>$sysdefs
   echo "#  define HAVE_LIMITS_H"		>>$sysdefs
   echo "#endif /* HAVE_LIMITS_H */"		>>$sysdefs
 fi
 
-if [ -f /usr/include/sys/wait.h ]; then
+file=sys/wait.h
+eval $findf
+if [ -n "$found" ]; then
   echo ""					>>$sysdefs
   echo "#if !defined (HAVE_WAIT_H)"		>>$sysdefs
   echo "#  define HAVE_WAIT_H"			>>$sysdefs
   echo "#endif /* HAVE_WAIT_H */"		>>$sysdefs
 fi
 
+file=alloca.h
+eval $findf
 if [ -f /usr/include/alloca.h ]; then
   echo ""					>>$sysdefs
   echo "#if !defined (HAVE_ALLOCA_H)"		>>$sysdefs
@@ -295,30 +333,36 @@ if [ -f /usr/include/alloca.h ]; then
   echo "#endif /* HAVE_ALLOCA_H */"		>>$sysdefs
 fi
 
-if [ -f /usr/include/sys/resource.h ]; then
+file=sys/resource.h
+eval $findf
+if [ -n "$found" ]; then
   echo ""					>>$sysdefs
   echo "#if !defined (HAVE_RESOURCE)"		>>$sysdefs
   echo "#  define HAVE_RESOURCE"		>>$sysdefs
   echo "#endif /* HAVE_RESOURCE */"		>>$sysdefs
-else
-  RESOURCE=
 fi
 
-if [ -f /usr/include/dirent.h ]; then
+file=dirent.h
+eval $findf
+if [ -n "$found" ]; then
   echo ""					>>$sysdefs
   echo "#if !defined (HAVE_DIRENT_H)"		>>$sysdefs
   echo "#  define HAVE_DIRENT_H"		>>$sysdefs
   echo "#endif /* HAVE_DIRENT_H */"		>>$sysdefs
 fi
 
-if [ -f /usr/include/string.h ]; then
+file=string.h
+eval $findf
+if [ -n "$found" ]; then
   echo ""					>>$sysdefs
   echo "#if !defined (HAVE_STRING_H)"		>>$sysdefs
   echo "#  define HAVE_STRING_H"		>>$sysdefs
   echo "#endif /* HAVE_STRING_H */"		>>$sysdefs
 fi
 
-if [ -f /usr/include/varargs.h ]; then
+file=varargs.h
+eval $findf
+if [ -n "$found" ]; then
   echo ""					>>$sysdefs
   echo "#if !defined (HAVE_VARARGS_H)"		>>$sysdefs
   echo "#  define HAVE_VARARGS_H"		>>$sysdefs
@@ -339,6 +383,18 @@ if [ "$UNAME" = "UNIX_SV" ] && [ "$UNAME_R" = "4.2" ]; then
   echo "#if !defined (USGr4_2)"		>>$sysdefs
   echo "#  define USGr4_2"		>>$sysdefs
   echo "#endif /* USGr4_2 */"		>>$sysdefs
+fi
+
+# Is this AIX PS/2 1.3?  Yuck.
+if [ "$UNAME" = "AIX" ] && [ "$UNAME_V" = "1" ] && [ "$RELEASE" = "3" ]; then
+  case "$UNAME_M" in
+  i386|i486)
+	echo ""					>>$sysdefs
+	echo "#if !defined (AIX_13)"		>>$sysdefs
+	echo "#  define AIX_13"			>>$sysdefs
+	echo "#endif /* AIX_13 */"		>>$sysdefs
+	;;
+  esac
 fi
 
 # If the user is using a recent Bash already, let's compile with that

@@ -686,6 +686,7 @@ cprintf (format, arg1, arg2)
 
 		the_printed_command_resize (len + 1);
 		the_printed_command[command_string_index++] = character;
+		the_printed_command[command_string_index] = '\0';
 	      }
 	      break;
 
@@ -694,6 +695,7 @@ cprintf (format, arg1, arg2)
 	    }
 	}
     }
+  the_printed_command[command_string_index] = '\0';
 }
 
 #else /* We have support for varargs. */

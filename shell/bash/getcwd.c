@@ -108,7 +108,7 @@ extern char *alloca ();
    big as necessary.  */
 #if defined (__STDC__)
 char *
-getcwd (char *buf, int size)
+getcwd (char *buf, size_t size)
 #else /* !__STDC__ */
 char *
 getcwd (buf, size)

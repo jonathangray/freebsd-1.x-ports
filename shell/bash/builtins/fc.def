@@ -151,37 +151,51 @@ fc_builtin (list)
   reverse = listing = execute = 0;
 
   /* Parse out the options and set which of the two forms we're in. */
-  reset_internal_getopt ();
-  while ((opt = internal_getopt (list, "nlrse:")) != -1) {
-    switch (opt)
-      {
-      case 'n':
-	numbering = 0;
+
+  while (list && *list->word->word == '-')
+    {
+      register char *s = &((list->word->word)[1]);
+
+      if (!isletter (*s))
 	break;
 
-      case 'l':
-	listing = 1;
-	break;
+      while (opt = *s++)
+	{
+	  switch (opt)
+	    {
+	    case 'n':
+	      numbering = 0;
+	      break;
 
-      case 'r':
-	reverse = 1;
-	break;
+	    case 'l':
+	      listing = 1;
+	      break;
 
-      case 's':
-	execute = 1;
-	break;
+	    case 'r':
+	      reverse = 1;
+	      break;
 
-      case 'e':
-	ename = list_optarg;
-	break;
+	    case 's':
+	      execute = 1;
+	      break;
 
-      default:
-	builtin_error (USAGE);
-	return (EXECUTION_FAILURE);
-      }
-  }
+	    case 'e':
+	      list = list->next;
+	      if (list == NULL)
+		{
+	          builtin_error (USAGE);
+	          return (EXECUTION_FAILURE);
+		}
+	      ename = list->word->word;
+	      break;
 
-  list = loptend;
+	    default:
+	      builtin_error (USAGE);
+	      return (EXECUTION_FAILURE);
+	    }
+	}
+      list = list->next;
+    }
 
   if (ename && (*ename == '-') && (ename[1] == '\0'))
     execute = 1;
@@ -328,7 +342,9 @@ fc_builtin (list)
 	  QUIT;
 	  if (numbering)
 	    fprintf (stream, "%d", i + history_base);
-	  fprintf (stream, "\t%c%s\n", histdata (i) ? '*' : ' ', histline (i));
+	  if (listing)
+	    fprintf (stream, "\t%c", histdata (i) ? '*' : ' ');
+	  fprintf (stream, "%s\n", histline (i));
 	}
     }
   else
@@ -338,7 +354,9 @@ fc_builtin (list)
 	  QUIT;
 	  if (numbering)
 	    fprintf (stream, "%d", i + history_base);
-	  fprintf (stream, "\t%c%s\n", histdata (i) ? '*' : ' ', histline (i));
+	  if (listing)
+	    fprintf (stream, "\t%c", histdata (i) ? '*' : ' ');
+	  fprintf (stream, "%s\n", histline (i));
 	}
     }
 

@@ -163,45 +163,46 @@ read_builtin (list)
     }
   else
     {
+      SHELL_VAR *var;
       /* This code implements the Posix.2 spec for splitting the words
 	 read and assigning them to variables.  If $IFS is unset, we
 	 use the default value of " \t\n". */
       if (!ifs_chars)
 	ifs_chars = "";
-      words = list_string (input_string, ifs_chars, 0);
-      rwords = words;
 
-      free (input_string);
-
-      while (list)
+      while (list->next)
 	{
-	  SHELL_VAR *var;
+	  char *t, *e;
 
 	  varname = list->word->word;
 
-	  if (!list->next)
+	  /* If there are more variables than words read from the input,
+	     the remaining variables are set to the empty string. */
+	  if (*input_string)
 	    {
-	      /* Call string_list_dollar_star because P1003.2 specifies
-		 that the intervening separators are preserved in the
-		 result of a read that specifies fewer variables than words
-		 read. */
-	      char *t = words ? string_list_dollar_star (words) : "";
+	      /* This call updates INPUT_STRING. */
+	      t = get_word_from_string (&input_string, ifs_chars, &e);
+	      *e = '\0';
 	      var = bind_variable (varname, t);
-	      if (words)
-		free (t);
 	    }
 	  else
-	    var = bind_variable (varname, words ? words->word->word : "");
+	    {
+	      t = (char *)0;
+	      var = bind_variable (varname, "");
+	    }
 
 	  stupidly_hack_special_variables (varname);
 	  var->attributes &= ~att_invisible;
 
+	  if (t)
+	    free (t);
+
 	  list = list->next;
-	  if (words)
-	    words = words->next;
 	}
-      if (rwords)
-	dispose_words (rwords);
+
+      var = bind_variable (list->word->word, input_string);
+      stupidly_hack_special_variables (list->word->word);
+      var->attributes &= ~att_invisible;
     }
 
   return (EXECUTION_SUCCESS);

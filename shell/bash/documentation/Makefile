@@ -1,5 +1,6 @@
 # This Makefile is for the Bash/documentation directory -*- text -*-.
 #
+CP	    = cp
 
 DOC_SUPPORT = ../lib/doc-support/
 TEXINDEX    = $(DOC_SUPPORT)texindex
@@ -52,3 +53,10 @@ distclean:
 	rm -f *.aux *.cp *.fn *.ky *.log *.pg *.toc *.tp *.vr *.cps *.pgs \
 	*.dvi *.info *.info-* *.fns *.kys *.tps *.vrs *.o core texindex \
 	rluser.texinfo hsuser.texinfo
+
+realclean:	clean
+
+install: features.info
+	$(CP) bash.1 $(mandir)
+	sed 's:so bash.1:so man1/bash.1:' < bash_builtins.1 > $(mandir)/bash_builtins.1
+	$(CP) features.info $(infodir)/bash.info

@@ -128,7 +128,8 @@ void
 dispose_word (word)
      WORD_DESC *word;
 {
-  free (word->word);
+  if (word->word)
+    free (word->word);
   free (word);
 }
 

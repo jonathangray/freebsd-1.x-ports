@@ -24,6 +24,10 @@ Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 
 #include "siglist.h"
 
+#if !defined (NSIG)
+#  include "trap.h"
+#endif
+
 char *sys_siglist[NSIG];
 
 extern char *xmalloc (), *malloc ();

@@ -2,7 +2,7 @@
 #if !defined (_SIGLIST_H_)
 #define _SIGLIST_H_
 
-#if defined (Solaris) || defined (USGr4_2)
+#if defined (Solaris) || defined (USGr4_2) || defined (drs6000)
 #  if !defined (sys_siglist)
 #    define sys_siglist _sys_siglist
 #  endif /* !sys_siglist */
@@ -13,7 +13,7 @@ extern char *sys_siglist[];
 #endif /* !Solaris */
 
 #if !defined (strsignal)
-#  define strsignal(sig) sys_siglist[sig]
+#  define strsignal(sig) (char *)sys_siglist[sig]
 #endif /* !strsignal */
 
 #endif /* _SIGLIST_H */

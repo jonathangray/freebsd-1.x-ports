@@ -25,7 +25,10 @@
 #include "config.h"
 #endif
 
-/* If compiling with GCC, this file's not needed.  */
+/* If compiling with GCC 2, this file's not needed.  */
+#if !defined (__GNUC__) || __GNUC__ < 2
+
+/* If alloca is defined somewhere, this file is not needed. */
 #ifndef alloca
 
 #ifdef emacs
@@ -45,12 +48,12 @@ lose
 /* If your stack is a linked list of frames, you have to
    provide an "address metric" ADDRESS_FUNCTION macro.  */
 
-#ifdef CRAY
+#if defined (CRAY) && defined (CRAY_STACKSEG_END)
 long i00afunc ();
 #define ADDRESS_FUNCTION(arg) (char *) i00afunc (&(arg))
 #else
 #define ADDRESS_FUNCTION(arg) &(arg)
-#endif
+#endif /* CRAY && CRAY_STACKSEG_END */
 
 #if __STDC__
 typedef void *pointer;
@@ -204,7 +207,7 @@ alloca (size)
   }
 }
 
-#ifdef CRAY
+#if defined (CRAY) && defined (CRAY_STACKSEG_END)
 
 #ifdef DEBUG_I00AFUNC
 #include <stdio.h>
@@ -470,6 +473,7 @@ i00afunc (long address)
 }
 
 #endif /* not CRAY2 */
-#endif /* CRAY */
+#endif /* CRAY && CRAY_STACKSEG_END */
 
 #endif /* no alloca */
+#endif /* !__GNUC__ || __GNUC__ < 2 */

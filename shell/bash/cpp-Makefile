@@ -60,6 +60,25 @@
 /**/# them.
 /* #define HAVE_BISON */
 
+/* Include some boilerplate Gnu makefile definitions. */
+prefix = /usr/local
+
+exec_prefix = $(prefix)
+bindir = $(exec_prefix)/bin
+libdir = $(exec_prefix)/lib
+
+manroot = $(prefix)/man
+
+man1ext = 1
+man1dir = $(manroot)/man$(man1ext)
+mandir = $(man1dir)
+manext = $(man1ext)
+
+infodir = $(prefix)/info
+
+srcdir = .
+VPATH = $(srcdir)
+
 /* This includes the appropriate description for the machine that you are
    using (we hope).  If the compilation doesn't work correctly, then you
    will have to edit the file `machines.h' to include a description for the
@@ -115,7 +134,7 @@ SHELL=/bin/sh
 RM = rm -f
 AR = ar
 COMPRESS = gzip
-COMPRESS_EXT = .z
+COMPRESS_EXT = .gz
 
 Machine = M_MACHINE
 OS = M_OS
@@ -169,6 +188,11 @@ UNISTD = -DHAVE_UNISTD_H
 /**/# This system has <stdlib.h>
 #if defined (HAVE_STDLIB_H)
 STDLIB = -DHAVE_STDLIB_H
+#endif
+
+/**/# This system has <limits.h>
+#if defined (HAVE_LIMITS_H)
+LIMITSH = -DHAVE_LIMITS_H
 #endif
 
 #if defined (HAVE_GETGROUPS)
@@ -238,7 +262,8 @@ STRCHR = -DHAVE_STRCHR
 DEVFD = -DHAVE_DEV_FD
 #endif /* HAVE_DEV_FD */
 
-SYSTEM_FLAGS = $(LINEBUF) $(VPRINTF) $(UNISTD) $(STDLIB) $(GROUPS) $(RESOURCE) \
+SYSTEM_FLAGS = $(LINEBUF) $(VPRINTF) $(UNISTD) $(STDLIB) $(LIMITSH) \
+       $(GROUPS) $(RESOURCE) \
        $(SIGHANDLER) $(SYSDEP) $(WAITH) $(GETWD) $(DUP2) $(STRERROR) \
        $(DIRENT) $(DIRENTH) $(STRINGH) $(VARARGSH) $(STRCHR) $(DEVFD) \
        -D$(Machine) -D$(OS)
@@ -283,13 +308,14 @@ LIBINC_USAGE = "-I$${LIBINCDIR} -I$${LIBINCDIR}/$(LIBSRC)"
 	 $(MAKE) $(MFLAGS) CPPFLAGS='$(CPPFLAGS)' \
 	 CFLAGS='$(CFLAGS) '$(LIBINC_USAGE)' -I.' LDFLAGS='$(LDFLAGS)' \
 	 RANLIB='$(RANLIB)' AR='$(AR)' CC='$(CC)' RM='$(RM)' \
-	 DIRECTDEFINE='-D 'directory)
+	 DIRECTDEFINE='-D '$(srcdir)/directory)
 
 /**/# Flags used when building libraries.
 LIBRARY_CFLAGS  = $(DEBUG_FLAGS) $(SIGHANDLER) $(ALLOCA_CFLAGS) \
 		  $(SYSDEP) $(DIRENT) $(DIRENTH) $(STRINGH) $(VARARGSH) \
 		  $(PTEM) $(PTE) \
-		  $(STRCHR) -D$(Machine) -D$(OS) $(UNISTD) $(STDLIB) -DSHELL
+		  $(STRCHR) -D$(Machine) -D$(OS) $(UNISTD) $(LIMITSH) \
+		  $(STDLIB) -DSHELL
 
 /* **************************************************************** */
 /*                                                                  */
@@ -365,7 +391,8 @@ READLINE_SUPPORT = $(RL_LIBSRC)Makefile $(RL_LIBSRC)ChangeLog \
 		   $(READLINE_DOC_SUPPORT)
 
 READLINE_CFLAGS = $(DEBUG_FLAGS) $(SIGHANDLER) $(ALLOCA_CFLAGS) \
-		  $(SYSDEP) -D$(Machine) -D$(OS) $(UNISTD) $(STDLIB)
+		  $(SYSDEP) -D$(Machine) -D$(OS) $(UNISTD) $(STDLIB) \
+		  $(LIMITSH)
 #else /* !HAVE_READLINE_SOURCE */
 #  if defined (READLINE)
 #    define READLINE_LIBRARY -lreadline
@@ -401,7 +428,8 @@ HIST_LIBDOC = $(HIST_LIBSRC)doc/
 #  endif /* !READLINE */
 
 HISTORY_CFLAGS = $(DEBUG_FLAGS) $(SIGHANDLER) $(ALLOCA_CFLAGS) \
-		  $(SYSDEP) -D$(Machine) -D$(OS) $(UNISTD) $(STDLIB)
+		 $(SYSDEP) -D$(Machine) -D$(OS) $(UNISTD) $(STDLIB) \
+		 $(LIMITSH)
 
 /**/# The source, object and documentation of the history library.
 HISTORY_SOURCE	= $(HIST_LIBSRC)history.c $(HIST_LIBSRC)history.h
@@ -418,7 +446,7 @@ HISTORY_LDFLAGS = $(SEARCH_LIB)$(HIST_LIBSRC)
 #else /* !HAVE_HISTORY_SOURCE */
 #  if defined (HISTORY) && !defined (READLINE)
 #    define HISTORY_LIBRARY -lhistory
-HISTORY_LDFLAGS = $(SEARCH_LIB)/usr/gnu/lib $(SEARCH_LIB)/usr/local/lib
+HISTORY_LDFLAGS = $(SEARCH_LIB)$(libdir) $(SEARCH_LIB)/usr/local/lib
 #  endif /* HISTORY && !READLINE */
 #endif /* !HAVE_HISTORY_SOURCE */
 
@@ -441,9 +469,9 @@ TERMCAP_LDFLAGS = $(SEARCH_LIB)$(TERM_LIBSRC)
 
 /* Guessed at symbol for LIBRARIES, below. */
 #  if defined (USE_TERMCAP_EMULATION)
-#    define TERMCAP_LIBRARY /usr/lib/libcurses.a
+#    define TERMCAP_LIBRARY -lcurses
 #  else /* !USE_TERMCAP_EMULATION */
-#    define TERMCAP_LIBRARY /usr/lib/libtermcap.a
+#    define TERMCAP_LIBRARY -ltermcap
 #  endif /* !USE_TERMCAP_EMULATION */
 #endif /* !USE_GNU_TERMCAP */
 
@@ -475,7 +503,7 @@ GLOB_LIB     = -lglob
 /**/# The source, object and documentation for the GNU Tilde library.
 TILDE_LIBSRC = $(LIBSRC)tilde/
 TILDE_LIB = -ltilde
-#  define TILDE_LIBRARY ./lib/tilde/libtilde.a
+#  define TILDE_LIBRARY $(TILDE_LIBSRC)libtilde.a
 
 TILDE_SOURCE	= $(TILDE_LIBSRC)tilde.c $(TILDE_LIBSRC)tilde.h
 TILDE_OBJ	= $(TILDE_LIBSRC)tilde.o
@@ -488,7 +516,7 @@ TILDE_LDFLAGS = $(SEARCH_LIB)$(TILDE_LIBSRC)
 
 #else /* !HAVE_TILDE_SOURCE */
 /**/# Guessed at location of the tilde library.
-#  define TILDE_LIBRARY /usr/local/lib/libtilde.a
+#  define TILDE_LIBRARY $(libdir)/libtilde.a
 #endif /* !HAVE_TILDE_SOURCE */
 
 /**/# Our malloc library.
@@ -513,6 +541,8 @@ MALLOC_LDFLAGS = $(SEARCH_LIB)$(MALLOC_LIBSRC)
 MALLOC_LIB     = -lmalloc
 
 MALLOC_DEP = MALLOC_LIBRARY
+#else
+#  define MALLOC_LIBRARY
 #endif /* USE_GNU_MALLOC_LIBRARY */
 
 BASHPOSIX_LIB     = $(LIBSRC)posixheaders/
@@ -543,7 +573,7 @@ TERMCAP_LIB = -ltermcap
 #    if defined (HAVE_READLINE_SOURCE)
 READLINE_LDFLAGS = $(SEARCH_LIB)$(RL_LIBSRC) $(TERMCAP_LDFLAGS)
 #    else
-READLINE_LDFLAGS = $(TERMCAP_LDFLAGS) $(SEARCH_LIB)/usr/gnu/lib \
+READLINE_LDFLAGS = $(TERMCAP_LDFLAGS) $(SEARCH_LIB)$(libdir) \
 		   $(SEARCH_LIB)/usr/local/lib
 #    endif /* HAVE_READLINE_SOURCE */
 #  endif /* LD_HAS_NO_DASH_L */
@@ -827,18 +857,25 @@ DOCUMENTATION = $(BASHDOCS) $(LIBRARY_DOC)
 EXAMPLES = examples/[a-zA-Z]*
 
 ENDIAN_SUPPORT = endian.c
-ENDIAN_OUTPUT  = endian.aux endian.h
+#if !defined (HAVE_WAIT_H)
+ENDIAN_HEADER = bash-endian.h
+#else
+ENDIAN_HEADER =
+#endif
+ENDIAN_OUTPUT = endian.aux $(ENDIAN_HEADER)
 
 SIGNAMES_SUPPORT = signames.c
 SIGNAMES_OUTPUT  = signames.aux signames.h
 
+SUPPORT_SRC = $(srcdir)/support/
 SDIR = ./support/
 MKTARFILE = $(SDIR)mktarfile
-SCRIPTS_SUPPORT = $(SDIR)mksysdefs $(SDIR)cppmagic $(SDIR)cat-s \
-		  $(MKTARFILE) $(SDIR)mail-shell $(SDIR)inform \
-		  $(SDIR)/fixdist $(SDIR)mklinks $(SDIR)PORTING \
-		  $(SDIR)/clone.bash
-FAQ = $(SDIR)FAQ
+SCRIPTS_SUPPORT = $(SUPPORT_SRC)mksysdefs $(SUPPORT_SRC)cppmagic \
+		  $(SUPPORT_SRC)cat-s $(MKTARFILE) $(SUPPORT_SRC)mail-shell \
+		  $(SUPPORT_SRC)inform $(SUPPORT_SRC)/fixdist \
+		  $(SUPPORT_SRC)mklinks $(SUPPORT_SRC)PORTING \
+		  $(SUPPORT_SRC)/clone.bash
+FAQ = $(SUPPORT_SRC)FAQ
 
 TEST_SUITE = ./test-suite/
 TEST_SUITE_SUPPORT = $(TEST_SUITE)[a-zA-Z0-9]*
@@ -848,8 +885,8 @@ CREATED_SUPPORT = $(ENDIAN_OUTPUT) $(SIGNAMES_OUTPUT) sysdefs.h \
 
 SUPPORT = configure $(ENDIAN_SUPPORT) $(SIGNAMES_SUPPORT) $(SCRIPTS_SUPPORT) \
 	  $(BUILTIN_SUPPORT) COPYING Makefile cpp-Makefile ChangeLog \
-	  .distribution newversion.c $(EXAMPLES) $(SDIR)bash.xbm $(FAQ)\
-	  $(SDIR)getcppsyms.c $(TEST_SUITE_SUPPORT) $(SDIR)bashbug.c
+	  .distribution newversion.c $(EXAMPLES) $(SUPPORT_SRC)bash.xbm \
+	  $(FAQ) $(SUPPORT_SRC)getcppsyms.c $(TEST_SUITE_SUPPORT)
 
 /**/# BAGGAGE consists of things that you want to keep with the shell for some
 /**/# reason, but do not actually use; old source code, etc.
@@ -924,17 +961,20 @@ MALLOC_LIBRARY: $(MALLOC_SOURCE)
 
 version.o:    version.h version.c
 
-shell.o:      shell.h flags.h shell.c posixstat.h filecntl.h endian.h parser.h
+shell.o:      shell.h flags.h shell.c posixstat.h filecntl.h \
+              $(ENDIAN_HEADER) parser.h
 		$(RM) $@
 		$(CC) $(CFG_FLAGS) $(CFLAGS) $(CPPFLAGS) -c shell.c
 
-endian.h:     endian.aux
+#if !defined (HAVE_WAIT_H)
+$(ENDIAN_HEADER):     endian.aux
 		$(RM) $@
 		./endian.aux $@
 
 endian.aux:   endian.c
 		$(RM) $@
 		$(CC) $(CFLAGS) -o $@ endian.c
+#endif
 
 signames.h:   signames.aux
 		$(RM) $@
@@ -985,7 +1025,7 @@ dispose_cmd.o: shell.h command.h
 dispose_cmd.o: general.h variables.h config.h quit.h
 error.o: error.h
 execute_cmd.o: shell.h command.h y.tab.h posixstat.h flags.h jobs.h
-execute_cmd.o: general.h variables.h config.h quit.h hash.h endian.h
+execute_cmd.o: general.h variables.h config.h quit.h hash.h $(ENDIAN_HEADER)
 execute_cmd.o: unwind_prot.h siglist.h builtins/builtext.h
 expr.o: shell.h command.h hash.h
 expr.o: general.h variables.h config.h quit.h
@@ -995,7 +1035,7 @@ general.o: general.h variables.h config.h quit.h machines.h
 hash.o: shell.h command.h hash.h
 hash.o: general.h variables.h config.h quit.h
 jobs.o: shell.h command.h hash.h trap.h jobs.h siglist.h
-jobs.o: general.h variables.h config.h endian.h quit.h builtins/builtext.h
+jobs.o: general.h variables.h config.h $(ENDIAN_HEADER) quit.h builtins/builtext.h
 mailcheck.o: posixstat.h maxpath.h variables.h
 mailcheck.o: hash.h quit.h
 make_cmd.o: shell.h command.h flags.h
@@ -1008,7 +1048,7 @@ shell.o: shell.h command.h flags.h machines.h
 shell.o: general.h variables.h config.h quit.h
 shell.o: posixstat.h filecntl.h jobs.h input.h
 subst.o: shell.h command.h flags.h jobs.h siglist.h
-subst.o: general.h variables.h config.h endian.h quit.h
+subst.o: general.h variables.h config.h $(ENDIAN_HEADER) quit.h
 test.o: posixstat.h
 trap.o: trap.h shell.h command.h hash.h unwind_prot.h signames.h
 trap.o: general.h variables.h config.h quit.h
@@ -1196,6 +1236,7 @@ install:	.made
 #		cp $(Program) $(bindir)/$(Program)
 		install -c -s -o bin -g bin -m 555 $(Program) $(bindir)/$(Program)
 		$(RM) installed-$(Program)
+		( cd $(DOCDIR) ; $(MAKE) $(MFLAGS) mandir=$(mandir) infodir=$(infodir) $@ )
 #		-ln -s $(bindir)/$(Program) installed-$(Program)
 		install -c -o bin -g bin -m 444 $(DOCDIR)/bash.1 /usr/gnu/man/man1
 
@@ -1222,10 +1263,10 @@ newversion:	newversion.aux
 		mv -f newversion.h version.h
 		$(MAKE) $(MFLAGS)
 
-documentation:  documentation-frob
-		(cd $(DOCDIR); make)
+documentation:  documentation-force
+		(cd $(DOCDIR); $(MAKE) $(MFLAGS))
 
-documentation-frob:
+documentation-force:
 
 tags:		$(SOURCES) $(BUILTIN_C_CODE) $(LIBRARY_SOURCE)
 		etags $(SOURCES) $(BUILTIN_C_CODE) $(LIBRARY_SOURCE)
@@ -1246,9 +1287,13 @@ clean:
 		CLEAN_TILDE;
 		CLEAN_MALLOC;
 
+distclean:	clean
+realclean:	clean
+		$(RM) y.tab.c y.tab.h
+
 /**/# Here is a convenient rule when you arrive at a new site and wish to
 /**/# install bash on several different architectures.  It creates a new
-/**/# directory to hold the results of compilatation.  The directory is
+/**/# directory to hold the results of compilation.  The directory is
 /**/# named Machine-OS.
 architecture: $(Machine)-$(OS)/$(Program)
 

@@ -126,7 +126,6 @@ extern GENERIC_LIST *reverse_list (), *delete_element (), *list_append ();
 extern char *xmalloc (), *xrealloc ();
 extern void vfree ();
 extern char *itos ();
-extern char *strerror ();
 extern void unset_nodelay_mode ();
 extern void map_over_list ();
 extern void map_over_words ();
@@ -143,5 +142,9 @@ extern void set_lines_and_columns ();
 extern void tilde_initialize ();
 extern char *getwd ();
 extern char *polite_directory_format ();
+
+#if !defined (strerror)
+extern char *strerror ();
+#endif
 
 #endif	/* _GENERAL_H */

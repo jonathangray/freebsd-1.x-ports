@@ -30,7 +30,6 @@ extern KEYMAP_ENTRY_ARRAY vi_escape_keymap;
 
 /* The keymap arrays for handling vi mode. */
 KEYMAP_ENTRY_ARRAY vi_movement_keymap = {
-
   /* The regular control keys come first. */
   { ISFUNC, (Function *)0x0 },		/* Control-@ */
   { ISFUNC, (Function *)0x0 },		/* Control-a */
@@ -40,7 +39,7 @@ KEYMAP_ENTRY_ARRAY vi_movement_keymap = {
   { ISFUNC, rl_emacs_editing_mode },	/* Control-e */
   { ISFUNC, (Function *)0x0 },		/* Control-f */
   { ISFUNC, rl_abort },			/* Control-g */
-  { ISFUNC, rl_rubout },		/* Control-h */
+  { ISFUNC, rl_backward },		/* Control-h */
   { ISFUNC, (Function *)0x0 },		/* Control-i */
   { ISFUNC, rl_newline },		/* Control-j */
   { ISFUNC, rl_kill_line },		/* Control-k */
@@ -60,7 +59,7 @@ KEYMAP_ENTRY_ARRAY vi_movement_keymap = {
   { ISFUNC, rl_yank },			/* Control-y */
   { ISFUNC, (Function *)0x0 },		/* Control-z */
 
-  { ISFUNC, (Function *)rl_abort },	/* Control-[ */
+  { ISFUNC, rl_abort },			/* Control-[ */
   { ISFUNC, (Function *)0x0 },		/* Control-\ */
   { ISFUNC, (Function *)0x0 },		/* Control-] */
   { ISFUNC, (Function *)0x0 },		/* Control-^ */
@@ -174,7 +173,7 @@ KEYMAP_ENTRY_ARRAY vi_movement_keymap = {
   { ISFUNC, rl_vi_column },		/* | */
   { ISFUNC, (Function *)0x0 },		/* } */
   { ISFUNC, rl_vi_change_case },	/* ~ */
-  { ISFUNC, rl_backward },		/* RUBOUT */
+  { ISFUNC, (Function *)0x0 },		/* RUBOUT */
 
 #if KEYMAP_SIZE > 128
   /* Undefined keys. */
@@ -311,7 +310,6 @@ KEYMAP_ENTRY_ARRAY vi_movement_keymap = {
 
 
 KEYMAP_ENTRY_ARRAY vi_insertion_keymap = {
-
   /* The regular control keys come first. */
   { ISFUNC, (Function *)0x0 },		/* Control-@ */
   { ISFUNC, rl_insert },		/* Control-a */
@@ -416,7 +414,7 @@ KEYMAP_ENTRY_ARRAY vi_insertion_keymap = {
 
   /* Some more punctuation. */
   { ISFUNC, rl_insert },		/* [ */
-  { ISFUNC, rl_quoted_insert },		/* \ */
+  { ISFUNC, rl_insert },		/* \ */
   { ISFUNC, rl_insert },		/* ] */
   { ISFUNC, rl_insert },		/* ^ */
   { ISFUNC, rl_insert },		/* _ */

@@ -1319,7 +1319,7 @@ history_expand (string, output)
 		    int delimiter = 0;
 		    int si, l_this, l_that, l_temp = strlen (temp);
 
-		    if (i + 2 < strlen (string))
+		    if (i + 2 < (int)strlen (string))
 		      delimiter = string[i + 2];
 
 		    if (!delimiter)

@@ -28,7 +28,11 @@
 #  include "ansi_stdlib.h"
 #endif /* HAVE_STDLIB_H */
 
-char *signal_names[NSIG];
+#if !defined (NSIG)
+#  define NSIG 64
+#endif
+
+char *signal_names[2 * NSIG];
 
 char *progname;
 
@@ -36,7 +40,7 @@ initialize_signames ()
 {
   register int i;
 
-  for (i = 1; i < NSIG; i++)
+  for (i = 1; i < sizeof(signal_names)/sizeof(signal_names[0]); i++)
     signal_names[i] = (char *)NULL;
 
   /* `signal' 0 is what we do on exit. */

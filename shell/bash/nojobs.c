@@ -70,8 +70,17 @@
 extern int errno;
 #endif /* !errno */
 
+extern int interactive, interactive_shell, login_shell;
+extern int last_command_exit_value;
+#if defined (_POSIX_VERSION)
+extern sigset_t top_level_mask;
+#endif
+
 pid_t last_made_pid = NO_PID;
 pid_t last_asynchronous_pid = NO_PID;
+
+/* Call this when you start making children. */
+int already_making_children = 0;
 
 #if defined (_POSIX_VERSION)
 static void reap_zombie_children ();
@@ -274,6 +283,8 @@ make_child (command, async_p)
   if (command)  
     free (command);
 
+  start_pipeline ();
+
 #if defined (BUFFERED_INPUT)
   /* If default_buffered_input is active, we are reading a script.  If
      the command is asynchronous, we have already duplicated /dev/null
@@ -313,13 +324,13 @@ make_child (command, async_p)
       if (default_buffered_input > 0)
 	{
           close_buffered_fd (default_buffered_input);
-          default_buffered_input = -1;
+          default_buffered_input = bash_input.location.buffered_fd = -1;
 	}
 #endif /* BUFFERED_INPUT */
 
-#if 0
-      /* Cancel shell traps. */
-      restore_original_signals ();
+#if defined (_POSIX_VERSION)
+      /* Restore top-level signal mask. */
+      sigprocmask (SIG_SETMASK, &top_level_mask, (sigset_t *)NULL);
 #endif
 
       /* Ignore INT and QUIT in asynchronous children. */
@@ -329,14 +340,12 @@ make_child (command, async_p)
 	  set_signal_handler (SIGQUIT, SIG_IGN);
 	  last_asynchronous_pid = getpid ();
 	}
-      else
-	{
+
 #if defined (SIGTSTP)
-	  set_signal_handler (SIGTSTP, SIG_DFL);
-	  set_signal_handler (SIGTTIN, SIG_DFL);
-	  set_signal_handler (SIGTTOU, SIG_DFL);
+      set_signal_handler (SIGTSTP, SIG_DFL);
+      set_signal_handler (SIGTTIN, SIG_DFL);
+      set_signal_handler (SIGTTOU, SIG_DFL);
 #endif
-	}
     }
   else
     {
@@ -615,6 +624,12 @@ stop_pipeline (async, ignore)
      int async;
      char *ignore;
 {
+  already_making_children = 0;
+}
+
+start_pipeline ()
+{
+  already_making_children = 1;
 }
 
 /* Print descriptive information about the job with leader pid PID. */

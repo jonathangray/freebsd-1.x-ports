@@ -1,4 +1,7 @@
 /* jobs.h -- structures and stuff used by the jobs.c file. */
+#if !defined (__JOBS_H__)
+#  define __JOBS_H__
+
 #include "quit.h"
 #include "siglist.h"
 
@@ -8,23 +11,11 @@
 #define JLIST_PID_ONLY 2
 #define JLIST_CHANGED_ONLY 3
 
-/* Cadmus machines are brain-dead from the moment of fission, like all
-   bacteria. */
-#if defined (cadmus) || defined (BrainDeath)
-#  undef HAVE_WAIT_H
-#endif /* BrainDeath */
-
-/* HP/UX 6.x sys/wait.h is a complete loss when it comes to the WIF macros.
-   Pretend we don't have a wait.h. */
-#if defined (hpux) && !defined (_POSIX_VERSION)
-#  undef HAVE_WAIT_H
-#endif
-
 #if defined (HAVE_WAIT_H)
 #  include <sys/wait.h>
 #else /* !HAVE_WAIT_H */
 
-#  include "endian.h"
+#  include "bash-endian.h"
 
 #  if !defined (_POSIX_VERSION)
 #    if defined (LITTLE_ENDIAN)
@@ -284,3 +275,5 @@ extern int job_slots;
 extern void restart_job_control (), end_job_control ();
 extern void wait_for_background_pids ();
 extern int wait_for_single_pid ();
+
+#endif /* !__JOBS_H__ */

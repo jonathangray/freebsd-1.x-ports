@@ -983,16 +983,11 @@ make_child (command, async_p)
 	 0 because that's the file descriptor used when redirecting input,
 	 and it's wrong to close the file in that case. */
       if (default_buffered_input > 0)
-        {
-          close_buffered_fd (default_buffered_input);
-          default_buffered_input = -1;
-        }
+	{
+	  close_buffered_fd (default_buffered_input);
+	  default_buffered_input = bash_input.location.buffered_fd = -1;
+	}
 #endif /* BUFFERED_INPUT */
-
-#if 0
-      /* Cancel traps, in trap.c. */
-      restore_original_signals ();
-#endif
 
       /* Restore top-level signal mask. */
       sigprocmask (SIG_SETMASK, &top_level_mask, (sigset_t *)NULL);
@@ -2446,7 +2441,12 @@ sigwinch_sighandler (sig)
 #endif /* USG && !_POSIX_VERSION */
   if ((ioctl (shell_tty, TIOCGWINSZ, &win) == 0) &&
       win.ws_row > 0 && win.ws_col > 0)
-    set_lines_and_columns (win.ws_row, win.ws_col);
+    {
+#if defined (aixpc)
+      shell_tty_info.c_winsize = win;	/* structure copying */
+#endif
+      set_lines_and_columns (win.ws_row, win.ws_col);
+    }
 }
 #endif /* !READLINE && TIOCGWINSZ && SIGWINCH */
 

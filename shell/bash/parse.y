@@ -85,12 +85,14 @@ char *current_prompt_string;
 
 char *decode_prompt_string ();
 
+void gather_here_documents ();
+
 /* The number of lines read from input while creating the current command. */
 int current_command_line_count = 0;
 
 /* Variables to manage the task of reading here documents, because we need to
    defer the reading until after a complete command has been collected. */
-REDIRECT *redirection_needing_here_doc = (REDIRECT *)NULL;
+static REDIRECT *redir_stack[10];
 int need_here_doc = 0;
 %}
 
@@ -198,14 +200,12 @@ redirection:	'>' WORD
 	|	LESS_LESS WORD
 			{
 			  $$ = make_redirection ( 0, r_reading_until, $2);
-			  redirection_needing_here_doc = $$;
-			  need_here_doc = 1;
+			  redir_stack[need_here_doc++] = $$;
 			}
 	|	NUMBER LESS_LESS WORD
 			{
 			  $$ = make_redirection ($1, r_reading_until, $3);
-			  redirection_needing_here_doc = $$;
-			  need_here_doc = 1;
+			  redir_stack[need_here_doc++] = $$;
 			}
 	|	LESS_AND NUMBER
 			{
@@ -251,15 +251,13 @@ redirection:	'>' WORD
 			{
 			  $$ = make_redirection
 			    (0, r_deblank_reading_until, $2);
-			  redirection_needing_here_doc = $$;
-			  need_here_doc = 1;
+			  redir_stack[need_here_doc++] = $$;
 			}
 	|	NUMBER LESS_LESS_MINUS WORD
 			{
 			  $$ = make_redirection
 			    ($1, r_deblank_reading_until, $3);
-			  redirection_needing_here_doc = $$;
-			  need_here_doc = 1;
+			  redir_stack[need_here_doc++] = $$;
 			}
 	|	GREATER_AND '-'
 			{ $$ = make_redirection ( 1, r_close_this, 0L); }
@@ -460,8 +458,7 @@ list:		newlines list0
 			{
 			  $$ = $2;
 			  if (need_here_doc)
-			    make_here_document (redirection_needing_here_doc);
-			  need_here_doc = 0;
+			    gather_here_documents ();
 			 }
 	;
 
@@ -514,23 +511,20 @@ simple_list:	simple_list1
 			{
 			  $$ = $1;
 			  if (need_here_doc)
-			    make_here_document (redirection_needing_here_doc);
-			  need_here_doc = 0;
+			    gather_here_documents ();
 			}
 	|	simple_list1 '&'
 			{
 			  /* $1->flags |= CMD_FORCE_SUBSHELL; */
 			  $$ = command_connect ($1, (COMMAND *)NULL, '&');
 			  if (need_here_doc)
-			    make_here_document (redirection_needing_here_doc);
-			  need_here_doc = 0;
+			    gather_here_documents ();
 			}
 	|	simple_list1 ';'
 			{
 			  $$ = $1;
 			  if (need_here_doc)
-			    make_here_document (redirection_needing_here_doc);
-			  need_here_doc = 0;
+			    gather_here_documents ();
 			}
 	;
 
@@ -1330,6 +1324,9 @@ shell_getc (remove_quoted_newline)
 	  shell_input_line_len = shell_input_line ?
 				 strlen (shell_input_line) :
 				 0;
+	  if (!shell_input_line_len)
+	    current_command_line_count--;
+
 	  /* We have to force the xrealloc below because we don't know the
 	     true allocated size of shell_input_line anymore. */
 	  shell_input_line_size = shell_input_line_len;
@@ -1653,6 +1650,17 @@ static int delimiter_depth = 0;
 /* How many slots are allocated to DELIMITERS. */
 static int delimiter_space = 0;
 
+void
+gather_here_documents ()
+{
+  int r = 0;
+  while (need_here_doc)
+    {
+      make_here_document (redir_stack[r++]);
+      need_here_doc--;
+    }
+}
+
 /* Macro for accessing the top delimiter on the stack.  Returns the
    delimiter or zero if none. */
 #define current_delimiter() \
@@ -1802,10 +1810,9 @@ read_token (command)
       shell_getc (0);
 
       /* If we're about to return an unquoted newline, we can go and collect
-	 the text of any pending here document. */
+	 the text of any pending here documents. */
       if (need_here_doc)
-	make_here_document (redirection_needing_here_doc);
-      need_here_doc = 0;
+        gather_here_documents ();
 
 #if defined (ALIAS)
       expand_next_token = 0;
@@ -1819,8 +1826,7 @@ read_token (command)
       /* If we're about to return an unquoted newline, we can go and collect
 	 the text of any pending here document. */
       if (need_here_doc)
-	make_here_document (redirection_needing_here_doc);
-      need_here_doc = 0;
+	gather_here_documents ();
 
 #if defined (ALIAS)
       expand_next_token = 0;
@@ -2412,11 +2418,11 @@ reserved_word_acceptable (token)
     return (0);
 }
 
-/* Return the index of WORD in the alist of reserved words, or -1 if WORD
-   is not a shell reserved word. */
+/* Return the index of TOKEN in the alist of reserved words, or -1 if
+   TOKEN is not a shell reserved word. */
 int
-find_reserved_word (word)
-     char *word;
+find_reserved_word (token)
+     char *token;
 {
   int i;
   for (i = 0; word_token_alist[i].word != (char *)NULL; i++)
@@ -2455,7 +2461,7 @@ reset_readline_prompt ()
    newline separator for such tokens is replaced with a space. */
 static int no_semi_successors[] = {
   '\n', '{', '(', ')', ';', '&', '|',
-  CASE, DO, ELSE, IF, IN, SEMI_SEMI, THEN, UNTIL, WHILE,
+  CASE, DO, ELSE, IF, IN, SEMI_SEMI, THEN, UNTIL, WHILE, AND_AND, OR_OR,
   0
 };
 

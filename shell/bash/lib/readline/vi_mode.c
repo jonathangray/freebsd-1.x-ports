@@ -28,6 +28,8 @@
 /* **************************************************************** */
 #if defined (VI_MODE)
 
+#include <sys/types.h>
+
 #if defined (HAVE_STDLIB_H)
 #  include <stdlib.h>
 #else
@@ -42,15 +44,8 @@ extern char *xmalloc (), *xrealloc ();
 
 #include <stdio.h>
 
-#if defined (__GNUC__)
-#  define alloca __builtin_alloca
-#else
-#  if defined (sparc) || defined (HAVE_ALLOCA_H)
-#    include <alloca.h>
-#  endif
-#endif
-
 /* Some standard library routines. */
+#include "rldefs.h"
 #include "readline.h"
 #include "history.h"
 
@@ -76,6 +71,10 @@ extern char *xmalloc (), *xrealloc ();
 
 #ifndef exchange
 #define exchange(x, y) {int temp = x; x = y; y = temp;}
+#endif
+
+#ifndef VI_COMMENT_BEGIN_DEFAULT
+#define VI_COMMENT_BEGIN_DEFAULT "#"
 #endif
 
 /* Variables imported from readline.c */
@@ -159,6 +158,9 @@ rl_vi_redo (count, c)
 rl_vi_yank_arg (count)
      int count;
 {
+  /* vi mode is defined to insert a space before the last argument. */
+  rl_insert (1, ' ');
+
   /* Readline thinks that the first word on a line is the 0th, while vi
      thinks the first word on a line is the 1st.  Compensate. */
   if (rl_explicit_arg)
@@ -751,7 +753,9 @@ rl_vi_delete_to (count, key)
       return -1;
     }
 
-  if ((c != 'l') && (c != ' ') && (c != '|') && (c != 'h') && rl_mark < rl_end)
+  /* These are the motion commands that do not require adjusting the
+     mark. */
+  if ((strchr (" l|h^0%bB", c) == 0) && (rl_mark < rl_end))
     rl_mark++;
 
   rl_kill_text (rl_point, rl_mark);
@@ -776,7 +780,10 @@ rl_vi_change_to (count, key)
       return -1;
     }
 
-  if ((c != 'l') && (c != ' ') && (c != '|') && (c != 'h') && rl_mark < rl_end)
+  /* These are the motion commands that do not require adjusting the
+     mark.  c[wW] are handled by special-case code in rl_vi_domove(),
+     and already leave the mark at the correct location. */
+  if ((strchr (" l|hwW^0%bB", c) == 0) && (rl_mark < rl_end))
     rl_mark++;
 
   /* The cursor never moves with c[wW]. */
@@ -805,7 +812,9 @@ rl_vi_yank_to (count, key)
       return -1;
     }
 
-  if ((c != 'l') && (c != ' ') && (c != '|') && (c != 'h') && rl_mark < rl_end)
+  /* These are the motion commands that do not require adjusting the
+     mark. */
+  if ((strchr (" l|h^0%bB", c) == 0) && (rl_mark < rl_end))
     rl_mark++;
 
   rl_begin_undo_group ();
@@ -849,7 +858,7 @@ rl_vi_comment ()
   if (rl_vi_comment_begin != (char *)NULL)
     rl_insert_text (rl_vi_comment_begin);
   else
-    rl_insert_text (": ");	/* Default. */
+    rl_insert_text (VI_COMMENT_BEGIN_DEFAULT);	/* Default. */
 
   rl_redisplay ();
   rl_newline (1, '\010');

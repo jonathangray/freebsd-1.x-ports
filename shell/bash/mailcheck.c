@@ -374,10 +374,15 @@ check_mail ()
 	     the mail in the file is manipulated, check the size also.  If
 	     the file has not grown, continue. */
 	  if (i != -1 &&
-	      (mailfiles[i]->access_time == mailfiles[i]->mod_time) &&
+	      (mailfiles[i]->access_time >= mailfiles[i]->mod_time) &&
 	      !file_is_bigger)
 	    goto next_mail_file;
 
+#if 0
+	  /* XXX - this test is useless, and so is the assignment.
+		   have already gone to the next mail file if the test
+		   succeeds, since it is the same as the one above, and
+		   the assignment has already been made. */
 	  if (!use_user_notification)
 	    {
 	      if (i != -1 &&
@@ -385,6 +390,7 @@ check_mail ()
 		  file_is_bigger)
 		you_have_mail_message = "You have new mail in $_";
 	    }
+#endif
 
 	  if ((tlist = expand_string (you_have_mail_message, 1)))
 	    {

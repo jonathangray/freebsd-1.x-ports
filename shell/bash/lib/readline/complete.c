@@ -63,6 +63,11 @@ extern struct passwd *getpwent ();
 /* Some standard library routines. */
 #include "readline.h"
 
+/* Possible values for do_replace in rl_complete_internal. */
+#define NO_MATCH	0
+#define SINGLE_MATCH	1
+#define MULT_MATCH	2
+
 #if !defined (strchr) && !defined (__STDC__)
 extern char *strchr (), *strrchr ();
 #endif /* !strchr && !__STDC__ */
@@ -73,6 +78,10 @@ extern char *rl_copy_text ();
 extern Function *rl_last_func;
 extern int rl_editing_mode;
 extern int screenwidth;
+
+/* Forward declarations for functions defined and used in this file. */
+char *filename_completion_function ();
+char **completion_matches ();
 
 static int compare_strings ();
 static char *rl_strpbrk ();
@@ -94,6 +103,10 @@ int rl_complete_with_tilde_expansion = 0;
 #define VISIBLE_STATS
 
 #if defined (VISIBLE_STATS)
+#  if !defined (X_OK)
+#    define X_OK 1
+#  endif
+
 static int stat_char ();
 
 /* Non-zero means add an additional character to each filename displayed
@@ -214,6 +227,44 @@ int rl_filename_completion_desired = 0;
    to implement FIGNORE a la SunOS csh. */
 Function *rl_ignore_some_completions_function = (Function *)NULL;
 
+#if defined (SHELL)
+/* A function to strip quotes that are not protected by backquotes.  It
+   allows single quotes to appear within double quotes, and vice versa.
+   It should be smarter.  It's fairly shell-specific, hence the SHELL
+   definition wrapper. */
+static char *
+_delete_quotes (text)
+     char *text;
+{
+  char *ret, *p, *r;
+  int l, quoted;
+
+  l = strlen (text);
+  ret = xmalloc (l + 1);
+  for (quoted = 0, p = text, r = ret; p && *p; p++)
+    {
+      /* Allow backslash-quoted characters to pass through unscathed. */
+      if (*p == '\\')
+        continue;
+      /* Close quote. */
+      if (quoted && *p == quoted)
+	{
+	  quoted = 0;
+	  continue;
+	}
+      /* Open quote. */
+      if (quoted == 0 && (*p == '\'' || *p == '"'))
+	{
+	  quoted = *p;
+	  continue;
+	}
+      *r++ = *p;
+    }
+  *r = '\0';
+  return ret;
+}
+#endif /* SHELL */
+
 /* Complete the word at or before point.
    WHAT_TO_DO says what to do with the completion.
    `?' means list the possible completions.
@@ -222,13 +273,15 @@ Function *rl_ignore_some_completions_function = (Function *)NULL;
 rl_complete_internal (what_to_do)
      int what_to_do;
 {
-  char *filename_completion_function ();
-  char **completion_matches (), **matches;
+  char **matches;
   Function *our_func;
-  int start, scan, end, delimiter = 0;
+  int start, scan, end, delimiter = 0, pass_next;
   char *text, *saved_line_buffer;
-  char quote_char = '\0';
   char *replacement;
+#if defined (SHELL)
+  char quote_char = '\0';
+  int found_quote = 0;
+#endif
 
   if (rl_line_buffer)
     saved_line_buffer = savestring (rl_line_buffer);
@@ -238,7 +291,7 @@ rl_complete_internal (what_to_do)
   if (rl_completion_entry_function)
     our_func = rl_completion_entry_function;
   else
-    our_func = (int (*)())filename_completion_function;
+    our_func = (Function *)filename_completion_function;
 
   /* Only the completion entry function can change this. */
   rl_filename_completion_desired = 0;
@@ -252,10 +305,22 @@ rl_complete_internal (what_to_do)
 	{
 	  /* We have a list of characters which can be used in pairs to
 	     quote substrings for the completer.  Try to find the start
-	     of an unclosed quoted substring.
-	     [FIXME: Doesn't yet handle '\' escapes to quote quotes. */
-	  for (scan = 0; scan < end; scan++)
+	     of an unclosed quoted substring. */
+	  /* FOUND_QUOTE is set so we know what kind of quotes we found. */
+	  for (scan = pass_next = 0; scan < end; scan++)
 	    {
+	      if (pass_next)
+		{
+		  pass_next = 0;
+		  continue;
+		}
+
+	      if (rl_line_buffer[scan] == '\\')
+		{
+		  pass_next = 1;
+		  continue;
+		}
+
 	      if (quote_char != '\0')
 		{
 		  /* Ignore everything until the matching close quote char. */
@@ -271,18 +336,41 @@ rl_complete_internal (what_to_do)
 		  /* Found start of a quoted substring. */
 		  quote_char = rl_line_buffer[scan];
 		  rl_point = scan + 1;
+#if defined (SHELL)
+		  if (quote_char == '\'')
+		    found_quote |= 1;
+		  else if (quote_char == '"')
+		    found_quote |= 2;
+#endif
 		}
 	    }
 	}
 
       if (rl_point == end)
 	{
+	  int quoted = 0;
 	  /* We didn't find an unclosed quoted substring up which to do
 	     completion, so use the word break characters to find the
 	     substring on which to complete. */
-	  while
-	    (--rl_point &&
-	     !strchr (rl_completer_word_break_characters, rl_line_buffer[rl_point]));
+	  while (--rl_point)
+	    {
+#if defined (SHELL)
+	      /* Don't let word break characters in quoted substrings break
+		 words for the completer. */
+	      if (found_quote)
+		{
+		  if (strchr (rl_completer_quote_characters, rl_line_buffer[rl_point]))
+		    {
+		      quoted = !quoted;
+		      continue;
+		    }
+		  if (quoted)
+		    continue;
+		}
+#endif /* SHELL */
+	      if (strchr (rl_completer_word_break_characters, rl_line_buffer[rl_point]))
+	        break;
+	    }
 	}
 
       /* If we are at a word break, then advance past it. */
@@ -301,6 +389,7 @@ rl_complete_internal (what_to_do)
 	}
     }
 
+  /* At this point, we know we have an open quote if quote_char != '\0'. */
   start = rl_point;
   rl_point = end;
   text = rl_copy_text (start, end);
@@ -321,6 +410,19 @@ rl_complete_internal (what_to_do)
 	  goto after_usual_completion;
 	}
     }
+
+#if defined (SHELL)
+  /* Beware -- we're stripping the quotes here.  Do this only if we know
+     we are doing filename completion. */
+  if (found_quote && our_func == (Function *)filename_completion_function)
+    {
+      /* delete single and double quotes */
+      replacement = _delete_quotes (text);
+      free (text);
+      text = replacement;
+      replacement = (char *)0;
+    }
+#endif /* SHELL */
 
   matches = completion_matches (text, our_func);
 
@@ -405,7 +507,7 @@ rl_complete_internal (what_to_do)
 	     ignore function with the array as a parameter.  It can
 	     munge the array, deleting matches as it desires. */
 	  if (rl_ignore_some_completions_function &&
-	      our_func == (int (*)())filename_completion_function)
+	      our_func == (Function *)filename_completion_function)
 	    (void)(*rl_ignore_some_completions_function)(matches);
 
 	  /* If we are doing completion on quoted substrings, and any matches
@@ -423,34 +525,44 @@ rl_complete_internal (what_to_do)
 	    {
 	      int do_replace;
 
-	      do_replace = 0;
+	      do_replace = NO_MATCH;
 
 	      /* If there is a single match, see if we need to quote it.
 		 This also checks whether the common prefix of several
 		 matches needs to be quoted.  If the common prefix should
 		 not be checked, add !matches[1] to the if clause. */
 	      if (rl_strpbrk (matches[0], rl_completer_word_break_characters))
-		do_replace = matches[1] ? 2 : 1;    /* 2 == partial quote */
+		do_replace = matches[1] ? MULT_MATCH : SINGLE_MATCH;
 
-	      if (do_replace)
+	      if (do_replace != NO_MATCH)
 		{
 #if defined (SHELL)
 		  /* XXX - experimental */
 		  /* Quote the replacement, since we found an
 		     embedded word break character in a potential
 		     match. */
-		  char *rtext;
+		  char *rtext, *mtext;
 		  int rlen;
 		  extern char *double_quote ();	/* in builtins/common.c */
 
-		  rtext = double_quote (matches[0]);
+		  /* If DO_REPLACE == MULT_MATCH, it means that there is
+		     more than one match.  In this case, we do not add
+		     the closing quote or attempt to perform tilde
+		     expansion.  If DO_REPLACE == SINGLE_MATCH, we try
+		     to perform tilde expansion, because double quotes
+		     inhibit tilde expansion by the shell. */
+
+		  mtext = matches[0];
+		  if (mtext[0] == '~' && do_replace == SINGLE_MATCH)
+		    mtext = tilde_expand (matches[0]);
+		  rtext = double_quote (mtext);
+		  if (mtext != matches[0])
+		    free (mtext);
+
 		  rlen = strlen (rtext);
 		  replacement = (char *)alloca (rlen + 1);
 		  strcpy (replacement, rtext);
-		  /* If DO_REPLACE == 2, it means that there is more than
-		     one match.  In this case, we do not add the closing
-		     quote. */
-		  if (do_replace == 2)
+		  if (do_replace == MULT_MATCH)
 		    replacement[rlen - 1] = '\0';
 		  free (rtext);
 #else /* !SHELL */
@@ -706,6 +818,7 @@ rl_complete_internal (what_to_do)
 	  break;
 
 	default:
+	  fprintf (stderr, "\r\nreadline: bad value for what_to_do in rl_complete\n");
 	  abort ();
 	}
 
@@ -852,7 +965,7 @@ int completion_case_fold = 0;
 char **
 completion_matches (text, entry_function)
      char *text;
-     char *(*entry_function) ();
+     CPFunction *entry_function;
 {
   /* Number of slots in match_list. */
   int match_list_size;

@@ -230,13 +230,16 @@ rl_generic_bind (type, keyseq, data, map)
       return -1;
     }
 
-  keys = (char *)alloca (1 + (2 * strlen (keyseq)));
+  keys = xmalloc (1 + (2 * strlen (keyseq)));
 
   /* Translate the ASCII representation of KEYSEQ into an array of
      characters.  Stuff the characters into KEYS, and the length of
      KEYS into KEYS_LEN. */
   if (rl_translate_keyseq (keyseq, keys, &keys_len))
-    return -1;
+    {
+      free (keys);
+      return -1;
+    }
 
   /* Bind keys, making new keymaps as necessary. */
   for (i = 0; i < keys_len; i++)
@@ -271,6 +274,7 @@ rl_generic_bind (type, keyseq, data, map)
 	  map[ic].type = type;
 	}
     }
+  free (keys);
   return 0;
 }
 
@@ -829,7 +833,7 @@ rl_parse_and_bind (string)
      rl_set_key ().  Otherwise, let the older code deal with it. */
   if (*string == '"')
     {
-      char *seq = (char *)alloca (1 + strlen (string));
+      char *seq = xmalloc (1 + strlen (string));
       register int j, k = 0;
       int passc = 0;
 
@@ -867,6 +871,7 @@ rl_parse_and_bind (string)
       else
 	rl_set_key (seq, rl_named_function (funname), _rl_keymap);
 
+      free (seq);
       return 0;
     }
 

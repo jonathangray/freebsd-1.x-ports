@@ -874,6 +874,13 @@ rl_call_last_kbd_macro (count, ignore)
   if (!current_macro)
     rl_abort ();
 
+  if (defining_kbd_macro)
+    {
+      ding ();		/* no recursive macros */
+      current_macro[--current_macro_index] = '\0';	/* erase this char */
+      return 0;
+    }
+
   while (count--)
     with_macro_input (savestring (current_macro));
 }
@@ -3056,8 +3063,10 @@ rl_yank_nth_arg (count, ignore)
     rl_point++;
 #endif /* VI_MODE */
 
+#if 0
   if (rl_point && the_line[rl_point - 1] != ' ')
     rl_insert_text (" ");
+#endif
 
   rl_insert_text (arg);
   free (arg);

@@ -280,6 +280,14 @@ initialize_shell_variables (env)
   bind_variable ("OPTERR", "1");
 #endif /* GETOPTS_BUILTIN */
 
+  /* Find out if we're supposed to be in Posix.2 mode via an
+     environment variable. */
+  temp_var = find_variable ("POSIXLY_CORRECT");
+  if (!temp_var)
+    temp_var = find_variable ("POSIX_PEDANTIC");
+  if (temp_var && imported_p (temp_var))
+    sv_strict_posix (temp_var->name);
+
   /* Get the full pathname to THIS shell, and set the BASH variable
      to it. */
   {
@@ -601,7 +609,7 @@ print_var_function (var)
      SHELL_VAR *var;
 {
   if (function_p (var) && var->value)
-    printf ("%s", named_function_string ((char *)NULL, var->value, 1));
+    printf ("%s", named_function_string ((char *)NULL, function_cell(var), 1));
 }
 
 /* **************************************************************** */
@@ -818,7 +826,7 @@ find_variable (name)
   extern Function *this_shell_builtin;
 
   return (find_variable_internal
-	  (name, (variable_context || this_shell_builtin)));
+	  (name, (variable_context || this_shell_builtin || builtin_env)));
 }
 
 /* Look up the function entry whose name matches STRING.
@@ -1331,24 +1339,24 @@ set_func_auto_export (name)
 assignment (string)
      char *string;
 {
-  register int c, index = 0;
+  register int c, indx = 0;
 
-  c = string[index];
+  c = string[indx];
 
   if (!isletter (c) && c != '_')
     return (0);
 
-  while (c = string[index])
+  while (c = string[indx])
     {
       /* The following is safe.  Note that '=' at the start of a word
 	 is not an assignment statement. */
       if (c == '=')
-	return (index);
+	return (indx);
 
       if (!isletter (c) && !digit (c) && c != '_')
 	return (0);
 
-      index++;
+      indx++;
     }
   return (0);
 }
@@ -1750,7 +1758,7 @@ static char *last_tempenv_value = (char *)NULL;
 
 char *
 getenv (name)
-#if defined (Linux)
+#if defined (Linux) || defined (__bsdi__)
      _CONST_HACK char *name;
 #else
      char _CONST_HACK *name;

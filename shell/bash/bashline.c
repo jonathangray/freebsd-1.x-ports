@@ -109,7 +109,12 @@ posix_readline_initialize (on_or_off)
 {
 #if defined (VI_MODE)
   if (on_or_off)
-    rl_bind_key_in_map (CTRL('I'), rl_insert, vi_insertion_keymap);
+    {
+      rl_bind_key_in_map (CTRL('I'), rl_insert, vi_insertion_keymap);
+      if (rl_vi_comment_begin)
+	free (rl_vi_comment_begin);
+      rl_vi_comment_begin = savestring ("#");
+    }
   else
     rl_bind_key_in_map (CTRL('I'), rl_complete, vi_insertion_keymap);
 #endif
@@ -1389,14 +1394,15 @@ test_for_directory (name)
 {
   struct stat finfo;
   char *fn;
-  int r;
 
   fn = tilde_expand (name);
   if (stat (fn, &finfo) != 0)
-    return 1;		/* let the completer figure this one out */
-  r = S_ISDIR (finfo.st_mode);
+    {
+      free (fn);
+      return 0;
+    }
   free (fn);
-  return r;
+  return (S_ISDIR (finfo.st_mode));
 }
 
 /* Remove files from NAMES, leaving directories. */

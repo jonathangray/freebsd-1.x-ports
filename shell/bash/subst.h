@@ -53,6 +53,8 @@ extern void word_list_remove_quoted_nulls ();
    STRING. */
 extern WORD_LIST *list_string ();
 
+extern char *get_word_from_string ();
+
 /* Given STRING, an assignment string, get the value of the right side
    of the `=', and bind it to the left side.  If EXPAND is true, then
    perform parameter expansion, command substitution, and arithmetic

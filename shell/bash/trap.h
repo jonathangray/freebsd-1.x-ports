@@ -1,13 +1,16 @@
 /* trap.h -- data structures used in the trap mechanism. */
 
-#ifndef NSIG
+#if !defined (__TRAP_H__)
+#define __TRAP_H__
+
+#if !defined (SIG_DFL)
 #include <sys/types.h>
 #include <signal.h>
-#endif
+#endif /* SIG_DFL */
 
-#ifndef NSIG
+#if !defined (NSIG)
 #define NSIG 64
-#endif
+#endif /* !NSIG */
 
 #define NO_SIG -1
 #define DEFAULT_SIG SIG_DFL
@@ -18,3 +21,5 @@
 extern char *trap_list[NSIG];
 extern char *signal_name ();
 extern int decode_signal ();
+
+#endif /* __TRAP_H__ */

@@ -381,9 +381,6 @@ make_here_document (temp)
 	    while (line = read_secondary_line
 		     (temp->redirectee.filename->quoted == 0))
 	      {
-		if (!line)
-		  goto document_done;
-
 		line_number++;
 
 		if (kill_leading)
@@ -395,7 +392,10 @@ make_here_document (temp)
 		       is a hack, though. */
 		    if ((strncmp (line, redirectee_word, len) == 0) &&
 			line[len] == '\n')
-		      goto document_done;
+		      {
+			free (line);
+			goto document_done;
+		      }
 
 		    for (i = 0; line[i] == '\t'; i++)
 		      ;
@@ -406,7 +406,10 @@ make_here_document (temp)
 
 		if ((strncmp (line, redirectee_word, len) == 0) &&
 		    line[len] == '\n')
-		  goto document_done;
+		  {
+		    free (line);
+		    goto document_done;
+		  }
 
 		l = strlen (line);
 		if (l + document_index >= document_size)
@@ -418,9 +421,9 @@ make_here_document (temp)
 		if (l != 0)
 		  {
 		    strcpy (&document[document_index], line);
-		    free (line);
 		    document_index += l;
 		  }
+		free (line);
 	      }
   document_done:
 	    if (!document)

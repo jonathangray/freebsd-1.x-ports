@@ -70,7 +70,7 @@ extern int errno;
 
 /* What type are the user and group ids?  GID_T is actually the type of
    the array that getgroups(3) returns. */
-#if defined (SunOS4) || defined (__bsdi__)
+#if defined (SunOS4) || defined (__bsdi__) || defined (__FreeBSD__)
 #  define GID_T int
 #  define UID_T int
 #else /* !SunOS4 && !__bsdi__*/
@@ -78,13 +78,13 @@ extern int errno;
 #  define UID_T uid_t
 #endif /* !SunOS4 && !__bsdi__ */
 
-#if !defined (Linux) && !defined (USGr4_2)
+#if !defined (Linux) && !defined (USGr4_2) && !defined (SunOS5)
 extern gid_t getegid ();
 extern uid_t geteuid ();
 #  if !defined (sony)
 extern gid_t getgid ();
 #  endif /* !sony */
-#endif /* !Linux && !USGr4_2 */
+#endif /* !Linux && !USGr4_2 && !SunOS5 */
 
 #if !defined (R_OK)
 #define R_OK 4
@@ -654,9 +654,9 @@ binary_operator ()
 	      pos += 3;
 	      if (l_is_l || r_is_l)
 		test_syntax_error ("-ef does not accept -l\n", (char *)NULL);
-	      if (stat (argv[op - 1], &stat_buf) < 0)
+	      if (test_stat (argv[op - 1], &stat_buf) < 0)
 		return (FALSE);
-	      if (stat (argv[op + 1], &stat_spare) < 0)
+	      if (test_stat (argv[op + 1], &stat_spare) < 0)
 		return (FALSE);
 	      return (TRUE ==
 		      (stat_buf.st_dev == stat_spare.st_dev &&
@@ -677,7 +677,7 @@ binary_operator ()
 	    }
 	  break;
 	}
-      test_syntax_error ("unknown binary operator", argv[op]);
+      test_syntax_error ("%s: unknown binary operator", argv[op]);
     }
 
   if (argv[op][0] == '=' && !argv[op][1])
@@ -693,6 +693,7 @@ binary_operator ()
       pos += 3;
       return (TRUE == value);
     }
+  return (FALSE);
 }
 
 static int
@@ -729,7 +730,11 @@ unary_operator ()
 
     case 'x':			/* File is executable? */
       unary_advance ();
+#if defined (AFS)
+      value = -1 != access (argv[pos - 1], X_OK);
+#else
       value = -1 != eaccess (argv[pos - 1], X_OK);
+#endif
       return (TRUE == value);
 
     case 'O':			/* File is owned by you? */

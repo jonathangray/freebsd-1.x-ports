@@ -42,7 +42,7 @@
 #include "filecntl.h"
 #include "bashansi.h"
 
-#if defined (HAVE_VFPRINTF)
+#if defined (HAVE_VARARGS_H)
 #include <varargs.h>
 #endif
 
@@ -249,7 +249,7 @@ int default_buffered_input = -1;
 
 static char *local_pending_command = (char *)NULL;
 
-static int issock ();
+static int isnetconn ();
 static void run_startup_files ();
 
 main (argc, argv, env)
@@ -302,7 +302,8 @@ main (argc, argv, env)
   privileged_mode = (current_user.uid != current_user.euid) ||
 		    (current_user.gid != current_user.egid);
 
-  posixly_correct = getenv ("POSIXLY_CORRECT") != (char *)NULL;
+  posixly_correct = (getenv ("POSIXLY_CORRECT") != (char *)NULL) ||
+		    (getenv ("POSIX_PEDANTIC") != (char *)NULL);
 
 #if defined (USE_GNU_MALLOC_LIBRARY)
   {
@@ -923,16 +924,10 @@ run_startup_files ()
          login			NO
          bash			YES
       */
-#if defined (S_ISSOCK)
       if (!act_like_sh && !no_rc &&
-          (interactive_shell || (issock (fileno (stdin)) &&
+          (interactive_shell || (isnetconn (fileno (stdin)) &&
 			         local_pending_command)))
-#else /* !S_ISSOCK */
-      if (!act_like_sh && !no_rc &&
-          (interactive_shell || (!isatty (fileno (stdin)) &&
-			         local_pending_command)))
-#endif /* !S_ISSOCK */
-        maybe_execute_file (bashrc_file);
+	maybe_execute_file (bashrc_file);
     }
 
    /* Try a TMB suggestion.  If running a script, then execute the
@@ -1313,11 +1308,9 @@ alrm_catcher(i)
 parse_command ()
 {
   extern int need_here_doc, current_command_line_count;
-  extern REDIRECT *redirection_needing_here_doc;
   int r;
 
   need_here_doc = 0;
-  redirection_needing_here_doc = (REDIRECT *)NULL;
 
   run_pending_traps ();
 
@@ -1325,8 +1318,7 @@ parse_command ()
   r = yyparse ();
 
   if (need_here_doc)
-    make_here_document (redirection_needing_here_doc);
-  need_here_doc = 0;
+    gather_here_documents ();
 
   return (r);
 }
@@ -1613,6 +1605,9 @@ static struct termsig terminating_signals[] = {
 
 #define TERMSIGS_LENGTH (sizeof (terminating_signals) / sizeof (struct termsig))
 
+#define XSIG(x) (terminating_signals[x].signum)
+#define XHANDLER(x) (terminating_signals[x].orig_handler)
+
 /* This function belongs here? */
 sighandler
 termination_unwind_protect (sig)
@@ -1666,10 +1661,10 @@ initialize_terminating_signals ()
   act.sa_flags = 0;
   sigemptyset (&act.sa_mask);
   for (i = 0; i < TERMSIGS_LENGTH; i++)
-    sigaddset (&act.sa_mask, terminating_signals[i].signum);
+    sigaddset (&act.sa_mask, XSIG (i));
   for (i = 0; i < TERMSIGS_LENGTH; i++)
     {
-      sigaction (terminating_signals[i].signum, &act, &oact);
+      sigaction (XSIG (i), &act, &oact);
       terminating_signals[i].orig_handler = oact.sa_handler;
     }
 
@@ -1677,7 +1672,7 @@ initialize_terminating_signals ()
 
   for (i = 0; i < TERMSIGS_LENGTH; i++)
     terminating_signals[i].orig_handler =
-      signal (terminating_signals[i].signum, termination_unwind_protect);
+      signal (XSIG (i), termination_unwind_protect);
 
 #endif /* !_POSIX_VERSION */
 
@@ -1706,7 +1701,7 @@ reset_terminating_signals ()
 {
   register int i;
 
-#if defined (__POSIX_VERSION)
+#if defined (_POSIX_VERSION)
   struct sigaction act;
 
   act.sa_flags = 0;
@@ -1715,24 +1710,26 @@ reset_terminating_signals ()
     {
       /* Skip a signal if it's trapped or handled specially, because the
 	 trap code will restore the correct value. */
-      if (signal_is_trapped (i) || signal_is_special (i))
+      if (signal_is_trapped (XSIG (i)) || signal_is_special (XSIG (i)))
 	continue;
 
-      act.sa_handler = terminating_signals[i].orig_handler;
-      sigaction (terminating_signals[i].signum, &act, (struct sigaction *) NULL);
+      act.sa_handler = XHANDLER (i);
+      sigaction (XSIG (i), &act, (struct sigaction *) NULL);
+#undef XSIG
     }
 #else
   for (i = 0; i < TERMSIGS_LENGTH; i++)
     {
-      if (signal_is_trapped (i) || signal_is_special (i))
+      if (signal_is_trapped (XSIG (i)) || signal_is_special (XSIG (i)))
 	continue;
 
-      signal (terminating_signals[i].signum,
-	      terminating_signals[i].orig_handler);
+      signal (XSIG (i), XHANDLER (i));
     }
 #endif
 }
-  
+#undef XSIG
+#undef XHANDLER
+
 /* What to do when we've been interrupted, and it is safe to handle it. */
 void
 throw_to_top_level ()
@@ -1946,18 +1943,43 @@ show_shell_version ()
 	  dist_version, build_version);
 }
 
-/* Is FD a socket? */
+#if !defined (USG) && defined (ENOTSOCK)
+#include <sys/socket.h>
+#endif
+
+/* Is FD a socket or network connection? */
 static int
-issock (fd)
+isnetconn (fd)
      int fd;
 {
-#if defined (S_ISSOCK)
+#if defined (USGr4) || defined (USGr4_2)
+  /* Sockets on SVR4 and SVR4.2 are character special (streams) devices. */
   struct stat sb;
 
-  if (fstat(fd, &sb) < 0)
+  if (fstat (fd, &sb) < 0)
+    return (0);
+  return (S_ISCHR (sb.st_mode));
+#else /* !USGr4 && !USGr4_2 */
+#  if defined (ENOTSOCK) && !defined (USG)
+  int rv, l;
+  struct sockaddr sa;
+                  
+  l = sizeof(sa);
+  rv = getpeername(0, &sa, &l);
+  if (rv < 0 && errno == ENOTSOCK)
     return 0;
-  return (S_ISSOCK (sb.st_mode) != 0);
-#else
+  else
+    return 1;
+#  else /* !ENOTSOCK && !USG */
+#    if defined (S_ISSOCK)
+  struct stat sb;
+
+  if (fstat (fd, &sb) < 0)
+    return (0);
+  return (S_ISSOCK (sb.st_mode));
+#    else /* !S_ISSOCK */
   return (0);
-#endif
+#    endif /* !S_ISSOCK */
+#  endif /* !ENOTSOCK && !USG */
+#endif /* !USGr4 && !USGr4_2 */
 }

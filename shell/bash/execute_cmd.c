@@ -64,6 +64,7 @@ extern int posixly_correct;
 extern int breaking, continuing, loop_level;
 extern int interactive, interactive_shell, login_shell;
 extern char **temporary_env, **function_env, **builtin_env;
+extern int already_making_children;
 
 #if defined (JOB_CONTROL)
 extern int job_control;
@@ -102,6 +103,11 @@ static char *find_user_command_internal (), *find_user_command_in_path ();
 
 /* The line number that the currently executing function starts on. */
 static int function_line_number = 0;
+
+/* For catching RETURN in a function. */
+int return_catch_flag = 0;
+int return_catch_value;
+jmp_buf return_catch;
 
 /* The value returned by the last synchronous command. */
 int last_command_exit_value = 0;
@@ -328,7 +334,7 @@ execute_command_internal (command, asynchronous, pipe_in, pipe_out,
 			      asynchronous);
       if (paren_pid == 0)
 	{
-	  int user_subshell, return_code;
+	  int user_subshell, return_code, function_value;
 
 	  /* Cancel traps, in trap.c. */
 	  restore_original_signals ();
@@ -342,15 +348,6 @@ execute_command_internal (command, asynchronous, pipe_in, pipe_out,
 	  user_subshell = (command->flags & CMD_WANT_SUBSHELL) != 0;
 	  command->flags &= ~(CMD_FORCE_SUBSHELL | CMD_WANT_SUBSHELL | CMD_INVERT_RETURN);
 
-#if defined (JOB_CONTROL)
-	  /* If a construct like ( exec xxx yyy ) & is given while job
-	     control is active, we want to prevent exec from putting the
-	     subshell back into the original process group, carefully
-	     undoing all the work we just did in make_child. */
-	  if (asynchronous)
-	    original_pgrp = -1;
-#endif /* JOB_CONTROL */
-
 	  /* If a command is asynchronous in a subshell (like ( foo ) & or
 	     the special case of an asynchronous GROUP command where the
 	     the subshell bit is turned on down in case cm_group: below), 
@@ -363,8 +360,20 @@ execute_command_internal (command, asynchronous, pipe_in, pipe_out,
 	     builtins in the background, which executed in a subshell
 	     environment.  I just don't see the need to fork two subshells. */
 
-	  /* Don't fork again, we are already in a subshell. */
-	  asynchronous = 0;
+	  /* Don't fork again, we are already in a subshell.  A `doubly
+	     async' shell is not interactive, however. */
+	  if (asynchronous)
+	    {
+#if defined (JOB_CONTROL)
+	      /* If a construct like ( exec xxx yyy ) & is given while job
+		 control is active, we want to prevent exec from putting the
+		 subshell back into the original process group, carefully
+		 undoing all the work we just did in make_child. */
+	      original_pgrp = -1;
+#endif /* JOB_CONTROL */
+	      interactive_shell = 0;
+	      asynchronous = 0;
+	    }
 
 	  /* Subshells are neither login nor interactive. */
 	  login_shell = interactive = 0;
@@ -400,8 +409,17 @@ execute_command_internal (command, asynchronous, pipe_in, pipe_out,
 	      command->value.Simple->flags |= CMD_NO_FORK;
 	    }
 
-	  return_code = execute_command_internal
-	    (command, asynchronous, NO_PIPE, NO_PIPE, fds_to_close);
+	  /* If we're inside a function while executing this subshell, we
+	     need to handle a possible `return'. */
+	  function_value = 0;
+	  if (return_catch_flag)
+	    function_value =  setjmp (return_catch);
+
+	  if (function_value)
+	    return_code = return_catch_value;
+	  else
+	    return_code = execute_command_internal
+	      (command, asynchronous, NO_PIPE, NO_PIPE, fds_to_close);
 
 	  /* If we were explicitly placed in a subshell with (), we need
 	     to do the `shell cleanup' things, such as running traps[0]. */
@@ -569,11 +587,11 @@ execute_command_internal (command, asynchronous, pipe_in, pipe_out,
 
     case cm_simple:
       {
+	/* We can't rely on this variable retaining its value across a
+	   call to execute_simple_command if a longjmp occurs as the
+	   result of a `return' builtin.  This is true for sure with gcc. */
 	pid_t last_pid = last_made_pid;
 
-#if defined (JOB_CONTROL)
-	extern int already_making_children;
-#endif /* JOB_CONTROL */
 	if (ignore_return && command->value.Simple)
 	  command->value.Simple->flags |= CMD_IGNORE_RETURN;
 	exec_result =
@@ -592,12 +610,11 @@ execute_command_internal (command, asynchronous, pipe_in, pipe_out,
 
 	/* If we forked to do the command, then we must wait_for ()
 	   the child. */
-#if defined (JOB_CONTROL)
+
+	/* XXX - this is something to watch out for if there are problems
+	   when the shell is compiled without job control. */
 	if (already_making_children && pipe_out == NO_PIPE &&
 	    last_pid != last_made_pid)
-#else
-	if (pipe_out == NO_PIPE && last_pid != last_made_pid)
-#endif /* JOB_CONTROL */
 	  {
 	    stop_pipeline (asynchronous, (COMMAND *)NULL);
 
@@ -640,12 +657,13 @@ execute_command_internal (command, asynchronous, pipe_in, pipe_out,
 	    if (ignore_return && tc)
 	      tc->flags |= CMD_IGNORE_RETURN;
 
-	    /* If this shell was compiled without job control support, or if
-	       job control is not active (e.g., if the shell is not running
-	       interactively), then the standard input for an asynchronous
-	       command is /dev/null. */
+	    /* If this shell was compiled without job control support, if
+	       the shell is not running interactively, if we are currently
+	       in a subshell via `( xxx )', or if job control is not active
+	       then the standard input for an asynchronous command is
+	       forced to /dev/null. */
 #if defined (JOB_CONTROL)
-	    if (!interactive || !job_control)
+	    if (!interactive_shell || subshell_environment || !job_control)
 #endif /* JOB_CONTROL */
 	    {
 	      REDIRECT *tr = 
@@ -659,7 +677,7 @@ execute_command_internal (command, asynchronous, pipe_in, pipe_out,
 	      (tc, 1, pipe_in, pipe_out, fds_to_close);
 
 #if defined (JOB_CONTROL)
-	    if (!interactive || !job_control)
+	    if (!interactive_shell || subshell_environment || !job_control)
 #endif /* JOB_CONTROL */
 	    {
 	      /* Remove the redirection we added above.  It matters,
@@ -1224,11 +1242,6 @@ bind_lastarg (arg)
   var = bind_variable ("_", arg);
   var->attributes &= ~att_exported;
 }
-
-/* For catching RETURN in a function. */
-int return_catch_flag = 0;
-int return_catch_value;
-jmp_buf return_catch;
 
 /* The meaty part of all the executions.  We have to start hacking the
    real execution of commands here.  Fork a process, set things up,
@@ -2833,7 +2846,7 @@ check_identifier (word)
 #define u_mode_bits(x) (((x) & 0000700) >> 6)
 #define g_mode_bits(x) (((x) & 0000070) >> 3)
 #define o_mode_bits(x) (((x) & 0000007) >> 0)
-#define X_BIT(x) (x & 1)
+#define X_BIT(x) ((x) & 1)
 
 /* Return some flags based on information about this file.
    The EXISTS bit is non-zero if the file is found.
