@@ -3,14 +3,17 @@ all:
 
 install: World
 
-World:
-	@echo Making xview3.2 and clients
-	@echo If you get an error message about to many open files you have
-	@echo to raise your limit, in tcsh: "limit openfiles 200"
-	(cd xview/config; make install)
+config:
+	(cd xview/config; $(MAKE) install)
 	(cd xview; xmkmf)
-	(cd xview; make Makefiles includes all install install.man)
-	(cd xview; make SUBDIRS=clients Makefiles all install install.man)
+	(cd xview; $(MAKE) Makefiles)
+	(cd xview; $(MAKE) SUBDIRS=clients Makefiles)
+
+World:	config
+	@echo Making xview3.2 and clients
+	rm -f xview/lib/libxview/libxview.a
+	(cd xview; $(MAKE) includes all install install.man)
+	(cd xview; $(MAKE) SUBDIRS=clients all install install.man)
 	tar cvf - share|(cd /usr/X386; tar xf -)
 	@echo Make and Installation of xview is complete!
 	@echo Don't forget to set OPENWINHOME in your ~/.tcshrc or equiv.
@@ -23,9 +26,9 @@ xview32l.tgz:
 
 pkg:	World xview32b.tgz xview32l.tgz
 
-clean:
+clean:	config
 	rm -f xview32b.tgz xview32l.tgz
-	(cd xview; make clean)
-	(cd xview; make SUBDIRS=clients clean)
+	(cd xview; $(MAKE) clean)
+	(cd xview; $(MAKE) SUBDIRS=clients clean)
 	(cd xview; rm -rf build)
 	(cd xview; mkdir build)
