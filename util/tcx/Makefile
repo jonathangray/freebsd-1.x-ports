@@ -34,8 +34,17 @@ clean:
 	/bin/rm -f *.o tcx untcx
 
 install: tcx untcx
-	install -c -s -o bin -g bin -m 555 tcx /usr/local/bin/tcx
-	install -c -s -o root -g bin -m 4711 untcx /usr/local/bin/untcx
-	install -c -o bin -g bin -m 444 tcx.1 /usr/local/man/man1/tcx.1
-	install -c -o bin -g bin -m 444 untcx.1 /usr/local/man/man1/untcx.1
+	install -c -s -o bin -g bin -m 555 tcx /usr/gnu/bin/tcx
+	install -c -s -o root -g bin -m 4711 untcx /usr/gnu/bin/untcx
+	install -c -o bin -g bin -m 444 tcx.1 /usr/gnu/man/man1/tcx.1
+	install -c -o bin -g bin -m 444 untcx.1 /usr/gnu/man/man1/untcx.1
 	mkdir /var/exec
+
+
+pkg:	pkg_bin pkg_src
+
+pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
+	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S tcx_src
+
+pkg_bin: install pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B 
+	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B tcx_bin
