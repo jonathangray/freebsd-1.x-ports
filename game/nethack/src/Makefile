@@ -349,7 +349,7 @@ tags: $(CSOURCES)
 	@( cd ../util ; $(MAKE) tags )
 
 clean:
-	rm -f *.o
+	rm -f *.o nethack
 
 spotless: clean
 	rm -f a.out core $(GAME) Sys*
