@@ -2,10 +2,13 @@
 	vi:se ts=3 sw=3:
  */
 
-/* $Id: display.c,v 1.1 1994/02/19 16:03:08 ache Exp $
+/* $Id: display.c,v 1.2 1994/02/21 12:03:24 ache Exp $
  * $Log: display.c,v $
- * Revision 1.1  1994/02/19 16:03:08  ache
- * Initial revision
+ * Revision 1.2  1994/02/21 12:03:24  ache
+ * Fix compilation bug + misc. cleanups
+ *
+ * Revision 1.1.1.1  1994/02/19  16:03:09  ache
+ * Tracker port, drop-in replacement of obsoleted stracker
  *
  * Revision 4.0  1994/01/11  17:45:22  espie
  * Major change: does not use sprintf heavily.
@@ -67,7 +70,7 @@
 #include "tags.h"
 #include "prefs.h"
 
-ID("$Id: display.c,v 1.1 1994/02/19 16:03:08 ache Exp $")
+ID("$Id: display.c,v 1.2 1994/02/21 12:03:24 ache Exp $")
 LOCAL void init_display P((void));
 LOCAL void (*INIT)P((void)) = init_display;
      
@@ -155,8 +158,6 @@ int n;
    *to = *v;
    }
 
-LOCAL char *id = "$Id: display.c,v 1.1 1994/02/19 16:03:08 ache Exp $";
-     
 LOCAL void (*table[NUMBER_EFFECTS]) P((int samp, int para, int note, struct channel *ch));
 
 LOCAL void disp_default(samp, para, note, ch)

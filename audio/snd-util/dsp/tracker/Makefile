@@ -1,9 +1,10 @@
 O = .o
+OPTS = -c
 UI = Unix/./
 BIN_DIR = /usr/local/bin
 MAN_DIR = /usr/local/man
 INSTALL = install
-INST_BIN_OPT = -s -m 755 -o bin -g bin
+INST_BIN_OPT = -s -o bin -g bin
 INST_MAN_OPT = -m 644 -o bin -g bin
 
 CFLAGS = -O2 -funroll-loops
@@ -31,10 +32,7 @@ config.h:
 	cp $(CONFIG)config.h config.h
 
 install: 
-	$(INSTALL) $(INST_BIN_OPT) tracker $(BIN_DIR)
-	$(INSTALL) $(INST_BIN_OPT) randomize $(BIN_DIR)
-	$(INSTALL) $(INST_BIN_OPT) analyzer $(BIN_DIR)
-	$(INSTALL) $(INST_BIN_OPT) splitmod $(BIN_DIR)
+	$(INSTALL) $(INST_BIN_OPT) tracker randomize analyzer splitmod $(BIN_DIR)
 	$(INSTALL) $(INST_MAN_OPT) man/tracker.1 $(MAN_DIR)/man1/tracker.1
 
 tracker: ${OBJ_TRACKER}
@@ -49,59 +47,26 @@ randomize: randomize.c
 splitmod: ${OBJ_SPLITMOD}
 	$(CC) -o splitmod ${CFLAGS} ${OBJ_SPLITMOD} ${LIBS}
 
-main$O: main.c song.h
-	$(CC) ${COPTS} main.c
-
-tools$O: main.c 
-	$(CC) ${COPTS} tools.c
+main$O: song.h
 
 $(AUDIO)audio$O: $(AUDIO)audio.c 
-	cd `dirname $(AUDIO)`; $(CC) -I.. ${COPTS} audio.c
+	cd $(AUDIO); $(CC) -I.. ${COPTS} audio.c
 
 $(UI)ui$O: $(UI)ui.c
 	cd $(UI); $(CC) -I.. ${COPTS} ui.c
 
-split$O: split.c
-	$(CC) ${COPTS} split.c
+automaton$O: song.h channel.h
 
-open$O: open.c
-	$(CC) ${COPTS} open.c
+getopt$O: getopt.h
 
-audio$O: audio.c
-	$(CC) ${COPTS} audio.c
+getopt1$O: getopt.h
 
-automaton$O: automaton.c song.h channel.h
-	$(CC) ${COPTS} automaton.c
+player$O: song.h channel.h
 
-getopt$O: getopt.c getopt.h
-	$(CC) ${COPTS} getopt.c
+st_read$O: song.h
 
-getopt1$O: getopt1.c getopt.h
-	$(CC) ${COPTS} getopt1.c
-
-player$O: player.c song.h channel.h
-	$(CC) ${COPTS} player.c
-
-st_read$O: st_read.c song.h
-	$(CC) ${COPTS} st_read.c
-
-commands$O: commands.c channel.h song.h
-	$(CC) ${COPTS} commands.c
-
-dump_song$O: dump_song.c
-	$(CC) $(COPTS) dump_song.c
-analyzer$O: analyzer.c
-	$(CC) $(COPTS) analyzer.c
-setup_audio$O: setup_audio.c
-	$(CC) $(COPTS) setup_audio.c
-notes$O: notes.c
-	$(CC) $(COPTS) notes.c
-
-display$O: display.c
-	$(CC) $(COPTS) display.c
-
+commands$O: channel.h song.h
 
 clean:
 	-rm -f config.h $(OBJ_TRACKER) $(OBJ_ANALYZER) $(OBJ_SPLITMOD) randomize$O
 	-rm -f tracker randomize splitmod analyzer core*
-
