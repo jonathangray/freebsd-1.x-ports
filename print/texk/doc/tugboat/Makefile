@@ -72,8 +72,8 @@ t-of-c/tb1392.cnt t-of-c/tb1493.cnt
 # TUGCONTENTS = tb0988.cnt
 
 all:	tugbib tugbib2 kwic guidepro.dvi tb0hyf.dvi tb0tree.dvi \
-	tubguide.dvi tugbot.dvi
-# tb0cyr.dvi
+	tubguide.dvi
+# tb0cyr.dvi  tugbot.dvi
 
 kwic:	kwic.dvi
 
@@ -139,12 +139,4 @@ tugbot.dvi: tugbot.tex
 
 
 clean realclean:
-	@- $(RM) *.aux
-	@- $(RM) *.blg
-	@- $(RM) *.bbl
-	@- $(RM) *.dvi*
-	@- $(RM) *.log
-	@- $(RM) *.lst
-	@- $(RM) *.ptx
-	@- $(RM) *.kwic
-	@- $(RM) *~*
+	-$(RM) *.aux *.blg *.bbl *.dvi* *.log *.lst *.ptx *.kwic* ~*
