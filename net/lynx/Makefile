@@ -131,10 +131,10 @@ mips:
 		WWWLIB="../WWW/Library/mips/libwww.a"
 
 freebsd:
-	cd WWW/Library/Implementation; make -f freebsd_Makefile LYFLAGS=""
+	cd WWW/Library/freebsd; make LYFLAGS=""
 	cd src; make all CC="cc" MCFLAGS="-O -DUNIX -DNO_KEYPAD -I../$(WWWINC)"\
 		LIBS="-lcurses -ltermcap $(WAISLIB)" \
-		WWWLIB="../WWW/Library/svr4/libwww.a"
+		WWWLIB="../WWW/Library/freebsd/libwww.a"
 
 # Tested on DN 3500 & 4500's running Domain O/S 10.4 BSD
 # -Acpu,mathchip may have to be changed on other machines - see man cpuhep
