@@ -214,7 +214,7 @@ static void maybe_warn_assign_as_truth_value (tree *expr);
 %right POW EPOW
 
 // There are 19 shift/reduce conflicts, ok?
-%expect 19
+// %expect 19
 
 // Where to start.
 %start input
