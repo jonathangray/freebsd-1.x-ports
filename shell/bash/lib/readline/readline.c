@@ -30,7 +30,8 @@
 #include <signal.h>
 
 /* This is needed to include support for TIOCGWINSZ and window resizing. */
-#if defined (OSF1) || defined (BSD386) || defined (_386BSD) || defined (AIX)
+#if defined (OSF1) || defined (BSD386) || defined (_386BSD) || \
+    defined (FreeBSD) || defined (NetBSD) || defined (AIX)
 #  include <sys/ioctl.h>
 #endif /* OSF1 */
 
