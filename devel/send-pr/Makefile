@@ -45,10 +45,12 @@ install: all
 	-parent=`echo $(man1dir)|sed -e 's@/[^/]*$$@@'`; \
 	if [ -d $$parent ] ; then true ; else mkdir $$parent ; fi
 	if [ -d $(man1dir) ] ; then true ; else mkdir $(man1dir) ; fi
-	sh install-sid net
-	#cp send-pr.1 $(man1dir)/send-pr.1
-	#chmod 644 $(man1dir)/send-pr.1
+	cp send-pr.1 $(man1dir)/send-pr.1
+	chmod 644 $(man1dir)/send-pr.1
 
 clean:
-	rm -f send-pr send-pr.el
+	rm -f send-pr send-pr.el install-sid
 
+package pkg_bin:
+	pkg_create -t ./inst.XXXXXX -c pkg/+ONELINE -d pkg/+DESC \
+	-f pkg/+PLIST send-pr_bin
