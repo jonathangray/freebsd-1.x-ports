@@ -36,7 +36,7 @@
  *      Public Domain.  Distribution Unlimited.
  */
 #ifndef lint
-static char RCSid[] = "ttcp.c $Revision: 1.1 $";
+static char RCSid[] = "ttcp.c $Revision: 1.2 $";
 #endif
 
 #define BSD43
@@ -50,6 +50,7 @@ static char RCSid[] = "ttcp.c $Revision: 1.1 $";
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <machine/endian.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
