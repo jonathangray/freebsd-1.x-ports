@@ -11,9 +11,10 @@ gets stdin port;
 # the given port.
 #
 
-MakeRPCServer $port
+dp_MakeRPCServer $port
 
-# names, files -- list of room occupants and their associated rpcFile's:
+# names -- list of room occupants
+# files -- list of active rpc files
 #
 
 set names {};
@@ -38,21 +39,24 @@ proc Enter {name} \
   #
   lappend names $name; 
   lappend files $rpcFile;
+
+  # Arrange to remove the information from the names and files list
+  # when the connection is closed. 
+  dp_atclose $rpcFile append "Leave $name $rpcFile"
 }
 
-proc Leave {} \
+# The following command is invoked automatically when a file is closed
+# This can happend because a server dies unexpectedly.  The callback is
+# created by the "dp_atclose" call above.  The two parameters give the
+# rpc file and the name of the person.
+#
+proc Leave {n f} \
 {
-  global names;
-  global files;
-  global rpcFile;
+    global names;
+    global files;
 
-  # Forget the name and the associated RPC file handle
-  # of the client who is leaving the room;
-  #
-  set position [lsearch $files $rpcFile];
-
-  set names [ldelete $names [lindex $names $position]];
-  set files [ldelete $files $rpcFile];
+    set files [ldelete $files $f]
+    set names [ldelete $names $n]
 }
 
 proc Say {message} \
@@ -69,7 +73,7 @@ proc Say {message} \
   #
   foreach client $files \
     {
-      RPC $client Hear $speaker $message;
+      dp_RPC $client Hear $speaker $message;
     }
 }
 

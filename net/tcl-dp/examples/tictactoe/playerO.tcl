@@ -19,14 +19,15 @@ gets stdin port;
 # Connect to server (player X) as an RPC client;
 #
 
-set server [MakeRPCClient $host $port];
+set server [dp_MakeRPCClient $host $port];
 
 # Instead of creating a local board object, we ask the server to
 # distribute its board object to us;
 #
 
 source board.tcl;
-RPC $server eval DistributeObject .board \$rpcFile board;
+set remFile [dp_RPC $server set rpcFile]
+dp_RPC $server eval dp_DistributeObject .board $remFile board;
 
 # Initialize the user interface;
 #
@@ -37,6 +38,6 @@ source interface.tcl;
 # the distributed board object changes;
 #
 
-SetTrigger .board state update;
+dp_SetTrigger after .board state DisplayUpdate
 
 

@@ -16,7 +16,7 @@
 
 ################################################################
 #
-# objectCreateProc
+# dp_objectCreateProc
 #
 #	creates a procedure <object> to represent an
 #	object of given <class>.  
@@ -25,25 +25,36 @@
 #	the form <class>.method1, ..., <class>.methodn. 
 #
 
-proc objectCreateProc {class object} {
+proc dp_objectCreateProc {class object} {
 
+  set methodName "$class.\$name"
   set    body "";
-  append body "eval $class.";
-  append body {[lindex $args 0]};
+  append body {if [string length [info procs}
+  append body " $methodName";
+  append body {]] }
+  append body "{eval $methodName";
   append body " $object ";
-  append body {[lrange $args 1 end]};
+  append body {$args};
+  append body "} else {"
+  append body "error "
+  append body {"}
+  append body "bad option "
+  append body {\"$name\"};
+  append body {"}
+  append body "}"
 
-  proc $object args $body;
+
+  proc $object {name args} $body;
 
   return $object;
 }
 
 ################################################################
 #
-# objectExists
+# dp_objectExists
 #
 
-proc objectExists {object} {
+proc dp_objectExists {object} {
 
   if {[lsearch [info procs] $object] < 0} {
     return 0;
@@ -56,13 +67,13 @@ proc objectExists {object} {
 # objectFree
 #
 
-proc objectFree {object} {
+proc dp_objectFree {object} {
   global _objects;
 
-  if [objectExists $object] {
+  if [dp_objectExists $object] {
 
-    foreach slot [objectSlots $object] {
-      objectSlotFree $object $slot;
+    foreach slot [dp_objectSlots $object] {
+      dp_objectSlotFree $object $slot;
     }
 
     rename $object "";
@@ -71,11 +82,11 @@ proc objectFree {object} {
 
 ################################################################
 #
-# objectSlot
-# objectSlotSet
-# objectSlotAppend
+# dp_objectSlot
+# dp_objectSlotSet
+# dp_objectSlotAppend
 #
-# objectSlotFree
+# dp_objectSlotFree
 #
 #	object slot abstraction implemented 
 #	using associative arrays.
@@ -87,31 +98,31 @@ set _objects(null) {};
 
 #------------------------------------------------------------
 
-proc objectSlotFree {object slot} {
+proc dp_objectSlotFree {object slot} {
   global _objects;
 
   catch {unset _objects($object,$slot)};
 }
 
-proc objectSlot {object slot} {
+proc dp_objectSlot {object slot} {
   global _objects;
 
   return [set _objects($object,$slot)];
 }
 
-proc objectSlotSet {object slot value} {
+proc dp_objectSlotSet {object slot value} {
   global _objects;
 
   return [set _objects($object,$slot) $value];
 }
 
-proc objectSlotAppend {object slot value} {
+proc dp_objectSlotAppend {object slot value} {
   global _objects;
 
   return [lappend _objects($object,$slot) $value];
 }
 
-proc objectSlots {object} {
+proc dp_objectSlots {object} {
   global _objects;
 
   set objectSlots {};
@@ -135,10 +146,10 @@ proc objectSlots {object} {
 
 ################################################################
 #
-# objectConfigure - configure the slots of an object.
+# dp_objectConfigure - configure the slots of an object.
 #
 
-proc objectConfigure {class object args} {
+proc dp_objectConfigure {class object args} {
 
   set argc [llength $args];
 
@@ -149,8 +160,8 @@ proc objectConfigure {class object args} {
     # Return a list of all the slotnames and values of the object;
     #
     set configs {};
-    foreach slot [objectSlots $object] {
-      lappend configs [list -$slot {} [objectSlot $object $slot]];
+    foreach slot [dp_objectSlots $object] {
+      lappend configs [list -$slot {} [dp_objectSlot $object $slot]];
     }
     return $configs;
   }
@@ -164,7 +175,7 @@ proc objectConfigure {class object args} {
     set slot [string trimleft [lindex $args 0] \-];
 
     if {[string length $slot] > 0} {
-      return [list -$slot {} [objectSlot $object $slot]];
+      return [list -$slot {} [dp_objectSlot $object $slot]];
     }
   }
 
@@ -179,7 +190,7 @@ proc objectConfigure {class object args} {
 
     eval $class.configure $object [lrange $args 2 end];
 
-    objectSlotSet $object $slot [lindex $args 1];
+    dp_objectSlotSet $object $slot [lindex $args 1];
 
     return $object;
   }

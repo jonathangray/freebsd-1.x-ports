@@ -15,12 +15,12 @@ set port 4545;
 # the process that's running on machine "host" at port number "port".
 # This remote process, of course, should be the idServer.
 #
-# MakeRPCClient will return a file handle to represent the RPC
+# dp_MakeRPCClient will return a file handle to represent the RPC
 # connection to the idServer.  We'll save this file handle in
 # the variable called server.
 #
 
-set server [MakeRPCClient $host $port];
+set server [dp_MakeRPCClient $host $port];
 
 # The following command does an RPC to get a new id from the idServer.
 #
@@ -30,5 +30,5 @@ set server [MakeRPCClient $host $port];
 # That's it!
 #
 
-puts stdout [RPC $server GetId];
+puts stdout [dp_RPC $server GetId];
 

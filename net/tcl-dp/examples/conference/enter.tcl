@@ -20,7 +20,7 @@ gets stdin name;
 # global variable server;
 #
 
-set server [MakeRPCClient $host $port]
+set server [dp_MakeRPCClient $host $port]
 
 # The conference server will occasionally RPC a Hear 
 # command to us when we need to hear a message from some speaker.
@@ -49,7 +49,7 @@ proc who {} \
 
   # RPC to the conference server to get the list of all its client names;
   #
-  puts stdout [RPC $server set names];
+  puts stdout [dp_RPC $server set names];
 }
 
 proc say {args} \
@@ -60,22 +60,14 @@ proc say {args} \
   # The conference server will repeat my message to all clients, by RPC,
   # for them to Hear.
   #
-  RPC $server Say $args;
+  dp_RPC $server Say $args;
 }
 
-proc leave {} \
-{
-  global server;
-
-  # Tell the conference server, by RPC, that I'm Leaving the conference.
-  #
-  RPC $server Leave;
-  puts stdout "Left conference.";
-  exit;
-}
-
-proc bye {} {leave};
-proc quit {} {leave}
+# To leave, we just exit, and the file is automatically closed.  The
+# conference server will automatically clen up on his end.
+proc leave {} {exit}
+proc bye {} {exit};
+proc quit {} {exit}
 
 # On startup, automatically enter the conference.
 #
@@ -87,9 +79,8 @@ proc enter {} \
 
   # Tell the conference server, by RPC, that I'm Entering the conference.
   #
-  RPC $server Enter $name;
+  dp_RPC $server Enter $name;
   puts stdout "Entered conference.";
 }
 
 enter;
-

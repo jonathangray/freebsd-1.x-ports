@@ -1,4 +1,3 @@
-
 #
 # board.tcl -- Tcl/Tk script that defines a Tic Tac Toe board object.
 #
@@ -20,11 +19,11 @@ proc board {aBoard args} {
   # Create a procedure to represent a new board object.  
   # This new board object (procedure) will have the name of $aBoard;
   #
-  objectCreateProc board $aBoard;
+  dp_objectCreateProc board $aBoard;
 
   # Give the new board object one slot, called state;
   #
-  objectSlotSet $aBoard state {S S S S S S S S S};
+  dp_objectSlotSet $aBoard state {S S S S S S S S S};
 
   # Finish configuration of the new board object;
   #
@@ -49,15 +48,15 @@ proc board {aBoard args} {
 #
 
 proc board.configure {aBoard args} {
-  return [eval objectConfigure board $aBoard $args];
+  return [eval dp_objectConfigure board $aBoard $args];
 }
 
 proc board.slot-value {aBoard slot} {
-  return [objectSlot $aBoard $slot];
+  return [dp_objectSlot $aBoard $slot];
 }
 
-# In the following board methods, note the use of setf and getf 
-# instead of objectSlotSet and objectSlot;  setf and getf
+# In the following board methods, note the use of dp_setf and dp_getf 
+# instead of objectSlotSet and objectSlot;  dp_setf and dp_getf
 # are used for slot access to Tcl-DP distributed objects;
 #
 
@@ -65,7 +64,7 @@ proc board.slot-value {aBoard slot} {
 #
 
 proc board.clear {aBoard} {
-  setf $aBoard state {S S S S S S S S S};
+  dp_setf $aBoard state {S S S S S S S S S};
   return $aBoard;
 }
 
@@ -74,15 +73,15 @@ proc board.clear {aBoard} {
 #
 
 proc board.entryGet {aBoard x y} {
-  set state [getf $aBoard state];
+  set state [dp_getf $aBoard state];
   set position [expr ($x*3)+$y];
   return [lindex $state $position];
 }
 
 proc board.entrySet {aBoard x y value} {
-  set state [getf $aBoard state];
+  set state [dp_getf $aBoard state];
   set position [expr ($x*3)+$y];
-  setf $aBoard state [lreplace $state $position $position $value];
+  dp_setf $aBoard state [lreplace $state $position $position $value];
   return $value;
 }
 

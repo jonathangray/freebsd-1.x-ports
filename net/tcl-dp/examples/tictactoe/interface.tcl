@@ -57,7 +57,7 @@ proc column {w i} {
 # according to the state of the distributed board object;
 #
 
-proc update {} {
+proc DisplayUpdate {} {
   for {set row 0} {$row <= 2} {incr row} {
     for {set col 0} {$col <= 2} {incr col} {
       set entry [.board entryGet $col $row];

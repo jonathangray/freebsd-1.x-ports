@@ -11,14 +11,14 @@ puts stdout "Tic Tac Toe - player X";
 # Get information from user;
 #
 
-puts stdout "Enter an unsed port number (ex: 8765) : " nonewline;
+puts stdout "Enter an unused port number (ex: 8765) : " nonewline;
 gets stdin port;
 
 # Make an RPC server socket, which will be waiting for player O 
 # to connect through the supplied port number;
 #
 
-MakeRPCServer $port
+dp_MakeRPCServer $port
 
 # Create a local board object that will get distributed to player O;
 #
@@ -35,5 +35,5 @@ source interface.tcl;
 # the distributed board object changes;
 #
 
-SetTrigger .board state update;
+dp_SetTrigger after .board state DisplayUpdate
 
