@@ -109,7 +109,7 @@ X11_LIB = -lX11
 CC_FOR_BUILD = $(CC)
 CXX_FOR_BUILD = $(CXX)
 
-SUBDIRS = mmalloc libiberty opcodes bfd readline gash tcl tk tclX byacc flex bison binutils ld gas gcc gdb make patch prms send-pr gprof gdbtest tgas etc expect dejagnu sim m4 autoconf ispell grep diff rcs cvs fileutils shellutils textutils wdiff find emacs uudecode hello tar gzip indent recode release sed utils libm  libio libg++ groff
+SUBDIRS = mmalloc libiberty opcodes bfd gash tcl tk tclX byacc flex bison binutils ld gas gcc gdb make patch prms send-pr gprof gdbtest tgas etc expect dejagnu sim m4 autoconf ispell grep diff rcs cvs fileutils shellutils textutils wdiff find emacs uudecode hello tar gzip indent recode release sed utils libm  libio libg++ groff
 OTHERS = 
 
 ALL = all.normal
@@ -327,7 +327,6 @@ ALL_MODULES = \
 	all-patch \
 	all-prms \
 	all-rcs \
-	all-readline \
 	all-release \
 	all-recode \
 	all-sed \
@@ -376,7 +375,6 @@ CHECK_MODULES = \
 	check-patch \
 	check-prms \
 	check-rcs \
-	check-readline \
 	check-recode \
 	check-sed \
 	check-send-pr \
@@ -425,7 +423,6 @@ INSTALL_MODULES = \
 	install-patch \
 	install-prms \
 	install-rcs \
-	install-readline \
 	install-recode \
 	install-sed \
 	install-send-pr \
@@ -815,7 +812,7 @@ all-gas: all-libiberty all-opcodes all-bfd
 all-gash: all-tcl
 all-gawk:
 all-gcc: all-libiberty all-byacc all-binutils all-gas all-pagas
-all-gdb: all-libiberty all-opcodes all-bfd all-mmalloc all-readline all-glob all-byacc all-sim
+all-gdb: all-libiberty all-opcodes all-bfd all-mmalloc all-glob all-byacc all-sim
 all-glob:
 all-gprof: all-libiberty all-bfd
 all-grep: all-libiberty
@@ -835,7 +832,6 @@ all-opcodes: all-bfd
 all-patch:
 all-prms: all-libiberty
 all-rcs:
-all-readline:
 all-recode: all-libiberty
 all-sed: all-libiberty
 all-send-pr: all-prms
@@ -928,7 +924,7 @@ DEVO_SUPPORT= README Makefile.in configure configure.in \
 ETC_SUPPORT= Makefile.in cfg-paper.texi configure.in configure.man \
 	configure.texi standards.texi make-stds.texi
 
-GDB_SUPPORT_DIRS= bfd include libiberty mmalloc opcodes readline glob sim
+GDB_SUPPORT_DIRS= bfd include libiberty mmalloc opcodes glob sim
 GDB_SUPPORT_FILES= $(GDB_SUPPORT_DIRS)
 
 .PHONY: setup-dirs-gdb gdb.tar.gz make-gdb.tar.gz
@@ -963,8 +959,6 @@ make-gdb.tar.gz: $(DEVO_SUPPORT) $(GDB_SUPPORT_DIRS) gdb texinfo/texinfo.tex
 	ln proto-toplev/gdb/COPYING proto-toplev/bfd/COPYING
 	rm                          proto-toplev/include/COPYING
 	ln proto-toplev/gdb/COPYING proto-toplev/include/COPYING
-	rm                          proto-toplev/readline/COPYING
-	ln proto-toplev/gdb/COPYING proto-toplev/readline/COPYING
 
 	# Change the bug reporting address in configure to bug-gdb
 	rm proto-toplev/configure
