@@ -53,12 +53,12 @@ MANN_DIR =	$(MAN_DIR)/mann
 # The directory containing the Tcl sources and headers appropriate
 # for this version of Tcl-DP ("." will be replaced or has already
 # been replaced by the configure script):
-TCL_DIR =	./../tcl
+TCL_DIR =	./../../lang/tcl
 
 # The directory containing the Tk sources and headers appropriate
 # for this version of Tcl-DP ("." will be replaced or has already
 # been replaced by the configure script):
-TK_DIR =	./../tk
+TK_DIR =	./../../x11/tk
 
 # The directory containing the Tcl library archive file appropriate
 # for this version of Tcl-DP:
