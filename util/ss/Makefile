@@ -1,5 +1,5 @@
 #############################################################################
-# Makefile $Revision: 1.1 $
+# Makefile $Revision: 1.2 $
 #
 # How to build the 'ss' package:
 # 1) Read this Makefile, keeping an eye out for anything that appears to
@@ -435,13 +435,11 @@ p$(name):	pss.c pvmtbl.o pxmalloc.o
 
 man:	ss.man
 	name=$(name) NAME=$(NAME) LIBDIR=$(LIBDIR) sh torev ss.man > $(name).$(MANEXT)
- 
 
 # - Do the same for ``pss.doc''
 pman:	pss.doc
 	name=$(name) NAME=$(NAME) LIBDIR=$(LIBDIR) sh torev pss.doc > p$(name).$(MANEXT)
- 
- 
+
 #  	Make Install
 #---------------------------------------------------------------------------
 

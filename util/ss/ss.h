@@ -124,6 +124,10 @@
    size_t	strlen();
 #endif
 
+#ifndef beep
+# define beep() fprintf(stderr, "\a")
+#endif
+
 
 /*	 Global Structure Definitions
  *----------------------------------------------------------------------
