@@ -11,7 +11,7 @@ exec= /usr/local/bin
 ##change the next line if you want the lynx man file installed somewhere
 ##besides /usr/man/man1
 
-doc= /usr/man/man1
+doc= /usr/local/man/man1
 
 ##change the next line if you want the lynx.cfg file installed somewhere
 ##besides /usr/local/lib
@@ -41,8 +41,9 @@ WWWINC= WWW/Library/Implementation
 # you should not have to modify anything from here down!
 # If you are not, then you should edit the generic: entry below.
 #
+all: freebsd
 
-all:  
+run:
 	@echo
 	@echo "Please run make with one of the following arguments"
 	@echo "aix32      -- for RS/6000 running AIX 3.2"
@@ -310,19 +311,9 @@ install:
 	$(installbin) lynx $(exec)/lynx
 	$(installdoc) lynx.man $(doc)/lynx.1
 	$(installdoc) lynx.cfg $(cfg)/lynx.cfg
-<<<<<<< Makefile
 
 lynx_bin:
 	pkg_create -f pkg/+CONTENTS -d pkg/+DESC -p /usr/local \
-		-c -"LYNX, Version 2.2" lynx_bin.tgz
+		-c -"LYNX, Version 2.3" lynx_bin.tgz
 
 package:    lynx_bin
-||||||| 1.1.1.2
-
-lynx_bin:
-	pkg_create -f pkg/+CONTENTS -d pkg/+DESC -p /usr/local \
-		-c -"LYNX, Version 2.2" lynx_bin.tgz
-
-pkg:    lynx_bin
-=======
->>>>>>> /tmp/T4007000
