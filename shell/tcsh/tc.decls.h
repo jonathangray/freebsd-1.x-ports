@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.decls.h,v 1.1 1993/07/20 10:48:55 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.decls.h,v 1.1.1.2 1994/07/05 20:39:33 ache Exp $ */
 /*
  * tc.decls.h: Function declarations from all the tcsh modules
  */
@@ -60,7 +60,14 @@ extern	void		  showall	__P((Char **, struct command *));
 extern	void		  dobindkey	__P((Char **, struct command *));
 extern	int		  parseescape	__P((Char **));
 extern	unsigned char    *unparsestring	__P((Char *, unsigned char *, Char *));
+#ifdef OBSOLETE
 extern	void		  dobind	__P((Char **, struct command *));
+#endif /* OBSOLETE */
+
+/*
+ * tc.defs.c:
+ */
+extern	void		  getmachine	__P((void));
 
 
 /*
@@ -80,6 +87,7 @@ extern	void		  dolist	__P((Char **, struct command *));
 extern	void		  dotelltc	__P((Char **, struct command *));
 extern	void		  doechotc	__P((Char **, struct command *));
 extern	void		  dosettc	__P((Char **, struct command *));
+extern	int		  cmd_expand	__P((Char *, Char *));
 extern	void		  dowhich	__P((Char **, struct command *));
 extern	struct process	 *find_stop_ed	__P((void));
 extern	void		  fg_proc_entry	__P((struct process *));
@@ -94,13 +102,18 @@ extern	void		  rmstar	__P((struct wordent *));
 extern	void		  continue_jobs	__P((struct wordent *));
 extern	Char		 *gettilde	__P((Char *));
 extern	Char		 *getusername	__P((Char **));
+#ifdef OBSOLETE
 extern	void		  doaliases	__P((Char **, struct command *));
+#endif /* OBSOLETE */
 extern	void		  shlvl		__P((int));
 extern	int		  fixio		__P((int, int));
 extern	int		  collate	__P((const Char *, const Char *));
 #ifdef HASHBANG
 extern	int		  hashbang	__P((int, Char ***));
 #endif /* HASHBANG */
+#ifdef REMOTEHOST
+extern	void		  remotehost	__P((void));
+#endif /* REMOTEHOST */
 
 
 /*
@@ -123,7 +136,7 @@ extern	void		  domigrate	__P((Char **, struct command *));
 extern	void 		  dowarp	__P((Char **, struct command *));
 #endif /* WARP */
 
-#ifdef masscomp
+#if defined(masscomp) || defined(hcx)
 extern	void		  douniverse	__P((Char **, struct command *));
 #endif /* masscomp */
 
@@ -152,9 +165,14 @@ extern	void	 	  fix_strcoll_bug	__P((void));
 extern	void	 	  osinit	__P((void));
 
 #ifdef NEEDmemmove
-extern void 		 *xmemmove	__P((ptr_t, const ptr_t, size_t));
+extern ptr_t 		 xmemmove	__P((ptr_t, const ptr_t, size_t));
 # define memmove(a, b, c) xmemmove((a), (b), (c))
 #endif /* NEEDmemmove */
+
+#ifdef NEEDmemset
+extern ptr_t 		 xmemset	__P((ptr_t, int, size_t));
+# define memset(a, b, c) xmemset((a), (b), (c))
+#endif /* NEEDmemset */
 
 
 #ifdef NEEDgetwd
@@ -241,7 +259,7 @@ extern	void 		  sigpause	__P((int));
 extern	sigret_t	(*xsignal	__P((int, sigret_t (*)(int)))) ();
 # define signal(a, b)	  xsignal(a, b)
 #endif /* NEEDsignal */
-#if defined(_SEQUENT_) || (SYSVREL > 3 && defined(POSIXSIGS))
+#if defined(_SEQUENT_) || ((SYSVREL > 3 || defined(_DGUX_SOURCE)) && defined(POSIXSIGS))
 extern	sigmask_t	  sigsetmask	__P((sigmask_t));
 extern	sigmask_t	  sigblock	__P((sigmask_t));
 extern	void		  bsd_sigpause	__P((sigmask_t));
@@ -281,10 +299,9 @@ extern	char		 *short2qstr	__P((const Char *));
 
 
 /*
- * tc.vers.h:
+ * tc.vers.c:
  */
 extern	void		  fix_version	__P((void));
-extern	char		 *gethosttype	__P((void));
 
 /*
  * tc.who.c
@@ -292,9 +309,12 @@ extern	char		 *gethosttype	__P((void));
 #ifndef HAVENOUTMP
 extern	void		  initwatch	__P((void));
 extern	void		  resetwatch	__P((void));
-extern	void		  watch_login	__P((void));
+extern	void		  watch_login	__P((int));
 extern	char 		 *who_info	__P((ptr_t, int, char *));
 extern	void		  dolog		__P((Char **, struct command *));
+# ifdef UTHOST
+extern	char		 *utmphost	__P((void));
+# endif /* UTHOST */
 #endif /* HAVENOUTMP */
 
 #endif /* _h_tc_decls */

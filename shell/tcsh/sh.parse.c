@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.parse.c,v 1.1 1993/07/20 10:48:50 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.parse.c,v 1.1.1.2 1994/07/05 20:38:44 ache Exp $ */
 /*
  * sh.parse.c: Interpret a list of tokens
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.parse.c,v 1.1 1993/07/20 10:48:50 smace Exp $")
+RCSID("$Id: sh.parse.c,v 1.1.1.2 1994/07/05 20:38:44 ache Exp $")
 
 /*
  * C shell

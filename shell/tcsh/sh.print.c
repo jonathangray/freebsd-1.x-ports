@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.print.c,v 1.1 1993/07/20 10:48:50 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.print.c,v 1.1.1.2 1994/07/05 20:38:47 ache Exp $ */
 /*
  * sh.print.c: Primitive Output routines.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.print.c,v 1.1 1993/07/20 10:48:50 smace Exp $")
+RCSID("$Id: sh.print.c,v 1.1.1.2 1994/07/05 20:38:47 ache Exp $")
 
 #include "ed.h"
 

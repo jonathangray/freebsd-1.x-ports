@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/ed.chared.c,v 1.1 1993/07/20 10:48:53 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/ed.chared.c,v 1.1.1.2 1994/07/05 20:39:12 ache Exp $ */
 /*
  * ed.chared.c: Character editing functions.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.chared.c,v 1.1 1993/07/20 10:48:53 smace Exp $")
+RCSID("$Id: ed.chared.c,v 1.1.1.2 1994/07/05 20:39:12 ache Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -51,6 +51,14 @@ RCSID("$Id: ed.chared.c,v 1.1 1993/07/20 10:48:53 smace Exp $")
 
 #define CHAR_FWD	0
 #define CHAR_BACK	1
+
+/*
+ * vi word treatment
+ * from: Gert-Jan Vons <vons@cesar.crbca1.sinet.slb.com>
+ */
+#define C_CLASS_WHITE	1
+#define C_CLASS_ALNUM	2
+#define C_CLASS_OTHER	3
 
 static Char *InsertPos = InputBuf; /* Where insertion starts */
 static Char *ActionPos = 0;	   /* Where action begins  */
@@ -72,6 +80,7 @@ static	void	 c_alternativ_key_map	__P((int));
 static	void	 c_insert		__P((int));
 static	void	 c_delafter		__P((int));
 static	void	 c_delbefore		__P((int));
+static 	int	 c_to_class		__P((int));
 static	Char	*c_prev_word		__P((Char *, Char *, int));
 static	Char	*c_next_word		__P((Char *, Char *, int));
 static	Char	*c_number		__P((Char *, int *, int));
@@ -213,6 +222,31 @@ c_preword(p, low, n)
     return(p);
 }
 
+/*
+ * c_to_class() returns the class of the given character.
+ *
+ * This is used to make the c_prev_word() and c_next_word() functions
+ * work like vi's, which classify characters. A word is a sequence of
+ * characters belonging to the same class, classes being defined as
+ * follows:
+ *
+ *	1/ whitespace
+ *	2/ alphanumeric chars, + underscore
+ *	3/ others
+ */
+static int
+c_to_class(ch)
+register int  ch;
+{
+    if (Isspace(ch))
+        return C_CLASS_WHITE;
+
+    if (Isdigit(ch) || Isalpha(ch) || ch == '_')
+        return C_CLASS_ALNUM;
+
+    return C_CLASS_OTHER;
+}
+
 static Char *
 c_prev_word(p, low, n)
     register Char *p, *low;
@@ -220,19 +254,46 @@ c_prev_word(p, low, n)
 {
     p--;
 
+    if (!VImode) {
+	while (n--) {
+	    while ((p >= low) && !isword(*p)) 
+		p--;
+	    while ((p >= low) && isword(*p)) 
+		p--;
+	}
+      
+	/* cp now points to one character before the word */
+	p++;
+	if (p < low)
+	    p = low;
+	/* cp now points where we want it */
+	return(p);
+    }
+  
     while (n--) {
-	while ((p >= low) && !isword(*p)) 
-	    p--;
-	while ((p >= low) && isword(*p)) 
-	    p--;
+        register int  c_class;
+
+        if (p < low)
+            break;
+
+        /* scan until beginning of current word (may be all whitespace!) */
+        c_class = c_to_class(*p);
+        while ((p >= low) && c_class == c_to_class(*p))
+            p--;
+
+        /* if this was a non_whitespace word, we're ready */
+        if (c_class != C_CLASS_WHITE)
+            continue;
+
+        /* otherwise, move back to beginning of the word just found */
+        c_class = c_to_class(*p);
+        while ((p >= low) && c_class == c_to_class(*p))
+            p--;
     }
 
-    /* cp now points to one character before the word */
-    p++;
-    if (p < low)
-	p = low;
-    /* cp now points where we want it */
-    return(p);
+    p++;                        /* correct overshoot */
+
+    return (p);
 }
 
 static Char *
@@ -240,16 +301,42 @@ c_next_word(p, high, n)
     register Char *p, *high;
     register int n;
 {
-    while (n--) {
-	while ((p < high) && !isword(*p)) 
-	    p++;
-	while ((p < high) && isword(*p)) 
-	    p++;
+    if (!VImode) {
+	while (n--) {
+	    while ((p < high) && !isword(*p)) 
+		p++;
+	    while ((p < high) && isword(*p)) 
+		p++;
+	}
+	if (p > high)
+	    p = high;
+	/* p now points where we want it */
+	return(p);
     }
-    if (p > high)
-	p = high;
-    /* p now points where we want it */
-    return(p);
+
+    while (n--) {
+        register int  c_class;
+
+        if (p >= high)
+            break;
+
+        /* scan until end of current word (may be all whitespace!) */
+        c_class = c_to_class(*p);
+        while ((p < high) && c_class == c_to_class(*p))
+            p++;
+
+        /* if this was all whitespace, we're ready */
+        if (c_class == C_CLASS_WHITE)
+            continue;
+
+	/* if we've found white-space at the end of the word, skip it */
+        while ((p < high) && c_to_class(*p) == C_CLASS_WHITE)
+            p++;
+    }
+
+    p--;                        /* correct overshoot */
+
+    return (p);
 }
 
 static Char *
@@ -468,11 +555,38 @@ excl_sw:
      */
     if (q[1] == ':') {
 	*bend = '\0';
-	omodbuf = buf;
-	while (q[1] == ':' && (modbuf = domod(omodbuf, (int) q[2])) != NULL) {
-	    if (omodbuf != buf)
-		xfree((ptr_t) omodbuf);
-	    omodbuf = modbuf;
+	modbuf = omodbuf = buf;
+	while (q[1] == ':' && modbuf != NULL) {
+	    switch (q[2]) {
+	    case 'r':
+	    case 'e':
+	    case 'h':
+	    case 't':
+	    case 'q':
+	    case 'x':
+	    case 'u':
+	    case 'l':
+		if ((modbuf = domod(omodbuf, (int) q[2])) != NULL) {
+		    if (omodbuf != buf)
+			xfree((ptr_t) omodbuf);
+		    omodbuf = modbuf;
+		}
+		break;
+
+	    case 'a':
+	    case 'g':
+		/* Not implemented; this needs to be done before expanding
+		 * lex. We don't have the words available to us anymore.
+		 */
+		break;
+
+	    case 'p':
+		/* Ok */
+		break;
+
+	    default:
+		break;
+	    }
 	    q += 2;
 	}
 	if (omodbuf != buf) {
@@ -697,8 +811,10 @@ c_get_histline()
     if (LastChar > InputBuf) {
 	if (LastChar[-1] == '\n')
 	    LastChar--;
+#if 0
 	if (LastChar[-1] == ' ')
 	    LastChar--;
+#endif
 	if (LastChar < InputBuf)
 	    LastChar = InputBuf;
     }
@@ -1261,7 +1377,7 @@ e_newline(c)
     int c;
 {				/* always ignore argument */
     USE(c);
-    PastBottom();
+  /*  PastBottom();  NOW done in ed.inputl.c */
     *LastChar++ = '\n';		/* for the benefit of CSH */
     *LastChar = '\0';		/* just in case */
     if (VImode)
@@ -1514,7 +1630,7 @@ e_up_search_hist(c)
 	hp = hp->Hnext;
 
     while (hp != NULL) {
-	Char sbuf[BUFSIZE], *hl;
+	Char sbuf[INBUFSIZE], *hl;
 	if (hp->histline == NULL) {
 	    hp->histline = Strsave(sprlex(sbuf, &hp->Hlex));
 	}
@@ -1567,7 +1683,7 @@ e_down_search_hist(c)
     c_hsetpat();		/* Set search pattern !! */
 
     for (h = 1; h < Hist_num && hp; h++) {
-	Char sbuf[BUFSIZE], *hl;
+	Char sbuf[INBUFSIZE], *hl;
 	if (hp->histline == NULL) {
 	    hp->histline = Strsave(sprlex(sbuf, &hp->Hlex));
 	}
@@ -1710,6 +1826,17 @@ e_normalize_path(c)
     *LastChar = '\0';		/* just in case */
     return(CC_NORMALIZE_PATH);
 }
+
+/*ARGSUSED*/
+CCRETVAL
+e_normalize_command(c)
+    int c;
+{
+    USE(c);
+    *LastChar = '\0';		/* just in case */
+    return(CC_NORMALIZE_COMMAND);
+}
+
 /*ARGSUSED*/
 CCRETVAL
 e_expand_vars(c)
@@ -1797,7 +1924,7 @@ e_yank_kill(c)
     Mark = Cursor;		/* set the mark */
     cp = Cursor;		/* for speed */
 
-    c_insert(LastKill - KillBuf);	/* open the space, */
+    c_insert((int)(LastKill - KillBuf));	/* open the space, */
     for (kp = KillBuf; kp < LastKill; kp++)	/* copy the chars */
 	*cp++ = *kp;
 
@@ -1863,18 +1990,44 @@ e_delwordprev(c)
 	*kp++ = *p;
     LastKill = kp;
 
-    c_delbefore(Cursor - cp);	/* delete before dot */
+    c_delbefore((int)(Cursor - cp));	/* delete before dot */
     Cursor = cp;
     if (Cursor < InputBuf)
 	Cursor = InputBuf;	/* bounds check */
     return(CC_REFRESH);
 }
 
+/* DCS <dcs@neutron.chem.yale.edu>, 9 Oct 93
+ *
+ * Changed the names of some of the ^D family of editor functions to
+ * correspond to what they actually do and created new e_delnext_list
+ * for completeness.
+ *   
+ *   Old names:			New names:
+ *   
+ *   delete-char		delete-char-or-eof
+ *     F_DELNEXT		  F_DELNEXT_EOF
+ *     e_delnext		  e_delnext_eof
+ *     edelnxt			  edelnxteof
+ *   delete-char-or-eof		delete-char			
+ *     F_DELNEXT_EOF		  F_DELNEXT
+ *     e_delnext_eof		  e_delnext
+ *     edelnxteof		  edelnxt
+ *   delete-char-or-list	delete-char-or-list-or-eof
+ *     F_LIST_DELNEXT		  F_DELNEXT_LIST_EOF
+ *     e_list_delnext		  e_delnext_list_eof
+ *   				  edellsteof
+ *   (no old equivalent)	delete-char-or-list
+ *   				  F_DELNEXT_LIST
+ *   				  e_delnext_list
+ *   				  e_delnxtlst
+ */
+
 /* added by mtk@ari.ncl.omron.co.jp (920818) */
 /* rename e_delnext() -> e_delnext_eof() */
 /*ARGSUSED*/
 CCRETVAL
-e_delnext_eof(c)
+e_delnext(c)
     int c;
 {
     USE(c);
@@ -1898,7 +2051,7 @@ e_delnext_eof(c)
 
 /*ARGSUSED*/
 CCRETVAL
-e_delnext(c)
+e_delnext_eof(c)
     int c;
 {
     USE(c);
@@ -1928,7 +2081,26 @@ e_delnext(c)
 
 /*ARGSUSED*/
 CCRETVAL
-e_list_delnext(c)
+e_delnext_list(c)
+    int c;
+{
+    USE(c);
+    if (Cursor == LastChar) {	/* if I'm at the end */
+	PastBottom();
+	*LastChar = '\0';	/* just in case */
+	return(CC_LIST_CHOICES);
+    }
+    else {
+	c_delafter(Argument);	/* delete after dot */
+	if (Cursor > LastChar)
+	    Cursor = LastChar;	/* bounds check */
+	return(CC_REFRESH);
+    }
+}
+
+/*ARGSUSED*/
+CCRETVAL
+e_delnext_list_eof(c)
     int c;
 {
     USE(c);
@@ -1991,7 +2163,7 @@ e_delwordnext(c)
 	*kp++ = *p;
     LastKill = kp;
 
-    c_delafter(cp - Cursor);	/* delete after dot */
+    c_delafter((int)(cp - Cursor));	/* delete after dot */
     if (Cursor > LastChar)
 	Cursor = LastChar;	/* bounds check */
     return(CC_REFRESH);
@@ -2065,7 +2237,7 @@ e_killbeg(c)
     while (cp < Cursor)
 	*kp++ = *cp++;		/* copy it */
     LastKill = kp;
-    c_delbefore(Cursor - InputBuf);
+    c_delbefore((int)(Cursor - InputBuf));
     Cursor = InputBuf;		/* zap! */
     return(CC_REFRESH);
 }
@@ -2105,7 +2277,7 @@ e_killregion(c)
 	while (cp < Mark)
 	    *kp++ = *cp++;	/* copy it */
 	LastKill = kp;
-	c_delafter(cp - Cursor);/* delete it - UNUSED BY VI mode */
+	c_delafter((int)(cp - Cursor));	/* delete it - UNUSED BY VI mode */
     }
     else {			/* mark is before cursor */
 	cp = Mark;
@@ -2113,7 +2285,7 @@ e_killregion(c)
 	while (cp < Cursor)
 	    *kp++ = *cp++;	/* copy it */
 	LastKill = kp;
-	c_delbefore(cp - Mark);
+	c_delbefore((int)(cp - Mark));
 	Cursor = Mark;
     }
     return(CC_REFRESH);
@@ -2170,6 +2342,7 @@ e_charswitch(cc)
 	return(CC_REFRESH);
     }
     else {
+	Cursor--;		/* Restore cursor position */
 	return(CC_ERROR);
     }
 }
@@ -2370,8 +2543,10 @@ v_repeat_srch(c)
     switch (c) {
     case F_DOWN_SEARCH_HIST:
 	rv = e_down_search_hist(0);
+	break;
     case F_UP_SEARCH_HIST:
 	rv = e_up_search_hist(0);
+	break;
     default:
 	break;
     }
@@ -3026,7 +3201,7 @@ e_copyprev(c)
     /* does a bounds check */
     cp = c_prev_word(Cursor, InputBuf, Argument);	
 
-    c_insert(oldc - cp);
+    c_insert((int)(oldc - cp));
     for (dp = oldc; cp < oldc && dp < LastChar; cp++)
 	*dp++ = *cp;
 

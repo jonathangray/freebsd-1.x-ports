@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.lex.c,v 1.1 1993/07/20 10:48:50 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.lex.c,v 1.1.1.2 1994/07/05 20:38:37 ache Exp $ */
 /*
  * sh.lex.c: Lexical analysis into tokens
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.lex.c,v 1.1 1993/07/20 10:48:50 smace Exp $")
+RCSID("$Id: sh.lex.c,v 1.1.1.2 1994/07/05 20:38:37 ache Exp $")
 
 #include "ed.h"
 /* #define DEBUG_INP */
@@ -58,6 +58,7 @@ static	void	 	 getexcl	__P((int));
 static	struct Hist 	*findev		__P((Char *, bool));
 static	void	 	 setexclp	__P((Char *));
 static	int	 	 bgetc		__P((void));
+static	void		 balloc		__P((int));
 static	void	 	 bfree		__P((void));
 static	struct wordent	*gethent	__P((int));
 static	int	 	 matchs		__P((Char *, Char *));
@@ -841,6 +842,8 @@ getsub(en)
 	case 'r':
 	case 't':
 	case 'e':
+	case 'u':
+	case 'l':
 	    break;
 
 	case '&':
@@ -1452,7 +1455,9 @@ readc(wanteof)
     bool    wanteof;
 {
     int c;
-    static  sincereal;
+    static  sincereal;	/* Number of real EOFs we've seen */
+    Char *ptr;		/* For STRignoreeof */
+    int numeof = 0;	/* Value of STRignoreeof */
 
 #ifdef DEBUG_INP
     xprintf("readc\n");
@@ -1461,6 +1466,19 @@ readc(wanteof)
 	peekread = 0;
 	return (c);
     }
+
+    /* Compute the value of EOFs */
+    if ((ptr = varval(STRignoreeof)) != STRNULL) {
+	while (*ptr) {
+	    if (!Isdigit(*ptr)) {
+		numeof = 0;
+		break;
+	    }
+	    numeof = numeof * 10 + *ptr++ - '0';
+	}
+    } 
+    if (numeof < 1) numeof = 26;	/* Sanity check */
+
 top:
     aret = F_SEEK;
     if (alvecp) {
@@ -1562,7 +1580,7 @@ reread:
 		int     ctpgrp;
 #endif /* BSDJOBS */
 
-		if (++sincereal > 25)
+		if (++sincereal >= numeof)	/* Too many EOFs?  Bye! */
 		    goto oops;
 #ifdef BSDJOBS
 		if (tpgrp != -1 &&
@@ -1584,15 +1602,34 @@ reread:
 		    goto reread;
 		}
 #endif /* BSDJOBS */
+		/* What follows is complicated EOF handling -- sterling@netcom.com */
+		/* First, we check to see if we have ignoreeof set */
 		if (adrof(STRignoreeof)) {
-		    if (loginsh)
-			xprintf("\nUse \"logout\" to logout.\n");
-		    else
-			xprintf("\nUse \"exit\" to leave tcsh.\n");
-		    reset();
+			/* If so, we check for any stopped jobs only on the first EOF */
+			if ((sincereal == 1) && (chkstop == 0)) {
+				panystop(1);
+			}
+		} else {
+			/* If we don't have ignoreeof set, always check for stopped jobs */
+			if (chkstop == 0) {
+				panystop(1);
+			}
 		}
-		if (chkstop == 0)
-		    panystop(1);
+		/* At this point, if there were stopped jobs, we would have already
+		 * called reset().  If we got this far, assume we can print an
+		 * exit/logout message if we ignoreeof, or just exit.
+		 */
+		if (adrof(STRignoreeof)) {
+			/* If so, tell the user to use exit or logout */
+		    if (loginsh) {
+				xprintf("\nUse \"logout\" to logout.\n");
+		   	} else {
+				xprintf("\nUse \"exit\" to leave tcsh.\n");
+			}
+			reset();
+		} else {
+			/* If we don't have ignoreeof set, just fall through */
+		}
 	    }
     oops:
 	    doneinp = 1;
@@ -1607,13 +1644,30 @@ reread:
     return (c);
 }
 
+static void
+balloc(buf)
+    int buf;
+{
+    Char **nfbuf;
+
+    while (buf >= fblocks) {
+	nfbuf = (Char **) xcalloc((size_t) (fblocks + 2),
+			  sizeof(Char **));
+	if (fbuf) {
+	    (void) blkcpy(nfbuf, fbuf);
+	    xfree((ptr_t) fbuf);
+	}
+	fbuf = nfbuf;
+	fbuf[fblocks] = (Char *) xcalloc(BUFSIZE, sizeof(Char));
+	fblocks++;
+    }
+}
+
 static int
 bgetc()
 {
-    int buf;
-    int c;
+    int c, off, buf;
     int numleft = 0, roomleft;
-    extern Char InputBuf[];
     char    tbuf[BUFSIZE + 1];
 
     if (cantell) {
@@ -1638,90 +1692,42 @@ bgetc()
 	fseekp++;
 	return (c);
     }
-again:
-    buf = (int) fseekp / BUFSIZE;
-    if (buf >= fblocks) {
-	Char **nfbuf =
-	(Char **) xcalloc((size_t) (fblocks + 2),
-			  sizeof(Char **));
 
-	if (fbuf) {
-	    (void) blkcpy(nfbuf, fbuf);
-	    xfree((ptr_t) fbuf);
-	}
-	fbuf = nfbuf;
-	fbuf[fblocks] = (Char *) xcalloc(BUFSIZE, sizeof(Char));
-	fblocks++;
-	if (!intty)
-	    goto again;
-    }
-    if (fseekp >= feobp) {
-	int off;
-	off = (int) feobp % BUFSIZE;
-	buf = (int) feobp / BUFSIZE;
-	roomleft = BUFSIZE - off;
-	for (;;) {
-	    if (editing && intty) {	/* then use twenex routine */
-		c = numleft ? numleft : Inputl();	/* PWP: get a line */
-		if (c > roomleft) {	/* No room in this buffer? */
-		    /* start with fresh buffer */
-		    feobp = fseekp = fblocks * BUFSIZE;
-		    numleft = c;
-		    goto again;
-		}
-		if (c > 0) {
-		    /* 
-		     * Cannot really happen, but it does! 
-		     * I really cannot explain why the following if 
-		     * statement can get executed, but at least when it
-		     * does we are not going to core-dump any more.
-		     * It has something to do with a weird interaction
-		     * with run-fg-editor or interrupts I think, but 
-		     * I have not been able to pin it down!
-		     */
-		    if (buf >= fblocks || off > BUFSIZE) {
-#ifdef I_DEBUG
-			xprintf("buf %lx, fblocks %lx, off %lx, BUFSIZE %lx\n",
-				buf, fblocks, off, BUFSIZE);
-			xprintf("Dumping core...");
-			flush();
-			if (fork() == 0)
-			    (void) kill(0, 6);
-			xprintf("ok.\n");
-			flush();
-#endif
-			/* start with fresh buffer */
-			feobp = fseekp = fblocks * BUFSIZE;
-			numleft = c;
-			goto again;
-		    }
-		    (void) memmove((ptr_t) (fbuf[buf] + off), (ptr_t) InputBuf,
-				   (size_t) (c * sizeof(Char)));
-		}
-		numleft = 0;
+    while (fseekp >= feobp) {
+	if (editing && intty) {		/* then use twenex routine */
+	    fseekp = feobp;		/* where else? */
+	    c = numleft = Inputl();	/* PWP: get a line */
+	    while (numleft > 0) {
+		off = (int) feobp % BUFSIZE;
+		buf = (int) feobp / BUFSIZE;
+		balloc(buf);
+		roomleft = BUFSIZE - off;
+		if (roomleft > numleft)
+		    roomleft = numleft;
+		(void) memmove((ptr_t) (fbuf[buf] + off), (ptr_t) (InputBuf + c - numleft), (size_t) (roomleft * sizeof(Char)));
+		numleft -= roomleft;
+		feobp += roomleft;
 	    }
-	    else {
-		c = read(SHIN, tbuf, (size_t) roomleft);
-		if (c > 0) {
-		    int     i;
-		    Char   *ptr = fbuf[buf] + off;
+	}
+	else {
+	    off = (int) feobp % BUFSIZE;
+	    buf = (int) feobp / BUFSIZE;
+	    balloc(buf);
+	    roomleft = BUFSIZE - off;
+	    c = read(SHIN, tbuf, (size_t) roomleft);
+	    if (c > 0) {
+		int     i;
+		Char   *ptr = fbuf[buf] + off;
 
-		    for (i = 0; i < c; i++)
-			ptr[i] = (unsigned char) tbuf[i];
-		}
+		for (i = 0; i < c; i++)
+		    ptr[i] = (unsigned char) tbuf[i];
+		feobp += c;
 	    }
-	    if (c >= 0)
-		break;
-	    if ((c = fixio(SHIN, errno)) == -1)
-		break;
 	}
-	if (c <= 0)
+	if (c == 0 || (c < 0 && fixio(SHIN, errno) == -1))
 	    return (-1);
-	feobp += c;
-	if (editing && !intty)
-	    goto again;
     }
-    c = fbuf[buf][(int) fseekp % BUFSIZE];
+    c = fbuf[(int) fseekp / BUFSIZE][(int) fseekp % BUFSIZE];
     fseekp++;
     return (c);
 }

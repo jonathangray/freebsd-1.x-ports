@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.func.c,v 1.1 1993/07/20 10:48:55 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.func.c,v 1.1.1.2 1994/07/05 20:39:36 ache Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.func.c,v 1.1 1993/07/20 10:48:55 smace Exp $")
+RCSID("$Id: tc.func.c,v 1.1.1.2 1994/07/05 20:39:36 ache Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -46,6 +46,14 @@ RCSID("$Id: tc.func.c,v 1.1 1993/07/20 10:48:55 smace Exp $")
 #ifdef HESIOD
 # include <hesiod.h>
 #endif /* HESIOD */
+
+#ifdef AFS
+#define PASSMAX 16
+#include <afs/kautils.h>
+long ka_UserAuthenticateGeneral();
+#else
+#define PASSMAX 8
+#endif /* AFS */
 
 #ifdef TESLA
 extern int do_logout;
@@ -394,17 +402,15 @@ dosettc(v, c)
  *  West-Germany
  * Thanks!!
  */
-
-/*ARGSUSED*/
-void
-dowhich(v, c)
-    register Char **v;
-    struct command *c;
+int
+cmd_expand(cmd, str)
+    Char *cmd;
+    Char *str;
 {
     struct wordent lexp[3];
     struct varent *vp;
+    int rv = TRUE;
 
-    USE(c);
     lexp[0].next = &lexp[1];
     lexp[1].next = &lexp[2];
     lexp[2].next = &lexp[0];
@@ -415,6 +421,31 @@ dowhich(v, c)
 
     lexp[0].word = STRNULL;
     lexp[2].word = STRret;
+
+    if ((vp = adrof1(cmd, &aliases)) != NULL) {
+	if (str == NULL) {
+	    xprintf("%S: \t aliased to ", cmd);
+	    blkpr(vp->vec);
+	    xputchar('\n');
+	}
+	else 
+	    blkexpand(vp->vec, str);
+    }
+    else {
+	lexp[1].word = cmd;
+	rv = tellmewhat(lexp, str);
+    }
+    return rv;
+}
+
+
+/*ARGSUSED*/
+void
+dowhich(v, c)
+    register Char **v;
+    struct command *c;
+{
+    USE(c);
 
 #ifdef notdef
     /* 
@@ -434,17 +465,9 @@ dowhich(v, c)
     }
 #endif
 
-    while (*++v) {
-	if ((vp = adrof1(*v, &aliases)) != NULL) {
-	    xprintf("%S: \t aliased to ", *v);
-	    blkpr(vp->vec);
-	    xputchar('\n');
-	}
-	else {
-	    lexp[1].word = *v;
-	    tellmewhat(lexp);
-	}
-    }
+    while (*++v) 
+	(void) cmd_expand(*v, NULL);
+
 #ifdef notdef
     /* Again look at the comment above; since we don't glob, we don't free */
     if (gargv)
@@ -552,7 +575,7 @@ static char *
 xgetpass(prm)
     char *prm;
 {
-    static char pass[9];
+    static char pass[PASSMAX + 1];
     int fd, i;
     sigret_t (*sigint)();
 
@@ -565,7 +588,7 @@ xgetpass(prm)
     for (i = 0;;)  {
 	if (read(fd, &pass[i], 1) < 1 || pass[i] == '\n') 
 	    break;
-	if (i < 8)
+	if (i < PASSMAX)
 	    i++;
     }
 	
@@ -648,10 +671,33 @@ auto_lock()
     xputchar('\n'); 
     for (i = 0; i < 5; i++) {
 	char *crpp, *pp;
+#ifdef AFS
+	char *afsname;
+	Char *safs;
+
+	if ((safs = varval(STRafsuser)) != STRNULL)
+	    afsname = short2str(safs);
+	else
+	    if ((afsname = getenv("AFSUSER")) == NULL)
+	        afsname = pw->pw_name;
+#endif
 	pp = xgetpass("Password:"); 
 
 	crpp = XCRYPT(pp, srpp);
-	if (strcmp(crpp, srpp) == 0) {
+	if ((strcmp(crpp, srpp) == 0)
+#ifdef AFS
+	    || (ka_UserAuthenticateGeneral(KA_USERAUTH_VERSION,
+					   afsname,     /* name */
+					   NULL,        /* instance */
+					   NULL,        /* realm */
+					   pp,          /* password */
+					   0,           /* lifetime */
+					   0, 0,         /* spare */
+					   NULL)        /* reason */
+	    == 0)
+#endif /* AFS */
+	    ) {
+	    (void) memset(pp, 0, PASSMAX);
 	    if (GettingInput && !just_signaled) {
 		(void) Rawmode();
 		ClearLines();	
@@ -828,7 +874,7 @@ period_cmd()
     }
     periodic_active = 1;
     if (!whyles && adrof1(STRperiodic, &aliases)) {
-	vp = value(STRtperiod);
+	vp = varval(STRtperiod);
 	if (vp == STRNULL)
 	    return;
 	interval = getn(vp);
@@ -885,7 +931,7 @@ aliasrun(cnt, s1, s2)
     }
 
     /* Save the old status */
-    status = getn(value(STRstatus));
+    status = getn(varval(STRstatus));
 
     /* expand aliases like process() does. */
     alias(&w);
@@ -1001,7 +1047,7 @@ rmstar(cp)
     if (!adrof(STRrmstar))
 	return;
 #ifdef RMDEBUG
-    tag = value(STRrmdebug);
+    tag = varval(STRrmdebug);
 #endif /* RMDEBUG */
     we = cp->next;
     while (*we->word == ';' && we != cp)
@@ -1098,10 +1144,10 @@ continue_jobs(cp)
 
 
 #ifdef CNDEBUG
-    tag = value(STRcndebug);
+    tag = varval(STRcndebug);
 #endif /* CNDEBUG */
-    continue_list = value(STRcontinue);
-    continue_args_list = value(STRcontinue_args);
+    continue_list = varval(STRcontinue);
+    continue_args_list = varval(STRcontinue_args);
     if (*continue_list == '\0' && *continue_args_list == '\0')
 	return;
 
@@ -1441,7 +1487,7 @@ getusername(hm)
 	tcache = NULL;
 	return NULL;
     }
-    if (((h = value(STRhome)) != STRNULL) &&
+    if (((h = varval(STRhome)) != STRNULL) &&
 	(Strncmp(p = *hm, h, (size_t) (j = (int) Strlen(h))) == 0) &&
 	(p[j] == '/' || p[j] == '\0')) {
 	*hm = &p[j];
@@ -1456,6 +1502,7 @@ getusername(hm)
     return NULL;
 }
 
+#ifdef OBSOLETE
 /*
  * PWP: read a bunch of aliases out of a file QUICKLY.  The format
  *  is almost the same as the result of saying "alias > FILE", except
@@ -1543,6 +1590,7 @@ eof:
 	blkfree(gargv), gargv = 0;
     resexit(oldexit);
 }
+#endif /* OBSOLETE */
 
 
 /*
@@ -1562,7 +1610,8 @@ shlvl(val)
 	    val += atoi(cp);
 
 	if (val <= 0) {
-	    unsetv(STRshlvl);
+	    if (adrof(STRshlvl) != NULL)
+		unsetv(STRshlvl);
 	    Unsetenv(STRKSHLVL);
 	}
 	else {
@@ -1592,27 +1641,66 @@ fixio(fd, e)
 
 #ifdef EWOULDBLOCK
     case EWOULDBLOCK:
-# define TRY_AGAIN
+# define FDRETRY
 #endif /* EWOULDBLOCK */
 
 #if defined(POSIX) && defined(EAGAIN)
 # if !defined(EWOULDBLOCK) || EWOULDBLOCK != EAGAIN
     case EAGAIN:
-#  define TRY_AGAIN
+#  define FDRETRY
 # endif /* !EWOULDBLOCK || EWOULDBLOCK != EAGAIN */
 #endif /* POSIX && EAGAIN */
 
 	e = 0;
-#ifdef TRY_AGAIN
-# if defined(F_SETFL) && defined(O_NDELAY)
+#ifdef FDRETRY
+# ifdef F_SETFL
+/*
+ * Great! we have on suns 3 flavors and 5 names...
+ * I hope that will cover everything.
+ * I added some more defines... many systems have different defines.
+ * Rather than dealing with getting the right includes, we'll just
+ * cover all the known possibilities here.  -- sterling@netcom.com
+ */
+#  ifndef O_NONBLOCK
+#   define O_NONBLOCK 0
+#  endif /* O_NONBLOCK */
+#  ifndef O_NDELAY
+#   define O_NDELAY 0
+#  endif /* O_NDELAY */
+#  ifndef FNBIO
+#   define FNBIO 0
+#  endif /* FNBIO */
+#  ifndef _FNBIO
+#   define _FNBIO 0
+#  endif /* _FNBIO */
+#  ifndef FNONBIO
+#   define FNONBIO 0
+#  endif /* FNONBIO */
+#  ifndef FNONBLOCK
+#   define FNONBLOCK 0
+#  endif /* FNONBLOCK */
+#  ifndef _FNONBLOCK
+#   define _FNONBLOCK 0
+#  endif /* _FNONBLOCK */
+#  ifndef FNDELAY
+#   define FNDELAY 0
+#  endif /* FNDELAY */
+#  ifndef _FNDELAY
+#   define _FNDELAY 0
+#  endif /* _FNDELAY */
+#  ifndef FNDLEAY	/* Some linux versions have this typo */
+#   define FNDLEAY 0
+#  endif /* FNDLEAY */
 	if ((e = fcntl(fd, F_GETFL, 0)) == -1)
 	    return -1;
 
-	if (fcntl(fd, F_SETFL, e & ~O_NDELAY) == -1)
+	e &= ~(O_NDELAY|O_NONBLOCK|FNBIO|_FNBIO|FNONBIO|FNONBLOCK|_FNONBLOCK|
+	       FNDELAY|_FNDELAY|FNDLEAY);	/* whew! */
+	if (fcntl(fd, F_SETFL, e) == -1)
 	    return -1;
 	else 
 	    e = 1;
-# endif /* F_SETFL && O_NDELAY */
+# endif /* F_SETFL */
 
 # ifdef FIONBIO
 	e = 0;
@@ -1622,7 +1710,7 @@ fixio(fd, e)
 	    e = 1;
 # endif	/* FIONBIO */
 
-#endif /* TRY_AGAIN */
+#endif /* FDRETRY */
 	return e ? 0 : -1;
 
     case EINTR:
@@ -1656,7 +1744,12 @@ collate(a, b)
 
     rv = strcoll(sa, sb);
 
-    if (errno != 0) {
+    /*
+     * We should be checking for errno != 0, but some systems
+     * forget to reset errno to 0. So we only check for the 
+     * only documented valid errno value for strcoll [EINVAL]
+     */
+    if (errno == EINVAL) {
 	xfree((ptr_t) sa);
 	xfree((ptr_t) sb);
 	stderror(ERR_SYSTEM, "strcoll", strerror(errno));
@@ -1732,3 +1825,82 @@ hashbang(fd, vp)
     return -1;
 }
 #endif /* HASHBANG */
+
+#ifdef REMOTEHOST
+
+#ifdef ISC
+# undef MAXHOSTNAMELEN	/* Busted headers? */
+#endif
+
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+
+static sigret_t
+palarm(snum)
+    int snum;
+{
+    USE(snum);
+#ifdef UNRELSIGS
+    if (snum)
+	(void) sigset(snum, SIG_IGN);
+#endif /* UNRELSIGS */
+    (void) alarm(0);
+
+#ifndef SIGVOID
+    return (snum);
+#endif
+}
+
+/*
+ * From: <lesv@ppvku.ericsson.se> (Lennart Svensson)
+ */
+void 
+remotehost()
+{
+    char *host = NULL;
+    struct hostent* hp;
+    struct sockaddr_in saddr;
+    int len = sizeof(struct sockaddr_in);
+
+    /* Don't get stuck if the resolver does not work! */
+    sigret_t (*osig)() = signal(SIGALRM, palarm);
+    (void) alarm(2);
+
+    if (getpeername(SHIN, (struct sockaddr *) &saddr, &len) != -1) {
+	if ((hp = gethostbyaddr((char *)&saddr.sin_addr, len, AF_INET)) != NULL)
+	    host = hp->h_name;
+	else
+	    host = inet_ntoa(saddr.sin_addr);
+    }
+#ifdef UTHOST
+    else {
+	char *ptr, *sptr;
+	char *name = utmphost();
+	if (name != NULL) {
+	    /* Look for host:display.screen */
+	    if ((sptr = strchr(name, ':')) != NULL)
+		*sptr = '\0';
+	    if ((hp = gethostbyname(name)) == NULL) {
+		/* Try again eliminating the trailing domain */
+		if ((ptr = strchr(name, '.')) != NULL) {
+		    *ptr = '\0';
+		    if ((hp = gethostbyname(name)) != NULL)
+			host = hp->h_name;
+		    *ptr = '.';
+		}
+	    }
+	    else
+		host = hp->h_name;
+	    if (sptr)
+		*sptr = ':';
+	}
+    }
+#endif
+    (void) alarm(0);
+    (void) signal(SIGALRM, osig);
+
+    if (host)
+	tsetenv(STRREMOTEHOST, str2short(host));
+}
+#endif /* REMOTEHOST */

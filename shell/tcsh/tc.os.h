@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.os.h,v 1.1 1993/07/20 10:48:56 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.os.h,v 1.1.1.2 1994/07/05 20:39:39 ache Exp $ */
 /*
  * tc.os.h: Shell os dependent defines
  */
@@ -72,9 +72,12 @@
 # define NOFILE 256
 #endif /* NOFILE */
 
-#ifdef linux
+#if defined(linux) || defined(NetBSD) || SYSVREL >= 4 
 # undef NEEDstrerror
-#endif /* linux */
+#endif /* linux || NetBSD || SYSVREL >= 4 */
+#if defined(BSD) && BSD >= 199306
+# undef NEEDstrerror
+#endif
 
 #ifdef OREO
 # include <sys/time.h>
@@ -220,13 +223,16 @@ struct ucred {
 #ifdef ISC
 /* these are not defined for _POSIX_SOURCE under ISC 2.2 */
 # ifndef S_IFMT
-#  define S_IFMT  0170000		/* type of file */
-#  define S_IFDIR 0040000		/* directory */
-#  define S_IFCHR 0020000		/* character special */
-#  define S_IFBLK 0060000		/* block special */
-#  define S_IFREG 0100000		/* regular */
-#  define S_IFIFO 0010000		/* fifo */
-#  define S_IFNAM 0050000		/* special named file */
+#  define S_IFMT	0170000		/* type of file */
+#  define S_IFDIR	0040000		/* directory */
+#  define S_IFCHR	0020000		/* character special */
+#  define S_IFBLK	0060000		/* block special */
+#  define S_IFREG	0100000		/* regular */
+#  define S_IFIFO	0010000		/* fifo */
+#  define S_IFNAM	0050000		/* special named file */
+#  ifndef ISC202
+#   define S_IFLNK	0120000		/* symbolic link */
+#  endif /* ISC202 */
 # endif /* S_IFMT */
 #endif /* ISC */
 
@@ -334,6 +340,20 @@ struct ucred {
 #ifndef S_ISVTX
 # define S_ISVTX 0001000	/* sticky */
 #endif /* S_ISVTX */
+#ifndef S_ENFMT
+# define S_ENFMT S_ISGID	/* record locking enforcement flag */
+#endif /* S_ENFMT */
+
+/* the following macros are for POSIX conformance */
+#ifndef S_IRWXU
+# define S_IRWXU (S_IRUSR | S_IWUSR | S_IXUSR)
+#endif /* S_IRWXU */
+#ifndef S_IRWXG
+# define S_IRWXG (S_IRGRP | S_IWGRP | S_IXGRP)
+#endif /* S_IRWXG */
+#ifndef S_IRWXO
+# define S_IRWXO (S_IROTH | S_IWOTH | S_IXOTH)
+#endif /* S_IRWXO */
 
 /*
  * Access()
@@ -475,6 +495,9 @@ typedef struct timeval timeval_t;
 # define free tcsh_free
 #endif /* NeXT */
 
+#ifndef NEEDgethostname
+extern int gethostname();
+#endif /* NEEDgethostname */
 
 #if !defined(POSIX) || defined(SUNOS4) || defined(UTekV) || defined(sysV88)
 extern time_t time();
@@ -510,15 +533,11 @@ extern void qsort();
 # endif	/* SUNOS4 */
 extern void perror();
 
-# ifndef NEEDgethostname
-extern int gethostname();
-# endif /* NEEDgethostname */
-
 # ifdef BSDSIGS
-#  if defined(_AIX370) || defined(MACH) || defined(NeXT) || defined(_AIXPS2) || defined(ardent) || defined(SUNOS4)
+#  if defined(_AIX370) || defined(MACH) || defined(NeXT) || defined(_AIXPS2) || defined(ardent) || defined(SUNOS4) || defined(HPBSD)
 extern int sigvec();
 extern int sigpause();
-#  else	/* !(_AIX370 || MACH || NeXT || _AIXPS2 || ardent || SUNOS4) */
+#  else	/* !(_AIX370 || MACH || NeXT || _AIXPS2 || ardent || SUNOS4 || HPBSD) */
 #   if (!defined(apollo) || !defined(__STDC__)) && !defined(__DGUX__) && !defined(fps500)
 extern sigret_t sigvec();
 extern void sigpause();
@@ -561,7 +580,9 @@ extern int strcoll();
 
 # ifdef BSDJOBS
 #  ifdef BSDTIMES
+#   ifndef HPBSD
 extern int wait3();
+#   endif /* HPBSD */
 #  else	/* !BSDTIMES */
 #   if !defined(POSIXJOBS) && !defined(_SEQUENT_)
 extern int wait3();
@@ -583,14 +604,14 @@ extern int setpriority();
 extern int nice();
 # endif	/* BSDNICE */
 
-# if (!defined(fps500) && !defined(apollo) && !defined(__lucid))
+# if (!defined(fps500) && !defined(apollo) && !defined(__lucid) && !defined(HPBSD) && !defined(DECOSF1))
 extern void setpwent();
 extern void endpwent();
-# endif /* !fps500 && !apollo && !__lucid */
+# endif /* !fps500 && !apollo && !__lucid && !HPBSD && !DECOSF1 */
 
 # ifndef __STDC__
 extern struct passwd *getpwuid(), *getpwnam(), *getpwent();
-#  ifdef PW_SHADOW
+#  ifdef PW_etgHADOW
 extern struct spwd *getspnam(), *getspent();
 #  endif /* PW_SHADOW */
 #  ifdef PW_AUTH
@@ -612,6 +633,10 @@ extern char *getwd();
 extern char *ttyname();   
 # endif /* SCO */
 
+# ifdef __clipper__
+extern char *ttyname();   
+# endif
+
 #endif /* !POSIX || SUNOS4 || UTekV || sysV88 */
 
 #if defined(SUNOS4) && __GNUC__ == 2
@@ -620,35 +645,53 @@ extern char *ttyname();
  */
 extern int ioctl __P((int, int, ...));
 extern int readlink __P((const char *, char *, size_t));
+extern void setgrent __P((void));
+extern void endgrent __P((void));
+# ifdef REMOTEHOST
+struct sockaddr;
+extern int getpeername __P((int, struct sockaddr *, int *));
+# endif /* REMOTEHOST */
 #endif /* SUNOS4 && __GNUC__ == 2 */
 
 #if (defined(BSD) && !defined(__386BSD__)) || defined(SUNOS4) 
+# if defined(__alpha) && defined(__osf__) && DECOSF1 < 200
 extern void bcopy	__P((const void *, void *, size_t));
-# define memmove(a, b, c) (bcopy((char *) (b), (char *) (a), (int) (c)), a)
+#  define memmove(a, b, c) (bcopy((char *) (b), (char *) (a), (int) (c)), a)
+# endif
 #endif /* (BSD && !__386BSD__) || SUNOS4 */
 
 #if !defined(hpux) && !defined(COHERENT) && ((SYSVREL < 4) || defined(_SEQUENT_)) && !defined(__386BSD__) && !defined(memmove)
 # define NEEDmemmove
-#endif /* !hpux && !COHERENT && (SYSVREL < 4 || _SEQUENT_) && !__36BSD__ && !memmove */
+#endif /* !hpux && !COHERENT && (SYSVREL < 4 || _SEQUENT_) && !__386BSD__ && !memmove */
+
+#if defined(UTek)
+# define NEEDmemset
+#endif /* Utek */
 
 #if SYSVREL == 4
-extern int gethostname();
+# ifdef REMOTEHOST
+extern int getpeername();
+# endif /* REMOTEHOST */
+# ifndef BSDTIMES
 extern int getrlimit();
 extern int setrlimit();
-extern int getrusage();
-# ifndef IRIS4D
-extern int gettimeofday();
-extern int wait3();
-# endif
+# endif /* !BSDTIMES */
+# if !defined(IRIS4D) || !defined(SOLARIS2)
+extern int wait3();	/* I think some bizarre systems still need this */
+# endif /* !IRIS4D || !SOLARIS2 */
+# if defined(SOLARIS2)
+#  undef NEEDstrerror
+# endif /* SOLARIS2 */
 #endif /* SYSVREL == 4 */
 
-#if defined(__osf__) && defined(__alpha)
+#if defined(__alpha) && defined(__osf__) && DECOSF1 < 200
+/* These are ok for 1.3, but conflict with the header files for 2.0 */
 extern int gethostname __P((char *, int));
-extern void *sbrk __P((ssize_t));
+extern char *sbrk __P((ssize_t));
 extern int ioctl __P((int, unsigned long, char *));
 extern pid_t vfork __P((void));
 extern int killpg __P((pid_t, int));
 extern char *getwd __P((char *));
-#endif /* __osf__ && __alpha */
+#endif /* __osf__ && __alpha && DECOSF1 < 200 */
 
 #endif /* _h_tc_os */

@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.proc.h,v 1.1 1993/07/20 10:48:51 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.proc.h,v 1.1.1.2 1994/07/05 20:38:57 ache Exp $ */
 /*
  * sh.proc.h: Process data structures and variables
  */
@@ -105,6 +105,7 @@ struct process {
 #define	PPTIME		(1<<14)	/* time individual process */
 #define	PNEEDNOTE	(1<<15)	/* notify as soon as practical */
 #define PBACKQ		(1<<16)	/* Process is `` evaluation */
+#define PHUP		(1<<17)	/* Process is marked for SIGHUP on exit */
 
 #define	PMAXLEN		80
 

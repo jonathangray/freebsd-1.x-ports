@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.c,v 1.1 1993/07/20 10:48:48 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.c,v 1.1.1.2 1994/07/05 20:38:06 ache Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -43,7 +43,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$Id: sh.c,v 1.1 1993/07/20 10:48:48 smace Exp $")
+RCSID("$Id: sh.c,v 1.1.1.2 1994/07/05 20:38:06 ache Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -117,9 +117,39 @@ bool    tellwhat = 0;
 time_t  t_period;
 Char  *ffile = NULL;
 bool	dolzero = 0;
+int	insource = 0;
 static time_t  chktim;		/* Time mail last checked */
 
 extern char **environ;
+
+/*
+ * This preserves the input state of the shell. It is used by
+ * st_save and st_restore to manupulate shell state.
+ */
+struct saved_state {
+    int		  insource;
+    int		  SHIN;
+    int		  intty;
+    struct whyle *whyles;
+    Char 	 *gointr;
+    Char 	 *arginp;
+    Char	 *evalp;
+    Char	**evalvec;
+    Char	 *alvecp;
+    Char	**alvec;
+    int		  onelflg;
+    bool	  enterhist;
+    Char	**argv;
+    Char	  HIST;
+    bool	  cantell;
+    struct Bin	  B;
+    /* These keep signal state and setjump state */
+#ifdef BSDSIGS
+    sigmask_t	  mask;
+#endif
+    jmp_buf_t	  oldexit;
+    int		  reenter;
+};
 
 static	int		  srccat	__P((Char *, Char *));
 static	int		  srcfile	__P((char *, bool, int, Char **));
@@ -127,6 +157,10 @@ static	sigret_t	  phup		__P((int));
 static	void		  srcunit	__P((int, bool, int, Char **));
 static	void		  mailchk	__P((void));
 static	Char	 	**defaultpath	__P((void));
+static	void		  record	__P((void));
+static	void		  st_save	__P((struct saved_state *, int, int,
+					     Char **, Char **));
+static void		  st_restore	__P((struct saved_state *, Char **));
 
 int
 main(argc, argv)
@@ -405,6 +439,12 @@ main(argc, argv)
     (void) sigset(SIGALRM, alrmcatch);
 
     set(STRstatus, Strsave(STR0), VAR_READWRITE);
+
+    /*
+     * get and set machine specific envirnment variables
+     */
+    getmachine();
+
     fix_version();		/* publish the shell version */
 
     /*
@@ -452,7 +492,7 @@ main(argc, argv)
 	int     oid = getoid();
 
 	Itoa(oid, buff);
-	set(STRoid, Strsave(buff));
+	set(STRoid, Strsave(buff), VAR_READWRITE);
 #endif /* apollo */
 
 	Itoa(uid, buff);
@@ -472,9 +512,9 @@ main(argc, argv)
 	else
 	    set(STRuser, SAVE(pw->pw_name), VAR_READWRITE);
 	if (cln == NULL)
-	    tsetenv(STRLOGNAME, value(STRuser));
+	    tsetenv(STRLOGNAME, varval(STRuser));
 	if (cus == NULL)
-	    tsetenv(STRKUSER, value(STRuser));
+	    tsetenv(STRKUSER, varval(STRuser));
     }
 
     /*
@@ -492,10 +532,13 @@ main(argc, argv)
 	    tsetenv(STRHOST, str2short("unknown"));
     }
 
+
+#ifdef REMOTEHOST
     /*
-     * HOSTTYPE, too. Just set it again.
+     * Try to determine the remote host we were logged in from.
      */
-    tsetenv(STRHOSTTYPE, str2short(gethosttype()));
+    remotehost();
+#endif /* REMOTEHOST */
  
 #ifdef apollo
     if ((tcp = getenv("SYSTYPE")) == NULL)
@@ -756,6 +799,14 @@ main(argc, argv)
 		use_fork = 1;
 		break;
 
+	    case ' ':
+	    case '\t':
+		/* 
+		 * for O/S's that don't do the argument parsing right in 
+		 * "#!/foo -f " scripts
+		 */
+		break;
+
 	    default:		/* Unknown command option */
 		exiterr = 1;
 		stderror(ERR_TCSHUSAGE, tcp-1);
@@ -849,8 +900,7 @@ main(argc, argv)
      * Set up the prompt.
      */
     if (prompt) {
-	set(STRprompt, Strsave(uid == 0 ? STRsymhash : STRsymarrow),
-	    VAR_READWRITE);
+	set(STRprompt, Strsave(STRdefprompt), VAR_READWRITE);
 	/* that's a meta-questionmark */
 	set(STRprompt2, Strsave(STRmquestion), VAR_READWRITE);
 	set(STRprompt3, Strsave(STRKCORRECT), VAR_READWRITE);
@@ -1028,7 +1078,9 @@ main(argc, argv)
         act.sa_flags=0;	           /* want behaviour of sigset() without
                                     * SA_NOCLDSTOP
 				    */
-        (void) sigaction(SIGCHLD,&act,(struct sigaction *)NULL);
+
+        if ((sigaction(SIGCHLD,&act,(struct sigaction *)NULL)) == -1)
+	    stderror(ERR_SYSTEM, "sigaction", strerror(errno));
     }
 #else /* SYSVREL <= 3 */
     (void) sigset(SIGCHLD, pchild);	/* while signals not ready */
@@ -1046,7 +1098,7 @@ main(argc, argv)
     reenter = setexit();	/* PWP */
     haderr = 0;			/* In case second time through */
     if (!fast && reenter == 0) {
-	/* Will have value(STRhome) here because set fast if don't */
+	/* Will have varval(STRhome) here because set fast if don't */
 	{
 	    int     osetintr = setintr;
 	    sigret_t (*oparintr)() = parintr;
@@ -1077,11 +1129,11 @@ main(argc, argv)
 	}
 #ifdef LOGINFIRST
 	if (loginsh)
-	    (void) srccat(value(STRhome), STRsldotlogin);
+	    (void) srccat(varval(STRhome), STRsldotlogin);
 #endif
 	/* upward compat. */
-	if (!srccat(value(STRhome), STRsldottcshrc))
-	    (void) srccat(value(STRhome), STRsldotcshrc);
+	if (!srccat(varval(STRhome), STRsldottcshrc))
+	    (void) srccat(varval(STRhome), STRsldotcshrc);
 
 	if (!fast && !arginp && !onelflg && !havhash)
 	    dohash(NULL,NULL);
@@ -1092,7 +1144,7 @@ main(argc, argv)
 	loadhist(NULL, 0);
 #ifndef LOGINFIRST
 	if (loginsh)
-	    (void) srccat(value(STRhome), STRsldotlogin);
+	    (void) srccat(varval(STRhome), STRsldotlogin);
 #endif
 	if (!fast && (loginsh || rdirs))
 	    loaddirs(NULL);
@@ -1138,8 +1190,7 @@ main(argc, argv)
 	    xprintf("exit\n");
 	}
     }
-    recdirs(NULL);
-    rechist(NULL);
+    record();
     exitstat();
     return (0);
 }
@@ -1148,7 +1199,7 @@ void
 untty()
 {
 #ifdef BSDJOBS
-    if (tpgrp > 0) {
+    if (tpgrp > 0 && opgrp != shpgrp) {
 	(void) setpgid(0, opgrp);
 	(void) tcsetpgrp(FSHTTY, opgrp);
 	(void) resetdisc(FSHTTY);
@@ -1232,12 +1283,125 @@ srcfile(f, onlyown, flag, av)
     return 1;
 }
 
+
+/*
+ * Save the shell state, and establish new argument vector, and new input
+ * fd.
+ */
+static void
+st_save(st, unit, hflg, al, av)
+    struct saved_state *st;
+    int unit, hflg;
+    Char **al, **av;
+{
+    st->insource	= insource;
+    st->SHIN		= SHIN;
+    st->intty		= intty;
+    st->whyles		= whyles;
+    st->gointr		= gointr;
+    st->arginp		= arginp;
+    st->evalp		= evalp;
+    st->evalvec		= evalvec;
+    st->alvecp		= alvecp;
+    st->alvec		= alvec;
+    st->onelflg		= onelflg;
+    st->enterhist	= enterhist;
+    st->HIST		= HIST;
+    st->cantell		= cantell;
+    cpybin(st->B, B);
+
+    /*
+     * we can now pass arguments to source. 
+     * For compatibility we do that only if arguments were really
+     * passed, otherwise we keep the old, global $argv like before.
+     */
+    if (av != NULL && *av != NULL) {
+	struct varent *vp;
+	if ((vp = adrof(STRargv)) != NULL)
+	    st->argv = saveblk(vp->vec);
+	else
+	    st->argv = NULL;
+	setq(STRargv, saveblk(av), &shvhed, VAR_READWRITE);
+    }
+    else
+	st->argv = NULL;
+
+    /* Establish new input arena */
+    {
+	fbuf = NULL;
+	fseekp = feobp = fblocks = 0;
+	settell();
+    }
+
+    SHIN	= unit;
+    arginp	= 0;
+    onelflg	= 0;
+    intty	= isatty(SHIN);
+    whyles	= 0;
+    gointr	= 0;
+    evalvec	= 0;
+    evalp	= 0;
+    alvec	= al;
+    alvecp	= 0;
+    enterhist	= hflg;
+    if (enterhist)
+	HIST	= '\0';
+    insource	= 1;
+}
+
+
+/*
+ * Restore the shell to a saved state
+ */
+static void
+st_restore(st, av)
+    struct saved_state *st;
+    Char **av;
+{
+    if (st->SHIN == -1)
+	return;
+
+    /* Reset input arena */
+    {
+	register int i;
+	register Char** nfbuf = fbuf;
+	register int nfblocks = fblocks;
+
+	fblocks = 0;
+	fbuf = NULL;
+	for (i = 0; i < nfblocks; i++)
+	    xfree((ptr_t) nfbuf[i]);
+	xfree((ptr_t) nfbuf);
+    }
+    cpybin(B, st->B);
+
+    (void) close(SHIN);
+
+    insource	= st->insource;
+    SHIN	= st->SHIN;
+    arginp	= st->arginp;
+    onelflg	= st->onelflg;
+    evalp	= st->evalp;
+    evalvec	= st->evalvec;
+    alvecp	= st->alvecp;
+    alvec	= st->alvec;
+    intty	= st->intty;
+    whyles	= st->whyles;
+    gointr	= st->gointr;
+    HIST	= st->HIST;
+    enterhist	= st->enterhist;
+    cantell	= st->cantell;
+
+    if (st->argv != NULL)
+	setq(STRargv, st->argv, &shvhed, VAR_READWRITE);
+    else if (av != NULL  && *av != NULL && adrof(STRargv) != NULL)
+	unsetv(STRargv);
+}
+
 /*
  * Source to a unit.  If onlyown it must be our file or our group or
  * we don't chance it.	This occurs on ".cshrc"s and the like.
  */
-int     insource;
-static  Char **goargv = NULL;
 static void
 srcunit(unit, onlyown, hflg, av)
     register int unit;
@@ -1245,44 +1409,15 @@ srcunit(unit, onlyown, hflg, av)
     int hflg;
     Char **av;
 {
-    /*
-     * PWP: this is arranged like this so that an optimizing compiler won't go
-     * and put things like oSHIN in a register that longjmp() restores.  The
-     * problem is that on my Sun 3/50, gcc will put oSHIN in a register.  That
-     * would be OK, but setjmp() saves ALL of the registers and longjmp()
-     * restores ALL of them, thus if you do a setjmp(), set oSHIN to something
-     * (like SHIN), then do a longjmp(), the value of oSHIN will magically
-     * become -1 again.
-     * 
-     * Perhaps setjmp() should only save the stack pointer, frame pointer, and
-     * program counter...
-     */
-
-    /* We have to push down a lot of state here */
-    /* All this could go into a structure */
-    int     oSHIN = -1, oldintty = intty, oinsource = insource;
-    struct whyle *oldwhyl = whyles;
-    Char   *ogointr = gointr, *oarginp = arginp;
-    Char   *oevalp = evalp, **oevalvec = evalvec;
-    int     oonelflg = onelflg;
-    bool    oenterhist = enterhist;
-    Char    OHIST = HIST;
-    bool    otell = cantell;
-    Char **oargv;
-    struct Bin saveB;
-#ifdef BSDSIGS
-    volatile sigmask_t omask = (sigmask_t) 0;
-#endif
-    jmp_buf_t oldexit;
-
-    /* The (few) real local variables */
-    int     my_reenter;
-
+    struct saved_state st;
+    st.SHIN = -1;	/* st_restore checks this */
 
     if (unit < 0)
 	return;
+
     if (didfds)
 	donefds();
+
     if (onlyown) {
 	struct stat stb;
 
@@ -1292,62 +1427,17 @@ srcunit(unit, onlyown, hflg, av)
 	}
     }
 
-    /*
-     * There is a critical section here while we are pushing down the input
-     * stream since we have stuff in different structures. If we weren't
-     * careful an interrupt could corrupt SHIN's Bin structure and kill the
-     * shell.
-     * 
-     * We could avoid the critical region by grouping all the stuff in a single
-     * structure and pointing at it to move it all at once.  This is less
-     * efficient globally on many variable references however.
-     */
-    insource = 1;
-    getexit(oldexit);
+    getexit(st.oldexit);
 
     if (setintr)
 #ifdef BSDSIGS
-	omask = sigblock(sigmask(SIGINT));
+	st.mask = sigblock(sigmask(SIGINT));
 #else
 	(void) sighold(SIGINT);
 #endif
-    /*
-     * Bugfix for running out of memory by: Jak Kirman
-     * <jak%cs.brown.edu@RELAY.CS.NET>.  Solution: pay attention to what
-     * setexit() is returning because my_reenter _may_ be in a register, and
-     * thus restored to 0 on a longjump(). (PWP: insert flames about
-     * compiler-dependant code here) PWP: THANKS LOTS !!!
-     */
-    /* Setup the new values of the state stuff saved above */
 
-#ifdef NO_STRUCT_ASSIGNMENT
-    (void) memmove((ptr_t) &(saveB), (ptr_t) &B, sizeof(B));
-#else
-    saveB = B;
-#endif
-    fbuf = NULL;
-    fseekp = feobp = fblocks = 0;
-    oSHIN = SHIN, SHIN = unit, arginp = 0, onelflg = 0;
-    intty = isatty(SHIN), whyles = 0, gointr = 0;
-    evalvec = 0;
-    evalp = 0;
-    enterhist = hflg;
-    if (enterhist)
-	HIST = '\0';
-    /*
-     * we can now pass arguments to source. 
-     * For compatibility we do that only if arguments were really
-     * passed, otherwise we keep the old, global $argv like before.
-     */
-
-    oargv = goargv;
-    goargv = NULL;
-    if (av != NULL && *av != NULL && **av != '\0') {
-	struct varent *vp;
-	if ((vp = adrof(STRargv)) != NULL)
-	    goargv = saveblk(vp->vec);
-	setq(STRargv, saveblk(av), &shvhed, VAR_READWRITE);
-    }
+    /* Save the current state and move us to a new state */
+    st_save(&st, unit, hflg, NULL, av);
 
     /*
      * Now if we are allowing commands to be interrupted, we let ourselves be
@@ -1355,71 +1445,46 @@ srcunit(unit, onlyown, hflg, av)
      */
     if (setintr)
 #ifdef BSDSIGS
-	(void) sigsetmask(omask);
+	(void) sigsetmask(st.mask);
 #else
 	(void) sigrelse(SIGINT);
 #endif
-    settell();
 
-/* PWP: think of this as like a LISP (unwind-protect ...) */
-/* thanks to Diana Smetters for pointing out how this _should_ be written */
+    /*
+     * Bugfix for running out of memory by: Jak Kirman
+     * <jak%cs.brown.edu@RELAY.CS.NET>.  Solution: pay attention to what
+     * setexit() is returning because reenter _may_ be in a register, and
+     * thus restored to 0 on a longjump(). (PWP: insert flames about
+     * compiler-dependant code here) PWP: THANKS LOTS !!!
+     *
+     * PWP: think of this as like a LISP (unwind-protect ...)
+     * thanks to Diana Smetters for pointing out how this _should_ be written
+     */
 #ifdef cray
-    my_reenter = 1;		/* assume non-zero return val */
+    st.reenter = 1;		/* assume non-zero return val */
     if (setexit() == 0) {
-	my_reenter = 0;		/* Oh well, we were wrong */
+	st.reenter = 0;		/* Oh well, we were wrong */
 #else
-    if ((my_reenter = setexit()) == 0) {
+    if ((st.reenter = setexit()) == 0) {
 #endif
 	process(0);		/* 0 -> blow away on errors */
     }
 
     if (setintr)
 #ifdef BSDSIGS
-	(void) sigsetmask(omask);
+	(void) sigsetmask(st.mask);
 #else
 	(void) sigrelse(SIGINT);
 #endif
-    if (oSHIN >= 0) {
-	register int i;
 
-	register Char** nfbuf = fbuf;
-	register int nfblocks = fblocks;
-	fblocks = 0;
-	fbuf = NULL;
-	for (i = 0; i < nfblocks; i++)
-	    xfree((ptr_t) nfbuf[i]);
-	xfree((ptr_t) nfbuf);
-
-	/* Reset input arena */
-#ifdef NO_STRUCT_ASSIGNMENT
-	(void) memmove((ptr_t) &B, (ptr_t) &(saveB), sizeof(B));
-#else
-	B = saveB;
-#endif
-	(void) close(SHIN), SHIN = oSHIN;
-	arginp = oarginp, onelflg = oonelflg;
-	evalp = oevalp, evalvec = oevalvec;
-	intty = oldintty, whyles = oldwhyl, gointr = ogointr;
-	if (enterhist)
-	    HIST = OHIST;
-	if (av != NULL && *av != NULL && **av != '\0') {
-	    if (goargv)
-		setq(STRargv, goargv, &shvhed, VAR_READWRITE);
-	    else
-		unsetv(STRargv);
-	}
-	enterhist = oenterhist;
-	cantell = otell;
-    }
-
-    resexit(oldexit);
-    goargv = oargv;
+    /* Restore the old state */
+    st_restore(&st, av);
+    resexit(st.oldexit);
     /*
      * If process reset() (effectively an unwind) then we must also unwind.
      */
-    if (my_reenter)
+    if (st.reenter)
 	stderror(ERR_SILENT);
-    insource = oinsource;
 }
 
 
@@ -1430,8 +1495,7 @@ goodbye(v, c)
     struct command *c;
 {
     USE(c);
-    rechist(NULL);
-    recdirs(NULL);
+    record();
 
     if (loginsh) {
 	(void) signal(SIGQUIT, SIG_IGN);
@@ -1444,7 +1508,7 @@ goodbye(v, c)
 	(void) srcfile(_PATH_DOTLOGOUT, 0, 0, NULL);
 #endif
 	if (adrof(STRhome))
-	    (void) srccat(value(STRhome), STRsldtlogout);
+	    (void) srccat(varval(STRhome), STRsldtlogout);
 #ifdef TESLA
 	do_logout = 1;
 #endif /* TESLA */
@@ -1465,7 +1529,7 @@ exitstat()
      */
     child = 1;
 
-    xexit(getn(value(STRstatus)));
+    xexit(getn(varval(STRstatus)));
 }
 
 /*
@@ -1479,8 +1543,17 @@ int snum;
     if (snum)
 	(void) sigset(snum, SIG_IGN);
 #endif /* UNRELSIGS */
-    rechist(NULL);
-    recdirs(NULL);
+
+    if (loginsh) {
+	set(STRlogout, STRhangup, VAR_READWRITE);
+#ifdef _PATH_DOTLOGOUT
+	(void) srcfile(_PATH_DOTLOGOUT, 0, 0, NULL);
+#endif
+	if (adrof(STRhome))
+	    (void) srccat(varval(STRhome), STRsldtlogout);
+    }
+
+    record();
 
 #ifdef POSIXJOBS 
     /*
@@ -1497,18 +1570,20 @@ int snum;
 	     * the process leader has exited and the foreground flag
 	     * is cleared for it.
 	     */
-	    do
+	    do 
 		/*
-		 * If a process is in the foreground; we try to kill
+		 * If a process is in the foreground we try to kill
 		 * it's process group. If we succeed, then the 
 		 * whole job is gone. Otherwise we keep going...
 		 * But avoid sending HUP to the shell again.
 		 */
-		if ((np->p_flags & PFOREGND) != 0 && np->p_jobid != shpgrp &&
-		    killpg(np->p_jobid, SIGHUP) != -1) {
-		    /* In case the job was suspended... */
-		    (void) killpg(np->p_jobid, SIGCONT);
-		    break;
+		if (((np->p_flags & PFOREGND) != 0) && np->p_jobid != shpgrp) {
+		    np->p_flags &= ~PHUP;
+		    if (killpg(np->p_jobid, SIGHUP) != -1) {
+			/* In case the job was suspended... */
+			(void) killpg(np->p_jobid, SIGCONT);
+			break;
+		    }
 		}
 	    while ((np = np->p_friends) != pp);
 	}
@@ -1735,7 +1810,7 @@ process(catch)
 	     * Following that, the prompt precmd is run.
 	     */
 #ifndef HAVENOUTMP
-	    watch_login();
+	    watch_login(0);
 #endif /* !HAVENOUTMP */
 	    sched_run();
 	    period_cmd();
@@ -1807,7 +1882,7 @@ process(catch)
 	 * If had a tellwhat from twenex() then do
 	 */
 	if (tellwhat) {
-	    tellmewhat(&paraml);
+	    (void) tellmewhat(&paraml, NULL);
 	    reset();
 	}
 
@@ -1993,7 +2068,7 @@ gethdir(home)
      * Is it us?
      */
     if (*home == '\0') {
-	if ((h = value(STRhome)) != STRNULL) {
+	if ((h = varval(STRhome)) != STRNULL) {
 	    (void) Strcpy(home, h);
 	    return 0;
 	}
@@ -2059,6 +2134,22 @@ xexit(i)
     }
 #endif /* TESLA */
 
+    {
+	struct process *pp, *np;
+
+	/* Kill all processes marked for hup'ing */
+	for (pp = proclist.p_next; pp; pp = pp->p_next) {
+	    np = pp;
+	    do 
+		if ((np->p_flags & PHUP) && np->p_jobid != shpgrp)
+		    if (killpg(np->p_jobid, SIGHUP) != -1) {
+			/* In case the job was suspended... */
+			(void) killpg(np->p_jobid, SIGCONT);
+			break;
+		    }
+	    while ((np = np->p_friends) != pp);
+	}
+    }
     untty();
     _exit(i);
 }
@@ -2107,4 +2198,13 @@ defaultpath()
 #endif
     *blkp = NULL;
     return (blk);
+}
+
+static void
+record()
+{
+    if (!fast) {
+	recdirs(NULL, adrof(STRsavedirs) != NULL);
+	rechist(NULL, adrof(STRsavehist) != NULL);
+    }
 }

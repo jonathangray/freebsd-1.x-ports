@@ -1,7 +1,7 @@
 /**/#
-/**/# $Id: Imakefile,v 1.1 1993/07/20 10:48:47 smace Exp $
+/**/# $Id: Imakefile,v 1.1.1.2 1994/07/05 20:37:43 ache Exp $
 /**/#
-/**/# Imakefile for for tcsh 6.04
+/**/# Imakefile for for tcsh 6.05
 /**/# Marc Horowitz, MIT SIPB
 /**/#
 
@@ -46,16 +46,25 @@ ones.  Please send in your fixes and additions! */
 
 # if defined(SunArchitecture)
 #  if (OSMajorVersion == 3)
-#   define ConfigH sos3
-#  else /* OSMajorVersion == 4 */
-#   if (OSMinorVersion == 0)
-#    define ConfigH sos40
-#   else /* OSMinorVersion == 1 */
-#    if (OSTeenyVersion == 3)
-#     define ConfigH sos413
-#    else /* OsTeenyVersion in [0,1,2] */
-#     define ConfigH sos41
+#   define ConfigH sunos35
+#  else
+#   if (OSMajorVersion == 4)
+#    if (OSMinorVersion == 0)
+#     define ConfigH sunos40
+#    else /* OSMinorVersion == 1 */
+#     if (OSTeenyVersion == 3)
+#      define ConfigH sunos413
+#     else /* OsTeenyVersion in [0,1,2] */
+#      define ConfigH sunos41
+#     endif
 #    endif
+#   else /* OSMajorVersion == 5 */
+#    if (OSMinorVersion < 3)
+#     define ConfigH sol2
+#    else
+#     define ConfigH sol23
+#    endif
+#    define NoCombineRegs
 #   endif
 #  endif
 # endif
@@ -125,6 +134,24 @@ SYSSRCS=ma.setp.c
 SYSOBJS=ma.setp.${SUF}
 EXTF=mi.termios.c mi.wait.h mi.varargs.h vms.termcap.c
 # endif
+
+# ifdef i386Isc
+#  if IscVersion != 202
+#   define ConfigH isc
+#   define UseLibCposix
+#  else
+#   define ConfigH isc202
+#  endif
+# endif /* i386Isc */
+
+# ifdef i386BsdArchitecture
+#  define ConfigH bsd4.4
+# endif /* i386BsdArchitecture */
+
+# ifdef i386SVR4Architecture
+#  define ConfigH sysv4
+# endif
+
 #endif /* !ConfigH */
 
 /* generic os's */
@@ -152,7 +179,7 @@ EXTF=mi.termios.c mi.wait.h mi.varargs.h vms.termcap.c
 # endif
 #endif
 
-#CONFIGH = Concat3(-DCONFIGH=\"config/config.,ConfigH,\")
+#CONFIGH = Concat3(-DCONFIGH=\"config/,ConfigH,\")
 
 #ifdef TcshPath
 TCSHPATH = Concat3(-D_PATH_TCSHELL=\",TcshPath,\")
@@ -171,7 +198,7 @@ LIBTERMCAP =
 #endif
 
 #if defined(SQNTArchitecture) || defined(SequentArchitecture)
-LIBSQNT=-lseq
+LIBSQNT=-lsocket -linet -lnsl -lseq
 #endif
 
 /* This may not be good enough - I don't have access to enough systems
@@ -246,6 +273,12 @@ LIBINTL = -lintl
 LIBINTL =
 #endif
 
+#if defined(HasLibCrypt)
+LIBCRYPT = -lcrypt
+#else
+LIBCRYPT =
+#endif
+
 #if defined(MacIIArchitecture) || defined(UseLibPosix)
 LIBPOSIX = -lposix
 #else
@@ -263,7 +296,7 @@ LIBDIRECTENT =
 
 SYSLIBS = $(LIBPOSIX) $(LIBDIRECTENT) $(LIBTERMCAP) $(LIBCURSES) \
 	$(LIBNET) $(LIBINTL) $(LIBSOCKET) $(LIBSUN) $(LIBBSD) $(LIBCPOSIX) \
-	$(LIBINET) $(LIBDIRECT) $(LIBX) $(LIBC_S) $(LIBSQNT)
+	$(LIBINET) $(LIBDIRECT) $(LIBX) $(LIBC_S) $(LIBSQNT) $(LIBCRYPT)
 
 /* Past here, nothing should need to be changed to compile on a different
 platform, unless you have a really weird architecture. */
@@ -275,7 +308,11 @@ CC = MyCC
 #  if HasGcc2
 CC = gcc 
 #  else
+#   ifdef NoCombineRegs
+CC = gcc -finline-functions -fstrength-reduce
+#   else
 CC = gcc -fcombine-regs -finline-functions -fstrength-reduce
+#   endif
 #  endif
 # else
 CC = cc
@@ -292,6 +329,17 @@ HESLIB =
 HESDEF =
 #endif
 
+#ifdef AFS
+AFSLIBDIR = /usr/afsws/lib
+AFSLIB = -L$(AFSLIBDIR) -L$(AFSLIBDIR)/afs -lkauth -lprot -lubik\
+	 -lauth -lrxkad -lsys -ldes -lrx -llwp -lcom_err\
+	 $(AFSLIBDIR)/afs/util.a
+AFSDEF = -DAFS -I/usr/afsws/include
+#else
+AFSLIB =
+AFSDEF =
+#endif
+
 /* This is encore specific, but I don't know what encore's #define is,
 and it shouldn't hurt to have it here, so here it is */
 PARALLEL=12				# Make the multi-max run fast.
@@ -305,15 +353,16 @@ MANSUFFIX = 1
 #ifndef ManSuffix
 #define ManSuffix $(MANSUFFIX)
 #endif
+
 #ifdef DestBin
-BINDIR = DestBin
+TCSH_BINDIR = DestBin
 #else
-BINDIR = $(TCSHTOP)/bin
+TCSH_BINDIR = $(TCSHTOP)/bin
 #endif
 #ifdef DestMan
-MANDIR = DestMan
+TCSH_MANDIR = DestMan
 #else
-MANDIR = $(TCSHTOP)/man/man$(MANSUFFIX)
+TCSH_MANDIR = $(TCSHTOP)/man/man$(MANSUFFIX)
 #endif
 
 #ifndef MyCflags
@@ -353,12 +402,12 @@ HTDEF = Concat3(-DHOSTTYPE=\",HostType,\")
 HTDEF =
 #endif
 
-DEFINES = $(TCSHPATH) $(HESDEF) $(HTDEF) MyDefines MyCflags MyStdc
+DEFINES = $(TCSHPATH) $(HESDEF) $(AFSDEF) $(HTDEF) MyDefines MyCflags MyStdc
 INCLUDES = -I. MyIncludes
 LDLIBS = MyLibs
 
 SUF = o
-VERSION = 6.04
+VERSION = 6.05
 
 SHSRCS=	sh.c sh.dir.c sh.dol.c sh.err.c sh.exec.c sh.char.c \
 	sh.exp.c sh.file.c sh.func.c sh.glob.c sh.hist.c sh.init.c \
@@ -384,9 +433,9 @@ EDOBJS=	ed.chared.${SUF} ed.refresh.${SUF} ed.screen.${SUF} ed.init.${SUF} \
 TCSRCS= tc.alloc.c tc.bind.c tc.const.c tc.decls.h tc.disc.c \
 	tc.func.c tc.os.c tc.os.h tc.printf.c tc.prompt.c \
 	tc.sched.c tc.sig.c tc.sig.h tc.str.c sh.types.h tc.vers.c tc.wait.h \
-	tc.who.c tc.h
-TCOBJS=	tc.alloc.${SUF} tc.bind.${SUF} tc.const.${SUF} tc.disc.${SUF} \
-	tc.func.${SUF} tc.os.${SUF} tc.printf.${SUF} \
+	tc.who.c tc.h 
+TCOBJS=	tc.alloc.${SUF} tc.bind.${SUF} tc.const.${SUF} tc.defs.${SUF} \
+	tc.disc.${SUF} tc.func.${SUF} tc.os.${SUF} tc.printf.${SUF} \
 	tc.prompt.${SUF} tc.sched.${SUF} tc.sig.${SUF} tc.str.${SUF} \
 	tc.vers.${SUF} tc.who.${SUF} 
 
@@ -394,8 +443,8 @@ MISCF = Makefile.std Fixes MAKEDIFFS MAKESHAR NewThings README FAQ \
 	WishList config_f.h eight-bit.me glob.3 patchlevel.h \
 	pathnames.h tcsh.man Ported src.desc Imakefile imake.config \
 	README.imake complete.tcsh vmsreadme.txt Makefile.vms termcap.vms \
-	snames.h
-CONFSRCS=config/config.*
+	snames.h host.defs gethost.c tcsh.man2html
+CONFSRCS=config/[a-z]*
 
 
 SRCS = $(SHSRCS) $(TWSRCS) $(EDSRCS) $(TCSRCS)
@@ -428,12 +477,12 @@ tc.const.h: config.h tc.const.c
 	@echo '#define _h_tc_const' >> $@
 	${CC} -E $(INCLUDES) ${DFLAGS} -D_h_tc_const tc.const.c | \
 	    grep 'Char STR' | \
-	    sed -e 's/Char \([a-zA-Z0-9_]*\)\(.*\)/extern Char \1[];/' | \
+	    sed -e 's/Char \([a-zA-Z0-9_]*\)\[\].*/extern Char \1[];/' | \
 	    sort >> $@
 	@echo '#endif /* _h_tc_const */' >> $@
 
 config.h:
-	@cp config/config.ConfigH config.h
+	@cp config/ConfigH config.h
 
 $(OBJS): sh.err.h tc.const.h ed.defns.h
 
@@ -469,13 +518,23 @@ world:
 	make clean ; make depend ; make tcsh ; make install
 
 clean::
-	rm -f ed.defns.h sh.err.h tc.const.h config.h
+	rm -f ed.defns.h sh.err.h tc.const.h config.h tc.defs.*
 
-depend:: config.h ed.defns.h sh.err.h tc.const.h $(SRCS)
+depend:: config.h ed.defns.h sh.err.h tc.const.h $(SRCS) tc.defs.c
 
-NormalProgramTarget(tcsh, $(OBJS), ed.defns.h sh.err.h tc.const.h, \
-			/*LOCALLIBS*/, $(HESLIB) $(SYSLIBS))
+tc.defs.${SUF}:	tc.defs.c sh.h
 
-InstallProgram(tcsh, $(BINDIR));
-InstallManPage(tcsh, $(MANDIR));
+tc.defs.c:	gethost host.defs
+	@rm -f $@
+	@echo "/* Do not edit this file, make creates it */" > $@
+	./gethost host.defs >> $@
+
+ALIB=$(HESLIB) $(AFSLIB) $(SYSLIBS)
+AINC=ed.defns.h sh.err.h tc.const.h sh.h
+
+NormalProgramTarget(tcsh, $(OBJS), $(AINC), /*LOCALLIBS*/, $(ALIB))
+NormalProgramTarget(gethost, gethost.${SUF}, $(AINC), /*LOCALLIBS*/, $(ALIB))
+
+InstallProgram(tcsh,$(TCSH_BINDIR));
+InstallManPage(tcsh,$(TCSH_MANDIR));
 DependTarget()

@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.who.c,v 1.1 1993/07/20 10:48:57 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.who.c,v 1.1.1.2 1994/07/05 20:39:51 ache Exp $ */
 /*
  * tc.who.c: Watch logins and logouts...
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.who.c,v 1.1 1993/07/20 10:48:57 smace Exp $")
+RCSID("$Id: tc.who.c,v 1.1.1.2 1994/07/05 20:39:51 ache Exp $")
 
 #include "tc.h"
 
@@ -152,7 +152,8 @@ resetwatch()
  * Watch /etc/utmp for login/logout changes.
  */
 void
-watch_login()
+watch_login(force)
+    int force;
 {
     int     utmpfd, comp = -1, alldone;
 #ifdef BSDSIGS
@@ -161,7 +162,7 @@ watch_login()
     struct utmp utmp;
     struct who *wp, *wpnew;
     struct varent *v;
-    Char  **vp;
+    Char  **vp = NULL;
     time_t  t, interval = MAILINTVL;
     struct stat sta;
 #if defined(UTHOST) && defined(_SEQUENT_)
@@ -176,7 +177,7 @@ watch_login()
 #endif
 
     v = adrof(STRwatch);
-    if (v == NULL) {
+    if (v == NULL && !force) {
 #ifdef BSDSIGS
 	(void) sigsetmask(omask);
 #else
@@ -184,9 +185,14 @@ watch_login()
 #endif
 	return;			/* no names to watch */
     }
-    trim(vp = v->vec);
-    if (blklen(vp) % 2)		/* odd # args: 1st == # minutes. */
-	interval = (number(*vp)) ? (getn(*vp++) * 60) : MAILINTVL;
+    if (!force) {
+	trim(vp = v->vec);
+	if (blklen(vp) % 2)		/* odd # args: 1st == # minutes. */
+	    interval = (number(*vp)) ? (getn(*vp++) * 60) : MAILINTVL;
+    }
+    else
+	interval = 0;
+	
     (void) time(&t);
     if (t - watch_period < interval) {
 #ifdef BSDSIGS
@@ -343,6 +349,9 @@ watch_login()
 #if defined(UTHOST) && defined(_SEQUENT_)
     endutent();
 #endif
+
+    if (force || vp == NULL)
+	return;
 
     /*
      * The state of all logins is now known, so we can search the user's list
@@ -557,4 +566,24 @@ struct command *c;
 	wp = wp->who_next;
     }
 }
+
+# ifdef UTHOST
+char *
+utmphost()
+{
+    char *tty = short2str(varval(STRtty));
+    struct who *wp;
+    char *host = NULL;
+
+    watch_login(1);
+    
+    for (wp = whohead.who_next; wp->who_next != NULL; wp = wp->who_next) {
+	if (strcmp(tty, wp->who_tty) == 0)
+	    host = wp->who_host;
+	wp->who_name[0] = '\0';
+    }
+    resetwatch();
+    return host;
+}
+# endif /* UTHOST */
 #endif /* HAVENOUTMP */

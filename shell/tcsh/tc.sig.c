@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.sig.c,v 1.1 1993/07/20 10:48:56 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.sig.c,v 1.1.1.2 1994/07/05 20:39:44 ache Exp $ */
 /*
  * tc.sig.c: Signal routine emulations
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.sig.c,v 1.1 1993/07/20 10:48:56 smace Exp $")
+RCSID("$Id: tc.sig.c,v 1.1.1.2 1994/07/05 20:39:44 ache Exp $")
 
 #include "tc.wait.h"
 
@@ -269,8 +269,6 @@ extern int errno;
 char   *show_sig_mask();
 #endif /* SHOW_SIGNALS */
 
-int     debug_signals = 0;
-
 #ifndef __PARAGON__
 /*
  * sigsetmask(mask)
@@ -292,9 +290,10 @@ sigsetmask(mask)
 	if (ISSET(mask, i))
 	    sigaddset(&set, i);
 
-    if (sigprocmask(SIG_SETMASK, &set, &oset))
+    if ((sigprocmask(SIG_SETMASK, &set, &oset)) == -1) {
 	xprintf("sigsetmask(0x%x) - sigprocmask failed, errno %d",
 		mask, errno);
+    }
 
     m = 0;
     for (i = 1; i <= MAXSIG; i++)
@@ -323,16 +322,16 @@ sigblock(mask)
     (void) sigemptyset(&oset);
 
     /* Get present set of signals. */
-    if (sigprocmask(SIG_SETMASK, NULL, &set))
-	xprintf("sigblock(0x%x) - sigprocmask failed, errno %d",
-		mask, errno);
+    if ((sigprocmask(SIG_SETMASK, NULL, &set)) == -1)
+	stderror(ERR_SYSTEM, "sigprocmask", strerror(errno));
 
     /* Add in signals from mask. */
     for (i = 1; i <= MAXSIG; i++)
 	if (ISSET(mask, i))
 	    sigaddset(&set, i);
 
-    sigprocmask(SIG_SETMASK, &set, &oset);
+    if ((sigprocmask(SIG_SETMASK, &set, &oset)) == -1)
+	stderror(ERR_SYSTEM, "sigprocmask", strerror(errno));
 
     /* Return old mask to user. */
     m = 0;

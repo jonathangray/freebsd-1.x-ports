@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.str.c,v 1.1 1993/07/20 10:48:57 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.str.c,v 1.1.1.2 1994/07/05 20:39:46 ache Exp $ */
 /*
  * tc.str.c: Short string package
  * 	     This has been a lesson of how to write buggy code!
@@ -37,7 +37,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.str.c,v 1.1 1993/07/20 10:48:57 smace Exp $")
+RCSID("$Id: tc.str.c,v 1.1.1.2 1994/07/05 20:39:46 ache Exp $")
 
 #define MALLOC_INCR	128
 
@@ -324,7 +324,8 @@ s_strsave(s)
 	s = STRNULL;
     for (p = (Char *) s; *p++;)
 	continue;
-    n = p = (Char *) xmalloc((size_t) ((p - s) * sizeof(Char)));
+    n = p = (Char *) xmalloc((size_t) 
+			     ((((const Char *) p) - s) * sizeof(Char)));
     while ((*p++ = *s++) != '\0')
 	continue;
     return (n);
@@ -346,7 +347,8 @@ s_strspl(cp, dp)
     for (q = (Char *) dp; *q++;)
 	continue;
     ep = (Char *) xmalloc((size_t)
-			  (((p - cp) + (q - dp) - 1) * sizeof(Char)));
+			  (((((const Char *) p) - cp) + 
+			    (((const Char *) q) - dp) - 1) * sizeof(Char)));
     for (p = ep, q = (Char*) cp; (*p++ = *q++) != '\0';)
 	continue;
     for (p--, q = (Char *) dp; (*p++ = *q++) != '\0';)

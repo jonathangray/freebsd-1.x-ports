@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/ed.refresh.c,v 1.1 1993/07/20 10:48:54 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/ed.refresh.c,v 1.1.1.2 1994/07/05 20:39:22 ache Exp $ */
 /*
  * ed.refresh.c: Lower level screen refreshing functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.refresh.c,v 1.1 1993/07/20 10:48:54 smace Exp $")
+RCSID("$Id: ed.refresh.c,v 1.1.1.2 1994/07/05 20:39:22 ache Exp $")
 
 #include "ed.h"
 /* #define DEBUG_UPDATE */
@@ -79,7 +79,7 @@ Char *f, *t;
  *	debugging cause you'll mangle up the file descriptors!
  */
 static void
-#if __STDC__
+#ifdef FUNCPROTO
 dprintf(char *fmt, ...)
 #else
 dprintf(va_list)
@@ -92,7 +92,7 @@ dprintf(va_list)
     if ((dtty = getenv("DEBUGTTY"))) {
 	int o;
 	va_list va;
-#if __STDC__
+#ifdef FUNCPROTO
 	va_start(va, fmt);
 #else
 	char *fmt;
@@ -739,20 +739,20 @@ update_line(old, new, cur_line)
 		    dprintf("   ERROR: cannot insert in early first diff\n");
 #endif  /* DEBUG_UPDATE */
 		Insert_write(nfd, fx);
-		str_insert(old, ofd - old, TermH, nfd, fx);
+		str_insert(old, (int) (ofd - old), TermH, nfd, fx);
 	    }
 	    /*
 	     * write (nsb-nfd) - fx chars of new starting at (nfd + fx)
 	     */
 	    so_write(nfd + fx, (nsb - nfd) - fx);
-	    str_cp(ofd + fx, nfd + fx, (nsb - nfd) - fx);
+	    str_cp(ofd + fx, nfd + fx, (int) ((nsb - nfd) - fx));
 	}
 	else {
 #ifdef DEBUG_UPDATE
 	    dprintf("without anything to save\r\n");
 #endif  /* DEBUG_UPDATE */
 	    so_write(nfd, (nsb - nfd));
-	    str_cp(ofd, nfd, (nsb - nfd));
+	    str_cp(ofd, nfd, (int) (nsb - nfd));
 	    /*
 	     * Done
 	     */
@@ -784,13 +784,13 @@ update_line(old, new, cur_line)
 		    dprintf("   ERROR: cannot delete in first diff\n");
 #endif /* DEBUG_UPDATE */
 		DeleteChars(-fx);
-		str_delete(old, ofd - old, TermH, -fx);
+		str_delete(old, (int) (ofd - old), TermH, -fx);
 	    }
 	    /*
 	     * write (nsb-nfd) chars of new starting at nfd
 	     */
 	    so_write(nfd, (nsb - nfd));
-	    str_cp(ofd, nfd, (nsb - nfd));
+	    str_cp(ofd, nfd, (int) (nsb - nfd));
 
 	}
 	else {
@@ -895,21 +895,21 @@ update_line(old, new, cur_line)
 		    dprintf("   ERROR: cannot insert in late first diff\n");
 #endif /* DEBUG_UPDATE */
 		Insert_write(nfd, fx);
-		str_insert(old, ofd - old, TermH, nfd, fx);
+		str_insert(old, (int) (ofd - old), TermH, nfd, fx);
 	    }
 
 	    /*
 	     * write (nsb-nfd) - fx chars of new starting at (nfd + fx)
 	     */
 	    so_write(nfd + fx, (nsb - nfd) - fx);
-	    str_cp(ofd + fx, nfd + fx, (nsb - nfd) - fx);
+	    str_cp(ofd + fx, nfd + fx, (int) ((nsb - nfd) - fx));
 	}
 	else {
 #ifdef DEBUG_UPDATE
 	    dprintf("without anything to save\r\n");
 #endif /* DEBUG_UPDATE */
 	    so_write(nfd, (nsb - nfd));
-	    str_cp(ofd, nfd, (nsb - nfd));
+	    str_cp(ofd, nfd, (int) (nsb - nfd));
 	}
     }
 

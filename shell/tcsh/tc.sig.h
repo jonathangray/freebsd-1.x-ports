@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.sig.h,v 1.1 1993/07/20 10:48:56 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.sig.h,v 1.1.1.2 1994/07/05 20:39:45 ache Exp $ */
 /*
  * tc.sig.h: Signal handling
  *

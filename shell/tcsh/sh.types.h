@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.types.h,v 1.1 1993/07/20 10:48:57 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.types.h,v 1.1.1.2 1994/07/05 20:39:47 ache Exp $ */
 /* sh.types.h: Do the necessary typedefs for each system.
  *             Up till now I avoided making this into a separate file
  *	       But I just wanted to eliminate the whole mess from sh.h
@@ -256,6 +256,27 @@ typedef char * caddr_t;
 
 
 /***
+ *** NeXT OS 3.x
+ ***/ 
+#ifdef NeXT
+# ifndef _SPEED_T
+#  define _SPEED_T
+   typedef unsigned int speed_t; 
+# endif /* _SPEED_T */
+#endif /* NeXT */
+
+/***
+ *** Utah's HPBSD
+ *** some posix & 4.4 BSD changes (pid_t is a short)
+ ***/
+#ifdef HPBSD
+# ifndef _PID_T
+#  define _PID_T
+# endif /* _PID_T */
+#endif /* HPBSD */
+
+
+/***
  *** Pyramid, BSD universe
  *** In addition to the size_t
  ***/
@@ -411,6 +432,14 @@ typedef char * caddr_t;
 # ifndef _SIZE_T
 #  define _SIZE_T
 # endif /* _SIZE_T */
+# ifndef _UID_T
+#  define _UID_T
+   typedef int uid_t;
+# endif /* _UID_T */
+# ifndef _GID_T
+#  define _GID_T
+   typedef int gid_t;
+# endif /* _GID_T */
 #endif /* UTek */
 
 /* 

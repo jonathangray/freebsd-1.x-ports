@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.hist.c,v 1.1 1993/07/20 10:48:49 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.hist.c,v 1.1.1.2 1994/07/05 20:38:31 ache Exp $ */
 /*
  * sh.hist.c: Shell history expansions and substitutions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.hist.c,v 1.1 1993/07/20 10:48:49 smace Exp $")
+RCSID("$Id: sh.hist.c,v 1.1.1.2 1994/07/05 20:38:31 ache Exp $")
 
 #include "tc.h"
 
@@ -71,7 +71,7 @@ savehist(sp, mflg)
     /* throw away null lines */
     if (sp && sp->next->word[0] == '\n')
 	return;
-    cp = value(STRhistory);
+    cp = varval(STRhistory);
     if (*cp) {
 	register Char *p = cp;
 
@@ -110,6 +110,7 @@ struct wordent *a0, *b0;
     } 
 }
 
+
 struct Hist *
 enthist(event, lp, docopy, mflg)
     int     event;
@@ -118,9 +119,24 @@ enthist(event, lp, docopy, mflg)
     bool    mflg;
 {
     extern time_t Htime;
-    struct Hist *p, *pp = &Histlist;
+    struct Hist *p = NULL, *pp = &Histlist;
     int n, r;
-    register struct Hist *np = (struct Hist *) xmalloc((size_t) sizeof(*np));
+    register struct Hist *np;
+    Char *dp;
+    
+    if ((dp = varval(STRhistdup)) != STRNULL) {
+	if (eq(dp, STRall)) {
+	    for (p = pp; (p = p->Hnext) != NULL;)
+		if (heq(lp, &(p->Hlex)))
+		    break;
+	}
+	else if (eq(dp, STRprev)) {
+	    if (pp->Hnext && heq(lp, &(pp->Hnext->Hlex)))
+		p = pp->Hnext;
+	}
+    }
+
+    np = p ? p : (struct Hist *) xmalloc((size_t) sizeof(*np));
 
     /* Pick up timestamp set by lex() in Htime if reading saved history */
     if (Htime != (time_t) 0) {
@@ -129,6 +145,9 @@ enthist(event, lp, docopy, mflg)
     }
     else
 	(void) time(&(np->Htime));
+
+    if (p == np)
+	return np;
 
     np->Hnum = np->Href = event;
     if (docopy) {
@@ -193,7 +212,7 @@ dohist(vp, c)
     int     n, hflg = 0;
 
     USE(c);
-    if (getn(value(STRhistory)) == 0)
+    if (getn(varval(STRhistory)) == 0)
 	return;
     if (setintr)
 #ifdef BSDSIGS
@@ -241,13 +260,13 @@ dohist(vp, c)
 	return;
     }
     else if (hflg & HIST_SAVE) {
-	rechist(*vp);
+	rechist(*vp, 1);
 	return;
     }
     if (*vp)
 	n = getn(*vp);
     else {
-	n = getn(value(STRhistory));
+	n = getn(varval(STRhistory));
     }
     dohist1(Histlist.Hnext, &n, hflg);
 }
@@ -279,19 +298,7 @@ phist(hp, hflg)
     int     hflg;
 {
 
-    if (hflg != HIST_ONLY) {
-	Char   *cp = str2short("%h\t%T\t%R\n");
-	Char buf[BUFSIZE];
-	struct varent *vp = adrof(STRhistory);
-
-	if (vp && vp->vec[0] && vp->vec[1])
-	    cp = vp->vec[1];
-
-	tprintf(FMT_HISTORY, buf, cp, BUFSIZE, NULL, hp->Htime, (ptr_t) hp);
-	for (cp = buf; *cp;)
-	    xputchar(*cp++);
-    }
-    else {
+    if (hflg & HIST_ONLY) {
 	/* 
 	 * Make file entry with history time in format:
 	 * "+NNNNNNNNNN" (10 digits, left padded with ascii '0') 
@@ -302,6 +309,18 @@ phist(hp, hflg)
 	    xprintf("%S\n", hp->histline);
 	else
 	    prlex(&hp->Hlex);
+    }
+    else {
+	Char   *cp = str2short("%h\t%T\t%R\n");
+	Char buf[INBUFSIZE];
+	struct varent *vp = adrof(STRhistory);
+
+	if (vp && vp->vec[0] && vp->vec[1])
+	    cp = vp->vec[1];
+
+	tprintf(FMT_HISTORY, buf, cp, INBUFSIZE, NULL, hp->Htime, (ptr_t) hp);
+	for (cp = buf; *cp;)
+	    xputchar(*cp++);
     }
 }
 
@@ -321,7 +340,7 @@ fmthist(fmt, ptr, buf)
 	if (HistLit && hp->histline)
 	    (void) xsprintf(buf, "%S", hp->histline);
 	else {
-	    Char ibuf[BUFSIZE], *ip;
+	    Char ibuf[INBUFSIZE], *ip;
 	    char *p;
 	    (void) sprlex(ibuf, &hp->Hlex);
 	    for (p = buf, ip = ibuf; (*p++ = *ip++) != '\0'; )
@@ -336,67 +355,72 @@ fmthist(fmt, ptr, buf)
 }
 
 void
-rechist(fname)
+rechist(fname, ref)
     Char *fname;
+    int ref;
 {
-    Char    buf[BUFSIZE], hbuf[BUFSIZE];
+    Char    *snum;
     int     fp, ftmp, oldidfds;
-    extern  int fast;
-    struct  varent *shist;
+    struct varent *shist;
     static Char   *dumphist[] = {STRhistory, STRmh, 0, 0};
 
-    if (!fast) {
-	/*
-	 * If $savehist is just set, we use the value of $history
-	 * else we use the value in $savehist
-	 */
-	if ((shist = adrof(STRsavehist)) != NULL) {
-	    if (shist->vec[0][0] != '\0')
-		(void) Strcpy(hbuf, shist->vec[0]);
-	    else if ((shist = adrof(STRhistory)) != 0 && 
-		     shist->vec[0][0] != '\0')
-		(void) Strcpy(hbuf, shist->vec[0]);
-	    else
-		return;
-	}
+    if (fname == NULL && !ref) 
+	return;
+    /*
+     * If $savehist is just set, we use the value of $history
+     * else we use the value in $savehist
+     */
+    if (((snum = varval(STRsavehist)) == STRNULL) &&
+	((snum = varval(STRhistory)) == STRNULL))
+	snum = STRmaxint;
+
+
+    if (fname == NULL) {
+	if ((fname = varval(STRhistfile)) == STRNULL)
+	    fname = Strspl(varval(STRhome), &STRtildothist[1]);
 	else
-	    return;
-
-	if (fname == NULL) 
-	    if ((fname = value(STRhistfile)) == STRNULL) {
-		fname = Strcpy(buf, value(STRhome));
-		(void) Strcat(buf, &STRtildothist[1]);
-	    }
-
-	/*
-	 * The 'savehist merge' feature is intended for an environment
-	 * with numerous shells beeing in simultaneous use. Imagine
-	 * any kind of window system. All these shells 'share' the same 
-	 * ~/.history file for recording their command line history. 
-	 * Currently the automatic merge can only succeed when the shells
-	 * nicely quit one after another. 
-	 *
-	 * Users that like to nuke their environment require here an atomic
-	 * 	loadhist-creat-dohist(dumphist)-close
-	 * sequence.
-	 *
-	 * jw.
-	 */ 
-	if (shist->vec[1] && eq(shist->vec[1], STRmerge))
-	  loadhist(fname, 1);
-	fp = creat(short2str(fname), 0600);
-	if (fp == -1) 
-	    return;
-	oldidfds = didfds;
-	didfds = 0;
-	ftmp = SHOUT;
-	SHOUT = fp;
-	dumphist[2] = hbuf;
-	dohist(dumphist, NULL);
-	(void) close(fp);
-	SHOUT = ftmp;
-	didfds = oldidfds;
+	    fname = Strsave(fname);
     }
+    else
+	fname = globone(fname, G_ERROR);
+
+    /*
+     * The 'savehist merge' feature is intended for an environment
+     * with numerous shells beeing in simultaneous use. Imagine
+     * any kind of window system. All these shells 'share' the same 
+     * ~/.history file for recording their command line history. 
+     * Currently the automatic merge can only succeed when the shells
+     * nicely quit one after another. 
+     *
+     * Users that like to nuke their environment require here an atomic
+     * 	loadhist-creat-dohist(dumphist)-close
+     * sequence.
+     *
+     * jw.
+     */ 
+    /*
+     * We need the didfds stuff before loadhist otherwise
+     * exec in a script will fail to print if merge is set.
+     * From: mveksler@iil.intel.com (Veksler Michael)
+     */
+    oldidfds = didfds;
+    didfds = 0;
+    if ((shist = adrof(STRsavehist)) != NULL)
+	if (shist->vec[1] && eq(shist->vec[1], STRmerge))
+	    loadhist(fname, 1);
+    fp = creat(short2str(fname), 0600);
+    if (fp == -1) {
+	didfds = oldidfds;
+	return;
+    }
+    ftmp = SHOUT;
+    SHOUT = fp;
+    dumphist[2] = snum;
+    dohist(dumphist, NULL);
+    (void) close(fp);
+    SHOUT = ftmp;
+    didfds = oldidfds;
+    xfree((ptr_t) fname);
 }
 
 
@@ -410,7 +434,7 @@ loadhist(fname, mflg)
 
     if (fname != NULL)
 	loadhist_cmd[2] = fname;
-    else if ((fname = value(STRhistfile)) != STRNULL)
+    else if ((fname = varval(STRhistfile)) != STRNULL)
 	loadhist_cmd[2] = fname;
     else
 	loadhist_cmd[2] = STRtildothist;

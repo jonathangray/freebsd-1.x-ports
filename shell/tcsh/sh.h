@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.h,v 1.1 1993/07/20 10:48:51 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.h,v 1.1.1.2 1994/07/05 20:39:00 ache Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -67,7 +67,7 @@ typedef char Char;
 #endif 
 
 /* Elide unused argument warnings */
-#define USE(a)	((void) (a))
+#define USE(a)	(void) (a)
 /*
  * If your compiler complains, then you can either
  * throw it away and get gcc or, use the following define
@@ -180,13 +180,13 @@ typedef int sigret_t;
 #endif 
 
 #if !defined(_MINIX) && !defined(_VMS_POSIX)
-#include <sys/param.h>
+# include <sys/param.h>
 #endif /* _MINIX && vmsposix atp */
 #include <sys/stat.h>
 
 #if defined(BSDTIMES) || defined(BSDLIMIT)
 # include <sys/time.h>
-# if SYSVREL>3 && !defined(sgi) && !defined(sun)
+# if SYSVREL>3 && !defined(sgi) && !defined(sun) && !(defined(__alpha) && defined(__osf__))
 #  include "/usr/ucbinclude/sys/resource.h"
 # else
 #  include <sys/resource.h>
@@ -270,9 +270,9 @@ extern int setpgrp();
 #define CSWTCH _POSIX_VDISABLE
 #endif
 
-#if !defined(FIOCLEX) && defined(SUNOS4)
+#if (!defined(FIOCLEX) && defined(SUNOS4)) || ((SYSVREL == 4) && !defined(_SEQUENT_))
 # include <sys/filio.h>
-#endif /* !FIOCLEX && SUNOS4 */
+#endif /* (!FIOCLEX && SUNOS4) || (SYSVREL == 4 && !_SEQUENT_) */
 
 #if !defined(_MINIX) && !defined(COHERENT)
 # include <sys/file.h>
@@ -286,7 +286,7 @@ extern int setpgrp();
 
 #include <setjmp.h>
 
-#if __STDC__
+#if __STDC__ || defined(FUNCPROTO)
 # include <stdarg.h>
 #else
 #ifdef	_MINIX
@@ -310,6 +310,7 @@ extern int setpgrp();
 # include <stdio.h>	/* So the fgetpwent() prototypes work */
 #endif /* hpux || sgi || OREO || COHERENT */
 #include <pwd.h>
+#include <grp.h>
 #ifdef PW_SHADOW
 # include <shadow.h>
 #endif /* PW_SHADOW */
@@ -339,14 +340,19 @@ extern int setpgrp();
 #undef __P
 #ifndef __P
 # if __STDC__ || defined(FUNCPROTO)
+#  ifndef FUNCPROTO
+#   define FUNCPROTO
+#  endif
 #  define __P(a) a
 # else
 #  define __P(a) ()
-#  define const
-#  ifndef apollo
-#   define volatile	/* Apollo 'c' extensions need this */
-#  endif /* apollo */
-# endif 
+#  if !__STDC__
+#   define const
+#   ifndef apollo
+#    define volatile	/* Apollo 'c' extensions need this */
+#   endif /* apollo */
+#  endif 
+# endif
 #endif 
 
 
@@ -360,7 +366,12 @@ extern int setpgrp();
 # define _exit		exit
 typedef  int		pret_t;
 #else
+# ifndef MULTIFLOW
 typedef void		pret_t;
+# else
+/* Multiflow compiler bug */
+#  define pret_t	void
+# endif
 #endif /* PURIFY */
 
 typedef int bool;
@@ -429,6 +440,10 @@ extern void		DebugFree	__P((ptr_t, char *, int));
 #if !defined(MAXNAMLEN) && defined(_D_NAME_MAX)
 # define MAXNAMLEN _D_NAME_MAX
 #endif /* MAXNAMLEN */
+
+#ifdef REMOTEHOST
+# include <netdb.h>
+#endif /* REMOTEHOST */
 
 #ifndef MAXHOSTNAMELEN
 # define MAXHOSTNAMELEN	255
@@ -579,8 +594,10 @@ EXTERN int   OLDSTD;		/* Old standard input (def for cmds) */
 #  define setexit()  setjmp(reslab)
 #  define reset()    longjmp(reslab, 1)
 # endif
-# define getexit(a) (void) memmove((ptr_t)(a), (ptr_t)reslab, sizeof(reslab))
-# define resexit(a) (void) memmove((ptr_t)reslab, ((ptr_t)(a)), sizeof(reslab))
+# define getexit(a) (void) memmove((ptr_t)&(a), (ptr_t)&reslab, sizeof(reslab))
+# define resexit(a) (void) memmove((ptr_t)&reslab, (ptr_t)&(a), sizeof(reslab))
+
+# define cpybin(a, b) (void) memmove((ptr_t)&(a), (ptr_t)&(b), sizeof(Bin))
 
 #else
 
@@ -594,8 +611,10 @@ EXTERN int   OLDSTD;		/* Old standard input (def for cmds) */
 #  define reset()    longjmp(reslab.j, 1)
 # endif
 
-# define getexit(a) ((a) = reslab)
-# define resexit(a) (reslab = (a))
+# define getexit(a) (void) ((a) = reslab)
+# define resexit(a) (void) (reslab = (a))
+
+# define cpybin(a, b) (void) ((a) = (b))
 
 #endif	/* NO_STRUCT_ASSIGNMENT */
 
@@ -730,19 +749,23 @@ EXTERN Char   *lap;
  * as needed during the semantics/exeuction pass (sh.sem.c).
  */
 struct command {
-    short   t_dtyp;		/* Type of node 		 */
+    unsigned char   t_dtyp;	/* Type of node 		 */
 #define	NODE_COMMAND	1	/* t_dcom <t_dlef >t_drit	 */
 #define	NODE_PAREN	2	/* ( t_dspr ) <t_dlef >t_drit	 */
 #define	NODE_PIPE	3	/* t_dlef | t_drit		 */
 #define	NODE_LIST	4	/* t_dlef ; t_drit		 */
 #define	NODE_OR		5	/* t_dlef || t_drit		 */
 #define	NODE_AND	6	/* t_dlef && t_drit		 */
-    short   t_dflg;		/* Flags, e.g. F_AMPERSAND|... 	 */
+    unsigned char   t_nice;	/* Nice value			 */
+#ifdef apollo
+    unsigned char   t_systype;	/* System environment		 */
+#endif 
+    unsigned long   t_dflg;	/* Flags, e.g. F_AMPERSAND|... 	 */
 /* save these when re-doing 	 */
 #ifndef apollo
-#define	F_SAVE	(F_NICE|F_TIME|F_NOHUP)	
+#define	F_SAVE	(F_NICE|F_TIME|F_NOHUP|F_HUP)	
 #else
-#define	F_SAVE	(F_NICE|F_TIME|F_NOHUP|F_VER)
+#define	F_SAVE	(F_NICE|F_TIME|F_NOHUP||F_HUP|F_VER)
 #endif 
 #define	F_AMPERSAND	(1<<0)	/* executes in background	 */
 #define	F_APPEND	(1<<1)	/* output is redirected >>	 */
@@ -759,8 +782,9 @@ struct command {
 #define	F_NOHUP		(1<<12)	/* nohup this command 		 */
 #define	F_TIME		(1<<13)	/* time this command 		 */
 #define F_BACKQ		(1<<14)	/* command is in ``		 */
+#define F_HUP		(1<<15)	/* hup this command		 */
 #ifdef apollo
-#define F_VER		(1<<15)	/* execute command under SYSTYPE */
+#define F_VER		(1<<16)	/* execute command under SYSTYPE */
 #endif 
     union {
 	Char   *T_dlef;		/* Input redirect word 		 */
@@ -776,10 +800,6 @@ struct command {
 #define	t_dcdr	R.T_dcdr
     Char  **t_dcom;		/* Command/argument vector 	 */
     struct command *t_dspr;	/* Pointer to ()'d subtree 	 */
-    short   t_nice;
-#ifdef F_VER
-    short   t_systype;
-#endif 
 };
 
 
@@ -863,7 +883,7 @@ EXTERN struct varent {
 #define v_parent	v_link[2]
 
 #define adrof(v)	adrof1(v, &shvhed)
-#define value(v)	value1(v, &shvhed)
+#define varval(v)	value1(v, &shvhed)
 
 /*
  * The following are for interfacing redo substitution in
@@ -940,14 +960,6 @@ EXTERN int     lastev;		/* Last event reference (default) */
 
 EXTERN Char    HIST;		/* history invocation character */
 EXTERN Char    HISTSUB;		/* auto-substitute character */
-
-/*
- * To print system call errors...
- */
-#ifndef linux
-extern char *sys_errlist[];
-extern int errno, sys_nerr;
-#endif /* !linux */
 
 /*
  * For operating systems with single case filenames (OS/2)
@@ -1043,5 +1055,15 @@ extern Char    **INVPPTR;
 
 #include "tc.h"
 #include "sh.decls.h"
+
+/*
+ * To print system call errors...
+ */
+#ifndef linux
+#ifdef NEEDstrerror
+extern char *sys_errlist[];
+#endif
+extern int errno, sys_nerr;
+#endif /* !linux */
 
 #endif /* _h_sh */

@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/ed.h,v 1.1 1993/07/20 10:48:54 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/ed.h,v 1.1.1.2 1994/07/05 20:39:17 ache Exp $ */
 /*
  * ed.h: Editor declarations and globals
  */
@@ -95,6 +95,7 @@ extern KEYCMD NumFuns;		/* number of KEYCMDs in above table */
 #define CC_COMPLETE_ALL		18
 #define CC_COMPLETE_FWD		19
 #define CC_COMPLETE_BACK	20
+#define CC_NORMALIZE_COMMAND	21
 
 typedef union Xmapval {		/* value passed to the Xkey routines */
     KEYCMD cmd;
@@ -146,7 +147,6 @@ EXTERN Char CurrentHistLit;	/* Literal status of current show history line */
 /*
  * These are truly extern
  */
-extern Char PromptBuf[];
 extern int MacroLvl;
 
 EXTERN Char *KeyMacro[MAXMACROLEVELS];

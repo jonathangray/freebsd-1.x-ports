@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.os.c,v 1.1 1993/07/20 10:48:56 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.os.c,v 1.1.1.2 1994/07/05 20:39:37 ache Exp $ */
 /*
  * tc.os.c: OS Dependent builtin functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.os.c,v 1.1 1993/07/20 10:48:56 smace Exp $")
+RCSID("$Id: tc.os.c,v 1.1.1.2 1994/07/05 20:39:37 ache Exp $")
 
 #include "tw.h"
 #include "ed.h"
@@ -572,7 +572,7 @@ dowarp(v, c)
     if (*v == 0) {		/* display warp value */
 	if (warp < 0)
 	    stderror(ERR_NAME | ERR_STRING, "Getwarp failed");
-	we = getwarpbyvalue(warp);
+	we = getwarpbyvarval(warp);
 	if (we)
 	    printf("%s\n", we->w_name);
 	else
@@ -603,10 +603,10 @@ dowarp(v, c)
 #endif /* WARP */
 
 /***
- *** Masscomp
+ *** Masscomp or HCX
  ***/
 /* Added, DAS DEC-90. */
-#ifdef masscomp
+#if defined(masscomp) || defined(hcx)
 /*ARGSUSED*/
 void
 douniverse(v, c)
@@ -623,7 +623,7 @@ douniverse(v, c)
     else if (*cp == '\0' || setuniverse(short2str(cp)) != 0)
 	stderror(ERR_NAME | ERR_STRING, "Illegal universe");
 }
-#endif /* masscomp */
+#endif /* masscomp || hcx */
 
 
 #ifdef _SEQUENT_
@@ -669,19 +669,35 @@ pr_stat_sub(p2, p1, pr)
 #endif /* _SEQUENT_ */
 
 
+#ifdef NEEDmemset
+/* This is a replacement for a missing memset function */
+ptr_t xmemset(loc, value, len)
+    ptr_t loc;
+    int len;
+    size_t value;
+{
+    char *ptr = (char *) loc;
+  
+    while (len--)
+	*ptr++ = value;
+    return loc;
+}
+#endif /* NEEDmemset */
+
+
 #ifdef NEEDmemmove
 /* memmove():
  * 	This is the ANSI form of bcopy() with the arguments backwards...
  *	Unlike memcpy(), it handles overlaps between source and 
  *	destination memory
  */
-void*
+ptr_t
 xmemmove(vdst, vsrc, len)
     ptr_t vdst;
     const ptr_t vsrc;
     size_t len;
 {
-    const char *src = (char *) vsrc;
+    const char *src = (const char *) vsrc;
     char *dst = (char *) vdst;
 
     if (src == dst)
@@ -818,9 +834,9 @@ xstrerror(i)
 {
     static char errbuf[40]; /* 64 bit num */
 
-    if (i >= 0 && i < sys_nerr) 
+    if (i >= 0 && i < sys_nerr) {
 	return sys_errlist[i];
-    else {
+    } else {
 	(void) xsprintf(errbuf, "Unknown Error: %d", i);
 	return errbuf;
     }
@@ -1060,8 +1076,13 @@ xgetwd(pathname)
 	if (DEV_DEV_COMPARE(st_dotdot.st_dev, st_cur.st_dev)) {
 	    /* Parent has same device. No need to stat every member */
 	    for (d = readdir(dp); d != NULL; d = readdir(dp)) 
+#ifdef __clipper__
+		if (((unsigned long)d->d_fileno & 0xffff) == st_cur.st_ino)
+		    break;
+#else
 		if (d->d_fileno == st_cur.st_ino)
 		    break;
+#endif
 	}
 	else {
 	    /* 
@@ -1127,7 +1148,6 @@ strrcpy(ptr, str)
 /***
  *** Domain/OS
  ***/
-#undef value			/* XXX: Careful here */
 #include <apollo/base.h>
 #include <apollo/loader.h>
 #include <apollo/error.h>

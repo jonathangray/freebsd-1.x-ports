@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/snames.h,v 1.1 1993/07/20 10:48:48 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/snames.h,v 1.1.1.2 1994/07/05 20:38:01 ache Exp $ */
 /*
  * snames.h: Short names for old compilers
  */
@@ -33,6 +33,8 @@
 #define	e_expand_vars		eexpandvars
 #define	e_delnext		edelnxt
 #define	e_delnext_eof		edelnxteof
+#define e_delnext_list		edelnxtlst
+#define e_delnext_list_eof	edellsteof
 #define	e_delwordnext		edelwrdnext
 #define	e_delwordprev		edelwrdprev
 #define	e_expand		eexp

@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.dir.h,v 1.1 1993/07/20 10:48:51 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.dir.h,v 1.1.1.2 1994/07/05 20:38:56 ache Exp $ */
 /*
  * sh.dir.h: Directory data structures and globals
  */

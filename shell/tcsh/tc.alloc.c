@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.alloc.c,v 1.1 1993/07/20 10:48:55 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.alloc.c,v 1.1.1.2 1994/07/05 20:39:29 ache Exp $ */
 /*
  * tc.alloc.c (Caltech) 2/21/82
  * Chris Kingsley, kingsley@cit-20.
@@ -44,7 +44,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.alloc.c,v 1.1 1993/07/20 10:48:55 smace Exp $")
+RCSID("$Id: tc.alloc.c,v 1.1.1.2 1994/07/05 20:39:29 ache Exp $")
 
 static char   *memtop = NULL;		/* PWP: top of current memory */
 static char   *membot = NULL;		/* PWP: bottom of allocatable memory */
@@ -211,8 +211,7 @@ malloc(nbytes)
     /*
      * Record allocated size of block and bound space with magic numbers.
      */
-    if (nbytes <= 0x10000)
-	p->ov_size = nbytes - 1;
+    p->ov_size = (p->ov_index <= 13) ? nbytes - 1 : 0;
     p->ov_rmagic = RMAGIC;
     *((U_int *) (((caddr_t) p) + nbytes - RSLOP)) = RMAGIC;
 #endif
@@ -397,8 +396,16 @@ realloc(cp, nbytes)
 
     /* avoid the copy if same size block */
     if (was_alloced && (onb <= (U_int) (1 << (i + 3))) && 
-	(onb > (U_int) (1 << (i + 2))))
+	(onb > (U_int) (1 << (i + 2)))) {
+#ifdef RCHECK
+	/* JMR: formerly this wasn't updated ! */
+	nbytes = MEMALIGN(MEMALIGN(sizeof(union overhead))+nbytes+RSLOP);
+	*((U_int *) (((caddr_t) op) + nbytes - RSLOP)) = RMAGIC;
+	op->ov_rmagic = RMAGIC;
+	op->ov_size = (op->ov_index <= 13) ? nbytes - 1 : 0;
+#endif
 	return ((memalign_t) cp);
+    }
     if ((res = malloc(nbytes)) == NULL)
 	return ((memalign_t) NULL);
     if (cp != res) {		/* common optimization */

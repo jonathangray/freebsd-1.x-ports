@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.bind.c,v 1.1 1993/07/20 10:48:55 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.bind.c,v 1.1.1.2 1994/07/05 20:39:30 ache Exp $ */
 /*
  * tc.bind.c: Key binding functions
  */
@@ -36,25 +36,545 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.bind.c,v 1.1 1993/07/20 10:48:55 smace Exp $")
+RCSID("$Id: tc.bind.c,v 1.1.1.2 1994/07/05 20:39:30 ache Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"
 
+#ifdef OBSOLETE
 static	int    tocontrol	__P((int));
 static	char  *unparsekey	__P((int));
 static	KEYCMD getkeycmd	__P((Char **));
 static	int    parsekey		__P((Char **));
+static	void   pkeys		__P((int, int));
+#endif /* OBSOLETE */
+
 static	void   printkey		__P((KEYCMD *, Char *));
 static	KEYCMD parsecmd		__P((Char *));
 static	Char  *parsestring	__P((Char *, Char *));
+static	Char  *parsebind	__P((Char *, Char *));
 static	void   print_all_keys	__P((void));
 static	void   printkeys	__P((KEYCMD *, int, int));
 static	void   bindkey_usage	__P((void));
 static	void   list_functions	__P((void));
-static	void   pkeys		__P((int, int));
 
 extern int MapsAreInited;
+
+
+
+
+/*ARGSUSED*/
+void
+dobindkey(v, c)
+    Char  **v;
+    struct command *c;
+{
+    KEYCMD *map;
+    int     ntype, no, remove, key, bind;
+    Char   *par;
+    Char    p;
+    Char    inbuf[200];
+    Char    outbuf[200];
+    Char   *in;
+    Char   *out;
+    KEYCMD  cmd;
+
+    USE(c);
+    if (!MapsAreInited)
+	ed_InitMaps();
+
+    map = CcKeyMap;
+    ntype = XK_CMD;
+    key = remove = bind = 0;
+    for (no = 1, par = v[no]; 
+	 par != NULL && (*par++ & CHAR) == '-'; no++, par = v[no]) {
+	if ((p = (*par & CHAR)) == '-')
+	    break;
+	else 
+	    switch (p) {
+	    case 'b':
+		bind = 1;
+		break;
+	    case 'k':
+		key = 1;
+		break;
+	    case 'a':
+		map = CcAltMap;
+		break;
+	    case 's':
+		ntype = XK_STR;
+		break;
+	    case 'c':
+		ntype = XK_EXE;
+		break;
+	    case 'r':
+		remove = 1;
+		break;
+	    case 'v':
+		ed_InitVIMaps();
+		return;
+	    case 'e':
+		ed_InitEmacsMaps();
+		return;
+	    case 'd':
+#ifdef VIDEFAULT
+		ed_InitVIMaps();
+#else /* EMACSDEFAULT */
+		ed_InitEmacsMaps();
+#endif /* VIDEFAULT */
+		return;
+	    case 'l':
+		list_functions();
+		return;
+	    default:
+		bindkey_usage();
+		return;
+	    }
+    }
+
+    if (!v[no]) {
+	print_all_keys();
+	return;
+    }
+
+    if (key) {
+	if (!IsArrowKey(v[no]))
+	    xprintf("Invalid key name `%S'\n", v[no]);
+	in = v[no++];
+    }
+    else {
+	if (bind) {
+	    if ((in = parsebind(v[no++], inbuf)) == NULL)
+		return;
+	}
+	else {
+	    if ((in = parsestring(v[no++], inbuf)) == NULL)
+		return;
+	}
+    }
+
+    if (remove) {
+	if (key) {
+	    (void) ClearArrowKeys(in);
+	    return;
+	}
+	if (in[1]) {
+	    (void) DeleteXkey(in);
+	}
+	else if (map[(unsigned char) *in] == F_XKEY) {
+	    (void) DeleteXkey(in);
+	    map[(unsigned char) *in] = F_UNASSIGNED;
+	}
+	else {
+	    map[(unsigned char) *in] = F_UNASSIGNED;
+	}
+	return;
+    }
+    if (!v[no]) {
+	if (key)
+	    PrintArrowKeys(in);
+	else
+	    printkey(map, in);
+	return;
+    }
+    if (v[no + 1]) {
+	bindkey_usage();
+	return;
+    }
+    switch (ntype) {
+    case XK_STR:
+    case XK_EXE:
+	if ((out = parsestring(v[no], outbuf)) == NULL)
+	    return;
+	if (key) {
+	    if (SetArrowKeys(in, XmapStr(out), ntype) == -1)
+		xprintf("Bad key name: %S\n", in);
+	}
+	else
+	    AddXkey(in, XmapStr(out), ntype);
+	map[(unsigned char) *in] = F_XKEY;
+	break;
+    case XK_CMD:
+	if ((cmd = parsecmd(v[no])) == 0)
+	    return;
+	if (key)
+	    (void) SetArrowKeys(in, XmapCmd((int) cmd), ntype);
+	else {
+	    if (in[1]) {
+		AddXkey(in, XmapCmd((int) cmd), ntype);
+		map[(unsigned char) *in] = F_XKEY;
+	    }
+	    else {
+		ClearXkey(map, in);
+		map[(unsigned char) *in] = cmd;
+	    }
+	}
+	break;
+    default:
+	abort();
+	break;
+    }
+    if (key)
+	BindArrowKeys();
+}
+
+static void
+printkey(map, in)
+    KEYCMD *map;
+    Char   *in;
+{
+    unsigned char outbuf[100];
+    register struct KeyFuncs *fp;
+
+    if (in[0] == 0 || in[1] == 0) {
+	(void) unparsestring(in, outbuf, STRQQ);
+	for (fp = FuncNames; fp->name; fp++) {
+	    if (fp->func == map[(unsigned char) *in]) {
+		xprintf("%s\t->\t%s\n", outbuf, fp->name);
+	    }
+	}
+    }
+    else 
+	PrintXkey(in);
+}
+
+static  KEYCMD
+parsecmd(str)
+    Char   *str;
+{
+    register struct KeyFuncs *fp;
+
+    for (fp = FuncNames; fp->name; fp++) {
+	if (strcmp(short2str(str), fp->name) == 0) {
+	    return (KEYCMD) fp->func;
+	}
+    }
+    xprintf("Bad command name: %S\n", str);
+    return 0;
+}
+
+static Char *
+parsebind(s, b)
+    Char *s;
+    Char *b;
+{
+    static const char badspec[] = "Bad key spec %S\n";
+    Char *buf = b;
+    switch (*s) {
+    case '^':
+	s++;
+	*b++ = (*s == '?') ? '\177' : ((*s & CHAR) & 0237);
+	*b = '\0';
+	return buf;
+
+    case 'F':
+    case 'M':
+    case 'X':
+    case 'C':
+	if (s[1] != '-' || s[2] == '\0') {
+	    xprintf(badspec, s);
+	    return NULL;
+	}
+	s += 2;
+	switch (s[-2]) {
+	case 'F': case 'f':	/* Turn into ^[str */
+	    *b++ = '\033';
+	    Strcpy(b, s);
+	    return buf;
+
+	case 'C': case 'c':	/* Turn into ^c */
+	    *b++ = (*s == '?') ? '\177' : ((*s & CHAR) & 0237);
+	    *b = '\0';
+	    return buf;
+
+	case 'X' : case 'x':	/* Turn into ^Xc */
+	    *b++ = 'X' & 0237;
+	    *b++ = *s;
+	    *b = '\0';
+	    return buf;
+
+	case 'M' : case 'm':	/* Turn into 0x80|c */
+	    *b++ = *s | 0x80;
+	    *b = '\0';
+	    return buf;
+
+	default:
+	    abort();
+	    /*NOTREACHED*/
+	    return NULL;
+	}
+
+    default:
+	xprintf(badspec, s);
+	return NULL;
+    }
+}
+
+
+int
+parseescape(ptr)
+    Char  **ptr;
+{
+    Char   *p, c;
+
+    p = *ptr;
+
+    if ((p[1] & CHAR) == 0) {
+	xprintf("Something must follow: %c\n", *p);
+	return -1;
+    }
+    if ((*p & CHAR) == '\\') {
+	p++;
+	switch (*p & CHAR) {
+	case 'a':
+	    c = '\007';		/* Bell */
+	    break;
+	case 'b':
+	    c = '\010';		/* Backspace */
+	    break;
+	case 't':
+	    c = '\011';		/* Horizontal Tab */
+	    break;
+	case 'n':
+	    c = '\012';		/* New Line */
+	    break;
+	case 'v':
+	    c = '\013';		/* Vertical Tab */
+	    break;
+	case 'f':
+	    c = '\014';		/* Form Feed */
+	    break;
+	case 'r':
+	    c = '\015';		/* Carriage Return */
+	    break;
+	case 'e':
+	    c = '\033';		/* Escape */
+	    break;
+	case '0':
+	case '1':
+	case '2':
+	case '3':
+	case '4':
+	case '5':
+	case '6':
+	case '7':
+	    {
+		register int cnt, val, ch;
+
+		for (cnt = 0, val = 0; cnt < 3; cnt++) {
+		    ch = *p++ & CHAR;
+		    if (ch < '0' || ch > '7') {
+			p--;
+			break;
+		    }
+		    val = (val << 3) | (ch - '0');
+		}
+		if ((val & 0xffffff00) != 0) {
+		    xprintf("Octal constant does not fit in a char.\n");
+		    return 0;
+		}
+		c = (Char) val;
+		--p;
+	    }
+	    break;
+	default:
+	    c = *p;
+	    break;
+	}
+    }
+    else if ((*p & CHAR) == '^' && (Isalpha(p[1] & CHAR) || 
+				    strchr("@^_?\\|[{]}", p[1] & CHAR))) {
+	p++;
+	c = (*p == '?') ? '\177' : ((*p & CHAR) & 0237);
+    }
+    else
+	c = *p;
+    *ptr = p;
+    return (c);
+}
+
+static Char *
+parsestring(str, buf)
+    Char   *str;
+    Char   *buf;
+{
+    Char   *b;
+    Char   *p;
+    int    es;
+
+    b = buf;
+    if (*str == 0) {
+	xprintf("Null string specification\n");
+	return 0;
+    }
+
+    for (p = str; *p != 0; p++) {
+	if ((*p & CHAR) == '\\' || (*p & CHAR) == '^') {
+	    if ((es = parseescape(&p)) == -1)
+		return 0;
+	    else
+		*b++ = (Char) es;
+	}
+	else
+	    *b++ = *p & CHAR;
+    }
+    *b = 0;
+    return buf;
+}
+
+unsigned char *
+unparsestring(str, buf, sep)
+    Char   *str;
+    unsigned char *buf;
+    Char   *sep;
+{
+    unsigned char *b;
+    Char   *p;
+
+    b = buf;
+    *b++ = sep[0];
+    if (*str == 0) {
+	*b++ = '^';
+	*b++ = '@';
+	*b++ = sep[1];
+	*b++ = 0;
+	return buf;
+    }
+
+    for (p = str; *p != 0; p++) {
+	if (Iscntrl(*p)) {
+	    *b++ = '^';
+	    if (*p == '\177')
+		*b++ = '?';
+	    else
+		*b++ = *p | 0100;
+	}
+	else if (*p == '^' || *p == '\\') {
+	    *b++ = '\\';
+	    *b++ = *p;
+	}
+	else if (*p == ' ' || (Isprint(*p) && !Isspace(*p))) {
+	    *b++ = *p;
+	}
+	else {
+	    *b++ = '\\';
+	    *b++ = ((*p >> 6) & 7) + '0';
+	    *b++ = ((*p >> 3) & 7) + '0';
+	    *b++ = (*p & 7) + '0';
+	}
+    }
+    *b++ = sep[1];
+    *b++ = 0;
+    return buf;			/* should check for overflow */
+}
+
+static void
+print_all_keys()
+{
+    int     prev, i;
+
+    xprintf("Standard key bindings\n");
+    prev = 0;
+    for (i = 0; i < 256; i++) {
+	if (CcKeyMap[prev] == CcKeyMap[i])
+	    continue;
+	printkeys(CcKeyMap, prev, i - 1);
+	prev = i;
+    }
+    printkeys(CcKeyMap, prev, i - 1);
+
+    xprintf("Alternative key bindings\n");
+    prev = 0;
+    for (i = 0; i < 256; i++) {
+	if (CcAltMap[prev] == CcAltMap[i])
+	    continue;
+	printkeys(CcAltMap, prev, i - 1);
+	prev = i;
+    }
+    printkeys(CcAltMap, prev, i - 1);
+    xprintf("Multi-character bindings\n");
+    PrintXkey(STRNULL);	/* print all Xkey bindings */
+    xprintf("Arrow key bindings\n");
+    PrintArrowKeys(STRNULL);
+}
+
+static void
+printkeys(map, first, last)
+    KEYCMD *map;
+    int     first, last;
+{
+    register struct KeyFuncs *fp;
+    Char    firstbuf[2], lastbuf[2];
+    unsigned char unparsbuf[10], extrabuf[10];
+
+    firstbuf[0] = (Char) first;
+    firstbuf[1] = 0;
+    lastbuf[0] = (Char) last;
+    lastbuf[1] = 0;
+    if (map[first] == F_UNASSIGNED) {
+	if (first == last)
+	    xprintf("%-15s->  is undefined\n",
+		    unparsestring(firstbuf, unparsbuf, STRQQ));
+	return;
+    }
+
+    for (fp = FuncNames; fp->name; fp++) {
+	if (fp->func == map[first]) {
+	    if (first == last) {
+		xprintf("%-15s->  %s\n",
+			unparsestring(firstbuf, unparsbuf, STRQQ), fp->name);
+	    }
+	    else {
+		xprintf("%-4s to %-7s->  %s\n",
+			unparsestring(firstbuf, unparsbuf, STRQQ),
+			unparsestring(lastbuf, extrabuf, STRQQ), fp->name);
+	    }
+	    return;
+	}
+    }
+    if (map == CcKeyMap) {
+	xprintf("BUG!!! %s isn't bound to anything.\n",
+		unparsestring(firstbuf, unparsbuf, STRQQ));
+	xprintf("CcKeyMap[%d] == %d\n", first, CcKeyMap[first]);
+    }
+    else {
+	xprintf("BUG!!! %s isn't bound to anything.\n",
+		unparsestring(firstbuf, unparsbuf, STRQQ));
+	xprintf("CcAltMap[%d] == %d\n", first, CcAltMap[first]);
+    }
+}
+
+static void
+bindkey_usage()
+{
+    xprintf(
+	"Usage: bindkey [options] [--] [in-string [out-string | command]]\n");
+    xprintf("    -a   bind key in alternative key binding\n");
+    xprintf("    -b   accept symbolic key definitions\n");
+    xprintf("    -s   bind an out-string instead of a command\n");
+    xprintf("    -c   bind a unix-command instead of a command\n");
+    xprintf("    -v   initialized maps to default vi bindings\n");
+    xprintf("    -e   initialized maps to default emacs bindings\n");
+    xprintf("    -d   initialized maps to default bindings\n");
+    xprintf("    -l   list available functions with descriptions\n");
+    xprintf("    -r   remove the binding of in-string\n");
+    xprintf("    -k   bind arrow key with name in in-string\n");
+    xprintf(
+       "\nIn no out-string or command is given, the binding for in-string\n");
+    xprintf("is printed or all bindings if in-strings is not given.\n");
+}
+
+static void
+list_functions()
+{
+    register struct KeyFuncs *fp;
+
+    for (fp = FuncNames; fp->name; fp++) {
+	xprintf("%s\n          %s\n", fp->name, fp->description);
+    }
+}
+
+#ifdef OBSOLETE
 
 /*
  * Unfortunately the apollo optimizer does not like & operations
@@ -68,7 +588,6 @@ static unsigned char APOLLO_0377 = 0377;
 #else /* sane */
 # define APOLLO_0377    0377
 #endif /* apollo */
-
 
 static int
 tocontrol(c)
@@ -335,443 +854,6 @@ parsekey(sp)
 
 /*ARGSUSED*/
 void
-dobindkey(v, c)
-    Char  **v;
-    struct command *c;
-{
-    KEYCMD *map;
-    int     ntype, no, remove, key;
-    Char   *par;
-    Char    p;
-    Char    inbuf[200];
-    Char    outbuf[200];
-    Char   *in;
-    Char   *out;
-    KEYCMD  cmd;
-
-    USE(c);
-    if (!MapsAreInited)
-	ed_InitMaps();
-
-    map = CcKeyMap;
-    ntype = XK_CMD;
-    key = remove = 0;
-    for (no = 1, par = v[no]; 
-	 par != NULL && (*par++ & CHAR) == '-'; no++, par = v[no]) {
-	if ((p = (*par & CHAR)) == '-')
-	    break;
-	else 
-	    switch (p) {
-	    case 'k':
-		key = 1;
-		break;
-	    case 'a':
-		map = CcAltMap;
-		break;
-	    case 's':
-		ntype = XK_STR;
-		break;
-	    case 'c':
-		ntype = XK_EXE;
-		break;
-	    case 'r':
-		remove = 1;
-		break;
-	    case 'v':
-		ed_InitVIMaps();
-		return;
-	    case 'e':
-		ed_InitEmacsMaps();
-		return;
-	    case 'd':
-#ifdef VIDEFAULT
-		ed_InitVIMaps();
-#else /* EMACSDEFAULT */
-		ed_InitEmacsMaps();
-#endif /* VIDEFAULT */
-		return;
-	    case 'l':
-		list_functions();
-		return;
-	    default:
-		bindkey_usage();
-		return;
-	    }
-    }
-
-    if (!v[no]) {
-	print_all_keys();
-	return;
-    }
-
-    if (key) 
-	in = v[no++];
-    else
-	if ((in = parsestring(v[no++], inbuf)) == NULL)
-	    return;
-
-    if (remove) {
-	if (key) {
-	    (void) ClearArrowKeys(in);
-	    return;
-	}
-	if (in[1]) {
-	    (void) DeleteXkey(in);
-	}
-	else if (map[(unsigned char) *in] == F_XKEY) {
-	    (void) DeleteXkey(in);
-	    map[(unsigned char) *in] = F_UNASSIGNED;
-	}
-	else {
-	    map[(unsigned char) *in] = F_UNASSIGNED;
-	}
-	return;
-    }
-    if (!v[no]) {
-	if (key)
-	    PrintArrowKeys(in);
-	else
-	    printkey(map, in);
-	return;
-    }
-    if (v[no + 1]) {
-	bindkey_usage();
-	return;
-    }
-    switch (ntype) {
-    case XK_STR:
-    case XK_EXE:
-	if ((out = parsestring(v[no], outbuf)) == NULL)
-	    return;
-	if (key)
-	    (void) SetArrowKeys(in, XmapStr(out), ntype);
-	else
-	    AddXkey(in, XmapStr(out), ntype);
-	map[(unsigned char) *in] = F_XKEY;
-	break;
-    case XK_CMD:
-	if ((cmd = parsecmd(v[no])) == 0)
-	    return;
-	if (key)
-	    (void) SetArrowKeys(in, XmapCmd((int) cmd), ntype);
-	else {
-	    if (in[1]) {
-		AddXkey(in, XmapCmd((int) cmd), ntype);
-		map[(unsigned char) *in] = F_XKEY;
-	    }
-	    else {
-		ClearXkey(map, in);
-		map[(unsigned char) *in] = cmd;
-	    }
-	}
-	break;
-    default:
-	abort();
-	break;
-    }
-    if (key)
-	BindArrowKeys();
-}
-
-static void
-printkey(map, in)
-    KEYCMD *map;
-    Char   *in;
-{
-    unsigned char outbuf[100];
-    register struct KeyFuncs *fp;
-
-    if (in[0] == 0 || in[1] == 0) {
-	(void) unparsestring(in, outbuf, STRQQ);
-	for (fp = FuncNames; fp->name; fp++) {
-	    if (fp->func == map[(unsigned char) *in]) {
-		xprintf("%s\t->\t%s\n", outbuf, fp->name);
-	    }
-	}
-    }
-    else 
-	PrintXkey(in);
-}
-
-static  KEYCMD
-parsecmd(str)
-    Char   *str;
-{
-    register struct KeyFuncs *fp;
-
-    for (fp = FuncNames; fp->name; fp++) {
-	if (strcmp(short2str(str), fp->name) == 0) {
-	    return (KEYCMD) fp->func;
-	}
-    }
-    xprintf("Bad command name: %S\n", str);
-    return 0;
-}
-
-int
-parseescape(ptr)
-    Char  **ptr;
-{
-    Char   *p, c;
-
-    p = *ptr;
-
-    if ((p[1] & CHAR) == 0) {
-	xprintf("Something must follow: %c\n", *p);
-	return -1;
-    }
-    if ((*p & CHAR) == '\\') {
-	p++;
-	switch (*p & CHAR) {
-	case 'a':
-	    c = '\007';		/* Bell */
-	    break;
-	case 'b':
-	    c = '\010';		/* Backspace */
-	    break;
-	case 't':
-	    c = '\011';		/* Horizontal Tab */
-	    break;
-	case 'n':
-	    c = '\012';		/* New Line */
-	    break;
-	case 'v':
-	    c = '\013';		/* Vertical Tab */
-	    break;
-	case 'f':
-	    c = '\014';		/* Form Feed */
-	    break;
-	case 'r':
-	    c = '\015';		/* Carriage Return */
-	    break;
-	case 'e':
-	    c = '\033';		/* Escape */
-	    break;
-	case '0':
-	case '1':
-	case '2':
-	case '3':
-	case '4':
-	case '5':
-	case '6':
-	case '7':
-	    {
-		register int cnt, val, ch;
-
-		for (cnt = 0, val = 0; cnt < 3; cnt++) {
-		    ch = *p++ & CHAR;
-		    if (ch < '0' || ch > '7') {
-			p--;
-			break;
-		    }
-		    val = (val << 3) | (ch - '0');
-		}
-		if ((val & 0xffffff00) != 0) {
-		    xprintf("Octal constant does not fit in a char.\n");
-		    return 0;
-		}
-		c = (Char) val;
-		--p;
-	    }
-	    break;
-	default:
-	    c = *p;
-	    break;
-	}
-    }
-    else if ((*p & CHAR) == '^' && (Isalpha(p[1] & CHAR) || 
-				    strchr("@^_?\\|[{]}", p[1] & CHAR))) {
-	p++;
-	c = (*p == '?') ? '\177' : ((*p & CHAR) & 0237);
-    }
-    else
-	c = *p;
-    *ptr = p;
-    return (c);
-}
-
-static Char *
-parsestring(str, buf)
-    Char   *str;
-    Char   *buf;
-{
-    Char   *b;
-    Char   *p;
-    int    es;
-
-    b = buf;
-    if (*str == 0) {
-	xprintf("Null string specification\n");
-	return 0;
-    }
-
-    for (p = str; *p != 0; p++) {
-	if ((*p & CHAR) == '\\' || (*p & CHAR) == '^') {
-	    if ((es = parseescape(&p)) == -1)
-		return 0;
-	    else
-		*b++ = (Char) es;
-	}
-	else
-	    *b++ = *p & CHAR;
-    }
-    *b = 0;
-    return buf;
-}
-
-unsigned char *
-unparsestring(str, buf, sep)
-    Char   *str;
-    unsigned char *buf;
-    Char   *sep;
-{
-    unsigned char *b;
-    Char   *p;
-
-    b = buf;
-    *b++ = sep[0];
-    if (*str == 0) {
-	*b++ = '^';
-	*b++ = '@';
-	*b++ = sep[1];
-	*b++ = 0;
-	return buf;
-    }
-
-    for (p = str; *p != 0; p++) {
-	if (Iscntrl(*p)) {
-	    *b++ = '^';
-	    if (*p == '\177')
-		*b++ = '?';
-	    else
-		*b++ = *p | 0100;
-	}
-	else if (*p == '^' || *p == '\\') {
-	    *b++ = '\\';
-	    *b++ = *p;
-	}
-	else if (*p == ' ' || (Isprint(*p) && !Isspace(*p))) {
-	    *b++ = *p;
-	}
-	else {
-	    *b++ = '\\';
-	    *b++ = ((*p >> 6) & 7) + '0';
-	    *b++ = ((*p >> 3) & 7) + '0';
-	    *b++ = (*p & 7) + '0';
-	}
-    }
-    *b++ = sep[1];
-    *b++ = 0;
-    return buf;			/* should check for overflow */
-}
-
-static void
-print_all_keys()
-{
-    int     prev, i;
-
-    xprintf("Standard key bindings\n");
-    prev = 0;
-    for (i = 0; i < 256; i++) {
-	if (CcKeyMap[prev] == CcKeyMap[i])
-	    continue;
-	printkeys(CcKeyMap, prev, i - 1);
-	prev = i;
-    }
-    printkeys(CcKeyMap, prev, i - 1);
-
-    xprintf("Alternative key bindings\n");
-    prev = 0;
-    for (i = 0; i < 256; i++) {
-	if (CcAltMap[prev] == CcAltMap[i])
-	    continue;
-	printkeys(CcAltMap, prev, i - 1);
-	prev = i;
-    }
-    printkeys(CcAltMap, prev, i - 1);
-    xprintf("Multi-character bindings\n");
-    PrintXkey(STRNULL);	/* print all Xkey bindings */
-    xprintf("Arrow key bindings\n");
-    PrintArrowKeys(STRNULL);
-}
-
-static void
-printkeys(map, first, last)
-    KEYCMD *map;
-    int     first, last;
-{
-    register struct KeyFuncs *fp;
-    Char    firstbuf[2], lastbuf[2];
-    unsigned char unparsbuf[10], extrabuf[10];
-
-    firstbuf[0] = (Char) first;
-    firstbuf[1] = 0;
-    lastbuf[0] = (Char) last;
-    lastbuf[1] = 0;
-    if (map[first] == F_UNASSIGNED) {
-	if (first == last)
-	    xprintf("%-15s->  is undefined\n",
-		    unparsestring(firstbuf, unparsbuf, STRQQ));
-	return;
-    }
-
-    for (fp = FuncNames; fp->name; fp++) {
-	if (fp->func == map[first]) {
-	    if (first == last) {
-		xprintf("%-15s->  %s\n",
-			unparsestring(firstbuf, unparsbuf, STRQQ), fp->name);
-	    }
-	    else {
-		xprintf("%-4s to %-7s->  %s\n",
-			unparsestring(firstbuf, unparsbuf, STRQQ),
-			unparsestring(lastbuf, extrabuf, STRQQ), fp->name);
-	    }
-	    return;
-	}
-    }
-    if (map == CcKeyMap) {
-	xprintf("BUG!!! %s isn't bound to anything.\n",
-		unparsestring(firstbuf, unparsbuf, STRQQ));
-	xprintf("CcKeyMap[%d] == %d\n", first, CcKeyMap[first]);
-    }
-    else {
-	xprintf("BUG!!! %s isn't bound to anything.\n",
-		unparsestring(firstbuf, unparsbuf, STRQQ));
-	xprintf("CcAltMap[%d] == %d\n", first, CcAltMap[first]);
-    }
-}
-
-static void
-bindkey_usage()
-{
-    xprintf(
-	"Usage: bindkey [options] [--] [in-string [out-string | command]]\n");
-    xprintf("    -a   bind key in alternative key binding\n");
-    xprintf("    -s   bind an out-string instead of a command\n");
-    xprintf("    -c   bind a unix-command instead of a command\n");
-    xprintf("    -v   initialized maps to default vi bindings\n");
-    xprintf("    -e   initialized maps to default emacs bindings\n");
-    xprintf("    -d   initialized maps to default bindings\n");
-    xprintf("    -l   list available functions with descriptions\n");
-    xprintf("    -r   remove the binding of in-string\n");
-    xprintf("    -k   bind arrow key with name in in-string\n");
-    xprintf(
-       "\nIn no out-string or command is given, the binding for in-string\n");
-    xprintf("is printed or all bindings if in-strings is not given.\n");
-}
-
-static void
-list_functions()
-{
-    register struct KeyFuncs *fp;
-
-    for (fp = FuncNames; fp->name; fp++) {
-	xprintf("%s\n          %s\n", fp->name, fp->description);
-    }
-}
-
-/*ARGSUSED*/
-void
 dobind(v, dummy)
     register Char **v;
     struct command *dummy;
@@ -969,3 +1051,4 @@ pkeys(first, last)
 	xprintf("CcAltMap[%d] == %d\n", first, CcAltMap[first]);
     }
 }
+#endif /* OBSOLETE */

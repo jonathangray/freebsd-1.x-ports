@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tw.comp.c,v 1.1 1993/07/20 10:48:53 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tw.comp.c,v 1.1.1.2 1994/07/05 20:39:11 ache Exp $ */
 /*
  * tw.comp.c: File completion builtin
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tw.comp.c,v 1.1 1993/07/20 10:48:53 smace Exp $")
+RCSID("$Id: tw.comp.c,v 1.1.1.2 1994/07/05 20:39:11 ache Exp $")
 
 #include "tw.h"
 #include "ed.h"
@@ -284,7 +284,7 @@ tw_result(act, pat)
 	xfree((ptr_t) res), res = NULL;
 
     switch (act[0] & ~QUOTE) {
-    case 'C':
+    case 'X':
 	looking = TW_COMPLETION;
 	break;
     case 'S':
@@ -299,14 +299,29 @@ tw_result(act, pat)
     case 'c':
 	looking = TW_COMMAND;
 	break;
+    case 'C':
+	looking = TW_PATH | TW_COMMAND;
+	break;
     case 'd':
 	looking = TW_DIRECTORY;
+	break;
+    case 'D':
+	looking = TW_PATH | TW_DIRECTORY;
 	break;
     case 'e':
 	looking = TW_ENVVAR;
 	break;
     case 'f':
 	looking = TW_FILE;
+	break;
+#ifdef COMPAT
+    case 'p':
+#endif /* COMPAT */
+    case 'F':
+	looking = TW_PATH | TW_FILE;
+	break;
+    case 'g':
+	looking = TW_GRPNAME;
 	break;
     case 'j':
 	looking = TW_JOB;
@@ -317,14 +332,14 @@ tw_result(act, pat)
     case 'n':
 	looking = TW_NONE;
 	break;
-    case 'p':
-	looking = TW_PATHNAME;
-	break;
     case 's':
 	looking = TW_SHELLVAR;
 	break;
     case 't':
 	looking = TW_TEXT;
+	break;
+    case 'T':
+	looking = TW_PATH | TW_TEXT;
 	break;
     case 'v':
 	looking = TW_VARIABLE;

@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.sched.c,v 1.1 1993/07/20 10:48:56 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.sched.c,v 1.1.1.2 1994/07/05 20:39:43 ache Exp $ */
 /*
  * tc.sched.c: Scheduled command execution
  *
@@ -38,7 +38,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.sched.c,v 1.1 1993/07/20 10:48:56 smace Exp $")
+RCSID("$Id: tc.sched.c,v 1.1.1.2 1994/07/05 20:39:43 ache Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -73,7 +73,6 @@ dosched(v, c)
     Char   *cp;
     bool    relative;		/* time specified as +hh:mm */
     struct tm *ltp;
-    char   *timeline;
 
     USE(c);
 /* This is a major kludge because of a gcc linker  */
@@ -87,13 +86,17 @@ dosched(v, c)
     v++;
     cp = *v++;
     if (cp == NULL) {
+	Char   *fmt;
+	if ((fmt = varval(STRsched)) == STRNULL)
+	    fmt = str2short("%h\t%T\t%R\n");
 	/* print list of scheduled events */
 	for (count = 1, tp = sched_ptr; tp; count++, tp = tp->t_next) {
-	    timeline = (char *) ctime(&tp->t_when);
-	    timeline[16] = '\0';
-	    xprintf("%6d\t%s\t", count, timeline);
-	    blkpr(tp->t_lex);
-	    xputchar('\n');
+	    Char buf[BUFSIZE], sbuf[BUFSIZE], *cp;
+	    blkexpand(tp->t_lex, buf);
+	    tprintf(FMT_SCHED, sbuf, fmt, sizeof(sbuf), 
+		    short2str(buf), tp->t_when, (ptr_t) &count);
+	    for (cp = sbuf; *cp;)
+		xputchar(*cp++);
 	}
 	return;
     }

@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.h,v 1.1 1993/07/20 10:48:57 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.h,v 1.1.1.2 1994/07/05 20:39:53 ache Exp $ */
 /*
  * tc.h: Tcsh includes
  */
@@ -48,5 +48,6 @@
 #define FMT_PROMPT	0
 #define FMT_WHO		1
 #define FMT_HISTORY	2
+#define FMT_SCHED	3
 
 #endif /* _h_tc */

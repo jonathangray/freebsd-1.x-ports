@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/ed.screen.c,v 1.1 1993/07/20 10:48:54 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/ed.screen.c,v 1.1.1.2 1994/07/05 20:39:23 ache Exp $ */
 /*
  * ed.screen.c: Editor/termcap-curses interface
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.screen.c,v 1.1 1993/07/20 10:48:54 smace Exp $")
+RCSID("$Id: ed.screen.c,v 1.1.1.2 1994/07/05 20:39:23 ache Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -755,6 +755,16 @@ SetArrowKeys(name, fun, type)
     return -1;
 }
 
+int
+IsArrowKey(name)
+    Char *name;
+{
+    int i;
+    for (i = 0; i < 4; i++)
+	if (Strcmp(name, arrow[i].name) == 0)
+	    return 1;
+    return 0;
+}
 
 int
 ClearArrowKeys(name)
@@ -1281,7 +1291,7 @@ GetTermCaps()
 	ptr = "dumb";
 #endif /* apollo */
 
-    if (!ptr || !ptr[0] || !strcmp(ptr, "wm"))
+    if (!ptr || !ptr[0] || !strcmp(ptr, "wm") || !strcmp(ptr,"dmx"))
 	ptr = "dumb";
 
     setzero(bp, TC_BUFSIZE);

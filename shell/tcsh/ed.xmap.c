@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/ed.xmap.c,v 1.1 1993/07/20 10:48:54 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/ed.xmap.c,v 1.1.1.2 1994/07/05 20:39:25 ache Exp $ */
 /*
  * ed.xmap.c: This module contains the procedures for maintaining
  *	      the extended-key map.
@@ -92,7 +92,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.xmap.c,v 1.1 1993/07/20 10:48:54 smace Exp $")
+RCSID("$Id: ed.xmap.c,v 1.1.1.2 1994/07/05 20:39:25 ache Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"

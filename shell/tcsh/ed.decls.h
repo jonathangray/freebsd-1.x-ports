@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/ed.decls.h,v 1.1 1993/07/20 10:48:53 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/ed.decls.h,v 1.1.1.2 1994/07/05 20:39:13 ache Exp $ */
 /*
  * ed.decls.h: Editor external definitions
  */
@@ -92,6 +92,7 @@ extern	void	TellTC			__P((char *));
 extern	void	SetTC			__P((char *, char *));
 extern	void	EchoTC			__P((Char **));
 extern	int 	SetArrowKeys		__P((Char *, XmapVal *, int));
+extern	int 	IsArrowKey		__P((Char *));
 extern	void	ResetArrowKeys		__P((void));
 extern	void	DefaultArrowKeys	__P((void));
 extern	int 	ClearArrowKeys		__P((Char *));
@@ -124,7 +125,8 @@ extern	CCRETVAL	e_delprev		__P((int));
 extern	CCRETVAL	e_delnext		__P((int));
 /* added by mtk@ari.ncl.omron.co.jp (920818) */
 extern	CCRETVAL	e_delnext_eof		__P((int));	
-extern	CCRETVAL	e_list_delnext		__P((int));	/* for ^D */
+extern	CCRETVAL	e_delnext_list		__P((int));
+extern	CCRETVAL	e_delnext_list_eof	__P((int));	/* for ^D */
 extern	CCRETVAL	e_toend			__P((int));
 extern	CCRETVAL	e_tobeg			__P((int));
 extern	CCRETVAL	e_charback		__P((int));
@@ -223,6 +225,7 @@ extern	CCRETVAL	v_rchar_back		__P((int));
 extern  CCRETVAL        v_charto_fwd		__P((int));
 extern  CCRETVAL        v_charto_back		__P((int));
 extern  CCRETVAL        e_normalize_path	__P((int));
+extern  CCRETVAL        e_normalize_command	__P((int));
 extern  CCRETVAL        e_stuff_char		__P((int));
 extern  CCRETVAL        e_list_all		__P((int));
 extern  CCRETVAL        e_complete_all		__P((int));

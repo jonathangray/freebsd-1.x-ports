@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.decls.h,v 1.1 1993/07/20 10:48:52 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.decls.h,v 1.1.1.2 1994/07/05 20:39:01 ache Exp $ */
 /*
  * sh.decls.h	 External declarations from sh*.c
  */
@@ -71,7 +71,7 @@ extern	void		  dopopd	__P((Char **, struct command *));
 extern	void		  dfree		__P((struct directory *));
 extern	void		  dsetstack	__P((void));
 extern	int		  getstakd	__P((Char *, int));
-extern	void		  recdirs	__P((Char *));
+extern	void		  recdirs	__P((Char *, int));
 extern	void		  loaddirs	__P((Char *));
 
 /*
@@ -94,18 +94,17 @@ extern	void		  doexec	__P((struct command *));
 extern	void		  dohash	__P((Char **, struct command *));
 extern	void		  dounhash	__P((Char **, struct command *));
 extern	void		  execash	__P((Char **, struct command *));
-#ifdef VFORK
 extern	void		  hashstat	__P((Char **, struct command *));
-#endif
 extern	void		  xechoit	__P((Char **));
 extern	int		  executable	__P((Char *, Char *, bool));
-extern	void		  tellmewhat	__P((struct wordent *));
+extern	int		  tellmewhat	__P((struct wordent *, Char *));
 extern	void		  dowhere	__P((Char **, struct command *));
 extern	int		  find_cmd	__P((Char *, int));
 
 /*
  * sh.exp.c
  */
+extern  Char     *filetest       __P((Char *, Char ***, bool));
 extern	int	 	  expr		__P((Char ***));
 extern	int		  exp0		__P((Char ***, bool));
 
@@ -140,9 +139,11 @@ extern	void		  dologout	__P((Char **, struct command *));
 extern	void		  donewgrp	__P((Char **, struct command *));
 #endif
 extern	void		  donohup	__P((Char **, struct command *));
+extern	void		  dohup		__P((Char **, struct command *));
 extern	void		  doonintr	__P((Char **, struct command *));
 extern	void		  doprintenv	__P((Char **, struct command *));
 extern	void		  dorepeat	__P((Char **, struct command *));
+extern	void		  dofiletest	__P((Char **, struct command *));
 extern	void		  dosetenv	__P((Char **, struct command *));
 extern	void		  dosuspend	__P((Char **, struct command *));
 extern	void		  doswbrk	__P((Char **, struct command *));
@@ -187,7 +188,7 @@ extern	void	 	  dohist	__P((Char **, struct command *));
 extern  struct Hist 	 *enthist	__P((int, struct wordent *, bool, bool));
 extern	void	 	  savehist	__P((struct wordent *, bool));
 extern	void		  fmthist	__P((int, ptr_t, char *));
-extern	void		  rechist	__P((Char *));
+extern	void		  rechist	__P((Char *, int));
 extern	void		  loadhist	__P((Char *, bool));
 
 
@@ -217,6 +218,7 @@ extern	Char		**blkcpy	__P((Char **, Char **));
 extern	void		  blkfree	__P((Char **));
 extern	int		  blklen	__P((Char **));
 extern	void		  blkpr		__P((Char **));
+extern	void		  blkexpand	__P((Char **, Char *));
 extern	Char		**blkspl	__P((Char **, Char **));
 extern	void		  closem	__P((void));
 #ifndef CLOSE_ON_EXEC

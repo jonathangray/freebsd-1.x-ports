@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tw.decls.h,v 1.1 1993/07/20 10:48:52 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tw.decls.h,v 1.1.1.2 1994/07/05 20:39:05 ache Exp $ */
 /*
  * tw.decls.h: Tenex external declarations
  */
@@ -73,6 +73,7 @@ extern	 void		  tw_bind_start		__P((DIR *, Char *));
 extern	 void		  tw_limit_start	__P((DIR *, Char *));
 extern	 void		  tw_sig_start		__P((DIR *, Char *));
 extern	 void		  tw_job_start		__P((DIR *, Char *));
+extern	 void		  tw_grpname_start	__P((DIR *, Char *));
 extern	 Char		 *tw_cmd_next		__P((Char *, int *));
 extern	 Char		 *tw_logname_next	__P((Char *, int *));
 extern	 Char		 *tw_shvar_next		__P((Char *, int *));
@@ -84,9 +85,11 @@ extern	 Char		 *tw_bind_next		__P((Char *, int *));
 extern	 Char		 *tw_limit_next		__P((Char *, int *));
 extern	 Char		 *tw_sig_next		__P((Char *, int *));
 extern	 Char		 *tw_job_next		__P((Char *, int *));
+extern	 Char		 *tw_grpname_next	__P((Char *, int *));
 extern	 void		  tw_dir_end		__P((void));
 extern	 void		  tw_cmd_free		__P((void));
 extern	 void		  tw_logname_end	__P((void));
+extern	 void		  tw_grpname_end	__P((void));
 extern	 Char		 *tw_item_add		__P((int));
 extern	 Char	        **tw_item_get		__P((void));
 extern	 void		  tw_item_free		__P((void));

@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/ed.defns.c,v 1.1 1993/07/20 10:48:53 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/ed.defns.c,v 1.1.1.2 1994/07/05 20:39:15 ache Exp $ */
 /*
  * ed.defns.c: Editor function definitions and initialization
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.defns.c,v 1.1 1993/07/20 10:48:53 smace Exp $")
+RCSID("$Id: ed.defns.c,v 1.1.1.2 1994/07/05 20:39:15 ache Exp $")
 
 #include "ed.h"
 
@@ -133,8 +133,8 @@ PFCmd   CcFuncTbl[] = {		/* table of available commands */
 #define		F_EXCHANGE_MARK	43
     e_last_item,
 #define		F_LAST_ITEM	44
-    e_list_delnext,
-#define		F_LIST_DELNEXT	45
+    e_delnext_list_eof,
+#define		F_DELNEXT_LIST_EOF	45
     v_cmd_mode,
 #define		V_CMD_MODE	46
     v_insert,
@@ -263,8 +263,12 @@ PFCmd   CcFuncTbl[] = {		/* table of available commands */
 #define		F_COMPLETE_FWD	108
     e_complete_back,
 #define		F_COMPLETE_BACK	109
+    e_delnext_list,
+#define		F_DELNEXT_LIST	110
+    e_normalize_command,
+#define		F_COMMAND_NORM	111
     0				/* DUMMY VALUE */
-#define		F_NUM_FNS	110
+#define		F_NUM_FNS	112
 };
 
 KEYCMD  NumFuns = F_NUM_FNS;
@@ -280,7 +284,7 @@ KEYCMD  CcEmacsMap[] = {
     F_TOBEG,			/* ^A */
     F_CHARBACK,			/* ^B */
     F_TTY_INT,			/* ^C */
-    F_LIST_DELNEXT,		/* ^D */
+    F_DELNEXT_LIST_EOF,		/* ^D */
     F_TOEND,			/* ^E */
     F_CHARFWD,			/* ^F */
     F_UNASSIGNED,		/* ^G */
@@ -955,7 +959,7 @@ KEYCMD  CcViCmdMap[] = {
     V_UNDO,			/* u */
     F_EXPAND_VARS,		/* v */
     V_WORDBEGNEXT,		/* w */
-    F_DELNEXT,			/* x */
+    F_DELNEXT_EOF,		/* x */
     F_UNASSIGNED,		/* y */
     F_UNASSIGNED,		/* z */
     F_UNASSIGNED,		/* { */
@@ -1130,9 +1134,11 @@ struct KeyFuncs FuncNames[] = {
     { "delete-char", F_DELNEXT,
       "Delete character under cursor" },
     { "delete-char-or-eof", F_DELNEXT_EOF,
-      "Delete character under cursor or end of file if there is no character" },
-    { "delete-char-or-list", F_LIST_DELNEXT,
+      "Delete character under cursor or signal end of file on an empty line" },
+    { "delete-char-or-list", F_DELNEXT_LIST,
       "Delete character under cursor or list completions if at end of line" },
+    { "delete-char-or-list-or-eof", F_DELNEXT_LIST_EOF,
+      "Delete character under cursor, list completions or signal end of file" },
     { "delete-word", F_DELWORDNEXT,
       "Cut from cursor to end of current word - save in cut buffer" },
     { "digit", F_DIGIT,
@@ -1197,6 +1203,8 @@ struct KeyFuncs FuncNames[] = {
       "Execute command" },
     { "normalize-path", F_PATH_NORM,
       "Expand pathnames, eliminating leading .'s and ..'s" },
+    { "normalize-command", F_COMMAND_NORM,
+      "Expand commands to the resulting pathname or alias" },
     { "overwrite-mode", F_INSOVR,
       "Switch from insert to overwrite mode or vice versa" },
     { "prefix-meta", F_METANEXT,
@@ -1451,6 +1459,8 @@ ed_InitEmacsMaps()
     AddXkey(buf, XmapCmd(F_PATH_NORM),     XK_CMD);
     buf[1] = 'N';
     AddXkey(buf, XmapCmd(F_PATH_NORM),     XK_CMD);
+    buf[1] = '?';
+    AddXkey(buf, XmapCmd(F_COMMAND_NORM),  XK_CMD);
     buf[1] = '\t';
     AddXkey(buf, XmapCmd(F_COMPLETE_ALL),  XK_CMD);
     buf[1] = 004;	/* ^D */

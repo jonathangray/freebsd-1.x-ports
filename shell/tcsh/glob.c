@@ -96,7 +96,9 @@ static	int	 glob3		__P((Char *, Char *, Char *, Char *,
 				     glob_t *, int));
 static	int	 globextend	__P((Char *, glob_t *));
 static	int	 match		__P((Char *, Char *, Char *, int));
+#ifndef __clipper__
 static	int	 compare	__P((const ptr_t, const ptr_t));
+#endif
 static 	DIR	*Opendir	__P((Char *));
 #ifdef S_IFLNK
 static	int	 Lstat		__P((Char *, struct stat *));
@@ -245,7 +247,13 @@ static int
 compare(p, q)
     const ptr_t  p, q;
 {
+#if defined(NLS) && !defined(NOSTRCOLL)
+    errno = 0;  /* strcoll sets errno, another brain-damage */
+ 
+    return (strcoll(*(char **) p, *(char **) q));
+#else
     return (strcmp(*(char **) p, *(char **) q));
+#endif /* NLS && !NOSTRCOLL */
 }
 
 /*

@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.err.c,v 1.1 1993/07/20 10:48:48 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.err.c,v 1.1.1.2 1994/07/05 20:38:17 ache Exp $ */
 /*
  * sh.err.c: Error printing routines. 
  */
@@ -37,7 +37,7 @@
 #define _h_sh_err		/* Don't redefine the errors	 */
 #include "sh.h"
 
-RCSID("$Id: sh.err.c,v 1.1 1993/07/20 10:48:48 smace Exp $")
+RCSID("$Id: sh.err.c,v 1.1.1.2 1994/07/05 20:38:17 ache Exp $")
 
 /*
  * C Shell
@@ -311,12 +311,12 @@ static char *errorlist[] =
     "Selector overflow",
 #define ERR_TCSHUSAGE   124
 #ifdef apollo
-    "Unknown option: -%s\nUsage: tcsh [ -bcdefilmnqstvVxX -Dname[=value] ] [ argument ... ]",
+    "Unknown option: `-%s'\nUsage: tcsh [ -bcdefilmnqstvVxX -Dname[=value] ] [ argument ... ]",
 #else /* !apollo */
 # ifdef convex
-    "Unknown option: -%s\nUsage: tcsh [ -bcdefFilmnqstvVxX ] [ argument ... ]",
+    "Unknown option: `-%s'\nUsage: tcsh [ -bcdefFilmnqstvVxX ] [ argument ... ]",
 # else /* rest */
-    "Unknown option: -%s\nUsage: tcsh [ -bcdefilmnqstvVxX ] [ argument ... ]",
+    "Unknown option: `-%s'\nUsage: tcsh [ -bcdefilmnqstvVxX ] [ argument ... ]",
 # endif /* convex */
 #endif /* apollo */
 #define ERR_COMPCOM	125
@@ -344,7 +344,7 @@ static char *errorlist[] =
  */
 void
 /*VARARGS1*/
-#if __STDC__
+#ifdef FUNCPROTO
 seterror(unsigned int id, ...)
 #else
 seterror(va_alist)
@@ -355,7 +355,7 @@ seterror(va_alist)
     if (seterr == 0) {
 	va_list va;
 	char    berr[BUFSIZE];
-#if __STDC__
+#ifdef FUNCPROTO
 	va_start(va, id);
 #else
 	unsigned int id;
@@ -392,7 +392,7 @@ seterror(va_alist)
  */
 void
 /*VARARGS*/
-#if __STDC__
+#ifdef FUNCPROTO
 stderror(unsigned int id, ...)
 #else
 stderror(va_alist)
@@ -404,7 +404,7 @@ stderror(va_alist)
     int flags;
     int vareturn;
 
-#if __STDC__
+#ifdef FUNCPROTO
     va_start(va, id);
 #else
     unsigned int id;
@@ -422,7 +422,7 @@ stderror(va_alist)
     id &= ~ERR_FLAGS;
 
     /* Pyramid's OS/x has a subtle bug in <varargs.h> which prevents calling
-     * va_end more than once in the same function. -- sterling@oldcolo.com
+     * va_end more than once in the same function. -- sterling@netcom.com
      */
     if (!((flags & ERR_OLD) && seterr == NULL)) {
 	vareturn = 0;	/* Don't return immediately after va_end */

@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.const.c,v 1.1 1993/07/20 10:48:55 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.const.c,v 1.1.1.2 1994/07/05 20:39:32 ache Exp $ */
 /*
  * sh.const.c: String constants for tcsh.
  */
@@ -36,29 +36,46 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.const.c,v 1.1 1993/07/20 10:48:55 smace Exp $")
+RCSID("$Id: tc.const.c,v 1.1.1.2 1994/07/05 20:39:32 ache Exp $")
 
 Char STRlogout[]        = { 'l', 'o', 'g', 'o', 'u', 't', '\0' };
 Char STRautologout[]    = { 'a', 'u', 't', 'o', 'l', 'o', 'g', 'o', 'u', 't', 
 			    '\0' };
 Char STRdefautologout[] = { '6', '0', '\0' };
 Char STRautomatic[]     = { 'a', 'u', 't', 'o', 'm', 'a', 't', 'i', 'c', '\0' };
+Char STRhangup[]	= { 'h', 'a', 'n', 'g', 'u', 'p', '\0' };
 Char STRaout[]          = { 'a', '.', 'o', 'u', 't', '\0' };
 Char STRtty[]           = { 't', 't', 'y', '\0' };
 Char STRany[]           = { 'a', 'n', 'y', '\0' };
 Char STRstatus[]        = { 's', 't', 'a', 't', 'u', 's', '\0' };
 Char STR0[]             = { '0', '\0' };
 Char STR1[]             = { '1', '\0' };
+/* STRm1 would look too much like STRml IMHO */
+Char STRminus1[]	= { '-', '1', '\0' };
+Char STRmaxint[]	= { '0', 'x', '7', 'f', 'f', 'f', 'f', 'f', 'f', 'f',
+			    '\0' };
+Char STRcolon[]		= { ':', '\0' };
 Char STRNULL[]          = { '\0' };
 Char STRtcsh[]          = { 't', 'c', 's', 'h', '\0' };
 Char STRhome[]          = { 'h', 'o', 'm', 'e', '\0' };
 Char STRuser[]          = { 'u', 's', 'e', 'r', '\0' };
+#ifdef AFS
+Char STRafsuser[]          = { 'a', 'f', 's', 'u', 's', 'e', 'r', '\0' };
+#endif /* AFS */
 Char STRterm[]          = { 't', 'e', 'r', 'm', '\0' };
 Char STRversion[]       = { 'v', 'e', 'r', 's', 'i', 'o', 'n', '\0' };
 Char STRuid[]           = { 'u', 'i', 'd', '\0' };
 Char STRgid[]           = { 'g', 'i', 'd', '\0' };
+Char STRunknown[]	= { 'u', 'n', 'k', 'n', 'o', 'w', 'n', '\0' };
 Char STRHOST[]          = { 'H', 'O', 'S', 'T', '\0' };
-Char STRHOSTTYPE[]      = { 'H', 'O', 'S', 'T', 'T', 'Y', 'P', 'E', '\0' };
+#ifdef REMOTEHOST
+Char STRREMOTEHOST[]	= { 'R', 'E', 'M', 'O', 'T', 'E', 'H', 
+			    'O', 'S', 'T', '\0' };
+#endif /* REMOTEHOST */
+Char STRHOSTTYPE[]	= { 'H', 'O', 'S', 'T', 'T', 'Y', 'P', 'E', '\0' };
+Char STRVENDOR[]	= { 'V', 'E', 'N', 'D', 'O', 'R', '\0' };
+Char STRMACHTYPE[]	= { 'M', 'A', 'C', 'H', 'T', 'Y', 'P', 'E', '\0' };
+Char STROSTYPE[]	= { 'O', 'S', 'T', 'Y', 'P', 'E', '\0' };
 Char STRedit[]          = { 'e', 'd', 'i', 't', '\0' };
 Char STRaddsuffix[]     = { 'a', 'd', 'd', 's', 'u', 'f', 'f', 'i', 'x', '\0' };
 Char STRnostat[]        = { 'n', 'o', 's', 't', 'a', 't', '\0' };
@@ -70,10 +87,13 @@ Char STRpath[]          = { 'p', 'a', 't', 'h', '\0' };
 Char STRprompt[]        = { 'p', 'r', 'o', 'm', 'p', 't', '\0' };
 Char STRprompt2[]       = { 'p', 'r', 'o', 'm', 'p', 't', '2', '\0' };
 Char STRprompt3[]       = { 'p', 'r', 'o', 'm', 'p', 't', '3', '\0' };
+Char STRellipsis[]      = { 'e', 'l', 'l', 'i', 'p', 's', 'i', 's', '\0' };
 Char STRcwd[]           = { 'c', 'w', 'd', '\0' };
+Char STRowd[]           = { 'o', 'w', 'd', '\0' };
 Char STRstar[]          = { '*', '\0' };
 Char STRdot[]           = { '.', '\0' };
 Char STRhistory[]       = { 'h', 'i', 's', 't', 'o', 'r', 'y', '\0' };
+Char STRhistdup[]	= { 'h', 'i', 's', 't', 'd', 'u', 'p', '\0' };
 Char STRhistfile[]      = { 'h', 'i', 's', 't', 'f', 'i', 'l', 'e', '\0' };
 Char STRsource[]        = { 's', 'o', 'u', 'r', 'c', 'e', '\0' };
 Char STRmh[]            = { '-', 'h', '\0' };
@@ -98,11 +118,10 @@ Char STRsavehist[]      = { 's', 'a', 'v', 'e', 'h', 'i', 's', 't', '\0' };
 Char STRnormal[]        = { 'n', 'o', 'r', 'm', 'a', 'l', '\0' };
 Char STRsldtlogout[]    = { '/', '.', 'l', 'o', 'g', 'o', 'u', 't', '\0' };
 Char STRjobs[]          = { 'j', 'o', 'b', 's', '\0' };
-Char STRsymhash[]       = { '#', ' ', '\0' };
-Char STRsymarrow[]      = { '>', ' ', '\0' };
+Char STRdefprompt[]     = { '%', '#', ' ', '\0' };
 Char STRmquestion[]     = { '%', 'R', '?' | QUOTE, ' ', '\0' };
 Char STRKCORRECT[]      = { 'C', 'O', 'R', 'R', 'E', 'C', 'T', '>', '%', 'R', 
-			    ' ', '(', 'y', '|', 'n', '|', 'e', ')', 
+			    ' ', '(', 'y', '|', 'n', '|', 'e', '|', 'a', ')', 
 			    '?' | QUOTE, ' ', '\0' };
 Char STRunalias[]       = { 'u', 'n', 'a', 'l', 'i', 'a', 's', '\0' };
 Char STRalias[]         = { 'a', 'l', 'i', 'a', 's', '\0' };
@@ -216,6 +235,9 @@ Char STRQNULL[]		= { '\0' | QUOTE, '\0' };
 Char STRcorrect[]	= { 'c', 'o', 'r', 'r', 'e', 'c', 't', '\0' };
 Char STRcmd[]		= { 'c', 'm', 'd', '\0' };
 Char STRall[]		= { 'a', 'l', 'l', '\0' };
+Char STRprev[]		= { 'p', 'r', 'e', 'v', '\0' };
+Char STRcomplete[]	= { 'c', 'o', 'm', 'p', 'l', 'e', 't', 'e', '\0' };
+Char STRenhance[]	= { 'e', 'n', 'h', 'a', 'n', 'c', 'e', '\0' };
 Char STRautoexpand[]	= { 'a', 'u', 't', 'o', 'e', 'x', 'p', 'a', 'n', 'd',
 			    '\0' };
 Char STRautocorrect[]	= { 'a', 'u', 't', 'o', 'c', 'o', 'r', 'r', 'e', 'c',
@@ -240,6 +262,7 @@ Char STRinputmode[]	= { 'i', 'n', 'p', 'u', 't', 'm', 'o', 'd', 'e', '\0' };
 Char STRoverwrite[]	= { 'o', 'v', 'e', 'r', 'w', 'r', 'i', 't', 'e', '\0' };
 Char STRinsert[]	= { 'i', 'n', 's', 'e', 'r', 't', '\0' };
 Char STRnohup[]		= { 'n', 'o', 'h', 'u', 'p', '\0' };
+Char STRhup[]		= { 'h', 'u', 'p', '\0' };
 Char STRnice[]		= { 'n', 'i', 'c', 'e', '\0' };
 Char STRshowdots[]	= { 's', 'h', 'o', 'w', 'd', 'o', 't', 's', '\0' };
 Char STRthen[]		= { 't', 'h', 'e', 'n', '\0' };
@@ -247,6 +270,7 @@ Char STReof[]		= { '^', 'D', '\b', '\b', '\0' };
 Char STRlistjobs[]	= { 'l', 'i', 's', 't', 'j', 'o', 'b', 's', '\0' };
 Char STRlong[]		= { 'l', 'o', 'n', 'g', '\0' };
 Char STRwho[]		= { 'w', 'h', 'o', '\0' };
+Char STRsched[]		= { 's', 'c', 'h', 'e', 'd', '\0' };
 Char STRrmstar[]        = { 'r', 'm', 's', 't', 'a', 'r', '\0' };
 Char STRrm[]            = { 'r', 'm', '\0' };
 Char STRshlvl[]		= { 's', 'h', 'l', 'v', 'l', '\0' };

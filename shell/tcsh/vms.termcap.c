@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/vms.termcap.c,v 1.1 1993/07/20 10:48:57 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/vms.termcap.c,v 1.1.1.2 1994/07/05 20:39:56 ache Exp $ */
 /*
  *	termcap.c	1.1	20/7/87		agc	Joypace Ltd
  *
@@ -9,7 +9,7 @@
  *	A public domain implementation of the termcap(3) routines.
  */
 #include "sh.h"
-RCSID("$Id: vms.termcap.c,v 1.1 1993/07/20 10:48:57 smace Exp $")
+RCSID("$Id: vms.termcap.c,v 1.1.1.2 1994/07/05 20:39:56 ache Exp $")
 #ifdef _VMS_POSIX
 /*    efth      1988-Apr-29
 

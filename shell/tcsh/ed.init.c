@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/ed.init.c,v 1.1 1993/07/20 10:48:54 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/ed.init.c,v 1.1.1.2 1994/07/05 20:39:18 ache Exp $ */
 /*
  * ed.init.c: Editor initializations
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.init.c,v 1.1 1993/07/20 10:48:54 smace Exp $")
+RCSID("$Id: ed.init.c,v 1.1.1.2 1994/07/05 20:39:18 ache Exp $")
 
 #include "ed.h"
 #include "ed.term.h"

@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.sem.c,v 1.1 1993/07/20 10:48:51 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.sem.c,v 1.1.1.2 1994/07/05 20:38:52 ache Exp $ */
 /*
  * sh.sem.c: I/O redirections and job forking. A touchy issue!
  *	     Most stuff with builtins is incorrect
@@ -37,7 +37,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.sem.c,v 1.1 1993/07/20 10:48:51 smace Exp $")
+RCSID("$Id: sh.sem.c,v 1.1.1.2 1994/07/05 20:38:52 ache Exp $")
 
 #include "tc.h"
 
@@ -200,6 +200,13 @@ execute(t, wanttty, pipein, pipeout)
 		}
 		else
 		    break;
+	    else if (eq(t->t_dcom[0], STRhup))
+		if (t->t_dcom[1]) {
+		    t->t_dflg |= F_HUP;
+		    lshift(t->t_dcom, 1);
+		}
+		else
+		    break;
 	    else if (eq(t->t_dcom[0], STRtime))
 		if (t->t_dcom[1]) {
 		    t->t_dflg |= F_TIME;
@@ -277,7 +284,7 @@ execute(t, wanttty, pipein, pipeout)
 	    t->t_dflg &= ~(F_NICE);
 	if (((t->t_dflg & F_TIME) || ((t->t_dflg & F_NOFORK) == 0 &&
 	     (!_gv.bifunc || t->t_dflg &
-	      (F_PIPEOUT | F_AMPERSAND | F_NICE | F_NOHUP)))) ||
+	      (F_PIPEOUT | F_AMPERSAND | F_NICE | F_NOHUP | F_HUP)))) ||
 	/*
 	 * We have to fork for eval too.
 	 */
@@ -499,6 +506,8 @@ execute(t, wanttty, pipein, pipeout)
 
 		    if (t->t_dflg & F_NOHUP)
 			(void) signal(SIGHUP, SIG_IGN);
+		    if (t->t_dflg & F_HUP)
+			(void) signal(SIGHUP, SIG_DFL);
 		    if (t->t_dflg & F_NICE)
 # ifdef BSDNICE
 			(void) setpriority(PRIO_PROCESS, 0, t->t_nice);
@@ -637,7 +646,7 @@ execute(t, wanttty, pipein, pipeout)
 	if (t->t_dcar) {
 	    t->t_dcar->t_dflg |= t->t_dflg & F_NOINTERRUPT;
 	    execute(t->t_dcar, _gv.wanttty, NULL, NULL);
-	    if ((getn(value(STRstatus)) == 0) !=
+	    if ((getn(varval(STRstatus)) == 0) !=
 		(t->t_dtyp == NODE_AND)) {
 		VOL_RESTORE();
 		return;

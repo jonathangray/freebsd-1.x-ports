@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/patchlevel.h,v 1.1 1993/07/20 10:48:46 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/patchlevel.h,v 1.1.1.2 1994/07/05 20:37:26 ache Exp $ */
 /*
  * patchlevel.h: Our life story.
  */
@@ -7,8 +7,8 @@
 
 #define ORIGIN "Cornell"
 #define REV 6
-#define VERS 4
+#define VERS 5
 #define PATCHLEVEL 0
-#define DATE "93/07/03"
+#define DATE "94/19/06"
 
 #endif /* _h_patchlevel */

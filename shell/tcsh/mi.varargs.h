@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/mi.varargs.h,v 1.1 1993/07/20 10:48:57 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/mi.varargs.h,v 1.1.1.2 1994/07/05 20:39:55 ache Exp $ */
 /*
  * mi.varargs.h: Correct varargs for minix
  */

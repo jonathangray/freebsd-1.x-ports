@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.proc.c,v 1.1 1993/07/20 10:48:50 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.proc.c,v 1.1.1.2 1994/07/05 20:38:50 ache Exp $ */
 /*
  * sh.proc.c: Job manipulations
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.proc.c,v 1.1 1993/07/20 10:48:50 smace Exp $")
+RCSID("$Id: sh.proc.c,v 1.1.1.2 1994/07/05 20:38:50 ache Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -357,7 +357,7 @@ found:
 #  endif /* POSIX */
 # endif /* !_SEQUENT_ */
 #endif /* !BSDTIMES */
-	    >= atoi(short2str(value(STRtime))))
+	    >= atoi(short2str(varval(STRtime))))
 	    fp->p_flags |= PTIME;
 	jobflags |= fp->p_flags;
     } while ((fp = fp->p_friends) != pp);
@@ -383,9 +383,9 @@ found:
 	    pclrcurr(fp);
 	if (jobflags & PFOREGND) {
 	    if (!(jobflags & (PSIGNALED | PSTOPPED | PPTIME) ||
-#ifdef IIASA
+#ifdef notdef
 		jobflags & PAEXITED ||
-#endif /* IIASA */
+#endif /* notdef */
 		!eq(dcwd->di_name, fp->p_cwd->di_name))) {
 	    /* PWP: print a newline after ^C */
 		if (jobflags & PINTERRUPTED) {
@@ -565,7 +565,7 @@ pjwait(pp)
 		getpid(), fp->p_procid);
 #endif /* JOBDEBUG */
 #ifdef BSDSIGS
-	/* sigpause(sigblock((sigmask_t) 0) &~ sigmask(SIGCHLD)); */
+	/* (void) sigpause(sigblock((sigmask_t) 0) &~ sigmask(SIGCHLD)); */
 	(void) sigpause(omask & ~sigmask(SIGCHLD));
 #else /* !BSDSIGS */
 	(void) sigpause(SIGCHLD);
@@ -592,7 +592,7 @@ pjwait(pp)
 		Char   *jobcommand[3];
 
 		jobcommand[0] = STRjobs;
-		if (eq(value(STRlistjobs), STRlong))
+		if (eq(varval(STRlistjobs), STRlong))
 		    jobcommand[1] = STRml;
 		else
 		    jobcommand[1] = NULL;
@@ -772,6 +772,8 @@ palloc(pid, t)
 	pp->p_flags |= PPTIME;
     if (t->t_dflg & F_BACKQ)
 	pp->p_flags |= PBACKQ;
+    if (t->t_dflg & F_HUP)
+	pp->p_flags |= PHUP;
     cmdp = command;
     cmdlen = 0;
     padd(t);
@@ -1463,7 +1465,7 @@ dokill(v, c)
     v++;
     if (v[0] && v[0][0] == '-') {
 	if (v[0][1] == 'l') {
-	    for (signum = 1; signum <= nsig; signum++) {
+	    for (signum = 0; signum <= nsig; signum++) {
 		if ((name = mesg[signum].iname) != NULL) {
 		    len += strlen(name) + 1;
 		    if (len >= T_Cols - 1) {
@@ -1482,7 +1484,7 @@ dokill(v, c)
 		stderror(ERR_NAME | ERR_BADSIG);
 	}
 	else {
-	    for (signum = 1; signum <= nsig; signum++)
+	    for (signum = 0; signum <= nsig; signum++)
 		if (mesg[signum].iname &&
 		    eq(&v[0][1], str2short(mesg[signum].iname)))
 		    goto gotsig;
@@ -1943,7 +1945,7 @@ pfork(t, wanttty)
 	 * either have exited or not yet started to run.  Two uglies become
 	 * one.
 	 */
-	sigpause(omask & ~SYNCHMASK);
+	(void) sigpause(omask & ~SYNCHMASK);
 	if (mysigvec(SIGSYNCH, &osv, NULL))
 	    stderror(ERR_SYSTEM, "pfork parent: sigvec restore",
 		     strerror(errno));
@@ -1974,7 +1976,6 @@ static void
 setttypgrp(pgrp)
     int pgrp;
 {
-#ifdef BSDJOBS
     /*
      * If we are piping out a builtin, eg. 'echo | more' things can go
      * out of sequence, i.e. the more can run before the echo. This
@@ -1989,20 +1990,19 @@ setttypgrp(pgrp)
      *    group again.
      */
     if (tcgetpgrp(FSHTTY) != pgrp) {
-# ifdef POSIXJOBS
+#ifdef POSIXJOBS
         /*
 	 * tcsetpgrp will set SIGTTOU to all the the processes in 
 	 * the background according to POSIX... We ignore this here.
 	 */
 	sigret_t (*old)() = sigset(SIGTTOU, SIG_IGN);
-# endif /* POSIXJOBS */
+#endif
 	(void) tcsetpgrp(FSHTTY, pgrp);
 # ifdef POSIXJOBS
 	(void) sigset(SIGTTOU, old);
-# endif /* POSIXJOBS */
+# endif
 
     }
-#endif /* BSDJOBS */
 }
 
 

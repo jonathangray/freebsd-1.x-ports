@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.func.c,v 1.1 1993/07/20 10:48:49 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/sh.func.c,v 1.1.1.2 1994/07/05 20:38:29 ache Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.func.c,v 1.1 1993/07/20 10:48:49 smace Exp $")
+RCSID("$Id: sh.func.c,v 1.1.1.2 1994/07/05 20:38:29 ache Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -209,12 +209,64 @@ donohup(v, c)
 
 /*ARGSUSED*/
 void
+dohup(v, c)
+    Char **v;
+    struct command *c;
+{
+    USE(c);
+    USE(v);
+    if (intty)
+	stderror(ERR_NAME | ERR_TERMINAL);
+    if (setintr == 0)
+	(void) signal(SIGHUP, SIG_DFL);
+}
+
+
+/*ARGSUSED*/
+void
 dozip(v, c)
     Char **v;
     struct command *c;
 {
     USE(c);
     USE(v);
+}
+
+/*ARGSUSED*/
+void
+dofiletest(v, c)
+    Char **v;
+    struct command *c;
+{
+    Char **fileptr, *ftest, *res;
+
+    if (*(ftest = *++v) != '-')
+	stderror(ERR_NAME | ERR_FILEINQ);
+    ++v;
+
+    gflag = 0;
+    tglob(v);
+    if (gflag) {
+	v = globall(v);
+	if (v == 0)
+	    stderror(ERR_NAME | ERR_NOMATCH);
+    }
+    else
+	v = gargv = saveblk(v);
+    trim(v);
+
+    while (*(fileptr = v++) != '\0') {
+	xprintf("%S", res = filetest(ftest, &fileptr, 0));
+	xfree((ptr_t) res);
+	if (*v)
+	    xprintf(" ");
+    }
+    xprintf("\n");
+
+    if (gargv) {
+	blkfree(gargv);
+	gargv = 0;
+    }
 }
 
 void
@@ -283,7 +335,7 @@ dologin(v, c)
 {
     USE(c);
     islogin();
-    rechist(NULL);
+    rechist(NULL, adrof(STRsavehist) != NULL);
     (void) signal(SIGTERM, parterm);
     (void) execl(_PATH_LOGIN, "login", short2str(v[1]), NULL);
     untty();
@@ -470,6 +522,7 @@ doexit(v, c)
     struct command *c;
 {
     USE(c);
+
     if (chkstop == 0 && (intty || intact) && evalvec == 0)
 	panystop(0);
     /*
@@ -482,7 +535,10 @@ doexit(v, c)
 	    stderror(ERR_NAME | ERR_EXPRESSION);
     }
     btoeof();
+#if 0
     if (intty)
+#endif
+    /* Always close, why only on ttys? */
 	(void) close(SHIN);
 }
 
@@ -1222,6 +1278,8 @@ doprintenv(v, c)
 	xprintf("%S\n", e);
 	output_raw = 0;
     }
+    else
+	set(STRstatus, Strsave(STR1), VAR_READWRITE);
 }
 
 /* from "Karl Berry." <karl%mote.umb.edu@relay.cs.net> -- for NeXT things
@@ -1757,7 +1815,7 @@ getval(lp, v)
 	cp++;
     if (*cp == 0) {
 	if (*v == 0)
-	    return restrict_limit((f + 0.5) * lp->limdiv);
+	    return f == 0.0 ? (RLIM_TYPE) 0 : restrict_limit((f + 0.5) * lp->limdiv);
 	cp = *v;
     }
     switch (*cp) {
@@ -1765,7 +1823,7 @@ getval(lp, v)
     case ':':
 	if (lp->limconst != RLIMIT_CPU)
 	    goto badscal;
-	return restrict_limit((f * 60.0 + atof(short2str(cp + 1))));
+	return f == 0.0 ? (RLIM_TYPE) 0 : restrict_limit((f * 60.0 + atof(short2str(cp + 1))));
     case 'h':
 	if (lp->limconst != RLIMIT_CPU)
 	    goto badscal;
@@ -1815,7 +1873,7 @@ getval(lp, v)
 	break;
     case 'u':
 	limtail(cp, "unlimited");
-	return (RLIM_INFINITY);
+	return ((RLIM_TYPE) RLIM_INFINITY);
     default:
 # ifdef RLIMIT_CPU
 badscal:
@@ -1823,11 +1881,11 @@ badscal:
 	stderror(ERR_NAME | ERR_SCALEF);
     }
 # ifdef convex
-    return restrict_limit((f + 0.5));
+    return f == 0.0 ? (RLIM_TYPE) 0 : restrict_limit((f + 0.5));
 # else
     f += 0.5;
     if (f > (float) RLIM_INFINITY)
-	return RLIM_INFINITY;
+	return ((RLIM_TYPE) RLIM_INFINITY);
     else
 	return ((RLIM_TYPE) f);
 # endif /* convex */
