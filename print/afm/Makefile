@@ -1,4 +1,4 @@
-#	$Header: /a/cvs/386BSD/ports/print/afm/Makefile,v 1.1 1993/09/01 17:01:10 ljo Exp $
+#	$Header: /a/cvs/386BSD/ports/print/afm/Makefile,v 1.2 1993/10/17 00:00:54 ljo Exp $
 #
 # FlexFAX Facsimile Software
 #
@@ -78,6 +78,12 @@ AFMFILES=\
 	ZapfChancery-MediumItalic.afm \
 	ZapfDingbats.afm \
 	${NULL}
+
+all:
+	@echo It's ready to be installed!
+
+clean:
+	@echo Nothing needs to be cleaned!
 
 install: ${AFMFILES}
 	[ -d ${AFMDIR} ] || mkdir ${AFMDIR}
