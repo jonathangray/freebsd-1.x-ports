@@ -167,7 +167,7 @@ pkg:	pkg_src pkg_bin
 pkg_src: pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S clean
 	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S tcl_src
 
-pkg_bin: pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B all
+pkg_bin: pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B all install
 	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B tcl_bin
 
 install: install-binaries install-libraries install-man
