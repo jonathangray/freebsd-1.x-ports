@@ -6,6 +6,7 @@ SUBDIR =
 G_SUBDIR =
 
 SUBDIR += dgd
+SUBDIR += ncftp
 G_SUBDIR += gopher
 SUBDIR += sup
 SUBDIR += tcl-dp
