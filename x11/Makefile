@@ -22,6 +22,7 @@ SUBDIR += xpm
 SUBDIR += fvwm # depends on xpm
 SUBDIR += piewm # depends on xpm
 SUBDIR += xphoon
+SUBDIR += kterm
 
 .if !defined(AVOID)
 SUBDIR += xxgdb
