@@ -1518,7 +1518,11 @@ cdpath ()
 void
 print_groups()
 {
+#ifdef __FreeBSD__
+    int    groups[NGROUPS_MAX];
+#else
     gid_t  groups[NGROUPS_MAX];
+#endif
     int    ngroups = 0;
 
     if ( (ngroups = getgroups(NGROUPS_MAX, groups)) < 0 ) {
