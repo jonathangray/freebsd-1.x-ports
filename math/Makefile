@@ -1,13 +1,13 @@
-# /usr/ports/math/Makefile.inc 0.1	Jan 94	Julian Stacey <stacey@guug.de>
+# /usr/ports/math/Makefile V2.3	Jan 94	Julian Stacey <stacey@guug.de>
 #	Copyright Julian Stacey, Munich Dec. 93, Free Software, No Liability.
 #	For details see `Legalities' in /sys/Makefile.
 
 SUBDIR =
 G_SUBDIR =
 
-SUBDIR += blas # blas invokes /usr/local/bin/f77
+SUBDIR += blas
 
-G_SUBDIR += octave/octave-0.74
+G_SUBDIR += octave/octave
 #	g++ -I. -I./../liboctave -I./../dld -I./.. -I. -I../liboctave -I../dld -I.. -D>
 #	arith-ops.o builtins.o error.o file-io.o g-builtins.o gripes.o help.o idx-vecto>
 #	../liboctave.a ../libcruft.a ../libreadline.a \

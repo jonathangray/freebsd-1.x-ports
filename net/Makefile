@@ -1,17 +1,14 @@
-# /usr/ports/net/Makefile.inc 0.1	Jan 94	Julian Stacey <stacey@guug.de>
+# /usr/ports/net/Makefile V2.3	Jan 94	Julian Stacey <stacey@guug.de>
 #	Copyright Julian Stacey, Munich Dec. 93, Free Software, No Liability.
 #	For details see `Legalities' in /sys/Makefile.
 
 SUBDIR =
 G_SUBDIR =
 
+SUBDIR += dgd
 G_SUBDIR += gopher
-# "as ${MAKE} -k breaks on gopher with"
-# " Makefile, line 63: Need an operator"
-
 SUBDIR += sup
 SUBDIR += tcl-dp
-SUBDIR += dgd
 
 .if !defined(AVOID) & defined(WAIT_OK)
 .if exists(DPWISH_BINARY)

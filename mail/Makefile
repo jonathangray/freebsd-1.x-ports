@@ -1,11 +1,11 @@
-# /usr/ports/mail/Makefile.inc 0.1	Jan 94	Julian Stacey <stacey@guug.de>
+# /usr/ports/mail/Makefile V2.3	Jan 94	Julian Stacey <stacey@guug.de>
 #	Copyright Julian Stacey, Munich Dec. 93, Free Software, No Liability.
 #	For details see `Legalities' in /sys/Makefile.
 
 SUBDIR =
 G_SUBDIR =
 
-SUBDIR += elm #	Rod says things (which ?) depend on this.
+SUBDIR += elm #
 
 .if defined(WAIT_OK)
 SUBDIR += exmh
@@ -17,12 +17,8 @@ SUBDIR += exmh
 #	vmh.c:369: structure has no member named `_maxy'
 .endif
 
-SUBDIR += mh
-SUBDIR += mush
-#	cc -O -DCURSES -DBSD -fwritable-strings -c main.c
-#	In file included from main.c:3:
-#	mush.h:235: parse error before `_tty'
-
+SUBDIR += mh	# vmh.c:1125: structure has no member named `_y'
+SUBDIR += mush	# main.c:154: structure has no member named `sg_flags'
 SUBDIR += popper
 
 .include <bsd.subdir_ports.mk>

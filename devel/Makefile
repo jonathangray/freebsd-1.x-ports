@@ -1,4 +1,4 @@
-# /usr/ports/devel/Makefile.inc 0.1	Jan 94	Julian Stacey <stacey@guug.de>
+# /usr/ports/devel/Makefile V2.3	Jan 94	Julian Stacey <stacey@guug.de>
 #	Copyright Julian Stacey, Munich Dec. 93, Free Software, No Liability.
 #	For details see `Legalities' in /sys/Makefile.
 
@@ -20,7 +20,8 @@ SUBDIR += gdb
 SUBDIR += gic
 .endif
 SUBDIR += gmake
-SUBDIR += mprof30
+SUBDIR += mprof30	# name told me by jkh ?
+SUBDIR += mprof		# probable proper name
 
 .include <bsd.subdir_ports.mk>
 

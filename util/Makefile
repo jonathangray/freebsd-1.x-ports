@@ -1,4 +1,4 @@
-# /usr/ports/util/Makefile.inc 0.1	Jan 94	Julian Stacey <stacey@guug.de>
+# /usr/ports/util/Makefile V2.3	Jan 94	Julian Stacey <stacey@guug.de>
 #	Copyright Julian Stacey, Munich Dec. 93, Free Software, No Liability.
 #	For details see `Legalities' in /sys/Makefile.
 

@@ -1,12 +1,13 @@
-# /usr/ports/Makefile V2.2	by Julian Stacey <stacey@guug.de>
+# /usr/ports/Makefile V2.3	by Julian Stacey <stacey@guug.de>
 #	Copyright Julian Stacey, Munich Dec. 93, Free Software, No Liability.
 #	For details see `Legalities' in /sys/Makefile.
-# Maintenance:
-#	SUBDIRs now have ifdef's round them all,
-#	because many people will not have space for all package sources,
-#	but without them, make can recursively { cd ... fail ; make } .
 
-MAKE_X_MIT ?= NO
+# This Makefile & ports/*/Makefile are still in development.
+# Some comments detailing bugs are suposedly no longer valid,
+# but until I can manage to sup all of ports/ I can't prove bugs are gone,
+# so comments stay for a while as a warning to check.
+
+MAKE_X_MIT ?= YES
 
 world:	display tools .configured objj _SUBDIRUSE all
 	@# _SUBDIRUSE with bsd.subdir_ports.mk does a make world in subdirs
@@ -22,7 +23,6 @@ tools:
 	#	@echo "==={> $$i devel"
 	#	cd devel ; make tools	# devel/gmake	--> /usr/gnu/bin/gmake
 	#	@echo "<}=== $$i devel"
-	#	@# maybe add some cludge as per note in math/Makefile Re. f77 & f2c
 
 display:
 	@echo	DESTDIR is	${DESTDIR}
@@ -35,9 +35,6 @@ display:
 	@echo	BINDIR is	${BINDIR}
 	@echo	MAKE_X_MIT is	${MAKE_X_MIT}
 
-#	test:
-#		here=`pwd`; dest=/usr/obj/`echo $$here`;echo $$dest
-#	
 #	cleandist:
 #	.if !defined(NOCLEANDIR)
 #		@echo " Cleaning up the source tree, and rebuilding the obj tree"
@@ -70,16 +67,19 @@ clean:	_SUBDIRUSE
 #	done in bsd.subdir_ports.mk
 
 .configured:
-.if defined(CLUDGE)
+.if defined(NEVER_CLUDGE)
+	@# All this stuff will go, once a clean sup & make proves it
+	@# can be discarded
 	@echo "Started configuring."
 	# Start of some temporary nasty cludges for broken packages
 	@# for tcl-dp
 	-ln -s /usr/src/../ports /usr/ports
-	@echo Kludging for syscons_xtra
+	@echo Cludging for syscons_xtra
 	cd /usr/src/sys/sys ; ln -s ../i386/include/console.h console.h
-	@echo Kludging for rzsz
+	@echo Cludging for rzsz
 	-mkdir /usr/local/man/cat1
-	-cd math/octave/octave-0.74; ./configure
+	-cd math/octave/octave; ./configure
+	-cd ilocal/wu-ftpd; chmod +x build; ./build bsd
 	-cd mail/elm; ./configure
 	#	PENDING Rod says:
 	#	If you don't do the configure you end up with elm thinking your
