@@ -1,0 +1,485 @@
+--- -*- Mode: Sather;  -*-
+-- File: typeob.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1990, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Each class contains information about a type in Sather.
+--*
+--* CLASSES: TYPEOB, SIMPLE_TYPEOB, PARAM_TYPEOB, DISPATCH_TYPEOB
+--*
+--* RCS: $Id: typeob.sa,v 1.1 1994/02/12 03:21:55 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 05:17 1993 (hws)
+--*  Oct 17 05:17 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 28 05:10 1993 (hws): switch -> case
+--*  Mar  1 12:41 1993 (hws): more uniform error msgs
+--* Created: Tue Jun  5 15:26:15 1990 (clim)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class TYPEOB is
+   -- The parent class from which the others inherit.
+   PARSEROB;
+   RESERVED_WORDS;		-- Need to know reserved classes
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   disp_type:$TYPEOB is
+      -- Dispatch type of TYPEOB; only non-null for DISPATCH_TYPEOB
+   end; -- disp_type
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   name_str:STR is
+      -- Returns the print form of type
+   end; -- name_str
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_key(pl:LIST{INT}; pi:LST_TYPEOB_S):LSTINT_KEY is
+      -- All descendents must compute their own keys
+   end; -- get_key
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):$TYPEOB_S is
+      res := INSTANT_TYPEOB_S::create(0, lineno);
+   end; -- pcopy
+   
+end; -- class TYPEOB
+
+--------------------------------------------------------------------
+   
+class SIMPLE_TYPEOB is
+   -- Simple types.
+   TYPEOB;
+
+-- Computed during parsing
+   attr name:INT;			-- Index of the class name
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:INT):SAME is
+      -- Create a simple typeob with the given name
+      res := new; 
+      res.lineno := GLOBALS::curr_lineno;
+      if (not (GLOBALS::str_table).at_index(nm).is_upper_case) then
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, GLOBALS::curr_lineno,
+	    "SIMPLE_TYPEOB",
+	    STR::create.s("Uncapitalized type name \"").
+                            s((GLOBALS::str_table).at_index(nm)).
+                            s("\""));
+	 new_str:STR := (GLOBALS::str_table).at_index(nm).copy.to_upper_case;
+	 nm := (GLOBALS::str_table).insert_str(new_str);
+      end; -- if
+      res.name := nm; 
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   disp_type:$TYPEOB is
+      -- The dispatched type of a simple type is itself.
+      res := self;
+   end; -- disp_type
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   name_str:STR is
+      -- String representation of simple type.
+      res := (GLOBALS::str_table).at_index(name);
+   end; -- name_str
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_key(pl:LIST{INT}; pi:LST_TYPEOB_S):LSTINT_KEY is
+      -- Returns "void" if key cannot be succesfully constructed.
+      
+      res := res.create(1).push(name);
+      -- If the corresponding instance is not found in global semantic
+      -- table, install it.
+      inst:CLASSOB_S := (GLOBALS::class_inst).get_obj(res);
+      if (inst /= void) then
+	 -- Simple class already installed.  
+      else
+	 if (install_simple_inst(res)) then
+	    -- Install simple class into global semantic table
+	 else
+	    res := void;
+	 end; -- if
+      end; -- if
+   end; -- get_key
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):$TYPEOB_S is
+      -- Returns a type expression representing the simple type in
+      -- original Sather code.
+
+      -- First check if it is a type parameter.  A linear search is
+      --   done since the list should be short.
+      i:INT := 0;
+      if (pl /= void) then
+	 -- Caller must ensure that the list of type parameters and
+	 --   instantiations have the same size.
+	 sz:INT := pl.insert;
+	 loop until!(i >= sz);
+	    if (name = pl[i]) then
+	       -- We must make a copy, because the use of the type is
+	       -- at a different line number from the occurrence of
+	       -- instantiations.
+	       res := pi[i].copy;
+	       res.lineno := lineno;
+	       return;
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+      end; -- if
+      
+	 -- Indices of predefined classes in global semantic table is
+	 -- fixed.
+      case (name) 
+      when (ob_ind) then
+	 -- Error since OB can only be used in a dispatched fashion.  
+	 --   Pretend we have seen it as $OB.
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::OB_ici, lineno).
+                                  dispatched;
+
+      -- We use predefined CLASSOB_S's rather than predefined TYPEOB_S's
+      --   because of TYPEOB_S's will contain the specific line number.  
+		      
+      -- The base array classes are instantiated with $OB.
+      when (array_ind) then
+	 -- Error since ARRAY must be parametrized.
+	 -- In case of error, use "ARRAY{$OB}".
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, lineno,
+	    "SIMPLE_TYPEOB",
+	    STR::create.s("Unparametrized use of ARRAY"));
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::ARRAY_ici, lineno);
+
+      when (array2_ind) then
+	 -- Error since ARRAY2 must be parametrized.
+	 -- In case of error, use "ARRAY2{$OB}".
+         ERR_INFO::format_error_msg_file(ERR_INFO::filename, lineno,
+	    "SIMPLE_TYPEOB",
+	    STR::create.s("Unparametrized use of ARRAY2"));
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::ARRAY2_ici, lineno);
+
+      when (array3_ind) then
+	 -- Error since ARRAY3 must be parametrized.
+	 -- In case of error, use "ARRAY3{$OB}".
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, lineno,
+	    "SIMPLE_TYPEOB",
+	    STR::create.s("Unparametrized use of ARRAY3"));
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::ARRAY3_ici, lineno);
+
+      when (array4_ind) then
+	 -- Error since ARRAY4 must be parametrized.
+	 -- In case of error, use "ARRAY4{$OB}".
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, lineno,
+	    "SIMPLE_TYPEOB",
+	    STR::create.s("Unparametrized use of ARRAY4"));
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::ARRAY4_ici, lineno);
+
+      when (bool_ind) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::BOOL_ici, lineno);
+		      
+      when (c_ind) then
+	 -- At this point, we cannot determine whether the "C" type
+	 --   specification is used as class inheritance or for 
+	 --   declaration.  The former is not an error but the latter is.
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::C_ici, lineno);
+
+      when (char_ind) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::CHAR_ici, lineno);
+
+      when (double_ind) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::DOUBLE_ici, lineno);
+
+      when (err_ind) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::ERR_ici, lineno);
+
+      when (file_ind) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::FILE_ici, lineno);
+
+      when (in_ind) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::IN_ici, lineno);
+
+      when (int_ind) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::INT_ici, lineno);
+
+      when (out_ind) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::OUT_ici, lineno);
+
+      when (real_ind) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::REAL_ici, lineno);
+
+      -- "SAME" will be resolved later after all expansion
+      --   has been done.
+      when (self_type_ind) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::SELF_TYPE_ici, lineno);
+
+      when (str_ind) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::STR_ici, lineno);
+
+      when (str_cursor_ind) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::STR_CURSOR_ici, lineno);
+
+      when (sys_ind) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::SYS_ici, lineno);
+
+      when (fob_ind) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::FOB_ici, lineno);
+
+      when (sux_ind) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::SUX_ici, lineno);
+
+      when (undefine_ind) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::UNDEFINE_ici, lineno);
+
+      else
+	 -- Not a reserved class.  
+	 key:LSTINT_KEY := get_key(pl, pi);
+	    -- Construct the key to instantiated class object
+         if (key = void) then
+	    res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::OB_ici, lineno).
+	                             dispatched;
+	 else
+	    inst:CLASSOB_S := (GLOBALS::class_inst).get_obj(key);
+	    res := INSTANT_TYPEOB_S::create(inst.index, lineno);
+	 end; -- if
+      end; -- case
+   end; -- pcopy
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   install_simple_inst(k:LSTINT_KEY):BOOL is
+      -- Returns "true" if class instance successfully installed
+      
+      def:CLASSOB := (GLOBALS::class_defs).get_obj(name);
+	 -- Get the CLASSOB using the index of name, and check
+	 --   that the definition exists and does not have type 
+	 --   parameters.  Install a CLASSOB_S for this class definition.
+      
+      if (def = void) then
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, lineno,
+	    "SIMPLE_TYPEOB",
+	    STR::create.s("Undefined type \"").
+                                      s((GLOBALS::str_table).at_index(name)).
+                                      s("\""));
+	 return;
+      end; -- if
+      
+      if (def.non_param_p) then
+	    -- Install into global semantic table.
+	    -- If a previous compilation exists, we might have to install the
+	    -- object in the same position.
+	 OLDNEW_HANDLER::install_new_classob_s(-1,k,CLASSOB_S::create(def,k,void));
+	 res := true;
+      else
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, lineno,
+	    "SIMPLE_TYPEOB",
+	    STR::create.s("Type specification \"").
+	                     s((GLOBALS::str_table).at_index(name)).
+                             s("\" expects instantiations"));
+	 return;
+      end; -- if
+   end; -- install_simple_inst
+
+end; -- class SIMPLE_TYPEOB
+
+--------------------------------------------------------------------
+   
+class PARAM_TYPEOB is
+   -- Parameterized types.
+   TYPEOB;
+   
+-- Computed in parsing
+   attr name:INT;			-- Index of the class name
+   attr params:LST_TYPEOB;		-- List of parameter types
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:INT; p:LST_TYPEOB):SAME is
+      res := new;
+      if (not (GLOBALS::str_table).at_index(nm).is_upper_case) then
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, GLOBALS::curr_lineno,
+	    "PARAM_TYPEOB",
+	    STR::create.s("Uncapitalized type name \"").
+                             s((GLOBALS::str_table).at_index(nm)).
+                             s("\""));
+	 new_str:STR := (GLOBALS::str_table).at_index(nm).copy.to_upper_case;
+	 nm := (GLOBALS::str_table).insert_str(new_str);
+      end; -- if
+      res.name := nm;
+      res.params := p;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   name_str:STR is
+      -- Include type instantiations in name string of parametrized type
+      res := (GLOBALS::str_table).at_index(name).copy.s("{");
+      i:INT := 0;
+      psz:INT;
+      if (params /= void) then
+	 psz := params.insert;
+      end; -- if
+      loop until!(i >= psz);
+	 res := res.s(params[i].name_str);
+	 if not (i >= psz) then
+	    res := res.s(",");
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      res := res.s("}");
+   end; -- name_str
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_key(pl:LIST{INT}; pi:LST_TYPEOB_S):LSTINT_KEY is
+      i:INT := 0;
+      sz:INT;
+      if (params /= void) then
+	 sz := params.insert;
+      end; -- if
+      if (sz <= 0) then
+	 ERR_INFO::compiler_error_msg("PARAM_TYPEOB", "Missing instantiation");
+	 return;
+      end; -- if
+      res := res.create(1 + sz).push(name);
+      localpi:LST_TYPEOB_S := localpi.create(1 + sz);
+      loop until!(i >= sz);
+	 par:INSTANT_TYPEOB_S := params[i].pcopy(pl, pi);
+
+	 if (par = void) then
+	    ERR_INFO::compiler_error_msg("PARAM_TYPEOB", "\"pcopy\" fail");
+	 else
+	    localpi := localpi.push(par);
+	 end; -- if
+	 
+	    -- Note that if the key for "FOO{X}" is (x, y), then the
+	    -- key for "FOO{$X}" is (x, -y).
+--	 if (params[i].type = DISPATCH_TYPEOB::type) then
+--	    res := res.push(- next_ind);
+--	 else
+--	    res := res.push(next_ind);
+--	 end; -- if
+-- -- IMPORTANT NOTE:  If we have, eg: 
+-- --      class C1{T} is
+-- --         x:T; ...
+-- --      end;
+-- -- and somewhere a declaration y:C1{$C2}, then the result of applying
+-- -- "pcopy" on a SIMPLE_TYPEOB is an INSTANT_TYPEOB_S with negative index.
+-- -- Hence we should simply use the index of the returned INSTANT_TYPEOB_S,
+-- -- instead of applying "inst_ind" to the returned INSTANT_TYPEOB_S.
+
+	 res := res.push(par.index);
+	 i := i + 1;
+      end; -- loop
+      -- If the corresponding instance is not found in global semantic
+      -- table, install it.
+      inst:CLASSOB_S := (GLOBALS::class_inst).get_obj(res);
+      if (inst /= void) then
+	 -- Parametrized class already installed
+      else
+	 if (install_param_inst(res, localpi)) then
+	    -- Parametrized class installed into global semantic table.
+	 else
+	    res := void;
+	 end; -- if
+      end; -- if
+   end; -- get_key
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   install_param_inst(k:LSTINT_KEY; pinst:LST_TYPEOB_S):BOOL is
+      -- Returns "true" if class instance is successfully installed in
+      -- global semantic table.
+
+      -- The semantic type object does not exist in the table for given key.
+      def:CLASSOB := (GLOBALS::class_defs).get_obj(name);
+      if (def = void) then
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, lineno, "PARAM_CLASSOB",
+	    STR::create.s("Undefined type \"").
+	    s((GLOBALS::str_table).at_index(name)).
+	    s("\""));
+	 return;
+      end; -- if
+
+      OLDNEW_HANDLER::install_new_classob_s(-1,k,CLASSOB_S::create(def, k, pinst));
+      res := true;
+   end; -- install_param_inst
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):$TYPEOB_S is
+      -- If it is a parametrized array type, we want to create class
+      --   instances using different CLASSOB_S.
+      
+      -- The class name cannot be one of the type parameters.
+      k:LSTINT_KEY := get_key(pl, pi);
+      if (k = void) then
+	 res := INSTANT_TYPEOB_S::create(RESERVED_CLASSES::OB_ici, lineno).dispatched;
+      else
+	 inst:CLASSOB_S := (GLOBALS::class_inst).get_obj(k);
+	 res := INSTANT_TYPEOB_S::create(inst.index, lineno);
+      end; -- if
+
+   end; -- pcopy
+
+end; -- class PARAM_TYPEOB
+
+--------------------------------------------------------------------
+   
+class DISPATCH_TYPEOB is
+   -- Dispatched types.
+   TYPEOB;
+
+-- Computed during parsing
+   attr dt:$TYPEOB;			-- TYPEOB dispatched from
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(t:$TYPEOB):SAME is
+      -- This checks for declarations of the form eg "$$FOO" which are not
+      --   checked by parser.
+      if (t.type = DISPATCH_TYPEOB::type) then
+	 ERR_INFO::error_msg(
+	           STR::create.s(ERR_INFO::filename).c('(').
+	           i(GLOBALS::curr_lineno).c(')').
+	           s(" (DISPATCH_TYPE) : Erroneous dispatch type \"").
+	           s(t.name_str).s("\"\n"));
+	 res := res.create(t.disp_type);
+	 return;
+      end; -- if 
+      res := new;
+      res.dt := t;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   disp_type:$TYPEOB is
+      res := dt.disp_type;
+   end; -- disp_type
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   name_str:STR is
+      res := STR::create.c('$').s(dt.name_str);
+   end; -- name_str
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_key(pl:LIST{INT}; pi:LST_TYPEOB_S):LSTINT_KEY is
+      -- Key of a DISPATCH_TYPEOB is the same as whatever type
+      --   it is dispatched from.  Thus $FOO and FOO have the
+      --   same key, but FOO{X} and FOO{$X} have different keys because
+      --   we need to install two class instantiations.
+      res := dt.get_key(pl, pi);
+   end; -- get_key
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):$TYPEOB_S is
+      -- "create" ensures that the dispatch type is either SIMPLE_TYPEOB or
+      --   PARAM_TYPEOB.
+      res := dt.pcopy(pl, pi).dispatched;
+      res.lineno := lineno;
+   end; -- pcopy
+
+end; -- class DISPATCH_TYPEOB
+
+--------------------------------------------------------------------

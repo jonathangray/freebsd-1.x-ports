@@ -1,0 +1,775 @@
+
+			THE EMACS SATHER MODE
+
+	   Heinz W. Schmidt, ICSI, (hws@ICSI.Berkeley.EDU)
+
+			revised: June 4, 1991
+
+
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+				  OVERVIEW
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+ 
+
+S. SATHER EMACS ENVIRONMENT
+
+   The Sather Emacs envirnoment consists of the following parts:
+
+   S1. Syntax and indentation rules
+
+   S2. Templates
+
+   S3. Source browser
+
+   S4. Inline documentation generator
+
+   S5. Report generation
+
+
+E. EXTENSION PACKAGES
+
+   Three optional packages extend the mode:
+
+   E1. Sky Mouse, a syntax-oriented point and click interface
+
+   E2. Sather to C Interface Generator
+
+   E3. Eiffel to Sather conversion facility
+
+
+B. BASIC SUPPORT
+
+   The mode builds on three other packages:
+
+   B1. Language Tools, a set of generic commands for language modes,
+       building on Thing tools.
+
+   B2. Emacs tags facility, a set of tag-based retrieval commands.
+
+   B3. Sdb-mode, a mode for the SDB, the Sather debugger.
+
+
+
+Each of  these points  is  shortly described below. Altogether  the  various
+packages  make the mode  a rich  and  powerful  programming environment that
+links browsing, source editing, compilation and debugging  of Sather program
+under a uniform framework.
+
+For  a precise and actual   listing  of the  key bindings   see  the  online
+documentation of the mode (M-x describe-mode or C-h m). For a quick overview
+of the mouse map see the end of this file.
+
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+ 
+			S. SATHER EMACS ENVIRONMENT
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+ 
+
+		   S1. Syntax and indentation rules
+
+
+The Sather syntax is controlled by the syntax table and  the language tools'
+variables "thing-boundary-alist"  and "matching-identifiers-alist".  Various
+Emacs   commands respect these  variables  and  become  mode  dependent only
+through them.  Particularly syntactic 'things', short things, are recognized
+by a number of commands and by the optional mouse  package  (Cf. short recap
+below).
+
+The syntax table  defines  '_'  and ':'  as  a   word separator but   symbol
+characters.  All other special characters are punctuation characters  in the
+technical sense of the Emacs syntax support, cf.  Emacs manual  for details.
+The pairs (), [], {}, <> are defined as balanced character pairs.
+
+The Thing  tools  relate Emacs  syntax tables   to  emacs regions.  Given  a
+character position, for instance the cursor position or the point  where you
+click the mouse, they return  an extension  of  text  called a region,  that
+represents a corresponding syntactic object.  For  instance, when  you click
+to   an  open  parenthesis,  a  region  is   selected   that  extends to the
+corresponding  closing parenthesis.  This is  done  by  calling  Thing  tool
+abstractions  that associate selection  methods to characters in the  syntax
+table and that treat different  types of characters (word/symbol/punctuation
+etc) differently when extending regions of text.
+
+This syntactic knowledge is  extended by functions  of the  Language  tools,
+adding balanced keywords to  the logic.  For instance when  you click to the
+first character  of an  `if' a  region  will be selected that  extend to the
+corresponding end. This is based on an extendible list  of matching keywords
+used in a simple and fast depth counting parsing algorithm.
+
+Many of the following commands build on this  skeleton syntax knowledge. For
+instance, edit-definition looks for a symbol at the cursor position to start
+its job, while indent-thing invoked on the beginning of  a feature finds the
+balanced is/end and operates on the region thus defined.
+
+Similarly the  indentation  rules  follow the   syntax. Typically  syntactic
+nesting levels are represented  by indentation levels.   Usually  the cursor
+finds the right place when it goes to  a new line  before you type anything.
+Sometimes  a   special indentation is required  after   you have started for
+instance with a keyword and  then you  may have  to  press the  'indentation
+button' TAB on the line that should find its proper intendation level.
+
+Usually  indentation is  right.  But in a few   cases  it is  not  and  this
+deliberately so.  In order to  not require a  full  parsing of the text from
+file begin to the current line a few simplifying  assumptions  are made that
+you HAVE TO  KNOW. Otherwise you might  be surprised by some sideeffects  of
+indentation. The following is refered to as the THREE SPACE RESTRICTION:
+
+1) Top level text, ie. the beginning of  a  class or feature or of top-level
+comment in  between classes and/or  features  should not  start  more that 3
+spaces from the left margin.
+
+2) Non-top level text should always start more  than  3 spaces from the left
+margin.
+
+This distinction  is used to  LIMIT  parsing while editing incomplete Sather
+source. The indentation   functions themselves guarantee that  the resulting
+text satisfies these constraints.
+
+Multi-line statements can be exempted from indentation in two ways:
+
+ 1. lines that contain comments starting with '---' will not
+    be changed by the indentation algorithm. More precisely,
+    any comment-start '--' followed by a non-whitespace character
+    will have this effect.
+
+    This allow one to write
+    
+    foo(x1,x2,x3,x4,
+        x5,x6,x7: INT) is   --- won't be left-aligned to foo
+
+ 2. Lines starting with a punctuation character are indented further,
+    unless the previous line starts with a punctuation character.
+
+    This allows one to write
+
+    x := y1.y2
+	.y3(a).b
+	.y4(b).a;
+	
+
+Besides  indentation, features can  be written with more  or less horizontal
+space  between   constructs.     The   dual   commands   uglify-region   and
+beautify-region allow  one   to  switch    between  a  terse     and   spacy
+representation.  The style  of the spacy  representation can be modified  by
+the changing the sets of leaders (preceded by space), separators (surrounded
+by space) and trailers (followed by space). If the  package is running under
+Epoch beautify will also use multiple styles to highlight keywords, reserved
+words and comments.  Note that these commands, for instance beautify-buffer,
+have prefix arguments that  let   them do other  combinations of  horizontal
+spacing w/out multi-style  changes. Like most of  the features  described in
+this document you can  customize beautify. Here is  the default  setting for
+the comfort of copying and changing it:
+
+(setq sather-leader-list nil) 
+(setq sather-separator-list 
+	'(":=" "=" "<" ">" "<=" ">=" "/=" "*" "+" "-" "/"))
+(setq sather-trailer-list '(";" ":"))
+
+For a detailed description cf.  the online documentation  of beautify-region
+(C-h d beautify-region).
+
+	 
+			    S2. Templates
+
+Templates  of  the major Sather  constructs can be inserted in  two ways: by
+means of abbreviations and by means of commands.
+
+If   you   switch  into  the Emacs   abbreviation  mode,  then  for instance
+abbreviations  unt  or ifa   expand   to  an  'until..loop..end' or    to an
+'if..then..else' construct  respectively. For  most of  the constructs there
+are   abbreviations  defined.   Abbreviations  also   include   three-letter
+expansions for most of the common types occuring  in Sather programs and you
+can easily add new  expansions.  Cf.  Emacs  abbreviations facility for more
+details.
+
+The expansion of major constructs is also on C-c key  combinations for those
+who cannot accept automatic expansion while typing blindly. For instance C-c
+u inserts an 'until..loop..end'.
+
+You may add your  own templates. They  are built using  a simple but general
+template  editing  facility offered  by  the  language-tools  package.  Each
+template has a 'hot spot' where  the cursor ends  up in a place between text
+and keywords. Optionally  a template expansion  can query the  user for  one
+name that can then be inserted at several places  inside the templates text.
+Cf.   the "sather-mode.el" source  code  for examples  and  comments on this
+facility.
+
+
+
+			  S3. Source browser
+
+
+The  source browsing facility is based  on Emacs tag  tables.    A tag table
+represents a set of files and a symbol xref for these files.  Using commands
+of the Sather mode you can generate  an Emacs  tag  table  for any number of
+related  Sather files.  In fact, each  file can have its  own tag  table but
+usually  we propose  to generate tag  table files for  a .sather file. A tag
+table file generated this way will contain indexes into  the source only for
+the starting  lines  of  class  definitions, parent  class  references,  and
+feature definitions.
+
+Currently  the  THREE SPACE RESTRICTION  above applies to  avoid  parsing of
+source  text.   This  restriction  only   applies for  the  small   function
+sather-tags. The more complex browsing command set does not depend on it. It
+only requires tag tables in Emacs' format. (In  fact we hope that Sather tag
+tables will be generated by the compiler some day.)
+
+Emacs' native tags facility is flexible. It does not require to regenerate a
+tag table each time you do simple changes to a file. Usually  Emacs searches
+for definitions in increasing increments from the indexed  position. HOWEVER
+it searches for an exact  match.  I.e.   if  you have changed the  name of a
+feature Emacs will  not find it  this way.  Also  it will not know about new
+features you have added without recreation of the tag table file.
+
+Based on the tags facility you  can normally search for a  definition or for
+all occurrences of a  tag in the  source  files that are  mentioned in a tag
+table. Similarly the files of  a tag table  can be  used as a collection for
+query replacing.
+
+The   Sather mode extends   this  functionality by dealing with overloading,
+disambiguation and completion. You can point  to a Sather  name by using the
+cursor or the mouse and the browsing commands  will find the definition, all
+callers, list a class hierarchy, or all names that are related to that word.
+From the source that you are  thrown into you can  continue browsing in this
+way. All documentation buffers that  are created by documentation  tools are
+sensitive to the same set of commands and so are all temporary  buffers used
+to list  Sather names  for browsing purposes.   They  are  all automatically
+switched to Sather mode. This gives the browsing tool a Hypertext-like feel.
+
+You may use  edit-definition to find the first  definition of an  overloaded
+tag and next-definition to step from one point  in some  source  file to the
+next definition until you have seen all possible definition of  a tag in the
+various related classes.
+
+The sather-parent command presents the parents' graph optionally associating
+the  own features   of  each parent  that are  visible  in   the   class  in
+consideration.
+
+All online documentation that is shown  by  source browsing commands  is put
+into  buffers  that can themselves serve for  browsing. For instance under X
+(with the  sky-mouse package loaded)  you can  just  point into  a hierarchy
+buffer to see more  information.  The  default browsing commands are  on M-S
+(meta-shift):  M-S-Left    edit-this,  M-S-Middle document-this,   M-S-Right
+parents-this. For instance, I use the following combination very often:
+
+1. sather-parents with feature list
+   0 C-c C-p        or (under Epoch) double-click M-S-Right on a class name
+   This shows the ancestor tree with names of all inherited features at
+   the place from where they actually come.
+
+2. Then I click to the names in this hiearchy buffer, mostly using
+   M-S-Left (edit-this)
+   M-S-Middle (document-this)
+   This will show the source or online documentation in another buffer.
+   In this buffer I may continue clicking to get to related points in the 
+   source.
+
+While these mouse commands are used, the facility maintains a  notion of the
+`class  of  interest.   This will be  the  last   class you have  looked for
+explicitly with one of these commands.  Pointing to  a feature name tries to
+find the  unique feature definition that is  defined in or inherited by this
+`interesting  class'. This  is most useful  in sources too. During debugging
+for instance, I sometimes want to know what feature is actually called  at a
+certain point. Consider this part of a feature body
+
+	x:=5; foo(a,b).bar(x,y);
+
+Clicking to foo will find the `right' definition if the interesting class is
+the current class or one that  inherits foo  from it.  To get  to the proper
+definition of bar however, you  may have to  switch  to another class first.
+Sometimes this is simple: M-S-Left  click to foo,  this  will throw  you  to
+definition of foo which should  have a result type.  M-S-Left  click to this
+type to get to its definition and make it the currently `interesting class'.
+Then M-S-Left click to bar. (To make sure this works  I split the  screen in
+at least three windows, then the original `bar' call should still be visible
+even though we are already `two steps away' from it).
+
+Sather-apropos (C-c C-a) is another useful command  in this suite.   Apropos
+can be used with regular expressions to get  a quick overview of all related
+'concepts' and 'terms' in the universe defined by a set of files.
+
+Note also that  the mouse can be  used to "fill in" minibuffer  input.  Many
+browsing command prompt for a name by means of the minibuffer. When the name
+happens to be on the screen, you can use C-M-Middle to put the corresponding
+word or  name (cf.  things)  into the minibuffer.  For  more details see the
+notes on   mouse functions in  this file  and the detailed   online help for
+sky-mouse (you get the mouse tutorial by C-h Z). So for instance, one way of
+poking around in a system is by means  of  sather-apropos, edit-definitions,
+and edit-callers.   I type  C-c C-a  (sather-apropos),  enter  the name of a
+concept ("shared" say) that I'm interested in  and type RET.  The topic will
+be used  as substring  and sather-apropos  will list something like (for the
+compiler sources, say):
+
+Tags matching regexp "shared"
+CLASSOB_S::cprint_init_shareds_and_consts
+RESERVED_KEYWORD_NAMES::shared_kw_name
+RESERVED_WORDS::shared_kw_ind
+SYS::Shared
+
+Then I click M-S-Left (edit-this) to the class name ("CLASSOB_S", say) which
+will  throw me into  the source at  the beginning of  this  class.  The next
+M-S-Left to the  feature ("cprint_init_shareds_and_consts", say) brings  the
+feature definition into focus. Using M-S-Left I then follow the calls in the
+body of that  feature.  M-?  (edit-callers) will  prompt for the  name whose
+callers  I want   to  see.  Then    click    M-C-Middle  to  a name    (like
+"cprint_init_shareds_and_consts" that  may  still be  around  on one of  the
+windows will  focus to the  first caller it finds according  to the files in
+the current tag table.  M-, (tags-loop-continue)  will then continue to show
+the next caller until all have been visited or until we follow another trail
+with other browser commands.
+
+The document command (C-c C-d, document-this) or  M-S-Middle (document-this)
+extracts the  inline documentation of  the  definitions of a  single tag and
+presents  a compact   summary.   For  features  this  summary contains   all
+definitions,  the class  of their respective  definition, the signature  and
+their top-level comment and assertions.   For classes it  gives a summary of
+the client view, i.e.  the set of public features and direct parents.
+
+Note also that you can make your  notes sensitive to these browsing commands
+by just switching into Sather mode from time  to time.  I sometimes use this
+by making a buffer  notes.text into which I exclude   the complete  names of
+features like  CLASSOB_S::cprint_init_shareds_and_consts above or the result
+of a  trace and attribute  them with  notes.  I can  then get back easily to
+interesting points that I've visited  and documented a little.  For instance
+you may have already generated a comiler tag table.  then you  might try the
+following now.  Visit the compiler tag table by
+
+	M-x visit-tags-table $SATHER_HOME/compiler/TAGS 
+
+and then switch to Sather mode on this documentation buffer here by
+
+	M-x sather-mode.
+
+You can point to the above tags produced by  sather-apropos (and see whether
+they still exist in your version of the compiler).
+
+
+
+		  S4. Inline documentation generator
+
+Most of  the inline documentation  functions are part  of the Language tools
+package and applicable  in all  language modes once  this package is loaded.
+Emacs knows the comment syntax of its current mode and the fill-column, i.e.
+the 'best' right margin which is also settable by the user.
+
+Insertion of  the first class  template in a  Sather  file   or the explicit
+header command from the Language tools, inserts a language  specific.  There
+are various formal entries in the  header recognized by several commands. In
+particular the HISTORY entry will associate a creation and last modification
+timestamp  to  the file.  Also  it   is recognized  and   used  to insert  a
+modification log with the "doc-modification" command.
+
+For customizing the format of  headers cf.  the online  documentation of the
+related commands.
+
+For commenting and   uncommenting regions of code   during   development the
+commands comment-region-lines and uncomment-region-lines can be used.
+
+Comment filling is supported with the generic command fill-or-indent-region.
+If code lines are included it will indent a region.  Otherwise it treats the
+region as comment and  fills it.  This  is particularly useful  when invoked
+with the mouse which allows  one to fill  a comment by a single  stroke with
+the mouse. This is also on the mouse because it is so often used. You get it
+on C-M-Right  by default.  C-M-Right click to  the the first letter of `is',
+`if' etc will indent `that thing', marking a number of  lines will indent or
+fill  that number of  lines. Watch  out: the  first line  tells  the command
+whether you want to fill  or indent. If you  are not  sure in the beginning,
+Mark a thing by doing  C-M-Left which is  mouse-mark-thing to just  see what
+construct the mouse thinks this is.
+
+For   inline commenting  classes  the sather   abbreviations include various
+patterns and section separators.  The major abbreviations are:
+
+	inh    inheritance
+	rpr    representation
+	imp    implementation note
+	pbl    public
+	rpl    replaceable
+	fml    family
+	scr    secrets
+
+Various horizontal lines allow the user to separate sections of related code
+and tie them together with a common comment.
+
+	lnd    dash line
+        lnt    tilde line
+        lnp    plus line
+        lnm    minus line
+	  
+
+
+			S5. Report generation
+
+The facilities for source browsing and online  documentation  can be used to
+produce reports documenting class  interfaces and library packages. First of
+all, you may just save the online documentation buffers produced by  C-c C-d
+and  C-c C-p. Secondly  two formats are supported. These  are file and class
+documentation.  Both show only the  public features of  classes. In the file
+format feature bodies,  irrelevant comment and  vertical spacing is  removed
+from a file. The class  documentation documentation format describes classes
+in a more readable form for online documentation. This is how you invoke the
+functions, all of  these are  accessible  by  different prefix  arguments to
+"sather-documentation" (C-c C-d).
+
+M-x document-current-buffer    -- file format of the current buffer -> x.doc
+M-x document-tag-table-files   -- above for all files into one directory
+M-x document-tag-table-classes -- alphabetically all classes, not saved
+
+
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+ 
+			     EXTENSION PACKAGES
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+ 
+      E1. Sky Mouse, a syntax-oriented point and click interface
+
+The sky mouse package is a public domain package of mouse commands for Emacs
+and in particular for Epoch (a preliminary X oriented  version of Emacs that
+is  used  to  experiment with Gnu  X features).  The  package is extensively
+documented. Cf.  the README file  of  the  sky-mouse directory and  when the
+package is loaded C-h Z for an interactive Mouse Tutorial.
+
+
+		 E2. Sather to C Interface Generator
+
+Sather to  C Interfaces allow the user   to  describe foreign  abstract data
+types  in terms of a   Sather like notation  that includes  the mapping from
+Sather names to C names and from Sather types to C types.  Files in this SAC
+format are  automatically  converted to .sa  and .c files,  simplifying  the
+efficient access of C packages.
+
+For more  information cf.  the README file   in the SAC  directory, or   the
+corresponding memo.
+
+
+	       E3. Eiffel to Sather conversion facility
+
+Eiffel code can be transformed to Sather automatically. 90% of the necessary
+keyword renamings, lexical and   syntactic  changes are  done automatically.
+However a few transformations may require interaction or  it is advisable to
+run the compiler on the resulting code to detect the untransformed parts.
+
+The transformation does not include a proper treatment of the interface. The
+Eiffel interface declaration is simply commented and  must be done manually.
+Usually it requires restructuring of the parent hierarchy.
+
+The following transformations are performed:
+
+ 1. Replacement of keywords, such as 'inspect' -> 'switch'.
+ 2. Replacement of identifiers, such as 'BOOLEAN' -> 'BOOL'.
+ 3. Replacement of special sequences, such as '[' -> '{' or '?=' -> ':='.
+ 4. Replacement of Eiffel constructs by the corresponding Sather constructs.
+    For instance loops, locals etc. have a syntactically different structure. 
+ 4. Deletion of parameter constraints in parameterized classes.
+ 5. Commenting of class interfaces (you have to revisit them and
+    reintroduce inheritance, but typically all the export, rename
+    and define declarations have to be interpreted to get it right).
+ 6. Transformation of pre- and postconditions into legal Sather assertions
+    of the form 'assert (pre) ... end;', 'assert (post) ... end;'.
+ 7. Commenting of invariants and variants constructs.
+ 8. Conversion of create calls to assigning create calls.
+ 9. All class identifiers are changed to uppercase.
+10. ',' and ';' separated signatures are changed to be acceptable to Sather.
+
+The following deficiencies are known: 
+
+1-3. A few replacements are run as query-replace to make sure, identifiers
+     are not replaced accidentidally, like comment text in 'current' -> 'self'.
+6. Assertions that continue over a number of lines are treated improperly
+   sometimes. The 'end;' may end up in the wrong place.
+7. Only the first line of invariants is commented.
+8-9. The types of local declarations may not always end up to be uppercase.
+10. Factorized types in argument lists like in foo(x,y:BAR, g:BAZ)
+   may not always be treated correctly.
+
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+ 
+			       BASIC SUPPORT
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+ 
+			     B1. Language Tool
+
+Most of the language independent aspects of the Sather environment have been
+extracted and generalized in the meantime. This is interesting for  you only
+if you want to use this functionality also  in other language modes that you
+use with  emacs. For instance  all the  documentation standard and  template
+editing is part of this language independent tools.
+
+The file emacs/lisp/lang-tools.el contains examples  of how this  can be
+used in other languages. In general you just need to put some customizations
+in your   .emacs file   to  tune  buffer   local  user  variables like   the
+"doc-file-summary" or  to make commands  like  "doc-header"  also  available
+under C-c h in other modes than the Sather mode.
+
+
+			       B2. Emacs Tags
+
+All of the tags based Sather commads rely on the Emacs tags format, although
+they know what is included  in  a tag file and  use this  to find the  right
+things. Sometimes you may want to use the  general  Emacs Tags facility that
+treats a Sather program just like a piece of informal text. For instance you
+may want to replace some  string in all  files  of a tag  table. The  sather
+related command would only  replace full identifiers,  and only in  `formal'
+positions, i.e.  in source  code  and when  formally  quoted like  `this' in
+comments.   tags-query-replace  does not   care  and helps  you  to find and
+replace any other occurrences,  too, like in the  middel of identifiers. The
+Emacs tags facility is described detail in the Emacs manual.
+
+
+	       B3. SDB-mode, a mode for the Sather debugger
+
+SDB is an extension of gdb for Sather. Similarly sdb-mode is an extension of
+gdb-mode. You start sdb by typing 
+
+ M-x sdb
+
+on a sather buffer.  This will  prompt  for an executable to run  under sdb.
+This executable should have been produced with the cs option -sdb and the cc
+option -g. 
+
+In  this context,  for simplicity, I assume  that you already know about gdb
+and sdb (you can find out about their  native  commands by  typing help, or,
+help <topic>, when they are running. Also there  is a detailed sdb manual in
+the Emacs info tree (M-x info).
+
+The  most important  commands (for me at  least) are setting of breakpoints,
+visiting and inspecting instances and stepping through source code. To set a
+breakpoint you  type C-x SPACE  on  the Sather  source  line  while   sdb is
+running.  When  you tell sdb  to `run' or `continue',  it may break at those
+places (if it hits them) and a small arrow appears there like below:
+
+    cmd_item(name: STR; action: $MENU_COMMAND): SELF_TYPE is
+=>    item: $CHAN := X::create_root(X::menuitem);
+      help_info(item,action.name);
+      X::set12(item,X::menu_string,CSTR::from_str_(name),
+	 X::menu_notify_proc,X::menu_item_action_ref,
+	 xnl,xnl,xnl,
+	 xnl,xnl,xnl,xnl);
+      X::set1(xv_object, -- the xv menu
+	 X::menu_append_item,item);
+      X::register_cmd(item,action);
+      res := self;
+   end;
+
+For stepping and inspecting instances, you may  either  type commands to the
+sdb prompt, or use emacs key sequences in sdb, or use the  mouse to click to
+what  sdb shows you. For  instance M-s steps into  a call, M-n  steps over a
+call, C-c C-f finishes a feature. Equivalently you may type step <RET>, next
+<RET>,  finish <RET>,  respectively.  A  comfortable  extension is available
+under the   sky-mouse package.   The  M-S button combinations are   used  to
+visit/describe/leave  attributes that appear  on the  sdb window.  The mouse
+will automatically insert the corresponding  command. The  dialog  below was
+produced exclusively with the mouse, once sdb was running and had stopped at
+the breakpoint  above. Note that  the mouse shows an array  contents too, so
+you can  then click  to an index  to see the  contents  of the corresponding
+slot.
+
+Object <0xA5F78>:MENU
+title:STR = Junk
+parent_window:WINDOW = <0xA5F90>
+xv_object:CHAN = <0xCD398>
+parent_menu:MENU = <void>
+(sdb) Object <0xA5F78>:MENU
+title:STR = Junk
+parent_window:WINDOW = <0xA5F90>
+xv_object:CHAN = <0xCD398>
+parent_menu:MENU = <void>
+(sdb) show
+Object <0xA5F78>:MENU
+title:STR = Junk
+parent_window:WINDOW = <0xA5F90>
+xv_object:CHAN = <0xCD398>
+parent_menu:MENU = <void>
+(sdb) show
+Object <0xA5F78>:MENU
+title:STR = Junk
+parent_window:WINDOW = <0xA5F90>
+xv_object:CHAN = <0xCD398>
+parent_menu:MENU = <void>
+(sdb) leave
+Can't go up that far
+(sdb) visit parent_window
+(sdb) show
+Object <0xA5F90>:CANVAS
+title:STR = Graphic Pane
+parent_window:FRAME = <0xA4F00>
+xv_object:CHAN = <0xCC670>
+gc:CHAN = <0xCD320>
+(sdb) visit title
+(sdb) show
+Array(13) <0x6E29C>:STR "Graphic Pane"
+shared precision:INT = 6
+(sdb) array[*]
+0:G 1:r 2:a 3:p 4:h 5:i 6:c 7:C32 8:P 9:a 10:n 11:e 12:C0 
+(sdb) visit [1]
+(sdb) show
+CHAR = 'r'
+(sdb) visit [4]
+CHAR is not a 1D array
+Can't visit ([4])
+(sdb) leave
+(sdb) leave
+(sdb) visit [4]
+CANVAS is not a 1D array
+Can't visit ([4])
+(sdb) visit title
+(sdb) show
+Array(13) <0x6E29C>:STR "Graphic Pane"
+shared precision:INT = 6
+(sdb) array[*]
+0:G 1:r 2:a 3:p 4:h 5:i 6:c 7:C32 8:P 9:a 10:n 11:e 12:C0 
+(sdb) leave
+(sdb) leave
+leave
+(sdb) Can't go up that far
+(sdb) show
+Object <0xA5F78>:MENU
+title:STR = Junk
+parent_window:WINDOW = <0xA5F90>
+xv_object:CHAN = <0xCD398>
+parent_menu:MENU = <void>
+(sdb) visit parent_window
+(sdb) show
+Object <0xA5F90>:CANVAS
+title:STR = Graphic Pane
+parent_window:FRAME = <0xA4F00>
+xv_object:CHAN = <0xCC670>
+gc:CHAN = <0xCD320>
+(sdb) visit parent_window
+show
+(sdb) Object <0xA4F00>:FRAME
+title:STR = /n/icsib29/da/local/sather/lib/user_interface/xview/test/menu2_test
+parent_window:FRAME = <void>
+xv_object:CHAN = <0xC8C98>
+shared default_title:STR = No Title
+named_objects:LIST{$UI_OBJECT} = <0xA4ED0>
+status_doc_str:STR = 
+mode_doc_str:STR = 
+default_panel:PANEL = <0xA4EA0>
+(sdb) visit default_panel
+(sdb) show
+Object <0xA4EA0>:PANEL
+take_new_row:BOOL = F
+take_new_col:BOOL = F
+take_pos:BOOL = F
+title:STR = Default Panel
+parent_window:FRAME = <0xA4F00>
+xv_object:CHAN = <0xC9A30>
+gc:CHAN = <void>
+col_gap:INT = -1
+row_gap:INT = -1
+item_x:INT = -1
+item_y:INT = -1
+new_image:CHAN = <void>
+item_list:STR_HASH_MAP{CHAN} = <0xA3F30>
+(sdb) visit list
+Can't find feature (list) in class PANEL
+Can't visit (list)
+(sdb) visit item_list
+(sdb) show
+Object <0xA3F30>:STR_HASH_MAP{CHAN}
+tbl:GENERAL_HASH{STR_HASH_MAP_ELT{CHAN}} = <0xA3F20>
+tmp:STR_HASH_MAP_ELT{CHAN} = <0xA3F10>
+(sdb) visit tbl
+(sdb) show
+Object <0xA3F20>:GENERAL_HASH{STR_HASH_MAP_ELT{CHAN}}
+size:INT = 2
+tbl:ARRAY{STR_HASH_MAP_ELT{CHAN}} = <0xA4E70>
+mask:INT = 7
+(sdb) visit tbl
+(sdb) show
+Array(9) <0xA4E70>:ARRAY{STR_HASH_MAP_ELT{CHAN}}
+(sdb) array[*]
+0:<void> 1:<void> 2:<void> 3:<void> 4:<0xA3EF0> 5:<void> 6:<void> 7:<0xA3F00> 8:<void> 
+(sdb) visit [4]
+(sdb) show
+Object <0xA3EF0>:STR_HASH_MAP_ELT{CHAN}
+str:STR = Fit Panes
+hash:INT = 21348
+val:CHAN = <0xCC3A0>
+(sdb) visit str
+(sdb) show
+Array(10) <0x6E288>:STR "Fit Panes"
+array[*]
+shared precision:INT = 6
+(sdb) 0:F 1:i 2:t 3:C32 4:P 5:a 6:n 7:e 8:s 9:C0 
+(sdb) 
+
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+ 
+		    APPENDIX 1.: SKY MOUSE INSTALLATION
+				      
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+ 
+
+Under  Emacs x-mouse  or Epoch,  the  cs.uiuc.edu X  extension of Emacs  you
+.emacs will make mouse functions available that allow one  to  mark regions,
+that save/kill  and yank  using the  Emacs kill-ring  and that undestand the
+Thing syntax (cf.  above)  when marking or copying  things. Also pointing to
+identifiers in Sather sources can be used to invoke the most common commands
+for them. There is a do-it-and-learn-it MOUSE-TUTORIAL written in analogy to
+the Emacs TUTORIAL.  Once  you have loaded  etc/.emacs you should be able to
+type C-h  Z  wich means <help> mouse  and  will put   you  into the tutorial
+session.
+
+Normally you may  not  need any special   setup to  make the mouse  commands
+working.  However  we  found  that some   older  setups  of  window  manager
+definitions like .twmrc grab all mouse event  before they are seen by Emacs.
+Also in  the  Epoch  implementation (at least   up to 3.2.5)  cut  and paste
+between and Emacs window  and an xterm  (say) requires a special setup since
+both have different default cut buffers. If you need to  deal with this, you
+will find  a  short extract of the installation  procedure for the sky-mouse
+package in etc/sky-install.txt. See also the sample files sky.Xdefaults.
+
+Quick Overview of the Mouse Map
+
+C-h Z -- Mouse Tutorial
+C-h z -- Play Mouse, <Return> to exit (press button and modifiers to see doc)
+
+GLOBAL MOUSE FUNCTIONS:
+------+--------------------------------------------------------------+
+Mod   |  Left 		     Middle		 Right         Window manager
+------+--------------------------------------------------------------+
+--    |  Select		     Extend		 Paste	  	  olwm
+--    |  Select		     Paste		 Extend		  not olwm
+      |                                                              |
+S     |  Mark Thing	     Save/Kill/Yank	   --                |  Universal
+C     |  Exit minibuffer     Kill to point       Toggle Scroll Mode   > Text/Lang.
+M     |  Toggle Focus        Yank to point       Warp to point       |  
+C-M   |  Mark Thing          Yank to point       Fill or indent      |
+------+--------------------------------------------------------------+
+      |                                                              |
+      |  Exec kbd macro      Run Point fn        Run Region fn       |  Text
+      |                                                              |
+M-S   |  Edit /              Describe /          Parents /            > Sather
+      |  Visit               Show                Leave, Up           |  SDB
+      |                                                              |
+      |        -- under epoch multi-click for prefix arg --          |
+------+--------------------------------------------------------------+
+C-M-S |  This Summary        Mouse Tutorial      Mouse Tutorial      |
+------+--------------------------------------------------------------+
+
+
+
+MINOR MOUSE SCROLLING MODE, regular invocation by C-Right.
+This will vanish when Epoch or Emacs 19 has scrollbars.
+------+--------------------------------------------------------------+
+Mod   |           Left              Middle             Right         |
+------+--------------------------------------------------------------+
+  -   |        Line to top        Drag Scroll     Line to bottom     |
+  S   |          Page up          Page percent       Page down       |
+  M   |          All up              Help            All down        |
+      |                                                              |
+ M-S  |           Help               Help              Help          |
+  C   |       End scrolling     End scrolling     End scrolling      |
+------+--------------------------------------------------------------+

@@ -1,0 +1,257 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/base/str_form.sa
+-- Author: Richard Durbin and Stephen Omohundro
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Formatted output to strings.
+--*
+--* CLASSES: STR_FORMATTER, STR_FORMATTER_TEST, 
+--* 
+--* REQUIRED FILES: ./test.sa
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: str_form.sa,v 1.1 1994/02/12 03:23:15 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 23 16:22 1993 (hws)
+--*  Oct 23 16:22 1993 (hws): SELF_TYPE -> SAME
+--*  Oct 17 06:25 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 27 14:28 1993 (hws): require -> pre
+--*  Feb 21 18:48 1993 (hws): assert (pre) -> require
+--*  May 21 12:03 1991 (om): Changed to output strings instead of write files.
+--*  May 21 11:52 1991 (om): Changed names for consistency. Added test.
+--* Created: Mon Mar 11 21:52:27 1991 (durbin)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class STR_FORMATTER is
+   -- This class is useful for producing output in aligned fields (eg.
+   -- to print out tables of numbers). If `f' is a STR_FORMATTER, then
+   -- to append a series of fields of length `20' to a string you could
+   -- write:
+   --
+   -- f.set_width(20);
+   -- my_str:=my_str.s(f.i(143)).s(f.s("is bigger than")).s(f.r("36.4")).nl;
+   --
+   -- It is possible to set the precision of real numbers and whether
+   -- items are left or right justified or centered within their field.
+   -- Multiple formatters may be used for separate fields to avoid having
+   -- to continually change parameters in mid string. Output to files
+   -- works analogously to output to strings. 
+   
+   const digits:STR:="0123456789";
+   
+   attr width:INT;			-- The current field size.
+   attr precision:INT;		-- The current precision.
+   attr justification:INT;		-- 0 for right, 1 for center, 2 for left. 
+   
+   create(w:INT):SAME is
+      -- A new formatted string object for producing fields of width `w'.
+      -- The default is right justification and a precision of `3'.
+      res:=new; res.set_width(w); res.set_precision(3);
+   end; -- create
+   
+   set_width(w:INT):SAME pre w>0 is
+      -- Set field width to `w'. Adjust precision if width is too small.
+      res:=self; width:=w;
+      if precision > w-2 then set_precision(w-2) end;
+   end; -- set_width
+   
+   set_precision(p:INT):SAME pre p >= 0 is
+      -- Set floating point precision (i.e. digits after the decimal) to `p'.
+      res:=self; precision:=p;
+   end; -- set_precision
+   
+   right_justify:SAME is
+      -- Produce items abutting the right side of the field.
+      res:=self; justification:=0;
+   end; -- right_justify
+   
+   left_justify:SAME is
+      -- Produce items abutting the left side of the field.
+      res:=self; justification:=2;
+   end; -- left_justify
+   
+   center_justify:SAME is
+      -- Produce items centered in the field.
+      res:=self; justification:=1;
+   end; -- center_justify
+
+   insert_blanks(n,loc:INT; s:STR) is
+      -- Insert `n' blanks starting at character `loc' in string `s'.
+      i:INT; loop until!(i>=n);
+	 s[i+loc]:=' ';
+	 i:=i+1
+      end; -- loop
+   end; -- insert_blanks
+      
+   s(st:STR):STR is
+      -- Output a field containing `st' either truncated or filled to
+      -- the field width with blanks. Filling is done on the left, right,
+      -- or both depending on the justification.
+      res:=STR::create_sized(width+1);
+      len:INT:=st.length;
+      if len>=width then
+	 i:INT; loop until!(i>=width); res[i]:=st[i]; i:=i+1 end;
+      elsif justification=0 then -- right justified
+	 insert_blanks(width-len,0,res);
+	 i:INT; loop until!(i>=len); res[i+width-len]:=st[i]; i:=i+1 end;
+      elsif justification=1 then -- centered
+	 l1:INT:=(width-len).rshift(1);
+	 l2:INT:=width-len-l1;
+	 insert_blanks(l1,0,res); insert_blanks(l2,l1+len,res);
+	 i:INT; loop until!(i>=len); res[i+l1]:=st[i]; i:=i+1 end;
+      elsif justification=2 then -- left justified
+	 insert_blanks(width-len,len,res);
+	 i:INT; loop until!(i>=len); res[i]:=st[i]; i:=i+1 end;
+      end; -- if
+   end; -- s
+
+   b(x:BOOL):STR is
+      -- Output a field containing `x', filled with blanks to field width.
+      st:STR:=x.to_s;
+      res:=s(st);
+   end; -- b
+
+   c(x:CHAR):STR is
+      -- Output a field containing `x', filled with blanks to field width.
+      st:STR:=x.to_s;
+      res:=s(st);
+   end; -- c
+
+   i(x:INT):STR is
+      -- Output a field containing the integer `x', filled with blanks to
+      -- field width. If field is too small, fill field with a space
+      -- and then asterisks.
+      st:STR:=x.to_s;
+      if st.length>width then
+	 res:=STR::create_sized(width+1);
+	 res[0]:=' ';
+	 i:INT:=1; loop until!(i>=width); res[i]:='*'; i:=i+1 end;
+      else
+	 res:=s(st);
+      end; -- if
+   end; -- i
+	 
+   r(x:REAL):STR is
+      -- Output a field containing the real `x', filled with blanks to
+      -- field width. If field is too small, fill field with a space
+      -- and then asterisks. Use the given precision.
+      sprec:INT:=STR::precision; -- remember old precision
+      STR::precision:=precision; -- set to our desired precision
+      st:STR:=x.to_s;
+      if st.length>width then
+	 res:=STR::create_sized(width+1);
+	 res[0]:=' ';
+	 i:INT:=1; loop until!(i>=width); res[i]:='*'; i:=i+1 end;
+      else
+	 res:=s(st);
+      end; -- if
+      STR::precision:=sprec;
+   end; -- r
+   
+   d(x:DOUBLE):STR is
+      -- Output a field containing the real `x', filled with blanks to
+      -- field width. If field is too small, fill field with a space
+      -- and then asterisks. Use the given precision.
+      sprec:INT:=STR::precision; -- remember old precision
+      STR::precision:=precision; -- set to our desired precision
+      st:STR:=x.to_s;
+      if st.length>width then
+	 res:=STR::create_sized(width+1);
+	 res[0]:=' ';
+	 i:INT:=1; loop until!(i>=width); res[i]:='*'; i:=i+1 end;
+      else
+	 res:=s(st);
+      end; -- if
+      STR::precision:=sprec;
+   end; -- d
+   
+end; -- class STR_FORMATTER
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class STR_FORMATTER_TEST is
+   -- Test of `STR_FORMATTER'.
+
+   TEST;
+   
+   main is
+      -- Test of `STR_FORMATTER'.
+      class_name("STR_FORMATTER");
+      f:STR_FORMATTER:=STR_FORMATTER::create(5);
+      test("s right 5", f.s("this is a test"), "this ");
+      test("b right 5", f.b(true), "    T");
+      test("c right 5", f.c('x'), "    x");
+      test("i right 5", f.i(124578), " ****");
+      test("i2 right 5", f.i(43), "   43");
+      test("r right 5", f.r(4.3), "4.300");
+      test("r2 right 5", f.r(2454.3), " ****");
+      test("d right 5", f.d(4.3), "4.300");
+      f.right_justify.set_width(20);
+      test("s right 20", f.s("this is a test"), "      this is a test");
+      test("b right 20", f.b(true), "                   T");
+      test("c right 20", f.c('x'),  "                   x");
+      test("i right 20", f.i(43),   "                  43");
+      test("r right 20", f.r(4.3),  "               4.300");
+      test("d right 20", f.d(4.3),  "               4.300");
+      f.left_justify.set_width(20);
+      test("s left 20", f.s("this is a test"), "this is a test      ");
+      test("b left 20", f.b(true),  "T                   ");
+      test("c left 20", f.c('x'),   "x                   ");
+      test("i left 20", f.i(43),    "43                  ");
+      test("r left 20", f.r(4.3),   "4.300               ");
+      test("d left 20", f.d(4.3),   "4.300               ");
+      f.center_justify.set_width(20);
+      test("s center 20", f.s("this is a test"), "   this is a test   ");
+      test("b center 20", f.b(true),"         T          ");
+      test("c center 20", f.c('x'), "         x          ");
+      test("i center 20", f.i(43),  "         43         ");
+      test("r center 20", f.r(4.3), "       4.300        ");
+      test("d center 20", f.d(4.3), "       4.300        ");
+      t1:STR_FORMATTER:=STR_FORMATTER::create(50).center_justify;
+      t2:STR_FORMATTER:=STR_FORMATTER::create(20).left_justify;
+      t3:STR_FORMATTER:=STR_FORMATTER::create(10).center_justify;
+      t4:STR_FORMATTER:=STR_FORMATTER::create(20).right_justify;
+      t:STR:=STR::create.nl;
+      t:=t.s(t1.s("This is a Multi-formatted")).nl.s(t1.s("Table")).nl.nl;
+      t:=t.s(t2.s("Watts")).s(t3.s("Zone")).s(t4.s("Customer")).nl;
+      t:=t.s(t2.s("-----")).s(t3.s("----")).s(t4.s("--------")).nl;
+      t:=t.s(t2.r(13.4)).s(t3.i(5)).s(t4.s("Malloy")).nl;
+      t:=t.s(t2.r(22.44)).s(t3.i(158)).s(t4.s("Higgins")).nl;
+      t:=t.s(t2.r(.489)).s(t3.i(14)).s(t4.s("Walpirg")).nl;
+      t:=t.s(t2.r(187.2)).s(t3.i(4098)).s(t4.s("Shimony")).nl;
+      t:=t.s(t2.r(1999.6)).s(t3.i(38)).s(t4.s("Plunkett")).nl;
+      t:=t.s(t2.r(3.2)).s(t3.i(809)).s(t4.s("Blodgett")).nl.nl;
+      unchecked_test("table", t, "");
+	 -- Should produce the ouput:
+	 -- 
+	 --             This is a Multi-formatted             
+	 --                       Table                       
+	 -- 
+	 -- Watts                  Zone               Customer
+	 -- -----                  ----               --------
+	 -- 13.400                  5                   Malloy
+	 -- 22.440                 158                 Higgins
+	 -- 0.489                   14                 Walpirg
+	 -- 187.200                4098                Shimony
+	 -- 1999.600                38                Plunkett
+	 -- 3.200                  809                Blodgett
+	 -- 
+      finish;
+   end; -- main
+   
+end; -- class STR_FORMATTER_TEST 
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

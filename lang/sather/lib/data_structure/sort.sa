@@ -1,0 +1,185 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/data_structure/sort.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Sorting algorithms.
+--*
+--* CLASSES: QUICKSORT{T}, STR_SORT, SORT_TEST
+--* 
+--* REQUIRED FILES:
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: sort.sa,v 1.1 1994/02/12 03:23:26 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:32 1993 (hws)
+--*  Oct 17 06:32 1993 (hws): Sather 1 syntax, copyright note
+--* Created: Sun Mar 11 22:24:50 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class QUICKSORT{T} is
+   -- An empty class for sorting `LIST{T}'.  `T' may be `INT', `REAL', or 
+   -- `DOUBLE'. By inheriting `QUICKSORT{T}' and redefining `compare',
+   -- `LIST''s of elements of other types may be sorted as demonstrated
+   -- in `STR_SORT'.
+   
+   const qs_lim:INT:=10;	-- When to stop the quicksort recursion.
+
+   compare(a,b:T):BOOL is
+      -- Comparison for `INT', `REAL' and `DOUBLE'. Redefine for others. 
+      res:=(a<=b);
+   end; -- compare
+
+   insertion_sort_range(ls:LIST{T}; l,u:INT) is
+      -- Stably sort the elements in the range `[i,j]' of `l' by insertion
+      -- sort.
+      i:INT:=l+1; loop until!(i>u);
+	 e:T:=ls[i];
+	 j:INT:=i-1; loop until!(j<l);
+	    if compare(ls[j], e) then break! end;
+	    ls[j+1]:=ls[j]; j:=j-1
+	 end; -- loop
+	 ls[j+1]:=e;
+	 i:=i+1
+      end; -- loop
+   end; -- insertion_sort_range
+   
+   insertion_sort(ls:LIST{T}) is
+      -- Sort `ls' by insertion sort.
+      insertion_sort_range(ls,0,ls.size-1);
+   end; -- insertion_sort
+   
+   quicksort_range(ls:LIST{T}; l,u:INT) is
+      -- Use quicksort to sort the range `[l,u]' of `ls'.
+      if u-l>qs_lim then
+	 r:INT:=RANDOM::int_range(l,u);
+	 t:T:=ls[r]; ls[r]:=ls[l]; ls[l]:=t; -- swap r and l
+	 m:INT:=l;
+	 i:INT:= l+1; loop until!(i>u);
+	    if compare(ls[i], t) then 
+	       m:=m+1; 
+	       s:T:=ls[m]; ls[m]:=ls[i]; ls[i]:=s; -- swap m and i
+	    end; -- if
+	    i:=i+1
+	 end; -- loop
+	 v:T:=ls[l]; ls[l]:=ls[m]; ls[m]:=v;
+	 quicksort_range(ls,l,m-1); quicksort_range(ls,m+1,u);
+      else
+	 insertion_sort_range(ls,l,u)
+      end; -- if
+   end; -- quicksort_range
+   
+   quicksort(ls:LIST{T}) is
+      -- Sort `ls' by quicksort.
+      quicksort_range(ls,0,ls.size-1);
+   end; -- quicksort
+
+   is_sorted(ls:LIST{T}):BOOL is
+      -- Trueif `ls' is sorted.
+      res:=true;
+      i:INT; loop until!(i>=ls.size-1);
+	 if not compare(ls[i],ls[i+1]) then res:=false; return end;
+	 i:=i+1
+      end; -- loop
+   end; -- is_sorted
+   
+end; -- class QUICKSORT{T}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class STR_SORT is
+   -- Sort `LIST{STR}' alphabetically. Usage: `STR_SORT::sort(l)'.
+   -- Also supports `STR_SORT::is_sorted(l):BOOL'.
+   
+   QUICKSORT{STR};
+   
+   compare(a,b:STR):BOOL is
+      -- Redefined comparison for strings.
+      res:= (not b.is_less_than(a));
+   end; -- compare
+   
+   sort(l:LIST{STR}) is
+      -- Sort the strings in `l' lexicographically.
+      quicksort(l)
+   end; -- sort
+   
+end; -- class STR_SORT
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class SORT_TEST is
+   -- Test `QUICKSORT{INT}', `QUICKSORT{REAL}', and `STR_SORT'.
+   TEST;
+
+   main is
+      -- Test `QUICKSORT{INT}', `QUICKSORT{REAL}', and `STR_SORT'.
+      isort_test; rsort_test; ssort_test;
+   end; -- main
+   
+   isort_test is
+      -- Test QUICKSORT{INT}.
+      class_name("QUICKSORT{INT}");
+      l:LIST{INT}:=l.create;
+      i:INT; loop until!(i=200);
+	 l:=l.push(RANDOM::int_range(1,1000));
+	 i:=i+1
+      end; -- loop
+      test("is_sorted", QUICKSORT{INT}::is_sorted(l).to_s, "F");
+      m:LIST{INT}:=l.copy;
+      QUICKSORT{INT}::insertion_sort(m);
+      test("insertion_sort", QUICKSORT{INT}::is_sorted(m).to_s, "T");
+      m:=l.copy;
+      QUICKSORT{INT}::quicksort(m);
+      test("quick_sort", QUICKSORT{INT}::is_sorted(m).to_s, "T");
+      finish;
+   end; -- isort_test
+   
+   rsort_test is 
+      -- Test QUICKSORT{REAL}.
+      class_name("QUICKSORT{REAL}");
+      l:LIST{REAL}:=l.create;
+      i:INT; loop until!(i=200);
+	 l:=l.push(RANDOM::uniform);
+	 i:=i+1
+      end; -- loop
+      test("is_sorted", QUICKSORT{REAL}::is_sorted(l).to_s, "F");
+      m:LIST{REAL}:=l.copy;
+      QUICKSORT{REAL}::insertion_sort(m);
+      test("insertion_sort", QUICKSORT{REAL}::is_sorted(m).to_s, "T");
+      m:=l.copy;
+      QUICKSORT{REAL}::quicksort(m);
+      test("quick_sort", QUICKSORT{REAL}::is_sorted(m).to_s, "T");
+      finish;
+   end; -- rsort_test
+
+   ssort_test is
+      -- Test STR_SORT.
+      class_name("STR_SORT");
+      l:LIST{STR}:=l.create;
+      l:=l.push("one"); l:=l.push("two"); l:=l.push("three"); 
+      l:=l.push("four"); l:=l.push("five"); l:=l.push("six"); 
+      l:=l.push("seven"); l:=l.push("eight"); l:=l.push("nine"); 
+      l:=l.push("ten"); l:=l.push("eleven"); l:=l.push("twelve"); 
+      l:=l.push("thirteen"); l:=l.push("fourteen"); l:=l.push("fifteen");
+      test("is_sorted", STR_SORT::is_sorted(l).to_s, "F");
+      STR_SORT::sort(l);
+      test("sort", STR_SORT::is_sorted(l).to_s, "T");
+      finish;
+   end; -- ssort_test
+   
+end; -- class SORT_TEST
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

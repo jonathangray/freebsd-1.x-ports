@@ -1,0 +1,262 @@
+-- -*- Mode: Sather; -*-
+-- File: xvob.sa
+-- Author: Heinz Schmidt (hws@icsi.berkeley.edu)
+-- Created: Mon Dec 17 08:37:25 1990
+-- Copyright (C) 1990, International Computer Science Institute
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION:  Sather to XView interface. 
+--*            Some callbacks receive arguments that they are expected to 
+--*            update and use in calls to Xview or to return updated.
+--*            Many functions want to be macros in the optimizing code.
+--*
+--* CLASSES: C_RECT
+--* 
+--* RELATED PACKAGES: cob.sa, ccob.sa
+--*
+--*  [XvPM2] O'Reilly: XView Programming Manual, Version 2.0
+--*          X Window System Guide, Vol. 7
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+--*
+--* FOREIGN STRUCTURES
+--* 
+-- Points and rectangles are used all over the place, for instance when we 
+-- are called back to repaint parts of the window; or to define a clipping 
+-- region to Xview. 
+
+   struct C_RECT/rect( left/r_left : INT;
+                     right/r_right : INT;
+                     width/r_width : INT;
+                    height/r_height: INT ) is -- an XView rectangle.
+		    end; 
+
+--*
+--* XView Functions
+--* 
+-- Generic XView construction, access and destruction (cf. XvPM2) -----------
+-- A number of Xview properties can be used only with xv_create.   For now we
+-- simply support a long arglist. Should we support a LST{$COB} arg instead and
+-- split it in C? Some of the kludge here would go away but then: the Sather-C
+-- would be more fragile.   Since xv_  functions are XView  functions with var
+-- args, it is simpler to  just change the number of args  here. Take care
+-- that only xvlow calls the C functions directly.
+
+   function xv_create(parent:$CHAN; xvclass:CKEY; x1,x2,x3,x4,x5:$COB):$CHAN is 
+      -- creates an XView object. 
+      -- returns xv_null if create fails. parent can be xv_null. 
+      implemented
+   end; 
+   
+   function xv_create20(a:$CHAN; b:CKEY; b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t:$COB):$CHAN is
+      -- xv_create, more parameters for objects that want many init 
+      -- properties or die with segmentation faults when touched the first time.
+      "xv_create(" a "," b "," c "," d "," e ","  f "," g "," h "," i "," 
+                   j ","  k "," l "," m "," n "," o ","  p "," q "," r "," 
+                   s "," t ")" ;
+   end;
+   
+   function xv_destroy(xvobj:$CHAN) is -- destroys xvobj and inferiors.
+      implemented 
+   end;
+   
+   function xv_destroy_safe(frame:$CHAN) is 
+      -- destroys frame and let's main loop return.
+      implemented
+   end; 
+ 
+-- Some attributes like choice lists take only inline string lists.
+-- so provide a sufficient number of parameters.
+
+   function xv_set(xvobj:$CHAN; x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,
+                x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,
+                x21,x22,x23,x24,x25,x26,x27,x28,x29:$COB) is 
+		   -- sets attributes of xvobj.
+		   -- Result indicates failure or success.   
+		   implemented
+		end; 
+   
+   function xv_get(xvobj:$CHAN; attr,opt_key:$COB):$COB is 
+      -- gets attribute value, some have key. 0 if fails. 
+      implemented
+   end;
+   
+   function xv_find(parent,xvclass,x1,x2,x4,x5,x6,x7,x8,x9,x10,x11:$COB):$CHAN is 
+      -- find XView object.
+      -- creates object if XV_AUTO_CREATE = true.
+      implemented
+   end;
+   
+   function sxv_initialize(argc:INT; argv:CSTRAY) is
+      -- initializes XView and Sather-XView package.
+      -- argc,argv can be used to pass on command line arguments.
+      -- xv_init is called and read .Xdefaults if present.
+      "xv_init(XV_INIT_ARGS," argc "," argv ",NULL)" ;
+   end;
+
+   function xv_main_loop(frame:$CHAN) is -- starts frame's event handling loop.
+      implemented
+   end;
+      
+--*
+--* CALLBACK SUPPORT
+--*
+--  we use the (c_name) compiler directive to allow  calls from  XView to this
+-- code. This  will also  be  respected by  the interpreter.  The addresses of
+-- callbacks  are  stored  in a  table in the xvaux.c  package for registering
+-- callback functions with XView.
+
+   function sxv_cb_adr_(callback:INT):$COB is -- indexed callback address.   
+      implemented
+   end;
+   
+   function to_xv_(attr:INT):$COB is -- indexed XView constant access.
+      implemented   
+   end;  
+
+--*
+--* Auxiliaries hiding details of event registration
+--* 
+--  the keys involved here at the C side are typically macros which expand into
+--  sequences of event masks. We support only the most common combinations.
+   
+   function sxv_win_consume_ascii_events(window:$CHAN) is 
+      -- window is to receive ascii events.
+      implemented
+   end; 
+   function sxv_win_consume_mouse_events(window:$CHAN) is 
+      -- window is to receive mouse envents.
+      implemented
+   end; 
+   function sxv_win_consume_right_keys(window:$CHAN) is 
+      -- window is to receive function keys.
+      implemented
+   end; 
+   function sxv_win_ignore_up_events(window:$CHAN) is 
+      -- window is to ignore all button release's.
+      implemented
+   end; 
+   function sxv_win_ignore_up_ascii_events(window:$CHAN) is 
+      -- window is to ignore up keys.
+      implemented
+   end; 
+
+--* 
+--* XView procedures
+--* 
+--   
+-- listed in the order they appear in the XvAPI1 Summary tables.
+-- Sections are either completely included (except for macros) or 
+-- skipped entirely.
+   
+-- Common Procedures
+   
+   function xv_col(window,column:$COB):$COB is  -- col to pixel (excl. left margin).
+      implemented 
+   end;
+   function xv_cols(window,columns:$COB):$COB is -- col to pixel (incl. left margin).
+      implemented 
+   end;
+   function xv_row(window,row:$COB):$COB is -- row to pixel (excl. top margin).
+      implemented 
+   end;
+   function xv_rows(window,rows:$COB):$COB is -- row to pixel (incl. top margin).
+      implemented 
+   end;
+   
+-- Cursor Procedures *** skipped
+   
+-- Frame Procedures
+   
+   function frame_get_rect(frame:$COB):$COB is -- the bounding box of the frame.
+      implemented 
+   end;   
+   function frame_set_rect(frame,rect:$COB) is -- set the bounding box of the frame.
+      implemented 
+   end;   
+   function frame_fit_all_panes(frame:$COB) is -- fit subpanes and then frame.
+      implemented 
+   end;   
+   
+-- Menu Procedures
+   
+   function menu_show(menu,window,event,null:$COB) is -- pop up menu over window.
+      implemented 
+   end;   
+
+-- Panel Procedures *** skipped
+-- Scrollbar Procedures *** skipped
+-- Selection Procedures *** skipped
+-- Text Subwindow Procedures *** skipped
+   
+-- Window Procedures
+   
+   function window_done(win:$COB):$COB is 
+      -- destroys the entire hierarchy to which win belongs. 
+      implemented
+   end; 
+   
+   function window_main_loop(base_frame:$COB) is 
+      -- display frame and start Notifier for it.
+      implemented
+   end;
+   
+-- window_bell(win:$COB) is end; -- ring the bell.
+   
+   function xv_display_from_window(win:$COB):$COB is -- the display object.
+      implemented
+   end; 
+
+-- window_read_event *** skipped   
+-- Window Manager Procedures *** skipped
+   
+--*
+--* We roll our own abstraction for main menu and notification
+--*
+   
+-- Main menu popped up on ACTION_MENU event.
+   
+   function sxv_install_main_menu(window,menu:$COB) is 
+      -- install window's main menu. 
+      implemented
+   end;
+   function sxv_copy_main_menu(oldwindow,newwindow:$COB) is 
+      -- copy menu from one view to other.
+      implemented
+   end;
+   
+-- Simple Notice Interface
+
+   function sxv_confirm(prompt_cstr_array,window,event:$COB) is 
+      -- displays prompt and waits for the user to confirm.
+      -- Prompt must be a cstring array ptr.
+      -- The notice window emanates from event's position if not null. 
+      -- Window is mandatory.
+      implemented
+   end;
+   
+   function sxv_yesorno(prompt_cstr_array,window,event,yes_cstr,no_cstr:$COB):$COB is
+      -- displays prompt and waits for the user to select a yes or no button.
+      -- One of NOTICE_FAILED, NOTICE_YES, NOTICE_NO is returned.
+      -- Prompt must be a cstring array ptr.
+      -- The notice window emanates from event's position if not null. 
+      -- Window is mandatory.
+      implemented
+   end;
+   
+   function sxv_query(prompt_cstr_array,window,event,buttons_cstr_array:$COB):$COB is
+      -- displays prompt and waits for the user to select one of n buttons.
+      -- Prompt must be a cstring array ptr.
+      -- The notice window emanates from event's position if not null. 
+      -- Window is mandatory.
+      -- The number of buttons and the button titles are derived from buttons,
+      -- a C string array ptr.
+      implemented
+   end;
+
+--*
+--* C functions
+--*
+
+   function exit(rc:INT) is -- exit application.
+      implemented
+   end;

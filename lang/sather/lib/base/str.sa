@@ -1,0 +1,717 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/base/str.sa
+-- Author: Stephen M. Omohundro and Chu-Cheow Lim
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Strings.
+--*
+--* CLASSES: STR, STR_CURSOR, STR_TEST
+--* 
+--* RELATED PACKAGES:
+--*
+--* RCS: $Id: str.sa,v 1.1 1994/02/12 03:23:16 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:24 1993 (hws)
+--*  Oct 17 06:24 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 27 14:27 1993 (hws): require->pre
+--*  Aug 20 13:46 1993 (oscar): str{len,cat,cmp} -> sstr{len,cat,cmp} to fool ANSI C
+--*  Feb 21 18:47 1993 (hws): assert(pre) -> require
+--*  Feb 21 18:48 1992 (hws): Added Nobuyuki Hikichi's patch to sccanfd
+--*  May 26 15:20 1991 (hws): adapt STR_CURSOR to standard cursor
+--*       protocol.
+--*  Apr 25 14:26 1991 (om): Added Richard Durbin's code to STR_CURSOR.
+--* Created: Thu Apr 18 17:23:00 1991 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class STR is
+   -- Sather strings are simply arrays of characters in which all characters
+   -- following the last character of the string are equal to `\000'.  Each
+   -- string must have at least one such character for compatibility with C
+   -- strings. The primary means for constructing strings in Sather is to
+   -- append strings constructed from entities to the end of existing
+   -- strings. The amortized doubling technique is used to automatically
+   -- allocate space for strings. This means that if there is not room in a
+   -- string for the characters which need to be appended, a new string with
+   -- twice as many characters is allocated and the original characters are
+   -- copied over. By the time a string constructed by repeated appending
+   -- gets to be of length n, at most O(log n) such extensions will have
+   -- been made, the total number of copied characters is O(n) as is the
+   -- amount of wasted space and garbage to be collected by the collector.
+   -- Thus the costs per character are constant when amortized over the
+   -- construction of an entire string. Because all characters following the
+   -- end of a string are equal to 0, the end of the string is found by
+   -- binary search. This allows the system to determine the length of
+   -- strings in O(log n) time without the space and time overhead of
+   -- explictly storing and updating the length.
+   -- 
+   -- Most strings are constructed by appending component strings together.
+   -- For example,
+   -- 
+   -- ``s:STR:="The floor of ".r(15.3).s(" is ").i(15).c('.').nl;''
+   -- 
+   -- sets the string `s' to `"The floor of 15.3 is 12.\n"'. Each of the
+   -- appending routines: `b', `c', `s', `i', `r', `d', and `nl' return
+   -- the new string. These operations work by amortized doubling and
+   -- potentially destroy the original string. To append to an existing
+   -- string without destroying it, one may use `copy' in an expression like:
+   -- 
+   -- `s2:=s1.copy.s(" appended part")'.
+   -- 
+   -- Reals and doubles are converted to strings with a precision given by
+   -- the shared integer `precision'. If `precision' is equal to `0' then
+   -- only the integer part of a `REAL' is put into the string. Whenever this
+   -- variable is set, future constructions use the new value until it is
+   -- changed again. In strings, the boolean values `true' and `false' are
+   -- represented by `"T"' and `"F"'. `cursor' produces an object of type
+   -- `STR_CURSOR' which points at the head of the string and is used to
+   -- sequentially read out its components.
+   
+   ARRAY{CHAR};
+   shared precision: INT := 6;	-- Digits of precision in printing `REAL''s.
+      -- If `precision=0', then print `REAL''s as `INT''s.
+   
+   create: SAME is
+      -- An empty string.
+      res := new(4);
+   end; -- create
+   
+   create_sized(n: INT): SAME pre n >= 1 is
+      -- An empty string with room for `n' characters (including the end
+      -- terminator).
+      res := new(n);
+   end; -- create
+   
+   b(bo: BOOL): STR is
+      -- A string with 'T' or 'F' appended according to the value of `bo'.
+      l: INT := length;
+      if (l + 2 > asize) then res := extend(asize * 2); else res := self end;
+      if bo then res[l] := 'T' else res[l] := 'F' end;
+	 -- the next character is automatically = '\0'
+   end; -- b
+   
+   c(ch: CHAR): STR is
+      -- A string with character `ch' appended.
+      l: INT := length;
+      if (l + 2 > asize) then res := extend(asize * 2); else res := self end;
+      res[l] := ch; 
+      	 -- the next character is automatically = '\0'
+   end; -- c
+   
+   s(st: STR): STR is
+      -- A string with `st' appended.
+      l1: INT := length; l2: INT := st.length; 
+      lt: INT := l1 + l2 + 1;
+      if (lt > asize) then
+	 ns: INT := asize * 2;
+	 loop until!(ns >= lt); ns := ns * 2 end; -- find first doubling bigger
+	 res := extend(ns); 
+      else res := self end;
+      C::sstrcat(C::str_ptr_(res),C::str_ptr_(st));
+   end; -- s
+   
+   i(in: INT): STR is
+      -- A string with integer `in' appended.
+      l: INT := length; lt: INT := l + 12; -- max `INT' is less than 11 `CHAR''s
+      if (lt > asize) then
+	 ns: INT := asize * 2;
+	 loop until!(ns >= lt); ns := ns * 2 end; -- find first doubling bigger
+	 res := extend(ns); 
+      else res := self end;
+      C::sprintfi(C::str_ptr_(res), in, l)
+   end; -- i
+   
+   r(re: REAL): STR is
+      -- A string with the `REAL' `re' appended.
+      l: INT := length; lt: INT := l + 12; -- max `REAL' is less than 11 `CHAR''s
+      if (lt > asize) then
+	 ns: INT := asize * 2;
+	 loop until!(ns >= lt); ns := ns * 2 end; -- find first doubling bigger
+	 res := extend(ns); 
+      else res := self end;
+      C::sprintfd(C::str_ptr_(res), re, precision,l)
+   end; -- r
+   
+   d(do: DOUBLE): STR is
+      -- A string with the `DOUBLE' `do' appended.
+      l: INT := length; lt: INT := l + 12; -- max `DOUBLE' is less than 11 `CHAR''s
+      if (lt > asize) then
+	 ns: INT := asize * 2;
+	 loop until!(ns >= lt); ns := ns * 2 end; -- find first doubling bigger
+	 res := extend(ns); 
+      else res := self end;
+      C::sprintfd(C::str_ptr_(res), do, precision,l)
+   end; -- d
+   
+   nl: STR is
+      -- A string with a newline character appended to `self'.
+      res := self.c('\n');
+   end; -- nl
+   
+   is_equal(st: STR): BOOL is
+      -- True if `self' is the same string as `st'.
+      res := (0 = C::sstrcmp(C::str_ptr_(self),C::str_ptr_(st)));
+   end; -- is_equal
+   
+   is_less_than(st: STR): BOOL is
+      -- True if `self' is lexicographically before `st'.
+      res := (0 > C::sstrcmp(C::str_ptr_(self),C::str_ptr_(st)));
+   end; -- is_less_than
+   
+   to_upper_case: STR is
+      -- Converts all characters in `self' to upper case.
+      i: INT := 0; l: INT := length;
+      loop until!(i = l); [i] := [i].to_upper_case; i := i + 1 end;
+      res := self;
+   end; -- to_upper_case
+   
+   to_lower_case: STR is
+      -- Converts all characters in `self' to lower case.
+      i: INT := 0; l: INT := length;
+      loop until!(i = l); [i] := [i].to_lower_case; i := i + 1 end;
+      res := self;
+   end; -- to_lower_case
+   
+   capitalize: STR is
+      -- Capitalize all the words in `self'.
+      i: INT := 0; l: INT := length;
+      loop until!(i = l);
+	 if i = 0 then 
+	    [i] := [i].to_upper_case; 
+	 elsif [i - 1].is_space or [i - 1].is_punctuation then
+	    [i] := [i].to_upper_case; 
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      res := self;
+   end; -- capitalize
+   
+   is_upper_case: BOOL is
+      -- True if all alphabetic characters in `self' are capitalized.
+      i: INT := 0; l: INT := length;
+      loop until!(i = l);
+	 if ([i].is_alphabetic) then
+	    if [i].is_lower_case then return end;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      res := true;
+   end; -- is_upper_case
+   
+   head(n: INT): STR pre n >= 0 is
+      -- A new string consisting of the first `n' letters of `self'.
+      nc: INT := length.min(n);
+      res := res.new(nc + 1);
+      i: INT := 0; loop until!(i = nc);
+	 res[i] := [i]; i := i + 1
+      end; -- loop
+	 -- already terminated with '\0'
+   end; -- head
+   
+   tail(n: INT): STR pre n >= 0 is
+      -- A new string consisting of the last `n' letters of `self'.
+      l: INT := length; nc: INT := l.min(n); st: INT := l - nc;
+      res := res.new(nc + 1);
+      i: INT := 0; loop until!(i = nc);
+	 res[i] := [st + i]; i := i + 1
+      end; -- loop
+	 -- already terminated with '\0'
+   end; -- tail
+   
+   length: INT is
+      -- The current length of `self' (not including trailing '\0').
+      if asize < 20 then	-- small enough that brute count is fast
+	 res := C::sstrlen(C::str_ptr_(self));
+      elsif [0] = '\0' then return -- do empty strings immediately
+      else			-- do by binary search
+	 l: INT; u: INT := asize - 1;	-- [u]='\0', [l]/='\0'
+	 loop until!(u = l + 1);
+	    m: INT := l + (u - l).rshift(1); -- split the difference
+	    if [m] = '\0' then u := m;
+	    else l := m end;
+	 end; -- loop
+	    -- at this point u=l+1 and [u]='\0', [l]/='\0'
+	 res := u;
+      end; -- if
+   end; -- length
+   
+   substring(n,m: INT): STR pre n >= 0 and m >= 0 and n <= m is
+      -- The substring between characters `n' and `m' inclusive. (`n<=m').
+      l: INT := length; 
+      if l <= n then res := create; return end; -- empty string
+      nc: INT := (l).min(m + 1) - n; 
+      res := res.new(nc + 1);
+      i: INT := 0; loop until!(i = nc);
+	 res[i] := [n + i]; i := i + 1
+      end; -- loop
+	 -- already terminated with '\0'
+   end; -- substring
+   
+   index_of_char(ch: CHAR): INT is
+      -- The index of the first appearance of `ch' in `self' or `-1' if
+      -- absent.
+      l: INT := length; res := - 1;
+      i: INT := 0; loop until!(i = l);
+	 if [i] = ch then res := i; break! end;
+	 i := i + 1
+      end;
+   end; -- index_of_char
+   
+   reverse: STR is
+      -- Reverse the order of the characters in `self'. Return `self'.
+      l: INT := length; sm: INT := l - 1;
+      t: CHAR;
+      i: INT; loop until!(i = l.rshift(1));
+	 t := [i]; [i] := [sm - i]; [sm - i] := t;
+	 i := i + 1;
+      end; -- loop
+      res := self;
+   end; -- reverse
+   
+   is_empty: BOOL is
+      -- True if `self' has no characters.
+      res := ([0] = '\0')
+   end; -- is_empty
+   
+   to_i: INT is
+      -- The `INT' of which `self' is a representation.
+      res := C::sscanfi(C::str_ptr_(self),0);
+   end; -- to_i
+   
+   to_r: REAL is 
+      -- The `REAL' of which `self' is a representation.
+      res := C::sscanfd(C::str_ptr_(self),0);
+   end; -- to_r
+   
+   to_d: DOUBLE is
+      -- The `DOUBLE' of which `self' is a representation.
+      res := C::sscanfd(C::str_ptr_(self),0);
+   end; -- to_d
+   
+   to_b: BOOL is
+      -- The `BOOL' of which `self' is a representation.
+      -- (ie. has value `true' if `"T"' and `false' if `"F"').
+      if [0] = 'T' then res := true end;
+   end; -- to_b
+   
+   to_c: CHAR is
+      -- The `CHAR' of which `self' is a representation.
+      res := [0];
+   end; -- to_c
+   
+   from_c_str(st: F_OB): STR is
+      -- Returns a Sather string corresponding to the C string whose 
+      -- pointer is `st'. Used internally.
+      if (st /= void) then
+	 res := C::makestr_(st);
+      end; -- if
+   end; -- from_c_str
+   
+   cursor: STR_CURSOR is
+      -- A cursor into `self'.
+      res := STR_CURSOR::create(self);
+   end; -- cursor
+   
+   hash: INT is
+      -- An inexpensive to compute hash function of `self'.
+      -- Gives an `INT' with rightmost 24 bits. 
+      i: INT; 
+      loop
+	 if [i] = '\0' then break! end;
+	 res := res.bit_xor([i].to_i.lshift(i.bit_and(15)));
+	 i := i + 1;
+      end; -- loop
+   end; -- hash
+   
+end; -- class STR
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class C is
+   -- The C routines needed for `STR'.
+   
+   str_ptr_(s: STR): F_OB is end; -- A C pointer to the C string part of `s'.
+   makestr_(st: F_OB): STR is end; -- Create a Sather string from a C string.
+   sstrlen(s: F_OB): INT is end; -- Length given a pointer to C string.
+   sstrcat(s1,s2: F_OB): F_OB is end; -- Catenate C string s2 onto C string s1
+   sstrcmp(s1,s2: F_OB): INT is end; -- Compare C strings, <0 if s1<s2, 0 =, >0>
+   sprintfi(s: F_OB; i,l: INT) is end; -- Insert `i' into `s' at `CHAR' `l'.
+   sprintfd(s: F_OB; d: DOUBLE; p,l: INT) is end; -- Insert `d' into `s' at
+      -- `CHAR' `l' with precision `p'.
+end; -- class C
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class STR_CURSOR is
+   -- Class for stepping through strings extracting information.
+   -- Throughout the Sather libraries, cursor classes are used to keep
+   -- pointers into container data structures. In each case there is the
+   -- possibility of problems if the the structure is destructively modified
+   -- while a cursor points to its internals. The preferred approach is to
+   -- completely use one or more cursors into a structure before
+   -- destructively modifying it. For strings, cursors are used to
+   -- sequentially read out the components of a string. They may be used to
+   -- perform a similar function to that played by "scanf" in C without need
+   -- for functions with a variable number of arguments.  This approach is
+   -- actually much more general since it allows for testing for the
+   -- presence of an `INT', for example, at a given point in the string.
+   -- 
+   -- In typical usage a string cursor pointing to the beginning of the
+   -- string `s' is created by the call `s.cursor' in the string class or by
+   -- `create(st)' in the string cursor class. If the structure of the
+   -- string is precisely known, then a sequence of calls to `get_foo' will
+   -- allow one to extract the known components. White space is skipped over
+   -- in searching for integers, reals and doubles. For example, if the
+   -- string `s' consists of a boolean, three integers, a real and a string
+   -- then these components may be extracted with:
+   -- 
+   -- `sc:STR_CURSOR:=s.cursor; b:BOOL:=sc.get_b; i1:INT:=sc.get_i; 
+   -- i2:INT:=sc.get_i; i3:INT:=sc.get_i; r:REAL:=sc.get_r; s1:STR:=sc.get_s;'
+   -- 
+   -- If we were wrong about the structure of the string, then the shared
+   -- variable `error' will be set to a non-zero value. Sometimes we are not
+   -- certain of the structure of a string. For example, we may not know
+   -- whether the next field will contain an integer or a real. In this case
+   -- we may use the routines with names of the form `foo_size'. If there is
+   -- no possible entity of the specified type at the current location, such
+   -- calls will return 0. Otherwise they will return the number of
+   -- characters in the specified entity without moving the cursor forward.
+   
+   attr s: STR;			-- The string we are scanning.
+   attr index: INT;			-- The index of the current character.
+   attr error: INT;			-- 0 if no errors, an error code otherwise.
+   
+   create(st: STR): SAME is 
+      -- Make a scanner for the string `st'.
+      res := res.new; res.s := st; 
+   end; -- create
+   
+   get_s: STR is 
+      -- A string containing characters up to and including the next newline.
+      res := STR::create;
+      l: INT;			-- always = res.length 
+      loop
+	 if s[index] = '\0' then break! end;
+	 if res.asize = l + 1 then res := res.c(s[index]) -- will expand res
+	 else res[l] := s[index] end;
+	 index := index + 1; l := l + 1;
+	 if s[index - 1] = '\n' then break! end;
+      end; -- loop
+   end; -- get_s
+   
+   b_size: INT is
+      -- `1' if index points at 'T' or 'F', `0' otherwise.
+      if is_done then return end;
+      if (s[index] = 'T') or (s[index] = 'F') then res := 1 end;
+   end; -- b_size
+   
+   get_b: BOOL is 
+      -- Read `"T"' or `"F"' and return `true' or `false'.
+      if b_size = 0 then error := 1; return end;
+      if s[index] = 'T' then res := true end;
+      index := index + 1;
+   end; -- get_b
+   
+   get_c: CHAR is
+      -- Read one character.
+      if is_done then error := 1; return end;
+      res := s[index]; index := index + 1
+   end; -- get_c
+   
+   digits_size(i: INT): INT is
+      -- Number of `CHAR''s starting at `i' which are digits.
+      loop until!(not s[i].is_digit);
+	 res := res + 1; i := i + 1
+      end; -- loop
+   end; -- digits_size
+   
+   i_size: INT is
+      -- Number of `CHAR''s in an integer at `index', `0' if not present.
+      if(s[index] = '-') or(s[index] = '+') then
+	 res := digits_size(index + 1);
+	 if res = 0 then return else res := res + 1; return end;
+      else
+	 res := digits_size(index);
+      end; -- if
+   end; -- i_size
+   
+   get_i: INT is 
+      -- Read an integer.
+      skip_space;
+      is1: INT := i_size;
+      if is1 = 0 or is1 > 12 then error := 1; return end;
+      res := C::sscanfi(C::str_ptr_(s),index);
+      index := index + is1;
+   end; -- get_i
+   
+   r_size: INT is
+      -- Number of `CHAR''s in a `REAL' or `DOUBLE' at `index', `0'
+      -- if not present. Accepts integers as well.
+      t: INT; i: INT := index; has_ip,has_dp,has_fp,has_e,has_exp: BOOL;
+      if(s[i] = '-') or(s[i] = '+') then i := i + 1 end;
+      t := digits_size(i); if t > 0 then has_ip := true; i := i + t end;
+      if s[i] = '.' then has_dp := true; i := i + 1 end;
+      t := digits_size(i); if t > 0 then has_fp := true; i := i + t end;
+      if s[i] = 'e' or s[i] = 'E' then has_e := true; i := i + 1 end;
+      if(s[i] = '-') or(s[i] = '+') then i := i + 1 end;
+      t := digits_size(i); if t > 0 then has_exp := true; i := i + t end;
+      if(not has_ip) and(not has_fp) then return end;
+	 -- if (not has_dp) and (not has_e) then return end; allow INT
+      if has_e and(not has_exp) then return end;
+      res := i - index;
+   end; -- r_size
+   
+   get_r: REAL is 
+      -- Read a `REAL'.
+      skip_space;
+      rs: INT := r_size;
+      if rs = 0 or rs > 22 then error := 1; return end;
+      res := C::sscanfd(C::str_ptr_(s),index);
+      index := index + rs;
+   end; -- get_r
+   
+   get_d: DOUBLE is 
+      -- Read a `DOUBLE'.
+      skip_space;
+      rs: INT := r_size;
+      if rs = 0 or rs > 22 then error := 1; return end;
+      res := C::sscanfd(C::str_ptr_(s),index);
+      index := index + rs;
+   end; -- get_d
+   
+   item: CHAR is
+      -- the current char or void.
+      if not is_done then res := s[index] end;
+   end;
+   
+   first: CHAR is 
+      -- Go to the beginning of the string and return the first char.
+      index := 0; res := item;
+   end; -- first
+   
+   next: CHAR pre not is_done is -- Move to the next char and return it or void.
+      get_c; res := item;
+   end;
+   
+   space_size(i: INT): INT is
+      -- Number of space characters, tabs, newlines and other ASCII
+      -- whitespace starting at character `i'.
+      j: INT := i; loop until!(not s[j].is_space); j := j + 1 end;
+      res := j - i
+   end; -- space_size
+   
+   skip_space: STR_CURSOR is
+      -- Move over space, tabs, newlines and other ASCII whitespace and
+      -- return `self'.
+      index := index + space_size(index); res := self;
+   end; -- skip_space
+   
+   is_done: BOOL is 
+      -- True if the cursor is at the end of the string.
+      res := (s[index] = '\0');
+   end; -- is_done
+   
+   reassign (str : STR): STR_CURSOR is
+      -- Change the string that `self' points to, return `self'.
+      s := str;
+      index := 0;
+      res := self;
+   end; -- reassign
+   
+   c_equals(c: CHAR): BOOL is
+      -- True if the next character is equal to `c'.
+      if is_done then error := 1; res := false;
+      else res := (s[index] = c);
+      end; -- if
+   end; -- c_equals
+   
+   c_accept(c: CHAR): BOOL is
+      -- True if the next char is `c'. If so, skip it and any following
+      -- white space.
+      res := c_equals(c);
+      if res then
+	 get_c;
+	 skip_space;
+      end; -- if
+   end; -- c_accept
+   
+   get_s_cut(cutset: STR): STR is
+      -- String up to and including the next member of `cutset'.
+      res := STR::create;
+      l: INT;			-- always = res.length
+      cutlen: INT := cutset.length;
+      c: CHAR; i: INT;		-- local variables inside loop
+      loop
+	 c := s[index];
+	 if c = '\0' then break! end;
+	 if res.asize = l + 1 then res := res.c(c) -- will expand res
+	 else res[l] := c end;
+	 index := index + 1; l := l + 1;
+	 i := cutlen; loop until!(i = 0); i := i - 1;
+	    if c = cutset[i] then return end;
+	 end; -- loop
+      end; -- loop
+   end; -- get_s_cut
+   
+   get_word: STR is
+      -- Return string up to but not including white space. Cursor is
+      -- moved past white space.
+      res := get_s_cut(" \t\n");
+      skip_space;
+      c : CHAR := res[res.length - 1];
+      if c = ' ' or c = '\t' or c = '\n' then
+	 res[res.length - 1] := '\0'; -- remove cut character
+      end; -- if
+   end; -- get_word
+   
+   update_i(x: INT): INT is
+      -- If `get_i' return it and `skip_space', else return `x'.
+      error := 0;
+      res := get_i;
+      if error /= 0 then res := x ; error := 0; end;
+      skip_space;
+   end; -- update_i
+   
+   update_r(x: REAL): REAL is
+      -- If `get_r' return it and `skip_space', else return `x'.
+      error := 0;
+      res := get_r;
+      if error /= 0 then res := x; error := 0; end;
+      skip_space;
+   end; -- update_r
+   
+end; -- class STR_CURSOR
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class C is
+   -- C routines used in STR_CURSOR.
+   sscanfi(p: F_OB; l: INT): INT is end; -- `INT' in string at offset `l'.
+   sscanfd(p: F_OB; l: INT): DOUBLE is end; -- `DOUBLE' in string at offset `l'.
+end; -- class C
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class STR_TEST is
+   -- Test the classes `STR' and `STR_CURSOR'.
+   TEST;
+   
+   main is
+      -- Test the classes `STR' and `STR_CURSOR'.
+      str_test;
+      str_cursor_test;
+   end; -- main
+   
+   str_test is
+      -- Test `STR'.
+      class_name("STR");
+      s: STR := "test=".b(true).b(false);
+      test("BOOL append",s,"test=TF");
+      s := "test=".c('x').c('2');
+      test("CHAR append",s,"test=x2");
+      s := "test=".s("one string ").s("and another");
+      test("STR append",s,"test=one string and another");
+      s := "test=".i(15).s(" ").i(4 + 9); 
+      test("INT append",s,"test=15 13");
+      s := "test=".r(4.2).s(" ").r( -1.0e-1);
+      test("REAL append",s,"test=4.200000 -0.100000");
+      s := "test=".d(4.2).s(" ").d( -1.0e-1);
+      test("DOUBLE append",s,"test=4.200000 -0.100000");
+      STR::precision := 2; 
+      s := "test=".r(4.2).s(" ").r( -1.0e-1);
+      test("REAL append, precision=2",s,"test=4.20 -0.10");
+      STR::precision := 0;
+      s := "test=".r(4.2).s(" ").r( -1.0e-1);
+      test("REAL append, precision=0",s,"test=4 0");
+      STR::precision := 6;
+      s := "test=".r(4.2).s(" ").r( -1.0e-1);
+      test("REAL append, precision=6",s,"test=4.200000 -0.100000");
+      s := "test=".nl.s("next line");
+      test("New line append",s,"test=\nnext line");
+      s := "test string".copy;
+      test("is_equal 1",s.is_equal("test string").to_s,"T");
+      s2: STR := "test string 2";
+      test("is_equal 2",s.is_equal(s2).to_s,"F");
+      test("is_less_than",s.is_less_than(s2).to_s,"T");
+      test("to_upper_case",s.to_upper_case,"TEST STRING");
+      test("to_lower_case",s.to_lower_case,"test string");
+      test("capitalize",s.capitalize,"Test String");
+      test("is_upper_case 1",s.is_upper_case.to_s,"F");
+      test("is_upper_case 2",s.copy.to_upper_case.is_upper_case.to_s,"T");
+      test("head",s.head(6),"Test S");
+      test("tail",s.tail(6),"String");
+      test("length",s.length.to_s,"11");
+      test("substring",s.substring(2,7),"st Str");
+      test("index_of_char",s.index_of_char('i').to_s,"8");
+      test("reverse","reverse".reverse,"esrever");
+      test("is_empty 1",s.is_empty.to_s,"F");
+      test("is_empty 2","".is_empty.to_s,"T");
+      test("to_i","-173".to_i.to_s,"-173");
+      test("to_r","173.0".to_r.to_s,"173.000000");
+      test("to_d","-173.87".to_d.to_s,"-173.870000");
+      test("to_b 1","T".to_b.to_s,"T");
+      test("to_b 2","F".to_b.to_s,"F");
+      test("hash","A test string".hash.to_s,"265929");
+      finish;
+   end; -- str_test
+   
+   str_cursor_test is
+      -- Test `STR_CURSOR'.
+      class_name("STR_CURSOR");
+      c: STR_CURSOR := STR_CURSOR::create("A test string\n with two lines.");
+      test("get_s", c.get_s, "A test string".nl);
+      test("b_size 1", "T and F".cursor.b_size.to_s, "1");
+      test("b_size 2", "S and F".cursor.b_size.to_s, "0");
+      test("get_b 1", "T and F".cursor.get_b.to_s, "T");
+      test("get_b 2", "F and F".cursor.get_b.to_s, "F");
+      test("get_b 3", "S and F".cursor.get_b.to_s, "F");
+      test("get_c", "S and F".cursor.get_c.to_s, "S");
+      test("digits_size", "123443 and others".cursor.digits_size(2).to_s,"4");
+      test("i_size 1", "-342 a number".cursor.i_size.to_s, "4");
+      test("i_size 2", "a number".cursor.i_size.to_s, "0");
+      test("get_i 1", "-342 a number".cursor.get_i.to_s, "-342");
+      test("get_i 2", "a number".cursor.get_i.to_s, "0");
+      test("r_size", "-342.4e-9 a number".cursor.r_size.to_s, "9");
+      test("get_r 1", "34.2e1 a number".cursor.get_r.to_s
+	    , "342.000000");
+      test("get_r 2", "a number".cursor.get_r.to_s, "0.000000");
+      test("get_d 1", "-342.4e-1 a number".cursor.get_d.to_s
+	    , "-34.240000");
+      test("get_d 2", "a number".cursor.get_d.to_s, "0.000000");
+      c.first;
+      test("first", c.get_s, "A test string".nl);
+      test("space_size", "A \n  a string".cursor.space_size(1).to_s, "4");
+      test("skip_space", " \n  A string".cursor.skip_space.get_s,"A string");
+      c.get_s;
+      test("is_done 1", c.is_done.to_s, "T");
+      test("is_done 2", "A string".cursor.is_done.to_s, "F");
+      test("reassign", c.reassign("foo").get_s, "foo");
+      test("c_equals", "A string".cursor.c_equals('A').to_s, "T");
+      c := "X   string".cursor;
+      test("c_accept 1", c.c_accept('X').to_s, "T");
+      test("c_accept 2", c.get_s, "string");
+      test("get_s_cut", "a test string".cursor.get_s_cut("srix"),"a tes");
+      c := "this is a string".cursor;
+      test("get_word 1", c.get_word, "this");
+      test("get_word 2", c.get_s, "is a string");
+      test("update_i", "123 is a number".cursor.update_i(34).to_s, "123");
+      test("update_r", "123 is a number".cursor.update_r(34.).to_s
+	    , "123.000000");
+      finish;
+   end; -- str_cursor_test
+   
+end; -- class STR_TEST
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+

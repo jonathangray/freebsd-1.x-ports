@@ -1,0 +1,159 @@
+-- -*- Mode: Sather;  -*-
+-- File: stmtob_s.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU) and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1990, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Statement nodes created during semantic phase.
+--*
+--* CLASSES: OPT_STMTOB_S, ASSERT_STMTOB_S, DEBUG_STMTOB_S.
+--* RELATED FILES: stmtob_s.sa, stmtob.sa
+--*
+--* RCS: $Id: opt_stmt_s.sa,v 1.1 1994/02/12 03:21:53 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 05:05 1993 (hws)
+--*  Oct 17 05:05 1993 (hws): Sather 1 syntax, copyright note
+--*  Mar  6 00:12 1993 (hws): allow anding assertions
+--*  Aug 27 17:38 1991 (hws): adapt to ERR_INFO signature change, lineno
+--*                for out-of-line code so sdb gets correct info.
+--* Created: Mon Jun 11 14:12:10 1990 (clim)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class OPT_STMTOB_S is
+   -- Represent statements which can be turned on/off by an identifier key
+   STMTOB_S;
+   
+   attr class_inst:CLASSOB_S;	-- Class instance we are in
+      -- Updated in "semant"
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(ln:INT):SAME is
+      res := new;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(lineno);
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      class_inst := symtab.in_class;
+   end; -- semant
+
+end; -- class OPT_STMTOB_S
+
+--------------------------------------------------------------------
+
+class ASSERT_STMTOB_S is
+   COMPILE_KEYS_CONST;
+   -- Assertions can be turned on/off by a key
+   OPT_STMTOB_S;
+      -- Key name index stored in OPT_STMTOB_S
+   
+   attr as_exp:$EXPROB_S;		-- Assertion
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(a:$EXPROB_S; ln:INT):SAME is
+      res := new;
+      res.as_exp := a;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(as_exp.dup, lineno);
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   and_assertion(a: SAME; ln: INT) is
+      as_exp := OP_EXPROB_S::create(OP_INDICES::and_op_ind,
+		   LST_EXPROB_S::new(2).push(as_exp).push(a.as_exp.dup), ln);
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      as_exp.resolve_predef_types(index);
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      class_inst := symtab.in_class;
+      as_exp.semant(symtab);
+
+      if as_exp.res_type = void then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(ASSERT_STMTOB_S): Assertion does not return BOOL value"));
+	 as_exp.res_type := GLOBALS::bool_typeob_s;
+      else
+	 if not as_exp.res_type.bool_type_p then
+	    ERR_INFO::format_error_msg(
+	       lineno,
+	       STR::create.s("(ASSERT_STMTOB_S): Assertion does not return BOOL value"));
+	    as_exp.res_type := GLOBALS::bool_typeob_s;
+	 end;
+      end; -- if
+      if (GLOBALS::curr_class_inst).structure_updated or
+	 (GLOBALS::curr_class_inst).internal_updated then
+	 return;
+      end; -- if
+      
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      res := as_exp.gen_temps;
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   validate_dispatches_and_get_ext_strs is
+      -- There is no type definition to be checked, so the only thing
+      -- to do is to record references to external strings.
+      as_exp.get_ext_strs;
+   end; -- validate_dispatches_and_get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) is
+      if COMPILER_OPTIONS::rt_code_check then
+	 as_exp.cprint_pre_code(outfile);
+	 outfile.indent;
+	 if COMPILER_OPTIONS::dbg_mode = true then
+	    -- line num of assert statement
+	    DBTABLE::addCLine(ERR_INFO::def_filename(lineno),
+	       ERR_INFO::def_lineno(lineno),
+	       outfile.name,outfile.line_no);
+	 end;	 
+	 outfile.s("assert_(");
+	 as_exp.cprint_act_code(outfile);
+	 outfile.c(',').i(lineno).s(",\"").s(ERR_INFO::def_filename(lineno)).
+	         s("\");\n").inc_ln(1);
+      end; -- if
+   end; -- cprint_code
+
+end; -- class ASSERT_STMTOB_S
+
+------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+

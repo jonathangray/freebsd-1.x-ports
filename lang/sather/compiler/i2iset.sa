@@ -1,0 +1,98 @@
+-- File: int_to_intset.sa
+-- Author: Chu-Cheow Lim
+-- Created: Fri Jan 18 09:44:33 1991
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION:Maps a non-negative integer to a set of integers.
+--* 
+--* CLASSES:INT_HASH_ELT, INT_TO_INTSET
+--*
+--* RELATED PACKAGES:/usr/local/src/sather/datastr/gen_hash.sa
+--*
+--* RCS: $Id: i2iset.sa,v 1.1 1994/02/12 03:21:52 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 04:45 1993 (hws)
+--*  Oct 17 04:44 1993 (hws): Sather 1 syntax, copyright note
+--* 18 Jan: Added a routine which takes <int1, int2> and insert "int2"
+--*         into the set associated with "int1".
+--*
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class INT_HASH_ELT is
+   -- Elements of a GEN_HASH table for pairing integer with set of integers.
+   attr val:INT;			-- The integer.  
+   attr hash:INT;			-- Hash value of "val".
+   attr assoc:INT_HASH_SET;		-- Set of integer associated with "val".
+   
+   create(i:INT; iset:INT_HASH_SET):SAME is
+      -- An INT_HASH_ELT which associates a set of integers to an integer.
+      res := INT_HASH_ELT::new; res.val := i; res.assoc := iset;
+      res.hash := i;
+   end; -- create
+   
+   is_equal(e:SAME):BOOL is
+      res := (e.hash = hash);
+   end; -- equal
+
+end; -- class INT_HASH_ELT
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class INT_TO_INTSET is
+   -- Mapping from integer to set of integers.
+   -- create, get, ins, del, clr
+   
+   attr t:GENERAL_HASH{INT_HASH_ELT};	-- Table of mappings.
+   
+   create:SAME is
+      -- Empty mapping.
+      res := SAME::new; res.t := res.t.create; 
+   end; -- create
+   
+   get(i:INT):INT_HASH_SET is
+      -- Set of integers associated with i or 0 if absent.
+      ie:INT_HASH_ELT := t.get(INT_HASH_ELT::create(i, void));
+      if (ie /= void) then res := ie.assoc; end;
+   end; -- get
+
+   insert(i:INT; iset:INT_HASH_SET) is
+      -- Maps "i" to "iset", overwriting previous mapping if exists.
+      t.insert(INT_HASH_ELT::create(i, iset));
+   end; -- ins
+
+   ins_ent(i:INT; j:INT) is
+      -- Insert "j" into the set of integers associated with "i".
+      ie:INT_HASH_ELT := t.get(INT_HASH_ELT::create(i, void));
+      if (ie /= void) then 
+	 ie.assoc := ie.assoc.insert(j);
+      else
+	 insert(i, INT_HASH_SET::create.insert(j));
+      end; -- if
+   end; -- if
+   
+   delete(i:INT) is
+      -- Delete "i" if present.
+      t.delete(INT_HASH_ELT::create(i, void));
+   end; -- del
+
+   clear is
+      -- Clear the table.
+      t.clear;
+   end; -- clr
+
+end; -- class INT_TO_INTSET
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+

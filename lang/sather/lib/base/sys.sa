@@ -1,0 +1,462 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/base/sys.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU) and Stephen Omohundro
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Interface to runtime information about classes and objects.
+--*
+--* CLASSES: SYS, SYS_TEST, SYS_TEST_CLASS, EMPTY_CLASS
+--*
+--* REQUIRED FILES: data_structure/str_hash.sa, base/test.sa,
+--*   data_structure/genrl_hash.sa, data_structure/list.sa
+--* RELATED FILES:
+--*
+--* RCS: $Id: sys.sa,v 1.1 1994/02/12 03:23:17 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 23 16:25 1993 (hws)
+--*  Oct 23 16:25 1993 (hws): SELF_TYPE -> SAME
+--*  Oct 17 06:25 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 27 14:30 1993 (hws): require -> pre
+--*  Jun  7 00:15 1993 (hws): improve doco
+--*  May  4 16:21 1993 (hws): ANSI C, avoid err_quit double def, known in all_.h
+--*  Feb 21 18:50 1993 (hws): assert (pre) -> require
+--*  Jun 28 15:52 1992 (hws): info_fname respects changes to short file names
+--*  May 23 14:31 1991 (om): Changed names, documentation, test code.
+--* Created: Wed Nov 21 11:43:00 1990 (clim)
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class SYS is
+   -- Sather interface to information about the names, numbering, and
+   -- layout of classes. The program must be compiled with the "-info"
+   -- option enabled. This causes the compiler to generate a large table
+   -- of all class and feature names used in the program. When `init'
+   -- is called, this information is read by the system and the other
+   -- routines in this class give access to it.
+   
+   -- Table which maps class number to class name:
+   shared class_table:ARRAY{STR} := ARRAY{STR}::new(C::num_classes_);
+   
+   -- Table which maps class name to class number:
+   shared class_rtable:STR_HASH_MAP{INT} := STR_HASH_MAP{INT}::create;
+
+   -- Table which maps feature index to index:
+   shared feature_table:ARRAY{STR} := ARRAY{STR}::new(C::max_name_index_);
+
+   -- Table which maps feature name to feature index:
+   shared feature_rtable:STR_HASH_MAP{INT} := STR_HASH_MAP{INT}::create;
+
+   shared initialized:BOOL := false; -- Set `true' by initialization.
+
+   const Attribute:INT := 1;
+   const Routine:INT := 2;
+   const Shared:INT := 3;
+   const Constant:INT := 4;
+   
+   init:BOOL is
+      -- Read the class and feature name to index mapping from the
+      -- generated info file and return `false' if there is an error. 
+      res := true;
+      if initialized then return end;
+	 -- First get class indices:
+      info_fname:STR := STR::create.s(C::makestr_(C::prog_dir_))
+	    .s(C::makestr_(C::prog_name_)).s(".sa_");
+      infile:FILE := FILE::create;
+      infile.open_for_read(info_fname);
+      if (infile.error /= 0) then
+	 ERR::s("Missing information file \"").s(info_fname).
+	      s("\"; Check compiler option\n");
+	 res := false; return;
+      else
+	 st:STR; ind:INT;
+	 loop until!(infile.check_eof);
+	    ind := infile.get_i;
+	    if (infile.check_eof) then break!; end;
+	    st := infile.get_s_up_to('\n');
+	    class_table[ind] := st;
+	    class_rtable.insert(st, ind);
+	 end; -- loop
+	 infile.close;
+      end; -- if
+	 -- Next get feature name indices:
+      info_fname:STR := STR::create.s(C::makestr_(C::prog_dir_))
+	    .s("name_ind_");
+      infile:FILE := FILE::create;
+      infile.open_for_read(info_fname);
+      if (infile.error /= 0) then
+	 ERR::s("Missing information file \"").s(info_fname)
+	       .s("\"; Check compiler option\n");
+	 res := false; return;
+      else
+	 st:STR; ind:INT;
+	 loop until!(infile.check_eof);
+	    ind := infile.get_i;
+	    if (infile.check_eof) then break!; end;
+	    c:INT := infile.get_ci; -- Get rid of separating character.
+	    st := infile.get_s_up_to('\001');
+	    feature_table[ind] := st;
+	    feature_rtable.insert(st, ind);
+	 end; -- loop
+	 infile.close;
+      end; -- if
+      initialized := true;
+   end; -- init
+
+   number_of_classes:INT is
+      -- The number of classes in the system.
+      res:=C::num_classes_;
+   end; -- number_of_classes
+   
+   class_index(nm:STR):INT is
+      -- The index of the class whose name is `nm' or `0' if none.
+      res := class_rtable.get(nm);
+   end; -- class_index
+   
+   class_name(i:INT):STR pre i>=0 and i<number_of_classes is
+      -- The name of the class whose index is `i'.
+      res := class_table[i];
+   end; -- class_name
+   
+   class_base_size(i:INT):INT is
+      -- Size in bytes of objects belonging to the class with index
+      -- `i' not including any extendible array portion.
+      res := C::safe_ob_base_size_(i, 0);
+   end; -- class_base_size
+
+   class_c_type(i:INT):INT is
+      -- C type of basic/non-basic class.
+      -- The values are: 1:ptr, 2:char, 3:int, 4:float, 5:double.
+      res := C::safe_cl_ctype_(i, 0);
+   end; -- class_ctype
+
+   class_number_of_features(i:INT):INT is
+      -- The number of features defined for class `i'.
+      res := C::safe_cl_feat_num_(i,0);
+   end; -- class_number_of_features
+
+   class_array_dim(i:INT):INT is
+      -- Number of array dimensions of the class with index `i'. Zero
+      -- if `i' is not an array class.
+      res := C::safe_ob_arr_dim_(i, 0);
+   end; -- class_array_dim
+
+   class_array_c_type(i:INT):INT is
+      -- C type of array elements.
+      -- The values are: 1:ptr, 2:char, 3:int, 4:float, 5:double.
+      res := C::safe_ob_arr_ctype_(i, 0);
+   end; -- class_array_ctype
+
+   class_number_of_attributes(i:INT):INT is
+      -- Number of attributes in class `i'.
+      res := C::safe_ob_attr_num_(i, 0);
+   end; -- class_number_of_attributes
+
+   class_attribute_c_type(ci,a:INT):INT is
+      -- C type of attribute `a' in the class with index `ci'.
+      -- The values are: 1:ptr, 2:char, 3:int, 4:float, 5:double.
+      res := C::safe_ob_attr_ctype_(ci, a, 0);
+   end; -- class_attribute_c_type
+
+   class_array_element_type(i:INT):INT is
+      -- Sather type specified as a class index of the elements of
+      -- the array defined by `i' if it is an array class.
+      res := C::safe_cl_arr_satype_(i, 0);
+   end; -- class_array_element_type
+
+   is_a_descendent_of(i,j:INT):BOOL is
+      -- True if class `i' is a descendent of class `j'.
+      res := C::safe_is_a_des_of_(i,j,0);
+   end; -- is_a_descendent_of
+
+   feature_name(ci,f:INT):STR is
+      -- The name of the `f'th feature in the class with index `ci'.
+      ind:INT := C::safe_cl_feat_name_(ci,f,0);
+      res := feature_table[ind];
+   end; -- feature_name
+
+   feature_category(ci,f:INT):INT is
+      -- The category of the `f''th feature of the class with index `ci'.
+      -- The values are: 1:attribute, 2:routine, 3:shared, 4:constant.
+      res := C::safe_cl_feat_cat_(ci,f,0);
+   end; -- feature_category
+
+   feature_index(ci:INT; f:STR):INT is
+      -- The index of the feature with name `f' in the class with index
+      -- `ci' if found, `-1' otherwise.
+      fi:INT := feature_rtable.get(f);
+      f_num:INT := C::safe_cl_feat_num_(ci,0);
+      i:INT;
+      loop until!(i >= f_num);
+	 ind:INT := C::safe_cl_feat_name_(ci,i,0);
+	 if (ind = fi) then
+	    res := i; return;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      res := -1;
+   end; -- feature_index
+
+   feature_type(ci,f:INT):INT is
+      -- The class index of the type of feature `f' in the class with
+      -- index `ci' if the feature is a shared, constant, or attribute.
+      -- `0' if the feature is a routine.
+      res := C::safe_cl_feat_satype_(ci,f,0);
+   end; -- feature_type
+
+   feature_c_type(ci,f:INT):INT is
+      -- C type of shared/constant/attribute, or `0' if it is a routine.
+      -- The values are: 1:ptr, 2:char, 3:int, 4:float, 5:double.
+      satype:INT := C::safe_cl_feat_satype_(ci,f,0);
+      if (satype /= 0) then
+	 res := C::safe_cl_ctype_(satype,0);
+      end; -- if
+   end; -- feature_c_type
+
+   feature_location(ci,f:INT):INT is
+      -- Returns the following for the `f''th feature of the class with
+      -- index `ci', depending on the category of feature:
+      -- 1) Shared/Constant -- Address of global variable
+      -- 2) Attribute -- Offset of attribute
+      -- 3) Routine -- Address of routine
+      name:INT := C::safe_cl_feat_name_(ci,f,0); -- Need name index
+	 -- to access dispatch table.
+      res := C::safe_get_dispatch_(ci,name,0);
+   end; -- feature_location
+
+end; -- class SYS
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class C is
+   -- C routines used in SYS.
+   
+   -- Routines to access attribute table.
+   safe_ob_base_size_(ici,ln:INT):INT is end;
+   safe_ob_arr_dim_(ici,ln:INT):INT is end;
+   safe_ob_arr_ctype_(ici,ln:INT):INT is end;
+   safe_ob_attr_num_(ici,ln:INT):INT is end;
+   safe_ob_attr_ctype_(ici,j,ln:INT):INT is end;
+   safe_get_dispatch_(ici,nm,ln:INT):INT is end;
+
+   -- Routines to access feature table.
+   safe_cl_feat_num_(ici,ln:INT):INT is end;
+   safe_cl_ctype_(ici,ln:INT):INT is end;
+   safe_cl_arr_satype_(ici,ln:INT):INT is end;
+   safe_cl_fullname_(ici,ln:INT):INT is end;
+   safe_cl_feat_name_(ici,f,ln:INT):INT is end;
+   safe_cl_feat_cat_(ici,f,ln:INT):INT is end;
+   safe_cl_feat_satype_(ici,f,ln:INT):INT is end;
+   safe_is_a_des_of_(i,j,ln:INT):BOOL is end;
+
+   -- Name of current program.
+   shared prog_name_:F_OB;
+
+   -- Name of directory where program is stored.
+   shared prog_dir_:F_OB;
+   
+   -- Number of classes given in runtime initialization.
+   shared num_classes_:INT;
+   
+   -- Largest name index generated within the program.
+   shared max_name_index_:INT;
+
+   -- Runtime error exit, part of all_.h now, no need to explicitly make known
+   --   err_quit_(err,ln:INT) is end;
+   
+end; -- class C
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class SYS_TEST is
+   -- Test of `SYS' class. This program must be compiled with the
+   -- "-info" option enabled.
+   
+   TEST;
+   
+   -- The compiler only generates code for classes that are used.  Hence
+   -- we include these dummy declarations that use `SYS_TEST_CLASS'.
+   shared d1:SYS_TEST_CLASS;
+   shared d2:ARRAY2{$OB};
+   shared d3:ARRAY3{$OB};
+   shared d4:EMPTY_CLASS;
+
+   main is
+      -- Test `SYS'.
+      class_name("SYS");
+      class_index:INT;
+      SYS::init;
+      unchecked_test("number_of_classes", SYS::number_of_classes.to_s, "");
+      test("class_index OUT", SYS::class_index("OUT").to_s, "9");
+      test("class_index SAME", SYS::class_index("SAME").to_s, "10");
+      class_index := SYS::class_index("SYS_TEST_CLASS");
+      unchecked_test("class_index SYS_TEST_CLASS", class_index.to_s, "27");
+      test("class_name 4", SYS::class_name(4), "ARRAY4{$OB}");
+      test("class_name 14", SYS::class_name(14), "CHAR");
+      test("class_name 15", SYS::class_name(15), "INT");
+      test("class_name 18", SYS::class_name(18), "DOUBLE");
+      test("class_name test_class", SYS::class_name(class_index)
+	    , "SYS_TEST_CLASS");
+      test("class_base_size CHAR"
+	    , SYS::class_base_size(SYS::class_index("CHAR")).to_s, "1");
+      test("class_base_size ARRAY{$OB}",
+	 SYS::class_base_size(SYS::class_index("ARRAY{$OB}")).to_s, "4");
+      unchecked_test("class_base_size SYS_TEST_CLASS (should <= does)",
+	 SYS::class_base_size(class_index).to_s,
+	 (SYS::class_base_size(SYS::class_index("CHAR")) +
+	    SYS::class_base_size(SYS::class_index("BOOL")) + 
+	    SYS::class_base_size(SYS::class_index("INT")) +
+	    SYS::class_base_size(SYS::class_index("REAL")) +
+	    SYS::class_base_size(SYS::class_index("DOUBLE")) +
+	    4).to_s);
+      test("class_c_type CHAR"
+	    , SYS::class_c_type(SYS::class_index("CHAR")).to_s, "2");
+      test("class_c_type SYS_TEST_CLASS"
+	    , SYS::class_c_type(class_index).to_s, "1");
+      num_feats:INT := SYS::class_number_of_features(class_index);
+      test("class_number_of_features SYS_TEST_CLASS", num_feats.to_s, "9");
+      test("class_array_dim SYS_TEST_CLASS"
+	    , SYS::class_array_dim(class_index).to_s, "0");
+      test("class_array_dim ARRAY2{$OB}"
+	    , SYS::class_array_dim(SYS::class_index("ARRAY2{$OB}")).to_s,"2");
+      test("class_array_c_type ARRAY2{$OB}"
+	    , SYS::class_array_c_type(SYS::class_index("ARRAY2{$OB}")).to_s
+	    , "1");
+      
+      test("feature_name 0", SYS::feature_name(class_index,0), "x1");
+      test("feature_category 0", SYS::feature_category(class_index,0).to_s
+	    , "1");
+      test("feature_location 0", SYS::feature_location(class_index,0).to_s
+	    , "4");
+      test("feature_type 0"
+	    , SYS::class_name(SYS::feature_type(class_index,0)), "CHAR");
+      test("feature_c_type 0", SYS::feature_c_type(class_index,0).to_s, "2");
+      
+      test("feature_name 1", SYS::feature_name(class_index,1), "x5");
+      test("feature_category 1", SYS::feature_category(class_index,1).to_s
+	    , "1");
+      test("feature_location 1", SYS::feature_location(class_index,1).to_s
+	    , "5");
+      test("feature_type 1"
+	    , SYS::class_name(SYS::feature_type(class_index,1)), "BOOL");
+      test("feature_c_type 1", SYS::feature_c_type(class_index,1).to_s, "2");
+
+      test("feature_name 2", SYS::feature_name(class_index,2), "x3");
+      test("feature_category 2", SYS::feature_category(class_index,2).to_s
+	    , "1");
+      test("feature_location 2", SYS::feature_location(class_index,2).to_s
+	    , "8");
+      test("feature_type 2"
+	    , SYS::class_name(SYS::feature_type(class_index,2)), "REAL");
+      test("feature_c_type 2", SYS::feature_c_type(class_index,2).to_s, "4");
+
+      test("feature_name 3", SYS::feature_name(class_index,3), "x4");
+      test("feature_category 3", SYS::feature_category(class_index,3).to_s
+	    , "1");
+      test("feature_location 3", SYS::feature_location(class_index,3).to_s
+	    , "12");
+      test("feature_type 3"
+	    , SYS::class_name(SYS::feature_type(class_index,3)), "DOUBLE");
+      test("feature_c_type 3", SYS::feature_c_type(class_index,3).to_s, "5");
+
+      test("feature_name 4", SYS::feature_name(class_index,4), "x2");
+      test("feature_category 4", SYS::feature_category(class_index,4).to_s
+	    , "1");
+      test("feature_location 4", SYS::feature_location(class_index,4).to_s
+	    , "20");
+      test("feature_type 4"
+	    , SYS::class_name(SYS::feature_type(class_index,4)), "INT");
+      test("feature_c_type 4", SYS::feature_c_type(class_index,4).to_s, "3");
+
+      test("feature_name 5", SYS::feature_name(class_index,5), "foo1");
+      test("feature_category 5", SYS::feature_category(class_index,5).to_s
+	    , "2");
+
+      test("feature_name 6", SYS::feature_name(class_index,6), "foo2");
+      test("feature_category 6", SYS::feature_category(class_index,6).to_s
+	    , "2");
+
+      test("feature_name 7", SYS::feature_name(class_index,7), "s1");
+      test("feature_category 7", SYS::feature_category(class_index,7).to_s
+	    , "3");
+      test("feature_type 7"
+	    , SYS::class_name(SYS::feature_type(class_index,7)), "INT");
+      test("feature_c_type 7", SYS::feature_c_type(class_index,7).to_s, "3");
+
+      test("feature_name 8", SYS::feature_name(class_index,8), "c1");
+      test("feature_category 8", SYS::feature_category(class_index,8).to_s
+	    , "4");
+      test("feature_type 8"
+	    , SYS::class_name(SYS::feature_type(class_index,8)), "STR");
+      test("feature_c_type 8", SYS::feature_c_type(class_index,8).to_s, "1");
+      
+      num_attrs:INT := SYS::class_number_of_attributes(class_index);
+      test("class_number_of_attributes", num_attrs.to_s, "5");
+      test("class_attribute_c_type 0"
+	    ,SYS::class_attribute_c_type(class_index, 0).to_s, "2");
+      test("class_attribute_c_type 1"
+	    ,SYS::class_attribute_c_type(class_index, 1).to_s, "2");
+      test("class_attribute_c_type 2"
+	    ,SYS::class_attribute_c_type(class_index, 2).to_s, "4");
+      test("class_attribute_c_type 3"
+	    ,SYS::class_attribute_c_type(class_index, 3).to_s, "5");
+      test("class_attribute_c_type 4"
+	    ,SYS::class_attribute_c_type(class_index, 4).to_s, "3");
+      index1:INT := SYS::class_index("ARRAY3{$OB}");
+      test("class_array_element_type ARRAY3{$OB}"
+	    ,SYS::class_name(SYS::class_array_element_type(index1)), "$OB");
+      test("is_a_descendent_of 1",
+	 SYS::is_a_descendent_of(class_index
+	       , SYS::class_index("EMPTY_CLASS")).to_s, "T");
+      test("is_a_descendent_of 2",
+	 SYS::is_a_descendent_of(SYS::class_index("EMPTY_CLASS")
+	       , class_index).to_s, "F");
+      finish;
+   end; -- main
+
+end; -- class SYS_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class EMPTY_CLASS is
+   -- Empty class to be used in SYS_TEST.
+   
+end; -- class EMPTY_CLASS
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class SYS_TEST_CLASS is
+   -- This is a class defined to be used in SYS_TEST.
+
+   EMPTY_CLASS;
+
+   attr x1:CHAR;
+   attr x2:INT;
+   attr x3:REAL;
+   attr x4:DOUBLE;
+   attr x5:BOOL;
+
+   foo1 is
+      -- Routine does nothing.
+   end; -- foo
+   
+   foo2:BOOL is
+      res := (s1 = x2);
+   end; -- foo2
+
+   shared s1:INT := 12;
+   const c1:STR := "hello world\n";
+   
+end; -- class SYS_TEST_CLASS
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

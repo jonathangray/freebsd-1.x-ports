@@ -1,0 +1,435 @@
+-*- Mode: Text;  -*-
+File: 0.5-HALFWAY-TO-1
+Author: Heinz W. Schmidt (hws@csis.dit.csiro.AU)
+(c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+Australia, 1992, 1993. All rights reserved.
+
+*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* HISTORY:
+* Created: Thu Mar 19 16:33:35 1992 (hws)
+*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+While most of the changes in Sather 0.5 are fixes and cleanups, THIS RELEASE IS
+NOT UPWARD COMPATIBLE WITH the previous public release Sather 0.2.  This is
+mainly due to the desire to get closer to the upcoming Sather 1 and provide a
+route towards upgrading more easily.
+
+The motto of this release is 
+
+	"Half Way to Sather 1".
+
+The following list describes the incompatible changes.
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			      SUMMARY OF CHANGES
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+			       1. CODER CHANGES
+
+The coder produces ANSI C by default now. Cross coding is supported by default.
+This means C compilation and the involved make setup for compiling target code
+is outside the compiler now.  The respective changes are described in more
+detail below under 1.x.
+
+			      2. LIBRARY CHANGES
+
+Besides many fixes and patches, some directories were moved out of the 
+distribution to reduce the size of the core distribution. These must
+be obtained separately and are now under sather/contrib.
+
+
+			     3. SATHER 1.0 CHANGES
+
+Sather 0 semantics was clothed in Sather 1.0 syntax where possible to simplify
+migration to Sather 1. Some extensions where added during the specification of
+Sather 1, to support our proposals. particularly in the area of interface
+specifications (pre/post/invariant). The respective supported syntax is largely
+but not entirely compatible with Sather 1.0. Furthermore several additions
+where made to the parser to help bootstrapping the Sather 1.0 compiler using
+Sather 0.5.  Find more details in points 2.x.
+
+
+		   4. COMPILER COMMAND LINE OPTIONS CHANGED
+
+The compiler command line options were changed to cope with some of the above
+changes, but also there were some cleanups.  See "man cs" for more details or
+the file cs_options in this directory. The points under 3.x list most of the
+changes.
+
+		   5. SATHER COMMAND FILE CHANGES (.sather)
+
+The syntax of .sather files was simplified to reflect changes in 3.
+more cleanly. Also the syntax was polished. More in points 4.x.
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			      DETAILS OF CHANGES
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 
+			       1. CODER CHANGES
+
+1.1. ANSI C code compliance
+
+The generated code is now ANSI C compliant by default.  The option -kr can be
+used to generate K&R C if necessary. See also the option -ansi.
+
+1.2. No more make, `mkROOT' now `Makefile'
+
+The compiler was simplified to avoid running the generated make files and other
+build related steps. Instead "cs" has become a shell script that runs the
+compiler and then the "make". This way the less virtual memory is required (for
+instance consider gcc running under make running under the Sather compiler in
+the earlier setup).  This also simplifies running sather as part of your own
+make setup.  The generated make file is called `Makefile' now and does not
+contain the name of the main class any more.
+
+This change implies disabling the 0.2 compiler `-dco' and `-mak' options. These
+still exist as options to "cs". See "man cs" for details.
+
+ A number of options are therefore realized now as part of cs rather than
+ the compiler proper. For instance "-dco" skips running the make step.
+ Furthermore you can say
+			     cs etc/hello
+ and it will locate .sather in etc/hello and use hello as the name of the
+ main class. If it does not find .sather it looks for a etc/hello.sather
+ file instead.
+
+1.3. MAIN_.c, SINIT_.c, CLASINFO_.c
+
+The "big" MAIN_.c was split into several files. MAIN_.c contains the virtual C
+"main" and global initialization. SINIT_.c encapsulates the initialization of
+all shared variables, and CLASINFO_.c contains all tables, ie. feature, class
+and inheritance tables.
+
+1.4. Libraries -l, CLIB parameter in generated Makefile 
+
+Archives are no longer copied or linked but referenced with -l as one should
+expect. A CLIB macro allows to add library paths when running the generated
+Makefile. As in 0.2 "-l.." options of the -cflags option will be used in the
+link step and define the now the default for the CLIB macro.
+
+-------------------------------------------------------------------------------
+	 
+			      2. LIBRARY CHANGES
+
+2.1. lib/base/pathname.sa
+
+The `/tmp_mnt' automount directory is no longer stripped off.  In Sather 0.2
+the lib/base/pathname.sa logic removed the automount directory.  This turned
+out to violate the consistency of pathnames on some DEC machines.  If you need
+this feature you need to change that library class back.
+
+2.2 lib/base/dbg.sa
+
+An added class allowing debugging conditionals of the form
+
+	if DBG::typecheck then ... end;
+
+for the most important debug keys, now that debug statements are no longer
+supported. 
+
+2.3 lib/user_interface/xview unbundled
+
+The xview interface is unbundled and must be obtained separately from the ftp
+host. When merging it with the sather directory tree it will be placed in
+contrib/xview.
+
+2.4 lib/connectionist/icsim unbundled
+
+The xview interface is unbundled and must be obtained separately from the ftp
+host. When merging it with the sather directory tree it will be placed in
+contrib/icsim.
+
+2.5 etc/performance unbundled
+
+The benchmark code is unbundled and must be obtained separately from the ftp
+host. When merging it with the sather directory tree it will be placed in
+contrib/performance.
+
+-------------------------------------------------------------------------------
+
+			     3. SATHER 1.0 CHANGES
+
+3.1. The `debug' keyword is gone and so are `dbg_keys'
+
+Sather 1 compatibility change.
+
+3.2. UNDEFINE becomes undefine.
+
+The syntax
+
+	undefine foo;
+
+can be used to undefine a feature.  The old foo:UNDEFINE syntax is no longer
+supported.
+
+3.3. alias define alias
+
+The `alias' construct is renamed to `define' in line with change 15.
+
+3.4. pre and post
+
+The syntax for pre and postconditions is explicit now. In line with Sather 1,
+the `pre' and `post' keywords are used as part of the routine signature
+preceding the "is" keyword.
+
+3.5. invariant
+
+Class invariants are specified by the `invariant' syntax. One writes
+
+       invariant equal: a = b;
+
+at the level of features. Invariants are named and can be redefined namewise.
+The conjunction (logical and) of all named invariants, defined directly or
+inherited, defines the class invariant.
+
+3.6. Abstract classes (towards Sather 1.0)
+
+Abstract classes are supported using the keyword `abstract'. Their name must
+start with a `$'. For instance
+
+       abstract $PERSON is ... end;
+
+Abstract classes do not have a constructor (new). Their routines may be
+incomplete.  An incomplete routine is defined by omitting "is <body>".  It may
+contain pre and postconditions, of course.
+
+WARNING: Unlike Sather 0.1, the abstraction $A of a concrete classes A is
+ also supported. However an abstract class "$A" cannot be used in the 
+ form x: A  as A::new is not supported.
+
+3.7. `protect' and `raise' exception syntax.
+
+ Sather 1 compatibility change. 
+ Instead of the 0.2 syntax 
+
+    foo; bar; baz;
+    except (exception: ERROR) then MYEXCEPTION::create(exception) break;
+    except (exception: SUX) then ;
+
+ one writes
+
+    protect
+      foo; bar; baz;
+    against ERROR then raise MYEXCEPTION::create(exception);
+    against SUX then ;
+    end; -- protect
+
+3.8. `SELF_TYPE' renamed to `SAME'
+
+ Sather 1 compatibility change. 
+
+3.9. `constant' renamed to `const'
+
+ Sather 1 compatibility change. 
+
+3.10. `attr' keyword for attributes mandatory.
+
+ Sather 1 compatibility change. 
+
+3.11. Limited literal syntax `#'
+
+ Sather 1 compatibility change. 
+ Instead of A::new one simply writes #A.
+
+ WARNING: A::new is still legal, but will not be supported in Sather 1.
+
+3.12. Limited type inference with `::=' (Towards Sather 1)
+
+ x::=FOO::rout(x,y,3) is a short-hand for x: FOO := FOO::rout(x,y,3).
+ One can also write x: := FOO::rout(x,y,3) to indicate the "type gap" more
+ clearly.
+
+ Similarly,
+
+ x::=#FOO; y: := #BAR; a::=#ARRAY2(5,6); b: := #ARRAY4(16,16,16,16)
+ are shorthands. According to 18 they are:
+
+ x::FOO::new; y: := BAR::new; and so on, and therefore the type is "inferred"
+ as described above.
+
+ Note that this is a very restricted form of type inference only compared to
+ that of Sather 1.0 which computes the type of the righthand side expression
+ and uses that.
+
+3.13. `break' renamed `break!'
+
+ Sather 1 compatibility change. 
+
+3.14. `until ... loop' now `loop until!' 
+
+ Sather 1 compatibility change. 
+ Instead of the 0.2 syntax
+
+ until expr loop body end  
+
+ one writes now 
+
+ loop until!(expr); body end
+
+ as if until! would be a built-in iterator. (It is not, the same old code is
+ generated, the parser transforms the input appropriately).
+
+3.15. `while!' added (Towards Sather 1)
+
+ One can also write now in the Sather 1 syntax
+
+ loop while!(expr); body end
+
+ This is equivalent to 
+
+ loop until!(not expr); body end
+
+3.16. `switch' renamed to `case'
+
+ Sather 1 compatibility change. 
+
+3.17. `readonly' keyword (towards Sather 1)
+
+ Is currently disabled. Warnings do not yet work.
+
+3.18. Type-bounds allowed but ignored
+
+To simplify bootstrapping and adapting to Sather 1.0, typebounds were
+permitted in the parser. They are ignored currently by the compiler.
+This means there will be no checks.
+
+For instance you can write now
+
+class FOO{A,YOURDBG < DBG}  < BAR
+                            > BAZ is
+ ...
+end
+
+The DBG bounds the formal parameter YOURDBG. Actualizations will go unchecked
+for now. But you may already use this syntax in preparation for the new
+compiler.
+
+The BAR bounds the current class FOO upwards and BAZ bounds it downwards.
+Again, no checks are made in Sather 0.5, that this claim is true.
+
+3.19. Comma separates formal procedure parameters
+
+Sather 1.0 compatibility change. The old syntax with ";" is still supported for
+upward compatibility with Sather 0.2 sources.  In fact currently "," and ";"
+can be interchanged.
+
+-------------------------------------------------------------------------------
+ 
+	       4. COMPILER COMMAND LINE OPTIONS CHANGED: Details
+
+4.1. -voi compiler option vanished, -kr and -ansi option added
+
+With the ANSI C the old -voi option is meaningless. Use -kr if necessary. -ansi
+was added as a compiler option for symmetry.  If no choice is made, the
+compiler uses a default. First it checks whether the cross coding option -x is
+used with a "kr" tag (such as "mips-ultrix-kr"). If so it assumes K&R coding.
+Otherwise it uses the configuration default. For instance if the compiler was
+generated in a "mips-ultrix-kr" environment it will use K&R coding as the
+default.
+
+4.2. New compiler option -x and environment variable SATHER_ENVI
+
+This allows choosing cross coding with an architecture different from the
+architecture on which the compiler is running. This affects the choice of
+object files such as runtime system components, as listed in the generated
+Makefile. The system command file sys/sys_dot_sather for instance lists several
+bin.${SATHER_ENVI} files. The Sather lib/base/pathname.sa logic expands literal
+environment variables, only.  Consequently the curly braced variables will be
+taken literally into the generated Makefile and the -x option will be used to
+to define a corresponding SATHER_ENVI default in that Makefile. This default
+includes a suffix "kr" if -kr is chosen, in order to determine the C language /
+library choice as part of the target environment.
+
+The compiler uses symbolics links (on some environments copies) to precompiled
+code of some built-in classes. If you want to cross compile and then transfer
+the compilation directory to a target environment to run make there, these
+links may not be appropriate. Use the option -gen (cf. cs_options.txt or man
+cs) in this case to have C code generated for built-in classes.
+
+4.3.`-dco' gone, `-mak' gone
+
+-dco and -mak were removed from the compiler and have become options
+of the "cs" script. 
+
+4.4. New compiler option -gc {yes|no}
+
+allows to choose whether the garbage collector is included.  By default the gc
+is included if the compiler contains it. You can create different version of
+the GC. In particular there is a silent and verbose version.  The verbose GC
+version may be useful when you're experimenting with memory management. The
+default installation settings choose the silent version. You can create a
+verbose version by
+
+	cd sys/C/GC
+	make CFLAGS='...' gc.a
+            (omitting the "-DSILENT" C flag.)
+        cp gc.a $SATHER_HOME/bin.$SATHER_ENVI/libgcv.a
+
+You can then link with the gcv version by including "-l gcv" in the -cflags
+options to the Sather compiler.
+
+4.5. `-stm' renamed to `-res'
+
+The compiler option -stm warned when a function is called without assigning the
+result. This option was named more appropriately.
+
+4.6. `-bro' option dropped
+
+Simplification. -info was equivalent to -bro and is still supported.
+
+4.7. `-fast' option dropped
+
+Simplification. The compiler will always use the corresponding incremental
+compilation logic now that was invoked when -fast was used previously.  Recall
+that -ncs forces a new compilation directory, and hence a full compilation,
+anyway.
+
+-------------------------------------------------------------------------------
+ 
+5. SATHER COMMAND FILE CHANGES (.sather)
+
+5.1. The (make_file) option was dropped from .sather
+
+Note that the cs script is running the make step now. You might as well write a
+make file and run "cs" or "sather" under that after compiling the relevant C
+files. This seems to give more control over incremental compiles anyway than
+the previous way.
+
+5.2. Several options were renamed 
+
+Cleanup action. 
+
+c_files is now object_files. This is consistent with the changes above. If your
+code depends on a C file, you can express that as a make dependency and enter
+the object_files: list in your .sather command file.
+
+cc_flags is now cflags. This is in line with the Makefile and cs naming
+conventions.
+
+c_compiler is now cc. Ditto.
+
+c_name is now name and c_macro is now macro. Simplification for cross coding.
+
+home_directory is now sather_home
+
+
+5.3 The `dbg_keys' option was removed.
+
+Sather 1 compatibility change.
+
+5.4 Some opt
+
+5.4 All options are written without parentheses now. The following example
+contains all supported options. See "man cs" for details.
+
+sather_home:  /users/me/sather
+source_files: $SATHER_LIB/base/dbg.sa $SATHER_CONTRIB/performance/8queen.sa
+object_files: ${SATHER_HOME}/bin.meiko/gcaux.o
+cflags:       -O
+cc:           cc88
+name:         IDENT CONSTANTS::ident
+macro:        "#include \"defs.h\"" get_definition put_definition
+include:      more_macros.sather
+
+See "man cs" for details.

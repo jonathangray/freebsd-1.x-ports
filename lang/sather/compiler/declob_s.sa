@@ -1,0 +1,933 @@
+-- -*- Mode: Sather;  -*-
+-- File: declob_s.sa
+-- Author: Chu-Cheow Lim and Jeff Bilmes
+-- Author: Jeff Bilmes (bilmes@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+--          Oscar Bosman (oscar@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Declaration nodes created during semantic phase
+--*
+--* RCS: $Id: declob_s.sa,v 1.1 1994/02/12 03:21:50 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 04:58 1993 (hws)
+--*  Oct 17 04:32 1993 (hws): copyright note
+--*  Oct 15 23:38 1993 (hws): provide filename with -chk on shared/const init
+--*  Sep 28 04:53 1993 (hws): switch -> case
+--*  Jun 18 11:33 1993 (oscar): cprint_decln() doesn't append ";\n"
+--*                             (allows ANSI function prototypes)
+--*  Apr 20 01:38 1993 (hws): cast init expression for ANSI C
+--*  Apr 18 01:26 1993 (hws): align on double float to 8byte boundary.
+--*  Jul  2 02:24 1992 (hws): guarantee eval of init expressions for effect
+--*  Jun 29 11:27 1992 (hws): fix -chk trace to use correct file names
+--*  Mar 22 22:12 1992 (hws): Fix initialization to use base VOIDs, avoid
+--*                           floating error under Sequent gcc.
+--*  Aug 27 14:07 1991 (hws): Do allow shared initialization loops within class.
+--*  Aug 26 02:52 1991 (hws): Order always but produce code only when used.
+--*  Aug 20 11:32 1991 (hws): Order shared/constant init class-wise and
+--*                           add check for cyclic shared definitions.
+--* Created: Mon Jun 11 12:38:16 1990
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class DECLOB_S is
+   -- Parent class of declarations
+   SEMANTOB;
+
+   attr name: INT;			-- name index of the declared object.
+   
+   attr type_spec:$TYPEOB_S;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(t:$TYPEOB_S; ln:INT):SAME is
+      res := new;
+      res.type_spec := t;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(type_spec.dup, lineno);
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   undefined_p:BOOL is
+      res := (type_spec.inst_ind = RESERVED_CLASSES::UNDEFINE_ici);
+   end; -- undefined_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      type_spec.resolve_predef_types(index);
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   typeof:$TYPEOB_S is
+      res := type_spec;
+   end; -- typeof
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   declob_s_name:INT is
+      -- Name of declared parameter, local, attribute, shared or constant
+      res := name;
+   end; -- declob_s_name
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   validate_dispatches_and_get_ext_strs is
+      if (type_spec.is_dispatched) then
+	 if (type_spec.nonptr_p) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(DECLOB_S): Dispatch on basic type"));
+	 end; -- if
+      end; -- if
+      
+      -- NOTE:
+      -- If we are handling a constant/shared feature eg
+      -- "constant y:STR := CL::x" where "CL::x" is a constant string
+      -- eg "constant x:STR := "xyz";", 
+      -- then we do not have to do anything because in the "semant" 
+      -- routine, the STR_CONST_EXPROB_S for "xyz" would have added 
+      -- itself to the global list of references to external strings,
+      -- and the list within the class itself.
+   end; -- validate_dispatches_and_get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_cname(outfile:SAT_OUTFILE) is
+      outfile.s((GLOBALS::str_table).at_index(name)).
+              s("__");
+   end; -- cprint_cname
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_cname(outfile:SAT_OUTFILE) is 
+      -- prints the cname, by default appends `__' to Sather name.
+      outfile.s((GLOBALS::str_table).at_index(name)).
+              s("__");
+   end; -- cprint_cname
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) is
+      -- The following will be printed for each kind of declaration.
+      -- a.  ATTR_DECL_FEATOB_S :  Nothing
+      -- b.  SHARED_DECL_FEATOB_S : The initialization code
+      -- c.  CONST_DECL_FEATOB_S : Initialization code if not a constant
+      -- d.  PARAM_DECLOB_S : Nothing
+      -- e.  LVAR_DECLOB_S : Initialization of local variable if any.
+   end; -- cprint_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_decln(outfile:SAT_OUTFILE) is
+      -- The following will be printed for each kind of declaration.
+      -- a.  ATTR_DECL_FEATOB_S :  Nothing
+      -- b.  SHARED_DECL_FEATOB_S : Declared as a C global
+      -- c.  CONST_DECL_FEATOB_S : Declared as a C global if value cannot
+      --                           be computed at compile time
+      -- d.  PARAM_DECLOB_S : Just the parameter declaration
+      -- e.  LVAR_DECLOB_S : Declaration of local variable.
+   end; -- cprint_decln
+
+end; -- class DECLOB_S
+
+--------------------------------------------------------------------
+   
+class ATTR_DECL_FEATOB_S is
+   -- Attributes.
+   C_TYPE_CONST;
+   FEATOB_S;
+   DECLOB_S;
+      -- "undefined_p" in DECLOB_S will over-shadow "undefined_p" in
+      --   FEATOB_S.  Similarly for "validate_dispatches_and_get_ext_strs".
+   
+   attr init_expr:$EXPROB_S;		-- Initialization expression
+   
+-- Computed during semantic check
+   attr ctype:INT;			-- C type of attribute
+   attr off:INT;			-- the offset in the object
+      -- Calculated in "compute_own_offset"
+      -- If it is -1 (in the case of "asize", "asize1" etc), we need
+      -- to handle the case differently.  
+   
+   attr disp:BOOL;			-- True if dispatched anywhere.
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:INT; t:$TYPEOB_S; priv:BOOL; c_def:CLASSOB; ln:INT):SAME is
+      res := new;
+      if (GLOBALS::str_table).reserved_name_p(nm) then
+	 ERR_INFO::error_msg(
+	           STR::create.s("(ROUT_FEATOB): Error in redefining \"").
+                            s(GLOBALS::str_table.at_index(nm)).
+	                    s("\"\n"));
+      end; -- if
+      res.name := nm;
+      res.type_spec := t;
+      res.pte := priv;
+      res.cls_def := c_def;
+      res.cls_inst := GLOBALS::curr_class_inst;	     
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+      res := STR::create.s((GLOBALS::str_table).at_index(name)).
+                      c(':').
+                      s(type_spec.sather_code);
+      if init_expr = void then
+	 res := res.c(';');
+      else
+	 res := res.s(":=").s(init_expr.sather_code).c(';');
+      end;
+   end; -- sather_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(name, type_spec.dup, pte, cls_def, lineno);
+      if (init_expr /= void) then
+	 res.init_expr := init_expr.dup;
+      end;
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   compute_own_offset(nextloc:INT):INT is
+      -- Size of allocated space depends on the type
+      ctype := type_spec.ctype;
+	 -- Compute actual C type after the ancestors have been 
+	 --   computed.  Eg, if FOO inherits from INT, FOO is 
+         --   treated just like an INT.
+
+      -- NOTE: Attributes such as "asize", "asize1" etc of array objects
+      --       are handled by the compiler because if they are included
+      --       as a feature array object, we won't be able to locate the
+      --       offsets, because the sizes are stored after the base size
+      --       of object.
+      -- These attributes are not part of the base size (refer to runtime
+      -- routines for proper coordination).  Hence if "asize" etc are
+      -- defined by user, he/she must be able to manage this attribute,
+      -- because all references to "asize" then refers to whatever the
+      -- user defined, not to the definition provided.
+      case (ctype)
+      when c_ptr, c_int, c_float then
+	 off := (nextloc + 3).rshift(2).lshift(2); -- Get next multiple of 4
+	 res := 4 + off;
+      when c_char then
+	 off := nextloc;
+	 res := 1 + off;
+      when c_double then
+	 off := (nextloc + 7).rshift(3).lshift(3); -- Get next multiple of 8
+	 res := 8 + off;	                   -- Allocate 8 bytes
+      else
+	 -- This branch should not be taken, but is left in 
+	 --   for the moment.
+	 res := nextloc;
+      end; -- case
+   end; -- compute_own_offset
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_offset:INT is
+      res := off;
+   end; -- get_offset
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   compatible_des_feat(feat:SAME; lval_p:BOOL):BOOL is
+      -- "lval_p" is true when we are using the attribute as the LHS of
+      -- an assignment statement.  "feat" is guaranteed to be non-void.
+      if (lval_p) then
+	 res := type_spec.conforms_to(feat.type_spec);
+      else
+	 res := feat.type_spec.conforms_to(type_spec);
+      end; -- if
+      -- "feat" is a compatible descendent attribute if its type
+      -- conforms to the type of the parent attribute.
+
+      if (pte /= feat.pte) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(ATTR_DECL_FEATOB_S): Inconsistent use of \"private\" for attribute \"").
+                            s((GLOBALS::str_table).at_index(name)).
+	                    s("\" in \"").
+	                    s(self.cls_inst.full_name).s("\" and \"").
+	                    s(feat.cls_inst.full_name).s("\""));
+      end; -- if
+   end; -- compatible_des_feat
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      -- Refer to note in "do_update_info" routine.
+      co:CLASSOB_S := type_spec.inst_cls;
+      if (co.c_type_updated) then
+	 (GLOBALS::curr_class_inst).structure_updated := true;
+      end; -- if
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_offset(outfile:SAT_OUTFILE) is
+      if (COMPILER_OPTIONS::verbose_code) then
+	 outfile.s(cls_inst.prefix).
+	         s("_OF_").
+	         s((GLOBALS::str_table).at_index(name)).
+	         c('_');
+      else
+	 outfile.i(off);
+      end; -- if
+   end; -- cprint_offset
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Continuation code
+   const cont1:INT := 1;	-- Print reference to attribute in self
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cont_cprint_code(outfile:SAT_OUTFILE; cont:INT) is
+      -- "cont" represents the continuation of printing the
+      -- attribute access code.  In this case, there is only
+      -- one choice.
+      if (cont /= cont1) then
+	 ERR_INFO::compiler_error_msg("ATTR_DECL_FEATOB_S",
+	           STR::create.s("Unknown continuation #").
+	                    i(cont).s(" in ATTR_DECL_FEATOB_S"));
+      else
+	 if (not GLOBAL_PROC::cprint_ref_to_self(outfile)) then
+	    ERR_INFO::format_warning_msg(
+	              lineno,
+	              STR::create.s("(ATTR_DECL_FEATOB_S): Void object"));
+	 end; -- if
+	 outfile.c(',');
+	 cprint_offset(outfile);
+      end; -- if
+   end; -- cont_cprint_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_access_value(outfile:SAT_OUTFILE) is
+      case (ctype)
+      when (c_ptr) then
+	 PRINT_C_CODE::cprint_ptr_attr_access(outfile, cont1, self);
+      when c_int then
+	 PRINT_C_CODE::cprint_int_attr_access(outfile, cont1, self);
+      when (c_char) then
+	 PRINT_C_CODE::cprint_char_attr_access(outfile, cont1, self);
+      when (c_float) then
+	 PRINT_C_CODE::cprint_float_attr_access(outfile, cont1, self);
+      when (c_double) then
+	 PRINT_C_CODE::cprint_double_attr_access(outfile, cont1, self);
+      end; -- case
+   end; -- cprint_access_value
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_store_dispval(outfile:SAT_OUTFILE) is
+      -- Print offset of attribute
+      cprint_offset(outfile);
+   end; -- cprint_store_dispval
+
+end; -- class ATTR_DECL_FEATOB_S
+
+--------------------------------------------------------------------
+
+class SHARED_DECL_FEATOB_S is
+   -- Shared attributes.
+   FEATOB_S;
+   DECLOB_S;
+      -- "undefined_p" in DECLOB_S will over-shadow "undefined_p" in
+      --   FEATOB_S.  Similarly for "validate_dispatches_and_get_ext_strs".
+
+   attr init_expr:$EXPROB_S;		-- Initialization expression
+   attr tmpct:LIST{INT};
+   -- List of temporaries needed for initial expression; computed 
+   -- in "do_gen_temps"
+   
+-- cls_inst:CLASSOB_S;   
+-- cls_def:CLASSOB;
+-- -- Inherited from FEATOB_S
+   
+-- Computed during semantic check
+   attr disp:BOOL;			-- True if dispatched anywhere.
+   attr seen:BOOL;			-- For detecting loops
+   attr printed_p:BOOL;		
+      -- True if initialization code has been printed.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:INT; t:$TYPEOB_S; e:$EXPROB_S; priv:BOOL; c_def:CLASSOB; ln:INT):SAME is
+      res := new;
+      res.name := nm;
+      res.type_spec := t;
+      res.init_expr := e;
+      res.maybe_used := ( e /= void ); -- eval init expression for effects
+      res.pte := priv;
+      res.cls_def := c_def;	     
+      res.cls_inst := GLOBALS::curr_class_inst;	     
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+      res := STR::create.s("shared ").
+                      s((GLOBALS::str_table).at_index(name)).
+                      c(':').
+                      s(type_spec.sather_code);
+      if (init_expr /= void) then
+	 res := res.s(" := ").s(init_expr.sather_code);
+      else
+	 res := res.c(';');
+      end; -- if
+   end; -- sather_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      if (init_expr /= void) then
+	 res := create(name, type_spec.dup, init_expr.dup, pte, cls_def, lineno);
+      else
+	 res := create(name, type_spec.dup, void, pte, cls_def, lineno);
+      end; -- if
+   end; -- dup
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      type_spec.resolve_predef_types(index);
+      if (init_expr /= void) then
+	 init_expr.resolve_predef_types(index);
+      end; -- if
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   compatible_des_feat(feat:SAME; lval_p:BOOL):BOOL is
+      -- "lval_p" is true when we are using the attribute as the LHS of
+      -- an assignment statement.  "feat" is guaranteed to be non-void.
+
+      if (lval_p) then
+	 res := type_spec.conforms_to(feat.type_spec);
+      else
+	 res := feat.type_spec.conforms_to(type_spec);
+      end; -- if
+      -- "feat" is a compatible descendent shared feature if its type
+      -- conforms to the type of the parent shared feature.
+
+      if (pte /= feat.pte) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(SHARED_DECL_FEATOB_S): Inconsistent use of \"private\" for shared feature \"").
+                            s((GLOBALS::str_table).at_index(name)).
+	                    s("\" in \"").
+                            s(self.cls_inst.full_name).s("\" and \"").
+                 	    s(feat.cls_inst.full_name).s("\""));
+      end; -- if
+   end; -- compatible_des_feat
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      semant_prologue;
+      if (init_expr /= void) then
+	 init_expr.semant(symtab);
+	 if (init_expr.res_type = void) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(SHARED_DECL_FEATOB_S): Unknown type in the initial expression"));
+	    init_expr.res_type := GLOBALS::ob_typeob_s;
+	 end; -- if
+	 if not GLOBAL_PROC::conform_tst(init_expr.res_type, type_spec, 
+	                                 init_expr) then
+	    ERR_INFO::type_mismatch_err("initialization","",
+	       init_expr.res_type,
+	       type_spec,
+	       lineno);
+	 end; -- if
+	 if not (init_expr.valid_init_expr) then
+	    ERR_INFO::format_error_exit(
+	              lineno,
+	              STR::create.s("(SHARED_DECL_FEATOB_S): Invalid reference found in shared feature initialization"));
+	 end; -- if
+      end; -- if
+
+      -- Refer to note in "do_update_info" routine.
+      co:CLASSOB_S := type_spec.inst_cls;
+      if (co.c_type_updated) then
+	 (GLOBALS::curr_class_inst).structure_updated := true;
+      end; -- if
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   do_gen_temps is
+      if (init_expr /= void) and (tmpct = void) then
+	 tmpct := init_expr.gen_temps;
+      end; -- if
+   end; -- do_gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   cprint_cname(outfile:SAT_OUTFILE) is
+      if (cls_inst.index = RESERVED_CLASSES::C_ici) then
+	 outfile.s((GLOBALS::str_table).at_index(name));
+      else
+	 outfile.s(cls_inst.prefix).
+                 c('_').
+                 s((GLOBALS::str_table).at_index(name)).
+                 c('_');
+      end; -- if
+   end; -- cprint_cname
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_extern(outfile:SAT_OUTFILE) is
+      -- Print out the C "extern" declaration
+      outfile.s("extern ");
+      old_ind:INT := outfile.index;
+      outfile.ind_init;
+      cprint_decln(outfile);
+      outfile.s(";\n").inc_ln(1);
+      outfile.index := old_ind;
+   end; -- cprint_extern
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_decln(outfile:SAT_OUTFILE) is
+      -- Print out the C declaration of shared attribute
+      outfile.s("/*shared*/ ");
+      	 -- Get the class instance for the return type and ask it
+	 --   to print the C type.
+      type_spec.inst_cls.cprint_ctype(outfile);
+      outfile.c(' ');
+      cprint_cname(outfile);
+   end; -- cprint_decln
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_access_value(outfile:SAT_OUTFILE) is
+      cprint_cname(outfile);
+   end; -- cprint_access_value
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_store_dispval(outfile:SAT_OUTFILE) is
+      -- Print ddress of global C variable (with cast to "int")
+      outfile.s("(int)&");
+      cprint_cname(outfile);
+   end; -- cprint_store_dispval
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_init_code(outfile:SAT_OUTFILE) is
+      -- Print init code if not yet printed. This is called from class
+      -- and from other init expressions to solve initialization dependencies
+      -- class-wise.
+      if seen and GLOBALS::curr_class_inst /= cls_inst then -- we are reentering the same object.
+	 ERR_INFO::format_error_msg(
+		  lineno,
+		  STR::create.s("(SHARED_DECL_FEATOB_S): Loop dependency for shared feature definition"));
+      	 return;		-- optimize a little, we'd return in the next statement anyway.
+      end;
+      if printed_p or (cls_inst.index = RESERVED_CLASSES::C_ici) then
+	 printed_p := true;	-- Mark self done.
+	 return;
+      else
+	 -- If we are called from init_expr of other class attribute our class
+	 -- is depended-upon by that class and we make sure that the init
+	 -- of our whole class precedes the initialization of the dependent
+	 -- class attribute. ... But complain about loops.
+	 -- Save/restore GLOBALS::curr_class_inst for our own purpose, so we
+	 -- can recognize the dependent and depended-upon class (our own).
+	 if GLOBALS::curr_class_inst /= cls_inst then
+	    -- We were called by a dependent class.
+	    if cls_inst.seen then -- and indirectly by our class.
+	       ERR_INFO::format_error_msg(
+		  lineno,
+		  STR::create.s("(SHARED_DECL_FEATOB_S): Weak loop dependency for class initialization, unable to order classes"));
+	       printed_p := true;	-- Mark done, one error message enough.
+	       return;
+	    else		-- Let the whole class init precede.
+	       co: CLASSOB_S := GLOBALS::curr_class_inst;
+	       GLOBALS::curr_class_inst := cls_inst;
+	       cls_inst.cprint_init_shareds_and_consts(outfile);
+		  -- restore so other shared/constant can reconize if depended-upon.
+	       GLOBALS::curr_class_inst := co;
+	       return;		-- The init code for our whole class includes our own.
+	    end;
+	 end; -- if
+      end; -- if
+      printed_p := true;	-- Mark done.
+      if (init_expr /= void) then
+	 seen := true;
+	 init_expr.cprint_init_code(outfile);
+	    -- up to here we just run down to order other inits before us.
+	    -- now we start printing.
+	 if (GLOBAL_PROC::handle_feature_p(self)) then
+	    -- Print initialization of class definition file name for runtime check.
+	    cls_inst.cprint_pre_rtcode(outfile);
+	    init_expr.cprint_pre_code(outfile);
+	    outfile.indent;
+	    cprint_cname(outfile);
+	    outfile.s(" = ("); type_spec.cprint_ctype(outfile);
+	    outfile.s(")");
+	    init_expr.cprint_act_code(outfile);
+	    outfile.s(";\n").inc_ln(1);
+	 end;
+	 seen := false;
+      else
+	 if (GLOBAL_PROC::handle_feature_p(self)) then
+	    outfile.indent;
+	    cprint_cname(outfile);
+	    outfile.s(" = ");
+	    type_spec.cprint_void(outfile);
+	    outfile.s(";\n").inc_ln(1);
+	 end;
+      end; -- if
+   end; -- cprint_init_code
+
+end; -- class SHARED_DECL_FEATOB_S
+
+--------------------------------------------------------------------
+
+class CONST_DECL_FEATOB_S is
+   -- Constant attributes.
+   FEATOB_S;
+   DECLOB_S;
+      -- "undefined_p" in DECLOB_S will over-shadow "undefined_p" in
+      --   FEATOB_S.  Similarly for "validate_dispatches_and_get_ext_strs".
+
+   attr init_expr:$EXPROB_S;	
+      -- Initialization expression, guaranteed non-void
+   attr tmpct:LIST{INT};
+      -- List of temporaries needed in initial expression
+
+-- Computed during semantic check
+   attr const_done:BOOL;		-- "true" if constant has been evaluated
+   attr constval:$CONST_EXPROB_S;	-- Value of constant
+      -- "constval" contains an integer value only if constant has been
+      --  declared to be an integer or a descendent of an integer.
+
+   attr seen:BOOL;			-- For detecting loops
+   attr disp:BOOL;			-- True if dispatched.
+   attr printed_p:BOOL;		
+      -- True if initialization code has been printed.
+   
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:INT; t:$TYPEOB_S; e:$EXPROB_S; priv:BOOL; c_def:CLASSOB; ln:INT):SAME is
+      res := new;
+      res.name := nm;
+      res.type_spec := t;
+      res.init_expr := e;
+      res.maybe_used := true; -- eval init expression in any event for effects
+      res.pte := priv;
+      res.cls_def := c_def;	     
+      res.cls_inst := GLOBALS::curr_class_inst;	     
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+      res := STR::create.s("constant ").
+                      s((GLOBALS::str_table).at_index(name)).
+                      c(':').
+                      s(type_spec.sather_code).
+                      s(" := ").
+                      s(init_expr.sather_code);
+   end; -- sather_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      if (init_expr /= void) then
+	 res := create(name, type_spec.dup, init_expr.dup, pte, cls_def, lineno);
+      else
+	 res := create(name, type_spec.dup, void, pte, cls_def, lineno);
+      end; -- if
+   end; -- dup
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      type_spec.resolve_predef_types(index);
+      init_expr.resolve_predef_types(index);
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_constval:$CONST_EXPROB_S is
+      if (const_done) then
+	 res := constval;
+	 return;
+      end; -- if
+      -- If we haven't attempted to evaluate the constant, try to find
+      -- a value for the CONST_DECL_FEATOB_S, and then get the "constval".
+      eval_constant;
+      res := constval;
+   end; -- get_constval
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   eval_constant is
+      if (const_done) then
+	 return;
+      end;
+
+      if (seen) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(CONST_DECL_FEATOB_S): Loop dependency for constant feature definition"));
+         return;
+      end; -- if
+      seen := true;		-- For detecting loop dependency
+      constval := init_expr.expr_eval_constant;
+	 -- Returns an $EXPROB_S node (in particularly, an
+	 --   INT_CONST_EXPROB_S node) or void if the expression does not 
+	 --   return a constant value.
+      seen := false;
+      const_done := true;
+   end; -- eval_constant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   compatible_des_feat(feat:SAME; lval_p:BOOL):BOOL is
+      res := feat.type_spec.conforms_to(type_spec);
+      -- NOTE: Constant features can only be used on the right hand side
+      -- of assignment statement, so we only need to check that the descendent
+      -- feature's type conforms to the current constant feature's type.
+      
+      -- "feat" is a compatible descendent constant feature if its type
+      -- conforms to the type of the parent constant feature.
+      if (pte /= feat.pte) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(CONST_DECL_FEATOB_S): Inconsistent use of \"private\" for constant \"").
+                            s((GLOBALS::str_table).at_index(name)).
+	                    s("\" in \"").
+                            s(self.cls_inst.full_name).s("\" and \"").
+	                    s(feat.cls_inst.full_name).s("\""));
+      end; -- if
+   end; -- compatible_des_feat
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      semant_prologue;
+      init_expr.semant(symtab);
+      if (init_expr.res_type = void) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(CONST_DECL_FEATOB_S): Unknown type in the initial expression"));
+	 init_expr.res_type := GLOBALS::ob_typeob_s;
+      end; -- if
+      if not (GLOBAL_PROC::conform_tst(init_expr.res_type, type_spec,
+	                               init_expr)) then
+	 ERR_INFO::format_error_exit(
+	           lineno,
+	           STR::create.s("(CONST_DECL_FEATOB_S): Type mismatch in constant feature definition"));
+	 
+      elsif not (init_expr.valid_init_expr) then
+	 ERR_INFO::format_error_exit(
+	           lineno,
+	           STR::create.s("(CONST_DECL_FEATOB_S): Invalid reference found in constant feature initialization"));
+      end; -- if
+
+      -- Refer to note in "do_update_info" routine.
+      co:CLASSOB_S := type_spec.inst_cls;
+      if (co.c_type_updated) then
+	 (GLOBALS::curr_class_inst).structure_updated := true;
+      end; -- if
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   is_a_str_const:INT is
+      -- Returns the temporary name of the variable associated with the
+      -- Sather string if any.
+      if (not const_done) then
+	 eval_constant;
+      end; -- if
+      if (const_done) then
+	 if (constval /= void) then
+	    if (constval.type = STR_CONST_EXPROB_S::type) then
+	       str_const:STR_CONST_EXPROB_S := constval;
+	       res := str_const.temp_name;
+	    end; -- if
+	 end; -- if
+      end; -- if
+   end; -- is_a_str_const
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   do_gen_temps is
+      if (tmpct = void) then
+	 tmpct := init_expr.gen_temps;
+      end; -- if
+   end; -- do_gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_cname(outfile:SAT_OUTFILE) is
+      if (cls_inst.index = RESERVED_CLASSES::C_ici) then
+	 outfile.s((GLOBALS::str_table).at_index(name));
+      else
+	 outfile.s(cls_inst.prefix).
+                 c('_').
+                 s((GLOBALS::str_table).at_index(name)).
+                 c('_');
+      end; -- if
+   end; -- cprint_cname
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_extern(outfile:SAT_OUTFILE) is
+      -- Print out the C "extern" declaration
+      if (not const_done) then
+	 eval_constant;
+      end; -- if
+      -- Whether the global variable for this constant feature is actually
+      -- used or not, we can still print the extern-declaration.
+      outfile.s("extern ");
+      old_ind:INT := outfile.index;
+      outfile.ind_init;
+      cprint_decln(outfile);
+      outfile.s(";\n").inc_ln(1);
+      outfile.index := old_ind;
+   end; -- cprint_extern
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_decln_with_poss_init(outfile:SAT_OUTFILE) is
+      if (not const_done) then
+	 eval_constant;
+      end; -- if
+      outfile.s("/*constant*/ ");
+      type_spec.inst_cls.cprint_ctype(outfile);
+	 -- Get the class instance for the return type and ask it
+	 --   to print the C type.
+      outfile.c(' ');
+      cprint_cname(outfile);
+      if (const_done) and (constval /= void) then
+	 outfile.s(" = ");
+	 constval.cprint_act_code(outfile);
+      end; -- if
+   end; -- cprint_decln_with_poss_init
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_decln(outfile:SAT_OUTFILE) is
+      -- Print out the C "extern" declaration; caller is not responsible for
+      -- checking that this does not have a constant value.
+      if (not const_done) then
+	 eval_constant;
+      end; -- if
+      outfile.s("/*constant*/ ");
+      type_spec.inst_cls.cprint_ctype(outfile);
+	 -- Get the class instance for the return type and ask it
+	 --   to print the C type.
+      outfile.c(' ');
+      cprint_cname(outfile);
+    end; -- cprint_decln
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_access_value(outfile:SAT_OUTFILE) is
+      if (const_done) and (constval /= void) then
+	 constval.cprint_act_code(outfile);
+      else
+	 cprint_cname(outfile);
+      end; -- if
+   end; -- cprint_access_value
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_store_dispval(outfile:SAT_OUTFILE) is
+      -- Print address of global C variable (with cast to "int")
+      outfile.s("(int)&");
+      cprint_cname(outfile);
+   end; -- cprint_store_dispval
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_init_code(outfile:SAT_OUTFILE) is
+      -- Print init code if not yet printed. This is called from class
+      -- and from other init expressions to solve initialization dependencies
+      -- class-wise.
+      if printed_p or (cls_inst.index = RESERVED_CLASSES::C_ici) then
+	 printed_p := true;	-- Mark self done.
+	 return;
+      else
+	 -- If we are called from init_expr of other class attribute our class
+	 -- is depended-upon by that class and we make sure that the init
+	 -- of our whole class precedes the initialization of the dependent
+	 -- class attribute. ... But complain about loops.
+	 -- Save/restore GLOBALS::curr_class_inst for our own purpose, so we
+	 -- can recognize the dependent and depended-upon class (our own).
+	 if GLOBALS::curr_class_inst /= cls_inst then
+	    -- We were called by a dependent class.
+	    if cls_inst.seen then -- and indirectly by our class.
+	       ERR_INFO::format_error_msg(
+		  lineno,
+		  STR::create.s("(CONST_DECL_FEATOB_S): Weak loop dependency for class initialization, unable to order classes"));
+	       printed_p := true;	-- Mark done, one error message enough.
+	       return;
+	    else		-- Let the whole class init precede.
+	       co: CLASSOB_S := GLOBALS::curr_class_inst;
+	       GLOBALS::curr_class_inst := cls_inst;
+	       cls_inst.cprint_init_shareds_and_consts(outfile);
+		  -- restore so other shared/constant can reconize if depended-upon.
+	       GLOBALS::curr_class_inst := co;
+	       return;		-- The init code for our whole class includes our own.
+	    end;
+	 end; -- if
+      end; -- if
+      printed_p := true;	-- Mark done. Don't allow init code twice.
+      if (const_done) and (constval /= void) then
+      else
+	 init_expr.cprint_init_code(outfile);
+	 if (GLOBAL_PROC::handle_feature_p(self)) then
+	    -- Print initialization of class definition file name for runtime check.
+	    cls_inst.cprint_pre_rtcode(outfile);
+	    init_expr.cprint_pre_code(outfile);
+	    outfile.indent;
+	    cprint_cname(outfile);
+	    outfile.s(" = ");
+	    init_expr.cprint_act_code(outfile);
+	    outfile.s(";\n").inc_ln(1);
+	 end;
+      end; -- if
+   end; -- cprint_init_code
+
+end; -- class CONST_DECL_FEATOB_S
+
+--------------------------------------------------------------------
+   
+class PARAM_DECLOB_S is
+   -- Single parameter declaration
+   -- Note: Type parameters are handled separately.
+   -- Name is computed during semantic check   
+
+   DECLOB_S;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:INT; tp:$TYPEOB_S; ln:INT):SAME is
+      res := new;
+      res.name := nm;
+      res.type_spec := tp;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+      res := STR::create.s((GLOBALS::str_table).at_index(name)).
+                      s(type_spec.sather_code);
+   end; -- sather_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(name, type_spec.dup, lineno);
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      symtab.enter_sym(name, self);
+
+      -- Refer to note in "do_update_info" routine.
+      -- NOTE: In this case, we mark the current class as "internal_updated"
+      --       only, because only the declarations of the parameters are
+      --       changed, and this does not affect other classes.
+      co:CLASSOB_S := type_spec.inst_cls;
+      if (co.c_type_updated) then
+	 (GLOBALS::curr_class_inst).internal_updated := true;
+      end; -- if
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_decln(outfile:SAT_OUTFILE) is
+      -- Print the parameter declaration
+      type_spec.cprint_ctype(outfile); outfile.c(' ');
+      cprint_cname(outfile);
+   end; -- cprint_decln
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_access_value(outfile:SAT_OUTFILE) is
+      cprint_cname(outfile);
+   end; -- cprint_access_value
+
+end; -- class PARAM_DECLOB_S
+
+--------------------------------------------------------------------
+
+

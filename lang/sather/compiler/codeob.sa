@@ -1,0 +1,212 @@
+--- -*- Mode: Sather;  -*-
+-- File: codeob.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU) and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1990, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Ancestor class of all classes representing Sather code
+--*           in compiler
+--*
+--* CLASSES: CODEOB, PARSEROB, SEMANTOB
+--*
+--* RCS: $Id: codeob.sa,v 1.1 1994/02/12 03:21:46 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 04:53 1993 (hws)
+--*  Sep 19 18:10 1992 (hws): more uniform error messages
+--*  Jan 28 18:52 1992 (hws): Add compiler_error_msg
+--*  Aug 27 16:54 1991 (hws): Extend the error info scheme to allow msgs
+--*       to refer to non-current files
+--*  Aug 25 13:58 1991 (hws): let compiler behave more gracefully when
+--*                           current class/file unknown
+--* Created: Wed Jun  6 16:01:44 1990 (clim)
+--*
+--* Modified: Thu Oct 18 15:13:21 1990 (clim)
+--* Extract the error routines to be put in a separate class so that 
+--*   they are not inherited by all the objects.  This will reduce 
+--*   the amount of code generated for the compiler.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class CODEOB is
+   -- This is the top-most ancestor class of all classes in the
+   -- compiler which represent Sather code.
+
+   attr lineno:INT;			-- Line number is common to all constructs.
+   attr kwdname:INT;			-- Any value may be passed by name.
+   const print_indent:INT := 2;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create:SAME is
+      -- Create a parent object; this is never called if the compiler code
+      -- is correct.
+
+      res := new;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   out_of_line(fn: STR) is
+      -- update line info to refer to original file `fn' rather than the current
+      -- context in which this construct is used to compose code.
+      lineno := ERR_INFO::out_of_line_err_info(fn,lineno);
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      -- Duplicate a parent object.
+      res := copy;
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   put_kwdname(nm: INT) is
+      -- Associate name to expression.
+      -- Make sure this works on several types of expressions;
+      -- even if called from C (parser) as XYZ::put_kwdname.
+      x: $CODEOB := self;
+      x.kwdname := nm;
+   end;
+      
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+   end; -- sather_code
+
+end; -- class CODEOB
+
+--------------------------------------------------------------------
+   
+class SEMANTOB is
+   -- Parent class of objects created during semantic phase
+   
+   CODEOB;
+      -- Line number of semantic objects have to be updated by
+      -- whoever calls the `create' routine, because since we
+      -- have finished parsing, we cannot get any line information
+      -- at this point.
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(ln,nm:INT):SAME is
+      -- Create a object for parent class of semantic objects.
+      res := new;
+      res.lineno := ln;
+      res.kwdname := nm;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      -- Resolve predefined types (SAME etc).
+   end; -- resolve_predef_types
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      -- Find referrent of symbols, from the given symbol table.
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   typeof:$TYPEOB_S is
+      -- Resultant type of expression.
+   end; -- typeof
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_offset:INT is
+      -- Offset of attribute feature.
+   end; -- get_offset
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_offset(outfile:SAT_OUTFILE) is
+      -- Print offset of attribute feature.
+   end; -- cprint_offset
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_constval:$CONST_EXPROB_S is
+      -- Get a object representing a constant value for this
+      -- expression.
+   end; -- get_constval
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- -- (NOTE:
+-- -- The implementation has two relevant routines are:
+-- -- a. eval_constant (No return value) for FEATOB_S's
+-- -- b. expr_eval_constant (Return $CONST_EXPROB_S) for EXPROB_S's)
+-- -- c. get_constval (Return $CONST_EXPROB_S) for SEMANTOB's, but only
+-- --    makes sense for CONST_DECL_FEATOB_S.  This is needed, because
+-- --    we get the constant value of an expression from a "referrent" whose 
+-- --    type is $SEMANTOB.
+--
+--   eval_constant is
+--      -- This is relevant only for expressions in constant definition.
+--      -- Constants are evaluated according to the following rules:
+--      -- 1.  integer :  Try to evaluate the arithmetic expressions as well
+--      -- 2.  bool, char, real, double : Only if the node is one of the
+--      --     CONST_EXPROB_S nodes  
+--   end; -- eval_constant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cont_cprint_code(outfile:SAT_OUTFILE; cont:INT) is
+      -- Default is to print nothing.  If a descendent redefines this 
+      -- routine, the type of "obj" should be redeclared to be the appropriate
+      -- non-dispatched type.
+   end; -- cont_cprint_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_cname(outfile:SAT_OUTFILE) is
+      -- Only relevant for ROUT_FEATOB_S, CONST_DECL_FEATOB_S or
+      --   SHARED_DECL_FEATOB_S.
+   end; -- cprint_cname
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_extern(outfile:SAT_OUTFILE) is
+      -- Only relevant for ROUT_FEATOB_S, CONST_DECL_FEATOB_S, and
+      -- SHARED_DECL_FEATOB_S.
+   end; -- cprint_extern
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_access_value(outfile:SAT_OUTFILE) is
+      -- The following will be printed for each kind of declaration.
+      -- a.  ATTR_DECL_FEATOB_S :  Print code to access attribute of "self"
+      -- b.  SHARED_DECL_FEATOB_S : Print name of corresponding global C 
+      --                            variable
+      -- c.  CONST_DECL_FEATOB_S : The actual name of the global C variable
+      --                           or a constant value 
+      -- d.  PARAM_DECLOB_S : C name of parameter
+      -- e.  LVAR_DECLOB_S : C name of local variable
+   end; -- cprint_access_value
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_init_code(outfile:SAT_OUTFILE) is
+      -- This is only relevant for 
+      -- a. SHARED_ / CONST_DECL_FEATOB_S : Print out the initialization code
+      -- b. All EXPROB_S's : Ask the referrent to print out the initialzation
+      --                     code if they are SHARED_ or CONST_DECL_FEATOB_S.
+   end; -- cprint_init_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+end; -- class SEMANTOB
+
+--------------------------------------------------------------------
+
+class PARSEROB is
+   -- Parent class of objects created during parsing.
+   CODEOB;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):$SEMANTOB is
+      -- Copy parsing information into a new node for semantic phase.
+      res := SEMANTOB::create(lineno,kwdname);
+   end; -- pcopy
+   
+end; -- class PARSEROB
+
+--------------------------------------------------------------------
+
+

@@ -1,0 +1,197 @@
+-- -*- Mode: Sather;  -*-
+-- File: hash.sa
+-- Author: Stephen M. Omohundro
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION:
+--*
+--* RCS: $Id: hash.sa,v 1.1 1994/02/12 03:21:47 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 05:01 1993 (hws)
+--*  Sep 28 15:20 1993 (hws): Sather 1 syntax, copyright note
+--* Created: Tue Mar 27 22:30:59 1990
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class HASH{T} is
+   -- Hash tables for elements indexed by positive integer keys.
+   -- Interface routines: create, get, insert, delete, frst, nxt, none
+   
+   attr hsize:INT;			-- Number stored (including deletes!)
+   attr key_tbl:ARRAY{$KEY};		-- Storage for the keys
+   attr ent_tbl:ARRAY{T};		-- Storage for the entries
+   
+   const def_init_size:INT := 5; -- Default initial size
+   
+   create(init_size:INT):SAME is
+      -- Make an empty hash table.
+      if (init_size <= 0) then
+	 init_size := def_init_size;
+      end; -- if
+      res := new; 
+      res.key_tbl := res.key_tbl.new(init_size); 
+      res.ent_tbl := res.ent_tbl.new(init_size);
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get(k:$KEY):T is
+      -- Return entry associated with key k or void if not stored.
+      hsh:INT := k.hash(key_tbl.asize);
+
+      loop
+	 if (key_tbl[hsh] = 0) then 
+	    break!;
+	 else
+	    if (key_tbl[hsh] = i) then 
+	       res := ent_tbl[hsh]; 
+	       break!;
+	    elsif (hsh = key_tbl.asize-1) then 
+	       hsh := 0;
+	    else 
+	       hsh := hsh+1 ;
+	    end; -- if
+	 end; -- if
+      end; -- loop
+   end; -- get
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resize(ns:INT) is
+      -- Resize self to have ns entries. Copy non-deleted entries over.
+      
+      nkey_tbl:ARRAY{$KEY} := key_tbl.new(ns);		
+      nent_tbl:ARRAY{T}    := ent_tbl.new(ns);
+      
+      hsize := 0;
+      i:INT := 0;
+      loop until!(i = key_tbl.asize);
+	 if (key_tbl[i] > 0) then 
+	    val:INT := key_tbl[i];
+	    hsh:INT := val.hash(ns);
+	    loop		
+	       if (nkey_tbl[hsh] = 0) then 
+		  nkey_tbl[hsh] := val; 
+		  nent_tbl[hsh] := ent_tbl[i];
+		  hsize := hsize+1; 
+		  break!;
+	       elsif (hsh = ns - 1) then 
+		  hsh := 0; 
+	       else 
+		  hsh := hsh+1 
+	       end; -- if
+	    end; -- loop
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      key_tbl := nkey_tbl; 
+      ent_tbl := nent_tbl;
+   end; -- resize
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   insert(k:$KEY; e:T) is
+      -- Insert key k and entity e. Overwrite if already there.
+      
+      if (2 * (hsize + 1) > key_tbl.asize) then 
+	 resize(key_tbl.asize * 2 + 1);
+      end;
+      hsh:INT := k.hash(key_tbl.asize);
+      loop	
+	 if (key_tbl[hsh] = 0) then 
+	    key_tbl[hsh] := k; 
+	    ent_tbl[hsh] := e; 
+	    hsize := hsize+1; 
+	    break!;
+	 elsif (key_tbl[hsh] = k) then 
+	    ent_tbl[hsh] := e; 	-- Put in new entry
+	    break!;	
+	 elsif (hsh = key_tbl.asize-1) then 
+	    hsh := 0;		-- Loop to front of table
+	 else 
+	    hsh := hsh + 1;	-- Try next slot
+	 end;
+      end; -- loop
+   end; -- insert
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   delete(k:$KEY) is
+      -- Delete entry i if it is in the table.
+      hsh:INT := k.hash(key_tbl.asize);
+      loop
+	 if (key_tbl[hsh] = 0) then 
+	    break!;		-- Not in table
+	 else
+	    if (key_tbl[hsh] = k) then 
+	       key_tbl[hsh] := -k; 
+	       break!;		-- Mark it deleted
+	    elsif (hsh = key_tbl.asize-1) then 
+	       hsh := 0;
+	    else 
+	       hsh := hsh+1;
+	    end; -- if
+	 end; -- if
+      end; -- loop
+   end; -- delete
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   frst:$KEY is
+      -- First key in table or the constant none.
+      i:INT := 0; 
+      loop until!(i = key_tbl.asize);
+	 if (key_tbl[i] > 0) then 
+	    res := key_tbl[i]; 
+	    break!;
+	 end; -- if
+      end; -- loop
+      res :=  none
+   end; -- frst
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   nxt(i:$KEY):INT is
+      -- The key after key i or the constant none if i isn't in the table 
+      -- or is the last entry.	
+      -- Useful as: i:INT := h.frst loop until!(i=h.none); i := hs.nxt(i) end;
+      
+      hsh:INT := i.hash(key_tbl.asize);
+      loop
+	 if (key_tbl[hsh] = 0) then 
+	    res :=  none; 
+	    break!;
+	 else
+	    if (key_tbl[hsh] = i) then -- Found it
+	       loop
+		  if (hsh = key_tbl.asize-1) then 
+		     res := none; -- Last entry
+		     break!;
+		  else
+		     hsh := hsh + 1;
+		     if (key_tbl[hsh] > 0) then 
+			res := key_tbl[hsh]; 
+			break!;
+		     end; -- if
+		  end; -- if
+	       end; -- loop
+	    elsif (hsh = key_tbl.asize - 1) then 
+	       hsh := 0;
+	    else 
+	       hsh := hsh + 1;
+	    end; -- if
+	 end; -- if
+      end; -- loop
+   end; -- nxt
+   
+   const none:INT := -1;
+
+end; -- class HASH
+
+--------------------------------------------------------------------
+

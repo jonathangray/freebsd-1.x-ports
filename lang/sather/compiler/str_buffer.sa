@@ -1,0 +1,111 @@
+-- -*- Mode: Sather;  -*-
+-- File: str_buffer.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION:  A self-extensible string object (resembles both `STR' and
+--*            `LST{T}'.
+--*
+--* RCS: $Id: str_buffer.sa,v 1.1 1994/02/12 03:21:54 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 05:13 1993 (hws)
+--*  Oct 17 05:13 1993 (hws): Sather 1 syntax, copyright note
+--* Created: Fri Jun  1 16:51:49 1990 (clim)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class STR_BUFFER is
+   -- Extensible array of characters, to handle arbitrary symbol length
+   -- required by the scanner.
+
+   LIST{CHAR};
+   const def_str_len:INT := 20;	-- Default initial buffer size is 20
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(init_str_len:INT):SAME is
+      -- Create an extensible array of characters.
+      if (init_str_len <= 0) then
+	 -- Create a list of initial size 20
+	 res := new(def_str_len);
+      else
+	 res := new(init_str_len);
+      end;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   strval:STR is
+      -- Returns a copy of the string as a `STR' object.
+      res := res.new(insert + 1);
+      
+      i:INT := 0;
+      loop until!((self[i] = '\0') or (i >= insert));
+	 res[i] := self[i];
+	 i := i + 1;
+      end; -- loop
+      res[i] := '\0';
+   end; -- strval
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   is_equal(strv:STR):BOOL is
+      -- Returns "true" if given string is same as the one in buffer.
+      i:INT := 0;
+      l1:INT := strv.length;
+      l2:INT := insert;
+      loop until!((i >= l1) or (i >= l2));
+	 
+	 -- STR_BUFFER is a descendent of ARRAY, so character in
+	 --   buffer can be referenced directly.
+	 if (self[i] /= strv[i]) then
+	    res := false;
+	    return;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      if (self[i] = '\0') and (strv[i] = '\0') then
+	 res := true;
+      end; -- if
+   end; -- equal
+      
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   terminate:SAME is
+      -- Insert a null character.
+      if insert < asize then
+	 res := self;
+      else
+	 res := self.extend(2 * asize);
+      end; -- if
+      res[insert] := '\0'; 
+   end; -- terminate
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   length:INT is
+      -- Number of characters pushed into the list including the last
+      -- character if it is '\0'.
+      if ([insert] = '\0') then
+	 res := insert + 1;
+      else
+	 res := insert;
+      end; -- if
+   end; -- length
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   init is
+      -- Initialize string buffer.
+      insert := 0;
+   end; -- init
+
+end; -- class STR_BUFFER
+
+--------------------------------------------------------------------
+

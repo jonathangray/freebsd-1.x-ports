@@ -1,0 +1,295 @@
+--- -*- Mode: Sather;  -*-
+-- File: c_codegen.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU) and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1990, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+-- 
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Routines to print C code
+--*
+--* RCS: $Id: c_codegen.sa,v 1.1 1994/02/12 03:21:47 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 03:36 1993 (hws)
+--*  Sep 28 04:47 1993 (hws): switch -> case
+--*  Jun 30 00:13 1992 (hws): format so TAGS find all routines.
+--*  Nov 27 00:06 1991 (hws): integrate clim's -chk patch.
+--* Created: Thu Oct 11 15:59:01 1990 (clim)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class PRINT_C_CODE is
+   -- This class provides a "lineno" attribute, just in case, it is 
+   -- being used/inherited by objects without the "lineno" attribute.
+
+   -- In the general case, this class is only used as an inherited class
+   -- for SEMANTOB and there is no check/code generated on this class.
+   -- In that case, the missing referrent for "lineno" will not be discovered, 
+   -- but if we want to use the "-all" option, the compiler will complain.
+   -- To avoid that trouble, we have (in an unclean manner), provided a
+   -- "lineno" attribute.  This also serves as a reminder that all classes
+   -- that inherits from this class should have their own "lineno" attribute.
+   
+   -- Similar reasoning means that we have to provide a dummy routine
+   -- which all objects wanting to print C code should provide.  This
+   -- will allow the "cont_cprint_code" routine to decide exactly 
+   -- what to print.
+   
+-- By passing the object as one of the arguments, and invoking the print
+-- routines directly (instead of inheriting them), the dummy features
+-- "lineno" and "cont_cprint_code" are irrelevant.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_sather_str_mi(outfile:SAT_OUTFILE; cont:INT;
+                        exp:STR_CONST_EXPROB_S) is
+      -- Print sather string declaration (local).
+      outfile.indent;
+      outfile.s("SATHER_STR_(");
+      exp.cont_cprint_code(outfile, cont);
+      outfile.c(')');
+   end; -- cprint_sather_str_mi
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_sather_str1_mi(outfile:SAT_OUTFILE; cont:INT;
+                         exp:STR_CONST_EXPROB_S) is
+      -- Print sather string declaration (global).
+      outfile.indent;
+      outfile.s("SATHER_STR1_(");
+      exp.cont_cprint_code(outfile, cont);
+      outfile.c(')');
+   end; -- cprint_sather_str_mi
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_rt_typechk(outfile:SAT_OUTFILE; rt_type, temp_name, lineno:INT) is
+      -- Strict/Descendent type check for result of expression.
+      outfile.indent;
+      if (rt_type > 0) then
+	 outfile.s("TYPECHK1_(");
+      else
+	 outfile.s("TYPECHK2_(");
+      end; -- if
+      GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+      -- Note that we do not need any semi-colon at the end.
+      outfile.c(',').i(rt_type).c(',').i(lineno).s(")\n").inc_ln(1);
+   end; -- cprint_rt_typechk
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_void_tst(outfile:SAT_OUTFILE; cont:INT; exp:$EXPROB_S) is
+      -- Void object test.
+      outfile.indent;
+      outfile.s("VOID_TST_(");
+      exp.cont_cprint_code(outfile, cont);
+      outfile.c(',').i(exp.lineno).s(");\n").inc_ln(1);
+   end; -- cprint_void_tst
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_arr_bound_tst(ith_index, name1, name2:INT; outfile:SAT_OUTFILE;
+                        lineno:INT) is
+      -- Tests whether ith index is out of bound.
+      outfile.indent;
+      outfile.s("ARR_BOUND_TST_(").i(ith_index).c(',');
+      GLOBAL_PROC::cprint_ctemp_name(name1, outfile);
+      outfile.c(',');
+      GLOBAL_PROC::cprint_ctemp_name(name2, outfile);
+      outfile.c(',').i(lineno).s(");\n").inc_ln(1);
+   end; -- cprint_arr_bound_tst
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Different forms of attribute access for INT, CHAR, FLOAT, DOUBLE, and 
+-- any non-basic sather class.
+   
+   cprint_char_attr_access(outfile:SAT_OUTFILE; cont:INT; obj:$SEMANTOB) is
+      -- Character attribute access. 
+      outfile.s("CATT_(");
+      obj.cont_cprint_code(outfile, cont);
+      outfile.c(')');
+   end; -- cprint_char_attr_access
+
+-- --------------------
+   cprint_int_attr_access(outfile:SAT_OUTFILE; cont:INT; obj:$SEMANTOB) is
+      -- Integer attribute access.
+      outfile.s("IATT_(");
+      obj.cont_cprint_code(outfile, cont);
+      outfile.c(')');
+   end; -- cprint_int_attr_access
+
+-- --------------------
+   cprint_float_attr_access(outfile:SAT_OUTFILE; cont:INT; obj:$SEMANTOB) is
+      -- Single-precsion floating-point attribute access.
+      outfile.s("FATT_(");
+      obj.cont_cprint_code(outfile, cont);
+      outfile.c(')');
+   end; -- cprint_float_attr_access
+
+-- --------------------
+   cprint_double_attr_access(outfile:SAT_OUTFILE; cont:INT; obj:$SEMANTOB) is
+      -- Double-precsion floating-point attribute access.
+      outfile.s("DATT_(");
+      obj.cont_cprint_code(outfile, cont);
+      outfile.c(')');
+   end; -- cprint_double_attr_access
+
+-- --------------------
+   cprint_ptr_attr_access(outfile:SAT_OUTFILE; cont:INT; obj:$SEMANTOB) is
+      -- Object attribute access.
+      outfile.s("PATT_(");
+      obj.cont_cprint_code(outfile, cont);
+      outfile.c(')');
+   end; -- cprint_ptr_attr_access
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_type_access(outfile:SAT_OUTFILE; cont:INT; exp:$EXPROB_S) is
+      -- Object type access.
+      outfile.s("TYPE_(");
+      exp.cont_cprint_code(outfile, cont);
+      outfile.c(')');
+   end; -- cprint_type_access
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_cache_dispatch(outfile:SAT_OUTFILE; cont:INT;
+                         exp:EXPR_ARGS_EXPROB_S) is
+      -- Cache dispatch code.
+      outfile.indent;
+      if (GLOBAL_PROC::check_is_on) then
+	 outfile.s("safe_cache_dispatch_(");
+	 exp.cont_cprint_code(outfile, cont);
+	 outfile.c(',').i(exp.lineno);
+      else
+	 outfile.s("cache_dispatch_(");
+	 exp.cont_cprint_code(outfile, cont);
+      end; -- if
+      outfile.s(");\n").inc_ln(1);
+   end; -- cprint_cache_dispatch
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_ob_cache_dispatch(outfile:SAT_OUTFILE; cont:INT;
+                            exp:EXPR_ARGS_EXPROB_S) is
+      -- Handles special dispatch for "f.expr" (f:$OB).
+      -- We do not care whether the check is on or not, because the
+      -- dispatching value may be missing even in the normal case 
+      -- for "f.expr" (f:$OB).
+      outfile.indent;
+      outfile.s("ob_cache_dispatch_(");
+      exp.cont_cprint_code(outfile, cont);
+      outfile.s(");\n").inc_ln(1);
+   end; -- cprint_ob_cache_dispatch
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_array_dispatch(outfile:SAT_OUTFILE; cont:INT; exp:$EXPROB_S) is
+      -- Dispatch to get base size of array.
+      outfile.indent;
+      outfile.s("array_dispatch_(");
+      exp.cont_cprint_code(outfile, cont);
+      outfile.s(");\n").inc_ln(1);
+   end; -- cprint_array_dispatch
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_atomic_check(outfile:SAT_OUTFILE; cont:INT; exp:$EXPROB_S) is
+      -- Whether the object contains non-object attributes.
+      outfile.s("atomic_p_(");
+      exp.cont_cprint_code(outfile, cont);
+      outfile.c(')');
+   end; -- cprint_atomic_check
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_copy(outfile:SAT_OUTFILE; cont:INT; exp:$EXPROB_S) is
+      -- Copy object.
+      outfile.s("copy_(");
+      exp.cont_cprint_code(outfile, cont);
+      outfile.c(')');
+   end; -- cprint_copy
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_new(outfile:SAT_OUTFILE; dim:INT; cont:INT; exp:$EXPROB_S) is
+      -- Print calls to runtime routines to create new objects
+      case (dim)
+      when -1 then
+	 if (GLOBAL_PROC::check_is_on) then 
+	    outfile.s("safe_generic_new_(");
+	    exp.cont_cprint_code(outfile, cont);
+	    outfile.c(',').i(exp.lineno);
+	 else 
+	    outfile.s("generic_new_("); 
+	    exp.cont_cprint_code(outfile, cont);
+	 end; -- if
+      when 0 then
+	 if (GLOBAL_PROC::check_is_on) then 
+	    outfile.s("safe_new_(");
+	    exp.cont_cprint_code(outfile, cont);
+	    outfile.c(',').i(exp.lineno);
+	 else 
+	    outfile.s("new_("); 
+	    exp.cont_cprint_code(outfile, cont);
+	 end; -- if
+      when 1 then
+	 if (GLOBAL_PROC::check_is_on) then 
+	    outfile.s("safe_new1_(");
+	    exp.cont_cprint_code(outfile, cont);
+	    outfile.c(',').i(exp.lineno);
+	 else 
+	    outfile.s("new1_("); 
+	    exp.cont_cprint_code(outfile, cont);
+	 end; -- if
+      when 2 then
+	 if (GLOBAL_PROC::check_is_on) then 
+	    outfile.s("safe_new2_(");
+	    exp.cont_cprint_code(outfile, cont);
+	    outfile.c(',').i(exp.lineno);
+	 else 
+	    outfile.s("new2_("); 
+	    exp.cont_cprint_code(outfile, cont);
+	 end; -- if
+      when 3 then
+	 if (GLOBAL_PROC::check_is_on) then 
+	    outfile.s("safe_new3_(");
+	    exp.cont_cprint_code(outfile, cont);
+	    outfile.c(',').i(exp.lineno);
+	 else 
+	    outfile.s("new3_("); 
+	    exp.cont_cprint_code(outfile, cont);
+	 end; -- if
+      when 4 then
+	 if (GLOBAL_PROC::check_is_on) then 
+	    outfile.s("safe_new4_(");
+	    exp.cont_cprint_code(outfile, cont);
+	    outfile.c(',').i(exp.lineno);
+	 else 
+	    outfile.s("new4_("); 
+	    exp.cont_cprint_code(outfile, cont);
+	 end; -- if
+      end; -- case
+      outfile.c(')');
+   end; -- cprint_new
+ 
+ -- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_restore_exec_info(outfile:SAT_OUTFILE) is
+      -- Print the macro which will restore the necessary information.
+      outfile.s("RESTORE_EXEC_INFO_;\n").inc_ln(1);
+   end; -- cprint_restore_exec_info
+ 
+ -- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_update_exec_info1(outfile:SAT_OUTFILE; filename, classname:STR;
+   routinename:STR) is
+      -- Print the macro which will store the necessary information.
+      outfile.s("UPDATE_EXEC_INFO_(\"").
+      s(filename).
+      s("\", \"").
+      s(classname).
+      s("\", \"").
+      s(routinename).
+      s("\");\n").
+      inc_ln(1);
+   end; -- cprint_update_exec_info1
+ 
+end; -- class PRINT_C_CODE
+
+--------------------------------------------------------------------
+

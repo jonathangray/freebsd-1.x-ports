@@ -1,0 +1,416 @@
+-- -*- Mode: Sather;  -*-
+-- File: declob.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU) and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION:  Declarations of shareds/constants/attributes or paramater.
+--*
+--* CLASSES: DECLOB, ATTR_DECL_FEATOB, CONST_DECL_FEATOB,
+--*          SHARED_DECL_FEATOB, PARAM_DECLOB, ANY_DECLOB
+--*
+--* RCS: $Id: declob.sa,v 1.1 1994/02/12 03:21:48 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 04:58 1993 (hws)
+--*  Oct 17 04:31 1993 (hws): copyright fix
+--*  Mar  1 12:12 1993 (hws): more uniform error msg
+--*  Aug 20 13:41 1991 (hws): added init expressions to ATTR_DECL_FEATOB
+--* Created: Thu Jun  7 16:54:24 1990 (clim)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class DECLOB is
+   -- Parent class of declarations
+   PARSEROB;
+   
+   attr type_spec:$TYPEOB;
+   attr pte:BOOL;			-- whether private.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(t:$TYPEOB):SAME is
+      res := new;
+      res.type_spec := t;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):DECLOB_S is
+      res := res.create(type_spec.pcopy(pl, pi), lineno);
+   end; -- pcopy
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_private is
+      pte := true;
+   end; -- mark_private
+
+end; -- class DECLOB
+
+--------------------------------------------------------------------
+   
+class ATTR_DECL_FEATOB is
+   -- Attributes.
+   FEATOB;
+   DECLOB;
+
+   attr init_expr:$EXPROB;		-- Initialization expression
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:INT; t:$TYPEOB; e:$EXPROB; ln:INT):SAME is
+      res := new;
+      if (GLOBALS::str_table).reserved_name_p(nm) then
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, ln,
+	    "ATTR_DECL_FEATOB",
+	    STR::create.s("Redefining \"").
+	           s((GLOBALS::str_table).at_index(nm)).s("\""));
+      end; -- if
+      res.name := nm;
+      res.type_spec := t;
+      res.init_expr := e;
+      -- Line number is provided separately by caller.
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create_lst(do:ANY_DECLOB; e:$EXPROB):LST_FEATOB is
+      -- Given a ANY_DECLOB, take the list of identifiers in
+      --   ANY_DECLOB, and make a list of $FEATOB's (in
+      --   particular a list of ATTR_DECL_FEATOB's).
+      
+      i:INT := 0;
+      sz:INT := do.size;
+      res := res.create(sz);	-- Only allocate necessary amount of space
+      
+      nm:INT;
+      tp:$TYPEOB;
+      
+      tp := do.type_spec;
+      loop until!(i >= sz);
+	 nm := do.names[i];
+ 	 res := res.push(ATTR_DECL_FEATOB::create(nm, tp, e, do.lineno));
+	 i := i + 1;
+      end; -- loop
+
+   end; -- create_lst
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):ATTR_DECL_FEATOB_S is
+      res := res.create(name, 
+                        type_spec.pcopy(pl, pi),
+                        pte,
+                        cls_def,
+                        lineno);
+      if init_expr /= void then
+	 res.init_expr := init_expr.pcopy(pl,pi);
+      end;
+   end; -- pcopy
+
+end; -- class ATTR_DECL_FEATOB
+
+--------------------------------------------------------------------
+
+class SHARED_DECL_FEATOB is
+   -- Shared attributes.
+   FEATOB;
+   DECLOB;
+
+   attr init_expr:$EXPROB;		-- Initialization expression
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:INT; t:$TYPEOB; e:$EXPROB; ln:INT):SAME is
+      res := new;
+      if (GLOBALS::str_table).reserved_name_p(nm) then
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, ln,
+	    "SHARED_DECL_FEATOB",
+	    STR::create.s("Redefining \"").
+	           s((GLOBALS::str_table).at_index(nm)).s("\""));
+      end; -- if
+      res.name := nm;
+      res.type_spec := t;
+      res.init_expr := e;
+      -- Line number is provided separately by caller.
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create_lst(do:ANY_DECLOB; exp:$EXPROB):LST_FEATOB is
+      -- Given a ANY_DECLOB, take the list of identifiers in
+      --   ANY_DECLOB, and make a list of $FEATOB's (in
+      --   particular a list of CONST_DECL_FEATOB's).
+      sz:INT := do.size;
+      res := res.create(sz);	-- Only allocate necessary amount of space
+
+      first:INT;
+      if (sz > 0) then
+	 -- If there is an initialization expression, it is executed only
+	 --   once and the rest are assigned from the first constant
+	 --   attribute.
+	 first := do.names[0];
+      else
+	 -- *! Exit for the moment; the alternative remedy is to just
+	 -- ignore the declaration.
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, lineno,
+	    "SHARED_DECL_FEATOB","No name found in declaration");
+      end; -- if
+
+      -- The initial expression is executed only once when assigned to
+      --   the first constant attribute.
+      
+      -- *! This conversion is different from the one currently implemented
+      --    in the C compiler.
+      i:INT := 0;
+      nm:INT;
+      tp:$TYPEOB;
+      s_declob:SHARED_DECL_FEATOB;
+
+      loop until!(i >= sz);
+	 nm := do.names[i];
+	 tp := do.type_spec;
+	 if (i > 0) and (exp /= void) then
+	    -- If there is an initialization expression and this is not
+	    --   the first shared attribute in the list, get the initial
+	    --   value from the first shared attribute.
+	    s_declob := s_declob.create(nm, tp, ID_EXPROB::create(first),
+	                             do.lineno);
+	 else
+	    s_declob := s_declob.create(nm, tp, exp, do.lineno);
+	 end;
+ 	 res := res.push(s_declob);
+	 i := i + 1;
+      end; -- loop
+   end; -- create_lst
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):SHARED_DECL_FEATOB_S is
+      if (init_expr /= void) then
+	 res := res.create(name, 
+	                type_spec.pcopy(pl, pi),
+                        init_expr.pcopy(pl, pi), 
+                        pte,
+                        cls_def,
+                        lineno);
+      else
+	 res := res.create(name, 
+	                type_spec.pcopy(pl, pi),
+                        void,
+                        pte,
+	                cls_def,
+                        lineno);
+      end; -- if
+   end; -- pcopy
+
+end; -- class SHARED_DECL_FEATOB
+
+--------------------------------------------------------------------
+
+class CONST_DECL_FEATOB is
+   -- Constant attributes.
+   FEATOB;
+   DECLOB;
+
+   attr init_expr:$EXPROB;
+      -- Initialization expression, this is guaranteed non-void from the 
+      --   way the parser works.
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:INT; t:$TYPEOB; e:$EXPROB; ln:INT):SAME is
+      res := new;
+      if (GLOBALS::str_table).reserved_name_p(nm) then
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, ln,
+	    "CONST_DECL_FEATOB",
+	    STR::create.s("Redefining \"").
+	           s((GLOBALS::str_table).at_index(nm)).s("\""));
+      end; -- if
+      res.name := nm;
+      res.type_spec := t;
+      res.init_expr := e;
+      -- Line number is updated separately by caller.
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create_lst(do:ANY_DECLOB; exp:$EXPROB):LST_FEATOB is
+      -- Given a ANY_DECLOB, take the list of identifiers in
+      --   ANY_DECLOB, and make a list of $FEATOB's (in
+      --   particular a list of CONST_DECL_FEATOB's).
+      i:INT := 0;
+      sz:INT := do.size;
+      res := res.create(sz);	-- Only allocate necessary amount of space
+      
+      if (exp = void) then
+	 -- Constant attributes must have an initial expression.
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, lineno,
+	    "CONST_DECL_FEATOB",
+	    STR::create.s("No initialization for constant features"));
+	 loop until!(i >= sz);
+	    ERR_INFO::error_msg(STR::create.s((GLOBALS::str_table).at_index(do.names[i])).c(','));
+	    i := i + 1;
+	 end; -- loop
+	 ERR_INFO::error_msg("\n");
+	 exp := ID_EXPROB::create(RESERVED_WORDS::void_ind);
+      end; -- if
+	 
+      first:INT;
+      if (sz > 0) then
+	 -- If there is an initialization expression, it is executed only
+	 --   once and the rest are assigned from the first constant
+	 --   attribute.
+	 first := do.names[0];
+      else
+	 -- *! Exit for the moment; the alternative remedy is to just
+	 -- ignore the declaration.
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, lineno,
+	    "CONST_DECL_FEATOB","No name found in declaration");
+      end; -- if
+
+      -- The initial expression is executed only once when assigned to
+      --   the first constant attribute.
+      
+      -- *! This conversion is different from the one currently implemented
+      --    in the C compiler.
+      nm:INT;
+      tp:$TYPEOB;
+      c_declob:CONST_DECL_FEATOB;
+
+      i := 0;
+      loop until!(i >= sz);
+	 nm := do.names[i];
+	 tp := do.type_spec;
+	 if (i > 0) then
+	    -- At this point, we are guaranteed that an initial expression
+	    --   exists.
+	    c_declob := c_declob.create(nm, tp, ID_EXPROB::create(first), do.lineno);
+	 else
+	    c_declob := c_declob.create(nm, tp, exp, do.lineno);
+	 end;
+ 	 res := res.push(c_declob);
+	 i := i + 1;
+      end; -- loop
+   end; -- create_lst
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):CONST_DECL_FEATOB_S is
+      if (init_expr /= void) then
+	 res := res.create(name,
+                        type_spec.pcopy(pl, pi),
+                        init_expr.pcopy(pl, pi),
+                        pte,
+	                cls_def,
+                        lineno);
+      else
+	 res := res.create(name,
+                        type_spec.pcopy(pl, pi),
+                        void,
+                        pte,
+                        cls_def,
+                        lineno);
+      end; -- if
+   end; -- pcopy
+
+end; -- class CONST_DECL_FEATOB
+
+--------------------------------------------------------------------
+   
+class PARAM_DECLOB is
+   -- Single parameter declaration
+   -- Note: Type parameters are handled separately. 
+   DECLOB;
+   
+   attr name:INT;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:INT; tp:$TYPEOB; ln:INT):SAME is
+      res := new;
+      if (GLOBALS::str_table).reserved_name_p(nm) then
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, ln,
+	    "PARAM_DECLOB",
+	    STR::create.s("Redefining \"").
+	           s((GLOBALS::str_table).at_index(nm)).s("\""));
+      end; -- if
+      res.name := nm;
+      res.type_spec := tp;
+      -- Line number is provided separately by caller.
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create_lst(do:ANY_DECLOB):LST_DECLOB is
+      -- Given a ANY_DECLOB, take the list of identifiers in
+      --   ANY_DECLOB, and make a list of $DECLOB's (in
+      --   particular a list of PARAM_DECLOB's).
+      i:INT := 0;
+      sz:INT := do.size;
+      res := res.create(sz);	-- Only allocate necessary amount of space
+      
+      nm:INT;
+      tp:$TYPEOB;
+      p_declob:PARAM_DECLOB;
+      
+      tp := do.type_spec;
+      loop until!(i >= sz);
+	 nm := do.names[i];
+	 p_declob := p_declob.create(nm, tp, do.lineno);
+ 	 res := res.push(p_declob);
+	 i := i + 1;
+      end; -- loop
+   end; -- create_lst
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):PARAM_DECLOB_S is
+      res := res.create(name, type_spec.pcopy(pl, pi), lineno);
+   end; -- pcopy
+
+end; -- class PARAM_DECLOB
+
+--------------------------------------------------------------------
+
+class ANY_DECLOB is
+   -- Temporary object to hold list of name indices and a type
+   --   (inherited from DECLOB).  
+   DECLOB;
+   
+   attr names:LIST{INT};
+   -- This is guaranteed to be non-void from the parse-tree construction.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nms:LIST{INT}; tp:$TYPEOB):SAME is
+      res := new;
+      res.names := nms;
+      res.type_spec := tp;
+      -- !* Should be line number of identifiers, but we cannot tell
+      --    at this point.
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   size:INT is
+      if (names /= void) then
+	 res := names.insert;
+      end; -- if
+   end; -- size
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_type_spec:$TYPEOB is
+      res := type_spec;
+   end; -- get_type_spec
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   ith_name(i:INT):INT is
+      res := names[i];
+   end; -- ith_name
+
+end; -- class ANY_DECLOB
+
+--------------------------------------------------------------------
+
+
+

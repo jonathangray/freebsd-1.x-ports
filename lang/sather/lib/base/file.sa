@@ -1,0 +1,365 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/base/file.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Interface to Unix files.
+--*
+--* CLASSES: FILE, FILE_TEST, IN, OUT, ERR
+--* 
+--* RELATED PACKAGES:
+--*
+--* RCS: $Id: file.sa,v 1.1 1994/02/12 03:23:16 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 29 23:31 1993 (hws)
+--*  Oct 29 23:31 1993 (hws): undone unsigned int output, would violate cross compilation choice
+--*  Oct 17 06:23 1993 (hws): Sather 1 syntax, copyright note
+--*  Aug 23 12:28 1993 (oscar): ANSI C v. K&R unsigned int format handled in C code
+--*  May 17 03:51 1993 (hws): change unsigned int format to (unsigned int) for K&R Sun cc
+--*  May 10 15:49 1993 (hws): fix unsigned int format to 0123u
+--*  Apr 22 11:51 1993 (hws): add unsigned int format
+--* Modified: Mon Sep 24 15:07:33 1990 (clim)
+--*           Added code for functions to return correct file objects.
+--* Modified By : Chu-Cheow Lim
+--* Date : Mon Sep 24 15:11:28 1990
+--* 1. Modify return types of routines: b,c,i,s,r,d  from FILE to SELF_TYPE,
+--*    because of requirement by classes ERR, OUT.  
+--* 2. Change the interface for: stdin, stdout, stderr to stdin_, stdout_,
+--*    stderr_ which are C routines found in C/file_.c.  The reason is that
+--*    stdin, etc cannot be declared as a:
+--* a) shared feature:  This will cause an extern declaration to be generated
+--*    which interferes with the macro definition in <stdio.h>.
+--* b) constant feature:  This requires a value to be provided which may be
+--*    inadvertently inserted into the generated C code.
+--* c) attribute feature:  We want to refer to "C::stdin" and such a
+--*    reference is not allowed for attribute.
+--* Created: Sun Feb  4 16:27:22 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class FILE is
+   -- Sather representation of Unix file structure.
+   
+   attr fp: F_OB;			-- A C pointer to the file
+   attr name: STR;			-- The name of the file.
+   
+   const eof:INT:=-1;	-- C marker for end of file.
+   shared error_val:INT;	-- Error code for Sather read errors.
+   const read_error:INT := 1; -- Error while attempting to read.
+   const eof_error:INT := 2;	-- Hit end of file while attempting to read.
+   const open_error:INT := 3; -- Error in opening file.
+
+   error:INT is
+      -- 0 if no error on last operation. Error code otherwise. Clears err.
+      res:=error_val; error_val:=0;
+      if res=0 then
+	 sv:INT:=C::scanf_val_;
+	 if sv=0 then res:=read_error
+	 elsif sv=eof then res:=eof_error end;
+      end; -- if
+   end; -- error
+
+   create:SAME is
+      -- A new unitialized file object.
+      res:=new;
+   end; -- create
+   
+   in:SAME is
+      -- A FILE object for stdin.
+      res:=res.new; res.fp:=C::stdin_; res.name:="in";
+   end; -- in
+   
+   out:SAME is
+      -- A FILE object for stdout.
+      res:=res.new; res.fp:=C::stdout_; res.name:="out";
+   end; -- out
+   
+   err:SAME is
+      -- A FILE object for stderr.
+      res:=res.new; res.fp:=C::stderr_; res.name:="err";
+   end; -- err
+   
+   check_eof:BOOL is
+      -- True if eof has been previously read. Clear the status.
+      res:=C::check_eof_(fp);
+   end; -- check_eof
+   
+   get_c:CHAR is
+      -- Read a character. No checking for eof. Must use check_eof.
+      res:=C::get_ci_(fp).to_c
+   end; -- get_c
+
+   get_ci:INT is
+      -- Read a character as an integer. 
+      res:=C::get_ci_(fp)
+   end; -- get_ci
+   
+   get_b:BOOL is
+      -- Read "T" or "F". False and error if neither.
+      ci:INT:=get_ci;
+      if ci=eof then error_val:=eof_error; return end;
+      c:CHAR:=ci.to_c;
+      if c='T' then res:=true
+      elsif c='F' then 
+      else error_val:=read_error end;
+   end; -- get_b 
+   
+   get_i:INT is
+      -- Read an integer.
+      res:=C::fscanfi_(fp);
+   end; -- get_i
+   
+   get_r:REAL is 
+      -- Read a real number.
+      res:=C::fscanfd_(fp);
+   end; -- get_r
+   
+   get_d:DOUBLE is
+      -- Read a double.
+      res:=C::fscanfd_(fp);
+   end; -- get_d
+   
+   get_s:STR is
+      -- Read a string up to the next \n.
+      res:=STR::create; 
+      ci:INT:=C::get_ci_(fp);
+      ind:INT;
+      loop until!(ci=eof);
+	 c:CHAR:=ci.to_c;
+	 if ind+1=res.asize then res:=res.c(c) -- expand if necessary
+	 else res[ind]:=c end;
+	 ind:=ind+1;
+	 if c='\n' then return end;
+	 ci:=C::get_ci_(fp);
+      end; -- loop
+   end; -- get_s
+   
+   get_s_up_to(c0:CHAR):STR is
+      -- Read a string up to (but excluding) the next character given
+      -- by c0.
+      res:=STR::create; 
+      ci:INT:=C::get_ci_(fp);
+      ind:INT;
+      loop until!(ci=eof);
+	 c:CHAR:=ci.to_c;
+	 if c=c0 then return end;
+	 if ind+1=res.asize then res:=res.c(c) -- expand if necessary
+	 else res[ind]:=c end;
+	 ind:=ind+1;
+	 ci:=C::get_ci_(fp);
+      end; -- loop
+   end; -- get_s_up_to
+   
+   unget_c(ch:CHAR) is
+      -- Unget the last character.
+      C::ungetc(ch,fp);
+   end; -- unget_c
+   
+   b(bo:BOOL):SAME is
+      -- Output "T" or "F" and return the file.
+      if (bo) then C::fputc('T',fp);  
+      else C::fputc('F',fp) end;
+      res:=self;
+   end; -- b
+   
+   c(ch:CHAR):SAME is
+      -- Output a character.
+      C::fputc(ch,fp); res:=self;
+   end; -- c
+   
+   i(in:INT):SAME is
+      -- Output an int.
+      C::fprintfi_(fp,in);
+      res:=self;
+   end; -- i
+   
+   s(st:STR):SAME is
+      -- Output a string.
+      C::fprintfs_(fp,C::str_ptr_(st));
+      res:=self;
+   end; -- s
+   
+   r(re:REAL):SAME is
+      -- Output a real.
+      C::fprintfd_(fp,re);
+      res:=self;
+   end; -- r
+   
+   d(do:DOUBLE):SAME is
+      -- Output a double.
+      C::fprintfd_(fp,do);
+      res:=self;
+   end; -- d
+
+   nl:SAME is
+      res := c('\n');
+   end; -- nl
+
+   open_for_read(nm:STR) is
+      -- Open the named file for reading.
+      name:=nm; fp:=C::fopenr_(C::str_ptr_(nm));
+      if (fp=void) then error_val:=open_error end;
+   end; -- open_for_read
+   
+   open_for_write(nm:STR) is
+      -- Open the named file for writing.
+      name:=nm; fp:=C::fopenw_(C::str_ptr_(nm));
+      if (fp=void) then error_val:=open_error end;
+   end; -- open_for_write
+   
+   open_for_append(nm:STR) is
+      -- Open the named file for appending.
+      name:=nm; fp:=C::fopena_(C::str_ptr_(nm));
+      if (fp=void) then error_val:=open_error end;
+   end; -- open_for_append
+
+   close is
+      -- Close the file.
+      if (fp/=void) then C::fclose(fp) end;
+   end; -- close
+   
+   get_s_of_len(n:INT):STR is
+      -- Read at most n characters.
+      res := STR::new(n+1);
+      ci:INT:=C::get_ci_(fp);
+      ind:INT;
+      loop until!(ci=eof);
+	 if ind>=n then return end;
+	 c:CHAR:=ci.to_c;
+	 res[ind]:=c;
+	 ind:=ind+1;
+      end; -- loop
+   end; -- get_s_of_len
+   
+   flush is
+      -- Flush the buffer.
+      if (fp/=void) then C::fflush(fp) end;
+   end; -- flush
+   
+   open_pipe_for_read(command:STR) is
+      -- Open a pipe for reading with given sh shell command line.
+      fp:=C::popenr_(C::str_ptr_(command));
+      if (fp=void) then error_val:=open_error end;      
+   end; -- open_pipe_for_read
+
+   open_pipe_for_write(command:STR) is
+      -- Open a pipe for writing with given sh shell command line.
+      fp:=C::popenw_(C::str_ptr_(command));
+      if (fp=void) then error_val:=open_error end;      
+   end; -- open_pipe_for_read
+   
+   close_pipe is
+      -- Close a pipe.
+      if fp/=void then C::pclose(fp) end;
+   end; -- close_pipe
+   
+   seek_relative(n:INT) is
+      -- Move in the file relative to current location.
+      if (fp/=void) then C::fseek(fp,n,1) end;
+   end; -- seek_relative
+   
+   seek_from_front(n:INT) is
+      -- Move relative to front of file.
+      if (fp/=void) then C::fseek(fp,n,0) end;
+   end; -- seek_from_front
+   
+   seek_from_end(n:INT) is
+      -- Move relative to end of file.
+      if (fp/=void) then C::fseek(fp,n,2) end;
+   end; -- seek_from_end
+   
+end; -- class FILE
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class C is
+   stdin_:F_OB is end; -- C standard input
+   stdout_:F_OB is end; -- C standard output
+   stderr_:F_OB is end; -- C standard error stream
+   scanf_val_:INT is end; -- What the last scanf returned.
+   get_ci_(fp:F_OB):INT is end; -- Next character as int.
+   check_eof_(fp:F_OB):BOOL is end; -- True if eof read, clears it.
+   fscanfi_(fp:F_OB):INT is end; -- Attempts to read an int.
+   fscanfd_(fp:F_OB):DOUBLE is end; -- Attempts to read a double.
+   ungetc(ch:CHAR;fp:F_OB) is end; -- Replaces last char.
+   fputc(ch:CHAR; fp:F_OB) is end; -- Output char.
+   fprintfi_(fp:F_OB;in:INT) is end; -- Output int.
+   fprintfu_(fp:F_OB;in:INT) is end; -- Output unsigned int.
+   fprintfs_(fp:F_OB;st:F_OB) is end; -- Output string.
+   fprintfd_(fp:F_OB;do:DOUBLE) is end; -- Output double.
+   fopenr_(s:F_OB):F_OB is end; -- Open for reading.
+   fopenw_(s:F_OB):F_OB is end; -- Open for writing.
+   fopena_(s:F_OB):F_OB is end; -- Open for appending.
+   fclose(fp:F_OB) is end; -- Close the file.
+   fflush(fp:F_OB) is end; -- Flush the buffer.
+   popenr_(c:F_OB):F_OB is end; -- Open pipe for reading.
+   popenw_(c:F_OB):F_OB is end; -- Open pipe for writing.
+   pclose(fp:F_OB) is end; -- Close a pipe.
+   fseek(fp:F_OB;off,where:INT) is end; -- Seek in file.
+end; -- class C
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class IN is
+   -- Direct access to stdin.
+   
+   shared file:FILE := FILE::in; -- A file object for stdin.
+   
+   get_c:CHAR is res:=file.get_c end;
+   get_b:BOOL is res:=file.get_b end;
+   get_i:INT is res:=file.get_i end;
+   get_r:REAL is res:=file.get_r end;
+   get_d:DOUBLE is res:=file.get_d end;
+   get_s:STR is res:=file.get_s end;
+   unget_c(ch:CHAR) is file.unget_c(ch) end;
+   check_eof:BOOL is res:=file.check_eof end;
+
+end; -- class IN
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class OUT is
+   -- Direct access to stdout.
+   
+   shared file:FILE := FILE::out; -- A file object for stdout.
+   
+   b(bo:BOOL):OUT is file.b(bo); res:=self end;
+   c(ch:CHAR):OUT is file.c(ch); res:=self end;
+   i(in:INT):OUT is file.i(in); res:=self end;
+   s(st:STR):OUT is file.s(st); res:=self end;
+   r(re:REAL):OUT is file.r(re); res:=self end;
+   d(do:DOUBLE):OUT is file.d(do); res:=self end;
+   nl:OUT is file.nl; res:=self end;
+
+end; -- class OUT
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class ERR is
+      -- Direct access to stderr.
+   
+   shared file:FILE := FILE::err; -- A file object for stderr.
+   
+   b(bo:BOOL):ERR is file.b(bo); res:=self end;
+   c(ch:CHAR):ERR is file.c(ch); res:=self end;
+   i(in:INT):ERR is file.i(in); res:=self end;
+   s(st:STR):ERR is file.s(st); res:=self end;
+   r(re:REAL):ERR is file.r(re); res:=self end;
+   d(do:DOUBLE):ERR is file.d(do); res:=self end;
+   nl:ERR is file.nl; res:=self end;
+
+end; -- class ERR
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+

@@ -1,0 +1,146 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/base/any.sa
+-- Author: Heinz Schmidt (hws@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: generic creation, deferral, ignore and describe protocol.
+--*           Obtained by mixing ANY into the root classes of some hierarchy.
+--*
+--* CLASSES:  ANY, CHECK
+--* 
+--* REQUIRED FILES: sather/lib/data_structure/pmap.sa
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: any.sa,v 1.1 1994/02/12 03:23:16 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:22 1993 (hws)
+--*  Oct 17 06:22 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 27 14:23 1993 (hws): require -> pre
+--*  Feb 21 18:12 1993 (hws): assert (pre) -> require
+--*  Sep  8 16:15 1991 (hws): Moved from ICSIM library upward as a general tool.
+--*         Should we have an additional directory "tools"?
+--* Created: Sun Sep  8 16:03:30 1991 (hws)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class ANY is
+   -- Abstraction: print, create, create_default
+   -- Auxiliaries: must_redefine, deferred, ignored, not_yet
+   
+--- - - - - - - - - - - - - INITIALIZATION  - - - - - - - - - - - - ---
+-- Implementation note:
+-- Uniform initialization is supported by a number of programming
+-- conventions that we fix here for all classes.
+-- Our programming conventions include an initialization protocol that splits
+-- instance allocation via `new', context-free `initialize' including
+-- component creation, and a possibly context-dependent `finish'.
+-- Caller arguments to create are passed by initialization parameter maps
+-- (pmaps). This allows a caller to pass a variable number of init parameters.
+-- in a uniform way throughout ICSIM.
+-- Usually classes do not have an own definition of `create'. Anyone is free,
+-- though, to overwrite the protocol. 
+   
+-- Initialization
+
+   finish(init_pmap: PMAP) is ignored("ANY::finish"); end;
+      -- final init, when all components are created.
+   
+-- CREATE: with and without init parameters.
+
+   const default_init_pmap: PMAP := PMAP::create;
+      -- non-attribute initialization defaults
+   
+   create_default: SAME is
+      -- Generic creation.  Builds a default instance by means of
+      -- `default_init_pmap'.
+      res := create(default_init_pmap);
+   end;
+   
+   create(init_pmap: PMAP): SAME is
+      -- Generic creation.  Builds a functioning instance and runs `initialize'.
+      res := new;
+      res.initialize(init_pmap).finish(init_pmap);
+   end;
+   
+-- Readable Init Pmap access
+
+   private int(i: $OB; p: INT): INT
+      pre i.type = PMAP::type is
+      ip: PMAP := i; res := ip.int(p);
+   end;
+   
+   private int_opt(i: $OB; p,d: INT): INT pre i.type = PMAP::type is
+      ip: PMAP := i; res := ip.int_opt(p,d);
+   end;
+   
+   private real(i: $OB; p: INT): REAL pre i.type = PMAP::type is
+      ip: PMAP := i; res := ip.real(p);
+   end;
+   
+   private real_opt(i: $OB; p: INT; d: REAL): REAL 
+      pre i.type = PMAP::type is
+      ip: PMAP := i; res := ip.real_opt(p,d);
+   end;
+   
+   private ob(i: $OB; p: INT): $OB 
+      pre i.type = PMAP::type is
+      ip: PMAP := i; res := ip.ob(p);
+   end;
+   
+   private ob_opt(i: $OB; p: INT; d: $OB): $OB
+      pre i.type = PMAP::type is
+      ip: PMAP := i; res := ip.ob_opt(p,d);
+   end;
+   
+--- - - - - - - - - - PUBLIC - ABSTRACT DATA TYPE - - - - - - - - - ---
+   
+   print is OUT::s(" <").i(type).s("::").i(C::ob_id(self)).s("> ") end;
+
+--- - - - - - - - - -  AUXILIARIES - FOR FAMILY - - - - - - - - - - ---
+
+-- a few conventions that make life easier.
+   
+   private must_redefine(name,why: $STR) is -- Descendents redefine.
+      ERR::s(name).s(" not redefined. ").s(why).nl;
+   end;
+   
+   private deferred(name: STR) is -- If called something is wrong.
+      must_redefine(name,"Deferred.");
+   end;
+   
+   private not_yet(name: $STR) is -- Temporary stub.
+      OUT::s(name).s(" not implemented yet.\n");
+   end;
+   
+   private ignored(name: $STR) is -- Ignore.
+      if DBG::trace_ignored_features then 
+	 must_redefine(name,": ignored.");
+      end;
+   end;
+   
+end; -- class ANY
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 
+-- We introduce deferred classes in our Sather code  as `class FOO {DEFERRED}...'
+-- Use FOO {CHECK} at the point where they are to be checked in an unparameterized
+-- class or a ground actualization (no class variables) of some parameterized
+-- class.
+
+class CHECK is end; -- Dummy for actualizing `deferred classes', decle
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 
+ 

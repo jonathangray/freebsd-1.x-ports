@@ -1,0 +1,261 @@
+-- -*- Mode: Sather;  -*-
+-- File: featob.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU) and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION:  Features of a class definition.
+--*
+--* CLASSES: FEATOB, CINH_FEATOB, ROUT_FEATOB
+
+--* RCS: $Id: featob.sa,v 1.1 1994/02/12 03:21:51 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 05:00 1993 (hws)
+--*  Oct 17 04:36 1993 (hws): Sather 1 syntax, copyright note last week
+--*  Sep 28 05:17 1993 (hws): pre,post conflict with Sather 1 kwds
+--*  Mar  7 22:29 1993 (hws): add spec features for named invariants
+--*  Mar  1 12:37 1993 (hws): more uniform error msgs
+--*  Feb 25 02:13 1993 (hws): allow inheriting abstract class
+--*  Feb 22 23:27 1993 (hws): add "old" declarations
+--*  Feb 21 16:30 1993 (hws): add abstract
+--*  Feb 21 16:17 1993 (hws): add pre and postconditions
+--*  Feb 21 17:54 1992 (hws): rename duplicate -> alias. Internally we
+--*    we still had it the older way, while the external `alias' was
+--*    working for some time now and is used in several sources.
+--*    Memo for why `alias': rings with the attribute/noun character
+--*    of private/shared/class etc. The verb `duplicate' or `repeat'
+--*    that we used for some time would be the only exception to the
+--*    rule that only control structures can be read as verbs, and all of
+--*    those are nouns as well (switch/loop etc.). Alias is also shorter.
+--*    And alias <new> <old> rings with the shell syntax, so at least
+--*    UNIX users have the right mnemotechnics in place, but this direction seems
+--*    to reflect proper English use anyway (I'm not the right person to judge, but
+--*    acc to several colleagues' hard meditation it seems ok more generally).
+--*  Aug 25 14:01 1991 (hws): make ALIAS_FEATOB::pcopy preserve private 
+--*  Aug 20 16:25 1991 (hws): add alias (ALIAS_FEATOB)
+--* Created: Thu Jun  7 16:54:24 1990 (clim)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class FEATOB is
+   -- Features of a class.
+   PARSEROB;
+   attr cls_def:CLASSOB;		
+      -- Class definition in which this feature appears; this is updated
+      -- by the caller who creates the feature.  In the compiler, this
+      -- is updated by the class containing the features, when the class
+      -- is created.
+
+   attr name:INT;			-- Name (index) of feature
+   attr abt, pte, spec, shrd, rdo:BOOL; -- whether abstract / private / spec / shared
+      -- readonly; 
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_private is
+      pte := true;
+   end; -- mark_private
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_abstract is
+      abt := true;
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_spec is
+      spec := true;
+   end;   
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_shared is
+      shrd := true;
+   end;   
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_readonly is
+      rdo := true;
+   end;   
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):$FEATOB_S is
+      res := FEATOB_S::create(lineno, cls_def);
+   end; -- pcopy
+
+end; -- class FEATOB
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+class CINH_FEATOB is
+   -- Inherited classes.
+   FEATOB;
+
+   attr cls:$TYPEOB;			-- The inherited class specification
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(cls:$TYPEOB):SAME is
+      
+      -- Should have non-null TYPEOB.
+      if (cls = void) then
+	 ERR_INFO::compiler_error_msg("CINH_FEATOB",
+	    "Expected non-null type object");
+      end; -- if
+      res := new;
+      res.cls := cls;
+      res.lineno := GLOBALS::curr_lineno;
+      if (cls.type = DISPATCH_TYPEOB::type) then
+	 res.mark_abstract;
+      end;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):CINH_FEATOB_S is
+      -- Perform the following check:
+      -- a. The name of inherited class should not be in the type 
+      --    parameters list. 
+      res := res.create(cls.pcopy(pl, pi), lineno, cls_def);
+      if abt then res.mark_abstract end;
+   end; -- pcopy
+
+end; -- class CINH_FEATOB
+
+--------------------------------------------------------------------   
+   
+class ROUT_FEATOB is
+   -- Routines.
+   FEATOB;
+
+   attr precond, postcond: ASSERT_STMTOB;
+   attr old: LST_STMTOB;
+   
+   attr plist:LST_DECLOB;		-- List of parameter declarations, if any.
+      -- In particular, this should contain a list of PARAM_DECLOB's.
+   
+   attr rettype:$TYPEOB;		-- Return type, if any.
+   attr slist:LST_STMTOB;		-- List of statements.
+   attr endLineno:INT;  -- Sather line number of the end of the routine.
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:INT; spec: ROUT_SPECOB; pl:LST_DECLOB; rt:$TYPEOB; sl:LST_STMTOB;ln:INT;
+      eln:INT): SAME is
+      res := new;
+      if ((GLOBALS::str_table).reserved_name_p(nm) and (not
+         CLASSOB_S::auto_generating_p)) then
+         ERR_INFO::format_error_msg_file(ERR_INFO::filename, GLOBALS::curr_lineno,
+	    "ROUT_FEATOB",
+	    STR::create.s("Redefining \"").
+                             s((GLOBALS::str_table).at_index(nm)).s("\""));
+      end; -- if
+      res.name := nm;
+      res.precond := spec.precond;
+      res.postcond := spec.postcond;
+      res.old := spec.old;
+      res.plist := pl;
+      res.rettype := rt;
+      res.slist := sl;
+
+      -- Line number is end of routine definition. (not any more)
+      -- res.lineno := GLOBALS::curr_lineno;
+
+      res.lineno := ln; -- Sather line of start of routine definition 
+      res.endLineno := eln; -- Sather line of end of routine definition
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):ROUT_FEATOB_S is
+      tmpplist:LST_DECLOB_S;
+      tmprettype:$TYPEOB_S;
+      tmpslist:LST_STMTOB_S;
+      tmppre,tmppost:ASSERT_STMTOB_S;
+      if (plist /= void) then
+	 tmpplist := plist.pcopy(pl, pi);
+      else
+	 tmpplist := void;
+      end; -- if
+      if (rettype /= void) then
+	 tmprettype := rettype.pcopy(pl, pi);
+      else
+	 tmprettype := void;
+      end; -- if
+      if (slist /= void) then
+	 tmpslist := slist.pcopy(pl, pi);
+      else
+	 tmpslist := void;
+      end; -- if
+      if precond/=void then tmppre := precond.pcopy(pl,pi) end;
+      if postcond/=void then tmppost := postcond.pcopy(pl,pi) end;
+      tmpold: LST_STMTOB_S;
+      if old/=void then tmpold := old.pcopy(pl,pi) end;
+      res := res.create(name, tmppre, tmppost, tmpold,
+                     tmpplist,
+                     tmprettype,
+                     tmpslist,
+                     pte,
+                     cls_def,
+                     lineno,endLineno);
+      if spec then res.mark_spec end;
+      if rdo then res.mark_readonly end;
+   end; -- pcopy
+
+end; -- class ROUT_FEATOB
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class ROUT_SPECOB is
+   attr precond,postcond: ASSERT_STMTOB;	-- pre and post condition
+   attr old: LST_STMTOB;		-- locals to hold "old" state for ensure
+   
+   create(a: ASSERT_STMTOB; o: LST_STMTOB; b: ASSERT_STMTOB): SAME is
+      res := new;
+      res.precond := a;
+      res.postcond := b;
+      res.old := o;
+   end;
+end; -- class ROUT_SPECOB
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+class ALIAS_FEATOB is
+   FEATOB;
+   attr original_name: INT;		-- name of what this is repeating.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):ALIAS_FEATOB_S is
+      res := ALIAS_FEATOB_S::create(name,original_name,cls_def,lineno);
+      if pte then res.mark_private end;
+   end; -- pcopy
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   create(nm,orig:INT; ln:INT): SAME is
+      res := new;
+	 -- complain about redefinition of reserved's
+      if (GLOBALS::str_table).reserved_name_p(nm) then
+         ERR_INFO::format_error_msg_file(ERR_INFO::filename, GLOBALS::curr_lineno,
+	    "ALIAS_FEATOB",
+	    STR::create.s("Redefining \"").
+                             s((GLOBALS::str_table).at_index(nm)).s("\""));
+      end; -- if
+	 -- complain about repetition of predefined;
+      if (GLOBALS::str_table).reserved_name_p(orig) then
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, GLOBALS::curr_lineno,
+	    "ALIAS_FEATOB",
+	     STR::create.s("Repeating \"").
+                             s((GLOBALS::str_table).at_index(orig)).s("\""));
+      end;    
+      res.name := nm;
+      res.original_name := orig;
+      res.lineno := ln; 
+   end; -- create
+   
+end; -- class ALIAS_FEATOB
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+

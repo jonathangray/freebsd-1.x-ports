@@ -1,0 +1,251 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/data_structure/gap_list.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: An array-based replacement for linked lists.
+--*
+--* CLASSES: GAP_LIST, GAP_LIST_CURSOR, GAP_LIST_TEST
+--*
+--* REQUIRED FILES: ../base/test.sa
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: gap_list.sa,v 1.1 1994/02/12 03:23:25 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:31 1993 (hws)
+--*  Oct 17 06:31 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 27 14:31 1993 (hws): require -> pre
+--*  Apr  3 17:04 1993 (hws): assert -> require
+--*  May 26 15:37 1991 (hws): adapt BIT_VECTOR_CURSOR to standard
+--*                           protocol.
+--* Created: Tue Oct  9 14:59:38 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class GAP_LIST{T} is
+   -- An array replacement for linked lists.
+   -- The class `GAP_LIST{T}' is an array based list structure like `LIST{T}'
+   -- but it supports insertions and deletions from the middle of the list
+   -- as well as the end.  This structure consists of an extensible array
+   -- with a "gap" region in the middle. When an insertion or deletion is
+   -- required, the gap is first moved to the proper location by moving
+   -- elements around.  Element access is by index and skips over the gap
+   -- wherever it may lie. As long as most insertions and deletions are
+   -- fairly close in location to the preceding one, the movement of
+   -- elements accross the gap will not be extensive. Algorithms which are
+   -- based on doubly linked lists often have a single pointer which moves
+   -- up and down the list inserting and deleting elements as it moves. Such
+   -- algorithms will also operate efficiently with gap lists.  Sometimes
+   -- this structure is refered to as a "double stack" since it may be
+   -- viewed as two stack which approach one another. It has found wide use
+   -- in text editors (such as GNU Emacs) and turns out to be much more
+   -- efficient in practice than more obvious structures such as a linked
+   -- list of strings for each line.
+
+   ARRAY{T};
+   attr gap_start,gap_size: INT;	-- Start of gap and size of gap.
+   
+   create: SAME is
+      -- A new `GAP_LIST' with default `size=5'.
+      res := new(5); res.gap_size := 5;
+   end; -- create
+   
+   create_sized(n: INT): SAME is
+      -- A new `GAP_LIST' with `size=n'.
+      res := new(n); res.gap_size := n;
+   end; -- create_sized
+   
+   insert(i: INT; e: T): SAME is
+      -- Insert element `e' at location `i' pushing later elements forward.
+      -- Usage: `l:=l.insert(5,e)'. Destructive.
+      res := self;
+      if gap_size = 0 then		-- no gap, so double size
+	 res := extend(2 * asize); 
+	 res.gap_start := asize; res.gap_size := res.asize - res.gap_start; 
+	 clear;			-- help the garbage collector
+      end; -- if
+      res.move_gap(i);
+      res[i] := e;
+      res.gap_start := res.gap_start + 1;
+      res.gap_size := res.gap_size - 1;
+   end; -- insert
+   
+   delete(i: INT) is 
+      -- Delete the `i'th element.
+      move_gap(i); gap_size := gap_size + 1;
+   end; -- delete
+   
+   move_gap(l: INT) pre l <= size is
+      -- Move the gap to start at `l'. Must have `l<=size'.
+      if l <= gap_start then
+	 b: INT := l + gap_size;
+	 i: INT := gap_start + gap_size - 1; loop until!(i < b);
+	    [i] := [i - gap_size];
+	    i := i - 1
+	 end; -- loop
+      else
+	 i: INT := gap_start; loop until!(i = l);
+	    [i] := [i + gap_size];
+	    i := i + 1
+	 end; -- loop
+      end; -- if
+      gap_start := l;
+   end; -- move_gap
+   
+   get(i: INT): T is
+      -- Retrieve the `i'th element.
+      if i < gap_start then res := [i] else res := [gap_size + i] end;
+   end; -- get
+   
+   size: INT is
+      -- The total number of elements.
+      res := asize - gap_size;
+   end; -- size
+   
+   replace(i: INT; e: T) is
+      -- Replace the `i'th element by `e'.
+      if i < gap_start then [i] := e else [gap_size + i] := e end;
+   end; -- replace
+
+   is_empty: BOOL is
+      -- True if `self' is empty.
+      res := (gap_size = asize);
+   end; -- is_empty
+
+   clear is
+      -- Clear the list.
+      i: INT; loop until!(i = asize);
+	 [i] := void;
+	 i := i + 1
+      end; -- loop
+      gap_start := 0; gap_size := asize;
+   end; -- clear
+
+   cursor: GAP_LIST_CURSOR{T} is
+      -- A cursor into `self'.
+      res := GAP_LIST_CURSOR{T}::create(self);
+   end; -- cursor
+   
+end; -- class GAP_LIST{T}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class GAP_LIST_CURSOR{T} is
+   -- Cursors into `GAP_LIST{T}' for stepping through all entries.
+   -- Since the elements in a `GAP_LIST' structure are accessible by index it
+   -- is often convenient to directly step through the elements. This cursor
+   -- class is provided for consistency with other classes,
+   -- however. The way one would print each element in `l' a `GAP_LIST{INT}'
+   -- without using a `GAP_LIST_CURS' object is:
+   -- `
+   --    i:INT; loop until!(i=l.size);
+   --       OUT::i(l[i]).s(" ");
+   --       i:=i+1
+   --    end;
+   -- '
+   -- Using a cursor this would look like:
+   -- `
+   --    lc:GAP_LST_CURS:=l.cursor; loop until!(lc.is_done loop
+   --       OUT::i(lc.item).s(" ");
+   --       lc.next;
+   --    end;
+   -- '
+   
+   attr l: GAP_LIST{T};		-- The list pointed into.
+   attr index: INT;			-- The index into the list.
+
+   create(l: GAP_LIST{T}): SAME is
+      -- A cursor into `l' which is initialized to the first element. 
+      res := GAP_LIST_CURSOR{T}::new; res.l := l;
+   end; -- create
+
+   is_done: BOOL is
+      -- True if all entries have been visited.
+      res := (index >= l.size)
+   end; -- is_done
+   
+   first: T is
+      -- Set the cursor to the first location, if any.
+      index := 0;
+      res := item;
+   end; -- first
+
+   item: T is
+      -- The current entry or `void' if `is_done'.
+      if not is_done then res := l.get(index) end;
+   end; -- item
+
+   next: T is
+      -- Move the cursor to the next location.
+      if is_done then return end;
+      index := index + 1;
+      res := item;
+   end; -- next
+   
+end; -- class LIST_CURSOR{T}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class GAPL_TEST is
+   -- Test of `GAP_LIST{T}'.
+   TEST;
+   
+   main is
+      -- Test of `GAP_LIST{T}'.
+      class_name("GAP_LIST{INT}");
+      l: GAP_LIST{INT} := list_of_range(0,14);
+      test("list entries", str_of_list(l)
+	    , "0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14");
+      test("size", l.size.to_s, "15");
+      test("is_empty 1", l.is_empty.to_s, "F");
+      l.delete(2);
+      test("delete", str_of_list(l)
+      	    , "0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14");
+      l := l.insert(4, 17);
+      test("insert", str_of_list(l)
+	    , "0, 1, 3, 4, 17, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14");
+      test("get", l.get(4).to_s, "17");
+      l.replace(4, 19);
+      test("replace", str_of_list(l)
+	    , "0, 1, 3, 4, 19, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14");
+      l.clear;
+      test("clear", str_of_list(l), "");
+      test("is_empty 2", l.is_empty.to_s, "T");
+      finish;
+   end; -- main
+   
+   str_of_list(l: GAP_LIST{INT}): STR is
+      -- A string containing the elements of `l' of the form `"1, 2, 3"'.
+      res := STR::create;
+      lc: GAP_LIST_CURSOR{INT} := l.cursor;
+      loop until!(lc.is_done);
+	 res := res.i(lc.item);
+	 lc.next;
+	 if not lc.is_done then res := res.s(", "); end;
+      end; -- loop
+   end; -- str_of_list
+
+   list_of_range(l,h: INT): GAP_LIST{INT} is   
+      -- A gap list containing `l,...,h'.
+      res := GAP_LIST{INT}::create;
+      i: INT := l; loop until!(i > h);
+	 res := res.insert(res.size, i);
+	 i := i + 1
+      end; -- loop
+   end; -- list_of_range
+
+end; -- class GAPL_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

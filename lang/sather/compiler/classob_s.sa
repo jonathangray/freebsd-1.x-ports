@@ -1,0 +1,2140 @@
+--- -*- Mode: Sather;  -*-
+-- File: classob_s.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU) and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1990, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+-- 
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+--          Oscar Bosman (oscar@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Classes (created during semantic phase) for holding representation
+--*           of (actualized) Sather classes.
+--*
+--* RCS: $Id: classob_s.sa,v 1.1 1994/02/12 03:21:47 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 30 01:48 1993 (hws)
+--*  Oct 29 23:36 1993 (hws): treat unsigned int output with -x properly
+--*  Oct 16 00:14 1993 (hws): fix -chk exec update info with shared init
+--*  Sep 28 04:49 1993 (hws): switch -> case
+--*  Jun 17 17:06 1993 (oscar): cprint_decln() doesn't append ";\n"
+--*                             (allows ANSI function prototypes)
+--*  May 11 00:07 1993 (hws): don't (int)"CLASS" with -info
+--*  Apr 17 03:27 1993 (hws): put cs options in top file comment
+--*  Mar  6 00:12 1993 (hws): inherit invariants if missing
+--*  Feb 28 16:57 1993 (hws): uniform compiler error messages
+--*  Feb 26 09:23 1993 (hws): make "undefine" work by mocking "foo: UNDEFINED"
+--*  Feb 25 01:39 1993 (hws): mark abstract classes
+--*  Feb 24 11:10 1993 (hws): add invariant
+--*  Feb 21 16:47 1993 (hws): adapt to routines with specs
+--*  Sep 19 20:43 1992 (hws): use line number of class head in error messages
+--*  Jun 29 11:12 1992 (hws): fix -chk trace to use correct file names
+--*  Nov 27 00:04 1991 (hws): integrate clim's -chk patch.
+--*  Sep  3 16:44 1991 (hws): fix void return when error in alias_feature.
+--*  Aug 28 02:20 1991 (hws): more uniform error messages
+--*  Aug 26 02:35 1991 (hws): Also traverse unused class attributes to
+--*                           guarantee init ordering.
+--*  Aug 25 13:56 1991 (hws): make alias respect private
+--*  Aug 23 15:04 1991 (hws): add init arg
+--*  Aug 20 11:32 1991 (hws): Order shared/const init class-wise and
+--*                           add check for cyclic shared definitions.
+--* Created: Mon Jun 11 11:28:56 1990 (clim)
+--*
+--* NOTE:
+--* 1.  By implementing "externs" as a INT_SET, we assume that the encoded
+--*     <class index, feature name index> cannot be equal -1.
+--*
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class CLASSOB_S is
+   RESERVED_WORDS;
+   C_TYPE_CONST;
+   COMPILE_KEYS_CONST;
+   
+-- Computed during semantic check
+   attr index:INT;
+      -- Index to global semantic table; updated by insert procedures
+      -- in CLASSOB_S_TABLE
+   
+-- Like CLASSOB, these two features were originally inherited from CODEOB,
+-- but this is unnatural, so we just declare them directly.
+   attr lineno:INT;
+   const print_indent:INT := 2;
+
+   attr def:CLASSOB;			-- CLASSOB of origin
+   attr flst:LST_FEATOB_S;		
+      -- List of features.  This list may contain empty entries after
+      --   duplicates are eliminated.  But before exiting from
+      --   "expand_cinh", we compact the new list of features so that
+      --   there will not be any void entry.
+
+   attr invar: $EXPROB_S;	-- invariant
+
+   attr abt: BOOL := false;		-- abstract class
+
+   attr pinst:LST_TYPEOB_S;	
+      -- Instantiations of type parameters stored as $TYPEOB_S's, and
+      -- hence FOO{X} and FOO{$X} are both installed in the global class
+      -- instance table.
+   attr is_parametrized:BOOL;
+      -- Set to "true" is this is an instantiated class.  Computed when
+      -- the object is created.
+   
+   attr key:LSTINT_KEY;		-- Holds a unique key
+   
+   attr cinh_done:BOOL;		-- 
+      -- Set to "true" when class inheritance finished
+
+   attr seen:BOOL;	-- T iff we are currently printing the init code
+   attr printed_p:BOOL; -- T iff shared/const init code printed
+      -- Shared initexpressions may depend on shared's in other classes.
+      -- Whenever shared x in class X depends on some shared y in class Y we 
+      -- initialize the WHOLE class Y before initializing x.
+      -- For this purpose before cprint'ing the init code for x we traverse
+      -- its init expression and cprint the init of any class whose shared's or
+      -- consts it depends on. As soon as the init code is printed we
+      -- set printed_p to true (and will not print it again when
+      -- visiting the class second time).
+      -- While we are printing seen is T, so that a second call
+      -- will detect a cyclic dependency that we can complain about.
+
+   attr symtab:SYMBOL_TABLE;
+      -- Contains (feature, name-index) pair after expanding class and
+      --   feature inheritance, and eliminating duplicates (including
+      --   UNDEFINE's).  The features are also stored in "flst".
+      --   It is organized as a symbol table, so that later semantic
+      --   can use the same table.
+   
+   attr my_inh:LIST{CLASSOB_S};		-- CLASSOB_S inherited from
+      -- Computed in "eliminate_dup".  Note that this must be a pointer
+      -- to a CLASSOB_S object, rather than an integer, because positions
+      -- of CLASSOB_S's may change. 
+   -- NOTE: In the current implementation, the positions of CLASSOB_S's
+   --       remain the same (in different incremental compilations)
+   --       because if not, the required changes to the compiler structure
+   --       will be large.
+   
+   attr num_attrs:INT;		-- Number of attributes
+      -- Computed in "resolve_predef_types_and_compute_num_attrs"
+   attr atomic_p:INT;
+      -- This attribute is "0" if an object of this class contains
+      -- pointers; computed in "compute_attr_offsets".  For non-pointer
+      -- classes (eg INT), this attribute is irrelevant but set to "1".
+   
+   attr anc:LIST{INT};		-- Ancestors
+      -- Computed in "compute_anc"
+   attr des:INT_HASH_SET;		-- Descendents by inheritance
+      -- Created in "create" but computed in "compute_des"
+   attr pdes:INT_HASH_SET;
+      -- Descendents via parametrization; computed in "compute_pdes"
+   attr alldes:INT_HASH_SET;
+      -- All descendents via parametrization; computed in "compute_des"
+      -- and "compute_pdes".  This is guaranteed to be non-void after 
+      -- "compute_pdes" (because it is copied from "des" which is non-void).
+
+   attr pdepth:INT;
+      -- Depth of class instance; updated by semantic routine operating
+      -- directly on the class intance
+   
+   attr prefix:STR;			-- Prefix of the form FOO123_
+      -- Computed in "update_ind" which is called when class instance 
+      --   has been inserted into global table.
+   attr my_strname:STR;
+      -- Full name of Sather class (with parametrization)
+
+   attr cfilename:STR;		-- Name of C file (without suffix)
+      -- Computed in "update_ind" which is called when class instance 
+      --   has been inserted into global table.
+
+   attr basic_type:INT;		
+      -- Contains index to the global table of basic type (if any) 
+      --   inherited from.  If this class instance does not inherit
+      --   from any basic type, then it is 0.  Updated in "compute_anc".
+   -- NOTE: The computation is quite subtle.  There are two cases to be
+   -- considered: 
+   -- (1) BOOL, CHAR, INT, REAL, DOUBLE, F_OB (*)
+   -- In this case, the descendents' basic type are updated in 
+   -- "add_unique_anc".  For the (*) classes, their basic_types are
+   -- updated "update_ctype" (if it's not already updated).
+   --
+   -- (2) Array classes (**)
+   -- We distinguish between two kinds of descendents.
+   -- (a) Parametrized descendent (eg ARRAY{FOO}).  The basic type
+   -- is updated at the end of "compute_anc" when the dimension is
+   -- computed.
+   -- (b) Mixed descendent (eg BAR inherits from ARRAY{FOO}).  The basic
+   -- type is updated in "add_unique_anc".
+   
+   attr arrdim:INT;	
+      -- 1,2,3,4 or 0 if no array, no value needed for "unsure".
+      -- Updated in "compute_anc".
+   
+   attr ctype:INT;			
+      -- Updated in "compute_anc".  This is the C type for something
+      --   declared to be of this class.
+   
+   attr base_size:INT;		-- Size in bytes without array stuff
+      -- Calculated in "compute_attr_offsets" 
+   
+   attr cnames:INT_HASH_SET;		-- C names used in this class
+   attr externs:INT_HASH_SET;		-- Names and class instance of features used
+      -- Computed in "semant" phase (specifically TYPESPEC_ARGS_EXPROB_S node)
+   attr ext_strs:INT_HASH_SET;		-- Global names of string consts
+      -- Computed in "semant" phase
+   -- NOTE:
+   -- "ext_strs", "cnames" and "externs" are initialized when the CLASSOB_S 
+   -- object is created (ie "create" routine) and all guaranteed to be non-void.
+
+   attr elem_type:$TYPEOB_S;
+      -- Contains information about whether dispatched and index to 
+      -- class instance which is type of element.  This is updated in 
+      -- "compute_anc".
+   
+   attr is_used_p:BOOL;
+      -- This flag is "true" if eg this class is used elsewhere besides in
+      -- class inheritance.  
+      -- IMPORTANT:  This flag is used only for determining if the C code
+      --             for a class is to be generated (more generally, for 
+      --             any printing of code associated with that class).
+      --             Semantic check for all classes are done independent of 
+      --             this value.  This is because of the possible conflict 
+      --             with the use of "f.expr" (f:$OB).  (Ref: Implementation 
+      --             of routine call on general objects in general document).
+   attr found_classes_used:BOOL;
+      -- This flag is "true" if the internal features of this class have been
+      -- scanned to gather used classes.
+   attr cp_feats_from_def:BOOL;
+      -- This flag is "true" if the features of the class definition have
+      -- been copied using "copy_features" routine.
+   
+   attr structure_updated:BOOL;
+   attr internal_updated:BOOL;
+   -- These two values indicate how drastically the class has changed.
+   -- If the class C1's interface has changed, then any other class C2
+   -- that uses C1 (eg by inheritance, variable/attribute of type C1 or
+   -- $C1 etc) must be changed.  
+   attr c_type_updated:BOOL;
+   -- This indicate if the C type of this class has changed from previous
+   -- compilation.  It affects the interface of other classes whose 
+   -- attributes/shareds etc uses this class.  (Refer to note in 
+   -- "do_update_info" in ATTR_DECL_FEATOB_S.)  This is computed in 
+   -- "compute_anc" after "ctype" has been found.
+   -- NOTE: "c_type_updated" = "true" => "structure_updated" = "true"
+
+   attr def_time_stamp:TIME_INT;
+   -- Time-stamp for this particular instantiated class; this value is
+   -- computed from the time-stamp of class definition.
+   
+   attr time_stamp:TIME_INT;
+   -- This value is initialized from "def_time_stamp" (in "create" routine)
+   -- and updated in "compute_time_stamp".  This is recursively defined
+   -- as the largest of:
+   -- 1.  "time_stamp" of all ancestors
+   -- 2.  "time_stamp" of all type parameters.
+
+   attr time_stamp_done:BOOL;
+   -- The value is "true" if the attribute "time_stamp" has been updated
+   -- properly.
+   
+   attr callees:INT_HASH_SET;
+      -- Indices of class whose features (ie shareds/consts etc) are
+      -- called by this particular class.  The called classes (callees)
+      -- are marked "internal_updated".  If we have eg:
+      --      x:$P;
+      --      x.f;
+      -- then this set includes all the descendents of P.
+      -- This value is created in the "create" routine, updated in the "semant"
+      -- routines of EXPR_ARGS_EXPROB_S and TYPESPEC_ARGS_EXPROB_S.  The
+      -- classes are marked in the "misc_info" routine.
+   attr callers:INT_HASH_SET;
+   -- Refer to implementation note for use of this attribute.
+
+   attr semant_done:BOOL;
+      -- The caller of "semant" should set this to "true" when it is done.
+   
+   const prefix_size:INT := 3;
+      -- Number of characters from class name to use for prefix
+   const filename_size:INT := 6;
+      -- Number of characters from class name to use for file name containing
+      -- class code
+
+   shared auto_generating_p: BOOL; -- allow reserved features that the class
+      -- can add itself as if it was in the source.
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(d:CLASSOB; k:LSTINT_KEY; pi:LST_TYPEOB_S):SAME is
+      -- Creates an object representing an (actualized) Sather class.
+      
+      -- Caller is not responsible for checking that the number of type
+      -- parameters and instantiations match, so we check just in case.
+      -- "k" is guaranteed to be non-void (by caller).
+      psz:INT;
+      if (pi /= void) then
+	 psz := pi.insert;
+      end; -- if
+      tsz:INT := d.num_params;
+      if (tsz /= psz) then
+	 CS_ERROR::wrong_number_of_type_parameters(d.fname, d.lineno);
+         -- Recreate the type parameters and key.
+	 if (tsz < psz) then
+	    -- There are too many type parameters.  Pop off some values.
+	    if (pi /= void) then
+	       i:INT := psz;
+	       loop until!(i <= tsz);
+		  pi.pop;
+		  i := i - 1;
+	       end; -- loop
+	       if (pi.insert = 0) then
+		  pi := void;
+	       end; -- if
+	    end; -- if
+	    i:INT := psz;
+	    loop until!(i <= tsz);
+	       k.pop;
+	       i := i - 1;
+	    end; -- loop
+	 else
+	    -- There are too few type parameters.  Push $OB as substitutes.
+	    if (pi = void) then
+	       pi := LST_TYPEOB_S::create(2);
+	    end; -- if
+	    i:INT := psz;
+	    loop until!(i >= tsz);
+	       pi := pi.push(GLOBALS::ob_typeob_s);
+	       k := k.push(- (RESERVED_CLASSES::OB_ici));
+		  -- NOTE: $OB is dispatched.
+	       i := i + 1;
+	    end; -- loop
+	 end; -- if
+      end; -- if
+      res := new;
+      res.def_time_stamp := d.time_stamp;
+      res.time_stamp := d.time_stamp;
+      if (tsz > 0) then
+	 res.is_parametrized := true; 
+      end; -- if
+      res.pinst := pi;
+      res.def := d;
+      res.key := k;
+      res.abt := d.abt;
+      res.des := INT_HASH_SET::create;
+      res.cnames := INT_HASH_SET::create;
+      res.externs := INT_HASH_SET::create;
+      res.ext_strs := INT_HASH_SET::create;
+      res.callees := INT_HASH_SET::create;
+      res.callers := INT_HASH_SET::create;
+      res.lineno := d.first_lineno;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   copy_features is
+      -- Copy all the features in CLASSOB, installing new CLASSOB_S as
+      -- necessary.  Caller must determine if there is any type
+      -- instantiations.
+      if (flst /= void) then
+	 ERR_INFO::compiler_error_msg("CLASSOB_S",
+	    STR::create.s("class \"").s(def.name_str)
+		  .s("\"Copying features twice"));
+      end; -- if
+      
+	 -- We cannot add the mapping between "SAME" and the actual 
+         --   class instance which is myself at this point, because there
+	 --   might be duplication because of class/feature expansion.
+      if (def.flst /= void) then
+	 flst := def.flst.pcopy(def.plst, pinst);
+	 -- The numbers of type parameters and instantiations have been
+	 --   checked to be equal in "create".
+      end; -- if
+
+   end; -- copy_features
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   update_ind(i:INT) is
+      -- An interface routine to update Sather class index, so that
+      -- any necessary house-keeping code is executed whenever the index
+      -- updated.
+      index := i;
+	 -- Can make prefix when index is done
+      prefix := make_prefix;
+      cfilename := make_cfilename;
+   end; -- update_ind
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_is_used is
+      -- Interface routine to update usage of Sather class (`is_used_p'
+      -- attribute) together with other house-keeping code.
+      -- A class is used if instances are possible and hence code
+      -- may be needed. Abstract classes are not used in this sense.
+      
+      -- Normally, we just have to mark this class, because in the case
+      -- of parametrized classes, there is no way that the type parameters
+      -- may be used.  However, if it is an array, then it is possible to 
+      -- access elements of an array from another class, and so we have to
+      -- mark the class of array elements as being used.
+      if not abt then is_used_p := true end;
+      -- don't complain here, there is little information about the offending
+      -- error line
+      
+      def_ind:INT := def.index;
+      if (def_ind = array_ind) or (def_ind = array2_ind) or 
+	 (def_ind = array3_ind) or (def_ind = array4_ind) then
+	 -- By the definition of ARRAY, ARRAY2, ARRAY3 and ARRAY4, there
+	 -- is only one type parameter.  This is guaranteed by the definition
+	 -- given (in basic classes), and "create" routine (which ensures that
+	 -- the number of type parameters is correct).
+	 co:CLASSOB_S := pinst[0].inst_cls;
+	 co.mark_is_used;
+      end; -- if
+   end; -- if
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   make_prefix:STR is
+      -- Make a string to be used in C code generation (illustrates
+      -- use of various string routines).
+      nm:STR := def.name_str;
+      nc:INT := nm.length;
+      if (nc < prefix_size) then
+	 res := nm.head(prefix_size).to_upper_case;
+	 i:INT := nc;
+	 loop until!(i >= prefix_size);
+	    res := res.c('_');
+	    i := i + 1;
+	 end; -- loop
+	 res := res.i(index);
+      else
+	 res := nm.head(prefix_size).to_upper_case.i(index);
+      end; -- if
+   end; -- make_prefix
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   make_cfilename:STR is
+      -- Name of C file name to contain code for this Sather class.
+      nm:STR := def.name_str;
+      nc:INT := nm.length;
+      if (nc < filename_size) then
+	 res := nm.head(filename_size).to_lower_case;
+	 i:INT := nc;
+	 loop until!(i >= filename_size);
+	    res := res.c('_');
+	    i := i + 1;
+	 end; -- loop
+	 res := res.i(index);
+      else
+	 res := nm.head(filename_size).to_lower_case.i(index);
+      end; -- if
+   end; -- make_cfilename
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   parametrized_p:BOOL is
+      -- Returns `true' if definition of current Sather class is
+      -- parametrized.
+      if (pinst /= void) then
+	 res := (pinst.insert > 0);
+      end; -- if
+   end; -- parametrized_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   name_str:STR is
+      -- Returned string should not be modified.  This is the name
+      -- of the class definition, not the full name (eg parametrized class).
+      res := def.name_str;
+   end; -- name_str
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   full_name:STR is
+      -- Full name of the class, whether parametrized or not
+      if (my_strname /= void) then
+	 res := my_strname; return;
+      end; -- if
+      res := STR::create.s(def.name_str);
+      psz:INT;
+      if (pinst /= void) then
+	 psz := pinst.insert;
+      end; -- if
+      if (psz > 0) then
+	 res := res.c('{');
+	 i:INT := 0;
+	 loop until!(i >= psz);
+	    res := res.s(pinst[i].full_name);
+	    i := i + 1;
+	    if not (i >= psz) then
+	       res := res.c(',');
+	    end; -- if
+	 end; -- loop
+	 res := res.c('}');
+      end; -- if
+      my_strname := res;
+   end; -- full_name
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   update_ctype is
+      -- The current class is not a pointer as long as the correponding
+      -- C type is either "char", "int", "float", or "double".
+      if (basic_type = 0) then
+	 -- Default to object if myself is not one of the basic types.
+	 -- Set "basic_type" to my own index.
+	 case (def.index)
+	 when int_ind then
+	    basic_type := index;
+	    ctype := c_int;
+	 when char_ind, bool_ind then
+	    basic_type := index;
+	    ctype := c_char;
+	 when real_ind then
+	    basic_type := index;
+	    ctype := c_float;
+	 when double_ind then
+	    basic_type := index;
+	    ctype := c_double;
+	 when fob_ind then
+	    basic_type := index;
+	    ctype := c_ptr;
+	 else
+	    ctype := c_ptr;
+	 end; -- case
+      else
+	 co:CLASSOB_S := (GLOBALS::class_inst).at_index(basic_type);
+	 case (co.def.index)
+	 when int_ind then
+	    ctype := c_int;
+	 when char_ind, bool_ind then
+	    ctype := c_char;
+	 when real_ind then
+	    ctype := c_float;
+	 when double_ind then
+	    ctype := c_double;
+	 else
+	    ctype := c_ptr;
+	 end; -- case
+      end; -- if
+   end; -- update_ctype
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_feature(index:INT):$SEMANTOB is
+      -- This routine should only be used after class inheritance
+      --   have been fully expanded and duplicates eliminated, because
+      --   "symtab" is non-void only after these operations.
+      if (symtab = void) then
+	 -- This should not happen from the compiler construction, but as an
+	 -- interface to this class, we should provide for this contingency.
+	 ERR_INFO::compiler_error_msg("CLASSOB_S",STR::create.s("class \"")
+		  .s(full_name).s(") -- Missing symbol table")); 
+	 return;
+      end; -- if
+      res := symtab.get_feature(index);
+   end; -- get_feature
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   store_feature_unique(new_flst:LST_FEATOB_S; fo:$FEATOB_S):LST_FEATOB_S is
+      -- Stores a feature uniquely into both the given feature list and the 
+      -- symbol table of this Sather class.
+   
+      res := new_flst.push_unique(fo);
+	 -- The definition of "push_in" in LST_FEATOB_S checks
+	 --   the name of given feature against names of
+	 --   all other features and replace the old feature
+	 --   if name already exists.
+      
+      symtab.add_feature(fo.featob_s_name, fo);
+	 -- This means that at any time, at most one definition
+	 --   is stored for a particular feature name.
+      
+   end; -- store_feature_unique
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   eliminate_dup is
+      -- Eliminate attributes declared as UNDEFINE, leaving only
+      -- the latest feature with the same name.  (This does not 
+      -- apply to inherited class features.)  This assumes that
+      -- at any time, there is only one feature with a certain
+      -- name. 
+      
+      i:INT := 0;
+      sz:INT;
+      if (flst /= void) then
+	 sz := flst.insert; 
+      end; -- if
+      loop until!(i >= sz);
+	 fo:$FEATOB_S := flst[i];
+	 GLOBALS::curr_feature := fo;
+
+	 if (fo.type = ATTR_DECL_FEATOB_S::type) and (fo.undefined_p) then
+	    -- Remove attribute from both table and list.  There should only
+	    --   be one feature for a particular name, because in class
+	    --   inheritance expansion, we have replaced earlier features of
+	    --   the same name by a later feature.
+	    symtab.del_feature(fo.featob_s_name);
+	    flst[i] := void;
+	 elsif (fo.type = CINH_FEATOB_S::type) then
+	    ERR_INFO::compiler_error_msg("CLASSOB_S",STR::create
+		  .s("Unexpected class inheritance after expansion"));
+	    flst[i] := void;
+	 else
+	    -- The feature is already in the table.
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- eliminate_dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   expand_cinh:BOOL is
+      -- First make sure the class that is inherited has already been expanded.
+      -- After expansion immediately eliminate features with duplicate names
+      --   and deal with UNDEFINE declarations.
+      -- Perform the following checks:
+      -- a.  No cycle in class inheritance graph
+      -- b.  "UNDEFINE" and "OB" are not inheritable.
+      -- The line numbers of alias (inherited) features are obtained from
+      -- line number of the current feature that is being expanded.  This is
+      -- done by having "dup" routine of "LST_FEATOB_S" update all the line
+      -- numbers of aliasd features from the line number of 
+      -- "GLOBALS::curr_feature".
+   
+      -- Returns "true" when class inheritance is expanded properly.
+      if (cinh_done) then
+	 res := true;
+	 return;
+      end; -- if
+      if (my_inh /= void) then
+	 CS_ERROR::cyclic_inheritance(def.fname, def.first_lineno,
+	    full_name);
+	 return;
+      end; -- if
+      
+      i:INT := 0;
+      sz:INT;
+      if (flst /= void) then
+	 sz := flst.insert;
+      end; -- if 
+      symtab := SYMBOL_TABLE::create(sz + 2, self);
+      new_flst:LST_FEATOB_S := new_flst.create(sz * 2);
+	 -- Allocate more space for inherited features
+      init_attr_lst:LST_FEATOB_S := init_attr_lst.create(2);
+      
+      ok:BOOL := true;
+      if (flst = void) then
+	 res := ok;
+	 flst := new_flst;
+	 cinh_done := true;
+	 return;
+      end; -- if
+
+      loop until!(i >= sz);
+	 GLOBALS::curr_feature := flst[i];
+	 if (flst[i].type = ALIAS_FEATOB_S::type) then
+	    -- install additional feature of the new name possibly overshadowing.
+	    new_flst := alias_feature(new_flst,flst[i]);
+	 elsif (flst[i].type /= CINH_FEATOB_S::type) then
+	    -- Over-shadow any previous features with the same name
+	    new_flst := store_feature_unique(new_flst, flst[i]);
+	    if (flst[i].type = ATTR_DECL_FEATOB_S::type) then
+	       att:ATTR_DECL_FEATOB_S := flst[i];
+	       if att.init_expr /= void then
+		  init_attr_lst := store_feature_unique(init_attr_lst,att);
+	       end;
+	    end;
+	 else
+	    -- "class_inst_ind" is guaranteed to return a positive integer 
+	    -- since we have checked that it is a class inheritance feature.
+	    index:INT := flst[i].class_inst_ind;
+	    
+	       -- "OB", "SAME" and "UNDEFINE" are not inheritable, 
+	       --   just ignore it.
+	    if (index = RESERVED_CLASSES::OB_ici) then
+	       CS_ERROR::non_inheritable("OB",lineno);
+	    elsif (index = RESERVED_CLASSES::UNDEFINE_ici) then
+	       CS_ERROR::non_inheritable("UNDEFINE",lineno);
+	    elsif (index = RESERVED_CLASSES::SELF_TYPE_ici) then
+	       CS_ERROR::non_inheritable("SAME",lineno);
+	    else
+	       if (my_inh = void) then
+		  my_inh := LIST{CLASSOB_S}::create(5); -- *! Random size
+	       end; -- if
+	       
+	       inhc:CLASSOB_S := (GLOBALS::class_inst).at_index(index);
+	       if (inhc /= void) then
+		  my_inh := my_inh.push(inhc);
+		  
+		  -- Update correct file name and class instance when we
+		  -- handle a different class instance
+		  prevfname:STR := GLOBALS::curr_filename;
+		  previnst:CLASSOB_S := GLOBALS::curr_class_inst;
+		  prevfeat:$FEATOB_S := GLOBALS::curr_feature; 
+		  GLOBALS::curr_filename := inhc.def.fname;
+		  GLOBALS::curr_class_inst := inhc;
+
+		  ok := ok and (inhc.expand_cinh);
+		  
+		  -- After expanding the inherited class, restore old
+		  -- file name and class instance.
+		  GLOBALS::curr_filename := prevfname;
+		  GLOBALS::curr_class_inst := previnst;
+		  GLOBALS::curr_feature := prevfeat;
+
+		  j:INT := 0;
+		  tmp_flst:LST_FEATOB_S := inhc.flst.dup;
+		  tsz:INT;
+		  if (tmp_flst /= void) then
+		     tsz := tmp_flst.insert;
+		  end; -- if
+		  loop until!(j >= tsz);
+		     new_flst := store_feature_unique(new_flst, tmp_flst[j]);
+		     if (tmp_flst[j].type = ATTR_DECL_FEATOB_S::type) then
+			att:ATTR_DECL_FEATOB_S := tmp_flst[j];
+			if att.init_expr /= void then
+			   init_attr_lst := store_feature_unique(init_attr_lst,att);
+			end;
+		     elsif (tmp_flst[j].type = ROUT_FEATOB_S::type) then
+			routf: ROUT_FEATOB_S := tmp_flst[j];
+			if (routf.spec) then
+			   if invar = void then
+			      invar := ID_EXPROB_S::create(routf.name,lineno);
+			   else
+			      invar :=
+				    OP_EXPROB_S::create(
+				       OP_EXPROB_S::and_op_ind,
+				       LST_EXPROB_S::new(2).push(invar).push(
+					  ID_EXPROB_S::create(routf.name,lineno)),
+				       lineno);
+			   end;
+			end;
+		     end;
+		     j := j + 1;
+		  end; -- loop
+	       else
+		  ERR_INFO::compiler_error_msg("CLASSOB_S",
+		     STR::create.s("Inherited class index ").i(index)
+			   .s(" not found"));
+		  ok := false;
+	       end; -- if
+	       -- At this point, the "cls_def" field for each feature is already
+	       --   updated because of the way "dup" and "create" are called.
+	    end; -- if
+
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      
+      res := ok;
+      flst := new_flst;
+      cinh_done := true;
+      eliminate_dup;		-- replace undefined by void
+      flst := flst.compact;	-- remove void
+
+	 -- Check that concrete class definitions are completely implemented.
+      if not abt then
+	 i := 0;
+	 loop until!(i = flst.insert);
+	    if flst[i].abt then
+	       CS_ERROR::unimplemented_feature(flst[i].name,flst[i].lineno);
+	    end;
+	    i := i+1;
+	 end;
+      end;
+
+      if (not abt) and (not base_classname_p(def.index)) then
+	 add_initializer(init_attr_lst);
+	 if invar /= void then add_invariant end;
+      end;
+
+   end; -- expand_cinh
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   alias_feature(new_flst: LST_FEATOB_S; f: ALIAS_FEATOB_S): LST_FEATOB_S is
+      -- expand a alias declaration into a copy of the referenced feature
+      -- under the new name. Duplication is independent of private/public.
+      -- The newly inserted feature of course is subject to the usual restrictions.
+      -- Since it has a possibly new name, however, these restriction can be weak.
+      res := new_flst;		-- make sure we return it also on error
+      any: $SEMANTOB := get_feature(f.original_name);
+      fea: $FEATOB_S;
+      if (any = void) then
+	 CS_ERROR::undefined_feature(f.original_name,f.lineno);
+	 return;
+      else
+	 any := any.dup;
+      end;      
+      fea := any;		-- original_name is an identifier
+      fea.lineno := f.lineno;	-- point of alias declaration
+      fea.name := f.name;
+      fea.pte := false;		
+      if f.pte then fea.mark_private; end;
+      if f.abt then fea.mark_abstract; end;
+      res := store_feature_unique(res, fea);
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   const invar_feature_name: STR := "_invar_";
+
+   get_invariant: ROUT_FEATOB_S is
+      res := get_feature(GLOBALS::str_table.insert_str(invar_feature_name));
+   end;
+
+   add_invariant is
+      -- Add an `_invar__' BOOL is res:=invar end' routine to the current
+      -- class.
+      
+      CLASSOB_S::auto_generating_p := true;
+
+      invarrout: INT := GLOBALS::str_table.insert_str(invar_feature_name);
+      invf: ROUT_FEATOB_S :=	-- feature
+	    ROUT_FEATOB::create(invarrout,
+	       ROUT_SPECOB::create(void,void,void), -- pre and postcondition
+               void,		-- parameter list
+	       SIMPLE_TYPEOB::create(RESERVED_WORDS::bool_ind), -- result type
+	       LST_STMTOB::create(5), -- empty
+	       lineno,		-- end, then begin
+	       lineno).pcopy(def.plst,pinst);
+      
+      --- fill in invariant as body "res:=invar"
+      invf.slist := invf.slist.push(
+	 ASSIGN_STMTOB_S::create(
+	    ID_EXPROB_S::create(RESERVED_WORDS::res_ind,lineno),
+	    invar, lineno));
+      flst := store_feature_unique(flst,invf);
+      invf.cls_def := self.def;
+      
+      CLASSOB_S::auto_generating_p := false;
+      
+   end;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   add_initializer(init_attr_lst:LST_FEATOB_S) is
+      -- Add an `initialize(initarg: $OB): SAME' routine to the current
+      -- class except overwriting any inherited one by an optimized version for
+      -- self.
+      
+       -- Note: we need to generate an initializer for every OB class, unless we
+       -- can prove it is never called.
+      CLASSOB_S::auto_generating_p := true;
+      -- create ROUT_FEATOB parse-tree and turn into a ROUT_FEATOB_S
+      initarg_ind: INT := GLOBALS::str_table.insert_str("initarg");
+      initf: ROUT_FEATOB_S :=	-- feature
+	    ROUT_FEATOB::create(
+	       RESERVED_WORDS::init_ind, -- name
+	       ROUT_SPECOB::create(void,void,void), -- pre and postcondition
+	       PARAM_DECLOB::create_lst(
+		  ANY_DECLOB::create(  -- "initarg: $OB"
+		  LIST{INT}::create(1).push(initarg_ind),
+		  DISPATCH_TYPEOB::create(SIMPLE_TYPEOB::create(ob_ind)))),
+	       SIMPLE_TYPEOB::create(self_type_ind), -- result type
+	       LST_STMTOB::create(5), -- empty body
+	       lineno,		-- end, then begin
+	       lineno).pcopy(def.plst,pinst);
+
+      --- repeat init expressions and add statements to body
+      i: INT; sz: INT := init_attr_lst.insert;
+      
+      loop until!(i >= sz);
+	 att: ATTR_DECL_FEATOB_S := init_attr_lst[i];
+	 init_expr: $EXPROB_S := att.init_expr.dup;
+	 asgn: ASSIGN_STMTOB_S :=
+	       ASSIGN_STMTOB_S::create(
+		  ID_EXPROB_S::create(att.name,att.lineno),
+		  init_expr.dup,
+		  init_expr.lineno);
+	 asgn.out_of_line(att.cls_def.fname);
+	 initf.slist := initf.slist.push(asgn); -- extend body
+	 i := i + 1;
+      end;
+      --- finally generate   "res := self;"
+      initf.slist := initf.slist.push(ASSIGN_STMTOB_S::create(
+	    ID_EXPROB_S::create(res_ind,lineno),
+	    ID_EXPROB_S::create(self_ind,lineno),
+	    lineno));
+      flst := store_feature_unique(flst,initf);
+      initf.cls_def := self.def;
+
+      CLASSOB_S::auto_generating_p := false;
+   end;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types_and_compute_num_attrs is
+      -- Now that we have all the features of a class instance, we can
+      -- a.  resolve SAME
+      -- b.  check that "C", "SYS", "UNDEFINE" is not used in any 
+      --     declaration
+      -- c.  check that "OB" is used only in a dispatched fashion.	    
+      -- Also, since we have all the features of a class instance and eliminated
+      -- duplicates, we can count the number of attributes for each class. 
+      -- This also reduce the number of passes.
+      -- Another function of this function is to mark those classes whose code
+      -- will not be used anywhere. 
+
+      i:INT := 0;
+      sz:INT;
+      if (flst /= void) then
+	 sz := flst.insert;
+      end; -- if
+      count:INT := 0; 
+      loop until!(i >= sz);
+	 GLOBALS::curr_feature := flst[i];
+	 flst[i].resolve_predef_types(index);
+	 flst[i].cls_inst := self;
+	 if (flst[i].type = ATTR_DECL_FEATOB_S::type) then
+	    count := count + 1;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      num_attrs := count;
+   end; -- resolve_predef_types_and_compute_num_attrs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   compute_pdepth:INT is
+      -- Level of parametrization of this (actualized) Sather class.
+      -- Non-parametrized classes are at level 0.
+      if (not parametrized_p) then
+	 res := 0;
+      elsif (pdepth /= 0) then
+	 res := pdepth;
+      else
+	 i:INT := 0;
+	 psz:INT;
+	 if (pinst /= void) then
+	    psz := pinst.insert;
+	 end; -- if
+	 md:INT := 0;
+	 loop until!(i >= psz);
+	    co:CLASSOB_S := pinst[i].inst_cls;
+	    d:INT := co.compute_pdepth;
+	    if (d > md) then
+	       md := d;
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+	 pdepth := 1 + md;
+	 res := pdepth;
+      end; -- if
+   end; -- compute_pdepth
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   add_unique_anc(anc_index:INT) is
+      -- Add index of an ancestor to the list of ancestor indices.
+      
+      -- Later ancestors will overshadow earlier ancestors of the same name.
+      -- Eg.  if FOO inherits ARRAY{FOO}, and BAR inherits ARRAY{BAR},
+      --      and BAZ inherits from FOO, then BAR, then BAZ is an
+      --      array with elements of type BAR.  Similarly, for any
+      --      parametrized type other than ARRAY.
+	 
+      co:CLASSOB_S := (GLOBALS::class_inst).at_index(anc_index);
+      if anc.not_in(anc_index) then
+	 anc_name:INT := co.def.index;
+	 case (anc_name)
+	 when bool_ind, char_ind, double_ind, int_ind, real_ind, fob_ind then
+	    if (basic_type /= 0) and (basic_type /= anc_index) then
+	       CS_ERROR::incompatible_inheritance(full_name,
+		  (GLOBALS::class_inst).at_index(basic_type).full_name,
+		  (GLOBALS::class_inst).at_index(anc_index).full_name);
+	    -- Disregard the first basic type
+	    end; -- if
+	    basic_type := anc_index;
+	 when array_ind, array2_ind, array3_ind, array4_ind then
+	    if (basic_type /= 0) then
+	       co1:CLASSOB_S := (GLOBALS::class_inst).at_index(basic_type);
+	       if (co1.def.index = anc_name) then
+		  -- If previous basic type is an array of the same dimension,
+		  -- then we allow it, and the new basic type is the new
+		  -- array.
+	       else
+		  CS_ERROR::incompatible_inheritance(full_name,
+		     (GLOBALS::class_inst).at_index(basic_type).full_name,
+		     (GLOBALS::class_inst).at_index(anc_index).full_name);
+	       end; -- if
+	    end; -- if
+	    basic_type := anc_index;
+	 end; -- case
+	    -- We just record the ancestor.  
+	    -- Eg, if "FOO" inherits from "LST{BAR}" and "LST{BAZ}", both
+	    -- are recorded.  But "LST{BAZ}" will overshadow "LST{BAR}" and
+	    -- be recorded as the basic type.  
+	    -- This is so even though all the features in "LST{BAR}" will have
+	    -- been overshadowed by those in "LST{BAZ}".
+	 anc := anc.push(anc_index); 
+      else
+	 -- We have already record the ancestor in the list.
+      end; -- if
+   end; -- add_unique_anc
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   compute_anc is
+      -- Compute list of all direct/indirect ancestor indices.
+      if (anc /= void) then
+	 return;		-- Already computed
+      end; -- if
+      
+      anc := anc.create(5);	-- *! Some random size
+      sz:INT;
+      if (my_inh /= void) then
+	 sz := my_inh.insert;
+      end; -- if
+      
+      i:INT := 0;
+      p_anc:LIST{INT} := p_anc.create(10); -- *! Random size
+      
+      loop until!(i >= sz);
+	 parent:CLASSOB_S := my_inh[i];
+	 if (parent = void) then
+	    -- This should not occur, because a CLASSOB_S is pushed into
+	    -- "my_inh" (in routine "expand_cinh") only if the class 
+	    -- instance is found.
+	    ERR_INFO::compiler_error_msg("CLASSOB_S","Missing parent");
+	    return;
+	 end; -- if
+	 parent.compute_anc;
+	    -- The parent will checks that list of ancestors is proper and
+	    --   adjust the list accordingly if needed.  (Refer to routine
+	    --   description for more details.)
+	 
+	 p_anc := p_anc.append(parent.anc);
+	    -- Accumulate the list of ancestors
+	 p_anc := p_anc.push(parent.index);
+	 i := i + 1;
+      end; -- loop
+      
+      -- Verify the ancestor lists for the following rules:
+      -- Each class instance will check the following:
+      -- a.  A class cannot inherit from two or more different basic
+      --     types (including array types).  This immediately means 
+      --     that a class cannot inherit from two arrays with different 
+      --     dimensions.
+      -- b.  Update the slot which flags the basic type (if any)
+      --     inherited from.
+      -- c.  If a class inherits from INT, REAL etc, all other ancestors
+      --     should be empty.  If a class inherits from ARRAY, ARRAY2 etc,
+      --     it cannot only inherit from other user-defined classes.
+      -- 
+      -- "expand_cinh" checks that a class cannot inherit from the 
+      --   types "OB", "UNDEFINE", "SAME". 
+      
+      j:INT := 0;
+      
+      -- "p_anc" is guaranteed to be non-void from the execution of
+      -- code just before this.
+      psz:INT := p_anc.insert;
+      loop until!(j >= psz);
+	 if (p_anc[j] = index) then
+	    -- Should not encounter this error because cycle in class
+	    -- inheritance is checked in "expand_cinh".
+	    CS_ERROR::cyclic_inheritance(def.fname, lineno,
+	       (GLOBALS::class_inst).at_index(index).full_name);
+	 end; -- if
+
+	 add_unique_anc(p_anc[j]);
+	 j := j + 1;
+	    -- Ensures that only unique elements of "p_anc" are added to 
+	    --   the ancestor list.  Definitions of later ancestors will
+	    --   overshadow that of earlier ancestors of the same name.
+	    -- Eg.  if FOO inherits ARRAY{FOO}, and BAR inherits ARRAY{BAR},
+	    --      and BAZ inherits from FOO, then BAR, then BAZ is an
+	    --      array with elements of type BAR.  Similarly, for any
+	    --      parametrized type other than ARRAY.
+	    -- 
+	    -- Also check that if FOO inherits from 2 basic types, eg if
+	    -- FOO inherits from INT and CHAR, this is an error.
+      end; -- loop
+
+      if (basic_type /= 0) then
+	 co:CLASSOB_S := (GLOBALS::class_inst).at_index(basic_type);
+	 if (co.def.index = char_ind) or
+	    (co.def.index = int_ind) or
+	    (co.def.index = real_ind) or
+	    (co.def.index = double_ind) or
+	    (co.def.index = bool_ind) or
+	    (co.def.index = fob_ind) then
+            -- Suppose the basic type inherited from is "INT", "REAL", "CHAR",
+	    -- "BOOL", "DOUBLE" or "F_OB", the other ancestors must not have any 
+	    -- attributes.  Alternatively, this class must not have any
+	    -- attributes.
+	    if (num_attrs > 0) then
+	       CS_ERROR::basic_with_attributes(lineno);
+	    end; -- if
+	 elsif (co.def.index = array_ind) or
+	       (co.def.index = array2_ind) or
+	       (co.def.index = array3_ind) or
+	       (co.def.index = array4_ind) then
+	    -- Inherit from an array, so this class itself is an array.
+	    -- Get the class instance of array elements.
+	    -- If it had been a "STR" or descendent of "STR", it inherits
+	    --   "ARRAY{CHAR}".
+	    
+	    if (co.pinst /= void) then
+	       if (co.pinst.insert /= 1) then
+		  ERR_INFO::compiler_error_msg("CLASSOB_S","Array should be parametrized");
+		  return;
+	       end; -- if
+	    else
+	       ERR_INFO::compiler_error_msg("CLASSOB_S", "Array should be parametrized");
+	       return;
+	    end; -- if
+
+	    -- At this point, we know that the element type of an array is the 
+	    -- type with which it is instantiated.
+	    if (co.elem_type = void) then
+	       -- Parametrization should be automatically checked because of 
+	       -- definition of ARRAY's provided.
+	       ERR_INFO::compiler_error_msg("CLASSOB_S","Error in computing element type");
+	       co.elem_type := co.pinst[0];
+	    end; 
+	    elem_type := co.elem_type;
+	    if (arrdim = 0) then
+	       -- If we have already determined the dimensions, don't bother.
+	       arrdim := co.arrdim;
+	    end; -- if
+	 end; -- if
+      else			-- For directly instantiated ARRAY classes
+	 my_name:INT := def.index;
+	 if (my_name = array_ind) or
+	    (my_name = array2_ind) or
+	    (my_name = array3_ind) or
+	    (my_name = array4_ind) then
+	    if (pinst /= void) then
+	       if (pinst.insert /= 1) then
+		  -- Parametrization should be automatically checked because of 
+		  -- definition of ARRAY's provided.
+		  ERR_INFO::compiler_error_msg("CLASSOB_S","Array should be parametrized");
+		  return;
+	       end; -- if
+	    else
+	       ERR_INFO::compiler_error_msg("CLASSOB_S","Array should be parametrized");
+	       return;
+	    end; -- if
+	    
+	    if (elem_type = void) then
+	       elem_type := pinst[0];
+	    end; -- if
+
+	    -- Remember to set the basic types of these parametrized
+	    -- array classes to itself.
+	    case (my_name)
+	    when array_ind then
+	       basic_type := index;
+	       arrdim := 1;
+	    when array2_ind then
+	       basic_type := index;
+	       arrdim := 2;
+	    when array3_ind then
+	       basic_type := index;
+	       arrdim := 3;
+	    when array4_ind then
+	       basic_type := index;
+	       arrdim := 4;
+	    end; -- case
+	 end; -- if
+      end; -- if
+
+      -- At this point, we have computed the basic type, and can get
+      -- the "ctype" for each class.
+      update_ctype;
+
+      -- All non-basic Sather objects implicitly have $OB as one of ancestors.
+      -- Note that F_OB is considered as a basic Sather object (with respect to
+      -- dispatching).
+      if (ctype = C_TYPE_CONST::c_ptr) and
+         (basic_type /= RESERVED_CLASSES::FOB_ici) then
+	 add_unique_anc(RESERVED_CLASSES::OB_ici);
+      end; -- if
+      
+      -- If the basic type is BOOL, CHAR, INT, REAL, DOUBLE or F_OB, this
+      -- class and *all* its ancestors must have the same basic type.
+      -- This will ensure that these classes form a dag in the inheritance
+      -- graph.  No non-basic Sather class can inherit from BOOL, CHAR,
+      -- INT, REAL or DOUBLE, because, by definition of the code above,
+      -- once there is such a inheritance, the class's basic type is
+      -- automatically set and it is a basic class.
+      -- NOTE: It is only at this point that the basic types are all
+      -- well defined.
+      if (basic_type /= 0) then
+	 case (basic_type)
+	 when RESERVED_CLASSES::BOOL_ici,
+	      RESERVED_CLASSES::CHAR_ici,
+	      RESERVED_CLASSES::INT_ici,
+	      RESERVED_CLASSES::REAL_ici,
+	      RESERVED_CLASSES::DOUBLE_ici,
+	      RESERVED_CLASSES::FOB_ici then
+	    i:INT := 0;
+	    -- Go through all the ancestors and make sure all basic types
+	    -- are the same (to ensure a self-containing inheritance dag).
+	    loop until!(i >= psz);
+	       if (p_anc[i] = index) then
+		  -- Should not encounter this error because cycle in class
+		  -- inheritance is checked in "expand_cinh".
+		  CS_ERROR::cyclic_inheritance(def.fname, lineno,
+		     (GLOBALS::class_inst).at_index(index).full_name);
+	       end; -- if
+	       co:CLASSOB_S := (GLOBALS::class_inst).at_index(p_anc[i]);
+	       if (co.basic_type /= basic_type) then
+		  CS_ERROR::basic_cross_inheritance(
+		     (GLOBALS::class_inst).at_index(index).full_name);
+		  break!;
+	       end; -- if
+	       i := i + 1;
+	    end; -- loop
+	 end; -- case
+      end; -- if
+      
+      prev_ctype:INT := OLDNEW_HANDLER::get_ctype(self);
+      if (prev_ctype < 0) or (prev_ctype /= ctype) then
+	 c_type_updated := true;
+	 structure_updated := true;
+      end; -- if
+   end; -- compute_anc
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   compute_des is
+      -- Add self to the ancestors' descendent lists.  The list
+      -- is created when the class instance is created.
+      -- This routine computes the decendant relationship information based on
+      -- inheritance information.
+
+      i:INT := 0;
+      sz:INT;
+      if (anc /= void) then
+	 sz := anc.insert;
+      end; -- if
+      loop until!(i >= sz);
+	 ancestor:CLASSOB_S := (GLOBALS::class_inst).at_index(anc[i]);
+	 if (ancestor = void) then
+	    -- *! This should not occur, because an index is pushed into
+	    --    "anc" (in routine "compute_anc") only if the class 
+	    --    instance is found.
+	    ERR_INFO::compiler_error_msg("CLASSOB_S","Missing class inst");
+	    return;
+	 end; -- if
+	 ancestor.des := ancestor.des.insert(index);
+	    -- Add own index to ancestor's descendent list 
+	 i := i + 1;
+      end; -- loop
+   end; -- compute_des
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   compute_pdes is
+      -- This routine computes decendant information based on paramaterized
+      -- actualization information.
+      
+      i:INT := 0;
+      if (pdes = void) then
+	 pdes := INT_HASH_SET::create;
+      end; -- if
+      loop until!(i >= (GLOBALS::class_inst).next_ind);
+	 co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	 if (co /= void) and (co /= self) then
+	    if (co.def = self.def) then -- if we come from the same class
+	       if (co.pinst.param_type_conforms_to(pinst)) then
+		  pdes := pdes.insert(i);
+		  -- alldes := alldes.ins(i);
+		  add_new_des(co);
+		  co.add_new_anc(self);
+	       end; -- if
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+
+   end; -- compute_pdes
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private add_new_des(newDes:CLASSOB_S) is
+      -- Add a new descendant to self (to alldes) and
+      -- add all the descendants decendants (again to alldes).
+      -- Notify all my ancesters that I have a new descendant so they
+      -- will also add the new descendant to their descendant lists.
+      ancestor:CLASSOB_S;
+      if alldes.get(newDes.index) then
+	 return; -- already there
+      end;
+      alldes := alldes.insert(newDes.index);
+      alldes := alldes.union(newDes.alldes);
+      sz:INT;
+      i:INT;
+      if (anc /= void) then
+         sz := anc.insert;
+      end; -- if
+      loop until!(i >= sz);
+         ancestor:CLASSOB_S := (GLOBALS::class_inst).at_index(anc[i]);
+         if (ancestor = void) then
+            ERR_INFO::compiler_error_msg("CLASSOB_S", "Missing ancestor class");
+         end; -- if      
+	 ancestor.add_new_des(newDes);
+	 i := i + 1;
+      end;
+   end; -- add_new_des
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private add_new_anc(newAnc:CLASSOB_S) is
+      -- Add a new ancestor (and new ancestor's ancestors), and notify all
+      -- descendant classes that they also should add a the new ancestor.
+      if not anc.not_in(newAnc.index) then
+	 return -- already there
+      end;
+      anc := anc.push(newAnc.index);
+      anc := anc.union(newAnc.anc);
+
+      des_cur:INT_HASH_SET_CURSOR := alldes.cursor;
+
+      loop until!(des_cur.is_done);
+         descendant:CLASSOB_S := (GLOBALS::class_inst).at_index(des_cur.item);
+         if (descendant = void) then
+            ERR_INFO::compiler_error_msg("CLASSOB_S", "Missing descendant class");
+         end; -- if      
+	 descendant.add_new_anc(newAnc);
+	 des_cur.next;
+      end;      
+   end; -- add_new_anc
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   adjust_parent_alldes is
+      -- Now that all my descendents have been computed, add them
+      -- to all my ancestors.
+      i:INT := 0;
+      sz:INT;
+      if (anc /= void) then
+         sz := anc.insert;
+      end; -- if
+      loop until!(i >= sz);
+         ancestor:CLASSOB_S := (GLOBALS::class_inst).at_index(anc[i]);
+         if (ancestor = void) then
+            ERR_INFO::compiler_error_msg("CLASSOB_S", "Missing class inst");
+         end; -- if
+         j:INT := 0;
+         alldes_sz:INT := alldes.asize;
+         loop until!(j >= alldes_sz);
+            index:INT := alldes[j];
+            if (index > 1) then
+               ancestor.alldes := ancestor.alldes.insert(index);
+            end; -- if
+            j := j + 1;
+         end; -- loop
+         i := i + 1;
+      end; -- loop
+   end; -- adjust_parent_alldes
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   compute_time_stamp is
+      -- Compute time-stamp of this Sather class; it is the largest
+      -- times of all its direct/indirect ancestors and itself.
+      if (time_stamp_done) then
+	 return;
+      end; -- if
+      i:INT := 0;
+      sz:INT := anc.insert;
+      loop until!(i >= sz);
+	 co:CLASSOB_S := (GLOBALS::class_inst).at_index(anc[i]);
+	 -- This check is to ensure that there is no infinite recursion;
+	 -- eg $OB is an ancestor of $OB.
+	 if (co /= self) then
+	    co.compute_time_stamp;
+	    if (co.time_stamp > time_stamp) then
+	       -- Update my own time stamp from ancestor's time-stamp
+	       time_stamp := co.time_stamp;
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      i := 0;
+      psz:INT;
+      if (pinst /= void) then
+	 psz := pinst.insert;
+      end; -- if
+      loop until!(i >= psz);
+	 co:CLASSOB_S := pinst[i].inst_cls;
+	 if (co.time_stamp > time_stamp) then
+	    -- Update my time stamp from the type parameter's time-stamps.
+	    -- NOTE: This depends on the fact that "compute_time_stamp"
+	    --       routine is called in order of increasing parametrization
+	    --       depth.
+	    time_stamp := co.time_stamp;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      if (def_time_stamp /= OLDNEW_HANDLER::get_def_time_stamp(self)) or
+	 (time_stamp /= OLDNEW_HANDLER::get_time_stamp(self)) then
+	 structure_updated := true; 
+      end; -- if
+      time_stamp_done := true;
+   end; -- compute_time_stamp
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   compute_attr_offsets is
+      -- Group all attributes requiring less than 4 bytes together.
+      -- Note that the compacting can be done only after all the C types
+      -- of classes are done (ie after "compute_anc" where "ctype" is
+      -- computed).
+      flst.compactAttr;
+
+      -- This routine should be called only after the "ctype" of class
+      -- has been computed.
+      if (ctype = 0) then
+	 update_ctype;
+      end; -- if
+
+      case (ctype)
+      when c_float then
+	 atomic_p := 1;
+	 base_size := c_float_size;
+      when c_int then
+	 atomic_p := 1;
+	 base_size := c_int_size;
+      when c_double then
+	 atomic_p := 1;
+	 base_size := c_double_size;
+      when c_char then
+	 atomic_p := 1;
+	 base_size := c_char_size;
+      else
+	 contains_ptr:BOOL := false;
+	 i:INT := 0;
+	 sz:INT;
+	 if (flst /= void) then
+	    sz := flst.insert;
+	 end; -- if
+	 nextloc:INT := 4;		-- Leave room for header tag
+	 loop until!(i >= sz);
+
+	    if (flst[i].type = ATTR_DECL_FEATOB_S::type) then
+	       attr_feat:ATTR_DECL_FEATOB_S := flst[i];
+	       GLOBALS::curr_feature := attr_feat;
+	       nextloc := attr_feat.compute_own_offset(nextloc);
+		  -- NOTE: We need to call "compute_own_offset" first, because
+		  -- it has the side-effect of updating the C-type of the
+		  -- attribute feature.
+	       if (attr_feat.ctype = c_ptr) then
+		  contains_ptr := true;
+	       end; -- if
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+	 -- Round off to next multiple of 4.  
+	 -- If the class is a descendent of eg INT, at this point, we
+	 --   have determined that INT is the only ancestor that requires
+	 --   any space, so 4 bytes will be allocated.  
+	 -- Use the provided "lshift" and "rshift" routines provided by
+	 -- class "INT".
+	 
+	 -- Non-array classes are atomic as long as none of the attributes
+	 -- is a pointer.
+	 if (arrdim = 0) then
+	    if (not contains_ptr) then
+	       atomic_p := 1;
+	    else
+	       atomic_p := 0;
+	    end; -- if
+	 else
+	    -- Array classes are atomic as long as the element type of the
+	    -- array is not an object and the array does not contain pointers.
+	    if (elem_type.ctype /= c_ptr) then
+	       if (not contains_ptr) then
+		  atomic_p := 1;
+	       else
+		  atomic_p := 0;
+	       end; -- if
+	    else
+	       atomic_p := 0;
+	    end; -- if
+	 end; -- if
+	 
+	 base_size := (nextloc + 3).rshift(2).lshift(2);
+      end; -- case
+   end; -- compute_attr_offsets
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pre_semant is
+      -- We perform the semantic check for consts/shareds first
+      -- because the semantic check of routines may look for the
+      -- values of consts.  Eg
+      --      const x:INT := FOO::y;
+      --      f is .... SAME::x .... end;
+      -- In this case, when we want to check if `SAME::x' is a const,
+      -- we need to know the referrent of `y' in FOO.
+
+      i:INT := 0;
+      fsz:INT;
+      if (flst /= void) then
+	 fsz := flst.insert;
+      end; -- if
+      GLOBALS::pre_semant := true;
+      loop until!(i >= fsz);
+	 if (flst[i].type /= ROUT_FEATOB_S::type) then
+	    GLOBALS::curr_feature := flst[i];
+	    flst[i].semant(symtab);
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      GLOBALS::pre_semant := false;
+   end; -- pre_semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant is
+      -- Features have already been entered into symbol table in earlier
+      -- phases.  Rather than using the general `semant' routine from
+      -- LST_SEMANTOB class, since we need to update the global variable
+      -- `GLOBALS::curr_feature', we explicitly cycle through the
+      -- list of features. 
+
+      i:INT := 0;
+      fsz:INT;
+      if (flst /= void) then 
+	 fsz := flst.insert;
+      end; -- if
+      loop until!(i >= fsz);
+	 GLOBALS::curr_feature := flst[i];
+	 flst[i].semant(symtab);
+	 i := i + 1;
+      end; -- loop
+      if invar/=void then get_invariant.maybe_used := true end;
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_callees_and_callers is
+      -- Update which classes might have been changed and need to
+      -- be regenerated using the following rules:
+      
+      -- a. Check if there is a reference to a class whose interface
+      --    has changed.  If so, mark this class's "internal_updated"
+      --    as "true".  So eg if we have:
+      --            class Q
+      --               x:P; ...x.f... -- P is marked as "structure_updated"
+      --            end;  
+      --    Q must be marked as "internal_updated", and since Q is stored
+      --    in P's "callers", by going through the caller-list will suffice.
+      -- b. Mark all callees of current class as "internal_updated".
+      -- c. Check if the C macros have changed, and if so, mark the current
+      --    class as "internal_updated".
+      
+      if (index /= RESERVED_CLASSES::OB_ici) then
+	 if (structure_updated) then  
+	    i:INT;
+	    sz:INT := callees.asize;
+	    loop until!(i >= sz);
+	       index:INT := callees[i];
+	       if (index > 0) then
+		  co:CLASSOB_S := (GLOBALS::class_inst).at_index(index);
+		  co.internal_updated := true;
+	       end; -- if
+	       i := i + 1;
+	    end; -- loop
+	    
+	    i:INT;
+	    sz:INT := callers.asize;
+	    loop until!(i >= sz);
+	       index:INT := callers[i];
+	       if (index > 0) then
+		  co:CLASSOB_S := (GLOBALS::class_inst).at_index(index);
+		  co.internal_updated := true;
+	       end; -- if
+	       i := i + 1;
+	    end; -- loop
+	 elsif not (internal_updated) then
+	    -- At this point, this class is not marked at more, but we
+	    -- may still need to regenerate the C code if the C macros
+	    -- have changed.
+	    empty_set:INT_HASH_SET := INT_HASH_SET::create;
+	    i:INT;
+	    sz:INT := cnames.asize;
+	    loop until!(i >= sz);
+	       ith_cname:INT := cnames[i];
+	       if (ith_cname > 0) then
+		  -- We have to make a copy since "sym_difference" is
+		  -- a destructive operation.
+		  new_macros:INT_HASH_SET := (GLOBALS::c_macros).get(ith_cname).copy;
+		  old_macros:INT_HASH_SET := (GLOBALS::class_stat_tbl).c_macros.
+		                        get(ith_cname);
+		  if (new_macros /= old_macros) then
+		     if (new_macros /= void) and 
+			(old_macros /= void) then
+			changes:INT_HASH_SET := new_macros.sym_difference(old_macros);
+			if not (changes.is_a_subset_of(empty_set)) then
+			   internal_updated := true; break!;
+			end; -- if
+		     end; -- if
+		  end; -- if
+	       end; -- if
+	       i := i + 1;
+	    end; -- loop
+	 end; -- if
+      end; -- if
+   end; -- mark_callees_and_callers
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   misc_info is
+      -- Traverse the routines and perform the following function:
+      -- a. Look for all required temporaries 
+      -- b1. Generate goto-tags
+      -- b2. Check that all "break!" statements are inside loops
+      -- c. Check that all dispatches are only on non-basic objects.
+      -- d. Evaluate all value of const features.
+      -- e. Collect all the temporary names of strings consts
+      --    which are const features and in other classes.
+      i:INT := 0;
+      fsz:INT;
+      if (flst /= void) then 
+	 fsz := flst.insert;
+      end; -- if
+      loop until!(i >= fsz);
+
+	 fo:$FEATOB_S := flst[i];
+	 GLOBALS::curr_feature := fo;
+	    -- Find if the temporaries needed to compute initial expression, 
+	    -- which are stored in the CONST_DECL_FEATOB_S, SHARED_DECL_FEATOB_S
+	    -- or ROUT_FEATOB_S, and can be retrieved later.
+	 fo.do_gen_temps;
+	 case (fo.type)
+	 when (SHARED_DECL_FEATOB_S::type) then
+	    shared_feat:SHARED_DECL_FEATOB_S := fo;
+	    if (shared_feat.tmpct /= void) then
+	       GLOBALS::tmpct := (GLOBALS::tmpct).append(shared_feat.tmpct);
+	    end; -- if
+	 when (CONST_DECL_FEATOB_S::type) then
+	    const_feat:CONST_DECL_FEATOB_S := fo;
+	    if (const_feat.tmpct /= void) then
+	       GLOBALS::tmpct := (GLOBALS::tmpct).append(const_feat.tmpct);
+	    end; -- if
+	 end; -- case
+	 
+	 if (fo.type = ROUT_FEATOB_S::type) then
+	    fo.gen_goto_tags;
+	 elsif (fo.type = CONST_DECL_FEATOB_S::type) then
+	    fo.eval_constant;
+	 end; -- if
+	    -- Only put in this code after the "validate_dispatches" routines
+	    -- are written.  In the boot-strap, these are no-op routines.
+	 fo.validate_dispatches_and_get_ext_strs;
+	    -- Check:
+	    -- a.  A class whose base type is a 'char', 'int', 'double' or 
+	    --     'float' cannot be dispatched.
+	    -- b.  Issue warning message if user tries to dispatch '$FOO' 
+	    --     and 'FOO' has a non-pointer descendent, (which means by 
+	    --     our rules that FOO has no attributes).
+	    -- c.  Get references to string consts (const features)
+	    --     of other classes (only for routines).  The cases for
+	    --     for const/shared feature are dealt with in "semant"
+	    --     routine.
+	 i := i + 1;
+      end; -- loop
+   end; -- misc_info;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_macros(outfile:SAT_OUTFILE) is
+      c_class:CLASSOB_S := 
+         (GLOBALS::class_inst).at_index(RESERVED_CLASSES::C_ici);
+      allmacros:INT_HASH_SET := INT_HASH_SET::create;
+      
+      -- An alternate implementation is to access the INT_SET as an ARRAY{INT}.
+      i:INT;
+      sz:INT := cnames.asize;
+      loop until!(i >= sz);
+	 ith_cname:INT := cnames[i];
+	 if (ith_cname > 0) then
+	    macros:INT_HASH_SET := (GLOBALS::c_macros).get(ith_cname);
+	    if (macros /= void) then
+	       allmacros := allmacros.union(macros);
+	    end; -- if
+	    if (c_class /= void) then
+	       feat:$SEMANTOB := c_class.get_feature(ith_cname);
+	       feat.cprint_extern(outfile);
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      
+      i:INT;
+      sz:INT := allmacros.asize;
+      loop until!(i >= sz);
+	 ith_macro:INT := allmacros[i];
+	 if (ith_macro > 0) then
+	    outfile.s((GLOBALS::str_table).at_index(ith_macro)).c('\n').inc_ln(1);
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      outfile.c('\n').inc_ln(1);
+   end; -- cprint_macros
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_header_and_macros(outfile:SAT_OUTFILE) is
+      -- Print out a header for a C file saying what class it is.
+      -- !* Add in code later to put in name and date
+      outfile.s("/* ").
+              s(cfilename).
+              s(".c : Sather class: ").
+              s(full_name).s(", ");
+      SATHER_SEMANT::cs_options_cprint(outfile);
+      outfile.s(" */\n\n");
+	 -- If class is parametrized, "full_name" will get the
+	 -- correct description.
+      
+      outfile.s("#include \"all_.h\"\n").
+              s("#include \"").s(INSTALL_CONSTS::c_names_file).s("\"\n");
+      if (COMPILER_OPTIONS::verbose_code) then
+	 outfile.s("#include \"").s(INSTALL_CONSTS::offset_file).
+	         s("\"\n");
+	 outfile.inc_ln(1);
+      end; -- if
+
+      outfile.s("\nstatic char __sather_compiled__;\n");
+      -- this will need to change if C code gen phase of this routine changes.
+      outfile.inc_ln(6);
+      
+      cprint_macros(outfile);
+   end; -- cprint_header_and_macros
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_externs(outfile:SAT_OUTFILE) is
+      -- Print features which are referenced but not defined in this
+      -- class.
+      
+      -- -- Take advantage of the INT_SET being also an ARRAY.
+      i:INT;
+      sz:INT := externs.asize;
+      loop until!(i >= sz);
+	 key:INT := externs[i];
+	 if (key /= -1) then
+	    fnm:INT := GLOBAL_PROC::featname_from_key(key);
+	    ci:INT := GLOBAL_PROC::classind_from_key(key);
+	    fo:$SEMANTOB := (GLOBALS::class_inst).at_index(ci).get_feature(fnm);
+	       -- "fo" is forced by the "get_feature" routine to get a general
+	       -- semantic object rather than a "FEATOB_S".
+	    if (fo = void) then
+	       ERR_INFO::compiler_error_msg("CLASSOB_S",
+		  STR::create.s("Code <3,").
+		  i(key).c(',').i(fnm).c(',').
+		  i(ci).s(">\n"));
+	    end; -- if
+	    fo.cprint_extern(outfile);
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      
+   end; -- cprint_externs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_ext_strs(outfile:SAT_OUTFILE) is
+      -- Print extern declarations for references to strings consts
+      -- in constant feature of other classes.
+      
+      -- -- The following code makes use of INT_SET as an ARRAY{INT}.
+      i:INT;
+      sz:INT := ext_strs.asize;
+      loop until!(i >= sz);
+	 ith_ext_str:INT := ext_strs[i];
+	 if (ith_ext_str > 0) then
+	    outfile.s("extern ");
+	    GLOBAL_PROC::cprint_sather_str_type(outfile);
+	    GLOBAL_PROC::cprint_global_tmpnm_str(ith_ext_str, outfile);
+	    outfile.s(";\n").inc_ln(1);
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- cprint_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_declns(outfile:SAT_OUTFILE) is
+      -- Print out declarations of routines/shared/consts in this class.
+      i:INT := 0;
+      fsz:INT;
+      if (flst /= void) then 
+	 fsz := flst.insert;
+      end; -- if
+      outfile.s("\n\n").inc_ln(2);
+      loop until!(i >= fsz);
+	 -- -- Eliminate check for void feature entry because we compact the
+	 -- -- list at the end of "expand_cinh".
+	 -- if (flst[i] /= void) then
+	 
+	 if (flst[i].type /= ATTR_DECL_FEATOB_S::type) and
+	    (flst[i].type /= CONST_DECL_FEATOB_S::type) then
+	    GLOBALS::curr_feature := flst[i];
+	    if (GLOBAL_PROC::handle_feature_p(flst[i])) then
+	       flst[i].cprint_decln(outfile);
+	       outfile.s(";\n").inc_ln(1);
+	    end; -- if
+	 else
+	    if (flst[i].type = CONST_DECL_FEATOB_S::type) then
+	       const_feat:CONST_DECL_FEATOB_S := flst[i];
+	       GLOBALS::curr_feature := const_feat;
+	       if (GLOBAL_PROC::handle_feature_p(flst[i])) then
+		  const_feat.cprint_decln_with_poss_init(outfile);
+		  outfile.s(";\n").inc_ln(1);
+	       end; -- if
+	    end; -- if
+	 end; -- if
+	 
+         -- end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- cprint_declns
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_attr_tbl(outfile:SAT_OUTFILE) is
+      -- Print out an initialized array declaration which will eventually be
+      --   an entry in the global table "attr_table_".  Here it will be named
+      --   "attr_ent_FOO12_".  It has entries:  base-size (in bytes not
+      --   including array stuff), array dimension, type of array element,
+      --   number of attributes, the set of C types, and the set of offsets.
+
+      outfile.s("int attr_ent_").
+              s(prefix).
+              s("[]={").
+              i(base_size).
+              s(",").
+              i(arrdim).
+              s(",");
+      e_type:$TYPEOB_S := elem_type;
+      if (e_type = void) then
+	 -- This class does not inherit any array.
+	 outfile.i(0).
+	         s(",").
+	         i(num_attrs);
+      else
+	 -- Print the C type of the array element.
+	 outfile.i(e_type.inst_cls.ctype).
+	         s(",").
+                 i(num_attrs);
+      end; -- if
+      i:INT := 0;
+      fsz:INT;
+      if (flst /= void) then 
+	 fsz := flst.insert;
+      end; -- if
+      loop until!(i >= fsz);
+	 if (flst[i].type = ATTR_DECL_FEATOB_S::type) then
+	    outfile.c(',').i(flst[i].typeof.ctype);
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+
+      i := 0;
+      loop until!(i >= fsz);
+	 if (flst[i].type = ATTR_DECL_FEATOB_S::type) then
+	    outfile.c(',');
+	    flst[i].cprint_offset(outfile);
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      outfile.s("};\n\n").inc_ln(2);
+   end; -- cprint_attr_tbl
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_feat_tbl(outfile:SAT_OUTFILE) is
+      -- Print out an initialized array declaration which will eventually be
+      -- an entry in the global table "feat_table_".  Here it will be named
+      -- "feat_ent_FOO12_".  It has entries:  number of features, C type
+      -- of this class, Sather type (Class index) of array element (0 if this 
+      -- class is not an array), the set of feature name indices, categories 
+      -- of features, and the set of Sather types of features.
+      
+      fsz:INT;
+      if (flst /= void) then 
+	 fsz := flst.insert;
+      end; -- if
+
+      -- print name as variable
+      outfile.s("char *feat_typename_").s(prefix).s("=\"")
+	    .s(full_name).s("\";\n").inc_ln(1);
+      outfile.s("unsigned int feat_ent_").
+              s(prefix).
+              s("[]={").
+              i(fsz).
+              s(",").
+              i(ctype).
+              s(",");
+      e_type:$TYPEOB_S := elem_type;
+      if (e_type = void) then
+	 -- This class does not inherit any array.
+	 outfile.i(0);
+      else
+	 -- Print the Sather type of the array element.
+	 outfile.i(e_type.inst_cls.index);
+      end; -- if
+
+      -- Class full name (ie with type parameters instantiated).
+
+      -- some compilers don't accept (int)"stringconst"
+      -- but initializers must be consts and const is not storage class in K&R C.
+      outfile.s(",(int)&feat_typename_").s(prefix);
+      
+      -- Print name indices of features.
+      i:INT := 0;
+      loop until!(i >= fsz);
+	 outfile.c(',').i(flst[i].featob_s_name);
+	 i := i + 1;
+      end; -- loop
+
+      -- Print categories of features.
+      i := 0;
+      loop until!(i >= fsz);
+	 case (flst[i].type)
+	 when ATTR_DECL_FEATOB_S::type then
+	    outfile.c(',').i(SYS::Attribute);
+	 when SHARED_DECL_FEATOB_S::type then
+	    outfile.c(',').i(SYS::Shared);
+	 when CONST_DECL_FEATOB_S::type then
+	    outfile.c(',').i(SYS::Constant);
+	 when ROUT_FEATOB_S::type then
+	    outfile.c(',').i(SYS::Routine);
+	 end; -- case
+	 i := i + 1;
+      end; -- loop
+      
+      -- Print Sather type of features.
+      i := 0;
+      loop until!(i >= fsz);
+	 case (flst[i].type)
+	 when ATTR_DECL_FEATOB_S::type then
+	    a_featob_s:ATTR_DECL_FEATOB_S := flst[i];
+	    satype:$TYPEOB_S := a_featob_s.type_spec;
+	    outfile.c(',').i(satype.inst_cls.index);
+
+	 when SHARED_DECL_FEATOB_S::type then
+	    s_featob_s:SHARED_DECL_FEATOB_S := flst[i];
+	    satype:$TYPEOB_S := s_featob_s.type_spec;
+	    outfile.c(',').i(satype.inst_cls.index);
+
+	 when CONST_DECL_FEATOB_S::type then
+	    c_featob_s:CONST_DECL_FEATOB_S := flst[i];
+	    satype:$TYPEOB_S := c_featob_s.type_spec;
+	    outfile.c(',').i(satype.inst_cls.index);
+
+	 when ROUT_FEATOB_S::type then
+	    outfile.s(",0");
+	 end; -- case
+
+	 i := i + 1;
+      end; -- loop
+      
+      outfile.s("};\n\n").inc_ln(2);
+   end; -- cprint_feat_tbl
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_des_tbl(outfile:SAT_OUTFILE) is
+      -- Print a list of integers (representing a bit-vector), indicating
+      -- which classes are descendent of current class.
+      last_cls_ind:INT := (GLOBALS::class_inst).next_ind - 1;
+      num_cls:INT := last_cls_ind + 1; 
+      num_cols:INT;
+      if (num_cls.mod(32) = 0) then
+	 num_cols := num_cls / 32;
+      else
+	 num_cols := (num_cls / 32) + 1;
+      end; -- if
+      j:INT;
+      outfile.s("unsigned int des_ent_").s(prefix).s("[]={");
+      outfile.indent;
+      -- Number of columns is guaranteed to be at least 1 (unless number
+      -- of classes is 0 which is impossible).
+      loop until!(j >= num_cols);
+	 l:INT := j * 32;	-- Lower index
+	 u:INT := l + 32 - 1; -- Upper index
+	 if (u > last_cls_ind) then
+	    -- Classes indices range from 0 to last_cls_ind.
+	    u := last_cls_ind;
+	 end; -- if
+
+	 des_bit_vector: INT := GLOBAL_PROC::check_des_of(index, l, u);
+
+	 -- 123u in ANSI C
+	 -- (unsigned int)123 in K&R C
+	 if des_bit_vector=0 then
+	    outfile.i(des_bit_vector);
+	 elsif COMPILER_OPTIONS::k_and_r_c then
+	    outfile.s("(unsigned int)").i(des_bit_vector);
+	 else
+	    outfile.i(des_bit_vector).c('u');
+	 end;
+	 j := j + 1;
+	 if (j < num_cols) then
+	    outfile.c(',');
+	 end; -- if
+      end; -- loop
+      outfile.s("};\n").inc_ln(1);
+   end; -- cprint_des_tbl
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_routines(outfile:SAT_OUTFILE) is
+      -- Print out all routines in class.
+      i:INT := 0;
+      fsz:INT;
+      if (flst /= void) then 
+	 fsz := flst.insert;
+      end; -- if
+      loop until!(i >= fsz);
+	 if (flst[i].type = ROUT_FEATOB_S::type) then
+	    if (GLOBAL_PROC::handle_feature_p(flst[i])) then
+	       GLOBALS::curr_feature := flst[i];
+	       flst[i].cprint_routine(outfile);
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- cprint_routines
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_ctype(outfile:SAT_OUTFILE) is
+      -- Print out the C type names.
+      case (ctype)
+      when c_ptr then
+	 outfile.s(c_ptr_name);
+      when c_char then
+	 outfile.s(c_char_name);
+      when c_int then
+	 outfile.s(c_int_name);
+      when c_float then
+	 outfile.s(c_float_name);
+      when c_double then
+	 outfile.s(c_double_name);
+      end; -- case
+   end; -- cprint_ctype
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_extern_feats(outfile:SAT_OUTFILE):INT is
+      -- We print the extern declarations for all features that
+      -- might possibly be used (regardless of whether feature might
+      -- be used in a dispatch fashion).  
+      
+      i:INT := 0;
+      fsz:INT;
+      if (flst /= void) then
+	 fsz := flst.insert;
+      end; -- if
+      loop until!(i >= fsz);
+	 if (flst[i].type /= ATTR_DECL_FEATOB_S::type) then
+	    GLOBALS::curr_feature := flst[i];
+	    
+	    -- NOTE:
+	    -- The conditions on whether to print the external declarations
+	    -- should closely resemble those in deciding whether to insert 
+	    -- a feature into the dispatch table ("cprint_insert_feats").
+	    if (GLOBAL_PROC::handle_feature_p(flst[i])) then
+	       flst[i].cprint_extern(outfile);
+	    end; -- if
+	 end; -- if
+	 res := res + 1;
+	 i := i + 1;
+      end; -- loop
+   end; -- cprint_extern_feats
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_insert_feats(outfile:SAT_OUTFILE) is
+      -- We insert a dispatch value into the dispatch table only if there
+      -- is a chance that it might be used.
+      
+      i:INT := 0;
+      fsz:INT;
+      if (flst /= void) then
+	 fsz := flst.insert;
+      end; -- if
+      printed:BOOL := false;
+      loop until!(i >= fsz);
+	 GLOBALS::curr_feature := flst[i];
+
+	    -- We insert only those features that might possibly be
+	    -- dispatched.  Even those which maybe used but not dispatched
+	    -- are not inserted into the table.
+	 
+	    -- NOTE:
+	    -- A feature is inserted into the dispatch table if:
+	    -- (1) it may be used in dispatch
+	    -- (2) all feature info is given (eg browser mode)
+	    -- Note that this is more stringent than printing the extern/
+	    -- actual declarations of the routines (in "cprint_extern_feats",
+	    -- the test "GLOBAL_PROC::handle_feature_p" is called). 
+	 if (flst[i].used_in_dispatch) or (GLOBALS::print_feat_info) then
+	    name:INT := flst[i].featob_s_name;
+	    where:INT := GLOBAL_PROC::help_insert(index, name); 
+	    outfile.indent;
+	    outfile.s("dispatch_table_[").
+	            i(where).
+	            s("] = ").
+	            i(GLOBAL_PROC::key_of_class_feat(index, name)).
+	            s(";\n").inc_ln(1);
+	    outfile.indent;
+	    outfile.s("dispatch_table_[").
+	            i(where + 1).
+	            s("] = ");
+	    flst[i].cprint_store_dispval(outfile);
+	    outfile.s(";\n").inc_ln(1);
+	    printed := true;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      if (printed) then
+	 outfile.c('\n').inc_ln(1);
+      end; -- if
+   end; -- cprint_insert_feats
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_post_rtcode(outfile:SAT_OUTFILE) is
+      -- Print any house-keeping code necessary just before quitting
+      -- a routine (of this class).
+      if (GLOBAL_PROC::check_is_on) then
+	 outfile.c('\n').indent.inc_ln(1);
+	 PRINT_C_CODE::cprint_restore_exec_info(outfile);
+      end; -- if
+   end; -- cprint_post_rtcode
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_pre_rtcode(outfile:SAT_OUTFILE) is
+      -- Print any house-keeping code necessary just before starting
+      -- to execute a shared initialization.
+      if (GLOBAL_PROC::check_is_on) then
+	 outfile.c('\n').indent.inc_ln(1);
+
+	 filename:STR; 
+	 if (def /= void) then
+	    if (def.fname /= void) then
+	       filename := def.fname;
+	    end; -- if
+	 end; -- if
+	 if (filename = void) then
+	    filename := "<apparently not from file>";
+	 end; -- if
+	
+	 -- Use local variable in initialization routine to store
+	 -- previous filename.
+	 outfile.indent.s("SHARED_UPDATE_EXEC_INFO_(\"")
+	       .s(ERR_INFO::def_filename(lineno)).s("\",\"")
+	       .s(full_name).s("\");\n").inc_ln(1);
+      end; -- if
+   end; -- cprint_pre_rtcode
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_init_shareds_and_consts(outfile:SAT_OUTFILE) is
+      -- Print out the initialization code for consts and shareds which
+      -- are globals. Respect `printed_p' and do it only once.
+      -- But set `seen' so features can detect potential loop.
+      
+      if printed_p then return; end;
+      seen := true;
+
+      i:INT := 0;
+      fsz:INT;
+      if (flst /= void) then
+	 fsz := flst.insert;
+      end; -- if
+      
+      loop until!(i >= fsz);
+	 if (flst[i].type = CONST_DECL_FEATOB_S::type) or
+	    (flst[i].type = SHARED_DECL_FEATOB_S::type) then
+	    GLOBALS::curr_feature := flst[i];
+	    -- let feature decide how to handle it, so it
+	    -- can imply class ordering.
+	    flst[i].cprint_init_code(outfile);
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+
+      seen := false; 
+      printed_p := true;	-- mark class initialization done.
+   end; -- cprint_init_shareds_and_consts 
+
+	    
+end; -- class CLASSOB_S
+
+

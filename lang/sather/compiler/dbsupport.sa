@@ -1,0 +1,161 @@
+-- -*- Mode: Sather;  -*-
+-- File: dbsupport.sa
+-- Author: Jeff Bilmes (bilmes@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Provides support classes for producing the debugger tables.
+--*
+--* RCS: $Id: dbsupport.sa,v 1.1 1994/02/12 03:21:50 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 04:57 1993 (hws)
+--*  Oct 17 04:30 1993 (hws): Sather 1 syntax changes
+--* Created: Thu Mar  7 23:48:17 1991 (bilmes)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class STRINT_HASH_ELT is
+   -- Elements of a GEN_HASH table for pairing <strings,int> tuples with ints.
+   
+   attr s:STR;			-- The string.
+   attr int:INT;                     -- the int
+   attr hash:INT;			-- The int hash value of s.
+   attr val:INT;			-- The int associated with s.
+   
+   create(ns:STR; i:INT; nval:INT):SAME is
+      -- An STRINT_HASH_ELT which associates <ns,i> with nval.
+      res:=STRINT_HASH_ELT::new; res.s:=ns; res.val:=nval; res.int := i;
+      res.hash:=str_hash(ns,i);
+   end; -- create
+   
+   str_hash(st:STR;i:INT):INT is
+      -- A hash value for string <st,i>. Cheap function.
+      i:INT; 
+      loop
+	 if st[i]='\0' then return end;
+	 res:=res.bit_xor(st[i].to_i.lshift(i.bit_and(15)));
+	 i:=i+1;
+      end; -- loop
+      res := res.bit_xor(i);
+   end; -- str_hash
+   
+   is_equal(e:STRINT_HASH_ELT):BOOL is
+      -- True if self and e have the same string.
+      res := false;
+      if e.hash=hash then
+	 if e.int = int then
+	    res:= s.is_equal(e.s);
+	 end;
+      end;
+   end; -- equal
+   
+end; -- class STRINT_HASH_ELT
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class STRINT_TO_INT is
+   -- Mappings from <strings,int> tuples to ints.
+   -- create, get, ins, del, clr
+   
+   attr t:GENERAL_HASH{STRINT_HASH_ELT};	-- the table
+   
+   create:SAME is
+      -- An empty mapping.
+      res:=STRINT_TO_INT::new; res.t:=res.t.create;
+   end; -- create
+   
+   get(s:STR;i:INT):INT is
+      -- The int associated with <s,i> or -1 if absent.
+      te:STRINT_HASH_ELT:=t.get(STRINT_HASH_ELT::create(s,i,0));
+      if te=void then
+	 res := -1;
+      else
+	 res := te.val;
+      end;
+   end; -- get
+   
+   insert(s:STR; i:INT; v:INT) is
+      -- Map <s,i> into v, overwriting if previous value.
+      t.insert(STRINT_HASH_ELT::create(s,i,v))
+   end; -- ins
+   
+   delete(s:STR;i:INT) is
+      -- Delete s if present.
+      t.delete(STRINT_HASH_ELT::create(s,i,0));
+   end; -- del
+   
+   clear is			
+      -- Clear the table.
+      t.clear;
+   end; -- clr
+   
+end; -- class STRINT_TO_INT
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class STR2INT2STR is   
+   -- a bit different than STR_TO_INT
+   -- provides both STR -> INT and INT -> STR mapping.
+   attr tbl: GENERAL_HASH{STR_HASH_MAP_ELT{INT}}; -- The table.
+   attr tmp: STR_HASH_MAP_ELT{INT};	-- A temporary element for queries.
+
+   attr itos:ARRAY{STR}; -- integer to string mapping
+   
+   create:SAME is
+      -- An empty mapping.
+      res:=STR2INT2STR::new;
+      res.tbl:=res.tbl.create;
+      res.itos := ARRAY{STR}::new(100);
+   end; -- create
+
+   geti(s:STR):INT is
+      -- The int associated with s or -1 if absent.
+      te:STR_HASH_MAP_ELT{INT}:=tbl.get(STR_HASH_MAP_ELT{INT}::create(s,0));
+      if te /= void then
+	 res:=te.val;
+	 return;
+      end;
+      res := -1;
+   end; -- get
+
+   gets(i:INT):STR is
+      -- Get the STR associated with i or "" if absent
+      if i >= itos.asize or i < 0 then
+	 res := "";
+	 return;
+      end;
+      res := itos[i];
+      if res = void then
+	 res := "";
+      end;
+   end; -- gets
+   
+   insert(s:STR; v:INT):BOOL is
+      -- Map s <--> v, no overwriting of a previous value.
+      res := false;
+      if geti(s) = -1 then
+	 tbl.insert(STR_HASH_MAP_ELT{INT}::create(s,v));
+	 loop until!(v < itos.asize);
+	    a:ARRAY{STR} := itos;
+	    itos := a.extend(2*a.asize);
+	    a.clear;
+	 end;
+	 itos[v] := s;
+	 res := true;
+      end;
+   end; -- ins
+
+   
+end; -- class STR2INT2STR
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1,0 +1,130 @@
+File: sather/doc/sdb_info.txt
+Author: Jeff Bilmes
+Created: Tue Jun  4 04:09:40 1991
+Copyright (C) International Computer Science Institute, 1991
+
+This file quickly describes the sdb extensions to gdb and some sdb commands that
+are useful when debugging sather programs.
+
+In order for sdb to operate on a compiled sather program, the sather
+program must be compiled with the '-sdb' option.
+
+To run sdb on the command line, type
+
+	sdb satherProgram coreFile
+
+or in emacs, type:
+
+	"M-x sdb"
+
+In emacs, you may provide a core file using the sdb "core-file" command. 
+
+Type "help" at the sdb prompt for general help, or "help sather"
+for commands useful with Sather. To get help on a specific sdb command,
+use that command name as an argument to the "help" command (e.g. "help show"
+will give verbose help on the "show" sather command). Only enough
+characters of a command to make it unambiguous need to be typed. Thus,
+"sh" is "show", "v" is "visit", ...
+
+Breakpoints: Breakpoints are set using the "break" command and
+in Sather code are specified in one of two ways.
+
+    break <Sather File Name:Line Number>
+or
+    break <Sather Class Name:Routine name>
+
+Listing Breakpoints: The "info break" command will list all current breakpoints.
+
+Enable/Disable/Deleting Breakpoints: The "enable", "disable", and "delete"
+command will enable, disable, or delete a breakpoint given by the break point
+number specified in the argument to the command.
+
+Stepping: The "step" and "next" commands are used to step sather source
+lines. The "step" command will step into functions, whereas the "next"
+command will step over functions.
+
+Continuing: The "continue" command will continue execution after a break point.
+
+Other useful commands:
+
+   "up" go up the current stack frame
+   "down" go back down the current stack frame
+   "finish" will continue execution until the current function returns.
+   "print" will print C like expressions.
+   "source" will execute the commands given in a file.
+
+Sather Extensions:
+
+When a break point occurs in a sather function, the 'self' variable
+will become the 'current object.' The current object is what the
+"show", "array", "assign", and "visit" commands will operate with.
+You may change the current object using the "visit" command or
+the "up"/"down" commands. sdb will use the run-time type of 'self'
+to determine how further commands will work. If 'self' is void,
+the static type will be used, and only shared attributes of that
+object type will be changeable.
+
+show: 
+Show the types and values of features.
+If no argument is given, then show the features of the current
+object (not including the array portion, constants, or routines). The current
+object may be changed by using the 'visit' and 'leave' commands or by
+changing the current stack frame using the 'up' and 'down' commands. If an
+argument is given, show the feature specified by the argument. The argument
+syntax is the same as for the 'visit' command with the inclusion that basic
+local variables or arguments may be shown.
+
+ashow: Like "show" but list all features when given no argument.
+cshow: Like "show" but also list constants when given no argument.
+rshow: Like "show" but also list routines when given no argument.
+
+visit:
+Visit the object given by the feature specified in the argument.
+The feature specified may be a feature of the current object (i.e.
+'visit foo' where 'foo' is a feature of 'self'), may be a feature of
+a different object (i.e. 'visit SOMECLASS::bar' where bar is a feature
+of class 'SOMECLASS'), may be a feature of a feature (i.e. 'visit foo.bar'
+where 'bar' is a feature of 'foo' which is a feature of 'self'), may
+be an array spec of an array object (i.e. 'visit [3]' if self is an
+array object, or 'visit foo[3]' if 'foo' is an array object of 'self),
+or may be a non-basic non-void local variable or argument.
+
+leave: 
+Leave current object being visited. If a number argument is given, 
+leave that many times.
+
+array: 
+Display the array portion (if any) of the current object.
+If no argument is given, default elements of 0 through 1 will be printed
+for each dimension. If an argument is given, selective portions of the nD
+array may be specified as:
+      1D: [range]
+      2D: [range,range]
+      3D: [range,range,range]
+      4D: [range,range,range,range]
+      where range is defined by
+        range ->         -- default elements
+        range -> *       -- all elements
+        range -> n       -- element n
+        range -> n -     -- element n through the end
+        range -> - m     -- beginning element through m
+        range -> n-m     -- elements n through m
+        range -> range|range -- elements in both ranges.
+
+assign: 
+Assign a value to an attribute or array elements.
+The value given by the argument will be assigned to either a Sather attribute
+or the specified array elements of the current object. If the current object is
+an array, the value may be assigned to the array elements specified by the
+same array specification syntax as the 'array' command. For example:
+      assign foo 4            -- assign 4 to self.foo
+      assign [3,4-5] 3.14159  -- assign pi to the given array elements.
+
+location: 
+Show the objects in current visit stack.
+
+descendents: 
+Show descendent information.
+If an argument is given, show descendents of the class specified by the
+argument. Otherwise, show all classes and their descendents (this really
+can be a prodigious amount of text).

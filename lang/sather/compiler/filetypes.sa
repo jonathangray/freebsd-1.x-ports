@@ -1,0 +1,352 @@
+-- -*- Mode: Sather;  -*-
+-- File: filetypes.sa
+-- Author: Chu-Cheow Lim
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION:
+--* Classes corresponding to different kinds of input files
+--*
+--* CLASSES:
+--* a.  TEXTFILE (has line number)
+--* b.  SAT_CMDFILE (returns tokens for command file)
+--* c.  STR_TAB_FILE (for reading special integers-strings for table)
+--*
+--* RCS: $Id: filetypes.sa,v 1.1 1994/02/12 03:21:52 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 05:00 1993 (hws)
+--*  Oct  6 00:13 1993 (hws): delete c_makefiles; c_files -> object_files
+--*  Sep 28 05:02 1993 (hws): switch -> case
+--* Created: Mon Jun  4 13:39:51 1990
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class TEXTFILE is
+   -- Read-only input file with text file attributes eg line no.
+   -- Returns a stream of characters stripped of <cr>.
+   
+   FILE;			-- Inherits from FILE
+
+   attr lineno:INT;			-- Current input line, starts from 1
+
+   attr curr_ch:CHAR;		-- Last character being read
+
+   error_msg(s:STR) is
+      C::error_msg(C::str_ptr_(s));
+   end;
+   
+   error_exit(s:STR) is
+      C::error_exit(C::str_ptr_(s));
+   end; 
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:STR):SAME is
+      -- Open named file for reading 
+      res := res.new;
+      res.open_for_read(nm);
+      if (res.error /= 0) then	-- Only initialize lineno if open
+	 res.lineno := 1;	--  file successfully 
+	 error_exit(STR::create.s("ERROR: Failure to open \"").s(nm).
+	            s("\"\n"));
+      end; -- if
+      res.lineno := 1;
+	 -- Only initialize lineno if open file successfully
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   whitespace(ch:CHAR):BOOL is
+      -- Returns "true" if "ch" is newline, space, backspace etc.
+      case (ch)
+      when (' ') then
+	 res := true;
+      when ('\n') then
+	 res := true;
+      when ('\b') then
+	 res := true;
+      when ('\t') then
+	 res := true;
+      else
+	 res := false;
+      end; -- case
+   end; -- whitespace
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   read_next: CHAR is
+      -- Read and return next character from input file
+      curr_ch := get_c;
+      if (curr_ch = '\n') then
+	 lineno := lineno + 1;
+      end; -- if
+      res := curr_ch;
+   end; -- read_next
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_token:INT is
+      -- All descendent classes return tokens.
+   end; -- get_token
+
+end; -- class TEXTFILE
+
+--------------------------------------------------------------------
+
+class SAT_CMDFILE is
+
+   COMPILE_KEYS_CONST;		-- Reserved words for command files
+
+   TEXTFILE;
+   attr buf:STR_BUFFER;		-- Stores current string
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:STR):SAME is
+      -- This initialization will allocate space for SAT_CMDFILE
+      -- object and does initialization for TEXTFILE part.
+      -- Open named file for reading 
+      res := res.new;
+      res.open_for_read(nm);
+      if (res.error /= 0) then	
+	 error_exit(STR::create.s("ERROR: Failure to open \"").s(nm).
+	            s("\"\n"));
+      end; -- if
+	 -- Only initialize lineno if open file successfully 
+      res.lineno := 1;
+      res.buf := res.buf.create(-1);
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   check_kw:INT is
+      -- Returns a keyword token.  If buffer does not contain a 
+      --   keyword, return an integer not in the range of valid 
+      --   tokens.
+      
+      -- !* Temporarily do a brute force comparison.  May change
+      --   to more efficient search if necessary.
+      
+      if (buf.is_equal(source_files_kw)) then
+	 res := source_files_ind;
+      elsif (buf.is_equal(object_files_kw)) then
+	 res := object_files_ind;
+      elsif (buf.is_equal(cc_flags_kw)) then
+	 res := cc_flags_ind;
+      elsif (buf.is_equal(c_macro_kw)) then
+	 res := c_macro_ind;
+      elsif (buf.is_equal(c_name_kw)) then
+	 res := c_name_ind;
+      elsif (buf.is_equal(include_kw)) then
+	 res := include_ind;
+      elsif (buf.is_equal(sather_home_kw)) then
+	 res := sather_home_ind;
+      elsif (buf.is_equal(c_compiler_kw)) then
+	 res := c_compiler_ind;
+      else
+	 res := non_compile_key_ind;
+      end; -- if
+   end; -- check_kw
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_token:INT is
+      -- Return tokens for sather command file
+      
+      -- "curr_ch" either contains a whitespace, EOF or last
+      --   character of a token (eg '"' in the case of quoted
+      --   expressions.
+      loop until!((not whitespace(read_next)) or (check_eof));
+      end; -- loop
+
+      if (check_eof) then
+	 res := eof_tok;
+	 return;
+      end; -- if
+      
+      buf.init;			-- Clear string buffer
+
+      if (curr_ch = '\"') then      
+	 -- Handle quoted expressions
+	 res := qexp_tok;
+	 loop until!(check_eof);
+	    if (read_next = '\\') then
+	       if (read_next = '\n') then		  
+		  -- Retain '\' if it is a newline
+		  buf := buf.push('\\').push(curr_ch);
+	       else
+		  if (not check_eof) then
+		     buf := buf.push(curr_ch);
+		  end; -- if
+	       end; -- if
+	    else
+	       if (curr_ch = '\"') then
+		  buf := buf.terminate; 
+		  return;
+	       end; -- if
+	       if (not check_eof) then
+		  buf := buf.push(curr_ch);
+	       end; -- if
+	    end; -- if
+	 end; -- loop
+	 
+	 if (check_eof) then
+	    error_exit(STR::create.s(name).c('(').i(lineno).c(')').
+	               s(" (SAT_CMDFILE) : Unexpected end of quoted expr\n")); 
+	 end; -- if
+      end; -- if
+
+      -- At this point the first character of the token is not '"'. 
+      -- Check for comments.
+      if (curr_ch = '-') then   
+	 if (read_next = '-') then
+	    -- Remove comments
+	    loop until!(read_next = '\n');
+	       if (check_eof) then 
+		  res := eof_tok;
+		  return;
+	       end; -- if
+	    end; -- loop
+	    res := get_token;
+	    return;
+	 else
+	    -- Not a comment; reinsert '-' and the newest character
+	    if not (check_eof) then
+	       buf := buf.push('-');
+	       if (not whitespace(curr_ch)) then
+		  buf := buf.push(curr_ch);
+	       end; -- if
+	       if (whitespace(read_next)) then
+		  buf:= buf.terminate;
+		  res := ident_tok; -- Definitely not a command keyword
+		  return;
+	       elsif (check_eof) then		  
+		  buf:= buf.terminate;
+		  res := ident_tok; -- Definitely not a command keyword
+		  return;
+	       end; -- if
+	    else
+	       buf := buf.terminate;
+	       res := ident_tok; 
+		  -- Even a "-" is considered as identifier in compiler command.
+	       return;
+	    end; -- if
+	 end; -- if
+      end; -- if
+   
+      buf := buf.push(curr_ch);
+      loop
+         if (whitespace(read_next)) then break! end;
+	 if (check_eof) then break! end;
+	 buf := buf.push(curr_ch);
+      end; -- loop
+
+      buf := buf.terminate;
+	 -- Terminate current string
+      res := check_kw;		
+	 -- Compare input string with possible keywords
+
+      if (not compile_key_p(res)) then
+	 -- If it is not a command keyword, default to an identifier.
+	 res := ident_tok;
+      end; -- if
+   end; -- get_token
+
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   curr_str:STR is
+      -- Return string in buffer.  
+      res := buf.strval;
+   end; -- curr_str
+
+end; -- class SAT_CMDFILE
+
+--------------------------------------------------------------------
+
+class OUTFILE is
+   -- Specifically for output
+   
+   FILE;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   indent(steps:INT) is
+      i:INT := 0;
+      loop until!(i >= steps);
+	 c(' ');
+	 i := i + 1;
+      end; -- loop
+   end; -- indent
+
+end; -- class OUTFILE
+
+--------------------------------------------------------------------
+
+class SAT_OUTFILE is
+-- Used for outputting Sather code.
+-- Adapted from "SOUT" class by Steve
+   
+   OUTFILE;
+   
+   attr index:INT;			-- Current indentation
+   attr line_no:INT;                 -- current line number. Used for debugger.
+
+   const ind_inc_sz:INT := 3; -- Indentation increment
+
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   indent:SAME is
+      i:INT := 0;
+      loop until!(i >= index);
+	 c(' ');
+	 i := i + 1;
+      end; -- loop
+      res := self;
+   end; -- indent
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   ind_init:SAME is
+      index := 0;
+      res := self;
+   end; -- ind_init
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   ind_inc:SAME is
+      index := index + ind_inc_sz;
+      res := self;
+   end; -- ind_inc
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   ind_dec:SAME is
+      index := index - ind_inc_sz;
+      res := self;
+   end; -- ind_dec
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_bool(v:BOOL):SAME is
+      if (v) then
+	 res := s("'\\1'");
+      else
+	 res := s("'\\0'");
+      end; -- if
+   end; -- cprint_bool
+
+   inc_ln(i:INT):SAME is
+      line_no := line_no + i;
+      res := self;
+   end; -- inc_ln
+   
+end; -- class SAT_OUTFILE
+
+--------------------------------------------------------------------
+
+class STR_TAB_FILE is
+   FILE;
+
+end; -- class STR_TAB_FILE
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+

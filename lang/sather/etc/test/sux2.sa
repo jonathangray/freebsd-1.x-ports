@@ -1,0 +1,111 @@
+--* Last edited: Oct 12 23:23 1993 (hws)
+--* HISTORY:
+--*  Apr  3 21:38 1993 (hws): change C:: alluppercase names 
+
+class SUX2_TEST is
+   -- This is a rewrite of the SUX_TEST in unix.sa with an
+   -- a better coverage of the exception flows and perhaps better error msg's.
+   -- Run:
+   -- cs -info -com $SATHER_HOME/etc/test/sux2.sather sux2_test
+   
+   TEST;
+   
+   main is
+      class_name("SUX");
+      test("C::SIGKILL_ type",SUX::create(C::sigkill_).signal_type,
+	 "SIGKILL");
+      test("C::SIGKILL_ doc",SUX::create(C::sigkill_).signal_doc,
+	 "kill (cannot be caught or ignored)");
+      test1;
+      test2;
+      test3;
+      test4;
+      test5;
+      test6;
+      finish;      
+   end;
+
+   test1 is
+      SUX::expect(C::sigsegv_);
+      SUX::expect(C::sigbus_);
+      protect
+	 sx: SUX;
+	 sx.signal_type; -- this accesses void object
+      against SUX then
+	 test("Void object abort",
+	    (exception.signal_type.is_equal("SIGSEGV") or
+	      exception.signal_type.is_equal("SIGBUS")).to_s,
+	   "T");
+      end; 
+   end;
+
+   test2 is
+      protect 
+	 raise SUX_CHILD::new;
+      against SUX_PARENT then
+	 test("SUX_CHILD match SUX_PARENT", "match SUX_PARENT::type", "match $SUX_PARENT::type");
+      against $SUX_PARENT then 
+	 test("SUX_CHILD match $SUX_PARENT", exception.type.to_s, SUX_CHILD::type.to_s);
+      against $OB then
+	 test("SUX_CHILD match $OB", "match $OB::type", "match $SUX_PARENT::type");
+      end;
+   end;
+
+   test3 is
+      protect 
+	 raise SUX_PARENT::new;
+      against SUX_PARENT then
+	 test("SUX_PARENT match SUX_PARENT", exception.type.to_s, SUX_PARENT::type.to_s);
+      against $SUX_PARENT then 
+	 test("SUX_PARENT match $SUX_PARENT", exception.type.to_s, SUX_CHILD::type.to_s);
+      against $OB then
+	 test("SUX_PARENT match $OB", "match $OB::type", "match $SUX_PARENT::type");
+      end;
+   end;
+
+   test4 is
+      protect 
+	 raise SUX_PARENT::new;
+      against $SUX_PARENT then 
+	 test("SUX_PARENT match $SUX_PARENT", exception.type.to_s, SUX_PARENT::type.to_s);
+      against $OB then
+	 test("SUX_PARENT match $OB", "match $OB::type", "match $SUX_PARENT::type");
+      end;
+   end;
+
+   test5 is
+      protect
+	 raise SUX_PARENT::new;
+      against $SUX_CHILD then 
+	 test("SUX_PARENT match $SUX_CHILD", "match $SUX_CHILD::type", "match $OB");
+      against $OB then
+	 test("SUX_PARENT match $OB", "match $OB::type", "match $OB::type");
+      end;
+   end;
+   
+   test6 is
+      protect 
+	 testn(1000);
+      against SUX_PARENT then
+	 test("against SUX_PARENT (unwind 1000)",
+	    exception.type.to_s, SUX_PARENT::type.to_s);
+      against  $OB then
+	 test("against $OB (unwind 1000)",
+	    "match $OB::type", "match $SUX_PARENT::type");
+      end;
+   end;
+
+   testn(i:INT) is
+      protect 
+	 if i=0 then
+	    raise SUX_PARENT::new;
+	 else
+	    testn(i-1);
+	 end;
+      against $SUX_CHILD then
+	 test("against $SUX_CHILD (unwind ".copy.i(i).s(")"),
+	    "match $SUX_CHILD::type", "match SUX_PARENT::type");
+      end;
+   end;
+   
+end;

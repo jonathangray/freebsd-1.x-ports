@@ -1,0 +1,289 @@
+--- -*- Mode: Sather;  -*-
+-- File: classob_s_table.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU) and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1990, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Stores instantiated class definitions (ie CLASSOB_S objects)
+--*
+--* CLASSES: CLASSOB_S_TABLE
+--* 
+--* REQUIRED FILES: constants.sa (inheritance from RESERVED_WORDS)
+--*
+--* RCS: $Id: classs_tab.sa,v 1.1 1994/02/12 03:21:49 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 04:53 1993 (hws)
+--*  Oct 17 03:45 1993 (hws): Sather 1 syntax changes
+--* Created: Wed Jun  6 17:19:50 1990 (clim)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class CLASSOB_S_TABLE is
+   
+   -- We keep this inheritance, rather of directly accessing the constant
+   -- features in `RESERVED_WORDS', in order to use as much of the language
+   -- constructs as possible, so that the compiler can serve as a good test.
+   RESERVED_WORDS;
+
+   attr keys:ARRAY{LSTINT_KEY};
+   attr indices:ARRAY{INT};
+      -- The key type used is LSTINT_KEY
+   attr instances:ARRAY{CLASSOB_S};
+   attr instances_size:INT;
+   attr keys_size:INT;
+   attr next_ind:INT;
+
+   const def_table_size:INT := 50; 
+      -- *! Random size, but must be be enough to accomodate at least the
+      -- predefined classes.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   error_msg(s:STR) is
+      -- Print an error message.
+      C::error_msg(C::str_ptr_(s));
+   end;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   error_exit(s:STR) is
+      -- Print error message and quit.
+      C::error_exit(C::str_ptr_(s));
+   end; 
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   expand(size:INT) is
+      -- Increase the size of the table until it is larger than
+      -- the required size.
+      loop until!(instances_size > size);
+	 double_tables;
+      end; -- loop
+      next_ind := size;
+   end; -- if
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(size:INT):SAME is
+      -- Create a table to contain actualized class representations.
+      res := new;
+      if (size <= 0) then
+	 size := def_table_size;
+      end; -- if
+      res.instances_size := size;
+      res.keys_size := size * 2;
+      res.keys := res.keys.new(2 * size);
+      res.indices := res.indices.new(2 * size);
+      res.instances := res.instances.new(size);
+      res.next_ind := 0;
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   hash(k:LSTINT_KEY):INT is
+      -- Hash function on actualized class representations.
+      res := k.hash(keys_size);
+   end; -- hash
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_obj(k:LSTINT_KEY):CLASSOB_S is
+      -- Given a key (sequence of integers), return the corresponding
+      -- actualized Sather class.
+      insert:INT := hash(k);
+      loop
+	 if (keys[insert] = void) then
+	    return;
+	 elsif (keys[insert].is_equal(k)) then
+	    res := instances[indices[insert]];
+	    return;
+	 else
+	    insert := (insert + 1).u_mod(keys_size);
+	 end; -- if
+      end; -- loop
+   end; -- get_obj
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   add_unique_obj(k:LSTINT_KEY; inst:CLASSOB_S) is
+      -- Add the object and replace older object (with same key) if 
+      -- one already exists.
+      if (next_ind = instances_size) then
+	 double_tables;
+      end; -- if
+      insert:INT := hash(k); 
+      loop
+	 if (keys[insert] = void) then
+	    tmp_inst:CLASSOB_S := instances[next_ind];
+	    
+	    -- Since there is no specific location to put the object,
+	    -- we look for the first empty position.
+	    loop until!(tmp_inst = void);
+	       next_ind := next_ind + 1;
+	       if (next_ind = instances_size) then
+		  double_tables;
+		  add_unique_obj(k, inst);
+		  return;
+	       end; -- if
+	       tmp_inst := instances[next_ind];
+	    end; -- loop
+	    
+	    -- Code ensures that the tables have not been expanded at this
+	    -- point, so that the entries holding the keys have not changed
+	    -- when tested at (*).
+	    instances[next_ind] := inst;
+	    inst.update_ind(next_ind);
+	    keys[insert] := k;
+	    indices[insert] := next_ind;
+	    next_ind := next_ind + 1;
+	    return;
+	 elsif (keys[insert].is_equal(k)) then
+	    -- Replace older object by newer one
+	    instances[indices[insert]] := inst;
+	    inst.update_ind(indices[insert]);
+	    return;
+	 else
+	    insert := (insert + 1).u_mod(keys_size);
+	 end; 
+      end; -- loop
+   end; -- add_unique_obj
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   add_unique_obj_at(k:LSTINT_KEY; inst:CLASSOB_S; loc:INT) is
+      -- Add the object at a unique location.  If an object C2 (with different
+      -- key) already exists at that location, move C2 to a new location.
+      -- If an object C2' (with same key) already exists at that location,
+      -- it is replaced by the new object.
+
+      if (next_ind = instances_size) then
+	 double_tables;
+      end; -- if
+      
+      -- Our tables must be big enough to provide the specified location.
+      loop until!(loc < instances_size);
+	 double_tables;
+      end; -- loop
+      insert:INT := hash(k);
+      loop
+	 if (keys[insert] = void) then
+	    -- NOTE: The ordering of operations is important.  First the
+	    --       old object is deleted.  (We cannot insert the new
+	    --       object, because that will mess up the "remove_obj"
+	    --       routine.)  Then new object is inserted.  (We cannot
+	    --       yet re-inserted the old object because it may be
+	    --       re-inserted into the location reserved for new object.)
+	    tmp_inst:CLASSOB_S := instances[loc];
+	    if (tmp_inst /= void) then
+	       -- We have to move the old object (with different key) because
+	       -- the current object MUST have this location.
+	       ERR::s("ERROR: Collision in class index (").i(loc).
+	            s(") between ").s(tmp_inst.full_name).s(" and ").
+	            s(inst.full_name).c('\n');
+	       ERR_INFO::compiler_error_msg("CLASSOB_S_TABLE",
+		  "Compiler error (code 3) in incremental compilation information; Please report\n");
+	       -- In case compiler_error_msg continues, clean up.
+	       remove_obj(tmp_inst.key);
+	    end; -- if
+	    instances[loc] := inst;
+	    inst.update_ind(loc);
+	    keys[insert] := k;
+	    indices[insert] := loc;
+
+	    if (tmp_inst /= void) then
+	       add_unique_obj(tmp_inst.key, tmp_inst);
+	    end; -- if
+	    return;
+	 elsif (keys[insert].is_equal(k)) then
+	    -- Replace older object (with same key) by newer one.
+	    instances[indices[insert]] := inst;
+	    inst.update_ind(indices[insert]);
+	    return;
+	 else
+	    insert := (insert + 1).u_mod(keys_size);
+	 end; -- if
+      end; -- loop
+   end; -- add_unique_obj_at
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   double_tables is
+      -- Double the size of actualized class table.
+      old_keys_size:INT := keys_size;
+      instances_size := 2 * instances_size;
+      keys_size := 2 * keys_size;
+      nkeys:ARRAY{LSTINT_KEY} := keys.new(keys_size);
+      nindices:ARRAY{INT} := indices.new(keys_size);
+      instances := instances.extend(instances_size);
+      i:INT := 0;
+      loop until!(i >= old_keys_size);
+	 if (keys[i] /= void) then
+	    k:LSTINT_KEY := keys[i];
+	    insert:INT := hash(k);
+	    loop
+	       if (nkeys[insert] = void) then
+		  nkeys[insert] := k;
+		  nindices[insert] := indices[i];
+		  break!;
+	       else
+		  insert := (insert + 1).u_mod(keys_size);
+	       end; -- if
+	    end; -- loop
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      keys := nkeys;
+      indices := nindices;
+   end; -- double_tables
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   remove_obj(k:LSTINT_KEY):BOOL is
+      -- Returns "true" if object exists and is removed, false otherwise
+      insert:INT := hash(k);
+      loop
+	 if (keys[insert] = void) then
+	    return;
+	 elsif (keys[insert].is_equal(k)) then
+	    inst:CLASSOB_S := instances[indices[insert]];
+	    instances[indices[insert]] := void;
+	    inst.update_ind(0);
+	    keys[insert] := void;
+	    indices[insert] := 0;
+	    res := true;
+	    return;
+	 else
+	    insert := (insert + 1).u_mod(keys_size);
+	 end; -- if
+      end; -- loop
+   end; -- remove_obj
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   at_index(i:INT):CLASSOB_S is
+      -- Returns an actualized class representation if it is within
+      -- current range of table.
+      if (i < 0) or (i >= instances_size) then
+	 error_msg("(CLASSOB_S_TABLE) : Index out of range\n");
+	 return;
+      end; -- if
+      res := instances[i];
+   end; -- at_index
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   print_table(outfile:OUTFILE) is
+      -- Print whatever class representations are currently in
+      -- the table.
+      i:INT := 0;
+      loop until!(i >= keys_size);
+	 if (keys[i] /= void) then
+	    OUT::c('<').s(instances[indices[i]].full_name).c(',').
+	         i(indices[i]).c('>').c('\n');
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- print_table
+
+end; -- class CLASSOB_S_TABLE
+
+--------------------------------------------------------------------
+

@@ -1,0 +1,274 @@
+-- -*- Mode: Sather;  -*-
+-- File: dot_sather_handler.sa
+-- Author: Chew-Chow Lim and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Combine several classes to handle reading of .sather file
+--*
+--* RCS: $Id: dot_sa.sa,v 1.1 1994/02/12 03:21:50 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 04:58 1993 (hws)
+--*  Oct  6 00:16 1993 (hws): remave c_makefiles
+--*  Oct  6 00:12 1993 (hws): c_files -> object_files
+--*  Sep 28 04:53 1993 (hws): switch -> case
+--*  Mar  1 12:24 1993 (hws): more uniform error msgs
+--*  Feb 21 20:29 1993 (hws): remove debug
+--* Created: Fri Jun  1 16:41:21 1990
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class DOT_SATHER_HANDLER is
+
+   COMPILE_KEYS_CONST;
+      -- Compile keys strings/index (rather than say building
+      --   an association list) since this class handling sather
+      --   compiler command file is not being reused. 
+   
+   const def_cmdfile_name:STR := ".sather";
+      -- Default command file to look for
+
+   -- List of possible errors that might occur in reading command file
+   const err_unknown_file:INT := 1;
+   
+   attr inp:LIST{SAT_CMDFILE};
+      -- List of compiler command files.  This value is guaranteed to
+      -- be non-void if we use "create" routine.
+
+   attr cmdfile:SAT_CMDFILE;
+      -- Current compiler command file
+
+   attr sat_info:ARRAY{$COMPILE_KEYOB};
+      -- Each COMPILE_KEY (or a descendent class of COMPILE_KEY) stores
+      --   info for a compile key.		
+
+   attr error_flag:BOOL;
+      -- Set when an error occurs in reading or trying to read a command 
+      --   file	
+   
+   attr error_type:INT;
+      -- Type of error if "error_flag" is set
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   error_msg(s:STR) is
+      C::error_msg(C::str_ptr_(s));
+   end;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   error_exit(s:STR) is
+      C::error_exit(C::str_ptr_(s));
+   end; 
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create:SAME is
+
+      res := new;
+      res.inp := res.inp.create(2); -- *! Random size
+      res.sat_info := res.sat_info.new(num_compile_keys);
+
+      -- Create all the objects to hold key info
+      i:INT := compile_keys_fst_ind;
+      loop until!(i > compile_keys_lst_ind);
+	 case (i)	 
+	 when (object_files_ind) then
+	    res.sat_info[i] := OBJECT_FILES_KEYOB::create;
+	 when (c_name_ind) then
+	    res.sat_info[i] := C_NAME_KEYOB::create;
+	 when (c_macro_ind) then
+	    res.sat_info[i] := C_MACRO_KEYOB::create;
+	 else			-- *! Temporarily use the GENERIC_KEYOB class
+	    res.sat_info[i] := GENERIC_KEYOB::create;
+	 end; -- case
+	 i := i + 1;
+      end; -- loop
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   init(cmdfile_name:STR) is
+      
+      -- Use default command file if no file name is given
+      if (cmdfile_name = void) then
+	 cmdfile_name := def_cmdfile_name;
+      end;
+      
+      -- First try to open command file
+      tmpcmdfile:SAT_CMDFILE := tmpcmdfile.create(cmdfile_name);
+      if (tmpcmdfile.error /= 0) then
+	    -- *! Temporarily kludgy code; might want to modify code
+	    --    to look for command file in places other than HOME
+	 home_dir:STR := UNIX::getenv(INSTALL_CONSTS::env_v_home);
+	 if (home_dir = void) then
+	    error_exit(STR::create.s("Unknown home directory; HOME unknown\n"));
+	 else
+	    home_dir := UPATHS::canonicalize(home_dir);
+	 end;
+	 home:STR      := STR::create.s(home_dir).c('/');
+	 cmdfile_name  := STR::create.s(home).s(cmdfile_name);
+	 tmpcmdfile    := tmpcmdfile.create(cmdfile_name);
+	 if (tmpcmdfile.error /= 0) then
+	    error_flag := true;
+	    error_type := err_unknown_file;
+	    error_exit(STR::create.s("Error in opening command file \"").
+	                        s(cmdfile_name).s("\"\n"));
+	 else
+	    cmdfile := tmpcmdfile;
+	    inp := inp.push(tmpcmdfile);
+	 end; -- if
+      else
+	 cmdfile := tmpcmdfile;
+	 inp := inp.push(tmpcmdfile);
+      end; -- if
+
+   end; -- init
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   found_p(fname:STR):BOOL is
+      -- Returns "true" if file exists in current stack
+      i:INT := 0;
+      loop until!(i >= inp.insert);
+	 if (fname.is_equal(inp[i].name)) then
+	    res := true;
+	    return;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- found_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   read_cmdfile:BOOL is
+      -- First command file is provided when object is created.
+      -- Returns "true" if cmdfile has been processed successfully.
+      -- Otherwise, "error_flag" is false and "error_type" contains
+      --   the type of error.
+
+      oldcmdfile:SAT_CMDFILE;
+      tok:INT := cmdfile.get_token;
+      curr_key:INT;		-- Current command key
+
+      -- Skip all other tokens until a command key or end of file
+      loop until!((compile_key_p(tok)) or (tok = eof_tok));
+	 ERR_INFO::format_error_msg_file(cmdfile.name, cmdfile.lineno,
+	    "DOT_SATHER_HANDLER",
+	    STR::create.s("Unrecognized string \"").
+	           s(cmdfile.curr_str).s("\""));
+	 tok := cmdfile.get_token;
+      end; -- loop
+      
+      curr_key := tok;
+      tok := cmdfile.get_token;
+
+      -- The special variables for sather home and architecture (and only these)
+      -- may be used in the sys_dot_sather file that is always included.
+      -- We need to make sure that these variables are set. Otherwise
+      -- Users would be forced to have them set.
+      -- However .sather home setting is irrelevant if it was given
+      -- as compiler command line option.
+      varval: STR;
+      if not COMPILER_OPTIONS::is_opt_sather_home then
+	 varval := UNIX::getenv(INSTALL_CONSTS::env_v_sat_home);
+	 if varval = void then
+	    UNIX::putenv(INSTALL_CONSTS::env_v_sat_home,COMPILER_OPTIONS::sather_home);
+	    varval := UNIX::getenv(INSTALL_CONSTS::env_v_sat_home);
+	 else
+	 end;
+      end;
+      varval := UNIX::getenv(INSTALL_CONSTS::env_v_environment);
+      if varval = void then
+	 UNIX::putenv(INSTALL_CONSTS::env_v_environment,INSTALL_CONSTS::default_environment);
+	 varval := UNIX::getenv(INSTALL_CONSTS::env_v_environment);
+      end;
+
+      loop until!(inp.is_empty);
+	 case (tok)
+	 when (eof_tok) then
+	    if (curr_key = c_macro_ind) or (curr_key = c_name_ind) then
+	       sat_info[curr_key].terminate;
+	    end; -- if
+	    cmdfile.close;
+	    oldcmdfile := inp.pop;
+	    cmdfile := inp.top;
+	    res := true;
+	    return;
+	    
+	 when (ident_tok) then
+	    if (curr_key = sather_home_ind) then
+	       COMPILER_OPTIONS::set_sather_home(cmdfile.curr_str);
+	       UNIX::putenv(INSTALL_CONSTS::env_v_sat_home,
+		  COMPILER_OPTIONS::sather_home);
+	    elsif (curr_key = include_ind) then
+	       -- Check that command file is not already being read
+	       includefilename:STR := UPATHS::canonicalize(cmdfile.curr_str);
+	       if (found_p(includefilename)) then
+		  ERR_INFO::format_error_msg_file(cmdfile.name, cmdfile.lineno,
+		     "DOT_SATHER_HANDLER",
+		     STR::create.s("Cycle in include files \"").
+		            s(includefilename).s("\""));
+	       end; -- if
+	       
+	       -- *! Temporarily use simple search for included
+	       --   command files
+	       cmdfile := cmdfile.create(includefilename);
+	       if (cmdfile.error /= 0) then
+		  ERR_INFO::format_error_msg_file(cmdfile.name, cmdfile.lineno,
+		     "DOT_SATHER_HANDLER",
+		     STR::create.s("Can't open include file \"").
+		             s(cmdfile.curr_str).s("\""));
+	       else
+		  inp := inp.push(cmdfile);
+		  ok:BOOL := read_cmdfile;
+	       end; -- if
+	    else
+
+	       -- The "_KEYOB"s will check for correctness.
+	       -- C_MACRO_KEYOB signals an error if there is no quoted
+	       --   expression entered before.
+	       -- C_NAME_KEYOB will detect if this is the first token
+	       --   after the command and allocate space accordingly.
+		  
+	       sat_info[curr_key].insert(UPATHS::canonicalize(cmdfile.curr_str));
+	    end; -- if
+
+	 when (qexp_tok) then
+	    if (curr_key /= c_macro_ind) then
+	       ERR_INFO::format_error_msg_file(cmdfile.name, cmdfile.lineno,
+		  "DOT_SATHER_HANDLER",
+		  STR::create.s("Unexpected quoted expr\"").
+                          s(cmdfile.curr_str).s("\""));
+	    else
+	       -- C_MACRO_KEYOB signals an error if this quoted expression
+	       --   is not the first.
+	       sat_info[curr_key].start(cmdfile.curr_str);
+	    end; -- if
+
+	 else
+	    if (curr_key = c_macro_ind) or (curr_key = c_name_ind) then
+	       sat_info[curr_key].terminate;
+	    end; -- if
+	    curr_key := tok;
+	 end; -- case
+	 tok := cmdfile.get_token;
+      end; -- loop
+   end; -- read_cmdfile
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Interface routines for users of the command info
+
+   ith_source_file(i:INT):STR is
+      -- Name of ith source file; returns void if none
+      command:$COMPILE_KEYOB := sat_info[source_files_ind]; 
+      if (i >= 0) and (i < command.info_size) then
+	 res := command.ith_str(i);
+      end; -- if
+   end; -- ith_source_file
+
+end; -- class DOT_SATHER_HANDLER

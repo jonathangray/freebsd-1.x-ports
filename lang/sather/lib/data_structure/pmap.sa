@@ -1,0 +1,412 @@
+-- -*- Mode: Sather;  -*-
+-- File: pmap.sa
+-- Author: Heinz Schmidt (hws@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: A PMAP is an extension of a map allowing programs to
+--*           map parm names to values and define and access these
+--*           mappings like keyword parameters. Callers build maps as the
+--*           last parameter passed to a callee. The callee contains a kind
+--*           of type definition for the lists at the beginning of the body
+--*           that is analogous to parameter declaration and has the effect
+--*           of retrieving the passed values from the map at run time.
+--*           PMAPs distinguish required and optional parms and clients
+--*           can provide a defaults for the latter.
+--*
+--* CLASSES: PMAP
+--* 
+--* REQUIRED FILES: ../base/type.sa
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: pmap.sa,v 1.1 1994/02/12 03:23:26 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:32 1993 (hws)
+--*  Oct 17 06:32 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 27 14:34 1993 (hws): require -> pre
+--*  Aug 26 03:59 1991 (hws): add `from' and avoid empty declared_parms
+--*  Jul 13 00:53 1991 (hws): add str parameters, auto creation a la STR
+--*  Jul 12 17:33 1991 (hws): fix subtle bug in debug and rename.
+--* Created: Fri May 24 22:40:01 1991 (hws)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class PMAP is
+   -- A paramter map, from parameter names to values. Parameters are int
+   -- symbols. They can be declared like this
+   --            constant name: INT := UNIQUE::int;
+   -- Note: Initially parameter names were represented by strings.
+   -- Errors in symbolic names (ints) can be detected at compile time and hasing
+   -- ints is much faster than strings. Also there was a rest function
+   -- initially. Its rare use does not seems to justify the need for
+   -- marking the parameters that were used.
+   -- 
+   -- Parameters may be required or optional. Optional parmameters may have a
+   -- default. PMAPs can be used for a kind of keyword parameter passing.
+   --
+   -- Use the compiler option -chk to check pmap definition and access.
+   -- 
+   -- Representation: hashtable mapping strings to parameter values and a set of
+   --                 used parms for checking constant vs. variable number of
+   --                 parameter list.
+   -- Abstraction: declare, allow_others, no_others, 
+   --              b,c,i,s,r,d,o, bool,char,int,string,real,double,ob,
+   --              bool_opt,char_opt,int_opt,string_opt,real_opt,double_opt,ob_opt
+
+--- - - - - - - - - - - - - - INHERITANCE - - - - - - - - - - - - - ---
+
+   INT_HASH_MAP {$OB};		-- maps parm -> value
+   
+--- - - - - - - - - - - - - - ATTRIBUTES  - - - - - - - - - - - - - ---
+ 
+   private attr declared_parms: INT_HASH_SET := INT_HASH_SET::create;
+
+--- - - - - - - - - - - - - INITIALIZATION  - - - - - - - - - - - - ---
+
+   define pmap_parent_create create;
+   create: SAME is
+      res := PMAP::pmap_parent_create.initialize(void);      
+   end;
+   
+--- - - - - - - - - - PUBLIC - ABSTRACT DATA TYPE - - - - - - - - - ---
+
+   cursor: PMAP_CURSOR is -- A cursor into the table.
+      res := res.create(self);
+   end; -- cursor
+
+-- - Declaration
+
+   declare is
+      -- start declaration of parameter "types". When `no_others'
+      -- or `allow_others' is called later, `self' is optionally checked.
+      if DBG::type_check then declared_parms := INT_HASH_SET::create; end;
+   end;
+
+   allow_others is
+      -- allows other parms than those since `declare'.
+   end;
+
+   no_others pre has_declared_parms_only is 
+      -- pres that `self' does not have parms additional to the ones
+      -- declared. This is only checked with the debug_key `type_check'.
+   end;
+
+-- - Insertion: unfortunately we have to split it again in basic, non-basic.
+
+   b(p: INT; v: BOOL): SAME is
+      -- set bool parameter `p' to value `v'. Auto creates if necessary.
+      if self = void then res := PMAP::create else res := self; end;
+      res.insert(p,BOOL_OB::create(v));
+   end;
+   
+   c(p: INT; v: CHAR): SAME is
+      -- set char parameter `p' to value `v'. Auto creates if necessary.
+      if self = void then res := PMAP::create else res := self; end;
+      res.insert(p,CHAR_OB::create(v));
+   end;
+   
+   i(p: INT; v: INT): SAME is
+      -- set int parameter `p' to value `v'. Auto creates if necessary.
+      if self = void then res := PMAP::create else res := self; end;
+      res.insert(p,INT_OB::create(v));
+   end;
+
+   s(p: INT; v: STR): SAME is
+      -- set int parameter `p' to value `v'. Auto creates if necessary.
+      if self = void then res := PMAP::create else res := self; end;
+      res.insert(p,v);
+   end;
+   
+   d(p: INT; v: DOUBLE): SAME is
+      -- set double parameter `p' to value `v'. Auto creates if necessary.
+      if self = void then res := PMAP::create else res := self; end;
+      res.insert(p,DOUBLE_OB::create(v));
+   end;
+
+   r(p: INT; v: REAL): SAME is
+      -- set real parameter `p' to value `v'. Auto creates if necessary.
+      if self = void then res := PMAP::create else res := self; end;
+      res.insert(p,REAL_OB::create(v));
+   end;
+
+   o(p: INT; v: $OB): SAME is
+      -- set ob parameter `p' to value `v'. Auto creates if necessary.
+      if self = void then res := PMAP::create else res := self; end;
+      res.insert(p,v);
+   end;
+
+-- - Declarative access: Required parameters
+
+   bool(p: INT): BOOL pre req(p) is
+      -- the value of the required BOOL parm `p'.
+      v: BOOL_OB := get(p);
+      res := v.val;
+   end;
+
+   char(p: INT): CHAR pre req(p) is
+      -- the value of the required CHAR parm `p'.
+      v: CHAR_OB := get(p);
+      res := v.val;
+   end;
+
+   int(p: INT): INT pre req(p) is
+      -- the value of the required INT parm `p'.
+      v: INT_OB := get(p);
+      res := v.val;
+   end;
+
+   str(p: INT): STR pre req(p) is
+      -- the value of the required INT parm `p'.
+      res := get(p);
+   end;
+   
+   real(p: INT): REAL pre req(p) is
+      -- the value of the required REAL parm `p'.
+      v: REAL_OB := get(p);
+      res := v.val;
+   end;
+
+   double(p: INT): DOUBLE pre req(p) is
+      -- the value of the required DOUBLE parm `p'.
+      v: DOUBLE_OB := get(p);
+      res := v.val;
+   end;
+
+   ob(p: INT): $OB pre req(p) is 
+      -- the value of the required $OB parm `p'. 
+      res := get(p);
+   end;
+
+-- - Declarative access: optional parmameters
+
+   bool_opt(p: INT; default: BOOL): BOOL is
+      -- the value of the optional BOOL parm `p', or `default'.
+      if DBG::type_check then declare_parm(p) end;
+      v: BOOL_OB;
+      if test(p) then
+	 v := get(p); res := v.val
+      else
+	 res := default
+      end;
+   end;
+
+   char_opt(p: INT; default: CHAR): CHAR is
+      -- the value of the optional CHAR parm `p', or `default'.
+      if DBG::type_check then declare_parm(p) end;
+      v: CHAR_OB;
+      if test(p) then
+	 v := get(p); res := v.val
+      else
+	 res := default
+      end;
+   end;
+
+   int_opt(p: INT; default: INT): INT is
+      -- the value of the optional INT parm `p', or `default'.
+      if DBG::type_check then declare_parm(p) end;
+      v: INT_OB;
+      if test(p) then
+	 v := get(p); res := v.val
+      else
+	 res := default
+      end;
+   end;
+
+   str_opt(p: INT; default: STR): STR is
+      -- the value of the required STR parm `p', or `default'.
+      if DBG::type_check then declare_parm(p) end;
+      if test(p) then res := get(p); else res := default; end;
+   end;
+
+   real_opt(p: INT; default: REAL): REAL is
+      -- the value of the optional REAL parm `p', or `default'.
+      if DBG::type_check then declare_parm(p) end;
+      v: REAL_OB;
+      if test(p) then
+	 v := get(p); res := v.val
+      else
+	 res := default
+      end;
+   end;
+
+   double_opt(p: INT; default: DOUBLE): DOUBLE is
+      -- the value of the optional DOUBLE parm `p', or `default'.
+      if DBG::type_check then declare_parm(p) end;
+      v: DOUBLE_OB;
+      if test(p) then
+	 v := get(p); res := v.val
+      else
+	 res := default
+      end;
+   end;
+
+   ob_opt(p: INT; default: $OB): $OB is
+      -- the value of the optional `$OB' parm `p', or `default'.
+      if DBG::type_check then declare_parm(p) end;
+      if test(p) then res := get(p) else res := default end;
+   end;
+
+   from(pmap: $OB): PMAP pre pmap.type = PMAP::type is
+      -- return pmap.
+      res := pmap;
+   end;
+   
+--- - - - - - - - - - -  SECRETS - MAY CHANGE - - - - - - - - - - - ---
+  
+   private req(p: INT): BOOL is 
+      -- Tests whether parm `p' is be present `self'. Also marks
+      -- it as a known parm for optional check of unknown parms.
+      res := test(p); declare_parm(p); 
+   end;
+
+   private opt(p: INT) is
+      -- Marks `p' as a known parm for optional check of unknown parms.
+      declare_parm(p)
+   end;
+
+   private declare_parm(p: INT) is
+      declared_parms.insert(p);
+   end;
+   
+   private has_declared_parms_only: BOOL is
+      -- find out whether `self' has only declared parms.
+      c: PMAP_CURSOR := self.cursor;
+      res := true;
+      loop until!(c.is_done);
+	 if not declared_parms.test(c.key) then
+	    res := false;
+	    return;
+	 end;
+	 c.next
+      end;
+   end;
+   
+end;
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class PMAP_CURSOR is
+   -- A cursor into `PMAP' objects for stepping through all entries.
+
+   INT_HASH_MAP_CURSOR{$OB};
+   attr tbl: PMAP;
+
+   create(m: PMAP): PMAP_CURSOR is
+      -- A cursor into `m' which is initialized to the first element.
+      res := SAME::new;
+      res.tbl := m; res.first;
+   end; -- create
+
+end; -- PMAP_CURSOR
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class KW is
+   -- keywords, to be used with pmaps.
+   -- Unique int keys with associated string representation
+   -- so we can also use them for parameter / value associations.
+
+-- Support a bijective association between keys and their representation.
+
+   const init_after: INT := UNIQUE::int; -- requires init ordering
+   
+   shared key_names: INT_HASH_MAP{STR} := key_names.create;
+   shared named_keys: STR_HASH_MAP{INT} := named_keys.create;
+
+   keyword(nm: STR): INT is
+      -- declares keyword, e.g.  const list := KW::keyword("list");
+      res := UNIQUE::int;
+      KW::key_names.insert(res,nm);
+      KW::named_keys.insert(nm,res);
+   end;
+
+   to_str(key: INT): STR is -- string representation of key or `void'.
+      res := KW::key_names.get(key);
+   end;
+
+   to_key(nm: STR): INT is -- key representation of name `nm' or `void'.
+      res := KW::named_keys.get(nm);
+   end;
+
+-- Various generic keywords that seem application independent
+-- So, this is the way you use it.
+
+   const list: INT := KW::keyword("list");
+   const pmap: INT := KW::keyword("pmap");
+   const file: INT := KW::keyword("file");
+   const size: INT := KW::keyword("size");
+   const from: INT := KW::keyword("from");
+   const to: INT := KW::keyword("end");
+   const test: INT := KW::keyword("test");
+
+
+end; -- class KW
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class PMAP_TEST is
+   -- Illustrates and tests the use of PMAP for keyword parameter passing.
+   -- For now parm names are strings. This can easily be changed to
+   -- integers if speed is important for the expense of const declarations.
+
+   -- Compiled with -chk the test should complain.
+
+   TEST;
+   const n_layers: INT := UNIQUE::int;
+   const n_hidden: INT := UNIQUE::int;
+   const min_weight: INT := UNIQUE::int;
+   const max_weight: INT := UNIQUE::int;
+   const distribution: INT := UNIQUE::int;
+   const input_data: INT := UNIQUE::int;
+   const superfluous: INT := UNIQUE::int;
+
+   caller is
+      f(5,PMAP::i(n_layers,5).
+	 r(min_weight,-.2).
+	 r(distribution,0.5).
+	 o(input_data,LIST{INT}::create). -- dummy object to avoid additional class
+	 i(superfluous,5)
+      );
+   end;
+
+   f(x: INT; p: PMAP) is
+      p.declare;
+         n: INT := p.int(n_layers);                    --- 
+         min: REAL := p.real_opt(min_weight,-1.);      ---
+         max: REAL := p.real_opt(max_weight,1.);       ---
+         in: LIST{INT} := p.ob_opt(input_data,void);   ---
+         h: INT := p.int_opt(n_hidden,8);              ---
+      p.no_others;
+      
+      test("int prop",n.to_s,"5");
+      test("real prop 1",min.to_s,"-0.200000");
+      test("real prop 2",max.to_s,"1.000000");
+      test("ob prop",in.type.to_s,LIST{INT}::type.to_s);
+      test("default works",h.to_s,"8");
+
+   end;
+
+   main is
+      class_name("PMAP");
+      OUT::s("The test deliberately produces an assertion error when compiled").nl.
+      s("with -chk and the debug_key type_check.").nl.
+      s("The error reads: ...has_declared_parms_only ... fails.").nl;
+      caller;
+      finish;
+   end;
+
+end;
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 

@@ -1,0 +1,100 @@
+-- File: dbkey.sa
+-- Author: Chu-Cheow Lim
+-- Created: Tue Jan 15 13:33:29 1991
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION:Keeps a list of <class index, key id> pairs.  The keys are
+--*          those used in debug/assert statements.
+--*
+--* RCS: $Id: dbkey.sa,v 1.1 1994/02/12 03:21:50 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 04:56 1993 (hws)
+--*  Oct 17 04:29 1993 (hws): Sather 1 syntax changes
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class CLASS_KEY_SET is
+   -- Uses linear search because presumably there are not many assert/debug
+   -- keys.
+   attr classes:LIST{INT};
+   attr keys:LIST{INT};
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(sz:INT):SAME is
+      -- "sz" (> 0) gives the number of <class index, key id> pairs this object
+      -- must be prepared to hold.
+      res := new;
+      res.classes := LIST{INT}::new(sz);
+      res.keys := LIST{INT}::new(sz);
+      res.clear;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   insert(ci:INT; k:INT) is
+      -- Insert the <class index, key id> pair if it does not exist.
+      -- NOTE:  If key already exists with class index equal to 0, then
+      --        it is not inserted.
+      i:INT; sz:INT := keys.asize;
+      loop until!(i >= sz);
+	 if (keys[i] = k) then
+	    if (classes[i] = 0) or (classes[i] = ci) then
+	       return;
+	    end; -- if
+	 elsif (keys[i] = -1) then
+	    keys[i] := k; classes[i] := ci; return;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- ins
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   display is
+      i:INT; sz:INT := keys.asize;
+      loop until!(i >= sz);
+	 if (keys[i] /= -1) then
+	    OUT::s("Class index = ").i(classes[i]).
+	         s("; identifier = ").
+	         s((GLOBALS::str_table).at_index(keys[i])).
+	         c('\n');
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- if
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   exists(ci:INT; k:INT):BOOL is
+      i:INT; sz:INT := keys.asize;
+      loop until!(i >= sz);
+	 if (keys[i] = k) then
+	    if (classes[i] = 0) or (classes[i] = ci) then
+	       res := true; return;
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- exists
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   clear is
+      i:INT;
+      loop until!(i >= keys.asize);
+	 keys[i] := -1;
+	 i := i + 1;
+      end; -- loop
+   end; -- clr
+   
+end; -- class CLASS_KEY_SET
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+

@@ -1,0 +1,102 @@
+Sat Oct  9 20:00:32 1993  Heinz Schmidt  (hws at sagitta)
+
+* Made ar and ranlib symbolic in Makefile allowing to locate them in 
+  different places on different boxes. Patches below.
+
+* Patched Oscars earlier gc3.2 changes into gc3.3. Patches below.
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+*** Makefile.~1~	Sat Oct  2 08:41:29 1993
+--- Makefile	Mon Oct 11 12:15:34 1993
+***************
+*** 13,19 ****
+  # versions of make otherwise fork the shell specified in
+  # the SHELL environment variable.
+  SHELL= /bin/sh
+! 
+  CC= cc
+  CFLAGS= -O -DSILENT
+  # Setjmp_test may yield overly optimistic results when compiled
+--- 13,20 ----
+  # versions of make otherwise fork the shell specified in
+  # the SHELL environment variable.
+  SHELL= /bin/sh
+! AR= ar
+! RANLIB= ranlib
+  CC= cc
+  CFLAGS= -O -DSILENT
+  # Setjmp_test may yield overly optimistic results when compiled
+***************
+*** 39,46 ****
+  $(OBJS) test.o: $(srcdir)/gc_private.h $(srcdir)/gc_headers.h $(srcdir)/gc.h $(srcdir)/config.h
+  
+  gc.a: $(OBJS)
+! 	ar ru gc.a $(OBJS)
+! 	ranlib gc.a || cat /dev/null
+  #	ignore ranlib failure; that usually means it doesn't exist, and isn't needed
+  
+  mach_dep.o: $(srcdir)/mach_dep.c $(srcdir)/mips_mach_dep.s $(srcdir)/rs6000_mach_dep.s if_mach if_not_there
+--- 40,47 ----
+  $(OBJS) test.o: $(srcdir)/gc_private.h $(srcdir)/gc_headers.h $(srcdir)/gc.h $(srcdir)/config.h
+  
+  gc.a: $(OBJS)
+! 	${AR} ru gc.a $(OBJS)
+! 	${RANLIB} gc.a || cat /dev/null
+  #	ignore ranlib failure; that usually means it doesn't exist, and isn't needed
+  
+  mach_dep.o: $(srcdir)/mach_dep.c $(srcdir)/mips_mach_dep.s $(srcdir)/rs6000_mach_dep.s if_mach if_not_there
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+*** gc.h.orig   Wed Aug 11 07:28:40 1993
+--- gc.h        Sat Oct  9 19:53:46 1993
+***************
+*** 14,17 ****
+--- 14,27 ----
+  # define GC_H
+  
++ /*
++  * gcc.2.3.3 generates errors if these files are not included before stddef.h
++  */
++ 
++ #ifdef __GNUC__
++ #   include <sys/types.h>
++ #   include <time.h>
++ #   include <stdio.h>
++ #endif
++ 
+  # include <stddef.h>
+
+*** gc_private.h.orig   Sat Oct  2 09:35:30 1993
+--- gc_private.h        Sat Oct  9 19:36:05 1993
+***************
+*** 1,2 ****
+--- 1,3 ----
++ /* * Last edited: Oct  9 19:36 1993 (hws) */
+  /* 
+   * Copyright 1988, 1989 Hans-J. Boehm, Alan J. Demers
+***************
+*** 223,227 ****
+  
+  # ifndef BCOPY_EXISTS
+! #   include <string.h>
+  #   define bcopy(x,y,n) memcpy(y,x,n)
+  #   define bzero(x,n)  memset(x, 0, n)
+--- 224,230 ----
+  
+  # ifndef BCOPY_EXISTS
+! #   ifndef __GNUC__  /* gcc generates redefinition warnings (oscar) */
+! #      include <string.h>
+! #   endif
+  #   define bcopy(x,y,n) memcpy(y,x,n)
+  #   define bzero(x,n)  memset(x, 0, n)
+
+
+Sat Sep  4 23:58:02 1993  Heinz Schmidt  (hws at sagitta)
+
+* Integrated GC 3.2 in vanilla. Avoid any changes on the GC if possible.
+  The make files can be customized from sys/C using CFLAGS etc.
+
+* Two changes were necessary: gc.h required a __GNUC__ special
+  treatment to avoid repeated definitions errors. Simiarly gc_private.h
+  in connection with string.h include.  
+

@@ -1,0 +1,459 @@
+-- -*- Mode: Sather;  -*-
+-- File: symbol_table.sa
+-- Author: Chu-Cheow Lim
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: 
+--* A table of FEATOB_S's at the outer most level.  Used simultaneously
+--* as a symbol table for local variable, parameters etc.
+--*
+--* RCS: $Id: symtab.sa,v 1.1 1994/02/12 03:21:55 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 05:15 1993 (hws)
+--*  Oct 17 05:14 1993 (hws): Sather 1 syntax, copyright note
+--* Created: Fri Jul 20 17:23:32 1990 (clim)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class HASH_TABLE{T} is
+   -- Associate an object with its name; used by SYMBOL_TABLE
+   
+-- NOTE: Assume that the name of an object is never 0.
+   
+   attr names:ARRAY{INT};	-- Names indices.
+   attr indices:ARRAY{INT};	-- Index into `objs'.
+   attr objs:ARRAY{T};		-- Array of stored objects.
+   attr obj_table_size:INT;	-- Size of `objs'.
+   attr names_size:INT;		-- Size of `names' (2 * `obj_table_size').
+   attr next_ind:INT;		-- Next position to insert into `objs'.
+
+   const def_table_size:INT := 7; -- *! Random size
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(size:INT):SAME is
+      -- Create a hash table that can contain `size' objects.
+      res := new;
+      if (size <= 0) then
+	 size := def_table_size;
+      end; -- if
+      res.obj_table_size := size;
+      res.names_size := size * 2;
+      res.names := res.names.new(2 * size);
+      res.indices := res.indices.new(2 * size);
+      res.objs := res.objs.new(size);
+      res.next_ind := 0;
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   hash(nm:INT):INT is
+      -- Hash function on <object, name index> pair.
+      res := nm.u_mod(names_size);
+   end; -- hash
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_obj(nm:INT):T is
+      -- Given a name index `nm', return an object from hash table,
+      -- if any.
+      insert:INT := hash(nm);
+      loop
+	 if (names[insert] = 0) then
+	    return;
+	 elsif (names[insert] = nm) then
+--	    if (objs[indices[insert]] /= C::id_ob(-1)) then
+--	       res := objs[indices[insert]];
+--	    end; -- if
+	    res := objs[indices[insert]];
+	    return;
+	 else
+	    insert := (insert + 1).u_mod(names_size);
+	 end; -- if
+      end; -- loop
+   end; -- get_obj
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   add_obj(nm:INT; ob:T):BOOL is
+      -- Add the object and returns "true" if one already exists; the
+      -- older object is shadowed, but not deleted in case we want to
+      -- dump the whole table.
+      if (next_ind >= obj_table_size) then
+	 double_tables;
+      end; -- if
+      insert:INT := hash(nm); 
+      loop
+	 if (names[insert] = 0) then
+	    objs[next_ind] := ob;
+	    names[insert] := nm;
+	    indices[insert] := next_ind;
+	    next_ind := next_ind + 1;
+	    return;
+	 elsif (names[insert] = nm) then
+	    -- Shadow older object by newer one, but do not delete older
+	    -- object
+	    objs[next_ind] := ob;
+	    indices[insert] := next_ind;
+	    next_ind := next_ind + 1;
+	    res := true;
+	    return;
+	 else
+	    insert := (insert + 1).u_mod(names_size);
+	 end; 
+      end; -- loop
+   end; -- add_obj
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   add_unique_obj(nm:INT; ob:T) is
+      -- Add the object and replace older object (with same key) if 
+      -- one already exists.
+      if (next_ind >= obj_table_size) then
+	 double_tables;
+      end; -- if
+      insert:INT := hash(nm); 
+      loop
+	 if (names[insert] = 0) then -- (*)
+	    tmp_ob:T := objs[next_ind];
+	    
+	    -- Since there is no specific location to put the object,
+	    -- we look for the first empty location.
+	    loop until!(tmp_ob = void);
+	       next_ind := next_ind + 1;
+	       if (next_ind = obj_table_size) then
+		  double_tables; 
+		  add_unique_obj(nm, ob);
+		  return;
+	       end; -- if
+	       tmp_ob := objs[next_ind];
+	    end; -- loop
+	    
+	    -- Code ensures that the tables have not been expanded at this
+	    -- point, so that the entries holding the keys have not changed
+	    -- when tested at (*).
+	    objs[next_ind] := ob;
+	    names[insert] := nm;
+	    indices[insert] := next_ind;
+	    next_ind := next_ind + 1;
+	    return;
+	 elsif (names[insert] = nm) then
+	    -- Replace older object by newer one
+	    objs[indices[insert]] := ob;
+	    return;
+	 else
+	    insert := (insert + 1).u_mod(names_size);
+	 end; 
+      end; -- loop
+   end; -- add_unique_obj
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+--   add_unique_obj_at(nm:INT; ob:T; loc:INT) is
+--      -- ** This operation is not needed.
+--      -- Add the object at a unique location.  If an object C2 (with different
+--      -- key) already exists at that location, move C2 to a new location.
+--      -- If an object C2' (with same key) already exists at that location,
+--      -- C2' is replaced by the new object.
+--      if (next_ind = obj_table_size) then
+--	 double_tables;
+--      end; -- if
+--      
+--      -- Our tables must be big enough to provide the specified location.
+--      loop until!(loc < obj_table_size);
+--	 double_tables;
+--      end; -- loop
+--      insert:INT := hash(nm);
+--      loop
+--	 if (names[insert] = 0) then
+--	    -- NOTE: The ordering of operations is important.  First the
+--	    --       old object is deleted.  (We cannot insert the new
+--	    --       object, because that will mess up the "remove_obj"
+--	    --       routine.)  Then new object is inserted.  (We cannot
+--	    --       yet re-inserted the old object because it may be
+--	    --       re-inserted into the location reserved for new object.)
+--	    tmp_ob:T := objs[loc];
+--	    
+--	    if (tmp_ob /= void) then
+--	       -- We have to move the old object (with different key) because
+--	       -- the current object MUST have this location.
+--	       remove_obj(nm);
+--	    end; -- if
+--	    objs[loc] := ob;
+--	    names[insert] := nm;
+--	    indices[insert] := loc;
+--	    if (tmp_ob /= void) then
+--	       add_unique_obj(nm, tmp_ob);
+--	    end; -- if
+--	    return;
+--	 elsif (names[insert] = nm) then
+--	    objs[indices[insert]] := ob;
+--	    return;
+--	 else
+--	    insert := (insert + 1).u_mod(names_size);
+--	 end; -- if
+--      end; -- loop
+--   end; -- add_unique_obj_at
+--
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   double_tables is
+      -- Double the size of hash table, and rehash all previously
+      -- inserted objects.
+      old_names_size:INT := names_size;
+      obj_table_size := 2 * obj_table_size;
+      names_size := 2 * names_size;
+      nnames:ARRAY{INT} := names.new(names_size);
+      nindices:ARRAY{INT} := indices.new(names_size);
+      objs := objs.extend(obj_table_size);
+      i:INT := 0;
+      loop until!(i >= old_names_size);
+	 if (names[i] > 0) then
+	    nm:INT := names[i];
+	    insert:INT := hash(nm);
+	    loop
+	       if (nnames[insert] = 0) then
+		  nnames[insert] := nm;
+		  nindices[insert] := indices[i];
+		  break!;
+	       else
+		  insert := (insert + 1).u_mod(names_size);
+	       end; -- if
+	    end; -- loop
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      names := nnames;
+      indices := nindices;
+   end; -- double_tables
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   remove_obj(nm:INT):BOOL is
+      -- Returns "true" if object exists and is removed, false otherwise
+      insert:INT := hash(nm);
+      loop
+	 if (names[insert] = 0) then
+	    return;
+	 elsif (names[insert] = nm) then
+--	    objs[indices[insert]] := C::id_ob(-1);
+	    objs[indices[insert]] := void;
+	    res := true;
+	    return;
+	 else
+	    insert := (insert + 1).u_mod(names_size);
+	 end; -- if
+      end; -- loop
+   end; -- remove_obj
+
+end; -- class HASH_TABLE
+   
+--------------------------------------------------------------------
+
+class SYMBOL_TABLE is
+   -- Symbol table associated with an actual Sather class.  The features
+   -- are stored in the first hash table, and subsequent nesting in
+   -- each subsequent hash tables.
+
+   attr in_class:CLASSOB_S;		
+      -- Class instance to which the symbol table belongs.
+   
+   attr scopes:LIST{HASH_TABLE{$SEMANTOB}};
+   attr scope_indices:LIST{INT};
+   -- Both lists are guaranteed to be non-void if we use "create" routine.
+   
+   attr curr_scope_index:INT;
+      -- Index to hash table for current scope; this value is not
+      -- stored on top of the stack.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   error_msg(s:STR) is
+      -- Print error message.
+      C::error_msg(C::str_ptr_(s));
+   end;
+		     
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   error_exit(s:STR) is
+      -- Print message and exit.
+      C::error_exit(C::str_ptr_(s));
+   end;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(sz:INT; cls:CLASSOB_S):SAME is
+      -- Create a symbol table.
+      res := new;
+      res.in_class := cls;
+      res.scopes := (LIST{HASH_TABLE{$SEMANTOB}}::create(4)).push(HASH_TABLE{$SEMANTOB}::create(20)); 
+	 -- *! Random size
+      res.curr_scope_index := 0;
+      res.scope_indices := res.scope_indices.create(20);
+	 -- *! Random size
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   add_feature(nm:INT; new_fo:$FEATOB_S) is
+      -- Add a new FEATOB_S and replace an older version by a newer one
+      if (not scope_indices.is_empty) then
+	 -- We are not dealing with the outermost level
+	 return;
+      end; -- if
+      enter_unique_sym(nm, new_fo);
+   end; -- add_feature
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   del_feature(nm:INT) is
+      -- Removes the FEATOB_S successfully removed from
+      -- table.  The table maintains the property that there is
+      -- only one feature for each name.
+      if (not scope_indices.is_empty) then
+	 -- We are not dealing with the outermost level
+	 return;
+      end; -- if
+      b:BOOL := scopes[curr_scope_index].remove_obj(nm);
+	 -- *! We might do some checking here, but ignore for now.
+   end; -- del_feature
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Mark a feature as being possibly used if it has been looked up.
+
+   get_feature(nm:INT):$SEMANTOB is
+      -- Features only occur in the first hash table.
+      res := scopes[0].get_obj(nm);
+   end; -- get_feature
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   defined_in_curr_scope_p(nm:INT):BOOL is
+      -- Returns "true" if symbol is defined in current scope.
+      res := (scopes[curr_scope_index].get_obj(nm) /= void);
+   end; -- defined_in_curr_scope_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   defined_in_all_scopes_p(nm:INT):BOOL is
+      -- Returns "true" if any of the hash tables up to the lowest
+      -- level (feature-table).
+      limit:INT;
+      if ((scope_indices.insert - 1) <= 0) then
+	 -- This means we are at the outer-most scope of the routine.  So the
+	 -- index of this outer-most scope should provide the limit beyond
+	 -- which we should NOT check.
+	 limit := curr_scope_index;
+      else
+	 -- Otherwise, the index of this outer-most scope is stored as the
+	 -- second element of the stacked scope indices.  (The first element
+	 -- is the scope for the class body.)
+	 limit := scope_indices[1];
+      end; -- if
+
+      i:INT := scopes.insert - 1;
+      loop until!(i < limit);
+	 res := (scopes[i].get_obj(nm) /= void);
+	 if (res) then
+	    return;
+	 end; -- if
+	 i := i - 1;
+      end; -- loop
+      res := (scopes[scope_indices[0]].get_obj(nm) /= void);
+   end; -- defined_in_all_scopes_p 
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   defined_in_non_outer_scopes_p(nm:INT):BOOL is
+      -- This routine checks for the given name in all scopes (whether exited or
+      -- or not) in the current routine definition.
+      
+      if (scope_indices.is_empty) then
+	 -- We are at the outermost scope.
+	 return;
+      end; -- if
+      limit:INT;
+      if ((scope_indices.insert - 1) <= 0) then
+	 -- This means we are at the outer-most scope of the routine.  So the
+	 -- index of this outer-most scope should provide the limit beyond
+	 -- which we should NOT check.
+	 limit := curr_scope_index;
+      else
+	 -- Otherwise, the index of this outer-most scope is stored as the
+	 -- second element of the stacked scope indices.  (The first element
+	 -- is the scope for the class body.)
+	 limit := scope_indices[1];
+      end; -- if
+      
+      -- Start from the latest scope pushed onto the stack.  This scope
+      -- may already have been exited, but it is one of the scopes within
+      -- the current routine.
+      i:INT := scopes.insert - 1;
+      loop until!(i < limit);
+	 res := (scopes[i].get_obj(nm) /= void);
+	 if (res) then
+	    return;
+	 end; -- if
+	 i := i - 1;
+      end; -- loop
+   end; -- defined_in_non_outer_scopes_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   enter_unique_sym(nm:INT; item:$SEMANTOB) is
+      -- Store semantic object associated with name index `nm' (uniquely).
+      scopes[curr_scope_index].add_unique_obj(nm, item);
+   end; -- enter_unique_sym
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   enter_sym(nm:INT; item:$SEMANTOB) is
+      -- Store semantic object associated with name index `nm' (non-uniquely).
+      r:BOOL := scopes[curr_scope_index].add_obj(nm, item);
+   end; -- enter_unique_sym
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_sym_curr_scope(nm:INT):$SEMANTOB is
+      -- Return object associated with `nm' in current hash table.
+      res := scopes[curr_scope_index].get_obj(nm);
+   end; -- get_sym_curr_scope
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Mark a feature as being possibly used if it has been looked up.
+   
+   get_sym(nm:INT):$SEMANTOB is
+      -- Return object associated with `nm' in any of the stack of
+      -- hash tables.
+      res := scopes[curr_scope_index].get_obj(nm);
+      if (res = void) then
+	 i:INT := scope_indices.insert - 1;
+	 loop until!(i < 0);
+	    -- Check all including the outermost scope
+	    index:INT := scope_indices[i];
+	    res := scopes[index].get_obj(nm);
+	    if (res /= void) then
+	       break!;
+	    end; -- if
+	    i := i - 1;
+	 end; -- loop
+      end; -- if
+   end; -- get_sym
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   enter_new_scope is
+      -- Push a new table and update the list of indices (`scope_indices')
+      -- that gives the current stack of hash tables.
+      scope_indices := scope_indices.push(curr_scope_index);
+      curr_scope_index := scopes.insert;
+      scopes := scopes.push(HASH_TABLE{$SEMANTOB}::create(10)); 
+	 -- *! Random size
+   end; -- enter_new_scope
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   leave_new_scope is
+      -- Pop latest hash table and update the list of indices (`scope_indices')
+      -- that gives the current stack of hash tables.
+      if (scope_indices.is_empty) then
+	 -- No previous scope to return to
+	 return;
+      end; -- if
+      curr_scope_index := scope_indices.pop;
+   end; -- leave_new_scope
+
+end; -- class SYMBOL_TABLE
+
+--------------------------------------------------------------------
+

@@ -1,0 +1,1758 @@
+-- -*- Mode: Sather;  -*-
+-- File: stmtob_s.sa
+-- Author: Chu-Cheow Lim and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+--          Oscar Bosman (oscar@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Statement nodes created during semantic phase
+--*
+--* RCS: $Id: stmtob_s.sa,v 1.1 1994/02/12 03:21:54 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 31 13:22 1993 (hws)
+--*  Oct 31 12:48 1993 (hws): switch -> case also in compiler messages!
+--*  Oct 17 05:11 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 28 05:25 1993 (hws): Sather 1 assertion syntax
+--*  Sep 28 01:13 1993 (hws): enable -info if exceptions $ dispatch
+--*  Jun 18 11:43 1993 (oscar): cprint_decln() doesn't append ";\n"
+--*                             (allows ANSI function prototypes)
+--*  Apr 19 23:41 1993 (hws): add casts for init expressions
+--*  Mar 11 1993 (clim): Fix possible dispatch cache problem in assignment
+--*                      statement.
+--*  Mar  2 12:27 1993 (hws): fix BREAK_STMTOB_S::dup to copy expression
+--*  Mar  2 02:57 1993 (hws): goto return so postcond checking works
+--*  Mar  1 13:21 1993 (hws): more uniform error msgs
+--*  Feb 21 20:36 1993 (hws): delete debug stmts
+--*  Jun 29 19:38 1992 (hws): gen temps for error expression in break.
+--*  Jun 28 16:04 1992 (hws): non-bool test in loop made compiler dump; fix ditto switch.
+--*  Mar 22 22:19 1992 (hws): base VOID init, to avoid floating exception
+--*                           on Sequent.
+--*  Nov 26 23:39 1991 (hws): integrated clim's -chk changes
+--*  Aug 27 17:38 1991 (hws): adapt to ERR_INFO signature change, lineno
+--*                for out-of-line code so sdb gets correct info.
+--* Created: Mon Jun 11 14:12:10 1990
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+-- Miscellaneous Notes
+-- -------------------
+-- We have to handle break-statement within loop in a switch branch
+-- in a special manner.  In this case, since the code in branch might
+-- be printed multiple times, we want to either print it only once
+-- ("cprint_if_form_code" in SWITCH_STMTOB_S) or generate different
+-- tags (by LOOP_STMTOB_S), each time it is printed.  Otherwise, 
+-- duplicate tags will be generated. 
+
+--------------------------------------------------------------------
+   
+class STMTOB_S is
+   -- Statement objects created during semantic phase.
+   SEMANTOB;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(ln: INT): SAME is
+      res := new;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(lineno);
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   typechk_exprs(tp:$TYPEOB_S):BOOL is
+      -- Returns "true" if all the expressions in the statement conforms to
+      -- given type; currently only relevant for WHEN_STMTOB_S.
+      res := true;
+   end; -- typechk_exprs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      -- Default is not to generate any temporaries.  There is no
+      --   guarantee of returning a list, hence the returned value
+      --   may be void.
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_goto_tags(block: $BLOCK_STMTOB_S) is
+      -- The parameter is the closest enclosing named block or loop statement.
+      -- Default is to do nothing.
+   end; -- gen_goto_tags
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   validate_dispatches_and_get_ext_strs is
+      -- The only situation where any real check is done is in 
+      -- "LVAR_DECL_STMTOB_S" where the "type_spec" is checked.
+      -- In other cases, we just recursively check the statement list
+      -- for any local variable declarations.
+      
+      -- In a similar vein, the only situation where references to 
+      -- strings (constant features in other classes) have to be
+      -- recorded are in EXPR_ARGS_EXPROB_S and TYPESPEC_ARGS_EXPROB_S.
+      
+   end; -- validate_dispatches_and_get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) is
+      -- Default is to print nothing
+   end; -- cprint_code
+
+end; -- class STMTOB_S
+   
+------------------------------------------------------------------------
+   
+class LVAR_DECL_STMTOB_S is
+   -- Local variable declaration.
+   STMTOB_S;
+   DECLOB_S;
+   -- Previously, the "validate_dispatches_and_get_ext_strs" of this class 
+   -- is inherited from "DECLOB_S" (because we only validate dispatches), 
+   -- but record external strings as well, we need to recurse down and
+   -- check the initialization expression if any.
+
+   attr name:INT;			-- Variable name index
+   attr init_expr:$EXPROB_S;		-- Initialization expression, if any
+   
+   attr suffix:INT;			-- If nonzero, add to end of name.
+   -- Computed in "remember_local" of ROUT_FEATOB_S
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:INT; tp:$TYPEOB_S; exp:$EXPROB_S; ln:INT):SAME is
+      res := new; 
+      res.name := nm;
+      res.type_spec := tp;
+      res.init_expr := exp;
+      res.lineno := ln;
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      if (init_expr /= void) then
+	 res := create(name, type_spec.dup, init_expr.dup, lineno);
+      else
+	 res := create(name, type_spec.dup, void, lineno);
+      end; -- if
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   declob_s_name:INT is
+      res := name;
+   end; -- declob_s_name
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      type_spec.resolve_predef_types(index);
+	 -- The initialization expression should not have any type
+         --   specification.
+      if (init_expr /= void) then
+	 init_expr.resolve_predef_types(index);
+      end; -- if
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      -- Perform the following checks:
+      -- a.  Redeclaration in the same scope.
+      -- Enter the local variable declaration into a list for 
+      --   routine.
+      
+      if (symtab.defined_in_non_outer_scopes_p(name)) then
+	 -- If symbol already defined, the older one is overshadowed.
+	 suffix := GLOBAL_PROC::global_key;
+      end; -- if
+      symtab.enter_sym(name, self);
+      (GLOBALS::curr_feature).remember_local(self);
+
+      if (init_expr /= void) then
+	 init_expr.semant(symtab);
+	 if (init_expr.res_type = void) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(LVAR_DECL_STMTOB_S): No return value from init expression")); 
+	 else
+	    if not (GLOBAL_PROC::conform_tst(init_expr.res_type, type_spec,
+	                                     init_expr))
+	    then
+	       -- Remedy by making the variable be of type $OB 
+	       -- and go on, but exit for the moment
+	       ERR_INFO::type_mismatch_err("local declaration","",
+	                                   init_expr.res_type,
+	                                   type_spec, lineno);
+	       
+
+	       new_type_spec:$TYPEOB_S := (GLOBALS::ob_typeob_s).copy;
+	       new_type_spec.lineno := type_spec.lineno;
+	       type_spec := new_type_spec;
+	    end; -- if
+	 end; -- if
+      end; -- if
+      
+      co:CLASSOB_S := type_spec.inst_cls;
+      if (co.c_type_updated) then
+	 (GLOBALS::curr_class_inst).internal_updated := true;
+      end; -- if
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      -- Temporaries are those generated in the initial expression if any
+      if (init_expr /= void) then
+	 res := init_expr.gen_temps;
+      end; -- if
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   validate_dispatches_and_get_ext_strs is
+      if (type_spec.is_dispatched) then
+	 if (type_spec.nonptr_p) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(LVAR_DECL_STMTOB_S): Dispatch on basic type"));
+	 end; -- if
+      end; -- if
+
+      -- The main purpose of recursing down the initialization expression
+      -- is to get references to external string (constant features in
+      -- other classes).
+      if (init_expr /= void) then
+	 init_expr.get_ext_strs;
+      end; -- if
+   end; -- validate_dispatches_and_get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_cname(outfile:SAT_OUTFILE) is
+      -- Print C name of local variable.  Append an integer suffix if
+      --   suffix is positive.
+      outfile.s((GLOBALS::str_table).at_index(name));
+      if (suffix > 0) then
+	 outfile.c('_').i(suffix).c('_');
+      else
+	 outfile.s("__");
+      end; -- if
+   end; -- cprint_cname
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_decln(outfile:SAT_OUTFILE) is
+      -- Print the local variable declaration and init.
+      type_spec.cprint_ctype(outfile); outfile.c(' ');
+      outfile.indent;
+      cprint_cname(outfile);
+      outfile.s(" = ");
+      type_spec.cprint_void(outfile);
+   end; -- cprint_decln
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_access_value(outfile:SAT_OUTFILE) is
+      cprint_cname(outfile);
+   end; -- cprint_access_value
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) is
+      -- Print initialization code for local variable
+
+      if (init_expr = void) then
+	 -- If there is no initialization, use the default initial values.
+	 outfile.indent;
+	 -- don't add to dbg table here if default initializtion
+	 cprint_cname(outfile);
+	 outfile.s(" = S_"); type_spec.cprint_ctype(outfile);
+	 outfile.s("_VOID_;\n").inc_ln(1);
+      else
+	 init_expr.cprint_pre_code(outfile);
+	 outfile.indent;
+	 if COMPILER_OPTIONS::dbg_mode = true then
+	    DBTABLE::addCLine(ERR_INFO::def_filename(lineno),
+	       ERR_INFO::def_lineno(lineno),
+	       outfile.name,outfile.line_no);
+	 end;
+	 cprint_cname(outfile);
+	 -- cast expression, e.g. S_ptr_VOID
+	 outfile.s(" = (");  type_spec.cprint_ctype(outfile);
+	 outfile.s(")");
+	 init_expr.cprint_act_code(outfile);
+	 outfile.s(";\n").inc_ln(1);
+      end;
+   end; -- cprint_code
+
+end; -- class LVAR_DECL_STMTOB_S
+
+------------------------------------------------------------------------   
+
+class ASSIGN_STMTOB_S is
+   -- Assignments.
+   STMTOB_S;
+   
+   attr lval:$EXPROB_S;		-- Left side of assignment
+   attr expr:$EXPROB_S;		-- Right side of assignment
+
+   attr temp_name:INT;
+   attr temp_ctype:INT;
+   -- Temporary locations.  These are not used to pre-evaluate the RHS
+   -- in case a thread might block (or there is a recursive call) which
+   -- mess up the dispatch-cache used for the attribute on LHS.
+   -- Updated in `gen_temps'.
+ 
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(lv:$EXPROB_S; exp:$EXPROB_S; ln:INT):SAME is
+      res := new;
+      res.lval := lv;
+      res.expr := exp;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   out_of_line(fn: STR) is
+      -- update line info to refer to original file `fn' rather
+      -- than the current context in which this construct is
+      -- used to compose code.
+      lineno := ERR_INFO::out_of_line_err_info(fn,lineno);
+      lval.out_of_line(fn);
+      expr.out_of_line(fn);
+   end;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(lval.dup, expr.dup, lineno);
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      lval.resolve_predef_types(index);
+      expr.resolve_predef_types(index);
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      GLOBALS::semant_lval := true;
+      -- This is a flag used in "semant" of EXPR_ARGS_EXPROB_S when
+      -- checking the consistency of the descendent feature definitions.
+      
+      lval.semant(symtab);
+      if (lval.res_type = void) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(ASSIGN_STMTOB_S): LHS has no known type\n"));
+	 lval.res_type := GLOBALS::ob_typeob_s;
+      end; -- if
+      GLOBALS::semant_lval := false;
+      
+	 -- Must perform semantic check before deciding if it is 
+	 --   assignable because we need to know the references.
+      if (lval.assignable_p) then
+	 expr.semant(symtab);
+	 if (expr.res_type = void) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(ASSIGN_STMTOB_S): RHS does not return value"));
+	    expr.res_type := GLOBALS::ob_typeob_s;
+	 -- Remedy by making the type be $OB and go on.
+	 else
+	    if not GLOBAL_PROC::conform_tst(expr.res_type, lval.res_type, expr)
+	    then
+	       ERR_INFO::type_mismatch_err("assignment", "", expr.res_type,
+	                                   lval.res_type, lineno);
+
+
+	       new_res_type:$TYPEOB_S := (GLOBALS::ob_typeob_s).copy;
+	       lval.res_type := new_res_type;
+	    end; -- if
+	 end; -- if
+      else
+	 -- This is serious error; we simply ignore the situation and go on.
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(ASSIGN_STMTOB_S): LHS is not assignable"));
+         expr.res_type := GLOBALS::ob_typeob_s;
+      end; -- if
+   end; -- semant
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      res := lval.gen_temps;
+      if (res /= void) then
+	 res := res.append(expr.gen_temps); 
+      else
+	 res := expr.gen_temps;
+      end; -- if
+      	 -- Cases when we have to pre-evaluate the RHS into a
+      	 -- temporary 	 -- * LHS is `<obj>.f' when `<obj>' has a
+      	 -- dispatched type 	 -- `f' can be an attribute or shared
+      	 -- -- * LHS is `<array>[...]' when `<array>' has a dispatched
+      	 -- type.  	 -- It doesn't matter whether the
+      	 -- <obj>/<array> has a near/far 	 -- pointer, because
+      	 -- in all cases, the main problem is that the RHS -- might
+      	 -- block and another thread gets executed before the cache --
+      	 -- is used.  (Or the same problem can be casued by a
+      	 -- recursive call -- that changes the cache of LHS.)  --
+	 -- All these situations can be tested by the "to_be_pre_evaluated"
+	 -- routine.
+
+      need_to_pre_eval_rhs:BOOL
+	    := (expr.to_be_pre_evaluated) and (lval.to_be_pre_evaluated);
+	       -- By using 0 vs non-0 as a marker of whether a temporary name
+	       -- has already been generated, we allow `gen_temps' to be called
+	       -- more than once.
+      if (temp_name > 0) then
+	 if (res /= void) then
+	    res := res.push(temp_name).push(temp_ctype);
+	 else 
+	    res := LIST{INT}::create(2).push(temp_name).push(temp_ctype);
+	 end; -- if
+      elsif (temp_name = 0) then
+	 if (need_to_pre_eval_rhs) then
+	    temp_name := GLOBAL_PROC::global_key;
+	    temp_ctype := expr.res_type.ctype;
+	    if (res /= void) then
+	       res := res.push(temp_name).push(temp_ctype);
+	    else
+	       res := LIST{INT}::create(2).push(temp_name).push(temp_ctype);
+	    end; -- if
+	 else
+	    temp_name := -1;
+	 end; -- if
+      end; -- if
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   validate_dispatches_and_get_ext_strs is
+      -- We do not need to check type dispatches in an assignment statement.
+      -- The only thing to do is to get references to external strings.
+      
+      lval.get_ext_strs;
+      
+      -- Intuitively, this should be not necessary, because the only
+      -- external string references are constant features and these are
+      -- not assignable.
+      expr.get_ext_strs;
+   end; -- validate_dispatches_and_get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) is
+      expr.cprint_pre_code(outfile);
+      if (temp_name > 0) then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(" = ");
+	 expr.cprint_act_code(outfile);
+	 outfile.s(";\n").inc_ln(1);
+      end; -- if
+      lval.cprint_pre_code(outfile);
+      outfile.indent;
+      if COMPILER_OPTIONS::dbg_mode = true then
+	 DBTABLE::addCLine(ERR_INFO::def_filename(lineno),
+	    ERR_INFO::def_lineno(lineno),
+	    outfile.name,outfile.line_no);
+      end;
+      if (temp_name > 0) then
+	 lval.cprint_act_code(outfile);
+	 outfile.s(" = ");
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(";\n").inc_ln(1);
+      else
+	 lval.cprint_act_code(outfile);
+	 outfile.s(" = ("); lval.res_type.cprint_ctype(outfile);
+	 outfile.s(")");
+	 expr.cprint_act_code(outfile);
+	 outfile.s(";\n").inc_ln(1);
+      end;
+   end; -- cprint_code
+
+end; -- class ASSIGN_STMTOB_S
+   
+------------------------------------------------------------------------   
+   
+class COND_STMTOB_S is
+   -- Conditionals.
+   STMTOB_S;
+   
+   attr test:$EXPROB_S;		-- Boolean test.
+   attr then_part:LST_STMTOB_S;	-- List of statements in then-clause.
+      -- This value is guaranteed to be non-void.
+
+   attr elsif_part:LST_STMTOB_S;	
+      -- Elsif clauses, if any.  This should contain only ELSIF_STMTOB_S's.
+      -- This value is guaranteed to be non-void.
+   
+   attr else_part:LST_STMTOB_S;        -- List of statements in else-clause, if any.
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(t:$EXPROB_S; tp:LST_STMTOB_S; eip:LST_STMTOB_S; ep:LST_STMTOB_S;
+          ln:INT): SAME is
+      res := new;
+      res.test := t;
+      res.then_part := tp;
+      res.elsif_part := eip;
+      res.else_part := ep;
+      res.lineno := ln;	     
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      if (else_part /= void) then
+	 res := create(test.dup, then_part.dup, elsif_part.dup, else_part.dup,
+                    lineno);
+      else
+	 res := create(test.dup, then_part.dup, elsif_part.dup, void,
+                    lineno);
+      end; -- if
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      test.resolve_predef_types(index);
+      then_part.resolve_predef_types(index);
+      elsif_part.resolve_predef_types(index);
+      if (else_part /= void) then
+	 else_part.resolve_predef_types(index);
+      end; -- if
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      test.semant(symtab);
+      if (test.res_type = void) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+		   STR::create.s("(COND_STMTOB_S): Test in \"if\" has no return type"));
+	 test.res_type := (GLOBALS::bool_typeob_s).copy;
+	 test.res_type.lineno := lineno;
+      end; -- if
+      if not test.res_type.bool_type_p then
+	 ERR_INFO::format_error_exit(
+	           lineno,
+	           STR::create.s("(COND_STMTOB_S): Test in \"if\" statement should return BOOL value"));
+	 test.res_type := (GLOBALS::bool_typeob_s).copy;
+      end; -- if
+      
+      symtab.enter_new_scope;
+      then_part.semant(symtab);
+      symtab.leave_new_scope;
+      elsif_part.semant(symtab);
+      
+      if (else_part /= void) then
+	 symtab.enter_new_scope;
+	 else_part.semant(symtab);
+	 symtab.leave_new_scope;
+      end; -- if
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      res := test.gen_temps;
+      if (res /= void) then
+	 res := res.append(then_part.gen_temps); 
+      else
+	 res := then_part.gen_temps;
+      end; -- if
+      if (res /= void) then
+	 res := res.append(elsif_part.gen_temps);
+      else
+	 res := elsif_part.gen_temps;
+      end; -- if
+      if (else_part /= void) then
+	 if (res /= void) then
+	    res := res.append(else_part.gen_temps);
+	 else
+	    res := else_part.gen_temps;
+	 end; -- if
+      else			-- "else_part" is void
+      end; -- if
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_goto_tags(block: $BLOCK_STMTOB_S) is
+      then_part.gen_goto_tags(block);
+      elsif_part.gen_goto_tags(block);
+      if (else_part /= void) then
+	 else_part.gen_goto_tags(block);
+      end; -- if
+   end; -- gen_goto_tags
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   validate_dispatches_and_get_ext_strs is
+      then_part.validate_dispatches_and_get_ext_strs;
+      elsif_part.validate_dispatches_and_get_ext_strs;
+      if (else_part /= void) then
+	 else_part.validate_dispatches_and_get_ext_strs;
+      end; -- if
+
+      -- We record any external string references in the test condition.
+      test.get_ext_strs;
+   end; -- validate_dispatches_and_get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_elsif_code(outfile:SAT_OUTFILE; level:INT) is
+      outfile.indent.
+              s("else {\n").inc_ln(1);
+      if (level = elsif_part.insert) then
+	 if (else_part /= void) then
+	    outfile.ind_inc;
+	    else_part.cprint_code(outfile);
+	    outfile.ind_dec;
+	 end; -- if
+      else
+	 outfile.ind_inc;
+	 elsif_part[level].cprint_code(outfile);
+	 cprint_elsif_code(outfile, level+1);
+	 outfile.ind_dec;
+      end; -- if
+      outfile.indent.
+              s("}\n").inc_ln(1);
+   end; -- cprint_elsif_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) is
+      test.cprint_pre_code(outfile);
+
+      if COMPILER_OPTIONS::dbg_mode = true then
+	 -- line for before the "if"
+	 DBTABLE::addCLine(ERR_INFO::def_filename(lineno),
+	    ERR_INFO::def_lineno(lineno),
+	    outfile.name,outfile.line_no);
+      end;
+      outfile.indent.
+              s("if (");
+      test.cprint_act_code(outfile);
+      outfile.s(") {\n").inc_ln(1);
+
+      -- Print the "then" part of "if" statement
+      outfile.ind_inc;
+      then_part.cprint_code(outfile);
+      outfile.ind_dec.
+              indent.
+              s("}\n").inc_ln(1);
+      
+      -- Print the "elsif" part, if any.  (Because of tree construction in
+      --  the parser, the "elsif_part" is never void.)
+      cprint_elsif_code(outfile, 0);
+      
+   end; -- cprint_code
+
+end; -- class COND_STMTOB_S
+
+------------------------------------------------------------------------
+
+class EXCEPT_STMTOB_S is
+   -- An except clause.
+   
+   STMTOB_S;
+   
+   attr norm_part, except_part: LST_STMTOB_S; -- normal and exceptional
+      -- a `void' except_part indicates a degenerate construct with no handlers.
+
+   attr exc_decl: LST_STMTOB_S;	-- identifier and type
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(norm, hdlr, exc: LST_STMTOB_S; ln: INT):SAME is
+      res := new;
+      res.exc_decl := exc;
+      res.norm_part := norm;
+      res.except_part := hdlr;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      if except_part = void then
+	 res := create(norm_part.dup,void,void,lineno);
+      else 
+	 res := create(norm_part.dup,except_part.dup,
+		   exc_decl.dup,lineno);
+      end;
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      norm_part.resolve_predef_types(index);
+      if  except_part /= void then
+	 exc_decl.resolve_predef_types(index);
+	 except_part.resolve_predef_types(index);
+      end;
+   end; -- resolve_predef_types
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      norm_part.semant(symtab);
+      
+      if except_part /= void then
+	 -- The exception part is the scope of the error variable.
+	 symtab.enter_new_scope;
+
+	 exc_decl.semant(symtab);
+	 exc: LVAR_DECL_STMTOB_S := exc_decl[0];
+	 typ: $TYPEOB_S := exc.type_spec;
+      
+	 if not (typ = void) then
+	    if not typ.conforms_to(GLOBALS::ob_typeob_s) then
+	       ERR_INFO::format_error_msg(
+		  typ.lineno,
+		  STR::create.s("(EXCEPT_STMTOB_S): Exception type must be an object type."));
+	    end;
+	 end;
+      
+	 except_part.semant(symtab);
+      
+	 symtab.leave_new_scope;
+      end; -- if
+   end; -- semant
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      res := norm_part.gen_temps;
+      if except_part /= void then
+	 if (res /= void) then
+	    res := res.append(exc_decl.gen_temps);      
+	 else
+	    res := exc_decl.gen_temps;
+	 end;
+	 if (res /= void) then
+	    res := res.append(except_part.gen_temps);      
+	 else
+	    res := except_part.gen_temps;
+	 end;
+      end;
+   end;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_goto_tags(block: $BLOCK_STMTOB_S) is
+      norm_part.gen_goto_tags(block);
+      if except_part /= void then
+	 except_part.gen_goto_tags(block);
+      end;
+   end; -- gen_goto_tags
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   validate_dispatches_and_get_ext_strs is
+      norm_part.validate_dispatches_and_get_ext_strs;
+       if except_part /= void then
+	  except_part.validate_dispatches_and_get_ext_strs;
+       end;
+   end; -- validate_dispatches_and_get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) is
+      if except_part = void then
+	 norm_part.cprint_code(outfile);
+      else 
+	 err: LVAR_DECL_STMTOB_S := exc_decl[0];
+	 typ: $TYPEOB_S := err.type_spec;
+	 
+	 outfile.s("EH_CATCH (\n").inc_ln(1);
+	 outfile.ind_inc.indent;
+	    -- type code
+	 if typ.is_dispatched then
+	    if not GLOBALS::print_feat_info then
+	       -- switch it on and don't bother user
+	       GLOBALS::print_feat_info := true;
+--	    ERR_INFO::format_warning_msg(
+--	       typ.lineno,
+--	       STR::create.s("(EXCEPT_STMTOB_S): `except' with dispatched type requires runtime type info (-info)."));
+	    end;
+	    outfile.c('-');
+	 end;
+	 outfile.i(typ.inst_ind); outfile.c(',');
+	 err.cprint_cname(outfile); outfile.s(", {\n").inc_ln(1);
+	 outfile.indent;
+	 err.cprint_decln(outfile);
+	 outfile.s(";\n").inc_ln(1);
+	    -- normal code
+	 outfile.indent; norm_part.cprint_code(outfile);
+	 outfile.s("\n").inc_ln(1);
+	 outfile.indent.s("},{\n").inc_ln(1);
+	    -- handler code, but first make sure we resume current -chk exec info
+	 if (GLOBAL_PROC::check_is_on) then
+	    outfile.indent.s("CATCH_EXEC_INFO_;\n").inc_ln(1);
+	 end;
+
+	 except_part.cprint_code(outfile);
+	 outfile.ind_dec;
+
+	 outfile.indent.s("});").indent;
+      end; -- if
+   end; -- cprint_code
+
+end; -- class EXCEPT_STMTOB_S
+
+------------------------------------------------------------------------
+
+class ELSIF_STMTOB_S is
+   -- An elsif clause.
+   STMTOB_S;
+   
+   attr test:$EXPROB_S;
+   attr then_part:LST_STMTOB_S;	-- List of statements in then-clause.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(t:$EXPROB_S; tp:LST_STMTOB_S; ln:INT):SAME is
+      res := new;
+      res.test := t;
+      res.then_part := tp;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(test.dup, then_part.dup, lineno);
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      test.resolve_predef_types(index);
+      then_part.resolve_predef_types(index);
+   end; -- resolve_predef_types
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   validate_dispatches_and_get_ext_strs is
+      then_part.validate_dispatches_and_get_ext_strs;
+
+      -- We record any external string references in the test condition.
+      test.get_ext_strs;
+   end; -- validate_dispatches_and_get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      test.semant(symtab);
+      if (test.res_type = void) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+		   STR::create.s("(ELSIF_STMTOB_S): Test in \"elsif\" has no return type"));
+	 test.res_type := (GLOBALS::bool_typeob_s).copy;
+	 test.res_type.lineno := lineno;
+      end; -- if
+      if not test.res_type.bool_type_p then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(ELSIF_STMTOB_S): Test in \"elsif\" statement should return BOOL value"));
+	 test.res_type := (GLOBALS::bool_typeob_s).copy;
+      end; -- if
+      
+      symtab.enter_new_scope;
+      then_part.semant(symtab);
+      symtab.leave_new_scope;
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      res := test.gen_temps;
+      if (res /= void) then
+	 res := res.append(then_part.gen_temps);
+      else
+	 res := then_part.gen_temps;
+      end; -- if
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_goto_tags(block: $BLOCK_STMTOB_S) is
+      then_part.gen_goto_tags(block);
+   end; -- gen_goto_tags
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) is
+      test.cprint_pre_code(outfile);
+      if COMPILER_OPTIONS::dbg_mode = true then
+	 -- line for just before the "if"
+	 DBTABLE::addCLine(ERR_INFO::def_filename(lineno),
+	    ERR_INFO::def_lineno(lineno),
+	    outfile.name,outfile.line_no);
+      end;
+      outfile.indent.
+              s("if (");
+      test.cprint_act_code(outfile);
+      outfile.s(") {\n").
+              ind_inc.inc_ln(1);
+      then_part.cprint_code(outfile);
+      outfile.ind_dec.
+              indent.
+              s("}\n").inc_ln(1);
+   end; -- cprint_code
+
+end; -- class ELSIF_STMTOB_S
+
+--------------------------------------------------------------------
+class BLOCK_STMTOB_S is
+
+   attr goto_tag:INT;		-- >0 for break tag called goto_tag_12_
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_goto_tag:INT is
+      if not (goto_tag > 0) then
+	 goto_tag := GLOBAL_PROC::global_key;
+      end; -- if
+      res := goto_tag;
+   end; -- get_goto_tag
+
+end;
+
+------------------------------------------------------------------------
+
+class LOOP_STMTOB_S is
+   -- Loops.
+   STMTOB_S;
+   BLOCK_STMTOB_S;
+
+   attr test:$EXPROB_S;		-- Termination test, if any.
+   attr stmts:LST_STMTOB_S;		-- Body of loop.
+   
+-- Computed during semantic check
+   attr printed:INT;			-- Number of times code is generated.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(t:$EXPROB_S; s:LST_STMTOB_S; ln:INT):SAME is
+      res := new;
+      res.test := t;
+      res.stmts := s;
+      res.lineno := ln;
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      if (test /= void) then
+	 res := create(test.dup, stmts.dup, lineno);
+      else
+	 res := create(void, stmts.dup, lineno);
+      end; -- if
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      if (test /= void) then
+	 test.resolve_predef_types(index);
+      end; -- if
+      stmts.resolve_predef_types(index);
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      if (test /= void) then
+	 test.semant(symtab);
+	 if (test.res_type = void) then
+	    ERR_INFO::format_error_msg(
+	       lineno,
+	       STR::create.s("(LOOP_STMTOB_S): Test in \"loop\" has no return type"));
+	    test.res_type := (GLOBALS::bool_typeob_s).copy;
+	    test.res_type.lineno := lineno;
+	 end;
+	 if not test.res_type.bool_type_p then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(LOOP_STMTOB_S): Test in \"loop\" statement should return a BOOL value"));
+	    test.res_type := (GLOBALS::bool_typeob_s).copy;
+	 end; -- if
+      end; -- if
+
+      symtab.enter_new_scope;
+      stmts.semant(symtab);
+      symtab.leave_new_scope;
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      if (test /= void) then
+	 res := test.gen_temps;
+      end; -- if
+      if (res /= void) then
+	 res := res.append(stmts.gen_temps);
+      else
+	 res := stmts.gen_temps;
+      end; -- if
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_goto_tags(block: $BLOCK_STMTOB_S) is
+      stmts.gen_goto_tags(self); 
+   end; -- gen_goto_tags
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   validate_dispatches_and_get_ext_strs is
+      stmts.validate_dispatches_and_get_ext_strs;
+
+      -- We record any external string references in the test condition.
+      if (test /= void) then
+	 test.get_ext_strs;
+      end; -- if
+   end; -- validate_dispatches_and_get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) is
+      old_g_tag:INT := GLOBALS::g_tag;
+      if (printed > 0) then
+	 GLOBALS::g_tag := printed;
+      end; -- if
+      
+      if COMPILER_OPTIONS::dbg_mode = true then
+	 -- lineno at end of C while since LOOP_STMTOB_S's lineno seems
+	 -- to be at the end of the Sather loop block.
+	 DBTABLE::addCLine(ERR_INFO::def_filename(lineno),
+	    ERR_INFO::def_lineno(lineno),
+	    outfile.name,outfile.line_no);
+      end;
+
+      outfile.indent.
+              s("while (1) {\n").inc_ln(1);
+
+      if (test /= void) then
+	 outfile.ind_inc;
+	 test.cprint_pre_code(outfile);
+	 -- don't but in line no printing here since this C code
+	 -- corresponds to the sather code in an "until" statement.
+	 outfile.indent.
+	         s("if (");
+	 test.cprint_act_code(outfile);
+	 outfile.s(") break;\n").inc_ln(1).
+	         ind_dec;
+      end; -- if
+
+      outfile.ind_inc;
+      stmts.cprint_code(outfile);
+      outfile.ind_dec.
+              indent.
+              s("}\n").inc_ln(1);
+
+      -- Goto tag if there is any "break" statement in the loop
+      if (goto_tag > 0) then 
+	 outfile.ind_dec.
+	         indent.
+	         ind_inc;
+	 GLOBAL_PROC::cprint_goto_tag(goto_tag, outfile);
+	 outfile.s(": ;\n").inc_ln(1);
+      end; -- if
+      
+      GLOBALS::g_tag := old_g_tag;
+      printed := printed + 1;
+   end; -- cprint_code
+
+end; -- class LOOP_STMTOB_S
+
+------------------------------------------------------------------------
+
+class SWITCH_STMTOB_S is
+   -- Switch statements.
+   STMTOB_S;
+   
+   attr test:$EXPROB_S;
+   attr when_part:LST_WHEN_STMTOB_S;	
+      -- List of when clauses.  The objects should all be "WHEN_STMTOB_S"'s.
+      -- The value is guaranteed to be non-void.
+   attr else_part:LST_STMTOB_S;	
+      -- List of statements at end, if any.
+   
+   attr all_consts_p:BOOL;
+      -- "true" if all the expressions in when-clauses are integers and
+      -- constants; otherwise, we need to allocate temporary variable to
+      -- hold the value of "test".
+   attr temp_name:INT;
+   attr temp_ctype:INT;
+   
+   -- This tag is needed if the case statement is generated using C 
+   -- if-statement.  The problem occurs when we have:
+   -- case ...
+   -- when a1,a2,a3 then
+   --     loop until!(c1);
+   --        S...; break;
+   --     end;
+   -- ...
+   -- In the previous case, the loop-statement will be generated 3 times
+   -- but there will be a problem of the loop-tag being printed 3 times.
+   -- Hence the alternative is to generate the following code:
+   --    if (a1 == ...) goto tag_1;
+   --    else if (a2 == ...) goto tag_1;
+   --    ...
+   --    goto end_tag_;
+   -- tag_1:  
+   --    <loop-statement>
+   --    goto end_tag_;
+   -- tag_2:
+   --    ....
+   --    goto end_tag_1;
+   -- end_tag_1:
+   --
+   -- NOTE:
+   -- This only handles the case when the type of value is non-integer
+   -- and non-character.  For the integer/character case, when printing
+   -- the default branch, if a statement is printed multiple times (in
+   -- particular the loop statement, the generated tags are different 
+   -- using the global variable "g_tag").
+   attr tag:INT;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(t:$EXPROB_S; wp:LST_WHEN_STMTOB_S; ep:LST_STMTOB_S; ln:INT):SAME is
+      res := new;
+      res.test := t;
+      res.when_part := wp;
+      res.else_part := ep;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      if (else_part /= void) then
+	 res := create(test.dup, when_part.dup, else_part.dup, lineno);
+      else
+	 res := create(test.dup, when_part.dup, void, lineno);
+      end; -- if
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      test.resolve_predef_types(index);
+      when_part.resolve_predef_types(index);
+      if (else_part /= void) then
+	 else_part.resolve_predef_types(index);
+      end; -- if
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      test.semant(symtab);
+      if (test.res_type = void) then
+	 ERR_INFO::format_error_msg(
+	    lineno,
+	    STR::create.s("(SWITCH_STMTOB_S): Test in \"case\" has no return type"));
+	 test.res_type := (GLOBALS::bool_typeob_s).copy;
+	 test.res_type.lineno := lineno;
+      end;
+      -- We allow any type in the case statement as long as it matches 
+      -- with the type of the expressions.
+      when_part.semant(symtab);
+      i:INT := 0;
+      wsz:INT := when_part.insert;
+      loop until!(i >= wsz);
+	 w_stmt:WHEN_STMTOB_S := when_part[i];
+	 if not w_stmt.typechk_exprs(test.res_type) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(SWITCH_STMTOB_S): Type mismatch in \"case\" statement"));
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      
+      if (else_part/= void) then
+	 symtab.enter_new_scope;
+	 else_part.semant(symtab);
+	 symtab.leave_new_scope;
+      end; -- if
+      
+      -- If all tests for the when-clauses are constants, we flag it
+      -- and do not need to generate any temporary variables to store
+      -- the test value.
+      i := 0;
+      all_consts_p := true;
+      loop until!(i >= wsz);
+	 all_consts_p := (when_part[i].all_consts_p) and all_consts_p;
+	 i := i + 1;
+      end; -- loop
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      res := test.gen_temps;
+      if (not all_consts_p) then
+	 if (temp_name <= 0) then
+	    temp_name := GLOBAL_PROC::global_key;
+	    temp_ctype := test.res_type.ctype;
+	    if (res /= void) then
+	       res := res.push(temp_name).push(temp_ctype);
+	    else
+	       res := LIST{INT}::create(2).push(temp_name).push(temp_ctype);
+	    end; -- if
+	 else
+	    res := LIST{INT}::create(2).push(temp_name).push(temp_ctype);
+	 end; -- if
+      end; -- if 
+      if (res /= void) then
+	 res := res.append(when_part.gen_temps);
+      else
+	 res := when_part.gen_temps;
+      end; -- if
+      if (else_part /= void) then
+	 if (res /= void) then
+	    res := res.append(else_part.gen_temps);
+	 else
+	    res := else_part.gen_temps;
+	 end;
+      else			-- If "else_part" is void, do nothing
+      end; -- if
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_goto_tags(block: $BLOCK_STMTOB_S) is
+      when_part.gen_goto_tags(block);
+      if (else_part /= void) then
+	 else_part.gen_goto_tags(block);
+      end; -- if
+   end; -- gen_goto_tags
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   validate_dispatches_and_get_ext_strs is
+      when_part.validate_dispatches_and_get_ext_strs;
+      if (else_part /= void) then
+	 else_part.validate_dispatches_and_get_ext_strs;
+      end; -- if
+
+      -- We record any external string references in the test condition.
+      test.get_ext_strs;
+   end; -- validate_dispatches_and_get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private cprint_if_form_code(outfile:SAT_OUTFILE; i,j:INT) is
+      -- This is purely for private use, to print the whole case statement
+      -- as a large if-statement.  Print the code for the "i"th WHEN_STMTOB_S
+      -- and "j"th expression with the when-clause.
+      if (i = when_part.insert) then
+	if (else_part /= void) then
+	   else_part.cprint_code(outfile);
+	else
+	   outfile.indent;
+	   outfile.s(";\n").inc_ln(1);
+	end; -- if
+      else			-- Otherwise, "i < when_part.ins" holds
+	 -- The "exprs" attribute of WHEN_STMTOB_S is guaranteed to be 
+	 -- non-void from parse-tree construction.
+	 if (j = when_part[i].exprs.insert) then
+	    cprint_if_form_code(outfile, i + 1, 0);
+	 else			-- Otherwise, "j < when_part[i].exprs.ins" 
+	    when_part[i].exprs[j].cprint_pre_code(outfile);
+	    if COMPILER_OPTIONS::dbg_mode = true then
+	       -- line of "when" thats translated to a C if
+	       DBTABLE::addCLine(ERR_INFO::def_filename(lineno),
+		  ERR_INFO::def_lineno(lineno),
+		  outfile.name,outfile.line_no);
+	    end;
+	    outfile.indent.
+	            s("if (");
+	    when_part[i].exprs[j].cprint_act_code(outfile);
+	    outfile.s(" == ");
+	    GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	    outfile.s(") {\n").
+	            ind_inc.inc_ln(1);
+	       -- Old and incorrect format
+	    outfile.s("goto goto_tag_").i(tag).c('_').i(i).s("_;\n").inc_ln(1).
+	            ind_dec.
+	            indent.
+	            s("}\n").inc_ln(1).
+	            indent.
+	            s("else {\n").inc_ln(1).
+	            ind_inc;
+	    cprint_if_form_code(outfile, i, j + 1);
+	    outfile.ind_dec.
+	            indent.
+	            s("}\n").inc_ln(1);
+	 end; -- if
+      end; -- if
+   end; -- cprint_if_form_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_then_parts_code(outfile:SAT_OUTFILE) is
+      i:INT := 0;
+      wsz:INT := when_part.insert;
+      loop until!(i >= wsz);
+	 outfile.s("goto_tag_").i(tag).c('_').i(i).s("_: ;\n").
+	         ind_inc.inc_ln(1);
+	 when_part[i].then_part.cprint_code(outfile);
+	 outfile.indent.
+	         s("goto goto_tag_").i(tag).s("_;\n").inc_ln(1);
+	 i := i + 1;
+	 outfile.ind_dec;
+      end; -- loop
+   end; -- cprint_then_parts_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_default_code(outfile:SAT_OUTFILE; i, j:INT) is
+      -- Print the code for the "i"th WHEN_STMTOB_S, and "j"th expression
+      -- within the when-clause.
+      if (i = when_part.insert) then
+	 if (else_part /= void) then
+	    else_part.cprint_code(outfile);
+	 else
+	    outfile.indent.
+	            s(";\n").inc_ln(1);
+	 end; -- if
+      else			-- Otherwise, "i < when_part.ins" holds
+	 if (j = when_part[i].exprs.insert) then
+	    cprint_default_code(outfile, i + 1, 0);
+	 else	
+	    -- Otherwise, "j < when_part[i].exprs.ins" holds
+	    if (when_part[i].const_exprs[j] = void) then
+	       when_part[i].exprs[j].cprint_pre_code(outfile);
+	       if COMPILER_OPTIONS::dbg_mode = true then
+		  DBTABLE::addCLine(ERR_INFO::def_filename(lineno),
+		     ERR_INFO::def_lineno(lineno),
+		     outfile.name,outfile.line_no);
+	       end;
+	       outfile.indent.
+	               s("if (");
+	       when_part[i].exprs[j].cprint_act_code(outfile);
+	       outfile.s(" == ");
+	       GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	       outfile.s(") {\n").inc_ln(1).
+	               ind_inc;
+	       when_part[i].then_part.cprint_code(outfile);
+	       outfile.ind_dec.
+	               indent.
+	               s("}\n").inc_ln(1).
+	               indent.
+	               s("else {\n").inc_ln(1).
+	               ind_inc;
+	       cprint_default_code(outfile, i, j + 1);
+	       outfile.ind_dec.
+	               indent.
+	               s("}\n").inc_ln(1);
+	    else
+	       cprint_default_code(outfile, i, j + 1);
+	    end; -- if
+	 end; -- if
+      end; -- if
+   end; -- cprint_default_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private cprint_caseform_code(outfile:SAT_OUTFILE) is
+      -- This is purely for private use, to print the case-statements
+      -- in a C-switch statement.
+      i:INT := 0;
+      wsz:INT := when_part.insert;
+      loop until!(i >= wsz);
+	 when_part[i].cprint_case_code(outfile);
+	 i := i + 1;
+      end; -- loop
+      outfile.indent;
+      outfile.s("default:\n").inc_ln(1);
+      outfile.ind_inc;
+      cprint_default_code(outfile, 0, 0); 
+      -- Throw in an extra ';' just in case there is no code for default-case.
+      outfile.indent;
+      outfile.s(";\n").inc_ln(1);
+      outfile.ind_dec;
+   end; -- cprint_caseform_code
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) pre test.res_type /= void is
+      if ((test.res_type.int_type_p) or (test.res_type.char_type_p)) then
+	 -- These are the types required in order to generate C-switch 
+	 -- statements.  These type-checks must match those done in "semant"
+	 -- of WHEN_STMTOB_S.
+	 
+	 -- C switch statements require all the expressions to be
+	 -- constant.  In the "semant"/"misc_info" phase, we have 
+	 -- resolved referrents and checked the type of the expressions 
+	 -- before deciding if they are constants.
+	
+	 -- If the test is an integer, then for expressions (in the "when"
+	 -- clauses) which are constants, we use the C-switch statement,
+	 -- and generate the rest in the "default" branch.
+	 test.cprint_pre_code(outfile);
+	 if COMPILER_OPTIONS::dbg_mode = true then
+	    -- line for beginning of switch whether or not we have a const.
+	    DBTABLE::addCLine(ERR_INFO::def_filename(lineno),
+	       ERR_INFO::def_lineno(lineno),
+	       outfile.name,outfile.line_no);
+	 end;
+	 if (all_consts_p) and (temp_name = 0) then
+	    outfile.indent.
+	            s("switch (");
+	    test.cprint_act_code(outfile);
+	    outfile.s(") {\n").inc_ln(1);
+	 else
+	    outfile.indent;
+	    GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	    outfile.s("= ");
+	    test.cprint_act_code(outfile);
+	    outfile.s(";\n").inc_ln(1).
+	            indent.
+	            s("switch (");
+	    GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	    outfile.s(") {\n").inc_ln(1);
+	 end; -- if
+	 outfile.ind_inc;
+	 cprint_caseform_code(outfile);
+	 outfile.ind_dec.
+	         indent.
+	         s("}\n").inc_ln(1);
+      else
+	 test.cprint_pre_code(outfile);
+	 outfile.indent;
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(" = ");
+	 test.cprint_act_code(outfile);
+	 outfile.s(";\n").inc_ln(1);
+	 tag := GLOBAL_PROC::global_key;
+	 cprint_if_form_code(outfile, 0, 0);
+	 outfile.indent.
+	         s("goto goto_tag_").i(tag).s("_;\n").inc_ln(1);
+
+	 -- Now print all the then-part of the case-statement, but do not
+	 -- print the else-part because this is handled in 
+	 -- "cprint_if_form_code".
+	 cprint_then_parts_code(outfile);
+	 outfile.indent.
+	         s("goto_tag_").i(tag).s("_: ;\n").inc_ln(1);
+      end;
+   end; -- cprint_code
+
+end; -- class SWITCH_STMTOB_S
+
+------------------------------------------------------------------------
+
+class WHEN_STMTOB_S is
+   -- When clauses in case statments.
+   STMTOB_S;
+
+   attr exprs:LST_EXPROB_S;		-- List of values to match.     
+   attr then_part:LST_STMTOB_S;	-- Statements to execute otherwise
+      -- The values of "exprs" and "then_part" are guaranteed to be non-void
+      --   even though the list may be empty.
+
+   attr const_exprs:LST_EXPROB_S;
+      -- "const_exprs[i]" contains the constant expression for the 
+      -- correponding "exprs[i]"
+   attr all_consts_p:BOOL;
+      -- "true" if all the expressions are integers and constants.  Both are
+      -- computed in "semant"
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(e:LST_EXPROB_S; t:LST_STMTOB_S; ln:INT):SAME is
+      res := new;
+      res.exprs := e;
+      res.then_part := t;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(exprs.dup, then_part.dup, lineno);
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      exprs.resolve_predef_types(index);
+      then_part.resolve_predef_types(index);
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   typechk_exprs(tp:$TYPEOB_S):BOOL is
+      i:INT := 0;
+      esz:INT := exprs.insert;
+      res := true;
+      loop until!(i >= esz);
+	 if (exprs[i].res_type = void) then
+	    ERR_INFO::compiler_error_msg("WHEN_STMTOB_S",
+	    "Type of \"when\" expressions unknown");
+	 else
+	    if not GLOBAL_PROC::conform_tst(exprs[i].res_type, tp, exprs[i])
+	    then
+	       ERR_INFO::type_mismatch_err("when", "", exprs[i].res_type,
+	                                   tp, lineno);
+
+	       res := false;
+	       exprs[i].res_type := tp;
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- typechk_exprs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      exprs.semant(symtab);
+      i:INT := 0;
+      esz:INT := exprs.insert;
+      const_exprs := LST_EXPROB_S::create(esz);
+      all_consts_p := true;
+      loop until!(i >= esz);
+	 const_exprs[i] := exprs[i].expr_eval_constant;
+	 if (const_exprs[i] /= void) then
+	    etype:$TYPEOB_S := const_exprs[i].res_type;
+	    if not (etype.int_type_p or etype.char_type_p) then
+	       -- Only keep the constant expressions for integers or characters.
+	       const_exprs[i] := void;
+	    end; -- if
+	 end; -- if
+	 all_consts_p := all_consts_p and (const_exprs[i] /= void);
+	 i := i + 1;
+      end; -- loop
+      symtab.enter_new_scope;
+      then_part.semant(symtab);
+      symtab.leave_new_scope;
+   end; -- semant
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      res := exprs.gen_temps;
+      if (res /= void) then
+	 res := res.append(then_part.gen_temps);
+      else
+	 res := then_part.gen_temps;
+      end; -- if
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_goto_tags(block: $BLOCK_STMTOB_S) is
+      then_part.gen_goto_tags(block);
+   end; -- gen_goto_tags
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   validate_dispatches_and_get_ext_strs is
+      then_part.validate_dispatches_and_get_ext_strs;
+
+      -- We record any external string references in the list of values
+      -- in when-statement.
+      exprs.get_ext_strs;
+   end; -- validate_dispatches_and_get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) is
+      -- WHEN_STMOB_S's are under the control of SWITCH_STMTOB_S, and
+      -- so will either print themselves as case-statements or if-statements.
+      -- When asked to printed out as case-statements, only those expressions
+      -- with integer constants are printed; otherwise, the printing depends
+      -- on SWITCH_STMTOB_S.
+   end; -- cprint_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_case_code(outfile:SAT_OUTFILE) is
+      i:INT := 0;
+      esz:INT := exprs.insert;
+      case_printed:BOOL;
+
+      -- Print the C "case" expressions
+      loop until!(i >= esz);
+	 if (const_exprs[i] /= void) then
+	    outfile.indent;
+	    if COMPILER_OPTIONS::dbg_mode = true then
+	       DBTABLE::addCLine(ERR_INFO::def_filename(lineno),
+		  ERR_INFO::def_lineno(lineno),
+		  outfile.name,outfile.line_no);
+	    end;
+	    outfile.s("case (");
+	    const_exprs[i].cprint_act_code(outfile);
+	    outfile.s(") :\n").inc_ln(1);
+	    case_printed := true;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      
+      -- Print statements following "case" expressions
+      if (case_printed) then
+	 outfile.ind_inc;
+	 then_part.cprint_code(outfile);
+	 outfile.indent.
+	         ind_dec.
+	         s("break;\n").inc_ln(1);
+      end; -- if
+   end; -- cprint_case_code
+
+end; -- class WHEN_STMTOB_S
+
+------------------------------------------------------------------------
+
+class BREAK_STMTOB_S is
+   -- Break statements.
+   STMTOB_S;
+   
+-- Computed during semantic check
+   attr tag:INT;			-- This is > 0 if goto tag
+   attr expr: $EXPROB_S;             -- Exception value to pass on
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(lineno);
+      if expr/=void then res.expr := expr end;
+   end; -- dup
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      if expr/=void then expr.resolve_predef_types(index) end;
+   end; -- resolve_predef_types
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      -- Find referrent of symbols, from the given symbol table.
+      if expr /= void then
+	 expr.semant(symtab);
+	 et: INSTANT_TYPEOB_S := expr.res_type;
+	 if (et = void) then
+	    ERR_INFO::format_error_msg(
+	       lineno,
+	       STR::create.s("(BREAK_STMTOB_S): Expression does not return value"));
+		  -- Remedy by making the type be $OB and go on.
+	    expr.res_type := GLOBALS::ob_typeob_s;
+	 elsif not (et.conforms_to(GLOBALS::ob_typeob_s)) then
+	    ERR_INFO::format_error_msg(
+	       lineno,
+	       STR::create
+		     .s("(BREAK_STMTOB_S): Expression does not return object type value"));
+	 end;
+      end;
+   end; -- semant
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   
+   gen_temps:LIST{INT} is
+      -- Generate temporaries for expression.  `void' if no temporaries. 
+      if expr /= void then res := expr.gen_temps; end;
+   end; -- gen_temps
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_goto_tags(block: $BLOCK_STMTOB_S) is
+      if expr = void then
+	 if block = void then
+	    -- "break" statement found that is not inside a loop
+	    ERR_INFO::format_error_msg(
+	       lineno,
+	       STR::create.s("(BREAK_STMTOB_S): \"break\" statement found outside loop"));
+	    return;
+	 else
+	    tag := block.get_goto_tag;
+	 end;
+      end; -- if
+   end; -- gen_goto_tags
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) is
+      outfile.indent;
+      if COMPILER_OPTIONS::dbg_mode = true then
+	 -- line just before Sather 'break'
+	 DBTABLE::addCLine(ERR_INFO::def_filename(lineno),
+	    ERR_INFO::def_lineno(lineno),
+	    outfile.name,outfile.line_no);
+      end;
+      if (expr = void) then
+	 if (tag = 0) then
+	    -- "break" can only be used within loop and so the tag should
+	    -- be non-zero at this point.  This should already have been
+	    -- detected by "gen_goto_tags".
+	    ERR_INFO::format_error_msg(
+	       lineno,
+	       STR::create.s("(BREAK_STMTOB_S): \"break\" statement found outside loop"));
+	    
+		  -- Remedy by generating C "return" statements.
+	    outfile.s("goto ret0__;\n").inc_ln(1);
+	 else
+	    outfile.s("goto ");
+	    GLOBAL_PROC::cprint_goto_tag(tag, outfile);
+	    outfile.s(";\n").inc_ln(1);
+	 end; -- if
+      else
+	 expr.cprint_pre_code(outfile);
+	 outfile.s("EH_THROW(");
+	 expr.cprint_act_code(outfile);
+	 outfile.s(");");
+      end;
+   end; -- cprint_code
+   
+end; -- class BREAK_STMTOB_S
+
+--------------------------------------------------------------------
+
+class RETURN_STMTOB_S is
+   -- Return statements.
+   STMTOB_S;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) is
+      -- Remember to restore correct file name when we return from a
+      -- routine call.
+      if (GLOBAL_PROC::check_is_on) then
+	 outfile.c('\n').inc_ln(1).indent;
+	 PRINT_C_CODE::cprint_restore_exec_info(outfile);
+      end; -- if
+
+      outfile.indent;
+      if COMPILER_OPTIONS::dbg_mode = true then
+	 -- line before Sather "return"
+	 DBTABLE::addCLine(ERR_INFO::def_filename(lineno),
+	    ERR_INFO::def_lineno(lineno),
+	    outfile.name,outfile.line_no);
+      end;
+      outfile.s("goto ret0__;\n").inc_ln(1);
+   end; -- cprint_code
+
+end; -- class RETURN_STMTOB_S
+
+--------------------------------------------------------------------
+   
+class CALL_STMTOB_S is
+   -- Calls.
+   STMTOB_S;
+   attr expr:$EXPROB_S;		-- EXPROB_S representation of the call
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(exp:$EXPROB_S; ln:INT):SAME is
+      res := new;
+      res.expr := exp;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   out_of_line(fn: STR) is
+      -- update line info to refer to original file `fn' rather
+      -- than the current context in which this construct is
+      -- used to compose code.
+      lineno := ERR_INFO::out_of_line_err_info(fn,lineno);
+      expr.out_of_line(fn);
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(expr.dup, lineno);
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      expr.resolve_predef_types(index);
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      expr.semant(symtab);
+      if (COMPILER_OPTIONS::warn_rt_val) then
+	 if (expr.res_type /= void) then
+	    ERR_INFO::format_warning_msg(
+	              lineno,
+	              STR::create.s("(CALL_STMTOB_S): Call statement returns a value"));
+	 end; -- if
+      end; -- if
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      res := expr.gen_temps;
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   validate_dispatches_and_get_ext_strs is
+      -- There is no type definition to be checked, so the only thing
+      -- to do is to record references to external strings.
+      expr.get_ext_strs;
+   end; -- validate_dispatches_and_get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) is
+      expr.cprint_pre_code(outfile);
+      outfile.indent;
+      if COMPILER_OPTIONS::dbg_mode = true then
+	 -- line before the call.
+	 DBTABLE::addCLine(ERR_INFO::def_filename(lineno),
+	    ERR_INFO::def_lineno(lineno),
+	    outfile.name,outfile.line_no);
+      end;
+      if (expr.res_type /= void) then
+	 outfile.s("(void)");
+      end; -- if 
+      expr.cprint_act_code(outfile);
+      outfile.s(";\n").inc_ln(1);
+   end; -- cprint_code
+
+end; -- class CALL_STMTOB_S
+
+------------------------------------------------------------------------
+

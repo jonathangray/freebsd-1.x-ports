@@ -1,0 +1,454 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/graphics/grfx_out.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Generic output of graphics primitives suitable for several
+--*           devices. PostScript and Framemaker formats are in this
+--*           file.
+--*
+--* CLASSES: GRAPHICS_OUT, POSTSCRIPT_GRAPHICS_OUT, FRAME_GRAPHICS_OUT,
+--*          GRAPHICS_OUT_TEST
+--* 
+--* REQUIRED FILES: ../geometry/vector_low.sa,
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: grfx_out.sa,v 1.1 1994/02/12 03:23:19 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 07:04 1993 (hws)
+--*  Oct 17 06:58 1993 (hws): Sather 1 syntax, copyright note
+--* Created: Mon Oct 15 10:35:42 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class GRAPHICS_OUT is
+   -- Specification class to be inherited by classes which support basic
+   -- drawing primitives. Drawing is in the unit square. All
+   -- coordinates are reals in `[0.,1.]'. The origin `(0.,0.)' is the lower 
+   -- left corner and coordinates increase upward and rightward.
+   -- If a particular output device doesn't support a call, it should make
+   -- its best attempt (eg. if gray lines aren't supported, it should draw
+   -- them in black).
+   
+   attr line_width:REAL;		-- The width of the next line.
+   attr point_diameter:REAL;		-- The diameter of the next point.
+   attr filled:BOOL;			-- Whether the next figure should be filled.
+   attr no_line:BOOL;		-- True if no bounding line should appear.
+      -- Gray levels represent black by `0.' and white by `1.'
+   attr line_gray:REAL;		-- The next line's gray level (default black).
+   attr fill_gray:REAL;		-- If filled, the next fill's gray level.
+      -- Locations in a string.
+   const str_l:INT:=0;	-- The bottom left of a string (the default).
+   const str_c:INT:=1;	-- The bottom center of a string.
+   const str_r:INT:=2;	-- The bottom right of a string.
+   attr str_loc:INT;			-- The part of a string used to locate it.
+   attr font:INT;			-- The font to use in drawing strings.
+   
+   draw_point(x,y:REAL) is
+      -- Draw a single point at the location `(x,y)'.
+      ERR::s("GRAPHICS_OUT: `draw_point' not redefined.").nl;
+   end; -- draw_point
+   
+   draw_line(x1,y1,x2,y2:REAL) is
+      -- Draw a line segment from `(x1,y1)' to `(x2,y2)'.
+      ERR::s("GRAPHICS_OUT: `draw_line' not redefined.").nl;
+   end; -- draw_line
+
+   draw_polyline(l:LIST{VECTOR_2}) is
+      -- Draw a series of segments given by the points in `l'.
+      i:INT:=1; loop until!(i=l.size);
+	 draw_line(l[i-1].x,l[i-1].y,l[i].x,l[i].y);
+	 i:=i+1
+      end; -- loop
+   end; -- draw_polyline
+   
+   draw_closed_polyline(l:LIST{VECTOR_2}) is
+      -- Draw the closed shape defined by the points in `l'. Should respect
+      -- the status of `filled'. Default just draws lines.
+      i:INT:=1; loop until!(i=l.size);
+	 draw_line(l[i-1].x,l[i-1].y,l[i].x,l[i].y);
+	 i:=i+1
+      end; -- loop
+      draw_line(l[l.size-1].x,l[l.size-1].y,l[0].x,l[0].y);
+   end; -- draw_closed_polyline
+   
+   draw_rect(x1,y1,x2,y2:REAL) is
+      -- Draw a rectangle with diagonally opposite corners `(x1,y1)' and
+      -- `(x2,y2)'. Should respect the status of `filled'.
+      -- Default just draws lines.
+      draw_line(x1,y1,x1,y2); draw_line(x1,y2,x2,y2);
+      draw_line(x2,y2,x2,y1); draw_line(x2,y1,x1,y1);
+   end; -- draw_rect
+   
+   draw_circle (x,y,r:REAL) is
+      -- Draw a circle centered at (x,y) of radius r. Respects "filled".
+      -- Default just draws `20' segments.
+      dth:DOUBLE:=2.*MATH::pi/20.; -- change in angle.
+      i:INT; loop until!(i=21);
+	 th1:REAL:=i*dth; th2:REAL:=th1+dth;
+	 draw_line(x+r*MATH::cos(th1), y+r*MATH::sin(th1)
+	       , x+r*MATH::cos(th2), y+r*MATH::sin(th2));
+	 i:=i+1;
+      end; -- loop
+   end; -- draw_circle
+   
+   draw_str (x,y:REAL; s:STR) is
+      -- Draw the string `s' with location (specified by `str_loc')
+      -- at `(x,y)'.
+      ERR::s("GRAPHICS_OUT: `draw_str' not redefined.").nl;
+   end; -- draw_str
+   
+   init is
+      -- Start up a graphic, for devices which need it.
+   end; -- init
+   
+   finish is
+      -- Finish up a graphic, for devices which need it.
+   end; -- finish
+   
+   comment (s:STR) is
+      -- Put a comment into the output, for devices which support it.
+   end; -- comment
+   
+end; -- class GRAPHICS_OUT
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class POSTSCRIPT_GRAPHICS_OUT is
+   -- Postscript output.
+   
+   GRAPHICS_OUT;
+   -- Defines: line_width, point_diameter, filled, line_gray,
+   -- fill_gray, str_l, str_c, str_r, str_loc, font
+   
+   attr scale:REAL;			-- The amount by which to scale output.
+   attr file:FILE;			-- The file in which to put the output.
+   
+   create(file:FILE):SAME is
+      -- Initialize reasonable defaults. Put output in `file'.
+      res:=new; res.scale:=4.; res.line_width:=.002; 
+      res.point_diameter:=.056; res.file:=file;
+   end; -- create
+   
+   draw_point (x,y:REAL) is
+      -- Draw a single point.
+      file.s("newpath ").r(point_diameter).s(" setlinewidth").nl;
+      file.r(x).s(" ").r(y).s(" moveto 0 0 rlineto").nl;
+      if line_gray>.01 then	-- not black
+	 file.s("gsave ").r(line_gray).s(" setgray stroke grestore").nl;
+      else
+	 file.s("stroke").nl;
+      end; -- if
+   end; -- draw_point
+   
+   draw_line (x1,y1,x2,y2:REAL) is
+      -- Draw a line segment from `(x1,y1)' to `(x2,y2)'.
+      file.s("newpath ").r(line_width).s(" setlinewidth").nl;
+      file.r(x1).s(" ").r(y1).s(" moveto ");
+      file.r(x2).s(" ").r(y2).s(" lineto").nl;
+      if line_gray>.01 then	-- not black
+	 file.s("gsave ").r(line_gray).s(" setgray stroke grestore").nl;
+      else
+	 file.s("stroke").nl;
+      end; -- if
+   end; -- draw_line
+
+   draw_polyline (l:LIST{VECTOR_2}) is
+      -- Draw a series of segments given by the points in `l'.
+      if l.size<1 then return end; -- nothing to draw
+      file.s("newpath ").r(line_width).s(" setlinewidth").nl;
+      file.r(l[0].x).s(" ").r(l[0].y).s(" moveto ");
+      i:INT:=1; loop until!(i=l.size);
+	 file.r(l[i].x).s(" ").r(l[i].y).s(" lineto").nl;
+	 i:=i+1;
+      end; -- loop
+      if line_gray>.01 then	-- not black
+	 file.s("gsave ").r(line_gray).s(" setgray stroke grestore").nl;
+      else
+	 file.s("stroke").nl;
+      end; -- if
+      file.s("stroke").nl;
+   end; -- draw_polyline
+
+   draw_closed_polyline (l:LIST{VECTOR_2}) is
+      -- Draw the closed figure defined by `l'.
+      if l.size<1 then return end; -- nothing to draw
+      file.s("newpath ").r(line_width).s(" setlinewidth").nl;
+      file.r(l[0].x).s(" ").r(l[0].y).s(" moveto ");
+      i:INT:=1; loop until!(i=l.size);
+	 file.r(l[i].x).s(" ").r(l[i].y).s(" lineto").nl;
+	 i:=i+1;
+      end; -- loop
+      file.s("closepath").nl;
+      if filled then
+	 file.s("gsave ").r(fill_gray).s(" setgray fill grestore").nl;
+      end; -- if
+      if not no_line then
+	 if line_gray>.01 then	-- not black
+	    file.s("gsave ").r(line_gray).s(" setgray stroke grestore").nl;
+	 else
+	    file.s("stroke").nl;
+	 end; -- if
+	 file.s("stroke").nl;
+      end; -- if
+   end; -- draw_closed_polyline
+   
+   draw_rect (x1,y1,x2,y2:REAL) is
+      -- Draw a rectangle. Respects `filled'.
+      file.s("newpath ").r(line_width).s(" setlinewidth").nl;
+      file.r(x1).s(" ").r(y1).s(" moveto ");
+      file.r(x1).s(" ").r(y2).s(" lineto").nl;
+      file.r(x2).s(" ").r(y2).s(" lineto").nl;
+      file.r(x2).s(" ").r(y1).s(" lineto closepath").nl;
+      if filled then
+	 file.s("gsave ").r(fill_gray).s(" setgray fill grestore").nl;
+      end; -- if
+      if not no_line then
+	 if line_gray>.01 then	-- not black
+	    file.s("gsave ").r(line_gray).s(" setgray stroke grestore").nl;
+	 else
+	    file.s("stroke").nl;
+	 end; -- if
+	 file.s("stroke").nl;
+      end; -- if
+   end; -- draw_rect
+   
+   draw_circle (x,y,r:REAL) is
+      -- Draw a circle centered at `(x,y)' of radius `r'. Respects `filled'.
+      file.s("newpath ").r(line_width).s(" setlinewidth").nl;
+      file.r(x).s(" ").r(y).s(" ").r(r).s(" 0 360 arc").nl;
+      if filled then
+	 file.s("gsave ").r(fill_gray).s(" setgray fill grestore").nl;
+      end; -- if
+      if not no_line then
+	 if line_gray>.01 then	-- not black
+	    file.s("gsave ").r(line_gray).s(" setgray stroke grestore").nl;
+	 else
+	    file.s("stroke").nl;
+	 end; -- if
+	 file.s("stroke").nl;
+      end; -- if
+   end; -- draw_circle
+   
+   draw_str (x,y:REAL; s:STR) is
+      -- Draw the string `s' with location (specified by `str_loc') at
+      -- `(x,y)'. Still needs to deal with centering etc.
+      file.r(x).s(" ").r(y).s(" moveto").nl;
+      file.s("(").s(s).s(") show").nl;
+   end; -- draw_str
+   
+   init is
+      -- Header information for postscript file.
+      file.s("%!\n36 dup translate 72 6.5 mul dup scale").nl;
+      file.s("1 setlinecap 1 setlinejoin").nl;
+      file.s("0. setgray").nl;
+      file.s("/Helvetica findfont .025 scalefont setfont").nl;
+   end; -- init
+   
+   finish is
+      -- Close the file.
+      file.s("showpage").nl; file.close;
+   end; -- finish
+   
+   comment (s:STR) is
+      -- Put a comment into the output.
+      file.s("%").s(s).nl;
+   end; -- comment
+   
+end; -- class POSTSCRIPT_GRAPHICS_OUT
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class FRAME_GRAPHICS_OUT is
+   -- Framemaker graphics ouput in Marker Interchange Format (MIF).
+   
+   GRAPHICS_OUT;
+   -- Defines: line_width, point_diameter, filled, line_gray,
+   -- fill_gray, str_l, str_c, str_r, str_loc, font
+   
+   attr scale:REAL;			-- The amount by which to scale output.
+   attr file:FILE;			-- The file to put the output.
+   
+   create(file:FILE):SAME is
+      -- Initialize to make figures in Framemaker documents. Put output in 
+      -- `file'.
+      res:=new; res.scale:=2.; res.line_width:=.002; 
+      res.point_diameter:=.056; res.file:=file;
+   end; -- create
+   
+   draw_point (x,y:REAL) is
+      -- Draw a single point at the location `(x,y)'.
+      file.s("<Ellipse <Fill 0><PenWidth .5><BRect ");
+      file.r(x*scale-(point_diameter/2.)).s(" ");
+      file.r(scale*(1.-y)-(point_diameter/2.)).s(" ");
+      file.r(point_diameter).s(" ").r(point_diameter).s(">>").nl;
+   end; -- draw_point
+   
+   draw_line (x1,y1,x2,y2:REAL) is
+      -- Draw a line segment from `(x1,y1)' to `(x2,y2)'.
+      file.s("<PolyLine <Point ").r(x1*scale).s(" ");
+      file.r(scale*(1.-y1)).s("><Point ").r(x2*scale).s(" ");
+      file.r(scale*(1.-y2)).s(">>").nl;
+   end; -- draw_line
+
+   draw_polyline (l:LIST{VECTOR_2}) is
+      -- Draw a series of segments given by the points in `l'.
+      if l.size<1 then return end; -- nothing to draw
+      file.s("<PolyLine ");
+      line_gray_out; fill_gray_out; line_width_out;
+      file.s("NumPoints ").i(l.size).s(">").nl;
+      file.s("<Point ").r(l[0].x*scale).s(" ");
+      file.r(scale*(1.-l[0].y)).s(">").nl; -- first point
+      i:INT:=1; loop until!(i=l.size);
+	 file.s("<Point ").r(l[i].x*scale).s(" ");
+	 file.r(scale*(1.-l[i].y)).s(">").nl;
+	 i:=i+1
+      end; -- loop
+      file.s(">").nl;
+   end; -- draw_polyline
+   
+   draw_closed_polyline (l:LIST{VECTOR_2}) is
+      -- Draw the closed shape defined by the points in `l'. Respects
+      -- `filled'.
+      if l.size<1 then return end; -- nothing to draw
+      file.s("<Polygon ");
+      line_gray_out; fill_gray_out; line_width_out;
+      file.s("NumPoints ").i(l.size).s(">").nl;
+      file.s("<Point ").r(l[0].x*scale).s(" ");
+      file.r(scale*(1.-l[0].y)).s(">").nl; -- first point
+      i:INT:=1; loop until!(i=l.size);
+	 file.s("<Point ").r(l[i].x*scale).s(" ");
+	 file.r(scale*(1.-l[i].y)).s(">").nl;
+	 i:=i+1
+      end; -- loop
+      file.s(">").nl;
+   end; -- draw_closed_polyline
+   
+   draw_rect (x1,y1,x2,y2:REAL) is
+      -- Draw a rectangle with diagonally opposite corners `(x1,y1)' and
+      -- `(x2,y2)'. Respects the status of `filled'.
+      file.s("<Rectangle ");       
+      line_gray_out; fill_gray_out; line_width_out;
+      file.s("BRect ").r(x1*scale).s(" ").r(scale*(1.-y2));
+      file.s(" ").r((x2-x1)*scale).s(" ").r(scale*(y2-y1));
+      file.s(">>").nl;
+   end; -- draw_rect
+   
+   draw_circle (x,y,r:REAL) is
+      -- Draw a circle centered at `(x,y)' of radius `r'. Respects `filled'.
+      file.s("<Ellipse ");       
+      line_gray_out; fill_gray_out; line_width_out;
+      file.s("BRect ").r((x-r)*scale).s(" ").r(scale*(1.-y-r));
+      file.s(" ").r(2.*r*scale).s(" ").r(scale*2.*r);
+      file.s(">>").nl;
+   end; -- draw_circle
+   
+   draw_str (x,y:REAL; s:STR) is
+      -- Draw the string `s' with location (specified by `str_loc')
+      -- at `(x,y)'.
+      if str_loc=str_l then
+	 file.s("<TextLine <TLOrigin ").r(scale*x);
+	 file.s(" ").r(scale*(1.-y)).s("><String `").s(s).s("'>>").nl;
+      elsif str_loc=str_c then
+	 file.s("<TextLine <TLOrigin ").r(scale*x);
+	 file.s(" ").r(scale*(1.-y)).s(">");
+	 file.s("<TLAlignment Center>");
+	 file.s("<String `").s(s).s("'>>").nl;
+      elsif str_loc=str_r then
+	 file.s("<TextLine <TLOrigin ").r(scale*x);
+	 file.s(" ").r(scale*(1.-y)).s(">");
+	 file.s("<TLAlignment Right>");
+	 file.s("<String `").s(s).s("'>>").nl;
+      end; -- if
+   end; -- draw_str
+   
+   init is
+      -- Header information for mif file.
+      file.s("<MIFFile 2.00> # Sather FRAME_GRAPHICS_OUT graphics.").nl;
+	 -- Use Helvetica 9 point by default.
+      file.s("<Font <FFamily `Helvetica'> <FSize 9> <FPlain Yes>>\n");
+   end; -- init
+   
+   finish is
+      -- Close the file.
+      file.close;
+   end; -- finish
+   
+   comment (s:STR) is
+      -- Put a comment into the output.
+      file.s("<Comment ").s(s).s(">").nl;
+   end; -- comment
+   
+   line_width_out is
+      -- Output line_width information.
+      if line_width<=.01 then file.s("<PenWidth .5>").nl;
+      elsif line_width<=.04 then file.s("<PenWidth 1>").nl;
+      elsif line_width<=.05 then file.s("<PenWidth 3>").nl;
+      else file.s("<PenWidth 4>").nl end;
+   end; -- line_width_out
+   
+   line_gray_out is
+      -- Output `line_gray' information, code between `0' and `7'.
+      if no_line then
+	 file.s("<Pen 15>").nl;	-- make invisible
+      else
+	 file.s("<Pen ").i((line_gray*7.99).floor).s(">").nl;
+      end; -- if
+   end; -- line_gray_out
+   
+   fill_gray_out is
+      -- Output `fill_gray' information, code between `0' and `7'.
+      if filled then
+	 file.s("<Fill ").i((line_gray*7.99).floor).s(">").nl;
+      else			-- make invisible
+	 file.s("<Fill 15>").nl;
+      end; -- if
+   end; -- fill_gray_out
+   
+end; -- class FRAME_GRAPHICS_OUT
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class GRFX_TEST is
+   -- Test of FRAME_GRAPHICS_OUT.
+   
+   main is
+      fl:FILE:=FILE::new; fl.open_for_write("foo");
+      f:FRAME_GRAPHICS_OUT:=f.create(fl);
+      f.init;
+      i:INT; loop until!(i=50);
+	 f.draw_point(RANDOM::uniform,RANDOM::uniform);
+	 i:=i+1;
+      end; -- loop
+      f.draw_line(.1,.1,.9,.9);
+      f.draw_str(.3,.1,"This is a test");
+      f.finish;
+
+      fl:FILE:=FILE::new; fl.open_for_write("foo.ps");
+      f:POSTSCRIPT_GRAPHICS_OUT:=f.create(fl);
+      f.init;
+      i:INT; loop until!(i=50);
+	 f.draw_point(RANDOM::uniform,RANDOM::uniform);
+	 i:=i+1;
+      end; -- loop
+      f.draw_line(.1,.1,.9,.9);
+      f.draw_str(.3,.1,"This is a test");
+      f.finish;
+   end; -- main
+   
+end; -- class GRFX_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+

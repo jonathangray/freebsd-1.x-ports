@@ -1,0 +1,840 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/base/base.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: The base types.
+--*
+--* CLASSES: BOOL, CHAR, INT, REAL, DOUBLE, BASE_TEST
+--*
+--* REQUIRED FILES: list.sa, out.sa
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: base.sa,v 1.1 1994/02/12 03:23:16 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:22 1993 (hws)
+--*  Oct 17 06:22 1993 (hws): Sather 1 syntax, copyright note
+--*  Oct  5 13:09 1993 (hws): add Bill Footes patch of INT::pow
+--*  Sep 27 14:20 1993 (hws): switch -> case, require -> pre
+--*  Feb 21 18:04 1993 (hws): assert(pre) -> require
+--* Created: Mon Mar 12 23:34:27 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class BOOL is
+   -- `BOOL' defines the routines which are applicable to boolean expressions.
+   -- In addition to `and', `or' and `not' which are built into the Sather
+   -- language, it defines several additional standard binary operations.
+
+   xor(b:BOOL):BOOL is
+      -- The truth value of `self' exclusive or `b'.
+      res:=((self or b) and (not (self and b)))
+   end; -- xor
+   
+   xnor(b:BOOL):BOOL is
+      -- The truth value of `self' exclusive nor `b'.
+      res := not xor(b)
+   end; -- xnor
+   
+   nand(b:BOOL):BOOL is
+      -- The truth value of `self' nand `b'.
+      res := not (self and b)
+   end; -- nand
+   
+   nor(b:BOOL):BOOL is
+      -- The truth value of `self' nor `b'.
+      res := not (self or b)
+   end; -- nor
+   
+   implies(b:BOOL):BOOL is
+      -- The truth value of `self' implies `b'.
+      res := ((not self) or b)
+   end; -- implies
+   
+   to_s:STR is
+      -- The string representation of `self'.
+      res:=STR::create; res.b(self);
+   end; -- to_s
+   
+end; -- class BOOL
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class CHAR is
+   -- `CHAR' defines operations on characters. The operations with names of
+   -- the form `is_foo' are predicates which return a boolean value
+   -- depending on whether the character has the specified characteristic.
+   -- This is a general naming convention throughout the Sather libraries.
+   -- As in C, white space characters include space, tab, carriage return,
+   -- newline, vertical tab, or form feed. Printing characters are all
+   -- characters except control characters. Punctuation characters are those
+   -- which are neither control characters nor alphanumeric characters. The
+   -- function `to_i' returns the ASCII value corresponding the character.
+   -- The case conversion routines `to_upper_case' and `to_lower_case' work
+   -- on all characters unlike the versions in many C libraries.
+
+   is_alphabetic:BOOL is
+      -- True if `self' is an alphabetic character.
+      res := C::is_alpha(self)
+   end; -- is_alphabetic
+
+   is_upper_case:BOOL is
+      -- True if `self' is uppercase.
+      res := C::is_upper(self)
+   end; -- is_upper_case
+
+   is_lower_case:BOOL is
+      -- True if `self' is lowercase.
+      res := C::is_lower(self)
+   end; -- is_lower_case
+
+   is_digit:BOOL is
+      -- True if `self' is a digit.
+      res := C::is_digit(self)
+   end; -- is_digit
+
+   is_alphanumeric:BOOL is
+      -- True if `self' is alphanumeric.
+      res := C::is_alnum(self)
+   end; -- is_alphanumeric
+
+   is_space:BOOL is
+      -- True if `self' is whitespace.
+      res := C::is_space(self)
+   end; -- is_space
+
+   is_print:BOOL is
+      -- True if `self' is a printing character.
+      res := C::is_print(self)
+   end; -- is_print
+   
+   is_punctuation:BOOL is
+      -- True if `self' is punctuation.
+      res := C::is_punct(self)
+   end; -- is_punctuation
+
+   is_control:BOOL is
+      -- True if `self' is a control character.
+      res := C::is_cntrl(self)
+   end; -- is_control
+
+   to_i:INT is
+      -- Convert `self' to an integer.
+      res := C::c_to_i(self)
+   end; -- to_i
+
+   to_s:STR is
+      -- The string representation of `self'.
+      res:=STR::create; res.c(self);
+   end; -- to_s
+
+   to_upper_case:CHAR is
+      -- Convert `self' to upper case (always works, unlike the C library).
+      res := C::to_upper(self)
+   end; -- to_upper_case
+   
+   to_lower_case:CHAR is
+      -- Convert `self' to lower case (always works, unlike the C library).
+      res := C::to_lower(self)
+   end; -- to_lower_case
+   
+end; -- class CHAR
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class C is
+   -- C support for `CHAR'.
+
+   is_alpha(c:CHAR):BOOL is end;
+   is_upper(c:CHAR):BOOL is end;
+   is_lower(c:CHAR):BOOL is end;
+   is_digit(c:CHAR):BOOL is end;
+   is_alnum(c:CHAR):BOOL is end;
+   is_space(c:CHAR):BOOL is end;
+   is_print(c:CHAR):BOOL is end;
+   is_punct(c:CHAR):BOOL is end;
+   is_cntrl(c:CHAR):BOOL is end;
+   c_to_i(c:CHAR):INT is end;
+   to_upper(c:CHAR):CHAR is end;
+   to_lower(c:CHAR):CHAR is end;
+   
+end; -- class C
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class INT is
+   -- `INT' defines operations on integers. The operations built
+   -- into Sather include addition, subtraction, multiplication, and
+   -- division. The syntax of a dotted routine call makes it natural for
+   -- infix operations (eg. `15.mod(8)'). The `mod' routine produces the
+   -- mathematical modulo operation on arbitrary integers. The `u_mod'
+   -- operation agrees with it on positive integers and executes more
+   -- quickly. The `to_s' routine produces a string representation of self,
+   -- but it is more common to append an integer to an existing string as in
+   -- `my_string.i(15)'. The routines with name of the form `bit_foo'
+   -- perform boolean operations bitwise on the integer. `lshift' and
+   -- `rshift' insert 0's into locations shifted from the edge of the
+   -- integer. `arith_rshift' inserts 1's in case the integer is negative.
+   -- The `sqrt' routine must be applied to a non-negative argument.
+   -- Many of these operations are implemented as macros and do not have
+   -- the overhead of a function call.
+
+   u_mod(i:INT):INT is
+      -- Fast version of modulo `i'. Always ends up in range [0, i) but 
+      -- on negatives the value is shifted by (2^32 mod i) from true modulo.
+      res := C::u_mod(self,i)
+   end; -- u_mod
+
+   mod(i:INT):INT is
+      -- Remainder when `self' is divided by `i' (works on negative `INT''s). 
+      if self>=0 then 
+	 res:=u_mod(i)
+      else 
+	 res:=i-((-self).u_mod(i));
+	 if res=i then res:=0 end;
+      end; -- if
+   end; -- mod
+
+   to_r:REAL is
+      -- Convert to `REAL'.
+      res := C::i_to_r(self)
+   end; -- to_r
+
+   to_d:DOUBLE is
+      -- Convert to `DOUBLE'.
+      res := C::i_to_d(self)
+   end; -- to_d
+   
+   to_c:CHAR is
+      -- Convert to `CHAR'.
+      res := C::i_to_c(self)
+   end; -- to_c
+   
+   to_s:STR is
+      -- The string representation of `self'.
+      res:=STR::create_sized(12); res.i(self);
+   end; -- to_s
+
+   bit_and(i:INT):INT is
+      -- The bitwise "and" of `self' and `i'.
+      res := C::bit_and(self,i)
+   end; -- bit_and
+   
+   bit_or(i:INT):INT is
+      -- The bitwise "or" of `self' and `i'.
+      res := C::bit_or(self,i)
+   end; -- bit_or
+
+   bit_xor(i:INT):INT is
+      -- The bitwise "exclusive or" of `self' and `i'.
+      res := C::bit_xor(self,i)
+   end; -- bit_xor
+   
+   bit_not:INT is
+      -- Return `self' with its bits inverted.
+      res := C::bit_not(self)
+   end; -- bit_not
+   
+   lshift(i:INT):INT is
+      -- The bits of `self' shifted left `i' places.
+      res := C::lshift(self, i)
+   end; -- lshift
+
+   rshift(i:INT):INT is
+      -- The bits of `self' shifted right `i' places.
+      res := C::rshift(self, i)
+   end; -- rshift
+   
+   arith_rshift(i:INT):INT is
+      -- The bits of `self' arithmetically shifted right `i' places.
+      -- If `i' is negative, inserts ones.
+      res := C::arith_rshift(self, i)
+   end; -- arith_rshift
+   
+   abs:INT is
+      -- Absolute value.
+      if self<0 then res:= -self else res:=self end;
+   end; -- abs
+
+   nth_bit(n:INT):BOOL is
+      -- True if the `n'th bit of `self' is 1.
+      res := (bit_and(1.lshift(n)) /= 0)
+   end; -- nth_bit
+   
+   set_nth_bit(n:INT):INT is
+      -- Return `self' with the `n'th bit set.
+      res := bit_or(1.lshift(n))
+   end; -- set_nth_bit
+
+   unset_nth_bit(n:INT):INT is
+      -- Return `self' with the `n'th bit unset.
+      res := bit_and((1.lshift(n)).bit_not)
+   end; -- set_nth_bit
+   
+   max(i:INT):INT is
+      -- The maximum of `self' and `i'.
+      if i>self then res:=i else res:=self end;
+   end; -- max
+   
+   min(i:INT):INT is
+      -- The minimum of `self' and `i'.
+      if i>self then res:=self else res:=i end;
+   end; -- min
+   
+   pow(i:INT):INT is
+      -- Integer approximation of `self' to the `i'th power.
+      res:=(0.5+to_d.pow(i.to_d)).to_i -- res:=to_d.pow(i.to_d).to_i
+      -- B.Foote: It's OK to round here because an integer raised to a power
+      -- should always be an integer.  It's necessary because some math
+      -- libraries could return a value epsilon below the proper value,
+      -- which would get truncated down.
+   end; -- pow
+   
+   sqrt:INT pre self>=0 is
+      -- Integer approximation of the square root of `self'.
+      res:=to_d.sqrt.to_i
+   end; -- sqrt
+
+   to_octal:STR is
+      -- The octal representation of `self' of the form `"015"'.
+      -- `self' is interpreted as an unsigned integer.
+      res:=STR::create;
+      i:INT:=self;
+      loop
+	 if i=0 then break! end;
+	 res:=res.i(i.bit_and(7));
+	 i:=i.rshift(3);
+      end; -- loop
+      res:=res.s("0"); res.reverse;
+   end; -- to_octal
+
+   to_binary:STR is
+      -- The binary representation of `self' of the form `"100100"'.
+      -- `self' is interpreted as an unsigned integer.
+      res:=STR::create;
+      i:INT:=self;
+      loop
+	 res:=res.i(i.bit_and(1));
+	 i:=i.rshift(1);
+	 if i=0 then break! end;
+      end; -- loop
+      res.reverse;
+   end; -- to_binary
+
+   to_hex:STR is
+      -- The hexadecimal representation of `self' of the form `"0x5A"'.
+      -- `self' is interpreted as an unsigned integer.
+      res:=STR::create;
+      i:INT:=self;
+      loop
+	 case (i.bit_and(15))
+	 when 10 then res:=res.s("A");
+	 when 11 then res:=res.s("B");
+	 when 12 then res:=res.s("C");
+	 when 13 then res:=res.s("D");
+	 when 14 then res:=res.s("E");
+	 when 15 then res:=res.s("F");
+	 else res:=res.i(i.bit_and(15))
+	 end; -- case
+	 i:=i.rshift(4);
+	 if i=0 then break! end;
+      end; -- loop
+      res:=res.s("x0"); res.reverse;
+   end; -- to_hex
+   
+end; -- class INT
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class C is
+   -- C support for INT.
+   
+   u_mod(i,j:INT):INT is end;
+   i_to_r(i:INT):REAL is end;
+   i_to_d(i:INT):DOUBLE is end;
+   i_to_c(i:INT):CHAR is end;
+   i_to_s(i:INT):STR is end;
+   bit_and(i,j:INT):INT is end;
+   bit_or(i,j:INT):INT is end;
+   bit_xor(i,j:INT):INT is end;
+   bit_not(i:INT):INT is end;
+   lshift(i,j:INT):INT is end;
+   rshift(i,j:INT):INT is end;
+   arith_rshift(i,j:INT):INT is end;
+   i_abs(i:INT):INT is end;
+   
+end; -- class C
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class REAL is
+   -- `REAL' defines operations on single-precision real numbers.
+   -- More exotic special functions are defined in the `MATH' class.
+   -- `REAL''s and `DOUBLE''s are generally interchangable and the compiler
+   -- will properly convert between them. `pow(x)' computes `self' raised to
+   -- the power of `x'. It requires that `x' be larger than 0 if `self' is
+   -- equal to zero and that `self' be non-negative if `x' is not an integer.
+   -- `sqrt' computes the square root and requires that `self' be
+   -- non-negative. `to_i', `floor', `ceiling', and `round' compute the four
+   -- natural ways to approximate a floating point value by an integer.
+   -- `mod(x)' computes the floating point remainder of `self' divided by
+   -- `x' and has the same sign as `self'.
+
+   to_d:DOUBLE is
+      -- Convert to a `DOUBLE'.
+      res := C::r_to_d(self)
+   end; -- to_d
+   
+   to_i:INT is
+      -- Nearest integer toward zero (sometimes called "truncate").
+      res := C::r_to_i(self);
+   end; -- to_i
+
+   to_s:STR is
+      -- The string representation of `self'.
+      res:=STR::create_sized(12); res.r(self);
+   end; -- to_s
+
+   max(r:REAL):REAL is
+      -- The maximum of `self' and `r'.
+      if r>self then res:=r else res:=self end;
+   end; -- max
+   
+   min(r:REAL):REAL is
+      -- The minimum of `self' and `r'.
+      if r>self then res:=self else res:=r end;
+   end; -- min
+   
+   pow(x:REAL):DOUBLE
+       pre not (self=0. and x<=0.) and
+               not(self<0. and x/=x.floor) is 
+      --  Returns `self' raised to the power of `x'. 
+      res:=C::pow(self,x)
+   end; -- pow
+
+   sqrt:DOUBLE pre self>=0 is
+      -- The square root of `self', `self>=0'.
+      res:=C::sqrt(self);
+   end; -- sqrt
+   
+   floor:INT is
+      -- Largest integer not greater than `self'.
+      res:=C::d_to_i(C::floor(self))
+   end; -- floor
+   
+   ceiling:INT is
+      -- Smallest integer not less than `self'.
+      res:=C::d_to_i(C::ceil(self))
+   end; -- ceiling
+
+   round:INT is
+      -- Closest integer to `self'.
+      if self < 0.0 then res := C::d_to_i((self-.5))
+      else res := C::d_to_i((self+.5)) end;
+   end; -- round
+
+   abs:DOUBLE is
+      -- The absolute value of `self'.
+      res:=C::fabs(self);
+   end; -- abs
+
+   mod(x:DOUBLE):DOUBLE is
+      -- The floating point remainder of `self/x' with the same sign as
+      -- `self'.
+      res:=C::fmod(self,x);
+   end; -- mod
+
+end; -- class REAL
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class C is
+   -- C support for `REAL'.
+   
+   r_to_d(r:REAL):DOUBLE is end;
+   r_to_i(r:REAL):INT is end;
+   
+end; -- class C
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class DOUBLE is
+   -- `DOUBLE' defines operations on double-precision real numbers.
+   -- It has routines corresponding to those in `REAL' and they obey
+   -- the same restrictions.
+   -- More exotic special functions are defined in the `MATH' class.
+   -- `REAL''s and `DOUBLE''s are generally interchangable and the compiler
+   -- will properly convert between them. `pow(x)' computes `self' raised to
+   -- the power of `x'. It requires that `x' be larger than `0' if `self' is
+   -- equal to zero and that `self' be non-negative if `x' is not an
+   -- integer. `sqrt' computes the square root and requires that `self'
+   -- be non-negative. `to_i', `floor', `ceiling', and `round' compute
+   -- the four natural ways to approximate a floating point value by an
+   -- integer. `mod(x)' computes the floating point remainder of `self'
+   -- divided by `x' and has the same sign as self.
+   
+   to_r:REAL is
+      -- Convert to a `REAL'.
+      res := C::d_to_r(self)
+   end; -- to_r
+   
+   to_i:INT is
+      -- Nearest integer toward zero (sometimes called "truncate").
+      res := C::d_to_i(self);
+   end; -- to_i
+
+   to_s:STR is
+      -- The string representation of `self'.
+      res:=STR::create_sized(12); res.d(self);
+   end; -- to_s
+
+   max(r:DOUBLE):DOUBLE is
+      -- The maximum of `self' and `r'.
+      if r>self then res:=r else res:=self end;
+   end; -- max
+   
+   min(r:DOUBLE):DOUBLE is
+      -- The minimum of `self' and `r'.
+      if r>self then res:=self else res:=r end;
+   end; -- min
+
+   pow(x:DOUBLE):DOUBLE
+      pre not (self=0. and x<=0.) and
+              not (self<0. and x/=x.floor) is
+      --  Returns `self' raised to the power of `x'. 
+      res:=C::pow(self,x)
+   end; -- pow
+
+   sqrt:DOUBLE pre self>=0 is
+      -- The square root of `self'.
+      res:=C::sqrt(self);
+   end; -- sqrt
+   
+   floor:INT is
+      -- Largest integer not greater than `self'.
+      res:=C::d_to_i(C::floor(self))
+   end; -- floor
+   
+   ceiling:INT is
+      -- Smallest integer not less than `self'.
+      res:=C::d_to_i(C::ceil(self))
+   end; -- ceiling
+
+   round:INT is
+      -- Closest integer to `self'.
+      if self < 0.0 then res := C::d_to_i((self-.5))
+      else res := C::d_to_i((self+.5)) end;
+   end; -- round
+
+   abs:DOUBLE is
+      -- The absolute value of `self'.
+      res:=C::fabs(self);
+   end; -- abs
+
+   mod(x:DOUBLE):DOUBLE is
+      -- The floating point remainder of `self/x' with the same sign
+      -- as `self'.
+      res:=C::fmod(self,x);
+   end; -- mod
+
+end; -- class DOUBLE
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class C is
+   -- C support for `DOUBLE'.
+   
+   d_to_r(d:DOUBLE):REAL is end;
+   d_to_i(d:DOUBLE):INT is end;
+   pow(x,y:DOUBLE):DOUBLE is end;
+   sqrt(x:DOUBLE):DOUBLE is end;
+   ceil(x:DOUBLE):DOUBLE is end;
+   floor(x:DOUBLE):DOUBLE is end;
+   fabs(x:DOUBLE):DOUBLE is end;
+   fmod(x,y:DOUBLE):DOUBLE is end;
+   
+end; -- class C
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class C is
+   -- Miscellaneous basic C routines.
+   
+   ob_id(p:$OB):INT is end; -- returns `INT' corresponding to a pointer
+   id_ob(i:INT):$OB is end; -- returns pointer corresponding to an `INT'
+   
+end; -- class C
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class BASE_TEST is
+   -- Test of the base classes.
+   TEST;
+   
+   main is
+      -- Test `BOOL', `CHAR', `INT', `REAL', and `DOUBLE'.
+      bool_test; char_test; int_test; real_test; double_test;
+   end; -- main
+   
+   bool_test is
+      -- Test `BOOL'.
+      class_name("BOOL");
+      
+      test("not F", (not false).to_s, "T");
+      test("not T", (not true).to_s, "F");
+      
+      test("F and F", (false and false).to_s, "F");
+      test("F and T", (false and true).to_s, "F");
+      test("T and F", (true and false).to_s, "F");
+      test("T and T", (true and true).to_s, "T");
+      
+      test("F or F", (false or false).to_s, "F");
+      test("F or T", (false or true).to_s, "T");
+      test("T or F", (true or false).to_s, "T");
+      test("T or T", (true or true).to_s, "T");
+      
+      test("F.xor(F)", (false.xor(false)).to_s, "F");
+      test("F.xor(T)", (false.xor(true)).to_s, "T");
+      test("T.xor(F)", (true.xor(false)).to_s, "T");
+      test("T.xor(T)", (true.xor(true)).to_s, "F");
+      
+      test("F.xnor(F)", (false.xnor(false)).to_s, "T");
+      test("F.xnor(T)", (false.xnor(true)).to_s, "F");
+      test("T.xnor(F)", (true.xnor(false)).to_s, "F");
+      test("T.xnor(T)", (true.xnor(true)).to_s, "T");
+
+      test("F.nand(F)", (false.nand(false)).to_s, "T");
+      test("F.nand(T)", (false.nand(true)).to_s, "T");
+      test("T.nand(F)", (true.nand(false)).to_s, "T");
+      test("T.nand(T)", (true.nand(true)).to_s, "F");
+
+      test("F.nor(F)", (false.nor(false)).to_s, "T");
+      test("F.nor(T)", (false.nor(true)).to_s, "F");
+      test("T.nor(F)", (true.nor(false)).to_s, "F");
+      test("T.nor(T)", (true.nor(true)).to_s, "F");
+
+      test("F.implies(F)", (false.implies(false)).to_s, "T");
+      test("F.implies(T)", (false.implies(true)).to_s, "T");
+      test("T.implies(F)", (true.implies(false)).to_s, "F");
+      test("T.implies(T)", (true.implies(true)).to_s, "T");
+      finish;
+   end; -- bool_test
+
+   char_test is
+      -- Test `CHAR'.
+      class_name("CHAR");
+
+      test("' '.is_alphabetic", ' '.is_alphabetic.to_s, "F");
+      test("'.'.is_alphabetic", '.'.is_alphabetic.to_s, "F");
+      test("'1'.is_alphabetic", '1'.is_alphabetic.to_s, "F");
+      test("'a'.is_alphabetic", 'a'.is_alphabetic.to_s, "T");
+      test("'A'.is_alphabetic", 'A'.is_alphabetic.to_s, "T");
+      test("3.to_c.is_alphabetic", 3.to_c.is_alphabetic.to_s, "F");
+
+      test("' '.is_upper_case", ' '.is_upper_case.to_s, "F");
+      test("'.'.is_upper_case", '.'.is_upper_case.to_s, "F");
+      test("'1'.is_upper_case", '1'.is_upper_case.to_s, "F");
+      test("'a'.is_upper_case", 'a'.is_upper_case.to_s, "F");
+      test("'A'.is_upper_case", 'A'.is_upper_case.to_s, "T");
+      test("3.to_c.is_upper_case", 3.to_c.is_upper_case.to_s, "F");
+
+      test("' '.is_lower_case", ' '.is_lower_case.to_s, "F");
+      test("'.'.is_lower_case", '.'.is_lower_case.to_s, "F");
+      test("'1'.is_lower_case", '1'.is_lower_case.to_s, "F");
+      test("'a'.is_lower_case", 'a'.is_lower_case.to_s, "T");
+      test("'A'.is_lower_case", 'A'.is_lower_case.to_s, "F");
+      test("3.to_c.is_lower_case", 3.to_c.is_lower_case.to_s, "F");
+
+      test("' '.is_digit", ' '.is_digit.to_s, "F");
+      test("'.'.is_digit", '.'.is_digit.to_s, "F");
+      test("'1'.is_digit", '1'.is_digit.to_s, "T");
+      test("'a'.is_digit", 'a'.is_digit.to_s, "F");
+      test("'A'.is_digit", 'A'.is_digit.to_s, "F");
+      test("3.to_c.is_digit", 3.to_c.is_digit.to_s, "F");
+
+      test("' '.is_alphanumeric", ' '.is_alphanumeric.to_s, "F");
+      test("'.'.is_alphanumeric", '.'.is_alphanumeric.to_s, "F");
+      test("'1'.is_alphanumeric", '1'.is_alphanumeric.to_s, "T");
+      test("'a'.is_alphanumeric", 'a'.is_alphanumeric.to_s, "T");
+      test("'A'.is_alphanumeric", 'A'.is_alphanumeric.to_s, "T");
+      test("3.to_c.is_alphanumeric", 3.to_c.is_alphanumeric.to_s, "F");      
+
+      test("' '.is_space", ' '.is_space.to_s, "T");
+      test("'.'.is_space", '.'.is_space.to_s, "F");
+      test("'1'.is_space", '1'.is_space.to_s, "F");
+      test("'a'.is_space", 'a'.is_space.to_s, "F");
+      test("'A'.is_space", 'A'.is_space.to_s, "F");
+      test("3.to_c.is_space", 3.to_c.is_space.to_s, "F");
+      
+      test("' '.is_print", ' '.is_print.to_s, "T");
+      test("'.'.is_print", '.'.is_print.to_s, "T");
+      test("'1'.is_print", '1'.is_print.to_s, "T");
+      test("'a'.is_print", 'a'.is_print.to_s, "T");
+      test("'A'.is_print", 'A'.is_print.to_s, "T");
+      test("3.to_c.is_print", 3.to_c.is_print.to_s, "F");
+
+      test("' '.is_punctuation", ' '.is_punctuation.to_s, "F");
+      test("'.'.is_punctuation", '.'.is_punctuation.to_s, "T");
+      test("'1'.is_punctuation", '1'.is_punctuation.to_s, "F");
+      test("'a'.is_punctuation", 'a'.is_punctuation.to_s, "F");
+      test("'A'.is_punctuation", 'A'.is_punctuation.to_s, "F");
+      test("3.to_c.is_punctuation", 3.to_c.is_punctuation.to_s, "F");
+
+      test("' '.is_control", ' '.is_control.to_s, "F");
+      test("'.'.is_control", '.'.is_control.to_s, "F");
+      test("'1'.is_control", '1'.is_control.to_s, "F");
+      test("'a'.is_control", 'a'.is_control.to_s, "F");
+      test("'A'.is_control", 'A'.is_control.to_s, "F");
+      test("3.to_c.is_control", 3.to_c.is_control.to_s, "T");
+
+      test("'a'.to_i", 'a'.to_i.to_s, "97");
+      test("'a'.to_s", 'a'.to_s, "a");
+      test("'a'.to_upper_case", 'a'.to_upper_case.to_s, "A");
+      test("'A'.to_lower_case", 'A'.to_lower_case.to_s, "a");
+      finish;
+   end; -- char_test
+   
+   int_test is
+      -- Test `INT'.
+      class_name("INT");
+      test("10.u_mod(3)", 10.u_mod(3).to_s, "1");
+      test("(-10).u_mod(3)", (-10).u_mod(3).to_s, "0");
+      test("10.mod(3)", 10.mod(3).to_s, "1");
+      test("(-10).mod(3)", (-10).mod(3).to_s, "2"); 
+      test("10.to_r", 10.to_r.to_s, "10.000000");
+      test("(-10).to_r", (-10).to_r.to_s, "-10.000000");
+      test("10.to_d", 10.to_d.to_s, "10.000000");
+      test("(-10).to_d", (-10).to_d.to_s, "-10.000000");
+      test("75.to_c", 75.to_c.to_s, "K");
+      test("115.to_c", 115.to_c.to_s, "s");
+      test("115.to_s", 115.to_s, "115");
+      test("(-115).to_s", (-115).to_s, "-115");
+      test("12.bit_and(10)", 12.bit_and(10).to_s, "8");
+      test("12.bit_or(10)", 12.bit_or(10).to_s, "14");
+      test("12.bit_xor(10)", 12.bit_xor(10).to_s, "6");
+      test("12.bit_not", 12.bit_not.to_s, "-13");
+      test("2.lshift(3)", 2.lshift(3).to_s, "16");
+      test("4.rshift(2)", 4.rshift(2).to_s, "1");
+      test("(-1).rshift(2)", (-1).rshift(2).to_s, "1073741823");
+      test("(-1).rshift(30)", (-1).rshift(30).to_s, "3");
+      test("(-1).arith_rshift(2)", (-1).arith_rshift(2).to_s, "-1");
+      test("(-1).arith_rshift(30)", (-1).arith_rshift(30).to_s, "-1");
+      test("10.abs", 10.abs.to_s, "10");
+      test("(-10).abs", (-10).abs.to_s, "10");
+      test("4.nth_bit(0)", 4.nth_bit(0).to_s, "F");
+      test("4.nth_bit(2)", 4.nth_bit(2).to_s, "T");
+      test("4.set_nth_bit(0)", 4.set_nth_bit(0).to_s, "5");
+      test("4.set_nth_bit(2)", 4.set_nth_bit(2).to_s, "4");
+      test("4.unset_nth_bit(0)", 4.unset_nth_bit(0).to_s, "4");
+      test("4.unset_nth_bit(2)", 4.unset_nth_bit(2).to_s, "0");
+      test("3.max(4)", 3.max(4).to_s, "4");
+      test("(-10).max(-20)", (-10).max(-20).to_s, "-10");
+      test("3.min(4)", 3.min(4).to_s, "3");
+      test("(-10).min(-20)", (-10).min(-20).to_s, "-20");
+      test("3.pow(4)", 3.pow(4).to_s, "81");
+      test("169.sqrt", 169.sqrt.to_s, "13");
+      test("to_hex", 31.to_hex, "0x1F");
+      test("to_octal", 31.to_octal, "037");
+      test("to_binary", 31.to_binary, "11111");
+      finish;
+   end; -- int_test
+
+   real_test is
+      -- Test `REAL'.
+      class_name("REAL");
+      test("(4.0).to_d", (4.0).to_d.to_s, "4.000000");
+      test("(4.35).to_s", (4.35).to_s, "4.350000");
+      
+      test("(4.3).to_i", (4.3).to_i.to_s, "4");
+      test("(4.7).to_i", (4.7).to_i.to_s, "4");
+      test("(-4.3).to_i", (-4.3).to_i.to_s, "-4");
+      test("(-4.7).to_i", (-4.7).to_i.to_s, "-4");
+
+      test("(4.3).floor", (4.3).floor.to_s, "4");
+      test("(4.7).floor", (4.7).floor.to_s, "4");
+      test("(-4.3).floor", (-4.3).floor.to_s, "-5");
+      test("(-4.7).floor", (-4.7).floor.to_s, "-5");
+
+      test("(4.3).ceiling", (4.3).ceiling.to_s, "5");
+      test("(4.7).ceiling", (4.7).ceiling.to_s, "5");
+      test("(-4.3).ceiling", (-4.3).ceiling.to_s, "-4");
+      test("(-4.7).ceiling", (-4.7).ceiling.to_s, "-4");
+
+      test("(4.3).round", (4.3).round.to_s, "4");
+      test("(4.7).round", (4.7).round.to_s, "5");
+      test("(-4.3).round", (-4.3).round.to_s, "-4");
+      test("(-4.7).round", (-4.7).round.to_s, "-5");
+
+      test("(3.2).max(4.7)", (3.2).max(4.7).to_s, "4.700000");
+      test("(-10.2).max(-20.8)", (-10.2).max(-20.8).to_s, "-10.200000");
+      
+      test("(3.2).min(4.7)", (3.2).min(4.7).to_s, "3.200000");
+      test("(-1.2).min(-2.7)", (-1.2).min(-2.7).to_s, "-2.700000");
+      
+      test("(3.0).pow(4.0)", (3.0).pow(4.0).to_s, "81.000000");
+      test("(169.0).sqrt", (169.0).sqrt.to_s, "13.000000");
+      test("(4.7).abs", (4.7).abs.to_s, "4.700000");
+      test("(-4.7).abs", (-4.7).abs.to_s, "4.700000");
+      test("(10.5).mod(2.5)", (10.5).mod(2.5).to_s, "0.500000");
+      finish;
+   end; -- real_test
+
+   double_test is
+      -- Test `DOUBLE'.
+      class_name("DOUBLE");
+      d:DOUBLE:=4.0;
+      test("(4.0).to_r", (d).to_r.to_s, "4.000000");
+      d:=4.35; test("(4.35).to_s", d.to_s, "4.350000");
+
+      d:=4.3; test("(4.3).to_i", d.to_i.to_s, "4");
+      d:=4.7; test("(4.7).to_i", d.to_i.to_s, "4");
+      d:=(-4.3); test("(-4.3).to_i", d.to_i.to_s, "-4");
+      d:=(-4.7); test("(-4.7).to_i", d.to_i.to_s, "-4");
+
+      d:=4.3; test("(4.3).floor", d.floor.to_s, "4");
+      d:=4.7; test("(4.7).floor", d.floor.to_s, "4");
+      d:=-4.3; test("(-4.3).floor", d.floor.to_s, "-5");
+      d:=-4.7; test("(-4.7).floor", d.floor.to_s, "-5");
+
+      d:=4.3; test("(4.3).ceiling", d.ceiling.to_s, "5");
+      d:=4.7; test("(4.7).ceiling", d.ceiling.to_s, "5");
+      d:=-4.3; test("(-4.3).ceiling", d.ceiling.to_s, "-4");
+      d:=-4.7; test("(-4.7).ceiling", d.ceiling.to_s, "-4");
+
+      d:=4.3; test("(4.3).round", d.round.to_s, "4");
+      d:=4.7; test("(4.7).round", d.round.to_s, "5");
+      d:=-4.3; test("(-4.3).round", d.round.to_s, "-4");
+      d:=-4.7; test("(-4.7).round", d.round.to_s, "-5");
+
+      d2:DOUBLE;
+      d:=3.2; d2:=4.7; test("(3.2).max(4.7)", d.max(d2).to_s, "4.700000");
+      d:=-10.2; d2:=-20.8;
+      test("(-10.2).max(-20.8)", d.max(d2).to_s, "-10.200000");
+      
+      d:=3.2; d2:=4.7; test("(3.2).min(4.7)", d.min(d2).to_s, "3.200000");
+      d:=-1.2; d2:=-2.7;
+      test("(-1.2).min(-2.7)", d.min(d2).to_s, "-2.700000");
+      
+      d:=3.; d2:=4.; test("(3.0).pow(4.0)", d.pow(d2).to_s, "81.000000");
+      d:=169.; test("(169.0).sqrt", d.sqrt.to_s, "13.000000");
+      d:=4.7; test("(4.7).abs", d.abs.to_s, "4.700000");
+      d:=-4.7; test("(-4.7).abs", d.abs.to_s, "4.700000");
+      d:=10.5; d2:=2.5; test("(10.5).mod(2.5)", d.mod(d2).to_s, "0.500000");
+      finish;
+   end; -- double_test
+   
+end; -- class BASE_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

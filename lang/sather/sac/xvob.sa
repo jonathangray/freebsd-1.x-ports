@@ -1,0 +1,288 @@
+--+ Sather to C interface code generated Thu May 23 14:10:13 1991 from xvob.
+--+
+--+ preserve-comment=t.
+--+ sather-c-type-alist=
+--+   ((INT . int) (REAL . float) (DOUBLE . double) 
+--+    (CHAR . char) (BOOL . char) (CKEY . int) 
+--+    (CHAN . int) (CARRAY . "ptr *") (CSTRAY . "ptr *") 
+--+    (OTHERWISE . ptr) )
+--+
+--+ The code consists of three parts.
+--+ xvob.sa contains Sather and C classes importing from C.
+--+ xvob.c contains the corresponding C functions to go with
+--+ the Sather interpreter.
+--+ xvob.macros contains macros to be included in the
+--+ .sather file. Use (include) xvob.macros there.
+--+ If you refer to C structures, the xvob.c file must always
+--+ be included, with the macros file, too.
+--+----------------------------------------------------------------------------
+
+-- PRESERVED FILE HEADER 
+-- -*- Mode: Sather; -*-
+-- File: xvob.sa
+-- Author: Heinz Schmidt (hws@icsi.berkeley.edu)
+-- Created: Mon Dec 17 08:37:25 1990
+-- Copyright (C) 1990, International Computer Science Institute
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION:  Sather to XView interface. 
+--*            Some callbacks receive arguments that they are expected to 
+--*            update and use in calls to Xview or to return updated.
+--*            Many functions want to be macros in the optimizing code.
+--*
+--* CLASSES: C_RECT
+--* 
+--* RELATED PACKAGES: cob.sa, ccob.sa
+--*
+--*  [XvPM2] O'Reilly: XView Programming Manual, Version 2.0
+--*          X Window System Guide, Vol. 7
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- END FILE HEADER 
+
+--*
+--* FOREIGN STRUCTURES
+--* 
+-- Points and rectangles are used all over the place, for instance when we 
+-- are called back to repaint parts of the window; or to define a clipping 
+-- region to Xview. 
+
+class C_RECT is -- an overlay class for the foreign C structure rect.
+
+     -- an XView rectangle.
+   
+   COB; -- a C_RECT is a C object.
+        -- Do not use new, copy or deep-copy here. The C functions generated
+        -- don't know what to do with Sather-created instances.
+
+-- Constructor --
+   create(left:INT; right:INT; width:INT; height:INT):SELF_TYPE is
+            res := C::create_c_rect(left,right,width,height)
+   end;
+
+-- Readers --
+   left:INT is res := C::c_rect_left(self) end;
+   right:INT is res := C::c_rect_right(self) end;
+   width:INT is res := C::c_rect_width(self) end;
+   height:INT is res := C::c_rect_height(self) end;
+
+-- Writers --
+   set_left(x:INT) is C::set_c_rect_left(self,x) end;
+   set_right(x:INT) is C::set_c_rect_right(self,x) end;
+   set_width(x:INT) is C::set_c_rect_width(self,x) end;
+   set_height(x:INT) is C::set_c_rect_height(self,x) end;
+
+end; -- class C_RECT
+
+class C is -- the supporting C ADT for class C_RECT
+
+-- Constructor --
+   create_c_rect(left:INT; right:INT; width:INT; height:INT):$C_RECT is end;
+
+-- Readers --
+   c_rect_left(cob:$C_RECT):INT is end;
+   c_rect_right(cob:$C_RECT):INT is end;
+   c_rect_width(cob:$C_RECT):INT is end;
+   c_rect_height(cob:$C_RECT):INT is end;
+
+-- Writers --
+   set_c_rect_left(cob:$C_RECT; x:INT) is end;
+   set_c_rect_right(cob:$C_RECT; x:INT) is end;
+   set_c_rect_width(cob:$C_RECT; x:INT) is end;
+   set_c_rect_height(cob:$C_RECT; x:INT) is end;
+
+end; -- class C
+
+class C is -- constants and functions
+
+
+--*
+--* XView Functions
+--* 
+-- Generic XView construction, access and destruction (cf. XvPM2) -----------
+-- A number of Xview properties can be used only with xv_create.   For now we
+-- simply support a long arglist. Should we support a LST{$COB} arg instead and
+-- split it in C? Some of the kludge here would go away but then: the Sather-C
+-- would be more fragile.   Since xv_  functions are XView  functions with var
+-- args, it is simpler to  just change the number of args  here. Take care
+-- that only xvlow calls the C functions directly.
+   xv_create(parent:$CHAN; xvclass:CKEY; x1,x2,x3,x4,x5:$COB):$CHAN is 
+     -- creates an XView object. 
+     -- returns xv_null if create fails. parent can be xv_null. 
+   end;
+
+   xv_create20(a:$CHAN; b:CKEY; b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t:$COB):$CHAN is 
+     -- xv_create, more parameters for objects that want many init 
+     -- properties or die with segmentation faults when touched the first time.
+   end;
+
+   xv_destroy(xvobj:$CHAN) is 
+     -- destroys xvobj and inferiors.
+   end;
+
+   xv_destroy_safe(frame:$CHAN) is 
+     -- destroys frame and let's main loop return.
+   end;
+
+-- Some attributes like choice lists take only inline string lists.
+-- so provide a sufficient number of parameters.
+   xv_set(xvobj:$CHAN; x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29:$COB) is 
+     -- sets attributes of xvobj.
+     -- Result indicates failure or success.   
+   end;
+
+   xv_get(xvobj:$CHAN; attr,opt_key:$COB):$COB is 
+     -- gets attribute value, some have key. 0 if fails. 
+   end;
+
+   xv_find(parent,xvclass,x1,x2,x4,x5,x6,x7,x8,x9,x10,x11:$COB):$CHAN is 
+     -- find XView object.
+     -- creates object if XV_AUTO_CREATE = true.
+   end;
+
+   sxv_initialize(argc:INT; argv:CSTRAY) is 
+     -- initializes XView and Sather-XView package.
+     -- argc,argv can be used to pass on command line arguments.
+     -- xv_init is called and read .Xdefaults if present.
+   end;
+
+   xv_main_loop(frame:$CHAN) is 
+     -- starts frame's event handling loop.
+   end;
+
+--*
+--* CALLBACK SUPPORT
+--*
+--  we use the (c_name) compiler directive to allow  calls from  XView to this
+-- code. This  will also  be  respected by  the interpreter.  The addresses of
+-- callbacks  are  stored  in a  table in the xvaux.c  package for registering
+-- callback functions with XView.
+   sxv_cb_adr_(callback:INT):$COB is 
+     -- indexed callback address.   
+   end;
+
+   to_xv_(attr:INT):$COB is 
+     -- indexed XView constant access.
+   end;
+
+--*
+--* Auxiliaries hiding details of event registration
+--* 
+--  the keys involved here at the C side are typically macros which expand into
+--  sequences of event masks. We support only the most common combinations.
+   sxv_win_consume_ascii_events(window:$CHAN) is 
+     -- window is to receive ascii events.
+   end;
+   sxv_win_consume_mouse_events(window:$CHAN) is 
+     -- window is to receive mouse envents.
+   end;
+   sxv_win_consume_right_keys(window:$CHAN) is 
+     -- window is to receive function keys.
+   end;
+   sxv_win_ignore_up_events(window:$CHAN) is 
+     -- window is to ignore all button release's.
+   end;
+   sxv_win_ignore_up_ascii_events(window:$CHAN) is 
+     -- window is to ignore up keys.
+   end;
+
+--* 
+--* XView procedures
+--* 
+--   
+-- listed in the order they appear in the XvAPI1 Summary tables.
+-- Sections are either completely included (except for macros) or 
+-- skipped entirely.
+   xv_col(window,column:$COB):$COB is 
+     -- Common Procedures
+     -- col to pixel (excl. left margin).
+   end;
+   xv_cols(window,columns:$COB):$COB is 
+     -- col to pixel (incl. left margin).
+   end;
+   xv_row(window,row:$COB):$COB is 
+     -- row to pixel (excl. top margin).
+   end;
+   xv_rows(window,rows:$COB):$COB is 
+     -- row to pixel (incl. top margin).
+   end;
+
+-- Cursor Procedures *** skipped
+   frame_get_rect(frame:$COB):$COB is 
+     -- Frame Procedures
+     -- the bounding box of the frame.
+   end;
+   frame_set_rect(frame,rect:$COB) is 
+     -- set the bounding box of the frame.
+   end;
+   frame_fit_all_panes(frame:$COB) is 
+     -- fit subpanes and then frame.
+   end;
+
+-- Menu Procedures
+   menu_show(menu,window,event,null:$COB) is 
+     -- pop up menu over window.
+   end;
+
+-- Panel Procedures *** skipped
+-- Scrollbar Procedures *** skipped
+-- Selection Procedures *** skipped
+-- Text Subwindow Procedures *** skipped
+   window_done(win:$COB):$COB is 
+     -- Window Procedures
+     -- destroys the entire hierarchy to which win belongs. 
+   end;
+
+   window_main_loop(base_frame:$COB) is 
+     -- display frame and start Notifier for it.
+   end;
+
+-- window_bell(win:$COB) is end; -- ring the bell.
+   xv_display_from_window(win:$COB):$COB is 
+     -- the display object.
+   end;
+
+-- window_read_event *** skipped   
+-- Window Manager Procedures *** skipped
+   sxv_install_main_menu(window,menu:$COB) is 
+     --*
+     --* We roll our own abstraction for main menu and notification
+     --*
+     -- Main menu popped up on ACTION_MENU event.
+     -- install window's main menu. 
+   end;
+   sxv_copy_main_menu(oldwindow,newwindow:$COB) is 
+     -- copy menu from one view to other.
+   end;
+
+-- Simple Notice Interface
+   sxv_confirm(prompt_cstr_array,window,event:$COB) is 
+     -- displays prompt and waits for the user to confirm.
+     -- Prompt must be a cstring array ptr.
+     -- The notice window emanates from event's position if not null. 
+     -- Window is mandatory.
+   end;
+
+   sxv_yesorno(prompt_cstr_array,window,event,yes_cstr,no_cstr:$COB):$COB is 
+     -- displays prompt and waits for the user to select a yes or no button.
+     -- One of NOTICE_FAILED, NOTICE_YES, NOTICE_NO is returned.
+     -- Prompt must be a cstring array ptr.
+     -- The notice window emanates from event's position if not null. 
+     -- Window is mandatory.
+   end;
+
+   sxv_query(prompt_cstr_array,window,event,buttons_cstr_array:$COB):$COB is 
+     -- displays prompt and waits for the user to select one of n buttons.
+     -- Prompt must be a cstring array ptr.
+     -- The notice window emanates from event's position if not null. 
+     -- Window is mandatory.
+     -- The number of buttons and the button titles are derived from buttons,
+     -- a C string array ptr.
+   end;
+
+--*
+--* C functions
+--*
+   exit(rc:INT) is 
+     -- exit application.
+   end;
+
+end; -- class C

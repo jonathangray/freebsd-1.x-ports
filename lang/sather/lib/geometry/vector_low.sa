@@ -1,0 +1,1003 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/geometry/vector_low.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Vectors in low dimensions.
+--*
+--* CLASSES: VECTOR_2, VECTOR_3, VECTOR_2_LIST, VECTOR_3_LIST,
+--*          VECTOR_LOW_TEST
+--* 
+--* REQUIRED FILES: data_structure/list.sa, geometry/matrix.sa,
+--*      numerical/math.sa, base/random.sa, base/time.sa, base/test.sa,
+--*      base/C/time_.o, geometry/vector.sa
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: vector_low.sa,v 1.1 1994/02/12 03:23:18 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:35 1993 (hws)
+--*  Oct 17 06:35 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 27 14:48 1993 (hws): require -> pre
+--*  Apr  3 16:57 1993 (hws): assert(pre) -> require
+--* Created: Wed Mar 13 11:16:31 1991 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class VECTOR_2 is
+   -- Two-dimensional vectors.
+   attr x,y:REAL;			-- Components of vector.
+   
+   create:SAME is
+      -- A new `VECTOR_2' initialized to the origin. 
+      res:=new;
+   end; -- create
+   
+   in_vector(v:VECTOR) pre v.dim=2 is
+      -- Put `self' into `v'.
+      v[0]:=x; v[1]:=y;
+   end; -- in_vector
+   
+   from_vector(v:VECTOR):VECTOR_2 pre v.dim=2 is
+      -- Fill in `self' from `v' and return `self'.
+      x:=v[0]; y:=v[1];
+      res:=self;
+   end; -- from_vector
+
+   create_from_vector(v:VECTOR):VECTOR_2 pre v.dim=2 is
+      -- A new `VECTOR_2' with the elements in `v'.
+      res:=new; res.x:=v[0]; res.y:=v[1];
+   end; -- create_from_vector
+
+   vector:VECTOR is
+      -- A vector corresponding to `self'. 
+      res:=VECTOR::create(2); in_vector(res);
+   end; -- vector
+   
+   to_s:STR is
+      -- A string representation of `self' of the form: "(2.34, 4.56)".
+      res:="(".r(x).s(", ").r(y).s(")");
+   end; -- to_s
+
+   create_from_s(s:STR):VECTOR_2 is
+      -- Create a new `VECTOR_2' from a string of the form:
+      -- "(2.34, 4.56)". Returns `void' if not of this form (extra white 
+      -- space is ignored).
+      res:=create;
+      sc:STR_CURSOR:=s.cursor;
+      sc.skip_space;
+      if not sc.c_accept('(') then res:=void; return end;
+      res.x:=sc.get_r;
+      if sc.error/=0 then res:=void; return end;
+      sc.skip_space;
+      if not sc.c_accept(',') then res:=void; return end;
+      res.y:=sc.get_r;
+      if sc.error/=0 then res:=void; return end;
+      sc.skip_space;
+      if not sc.c_accept(')') then res:=void; return end;
+   end; -- create_from_s
+
+   plus(v:VECTOR_2):VECTOR_2 is
+      -- The sum of `self' and `v'.
+      res:=new; res.x:=x+v.x; res.y:=y+v.y;
+   end; -- plus
+   
+   minus(v:VECTOR_2):VECTOR_2 is
+      -- The difference of `self' and `v'.
+      res:=new; res.x:=x-v.x; res.y:=y-v.y;
+   end; -- minus
+   
+   dot(v:VECTOR_2):REAL is
+      -- The dot product of `self' and `v'.
+      res:=x*v.x+y*v.y;
+   end; -- dot
+   
+   to(v:VECTOR_2):VECTOR_2 is
+      -- Make `self' be equal to `v' and return it.
+      x:=v.x; y:=v.y; res:=self;
+   end; -- to
+   
+   scale_by(s:REAL):VECTOR_2 is
+      -- Scale `self' by `s' and return it.
+      x:=x*s; y:=y*s; res:=self;
+   end; -- scale_by
+   
+   to_sum_with(v:VECTOR_2):VECTOR_2 is
+      -- Make `self' be sum with `v' and return it.
+      x:=x+v.x; y:=y+v.y; res:=self;
+   end; -- to_sum_with
+   
+   to_scaled_sum_with(v:VECTOR_2; s:REAL):VECTOR_2 is
+      -- Make `self' be the sum with `s' times `v' and return it.
+      x:=x+s*v.x; y:=y+s*v.y; res:=self;
+   end; -- to_scaled_sum_with
+   
+   to_sum_of(v1,v2:VECTOR_2):VECTOR_2 is
+      -- Make `self' be the sum of `v1' and `v2' and return it.
+      x:=v1.x+v2.x; y:=v1.y+v2.y; res:=self;
+   end; -- to_sum_of
+   
+   to_difference_of(v1,v2:VECTOR_2):VECTOR_2 is
+      -- Make `self' be `v1-v2' and return it.
+      x:=v1.x-v2.x; y:=v1.y-v2.y; res:=self;
+   end; -- to_difference_of
+   
+   to_difference_with(v:VECTOR_2):VECTOR_2 is
+      -- Subtract `v' from `self' and return it.
+      x:=x-v.x; y:=y-v.y; res:=self;
+   end; -- to_difference_with
+
+   to_constant(c:REAL):VECTOR_2 is 
+      -- Make each component of `self' be `c' and return it.
+      x:=c; y:=c; res:=self;
+   end; -- to_constant
+      
+   to_zero:VECTOR_2 is
+      -- Make `self' be the origin and return it.
+      x:=0; y:=0; res:=self;
+   end; -- to_zero
+   
+   to_ones:VECTOR_2 is 
+      -- Make `self' be all ones and return it.
+      x:=1.; y:=1.; res:=self;
+   end; -- to_ones
+   
+   length:REAL is
+      -- Euclidean length of `self'.
+      res:=(x*x+y*y).sqrt;
+   end; -- length
+   
+   square_length:REAL is
+      -- The square of the Euclidean length of `self'.
+      res:=x*x+y*y;
+   end; -- square_length
+   
+   normalize:VECTOR_2 is
+      -- If not `0', then scale `self' to length `1' and return it.
+      l:REAL:=(x*x+y*y).sqrt;
+      if l/=0. then x:=x/l; y:=y/l; end;
+      res:=self;
+   end; -- normalize
+
+   is_normalized:BOOL is
+      -- True if `self' is within `epsilon' of being normalized.
+      res:=MATH::is_epsilon_equal(square_length,1.);
+   end; -- is_normalized
+   
+   distance_to(v:VECTOR_2):REAL is
+      -- The Euclidean distance from `self' to `v'.
+      dx:REAL:=x-v.x; dy:REAL:=y-v.y;
+      res:=(dx*dx+dy*dy).sqrt;
+   end; -- distance_to
+
+   square_distance_to(v:VECTOR_2):REAL is
+      -- The square of the Euclidean distance from `self' to `v'.
+      dx:REAL:=x-v.x; dy:REAL:=y-v.y;
+      res:=dx*dx+dy*dy;
+   end; -- square_distance_to
+
+   to_midpoint_with(v:VECTOR_2):VECTOR_2 is
+      -- Make `self' be the midpoint of `self' and `v' and return it.
+      x:=(x+v.x)/2.; y:=(y+v.y)/2.; res:=self;
+   end; -- to_midpoint_with
+   
+   move_away_from(v:VECTOR_2; d:REAL):VECTOR_2 is
+      -- Move `self' a distance `d' in the direction away from `v' and
+      -- return it.
+      dx:REAL:=x-v.x; dy:REAL:=y-v.y;
+      s:REAL:=(dx*dx+dy*dy).sqrt;
+      if s/=0. then		-- don't do anything if same vector.
+	 s:=d/s;
+	 x:=(s+1.)*x-s*v.x; y:=(s+1.)*y-s*v.y;
+      end; -- if
+      res:=self;
+   end; -- move_away_from
+   
+   move_toward(v:VECTOR_2; d:REAL):VECTOR_2 is
+      -- Move `self' a distance `d' in the direction toward `v' and
+      -- return it.
+      dx:REAL:=x-v.x; dy:REAL:=y-v.y;
+      s:REAL:=(dx*dx+dy*dy).sqrt;
+      if s/=0. then		-- don't do anything if same vector.
+	 s:=d/s;
+	 x:=(1.-s)*x+s*v.x; y:=(1.-s)*y+s*v.y;
+      end; -- if
+      res:=self;
+   end; -- move_toward
+   
+   to_interpolate_between(v0,v1:VECTOR_2; t:REAL):VECTOR_2 is
+      -- When `t=0.' make `self=v0', when `t=1.' make `self=v1', and
+      -- return it.
+      ot:REAL:=1.-t;
+      x:=ot*v0.x+t*v1.x; y:=ot*v0.y+t*v1.y;
+      res:=self;
+   end; -- to_interpolate_between
+   
+   make_orthogonal_to_unit(u:VECTOR_2):VECTOR_2 is
+      -- Subtract off projection onto unit vector `u' and return `self'.
+      d:REAL:=x*u.x+y*u.y;
+      x:=x-d*u.x; y:=y-d*u.y;
+      res:=self;
+   end; -- make_orthogonal_to_unit
+   
+   to_uniform_random:VECTOR_2 is
+      -- Make `self' be a uniformly random vector in the unit square and
+      -- return it.
+      x:=RANDOM::uniform; y:=RANDOM::uniform; res:=self;
+   end; -- to_uniform_random
+   
+   to_normal_random(s:REAL):VECTOR_2 is
+      -- Make `self' be a normal random vector, mean 0, standard deviation
+      -- `s' and return it.
+      x:=RANDOM::normal(0.,s); y:=RANDOM::normal(0.,s); res:=self;
+   end; -- to_normal_random
+
+   to_unit_random:VECTOR_2 is
+      -- Make `self' be unit vector uniform over the unit circle and
+      -- return it.
+      l:REAL;
+      loop			-- get non-zero normally distributed vector
+	 x:=RANDOM::normal(0.,1.); y:=RANDOM::normal(0.,1.);
+	 l:=length; if l/=0. then break! end;
+      end; -- loop
+      scale_by(1./l);
+      res:=self;
+   end; -- to_unit_random
+   
+   to_ball_random:VECTOR_2 is
+      -- Make `self' be uniform in the unit ball and return it.
+      loop
+	 x:=RANDOM::uniform_range(-1.,1.); y:=RANDOM::uniform_range(-1.,1.);
+	 if x*x+y*y<=1. then break! end;
+      end; -- loop
+      res:=self;
+   end; -- to_ball_random
+
+   is_epsilon_equal(v:VECTOR_2):BOOL is
+      -- True if the components of `self' are within `epsilon' of `v'.
+      res:=MATH::is_epsilon_equal(x, v.x) and MATH::is_epsilon_equal(y, v.y);
+   end; -- is_epsilon_equal
+   
+   reflect:VECTOR_2 is
+      -- Reflect `self' through the origin and return it.
+      x:=-x; y:=-y; res:=self;
+   end; -- reflect
+
+   to_perpendicular:VECTOR_2 is
+      -- Rotate `self' counter-clockwise by `pi/2' and return it.
+      t:REAL:=x; x:=-y; y:=t; res:=self;
+   end; -- to_perpendicular
+   
+end; -- class VECTOR_2
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class VECTOR_3 is
+   -- Three-dimensional vectors.
+   attr x,y,z:REAL;			-- Components of vector.
+   
+   create:SAME is
+      -- A new `VECTOR_3' initialized to the origin. 
+      res:=new;
+   end; -- create
+   
+   in_vector(v:VECTOR) pre v.dim=3 is
+      -- Put `self' into `v'.
+      v[0]:=x; v[1]:=y; v[2]:=z;
+   end; -- in_vector
+   
+   from_vector(v:VECTOR):VECTOR_3 pre v.dim=3  is
+      -- Get `self' from `v' and return it.
+      x:=v[0]; y:=v[1]; z:=v[2];
+      res:=self;
+   end; -- from_vector
+
+   create_from_vector(v:VECTOR):VECTOR_3 pre v.dim=3 is
+      res:=new; res.x:=v[0]; res.y:=v[1]; res.z:=v[2];
+   end; -- create_from_vector
+
+   to_s:STR is
+      -- A string representation of `self' of the form: "(2.34, 4.56, 3.4)".
+      res:="(".r(x).s(", ").r(y).s(", ").r(z).s(")");
+   end; -- to_s
+
+   create_from_s(s:STR):VECTOR_3 is
+      -- Create a new `VECTOR_3' from a string of the form:
+      -- "(2.34, 4.56, 3.4)". Returns `void' if not of this form (extra white 
+      -- space is ignored).
+      res:=create;
+      sc:STR_CURSOR:=s.cursor;
+      sc.skip_space;
+      if not sc.c_accept('(') then res:=void; return end;
+      res.x:=sc.get_r;
+      if sc.error/=0 then res:=void; return end;
+      sc.skip_space;
+      if not sc.c_accept(',') then res:=void; return end;
+      res.y:=sc.get_r;
+      if sc.error/=0 then res:=void; return end;
+      sc.skip_space;
+      if not sc.c_accept(',') then res:=void; return end;
+      res.z:=sc.get_r;
+      if sc.error/=0 then res:=void; return end;
+      sc.skip_space;
+      if not sc.c_accept(')') then res:=void; return end;
+   end; -- create_from_s
+   
+   vector:VECTOR is
+      -- A vector corresponding to `self'. 
+      res:=VECTOR::create(3); in_vector(res);
+   end; -- vector
+
+   plus(v:VECTOR_3):VECTOR_3 is
+      -- The sum of `self' and `v'.
+      res:=new; res.x:=x+v.x; res.y:=y+v.y; res.z:=z+v.z;
+   end; -- plus
+   
+   minus(v:VECTOR_3):VECTOR_3 is
+      -- The difference of `self' and `v'.
+      res:=new; res.x:=x-v.x; res.y:=y-v.y; res.z:=z-v.z;
+   end; -- minus
+   
+   dot(v:VECTOR_3):REAL is
+      -- The dot product of `self' and `v'.
+      res:=x*v.x+y*v.y+z*v.z;
+   end; -- dot
+   
+   to(v:VECTOR_3):VECTOR_3 is
+      -- Make `self' be equal to `v' and return it.
+      x:=v.x; y:=v.y; z:=v.z; res:=self;
+   end; -- to
+   
+   scale_by(s:REAL):VECTOR_3 is
+      -- Scale `self' by `s' and return it.
+      x:=x*s; y:=y*s; z:=z*s; res:=self;
+   end; -- scale_by
+   
+   to_sum_with(v:VECTOR_3):VECTOR_3 is
+      -- Make `self' be the sum with `v' and return it.
+      x:=x+v.x; y:=y+v.y; z:=z+v.z; res:=self;
+   end; -- to_sum_with
+   
+   to_scaled_sum_with(v:VECTOR_3; s:REAL):VECTOR_3 is
+      -- Make `self' be the sum with `s' times `v' and return it.
+      x:=x+s*v.x; y:=y+s*v.y; z:=z+s*v.z; res:=self;
+   end; -- to_scaled_sum_with
+   
+   to_sum_of(v1,v2:VECTOR_3):VECTOR_3 is
+      -- Make `self' be the sum of `v1' and `v2' and return it.
+      x:=v1.x+v2.x; y:=v1.y+v2.y; z:=v1.z+v2.z; res:=self;
+   end; -- to_sum_of
+   
+   to_difference_of(v1,v2:VECTOR_3):VECTOR_3 is
+      -- Make `self' be `v1-v2' and return it.
+      x:=v1.x-v2.x; y:=v1.y-v2.y; z:=v1.z-v2.z; res:=self;
+   end; -- to_difference_of
+   
+   to_difference_with(v:VECTOR_3):VECTOR_3 is
+      -- Subtract `v' from `self' and return it.
+      x:=x-v.x; y:=y-v.y; z:=z-v.z; res:=self;
+   end; -- to_difference_with
+
+   to_constant(c:REAL):VECTOR_3 is 
+      -- Make each component of `self' be `c' and return it.
+      x:=c; y:=c; z:=c; res:=self;
+   end; -- to_constant
+
+   to_zero:VECTOR_3 is
+      -- Make `self' be the origin and return it.
+      x:=0; y:=0; z:=0; res:=self;
+   end; -- to_zero
+   
+   to_ones:VECTOR_3 is 
+      -- Make `self' be all ones and return it.
+      x:=1.; y:=1.; z:=1.; res:=self;
+   end; -- to_ones
+   
+   length:REAL is
+      -- Euclidean length of `self'.
+      res:=(x*x+y*y+z*z).sqrt;
+   end; -- length
+   
+   square_length:REAL is
+      -- The square of the Euclidean length of `self'.
+      res:=x*x+y*y+z*z;
+   end; -- square_length
+   
+   normalize:VECTOR_3 is
+      -- If not `0', the scale `self' to length `1' and return it.
+      l:REAL:=(x*x+y*y+z*z).sqrt;
+      if l/=0. then x:=x/l; y:=y/l; z:=z/l; end;
+      res:=self;
+   end; -- normalize
+
+   is_normalized:BOOL is
+      -- True if `self' is within `epsilon' of being normalized.
+      res:=MATH::is_epsilon_equal(square_length,1.);
+   end; -- is_normalized
+   
+   distance_to(v:VECTOR_3):REAL is
+      -- The Euclidean distance from `self' to `v'.
+      dx:REAL:=x-v.x; dy:REAL:=y-v.y; dz:REAL:=z-v.z;
+      res:=(dx*dx+dy*dy+dz*dz).sqrt;
+   end; -- distance_to
+
+   square_distance_to(v:VECTOR_3):REAL is
+      -- The square of the Euclidean distance from `self' to `v'.
+      dx:REAL:=x-v.x; dy:REAL:=y-v.y; dz:REAL:=z-v.z;
+      res:=dx*dx+dy*dy+dz*dz;
+   end; -- square_distance_to
+
+   to_midpoint_with(v:VECTOR_3):VECTOR_3 is
+      -- Make `self' be the midpoint of `self' and `v' and return it.
+      x:=(x+v.x)/2.; y:=(y+v.y)/2.; z:=(z+v.z)/2.; res:=self;
+   end; -- to_midpoint_with
+   
+   move_away_from(v:VECTOR_3; d:REAL):VECTOR_3 is
+      -- Move `self' a distance `d' in the direction away from `v' and
+      -- return it.
+      dx:REAL:=x-v.x; dy:REAL:=y-v.y; dz:REAL:=z-v.z;
+      s:REAL:=(dx*dx+dy*dy+dz*dz).sqrt;
+      if s/=0. then		-- don't do anything if same vector.
+	 s:=d/s;
+	 x:=(s+1.)*x-s*v.x; y:=(s+1.)*y-s*v.y; z:=(s+1.)*z-s*v.z;
+      end; -- if
+      res:=self;
+   end; -- move_away_from
+   
+   move_toward(v:VECTOR_3; d:REAL):VECTOR_3 is
+      -- Move `self' a distance `d' in the direction toward `v' and
+      -- return it.
+      dx:REAL:=x-v.x; dy:REAL:=y-v.y; dz:REAL:=z-v.z;
+      s:REAL:=(dx*dx+dy*dy+dz*dz).sqrt;
+      if s/=0. then		-- don't do anything if same vector.
+	 s:=d/s;
+	 x:=(1.-s)*x+s*v.x; y:=(1.-s)*y+s*v.y; z:=(1.-s)*z+s*v.z;
+      end; -- if
+      res:=self;
+   end; -- move_toward
+   
+   to_interpolate_between(v0,v1:VECTOR_3; t:REAL):VECTOR_3 is
+      -- When `t=0.' make `self=v0', when `t=1.' make `self=v1' and
+      -- return it.
+      ot:REAL:=1.-t;
+      x:=ot*v0.x+t*v1.x; y:=ot*v0.y+t*v1.y; z:=ot*v0.z+t*v1.z;
+      res:=self;
+   end; -- to_interpolate_between
+   
+   make_orthogonal_to_unit(u:VECTOR_3):VECTOR_3 is
+      -- Subtract off projection onto unit vector `u' from `self' and
+      -- return it.
+      d:REAL:=x*u.x+y*u.y+z*u.z;
+      x:=x-d*u.x; y:=y-d*u.y; z:=z-d*u.z;
+      res:=self;
+   end; -- make_orthogonal_to_unit
+   
+   to_uniform_random:VECTOR_3 is
+      -- Make `self' a uniformly random vector in the unit square and
+      -- return it.
+      x:=RANDOM::uniform; y:=RANDOM::uniform; z:=RANDOM::uniform;
+      res:=self;
+   end; -- to_uniform_random
+   
+   to_normal_random(s:REAL):VECTOR_3 is
+      -- Make `self' be a normal random vector, mean 0, standard deviation
+      -- `s' and return it.
+      x:=RANDOM::normal(0.,s); y:=RANDOM::normal(0.,s);
+      z:=RANDOM::normal(0.,s);
+      res:=self;
+   end; -- to_normal_random
+
+   to_unit_random:VECTOR_3 is
+      -- Make `self' be unit vector uniform over the unit circle and
+      -- return it.
+      l:REAL;
+      loop			-- get non-zero normally distributed vector
+	 x:=RANDOM::normal(0.,1.); y:=RANDOM::normal(0.,1.);
+	 z:=RANDOM::normal(0.,1.);
+	 l:=length; if l/=0. then break! end;
+      end; -- loop
+      scale_by(1./l);
+      res:=self;
+   end; -- to_unit_random
+   
+   to_ball_random:VECTOR_3 is
+      -- Make `self' be uniform in the unit ball and return it.
+      loop
+	 x:=RANDOM::uniform_range(-1.,1.); y:=RANDOM::uniform_range(-1.,1.);
+	 z:=RANDOM::uniform_range(-1.,1.);
+	 if x*x+y*y+z*z<=1. then break! end;
+      end; -- loop
+      res:=self;
+   end; -- to_ball_random
+
+   is_epsilon_equal(v:VECTOR_3):BOOL is
+      -- True if the components of `self' are within `epsilon' of `v'.
+      res:=MATH::is_epsilon_equal(x, v.x) and MATH::is_epsilon_equal(y, v.y)
+      and MATH::is_epsilon_equal(z, v.z);
+   end; -- is_epsilon_equal
+   
+   reflect:VECTOR_3 is
+      -- Reflect `self' through the origin and return it.
+      x:=-x; y:=-y; z:=-z; res:=self;
+   end; -- reflect
+
+   to_cross_product_of(v1,v2:VECTOR_3):VECTOR_3 is
+      -- Set `self' to the cross product of `v1' and `v2' and return it.
+      x:=v1.y*v2.z-v2.y*v1.z;
+      y:=v1.z*v2.x-v2.z*v1.x;
+      z:=v1.x*v2.y-v2.x*v1.y;
+      res:=self;
+   end; -- to_cross_product_of
+   
+end; -- class VECTOR_3
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class VECTOR_2_LIST is
+   -- Lists of `VECTOR_2', typically used to hold "polylines" or curves
+   -- for two dimensional graphics.
+   
+   LIST{VECTOR_2};
+
+   -- `create:SAME' is inherited.
+   -- `size:INT' is inherited.
+   
+   vector_list:VECTOR_LIST is
+      -- Make a `VECTOR_LIST' whose vectors are equal to those in `self'.
+      res:=VECTOR_LIST::create;
+      i:INT; loop until!(i=size); res:=res.push([i].vector); i:=i+1 end;
+   end; -- vector_list
+
+   create_from_vector_list(vl:VECTOR_LIST):SAME is
+      -- Given a `VECTOR_LIST' of two-dimensional vectors, make
+      -- a corresponding `VECTOR_2_LIST'.
+      res:=create;
+      i:INT; loop until!(i=vl.size);
+	 res:=res.push(VECTOR_2::create_from_vector(vl[i]));
+	 i:=i+1
+      end; -- loop
+   end; -- create_from_vector_list
+
+   to_s:STR is
+      -- A string version of `self'. Of the form:
+      -- "((1.0, 2.0), (3.5, 3.7))".
+      res:="(";
+      i:INT; loop until!(i=size);
+	 res:=res.s([i].to_s);
+	 i:=i+1;
+	 if i/=size then res:=res.s(", ") end;
+      end; -- loop
+      res:=res.s(")");
+   end; -- to_s
+
+   nearest_to(v:VECTOR_2):INT is
+      -- The index of the first closest vector in `self' to `v'.
+      if size=0 then return end;
+      dbest:REAL:=v.square_distance_to([0]); 
+      i:INT:=1; loop until!(i=size);
+	 d:REAL := v.square_distance_to([i]);
+	 if d<dbest then dbest:=d; res:=i end;
+	 i:=i+1;
+      end; -- loop
+   end; -- nearest_to
+
+   n_nearest_to(v:VECTOR_2; n:INT):LIST{INT} pre n>=0 is
+      -- A list of indices of the `n' closest vectors to `v'.
+      res:=LIST{INT}::create_sized(n+1); -- indices of `n' closest 
+      dsl:LIST{REAL}:=LIST{REAL}::create_sized(n+1); -- square distances
+                	                             -- to `n' closest
+      nbst:REAL:=MATH::maxreal;	-- nth best so far
+      i:INT; loop until!(i=size);
+	 sd:REAL:=v.square_distance_to([i]);
+	 if sd<nbst then
+	    j:INT:=res.size-1; loop until!(j<0);
+	       if sd>=dsl[j] then break! end; -- hit the insertion location
+	       res[j+1]:=res[j]; dsl[j+1]:=dsl[j];
+	       j:=j-1;
+	    end;
+	    res[j+1]:=i; dsl[j+1]:=sd; 
+	    if res.size<n then	-- haven't hit end yet
+	       res.size:=res.size+1; dsl.size:=dsl.size+1;
+	    else
+	       nbst:=dsl[n-1];
+	    end; -- if
+	 end; -- if
+	 i:=i+1
+      end; -- loop
+   end; -- n_nearest_to
+
+   within_square_distance_of(v:VECTOR_2; sr:REAL):LIST{INT} is
+      -- A list of the indices of the vectors in `self' which are within
+      -- a square distance `sr' of `v'.
+      res:=res.create;
+      i:INT; loop until!(i=size);
+	 if v.square_distance_to([i])<=sr then
+	    res:=res.push(i);
+	 end; -- if
+	 i:=i+1
+      end; -- loop
+   end; -- within_square_distance_of
+
+   create_uniform_random(n:INT):VECTOR_2_LIST is
+      -- A list of `n' uniformly distributed random vectors in the unit
+      -- square of the plane.
+      res:=create_sized(n);
+      i:INT; loop until!(i=n);
+	 res:=res.push(VECTOR_2::new.to_uniform_random);
+	 i:=i+1
+      end; -- loop
+   end; -- create_uniform_random
+
+   create_standard_normal_random(n:INT):VECTOR_2_LIST is
+      -- A list of `n' normally distributed random vectors in the plane
+      -- with mean at the origin and unit variance.
+      res:=create_sized(n);
+      i:INT; loop until!(i=n);
+	 res:=res.push(VECTOR_2::new.to_normal_random(1.0));
+	 i:=i+1
+      end; -- loop
+   end; -- create_standard_normal_random
+   
+   scale_by(s:REAL):VECTOR_2_LIST is
+      -- Scale each vector in `self' by `s' and return it.
+      i:INT; loop until!(i=size); [i].scale_by(s); i:=i+1 end;
+      res:=self;
+   end; -- scale_by
+
+   translate_by(v:VECTOR_2):VECTOR_2_LIST is
+      -- Translate each vector in `self' by `v' and return it.
+      i:INT; loop until!(i=size); [i].to_sum_with(v); i:=i+1 end;
+      res:=self;
+   end; -- translate_by
+   
+end; -- class VECTOR_2_LIST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class VECTOR_3_LIST is
+   -- Lists of `VECTOR_3', typically used to hold three dimensional curves
+   -- for graphics.
+   
+      LIST{VECTOR_3};
+
+   -- `create:SAME' is inherited.
+   -- `size:INT' is inherited.
+   
+   vector_list:VECTOR_LIST is
+      -- Make a `VECTOR_LIST' whose vectors are equal to those in `self'.
+      res:=VECTOR_LIST::create;
+      i:INT; loop until!(i=size); res:=res.push([i].vector); i:=i+1 end;
+   end; -- vector_list
+
+   create_from_vector_list(vl:VECTOR_LIST):SAME is
+      -- Given a `VECTOR_LIST' of two-dimensional vectors, make
+      -- a corresponding `VECTOR_3_LIST'.
+      res:=create;
+      i:INT; loop until!(i=vl.size);
+	 res:=res.push(VECTOR_3::create_from_vector(vl[i]));
+	 i:=i+1
+      end; -- loop
+   end; -- create_from_vector_list
+
+   to_s:STR is
+      -- A string version of `self' of the form:
+      -- "((1.0, 2.0, 4.5), (3.5, 3.7, 6.8))".
+      res:="(";
+      i:INT; loop until!(i=size);
+	 res:=res.s([i].to_s);
+	 i:=i+1;
+	 if i/=size then res:=res.s(", ") end;
+      end; -- loop
+      res:=res.s(")");
+   end; -- to_s
+   
+   nearest_to(v:VECTOR_3):INT is
+      -- The index of the first closest vector in `self' to `v'.
+      if size=0 then return end;
+      dbest:REAL:=v.square_distance_to([0]); 
+      i:INT:=1; loop until!(i=size);
+	 d:REAL := v.square_distance_to([i]);
+	 if d<dbest then dbest:=d; res:=i end;
+	 i:=i+1;
+      end; -- loop
+   end; -- nearest_to
+   
+   n_nearest_to(v:VECTOR_3; n:INT):LIST{INT} pre n>=0 is
+      -- A list of indices of the `n' closest vectors to `v'.
+      res:=LIST{INT}::create_sized(n+1); -- indices of `n' closest 
+      dsl:LIST{REAL}:=LIST{REAL}::create_sized(n+1); -- square distances
+                	                             -- to `n' closest
+      nbst:REAL:=MATH::maxreal;	-- nth best so far
+      i:INT; loop until!(i=size);
+	 sd:REAL:=v.square_distance_to([i]);
+	 if sd<nbst then
+	    j:INT:=res.size-1; loop until!(j<0);
+	       if sd>=dsl[j] then break! end; -- hit the insertion location
+	       res[j+1]:=res[j]; dsl[j+1]:=dsl[j];
+	       j:=j-1;
+	    end;
+	    res[j+1]:=i; dsl[j+1]:=sd; 
+	    if res.size<n then	-- haven't hit end yet
+	       res.size:=res.size+1; dsl.size:=dsl.size+1;
+	    else
+	       nbst:=dsl[n-1];
+	    end; -- if
+	 end; -- if
+	 i:=i+1
+      end; -- loop
+   end; -- n_nearest_to
+
+   within_square_distance_of(v:VECTOR_3; sr:REAL):LIST{INT} is
+      -- A list of the indices of the vectors in `self' which are within
+      -- a square distance `sr' of `v'.
+      res:=res.create;
+      i:INT; loop until!(i=size);
+	 if v.square_distance_to([i])<=sr then
+	    res:=res.push(i);
+	 end; -- if
+	 i:=i+1
+      end; -- loop
+   end; -- within_square_distance_of
+
+   create_uniform_random(n:INT):VECTOR_3_LIST is
+      -- A list of `n' uniformly distributed random vectors in the unit
+      -- cube of three-space.
+      res:=create_sized(n);
+      i:INT; loop until!(i=n);
+	 res:=res.push(VECTOR_3::new.to_uniform_random);
+	 i:=i+1
+      end; -- loop
+   end; -- create_uniform_random
+
+   create_standard_normal_random(n:INT):VECTOR_3_LIST is
+      -- A list of `n' normally distributed random vectors in three
+      -- space with mean at the origin and unit variance.
+      res:=create_sized(n);
+      i:INT; loop until!(i=n);
+	 res:=res.push(VECTOR_3::new.to_normal_random(1.0));
+	 i:=i+1
+      end; -- loop
+   end; -- create_standard_normal_random
+
+   scale_by(s:REAL):VECTOR_3_LIST is
+      -- Scale each vector in `self' by `s' and return it.
+      i:INT; loop until!(i=size); [i].scale_by(s); i:=i+1 end;
+      res:=self;
+   end; -- scale_by
+
+   translate_by(v:VECTOR_3):VECTOR_3_LIST is
+      -- Translate each vector in `self' by `v' and return it.
+      i:INT; loop until!(i=size); [i].to_sum_with(v); i:=i+1 end;
+      res:=self;
+   end; -- translate_by
+
+end; -- class VECTOR_3_LIST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class VECTOR_LOW_TEST is
+   -- Test of `VECTOR_2', `VECTOR_3', `VECTOR_2_LIST', and `VECTOR_3_LIST'.
+   
+   TEST;
+
+   main is
+      -- Test of `VECTOR_2', `VECTOR_3', `VECTOR_2_LIST', and `VECTOR_3_LIST'.
+      vector_2_test;
+      vector_3_test;
+      vector_2_list_test;
+      vector_3_list_test;
+   end; -- main
+
+   vector_2_test is
+      -- Test of `VECTOR_2'.
+      class_name("VECTOR_2");
+      STR::precision:=2;
+      test("to and from s",
+	 VECTOR_2::create_from_s("(1.3, 2.6)").to_s, "(1.30, 2.60)");
+      vc:VECTOR:=VECTOR::create(2);
+      VECTOR_2::create_from_s("(1.3, 2.6)").in_vector(vc);
+      test("in_vector", vc.to_s, "(1.30, 2.60)");
+      test("from_vector", VECTOR_2::create.from_vector(vc).to_s,
+	 "(1.30, 2.60)");
+      test("create_from_vector", VECTOR_2::create_from_vector(vc).to_s,
+	 "(1.30, 2.60)");
+      test("vector", VECTOR_2::create_from_s("(1.3, 2.6)").vector.to_s,
+	 "(1.30, 2.60)");
+      v0:VECTOR_2:=VECTOR_2::create_from_s("(1.00, 0.00)");
+      v1:VECTOR_2:=VECTOR_2::create_from_s("(0.00, 1.00)");
+      v2:VECTOR_2:=VECTOR_2::create_from_s("(0.00, 0.00)");
+      test("plus", v0.plus(v1).to_s, "(1.00, 1.00)");
+      test("minus", v0.minus(v1).to_s, "(1.00, -1.00)");
+      test("dot", v0.dot(v1).to_s, "0.00");
+      test("scale_by", v0.copy.scale_by(5.).to_s, "(5.00, 0.00)");
+      test("to", v0.copy.to(v1).to_s, "(0.00, 1.00)");
+      test("to_sum_with", v0.copy.to_sum_with(v1).to_s, "(1.00, 1.00)");
+      test("to_scaled_sum_with", v0.copy.to_scaled_sum_with(v1, 5.).to_s
+	    , "(1.00, 5.00)");
+      test("to_sum_of", v0.copy.to_sum_of(v1,v2).to_s, "(0.00, 1.00)");
+      test("to_difference_of", v0.copy.to_difference_of(v1,v2).to_s
+	    , "(0.00, 1.00)");
+      test("to_difference_with", v0.copy.to_difference_with(v1).to_s
+	    , "(1.00, -1.00)");
+      test("to_constant", v0.copy.to_constant(3.).to_s, "(3.00, 3.00)");
+      test("to_ones", v0.copy.to_ones.to_s, "(1.00, 1.00)");
+      test("to_zero", v0.copy.to_zero.to_s, "(0.00, 0.00)");
+      test("length", v0.copy.scale_by(2.).length.to_s, "2.00");
+      test("square_length", v0.copy.scale_by(2.).square_length.to_s, "4.00");
+      test("normalize", v0.copy.scale_by(5.).normalize.to_s
+	    , "(1.00, 0.00)");
+      test("is_normalized 1", v0.copy.scale_by(5.).is_normalized.to_s, "F");
+      test("is_normalized 2", v0.is_normalized.to_s, "T");
+      test("distance_to",
+	 v0.copy.scale_by(3.).distance_to(v1.copy.scale_by(4.)).to_s, "5.00");
+      test("square_distance_to",
+	 v0.copy.scale_by(3.).square_distance_to(v1.copy.scale_by(4.)).to_s
+	       , "25.00");
+      test("to_midpoint_with", v1.copy.to_midpoint_with(v2).to_s,
+	 "(0.00, 0.50)");
+      test("move_away_from", v1.copy.to_zero.move_away_from(v2,1.).to_s,
+	 "(0.00, 0.00)");
+      test("move_toward", v1.copy.to_zero.move_toward(v1,.5).to_s,
+	 "(0.00, 0.50)");
+      test("to_interpolate_between"
+	    , v2.copy.to_interpolate_between(v0,v1,.5).to_s,
+	 "(0.50, 0.50)");
+      test("make_orthogonal_to_unit",
+	 v0.plus(v1).make_orthogonal_to_unit(v1).to_s, "(1.00, 0.00)");
+      unchecked_test("to_uniform_random", v1.copy.to_uniform_random.to_s, "");
+      unchecked_test("to_normal_random",
+	 v1.copy.to_normal_random(1.0).to_s, "");
+      unchecked_test("to_unit_random", v1.copy.to_unit_random.to_s, "");
+      unchecked_test("to_ball_random", v1.copy.to_ball_random.to_s, "");
+      test("is_epsilon_equal 1", v1.is_epsilon_equal(v1).to_s, "T");
+      test("is_epsilon_equal 2", v1.is_epsilon_equal(v2).to_s, "F");
+      test("reflect", v1.copy.reflect.to_s, "(-0.00, -1.00)");
+      test("to_perpendicular", v1.copy.to_perpendicular.to_s,
+	 "(-1.00, 0.00)");
+      finish;
+   end; -- vector_2_test
+
+   vector_3_test is
+      -- Test of `VECTOR_3'.
+      class_name("VECTOR_3");
+      STR::precision:=2;
+      test("to and from s", VECTOR_3::create_from_s("(1.3, 2.6, 8.2)").to_s
+	       , "(1.30, 2.60, 8.20)");
+      vc:VECTOR:=VECTOR::create(3);
+      VECTOR_3::create_from_s("(1.3, 2.6, 8.7)").in_vector(vc);
+      test("in_vector", vc.to_s, "(1.30, 2.60, 8.70)");
+      test("from_vector", VECTOR_3::create.from_vector(vc).to_s,
+	 "(1.30, 2.60, 8.70)");
+      test("create_from_vector", VECTOR_3::create_from_vector(vc).to_s,
+	 "(1.30, 2.60, 8.70)");
+      test("vector", VECTOR_3::create_from_s("(1.3, 2.6, 8.7)").vector.to_s,
+	 "(1.30, 2.60, 8.70)");
+      v0:VECTOR_3:=VECTOR_3::create_from_s("(1.00, 0.00, 0.00)");
+      v1:VECTOR_3:=VECTOR_3::create_from_s("(0.00, 1.00, 0.00)");
+      v2:VECTOR_3:=VECTOR_3::create_from_s("(0.00, 0.00, 1.00)");
+      test("plus", v0.plus(v1).to_s, "(1.00, 1.00, 0.00)");
+      test("minus", v0.minus(v1).to_s, "(1.00, -1.00, 0.00)");
+      test("dot", v0.dot(v1).to_s, "0.00");
+      test("scale_by", v0.copy.scale_by(5.).to_s, "(5.00, 0.00, 0.00)");
+      test("to", v0.copy.to(v1).to_s, "(0.00, 1.00, 0.00)");
+      test("to_sum_with", v0.copy.to_sum_with(v1).to_s, "(1.00, 1.00, 0.00)");
+      test("to_scaled_sum_with", v0.copy.to_scaled_sum_with(v1, 5.).to_s
+	    , "(1.00, 5.00, 0.00)");
+      test("to_sum_of", v0.copy.to_sum_of(v1,v2).to_s, "(0.00, 1.00, 1.00)");
+      test("to_difference_of", v0.copy.to_difference_of(v1,v2).to_s
+	    , "(0.00, 1.00, -1.00)");
+      test("to_difference_with", v0.copy.to_difference_with(v1).to_s
+	    , "(1.00, -1.00, 0.00)");
+      test("to_constant", v0.copy.to_constant(3.).to_s, "(3.00, 3.00, 3.00)");
+      test("to_ones", v0.copy.to_ones.to_s, "(1.00, 1.00, 1.00)");
+      test("to_zero", v0.copy.to_zero.to_s, "(0.00, 0.00, 0.00)");
+      test("length", v0.copy.scale_by(2.).length.to_s, "2.00");
+      test("square_length", v0.copy.scale_by(2.).square_length.to_s, "4.00");
+      test("normalize", v0.copy.scale_by(5.).normalize.to_s
+	    , "(1.00, 0.00, 0.00)");
+      test("is_normalized 1", v0.copy.scale_by(5.).is_normalized.to_s, "F");
+      test("is_normalized 2", v0.is_normalized.to_s, "T");
+      test("distance_to",
+	 v0.copy.scale_by(3.).distance_to(v1.copy.scale_by(4.)).to_s, "5.00");
+      test("square_distance_to",
+	 v0.copy.scale_by(3.).square_distance_to(v1.copy.scale_by(4.)).to_s
+	       , "25.00");
+      test("to_midpoint_with", v1.copy.to_midpoint_with(v2).to_s,
+	 "(0.00, 0.50, 0.50)");
+      test("move_away_from", v1.copy.to_zero.move_away_from(v2,1.).to_s,
+	 "(0.00, 0.00, -1.00)");
+      test("move_toward", v1.copy.to_zero.move_toward(v2,.5).to_s,
+	 "(0.00, 0.00, 0.50)");
+      test("to_interpolate_between"
+	    , v2.copy.to_interpolate_between(v0,v1,.5).to_s,
+	 "(0.50, 0.50, 0.00)");
+      test("make_orthogonal_to_unit",
+	 v0.plus(v1).make_orthogonal_to_unit(v1).to_s, "(1.00, 0.00, 0.00)");
+      unchecked_test("to_uniform_random", v1.copy.to_uniform_random.to_s, "");
+      unchecked_test("to_normal_random",
+	 v1.copy.to_normal_random(1.0).to_s, "");
+      unchecked_test("to_unit_random", v1.copy.to_unit_random.to_s, "");
+      unchecked_test("to_ball_random", v1.copy.to_ball_random.to_s, "");
+      test("is_epsilon_equal 1", v1.is_epsilon_equal(v1).to_s, "T");
+      test("is_epsilon_equal 2", v1.is_epsilon_equal(v2).to_s, "F");
+      test("reflect", v1.copy.reflect.to_s, "(-0.00, -1.00, -0.00)");
+      test("to_cross_product_of", v0.copy.to_cross_product_of(v0,v1).to_s,
+	 "(0.00, 0.00, 1.00)");
+      finish;
+   end; -- vector_3_test
+
+   vector_2_list_test is
+      -- Test of `VECTOR_2_LIST'.
+      class_name("VECTOR_2_LIST");
+      STR::precision:=2;
+      v0:VECTOR_2:=VECTOR_2::create_from_s("(1.00, 0.00)");
+      v1:VECTOR_2:=VECTOR_2::create_from_s("(0.00, 1.00)");
+      v2:VECTOR_2:=VECTOR_2::create_from_s("(2.00, 0.00)");
+      v3:VECTOR_2:=VECTOR_2::create_from_s("(0.00, 3.00)");
+      vl:VECTOR_2_LIST:=vl.create;
+      vl:=vl.push(v0); vl:=vl.push(v1); vl:=vl.push(v2); vl:=vl.push(v3);
+      test("to_s", vl.to_s,
+	 "((1.00, 0.00), (0.00, 1.00), (2.00, 0.00), (0.00, 3.00))");
+      test("vector_list and create_from_vector_list",
+	 VECTOR_2_LIST::create_from_vector_list(vl.vector_list).to_s,
+	 "((1.00, 0.00), (0.00, 1.00), (2.00, 0.00), (0.00, 3.00))");
+      test("nearest_to", vl.nearest_to(v1).to_s, "1");
+      test("n_nearest_to", vl.n_nearest_to(v1,2).size.to_s, "2");
+      test("within_square_distance_of",
+	 vl.within_square_distance_of(v1,.1).size.to_s, "1");
+      test("create_uniform_random",
+	 VECTOR_2_LIST::create_uniform_random(3).size.to_s, "3");
+      test("create_standard_normal_random",
+	 VECTOR_2_LIST::create_standard_normal_random(3).size.to_s, "3");
+      test("scale_by", vl.scale_by(2.0).to_s,
+	 "((2.00, 0.00), (0.00, 2.00), (4.00, 0.00), (0.00, 6.00))");
+      test("translate_by",
+	 vl.translate_by(VECTOR_2::create_from_s("(1.0,0.0)")).to_s,
+	 "((3.00, 0.00), (1.00, 2.00), (5.00, 0.00), (1.00, 6.00))");
+      finish;
+   end; -- vector_2_list_test
+
+   vector_3_list_test is
+      -- Test of `VECTOR_3_LIST'.
+      class_name("VECTOR_3_LIST");
+      STR::precision:=2;
+      v0:VECTOR_3:=VECTOR_3::create_from_s("(1.00, 0.00, 0.00)");
+      v1:VECTOR_3:=VECTOR_3::create_from_s("(0.00, 1.00, 0.00)");
+      v2:VECTOR_3:=VECTOR_3::create_from_s("(0.00, 0.00, 1.00)");
+      vl:VECTOR_3_LIST:=vl.create;
+      vl:=vl.push(v0); vl:=vl.push(v1); vl:=vl.push(v2);
+      test("to_s", vl.to_s,
+	 "((1.00, 0.00, 0.00), (0.00, 1.00, 0.00), (0.00, 0.00, 1.00))");
+      test("vector_list and create_from_vector_list",
+	 VECTOR_3_LIST::create_from_vector_list(vl.vector_list).to_s,
+	 "((1.00, 0.00, 0.00), (0.00, 1.00, 0.00), (0.00, 0.00, 1.00))");
+      test("nearest_to", vl.nearest_to(v1).to_s, "1");
+      test("n_nearest_to", vl.n_nearest_to(v1,2).size.to_s, "2");
+      test("within_square_distance_of",
+	 vl.within_square_distance_of(v1,.1).size.to_s, "1");
+      test("create_uniform_random",
+	 VECTOR_3_LIST::create_uniform_random(3).size.to_s, "3");
+      test("create_standard_normal_random",
+	 VECTOR_3_LIST::create_standard_normal_random(3).size.to_s, "3");
+      test("scale_by", vl.scale_by(2.0).to_s,
+	 "((2.00, 0.00, 0.00), (0.00, 2.00, 0.00), (0.00, 0.00, 2.00))");
+      test("translate_by",
+	 vl.translate_by(VECTOR_3::create_from_s("(1.0,0.0,0.0)")).to_s,
+	 "((3.00, 0.00, 0.00), (1.00, 2.00, 0.00), (1.00, 0.00, 2.00))");
+      finish;
+   end; -- vector_3_list_test
+
+end; -- class VECTOR_LOW_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

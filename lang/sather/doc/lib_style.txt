@@ -1,0 +1,276 @@
+File: sather/doc/lib_style.txt
+Author: Stephen M. Omohundro
+Created: Thu Apr 18 15:03:49 1991
+Copyright (C) International Computer Science Institute, 1991
+
+
+                  Sather Class Library Style Guide
+
+This file describes the recommended style for writing library classes.
+
+
+Library Files
+
+Each library file should contain the definitions of related classes.
+The file should begin with a header of the form:
+
+-- -*- Mode: Sather;  -*-
+-- File: ob_hash.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Extendible hash tables for representing sets of objects and
+--*           mappings from sets of object keys to objects of a specified
+--*           type.
+--*
+--* CLASSES: OB_HASH_MAP{T}, OB_HASH_MAP_CURSOR{T}, OB_HASH_SET,
+--*          OB_HASH_SET_CURSOR, OB_HASH_TEST
+--*
+--* REQUIRED FILES: list.sa, test.sa
+--*
+--* RELATED FILES: int_hash.sa, str_hash.sa, general_hash.sa
+--*
+--* HISTORY:
+--* Last edited: May 10 15:20 1991 (om)
+--*  May 20 15:05 1991 (om): Added this modification line. 
+--* Created: Sun Sep  9 23:19:38 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This kind of header is automatically generated in the Emacs Sather mode by
+the command "C-c h". The line "-- -*- Mode: Sather;  -*-" tells Emacs
+to use the Sather mode in editing the file. A short description of the
+unifying concept of the file should appear after "FUNCTION:". A list
+of the classes defined in the file (excluding extensions to the `C'
+class) should appear after "CLASSES:". A list of the other files
+needed to compile this file should appear after "REQUIRED FILES:". The
+"RELATED FILES:" section is used to alert the reader to other classes
+with a similar purpose or other connection. The "HISTORY:" section
+automatically gives the date, time, and login name of the last person
+to edit the file after "Last edited:" and the time of creation after
+"Created:". The Emacs command "C-c m" is used to automatically insert
+a line for describing modifications made. 
+
+
+Class Definitions
+
+Following this header, the class definitions should follow, separated
+by a line of the form:
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Each class definition should begin with a comment describing the class
+and any general restrictions or hints on using it. The first and last
+lines have no indentation and a comment with the class name should
+follow the final `end'. All code in the definition proper is indented.
+The standard indentation is three spaces and is the same at all
+levels. A typical example of the form of a class definition is:
+
+class PRIORITY_QUEUE{T} is
+   -- Priority queues.  Retrieves maximal elements first.
+   -- `T' must define `is_less_than' which is used to define the ordering.
+   -- `COMPARABLE_INT' defines this for `INT''s.
+   
+   --The code is placed here.
+   
+end; -- class PRIORITY_QUEUE
+
+Each class should have a `create' routine with an appropriate number
+of arguments. For consistency, such a routine should be defined even
+if it just calls `new'. These routines should declare their return
+type as `SELF_TYPE' so that they may be naturally inherited.
+Specialized creation routines should have names of the form
+`create_foo'. A common example is `create_sized(n:INT)' which creates
+a version of a container object with the given number of slots.
+
+
+Attribute Comments
+
+Every attribute should have a comment following the interface
+definition which describes what the routine or attribute is used for.
+This comment is used by the documentation tools to document the
+feature. For example, the Emacs mode can extract all such comments
+from a given class to provide documentation for that class. It can
+also extract the definition and leading comment for a particular
+routine or object attribute. 
+
+The comment should be short but informative. A complete sentence
+starting with a capital letter and ending with a period is preferred.
+For routines, the types of the arguments are in the prototype and need
+not be repeated in the comment. Any Sather code (such as argument
+names) in the comment should be surrounded by left and right single
+quotes. This allows a reader to determine that the quoted text is not
+to be read as a part of the sentence and allows the documentation
+tools to set such text in a different font (typically Courier). If the
+quoted text itself contains a single quote, it should be surrounded
+with two pairs of single quotes (eg. ``a_string:=a_string.c('x');'').
+Some example comments from the vector class are:
+
+   create(n:INT):SELF_TYPE is
+      -- A zero initialized vector of dimension `n'.
+   
+   plus(v:VECTOR):VECTOR is
+      -- The sum of `self' and `v'.
+
+   to_sum_with(v:VECTOR) is
+      -- Make `self' be the sum with `v'.
+
+Many routines in library classes should begin with an `assert'
+statement named `pre' which checks for the validity of preconditions
+assumed by the class. When a user first uses the class, he will often
+compile with these assertions turned on. They will immediately alert
+him if he calls routines in the class incorrectly. They should not
+require a large amount of computation compared to the function
+computed. Typical examples include checking that the dimensions of
+passed arrays are consistent (eg. when adding two vectors, their
+lengths should be the same) or that a certain argument is not void.
+
+It is generally a good practice to use `SELF_TYPE' for the value
+returned by `create'-like routines. This is so that when a class is
+inherited, the routines create instances of the descendent rather than
+the parent. A similar argument often applies to the declaration of
+the arguments of routines which combine two objects of the same type. 
+
+
+Naming Conventions:
+
+1) Names should be chosen to give a reasonable intuition about the
+meaning.
+
+2) In most cases complete words are prefered to abbreviations. Some
+exceptions include operations which append or insert one of the basic
+types `BOOL', `CHAR', `INT', `REAL', `DOUBLE', or `STR'. Because these
+are used in such abundance, throughout the library they are given the
+one letter abbreviations `b', `c', `i', `r', `d', and `s'. In
+addition, the newline character is associated with the abbreviation
+`nl'.
+
+
+Class Names:
+
+1) Class names must be in upper-case. An underscore should be used to
+separate different words. Eg: `ARRAY_TEST', `BINARY_TREE_NODE'.
+
+2) Test classes should have the name of a class or file followed by
+"_TEST". Eg. `ARRAY_TEST', `FILE_TEST'.
+
+3) Cursor classes should be named by appending "_CURSOR" to the base
+classname. Eg. `STR_CURSOR', `BIT_VECTOR_CURSOR'.
+
+4) Special classes for specific dimensions are indicated by appending
+the dimension after the class name. Eg. `VECTOR_2' and `VECTOR_3' for
+two and three-dimensional vectors, `MATRIX_3' for 3 by 3 matrices.
+When more than one dimension is important, they should be listed
+separated by an underscore: eg. `AFFINE_MAP_1_1', `AFFINE_MAP_1_2',
+`AFFINE_MAP_1_3', `AFFINE_MAP_2_1', `AFFINE_MAP_2_2',
+`AFFINE_MAP_2_3', `AFFINE_MAP_3_1', `AFFINE_MAP_3_2', `AFFINE_MAP_3_3'
+give special versions of affine maps for the various dimensions.
+
+5) If there are many classes that form a group that will often be used
+with other classes, it is a good idea to give them a common prefix.
+For example, classes defining different tokens in a parser for an
+arithmetic package might all be prefixed by "ARITH_". This helps avoid
+conflicts and allows the most natural name to be chosen after the
+prefix. 
+
+6) Classes which define sets of a particular type should have names of
+the form `FOO_SET', eg. `INT_HASH_SET', `OB_HASH_SET', etc. Classes which
+are just lists of objects a particular type with special routines
+defined should be named `FOO_LIST', eg. `VECTOR_LIST', `BOX_LIST'.
+Classes which define mappings from one domain to another should have
+names of the form `FOO_MAP', eg. `VECTOR_MAP', `INT_HASH_MAP'.
+
+7) Versions of classes which are less convenient to use but are more
+efficient than the most basic type should be prefixed with "FAST_".
+Eg. `FAST_QUEUE', `FAST_BIT_VECTOR'.
+
+
+Routine Names:
+
+1) Routine names are in lower case with an underscore separating the
+different words. 
+
+2) Some preferred words: `clear', `create', `cursor', `delete',
+`difference', `first', `get', `index', `init', `insert',
+`intersection', `item', `limit', `random', `range', `size',
+`sym_difference', `uniform', `union'.
+
+3) Predicates which test whether a certain property holds for an
+object should have names of the form `is_foo'. Eg. from `CHAR':
+`is_alpha', `is_upper', from `STR': `is_upper_case', from `INT_SET':
+`is_a_subset_of', `is_empty', from `LINE': `is_parallel_to', from
+`VECTOR': `is_normalized', etc.
+
+4) Each library class should define `create:SELF_TYPE' to define the
+standard way to make new objects. This routine should have arguments
+for the parameters which are most likely to change. For parameters
+which mostly remain the same, it is preferable to have them
+initialized to a default value and then change them after the object
+is created. Often this default value will come from a shared variable
+in the class named `foo_default'. In this way, the user can set his
+standard values and then create many objects.
+
+Another technique is to pass a small init specification
+object as a `foo_default' argument to `create'. This is preferable
+if a number of shareds would be necessary to determine the initialization
+and if interferences between otherwise unrelated calls might result
+from a partial setting of these shareds. This technique also
+continues to work in a parallel extension of Sather. Like the shared,
+the same foo_default value can be used for several calls to create.
+
+5) Special creation routines should have names of the form
+`create_foo'.  A common instance is `create_sized(n:INT)' which allows
+one to specify an initial size for an object (eg. lists, strings, hash
+tables). Names of the form `create_from_foo' is also useful when you
+want to create a special object from a more general kind (eg. in
+VECTOR_2: create_from_vector(v:VECTOR):VECTOR_2).
+
+6) Most geometric classes should define `dim:INT' to return the dimension
+of the space they are defined in.
+
+7) When routine names are read in place a routine call should read almost
+like a grammatical sentence. Eg. in `INT_SET': `s1.is_a_subset_of(s2)'.
+
+8) Names of the form `to_foo' are used for routines which alter `self'
+in a way which should be described by the name. The most basic version
+is just `to' which is used to fill in the attributes of an object with
+the values held in another object (unlike `copy' this doesn't declare
+any new space for the object). Eg. in `VECTOR': `v1.to(v2)' sets `v1'
+to be equal to `v2'. The next most complex version changes `self' to
+hold a specific value. Eg. in `VECTOR': `v.to_zero' sets `self' to be
+the origin, `v.to_ones' sets each entry to be equal to one and
+`v.to_uniform_random' sets `v' to be a random vector in the unit cube.
+Finally constructions like: `to_sum_with(v:VECTOR)' changes `self' to
+become its sum with `v'.  For basic classes like `INT' or `REAL',
+where it is not possible to change `self', the names of the form
+`to_foo' return a transformed version of `self'. For example in `INT',
+`i.to_s' returns a string version of `i'.
+
+9) Names like `foo_in' are used to change the attributes of one of the
+arguments. Eg. in `VECTOR_LIST': `l.mean_in(v)' will put the mean of
+the vectors in `l' into the vector `v' and `l.covariance_in(c)' puts
+the covariance of the vectors into the matrix `c'. Such constructions
+(and those of the form `to_' do not require the allocation of new
+space and so are more efficient from a garbage collection point of
+view. They also allow the alteration of objects which are already a
+part of complex structures with changing any pointers into the object.
+
+
+Cursor classes:
+
+These classes provide pointers into container classes which hold sets
+of items and allow one to step through each item. The preferred
+interface often includes the following routines:
+
+create(c:CONTAINER_TYPE):SELF_TYPE is: A cursor into `c' which is
+   initialized to the first element.  
+
+first:HELD_TYPE is: Set the cursor to the first location, if any and
+   return the corresponding item.
+
+next:HELD_TYPE is: Move the cursor to the next location and return the
+   corresponding item.
+
+is_done:BOOL True if all entries finished.
+
+item:HELD_TYPE is: The current item in the set.
+

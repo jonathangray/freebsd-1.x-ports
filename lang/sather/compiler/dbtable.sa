@@ -1,0 +1,366 @@
+-- -*- Mode: Sather;  -*-
+-- File: dbtable.sa
+-- Author: Jeff Bilmes (bilmes@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+--          Oscar Bosman (oscar@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Provides routines so that the Sather compiler can produce tables
+--*   that sdb needs.
+--*
+--* RCS: $Id: dbtable.sa,v 1.1 1994/02/12 03:21:50 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 04:57 1993 (hws)
+--*  Oct 17 04:30 1993 (hws): Sather 1 syntax chnages
+--*  Aug 23 10:26 1993 (oscar): strcmp -> sstrcmp to fob off ANSI C compiler
+--* Created: Fri Mar  1 16:44:38 1991 (bilmes)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class CFILEENT is
+   attr cFileName:STR;
+   attr cLineNo:INT;
+
+   create(s:STR;i:INT):CFILEENT is
+      -- 
+      res := res.new;
+      res.cFileName := s;
+      res.cLineNo := i;
+   end; -- create(s:STR;i:INT)
+
+end; -- class CFILEENT
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class SATLINEEXP is
+   -- sather line expansion
+
+   SORTOB; -- array's of these are sortable 
+   attr cFiles:ARRAY{CFILEENT}; -- the C files sather filename:lineno trans to.
+   const defLength:INT := 20;
+   attr satFileName:STR; -- sather file name
+   attr satLineNo:INT;   -- the sather line number for this entry
+   attr length:INT;
+
+   create(sfn:STR;sln:INT):SATLINEEXP is
+      res := SATLINEEXP::new;
+      res.cFiles := ARRAY{CFILEENT}::new(defLength);
+      res.length := 0;
+      res.satFileName := sfn;
+      res.satLineNo := sln;
+   end; -- SATLINEEXP
+   
+   add(cfname:STR;ln:INT) is
+      -- 
+      if length >= cFiles.asize then
+	 at:ARRAY{CFILEENT} := cFiles;
+	 cFiles := at.extend(2*at.asize);
+	 at.clear;
+      end;
+      cfe:CFILEENT := cfe.create(cfname,ln);
+      cFiles[length] := cfe;
+      length := length + 1;
+   end; -- add
+
+   print(outfile:FILE) is
+      -- 
+      i:INT;
+      outfile.s(satFileName).s(":").i(satLineNo);
+      i:=0; loop until!(i >= length);
+	 outfile.s(" ").s(cFiles[i].cFileName).s(":").i(cFiles[i].cLineNo);
+	 i := i + 1;
+      end;
+      outfile.nl;
+   end; -- print(outfile:FILE)
+
+   comp(slep:$SORTOB):INT is
+      -- compare self with given sle
+      -- return -1 if self < sle
+      -- return 0 if self = sle
+      -- return 1 if self > sle
+      sle:SATLINEEXP := slep;
+      val:INT := C::sstrcmp(C::str_ptr_(satFileName),C::str_ptr_(sle.satFileName));
+      if val < 0 then
+	 res := -1;
+      elsif val > 0 then
+	 res := 1;
+      elsif satLineNo < sle.satLineNo then
+	 res := -1;
+      elsif satLineNo > sle.satLineNo then
+	 res := 1;
+      else
+	 res := 0;
+      end;
+   end; -- comp
+   
+end; -- class SATLINEEXP
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class DBTABLE is
+
+   const defSize:INT := 20; -- corresponds to avg number of files
+
+   shared entries:ARRAY{SATLINEEXP};
+   shared curLength:INT := 0; -- current length of entries
+   shared entryMap:STRINT_TO_INT; -- map from <satherFileName,satherLineNo>
+                                  -- to index in entries array
+
+   shared satherFiles:STR2INT2STR;  -- map from sather file name <--> index number
+   shared numSatherFiles:INT := 0;
+   shared cFiles:STR2INT2STR;  -- map from C file name <--> index number
+   shared numCFiles:INT := 0;
+
+   init is
+      -- initialize all tables.
+      entries := ARRAY{SATLINEEXP}::new(defSize);
+      curLength := 0;
+      entryMap := STRINT_TO_INT::create;
+      satherFiles := STR2INT2STR::create;
+      cFiles := STR2INT2STR::create;
+   end; -- init
+   
+   addCLine(satherFileName:STR;satherLineNo:INT;cFileName:STR;cClineNo:INT) is
+      -- add to the global debugger table the cfile:lineno that corresponds
+      -- to the given sather file name and line number
+      loc:INT;
+
+      loc := entryMap.get(satherFileName,satherLineNo);
+      if loc = -1 then
+	 -- file not entered yet.
+	 entryMap.insert(satherFileName,satherLineNo,curLength);
+	 if curLength >= entries.asize then
+	    a:ARRAY{SATLINEEXP} := entries;
+	    entries := a.extend(2*a.asize);
+	    a.clear;
+	 end;
+	 sle:SATLINEEXP := SATLINEEXP::create(satherFileName,satherLineNo);
+	 sle.add(cFileName,cClineNo);
+	 entries[curLength] := sle;
+	 curLength := curLength + 1;
+      else
+	 entries[loc].add(cFileName,cClineNo);
+      end;
+      
+   end; -- addCLine
+
+   sort is
+      -- Sort the information so that things get printed out in order
+      -- in the debugger table. Then insert the Sather and C file names
+      -- into str <--> int tables to the table will reference the strings
+      -- as ints.
+      i,j:INT;
+      SORTER::qsort(entries,0,curLength-1);
+      
+      i := 0; loop until!(i >= curLength);
+	 if satherFiles.insert(entries[i].satFileName,numSatherFiles) then
+	    numSatherFiles := numSatherFiles + 1;
+	 end;
+	 j := 0; loop until!(j >= entries[i].length);
+	    if cFiles.insert(entries[i].cFiles[j].cFileName,numCFiles) then
+	       numCFiles := numCFiles + 1;
+	    end;
+	    j := j + 1;
+	 end;
+	 i := i + 1;
+      end;
+
+   end; -- sort
+
+   print is
+      -- print out the debugger table in the form:
+      -- 
+      -- <numSatherFiles>
+      -- satherFile1
+      -- ...
+      -- <numCFiles>
+      -- C file 1
+      -- ...
+      -- satherFileNum:satherFileLineNum cfileNum:cfilelineno ...
+      -- ...
+
+      i,j:INT;
+      prev:INT := -1;
+      sort;
+      outfile:FILE := FILE::new;
+      outfname:STR :=  STR::create.s(COMPILER_OPTIONS::target_dir).
+	                          s("_dbg_output_");
+      outfile.open_for_write(outfname);
+      if (outfile.error /= 0) then
+	 SATHER_SEMANT::error_msg(STR::create.s("Error in opening \"").
+	                s(outfname).s("\"\n"));
+	 return;
+      end;
+      
+      outfile.i(numSatherFiles).nl;
+      i := 0; loop until!(i >= numSatherFiles);
+	 outfile.s(satherFiles.gets(i)).nl;
+	 i := i + 1;
+      end;
+      outfile.i(numCFiles).nl;      
+      i := 0; loop until!(i >= numCFiles);
+	 outfile.s(cFiles.gets(i)).nl;
+	 i := i + 1;
+      end;
+      
+      i := 0; loop until!(i >= curLength);
+	 item:INT := satherFiles.geti(entries[i].satFileName);
+	 if item /= prev then
+	    outfile.c('_').i(item).s(":").nl;
+	 end;
+	 outfile.i(entries[i].satLineNo);
+	 prev := item;
+	 j := 0; loop until!(j >= entries[i].length);
+	    outfile.s(" ").i(
+	    cFiles.geti(entries[i].cFiles[j].cFileName)).s(":").
+	      i(entries[i].cFiles[j].cLineNo);
+	    j := j + 1;
+	 end;
+	 outfile.nl;
+	 i := i + 1;
+      end;
+
+      outfile.close;
+   end; -- print
+
+   
+end; -- class DBTABLE
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class TWOINTS is
+   attr cFileIndex:INT;
+   attr cLineNum:INT;
+end; -- class TWOINTS
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class SATLINEENT is
+   attr satLineNo:INT;  -- sather line for this file
+   attr numEnts:INT;
+   attr cFileEnts:ARRAY{TWOINTS}; -- array of C file entries.
+
+   create:SAME is
+      -- 
+      res := SAME::new;
+      res.cFileEnts := ARRAY{TWOINTS}::new(1); -- most entries only have one C file.
+      res.numEnts := 0;
+   end; -- create
+
+   add(item:STR_CURSOR) is
+      -- add data from string provided by cur which is assumed to be in regex form:
+      --   (<int>:<int>)+
+      loop until!(item.is_done);
+	 if numEnts >= cFileEnts.asize then
+	    t:ARRAY{TWOINTS} := cFileEnts;
+	    cFileEnts := t.extend(t.asize*2);
+	    t.clear;
+	 end;
+	 cFileEnts[numEnts] := TWOINTS::new;
+	 cFileEnts[numEnts].cFileIndex := item.get_i;
+	 item.get_c;
+	 cFileEnts[numEnts].cLineNum := item.get_i;	 
+	 item.skip_space;
+      end;
+   end; -- add
+   
+end; -- class SATLINEENT
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+class SATFILEENT is
+   attr satFileEnts:ARRAY{SATLINEENT};
+   attr numEnts:INT;
+   const defaultLineEntries:INT := 200;
+   
+   create:SAME is
+      -- 
+      res := SAME::new;
+      res.satFileEnts := ARRAY{SATLINEENT}::new(defaultLineEntries);
+   end; -- create
+   
+   add(s:STR) is
+      -- add a sather file entry by parsing string which
+      -- is assumed to be of the form:
+      --     satherLineNo<space>cFileNameIndex<colon>cLineNumber
+      -- with possible repeating <space>cFileNameIndex<colon>cLineNumber
+
+      item:STR_CURSOR;
+      if numEnts >= satFileEnts.asize then
+	 t:ARRAY{SATLINEENT} := satFileEnts;
+	 satFileEnts := t.extend(t.asize*2);
+	 t.clear;
+      end;
+      item := s.cursor;
+      satFileEnts[numEnts] := SATLINEENT::create;
+      satFileEnts[numEnts].satLineNo := item.get_i;
+      item.skip_space;
+      satFileEnts[numEnts].add(item);
+   end; -- add
+
+
+end; -- class SATFILEENT
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~   
+
+class DTABLE_TST is
+
+   main(args:ARRAY{STR}) is
+      -- 
+      DBTABLE::init;
+      i:INT;
+      i := 0; loop until!(i >= 20);
+	 DBTABLE::addCLine("foo.sa",i,"foo.c",2*i);
+	 i := i + 1;
+      end;
+      i := 5; loop until!(i >= 20);
+	 DBTABLE::addCLine("foo.sa",i,"bar.c",2*i-1);
+	 i := i + 1;
+      end;
+      i := 10; loop until!(i >= 20);
+	 DBTABLE::addCLine("foo.sa",i,"baz.c",2*i-2);
+	 i := i + 1;
+      end;
+      i := 15; loop until!(i >= 20);
+	 DBTABLE::addCLine("foo.sa",i,"spoons.c",2*i-3);
+	 i := i + 1;
+      end;
+      
+      i := 0; loop until!(i >= 20);
+	 DBTABLE::addCLine("bar.sa",i,"foo.c",2*i);
+	 i := i + 1;
+      end;
+      i := 0; loop until!(i >= 15);
+	 DBTABLE::addCLine("bar.sa",i,"bar.c",2*i-1);
+	 i := i + 1;
+      end;      
+      i := 0; loop until!(i >= 10);
+	 DBTABLE::addCLine("bar.sa",i,"baz.c",2*i-2);
+	 i := i + 1;
+      end;      
+      i := 0; loop until!(i >= 5);
+	 DBTABLE::addCLine("bar.sa",i,"spoons.c",2*i-3);
+	 i := i + 1;
+      end;      
+
+      DBTABLE::print;
+      -- if args[1] /= void then
+	--  dbtr:DBTABLE_READ := dbtr.create;
+	--  OUT::s("reading\n");
+	-- dbtr.read(args[1]);
+      -- end;
+   end; -- main
+   
+end; -- class DTABLE_TST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+

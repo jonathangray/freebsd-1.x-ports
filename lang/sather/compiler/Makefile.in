@@ -1,0 +1,194 @@
+# File: Mkf.gen
+# Author: Jeff Bilmes
+# Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+#
+# COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+# and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+# LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+# distribution. The license is also available from ICSI, 1947 Center
+# St., Suite 600, Berkeley CA 94704, USA.
+# 
+# Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au),
+#          Oscar Bosman (oscar@csis.dit.csiro.au)
+# (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+# Australia, 1992, 1993.
+# The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+# to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# FUNCTION:
+#    Makefile for the compiler itself.
+#
+#* RCS: $Id: Makefile.in,v 1.1 1994/02/12 03:21:46 hsu Exp $
+#* HISTORY:
+#* Last edited: Feb 16 11:47 1992 (hws)
+#*  Oct 31 14:23 1993 (hws): fill ENVI in, in boot-create step
+#*  Oct 24 22:19 1993 (hws): add distclean
+#*  Oct 24 19:37 1993 (hws): typo in krboot-create
+#*  Oct 24 19:00 1993 (hws): propagate GUESS_ENVI to install.sa
+#*  Sep 27 22:42 1993 (hws): pass ARCH not ARCHITECTURE in compiler step
+#*  Sep  3 14:38 1993 (hws): boot-create: create ANSI and KR version
+#*  Sep  3 01:49 1993 (hws): move SATHERBOOTFILEDIR to Mkf.site
+#*  Aug 31 17:30 1993 (oscar): and use $ARCH when compiling compiler
+#*  Aug 30 15:27 1993 (oscar): pass $ARCH in boot_compile
+#*  May 18 00:07 1993 (hws): Use "make" in the boot compiler "Makefile"
+#*  May  4 16:32 1993 (hws): adapt to boot compiler "Makefile"
+#*  Apr 16 22:24 1993 (hws): avoid libgc.a symlink
+#*  Apr 16 17:25 1993 (hws): drop libm.a treatment
+#*  Apr  1 15:28 1993 (hws): quote MAINCC, sgi requires "cc -cckr"
+#*  Jun 28 14:59 1992 (hws): compiler config must work with SATHER_HOME not TOPDIR.
+#*  Feb 16 11:47 1992 (hws): finally deleted all the sather home adj stuff in the boot compiler.
+#*  Feb  1 19:33 1992 (hws): include shared defaults now.
+#*  Feb  1 17:46 1992 (hws): ARCH itecture dependent bin introduced 
+#* Created: Mon Jan  7 09:33:08 1991
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Local defaults
+SATHERCFILEDIR = cs.cs
+SATHER_HOMEADJUST = adj.commands
+
+# The boot compiler is the result of translating the sather compiler
+# to C. This C code is ANSI C by default and KR C in case the 
+# command line option -kr is used with cs. The boot compiler is 
+# distributed in both C versions so users need one compiler only.
+SATHERBOOTCFILEDIR = cs.cs.boot${CLANG}
+ANSIBOOTDIR  = cs.cs.boot
+KRBOOTDIR    = cs.cs.bootkr
+
+CODEFILES = c_codegen.sa classob.sa classob_s.sa classs_tab.sa \
+  class_tab.sa codeob.sa common_data.sa cs_keys.sa constants.sa cs.sa \
+  dbkey.sa dbsupport.sa dbtable.sa declob.sa declob_s.sa dot_sa.sa \
+  exprob.sa exprob_s.sa exprob_s2.sa fd.macros fd.sa featob.sa featob_s.sa \
+  filetypes.sa hash.sa inc_compile.sa info.sa install.sa \
+  i2iset.sa key.sa lexer.h lst.sa lst_codeob.sa make-parser map-c-names \
+  opt_stm_s.sa persist.sa semant.sa sorter.sa ssather.y stmtob.sa stmtob_s.sa \
+  str_buffer.sa str_set.sa str_table.sa symtab.sa syserr.sa time.sa timer.c \
+  timer.sa typeob.sa typeob_s.sa .sather .sa.c_fstat .sa.persist \
+  syserr.macros
+
+all: cs
+
+
+# Defaults adjustments for compiler. The compiler/install.sa is used
+# generate a configuration specific file.
+
+BOOTCREATE=  NO
+
+config:
+	@echo Customizing compiler sources in-${ENVI}.sa "..."
+	-${RM} ${SATHER_HOMEADJUST}
+	@echo '1,$$s,'\"@SATHER_HOME@\"','\"${SATHER_HOME}\"',g' > ${SATHER_HOMEADJUST}
+	@echo '1,$$s,'\"@SATHER_ENVI@\"','\"${ENVI}\"',g' >> ${SATHER_HOMEADJUST}
+	@echo '1,$$s,'\"@DATE@\"','\"${CONFIG_DATE}\"',g' >> ${SATHER_HOMEADJUST}
+	@echo '1,$$s,'\"@VERSION@\"','\"${RELEASEVERSION}\"',g' >> ${SATHER_HOMEADJUST}
+	@echo '1,$$s,'\"@HOST@\"','\"${HOSTNAME}\"',g' >> ${SATHER_HOMEADJUST}
+	@echo '1,$$s,'\"@CC@\"','\"${CC}\"',g' >> ${SATHER_HOMEADJUST}
+	( if [ "${BOOTCREATE}" = NO ] ; then \
+	    ${ECHO} '1,$$s,'\"@GUESS_ENVI@\"','\"${GUESS_ENVI}\"',g' >> ${SATHER_HOMEADJUST} ; \
+	    ${ECHO} '1,$$s,'\"@CP@\"','\"${CP}\"',g' >> ${SATHER_HOMEADJUST} ; \
+	    ${ECHO} '1,$$s,'\"@LN@\"','\"${LN}\"',g' >> ${SATHER_HOMEADJUST} ; \
+	    ${ECHO} '1,$$s,'\"@RM@\"','\"${RM}\"',g' >> ${SATHER_HOMEADJUST} ; \
+	    ${ECHO} '1,$$s,'\"@MD@\"','\"${MD}\"',g' >> ${SATHER_HOMEADJUST} ; \
+	    ${ECHO} '1,$$s,'\"@TEST@\"','\"${TEST}\"',g' >> ${SATHER_HOMEADJUST} ; \
+	    ${ECHO} '1,$$s,'\"@CMP@\"','\"${CMP}\"',g' >> ${SATHER_HOMEADJUST} ; \
+	    ${ECHO} '1,$$s,'\"@ECHO@\"','\"${ECHO}\"',g' >> ${SATHER_HOMEADJUST} ; \
+  	 else \
+	    ${ECHO} '1,$$s,'\"@GUESS_ENVI@\"','\"${GUESS_ENVI}\"',g' >> ${SATHER_HOMEADJUST} ; \
+	    ${ECHO} '1,$$s,'\"@CP@\"','\"cp\"',g' >> ${SATHER_HOMEADJUST} ; \
+	    ${ECHO} '1,$$s,'\"@LN@\"','\"cp\"',g' >> ${SATHER_HOMEADJUST} ; \
+	    ${ECHO} '1,$$s,'\"@RM@\"','\"rm\"',g' >> ${SATHER_HOMEADJUST} ; \
+	    ${ECHO} '1,$$s,'\"@MD@\"','\"mkdir\"',g' >> ${SATHER_HOMEADJUST} ; \
+	    ${ECHO} '1,$$s,'\"@TEST@\"','\"test\"',g' >> ${SATHER_HOMEADJUST} ; \
+	    ${ECHO} '1,$$s,'\"@CMP@\"','\"cmp\"',g' >> ${SATHER_HOMEADJUST} ; \
+	    ${ECHO} '1,$$s,'\"@ECHO@\"','\"echo\"',g' >> ${SATHER_HOMEADJUST} ; \
+	 fi )
+	@echo w >> ${SATHER_HOMEADJUST}
+	@echo q >> ${SATHER_HOMEADJUST}
+	-${RM} in-${ENVI}.sa
+	-${CP} install.sa in-${ENVI}.sa
+	${ED} in-${ENVI}.sa < ${SATHER_HOMEADJUST} 
+	@echo "... done"
+	
+# compiler building 
+
+cs: ssather.o timer.o precompiled
+	@echo Making complete compiler. 
+	( SATHER_ENVI=${ENVI}; export SATHER_ENVI; \
+	 SATHER_HOME=${TOPDIR}; export SATHER_HOME; \
+	 ${CS} ${CSFLAGS} -x ${ENVI} -hom ${TOPDIR} cs ; \
+	 ( cd cs.cs ; ${MKCMD} MAINCC="${MAINCC}" MAINFLAGS="${MAINFLAGS}" ); \
+	)
+	${CP} ./cs.cs/cs ${CS}
+	${TOUCH} cs
+
+ssather.c: ssather.y lexer.h
+	${YACC} ssather.y
+	${MV} y.tab.c ssather.c
+
+# compile the boot Sather compiler and clear when executable is available
+# to save space
+
+bootcs: ssather.o timer.o
+	@echo Making boot compiler.
+	( cd ${SATHERBOOTCFILEDIR}; ${SATHER_MAKE} SATHER_ENVI=${ENVI} \
+	 CC="${MAINCC}" CFLAGS="${CFLAGS}" \
+	 SATHER_HOME=${TOPDIR} \
+	 SATHER_MAKE=${SATHER_MAKE} MAINFLAGS="${MAINFLAGS}" ${BOOTFLAGS}; )
+	${CP} ${SATHERBOOTCFILEDIR}/cs ${CS}
+	-( cd ${SATHERBOOTCFILEDIR}; ${RM} *.o )
+	${TOUCH} bootcs
+	@echo ...Done.
+
+# comile the precompiled classes
+
+precompiled: bootcs
+	( cd ${TOPDIR}/sys/C/crt_pre; ${MAKE} SATHER_HOME=${TOPDIR} )
+	${TOUCH} precompiled
+
+clean:
+	-${RM} -r *.cs bootcs cs precompiled timer.o ssather.o *~
+	-( cd ${SATHERBOOTCFILEDIR}; ${RM} *.o )
+	-${RM} -r ${SATHERCFILEDIR}
+
+distclean:
+	${MAKE} clean
+	-( cd ${ANSIBOOTDIR} ; ${RM} class_stat_ name_ind_ )
+	-( cd ${KRBOOTDIR} ; ${RM} cs.sa_ class_stat_ name_ind_ )
+
+# Distribution support
+# also includes parser generation now, so yacc is not needed on target system.
+
+boot-create:
+	make ENVI=${ARCH} BOOTCREATE=YES config
+	make ENVI=${ARCH}kr BOOTCREATE=YES config
+	make SATHER_HOME=${SATHER_HOME} TOPDIR=${SATHER_HOME} ansiboot-create;
+	make SATHER_HOME=${SATHER_HOME} TOPDIR=${SATHER_HOME} krboot-create;
+	make ssather.c
+
+# need to overwrite target. otherwise a kr compiler will assume it produces
+# for kr
+
+ansiboot-create:
+	${CS} -x ${ARCH} -gen -all -info cs
+	-${RM} -r ${ANSIBOOTDIR}
+	${MV} cs.cs ${ANSIBOOTDIR}
+
+krboot-create:
+	${CS} -kr -gen -all -info cs
+	-${RM} -r ${KRBOOTDIR}
+	${MV} cs.cs ${KRBOOTDIR}
+
+# Development support
+
+release:
+	${RM} -r ${SATHER_HOME}/compiler/
+	( cd ..; ${CP} -pR compiler ${SATHER_HOME} )
+
+CIMSG = Sather file
+allci:
+	ci -u -m'${CIMSG}' ${CODEFILES}
+allco:
+	ci -l ${CODEFILES}
+
+.c.o: ${TOPDIR}/sys/C/all_.h
+	${CC} $(CFLAGS) -I${TOPDIR}/sys/C -c $<
+

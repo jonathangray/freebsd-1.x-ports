@@ -1,0 +1,337 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/user_interface/sunwind.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Generic sunwindow interface.
+--*
+--* CLASSES: SUNWIND, SUNWIND_TEST, SUNWIND_GRAPHICS_TEST
+--* 
+--* REQUIRED FILES: graphics/graphics_out.sa, base/test.sa
+--*                 user_interface/C/sunwind_.o
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: sunwind.sa,v 1.1 1994/02/12 03:23:24 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 07:45 1993 (hws)
+--*  Oct 17 07:44 1993 (hws): Sather 1 syntax, copyright note
+--* Created: Wed Oct 10 15:38:35 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class SUNWIND is
+   -- Generic sunwindow interface. This class provides a simple user
+   -- interface under SunView which is sufficient for many applications.
+   -- It puts up a window consisting of a graphics output section which
+   -- is a 512 by 512 square and an input section. This consists of a
+   -- variable number of labelled buttons, sliders, and text input
+   -- fields. It also has a region for printing out text messages to
+   -- the user. To use, set `SUNWIND::routine_ob' to an object whose class
+   -- defines `mouse_routine', `button_routine', and `slider_routine'. Then
+   -- call `win_create', then `win_loop'. See the test classes for examples.
+   -- The ".sather" file must include the following entries to allow
+   -- the calling of the appropriate Sather function from the C
+   -- sunwindows code:
+   -- (c_name) mouse_routine SUNWIND::mouse_routine
+   -- (c_name) button_routine SUNWIND::button_routine
+   -- (c_name) slider_routine SUNWIND::slider_routine
+   -- The sunwindow libraries must be linked in by including the line:
+   -- (cc_flags) -lsuntool -lsunwindow -lpixrect -lm
+   -- in your ".sather" file as well. (And don't forget to include
+   -- (c_files) ~/sl/lib/user_interface/C/sunwind_.o)
+   -- An example ".sather" file is in "sather/etc/test/sunwind_test.sather".
+   
+   GRAPHICS_OUT;
+      -- Defines: line_width, point_diameter, filled, line_gray,
+      -- fill_gray, str_l, str_c, str_r, str_loc, font
+
+   shared routine_ob:$SUNWIND:=SUNWIND::new; -- Object whose class
+                                             --- defines the callbacks.
+   
+   win_create(butnum,slinum,txtnum:INT) is
+      -- Create a new window and display it, with `butnum' buttons,
+      -- `slinum' sliders, and `txtnum' text input fields. Last button
+      -- will automatically be a quit button.
+      C::win_create(butnum,slinum,txtnum);
+   end; -- win_create
+   
+   win_loop is
+      -- Start up the main window loop.
+      C::win_loop;
+   end; -- win_loop
+   
+   mouse_routine(but,x,y,evt:INT) is
+      -- Just calls the client mouse routine when a mouse button is pressed
+      -- or the mouse is moved with a button depressed (dragging).
+      -- `but' will be set to `1', `2', or `3' depending on the mouse button
+      -- pressed. `x' and `y' will be set to the canvas coordinates of
+      -- the mouse press on the canvas. `evt' will be `1' for a downward
+      -- mouse button press, `2' for button release, and `3' for drag.
+      if self=void then SUNWIND::routine_ob.mouse_routine(but,x,y,evt) end;
+   end; -- mouse_routine
+   
+   button_routine(but:INT) is
+      -- Just calls the client button routine when a button is pressed.
+      -- `but' will be the number of the button which was pressed.
+      if self=void then SUNWIND::routine_ob.button_routine(but) end;
+   end; -- button_routine
+
+   slider_routine(slider,value:INT) is
+      -- Just calls the client slider routine when a slider is moved.
+      -- `slider' will be set to the slider number, `value' to the
+      -- value of that slider.
+      if self=void then SUNWIND::routine_ob.slider_routine(slider,value) end;
+   end; -- slider_routine
+   
+   draw_rect_p(xa,ya,xb,yb:INT) is
+      -- Xor a rectangle with coordinates specified in window pixels.
+      C::draw_rect(xa,ya,xb,yb);
+   end; -- draw_rect_p
+   
+   display_message(message:STR) is
+      -- Put `message' in the message region of the window.
+      C::display_panel_message(C::str_ptr_(message))
+   end; -- display_panel_message
+   
+   clear_canvas is
+      -- Erase the canvas portion of the window.
+      C::clear_canvas
+   end; -- clear_canvas
+   
+   set_frame_label(s:STR) is
+      -- Label the frame with the string `s'.
+      C::set_frame_label(C::str_ptr_(s));
+   end; -- set_frame_label
+   
+   set_button_label(b:INT; s:STR) is
+      -- Label button number `b' with the string `s'.
+      C::set_button_label(b,C::str_ptr_(s));
+   end; -- set_button_label
+
+   set_slider_label(sl:INT; s:STR) is
+      -- Label slider number `sl' with the string `s'.
+      C::set_slider_label(sl, C::str_ptr_(s));
+   end; -- set_slider_label
+   
+   set_slider_params(sl,minval,maxval,val:INT) is
+      -- Set the parameters of slider number `sl'. `minval' is the minimum
+      -- value it can represent, `maxval' is the maximum value, and `val'
+      -- is the current value it should be set to.
+      C::set_slider_params(sl,minval,maxval,val);
+   end; -- set_slider_params
+   
+   slider_val(sli:INT):INT is
+      -- The current setting of slider number `sli'.
+      res := C::slider_val(sli) 
+   end; -- slider_val
+   
+   set_text_label(t:INT; s:STR) is
+      -- Label text input field number `t' with `s'.
+      C::set_text_label(t,C::str_ptr_(s));
+   end; -- set_text_label
+   
+   set_text_value(t:INT;s:STR) is
+      -- Set the current value of text input field `t' to `s'.
+      C::set_text_value(t,C::str_ptr_(s));
+   end; -- set_text_value
+   
+   get_text_value(t:INT):STR is
+      -- The current setting of text input field number `t'.
+      res:=C::makestr_(C::get_text_value(t));
+   end; -- get_text_value
+   
+   draw_line_p(xa,ya,xb,yb:INT) is
+      -- Draw a line segment specified in pixels.
+      C::draw_line(xa,ya,xb,yb);
+   end; -- draw_line
+   
+   draw_circle_p(x,y,r:INT) is
+      -- Draw circle specified in pixels.
+      C::draw_circle(x,y,r);
+   end; -- draw_circle_p
+   
+   draw_line_xor_p(xa,ya,xb,yb:INT) is
+      -- Xor draw a line segment specified in pixels.
+      C::draw_line_xor(xa,ya,xb,yb);
+   end; -- draw_line_xor_p
+   
+   draw_line_xor(xa,ya,xb,yb:REAL) is
+      -- Xor draw a line segment with real endpoints.
+      C::draw_line_xor((xa*512).floor,((1.-ya)*512).floor,
+         (xb*512).floor,((1.-yb)*512).floor);
+   end; -- draw_line_xor
+
+   draw_point_p(x,y:INT) is
+      -- Draw a point with pixel coordinates.
+      C::draw_point(x,y)
+   end; -- draw_point
+
+   draw_point_xor(x,y:REAL) is
+      -- Xor draw a single point with real coordinates.
+      C::draw_box_xor(5,(x*512).floor-2,((1.-y)*512).floor-2)
+   end; -- draw_point
+
+   draw_box_xor_p(sz,x,y:INT) is
+      -- Xor draw a box with pixel coords and size `sz'. (Good for marking
+      -- points on the screen).
+      C::draw_box_xor(sz,x,y);
+   end; -- draw_box_xor
+   
+   draw_box_p(sz,x,y:INT) is
+      -- Draw a box with pixel coords and size `sz'. (Good for marking
+      -- points on the screen).
+      C::draw_box(sz,x,y);
+   end; -- draw_box
+   
+-- The GRAPHICS_OUT versions are given below:
+   
+   draw_point(x,y:REAL) is
+      -- Draw a single point.
+      C::draw_box(5,(x*512).floor-2,((1.-y)*512).floor-2)
+   end; -- draw_point
+   
+   draw_line (x1,y1,x2,y2:REAL) is
+      -- Draw a line segment in `0.,1.' coordinates.
+      C::draw_line((x1*512).floor,((1.-y1)*512).floor,
+         (x2*512).floor,((1.-y2)*512).floor);
+   end; -- draw_line
+
+   draw_rect(x1,y1,x2,y2:REAL) is
+      -- Draw a rectangle in `[0.,1.]' coordinates.
+      C::draw_rect((x1*512).floor,((1.-y1)*512).floor,
+	 (x2*512).floor,((1.-y2)*512).floor);
+   end; -- draw_rect
+   
+   draw_rect_xor(x1,y1,x2,y2:REAL) is
+      -- Xor draw a rectangle in `0.,1.' coordinates.
+      draw_line_xor(x1,y1,x2,y1);
+      draw_line_xor(x2,y1,x2,y2);
+      draw_line_xor(x2,y2,x1,y2);
+      draw_line_xor(x1,y2,x1,y1);
+   end; -- draw_line_xor
+   
+   draw_circle(x,y,r:REAL) is
+      -- Draw a circle centered at `(x,y)' of radius `r'. 
+      C::draw_circle((x*512).floor,((1.-y)*512).floor,(r*512).floor);
+   end; -- draw_circle
+
+   draw_circle_xor(x,y,r:REAL) is
+      -- Xor draw a circle centered at `(x,y)' of radius `r'. 
+      C::draw_circle_xor((x*512).floor,((1.-y)*512).floor,(r*512).floor);
+   end; -- draw_circle_xor
+   
+   draw_str (x,y:REAL; s:STR) is
+      -- Draw the string `s' with point specified by `str_loc' at `(x,y)'.
+      if str_loc=str_l then
+	 C::draw_text((512*x).floor,(512*(1.-y)).floor-8,C::str_ptr_(s));
+	    -- Since measures letters from their tops.
+      elsif str_loc=str_c then
+	 l:INT:=s.length;		-- number of chars.
+	 sh:REAL:=7.*l/1024.;	-- amount to shift by (assumes 7 pixel chars)
+	 C::draw_text((512*(x-sh)).floor,(512*(1.-y)).floor-8,C::str_ptr_(s));
+      elsif str_loc=str_r then
+	 l:INT:=s.length;		-- number of chars.
+	 sh:REAL:=7.*l/512.;	-- amount to shift by (assumes 7 pixel chars)
+	 C::draw_text((512*(x-sh)).floor,(512*(1.-y)).floor-8,C::str_ptr_(s));
+      end; -- if
+   end; -- draw_str
+
+end; -- class SUNWIND
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class C is
+   win_create(butnum,slinum,txtnum:INT) is end; -- create a window
+   win_loop is end; -- start up the event loop
+   draw_rect(xa,ya,xb,yb:INT) is end;
+   display_panel_message(message:F_OB) is end;
+   clear_canvas is end;
+   set_frame_label(s:F_OB) is end;
+   set_button_label(b:INT; s:F_OB) is end;
+   set_slider_label(sl:INT; s:F_OB) is end;
+   set_slider_params(sl,minval,maxval,val:INT) is end;
+   slider_val(sli:INT):INT is end;
+   set_text_label(t:INT; s:F_OB) is end;
+   set_text_value(t:INT; s:F_OB) is end;
+   get_text_value(t:INT):F_OB is end;
+   draw_line(xa,ya,xb,yb:INT) is end;
+   draw_circle(x,y,r:INT) is end;
+   draw_line_xor(xa,ya,xb,yb:INT) is end;
+   draw_point(x,y:INT) is end; 
+   draw_box_xor(sz,x,y:INT) is end;
+   draw_box(sz,x,y:INT) is end;
+   draw_box_xor(s,x,y:INT) is end;
+   draw_circle_xor(x,y,r:INT) is end;
+   draw_text(x,y:INT; s:F_OB) is end;
+end; -- class C
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class SUNW_TEST is
+   -- Try out SUNWIND.
+   
+   SUNWIND;
+   
+   xa,ya,xb,yb:INT;
+   
+   main is 
+      SUNWIND::routine_ob:=new;
+      win_create(5,5,5); 
+      draw_circle(.5,.5,.2);
+      display_message("This is\ a test.");
+      win_loop;
+   end;
+   
+   button_routine(but:INT) is
+      s:STR:="Mouse button ".copy.i(but).s(".");
+      display_message(s);
+   end;
+	 
+   mouse_routine(but,x,y,evt:INT) is
+      if but=1 then
+	 if evt=1 then 
+	    xa:=x; ya:=y; xb:=x; yb:=y; draw_rect_p(xa,ya,xb,yb);
+	 elsif evt=3 then 
+	    draw_rect_p(xa,ya,xb,yb); 
+	    xb:=x; yb:=y; 
+	    draw_rect_p(xa,ya,xb,yb);
+	 else
+	    draw_rect_p(xa,ya,xb,yb); 
+	    draw_circle_p((xa+xb)/2,(ya+yb)/2,(xb-xa)/2);
+	 end;
+      end;
+   end;
+   
+end; -- class SUNW_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class SUNGFX_TEST is
+   -- Try out SUNWIND version of GRAPHICS_OUT.
+   
+   main is
+      s:SUNWIND:=s.new;
+      s.win_create(1,0,0);
+      s.init;
+      i:INT; loop until!(i=50); s.draw_point(RANDOM::uniform,RANDOM::uniform); i:=i+1 end;
+      s.draw_line(.1,.1,.9,.9);
+      s.draw_str(.3,.1,"This is\ a test");
+      s.finish;
+      s.win_loop;
+   end; -- main
+   
+end; -- class SUNGFX_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1,0 +1,403 @@
+-- File: compile_keys.sa
+-- Author: Chu-Cheow Lim and Jeff Bilmes
+-- Created: Mon Jun  4 08:52:13 1990
+-- Copyright (C) International Computer Science Institute, 1990, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Each class takes care of a compilation key.  The name of a
+--*           class consists of the keyword followed by "_KEYOB". 
+--*
+--* RCS: $Id: cs_keys.sa,v 1.1 1994/02/12 03:21:49 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 29 23:05 1993 (hws)
+--*  Oct 29 23:05 1993 (hws): change the .sather syntax
+--*  Oct  6 00:05 1993 (hws): remove (c_makefile) options and change
+--*         (c_files) option to (object_files) option.
+--*  Nov 26 23:59 1991 (hws): integrate clim's -chk patch
+--* 18 Jan: Remove "locate_cmacro" routine, because we have implemented
+--*         a INT_TO_INTSET data structure to retrieve C macros for a C
+--*         name more rapidly. 
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class COMPILE_KEYOB is
+   
+   error_msg(s:STR) is
+      C::error_msg(C::str_ptr_(s));
+   end;
+   
+   error_exit(s:STR) is
+      C::error_exit(C::str_ptr_(s));
+   end; 
+   
+   -- "start", "terminate" are needed specifically for C_MACRO_KEYOB
+   --   and C_NAME_KEYOB
+   
+   start(nm:STR) is
+      -- Start of current command.  Only useful for C_MACRO_KEYOB
+
+      error_msg(STR::create.s("(COMPILE_KEYOB) : Unexpected string \"").s(nm).
+                s("\"\n"));
+   end; -- start
+
+   terminate is
+      -- End of current command
+   end; -- terminate
+
+   cmacro_def(i:INT):STR is
+      -- Only relevant for C_MACRO_KEYOB
+   end; -- cmacro_def
+   
+   insert(nm:STR) is
+      -- Store string in "_KEYOB" objects
+   end; -- insert
+
+   create:SAME is
+      res := new;
+   end; -- create
+
+   info_size:INT is
+      -- All descendents must define amount of information they hold
+   end; -- if
+   
+   ith_str(i:INT):STR is
+      -- Only relevant for GENERIC_KEYOB, OBJECT_FILES_KEYOB
+   end; -- ith_str
+   
+   ith_info(i:INT):LIST{STR} is
+      -- Relevant for C_NAME_KEYOB, C_MACRO_KEYOB 
+   end; -- ith_info
+   
+   cprint_self(outfile:OUTFILE) is
+   end; -- cprint_self
+   
+end; -- class COMPILE_KEYOB
+
+--------------------------------------------------------------------
+
+class GENERIC_KEYOB is
+   
+   COMPILE_KEYOB;
+   
+   attr info:LIST{STR};
+   -- A list of names for makefile called to compiler C code.  
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create:SAME is
+      res := new;
+      res.info := res.info.create(1);
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   insert(nm:STR) is
+      -- Store string
+      info := info.push(nm);
+   end; -- push
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   info_size:INT is
+      res := info.insert;
+   end; -- if
+
+   ith_str(i:INT):STR is
+      res := info[i];
+   end; -- ith_str
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_self(outfile:OUTFILE) is
+      outfile.s("(generic) ");
+      i:INT := 0;
+      sz:INT := info.insert;
+      loop until!(i >= sz);
+	 outfile.s(info[i]).
+	         s("\n");
+	 i := i + 1;
+      end; -- loop
+      outfile.s("\n");
+   end; -- cprint_self
+   
+end; -- class GENERIC_KEYOB
+
+--------------------------------------------------------------------
+
+class OBJECT_FILES_KEYOB is
+
+   COMPILE_KEYOB;
+   
+   attr info:LIST{STR};			
+      -- A list of C source file names to be compiled with Sather
+      --   generated C files.
+   
+   attr num_OBJECT_FILES:INT;
+      -- Number of C source files
+
+   const init_num_OBJECT_FILES:INT := 5;
+      -- Default initial number of C source files
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create: SAME is
+      res := new;
+      res.info        := res.info.create(-1);
+      res.num_OBJECT_FILES := 0;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   insert(nm:STR) is
+      info := info.push(nm); 
+   end; -- insert
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   info_size:INT is
+      res := info.insert;
+   end; -- if
+
+   ith_str(i:INT):STR is
+      res := info[i];
+   end; -- ith_str
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_self(outfile:OUTFILE) is
+      outfile.s("(object_files) ");
+      i:INT := 0;
+      sz:INT := info.insert;
+      loop until!(i >= sz);
+	 outfile.s(info[i]).
+	         s("\n");
+	 i := i + 1;
+      end; -- loop
+      outfile.s("\n");
+   end; -- cprint_self
+   
+end; -- class OBJECT_FILES_KEYOB
+   
+--------------------------------------------------------------------
+   
+class C_NAME_KEYOB is
+
+   COMPILE_KEYOB;
+   
+   attr info:LIST{LIST{STR}};		-- Stores name entries
+   attr name_ent:LIST{STR};
+
+   const def_num_ent:INT := 20;	-- Expected number of c_name commands
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create:SAME is
+      res := new;
+      res.info := res.info.create(def_num_ent);
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   insert(nm:STR) is
+      -- There should be only two entries per c_name command. 
+      if (name_ent = void) then
+	 name_ent := name_ent.create(-1).push(nm);
+      elsif (name_ent.insert >= 2) then
+	 -- *! Temporarily give a no-so-informative msg
+	 error_exit(STR::create.s("(C_NAME_KEYOB) : Unexpected third entry (").
+		s(name_ent[0]).s(") (").s(name_ent[1]).s(") (").s(nm).
+	            s(")\n"));
+      else 
+	 name_ent := name_ent.push(nm);
+      end; -- if
+   end; -- insert
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   terminate is
+      -- End of c_name command
+      if (name_ent /= void) then
+	 if (name_ent.insert /= 2) then
+	    -- There should be exactly two entries per c_name command.
+	    
+	    -- *! Temporarily give a no-so-informative msg
+	    error_exit("(C_NAME_KEYOB) : Wrong number of entries\n");
+	 else
+	    info := info.push(name_ent);
+	    name_ent := void;
+	 end; -- if
+      end; -- if
+   end; -- terminate
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   info_size:INT is
+      res := info.insert;
+   end; -- if
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   ith_info(i:INT):LIST{STR} is
+      res := info[i];
+   end; -- ith_info
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_self(outfile:OUTFILE) is
+      outfile.s("(c_name) ");
+      i:INT := 0;
+      size:INT := info.insert;
+      loop until!(i >= size);
+	 j:INT := 0;
+	 sz:INT;
+	 if (info[i] /= void) then
+	    sz := info[i].insert;
+	 end; -- if
+	 loop until!(j >= sz);
+	    outfile.s(info[i][j]).
+	            s("\n");
+	    j := j + 1;
+	 end; -- loop
+	 outfile.s("\n");
+	 i := i + 1;
+      end; -- loop
+      outfile.s("\n");
+   end; -- cprint_self
+   
+end; -- class C_NAME_KEYOB
+
+--------------------------------------------------------------------
+
+class C_MACRO_KEYOB is
+   
+   COMPILE_KEYOB;
+   
+   attr info:LIST{LIST{STR}};		-- Store macro entries
+   attr macro_ent:LIST{STR};		
+
+   const def_num_ent:INT := 10;	-- Expected number of macro entries
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create:SAME is
+      res := new;
+      res.info := res.info.create(def_num_ent);
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   start(nm:STR) is
+      -- Handle first string of macro command, which has been checked
+      -- to be a quoted expression.
+      
+      if (macro_ent = void) then   
+	 macro_ent := macro_ent.create(-1).push(nm);
+      else
+	 -- *! Is the expression for error msg valid?
+	 -- *! Temporarily give a no-so-informative msg
+	 error_exit(STR::create.s("(C_MACRO_KEYOB) : Unexpected quoted expr \"").s(nm).
+	            s("\"\n"));
+      end; -- if
+   end; -- start
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   insert(nm:STR) is
+      -- Insert identifiers after quoted expression
+      if (macro_ent = void) then
+	 -- *! Is the expression for error msg valid?
+	 -- *! Temporarily give a no-so-informative msg
+	 error_exit(STR::create.s("(C_MACRO_KEYOB) : Quoted expr expected before \"").
+	            s(nm).s("\"\n"));
+      else
+	 macro_ent := macro_ent.push(nm);
+      end; -- if
+   end; -- insert
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   terminate is
+      -- End of c_macro command
+      if (macro_ent /= void) then
+	 info := info.push(macro_ent);
+	 macro_ent := void;
+      end; -- if
+   end; -- terminate
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cmacro_def(i:INT):STR is
+      -- Return the C macro definition at that index
+      -- Note: Assume index is valid.
+      res := info[i][0];
+   end; -- cmacro_def
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   info_size:INT is
+      res := info.insert;
+   end; -- if
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   ith_info(i:INT):LIST{STR} is
+      res := info[i];
+   end; -- ith_info
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_self(outfile:OUTFILE) is
+      outfile.s("(c_macro) ");
+      i:INT := 0;
+      size:INT := info.insert;
+      loop until!(i >= size);
+	 j:INT := 0;
+	 sz:INT;
+	 if (info[i] /= void) then
+	    sz := info[i].insert;
+	 end; -- if
+	 loop until!(j >= sz);
+	    outfile.s(info[i][j]).
+	            s("\n");
+	    j := j + 1;
+	 end; -- loop
+	 outfile.s("\n");
+	 i := i + 1;
+      end; -- loop
+      outfile.s("\n");
+   end; -- cprint_self
+   
+end; -- class C_MACRO_KEYOB
+
+--------------------------------------------------------------------
+
+class COMPILE_KEYS_CONST is
+   -- Names of compilation keys and corresponding indices
+   
+   const source_files_kw:STR := "source_files:";
+   const object_files_kw:STR := "object_files:";
+   const cc_flags_kw:STR     := "cflags:";
+   const c_macro_kw:STR      := "macro:";
+   const c_name_kw:STR       := "name:";
+   const include_kw:STR      := "include:";
+   const sather_home_kw:STR  := "sather_home:";
+   const c_compiler_kw:STR   := "cc:";
+
+   -- Indices are also reusable as tokens for command file
+   const source_files_ind:INT := 0;
+   const object_files_ind:INT := 1;
+   const cc_flags_ind:INT     := 2;
+   const c_macro_ind:INT      := 3;
+   const c_name_ind:INT       := 4;
+   const include_ind:INT      := 5;
+   const sather_home_ind:INT  := 6;
+   const c_compiler_ind:INT   := 7;
+   
+   const compile_keys_fst_ind:INT := 0;
+   const compile_keys_lst_ind:INT := 7;
+
+   const num_compile_keys:INT := 8;
+   
+   const non_compile_key_ind:INT := compile_keys_lst_ind + 1;
+
+   const eof_tok:INT   := -1; 
+   const ident_tok:INT := -2; 
+   const qexp_tok:INT  := -3;
+
+   compile_key_p(i:INT):BOOL is
+      -- Return "true" if integer is among the indices for command keywords
+      res := (i <= compile_keys_lst_ind) and (i >= compile_keys_fst_ind);
+   end; -- compile_key_p
+   
+end; -- class COMPILE_KEYS_CONST
+
+--------------------------------------------------------------------
+

@@ -1,0 +1,172 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/data_structure/binary_tree.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Binary trees.
+--*
+--* CLASSES: BINARY_TREE_NODE, BINARY_TREE_P_NODE, BINARY_TREE_NODE_TEST 
+--*
+--* REQUIRED FILES: ../base/test.sa
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: binary_tree.sa,v 1.1 1994/02/12 03:23:25 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:30 1993 (hws)
+--*  Oct 17 06:30 1993 (hws): Sather 1 syntax, copyright note
+--* Created: Mon Jun 25 16:57:58 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class BINARY_TREE_NODE is
+   -- Binary tree nodes, not necessarily any parent pointers.   
+   
+   attr lt,rt:SAME;		-- Left and right pointers.
+
+   create:SAME is
+      -- A new leaf node.
+      res:=new;
+   end; -- create
+   
+   is_leaf:BOOL is
+      -- True if node is a leaf of the tree.
+      res:=(lt=void and rt=void)
+   end; -- is_leaf
+
+   depth:INT is
+      -- The depth of subtree rooted at this node.
+      if lt=void then 
+	 if rt=void then res:=0 
+	 else res:=1+rt.depth end
+      else
+	 if rt=void then res:=1+lt.depth
+	 else res:=1+lt.depth.max(rt.depth) end;
+      end; -- if
+   end; -- depth
+   
+   number_of_leaves:INT is
+      -- The number of leaves in subtree rooted at this node.
+      if lt=void then 
+	 if rt=void then res:=1 
+	 else res:=rt.number_of_leaves end
+      else
+	 if rt=void then res:=lt.number_of_leaves
+	 else res:=lt.number_of_leaves+rt.number_of_leaves end
+      end; -- if
+   end; -- number_of_leaves
+   
+   nodes_at_depth(d:INT):INT is
+      -- The number of nodes at depth `d' from this node.
+      if d=0 then res:=1
+      else
+	 if lt=void then 
+	    if rt=void then res:=0 
+	    else res:=rt.nodes_at_depth(d-1) end
+	 else
+	    if rt=void then res:=lt.nodes_at_depth(d-1)
+	    else res:=lt.nodes_at_depth(d-1)+rt.nodes_at_depth(d-1) 
+	    end
+	 end; -- if
+      end; -- if
+   end; -- nodes_at_depth
+   
+   total_depth:INT is
+      -- Sum of the depths of all the leaves.
+      res:=total_depth_helper(0)
+   end; -- total_depth
+   
+   total_depth_helper(d:INT):INT is
+      -- The contribution of the leaves beneath this root which is at
+      -- depth d, to the total depth.
+      if lt=void then 
+	 if rt=void then res:=d 
+	 else res:=rt.total_depth_helper(d+1) end
+      else
+	 if rt=void then res:=lt.total_depth_helper(d+1)
+	 else res:=lt.total_depth_helper(d+1)+rt.total_depth_helper(d+1)
+	 end;
+      end; -- if
+   end; -- total_depth_helper
+   
+   width:INT is
+      -- The maximum width of the tree rooted at `self'.
+      if lt=void then 
+	 if rt=void then res:=1
+	 else res:=rt.width end;
+      else
+	 if rt=void then res:=lt.width
+	 else res:=lt.width+rt.width
+	 end; -- if
+      end; -- if
+   end; -- width
+
+   leftmost_leaf:SAME is
+      -- The leftmost leaf in the tree.
+      if lt=void then 
+	 if rt=void then res:=self 
+	 else res:=rt.leftmost_leaf end 
+      else
+	 res:=lt.leftmost_leaf
+      end; -- if
+   end; -- leftmost_leaf
+   
+end; -- class BINARY_TREE_NODE
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class BINARY_TREE_P_NODE is
+   -- Binary tree nodes with parent pointers.
+   
+   BINARY_TREE_NODE;
+   
+   attr par:SAME;		-- parent pointer
+   
+end; -- class BINARY_TREE_P_NODE
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class BTREE_TEST is
+   -- Test of `BINARY_TREE_NODE' and `BINARY_TREE_P_NODE'.
+   
+   TEST;
+   
+   main is
+      -- Test of `BINARY_TREE_NODE' and `BINARY_TREE_P_NODE'.
+      class_name("BINARY_TREE_NODE");
+      t:BINARY_TREE_NODE:=t.create;
+      t.lt:=balanced_tree(5); t.rt:=balanced_tree(10);
+      test("is_leaf 1", t.is_leaf.to_s, "F");
+      tmp:BINARY_TREE_NODE:=t.leftmost_leaf;
+      test("is_leaf 2", tmp.is_leaf.to_s, "T");
+      test("depth", t.depth.to_s, "11");
+      test("number_of_leaves", t.number_of_leaves.to_s, "1056");
+      test("nodes_at_depth 1", t.nodes_at_depth(2).to_s, "4");
+      test("nodes_at_depth 2", t.nodes_at_depth(7).to_s, "64");
+      test("total_depth", t.total_depth.to_s, "11456");
+      test("width", t.width.to_s, "1056");
+      finish
+   end; -- main
+
+   balanced_tree(d:INT):BINARY_TREE_NODE is
+      -- Create a balanced tree of depth `d'.
+      res:=res.create;
+      if d>0 then
+	 res.lt:=balanced_tree(d-1); res.rt:=balanced_tree(d-1);
+      end; -- if
+   end; -- balanced_tree
+   
+end; -- class BTREE_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

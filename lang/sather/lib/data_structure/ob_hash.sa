@@ -1,0 +1,690 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/data_structure/ob_hash.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Extendible hash tables for representing sets of objects and
+--*           mappings from sets of object keys to objects of a specified
+--*           type.
+--*
+--* CLASSES: OB_HASH_MAP{T}, OB_HASH_MAP_CURSOR{T}, OB_HASH_SET,
+--*          OB_HASH_SET_CURSOR, OB_HASH_TEST
+--*
+--* REQUIRED FILES: ./list.sa, ../base/test.sa
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: ob_hash.sa,v 1.1 1994/02/12 03:23:25 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:31 1993 (hws)
+--*  Oct 17 06:31 1993 (hws): Sather 1 syntax, copyright note
+--* Created: Sun Sep  9 23:19:38 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class OB_HASH_MAP{T} is
+   -- Hash tables which associate entities of type `T' to arbitrary objects.
+   -- The table is always at least twice as large as number of objects.
+   -- The key `0' is used for empty entries. The size of the table is
+   -- always of the form `2^n+1' and nearly doubles on each expansion.
+   -- The last entry is a sentinel element which holds `0' (to avoid
+   -- testing for the end of array in the loop). The 
+   -- hash function is just the last n bits of the pointer of the object 
+   -- shifted right by `2' (since the last two bits are always zero).
+   -- The extra serial search this simple function sometimes entails is 
+   -- still cheaper than more typical functions using a multiply and a
+   -- modulo operation. 
+   
+   attr size: INT;			-- Number of entries stored.
+   attr ob_tbl: ARRAY{$OB};		-- Storage for the key objects.
+   attr ent_tbl: ARRAY{T};		-- Storage for the associated entities.
+   attr mask: INT;			-- Mask for hash function.
+      -- If table is of size `2^n+1' then mask will have last `n' bits on.
+   
+   create: SAME is
+      -- An emtpy hash table.
+      res := new; 
+      res.ob_tbl := ARRAY{$OB}::new(9); 
+      res.ent_tbl := ARRAY{T}::new(9);
+      res.mask := 7;		-- just last three bits to start
+   end; -- create
+   
+   get(o: $OB): T is
+      -- The entry associated with object `o' or `void' if absent.
+      hsh: INT := C::ob_id(o).rshift(2).bit_and(mask); 
+      loop
+	 loop
+	    obt: $OB := ob_tbl[hsh];
+	    if obt = o then res := ent_tbl[hsh]; return; -- found it
+	    elsif obt = void then break! end; -- hit hole or sentinel
+	    hsh := hsh + 1;
+	 end; -- loop
+	 if hsh /= ob_tbl.asize - 1 then break! -- didn't hit sentinel
+	 else hsh := 0 end; -- hit it so go back to beginning
+      end; -- loop
+   end; -- get
+
+   test(o: $OB): BOOL is
+      -- True if `o' is stored in the table.
+      hsh: INT := C::ob_id(o).rshift(2).bit_and(mask); 
+      loop
+	 loop
+	    obt: $OB := ob_tbl[hsh];
+	    if obt = o then res := true; return; -- found it
+	    elsif obt = void then break! end; -- hit hole or sentinel
+	    hsh := hsh + 1;
+	 end; -- loop
+	 if hsh /= ob_tbl.asize - 1 then break! -- didn't hit sentinel
+	 else hsh := 0 end; -- hit it so go back to beginning
+      end; -- loop
+   end; -- test
+   
+   double_size is
+      -- Resize `self' to double. Copy entries over.
+      ns: INT := (ob_tbl.asize - 1) * 2 + 1; -- new expanded size
+      mask := mask.lshift(1) + 1;	-- add in another bit
+      nob_tbl: ARRAY{$OB} := ARRAY{$OB}::new(ns);		
+      nent_tbl: ARRAY{T} := ARRAY{T}::new(ns);
+      size := 0;
+      i: INT := 0; loop until!(i = ob_tbl.asize - 1);
+	 val: $OB := ob_tbl[i];
+	 if val /= void then 
+	    hsh: INT := C::ob_id(val).rshift(2).bit_and(mask);
+	    loop		
+	       if nob_tbl[hsh] = void then 
+		  nob_tbl[hsh] := val; nent_tbl[hsh] := ent_tbl[i];
+		  size := size + 1; break!
+	       elsif hsh = ns - 2 then hsh := 0 
+	       else hsh := hsh + 1 end;
+	    end; -- loop
+	 end; -- if
+	 i := i + 1
+      end; -- loop
+      ob_tbl.clear; ent_tbl.clear;	-- help the garbage collector
+      ob_tbl := nob_tbl; ent_tbl := nent_tbl;
+   end; -- double_size
+   
+   insert(o: $OB; e: T) is
+      -- Insert ob `o' paired with entity `e'. Overwrite if present.
+      if (size + 1).lshift(1) > ob_tbl.asize then double_size end;
+      hsh: INT := C::ob_id(o).rshift(2).bit_and(mask);
+      loop	
+	 if ob_tbl[hsh] = void then 
+	    ob_tbl[hsh] := o; ent_tbl[hsh] := e; size := size + 1; break!
+	 elsif ob_tbl[hsh] = o then 
+	    ent_tbl[hsh] := e; break! -- put in new ent
+	 elsif hsh = ob_tbl.asize - 2 then 
+	    hsh := 0		-- loop to front
+	 else hsh := hsh + 1 end; -- try next slot
+      end; -- loop
+   end; -- insert
+
+   delete(o: $OB) is
+      -- Delete entry `o' if present.
+      hsh: INT := C::ob_id(o).rshift(2).bit_and(mask);
+      hole: INT;			-- location of hole
+      loop
+	 if ob_tbl[hsh] = void then return -- not in table
+	 else
+	    if ob_tbl[hsh] = o then	
+	       hole := hsh; ob_tbl[hole] := void; -- delete it
+	       ent_tbl[hsh] := void; size := size - 1; break!
+	    elsif hsh = ob_tbl.asize - 2 then 
+	       hsh := 0 
+	    else hsh := hsh + 1 end;
+	 end; -- if
+      end; -- loop
+      ind: INT := hole;		-- check that hole isn't in the way
+      loop
+	 if ind = ob_tbl.asize - 2 then ind := 0
+	 else ind := ind + 1 end;
+	 if ob_tbl[ind] = void then break! end; -- end of block
+	 hsh := C::ob_id(ob_tbl[ind]).rshift(2).bit_and(mask);
+	 if hsh <= ind then	-- block doesn't wrap around
+	    if hole < ind and hole >= hsh then -- hole in way
+	       ob_tbl[hole] := ob_tbl[ind]; ent_tbl[hole] := ent_tbl[ind];
+	       hole := ind; ob_tbl[ind] := void; ent_tbl[ind] := void;
+	    end; -- if
+	 else		-- block wraps
+	    if hole >= hsh or hole < ind then -- hole in way
+	       ob_tbl[hole] := ob_tbl[ind]; ent_tbl[hole] := ent_tbl[ind];
+	       hole := ind; ob_tbl[ind] := void; ent_tbl[ind] := void;
+	    end; -- if
+	 end; -- if
+      end; -- loop
+   end; -- delete
+
+   clear is
+      -- Clear the tables.
+      size := 0; ob_tbl.clear; ent_tbl.clear;
+   end; -- clear
+
+   cursor: OB_HASH_MAP_CURSOR{T} is
+      -- A cursor into the table.
+      res := OB_HASH_MAP_CURSOR{T}::create(self)
+   end; -- cursor
+
+   is_empty: BOOL is
+      -- True if `self' is empty.
+      c: OB_HASH_MAP_CURSOR{T} := cursor;
+      res := c.is_done;
+   end; -- is_empty
+
+   rehash is
+      -- Make sure each entry is correctly hashed. (Used after moves.)
+      lob: LIST{$OB} := LIST{$OB}::create; -- To hold the objects.
+      lent: LIST{T} := LIST{T}::create; -- To hold the corresponding entries.
+      c: OB_HASH_MAP_CURSOR{T} := cursor;
+      loop until!(c.is_done);
+	 lob := lob.push(c.key); lent := lent.push(c.item);
+	 c.next
+      end; -- loop
+      clear;
+      i: INT; loop until!(i = lob.size);
+	 insert(lob[i], lent[i]);
+	 i := i + 1
+      end; -- loop
+      lob.clear; lent.clear;	-- help gc
+   end; -- rehash
+
+   after_deep_copy is
+      -- Must rehash after a deep copy since pointers are changed.
+      rehash;
+   end; -- after_deep_copy
+
+   after_deep_save is
+      -- Must rehash after a deep save since pointers are changed.
+      rehash;
+   end; -- after_deep_save
+
+end; -- class OB_HASH_MAP{T}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class OB_HASH_MAP_CURSOR{T} is
+   -- A cursor into `OB_HASH_MAP{T}' tables for stepping through all objects.
+
+   attr tbl: OB_HASH_MAP{T};		-- The pointer to the table.
+   attr index: INT;			-- The index into the table.
+   attr is_done: BOOL;		-- True if all entries have been visited.
+
+   create(t: OB_HASH_MAP{T}): SAME is
+      -- A cursor into `t' which is initialized to the first element. 
+      res := SAME::new; res.tbl := t; res.first;
+   end; -- create
+   
+   first: T is
+      -- Set the cursor to the first location, if any.
+      is_done := false;
+      index := 0;
+      loop
+	 val: $OB := tbl.ob_tbl[index];
+	 if val /= void then break!
+	 elsif index >= tbl.ob_tbl.asize - 1 then is_done := true; break!
+	 else index := index + 1 end;
+      end; -- loop
+      res := item;
+   end; -- first
+
+   key: $OB is
+      -- The current ob key.
+      if not is_done then res := tbl.ob_tbl[index] end;
+   end; -- ob
+
+   item: T is
+      -- The item associated with the current ob.
+      if not is_done then res := tbl.ent_tbl[index] end;
+   end; -- item
+   
+   next: T is
+      -- Move the cursor to the next location.
+      if is_done then return end;
+      index := index + 1;
+      loop
+	 if index >= tbl.ob_tbl.asize - 1 then is_done := true; break!
+	 else
+	    val: $OB := tbl.ob_tbl[index];
+	    if val /= void then break!
+	    else index := index + 1 end;
+	 end; -- if
+      end; -- loop
+      res := item;
+   end; -- next
+   
+end; -- class OB_HASH_MAP_CURSOR{T}
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class OB_HASH_SET is
+   -- Sets of objects represented by extendible hash tables.
+   -- The table is always at least twice as large as the number of obs
+   -- The key `0' is used for empty entries. The size of the table is
+   -- always of the form `2^n+1' and nearly doubles on each expansion.
+   -- The last entry is a sentinel element which holds `0' (to avoid
+   -- testing for the end of the array in the loop). The hash function
+   -- is just the last `n' bits of the 
+   -- object pointer shifted two bits to the right. The extra serial search
+   -- that this simple function sometimes entails is still cheaper than 
+   -- more typical functions which use a multiply and a modulo operation.
+   -- Keeping it only half full saves us from disaster even with such
+   -- a simple hash function.
+ 
+   attr size: INT;			-- Number of entries stored.
+   attr mask: INT;			-- Mask for the hash function.
+   ARRAY{$OB};			-- The hash table.
+   
+   create: SAME is
+      -- An empty `OB_HASH_SET'.
+      res := new(9); res.mask := 7;	-- use last three bits
+   end; -- create
+   
+   get(o: $OB): BOOL is
+      -- True if `o' is in the stored set.
+      hsh: INT := C::ob_id(o).rshift(2).bit_and(mask);
+      loop
+	 loop
+	    kt: $OB := [hsh];
+	    if kt = o then res := true; return; -- found it
+	    elsif kt = void then break! end; -- hit hole or sentinel
+	    hsh := hsh + 1;
+	 end; -- loop
+	 if hsh /= asize - 1 then break! -- didn't hit sentinel
+	 else hsh := 0 end; -- hit it so go back to beginning
+      end; -- loop
+   end; -- get
+
+   double_size: OB_HASH_SET is
+      -- Resize `self' to double. Copy non-deleted entries over.
+      ns: INT := (asize - 1) * 2 + 1;	-- new expanded size
+      res := new(ns);
+      res.mask := mask.lshift(1) + 1;	-- add in another bit
+      i: INT := 0; loop until!(i = asize - 1);
+	 val: $OB := [i];
+	 if val /= void then 
+	    hsh: INT := C::ob_id(val).rshift(2).bit_and(res.mask);
+	    loop		
+	       if res[hsh] = void then 
+		  res[hsh] := val; 
+		  res.size := res.size + 1; break!
+	       elsif hsh = ns - 2 then hsh := 0 
+	       else hsh := hsh + 1 end;
+	    end; -- loop
+	 end; -- if
+	 i := i + 1
+      end; -- loop
+      clear;			-- give the garbage collector a hand
+   end; -- double_size
+
+   insert(o: $OB): OB_HASH_SET is
+      -- Insert object `o'.
+      if (size + 1).lshift(1) > asize then res := double_size 
+      else res := self end;
+      hsh: INT := C::ob_id(o).rshift(2).bit_and(res.mask);
+      loop	
+	 if res[hsh] = void then 
+	    res[hsh] := o; res.size := res.size + 1; break!
+	 elsif res[hsh] = o then break! -- already there
+	 elsif hsh = res.asize - 2 then 
+	    hsh := 0		-- loop to front
+	 else hsh := hsh + 1 end; -- try next slot
+      end; -- loop
+   end; -- insert
+
+   delete(o: $OB) is
+      -- Delete object `o' if present.
+      hsh: INT := C::ob_id(o).rshift(2).bit_and(mask);
+      hole: INT;			-- location of hole
+      loop
+	 if [hsh] = void then return -- not in table
+	 else
+	    if [hsh] = o then	
+	       hole := hsh; [hole] := void; -- delete it
+	       size := size - 1; break!
+	    elsif hsh = asize - 2 then 
+	       hsh := 0 
+	    else hsh := hsh + 1 end;
+	 end; -- if
+      end; -- loop
+      ind: INT := hole;		-- check that hole isn't in the way
+      loop
+	 if ind = asize - 2 then ind := 0
+	 else ind := ind + 1 end;
+	 if [ind] = void then break! end; -- end of block
+	 hsh := C::ob_id([ind]).rshift(2).bit_and(mask);
+	 if hsh <= ind then	-- block doesn't wrap around
+	    if hole < ind and hole >= hsh then -- hole in way
+	       [hole] := [ind]; hole := ind; [ind] := void;
+	    end; -- if
+	 else		-- block wraps
+	    if hole >= hsh or hole < ind then -- hole in way
+	       [hole] := [ind]; hole := ind; [ind] := void;
+	    end; -- if
+	 end; -- if
+      end; -- loop
+   end; -- delete
+
+   clear is
+      -- Clear the table.
+      size := 0; 
+      i: INT; loop until!(i = asize);
+	 [i] := void;
+	 i := i + 1;
+      end; -- loop
+   end; -- clear
+   
+   cursor: OB_HASH_SET_CURSOR is
+      -- A cursor into the table.
+      res := OB_HASH_SET_CURSOR::create(self)
+   end; -- cursor
+
+   union(s: OB_HASH_SET): OB_HASH_SET is
+      -- A new set whose elements are the union of `self' and `s'.
+      res := create;
+      c: OB_HASH_SET_CURSOR := s.cursor;
+      loop until!(c.is_done);
+	 res := res.insert(c.item);
+	 c.next
+      end; -- loop
+      c := cursor;
+      loop until!(c.is_done);
+	 res := res.insert(c.item);
+	 c.next
+      end; -- loop
+   end; -- union
+   
+   intersection(s: OB_HASH_SET): OB_HASH_SET is
+      -- A new set whose elements are the intersection of `self' and `s'.
+      res := create;
+      c: OB_HASH_SET_CURSOR := cursor;
+      loop until!(c.is_done);
+	 if s.get(c.item) then res := res.insert(c.item) end;
+	 c.next;
+      end; -- loop
+   end; -- intersection
+
+   difference(s: OB_HASH_SET): OB_HASH_SET is
+      -- A new set whose elements are those in `self' which are not in `s'.
+      res := create;
+      c: OB_HASH_SET_CURSOR := cursor;
+      loop until!(c.is_done);
+	 if not s.get(c.item) then res := res.insert(c.item) end;
+	 c.next;
+      end; -- loop
+   end; -- difference 
+   
+   sym_difference(s: OB_HASH_SET): OB_HASH_SET is
+      -- A new set whose elements are those in `self' or `s' but not both.
+      res := create;
+      c: OB_HASH_SET_CURSOR := cursor; 
+      loop until!(c.is_done);
+	 if not s.get(c.item) then res := res.insert(c.item) end;
+	 c.next;
+      end; -- loop
+      c := s.cursor; 
+      loop until!(c.is_done);
+	 if not get(c.item) then res := res.insert(c.item) end;
+	 c.next;
+      end; -- loop
+   end; -- sym_difference
+   
+   is_a_subset_of(s: OB_HASH_SET): BOOL is
+      -- True if `self' is a subset of `s'.
+      c: OB_HASH_SET_CURSOR := cursor;
+      loop until!(c.is_done);
+	 if not s.get(c.item) then res := false; return; end;
+	 c.next;
+      end; -- loop
+      res := true; 
+   end; -- if
+
+   is_empty: BOOL is
+      -- True if `self' is empty.
+      c: OB_HASH_SET_CURSOR := cursor;
+      res := c.is_done;
+   end; -- is_empty
+
+   rehash is
+      -- Make sure each entry is correctly hashed. (Used after moves.)
+      lob: LIST{$OB} := LIST{$OB}::create; -- To hold the objects.
+      c: OB_HASH_SET_CURSOR := cursor;
+      loop until!(c.is_done);
+	 lob := lob.push(c.item); 
+	 c.next
+      end; -- loop
+      clear;
+      i: INT; loop until!(i = lob.size);
+	 insert(lob[i]);	-- Can't overflow.
+	 i := i + 1
+      end; -- loop
+      lob.clear;		-- help gc
+   end; -- rehash
+
+   after_deep_copy is
+      -- Must rehash after a deep copy since pointers are changed.
+      rehash;
+   end; -- after_deep_copy
+
+   after_deep_save is
+      -- Must rehash after a deep save since pointers are changed.
+      rehash;
+   end; -- after_deep_save
+      
+end; -- class OB_HASH_SET
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class OB_HASH_SET_CURSOR is
+   -- A cursor into `OB_HASH_SET''s for stepping through all keys.
+   
+   attr tbl: OB_HASH_SET;		-- The pointer to the table.
+   attr index: INT;			-- The index into the table.
+   attr is_done: BOOL;		-- True if all entries have been visited.
+
+   create(t: OB_HASH_SET): SAME is
+      -- A cursor into `t' which is initialized to the first element. 
+      res := OB_HASH_SET_CURSOR::new; res.tbl := t; res.first;
+   end; -- create
+   
+   first: $OB is
+      -- Set the cursor to the first location, if any.
+      is_done := false;
+      index := 0;
+      loop
+	 val: $OB := tbl[index];
+	 if val /= void then break!
+	 elsif index = tbl.asize - 1 then is_done := true; break!
+	 else index := index + 1 end;
+      end; -- loop
+      res := item;
+   end; -- first
+
+   item: $OB is
+      -- The current object.
+      if not is_done then res := tbl[index] end;
+   end; -- item
+
+   next: $OB is
+      -- Move the cursor to the next location.
+      if is_done then return end;
+      index := index + 1;
+      loop
+	 if index = tbl.asize - 1 then is_done := true; break!
+	 elsif tbl[index] /= void then break!
+	 else index := index + 1 end;
+      end; -- loop
+      res := item;
+   end; -- next
+
+end; -- class OB_HASH_SET_CURSOR
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class OBH_TEST is
+   -- Test the classes `OB_HASH_MAP', `OB_HASH_MAP_CURSOR', `OB_HASH_SET'
+   -- and `OB_HASH_SET_CURSOR'.
+   TEST;
+
+   shared ob_array: ARRAY{STR};	-- Array of objects to use in tests.
+
+   main is
+      -- Test the classes `OB_HASH_MAP', `OB_HASH_MAP_CURSOR', `OB_HASH_SET'
+      -- and `OB_HASH_SET_CURSOR'.
+      init_ob_array;
+      ob_hash_map_test;
+      ob_hash_set_test;
+   end; -- main
+
+   init_ob_array is
+      -- Put strings for the 26 letters of the alphabet in `ob_array'.
+      ob_array := ARRAY{STR}::new(26); -- Make some objects to insert
+      ob_array[0] := "a"; ob_array[1] := "b"; ob_array[2] := "c";
+      ob_array[3] := "d"; ob_array[4] := "e"; ob_array[5] := "f";
+      ob_array[6] := "g"; ob_array[7] := "h"; ob_array[8] := "i";
+      ob_array[9] := "j"; ob_array[10] := "k"; ob_array[11] := "l";
+      ob_array[12] := "m"; ob_array[13] := "n"; ob_array[14] := "o";
+      ob_array[15] := "p"; ob_array[16] := "q"; ob_array[17] := "r";
+      ob_array[18] := "s"; ob_array[19] := "t"; ob_array[20] := "u";
+      ob_array[21] := "v"; ob_array[22] := "w"; ob_array[23] := "x";
+      ob_array[24] := "y"; ob_array[25] := "z";
+   end; -- init_ob_array
+   
+   ob_hash_set_test is
+      -- Test of `OB_HASH_SET' and `OB_HASH_SET_CURSOR'.
+      class_name("OB_HASH_SET");
+
+      s: OB_HASH_SET := set_from_range(0,9);
+      test("s := set_from_range(0,9)", str_of_set(s)
+	    ,"a, b, c, d, e, f, g, h, i, j");
+      test("s.get(ob_array[3])", s.get(ob_array[3]).to_s, "T");
+      test("s.get(ob_array[12])", s.get(ob_array[12]).to_s, "F");
+      s := s.insert(ob_array[12]);
+      test("s:=s.insert(ob_array[12]);s.get(ob_array[12])"
+	    , s.get(ob_array[12]).to_s, "T");
+      test("Entries in s", str_of_set(s)
+      	    ,"a, b, c, d, e, f, g, h, i, j, m");
+      s.delete(ob_array[4]);
+      test("s:=s.delete(ob_array[4]);s.get(ob_array[4])"
+	    , s.get(ob_array[4]).to_s, "F");
+      test("Entries in s", str_of_set(s)
+	    ,"a, b, c, d, f, g, h, i, j, m");
+      test("s.size", s.size.to_s, "10");
+      s.clear;
+      test("s.clear; Entries in s", str_of_set(s), "");
+      s := set_from_range(0,10);
+      test("s := set_from_range(0,10)", str_of_set(s)
+      	    ,"a, b, c, d, e, f, g, h, i, j, k");
+      t: OB_HASH_SET := set_from_range(5,14);
+      test("t:=set_from_range(5,14);", str_of_set(t)
+      	    ,"f, g, h, i, j, k, l, m, n, o");
+      test("union", str_of_set(s.union(t))
+	    ,"a, b, c, d, e, f, g, h, i, j, k, l, m, n, o");
+      test("intersection", str_of_set(s.intersection(t))
+	    ,"f, g, h, i, j, k");
+      test("difference", str_of_set(s.difference(t))
+	    ,"a, b, c, d, e");
+      test("sym_difference", str_of_set(s.sym_difference(t))
+	    ,"a, b, c, d, e, l, m, n, o");
+      test("is_a_subset_of", s.is_a_subset_of(t).to_s, "F");
+      s.rehash;
+      test("rehash", str_of_set(s) ,"a, b, c, d, e, f, g, h, i, j, k");
+      finish;
+   end; -- ob_hash_test_set
+
+   set_from_range(l,h: INT): OB_HASH_SET is
+      -- Make a set of `STR' objects from the letters in the alphabet
+      -- between `l' and `h'. Must be in range `[0,25]'.
+      res := OB_HASH_SET::create;
+      i: INT := l; loop until!(i > h);
+	 res := res.insert(ob_array[i]);
+	 i := i + 1
+      end; -- loop
+   end; -- set_from_range
+
+   str_of_set(s: OB_HASH_SET): STR is
+      -- A string containing the elements of `s' in alphabetical order
+      -- separated by commas.
+      res := STR::create;
+      start: BOOL := true;
+      i: INT; loop until!(i = 26);
+
+	 if s.get(ob_array[i]) then
+	    if not start then
+	       res := res.s(", ").s(ob_array[i]);
+	    else
+	       res := res.s(ob_array[i]); start := false;
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- str_of_set
+
+   ob_hash_map_test is
+      -- Test the classes `OB_HASH_MAP' and `OB_HASH_MAP_CURSOR'.
+      class_name("OB_HASH_MAP");
+      
+      h: OB_HASH_MAP{INT} := map_from_range(0,9);
+      test("h := map_from_range(0,9)", str_of_map(h)
+	    ,"a:0, b:1, c:2, d:3, e:4, f:5, g:6, h:7, i:8, j:9");
+      test("h.get(ob_array[4])", h.get(ob_array[4]).to_s, "4");
+      h.delete(ob_array[4]);
+      test("h.delete(ob_array[4]); h.get(ob_array[4])"
+	    , h.get(ob_array[4]).to_s, "0");
+      test("h entries", str_of_map(h)
+	    ,"a:0, b:1, c:2, d:3, f:5, g:6, h:7, i:8, j:9");
+      h.rehash;
+      test("rehash", str_of_map(h)
+	    ,"a:0, b:1, c:2, d:3, f:5, g:6, h:7, i:8, j:9");
+      test("h.size", h.size.to_s, "9");
+      h.clear;
+      test("h.clear", str_of_map(h), "");
+      finish;
+   end; -- ob_hash_map_test
+
+   map_from_range(l,h: INT): OB_HASH_MAP{INT} is
+      -- Make a map from `STR' objects which are letters in the alphabet
+      -- between `l' and `h' to corresopnding `INT''s.
+      -- Must be in range `[0,25]'.
+      res := OB_HASH_MAP{INT}::create;
+      i: INT := l; loop until!(i > h);
+	 res.insert(ob_array[i],i);
+	 i := i + 1
+      end; -- loop
+   end; -- map_from_range
+
+   str_of_map(s: OB_HASH_MAP{INT}): STR is
+      -- A string containing the elements of `s' in alphabetical order
+      -- separated by commas. Of the form `"b:1, c:2"'.
+      res := STR::create;
+      start: BOOL := true;
+      i: INT; loop until!(i = 26);
+	 if s.test(ob_array[i]) then
+	    if not start then
+	       res := res.s(", ").s(ob_array[i]).s(":")
+		     .s(s.get(ob_array[i]).to_s);
+	    else
+	       res := res.s(ob_array[i]).s(":").s(s.get(ob_array[i]).to_s);
+	       start := false;
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- str_of_map
+
+end; -- class OBH_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+
+

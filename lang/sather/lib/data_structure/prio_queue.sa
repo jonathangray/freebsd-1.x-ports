@@ -1,0 +1,196 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/data_structure/prio_queue.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Priority queues.
+--*
+--* CLASSES: PRIORITY_QUEUE{T}, COMPARABLE_INT, PRIORITY_QUEUE_TEST
+--* 
+--* REQUIRED FILES: ./random_hash.sa
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: prio_queue.sa,v 1.1 1994/02/12 03:23:26 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:32 1993 (hws)
+--*  Oct 17 06:32 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 27 14:34 1993 (hws): require -> pre
+--*  Feb 21 19:24 1993 (hws): assert -> require
+--* Created: Sat Feb  3 22:09:50 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class PRIORITY_QUEUE{T} is
+   -- Priority queues.  Retrieves maximal elements first.
+   -- `T' must define `is_less_than' which is used to define the ordering.
+   -- `COMPARABLE_INT' defines this for `INT''s.
+   
+   attr arr:ARRAY{T};		
+   attr size:INT;			-- Bottom of queue, = number of elements.
+   
+   create:SAME is
+      -- A new empty priority queue.
+      res:=res.new; res.arr:=res.arr.new(8);
+   end; -- create
+
+   create_sized(n:INT):SAME pre n>=1 is
+      -- A new empty priority queue, initially sized to hold `n' elements.
+      res:=res.new; res.arr:=res.arr.new(n+1);
+   end; -- create_sized
+   
+   insert (e:T) is
+      -- Insert `e' into priority queue.
+      if size>=arr.asize-2 then	-- resize if area full
+	 arr:=arr.extend(2*arr.asize) 
+      end; 
+      size:=size+1;
+      arr[size]:=e;		-- put new element at bottom
+      sift_up(1,size)		-- fix up the heap
+   end; -- insert
+   
+   sift_up (l,u:INT) pre l>=1 and u>=1 and l<=u is
+      -- Makes an `l,u' heap from a `l,u-1' heap in area.
+      i:INT:=u; loop until!(i<=l);
+	 j:INT := i.rshift(1);
+	 if arr[i].is_less_than(arr[j]) then break!
+	 else 
+	    te:T:=arr[j]; arr[j]:=arr[i]; arr[i]:=te; -- swap i and j
+	    i := j
+	 end -- if
+      end -- loop
+   end; -- sift_up
+   
+   sift_dn (l,u:INT) pre l>=0 and u>=0 is
+      -- Make an `l,u' heap from an `l+1,u' heap in area.
+      i:INT:=l;
+      loop
+	 c:INT:= 2 * i;
+	 if c>u then break! end;
+	 if 1+c<=u and arr[c].is_less_than(arr[c+1]) -- bigger sib
+	 then c:=c+1 end;
+	 if not arr[i].is_less_than(arr[c]) then break!
+	 else
+	    te:T:=arr[c]; arr[c]:=arr[i]; arr[i]:=te; -- swap i and c
+	    i:=c
+	 end -- if
+      end -- loop
+   end; -- sift_dn
+   
+   is_empty:BOOL is
+      -- True if queue is empty.
+      res := (size=0)
+   end; -- is_empty
+   
+   pop:T is
+      -- Pops off the first element or `void' if empty.
+      if is_empty then return end;
+      res:=arr[1];
+      arr[1]:=arr[size];
+      arr[size]:=void;		-- forget so gc can get what was there
+      size:=size-1;		-- shrink queue
+      sift_dn(1,size);		-- fix up heap
+   end; -- pop
+
+   top:T is
+      -- Top element or `void' if empty.
+      if not is_empty then res := arr[1] end;
+   end; -- top
+
+   clear is
+      -- Clear the queue.
+      arr.clear; size:=0;
+   end; -- clear
+   
+   check_heap:BOOL is
+      -- True if `self' is a legal heap.
+      res:=true;
+      i:INT:=1; loop until!(i>size);
+	 if 2*i<=size then
+	    if arr[i].is_less_than(arr[2*i])
+	    then res:=false; break! end;
+	 end; -- if
+	 if 2*i+1<=size then
+	    if arr[i].is_less_than(arr[2*i+1])
+	    then res:=false; break! end;
+	 end; -- if
+	 i:=i+1
+      end -- loop
+   end; -- check_heap
+
+   bounded_insert (e:T; bnd:INT) is
+      -- Insert `e', then pop enough so that `size<=bnd'.
+      -- The queue retains the smallest `bnd' elements and the operation
+      -- is cheaper than building a priority queue for all the elements.
+      insert(e); 
+      loop until!(size<=bnd); pop end;
+   end; -- bnd_insert
+   
+end; -- class PRIORITY_QUEUE
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class COMPARABLE_INT is
+   -- Ints that define `is_less_than'.
+   INT;
+
+   is_less_than(i:INT):BOOL is
+      -- True if `self' is less than `i'.
+      res := (self<i);
+   end; -- is_less_than
+   
+end; -- class COMPARABLE_INT
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class PRIOQ_TEST is
+   -- Test of PRIORITY_QUEUE{COMPARABLE_INT}.
+
+   TEST;
+   
+   main is
+      -- Test of PRIORITY_QUEUE{COMPARABLE_INT}.
+      class_name("PRIORITY_QUEUE{COMPARABLE_INT}");
+      p:PRIORITY_QUEUE{COMPARABLE_INT}:=p.create;
+      i:INT; loop until!(i=50);
+	 p.insert(RANDOM::int_range(1,500));
+	 i:=i+1;
+      end; -- loop
+      test("check_heap", p.check_heap.to_s, "T");
+      test("top", p.top.to_s, "496");
+      test("pop 1", p.pop.to_s, "496");
+      test("pop 2", p.pop.to_s, "492");
+      test("pop 3", p.pop.to_s, "468");
+      test("pop 4", p.pop.to_s, "466");
+      test("pop 5", p.pop.to_s, "456");
+      test("is_empty 1", p.is_empty.to_s, "F");
+      p.clear;
+      test("is_empty 2", p.is_empty.to_s, "T");
+      p:=p.create_sized(10);
+      i:INT; loop until!(i=50);
+	 p.bounded_insert(RANDOM::int_range(1,500),5);
+	 i:=i+1;
+      end; -- loop
+      test("pop 6", p.pop.to_s, "46");
+      test("pop 7", p.pop.to_s, "37");
+      test("pop 8", p.pop.to_s, "31");
+      test("pop 9", p.pop.to_s, "26");
+      test("pop 10", p.pop.to_s, "8");
+      finish;
+   end; -- main
+   
+end; -- class PRIOQ_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+

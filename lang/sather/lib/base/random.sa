@@ -1,0 +1,579 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/base/random.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Random number generation.
+--*
+--* CLASSES: RANDOM, RANDOM_GEN, MS_RANDOM_GEN, PMS_RANDOM_GEN,
+--*          COMB_RANDOM_GEN{G1,G2}, PERM_RANDOM_GEN{G}, RANDOM_TEST
+--*
+--* REQUIRED FILES: base/test.sa, numerical/math.sa, base/time.sa
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: random.sa,v 1.1 1994/02/12 03:23:16 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:24 1993 (hws)
+--*  Oct 17 06:24 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 27 14:28 1993 (hws): require -> pre
+--* Created: Thu Sep 27 16:19:45 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class RANDOM is
+   -- Generate random numbers from different distributions.
+   -- Tries to satisfy a number of needs. In the most common situation,
+   -- a single generator will supply all random numbers for the system.
+   -- Calls of the form: `RANDOM::uniform' will use this shared generator 
+   -- (as will `r.uniform' where `r:RANDOM' is `void'). To use multiple
+   -- generators (perhaps of different kinds) one creates object instances
+   -- of type `RANDOM'. These objects have an attribute `gen' of type
+   -- `$RANDOM_GEN' which holds the actual generator. Several types of
+   -- generator are provided and new ones may be added by having them inherit
+   -- the specification class `RANDOM_GEN'. Classes are provided to combine
+   -- generators and to randomly permute the output of a generator.
+
+   MATH;			-- Many `MATH' routines are used.
+   shared sgen:$RANDOM_GEN:=MS_RANDOM_GEN::create; -- The shared generator.
+   attr gen:$RANDOM_GEN;		-- The individual generator if `self/=void'.
+   
+   create:SAME is			
+      -- A new `RANDOM' object initialized with a standard generator.
+      res:=new; res.gen:=MS_RANDOM_GEN::create;
+   end; -- create
+
+   init(nseed:INT) is
+      -- Initialize generator with `nseed'. 
+      -- Apply to `sgen' if `self=void', otherwise apply it to `gen'.
+      if self=void then sgen.init(nseed); snorm_cache_valid:=false;
+      else gen.init(nseed); norm_cache_valid:=false; end;
+   end; -- init
+
+   init_with_time is
+      -- Initialize using the time as a seed. Call twice to mix up the time
+      -- a bit.
+      init((TIME::time*1000).mod(1000000.).to_i);
+      uniform; uniform;
+   end; -- init_with_time
+   
+   set_gen(g:$RANDOM_GEN) is
+      -- Change the generator `sgen' or `gen' to `g'.
+      if self=void then sgen:=g
+      else gen:=g end;
+   end; -- set_gen
+   
+   uniform:DOUBLE is
+      -- A uniformly distributed double in `[0.,1.)'.
+      -- Uses default generator if self=void (as in RANDOM::uniform) else gen.
+      if self=void then res:=sgen.get
+      else res:=gen.get end;
+   end; -- uniform
+   
+   uniform_range (l,u:DOUBLE):DOUBLE pre l<=u is
+      -- A uniformly distributed double in the range `[l,u)'.
+      res := l + (u-l)*uniform
+   end; -- uniform_range
+
+   int_range (l,u:INT):INT pre l<=u is
+	 -- A uniform random member of `{l,...,u}'.
+      res := l + ((u-l+1)*uniform).floor
+   end; -- int_range
+   
+   bit(p:DOUBLE):BOOL pre p>=0. and p<=1. is
+      -- True with probability `p'.
+      res:=(uniform<p);
+   end; -- bit
+
+   normal(m,s:DOUBLE):DOUBLE pre s>=0 is
+      -- A normally distributed `DOUBLE' with mean `m' and standard
+      -- deviation `s'.
+      res:= m + s*standard_normal
+   end; -- normal
+   
+   attr norm_cache:DOUBLE;		-- Cache of normal deviate generated earlier.
+   shared snorm_cache:DOUBLE;	-- Shared version of above.
+   attr norm_cache_valid:BOOL;	-- `True' if a value is cached.
+   shared snorm_cache_valid:BOOL; -- Shared version of above.
+   
+   standard_normal:DOUBLE is
+      -- A normally distributed `DOUBLE' with mean `0.' and unit variance.
+      -- Uses Box-Muller method which generates two normal deviates and
+      -- requires two calls to uniform. One of these is cached for the next
+      -- call. Based on Knuth, Vol. 2, p. 117.
+      if self=void then		-- use globals
+	 if snorm_cache_valid then -- use stored value
+	    res:=snorm_cache; snorm_cache_valid:=false;
+	 else			-- must recompute
+	    s:DOUBLE:=10; v1,v2:DOUBLE;
+	    loop until!(s<1.0 and s/=0.); -- get two samples inside unit circle
+	       v1:=uniform_range(-1.,1.); v2:=uniform_range(-1.,1.);
+	       s:=v1*v1+v2*v2;
+	    end; -- loop, executed 1.27 times on average
+	    rt:DOUBLE:= (-2.0*log(s)/s).sqrt;
+	    snorm_cache:=v1*rt; snorm_cache_valid:=true;
+	    res:=v2*rt;
+	 end; -- if
+      else			-- use locals
+	 if norm_cache_valid then -- use stored value
+	    res:=norm_cache; norm_cache_valid:=false;
+	 else			-- must recompute
+	    s:DOUBLE:=10; v1,v2:DOUBLE;
+	    loop until!(s<1.0 and s/=0.); -- get two samples inside unit circle
+	       v1:=uniform_range(-1.,1.); v2:=uniform_range(-1.,1.);
+	       s:=v1*v1+v2*v2;
+	    end; -- loop, executed 1.27 times on average
+	    rt:DOUBLE:= (-2.0*log(s)/s).sqrt;
+	    norm_cache:=v1*rt; norm_cache_valid:=true;
+	    res:=v2*rt;
+	 end; -- if
+      end; -- if
+   end; -- standard_normal
+   
+   exponential(m:DOUBLE):DOUBLE pre m>=0 is
+      -- Samples from an exponential distribution: `p(x)=e^(-x/m)/m'.
+      -- Mean is `m'. Eg: Time between emissions when one per `m' seconds on 
+      -- average. Based on Knuth, Vol. 2, p. 128.
+      u:DOUBLE; loop until!(u/=0.); u:=uniform end;
+      res:= -m*log(u);
+   end; -- exponential
+   
+   gamma(a:INT):DOUBLE pre a>=1 is
+      -- Samples from the Gamma distribution: `p(x)=(x^(a-1)e^(-x))/G(a)'.
+      -- Mean is a. Based on Knuth, Vol. 2, p. 129. and
+      -- Numerical Recipes in C, Press et. al. p. 220.
+      -- Waiting time for ath event in Poisson process of unit mean.
+      -- Pre a>=1.
+      if a<6 then		-- direct method by adding waiting times.
+	 res:=1.0;
+	 loop
+	    j:INT; loop until!(j=a); res:=res*uniform; j:=j+1 end;
+	    if res/=0. then break! end;
+	 end; -- loop
+	 res:= -log(res);
+      else			-- use rejection method
+	 y:DOUBLE; s:DOUBLE:=(2.*a-1.).sqrt;
+	 loop
+	    loop
+	       y:=tan(pi * uniform); -- tan of random angle
+	       res:=s*y+a-1;
+	       if res>0. then break! end; -- reject res if in zero prob.
+	    end; -- loop
+	    if (1.+y*y)*exp((a-1)*log(res/(a-1))-s*y)>=uniform 
+	    then break! end;
+	 end; -- loop
+      end; -- if
+   end; -- gamma
+   
+   beta(a,b:INT):DOUBLE pre a>0. and b>0. is
+      -- Samples from the Beta distribution 
+      -- `p(x)=(G(a+b)/(G(a)G(b)))x^(a-1)(1-x)^(b-1)', `0<x<1', `a,b>0'.
+      -- Mean is `a/(a+b)'. Knuth, Vol. 2, p. 129.
+      x1:DOUBLE:=gamma(a);
+      if x1=0. then res:=0.; return end;
+      res:=x1/(x1+gamma(b));
+   end; -- beta
+   
+   chi_square(v:INT):DOUBLE is
+      -- Samples from the Chi-Square distribution:
+      -- `p(x)=e^(-x/2)x^((v/2)-1)/(2^(v/2)G(v/2))'. Mean is `v'. `x>=0'.
+      -- Based on Knuth, Vol. 2, p. 130.
+      res:=2*gamma(v/2);
+   end; -- chi_square
+   
+   f_dist(v1,v2:INT):DOUBLE is
+      -- Samples from the F-distribution with `v1' and `v2' degrees of
+      -- freedom (see any statistics text). Based on Knuth, Vol. 2, p. 130.
+      res:=chi_square(v1)*v2/(chi_square(v2)*v1);
+   end; -- f_dist
+   
+   t_dist(v:INT):DOUBLE is
+      -- Samples from the t-distribution with `v' degrees of freedom (see
+      -- any statistics text). Based on Knuth, Vol. 2, p. 130.
+      res:=standard_normal/((chi_square(v)/v).sqrt);
+   end; -- t_dist
+   
+   geometric(p:DOUBLE):INT is
+      -- Samples from the geometric distribution. Is the number of trials
+      -- needed until an event of probability `p' first occurs.
+      -- `P(n)=(1-p)^(n-1)p'. Mean is `1/p'. Based on Knuth, Vol. 2, p. 131.
+      if p=1. then res:=1; return end;
+      res:=(log(uniform)/log(1-p)).ceiling;
+   end; -- geometric
+
+   binomial(n:INT; p:DOUBLE):INT pre p>=0. and p<=1. is
+      -- Samples from the binomial distribution:
+      -- `P(t)=(n t) p^t (1-p)^(n-t)'. Mean is `np'. Is number of
+      -- occurrences of a probability `p' event in `n' trials.
+      -- Based on Knuth, Vol. 2, p. 131. and Numerical Recipes in C, p. 223.
+      dr:DOUBLE;		-- double version of res.
+      -- can flip p->1-p if we also do res->n-res
+      lp:DOUBLE; if p<.5 then lp:=p else lp:=1.-p end; 
+      am:DOUBLE:=n*lp;		-- mean of res
+      if n<25 then		-- Use direct method if n small enough.
+	 i:INT; loop until!(i=n);
+	    if uniform<lp then dr:=dr+1. end;
+	    i:=i+1;
+	 end; -- loop
+      elsif am<1. then		-- such small prob, approximate by Poisson
+	 dr:=poisson(am);	-- poisson distribution with the same mean
+	 if dr>n then dr:=n end; -- chop the tail
+      else			-- use rejection method
+	 y:DOUBLE; t:DOUBLE;
+	 sq:DOUBLE:=(2.*am*(1.-lp));
+	 loop
+	    loop		-- rejection with Lorenzian comparison
+	       y:=cauchy; dr:=sq*y+am;  if dr>=0. and dr<n+1. then break! end;
+	    end; -- loop
+	    dr:=dr.floor.to_d;
+	    if uniform<=1.2*sq*(1.+y*y)*exp(log_gamma(n+1.)-log_gamma(dr+1.)
+	         -log_gamma(n-dr+1.)+dr*log(lp)+(n-dr)*log(1.-lp)) 
+	    then break! end;
+	 end; -- loop
+      end; -- if
+      if lp/=p then res:=n-dr.to_i else res:=dr.to_i end; -- undo symmetry
+   end; -- binomial
+   
+   poisson(x:DOUBLE):INT is
+      -- Samples from the Poisson distribution: `p(j)=x^j e^(-x)/j!'.
+      -- Mean is `x'. Is number of events in time interval `x'.
+      -- Based on Numerical Recipes in C, p. 221.
+      if (x<12.) then		-- use direct method
+	 res:=-1; t:DOUBLE:=1.; g:DOUBLE:=exp(-x);
+	 loop
+	    res:=res+1; t:=t*uniform; if t<=g then return end;
+	 end; -- loop
+      else			-- use rejection method
+	 rd:DOUBLE;		-- double version of res
+	 loop
+	    y:DOUBLE; g:DOUBLE:=x*log(x)-log_gamma(x+1.); 
+	    sq:DOUBLE:=(2.*x).sqrt;
+	    loop		-- use Lorentzian comparison
+	       y:=cauchy; rd:=sq*y+x; if rd>=0. then break! end;
+	    end; -- loop
+	    rd:=rd.floor.to_d;
+	    if uniform<=.9*(1.+y*y)*exp(rd*log(x)-log_gamma(rd+1.)-g)
+	    then break! end;
+	 end; -- loop
+	 res:=rd.to_i;
+      end; -- if
+   end; -- poisson
+   
+   cauchy:DOUBLE is
+      -- Samples from the Cauchy distribution: `p(x)=1/pi(1+x^2)'.
+      -- (Also called the Lorentzian.) No mean. Based on NR in C. p. 220.
+      res:=tan(pi*uniform)
+   end; -- cauchy
+   
+   cantor(s:DOUBLE):DOUBLE is
+      -- A uniform random sample from a Cantor set with scaling `s'.
+      r:DOUBLE:=uniform;  m:DOUBLE:=1-s;
+      i:INT:=0; loop until!(i>33);
+	 if r>=.5 then r:=r-.5; res:=res+m end;
+	 r:=r*2.; m := m*s; i:=i+1
+      end; -- loop
+   end; -- cantor
+   
+   standard_cantor:DOUBLE is
+      -- A uniform random sample from the canonical Cantor set in `[0,1)'.
+      res := cantor(.3333333333)
+   end; -- standard_cantor
+
+end; -- class RANDOM
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class RANDOM_GEN is
+   -- Shell class to be inherited by different random number generators.
+   -- Each descendent should also define a `create' routine with no arguments
+   -- which returns an initialized generator of the corresponding type.
+   
+   init(nseed:INT) is
+      -- Initialize the generator using nseed. Any `INT' value should be
+      -- legal.
+      ERR::s("RANDOM_GEN error: init not defined.").nl;
+   end; -- init
+   
+   get:DOUBLE is
+      -- The next random value. Should be in `[0.,1.)'.
+      ERR::s("RANDOM_GEN error: get not defined.").nl;
+   end; -- get
+   
+end; -- class RANDOM_GEN
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class MS_RANDOM_GEN is
+   -- The "minimal standard" generator described in "Random Number
+   -- Generators: Good Ones are Hard to Find" by Stephen Park and 
+   -- Keith Miller, Communications of the ACM, October 1988, Volume 
+   -- 31, Number 10, p. 1192. Linear congruential, produces a value
+   -- in `[0.,1.)' including `0.' but not `1.' Any seed value in
+   -- the range `[1,2147483646]' is equally good. 
+
+   RANDOM_GEN;			-- Inherits from specification class.
+   
+   -- Constants used in generator:
+   const ms_a:DOUBLE:=16807.0;	-- `7^5'
+   const ms_m:DOUBLE:=2147483647.0; -- `(2^31)-1', prime
+   const ms_md:DOUBLE:=ms_m-1.; -- to avoid continual recomputation
+   
+   attr seed:INT;			-- Current state of generator.
+   
+   create:SAME is
+      -- A minimal standard generator with `seed=1'.
+      res:=new; res.seed:=1;
+   end; -- create
+   
+   init(nseed:INT) is
+      -- Initialize the generator.
+      seed:=1+(nseed-1).mod(2147483645) -- keep in legal range
+   end; -- init
+   
+   get:DOUBLE is
+      -- Pseudo-random value in `[0.,1.)' generated by minimal
+      -- standard generator.
+      tmp:DOUBLE:=ms_a*seed;
+      seed:=(tmp-(ms_m*((tmp/ms_m).to_i))).to_i;
+      res:=(seed-1)/ms_md;
+   end; -- get
+
+   test:BOOL is
+      -- True if generator is performing correctly. 
+      -- On failure try `PMS_RANDOM_GEN'.
+      init(1);
+      n:INT; loop until!(n=10000);
+	 u:DOUBLE:=get;
+	 n:=n+1;
+      end; -- loop
+      res:=(seed=1043618065);
+   end; -- test
+   
+end; -- class MS_RANDOM_GEN
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class PMS_RANDOM_GEN is
+   -- A slower but portable version of `MS_RANDOM_GEN'.
+   -- (See its description.)
+   
+   RANDOM_GEN;			-- Inherits from specification class.
+   
+   -- Consts used in generator:
+   const ms_a:DOUBLE:=16807.0;	-- `7^5'
+   const ms_m:DOUBLE:=2147483647.0; -- `(2^31)-1', prime
+   const ms_md:DOUBLE:=ms_m-1.; -- to avoid continual recomputation
+   const ms_q:DOUBLE:=127773.0; -- `(ms_m/ms_a).floor'
+   const ms_r:DOUBLE:=2836.0; -- `ms_m.mod(ms_a)'
+
+   attr seed:INT;			-- Current state of generator.
+   
+   create:SAME is
+      -- A new generator with `seed=1'.
+      res:=new; res.seed:=1;
+   end; -- create
+   
+   init(nseed:INT) is
+      -- Initialize the generator.
+      seed:=1+(nseed-1).mod(2147483645) -- keep in legal range
+   end; -- init
+   
+   get:DOUBLE is
+      -- A pseudo-random value in `[0.,1.)'. Won't overflow on most machines.
+      hi:DOUBLE:=(seed/ms_q).to_i;
+      lo:DOUBLE:=seed-(ms_q*hi);
+      test:DOUBLE:=(ms_a*lo)-(ms_r*hi);
+      if test>0.0 then seed:=test.to_i 
+      else seed:=(test+ms_m).to_i end;
+      res:=(seed-1)/ms_md;
+   end; -- get
+
+   test:BOOL is
+      -- `True' if generator is performing correctly. 
+      init(1);
+      n:INT; loop until!(n=10000);
+	 u:DOUBLE:=get;
+	 n:=n+1;
+      end; -- loop
+      res:=(seed=1043618065);
+   end; -- test
+   
+end; -- class PMS_RANDOM_GEN
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class COMB_RANDOM_GEN{G1,G2} is
+   -- A `RANDOM_GEN' whose samples are a combination of two generators
+   -- of types `G1' and `G2'. These must be descendents of `RANDOM_GEN'
+   -- and should be independent of one another.
+   RANDOM_GEN;
+   
+   attr g1:G1;			-- The two generators.
+   attr g2:G2;			
+
+   create:SAME is
+      -- A new combo generator.
+      res:=new; res.g1:=G1::create; res.g2:=G2::create;
+   end; -- create
+   
+   init(nseed:INT) is
+      -- Initialize the two generators with `nseed'.
+      g1.init(nseed); g2.init(nseed);
+   end; -- init
+   
+   get:DOUBLE is
+      -- Pseudo-random value in `[0.,1.)' constructed from `g1' and `g2'.
+      res:=g1.get+g2.get;
+      if res>=1. then res:=res-1. end;
+   end; -- get
+   
+end; -- class COMB_RANDOM_GEN{G1,G2}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class PERM_RANDOM_GEN{G} is
+   -- A generator which randomly permutes the outputs of a generator of type
+   -- `G' (which should be a descendent of `RANDOM_GEN') to break up serial
+   -- correlations.
+   RANDOM_GEN;
+   
+   attr g:G;				-- The generator whose output we permute.
+   attr tbl:ARRAY{DOUBLE};		-- The permutation table.
+   
+   create:SAME is
+      -- A new permutation generator.
+      res:=new; res.tbl:=ARRAY{DOUBLE}::new(97); res.g:=G::create; init(1);
+   end; -- create
+   
+   init(nseed:INT) is
+      -- Initialize both the generator `g' and the table using `nseed'.
+      g.init(nseed);		-- initialize the generator
+      i:INT; loop until!(i=97);	-- initialize the table
+	 tbl[i]:=g.get;
+	 i:=i+1
+      end; -- loop
+   end; -- init
+      
+   get:DOUBLE is
+      -- Pseudo-random value in `[0.,1.)' constructed from `g' by
+      -- permutation.
+      nv:DOUBLE:=g.get;		-- new random value
+      ti:INT:=(nv*97).to_i;	-- index to swap with
+      res:=tbl[ti]; tbl[ti]:=nv;
+   end; -- get
+   
+end; -- class PERM_RANDOM_GEN{G}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class RANDOM_TEST is
+   -- Test of `RANDOM'.
+   
+   main is
+      -- Perform tests.
+      OUT::s("Test of RANDOM:").nl;
+      g:MS_RANDOM_GEN:=RANDOM::sgen;
+      OUT::s("sgen.test=").b(g.test).nl;
+      r:RANDOM:=r.create; r.set_gen(PMS_RANDOM_GEN::create);
+      g2:PMS_RANDOM_GEN:=r.gen;
+      OUT::s("PMS_RANDOM_GEN: r.gen.test=").b(g2.test).nl;
+      RANDOM::init(103);
+      OUT::s("RANDOM::uniform: ");
+      i:INT:=0; loop until!(i=10); OUT::d(RANDOM::uniform).s(", "); i:=i+1 end; 
+      OUT::nl;
+      OUT::s("RANDOM::uniform_range(15.,25.): ");
+      i:INT:=0; loop until!(i=10); OUT::d(RANDOM::uniform_range(15.,25.)).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+      OUT::s("RANDOM::int_range(-5,5): ");
+      i:INT:=0; loop until!(i=10); OUT::i(RANDOM::int_range(-5,5)).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+      OUT::s("RANDOM::bit(.8): ");
+      i:INT:=0; loop until!(i=10); OUT::b(RANDOM::bit(.8)).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+      OUT::s("RANDOM::normal(10.,5.): ");
+      i:INT:=0; loop until!(i=10); OUT::d(RANDOM::normal(10.,5.)).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+      OUT::s("RANDOM::standard_normal: ");
+      i:INT:=0; loop until!(i=10); OUT::d(RANDOM::standard_normal).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+      OUT::s("RANDOM::exponential(5.): ");
+      i:INT:=0; loop until!(i=10); OUT::d(RANDOM::exponential(5.)).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+      OUT::s("RANDOM::gamma(5): ");
+      i:INT:=0; loop until!(i=10); OUT::d(RANDOM::gamma(5)).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+      OUT::s("RANDOM::beta(15,25): ");
+      i:INT:=0; loop until!(i=10); OUT::d(RANDOM::beta(15,25)).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+      OUT::s("RANDOM::chi_square(5): ");
+      i:INT:=0; loop until!(i=10); OUT::d(RANDOM::chi_square(5)).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+      OUT::s("RANDOM::f_dist(5,2): ");
+      i:INT:=0; loop until!(i=10); OUT::d(RANDOM::f_dist(5,2)).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+      OUT::s("RANDOM::t_dist(5): ");
+      i:INT:=0; loop until!(i=10); OUT::d(RANDOM::t_dist(5)).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+      OUT::s("RANDOM::geometric(.5): ");
+      i:INT:=0; loop until!(i=10); OUT::i(RANDOM::geometric(.5)).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+      OUT::s("RANDOM::binomial(400,.5): ");
+      i:INT:=0; loop until!(i=10); OUT::i(RANDOM::binomial(400,.5)).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+      OUT::s("RANDOM::poisson(5.): ");
+      i:INT:=0; loop until!(i=10); OUT::i(RANDOM::poisson(5.)).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+      OUT::s("RANDOM::cauchy: ");
+      i:INT:=0; loop until!(i=10); OUT::d(RANDOM::cauchy).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+      OUT::s("RANDOM::cantor(.4): ");
+      i:INT:=0; loop until!(i=10); OUT::d(RANDOM::cantor(.4)).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+            OUT::s("RANDOM::standard_cantor: ");
+      i:INT:=0; loop until!(i=10); OUT::d(RANDOM::standard_cantor).s(", "); 
+	 i:=i+1 end; OUT::nl; 
+      RANDOM::init_with_time;
+      OUT::s("init_with_time; uniform: ");
+      i:INT:=0; loop until!(i=4); OUT::d(RANDOM::uniform).s(", "); i:=i+1 end; 
+      OUT::nl;
+      RANDOM::init(100);
+      OUT::s("init(100); uniform: ");
+      i:INT:=0; loop until!(i=4); OUT::d(RANDOM::uniform).s(", "); i:=i+1 end; 
+      OUT::nl;
+      RANDOM::init(105);
+      OUT::s("init(105); uniform: ");
+      i:INT:=0; loop until!(i=4); OUT::d(RANDOM::uniform).s(", "); i:=i+1 end; 
+      OUT::nl;
+      RANDOM::init(100);
+      OUT::s("init(100); uniform: ");
+      i:INT:=0; loop until!(i=4); OUT::d(RANDOM::uniform).s(", "); i:=i+1 end; 
+      OUT::nl;
+      RANDOM::init_with_time;
+      OUT::s("init_with_time; uniform: ");
+      i:INT:=0; loop until!(i=4); OUT::d(RANDOM::uniform).s(", "); i:=i+1 end; 
+      OUT::nl;      
+      RANDOM::init_with_time;
+      OUT::s("init_with_time; uniform: ");
+      i:INT:=0; loop until!(i=4); OUT::d(RANDOM::uniform).s(", "); i:=i+1 end; 
+      OUT::nl;      
+      RANDOM::init_with_time;
+      OUT::s("init_with_time; uniform: ");
+      i:INT:=0; loop until!(i=4); OUT::d(RANDOM::uniform).s(", "); i:=i+1 end; 
+      OUT::nl;
+   end; -- main
+   
+end; -- class RANDOM_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+

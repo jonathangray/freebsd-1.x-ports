@@ -1,0 +1,1022 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/numerical/matrix.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Matrices and linear algebra.
+--*
+--* CLASSES: MATRIX, NR_SVD, MATRIX_TEST
+--*
+--* REQUIRED FILES: data_structure/list.sa, numerical/math.sa,
+--*      base/random.sa, base/time.sa, base/test.sa,
+--*      base/C/time_.o, geometry/vector.sa
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: matrix.sa,v 1.1 1994/02/12 03:23:18 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:35 1993 (hws)
+--*  Oct 17 06:34 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 27 14:44 1993 (hws): require -> pre
+--*  Apr  3 16:55 1993 (hws): assert(pre) -> require
+--* Created: Wed Mar 14 23:44:10 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class MATRIX is
+   -- Matrices with real entries.
+   
+   ARRAY2{REAL};
+
+   nr:INT is res:=asize1 end; -- Number of rows.
+   nc:INT is res:=asize2 end; -- Number of columns.
+
+   create(nr,nc:INT):SAME is
+      -- A new matrix.
+      res:=new(nr,nc);
+   end; -- create
+   
+   to(m:MATRIX):MATRIX pre m.nr=nr and m.nc=nc is
+      -- Copy `m' into `self' and return it.
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=nc); [i,j]:=m[i,j]; j:=j+1 end;
+	 i:=i+1
+      end; --loop
+      res:=self;
+   end; -- to
+
+   to_s:STR is
+      -- A string representation of `self' of the form:
+      -- "((1.00, 2.33), (4.5, 2.8), (9.7, 3.2))" giving succesive rows.
+      res:="(";
+      i:INT; loop until!(i>=nr);
+	 res:=res.s("(");
+	 j:INT:=0; loop until!(j>=nc);
+	    res:=res.r([i,j]);
+	    j:=j+1;
+	    if j/=nc then res:=res.s(", ") end;
+	    end; -- loop
+	 res:=res.s(")");
+	 i:=i+1;
+	 if i/=nr then res:=res.s(", ") end;
+      end; -- loop
+      res:=res.s(")");
+   end; -- to_s
+
+   create_from_s(s:STR):MATRIX is
+      -- Create a new matrix from a string of the form:
+      -- "((1.00, 2.33), (4.5, 2.8), (9.7, 3.2))" giving succesive rows.
+      -- Returns `void' if not of this form (extra white space is ignored).
+      -- Must be at least one entry.
+      sc:STR_CURSOR:=s.cursor;
+      tmp:LIST{LIST{REAL}}:=tmp.create;
+      sc.skip_space;
+      if not sc.c_accept('(') then return end;
+      loop
+	 tmp:=tmp.push(LIST{REAL}::create);
+	 if not sc.c_accept('(') then return end;
+	    loop
+	       tmp:=tmp.push(tmp.pop.push(sc.get_r));
+	       if sc.error/=0 then return end; -- should have been a real
+	       sc.skip_space;
+	       if not sc.c_accept(',') then break! end;
+	    end; -- loop
+	 if not sc.c_accept(')') then return end;
+	 sc.skip_space;
+	 if not sc.c_accept(',') then break! end;
+      end; -- loop
+      if not sc.c_accept(')') then return end;
+      snc:INT:=tmp.top.size;
+      res:=MATRIX::create(tmp.size,snc);
+      i:INT; loop until!(i>=tmp.size);
+	 if tmp[i].size/=snc then res:=void; return end; -- wrong row size
+	 j:INT:=0; loop until!(j>=snc);
+	    res[i,j]:=tmp[i][j];
+	    j:=j+1;
+	 end; -- loop
+	 i:=i+1
+      end; -- loop
+   end; -- create_from_s
+   
+   to_portion_of(m:MATRIX):MATRIX is
+      -- Copy into `self' as much of `m' as will fit and return it.
+      i:INT; loop until!(i=nr.min(m.nr));
+	 j:INT:=0; loop until!(j=nc.min(m.nc)); [i,j]:=m[i,j]; j:=j+1 end;
+	 i:=i+1
+      end; -- loop
+      res:=self;
+   end; -- to_portion_of
+   
+   to_zero:MATRIX is
+      -- Set `self' to the zero matrix and return it.
+      i:INT:=0; loop until!(i=nr);
+	 j:INT:=0; loop until!(j=nc); [i,j]:=0.; j:=j+1 end;
+	 i:=i+1
+      end; --loop
+      res:=self;
+   end; -- to_zero
+
+   to_identity:MATRIX is
+      -- Set `self' to the identity matrix and return it.
+      -- (Extra zeroes if non-square).
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=nc);
+	    if i=j then [i,j]:=1. else [i,j]:=0. end;
+	    j:=j+1
+	 end; -- loop
+	 i:=i+1
+      end; --loop
+      res:=self;
+   end; -- to_identity
+   
+   plus(m:MATRIX):MATRIX pre m.nr=nr and m.nc=nc is
+      -- The sum of `self' and `m'.
+      res:=new(nr,nc);
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=nc); res[i,j]:=[i,j]+m[i,j]; j:=j+1 end;
+	 i:=i+1
+      end; --loop
+   end; -- plus
+
+   to_sum_with(m:MATRIX):MATRIX pre m.nr=nr and m.nc=nc is
+      -- Set `self' to its sum with `m' and return it.
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=nc); [i,j]:=[i,j]+m[i,j]; j:=j+1 end;
+	 i:=i+1
+      end; --loop
+      res:=self;
+   end; -- to_sum_with
+   
+   minus(m:MATRIX):MATRIX pre m.nr=nr and m.nc=nc is
+      -- `Self' minus `m'.
+      res:=new(nr,nc);
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=nc); res[i,j]:=[i,j]-m[i,j]; j:=j+1 end;
+	 i:=i+1
+      end; --loop
+   end; -- minus
+
+   scale_by(s:REAL):MATRIX is
+      -- Scale `self' by `s' and return it.
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=nc); [i,j]:=s*[i,j]; j:=j+1 end;
+	 i:=i+1
+      end; -- loop
+      res:=self;
+   end; -- scale_by
+
+   times(m:MATRIX):MATRIX pre m.nr=nc  is
+      -- `Self' times `m'.
+      res:=new(nr,m.nc);
+      i:INT; loop until!(i=res.nr);
+	 j:INT; loop until!(j=res.nc); 
+	    k:INT; loop until!(k=nc); 
+	       res[i,j]:=res[i,j]+[i,k]*m[k,j]; 
+	       k:=k+1; 
+	    end; -- loop
+	    j:=j+1 
+	 end; -- loop
+	 i:=i+1
+      end; --loop
+   end; -- times
+   
+   to_product_of(a,b:MATRIX):MATRIX
+   pre nr=a.nr and nc=b.nc and a.nc=b.nr is
+      -- Set `self' to the matrix product of `a' and `b' and return it.
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=nc);
+	    [i,j]:=0.;
+	    k:INT; loop until!(k=a.nc); [i,j]:=[i,j]+a[i,k]*b[k,j]; k:=k+1 end;
+	    j:=j+1
+	 end; -- loop
+	 i:=i+1
+      end; --loop
+      res:=self;
+   end; -- to_product_of
+
+   to_product_with_diagonal(d:VECTOR):MATRIX is
+      -- Set `self' to be the product of itself with a diagonal matrix whose
+      -- diagonal entries are the components of `d' truncated or extended
+      -- with zeroes to be the correct size. Return `self'.
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=nc);
+	    if j<d.dim then [i,j]:=[i,j]*d[j] else [i,j]:=0.0; end;
+	    j:=j+1
+	 end; -- loop
+	 i:=i+1
+      end; --loop
+      res:=self;
+   end; -- to_product_with_diagonal
+
+   act_on(v:VECTOR):VECTOR pre v.dim=nc is
+      -- A new vector equal to `self' times `v'.
+      res:=VECTOR::new(nr);
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=nc); res[i]:=res[i]+[i,j]*v[j]; j:=j+1 end;
+	 i:=i+1
+      end; --loop
+   end; -- act_on
+
+   act_on_in(v,vr:VECTOR) pre v.dim=nc and vr.dim=nr is
+      -- Set `vr' to the result of `self' acting on `v'.
+      vr.to_zero;
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=nc); vr[i]:=vr[i]+[i,j]*v[j]; j:=j+1 end;
+	 i:=i+1
+      end; --loop
+   end; -- act_on_in
+   
+   affine_act_on_in(v1,v2:VECTOR) pre v1.dim=nc-1 and v2.dim=nr is
+      -- Set `v2' to the result of `self' acting affinely on `v1'.
+      -- i.e. the same effect as adding an extra `1' to the end of `v1'.
+      v2.to_zero;
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=nc-1); v2[i]:=v2[i]+[i,j]*v1[j]; j:=j+1 end;
+	 v2[i]:=v2[i]+[i,nc-1];
+	 i:=i+1
+      end; --loop
+   end; -- affine_act_on_in
+   
+   transpose:MATRIX is
+      -- The transpose of `self'.
+      res:=new(nc,nr);
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=nc); res[j,i]:=[i,j]; j:=j+1 end;
+	 i:=i+1;
+      end; -- loop
+   end; -- transpose
+
+   to_transpose_of(m:MATRIX):MATRIX pre m.nr=nc and m.nc=nr is
+      -- Set `self' to the matrix transpose of `m' and return it.
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=nc); [i,j]:=m[j,i]; j:=j+1 end;
+	 i:=i+1
+      end; --loop
+      res:=self;
+   end; -- to_transpose_of
+   
+   transpose_act_on(v:VECTOR):VECTOR pre v.dim=nr is
+      -- The transpose of `self' times `v'.
+      res:=VECTOR::new(nc);
+      i:INT; loop until!(i=nc);
+	 j:INT; loop until!(j=nr); res[i]:=res[i]+[j,i]*v[j]; j:=j+1 end;
+	 i:=i+1
+      end; --loop
+   end; -- transpose_act_on
+   
+   transpose_act_on_in(v,vr:VECTOR) pre v.dim=nr and vr.dim=nc is
+      -- Set `vr' to the result of the transpose of `self' acting on `v'.
+      vr.to_zero;
+      i:INT; loop until!(i=nc);
+	 j:INT; loop until!(j=nr); vr[i]:=vr[i]+[j,i]*v[j]; j:=j+1 end;
+	 i:=i+1
+      end; --loop
+   end; -- trans_act_on_v_in
+
+   column(j:INT):VECTOR is
+      -- The `j'th column of `self'.
+      res:=VECTOR::new(nr); column_in(j,res);
+   end; -- column
+
+   column_in(j:INT; v:VECTOR) is
+      -- Copy as much of the `j'th column of `self' into `v' as will fit.
+      lim:INT:=nr.min(v.dim);
+      i:INT:=0; loop until!(i=lim); v[i]:=[i,j]; i:=i+1 end;
+   end; -- column_in
+
+   column_from(j:INT; v:VECTOR):MATRIX is
+      -- Copy as much of `v' as will fit into the `j'th column of `self' and
+      -- return it.
+      lim:INT:=nr.min(v.dim);
+      i:INT; loop until!(i=lim); [i,j]:=v[i]; i:=i+1 end;
+      res:=self;
+   end; -- column_from
+   
+   row(i:INT):VECTOR is
+      -- The `i'th row of `self'.
+      res:=VECTOR::new(nc); row_in(i,res);
+   end; -- row
+
+   row_in(i:INT; v:VECTOR) is
+      -- Copy as much of the `i'th row of `self' into `v' as will fit.
+      lim:INT := nc.min(v.dim);
+      j:INT; loop until!(j=lim); v[j]:=[i,j]; j:=j+1 end;
+   end; -- row_in
+   
+   row_from(i:INT; v:VECTOR):MATRIX is
+      -- Copy as much of `v' as will fit into the `i'th row of `self' and
+      -- return it. 
+      lim:INT:=nc.min(v.dim);
+      j:INT; loop until!(j=lim); [i,j]:=v[j]; j:=j+1 end;
+      res:=self;
+   end; -- row_from
+
+   diagonal_in(v:VECTOR) pre v.dim = nr.min(nc) is
+      -- Copy as much of the diagonal of `self' into `v' as will fit.
+      lim:INT := nr.min(nc).min(v.dim);
+      i:INT; loop until!(i=lim); v[i]:=[i,i]; i:=i+1 end;
+   end; -- diagonal_in
+
+   trace:REAL is
+      -- The trace of `self'. Sum of diagonal if not square.
+      lim:INT:=nr.min(nc);
+      i:INT; loop until!(i=lim); res:=res+[i,i]; i:=i+1 end;
+   end; -- trace
+
+   svd_in(a:MATRIX; w:VECTOR; v:MATRIX)
+   pre a.nr=nr.max(nc) and a.nc=nc and 
+	 w.dim=nc and v.nr=nc and v.nc=nc  is
+      -- Computes the singular value decomposition of `self = a w v^T'.
+      -- `a' must be `max(nr,nc)' by `nc', `w' length `nc', `v' is `nc' by
+      -- `nc'. `Self' is unchanged, `a', `w', `v' are altered.
+
+      -- fill in a with self and extra zero rows if necessary
+      a.to_zero; a.to_portion_of(self); 
+      NR_SVD::svd(a,w,v);	-- Start with Numerical Recipes version.
+	 -- Eventually use a better algorithm.
+   end; -- svd_in
+   
+   svd_back_sub(u:MATRIX; w:VECTOR; v:MATRIX; b,x:VECTOR)
+   pre u.nc=w.dim and v.nr=u.nc and v.nc=u.nc and
+	 b.dim=u.nr and x.dim=u.nc is 
+      -- Solves `a.x=b' for `x' when `a=u.d.v^T' is the svd of `a'.
+      tmp:VECTOR:=tmp.new(u.nc);
+      j:INT; loop until!(j=u.nc); -- calculate u^T.b in tmp
+	 s:REAL:=0.;
+	 if w[j].abs>=0.000001 then	-- nonzero only if w_j is nonzero
+	    i:INT; loop until!(i=u.nr); 
+	       s:=s+u[i,j]*b[i]; i:=i+1
+	    end; -- loop
+	    s:=s/w[j];
+	 end; -- if
+	 tmp[j]:=s;
+	 j:=j+1
+      end; -- loop
+      j:INT:=0; loop until!(j=u.nc);
+	 s:REAL:=0.;
+	 jj:INT:=0; loop until!(jj=u.nc);
+	    s:=s+v[j,jj]*tmp[jj]; jj:=jj+1
+	 end; -- loop
+	 x[j]:=s;
+	 j:=j+1
+      end; -- loop
+   end; -- svd_back_sub
+   
+   to_linear_fit_of(in,out:VECTOR_LIST):MATRIX
+   pre nr=out.dim and nc=in.dim and out.size=in.size is
+      -- Fill in `self' to be the least squares best linear approximation
+      -- relating `in' to `out' by: `out[i]=self.act_on(in[i])'.
+      -- Return `self'.
+      it:MATRIX:=new(in.size,in.dim);
+      i:INT; loop until!(i=in.size); it.row_from(i,in[i]); i:=i+1; end;
+      u:MATRIX:=new(it.nr.max(it.nc),it.nc);      
+      v:MATRIX:=new(it.nc,it.nc); w:VECTOR:=w.new(it.nc);
+      it.svd_in(u,w,v);
+      wmax:REAL:=w.max_value; wmin:REAL:=wmax*(.000001);
+      i:INT; loop until!(i=it.nc); 
+	 if w[i]<=wmin then w[i]:=0. end; 
+	 i:=i+1 
+      end; -- loop
+      x:VECTOR:=x.new(nc); b:VECTOR:=b.new(out.size);
+      i:INT; loop until!(i=out.dim); -- get each row of self
+	 j:INT; loop until!(j=out.size); b[j]:=out[j][i]; j:=j+1 end;
+	 it.svd_back_sub(u,w,v,b,x);
+	 row_from(i,x);
+	 i:=i+1
+      end; -- loop
+      res:=self;
+   end; -- to_linear_fit_of
+
+   to_affine_fit_of(in,out:VECTOR_LIST):MATRIX
+   pre nr=out.dim and nc=in.dim+1 and out.size=in.size is
+      -- Fill in `self' to be the best least squares affine map relating 
+      -- `in' to `out' by: `out[i]=self.affine_act_on(in[i])'.
+      -- Return `self'.
+      it:MATRIX:=new(in.size,in.dim+1);
+      i:INT; loop until!(i=in.size); 
+	 it.row_from(i,in[i]); it[i,in.dim]:=1.; -- put in affine piece
+	 i:=i+1; 
+      end;
+      u:MATRIX:=new(it.nr.max(it.nc),it.nc);      
+      v:MATRIX:=new(it.nc,it.nc); w:VECTOR:=w.new(it.nc);
+      it.svd_in(u,w,v);
+      wmax:REAL:=w.max_value; wmin:REAL:=wmax*(.000001);
+      i:INT; loop until!(i=it.nc); 
+	 if w[i]<=wmin then w[i]:=0. end; 
+	 i:=i+1 
+      end; -- loop
+      x:VECTOR:=x.new(nc); b:VECTOR:=b.new(out.size);
+      i:INT; loop until!(i=out.dim); -- get each row of self
+	 j:INT; loop until!(j=out.size); b[j]:=out[j][i]; j:=j+1 end;
+	 it.svd_back_sub(u,w,v,b,x);
+	 row_from(i,x);
+	 i:=i+1
+      end; -- loop
+      res:=self;
+   end; -- to_linear_fit_of
+   
+   to_weighted_linear_fit_of(in,out:VECTOR_LIST; wt:LIST{REAL}):MATRIX
+   pre
+   	 nr=out.dim and nc=in.dim and out.size=in.size and wt.size=in.size
+   is
+      -- Fill in `self' to be the least squares best linear approximation
+      -- relating `in' to `out' by: `out[i]=self.act_on(in[i])'. `wt[i]'
+      -- gives the weight which should be given to the ith example.
+      -- (typically in `[0.,1.]' (`0.' means ignore, `1.' means full weight).
+      -- Return `self'.
+      it:MATRIX:=new(in.size,in.dim);
+      i:INT; loop until!(i=it.nr); it.row_from(i,in[i]); i:=i+1; end;
+      i:INT; loop until!(i=it.nr);	-- scale by wt
+	 j:INT; loop until!(j=it.nc); it[i,j]:=it[i,j]*wt[i]; j:=j+1 end;
+	 i:=i+1
+      end; -- loop
+      u:MATRIX:=new(it.nr.max(it.nc),it.nc);      
+      v:MATRIX:=new(it.nc,it.nc); w:VECTOR:=w.new(it.nc);
+      it.svd_in(u,w,v);
+      wmax:REAL:=w.max_value; wmin:REAL:=wmax*(.000001);
+      i:INT; loop until!(i=it.nc); 
+	 if w[i]<=wmin then w[i]:=0. end; 
+	 i:=i+1 
+      end; -- loop
+      x:VECTOR:=x.new(nc); b:VECTOR:=b.new(out.size);
+      i:INT; loop until!(i=out.dim); -- get each row of self
+	 j:INT; loop until!(j=out.size); b[j]:=out[j][i]*wt[j]; j:=j+1 end;
+	 it.svd_back_sub(u,w,v,b,x);
+	 row_from(i,x);
+	 i:=i+1
+      end; -- loop
+      res:=self;
+   end; -- to_weighted_linear_fit_of
+
+   to_weighted_affine_fit_of(in,out:VECTOR_LIST; wt:LIST{REAL}):MATRIX
+   pre
+   	 nr=out.dim and nc=in.dim+1 and out.size=in.size and wt.size=in.size
+   is
+      -- Fill in `self' to be the least squares best affine approximation
+      -- relating `in' to `out' by: `out[i]=self.affine_act_on(in[i])'. 
+      -- `wt[i]' gives the weight which should be given to the `i'th example. 
+      -- (typically in `[0.,1.]' (`0.' means ignore, `1.' means full weight).
+      it:MATRIX:=new(in.size,in.dim+1);
+      i:INT; loop until!(i=it.nr); 
+	 it.row_from(i,in[i]); it[i,in.dim]:=wt[i];
+	 i:=i+1; 
+      end; -- loop
+      i:INT; loop until!(i=it.nr);	-- scale by wt
+	 j:INT; loop until!(j=it.nc-1); it[i,j]:=it[i,j]*wt[i]; j:=j+1 end;
+	 i:=i+1
+      end; -- loop
+      u:MATRIX:=new(it.nr.max(it.nc),it.nc);      
+      v:MATRIX:=new(it.nc,it.nc); w:VECTOR:=w.new(it.nc);
+      it.svd_in(u,w,v);
+      wmax:REAL:=w.max_value; wmin:REAL:=wmax*(.000001);
+      i:INT; loop until!(i=it.nc); 
+	 if w[i]<=wmin then w[i]:=0. end; 
+	 i:=i+1 
+      end; -- loop
+      x:VECTOR:=x.new(nc); b:VECTOR:=b.new(out.size);
+      i:INT; loop until!(i=out.dim); -- get each row of self
+	 j:INT; loop until!(j=out.size); b[j]:=out[j][i]*wt[j]; j:=j+1 end;
+	 it.svd_back_sub(u,w,v,b,x);
+	 row_from(i,x);
+	 i:=i+1
+      end; -- loop
+      res:=self;
+   end; -- to_weighted_affine_fit_of
+
+   is_epsilon_equal(m:MATRIX):BOOL pre m.nr=nr and m.nc=nc is
+      -- True if `self' is within `epsilon' of `m'.
+      res:=true;
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=nc);
+	    if not MATH::is_epsilon_equal([i,j],m[i,j]) then res :=false end;
+	    j:=j+1
+	 end; -- loop
+	 i:=i+1
+      end; -- loop
+   end; -- is_epsilon_equal
+   
+   to_uniform_random:MATRIX is
+      -- Make `self''s entries uniform in `[0.,1.]' and return it;
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=nc); [i,j]:=RANDOM::uniform; j:=j+1 end;
+	 i:=i+1
+      end; --loop
+      res:=self;
+   end; -- to_uniform_random
+
+   jacobi_sym_eigen(d:VECTOR; v:MATRIX)
+   pre nr=nc and d.dim=nr and v.nr=nr and v.nc=nr 
+   is
+      -- Computes the eigenvectors and eigenvalues of symmetric matrices
+      -- by the Jacobi method. `self' must be a symmetric matrix, `d' will
+      -- be filled with its eigenvalues and the columns of `v' will be
+      -- the eigenvectors. Entries above the diagonal are destroyed.
+      -- Based on Numerical Recipes.
+      j,iq,ip,i,nrot:INT; tresh,theta,tau,t,sm,s,h,g,c:REAL; n:INT:=nr;
+      b:VECTOR:=VECTOR::new(n); z:VECTOR:=VECTOR::new(n);
+      v.to_identity; diagonal_in(d); b.to(d);
+      i:=0; loop until!(i=50); 
+	 sm:=0.;
+	 ip:=0; loop until!(ip=n-1);
+	    iq:=ip+1; loop until!(iq=n); sm:=sm+[ip,iq].abs; iq:=iq+1 end;
+	    ip:=ip+1
+	 end;
+	 if sm=0. then return end;
+	 if i<3 then tresh:=.2*sm/(n*n) else tresh:=0. end;
+	 ip:=0; loop until!(ip=n-1);
+	    iq:=ip+1; loop until!(iq=n);
+	       g:=100.*[ip,iq].abs;
+	       if i>3 and d[ip].abs+g=d[ip].abs and d[iq].abs+g=d[iq].abs
+	       then [ip,iq]:=0.
+	       elsif [ip,iq].abs>tresh then
+		  h:=d[iq]-d[ip];
+		  if h.abs+g=h.abs then t:=[ip,iq]/h
+		  else
+		     theta:=.5*h/[ip,iq];
+		     t:=1./(theta.abs+(1.+theta*theta).sqrt);
+		     if theta<0. then t:=-t end;
+		  end; -- if
+		  c:=1./(1+t*t).sqrt; s:=t*c; tau:=s/(1.+c); h:=t*[ip,iq];
+		  z[ip]:=z[ip]-h; z[iq]:=z[iq]+h; 
+		  d[ip]:=d[ip]-h; d[iq]:=d[iq]+h;
+		  [ip,iq]:=0.;
+		  j:=0; loop until!(j>ip-1);
+		     g:=[j,ip]; h:=[j,iq]; [j,ip]:=g-s*(h+g*tau);
+		     [j,iq]:=h+s*(g-h*tau); j:=j+1
+		  end; -- loop
+		  j:=ip+1; loop until!(j>iq-1);
+		     g:=[ip,j]; h:=[j,iq]; [ip,j]:=g-s*(h+g*tau);
+		     [j,iq]:=h+s*(g-h*tau); j:=j+1
+		  end; -- loop
+		  j:=iq+1; loop until!(j>=n);
+		     g:=[ip,j]; h:=[iq,j]; [ip,j]:=g-s*(h+g*tau);
+		     [iq,j]:=h+s*(g-h*tau); j:=j+1
+		  end; -- loop
+		  j:=0; loop until!(j>=n);
+		     g:=v[j,ip]; h:=v[j,iq]; v[j,ip]:=g-s*(h+g*tau);
+		     v[j,iq]:=h+s*(g-h*tau); j:=j+1
+		  end; -- loop
+		  nrot:=nrot+1;
+	       end; -- if
+	       iq:=iq+1
+	    end; -- loop
+	    ip:=ip+1
+	 end; -- loop
+	 b.to_sum_with(z); d.to(b); z.to_zero;
+	 i:=i+1
+      end; -- loop
+      ERR::s("MATRIX: jacobi_sym_eigen, too many iterations.").nl;
+   end; -- jacobi_sym_eigen
+
+   jacobi_sort_sym_eigen(d:VECTOR; v:MATRIX)
+   pre nr=nc and d.dim=nr and v.nr=nr and v.nc=nr
+   is
+      -- Computes the eigenvalues and eigenvectors of a symmetric matrix
+      -- in sorted order by the Jacobi method.
+      -- Self must be a symmetric matrix, d will be filled with its
+      -- eigenvalues in sorted order and the columns of v will be
+      -- the eigenvectors. Entries above the diagonal are destroyed.
+      -- Based on Numerical Recipes.
+      jacobi_sym_eigen(d,v);
+      i:INT; loop until!(i=nr);
+	 k:INT:=i; p:REAL:=d[k];
+	 j:INT:=i+1; loop until!(j=nr); 
+	    if d[j]>=p then p:=d[j]; k:=j end;
+	    j:=j+1
+	 end; -- loop
+	 if k/=i then
+	    d[k]:=d[i]; d[i]:=p;
+	    j:=0; loop until!(j=nr);
+	       p:=v[j,i]; v[j,i]:=v[j,k]; v[j,k]:=p;
+	       j:=j+1;
+	    end; -- loop
+	 end; -- if
+	 i:=i+1
+      end; -- loop
+   end; -- jacobi_sort_sym_eigen
+
+   symmetrize:MATRIX pre nr=nc is
+      -- Symmetrize `self' by averaging opposing entries and return it.
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=i);
+	    [i,j]:=([i,j]+[j,i])/2.;
+	    [j,i]:=[i,j];
+	    j:=j+1
+	 end; -- loop
+	 i:=i+1
+      end; --loop
+      res:=self;
+   end; -- symmetrize
+
+   to_outer_product_of(u,v:VECTOR):MATRIX
+   pre nr=u.dim and nc=v.dim is
+      -- Set `self[i,j]' to `u.i * v.j' (like `u v^T') and return it.
+      i:INT; loop until!(i=nr);
+	 j:INT; loop until!(j=nc); [i,j]:=u[i]*v[j]; j:=j+1 end;
+	 i:=i+1
+      end; -- loop
+      res:=self;
+   end; -- to_outer_product_of
+
+   affine_column_from(j:INT; v:VECTOR):MATRIX pre v.dim=nr-1 is
+      -- Copy `v' into the `j'th column of `self' and add a `1' at the end.
+      -- Return `self'.
+      i:INT:=0; loop until!(i=nr-1);
+	 [i,j]:=v[i];
+	 i:=i+1
+      end; --loop
+      [nr-1,j]:=1.;
+      res:=self;
+   end; -- affine_column_from
+   
+end; -- class MATRIX
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class NR_SVD is
+   -- Singular value decomposition derived from Numerical Recipes.
+   -- This algorithm is known to have a problem with an obscure case (but
+   -- works almost all of the time). Better algorithms are being worked on.
+   
+   pythag(a,b:REAL):REAL is
+      -- Square root of a^2+b^2 without destructive overflow or underflow.
+      at:REAL:=a.abs;  bt:REAL:=b.abs; ct:REAL;
+      if at>bt then ct:=bt/at; res:=at*(1.+ct*ct).sqrt;
+      elsif bt/=0. then ct:=at/bt; res:=bt*(1.+ct*ct).sqrt;
+      end; -- if
+   end; -- pythag
+   
+   svd(a:MATRIX; w:VECTOR; v:MATRIX)
+   pre
+     a.nr>=a.nc and w.dim=a.nc and v.nr=a.nc and v.nc=a.nc
+   is
+      -- Computes the singular value decomposition of a. When finished,
+      -- a w v^T equals the old a. Must have a.nr>=a.nc.
+      -- Based on Numerical Recipes in C, p. 68.
+      m:INT:=a.nr; n:INT:=a.nc;
+	 -- Householder reduction to bidiagonal form (should be separate).
+      rv1:VECTOR:=rv1.new(n); g,scale,anorm,c,s,f,h,s,x,y,z:REAL; 
+      i,its,j,jj,k,l,nm:INT;  flag:BOOL;
+      i:=0; loop until!(i>=n);
+	 l:=i+1;  rv1[i]:=scale*g; g:=0.; s:=0.; scale:=0.;
+	 if i<m then 
+	    k:=i; loop until!(k>=m); scale:=scale+a[k,i].abs; k:=k+1 end; 
+	    if scale/=0. then
+	       k:=i; loop until!(k>=m); 
+		  a[k,i]:=a[k,i]/scale; s:=s+a[k,i]*a[k,i]; k:=k+1 
+	       end; -- loop
+	       f:=a[i,i]; 
+	       if f<0. then g:=s.sqrt else g:=-s.sqrt end;
+	       h:=f*g-s; a[i,i]:=f-g;
+	       if i/=n-1 then
+		  j:=l; loop until!(j>=n);
+		     s:=0.; 
+		     k:=i; loop until!(k>=m); s:=s+a[k,i]*a[k,j]; k:=k+1 end;
+		     f:=s/h;
+		     k:=i; loop until!(k>=m); a[k,j]:=a[k,j]+f*a[k,i];k:=k+1 end;
+		     j:=j+1
+		  end; -- loop
+	       end; -- if
+	       k:=i; loop until!(k>=m); a[k,i]:=a[k,i]*scale; k:=k+1 end;
+	    end; -- if
+	 end; -- if
+	 w[i]:=scale*g; g:=0.; s:=0.; scale:=0.;
+	 if i<m and i/=n-1 then
+	    k:=l; loop until!(k>=n); scale:=scale+a[i,k].abs; k:=k+1 end;
+	    if scale/=0. then
+	       k:=l; loop until!(k>=n);
+		  a[i,k]:=a[i,k]/scale; s:=s+a[i,k]*a[i,k]; k:=k+1
+	       end; -- loop
+	       f:=a[i,l];
+	       if f<0. then g:=s.sqrt else g:=-s.sqrt end;
+	       h:=f*g-s; a[i,l]:=f-g;
+	       k:=l; loop until!(k>=n); 
+		  rv1[k]:=a[i,k]/h;
+		  k:=k+1 
+	       end;
+	       if i/=m-1 then
+		  j:=l; loop until!(j>=m); 
+		     s:=0.;
+		     k:=l; loop until!(k>=n); s:=s+a[j,k]*a[i,k]; k:=k+1 end;
+		     k:=l; loop until!(k>=n); a[j,k]:=a[j,k]+s*rv1[k];k:=k+1 end;
+		     j:=j+1
+		  end; -- loop
+	       end; -- if
+	       k:=l; loop until!(k>=n); a[i,k]:=a[i,k]*scale; k:=k+1 end;
+	    end; -- if
+	 end; -- if
+	 anorm:=anorm.max(w[i].abs+rv1[i].abs);
+	 i:=i+1;
+      end; -- loop
+	 -- Accumulation of right-hand transformations.
+      i:=n-1; loop until!(i<0); 
+	 if i<n-1 then
+	    if g/=0. then
+	       j:=l; loop until!(j>=n); 
+		  v[j,i]:=(a[i,j]/a[i,l])/g;
+		  j:=j+1 
+	       end;
+	       j:=l; loop until!(j>=n);
+		  s:=0.;
+		  k:=l; loop until!(k>=n); s:=s+a[i,k]*v[k,j]; k:=k+1 end;
+		  k:=l; loop until!(k>=n); v[k,j]:=v[k,j]+s*v[k,i]; k:=k+1 end;
+		  j:=j+1
+	       end; -- loop
+	    end; -- if
+	    j:=l; loop until!(j>=n); v[i,j]:=0.; v[j,i]:=0.; j:=j+1 end;
+	 end; -- if
+	 v[i,i]:=1.; g:=rv1[i]; l:=i;
+	 i:=i-1;
+      end; -- loop
+      -- Accumulation of left-hand transformations.
+      i:=n-1; loop until!(i<0); 
+	 l:=i+1; g:=w[i];
+	 if i<n-1 then
+	    j:=l; loop until!(j>=n); a[i,j]:=0.; j:=j+1 end;
+	 end; -- if
+	 if g/=0. then
+	    g:=1./g;
+	    if i/=n-1 then
+	       j:=l; loop until!(j>=n);
+		  s:=0.;
+		  k:=l; loop until!(k>=m); s:=s+a[k,i]*a[k,j]; k:=k+1 end;
+		  f:=(s/a[i,i])*g;
+		  k:=i; loop until!(k>=m); a[k,j]:=a[k,j]+f*a[k,i]; k:=k+1 end;
+		  j:=j+1
+	       end; -- loop
+	    end; -- if
+	    j:=i; loop until!(j>=m); a[j,i]:=a[j,i]*g; j:=j+1 end;
+	 else
+	    j:=i; loop until!(j>=m); a[j,i]:=0.; j:=j+1 end;
+	 end; -- if
+	 a[i,i]:=a[i,i]+1;
+	 i:=i-1;
+      end; -- loop
+	 -- Diagonalization of the bidiagonal form.
+      k:=n-1; loop until!(k<0);	-- loop over singular values
+	 its:=0; loop until!(its>=30); -- loop over allowed iterations
+	    flag:=true; 
+	    l:=k; loop until!(l<0); -- test for splitting
+	       nm:=l-1;		-- rv[1] is always zero
+	       if rv1[l].abs.to_r+anorm=anorm then flag:=false; break! end;
+	       if w[nm].abs.to_r+anorm=anorm then break! end;
+	       l:=l-1
+	    end; -- loop
+	    if flag then
+	       c:=0.; s:=1.; 
+	       i:=l; loop until!(i>k);
+		  f:=s*rv1[i];
+		  if f.abs.to_r+anorm/=anorm then
+		     g:=w[i]; h:=pythag(f,g); w[i]:=h; h:=1./h;
+		     c:=g*h; s:=-f*h;
+		     j:=0; loop until!(j>=m); 
+			y:=a[j,nm]; z:=a[j,i]; 
+			a[j,nm]:=y*c+z*s; a[j,i]:=z*c-y*s;
+			j:=j+1
+		     end; -- loop
+		  end; -- if
+		  i:=i+1
+	       end; -- loop
+	    end; -- if
+	    z:=w[k];
+	    if l=k then		-- convergence
+	       if z<0. then	-- singular value is made non-negative
+		  w[k]:=-z;
+		  j:=0; loop until!(j>=n); v[j,k]:=-v[j,k]; j:=j+1 end;
+	       end; -- if
+	       break!;
+	    end; -- if
+	    if its=30 then ERR::s("SVD: 30 iterations, no convergence\n") end;
+	       -- shift from bottom 2 by 2 minor
+	    x:=w[l]; nm:=k-1; y:=w[nm]; g:=rv1[nm]; h:=rv1[k];
+	    f:=((y-z)*(y+z)+(g-h)*(g+h))/(2.*h*y); g:=pythag(f,1.);
+	    if f>=0. then f:=((x-z)*(x+z)+h*((y/(f+g.abs))-h))/x
+	    else f:=((x-z)*(x+z)+h*((y/(f-g.abs))-h))/x end;
+	       -- Next QR transformation
+	    c:=1.; s:=1.; 
+	    j:=l; loop until!(j>=nm+1);
+	       i:=j+1; g:=rv1[i]; y:=w[i]; h:=s*g; g:=c*g; z:=pythag(f,h);
+	       rv1[j]:=z; c:=f/z; s:=h/z; f:=x*c+g*s; g:=g*c-x*s;
+	       h:=y*s; y:=y*c; 
+	       jj:=0; loop until!(jj>=n);
+		  x:=v[jj,j]; z:=v[jj,i]; v[jj,j]:=x*c+z*s; v[jj,i]:=z*c-x*s;
+		  jj:=jj+1
+	       end; -- loop
+	       z:=pythag(f,h); w[j]:=z;
+	       if z/=0. then z:=1./z; c:=f*z; s:=h*z end;
+	       f:=(c*g)+(s*y); x:=(c*y)-(s*g);
+	       jj:=0; loop until!(jj>=m); 
+		  y:=a[jj,j]; z:=a[jj,i]; a[jj,j]:=y*c+z*s; a[jj,i]:=z*c-y*s;
+		  jj:=jj+1
+	       end; -- loop
+	       j:=j+1
+	    end; -- loop
+	    rv1[l]:=0.; rv1[k]:=f; w[k]:=x;
+	    its:=its+1;
+	 end; -- loop
+	 k:=k-1
+      end; -- loop
+   end; -- svd_in
+
+end; -- class NR_SVD
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class MATRIX_TEST is
+   -- Test of `MATRIX' and `NR_SVD'.
+   TEST;
+   
+   main is
+      -- Test of `MATRIX' and `NR_SVD'.
+      class_name("MATRIX");
+      STR::precision :=2;
+      m:MATRIX :=MATRIX::create_from_s(
+         "((1.1, 4.2), (3.7, 5.6), (5.9, 6.3))");
+      test("nr", m.nr.to_s, "3");
+      test("nc", m.nc.to_s, "2");
+      test("create_from_s and to_s", m.to_s,
+         "((1.10, 4.20), (3.70, 5.60), (5.90, 6.30))");
+      m2:MATRIX :=MATRIX::create(3,2);
+      test("to and create", m2.to(m).to_s,
+	 "((1.10, 4.20), (3.70, 5.60), (5.90, 6.30))");
+      m3:MATRIX :=MATRIX::create(2,1);
+      test("to_portion_of", m3.to_portion_of(m).to_s, "((1.10), (3.70))");
+      test("to_zero", m.copy.to_zero.to_s,
+	 "((0.00, 0.00), (0.00, 0.00), (0.00, 0.00))");
+      m4:MATRIX :=m.copy.to_identity;
+      test("to_identity", m4.to_s,
+	 "((1.00, 0.00), (0.00, 1.00), (0.00, 0.00))");
+      test("plus", m4.plus(m).to_s,
+	 "((2.10, 4.20), (3.70, 6.60), (5.90, 6.30))");
+      test("to_sum_with", m4.copy.to_sum_with(m).to_s,
+	 "((2.10, 4.20), (3.70, 6.60), (5.90, 6.30))");
+      test("minus", m.minus(m4).to_s,
+	 "((0.10, 4.20), (3.70, 4.60), (5.90, 6.30))");
+      test("scale_by", m4.copy.scale_by(2.0).to_s,
+	 "((2.00, 0.00), (0.00, 2.00), (0.00, 0.00))");
+      test("times", m.times(MATRIX::create(2,2).to_identity).to_s,
+	 "((1.10, 4.20), (3.70, 5.60), (5.90, 6.30))");
+      test("to_product_of",
+	 m.copy.to_product_of(m,MATRIX::create(2,2).to_identity).to_s,
+	 "((1.10, 4.20), (3.70, 5.60), (5.90, 6.30))");
+      test("to_product_with_diagonal",
+	 m.copy.to_product_with_diagonal(VECTOR::create(2).to_ones).to_s,
+	 "((1.10, 4.20), (3.70, 5.60), (5.90, 6.30))");
+      v:VECTOR :=VECTOR::create_from_s("(1.0, 0.0)");
+      test("act_on", m.act_on(v).to_s, "(1.10, 3.70, 5.90)");
+      v2:VECTOR :=VECTOR::create(3); m.act_on_in(v,v2);
+      test("act_on_in", v2.to_s, "(1.10, 3.70, 5.90)");
+      v3:VECTOR :=VECTOR::create_from_s("(0.0)");
+      m.affine_act_on_in(v3,v2);
+      test("affine_act_on_in", v2.to_s, "(4.20, 5.60, 6.30)");
+      test("transpose", m.transpose.to_s,
+	 "((1.10, 3.70, 5.90), (4.20, 5.60, 6.30))");
+      test("to_transpose_of", MATRIX::create(2,3).to_transpose_of(m).to_s,
+	 "((1.10, 3.70, 5.90), (4.20, 5.60, 6.30))");
+      test("transpose_act_on", m.transpose.transpose_act_on(v).to_s,
+	 "(1.10, 3.70, 5.90)");
+      m.transpose.transpose_act_on_in(v,v2);
+      test("transpose_act_on_in", v2.to_s, "(1.10, 3.70, 5.90)");
+      test("column", m.column(0).to_s, "(1.10, 3.70, 5.90)");
+      m.column_in(0,v2);
+      test("column_in", v2.to_s, "(1.10, 3.70, 5.90)");
+      test("column_from", m.copy.column_from(0,v2.to_zero).to_s,
+	 "((0.00, 4.20), (0.00, 5.60), (0.00, 6.30))");
+      test("row", m.row(0).to_s, "(1.10, 4.20)");
+      m.row_in(0,v);
+      test("row_in", v.to_s, "(1.10, 4.20)");
+      test("row_from", m.copy.row_from(0,v.to_zero).to_s,
+	 "((0.00, 0.00), (3.70, 5.60), (5.90, 6.30))");
+      m.diagonal_in(v);
+      test("diagonal_in", v.to_s, "(1.10, 5.60)");
+      test("trace", m.trace.to_s, (m[0,0]+m[1,1]).to_s);
+      a:MATRIX:=MATRIX::create(3,4).to_uniform_random;
+      svd_matrix_test(1, a);
+      a:=MATRIX::create(4,3).to_uniform_random;
+      svd_matrix_test(2, a);
+      a:=MATRIX::create(5, 5).to_uniform_random;
+      svd_matrix_test(3, a);
+      a:=MATRIX::create_from_s("((0.,1.,0.),(0.,1.,1.),(0.,0.,0.))");
+      -- svd_matrix_test(4, a);	-- the bad example for Numerical Recipes
+      svd_back_sub_test(1,
+         MATRIX::create_from_s("((1.,0.,0.),(0.,2.,0.),(0.,0.,3.))"),
+	 VECTOR::create_from_s("(1.,0.,0.)"));
+      svd_back_sub_test(2,
+         MATRIX::create_from_s("((1.,0.,0.),(0.,2.,0.),(0.,0.,3.))"),
+	 VECTOR::create_from_s("(1.,1.,1.)"));
+      svd_back_sub_test(3,
+         MATRIX::create_from_s("((1.,2.,3.),(2.,2.,3.),(3.,2.,3.))"),
+	 VECTOR::create_from_s("(1.,1.,1.)"));
+      svd_back_sub_test(4,
+         MATRIX::create_from_s("((1.,2.,3.),(2.,2.,3.),(3.,2.,3.))"),
+   	 VECTOR::create_from_s("(1.,2.,3.)"));
+      svd_back_sub_test(5,
+         MATRIX::create_from_s("((1.,2.,3.,4.,5.),(2.,3.,4.,5.,1.)\
+	       ,(3.,4.,5.,1.,2.),(4.,5.,1.,2.,3.),(5.,1.,2.,3.,4.))"),
+   	 VECTOR::create_from_s("(1.,1.,1.,1.,1.)"));
+      svd_back_sub_test(6,
+         MATRIX::create_from_s("((1.,2.,3.,4.,5.),(2.,3.,4.,5.,1.)\
+	       ,(3.,4.,5.,1.,2.),(4.,5.,1.,2.,3.),(5.,1.,2.,3.,4.))"),
+   	 VECTOR::create_from_s("(1.,2.,3.,4.,5.)"));
+      svd_back_sub_test(7,
+         MATRIX::create_from_s("((1.4, 2.1, 2.1, 7.4, 9.6)\
+	       , (1.6, 1.5, 1.1, 0.7, 5.0), (3.8, 8.0, 9.6, 5.4, 8.8)\
+	       , (4.6, 8.2, 8.4, 0.4, 8.0), (2.6, 2.9, 0.1, 9.6, 7.7))"),
+         VECTOR::create_from_s("(1.1, 1.6, 4.7, 9.1, 0.1)"));
+      svd_back_sub_test(8,
+         MATRIX::create_from_s("((1.4, 2.1, 2.1, 7.4, 9.6)\
+	       , (1.6, 1.5, 1.1, 0.7, 5.0), (3.8, 8.0, 9.6, 5.4, 8.8)\
+	       , (4.6, 8.2, 8.4, 0.4, 8.0), (2.6, 2.9, 0.1, 9.6, 7.7))"),
+         VECTOR::create_from_s("(1.1, 1.6, 4.7, 9.1, 0.1)"));
+      lfm:MATRIX:=MATRIX::create_from_s("((1.,2.),(3.,4.),(5.,6.))");
+      lfi:VECTOR_LIST:=VECTOR_LIST::create;
+      lfi:=lfi.push(VECTOR::create_from_s("(1.,0.)"));
+      lfi:=lfi.push(VECTOR::create_from_s("(1.,1.)"));
+      lfi:=lfi.push(VECTOR::create_from_s("(0.,1.)"));
+      lfi:=lfi.push(VECTOR::create_from_s("(2.,1.)"));
+      lfo:VECTOR_LIST:=lfi.multiply_by_matrix(lfm);
+      test("to_linear_fit_of",
+	 lfm.copy.to_zero.to_linear_fit_of(lfi,lfo).to_s, lfm.to_s);
+      lfoa:VECTOR_LIST:=lfo.duplicate.translate_by
+	    (VECTOR::create_from_s("(1.,2.,3.)"));
+      lfma:MATRIX:=MATRIX::create_from_s
+	    ("((1.,2.,1.),(3.,4.,2.),(5.,6.,3.))");
+      test("to_affine_fit_of",
+	 lfma.copy.to_zero.to_affine_fit_of(lfi,lfoa).to_s, lfma.to_s);
+      wt:LIST{REAL}:=LIST{REAL}::create;
+      wt:=wt.push(1.); wt:=wt.push(1.); wt:=wt.push(1.); wt:=wt.push(1.);
+      test("to_weighted_linear_fit_of",
+	 lfm.copy.to_zero.to_weighted_linear_fit_of(lfi,lfo,wt).to_s
+	       , lfm.to_s);
+      test("to_weighted_affine_fit_of",
+	 lfma.copy.to_zero.to_weighted_affine_fit_of(lfi,lfoa,wt).to_s
+	       , lfma.to_s);
+      test("is_epsilon_equal 1", lfm.copy.is_epsilon_equal(lfm).to_s, "T");
+      test("is_epsilon_equal 2",
+	 lfm.copy.to_zero.is_epsilon_equal(lfm).to_s, "F");
+      test("to_uniform_random",
+	 lfm.copy.to_uniform_random.nr.to_s, "3");
+      em:MATRIX:=MATRIX::create(3,3).to_uniform_random.symmetrize;
+      eval:VECTOR:=VECTOR::create(3); evec:MATRIX:=em.copy;
+      em.copy.jacobi_sym_eigen(eval,evec);
+      test("jacobi_sym_eigen", em.act_on(evec.column(0)).to_s,
+	 evec.column(0).scale_by(eval[0]).to_s);
+      em.copy.jacobi_sort_sym_eigen(eval,evec);
+      test("jacobi_sort_sym_eigen", em.act_on(evec.column(0)).to_s,
+	 evec.column(0).scale_by(eval[0]).to_s);
+      test("symmetrize",
+	 MATRIX::create_from_s("((1., 2.),(0.,1.))").symmetrize.to_s,
+	 "((1.00, 1.00), (1.00, 1.00))");
+      test("to_outer_product_of",
+	 em.to_outer_product_of
+	       (VECTOR::create_from_s("(1.,1.,1.)"),
+		  VECTOR::create_from_s("(1.,1.,1.)")).to_s,
+	 "((1.00, 1.00, 1.00), (1.00, 1.00, 1.00), (1.00, 1.00, 1.00))");
+      test("affine_column_from",
+	 em.to_zero.affine_column_from(0,
+	    VECTOR::create_from_s("(1.,1.)")).to_s,
+	 "((1.00, 0.00, 0.00), (1.00, 0.00, 0.00), (1.00, 0.00, 0.00))");
+      finish;
+   end; -- main
+
+   svd_matrix_test(n:INT; a:MATRIX) is
+      -- Test the singular value decomposition of `a' labelling the test
+      -- by `n'.
+      u:MATRIX:=u.create(a.nr.max(a.nc),a.nc);
+      v:MATRIX:=v.create(a.nc, a.nc); w:VECTOR:=w.create(a.nc);
+      a.svd_in(u,w,v);
+      u.to_product_with_diagonal(w);
+      tmp:MATRIX:=u.copy.to_product_of(u,v.transpose);
+      cmp:MATRIX:=a.copy.to_zero.to_portion_of(tmp);
+      test("svd_in ".i(n), cmp.to_s, a.to_s);
+   end; -- svd_test_matrix
+
+   svd_back_sub_test(n:INT; a:MATRIX; b:VECTOR) is
+      -- Test `svd_back_sub' on the problem `a.x=b', label with `n'.
+      size:INT:=a.nr;
+      u:MATRIX:=u.new(size,size); v:MATRIX:=v.new(size,size);
+      w:VECTOR:=w.new(size); a.svd_in(u,w,v);
+      wmax:REAL:=w.max_value; wmin:REAL:=wmax*(.000001);
+      k:INT; loop until!(k=size);
+	 if w[k]<=wmin then w[k]:=0. end; k:=k+1 
+      end; -- loop
+      x:VECTOR:=VECTOR::create(size);
+      a.svd_back_sub(u,w,v,b,x);
+      c:VECTOR:=a.act_on(x);
+      test("svd_back_sub ".i(n), c.to_s, b.to_s);
+   end; -- svd_back_sub_test
+
+end; -- class MATRIX_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1,0 +1,342 @@
+-- -*- Mode: Sather;  -*-
+-- File: math.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: General mathematical operations including trigonometric
+--*           and special functions.
+--*
+--* CLASSES: MATH, MATH_TEST
+--* 
+--* REQUIRED FILES:
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: math.sa,v 1.1 1994/02/12 03:23:22 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 07:43 1993 (hws)
+--*  Oct 17 07:43 1993 (hws): Sather 1 syntax, copyright note
+--*  May 23 11:43 1993 (hws): make atan2 consistent with C::atan2 manual.
+--* Created: Mon Sep 17 23:21:30 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class MATH is
+   -- Mathematical operations (eg. trig and special functions, etc.).
+   -- All routines are declared to be `DOUBLE' but may be
+   -- applied to `REAL' arguments, and results may be used as `REAL''s.
+   
+   shared error:INT;		-- Non-zero is an error condition key.
+      -- This should be set with `MATH::error', so it works with inheritance.
+   
+   sin(x:DOUBLE):DOUBLE is 
+      -- Sine of `x'.
+      res:=C::sin(x) 
+   end; -- sin
+   
+   cos(x:DOUBLE):DOUBLE is 
+      -- Cosine of `x'.
+      res:=C::cos(x) 
+   end; -- cos
+   
+   tan(x:DOUBLE):DOUBLE is 
+      -- Tangent of `x'.
+      res:=C::tan(x)
+   end; -- tan
+   
+   arc_sin(x:DOUBLE):DOUBLE is 
+      -- `sin^-1(x)' in the range `[-pi/2, pi/2]', `x' must be in `[-1.,1.]'.
+      if x<-1. or x>1. then MATH::error:=1; return end;
+      res:=C::asin(x) 
+   end; -- arc_sin
+
+   arc_cos(x:DOUBLE):DOUBLE is 
+      -- `cos^-1(x)' in the range `[0., pi]', `x' must be in `[-1.,1.]'.
+      if x<-1. or x>1. then MATH::error:=2; return end;
+      res:=C::acos(x) 
+   end; -- arc_cos
+
+   arc_tan(x:DOUBLE):DOUBLE is 
+      -- `tan^-1(x)' in the range `[-pi/2, pi/2]'.
+      res:=C::atan(x) 
+   end; -- arc_tan
+
+   arc_tan2(y,x:DOUBLE):DOUBLE is 
+      -- `tan^-1(y/x)' in the range `[-pi/2, pi/2]'. Gets sign right.
+      res:=C::atan2(y,x) 
+   end; -- arc_tan2
+
+   sinh(x:DOUBLE):DOUBLE is 
+      -- Hyperbolic sine of `x'.
+      res:=C::sinh(x) 
+   end; -- sinh
+   
+   cosh(x:DOUBLE):DOUBLE is 
+      -- Hyperbolic cosine of `x'.
+      res:=C::cosh(x) 
+   end; -- cosh
+   
+   tanh(x:DOUBLE):DOUBLE is 
+      -- Hyperbolic tangent of `x'.
+      res:=C::tanh(x)
+   end; -- tanh
+   
+   exp(x:DOUBLE):DOUBLE is 
+      -- Exponential function `e^x'.
+      res:=C::exp(x)
+   end; -- exp
+   
+   log(x:DOUBLE):DOUBLE is 
+      -- Natural logarithm `ln(x)', `x>0'.
+      if x<=0. then MATH::error:=3; return end;
+      res:=C::log(x)
+   end; -- log
+   
+   log10(x:DOUBLE):DOUBLE is 
+      -- Base `10' logarithm of `x', `x>0'.
+      if x<=0. then MATH::error:=4; return end;
+      res:=C::log10(x)
+   end; -- log10
+   
+   shared epsilon:DOUBLE:=.0000001; -- Error tolerance for equality tests.
+   
+   is_epsilon_less_than(x,y:DOUBLE):BOOL is
+      -- `True' if `x' is less than `y+epsilon'.
+      res:=(x<y+epsilon);
+   end; -- is_epsilon_less_than
+   
+   is_epsilon_equal(x,y:REAL):BOOL is
+      -- `True' if `x' is within epsilon of `y'.
+      res:= (x<y+epsilon) and (x>y-epsilon);
+   end; -- is_epsilon_equal
+   
+   const pi:DOUBLE:=3.141592653; -- Circle circumference/diameter.
+   const e:DOUBLE:=2.718281828; -- The base of the natural logarithms.
+   const maxreal:REAL:=1.0E30; -- Used as upper limit.
+
+   log_gamma(x:DOUBLE):DOUBLE is
+      -- The log of the Gamma function of `x', for `x>0'. 
+      -- Lanczos approx. Derived from Numerical Recipes in C, Press, p. 168. 
+      if x<=0. then MATH::error:=5; return end;
+      if x<1. then res:=log_gamma(x+1.)-log(x); return end;
+      x1:DOUBLE:=x-1.; tmp:DOUBLE:=x1+5.5; tmp:=tmp-(x1+.5)*log(tmp);
+      ser:DOUBLE:=1.;
+      x1:=x1+1.; ser:=ser+76.18009173/x1;
+      x1:=x1+1.; ser:=ser-86.50532033/x1;
+      x1:=x1+1.; ser:=ser+24.01409822/x1;
+      x1:=x1+1.; ser:=ser-1.231739516/x1;
+      x1:=x1+1.; ser:=ser+(0.120858003e-2)/x1;
+      x1:=x1+1.; ser:=ser-(0.536382e-5)/x1;
+      res:=-tmp+log(2.50662827465*ser);
+   end; -- log_gamma
+   
+   shared factorial_cache:ARRAY{DOUBLE}; -- Cache for small values of `n!'.
+   
+   factorial(n:INT):DOUBLE is
+      -- The factorial `n!' as a double. Builds a cache of small values.
+      -- Based on Numerical Recipes in C, p. 169.
+      if n<0 then MATH::error:=6; return; end;
+      if n>32 then res:=exp(log_gamma(n+1.)); return end;
+      if MATH::factorial_cache=void then 
+	 MATH::factorial_cache:=ARRAY{DOUBLE}::new(33); -- make table
+	 MATH::factorial_cache[0]:=1.0;
+	 i:INT:=1; loop until!(i=33);
+	    MATH::factorial_cache[i]:=MATH::factorial_cache[i-1]*i;
+	    i:=i+1
+	 end;
+      end; -- if
+      res:=MATH::factorial_cache[n];
+   end; -- factorial
+   
+   shared log_factorial_cache:ARRAY{DOUBLE};
+      -- Cache the first 100 log_factorials.
+   
+   log_factorial(n:INT):DOUBLE is
+      -- The log of the factorial of `n'. Creates a cache table when
+      -- first used. Based on Numerical Recipes in C, p. 170.
+      if n<0 then MATH::error:=7; return end;
+      if n>100 then res:=log_gamma(n+1.); return end; -- out of table range
+      if MATH::log_factorial_cache=void then
+	 MATH::log_factorial_cache:=ARRAY{DOUBLE}::new(101)
+      end; -- if
+      if MATH::log_factorial_cache[n]=0. then
+	 MATH::log_factorial_cache[n]:=log_gamma(n+1.)
+      end; -- if
+      res:=MATH::log_factorial_cache[n];
+   end; -- log_factorial
+   
+   binomial_coefficient(n,k:INT):DOUBLE is
+      -- The binomial coefficient `(n k)=n!/(k!(n-k)!)' as a `DOUBLE'.
+      -- Based on Numerical Recipes in C, p. 169.
+      res:=exp(log_factorial(n)-log_factorial(k)
+             -log_factorial(n-k));
+      if res<1000000000. then res:=(res+.5).to_i.to_d; end; -- clean up small
+   end; -- binomial_coefficient
+      
+   beta(z,w:DOUBLE):DOUBLE is
+      -- The beta function. Based on Numerical Recipes in C. p. 170.
+      res:=exp(log_gamma(z)+log_gamma(w)-log_gamma(z+w));
+   end; -- beta
+   
+end; -- class MATH
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class C is
+
+   sin(x:DOUBLE):DOUBLE is end;
+   cos(x:DOUBLE):DOUBLE is end;
+   tan(x:DOUBLE):DOUBLE is end;
+   asin(x:DOUBLE):DOUBLE is end;
+   acos(x:DOUBLE):DOUBLE is end;
+   atan(x:DOUBLE):DOUBLE is end;
+   atan2(x,y:DOUBLE):DOUBLE is end;
+   sinh(x:DOUBLE):DOUBLE is end;
+   cosh(x:DOUBLE):DOUBLE is end;
+   tanh(x:DOUBLE):DOUBLE is end;
+   exp(x:DOUBLE):DOUBLE is end;
+   log(x:DOUBLE):DOUBLE is end;
+   log10(x:DOUBLE):DOUBLE is end;
+   
+end; -- class C
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class MATH_TEST is
+   -- Test of `MATH'.
+   
+   MATH;			-- Include it.
+   
+   main is
+      -- Perform the tests.
+      log_gamma_test; factorial_test; log_factorial_test;
+      binomial_coefficient_test;
+      beta_test;
+   end; -- main
+   
+   log_gamma_test is
+      -- Test the log_gamma function.
+      x:DOUBLE;
+      OUT::s("Test of log_gamma:").nl;
+      x:=1.0;  OUT::s("x=").d(x).s(",  true=").d(log(1.000000));
+      OUT::s(",  comp=").d(log_gamma(x)).nl;
+      x:=1.2;  OUT::s("x=").d(x).s(",  true=").d(log(.918169));
+      OUT::s(",  comp=").d(log_gamma(x)).nl;
+      x:=1.4;  OUT::s("x=").d(x).s(",  true=").d(log(.887264));
+      OUT::s(",  comp=").d(log_gamma(x)).nl;
+      x:=2.0;  OUT::s("x=").d(x).s(",  true=").d(log(1.000000));
+      OUT::s(",  comp=").d(log_gamma(x)).nl;
+      x:=.4;  OUT::s("x=").d(x).s(",  true=").d(log(2.218160));
+      OUT::s(",  comp=").d(log_gamma(x)).nl;
+      x:=10.;  OUT::s("x=").d(x).s(",  true=").d(log(3.6288000E05));
+      OUT::s(",  comp=").d(log_gamma(x)).nl;
+      x:=20.;  OUT::s("x=").d(x).s(",  true=").d(log(1.2164510E17));
+      OUT::s(",  comp=").d(log_gamma(x)).nl;
+      x:=30.;  OUT::s("x=").d(x).s(",  true=").d(log(8.8417620E30));
+      OUT::s(",  comp=").d(log_gamma(x)).nl;
+      OUT::nl;
+   end; -- log_gamma_test
+
+   factorial_test is
+      -- Test the factorial function.
+      n:INT;
+      OUT::s("Test of factorial:").nl;
+      n:=0;  OUT::s("n=").i(n).s(",  true=").r(1.);
+      OUT::s(",  comp=").r(factorial(n)).nl;
+      n:=1;  OUT::s("n=").i(n).s(",  true=").r(1.);
+      OUT::s(",  comp=").r(factorial(n)).nl;
+      n:=10;  OUT::s("n=").i(n).s(",  true=").r(3628800.);
+      OUT::s(",  comp=").r(factorial(n)).nl;
+      n:=15;  OUT::s("n=").i(n).s(",  true=").r(1.3076755E12);
+      OUT::s(",  comp=").r(factorial(n)).nl;
+      n:=30;  OUT::s("n=").i(n).s(",  true=").r(2.6525281E32);
+      OUT::s(",  comp=").r(factorial(n)).nl;
+      OUT::nl;
+   end; -- factorial_test
+   
+   log_factorial_test is
+      -- Test of log_factorial.
+      n:INT;
+      OUT::s("Test of log_factorial:").nl;
+      n:=0;  OUT::s("n=").i(n).s(",  true=").r(log(1.));
+      OUT::s(",  comp=").r(log_factorial(n)).nl;
+      n:=1;  OUT::s("n=").i(n).s(",  true=").r(log(1.));
+      OUT::s(",  comp=").r(log_factorial(n)).nl;
+      n:=10;  OUT::s("n=").i(n).s(",  true=").r(log(3628800.));
+      OUT::s(",  comp=").r(log_factorial(n)).nl;
+      n:=15;  OUT::s("n=").i(n).s(",  true=").r(log(1.3076755E12));
+      OUT::s(",  comp=").r(log_factorial(n)).nl;
+      n:=30;  OUT::s("n=").i(n).s(",  true=").r(log(2.6525281E32));
+      OUT::s(",  comp=").r(log_factorial(n)).nl;
+      OUT::nl;
+   end; -- log_factorial_test
+   
+   binomial_coefficient_test is
+      -- Test of binomial_coefficient.
+      n,k:INT;
+      OUT::s("Test of binomial_coefficient:").nl;
+      n:=1; k:=0;  OUT::s("n=").i(n).s(", k=").i(k).s(",  true=").r(1.);
+      OUT::s(",  comp=").r(binomial_coefficient(n,k)).nl;
+      n:=15; k:=7;  OUT::s("n=").i(n).s(", k=").i(k).s(",  true=").r(6435.);
+      OUT::s(",  comp=").r(binomial_coefficient(n,k)).nl;
+      n:=25;k:=11;OUT::s("n=").i(n).s(", k=").i(k).s(",  true=").r(4457400.);
+      OUT::s(",  comp=").r(binomial_coefficient(n,k)).nl;
+      n:=25; k:=15;
+      OUT::s("n=").i(n).s(", k=").i(k).s(",  true=").r(3268760.);
+      OUT::s(",  comp=").r(binomial_coefficient(n,k)).nl;
+      n:=25; k:=17;
+      OUT::s("n=").i(n).s(", k=").i(k).s(",  true=").r(1081575.);
+      OUT::s(",  comp=").r(binomial_coefficient(n,k)).nl;
+      OUT::nl;
+   end; -- binomial_coefficient_test 
+   
+   beta_test is
+      -- Test of beta.
+      n,k:DOUBLE;
+      OUT::s("Test of beta:").nl;
+      n:=1.; k:=1.;  OUT::s("n=").d(n).s(", k=").d(k).s(",  true=").r(1.);
+      OUT::s(",  comp=").r(beta(n,k)).nl;
+      n:=.6;k:=1.;
+      OUT::s("n=").d(n).s(", k=").d(k).s(",  true=").r(1.6666666);
+      OUT::s(",  comp=").r(beta(n,k)).nl;
+      n:=6.;k:=6.;
+      OUT::s("n=").d(n).s(", k=").d(k).s(",  true=").r(3.607504E-04);
+      OUT::s(",  comp=").r(beta(n,k)).nl;
+      n:=7.;k:=7.;
+      OUT::s("n=").d(n).s(", k=").d(k).s(",  true=").r(8.325008E-05);
+      OUT::s(",  comp=").r(beta(n,k)).nl;
+      n:=2.;k:=2.;
+      OUT::s("n=").d(n).s(", k=").d(k).s(",  true=").r(.16666666);
+      OUT::s(",  comp=").r(beta(n,k)).nl;
+      OUT::nl;
+   end; -- beta_test
+   
+--      OUT::s("(3.1).is_epsilon_less_than(4.1) {T} =").b((3.1).is_epsilon_less_than(4.1)).nl;
+--      OUT::s("(4.1).is_epsilon_less_than(3.1) {F} =").b((4.1).is_epsilon_less_than(3.1)).nl;
+--      OUT::s("(1.0/3.0).is_epsilon_equal(.3333333333) {T} =");
+--      OUT::b((1.0/3.0).is_epsilon_equal(.3333333333)).nl;
+--      d:=3.1; d2:DOUBLE:=4.1;
+--      OUT::s("(3.1).is_epsilon_less_than(4.1) {T} =").b(d.is_epsilon_less_than(d2)).nl;
+--      OUT::s("(4.1).is_epsilon_less_than(3.1) {F} =").b((d2).is_epsilon_less_than(d)).nl;
+--      OUT::s("(1.0/3.0).is_epsilon_equal(.3333333333) {T} =");
+--      d:=1.0; d2:=3.0; d3:DOUBLE:=.3333333333;
+--      OUT::b((d/d2).is_epsilon_equal(d3)).nl;
+--      OUT::nl;
+end; -- class MATH_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   
+
+

@@ -1,0 +1,289 @@
+-- -*- Mode: Sather;  -*-
+-- File: class_tab.sa
+-- Author: Chu-Cheow Lim
+-- Copyright (C) International Computer Science Institute, 1990
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Keeps track of class definitions (ie CLASSOB objects)
+--*
+--* RCS: $Id: class_tab.sa,v 1.1 1994/02/12 03:21:46 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 04:51 1993 (hws)
+--*  Sep 28 04:48 1993 (hws): switch -> case
+--*  Sep 26 20:44 1993 (hws): avoid cycle on multiple read of files
+--*  Sep 19 18:11 1992 (hws): more uniform error msg's
+--*  Sep 19 15:15 1992 (hws): allowed add-on features
+--* Created: Tue Jun  5 14:37:14 1990 (clim)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class CLASSOB_TABLE is
+   -- Encapsulates all routines on the class definition table.
+
+-- NOTE: Assume that the name of an object is never 0.
+   
+--   names:LST{INT};
+--   indices:LST{INT};
+--   objs:LST{T};
+--      -- Class definitions are stored in a hash table.
+--      -- The key type used is an integer (name of class).
+--   obj_table_size:INT;
+--   names_size:INT;
+--   next_ind:INT;
+--   
+-- -- Inherited from HASH_TABLE{CLASSOB} 
+ 
+   HASH_TABLE{CLASSOB};
+   const def_table_size:INT := 50;
+      -- The size of the table must be at least 25 to accomodate the
+      -- base classes.
+   
+   RESERVED_WORDS;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(size:INT):SAME is
+      res := new;
+      if (size <= 25) then
+        size := def_table_size;
+      end; -- if
+      res.obj_table_size := size;
+      res.names_size := size * 2;
+      res.names := res.names.new(2 * size);
+      res.indices := res.indices.new(2 * size);
+      res.objs := res.objs.new(size);
+      res.next_ind := 25;
+	 -- Start inserting user-defined classes at the 26th location
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   uppercase_name_p(def:CLASSOB) is
+      -- Checks that class name is upper, and change it if not.
+      nm:STR := def.name_str;
+      if not nm.is_upper_case then
+	 ERR_INFO::format_error_msg_file(def.fname,def.lineno,"CLASSOB_TABLE",
+	    STR::create.s("Class name \"").s(nm).s("\" converted to upper-case\n"));
+	 new_nm:STR := nm.copy.to_upper_case;
+	 def.change_name(new_nm);
+      end; -- loop
+   end; -- uppercase_name
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   install(new_def:CLASSOB) is
+      -- Install object into class definition table if not previously defined.
+      -- Semantic check:
+      -- a)  All class names are upper-case. 
+      -- b)  If duplicate class definition, add new features uniquely.
+      
+      key:INT := new_def.unique_key;
+      
+      -- Check upper-case class name.
+      uppercase_name_p(new_def);
+      
+      prev_def:CLASSOB := get_obj(key);
+      if (prev_def = void) then
+	 -- No duplicate class definition
+	 insert:INT := next_ind + 1;
+	    -- Keep a copy of the index
+	 case (new_def.index)
+	 when array_ind then
+	    next_ind := RESERVED_CLASSES::ARRAY_ici;
+	 when array2_ind then
+	    next_ind := RESERVED_CLASSES::ARRAY2_ici;
+	 when array3_ind then
+	    next_ind := RESERVED_CLASSES::ARRAY3_ici;
+	 when array4_ind then
+	    next_ind := RESERVED_CLASSES::ARRAY4_ici;
+	 when bool_ind then
+	    next_ind := RESERVED_CLASSES::BOOL_ici;
+	 when c_ind then
+	    next_ind := RESERVED_CLASSES::C_ici;
+	 when char_ind then
+	    next_ind := RESERVED_CLASSES::CHAR_ici;
+	 when double_ind then
+	    next_ind := RESERVED_CLASSES::DOUBLE_ici;
+	 when err_ind then
+	    next_ind := RESERVED_CLASSES::ERR_ici;
+	 when file_ind then
+	    next_ind := RESERVED_CLASSES::FILE_ici;
+	 when in_ind then
+	    next_ind := RESERVED_CLASSES::IN_ici;
+	 when int_ind then
+	    next_ind := RESERVED_CLASSES::INT_ici;
+	 when out_ind then
+	    next_ind := RESERVED_CLASSES::OUT_ici;
+	 when real_ind then
+	    next_ind := RESERVED_CLASSES::REAL_ici;
+	 when self_type_ind then
+	    next_ind := RESERVED_CLASSES::SELF_TYPE_ici;
+	 when str_ind then
+	    next_ind := RESERVED_CLASSES::STR_ici;
+	 when str_cursor_ind then
+	    next_ind := RESERVED_CLASSES::STR_CURSOR_ici;
+	 when ob_ind then
+	    next_ind := RESERVED_CLASSES::OB_ici;
+	 when sys_ind then
+	    next_ind := RESERVED_CLASSES::SYS_ici;
+	 when fob_ind then
+	    next_ind := RESERVED_CLASSES::FOB_ici;
+	 when sux_ind then
+	    next_ind := RESERVED_CLASSES::SUX_ici;	    
+	 when undefine_ind then
+	    next_ind := RESERVED_CLASSES::UNDEFINE_ici;
+	 else
+	    add_unique_obj(key, new_def);
+	    return;
+	 end; -- case
+	 add_unique_obj(key, new_def);
+	    -- Store class using the predefined indices
+	 if (insert <= RESERVED_CLASSES::LAST_PREDEF_ici) then
+	    next_ind := RESERVED_CLASSES::LAST_PREDEF_ici + 1;
+	 else
+	    next_ind := insert;
+	 end; -- if
+      else
+	 -- With duplicate class definition, we must do the following
+	 -- 1.  Check that both old and new definitions have the 
+	 --     same number and name of type parameters. 
+	 if (prev_def.plst = void) then
+	    if (new_def.plst = void) then
+	       -- Non-parametrized classes
+	    else
+	       ERR_INFO::format_error_msg_file(new_def.fname,new_def.first_lineno,
+		  "CLASSOB_TABLE",STR::create.s("Parametrization of class \"")
+			.s(prev_def.name_str).
+			s("\" differs from that in file ").
+	                 s(prev_def.fname).s(", line ").i(prev_def.first_lineno).s("\n"));
+	    end; -- if
+	 else
+	    if (new_def.plst = void) then
+	       ERR_INFO::format_error_msg_file(new_def.fname,new_def.first_lineno,
+		  "CLASSOB_TABLE",STR::create.s("Parametrization of class \"")
+			.s(prev_def.name_str).
+			s("\" differs from that in file ").
+	                 s(prev_def.fname).s(", line ").i(prev_def.first_lineno).s("\n"));
+	    else
+	       -- We have tested that "prev_def.plst" and "new_def.plst"
+	       -- are not void.
+
+	       psz:INT := new_def.plst.insert;
+	       if (psz /= prev_def.plst.insert) then
+		  ERR_INFO::format_error_msg_file(new_def.fname,new_def.first_lineno,
+		     "CLASSOB_TABLE",STR::create.s("Number of parameters of class \"")
+			   .s(prev_def.name_str).
+			   s("\" differs from that in file ").
+			   s(prev_def.fname).s(", line ").i(prev_def.first_lineno).s("\n"));
+	       else
+		  i:INT := 0;
+		  loop until!(i >= psz);
+		     if (prev_def.plst[i] /= new_def.plst[i]) then
+			ERR_INFO::format_error_msg_file(new_def.fname,new_def.first_lineno,
+			   "CLASSOB_TABLE",STR::create.s("Number of parameters of class \"")
+				 .s(prev_def.name_str).
+				 s("\" differs from that in file ").
+				 s(prev_def.fname).s(", line ").i(prev_def.first_lineno).s("\n"));
+		     end; -- if
+		     i := i + 1;
+		  end; -- loop
+	       end; -- if   
+	    end; -- if
+	 end; -- if
+	 
+	 -- 2. Warn if warnings allowed
+	 
+	 -- We allow definitions for the same class to be combined
+	 -- but warn only when overriding in non-C classes because the
+	 -- C class contains only declarations not implementations.
+
+	 if (prev_def.index /= RESERVED_WORDS::c_ind) then
+	    if (not COMPILER_OPTIONS::warnings_only) then
+	       err_str: STR := STR::create.
+			   s("Extending definition of class \"").
+	                   s(prev_def.name_str).
+	                   s("\"").s(" in ").c('"').s(prev_def.fname).c('"');
+	       i:INT := 0;
+	       if (prev_def.more_fnames.insert > 0) then
+		  loop until!(i = prev_def.more_fnames.insert);
+		     err_str := err_str.s(",\n        ")
+			   .c('"').s(prev_def.more_fnames[i]).s("\"");
+		     i := i + 1;
+		  end; -- loop
+	       end; -- if
+	       ERR_INFO::format_warning_msg_file(new_def.fname,new_def.first_lineno,
+		  "CLASSOB_TABLE",err_str);
+	    end; -- if
+	    LST_FEATOB::duplicate_defs_ok := false;
+	 end; -- if
+
+	 -- 3. Add the file name to the list of file names.
+	 --    Note that the same file could hold several defs.
+	 --    If we allow them across files we might do so in one file, too.
+	 --    Just add the file name so warnings will tell the user
+	 --    about double definitions in one file too.
+
+	 prev_def.more_fnames := prev_def.more_fnames.push(new_def.fname);
+	 
+	 -- 4. Merge all the new features into the PREVIOUS definition
+	 --    to keep around instead.
+
+	 prev_def.add_features(new_def.features);
+	 if (prev_def.index /= RESERVED_WORDS::c_ind) then
+	    LST_FEATOB::duplicate_defs_ok := true;
+	 end;
+
+      end; -- if
+   end; -- install
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   at_index(i:INT):CLASSOB is
+--      if (i < 0) or (i > next_ind) then
+      if (i < 0) or (i >= obj_table_size) then
+	 ERR_INFO::compiler_error_msg("CLASSOB_TABLE",STR::create
+	       .s("Invalid index ").i(i));
+	 return;
+      end; -- if
+      res := objs[i];
+   end; -- at_index
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   print_table(outfile:OUTFILE) is
+      i:INT := 0;
+      loop until!(i >= names_size);
+	 if (names[i] > 0) then
+--	    objs[indices[i]].print_self(outfile, 0, "<DEFINITION>");
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- print_table
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   print_def(outfile:OUTFILE; cnm:STR) is
+      index:INT := (GLOBALS::str_table).find_str(cnm);
+      if (index > 0) then
+	 i:INT := 0;
+	 loop until!(i >= names_size);
+	    if (names[i] = index) then
+--	       objs[indices[i]].print_self(outfile, 0, "<DEFINITION>");
+	       -- We can return here, but to verify that there is only
+	       -- one definition in the table, we continue looping.
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+      else
+	 outfile.s(cnm).s(" not found!!\n");
+      end; -- if
+   end; -- print_def
+
+end; -- class CLASSOB_TABLE
+
+--------------------------------------------------------------------
+

@@ -1,0 +1,128 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/base/test.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: A test class to be inherited by each testing class.
+--*
+--* CLASSES: TEST, TEST_TEST
+--* 
+--* REQUIRED FILES: data_structure/list.sa (LIST), base/file.sa (OUT)
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: test.sa,v 1.1 1994/02/12 03:23:17 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:27 1993 (hws)
+--*  Oct 17 06:27 1993 (hws): Sather 1 syntax, copyright note
+--*  May 23 13:51 1991 (om): Put in TEST_TEST from Subutai Ahmad.
+--* Created: Fri Apr 26 12:14:03 1991 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class TEST is
+   -- To be inherited by each testing class. The test routine should
+   -- start with the call `class_name("CLASS_FOO");'. It should then
+   -- have calls to `test' or `unchecked_test' which actually perform
+   -- the test. It should end with `finish' to print out the results.
+   -- The results are sent to both `stderr' and `stdout' so you can
+   -- redirect output to a file and still see whether all tests were
+   -- passed. The routine being tested must return a string. The
+   -- basic classes all have routines named `to_s' to produce string
+   -- representations of themselves. A typical test might look something
+   -- like: `test("sum", (1+1).to_s, "2");'. The tests are numbered and
+   -- the failures are summarized at the end. 
+
+   shared class_name_str:STR;	-- The name of the tested class.
+   shared failures:LIST{INT};	-- The tests which failed.
+   shared failure_docs:LIST{STR}; -- The documentation of the failures.
+   shared test_number:INT;	-- Which test.
+   
+   class_name(nm:STR) is
+      -- Specify the name of the class being tested. Must be called first.
+      class_name_str:=nm;
+      failures:=LIST{INT}::create;
+      failure_docs:=LIST{STR}::create;
+      test_number:=1;
+      OUT::s("Test of class ").s(nm).s(":").nl.nl;
+   end; -- class_name
+
+   test(doc,does,should:STR) is
+      -- Perform the test with the description `doc', return value `does',
+      -- and desired return value `should'. Keep track of failures.
+      OUT::s("   ").s(class_name_str).s(" Test ").i(test_number)
+	    .s(" (").s(doc).s(")").nl;
+      OUT::s("   Should = ").s(should).nl;
+      OUT::s("   Does   = ").s(does).nl.nl;
+      if not does.is_equal(should) then
+	 failures:=failures.push(test_number);
+	 failure_docs:=failure_docs.push(doc);
+      end; -- if
+      test_number:=test_number+1;
+   end; -- test
+   
+   unchecked_test(doc,does,should:STR) is
+      -- Perform the test with the description `doc', return value `does',
+      -- and desired return value `should'. Don't keep track of failures.
+      OUT::s("   ").s(class_name_str).s(" Test ").i(test_number)
+	    .s(" (").s(doc).s(")").nl;
+      OUT::s("   Should = ").s(should).nl;
+      OUT::s("   Does   = ").s(does).nl.nl;
+      test_number:=test_number+1;
+   end; -- unchecked_test
+
+   finish is
+      -- Complete the testing on the current class.
+      if failures.is_empty then
+	 -- Put on both ERR and OUT so one can avoid looking
+	 -- if one wants.
+	 ERR::s("ERR: Class ").s(class_name_str)
+	       .s(" passed all checkable tests.").nl.nl;
+	 OUT::s("OUT: Class ").s(class_name_str)
+	       .s(" passed all checkable tests.").nl.nl;
+      else
+	 i:INT; loop until!(i=failures.size);
+	    ERR::s("ERR: Class ").s(class_name_str)
+		  .s(" failed test ").i(failures[i]).s(" (")
+		  .s(failure_docs[i]).s(")").nl;
+	    OUT::s("OUT: Class ").s(class_name_str)
+		  .s(" failed test ").i(failures[i]).s(" (")
+		  .s(failure_docs[i]).s(")").nl;
+	    i:=i+1;
+	    ERR::nl;
+	 end; -- loop
+      end; -- if
+   end; -- finish
+
+end; -- class TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class TEST_TEST is
+   -- Test of `TEST'.
+   
+   TEST;
+   
+   main is
+      -- Test of `TEST'.
+      class_name("TEST");
+      test("A good test", "good", "good");
+      test("A bad test", "good", "bad");
+      unchecked_test("Unchecked test", "anything", "anything");
+      finish;
+   end; -- main
+   
+end; -- class TEST_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1,0 +1,247 @@
+-- -*- Mode: Sather;  -*-
+-- File: str_set.sa
+-- Author: Stephen M. Omohundro
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Sets of objects represented by extendible hash tables.
+--* CLASSES:  OB_SET, OB_SET_CURS, OB_SET_TST
+--*
+--* RCS: $Id: str_set.sa,v 1.1 1994/02/12 03:21:54 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 05:14 1993 (hws)
+--*  Oct 17 05:13 1993 (hws): Sather 1 syntax, copyright note
+--* Created: Thu May 30 22:11:34 1991 (bilmes)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Modified: Chu-Cheow Lim
+-- Date: Mon Jan 14 08:09:12 1991
+-- The original implementation is not suitable for persistent objects
+--   because the hash function depends on memory address.  Implement
+--   new hash function that works for persistent objects, specific
+--   for STR. 
+-- Remove OB_SET_TST.  Rename OB_SET, OB_SET_CURS to STR_SET, STR_SET_CURS.
+--------------------------------------------------------------------
+
+class STR_SET is
+   -- Sets of objects represented by extendible hash tables.
+   -- create, get, ins, del, size, clr, curs, union, intersection, difference,
+   -- sym_difference
+   
+   -- The table is always at least twice as large as the number of obs (plus
+   -- number of deletes since last expansion). The key 0 is used for empty
+   -- entries, 1 for deleted ones. The size of the table is always of the
+   -- form 2^n+1 and nearly doubles on each expansion. The last entry is 
+   -- a sentinel element which holds 0 (to avoid testing for the end of the
+   -- array in the loop). The hash function is just the last n bits of the 
+   -- object pointer shifted two bits to the right. The extra serial search
+   -- that this simple function sometimes entails is still cheaper than 
+   -- more typical functions which use a multiply and a mod.
+ 
+   attr hsize:INT;			-- number stored (including deletes!)
+   attr msk:INT;			-- mask for the hash function
+   ARRAY{STR};			-- the hash table
+   shared del_key:STR:="\0";
+   
+   create:SAME is
+      -- An empty STR_SET.
+      res:=new(9); res.msk:=7;	-- use last three bits
+   end; -- create
+   
+   hash(s:STR):INT is
+      i:INT := 0;
+      loop until!(s[i] = '\0');
+	 res := res.bit_xor(s[i].to_i.lshift(i.bit_and(15)));
+	 i := i + 1;
+      end; -- loop
+   end; -- hash
+   
+   get(o:STR):BOOL is
+      -- True if o is in the stored set.
+      hsh:INT:=hash(o).rshift(2).bit_and(msk);
+      loop
+	 loop
+	    kt:STR:=[hsh];
+	    if kt=o then res:= true; return;
+	    elsif kt=void then break!; -- hit hole or sentinel
+	    elsif kt.is_equal(o) then res:=true; return; -- found it
+	    end; -- if
+	    hsh:=hsh+1;
+	 end; -- loop
+	 if hsh /= asize-1 then return -- didn't hit sentinel
+	 else hsh:=0 end; -- hit it so go back to beginning
+      end; -- loop
+   end; -- get
+
+   double_size:STR_SET is
+      -- Resize self to double. Copy non-deleted entries over.
+      ns:INT:=(asize-1)*2+1;	-- new expanded size
+      res:=new(ns);
+      res.msk:=msk.lshift(1)+1;	-- add in another bit
+      i:INT:=0; loop until!(i=asize-1);
+	 val:STR:=[i];
+	 if val/=void and val/=del_key then 
+	    hsh:INT:=hash(val).rshift(2).bit_and(res.msk);
+	    loop		
+	       if res[hsh]=void then 
+		  res[hsh]:=val; 
+		  res.hsize:=res.hsize+1; break!
+	       elsif hsh=ns-2 then hsh:=0 
+	       else hsh:=hsh+1 end;
+	    end; -- loop
+	 end; -- if
+	 i:=i+1
+      end; -- loop
+      clear;			-- give the garbage collector a hand
+   end; -- double_size
+
+   insert(o:STR):STR_SET is
+      -- Insert ob o.
+      if (hsize+1).lshift(1)>asize then res:=double_size 
+      else res:=self end;
+      hsh:INT:=hash(o).rshift(2).bit_and(res.msk);
+      loop	
+	 if res[hsh]=void then 
+	    res[hsh]:=o; res.hsize:=res.hsize+1; return
+	 elsif res[hsh].is_equal(o) then return
+	 elsif hsh=res.asize-2 then 
+	    hsh:=0		-- loop to front
+	 else hsh:=hsh+1 end; -- try next slot
+      end; -- loop
+   end; -- ins
+
+   delete(o:STR) is
+      -- Delete string o if present.
+      hsh:INT:=hash(o).rshift(2).bit_and(msk);
+      loop
+	 if [hsh]=void then return -- not in table
+	 else
+	    if [hsh].is_equal(o) then 
+	       [hsh]:=del_key; return -- mark deleted
+	    elsif hsh=asize-2 then 
+	       hsh:=0 
+	    else hsh:=hsh+1 end;
+	 end; -- if
+      end; -- loop
+   end; -- del
+
+   size:INT is
+      -- Number of entries, (not fast).
+      i:INT; loop until!(i=asize);
+	 if [i]/=void and [i]/=del_key then res:=res+1 end;
+	 i:=i+1
+      end; -- loop
+   end; -- size
+   
+   clear is
+      -- Clear the table.
+      hsize:=0; 
+      i:INT; loop until!(i=asize);
+	 [i]:=void;
+	 i:=i+1;
+      end; -- loop
+   end; -- clr
+   
+   cursor:STR_SET_CURS is
+      -- A cursor into the table.
+      res:=STR_SET_CURS::create(self)
+   end; -- curs
+   
+   union(s:STR_SET):STR_SET is
+      -- Expand self to be the union with s. Destructive. 
+      res:=self;
+      c:STR_SET_CURS :=s.cursor;
+      loop until!(c.is_done);
+	 res:=res.insert(c.item);
+	 c.next
+      end; -- loop
+   end; -- union
+   
+   intersection(s:STR_SET):STR_SET is
+      -- Shrink self to be the intersection with s. Destructive.
+      c:STR_SET_CURS :=cursor;
+      loop until!(c.is_done);
+	 if not s.get(c.item) then delete(c.item) end;
+	 c.next
+      end; -- loop
+      res:=self;
+   end; -- intersection
+
+   difference(s:STR_SET):STR_SET is
+      -- Remove elements of self contained in s. Destructive. 
+      c:STR_SET_CURS :=cursor;
+      loop until!(c.is_done);
+	 if s.get(c.item) then delete(c.item) end;
+	 c.next
+      end; -- loop
+      res:=self;
+   end; -- difference 
+   
+   sym_difference(s:STR_SET):STR_SET is
+      -- Remove elements of self contained in s, add elements of s not 
+      -- contained in self. Destructive. 
+      tmp:STR_SET:=s.copy;
+      tmp:=tmp.difference(self);
+      res:=self.difference(s);
+      res:=res.union(tmp);
+   end; -- sym_difference
+      
+end; -- class STR_SET
+
+--------------------------------------------------------------------
+   
+class STR_SET_CURS is
+   -- A cursor into STR_SET's for stepping through all keys.
+   -- create, first, cur, next, done
+   
+   attr tbl:STR_SET;			-- pointer to table
+   attr index:INT;			-- index into table
+   attr is_done:BOOL;			-- true if all entries visited
+   const del_key:STR:="\0";
+
+   create(t:STR_SET):SAME is
+      -- A cursor into t which is initialized to first. 
+      res:=STR_SET_CURS::new; res.tbl:=t; res.first;
+   end; -- create
+   
+   first is
+      -- Set the cursor to the first location, if any.
+      is_done:=false;
+      index:=0;
+      loop
+	 val:STR:=tbl[index];
+	 if val/=void and val/=del_key then return
+	 elsif index=tbl.asize-1 then is_done:= true; return
+	 else index:=index+1 end;
+      end; -- loop
+   end; -- first
+
+   item:STR is
+      -- The current ob.
+      if not is_done then res:=tbl[index] end;
+   end; -- cur
+
+   next is
+      -- Move the cursor to the next location.
+      if is_done then return end;
+      index:=index+1;
+      loop
+	 if index=tbl.asize-1 then is_done:=true; return
+	 elsif tbl[index]/=void and tbl[index]/=del_key then return
+	 else index:=index+1 end;
+      end; -- loop
+   end; -- next
+
+end; -- class STR_SET_CURS
+
+--------------------------------------------------------------------

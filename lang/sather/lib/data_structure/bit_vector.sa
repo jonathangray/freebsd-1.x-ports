@@ -1,0 +1,317 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/data_structure/bit_vector.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Bit vectors, good for representing small sets.
+--*
+--* CLASSES: FAST_BIT_VECTOR, BIT_VECTOR, BIT_VECTOR_CURSOR,
+--*          BIT_VECTOR_TEST
+--* 
+--* REQUIRED FILES: ../base/test.sa
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: bit_vector.sa,v 1.1 1994/02/12 03:23:25 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:30 1993 (hws)
+--*  Oct 17 06:30 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 27 14:30 1993 (hws): require -> pre
+--*  May 26 15:33 1991 (hws): adapt BIT_VECTOR_CURSOR to standard protocol
+--* Created: Wed Mar  7 11:06:52 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class FAST_BIT_VECTOR is
+   -- Fast low level bit vectors.
+   
+   ARRAY{INT};
+   
+   create(n: INT): SAME pre n >= 0 is
+      -- A bit vector capable of holding next multiple of `32' over `n' bits.
+      res := new((n + 31).rshift(5)); -- Next multiple of 32 up.
+   end; -- create
+   
+   limit: INT is
+      -- The largest allowed entry.
+      res := asize.lshift(5) - 1
+   end; -- limit
+
+   new_limit(l: INT): FAST_BIT_VECTOR pre l >= 0is
+      -- A new vector with limit `l' with the same bits as `self'.
+      res := extend((l + 31).rshift(5)); -- next multiple of 32 up
+   end; -- new_limit
+   
+   test(i: INT): BOOL pre i >= 0 and i <= limit is
+      -- True if the `i'th bit is set.
+      res := [i.rshift(5)].nth_bit(i.bit_and(31));
+   end; -- test
+
+   insert(i: INT) pre i >= 0 and i <= limit is
+      -- Set the `i'th bit.
+      old: INT := [i.rshift(5)]; 
+      [i.rshift(5)] := old.set_nth_bit(i.bit_and(31))
+   end; -- insert
+   
+   size: INT is
+      -- Number of entries, (not cheap).
+      c: BIT_VECTOR_CURSOR := cursor;
+      loop until!(c.is_done);
+	 res := res + 1;
+	 c.next
+      end; -- loop
+   end; -- size
+
+   delete(i: INT) pre i >= 0 and i <= limit is
+      -- Unset the `i'th bit.
+      old: INT := [i.rshift(5)]; 
+      [i.rshift(5)] := old.unset_nth_bit(i.bit_and(31))
+   end; -- delete
+      
+   -- `clear' inherited from `ARRAY'.
+
+   cursor: BIT_VECTOR_CURSOR is
+      -- Return a cursor into vector.
+      res := BIT_VECTOR_CURSOR::create(self)
+   end; -- cursor
+   
+   union(s: FAST_BIT_VECTOR): FAST_BIT_VECTOR is
+      -- A new set with the elements in the union of `self' and `s'.
+      res := new(asize.max(s.asize));
+      sm,lg: FAST_BIT_VECTOR;
+      if asize >= s.asize then sm := s; lg := self else sm := self; lg := s end;
+      i: INT; loop until!(i = sm.asize);
+	 res[i] := sm[i].bit_or(lg[i]);
+	 i := i + 1
+      end; -- loop
+      loop until!(i = lg.asize);
+	 res[i] := lg[i];
+	 i := i + 1
+      end; -- loop
+   end; -- union
+   
+   intersection(s: FAST_BIT_VECTOR): FAST_BIT_VECTOR is
+      -- A new set with the elements in the intersection of `self' and `s'.
+      res := new(asize.min(s.asize));
+      i: INT; loop until!(i = res.asize);
+	 res[i] := [i].bit_and(s[i]);
+	 i := i + 1
+      end; -- loop
+   end; -- intersection
+
+   difference(s: FAST_BIT_VECTOR): FAST_BIT_VECTOR is
+      -- A new set with the elements in the difference of `self' and `s'.
+      res := new(asize);
+      small:INT:=asize.min(s.asize);
+      i: INT; loop until!(i >= small);
+	 res[i] := [i].bit_and(s[i].bit_not);
+	 i := i + 1
+      end; -- loop
+      loop until!(i >= asize);	-- finish off any extra bits
+	 res[i] := [i];
+	 i := i + 1
+      end; -- loop
+   end; -- intersection
+   
+   sym_difference(s: FAST_BIT_VECTOR): FAST_BIT_VECTOR is
+      -- A new set with the elements in the symmetric difference of
+      -- `self' and `s' (ie. in one but not both).
+      res := new(asize.max(s.asize));
+      sm,lg: FAST_BIT_VECTOR;
+      if asize>=s.asize then sm := s; lg:=self else sm:=self; lg:=s end;
+      i: INT; loop until!(i = sm.asize);
+	 res[i] := sm[i].bit_xor(lg[i]);
+	 i := i + 1
+      end; -- loop
+      loop until!(i = lg.asize);
+	 res[i] := lg[i];
+	 i := i + 1
+      end; -- loop
+   end; -- sym_difference
+   
+end; -- class FAST_BIT_VECTOR
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class BIT_VECTOR_CURSOR is
+   -- A cursor into `BIT_VECTOR''s for stepping through all entries.
+   
+   attr fbv: FAST_BIT_VECTOR;		-- pointer to bit vector
+   attr ind: INT;			-- bit index into vector
+   attr is_done: BOOL;		-- true if all entries finished
+
+   create(t: FAST_BIT_VECTOR): SAME is
+      -- A cursor into `t' which is initialized to the first entry. 
+      res := BIT_VECTOR_CURSOR::new; res.fbv := t; res.first;
+   end; -- create
+   
+   first: INT is
+      -- Set the cursor to the first location, if any.
+      is_done := false;
+      ind := 0;
+      loop
+	 if fbv.test(ind) then break!
+	 elsif ind >= fbv.limit then is_done := true; break!
+	 else ind := ind + 1 end;
+      end; -- loop
+      res := item;
+   end; -- first
+
+   item: INT is
+      -- The current key.
+      if not is_done then res := ind end;
+   end; -- item
+
+   next: INT is
+      -- Move the cursor to the next location.
+      if is_done then return end;
+      ind := ind + 1;
+      loop
+	 if fbv.test(ind) then break!
+	 elsif ind >= fbv.limit then is_done := true; break!
+	 else ind := ind + 1 end;
+      end; -- loop
+      res := item;
+   end; -- next
+
+end; -- class BIT_VECTOR_CURSOR
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class BIT_VECTOR is
+   -- Automatically expandable bit vectors. 
+   
+   attr fbv: FAST_BIT_VECTOR;
+   
+   create: SAME is
+      -- Make a new empty `BIT_VECTOR'.
+      res := new; res.fbv := res.fbv.new(3);
+   end;
+
+   test(i: INT): BOOL is
+      -- True if `i'th bit is set.
+      if i <= fbv.limit then res := fbv.test(i) else res := false end
+   end; -- test
+
+   insert(i: INT) is
+      -- Set the `i'th bit, extending if beyond the end.
+      if i > fbv.limit then fbv := fbv.new_limit(i) end;
+      fbv.insert(i);
+   end; -- insert
+   
+   delete(i: INT) is
+      -- Unset the `i'th bit.
+      if i <= fbv.limit then fbv.delete(i) end;
+   end; -- delete
+
+   size: INT is
+      -- Number of elements which are set.
+      res := fbv.size
+   end; -- size
+   
+   clear is
+      -- Clear out all the bits.
+      fbv.clear
+   end; -- clear
+      
+   cursor: BIT_VECTOR_CURSOR is
+      -- Use the same kind of cursor as in `BIT_VECTOR'.
+      res := fbv.cursor
+   end; -- cursor
+
+   union(s: BIT_VECTOR): BIT_VECTOR is
+      -- A new set with the elements in the union of `self' and `s'.
+      res := new;
+      res.fbv := fbv.union(s.fbv);
+   end; -- union
+   
+   intersection(s: BIT_VECTOR): BIT_VECTOR is
+      -- A new set with the elements in the intersection of `self' and `s'.
+      res := new;
+      res.fbv := fbv.intersection(s.fbv);
+   end; -- intersection
+
+   difference(s: BIT_VECTOR): BIT_VECTOR is
+      -- A new set with the elements in the difference of `self' and `s'.
+      res := new;
+      res.fbv := fbv.difference(s.fbv);
+   end; -- difference 
+   
+   sym_difference(s: BIT_VECTOR): BIT_VECTOR is
+      -- A new set with the elements in the symmetric difference of
+      -- `self' and `s' (ie. in one but not both).
+      res := new;
+      res.fbv := fbv.sym_difference(s.fbv);
+   end; -- sym_difference
+
+   duplicate: BIT_VECTOR is
+      -- A duplicate bit vector (same as `deep_copy' but faster).
+      res := BIT_VECTOR::new; res.fbv := fbv.copy;
+   end; -- duplicate
+   
+end; -- class BIT_VECTOR
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class BVEC_TEST is
+   -- Test of `FAST_BIT_VECTOR', `BIT_VECTOR_CURSOR', and `BIT_VECTOR'.
+   TEST;
+   
+   main is
+      -- Test of `FAST_BIT_VECTOR', `BIT_VECTOR_CURSOR', and `BIT_VECTOR'.
+      -- Testing `BIT_VECTOR' tests the other two classes.
+      class_name("BIT_VECTOR");
+      bv: BIT_VECTOR := bv.create;
+      
+      OUT::s("bv.insert of 4-9=");
+      bv.insert(4); bv.insert(5); bv.insert(6); bv.insert(7);
+      bv.insert(8); bv.insert(9);
+      test("insert 1", str_of_bv(bv), "4, 5, 6, 7, 8, 9");
+      test("test 1", bv.test(3).to_s, "F");
+      test("test 2", bv.test(4).to_s, "T");
+      test("test 3", bv.test(200).to_s, "F");
+      test("size", bv.size.to_s, "6");
+      bv2: BIT_VECTOR := bv.duplicate;
+      bv2.clear;
+      test("clear", str_of_bv(bv2), "");
+      bv2.insert(8); bv2.insert(9); bv2.insert(10); bv2.insert(11);
+      bv2.insert(12); bv2.insert(13);
+      test("insert 2", str_of_bv(bv2), "8, 9, 10, 11, 12, 13");
+      test("union", str_of_bv(bv.union(bv2))
+	    ,"4, 5, 6, 7, 8, 9, 10, 11, 12, 13");
+      test("intersection", str_of_bv(bv.intersection(bv2))
+	    ,"8, 9");
+      test("difference", str_of_bv(bv.difference(bv2))
+	    ,"4, 5, 6, 7");
+      test("sym_difference", str_of_bv(bv.sym_difference(bv2))
+	    ,"4, 5, 6, 7, 10, 11, 12, 13");
+      finish;
+   end; -- main
+
+   str_of_bv(bv: BIT_VECTOR): STR is
+      -- A string representation of the elements in `bv'.
+      -- Of the form `"1, 4, 5, 9"'.
+      res := STR::create;
+      bc: BIT_VECTOR_CURSOR := bv.cursor;
+      loop until!(bc.is_done);
+	 res := res.i(bc.item);
+	 bc.next;
+	 if not bc.is_done then res := res.s(", ") end;
+      end; -- loop
+   end; -- str_of_bv
+   
+end; -- class BVEC_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+

@@ -1,0 +1,769 @@
+-- -*- Mode: Sather;  -*-
+-- File: lst_codeob.sa
+-- Author: Chu-Cheow Lim and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Stores a chain of $CODEOB's
+--*
+--* RCS: $Id: lst_codeob.sa,v 1.1 1994/02/12 03:21:53 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 05:04 1993 (hws)
+--*  Oct 17 05:04 1993 (hws): Sather 1 syntax, copyright note
+--*  Oct  3 13:50 1993 (hws): readonly
+--*  Sep 28 05:05 1993 (hws): switch -> case
+--*  Jun 18 12:43 1993 (oscar): cprint_decln() doesn't append ";\n"
+--*                             (allows ANSI function prototypes)
+--*  Mar  7 23:20 1993 (hws): add mark_spec
+--*  Feb 21 21:32 1993 (hws): add mark_abstract
+--*  Sep 19 17:18 1992 (hws): allow warnings for duplicate feature defs
+--* Created: Thu May 30 18:51:36 1991 (bilmes)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class LST_PARSEROB is
+   PARSEROB;
+   LIST{$PARSEROB};
+      -- We need to inherit from this instantiation of list to override
+      -- the differently typed features in PARSEROB. So we can call
+      -- "pcopy" on each element.
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):LST_SEMANTOB is
+      i:INT := 0;
+      res := res.create(insert);
+      loop until!(i >= insert);
+	 res := res.push(self[i].pcopy(pl, pi));
+	 i := i + 1;
+      end; -- loop
+   end; -- pcopy
+
+end; -- class LST_PARSEROB
+
+--------------------------------------------------------------------
+   
+class LST_EXPROB is
+   LST_PARSEROB;
+   LIST{$EXPROB};		-- List of expressions
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):LST_EXPROB_S is
+      i:INT := 0;
+      res := res.create(insert); res.lineno := lineno;
+      loop until!(i >= insert);
+	 res := res.push(self[i].pcopy(pl, pi));
+	 i := i + 1;
+      end; -- loop
+   end; -- pcopy
+
+end; -- class LST_EXPROB
+
+--------------------------------------------------------------------
+
+class LST_STMTOB is
+   LST_PARSEROB;
+   LIST{$STMTOB};		-- List of statements
+
+-- *! LIST{$STMTOB} overrides the LIST features we inherit from LST_PARSEROB.
+-- This will give them the right typing, although the implementation is just
+-- identical.
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):LST_STMTOB_S is
+      i:INT := 0;
+      res := res.create(insert);
+      loop until!(i >= insert);
+	 res := res.push(self[i].pcopy(pl, pi));
+	 i := i + 1;
+      end; -- loop
+   end; -- pcopy
+
+end; -- class LST_STMTOB
+
+--------------------------------------------------------------------
+
+class LST_WHEN_STMTOB is
+   LST_STMTOB;
+   LIST{WHEN_STMTOB};
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):LST_WHEN_STMTOB_S is
+      i:INT := 0;
+      res := res.create(insert);
+      loop until!(i >= insert);
+	 res := res.push(self[i].pcopy(pl, pi));
+	 i := i + 1;
+      end; -- loop
+   end; -- pcopy
+
+end; -- class LST_WHEN_STMTOB
+
+--------------------------------------------------------------------
+
+class LST_DECLOB is
+   LST_PARSEROB;
+   LIST{$DECLOB};		-- List of declarations
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):LST_DECLOB_S is
+      i:INT := 0;
+      res := res.create(insert);
+      loop until!(i >= insert);
+	 res := res.push(self[i].pcopy(pl, pi));
+	 i := i + 1;
+      end; -- loop
+   end; -- pcopy
+
+end; -- class LST_DECLOB
+
+--------------------------------------------------------------------
+
+class LST_TYPEOB is
+   LST_PARSEROB;
+   LIST{$TYPEOB};
+      -- List of type specifications, used only in constructing 
+      --   parametrized type specification.
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):LST_TYPEOB_S is
+      i:INT := 0;
+      res := res.create(insert);
+      loop until!(i >= insert);
+	 res := res.push(self[i].pcopy(pl, pi));
+	 i := i + 1;
+      end; -- loop
+   end; -- pcopy
+
+end; -- class LST_TYPEOB
+
+--------------------------------------------------------------------
+
+class LST_FEATOB is
+   LST_PARSEROB;
+   LIST{$FEATOB};
+      -- List of features (may contain declaration objects which inherit
+      --   from both DECLOB and FEATOB)
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- This function is only for LST_FEATOB.
+   mark_private is
+      i:INT := 0;
+      loop until!(i >= insert);
+	 self[i].mark_private;
+	 i := i + 1;
+      end; -- loop
+   end; -- mark_private
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_spec is
+      i:INT := 0;
+      loop until!(i >= insert);
+	 self[i].mark_spec;
+	 i := i + 1;
+      end; -- loop
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_abstract is
+      i:INT := 0;
+      loop until!(i >= insert);
+	 self[i].mark_abstract;
+	 i := i + 1;
+      end; -- loop
+   end;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_shared is
+      i:INT := 0;
+      loop until!(i >= insert);
+	 self[i].mark_shared;
+	 i := i + 1;
+      end; -- loop
+   end;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_readonly is
+      i:INT := 0;
+      loop until!(i >= insert);
+	 self[i].mark_readonly;
+	 i := i + 1;
+      end; -- loop
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):LST_FEATOB_S is
+      i:INT := 0;
+      res := res.create(insert);
+      loop until!(i >= insert);
+	 res := res.push(self[i].pcopy(pl, pi));
+	 if self[i].abt then res[i].mark_abstract end;
+	 if self[i].rdo then res[i].mark_readonly end;
+	 i := i + 1;
+      end; -- loop
+   end; -- pcopy
+
+   shared duplicate_defs_ok: BOOL := true;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   add_unique_feat(f:$FEATOB):SAME is
+      case (f.type)
+      when CINH_FEATOB::type then
+	 res := push(f);
+      else
+	 -- Check for duplicates only for routines, attributes, shareds
+	 -- or constants.
+	 if (f.type = ROUT_FEATOB::type) or 
+	    (f.type = ATTR_DECL_FEATOB::type) or
+	    (f.type = SHARED_DECL_FEATOB::type) or
+	    (f.type = CONST_DECL_FEATOB::type) then
+	    i:INT := 0;
+	    loop until!(i >= insert);
+	       if (f.name = [i].name) then
+		  [i] := f;
+		  if not duplicate_defs_ok then
+		     ERR_INFO::format_warning_msg_file(GLOBALS::curr_filename, f.lineno,
+			"LST_FEATOB",
+			STR::create.s("Overriding definition \"").
+			s((GLOBALS::str_table).at_index(f.name)).
+			s("\""));	     
+		  end;
+		  res := self;
+		  return;
+	       end; -- if
+	       i := i + 1;
+	    end; -- loop
+	 end; -- if
+	 res := push(f);
+	    -- If no feature of the same name has been found, simply
+	    -- add it to current list.  
+      end; -- case
+   end; -- push_unique
+   
+end; -- class LST_FEATOB
+
+--*********************************************************************
+   
+class LST_SEMANTOB is
+   SEMANTOB;
+   LIST{$SEMANTOB};
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   out_of_line(fn: STR) is
+      -- update line info to refer to original file `fn' rather than the current
+      -- context in which this construct is used to compose code.
+      lineno := ERR_INFO::out_of_line_err_info(fn,lineno);
+      i:INT := 0;
+      loop until!(i >= insert);
+	 self[i].out_of_line(fn);
+	 i := i + 1;
+      end; -- loop
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      i:INT := 0;
+      res := create(insert);
+      loop until!(i >= insert);
+	 res := res.push(self[i].dup);
+	 i := i + 1;
+      end; -- loop
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      i:INT := 0;
+      loop until!(i >= insert);
+	 self[i].semant(symtab);
+	 i := i + 1;
+      end; -- loop
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      i:INT := 0;
+      loop until!(i >= insert);
+	 self[i].resolve_predef_types(index);
+	 i := i + 1;
+      end; -- loop
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) is
+      -- Only relevant for LST_STMTOB_S and LST_DECLOB_S
+   end; -- cprint_code
+
+end; -- class LST_SEMANTOB
+
+--------------------------------------------------------------------
+   
+class LST_EXPROB_S is
+   LST_SEMANTOB;
+   LIST{$EXPROB_S};		-- List of expressions
+   attr type_spec:LST_TYPEOB_S;
+   
+-- *! A little kludgy inheritance.  Although we inherit from "ARRAY"
+--    twice, it is as if we inherit from "ARRAY" only once.  Furthermore,
+--    the definition of "ARRAY{$EXPROB_S}" will over-shadow the definition
+--    of "ARRAY{$CODEOB}", and so "push", etc will work correctly.
+--    "LST_SEMANTOB" allows us to inherit any routine that will work
+--    on the whole list.
+-- NOTE:  The order of inheritance is important so that "self[i]"
+--        has type "$EXPROB_S".   
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+      i:INT := 0;
+      res := STR::create;
+      loop until!(i >= insert);
+	 res := res.s(self[i].sather_code).c(',');
+	 i := i + 1;
+      end; -- loop
+   end; -- sather_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Construct a type for this list of expressions.
+   semant(symtab:SYMBOL_TABLE) is
+      i:INT := 0;
+      loop until!(i >= insert);
+	 self[i].semant(symtab);
+	 i := i + 1;
+      end; -- loop
+      
+      type_spec := type_spec.create(insert);
+      i := 0;
+      loop until!(i >= insert);
+	 if (self[i].res_type /= void) then
+	    type_spec := type_spec.push(self[i].res_type);
+	 end;
+	 i := i + 1;
+      end; -- loop
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_ext_strs is
+      -- Record references to external strings in the list of
+      -- expressions.
+      i:INT := 0;
+      loop until!(i >= insert);
+	 [i].get_ext_strs;
+	 i := i + 1;
+      end; -- loop
+   end; -- get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   valid_init_expr:BOOL is
+      i:INT := 0;
+      res := true;
+      loop until!(i >= insert);
+	 res := res and self[i].valid_init_expr;
+	 i := i + 1;
+      end; -- loop
+   end; -- valid_init_expr
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   typeof:LST_TYPEOB_S is
+      res := type_spec;
+   end; -- typeof
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      i:INT := 0;
+      loop until!(i >= insert);
+	 if (res = void) then
+	    res := self[i].gen_temps;
+	 else
+	    res := res.append(self[i].gen_temps);
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_pre_code(outfile:SAT_OUTFILE) is
+      i:INT := 0;
+      loop until!(i >= insert);
+	 self[i].cprint_pre_code(outfile);
+	 i := i + 1;
+      end; -- loop
+   end; -- cprint_pre_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_act_code(outfile:SAT_OUTFILE) is
+      -- Ignore identation, default separator is ',' and no carriage-return
+      --   is provided.
+      i:INT := 0;
+      loop until!(i >= insert);
+	 self[i].cprint_act_code(outfile);
+	 i := i + 1;
+	 if (i < insert) then
+	    outfile.c(',');
+	 end; -- if
+      end; -- loop
+   end; -- cprint_act_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_init_code(outfile:SAT_OUTFILE) is
+      i:INT := 0;
+      loop until!(i >= insert);
+	 self[i].cprint_init_code(outfile);
+	 i := i + 1;
+      end; -- loop
+   end; -- cprint_init_code
+
+end; -- class LST_EXPROB_S
+
+--------------------------------------------------------------------
+class LST_STMTOB_S is
+   LST_SEMANTOB;		-- List of statements_
+   LIST{$STMTOB_S};
+   BLOCK_STMTOB_S;
+   
+-- *! LIST{$STMTOB_S} overrides the LIST features we inherit from LST_SEMANTOB.
+-- This will give them the right typing, although the implementation is just
+-- identical.
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   validate_dispatches_and_get_ext_strs is
+      i:INT := 0;
+      loop until!(i >= insert);
+	 self[i].validate_dispatches_and_get_ext_strs;
+	 i := i + 1; 
+      end; -- loop
+   end; -- validate_dispatches_and_get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) is
+      -- Ignore identation, default separator is ';' which is given by
+      --   each statement node.
+      i:INT := 0;
+      loop until!(i >= insert);
+	 self[i].cprint_code(outfile);
+	    -- STMTOB_S's will provide the indentation, ';' and carriage return
+	 i := i + 1;
+      end; -- loop
+   end;
+ 
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      i:INT := 0;
+      loop until!(i >= insert);
+	 if (res = void) then
+	    res := self[i].gen_temps;
+	 else
+	    res := res.append(self[i].gen_temps);
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_goto_tags(block: $BLOCK_STMTOB_S) is
+      i:INT := 0;
+      bl: $BLOCK_STMTOB_S := block;
+      if kwdname /= void then bl := self; end;
+      loop until!(i >= insert);
+	 self[i].gen_goto_tags(bl);
+	 i := i + 1;
+      end; -- loop
+   end; -- gen_goto_tags
+
+end; -- class LST_STMTOB_S
+
+--------------------------------------------------------------------
+
+class LST_WHEN_STMTOB_S is
+   LST_STMTOB_S;
+   LIST{WHEN_STMTOB_S};
+end; -- class LST_WHEN_STMTOB_S
+
+--------------------------------------------------------------------
+
+class LST_DECLOB_S is
+   LST_SEMANTOB;		-- List of declarations
+   LIST{$DECLOB_S};
+
+-- *! A little kludgy inheritance.  Although we inherit from "ARRAY"
+--    twice, it is as if we inherit from "ARRAY" only once.  Furthermore,
+--    the definition of "ARRAY{$DECLOB_S}" will over-shadow the definition
+--    of "ARRAY{$CODEOB}", and so "push", etc will work correctly.
+--    "LST_SEMANTOB" allows us to inherit any routine that will work
+--    on the whole list.
+-- NOTE:  The order of inheritance is important so that "self[i]"
+--        has type "$DECLOB_S".   
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   attr separator_code: STR;
+      -- The bit of C code that separates declarations.  This is
+      -- nearly always ";\n" except for the parameters of ANSI C
+      -- function prototypes, where it is ", ".  Should be set before
+      -- calling `cprint_code', but defaults to ";\n".
+
+   attr last_separator_code: STR;
+      -- The bit of C code that terminates the last declaration.  This
+      -- is nearly always ";\n" except for the parameters of ANSI C
+      -- function prototypes, where it is "".  Should be set before
+      -- calling `cprint_code', but defaults to ";\n".
+   
+   validate_dispatches_and_get_ext_strs is
+      i:INT := 0;
+      loop until!(i >= insert);
+	 self[i].validate_dispatches_and_get_ext_strs;
+	 i := i + 1; 
+      end; -- loop
+   end; -- validate_dispatches_and_get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_names(outfile:SAT_OUTFILE) is
+      -- Print the name of each declared variable.
+      i:INT := 0;
+      loop until!(i >= insert);
+	 self[i].cprint_cname(outfile);
+	 i := i + 1; 
+	 if (i < insert) then
+	    outfile.c(',');
+	 end; -- if
+      end; -- loop
+   end; -- cprint_names
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_code(outfile:SAT_OUTFILE) is
+      -- Before printing each declaration, provide the indentation.
+      -- Also, after each declaration is printed, a carriage-return is
+      --   provided by the declaration node.
+      check_separator_code;
+      i:INT := 0;
+      loop until!(i >= insert -1);
+	 outfile.indent;
+	 self[i].cprint_decln(outfile);
+	 outfile.s(separator_code);
+	 i := i + 1;
+      end; -- loop
+	 -- Do the last separately in case it is different.
+      if i < insert then
+	 outfile.indent;
+	 self[i].cprint_decln(outfile);
+	 outfile.s(last_separator_code);
+      end; -- if
+   end; -- cprint_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   check_separator_code is
+      -- If separator_code and last_separator_code haven't been set,
+      -- set them to something likely.
+      if separator_code = void then separator_code := ";\n"; end;
+      if last_separator_code = void then
+	 if separator_code[0] = ',' then
+	    last_separator_code := "";
+	 else 
+	    last_separator_code := separator_code;
+	 end; -- if
+      end; -- if
+   end; -- check_separator_code
+   
+end; -- class LST_DECLOB_S
+
+--------------------------------------------------------------------
+
+-- Use LST_TYPEOB_S for type parameters, rather than representating
+--   the instantiations by a list of indices (positive or negative) into global 
+--   semantic table.  We also use this class to represent the type
+--   of a sequence of expressions, eg  (1, "ai", 2*3)
+   
+class LST_TYPEOB_S is
+   TYPEOB_S;
+   LST_SEMANTOB;
+   LIST{$TYPEOB_S};   
+      -- List of type specifications, 
+    
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   conforms_to(tpp:$TYPEOB_S):BOOL is
+      -- This routine is only usable for cases where we know we are given
+      -- explicitly a list of "TYPEOB_S".
+      tp:LST_TYPEOB_S := tpp;
+      if (tp = void) then
+	 if (self = void) then
+	    res := true;
+	 elsif (insert = 0) then
+	    res := true;
+	 end; -- if
+	 return;
+      end; -- if
+      res := true;
+      n:INT := insert;
+      if (tp.insert /= insert) then
+	 res := false;
+	 n := insert.min(tp.insert);
+      end; -- if
+      i:INT := 0;
+      loop until!(i >= n);
+	 if not self[i].conforms_to(tp[i]) then
+	    res := false;
+	    return;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- conforms_to
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   param_type_conforms_to(tpp:$TYPEOB_S):BOOL is
+      -- This routine is only usable for cases where we know we are given
+      -- explicitly a list of "TYPEOB_S". It is used specifically for
+      -- parameters in parameterized types.
+      tp:LST_TYPEOB_S := tpp;
+      if (tp = void) then
+	 if (self = void) then
+	    res := true;
+	 elsif (insert = 0) then
+	    res := true;
+	 end; -- if
+	 return;
+      end; -- if
+      res := true;
+      n:INT := insert;
+      if (tp.insert /= insert) then
+	 res := false;
+	 n := insert.min(tp.insert);
+      end; -- if
+      i:INT := 0;
+      loop until!(i >= n);
+	 if not self[i].param_type_conforms_to(tp[i]) then
+	    res := false;
+	    return;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- conforms_to
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   full_name:STR is
+      i:INT := 0;
+      res := STR::create;
+      loop until!(i >= insert);
+	 res := res.s([i].full_name);
+	 i := i + 1; 
+	 if (i < insert) then
+	    res := res.s(" X ");
+	 end; -- if
+      end; -- loop
+   end; -- full_name
+
+end; -- class LST_TYPEOB_S
+   
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class LST_FEATOB_S is
+   LST_SEMANTOB;
+   LIST{$FEATOB_S};
+      -- List of features (may contain declaration objects which inherit
+      --   from both DECLOB and FEATOB)
+
+-- *! A little kludgy inheritance.  Although we inherit from "ARRAY"
+--    twice, it is as if we inherit from "ARRAY" only once.  Furthermore,
+--    the definition of "ARRAY{$STMTOB_S}" will over-shadow the definition
+--    of "ARRAY{$CODEOB}", and so "push", etc will work correctly.
+--    "LST_SEMANTOB" allows us to inherit any routine that will work
+--    on the whole list.
+-- NOTE:  The order of inheritance is important so that "self[i]"
+--        has type "$FEATOB_S".   
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      -- Duplicate all non-class-inheritance features.
+      i:INT := 0;
+      res := create(insert);
+      loop until!(i >= insert);
+	 if (self[i].type /= CINH_FEATOB_S::type) then
+	    GLOBALS::curr_feature := self[i];
+	 
+	    res := res.push(self[i].dup);
+	    self[i].lineno := (GLOBALS::curr_feature).lineno;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   compact:SAME is
+      -- Returns a list of features such that there is no void entry.
+      res := create(insert);
+      i:INT := 0;
+      loop until!(i >= insert);
+	 if ([i] /= void) then
+	    res := res.push([i]);
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- compact
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   compactAttr is
+      -- Move attributes that occupy less than 4 bytes into one
+      -- contiguous block.  NOTE: The specific types of the attributes
+      -- are not mentioned, because the actual size may change eg BOOL
+      -- may be implemented as C int or C char.
+      curr_pos:INT := 0;
+      i:INT := 0;
+      loop until!(i >= insert);
+	 if ([i].type = ATTR_DECL_FEATOB_S::type) then
+	    af:ATTR_DECL_FEATOB_S := [i];
+	    af_type:$TYPEOB_S := af.type_spec;
+	    af_ctype:INT := af_type.ctype;
+	    af_ctype_size:INT;
+	    case (af_ctype)
+	    when (C_TYPE_CONST::c_ptr) then
+	       af_ctype_size := C_TYPE_CONST::c_ptr_size;
+	    when (C_TYPE_CONST::c_char) then
+	       af_ctype_size := C_TYPE_CONST::c_char_size;
+	    when (C_TYPE_CONST::c_int) then
+	       af_ctype_size := C_TYPE_CONST::c_int_size;
+	    when (C_TYPE_CONST::c_float) then
+	       af_ctype_size := C_TYPE_CONST::c_float_size;
+	    when (C_TYPE_CONST::c_double) then
+	       af_ctype_size := C_TYPE_CONST::c_double_size;
+	    end; -- case
+	    if (af_ctype_size < 4) then
+	       -- Exchange the position of the features.
+	       tmp:$FEATOB_S := [i];
+	       [i] := [curr_pos];
+	       [curr_pos] := tmp;
+	       
+	       -- Remember to move the cursor.
+	       curr_pos := curr_pos + 1;
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- compactAttr
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   contains(fo:$FEATOB_S):INT is
+      -- Check that the feature name is among those in current list and
+      --   returns an index if so, -1 otherwise.
+
+      i:INT := 0;
+      res := -1;
+      loop until!(i >= insert);
+	 if (fo.featob_s_name = [i].featob_s_name) then
+	    res := i;
+	    return;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- contains
+   
+end; -- class LST_FEATOB_S
+
+--------------------------------------------------------------------
+

@@ -1,0 +1,3438 @@
+-- File: exprob_s.sa
+-- Author: Chu-Cheow Lim and Jeff Bilmes
+-- Created: Mon Jun 11 12:53:08 1990
+-- Copyright (C) International Computer Science Institute, 1990, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Representing Sather expressions (created during semantic
+--*           check).
+--*
+--* RCS: $Id: exprob_s.sa,v 1.1 1994/02/12 03:21:51 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 04:59 1993 (hws)
+--*  Sep 28 04:57 1993 (hws): switch -> case
+--*  Apr 17 23:06 1993 (hws): add proper void initialization to ID_EXPROB_S
+--*  Mar  1 13:06 1993 (hws): more uniform error msgs
+--*  Feb 28 16:38 1993 (hws): complain when new is used on abstract class
+--*  Feb 21 20:31 1993 (hws): delete debug stmts
+--*  Feb 10 20:20 1993 (clim): Fix bug in OP_EXPROB_S. Suppose
+--*         we have "x.foo + y.foo", where "x" and "y" are both dispatched.
+--*         In the old scheme, the generate code is something like:
+--*              cache_dispatch(<x>...)
+--*              cache_dispatch(<y>...)
+--*              IFN_(..)(<x>) + IFN_(..)(<y>)
+--*         But calling one of the routines may result in a recursive call
+--*         back to one of the functions which invalidates the cache.  This
+--*         is the same problem in the evaluation of arguments in
+--*         ID_ARGS_EXPROB_S etc (this problem was fixed in early 1991).
+--*  Aug 28 02:33 1991 (hws): Uniform error messages
+--*  Aug 27 11:12 1991 (hws): allow string constants in attribute initializers.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class EXPROB_S is
+   -- Expression objects created during semantic phase.
+
+   SEMANTOB;
+
+   attr res_type:$TYPEOB_S;		-- Actual resolved type of expression
+   attr c_type:INT;
+      -- Correponding C type; refer to C_TYPE_CONST for different C types
+   attr cast_to_c_type:INT;
+      -- If 'cast_to_c_type' is not zero, then cast the expression to this
+      -- C type before printing via cprint_act_code. Refer to C_TYPE_CONST for
+      -- different C types.
+      -- This is set in 'semant'
+      -- if this expression is an actual argument (of integer type) to a
+      -- routine whos formal is 'float' or 'double'. This would not be
+      -- necessary if we used ANSI C and C function prototyped headers.
+   
+   attr rt_type:INT;
+      -- The value is 0 if we do not need to generate the code for runtime
+      -- type-checking.  Otherwise, if the value is negative, we need to 
+      -- generate code for runtime type-checking for dispatched type (as
+      -- per case (4)).  If the value is positive, we need to generate code
+      -- for runtime type-checking as per cases (5b), (5d), (7) and (8).
+      -- (The different cases are described in "conforms_to" routine for
+      -- INSTANT_TYPEOB_S.)
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(ln:INT):SAME is
+      res := new;
+      res.lineno := ln;
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := EXPROB_S::new;
+      if (res_type /= void) then
+	 res.res_type := res_type.dup;
+      end; -- if
+      res.c_type := c_type;
+      res.lineno := lineno;
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      -- Do nothing; ultimately, this is only relevant for 
+      -- TYPESPEC_ARGS_EXPROB_S, but we need to recurse down the
+      -- expressions.
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   valid_init_expr:BOOL is
+      -- Default is valid
+      res := true;
+   end; -- valid_init_expr
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   assignable_p:BOOL is
+      -- Default is not assignable.
+   end; -- assignable_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   typeof:$TYPEOB_S is
+      res := res_type;
+   end; -- typeof
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      -- Default is not to generate any temporaries
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   expr_eval_constant:$CONST_EXPROB_S is
+      -- Default is no constant value.
+   end; -- expr_eval_constant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_ext_strs is
+      -- This records references to external strings; the real work
+      -- is done in EXPR_ARGS_EXPROB_S and TYPESPEC_ARGS_EXPROB_S.  
+      -- The other kinds of objects just preform recursion on the
+      -- subexpressions or do nothing.
+   end; -- get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   to_be_pre_evaluated:BOOL is
+      -- The default is to return "false".  The cases we have to check
+      -- are described in the implementation of dispatching mechanism
+      -- in the general document.
+   end; -- to_be_pre_evaluated
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   access_value_only:BOOL is
+      -- This is generally true, except for function calls when we look at
+      -- ID_EXPROB_S, ID_ARGS_EXPROB_S, EXPR_ARGS_EXPROB_S, 
+      -- TYPESPEC_ARGS_EXPROB_S), and in the case of AREF_EXPROB_S, when
+      -- if the array is value-access only.
+      res := true;
+   end; -- access_value_only
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   fob_error(op_name:STR; cls_name:STR) is
+      -- Give an error message when using a predefined routine on a 
+      -- foreign object.
+      ERR_INFO::format_error_msg(
+                lineno,
+                STR::create.s("(EXPROB_S): Invalid use of ").
+                         s(op_name).
+                         s(" on a foreign class ").
+                         s(cls_name));
+   end; -- fob_error
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_pre_code(outfile:SAT_OUTFILE) is
+      -- Default is to do nothing
+   end; -- cprint_pre_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_act_code(outfile:SAT_OUTFILE) is
+      -- Default is to do nothing
+   end; -- cprint_act_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_init_code(outfile:SAT_OUTFILE) is
+      -- If the referrents of the expressions are constants or shareds,
+      -- check whether their initialization code have been printed, and
+      -- call "cprint_init_code" for them if not. 
+   end; -- cprint_init_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   cprint_cast_code(outfile:SAT_OUTFILE) is
+      -- if cast_to_c_type is non-zero, generate the C code to cast this
+      -- expression to the specified C type.
+      if cast_to_c_type /= 0 then
+	 outfile.s("(");
+	 case (cast_to_c_type)
+	 when C_TYPE_CONST::c_ptr then
+	    outfile.s(C_TYPE_CONST::c_ptr_name);
+	 when C_TYPE_CONST::c_char then
+	    outfile.s(C_TYPE_CONST::c_char_name);
+	 when C_TYPE_CONST::c_int then
+	    outfile.s(C_TYPE_CONST::c_int_name);
+	 when C_TYPE_CONST::c_float then
+	    outfile.s(C_TYPE_CONST::c_float_name);
+	 when C_TYPE_CONST::c_double then
+	    outfile.s(C_TYPE_CONST::c_double_name);
+	 else
+	    ERR_INFO::compiler_error_msg("EXPROB_S", "Invalid C type cast");
+	 end; -- case
+	 outfile.s(")");
+      end; -- if
+   end; -- cprint_cast_code
+   
+end; -- class EXPROB_S
+
+--------------------------------------------------------------------
+   
+class ID_EXPROB_S is
+   -- Idenfifiers.
+   EXPROB_S;
+   
+   attr name:INT;			-- Identifier name
+   
+   attr referrent:$SEMANTOB;
+      -- Refer to only a $FEATOB_S, or a PARAM_DECLOB_S or 
+      --   a LVAR_DECL_STMTOB_S.
+   
+   attr temp_name_tpchk:INT;
+   attr temp_ctype_tpchk:INT;
+   -- Temporary variable to hold result of current expression so that
+   -- the type of the result can be checked (if runtime type-checking
+   -- is requested).
+   attr printed_times:INT;
+   -- The value is greater than 0 if the runtime type-checking code is already
+   -- generated, ie the code to compute value of the expression is already 
+   -- generated.  This is the number of times this node has been printed; it
+   -- should be less than or equal than the global variable "g_tag".
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:INT; ln:INT):SAME is
+      -- An expression with only one identifier
+      res := new;
+      res.name := nm;
+      res.lineno := ln;
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+      res := STR::create.s((GLOBALS::str_table).at_index(name));
+   end; -- sather_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(name, lineno);
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   valid_init_expr:BOOL is
+      if (referrent = void) then
+	 -- Handle "reserved" identifiers
+	 case (name)
+	 when RESERVED_WORDS::type_ind, 
+	      RESERVED_WORDS::void_ind, 
+	      RESERVED_WORDS::new_ind then
+	    res := true;
+	 else     
+	    -- Any other identifier including "asize", "asize1", "asize2", 
+	    -- "asize4", "copy", /* "deep_copy" */, "extend", "res", "self"
+	    ERR_INFO::format_error_exit(
+	              lineno,
+	              STR::create.s("(ID_EXPROB_S): Unknown identifier \"").
+	                       s(GLOBALS::str_table.at_index(name)).
+	                       s("\" in constant feature definition"));
+	 end; -- case
+      else
+	 -- A valid expression to initialize shared/constant feature can
+	 -- only contain constant/shared or use a routine.
+	 res := (referrent.type = CONST_DECL_FEATOB_S::type) or
+	        (referrent.type = SHARED_DECL_FEATOB_S::type) or
+	        (referrent.type = ROUT_FEATOB_S::type);
+      end; -- if
+   end; -- valid_init_expr
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      if (GLOBAL_PROC::check_is_on) then
+	 -- Generate the temporary variable to hold result of current 
+	 -- expression while its type is checked during runtime.
+	 if (rt_type /= 0) then
+	    temp_name_tpchk := GLOBAL_PROC::global_key;
+	    temp_ctype_tpchk := res_type.ctype;
+	    if (res /= void) then
+	       res := res.push(temp_name_tpchk).push(temp_ctype_tpchk);
+	    else
+	       res := LIST{INT}::create(2).push(temp_name_tpchk).
+	                               push(temp_ctype_tpchk);
+	    end; -- if
+	 end; -- if
+      end; -- if
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- The other relevant codes are EXPR_ARGS_EXPROB_S and TYPESPEC_ARGS_EXPROB_S.
+-- We have a separate routine to make sure that a constant feature's 
+-- initial expression eg the expression cannot use an attribute, but 
+-- may call routine etc.
+   expr_eval_constant:$CONST_EXPROB_S is
+      if (referrent = void) then
+	 -- Handle reserved identifiers
+	 case (name)
+	 when RESERVED_WORDS::type_ind then
+	    res := INT_CONST_EXPROB_S::create((GLOBALS::curr_class_inst).index.to_s,
+	                                   lineno);
+	 when RESERVED_WORDS::void_ind then
+	    -- At this point, the constant feature's type check has been
+	    -- done, so we can simply return an integer node.
+	    res := INT_CONST_EXPROB_S::create("0", lineno);
+
+	 when RESERVED_WORDS::new_ind then
+	    -- Initialize constant feature with an object of current class;
+	    -- but there is no constant value.
+	    res := void;
+	    
+	 else     
+	    -- Any other identifier including "asize", "asize1", "asize2", 
+	    -- "asize4", "copy", /* "deep_copy" */, "extend", "new", "res", "self"
+	    ERR_INFO::format_error_exit(
+	              lineno,
+	              STR::create.s("(ID_EXPROB_S): Unknown identifier \"").
+	                       s(GLOBALS::str_table.at_index(name)).
+	                       s("\" in constant feature definition"));	 
+	 end; -- case
+	 return;
+      end; -- if
+      
+      if (referrent.type = CONST_DECL_FEATOB_S::type) then
+	 res := referrent.get_constval;
+      end; -- if
+   end; -- expr_eval_constant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   access_value_only:BOOL is
+      -- Default is to return "false" if we do not know the referrent;
+      -- otherwise, return "true" if the referrent is not a routine. 
+      if (referrent /= void) then
+	 res := (referrent.type /= ROUT_FEATOB_S::type);
+      end; -- if
+      
+      -- We avoid optimization because the computation may further slow
+      -- down the compiler:
+      -- a.  If the identifier is eg "void", "type", "asize" etc, these 
+      --     are all constant values.
+   end; -- access_value_only
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      -- Look symbol up in table.
+      -- This allows some of the "reserved" feature names to be redefined.
+      if (referrent = void) then
+	 referrent := symtab.get_sym(name);
+      end; -- if
+
+      -- If the identifier is "new", etc used on a foreign object, it is
+      -- illegal, because there is no runtime information.
+      if (symtab.in_class.basic_type = RESERVED_CLASSES::FOB_ici) then
+	 GLOBAL_PROC::check_f_ob(self, name, symtab);
+      end; -- if
+      
+      -- Only give the default meaning if "reserved" identifiers not 
+      --   redefined. 
+      if (referrent = void) then
+	 case name
+	 when RESERVED_WORDS::copy_ind, 
+	      RESERVED_WORDS::self_ind then
+	    res_type := INSTANT_TYPEOB_S::create(symtab.in_class.index, lineno);
+	    -- We only come here for single identifier "copy" etc.
+	    -- Code such as "a.new" should have been handled by 
+	    -- EXPR_ARGS_EXPROB_S.
+	 
+	 when RESERVED_WORDS::new_ind then
+	    -- "new" requires arguments if we are handling an array class.
+	    res_type := INSTANT_TYPEOB_S::create(symtab.in_class.index, lineno);
+	    if (symtab.in_class.arrdim > 0) then
+	       ERR_INFO::format_error_msg(
+	                 lineno, 
+	                 STR::create.s("(ID_EXPROB_S): Applying \"new\" on an array class without arguments"));
+	    end; -- if
+	    if (res_type.nonptr_p) then
+	       -- We cannot call "new" on the basic classes INT, BOOL, CHAR,
+	       -- REAL and DOUBLE or any of their descendents.
+	       ERR_INFO::format_error_exit(
+	                 lineno,
+	                 STR::create.s("(ID_EXPROB_S): Applying \"new\" on a non-object class"));
+	    end;
+
+	    if (res_type.inst_cls.abt) then
+	       -- Abstract classes do not support creation
+	       ERR_INFO::format_error_exit(
+		  lineno,
+		  STR::create.s("(ID_EXPROB_S): Abstract class \"").
+		  s(res_type.inst_cls.full_name).s("\" used in \"new\" call"));
+	    end;
+
+      -- These features should be available from reading the ARRAY definitions.
+      --   We only come to this point if the identifiers are not part of a 
+      --   dot expression.     
+         when RESERVED_WORDS::asize_ind, RESERVED_WORDS::asize1_ind then
+            if (symtab.in_class.arrdim = 0) then
+	       ERR_INFO::format_error_exit(
+	                 lineno,
+	                 STR::create.s("(ID_EXPROB_S): \"").
+                                  s(GLOBALS::str_table.at_index(name)).
+	                          s("\" applied to non-array class"));
+            end; -- if
+	    res_type := GLOBALS::int_typeob_s;
+ 
+         when RESERVED_WORDS::asize2_ind then
+            if (symtab.in_class.arrdim <= 1) then
+	       ERR_INFO::format_error_exit(
+	                 lineno,
+	                 STR::create.s("(ID_EXPROB_S): \"").
+	                          s(GLOBALS::str_table.at_index(name)).
+	                          s("\" expects 2- or more dim ARRAY"));
+            end; -- if
+            res_type := GLOBALS::int_typeob_s;
+ 
+         when RESERVED_WORDS::asize3_ind then
+            if (symtab.in_class.arrdim <= 2) then
+	       ERR_INFO::format_error_exit(
+	                 lineno,
+	                 STR::create.s("(ID_EXPROB_S): \"").
+   	                          s(GLOBALS::str_table.at_index(name)).
+	                          s("\" expects 3- or more dim ARRAY"));
+            end; -- if
+            res_type := GLOBALS::int_typeob_s;
+ 
+         when RESERVED_WORDS::asize4_ind then
+            if (symtab.in_class.arrdim <= 3) then
+	       ERR_INFO::format_error_exit(
+	                 lineno,
+	                 STR::create.s("(ID_EXPROB_S): \"").
+	                          s(GLOBALS::str_table.at_index(name)).
+	                          s("\" expects 4- or more dim ARRAY"));
+            end; -- if
+	    res_type := GLOBALS::int_typeob_s;
+ 
+         when RESERVED_WORDS::extend_ind then
+	    -- "extend" must be called with size parameters.
+            if (symtab.in_class.arrdim = 0) then
+	       ERR_INFO::format_error_exit(
+	                 lineno,
+	                 STR::create.s("(ID_EXPROB_S): \"").
+                                  s(GLOBALS::str_table.at_index(name)).
+	                          s("\" expects ARRAY class"));
+            end; -- if
+	    ERR_INFO::format_error_msg(
+	              lineno, 
+	              STR::create.s("(ID_EXPROB_S): Arguments expected for \"extend\""));
+	    res_type := INSTANT_TYPEOB_S::create(symtab.in_class.index, lineno);
+
+	 when RESERVED_WORDS::type_ind then
+	    res_type := GLOBALS::int_typeob_s;
+	 
+	 when RESERVED_WORDS::res_ind then
+	    -- "res" is used only in routines which return values.
+	    if (GLOBALS::curr_feature.type /= ROUT_FEATOB_S::type) then
+	       ERR_INFO::format_error_exit(
+	                 lineno,
+	                 STR::create.s("(ID_EXPROB_S): \"res\" used in non-routine feature"));
+	    end; -- if
+	    if (GLOBALS::curr_feature.rettype = void) then
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(ID_EXPROB_S): \"res\" used in routine without return type\n"));
+	       res_type := GLOBALS::ob_typeob_s;
+	    else
+	       res_type := GLOBALS::curr_feature.rettype;
+	    end; -- if
+
+	 when RESERVED_WORDS::void_ind then
+	    res_type := GLOBALS::voidtype_s;
+	 else
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(ID_EXPROB_S): Undeclared identifier \"").
+	                       s((GLOBALS::str_table).at_index(name)).
+	                       s("\" used"));
+	    res_type := GLOBALS::ob_typeob_s;
+	 end; -- case
+      else
+	 -- If we are using a routine from another class which may or may not 
+	 --   be the C class, record this use in "externs" attribute of the 
+         --   current class object.
+	 -- NOTE:  This should not occur because this node represents a
+	 --        single identifier and can only refer to something defined 
+	 --        within the class.
+	 -- 
+	 -- The type of the identifier is the type of whatever it refers to 
+	 -- if the identifier does not refer to a routine.
+	 if (referrent.type = ROUT_FEATOB_S::type) then
+	    -- Check that the routine definition does not require any 
+	    -- parameters.
+	    num_params:INT := 0;
+	    if (referrent.typeof.paramstype /= void) then
+	       num_params := referrent.typeof.paramstype.insert;
+	    end; -- if
+	    if (num_params > 0) then
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(ID_EXPROB_S): Routine call \"").
+                                  s(GLOBALS::str_table.at_index(name)).
+                                  s("\" expects arguments"));
+	    end; -- if
+	    res_type := referrent.typeof.rettype;
+	 else
+	    res_type := referrent.typeof;
+	 end; -- if
+
+	 -- Remember to mark feature as being used.
+	 case (referrent.type)
+	 when ROUT_FEATOB_S::type then
+	    rout_feat:ROUT_FEATOB_S := referrent;
+	    rout_feat.maybe_used := true;
+	    
+	 when CONST_DECL_FEATOB_S::type then
+	    const_feat:CONST_DECL_FEATOB_S := referrent;
+	    const_feat.maybe_used := true;
+
+	 when ATTR_DECL_FEATOB_S::type then
+	    attr_feat:ATTR_DECL_FEATOB_S := referrent;
+	    attr_feat.maybe_used := true;
+
+	 when SHARED_DECL_FEATOB_S::type then
+	    shared_feat:SHARED_DECL_FEATOB_S := referrent;
+	    shared_feat.maybe_used := true;
+
+	 end; -- case
+      end; -- if
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   assignable_p:BOOL is
+      -- This should only be called after the referent has been
+      --   found.
+      if (referrent = void) then
+	 -- Handle reserved identifiers
+	 case (name)
+	 when  RESERVED_WORDS::res_ind then
+	    res := true;
+	 else
+	    -- Any other identifier including "asize", "asize1", "asize2", 
+	    -- "asize4", "copy", /* "deep_copy" */, "extend", "new", "self",
+	    -- "type", "void".
+	    ERR_INFO::format_error_msg(
+	              lineno, 
+	              STR::create.s("(ID_EXPROB_S): Identifier referrent \"").
+   	                       s((GLOBALS::str_table).at_index(name)).
+	                       s("\" not found"));
+	    res := false;
+	 end; -- case
+      else
+	 -- *! Deal with "private" features later.
+	 if (referrent.type = PARAM_DECLOB_S::type) or
+	    (referrent.type = LVAR_DECL_STMTOB_S::type) or
+	    (referrent.type = ATTR_DECL_FEATOB_S::type) or
+	    (referrent.type = SHARED_DECL_FEATOB_S::type) then
+	       -- Routine, and constant features are not assignable.
+	    res := true;
+	 end; -- if
+      end; -- if
+   end; -- assignable_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Continuation codes
+   const cont1:INT := 1;	-- Print access to "asize", "asize1"
+   const cont2:INT := 2;	-- Print access to "asize2"
+   const cont3:INT := 3;	-- Print access to "asize3"
+   const cont4:INT := 4;	-- Print access to "asize4"
+   
+   const cont5:INT := 5;	-- Print parameters for "new"
+   const cont6:INT := 6;	-- Print parameters for "copy", /* "deep_copy" */
+   const cont7:INT := 7;	-- Print reference to "self"
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cont_cprint_code(outfile:SAT_OUTFILE; cont:INT) is
+      -- "cont" represents the continuation of printing the
+      -- attribute access code. 
+      case (cont)
+      when cont1 then
+	 if (not GLOBAL_PROC::cprint_ref_to_self(outfile)) then
+	    ERR_INFO::format_error_msg(
+	              lineno, 
+	              STR::create.s("(ID_EXPROB_S): Attribute of void object"));
+	 end; -- if
+	 outfile.c(',').i(GLOBALS::curr_class_inst.base_size);
+	 
+      when cont2 then
+	 if (not GLOBAL_PROC::cprint_ref_to_self(outfile)) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(ID_EXPROB_S): Attribute of void object"));
+
+	 end; -- if
+	 outfile.c(',').i(GLOBALS::curr_class_inst.base_size + 4);
+
+      when cont3 then
+	 if (not GLOBAL_PROC::cprint_ref_to_self(outfile)) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(ID_EXPROB_S): Attribute of void object"));
+	 end; -- if
+	 outfile.c(',').i(GLOBALS::curr_class_inst.base_size + 8);
+
+      when cont4 then
+	 if (not GLOBAL_PROC::cprint_ref_to_self(outfile)) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(ID_EXPROB_S): Attribute of void object"));
+	 end; -- if
+	 outfile.c(',').i(GLOBALS::curr_class_inst.base_size + 12);
+
+      when cont5 then
+	 outfile.i(GLOBALS::curr_class_inst.index).c(',').
+	         i(GLOBALS::curr_class_inst.atomic_p);
+	 
+      when cont6 then
+	 if (not GLOBAL_PROC::cprint_ref_to_self(outfile)) then
+	    ERR_INFO::format_error_msg(
+	              lineno, 
+	              STR::create.s("(ID_EXPROB_S): Applying \"").
+	                       s(GLOBALS::str_table.at_index(name)).
+	                       s("\" on void object"));
+	 end; -- if
+	 outfile.c(',').i(GLOBALS::curr_class_inst.atomic_p);
+
+      when cont7 then
+	 if (not GLOBAL_PROC::cprint_ref_to_self(outfile)) then
+	    ERR_INFO::format_error_msg(
+	              lineno, 
+	              STR::create.s("(ID_EXPROB_S): Void object"));
+	 end; -- if
+
+      else
+	 ERR_INFO::compiler_error_msg("ID_EXPROB_S",
+	           STR::create.s("Unknown continuation #").
+	                    i(cont));
+      end; -- case
+   end; -- cont_cprint_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- -- No preliminary code needed for an identifier.  If the identifier
+-- -- is a child of eg AREF_EXPROB_S, then AREF_EXPROB_S is responsible
+-- -- for handling the dispatch code.
+
+-- However, if we want to do runtime check for void object, the 
+-- preliminary code should include a check for "self" not equal to void
+-- if the identifier refers to an attribute (predefined or user-defined).
+   cprint_pre_code(outfile:SAT_OUTFILE) is
+      if (GLOBAL_PROC::check_is_on) then
+	 if (referrent = void) then
+	    case (name)
+	    when RESERVED_WORDS::asize_ind, 
+	         RESERVED_WORDS::asize1_ind, 
+	         RESERVED_WORDS::asize2_ind, 
+	         RESERVED_WORDS::asize3_ind,
+	         RESERVED_WORDS::asize4_ind then
+	       PRINT_C_CODE::cprint_void_tst(outfile, cont7, self);
+	    end; -- case
+	 else
+	    if (referrent.type = ATTR_DECL_FEATOB_S::type) then
+	       PRINT_C_CODE::cprint_void_tst(outfile, cont7, self);
+	    end; -- if
+	 end; -- if
+	 if (rt_type /= 0) then
+	    GLOBAL_PROC::cprint_curr_exp_code(self, temp_name_tpchk, outfile);
+	 end; -- if
+      end; -- if
+   end; -- cprint_pre_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_act_code(outfile:SAT_OUTFILE) is
+      if (printed_times > GLOBALS::g_tag) then
+	 if (temp_name_tpchk > 0) then
+	    GLOBAL_PROC::cprint_ctemp_name(temp_name_tpchk, outfile);
+	    return;
+	 else 
+	    ERR_INFO::compiler_error_msg("ID_EXPROB_S",
+	              STR::create.s("Invalid printing count = ").
+	                       i(printed_times).s(" > ").
+	                       i(GLOBALS::g_tag));
+	 end; -- if
+      end; -- if
+      printed_times := printed_times + 1;
+
+      if (referrent = void) then
+	 case (name)
+	 when RESERVED_WORDS::copy_ind then
+	    PRINT_C_CODE::cprint_copy(outfile, cont6, self);
+	    
+	 when RESERVED_WORDS::extend_ind then
+	    -- "extend" should have been handled as within a ID_ARGS_EXPROB_S
+	    -- (eg "extend(10)") or as a EXPR_ARGS_EXPROB_S (eg 
+	    -- "a.extend (10)") or as a TYPESPEC_ARGS_EXPROB_S 
+	    -- (eg "X::extend(10)").
+	    ERR_INFO::format_error_exit(
+	              lineno,
+	              STR::create.s("(ID_EXPROB_S): \"extend\" needs at least one parameter\n"));
+	 when RESERVED_WORDS::new_ind then
+	    PRINT_C_CODE::cprint_new(outfile, 0, cont5, self);
+
+	 when RESERVED_WORDS::res_ind then
+	    outfile.s("res__");
+
+	 when RESERVED_WORDS::self_ind then
+	    if (not GLOBAL_PROC::cprint_ref_to_self(outfile)) then
+	       ERR_INFO::format_warning_msg(
+	                 lineno,
+	                 STR::create.s("(ID_EXPROB_S): Reference to void object"));
+	    end; -- if
+	 when RESERVED_WORDS::type_ind then
+	    outfile.i(GLOBALS::curr_class_inst.index);
+
+	 when RESERVED_WORDS::void_ind then
+	    -- Type dependent `void's are part of the abstact machine.
+	    res_type.cprint_void(outfile);
+	    
+	 when RESERVED_WORDS::asize_ind, RESERVED_WORDS::asize1_ind then
+	    PRINT_C_CODE::cprint_int_attr_access(outfile, cont1, self);
+	    
+	 when RESERVED_WORDS::asize2_ind then
+	    PRINT_C_CODE::cprint_int_attr_access(outfile, cont2, self);
+	    
+	 when RESERVED_WORDS::asize3_ind then
+	    PRINT_C_CODE::cprint_int_attr_access(outfile, cont3, self);
+
+	 when RESERVED_WORDS::asize4_ind then	
+	    PRINT_C_CODE::cprint_int_attr_access(outfile, cont4, self);
+
+	 else
+	    ERR_INFO::format_error_exit(
+	              lineno,
+	              STR::create.s("(ID_EXPROB_S): Identifier \"").
+ 	                       s((GLOBALS::str_table).at_index(name)).
+	                       s("\" has unknown referrent"));
+	 end; -- case
+      else
+	 cprint_cast_code(outfile);
+	 case (referrent.type)
+	 when ATTR_DECL_FEATOB_S::type, CONST_DECL_FEATOB_S::type, 
+	      SHARED_DECL_FEATOB_S::type, PARAM_DECLOB_S::type, 
+	      LVAR_DECL_STMTOB_S::type then
+	    referrent.cprint_access_value(outfile);
+	 when ROUT_FEATOB_S::type then
+	    referrent.cprint_cname(outfile);
+	    outfile.c('(');
+	    if (not GLOBAL_PROC::cprint_ref_to_self(outfile)) then
+	       ERR_INFO::format_warning_msg(
+	                 lineno,
+	                 STR::create.s("(ID_EXPROB_S): Routine call with void object"));
+	    end; -- if
+	    outfile.c(')');
+	 else
+	    ERR_INFO::format_error_exit(
+	              lineno,
+	              STR::create.s("(ID_EXPROB_S): Identifier \"").
+	                       s((GLOBALS::str_table).at_index(name)).
+                               s("\" has unknown referrent"));
+	 end; -- case
+      end; -- if
+   end; -- cprint_act_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_init_code(outfile:SAT_OUTFILE) is
+      -- Call "cprint_init_code" if the referrent is a CONST_DECL_FEATOB_S or
+      -- SHARED_DECL_FEATOB_S.
+      if (referrent /= void) then
+	 if (referrent.type = CONST_DECL_FEATOB_S::type) or
+	    (referrent.type = SHARED_DECL_FEATOB_S::type) then
+	    referrent.cprint_init_code(outfile);
+	 end; -- if
+      end; -- if
+   end; -- cprint_init_code
+
+end; -- class ID_EXPROB_S
+
+--------------------------------------------------------------------
+
+class CONST_EXPROB_S is
+   -- Parent class for boolean, character, integer, string or real Sather
+   -- constants.
+   EXPROB_S;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      -- Constant nodes are sharable.
+      res := self;
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   val:STR_CURSOR is
+      -- Default is to null string
+      res := STR_CURSOR::create("");
+   end; -- val
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      -- Type is determinable during node creation; for a general constant
+      -- node, we use $OB
+      res_type := GLOBALS::ob_typeob_s;
+   end; -- semant
+
+end; -- class CONST_EXPROB_S
+   
+--------------------------------------------------------------------
+
+class INT_CONST_EXPROB_S is
+   CONST_EXPROB_S;
+
+   attr intval:STR;
+      -- Pointer to string representation of integer
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(v:STR; ln:INT):SAME is
+      res := new;
+      res.intval := v;
+      res.lineno := ln;
+      res.res_type := GLOBALS::int_typeob_s;
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+      res := STR::create.s(intval);
+   end; -- sather_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      res_type := GLOBALS::int_typeob_s;
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   val:STR_CURSOR is
+      res := STR_CURSOR::create(intval);
+   end; -- val
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   expr_eval_constant:$CONST_EXPROB_S is
+      res := self;
+   end; -- expr_eval_constant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_act_code(outfile:SAT_OUTFILE) is
+      cprint_cast_code(outfile);
+      outfile.s(intval);
+   end; -- cprint_act_code
+
+end; -- class INT_CONST_EXPROB_S
+
+--------------------------------------------------------------------
+   
+class CHAR_CONST_EXPROB_S is
+   CONST_EXPROB_S;
+   
+   attr charval:STR;
+      -- Pointer to string representation of character
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(v:STR; ln:INT):SAME is
+      res := new;
+      res.charval := v;
+      res.lineno := ln;
+      res.res_type := GLOBALS::char_typeob_s;
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+      res := STR::create.s(charval);
+   end; -- sather_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   val:STR_CURSOR is
+      res := STR_CURSOR::create(charval);
+   end; -- val
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      res_type := GLOBALS::char_typeob_s;
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   expr_eval_constant:$CONST_EXPROB_S is
+      res := self;
+   end; -- expr_eval_constant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_act_code(outfile:SAT_OUTFILE) is
+      cprint_cast_code(outfile);
+      outfile.s(charval);
+   end; -- cprint_act_code
+
+end; -- class CHAR_CONST_EXPROB_S
+
+--------------------------------------------------------------------
+   
+class BOOL_CONST_EXPROB_S is
+   CONST_EXPROB_S;
+
+   attr boolval:INT;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(v:INT; ln:INT):SAME is
+      res := new;
+      res.boolval := v;
+      res.lineno := ln;
+      res.res_type := GLOBALS::bool_typeob_s;
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+      if (boolval = 1) then
+	 res := STR::create.s("true");
+      else
+	 res := STR::create.s("false");
+      end; -- if
+   end; -- sather_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      res_type := GLOBALS::bool_typeob_s;
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   val:STR_CURSOR is
+      if (boolval = 1) then
+	 res := STR_CURSOR::create("T");
+      else
+	 res := STR_CURSOR::create("F");
+      end;
+   end; -- val
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   expr_eval_constant:$CONST_EXPROB_S is
+      res := self;
+   end; -- expr_eval_constant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_act_code(outfile:SAT_OUTFILE) is
+      cprint_cast_code(outfile);
+      outfile.i(boolval);
+   end; -- cprint_act_code
+
+end; -- class BOOL_CONST_EXPROB_S
+
+--------------------------------------------------------------------
+   
+class STR_CONST_EXPROB_S is
+-- NOTE:
+-- The reason for changing the storage of string constants as strings to
+-- index (into table) is that when we do incremental compilation, the
+-- temporary names associated with a STR_CONST_EXPROB_S may change.  This
+-- is NOT a problem for strings used in a routine eg:
+--     foo(x:INT) is
+--        OUT::s("xxx");
+--     end; -- foo
+-- because the declaration for "xxx" is in the routine and used only 
+-- in the routine.  But with a constant/shared feature eg:
+--     constant foo:STR := "xxx"; /* class C1 */
+-- in a different class C2, we may refer to C1::foo (which is substituted
+-- by the actual string during code generation) eg in C2, we may have:
+--     shared bar:STR := C1::foo;
+-- During initialization, we need to refer to the temporary variable
+-- for "xxx" which may be different in the current compilation from
+-- the previous compilation, so that if C1 does not change, then the
+-- old code has a different temporary variable for "xxx" from the 
+-- current one generated in "MAIN_.c".
+   
+   CONST_EXPROB_S;
+   
+   attr strval:INT;
+      -- Index to table storing string representation of string constant
+   
+   -- Eliminate the use of temporary names, because since the index is
+   -- unique, we simply use that as the temporary variable name.
+--   temp_name:INT;
+--      -- Static variable that holds Sather string (assigned during
+--      -- "create" because duplication during inheritance expansion reuses
+--      -- the same node).
+   
+   attr global:BOOL;
+   -- This value is "true" if the string is found in a shared/constant
+   -- feature definition.
+   -- NOTE: Consider the following situation:
+   --      constant foo:STR := "xxx";
+   --      bar is
+   --         OUT::s("xxx").s(foo);
+   --      end; 
+   -- When the code is generated for "foo", it is a reference to a
+   -- temporary variable associated with the string.  If we simply
+   -- the same prefix eg "str100_" (100 = index of "xxx" in table),
+   -- then the reference is incorrect.  (Theoretically, as long as
+   -- the Sather strings do not change, there should not be any
+   -- problem though.)
+   -- Upated in "semant".
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(v:INT; ln:INT):SAME is
+      res := new;
+      res.strval := v;
+      res.lineno := ln;
+      res.res_type := GLOBALS::str_typeob_s;
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+      res := STR::create.s((GLOBALS::str_table).at_index(strval));
+   end; -- sather_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      if (GLOBALS::curr_feature.type /= ROUT_FEATOB_S::type) then
+	 global := true;
+      end; -- if
+      res_type := GLOBALS::str_typeob_s;
+      case (GLOBALS::curr_feature).type
+      when ROUT_FEATOB_S::type then
+	 rout_featob_s:ROUT_FEATOB_S := GLOBALS::curr_feature;
+	 rout_featob_s.add_str_const(self);
+
+      when SHARED_DECL_FEATOB_S::type, CONST_DECL_FEATOB_S::type then
+	 GLOBAL_PROC::add_str_const(self);
+	 -- NOTE: All such strings will be referenced via temporary
+	 --       variables for strings in shared/constant features,
+	 --       using "cprint_global_tmpnm_str".
+	 (GLOBALS::curr_class_inst).ext_strs := 
+	 (GLOBALS::curr_class_inst).ext_strs.insert(strval);
+      end;
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   expr_eval_constant:$CONST_EXPROB_S is
+      res := self;
+   end; -- expr_eval_constant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   temp_name:INT is
+      res := strval;
+   end; -- temp_name
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   find_actual_length:INT is
+      tmpstr:STR := (GLOBALS::str_table).at_index(strval);
+      num_chars:INT := tmpstr.length;
+      res := num_chars;
+      i:INT := 0;
+      seen_back_slash:BOOL := false;
+      num_digits:INT;
+      loop until!(i >= num_chars);
+	 if (tmpstr[i] = '\\') then
+	    if (seen_back_slash) then
+	       -- We are now looking at second '\' in "\\".
+	       seen_back_slash := false;
+	       num_digits := 0;
+	    else 
+	       res := res - 1;
+	       seen_back_slash := true;
+	       num_digits := 0;
+	    end; -- if
+	 elsif (tmpstr[i].is_digit) then
+	    if (seen_back_slash) then
+	       if (num_digits = 2) then
+		  -- We are now looking at '3' in "\123".
+		  seen_back_slash := false;
+		  num_digits := 0;
+	       else
+		  num_digits := num_digits + 1;
+		  res := res - 1;
+	       end; -- if
+	    else
+	       -- "seen_back_slash" stays false.
+	    end; -- if
+	 else
+	    seen_back_slash := false;
+	    num_digits := 0;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+
+   end; -- find_actual_length
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   const cont1:INT := 1;
+   -- Print the parameters:
+   -- <STR class index>, <length> + 1, <Temporary variable>, <Actual string>
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_mach_indep(outfile:SAT_OUTFILE) is
+      -- Print the string "xxx" in the declaration form
+      -- "SATHER_STR_(20,4,<var>,"xxx");" which will be macro-expanded
+      -- to:
+      -- "static struct { int tp_; int sz_; char st_[4] } <var> = 
+      --  { 20, 4, "xxx" };" 
+      -- Note that extra byte in the string to accomodate the null character.
+      
+      PRINT_C_CODE::cprint_sather_str_mi(outfile, cont1, self);
+      outfile.s(";\n").inc_ln(1);
+   end; -- cprint_mach_indep
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_mach_indep_global(outfile:SAT_OUTFILE) is
+      -- Print the string "xxx" in the declaration form
+      -- "SATHER_STR1_(20,4,<var>,"xxx");" which will be macro-expanded
+      -- to:
+      -- "struct { int tp_; int sz_; char st_[4] } <var> = 
+      --  { 20, 4, "xxx" };" 
+      -- Note that extra byte in the string to accomodate the null character.
+      -- The difference from previous routine is that the global variable is
+      -- not "static", so that it can be exported to other generated C files.
+      
+      PRINT_C_CODE::cprint_sather_str1_mi(outfile, cont1, self);
+      outfile.s(";\n").inc_ln(1);
+   end; -- cprint_mach_indep
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cont_cprint_code(outfile:SAT_OUTFILE; cont:INT) is
+      if (cont /= cont1) then
+	 ERR_INFO::compiler_error_msg("STR_CONST_EXPROB_S", "Weird initial continuation");
+      else
+	 len:INT := find_actual_length;
+	 outfile.i(RESERVED_CLASSES::STR_ici).c(',').
+	         i(len + 1).c(',');
+	 if (global) then
+	    GLOBAL_PROC::cprint_global_tmpnm_str(strval, outfile);
+	 else
+	    GLOBAL_PROC::cprint_local_tmpnm_str(strval, outfile);
+	 end; -- if
+	 outfile.s(",\"").
+	         s((GLOBALS::str_table).at_index(strval)).
+	         c('"');
+      end; -- if
+   end; -- cont_cprint_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_act_code(outfile:SAT_OUTFILE) is
+      cprint_cast_code(outfile);
+      outfile.s("(ptr)(&");
+      if (global) then
+	 GLOBAL_PROC::cprint_global_tmpnm_str(strval, outfile)
+      else
+	 GLOBAL_PROC::cprint_local_tmpnm_str(strval, outfile);
+      end; -- if
+      outfile.c(')');
+   end; -- cprint_act_code
+
+end; -- class STR_CONST_EXPROB_S
+
+--------------------------------------------------------------------
+   
+class REAL_CONST_EXPROB_S is
+   -- Contains either a value of type REAL or DOUBLE
+   CONST_EXPROB_S;
+
+   attr realval:STR;
+      -- Pointer to string representation of float/double constant
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(v:STR; ln:INT):SAME is
+      res := new;
+      res.realval := v;
+      res.lineno := ln;
+      res.res_type := GLOBALS::real_typeob_s;
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+      res := STR::create.s(realval);
+   end; -- sather_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      -- Though the type of eg "1.2" is REAL by default, during "semant"
+      -- phase, it may turn out to be "DOUBLE" (eg in an expression 
+      -- "1.2.f", "f" may be in the REAL or DOUBLE class).
+      -- These are all handled by the parent of this REAL_CONST_EXPROB_S.
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   expr_eval_constant:$CONST_EXPROB_S is
+      res := self;
+   end; -- expr_eval_constant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   val:STR_CURSOR is
+      res := STR_CURSOR::create(realval);
+   end; -- val
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_act_code(outfile:SAT_OUTFILE) is
+      cprint_cast_code(outfile);
+      outfile.s(realval);
+   end; -- cprint_act_code
+
+end; -- class REAL_CONST_EXPROB_S
+
+--------------------------------------------------------------------
+
+class OP_EXPROB_S is
+   -- Operator expressions.
+   
+   EXPROB_S;
+   OP_INDICES;
+
+   attr op_ind:INT;			-- Operation
+   attr children:LST_EXPROB_S;
+
+   attr eval_p:BOOL;			-- "true" if evaluation has been attempted
+   attr val:$CONST_EXPROB_S;
+      -- Computed in "eval_constant"
+   
+   attr has_pre_eval_operands:BOOL;
+   -- This value when set to `true' means that temporaries are generated
+   -- to pre-evaluate the children.  Updated in "semant".
+
+   attr temp_operands:ARRAY{INT};
+   attr temp_operands_ctype:ARRAY{INT};
+   -- List of variables to hold results of evaluating the children.
+   -- Values are guaranteed to be non-void and have the same length
+   -- as the number of children.  Initialized in "create".
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(op:INT; children:LST_EXPROB_S; ln:INT):SAME is
+      -- Expression node has exactly 1 child
+      res := new;
+      res.op_ind := op;
+      res.children := children;
+      res.lineno := ln;
+      s:INT := children.insert;
+      res.temp_operands := ARRAY{INT}::new(s);
+      res.temp_operands_ctype := ARRAY{INT}::new(s);
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+      c1:STR;
+      c2:STR;
+      case (op_ind)
+      when not_op_ind, uminus_op_ind, uplus_op_ind then
+	 c1 := children[0].sather_code;
+      else
+	 -- Operators: LT, GT, LE, GE, EQ, NE, AND, OR, PLUS, MINUS,
+	 --            MULT, DIVIDE
+	 c1 := children[0].sather_code;
+	 c2 := children[1].sather_code;
+      end; -- case
+      case (op_ind)
+      when (not_op_ind) then
+	 res := STR::create.s("(not ").s(c2).s(")");
+      when (lt_op_ind) then
+	 res := STR::create.c('(').s(c1).s(" < ").s(c2).c(')');
+      when (gt_op_ind) then
+	 res := STR::create.c('(').s(c1).s(" > ").s(c2).c(')');
+      when (le_op_ind) then
+	 res := STR::create.c('(').s(c1).s(" <= ").s(c2).c(')');
+      when (ge_op_ind) then
+	 res := STR::create.c('(').s(c1).s(" >= ").s(c2).c(')');
+      when (eq_op_ind) then
+	 res := STR::create.c('(').s(c1).s(" = ").s(c2).c(')');
+      when (ne_op_ind) then
+	 res := STR::create.c('(').s(c1).s(" /= ").s(c2).c(')');
+      when (and_op_ind) then
+	 res := STR::create.c('(').s(c1).s(" and ").s(c2).c(')');
+      when (or_op_ind) then
+	 res := STR::create.c('(').s(c1).s(" or ").s(c2).c(')');
+      when (uminus_op_ind) then
+	 res := STR::create.s("(- ").s(c2).s(")");
+      when (uplus_op_ind) then
+	 res := STR::create.s("(+ ").s(c2).s(")");
+      when (plus_op_ind) then
+	 res := STR::create.c('(').s(c1).s(" + ").s(c2).c(')');
+      when (minus_op_ind) then
+	 res := STR::create.c('(').s(c1).s(" - ").s(c2).c(')');
+      when (mult_op_ind) then
+	 res := STR::create.c('(').s(c1).s(" * ").s(c2).c(')');
+      when (divide_op_ind) then
+	 res := STR::create.c('(').s(c1).s(" / ").s(c2).c(')');
+      end; -- case
+   end; -- sather_code
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   out_of_line(fn: STR) is
+      -- update line info to refer to original file `fn' rather than the current
+      -- context in which this construct is used to compose code.
+      lineno := ERR_INFO::out_of_line_err_info(fn,lineno);
+      children.out_of_line(fn);
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(op_ind, children.dup, lineno);
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      children.resolve_predef_types(index);
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      csz:INT;
+      if (children /= void) then
+	 children.semant(symtab);
+	 csz := children.insert;
+      end;
+      i:INT := 0;
+      loop until!(i >= csz);
+	 if (children[i].res_type = void) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(OP_EXPROB_S): Unknown operand type"));
+	    case (op_ind)
+	    when and_op_ind, or_op_ind, not_op_ind, eq_op_ind,
+	         ne_op_ind, lt_op_ind, gt_op_ind, le_op_ind, ge_op_ind then
+	       res_type := GLOBALS::bool_typeob_s; 
+	    else		-- Assume integer arithmetic results
+	       res_type := GLOBALS::int_typeob_s;
+	    end; -- case
+	    return;
+	 end; -- if
+	 if (children[i].to_be_pre_evaluated) then
+	    temp_operands[i] := GLOBAL_PROC::global_key;
+	    temp_operands_ctype[i] := children[i].res_type.ctype;
+	    has_pre_eval_operands := true;
+	 end;
+	 i := i + 1;
+      end; -- loop
+      
+      -- Deal with different kinds of operators separately
+      case (op_ind)
+      when and_op_ind, or_op_ind then
+	 if (not children[0].res_type.bool_type_p) or
+	    (not children[1].res_type.bool_type_p)
+	 then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(OP_EXPROB_S): Expect BOOL type"));
+	 end; -- if
+	 res_type := GLOBALS::bool_typeob_s;
+	 
+      when not_op_ind then
+	 if (not children[0].res_type.bool_type_p) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(OP_EXPROB_S): Expect BOOL type"));
+	 end; -- if
+	 res_type := GLOBALS::bool_typeob_s;
+	 
+      when eq_op_ind, ne_op_ind then
+	    -- The '=' and '/=' operators apply to arithmetic types and
+	    --   pointer type.
+	 if not (children[0].res_type.arithtype and children[1].res_type.arithtype)
+	 then
+	    if (not children[0].res_type.conforms_to(children[1].res_type)) and
+	       (not children[1].res_type.conforms_to(children[0].res_type)) then
+	       ERR_INFO::type_mismatch_err("comparison"," or vice versa",
+		  children[0].res_type,
+		  children[1].res_type,
+		  lineno);
+	    end; -- if
+	 end; -- if
+	 res_type := GLOBALS::bool_typeob_s;
+	 
+      when lt_op_ind, gt_op_ind, le_op_ind, ge_op_ind then 
+	    -- !* Leave it to C or later phases to coerce type
+	 if (not children[0].res_type.arithtype) or 
+	    (not children[1].res_type.arithtype) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(OP_EXPROB_S): Expect arithmetic expressions for comparison"));
+	 end; -- if
+	 res_type := GLOBALS::bool_typeob_s;
+	 
+      when uminus_op_ind, uplus_op_ind then
+	 if (not children[0].res_type.arithtype) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(OP_EXPROB_S): Expect arithmetic expressions"));
+	 end;
+	 res_type := children[0].res_type;
+
+	 -- If arithmetic operator, try to see to the expression is a
+	 --   constant, if the operand is integers.
+      when exp_op_ind, plus_op_ind, minus_op_ind, 
+	 mult_op_ind, divide_op_ind then
+	 
+	 if (not children[0].res_type.arithtype) or
+	    (not children[1].res_type.arithtype) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(OP_EXPROB_S): Expect arithmetic expressions for arithmetic operator"));
+	 end; -- if
+	 res_type := children[0].res_type.resolve_arithtype(children[1].res_type);
+      else
+	 ERR_INFO::format_error_exit(
+	           lineno,
+	           STR::create.s("(OP_EXPROB_S): Unknown operator"));
+      end; -- case
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- NOTE: Verify that the operands are integers.
+--       Otherwise, there is no guarantee of correct evaluation.
+   expr_eval_constant:$CONST_EXPROB_S is
+      if (eval_p) then		-- Already evaluated
+	 res := val;
+	 return;
+      end; -- if
+      
+      case (op_ind)
+      when and_op_ind, or_op_ind, not_op_ind, eq_op_ind,
+           ne_op_ind, lt_op_ind, gt_op_ind, le_op_ind, ge_op_ind then
+	 eval_p := true;
+	 return;
+      when uminus_op_ind, uplus_op_ind then
+	 if not (children[0].res_type.int_type_p) then
+	    eval_p := true;
+	    return;
+	 end; -- if
+      when exp_op_ind, plus_op_ind, minus_op_ind, mult_op_ind,
+	   divide_op_ind then
+	 -- If arithmetic operator, try to see to the expression is a
+	 --   constant, if both operands are integers.
+	 if not (children[0].res_type.int_type_p and children[1].res_type.int_type_p)
+	    then
+	    eval_p := true;
+	    return;
+	 end; -- if
+      end; -- case
+      
+      op1, op2:$CONST_EXPROB_S;
+      -- Default is to return "void"
+      case (op_ind)
+      when uminus_op_ind then
+	 op1 := children[0].expr_eval_constant;
+	 if (op1 /= void) then
+	    res := INT_CONST_EXPROB_S::create((-(op1.val.get_i)).to_s, lineno);
+	 end; -- if
+	 
+      when uplus_op_ind then
+	 op1 := children[0].expr_eval_constant;
+	 if (op1 /= void) then
+	    res := INT_CONST_EXPROB_S::create(op1.val.get_i.to_s, lineno);
+	 end; -- if
+	 
+      when plus_op_ind then
+	 op1 := children[0].expr_eval_constant;
+	 op2 := children[1].expr_eval_constant;
+	 if (op1 /= void) and (op2 /= void) then
+	    res := INT_CONST_EXPROB_S::create((op1.val.get_i + op2.val.get_i).to_s,
+	                                    lineno);
+	 end; -- if
+	 
+      when minus_op_ind then
+	 op1 := children[0].expr_eval_constant;
+	 op2 := children[1].expr_eval_constant;
+	 if (op1 /= void) and (op2 /= void) then
+	    res := INT_CONST_EXPROB_S::create((op1.val.get_i - op2.val.get_i).to_s,
+	                                    lineno);
+	 end; -- if
+	 
+      when mult_op_ind then
+	 op1 := children[0].expr_eval_constant;
+	 op2 := children[1].expr_eval_constant;
+	 if (op1 /= void) and (op2 /= void) then
+	    res := INT_CONST_EXPROB_S::create((op1.val.get_i * op2.val.get_i).to_s,
+	                                    lineno);
+	 end; -- if
+	 
+      when divide_op_ind then
+	 op1 := children[0].expr_eval_constant;
+	 op2 := children[1].expr_eval_constant;
+	 if (op1 /= void) and (op2 /= void) then
+	    res := INT_CONST_EXPROB_S::create((op1.val.get_i / op2.val.get_i).to_s,
+	                                    lineno);
+	 end; -- if
+	 
+      when exp_op_ind then
+	 
+      else
+	 -- Do nothing for all the rest
+      end; -- case
+      eval_p := true;
+      val := res;
+   end; -- expr_eval_constant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_ext_strs is
+      -- Check the children for references to external strings.
+      children.get_ext_strs;
+   end; -- get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      -- Simpler code
+      res := children.gen_temps;
+      if (has_pre_eval_operands) then
+	 i:INT;
+	 s:INT := children.insert;
+	 loop until!(i >= s); 
+	    if (temp_operands[i] > 0) then
+	       if (res /= void) then
+		  res := res.push(temp_operands[i]).push(temp_operands_ctype[i]);
+	       else 
+		  res := LIST{INT}::create(2).push(temp_operands[i]).
+                                          push(temp_operands_ctype[i]);
+	       end; -- if
+	    end; -- if
+	    i := i+1;
+	 end; -- loop
+      end;
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   valid_init_expr:BOOL is
+      case (op_ind) 
+      when and_op_ind, or_op_ind, eq_op_ind,
+	   ne_op_ind, lt_op_ind, gt_op_ind,
+	   le_op_ind, ge_op_ind, plus_op_ind,
+	   minus_op_ind, mult_op_ind, divide_op_ind then
+	 res := children[0].valid_init_expr and
+	        children[1].valid_init_expr;
+      when not_op_ind, uminus_op_ind, uplus_op_ind then
+	 res := children[0].valid_init_expr;
+      else
+	 ERR_INFO::format_error_exit(
+	           lineno,
+	           STR::create.s("(OP_EXPROB_S): Unknown operator"));
+      end; -- case
+   end; -- valid_init_expr
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private cprint_ith_child_pre_code(i:INT; outfile:SAT_OUTFILE) is
+      -- Either 
+      -- a.  the operand has to be evaluated into a local temporary, or
+      -- b.  only generate the preliminary code for the operand.
+      -- Assume that the range of i is valid.
+      ith_child:$EXPROB_S := children[i];
+      ith_temp:INT := temp_operands[i];
+      ith_child.cprint_pre_code(outfile);
+      if (ith_temp > 0) then
+	 outfile.indent;
+	 GLOBAL_PROC::cprint_ctemp_name(ith_temp, outfile);
+	 outfile.s(" = ");
+	 ith_child.cprint_act_code(outfile);
+	 outfile.s(";\n").inc_ln(1);
+      end; -- if
+   end; -- cprint_ith_child_pre_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private cprint_ith_child_act_code(i:INT; outfile:SAT_OUTFILE) is
+      -- Either
+      -- a.  print the local variable containing the result of operand, or
+      -- b.  only generate the actual code for the operand.
+      -- Assume that the range of i is valid.
+      ith_temp:INT := temp_operands[i];
+      if (ith_temp > 0) then
+	 GLOBAL_PROC::cprint_ctemp_name(ith_temp, outfile);
+      else
+	 children[i].cprint_act_code(outfile);
+      end; -- if 
+   end; -- cprint_ith_child_act_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_pre_code(outfile:SAT_OUTFILE) is
+      case (op_ind)
+      when and_op_ind, or_op_ind, eq_op_ind,
+           ne_op_ind, lt_op_ind, gt_op_ind,
+           le_op_ind, ge_op_ind, exp_op_ind, 
+	   plus_op_ind, minus_op_ind, mult_op_ind,
+           divide_op_ind then
+	 cprint_ith_child_pre_code(0, outfile);
+	 cprint_ith_child_pre_code(1, outfile);
+      when not_op_ind, uminus_op_ind, uplus_op_ind then
+	 cprint_ith_child_pre_code(0, outfile);
+      end; -- case
+   end; -- cprint_pre_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_act_code(outfile:SAT_OUTFILE) is
+      cprint_cast_code(outfile);
+      outfile.c('(');
+      case (op_ind)
+      when and_op_ind then
+	 cprint_ith_child_act_code(0, outfile);
+	 outfile.s(" & ");
+	 cprint_ith_child_act_code(1, outfile);
+      when or_op_ind then
+	 cprint_ith_child_act_code(0, outfile);
+	 outfile.s(" | ");
+	 cprint_ith_child_act_code(1, outfile);
+      when not_op_ind then
+	 outfile.s("! ");
+	 cprint_ith_child_act_code(0, outfile);
+      when eq_op_ind then
+	 cprint_ith_child_act_code(0, outfile);
+	 outfile.s(" == ");
+	 cprint_ith_child_act_code(1, outfile);
+      when ne_op_ind then
+	 cprint_ith_child_act_code(0, outfile);
+	 outfile.s(" != ");
+	 cprint_ith_child_act_code(1, outfile);
+      when lt_op_ind then
+	 cprint_ith_child_act_code(0, outfile);
+	 outfile.s(" < ");
+	 cprint_ith_child_act_code(1, outfile);
+      when gt_op_ind then
+	 cprint_ith_child_act_code(0, outfile);
+	 outfile.s(" > ");
+	 cprint_ith_child_act_code(1, outfile);
+      when le_op_ind then
+	 cprint_ith_child_act_code(0, outfile);
+	 outfile.s(" <= ");
+	 cprint_ith_child_act_code(1, outfile);
+      when ge_op_ind then
+	 cprint_ith_child_act_code(0, outfile);
+	 outfile.s(" >= ");
+	 cprint_ith_child_act_code(1, outfile);
+      when uminus_op_ind then
+	 outfile.s("- ");
+	 cprint_ith_child_act_code(0, outfile);
+      when uplus_op_ind then
+	 cprint_ith_child_act_code(0, outfile);
+
+      -- Binary arithmetic operators.  
+      -- *!For now, use the same semantics as in C, but may change
+      --   later.
+      when exp_op_ind then
+	 outfile.s("/* '^' not supported */");
+      when plus_op_ind then
+	 cprint_ith_child_act_code(0, outfile);
+	 outfile.s(" + ");
+	 cprint_ith_child_act_code(1, outfile);
+      when minus_op_ind then
+	 cprint_ith_child_act_code(0, outfile);
+	 outfile.s(" - ");
+	 cprint_ith_child_act_code(1, outfile);
+      when mult_op_ind then
+	 cprint_ith_child_act_code(0, outfile);
+	 outfile.s(" * ");
+	 cprint_ith_child_act_code(1, outfile);
+      when divide_op_ind then
+	 cprint_ith_child_act_code(0, outfile);
+	 outfile.s(" / ");
+	 cprint_ith_child_act_code(1, outfile);
+      end; -- case
+      outfile.c(')');
+   end; -- cprint_act_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_init_code(outfile:SAT_OUTFILE) is
+      children.cprint_init_code(outfile);
+   end; -- cprint_init_code
+
+end; -- class OP_EXPROB_S
+
+--------------------------------------------------------------------
+
+class AREF_EXPROB_S is
+   -- Array references.  
+   EXPROB_S;
+   
+   attr array:$EXPROB_S;
+   -- An ID_EXPROB_S is created if the construct is of the form "[i]".
+
+   attr indices:LST_EXPROB_S;
+   -- This is guaranteed to be non-void from the construction of the
+   -- parse tree.
+
+   -- Each index expression will hold its own temporary for dispatch and
+   -- other purposes.  Hence if we want to check the array bounds, the array
+   -- expression has to hold the temporary names for the actual values of
+   -- the indices.  The temporary variables also hold the size of array.
+   -- If ith variable holds the index, (i+1)th variable holds the bound
+   -- value.
+   attr ind_temp_names:ARRAY{INT};
+   
+   attr temp_name:INT;
+   attr temp_ctype:INT;
+      -- Temporary variable to hold the value of object returned before
+      -- array access, ie value and type of the array object.
+   
+   attr typeholder_name:INT;
+   attr typeholder_ctype:INT;
+      -- Static variable to hold the Sather type of last accessed object
+   
+   attr dispval_name:INT;
+   attr dispval_ctype:INT;
+      --  Static variable to hold the base size of the type of object
+
+   attr temp_name_tpchk:INT;
+   attr temp_ctype_tpchk:INT;
+   -- Temporary variable (and C type of temporary variable) to hold result
+   -- of array access so that the type of the result can be checked (if
+   -- runtime type-checking is requested).
+   
+   attr temp_indices_val:ARRAY{INT};
+      -- List of temporaries to hold the index values for indexing into
+      -- array.  (All the values have integer type, so we do not need
+      -- an array to hold the type.)  Since the maximum size is 4, we
+      -- create an array of size 4, when the "create" routine is called.
+   attr has_pre_eval_indices:BOOL;
+      -- A simple flag which when set to "false", will allow operations
+      -- involving the operations on temporary variables (for index values)
+      -- kept in "temp_indices_val" to be bypassed.
+   
+   attr printed_times:INT;
+   -- The value is greater than 0 if the runtime type-checking code is already
+   -- generated, ie the code to compute value of the expression is already 
+   -- generated.  This is the number of times this node has been printed; it
+   -- should be less than or equal than the global variable "g_tag".
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(arr:$EXPROB_S; inds:LST_EXPROB_S; ln:INT):SAME is
+      res := new;
+      if (arr = void) then
+	 res.array := ID_EXPROB_S::create(RESERVED_WORDS::self_ind, ln);
+      else
+	 res.array := arr;
+      end; -- if
+      res.indices := inds;
+      res.lineno := ln;
+      res.temp_indices_val := ARRAY{INT}::new(4);
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+      res := STR::create.s(array.sather_code).c('[').s(indices.sather_code).c(']');
+   end; -- sather_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   out_of_line(fn: STR) is
+      -- update line info to refer to original file `fn' rather
+      -- than the current context in which this construct is
+      -- used to compose code.
+      lineno := ERR_INFO::out_of_line_err_info(fn,lineno);
+      array.out_of_line(fn);
+      indices.out_of_line(fn);
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      if (array /= void) then
+	 res := create(array.dup, indices.dup, lineno);
+      else
+	 res := create(void, indices.dup, lineno);
+      end; -- if
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      if (array /= void) then
+	 array.resolve_predef_types(index);
+      end; -- if
+      indices.resolve_predef_types(index);
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   valid_init_expr:BOOL is
+      res := array.valid_init_expr and
+             indices.valid_init_expr;
+      -- If we have "constant x:INT := self[i];", obviously "self[i]" is not
+      -- a valid expression for initializing the constant.
+   end; -- valid_init_expr
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      atype:$TYPEOB_S; 
+      array.semant(symtab);
+      atype := array.res_type;
+      if (atype = void) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(AREF_EXPROB_S): Referencing unknown array type"));
+	 array.res_type := GLOBALS::array_typeob_s;
+	 atype := GLOBALS::array_typeob_s;
+      end; -- if
+
+      -- We cannot use array access on foreign objects.
+      inst_tp:INSTANT_TYPEOB_S := atype;
+      if (inst_tp.my_basic_type = RESERVED_CLASSES::FOB_ici) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(AREF_EXPROB_S): Invalid array access on foreign object (").s(atype.inst_cls.full_name).c(')'));
+      end; -- if
+      
+      indices.semant(symtab);
+      isz:INT;
+      if (indices /= void) then
+	 isz := indices.insert;
+      end; -- if
+
+      -- Rather than checking for whether any of the resultant types of
+      -- the indices is void later, we do it in one place.
+      i:INT;
+      loop until!(i >= isz);
+	 if (indices[i].res_type = void) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(AREF_EXPROB_S): Index #").
+	                       i(i+1).s(" has no return type"));
+	    indices[i].res_type := GLOBALS::ob_typeob_s;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+
+      if (isz /= atype.inst_cls.arrdim) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(AREF_EXPROB_S): Dimension of class is not the same as number of indices\n"));
+      end; -- if
+	 
+      if (atype.is_dispatched) then
+	 i:INT;
+	 loop until!(i >= isz);
+	    if not (indices[i].access_value_only) then
+	       temp_indices_val[i] := GLOBAL_PROC::global_key;
+	       has_pre_eval_indices := true;
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+      else
+	 i:INT;
+	 loop until!(i >= isz);
+	    if (indices[i].to_be_pre_evaluated) then
+	       temp_indices_val[i] := GLOBAL_PROC::global_key;
+	       has_pre_eval_indices := true;
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+      end; -- if
+	 
+      i:INT := 0;
+      loop until!(i >= isz);
+	 if not (indices[i].res_type.int_type_p) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(AREF_EXPROB_S): Array reference #(").
+	                       i(i + 1).s(") has non-integer index"));
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+	 
+	 -- The type of the array reference is the type of the element of
+	 --   array.
+      res_type := atype.inst_cls.elem_type;
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   assignable_p:BOOL is
+      -- All array references are assignable.
+      res := true;
+   end; -- assignable_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      -- This routine should only be called after the type has been 
+      --   resolved, so that the value of "res_type" is correct.
+      if (temp_name < 0) or (res_type = void) then
+	 -- No temporaries generated 
+      elsif (temp_name = 0) then
+	 -- We are concerned with if the array is dispatched, not the
+	 -- result of the array reference.
+	 if (array /= void) then
+	    if (array.res_type.is_dispatched) then
+	       -- Temporary holding the variable
+	       temp_name := GLOBAL_PROC::global_key;
+	       temp_ctype := array.res_type.ctype;
+		  -- We get the type of the array , not its element.
+	       
+	       -- Static variables holding the type and base size of the
+	       --   object last accessed
+	       typeholder_name := GLOBAL_PROC::global_key;
+	       typeholder_ctype := C_TYPE_CONST::c_int;
+	       dispval_name := GLOBAL_PROC::global_key;
+	       dispval_ctype := C_TYPE_CONST::c_int;
+	       res := LIST{INT}::create(6).push(temp_name).
+	                               push(temp_ctype).
+	                               push(-typeholder_name).
+	                               push(typeholder_ctype).
+	                               push(-dispval_name).
+	                               push(dispval_ctype);
+	    else
+	       -- This indicates that we have checked that no temporary is
+	       --   needed.
+	       if (indices.insert < 2) then
+		  temp_name := -1;	
+	       else
+		  temp_name := GLOBAL_PROC::global_key;
+		  temp_ctype := array.res_type.ctype;
+		  -- We get the type of the array , not its element.
+		  res := LIST{INT}::create(2).push(temp_name).
+		                             push(temp_ctype);
+	       end; -- if
+	    end; -- if
+	 else
+	    temp_name := -1;
+	 end; -- if
+      else
+	 res := LIST{INT}::create(6).push(temp_name).
+	                         push(temp_ctype);
+	 -- We do separate checks because in the case of non-dispatched array 
+	 -- references, when the dimension is 2 or more, we have to generate 
+	 -- only temporary variables to hold the array.
+	 if (typeholder_name > 0) then
+	    res := res.push(-typeholder_name).
+	               push(typeholder_ctype);
+	 end; -- if 
+	 if (dispval_name > 0) then
+	    res := res.push(-dispval_name).
+	               push(dispval_ctype);
+	 end; -- if
+      end; -- if
+
+      -- At this point, if no temporary is generated, "temp_name" is equal
+      -- to -1.  If that is the case, we check if a runtime void check is
+      -- required.  If void check is required, we generate a temporary 
+      -- variable regardless.
+      if (temp_name = -1) then
+	 if (GLOBAL_PROC::check_is_on) then
+	    temp_name := GLOBAL_PROC::global_key;
+	    temp_ctype := array.res_type.ctype;
+	    
+	    -- By doing some flow analysis (textually), "res" should be
+	    -- void at this point.
+	    res := LIST{INT}::create(2).push(temp_name).push(temp_ctype);
+	 end; -- if
+      end; -- if
+      
+      -- Now check if we need to generate temporary variables to hold the
+      -- actual values of the indices.
+      if (GLOBAL_PROC::check_is_on) then
+	 num_temp_names:INT;
+	 if (indices /= void) then
+	    num_temp_names := indices.insert * 2;
+	 end; -- if
+	 ind_temp_names := ARRAY{INT}::new(num_temp_names);
+	 if (num_temp_names > 0) and (res = void) then
+	    res := LIST{INT}::create(num_temp_names);
+	 end; -- if
+	 i:INT := 0;
+	 loop until!(i >= num_temp_names);
+	    tmp_ind:INT := GLOBAL_PROC::global_key;
+	    ind_temp_names[i] := tmp_ind;
+	    res := res.push(tmp_ind).push(C_TYPE_CONST::c_int);
+	    i := i + 1;
+	 end; -- loop
+      end; -- if
+      
+      if (res = void) then
+	 res := indices.gen_temps;
+      else
+	 res := res.append(indices.gen_temps);
+      end; -- if
+      if (res = void) then
+	 res := array.gen_temps;
+      else
+	 res := res.append(array.gen_temps);
+      end; -- if
+      
+      if (GLOBAL_PROC::check_is_on) then
+	 -- Generate the temporary variable to hold result of current 
+	 -- expression while its type is checked during runtime.
+	 if (rt_type /= 0) then
+	    temp_name_tpchk := GLOBAL_PROC::global_key;
+	    temp_ctype_tpchk := res_type.ctype;
+	    if (res /= void) then
+	       res := res.push(temp_name_tpchk).push(temp_ctype_tpchk);
+	    else
+	       res := LIST{INT}::create(2).push(temp_name_tpchk).
+	                               push(temp_ctype_tpchk);
+	    end; -- if
+	 end; -- if
+      end; -- if
+      
+      -- The temporaries to be generated include those for holding the
+      -- pre-evaluated index values (due to requirement of dispatching
+      -- mechanism).
+      -- NOTE: We can merge the two list of temporary names for bound-
+      -- check and pre-evaluation (in dispatch), but this will make the
+      -- code difficult to understand.
+      if (has_pre_eval_indices) then
+	 i:INT := 0;
+	 sz:INT := indices.insert;
+	 loop until!(i >= sz);
+	    if (temp_indices_val[i] > 0) then
+	       if (res /= void) then
+		  res := res.push(temp_indices_val[i]).
+		             push(C_TYPE_CONST::c_int);
+	       else
+		  res := LIST{INT}::create(2).push(temp_indices_val[i]).
+		                          push(C_TYPE_CONST::c_int);
+	       end; -- if
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+      end; -- if
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_ext_strs is
+      array.get_ext_strs;
+      indices.get_ext_strs;	-- "indices" is guaranteed to be non-void.
+      
+   end; -- get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   to_be_pre_evaluated:BOOL is
+      -- This array expression must be pre-evaluated, if the object type is
+      -- the type of the array is dispatched.  Eg, if we have x:$FOO and
+      -- x[1,2] used in f(x[1,2]), then this expression must be pre-evaluated.
+      res := array.res_type.is_dispatched;
+   end; -- to_be_pre_evaluated
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   access_value_only:BOOL is
+      -- The array expression "expr[...]" is value-access only to the extent
+      -- that "expr" is value-access only.
+      res := array.access_value_only;
+   end; -- access_value_only
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private cprint_ith_index_pre_code(i:INT; outfile:SAT_OUTFILE) is
+      -- Either 
+      -- a.  Print the preliminary code for ith index expression, or
+      -- b.  Print the preliminary and actual code for ith index expression,
+      --     storing the result in a temporary.
+      indices[i].cprint_pre_code(outfile);
+      if (temp_indices_val[i] > 0) then
+	 outfile.indent;
+	 GLOBAL_PROC::cprint_ctemp_name(temp_indices_val[i], outfile);
+	 outfile.s(" = ");
+	 indices[i].cprint_act_code(outfile);
+	 outfile.s(";\n").inc_ln(1);
+      end; -- if
+   end; -- cprint_ith_index_pre_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private cprint_ith_index_act_code(i:INT; outfile:SAT_OUTFILE) is
+      -- Print the code to get the ith index value.  Either
+      -- a.  Print the actual code for ith index expression.
+      -- b.  Print the temporary holding the value of ith index.
+      ith_temp:INT := temp_indices_val[i];
+      if (ith_temp > 0) then
+	 GLOBAL_PROC::cprint_ctemp_name(ith_temp, outfile);
+      else
+	 indices[i].cprint_act_code(outfile);
+      end; -- if
+   end; -- cprint_ith_index_act_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_pre_code(outfile:SAT_OUTFILE) is
+      i:INT := 0;
+      isz:INT;
+      if (indices /= void) then
+	 isz := indices.insert;
+      end; -- if
+      loop until!(i >= isz);
+	 cprint_ith_index_pre_code(i, outfile);
+	 i := i + 1;
+      end; -- loop
+
+      -- Important:
+      -- The preliminary code is executed just before it is being used.
+      -- This is to prevent a change in any computed dispatch value when
+      -- the indices are evaluated.
+      array.cprint_pre_code(outfile);
+      if (array.res_type.is_dispatched) then
+	 outfile.indent;
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(" = ");
+	 array.cprint_act_code(outfile);
+	 outfile.s(";\n").inc_ln(1);
+	 
+	 if (GLOBAL_PROC::check_is_on) then
+	    PRINT_C_CODE::cprint_void_tst(outfile, cont54, self);
+	 end; -- if
+	 PRINT_C_CODE::cprint_array_dispatch(outfile, cont53, self);
+      else
+	 if (isz >= 2) then
+	    outfile.indent;
+	    GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	    outfile.s(" = ");
+	    array.cprint_act_code(outfile);
+	    outfile.s(";\n").inc_ln(1);
+	 else
+	    if (GLOBAL_PROC::check_is_on) then -- (*)
+	       outfile.indent;
+	       GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	       outfile.s(" = ");
+	       array.cprint_act_code(outfile);
+	       outfile.s(";\n").inc_ln(1);
+	    end; -- if
+	 end; -- if
+	 
+         -- We only need to verify if void check is requested.  If array
+	 -- object is already in a temporary (because of being dispatched or
+	 -- or of 2- or more dimensional), then everything's ok.  If not,
+	 -- then the part (*) will generate the code to put the array object
+	 -- in the temporary.  Note the places where void check code is
+	 -- generated.  We only come here in the non-dispatched case, because
+	 -- in the dispatch case, we have to check for void because doing
+	 -- the "array_dispatch_" to get base size.
+	 if (GLOBAL_PROC::check_is_on) then
+	    PRINT_C_CODE::cprint_void_tst(outfile, cont54, self);
+	 end; -- if
+      end; -- if
+      
+      -- After checking the array object, if runtime array bound check
+      -- is needed, compute the actual index value into the temporary
+      -- variables (for indices) and check.
+      if (GLOBAL_PROC::check_is_on) then
+	 i,j:INT := 0;
+	 num_temp_names:INT := isz * 2;
+	 loop until!(i >= num_temp_names);
+	    outfile.indent;
+	    GLOBAL_PROC::cprint_ctemp_name(ind_temp_names[i], outfile);
+	    outfile.s(" = ");
+	    cprint_ith_index_act_code(j, outfile); j := j + 1;
+	    outfile.s(";\n").inc_ln(1);
+	    
+	       -- Compute the bound and store it in a temporary variable
+	    outfile.indent;
+	    GLOBAL_PROC::cprint_ctemp_name(ind_temp_names[i + 1], outfile);
+	    outfile.s(" = ");
+	    
+	       -- Look at current index being examined and decide 
+	       -- the continuation code to be passed to print corresponding
+	       -- bound to be checked.  We need to check if type of object
+	       -- is dispatched or not (in the former case, the base size is
+               -- obtained during runtime).  
+	    
+	       -- NOTE: The alternative is to make the print routine check
+	       --       whether the type is dispatched.
+	    c_code:INT;
+	    if (array.res_type.is_dispatched) then
+	       case (i)
+	       when 0 then c_code := cont55; -- Print "asize"
+	       when 2 then c_code := cont56; -- Print "asize2"
+	       when 4 then c_code := cont57; -- Print "asize3"
+	       when 6 then c_code := cont58; -- Print "asize4"
+	       else ERR_INFO::compiler_error_msg("AREF_EXPROB_S",
+		  "Too many indices");
+	       end; -- case
+	    else
+	       case (i)
+	       when 0 then c_code := cont59; -- Print "asize"
+	       when 2 then c_code := cont60; -- Print "asize2"
+	       when 4 then c_code := cont61; -- Print "asize3"
+	       when 6 then c_code := cont62; -- Print "asize4"
+	       else ERR_INFO::compiler_error_msg("AREF_EXPROB_S", "Too many indices");
+	       end; -- case
+	    end; -- if
+	    PRINT_C_CODE::cprint_int_attr_access(outfile, c_code, self);
+	    outfile.s(";\n").inc_ln(1);
+	    
+	    PRINT_C_CODE::cprint_arr_bound_tst(i, ind_temp_names[i], 
+	                                       ind_temp_names[i+1],
+	                                       outfile, lineno);
+	    i := i + 2;
+	 end; -- loop
+      end; -- if
+
+      -- If runtime type-checking is requested, compute the array element
+      -- (note that previous checks are on the array, not array element),
+      -- and check the type of the array element.
+      if (GLOBAL_PROC::check_is_on) then
+	 if (rt_type /= 0) then
+	    GLOBAL_PROC::cprint_curr_exp_code(self, temp_name_tpchk, outfile);
+	 end; -- if
+      end; -- if
+   end; -- cprint_pre_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Continuation codes
+-- Access to dispatched arrays
+   const cont1:INT := 1;
+      -- Access to 1-dimensional array element of any type
+      
+   const cont6:INT := 6;
+      -- Access to 2-dimensional array element of any type
+      
+   const cont11:INT := 11;
+      -- Access to base of array storing 2nd dimension (of 2-dimensional array)
+      
+   const cont12:INT := 12;
+      -- Access to 3-dimensional array element of any type
+
+   const cont17:INT := 17;
+      -- Access to base of array storing 3rd dimension (of 3-dimensional array)
+   const cont18:INT := 18;
+      -- Access to base of 1st-dimensional array storing 2nd-dimension base 
+      -- offsets (of 3-dimensional array)
+      
+   const cont19:INT := 19;
+      -- Access to 4-dimensional array element of any type
+
+   const cont24:INT := 24;
+      -- Access to base of array storing 4th dimension (of 4-dimensional array)
+   const cont25:INT := 25;
+      -- Access to base of 2nd-dimensional array storing 3rd-dimension base 
+      -- offsets (of 4-dimensional array)
+   const cont26:INT := 26;
+      -- Access to base of 1st-dimensional array storing 2nd-dimension base 
+      -- offsets (of 4-dimensional array)
+      
+-- Access to non-dispatched arrays
+   const cont27:INT := 27;
+      -- Access to 1-dimensional array element of any type
+
+   const cont32:INT := 32;
+      -- Access to 2-dimensional array element of any type
+
+   const cont37:INT := 37;
+      -- Access to base of array storing 2nd dimension (of 2-dimensional array)
+      
+   const cont38:INT := 38;
+      -- Access to 3-dimensional array element of any type
+
+   const cont43:INT := 43;
+      -- Access to base of array storing 3rd dimension (of 3-dimensional array)
+   const cont44:INT := 44;
+      -- Access to base of 1st-dimensional array storing 2nd-dimension base 
+      -- offsets (of 3-dimensional array)
+      
+   const cont45:INT := 45;
+      -- Access to 4-dimensional array element of any type
+
+   const cont50:INT := 50;
+      -- Access to base of array storing 4th dimension (of 4-dimensional array)
+   const cont51:INT := 51;
+      -- Access to base of 2nd-dimensional array storing 3rd-dimension base 
+      -- offsets (of 4-dimensional array)
+   const cont52:INT := 52;
+      -- Access to base of 1st-dimensional array storing 2nd-dimension base 
+      -- offsets (of 4-dimensional array)
+   const cont53:INT := 53;
+      -- Print parameters for getting base size of array
+   const cont54:INT := 54;
+      -- Print temporary variable name
+
+-- Assume array object is already stored in a temporary variable.
+   const cont55:INT := 55;	-- Access to "asize1" of dispatched array
+   const cont56:INT := 56;	-- Access to "asize2" of dispatched array
+   const cont57:INT := 57;	-- Access to "asize3" of dispatched array
+   const cont58:INT := 58;	-- Access to "asize4" of dispatched array
+     
+   const cont59:INT := 59;	-- Access to "asize1" of non-dispatched array
+   const cont60:INT := 60;	-- Access to "asize2" of non-dispatched array
+   const cont61:INT := 61;	-- Access to "asize3" of non-dispatched array
+   const cont62:INT := 62;	-- Access to "asize4" of non-dispatched array
+      
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cont_cprint_code(outfile:SAT_OUTFILE; cont:INT) is
+      case (cont)
+-- Related to 1-dimensional array
+      when cont1 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", INTVAL_(");
+	 GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+	 outfile.s(") + sizeof(int) + ");
+
+	 case (res_type.ctype) 
+	 when (C_TYPE_CONST::c_ptr) then 
+	    cprint_index(0, C_TYPE_CONST::c_ptr_size, outfile);
+	 when (C_TYPE_CONST::c_int) then 
+	    cprint_index(0, C_TYPE_CONST::c_int_size, outfile);
+	 when (C_TYPE_CONST::c_char) then 
+	    cprint_index(0, C_TYPE_CONST::c_char_size, outfile);
+	 when (C_TYPE_CONST::c_float) then 
+	    cprint_index(0, C_TYPE_CONST::c_float_size, outfile);
+	 when (C_TYPE_CONST::c_double) then 
+	    cprint_index(0, C_TYPE_CONST::c_double_size, outfile);
+	 end; -- case
+	 
+-- Related to 2-dimensional array
+      when cont6 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", ");
+	    -- Compute base of 2nd dimension
+	 PRINT_C_CODE::cprint_int_attr_access(outfile, cont11, self);
+	 outfile.s(" + ");
+	 
+	 case (res_type.ctype)
+	 when (C_TYPE_CONST::c_ptr) then 
+	    cprint_index(1, C_TYPE_CONST::c_ptr_size, outfile);
+	 when (C_TYPE_CONST::c_int) then 
+	    cprint_index(1, C_TYPE_CONST::c_int_size, outfile);
+	 when (C_TYPE_CONST::c_char) then 
+	    cprint_index(1, C_TYPE_CONST::c_char_size, outfile);
+	 when (C_TYPE_CONST::c_float) then 
+	    cprint_index(1, C_TYPE_CONST::c_float_size, outfile);
+	 when (C_TYPE_CONST::c_double) then 
+	    cprint_index(1, C_TYPE_CONST::c_double_size, outfile);
+	 end; -- case
+	 
+      -- Compute base of array storing 2nd-dimension
+      when cont11 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", INTVAL_(");
+	 GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+	 outfile.s(") + 8 + ");
+	 cprint_index(0, C_TYPE_CONST::c_int_size, outfile);
+	 
+-- Related to 3-dimensional array
+      when cont12 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", ");
+	    -- Compute base of 3rd-dimension 
+	 PRINT_C_CODE::cprint_int_attr_access(outfile, cont17, self);
+	 outfile.s(" + ");
+	 
+	 case (res_type.ctype) 
+	 when (C_TYPE_CONST::c_ptr) then 
+	    cprint_index(2, C_TYPE_CONST::c_ptr_size, outfile);
+	 when (C_TYPE_CONST::c_int) then 
+	    cprint_index(2, C_TYPE_CONST::c_int_size, outfile);
+	 when (C_TYPE_CONST::c_char) then 
+	    cprint_index(2, C_TYPE_CONST::c_char_size, outfile);
+	 when (C_TYPE_CONST::c_float) then 
+	    cprint_index(2, C_TYPE_CONST::c_float_size, outfile);
+	 when (C_TYPE_CONST::c_double) then 
+	    cprint_index(2, C_TYPE_CONST::c_double_size, outfile);
+	 end; -- case
+	 
+      -- Compute base of 3rd-dimension
+      when cont17 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", ");
+	 PRINT_C_CODE::cprint_int_attr_access(outfile, cont18, self);
+	 outfile.s(" + ");
+	 cprint_index(1, C_TYPE_CONST::c_int_size, outfile);
+
+      -- Compute base of array storing 2nd-dimensional base offsets
+      when cont18 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", INTVAL_(");
+	 GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+	 outfile.s(") + 12 + ");
+	 cprint_index(0, C_TYPE_CONST::c_int_size, outfile);
+	 
+-- Related to 4-dimensional array
+      when cont19 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", ");
+	    -- Compute base of 4th-dimension
+	 PRINT_C_CODE::cprint_int_attr_access(outfile, cont24, self);
+	 outfile.s(" + ");
+	 
+	 case (res_type.ctype)
+	 when (C_TYPE_CONST::c_ptr) then 
+	    cprint_index(3, C_TYPE_CONST::c_ptr_size, outfile);
+	 when (C_TYPE_CONST::c_int) then 
+	    cprint_index(3, C_TYPE_CONST::c_int_size, outfile);
+	 when (C_TYPE_CONST::c_char) then 
+	    cprint_index(3, C_TYPE_CONST::c_char_size, outfile);
+	 when (C_TYPE_CONST::c_float) then 
+	    cprint_index(3, C_TYPE_CONST::c_float_size, outfile);
+	 when (C_TYPE_CONST::c_double) then 
+	    cprint_index(3, C_TYPE_CONST::c_double_size, outfile);
+	 end; -- case
+
+      -- Compute base of 4th-dimension
+      when cont24 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", ");
+	 PRINT_C_CODE::cprint_int_attr_access(outfile, cont25, self);
+	 outfile.s(" + ");
+	 cprint_index(2, C_TYPE_CONST::c_int_size, outfile);
+	 
+      -- Compute base of array storing 3nd-dimensional base offsets
+      when cont25 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", ");
+	 PRINT_C_CODE::cprint_int_attr_access(outfile, cont26, self);
+	 outfile.s(" + ");
+	 cprint_index(1, C_TYPE_CONST::c_int_size, outfile);
+	 
+      -- Compute base of array storing 2nd-dimensional base offsets
+      when cont26 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", INTVAL_(");
+	 GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+	 outfile.s(") + 16 + ");
+	 cprint_index(0, C_TYPE_CONST::c_int_size, outfile);
+	 
+-- Related to 1-dimensional non-dispatched array 
+      when cont27 then
+	 if (GLOBAL_PROC::check_is_on) then
+	    GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 else
+	    array.cprint_act_code(outfile);
+	 end; -- if
+	 outfile.s(", ").
+	         i(array.res_type.inst_cls.base_size+4).
+	         s(" + ");
+
+	 case (res_type.ctype)
+	 when (C_TYPE_CONST::c_ptr) then 
+	    cprint_index(0, C_TYPE_CONST::c_ptr_size, outfile);
+	 when (C_TYPE_CONST::c_int) then 
+	    cprint_index(0, C_TYPE_CONST::c_int_size, outfile);
+	 when (C_TYPE_CONST::c_char) then 
+	    cprint_index(0, C_TYPE_CONST::c_char_size, outfile);
+	 when (C_TYPE_CONST::c_float) then 
+	    cprint_index(0, C_TYPE_CONST::c_float_size, outfile);
+	 when (C_TYPE_CONST::c_double) then 
+	    cprint_index(0, C_TYPE_CONST::c_double_size, outfile);
+	 end; -- case
+
+-- Related to 2-dimensional non-dispatched array 
+      when cont32 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", ");
+	    -- Compute base of 2nd dimension
+	 PRINT_C_CODE::cprint_int_attr_access(outfile, cont37, self);
+	 outfile.s(" + ");
+
+	 case (res_type.ctype) 
+	 when (C_TYPE_CONST::c_ptr) then 
+	    cprint_index(1, C_TYPE_CONST::c_ptr_size, outfile);
+	 when (C_TYPE_CONST::c_int) then 
+	    cprint_index(1, C_TYPE_CONST::c_int_size, outfile);
+	 when (C_TYPE_CONST::c_char) then 
+	    cprint_index(1, C_TYPE_CONST::c_char_size, outfile);
+	 when (C_TYPE_CONST::c_float) then 
+	    cprint_index(1, C_TYPE_CONST::c_float_size, outfile);
+	 when (C_TYPE_CONST::c_double) then 
+	    cprint_index(1, C_TYPE_CONST::c_double_size, outfile);
+	 end; -- case
+
+      when cont37 then
+         GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+         outfile.s(", ").
+                 i(array.res_type.inst_cls.base_size+8).
+                 s(" + ");
+         cprint_index(0, C_TYPE_CONST::c_int_size, outfile);
+
+---- Related to 3-dimensional non-dispatched array 
+      when cont38 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", ");
+	    -- Compute base of 3rd-dimension 
+	 PRINT_C_CODE::cprint_int_attr_access(outfile, cont43, self);
+	 outfile.s(" + ");
+
+	 case (res_type.ctype)
+	 when (C_TYPE_CONST::c_ptr) then 
+	    cprint_index(2, C_TYPE_CONST::c_ptr_size, outfile);
+	 when (C_TYPE_CONST::c_int) then 
+	    cprint_index(2, C_TYPE_CONST::c_int_size, outfile);
+	 when (C_TYPE_CONST::c_char) then 
+	    cprint_index(2, C_TYPE_CONST::c_char_size, outfile);
+	 when (C_TYPE_CONST::c_float) then 
+	    cprint_index(2, C_TYPE_CONST::c_float_size, outfile);
+	 when (C_TYPE_CONST::c_double) then 
+	    cprint_index(2, C_TYPE_CONST::c_double_size, outfile);
+	 end; -- case
+
+      -- Compute base of 3rd-dimension
+      when cont43 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", ");
+	 PRINT_C_CODE::cprint_int_attr_access(outfile, cont44, self);
+	 outfile.s(" + ");
+	 cprint_index(1, C_TYPE_CONST::c_int_size, outfile);
+	 
+      -- Compute base of array storing 2nd-dimensional base offsets
+      when cont44 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", ").
+	         i(array.res_type.inst_cls.base_size+12).
+	         s(" + ");
+	 cprint_index(0, C_TYPE_CONST::c_int_size, outfile);
+
+-- Related to 4-dimensional non-dispatched array 
+      when cont45 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", ");
+	    -- Compute base of 4th-dimension
+	 PRINT_C_CODE::cprint_int_attr_access(outfile, cont50, self);
+	 outfile.s(" + ");
+
+	 case (res_type.ctype)
+	 when (C_TYPE_CONST::c_ptr) then 
+	    cprint_index(3, C_TYPE_CONST::c_ptr_size, outfile);
+	 when (C_TYPE_CONST::c_int) then 
+	    cprint_index(3, C_TYPE_CONST::c_int_size, outfile);
+	 when (C_TYPE_CONST::c_char) then 
+	    cprint_index(3, C_TYPE_CONST::c_char_size, outfile);
+	 when (C_TYPE_CONST::c_float) then 
+	    cprint_index(3, C_TYPE_CONST::c_float_size, outfile);
+	 when (C_TYPE_CONST::c_double) then 
+	    cprint_index(3, C_TYPE_CONST::c_double_size, outfile);
+	 end; -- case
+	 
+      -- Compute base of 4th-dimension
+      when cont50 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", ");
+	 PRINT_C_CODE::cprint_int_attr_access(outfile, cont51, self);
+	 outfile.s(" + ");
+	 cprint_index(2, C_TYPE_CONST::c_int_size, outfile);
+	 
+      -- Compute base of array storing 3nd-dimensional base offsets
+      when cont51 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", ");
+	 PRINT_C_CODE::cprint_int_attr_access(outfile, cont52, self);
+	 outfile.s(" + ");
+	 cprint_index(1, C_TYPE_CONST::c_int_size, outfile);
+	 
+      -- Compute base of array storing 2nd-dimensional base offsets
+      when cont52 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(", ").
+	         i(array.res_type.inst_cls.base_size+16).
+	         s(" + ");
+	 cprint_index(0, C_TYPE_CONST::c_int_size, outfile);
+	 
+      -- Parameters for getting base size of array
+      when cont53 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.c(',');
+	 GLOBAL_PROC::cprint_ctemp_name(typeholder_name, outfile);
+	 outfile.s(",INTVAL_(");
+	 GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+	 outfile.s(")");
+	 
+      when cont54 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+
+      when cont55 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(",INTVAL_(");
+	 GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+	 outfile.s(")");
+
+      when cont56 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(",INTVAL_(");
+	 GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+	 outfile.s(")+4");
+
+      when cont57 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(",INTVAL_(");
+	 GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+	 outfile.s(")+8");
+
+      when cont58 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(",INTVAL_(");
+	 GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+	 outfile.s(")+12");
+
+      when cont59 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.c(',').i(array.res_type.inst_cls.base_size);
+
+      when cont60 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.c(',').i(array.res_type.inst_cls.base_size+4);
+
+      when cont61 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.c(',').i(array.res_type.inst_cls.base_size+8);
+
+      when cont62 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.c(',').i(array.res_type.inst_cls.base_size+12);
+
+      else
+	 ERR_INFO::compiler_error_msg("AREF_EXPROB_S",
+	           STR::create.s("Unknown continuation #").
+	                    i(cont));
+      end; -- case
+   end; -- cont_cprint_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private cprint_index(i:INT; sz:INT; outfile:SAT_OUTFILE) is
+      -- We want the base size of the array object, not its element.
+
+      outfile.s("((");
+      
+      if (GLOBAL_PROC::check_is_on) then
+	 -- If runtime check is requested, the index value would have
+	 -- been computed in the "cprint_pre_code" for this AREF_EXPROB_S
+	 -- and stored in a temporary variable.  
+	 -- NOTE: The temporary holding an index is alternated with the
+	 --       the temporary holding the bound.  Hence the muliplication
+	 --       by 2 in getting the name of temporary.
+	 
+	 GLOBAL_PROC::cprint_ctemp_name(ind_temp_names[i*2], outfile);
+      else
+	 cprint_ith_index_act_code(i, outfile);
+      end; -- if
+
+      -- Instead of using multplication, it might be cheaper to use
+      -- arithmetic shifts.
+      case (sz)
+      when 1 then
+	 -- Avoid any multiplcation by 1.
+	 outfile.s("))");
+      when 2 then
+	 outfile.s(") << 1)");
+      when 4 then
+	 outfile.s(") << 2)");
+      when 8 then
+	 outfile.s(") << 3)");
+      else
+	 outfile.s(") * ").i(sz).c(')');
+      end; -- case
+   
+   end; -- cprint_index
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_act_code(outfile:SAT_OUTFILE) is
+      if (printed_times > GLOBALS::g_tag) then
+	 if (temp_name_tpchk > 0) then
+	    GLOBAL_PROC::cprint_ctemp_name(temp_name_tpchk, outfile);
+	    return;
+	 else 
+	    ERR_INFO::compiler_error_msg("AREF_EXPROB_S",
+	              STR::create.s("Invalid printing count = ").
+	                       i(printed_times).s(" > ").
+	                       i(GLOBALS::g_tag));
+	 end; -- if
+      end; -- if
+      printed_times := printed_times + 1;
+      
+      isz:INT;
+      if (indices /= void) then
+	 isz := indices.insert;
+      end; -- if
+      cprint_cast_code(outfile);
+      if (array.res_type.is_dispatched) then
+	 -- We are concerned with if the type of array is a
+	 -- dispatched type, not the type of this array reference.
+	 case (isz)
+	 when (1) then
+	    -- Note the 4 additional bytes to the base size to take into
+	    -- account "asize" attribute.
+	    case (res_type.ctype)
+	    when (C_TYPE_CONST::c_ptr) then
+	       PRINT_C_CODE::cprint_ptr_attr_access(outfile, cont1, self);
+
+	    when (C_TYPE_CONST::c_int) then
+	       PRINT_C_CODE::cprint_int_attr_access(outfile, cont1, self);
+
+	    when (C_TYPE_CONST::c_char) then
+	       PRINT_C_CODE::cprint_char_attr_access(outfile, cont1, self);
+
+	    when (C_TYPE_CONST::c_float) then
+	       PRINT_C_CODE::cprint_float_attr_access(outfile, cont1, self);
+
+	    when (C_TYPE_CONST::c_double) then
+	       PRINT_C_CODE::cprint_double_attr_access(outfile, cont1, self);
+
+	    end; -- case
+
+	 when (2) then
+	    case (res_type.ctype)
+	    when (C_TYPE_CONST::c_ptr) then
+	       PRINT_C_CODE::cprint_ptr_attr_access(outfile, cont6, self);
+	       
+	    when (C_TYPE_CONST::c_int) then 
+	       PRINT_C_CODE::cprint_int_attr_access(outfile, cont6, self);
+
+	    when (C_TYPE_CONST::c_char) then
+	       PRINT_C_CODE::cprint_char_attr_access(outfile, cont6, self);
+
+	    when (C_TYPE_CONST::c_float) then
+	       PRINT_C_CODE::cprint_float_attr_access(outfile, cont6, self);
+
+	    when (C_TYPE_CONST::c_double) then
+	       PRINT_C_CODE::cprint_double_attr_access(outfile, cont6, self);
+
+	    end; -- case
+
+	 when (3) then
+	    case (res_type.ctype)
+	    when (C_TYPE_CONST::c_ptr) then
+	       PRINT_C_CODE::cprint_ptr_attr_access(outfile, cont12, self);
+
+	    when (C_TYPE_CONST::c_int) then
+	       PRINT_C_CODE::cprint_int_attr_access(outfile, cont12, self);
+
+	    when (C_TYPE_CONST::c_char) then
+	       PRINT_C_CODE::cprint_char_attr_access(outfile, cont12, self);
+
+	    when (C_TYPE_CONST::c_float) then
+	       PRINT_C_CODE::cprint_float_attr_access(outfile, cont12, self);
+
+	    when (C_TYPE_CONST::c_double) then
+	       PRINT_C_CODE::cprint_double_attr_access(outfile, cont12, self);
+
+	    end; -- case
+
+	 when (4) then
+	    case (res_type.ctype)
+	    when (C_TYPE_CONST::c_ptr) then
+	       PRINT_C_CODE::cprint_ptr_attr_access(outfile, cont19, self);
+
+	    when (C_TYPE_CONST::c_int) then
+	       PRINT_C_CODE::cprint_int_attr_access(outfile, cont19, self);
+
+	    when (C_TYPE_CONST::c_char) then
+	       PRINT_C_CODE::cprint_char_attr_access(outfile, cont19, self);
+
+	    when (C_TYPE_CONST::c_float) then
+	       PRINT_C_CODE::cprint_float_attr_access(outfile, cont19, self);
+
+	    when (C_TYPE_CONST::c_double) then
+	       PRINT_C_CODE::cprint_double_attr_access(outfile, cont19, self);
+
+	    end; -- case
+	 end; -- case 
+      else			-- NON-DISPATCHED
+	 case (isz)
+	    -- We have to note the dimension to take care of extra attributes 
+	    -- such as "asize" etc which are not taken into account in the 
+	    -- base size.
+	 when (1) then
+	    -- Note the 4 additional bytes to the base size to take into
+	    -- account "asize" attribute.
+	    case (res_type.ctype)
+	    when (C_TYPE_CONST::c_ptr) then
+	       PRINT_C_CODE::cprint_ptr_attr_access(outfile, cont27, self);
+	       
+	    when (C_TYPE_CONST::c_int) then
+	       PRINT_C_CODE::cprint_int_attr_access(outfile, cont27, self);
+	       
+	    when (C_TYPE_CONST::c_char) then
+	       PRINT_C_CODE::cprint_char_attr_access(outfile, cont27, self);
+	       
+	    when (C_TYPE_CONST::c_float) then
+	       PRINT_C_CODE::cprint_float_attr_access(outfile, cont27, self);
+	       
+	    when (C_TYPE_CONST::c_double) then
+	       PRINT_C_CODE::cprint_double_attr_access(outfile, cont27, self);
+	       
+	    end; -- case
+	 when (2) then
+	    -- Note the 8 additional bytes to the base size to take into
+	    -- account "asize" attribute.
+	    case (res_type.ctype)
+	    when (C_TYPE_CONST::c_ptr) then
+	       PRINT_C_CODE::cprint_ptr_attr_access(outfile, cont32, self);
+	       
+	    when (C_TYPE_CONST::c_int) then
+	       PRINT_C_CODE::cprint_int_attr_access(outfile, cont32, self);
+	       
+	    when (C_TYPE_CONST::c_char) then
+	       PRINT_C_CODE::cprint_char_attr_access(outfile, cont32, self);
+	       
+	    when (C_TYPE_CONST::c_float) then
+	       PRINT_C_CODE::cprint_float_attr_access(outfile, cont32, self);
+	       
+	    when (C_TYPE_CONST::c_double) then
+	       PRINT_C_CODE::cprint_double_attr_access(outfile, cont32, self);
+	       
+	    end; -- case
+	 when (3) then
+	    -- Note the 12 additional bytes to the base size to take into
+	    -- account "asize"'s attribute.
+	    case (res_type.ctype)
+	    when (C_TYPE_CONST::c_ptr) then
+	       PRINT_C_CODE::cprint_ptr_attr_access(outfile, cont38, self);
+	       
+	    when (C_TYPE_CONST::c_int) then
+	       PRINT_C_CODE::cprint_int_attr_access(outfile, cont38, self);
+	       
+	    when (C_TYPE_CONST::c_char) then
+	       PRINT_C_CODE::cprint_char_attr_access(outfile, cont38, self);
+	       
+	    when (C_TYPE_CONST::c_float) then
+	       PRINT_C_CODE::cprint_float_attr_access(outfile, cont38, self);
+	       
+	    when (C_TYPE_CONST::c_double) then
+	       PRINT_C_CODE::cprint_double_attr_access(outfile, cont38, self);
+	       
+	    end; -- case
+	 when (4) then
+	    -- Note the 16 additional bytes to the base size to take into
+	    -- account "asize"'s attribute.
+	    case (res_type.ctype)
+	    when (C_TYPE_CONST::c_ptr) then
+	       PRINT_C_CODE::cprint_ptr_attr_access(outfile, cont45, self);
+
+	    when (C_TYPE_CONST::c_int) then
+	       PRINT_C_CODE::cprint_int_attr_access(outfile, cont45, self);
+	       
+	    when (C_TYPE_CONST::c_char) then
+	       PRINT_C_CODE::cprint_char_attr_access(outfile, cont45, self);
+	       
+	    when (C_TYPE_CONST::c_float) then
+	       PRINT_C_CODE::cprint_float_attr_access(outfile, cont45, self);
+	       
+	    when (C_TYPE_CONST::c_double) then
+	       PRINT_C_CODE::cprint_double_attr_access(outfile, cont45, self);
+	       
+	    end; -- case
+	 end; -- case
+      end; -- if
+   end; -- cprint_act_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_init_code(outfile:SAT_OUTFILE) is
+      array.cprint_init_code(outfile);
+      indices.cprint_init_code(outfile);
+   end; -- cprint_init_code
+
+end; -- class AREF_EXPROB_S
+
+--------------------------------------------------------------------
+
+class ID_ARGS_EXPROB_S is
+   -- Identifiers with args.
+   EXPROB_S;
+   
+   attr id:INT;			-- Function call
+   attr args:LST_EXPROB_S;
+      -- List of arguments (should not be "void", by definition, but can be empty)
+
+   attr referrent:$SEMANTOB;		-- Referrent of identifier
+      -- Computed in "semant"
+   
+   attr temp_name_tpchk:INT;
+   attr temp_ctype_tpchk:INT;
+   -- Temporary variable (and C type of temporary variable) to hold result
+   -- of routine call so that the type of the result can be checked (if 
+   -- runtime type-checking is required).
+   
+   attr temp_args:ARRAY{INT};
+   attr temp_args_ctype:ARRAY{INT};
+      -- List of variables to hold temporary variables that will contain
+      -- result of argument evaluation, except for cases without side-
+      -- effect.  (Ref: Implementation of dispatching mechanism in general
+      -- document).  The values are guaranteed to be non-void and have
+      -- the same length as the number of arguments.
+   attr has_pre_eval_args:BOOL;
+      -- If this value is false, then any code involving pre-evaluating
+      -- arguments can be avoided.  This is initialized to "false".
+   
+   attr printed_times:INT;
+   -- The value is greater than 0 if the runtime type-checking code is already
+   -- generated, ie the code to compute value of the expression is already 
+   -- generated.  This is the number of times this node has been printed; it
+   -- should be less than or equal than the global variable "g_tag".
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(id:INT; alst:LST_EXPROB_S; ln:INT):SAME is
+      res := new;
+      res.id := id;
+      res.args := alst;
+      res.lineno := ln;
+      
+      sz:INT := alst.insert;
+      res.temp_args := ARRAY{INT}::new(sz);
+      res.temp_args_ctype := ARRAY{INT}::new(sz);
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+      res := STR::create.s((GLOBALS::str_table).at_index(id)).
+                      c('(').
+                      s(args.sather_code).
+                      c(')');
+   end; -- sather_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   out_of_line(fn: STR) is
+      -- update line info to refer to original file `fn' rather than the current
+      -- context in which this construct is used to compose code.
+      lineno := ERR_INFO::out_of_line_err_info(fn,lineno);
+      args.out_of_line(fn);
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(id, args.dup, lineno);
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      args.resolve_predef_types(index);
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   valid_init_expr:BOOL is
+      if (referrent /= void) then
+	 if not (referrent.type = ROUT_FEATOB_S::type) then
+	    res := false;
+	 else
+	    res := args.valid_init_expr;
+	 end; -- if
+      else
+	 case (id)
+	 when RESERVED_WORDS::new_ind then
+	    res := args.valid_init_expr;
+	 else			
+	    -- Includes "void", "asize", "asize1", "asize2", "asize3", "asize4",
+	    -- "type", "copy", /* "deep_copy" */ (all used without arguments),
+	    -- "res", "self" (these are not valid in the initialization
+	    -- expressions of features), "extend" (no object referenced in
+	    -- the initialization expression)
+	 end; -- case
+      end; -- if
+   end; -- valid_init_expr
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   access_value_only:BOOL is
+      -- Default is to return "false" if we do not know the referrent;
+      -- otherwise, return "true" if the referrent is not a routine. 
+      if (referrent /= void) then
+	 res := (referrent.type /= ROUT_FEATOB_S::type);
+      end; -- if
+   end; -- access_value_only
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      -- This allows the "reserved" feature names to be redefined.
+      if (referrent = void) then
+	 referrent := symtab.get_sym(id);
+      end; -- if
+
+      -- If the identifier is "new", etc used on a foreign object, it is
+      -- illegal, because the runtime has no information on the format of
+      -- foreign object.
+      if (symtab.in_class.basic_type = RESERVED_CLASSES::FOB_ici) then
+	 GLOBAL_PROC::check_f_ob(self, id, symtab);
+      end; -- if
+
+      args.semant(symtab);
+      num_args:INT := args.insert;
+      i:INT;
+      loop until!(i >= num_args);
+	 if (args[i].res_type = void) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(ID_ARGS_EXPROB_S): Argument #").
+	                       i(i + 1).
+	                       s(" has no return type in call expression"));
+	    args[i].res_type := GLOBALS::ob_typeob_s;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+
+      -- Mark the arguments which involve dispatching on the current
+      -- arguments.  (Ref: Implementation of dispatching mechanism in 
+      -- general document)
+      i:INT := 0;
+      loop until!(i >= num_args);
+	 if (args[i].to_be_pre_evaluated) then
+	    temp_args[i] := GLOBAL_PROC::global_key;
+	    temp_args_ctype[i] := args[i].res_type.ctype;
+	    has_pre_eval_args := true;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+		  
+      -- Give the default meaning if "reserved" identifiers are not
+      -- redefined.
+      if (referrent = void) then
+	 case (id)
+	 when RESERVED_WORDS::asize_ind, 
+	      RESERVED_WORDS::asize1_ind, 
+	      RESERVED_WORDS::asize2_ind, 
+	      RESERVED_WORDS::asize3_ind, 
+	      RESERVED_WORDS::asize4_ind, 
+	      RESERVED_WORDS::type_ind then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(ID_ARGS_EXPROB_S): \"").
+	                       s((GLOBALS::str_table).at_index(id)).
+	                       s("\" does not need arguments"));
+	    res_type := GLOBALS::int_typeob_s;
+	    
+	 when RESERVED_WORDS::copy_ind then   
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(ID_ARGS_EXPROB_S): \"").
+	                       s((GLOBALS::str_table).at_index(id)).
+	                       s("\" does not need arguments"));
+	    res_type := INSTANT_TYPEOB_S::create(symtab.in_class.index, lineno);
+	 
+	 when RESERVED_WORDS::res_ind, 
+	      RESERVED_WORDS::self_ind, 
+	      RESERVED_WORDS::void_ind then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(ID_ARGS_EXPROB_S): Incorrect use of \"").
+	                       s((GLOBALS::str_table).at_index(id)).
+	                       s("\" -- Args ignored\n"));
+	    res_type := INSTANT_TYPEOB_S::create(symtab.in_class.index, lineno);
+   
+	 when RESERVED_WORDS::new_ind, RESERVED_WORDS::extend_ind then
+            asz:INT := args.insert;
+	    if (asz /= symtab.in_class.arrdim) then
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(ID_ARGS_EXPROB_S): \"").
+                                  s((GLOBALS::str_table).at_index(id)).
+	                          s("\" expects ").
+                                  i(symtab.in_class.arrdim).
+	                          s(" arguments but is given ").
+                                  i(asz));
+            end; -- if
+	    i:INT := 0;
+            loop until!(i >= asz);
+	       if not (args[i].res_type.int_type_p) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(ID_ARGS_EXPROB_S): \"").
+       	                             s((GLOBALS::str_table).at_index(id)).
+                                     s("\" gets non-integer argument #").
+		                     i(i + 1));
+	       end; -- if
+	       i := i + 1;
+	    end; -- loop
+	    res_type := INSTANT_TYPEOB_S::create(symtab.in_class.index, lineno);
+	 else
+	    ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(ID_ARGS_EXPROB_S): \"").
+	                          s((GLOBALS::str_table).at_index(id)).
+	                          s("\" is an unknown identifier"));
+            res_type := GLOBALS::ob_typeob_s;				     
+         end; -- case
+	    
+      -- This construct must refer to a routine call.
+      elsif (referrent.type = ROUT_FEATOB_S::type) then
+	 rout_feat:ROUT_FEATOB_S := referrent;
+	    -- Remember to mark routine as being used; the later code can
+	    -- refer to "rout_feat" rather than "referrent" to avoid cost
+	    -- of dispatch.
+	 rout_feat.maybe_used := true;
+	 ptypes:LST_TYPEOB_S := rout_feat.typeof.paramstype;
+	 num_params:INT := 0;
+	 if (ptypes /= void) then
+	    num_params := ptypes.insert;
+	 end; -- if
+	    
+         i:INT := 0;
+         num_args:INT := args.insert;
+	 if (num_params /= num_args) then
+	    -- Generate only error msgs; in the code generation phase,
+	    -- we'll just ignore the incompatibility and generate "bad code".
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(ID_ARGS_EXPROB_S): \"").
+	                       s((GLOBALS::str_table).at_index(id)).
+	                       s("\" gets incorrect number of args"));
+	 end; -- if
+
+         if (num_params < num_args) then
+	    num_args := num_params;
+	 end; -- if
+         loop until!(i >= num_args);
+	    if not (GLOBAL_PROC::conform_tst(args[i].res_type, ptypes[i],
+		                             args[i]))
+	    then
+	       -- Generate only error messages; in the code generation
+	       -- phase, we will just ignore the incompatibility and 
+	       -- generate "bad code".
+	       tn1:STR; tn2:STR;
+	       if (args[i].res_type /= void) then
+		  tn1 := args[i].res_type.full_name;
+	       else
+		  tn1 := "<UNKNOWN>";
+	       end; -- if
+	       if (ptypes[i] /= void) then
+		  tn2 := ptypes[i].full_name;
+	       else
+		  tn2 := "<UNKNOWN>";
+	       end; -- if
+	       ERR_INFO::format_error_msg(
+		         lineno,
+		         STR::create.s("(ID_ARGS_EXPROB_S): Argument #").
+		                  i(i + 1).
+		                  s(" has incorrect type (").
+		                  s(tn1).
+		                  s(") for \"").
+		                  s(GLOBALS::str_table.at_index(id)).
+		                  s("\" (").s(tn2).c(')'));
+	    elsif (args[i].res_type.int_type_p and (ptypes[i].real_type_p or
+	       ptypes[i].double_type_p)) then
+		  -- make sure it gets passed as a double.
+	       args[i].cast_to_c_type := C_TYPE_CONST::c_double;
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+
+         res_type := rout_feat.typeof.rettype;
+      else			-- Non-routine referrent
+	 ERR_INFO::format_error_exit(
+	           lineno,
+	           STR::create.s("(ID_ARGS_EXPROB_S): Expected routine call not found"));
+      end; -- if
+      
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      -- This node represents a construct with a single identifier preceded
+      -- by nothing else.  This construct must be a local routine call, and
+      -- so no temporary is generated, except for the arguments. 
+      res := args.gen_temps;
+
+      if (GLOBAL_PROC::check_is_on) then
+	 -- Generate the temporary variable to hold result of current 
+	 -- expression while its type is checked during runtime.
+	 if (rt_type /= 0) then
+	    temp_name_tpchk := GLOBAL_PROC::global_key;
+	    temp_ctype_tpchk := res_type.ctype;
+	    if (res /= void) then
+	       res := res.push(temp_name_tpchk).push(temp_ctype_tpchk);
+	    else
+	       res := LIST{INT}::create(2).push(temp_name_tpchk).
+	                               push(temp_ctype_tpchk);
+	    end; -- if
+	 end; -- if
+      end; -- if
+
+      -- The temporaries to be generated include those for holding
+      -- values of pre-evaluated arguments.
+      if (has_pre_eval_args) then
+	 i:INT := 0;
+	 sz:INT := args.insert;
+	 loop until!(i >= sz);
+	    if (temp_args[i] > 0) then
+	       if (res /= void) then
+		  res := res.push(temp_args[i]).push(temp_args_ctype[i]);
+	       else
+		  res := LIST{INT}::create(2).push(temp_args[i]).
+		                          push(temp_args_ctype[i]);
+	       end; -- if
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+      end; -- if
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_ext_strs is
+      args.get_ext_strs;
+   end; -- get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private cprint_ith_arg_pre_code(i:INT; outfile:SAT_OUTFILE) is
+      -- Either 
+      -- a.  the argument has to be evaluated into a local temporary, or
+      -- b.  only generate the preliminary code for the argument.
+      -- Assume that the range of i is valid.
+      ith_arg:$EXPROB_S := args[i];
+      ith_temp:INT := temp_args[i];
+      ith_arg.cprint_pre_code(outfile);
+      if (ith_temp > 0) then
+	 outfile.indent;
+	 GLOBAL_PROC::cprint_ctemp_name(ith_temp, outfile);
+	 outfile.s(" = ");
+	 ith_arg.cprint_act_code(outfile);
+	 outfile.s(";\n").inc_ln(1);
+      end; -- if
+   end; -- cprint_ith_arg_pre_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private cprint_ith_arg_act_code(i:INT; outfile:SAT_OUTFILE) is
+      -- Either
+      -- a.  print the local variable containing the result of argument, or
+      -- b.  only generate the actual code for the argument.
+      -- Assume that the range of i is valid.
+      ith_temp:INT := temp_args[i];
+      if (ith_temp > 0) then
+	 GLOBAL_PROC::cprint_ctemp_name(ith_temp, outfile);
+      else
+	 args[i].cprint_act_code(outfile);
+      end; -- if 
+   end; -- cprint_ith_arg_act_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- NOTE: The identifier cannot refer to an attribute, and so there is
+--       is no need to generate any code to check for void object.
+
+   cprint_pre_code(outfile:SAT_OUTFILE) is
+      -- By the construction of grammar, and parse trees, "args" is 
+      -- guaranteed to be non-void (and in this case, non-empty as well).
+      i:INT;
+      sz:INT := args.insert;
+      loop until!(i >= sz);
+	 cprint_ith_arg_pre_code(i, outfile);
+	 i := i + 1;
+      end; -- loop
+
+      if (GLOBAL_PROC::check_is_on) then
+	 if (rt_type /= 0) then
+	    GLOBAL_PROC::cprint_curr_exp_code(self, temp_name_tpchk, outfile);
+	 end; -- if
+      end; -- if
+   end; -- cprint_pre_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Continuation codes
+   const cont1:INT := 1;	-- Print parameters for "new" on any array 
+      
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cont_cprint_code(outfile:SAT_OUTFILE; cont:INT) is
+      case (cont)
+      when cont1 then
+	 co:CLASSOB_S := res_type.inst_cls;
+	 outfile.i(co.index).c(',');
+	 i:INT;
+	 sz:INT := args.insert;
+	 loop until!(i >= sz);
+	    cprint_ith_arg_act_code(i, outfile);
+	    outfile.c(',');
+	    i := i + 1;
+	 end; -- loop
+	 outfile.i(co.atomic_p);
+      else
+	 ERR_INFO::compiler_error_msg("ID_ARGS_EXPROB_S",
+	           STR::create.s("Unknown continuation#").
+                            i(cont));
+      end; -- case
+   end; -- cont_cprint_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_act_code(outfile:SAT_OUTFILE) is
+      -- If code for computing current expression is already generated,
+      -- just print the temporary variable name.
+      if (printed_times > GLOBALS::g_tag) then
+	 if (temp_name_tpchk > 0) then
+	    GLOBAL_PROC::cprint_ctemp_name(temp_name_tpchk, outfile);
+	    return;
+	 else 
+	    ERR_INFO::compiler_error_msg("ID_ARGS_EXPROB_S",
+	              STR::create.s("Invalid printing count = ").
+	                       i(printed_times).s(" > ").
+	                       i(GLOBALS::g_tag));
+	 end; -- if
+      end; -- if
+      printed_times := printed_times + 1;
+      
+      -- The cases we have to take note are "copy", /* "deep_copy" */, "extend",
+      --   "new", "type" and to use runtime support code when reasonable.
+
+      -- All reserved names are treated like any other features.  The
+      --   special meanings are used only if no referrent is found.
+
+      -- Handle special reserved feature names which do not
+      --   require any argument 
+      if (referrent = void)  then
+	 co:CLASSOB_S;
+	 case (id)
+	 when RESERVED_WORDS::new_ind then
+	    co := res_type.inst_cls;
+	    
+	    -- If the class is a basic type, the array dimension should
+	    -- be 0, and since the number of arguments is non-zero, this
+	    -- error should have been caught in "semant".
+
+            -- Check if "new" is being applied on an array object. 	  
+   	    -- ID_ARGS_STMTOB_S will use different runtime support routines 
+	    --   for different kinds of arrays.  
+	    --   
+	    -- NOTE: "semant" should have checked that the appropriate
+	    --       number of arguments are supplied.  This may be done by
+	    --       defining "new" with different number of parameters 
+	    --       in the classes ARRAY{T}, ARRAY2{T} etc.  But we also
+	    --       have built-in code to do the check.
+	    if (res_type.array_type_p) then
+	       PRINT_C_CODE::cprint_new(outfile, 1, cont1, self);
+	       
+	    elsif (res_type.array2_type_p) then
+	       PRINT_C_CODE::cprint_new(outfile, 2, cont1, self);
+	       
+	    elsif (res_type.array3_type_p) then
+	       PRINT_C_CODE::cprint_new(outfile, 3, cont1, self);
+
+	    elsif (res_type.array4_type_p) then
+	       PRINT_C_CODE::cprint_new(outfile, 4, cont1, self);
+	       
+	    end; -- if
+	    return;
+	    
+         -- At this point, we have ensured that if "extend" is
+         --   applied to array objects, the number of arguments is
+	 --   appropriate to the dimension of the array.  This can be
+	 --   automatically done in "semant" if we define "extend" in
+	 --   ARRAY{T}, ARRAY2{T} etc, each with different number of
+	 --   parameters.  But we have also provided built-in check
+	 --   in the compiler in "semant"
+	 --   
+	 --   We use different runtime support routines for arrays with 
+	 --   different dimension.
+	 when RESERVED_WORDS::extend_ind then
+	    -- If the object is not an array, the "extend" call is 
+            --   treated like any other routine.
+	    
+	    co := res_type.inst_cls;
+	    if (res_type.array_type_p) then
+	       outfile.s("extend1_(");
+	       if (not GLOBAL_PROC::cprint_ref_to_self(outfile)) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(ID_ARGS_EXPROB_S): Extending void object"));
+	       end; -- if
+	       outfile.c(',');
+--	       args[0].cprint_act_code(outfile);
+	       cprint_ith_arg_act_code(0, outfile);
+	       outfile.c(',').
+	               i(co.atomic_p).
+	               c(')');
+		  
+	    elsif (res_type.array2_type_p) then
+	       outfile.s("extend2_(");
+	       if (not GLOBAL_PROC::cprint_ref_to_self(outfile)) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(ID_ARGS_EXPROB_S): Extending void object"));
+	       end; -- if
+	       outfile.c(',');
+	       cprint_ith_arg_act_code(0, outfile);
+	       outfile.s(",");
+	       cprint_ith_arg_act_code(1, outfile);
+
+	       outfile.c(',').
+	               i(co.atomic_p).
+	               c(')');
+		  
+	    elsif (res_type.array3_type_p) then
+	       outfile.s("extend3_(");
+	       if (not GLOBAL_PROC::cprint_ref_to_self(outfile)) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(ID_ARGS_EXPROB_S): Extending void object"));
+	       end; -- if
+	       outfile.c(',');
+	       cprint_ith_arg_act_code(0, outfile);
+	       outfile.s(",");
+	       cprint_ith_arg_act_code(1, outfile);
+	       outfile.s(",");
+	       cprint_ith_arg_act_code(2, outfile);
+
+	       outfile.c(',').
+	               i(co.atomic_p).
+	               c(')');
+	       
+	    elsif (res_type.array4_type_p) then   
+	       outfile.s("extend4_(");
+	       if (not GLOBAL_PROC::cprint_ref_to_self(outfile)) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(ID_ARGS_EXPROB_S): Extending void object"));
+	       end; -- if
+	       outfile.c(',');
+
+	       cprint_ith_arg_act_code(0, outfile);
+	       outfile.s(",");
+	       cprint_ith_arg_act_code(1, outfile);
+	       outfile.s(",");
+	       cprint_ith_arg_act_code(2, outfile);
+	       outfile.s(",");
+	       cprint_ith_arg_act_code(3, outfile);
+
+	       outfile.c(',').
+	               i(co.atomic_p).
+	               c(')');
+	    end;
+	    return;
+
+         -- "res", "self" etc has been presumably called with parameters.
+	 -- Since no referrent is found, an error is signalled (in "semant") and
+	 -- we generate the call to runtime support routine as if
+	 -- no argument has been provided.
+	 when RESERVED_WORDS::res_ind then
+	    outfile.s("res__");
+	    
+	 when RESERVED_WORDS::self_ind then
+	    GLOBAL_PROC::cprint_ref_to_self(outfile);
+	    
+	 when RESERVED_WORDS::void_ind then
+	    outfile.c('0');
+	    
+	    -- All these errors for "asize" etc should have been 
+	    -- checked in "semant", and should not occur if we are 
+	    -- in this routine.
+	 when RESERVED_WORDS::asize_ind, 
+	      RESERVED_WORDS::asize1_ind, 
+	      RESERVED_WORDS::asize2_ind, 
+	      RESERVED_WORDS::asize3_ind,
+	      RESERVED_WORDS::asize4_ind,   
+	      RESERVED_WORDS::copy_ind then
+	    -- This case occurs when eg user has written
+	    -- a call eg "asize(x,y)", and has not redefined "asize".
+	    ERR_INFO::format_error_exit(
+	              lineno,
+	              STR::create.s("(ID_ARGS_EXPROB_S): Unknown use of \"").
+                               s((GLOBALS::str_table).at_index(id)).
+                               s("\" (a reserved feature name)"));
+	       
+	 when RESERVED_WORDS::type_ind then
+	    ERR_INFO::format_error_exit(
+	              lineno,
+	              STR::create.s("(ID_ARGS_EXPROB_S): Unexpected arguments supplied for \"type\" feature on object"));
+	 end; -- case
+	 return;
+	 
+      else
+	 -- All reserved "feature" names (including "asize", "asize1" etc)
+	 --   are redefinable and if there is a referrent, that means 
+	 --   the feature name has been redefined by user.
+	 
+	 -- If the referrent is not a routine, we would have exited at
+	 -- the "semant" phase.
+	 cprint_cast_code(outfile);
+	 referrent.cprint_cname(outfile);
+	 outfile.c('(');
+	 if (not GLOBAL_PROC::cprint_ref_to_self(outfile)) then
+	    ERR_INFO::format_warning_msg(
+	              lineno,
+	              STR::create.s("(ID_ARGS_EXPROB_S): Routine call with void object"));
+	 end; -- if
+	 i:INT := 0;
+	 asz:INT := args.insert;
+	 loop until!(i >= asz);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(i, outfile);
+	    i := i + 1;
+	    end; -- loop
+	 outfile.c(')');
+      end; -- if
+   end; -- cprint_act_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_init_code(outfile:SAT_OUTFILE) is
+      args.cprint_init_code(outfile);
+      -- Actually the referrent can neither be a CONST_DECL_FEATOB_S nor
+      -- SHARED_DECL_FEATOB_S, so this will result in incorrect code.
+      if (referrent.type = SHARED_DECL_FEATOB_S::type) or
+	 (referrent.type = CONST_DECL_FEATOB_S::type) then
+	 referrent.cprint_init_code(outfile);
+      end; -- if
+   end; -- cprint_init_code
+
+end; -- class ID_ARGS_EXPROB_S
+
+--------------------------------------------------------------------
+

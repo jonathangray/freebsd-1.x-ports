@@ -1,0 +1,397 @@
+-- -*- Mode: Sather;  -*-
+-- File: exprob.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION:  Classes for representing Sather expressions.
+--*
+--* CLASSES: EXPROB, ID_EXPROB, CONST_EXPROB, INT_CONST_EXPROB,
+--*          CHAR_CONST_EXPROB, BOOL_CONST_EXPROB, STR_CONST_EXPROB,
+--*          REAL_CONST_EXPROB, OP_EXPROB, AREF_EXPROB, 
+--*          ID_ARGS_EXPROB, EXPR_ARGS_EXPROB, TYPESPEC_ARGS_EXPROB 
+--*
+--* RCS: $Id: exprob.sa,v 1.1 1994/02/12 03:21:51 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 04:59 1993 (hws)
+--*  Oct 17 04:33 1993 (hws): copyright note
+--*  Mar  1 12:35 1993 (hws): more uniform error msgs
+--* Created: Thu Jun  7 12:13:24 1990 (clim)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class EXPROB is
+   -- Expressions.
+   PARSEROB;
+
+-- This inheritance is eliminated because it is not needed.
+--   C_TYPE_CONST;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):$EXPROB_S is
+      res := EXPROB_S::create(lineno);
+   end; -- pcopy
+   
+end; -- class EXPROB
+
+--------------------------------------------------------------------
+   
+class ID_EXPROB is
+   -- Idenfifiers.
+   EXPROB;
+   
+   attr name:INT;			-- Identifier name
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:INT):SAME is
+      -- An expression with only one identifier
+      res := new;
+      res.name := nm;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):ID_EXPROB_S is
+      -- The parameters are a list of indices for type parameter
+      --   names and a list of keys for the type instantiations.
+      res := res.create(name, lineno);
+   end; -- pcopy
+   
+end; -- class ID_EXPROB
+
+--------------------------------------------------------------------
+
+class CONST_EXPROB is
+   -- Parent class for boolean, character, integer, string or real Sather
+   -- constants.
+   EXPROB;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):$CONST_EXPROB_S is
+      -- We need to replicate nodes for constants, because each 
+      --   node has a different line number.
+      res := CONST_EXPROB_S::create(lineno);
+   end; -- pcopy
+   
+end; -- class CONST_EXPROB
+   
+--------------------------------------------------------------------
+
+class INT_CONST_EXPROB is
+   CONST_EXPROB;
+
+-- Computed during parsing
+   attr intval:STR;
+      -- Pointer to string representation of integer
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(v:STR):SAME is
+      res := new;
+      res.intval := v;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):INT_CONST_EXPROB_S is
+      -- We need to replicate nodes for constants.  
+      -- *! May want to optimize this later.
+      res := res.create(intval, lineno);
+   end; -- pcopy
+   
+end; -- class INT_CONST_EXPROB
+
+--------------------------------------------------------------------
+   
+class CHAR_CONST_EXPROB is
+   CONST_EXPROB;
+   
+   attr charval:STR;
+      -- Pointer to string representation of character
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(v:STR):SAME is
+      res := new;
+      res.charval := v;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):CHAR_CONST_EXPROB_S is
+      -- We need to replicate nodes for constants.  
+      -- *! May want to optimize this later.
+      res := res.create(charval, lineno);
+   end; -- pcopy
+   
+end; -- class CHAR_CONST_EXPROB
+
+--------------------------------------------------------------------
+   
+class BOOL_CONST_EXPROB is
+   CONST_EXPROB;
+
+-- Computed during parsing
+   attr boolval:INT;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(v:INT):SAME is
+      res := new;
+      res.boolval := v;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):BOOL_CONST_EXPROB_S is
+      -- We need to replicate nodes for constants.  
+      -- *! May want to optimize this later.
+      res := res.create(boolval, lineno);
+   end; -- pcopy
+   
+end; -- class BOOL_CONST_EXPROB
+
+--------------------------------------------------------------------
+   
+class STR_CONST_EXPROB is
+   CONST_EXPROB;
+   
+-- Computed during parsing
+   attr strval:INT;
+      -- Index associated with string representation of string constant
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(v:INT):SAME is
+      res := new;
+      res.strval := v;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):STR_CONST_EXPROB_S is
+      -- We need to replicate nodes for constants.  
+      -- *! May want to optimize this later.
+      res := res.create(strval, lineno);
+   end; -- pcopy
+   
+end; -- class STR_CONST_EXPROB
+
+--------------------------------------------------------------------
+   
+class REAL_CONST_EXPROB is
+   -- Contains either a value of type REAL or DOUBLE
+   CONST_EXPROB;
+
+-- Computed during parsing
+   attr realval:STR;
+      -- Pointer to string representation of float/double constant
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(v:STR):SAME is
+      res := new;
+      res.realval := v;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):REAL_CONST_EXPROB_S is
+      -- We need to replicate nodes for constants.  
+      -- *! May want to optimize this later.
+      res := res.create(realval, lineno);
+   end; -- pcopy
+   
+end; -- class REAL_CONST_EXPROB
+
+--------------------------------------------------------------------
+
+class OP_EXPROB is
+   -- Operator expressions.
+   OP_INDICES;
+   EXPROB;
+   
+-- Computed during parsing
+   attr op_ind:INT;			-- Operation
+   attr children:LST_EXPROB;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create_unary(op:INT; child:$EXPROB):SAME is
+      -- Expression node has exactly 1 child
+      res := new;
+      res.op_ind := op;
+      res.children := res.children.create(1).push(child);
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create_unary
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create_binary(op:INT; left:$EXPROB; right:$EXPROB):SAME is
+      -- Return expression node with 2 children
+      res := new;
+      res.op_ind := op;
+      res.children := res.children.create(2).push(left).push(right);
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create_binary
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):OP_EXPROB_S is
+      res := res.create(op_ind, children.pcopy(pl, pi), lineno);
+   end; -- pcopy
+   
+end; -- class OP_EXPROB
+
+--------------------------------------------------------------------
+
+class AREF_EXPROB is
+   -- Array references.  
+   EXPROB;
+   
+-- Computed during parsing
+   attr array:$EXPROB;
+   attr indices:LST_EXPROB;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(arr:$EXPROB; inds:LST_EXPROB):SAME is
+      res := new;
+      res.array := arr;
+      res.indices := inds;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):AREF_EXPROB_S is
+      if (array /= void) then
+	 res := res.create(array.pcopy(pl, pi),
+	                   indices.pcopy(pl, pi),
+                           lineno);
+      else 
+	 res := res.create(void, indices.pcopy(pl, pi), lineno);
+      end; -- if
+   end; -- pcopy
+
+end; -- class AREF_EXPROB
+
+--------------------------------------------------------------------
+
+class ID_ARGS_EXPROB is
+   -- Identifiers with args.
+   EXPROB;
+   
+-- Computed during parsing
+   attr id:INT;			-- Function call
+   attr args:LST_EXPROB;		-- List of arguments
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(f:INT; alst:LST_EXPROB):SAME is
+      res := new;
+      res.id := f;
+      res.args := alst;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):ID_ARGS_EXPROB_S is
+      -- The parameters are a list of indices for type parameter
+      --   names and a list of keys for the type instantiations.
+      if (args /= void) then
+	 res := res.create(id,
+	                args.pcopy(pl, pi),
+                        lineno);
+      else
+	 res := res.create(id, void, lineno);
+      end; -- if
+   end; -- pcopy
+
+end; -- class ID_ARGS_EXPROB
+
+--------------------------------------------------------------------
+
+class EXPR_ARGS_EXPROB is
+   -- Dotted expressions with possibly arguments
+   EXPROB;
+   
+-- Computed during parsing
+   attr obj:$EXPROB;
+   attr feat:INT;
+   attr args:LST_EXPROB;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(o:$EXPROB; f:INT; alst:LST_EXPROB):SAME is
+      res := new;
+      res.obj := o;
+      res.feat := f;
+      res.args := alst;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):EXPR_ARGS_EXPROB_S is
+      if (args /= void) then
+	 res := res.create(obj.pcopy(pl, pi),
+	                feat,
+	                args.pcopy(pl, pi),
+                        lineno);
+      else 
+	 res := res.create(obj.pcopy(pl, pi),
+	                feat,
+	                void,
+                        lineno);
+      end; -- if
+   end; -- pcopy
+
+end; -- class EXPR_ARGS_EXPROB
+
+--------------------------------------------------------------------
+
+class TYPESPEC_ARGS_EXPROB is
+   -- Class access to references with possibly arguments.
+   EXPROB;
+   
+-- Computed during parsing
+   attr type_spec:$TYPEOB;
+   attr feat:INT;
+   attr args:LST_EXPROB;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(ts:$TYPEOB; f:INT; alst:LST_EXPROB):SAME is
+      res := new;
+      -- Dispatching is not allowed for class references.
+      if (ts.type = DISPATCH_TYPEOB::type) then
+	 ERR_INFO::format_error_msg_file(ERR_INFO::filename, GLOBALS::curr_lineno,
+	    "TYPESPEC_ARGS_EXPROB",	    
+	    STR::create.s("Dispatching for \"").
+	           s(ts.name_str).
+	           s("\" ignored\n"));
+	 ts := ts.disp_type;
+      end; -- if
+      res.type_spec := ts;
+      res.feat := f;
+      res.args := alst;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):TYPESPEC_ARGS_EXPROB_S is
+      if (args /= void) then
+	 res := res.create(type_spec.pcopy(pl, pi),
+                        feat,
+	                args.pcopy(pl, pi),
+                        lineno);
+      else 
+	 res := res.create(type_spec.pcopy(pl, pi),
+                        feat,
+	                void,
+                        lineno);
+      end; -- if
+   end; -- pcopy
+
+end; -- class TYPESPEC_ARGS_EXPROB
+
+--------------------------------------------------------------------
+
+

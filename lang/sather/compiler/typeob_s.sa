@@ -1,0 +1,925 @@
+--- -*- Mode: Sather;  -*-
+-- File: typeob_s.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU) and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1990, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Top level control of Sather compiler.
+--*
+--* RCS: $Id: typeob_s.sa,v 1.1 1994/02/12 03:21:52 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 31 13:23 1993 (hws)
+--*  Oct 31 13:23 1993 (hws): yet another until..loop in comment.
+--*  Oct 17 05:17 1993 (hws): Sather 1 syntax, copyright note
+--*  Apr 21 19:25 1993 (hws): fix cprint_void to generate ptr 0
+--*  Mar  1 10:59 1993 (hws): warn when abstract class used
+--*  Feb 21 20:37 1993 (hws): delete debug stmts
+--*  Oct  7 01:20 1992 (hws): remember whether SELF_TYPE was updated.
+--*  Sep 20 06:05 1992 (hws): fix ROUT_FEATOB_S::create not to use uninit lineno.
+--* Created: Mon Jun 11 15:26:00 1990 (clim)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Contains a pointer to the actual/instantiated Sather types/classes
+-- Cleaned up and redid the conforms_to routines (bilmes)
+--------------------------------------------------------------------
+
+class TYPEOB_S is
+   -- Represent type information of expression/routine. 
+
+   SEMANTOB;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Only relevant for INSTANT_TYPEOB_S
+   
+   inst_ind:INT is
+      -- Index of class for type expression.
+   end; -- inst_ind
+
+   inst_cls:CLASSOB_S is
+      -- `CLASSOB_S' object given by this type expression.
+   end; -- inst_cls
+
+   is_dispatched:BOOL is
+      -- Type expression is dispatched.
+   end; -- is_dispatched
+
+   attr was_self_type_undispatched: BOOL; -- for now a bool later encoded in type index
+   
+   dispatched:$TYPEOB_S is
+      res := self;
+   end; -- dispatched
+   
+   undispatched:$TYPEOB_S is
+      res := self;
+   end; -- undispatched
+   
+   arithtype:BOOL is
+      -- Arithmetic type expression.
+   end; -- arithtype
+
+   int_type_p:BOOL is
+      -- Type expression for `INT' or its descendents.
+   end; -- int_type_p
+
+   bool_type_p:BOOL is
+      -- Type expression for `BOOL' or its descendents.
+   end; -- bool_type_p
+
+   char_type_p:BOOL is
+      -- Type expression for `CHAR' or its descendents.
+   end; -- char_type_p
+
+   real_type_p:BOOL is
+      -- Type expression for `REAL' or its descendents.
+   end; -- real_type_p
+
+   double_type_p:BOOL is
+      -- Type expression for `DOUBLE' or its descendents.
+   end; -- double_type_p
+
+   str_type_p:BOOL is
+      -- Type expression for `STR' or its descendents.
+   end; -- str_type_p
+
+   nonptr_p:BOOL is
+      -- Returns "true" if type expression refers to basic types.
+   end; -- nonptr_p
+
+   resolve_arithtype(tp:$TYPEOB_S):$TYPEOB_S is
+      res := GLOBALS::int_typeob_s;
+   end; -- resolve_arithtype
+
+   ctype:INT is
+      -- Returns 1 (ie "ptr") by default
+      res := C_TYPE_CONST::c_ptr;
+   end; -- compute_own_offset
+
+   cprint_ctype(outfile:SAT_OUTFILE) is
+      -- Print C type corresponding to current type expression.
+      inst_cls.cprint_ctype(outfile);
+   end; -- cprint_ctype
+
+   cprint_void(outfile:SAT_OUTFILE) is
+      -- Print C void name for this type
+      -- note that ptr may have to be refined appropriately. We do not
+      -- the type of the result-type into the expression and so "void"'s type
+      -- cannot be guessed.
+      if nonptr_p then 
+	 outfile.s("S_");
+	 cprint_ctype(outfile);
+	 outfile.s("_VOID_");
+      else
+	 outfile.s("0");
+      end;
+   end;
+
+   array_type_p:BOOL is
+      -- Returns "true" if type expression is a 1-dimensional array.
+   end; -- array_type_p
+
+   array2_type_p:BOOL is
+      -- Returns "true" if type expression is a 2-dimensional array.
+   end; -- array2_type_p
+
+   array3_type_p:BOOL is
+      -- Returns "true" if type expression is a 3-dimensional array.
+   end; -- array3_type_p
+
+   array4_type_p:BOOL is
+      -- Returns "true" if type expression is a 4-dimensional array.
+   end; -- array4_type_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Only relevant for ROUT_TYPEOB_S
+   rettype:INSTANT_TYPEOB_S is
+      -- Return-type of type expression of routine.
+   end; -- rettype
+
+   paramstype:LST_TYPEOB_S is
+      -- Types of parameters.
+   end; -- paramstype
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   conforms_to(tp:$TYPEOB_S):BOOL is
+      -- Each descendent will specify their conformance rules.
+   end; -- conforms_to
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   param_type_conforms_to(tp:$TYPEOB_S):BOOL is
+      -- Special for paramaterized types.
+   end; -- conforms_to
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   full_name:STR is
+      -- Each descendent will tell how print to its name.
+   end; -- full_name
+
+end; -- class TYPEOB_S
+    
+--------------------------------------------------------------------
+
+class INSTANT_TYPEOB_S is
+   -- Actual/Instantiated types
+   TYPEOB_S;
+   attr index:INT;
+      -- The index to actual CLASSOB_S for the type specification. 
+   -- NOTE: To use an index into the table (for instantiated
+   --       classes), we must ensure that the CLASSOB_S objects are
+   --       not moved.
+   -- CLASSOB_S will contain (among other things):
+   -- a.  an index to indicate its location in the global table
+   --     (CLASSOB_S_TABLE),
+   -- b.  pointer to original CLASSOB from which it is derived 
+   -- c.  a sequence of indices (may be null) into the global table 
+   --     (of type CLASSOB_S_TABLE), for type arguments. 
+
+-- *! Do not need this since we are using negative integers to
+--    represent dispatched type.
+-- New Implementation: We need this because we store pointer to CLASSOB_S
+-- rather than integer.
+   attr disp:BOOL;
+   attr basic_type:INT;
+   -- This is equal to the "basic_type" value of the CLASSOB_S given by
+   -- this INSTANT_TYPEOB_S.  It is initialized to -1.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(index:INT; ln:INT):SAME is
+      -- Create a type for ordinary expression.
+      res := new;
+      res.index := index;
+      res.lineno := ln;
+      res.basic_type := -1;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      -- Duplicate a type expression.
+      res := create(index, lineno);
+   end; -- dup
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   inst_ind:INT is
+      -- Index of class given by current type expression.
+      res := index;
+      if (res < 0) then
+	 res := -res;
+      end; -- if
+   end; -- inst_ind
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   inst_cls:CLASSOB_S is
+      -- `CLASSOB_S' object for current type expression.  If the type
+      -- is dispatched, then the "$" is ignored.
+      if (index = 0) then
+	 res := GLOBALS::void_classob_s;
+      elsif (index < 0) then
+	 res := (GLOBALS::class_inst).at_index(-index);
+      else
+	 res := (GLOBALS::class_inst).at_index(index);
+      end; -- if
+   end; -- inst_cls
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   ctype:INT is
+      -- C type corresponding to current type expression.
+      res := inst_cls.ctype;
+   end; -- ctype
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dispatched:SAME is
+      -- Make type expression dispatched.
+      disp := true;
+      if (index > 0) then
+	 index := - index;
+      end; -- if
+      res := self;
+   end; -- dispatched
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   undispatched:SAME is
+      -- Make type expression non-dispatched.
+      disp := false;
+      if (index < 0) then
+	 index := - index;
+      end; -- if
+      res := self;
+   end; -- undispatched
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   is_dispatched:BOOL is
+      -- Return "true" if the type is dispatched.
+      if (index < 0) or (disp) then
+	 res := true;
+      end; -- if
+   end; -- is_dispatched
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   int_type_p:BOOL is
+      -- Determine if this type expression is for `INT' or its descendents.
+      co:CLASSOB_S := inst_cls;
+      res := (inst_ind = RESERVED_CLASSES::INT_ici) or
+             (co.basic_type = RESERVED_CLASSES::INT_ici);
+   end; -- int_type_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   char_type_p:BOOL is
+      -- Determine if this type expression is for `CHAR' or its descendents.
+      co:CLASSOB_S := inst_cls;
+      res := (inst_ind = RESERVED_CLASSES::CHAR_ici) or
+             (co.basic_type = RESERVED_CLASSES::CHAR_ici);
+   end; -- char_type_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   bool_type_p:BOOL is
+      -- Determine if this type expression is for `BOOL' or its descendents.
+      co:CLASSOB_S := inst_cls;
+      res := (inst_ind = RESERVED_CLASSES::BOOL_ici) or
+             (co.basic_type = RESERVED_CLASSES::BOOL_ici);
+   end; -- bool_type_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   real_type_p:BOOL is
+      -- Determine if this type expression is for `REAL' or its descendents.
+      co:CLASSOB_S := inst_cls;
+      res := (inst_ind = RESERVED_CLASSES::REAL_ici) or
+             (co.basic_type = RESERVED_CLASSES::REAL_ici);
+   end; -- real_type_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   double_type_p:BOOL is
+      -- Determine if this type expression is for `DOUBLE' or its descendents.
+      co:CLASSOB_S := inst_cls;
+      res := (inst_ind = RESERVED_CLASSES::DOUBLE_ici) or
+             (co.basic_type = RESERVED_CLASSES::DOUBLE_ici);
+   end; -- double_type_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   str_type_p:BOOL is
+      -- Determine if this type expression is for `STR' or its descendents.
+      co:CLASSOB_S := inst_cls;
+      res := (inst_ind = RESERVED_CLASSES::STR_ici) or
+             (co.basic_type = RESERVED_CLASSES::STR_ici);
+   end; -- str_type_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   nonptr_p:BOOL is
+      -- Determine if this type expression is for basic classes.
+      co:CLASSOB_S := inst_cls; 
+      basic:INT := co.basic_type;
+      in:INT := inst_ind;
+      if (in = RESERVED_CLASSES::BOOL_ici) or
+	 (in = RESERVED_CLASSES::CHAR_ici) or
+	 (in = RESERVED_CLASSES::INT_ici) or
+	 (in = RESERVED_CLASSES::REAL_ici) or
+	 (in = RESERVED_CLASSES::DOUBLE_ici) then
+	 res := true;
+      elsif (basic = RESERVED_CLASSES::BOOL_ici) or
+	    (basic = RESERVED_CLASSES::CHAR_ici) or
+	    (basic = RESERVED_CLASSES::INT_ici) or
+	    (basic = RESERVED_CLASSES::REAL_ici) or
+	    (basic = RESERVED_CLASSES::DOUBLE_ici) then
+	 res := true;
+      end; -- if
+   end; -- nonptr_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   array_type_p:BOOL is
+      -- Determines if a type is just an ARRAY.
+      co:CLASSOB_S := inst_cls;
+      res := (co.def.index = RESERVED_WORDS::array_ind);
+      if (not res) then
+	 if (co.basic_type /= 0) then
+	    bco:CLASSOB_S := (GLOBALS::class_inst).at_index(co.basic_type);
+	    res := (bco.def.index = RESERVED_WORDS::array_ind);
+	 end; -- if
+      end; -- if
+   end; -- array_type_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   array2_type_p:BOOL is
+      -- Determines if a type is just an ARRAY2.
+      co:CLASSOB_S := inst_cls;
+      res := (co.def.index = RESERVED_WORDS::array2_ind);
+      if (not res) then
+	 if (co.basic_type /= 0) then
+	    bco:CLASSOB_S := (GLOBALS::class_inst).at_index(co.basic_type);
+	    res := (bco.def.index = RESERVED_WORDS::array2_ind);
+	 end; -- if
+      end; -- if
+   end; -- array2_type_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   array3_type_p:BOOL is
+      -- Determines if a type is just an ARRAY3.
+      co:CLASSOB_S := inst_cls;
+      res := (co.def.index = RESERVED_WORDS::array3_ind);
+      if (not res) then
+	 if (co.basic_type /= 0) and (not res) then
+	    bco:CLASSOB_S := (GLOBALS::class_inst).at_index(co.basic_type);
+	    res := (bco.def.index = RESERVED_WORDS::array3_ind);
+	 end; -- if
+      end; -- if
+   end; -- array3_type_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   array4_type_p:BOOL is
+      -- Determines if a type is just an ARRAY4.
+      co:CLASSOB_S := inst_cls;
+      res := (co.def.index = RESERVED_WORDS::array4_ind);
+      if (not res) then
+	 if (co.basic_type /= 0) then
+	    bco:CLASSOB_S := (GLOBALS::class_inst).at_index(co.basic_type);
+	    res := (bco.def.index = RESERVED_WORDS::array4_ind);
+	 end; -- if
+      end; -- if
+   end; -- array4_type_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   arithtype:BOOL is
+      -- Return "true" if this is an arithmetic type expression.
+      co:CLASSOB_S := inst_cls;
+      in:INT := inst_ind;
+      if (in = RESERVED_CLASSES::INT_ici) or 
+	 (in = RESERVED_CLASSES::REAL_ici) or
+	 (in = RESERVED_CLASSES::DOUBLE_ici) then
+	 res := true;
+      elsif (co.basic_type = RESERVED_CLASSES::INT_ici) or
+	    (co.basic_type = RESERVED_CLASSES::REAL_ici) or
+	    (co.basic_type = RESERVED_CLASSES::DOUBLE_ici) then
+	 res := true;
+      else
+	 res := false;
+      end; -- if
+   end; -- arithtype
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_arithtype(tp:$TYPEOB_S):$TYPEOB_S is
+      -- Resolve conflicting arithmetic types.
+      if (tp.double_type_p) or (double_type_p) then
+	 res := GLOBALS::double_typeob_s;
+      elsif (tp.real_type_p) or (real_type_p) then
+	 res := GLOBALS::real_typeob_s;
+      elsif (tp.int_type_p) and (int_type_p) then
+	 res := GLOBALS::int_typeob_s;
+      else
+	 res := GLOBALS::ob_typeob_s;
+      end; -- if
+   end; -- resolve_arithtype
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(new_index:INT) is
+      -- Resolve predefined types (SAME) and check for error
+      -- in other strange classes (C, SYS, UNDEFINE).
+      cls:CLASSOB_S := inst_cls;
+      if (cls = void) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(INSTANT_TYPEOB_S): Unknown class"));
+      else
+	 cls.mark_is_used;
+	    -- We should not need to mark any descendents, unless they are
+	    -- used explicitly in some way.  Otherwise, there is no way the
+	    -- descendent object can appear during runtime.  In addition, this
+	    -- phase is performed before the computation of ancestor/
+	    -- descendent relationship.
+      end; -- if
+      if cls.abt and (not is_dispatched) then
+	 -- abstract classes are not supposed to be used.
+	 ERR_INFO::format_error_msg(
+	    lineno,
+	    STR::create.s("(INSTANT_TYPEOB_S): Abstract class \"").
+	    s(inst_cls.full_name).
+	    s("\" is usable as dispatched only"));
+      end;
+      i:INT := inst_ind;
+      if (i = RESERVED_CLASSES::OB_ici) and (not is_dispatched) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(INSTANT_TYPEOB_S):\"").
+	                    s(inst_cls.full_name).
+	                    s("\" is usable as dispatched only"));
+      end; -- if
+      
+	 -- For all the invalid types: C, SYS, UNDEFINE, change them
+	 --   to $OB.
+      if (i = RESERVED_CLASSES::C_ici) or
+	 (i = RESERVED_CLASSES::SYS_ici) or
+	 (i = RESERVED_CLASSES::UNDEFINE_ici) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(INSTANT_TYPEOB_S):").
+                            s(inst_cls.full_name).
+                            s(" is an invalid type for declarations"));
+         index := RESERVED_CLASSES::OB_ici;
+	 dispatched;
+      elsif (i = RESERVED_CLASSES::SELF_TYPE_ici) then
+	 -- Resolve SAME.  Check whether it is dispatched before
+	 --   updating the index.
+         if (is_dispatched) then
+	    index := new_index;
+	    dispatched;
+	    ERR_INFO::format_error_msg(
+	       lineno,
+	       STR::create.s("(INSTANT_TYPEOB_S): $SAME is illegal; usually you really want SAME."));
+	 else
+	    index := new_index;
+	    was_self_type_undispatched := true;
+	 end;
+      end; -- if
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   conforms_to(tp:$TYPEOB_S):BOOL is
+      -- Test if `self' conforms to `tp'. By definition, a variable declared
+      -- to be of type T2 conforms to a variable declared to be of
+      -- type T1 if and only if T1 can hold an object of type T2.
+      GLOBALS::rt_type := 0;
+      if (tp = void) then
+	 if (self = void) then
+	    res := true;
+	 end; -- if
+	 return;
+      end; -- if
+      if (tp = GLOBALS::voidtype_s) then
+	 return;
+      end; -- if
+      if (self = GLOBALS::voidtype_s) then
+	 res := true;
+	 return;
+      end; -- if
+      my_index:INT := inst_ind;
+      other_index:INT := tp.inst_ind;
+      
+      -- Special check for the case of DOUBLE and REAL.
+      -- We use the routines to check for basic types, because we may
+      -- have a descendent of DOUBLE, REAL etc.
+      if (tp.double_type_p) then
+	 -- The case when "self.double_type_p" is true will be
+	 -- taken of when we check "my_index = other_index". 
+	 if (real_type_p) or (int_type_p) then
+	    res := true;
+	    return;
+	 end; -- if
+      end; -- if
+      if (tp.real_type_p) then
+	 if (int_type_p) or (double_type_p) then
+	    res := true;
+	    return;
+	 end; -- if
+      end; -- if
+
+      -- Descendents of basic classes conforms to the corresponding
+      -- basic class.
+      other_ctype:INT := tp.ctype;
+      my_ctype:INT := ctype;
+      if (other_ctype /= C_TYPE_CONST::c_ptr) and 
+	 (other_ctype /= C_TYPE_CONST::c_void) and
+	 (my_ctype /= C_TYPE_CONST::c_ptr) and 
+	 (my_ctype /= C_TYPE_CONST::c_void) then
+	 if (other_ctype = my_ctype) then
+	    res := true; 
+	    return;
+	 end; -- if
+      end; -- if
+
+-- The following tests are all for non-basic classes.
+--
+--           POLYGON
+--              |
+--              |
+--             \|/
+--            SQUARE  
+--
+--      In the following, 
+--      x <- y means that y conforms to x 
+-- 
+--       other             self
+--      $OB           <- <Any Object>          (1)
+--      $POLYGON      <- POLYGON               (2a)
+--      $POLYGON      <- $POLYGON              (2b) 
+--      $SQUARE       <- SQUARE                (2c)
+--      $SQUARE       <- $SQUARE               (2d)
+--
+--      $POLYGON      <- SQUARE                (3a)
+--      $POLYGON      <- $SQUARE               (3b)
+--
+--      $SQUARE       <- $POLYGON              (4)
+--      $SQUARE       <- POLYGON               ERROR
+--
+--      POLYGON       <- POLYGON               (5a)
+--      POLYGON       <- $POLYGON              (5b)      
+--      SQUARE        <- SQUARE                (5c)
+--      SQUARE        <- $SQUARE               (5d)
+--
+--      POLYGON       <- SQUARE                ERROR (6a)
+--      FOO{$POLYGON}  <- FOO{SQUARE}          (6b)
+--      POLYGON       <- $SQUARE               ERROR (7a)
+--
+--      SQUARE        <- POLYGON               ERROR (6c)
+--      SQUARE        <- $POLYGON              (7)
+-- 
+--      <Any Object>  <- $OB                   (8)
+--
+--
+-- Possible type errors during runtime:
+-- (4), (5b) (5d), (7), (8)
+-- 
+-- NOTE on (6b):
+-- -------------
+-- This conformance works.  The worry is whether the attributes in the
+-- FOO{$POLYGON} objects may be in a different order from those in 
+-- FOO{SQUARE}.  This can occur only if in FOO{T}, FOO inherits from T.
+-- But in this case, the inheritance is from a dispatched class, and there
+-- will be an error.  Suppose FOO inherits from T:
+--     x:FOO{SQUARE}; y:FOO{$POLYGON}; z:FOO{POLYGON};
+-- then there will be an error for inheriting from a dispatched class.
+-- Suppose FOO does not inherit from T, then the ordering of attributes
+-- in all three classes should be the same.  (That is, if FOO{T} has 
+-- attributes x,y,z, then all three have the same attributes in the same
+-- order.)
+      
+      if (tp.is_dispatched) then
+	 -- (1)
+	 if (other_index = RESERVED_CLASSES::OB_ici) then
+	    -- Conformance only holds if this is a pointer to an object
+	    if (not nonptr_p) then
+	       res := true;
+	    end; -- if
+	    return;
+	 end; -- if
+
+	 -- (2)
+	 if (my_index = other_index) then
+	    res := true;
+	    return;
+	 end; -- if
+
+	 -- (3)
+	 co2:CLASSOB_S := (GLOBALS::class_inst).at_index(other_index);
+--	 -- NOTE: We use the fact that INT_SET is also an ARRAY{INT}.
+--	 psz2:INT := co2.alldes.asize;
+--	 i:INT;
+--	 loop until!(i >= psz2);
+--	    -- IMPORTANT: "my_index" can never be -1, and so we avoid
+--	    --            checking whether the ith element of "alldes" 
+--	    --            is -1.
+--	    if (my_index = co2.alldes[i]) then
+--	       res := true;
+--	       return;
+--	    end; -- if 
+--	    i := i + 1;
+--	 end; -- loop
+
+-- -- In the new implementation, we make use of the direct membership
+-- -- check of INT_SET.
+	 if (co2.alldes.get(my_index)) then
+	    res := true;
+	    return;
+	 end; -- if
+	 
+	 -- (4)
+	 if (is_dispatched) then
+	    co3:CLASSOB_S := (GLOBALS::class_inst).at_index(my_index);
+	    
+-- -- Use the membership check routine of INT_SET.
+	    if (co3.alldes.get(other_index)) then
+	       res := true;
+	       update_rt_type(- other_index);
+	       return;
+	    end; -- if
+	 end; -- if
+      else
+	 -- The conformance code should allow the following:
+	 -- "sq:SQUARE; pol:$POLYGON; sq := pol;".
+	 
+	 -- (5)
+	 if (my_index = other_index) then
+	    res := true;
+	    if (is_dispatched) then
+	       -- Only need to generate runtime check for cases (5b) and
+	       -- (5d); using the example above, "GLOBALS::rt_type" gets 
+	       -- the value <index of POLYGON> or <index of SQUARE>.
+	       update_rt_type(other_index);
+	    end; -- if
+	    return;
+	 end; -- if
+
+	 -- (6)
+	 if (not is_dispatched) then
+	    -- Check case (6b)
+	    psz:INT;
+	    co_self:CLASSOB_S := (GLOBALS::class_inst).at_index(my_index);
+	    co_other:CLASSOB_S := (GLOBALS::class_inst).at_index(other_index);
+	    if (co_self.def = co_other.def) then
+	       if (co_self.is_parametrized and co_other.is_parametrized) then
+		  if (co_self.pinst.param_type_conforms_to(co_other.pinst)) then
+		     res := true;
+		     return;
+		  end; -- if
+	       end; -- if
+	    end; -- if
+	    return;
+	 end; -- if
+
+	 -- (8)
+--	 co1:CLASSOB_S := (GLOBALS::class_inst).at_index(other_index);
+-- If this type is $OB, it conforms to any non-basic type and vice versa (code 
+-- implemented above).
+	 if (my_index = RESERVED_CLASSES::OB_ici) then
+	    if (not tp.nonptr_p) then
+	       res := true;
+	       -- Using the example above, "GLOBALS::rt_type" gets the value
+	       -- <index of whatever object> (case (8)).
+	       update_rt_type(other_index);
+	    end; -- if
+	    return;
+	 end; -- if
+
+	 -- Allow (7) but catch error (7a)
+	 co1:CLASSOB_S := (GLOBALS::class_inst).at_index(my_index);
+
+	 if (co1.alldes.get(other_index)) then
+	    res := true;
+	       -- Using the example above, "GLOBALS::rt_type" gets the value
+	       -- <index of SQUARE> (case (7)).
+	    update_rt_type(other_index);
+	    return;
+	 end; -- if
+      end; -- if
+   end; -- conforms_to
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   param_type_conforms_to(other:$TYPEOB_S):BOOL is
+      -- Test if self conforms to other in the sence for when
+      -- self is the type of an arguemnt of a parameterized type
+      -- and is being checked for conformance with other which is
+      -- also the type of an argument of a parameterized type.
+      -- This routine is used to help compute_pdes in CLASSOB_S figure
+      -- out the descendant information based in parameterization.
+      
+      GLOBALS::rt_type := 0;
+      if (other = void) then
+	 if (self = void) then
+	    res := true;
+	 end; -- if
+	 return;
+      end; -- if
+      if (other = GLOBALS::voidtype_s) then
+	 return;
+      end; -- if
+      if (self = GLOBALS::voidtype_s) then
+	 res := true;
+	 return;
+      end; -- if
+      my_index:INT := inst_ind;
+      other_index:INT := other.inst_ind;
+
+      -- don't check for basic type conformance since basic types are
+      -- not dispatched, and since
+      -- FOO{INT} should not conform to FOO{FLOAT}, ...
+
+-- The following tests are all for non-basic classes.
+--
+--          A     FOO{X}
+--          |      |?
+--          v      v
+--          B     FOO{Y}
+--
+--     Table for "does FOO{Y} conform to FOO{X} by parameterization?"
+--     
+--          X  Y
+--         ------+--
+--          A  A | Y   (1)
+--          A  B | N
+--          B  A | N
+--          B  B | Y   (1)
+--          A $A | N
+--          A $B | N
+--          B $A | N
+--          B $B | N
+--         $A  A | Y   (2)
+--         $A  B | Y   (3)
+--         $B  A | N
+--         $B  B | Y   (2)
+--         $A $A | Y   (2)
+--         $A $B | Y   (3)
+--         $B $A | N
+--         $B $B | Y   (2)
+--     
+-- In the following case, Y = self, and X = other.
+
+
+      if (not other.is_dispatched) then
+	 if not is_dispatched then
+	    -- (1)
+	    if my_index = other_index then
+	       res := true;
+	       return; 
+	    end; -- if
+	 end; -- if
+      else -- other is dispatched
+	 -- (2)
+	 if my_index = other_index then
+	    res := true;
+	    return; 
+	 end; -- if
+
+	 -- (3)
+	 other_co:CLASSOB_S := (GLOBALS::class_inst).at_index(other_index);
+	 if other_co.alldes.get(my_index) then
+	    res := true;
+	    return;
+	 end;
+      end;
+   end; -- param_type_conforms_to
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   update_rt_type(index:INT) is
+      -- Before updating the global variable `rt_type', check that the
+      -- basic type is not F_OB.
+      if (my_basic_type /= RESERVED_CLASSES::FOB_ici) then
+	 GLOBALS::rt_type := index;
+      end; -- if
+   end; -- update_rt_type
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   my_basic_type:INT is
+      -- Returns basic type of this type expression.
+      if (basic_type = -1) then
+	 basic_type := inst_cls.basic_type;
+      end; -- if
+      res := basic_type;
+   end; -- my_basic_type
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   full_name:STR is
+      -- String representation of this type expression.
+      if (index < 0) or (disp) then
+	 res := STR::create.c('$').s(inst_cls.full_name);
+      else
+	 res := inst_cls.full_name;
+      end; -- if
+   end; -- full_name
+
+end; -- class INSTANT_TYPEOB_S
+	 
+--------------------------------------------------------------------
+
+class ROUT_TYPEOB_S is
+   -- Type expression of routine definitions.
+   
+   TYPEOB_S;
+   
+   attr list_paramstype:LST_TYPEOB_S;        -- Types of arguments of routine
+   attr retval_type:INSTANT_TYPEOB_S;	-- Return type of routine
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(parmstp:LST_TYPEOB_S; rtp:$TYPEOB_S; ln:INT):SAME is
+      -- Create a type expression for routines given the routine
+      -- return type and types of its parameters.
+      
+      res := new;
+      res.list_paramstype := parmstp;
+      -- This is just a safety-check, so that "retval_type" is used 
+      -- for the correct type.
+      if (rtp /= void) then
+	 if (rtp.type /= INSTANT_TYPEOB_S::type) then
+	    ERR_INFO::format_error_msg(
+	              ln,
+	              STR::create.s("(ROUT_TYPEOB_S):Return type object should be INSTANT_TYPEOB_S")); 
+	 end; -- if
+      end; -- if
+      res.retval_type := rtp;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      -- Duplicate type-expression (of routine).
+      res := create(list_paramstype.dup, retval_type.dup, lineno);
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   rettype:INSTANT_TYPEOB_S is
+      -- Return type of routine.
+      res := retval_type;
+   end; -- rettype
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   paramstype:LST_TYPEOB_S is
+      -- Types of parameters in routine.
+      res := list_paramstype;
+   end; -- argstype
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   conforms_to(tp:$TYPEOB_S):BOOL is
+
+      -- (a) "t1 x t2 -> t3" conforms to (b) "t1' x t2' -> t3'" if 
+      -- "t1 x t2" conforms to "t1' x t2'" and "t3'" conforms to "t3".
+      -- An example when this situation occurs is if (a) is the type of a 
+      -- routine call expression and (b) is the type of the routine definition.
+      --
+      -- Because for runtime type-checking, we need to check each argument 
+      -- individually, and set the flag to generate runtime type-checking code,
+      -- this routine is not used.
+      if (tp = void) then
+	 if (self = void) then
+	    res := true;
+	    return;
+	 end; -- if
+	 res := self.paramstype.conforms_to(void);
+	 if (res) then
+	    if (self.rettype /= void) then
+	       res := false;
+	    end; -- if
+	 end; -- if
+      else
+	 tp_rettype:INSTANT_TYPEOB_S := tp.rettype;
+	 self_rettype:INSTANT_TYPEOB_S := self.rettype;
+	 
+	 if (tp_rettype = void) then
+	    if (self_rettype = void) then
+	       res := true;
+	    else
+	       res := false;
+	    end; -- if
+	 else
+	    res := tp_rettype.conforms_to(self_rettype);
+	 end; -- if
+	 if (res) then
+	    res := self.paramstype.conforms_to(tp.paramstype);
+	 end; -- if
+      end; -- if
+   end; -- conforms_to
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   full_name:STR is
+      -- String representation of type expression (of routine).
+      rstr:STR; 
+      pstr:STR;
+      if (retval_type = void) then
+	 rstr := "<void>";
+      else
+	 rstr := retval_type.full_name;
+      end; -- if
+      if (list_paramstype = void) then
+	 pstr := "<void>";
+      else
+	 pstr := list_paramstype.full_name;
+      end; -- if
+      res := pstr.s("->").s(rstr);
+   end; -- full_name
+
+end; -- class ROUT_TYPEOB_S
+
+--------------------------------------------------------------------
+

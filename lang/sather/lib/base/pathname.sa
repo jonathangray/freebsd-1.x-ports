@@ -1,0 +1,250 @@
+-- -*- Mode: Sather;  -*-
+-- File: pathname.sa
+-- Author: Heinz Schmidt (hws@csis.dit.csiro.AU)
+-- Copyright (C) CSIRO Division of Information Technology, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: pathname canonicalization
+--*
+--* CLASSES: UNIX_PATH
+--* 
+--* REQUIRED FILES: lib/base/unix
+--*
+--* RELATED FILES: compiler/dot_sather_handler
+--*
+--* RCS: $Id: pathname.sa,v 1.1 1994/02/12 03:23:16 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 24 18:19 1993 (hws)
+--*  Oct 24 18:18 1993 (hws): fix a "concat" length error with stripping off "./"
+--*  Oct 17 06:23 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep  1 19:49 1993 (oscar): don't test automount stripping
+--*  Aug 30 15:23 1993 (oscar): don't strip off automount pathnames
+--*  May 17 00:05 1993 (hws): add test
+--*  May 16 21:52 1993 (hws): strip off /tmp_mnt in automounted pathnames
+--*  May 12 18:16 1993 (hws): fix a string access violation on variable subst
+--*  Feb 15 22:08 1992 (hws): extracted off dot_sather_handler now
+--*                           replaces the tilde_expand hacks.
+--* Created: Sat Feb 15 22:05:03 1992 (hws)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class UPATHS is -- portable logical pathnames.
+
+   env_v_val(st:STR):STR is
+      -- the value of the environment variable `st' or `default'.
+      res := UNIX::getenv(st);
+      if res = void then res := STR::create.s("$").s(st) end;
+   end;
+
+   canonicalize(st:STR):STR is
+      -- Given the path `st' substitute
+      -- all environment variables (terminated by . and /) by their values
+      -- a leading ~/ by the user home,
+      -- a leading ./ by the working directory,
+      -- leading ../'s by the working directory parent(s).
+      -- With dbg_key `paths' show the result on stdout.
+      var: STR; len:INT := st.length;
+      if st = void then return end;
+
+      -- substitute envi vars
+      i,j: INT; len := st.length; loop until!(i = len);
+	 if st[i] = '$' then
+	    -- find end which must be either / or .
+	    j := i+1;
+	    loop until!(j = len or st[j] = '/' or st[j] = '.'); j := j+1 end;
+	    var := env_v_val(st.substring(i+1,j-1));
+	    if i = 0 then
+	       st := STR::create.s(var).s(st.substring(j,len));
+	    else
+	       st := st.substring(0,i-1).s(var).s(st.substring(j,len));
+	    end;
+	    len := len-j+i+var.length; i := i+var.length;
+	 else
+	    i := i+1;	       
+	 end;
+      end;
+
+      -- relative      
+      if st[0] = '~' and len > 1 and st[1] = '/' then -- relative to home
+	 res := env_v_val("HOME").s(st.substring(1,len-1));
+      elsif st[0] = '.' then -- relative to working directory
+	 w: STR := UNIX::getcwd;
+	 if w /= void then
+	    res := patronize(st,st.length,w,w.length)
+	 end;
+      else
+	 res := st;
+      end;
+
+  --    res := UPATHS::strip_automount_name(res);
+      
+   end;
+
+-- Some systems support a so-called automount feature dynamically looking for
+-- a directory on a distributed file system and mounting it under a funny name
+-- such as "/tmp_mnt/the_real_name" or such. It may be convenient
+-- to suppress the automount directory. For instance we found that some
+-- programming tools do not always understand automounted pathnames. Some versions
+-- of Emacs tools don't understand them, for instance in error messages etc.
+-- Don't worry if your system does NOT support automount AND you do not have
+-- a mounted directory named that way.
+-- If you worry set the following variable to "" in the `main' of your program.
+
+   shared automount_name: STR := "/tmp_mnt"; -- the automount directory
+      
+   strip_automount_name(st: STR): STR is
+      -- strip off automount directory prefix, such as "/tmp_mnt".
+      -- See shared `automount_name' for actual value.
+
+      res := st;
+      autolen: INT := UPATHS::automount_name.length;    --- "/tmp_mnt" for instance
+      
+      if autolen /= 0 then
+	 len: INT := st.length;
+	    -- automount, in case
+	 if len > autolen then                          --- "/tmp_mnt/" for instance
+	    autolen := autolen-1; -- substring is inclusive
+	    if st.substring(0,autolen).is_equal(UPATHS::automount_name) then
+	       res := st.substring(autolen+1,len);
+	    end;
+	 end;
+      end;
+   end;
+   
+   patronize(st:STR; len_st:INT; wd:STR; len_wd:INT):STR is
+      -- strip off leading '..' off `st' and prepend appropriate prefix of `wd'.
+      if st[0] = '.' then
+	 if len_st > 1 and st[1] = '/' then
+	    res := STR::create.s(wd).s(st.substring(1,len_st-1));
+	 elsif len_st > 2 and st[1] = '.' and st[2] = '/' then
+	    loop until!(len_wd = 1 or wd[len_wd] = '/'); len_wd := len_wd-1 end;
+	    res := patronize(st.substring(3,len_st-1),len_st-3,
+		      wd.substring(0,len_wd-1),len_wd);
+	 elsif len_st = 2 and st[1] = '.' then
+	    loop until!(len_wd = 1 or wd[len_wd] = '/'); len_wd := len_wd-1 end;
+	    res := wd.substring(0,len_wd-1);	    
+	 else -- neither ./ nor ../ treat as name
+	    res := STR::create.s(wd).s("/").s(st);
+	 end;
+      else
+	 res := STR::create.s(wd).s("/").s(st);
+      end;
+   end;
+
+   filename(st:STR):STR is
+      -- the name (spoons.sa) in the path `st' (/user/me/spoons.sa)
+      st_end:INT := st.length-1;
+      stop:INT := st_end;
+     loop until!(stop < 0 or st[stop] = '/'); stop := stop-1 end;
+      res := st.substring(stop+1,st_end);
+   end;
+
+   dirname(st:STR):STR is
+      -- the directory name (/user/me) in the path `st' (/user/me/spoons.sa)
+      stop:INT := st.length-1;
+      loop until!(stop = 0 or st[stop] = '/'); stop := stop-1 end;
+      if stop = 0 then
+	 res := STR::create;
+      else
+	 res := st.substring(0,stop-1);
+      end;
+   end;
+
+   suffix(st:STR):STR is
+      -- the suffix (sa) in the path `st' (/user/me/spoons.sa)
+      st_end:INT := st.length-1;
+      stop:INT := st_end;
+      loop until!(stop < 0 or st[stop] = '/' or st[stop] = '.' );
+	 stop := stop-1 end;
+      res := st.substring(stop+1,st_end);
+   end;
+
+   filename_sans(st:STR):STR is
+      -- name without (sans) suffix (spoons) in the path `st' (/user/me/spoons.sa)
+      stop: INT := suffix(st).length;
+      name: STR := filename(st);
+      if name.length = stop then
+	 res := STR::create;
+      else 
+	 res := name.substring(0,name.length-stop-2);
+      end;
+   end;
+   
+   concat(p1,p2:STR):STR is
+      -- concatenate the paths p1 and p2, get rid of unnecessary '/' chars.
+      -- return p1/p2 as a new string
+      p1 := p1.copy;
+      if p1 = void then
+	 res := p2.copy;
+	 return;
+      elsif p2 = void then
+	 res := p1;
+	 return;
+      end;
+
+      -- get p1 to end in '/', and p2 to not start in "/" or "./"
+      len:INT := p1.length;
+      if p1[len-1] /= '/' then
+	 p1 := p1.c('/');
+      end;
+
+      p2start:INT := 0;
+      if p2[0] = '.' and p2[1] = '/' then
+	 p2start := 2;
+      elsif p2[0] = '/' then
+	 p2start := 1;
+      end;
+      if p2start /= 0 then
+	 p2 := p2.substring(p2start,(p2.length)-p2start);
+      end;
+      res := p1.s(p2);
+   end; -- concat
+
+end;
+
+class UPATHS_TEST is
+
+   TEST;
+
+   main(args: ARRAY{STR}) is
+      class_name("UPATHS");
+      s: STR := "/tmp_mnt/usr/lang/sather/lib/foo.sa";
+
+      test("Directory name", UPATHS::dirname(s), "/tmp_mnt/usr/lang/sather/lib");
+      -- don't check automount stripping
+      -- test("Canonicalize", UPATHS::canonicalize(s), "/usr/lang/sather/lib/foo.sa");
+      test("File name", UPATHS::filename(s), "foo.sa");
+      test("File suffix", UPATHS::suffix(s), "sa");
+      test("File sans suffix", UPATHS::filename_sans(s), "foo");
+      test("Strip automount", UPATHS::strip_automount_name(s), "/usr/lang/sather/lib/foo.sa");
+
+      finish;
+
+   end;
+   
+end; -- class UPATHS_TEST
+
+
+class UPATHS_TESTM is -- interactive test, pass command line argument.
+
+   main(args: ARRAY{STR}) is
+      s: STR := UPATHS::canonicalize(args[1]);
+      OUT::s("Can: ").s(s).nl;
+      OUT::s("Dir: ").s(UPATHS::dirname(s)).nl;
+      OUT::s("Nam: ").s(UPATHS::filename(s)).nl;
+      OUT::s("Suf: ").s(UPATHS::suffix(s)).nl;
+      OUT::s("San: ").s(UPATHS::filename_sans(s)).nl;
+      OUT::s("Mnt: ").s(UPATHS::strip_automount_name(s)).nl;
+   end;
+   
+end; -- class UPATHS_TESTM

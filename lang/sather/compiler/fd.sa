@@ -1,0 +1,84 @@
+-- File: fd.sa
+-- Author: Chu-Cheow Lim
+-- Created: Thu Jan 10 00:10:26 1991
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: 
+--* 
+--* RELATED PACKAGES: Must provide "fd.macros" for the relevant macros.
+--*
+--* RCS: $Id: fd.sa,v 1.1 1994/02/12 03:21:46 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 05:00 1993 (hws)
+--*  Oct 17 04:36 1993 (hws): Sather 1 syntax last week
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class FILE_DESCRIPTOR is
+   attr err_status:INT;
+   attr fp:INT;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   error:BOOL is
+      res := (fp = -1);
+   end; -- error
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   open_for_read(fn:STR):SAME is
+      res := new;
+      res.fp := C::fd_open(C::str_ptr_(fn),C::O_RDONLY, 0);
+      if (res.fp = -1) then
+	 res.err_status := C::errno;
+      end; -- if
+   end; -- open_for_read
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   open_for_write(fn:STR):SAME is
+      res := new;
+      res.fp := C::fd_open(C::str_ptr_(fn), (C::O_WRONLY).bit_or(C::O_CREAT), 
+                           0x1a4);
+      if (res.fp = -1) then
+	 res.err_status := C::errno;
+      end; -- if
+   end; -- open_for_write
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   close is
+      if (fp = -1) then
+	 return;
+      end; -- if
+      fp :=  C::fd_close(fp);
+      if (fp = -1) then
+	 err_status := C::errno;
+      end; -- if
+   end; -- close
+
+end; -- class FILE_DESCRIPTOR
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class C is
+   shared errno:INT;
+   
+   fd_open(s:F_OB; flags:INT; mode:INT):INT is end;
+   fd_close(fd:INT):INT is end;
+   
+   shared O_RDONLY:INT;
+   shared O_WRONLY:INT;
+   shared O_CREAT:INT;
+end; -- class C
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+

@@ -1,0 +1,263 @@
+ -*- Mode: Text;  -*-
+File: doc/INSTALL
+Author: Heinz W. Schmidt (hws@csis.dit.csiro.au) 
+(c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+Australia, 1992, 1993. 
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+This file describes how to install version 0.5 of the Sather
+distribution.
+
+If you have problems with this installation, send email to:
+
+	sather-admin@icsi.berkeley.edu
+
+See the file BUG_REPORTS in this case to make sure you are sufficiently
+specific.
+
+The system should build straight from the distribution on many UNIX platforms.
+For a list of supported platforms see the file doc/FAQ.
+
+The ftp directory contains binaries for some architectures if you want to
+avoid the trouble of installing the system yourself.
+
+If you want to run Sather on other platforms, read the file "doc/PORTING"
+before continuing with the steps described in "Installation" below.  The
+doc/PORTING file contains information about what we know of ongoing ports at
+the current point in time and instructions for how to port Sather to a new
+platform.
+
+If you want to support sather on multiple different architectures at
+your site from the same Sather directory tree, see the paragraph
+"Shared Installations" below.
+
+
+Installation
+============
+
+Below we describe the simplest installation procedure and then, make several
+observations and give hints to what can go wrong.  We assume you have untared
+the distribution and cd'ed to the top level directory.
+
+  1. configure
+
+     This step will configure make files and print a summary of the settings.
+     If you are  not happy with this, edit the file make/DEFSITE and run 
+     "configure" again. You can also pass the DEFSITE settings as command line
+     arguments, for example 
+
+                   "configure -TOPDIR /user/john/sather -CLANG ANSI"
+
+     Use "make showconfig" any time to look at your configuration settings.
+     
+
+  2. make -s 
+
+     This step builds the system in the current directory. If you 
+     omit "-s", you will obtain detailed make listings. The build
+     process takes 10 minutes on a Sparc10 with pmake, 40 minutes
+     on a Sparc2 with make and much longer on a 486 running linux.
+
+  3. IF AND ONLY IF you have TOPDIR different from SATHER_HOME
+     proceed with "make install".
+
+Now you are ready to try compiling some example Sather programs.  See the file
+"doc/STARTING" for more information.
+
+
+Details of installation step: configure
+=======================================
+
+The configuration step generates a Makefile for most subdirectories,
+
+ from Makefile.in in that directory, 
+ from make/DEFSITE representing your site definition,
+ from make/${ARCH}${CLANG} containing compilation flags for your environment,
+ from testing your environment.
+
+You can always type "make showconfig" to find out about the current setting.
+The configuration is also protocoled in detail in a file
+		     make/config.${ARCH}${CLANG}
+
+The next best thing after "configure" is to customize more explicitly.  For
+this you may change the parameters in make/DEFSITE, or pass command-line
+options to "configure", or change the compiler flags in
+make/${ARCH}${CLANG}. If you HAVE TO change the latter file to make the
+compilation work at all, please send a short problem note describing the
+problem with the distributed settings and including the files
+make/${ARCH}${CLANG} and make/config.${ARCH}${CLANG}
+ To: sather-admin@icsi.berkeley.edu
+ Subject: sather 0.5 make
+
+In case you wish to choose non-standard options for compiling the Sather
+runtime system and Sather precompiled classes, the following list of C flags
+may be helpful:
+
+-DSAFE_RT_: raise a runtime system exception when out of memory on `new' and friends
+           sys/C/runtime_.c
+
+-DGC_:     includes the GC
+           sys/C/runtime_.c, sys/C/all_.h
+
+-DPERSIST_TRACE: trace peristent store accesses
+           sys/C/deep_save_.c
+
+
+Details of installation step: make
+==================================
+
+This builds executables of all subsystems, such as the garbage collector (GC),
+the Sather debugger (SDB) etc and the Sather compiler (SATHER).  The compiler
+is bootstrapped. We have generated C code on a distribution host. There is a
+K&R C and an ANSI C version of the boot compiler. The configuration step will
+choose one depending on your compiler choice. The boot compiler is a full
+Sather compiler, which, once compiled, compiles the Sather compiler proper.
+The Sather sources of the compiler are customized in the configuration step to
+choose proper defaults for your environment.
+
+
+Details of installation step: make install
+==========================================
+
+This step copies the target executables and customized scripts to the target
+directories under SATHER_HOME -- if this is different from TOPDIR.
+
+If you wish, you can follow a "make install" by a "make clean".  Don't do a
+"make clean" in SATHER_HOME 8-O however, since that will delete some needed
+precompiled Sather classes (thus, don't do "make clean" if SATHER_HOME =
+TOPDIR).
+
+
+If something goes wrong :-( 
+===========================
+
+GCC WARNS cc1: /usr/tmp/cca10903.s: I/O error
+               write failed, file system is full
+
+GCC TMPDIR defaults to /usr/tmp which may not be as large as you think.
+setenv TMPDIR /tmp (or whatever you choose as intermediate area for gcc) and
+re-"make".
+
+
+C COMPILER WARNS: "warning: statement not reached"
+
+You should ignore any C compiler warning messages about unreachable code,
+i.e., "warning: statement not reached". The default settings for the C
+compiler make it compile quietly (-w). Perhaps, however, you want to see what
+is going on and you have changed the architecture specific settings in the
+make directory.
+
+
+C COMPILER WARNS: "illegal storage class"
+
+This can happen when the K&R C compiler is chosen with gcc -traditional. See
+the note about suppressing warnings with -w.
+
+
+DISK SPACE PROBLEMS:
+
+If you're short on disk space while installing and don't need one of the
+"kr" or "ANSI" boot compiler, you can savely delete the version you do not
+want to install.
+
+
+MEMORY PROBLEMS:
+
+Depending on the load of the installation machine you may experience memory
+problems when Sather compiles the compiler. One way this can show up is in not
+being able to copy files because the memory is already exhausted. Beside
+finding or buying a larger machine ;-) there are a number of ways to overcome
+this, you will know them, but others may not: minimize the number of other
+processes running on the machine, or, add more swap space, we use 64MB swap on
+our machines and 100MB swap on the development machine, ("pstat -s" tells you
+the "available" swap figure, we had a situation where 30MB available before
+running make was not enough but this may be due to GC settings.  We did not
+find time to tinker with this, if you do and push it down to the bare minimum
+let us know, please :-).)
+
+RESTART:
+
+If the installation was interrupted by you or for any other reason and a
+second attempt to build the system using make fails, you can cleanup the
+Sather directory by typing "make clean".  This removes most of the generated
+executables and also other intermediate information and allows you to start
+all over again by typing "make".
+
+Required Space
+==============
+
+The minimal configuration (without contrib etc) requires 
+
+SPACE         CONTENTS
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+<  3MB        tar'ed and compressed distribution
+< 10MB        untar'ed distribution directory tree
+                of this ~3.3MB ANSI C boot compiler
+                and     ~3.1MB K&R C boot compiler
+< 20MB        expansion during build
+<  5MB        installed (first time, i.e., one architecture)
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ 
+
+Moving the Sather directory tree
+================================
+
+The sather tree is relocatable, i.e. it can be moved around in a file system
+without requiring rebuilding. However you may want to update your make/DEFSITE
+file appropriately and run "configure" again to regenerate the compiler
+startup scripts.
+
+The directory tree location is entered in most Makefiles, the sys_dot_sather
+startup script, possibly in TAGS index files of the Emacs programming
+environment, indexing all sorts of Sather source files for fast browsing. All
+these can be fixed and brought up-to-date by editing the make/DEFSITE file
+after relocating the directory, and then running "configure" again.
+
+There are a few possible overriding ways for users to refer to the Sather
+directory, in the following order:
+
+* SATHER_HOME environment variable (cf. STARTING)
+* is overridden by the (sather_home) compiler directive in the .sather
+  file (cf. manual.txt)
+* is overridden by the -hom command line option to cs (cf. cs_options.txt)
+
+Only if none of these directives is used will the Sather compiler try to
+access the directory tree using the pathname that was used at the time of
+installation as the value of SATHER_HOME.
+
+
+Shared Installations
+====================
+
+Typically one assumes that the Sather system is build once for a particular
+hardware platform for which a port exists. Major parts of the system are
+written in Sather itself or in conditionalized C.  Different installations for
+different architectures can share the same directory tree. I.e., Sather and C
+source directories may be common while there are different bin directories
+bin.AA for each architecture AA supported by the same directory tree.
+
+Shared installations are created by running through the installation procedure
+several time following each "configure" immediately by an "make clean" step,
+as otherwise intermediate binary files might be included in the new build
+proces.
+
+You cannot run multiple installations concurrently from different target hosts
+accessing the same directory tree simultaneously.
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+ 
+Enjoy Sather! :-)
+
+
+PS: Sather is meant to combine the simplicity, ease and efficiency needed for
+serious OO programming. It may take some time to achieve this goal. If you are
+not satisfied don't sit and blame yourself - complain, discuss and improve
+Sather!  You may use the news group comp.lang.sather or the mailing list
+sather@icsi.berkeley.edu to do so. However, send requests to
+sather-admin@icsi.berkelely.edu.
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Smiley legend since we can't hear voice inflection over Unix...
+:-) Happy  ;-) Winky 8-) Big eyes :-( Frowning 8-O Omigod rm -r *
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+

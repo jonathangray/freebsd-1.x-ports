@@ -1,0 +1,380 @@
+-- -*- Mode: Sather;  -*-
+-- File: str_table.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION:  Stores strings found in Sather program.  A table is
+--*            initialized with Sather reserved words.
+--*
+--* RCS: $Id: str_table.sa,v 1.1 1994/02/12 03:21:54 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 31 14:07 1993 (hws)
+--*  Oct 31 14:07 1993 (hws): hack to support "arg" for Sather 1.0 bootstrap
+--*  Oct 24 23:16 1993 (hws): add include keyword
+--*  Oct 17 05:14 1993 (hws): Sather 1 syntax, copyright note
+--*  Feb 25 00:47 1993 (hws): add typecase
+--*  Feb 24 10:25 1993 (hws): add names for assertion tests
+--*  Feb 21 22:15 1993 (hws): add abstract, ensure, require init
+--*  Feb 21 17:47 1992 (hws): integrated the improved init
+--*  Aug 20 14:35 1991 (hws): added attribute init and alias
+--* Created: Wed Jun  6 16:48:50 1990 (clim)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class STR_TABLE is
+   -- String table with each string associated with a unique index.
+   -- We assume that when we augment the string table from the entries
+   -- in a file; the entries are stored in consecutive locations.
+   
+   attr stable:ARRAY{STR};		-- Array of strings.
+   attr htable:ARRAY{INT};		-- Indices into `htable'.
+   attr next_ind:INT;		-- Next position to insert string in `stable'.
+   shared reserved_names:INT_HASH_SET := INT_HASH_SET::create;
+      -- Reserves the following names
+      -- asize1, asize2, asize3, asize4, copy, /* deep_copy */, extend, new, res, 
+      -- self, type, void
+   
+   attr ssize:INT;
+   attr hsize:INT;
+      -- These values are accessible using "asize" of the tables, but
+      -- stored separately to speed up access.
+
+   RESERVED_CLASS_NAMES;
+   RESERVED_KEYWORD_NAMES;
+   RESERVED_FEAT_NAMES;
+   RESERVED_WORDS;
+      -- Inherit the strings for reserved words, and their (constant)
+      -- indices.  
+   
+   const init_size:INT := 2000;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create:SAME is
+      -- Store reserved names (not reserved keywords) 
+      reserved_names := reserved_names.insert(asize1_ind).
+                                       insert(asize2_ind).
+                                       insert(asize3_ind).
+                                       insert(asize4_ind).
+                                       insert(copy_ind).
+                                       insert(extend_ind).
+				       insert(init_ind).
+				       insert(new_ind).
+                                       insert(res_ind).
+                                       insert(self_ind).
+                                       insert(type_ind).
+                                       insert(void_ind);
+      -- Store reserved strings
+      res := new;
+      
+      res.ssize := init_size;
+      res.hsize := 2 * res.ssize;
+      res.stable := res.stable.new(res.ssize);
+      res.htable := res.htable.new(res.hsize);
+      
+      res.stable[0] := "";	-- Empty string stored at location 0
+      res.stable[alias_kw_ind] := alias_kw_name;
+      res.stable[attr_kw_ind] := attr_kw_name;
+      res.stable[undefine_kw_ind] := undefine_kw_name;
+      res.stable[require_kw_ind] := require_kw_name;
+      res.stable[ensure_kw_ind] := ensure_kw_name;
+      res.stable[invariant_kw_ind] := invariant_kw_name;
+      res.stable[typecase_kw_ind] := typecase_kw_name;
+      res.stable[abstract_kw_ind] := abstract_kw_name;
+      res.stable[include_kw_ind] := include_kw_name;
+      res.stable[and_kw_ind] := and_kw_name;
+      res.stable[assert_kw_ind] := assert_kw_name;
+      res.stable[break_kw_ind] := break_kw_name;
+      res.stable[class_kw_ind] := class_kw_name;
+      res.stable[constant_kw_ind] := constant_kw_name;
+      res.stable[debug_kw_ind] := debug_kw_name;
+      res.stable[else_kw_ind] := else_kw_name;
+      res.stable[elsif_kw_ind] := elsif_kw_name;
+      res.stable[end_kw_ind] := end_kw_name;
+      res.stable[if_kw_ind] := if_kw_name;
+      res.stable[inline_kw_ind] := inline_kw_name;
+      res.stable[is_kw_ind] := is_kw_name;
+      res.stable[loop_kw_ind] := loop_kw_name;
+      res.stable[not_kw_ind] := not_kw_name;
+      res.stable[or_kw_ind] := or_kw_name;
+      res.stable[private_kw_ind] := private_kw_name;
+      res.stable[protect_kw_ind] := protect_kw_name;
+      res.stable[raise_kw_ind] := raise_kw_name;
+      res.stable[against_kw_ind] := against_kw_name;
+      res.stable[return_kw_ind] := return_kw_name;
+      res.stable[readonly_kw_ind] := readonly_kw_name;
+      res.stable[shared_kw_ind] := shared_kw_name;
+      res.stable[switch_kw_ind] := switch_kw_name;
+      res.stable[then_kw_ind] := then_kw_name;
+      res.stable[until_kw_ind] := until_kw_name;
+      res.stable[when_kw_ind] := when_kw_name;
+      res.stable[while_kw_ind] := while_kw_name;
+      res.stable[asize_ind] := asize_fname;
+      res.stable[asize1_ind] := asize1_fname;
+      res.stable[asize2_ind] := asize2_fname;
+      res.stable[asize3_ind] := asize3_fname;
+      res.stable[asize4_ind] := asize4_fname;
+      res.stable[copy_ind] := copy_fname;
+      res.stable[deep_copy_ind] := deep_copy_fname;
+      res.stable[extend_ind] := extend_fname;
+      res.stable[init_ind] := init_fname;
+
+      res.stable[new_ind] := new_fname;
+      res.stable[type_ind] := type_fname;
+     
+      res.stable[res_ind] := res_vname;
+      res.stable[self_ind] := self_vname;
+      res.stable[exception_ind] := exception_vname;
+      res.stable[arg_ind] := arg_vname;
+    
+      res.stable[false_ind] := false_name;
+      res.stable[true_ind] := true_name;
+      res.stable[void_ind] := void_name;
+   
+      res.stable[array_ind] := array_classname;
+      res.stable[array2_ind] := array2_classname;
+      res.stable[array3_ind] := array3_classname;
+      res.stable[array4_ind] := array4_classname;
+      res.stable[bool_ind] := bool_classname;
+      res.stable[c_ind] := c_classname;
+      res.stable[char_ind] := char_classname;
+      res.stable[double_ind] := double_classname;
+      res.stable[file_ind] := file_classname;
+      res.stable[int_ind] := int_classname;
+      res.stable[real_ind] := real_classname;
+      res.stable[self_type_ind] := self_type_classname;
+      res.stable[str_ind] := str_classname;
+      res.stable[str_cursor_ind] := str_cursor_classname;
+   
+      res.stable[ob_ind]  := ob_classname;
+      res.stable[sys_ind] := sys_classname;
+      res.stable[fob_ind] := fob_classname;
+      res.stable[sux_ind] := sux_classname;
+      res.stable[undefine_ind] := undefine_classname;
+
+      res.stable[err_ind] := err_classname;
+      res.stable[in_ind] := in_classname;
+      res.stable[out_ind] := out_classname;
+
+      res.next_ind := last_reserved_word_ind + 1;
+
+      i:INT := 1;
+      loop until!((i > last_reserved_word_ind));      
+	 insert:INT := res.hash_string(res.stable[i]);
+	 loop
+	    if (res.htable[insert] /= 0) then
+	       insert := (insert + 1).u_mod(res.hsize);
+	    else
+	       break!;
+	    end; -- if
+	 end; -- loop
+	 res.htable[insert] := i;
+	 i := i + 1;
+      end; -- loop
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   augment is
+      -- The string table is augmented with the list of <index, string>
+      -- pairs created from previous compilation.
+      fname:STR := STR::create.s(COMPILER_OPTIONS::target_dir).
+                            s(INSTALL_CONSTS::name_ind_file);
+      f:STR_TAB_FILE := STR_TAB_FILE::new;
+      f.open_for_read(fname);
+      if (f.error /= 0) then
+	 return;
+      else
+	 -- Assume the file has correct format "<index>$<string>\n" and
+	 -- a)  The indices are distinct.
+	 -- b)  The specified locations are empty.
+	 i:INT := f.get_i;
+	 c:INT := f.get_ci;
+	 s:STR := f.get_s_up_to('\001');
+	 first:INT := i; 
+	 prev:INT;
+	 loop until!(f.check_eof);
+	    if (i = ssize) then
+	       double_tables;
+	    end; -- if
+--	    OUT::s("String = ").s(s).s("; index = ").i(i).c('\n');
+	    -- Predefined words take precedence.
+	    if (stable[i] = void) then 
+	       stable[i] := s;
+	    end; -- if
+	    prev := i;
+	    i := f.get_i;
+
+	    c := f.get_ci;
+	    s := f.get_s_up_to('\001');
+	 end; -- loop
+	    -- NOTE: Remember to update the index of the string table.
+	 next_ind := prev + 1;
+	 last:INT := prev;
+	 i := first;
+	 loop until!(i > last);
+	    insert:INT := hash_string(stable[i]);
+	    loop
+	       if (htable[insert] /= 0) then
+		  insert := (insert + 1).u_mod(hsize);
+	       else
+		  break!;
+	       end; -- if
+	    end; -- loop
+	    htable[insert] := i;
+	    i := i + 1;
+	 end; -- loop
+	 f.close;
+      end; -- if
+   end; -- augment
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   reserved_name_p(nm:INT):BOOL is
+      -- Returns "true" if `nm' is in the list of reserved names.
+      res := reserved_names.get(nm);
+   end; -- reserved_name_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   hash_string(s:STR):INT is
+      -- Hash function on a string stored in an object of type `STR'.
+      i:INT := 0;
+      loop until!(s[i] = '\0');
+	 res := s[i].to_i + 31 * res;
+	 i := i + 1;
+      end; -- loop
+      res := res.u_mod(hsize);
+   end; -- hash_string
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   hash_string_buf(s:STR_BUFFER):INT is
+      -- Hash function on a string stored in an object of type `STR_BUFFER'.
+      i:INT := 0;
+      loop until!(s[i] = '\0');
+	 res := s[i].to_i + 31 * res;
+	 i := i + 1;
+      end; -- loop
+      res := res.u_mod(hsize);
+   end; -- hash_string_buf
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   index_of_str(s:STR_BUFFER):INT is
+      -- Returns the index of a string, inserting a copy if not already there
+      if (s = void) then
+	 res := -1;
+	 return;
+      end; -- if
+      insert:INT := hash_string_buf(s);
+      loop
+	 if (htable[insert] = 0) then
+	    htable[insert] := next_ind;
+	    stable[next_ind] := s.strval;
+	    res := next_ind;
+	    next_ind := next_ind + 1;
+	    if (next_ind = ssize) then
+	       double_tables;
+	    end; -- if
+	    return;
+	 elsif (s.is_equal(stable[htable[insert]])) then
+	    res := htable[insert];
+	    return; 
+	 else
+	    insert := (insert + 1).u_mod(hsize);
+	 end; -- if
+      end; -- loop
+   end; -- index_of_str
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   insert_str(s:STR):INT is
+      -- Returns the index of a string, inserting a copy if not already there.
+      -- This works for "STR" where "index_of_str" works for "STR_BUFFER".
+      -- Also this does not copy the string.
+      if (s = void) then
+	 res := -1;
+	 return;
+      end; -- if
+      insert:INT := hash_string(s);
+      loop
+	 if (htable[insert] = 0) then
+	    htable[insert] := next_ind;
+	    stable[next_ind] := s;
+	    res := next_ind;
+	    next_ind := next_ind + 1;
+	    if (next_ind = ssize) then
+	       double_tables;
+	    end; -- if
+	    return;
+	 elsif (s.is_equal(stable[htable[insert]])) then
+	    res := htable[insert];
+	    return; 
+	 else
+	    insert := (insert + 1).u_mod(hsize);
+	 end; -- if
+      end; -- loop
+   end; -- insert_str
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   find_str(s:STR):INT is
+      -- Returns the index of a string or -1 if not found in table.
+      if (s = void) then
+	 res := -1;
+	 return;
+      end; -- if
+      insert:INT := hash_string(s);
+      loop
+	 if (htable[insert] = 0) then
+	    res := -1;
+	    return;
+	 elsif (s.is_equal(stable[htable[insert]])) then
+	    res := htable[insert];
+	    return; 
+	 else
+	    insert := (insert + 1).u_mod(hsize);
+	 end; -- if
+      end; -- loop
+   end; -- find_str
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   double_tables is
+      -- Double size of string table.
+      old_ssize:INT := ssize;
+      ssize := ssize * 2;
+      hsize := 2 * ssize;
+      htable := htable.new(hsize);
+      stable := stable.extend(ssize);
+      i:INT := 1;
+      insert:INT;
+      loop until!(i >= old_ssize);
+	 if (stable[i] /= void) then
+	    insert := hash_string(stable[i]);
+	    loop
+	       if (htable[insert] /= 0) then
+		  insert := (insert + 1).u_mod(hsize);
+	       else
+		  break!;
+	       end; -- if
+	    end; -- loop
+	    htable[insert] := i;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- double_tables
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   at_index(i:INT):STR is
+      -- Returns string at index i.
+      res := stable[i];
+   end; -- at_index
+
+end; -- class STR_TABLE
+
+--------------------------------------------------------------------
+

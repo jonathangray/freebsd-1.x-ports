@@ -1,0 +1,232 @@
+NOTE:
+The three attributes about updated class are computed by certain
+phases as follows:
+
+c_type_updated      --  all_compute_anc_and_des_and_time_stamp
+structure_updated   --  First phase of all_semant
+                        ("semant" in CLASSOB_S)
+internal_updated    --  Second phase of all_semant 
+                        ("mark_callees_and_callers" in CLASSOB_S)
+
+
+Consider following cases:
+
+class Q
+....
+    x:P;
+end;
+
+In "do_update_info" phase, if P has been marked as
+"structure_updated", then Q is marked "internal_updated", because the
+interface to P may have changed.  An example is:
+    class P
+       f:INT;
+    end;
+and the definition of P is being changed to:
+    class P
+       f:INT is ... end;
+    end;
+then any invocation "x.f" can remain unchanged in Q, but the C code
+to be generated for "x.f" in Q has changed.
+
+class Q
+....
+    x:$P;
+end;
+
+But the above case still gives the same result as the first case.  The
+reason we do not have to check the descendents of P is that if the
+types of the descendents' features must still be compatible with the
+types of P's features.  Hence, checking whether P has been marked as
+"structure_updated" is sufficient.
+
+Jan 20:  The implementation is changed to the following.  Instead of
+calling "do_update_info" on the features, (using the example above),
+in the "semant" phase, when P (and maybe its descendents) is put on
+Q's "callees", at the same time, Q (but not its descendents) is put on
+P's "callers".  At the start of the "misc_info" on P, then if P has
+been marked as "structure_updated", then Q (and other of P's
+"callers") are marked as "internal_updated".
+     
+----------------------------------------------------------------------
+
+class Q
+...
+     x:P;
+...  x.f2; (*)
+end;
+
+If (*) is inserted, and "f2" in class P was not previously used and
+hence not generated, then we need to mark P as "internal_updated" and
+regenerate the code for P.
+
+class Q
+...
+     x:$P;
+...  x.f2; (*)
+end;
+
+This case is even worse.  If "f2" in class P (and some or all of P's
+descendents) was not previously used and hence not generated, then we
+need to mark P and all its descendents as "internal_updated" and
+regenerate the code for P.  The code to do this is in "semant" routine
+for EXPR_ARGS_EXPROB_S and TYPESPEC_ARGS_EXPROB_S.
+
+----------------------------------------------------------------------
+
+class Q
+...
+     x:P (**)
+end;
+
+If (**) is newly inserted into the code, and P was not previously used
+and hence the whole C file for P not generated, then we need to mark P
+as "internal_updated" and generate the code for P.
+
+
+class Q
+...
+     x:$P (**)
+end;
+
+The reasoning is similar the previous case, except for those
+descendents of P which were not previously generated, we have to
+generate the code now.
+
+NOTE: This problem is solved by recording only those classes which
+have been generated.  Hence P will be automatically recorded as
+"structure_updated" (which is more stringent than necessary but
+correct).
+
+NOTE1: However, we encounter the following problem.  When implementing
+the ability to call "f.expr" where f is of type $OB, we may mark some
+classes as being used in the "semant" phase.  Hence we must do the
+checks on all classes, independent of whether the class is marked used
+or not.  (This marker becomes relevant only during the code-generation
+phase where we generate only C code for classes marked used.)  But
+this change to check all classes make it possible for useless classes
+which are not generated (but now marked "updated") to affect the
+update-status of classes which have not changed at all.  The solution
+to this is to do computation for all classes up till the "semant"
+phase; then in the "semant" phase, only used classes are invoked.  But
+when an "f.expr" is encountered, we mark the class and go on.  The
+loop that calls "semant" on all classes will have to continue till
+there is a fixed point.
+
+----------------------------------------------------------------------
+
+The mapping between name-strings and integers must be recorded because
+the integers are used in the dispatching process.  Hence this mapping
+must remain consistent from one compilation to the next.  Hence after
+the string table is created, and before the compiler starts reading in
+anything (ie even before reading the compiler commands), the string
+table is augmented with strings from previous compilation.  (In the
+current implementation, this augmentation is done just after all the
+options have been set up.)
+
+
+
+----------------------------------------------------------------------
+
+Removing C files:
+~~~~~~~~~~~~~~~~~
+
+We can never really tell what user C files have been involved in the
+previous compilation.  For example, if a ".y" file has been specified,
+the user may have generated (using user's makefile) ".c" and ".o"
+files with completely different names.  Hence the reasonable thing
+seems to be the following rule:
+-- If a ".c" or ".s" file is found, we'll try to remove ".o" file as well.
+-- If a ".h" file is found, it is removed and nothing else.
+-- If a file with other suffix is found, warn user about other C files
+related to this.
+
+----------------------------------------------------------------------
+
+Handling compiler commands in incremental compilation:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+(source_files) <list of Sather file names>
+-- Any updating required is simply handled from the Sather classes and
+   their time-stamps. (*)
+
+
+(c_files) <list of user C files>
+-- Keeps a mapping of user C filename and time-stamp.
+-- There are four possibilities:
+          Current compilation          Previous compilation
+          ~~~~~~~~~~~~~~~~~~~          ~~~~~~~~~~~~~~~~~~~~
+          Time-stamp = t1                Time-stamp = t2
+ a. t1 = t2.  Do nothing.
+ b. t1 /= t2. Do nothing.  The makefile will re-compile the C file.
+ c. t1 does not exist, but t2 does.  Link the user C file.
+ d. t2 does not exist, but t1 does.  In "record_new_cfiles" in
+    CLASS_STAT_TBL, the old file is noted in "cfiles_to_be_deleted".
+-- (*)
+
+
+(c_makefile) <user makefile> 
+-- If a makefile has been updated, the user is responsible for "touch"ing
+   his/her C files, so that the makefile will be re-executed.
+-- The Sather compiler can keep track of makefiles and the
+   time-stamps, but cannot force "make" to re-do all the files.
+-- (*)
+
+
+(debug_keys) <list of debug/assert keys>
+-- There is a global table which keeps a list of <class index, key id> pairs,
+   and a similar table saved from previous compilation.
+  
+-- The algorithm is:
+   If a key found in a class routine is 
+   a.  on in previous compilation but off in current compilation, or
+   b.  off in previous compilation but on in current compilation, then
+   mark the class as being "internal_updated".
+(*)
+
+(cc_flags) <list of C compiler flags>
+-- All the flags are stored as strings.
+-- If the intersection of current and previous sets of flags is
+   non-empty, and if a class C1 is not regenerated, then use the
+   system call "utimes" to update the C file for class C1.
+-- NOTE: Current implementation simply marks "new_compilation" which
+         means all the files are generated.
+(*)
+
+(c_macro) <C macro definition followed by list of feature names in class C>
+-- 
+
+
+(c_name) <mapping between a C name and feature specification>
+-- There is a global table keeping a list of pairs
+   <<class index, index of feature name>, string of C name> and a similar
+   table saved from previous compilation.  The first item in the pair
+   is encoded from the class index and index of feature name.
+-- Compare the two tables:
+   If a pair is found in previous compilation but not current
+   compilation or vice-versa, then mark the class as being 
+   "structure_updated".
+(*)
+-- NOTE: Currently the class is marked as "structure_updated"; a better
+         method may be to just mark the class C1 as just having the name
+         change, and any class accessing a feature in C1 is "touch"ed,
+         rather than regenerated (if it is not necessary).
+    
+
+(include) <list of files in the .sather format>
+-- Ignore the list of files, because all relevant information has been
+   stored, and dealt with separately. (*)
+
+
+(sather_home) <directory containing system files>
+-- Consider this as completely new compilation.  This is drastic, but
+   should not happen that often. (*)
+
+
+(c_compiler) <name of C compiler>
+-- If C compiler has changed, we must recompile everything (ie
+   consider this as completely new compilation). (*)
+
+(*) = DONE
+
+

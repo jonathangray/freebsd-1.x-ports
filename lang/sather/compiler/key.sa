@@ -1,0 +1,96 @@
+-- -*- Mode: Sather;  -*-
+-- File: key.sa
+-- Author: Chu-Cheow Lim
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Key associated with CLASSOB_S (constructed during semantic check)
+--*
+--* RCS: $Id: key.sa,v 1.1 1994/02/12 03:21:52 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 05:02 1993 (hws)
+--*  Oct 17 04:47 1993 (hws): Sather 1 syntax, copyright note
+--* Created: Sat Jun  9 21:32:25 1990
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class KEY is
+   -- Parent class for different kinds of key
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   hash(max:INT):INT is
+      -- Must be defined for all descendents
+   end; -- hash
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   is_equal(k:$KEY):BOOL is
+      -- Must be defined for all descendents
+      res := (k.type = self.type);
+   end; -- equal
+
+end; -- class KEY
+
+--------------------------------------------------------------------
+
+class LSTINT_KEY is
+   KEY;
+   LIST{INT};
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   hash(max:INT):INT is
+      i:INT := 0;
+      sum:INT := 0;
+      loop until!(i >= size);
+	 sum := sum + [i];
+	 i := i + 1;
+      end; -- loop
+      res := (sum * sum).u_mod(max);
+   end; -- hash
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   is_equal(k:LSTINT_KEY):BOOL is
+      -- Returns "true" if all integers are equal
+      res := true;
+      ksz:INT;
+      if (k /= void) then
+	 ksz := k.insert;
+      end; -- if
+      if (size /= ksz) then
+	 res := false;
+	 return;
+      end; -- if
+
+      -- Both lists have the same size.
+      i:INT := 0;
+      loop until!(i >= size);
+	 -- Compare corresponding elements in both lists
+	 if ([i] /= k[i]) then
+	    res := false;
+	    return;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- equal
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   key_print(outfile:OUTFILE) is
+      i:INT := 0;
+      outfile.c('[');
+      loop until!(i >= size);
+	 outfile.i([i]).c(',');
+	 i := i + 1;
+      end; -- loop
+      outfile.c(']');
+   end; -- key_print
+
+end; -- LSTINT_KEY

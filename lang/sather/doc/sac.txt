@@ -1,0 +1,797 @@
+
+	       SAC -- A generator for Sather to C interfaces
+	       =============================================
+
+			     Heinz W. Schmidt
+
+			       May 1991
+
+
+			       ABSTRACT
+				   
+The foreign function interface of Sather permits the Sather programmer to
+build on abstract data types, modular packages written in C, creating and
+accessing C data via function calls. This is a safe and simple interface to
+foreign packages and allows the programmer to take advantage of well-tested
+and professionally maintained C packages.
+
+Often there is a need to share data with such C packages in order to avoid
+the runtime cost incurred by function calls and the code duplication
+sometimes required to make some data access via an externally callable C
+function.  For instance many user interface packages based on X, such as
+XView, achieve efficiency by supporting some abstract function calls in the
+spirit of abstract data types not only in terms of public C functions but
+also by public #defines, that promote the use of symbolic constants for
+effectively packing and unpacking data or the use of function calls that
+are efficiently implemented by macros expanding to fast accesses.
+
+Any remedy for the lack of data sharing with C packages to achieve
+efficient call-forth and call-back requires to avoid the YAL effect (yet
+another layer -- of functions) or requires to rely on highly globally
+optimizing C compilers that could eliminate such an artificial layer of
+functions by propagating constants and by inlining small functions across
+the borderline between foreign C packages and Sather generated C code.
+
+Avoiding C functions however may collide with type-safety requirements for
+the Sather code calling C functions or may increase the complexity of the
+Sather C coder, the garbage collector, interpreter/debugger or any other
+Sather development tool.
+
+A simple means for avoiding the hassle and cutting down on the C code is
+the use of C macros that are used internally by the compiler and by some
+development tools but that we do not promote since it may open a can of
+worms and release them in otherwise type-correct Sather code.
+
+This document describes a safe way to using C macros by offering a few
+library classes that use macros in a predefined and tested way and by
+offering a conversion facility that allows to describe foreign abstract
+data types written in a Sather-like notation.  The conversion facility
+generates macros each of which is backed up by an equivalent C function to
+be used with interpreted code.  In this way a set of macros is always kept
+consistent with a set of C functions and there is no need for the
+programmer to mess with macros manually. Yet an optimized interface to C
+packages can finally be compiled when the C function version of the code is
+well-tested.
+
+			      ACKNOWLEDGEMENT
+
+	Thanks to Jeff Bilmes, Steven Omohundro and especially to Chu-Cheow
+Lim with whom I discussed an intermediate conversion scheme in detail and
+who discovered some loopholes.
+
+
+
+			     TABLE OF CONTENTS
+
+	1. MOTIVATION
+
+	2. FOREIGN TYPES
+	2.1 Basic Types
+	2.2 COB For Modeling Foreign Types
+
+	3. FOREIGN DATA DEFINITION
+	3.1 Abstract data types: structures
+	3.2 Constants
+	3.3 Subst C Functions
+
+	4.SAC syntax
+
+	5. Conversion and Use
+	5.1 Interactive Conversion
+	5.2 Batch Conversion
+
+	6. Considerations for pSather
+
+	7. Summary
+
+	APPENDIX I:   Rules
+	APPENDIX II:  Files
+	APPENDIX III: sac.el
+
+
+1. MOTIVATION
+
+For all languages compiling into C or binding with object code generated
+from C, the foreign language interface opens a door to existing well-tested
+and maintained libraries and at the same time to a bag of worms. The Sather
+language is no exception. For instance, a Sather user may wish to access a
+C package originally designed for use by other C programs. Even if the C
+package interface is well-designed for a modular use, it may be necessary
+to pass data forth and back that is defined or created by the C package. A
+pure function interface would require data conversion and would incur too
+high a runtime cost implied by the duplication of data and their runtime
+conversion.
+
+Different languages deal with this problem in different ways.  Various
+implementations of Lisp on Unix for instance, guarantee a fixed data format
+for many basic types (such as int, double etc) and for many generic types
+(such as arrays), so that they can be read safely by C routines and vice
+versa. To avoid clashes between the garbage collector (GC) and C packages
+holding pointers to such data, the respective data can be declared as
+static, that is unmovable by the GC.
+
+In Sather we only want to guarantee a fixed correspondence between basic
+Sather types and a few basic C types but do not want to promote direct
+access to instances and want all instances be collectable.  Furthermore, to
+keep the Sather interpreter simple, we rely on a pure foreign function
+interface to C.
+
+For an optimized Sather program, the compiler and parts of the Sather
+envrionment written in Sather, rely on a set of macros, which are basically
+C #define macros. These 'macro calls' are preprocessed by the C
+preprocessor before the C code, generated from Sather, is compiled. Such
+macros can be used to access shared structures such as C structures defined
+in a C package or to propagate constants from C packages to Sather. In more
+general terms, the macros can be used for efficiently implementing an
+abstract data type (ADT) around C data objects such that each macro
+function is, at the same time, 'backed up' by a C function that is used in
+unoptimized code such as code to be interpreted or debugged.
+
+Since we do not want to promote the use of such c_macros but also do not
+want to make the efficiency of Sather-to-C-package interfaces depend too
+much on global dataflow analysis and optimization across C and Sather
+borderlines (global inlining and constant propagation of the C compiler) we
+have developed a programming discipline for building ADT's around C data
+types and written a generator for supporting this discipline. This Sather
+to C interface generator takes a kind of ADT definitions and generates
+foreign function declarations to be included for the Sather compiler.
+Additionally it creates a macro file for opimizing calls to these functions
+in an optimized version of the code. No single macro is generated that is
+not backed up by an equivalent C function!
+
+
+2. FOREIGN TYPES
+
+2.1 Basic Types
+
+The following correspondence between basic Sather types and C types is
+guaranteed by the Sather compiler (cf. the Sather manual).
+
+INT  -> int
+REAL -> float
+DOUBLE -> double
+
+CHAR -> char
+BOOL -> char
+
+Everything else is passed as a 'ptr'. The 'ptr' type declaration is
+included in all C code generated from Sather. It is actually equivalent to
+'char *'.
+
+
+2.2 COB For Modeling Foreign Types
+
+Sather includes a predefined most general type of values of foreign
+types called F_OB.
+
+The following Sather classes are defined in the auxiliary library file
+cob.sa. They are subtypes of F_OB.
+
+ COB         --  C objects
+   CKEY      --  C keys (integer constants used to enumerate and identify)
+      CHAN   --  handles of C objects
+   CSTR      --  C strings
+   CARRAY    --  C arrays (of COBs)
+      CSTRAY --  C arrays (of CSTRs)
+
+The indentation corresponds to the inheritance relation. For instance
+CHAN inherits from CKEY inherits from COB.
+
+cob.sa is based on a few foreign functions to access the corresponding C
+objects. Most of these functions have macro counterparts that can be
+included in the .sather file when optimized code is to be generated.
+
+The foreign COB functions receive and return objects of these types.  The
+distinction of foreign function arguments and results that is possible due
+to this differentiation of foreign types, increases the power of the
+type-checker to catch illegal uses of foreign functions.
+
+In general all arguments are of a dispatched type. And often the result
+type is a dispatched type too to give the respective operation a generic
+character. This implies that it can be used with various type of 
+the COB hierarcy and depending on the argument types it returns differnt
+types of results. (Unfortunately such dependencies cannot be expressed
+for foreign functions, since there is exactly one variant of such
+a function and it 'lives' in class C.) 
+
+Although various types of arguments may be passed legally, in general the
+argument/result types will not be $COB's but COB subtypes. The possibility
+of restricting parameters (to subtypes) without losing the capability of
+casting in a type-compatible way shows powerful aspect of an
+object-oriented type system such as the one of Sather. In particular for
+modeling foreign types this seems to be an elegant way for gradually
+increasing the safety of a foreign function interface.  While strongly
+typed languages such as C rely on an escape from type-checking (casting) to
+offer the language user a means of strict checking combined with the
+effectively type-less freedom of parameter passing, Sather does implicit
+type conversion only if these are compatible with the subtype hierarchy.
+The more differentiated the foreign type-hierarchy, the finer the meshes of
+the type-checking catching illegal function uses.
+
+For instance, a CSTRAY variable may be used as actual parameter of a $COB
+function or a $COB value may be (reverse) assigned to a CSTRAY variable
+with optional runtime type checking. The additional checking granted by the
+Sather type reflection of a foreign abstract data type is obtained without
+paying the dangerous tribut of random manual casting in C.
+
+However, the foreign function definitions written in C really expect
+the corresponding C types and return them. We only want to use the
+typing capabilities of Sather in this context not the class
+capabilities. This means the aspect of dynamic instantiation and late
+binding (dynamic dispatch) is irrelevant. Precisely these points are
+the intention of the Sather's F_OB support. The compiler checks that
+code does not rely on runtime-type information of foreign objects.
+The COB type hierarchy is actually a type hierarchy and NOT a class
+hierarchy in the proper sense. COB and its children are meant to
+'overlay' types of C objects.  The compiler checks that COB is not
+used to create Sather objects. In particular it excludes that 
+
+	    new, copy and deep_copy are not used on COB objects
+
+and 
+
+		    'dispatching on' COB objects is
+
+is not supported (i.e. an object of a $ type) in the COB hierarchy cannot
+be 'dotted into'. For instance,	
+
+			     x: $COB;  x.do_y
+
+is illegal. 
+
+In other words: The Sather functions and C functions of COB types
+collectively form a FOREIGN ABSTRACT DATA TYPE. That is, an ADT that is
+implemented entirely in C outside of Sather. Only foreign constructors must
+be used to create instances. And dispatching to generic functions must be
+resolvable at compile-time.
+
+Our interface generator relies on the correspondence between these Sather
+type names and the corresponding C objects. This means, the C function
+definitions generated by the interface generator work with a fixed mapping
+from COB types to C types as listed below (including the basic type mapping
+given again):
+
+INT    -> int
+REAL   -> float
+DOUBLE -> double
+
+CHAR   -> char
+BOOL   -> char
+
+CKEY   -> int
+CHAN   -> int
+CARRAY -> ptr *
+CSTRAY -> ptr *
+
+This correspondence is extensible by means of converter variables and by
+establishing a correspondence between Sather classes and C structures, cf.
+the next section.
+
+By default all other Sather types are mapped to 'ptr'.
+
+
+3. FOREIGN DATA DEFINITION
+
+The data definition facility supported by the generator allows the user to
+extend the foreign ADTs in a safe but efficient way.  The user can declare
+structure classes, constants and substitutable functions. 
+
+ * Structure classes reflect or define overlays for C structs that are
+accessed in Sather like an instance using attributes and routines. Stucture
+classes introduce complete new ADTs, i.e. a type with a corresponding set
+of functions.  
+
+ * Constants propagate C #define constant values from C to Sather. The C
+function version involves a function call to get the value (usually once at
+initialization time) the macro version substitutes the call by the constant
+value.
+
+ * Substitutable (short subst) functions allow to extend existing types by
+new 'derived' functions, i.e. functions whose semantics can be expressed in
+terms of existing functions.  They are restricted such that calls can be
+expanded at compile time by means of a macro rather than being executed at
+runtime.
+
+
+3.1 Abstract data types: structures
+
+Structures or records are a central data abstraction facility in many
+programming languages allowing the user to introduce cartesian products of
+existing data types with a more or less fixed naming scheme for slot
+(field) accesses and constructors. Beside the important possibility of
+efficiently implementing such objects, the naming conventions cut down
+considerably on the number of terms (function names) the user needs to
+understand in a big program, without leaving the grounds of modular, ADT
+decomposition that comes with the use of access function calls.
+
+Foreign structure declarations for Sather read like this one
+
+   struct C_RECT/rect( left/r_left  : INT;
+                        top/r_top   : INT;
+                      width/r_width : INT;
+                     height/r_height: INT ) is -- an XView rectangle.
+   end; 
+
+or short 
+
+    struct C_RECT(left,top,width,height:INT) is end;
+
+if the Sather and C names of types and functions happen to be the same.
+The notation is chosen as close as possible to the construtor function.
+Slash (/) separates a Sather name from a C name, in this order. This
+constructor notation has all the information required to generate Sather
+declarations of foreign slot readers and writer, too, and to generate C code
+implementing them, automatically.
+
+The constructor expects arguments of the types and in the order of the slot
+description in parentheses.  The readers take an object and return a value
+of the respective slot type.  The writers, accordingly, take an object and
+a slot value and modify the object. Thus the set of these functions defines
+an ADT for the respective type -- C_RECT in Sather, rect in C.
+
+The Sather type C_RECT names a child class of COB and cannot be used to
+create a Sather instance (cf. Section 2.2 above). Since a structure class
+inherits from COB, its foreign instances can also be passed to other
+generic C functions. For instance, in the XView package,
+xv_set(ob,attr,val) is such a generic function with a first and third
+parameter position taking various types of C objects depending on the value
+of the second parameter.
+
+The general syntax of structure definitions is given in Section 5.
+
+The two classes (of Sather code) listed below are generated for the (long)
+structure definition above. They are supported by an appropriate set of C
+functions and an equivalent set of C macros. Beside the C ADT (class C
+below) encapsulating the foreign constructor and accessor implementations,
+the class C_RECT wraps yet another functional level around this ADT that
+lets the Sather programmer refer to foreign C_RECT instances in a way
+similar to attribute accesses and without the clumsy 'C::' prefix.  Due to
+inlining there is no runtime cost implied for this additional layer.  And
+the compile-time cost is negligible for this small class.
+
+
+class C_RECT is -- an overlay class for the foreign C structure rect.
+
+     -- an XView rectangle.
+   
+   COB; -- a C_RECT is a C object.
+        -- Do not use new, copy or deep-copy here. The C functions generated
+        -- don't know what to do with Sather-created instances.
+
+-- Constructor --
+   crt(left:INT; top:INT; width:INT; height:INT):SELF_TYPE is
+            res := C::crt_c_rect(left,top,width,height)
+   end;
+
+-- Readers --
+   left:INT is res := C::c_rect_left(self) end;
+   top:INT is res := C::c_rect_top(self) end;
+   width:INT is res := C::c_rect_width(self) end;
+   height:INT is res := C::c_rect_height(self) end;
+
+-- Writers --
+   set_left(x:INT) is C::set_c_rect_left(self,x) end;
+   set_top(x:INT) is C::set_c_rect_top(self,x) end;
+   set_width(x:INT) is C::set_c_rect_width(self,x) end;
+   set_height(x:INT) is C::set_c_rect_height(self,x) end;
+
+end; -- class C_RECT
+
+class C is -- the supporting C ADT for class C_RECT
+
+-- Constructor --
+   crt_c_rect(left:INT; top:INT; width:INT; height:INT):$C_RECT is end;
+
+-- Readers --
+   c_rect_left(cob:$C_RECT):INT is end;
+   c_rect_top(cob:$C_RECT):INT is end;
+   c_rect_width(cob:$C_RECT):INT is end;
+   c_rect_height(cob:$C_RECT):INT is end;
+
+-- Writers --
+   set_c_rect_left(cob:$C_RECT; x:INT) is end;
+   set_c_rect_top(cob:$C_RECT; x:INT) is end;
+   set_c_rect_width(cob:$C_RECT; x:INT) is end;
+   set_c_rect_height(cob:$C_RECT; x:INT) is end;
+
+end; -- class C
+
+class C is -- constants and functions
+
+Once the correspondence between the Sather class (here C_RECT) and the
+C struct (here rect) is established it is known to the converter for
+the rest of the file.
+
+
+3.2 Constants
+
+Constants are introduced by a definition like this one
+
+	   constant xv_error/XV_ERROR: CSTR;
+
+xv_error is the Sather name of the CSTR constant defined in a C class.
+XV_ERROR is the C name to which it is equated.
+
+The above constant definition expands into 
+
+	  xv_error:CSTR is end;
+
+embedded in a C class.
+
+
+3.3 Subst C Functions
+
+Last not least C computations can be defined in such a way that both a
+function and/or a macro can be wrapped around them to keep two equivalent
+versions of C code consistent. We call such functions subst functions 
+because the function body will be inlined or substituted for the function
+call if the macro file is included.  Otherwise it will result in a normal
+function call.  For instance,
+
+   function carray_get(a: CARRAY; n:INT): COB is
+      a "[" n "]" ;
+   end;
+
+will result in the Sather declaration
+
+   carray_get(a:CARRAY; n:INT):COB is end;
+
+embedded in a C class. Moreover the above function definition is expanded
+into a C function or equivalent C macro returning the 'n'th element of the
+array 'a'. In this way SAC function definitions can be used to build small
+C ADTs. The function heads correspond to the Sather foreign function
+declarations. They are used together with the body to derive two equivalent
+implementations, one in terms of C functions and one in terms of C macros.
+
+The body of a subst function consists of a sequence of strings interspersed
+with occurrences of the formal function arguments. The generated C code is
+a single expression that will automatically cast the arguments to the C
+type corresponding to the Sather type.
+
+Subst procedures, i.e. void functions, are defined similarly.  For
+instance,
+   
+   function carray_set(a:CARRAY; n:INT; v:COB) is
+      a "[" n "] =" v ;
+   end;
+
+The body expands into a corresponding C function or macro body by
+concatening the strings and the C versions of the formal parameters.  For a
+macro the formal parameters are cast appropriately. Function bodies are
+wrapped into a return statement and must be expressions.  Procedure bodies
+can be sequences of statements. String quotes and the escape charater (\)
+must be escaped in strings. For instance, 
+
+			  "printf(\"%s\\n %s\"," x "," y ")";
+
+might be a valid piece of a subst procedure body.
+
+An empty body is explicitly indicated by the keyword 'implemented', telling
+the converter to omit the generation of C functions and macros and only to
+copy the declaration into a corresponding Sather C class.  This is
+supported to be able to keep related function definitions together, even if
+they could be given equivalently in pure Sather.
+
+
+Note that subst functions are a RESTRICTED FEATURE:
+
+First, functions are restricted to simple expression bodies. This allows
+to keep macros and C function versions of the subst consistent in a simple
+way.
+
+Secondly, the correspondence of Sather types and C types is known to the
+converter (cf.  Section 2 and 3.1). This might lead to typing conflicts in
+the generated C code since many different Sather types will be mapped to
+the 'ptr' type in particular COB types reflecting foreign types.
+
+We do not believe right now that these restrictions raise practical
+problems but theoretically it may become a practical problem of course. It
+is not difficult to construct examples where this would happen. Yet we do
+not want the converter to collect global knowledge about generated
+structure types and such. Without global knowledge the converter works just
+like a macro expander, completely local on a single definition. This makes
+the conversion rules clear and simple. A user not accustomed to Emacs might
+easily apply the conversion rules manually.
+
+If a user wants to extend the correspondence between Sather and C types
+there is another simple way to do so by changing the type mapping in the
+converter.  The type mapping used by the converter is defined by an Emacs
+user variable.  This mapping is always listed in the file header of
+generated files to make the conversion reproducible later.
+
+
+4. SAC syntax
+
+The following grammar defines the syntax of structure, constant
+and function definitions.
+
+				CF-Grammar
+
+(Legend: 
+<> nonterminal, * iterates, [] optional, | or, {} group) 
+
+<sac-constant> ::= constant <sac-decl> ;
+<sac-struct>   ::= struct <sac-name> <sac-slots> is end;
+<sac-function> ::= function <@saname> <sac-sig> is <sac-body> ; end ;
+
+<sac-slots>    ::= [ <sac-decl> { ; <sac-slots> }* ]
+<sac-sig>      ::= <sac-slots> [ : <@satype> ]
+<sac-body>     ::= { <@string> | <@saname> }+
+
+<sac-decl>     ::= <sac-name> { , <sac-name> }* :  <@satype>
+<sac-name>     ::= <@saname> [ / <@cname> ]
+
+
+			      Lexeme classes
+
+(Legend:  id = Sather identifier, string = Sather string )
+
+<@satype> == identifier             
+<@saname> == identifier
+<@cname>  == identifier
+<@string> == string
+
+
+				   Note
+
+The 'cname' identifier in a 'sac-name' is optional. It defaults to the
+corresponding 'saname'.  This should be used only in function definitions.
+For constants and struct definitions it might lead to name clashes
+depending on the included C definition files.
+
+
+5. Conversion and Use
+
+5.1 Interactive Conversion
+
+The SAC converter is written in Emacs Lisp and can be invoked under
+Emacs using the command
+
+	M-x sac-convert-buffer.
+
+Typically a .sac file is written and the above command is applied to it
+while visiting the file. Three files are produced, a .sa, .c, and .macros
+version of the file. 	
+
+See the documentation of the command for more details. 
+
+A user variable 
+	
+	preserve-comment
+
+allows to toggle whether leading comment lines are preserved in the
+conversion. A leading comment is a comment that precedes a definition.  By
+default this variable is t resulting in carrying the file header of the
+.sac file to all generated files so that the conversion history is
+traceable.
+
+None of the files should be edited manually to guarantee
+reproducibility.
+
+To include the macros file (named myfile.macros, say) the line
+
+	(include) myfile.macros
+
+needs to be inserted in the .sather file. This is meaningful only when
+optimized code is generated. Otherwise the line should be commented out.
+
+	-- (include) myfile.macros
+
+The generated C and C macro files may rely on the inclusion of further C
+files. Inclusion is supported by the conversion routine only indirectly.
+When a file myfile.sac, say, is converted, the corresponding C file,
+myfile.c, contains a line
+
+	#include <myfile.h> 
+
+myfile.h has to be provided by the programmer and typically will consists
+of a list of other files to be included conditionally.
+
+Similarly the macros file contains an include line refering to myfile.h
+which guarantees myfile.h definitions are present when any one of the C
+macros are actually called in the compiled Sather code.
+
+Hence the suite of myfile files consists of
+
+	myfile.sac, myfile.sa, myfile.c, myfile.macros, myfile.h
+
+
+5.2 Batch Conversion
+
+Emacs can be used to compile a sac file in batch mode using a call of the
+form
+
+	emacs -batch -l sac-it.el -f compile-SACFILE
+
+where sac-it.el is an Elisp file and compile-SACFILE a function that
+must be defined after having loaded the Elisp file.
+
+In this way the conversion of SAC files can be made a step in a Makefile.
+
+For a convenient way of writing Makefile's a small shell is available
+	
+			     sac-it <filename>
+
+that translates a .sac file using the emacs batch mode.  To work
+appropriately you need to have an environment variable SATHER_HOME set
+to the Sather directory. For completeness, below is a listing of the
+supporting lines of codes.
+
+
+5.3 Naming Conflicts of Generated and Included C Code
+
+Inclusion of C definitions may result in naming conflicts that must be
+resolved on the level of the SAC definitions.
+
+The Sather compiler generates C indentifiers that are typically composed of
+class names and feature names or derivates of these. The few fixed names
+appearing in the Sather runtime typically have strange prefixes or
+postfixes such as double underscores. Naming conflicts are unlikely on this
+level.
+
+The SAC definitions may give explicit C names to be used in the generated C
+files which of course can conflict with included definitions. The
+programmer has to take care.
+
+
+6. Considerations for pSather
+
+In some sense a conversion 'adds' to the Sather language. Therefore it
+seems reasonable to include some thoughts on how this 'add-on' relates to
+pSather (parallel Sather), without going ino the details of pSather
+constructs.
+
+In general inlining (and macros) for this reason duplicate code and
+therefore make sense only if SHARED objects are not duplicated.  This is a
+general problem for instance with inlining and constant propagation in
+languages such as Common Lisp in which lexical closures and/or constant
+objects can be passed around as objects and compared.  Inlining such an
+object in duplicate code 'locations' may change the result of an EQ
+comparison from true to false because after inlining the comparison is made
+on two copies of originally perhaps the same object. Related to this is the
+possibility that (desired) side-effects may no longer affect the same
+object. And hence the role of shared objects to communicate history from
+one time of execution to another time may be broken.
+
+This problem does not occur for objects whose extensional equality (EQUAL)
+is the same as their intensional equality (EQ) which compares object
+references. Typically this is the case for basic types such as ints, chars
+and reals.
+
+For this reason, the promoted way of SAC constant usage seems to be safe
+with respect to pSather.
+
+With regard to the structure conversion, there are no shared objects
+duplicated. The reader code is completely without sideeffect and the writer
+code affects only the object in question, a possibly shared structure
+living in C.  In a pSather context such an object would live on some
+processor or in the virtual shared memory address space but would not have
+any (Sather type) synchronization built-in. Macro and function accesses to
+such an object remain equivalent in this pSather context.
+
+Therefore, the promoted way of SAC structure and function usage seems to be
+safe too.
+
+If synchronization is important for accesses to shared C objects, it must
+be programmed on top of such objects in Sather and the C functions must not
+be called directly. (There is no way to guarantee this anyway, except
+programming discipline).
+
+But some basic pSather library classes implementing shared object
+synchronization disciplines that rely on C state not subject to the GC may
+take advantage of the SAC conversion to offer alternative optimized version
+of pSather classes.
+
+The use of SAC constants and functions can violate the above requirements
+because it relies on expanding user defined macros or #defines from a user
+defined include file. The safety rule of thumb goes something like this:
+
+	NO SHARED DATA (static) INSIDE SAC FUNCTION BODIES
+
+This rule applies equally well to Sather as it does to pSather.
+
+
+7. Summary
+
+The foreign function interface of Sather permits the Sather programmer to
+build on abstract data types, modular packages written in C, creating and
+accessing C data via function calls. This is a safe and simple interface to
+foreign packages and allows the programmer to take advantage well-tested
+and professionally maintained C packages.
+
+Such functional interfaces are provided by a set of library classes and are
+generated by means of a conversion facility described in this document.
+The library classes provide support for a few very common C types and
+increase type-checking by reflecting a C type hierarchy within the Sather
+type hierarchy.
+
+The conversion package translates high-level Sather like code. Beside the
+ease of notation it generates C macros that can increase the efficiency of
+the resulting code considerably. Since each macro is 'backed up' by a
+corresponding equivalent C function, automatically, the generated code is
+suited for high-level interpretation and debugging.
+
+In this way a set of macros is always kept consistent with a set of C
+functions. In the simplest cases, constants and structures, the
+programmer does not need to understand the macros at all. Rather a few
+ADT like functional abstractions are sufficient to follow the code.
+
+
+
+				APPENDIX I: Rules
+
+Below we summarize the rules for the use of this programming discipline
+with foreign abstract data types:
+
+1. All C object types inherit from COB which inherits from F_OB. COB 
+objects are created in C and ony passed around in Sather but not
+manipulated there.
+
+2. If class A is a subclass of or equal to COB, then A is used only 
+undispatched. This means there is no variable declaration 'x: $A'
+that is used in combination with dotted access 'x.foo'.
+
+3. new, copy and deep-copy of class A are not used.
+
+4. Every c_macro used with Sather code has an equivalent C function that is
+used in interpreted code or code to be debugged.  This is guaranteed if the
+SAC conversion facility is used to define foreign ADTs.
+
+5. SAC function bodies and C #defines implementing them do not contain
+definitions of shared (static) data.
+
+
+			    APPENDIX II: Files
+
+
+A file myfile.sac is accompanied by the files
+
+	myfile.sa 	-- Sather foreign function declarations
+	                -- and overlay classes for structures
+	myfile.c        -- C function implementations of foreign ADT's
+	myfile.macros   -- C macro implementations of foreign ADT's
+	myfile.h        -- user provided file containing #include's
+
+
+The macros are included/excluded by uncommenting/commenting the .sather line
+
+	(include) myfile.macros
+
+
+
+The directory ~hws/sather/SAC contains a small sample conversion under the 
+name xob.
+
+
+			    APPENDIX III: sac.el
+
+The converter Lisp code relies on the variables
+
+preserve-comment's value is t
+
+Documentation:
+*Whether or not comments are collected when reading and translating
+ input from an Emacs buffer.
+
+
+sather-c-type-alist's value is ((INT . int) (CHAR . char) (BOOL . char) (OTHERWISE . ptr))
+
+Documentation:
+not documented as a variable.
+
+The top-level command is 
+
+sac-convert-buffer:
+Convert the Sather C interface definitions in the current buffer. The
+result consists of three parts, Sather code, C code and Sather c_macros. 
+These pieces of code are inserted into the buffers named like the current 
+buffer but ending in .sa, .c and .macros respectively.
+With a prefix argument, the command prompts for the file name.
+
+
+To make the command visible to Emacs one needs to tune the Emacs load-path
+and make the sac-convert-buffer command auto-loadable. Moreover the
+sather-mode should be available. The Emacs user prefering interactive
+conversion may for instance include the contents of file sac-it.el into the
+.emacs profile.
+

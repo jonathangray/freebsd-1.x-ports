@@ -1,0 +1,1537 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/base/unix.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Interface to Unix system commands.
+--*
+--* CLASSES: UNIX, UNIX_MSGS
+--*
+--* REQUIRED FILES: base/str.sa (STR)
+--*                 base/C/unix.macros
+--* RELATED FILES:
+--*
+--* RCS: $Id: unix.sa,v 1.1 1994/02/12 03:23:16 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 31 21:24 1993 (hws)
+--*  Oct 31 21:23 1993 (hws): catch -chk void error too in test.
+--*  Oct 17 06:29 1993 (hws): Sather 1 syntax, copyright note
+--*  Oct  5 13:02 1993 (hws): remove profil, not supported in Linux
+--*  Sep 27 15:08 1993 (hws): Sather 1 exception syntax
+--*  Modified: May 28 13:24 1991 (clim)
+--*    Classify system calls, and put a minimal set in UNIX.  The other
+--*    system calls which require interface to C structures should probably
+--*    in their own classes.
+--* Created: Sun Feb  4 16:34:38 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* NOTE:
+--* IMPORTANT:  
+--* -- Refer to notes in `UNIX_TEST' before running any test.
+
+class UNIX is
+   -- Sather interface to Unix system calls.
+   
+   shared unix_error:INT := 0;
+
+   -- The following is a list of system calls not provided in UNIX class.
+   -- * Suggested additional classes to hold definitions of these routines
+   --   are given, and suggested names are to have a `UNIX_' prefix, eg
+   --   `UNIX_SOCKET'.
+   -- * These `UNIX_' classes should be implemented using `F_OB' since
+   --   interface to C objects are needed.
+
+   -- _exit : This is not included because Sather identifiers do not
+   -- start with "_".
+
+
+   -- System-specific:
+   -- async_daemon   -- NFS daemons.
+   -- audit          -- Write a record to the audit log.
+   -- audition       -- Manipulate auditing.
+   -- auditsvc       -- Write audit records to specified file descriptor.
+   -- fchdir         -- Change current working directory.
+   -- fchroot        -- Change root directory.
+   -- getauid        -- Get and set user audit identity.
+   -- getdents      -- Get directory entries in a filesystem independent format.
+   -- getdirentries -- Get directory entries in a filesystem independent format.
+   -- getdomainname  -- Get name of current domain.
+   -- getmsg         -- Get next message off a stream.
+   -- mincore        -- Determine residency of memory pages.
+   -- mmap           -- Map pages of memory.
+   -- mprotect       -- Set protection of memory mapping.
+   -- msgctl         -- Message control operations.
+   -- msgget         -- Get message queue.
+   -- msgop          -- Message operations.
+   -- msgrcv         -- Message operations.
+   -- msgsnd         -- Message operations.
+   -- msync          -- Synchronize memory with physical storage.
+   -- munmap         -- Unmap pages of memory.
+   -- nfssvc         -- NFS daemons.
+   -- poll           -- STREAMS input/output multiplexing.
+   -- putmsg         -- Send a message on a stream.
+   -- quotactl       -- Manipuate disk quotas.
+   -- semctl         -- Semaphore control operations.
+   -- semget         -- Get set of semaphores.
+   -- semop          -- Semaphore operations.
+   -- setaudit       -- Set the audit classes for a specified user ID.
+   -- setauid        -- Set user audit identity.
+   -- setdomainname  -- Set name of current domain.
+   -- setuseraudit   -- Set the audit classes for a specified user ID.
+   -- shmat          -- Shared memory operations.
+   -- shmctl         -- Shared memory control operations.
+   -- shmdt          -- Shared memory operations.
+   -- shmget         -- Get shared memory segment identifier.
+   -- shmop          -- Shared memory operations.
+   -- tell           -- Move read/write pointer.
+   -- uname          -- Get name of current system.
+   -- vadvise        -- Get advice to paging system.
+   -- wait4          -- Wait for process to terminate.
+   -- WIFEXITED      -- Wait for process to terminate or stop.
+   -- WIFSIGNALED    -- Wait for process to terminate or stop.
+   -- WIFSTOPPED     -- Wait for process to terminate or stop.
+
+
+   -- SOCKET:
+   -- accept         -- Accept a connection on a socket.
+   -- bind           -- Bind a name to a socket.
+   -- connect        -- Initiate a connection on a socket.
+   -- getpeername    -- Get name of connected peer.
+   -- getsockname    -- Get socket name.
+   -- getsockopt     -- Get options on sockets.
+   -- listen         -- Listen for connections on a socket.
+   -- recv           -- Receive a message from a socket.
+   -- recvfrom       -- Receive a message from a socket.
+   -- recvmsg        -- Receive a message from a socket.
+   -- send           -- Send a message from a socket.
+   -- sendmsg        -- Send a message from a socket.
+   -- sendto         -- Send a message from a socket.
+   -- setsockopt     -- Set options on sockets.
+   -- shutdown       -- Shut down part of a full-duplex connection.
+   -- socket         -- Create an endpoint for communication.
+   -- socketpair     -- Create a pair of connected sockets.
+
+   
+   -- PROCESSOR/SIGNAL:
+   -- kill           -- Send a signal to a process or a group of processes.
+   -- killpg         -- Send signal to a process group.
+   -- ptrace         -- Process trace.
+   -- sigblock       -- Block signals.
+   -- sigpause       -- Atomically release blocked signals and wait for
+   --                -- interrupt.
+   -- sigsetmask     -- Set current signal mask.
+   -- sigstack       -- Set and/or get signal stack context.
+   -- sigvec         -- Software signal facilities.
+   -- reboot         -- Reboot system or halt processor.
+   -- syscall        -- Indirect system call (NOTE: Variable number of args).
+   -- wait           -- Wait for process to terminate.
+   -- wait3          -- Wait for process to terminate.
+   -- vfork          -- Spawn new process in a virtual memory efficient way.
+
+   
+   -- FILE_DESCRIPTOR:
+   -- access         -- Determine accessiblity of file.
+   -- chmod          -- Change mode of file.
+   -- chown          -- Change owner and group of a file.
+   -- close          -- Delete a descriptor.
+   -- creat          -- Create a new file.
+   -- fchmod         -- Change mode of file.
+   -- fchown         -- Change owner and group of a file.
+   -- fcntl          -- File control.
+   -- flock          -- Appy or remove an advisory lock on an open file.
+   -- fstat          -- Get file status.
+   -- fsync          -- Synchronize a file's in-core state with that on disk.
+   -- ftruncate      -- Set a file to a specified length.
+   -- getdtablesize  -- Get descriptor table size.
+   -- lseek          -- Move read/write pointer.
+   -- lstat          -- Get file status.
+   -- mknod          -- Make a special file.
+   -- open           -- Open or create a file for reading or writing.
+   -- pipe           -- Create an interprocess communication channel.
+   -- read           -- Read input.
+   -- readlink       -- Read value of a symbolic link.
+   -- readv          -- Read input.
+   -- select         -- Synchronous I/O multiplexing.
+   -- stat           -- Get file status.
+   -- truncate       -- Truncate a file to a specified length.
+   -- utimes         -- Set file times.
+   -- write          -- Write output.
+   -- writev         -- Write output.
+   -- dup2           -- Duplicate a descriptor.
+   -- dup            -- Duplicate a descriptor.
+
+   -- The following routines are currently in UNIX, but may be in
+   -- FILE_DESCRIPTOR too.
+   --    ++ chdir
+   --    ++ chroot 
+
+
+   -- FILE_SYSTEM:
+   -- fstatfs        -- Get file system statistics.
+   -- statfs         -- Get file system statistics.
+   -- mount          -- Mount file system.
+   -- u(n)mount      -- Remove a file system.
+
+
+   -- SYSTEM_TIME:
+   -- adjtime        -- Correct the time to allow synchronization of system clock.
+   -- getitimer      -- Get value of interval timer.
+   -- gettimeofday   -- Get the date and time.
+   -- settimeofday   -- Set date and time.
+   -- setitimer      -- Set value of interval timer.
+
+
+   -- MEMORY_MGT:
+   -- brk            -- Change data segment size.
+   -- getpagesize    -- Get system page size.
+   -- sbrk           -- Change data segment size.
+
+
+   -- RESOURCE:
+   -- getgroups      -- Get group access list.
+   -- getpriority    -- Get program scheduling priority.
+   -- getrlimit      -- Get maximum system resource consumption.
+   -- getrusage      -- Get information about resource utilization.
+   -- setpriority    -- Set program scheduling priority.
+   -- setrlimit      -- Control maximum system resource consumption.
+   -- setgroups      -- Set group access list.
+
+
+   acct(acctfile:STR):INT is
+      -- Turn accounting on or off.  Write information to `acctfile'.
+      -- -1 is returned if an error occurs; otherwise 0 is returned.
+      res := C::acct(C::str_ptr_(acctfile));
+      unix_error := C::errno;
+   end; -- acct
+
+   chdir(dirname:STR):INT is
+      -- Change current working directory.
+      -- Returns 0 if successful, -1 otherwise.
+      res := C::chdir(C::str_ptr_(dirname));
+      unix_error := C::errno;
+   end; -- chdir
+
+   chroot(dirname:STR):INT is
+      -- Change root directory.
+      -- Returns 0 if successful, -1 otherwise.      
+      res := C::chroot(C::str_ptr_(dirname));
+      unix_error := C::errno;
+   end; -- chroot
+
+   execve(prog:STR; argv:ARRAY{STR}; envp:ARRAY{STR}):INT is
+      -- Execute a file, by transforming the calling process into a
+      -- new process.  If `execve' returns to the calling process,
+      -- the returned value will be -1, ie an error has occurred.
+      -- `argv', `envp' should have a null pointer as the last pointer.
+      new_argv:ARRAY{F_OB};
+      if (argv /= void) then
+	 argv_sz:INT := argv.asize;
+	 new_argv := ARRAY{F_OB}::new(argv_sz);
+	 i:INT;
+	 loop until!(i >= argv_sz);
+	    if (argv[i] /= void) then
+	       new_argv[i] := C::str_ptr_(argv[i]);
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+      end; -- if
+      new_envp:ARRAY{F_OB};
+      if (envp /= void) then
+	 envp_sz:INT := envp.asize;
+	 new_envp := ARRAY{F_OB}::new(envp_sz);
+	 i:INT;
+	 loop until!(i >= envp_sz);
+	    if (envp[i] /= void) then
+	       new_envp[i] := C::str_ptr_(envp[i]);
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+      end; -- if
+      c_argv:F_OB;
+      c_envp:F_OB;
+      if (new_argv /= void) then
+	 c_argv := C::c_object_base_(new_argv);
+      end; -- if
+      if (new_envp /= void) then
+	 c_envp := C::c_object_base_(new_envp);
+      end; -- if
+      res := C::execve(C::str_ptr_(prog), c_argv, c_envp);
+      unix_error := C::errno;
+   end; -- execve
+
+   fork:INT is
+      -- Create a new process.
+      -- Returns 0 to child process and child process ID to parent
+      --   process.  Otherwise, -1 is returned to parent process.
+      res := C::fork;
+      unix_error := C::errno;
+   end; -- fork
+
+   getegid:INT is
+      -- Return group identity.
+      res := C::getegid;
+      unix_error := C::errno;
+   end; -- getegid
+
+   geteuid:INT is
+      -- Return user identity.
+      res := C::geteuid;
+      unix_error := C::errno;
+   end; -- geteuid
+
+   getgid:INT is
+      -- Return real group identity.
+      res := C::getgid;
+      unix_error := C::errno;
+   end; -- getgid
+
+-- Not in Sys V
+--   gethostid:INT is
+--      -- Get unique identifier of current host.
+--      res := C::gethostid;
+--      unix_error := C::errno;
+--   end; -- gethostid
+--
+--   gethostname(name:STR; namelen:INT):INT is
+--      -- Get name of current host.  `namelen' species the size of the
+--      -- array pointed to by `name'.
+--      -- Returns 0 if successful, -1 otherwise.      
+--      -- NOTE: The interface may be simplified by requiring only `name'.
+--      res := C::gethostname(C::str_ptr_(name), name.asize);
+--      unix_error := C::errno;
+--   end; -- gethostname
+--
+-- not in Hpux
+--   getpgrp(pid:INT):INT is
+--      -- Get process group.  If `pid' is 0, returns process group of
+--      -- calling process.
+--      res := C::getpgrp(pid);
+--      unix_error := C::errno;
+--   end; -- getpgrp
+
+   getpid:INT is
+      -- Return current process identification.
+      res := C::getpid;
+      unix_error := C::errno;
+   end; -- getpid
+
+   getppid:INT is
+      -- Return parent process identification.
+      res := C::getppid;
+      unix_error := C::errno;
+   end; -- getppid
+
+   getuid:INT is
+      -- Return real user identity.
+      res := C::getuid;
+      unix_error := C::errno;
+   end; -- getuid
+
+   ioctl(des, request, arg:INT):INT is
+      -- Control device.
+      -- Returns 0 if successful; -1 otherwise.
+      res := C::ioctl(des, request, arg);
+      unix_error := C::errno;
+   end; -- ioctl
+
+   link(name1, name2:STR):INT is
+      -- Make a hard link `name2' to an existing file given by `name1'.
+      -- Returns 0 if successful; -1 otherwise.
+      res := C::link(C::str_ptr_(name1), C::str_ptr_(name2));
+      unix_error := C::errno;
+   end; -- link
+
+   mkdir(name:STR; mode:INT):INT is
+      -- Make a new directory, with given `mode'.
+      -- Returns 0 if successful; -1 otherwise.
+      res := C::mkdir(C::str_ptr_(name), mode);
+      unix_error := C::errno;
+   end; -- if
+
+-- Linux does not have this yet (hws)
+--   profil(buff:STR; bufsiz, offset, scale:INT) is
+--      -- Execution time profile.
+--      C::profil(C::str_ptr_(buff), bufsiz, offset, scale);
+--   end; -- profil
+
+   rename(from, to:STR):INT is
+      -- Change the name of a file.
+      -- Returns 0 if successful; -1 otherwise.
+      res := C::rename(C::str_ptr_(from), C::str_ptr_(to));
+      unix_error := C::errno;
+   end; -- rename
+
+   rmdir(name:STR):INT is
+      -- Remove a directory file.
+      -- Returns 0 if successful, -1 otherwise.      
+      res := C::rmdir(C::str_ptr_(name));
+      unix_error := C::errno;
+   end; -- if
+   
+--   sethostname(name:STR; namelen:INT):INT is
+--      -- Set name of current host.  `namelen' specifies the size of
+--      -- string `name'.
+--      -- Returns 0 if successful, -1 otherwise.      
+--      res := C::sethostname(C::str_ptr_(name), name.length);
+--   end; -- sethostname
+-- not in Hpux
+--   setpgrp(pid, pgrp:INT):INT is
+--      -- Set process group.
+--      res := C::setpgrp(pid, pgrp);
+--      unix_error := C::errno;
+--   end; -- setpgrp
+--
+--   setregid(rgid, egid:INT):INT is
+--      -- Set real and effective group IDs.
+--      res := C::setregid(rgid, egid);
+--      unix_error := C::errno;
+--   end; -- setregid
+--
+--   setreuid(ruid, euid:INT):INT is
+--      -- Set real and effective user IDs.
+--      res := C::setreuid(ruid, euid);
+--      unix_error := C::errno;
+--   end; -- setreuid
+--
+-- Not supported in all Sys V
+--
+--   swapon(special:STR):INT is
+--      -- Add a swap device for interleaved paging/swapping.
+--      -- Returns 0 if successful; -1 otherwise.
+--      res := C::swapon(C::str_ptr_(special));
+--      unix_error := C::errno;
+--   end; -- swapon
+--
+--   symlink(name1,name2:STR):INT is
+--      -- Create a symbolic link "name2" to "name1".
+--      -- Returns 0 if successful; -1 otherwise.
+--      res := C::symlink(C::str_ptr_(name1),C::str_ptr_(name2));
+--      unix_error := C::errno;
+--   end; -- symlink
+
+   sync is
+      -- Update super-block.
+      C::sync;
+   end; -- sync
+
+   umask(numask:INT):INT is 
+      -- Set file creation mode mask.
+      -- Returns previous value of file mode mask.
+      res := C::umask(numask);
+   end; -- umask
+   
+   unlink(name:STR):INT is
+      -- Remove directory entry.
+      -- Returns 0 if successful; -1 otherwise.
+      res := C::unlink(C::str_ptr_(name));
+      unix_error := C::errno;
+   end; -- unlink
+   
+-- Not Hpux
+--   vhangup is
+--      -- Virtually "hangup" the current control terminal.
+--      C::vhangup;
+--   end; -- vhangup
+
+----------------------------------------------------------------------
+
+   system(com:STR):INT is
+      -- Execute the shell command "com".
+      res := C::system(C::str_ptr_(com));
+      unix_error := C::errno;
+   end; -- system
+   
+   getenv(name:STR):STR is
+      -- Return the value of name in the current environment.
+      -- `void' if undefined. 
+      res := STR::from_c_str(C::getenv(C::str_ptr_(name)));
+      unix_error := C::errno;
+   end; -- getenv
+   
+   putenv(name,val:STR):INT is
+      -- Set the value of name in the current environment.
+      -- Note that this is realized in C on top of putenv if GC is running,
+      -- since putenv may use malloc.
+      arg:STR := STR::create.s(name).c('=').s(val);
+      res := C::putenv_(C::str_ptr_(arg));
+   end; -- getenv
+   
+   getcwd:STR is
+      -- Use own getcwd_ using gc_malloc if appropriate. Realized via
+      -- "getwd" which seems to be portable.
+      c_str:F_OB := C::getcwd_;
+      if (c_str /= void) then
+	 res := STR::from_c_str(c_str);
+      else
+	 unix_error := C::errno;
+      end; -- if
+   end; -- getcwd
+   
+   login_name:STR is
+      -- User's login name.
+      c_str:F_OB := C::getlogin;
+      if (c_str /= void) then
+	 res := STR::from_c_str(c_str);
+      end; -- if
+      -- NOTE: We can call C code "getpwduid(getuid())" if previous
+      --       call to "getlogin" fails, but this is currently not
+      --       provided.
+   end;
+   
+   exit(i:INT) is
+      -- Terminate a process.
+      C::exit(i);
+   end; -- exit
+   
+end; -- class UNIX
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class C is
+   acct(name:F_OB):INT is end;
+   chdir(name:F_OB):INT is end;
+   chroot(name:F_OB):INT is end;
+   dup2(old_d, new_d:INT):INT is end;
+   dup(old_d:INT):INT is end;
+   execve(prog:F_OB; argv:F_OB; envp:F_OB):INT is end;
+   fork:INT is end;
+   getegid:INT is end;
+   geteuid:INT is end;
+   getgid:INT is end;
+--   gethostid:INT is end;
+--   gethostname(name:F_OB; namelen:INT):INT is end;
+--   getpgrp(pid:INT):INT is end;
+   getpid:INT is end;
+   getppid:INT is end;
+   getuid:INT is end;
+   ioctl(des, req, arg:INT):INT is end;
+   link(name1, name2:F_OB):INT is end;
+   mkdir(name:F_OB; mode:INT):INT is end;
+-- not on Linux
+--   profil(buff:F_OB; bufsiz, offset, scale:INT) is end;
+   rename(name1, name2:F_OB):INT is end;
+   rmdir(name:F_OB):INT is end;
+--   sethostname(name:F_OB; namelen:INT):INT is end;
+--   setpgrp(pid, pgrp:INT):INT is end;
+--   setregid(rgid, egid:INT):INT is end;
+--   setreuid(rgid, egid:INT):INT is end;
+   swapon(special:F_OB):INT is end;
+   sync is end;
+   umask(numask:INT):INT is end;
+   unlink(name:F_OB):INT is end;
+--   vhangup is end;
+   symlink(name1,name2:F_OB):INT is end;
+   system(com:F_OB):INT is end;
+   getenv(name:F_OB):F_OB is end;
+   putenv_(name:F_OB):INT is end;
+   getcwd_:F_OB is end;
+   getlogin:F_OB is end;
+   exit(i:INT) is end;
+   c_object_base_(sather_array:ARRAY{F_OB}):F_OB is end;
+
+   shared errno:INT;
+end; -- class C
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class SUX is
+   -- Signals of UniX system.
+
+   -- Normally you just do a SUX::expect(code) for the signals that you
+   -- want to see. For codes see corresponding C class. Once the expectation
+   -- is stated you can catch the error by a form like
+   -- protect ...  against SUX then ... end
+      
+   const initialized: BOOL := SUX::signals_init;    -- unixes differ in code, need rt init.
+   
+   attr code: INT;			-- the unix code when the signal was raised.
+   
+   expect(b:INT) is
+      -- Expect the signal code `b'. It will be turned into a SUX object
+      -- holding the code as the value of the `code' attribute.
+      C::eh_expect_signal_(b);
+   end;
+
+   signals_init: BOOL is
+      res := true;
+      C::eh_signals_init_;
+   end;
+
+   create(b:INT): SUX is
+      -- `SUX::create' is dangerously called by runtime system for now.
+      if not SUX::initialized then -- this is just a trick.
+	 -- Sather 0.2 does still try to optimize constants and does
+	 -- not recognize that there initializers may be there for an
+	 -- effect.
+	 SUX::signals_init
+      end;
+      res := new;
+      res.code := b;
+   end;   
+
+   signal_type: STR is
+      -- The Unix signal type. Call only for exception being handled.
+      -- Otherwise `code' may not be bound properly.
+      res := STR::from_c_str(C::eh_signal_type_str_(code));
+   end;
+
+   signal_doc: STR is
+      -- The exception documentation. Call only for exception being
+      -- handled. Otherwise `code' may not be bound properly.
+      res := STR::from_c_str(C::eh_signal_doc_str_(code));
+   end;
+   
+end;
+
+class C is  -- Runtime supported exception handling codes.
+
+   eh_signals_init_ is end;
+   eh_expect_signal_(s:INT) is end;
+   eh_signal_doc_str_(s:INT):F_OB is end;
+   eh_signal_type_str_(s:INT):F_OB is end;
+   shared sigint_: INT;
+   shared sigquit_: INT;
+   shared sigill_: INT;
+   shared sigtrap_: INT;
+   shared sigiot_: INT;
+   shared sigabrt_: INT;
+   shared sigemt_: INT;
+   shared sigfpe_: INT;
+   shared sigkill_: INT;
+   shared sigbus_: INT;
+   shared sigsegv_: INT;
+   shared sigsys_: INT;
+   shared sigpipe_: INT;
+   shared sigalrm_: INT;
+   shared sigterm_: INT;
+   shared sigurg_: INT;
+   shared sigstop_: INT;
+   shared sigtstp_: INT;
+   shared sigcont_: INT;
+   shared sigchld_: INT;
+   shared sigcld_: INT;
+   shared sigttin_: INT;
+   shared sigttou_: INT;
+   shared sigio_: INT;
+   shared sigpoll_: INT;
+
+end;
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class UNIX_CODES is
+   -- Error codes in UNIX system calls.
+
+   const eperm:INT     := C::EPERM;        -- Not owner
+   const enoent:INT    := C::ENOENT;       -- No such file or directory
+   const esrch:INT     := C::ESRCH;        -- No such process
+   const eintr:INT     := C::EINTR;        -- Interrupted system call
+   const eio:INT       := C::EIO;          -- I/O error
+   const enxio:INT     := C::ENXIO;        -- No such device or address
+   const e2big:INT     := C::E2BIG;        -- Arg list too long
+   const enoexec:INT   := C::ENOEXEC;      -- Exec format error
+   const ebadf:INT     := C::EBADF;        -- Bad file number
+   const echild:INT    := C::ECHILD;       -- No children
+   const eagain:INT    := C::EAGAIN;       -- No more processes
+   const enomem:INT    := C::ENOMEM;       -- Not enough memory
+   const eacces:INT    := C::EACCES;       -- Permission denied
+   const efault:INT    := C::EFAULT;       -- Bad address
+   const enotblk:INT   := C::ENOTBLK;      -- Block device required
+   const ebusy:INT     := C::EBUSY;        -- Device busy
+   const eexist:INT    := C::EEXIST;       -- File exists
+   const exdev:INT     := C::EXDEV;        -- Cross-device link
+   const enodev:INT    := C::ENODEV;       -- No such device
+   const enotdir:INT   := C::ENOTDIR;      -- Not a directory
+   const eisdir:INT    := C::EISDIR;       -- Is a directory
+   const einval:INT    := C::EINVAL;       -- Invalid argument
+   const enfile:INT    := C::ENFILE;       -- File table overflow
+   const emfile:INT    := C::EMFILE;       -- Too many open files
+   const enotty:INT    := C::ENOTTY;       -- Inappropriate ioctl for device
+   const efbig:INT     := C::EFBIG;        -- File too large
+   const enospc:INT    := C::ENOSPC;       -- No space left on device
+   const espipe:INT    := C::ESPIPE;       -- Illegal seek
+   const erofs:INT     := C::EROFS;        -- Read-only file system
+   const emlink:INT    := C::EMLINK;       -- Too many links
+   const epipe:INT     := C::EPIPE;        -- Broken piope
+   const edom:INT      := C::EDOM;         -- Math argument
+   const erange:INT    := C::ERANGE;       -- Result too large
+   const ewouldblock:INT := C::EWOULDBLOCK; -- Operation would block
+   const einprogress:INT := C::EINPROGRESS; -- Operation now in progress
+   const ealready:INT  := C::EALREADY;     -- Operation already in progress
+   const enotsock:INT  := C::ENOTSOCK;     -- Socket operation on non-socket
+   const edestaddrreq:INT := C::EDESTADDRREQ; -- Destination address required
+   const emsgsize:INT := C::EMSGSIZE;         -- Message too long
+   const eprototype:INT := C::EPROTOTYPE;  -- Protocol wrong type for socket
+   const enoprotoopt:INT := C::ENOPROTOOPT;
+      -- Option not supported by protocol
+   const eprotonosupport:INT := C::EPROTONOSUPPORT;
+      -- Protocol not supported
+   const esocktnosupport:INT := C::ESOCKTNOSUPPORT;
+      -- Socket type not supported
+   const eopnotsupp:INT := C::EOPNOTSUPP;
+      -- Operation not supported on socket
+   const epfnosupport:INT := C::EPFNOSUPPORT;
+      -- Protocol family not supported
+   const eafnosupport:INT := C::EAFNOSUPPORT;
+      -- Address family not supported by protocol family
+   const eaddrinuse:INT := C::EADDRINUSE;
+      -- Address already in use
+   const eaddrnotavail:INT := C::EADDRNOTAVAIL;
+      -- Can't assign requested address
+   const enetdown:INT := C::ENETDOWN;
+      -- Network is down
+   const enetunreach:INT := C::ENETUNREACH;
+      -- Network is unreachable
+   const enetreset:INT := C::ENETRESET;
+      -- Network dropped connection on reset
+   const econnaborted:INT := C::ECONNABORTED;
+      -- Software caused connection abort
+   const econnreset:INT := C::ECONNRESET;
+      -- Connection reset by peer
+   const enobufs:INT := C::ENOBUFS;
+      -- No buffer space available
+
+   const eisconn:INT       := C::EISCONN;      -- Socket is already connected
+   const enotconn:INT      := C::ENOTCONN;     -- Socket is not connected
+   const eshutdown:INT     := C::ESHUTDOWN;
+      -- Can't send after socket shutdown
+   const etimedout:INT     := C::ETIMEDOUT;    -- Connection timed out
+   const econnrefused:INT  := C::ECONNREFUSED;
+      -- Connection refused
+   const eloop:INT         := C::ELOOP;
+      -- Too many levels of symbolic links
+   const enametoolong:INT  := C::ENAMETOOLONG;
+      -- File name too long
+   const ehostdown:INT     := C::EHOSTDOWN;    -- Host is down
+   const ehostunreach:INT  := C::EHOSTUNREACH;
+      -- Host is unreachable
+   const enotempty:INT     := C::ENOTEMPTY;    -- Directory not empty
+   const edquot:INT        := C::EDQUOT;       -- Disc quota exceeded
+   const estale:INT        := C::ESTALE;       -- Stale NFS file handle
+   const eremote:INT       := C::EREMOTE;
+      -- Too many levels of remote in path
+   const enostr:INT        := C::ENOSTR;       -- Not a stream device
+   const etime:INT         := C::ETIME;        -- Timer expired
+   const enosr:INT         := C::ENOSR;        -- Out of stream resources
+   const enomsg:INT        := C::ENOMSG;       -- No message of desired type
+   const ebadmsg:INT       := C::EBADMSG;      -- Not a data message
+   const eidrm:INT         := C::EIDRM;        -- Identifier removed
+   
+   -- Assume that no code is beyond this integer.
+   const last_unix_code:INT:= eidrm;
+
+end; -- class UNIX_CODES
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class C is
+   
+   shared EPERM          :INT;
+   shared ENOENT         :INT;
+   shared ESRCH          :INT;
+   shared EINTR          :INT;
+   shared EIO            :INT;
+   shared ENXIO          :INT;
+   shared E2BIG          :INT;
+   shared ENOEXEC        :INT;
+   shared EBADF          :INT;
+   shared ECHILD         :INT;
+   shared EAGAIN         :INT;
+   shared ENOMEM         :INT;
+   shared EACCES         :INT;
+   shared EFAULT         :INT;
+   shared ENOTBLK        :INT;
+   shared EBUSY          :INT;
+   shared EEXIST         :INT;
+   shared EXDEV          :INT;
+   shared ENODEV         :INT;
+   shared ENOTDIR        :INT;
+   shared EISDIR         :INT;
+   shared EINVAL         :INT;
+   shared ENFILE         :INT;
+   shared EMFILE         :INT;
+   shared ENOTTY         :INT;
+   shared EFBIG          :INT;
+   shared ENOSPC         :INT;
+   shared ESPIPE         :INT;
+   shared EROFS          :INT;
+   shared EMLINK         :INT;
+   shared EPIPE          :INT;
+   shared EDOM           :INT;
+   shared ERANGE         :INT;
+   shared EWOULDBLOCK    :INT;
+   shared EINPROGRESS    :INT;
+   shared EALREADY       :INT;
+   shared ENOTSOCK       :INT;
+   shared EDESTADDRREQ   :INT;
+   shared EMSGSIZE       :INT;
+   shared EPROTOTYPE     :INT;
+   shared ENOPROTOOPT    :INT;
+   shared EPROTONOSUPPORT :INT;
+   shared ESOCKTNOSUPPORT  :INT;
+   shared EOPNOTSUPP       :INT;
+   shared EPFNOSUPPORT     :INT;
+   shared EAFNOSUPPORT     :INT;
+   shared EADDRINUSE       :INT;
+   shared EADDRNOTAVAIL    :INT;
+   shared ENETDOWN         :INT;
+   shared ENETUNREACH      :INT;
+   shared ENETRESET        :INT;
+   shared ECONNABORTED     :INT;
+   shared ECONNRESET       :INT;
+   shared ENOBUFS          :INT;
+   shared EISCONN          :INT;
+   shared ENOTCONN         :INT;
+   shared ESHUTDOWN        :INT;
+   shared ETIMEDOUT        :INT;
+   shared ECONNREFUSED     :INT;
+   shared ELOOP            :INT;
+   shared ENAMETOOLONG     :INT;
+   shared EHOSTDOWN        :INT;
+   shared EHOSTUNREACH     :INT;
+   shared ENOTEMPTY        :INT;
+   shared EDQUOT           :INT;
+   shared ESTALE           :INT;
+   shared EREMOTE          :INT;
+   shared ENOSTR           :INT;
+   shared ETIME            :INT;
+   shared ENOSR            :INT;
+   shared ENOMSG           :INT;
+   shared EBADMSG          :INT;
+   shared EIDRM            :INT;
+
+end; -- class C
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class UNIX_MESSAGES is
+
+   shared error_messages:ARRAY{STR};
+   const eperm          :STR := "Not owner";
+   const enoent         :STR := "No such file or directory";
+   const esrch          :STR := "No such process";
+   const eintr          :STR := "Interrupted system call";
+   const eio            :STR := "I/O error";
+   const enxio          :STR := "No such device or address";
+   const e2big          :STR := "Arg list too long";
+   const enoexec        :STR := "Exec format error";
+   const ebadf          :STR := "Bad file number";
+   const echild         :STR := "No children";
+   const eagain         :STR := "No more processes";
+   const enomem         :STR := "Not enough memory";
+   const eacces         :STR := "Permission denied";
+   const efault         :STR := "Bad address";
+   const enotblk        :STR := "Block device required";
+   const ebusy          :STR := "Device busy";
+   const eexist         :STR := "File exists";
+   const exdev          :STR := "Cross-device link";
+   const enodev         :STR := "No such device";
+   const enotdir        :STR := "Not a directory";
+   const eisdir         :STR := "Is a directory";
+   const einval         :STR := "Invalid argument";
+   const enfile         :STR := "File table overflow";
+   const emfile         :STR := "Too many open files";
+   const enotty         :STR := "Inappropriate ioctl for device";
+   const efbig          :STR := "File too large";
+   const enospc         :STR := "No space left on device";
+   const espipe         :STR := "Illegal seek";
+   const erofs          :STR := "Read-only file system";
+   const emlink         :STR := "Too many links";
+   const epipe          :STR := "Broken piope";
+   const edom           :STR := "Math argument";
+   const erange         :STR := "Result too large";
+   const ewouldblock    :STR := "Operation would block";
+   const einprogress    :STR := "Operation now in progress";
+   const ealready       :STR := "Operation already in progress";
+   const enotsock       :STR := "Socket operation on non-socket";
+   const edestaddrreq   :STR := "Destination address required";
+   const emsgsize       :STR := "Message too long";
+   const eprototype     :STR := "Protocol wrong type for socket";
+   const enoprotoopt    :STR := "Option not supported by protocol";
+   const eprotonosupport :STR := "Protocol not supported";
+   const esocktnosupport  :STR := "Socket type not supported";
+   const eopnotsupp       :STR := "Operation not supported on socket";
+   const epfnosupport     :STR := "Protocol family not supported";
+   const eafnosupport:STR
+	 := "Address family not supported by protocol family";
+   const eaddrinuse       :STR := "Address already in use";
+   const eaddrnotavail    :STR := "Can't assign requested address";
+   const enetdown         :STR := "Network is down";
+   const enetunreach      :STR := "Network is unreachable";
+   const enetreset        :STR := "Network dropped connection on reset";
+   const econnaborted     :STR := "Software caused connection abort";
+   const econnreset       :STR := "Connection reset by peer";
+   const enobufs          :STR := "No buffer space available";
+   const eisconn          :STR := "Socket is already connected";
+   const enotconn         :STR := "Socket is not connected";
+   const eshutdown        :STR := "Can't send after socket shutdown";
+   const etimedout        :STR := "Connection timed out";
+   const econnrefused     :STR := "Connection refused";
+   const eloop            :STR := "Too many levels of symbolic links";
+   const enametoolong     :STR := "File name too long";
+   const ehostdown        :STR := "Host is down";
+   const ehostunreach     :STR := "Host is unreachable";
+   const enotempty        :STR := "Directory not empty";
+   const edquot           :STR := "Disc quota exceeded";
+   const estale           :STR := "Stale NFS file handle";
+   const eremote          :STR := "Too many levels of remote in path";
+   const enostr           :STR := "Not a stream device";
+   const etime            :STR := "Timer expired";
+   const enosr            :STR := "Out of stream resources";
+   const enomsg           :STR := "No message of desired type";
+   const ebadmsg          :STR := "Not a data message";
+   const eidrm            :STR := "Identifier removed";
+
+   init is
+      error_messages := ARRAY{STR}::new(UNIX_CODES::last_unix_code + 1);
+      error_messages[ UNIX_CODES::eperm          ] := eperm;
+      error_messages[ UNIX_CODES::enoent         ] := enoent;
+      error_messages[ UNIX_CODES::esrch          ] := esrch;
+      error_messages[ UNIX_CODES::eintr          ] := eintr;
+      error_messages[ UNIX_CODES::eio            ] := eio;
+      error_messages[ UNIX_CODES::enxio          ] := enxio;
+      error_messages[ UNIX_CODES::e2big          ] := e2big;
+      error_messages[ UNIX_CODES::enoexec        ] := enoexec;
+      error_messages[ UNIX_CODES::ebadf          ] := ebadf;
+      error_messages[ UNIX_CODES::echild         ] := echild;
+      error_messages[ UNIX_CODES::eagain         ] := eagain;
+      error_messages[ UNIX_CODES::enomem         ] := enomem;
+      error_messages[ UNIX_CODES::eacces         ] := eacces;
+      error_messages[ UNIX_CODES::efault         ] := efault;
+      error_messages[ UNIX_CODES::enotblk        ] := enotblk;
+      error_messages[ UNIX_CODES::ebusy          ] := ebusy;
+      error_messages[ UNIX_CODES::eexist         ] := eexist;
+      error_messages[ UNIX_CODES::exdev          ] := exdev;
+      error_messages[ UNIX_CODES::enodev         ] := enodev;
+      error_messages[ UNIX_CODES::enotdir        ] := enotdir;
+      error_messages[ UNIX_CODES::eisdir         ] := eisdir;
+      error_messages[ UNIX_CODES::einval         ] := einval;
+      error_messages[ UNIX_CODES::enfile         ] := enfile;
+      error_messages[ UNIX_CODES::emfile         ] := emfile;
+      error_messages[ UNIX_CODES::enotty         ] := enotty;
+      error_messages[ UNIX_CODES::efbig          ] := efbig;
+      error_messages[ UNIX_CODES::enospc         ] := enospc;
+      error_messages[ UNIX_CODES::espipe         ] := espipe;
+      error_messages[ UNIX_CODES::erofs          ] := erofs;
+      error_messages[ UNIX_CODES::emlink         ] := emlink;
+      error_messages[ UNIX_CODES::epipe          ] := epipe;
+      error_messages[ UNIX_CODES::edom           ] := edom;
+      error_messages[ UNIX_CODES::erange         ] := erange;
+      error_messages[ UNIX_CODES::ewouldblock    ] := ewouldblock;
+      error_messages[ UNIX_CODES::einprogress    ] := einprogress;
+      error_messages[ UNIX_CODES::ealready       ] := ealready;
+      error_messages[ UNIX_CODES::enotsock       ] := enotsock;
+      error_messages[ UNIX_CODES::edestaddrreq   ] := edestaddrreq;
+      error_messages[ UNIX_CODES::emsgsize       ] := emsgsize;
+      error_messages[ UNIX_CODES::eprototype     ] := eprototype;
+      error_messages[ UNIX_CODES::enoprotoopt    ] := enoprotoopt;
+      error_messages[ UNIX_CODES::eprotonosupport ] := eprotonosupport;
+      error_messages[ UNIX_CODES::esocktnosupport  ] := esocktnosupport;
+      error_messages[ UNIX_CODES::eopnotsupp     ] := eopnotsupp;
+      error_messages[ UNIX_CODES::epfnosupport   ] := epfnosupport;
+      error_messages[ UNIX_CODES::eafnosupport   ] := eafnosupport;
+      error_messages[ UNIX_CODES::eaddrinuse     ] := eaddrinuse;
+      error_messages[ UNIX_CODES::eaddrnotavail  ] := eaddrnotavail;
+      error_messages[ UNIX_CODES::enetdown       ] := enetdown;
+      error_messages[ UNIX_CODES::enetunreach    ] := enetunreach;
+      error_messages[ UNIX_CODES::enetreset      ] := enetreset;
+      error_messages[ UNIX_CODES::econnaborted   ] := econnaborted;
+      error_messages[ UNIX_CODES::econnreset     ] := econnreset;
+      error_messages[ UNIX_CODES::enobufs        ] := enobufs;
+      error_messages[ UNIX_CODES::eisconn        ] := eisconn;
+      error_messages[ UNIX_CODES::enotconn       ] := enotconn;
+      error_messages[ UNIX_CODES::eshutdown      ] := eshutdown;
+      error_messages[ UNIX_CODES::etimedout      ] := etimedout;
+      error_messages[ UNIX_CODES::econnrefused   ] := econnrefused;
+      error_messages[ UNIX_CODES::eloop          ] := eloop;
+      error_messages[ UNIX_CODES::enametoolong   ] := enametoolong;
+      error_messages[ UNIX_CODES::ehostdown      ] := ehostdown;
+      error_messages[ UNIX_CODES::ehostunreach   ] := ehostunreach;
+      error_messages[ UNIX_CODES::enotempty      ] := enotempty;
+      error_messages[ UNIX_CODES::edquot         ] := edquot;
+      error_messages[ UNIX_CODES::estale         ] := estale;
+      error_messages[ UNIX_CODES::eremote        ] := eremote;
+      error_messages[ UNIX_CODES::enostr         ] := enostr;
+      error_messages[ UNIX_CODES::etime          ] := etime;
+      error_messages[ UNIX_CODES::enosr          ] := enosr;
+      error_messages[ UNIX_CODES::enomsg         ] := enomsg;
+      error_messages[ UNIX_CODES::ebadmsg        ] := ebadmsg;
+      error_messages[ UNIX_CODES::eidrm          ] := eidrm;
+   end; -- init
+   
+end; -- class UNIX_MESSAGES
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class UNIX_TEST is
+   -- Test of `UNIX' class.
+   
+   TEST;
+   const tester_name:STR := "clim"; -- Whoever is testing `UNIX'.
+   const tester_home_name:STR := "/n/icsib19/da/clim";
+      -- Home directory of tester.
+   
+   -- * Program should not be run in Emacs shell; otherwise, `login_name'
+   --   does not work.
+   -- * User must NOT be super-user.
+   -- * There is no environment variable/file/directory with the
+   --   names of the form `tmp?' where `?' is 7 digits or some letters
+   --   followed by 7 digits.
+
+   main is
+      -- Test `UNIX_MESSAGES' and `UNIX'.
+      test_unix_messages;
+      test_unix;
+   end; -- main
+
+   test_unix is
+      -- Test `UNIX' system calls.
+      class_name("UNIX");
+
+      -- Create an accounting file.
+      if (UNIX::acct("./tmp1234567") = 0) then
+	 OUT::s("Accounting file: `tmp1234567'").nl;
+	 UNIX::system("ls tmp1*");
+      else
+	 OUT::s("ERROR: ").
+	      s(UNIX_MESSAGES::error_messages[ UNIX::unix_error ]).
+	      nl;
+	 OUT::s("Expected error: `acct' is callable only by super-user").nl;
+      end; -- if
+
+      -- Create a temporary directory to test `chdir'.
+      if (UNIX::mkdir("tmpdir1234567", 0x3FF) = 0) then
+	 OUT::s("New directory: `tmpdir1234567'").nl;
+	 UNIX::system("ls tmpdir1*");
+      else
+	 OUT::s("ERROR: ").
+	      s(UNIX_MESSAGES::error_messages[ UNIX::unix_error ]).
+	      nl;
+      end; -- if
+
+      -- Change working directory.
+      current_wd:STR := UNIX::getcwd;
+      if (current_wd = void) then
+	 OUT::s("ERROR: ").
+	      s(UNIX_MESSAGES::error_messages[ UNIX::unix_error ]).
+	      nl;
+      end; -- if
+      if (UNIX::chdir("tmpdir1234567") = 0) then
+	 tmp_wd:STR := UNIX::getcwd;
+	 test("getcwd", tmp_wd, "???/tmpdir1234567");
+	 UNIX::chdir("..");	-- Revert to original working directory.
+      else
+	 OUT::s("ERROR: ").
+	      s(UNIX_MESSAGES::error_messages[ UNIX::unix_error ]).
+	      nl;
+      end; -- if
+
+      -- Test changing root directory.
+      if (UNIX::chroot("tmpdir1234567") /= 0) then
+	 OUT::s("ERROR: ").
+	      s(UNIX_MESSAGES::error_messages[ UNIX::unix_error ]).
+	      nl;
+	 OUT::s("Expected error: `chroot' is useful only for super-user").nl;
+      end; -- if
+
+      -- Create a child process.
+      pid:INT := UNIX::fork;
+      if (pid = -1) then
+	 OUT::s("ERROR: ").
+	      s(UNIX_MESSAGES::error_messages[ UNIX::unix_error ]).
+	      nl;
+      elsif (pid = 0) then
+	 -- Test `getpid', `getppid'.
+	 my_id:INT := UNIX::getpid;
+	 OUT::s("CHILD :  Child id           = ").i(my_id).nl;
+	 OUT::s("CHILD :  Parent id          = ").i(UNIX::getppid).nl;
+
+	 -- Test `getgid', `getegid'.
+	 OUT::s("CHILD :  Effective group id = ").i(UNIX::getegid).nl;
+	 OUT::s("CHILD :  Real group id      = ").i(UNIX::getgid).nl;
+
+	 -- Test `getuid', `geteuid'.
+	 OUT::s("CHILD :  Effective group id = ").i(UNIX::geteuid).nl;
+	 OUT::s("CHILD :  Real group id      = ").i(UNIX::getuid).nl;
+
+	 -- Test `gethostid', `gethostname'.
+--	 OUT::s("CHILD :  Host id            = ").i(UNIX::gethostid).nl;
+	 host_name:STR := STR::create_sized(10);
+	 if (UNIX::gethostname(host_name, 10) = 0) then
+	    OUT::s("CHILD :  Host name          = ").s(host_name).nl;
+	 else 
+	    OUT::s("ERROR: ").
+	         s(UNIX_MESSAGES::error_messages[ UNIX::unix_error ]).
+		 nl;
+	 end; -- if
+
+	 -- Test `getpgrp'.
+--	 OUT::s("CHILD :  Process group id   = ").i(UNIX::getpgrp(my_id)).nl;
+	 
+	 -- Test `execve'.
+	 OUT::s("Child process lists current directory contents (long form)").nl;
+	 argv:ARRAY{STR} := ARRAY{STR}::new(3);
+	 argv[0] := "/usr/bin/ls";
+	 argv[1] := "-l";
+	 UNIX::execve("/usr/bin/ls", argv, void);
+	 
+	 -- The child process never reaches this point.
+	 UNIX::exit(0);
+      else
+	 -- Test `getpid'.
+	 OUT::s("PARENT:  Child id           = ").i(pid).nl;
+	 OUT::s("PARENT:  Parent id          = ").i(UNIX::getpid).nl;
+	 
+	 -- Test `getgid', `getegid'.
+	 OUT::s("PARENT:  Effective group id = ").i(UNIX::getegid).nl;
+	 OUT::s("PARENT:  Real group id      = ").i(UNIX::getgid).nl;
+
+	 -- Test `getuid', `geteuid'.
+	 OUT::s("PARENT:  Effective group id = ").i(UNIX::geteuid).nl;
+	 OUT::s("PARENT:  Real group id      = ").i(UNIX::getuid).nl;
+
+	 -- Test `gethostid', `gethostname'.
+--	 OUT::s("PARENT:  Host id            = ").i(UNIX::gethostid).nl;
+	 host_name:STR := STR::create_sized(10);
+	 if (UNIX::gethostname(host_name, 10) = 0) then
+	    OUT::s("PARENT:  Host name          = ").s(host_name).nl;
+	 else 
+	    OUT::s("ERROR: ").
+	         s(UNIX_MESSAGES::error_messages[ UNIX::unix_error ]).
+		 nl;
+	 end; -- if
+
+	 -- Test `getpgrp'.
+--	 OUT::s("PARENT:  Process group id   = ").
+--	      i(UNIX::getpgrp(UNIX::getpid)).
+--	      nl;
+
+	 -- Miscellaneous tests.
+	 OUT::nl.nl;
+	 OUT::s("PARENT:  Testing other routines...").nl;
+
+	 test_result:STR := UNIX::login_name;
+	 if (test_result /= void) then
+	    test("login_name", test_result, tester_name);
+	 else
+	    test("login_name", "???", tester_name);
+	 end; -- if
+
+	 test_result:INT := UNIX::ioctl(1234567, 0, 0);
+	 test("ioctl", test_result.to_s, "-1");
+	 if (test_result = -1) then
+	    test("ioctl error message",
+	       UNIX_MESSAGES::error_messages[UNIX::unix_error],
+	       UNIX_MESSAGES::error_messages[UNIX_CODES::EBADF]);
+	 end; -- if
+
+	 test_result:INT := UNIX::swapon("./tmpdir1234567890/");
+	 test("swapon", test_result.to_s, "-1");
+	 if (test_result = -1) then
+	    test("swapon error message",
+	       UNIX_MESSAGES::error_messages[UNIX::unix_error],
+	       UNIX_MESSAGES::error_messages[UNIX_CODES::EPERM]);
+	 end; -- if
+
+	 test_result:INT := UNIX::sethostname("camelot", "camelot".length);
+	 test("sethostname", test_result.to_s, "-1");
+	 if (test_result = -1) then
+	    test("sethostname error message",
+	       UNIX_MESSAGES::error_messages[UNIX::unix_error],
+	       UNIX_MESSAGES::error_messages[UNIX_CODES::EPERM]);
+	 end; -- if
+
+--	 test_result:INT := UNIX::setpgrp(12345678, 2345678);
+--	 test("setpgrp", test_result.to_s, "-1");
+--	 if (test_result = -1) then
+--	    test("setpgrp error message",
+--	       UNIX_MESSAGES::error_messages[UNIX::unix_error],
+--	       UNIX_MESSAGES::error_messages[UNIX_CODES::EINVAL]);
+--	 end; -- if
+
+	 -- There is no change to real/effective process group id's.
+	 test_result:INT := UNIX::setregid(-1, -1);
+	 test("setregid", test_result.to_s, "0");
+
+	 -- There is no change to real/effective user id's.
+	 test_result:INT := UNIX::setreuid(-1, -1);
+	 test("setreuid", test_result.to_s, "0");
+
+	 oldmask:INT := UNIX::umask(0x1);
+	 test("umask",
+	    UNIX::umask(oldmask).to_s, -- Restore old file mode.
+	    "1");
+
+	 home_name:STR := UNIX::getenv("HOME");
+	 if (home_name /= void) then
+	    test("getenv", home_name, tester_home_name);
+	 else 
+	    test("getenv", "(No $HOME variable)", tester_home_name);
+	 end; -- if
+
+	 test_result:INT := UNIX::symlink("tmpdir1234567", "tmpdir3456789");
+	 test("symlink", test_result.to_s, "0");
+
+	 test_result:INT := UNIX::link("tmpdir1234567", "tmpdir2345678");
+	 test("link", test_result.to_s, "0");
+
+	 test_result:INT := UNIX::rename("tmpdir1234567", "tmpdir4567890");
+	 test("rename (1st)", test_result.to_s, "0");
+	 test_result:INT := UNIX::rename("tmpdir4567890", "tmpdir1234567");
+	 test("rename (2nd)", test_result.to_s, "0");
+
+	 test_result:INT := UNIX::rmdir("tmpdir1234567");
+	 test("rmdir(\"tmpdir1234567\")", test_result.to_s, "0");
+
+	 -- Remove hard and symbolic links.
+	 test_result:INT := UNIX::unlink("tmpdir2345678");
+	 test("unlink(\"tmpdir2345678\")", test_result.to_s, "0");
+	 test_result:INT := UNIX::unlink("tmpdir3456789");
+	 test("unlink(\"tmpdir3456789\")", test_result.to_s, "0");
+
+	 UNIX::sync;
+	 test("sync", "No printable effect", "No printable effect");
+	 
+	 buff:STR := STR::create_sized(10);
+--	 UNIX::profil(buff, 10, 0, 1);
+--	 test("profil", "No printable effect", "No printable effect");
+	 
+--	 UNIX::vhangup;
+--	 test("vhangup", "No printable effect", "No printable effect");
+
+	 UNIX::exit(0);
+	 -- If `exit' works, then this message is never printed.
+	 OUT::s("`exit' does not work!!!").nl;
+      end; -- if
+   end; -- test_unix
+
+   test_unix_messages is
+      -- Test `UNIX_MESSAGES' to make sure the array containing
+      -- messages is initialized correctly.
+      class_name("UNIX_MESSAGES");
+      UNIX_MESSAGES::init;
+      test("error_messages [EPERM          ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EPERM ],
+	 "Not owner");
+      test("error_messages [ENOENT         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENOENT ],
+	 "No such file or directory");
+      test("error_messages [ESRCH          ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ESRCH ],
+	 "No such process");
+      test("error_messages [EINTR          ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EINTR ],
+	 "Interrupted system call");
+      test("error_messages [EIO            ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EIO ],
+	 "I/O error");
+      test("error_messages [ENXIO          ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENXIO ],
+	 "No such device or address");
+      test("error_messages [E2BIG          ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::E2BIG ],
+	 "Arg list too long");
+      test("error_messages [ENOEXEC        ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENOEXEC ],
+	 "Exec format error");
+      test("error_messages [EBADF          ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EBADF ],
+	 "Bad file number");
+      test("error_messages [ECHILD         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ECHILD ],
+	 "No children");
+      test("error_messages [EAGAIN         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EAGAIN ],
+	 "No more processes");
+      test("error_messages [ENOMEM         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENOMEM ],
+	 "Not enough memory");
+      test("error_messages [EACCES         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EACCES ],
+	 "Permission denied");
+      test("error_messages [EFAULT         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EFAULT ],
+	 "Bad address");
+      test("error_messages [ENOTBLK        ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENOTBLK ],
+	 "Block device required");
+      test("error_messages [EBUSY          ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EBUSY ],
+	 "Device busy");
+      test("error_messages [EEXIST         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EEXIST ],
+	 "File exists");
+      test("error_messages [EXDEV          ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EXDEV ],
+	 "Cross-device link");
+      test("error_messages [ENODEV         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENODEV ],
+	 "No such device");
+      test("error_messages [ENOTDIR        ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENOTDIR ],
+	 "Not a directory");
+      test("error_messages [EISDIR         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EISDIR ],
+	 "Is a directory");
+      test("error_messages [EINVAL         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EINVAL ],
+	 "Invalid argument");
+      test("error_messages [ENFILE         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENFILE ],
+	 "File table overflow");
+      test("error_messages [EMFILE         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EMFILE ],
+	 "Too many open files");
+      test("error_messages [ENOTTY         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENOTTY ],
+	 "Inappropriate ioctl for device");
+      test("error_messages [ EFBIG          ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES:: EFBIG ],
+	 "File too large");
+      test("error_messages [ENOSPC         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENOSPC ],
+	 "No space left on device");
+      test("error_messages [ESPIPE         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ESPIPE ],
+	 "Illegal seek");
+      test("error_messages [EROFS          ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EROFS ],
+	 "Read-only file system");
+      test("error_messages [EMLINK         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EMLINK ],
+	 "Too many links");
+      test("error_messages [EPIPE          ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EPIPE ],
+	 "Broken piope");
+      test("error_messages [EDOM           ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EDOM ],
+	 "Math argument");
+      test("error_messages [ERANGE         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ERANGE ],
+	 "Result too large");
+      test("error_messages [EWOULDBLOCK    ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EWOULDBLOCK ],
+	 "Operation would block");
+      test("error_messages [EINPROGRESS    ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EINPROGRESS ],
+	 "Operation now in progress");
+      test("error_messages [EALREADY       ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EALREADY ],
+	 "Operation already in progress");
+      test("error_messages [ENOTSOCK       ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENOTSOCK ],
+	 "Socket operation on non-socket");
+      test("error_messages [EDESTADDRREQ   ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EDESTADDRREQ ],
+	 "Destination address required");
+      test("error_messages [EMSGSIZE       ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EMSGSIZE ],
+	 "Message too long");
+      test("error_messages [EPROTOTYPE     ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EPROTOTYPE ],
+	 "Protocol wrong type for socket");
+      test("error_messages [ ENOPROTOOPT    ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES:: ENOPROTOOPT ],
+	 "Option not supported by protocol");
+      test("error_messages [ EPROTONOSUPPORT ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EPROTONOSUPPORT ],
+	 "Protocol not supported");
+      test("error_messages [ ESOCKTNOSUPPORT  ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ESOCKTNOSUPPORT ],
+	 "Socket type not supported");
+      test("error_messages [ EOPNOTSUPP       ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EOPNOTSUPP ],
+	 "Operation not supported on socket");
+      test("error_messages [ EPFNOSUPPORT     ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EPFNOSUPPORT ],
+	 "Protocol family not supported");
+      test("error_messages [ EAFNOSUPPORT     ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EAFNOSUPPORT ],
+	 "Address family not supported by protocol family");
+      test("error_messages [EADDRINUSE       ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EADDRINUSE ],
+	 "Address already in use");
+      test("error_messages [EADDRNOTAVAIL    ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EADDRNOTAVAIL ],
+	 "Can't assign requested address");
+      test("error_messagest[ ENETDOWN         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES:: ENETDOWN ],
+	 "Network is down");
+      test("error_messages [ENETUNREACH      ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENETUNREACH ],
+	 "Network is unreachable");
+      test("error_messages [ ENETRESET        ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENETRESET ],
+	 "Network dropped connection on reset");
+      test("error_messages [ ECONNABORTED     ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ECONNABORTED ],
+	 "Software caused connection abort");
+      test("error_messages [ ECONNRESET       ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ECONNRESET ],
+	 "Connection reset by peer");
+      test("error_messages [ ENOBUFS          ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENOBUFS ],
+	 "No buffer space available");
+      test("error_messages [ EISCONN          ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EISCONN ],
+	 "Socket is already connected");
+      test("error_messages [ ENOTCONN         ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENOTCONN ],
+	 "Socket is not connected");
+      test("error_messages [ ESHUTDOWN        ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ESHUTDOWN ],
+	 "Can't send after socket shutdown");
+      test("error_messages [ ETIMEDOUT        ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ETIMEDOUT ],
+	 "Connection timed out");
+      test("error_messages [ ECONNREFUSED     ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ECONNREFUSED ],
+	 "Connection refused");
+      test("error_messages [ ELOOP            ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ELOOP ],
+	 "Too many levels of symbolic links");
+      test("error_messages [ ENAMETOOLONG     ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENAMETOOLONG ],
+	 "File name too long");
+      test("error_messages [ EHOSTDOWN        ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EHOSTDOWN ],
+	 "Host is down");
+      test("error_messages [ EHOSTUNREACH     ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EHOSTUNREACH ],
+	 "Host is unreachable");
+      test("error_messages [ ENOTEMPTY        ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENOTEMPTY ],
+	 "Directory not empty");
+      test("error_messages [ EDQUOT           ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EDQUOT ],
+	 "Disc quota exceeded");
+      test("error_messages [ ESTALE           ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ESTALE ],
+	 "Stale NFS file handle");
+      test("error_messages [ EREMOTE          ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EREMOTE ],
+	 "Too many levels of remote in path");
+      test("error_messages [ ENOSTR           ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENOSTR ],
+	 "Not a stream device");
+      test("error_messages [ ETIME            ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ETIME ],
+	 "Timer expired");
+      test("error_messages [ ENOSR            ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENOSR ],
+	 "Out of stream resources");
+      test("error_messages [ ENOMSG           ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::ENOMSG ],
+	 "No message of desired type");
+      test("error_messages [ EBADMSG          ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EBADMSG ],
+	 "Not a data message");
+      test("error_messages [ EIDRM            ]",
+	 UNIX_MESSAGES::error_messages [ UNIX_CODES::EIDRM ],
+	 "Identifier removed");
+   end; -- test_unix_messages
+
+end; -- class UNIX_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class SUX_TEST is
+
+   -- cs -com $SATHER_HOME/etc/test/unix.sather sux_test
+   
+   TEST;
+   
+   main is
+      class_name("SUX");
+      test("C::SIGKILL_ type",SUX::create(C::sigkill_).signal_type,
+	 "SIGKILL");
+      test("C::SIGKILL_ doc",SUX::create(C::sigkill_).signal_doc,
+	 "kill (cannot be caught or ignored)");
+      test1;
+      test2;
+      test3;
+      test4;
+      finish;      
+   end;
+
+   test1 is
+      SUX::expect(C::sigsegv_);
+      SUX::expect(C::sigbus_);
+      protect 
+        sx: SUX;
+        sx.signal_type; -- this accesses void object
+      against SUX then
+        test("Void object abort",
+             (exception.signal_type.is_equal("SIGSEGV") or
+	      exception.signal_type.is_equal("SIGBUS") or
+		 -- when compiled with -chk this should raise an error too
+	      exception.signal_type.is_equal("RT_VOIDOBJ")).to_s,
+	  "T");
+      end;
+   end;
+
+   test2 is
+      protect
+	 raise SUX_CHILD::new;
+      against SUX_PARENT then
+	 test("except SUX_PARENT", "match SUX_PARENT::type", "match $SUX_PARENT::type");
+      against $SUX_PARENT then 
+	 test("except $SUX_PARENT", exception.type.to_s, SUX_CHILD::type.to_s);
+      against $OB then
+	 test("except $OB", "match $OB::type", "match $SUX_PARENT::type");
+      end;
+   end;
+
+   test3 is
+      protect 
+	 raise SUX_PARENT::new;
+      against SUX_PARENT then
+	 test("except SUX_PARENT", exception.type.to_s, SUX_PARENT::type.to_s);
+      against $SUX_PARENT then 
+	 test("except $SUX_PARENT", exception.type.to_s, SUX_CHILD::type.to_s);
+      against $OB then
+	 test("except $OB", "match $OB::type", "match $SUX_PARENT::type");
+      end;
+   end;
+
+   test4 is
+      protect
+	 testn(1000);
+      against SUX_PARENT then
+	 test("except SUX_PARENT (unwind 1000)",
+	    exception.type.to_s, SUX_PARENT::type.to_s);
+      against $OB then
+	 test("except $OB (unwind 1000)",
+	    "match $OB::type", "match $SUX_PARENT::type");
+      end;
+   end;
+   
+   testn(i:INT) is
+      protect 
+	 if i=0 then
+	    raise SUX_PARENT::new;
+	 else
+	    testn(i-1);
+	 end;
+      against $SUX_CHILD then
+	 test("except $SUX_CHILD (unwind ".copy.i(i).s(")"),
+	    "match $SUX_CHILD::type", "match SUX_PARENT::type");
+      end;
+   end;
+   
+end;
+
+class SUX_CHILD is SUX_PARENT end;
+class SUX_PARENT is ANY_OB; end;
+

@@ -1,0 +1,198 @@
+--- -*- Mode: Sather;  -*-
+-- File: classob.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU) and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1990, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Holds the representation of Sather class definitions.
+--*
+--* RCS: $Id: classob.sa,v 1.1 1994/02/12 03:21:45 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 04:52 1993 (hws)
+--*  Oct  3 12:06 1993 (hws): add abstract flag 'abt'
+--*  Feb 24 12:43 1993 (hws): add invariants
+--*  Sep 19 21:06 1992 (hws): uniform error message
+--*  Sep 19 20:40 1992 (hws): recall line number of class head for errors
+--* Created: Thu Jun  7 09:10:04 1990
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class CLASSOB is
+   -- Classes possibly with type parameters.
+
+   -- Declare these two features separately, rather than inherit from
+   -- PARSEROB.
+   attr first_lineno:INT;	-- Line number at beginning of class definition
+   attr lineno:INT;		-- Line number at end of class definition
+   const print_indent:INT := 2; -- Indentation for printing class
+
+   attr index:INT;		-- Index of the class name
+   attr fname:STR;		-- Name of file the class is in
+   attr flst:LST_FEATOB;	-- List of features
+   attr plst:LIST{INT};		-- List of type parameter name indices
+   				-- It is void if not parameterized
+   attr invar: ASSERT_STMTOB;        -- invariant
+
+   attr more_fnames:LIST{STR};
+      -- Other file names in which class is found
+   
+   attr time_stamp:TIME_INT;
+   -- The time-stamp is taken from the time the file was last updated.
+   -- This value is updated in the "create" routine.
+
+   attr abt: BOOL := false; -- abstract
+   
+   RESERVED_CLASS_NAMES;
+   RESERVED_WORDS;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(index,lno:INT; pl:LIST{INT}; fl:LST_FEATOB; ab: BOOL):CLASSOB is
+      -- Create a CLASSOB with `fl' a list of features, `pl' a list
+      -- of type parameter names.
+      -- NOTE:
+      -- a.  If class name is repeated as a type parameter, the class
+      --     name will be overshadowed by type parameter within the
+      --     definition.
+      -- b.  Similarly if type parameter name is the same as predefined type.
+      res := new; 
+      res.index := index; 
+      res.plst := pl; 
+      res.flst := fl;
+      -- We cannot use the line number of class name, so instead, we use
+      -- the line number at the end of the class definition.
+      res.first_lineno := lno;
+      res.lineno := GLOBALS::curr_lineno;
+      res.fname := GLOBALS::curr_filename;
+      if (GLOBALS::curr_file_stat /= void) then
+	 res.time_stamp := (GLOBALS::curr_file_stat).filestat.st_mtime;
+      end; -- if
+      res.more_fnames := LIST{STR}::create(2);
+      res.abt := ab;
+      -- Check that there is no repetition of type parameter name.
+      if (pl /= void) then
+	 i:INT := 0;
+	 j:INT;
+	 sz:INT := pl.insert;
+	 loop until!(i >= (sz-1));
+	    j := i + 1;
+	    loop until!(j >= sz);
+	       if (pl[i] = pl[j]) then
+		  -- Line number is the end of the class definition.
+		  CS_ERROR::repeated_type_parameters(
+		     ERR_INFO::filename,lno,pl[i],pl[j]);
+	       end; -- if
+	       j := j + 1;
+	    end; -- loop
+	    i := i + 1;
+	 end; -- loop
+      end; -- if
+      
+      -- The parametrization of predefined types are fixed by the 
+      -- base class definition.
+      
+      -- Make known to each feature what class definition it belongs to.
+      fsz:INT := fl.insert;
+      -- "fl" is guaranteed to be non-null from construction of parse
+      -- trees.
+      k:INT := 0;
+      loop until!(k >= fsz);
+         if fl[k]/=void then
+            fl[k].cls_def := res;
+         end; 
+	 k := k + 1;
+      end; -- loop
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   num_params:INT is
+      -- Number of type parameters in class definition.
+      if (plst = void) then
+	 res := 0;
+      else
+	 res := plst.insert;
+      end;
+   end; -- num_params
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   non_param_p:BOOL is
+      -- Returns "true" if class definition is not parametrized.
+      if (plst = void) then
+	 res := true;
+      else
+	 res := (plst.insert = 0);
+      end; -- if
+   end; -- non_param_p
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   name_str:STR is
+      -- Name of class.
+      res := (GLOBALS::str_table).at_index(index);
+   end; -- name_str
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   filename:STR is
+      -- Name of files in which class definition is found.
+      -- `C' class is the only one that can span multiple files.
+      res := fname;
+      i:INT := 0;
+      msz:INT;
+      if (more_fnames /= void) then
+	 msz := more_fnames.insert;
+      end; -- if
+      loop until!(i >= msz);
+	 res := res.s(" ; ").
+	            s(more_fnames[i]);
+	 i := i + 1;
+      end; -- loop
+   end; -- filename
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   change_name(new_nm:STR) is
+      -- Change class name.  New name has to be inserted into
+      -- string table.
+      index := (GLOBALS::str_table).insert_str(new_nm);
+   end; -- change_name
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   add_features(nflst:LST_FEATOB) is
+      -- Add a list of features.  Caller must verify that it is
+      -- alright to add the list of features.
+
+      -- Old features with the same name will be replaced
+      -- by the new feature.
+      i:INT := 0;
+      num_feats:INT;
+      if (nflst /= void) then
+	 num_feats := nflst.insert;
+      end; -- if
+      loop until!(i >= num_feats);
+	 flst := flst.add_unique_feat(nflst[i]);
+	 i := i + 1;
+      end; -- loop
+   end; -- add_features
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   features:LST_FEATOB is
+      -- Returns a list of features of current class.
+      res := flst;
+   end; -- features
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   unique_key:INT is
+      -- Returns a unique key to identify CLASSOB.
+      res := index;
+   end; -- unique_key
+
+end; -- class CLASSOB
+
+--------------------------------------------------------------------

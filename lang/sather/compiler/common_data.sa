@@ -1,0 +1,1308 @@
+-- File: common_data.sa
+-- Author: Chu-Cheow Lim and Jeff Bilmes
+-- Created: Wed Jun  6 11:09:08 1990
+-- Copyright (C) International Computer Science Institute, 1990, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+-- Contains data structures used throughout compiler.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--------------------------------------------------------------------
+--* RCS: $Id: common_data.sa,v 1.1 1994/02/12 03:21:50 hsu Exp $
+--* History:
+--* Last edited: Oct 27 11:40 1993 (hws)
+--*  Oct 27 11:40 1993 (hws): remove dont_compiler_c
+--*  Oct  5 23:59 1993 (hws): add object_files option
+--*  Oct  5 23:30 1993 (hws): remove cfile / cmake file logic
+--*  Sep 28 04:50 1993 (hws): switch -> case
+--*  Sep 27 22:41 1993 (hws): care for -x sgikr and friends too
+--*  Apr 17 03:31 1993 (hws): delete -fast option, always incremental now
+--*  Apr 16 21:30 1993 (hws): add -x (cross coder) and -gc options.
+--*  Apr 16 21:24 1993 (hws): change -voi to -kr.
+--*  Feb 26 09:49 1993 (hws): do not handle abstract entities when coding
+--*  Sep 19 20:47 1992 (hws): adapt to new signature of CLASSOB::create
+--*  Jul  2 02:08 1992 (hws): avoid the annoying copy messages and solve ln vs cp later.
+--*  Jul  1 23:45 1992 (hws): add fast mode deleting identically generated code
+--*  Jul  1 23:41 1992 (hws): verbose_code by default off now, else meaningless to set.
+--*  Feb 24 19:50 1992 (hws): explicit pmake dependency removed.
+--*                           -mak <mymake> calls for use of mymake
+--*  Dec 16 10:38 1991 (hws): cp_user_cfile added 
+--* Created: 91/07/11 15:55:12 bilmes
+--------------------------------------------------------------------
+
+-- Originally we had two different classes containing global data.
+--   Data stored in one class (X) is directly accessed by the user.  The 
+--   difference from the other class (Y) is that the latter (Y) contains
+--   structures whose stored contents may change, but the pointer
+--   remains constant.  Hence shared features in (X) may
+--   be 'aliased' in another class by using a definition of the form:
+--   "shared xx:INT := X::xx;"(*), but not Y.  But in X, the shared feature
+--   initialization should be done by a main routine, and hence even 
+--   if other classes uses initialization of the form (*), the values
+--   would be incorrect.
+   
+class GLOBALS is
+
+   const indent_step:INT := 3;
+      -- *! May want to make this a variable that can be reset by
+      -- compiler option
+   
+   shared str_table:STR_TABLE;
+      -- String table stores all identifiers
+   
+   shared class_defs:CLASSOB_TABLE;
+      -- Class definitions
+   
+   shared class_inst:CLASSOB_S_TABLE;
+      -- Instantiated classes
+
+   shared class_stat_tbl:CLASS_STAT_TBL;
+      -- Information on the update-status of classes. 
+
+   shared dot_sather_reader:DOT_SATHER_HANDLER;
+   
+   shared curr_lineno:INT;
+      -- Line number of file during parsing.  Updated by lexer, and
+      --   reset for each time a new file is opened.
+
+   shared curr_loop_lineno:INT;
+      -- for debugger:
+      -- Line number of the beginning of a loop when it is parsed.
+      -- When an UNTIL or LOOP statement is first encountered in the parser,
+      -- curr_loop_lineno is set to curr_lineno
+   
+   shared curr_filename:STR;
+      -- Name of file we are currently handling; during parsing, it
+      -- is the name of file being parsed, but during semantic check,
+      -- it is the name of file in which the current class is being
+      -- defined; this is not used for printing error messages,
+      -- and updated during semantic check for completeness.  Most
+      -- of the updates to this and "curr_class_inst" are done in routines
+      -- of SATHER_SEMANT, but some are done in routines in CLASSOB_S 
+      -- when we recursively traverse other classes.
+   
+   shared curr_infile:FILE;
+      -- Name of file we are currently parsing
+   
+   shared curr_file_stat:FILE_STAT;
+   -- Contains information about file currently being parsed.
+   -- NOTE: This Sather object contains a pointer to a C structure.
+   
+   shared curr_class_inst:CLASSOB_S;
+      -- Class in whose structure we are traversing.  
+   
+   shared curr_feature:$FEATOB_S;
+      -- Feature node in whose structure we are traversing.  Used only for
+      -- "semant" and later phases.  But we always update it (most of the
+      -- time in routines in CLASSOB_S) for completeness.
+   
+   shared semant_lval:BOOL := false;
+   -- Flag used during "semant" to indicate if an expression is being
+   -- used as the LHS of an assignment statement.
+   
+-- Predefined class instances are referred to by fixed runtime indices.
+-- Hence we do not need global variables which refer to predefined 
+-- classes; instead we use the fixed indices to global semantic table.
+
+   -- These objects are not in any table, only to give a special type to
+   -- "void".
+   shared void_classob:CLASSOB;
+   shared void_classob_s:CLASSOB_S;
+   
+-- Predefined type objects for the predefined classes
+   shared voidtype_s:INSTANT_TYPEOB_S; -- Special type for "void"
+   shared ob_typeob_s:INSTANT_TYPEOB_S; -- Must be dispatched
+   shared array_typeob_s:INSTANT_TYPEOB_S; 
+   shared array2_typeob_s:INSTANT_TYPEOB_S;
+   shared array3_typeob_s:INSTANT_TYPEOB_S;
+   shared array4_typeob_s:INSTANT_TYPEOB_S;
+   shared bool_typeob_s:INSTANT_TYPEOB_S;
+   shared c_typeob_s:INSTANT_TYPEOB_S;
+   shared char_typeob_s:INSTANT_TYPEOB_S;
+   shared double_typeob_s:INSTANT_TYPEOB_S;
+   shared err_typeob_s:INSTANT_TYPEOB_S;
+   shared file_typeob_s:INSTANT_TYPEOB_S;
+   shared in_typeob_s:INSTANT_TYPEOB_S;
+   shared int_typeob_s:INSTANT_TYPEOB_S;
+   shared out_typeob_s:INSTANT_TYPEOB_S;
+   shared real_typeob_s:INSTANT_TYPEOB_S;
+   shared self_type_typeob_s:INSTANT_TYPEOB_S;
+   shared str_typeob_s:INSTANT_TYPEOB_S;
+   shared str_cursor_typeob_s:INSTANT_TYPEOB_S;
+   shared sys_typeob_s:INSTANT_TYPEOB_S;
+   shared fob_typeob_s:INSTANT_TYPEOB_S;
+   shared sux_typeob_s:INSTANT_TYPEOB_S;
+   shared undefine_typeob_s:INSTANT_TYPEOB_S;
+
+-- Directory containing the runtime stuff (also see file install.sa)
+   shared sys_dir:STR; -- dir containing default, sys_dot_sather, msg, ...
+   shared rt_dir:STR; -- dir containing runtime .o files
+   shared precomp_dir:STR; -- dir containing precompiled sather .o files
+
+   
+-- File which will contain the runtime initialization routine "main_"
+   shared main_init_file:OUTFILE;
+
+-- File from which to read the Sather compiler commands
+   shared sys_cmdfile_name:STR;
+   shared msgfile_name:STR;
+
+-- Non-parametrized class which contains the "main" routine to be called
+   shared final_prog_name:STR; 
+   shared creator_class_name:INT;
+   shared creator_classob:CLASSOB;
+   shared creator_classob_s:CLASSOB_S;
+   
+   shared next_key:INT := 1;
+      -- Used for assigned unique identifiers to different temporaries
+      --   just before code generation.
+
+   shared dispatch_table_size:INT;
+   -- Updated just before "MAIN_.c" is printed, this is the actual size
+   -- of "dispatch_table_" allocated in "MAIN_.c"
+   shared dispatch_flags:ARRAY{INT};
+   -- Allocated in "all_cprint_init" in class "SATHER_SEMANT"
+
+   -- String storing C library classes to be linked with
+   shared clib_options:STR := STR::create;
+
+   shared self_exists:BOOL := true;
+   shared features_called_from_c:INT_HASH_SET := INT_HASH_SET::create;
+   shared name_mappings:STR_HASH_MAP{INT} := STR_HASH_MAP{INT}::create;
+   
+   -- Main routine in user-specified class
+   shared main_rout:ROUT_FEATOB_S;
+
+   -- Temporary variables used when initializing shareds/consts
+   shared tmpct:LIST{INT} := LIST{INT}::create(5);
+
+   -- Holds a list of string consts used in initializing shareds/consts
+   shared str_consts:LIST{STR_CONST_EXPROB_S}:=LIST{STR_CONST_EXPROB_S}::create(10);
+
+   -- Holds a list of integers (indices of strings in string table).  This
+   -- is to handle the following case:
+   --        shared foo:STR := "xxx";
+   --        shared bar:STR := "xxx";
+   -- Then both instances of "xxx" will have the same index, and we want to
+   -- have exactly one declaration of "xxx".  The list of indices makes
+   -- sure each STR_CONST_EXPROB_S added to "str_consts" has a unique index.
+   shared str_indices:LIST{INT} := LIST{INT}::create(10);
+   
+   -- This is set to "true" if the feature table is to be printed
+   -- (eg if compiler is in browser mode).
+   shared print_feat_info:BOOL := false;
+   
+   -- This is set to "true" if the descendent table has to be printed
+   -- (eg for runtime type-checking).
+   shared print_des_info:BOOL := false;
+
+   -- Additional tag for printing goto-tag.  This is set to a value
+   -- greater than 0 if eg the loop statement is printed more than once.
+   -- In fact, this value is the same as the number of times the current
+   -- subtree has been printed.
+   shared g_tag:INT := 0;
+   
+   shared rt_type:INT := 0;
+      -- This value is set everytime "conforms_to" routine (in 
+      -- INSTANT_TYPEOB_S) is called.  It is set to runtime types to be 
+      -- checked during runtime (negative for dispatched types; positive 
+      -- for non-dispatched types).
+
+-- ~~~~~~~~~~~~~~~~~~~~
+
+   shared pre_semant:BOOL;
+   shared other_cnames:INT_HASH_SET := INT_HASH_SET::create;
+
+-- ~~~~~~~~~~~~~~~~~~~~
+   
+   shared c_compiler:STR;
+   -- The value determines the "CC" option in the generated makefile.
+   
+   shared cc_flags:ARRAY{STR};
+   -- The value determines the "CFLAGS" option in the generated makefile.
+
+   shared c_macros:INT_TO_INTSET;
+   -- Contains a list of <integer, array of integers> mappings where the
+   -- integers are indices into the string table.  The first integer is
+   -- from the C name, and the array of integers corresponds to the list
+   -- of C macro statements to be inserted for that C name.
+   -- This is created after the compiler commands have been read, because
+   -- this is used:
+   -- 1.  To mark CLASSOB_S's as "internal_updated" if the C macro changes.
+   -- 2.  To print the C macros during file generation.
+   
+   -- ** All the above are updated after the compiler commands have been read.
+
+   shared keys_set:CLASS_KEY_SET;
+   -- Contains a list of <class index, key id> pairs for the debug/assert
+   -- keys.  This is created just before the "semant" phase is started on
+   -- all classes, just we need to have all the identifier strings/indices
+   -- mapping.
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   init_file_info is
+      -- Initializes the file and directory names
+      rt_dir := UPATHS::concat(COMPILER_OPTIONS::sather_home,
+		   UPATHS::canonicalize(INSTALL_CONSTS::rt_subdir));
+      precomp_dir := UPATHS::concat(COMPILER_OPTIONS::sather_home,
+	                         INSTALL_CONSTS::precomp_subdir);
+      
+      if (sys_dir = void) then
+	 sys_dir := UPATHS::concat(COMPILER_OPTIONS::sather_home,
+	                         UPATHS::canonicalize(INSTALL_CONSTS::sys_subdir));
+      end; -- if
+
+      -- The system default "sys_dot_sather" could be overridden by
+      -- the "-sys" option.  This provides a way for the compiler writer
+      -- to test new runtime without disrupting the current users.
+      if (sys_cmdfile_name = void) then
+	 sys_cmdfile_name := STR::create.s(sys_dir).s(INSTALL_CONSTS::sys_cmdfile);
+      end; -- if
+
+      msgfile_name := STR::create.s(sys_dir).s(INSTALL_CONSTS::msgfile);
+      
+   end; -- init_file_info
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   init_typeob_s is
+      -- This is called in the compiler, ie after all the runtime
+      -- indices for base classes are initialized.
+      -- IMPORTANT: This should only be called after the CLASSOB_S objects
+      --            have been created (currently in "install_predefined_classes"
+      --            in SATHER_SEMANT).
+      
+      -- We have CLASSOB_S and CLASSOB objects which are not in the table, 
+      -- specially for the type of value "void".
+      void_classob   := CLASSOB::create(RESERVED_WORDS::void_ind, 0,
+                                     void, LST_FEATOB::create(1), void);
+      void_classob_s := CLASSOB_S::create(void_classob,
+                                       LSTINT_KEY::create(1).
+                                                   push(RESERVED_WORDS::void_ind),
+						   void);
+      void_classob_s.ctype := C_TYPE_CONST::c_ptr;
+      voidtype_s := INSTANT_TYPEOB_S::create(0, -1);
+	 -- Use 0 as the index for the type of "void"
+
+      ob_typeob_s := 
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::OB_ici, -1).dispatched;
+      array_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::ARRAY_ici, -1);
+      array2_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::ARRAY2_ici, -1);
+      array3_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::ARRAY3_ici, -1);
+      array4_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::ARRAY4_ici, -1);
+      bool_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::BOOL_ici, -1);
+      c_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::C_ici, -1);
+      char_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::CHAR_ici, -1);
+      double_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::DOUBLE_ici, -1);
+      err_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::ERR_ici, -1);
+      file_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::FILE_ici, -1);
+      in_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::IN_ici, -1);
+      int_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::INT_ici, -1);
+      out_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::OUT_ici, -1);
+      real_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::REAL_ici, -1);
+      self_type_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::SELF_TYPE_ici, -1);
+      str_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::STR_ici, -1);
+      str_cursor_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::STR_CURSOR_ici, -1);
+      sys_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::SYS_ici, -1);
+      fob_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::FOB_ici, -1);
+      sux_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::SUX_ici, -1);
+      undefine_typeob_s :=
+         INSTANT_TYPEOB_S::create(RESERVED_CLASSES::UNDEFINE_ici, -1);
+   end; -- init_typeob_s
+
+end; -- class GLOBALS
+
+--------------------------------------------------------------------
+   
+class GLOBAL_PROC is
+   -- This class contains routines which do not really belong to
+   --   any class.  Examples are routines which operate on integers.
+   --   We might have a descendent integer class that contains these
+   --   routines, but it may be too bothersome.
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   global_key:INT is
+      res := GLOBALS::next_key;
+      GLOBALS::next_key := GLOBALS::next_key + 1;
+   end; -- global_key
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   reset_global_key is
+      GLOBALS::next_key := 1;
+   end; -- reset_global_key
+
+
+   RESERVED_FEAT_NAMES;		
+      -- List of reserved features names
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- The key for dispatch table is obtained by having the first 14 bits
+--   hold the class index and the last 18 bits the feature name index.
+   
+   featname_from_key(k:INT):INT is
+      res := k.rshift(14);
+   end; -- featname_from_key
+   
+   classind_from_key(k:INT):INT is
+      res := k.bit_and(1.lshift(14) - 1);
+   end; -- classind_from_key
+   
+   key_of_class_feat(cnm:INT; feat:INT):INT is
+      res := (feat.lshift(14) + cnm);
+   end; -- key_of_class_feat
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   help_insert(cnm:INT; feat:INT):INT is
+      key:INT := key_of_class_feat(cnm, feat);
+      hash:INT := (((key * key).u_mod(GLOBALS::dispatch_table_size)).
+                                rshift(1)).
+                                lshift(1);
+      loop
+	 if (GLOBALS::dispatch_flags[hash + 1] = 0) then
+	    GLOBALS::dispatch_flags[hash] := 1;
+	    GLOBALS::dispatch_flags[hash + 1] := 1;
+	    res := hash;
+	    break!;
+	 else
+	    hash := hash + 2;
+	    if (hash >= GLOBALS::dispatch_table_size) then
+	       hash := 0;
+	    end; -- if
+	 end; -- if 
+      end; -- loop
+   end; -- help_insert
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   check_is_on:BOOL is
+      res := COMPILER_OPTIONS::rt_code_check;
+   end; -- check_is_on
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   handle_class_p(co:CLASSOB_S):BOOL is
+      res := (co.is_used_p) or
+	     ((COMPILER_OPTIONS::gen_all) and not co.abt) ;
+   end; -- handle_class_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   handle_feature_p(f:$FEATOB_S):BOOL is
+      res := (f.maybe_used) or
+	     ( ((COMPILER_OPTIONS::gen_all) or (GLOBALS::print_feat_info))
+	       and not f.abt );
+   end; -- handle_feature_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   is_clib_option(s:STR):BOOL is
+      -- Returns "true" if string starts with "-l".
+      res := s.head(2).is_equal("-l");
+   end; -- is_clib_option
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   conform_tst(c1,c2:$TYPEOB_S; exp:$EXPROB_S):BOOL is
+      res := c1.conforms_to(c2);
+      exp.rt_type := GLOBALS::rt_type;
+   end; -- conform_tst
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   add_str_const(str_const:STR_CONST_EXPROB_S) is
+      -- Add a string constant used in initialization of shared/constant
+      -- into a global list.  Note(1) that each STR_CONST_EXPROB_S is unique,
+      -- so we do not need to use "push_unique".  Note(2) that we call 
+      -- "push_unique" rather than "push" because STR_CONST_EXPROB_S's
+      -- may be shared between different trees and hence called more than
+      -- once. Note(3) that since the indices are unique (and hence the
+      -- STR_CONST_EXPROB_S's are unique) we need not use "push_unique".
+      -- NOTES(1),(2),(3) reflect the changing implementations.
+
+      k:INT := GLOBALS::str_indices.contains(str_const.strval);
+      if (k < 0) then
+	 GLOBALS::str_consts := GLOBALS::str_consts.push(str_const);
+	 GLOBALS::str_indices := GLOBALS::str_indices.push(str_const.strval);
+      end; -- if
+   end; -- add_str_const
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   remove_user_cfile(fn:STR; outfile:OUTFILE) is
+      suffix:STR := fn.tail(2);
+      orig_suffix:CHAR;
+      if (suffix.length = 2) then
+	 orig_suffix:CHAR := suffix[1];
+      end; -- if
+      is_done:BOOL := false;
+      last_ind:INT := fn.length - 1;
+      loop until!(is_done);
+	 if not COMPILER_OPTIONS::warnings_only then
+	    outfile.s("* Removing unused user C file \"").
+	    s(fn).
+	    s("\"\n");
+	 end;
+	 if (UNIX::unlink(fn) /= 0) then
+	    ERR::s("*** Warning: Failure to remove ").
+	         s(fn).c('\n');
+	 end; -- if
+	 if (suffix.is_equal(".c")) or 
+	    (suffix.is_equal(".s")) then
+	    suffix[1] := 'o';
+	    fn[last_ind] := 'o';
+
+	 elsif (suffix.is_equal(".o")) then
+	    is_done := true;
+	    
+	 elsif (suffix.is_equal(".h")) then
+	    is_done := true;
+	    
+	 elsif (suffix.is_equal(".y")) then
+	    suffix[1] := 'c';
+	    fn[last_ind] := 'c';
+	 else
+	    if not COMPILER_OPTIONS::warnings_only then
+	       outfile.s("*** Please remove any other files related to ")
+		     .s(fn)
+		     .s(" ***\n");
+	    end;
+	    is_done := true;
+	 end; -- if
+      end; -- loop
+      -- Restore original file name.
+      fn[last_ind] := orig_suffix;
+   end; -- remove_user_cfile
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   copy_user_cfile(fn:STR; outfile:OUTFILE) is
+      -- link or copy the c file `fn' using a `ln_command' from INSTALL_CONST.
+
+      fn := UPATHS::canonicalize(fn);
+
+      if not (COMPILER_OPTIONS::new_compilation) then
+	 -- we assume the files were properly fixed first time round.
+	 -- most users don't link to external files, don't complain.
+	 -- outfile.s("REMINDER: Change in user external object_files may require -ncs.").nl
+      else
+	 cp_com: STR := STR::create.s(INSTALL_CONSTS::ln_command).c(' ')
+	       .s(fn).c(' ').s(COMPILER_OPTIONS::target_dir);
+	 if (COMPILER_OPTIONS::do_timing) then
+	    TIME_VAL::cp_com_time := TIMER::time_syscall(cp_com);
+	 else
+	    GLOBAL_PROC::system(cp_com);
+	 end; -- if
+      end;
+   end; -- copy_user_cfile
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   system(com:STR) is
+      status:INT := UNIX::system(com);
+      if (status.bit_and(0xFF00).rshift(8) = 0xFF) then
+	 ERR_INFO::warning_msg(STR::create.s("*** Shell command \"").
+	 s(com).
+	 s("\" not executed. Reason: ").
+	 i(UNIX::unix_error).s(", cf <errno.h> ***\n\n"));
+      end; -- if
+   end; -- system
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   check_f_ob(exp:$EXPROB_S; name:INT; symtab:SYMBOL_TABLE) is
+      -- Assume that the caller has checked that the type of object is
+      -- a foreign object.
+      case (name)
+      when RESERVED_WORDS::copy_ind,
+--	   RESERVED_WORDS::deep_copy_ind,
+	   RESERVED_WORDS::new_ind,
+	   RESERVED_WORDS::asize_ind,
+	   RESERVED_WORDS::asize1_ind,
+	   RESERVED_WORDS::asize2_ind,
+	   RESERVED_WORDS::asize3_ind,
+	   RESERVED_WORDS::asize4_ind,
+	   RESERVED_WORDS::extend_ind,
+	   RESERVED_WORDS::type_ind then
+	 exp.fob_error((GLOBALS::str_table).at_index(name),
+	               symtab.in_class.full_name);
+      when RESERVED_WORDS::self_ind,
+	   RESERVED_WORDS::res_ind,
+	   RESERVED_WORDS::void_ind then
+      -- It is possible to refer to "self", "res", and "void".
+      else
+	 -- The particular $EXPROB_S is responsible for giving the error
+	 -- message when the referrent is void, and the name is not
+	 -- recognized.
+      end; -- case
+   end; -- check_f_ob
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   ctype_name(ctype:INT):STR is
+      case (ctype)
+      when (C_TYPE_CONST::c_ptr) then
+	 res := C_TYPE_CONST::c_ptr_name;
+	 
+      when (C_TYPE_CONST::c_char) then
+	 res := C_TYPE_CONST::c_char_name;
+	 
+      when (C_TYPE_CONST::c_int) then
+	 res := C_TYPE_CONST::c_int_name;
+	 
+      when (C_TYPE_CONST::c_float) then
+	 res := C_TYPE_CONST::c_float_name;
+	 
+      when (C_TYPE_CONST::c_double) then
+	 res := C_TYPE_CONST::c_double_name;
+      end; -- case      
+   end; -- ctype_name
+
+-- ~~~~~~~~~~~~~~~~~~~~
+
+   cprint_ctype_name(ctype:INT; outfile:SAT_OUTFILE) is
+      case (ctype)
+      when (C_TYPE_CONST::c_ptr) then
+	 outfile.s(C_TYPE_CONST::c_ptr_name);
+	 
+      when (C_TYPE_CONST::c_char) then
+	 outfile.s(C_TYPE_CONST::c_char_name);
+	 
+      when (C_TYPE_CONST::c_int) then
+	 outfile.s(C_TYPE_CONST::c_int_name);
+	 
+      when (C_TYPE_CONST::c_float) then
+	 outfile.s(C_TYPE_CONST::c_float_name);
+	 
+      when (C_TYPE_CONST::c_double) then
+	 outfile.s(C_TYPE_CONST::c_double_name);
+      end; -- case      
+   end; -- ctype_name
+
+-- ~~~~~~~~~~~~~~~~~~~~
+
+   cprint_ctemp_name(intval:INT; outfile:SAT_OUTFILE) is
+      if (intval < 0) then
+	 intval := - intval;
+      end; -- if
+      outfile.s("gl").i(intval).c('_');
+   end; -- cprint_ctemp_name
+
+-- ~~~~~~~~~~~~~~~~~~~~
+   cprint_global_tmpnm_str(strval:INT; outfile:SAT_OUTFILE) is
+      -- Temporary variables for declarations strings in constant/shared
+      -- features.
+      outfile.s("gs").i(strval).c('_');
+   end; -- cprint_global_tmpnm_str
+
+-- ~~~~~~~~~~~~~~~~~~~~
+   cprint_local_tmpnm_str(strval:INT; outfile:SAT_OUTFILE) is
+      -- Temporary variables for declarations strings in routines.
+      outfile.s("ls").i(strval).c('_');
+   end; -- cprint_local_tmpnm_str
+
+-- ~~~~~~~~~~~~~~~~~~~~
+   cprint_sather_str_type(outfile:SAT_OUTFILE) is
+      -- Print the type used for Sather string declaration.
+      outfile.s("struct { int tp_; int sz_; char st_; } ");
+   end; -- cprint_sather_str_type
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_curr_exp_code(exp:$EXPROB_S; temp_nm:INT; outfile:SAT_OUTFILE) is
+      -- This routine is called by "cprint_pre_code" routine in ID_EXPROB_S,
+      -- AREF_EXPROB_S, ID_ARGS_EXPROB_S, EXPR_ARGS_EXPROB_S and 
+      -- TYPESPEC_ARGS_EXPROB_S to generate the code that will compute 
+      -- the result of the expression into a temporary variable for runtime
+      -- type-checking.
+      outfile.indent;
+      GLOBAL_PROC::cprint_ctemp_name(temp_nm, outfile);
+      outfile.s(" = ");
+      exp.cprint_act_code(outfile);
+      outfile.s(";\n").inc_ln(1);
+      PRINT_C_CODE::cprint_rt_typechk(outfile, exp.rt_type, temp_nm, 
+                                      exp.lineno);
+   end; -- cprint_curr_exp_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_goto_tag(i:INT;outfile:SAT_OUTFILE) is
+      outfile.s("goto_tag_").i(i).c('_');
+      if (GLOBALS::g_tag > 0) then
+	 outfile.i(GLOBALS::g_tag).c('_');
+      end; -- if
+   end; -- cprint_goto_tag
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_ref_to_self(outfile:SAT_OUTFILE):BOOL is
+      -- Returns "true" if reference to variable "self" is valid at this
+      -- point.
+      if (GLOBALS::self_exists) then
+	 res := true;
+	 outfile.s("self__");
+      else
+	 outfile.c('0');
+      end; -- if
+   end; -- cprint_ref_to_self
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Prints the given integer as 4 bytes of "char".
+   cprint_octal_char(v:INT; outfile:SAT_OUTFILE) is
+      i:INT := 3;
+      loop until!(i < 0);
+	 outfile.c('\\');
+	 if (v.nth_bit(i*8+7)) then
+	    if (v.nth_bit(i*8+6)) then
+	       outfile.c('3');
+	    else
+	       outfile.c('2');
+	    end; -- if
+	 else
+	    if (v.nth_bit(i*8+6)) then
+	       outfile.c('1');
+	    else
+	       outfile.c('0');
+	    end; -- if
+	 end; -- if
+
+	 if (v.nth_bit(i*8+5)) then
+	    if (v.nth_bit(i*8+4)) then
+	       if (v.nth_bit(i*8+3)) then
+		  outfile.c('7');
+	       else
+		  outfile.c('6');
+	       end; -- if
+	    else 
+	       if (v.nth_bit(i*8+3)) then
+		  outfile.c('5');
+	       else
+		  outfile.c('4');
+	       end; -- if
+	    end; -- if
+	 else
+	    if (v.nth_bit(i*8+4)) then
+	       if (v.nth_bit(i*8+3)) then
+		  outfile.c('3');
+	       else
+		  outfile.c('2');
+	       end; -- if
+	    else 
+	       if (v.nth_bit(i*8+3)) then
+		  outfile.c('1');
+	       else
+		  outfile.c('0');
+	       end; -- if
+	    end; -- if
+	 end; -- if
+
+	 if (v.nth_bit(i*8+2)) then
+	    if (v.nth_bit(i*8+1)) then
+	       if (v.nth_bit(i*8)) then
+		  outfile.c('7');
+	       else
+		  outfile.c('6');
+	       end; -- if
+	    else 
+	       if (v.nth_bit(i*8)) then
+		  outfile.c('5');
+	       else
+		  outfile.c('4');
+	       end; -- if
+	    end; -- if
+	 else
+	    if (v.nth_bit(i*8+1)) then
+	       if (v.nth_bit(i*8)) then
+		  outfile.c('3');
+	       else
+		  outfile.c('2');
+	       end; -- if
+	    else 
+	       if (v.nth_bit(i*8)) then
+		  outfile.c('1');
+	       else
+		  outfile.c('0');
+	       end; -- if
+	    end; -- if
+	 end; -- if
+	 i := i - 1;
+      end; -- loop
+   end; -- cprint_octal_char
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Prints the given integer as 4 bytes of "char" (octal form), separated
+-- by commas. 
+   cprint_int_as_char_seq(v:INT; outfile:SAT_OUTFILE) is
+      i:INT := 3;
+      loop until!(i < 0);
+	 outfile.c('\\');
+	 if (v.nth_bit(i*8+7)) then
+	    if (v.nth_bit(i*8+6)) then
+	       outfile.c('3');
+	    else
+	       outfile.c('2');
+	    end; -- if
+	 else
+	    if (v.nth_bit(i*8+6)) then
+	       outfile.c('1');
+	    else
+	       outfile.c('0');
+	    end; -- if
+	 end; -- if
+
+	 if (v.nth_bit(i*8+5)) then
+	    if (v.nth_bit(i*8+4)) then
+	       if (v.nth_bit(i*8+3)) then
+		  outfile.c('7');
+	       else
+		  outfile.c('6');
+	       end; -- if
+	    else 
+	       if (v.nth_bit(i*8+3)) then
+		  outfile.c('5');
+	       else
+		  outfile.c('4');
+	       end; -- if
+	    end; -- if
+	 else
+	    if (v.nth_bit(i*8+4)) then
+	       if (v.nth_bit(i*8+3)) then
+		  outfile.c('3');
+	       else
+		  outfile.c('2');
+	       end; -- if
+	    else 
+	       if (v.nth_bit(i*8+3)) then
+		  outfile.c('1');
+	       else
+		  outfile.c('0');
+	       end; -- if
+	    end; -- if
+	 end; -- if
+
+	 if (v.nth_bit(i*8+2)) then
+	    if (v.nth_bit(i*8+1)) then
+	       if (v.nth_bit(i*8)) then
+		  outfile.c('7');
+	       else
+		  outfile.c('6');
+	       end; -- if
+	    else 
+	       if (v.nth_bit(i*8)) then
+		  outfile.c('5');
+	       else
+		  outfile.c('4');
+	       end; -- if
+	    end; -- if
+	 else
+	    if (v.nth_bit(i*8+1)) then
+	       if (v.nth_bit(i*8)) then
+		  outfile.c('3');
+	       else
+		  outfile.c('2');
+	       end; -- if
+	    else 
+	       if (v.nth_bit(i*8)) then
+		  outfile.c('1');
+	       else
+		  outfile.c('0');
+	       end; -- if
+	    end; -- if
+	 end; -- if
+	 i := i - 1;
+	 if (i >= 0) then
+	    outfile.c(',');
+	 end; -- if
+      end; -- loop
+   end; -- cprint_int_as_char_seq
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   union_classnames(l1, l2:LIST{INT}):LIST{INT} is
+      i:INT := 1;		
+	 -- The first class name in "l2" is stored in location 2.
+      sz:INT;
+      if (l2 /= void) then
+	 sz := l2.insert
+      end; -- if
+      loop until!(i >= sz);
+	 if (l1.not_in(l2[i])) then
+	    l1 := l1.push(l2[i]);
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      res := l1; 
+   end; -- union_classnames
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- The "LST{INT}" returned is guaranteed to be of length at least 1, if
+-- it is non-void.  The first integer is an index to continue reading, and
+-- the rest are class name indices.  
+-- NOTE: Only simple class names are extracted.
+   extract_simple_classnames(str:STR; start_index:INT):LIST{INT} is
+      -- States are numbered as follows:
+      -- (0) : Start state
+      -- (1) : Reading class name
+      -- (2) : Repeat recursive calls on parameters
+      -- (7) : Error state
+
+      classname:STR_BUFFER := STR_BUFFER::create(5); -- *! Random size
+      classname_ind:INT;
+      
+      state:INT := 0;
+      i:INT := start_index;
+      sz:INT := str.length;
+      subres:LIST{INT};
+      res := LIST{INT}::create(2).push(-1); 
+	 -- Reserve first integer to contain index, and the reason for
+	 -- storing a "-1" is so that when adding class names to the result
+	 -- list, the string index will not be confused with class name.
+      loop until!(i >= sz);
+	 ch:CHAR := str[i];
+	 case (state)
+	 when (0) then
+	    if (ch.is_alphabetic) or (ch = '_') then
+	       classname := classname.push(ch);
+	       state := 1;
+	    else
+	       state := 7;
+	    end; -- if
+	    
+	 when (1) then
+	    if (ch.is_alphabetic) or (ch.is_digit) or (ch = '_') then
+	       classname := classname.push(ch);
+	    elsif (ch = '{') then
+-- -- We only extract simple class name.
+--	       classname := classname.terminate;
+--	       classname_ind := (GLOBALS::str_table).index_of_str(classname);
+--	       res := res.push(classname_ind);
+	       state := 2;
+	    elsif (ch = ',') or (ch = '}') then
+	       classname := classname.terminate;
+	       classname_ind := (GLOBALS::str_table).index_of_str(classname);
+	       res := res.push_unique(classname_ind);
+	       res[0] := i;
+	       return;
+	    else
+	       state := 7;
+	    end; -- if
+	    
+	 when (2) then
+	    subres := extract_simple_classnames(str, i);
+	    if (subres = void) then
+	       res := void;
+	       return;
+	    end; -- if
+	    if (subres[0] <= 0) or (subres[0] > str.asize) then
+	       res := void;
+	       return;
+	    else
+	       new_ind:INT := subres[0];
+	       if (str[new_ind] = ',') then
+		  -- Stay in state 2 and continue reading the type parameters
+		  res := union_classnames(res, subres);
+		  i := new_ind;
+		  -- The statement "i := i + 1" will increment "i" appropriately.
+		  
+	       elsif (str[new_ind] = '}') then
+		  res := union_classnames(res, subres);
+		  res[0] := new_ind + 1;
+		  return;
+	       else
+		  state := 7;
+	       end; -- if
+	    end; -- if
+	 end; -- case
+	 if (state = 7) then
+	    res := void;
+	    return;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+-- -- If we exited the loop while in state 0 or 1, we are reading a simple
+-- -- class name which has not been taken care of, so we must insert it.
+      if (state = 0) or (state = 1) then
+	 classname := classname.terminate;
+	 classname_ind := (GLOBALS::str_table).index_of_str(classname);
+	 res := res.push(classname_ind);
+	 res[0] := i;
+      end; -- if
+   end; -- extract_simple_classnames
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Given a string (STR) with no whitespace in between, read the
+-- string and extract the instantiated class index (void if none located).
+   
+-- The "LST{INT}" returned is guaranteed to be of length 2, if
+-- it is non-void.  The first integer is the class index, and the
+-- second an index to continue reading.
+   analyze_class_name(str:STR; start_index:INT):LIST{INT} is
+      -- States are numbered as follows:
+      -- (0) : Start state
+      -- (1) : Reading class name
+      -- (2) : Repeat recursive calls on parameters
+      -- (7) : Error state
+      classname:STR_BUFFER := STR_BUFFER::create(5); -- *! Random size
+      local_key:LSTINT_KEY := LSTINT_KEY::create(1); -- *! Random size
+      co:CLASSOB_S;
+      classname_ind:INT; 
+      
+      state:INT := 0;
+      i:INT := start_index;
+      sz:INT := str.length;
+      subres:LIST{INT};
+      res := LIST{INT}::create(2);
+      loop until!((i >= sz) or (str[i] = '\0'));
+	 ch:CHAR := str[i];
+	 case (state)
+	 when (0) then
+	    if (ch.is_alphabetic) or (ch = '_') then
+	       classname := classname.push(ch.to_upper_case);
+	       state := 1;
+	    else
+	       state := 7;
+	    end; -- if
+	    
+	 when (1) then
+	    if (ch.is_alphabetic) or (ch.is_digit) or (ch = '_') then
+	       classname := classname.push(ch.to_upper_case);
+	    elsif (ch = '{') then
+	       classname := classname.terminate;
+	       classname_ind := (GLOBALS::str_table).index_of_str(classname);
+	       local_key := local_key.push(classname_ind);
+	       state := 2;
+	    elsif (ch = ',') or (ch = '}') then
+	       res[1] := i;
+	       tmp_key:LSTINT_KEY := LSTINT_KEY::create(1).push((GLOBALS::str_table).index_of_str(classname));
+	       co := (GLOBALS::class_inst).get_obj(tmp_key);
+	       if (co = void) then
+		  res := void;
+		  return;
+	       end; -- if
+	       res[0] := co.index;
+	       return;
+	    else
+	       state := 7;
+	    end; -- if
+
+	 when (2) then
+	    subres := analyze_class_name(str, i);
+	    if (subres = void) then
+	       res := void;
+	       return;
+	    end; -- if
+	    if (subres[1] <= 0) or (subres[1] > str.asize) then
+	       res := void;
+	       return;
+	    else
+	       new_ind:INT := subres[1];
+	       if (str[new_ind] = ',') then
+		  -- Stay in state 2 and continue reading the type parameters
+		  local_key := local_key.push(subres[0]);
+		  i := new_ind;
+		  -- The statement "i := i + 1" will increment "i" correctly.
+		  
+	       elsif (str[new_ind] = '}') then
+		  local_key := local_key.push(subres[0]);
+		  co := (GLOBALS::class_inst).get_obj(local_key);
+		  if (co = void) then
+		     res := void;
+		  else
+		     res[0] := co.index;
+		     res[1] := new_ind + 1;
+		  end; -- if
+		  return;
+	       else
+		  state := 7;
+	       end; -- if
+	    end; -- if
+	 end; -- case
+	 if (state = 7) then
+	    res := void;
+	    return;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      if (state = 1) then
+	 -- If we are still in state 1, after exiting from the loop, we
+	 -- have just scanned an identifier eg "FOO", so use this to locate
+	 -- the instantiated class.
+	 res[1] := i;
+	 classname := classname.terminate;
+	 tmp_key:LSTINT_KEY := LSTINT_KEY::create(1).push((GLOBALS::str_table).index_of_str(classname));
+	 co := (GLOBALS::class_inst).get_obj(tmp_key);
+	 if (co = void) then
+	    res := void;
+	    return;
+	 end; -- if
+	 res[0] := co.index;
+      end; -- if
+   end; -- analyze_class_name
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   extract_poss_names(s:STR):ARRAY{STR} is
+      -- Try to split the given string into a class name part separated by
+      -- "::" from another name, and return the two strings in an 
+      -- "ARRAY{STR}".  Otherwise, simply return a "void" object.
+      i:INT := 0;
+      split_p:BOOL := false;
+      loop until!((i >= s.asize) or (s[i] = '\0'));
+	 if (s[i] = ':') then
+	    if (s[i+1] = ':') then
+	       split_p := true;
+	       break!;
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      if (i <= 0) or (not split_p) then
+	 return;
+      end; -- if
+      s1:STR := STR::new(i + 1);
+      s2:STR := STR::new(s.asize - (i + 2));
+      j:INT := 0;
+      loop until!(j >= i);
+	 s1[j] := s[j];
+	 j := j + 1;
+      end; -- loop
+      s1[j] := '\0';
+      
+      j := i + 2;
+      loop until!((j >= s.asize) or (s[j] = '\0'));
+	 s2[j - (i + 2)] := s[j];
+	 j := j + 1;
+      end; -- loop
+      s2[j - (i + 2)] := '\0';
+      res := ARRAY{STR}::new(2);
+      res[0] := s1;
+      res[1] := s2;
+   end; -- extract_poss_names
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   extract_filename(fullname:STR):STR is
+      i:INT := 0; start_of_fname:INT := 0;
+      len:INT := fullname.length;
+      seen_back_slash:BOOL; 
+      loop until!(i >= len);
+	 if (fullname[i] = '/') then 
+	    if (not seen_back_slash) then
+	       start_of_fname := i+1;
+	    end; -- if
+	 elsif (fullname[i] = '\\') then
+	    seen_back_slash := true;
+	 else
+	    seen_back_slash := false;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      res := fullname.tail(len - start_of_fname);
+   end; -- extract_filename
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   check_des_of(ici:INT; l,u:INT):INT is
+      -- Return an integer (assumed to be 32 bits) such that for each
+      -- class whose class index is in the range l->u, the (l+i)th bit
+      -- is set if the class given by "ici" is an ancestor of the (l+i)
+      -- class.
+      if ((l - u + 1) > 32) then
+	 -- The integer can only accomodate information for 32 classes.
+	 ERR::s("Warning: Verify use of \"GLOBAL_PROC::check_anc_of\"\n");
+      end; -- if
+      co:CLASSOB_S := (GLOBALS::class_inst).at_index(ici);
+      if (co /= void) then
+	 des_set:INT_HASH_SET := co.alldes;
+	 if (des_set /= void) then
+	    curr_bit:INT := 1;
+	    loop until!(l > u);
+	       if (des_set.get(l)) then
+		  res := res.bit_or(curr_bit);
+	       end; -- if
+	       curr_bit := curr_bit.lshift(1);
+	       l := l + 1;
+	    end; -- loop
+	 end; -- if
+      end; -- if
+   end; -- check_des_of
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   octal(i:INT):STR is
+      -- Return a string as the octal representation of "i".
+      -- Assume a 32-bit representation of integer.
+      res := STR::create.c('0');
+      if (i.nth_bit(31)) then
+	 if (i.nth_bit(30)) then
+	    res := res.c('3');
+	 else
+	    res := res.c('2');
+	 end; -- if
+      else
+	 if (i.nth_bit(31)) then
+	    res := res.c('1');
+	 end; -- if
+      end; -- if
+      j:INT := 29;
+      loop until!(j < 0);
+	 if (i.nth_bit(j)) then
+	    if (i.nth_bit(j+1)) then
+	       if (i.nth_bit(j+2)) then
+		  res := res.c('7');
+	       else
+		  res := res.c('6');
+	       end; -- if
+	    else 
+	       if (i.nth_bit(j+2)) then
+		  res := res.c('5');
+	       else
+		  res := res.c('4');
+	       end; -- if
+	    end; -- if
+	 else
+	    if (i.nth_bit(j+1)) then
+	       if (i.nth_bit(j+2)) then
+		  res := res.c('3');
+	       else
+		  res := res.c('2');
+	       end; -- if
+	    else 
+	       if (i.nth_bit(j+2)) then
+		  res := res.c('1');
+	       else
+		  -- Do not append any zero
+	       end; -- if
+	    end; -- if
+	 end; -- if
+	 j := j - 3;
+      end; -- loop
+   end; -- octal
+
+   ob_ob(ob:$OB):$OB is
+      -- 
+      res := ob;
+   end; -- ob_ob
+
+end; -- class GLOBAL_PROC
+
+--------------------------------------------------------------------
+
+class COMPILER_OPTIONS is
+   -- Contains flags for compiler options set by user.
+   -- These items will be initialized separately if compiler options are 
+   -- provided. Compiler options always override corresponding options
+   -- of .sather, if any.
+      
+   -- Some tentative modes for the programming environment.
+   const browser_mode:INT := 1;
+   const interpreter_mode:INT := 2;
+   const debugger_mode:INT := 4;
+   
+-- Option: "-dir" <directory> 
+-- Directory to contain the generated c files
+   shared target_dir:STR;
+   
+-- Option: "-w"
+   shared warnings_only:BOOL;
+   
+-- Option: "-com" <filename>
+   shared cmdfile_name:STR;
+
+-- Option: "-hom" <directory>
+-- Directory containing the base and runtime directories.
+-- Should not end in a '/' character unless sather home is just "/"
+   shared sather_home:STR := INSTALL_CONSTS::sather_home;
+   shared is_opt_sather_home:BOOL; -- when true .sather looses
+
+   shared object_files: STR := "";
+   
+   set_sather_home(sat_home:STR) is
+      -- set the sather home default variable.
+      len:INT;
+      if sat_home = void then
+	 return;
+      end;
+      sat_home := UPATHS::canonicalize(sat_home);
+      len := sat_home.length;
+      if sat_home[len-1] = '/' and len > 1 then
+	 sat_home := sat_home.substring(0,len-2);
+      end;
+      sather_home := sat_home;
+   end; -- set_sather_home
+   
+-- Option: "-cre"
+-- Install all non-parametrized classes if this is "true".
+   shared all_np_classes:BOOL := false;
+   
+-- Option: "-kr"
+-- Generate old-style K&R C like Sather 0.2
+   shared k_and_r_c:BOOL := false;
+   
+-- Option: "-ver"
+-- Print attribute offsets with names which are '#define'd.
+   shared verbose_code:BOOL := false;
+
+-- Option: "-gen"
+-- Generate code for base classes
+   shared gen_base:BOOL := false;
+
+-- Option: "-chk"
+-- Generate code that will check for void object, array bound and type
+-- compatibility at runtime
+   shared rt_code_check:BOOL := false;
+
+-- Option: "-all"
+-- Determines whether to generate/check all classes (ie all features)
+   shared gen_all:BOOL := false;
+   
+-- Option: "-stm"
+-- Determines whether to generate warning messges for call statements
+--   with return value
+   shared warn_rt_val:BOOL := false;
+
+   
+-- Option: "-bro"
+-- This sets the compiler-mode to browser mode.
+   shared compiler_mode:INT := 0;
+
+-- Option: "-dbg"
+-- This turns on the production of all debugging information.
+   shared dbg_mode:BOOL := false;
+
+-- Option: "-ben"
+-- Asks the compiler to report timing on the various phases.
+   shared do_timing:BOOL := false;
+   
+-- Option: "-ncs"
+-- This will disable the mechanism for incremental compilation.
+   shared new_compilation:BOOL := false;
+
+-- Option: "-pds" 
+-- This will cause a print of a list of all classes and their class descendant
+-- relationships that are either by inheritance or are computed by
+-- parameterization.
+   shared print_desinfo:BOOL := false;
+   
+   shared dot_prefix:BOOL := false;
+
+-- Option: "-x"
+-- The target architecture may be different from that the compiler is running on.
+   shared target_environment: STR := INSTALL_CONSTS::default_environment;
+
+-- Option: "-gc"
+-- Whether or not GC is to be included in the generated code.
+-- Note that even if it is included, it might be switched off dynamically
+-- from within the program.
+   shared has_gc: BOOL := C::GC_is_on_; -- by default what the compiler has.
+
+end; -- class COMPILER_OPTIONS
+
+--------------------------------------------------------------------

@@ -1,0 +1,1085 @@
+-- -*- Mode: Sather;  -*-
+-- File: featob_s.sa
+-- Author: Chu-Cheow Lim and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+--          Oscar Bosman (oscar@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION:
+--* Features of a class definition
+--*
+--* RCS: $Id: featob_s.sa,v 1.1 1994/02/12 03:21:45 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 04:40 1993 (hws)
+--*  Sep 28 15:20 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 28 05:20 1993 (hws): pre/post conflict with kwd
+--*  Jun 18 12:50 1993 (oscar): add ANSI function prototypes
+--*  Jun  6 22:15 1993 (hws): don't check invar on FOO::fea call.
+--*  Apr 16 22:55 1993 (hws): void_needed -> k_and_r_c
+--*  Mar  8 00:07 1993 (hws): code invar with postcondition
+--*  Mar  7 23:05 1993 (hws): add mark_spec
+--*  Feb 25 02:18 1993 (hws): mark abstract on dup
+--*  Feb 23 00:00 1993 (hws): add "old"
+--*  Feb 21 16:41 1993 (hws): add pre and post conditions
+--*  Feb 21 16:34 1993 (hws): add abstract 
+--*  Mar 22 21:46 1992 (hws): fix res initialization so DOUBLE won't result
+--*                           in floating point error on sequent.
+--*  Feb 21 18:11 1992 (hws): rename duplicate -> alias
+--*     cf. note in featob.sa
+--*  Nov 26 23:57 1991 (hws): integrate clim's -chk patch
+--*  Aug 28 03:25 1991 (hws): more uniform error msgs
+--*  Aug 25 13:55 1991 (hws): polish alias support
+--*  Aug 20 17:20 1991 (hws): add alias support
+--* Created: Thu Jun  7 16:54:24 1990
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class FEATOB_S is
+   -- Features of a class.
+   SEMANTOB;
+
+   attr name: INT;
+      -- the name if really a feature (not CINH_FEATOB_S)
+      -- placing it here simplifies a lot of code, since that is the only
+      -- exception.
+
+   attr abt, pte, spec, shrd, rdo: BOOL;
+      -- whether abstract / private / spec / shared / readonly;
+
+   attr cls_def:CLASSOB;
+      -- For each feature, we only store the class definition from
+      --   which the feature is derived.  There is a global variable
+      --   "curr_class_inst" which gives the class instance we
+      --   are currently traversing, but this is insufficient, because
+      --   sometimes, we need to be able to find the class instance
+      --   of a feature different from a class we are currently traversing. 
+      --   This value is given by caller which creates the "FEATOB_S".
+   attr cls_inst:CLASSOB_S;
+      -- Updated from "GLOBALS::curr_class_inst" when the feature is created
+   
+   attr is_inherited:BOOL;
+   -- Indicates if this feature is inherited; relevant only for routine/
+   -- shared/constant/attribute.
+
+   attr used_in_dispatch:BOOL;
+   -- Updated in "consistent_defs" when we check that all features (of the
+   -- same name) in the descendents of a class have a consistent definition
+   -- with the feature in the parent class.
+
+   attr maybe_used:BOOL;
+   -- Updated whenever a look up is done on a feature; eg after calling
+   -- "get_feature", "get_sym" on the SYMBOL_TABLE object.
+   -- This attribute is initialized to "false" when feature object is first
+   -- created.  ("maybe_used" = true) is a very loose condition.  
+   -- A routine "f1" will be marked used once it is found in some routine
+   -- even though the latter may never be used at all.
+   
+   -- To get a stronger condition, we need "reachability".  A feature is
+   -- reachable only if:
+   -- 1.  it is called from C
+   -- 2.  it is the main routine
+   -- 3.  it is used within a reachable routine.
+   
+   attr consistent_defs_checked:INT;
+   -- The value is 0 if "consistent_defs" has not been called on the feature.
+   -- Otherwise, the value is 1 if the last time "consistent_defs" was
+   -- called, the parameter "lval_p" was false; otherwise, if the parameter 
+   -- was true, the value is 2.  If both kinds of calls has been made, the 
+   -- value is 3.
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(ln:INT; c_def:CLASSOB):SAME is
+      res := new;
+      res.lineno := ln;
+      res.cls_def := c_def;
+      res.cls_inst := GLOBALS::curr_class_inst;	     
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(lineno, cls_def);
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   class_inst_ind:INT is
+   end; -- class_inst_ind
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   featob_s_name:INT is
+      -- Name index of the feature.
+      res := name;      
+   end; -- featob_s_name
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_private is
+      pte := true;
+   end; -- mark_private
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_abstract is
+      abt := true;
+   end;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_spec is
+      spec := true;
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_shared is
+      shrd := true;
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_readonly is
+      rdo := true;
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   undefined_p:BOOL is
+      -- Only relevant for ATTR_DECL_FEATOB, SHARED_DECL_FEATOB and
+      --   CONST_DECL_FEATOB.
+   end; -- undefined_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   compute_own_offset(nextloc:INT):INT is
+      -- Default is no space allocated
+      res := nextloc;
+   end; -- compute_attr_offsets
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_offset:INT is
+      -- Default is no offset; this is relevant only for ATTR_DECL_FEATOB_S
+   end; -- get_offset
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_offset(outfile:SAT_OUTFILE) is
+      -- Default is to print nothing; this is relevant only for
+      -- ATTR_DECL_FEATOB_S.
+   end; -- cprint_offset
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   eval_constant is
+      -- This is relevant only for expressions in constant definition.
+      -- Constants are evaluated according to the following rules:
+      -- 1.  integer :  Try to evaluate the arithmetic expressions as well
+      -- 2.  bool, char, real, double, str : Only if the node is one of the
+      --     CONST_EXPROB_S nodes  
+   end; -- eval_constant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   typeof:$TYPEOB_S is
+      -- Default is void; only relevant for ROUT_FEATOB_S,
+      --   ATTR_DECL_FEATOB_S, SHARED_DECL_FEATOB_S, CONST_DECL_FEATOB_S,
+      --   PARAM_DECL_S.
+   end; -- typeof
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   rettype:$TYPEOB_S is
+      -- Default is void; only relevant for ROUT_FEATOB_S.
+   end; -- rettype
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   remember_local(lvar:LVAR_DECL_STMTOB_S) is
+      -- Default is to do nothing; only relevant for ROUT_FEATOB_S
+   end; -- remember_local
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant_prologue is
+      GLOBALS::curr_feature := self;
+   end; -- semant_prologue
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- For ROUT_FEATOB_S, get the temporaries for the body, whereas for
+-- SHARED_DECL_FEATOB_S and CONST_DECL_FEATOB_S, get and store the
+-- temporaries need for computing the initial expressions.
+   do_gen_temps is
+   end; -- do_gen_temps
+
+-- For ROUT_FEATOB_S, go through all expressions in the code, and
+-- if a class is marked as having its interface updated, mark the current
+-- class as having its internal updated.  Once a class is marked as having
+-- its internal updated, we do not need to check other features.  Similarly,
+-- do the same thing for the classes referenced in SHARED_DECL_FEATOB_S, 
+-- CONST_DECL_FEATOB_S, and ATTR_DECL_FEATOB_S.
+--   do_update_info is
+--   end; -- do_update_info;
+   
+-- Only relevant for ROUT_FEATOB_S
+   gen_goto_tags is
+   end; -- gen_goto_tags
+
+-- Check that all the dispatched type's are not of basic class.
+   validate_dispatches_and_get_ext_strs is
+   end; -- validate_dispatches_and_get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   compatible_des_feat(feat:SAME; lval_p:BOOL):BOOL is
+      res := true;
+   end; -- compatible_des_feat
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   update_used_in_dispatch is
+      used_in_dispatch := true;
+      maybe_used := true;
+   end; -- update_used_in_dispatch
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   consistent_defs(nm:INT; lval_p:BOOL) is
+      -- "lval_p" is true when we are using the feature (attribute or shared)
+      -- as the LHS of an assignment statement.
+      if (consistent_defs_checked = 1) and (lval_p = false) then
+	 return;
+      elsif (consistent_defs_checked = 2) and (lval_p = true) then
+	 return;
+      elsif (consistent_defs_checked = 3) then
+	 return;
+      end; -- if
+
+      -- If the types of the descendent features are consistent, the error 
+      -- message needs only be printed once (ie the error messages would
+      -- have been printed the last time "consistent_defs" was called).
+      if (consistent_defs_checked = 0) then
+	 if (lval_p) then
+	    consistent_defs_checked := 2;
+	 else
+	    consistent_defs_checked := 1;
+	 end; -- if
+      elsif (consistent_defs_checked = 1) then
+	 if (lval_p) then
+	    consistent_defs_checked := 3;
+	 end; -- if
+      elsif (consistent_defs_checked = 2) then
+	 if (not lval_p) then
+	    consistent_defs_checked := 3;
+	 end; -- if
+      end; -- if
+
+      co:CLASSOB_S := cls_inst;
+      i:INT := 0;
+      psz:INT;
+      -- NOTE: We make use of the fact that INT_SET is also an ARRAY{INT}.
+      descendents:INT_HASH_SET := co.alldes;
+      if (descendents /= void) then
+	 psz := descendents.asize;
+      end; -- if
+      update_used_in_dispatch;
+      
+      loop until!(i >= psz);
+	 index:INT := descendents[i];
+	 if (index > 0) then
+	    co1:CLASSOB_S := (GLOBALS::class_inst).at_index(index);
+	 
+	       -- If the descendent has no chance of being used at runtime, 
+	       -- there is no point to check for consistency of the feature 
+	       -- definitions.
+	 
+	    if (GLOBAL_PROC::handle_class_p(co1)) then
+	       referrent:$SEMANTOB := co1.get_feature(nm);
+	       if (referrent /= void) then
+		  if (referrent.type = self.type) then
+		     feat:SAME := referrent;
+		     feat.update_used_in_dispatch; 
+		     
+			-- Each descendent of FEATOB_S should define its 
+			-- definition of "compatible_des_feat".
+		     if (not compatible_des_feat(feat, lval_p)) then
+			ERR_INFO::format_error_msg(
+			          lineno,
+		                  STR::create.s("(FEATOB_S): Feature \"").
+                                           s((GLOBALS::str_table).at_index(nm)).
+	                                   s("\" has incompatible definitions for dispatch in \"").
+		                           s(co.full_name).s("\" and \"").
+	                                   s(co1.full_name).s("\""));
+		     end; -- if
+		  else
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(FEATOB_S): Feature \"").
+                                        s(GLOBALS::str_table.at_index(nm)).
+                                        s("\" are different kinds of features for dispatch in \"").
+	                                s(co.full_name).s("\" and \"").
+                                        s(co1.full_name).s("\""));
+		  end; -- if
+	       else
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(FEATOB_S): Feature \"").
+    	                             s((GLOBALS::str_table).at_index(nm)).
+	                             s("\" is missing for dispatch in descendent \"").
+	                             s(co1.full_name).s("\" of class \"").
+	                             s(co.full_name).s("\""));
+               end; -- if
+            end; -- if
+         end; -- if
+         i := i + 1; 
+      end; -- loop
+   end; -- consistent_defs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_cname(outfile:SAT_OUTFILE) is
+      -- Do not print anything.  This is relevant only for 
+      --   ROUT_FEATOB_S, CONST_DECL_FEATOB_S and SHARED_DECL_FEATOB
+   end; -- cprint_cname
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_extern(outfile:SAT_OUTFILE) is
+      -- Only relevant for ROUT_FEATOB_S, CONST_DECL_FEATOB_S,
+      --   and SHARED_DECL_FEATOB_S
+      ERR_INFO::format_error_exit(
+                lineno,
+                STR::create.s("(FEATOB_S): Invalid reference of feature"));
+   end; -- cprint_extern
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_decln(outfile:SAT_OUTFILE) is
+      -- Only relevant for ROUT_FEATOB_S, CONST_DECL_FEATOB_S,
+      --   and SHARED_DECL_FEATOB_S.  Print ordinary declaration.
+      ERR_INFO::format_error_msg(
+                lineno,
+                STR::create.s("(FEATOB_S): Feature is not declarable"));
+   end; -- cprint_decln
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_routine(outfile:SAT_OUTFILE) is
+      -- Only relevant for ROUT_FEATOB_S.  Print C code for routine.
+      ERR_INFO::format_error_msg(
+                lineno,
+                STR::create.s("(FEATOB_S): Error in printing routine"));
+   end; -- cprint_routine
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_store_dispval(outfile:SAT_OUTFILE) is
+      -- Print the following:
+      -- a. CINH_FEATOB_S: Nothing
+      -- b. ROUT_FEATOB_S: Name of routine with a cast to "int" in front
+      -- c. ATTR_DECL_FEATOB_S: Offset of attribute
+      -- d. SHARED_DECL_FEATOB_S: Address of global C variable (cast to "int")
+      -- e. CONST_DECL_FEATOB_S: Address of global C variable (cast to "int")
+   end; -- cprint_store_dispval
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_init_code(outfile:SAT_OUTFILE) is
+      -- Print the initialization code for SHARED_DECL_FEATOB_S and
+      -- CONST_DECL_FEATOB_S.  We do not check for loop dependencies
+      -- because that is checked in "eval_constant".
+   end; -- cprint_init_code
+
+end; -- class FEATOB_S
+
+--------------------------------------------------------------------
+      
+class CINH_FEATOB_S is
+   -- Inherited classes.
+   FEATOB_S;
+--   name: UNDEFINE;		-- This one does not have an own name but
+--                                -- refers to one.
+--   pte: UNDEFINE;		-- cannot be private.
+
+   attr cls:$TYPEOB_S;		-- The inherited class specification
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(tp:$TYPEOB_S; ln:INT; c_def:CLASSOB):SAME is
+      res := new;
+      res.cls := tp;
+      res.cls_def := c_def;
+      res.cls_inst := GLOBALS::curr_class_inst;	     
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(cls.dup, lineno, cls_def);
+      res.abt := abt;
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   class_inst_ind:INT is
+      res := cls.inst_ind;
+   end; -- class_inst_ind
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   featob_s_name:INT is
+      -- Names of inherited classes are in a separate name-space
+      --   from other features.
+      ERR_INFO::format_error_msg(
+                lineno,
+                STR::create.s("(CINH_FEATOB_S): Invalid reference of feature name"));
+   end; -- featob_s_name
+
+---- ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+end; -- class CINH_FEATOB_S
+
+--------------------------------------------------------------------   
+   
+class ROUT_FEATOB_S is
+   -- Routines.
+
+   FEATOB_S;
+
+   attr precond, postcond: ASSERT_STMTOB_S;	-- pre and postcondition;
+   attr old: LST_STMTOB_S;		-- local to hold old state on check;
+   
+   attr endLineno:INT; -- Sather line number of end of routine.
+
+   attr plist:LST_DECLOB_S;		-- List of parameter declarations, if any.
+      -- In particular, this should contain a list of PARAM_DECLOB_S's,
+      -- guaranteed to be non-void if "create" routine is used.
+   
+   attr rout_rettype:$TYPEOB_S;		-- Return type, if any.
+   attr slist:LST_STMTOB_S;
+      -- List of statements; pointer is never void, from grammar construction
+   
+   attr type_spec:ROUT_TYPEOB_S;	-- Type of routine
+
+   attr disp:BOOL;			-- True if dispatched.
+   attr locs:LST_DECLOB_S;		-- List of locals in routine
+   attr tmpct:LIST{INT};		
+      -- This list contains information about the temporaries, in
+      --   the form (ID, C type).  A negative ID means that the temporary
+      --   is a static variable.
+
+   attr str_consts_in_rout:LIST{STR_CONST_EXPROB_S};
+      -- Store a list of pointers to string constant nodes within this
+      -- routine.  This is used to declare static variables which hold
+      -- Sather strings.  Initialized in "create" routine, and so guaranteed
+      -- to be non-void.
+   attr str_indices:LIST{INT};
+      -- Store a list of distinct integers (indices of strings in string 
+      -- table).
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:INT; precond,postcond: ASSERT_STMTOB_S; o: LST_STMTOB_S; pl:LST_DECLOB_S; rt:$TYPEOB_S; sl:LST_STMTOB_S; -- inl:BOOL;
+          priv:BOOL; c_def:CLASSOB; ln:INT; eln:INT): SAME is
+      res := new;
+      res.name := nm;
+      if (pl = void) then
+	 -- Create an empty list so that later phases do not have to check
+	 -- for null pointers.
+	 pl := LST_DECLOB_S::create(1); 
+      end; -- if
+      res.plist := pl;
+      res.rout_rettype := rt;
+      res.slist := sl;
+      res.precond := precond;
+      res.postcond := postcond;
+      res.old := o;
+      res.pte := priv;
+      res.cls_def := c_def;
+      res.cls_inst := GLOBALS::curr_class_inst;	     
+      res.locs := LST_DECLOB_S::create(3); -- *! Some random size
+      res.lineno := ln; -- sather line of beginning of routine
+      res.endLineno := eln; -- sather line of end of routine
+      res.str_consts_in_rout := LIST{STR_CONST_EXPROB_S}::create(3);
+      res.str_indices := LIST{INT}::create(3);
+	     
+	 -- Construct an object to represent type of routine.
+      i:INT := 0;
+      psz:INT;
+      if (pl /= void) then
+	 psz := pl.insert;
+      end; -- if
+      if (psz > 0) then
+	 paramtype_lst:LST_TYPEOB_S := LST_TYPEOB_S::create(psz);
+	 loop until!(i >= psz);
+	    paramtype_lst := paramtype_lst.push(pl[i].type_spec);
+	    i := i + 1;
+	 end; -- loop
+	 res.type_spec := ROUT_TYPEOB_S::create(paramtype_lst ,rt, ln);
+      else
+	 res.type_spec := ROUT_TYPEOB_S::create(void, rt, ln);
+      end; -- if
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      new_plist:LST_DECLOB_S;
+      if (plist /= void) then
+	 new_plist := plist.dup;
+      end; -- if
+      
+      new_rout_rettype:$TYPEOB_S;
+      if (rout_rettype /= void) then
+	 new_rout_rettype := rout_rettype.dup;
+      end; -- if
+      
+      new_slist:LST_STMTOB_S;
+      if (slist /= void) then
+	 new_slist := slist.dup;
+      end; -- if
+      new_pre, new_post: ASSERT_STMTOB_S;
+      if precond/=void then new_pre := precond.dup end;
+      if postcond/=void then new_post := postcond.dup end;
+      new_old: LST_STMTOB_S;
+      if old/=void then new_old := old.dup end;
+
+      res := create(name, new_pre, new_post, new_old,
+		new_plist, new_rout_rettype, new_slist, -- inlinep, 
+		pte, cls_def, lineno, endLineno);
+      if abt then res.mark_abstract end;
+      if spec then res.mark_spec end;
+      if shrd then res.mark_shared end;
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      plist.resolve_predef_types(index);
+      if (rout_rettype /= void) then
+	 rout_rettype.resolve_predef_types(index);
+      end; -- if
+      if slist /= void then slist.resolve_predef_types(index) end;
+      if old /= void then old.resolve_predef_types(index) end;
+      if precond /= void then precond.resolve_predef_types(index) end;
+      if postcond /= void then postcond.resolve_predef_types(index) end;
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   rettype:$TYPEOB_S is
+      res := rout_rettype;
+   end; -- rettype
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   typeof:$TYPEOB_S is
+      res := type_spec;
+   end; -- typeof
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   remember_local(lvar:LVAR_DECL_STMTOB_S) is
+      locs := locs.push(lvar);
+   end; -- remember_local
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   validate_dispatches_and_get_ext_strs is
+      plist.validate_dispatches_and_get_ext_strs;
+      slist.validate_dispatches_and_get_ext_strs;
+   end; -- validate_dispatches_and_get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   compatible_des_feat(feat:SAME; lval_p:BOOL):BOOL is
+-- -- Suppose A inherits from B and C each of which defines a routine
+-- -- "foo:$B is ... end;" and "foo:$C is ...end;" respectively.  Then
+-- -- suppose A gets C's version of "foo", so A will have "foo:$C is ...end;"
+-- -- which is incompatible with B's definition of "foo".  Similar problem
+-- -- arises even if we have "foo:SAME is ... end;".  
+      
+-- -- Therefore, the strategy taken here is to first check for conformance
+-- -- and then allow the return type of "feat" to be any descendent of
+-- -- the current return type.
+      
+-- -- This code is copied from the code for "conforms_to" for class
+-- -- ROUT_TYPEOB_S, except that rather than strictly requiring the return
+-- -- types to conform, one can be a descendent of the other. (*)
+      if (pte /= feat.pte) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(ROUT_FEATOB_S): Inconsistent use of \"private\" for routine \"").
+                            s((GLOBALS::str_table).at_index(name)).
+                            s("\" in \"").
+	                    s(self.cls_inst.full_name).s("\" and \"").
+	                    s(feat.cls_inst.full_name).s("\""));
+      end; -- if
+
+      tp:$TYPEOB_S := feat.type_spec;
+      selftp:$TYPEOB_S := type_spec;
+-- -- We want : "selftp.conforms_to(tp)" plus a little extra test.
+      if (tp = void) then
+	 if (selftp = void) then
+	    res := true;
+	    return;
+	 end; -- if
+	 res := selftp.paramstype.conforms_to(void);
+	 if (res) then
+	    if (selftp.rettype /= void) then
+	       res := false;
+	    end; -- if
+	 end; -- if
+      else
+	 if (tp.rettype = void) then
+	    if (selftp.rettype = void) then
+	       res := true;
+	    else
+	       res := false;
+	    end; -- if
+	 else
+-- (*) This is the only difference from "conforms_to" in ROUT_TYPEOB_S.
+-- NOTE: The conformance check is to check if "tp.rettype" conforms to 
+-- "selftp.rettype" rather than the other way round.  This is because if
+-- the descendent routine returns a value whose type conforms to the return
+-- type of current routine, then by transitivity, it also conforms to whatever
+-- the return type of current routine is trying to conform to.
+	    if (selftp.rettype = void) then res := false;
+	    else 
+	       res := tp.rettype.conforms_to(selftp.rettype) or 
+	              (selftp.rettype.inst_cls.alldes.get(tp.rettype.inst_ind));
+	    end;
+	 end; -- if
+	 if (res) then
+	    if (selftp.paramstype = void) then
+	       if (tp.paramstype /= void) then
+		  res := false;
+	       end; -- if
+	    else
+	       -- covariance assumption
+	       -- res := selftp.paramstype.conforms_to(tp.paramstype);
+	       -- contravariance assumption
+	       -- res := tp.paramstype.conforms_to(selftp.paramstype);
+	       res := param_conforms_to(selftp.paramstype,tp.paramstype);
+	    end; -- if
+	 end; -- if
+      end; -- if
+      
+   end; -- compatible_des_feat
+
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   param_conforms_to(par,ch:LST_TYPEOB_S):BOOL is
+      -- This routine is only usable for cases where we know we are given
+      -- explicitly a list of "TYPEOB_S".
+      -- Check if parent class params "conforms'" to child.
+      -- This is taken from the LST_TYPEOB_S conforms_to routine, but with
+      -- modifications for contravariance which is a stronger condition
+      -- than regular conformance.
+      -- 
+      -- Add extra check for contravariance which will ensure that
+      -- any child class function's arguments are supertypes or the same type
+      -- as the same function defined in the parent class.
+      -- The basic rule we need is that if we have a variable of type v:$PAR, we
+      -- be able to do v.bar2(x) and that any value of x which is legal if v is
+      -- really a PAR should also be legal if v is really a CH.
+      -- i.e. given
+      -- class A is end; class B is A; end;
+      -- class PAR is
+      --   bar2(b:TP) is end;
+      -- end;
+      -- class CH is
+      --   PAR;
+      --   bar2(a:TC) is end;
+      -- end;
+      --    ... and substituting in for TP and TC, the status now is:
+      --
+      --    TP   TC
+      --    A    A     valid
+      --    A    $A    valid
+      --    A    B     error
+      --    A    $B    error
+      --    B    A     error
+      --    B    $A    valid
+      --    B    B     valid
+      --    B    $B    valid
+      --    $A   A     error
+      --    $A   $A    valid
+      --    $A   B     error
+      --    $A   $B    error 
+      --    $B   A     error
+      --    $B   $A    valid
+      --    $B   B     error
+      --    $B   $B    valid
+      --
+      if (ch = void) then
+	 if (par = void) then
+	    res := true;
+	 elsif (par.insert = 0) then
+	    res := true;
+	 end; -- if
+	 return;
+      end; -- if
+      res := true;
+      n:INT := par.insert;
+      if (ch.insert /= par.insert) then
+	 res := false;
+	 return;
+      end; -- if
+      i:INT := 0; loop until!(i >= n);
+	 if not par[i].conforms_to(ch[i]) then
+	    res := false;
+	    return;
+	 end; -- if
+	 if par[i].inst_ind /= ch[i].inst_ind then
+	    ch_co:CLASSOB_S := (GLOBALS::class_inst).at_index(ch[i].inst_ind);
+	    if not ch_co.alldes.get(par[i].inst_ind) then
+	       res := false;
+	       return;
+	    end;
+	 elsif par[i].is_dispatched and not ch[i].is_dispatched then
+	    res := false;
+	    return;
+	 end;
+	 i := i + 1;
+      end; -- loop
+
+   end; -- param_conforms_to
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   semant(symtab:SYMBOL_TABLE) is
+      semant_prologue;
+      
+      -- Go down one level for symbol table and enter parameters
+      symtab.enter_new_scope;
+      plist.semant(symtab);
+      
+      -- Do type checking for statements, entering local declarations
+      --   if necessary
+      slist.semant(symtab);
+
+      if old /= void then old.semant(symtab) end;
+      if precond /= void then precond.semant(symtab) end;
+      if postcond /= void then postcond.semant(symtab) end;
+
+      symtab.leave_new_scope;
+      if (rout_rettype /= void) then
+	 co:CLASSOB_S := rout_rettype.inst_cls;
+	 if (co.c_type_updated) then
+	    (GLOBALS::curr_class_inst).structure_updated := true;
+	 end; -- if
+      end; -- if
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   add_str_const(str_const:STR_CONST_EXPROB_S) is
+      -- Keeps track of the string constants used within the routine.
+      -- The argument is supposed to be non-void.
+      k:INT := str_indices.contains(str_const.strval);
+      if (k < 0) then
+	 str_consts_in_rout := str_consts_in_rout.push(str_const);
+	 str_indices := str_indices.push(str_const.strval);
+      end; -- if
+   end; -- add_str_const
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   do_gen_temps is
+      tmpct := tmpct.create(9);	-- *! Random size
+      if (slist /= void) then
+	 i:INT := 0;
+	 ssz:INT := slist.insert;
+	 loop until!(i >= ssz);
+	    tmpct := tmpct.append(slist[i].gen_temps);
+	    i := i + 1;
+	 end; -- loop
+      end; -- if
+      if old /= void then tmpct := tmpct.append(old.gen_temps) end;
+      if precond /= void then tmpct := tmpct.append(precond.gen_temps) end;
+      if postcond /= void then tmpct := tmpct.append(postcond.gen_temps) end;
+   end; -- do_gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_goto_tags is
+      -- Store the goto tags for "break" statements and check that
+      -- "break" statements can only occur inside loops.
+      if (slist /= void) then
+	 slist.put_kwdname(name); -- the block break can refer to top level
+	 i:INT := 0;
+	 ssz:INT := slist.insert;
+	 loop until!(i >= ssz);
+	    slist[i].gen_goto_tags(void);
+	    i := i + 1;
+	 end; -- loop
+      end; -- if
+   end; -- gen_goto_tags
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_cname(outfile:SAT_OUTFILE) is
+      if (cls_inst.index = RESERVED_CLASSES::C_ici) then
+	 outfile.s((GLOBALS::str_table).at_index(name));
+      else
+	 outfile.s(cls_inst.prefix).
+                 c('_').
+                 s((GLOBALS::str_table).at_index(name)).
+                 c('_');
+      end; -- if
+   end; -- cprint_cname
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_extern(outfile:SAT_OUTFILE) is
+      -- Print out the C "extern" declaration
+      outfile.s("extern ");
+      old_ind:INT := outfile.index;
+      outfile.ind_init;
+      cprint_decln(outfile);
+      outfile.s(";\n").inc_ln(1);
+      outfile.index := old_ind;
+   end; -- cprint_extern
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_decln(outfile:SAT_OUTFILE) is
+      -- Print out the declaration of routine.
+      if (rout_rettype /= void) then
+	 rout_rettype.cprint_ctype(outfile); outfile.c(' ');
+	 -- Get the class instance for the return type and ask it
+	 --   to print the C type. 
+      else
+	 if (not COMPILER_OPTIONS::k_and_r_c) then
+	    outfile.s("void ");
+	 end; -- if
+      end; -- if
+      cprint_cname(outfile);
+      outfile.c('(');
+      if (not COMPILER_OPTIONS::k_and_r_c) then
+	 -- function prototype parameter list
+	 plist.separator_code := ", "; plist.last_separator_code := "";
+	 if (cls_inst.index /= RESERVED_CLASSES::C_ici) then
+	    cls_inst.cprint_ctype(outfile); outfile.c(' ');
+	    -- The routine feature knows the class instance it is in.
+	    outfile.s("self__");
+	    if (plist.insert > 0) then outfile.s(plist.separator_code); end;
+	 end; -- if
+	 if (plist.insert > 0) then
+	    plist.cprint_code(outfile);
+	 end; -- if
+      end; -- if
+      outfile.c(')');
+   end; -- cprint_decln
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private cprint_rtcode(outfile:SAT_OUTFILE) is
+      if (GLOBAL_PROC::check_is_on) then
+	 outfile.c('\n'); 
+	 outfile.indent;
+ 	 outfile.inc_ln(1);
+ 
+	 -- Create a local variable to store previous filename before
+	 -- setting it to a new name.
+ 	 PRINT_C_CODE::cprint_update_exec_info1(
+ 	               outfile,
+ 		       ERR_INFO::def_filename(lineno),
+ 		       cls_inst.full_name,
+ 		       (GLOBALS::str_table).at_index(name));
+      end; -- if
+   end; -- cprint_rtcode
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private cprint_post_rtcode(outfile:SAT_OUTFILE) is
+      if (GLOBAL_PROC::check_is_on) then
+	 if postcond/=void then
+	    postcond.cprint_code(outfile);
+	 end;
+	 if cls_inst.invar/=void then
+	    outfile.indent;
+	    outfile.s("if (self__ /= S_ptr_VOID_) assert_(").s(cls_inst.prefix).c('_')
+		  .s(CLASSOB_S::invar_feature_name).s("_(self__),")
+		  .i(lineno).s(",\"").s(ERR_INFO::def_filename(lineno)).
+		  s("\");\n").inc_ln(1);
+	 end;
+	 outfile.c('\n');
+	 outfile.indent;
+	 outfile.inc_ln(1);
+	 PRINT_C_CODE::cprint_restore_exec_info(outfile);
+      end; -- if
+
+   end; -- cprint_post_rtcode
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Print C code for current routine.
+   cprint_routine(outfile:SAT_OUTFILE) is
+
+      if COMPILER_OPTIONS::dbg_mode = true then
+	 -- Break point at the top of the routine will be before 
+	 -- any declaration of C locals, tmps, ...
+	 DBTABLE::addCLine(ERR_INFO::def_filename(lineno),
+	    ERR_INFO::def_lineno(lineno),
+	    outfile.name,outfile.line_no);
+      end;
+
+      if (COMPILER_OPTIONS::k_and_r_c) then
+	 -- Print return type
+	 if (rout_rettype /= void) then
+	    rout_rettype.cprint_ctype(outfile); outfile.c(' ');
+	 end; -- if
+	 
+	    -- Print the routine name and parameters
+	 cprint_cname(outfile);
+	 outfile.s("(self__");
+	 if (plist.insert > 0) then
+	    outfile.c(',');
+	    plist.cprint_names(outfile);
+	 end; -- if
+	 outfile.s(")\n").inc_ln(1);
+	 
+	    -- Print declarations of parameters
+	 cls_inst.cprint_ctype(outfile); outfile.c(' ');
+	    -- The routine feature knows the class instance it is in.
+	 outfile.s("self__;\n").inc_ln(1);
+	 plist.separator_code := ";\n"; plist.last_separator_code := ";\n";
+	 plist.cprint_code(outfile);
+      else
+	 -- ANSI C function prototype is the same as in the declaration
+	 cprint_decln(outfile);
+	 outfile.c('\n').inc_ln(1);
+      end; -- if
+
+      -- Print beginning of code body
+      -- *! Deal with "inline" later
+      outfile.s("{\n").inc_ln(1);
+      
+      outfile.index := GLOBALS::indent_step;
+      
+      -- Initialization for returned value if any
+      if (rout_rettype /= void) then
+         outfile.indent;
+         rout_rettype.cprint_ctype(outfile); outfile.c(' ');
+         outfile.s("res__ = "); rout_rettype.cprint_void(outfile);
+	 outfile.s(";\n").inc_ln(1);
+      end; -- if
+
+      -- Declaration for strings used within the routine
+      i:INT;
+      sz:INT := str_consts_in_rout.insert;
+      loop until!(i >= sz);
+	 str_consts_in_rout[i].cprint_mach_indep(outfile);
+	 i := i + 1;
+      end; -- loop
+
+      -- Declaration for temporaries if any
+      if (tmpct /= void) then
+	 i:INT := 0;
+	 tsz:INT;
+	 if (tmpct /= void) then
+	    tsz := tmpct.insert;
+	 end; -- if
+	 loop until!(i >= tsz);
+	    outfile.indent;
+	    
+	    if (tmpct[i] < 0) then
+	       -- Once we encounter a static temporary variable, the next
+	       -- two variables must be to hold the type of last accessed
+	       -- object and the last dispatched value.
+	       
+	       outfile.s("static int ");
+	       GLOBAL_PROC::cprint_ctemp_name(tmpct[i], outfile);
+	       outfile.s(";\n");
+	       outfile.indent;
+	       outfile.s("static union dtype_ ");
+	       GLOBAL_PROC::cprint_ctemp_name(tmpct[i+2], outfile);
+	       outfile.s(";\n");
+	       outfile.inc_ln(2);
+	       i := i + 4;
+	    else
+	       GLOBAL_PROC::cprint_ctype_name(tmpct[i+1], outfile);
+	       outfile.c(' ');
+	       GLOBAL_PROC::cprint_ctemp_name(tmpct[i], outfile);
+	       outfile.s(";\n").inc_ln(1);
+	       i := i + 2;
+	    end; -- if
+	 end; -- loop
+      end; 
+
+      -- Declaration for all the locals
+      locs.separator_code := ";\n"; plist.last_separator_code := ";\n";
+      locs.cprint_code(outfile);
+
+      
+      -- Print any runtime code that may be needed, to pass information
+      -- to runtime routine
+      cprint_rtcode(outfile);
+
+      if COMPILER_OPTIONS::rt_code_check and precond/=void and not spec then
+	 precond.cprint_code(outfile);
+      end;
+
+      -- Print the code of body
+      if (slist /= void) then
+	 outfile.c('\n').inc_ln(1);
+	 slist.cprint_code(outfile);
+      end; -- if
+      
+      -- Print any runtime code that may be needed for restoring/cleaning
+      -- up.
+
+      outfile.nl.inc_ln(1);
+      outfile.indent;
+      outfile.s("ret0__:\n").inc_ln(1); -- return point
+      
+      if not spec then cprint_post_rtcode(outfile) end;
+
+      outfile.indent;
+      if (GLOBALS::curr_feature.rettype = void) then
+	 outfile.s("return;\n").inc_ln(1);
+      else
+	 outfile.s("return (res__);\n").inc_ln(1);
+      end; -- if
+
+      if COMPILER_OPTIONS::dbg_mode = true then
+	 -- Break point at the top of the routine will be before 
+	 -- any declaration of C locals, tmps, ...
+	 DBTABLE::addCLine(ERR_INFO::def_filename(lineno),
+	    ERR_INFO::def_lineno(endLineno),
+	    outfile.name,outfile.line_no);
+      end;
+
+      -- End of routine
+      outfile.s("}\n\n").inc_ln(2);
+      outfile.index := 0;
+   end; -- cprint_routine
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_store_dispval(outfile:SAT_OUTFILE) is
+      -- Print name of routine with a cast to "int" in front
+      outfile.s("(int)");
+      cprint_cname(outfile);
+   end; -- cprint_store_dispval
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_init_code(outfile:SAT_OUTFILE) is
+      -- An explicit reference to perhaps another class from an init expression:
+      -- the other class needs to be initialized before our own.
+      if TYPESPEC_ARGS_EXPROB_S::init_expr_explicit_p then
+	 if GLOBALS::curr_class_inst /= cls_inst then
+	    -- We were called by a dependent class.
+	    if cls_inst.seen then -- and indirectly by our class.
+	       ERR_INFO::format_error_msg(
+		  lineno,
+		  STR::create.s("(ROUT_FEATOB_S): Weak loop dependency for class initialization, unable to order classes"));
+	       return;
+	    else		-- Let the whole class init precede.
+	       co: CLASSOB_S := GLOBALS::curr_class_inst;
+	       GLOBALS::curr_class_inst := cls_inst;
+	       cls_inst.cprint_init_shareds_and_consts(outfile);
+		  -- restore so other shared/constant can reconize if depended-upon.
+	       GLOBALS::curr_class_inst := co;
+	       return;		-- The init code for our whole class includes our own.
+	    end;
+	 end; -- if
+      end; -- if
+   end; -- cprint_init_code
+
+end; -- class ROUT_FEATOB_S
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class ALIAS_FEATOB_S is
+   FEATOB_S;
+
+   attr original_name: INT;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   create(nm,orig: INT; cls: CLASSOB; ln: INT):SAME is
+      res := new;
+      res.name := nm;
+      res.original_name := orig;
+      res.cls_inst := GLOBALS::curr_class_inst;
+      res.cls_def := cls;
+      res.lineno := ln;
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   dup:SAME is
+      res := create(name,original_name,cls_def,lineno);
+      res.pte := pte;
+   end;
+   
+end; -- class ALIAS_FEATOB_S
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

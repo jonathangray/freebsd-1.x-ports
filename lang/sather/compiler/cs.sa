@@ -1,0 +1,990 @@
+-- -*- Mode: Sather;  -*-
+-- File: cs.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU) and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1990, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+--          Oscar Bosman (oscar@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Top level control of Sather compiler.
+--*
+--* CLASSES: CS
+--*
+--* RCS: $Id: cs.sa,v 1.1 1994/02/12 03:21:46 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 29 23:20 1993 (hws)
+--*  Oct 29 23:20 1993 (hws): fix kr defaulting problem
+--*  Oct 27 11:39 1993 (hws): remove -doc completely
+--*  Oct  9 00:20 1993 (hws): allow explicit -ansi choice, too, for symmetry
+--*  Oct  6 00:15 1993 (hws): remove c_makefile option
+--*  Sep 28 04:51 1993 (hws): switch -> case
+--*  Sep 28 03:31 1993 (hws): choose kr and/or appropriate target arch.
+--*  Aug 31 12:22 1993 (oscar): don't strip automount dir.: Dec is different
+--*  May 16 22:53 1993 (hws): avoid automount directory with getcwd
+--*  May 16 21:31 1993 (hws): fix bug in order of split MAIN code generation.
+--*  May 11 02:24 1993 (hws): split MAIN, some C compilers cannot handle as large
+--*  Apr 17 03:33 1993 (hws): delete -fast, always incremental now
+--*  Apr 17 02:42 1993 (hws): change mkROOT to Makefile
+--*  Apr 16 22:44 1993 (hws): change -stm to -res and -voi to -kr
+--*  Apr 16 21:43 1993 (hws): add -x and -gc option
+--*  Mar  1 13:02 1993 (hws): more uniform error messages
+--*  Feb 21 16:55 1993 (hws): remove continue on error option
+--*  Jul  2 03:15 1992 (hws): a little feedback for major passes.
+--*  Jul  1 23:52 1992 (hws): add -fast option
+--*  Feb 24 19:48 1992 (hws): changed -pmk to -mak
+--*  Feb  2 15:39 1992 (hws): avoid mkdir -p, 4.3BSD does not support it
+--*  Dec 17 13:59 1991 (hws): c_files copy using cp to avoid problems
+--*      with archives symbol table.
+--*  Dec 16 00:41 1991 (hws): Modified to avoid creation of symbolic links to
+--*      C files. Created problems when mounting a server under different schemes.
+--*      Automount for instance created several problems in this context.
+--* Created: Wed Jul 18 08:09:53 1990 (clim)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class C is
+   -- C routines used by top-level of compiler
+   
+-- Shared features of C class will not be defined/declared.  Furthermore,
+-- constant features of C class will be assigned.
+   
+-- In this case, these variables are defined/declared in the C files,
+-- and we do not want Sather to generate code to redefine/reallocate
+-- space for them again.
+   shared fin:F_OB;
+   shared buf:STR_BUFFER;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   print_tok(tok:INT):INT is
+      -- Print current token in scanning phase.
+   end; -- print_tok
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   lex_init is
+      -- Initialize scanner.
+   end; -- lex_init
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   yylex:INT is
+      -- Scanner routine call.
+   end; -- yylex
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   yyparse is
+      -- Parser routine call.
+   end; -- yylex
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   exit(status:INT) is
+   end; -- exit
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   error_msg(s:F_OB) is
+   end; -- error_msg
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   error_exit(s:F_OB) is
+   end; -- error_msg
+
+end; -- class C
+
+--------------------------------------------------------------------
+
+class CS is
+
+   shared outfile:OUTFILE;	-- Output file to print compiler progress.
+   shared stdin:FILE;		-- User input (for initial debugging).
+   shared predef_ok:BOOL;
+      -- "true" if predefined classes have been installed without error.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   error_msg(s:STR) is
+      -- Print an error message and update error count.
+      C::error_msg(C::str_ptr_(s));
+   end; -- error_msg
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   error_exit(s:STR) is
+      -- Print message and quit compilation.
+      C::error_exit(C::str_ptr_(s));
+   end; -- error_exit
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   warning_msg(s:STR) is
+      -- Print warning message; this is not counted as an error.
+      ERR::s(s);
+   end; -- warning_msg
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   read_commands:BOOL is
+      -- `true' iff successful.
+      
+      GLOBALS::dot_sather_reader := DOT_SATHER_HANDLER::create;
+      dsr:DOT_SATHER_HANDLER := GLOBALS::dot_sather_reader;
+      
+      -- First read the user provided command file, because the location
+      -- of the default system file may change because of the user provided
+      -- command "(sather_home)".
+      dsr.init(COMPILER_OPTIONS::cmdfile_name);
+      if (dsr.cmdfile = void) then
+	 error_exit(STR::create.s("Error in opening \"").s(COMPILER_OPTIONS::cmdfile_name).s("\"\n"));
+      elsif (dsr.cmdfile.error /= 0) then
+	 error_exit(STR::create.s("Error in opening \"").s(COMPILER_OPTIONS::cmdfile_name).s("\"\n"));
+      end; -- if
+      if (not dsr.read_cmdfile) then
+	 error_exit(STR::create.s("Error in reading \"").s(COMPILER_OPTIONS::cmdfile_name).s("\"\n"));
+      end; -- if
+
+      -- Initialize the various directory names before we can locate the
+      -- system default command file.
+      GLOBALS::init_file_info;
+      
+      -- Now read from system default command file.
+      dsr.init(GLOBALS::sys_cmdfile_name);
+      if (dsr.cmdfile = void) then
+	 error_exit(STR::create.s("Error in opening \"").s(GLOBALS::sys_cmdfile_name).s("\"\n"));
+      elsif (dsr.cmdfile.error /= 0) then
+	 error_exit(STR::create.s("Error in opening \"").s(GLOBALS::sys_cmdfile_name).s("\"\n"));
+      end; -- if
+      if (not dsr.read_cmdfile) then
+	 error_exit(STR::create.s("Error in reading \"").s(GLOBALS::sys_cmdfile_name).s("\"\n"));
+      end; -- if
+
+	 -- .sather must not override cs command line option
+      if GLOBALS::c_compiler = void then
+	 -- it wasn't set when parsing command line arguments.
+	 c_compiler:GENERIC_KEYOB := (GLOBALS::dot_sather_reader).sat_info[COMPILE_KEYS_CONST::c_compiler_ind];
+	 csz:INT := 0;
+	 if (c_compiler.info /= void) then
+	    csz := c_compiler.info.insert;
+	 end; -- if
+	 if (csz > 0) then
+	    if (csz > 1) then
+	       ERR::s("** Warning: More than one \"(c_compiler)\"; using \"").
+	       s(c_compiler.info[0]).
+	       s("\" **\n");
+	    end; -- if
+	    GLOBALS::c_compiler := c_compiler.info[0];
+	 end; -- if
+      end;
+      
+	 -- .sather must not override cs command line option
+      if GLOBALS::cc_flags = void then
+	 -- it wasn't set when parsing command line arguments.
+	 curr_cc_flags:GENERIC_KEYOB :=
+	    (GLOBALS::dot_sather_reader).
+	    sat_info[COMPILE_KEYS_CONST::cc_flags_ind];
+	 cc_sz:INT := 0;
+	 if (curr_cc_flags.info /= void) then
+	    cc_sz := curr_cc_flags.info.insert;
+	 end; -- if
+	 if (cc_sz /= 0) then
+	    GLOBALS::cc_flags := ARRAY{STR}::new(cc_sz);
+	    i:INT := 0;
+	    loop until!(i >= cc_sz);
+		  (GLOBALS::cc_flags)[i] := curr_cc_flags.info[i];
+	       i := i + 1;
+	    end; -- loop
+	 end; -- if
+      end; -- if
+
+      curr_c_macros:C_MACRO_KEYOB := (GLOBALS::dot_sather_reader).sat_info[COMPILE_KEYS_CONST::c_macro_ind];
+      -- NOTE: The string table must already be properly set up (including
+      --       string-indices mapping from previous compilation) before 
+      --       the following conversion from string to integers can be called.
+      GLOBALS::c_macros := INT_TO_INTSET::create;
+      i:INT;
+      imax:INT := curr_c_macros.info.insert;
+      loop until!(i >= imax);
+	 entry:LIST{STR} := curr_c_macros.info[i];
+	 j:INT;
+	 jmax:INT;
+	 qexp_ind:INT;
+	 if (entry /= void) then
+	    jmax := entry.insert;
+	 end; -- if
+	 if (jmax > 0) then
+	    qexp_ind := (GLOBALS::str_table).insert_str(entry[0]);
+	    loop until!(j >= jmax);
+	       cname_ind:INT := (GLOBALS::str_table).insert_str(entry[j]);
+	       (GLOBALS::c_macros).ins_ent(cname_ind, qexp_ind); 
+	       j := j + 1;
+	    end; -- loop
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+
+      -- Once again. Some of the directories may be relative to the sather home
+      -- directory defined in the command file.
+      GLOBALS::init_file_info;
+      res := true;
+   end; -- read_commands
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   release_msg is
+      -- Print out std message for user including formal reference
+      -- for bug reports. 
+      outfile.s("Sather Rel ").s(INSTALL_CONSTS::release_version)
+      	    .s(" Bin ").i(INSTALL_CONSTS::deep_save_version)
+            .s(" Envi ").s(INSTALL_CONSTS::default_environment)
+            .s(" (").s(INSTALL_CONSTS::guess_envi).s(")").nl
+      	    .s("Configuration as of ").s(INSTALL_CONSTS::install_date)
+	    .s(" on ").s(INSTALL_CONSTS::install_host).nl
+	    .s("(c) ICSI Berkeley, 1991, 1992, 1993. (c) CSIRO Australia, 1992, 1993.").nl
+	    .s("This is free software, PROVIDED \"AS IS\", WITH ABSOLUTELY NO WARRANTY EXPRESSED")
+	    .nl
+            .s("OR IMPLIED. ANY USE IS AT YOUR OWN RISK. You are welcome to distribute, use and")
+            .nl
+            .s("reuse it under the restrictions described in $SATHER_HOME/doc/license.txt.")
+	    .nl;
+   end;
+
+   system_msg is
+      -- Print out site message for users. This also enforces a kind of superuser
+      -- filter based on the first character of the message file.
+      msgfile:FILE := FILE::new;
+      msgfile.open_for_read(GLOBALS::msgfile_name);
+      if (msgfile.error = 0) then
+	 action:INT := msgfile.get_i;
+	 if (not COMPILER_OPTIONS::warnings_only) then
+	    ch:CHAR := msgfile.get_c;
+	    loop until!(msgfile.check_eof);
+	       OUT::c(ch); ch := msgfile.get_c;
+	    end; -- loop
+	 end;
+	 msgfile.close;
+	 case (action)
+	 when (COMPILER_ACTIONS::stop_compile) then
+	    C::exit(1);
+	 when (COMPILER_ACTIONS::privilege_only) then
+	    who:STR := UNIX::login_name;
+	    if (who /= void) then
+	       if not (who.is_equal(INSTALL_CONSTS::repair_who)) then 
+		  C::exit(1);
+	       end; -- if
+	    else
+	       C::exit(1);
+	    end; -- if
+	 end; -- case
+      end;
+   end; -- user_msg
+
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   read_source_files:BOOL is
+      -- Returns "true" if the user classes are successfully read.
+      res := true;
+
+      dsr:DOT_SATHER_HANDLER := GLOBALS::dot_sather_reader;
+      i:INT := 0;
+      GLOBALS::curr_filename := dsr.ith_source_file(i);
+      loop until!(GLOBALS::curr_filename = void);
+	 GLOBALS::curr_infile := FILE::new;
+	 (GLOBALS::curr_infile).open_for_read(GLOBALS::curr_filename);
+	 if ((GLOBALS::curr_infile).error /= 0) then
+	    error_exit(STR::create.s("Error in opening \"").s(GLOBALS::curr_filename).
+ 	               s("\"\n"));
+	    res := false;
+	 else
+	    C::fin := (GLOBALS::curr_infile).fp; 
+	    GLOBALS::curr_file_stat := FILE_STAT::create(GLOBALS::curr_infile);
+	    if ((GLOBALS::curr_file_stat).status = -1) then
+	       -- There is an error in getting the status of the file.  Issue
+	       -- a warning.
+	       ERR::s("Warning: Cannot get status of file \"").
+	            s(GLOBALS::curr_filename).
+	            s("\"\n");
+	    end; -- if
+	    GLOBALS::curr_lineno := 1;
+	    C::yyparse;
+	    (GLOBALS::curr_infile).close;
+	    GLOBALS::curr_file_stat := void;
+	 end; -- if
+	 i := i + 1;
+	 GLOBALS::curr_filename := dsr.ith_source_file(i);
+      end; -- loop
+   end; -- read_source_files
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   read_code is
+      -- Read all Sather code source files, (after initializing
+      -- scanner/parser).
+      C::lex_init;
+      setup_dir;
+      if (COMPILER_OPTIONS::do_timing) then
+	 TIME_VAL::start_code_read := TIMER::create;
+      end; -- if
+      if (not COMPILER_OPTIONS::warnings_only) then
+	 outfile.s("* Reading ...\n");
+      end;
+      if (not read_source_files) then
+	 error_exit("Error in reading user classes\n");
+      end; -- if
+   end; -- read_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   process_classdef(def:CLASSOB) is
+      -- This is called by parser to install a representation of
+      -- Sather class definition in `GLOBALS::class_defs'.
+      (GLOBALS::class_defs).install(def);
+      -- "def" may or may not be put into the table, depending on whether
+      -- there are multiple definitions of a class
+      if (def.index = GLOBALS::creator_class_name) then
+	 GLOBALS::creator_classob := (GLOBALS::class_defs).get_obj(def.index);
+      end; -- if
+   end; -- process_classdefs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   main_init is
+      -- Initialize all the global data structures
+      outfile := OUTFILE::out;
+      stdin := FILE::in;
+      GLOBALS::class_defs := CLASSOB_TABLE::create(50); 
+	 -- *! Random size; must be > 25, because 1-25 are reserved
+	 -- for predefined classes
+      GLOBALS::class_inst := CLASSOB_S_TABLE::create(50);
+      GLOBALS::str_table := STR_TABLE::create;
+   end; -- main_init
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   shared sdb_inc_compile_warning: BOOL; -- remind user of sdb line no problem.
+   
+   set_options(argv:ARRAY{STR}) is
+      -- Set appropriate flags according to user-specified compiler
+      -- options.
+      
+      i:INT := 1;
+      -- The creator class must be provided as the first argument, so
+      -- check that it is not one of the options.
+      argc:INT := argv.asize;
+      if (argc < 2) then
+	 error_exit("(ERROR): No main class provided\n");
+      end; -- if
+      
+      -- Use of options:
+      -- a. "-dir" : The final C code will be in "dir/foo.cs/*.c", and the
+      --    object code in "dir/foo"
+      -- b. "-com" : Read the given command file rather than ".sather".
+      -- c. "-cre" : If given, all non-parametrized classes are installed.
+      --             Otherwise, install only classes reachable only from 
+      --             base classes and given creator class.
+      -- e. "-kr"  : Generate K&R C code like Sather 0.2i
+      -- f. "-ver" : Use "#define"'d names for attribute offsets.
+      -- g. "-hom" : Use this as the Sather home directory, this overrides
+      --             any (sather_home) .sather entry
+      -- h. "-gen" : With this option, Sather files for most of the base
+      --             classes will be generated.
+      -- i. "-all" : With this option, Sather files for all classes will
+      --             will be generated.
+      -- j. "-chk" : Code for runtime check will be generated.
+      -- k. "-res" : Warning for call statement with return value
+      -- l. "-sys" : Provide alternative file from "sys_dot_sather"
+      -- m. "-info": Generate information for browser.
+      -- n. "-ben" : Ask the compiler to report timing on various phases.
+      -- q. "-ncs" : Do not perform incremental compilation.
+      -- r. "-dbg","-sdb" : Produce debugging information for sdb. This includes
+      --             browser info, feat_table production, and mapping tables
+      --             from sather file line numbers to c file line numbers.
+      -- s. "-pds" : Print descendant information.
+      -- t. "-cc"  : Use the given C compiler
+      -- u. "-cflags" : Use the given C flags.
+      -- v. "-dot" : Use (".").s(original_target_dir).
+      -- w. "-w"   : warnings only, quiet.
+      -- x. "-x"   : cross compilation to different architecture.
+      -- y. "-gc"  : whether gc is to be included
+      arc_env_v:STR := UNIX::getenv(INSTALL_CONSTS::env_v_environment);
+      if (arc_env_v /= void) then
+	 if not arc_env_v.is_equal("") then
+	    INSTALL_CONSTS::default_environment := STR::create.s(arc_env_v);
+	 end;
+      end; -- if
+      sh_env_v:STR := UNIX::getenv(INSTALL_CONSTS::env_v_sat_home);
+      if (sh_env_v /= void) then
+	 COMPILER_OPTIONS::set_sather_home(sh_env_v);
+      end;
+      ansi_kr_explicit : BOOL;
+      loop until!(i >= argc);
+	 if argv[i].is_equal("-dir") then
+	    -- Target directory to put the generated C files 
+	    if ((i + 1) < argc) then
+	       COMPILER_OPTIONS::target_dir := argv[i + 1].copy;
+	    else
+	       ERR::s("(-dir) option ignored\n");
+	    end; -- if
+	    i := i + 2;
+	 elsif argv[i].is_equal("-com") then
+	    -- Sather command file to be read by compiler
+	    if ((i + 1) < argc) then
+	       COMPILER_OPTIONS::cmdfile_name := argv[i + 1].copy;
+	    else
+	       ERR::s("(-com) option ignored\n");
+	    end; -- if
+	    i := i + 2;
+	 elsif argv[i].is_equal("-hom") then
+	    if ((i + 1) < argc) then
+	       COMPILER_OPTIONS::set_sather_home(argv[i + 1]);
+	       UNIX::putenv(INSTALL_CONSTS::env_v_sat_home,
+		  COMPILER_OPTIONS::sather_home);
+	       COMPILER_OPTIONS::is_opt_sather_home := true;	       
+	    else
+	       ERR::s("(-hom) option ignored\n");
+	    end; -- if
+	    i := i + 2;
+	 elsif argv[i].is_equal("-cre") then
+	    COMPILER_OPTIONS::all_np_classes := true;
+	    i := i + 1;
+	 elsif argv[i].is_equal("-kr") then
+	    COMPILER_OPTIONS::k_and_r_c := true;
+	    ansi_kr_explicit := true;
+	    i := i + 1;
+	 elsif argv[i].is_equal("-ansi") then
+	    COMPILER_OPTIONS::k_and_r_c := false;
+	    ansi_kr_explicit := true;
+	    i := i + 1;
+	 elsif argv[i].is_equal("-ver") then
+	    COMPILER_OPTIONS::verbose_code := true;
+            i := i + 1;
+	 elsif argv[i].is_equal("-gen") then
+	    COMPILER_OPTIONS::gen_base := true;
+	    i := i + 1;
+	 elsif argv[i].is_equal("-chk") then
+	    COMPILER_OPTIONS::rt_code_check := true;
+	    i := i + 1;
+	 elsif argv[i].is_equal("-all") then
+	    COMPILER_OPTIONS::gen_all := true;
+	    i := i + 1;
+	 elsif argv[i].is_equal("-gc") then
+	    if ((i + 1) < argc) then
+	       if argv[i+1].is_equal("yes") then
+		  COMPILER_OPTIONS::has_gc := true;
+		  i := i + 2;
+	       elsif argv[i+1].is_equal("no") then
+		  COMPILER_OPTIONS::has_gc := false;
+		   i := i + 2;
+	       else
+		  ERR::s("(-gc) option ignored\n");
+		  i := i + 1;
+	       end;
+	    end; -- if
+	 elsif argv[i].is_equal("-x") then
+	    if ((i + 1) < argc) then
+	       COMPILER_OPTIONS::target_environment := argv[i+1];
+	       i := i + 2;
+	    else
+	       ERR::s("(-x) option ignored\n");
+	       i := i + 1;
+	    end; -- if
+	 elsif argv[i].is_equal("-res") then
+	    COMPILER_OPTIONS::warn_rt_val := true;
+	    i := i + 1;
+	 elsif argv[i].is_equal("-sys") then
+	    if ((i + 1) < argc) then
+	       GLOBALS::sys_cmdfile_name := argv[i + 1].copy;
+	    else
+	       ERR::s("(-sys) option ignored\n");
+	    end; -- if
+	    i := i + 2;
+	 elsif argv[i].is_equal("-info") then
+	    COMPILER_OPTIONS::compiler_mode := COMPILER_OPTIONS::browser_mode;
+	    GLOBALS::print_feat_info := true;
+	    i := i + 1;
+	 elsif argv[i].is_equal("-dbg") or argv[i].is_equal("-sdb") then
+	    COMPILER_OPTIONS::compiler_mode := COMPILER_OPTIONS::browser_mode;
+	    COMPILER_OPTIONS::dbg_mode := true;
+	    GLOBALS::print_feat_info := true;
+	    -- Don't force a recompilation, users who want it can use -ncs
+	    -- COMPILER_OPTIONS::new_compilation := true;
+	    if not COMPILER_OPTIONS::warnings_only then
+	       sdb_inc_compile_warning := true;
+	    end;
+	    i := i + 1;
+	 elsif argv[i].is_equal("-ben") then
+	    COMPILER_OPTIONS::do_timing := true;
+	    i := i + 1;
+	 elsif argv[i].is_equal("-ncs") then
+	    COMPILER_OPTIONS::new_compilation := true;
+	    i := i + 1;
+	 elsif argv[i].is_equal("-w") then
+	    COMPILER_OPTIONS::warnings_only := true;
+	    i := i + 1;
+	 elsif argv[i].is_equal("-pds") then
+	    COMPILER_OPTIONS::print_desinfo := true;
+	    i := i + 1;
+	 elsif argv[i].is_equal("-cc") then
+	    if ((i + 1) < argc) then
+	       GLOBALS::c_compiler := argv[i + 1].copy;
+	    else
+	       ERR::s("(-cc) option ignored\n");
+	    end; -- if
+	    i := i + 2;
+	 elsif argv[i].is_equal("-cflags") then
+	    if ((i + 1) < argc) then
+	       -- get the stings from argv[i+1] into cc_flags
+	       curs:STR_CURSOR := argv[i+1].cursor;
+	       i:INT;
+	       curs.skip_space;
+	       if not curs.is_done then
+		  GLOBALS::cc_flags := ARRAY{STR}::new(1);
+	       end;
+	       -- this loop only done once, and we usually don't have > 10 cflags
+	       -- so don't worry about pre-processing to find the right size.
+	       loop until!(curs.is_done);
+		  if i >= GLOBALS::cc_flags.asize then
+		     tmp:ARRAY{STR} := GLOBALS::cc_flags;
+		     GLOBALS::cc_flags := GLOBALS::cc_flags.extend(1+tmp.asize);
+		     tmp.clear;
+		  end;
+		  GLOBALS::cc_flags[i] := curs.get_word;
+		  i := i + 1;
+	       end;
+	    else
+	       ERR::s("(-cflags) option ignored\n");
+	    end; -- if
+	    i := i + 2;
+	 elsif argv[i].is_equal("-dot") then
+	    COMPILER_OPTIONS::dot_prefix := true;
+	    i := i + 1;
+	 else
+	    if (GLOBALS::creator_class_name /= 0) then
+	       warning_msg(STR::create.s("(Warning) : Ambiguous creator class - ").
+	                            s(argv[i].copy.to_upper_case).s(" or ").
+	                            s(GLOBALS::str_table.at_index(GLOBALS::creator_class_name)).
+	                            s("; using ").s(argv[i].copy.to_upper_case).c('\n'));
+	    end; -- if
+	    
+	    GLOBALS::creator_class_name := (GLOBALS::str_table).
+	                                   insert_str(argv[i].copy.to_upper_case);
+	    GLOBALS::final_prog_name := argv[i].copy;
+	    i := i + 1;
+	 end; -- if
+      end; -- loop
+
+      -- If runtime check is on, we need the ancestor-descendent relation
+      -- for type-checking.  Also, if we print the feature table, that means
+      -- that information is generated for SYS routines, and so probably the
+      -- ancestor-descendent relation is needed too.
+      if (COMPILER_OPTIONS::rt_code_check) or
+	 (GLOBALS::print_feat_info) then
+	 GLOBALS::print_des_info := true;
+      end; -- if
+
+      -- The environment is defined by the architecture
+      -- and the language currently. We combine the two
+      -- to find the right libs and target coder.
+
+      -- default target "kr" ending to -kr if not explicitly chosen
+      arch: STR := COMPILER_OPTIONS::target_environment;
+      arch_s: INT := arch.length;
+      arch_kr: BOOL := false;
+      if arch_s >= 2 then
+	 if arch.substring(arch_s-2,arch_s).is_equal("kr") then
+	    arch_kr := true;
+	    if not ansi_kr_explicit then
+	       COMPILER_OPTIONS::k_and_r_c := true
+	    end;
+	 end;
+      end;
+
+      -- target "kr" with -kr
+      if COMPILER_OPTIONS::k_and_r_c and not arch_kr then
+	 COMPILER_OPTIONS::target_environment :=
+	       COMPILER_OPTIONS::target_environment.s("kr");
+      end;
+
+      if (GLOBALS::creator_class_name = 0) then
+	 error_exit("(ERROR): No main class provided\n");
+      end; -- if
+
+      -- We have made sure that the class name is all in upper-case.
+      
+      if (COMPILER_OPTIONS::target_dir = void) then
+	 working_dir:STR := UNIX::getcwd;
+	 prefix:STR;
+	 if COMPILER_OPTIONS::dot_prefix then
+	    prefix := ".";
+	 else
+	    prefix := "";
+	 end;
+	 if (working_dir /= void) then
+	    -- working_dir := UPATHS::strip_automount_name(working_dir);
+	    COMPILER_OPTIONS::target_dir := STR::create.s(working_dir).
+	                                             c('/').s(prefix).
+	                                             s(GLOBALS::final_prog_name).
+	                                             s(".cs/");
+	 else
+	    COMPILER_OPTIONS::target_dir := STR::create.s("./").s(prefix).
+	                                             s(GLOBALS::final_prog_name).
+	                                             s(".cs/");
+	 end; -- if
+      else
+	 -- Append an extra '/' to make sure that we write the generated
+	 -- C code into a directory.
+	 -- COMPILER_OPTIONS::target_dir := UPATHS::strip_automount_name(
+	 --    COMPILER_OPTIONS::target_dir);
+	 COMPILER_OPTIONS::target_dir := (COMPILER_OPTIONS::target_dir).c('/').s(GLOBALS::final_prog_name).s(".cs/");
+      end; -- if
+      
+-- -- The code to remove the directory is determined by 
+-- -- "COMPILER_OPTIONS::new_compilation", which is completely determined 
+-- -- only after the code "OLDNEW_HANDLER::init_class_stat_tbl" in the
+-- -- "main" routine.  Hence this code is executed that.
+      
+      -- Augment the string table with name-index mapping from previous
+      -- compilation.  
+      -- NOTE: This is the earliest possible point to augment the string
+      --       table with mappings from previous compilation, because we
+      --       need to know the target directory.
+      
+      -- WARNING: There is an ordering problem here.  We want to augment
+      --          the string table only if this is not a new compilation.
+      --          But we cannot fully determine if this is a new compilation
+      --          until the code "OLDNEW_HANDLER::init_class_stat_tbl".
+      --          Hence the result is that strings from previous compilation
+      --          will still be used even though this MAY be a new compilation.
+      --          We cannot augment the table later, because the strings are
+      --          needed when reading in the compiler commands.
+      if not (COMPILER_OPTIONS::new_compilation) then
+	 (GLOBALS::str_table).augment;
+      end;
+   end; -- set_options
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   setup_dir is
+      -- Create a directory name without trailing '/'s
+      len:INT := (COMPILER_OPTIONS::target_dir).length;
+      i:INT := len - 1;
+      loop until!(i < 0);
+	 if ((COMPILER_OPTIONS::target_dir)[i] = '/') then
+	    i := i - 1;
+	 else
+	    break!;
+	 end; -- if
+      end; -- loop
+      target_dir:STR := (COMPILER_OPTIONS::target_dir).head(i + 1);
+
+      -- Instead of deleting the directories and all the Sather generated C
+      -- files, with incremental compilation, we create a directory if it
+      -- does not exist, and later on, delete old C files.
+      if (COMPILER_OPTIONS::new_compilation) then
+	 rmdir:STR := STR::create.s("if [ -d ").s(target_dir)
+	       .s(" ]\nthen ").s(INSTALL_CONSTS::rm_command)
+	       .s(" -rf ").s(target_dir).s("\nfi");
+	 if (not COMPILER_OPTIONS::warnings_only) then
+	    outfile.s("* Cleaning target dir ...\n");
+	 end;
+	 if (COMPILER_OPTIONS::do_timing) then
+	    TIME_VAL::rmdir_time := TIMER::time_syscall(rmdir);
+	 else
+	    GLOBAL_PROC::system(rmdir);
+	 end; -- if
+      else
+	 if sdb_inc_compile_warning then	 
+	    outfile.s("REMINDER: correct line numbers with -sdb may require -ncs.").nl;
+	 end; -- if
+      end; -- if
+      mkdir:STR := STR::create.s("if [ ! -d ").s(target_dir)
+	 -- 4.3BSD does not support mkdir -p
+         --                 s(" ]\nthen mkdir -p ")
+	    .s(" ]\nthen ").s(INSTALL_CONSTS::mkdir_command).c(' ')
+	    .s(target_dir).s("; ");
+	 if (not COMPILER_OPTIONS::warnings_only) then
+	    mkdir := mkdir.s(INSTALL_CONSTS::echo_command)
+                     .s(" \"* Created directory --").s(target_dir).s("\" ");
+	 end;
+      mkdir := mkdir.s("\nfi");
+      if (COMPILER_OPTIONS::do_timing) then
+	 TIME_VAL::mkdir_time := TIMER::time_syscall(mkdir);
+      else
+	 GLOBAL_PROC::system(mkdir);
+      end; -- if
+   end; -- setup_dir
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   process_classes is
+      -- Start processing Sather code, after all class definitions
+      -- have been read.
+      if (SATHER_SEMANT::install_predefined_classes) then
+	 predef_ok := true;
+      else
+	 ERR_INFO::compiler_error_msg("CS", "Cannot install all predefined classes");
+	 C::exit(1);
+      end; -- if
+      GLOBALS::init_typeob_s;
+      -- Some type objects for predefined classes for general use
+      
+      -- Collect and install all non-parametrized non-predefined classes
+      i:INT := RESERVED_CLASSES::LAST_PREDEF_ici + 1;
+      lst_names:LIST{INT} := LIST{INT}::create(50); -- *! Random size
+      if (GLOBALS::creator_class_name > 0) and
+	 (not COMPILER_OPTIONS::all_np_classes) then
+	 -- Install simple classes from the given initial class name
+	 -- and from those used in the C interface.
+	 lst_names := lst_names.push(GLOBALS::creator_class_name).
+	                        union(SATHER_SEMANT::get_simple_classnames);
+      else
+	 loop until!(i >= (GLOBALS::class_defs).next_ind);
+	    def:CLASSOB := (GLOBALS::class_defs).at_index(i);
+	    if (def /= void) then
+	       if (def.num_params = 0) then
+		  lst_names := lst_names.push(def.index);
+	       end; -- if
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+      end; -- if
+      if (SATHER_SEMANT::install_root_classes(lst_names) = lst_names.insert) then
+	 if (not COMPILER_OPTIONS::warnings_only) then
+	    outfile.s("* Actualizing parameters ...\n");
+	 end;
+	 SATHER_SEMANT::all_create_inst;
+--	 SATHER_SEMANT::install_param_classes_from_c;
+-- -- !* This is a loop hole in Sather compilation.
+	 if (not COMPILER_OPTIONS::warnings_only) then
+	    outfile.s("* Customizing children ...\n");
+	 end;
+	 SATHER_SEMANT::all_expand_cinh;
+	 if (not COMPILER_OPTIONS::warnings_only) then
+	    outfile.s("* Resolving built-ins ...\n");
+	 end;
+	 SATHER_SEMANT::all_resolve_predef_types_and_compute_num_attrs(lst_names);
+	 if (not COMPILER_OPTIONS::warnings_only) then
+	    outfile.s("* Closing subtype relation ...\n");
+	 end;
+	 SATHER_SEMANT::all_compute_anc_and_des_and_time_stamp;
+	 if (not COMPILER_OPTIONS::warnings_only) then
+	    outfile.s("* Laying out instances ...\n");
+	 end;
+	 SATHER_SEMANT::all_compute_attr_offsets;
+	 if (not COMPILER_OPTIONS::warnings_only) then
+	    outfile.s("* Resolving clients ...\n");
+	 end;
+	 SATHER_SEMANT::find_called_features;
+	 -- Record mappings of C-Sather names; note that this must be
+	 -- done before "semant" because by the end of "semant" phase,
+	 -- all classes which should be marked "structure_updated" must already
+	 -- be so marked.  In this routine, we also go through the mappings
+	 -- from previous compilation, and mark any class whose affected
+	 -- by changes in the mapping.
+
+	 if (COMPILER_OPTIONS::do_timing) then
+	    TIME_VAL::start_semant := TIMER::create;
+	 end; -- if
+	 if (not COMPILER_OPTIONS::warnings_only) then
+	    outfile.s("* Analysing consistency ...\n");
+	 end;
+	 SATHER_SEMANT::all_semant;
+	 if (COMPILER_OPTIONS::print_desinfo) then
+	    SATHER_SEMANT::print_descendant_information;
+	 end; 
+	 if (C::omerrs > 0) then
+	    error_exit(C::omerrs.to_s.s(" ERRORS found; Exit from compilation\n"));
+	 end; -- if
+	 
+	 if (COMPILER_OPTIONS::do_timing) then
+	    TIME_VAL::start_print := TIMER::create;
+	 end; -- if
+
+	 if (not COMPILER_OPTIONS::warnings_only) then
+	    outfile.s("* Coding classes ...\n");
+	 end;
+	 SATHER_SEMANT::all_class_inst_cprint;
+	 if (not COMPILER_OPTIONS::warnings_only) then
+	    outfile.s("* Coding shareds ...\n");
+	 end;
+	 SATHER_SEMANT::cprint_init_shareds_and_consts;
+
+	 -- cprint_init prints and determines the dispatch table size
+	 -- which is used in class feature table code.
+	 -- First print the MAIN_.c therefore!
+	 
+	 if (not COMPILER_OPTIONS::warnings_only) then
+	    outfile.s("* Coding main ...\n");
+	 end;
+	 SATHER_SEMANT::cprint_init;
+
+	 if (not COMPILER_OPTIONS::warnings_only) then
+	    outfile.s("* Coding class tables ...\n");
+	 end;
+	 SATHER_SEMANT::cprint_class_info; -- feature/descendent tables
+
+	 if (COMPILER_OPTIONS::verbose_code) then
+	    offset_info_fname:STR := STR::create.s(COMPILER_OPTIONS::target_dir).
+	                                      s(INSTALL_CONSTS::offset_file);
+	    offset_info:SAT_OUTFILE := SAT_OUTFILE::new;
+	    offset_info.open_for_write(offset_info_fname);
+	    if (offset_info.error /= 0) then
+	       error_exit(STR::create.s("Error in opening \"").
+	                           s(INSTALL_CONSTS::offset_file).
+	                           s("\"\n"));
+	    else
+	       SATHER_SEMANT::print_defines(offset_info);
+	       offset_info.close;
+	    end; -- if
+
+	 end; -- if
+	 SATHER_SEMANT::print_sather_to_c_macros;
+	 if (GLOBALS::print_feat_info) then
+	    SATHER_SEMANT::print_browser_info;
+	 end; -- if
+      else
+	 ERR_INFO::compiler_error_msg("CS", "Not all main classes found");
+      end; -- if
+   end; -- process_classes
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   handle_object_files is
+      -- Record object files the current compilation depends on.
+      
+      object_files_keyob:OBJECT_FILES_KEYOB :=
+	    (GLOBALS::dot_sather_reader).sat_info[COMPILE_KEYS_CONST::object_files_ind];
+      object_files:LIST{STR} := object_files_keyob.info;
+      csz:INT := 0;
+      if (object_files /= void) then
+	 csz := object_files.insert;
+      end; -- if
+      i:INT := 0;
+
+      -- list the files in the make file later so we can safe do incremental
+      -- compiles without affecting the envi other than by way of generated code.
+
+      loop until!(i >= csz);
+	 COMPILER_OPTIONS::object_files :=
+	        COMPILER_OPTIONS::object_files.c(' ').s(object_files[i]);
+	 -- GLOBAL_PROC::copy_user_cfile(STR::create.s(object_files[i]),CS::outfile);
+	 i := i + 1;
+      end; -- loop
+      
+   end; -- handle_object_files
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   print_times is
+      -- Print amount of time spent in different phases and
+      -- the fraction amounts.
+      if (COMPILER_OPTIONS::do_timing) then
+	 t1:DOUBLE := TIME_VAL::start_command_read.time_spent - 
+	              TIME_VAL::start_main.time_spent +
+	              TIME_VAL::rmdir_time.time_spent + 
+	              TIME_VAL::mkdir_time.time_spent;
+	 t2:DOUBLE := TIME_VAL::start_code_read.time_spent - 
+	              TIME_VAL::start_command_read.time_spent;
+	 t3:DOUBLE := TIME_VAL::start_processing.time_spent - 
+	              TIME_VAL::start_code_read.time_spent;
+	 t4:DOUBLE := TIME_VAL::start_semant.time_spent - 
+	              TIME_VAL::start_processing.time_spent;
+	 t5:DOUBLE := TIME_VAL::start_print.time_spent - 
+	              TIME_VAL::start_semant.time_spent;
+	 t6:DOUBLE := TIME_VAL::start_last_stage.time_spent - 
+	              TIME_VAL::start_print.time_spent +
+	              TIME_VAL::rmfiles_com_time.time_spent;
+	 t7:DOUBLE := TIME_VAL::start_make.time_spent - 
+	              TIME_VAL::start_last_stage.time_spent +
+	              TIME_VAL::cp_com_time.time_spent;
+	 t8:DOUBLE := TIME_VAL::end_main.time_spent - 
+	              TIME_VAL::start_make.time_spent +
+	              TIME_VAL::mk_com_time.time_spent +
+	              TIME_VAL::mv_com_time.time_spent;
+	 total:DOUBLE := TIME_VAL::end_main.time_spent -
+	                 TIME_VAL::start_main.time_spent +
+	                 TIME_VAL::rmdir_time.time_spent + 
+	                 TIME_VAL::mkdir_time.time_spent +
+	                 TIME_VAL::rmfiles_com_time.time_spent +
+	                 TIME_VAL::cp_com_time.time_spent +
+	                 TIME_VAL::mk_com_time.time_spent +
+	                 TIME_VAL::mv_com_time.time_spent;
+	 
+	 OUT::s("Timing in seconds:\nInitialization/Set-up options = ").
+	      r(t1).s("  (").r(t1/total).
+	      s(")\nReading commands/System message = ").
+	      r(t2).s("  (").r(t2/total).
+	      s(")\nRead \".sa\" files = ").
+	      r(t3).s("  (").r(t3/total).
+	      s(")\nGeneral class processing = ").
+	      r(t4).s("  (").r(t4/total).
+	      s(")\nSemantic check = ").
+	      r(t5).s("  (").r(t5/total).
+	      s(")\nPrint C-files = ").
+	      r(t6).s("  (").r(t6/total).
+	      s(")\nMiscellaneous before make = ").
+	      r(t7).s("  (").r(t7/total).
+	      s(")\nCompiling C files = ").
+	      r(t8).s("  (").r(t8/total).
+	      s(")\nTotal time = ").
+	      r(total).
+	      s("\n\nPls send to clim@icsi; Thanks!\n\n");
+      end; -- if
+   end; -- print_times
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   main(argv:ARRAY{STR}):INT is
+      -- Top level routine of compiler.
+      res := 0;
+      TIME_VAL::start_main := TIMER::create;
+
+      main_init;
+
+      -- This comes first. So do not put things into it that are
+      -- not determined at startup. Following errors in command
+      -- reading follow the startup message.
+      release_msg;
+
+      set_options(argv);
+
+      if (COMPILER_OPTIONS::do_timing) then
+	 TIME_VAL::start_command_read := TIMER::create;
+      end; -- if
+
+      if (not read_commands) then
+	 error_exit("Error in reading compiler command file\n");
+      end; -- if
+
+      -- This displays the system defined message which can only be
+      -- located after sather home has been located.
+      system_msg;
+
+      C::buf := STR_BUFFER::create(0); -- initialize the scanner buffer.
+      
+      OLDNEW_HANDLER::init_class_stat_tbl;
+      -- Old information is restored only after the compiler commands
+      -- and compiling options have been set up.  This is because we
+      -- need to compare certain commands/options to decide if the current
+      -- compilation has to redo everything.
+      
+      OLDNEW_HANDLER::adjust_tables;
+      -- To make certain things consistent, we may need to readjust
+      -- certain values in the compiler data structures.
+
+      read_code;
+
+      if (COMPILER_OPTIONS::do_timing) then
+	TIME_VAL::start_processing := TIMER::create;
+      end; -- if
+
+      process_classes;
+
+      if (COMPILER_OPTIONS::do_timing) then
+	TIME_VAL::start_last_stage := TIMER::create;
+      end; -- if
+
+      OLDNEW_HANDLER::store_class_stat_tbl;
+      OLDNEW_HANDLER::store_name_ind_map;
+
+      handle_object_files;
+
+      SATHER_SEMANT::print_makefile;
+
+      TIME_VAL::end_main := TIMER::create;
+      print_times;
+   end; -- main
+   
+end; -- class CS
+
+--------------------------------------------------------------------

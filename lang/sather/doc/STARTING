@@ -1,0 +1,308 @@
+File: sather/doc/STARTING
+SEE COPYRIGHT NOTE AT END OF FILE.
+
+Welcome to Sather! This document is a short guide to setting up your Sather
+environment and using the Sather tools. The primary components you will want to
+know about are the Sather compiler, the Sather debugger, the GNU Emacs Sather
+programming environment, and the Sather library classes. We will assume that
+the Sather system has already been installed on your machine (see the document
+"sather/doc/INSTALL" for the description of this process). We will also assume
+that you are using the GNU emacs editing environment.  While it is certainly
+possible to use Sather without using Emacs, many of the environment tools are
+built on it and your programming facilities will be greatly enhanced by using
+it. GNU emacs is available for free from the Free Software Foundation and may
+be ftp'ed from "prep.ai.mit.edu".
+
+
+Your Environment
+================
+
+The Sather system has to know about your environment. Define the following
+variables in your .cshrc file, for example:
+
+setenv SATHER_HOME /usr/local/sather
+setenv SATHER_ENVI sun4kr
+set path = ($path $SATHER_HOME/bin.$SATHER_ENVI)
+setenv MANPATH $MANPATH":"$SATHER_HOME/man
+
+SATHER_HOME points to the Sather installation directory. SATHER_ENVI is a
+combination of the architecture and the C environment, such as "sun4" and "kr",
+for K&R C libraries. Standard (ANSI) C is selected if SATHER_ENVI is the empty
+string.
+
+Socalled ".sather" files select library classes and compiler options and some
+of these files are system supplied and use these variables to select the proper
+directories independent of what target system you are working on.
+
+The compiler in "bin.$SATHER_ENVI" is named "sather". The directory also
+contains the Sather debugger "sdb" if that was installed.  There is a shell
+script "cs" which runs "sather" and follows it by a make for the generated C
+code and Makefile. You may choose to write your own make files and "cs" scripts
+if you want to run the Sather compiler as part of a larger project.
+
+
+Emacs Environment
+=================
+
+The Emacs environment is unbundled and can be obtained by anonymous ftp from
+Sather distribution hosts. See the file README in the Sather Emacs distribution
+for details of how to set up that environment.
+
+
+Sample Program: Hello World
+===========================
+
+You are now ready to compile a Sather program. The simplest Sather program is
+"$SATHER_HOME/etc/hello.sa" which simply prints out "Hello world". The file
+essentially just contains:
+
+class HELLO is
+   -- Simplest program, just prints "Hello world." on stdout.
+   main is
+      -- Print "Hello world" on stdout.
+      OUT::s("Hello world").nl
+   end; -- main
+end; -- class HELLO
+
+To compile Sather programs you use a command file which specifies the source
+files to read and the compiler options to use.  "$SATHER_HOME/etc/hello.sather"
+is such a file. It essentially contains:
+
+source_files: $SATHER_HOME/etc/hello.sa
+
+
+Compiling and running "Hello World" from a shell
+================================================
+
+Type  "cs $SATHER_HOME/etc/hello -w".
+
+This will choose the command file $SATHER_HOME/etc/hello.sather.  It will also
+treat "hello" (the basename of that path) as the main class to generate an
+executable for, under that name. The flag "-w" means "No warnings". (For other
+options cf. the file doc/cs_options.txt.)
+
+The resulting dialog may now look like this:
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+sagitta 509> cs $SATHER_HOME/etc/hello -w
+Compiling Sather main class "hello" ...
+
+Sather Rel 0.5.1 Bin 28 Envi sun4kr (sparc-sun-sunos4.1.2)
+(c) ICSI Berkeley, 1991, 1992, 1993. All rights reserved.
+(c) CSIRO Australia, 1992, 1993. All rights reserved.
+This is free software, PROVIDED "AS IS", WITH ABSOLUTELY NO WARRANTY EXPRESSED 
+OR IMPLIED. ANY USE IS AT YOUR OWN RISK. You are welcome to distribute, use and
+reuse it under the restrictions described in $SATHER_HOME/doc/license.txt.
+
+Compiling C files using pmake ...
+... done
+sagitta 210> hello
+Hello world
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+"cs" is a shell script invoking the "sather" compiler passing on any command
+line options and then compiling the generated C code. The first argument in "cs
+main options", i.e., main is a path for the main class.  "cs" looks for a
+command file "main.sather" or "dir/.sather" where "dir" is the directory in the
+path "main". For instance, the call
+
+  cs $SATHER_HOME/etc/hello 
+
+above first looks for a command file "$SATHER_HOME/etc/hello.sather" then it
+tries "$SATHER_HOME/etc/.sather". If a command file is not explicitly specified
+(with -com, cf. doc/cs_options.txt), and the default command files cannot be
+found, it will create a simple one for you in the current directory. This will
+be called .sather and will contain a line
+
+  source_files: main.sa
+
+where "main" is the argument path.
+
+
+Compiling "Hello World" from within Emacs
+=========================================
+
+To do the same compile within Emacs, you simple type "M-x compile" and it will
+respond with "Compile command: make -k". Edit this to be 
+
+ "cs $SATHER_HOME/etc/hello -w"
+
+Hit return and it will ask whether you want to save each unsaved buffer. It
+will then open up a buffer called "*compilation*" where the compile will
+proceed. If you type "M-x shell" in the compile window, you can try out the
+program from within Emacs. For programs which compile correctly, there is not a
+great advantage to working this way.  The benefit arises when there are bugs.
+In this case the compiler will generate a series of error messages. When they
+begin arriving you may type "C-x `". This causes Emacs to parse the first error
+message and bring up a buffer with the source file with the cursor at the line
+of the error. You can use the Emacs Sather source browsing tools to find more
+about the current class and routines. You fix the error and type "C-x `" again
+until all errors have been repaired. Then "M-x compile" will start a new
+compile (and the default compile command will be the same as the last one).
+This process is particularly convenient if you split your main Emacs window
+into several subwindows.
+
+
+Other useful Emacs functions
+============================
+
+Another useful function of the Emacs environment is that it makes searching and
+editing Sather source files easier. First edit the ".sather" file you are
+working on. Type "M-x sather-tags" in this buffer.  This will generate an Emacs
+"tags" table for the source files in your program. The generated files record
+the names of the files and the routines and classes defined in them. You can
+type "M-." to cycle through all classes or features with a given name or you
+can safely find all callers of a particular feature. For example, if you
+generate sather-tags for the "hello.sa" example it will include information
+about the source file "hello.sa" and the library source files which are
+automatically included along with it.  Type "M-. main" and it will put you
+immediately at the routine "main". Type "M-.  create" and it will put you at
+the "create" routine in the class "STR".  Type "M-," and it will cycle through
+all the classes which have a routine named "create" in your program. If you put
+the cursor on a routine name such as "create" and type "M-x
+sather-documentation" it will make a buffer with a documentation line for each
+routine named "create". In this case the generated buffer might look like:
+
+
+STR::create: SAME is                                     [public]
+   An empty string.
+
+STR_CURSOR::create(st: STR): SAME is                     [public]
+   Make a scanner for the string `st'.
+
+FILE::create:SAME is                                     [public]
+   A new unitialized file object.
+
+
+If you type "M-x sather-documentation" when the cursor is over a class name, it
+will generate documentation for a whole class. For example "M-x
+sather-documentation <ret> HELLO" generates:
+
+
+HELLO is                                                       [class]
+
+   Simplest program, just prints "Hello world." on stdout.
+
+
+Public definitions of class HELLO: 
+
+main is
+   Print "Hello world" on stdout.
+
+
+Try typing "M-x sather-documentation <ret> STR" for documentation on the more
+extensive string class. There are many more features of the editing mode which
+may be found described in the documentation. (A short form may be seen by
+typing "C-h m".)
+
+Under X windows, the emacs environment optionally supports point-and-click,
+multi-style highlighting and menus.  With the point-and-click functions, one
+need only point to a feature name with the mouse and the system will
+immediately move to its definition or display its documentation.  Similarly one
+may point to an attribute name in SDB to show its value.  The multi-style
+support highlights feature heads and optionally keywords and sets documentation
+apart. It is currently only available under Epoch and Lucid Emacs.  Usually no
+extra setup is necessary once .emacs is loaded.  However, the documentation
+also contains hints on how to setup your X resource and window manager
+definitions to take full advantage of this interface. Find details of the
+Sather Emacs support can be found in "$SATHER_HOME/doc/sa-emacs.txt".
+
+
+Prefabricated Demo Programs
+===========================
+
+To try out more complex programs, look in the directory
+
+			   "$SATHER_HOME/etc/test".
+
+This contains suitable ".sather" files for compiling programs which run all the
+tests in different portions of the Sather library.  For example "ds.sather"
+will exercise each of the data structure classes. To run an individual test
+case, simply cd to the etc/test directory and run (under Emacs after M-x
+compile)
+
+	make INFO="-info" TEST=testname test
+
+To run all tests you type "make".
+To run all tests several times with different "cs" options exercising
+optional coding portions such as debugging and checking, you type 
+	
+	make rigorous
+
+This regression test will run for a long time ...
+
+
+Using the Sather Debugger SDB
+=============================
+
+To use the debugger, you must compile your program with the "-sdb" flag.
+Compile with the commmand: "cs -sdb $SATHER_HOME/etc/hello". Once compiled,
+under Emacs you type "M-x sdb" and at the query give it the name of the program
+"hello". Sdb will start up in a buffer called "*sdb-hello*" with information
+like:
+
+Current directory is /n/icsib29/da/om/sather/test/hello_test/
+SDB (bilmes), Copyright (c) 1991 International Computer Science Institute.
+            Copyright (c) 1989 Free Software Foundation, Inc.
+There is ABSOLUTELY NO WARRANTY for SDB; type "info warranty" for details.
+SDB is free software and you are welcome to distribute copies of it
+ under certain conditions; type "info copying" to see the conditions.
+Type "help" for a list of commands.
+Reading symbol data from /usr/local/lang/sather/test/hello...done.
+Reading Sather specific symbol information...
+done
+Reading Sather line number information
+(sdb) 
+
+Switch to the buffer with the "hello.sa" source code in it and move to the
+first line of "main". Type "C-x <space>" to set a breakpoint. In the sdb buffer
+you should see something like
+
+(sdb) Breakpoint 1 at 0x5448:  (hello.sa line 31) (C file hello_22.c line 23).
+
+Move to the SDB buffer and type "run". You should see:
+
+run
+Starting program: /n/icsib29/da/om/sather/test/hello_test/hello 
+
+Bpt 1, HELLO<0x0>::main  (hello.sa line 31)
+(sdb) 
+
+And a second window will show the "hello.sa" source file with an arrow pointing
+at the current line. You may single step through the program by typing "s". A
+wide variety of other debugging operations (such as examining objects, changing
+variables, and calling functions) may be performed. Type "help" to the "sdb"
+prompt to see the options. For more information on the debugger, see the file
+doc/sdb_info.txt.
+
+This has introduced the basics of the Sather environment. The key to Sather
+programming is the use of powerful reusable library classes.  These classes are
+in the directory "$SATHER_HOME/lib" and should be self documenting. Most
+classes have a corresponding "_TEST" class defined in the same file. It is
+often convenient to study the test class to see an example use of the class
+itself.
+
+
+
+Good luck in Sather programming!
+
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Author: Stephen M. Omohundro and Heinz Schmidt
+Copyright (C) International Computer Science Institute, 1991, 1992, 1993. 
+
+COPYRIGHT NOTICE: This file is provided "AS IS" WITHOUT ANY WARRANTY
+and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+distribution. The license is also available from ICSI, 1947 Center
+St., Suite 600, Berkeley CA 94704, USA.
+
+Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+(c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+Australia, 1992, 1993.
+The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+
+HISTORY:
+*  Oct 16 12:15 1993 (hws): Incorporate Sather 0.5 documentation.
+* Created: Mon Jun  3 12:51:56 1991 (om)

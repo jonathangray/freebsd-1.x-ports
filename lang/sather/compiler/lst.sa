@@ -1,0 +1,207 @@
+-- -*- Mode: Sather;  -*-
+-- File: lst.sa
+-- Author: Stephen M. Omohundro
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Lists implemented as extensible arrays.
+--*
+--* RCS: $Id: lst.sa,v 1.1 1994/02/12 03:21:52 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 05:03 1993 (hws)
+--*  Oct 17 04:50 1993 (hws): Sather 1 syntax, copyright note
+--* Created: Tue Feb 13 08:53:22 1990
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class LIST{T} is
+   -- Lists implemented as extensible arrays.
+
+   ARRAY{T};			-- Holds the stack elements
+   attr insert:INT;			-- The current insertion location.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   attr ci:INT;	
+      -- Location of current item never goes beyond "ins".
+              
+   const def_init_size:INT := 5;	-- Default initial size is 5
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(init_size:INT):SAME is
+      if (init_size <= 0) then
+	 -- Make a new lst with default size
+	 res := new(def_init_size);
+      else
+	 res := new(init_size);
+      end;
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   push(e:T):SAME is
+      -- Add a new element to the end, extending if necessary, return lst.
+      if insert < asize then
+	 res := self
+      else
+	 res := self.extend(2 * asize)
+      end; -- if
+      res[insert] := e; 
+      res.insert := res.insert + 1; 
+   end; -- push
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   size:INT is
+      -- Size of list
+      if (self = void) then
+	 res := 0;
+      else
+	 res := insert;
+      end; -- if
+   end; -- size
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   is_empty:BOOL is
+      -- True if list is empty.
+      res := (insert=0)
+   end; -- empty
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pop:T is
+      -- Return the top and shrink the list. Void if empty.
+      if is_empty then res:=void
+      else insert:=insert-1; res:=[insert]; [insert]:=void
+      end;
+   end; -- pop
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   top:T is
+      -- The value of the top of the list. Void if empty.
+      if is_empty then res:=void
+      else res:=[insert-1]
+      end; -- if
+   end; -- top
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   init_iterate is
+      -- Initialize 
+      ci := 0;
+   end; -- init_iterate
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   curr_item:T is
+      -- Return current value 
+      if (ci < insert) then
+	 res := self[ci];
+      end; -- if
+   end; -- curr_item
+      
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   next_item:T is
+      -- Return next value
+      if (ci + 1 < insert) then
+	 ci := ci + 1;
+	 res := self[ci];
+      end; -- if
+   end; -- next_item
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   prev_item:T is
+      -- Return prev value
+      if (ci - 1 >= 0) then
+	 ci := ci - 1;
+	 res := self[ci];
+      end; -- if
+   end; -- prev_item
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   push_unique(e:T):SAME is
+      -- Replace the first element found to be equal, if not
+      --   just add to the end.
+      k:INT := contains(e);
+      if (k >= 0) then
+	 [k] := e;
+	 res := self;
+      else 
+	 res := push(e);
+      end;
+   end; -- push_unique
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   append(list:SAME):SAME is
+      -- Append list of TYPEOB's or STMTOB's etc to current list
+      -- Test for "void" is essential to working of compiler.
+      if (list = void) then
+	 res := self;
+	 return;
+      end; -- if
+      res := self;
+      i:INT := 0;
+      sz:INT := list.insert;
+      loop until!(i >= sz);
+	 res := res.push(list[i]);
+	 i := i + 1;
+      end; -- loop
+   end; -- append
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   union(list:SAME):SAME is
+      -- Add unique elements to current list
+      -- *! Inefficient implementation 
+      i:INT := 0;
+      sz:INT := list.insert;
+      res := self;
+      loop until!(i >= sz);
+	 if (not_in(list[i])) then
+	    res := res.push(list[i]);
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- union
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   not_in(e:T):BOOL is
+      -- Returns true if "e" is not in current list
+      if (self = void) then
+	 res := true;
+	 return;
+      end; -- if
+      i:INT := 0;
+      res := true;
+      loop until!(i >= insert);
+	 if ([i] = e) then
+	    res := false;
+	    return;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- not_in
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   contains(e:T):INT is
+      -- Returns an index if "e" is in current list, -1 otherwise. 
+      if (self = void) then
+	 return;
+      end; -- if
+      i:INT := 0;
+      res := -1;
+      loop until!(i >= insert);
+	 if ([i] = e) then
+	    res := i;
+	    return;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- contains
+
+end; -- class LST
+
+--------------------------------------------------------------------

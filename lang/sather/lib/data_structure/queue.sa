@@ -1,0 +1,286 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/data_structure/queue.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Basic queue data structures. These classes actually
+--* implement the functionality of dequeues.
+--*
+--* CLASSES: FAST_QUEUE{T}, QUEUE{T}, QUEUE_TEST
+--*
+--* REQUIRED FILES: ../base/test.sa
+--*
+--* RELATED FILES:
+--* 
+--* RCS: $Id: queue.sa,v 1.1 1994/02/12 03:23:26 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:32 1993 (hws)
+--*  Oct 17 06:32 1993 (hws): Sather 1 syntax, copyright note
+--* Created: Sun Sep 23 16:00:46 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- There are both fast and clean versions of queues just as there are for
+-- stacks. `QUEUE{T}' hides an extra indirection which shields the user from
+-- having to reassign to the variable holding the queue, while
+-- `FAST_QUEUE{T}' requires such a reassignment.  Both structures actually
+-- support insertions and deletions at both the top and the bottom and so
+-- are actually examples of the more general deque structure.
+
+class FAST_QUEUE{T} is
+   -- Low-level queues (actually deques).
+
+   ARRAY{T};
+   attr t,b:INT;			-- Indices of the queue top and bottom.
+      -- `t' is where next element comes from.
+      -- `b' is where next insertion goes. 
+   
+   create:SAME is
+      -- An emtpy queue.
+      res:=new(4); t,b:INT:=3;
+   end; -- create
+   
+   is_empty:BOOL is
+      -- True if queue is empty.
+      res:=(t=b);
+   end; -- is_empty
+   
+   size:INT is
+      -- Number of elements currently in queue.
+      if t>=b then res:=t-b
+      else res:=t-b+asize end;
+   end; -- end
+   
+   double_size:FAST_QUEUE{T} is
+      -- Double the size of `self', copy the elements over. 
+      res:=extend(2*asize); res.t:=res.asize-1; res.b:=res.t;
+      if b<t then
+	 i:INT:=t; loop until!(i=b);
+	    res[res.b]:=[i];
+	    i:=i-1; res.b:=res.b-1;
+	 end; -- loop
+      else
+	 i:INT:=t; loop until!(i<0);
+	    res[res.b]:=[i];
+	    i:=i-1; res.b:=res.b-1;
+	 end; -- loop
+	 i:INT:=asize-1; loop until!(i=b);
+	    res[res.b]:=[i];
+	    i:=i-1; res.b:=res.b-1;
+	 end; -- loop
+      end;
+      clear; b:=0; t:=0;		-- help catch errors
+   end; -- double_size
+
+   insert_bottom(e:T):FAST_QUEUE{T} is
+      -- Insert an element at the bottom, expand if necessary.
+      if size>=asize-1 then res:=double_size else res:=self end;
+      res[res.b]:=e;
+      if res.b=0 then res.b:=res.asize-1 else res.b:=res.b-1 end;
+   end; -- insert_bottom
+
+   insert_top(e:T):FAST_QUEUE{T} is 
+      -- Insert an element at the top, (really a deque operation).
+      if size>=asize-1 then res:=double_size else res:=self end;
+      if res.t=res.asize-1 then res.t:=0 else res.t:=res.t+1 end;
+      res[res.t]:=e; 
+   end; -- insert_top
+   
+   top:T is
+      -- The top of the queue.
+      if is_empty then return end;
+      res:=[t];
+   end;
+
+   bottom:T is
+      -- The bottom of the queue.
+      if is_empty then return end;
+      if b=asize-1 then res:=[0] else res:=[b+1] end;
+   end;
+
+   pop_top:T is
+      -- Pop the top and return it.
+      if is_empty then return end;
+      res:=[t]; [t]:=void;
+      if t=0 then t:=asize-1 else t:=t-1 end;
+   end; -- pop_top
+   
+   pop_bottom:T is
+      -- The bottom of the queue (really a deque operation).
+      if is_empty then return end;
+      if b=asize-1 then b:=0 else b:=b+1 end;
+      res:=[b]; [b]:=void;
+   end; -- pop_bottom
+	 
+end; -- class FAST_QUEUE
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class QUEUE{T} is
+   -- Queues (actually deques).
+   -- The `QUEUE{T}' class has a similar interface to `FAST_QUEUE' but
+   -- is slightly less efficient and supports insertions of the form
+   -- `q.insert_top(e)' rather than `q:=q.insert_top(e)'.
+
+   attr q:ARRAY{T};
+   attr t,b:INT;			-- Indices of the top and bottom of the queue.
+      -- `t' is where next element comes from.
+      -- `b' is where next insertion goes. 
+   
+   create:SAME is
+      -- An emtpy queue.
+      res:=new; res.q:=ARRAY{T}::new(4); t,b:INT:=3;
+   end; -- create
+   
+   is_empty:BOOL is
+      -- True if queue is empty.
+      res:=(t=b);
+   end; -- is_empty
+   
+   size:INT is
+      -- Number of elements currently in queue.
+      if t>=b then res:=t-b
+      else res:=t-b+q.asize end;
+   end; -- size
+   
+   double_size is
+      -- Double the size of q, copy the elements over. 
+      oq:ARRAY{T}:=q; q:=oq.extend(2*oq.asize); 
+      ot:INT:=t; t:=q.asize-1; 
+      ob:INT:=b; b:=t;
+      if ob<ot then
+	 i:INT:=ot; loop until!(i=ob);
+	    q[b]:=oq[i];
+	    i:=i-1; b:=b-1;
+	 end; -- loop
+      else
+	 i:INT:=ot; loop until!(i<0);
+	    q[b]:=oq[i];
+	    i:=i-1; b:=b-1;
+	 end; -- loop
+	 i:INT:=oq.asize-1; loop until!(i=ob);
+	    q[b]:=oq[i];
+	    i:=i-1; b:=b-1;
+	 end; -- loop
+      end;
+      oq.clear;			-- help catch errors
+   end; -- double_size
+
+   insert_bottom(e:T) is
+      -- Insert an element at the bottom, expand if necessary.
+      if size>=q.asize-1 then double_size end;
+      q[b]:=e;
+      if b=0 then b:=q.asize-1 else b:=b-1 end;
+   end; -- insert_bottom
+   
+   top:T is
+      -- The top of the queue.
+      if is_empty then return end;
+      res:=q[t];
+   end; -- top
+
+   bottom:T is
+      -- The bottom of the queue.
+      if is_empty then return end;
+      if b=q.asize-1 then res:=q[0] else res:=q[b+1] end;
+   end; -- bottom
+
+   pop_top:T is
+      -- Pop the top and return it.
+      if is_empty then return end;
+      res:=q[t]; q[t]:=void;
+      if t=0 then t:=q.asize-1 else t:=t-1 end;
+   end; -- pop_top
+   
+   pop_bottom:T is
+      -- The bottom of the queue (really a deque operation).
+      if is_empty then return end;
+      if b=q.asize-1 then b:=0 else b:=b+1 end;
+      res:=q[b]; q[b]:=void;
+   end; -- pop_bottom
+   
+   insert_top(e:T) is 
+      -- Insert an element at the top, (really a deque operation).
+      if size>=q.asize-1 then double_size end;
+      if t=q.asize-1 then t:=0 else t:=t+1 end;
+      q[t]:=e; 
+   end; -- insert_top
+	 
+end; -- class QUEUE
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class QUEUE_TEST is
+   -- Test `FAST_QUEUE' and `QUEUE'.
+   TEST;
+   
+   main is
+      -- Test `FAST_QUEUE' and `QUEUE'.
+      fast_queue_test; queue_test;
+   end; -- main
+   
+   fast_queue_test is
+      -- Test `FAST_QUEUE'.
+      class_name("FAST_QUEUE");
+      f:FAST_QUEUE{INT}:=f.create;
+      test("size 1", f.size.to_s, "0");
+      test("is_empty 1", f.is_empty.to_s, "T");
+      f:=f.insert_bottom(1);
+      test("top 1", f.top.to_s, "1");
+      test("bottom 1", f.bottom.to_s, "1");
+      test("is_empty 2", f.is_empty.to_s, "F");
+      f:=f.insert_bottom(2); f:=f.insert_bottom(3);
+      f:=f.insert_bottom(4); f:=f.insert_bottom(5);
+      test("size 2", f.size.to_s, "5");
+      test("pop_top 1", f.pop_top.to_s, "1");
+      test("pop_bottom 1", f.pop_bottom.to_s, "5");
+      test("pop_top 2", f.pop_top.to_s, "2");
+      test("pop_top 3", f.pop_top.to_s, "3");
+      test("pop_top 4", f.pop_top.to_s, "4");
+      test("is_empty 3", f.is_empty.to_s, "T");
+      f:=f.insert_top(1); f:=f.insert_top(2); f:=f.insert_top(3);
+      test("pop_top 5", f.pop_top.to_s, "3");
+      test("pop_top 6", f.pop_top.to_s, "2");
+      test("pop_top 7", f.pop_top.to_s, "1");
+      finish;
+   end; -- fast_queue_test
+   
+   queue_test is
+      -- Test `QUEUE'.
+      class_name("QUEUE");
+      f:QUEUE{INT}:=f.create;
+      test("size 1", f.size.to_s, "0");
+      test("is_empty 1", f.is_empty.to_s, "T");
+      f.insert_bottom(1);
+      test("top 1", f.top.to_s, "1");
+      test("bottom 1", f.bottom.to_s, "1");
+      test("is_empty 2", f.is_empty.to_s, "F");
+      f.insert_bottom(2); f.insert_bottom(3);
+      f.insert_bottom(4); f.insert_bottom(5);
+      test("size 2", f.size.to_s, "5");
+      test("pop_top 1", f.pop_top.to_s, "1");
+      test("pop_bottom 1", f.pop_bottom.to_s, "5");
+      test("pop_top 2", f.pop_top.to_s, "2");
+      test("pop_top 3", f.pop_top.to_s, "3");
+      test("pop_top 4", f.pop_top.to_s, "4");
+      test("is_empty 3", f.is_empty.to_s, "T");
+      f.insert_top(1); f.insert_top(2); f.insert_top(3);
+      test("pop_top 5", f.pop_top.to_s, "3");
+      test("pop_top 6", f.pop_top.to_s, "2");
+      test("pop_top 7", f.pop_top.to_s, "1");
+      finish;
+   end; -- queue_test
+   
+end; -- class QUEUE_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

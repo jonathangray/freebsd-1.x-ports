@@ -1,0 +1,442 @@
+.TH CS 1V "4 July 1993"
+.SH NAME
+cs \- Sather compiler
+
+.SH SYNOPSIS
+.B cs
+.I class
+[
+.I options
+]
+.SH DESCRIPTION 
+.LP
+.B cs 
+is a compiler for the Sather language.  It compiles Sather code
+into C code and then passes it to the C compiler to produce an
+executable file named 
+.I class
+in the current directory (unless the
+.B -dir
+compiler option is used to specify a different directory).
+.LP
+Sather is an object-oriented programming language designed for
+efficiency and reusability. It has a clean and simple syntax,
+parameterized classes, object-oriented dispatch, multiple inheritance,
+strong typing and garbage collection. Sather supports the "programming
+by contract" metaphor of Eiffel. The compiler produces code which
+compares favourably with Eiffel and C++. A description: S.  Omohundro
+.I The Sather Language,
+is available in 
+.SB $SATHER_HOME/doc/manual.{ps,txt}.
+.LP
+The compiler requires a file containing compiler commands, by default
+this is a file named 
+.IB class \.sather
+or 
+.B \.sather
+in the current directory. If no such file exists, cs will assume a
+minimal 
+.B \.sather
+file consisting of the line
+.TP 1
+\fB    source_files: \fI class\fP.sa
+.LP
+Alternatively a
+.B \.sather
+file can be specified by the 
+.B -com
+option (see below).  This file consists of a
+series of specifications among which white-space and Sather style
+comments may be interspersed. Keywords in this file are surrounded by
+parentheses and are followed by white-space separated lists. The
+keywords are:
+.TP 1i
+.B source_files:
+Followed by a list of files in which Sather source
+code appears.
+.TP 
+.B object_files:
+Followed by a list of object files which will be linked
+with the Sather generated code.
+.TP
+.B cflags:
+C compiler flags to be enabled during compilation (e.g. -O, -g). 
+This key can be overridden by the 
+.B \-cflags
+compiler option.
+.TP
+.B cc:
+The C compiler to use for compiling the intermediate C code.
+By default, uses 
+.BR cc (1). 
+Can be overridden by the 
+.B \-cc
+compiler option.
+.TP
+.B name:
+Followed by a name and a feature specification of the form
+.IR CLASS::feature .  
+The name will be used in the generated C files to
+refer to the specified feature. This can be used to ensure correct
+linkage to external C code.
+.TP
+.B macro:
+Followed by a quoted string and one or more routine names.
+Whenever the name(s) occur(s) in a generated C file the string will be
+inserted near the beginning of that file. This can be used to inline
+functions in the generated C code if the string is a 
+.I #define 
+statement, or to 
+.I #include 
+a C header file where ever a function is called.
+.TP
+.B include:
+Followed by a list of files in the 
+.B \.sather 
+format. The effect is as if their contents were textually included.
+.TP
+.B sather_home:
+Followed by the directory which contains system files.
+By default 
+.B cs uses the value of the environment variable 
+.SB $SATHER_HOME
+or if this variable is undefined, the pathname of the sather
+installation directory. Can be overridden by the 
+.B \-hom
+compiler option.
+.LP
+All sections are optional and the order of their appearance is
+arbitrary. For most keys, multiple sections with the same key behave
+as if their lists had been appended. There must be a separate 
+.B name:
+key for each name defined.  The 
+.B include:
+facility makes it convenient to share system wide information. 
+.LP
+The argument 
+.I class
+is the name of the main class, i.e., a known class containing a routine named
+.I main
+. At the same time,
+.I class
+is the name of the executable (exuting this main routine).
+The case is ignored: the Sather compiler requires class names to be
+upper-case; the compiler will automatically convert
+.I class
+to uppercase when searching the main class.
+However the executable will be named exactly in the case of 
+.I class
+. In the call of the main routine,
+any references to 
+.I self 
+will have the value 
+.IR void . 
+If this class is named
+.IR INIT , 
+then the behaviour is exactly as if 
+.I INIT::main 
+were called.
+.LP
+The routine 
+.I main 
+in the class that the compiler is called on may either have no 
+arguments or a single argument of type 
+.I ARRAY{STR}. 
+If no argument is specified then any command line arguments the user
+might provide will be ignored. If an argument is provided then it will
+be filled in with an array of the strings making up the command line.
+The 
+.I asize
+of the array will be one larger than the number of command
+line arguments (similar to 
+.I argc 
+in C). The zeroth entry of the array will be the string used to
+invoke execution of the program. The successive entries will be the
+command line arguments.
+.LP
+If 
+.I main 
+is declared to return an 
+.IR INT , 
+then the value of 
+.I res 
+at program termination will become the return status of the program.
+.LP
+.B cs
+creates a directory with a name of the form 
+.IB class .cs 
+in the current directory (unless the 
+.B \-dir 
+compiler option is used to specify a different directory).  This
+directory will contain the generated C files, makefiles, and object
+files. 
+.SH OPTIONS
+.TP 1i
+.B \-all 
+Generate C code for all Sather classes listed in the
+.B .sather 
+file. Generates code even for routines which are never called and
+classes which are not used directly but are only inherited from.
+.TP
+.B \-ansi 
+Generate standard (ANSI) C code.
+.TP
+\fB\-cc\fP \fI<c compiler>\fP
+Use the specified C compiler. This defaults to 
+.BR cc (1) 
+and overrides any
+.B cc
+key in the 
+.B \.sather 
+file.
+.TP
+\fB\-cflags\fP \fI<flags>\fP
+Pass the given flags to the compiler generated make file. This
+overrides the 
+.B \.sather cflags
+key.
+.TP
+.B \-chk
+Cause the generated code to contain runtime checks for accesses out of
+array bounds, for attempts to access attributes of void objects, and
+to perform runtime type checking for reverse assignments. This catches
+the only three ways that a Sather program can dump core (assuming any
+included C code is correct). If one of these problems occurs the
+runtime system will print an error message describing the error and
+the source code location. It is often convenient to compile with this
+option during initial debugging of a program. It may be used
+independently of the 
+.B \-sdb 
+option.
+.TP
+\fB\-com\fP \fI<filename>\fP
+Read the commands from 
+.I <filename> 
+instead of from
+.B .sather 
+in the current working directory. 
+.TP
+\fB\-dir\fP \fI<directory>\fP
+Both the 
+.IB class .cs 
+subdirectory and compiled code will be installed in 
+.I <directory> 
+instead of the current directory.  
+.TP
+\fB\-gc\fP \fIyes\fP
+.TP
+\fB\-gc\fP \fIno\fP
+Do/do not include garbage collection code. The default depends upon
+how the compiler was installed.
+.TP
+.B \-gen
+Regenerate the automatically included basic library files instead of
+using stored object files.
+.TP
+\\fB\-hom\fP \fI<directory>\fP
+This overrides the 
+.B sather_home
+key of 
+.B \.sather.
+The default is the value of the environment variable
+.SB $SATHER_HOME 
+or, if this variable is undefined, the pathname of the sather
+installation directory burnt into the compiler at installation time. 
+This value is used in finding the pre-compiled runtime system and
+other files. Also it is exported as the value of the environment
+variable 
+.SB $SATHER_HOME
+that may be used in pathnames.
+.TP
+.B \-info
+Generate runtime class name information that is accessible from within
+programs through the 
+.I SYS 
+class.
+.TP
+.B \-kr
+Generate old style Kerninghan & Ritchie (K&R, 1st edition) C code.
+.TP
+.B \-ncs
+Treat the current compilation as completely new.  If there is any
+problem in re-compilation (e.g. due to a bug), this option may clear 
+the problem.
+.TP
+\\fB\-make\fP \fIno\fP
+Skip the make step, i.e., generate C code but don't compile it.
+.TP
+\\fB\-make\fP \fI<make>\fP
+Use the specified make facility to compile the generated C code.
+.TP
+.B \-pds
+Print descendent information to be used in certain classes. 
+.TP
+.B \-sdb
+Compile a version of a program with the information
+needed by sdb to do symbolic debugging. 
+.TP
+.B \-sys    
+.B cs 
+reads a default 
+.B \.sather 
+file from 
+.SB $SATHER_HOME/sys
+for some of the predefined classes.  This is useful when we want to
+test new predefined classes or alternative runtime systems while
+leaving the current runtime available to other users.  This option is
+not useful for general Sather programmers.
+.TP
+.B \-ver
+For people who would like to look at the generated
+C code, this provides more understandable code for
+accessing object attributes. 
+.TP
+.B \-w
+Warnings only. The 
+.B cs 
+output will be less verbose. This flag is not passed on to the C
+compiler. Use the 
+.B cflags
+key in 
+.B \.sather 
+or the 
+.B \-cflags 
+option above.
+.TP
+\fB\-x\fP \fI<environment>\fP
+Cross compile a version of the program for the architecture and C
+compiler specified by \fI<environment>\fP. The default is the value of
+the environment variable 
+.SB SATHER_ENVI 
+or, if this variable is undefined, the environment determined by the
+configure script and burnt into the compiler at installation time. 
+.LP
+.SH ENVIRONMENT
+.TP 20
+.SB SATHER_HOME
+This is the path of the top of the installed Sather distribution tree.
+.B cs 
+uses this path to find the runtime system files and files
+containing classes in the standard library. By default this is the
+Sather installation path. Can be overridden by the 
+.B sather_home
+key in the 
+.B \.sather 
+file or the 
+.B \-hom 
+compiler option.
+.TP 20
+.SB SATHER_MAKE
+The name of the
+.B make
+command that will be run on the C files generated by the Sather
+compiler. 
+.TP 20
+.SB SATHER_ENVI 
+A keyword used to identify the Sather development environment
+(architecture + operating system + C compiler).
+.SH FILES
+.PD 0
+.TP 20
+.B \.sather
+A file containing a list of Sather source files to
+be compiled and options for the compiler.
+.TP
+.B sys/sys_dot_sather
+A .sather file which is automatically read by the compiler.
+.TP
+.IB class .cs/* 
+C code generated by the compiler and their resulting object files,
+run-time system object files and make files
+.TP
+.I class
+executable output file
+.SH SEE ALSO
+.PD 0
+.BR cc (1),
+.BR make (1)
+.TP
+.B sdb
+(see
+.SB $SATHER_HOME/doc/sdb_info.txt
+)
+.TP
+S. Omohundro, 
+.IR "The Sather Language" , 
+(provided with the Sather distribution 
+as 
+.SB $SATHER_HOME/doc/manual.{ps,txt}
+).
+.LP
+.SH DIAGNOSTICS
+.LP
+The diagnostics produced by the Sather compiler provide a source file
+name, line number and an indication of the cause of the error.
+.LP
+The diagnostics produced by the runtime system provide a source file
+name, line number and dump of the call stack.
+.LP
+.SH NOTES
+.LP
+Classes 
+.I SYS
+and 
+.I UNIX 
+are predefined, but not read by 
+.B cs 
+for every compilation.  
+The reason is that these classes require the use of several 
+other data structures which will increase the number of
+files read by 
+.BR cs .
+.LP
+The Sather distribution includes a debugger,
+.BR sdb ,
+built on the gnu C debugger:
+.BR gdb .
+
+.LP
+A sather-mode for emacs and epoch is supplied with the Sather
+distribution. It provides extensive support for code development,
+class browsing and compilation. There is also a sdb-mode to support
+debugging. (See
+.SB $SATHER_HOME/doc/sa_emacs.txt
+).
+
+.SH BUGS
+.LP
+.B cs
+cannot always intuit a missing 
+.I end;
+clause as they occur in many contexts.  This can result in error
+messages such as:
+.LP
+.RS 1i
+\fIfoo.sa, line 179: syntax error at or near character / EOF \fR
+.RE
+.PD 0
+.LP
+referring to the last line in the file,
+or that refer to source lines that may be at some distance from the
+real error: e.g. a subsequent class declaration may be (incorrectly)
+interpreted as a nested class and cause an error.
+.LP
+.SH AUTHORS
+.LP
+.B cs 
+was written by Chu-Cheow Lim and Stephen Omohundro,
+International Computer Science Institute (ICSI), Berkeley.
+
+Jeff Bilmes and Heinz W. Schmidt (ICSI), wrote initial patches and
+extensions to the compiler. 
+
+This version is a major revision developed by Heinz Schmidt and Oscar
+Bosman, Commonwealth Scientific and Industrial Research Organisation,
+Div. Information Technology, Australia.
+
+This man page was written by Oscar Bosman, Commonwealth Scientific and
+Industrial Research Organisation, Div. Information Technology,
+Australia.
+
+Copyright (C) Commonwealth Scientific and Industrial Research
+Organisation, Australia, 1992, 1993.

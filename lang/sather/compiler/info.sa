@@ -1,0 +1,604 @@
+-- -*- Mode: Sather;  -*-
+-- File: info.sa
+-- Author: Chu-Cheow Lim and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION:
+--* Holds information about an instantiated class or class definition.
+--*
+--* RCS: $Id: info.sa,v 1.1 1994/02/12 03:21:50 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 05:02 1993 (hws)
+--*  Oct 17 04:46 1993 (hws): Sather 1 syntax, copyright note
+--* Created: Mon Jan  7 09:33:08 1991
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class CLASS_STAT is
+   
+   attr index:INT;			-- Class index
+   attr ctype:INT;			-- C type of this class
+   attr def_time_stamp:TIME_INT;	
+      -- Time when the class was last changed.  This time is obtained
+      -- from the time when the file containing the last is last changed.
+      -- Since the C class may be distributed among several files, this
+      -- value for the C class (or any class with multiple definitions) 
+      -- is 0, and for instantiated classes, the time of the class
+      -- class definition.
+   
+   attr time_stamp:TIME_INT;
+   -- Refer to description of "time_stamp" attribute in CLASSOB_S.
+
+   attr relevant:BOOL;
+   -- This value is "true" if this class is used in current compilation.
+   
+   attr filename:STR;
+   -- Name of C file (without suffix) containing code for Sather class.
+
+   attr callees:INT_HASH_SET;
+      -- Set of classes whose features is referred to by current class.
+
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(co:CLASSOB_S):SAME is
+      res := new;
+      res.index := co.index;
+      res.def_time_stamp := co.def_time_stamp;
+      res.time_stamp := co.time_stamp;
+      res.ctype := co.ctype;
+      res.filename := co.cfilename;
+      res.callees := co.callees;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   update(co:CLASSOB_S) is
+      index := co.index;
+      def_time_stamp := co.def_time_stamp;
+      time_stamp := co.time_stamp;
+      ctype := co.ctype;
+      filename := co.cfilename;
+      callees := co.callees;
+   end; -- create
+
+end; -- class CLASS_STAT
+
+--------------------------------------------------------------------
+
+class CLASS_STAT_TBL is
+
+   shared version:INT := INSTALL_CONSTS::deep_save_version;
+   -- A new compilation will be started if the version is different.
+   -- We only need to change the version if a newer data structure for
+   -- incremental compilation is created.
+
+   attr map_str_to_int:STR_HASH_MAP{INT};
+      -- Map full class name to class index.  This contains the mapping
+      -- for all the class names whether they are marked used or not.
+   
+   attr class_stats:ARRAY{CLASS_STAT};
+      -- Each object in the list contains the update statistics of the
+      -- corresponding instantiated class.
+
+-- Information from compiler commands file
+   attr user_cfile_to_time:STR_HASH_MAP{INT};
+      -- Keep track of user-specified C files and the corresponding time.
+      -- Delete old user C files if necessary.
+   attr sather_home:STR;
+   -- Updated from "COMPILER_OPTIONS::sather_home".
+   
+   attr c_compiler:STR;
+   -- Refer to "print_makefile" routine in SATHER_SEMANT for how
+   -- the value is derived.  If this is void, the default C compiler 
+   -- is used.
+   
+   attr cc_flags:STR_SET;
+   -- Set of C compiler flags specified by "(cc_flags)" compiler command.
+   attr keys_set:CLASS_KEY_SET;
+      -- List of <class index, key id> pairs given in compiler commands
+      -- "(debug_key)" in previous compilation.
+   attr c_macros:INT_TO_INTSET;
+   -- Contains mapping <integer, integer set>.  The first integer is
+   -- string index of the C name, and the set consists of indices of
+   -- C macro strings for the C name.
+
+   attr c_to_sather_names:STR_HASH_MAP{INT};
+      -- For each <string, integer> pair, the string is the C name of
+      -- the feature, the integer is encoded from the <class index,
+      -- index of feature name> pair.  This value is supposed to be
+      -- non-void.
+   
+-- Other information that affects incremental compilation.
+   attr chk_opt:BOOL;
+   attr bro_opt:BOOL;
+   attr all_opt:BOOL;
+   attr gen_opt:BOOL;
+   attr ver_opt:BOOL;
+   attr prev_target_dir:STR;
+   
+   -- Attributes which are relevant only during execution and hence
+   -- restored values may not be correct.
+   attr new_p:BOOL;
+      -- This table is new if there is no previous-compilation information
+      -- when the table is created.
+   attr new_cfiles_recorded:BOOL;
+   -- The value is "true" if the user C files for current compilation
+   -- has been recorded.
+
+   attr cfiles_to_be_deleted:STR_HASH_MAP{INT};
+   -- This consists of a list of user C file-names from previous compilation,
+   -- but does not exist in current compilation.
+   -- NOTE: If a C file is updated from previous compilation, then we do not
+   --       want to delete it and we only make a symbolic link to it.
+
+   -- IMPORTANT: The STR_TO_INT objects must not have any deleted objects
+   --            because deleted objects are represent by a non-zero invalid
+   --            integer.
+   
+   attr last_class_ind:INT;
+      -- The last index in the global CLASSOB_S_TABLE.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(fname:STR):SAME is
+      -- Read the tables from given file if it is applicable.  Otherwise,
+      -- create empty tables.
+      f:FILE_DESCRIPTOR := FILE_DESCRIPTOR::open_for_read(fname);
+      if (f.error) then
+	 res := alloc_create;
+      else
+	 res := PERSIST_OB::deep_restore_vn(f, version);
+	 if (res = void) then
+	    -- Restored object is void, so allocate an actual object to
+	    -- be returned.
+	    res := alloc_create; return;
+	 end; -- if
+	 if (res.type /= type) then
+	    -- Restored object is of the wrong class, so discard object
+	    -- and reallocate space for the tables.
+	    res := alloc_create; return;
+	 end; -- if
+	 -- Mark restored object as not being new.
+	 res.new_p := false;
+	 f.close;
+      end; -- if
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   alloc_create:SAME is
+      -- Allocate space for the tables.
+      res := new;
+      res.new_p := true;
+      res.new_cfiles_recorded := false;
+      res.map_str_to_int := STR_HASH_MAP{INT}::create;
+      res.class_stats := ARRAY{CLASS_STAT}::new(40);
+	 -- Since we have about 20 predefined classes, we allocate space for
+	 -- about twice this number of classes.
+      res.user_cfile_to_time := STR_HASH_MAP{INT}::create;
+      res.keys_set := CLASS_KEY_SET::create(1);
+      res.c_macros := INT_TO_INTSET::create;
+      res.c_to_sather_names := STR_HASH_MAP{INT}::create;
+   end; -- alloc_create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   display(f:FILE) is
+      -- Display the information to verify them.
+      t:GENERAL_HASH{STR_HASH_MAP_ELT{INT}} := map_str_to_int.tbl;
+      t_curs:GENERAL_HASH_CURSOR{STR_HASH_MAP_ELT{INT}} :=
+	 GENERAL_HASH_CURSOR{STR_HASH_MAP_ELT{INT}}::create(t);
+      t_curs.first;
+      loop until!(t_curs.is_done);
+	 elt:STR_HASH_MAP_ELT{INT} := t_curs.item;
+	 index:INT := elt.val;
+	 if (index < class_stats.asize) and (index > 0) then
+	    c_stat:CLASS_STAT := class_stats[index];
+	    if (c_stat /= void) then
+	       f.s("Class = <").s(elt.str).c(',').i(index).
+	         s(">;  definition time-stamp  = ");
+	       if (c_stat.def_time_stamp /= 0) then
+		  f.s(c_stat.def_time_stamp.ctime);
+	       else
+		  f.c('0');
+	       end; -- if
+	       f.s("\n\tcomputed time-stamp = ");
+	       if (c_stat.time_stamp /= 0) then
+		  f.s(c_stat.time_stamp.ctime);
+	       else
+		  f.c('0');
+	       end; 
+	       f.c('\n');
+	    end; -- if
+	 else
+	    f.s("Class = <").s(elt.str).c(',').i(index).
+	      s("> has no update statistics\n");
+	 end; -- if
+	 t_curs.next;
+      end; -- loop
+      t := user_cfile_to_time.tbl;
+      t_curs := GENERAL_HASH_CURSOR{STR_HASH_MAP_ELT{INT}}::create(t);
+      t_curs.first;
+      loop until!(t_curs.is_done);
+	 elt:STR_HASH_MAP_ELT{INT} := t_curs.item;
+	 f.s("User C file = \"").
+	   s(elt.str).
+	   s("\"; time = ");
+	 file_time:TIME_INT := elt.val;
+	 f.s(file_time.ctime).c('\n');
+	 t_curs.next;
+      end; -- loop
+   end; -- display
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   display_strings(f:FILE) is
+      t:GENERAL_HASH{STR_HASH_MAP_ELT{INT}} := map_str_to_int.tbl;
+      t_curs:GENERAL_HASH_CURSOR{STR_HASH_MAP_ELT{INT}} := GENERAL_HASH_CURSOR{STR_HASH_MAP_ELT{INT}}::create(t);
+      t_curs.first;
+      loop until!(t_curs.is_done);
+	 elt:STR_HASH_MAP_ELT{INT} := t_curs.item;
+	 f.s("Class name = ").s(elt.str).s("; Index = ").i(elt.val).c('\n'); 
+	 t_curs.next;
+      end; -- loop
+   end; -- display_strings
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   persist(fname:STR) is
+      f:FILE_DESCRIPTOR := FILE_DESCRIPTOR::open_for_write(fname);
+      if (f.error) then
+	 ERR::s("Error in opening \"").s(fname).s("\"; object not saved\n");
+      else
+	 PERSIST_OB::deep_save_vn(self, f, version);
+	 f.close;
+      end; -- if
+   end; -- persist
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_ind(cn:STR):INT is
+      res := map_str_to_int.get(cn);
+   end; -- get_ind
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_cfile_time(fn:STR):INT is
+      res := user_cfile_to_time.get(fn);
+   end; -- if
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   mark_relevant(co:CLASSOB_S) is
+      i:INT := co.index;
+      -- To double-check the previous algorithm, we also compute the
+      -- index from the full class name.
+      s:STR := co.full_name;
+      tmp_i:INT := map_str_to_int.get(s);
+      if (tmp_i <= 0) then
+	 -- Do nothing if there's no previous information about this class.
+      else
+	 if (i /= tmp_i) then
+	    ERR_INFO::error_exit("Compiler error (code 1) in incremental compilation information; Please report.\n");
+	 end; -- if
+	 if (i > 0) and (i < class_stats.asize) then
+	    c_stat:CLASS_STAT := class_stats[i];
+	    if (c_stat /= void) then
+	       c_stat.relevant := true;
+	    end; -- if
+	 else
+	    class_stats := class_stats.extend(2 * class_stats.asize);
+	    mark_relevant(co); 
+	 end; -- if
+      end; -- if
+   end; -- mark_relevant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   irrelevant_classes:LIST{STR} is
+      -- This routine guarantees to return a non-void list which may be
+      -- empty.
+      res := LIST{STR}::create(10);
+      t:GENERAL_HASH{STR_HASH_MAP_ELT{INT}} := map_str_to_int.tbl;
+      t_curs:GENERAL_HASH_CURSOR{STR_HASH_MAP_ELT{INT}} := GENERAL_HASH_CURSOR{STR_HASH_MAP_ELT{INT}}::create(t);
+      t_curs.first;
+      loop until!(t_curs.is_done);
+	 elt:STR_HASH_MAP_ELT{INT} := t_curs.item;
+	 index:INT := elt.val;
+	 if (index < class_stats.asize) and (index > 0) then
+	    c_stat:CLASS_STAT := class_stats[index];
+	    if (c_stat /= void) then
+	       if not (c_stat.relevant) then
+		  res := res.push(c_stat.filename);
+	       end; -- if
+	    end; -- if
+	 else
+	 end; -- if
+	 t_curs.next;
+      end; -- loop
+   end; -- irrelevant_classes
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   irrelevant_cfiles:LIST{STR} is
+      -- Returns a list of user C files to be deleted.      
+      -- This routine guarantees a non-void LST being returned.
+      res := LIST{STR}::create(5);	-- Random size.
+      if (cfiles_to_be_deleted /= void) then
+	 t:GENERAL_HASH{STR_HASH_MAP_ELT{INT}} := cfiles_to_be_deleted.tbl;
+	 t_curs:GENERAL_HASH_CURSOR{STR_HASH_MAP_ELT{INT}} := GENERAL_HASH_CURSOR{STR_HASH_MAP_ELT{INT}}::create(t);
+	 t_curs.first;
+	 loop until!(t_curs.is_done);
+	    elt:STR_HASH_MAP_ELT{INT} := t_curs.item;
+	    res := res.push(elt.str); 
+	    t_curs.next;
+	 end; -- loop
+      end; -- if
+   end; -- irrelevant_cfiles
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   clear is
+      -- Clear the table containing mapping of class names to indices, and
+      -- delete all the CLASS_STAT objects.
+      map_str_to_int := STR_HASH_MAP{INT}::create;
+      user_cfile_to_time := STR_HASH_MAP{INT}::create;
+      i:INT;
+      sz:INT := class_stats.asize;
+      loop until!(i >= sz);
+	 class_stats[i] := void;
+	 i := i + 1;
+      end; -- loop
+   end; -- clr
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   record_mapping(fn:STR; index:INT) is
+      map_str_to_int.insert(fn.copy, index);
+   end; -- record_mapping
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   record_new_cfiles(cfiles:LIST{STR}):ARRAY{BOOL} is
+      -- NOTE:  The records of user C files is based solely on file names.
+      --        Hence if a file has been updated but exists in previous
+      --        compilation, it is NOT recorded for deleting.
+
+      i:INT;
+      csz:INT;
+      if (cfiles /= void) then
+	 csz := cfiles.insert;
+      end; -- if
+      res := ARRAY{BOOL}::new(csz);
+      new_user_cfile_to_time:STR_HASH_MAP{INT} := STR_HASH_MAP{INT}::create;
+      cfiles_to_be_deleted := DEEP_COPY::deep_copy(user_cfile_to_time);
+
+
+      loop until!(i >= csz);
+	 ith_cfile:STR := cfiles[i];
+	 cfiles_to_be_deleted.delete(ith_cfile);
+	 old_time:TIME_INT := user_cfile_to_time.get(ith_cfile);
+	 cfile_stat:FILE_STAT := FILE_STAT::create_from_fn(ith_cfile);
+	 if (cfile_stat.status = -1) then
+	    ERR::s("Warning: Cannot get status of file \"").
+	         s(ith_cfile).
+	         s("\"\n");
+	 else
+	    new_time:TIME_INT := cfile_stat.filestat.st_mtime;
+	    if (old_time = new_time) then
+	       -- The C file is known from previous compilation. 
+	       res[i] := true;
+	    end; -- if
+	    new_user_cfile_to_time.insert(ith_cfile.copy, new_time);
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+
+      -- We have recorded the C files for current compilation and their
+      -- time-stamps.
+      user_cfile_to_time := new_user_cfile_to_time;
+      new_cfiles_recorded := true;
+   end; -- record_new_cfiles
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   record_class_stat(co:CLASSOB_S) is
+      index:INT := co.index;
+      if (index > 0) and (index < class_stats.asize) then
+	 c_stat:CLASS_STAT := class_stats[index];
+	 if (c_stat = void) then
+	    c_stat := CLASS_STAT::create(co);
+	    class_stats[index] := c_stat;
+	    return;
+	 end; -- if
+	 c_stat.update(co);
+      else
+	 class_stats := class_stats.extend(2 * class_stats.asize);
+	 record_class_stat(co);
+      end; -- if
+   end; -- record_class_stat
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   record_curr_compilation is
+      -- Record the time-stamps information of current compilation.
+      -- NOTE: Only generated classes are recorded.  The criteria
+      --       is the same as that in "all_class_inst_cprint" in 
+      --       SATHER_SEMANT.
+      i:INT;
+      sz:INT := (GLOBALS::class_inst).next_ind;
+      clear;
+      loop until!(i >= sz);
+	 co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	 if (co /= void) then
+	    record_mapping(co.full_name, co.index);
+	    if (GLOBAL_PROC::handle_class_p(co)) then
+	       record_class_stat(co);
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      last_class_ind := sz;
+
+      -- This is relevant only during execution, hence we simple
+      -- make it void.
+      cfiles_to_be_deleted := void;
+      
+      sather_home := (COMPILER_OPTIONS::sather_home).copy;
+      c_compiler := (GLOBALS::c_compiler).copy;
+      if (GLOBALS::cc_flags /= void) then
+	 i:INT := 0;
+	 sz:INT := (GLOBALS::cc_flags).asize;
+	 new_cc_flags:STR_SET := STR_SET::create;
+	 loop until!(i >= sz);
+	    new_cc_flags := new_cc_flags.insert((GLOBALS::cc_flags)[i]);
+	    i := i + 1;
+	 end; -- loop
+	 cc_flags := new_cc_flags;
+      else
+	 cc_flags := void;
+      end; -- if
+--      OUT::s("OLD KEYS:\n");
+--      keys_set.display;
+--      OUT::s("NEW KEYS:\n");
+--      (GLOBALS::keys_set).display;
+      keys_set := GLOBALS::keys_set;
+      c_macros := GLOBALS::c_macros;
+      c_to_sather_names := GLOBALS::name_mappings;
+   end; -- record_curr_compilation
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   at_index(i:INT):CLASS_STAT is
+      -- Guarantee to return non-void object.
+      if (i > 0) and (i < class_stats.asize) then
+	 res := class_stats[i];
+      else
+	 class_stats := class_stats.extend(2 * class_stats.asize);
+	 res := at_index(i);
+      end; -- if
+   end; -- at_index
+
+end; -- class CLASS_STAT_TBL
+
+--------------------------------------------------------------------
+
+class FILE_STAT is
+   -- Contains a status bit to indicate if the information has been
+   -- correctly read, and a pointer to a C structure.
+   attr status:INT;
+   attr filestat:C_FILESTAT;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(f:FILE):SAME is
+      -- The caller must check that file has been properly opened.
+      res := new;
+      res.filestat := C_FILESTAT::create;
+      res.status := C::stat(C::str_ptr_(f.name), res.filestat);
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create_from_fn(s:STR):SAME is
+      -- Same as "create", but using a file name.
+      res := new;
+      res.filestat := C_FILESTAT::create;
+      res.status := C::stat(C::str_ptr_(s), res.filestat);
+   end; -- create_from_fn
+
+end; -- class FILE_STAT
+
+--------------------------------------------------------------------
+
+class C_FILESTAT is
+   F_OB;
+
+-- Constructor --
+   create:SAME is
+      res := C::create_c_filestat;
+   end; -- create
+   
+-- Readers --
+   st_dev:INT is res := C::c_st_dev(self); end;
+   st_ino:INT is res := C::c_st_ino(self); end;
+   st_mode:INT is res := C::c_st_mode(self); end;
+   st_nlink:INT is res := C::c_st_nlink(self); end;
+   st_uid:INT is res := C::c_st_uid(self); end;
+   st_gid:INT is res := C::c_st_gid(self); end;
+   st_rdev:INT is res := C::c_st_rdev(self); end;
+   st_size:INT is res := C::c_st_size(self); end;
+   st_atime:TIME_INT is res := C::c_st_atime(self); end;
+   st_mtime:TIME_INT is res := C::c_st_mtime(self); end;
+   st_ctime:TIME_INT is res := C::c_st_ctime(self); end;
+--   st_blksize:INT is res := C::c_st_blksize(self); end;
+--   st_blocks:INT is res := C::c_st_blocks(self); end;
+   
+-- Writers --
+   set_st_dev(x:INT) is C::set_c_st_dev(self,x); end;
+   set_st_ino(x:INT) is C::set_c_st_ino(self,x); end;
+   set_st_mode(x:INT) is C::set_c_st_mode(self,x); end;
+   set_st_nlink(x:INT) is C::set_c_st_nlink(self,x); end;
+   set_st_uid(x:INT) is C::set_c_st_uid(self,x); end;
+   set_st_gid(x:INT) is C::set_c_st_gid(self,x); end;
+   set_st_rdev(x:INT) is C::set_c_st_rdev(self,x); end;
+   set_st_size(x:INT) is C::set_c_st_size(self,x); end;
+   set_st_atime(x:TIME_INT) is C::set_c_st_atime(self,x); end;
+   set_st_mtime(x:TIME_INT) is C::set_c_st_mtime(self,x); end;
+   set_st_ctime(x:TIME_INT) is C::set_c_st_ctime(self,x); end;
+--   set_st_blksize(x:INT) is C::set_c_st_blksize(self,x); end;
+--   set_st_blocks(x:INT) is C::set_c_st_blocks(self,x); end;
+   
+end; -- C_FILESTAT
+
+--------------------------------------------------------------------
+
+class C is
+   
+   fstat(fd:F_OB; addr:$F_OB):INT is end;
+   stat(fname:F_OB; addr:$F_OB):INT is end;
+   ctime(t:F_OB):F_OB is end;
+   address_of_int(i:INT):F_OB is end;
+   
+-- Constructor --
+   create_c_filestat:C_FILESTAT is end;
+   
+-- Readers --
+   c_st_dev(cob:C_FILESTAT):INT is end;
+   c_st_ino(cob:C_FILESTAT):INT is end;
+   c_st_mode(cob:C_FILESTAT):INT is end;
+   c_st_nlink(cob:C_FILESTAT):INT is end;
+   c_st_uid(cob:C_FILESTAT):INT is end;
+   c_st_gid(cob:C_FILESTAT):INT is end;
+   c_st_rdev(cob:C_FILESTAT):INT is end;
+   c_st_size(cob:C_FILESTAT):INT is end;
+   c_st_atime(cob:C_FILESTAT):TIME_INT is end;
+   c_st_mtime(cob:C_FILESTAT):TIME_INT is end;
+   c_st_ctime(cob:C_FILESTAT):TIME_INT is end;
+-- Not supported in Sys V
+--   c_st_blksize(cob:C_FILESTAT):INT is end;
+--   c_st_blocks(cob:C_FILESTAT):INT is end;
+   
+-- Writers --
+   set_c_st_dev(cob:C_FILESTAT; x:INT) is end;
+   set_c_st_ino(cob:C_FILESTAT; x:INT) is end;
+   set_c_st_mode(cob:C_FILESTAT; x:INT) is end;
+   set_c_st_nlink(cob:C_FILESTAT; x:INT) is end;
+   set_c_st_uid(cob:C_FILESTAT; x:INT) is end;
+   set_c_st_gid(cob:C_FILESTAT; x:INT) is end;
+   set_c_st_rdev(cob:C_FILESTAT; x:INT) is end;
+   set_c_st_size(cob:C_FILESTAT; x:INT) is end;
+   set_c_st_atime(cob:C_FILESTAT; x:TIME_INT) is end;
+   set_c_st_mtime(cob:C_FILESTAT; x:TIME_INT) is end;
+   set_c_st_ctime(cob:C_FILESTAT; x:TIME_INT) is end;
+-- Not supported in Sys V
+--   set_c_st_blksize(cob:C_FILESTAT; x:INT) is end;
+--   set_c_st_blocks(cob:C_FILESTAT; x:INT) is end;
+   
+end; -- class C
+
+--------------------------------------------------------------------
+
+class TIME_INT is
+   INT;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   ctime:STR is
+      res := STR::from_c_str(C::ctime(C::address_of_int(self)));
+   end; -- ctime
+   
+end; -- class TIME_INT
+
+--------------------------------------------------------------------

@@ -1,0 +1,112 @@
+ -*- Mode: Text;  -*-
+File: DISTRIBUTE
+Author: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+(c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+Australia, 1992, 1993. 
+*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* FUNCTION: short memo how to proceed with a distribution
+* HISTORY:
+*  Oct 17 01:21 1993 (hws): add SATHER_ENVI and adapt to new make setup
+* Created: Sun Dec 15 21:12:09 1991 (hws)
+*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The current Sather directory should contain the latest stable
+development version.
+
+To set up a Sather distribution:
+
+1. Edit the file make/config.in:
+
+	RELEASEVERSION =  a new release number
+
+2. Run the top level config step:
+
+	setenv SATHER_HOME <development home>
+        cd $SATHER_HOME
+	configure -TOPDIR $SATHER_HOME
+
+3. Generate the boot compiler. The boot compiler is a C output of the
+   current compiler run on the current compiler. It is generated as
+   follows:
+
+        cd $SATHER_HOME/compiler
+        make boot-create
+
+4. Check permissions and related items before copying or tar'ing:
+   
+   Is your "umask" appropriate for what you want the distribution to be?
+   The current setting in Makefile.in defines SATHER_DIST_UMASK as 022.
+   This makes distribution files at least group writable and others readable. 
+   So others can restrict this further when installing.
+
+   Perhaps you want to switch to a new default group, "newgrp sather"?
+
+5. Remove junk directories in development version BUT DO NOT "make clean"
+   NEVER EVER USE THIS ON THE DEVELOPMENT SYSTEM. "make clean" is written
+   for cleaning a build directory. 
+
+6. Create the distribution directory:
+
+             cd $SATHER_HOME
+             make DISTDIR=mypath dist
+
+    This will create a copy of the relevant files in the DISTDIR which
+    defaults to $HOME/sather/dist. The mask 022 grants group and others
+    read permission. Choose 002 for group write / others read combination.
+    Cf. umask for details.
+
+    make dist will also do some cleaning (i.e. call "make clean" and 
+    remove *.o *~ core ...), and will tar everything up in 
+    sather-$RELEASEVERSION.tar.Z
+
+7. Test install the distribution following the steps in INSTALL
+   pedantically, in an environment with SATHER_HOME, SATHER_ENVI, SATHER_MAKE
+   not unset.
+
+   7.1 untar the file, 
+   7.2 set the top level make/DEFSITE variables and
+   7.3 type "make config" and then "make".
+
+   This should work with SATHER_HOME = TOPDIR and with SATHER_HOME
+   different from TOPDIR. If different, the user is supposed to follow with
+   "make install". 
+   TOPDIR is the directory that the tar file gets untarred into and
+   where the boot compiler is compiled etc.  SATHER_HOME may be different
+   if the user decides to place it in a site "directory" and/or clean
+   some unneeded libraries or the boot compiler.
+
+   The user should also be allowed to run "make clean" and then a similar
+   installation for another system/architecture within the same
+   sather directory tree. This is supposed to use the same intermediate
+   file names but will save the results in unique architecture-dependent
+   directories like bin.sun4 etc.
+
+   An alpha version of a new distribution can be made from the dist
+   directory. It contains the bare minimum to compile and install the 
+   system and may be useful to test installation procedures and compiler.
+
+        setenv SATHER_HOME <distpath>
+	cd $SATHER_HOME/make
+	configure
+	cd ..
+	make -n bare
+	make bare
+
+8. How to distribute...
+
+       * 128.32.201.55  USA     /pub/sather       ftp.ICSI.Berkeley.EDU
+       * 129.26.8.90    EUROPE  /pub/Sather       ftp.gmd.DE
+       * 133.137.4.3    JAPAN   /pub/lang/sather  sra.CO.JP
+       * 192.41.146.1   AUS     /pub/sather       lynx.csis.dit.CSIRO.AU
+
+Login to the distribution hosts and to the ftp host, cd to
+~ftp/<pubsatherdir> on the ftp host, and get the new version via anon
+ftp from the distribution host, adapt the README, perhaps split the
+new version.
+
+A 2.5MB (2528931 bytes) bare alpha version (get from AUS) takes about:
+
+   CSIRO -> ANU, chara (sun):        16 seconds (160 Kbytes/s)
+   CSIRO -> ANU, vulcan (sequent):  270 seconds (9.2 Kbytes/s)   
+   AUS -> EUR gmdzi:                390 seconds (6.4 Kbytes/s)
+   AUS -> USA icsib:                750 seconds (3.3 Kbytes/s)

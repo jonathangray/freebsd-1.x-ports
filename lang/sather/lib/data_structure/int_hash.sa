@@ -1,0 +1,574 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/data_structure/int_hash.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Extendible hash tables for representing sets of non-negative
+--*           integers and mappings from sets of non-negative integer keys
+--*           to objects of a specified type.
+--*
+--* CLASSES: INT_HASH_MAP{T}, INT_HASH_MAP_CURSOR{T}, INT_HASH_SET,
+--*          INT_HASH_SET_CURSOR, INT_HASH_TEST
+--* 
+--* RELATED PACKAGES:
+--*
+--* RCS: $Id: int_hash.sa,v 1.1 1994/02/12 03:23:25 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:31 1993 (hws)
+--*  Oct 17 06:31 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 27 14:32 1993 (hws): require -> pre
+--*  Aug 15 19:11 1991 (hws): add `test' to make hash interface uniform.
+--*  May 26 15:41 1991 (hws): adapt CURSOR to standard protocol.
+--*  Jan 20: Added "is_a_subset_of" in INT_HASH_SET. (clim)
+--* Created: Tue Mar 27 22:30:59 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class INT_HASH_MAP{T} is
+   -- Hash tables which associate elements of type `T' to non-negative
+   -- `INT' keys. The table is always at least twice as large as number
+   -- of ints (plus the number of deletes since last expansion).
+   -- The key `-1' is used for empty entries, `-2' for deleted ones.
+   -- The size of the table is always one greater than a power of two and
+   -- nearly doubles on each expansion. The last entry is a sentinel element
+   -- which always holds `-1' (to avoid testing for end of array in loop).
+   -- The hash function is just the last `n' bits of the 
+   -- `INT' key.The extra serial search this simple function sometimes 
+   -- entails is still cheaper than more typical functions which use a
+   -- multiply and a modulo operation. 
+   
+   attr hsize: INT;			-- Number of entries stored.
+   attr key_tbl: ARRAY{INT};		-- Storage for the keys.
+   attr ent_tbl: ARRAY{T};		-- Storage for the entries.
+   attr mask: INT;			-- Mask for the hash function
+      -- If table is of size `2^n+1' then mask will have last `n' bits on.
+   
+   create: SAME is
+      -- An empty hash table.
+      res := new; 
+      res.key_tbl := ARRAY{INT}::new(9); 
+      i: INT; loop until!(i = res.key_tbl.asize); -- fill with empty key
+	 res.key_tbl[i] :=-1;
+	 i := i + 1
+      end; -- loop
+      res.ent_tbl := ARRAY{T}::new(9);
+      res.mask := 7;		-- just last three bits to start
+   end; -- create
+   
+   get(k: INT): T pre k >= 0 is
+      -- The entry associated with key `k' or `void' if absent.
+      hsh: INT := k.bit_and(mask); 
+      loop
+	 loop
+	    kt: INT := key_tbl[hsh];
+	    if kt = k then res := ent_tbl[hsh]; return; -- found it
+	    elsif kt =-1 then break! end; -- hit hole or sentinel
+	    hsh := hsh + 1;
+	 end; -- loop
+	 if hsh /= key_tbl.asize - 1 then break! -- didn't hit sentinel
+	 else hsh := 0 end; -- hit it so go back to beginning
+      end; -- loop
+   end; -- get
+
+   test(k: INT): BOOL pre k >= 0 is
+      -- True if `k' is stored in the table.
+      res := (get(k)/=void);
+   end;
+
+   double_size is
+      -- Resize `self' to double. Copy non-deleted entries over.
+      ns: INT := (key_tbl.asize - 1) * 2 + 1; -- new expanded size
+      mask := mask.lshift(1) + 1;	-- add in another bit
+      nkey_tbl: ARRAY{INT} := ARRAY{INT}::new(ns);		
+      i: INT := 0; loop until!(i = nkey_tbl.asize);
+	 nkey_tbl[i] :=-1;
+	 i := i + 1
+      end; -- loop
+      nent_tbl: ARRAY{T} := ARRAY{T}::new(ns);
+      hsize := 0;
+      i: INT := 0; loop until!(i = key_tbl.asize - 1);
+	 val: INT := key_tbl[i];
+	 if val >= 0 then 
+	    hsh: INT := val.bit_and(mask);
+	    loop		
+	       if nkey_tbl[hsh] =-1 then 
+		  nkey_tbl[hsh] := val; nent_tbl[hsh] := ent_tbl[i];
+		  hsize := hsize + 1; break!
+	       elsif hsh = ns - 2 then hsh := 0 
+	       else hsh := hsh + 1 end;
+	    end; -- loop
+	 end; -- if
+	 i := i + 1
+      end; -- loop
+      key_tbl.clear; ent_tbl.clear;	-- give the garbage collector a hand
+      key_tbl := nkey_tbl; ent_tbl := nent_tbl;
+   end; -- double_size
+   
+   insert(k: INT; e: T) pre k >= 0 is
+      -- Insert key `k' with entity `e'. Overwrite if present.
+      if (hsize + 1).lshift(1) > key_tbl.asize then double_size end;
+      hsh: INT := k.bit_and(mask);
+      loop	
+	 if key_tbl[hsh] <=-1 then 
+	    key_tbl[hsh] := k; ent_tbl[hsh] := e; hsize := hsize + 1; break!
+	 elsif key_tbl[hsh] = k then 
+	    ent_tbl[hsh] := e; break! -- put in new ent
+	 elsif hsh = key_tbl.asize - 2 then 
+	    hsh := 0		-- loop to front
+	 else hsh := hsh + 1 end; -- try next slot
+      end; -- loop
+   end; -- insert
+
+   delete(k: INT) pre k >= 0 is
+      -- Delete entry `k' if present.
+      hsh: INT := k.bit_and(mask);
+      loop
+	 if key_tbl[hsh] =-1 then break! -- not in table
+	 else
+	    if key_tbl[hsh] = k then 
+	       key_tbl[hsh] :=-2; ent_tbl[hsh] := void; break! -- mark deleted
+	    elsif hsh = key_tbl.asize - 2 then 
+	       hsh := 0 
+	    else hsh := hsh + 1 end;
+	 end; -- if
+      end; -- loop
+   end; -- delete
+
+   size: INT is
+      -- Number of entries stored, (not fast).
+      i: INT; loop until!(i = key_tbl.asize);
+	 if key_tbl[i] >= 0 then res := res + 1 end;
+	 i := i + 1
+      end; -- loop
+   end; -- size
+   
+   clear is
+      -- Clear the tables.
+      hsize := 0; 
+      ent_tbl.clear;
+      i: INT; loop until!(i = key_tbl.asize);
+	 key_tbl[i] :=-1;
+	 i := i + 1
+      end; -- loop
+   end; -- clear
+
+   cursor: INT_HASH_MAP_CURSOR{T} is
+      -- A cursor into the table.
+      res := INT_HASH_MAP_CURSOR{T}::create(self)
+   end; -- cursor
+   
+end; -- class INT_HASH_MAP{T}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class INT_HASH_MAP_CURSOR{T} is
+   -- A cursor into `INT_HASH_MAP{T}' tables for stepping through all keys.
+   
+   attr tbl: INT_HASH_MAP{T};		-- The pointer to the table.
+   attr index: INT;			-- The index into the table.
+   attr is_done: BOOL;		-- True if all entries have been visited.
+
+   create(t: INT_HASH_MAP{T}): SAME is
+      -- A cursor into `t' which is initialized to the first element. 
+      res := INT_HASH_MAP_CURSOR{T}::new; res.tbl := t; res.first;
+   end; -- create
+   
+   first: T is
+      -- Set the cursor to the first location, if any.
+      is_done := false;
+      index := 0;
+      loop
+	 val: INT := tbl.key_tbl[index];
+	 if val >= 0 then break!
+	 elsif index = tbl.key_tbl.asize - 1 then is_done := true; break!
+	 else index := index + 1 end;
+      end; -- loop
+      res := item;
+   end; -- first
+
+   key: INT is
+      -- The current key.
+      if not is_done then res := tbl.key_tbl[index] end;
+   end; -- key
+
+   item: T is
+      -- The item associated with the current key.
+      if not is_done then res := tbl.ent_tbl[index] end;
+   end; -- item
+   
+   next: T is
+      -- Move the cursor to the next location.
+      if is_done then return end;
+      index := index + 1;
+      loop
+	 if index = tbl.key_tbl.asize - 1 then is_done := true; break!
+	 elsif tbl.key_tbl[index] >= 0 then break!
+	 else index := index + 1 end;
+      end; -- loop
+      res := item;
+   end; -- next
+
+end; -- class INT_HASH_MAP_CURSOR{T}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class INT_HASH_SET is
+   -- Sets of non-negative integers represented by extendible hash tables.
+   -- The table is always at least twice as large as number of `INT''s (plus
+   -- number of deletes since last expansion). The key `-1' is used for empty
+   -- entries, `-2' for deleted ones. The size of the table is always of the
+   -- form `2^n+1' and nearly doubles on each expansion. The last entry is 
+   -- a sentinel element which always holds `-1' (to avoid testing for end of
+   -- array in loop). The hash function is just the last `n' bits of the 
+   -- `INT' key.The extra serial search this simple function sometimes 
+   -- entails is still cheaper than more typical functions which use a
+   -- multiply and a mod.
+ 
+   attr hsize: INT;			-- Number stored (including deletes!).
+   attr mask: INT;			-- Mask for the hash function.
+   ARRAY{INT};			-- The hash table.
+   
+   create: SAME is
+      -- An empty `INT_HASH_SET'.
+      res := new(9); res.mask := 7;	-- Use last three bits.
+      res.clear;		-- Init to `-1'.
+   end; -- create
+   
+   get(k: INT): BOOL pre k >= 0 is
+      -- True if `k' is in the stored set.
+      hsh: INT := k.bit_and(mask);
+      loop
+	 loop
+	    kt: INT := [hsh];
+	    if kt = k then res := true; return; -- Found it.
+	    elsif kt =-1 then break! end; -- Hit hole or sentinel.
+	    hsh := hsh + 1;
+	 end; -- loop
+	 if hsh /= asize - 1 then break! -- Didn't hit sentinel.
+	 else hsh := 0 end; -- Hit it so go back to beginning.
+      end; -- loop
+   end; -- get
+ 
+   test(k: INT): BOOL pre k >= 0 is
+      -- True if `k' is in the stored set.
+      -- Same as `get', all hash types have a `test' for uniformity now.
+      res := get(k);
+   end;
+
+   double_size: INT_HASH_SET is
+      -- Resize `self' to double. Copy non-deleted entries over.
+      ns: INT := (asize - 1) * 2 + 1;	-- New expanded size.
+      res := new(ns);
+      res.mask := mask.lshift(1) + 1; -- Add in another bit.
+      res.clear;		-- Init to `-1'.
+      i: INT := 0; loop until!(i = asize - 1);
+	 val: INT := [i];
+	 if val >= 0 then 
+	    hsh: INT := val.bit_and(res.mask);
+	    loop		
+	       if res[hsh] =-1 then 
+		  res[hsh] := val; 
+		  res.hsize := res.hsize + 1; break!
+	       elsif hsh = ns - 2 then hsh := 0 
+	       else hsh := hsh + 1 end;
+	    end; -- loop
+	 end; -- if
+	 i := i + 1
+      end; -- loop
+      clear;			-- Give the garbage collector a hand.
+   end; -- double_size
+
+   insert(k: INT): INT_HASH_SET pre k >= 0 is
+      -- Insert key `k'. Usage: `s:=s.insert(k)'.
+      if (hsize + 1).lshift(1) > asize then res := double_size 
+      else res := self end;
+      hsh: INT := k.bit_and(res.mask);
+      loop	
+	 if res[hsh] <=-1 then 
+	    res[hsh] := k; res.hsize := res.hsize + 1; break!
+	 elsif res[hsh] = k then break! -- already there
+	 elsif hsh = res.asize - 2 then 
+	    hsh := 0		-- loop to front
+	 else hsh := hsh + 1 end; -- try next slot
+      end; -- loop
+   end; -- insert
+
+   delete(k: INT) pre k >= 0 is
+      -- Delete entry `k' if it is in the table.
+      hsh: INT := k.bit_and(mask);
+      loop
+	 if [hsh] =-1 then break! -- not in table
+	 else
+	    if [hsh] = k then 
+	       [hsh] :=-2; break! -- mark deleted
+	    elsif hsh = asize - 2 then 
+	       hsh := 0 
+	    else hsh := hsh + 1 end;
+	 end; -- if
+      end; -- loop
+   end; -- delete
+
+   size: INT is
+      -- Number of entries, (not cheap).
+      i: INT; loop until!(i = asize);
+	 if [i] >= 0 then res := res + 1 end;
+	 i := i + 1
+      end; -- loop
+   end; -- size
+   
+   clear is
+      -- Empty the table out.
+      hsize := 0; 
+      i: INT; loop until!(i = asize);
+	 [i] :=-1;
+	 i := i + 1;
+      end; -- loop
+   end; -- clear
+   
+   cursor: INT_HASH_SET_CURSOR is
+      -- Return a cursor into the table.
+      res := INT_HASH_SET_CURSOR::create(self)
+   end; -- cursor
+   
+   union(s: INT_HASH_SET): INT_HASH_SET is
+      -- A new set whose elements are the union of `self' and `s'.
+      res := create;
+      c: INT_HASH_SET_CURSOR := s.cursor;
+      loop until!(c.is_done);
+	 res := res.insert(c.item);
+	 c.next
+      end; -- loop
+      c := cursor;
+      loop until!(c.is_done);
+	 res := res.insert(c.item);
+	 c.next
+      end; -- loop
+   end; -- union
+   
+   intersection(s: INT_HASH_SET): INT_HASH_SET is
+      -- A new set whose elements are the intersection of `self' and `s'.
+      res := create;
+      c: INT_HASH_SET_CURSOR := cursor;
+      loop until!(c.is_done);
+	 if s.get(c.item) then res := res.insert(c.item) end;
+	 c.next;
+      end; -- loop
+   end; -- intersection
+
+   difference(s: INT_HASH_SET): INT_HASH_SET is
+      -- A new set whose elements are those in `self' which are not in `s'.
+      res := create;
+      c: INT_HASH_SET_CURSOR := cursor;
+      loop until!(c.is_done);
+	 if not s.get(c.item) then res := res.insert(c.item) end;
+	 c.next;
+      end; -- loop
+   end; -- difference 
+   
+   sym_difference(s: INT_HASH_SET): INT_HASH_SET is
+      -- A new set whose elements are those in `self' or `s' but not both.
+      res := create;
+      c: INT_HASH_SET_CURSOR := cursor; 
+      loop until!(c.is_done);
+	 if not s.get(c.item) then res := res.insert(c.item) end;
+	 c.next;
+      end; -- loop
+      c := s.cursor; 
+      loop until!(c.is_done);
+	 if not get(c.item) then res := res.insert(c.item) end;
+	 c.next;
+      end; -- loop
+   end; -- sym_difference
+   
+   is_a_subset_of(s: INT_HASH_SET): BOOL is
+      -- True if `self' is a subset of `s'.
+      c: INT_HASH_SET_CURSOR := cursor;
+      loop until!(c.is_done);
+	 if not s.get(c.item) then res := false; return; end;
+	 c.next;
+      end; -- loop
+      res := true; 
+   end; -- if
+   
+end; -- class INT_HASH_SET
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class INT_HASH_SET_CURSOR is
+   -- A cursor into `INT_HASH_SET''s for stepping through all keys.
+   
+   attr tbl: INT_HASH_SET;		-- The pointer to the table.
+   attr index: INT;			-- The index into the table.
+   attr is_done: BOOL;		-- True if all entries finished.
+
+   create(t: INT_HASH_SET): SAME is
+      -- A cursor into `t' which is initialized to the first element. 
+      res := INT_HASH_SET_CURSOR::new; res.tbl := t; res.first;
+   end; -- create
+   
+   first: INT is
+      -- Set the cursor to the first location, if any.
+      is_done := false;
+      index := 0;
+      loop
+	 val: INT := tbl[index];
+	 if val >= 0 then break!
+	 elsif index = tbl.asize - 1 then is_done := true; break!
+	 else index := index + 1 end;
+      end; -- loop
+      res := item;
+   end; -- first
+
+   item: INT is
+      -- The current item in the set.
+      if not is_done then res := tbl[index] end;
+   end; -- item
+
+   next: INT is
+      -- Move the cursor to the next location.
+      if is_done then return end;
+      index := index + 1;
+      loop
+	 if index = tbl.asize - 1 then is_done := true; break!
+	 elsif tbl[index] >= 0 then break!
+	 else index := index + 1 end;
+      end; -- loop
+      res := item;
+   end; -- next
+
+end; -- class INT_HASH_SET_CURSOR
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class INTH_TEST is
+   -- Test the classes `INT_HASH_MAP', `INT_HASH_MAP_CURSOR',
+   -- `INT_HASH_SET', and `INT_HASH_SET_CURSOR'.
+   TEST;
+   
+   main is
+      -- Test the classes `INT_HASH_MAP', `INT_HASH_MAP_CURSOR',
+      -- `INT_HASH_SET', and `INT_HASH_SET_CURSOR'.
+      int_hash_map_test;
+      int_hash_set_test;
+   end; -- main
+
+   int_hash_map_test is
+      -- Test of `INT_HASH_MAP' and `INT_HASH_MAP_CURSOR'.
+      class_name("INT_HASH_MAP");
+
+      h: INT_HASH_MAP{INT} := evenly_spaced_map(123,100,10);
+      test("h := evenly_spaced_map", str_of_map(h)
+	    ,"1023:2023, 323:1323, 423:1423, 523:1523, 623:1623, 723:1723, 823:1823, 123:1123, 923:1923, 223:1223");
+      test("h.get(423)", h.get(423).to_s, "1423");
+      test("h.test(423)", h.test(423).to_s, "T");
+      h.delete(423);
+      test("h.delete(423); h.get(423)", h.get(423).to_s, "0");
+      test("h.test(423)", h.test(423).to_s, "F");
+      test("h entries", str_of_map(h)
+	    ,"1023:2023, 323:1323, 523:1523, 623:1623, 723:1723, 823:1823, 123:1123, 923:1923, 223:1223");
+      test("h.size", h.size.to_s, "9");
+      h.clear;
+      test("h.clear", str_of_map(h), "");
+      finish;
+   end; -- int_hash_map_test
+
+   str_of_map(h: INT_HASH_MAP{INT}): STR is
+      -- A string with the contents of `h' of the form "4:34, 7:34" where
+      -- the key is followed by a colon and the corresponding item. 
+      res := STR::create;
+      c: INT_HASH_MAP_CURSOR{INT} := h.cursor;
+      loop until!(c.is_done);
+	 res := res.i(c.key).s(":").i(c.item);
+	 c.next;
+	 if not c.is_done then res := res.s(", ") end;
+      end; -- loop
+   end; -- str_of_map
+
+   evenly_spaced_map(start,step,num: INT): INT_HASH_MAP{INT} is
+      -- An `INT_HASH_MAP{INT}' containing `num' `INT''s starting at `start'
+      -- and with spacing `step', each is paired with itself plus 1000.
+      res := INT_HASH_MAP{INT}::create;
+      i: INT; k: INT := start; loop until!(i = num);
+	 res.insert(k,k + 1000);
+	 k := k + step; i := i + 1
+      end; -- loop
+   end; -- evenly_spaced_map
+   
+   int_hash_set_test is
+      -- Test of `INT_HASH_SET' and `INT_HASH_SET_CURSOR'.
+      class_name("INT_HASH_SET");
+      
+      s: INT_HASH_SET := evenly_spaced_set(123,100,10);
+      test("s := evenly_spaced_set", str_of_set(s)
+	    ,"1023, 323, 423, 523, 623, 723, 823, 123, 923, 223"); 
+      test("s.get(223)", s.get(223).to_s, "T");
+      test("s.test(223)", s.test(223).to_s, "T");
+      test("s.get(1123)", s.get(1123).to_s, "F");
+      test("s.test(1123)", s.test(1123).to_s, "F");
+      s := s.insert(1123);
+      test("s.insert(1123); s.get(1123)", s.get(1123).to_s, "T");
+      test("Entries in s", str_of_set(s)
+	    ,"1023, 323, 1123, 423, 523, 623, 723, 823, 123, 923, 223"); 
+      s.delete(523);
+      test("delete(523); s.get(523)", s.get(523).to_s, "F");
+      test("Entries in s", str_of_set(s)
+	    ,"1023, 323, 1123, 423, 623, 723, 823, 123, 923, 223");
+      test("size", s.size.to_s, "10");
+      s.clear;
+      test("clear", str_of_set(s), "");
+      s := evenly_spaced_set(123,100,10);
+      test("s := evenly_spaced_set", str_of_set(s)
+      	    ,"1023, 323, 423, 523, 623, 723, 823, 123, 923, 223"); 
+      t: INT_HASH_SET := evenly_spaced_set(623,100,10);
+      test("t := evenly_spaced_set", str_of_set(t)
+	    ,"1123, 1223, 1323, 623, 1423, 723, 1523, 823, 923, 1023");
+      test("union", str_of_set(s.union(t))
+	    ,"223, 1123, 323, 1223, 423, 1323, 523, 1423, 623, 723, 1523, 823, 923, 123, 1023");
+      test("intersection", str_of_set(s.intersection(t))
+	    ,"1023, 723, 823, 923, 623");
+      test("difference", str_of_set(s.difference(t))
+      	    ,"323, 423, 523, 123, 223");
+      test("sym_difference", str_of_set(s.sym_difference(t))
+	    ,"323, 1123, 423, 1223, 523, 1323, 1423, 1523, 123, 223");
+      test("is_a_subset_of", s.is_a_subset_of(t).to_s, "F"); 
+      finish;
+   end; -- int_hash_set_test
+
+   evenly_spaced_set(start,step,num: INT): INT_HASH_SET is
+      -- An `INT_HASH_SET' containing `num' `INT''s starting at `start' and
+      -- with spacing `step'.
+      res := INT_HASH_SET::create;
+      i: INT; k: INT := start; loop until!(i = num);
+	 res := res.insert(k);
+	 k := k + step; i := i + 1
+      end; -- loop
+   end; -- evenly_spaced_set
+
+   str_of_set(s: INT_HASH_SET): STR is
+      -- A string containing the elements of `s' separated by commas.
+      res := STR::create;
+      c: INT_HASH_SET_CURSOR := s.cursor;
+      loop until!(c.is_done);
+	 res := res.i(c.item);
+	 c.next;
+	 if not c.is_done then res := res.s(", ") end;
+      end; -- loop
+   end; -- str_of_set
+   
+end; -- class INTH_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+

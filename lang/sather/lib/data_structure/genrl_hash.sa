@@ -1,0 +1,283 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/data_structure/genrl_hash.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: General hash tables in which the hash function and
+--*           equality test are defined by the class instantiating
+--*           the parameter.
+--*
+--* CLASSES: GENERAL_HASH{T}, GENERAL_HASH_CURSOR{T}.
+--* 
+--* RELATED PACKAGES:
+--*
+--* RCS: $Id: genrl_hash.sa,v 1.1 1994/02/12 03:23:25 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:31 1993 (hws)
+--*  Oct 17 06:31 1993 (hws): Sather 1 syntax, copyright note
+--*  Aug 15 19:13 1991 (hws): add `test' to make hash interface uniform
+--*  May 26 15:19 1991 (hws): adapt GENERAL_HASH_CURSOR to standard
+--*     cursor protocol.
+--* Created: Mon Sep 24 11:07:34 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Use `STR_HASH_TEST' in `str_hash.sa' to test these classes.
+   
+class GENERAL_HASH{T} is
+   -- General hash tables which hold elements of type `T'.
+   -- Type `T' must define `hash:INT' and `is_equal(e:T):BOOL'.
+   -- The table is always at least twice as large as the number of
+   -- elements. `void' elements are used for empty
+   -- entries. The size of the table is always of the form `2^n+1' and nearly
+   -- doubles on each expansion. The last entry is a sentinel element 
+   -- which holds `void' (to avoid testing for the end of array in the loop).
+   -- The hash function defined in `T' returns an `INT', the last `n' bits of
+   -- which are used to index the table.
+
+   attr size: INT;			-- Number of entries stored.
+   attr tbl: ARRAY{T};		-- Storage for the elements.
+   attr mask: INT;			-- Mask for hash function.
+      -- If table is of size `2^n+1' then mask will have last `n' bits on.
+   
+   create: SAME is
+      -- An emtpy hash table.
+      res := new; 
+      res.tbl := ARRAY{T}::new(9); 
+      res.mask := 7;		-- just last three bits to start
+   end; -- create
+   
+   get(e: T): T is
+      -- The stored element which `is_equal(e)' or `void' if absent.
+      hsh: INT := e.hash.bit_and(mask); 
+      loop
+	 loop
+	    te: T := tbl[hsh];
+	    if te = void then break! -- hit hole or sentinel
+	    elsif te.is_equal(e) then res := te; return; -- found it
+	    end; -- if
+	    hsh := hsh + 1;
+	 end; -- loop
+	 if hsh /= tbl.asize - 1 then break! -- didn't hit sentinel
+	 else hsh := 0 end; -- hit it so go back to beginning
+      end; -- loop
+   end; -- get
+
+   test(e: T): BOOL is
+      -- True if `e' is stored in the table.
+      res := (get(e)/=void);
+   end;
+   
+   double_size is
+      -- Resize tbl to double. Copy entries over.
+      ns: INT := (tbl.asize - 1) * 2 + 1; -- new expanded size
+      mask := mask.lshift(1) + 1;	-- add in another bit
+      ntbl: ARRAY{T} := ARRAY{T}::new(ns);		
+      size := 0;
+      i: INT := 0; loop until!(i = tbl.asize - 1);
+	 val: T := tbl[i];
+	 if val /= void then 
+	    hsh: INT := val.hash.bit_and(mask);
+	    loop		
+	       if ntbl[hsh] = void then 
+		  ntbl[hsh] := val; 
+		  size := size + 1; break!
+	       elsif hsh = ns - 2 then hsh := 0 
+	       else hsh := hsh + 1 end;
+	    end; -- loop
+	 end; -- if
+	 i := i + 1
+      end; -- loop
+      tbl.clear;			-- help the garbage collector
+      tbl := ntbl;
+   end; -- double_size
+   
+   insert(e: T) is
+      -- Insert element `e'. Overwrite an `is_equal' entry if present.
+      if (size + 1).lshift(1) > tbl.asize then double_size end;
+      hsh: INT := e.hash.bit_and(mask);
+      loop	
+	 if tbl[hsh] = void then 
+	    tbl[hsh] := e; size := size + 1; break!
+	 elsif tbl[hsh].is_equal(e) then 
+	    tbl[hsh] := e; break! -- put in new elt
+	 end; -- if
+	 if hsh = tbl.asize - 2 then hsh := 0 -- loop to front
+	 else hsh := hsh + 1 end; -- try next slot
+      end; -- loop
+   end; -- insert
+
+   delete(e: T) is
+      -- Delete element `e' if present.
+      hsh: INT := e.hash.bit_and(mask);
+      hole: INT;			-- location of hole made by delete element
+      loop
+	 if tbl[hsh] = void then return -- not in table
+	 else
+	    if tbl[hsh].is_equal(e) then	
+	       hole := hsh; tbl[hole] := void; -- delete it
+	       size := size - 1; break!
+	    elsif hsh = tbl.asize - 2 then 
+	       hsh := 0 
+	    else hsh := hsh + 1 end;
+	 end; -- if
+      end; -- loop
+      index: INT := hole;		-- check that hole isn't in the way
+      loop
+	 if index = tbl.asize - 2 then index := 0
+	 else index := index + 1 end;
+	 if tbl[index] = void then break! end; -- end of block
+	 hsh := tbl[index].hash.bit_and(mask);
+	 if hsh <= index then	-- block doesn't wrap around
+	    if hole < index and hole >= hsh then -- hole in way
+	       tbl[hole] := tbl[index]; hole := index; tbl[index] := void;
+	    end; -- if
+	 else		-- block wraps
+	    if hole >= hsh or hole < index then -- hole in way
+	       tbl[hole] := tbl[index]; hole := index; tbl[index] := void;
+	    end; -- if
+	 end; -- if
+      end; -- loop
+   end; -- delete
+
+   clear is
+      -- Clear the tables.
+      size := 0; tbl.clear;
+   end; -- clear
+
+   cursor: GENERAL_HASH_CURSOR{T} is
+      -- A cursor into the table.
+      res := GENERAL_HASH_CURSOR{T}::create(self)
+   end; -- cursor
+
+   is_empty: BOOL is
+      -- True if `self' is empty.
+      res := (size = 0);
+   end; -- is_empty
+
+   union(s: GENERAL_HASH{T}): GENERAL_HASH{T} is
+      -- A new table whose keys are the union of those in `self' and
+      -- in `s'. In case of equality, the elements in `self' are used.
+      res := create;
+      c: GENERAL_HASH_CURSOR{T} := s.cursor;
+      loop until!(c.is_done);
+	 res.insert(c.item);
+	 c.next
+      end; -- loop
+      c := cursor;
+      loop until!(c.is_done);
+	 res.insert(c.item);
+	 c.next
+      end; -- loop
+   end; -- union
+   
+   intersection(s: GENERAL_HASH{T}): GENERAL_HASH{T} is
+      -- A new table whose keys are the intersection of those in `self'
+      -- and `s' and whose elements are taken from `self'.
+      res := create;
+      c: GENERAL_HASH_CURSOR{T} := cursor; 
+      loop until!(c.is_done);
+	 if s.get(c.item) /= void then res.insert(c.item) end;
+	 c.next;
+      end; -- loop
+   end; -- intersection
+
+   difference(s: GENERAL_HASH{T}): GENERAL_HASH{T} is
+      -- A new table with the items in `self' which are not contained in `s'.
+      res := create;
+      c: GENERAL_HASH_CURSOR{T} := cursor; 
+      loop until!(c.is_done);
+	 if s.get(c.item) = void then res.insert(c.item) end;
+	 c.next;
+      end; -- loop
+   end; -- difference 
+   
+   sym_difference(s: GENERAL_HASH{T}): GENERAL_HASH{T} is
+      -- A new table with the elements which are in `self' or `s' but
+      -- not both.
+      res := create;
+      c: GENERAL_HASH_CURSOR{T} := cursor; 
+      loop until!(c.is_done);
+	 if s.get(c.item) = void then res.insert(c.item) end;
+	 c.next;
+      end; -- loop
+      c := s.cursor; 
+      loop until!(c.is_done);
+	 if get(c.item) = void then res.insert(c.item) end;
+	 c.next;
+      end; -- loop
+   end; -- sym_difference
+   
+   is_a_subset_of(s: GENERAL_HASH{T}): BOOL is
+      -- True if the keys in `self' are a subset of those in `s'.
+      c: GENERAL_HASH_CURSOR{T} := cursor;
+      loop until!(c.is_done);
+	 if s.get(c.item) = void then return end;
+	 c.next
+      end; -- loop
+      res := true
+   end; -- is_a_subset_of
+   
+end; -- class GENERAL_HASH{T}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class GENERAL_HASH_CURSOR{T} is
+   -- A cursor into `GENERAL_HASH{T}' tables for stepping through
+   -- all elements.
+
+   attr t: GENERAL_HASH{T};		-- The pointer to the table.
+   attr index: INT;			-- The index into the table.
+   attr is_done: BOOL;		-- True if all entries have been visited.
+
+   create(nt: GENERAL_HASH{T}): SAME is
+      -- A cursor into `nt' which is initialized to the first element. 
+      res := GENERAL_HASH_CURSOR{T}::new; res.t := nt; res.first;
+   end; -- create
+   
+   first: T is
+      -- Set the cursor to the first location, if any.
+      is_done := false;
+      index := 0;
+      loop
+	 val: T := t.tbl[index];
+	 if val /= void then break!
+	 elsif index >= t.tbl.asize - 1 then is_done := true; break!
+	 else index := index + 1 end;
+      end; -- loop
+      res := item;
+   end; -- first
+
+   item: T is
+      -- The current element.
+      if not is_done then res := t.tbl[index] end;
+   end; -- item
+
+   next: T is
+      -- Move the cursor to the next location.
+      if is_done then return end;
+      index := index + 1;
+      loop
+	 if index >= t.tbl.asize - 1 then is_done := true; break!
+	 else
+	    val: T := t.tbl[index];
+	    if val /= void then break!
+	    else index := index + 1 end;
+	 end; -- if
+      end; -- loop
+      res := item;
+   end; -- next
+   
+end; -- class GENERAL_HASH_CURSOR{T}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

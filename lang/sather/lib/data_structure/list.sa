@@ -1,0 +1,365 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/data_structure/list.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Lists implemented as extensible arrays.
+--*
+--* CLASSES: LIST{T}, LIST_CURSOR{T}, LIST_TEST
+--*
+--* REQUIRED FILES: ../base/test.sa
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: list.sa,v 1.1 1994/02/12 03:23:26 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:31 1993 (hws)
+--*  Oct 17 06:31 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 27 14:33 1993 (hws): require -> pre
+--*  Jun  6 23:32 1993 (hws): add push precondition.
+--*  Jun  6 23:16 1993 (hws): avoid bounds violation in push.
+--*  Nov 27 10:01 1991 (hws): avoid mention of old LIST_CURS in doc.
+--* Created: Tue Feb 13 08:53:22 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class LIST{T} is
+   -- The class `LIST{T}' defines what is perhaps the most widely
+   -- useful data structure in the Sather libraries. They are
+   -- extensible stacks based on amortized doubling. In some ways they
+   -- may be thought of as replacements for linked lists. Like linked
+   -- lists (which are widely used as containers in languages like
+   -- LISP), they serve as general container objects for holding
+   -- collections of other objects. They are often a more efficient
+   -- abstraction, however, because less allocation and deallocation
+   -- must occur, because they keep successive elements in successive
+   -- memory locations, they don't require storage for the links in a
+   -- linked list, and they support efficient access by array index.
+   -- Linked lists also support insertion and deletion into the middle
+   -- of the list. A variant of the `LIST' class called `GAP_LIST' will
+   -- often be useful in applications which require these operations.
+   -- The set operations `union', `intersection', `difference', and
+   -- `sym_difference' and the searching operation `index_of' are
+   -- implemented by brute force search. If extensive use is made of
+   -- these operations, one should consider the use of other data
+   -- structures such as `INT_HASH_SET', `OB_HASH_SET', or `BIT_VECTOR'.
+
+   ARRAY{T};			-- Holds the stack element.s
+   attr size: INT;			-- The current insertion location.
+   
+   create: SAME is
+      -- A new list with default `size=5'.
+      res := new(5)
+   end; -- create
+
+   create_sized(n: INT): SAME pre n >= 1 is
+      -- A new list with `size=n' (minimum of `1').
+      res := new(n) 
+   end; -- create_sized
+   
+   push(e: T): SAME pre asize >= 1
+   is      
+      -- Add a new element to the end of the list, extending if necessary.
+      -- Usage: `l:=l.push(e)'. Destructive.
+      siz: INT := size;
+      if siz < asize then res := self
+      else
+	 res := extend(2 * asize);
+	 clear;			-- help the garbage collector
+      end; -- if
+      res.size := siz + 1; 
+      res[siz] := e;
+   end; -- push
+
+   push_if_new(e: T): SAME is
+      -- Push `e' if not already present in the list.
+      -- Usage is: `l:=l.push_if_new(e)'. Destructive.
+      if index_of(e) =-1 then res := push(e)
+      else res := self end;
+   end; -- push_if_new
+   
+   is_empty: BOOL is
+      -- True if the list is empty.
+      res := (size = 0)
+   end; -- is_empty
+
+   safe_is_empty: BOOL is
+      -- True if `self' is `void' or empty.
+      if self = void then res := true
+      else res := is_empty end;
+   end; -- safe_is_empty
+   
+   pop: T is
+      -- Return the top element and shrink the list. `void' if empty.
+      if is_empty then res := void
+      else size := size - 1; res := [size]; [size] := void
+      end;
+   end; -- pop
+   
+   top: T is
+      -- The value of the top of the list. `void' if empty.
+      if is_empty then res := void
+      else res := [size - 1]
+      end; -- if
+   end; -- top
+
+   append(l: SAME): SAME is
+      -- Append the `l' to the end of `self' and return the result.
+      -- Destructive.
+      res := self;
+      i: INT; loop until!(i = l.size);
+	 res := res.push(l[i]);
+	 i := i + 1;
+      end; -- loop
+   end; -- append
+
+   union(s: SAME): SAME is
+      -- A new list containing the elements in `self' union `s'.
+      -- Consider `INT_HASH_SET' or `OB_HASH_SET' for better performance.
+      res := copy;
+      i: INT; loop until!(i = s.size);
+	 res := res.push_if_new(s[i]);
+	 i := i + 1
+      end; -- loop
+   end; -- union
+   
+   intersection(s: SAME): SAME is
+      -- A new list containing the elements in both `self' and `s'.
+      -- Consider `INT_HASH_SET' or `OB_HASH_SET' for better performance.
+      res := copy;
+      i: INT; loop until!(i = res.size);
+	 if s.index_of(res[i]) /=-1 then i := i + 1 
+	 else res.delete(i) end;
+      end; -- loop
+   end; -- intersection
+   
+   difference(s: SAME): SAME is
+      -- A new list containing the elements of `self' not in `s'.
+      -- Consider `INT_HASH_SET' or `OB_HASH_SET' for better performance.
+      res := copy;
+      i: INT; loop until!(i = res.size);
+	 if s.index_of(res[i]) =-1 then i := i + 1 
+	 else res.delete(i) end;
+      end; -- loop
+   end; -- difference
+
+   sym_difference(s: SAME): SAME is
+      -- A new list containing the elements in `self' or `s' but not both.
+      -- Consider `INT_HASH_SET' or `OB_HASH_SET' for better performance.
+      res := create;
+      i: INT; loop until!(i = size);
+	 if s.index_of([i]) =-1 then res := res.push([i]); end;
+	 i := i + 1
+      end; -- loop
+      i := 0; loop until!(i = s.size);
+	 if index_of(s[i]) =-1 then res := res.push(s[i]); end;
+	 i := i + 1
+      end; -- loop
+   end; -- sym_difference
+   
+   range(i,j: INT): SAME pre i >= 0 and j >= 0 and j >= i is
+      -- A new list whose elements are `[i],..,[j]'.
+      i := i.min(size - 1); j := j.min(size - 1);
+      res := res.new(j - i + 1);
+      k: INT := i; loop until!(k > j);
+	 res := res.push([k]);
+	 k := k + 1
+      end; -- loop
+   end; -- range
+   
+   reverse: SAME is
+      -- Reverse the order of the elements in `self'. Return `self'.
+      t: T;
+      sm: INT := size - 1;
+      i: INT; loop until!(i = size.rshift(1));
+	 t := [i]; [i] := [sm - i]; [sm - i] := t;
+	 i := i + 1;
+      end; -- loop
+      res := self;
+   end; -- reverse
+
+   index_of(e: T): INT is
+      -- Index of element `e' if contained in `self', `-1' if not (not fast).
+      -- Consider using `INT_HASH_SET' or `OB_HASH_SET'.
+      loop until!(res = size);
+	 if [res] = e then return end;
+	 res := res + 1;
+      end; -- loop
+      res :=-1;
+   end; -- index_of
+   
+   delete(i: INT) pre i >= 0 and i < size is
+      -- Delete the `i'th element, move the last element in its place.
+      size := size - 1; [i] := [size]; [size] := void; 
+   end; -- delete
+   
+   clear is
+      -- Clear the list.
+      i: INT; loop until!(i = size);
+	 [i] := void;
+	 i := i + 1
+      end; -- loop
+      size := 0;
+   end; -- clear
+
+   cursor: LIST_CURSOR{T} is
+      -- A cursor into the list.
+      res := LIST_CURSOR{T}::create(self);
+   end; -- cursor
+   
+end; -- class LIST{T}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class LIST_CURSOR{T} is
+   -- Cursors into `LIST{T}' for stepping through all entries.
+   -- Since the elements in a `LIST' structure are accessible by index it is
+   -- often convenient to directly step through the elements. The cursor
+   -- class `LIST_CURSOR' is provided for consistency with other classes,
+   -- however. The way one would print each element in `l' a `LIST{INT}'
+   -- without using a `LIST_CURS' object is:
+   -- `
+   --    i: INT; loop until!(i=l.size);
+   --       OUT::i(l[i]).s(" ");
+   --       i:=i+1
+   --    end;
+   -- '
+   -- Using a cursor this would look like:
+   -- `
+   --    lc: LIST_CURSOR := l.cursor; loop until!(lc.is_done);
+   --       OUT::i(lc.item).s(" ");
+   --       lc.next;
+   --    end;
+   -- '
+   
+   attr l: LIST{T};			-- The list pointed into.
+   attr index: INT;			-- The index into the list.
+
+   create(l: $LIST{T}): SAME is
+      -- A cursor into `l' which is initialized to the first element. 
+      res := LIST_CURSOR{T}::new; res.l := l;
+   end; -- create
+
+   is_done: BOOL is
+      -- True if all entries have been visited.
+      res := (index >= l.size)
+   end; -- is_done
+   
+   first: T is
+      -- Set the cursor to the first location, if any.
+      index := 0;
+      res := item;
+   end; -- first
+
+   item: T is
+      -- The current item in the list or `void' if `is_done'.
+      if not is_done then res := l[index] end;
+   end; -- item
+
+   next: T is
+      -- Move the cursor to the next location.
+      if is_done then return end;
+      index := index + 1;
+      res := item;
+   end; -- next
+   
+end; -- class LIST_CURSOR{T}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class LIST_TEST is
+   -- Test of `LIST{INT}'.
+   TEST;
+   
+   main is
+      -- Test of `LIST{INT}'.
+      class_name("LIST{INT}");
+      l: LIST{INT} := list_of_range(0,14);
+      test("list entries", str_of_list(l)
+	    , "0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14");
+      test("size", l.size.to_s, "15");
+      test("is_empty 1", l.is_empty.to_s, "F");
+      test("safe_is_empty 1", l.safe_is_empty.to_s, "F");
+      test("top", l.top.to_s, "14");
+      test("pop 1", l.pop.to_s, "14");
+      test("pop 2", l.pop.to_s, "13");
+      test("pop 3", l.pop.to_s, "12");
+      test("pop 4", l.pop.to_s, "11");
+      test("pop 5", l.pop.to_s, "10");
+      test("pop 6", l.pop.to_s, "9");
+      test("pop 7", l.pop.to_s, "8");
+      test("pop 8", l.pop.to_s, "7");
+      test("pop 9", l.pop.to_s, "6");
+      test("pop 10", l.pop.to_s, "5");
+      test("pop 11", l.pop.to_s, "4");
+      test("pop 12", l.pop.to_s, "3");
+      test("pop 13", l.pop.to_s, "2");
+      test("pop 14", l.pop.to_s, "1");
+      test("pop 15", l.pop.to_s, "0");
+      test("pop 16", l.pop.to_s, "0");
+      test("is_empty 2", l.is_empty.to_s, "T");
+      test("safe_is_empty 2", l.safe_is_empty.to_s, "T");
+      
+      l1: LIST{INT} := list_of_range(1,7);
+      test("l1 entries", str_of_list(l1)
+	    , "1, 2, 3, 4, 5, 6, 7");
+      l2: LIST{INT} := list_of_range(4,9);
+      test("l2 entries", str_of_list(l2)
+	    , "4, 5, 6, 7, 8, 9");
+      test("append", str_of_list(l1.copy.append(l2))
+	    ,"1, 2, 3, 4, 5, 6, 7, 4, 5, 6, 7, 8, 9");
+      test("range", str_of_list(l1.range(2,4)), "3, 4, 5");
+      test("reverse", str_of_list(l1.reverse)
+	    , "7, 6, 5, 4, 3, 2, 1");
+      test("union", str_of_list(l1.union(l2))
+	 ,"7, 6, 5, 4, 3, 2, 1, 8, 9");
+      test("intersection", str_of_list(l1.intersection(l2))
+	 ,"7, 6, 5, 4");
+      test("difference", str_of_list(l1.difference(l2))
+	 ,"1, 2, 3");
+      test("sym_difference", str_of_list(l1.sym_difference(l2))
+	 ,"3, 2, 1, 8, 9");
+      test("index_of", l1.index_of(2).to_s, "5");
+      l1.delete(1);
+      test("delete", str_of_list(l1)
+	    ,"7, 1, 5, 4, 3, 2");
+      l1.clear;
+      test("clear", str_of_list(l1), "");
+      finish;
+   end; -- main
+   
+   str_of_list(l: LIST{INT}): STR is
+      -- A string containing the elements of `l' of the form `"1, 2, 3"'.
+      res := STR::create;
+      lc: LIST_CURSOR{INT} := l.cursor;
+      loop until!(lc.is_done);
+	 res := res.i(lc.item);
+	 lc.next;
+	 if not lc.is_done then res := res.s(", "); end;
+      end; -- loop
+   end; -- str_of_list
+   
+   list_of_range(l,h: INT): LIST{INT} is   
+      -- A list containing `l,...,h'.
+      res := LIST{INT}::create;
+      i: INT := l; loop until!(i > h);
+	 res := res.push(i);
+	 i := i + 1
+      end; -- loop
+   end; -- list_of_range
+      
+end; -- class LIST_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+

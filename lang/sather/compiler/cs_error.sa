@@ -1,0 +1,342 @@
+-- -*- Mode: Sather;  -*-
+-- File: cs_error.sa
+-- Author: Heinz Schmidt (hws@csis.dit.csiro.AU)
+-- Copyright (C) CSIRO Division of Information Technology, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: This file separates all the error messages, so that foreign
+--*       language sites could customize the messages more easily.
+--*
+--*       We simply make each a function. The function call overhead is
+--*       irrelevant if there are errors. And the code size can be
+--*       reduced by inlining.
+--*
+--*       This does not include compiler messages, as these should
+--*       be readable to sather-admin. Complaints about error messages
+--*       should be resolved at local site if error output is customized.
+--*       Wrong error messages can be reproduced in English by sending
+--*       error reproducing code with .sather to sather-admin and
+--*       running them through the "English-speaking" compiler.
+--*
+--* CLASSES: CS_ERROR, ERR_INFO
+--*
+--* HISTORY:
+--* Last edited: Oct 17 04:55 1993 (hws)
+--*  Oct 16 00:12 1993 (hws): fix an out of bounds error that had been apparently for long.
+--*  Oct  3 12:34 1993 (hws): unimplemented feature message
+--*  Sep 28 05:14 1993 (hws): ensure -> post
+--*  Mar  2 12:32 1993 (hws): add compiler exception class
+--*  Sep 20 16:39 1992 (hws): mark warnings and make them respect -w
+--* Created: Sat Sep 19 21:37:21 1992 (hws)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class CS_ERROR is
+   -- A package containing all error messages. Customize here to change error
+   -- presentation.
+
+--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+-- Syntax errors
+
+--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+-- Completeness
+
+   undefined_feature(name: INT; line: INT) is
+      ERR_INFO::format_error_msg(line,
+	    STR::create.s("Error (CLASSOB_S): Cannot find feature \"")
+		  .s((GLOBALS::str_table).at_index(name)).s("\"\n"))
+   end;
+
+   unimplemented_feature(name: INT; line: INT) is
+      ERR_INFO::format_error_msg(line,
+	    STR::create.s("Error (CLASSOB_S): Abstract feature \"")
+		  .s((GLOBALS::str_table).at_index(name)).s("\" in concrete class.\n"))
+   end;
+
+-- Well-structuring
+
+   repeated_type_parameters(file:STR; line,p1,p2: INT) is
+      ERR_INFO::format_error_msg_file(file,line,"CLASSOB_S",
+	 STR::create.s("Repeated type parameters \"").
+	 s((GLOBALS::str_table).at_index(p1)).
+	 s("\" and \"").
+	 s((GLOBALS::str_table).at_index(p2)).s("\""));
+   end;
+
+   wrong_number_of_type_parameters(file:STR; line: INT) is
+      ERR_INFO::format_error_msg_file(file,line, "CLASSOB_S",
+	 "Wrong number of type parameters");
+   end;
+
+   cyclic_inheritance(file:STR; line: INT; name: STR) is
+      	 ERR_INFO::format_error_msg_file(file, line, "CLASSOB_S",
+	    STR::create.s("Cycle in class inheritance of \"").s(name).s("\""));
+   end;
+
+   basic_with_attributes(lineno: INT) is
+      	       ERR_INFO::format_error_exit(lineno,
+		  STR::create.s("(CLASSOB_S): Descendent of basic class must not have any attributes\n"));
+   end;
+
+--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+-- Conformance
+   
+   non_inheritable(name: STR; line: INT) is
+      ERR_INFO::format_error_msg_file(ERR_INFO::filename, line, "CLASSOB_S",
+	 STR::create.s(name).s(" is not inheritable"));
+   end;
+
+   incompatible_inheritance(name, c1, c2: STR) is
+      ERR_INFO::error_msg(STR::create.s(ERR_INFO::filename).c('(')
+	    .s(name).c(')').s(" (CLASSOB_S): Incompatible inheritance -- \"")
+	    .s(c1).s("\" and \"").s(c2).s("\"\n"));
+   end;
+
+   basic_cross_inheritance(name:STR) is
+      ERR_INFO::error_msg(STR::create.s("(CLASSOB_S): Basic class \"")
+	    .s(name).s("\" inherits from class of different root\n"));
+   end;
+
+
+--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+-- Typing errors
+
+end; -- CS_ERROR
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class ERR_INFO is
+   -- Different ways to print error messages, and whether to
+   -- quit compilation or not.
+   -- The default scheme passes line numbers in the calls and
+   -- finds the current file and class in global variables.
+   -- Exceptionally, code is composed in a out-of-line fashion,
+   -- such as initialization routines that are composed from various decls
+   -- possible stemming from different files. In this case, NEGATIVE numbers
+   -- are associated as line number to semantic constructs. These numbers are
+   -- defined and interpreted here.
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   warning_msg(s:STR) is
+      -- Print warning message; this is not counted as error.
+      if not COMPILER_OPTIONS::warnings_only then ERR::s("* ").s(s); end;
+   end; -- warning_msg
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   error_msg(s:STR) is
+      -- Print error message and increment error count.
+      C::error_msg(C::str_ptr_(s));
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   compiler_error_msg(classname,msg:STR) is
+      -- Print message so users can forward properly to sather-admin.
+      -- Exit compilation when encountering this error.
+      mess: STR := STR::create.s("(").s(classname).s("): COMPILER ERROR ").s(msg).nl;
+      error_msg(mess);
+      -- don't raise exception, rather set a breakpoint here when debugging.
+      -- COMPILER_EXCEPTION::create(mess) break;
+   end;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   error_exit(s:STR) is
+      -- Print error message and exit compilation.
+      C::error_exit(C::str_ptr_(s));
+   end; 
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   format_warning_msg(ln:INT; s:STR) is
+      -- Print warning message about a certain line in current
+      -- file, given by `def_filename'.
+      format_warning_msg_file(def_filename(ln), ln, def_classname, s);
+   end; -- format_warning_msg
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   format_error_msg(ln:INT; s:STR) is
+      -- Print message about error on a certain line in current
+      -- file, given by `def_filename'.
+      format_error_msg_file(def_filename(ln), ln, def_classname, s);
+   end; -- format_error_msg
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   format_warning_msg_file(file:STR; ln:INT; cls,s:STR) is
+      -- Print warning message about a certain line in current
+      -- file, given by `def_filename'.
+      warning_msg(STR::create.c('"').s(file)
+	    .s("\", line ").i(def_lineno(ln)).
+	    s(": in class ").s(cls).s(" (Warning)\n  -- ").s(s).s("\n\n"));
+   end; -- format_warning_msg
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   format_error_msg_file(file:STR; ln:INT; cls,s:STR) is
+      -- Print message about error on a certain line in current
+      -- file, given by `def_filename'.
+      error_msg(STR::create.c('"').s(file).
+                         s("\", line ").
+                         i(def_lineno(ln)).
+                         s(": in class ").
+                         s(cls).
+                         s("\n  -- ").
+                         s(s).s("\n\n"));
+   end; -- format_error_msg
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   format_error_exit(ln:INT; s:STR) is
+      -- Print message about error on a certain line in current
+      -- file, given by `def_filename', and exit from compilation.
+      error_exit(STR::create.c('"').s(def_filename(ln)).
+                          s("\", line ").
+                          i(def_lineno(ln)).
+                          s(": in class ").
+                          s(def_classname).
+                          s("\n  -- ").
+                          s(s).s("\n\n"));
+   end; -- format_error_exit
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   filename:STR is
+      -- Name of file containing the class currently being worked
+      -- on by compiler.
+      res := GLOBALS::curr_filename;
+   end; -- filename
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   private shared ool_file_names: LIST{STR} := LIST{STR}::create(5);
+   private shared ool_lines: LIST{INT} := LIST{INT}::create(5);
+   
+   out_of_line_err_info(f: STR; ln: INT): INT post res < 0 is
+      -- returns a negative int uniquely identifying the file `f' and line number
+      -- `ln' combination. This number can be passed to error info routines,
+      -- in place of a line number.
+      
+      if ln < 0 then res := ln;	return; end; -- already magic number
+	 -- note that many successive constructs on one line are possible
+      last: INT := ool_file_names.insert - 1;
+      if last /= -1 then 
+	 if ool_file_names[last] = f and ool_lines[last] = ln then
+	    res := - (last + 1);
+	    return;
+	 end;
+      end;
+      -- else push the new combination and return the neg index
+      ool_file_names := ool_file_names.push(f);
+      ool_lines := ool_lines.push(ln);
+      res := - ool_file_names.insert;
+
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   def_lineno(ln: INT): INT is
+      -- Line number of construct. `ln' is the actual line number of a construct
+      -- or a number generated by `out_of_line_err_info' that
+      -- identifies such a construct out of the current context.
+      if ln < 0 then
+	 res := ool_lines[(-ln)-1];
+      else
+	 res := ln
+      end; -- if
+   end; -- def_lineno
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   def_filename(ln: INT):STR is
+      -- Name of file containing the feature currently being worked
+      -- on by compiler.  NOTE: If the feature is inherited, this
+      -- gives the filename of the ancestor class in which the feature
+      -- is first defined. `ln' is the source line number of the erroneous
+      -- construct or a number generated by `out_of_line_err_info' that
+      -- identifies such a construct out of the current context.
+      if ln < 0 then
+	 res := ool_file_names[-ln-1]
+      else
+	 where:CLASSOB := (GLOBALS::curr_feature).cls_def;
+	 if (where /= void) then
+	    res := where.fname;
+	 else
+	    res := "<apparently not from file>"
+	 end; -- if
+      end; -- if
+   end; -- def_filename
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   def_classname:STR is
+      -- Name for user to locate class containing the feature currently
+      -- being worked on by compiler.
+      -- NOTE: If the feature is inherited, this contains both the original
+      -- and the inheriting class where the error occurs.
+      where:CLASSOB := (GLOBALS::curr_feature).cls_def; -- original
+      if (where /= void) then
+	 res := (GLOBALS::str_table).at_index(where.index);
+	 res := STR::create.s("\"").s(res).s("\""); -- quote it
+	 where_inst: CLASSOB := (GLOBALS::curr_class_inst).def; -- descendent
+	 if ((GLOBALS::class_inst) /= void) and
+	    (where_inst /= where) then
+	    res := STR::create.s(res).s(" in ")
+		  .s("\"").s((GLOBALS::str_table).at_index(where_inst.index)).s("\"");
+	    end;
+      else res := "<Apparently generated>"
+      end;
+   end; -- def_classname
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   feat_lineno:INT is
+      -- Line number of current feature being worked on.
+      if (GLOBALS::curr_feature /= void) then
+	 res := (GLOBALS::curr_feature).lineno;
+      else
+	 res := -1;
+      end; -- if
+   end; -- feat_lineno
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   type_mismatch_err(where,comnt:STR; t1,t2:$TYPEOB_S; ln:INT) is
+      -- Print out type mismatch error with a clearer message.
+      t1_nm:STR;
+      if (t1 /= void) then
+	 t1_nm := t1.inst_cls.full_name;
+	 if t1.is_dispatched then
+	    t1_nm := STR::create.s("$").s(t1_nm);
+	 end;
+      else
+	 t1_nm := "void";
+      end; -- if
+
+      t2_nm:STR;
+      if (t2 /= void) then
+	 t2_nm := t2.inst_cls.full_name;
+	 if t2.is_dispatched then
+	    t2_nm := STR::create.s("$").s(t2_nm);
+	 end;
+      else
+	 t2_nm := "void";
+      end; -- if
+      
+      format_error_msg(ln,
+                       STR::create.s("Type mismatch in ").s(where).
+                                s(" -- ").s(t1_nm).s(" does not conform to ").
+                                s(t2_nm).s(comnt));
+   end; -- type_mismatch_err
+
+end; -- class ERR_INFO
+
+--------------------------------------------------------------------
+
+class COMPILER_EXCEPTION is
+   shared exc: COMPILER_EXCEPTION := COMPILER_EXCEPTION::create("Compiler Error");
+   attr reason: STR;
+   create(r: STR): SAME is
+      -- a simple exception for "COMPILER ERROR" s.
+      res := new;
+      res.reason := r;
+   end;
+end;

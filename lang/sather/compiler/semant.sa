@@ -1,0 +1,2321 @@
+-- File: semant.sa
+-- Author: Chu-Cheow Lim and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1990, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Provides the necessary routines for semantic check
+--*
+--* RCS: $Id: semant.sa,v 1.1 1994/02/12 03:21:48 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 31 15:34 1993 (hws)
+--*  Oct 31 15:34 1993 (hws): change order of CLIB generated in Makefile to allow shadowing
+--*  Oct 24 22:53 1993 (hws): share EXTERNS_.h (Main and Sinit)
+--*  Oct 24 18:07 1993 (hws): give "main" class msg instead of "root" class.
+--*  Oct 17 05:06 1993 (hws): Sather 1 syntax, copyright note
+--*  Oct  6 00:17 1993 (hws): remove c_makefile handling
+--*  Sep 28 05:06 1993 (hws): switch -> case
+--*  Aug 30 15:55 1993 (oscar): compile SINIT, CLASINFO with MAINFLAGS too
+--*  Jun 16 17:38 1993 (oscar): remove offending `;' at eof SINIT_.c, MAIN_.c
+--*  May 17 22:30 1993 (hws): reintegrate dispatch tables in MAIN, need most symbols.
+--*  May 17 20:52 1993 (hws): don't forget closing CLASINFO file
+--*  May 17 02:10 1993 (hws): move string constants to were needed in initialization file
+--*  May 17 00:41 1993 (hws): cannot use string pointer for name in feature table initializer
+--*  May 16 16:18 1993 (hws): generate one CC only, remove MAINCC and include SATHER_LD
+--*  May 16 15:28 1993 (hws): fix in bug int the split.
+--*  May 12 14:19 1993 (hws): split MAIN_.c in several files
+--*  Apr 18 04:57 1993 (hws): add CC flag to make file
+--*  Apr 18 00:46 1993 (hws): pass self=void according to expected type.
+--*  Apr 17 07:48 1993 (hws): return status 0, if a main is void.
+--*  Apr 17 05:23 1993 (hws): treat void main not to return value
+--*  Apr 17 03:58 1993 (hws): introduce make dependency for all_.h etc.
+--*  Apr 17 03:42 1993 (hws): always do "fast" incremental compilation
+--*  Apr 17 03:28 1993 (hws): put cs options in top file comment of MAIN
+--*  Apr 17 02:43 1993 (hws): change mkROOT to Makefile
+--*  Apr 16 22:17 1993 (hws): use -l and -L library for dealing with archives.
+--*  Apr 16 21:59 1993 (hws): generate a .c.o dependency rather than the giant list
+--*  Apr 16 21:34 1993 (hws): use -gc option to determine whether GC is included
+--*  Mar  1 13:20 1993 (hws): more uniform error msgs
+--*  Sep 19 20:50 1992 (hws): adapt to new signature of CLASSOB::create
+--*  Aug 26 16:41 1992 (brand): changed the way fast compiling is done so
+--*    that sdb gets legit filenames.  See comments at line 1148.
+--*  Jul  2 00:14 1992 (hws): shrink dispatch tables to bare necessities.
+--*  Jul  2 00:03 1992 (hws): rolled in Kresten's fast handler (krab@iesd.auc.dk)
+--*  Jun 30 01:24 1992 (hws): proper massage of shared init expr in predef classes.
+--*  Mar 17 23:10 1992 (hws): "SATHER_MAKE" regained! We can define it
+--*         in the make file and for the boot compiler we pass it as
+--*         a make macro of course.
+--*  Feb 24 17:40 1992 (hws): use "make" for c_makefiles, so users can
+--*         use include / and we too in the boot compiler.
+--*  Feb 13 22:15 1992 (hws): boot compiler MAIN_.c created with GC_ cs did contain
+--*         a gc_malloc_ call and died on non-GC platform.
+--*  Jan 22 11:12 1992 (hws): replaced symbolic link logic for precompiled
+--*         classes by copy to avoid the filesystem hassle that
+--*         showed up in some installations.
+--*  Nov 26 23:48 1991 (hws): integrated clim's -chk patch.
+--* 18 Jan: In "all_create_inst" routine, we add a check to make sure
+--*         that the class indices does not exceed 2^14 - 1 (= 16383).
+--*         This is because in the dispatch table encoding, it is assumed
+--*         that the class index ranges from 0 to 16383.
+--* 25 Jan: Generate code to statically initialize "prog_name_", 
+--*         "prog_dir_", "max_name_index_", "num_classes_", 
+--*         "dispatch_table_size_" and "dispatch_table_" (only space allocated,
+--*         not initialized).
+--* Created: Fri Jun  8 15:21:56 1990
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class SATHER_SEMANT is
+
+   RESERVED_WORDS;
+   shared array_str_ind:INT := 0;
+   -- Compiler has to determine the index of "ARRAY{STR}" within the
+   -- particular instance of compilation.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   error_msg(s:STR) is
+      C::error_msg(C::str_ptr_(s));
+   end;
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   error_exit(s:STR) is
+      C::error_exit(C::str_ptr_(s));
+   end; 
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   install_predefined_classes:BOOL is
+      -- Returns "true" if all the predefined classes are defined and
+      -- successfully installed.
+      def:CLASSOB;		-- Definition of base class
+      k:LSTINT_KEY;		-- Key for the class instantiation
+      pi:LST_TYPEOB_S;
+	 -- List of type instantiations for ARRAYs
+      res := true;
+      
+      def := (GLOBALS::class_defs).get_obj(ob_ind);
+      if (def = void) then
+	 -- If there is no boot file, we simply install the useless CLASSOB_S.
+	 def := CLASSOB::create(ob_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(ob_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::OB_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(ob_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::OB_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+
+	 -- Used by ARRAY classes.
+      pi := pi.create(1).push(INSTANT_TYPEOB_S::create(RESERVED_CLASSES::OB_ici, -1).dispatched);
+-- ARRAY
+      def := (GLOBALS::class_defs).get_obj(array_ind);
+      if (def = void) then
+	 ERR_INFO::warning_msg(STR::create.s("(WARNING) : Predefined class \"").
+                               s((GLOBALS::str_table).at_index(array_ind)).
+                               s("\" not found\n"));
+	 def := CLASSOB::create(array_ind, 0,
+	                     LIST{INT}::create(1).push(ob_ind),
+	                     -- Pick a random name for type parameter.
+	                     LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(2).push(array_ind).push(- RESERVED_CLASSES::OB_ici);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::ARRAY_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, pi));
+      else
+	 k := k.create(2).push(array_ind).push(- RESERVED_CLASSES::OB_ici);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::ARRAY_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, pi));
+      end; -- if
+
+	 -- ARRAY2
+      def := (GLOBALS::class_defs).get_obj(array2_ind);
+      if (def = void) then
+	 ERR_INFO::warning_msg(STR::create.s("(WARNING) : Predefined class \"").
+                               s((GLOBALS::str_table).at_index(array2_ind)).
+                               s("\" not found\n"));
+	 def := CLASSOB::create(array2_ind, 0,
+	                     LIST{INT}::create(1).push(ob_ind),
+	                     -- Pick a random name for type parameter.
+	                     LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(2).push(array2_ind).push(- RESERVED_CLASSES::OB_ici);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::ARRAY2_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, pi));
+      else
+	 k := k.create(2).push(array2_ind).push(- RESERVED_CLASSES::OB_ici);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::ARRAY2_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, pi));
+      end; -- if
+
+-- ARRAY3
+      def := (GLOBALS::class_defs).get_obj(array3_ind);
+      if (def = void) then
+	 ERR_INFO::warning_msg(STR::create.s("(WARNING) : Predefined class \"").
+                               s((GLOBALS::str_table).at_index(array3_ind)).
+                               s("\" not found\n"));
+	 def := CLASSOB::create(array3_ind, 0,
+	                     LIST{INT}::create(1).push(ob_ind),
+	                     -- Pick a random name for type parameter.
+	                     LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(2).push(array3_ind).push(- RESERVED_CLASSES::OB_ici);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::ARRAY3_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, pi));
+      else
+	 k := k.create(2).push(array3_ind).push(- RESERVED_CLASSES::OB_ici);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::ARRAY3_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, pi));
+      end; -- if
+
+-- ARRAY4
+      def := (GLOBALS::class_defs).get_obj(array4_ind);
+      if (def = void) then
+	 ERR_INFO::warning_msg(STR::create.s("(WARNING) : Predefined class \"").
+                               s((GLOBALS::str_table).at_index(array4_ind)).
+                               s("\" not found\n"));
+	 def := CLASSOB::create(array4_ind, 0,
+	                     LIST{INT}::create(1).push(ob_ind),
+	                     -- Pick a random name for type parameter.
+	                     LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(2).push(array4_ind).push(- RESERVED_CLASSES::OB_ici);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::ARRAY4_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, pi));
+      else
+	 k := k.create(2).push(array4_ind).push(- RESERVED_CLASSES::OB_ici);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::ARRAY4_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, pi));
+      end; -- if
+
+-- BOOL
+      def := (GLOBALS::class_defs).get_obj(bool_ind);
+      if (def = void) then
+	 ERR_INFO::warning_msg(STR::create.s("(WARNING) : Predefined class \"").
+                               s((GLOBALS::str_table).at_index(bool_ind)).
+                               s("\" not found\n"));
+	 def := CLASSOB::create(bool_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(bool_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::BOOL_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(bool_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::BOOL_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+
+-- C
+      def := (GLOBALS::class_defs).get_obj(c_ind);
+      if (def = void) then
+	 ERR_INFO::warning_msg(STR::create.s("(WARNING) : Predefined class \"").
+                               s((GLOBALS::str_table).at_index(c_ind)).
+                               s("\" not found\n"));
+	 def := CLASSOB::create(c_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(c_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::C_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(c_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::C_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+
+-- CHAR
+      def := (GLOBALS::class_defs).get_obj(char_ind);
+      if (def = void) then
+	 ERR_INFO::warning_msg(STR::create.s("(WARNING) : Predefined class \"").
+                               s((GLOBALS::str_table).at_index(char_ind)).
+                               s("\" not found\n"));
+	 def := CLASSOB::create(char_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(char_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::CHAR_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(char_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::CHAR_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+
+-- DOUBLE
+      def := (GLOBALS::class_defs).get_obj(double_ind);
+      if (def = void) then
+	 ERR_INFO::warning_msg(STR::create.s("(WARNING) : Predefined class \"").
+                               s((GLOBALS::str_table).at_index(double_ind)).
+                               s("\" not found\n"));
+	 def := CLASSOB::create(double_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(double_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::DOUBLE_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(double_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::DOUBLE_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+
+-- ERR
+      def := (GLOBALS::class_defs).get_obj(err_ind);
+      if (def = void) then
+	 ERR_INFO::warning_msg(STR::create.s("(WARNING) : Predefined class \"").
+                               s((GLOBALS::str_table).at_index(err_ind)).
+                               s("\" not found\n"));
+	 def := CLASSOB::create(err_ind, 0, void, LST_FEATOB::create(1),void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(err_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::ERR_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(err_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::ERR_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+
+-- FILE
+      def := (GLOBALS::class_defs).get_obj(file_ind);
+      if (def = void) then
+	 ERR_INFO::warning_msg(STR::create.s("(WARNING) : Predefined class \"").
+                               s((GLOBALS::str_table).at_index(file_ind)).
+                               s("\" not found\n"));
+	 def := CLASSOB::create(file_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(file_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::FILE_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(file_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::FILE_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+
+-- IN
+      def := (GLOBALS::class_defs).get_obj(in_ind);
+      if (def = void) then
+	 ERR_INFO::warning_msg(STR::create.s("(WARNING) : Predefined class \"").
+                               s((GLOBALS::str_table).at_index(in_ind)).
+                               s("\" not found\n"));
+	 def := CLASSOB::create(in_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(in_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::IN_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(in_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::IN_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+
+-- INT
+      def := (GLOBALS::class_defs).get_obj(int_ind);
+      if (def = void) then
+	 ERR_INFO::warning_msg(STR::create.s("(WARNING) : Predefined class \"").
+                               s((GLOBALS::str_table).at_index(int_ind)).
+                               s("\" not found\n"));
+	 def := CLASSOB::create(int_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(int_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::INT_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(int_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::INT_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+
+-- OUT
+      def := (GLOBALS::class_defs).get_obj(out_ind);
+      if (def = void) then
+	 ERR_INFO::warning_msg(STR::create.s("(WARNING) : Predefined class \"").
+                               s((GLOBALS::str_table).at_index(out_ind)).
+                               s("\" not found\n"));
+	 def := CLASSOB::create(out_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(out_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::OUT_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(out_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::OUT_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+
+-- REAL
+      def := (GLOBALS::class_defs).get_obj(real_ind);
+      if (def = void) then
+	 ERR_INFO::warning_msg(STR::create.s("(WARNING) : Predefined class \"").
+                               s((GLOBALS::str_table).at_index(real_ind)).
+                               s("\" not found\n"));
+	 def := CLASSOB::create(real_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(real_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::REAL_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(real_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::REAL_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+
+-- SELF_TYPE
+      def := (GLOBALS::class_defs).get_obj(self_type_ind);
+      if (def = void) then
+	 -- If there is no boot file, we simply install the useless CLASSOB_S.
+	 def := CLASSOB::create(self_type_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(self_type_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::SELF_TYPE_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(self_type_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::SELF_TYPE_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+
+-- STR
+      def := (GLOBALS::class_defs).get_obj(str_ind);
+      if (def = void) then
+	 ERR_INFO::warning_msg(STR::create.s("(WARNING) : Predefined class \"").
+                               s((GLOBALS::str_table).at_index(str_ind)).
+                               s("\" not found\n"));
+	 def := CLASSOB::create(str_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(str_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::STR_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(str_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::STR_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+
+-- STR_CURSOR
+      def := (GLOBALS::class_defs).get_obj(str_cursor_ind);
+      if (def = void) then
+	 ERR_INFO::warning_msg(STR::create.s("(WARNING) : Predefined class \"").
+                               s((GLOBALS::str_table).at_index(str_cursor_ind)).
+                               s("\" not found\n"));
+	 def := CLASSOB::create(str_cursor_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(str_cursor_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::STR_CURSOR_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(str_cursor_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::STR_CURSOR_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void)); 
+      end; -- if
+
+-- SYS
+      def := (GLOBALS::class_defs).get_obj(sys_ind);
+      if (def = void) then
+	 -- If there is no boot file, we simply install the useless CLASSOB_S.
+	 def := CLASSOB::create(sys_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(sys_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::SYS_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(sys_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::SYS_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+
+-- FOB
+      def := (GLOBALS::class_defs).get_obj(fob_ind);
+      if (def = void) then
+	 -- If there is no boot file, we simply install the useless CLASSOB_S.
+	 def := CLASSOB::create(fob_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(fob_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::FOB_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(fob_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::FOB_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+
+-- SUX
+
+      def := (GLOBALS::class_defs).get_obj(sux_ind);
+      if (def = void) then
+	 -- If there is no boot file, we simply install the useless CLASSOB_S.
+	 def := CLASSOB::create(sux_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(sux_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::SUX_ici,
+	                                       k,
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(sux_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::SUX_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+
+-- UNDEFINE
+      def := (GLOBALS::class_defs).get_obj(undefine_ind);
+      if (def = void) then
+	 -- If there is no boot file, we simply install the useless CLASSOB_S.
+	 def := CLASSOB::create(undefine_ind, 0, void, LST_FEATOB::create(1), void);
+	 (GLOBALS::class_defs).install(def);
+	 k := k.create(1).push(undefine_ind);
+	 GLOBALS::curr_filename := "<NOT IN FILE>";
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::UNDEFINE_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      else
+	 k := k.create(1).push(undefine_ind);
+	 GLOBALS::curr_filename := def.fname;
+	 OLDNEW_HANDLER::install_new_classob_s(RESERVED_CLASSES::UNDEFINE_ici,
+	                                       k, 
+	                                       CLASSOB_S::create(def, k, void));
+      end; -- if
+      
+-- Make sure all user classes are stored after the predefined classes and
+-- classes from previous compilation.
+      max:INT := RESERVED_CLASSES::LAST_PREDEF_ici;
+      if (max < (GLOBALS::class_stat_tbl).last_class_ind) then
+	 max := (GLOBALS::class_stat_tbl).last_class_ind;
+      end; -- if
+      (GLOBALS::class_inst).expand(max + 1);
+   end; -- install_predefined_classes
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   install_root_classes(names:LIST{INT}):INT is
+      -- Install the root classes (with which "cs" was called); returns the
+      -- number of classes installed.
+      i:INT := 0;
+      nsz:INT;
+      if (names /= void) then
+	 nsz := names.insert;
+      end; -- if
+      loop until!(i >= nsz);
+	 def:CLASSOB := (GLOBALS::class_defs).get_obj(names[i]);
+	 if (def = void) then
+	    error_msg(STR::create.s("Main class \"").
+	              s((GLOBALS::str_table).at_index(names[i])).
+	              s("\" not found\n"));
+	 else
+	    -- If the definition is that called by the "cs" command, then
+	    -- set the value of "GLOBALS::creator_classob_s" to the newly
+	    -- created CLASSOB_S.
+	    k:LSTINT_KEY := k.create(1).push(names[i]);
+	    inst:CLASSOB_S := (GLOBALS::class_inst).get_obj(k);
+	    if (inst = void) then
+	       inst := CLASSOB_S::create(def, k, void); 
+
+	       GLOBALS::curr_filename := def.fname;
+	       GLOBALS::curr_class_inst := inst;
+
+	       OLDNEW_HANDLER::install_new_classob_s(-1, k, inst);
+	       inst.mark_is_used;
+	       if inst.abt then
+		  -- abstract classes are not supposed to be used.
+		  ERR_INFO::error_exit(
+		     STR::create.s("(SATHER_SEMANT): Abstract class \"")
+			   .s(inst.full_name).s("\" used as main class\n"));
+	       end;
+	       res := res + 1;
+	    end; -- if
+	    if (def = GLOBALS::creator_classob) then
+	       GLOBALS::creator_classob_s := inst;
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- install_root_class
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Now go through the class instances in order copying feature lists, 
+--   replacing all parser objects by semantic objects, installing 
+--   new class instances as necessary.
+   
+   all_create_inst is
+      -- NOTE: With incremental compilation, the CLASSOB_S objects
+      --       are not inserted in any particular order, and so we
+      --       must keep checking all CLASSOB_S's loop until!(all of them
+      --       are done. 
+      fixed_pt:BOOL := false;
+      loop until!(fixed_pt);
+	 fixed_pt := true;
+	 i:INT := 0;
+	    -- Note that we have to compute the size each time through
+	    --   the loop, because the table grows.
+	 loop until!(i >= (GLOBALS::class_inst).next_ind);
+	    co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	    if (co /= void) then
+	       GLOBALS::curr_filename := co.def.fname;
+	       GLOBALS::curr_class_inst := co;
+	       if (not co.cp_feats_from_def) then
+		  co.copy_features;
+		  co.cp_feats_from_def := true;
+		  fixed_pt := false;
+	       end; -- if
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+      end; -- if
+      if ((GLOBALS::class_inst).next_ind > 16383) then
+	 ERR_INFO::error_exit("ERROR: The compiler cannot handle more than 16383 classes.  One solution might be use the \"-ncs\" option.\n");
+      end; -- if
+   end; -- all_create_inst
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Now go through the class instances in order expanding all the class
+--   inheritance clauses.
+	 
+   all_expand_cinh is
+      i:INT := 0;
+      loop until!(i >= (GLOBALS::class_inst).next_ind);
+	 co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	 if (co /= void) then
+	    GLOBALS::curr_filename := co.def.fname;
+	    GLOBALS::curr_class_inst := co;
+	    if (not co.expand_cinh) then
+	       error_msg((co.def.fname).
+	                 s(" (CLASSOB_S) : Error in inheritance for \"").
+	                 s(co.full_name).s("\"\n"));
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- all_expand_cinh
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Now that we have all the features of a class instance, we can
+-- a.  resolve SELF_TYPE
+-- b.  check that "C", "SYS", "UNIX","UNDEFINE" is not used in any declaration.
+-- We have to do this phase before allocating offsets for the attributes.
+-- To reduce number of passes, we also 
+-- a. count the number of attributes for each class, and
+-- b. update the "cls_inst" attribute of the feature nodes to current class. 
+-- (b) must be done only after all the features have been duplicated 
+--   and there is no more expansion.
+
+   all_resolve_predef_types_and_compute_num_attrs(used_classes:LIST{INT}) is
+      
+      fixed_pt:BOOL := false;
+      loop until!(fixed_pt);
+	 fixed_pt := true;
+	 i:INT := 0;
+	 loop until!(i >= (GLOBALS::class_inst).next_ind);
+	    co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	    if (co /= void) then
+	       if (used_classes.contains(co.def.index) >= 0) or 
+		  (GLOBAL_PROC::handle_class_p(co)) then
+		  co.mark_is_used;
+		  if (not co.found_classes_used) then
+		     co.found_classes_used := true;
+		     fixed_pt := false;
+		  end; -- if
+	       end; -- if
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+      end; -- loop
+      
+      i:INT := 0;
+      loop until!(i >= (GLOBALS::class_inst).next_ind);
+	 co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	 if (co /= void) then
+	    GLOBALS::curr_filename := co.def.fname;
+	    GLOBALS::curr_class_inst := co;
+	    co.resolve_predef_types_and_compute_num_attrs;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      
+      -- If SYS class is used and user didn't specify "-info" option, we
+      -- give a reminder, instead of automatically generate the feature
+      -- table information (which may or may not be needed).
+      sys_class:CLASSOB_S := 
+         (GLOBALS::class_inst).at_index(RESERVED_CLASSES::SYS_ici);
+      if (sys_class /= void) then
+	 if (sys_class.is_used_p) and (not GLOBALS::print_feat_info) then
+	    ERR::s("REMINDER: Full type info access via used SYS class requires \"cs -info\"\n");
+	 end; -- if
+      end; -- if
+   end; -- all_resolve_predef_types_and_compute_num_attrs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   all_compute_anc_and_des_and_time_stamp is
+      i:INT := 0;
+      co:CLASSOB_S;
+      maxd:INT;
+      d:INT;
+      loop until!(i >= (GLOBALS::class_inst).next_ind);
+	 co := (GLOBALS::class_inst).at_index(i);
+	 if (co /= void) then
+	    GLOBALS::curr_filename := co.def.fname;
+	    GLOBALS::curr_class_inst := co;
+	    d := co.compute_pdepth;
+	    if (d > maxd) then
+	       maxd := d;
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+
+      i := 0;
+      loop until!(i >= (GLOBALS::class_inst).next_ind);
+	 co := (GLOBALS::class_inst).at_index(i); 
+	 if (co /= void) then
+	    GLOBALS::curr_filename := co.def.fname;
+	    GLOBALS::curr_class_inst := co;
+	    co.compute_anc;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+
+      i := 0;
+      loop until!(i >= (GLOBALS::class_inst).next_ind);
+	 co := (GLOBALS::class_inst).at_index(i);
+	 if (co /= void) then
+	    GLOBALS::curr_filename := co.def.fname;
+	    GLOBALS::curr_class_inst := co;
+	    co.compute_des;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+
+      -- make sure that all co's alldes attr is non-void and initialized to
+      -- the previously computed des object.
+      i := 0;
+      loop until!(i >= (GLOBALS::class_inst).next_ind);
+	 co := (GLOBALS::class_inst).at_index(i);
+	 if (co /= void) then
+	    if co.alldes = void then
+	       co.alldes := co.des.copy;
+	    end;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      
+      i := 1; -- no need to do zero depth those are simple  types.
+      loop until!(i > maxd);
+	 j:INT := 0;
+	 loop until!(j >= (GLOBALS::class_inst).next_ind);
+	    co := (GLOBALS::class_inst).at_index(j);
+	    if (co /= void) then
+	       if (co.pdepth = i) then
+		  GLOBALS::curr_filename := co.def.fname;
+		  GLOBALS::curr_class_inst := co;
+		  co.compute_pdes;
+	       end; -- if
+	    end; -- if
+	    j := j + 1;
+	 end; -- loop
+	 i := i + 1;
+      end; -- loop
+
+      i := 0;
+      loop until!(i >= (GLOBALS::class_inst).next_ind);
+	 co := (GLOBALS::class_inst).at_index(i);
+	 if (co /= void) then
+	    co.adjust_parent_alldes;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+
+      i := 0;
+      loop until!(i > maxd);
+	 j:INT := 0;
+	 loop until!(j >= (GLOBALS::class_inst).next_ind);
+	    co := (GLOBALS::class_inst).at_index(j);
+	    if (co /= void) then
+	       if (co.pdepth = i) then
+		  GLOBALS::curr_filename := co.def.fname;
+		  GLOBALS::curr_class_inst := co;
+		  co.compute_time_stamp;
+	       end; -- if
+	    end; -- if
+	    j := j + 1;
+	 end; -- loop
+	 i := i + 1;
+      end; -- loop
+   end; -- all_compute_anc_and_des
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   print_descendant_information is
+      -- 
+      i:INT := 0;
+      loop until!(i >= (GLOBALS::class_inst).next_ind);
+	 curClassOb:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	 if (curClassOb /= void) then
+	    OUT::s("----------------\n").s(curClassOb.full_name).nl;
+	    if curClassOb.alldes /= void then
+	       j:INT := 0;
+	       loop until!(j >= (GLOBALS::class_inst).next_ind);	       
+		  if curClassOb.alldes.get(j) then
+		     desClassOb:CLASSOB_S := (GLOBALS::class_inst).at_index(j);
+		     OUT::s("   ").s(desClassOb.full_name).nl;
+		  end; -- if
+		  j := j + 1;
+	       end; -- loop
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      OUT::s("----------------\n");
+   end; -- print_descendant_information
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- After getting the ancestors and resolving the types such as "SELF_TYPE",
+--   we can now allocate space for attributes.   
+   
+   all_compute_attr_offsets is
+      i:INT := 0;
+      sz:INT := (GLOBALS::class_inst).next_ind;
+      loop until!(i >= sz);
+	 co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	 if (co /= void) then
+
+	    GLOBALS::curr_filename := co.def.fname;
+	    GLOBALS::curr_class_inst := co;
+	    co.compute_attr_offsets;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- all_compute_attr_offsets
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Look up the features referenced from C and mark these as being
+-- used.  Then insert keys of these features into a set for later
+-- generation of code in "print_sather_to_c_macros".  Also store the
+-- associations between the keys and C names.
+
+-- Also look up the "main" routine in the class specified by user.
+   
+   find_called_features is
+      macros:C_NAME_KEYOB := (GLOBALS::dot_sather_reader).sat_info[COMPILE_KEYS_CONST::c_name_ind];
+      sz:INT := macros.info_size;
+      i:INT := 0;
+      loop until!(i >= sz);
+	 info:LIST{STR} := macros.ith_info(i);
+	 cnm:ARRAY{STR} := GLOBAL_PROC::extract_poss_names(info[1]);
+	 if (cnm = void) then
+	    error_msg(STR::create.s("Error in handling (c_name) <").
+	                       s(info[0]).s("> and <").s(info[1]).s(">\n"));
+	 else
+	    cnm_info:LIST{INT} := GLOBAL_PROC::analyze_class_name(cnm[0], 0);
+	    if (cnm_info = void) then
+	       error_msg(STR::create.s("Error (c_name) : Cannot analyze class \"").
+	                          s(cnm[0]).s("\"\n"));
+	    else
+	       co:CLASSOB_S := (GLOBALS::class_inst).at_index(cnm_info[0]);
+	       if (co /= void) then
+		  GLOBALS::curr_filename := co.def.fname;
+		  GLOBALS::curr_class_inst := co;
+		  
+		  feat_ind:INT := (GLOBALS::str_table).insert_str(cnm[1]);
+		  feat:$SEMANTOB := co.get_feature(feat_ind);
+		  if (feat = void) then
+		     error_msg(STR::create.s("Error (c_name) : Cannot find feature \"").
+		                        s(cnm[1]).s("\"\n"));
+		  else
+		     -- NOTE: This portion looks up old table using strings in
+		     --       new table.  The reverse is done after the new
+		     --       table has been constructed.
+		     k:INT := GLOBAL_PROC::key_of_class_feat(co.index, feat_ind);
+		     old_k:INT := (GLOBALS::class_stat_tbl).c_to_sather_names.
+		                                            get(info[0]);
+		     if (old_k = 0) then
+			-- The mapping <cname, C1::feat> is not found in
+			-- previous compilation, so update the class C1.
+			co.structure_updated := true;
+		     else
+			if (old_k /= k) then
+			   -- In this case, we have <cname1, C1::feat1> and
+			   -- <cname1, C2::feat2> from previous and current
+			   -- compilation where C1, C2 may be different, so
+			   -- we must update both C1 and C2.
+			   old_ci:INT := GLOBAL_PROC::classind_from_key(old_k);
+			   co.structure_updated := true;
+			   if (old_ci /= co.index) then
+			      old_co:CLASSOB_S := (GLOBALS::class_inst).at_index(old_ci);
+			      if (old_co = void) then
+				 OUT::s("Class (index=").i(old_ci).
+				      s(") from previous compilation no longer exists\n");
+			      else
+				 old_co.structure_updated := true;
+			      end; -- if
+			   end; -- if
+			end; -- if
+		     end; -- if
+		     case (feat.type)
+		     when ROUT_FEATOB_S::type then
+			rout_feat:ROUT_FEATOB_S := feat;
+			rout_feat.maybe_used := true;
+
+			GLOBALS::features_called_from_c := (GLOBALS::features_called_from_c).insert(k);
+			(GLOBALS::name_mappings).insert(info[0], k);
+			
+		     when CONST_DECL_FEATOB_S::type then
+			const_feat:CONST_DECL_FEATOB_S := feat;
+			const_feat.maybe_used := true;
+
+			GLOBALS::features_called_from_c := (GLOBALS::features_called_from_c).insert(k);
+			(GLOBALS::name_mappings).insert(info[0], k);
+			
+		     when SHARED_DECL_FEATOB_S::type then
+			shared_feat:SHARED_DECL_FEATOB_S := feat;
+			shared_feat.maybe_used := true;
+
+			GLOBALS::features_called_from_c := (GLOBALS::features_called_from_c).insert(k);
+			(GLOBALS::name_mappings).insert(info[0], k);
+			
+		     when ATTR_DECL_FEATOB_S::type then
+			error_msg(STR::create.s("Error (c_name) : Invalid ref from C to \"").
+			                   s(cnm[1]).
+			                   s("\" which is an attribute in \"").
+					   s(cnm[0]).
+					   s("\" class\n"));    
+		     end; -- case
+		  end; -- if
+	       else
+		  error_msg(STR::create.s("Error (c_name) : Cannot find class \"").
+		                     s(cnm[0]).s("\"\n"));
+	       end; -- if
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      main_ind:INT := (GLOBALS::str_table).insert_str(INSTALL_CONSTS::main_rout_name);
+      if (GLOBALS::creator_classob_s = void) then
+	 error_exit(STR::create.s("Error (c_name) : Creator class \"").
+	            s(GLOBALS::str_table.at_index(GLOBALS::creator_class_name)).
+	            s("\" not found\n"));
+	 
+      end; -- if
+      main_feat:$SEMANTOB := (GLOBALS::creator_classob_s).get_feature(main_ind);
+      if (main_feat = void) then
+	 error_msg(STR::create.s("Error : \"").
+	           s(GLOBALS::str_table.at_index(main_ind)).
+	           s("\" not found\n"));
+      else
+	 if (main_feat.type /= ROUT_FEATOB_S::type) then
+	    error_msg(STR::create.s("Error : \"").
+	              s(GLOBALS::str_table.at_index(main_ind)).
+	              s("\" not defined as a routine\n"));
+	 else
+	    -- Mark the main routine as being used
+	    GLOBALS::main_rout := main_feat;
+	    GLOBALS::main_rout.maybe_used := true;
+	 end; -- if
+      end; -- if
+
+      -- NOTE: Now that the new table "name_mappings" in class GLOBALS
+      --       has been constructed, go through the old table and check
+      --       if each name has stayed the same in the current compilation.
+      tbl:GENERAL_HASH{STR_HASH_MAP_ELT{INT}} := (GLOBALS::class_stat_tbl).
+	                            c_to_sather_names.tbl;
+      tbl_curs:GENERAL_HASH_CURSOR{STR_HASH_MAP_ELT{INT}} := tbl_curs.create(tbl);
+      tbl_curs.first;
+      loop until!(tbl_curs.is_done);
+	 elt:STR_HASH_MAP_ELT{INT} := tbl_curs.item;
+	 index:INT := (GLOBALS::name_mappings).get(elt.str);
+	 if (index = 0) then
+	    -- The mapping <cname, C1::feat> is not found in current
+	    -- compilation, so update the class C1.
+	    key:INT := elt.val;
+	    ci:INT := GLOBAL_PROC::classind_from_key(key);
+	    co:CLASSOB_S := (GLOBALS::class_inst).at_index(ci);
+	    co.structure_updated := true;
+	 else
+	    if (index /= elt.val) then
+	       -- In this case, we have <cname1, C1::feat1> and
+	       -- <cname2, C2::feat2> from previous and current compilation 
+	       -- where C1, C2 may be different, so we must updated both
+	       -- C1 and C2.
+	       new_ci:INT := GLOBAL_PROC::classind_from_key(index);
+	       ci:INT := GLOBAL_PROC::classind_from_key(elt.val);
+	       co:CLASSOB_S := (GLOBALS::class_inst).at_index(ci);
+	       if (ci /= new_ci) then
+		  new_co:CLASSOB_S := (GLOBALS::class_inst).at_index(new_ci);
+		  new_co.structure_updated := true;
+	       end; -- if
+	       if (co = void) then
+		  OUT::s("Class (index=").i(ci).
+		       s(") from previous compilation no longer exists\n");
+	       else
+		  co.structure_updated := true;
+	       end; -- if
+	    end; -- if
+	 end; -- if
+         tbl_curs.next;
+      end; -- loop
+   end; -- find_called_features
+
+---- ++++++++++++++++++++++++++++++++++++++++++++++++++
+--   record_keys_set is
+--      dbkeys:GENERIC_KEYOB := (GLOBALS::dot_sather_reader).sat_info[COMPILE_KEYS_CONST::debug_keys_ind];
+--      strs:LIST{STR} := dbkeys.info;
+--      sz:INT := strs.size;
+--      if (sz > 0) then
+--	 GLOBALS::keys_set := CLASS_KEY_SET::create(sz);
+--      else
+--	 GLOBALS::keys_set := CLASS_KEY_SET::create(1);
+--      end; -- if
+--      i:INT;
+--      loop until!(i >= sz);
+--	 s:STR := strs[i];
+--	 c_key:ARRAY{STR} := GLOBAL_PROC::extract_poss_names(s);
+--	 if (c_key = void) then
+--	    k_id:INT := (GLOBALS::str_table).insert_str(s);
+----	    OUT::s("Inserting <0,").i(k_id).s(">\n");
+--	    (GLOBALS::keys_set).insert(0, k_id);
+--	 else
+--	    cls:LIST{INT} := GLOBAL_PROC::analyze_class_name(c_key[0], 0);
+--	    if (cls /= void) then
+--	       k_id:INT := (GLOBALS::str_table).insert_str(s);
+----	       OUT::s("Inserting <").i(cls[0]).c(',').i(k_id).s(">\n");
+--	       (GLOBALS::keys_set).insert(cls[0], k_id);
+--	    else
+--	       ERR_INFO::warning_msg(STR::create.s("Ignore unknown class \"").
+--	                                      s(c_key[0]).
+--	                                      s("\" in command file\n"));
+--	    end; -- if
+--	 end; -- if
+--	 i := i + 1;
+--      end; -- loop
+--   end; -- record_keys_set
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- We need a separate phase to resolve the referrents because the process
+-- of printing the declarations may require us to know about features in
+-- arbitrary classes.
+   all_semant is
+      -- record_keys_set;
+      i:INT;
+      sz:INT := (GLOBALS::class_inst).next_ind;
+      loop until!(i >= sz);
+	 co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	 if (co /= void) then
+	    GLOBALS::curr_filename := co.def.fname;
+	    GLOBALS::curr_class_inst := co;
+	    co.pre_semant;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      
+      fixed_pt:BOOL := false;
+      loop until!(fixed_pt);
+	 fixed_pt := true;
+	 i:INT := 0;
+	 sz:INT := (GLOBALS::class_inst).next_ind;
+	 loop until!(i >= sz);
+	    co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	    if (co /= void) then
+	       if (GLOBAL_PROC::handle_class_p(co)) then
+		  if (not co.semant_done) then
+		     GLOBALS::curr_filename := co.def.fname;
+		     GLOBALS::curr_class_inst := co;
+		     co.semant;
+		     co.semant_done := true;
+		     fixed_pt := false;
+		  end; -- if
+	       end; -- if
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+      end; -- loop
+      
+      -- Mark the callers and callees of a "structure_updated" CLASSOB_S
+      -- as "internal_updated".   That is, the purpose is to check if 
+      -- there is a reference to a class whose interface has changed.  
+      -- If so, mark this class's "internal_updated" as "true".
+      i:INT;
+      sz:INT := (GLOBALS::class_inst).next_ind;
+      loop until!(i >= sz);
+	 co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	 if (co /= void) then
+	    if (GLOBAL_PROC::handle_class_p(co)) then
+	       GLOBALS::curr_filename := co.def.fname;
+	       GLOBALS::curr_class_inst := co;
+	       co.mark_callees_and_callers;
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- all_semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   final_pass(co:CLASSOB_S) is
+      GLOBALS::curr_filename := co.def.fname;
+      GLOBALS::curr_class_inst := co;
+      
+      co.misc_info;		
+	 -- Perform the following function:
+	 -- a. Look for all required temporaries 
+	 -- b1. Generate goto-tags
+	 -- b2. Check that all "break" statements are inside loops
+	 -- c. Check that all dispatches are only on non-basic objects
+	 -- d. Evaluate all constants.
+	 -- e. Collect all the temporary names of strings constants
+	 --    which are constant features and in other classes.
+
+      if (C::omerrs > 0) then
+	 return;
+      end; -- if
+
+      if (OLDNEW_HANDLER::updated_p(co)) or
+	 (COMPILER_OPTIONS::new_compilation) then
+	 outfname, outf_old, outf_obj:STR;
+	 outfname := STR::create.s(COMPILER_OPTIONS::target_dir)
+	       .s(co.cfilename).s(".c");
+
+	   --- Move the original zap.c to zap.C, then generate a
+	   -- new zap.c.  If the two are equivalent, then remove
+	   -- zap.C, else move zap.C back to zap.c.
+	   -- This arrangement is necessary because the file
+	   -- that we write generated code to is named in the
+	   -- Sather/C line correspondence file.  If we were
+	   -- to write to zap.C, then the Sather/C file would
+	   -- refer to no-longer-extant files.
+
+	 outf_old := STR::create.s(COMPILER_OPTIONS::target_dir)
+	       .s(co.cfilename).s(".C");
+	 outf_obj := STR::create.s(COMPILER_OPTIONS::target_dir)
+	       .s(co.cfilename).s(".o");
+	 if 0 = UNIX::system(STR::create.s(INSTALL_CONSTS::test_command)
+	    .s(" -f ").s(outfname))
+	 then UNIX::rename(outfname,outf_old); end;
+
+	 outfile:SAT_OUTFILE := SAT_OUTFILE::new;
+	 outfile.open_for_write(outfname);
+	 if (outfile.error /= 0) then
+	    error_msg(STR::create.s("Error in opening \"").s(outfname).s("\"\n"));
+	 else
+	    -- This cannot be a C class, so we can just go ahead and print.
+	    outfile.line_no := 1;
+	    co.cprint_header_and_macros(outfile);
+	    co.cprint_externs(outfile);
+	    co.cprint_ext_strs(outfile);
+	    
+	    if (co.index /= RESERVED_CLASSES::INT_ici) and
+	       (co.index /= RESERVED_CLASSES::CHAR_ici) and
+	       (co.index /= RESERVED_CLASSES::REAL_ici) and
+	       (co.index /= RESERVED_CLASSES::DOUBLE_ici) then
+	       outfile := outfile.s("#include \"macros_.h\"\n\n").inc_ln(2);
+	    end; -- if
+	    co.cprint_declns(outfile);
+	    outfile.s("extern int attr_ent_").
+	    s(co.prefix).
+	    s("[];\n\n").inc_ln(2);
+ 	    co.cprint_routines(outfile);
+	 end; -- if
+	 outfile.close;
+	 
+	 changed:BOOL := (UNIX::system(
+	    STR::create.s(INSTALL_CONSTS::cmp_command)
+		  .s(" -s ").s(outf_old).c(' ').s(outfname)
+	 ).bit_and(0xFF00).rshift(8)) /= 0;
+	 
+	 if (changed) then
+	    if not (COMPILER_OPTIONS::new_compilation) then
+	       OUT::s("** Regenerated C file for ").s(co.full_name).c('\n');
+	    end; -- if
+	    UNIX::unlink(outf_old);
+	 else
+	    UNIX::rename(outf_old,outfname); 
+	 end; -- if
+
+      end; -- if
+   end; -- final_pass
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- NOTES:
+-- (*) When "-chk" option is on, generate code for base classes, because
+-- a runtime error (void object or out-of-bound array indexing) can occur
+-- in a call on a base class object.  So "-chk" being on should imply
+-- "-gen" being on, but not "-all".
+
+   all_class_inst_cprint is
+      i:INT := 0;
+      sz:INT := (GLOBALS::class_inst).next_ind;
+      if (COMPILER_OPTIONS::target_dir = void) then
+	 ERR_INFO::compiler_error_msg("SATHER_SEMANT", "Target directory unknown");
+      end; -- if
+      if COMPILER_OPTIONS::dbg_mode = true then
+	 DBTABLE::init; -- initialize debugging table.
+      end;
+      GLOBALS::self_exists := true;
+      -- Set a global flag to indicate that all references to "self"
+      -- will be valid in the routines of the classes.
+      loop until!(i >= sz);
+	 co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	 if (co /= void) then
+	    if (GLOBAL_PROC::handle_class_p(co)) then
+	       -- Mark the current class being handled, so that at the end
+	       -- of the C code generation; all C files corresponding to 
+	       -- unmarked Sather classes are deleted.
+	       (GLOBALS::class_stat_tbl).mark_relevant(co);
+
+	       if (co.index = RESERVED_CLASSES::OB_ici) or 
+		  (co.index = RESERVED_CLASSES::C_ici) or
+		  (co.index = RESERVED_CLASSES::SELF_TYPE_ici) or
+		  (co.index = RESERVED_CLASSES::FOB_ici) or
+		  (co.index = RESERVED_CLASSES::UNDEFINE_ici) then
+	       else
+		  if (co.index <= RESERVED_CLASSES::LAST_PREDEF_ici) and
+		     (co.index /= RESERVED_CLASSES::SYS_ici) then
+		     -- Subtlety of code (Refer to (*) above).
+		     if (COMPILER_OPTIONS::gen_base) or 
+		        (COMPILER_OPTIONS::rt_code_check) then
+			final_pass(co);
+		     else
+			fname:STR := STR::create.s(co.cfilename).s(".o");
+			GLOBAL_PROC::copy_user_cfile(STR::create
+			      .s(GLOBALS::precomp_dir).s(fname),
+			      CS::outfile);
+			-- Check and generate temporaries for shared/constant
+			-- init expressions in predefined classes too (hws).
+			co.misc_info;
+		     end; -- if
+		  else
+		     final_pass(co);
+		  end; -- if
+	       end; -- if 
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      if COMPILER_OPTIONS::dbg_mode = true then
+	 DBTABLE::print;
+      end;
+      -- Remove irrelevant classes from previous compilation.
+      delete_classes:LIST{STR} := (GLOBALS::class_stat_tbl).irrelevant_classes;
+      len:INT := delete_classes.insert;
+      if (len > 0) then
+	 rmfiles_com:STR := STR::create.s("(cd ").
+	                             s(COMPILER_OPTIONS::target_dir).
+                                     s(";\nfor f in ");
+	 i:INT := 0;
+	 loop until!(i >= len);
+	    OUT::s("Removing old files \"").
+	         s(delete_classes[i]).
+	         s(".o\" and \"").
+	         s(delete_classes[i]).
+	         s(".c\"\n");
+	    rmfiles_com := rmfiles_com.s(delete_classes[i]).
+	                               s(".o ").
+	                               s(delete_classes[i]).
+	                               s(".c ");
+	    i := i + 1;
+	 end; -- loop
+	 
+	    -- Do not report any error; eg from previous compilation, we may
+	    -- have recorded classes which are not used and hence without
+	    -- any C code generated.
+	 rmfiles_com := rmfiles_com.s("\ndo\n ")
+	       .s(INSTALL_CONSTS::rm_command).s(" -f $f\ndone)");
+	 if (COMPILER_OPTIONS::do_timing) then
+	    TIME_VAL::rmfiles_com_time := TIMER::time_syscall(rmfiles_com);
+	 else
+	    GLOBAL_PROC::system(rmfiles_com);
+	 end; -- if
+      end; -- if
+   end; -- all_class_inst_cprint
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_macros(outfile:SAT_OUTFILE) is
+      -- Print C macros needed in "MAIN_.c" file.
+      outfile.c('\n').inc_ln(1);
+      allmacros:INT_HASH_SET := INT_HASH_SET::create;
+      
+      i:INT;
+      sz:INT := (GLOBALS::other_cnames).asize;
+      loop until!(i >= sz);
+	 ith_cname:INT := (GLOBALS::other_cnames)[i];
+	 if (ith_cname > 0) then
+	    macros:INT_HASH_SET := (GLOBALS::c_macros).get(ith_cname);
+	    if (macros /= void) then
+	       allmacros := allmacros.union(macros);
+	    end; -- if
+	    -- The extern declarations of C features have already been
+	    -- printed, so we do not need to print them here.
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      i:INT;
+      sz:INT := allmacros.asize;
+      loop until!(i >= sz);
+	 ith_macro:INT := allmacros[i];
+	 if (ith_macro > 0) then
+	    outfile.s((GLOBALS::str_table).at_index(ith_macro)).c('\n').inc_ln(1);
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      outfile.c('\n').inc_ln(1);
+   end; -- cprint_macros
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cs_options_cprint(outfile: SAT_OUTFILE) is
+      -- cprint comment line indicating the compile options that make
+      -- a difference in incremental compilation. Then incremental compilation
+      -- can pick the difference. In fact, the current compilation scheme
+      -- does not really depend on these, except by include files, if any.
+      -- These can be under user control and moreover our coding may change.
+      outfile.s("dbg=").s(COMPILER_OPTIONS::dbg_mode.to_s)
+	    .s(", gc=").s(COMPILER_OPTIONS::has_gc.to_s)
+	    .s(", chk=").s(COMPILER_OPTIONS::rt_code_check.to_s);
+      -- .s(", x=").s(COMPILER_OPTIONS::target_environment);
+      -- DO NOT include target architecture. Most of the code is independent
+      -- of this and it is easy to use architecture specific directories
+      -- via make files to get things properly distinguished. Then users
+      -- have more control and incremental compiles can still share
+      -- some common (lib) C classes accross architectures perhaps.
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   cprint_class_info is
+      -- Open the file "CLASINFO_.c" to contain initializations to attribute
+      -- and dispatch tables.
+      
+      outfname:STR := STR::create.s(COMPILER_OPTIONS::target_dir).s("CLASINFO_.c");
+      outfile:SAT_OUTFILE := SAT_OUTFILE::new;
+      outfile.open_for_write(outfname);
+      outfile.line_no := 1;
+      if (outfile.error /= 0) then
+	 error_msg("Error in opening \"CLASINFO_.c\"\n");
+      else
+	 -- Generate attribute entries 
+	 -- NOTE: Since C, OB, F_OB, UNDEFINE, and SELF_TYPE are never used,
+	 -- the ".o" files are not included, and so no attribute table
+	 -- exists for these classes.
+
+	 if (COMPILER_OPTIONS::verbose_code) then
+	    outfile.s("#include \"").s(INSTALL_CONSTS::offset_file).
+	    s("\"\n").inc_ln(1);
+	 end; -- if
+
+	 outfile.s("/* ");
+	 cs_options_cprint(outfile);
+	 outfile.s(" */\n").inc_ln(1);
+
+	 i: INT := 0;
+	 loop until!(i >= (GLOBALS::class_inst).next_ind);
+	    co: CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	    if (co /= void) then
+	       if (GLOBAL_PROC::handle_class_p(co)) then
+		  if (co.index /= RESERVED_CLASSES::OB_ici) and
+		     (co.index /= RESERVED_CLASSES::C_ici) and
+		     (co.index /= RESERVED_CLASSES::UNDEFINE_ici) and
+		     (co.index /= RESERVED_CLASSES::FOB_ici) and
+		     (co.index /= RESERVED_CLASSES::SELF_TYPE_ici) then
+		     
+		     co.cprint_attr_tbl(outfile);
+		     
+			-- Print feature entry for class only if necessary.
+		     if (GLOBALS::print_feat_info) then
+			co.cprint_feat_tbl(outfile);
+		     end; -- if
+		     
+			-- Print descendent relation for class only if needed.
+		     if (GLOBALS::print_des_info) then
+			co.cprint_des_tbl(outfile);
+		     end; -- if
+		     
+		  end; -- if
+		  
+		     -- Install attribute table for classes required by runtime
+		     -- but not seen by the compiler.  If it's installed by the 
+		     -- compiler, this branch will not be taken.
+	       else		-- (**)
+		  if (i = RESERVED_CLASSES::ARRAY_ici) then
+		     co.cprint_attr_tbl(outfile);
+		  end; -- if
+	       end; -- if
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+	 
+	    -- Print attribute table
+	 outfile.indent;
+	 outfile.s("int* attr_table_[] = {\n").inc_ln(1);
+	 outfile.ind_inc;
+	 i := 0;
+	 loop until!(i >= (GLOBALS::class_inst).next_ind);
+	    outfile.indent;
+	    co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	    if (co /= void) then
+	       if (GLOBAL_PROC::handle_class_p(co)) then 
+		  if (co.index /= RESERVED_CLASSES::C_ici) and
+		     (co.index /= RESERVED_CLASSES::OB_ici) and
+		     (co.index /= RESERVED_CLASSES::FOB_ici) and
+		     (co.index /= RESERVED_CLASSES::UNDEFINE_ici) and
+		     (co.index /= RESERVED_CLASSES::SELF_TYPE_ici) then
+
+		     outfile.s("attr_ent_").s(co.prefix);
+		  else
+		     outfile.c('0');
+		  end; -- if
+	       else
+		  -- Install attribute table for classes required by runtime
+		  -- but not seen by the compiler.  If it's installed by the 
+		  -- this branch will not be taken.  This branch must match 
+		  -- (**) above.
+		  if (i = RESERVED_CLASSES::ARRAY_ici) then
+		     outfile.s("attr_ent_").s(co.prefix);
+		  else
+		     outfile.c('0');
+		  end; -- if
+	       end; -- if
+	    else
+	       outfile.c('0');
+	    end; -- if
+	    i := i + 1;
+	    if (i < (GLOBALS::class_inst).next_ind) then
+	       outfile.c(',');
+	    end; -- if
+	    outfile.c('\n').inc_ln(1);
+	 end; -- loop
+	 outfile.ind_dec;
+	 outfile.indent;
+	 outfile.s("};\n").inc_ln(1);
+
+	    -- init routine (a) placeholder for later extension, (b) loader should
+	    -- include this file.
+
+	    -- Print feature table.
+	    -- NOTE: "feat_table_" must always be declared because it
+	    --       is not declared in runtime.
+	 print_gen_rt_table(outfile, "feat", GLOBALS::print_feat_info);
+	 
+	    -- Print descendent of class.
+	    -- NOTE: "des_table_" must always be declared because it
+	    --       is not declared in runtime.
+	 print_gen_rt_table(outfile, "des", GLOBALS::print_des_info);
+
+	    -- Print initializer code for the name of featurre table entries
+	 outfile.s("\n\nvoid main_init_info_()\n{\n").inc_ln(4);
+	 -- here class initialization if any
+	 outfile.s("\n}\n").inc_ln(2);
+
+	 outfile.close;
+	    
+      end;
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_init is
+      -- Open the file "MAIN_.c" to contain initializations to attribute
+      -- and dispatch tables.
+      
+      cprint_init_externs;
+      total: INT := total_externs;
+
+      outfname:STR := STR::create.s(COMPILER_OPTIONS::target_dir).s("MAIN_.c");
+      outfile:SAT_OUTFILE := SAT_OUTFILE::new;
+      outfile.open_for_write(outfname);
+      outfile.line_no := 1;
+      if (outfile.error /= 0) then
+	 error_msg("Error in opening \"MAIN_.c\"\n");
+      else
+
+	 outfile.s("#include \"EXTERNS_.h\"\n").inc_ln(1);
+
+	 GLOBALS::dispatch_table_size := total * 4;
+	 GLOBALS::dispatch_flags := ARRAY{INT}::new(GLOBALS::dispatch_table_size);
+
+	 -- Allocate two slots per feature and to make the dispatch table less 
+	 -- dense, allocate twice the required amount of space.
+	 -- Important: This calculation must come before initializing the
+	 --            runtime variables.
+	 cprint_rt_static(outfile);
+	 outfile.s("\n\nextern void main_init_shareds_and_consts_();\n");
+	 outfile.s("extern void main_init_info_();").inc_ln(3);
+
+	 cprint_init_feats(outfile); -- dispatch tables
+
+	 outfile.s("\n\nint main_(argc_,argv_)\nint argc_;\nptr argv_;\n{\n").
+	         ind_inc.
+	         indent.
+	         s("int i_;\n").
+	         indent.
+		 s("ptr new_argv_;\n\n").inc_ln(9);
+	 
+	 -- Print tempoary variables used for initialization of shareds/
+	 -- contants. 
+	 i:INT;
+	 sz:INT := (GLOBALS::tmpct).insert;
+	 -- The global list of temporaries are guaranteed to be non-void.
+	 loop until!(i >= sz);
+	    outfile.indent;
+	    if ((GLOBALS::tmpct)[i] < 0) then
+	       -- Once we encounter a static temporary variable, the next
+	       -- two variables must be to hold the type of last accessed
+	       -- object and the last dispatched value.
+	       
+	       outfile.s("static int ");
+	       GLOBAL_PROC::cprint_ctemp_name((GLOBALS::tmpct)[i], outfile);
+	       outfile.s(";\n").inc_ln(1);
+	       outfile.indent;
+	       outfile.s("static union dtype_ ");
+	       GLOBAL_PROC::cprint_ctemp_name((GLOBALS::tmpct)[i+2], outfile);
+	       outfile.s(";\n").inc_ln(1);
+	       i := i + 4;
+	    else
+	       GLOBAL_PROC::cprint_ctype_name((GLOBALS::tmpct)[i+1], outfile);
+	       outfile.c(' ');
+	       GLOBAL_PROC::cprint_ctemp_name((GLOBALS::tmpct)[i], outfile);
+	       outfile.s(";\n").inc_ln(1);
+	       i := i + 2;
+	    end; -- if
+	 end; -- loop
+	 outfile.c('\n').inc_ln(1);
+
+-- The variables "prog_name_", "prog_dir_", "max_name_index_", "num_classes_"
+-- "dispatch_table_size_" and "dispatch_table_" are all statically initialized.
+      
+	 outfile.indent.s("main_init_feats_();\n").inc_ln(1);
+	 outfile.indent.s("main_init_info_();\n").inc_ln(1);
+	 
+	 -- Print the code to insert the attribute lists into the 
+	 -- attribute table.
+	 -- NOTE: Since C, OB, F_OB, UNDEFINE, and SELF_TYPE are never used,
+	 -- the ".o" files are not included, and so no attribute table
+	 -- exists for these classes.
+	 outfile.indent.s("main_init_shareds_and_consts_();\n").inc_ln(1);
+
+	 if (argv_needed) then
+	    -- whether or not this compiler is running with GC does not
+	    -- tell us whether the boot compiler generated OR any program
+	    -- generated by users are running with GC.
+	    -- all_.h is included anyway. So just use calloc. (hws)
+	    outfile.indent.s("new_argv_ = (ptr)calloc((argc_ + 2), 4);\n").inc_ln(1);
+	    outfile.indent;
+	    tmp_ind:INT := get_array_str_ind;
+	    if (tmp_ind = 0) then
+	       outfile.s("/* Fail to create ARRAY{STR} */\n").inc_ln(1);
+	    else
+	       -- Since we have generated the code to allocate space for
+	       -- the arguments, this object should not be void.
+	       outfile.s("IATT_(new_argv_, 0) = ").
+	               i(tmp_ind).
+	               s(";\n").inc_ln(1);
+	    end; -- if
+	    outfile.indent;
+	       -- Since we have generated the code to allocate space for
+	       -- the arguments, this object should not be void.
+	    outfile.s("IATT_(new_argv_, 4) = argc_;\n");
+	    outfile.indent;
+	    outfile.s("for (i_ = 0; i_ < argc_; i_++) {\n").inc_ln(2);
+	    outfile.ind_inc;
+            outfile.indent;
+	    
+	       -- This should not generate any error, because the loop
+	       -- is bound by the number of arguments given.
+	    outfile.s("PATT_(new_argv_, (i_ + 2) * 4) = makestr_(PATT_(argv_, i_ * 4));\n");
+	    outfile.ind_dec;
+	    outfile.indent;
+	    outfile.s("}\n").inc_ln(2);
+	    outfile.indent;
+	    if (GLOBALS::creator_classob_s = void) then
+	       error_exit(STR::create.s("Error : Creator class \"").
+	                  s((GLOBALS::str_table).at_index(GLOBALS::creator_class_name)).
+	                  s("\" not found\n"));     
+	    end; -- if
+	    -- ANSI C does not accept return of "void"
+	    if GLOBALS::main_rout /= void then
+	       creator_type: INSTANT_TYPEOB_S :=
+			INSTANT_TYPEOB_S::create(GLOBALS::creator_classob_s.index, -1);
+	       if GLOBALS::main_rout.rout_rettype = void then -- procedure
+		  outfile.s((GLOBALS::creator_classob_s).prefix).s("_main_(");
+		  creator_type.cprint_void(outfile);
+		  outfile.s(", new_argv_);\n")
+			.s("return 0;\n").inc_ln(2);
+	       else
+		  outfile.s("return ((int)").s((GLOBALS::creator_classob_s).prefix).
+		  s("_main_(");
+		  creator_type.cprint_void(outfile);
+		  outfile.s(", new_argv_));\n").inc_ln(1);
+	       end;
+	    end;
+	 else
+	    if (GLOBALS::creator_classob_s = void) then
+	       error_exit(STR::create.s("Error : Creator class \"").
+	                  s((GLOBALS::str_table).at_index(GLOBALS::creator_class_name)).
+	                  s("\" not found\n"));     
+	    end; -- if
+	    if GLOBALS::main_rout /= void then
+	       if GLOBALS::main_rout.rout_rettype = void then -- procedure
+		  outfile.s((GLOBALS::creator_classob_s).prefix).
+		  s("_main_(0);\n").s("return 0;\n").inc_ln(2);
+	       else
+		  outfile.s("return (int)").s((GLOBALS::creator_classob_s).prefix).
+		  s("_main_(0);\n").inc_ln(1);
+	       end;
+	    end;
+	 end; -- if
+	 
+	 outfile.ind_dec;
+	 outfile.s("}\n").inc_ln(1);
+	 outfile.close;
+      end; -- if
+   end; -- cprint_init
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   shared total_externs:INT;
+   shared externs_done:BOOL := false;
+   
+   cprint_init_externs is
+      -- Print externs used in shared / constant init
+      if not externs_done then
+	 
+	 externs_done := true;
+	 
+	 outfname:STR := STR::create.s(COMPILER_OPTIONS::target_dir).s("EXTERNS_.h");
+	 outfile:SAT_OUTFILE := SAT_OUTFILE::new;
+	 outfile.open_for_write(outfname);
+	 outfile.line_no := 1;
+	 if (outfile.error /= 0) then
+	    error_msg("Error in opening \"EXTERNS_.h\"\n");
+	 else
+	    -- print all externs of features that might be used. Return the total number.
+	    total:INT;
+	    i:INT := 0;
+	    outfile.s("#include \"all_.h\"\n").
+	    s("#include \"").s(INSTALL_CONSTS::c_names_file).s("\"\n").
+	    inc_ln(2);
+	    outfile.s("/* ");
+	    cs_options_cprint(outfile);
+	    outfile.s(" */\n").inc_ln(1);
+	    
+	    co:CLASSOB_S;
+	    loop until!(i >= (GLOBALS::class_inst).next_ind);
+	       co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	       if (co /= void) then
+		  if (GLOBAL_PROC::handle_class_p(co)) then
+		     GLOBALS::curr_filename := co.def.fname;
+		     GLOBALS::curr_class_inst := co;
+		     
+		     total := total + co.cprint_extern_feats(outfile); 
+		     outfile.c('\n').inc_ln(1);
+		  end; -- if
+	       end; -- if
+	       i := i + 1;
+	    end;
+	       -- Print needed C macros.
+	    cprint_macros(outfile);
+	    
+	    if (COMPILER_OPTIONS::verbose_code) then
+	       outfile.s("#include \"").s(INSTALL_CONSTS::offset_file).
+	       s("\"\n").inc_ln(1);
+	    end; -- if
+	    
+	    total_externs := total;
+	 end;
+	 
+      end;
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_init_shareds_and_consts is
+      -- Code to initialize shared and constant attributes
+      -- This requires the extern declarations of all features
+      -- potentially requiring initialization or used in init expressions.
+      
+      -- Open the file "SINIT_.c" to contain initializations to attributes.
+      
+      outfname:STR := STR::create.s(COMPILER_OPTIONS::target_dir)
+	    .s("SINIT_.c");
+      outfile:SAT_OUTFILE := SAT_OUTFILE::new;
+      outfile.open_for_write(outfname);
+      outfile.line_no := 1;
+      if (outfile.error /= 0) then
+	 error_msg("Error in opening \"SINIT_.c\"\n");
+      else
+
+	 -- include externals, maybe used in init expressions
+	 
+	 outfile.s("#include \"EXTERNS_.h\"\n").inc_ln(1);
+	 
+	    -- Print declarations of constant strings used in shared/constant
+	    -- initialization.
+	 i:INT;
+	 sz:INT := GLOBALS::str_consts.insert;
+	 loop until!(i >= sz);
+	    (GLOBALS::str_consts)[i].cprint_mach_indep_global(outfile);
+	    i := i + 1;
+	 end; -- loop
+	 outfile.c('\n').inc_ln(1);
+	 
+	 outfile.s("\n\nvoid main_init_shareds_and_consts_()\n{\n");
+	 
+	 i: INT := 0;
+	 GLOBALS::self_exists := false;
+	    -- Set a global flag to indicate that during shared/constant
+	    -- initialization, all references to "self" will be "void".
+	 loop until!(i >= (GLOBALS::class_inst).next_ind);
+	    co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	    if (co /= void) then
+	       if (GLOBAL_PROC::handle_class_p(co)) then
+		  if (co.index /= RESERVED_CLASSES::C_ici) then
+		     GLOBALS::curr_filename := co.def.fname;
+		     GLOBALS::curr_class_inst := co;
+		     co.cprint_init_shareds_and_consts(outfile); 
+		  end; -- if
+	       end; -- if
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+	 outfile.ind_dec;
+	 outfile.s("\n}\n").inc_ln(2);
+	 outfile.close;
+      end; -- if
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_init_feats(outfile: SAT_OUTFILE) is
+      -- Print the code of a routine to insert the feature dispatch values into the
+      -- dispatch table.
+      -- This requires the extern declarations of all features
+      -- potentially dispatched to, routines, shared, constants.
+
+      outfile.s("\n\nvoid main_init_feats_()\n{\n").inc_ln(4);
+      i: INT := 0;
+      loop until!(i >= (GLOBALS::class_inst).next_ind);
+	 co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	 if (co /= void) then
+	    if (GLOBAL_PROC::handle_class_p(co)) then
+	       GLOBALS::curr_filename := co.def.fname;
+	       GLOBALS::curr_class_inst := co;
+	       
+		  -- Dispatch only non-C features.  We do not have to
+		  -- consider OB, F_OB, UNDEFINE and SELF_TYPE because:
+		  -- 1) OB, F_OB has no feature,
+		  -- 2) UNDEFINE should not exist,
+		  -- 3) SELF_TYPE has been resolved.
+	       if (co.index /= RESERVED_CLASSES::C_ici) then
+		  co.cprint_insert_feats(outfile); 
+	       end; -- if
+	       
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      
+      outfile.ind_dec;
+      outfile.s("\n}\n").inc_ln(2);
+      
+   end; -- if
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_rt_static(outfile:SAT_OUTFILE) is
+      -- Print variables used during runtime.
+
+      -- Print name of this program.
+      outfile.indent.
+              s("ptr prog_name_ = \"").s(GLOBALS::final_prog_name).
+              s("\";\n").inc_ln(1);
+	 
+      -- Print directory in which this program is located.
+      outfile.indent.
+	      s("ptr prog_dir_ = \"").s(COMPILER_OPTIONS::target_dir).
+	      s("\";\n").inc_ln(1);
+	 
+      -- Print maximum name index.
+      outfile.indent.
+	      s("int max_name_index_ = ").
+	      i((GLOBALS::str_table).next_ind).
+	      s(";\n").inc_ln(1); 
+	    
+      -- Print maximum class index.
+      outfile.indent.
+	      s("int num_classes_ = ").
+	      i((GLOBALS::class_inst).next_ind).
+	      s(";\n").inc_ln(1);
+
+      -- Print allocated size of dispatch table.
+      outfile.indent.
+              s("int dispatch_table_size_ = ").
+              i(GLOBALS::dispatch_table_size).
+              s(";\n").inc_ln(1);
+
+      -- Allocate space for dispatch table but do not initialize it.
+      outfile.indent.
+              s("int dispatch_table_[").
+              i(GLOBALS::dispatch_table_size).
+              s("];\n\n").inc_ln(2);
+      
+   end; -- cprint_rt_static
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   print_defines(outfile:SAT_OUTFILE) is
+      i:INT := 0;
+      loop until!(i >= (GLOBALS::class_inst).next_ind);
+	 co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	 if (co /= void) then
+	    if (GLOBAL_PROC::handle_class_p(co)) then
+	       GLOBALS::curr_filename := co.def.fname;
+	       GLOBALS::curr_class_inst := co;
+	    
+	       feats:LST_FEATOB_S := co.flst;
+	       if (feats /= void) then
+		  fsz:INT := feats.insert;
+		  j:INT := 0;
+		  loop until!(j >= fsz);
+		     -- Since the feature list of a class cannot contain empty
+		     -- entries, we don't need to check for void objects.
+		     if (feats[j].type = ATTR_DECL_FEATOB_S::type) then
+			outfile.s("#define ");
+			feats[j].cprint_offset(outfile);
+			outfile.c(' ').i(feats[j].get_offset).
+			        c('\n').inc_ln(1);
+		     end; -- if
+		     j := j + 1;
+		  end; -- loop
+	       end; -- if
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- print_defines
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- The set of features whose keys are retreived are guaranteed to exist.
+   print_sather_to_c_macros is
+      map_fname:STR := STR::create.s(COMPILER_OPTIONS::target_dir).
+                                s(INSTALL_CONSTS::c_names_file);
+      outfile:SAT_OUTFILE := SAT_OUTFILE::new;
+      outfile.open_for_write(map_fname);
+      if (outfile.error /= 0) then
+	 error_exit(STR::create.s("Error in opening \"").
+	                     s(map_fname).s("\"\n"));
+      else
+	 macros:C_NAME_KEYOB := (GLOBALS::dot_sather_reader).sat_info[COMPILE_KEYS_CONST::c_name_ind];
+	 sz:INT := macros.info_size;
+	 i:INT := 0;
+	 loop until!(i >= sz);
+	    info:LIST{STR} := macros.ith_info(i);
+	    
+	    -- Retrieve key of feature associated with C name
+	    k:INT := (GLOBALS::name_mappings).get(info[0]);
+	    if (k /= 0) then
+	       feat_ind:INT := GLOBAL_PROC::featname_from_key(k);
+	       class_ind:INT := GLOBAL_PROC::classind_from_key(k);
+	       co:CLASSOB_S := (GLOBALS::class_inst).at_index(class_ind);
+	       feat:$SEMANTOB := co.get_feature(feat_ind);
+	       case (feat.type)	    
+	       when ROUT_FEATOB_S::type then
+		  rout_feat:ROUT_FEATOB_S := feat;
+		  outfile.s("#define ");
+		  rout_feat.cprint_cname(outfile);
+		  outfile.c(' ').s(info[0]).c('\n').inc_ln(1);
+
+	       when CONST_DECL_FEATOB_S::type then
+		  const_feat:CONST_DECL_FEATOB_S := feat;
+		  outfile.s("#define ");
+		  const_feat.cprint_cname(outfile);
+		  outfile.c(' ').s(info[0]).c('\n').inc_ln(1);
+		  
+	       when SHARED_DECL_FEATOB_S::type then
+		  shared_feat:SHARED_DECL_FEATOB_S := feat;
+		  outfile.s("#define ");
+		  shared_feat.cprint_cname(outfile);
+		  outfile.c(' ').s(info[0]).c('\n').inc_ln(1);
+		  
+	       end; -- case
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+	 outfile.close
+      end; -- if
+   end; -- print_sather_to_c_macros
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   print_browser_info is
+      -- Print the <index, name> pairs for classes.
+      info_fname:STR := STR::create.s(COMPILER_OPTIONS::target_dir).
+                                 s(GLOBALS::final_prog_name).
+                                 s(".sa_");
+      outfile:OUTFILE := OUTFILE::new;
+      outfile.open_for_write(info_fname);
+      if (outfile.error /= 0) then
+	 error_exit(STR::create.s("Error in opening \"").
+	                     s(info_fname).s("\"\n"));
+      else
+	 i:INT := 0;
+	 loop until!(i >= (GLOBALS::class_inst).next_ind);
+	    co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	    if (co /= void) then
+	       if i = RESERVED_CLASSES::OB_ici then
+		  outfile.i(i).s("$").s(co.full_name).c('\n');
+	       else
+		  outfile.i(i).s(co.full_name).c('\n');
+	       end;
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+	 outfile.close;
+      end; -- if
+
+   end; -- print_browser_info
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   old_version_print_sather_to_c_macros is
+      map_fname:STR := STR::create.s(COMPILER_OPTIONS::target_dir).
+                                s(INSTALL_CONSTS::c_names_file);
+      outfile:SAT_OUTFILE := SAT_OUTFILE::new;
+      outfile.open_for_write(map_fname);
+      if (outfile.error /= 0) then
+	 error_exit(STR::create.s("Error in opening \"").
+	                     s(INSTALL_CONSTS::c_names_file).s("\"\n"));
+      else
+	 macros:$COMPILE_KEYOB := (GLOBALS::dot_sather_reader).sat_info[COMPILE_KEYS_CONST::c_name_ind];
+	 sz:INT := macros.info_size;
+	 i:INT := 0;
+	 loop until!(i >= sz);
+	    info:LIST{STR} := macros.ith_info(i);
+	    cnm:ARRAY{STR} := GLOBAL_PROC::extract_poss_names(info[1]);
+	    if (cnm = void) then
+	       outfile.s("/* Error in handling <").
+	               s(info[0]).
+	               s("> and <").
+	               s(info[1]).
+	               s("> */\n").inc_ln(1);
+	    else
+	       cnm_info:LIST{INT} := GLOBAL_PROC::analyze_class_name(cnm[0], 0);
+	       if (cnm_info = void) then
+		  error_msg(STR::create.s("Error : Cannot analyze class \"").
+		                     s(cnm[0]).s("\"\n"));
+	       else
+		  co:CLASSOB_S := (GLOBALS::class_inst).at_index(cnm_info[0]);
+		  if (co /= void) then
+		     GLOBALS::curr_filename := co.def.fname;
+		     GLOBALS::curr_class_inst := co;
+		     
+		     feat_ind:INT := (GLOBALS::str_table).insert_str(cnm[1]);
+		     feat:$SEMANTOB := co.get_feature(feat_ind);
+		     if (feat = void) then
+			error_msg(STR::create.s("Error : Cannot find feature \"").
+			                   s(cnm[1]).s("\"\n"));
+		     else
+			if (feat.type = ROUT_FEATOB_S::type) then
+			   rout_feat:ROUT_FEATOB_S := feat;
+			   outfile.s("#define ");
+			   rout_feat.cprint_cname(outfile);
+			   outfile.c(' ').s(info[0]).c('\n').inc_ln(1);
+			   
+			elsif (feat.type = CONST_DECL_FEATOB_S::type) then
+			   const_feat:CONST_DECL_FEATOB_S := feat;
+			   outfile.s("#define ");
+			   const_feat.cprint_cname(outfile);
+			   outfile.c(' ').s(info[0]).c('\n').inc_ln(1);
+			   
+			elsif (feat.type = SHARED_DECL_FEATOB_S::type) then
+			   shared_feat:SHARED_DECL_FEATOB_S := feat;
+			   outfile.s("#define ");
+			   shared_feat.cprint_cname(outfile);
+			   outfile.c(' ').s(info[0]).c('\n').inc_ln(1); 
+			   
+			end; -- if
+		     end; -- if
+		  else
+		     error_msg(STR::create.s("Error : Cannot find class \"").
+		                        s(cnm[0]).s("\"\n"));
+		  end; -- if
+	       end; -- if
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+	 outfile.close;
+      end; -- if
+   end; -- old_version_print_sather_to_c_macros
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   print_makefile is
+      mkfile_name:STR := STR::create.s(COMPILER_OPTIONS::target_dir).s("Makefile");
+      -- An "OUTFILE" would have sufficed, but for simplicity of 
+      -- hand-compilation, we continue to use a "SAT_OUTFILE".
+      mkfile:SAT_OUTFILE := SAT_OUTFILE::new;
+      mkfile.open_for_write(mkfile_name);
+      home: STR := INSTALL_CONSTS::env_v_sat_home;
+      envi: STR := INSTALL_CONSTS::env_v_environment;
+
+      if (mkfile.error /= 0) then
+	 error_exit("Error in opening \"Makefile\"\n");
+      else
+	 -- Generate the "SATHER_HOME" option
+	 mkfile.s(home).s("= ").s(COMPILER_OPTIONS::sather_home).nl;
+
+	 -- Generate the "MAINFLAGS" option
+	 mkfile.s("MAINFLAGS= ");	 
+	 if (COMPILER_OPTIONS::has_gc) then
+	    mkfile.s("-DGC_ ");
+	 end;
+	 mkfile.nl;
+
+	 -- Generate the "CFLAGS" options
+
+	 mkfile.s("CFLAGS= ");
+	 if (GLOBALS::cc_flags /= void) then
+	    i:INT := 0;
+	    cc_sz:INT := (GLOBALS::cc_flags).asize;
+	    loop until!(i >= cc_sz);
+	       if (GLOBAL_PROC::is_clib_option((GLOBALS::cc_flags)[i])) then
+	       -- "GLOBALS::clib_options" is created during start-up.
+	       GLOBALS::clib_options := GLOBALS::clib_options.
+		                                 s((GLOBALS::cc_flags)[i]).
+                                                 c(' ');
+	       else
+		  mkfile.s((GLOBALS::cc_flags)[i]).c(' ');
+	       end; -- if
+	       i := i + 1;
+	    end; -- loop
+	 end; -- if
+
+	 if COMPILER_OPTIONS::dbg_mode then
+	    mkfile.s(" -g ");
+	 end;
+	 if (COMPILER_OPTIONS::has_gc) then
+	    mkfile.s("-DGC_ \n");
+	 else
+	    mkfile.c('\n');
+	 end; -- if
+	    
+	 -- Generate the "CLIB" macro
+	 mkfile.s("CLIB= ").s(GLOBALS::clib_options).c('\n');
+
+	 -- Generate the "SATHER_ENVI" macro
+	 mkfile.s(envi).s("= ").s(COMPILER_OPTIONS::target_environment).c('\n');
+
+	 -- Generate the "OBJECTS" macro
+	 mkfile.s("OBJECTS= ").s(COMPILER_OPTIONS::object_files).c('\n');
+
+	 -- Generate the "CC" macro
+	 if (GLOBALS::c_compiler /= void) then
+	    mkfile.s("CC= ").s(GLOBALS::c_compiler).s("\n");
+	 else
+	    mkfile.s("CC= ").s(INSTALL_CONSTS::c_compiler).s("\n");
+	 end; -- if
+
+	 -- Generate the "SATHER_LD" macro, so one can use other tools
+	 -- more easily via `make SATHER_LD= ...' using the generated make file.
+
+	 mkfile.s("SATHER_LD= $(CC)").s("\n\n");
+
+	 
+	 -- Previously, we do not print the dependencies, but rely on 
+	 -- "*.c" to make all the relevant files be compiled.  We can 
+	 -- do this, because all necessary C files (".c", ".h" etc) would 
+	 -- have been copied into the current target directory.
+	 
+	 -- But in order for "pmake" to work, we have to print all the
+	 -- dependent (generated) C files.
+	 mkfile.s(GLOBALS::final_prog_name).c(':');
+	 mkfile.s(" \\\nMAIN_.o \\\nSINIT_.o \\\nCLASINFO_.o $(OBJECTS)");
+	 -- other objects dependencies
+	 
+	 i:INT := 0;
+	 sz:INT := (GLOBALS::class_inst).next_ind; 
+	 loop until!(i >= sz);
+	    -- NOTE: The test-condition should be similar (not identical)
+	    -- to the one in "all_class_inst_cprint".
+	    
+	    co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	    if (co /= void) then
+	       if (GLOBAL_PROC::handle_class_p(co)) then
+		  if (co.index = RESERVED_CLASSES::OB_ici) or
+		     (co.index = RESERVED_CLASSES::C_ici) or
+		     (co.index = RESERVED_CLASSES::FOB_ici) or
+		     (co.index = RESERVED_CLASSES::SELF_TYPE_ici) or
+		     (co.index = RESERVED_CLASSES::UNDEFINE_ici) then
+		  else
+		     mkfile.s(" \\\n").s(co.cfilename).s(".o");
+		  end; -- if
+	       end; -- if
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+	 mkfile.nl;
+	 
+	 -- Print the compile command in makefile.
+
+	 mkfile.s("\t$(SATHER_LD) $(CFLAGS) *.o $(OBJECTS) -o ")
+	       .s(GLOBALS::final_prog_name).s(" -L$(").s(home)
+	       .s(")/bin.$(").s(envi).s(") $(CLIB) -lm");
+	 if (COMPILER_OPTIONS::has_gc) then mkfile.s(" -lgc") end;
+	 mkfile.s("\n\n");
+	 
+	 -- Print the dependencies for all generated C files as a rule
+	 -- Leave MAINFLAGS separate, cc -O will not work on very large
+	 -- dispatch table initialization.
+	 
+	 mkfile.s("MAIN_.o : MAIN_.c\n");
+	 mkfile.s("\t $(CC) ").s("$(MAINFLAGS) ");
+	 mkfile.s("-I$(").s(home).s(")/sys/C -c MAIN_.c\n\n");
+	 mkfile.s("SINIT_.o : SINIT_.c\n");
+	 mkfile.s("\t $(CC) ").s("$(MAINFLAGS) ");
+	 mkfile.s("-I$(").s(home).s(")/sys/C -c SINIT_.c\n\n");
+	 mkfile.s("CLASINFO_.o : CLASINFO_.c\n");
+	 mkfile.s("\t $(CC) ").s("$(MAINFLAGS) ");
+	 mkfile.s("-I$(").s(home).s(")/sys/C -c CLASINFO_.c\n\n");
+	 -- suffix rule with dependents makes some "make" facilities run amok
+	 -- mkfile.s(".c.o: macros_.h all_.h ").s(INSTALL_CONSTS::c_names_file).s("\n");
+	 mkfile.s(".c.o:\n");
+	 mkfile.s("\t$(CC) $(CFLAGS) -I$(").s(home).s(")/sys/C -c $<\n\n");
+	 
+	 mkfile.close;
+      end; -- if
+   end; -- print_makefile
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   argv_needed:BOOL is
+      if (GLOBALS::main_rout /= void) then
+	 rout_type:$TYPEOB_S := GLOBALS::main_rout.typeof;
+	 param_types:LST_TYPEOB_S := rout_type.paramstype;
+	 if (param_types = void) then
+	    return;
+	 elsif (param_types.insert = 0) then
+	    return;
+	 end; -- if
+	 if (LST_TYPEOB_S::create(1).push(INSTANT_TYPEOB_S::create(get_array_str_ind, -1)).conforms_to(param_types)) then
+	    res := true;
+	 end; -- if
+      end; -- if
+   end; -- argv_needed
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   old_version_argv_needed:BOOL is
+      main_ind:INT := (GLOBALS::str_table).insert_str("main");
+      if (GLOBALS::creator_classob_s = void) then
+	 error_exit(STR::create.s("Error : Creator class \"").
+	            s((GLOBALS::str_table).at_index(GLOBALS::creator_class_name)).
+	            s("\" not found\n"));     
+      end; -- if
+      main_feat:$SEMANTOB := (GLOBALS::creator_classob_s).get_feature(main_ind);
+      if (main_feat = void) then
+	 error_msg("Error : \"main\" not found\n");
+      else
+	 if (main_feat.type /= ROUT_FEATOB_S::type) then
+	    error_msg("Error : \"main\" not defined as a routine\n");
+	 else
+	    -- Mark the "main" routine as being used.
+	    main_rout:ROUT_FEATOB_S := main_feat;
+	    main_rout.maybe_used := true;
+	    
+	    -- Get the type of the routine's list of parameters, and
+	    -- make sure that "ARRAY{STR}" conforms to the list of parameters.
+	    rout_type:$TYPEOB_S := main_rout.typeof;
+	    param_types:LST_TYPEOB_S := rout_type.paramstype;
+	    if (param_types = void) then
+	       return;
+	    elsif (param_types.insert = 0) then
+	       return;
+	    end; -- if
+	    if (LST_TYPEOB_S::create(1).push(INSTANT_TYPEOB_S::create(get_array_str_ind, -1)).conforms_to(param_types)) then
+	       res := true;
+	    end; -- if
+	 end; -- if
+      end; -- if
+   end; -- old_version_argv_needed
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- NOTE: The "LST{INT}" returned from "GLOBAL_PROC::extract_simple_classnames"
+-- contains an index into the string scanned and so is not one of the class
+-- names.  This routine is responsible for eliminating any base class names.
+   
+   get_simple_classnames:LIST{INT} is
+      tmpres:LIST{INT} := LIST{INT}::create(3);	-- !* Random size
+      res := LIST{INT}::create(3);	        -- !* Random size
+      c_names:C_NAME_KEYOB := (GLOBALS::dot_sather_reader).sat_info[COMPILE_KEYS_CONST::c_name_ind];
+      sz:INT := c_names.info_size;
+      i:INT := 0;
+      loop until!(i >= sz);
+	 info:LIST{STR} := c_names.ith_info(i);
+	 cnm:ARRAY{STR} := GLOBAL_PROC::extract_poss_names(info[1]);
+	 if (cnm = void) then
+	    error_msg(STR::create.s("Error in handling <").s(info[0]).
+	                       s("> and <").s(info[1]).
+	                       s("> in command file\n"));
+	 else
+	    cnm_lst:LIST{INT} := GLOBAL_PROC::extract_simple_classnames(cnm[0], 0);
+	    if (cnm_lst /= void) then
+	       tmpres := GLOBAL_PROC::union_classnames(tmpres, cnm_lst);
+	    else
+	       error_msg(STR::create.s("Error: Cannot analyze class \"").
+	                          s(cnm[0]).s("\"\n"));
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      i := 0;
+      tsz:INT := tmpres.insert;
+      loop until!(i >= tsz);
+	 if not (RESERVED_WORDS::base_classname_p(tmpres[i])) then
+	    res := res.push(tmpres[i]);
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+   end; -- get_simple_classnames
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_array_str_ind:INT is
+      if (array_str_ind = 0) then
+	 tmp_key:LSTINT_KEY := LSTINT_KEY::create(2).
+	                                   push(RESERVED_WORDS::array_ind).
+	                                   push(RESERVED_CLASSES::STR_ici);
+	 co:CLASSOB_S := (GLOBALS::class_inst).get_obj(tmp_key);
+	 if (co /= void) then
+	    array_str_ind := co.index;
+	    res := co.index;
+	 else
+	    error_msg("(Error) : Check whether type of argument of \"main\" is \"ARRAY{STR}\"\n");
+	    res := RESERVED_CLASSES::OB_ici;
+	 end; -- if
+      else
+	 res := array_str_ind;
+      end; -- if
+   end; -- get_array_str_ind
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   print_gen_rt_table(outfile:SAT_OUTFILE; table_prefix:STR; cond:BOOL) is
+      if (cond) then
+	 outfile.indent;
+	 outfile.s("unsigned int* ").s(table_prefix).s("_table_[] = {\n").ind_inc;
+	 i:INT := 0;
+	 loop until!(i >= (GLOBALS::class_inst).next_ind);
+	    outfile.indent;
+	    co:CLASSOB_S := (GLOBALS::class_inst).at_index(i);
+	    if (co /= void) then
+	       if (GLOBAL_PROC::handle_class_p(co)) then 
+		  if (co.index /= RESERVED_CLASSES::C_ici) and
+		     (co.index /= RESERVED_CLASSES::OB_ici) and
+		     (co.index /= RESERVED_CLASSES::FOB_ici) and
+		     (co.index /= RESERVED_CLASSES::UNDEFINE_ici) and
+		     (co.index /= RESERVED_CLASSES::SELF_TYPE_ici) then
+		     outfile.s(table_prefix).s("_ent_").
+		             s(co.prefix);
+		  else
+		     outfile.c('0');
+		  end; -- if
+	       else
+		  outfile.c('0');
+	       end; -- if
+	    else
+	       outfile.c('0');
+	    end; -- if
+	    i := i + 1;
+	    if (i < (GLOBALS::class_inst).next_ind) then
+	       outfile.c(',');
+	    end; -- if
+	    outfile.c('\n').inc_ln(1);
+	 end; -- loop
+	 outfile.ind_dec;
+	 outfile.indent;
+	 outfile.s("};\n").inc_ln(1);
+      else
+	 outfile.indent;
+	 outfile.s("int* ").s(table_prefix).s("_table_[] = {0};\n").inc_ln(1);
+      end; -- if
+   end; -- print_gen_rt_table
+
+end; -- class SATHER_SEMANT
+
+--------------------------------------------------------------------
+
+class C is
+   shared omerrs:INT;
+end; -- class C
+
+--------------------------------------------------------------------
+

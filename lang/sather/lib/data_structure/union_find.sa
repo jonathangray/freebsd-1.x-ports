@@ -1,0 +1,243 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/data_structure/union_find.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Collections of sets which support efficient union and find. 
+--*
+--* CLASSES: UF_HASH_ELT{T}, UNION_FIND{T}, UNION_FIND_TEST
+--* 
+--* REQUIRED FILES: ./genrl_hash.sa, ./list.sa, ./ob_hash.sa,
+--*                 ../base/test.sa, ./sort.sa
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: union_find.sa,v 1.1 1994/02/12 03:23:26 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:34 1993 (hws)
+--*  Oct 17 06:34 1993 (hws): Sather 1 syntax, copyright note
+--* Created: Tue Sep 25 11:32:21 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class UF_HASH_ELT{T} is
+   -- The hash table elements for `UNION_FIND{T}', for use in
+   -- `GENERAL_HASH{UF_HASH_ELT{T}}'. T cannot be a basic type.
+   -- Won't typically be used elsewhere.
+   
+   attr m:T;				-- The set member.
+   attr rank:INT;			-- Used to decide new root in unions.
+   attr parent:SAME;		-- Parent pointer, self for roots.
+   
+   create(m:T):SAME is
+      -- A new element holding `m'.
+      res:=res.new; res.m:=m; 
+      res.parent:=res;		-- make a singleton
+	 -- res.rank=0
+   end; -- create
+   
+   hash:INT is
+      -- The object pointer shifted right by two bits.
+      res:=C::ob_id(m).rshift(2);
+   end; -- hash
+   
+   is_equal(e:SAME):BOOL is
+      -- True if `self' and `e' hold the same member.
+      res:= (m=e.m);
+   end; -- is_equal
+   
+end; -- class UF_HASH_ELT{T}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class UNION_FIND{T} is
+   -- Collections of sets of elements of type `T' supporting union and find. 
+   -- T cannot be a basic type.
+   
+   attr t:GENERAL_HASH{UF_HASH_ELT{T}};	-- The table.
+   shared test_elt:UF_HASH_ELT{T}:=UF_HASH_ELT{T}::create(void); -- for tests
+   
+   create:SAME is
+      -- A new set of sets.
+      res:=res.new; 
+      res.t:=res.t.create;
+   end; -- create
+   
+   test(m:T):BOOL is
+      -- True if `m' is currently contained in one of the sets.
+      test_elt.m:=m; res:=(t.get(test_elt)/=void);
+   end; -- test
+   
+   insert(m:T) is
+      -- Add the element `m' as a singleton set (isolate it if present).
+      t.insert(UF_HASH_ELT{T}::create(m));
+   end; -- insert
+      
+   find(m:T):UF_HASH_ELT{T} is
+      -- The root of `m''s tree or `void' if absent.
+      -- Consider using `in_same_set' for a cleaner abstraction.
+      test_elt.m:=m; res:=t.get(test_elt);
+      if res=void then return end; -- not in table
+      loop
+	 if res.parent=res then break! end; -- hit root
+	 res.parent:=res.parent.parent;	-- path compression
+	 res:=res.parent;
+      end; -- loop
+   end; -- find
+   
+   elt_find(e:UF_HASH_ELT{T}):UF_HASH_ELT{T} is
+      -- Internal find given an `e'.
+      res:=e;
+      loop
+	 if res.parent=res then break! end; -- hit root
+	 res.parent:=res.parent.parent;	-- path compression
+	 res:=res.parent;
+      end; -- loop
+   end; -- elt_find
+   
+   union(m1,m2:T) is
+      -- Union together the sets containing `m1' and `m2'.
+      r1:UF_HASH_ELT{T}:=find(m1); -- root of m1's set.
+      r2:UF_HASH_ELT{T}:=find(m2); -- root of m2's set.
+      if r1=void or r2=void or r1=r2 then -- one is absent or they're same
+	 return 
+      end; -- if
+      if r1.rank>r2.rank then
+	 r2.parent:=r1;
+      elsif r1.rank<r2.rank then
+	 r1.parent:=r2;
+      else			-- r1.rank=r2.rank
+	 r1.parent:=r2; r2.rank:=r2.rank+1 -- increase rank
+      end; -- if
+   end; -- union
+      
+   in_same_set(m1,m2:T):BOOL is
+      -- True if `m1' and `m2' belong to the same set.
+      r1:UF_HASH_ELT{T}:=find(m1); -- root of m1's set.
+      r2:UF_HASH_ELT{T}:=find(m2); -- root of m2's set.
+      if r1=void or r2=void then -- one is absent
+      elsif r1=r2 then res:=true end;
+   end; -- in_same_set
+   
+   delete(m:T) is
+      -- Delete `m' if present.
+      test_elt.m:=m; t.delete(test_elt);
+   end; -- delete
+   
+   clear is
+      -- Eliminate all sets.
+      t.clear;
+   end; -- clear
+   
+   list_of_sets:LIST{LIST{T}} is
+      -- A list of lists of the elements in each set.
+      lt:OB_HASH_MAP{LIST{T}}:=lt.create; -- table of sets
+      tc:GENERAL_HASH_CURSOR{UF_HASH_ELT{T}}:=t.cursor;
+      loop until!(tc.is_done);	-- step through all members
+	 rt:UF_HASH_ELT{T}:=elt_find(tc.item); -- root of current member
+	 ol:LIST{T}:=lt.get(rt); -- list currently stored if any.
+	 if ol=void then ol:=LIST{T}::create end; -- new list if necessary
+	 ol:=ol.push(tc.item.m); -- put the current member on the list.
+	 lt.insert(rt,ol);	-- put the list in under rt
+	 tc.next
+      end; -- loop
+      res:=res.create;		-- the list to hold the result
+      ohc:OB_HASH_MAP_CURSOR{LIST{T}}:=lt.cursor; -- cursor into lt
+      loop until!(ohc.is_done);
+	 res:=res.push(ohc.item); -- add in this list
+	 ohc.next
+      end; -- loop
+      lt.clear;			-- help out the gc.
+   end; -- list_of_sets
+   
+end; -- class UNION_FIND{T}
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class UNIONF_TEST is
+   -- Test `UNION_FIND{STR}'.
+   TEST;
+   
+   main is
+      -- Test `UNION_FIND{STR}'.
+      class_name("UNION_FIND{STR}");
+      a:ARRAY{STR}:=a.new(15);	-- the set elements
+      a[0]:="a"; a[1]:="b"; a[2]:="c"; a[3]:="d"; a[4]:="e"; a[5]:="f";
+      a[6]:="g"; a[7]:="h"; a[8]:="i"; a[9]:="j"; a[10]:="k"; a[11]:="l";
+      a[12]:="m"; a[13]:="n"; a[14]:="o"; 
+      t:UNION_FIND{STR}:=t.create;
+      t.insert(a[0]); t.insert(a[1]);
+      t.insert(a[2]); t.insert(a[3]);
+      t.insert(a[4]);
+      test("insert", str_of_sets(t), "{a}, {b}, {c}, {d}, {e}");
+      test("test 1", t.test(a[0]).to_s, "T");
+      test("test 2", t.test(a[5]).to_s, "F");
+      t.union(a[0],a[1]); t.union(a[3],a[4]);
+      test("union 1", str_of_sets(t), "{a, b}, {c}, {d, e}");
+      test("in_same_set 1", t.in_same_set(a[0],a[1]).to_s, "T");
+      test("in_same_set 2", t.in_same_set(a[1],a[2]).to_s, "F");
+      t.union(a[1],a[2]); t.union(a[2],a[3]);t.union(a[3],a[4]);
+      test("union 2", str_of_sets(t), "{a, b, c, d, e}");
+      t.insert(a[5]); t.insert(a[6]); t.insert(a[7]);
+      t.insert(a[8]); t.insert(a[9]); t.insert(a[10]);
+      t.insert(a[11]); t.insert(a[12]); t.insert(a[13]); t.insert(a[14]);
+      OUT::s("union f-k, l-o: ").nl;
+      t.union(a[5],a[6]); t.union(a[6],a[7]);t.union(a[7],a[8]);
+      t.union(a[8],a[9]); t.union(a[9],a[10]);
+      t.union(a[11],a[12]); t.union(a[12],a[13]);t.union(a[13],a[14]);
+      test("union 3", str_of_sets(t)
+	    , "{a, b, c, d, e}, {f, g, h, i, j, k}, {l, m, n, o}");
+      t.delete(a[1]);
+      test("delete", str_of_sets(t)
+	    , "{a, c, d, e}, {f, g, h, i, j, k}, {l, m, n, o}");
+      t.clear;
+      test("clear", str_of_sets(t), "");
+      finish;
+   end; -- main
+
+   str_of_sets(t:UNION_FIND{STR}):STR is
+      -- A string displaying the elements of `t'. Each set is listed
+      -- alphabetically in curly brackets and the lists are given
+      -- alphabetically as well. Of the form: "{a, b, c}, {d, e, f, g}, {h}".
+      setl:LIST{LIST{STR}}:=t.list_of_sets;
+      strl:LIST{STR}:=strl.create; -- Set strl to list of strings of the sets.
+      setlc:LIST_CURSOR{LIST{STR}}:=setl.cursor;
+      loop until!(setlc.is_done);
+	 sets:LIST{STR}:=setlc.item;
+	 STR_SORT::sort(sets);	-- Put in sorted order
+	 s:STR:="{";
+	 setsc:LIST_CURSOR{STR}:=sets.cursor;
+	 loop until!(setsc.is_done);
+	    s:=s.s(setsc.item);
+	    setsc.next;
+	    if not setsc.is_done then s:=s.s(", ") end;
+	 end; -- loop
+	 s:=s.s("}");
+	 strl:=strl.push(s);
+	 setlc.next;
+      end; -- loop
+      STR_SORT::sort(strl);
+      strlc:LIST_CURSOR{STR}:=strl.cursor;
+      res:=STR::create;
+      loop until!(strlc.is_done);
+	 res:=res.s(strlc.item);
+	 strlc.next;
+	 if not strlc.is_done then res:=res.s(", ") end;
+      end; -- loop
+   end; -- str_of_sets
+   
+end; -- class UNIONF_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+

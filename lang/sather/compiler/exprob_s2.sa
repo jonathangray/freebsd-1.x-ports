@@ -1,0 +1,3396 @@
+-- File: exprob_s2.sa
+-- Author: Chu-Cheow Lim and Jeff Bilmes
+-- Created: Mon Jun 11 12:53:08 1990
+-- Copyright (C) International Computer Science Institute, 1990, 1991, 1992, 1993 
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Representing Sather expressions (created during semantic
+--*           check).
+--*
+--* RCS: $Id: exprob_s2.sa,v 1.1 1994/02/12 03:21:51 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 04:59 1993 (hws)
+--*  Sep 28 05:00 1993 (hws): switch -> case
+--*  Feb 28 17:07 1993 (hws): error when new used on abstract class
+--*  Feb 21 20:32 1993 (hws): delete debug stmts
+--*  Oct  6 14:53 1992 (hws): maybe generate dispatched call for $A::foo: SELF_TYPE
+--*        in second foo call in x.foo.foo with x: $A.
+--*  Aug 28 03:09 1991 (hws): more uniform error msgs
+--*  Aug 27 14:00 1991 (hws): class reference in class init expressions implies
+--*            ordering of class initialization.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class EXPR_ARGS_EXPROB_S is
+   -- Dotted expressions.
+   EXPROB_S;
+   
+   attr obj:$EXPROB_S;
+   attr feat:INT;
+   attr args:LST_EXPROB_S;
+   -- This is guaranteed to be non-void if it is created using the "create"
+   -- routine.
+   
+   attr referrent:$SEMANTOB;
+      -- Referrent of the name 
+   
+   attr temp_name:INT;
+   attr temp_ctype:INT;
+      -- Temporary variable to hold the value of object returned.  The
+      -- type of this variable should be consistent with the type of the
+      -- object.
+   
+   attr typeholder_name:INT;
+   attr typeholder_ctype:INT;
+      -- Static variable to hold the Sather type of last accessed object
+   
+   attr dispval_name:INT;
+   attr dispval_ctype:INT;
+      -- If the feature accessed is a shared, constant (sometimes) or 
+      --   routine, it is a pointer, else it is an offset to the attribute. 
+      --   "dispval_ctype" refers to the type for which "dispval_name" is
+      --   used.  For example, if it is an offset to the attribute, it
+      --   refers to the C type of the attribute.  If it a pointer to a
+      --   function, it refers to the type returned by the function.
+
+   attr temp_name_tpchk:INT;
+   attr temp_ctype_tpchk:INT;
+   -- Temporary variable (and C type of temporary variable) to hold result
+   -- of dotted expression so that the type of the result can be checked (if
+   -- runtime type-checking is requested).
+   
+   attr temp_args:ARRAY{INT};
+   attr temp_args_ctype:ARRAY{INT};
+      -- List of variables to hold temporary variables that will contain
+      -- result of argument evaluation, except for cases without side-
+      -- effect.  (Ref: Implementation of dispatching mechanism in general
+      -- document).  The values are guaranteed to be non-void and have
+      -- the same length as the number of arguments.
+   attr has_pre_eval_args:BOOL;
+      -- If this value is false, then any code involving pre-evaluating
+      -- arguments can be avoided.  This is initialized to "false".
+   
+   attr printed_times:INT;
+   -- The value is greater than 0 if the runtime type-checking code is already
+   -- generated, ie the code to compute value of the expression is already 
+   -- generated.  This is the number of times this node has been printed; it
+   -- should be less than or equal than the global variable "g_tag".
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(o:$EXPROB_S; f:INT; alst:LST_EXPROB_S; ln:INT):SAME is
+      res := new;
+      res.obj := o;
+      res.feat := f;
+      sz:INT;
+      if (alst /= void) then
+	 res.args := alst;
+	 sz := alst.insert;
+      else
+	 res.args := LST_EXPROB_S::create(1);
+      end; -- if
+      res.lineno := ln;
+      
+      res.temp_args := ARRAY{INT}::new(sz);
+      res.temp_args_ctype := ARRAY{INT}::new(sz);
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+      res := STR::create.s(obj.sather_code).
+                      c('.').
+                      s((GLOBALS::str_table).at_index(feat));
+      if (args /= void) then
+	 res := res.c('(').s(args.sather_code).c(')');
+      end; -- if
+   end; -- sather_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   out_of_line(fn: STR) is
+      -- update line info to refer to original file `fn' rather than the current
+      -- context in which this construct is used to compose code.
+      lineno := ERR_INFO::out_of_line_err_info(fn,lineno);
+      obj.out_of_line(fn);
+      args.out_of_line(fn);
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      res := create(obj.dup, feat, args.dup, lineno)
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      obj.resolve_predef_types(index);
+      args.resolve_predef_types(index);
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   valid_init_expr:BOOL is
+      res := obj.valid_init_expr;
+      if (res) then
+	 if (referrent /= void) then
+	    if (referrent.type = CONST_DECL_FEATOB_S::type) or
+	       (referrent.type = SHARED_DECL_FEATOB_S::type) or
+	       (referrent.type = ROUT_FEATOB_S::type) then
+	       if (args /= void) then
+		  res := args.valid_init_expr;
+	       end; -- if
+	    else
+	       res := false;
+	    end; -- if
+	 else
+	    case (feat)
+	    when RESERVED_WORDS::copy_ind,   
+	         RESERVED_WORDS::type_ind, 
+	         RESERVED_WORDS::extend_ind, 
+	         RESERVED_WORDS::new_ind, 
+	         RESERVED_WORDS::asize_ind, 
+	         RESERVED_WORDS::asize1_ind, 
+	         RESERVED_WORDS::asize2_ind, 
+	         RESERVED_WORDS::asize3_ind, 
+	         RESERVED_WORDS::asize4_ind then
+	       res := args.valid_init_expr;
+	    else
+	       -- Includes "res", "self", "void" (doesn't make sense in a
+	       -- dot expression), 
+
+	    end; -- case
+	 end; -- if
+      end; -- if
+   end; -- valid_init_expr
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- The other relevant codes are ID_EXPROB_S and TYPESPEC_ARGS_EXPROB_S.
+-- We have a separate routine to make sure that a constant feature's 
+-- initial expression eg the expression cannot use an attribute, but 
+-- may call routine etc.
+   expr_eval_constant:$CONST_EXPROB_S is
+      if (referrent = void) then
+	 -- Handle reserved identifiers
+	 case (feat)
+	 when RESERVED_WORDS::type_ind then
+	    res := INT_CONST_EXPROB_S::create(obj.res_type.inst_cls.index.to_s,
+	                                   lineno);
+         when RESERVED_WORDS::new_ind then
+	    -- Initialize constant feature with an object of current class;
+	    -- but there is no constant value.
+	    res := void;
+
+	 else     
+	    -- Any other identifier including "asize", "asize1", "asize2", 
+	    -- "asize4", "copy", /* "deep_copy" */, "extend", "new", "res", "self",
+	    -- "void"
+	    ERR_INFO::format_error_exit(
+	              lineno,
+	              STR::create.s("(EXPR_ARGS_EXPROB_S): \"").
+	                       s(GLOBALS::str_table.at_index(feat)).
+	                       s("\" is an unknown identifier in constant feature definition"));
+	 end; -- case
+	 return;
+      end; -- if
+      
+      if (referrent.type = CONST_DECL_FEATOB_S::type) then
+	 res := referrent.get_constval;
+      end; -- if
+   end; -- expr_eval_constant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      obj.semant(symtab);
+      obj_res_type:$TYPEOB_S := obj.res_type;
+      if (obj_res_type = void) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(EXPR_ARGS_EXPROB_S): Feature \"").
+	                    s(GLOBALS::str_table.at_index(feat)).
+	                    s("\" applied to unknown object type"));
+	 obj.res_type := GLOBALS::ob_typeob_s;
+	 obj_res_type := GLOBALS::ob_typeob_s;
+      end; -- if
+      
+      obj_cls:CLASSOB_S := obj_res_type.inst_cls;
+      alt_symtab:SYMBOL_TABLE := obj_cls.symtab;
+	 -- Get the symbol of the class instance for given expression
+      
+      if (alt_symtab = void) then
+	 ERR_INFO::format_error_exit(
+	           lineno,
+	           STR::create.s("(EXPR_ARGS_EXPROB_S): Class has no symbol table"));
+      end;
+      
+      -- Check for invalid predefined operations on foreign objects.
+      if (obj_cls.basic_type = RESERVED_CLASSES::FOB_ici) then
+	 GLOBAL_PROC::check_f_ob(self, feat, alt_symtab);
+      end; -- if
+      
+      -- We allow redefinition of any of the "reserved" feature names.
+      -- NOTE: Redefinition of "reserved" feature names is disallowed in
+      --       an earlier phase (during definiton of features).
+      if (referrent = void) then
+	 -- Rather than using "get_sym", we should just use "get_feature"
+	 -- because we are looking for a feature in a class.
+	 referrent := alt_symtab.get_feature(feat);
+
+	 -- If the type of "obj" is dispatched, we have to check that 
+	 -- "feat" is defined consistently in all the descendent classes 
+	 -- of the type of "obj".
+	 if requires_dispatched_call then
+	    if (referrent /= void) then
+	       case (referrent.type)
+	       when ROUT_FEATOB_S::type then
+		  rout_feat:ROUT_FEATOB_S := referrent;
+		  rout_feat.consistent_defs(feat, GLOBALS::semant_lval);
+		  
+	       when ATTR_DECL_FEATOB_S::type then
+		  attr_feat:ATTR_DECL_FEATOB_S := referrent;
+		  attr_feat.consistent_defs(feat, GLOBALS::semant_lval);
+		  
+	       when CONST_DECL_FEATOB_S::type then
+		  const_feat:CONST_DECL_FEATOB_S := referrent;
+		  const_feat.consistent_defs(feat, GLOBALS::semant_lval);
+
+	       when SHARED_DECL_FEATOB_S::type then
+		  shared_feat:SHARED_DECL_FEATOB_S := referrent;
+		  shared_feat.consistent_defs(feat, GLOBALS::semant_lval);
+	       end; -- case
+	    end; -- if
+	 end; -- if
+
+	 -- Remember to mark feature as being used. 
+	 if (referrent /= void) then
+	    case (referrent.type)
+	    when ROUT_FEATOB_S::type then
+	       rout_feat:ROUT_FEATOB_S := referrent;
+	       rout_feat.maybe_used := true;
+	       if (rout_feat.pte) and 
+		  (rout_feat.cls_inst /= (GLOBALS::curr_class_inst)) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(EXPR_ARGS_EXPROB_S): Routine \"").
+	                             s(GLOBALS::str_table.at_index(feat)).
+	                             s("\" is supposed to be private\n"));
+	       end; -- if
+	       
+	    when ATTR_DECL_FEATOB_S::type then
+	       attr_feat:ATTR_DECL_FEATOB_S := referrent;
+	       attr_feat.maybe_used := true;
+	       if (attr_feat.pte) and 
+		  (attr_feat.cls_inst /= (GLOBALS::curr_class_inst)) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(EXPR_ARGS_EXPROB_S): Attribute \"").
+                                     s(GLOBALS::str_table.at_index(feat)).
+	                             s("\" is supposed to be private\n"));
+	       end; -- if
+	       
+	    when CONST_DECL_FEATOB_S::type then
+	       const_feat:CONST_DECL_FEATOB_S := referrent;
+	       const_feat.maybe_used := true;
+	       if (const_feat.pte) and 
+		  (const_feat.cls_inst /= (GLOBALS::curr_class_inst)) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(EXPR_ARGS_EXPROB_S): Constant \"").
+	                             s(GLOBALS::str_table.at_index(feat)).
+	                             s("\" is supposed to be private\n"));
+	       end; -- if
+	       
+	    when SHARED_DECL_FEATOB_S::type then
+	       shared_feat:SHARED_DECL_FEATOB_S := referrent;
+	       shared_feat.maybe_used := true;
+	       if (shared_feat.pte) and 
+		  (shared_feat.cls_inst /= (GLOBALS::curr_class_inst)) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(EXPR_ARGS_EXPROB_S): Shared \"").
+                                     s(GLOBALS::str_table.at_index(feat)).
+	                             s("\" is supposed to be private\n"));
+	       end; -- if
+
+	    end; -- case
+	 end; -- if
+      end; -- if
+      
+      -- Record the class whose feature is being referenced by current
+      -- class.  We can avoid all these computation if it is predefined
+      -- feature (ie no referrent is found).  
+      -- IMPORTANT Assumption:  All features referenced when referrent
+      -- is void do not depend on the C code of the class, but the
+      -- attribute table for the class may be generated in file "MAIN_.c".
+      if (referrent /= void) then
+	 curr_callee:INT := obj_res_type.inst_ind;
+	 if not ((GLOBALS::curr_class_inst).callees.get(curr_callee)) then
+	    (GLOBALS::curr_class_inst).callees := 
+	    (GLOBALS::curr_class_inst).callees.insert(curr_callee);
+	 end; -- if
+	 if not (obj_cls.callers.get((GLOBALS::curr_class_inst).index)) then
+	    obj_cls.callers := obj_cls.callers.
+	                       insert((GLOBALS::curr_class_inst).index);
+	 end; -- if
+--	 obj_cls:CLASSOB_S := obj_res_type.inst_cls;
+-- Computed above.
+	 if requires_dispatched_call then
+
+
+	    i:INT;
+	    descendents:INT_HASH_SET := obj_cls.alldes;
+	    sz:INT := descendents.asize;
+	    loop until!(i >= sz);
+	       index:INT := descendents[i];
+	       if (index > 0) then
+		  (GLOBALS::curr_class_inst).callees :=
+		  (GLOBALS::curr_class_inst).callees.insert(index);
+	       end; -- if
+	       i := i + 1;
+	    end; -- loop
+	    
+	 end; -- if
+      end; -- if
+
+      -- Give the default meaning if "reserved" identifiers are not
+      -- redefined.
+      num_args:INT := 0;
+      if (args /= void) then
+	 num_args := args.insert;
+	 args.semant(symtab);
+      end; -- if
+
+      -- Rather than checking for whether any of the resultant types of 
+      -- the arguments is void later, we do it in one place.
+      i:INT;
+      loop until!(i >= num_args);		  
+	 if (args[i].res_type = void) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(EXPR_ARGS_EXPROB_S): Argument #").
+	                       i(i+1).s(" has no return type"));
+	    args[i].res_type := GLOBALS::ob_typeob_s;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+
+      -- Mark the arguments which involve dispatching on the current
+      -- arguments.  For example, if we have "f.x1(g.x2(h.x1))", and
+      -- "h" is dispatched, but "g" is not, then we do NOT mark the
+      -- the current argument.  But when we handle "g.x2", we do mark
+      -- the first argument of "g.x2(h.x1)".  (Ref: Implementation of
+      -- dispatching mechanism in general document)
+      if requires_dispatched_call then
+	 -- $FOB is allowed for type-checking, but we cannot dispatch on
+	 -- an object of type $FOB.
+	 if (obj_res_type.inst_cls.basic_type = RESERVED_CLASSES::FOB_ici) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(EXPR_ARGS_EXPROB_S): Cannot dispatch on ").
+	                       s(obj_res_type.full_name).
+	                       s(" which is a foreign object"));
+	 end; -- if
+	 
+	 -- All arguments have to be pre-evaluated.
+	 i:INT := 0;
+	 loop until!(i >= num_args);
+	    if not (args[i].access_value_only) then
+	       temp_args[i] := GLOBAL_PROC::global_key;
+	       temp_args_ctype[i] := args[i].res_type.ctype;
+	       has_pre_eval_args := true;
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+      else
+	 i:INT := 0;
+	 loop until!(i >= num_args);
+	    if (args[i].to_be_pre_evaluated) then
+	       temp_args[i] := GLOBAL_PROC::global_key;
+	       temp_args_ctype[i] := args[i].res_type.ctype;
+	       has_pre_eval_args := true;
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+      end; -- if
+		  
+      if (referrent = void) then
+	 -- Check for predefined feature names.
+	 case (feat)
+	 when RESERVED_WORDS::res_ind, 
+	      RESERVED_WORDS::self_ind, 
+	      RESERVED_WORDS::void_ind then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(EXPR_ARGS_EXPROB_S): \"").
+	                       s((GLOBALS::str_table).at_index(feat)).
+	                       s("\" is invalid in dot expression"));
+            res_type := GLOBALS::ob_typeob_s;
+				  
+	 when RESERVED_WORDS::type_ind then
+	    if (num_args = 0) then
+	    else
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(EXPR_ARGS_EXPROB_S): Unexpected arguments supplied for \"type\""));
+	       args := void;
+	    end; -- if
+	    res_type := GLOBALS::int_typeob_s;
+	    return;
+	    
+	 when RESERVED_WORDS::copy_ind then
+	    -- No arguments needed for "copy" and /* "deep_copy" */
+	    res_type := obj_res_type;
+	    if (num_args = 0) then
+	    else
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(EXPR_ARGS_EXPROB_S): \"").
+                                  s((GLOBALS::str_table).at_index(feat)).
+	                          s("\" does not expect argument"));
+	       -- Ignore the unwanted arguments.
+	       args := void;
+	    end; -- if
+	    return;
+
+	 when RESERVED_WORDS::extend_ind then
+	    -- Arguments are needed for "extend".
+	    -- This are not applicable for non-array types.
+	    res_type := obj_res_type;
+	    if not ((res_type.array_type_p) or
+	            (res_type.array2_type_p) or
+	            (res_type.array3_type_p) or
+	            (res_type.array4_type_p)) then
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(EXPR_ARGS_EXPROB_S): Cannot use non-array type for \"extend\""));
+	    end; -- if
+	    if (num_args = res_type.inst_cls.arrdim) then
+	       i:INT := 0;
+	       loop until!(i >= num_args);
+		  if not (args[i].res_type.int_type_p) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Argument #").
+		                        i(i + 1).
+		                        s(" is non-integer in \"extend\""));
+		  end; -- if
+		  i := i + 1;
+	       end; -- loop
+	    else
+	       ERR_INFO::format_error_msg(
+		         lineno,
+		         STR::create.s("(EXPR_ARGS_EXPROB_S): \"extend\" needs ").
+                                  i(res_type.inst_cls.arrdim).
+	                          s(" argument(s) but is given ").
+	                          i(num_args).s(" argument(s)"));
+   	    end; -- if
+	    return; 
+
+	 when RESERVED_WORDS::new_ind then
+	    -- Arguments may or may not be needed for "new".
+	    -- This is not applicable for basic types.
+	    res_type := obj_res_type;
+	    if (res_type.nonptr_p) then
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(EXPR_ARGS_EXPROB_S): Cannot use basic type for \"new\""));
+	    end; -- if
+	    
+	    -- NOTE: "res_type" is equivalent to "obj_res_type" here.
+	    ignore_num_args:BOOL;
+            if (res_type.is_dispatched) then
+	       ignore_num_args := true;
+	       if (res_type.inst_cls.arrdim = 0) and (num_args > 0) then
+		  ERR_INFO::format_warning_msg(
+		            lineno,
+	                    STR::create.s("(EXPR_ARGS_EXPROB_S): Applying \"new\" on non-array dispatched object with arguments; compiler cannot verify exact number of arguments needed\n"));
+	       end; -- if
+	    end; -- if
+	    if (num_args = res_type.inst_cls.arrdim) or (ignore_num_args) then
+	       i:INT := 0;
+	       min:INT := num_args.min(res_type.inst_cls.arrdim);
+	       loop until!(i >= num_args);
+		  if not (args[i].res_type.int_type_p) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Argument #").
+		                        i(i + 1).
+		                        s(" is non-integer in \"new\"\n"));
+		  end; -- if
+		  i := i + 1;
+	       end; -- loop
+	    else
+	       ERR_INFO::format_error_msg(
+		         lineno,
+		         STR::create.s("(EXPR_ARGS_EXPROB_S): \"new\" needs ").
+	                          i(res_type.inst_cls.arrdim).
+	                          s(" arguments but is given ").
+			          i(num_args));
+   	    end; -- if
+
+	    if (res_type.inst_cls.abt) then
+	       -- Abstract classes do not support creation
+	       ERR_INFO::format_error_exit(
+		  lineno,
+		  STR::create.s("(EXPR_ARGS_EXPROB_S): Abstract class \"").
+		  s(res_type.inst_cls.full_name).s("\" used in \"new\" call"));
+	    end;
+	    
+	    return;
+ 
+	       -- These features should be in the symbol table of the respective
+	       -- array types.  This would allow the user to define "asize" etc
+	       -- for non-array classes.  But we also provide default 
+	       -- definition.
+	       
+	 when RESERVED_WORDS::asize_ind, RESERVED_WORDS::asize1_ind then
+            if (obj_res_type.array_type_p) or 
+               (obj_res_type.array2_type_p) or
+               (obj_res_type.array3_type_p) or
+               (obj_res_type.array4_type_p) then
+	       if (num_args > 0) then
+		  -- Patch up by throwing away all the arguments.
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(EXPR_ARGS_EXPROB_S): \"").
+		                     s(GLOBALS::str_table.at_index(feat)).
+		                     s("\"'s unexpected args ignored"));
+		  args := void;
+	       end; -- if
+	    else
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(EXPR_ARGS_EXPROB_S): Applying \"").
+                                  s((GLOBALS::str_table).at_index(feat)).
+	                          s("\" to non-array object"));
+	    end; -- if
+	    res_type := GLOBALS::int_typeob_s;
+
+         when RESERVED_WORDS::asize2_ind then
+ 	    if (obj_res_type.array2_type_p) or
+ 	       (obj_res_type.array3_type_p) or
+ 	       (obj_res_type.array4_type_p) then
+	       if (num_args > 0) then
+		  -- Patch up by throwing away all the arguments.
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(EXPR_ARGS_EXPROB_S): \"").
+		                     s(GLOBALS::str_table.at_index(feat)).
+		                     s("\"'s unexpected args ignored"));
+		  args := void;
+	       end; -- if
+	    else
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(EXPR_ARGS_EXPROB_S): Applying \"asize2\" to non-array or 1-dim array object"));
+	    end; -- if
+	    res_type := GLOBALS::int_typeob_s;
+
+         when RESERVED_WORDS::asize3_ind then
+            if (obj_res_type.array3_type_p) or
+	       (obj_res_type.array4_type_p) then
+	       if (num_args > 0) then
+		  -- Patch up by throwing away all the arguments.
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(EXPR_ARGS_EXPROB_S): \"").
+		                     s(GLOBALS::str_table.at_index(feat)).
+		                     s("\"'s unexpected args ignored"));
+		  args := void;
+	       end; -- if
+	    else
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(EXPR_ARGS_EXPROB_S): Applying \"").
+	                          s(GLOBALS::str_table.at_index(feat)).
+	                          s("\" to inappropriate object"));
+	    end; -- if
+	    res_type := GLOBALS::int_typeob_s;
+
+	 when RESERVED_WORDS::asize4_ind then
+            if (obj_res_type.array4_type_p) then
+	       if (num_args > 0) then
+		  -- Patch up by throwing away all the arguments.
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(EXPR_ARGS_EXPROB_S): \"").
+		                     s(GLOBALS::str_table.at_index(feat)).
+		                     s("\"'s unexpected args ignored"));
+		  args := void;
+	       end; -- if
+	    else
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(EXPR_ARGS_EXPROB_S): Applying \"asize4\" to inappropriate-sized object"));
+	    end; -- if
+	    res_type := GLOBALS::int_typeob_s;
+         else
+            -- A possible case here is to have the expression "f.expr" where
+	    -- the type of f is $OB, and hence the referrent is void.
+            if (not handle_spec_expr) then		  
+	       ERR_INFO::format_error_msg(
+		         lineno,
+		         STR::create.s("(EXPR_ARGS_EXPROB_S): Unknown identifier \"").
+	                          s((GLOBALS::str_table).at_index(feat)).
+                                  s("\" used"));
+	       res_type := GLOBALS::ob_typeob_s;
+	    end; -- if
+         end; -- case
+      else
+	 -- !* Now "private" features are visible; deal with "private"
+	 --    features later.
+         case (referrent.type)
+         when LVAR_DECL_STMTOB_S::type, PARAM_DECLOB_S::type then
+	    -- This should not happen because when we search the symbol
+	    -- table, only features are visible in the table.
+	    ERR_INFO::compiler_error_msg("EXPR_ARGS_EXPROB_S",
+	              STR::create.s("Dotted expression cannot refer to a variable \"").
+	                       s((GLOBALS::str_table).at_index(feat)).
+                               s("\""));
+	 when CONST_DECL_FEATOB_S::type, SHARED_DECL_FEATOB_S::type,
+	      ATTR_DECL_FEATOB_S::type then
+	    -- If we are using some variable, parameter etc, there should
+	    -- not be any parameters.
+	    if (num_args > 0) then
+	       -- Patch up by throwing away the parameters
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(EXPR_ARGS_EXPROB_S): Unexpected arguments ignored"));
+	       args := void;
+	    end; -- if
+	    res_type := referrent.typeof;
+	 when ROUT_FEATOB_S::type then
+	    -- Match the types of the arguments with the parameters.
+	    i:INT := 0;
+	    ptypes:LST_TYPEOB_S := referrent.typeof.paramstype;
+	    num_params:INT := 0;
+	    if (ptypes /= void) then
+	       num_params := ptypes.insert;
+	    end; -- if
+	    if (num_params /= num_args) then
+	       -- Generate only error msgs; in the code generation phase,
+	       -- we'll just ignore the incompatibility and generate 
+	       -- "bad code".
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(EXPR_ARGS_EXPROB_S): \"").
+	                          s(GLOBALS::str_table.at_index(feat)).
+	                          s("\" gets incorrect number of args"));
+	    end; -- if
+	    if (num_params < num_args) then
+	       num_args := num_params;
+	    end; -- if
+	    loop until!(i >= num_args);
+	       -- The check for no return type has been done earlier.
+	       if not (GLOBAL_PROC::conform_tst(args[i].res_type, ptypes[i],
+		                                args[i]))
+
+	       then
+		  -- Generate only error msgs; in the code generation phase,
+		  -- we'll just ignore the incompatibility and generate 
+		  -- "bad code".
+		  tn1:STR; tn2:STR;
+		  if (args[i].res_type /= void) then
+		     tn1 := args[i].res_type.full_name;
+		  else
+		     tn1 := "<UNKNOWN>";
+		  end; -- if
+		  if (ptypes[i] /= void) then
+		     tn2 := ptypes[i].full_name;
+		  else
+		     tn2 := "<UNKNOWN>";
+		  end; -- if
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(EXPR_ARGS_EXPROB_S): Argument #").
+		                     i(i + 1).
+		                     s(" has incorrect type (").
+		                     s(tn1).s(") for \"").
+     	                             s(GLOBALS::str_table.at_index(feat)).
+		                     s("\" (").s(tn2).c(')'));
+
+	       elsif (args[i].res_type.int_type_p and (ptypes[i].real_type_p or
+		  ptypes[i].double_type_p)) then
+		     -- make sure it gets passed as a double.
+		  args[i].cast_to_c_type := C_TYPE_CONST::c_double;
+	       end; -- if
+	       i := i + 1;
+	    end; -- loop
+	    res_type := referrent.typeof.rettype;
+         else
+	    -- Handle special case:  If we have "1.2.f" and we cannot find 
+	    -- "f" in REAL class initially, we would have to look for "f" in
+	    -- DOUBLE class.
+	    if (obj.type = REAL_CONST_EXPROB_S::type) and 
+	       (obj.res_type.inst_ind = RESERVED_CLASSES::REAL_ici) then
+	       obj.res_type := GLOBALS::double_typeob_s;
+	       semant((GLOBALS::double_typeob_s).inst_cls.symtab);
+	    end; -- if
+	    
+	    if (referrent = void) then
+	       ERR_INFO::format_error_exit(
+	                 lineno,
+	                 STR::create.s("(EXPR_ARGS_EXPROB_S): \"").
+                                  s(GLOBALS::str_table.at_index(feat)).
+                                  s("\" has unknown referrent"));
+	    end; -- if
+         end; -- case
+
+	    -- Record any C names and reference to external features that
+	    --   that we would have to generate later.
+	    -- Get the definition of the class instance of the type specification
+	    --   in the current class-feature reference.  From the definition,
+	    --   get the name index and compare. 
+
+	 if (referrent.type /= ATTR_DECL_FEATOB_S::type) then
+	    co:CLASSOB_S := symtab.in_class;
+	    cls_ind:INT := obj_res_type.inst_cls.index;
+	    
+	    if (cls_ind = RESERVED_CLASSES::C_ici) then
+	       -- If it is a reference to a C name, record that fact for
+	       --   generating C macros later.  If this is found in the
+	       --   initialization of shared/constant features, we have
+	       --   to generate the C macros in `MAINx_.c'.
+	       if (GLOBALS::pre_semant) then
+		  GLOBALS::other_cnames := (GLOBALS::other_cnames).insert(feat);
+	       end; -- if
+	       co.cnames := co.cnames.insert(feat);
+	    else	
+	       -- Record the class and feature name so that we can generate
+	       --   C "extern" declarations.
+	       if (cls_ind /= symtab.in_class.index) then
+		  k:INT := GLOBAL_PROC::key_of_class_feat(cls_ind, feat);
+		  co.externs := co.externs.insert(k);
+	       end; -- if
+	    end; -- if
+	 end; -- if
+      end; -- if
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private handle_spec_expr:BOOL is
+      -- Handles the case for expression "f.expr" when the type of f
+      -- is $OB.  We check the following:
+      -- 1.  f is declared to be of type $OB.
+      -- 2.  The number of arguments is 0.
+      -- 3.  For all descendents of $OB (ie all classes, except the
+      --     basic and foreign classes), look for the definition of
+      --     feature and mark it as being "maybe_used".  Also mark
+      --     the corresponding class as being used.  When the feature
+      --     is checked, we verify:
+      --     a.  It is a routine.
+      --     b.  The routine definition does not return any value.
+      --     c.  The routine definition does not take any argument.
+      res := true;
+      obj_res_type:INSTANT_TYPEOB_S := obj.res_type;
+      if (obj_res_type = void) then
+	 ERR_INFO::format_error_msg(
+                   lineno,
+	           STR::create.s("(EXPR_ARGS_EXPROB_S): Feature \"").
+	                    s(GLOBALS::str_table.at_index(feat)).
+	                    s("\" applied to unknown object type"));
+	 res := false;
+	 return;
+      end; -- if
+      obj_type_index:INT := obj_res_type.inst_ind;
+      if (obj_type_index /= RESERVED_CLASSES::OB_ici) then
+	 res := false; return;
+      end; -- if
+      num_args:INT := 0;
+      if (args /= void) then
+	 num_args := args.insert;
+      end; -- if
+      if (num_args /= 0) then
+	 res := false; return;
+      end; -- if
+      obj_cls:CLASSOB_S := (GLOBALS::class_inst).at_index(obj_type_index);
+      if (obj_cls = void) then
+	 ERR_INFO::compiler_error_msg("EXPR_ARGS_EXPROB_S",
+	           STR::create.s("Invalid class number ").i(obj_type_index));
+	 res := false;
+	 return;
+      end; -- if
+      descendents:INT_HASH_SET := obj_cls.alldes;
+      i:INT := 0;
+      sz:INT := descendents.asize;
+      num_found:INT;	 
+      loop until!(i >= sz);
+	 des_ind:INT := descendents[i];
+	 if (des_ind > 0) then
+	    des_cls:CLASSOB_S := (GLOBALS::class_inst).at_index(des_ind);
+	    if (des_cls = void) then
+	       ERR_INFO::compiler_error_msg("EXPR_ARGS_EXPROB_S",
+	                 STR::create.s("Invalid descendent index for $OB ")
+	                          .i(des_ind));
+               res := false;
+               break!;
+            else
+               tmp_symtab:SYMBOL_TABLE := des_cls.symtab;
+               if (tmp_symtab = void) then
+		  ERR_INFO::compiler_error_msg("EXPR_ARGS_EXPROB_S",
+	                    STR::create.s("Missing symbol table class ")
+	                             .s(des_cls.full_name));
+		  res := false;
+		  break!;
+	       end; -- if
+               tmp_ref:$SEMANTOB := tmp_symtab.get_feature(feat);
+               if (tmp_ref /= void) then
+		  if (tmp_ref.type /= ROUT_FEATOB_S::type) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Use of ").
+		                        s((GLOBALS::str_table).at_index(feat)).
+		                        s(" in f.expr(f:$OB) requires a routine in ").
+		                        s(des_cls.full_name));		     
+		     res := false;
+		     break!;
+		  end; -- if
+		  tmp_rout_ref:ROUT_FEATOB_S := tmp_ref;
+		  if (tmp_rout_ref.rout_rettype /= void) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Use of ").
+		                        s((GLOBALS::str_table).at_index(feat)).
+		                        s(" in f.expr(f:$OB) requires a routine with no return value in ").
+		                        s(des_cls.full_name));		     
+		     res := false;
+		     break!;
+		  end; -- if
+		  tmp_params_num:INT := tmp_rout_ref.plist.insert;
+		  if (tmp_params_num /= 0) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Use of ").
+		                        s((GLOBALS::str_table).at_index(feat)).
+		                        s(" in f.expr(f:$OB) requires a routine with no parameter in ").
+		                        s(des_cls.full_name));		     
+		     res := false;
+		     break!;
+		  end; -- if
+		  -- At this point, the routine definition has passed all the
+		  -- checks, we mark the class and routine definition.
+		  num_found := num_found + 1;
+		  tmp_rout_ref.update_used_in_dispatch;
+		  des_cls.is_used_p := true;
+	       end; -- if
+               -- Ignore the case when we cannot find the feature definition
+               -- in the class.
+	    end; -- if
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+      if (num_found = 0) then
+	 -- We should be very suspicious, if we cannot find any feature by
+	 -- the given name.
+	 ERR_INFO::format_warning_msg(
+	           lineno,
+	           STR::create.s("(EXPR_ARGS_EXPROB_S): No class contains \"").
+	                    s((GLOBALS::str_table).at_index(feat)).
+	                    s("\" as a routine")); 
+      end; -- if
+   end; -- handle_spec_expr
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private handle_spec_expr_pre_code(outfile:SAT_OUTFILE):BOOL is
+      -- Print the code to get dispatch for the object "f" in "f.expr"
+      -- (where f:$OB).
+      obj_res_type:INSTANT_TYPEOB_S := obj.res_type;
+      
+      -- The resultant type of "obj" cannot be void after "semant".
+      obj_type_index:INT := obj_res_type.inst_ind;
+      if (obj_type_index /= RESERVED_CLASSES::OB_ici) then
+	 return;
+      end; -- if
+      num_args:INT := 0;
+      if (args /= void) then
+	 num_args := args.insert;
+      end; -- if
+      if (num_args /= 0) then
+	 return;
+      end; -- if
+      PRINT_C_CODE::cprint_ob_cache_dispatch(outfile, cont12, self);
+      res := true;
+   end; -- handle_spec_expr_pre_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private handle_spec_expr_act_code(outfile:SAT_OUTFILE):BOOL is
+      -- Print the code to invoke "f.expr" (where f:$OB).
+      obj_res_type:INSTANT_TYPEOB_S := obj.res_type;
+      
+      -- The resultant type of "obj" cannot be void after "semant".
+      obj_type_index:INT := obj_res_type.inst_ind;
+      if (obj_type_index /= RESERVED_CLASSES::OB_ici) then
+	 return;
+      end; -- if
+      num_args:INT := 0;
+      if (args /= void) then
+	 num_args := args.insert;
+      end; -- if
+      if (num_args /= 0) then
+	 return;
+      end; -- if
+      -- From the way the temporary variables are generated, this
+      -- shouldn't happen, but we check just in case.
+      if (dispval_name = 0) or (temp_name = 0) then
+	 ERR_INFO::compiler_error_msg("EXPR_ARGS_EXPROB_S",
+	    "(Code 4) in handling of f.expr where f:$OB.  Please report");
+	 return;
+      end; -- if
+      outfile.s("((INTVAL_(");
+      GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+      outfile.s(")!=0)? (IFN_(");
+      GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+      outfile.s(")(");
+      GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+      outfile.s(")):0)");
+      res := true;
+   end; -- handle_spec_expr_act_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   assignable_p:BOOL is
+      -- A dot expression is assignable iff the referenced feature is
+      --   assignable.
+      if (referrent /= void) then
+	 if (referrent.type = PARAM_DECLOB_S::type) or
+	    (referrent.type = LVAR_DECL_STMTOB_S::type) or
+	    (referrent.type = ROUT_FEATOB_S::type) or 
+	    (referrent.type = CONST_DECL_FEATOB_S::type) then
+	    res := false;	
+	       -- We should not have "x.y" where "y" is a local.
+	 elsif (referrent.type = ATTR_DECL_FEATOB_S::type) or
+	       (referrent.type = SHARED_DECL_FEATOB_S::type) then
+	    res := true;
+	 else		-- This should not occur, but just in case.
+	    ERR_INFO::compiler_error_msg("EXPR_ARGS_EXPROB_S",
+	              STR::create.s("Unrecognized referrent type \"").
+	                       s((GLOBALS::str_table).at_index(feat)).
+                               s("\""));
+	 end; -- if
+      else
+	 -- Handle "reserved" identifiers.
+	 -- All expressions such as "x.asize", etc are non-assignable.
+	 res := false;
+      end; -- if 
+   end; -- assignable_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      -- This routine should only be called after the type has been 
+      --   resolved, so that the value of "res_type" is correct.
+      if (temp_name < 0) then
+	 -- No temporaries generated 
+      elsif (temp_name = 0) then
+	 -- We have not checked whether a temporary is needed.
+	 if requires_dispatched_call then
+	    -- Temporary holding the object; the type should be
+	    -- consistent with the type of the object.
+	    temp_name := GLOBAL_PROC::global_key;
+	    temp_ctype := obj.res_type.ctype;
+	    
+	    -- Static variables holding the type and access value of the
+	    --   object attribute last accessed
+	    typeholder_name := GLOBAL_PROC::global_key;
+	    typeholder_ctype := C_TYPE_CONST::c_int;
+	    
+	    dispval_name := GLOBAL_PROC::global_key;
+	    -- Type of returned value of dot expression
+	    if (res_type /= void) then
+	       dispval_ctype := res_type.ctype;
+	    else
+	       -- This happens when we have a routine call which does not
+	       -- return any value.
+	       dispval_ctype := C_TYPE_CONST::c_void;
+	    end; -- if
+	    res := LIST{INT}::create(6).push(temp_name).
+	                            push(temp_ctype).
+	                            push(-typeholder_name).
+	                            push(typeholder_ctype).
+	                            push(-dispval_name).
+	                            push(dispval_ctype);
+	 else
+	    -- This indicates that we have checked that no temporary is
+	    --   needed.
+	    temp_name := -1;	
+	 end; -- if
+      else
+	 res := LIST{INT}::create(6).push(temp_name).
+	                         push(temp_ctype);
+	 if (typeholder_name > 0) then
+	    res := res.push(-typeholder_name).push(typeholder_ctype);
+	 end; -- if
+	 if (dispval_name > 0) then
+	    res := res.push(-dispval_name).push(dispval_ctype);
+	 end; -- if
+      end; -- if
+
+      if (referrent = void) and ((feat = RESERVED_WORDS::new_ind) or
+	                         (feat = RESERVED_WORDS::type_ind)) then
+	 if (temp_name = -1) then
+	    -- We only come here if the object is non-dispatched.
+	    
+	    temp_name := GLOBAL_PROC::global_key;
+	    temp_ctype := obj.res_type.ctype;
+	    res := LIST{INT}::create(2).push(temp_name).push(temp_ctype);
+	 end; -- if
+      end; -- if
+	 
+      -- If void check is requested, and no temporary is allocated, we
+      -- generate a new temporary to hold the object while it is being
+      -- tested for void.
+      if (GLOBAL_PROC::check_is_on) then
+	 if (temp_name = -1) then
+	    temp_name := GLOBAL_PROC::global_key;
+	    temp_ctype := obj.res_type.ctype;
+	    res := LIST{INT}::create(2).push(temp_name).push(temp_ctype);
+	 end; -- if
+      end; -- if
+      
+      if (res /= void) then
+	 res := res.append(args.gen_temps);
+      else
+	 res := args.gen_temps;
+      end; -- if
+      if (res /= void) then
+	 res := res.append(obj.gen_temps);
+      else
+	 res := obj.gen_temps;
+      end; -- if
+
+      -- If runtime type-checking is required, generate more temporary
+      -- to hold result of current expression while the type of the
+      -- result is checked.
+      if (GLOBAL_PROC::check_is_on) then
+	 if (rt_type /= 0) then
+	    temp_name_tpchk := GLOBAL_PROC::global_key;
+	    temp_ctype_tpchk := res_type.ctype;
+	    if (res /= void) then
+	       res := res.push(temp_name_tpchk).push(temp_ctype_tpchk);
+	    else
+	       res := LIST{INT}::create(2).push(temp_name_tpchk).
+	                               push(temp_ctype_tpchk);
+	    end; -- if
+	 end; -- if
+      end; -- if
+
+      -- The temporaries to be generated include those for holding
+      -- values of pre-evaluated arguments.
+      if (has_pre_eval_args) then
+	 i:INT := 0;
+	 sz:INT := args.insert;
+	 loop until!(i >= sz);
+	    if (temp_args[i] > 0) then
+	       if (res /= void) then
+		  res := res.push(temp_args[i]).push(temp_args_ctype[i]);
+	       else
+		  res := LIST{INT}::create(2).push(temp_args[i]).
+		                          push(temp_args_ctype[i]);
+	       end; -- if
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+      end; -- if
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_ext_strs is
+      obj.get_ext_strs;
+      args.get_ext_strs;	-- "args" is guaranteed to be non-void.
+      
+      -- Also remember to record references to string constants (in the
+      -- form of constant features) in other classes in "ext_strs" 
+      -- field of CLASSOB_S.
+      --
+      if (res_type /= void) then
+	 co:CLASSOB_S := res_type.inst_cls;
+	 cls_ind:INT := co.index;
+	 if (cls_ind = RESERVED_CLASSES::C_ici) then
+	 -- Do nothing
+	 else
+	    -- This is to avoid cases when we have 
+	    -- class FOO is
+	    --     x:FOO...  x.y  (where "x.y" refers to a constant feature)
+	    -- end; -- class
+	    if (cls_ind /= (GLOBALS::curr_class_inst).index) then
+	       
+	       -- NOTE: Only record if it is a different class.
+	       if (referrent /= void) then
+		  if (referrent.type = CONST_DECL_FEATOB_S::type) then
+		     const_feat:CONST_DECL_FEATOB_S := referrent;
+		     temp:INT := const_feat.is_a_str_const;
+		     if (temp > 0) then
+			-- NOTE: We record the reference in the current
+			-- class, not the class of the object.
+			(GLOBALS::curr_class_inst).ext_strs := 
+			(GLOBALS::curr_class_inst).ext_strs.insert(temp);
+		     end; -- if
+		  end; -- if
+	       end; -- if
+	    end; -- if
+	 end; -- if
+      end; -- if
+   end; -- get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   to_be_pre_evaluated:BOOL is
+      -- This expression must be pre-evaluated, if the object type is
+      -- dispatched.  The arguments of this expression have been taken
+      -- care of when we call "semant" on this expression.
+      res := requires_dispatched_call;
+   end; -- to_be_pre_evaluated
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   access_value_only:BOOL is
+      -- Default is to return "false" if we do not know the referrent;
+      -- otherwise, return "true" if the referrent is not a routine. 
+      if (referrent /= void) then
+	 res := (referrent.type /= ROUT_FEATOB_S::type);
+      end; -- if
+   end; -- access_value_only
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private cprint_ith_arg_pre_code(i:INT; outfile:SAT_OUTFILE) is
+      -- Either 
+      -- a.  the argument has to be evaluated into a local temporary, or
+      -- b.  only generate the preliminary code for the argument.
+      -- Assume that the range of i is valid.
+      ith_arg:$EXPROB_S := args[i];
+      ith_temp:INT := temp_args[i];
+      ith_arg.cprint_pre_code(outfile);
+      if (ith_temp > 0) then
+	 outfile.indent;
+	 GLOBAL_PROC::cprint_ctemp_name(ith_temp, outfile);
+	 outfile.s(" = ");
+	 ith_arg.cprint_act_code(outfile);
+	 outfile.s(";\n").inc_ln(1);
+      end; -- if
+   end; -- cprint_ith_arg_pre_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private cprint_ith_arg_act_code(i:INT; outfile:SAT_OUTFILE) is
+      -- Either
+      -- a.  print the local variable containing the result of argument, or
+      -- b.  only generate the actual code for the argument.
+      -- Assume that the range of i is valid.
+      ith_temp:INT := temp_args[i];
+      if (ith_temp > 0) then
+	 GLOBAL_PROC::cprint_ctemp_name(ith_temp, outfile);
+      else
+	 args[i].cprint_act_code(outfile);
+      end; -- if 
+   end; -- cprint_ith_arg_act_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   requires_dispatched_call: BOOL is
+      -- determine whether we need to generate a dispatched call.
+      -- requires that obj.res_type is non-void.
+      
+      -- We forward lift A::feat: SAME  to $A::feat: $SAME
+      -- in case obj is dispatched.
+      
+      if obj.res_type.is_dispatched then -- no questions asked
+	 res := true;
+      elsif res_type /= void then
+	 if (not res_type.is_dispatched) and res_type.was_self_type_undispatched and
+	    obj.type = EXPR_ARGS_EXPROB_S::type
+	 then -- could require lifting 
+	    e: EXPR_ARGS_EXPROB_S := obj;
+	    if e.dispatch_required then -- we ran over it once
+	       res := true
+	    elsif e.requires_dispatched_call then -- run over it first time
+	       res := true;
+	       dispatch_required := true;
+	    end;
+	 end;
+      end;
+   end;
+
+   attr dispatch_required: BOOL;	-- only for self type lifting temporarily.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_pre_code(outfile:SAT_OUTFILE) is
+      num_args:INT := 0;
+      if args /= void then
+	 num_args := args.insert;
+      end; -- if
+      
+      i:INT := 0;
+      loop until!(i >= num_args);
+	 cprint_ith_arg_pre_code(i, outfile);
+	 i := i + 1;
+      end; -- loop
+      
+      -- NOTE:
+      -- The preliminary code for object must be generated just before
+      -- it is being used.  Otherwise, any call to evaluate any argument
+      -- may change the computed dispatch value.
+      obj.cprint_pre_code(outfile);
+      -- we code a dispatched call when obj's type is dispatched or
+      -- is SAME lifted to $SAME like in
+      -- x: $A, A::foo: SAME ... x.foo.foo
+      -- at this point we assert that obj is non-void.
+      if requires_dispatched_call then 
+	 -- Code for dispatch
+	 outfile.indent;
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(" = ");
+	 obj.cprint_act_code(outfile);
+	 outfile.s(";\n").inc_ln(1);
+	 
+	 -- If void check is requested, generate the test before
+	 -- the dispatching code.
+	 if (GLOBAL_PROC::check_is_on) then
+	    if (referrent = void) then
+	       case (feat)
+	       when RESERVED_WORDS::extend_ind, 
+		    RESERVED_WORDS::copy_ind then
+		  -- "extend", "copy", /* "deep_copy" */: Void object is acceptable
+
+	       when RESERVED_WORDS::new_ind, 
+		    RESERVED_WORDS::asize_ind, 
+		    RESERVED_WORDS::asize1_ind, 
+		    RESERVED_WORDS::asize2_ind, 
+		    RESERVED_WORDS::asize3_ind,
+		    RESERVED_WORDS::asize4_ind, 
+		    RESERVED_WORDS::type_ind then
+	       -- NOTE: "new" and "type" need to access type of object.
+	       --       "asize", asize1", "asize2", "asize3", "asize4" also 
+	       --       require non-void objects. 
+
+		  PRINT_C_CODE::cprint_void_tst(outfile, cont10, self);
+	       end; -- case
+	    else
+	       -- If referrent is not void, from the following compiler code,
+	       -- "cache_dispatch_" code will be generated, and we need to 
+	       -- get at type of object in the dispatching.  Hence we generate
+	       -- the code to test for void object, independent of kind of
+	       -- referrent.
+	       PRINT_C_CODE::cprint_void_tst(outfile, cont10, self);
+	    end; -- if
+	 end; -- if
+	 
+	 -- Handle the special cases and quit after that.
+	 if (referrent = void) then
+	    case (feat)
+	    when RESERVED_WORDS::asize_ind, 
+	         RESERVED_WORDS::asize1_ind, 
+	         RESERVED_WORDS::asize2_ind, 
+	         RESERVED_WORDS::asize3_ind, 
+	         RESERVED_WORDS::asize4_ind then
+	       PRINT_C_CODE::cprint_array_dispatch(outfile, cont13, self);
+	    when RESERVED_WORDS::type_ind,
+	         RESERVED_WORDS::new_ind then
+	       -- Object has already been evaluated into a temporary
+               -- variable.  The generic runtime will handle the "new",
+	       -- "type" operations correctly, so we do NOT have to handle
+	       -- "f.expr" (f:$OB) here.
+	    else
+	       handle_spec_expr_pre_code(outfile);
+	    end; -- case
+	    return;
+	    -- If the referrent is void, the "cache_dispatch_" code
+	    -- is useless, since we will handle the cases separately.
+	 else
+	    PRINT_C_CODE::cprint_cache_dispatch(outfile, cont12, self);
+	 end; -- if
+      else
+	 -- Whether void check or not, for predefined functions "new", "type"
+	 -- the object is computed to achieve any side-effect.  Note that
+	 -- no void check is necessary even if void check is requested.
+
+	 -- POSSIBLE OPTIMIZATION: If object is side-effect free, we can
+	 --                        avoid generating this extra assignment.
+	 if (referrent = void) and ((feat = RESERVED_WORDS::new_ind) or
+	                            (feat = RESERVED_WORDS::type_ind)) then
+	    outfile.indent;
+	    GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	    outfile.s(" = ");
+	    obj.cprint_act_code(outfile);
+	    outfile.s(";\n").inc_ln(1);
+	    return;
+	 end; -- if
+	 
+	 -- Even if object is non-dispatched, if void check is requested,
+	 -- we have to generate the preliminary code to compute the 
+	 -- object and store it in the temporary variable, in addition 
+	 -- to the code that does the void check.
+	 if (GLOBAL_PROC::check_is_on) then
+	    if (referrent = void) then
+	       case (feat)
+	       when RESERVED_WORDS::extend_ind, 
+		    RESERVED_WORDS::copy_ind,
+		    RESERVED_WORDS::new_ind then
+		  -- "extend", "copy", /* "deep_copy" */: Void object is acceptable.
+		  -- Unlike the dispatched case, "new" does not need to access
+		  -- type of object.
+
+	       when RESERVED_WORDS::asize_ind, 
+		    RESERVED_WORDS::asize1_ind, 
+		    RESERVED_WORDS::asize2_ind, 
+		    RESERVED_WORDS::asize3_ind,
+		    RESERVED_WORDS::asize4_ind, 
+		    RESERVED_WORDS::type_ind then
+	       -- NOTE: "type" need to access type of object.
+	       --       "asize", asize1", "asize2", "asize3", "asize4" also 
+	       --       require non-void objects. 
+
+		  outfile.indent;
+		  GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		  outfile.s(" = ");
+		  obj.cprint_act_code(outfile);
+		  outfile.s(";\n").inc_ln(1);
+		  
+		  PRINT_C_CODE::cprint_void_tst(outfile, cont10, self);
+	       end; -- case
+	    else
+	       if (referrent.type = ATTR_DECL_FEATOB_S::type) then
+		  outfile.indent;
+		  GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		  outfile.s(" = ");
+		  obj.cprint_act_code(outfile);
+		  outfile.s(";\n").inc_ln(1);
+		  
+		  PRINT_C_CODE::cprint_void_tst(outfile, cont10, self);
+	       end; -- case
+	    end; -- if
+	 end; -- if
+      end; -- if
+
+      if (GLOBAL_PROC::check_is_on) then
+	 if (rt_type /= 0) then
+	    GLOBAL_PROC::cprint_curr_exp_code(self, temp_name_tpchk, outfile);
+	 end; -- if
+      end; -- if
+   end; -- cprint_pre_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Continuation codes
+-- Related to dispatched object
+   const cont1:INT := 1;
+      -- Print access to attribute of object whose offset is stored in
+      -- a temporary variable.
+   const cont2:INT := 2;	-- Print access to "asize2" of array
+   const cont3:INT := 3;	-- Print access to "asize3" of array
+   const cont4:INT := 4;	-- Print access to "asize4" of array
+	 
+-- Related to non-dispatched object
+   const cont5:INT := 5;	-- Print access to "asize" of ARRAY
+   const cont6:INT := 6;	-- Print access to "asize2" of array
+   const cont7:INT := 7;	-- Print access to "asize3" of array
+   const cont8:INT := 8;	-- Print access to "asize4" of array
+	 
+   const cont9:INT := 9;	-- Print access to attribute of object
+	 
+-- Print name of temporary variable
+   const cont10:INT := 10;	
+	 
+-- Print code that computes object of this dot expression
+   const cont11:INT := 11;	       
+
+-- Print parameters for "cache_dispatch_" code
+   const cont12:INT := 12;
+	 
+-- Print parameters for "array_dispatch_" code
+   const cont13:INT := 13;
+
+-- DISPATCHED TYPES
+-- NOTE: If we have "f:$FOO; ... f.new ...", if "FOO" is an array, then
+--       all descendents of "FOO" must be array of the same dimension.
+-- Print parameters for "new" 
+   const cont14:INT := 14;	-- Dispatched array/non-array object
+   const cont17:INT := 17;	-- Dispatched 1-dimensional object
+   const cont19:INT := 19;	-- Dispatched 2-dimensional object
+   const cont21:INT := 21;	-- Dispatched 3-dimensional object
+   const cont23:INT := 23;	-- Dispatched 4-dimensional object
+	 
+-- NON-DISPATCHED TYPES
+-- Print parameters for "new"
+   const cont15:INT := 15;   -- Non-dispatched non-array object
+   const cont16:INT := 16;	-- Non-dispatched 1-dimensional object
+   const cont18:INT := 18;	-- Non-dispatched 2-dimensional object
+   const cont20:INT := 20;	-- Non-dispatched 3-dimensional object
+   const cont22:INT := 22;	-- Non-dispatched 4-dimensional object
+	       
+-- Print parameters for "copy_"
+   const cont24:INT := 24;	-- Dispatched object
+   const cont25:INT := 25;	-- Non-dispatched object; generates actual code
+	       
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cont_cprint_code(outfile:SAT_OUTFILE; cont:INT) is
+      case (cont)
+      when cont1 then
+	 -- In the dispatching code, the object is already stored in
+	 -- the temporary variable.
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 
+	    -- Since the object is dispatched, we use the retrieved
+	    --   value as the offset (and hence as an integer).
+	 outfile.s(",INTVAL_(");
+	 GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+	 outfile.s(")");
+		  
+      when cont2 then
+	 -- In the dispatching code, the object is already stored in
+	 -- the temporary variable.
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(",INTVAL_(");
+	 GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);	 
+	 outfile.s(")+4");
+	 
+      when cont3 then
+	 -- In the dispatching code, the object is already stored in
+	 -- the temporary variable.
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(",INTVAL_(");
+	 GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);	 
+	 outfile.s(")+8");
+	 
+      when cont4 then
+	 -- In the dispatching code, the object is already stored in
+	 -- the temporary variable.
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.s(",INTVAL_(");
+	 GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);	 
+	 outfile.s(")+12");
+	 
+-- NOTE: In cases 5-9, the temporary variable (which stores object computed
+--       in preliminary code) or actual code is printed, depending on whether
+--       runtime check is requested.  If so, then, presumably, the preliminary
+--       code has already been generated.
+-- On the other	hand, cases 10 and 11 are complementary and user should
+-- decide which to use.
+	 
+      when cont5 then
+	 if (GLOBAL_PROC::check_is_on) then
+	    GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 else
+	    obj.cprint_act_code(outfile);
+	 end; -- if
+	 outfile.c(',').i(obj.res_type.inst_cls.base_size);
+	 
+      when cont6 then
+	 if (GLOBAL_PROC::check_is_on) then
+	    GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 else
+	    obj.cprint_act_code(outfile);
+	 end; -- if
+	 outfile.c(',').i(obj.res_type.inst_cls.base_size+4);
+
+      when cont7 then
+	 if (GLOBAL_PROC::check_is_on) then
+	    GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 else
+	    obj.cprint_act_code(outfile);
+	 end; -- if
+	 outfile.c(',').i(obj.res_type.inst_cls.base_size+8);
+
+      when cont8 then
+	 if (GLOBAL_PROC::check_is_on) then
+	    GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 else
+	    obj.cprint_act_code(outfile);
+	 end; -- if
+	 outfile.c(',').i(obj.res_type.inst_cls.base_size+12);
+
+      when cont9 then
+	 if (GLOBAL_PROC::check_is_on) then
+	    GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 else
+	    obj.cprint_act_code(outfile);
+	 end; -- if
+	 outfile.c(',');
+	    -- Since the object is non-dispatched, we know exactly
+	    --   what the offset is.  "get_offset" only returns 
+	    --   a correct result for ATTR_DECL_FEATOB_S.
+	       
+	 referrent.cprint_offset(outfile);
+	 
+      when cont10 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 
+      when cont11 then
+	 obj.cprint_act_code(outfile);
+
+      when cont12 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.c(',').
+	         i(feat).
+                 c(',');
+	 GLOBAL_PROC::cprint_ctemp_name(typeholder_name, outfile);
+	 outfile.s(",INTVAL_(");
+	 GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+	 outfile.c(')');
+	 
+      when cont13 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.c(',');
+	 GLOBAL_PROC::cprint_ctemp_name(typeholder_name, outfile);
+	 outfile.s(",INTVAL_(");
+	 GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+	 outfile.c(')');
+	 
+      when cont14 then
+	 PRINT_C_CODE::cprint_type_access(outfile, cont10, self);
+	 num_args:INT;
+	 if (args /= void) then
+	    num_args := args.insert;
+	 end; -- if
+	 outfile.c(',');
+	 i:INT := 0;
+	 loop until!(i >= 4);
+	    if (i >= num_args) then
+	       outfile.s("1,")
+	    else
+	       cprint_ith_arg_act_code(i, outfile);
+	       outfile.c(',');
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+	 PRINT_C_CODE::cprint_atomic_check(outfile, cont10, self);
+	 outfile.c(',').i(num_args);
+
+      when cont15 then
+	 outfile.i(obj.res_type.inst_cls.index).c(',').
+	         i(obj.res_type.inst_cls.atomic_p);
+
+      when cont16 then
+	 num_args:INT;
+	 if (args /= void) then
+	    num_args := args.insert;
+	 end; -- if
+	 outfile.i(obj.res_type.inst_cls.index);
+	 if (num_args /= 1) then
+	    outfile.s(",3,");
+	 else
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(0, outfile);
+	    outfile.c(',');
+	 end; -- if
+	 outfile.i(obj.res_type.inst_cls.atomic_p);
+	 
+      when cont17 then
+	 num_args:INT;
+	 if (args /= void) then
+	    num_args := args.insert;
+	 end; -- if
+	 PRINT_C_CODE::cprint_type_access(outfile, cont10, self);
+	 if (num_args /= 1) then
+	    outfile.s(",5,");
+	 else
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(0, outfile);
+	    outfile.c(',');
+	 end; -- if
+	 PRINT_C_CODE::cprint_atomic_check(outfile, cont10, self);
+	 
+      when cont18 then
+	 num_args:INT;
+	 if (args /= void) then
+	    num_args := args.insert;
+	 end; -- if
+	 outfile.i(obj.res_type.inst_cls.index);
+	 if (num_args /= 2) then
+	    outfile.s(",3,3,");
+	 else
+	    outfile.c(',');
+
+	    cprint_ith_arg_act_code(0, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(1, outfile);
+
+	    outfile.c(',');
+	 end; -- if
+	 outfile.i(obj.res_type.inst_cls.atomic_p);
+	 
+      when cont19 then
+	 num_args:INT;
+	 if (args /= void) then
+	    num_args := args.insert;
+	 end; -- if
+	 PRINT_C_CODE::cprint_type_access(outfile, cont10, self);
+	 if (num_args /= 2) then
+	    outfile.s(",4,4,");
+	 else
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(0, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(1, outfile);
+
+	    outfile.c(',');
+	 end; -- if
+	 PRINT_C_CODE::cprint_atomic_check(outfile, cont10, self);
+	 
+      when cont20 then
+	 num_args:INT;
+	 if (args /= void) then
+	    num_args := args.insert;
+	 end; -- if
+	 outfile.i(obj.res_type.inst_cls.index);
+	 if (num_args /= 3) then
+	    outfile.s(",2,2,2,");
+	 else
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(0, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(1, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(2, outfile);
+
+	    outfile.c(',');
+	 end; -- if
+	 outfile.i(obj.res_type.inst_cls.atomic_p);
+	 
+      when cont21 then
+	 num_args:INT;
+	 if (args /= void) then
+	    num_args := args.insert;
+	 end; -- if
+	 PRINT_C_CODE::cprint_type_access(outfile, cont10, self);
+	 if (num_args /= 3) then
+	    outfile.s(",3,3,3,");
+	 else
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(0, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(1, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(2, outfile);
+
+	    outfile.c(',');
+	 end; -- if
+	 PRINT_C_CODE::cprint_atomic_check(outfile, cont1, self);
+	 
+      when cont22 then
+	 num_args:INT;
+	 if (args /= void) then
+	    num_args := args.insert;
+	 end; -- if
+	 outfile.i(obj.res_type.inst_cls.index);
+	 if (num_args /= 4) then
+	    outfile.s(",2,2,2,2,");
+	 else
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(0, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(1, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(2, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(3, outfile);
+
+	    outfile.c(',');
+	 end; -- if 
+	 outfile.i(obj.res_type.inst_cls.atomic_p);
+
+      when cont23 then
+	 num_args:INT;
+	 if (args /= void) then
+	    num_args := args.insert;
+	 end; -- if
+	 PRINT_C_CODE::cprint_type_access(outfile, cont10, self);
+	 if (num_args /= 4) then
+	    outfile.s(",3,3,3,3,");
+	 else
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(0, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(1, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(2, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(3, outfile);
+
+	    outfile.c(',');
+	 end; -- if
+	 PRINT_C_CODE::cprint_atomic_check(outfile, cont10, self);
+	 
+      when cont24 then
+	 GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	 outfile.c(',');
+	 PRINT_C_CODE::cprint_atomic_check(outfile, cont10, self);
+	 
+      when cont25 then
+	 obj.cprint_act_code(outfile);
+	 outfile.c(',').i(obj.res_type.inst_cls.atomic_p);
+	 
+      else
+	 ERR_INFO::compiler_error_msg("EXPR_ARGS_EXPROB_S",
+	           STR::create.s("Unknown continuation #").
+	                    i(cont));
+      end; -- case
+   end; -- cont_cprint_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_act_code(outfile:SAT_OUTFILE) is
+      if (printed_times > GLOBALS::g_tag) then
+	 if (temp_name_tpchk > 0) then
+	    GLOBAL_PROC::cprint_ctemp_name(temp_name_tpchk, outfile);
+	    return;
+	 else 
+	    ERR_INFO::compiler_error_msg("EXPR_ARGS_EXPROB_S",
+	              STR::create.s("Invalid printing count = ").
+	                       i(printed_times).s(" > ").
+	                       i(GLOBALS::g_tag));
+	 end; -- if
+      end; -- if
+      printed_times := printed_times + 1;
+
+      num_args:INT := 0;
+      if args /= void then
+	 num_args := args.insert;
+      end; -- if
+
+      cprint_cast_code(outfile);
+      -- Check the type of the expression to see if it dispatched, not
+      -- the type of the result of this dot expression.
+      obj_res_type:$TYPEOB_S := obj.res_type;
+      if requires_dispatched_call then
+	 -- Handle special reserved feature names as special only if
+	 --   no referrent is found.
+	 if (referrent = void) then
+	    case (feat)
+	    when RESERVED_WORDS::new_ind then
+	       ERR_INFO::format_warning_msg(
+	                 lineno,
+	                 STR::create.s("(EXPR_ARGS_EXPROB_S): Applying \"new\" to dispatched object"));
+	       if (obj_res_type.nonptr_p) then
+		  ERR_INFO::format_error_exit(
+		            lineno,
+		            STR::create.s("(EXPR_ARGS_EXPROB_S): Applying \"new\" on a non-object class"));
+	       end; -- if
+	       if (obj_res_type.array_type_p) then
+		  if (num_args /= 1) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"new\" operator on 1-dimensional array object; default sizes used"));
+		  end; -- if
+		  PRINT_C_CODE::cprint_new(outfile, 1, cont17, self);
+		  
+	       elsif (obj_res_type.array2_type_p) then
+		  if (num_args /= 2) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"new\" operator on 2-dimensional array object; default sizes used\n"));
+		  end; -- if
+		  PRINT_C_CODE::cprint_new(outfile, 2, cont19, self);
+
+	       elsif (obj_res_type.array3_type_p) then
+		  if (num_args /= 3) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"new\" operator on 3-dimensional array object; default sizes used\n"));
+		  end; -- if
+		  PRINT_C_CODE::cprint_new(outfile, 3, cont21, self);
+
+	       elsif (obj_res_type.array4_type_p) then   
+		  if (num_args /= 4) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"new\" operator on 4-dimensional array object; default sizes used"));
+		  end; -- if
+		  PRINT_C_CODE::cprint_new(outfile, 4, cont23, self);
+		  
+	       else  
+		  -- Warning message generated during "semant"
+		  PRINT_C_CODE::cprint_new(outfile, -1, cont14, self);
+	       end; -- if
+	       
+	    when RESERVED_WORDS::extend_ind then
+	       -- Handle different kinds of array with default arguments.
+	       -- If the object is not an array, the "extend" call is 
+	       --   treated like any other routine.
+	       if (obj_res_type.array_type_p) then
+		  if (num_args /= 1) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S):Incorrect number of arguments supplied for \"extend\" operator on 1-dimensional array object; default sizes used"));
+		     outfile.s("extend1_(");
+		     GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		     outfile.s(",5,atomic_p_(");
+		     GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		     outfile.s("))");
+		  else
+		     outfile.s("extend1_(");
+		     GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(0, outfile);
+		     outfile.s(",atomic_p_(");
+		     GLOBAL_PROC::cprint_ctemp_name(temp_name,outfile);
+		     outfile.s("))");
+		  end; -- if
+	       
+	       elsif (obj_res_type.array2_type_p) then
+		  if (num_args /= 2) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"extend\" operator on 2-dimensional array object; default sizes used"));
+		     outfile.s("extend2_(");
+		     GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		     outfile.s(",4,4,atomic_p_(");
+		     GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		     outfile.s("))");
+		  else
+		     outfile.s("extend2_(");
+		     GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(0, outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(1, outfile);
+		     outfile.s(",atomic_p_(");
+		     GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		     outfile.s("))");
+		  end; -- if
+
+	       elsif (obj_res_type.array3_type_p) then
+		  if (num_args /= 3) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"extend\" operator on 3-dimensional array object; default sizes used"));
+		     outfile.s("extend3_(");
+		     GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		     outfile.s(",3,3,3,atomic_p_(");
+		     GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		     outfile.s("))");
+		  else
+		     outfile.s("extend3_(");
+		     GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(0, outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(1, outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(2, outfile);
+		     outfile.s(",atomic_p_(");
+		     GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		     outfile.s("))");
+		  end; -- if
+
+	       elsif (obj_res_type.array4_type_p) then   
+		  if (num_args /= 4) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"extend\" operator on 4-dimensional array object; default sizes used"));
+		     outfile.s("extend4_(");
+		     GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		     outfile.s(",3,3,3,3,atomic_p_(");
+		     GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		     outfile.s("))");
+		  else
+		     outfile.s("extend4_(");
+		     GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(0, outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(1, outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(2, outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(3, outfile);
+		     outfile.s(",atomic_p_(");
+		     GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+		     outfile.s("))");
+		  end; -- if
+	       else
+		  -- "extend" is not applicable for non-array object.
+		  -- This error should be signalled in "semant" but we did not
+		  -- exit the program, so we do it now.
+		  outfile.s("/* \"extend\" is not applicable for non-array object */");
+  	       end; -- if
+	       
+	    when RESERVED_WORDS::copy_ind then
+	       PRINT_C_CODE::cprint_copy(outfile, cont24, self);
+		  
+--	    when RESERVED_WORDS::deep_copy_ind then
+--               PRINT_C_CODE::cprint_deep_copy(outfile, cont10, self);
+
+	    when RESERVED_WORDS::asize_ind then
+	       if (obj_res_type.array_type_p) then
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont1, self);
+		  
+		  -- For 2- or more dimensional arrays, it should be
+		  -- handled automatically by the "asize" routines defined
+		  -- ARRAYx class.  If not, we just generate code for
+		  -- calculating the total size.
+	       elsif (obj_res_type.array2_type_p) then
+		  outfile.c('(');
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont1, self);
+		  outfile.s(" * ");
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont2, self);
+		  outfile.c(')');
+		  
+	       elsif (obj_res_type.array3_type_p) then
+		  outfile.c('(');
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont1, self);
+		  outfile.s(" * ");
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont2, self);
+		  outfile.s(" * ");
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont3, self);
+		  outfile.c(')');
+
+	       elsif (obj_res_type.array4_type_p) then
+		  outfile.c('(');
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont1, self);
+		  outfile.s(" * ");
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont2, self);
+		  outfile.s(" * ");
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont3, self);
+		  outfile.s(" * ");
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont4, self);
+		  outfile.c(')');
+
+	       end; -- if
+	    when RESERVED_WORDS::asize1_ind then
+	       if (obj_res_type.array_type_p) or
+		  (obj_res_type.array2_type_p) or
+		  (obj_res_type.array3_type_p) or
+		  (obj_res_type.array4_type_p) then
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont1, self);
+	       else
+		  outfile.s("/* Invalid reference to \"asize1\" */");
+	       end; -- if
+	    when RESERVED_WORDS::asize2_ind then
+	       if (obj_res_type.array2_type_p) or
+		  (obj_res_type.array3_type_p) or
+		  (obj_res_type.array4_type_p) then
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont2, self);
+	       else
+		  outfile.s("/* Invalid reference to \"asize2\" */");
+	       end; -- if
+	    when RESERVED_WORDS::asize3_ind then
+	       if (obj_res_type.array3_type_p) or
+		  (obj_res_type.array4_type_p) then
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont3, self);
+	       else
+		  outfile.s("/* Invalid reference to \"asize3\" */");
+	       end; -- if
+	    when RESERVED_WORDS::asize4_ind then
+	       if (obj_res_type.array4_type_p) then
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont4, self);
+	       else
+		  outfile.s("/* Invalid reference to \"asize4\" */");
+	       end; -- if
+	       
+	       -- These errors should not occur because they should have
+	       -- been caught in "semant" phase, and the program would have
+	       -- exited.
+	    when RESERVED_WORDS::res_ind, 
+		 RESERVED_WORDS::self_ind, 
+		 RESERVED_WORDS::void_ind then
+		  outfile.s("/* Invalid dot expression for \"").
+		          s((GLOBALS::str_table).at_index(feat)).
+		          s("\" */");
+	    when RESERVED_WORDS::type_ind then
+	       -- Expand using C macro "TYPE_" only for objects.
+	       -- All descendents of basic types cannot be dispatched.  This
+	       -- error should be caught in "validate_dispatches" (NOT 
+	       -- IMPLEMENTED IN BOOT-STRAP).
+	       if (obj_res_type.int_type_p) or
+	          (obj_res_type.bool_type_p) or
+		  (obj_res_type.char_type_p) or
+		  (obj_res_type.real_type_p) or
+		  (obj_res_type.double_type_p) then
+		  outfile.s("/* Cannot get type of an object dispatched on a descendent of a basic type */");
+	       else
+		  PRINT_C_CODE::cprint_type_access(outfile, cont10, self);
+	       end; -- if
+	       -- At this point, all possibility of special cases have been
+	       --   exhausted, so just print a comment if it is not the 
+               --   special case of "f.expr" (f:$OB).
+            else
+               if not (handle_spec_expr_act_code(outfile)) then
+		  outfile.s("/* Unknown identifer : \"").
+		          s((GLOBALS::str_table).at_index(feat)).
+		          s("\" */");
+	       end; -- if
+	    end; -- case
+	 else
+
+	 
+	    case (referrent.type)
+	       
+	    -- In the dispatched case, constants and shareds are treated
+	    -- similarly.
+	    when CONST_DECL_FEATOB_S::type, SHARED_DECL_FEATOB_S::type then
+	       -- CONST_DECL_FEATOB_S is not assignable, and has been 
+	       -- checked before this point by "semant".  
+	       case (res_type.ctype)
+	       when C_TYPE_CONST::c_ptr then
+		  outfile.s("PTRPTR_(");
+		  GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+		  outfile.c(')');
+		  
+	       when C_TYPE_CONST::c_int then
+		  outfile.s("INTPTR_(");
+		  GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+		  outfile.c(')');
+		  
+	       when C_TYPE_CONST::c_char then
+		  outfile.s("CHARPTR_(");
+		  GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+		  outfile.c(')');
+		  
+	       when C_TYPE_CONST::c_float then
+		  outfile.s("FLOATPTR_(");
+		  GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+		  outfile.c(')');
+		  
+	       when C_TYPE_CONST::c_double then
+		  outfile.s("DOUBLEPTR_(");
+		  GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+		  outfile.c(')');
+	       end; -- case
+	       
+	    when ROUT_FEATOB_S::type then 
+	       -- Print "((int ())(*gl15_.fn_int))(args)" */
+	       case (dispval_ctype)
+	       when C_TYPE_CONST::c_ptr then
+		  outfile.s("PFN_(");
+	       when C_TYPE_CONST::c_char then
+		  outfile.s("CFN_(");
+	       when C_TYPE_CONST::c_int then
+		  outfile.s("IFN_(");
+	       when C_TYPE_CONST::c_float then
+		  outfile.s("FFN_(");
+	       when C_TYPE_CONST::c_double then
+		  outfile.s("DFN_(");
+	       when C_TYPE_CONST::c_void then
+		  outfile.s("VFN_(");
+	       end; -- case
+	       GLOBAL_PROC::cprint_ctemp_name(dispval_name, outfile);
+	       outfile.s(")(");
+	       GLOBAL_PROC::cprint_ctemp_name(temp_name, outfile);
+	       i:INT := 0;
+	       loop until!(i >= num_args);
+		  outfile.c(',');
+		  cprint_ith_arg_act_code(i, outfile);
+		  i := i + 1;
+	       end; -- loop
+	       outfile.c(')');
+	    when ATTR_DECL_FEATOB_S::type then
+	       -- Print "IATT_(obj, INTVAL_(g15_))" */
+	       case (referrent.typeof.ctype)
+	       when C_TYPE_CONST::c_ptr then
+		  PRINT_C_CODE::cprint_ptr_attr_access(outfile, cont1, self);
+
+	       when C_TYPE_CONST::c_int then
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont1, self);
+
+	       when C_TYPE_CONST::c_char then
+		  PRINT_C_CODE::cprint_char_attr_access(outfile, cont1, self);
+
+	       when C_TYPE_CONST::c_float then
+		  PRINT_C_CODE::cprint_float_attr_access(outfile, cont1, self);
+
+	       when C_TYPE_CONST::c_double then
+		  PRINT_C_CODE::cprint_double_attr_access(outfile, cont1, self);
+
+	       end; -- case
+	    end; -- case
+	 end; -- if
+      else			-- NON-DISPATCHED
+	 -- Handle special reserved feature names as special only if
+	 --   no referrent is found.
+	 if (referrent = void) then
+	    case (feat)
+	    when RESERVED_WORDS::type_ind then
+	       -- We can just print the class number, because, even though
+	       -- there may be side-effects in computing the object, we
+	       -- have already made sure that the code is already executed.
+	       -- The object is now in a temporary variable, but we do not
+	       -- make use of it.
+	       outfile.c('(').i(obj_res_type.inst_ind).c(')');
+	       return;
+	       
+	    when RESERVED_WORDS::self_ind, 
+	         RESERVED_WORDS::void_ind, 
+	         RESERVED_WORDS::res_ind then
+	       -- The error should have been discovered during "semant",
+	       --   but just in case.
+	       outfile.s("/* Invalid reference to \"").
+	               s((GLOBALS::str_table).at_index(feat)).
+	               s("\" */");
+	    
+	    when RESERVED_WORDS::new_ind then
+	       -- In "semant", we have already checked that the object is
+	       -- a non-basic, so we only need to distinguish arrays from
+	       -- non-arrays now.
+       
+	       if (obj_res_type.array_type_p) then
+		  if (num_args /= 1) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"new\" operator on array object; default size provided"));
+		  end; -- if
+		  PRINT_C_CODE::cprint_new(outfile, 1, cont16, self);
+		  
+	       elsif (obj_res_type.array2_type_p) then
+		  if (num_args /= 2) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"new\" operator on 2-dimensional array object; default sizes used"));
+		  end; -- if
+		  PRINT_C_CODE::cprint_new(outfile, 2, cont18, self);
+
+	       elsif (obj_res_type.array3_type_p) then
+		  if (num_args /= 3) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"new\" operator on 3-dimensional array object; default sizes used"));
+		  end; -- if
+		  PRINT_C_CODE::cprint_new(outfile, 3, cont20, self);
+		  
+	       elsif (obj_res_type.array4_type_p) then
+		  if (num_args /= 4) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"new\" operator on 4-dimensional array object; default sizes used"));
+		  end; -- if
+		  PRINT_C_CODE::cprint_new(outfile, 4, cont22, self);
+	       
+	       else		-- It is a non-array non-basic-type object
+		  PRINT_C_CODE::cprint_new(outfile, 0, cont15, self);
+	       end; -- if
+	       return;
+	    
+	    when RESERVED_WORDS::extend_ind then
+	       -- Handle different kinds of array with default arguments.
+	       -- If the object is not an array, the "extend" call is 
+	       --   treated like any other routine.
+	       if (obj_res_type.array_type_p) then
+		  if (num_args /= 1) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+	                       STR::create.s("(EXPR_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"extend\" operator on 1-dimensional array object; default sizes used"));
+		     outfile.s("extend1_(");
+		     obj.cprint_act_code(outfile);
+		     outfile.s(",5,").
+		             i(obj_res_type.inst_cls.atomic_p).
+		             c(')');
+		  else
+		     outfile.s("extend1_(");
+		     obj.cprint_act_code(outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(0, outfile);
+		     outfile.c(',').
+		             i(obj_res_type.inst_cls.atomic_p).
+		             c(')');
+		  end; -- if
+	       
+	       elsif (obj_res_type.array2_type_p) then
+		  if (num_args /= 2) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"extend\" operator on 2-dimensional array object; default sizes used"));
+		     outfile.s("extend2_(");
+		     obj.cprint_act_code(outfile);
+		     outfile.s(",4,4,").
+		             i(obj_res_type.inst_cls.atomic_p).
+		             c(')');
+		  else
+		     outfile.s("extend2_(");
+		     obj.cprint_act_code(outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(0, outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(1, outfile);
+		     outfile.c(',').
+		             i(obj_res_type.inst_cls.atomic_p).
+		             c(')');
+		  end; -- if
+
+	       elsif (obj_res_type.array3_type_p) then
+		  if (num_args /= 3) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"extend\" operator on 3-dimensional array object; default sizes used"));
+		     outfile.s("extend3_(");
+		     obj.cprint_act_code(outfile); 
+		     outfile.s(",3,3,3,").
+		             i(obj_res_type.inst_cls.atomic_p).
+		             c(')');
+		  else
+		     outfile.s("extend3_(");
+		     obj.cprint_act_code(outfile); 
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(0, outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(1, outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(2, outfile);
+
+		     outfile.c(',').
+		             i(obj_res_type.inst_cls.atomic_p).
+		             c(')');
+		  end; -- if
+
+	       elsif (obj_res_type.array4_type_p) then   
+		  if (num_args /= 4) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(EXPR_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"extend\" operator on 4-dimensional array object; default sizes used"));
+		     outfile.s("extend4_(");
+		     obj.cprint_act_code(outfile);
+		     outfile.s(",3,3,3,3,").
+		             i(obj_res_type.inst_cls.atomic_p).
+		             c(')');
+		  else
+		     outfile.s("extend4_(");
+		     obj.cprint_act_code(outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(0, outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(1, outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(2, outfile);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(3, outfile);
+
+		     outfile.c(',').
+		             i(obj_res_type.inst_cls.atomic_p).
+		             c(')');
+		  end; -- if
+	       else
+		  -- "extend" is not applicable for non-array object.
+		  -- This error should be signalled in "semant" but we did not
+		  -- exit the program, so we do it now.
+		  outfile.s("/* \"extend\" is not applicable for non-array object */");
+  	       end; -- if
+	       
+	    when RESERVED_WORDS::copy_ind then   
+               PRINT_C_CODE::cprint_copy(outfile, cont25, self);
+	       return;
+
+
+	    when RESERVED_WORDS::asize_ind then
+	       -- Assume that the "asize" attribute is the first attribute
+	       -- after the base-size of object. (Refer to definitions of
+	       -- runtime routines.) 
+  	       if (obj_res_type.array_type_p) then
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont5, self);
+		  
+	       else
+		  -- "asize" is defined as an attribute only for 1-dimensional
+		  -- array, but for other kinds of array, we expect "asize"
+		  -- to be defined as a function.
+		  outfile.s("/* asize of non-array object */");
+	       end; -- if
+
+	    when RESERVED_WORDS::asize1_ind then
+	       -- Assume that the "asize1" attribute is the first attribute
+	       -- after the base-size of object. (Refer to definitions of
+	       -- runtime routines.) 
+  	       if (obj_res_type.array_type_p) or 
+  	          (obj_res_type.array2_type_p) or 
+	          (obj_res_type.array3_type_p) or
+	          (obj_res_type.array4_type_p) then
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont5, self);
+
+	       else
+		  -- "asize1" is defined as an attribute only for 2-or-more
+		  -- dimensional array.  We did not exit in the "semant" phase,
+		  -- so here we print a warning message.
+		  outfile.s("/* asize1 of non-array object */");
+	       end; -- if
+		  
+	    when RESERVED_WORDS::asize2_ind then
+	       -- Assume that the "asize2" attribute is the second attribute
+	       -- after the base-size of object. (Refer to definitions of
+	       -- runtime routines.) 
+  	       if (obj_res_type.array2_type_p) or 
+	          (obj_res_type.array3_type_p) or
+	          (obj_res_type.array4_type_p) then
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont6, self);
+
+	       else
+		  -- "asize2" is defined as an attribute only for 2-or-more
+		  -- dimensional array.  We did not exit in the "semant" phase,
+		  -- so here we print a warning message.
+		  outfile.s("/* asize2 of 1-dim or non-array object */");
+	       end; -- if
+
+	    when RESERVED_WORDS::asize3_ind then
+	       -- Assume that the "asize3" attribute is the third attribute
+	       -- after the base-size of object. (Refer to definitions of
+	       -- runtime routines.) 
+  	       if (obj_res_type.array3_type_p) or 
+	          (obj_res_type.array4_type_p) then
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont7, self);
+
+	       else
+		  -- "asize3" is defined as an attribute only for 3-or-more
+		  -- dimensional array.  We did not exit in the "semant" phase,
+		  -- so here we print a warning message.
+		  outfile.s("/* asize3 of 2-or-fewer-dim object */");
+	       end; -- if
+
+	    when RESERVED_WORDS::asize4_ind then
+	       -- Assume that the "asize4" attribute is the fourth attribute
+	       -- after the base-size of object. (Refer to definitions of
+	       -- runtime routines.) 
+  	       if (obj_res_type.array4_type_p) then
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont8, self);
+
+	       else
+		  -- "asize4" is defined as an attribute only for 4-
+		  -- dimensional array.  We did not exit in the "semant" phase,
+		  -- so here we print a warning message.
+		  outfile.s("/* asize4 of 3-or-fewer-dim object */");
+	       end; -- if
+            else
+	    -- At this point, all possibility of special cases have been
+	    --   exhausted, so just print a comment.
+	       outfile.s("/* Unknown identifier : \"").
+		       s((GLOBALS::str_table).at_index(feat)).
+		       s("\" */");
+	    end; -- case
+	    return;
+         else			-- Referrent is non-void
+	    case (referrent.type)
+	    when CONST_DECL_FEATOB_S::type, SHARED_DECL_FEATOB_S::type  then
+	       -- CONST_DECL_FEATOB_S is not assignable, and has been 
+	       --   checked before this point by "semant".  Ask the 
+	       --   constant feature to print out its access value 
+	       --   (constant if it is a constant value).
+	       referrent.cprint_access_value(outfile);
+	       
+	    when ROUT_FEATOB_S::type then
+	       referrent.cprint_cname(outfile);
+	       outfile.c('(');
+	       obj.cprint_act_code(outfile);
+	       i:INT := 0;
+	       loop until!(i >= num_args);
+		  outfile.c(',');
+		  cprint_ith_arg_act_code(i, outfile);
+		  i := i + 1;
+	       end; -- loop
+	       outfile.c(')');
+	       
+	    when ATTR_DECL_FEATOB_S::type then
+	       -- Print different macros depending on the C type of
+	       --   of the attribute.  NOTE: The ordering is based on
+	       --   an intuitive estimate of how common each kind of
+	       --   feature is.
+	       case (referrent.typeof.ctype) 
+	       when  C_TYPE_CONST::c_ptr then
+		  PRINT_C_CODE::cprint_ptr_attr_access(outfile, cont9, self);
+
+	       when  C_TYPE_CONST::c_int then
+		  PRINT_C_CODE::cprint_int_attr_access(outfile, cont9, self);
+
+	       when  C_TYPE_CONST::c_char then
+		  PRINT_C_CODE::cprint_char_attr_access(outfile, cont9, self);
+
+	       when  C_TYPE_CONST::c_float then
+		  PRINT_C_CODE::cprint_float_attr_access(outfile, cont9, self);
+
+	       when  C_TYPE_CONST::c_double then
+		  PRINT_C_CODE::cprint_double_attr_access(outfile, cont9, self);
+
+	       end; -- case
+	    else
+	       outfile.s("/* Unknown identifier : \"").
+	               s((GLOBALS::str_table).at_index(feat)).
+		       s("\" */");
+	    end; -- case
+         end; -- if
+      end; -- if
+   end; -- cprint_act_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_init_code(outfile:SAT_OUTFILE) is
+      obj.cprint_init_code(outfile);
+      args.cprint_init_code(outfile);
+      if (referrent /= void) then
+	 referrent.cprint_init_code(outfile);
+      end; -- if
+   end; -- cprint_init_code
+
+end; -- class EXPR_ARGS_EXPROB_S
+
+--------------------------------------------------------------------
+
+class TYPESPEC_ARGS_EXPROB_S is
+   -- Class access to references. 
+   EXPROB_S;
+   
+   attr type_spec:$TYPEOB_S;
+   attr feat:INT;
+   attr args:LST_EXPROB_S;
+   -- This is guaranteed to be non-void if created using the "create" routine.
+   
+   attr referrent:$SEMANTOB;
+   
+   attr temp_name_tpchk:INT;
+   attr temp_ctype_tpchk:INT;
+   -- Temporary variable (and C type of temporary variable) to hold result
+   -- of expression so that the type of the result can be checked (if
+   -- runtime type-checking is requested).
+   
+   attr temp_args:ARRAY{INT};
+   attr temp_args_ctype:ARRAY{INT};
+      -- List of variables to hold temporary variables that will contain
+      -- result of argument evaluation, except for cases without side-
+      -- effect.  (Ref: Implementation of dispatching mechanism in general
+      -- document).  The values are guaranteed to be non-void and have
+      -- the same length as the number of arguments.
+   attr has_pre_eval_args:BOOL;
+      -- If this value is false, then any code involving pre-evaluating
+      -- arguments can be avoided.  This is initialized to "false".
+   
+   attr printed_times:INT;
+   -- The value is greater than 0 if the runtime type-checking code is already
+   -- generated, ie the code to compute value of the expression is already 
+   -- generated.  This is the number of times this node has been printed; it
+   -- should be less than or equal than the global variable "g_tag".
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(ts:$TYPEOB_S; f:INT; alst:LST_EXPROB_S; ln:INT):SAME is
+      res := new;
+      res.type_spec := ts;
+      res.feat := f;
+      sz:INT;
+      if (alst /= void) then
+	 res.args := alst;
+	 sz := alst.insert;
+      else			-- Create an empty list
+	 res.args := LST_EXPROB_S::create(1);
+      end; -- if
+      res.lineno := ln;
+
+      res.temp_args := ARRAY{INT}::new(sz);
+      res.temp_args_ctype := ARRAY{INT}::new(sz);
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   sather_code:STR is
+      res := STR::create.s(type_spec.sather_code).
+                      s("::").
+                      s((GLOBALS::str_table).at_index(feat));
+      if (args /= void) then
+	 res := res.c('(').s(args.sather_code).c(')');
+      end; -- if
+   end; -- sather_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   out_of_line(fn: STR) is
+      -- update line info to refer to original file `fn' rather than the current
+      -- context in which this construct is used to compose code.
+      lineno := ERR_INFO::out_of_line_err_info(fn,lineno);
+      type_spec.out_of_line(fn);
+      args.out_of_line(fn);
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   dup:SAME is
+      if (args /= void) then
+	 res := create(type_spec.dup, feat, args.dup, lineno);
+      else
+	 res := create(type_spec.dup, feat, void, lineno);
+      end; -- if
+   end; -- dup
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   resolve_predef_types(index:INT) is
+      i_typeob_s:INSTANT_TYPEOB_S := type_spec;
+      if (type_spec.type /= INSTANT_TYPEOB_S::type) then
+	 ERR_INFO::compiler_error_msg("TYPESPEC_ARGS_EXPROB_S",
+	           STR::create.s(" in resolve_predef_types"));
+      end; -- if
+      i:INT := i_typeob_s.inst_ind;
+      if (i = RESERVED_CLASSES::OB_ici) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Invalid use of OB"));
+      elsif (i = RESERVED_CLASSES::UNDEFINE_ici) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Invalid use of UNDEFINE"));
+	 i_typeob_s.index := RESERVED_CLASSES::OB_ici;
+	 type_spec := i_typeob_s.dispatched;
+      elsif (i = RESERVED_CLASSES::SELF_TYPE_ici) then
+	 if (i_typeob_s.is_dispatched) then
+	    i_typeob_s.index := index; 
+	    type_spec := i_typeob_s.dispatched;
+	 else
+	    i_typeob_s.index := index; 
+	 end; -- if
+      end; -- if
+      
+      -- This code is similar to that found in "resolve_predef_types" in
+      -- INSTANT_TYPEOB_S.
+      cls:CLASSOB_S := type_spec.inst_cls;
+      if (cls = void) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Unexpected missing class"));
+      else
+	 cls.mark_is_used;
+	 if cls.abt then
+	    -- abstract classes are not supposed to be used.
+	    ERR_INFO::format_error_msg(
+	       lineno,
+	       STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Abstract class \"").
+	       	    s(cls.full_name).
+		    s("\" used in call"));
+	 end;
+	    -- We should not need to mark any descendents, unless they are
+	    -- used explicitly in some way.  Otherwise, there is no way the
+	    -- descendent object can appear during runtime.  In addition, this
+	    -- phase is performed before the computation of ancestor/
+	    -- descendent relationship.
+	 
+      end; -- if
+
+      if (args /= void) then
+	 args.resolve_predef_types(index);
+      end; -- if
+   end; -- resolve_predef_types
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   valid_init_expr:BOOL is
+      if (referrent /= void) then
+	 if (referrent.type = CONST_DECL_FEATOB_S::type) or
+	    (referrent.type = SHARED_DECL_FEATOB_S::type) or
+	    (referrent.type = ROUT_FEATOB_S::type) then
+	    if (args /= void) then
+	       res := args.valid_init_expr;
+	    else
+	       res := true;
+	    end; -- if
+	 else
+	    res := false;
+	 end; -- if
+      else
+	 case (feat)
+	 when RESERVED_WORDS::new_ind, RESERVED_WORDS::type_ind then
+	    res := args.valid_init_expr;
+	 else
+	    -- Includes "res", "self", "void", "copy", /* "deep_copy" */, "extend",
+	    -- "asize", "asize1", "asize2", "asize3", "asize4"
+	 end; -- case
+      end; -- if
+   end; -- valid_init_expr
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- The other relevant codes are ID_EXPROB_S and EXPR_ARGS_EXPROB_S.
+-- We have a separate routine to make sure that a constant feature's 
+-- initial expression eg the expression cannot use an attribute, but 
+-- may call routine etc.
+   expr_eval_constant:$CONST_EXPROB_S is
+      if (referrent = void) then
+	 -- Handle reserved identifiers
+	 case (feat)
+	 when RESERVED_WORDS::type_ind then
+	    res := INT_CONST_EXPROB_S::create(type_spec.inst_cls.index.to_s,
+	                                   lineno);
+         when RESERVED_WORDS::new_ind then
+	    -- Initialize constant feature with an object of class given
+	    -- by the type specification, but there is no constant value.
+	    res := void;
+	    
+	 else     
+	    -- Any other identifier including "asize", "asize1", "asize2", 
+	    -- "asize4", "copy", /* "deep_copy" */, "extend", "new", "res", "self",
+	    -- "void"
+	    ERR_INFO::format_error_exit(
+	              lineno,
+	              STR::create.s("(TYPESPEC_ARGS_EXPROB_S): \"").
+	                       s((GLOBALS::str_table).at_index(feat)).
+    	                       s("\" is invalid in constant feature definition"));
+	 end; -- case
+	 return;
+      end; -- if
+      
+      if (referrent.type = CONST_DECL_FEATOB_S::type) then
+	 res := referrent.get_constval;
+      end; -- if
+   end; -- expr_eval_constant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   semant(symtab:SYMBOL_TABLE) is
+      
+      if (type_spec.is_dispatched) then
+	 ERR_INFO::format_error_msg(
+	           lineno,
+	           STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Unexpected dispatched class for reference to class feature \"").
+                            s(GLOBALS::str_table.at_index(feat)).
+	                    c('"'));
+	 type_spec := type_spec.undispatched;
+      end; -- if
+      
+      -- During the creation of semantic objects, we have made sure that
+      -- "type_spec" will contain reference to some "CLASSOB_S" object.
+      obj_cls:CLASSOB_S := type_spec.inst_cls;
+      alt_symtab:SYMBOL_TABLE := obj_cls.symtab;
+      
+      if (alt_symtab = void) then
+	 ERR_INFO::format_error_exit(
+	           lineno,
+	           STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Class has no symbol table"));
+      end; -- if
+      
+      -- Check for invalid predefined routines on foreign objects.
+      if (obj_cls.basic_type = RESERVED_CLASSES::FOB_ici) then
+	 GLOBAL_PROC::check_f_ob(self, feat, alt_symtab);
+      end; -- if
+      
+      -- We allow redefinition of any "reserved" feature names.
+      -- !* Deal with "private" features later
+      if (referrent = void) then
+	 referrent := alt_symtab.get_feature(feat);
+	 if (referrent /= void) then
+
+	    -- Remember to mark the feature as being used.
+	    case (referrent.type)
+	    when ROUT_FEATOB_S::type then
+	       rout_feat:ROUT_FEATOB_S := referrent;
+	       rout_feat.maybe_used := true;
+	       if (rout_feat.pte) and 
+		  (rout_feat.cls_inst /= (GLOBALS::curr_class_inst)) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(TYPESPEC_ARGS_EXPROB_S): \"").
+		                     s(GLOBALS::str_table.at_index(feat)).
+	                             s("\" is private routine feature"));
+	       end; -- if
+	       
+	    when ATTR_DECL_FEATOB_S::type then
+	       attr_feat:ATTR_DECL_FEATOB_S := referrent;
+	       attr_feat.maybe_used := true;
+	       if (attr_feat.pte) and 
+		  (attr_feat.cls_inst /= (GLOBALS::curr_class_inst)) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(TYPESPEC_ARGS_EXPROB_S): \"").
+		                     s(GLOBALS::str_table.at_index(feat)).
+	                             s("\" is private attribute feature"));
+	       end; -- if
+	       
+	    when CONST_DECL_FEATOB_S::type then
+	       const_feat:CONST_DECL_FEATOB_S := referrent;
+	       const_feat.maybe_used := true;
+	       if (const_feat.pte) and 
+		  (const_feat.cls_inst /= (GLOBALS::curr_class_inst)) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(TYPESPEC_ARGS_EXPROB_S): \"").
+	                             s(GLOBALS::str_table.at_index(feat)).
+	                             s("\" is private constant feature"));
+	       end; -- if
+	       
+	    when SHARED_DECL_FEATOB_S::type then
+	       shared_feat:SHARED_DECL_FEATOB_S := referrent;
+	       shared_feat.maybe_used := true;
+	       if (shared_feat.pte) and 
+		  (shared_feat.cls_inst /= (GLOBALS::curr_class_inst)) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(TYPESPEC_ARGS_EXPROB_S): \"").
+                                     s(GLOBALS::str_table.at_index(feat)).
+	                             s("\" is private shared feature"));
+	       end; -- if
+
+	    end; -- case
+	 end; -- if
+      end; -- if
+      
+      -- Record the class whose feature is being referenced by current
+      -- class.  We can avoid all these computation if it is predefined
+      -- feature (ie no referrent is found).  
+      -- IMPORTANT Assumption:  All features referenced when referrent
+      -- is void do not depend on the C code of the class, but the
+      -- attribute table for the class may be generated in file "MAIN_.c".
+      if (referrent /= void) then
+	 curr_callee:INT := type_spec.inst_ind;
+	 if not ((GLOBALS::curr_class_inst).callees.get(curr_callee)) then
+	    (GLOBALS::curr_class_inst).callees := 
+	    (GLOBALS::curr_class_inst).callees.insert(curr_callee);
+	 end; -- if
+	 if not (obj_cls.callers.get((GLOBALS::curr_class_inst).index)) then
+	    obj_cls.callers := obj_cls.callers.
+	                       insert((GLOBALS::curr_class_inst).index);
+	 end; -- if
+--	 obj_cls:CLASSOB_S := type_spec.inst_cls;
+-- Computed above.
+	 if (type_spec.is_dispatched) then
+
+	    i:INT := 0;
+	    descendents:INT_HASH_SET := obj_cls.alldes;
+	    sz:INT := descendents.asize;
+	    loop until!(i >= sz);
+	       index:INT := descendents[i];
+	       if (index > 0) then
+		  (GLOBALS::curr_class_inst).callees :=
+		  (GLOBALS::curr_class_inst).callees.insert(index);
+	       end; -- if
+	       i := i + 1;
+	    end; -- loop
+	    
+	 end; -- if
+      end; -- if
+
+      num_args:INT := 0;
+      if (args /= void) then
+	 num_args := args.insert;
+	 args.semant(symtab);
+      end; -- if
+
+      -- Check for any resultant type of the argument being void.  If
+      -- so, we remedy by making the result type be $OB.
+      i:INT;		  
+      loop until!(i >= num_args);
+	 if (args[i].res_type = void) then
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Arg #").
+	                       i(i + 1).s(" has no return type"));
+	    args[i].res_type := GLOBALS::ob_typeob_s;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+ 
+      -- Mark the arguments which involve dispatching on the current
+      -- arguments.  (Ref: Implementation of dispatching mechanism in 
+      -- general document)
+      i:INT := 0;
+      loop until!(i >= num_args);
+	 if (args[i].to_be_pre_evaluated) then
+	    temp_args[i] := GLOBAL_PROC::global_key;
+	    temp_args_ctype[i] := args[i].res_type.ctype;
+	    has_pre_eval_args := true;
+	 end; -- if
+	 i := i + 1;
+      end; -- loop
+		  
+      if (referrent = void) then
+	 case (feat)
+	 when RESERVED_WORDS::res_ind, 
+	      RESERVED_WORDS::self_ind, 
+	      RESERVED_WORDS::void_ind, 
+	      RESERVED_WORDS::copy_ind,
+	      RESERVED_WORDS::extend_ind, 
+	      RESERVED_WORDS::asize_ind, 
+	      RESERVED_WORDS::asize1_ind,
+	      RESERVED_WORDS::asize2_ind, 
+	      RESERVED_WORDS::asize3_ind, 
+	      RESERVED_WORDS::asize4_ind then
+	    ERR_INFO::format_error_exit(
+	              lineno,
+	              STR::create.s("(TYPESPEC_ARGS_EXPROB_S): \"").
+                               s((GLOBALS::str_table).at_index(feat)).
+	                       s("\" is invalid in dot expression"));
+	 when RESERVED_WORDS::type_ind then
+	    if (num_args /= 0) then
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Unexpected arguments supplied for \"type\""));
+	       args := void;
+	    end; -- if
+	    res_type := GLOBALS::int_typeob_s;
+	    return;
+	 when RESERVED_WORDS::new_ind then
+	    -- Arguments may or may not be needed for "new".
+	    -- This is not applicable for basic types.
+	    res_type := type_spec;
+	    if (res_type.nonptr_p) then
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Cannot use non-object type for \"new\""));
+	    end; -- if
+	    
+	    if (num_args = res_type.inst_cls.arrdim) then
+	       i:INT := 0;
+	       loop until!(i >= num_args);
+		  if not (args[i].res_type.int_type_p) then
+		     ERR_INFO::format_error_msg(
+		               lineno,
+		               STR::create.s("(TYPESPEC_ARGS_EXPROB_S): \"").
+		                        s(GLOBALS::str_table.at_index(feat)).
+		                        s("\" gets non-integer arg #").
+		                        i(i));
+		  end; -- if
+		  i := i + 1;
+	       end; -- loop
+	    else
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(TYPESPEC_ARGS_EXPROB_S): \"new\" needs ").
+	                          i(res_type.inst_cls.arrdim).
+	                          s(" argument(s) but is given ").
+                                  i(num_args).s(" argument(s)"));
+   	    end; -- if
+	    return;
+	 else
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(TYPESPEC_ARGS_EXPROB_S): \"").
+                               s((GLOBALS::str_table).at_index(feat)).
+                               s("\" is an unknown identifier in ").
+			       s(type_spec.inst_cls.full_name).
+			       c('(').i(type_spec.inst_ind).c(')'));
+            res_type := GLOBALS::ob_typeob_s;				     
+	 end; -- case
+      else
+	 case (referrent.type)
+	 when LVAR_DECL_STMTOB_S::type, PARAM_DECLOB_S::type then
+	    -- This should not happen because when we search the symbol
+	    -- table, only features are visible in the table.
+	    ERR_INFO::compiler_error_msg("TYPESPEC_ARGS_EXPROB_S",
+	              STR::create.s("Invalid reference to variable \"").
+                               s((GLOBALS::str_table).at_index(feat)).
+                               s("\""));
+	 when ATTR_DECL_FEATOB_S::type then
+	    ERR_INFO::format_error_exit(
+	              lineno,
+	              STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Invalid external reference to attribute \"").
+                               s((GLOBALS::str_table).at_index(feat)).
+	                       s("\""));
+	    
+	 when CONST_DECL_FEATOB_S::type, SHARED_DECL_FEATOB_S::type then
+	    if (num_args > 0) then
+	       -- Patch up by throwing away the parameters
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(TYPESPEC_ARGS_EXPROB_S): \"").
+	                          s(GLOBALS::str_table.at_index(feat)).
+	                          s("\"'s unexpected args ignored [\"").
+	                          s(GLOBALS::str_table.at_index(feat)).
+	                          s("\" is a shared/constant"));
+	       args := void;
+	    end; -- if
+	    res_type := referrent.typeof;
+	 when ROUT_FEATOB_S::type then
+	    i:INT := 0;
+	    ptypes:LST_TYPEOB_S := referrent.typeof.paramstype;
+	    num_params:INT := 0;
+	    if (ptypes /= void) then
+	       num_params := ptypes.insert;
+	    end; -- if
+	    if (num_params /= num_args) then
+	       -- Generate only error msgs; in the code generation phase,
+	       -- we'll just ignore the incompatibility and generate 
+	       -- "bad code".
+	       ERR_INFO::format_error_msg(
+	                 lineno,
+	                 STR::create.s("(TYPESPEC_ARGS_EXPROB_S): \"").
+	                          s(GLOBALS::str_table.at_index(feat)).
+	                          s("\" gets incorrect number of args"));
+	       if (num_params < num_args) then
+		  num_args := num_params;
+	       end; -- if
+	    end; -- if
+	    loop until!(i >= num_args);
+	       if not (GLOBAL_PROC::conform_tst(args[i].res_type, ptypes[i],
+		                                args[i]))
+	       then
+		  -- Generate only error msgs; in the code generation phase,
+		  -- we'll just ignore the incompatibility and generate 
+		  -- "bad code".
+		  tn1:STR; tn2:STR;
+		  if (args[i].res_type /= void) then
+		     tn1 := args[i].res_type.full_name;
+		  else
+		     tn1 := "<UNKNOWN>";
+		  end; -- if
+		  if (ptypes[i] /= void) then
+		     tn2 := ptypes[i].full_name;
+		  else
+		     tn2 := "<UNKNOWN>";
+		  end; -- if
+		  ERR_INFO::format_error_msg(
+		  lineno,
+		  STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Argument #").
+		     i(i + 1).
+		     s(" has incorrect type (").
+		     s(tn1).
+		     s(") for \"").
+		     s(GLOBALS::str_table.at_index(feat)).
+		     s("\" (").s(tn2).c(')'));
+	       end; -- if
+	       i := i + 1;
+	    end; -- loop
+            res_type := referrent.typeof.rettype;
+         else
+	    ERR_INFO::format_error_exit(
+	              lineno,
+	              STR::create.s("(TYPESPEC_ARGS_EXPROB_S): \"").
+	                       s((GLOBALS::str_table).at_index(feat)).
+                               s("\" has unknown referrent"));
+	 end; -- case
+	    
+	    -- Record any C names and reference to external features that
+	    --   that we would have to generate later.
+	    -- Get the definition of the class instance of the type specification
+	    --   in the current class-feature reference.  From the definition,
+	    --   get the name index and compare. 
+
+	 co:CLASSOB_S := symtab.in_class;
+	 cls_ind:INT := type_spec.inst_cls.index;
+	    
+	 if (cls_ind = RESERVED_CLASSES::C_ici) then
+	    -- If it is a reference to a C name, record that fact for
+	    --   generating C macros later.  If this is found in the
+	    --   initialization of shared/constant features, we have
+	    --   to generate the C macros in `MAINx_.c'.
+	    if (GLOBALS::pre_semant) then
+	       GLOBALS::other_cnames := (GLOBALS::other_cnames).insert(feat);
+	    end; -- if
+	    co.cnames := co.cnames.insert(feat);
+	 else	
+	    if (cls_ind /= symtab.in_class.index) then
+	       -- Record the class and feature name so that we can generate
+	       --   C "extern" declarations (only for those references not
+	       --   in current class).
+	       k:INT := GLOBAL_PROC::key_of_class_feat(cls_ind, feat);
+	       co.externs := co.externs.insert(k);
+	    end; -- if
+	 end; -- if
+      end; -- if
+   end; -- semant
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   assignable_p:BOOL is
+      -- A reference to a class feature is assignable only if the
+      --   the feature is a shared.
+      if (referrent = void) then
+	 case (feat)
+	 when RESERVED_WORDS::asize_ind, 
+	      RESERVED_WORDS::asize1_ind, 
+	      RESERVED_WORDS::asize2_ind, 
+	      RESERVED_WORDS::asize3_ind, 
+	      RESERVED_WORDS::asize4_ind, 
+	      RESERVED_WORDS::copy_ind, 
+	      RESERVED_WORDS::extend_ind, 
+	      RESERVED_WORDS::new_ind, 
+	      RESERVED_WORDS::type_ind then
+	    res := false;
+	    ERR_INFO::format_error_msg(
+	              lineno,
+	              STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Assigning \"").
+	                       s((GLOBALS::str_table).at_index(feat)).
+	                       s("\" is invalid"));
+	 else
+	    ERR_INFO::format_error_msg(
+                      lineno,
+	              STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Assigning \"").
+	                       s((GLOBALS::str_table).at_index(feat)).
+	                       s("\" (Unknown class reference)"));
+	    res := false;
+	 end; -- case
+	 return;
+      end; -- if
+      
+      if (type_spec.inst_ind = RESERVED_CLASSES::C_ici) then
+	 -- We allow attribute features of C class to be assigned, because
+	 -- these correpond to C variables.
+	 res := (referrent.type = SHARED_DECL_FEATOB_S::type) or
+	        (referrent.type = ATTR_DECL_FEATOB_S::type);
+      else
+	 res := (referrent.type = SHARED_DECL_FEATOB_S::type);
+      end; -- if
+   end; -- assignable_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   access_value_only:BOOL is
+      -- Default is to return "false" if we do not know the referrent;
+      -- otherwise, return "true" if the referrent is not a routine. 
+      if (referrent /= void) then
+	 res := (referrent.type /= ROUT_FEATOB_S::type);
+      end; -- if
+   end; -- access_value_only
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private cprint_ith_arg_pre_code(i:INT; outfile:SAT_OUTFILE) is
+      -- Either 
+      -- a.  the argument has to be evaluated into a local temporary, or
+      -- b.  only generate the preliminary code for the argument.
+      -- Assume that the range of i is valid.
+      ith_arg:$EXPROB_S := args[i];
+      ith_temp:INT := temp_args[i];
+      ith_arg.cprint_pre_code(outfile);
+      if (ith_temp > 0) then
+	 outfile.indent;
+	 GLOBAL_PROC::cprint_ctemp_name(ith_temp, outfile);
+	 outfile.s(" = ");
+	 ith_arg.cprint_act_code(outfile);
+	 outfile.s(";\n").inc_ln(1);
+      end; -- if
+   end; -- cprint_ith_arg_pre_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   private cprint_ith_arg_act_code(i:INT; outfile:SAT_OUTFILE) is
+      -- Either
+      -- a.  print the local variable containing the result of argument, or
+      -- b.  only generate the actual code for the argument.
+      -- Assume that the range of i is valid.
+      ith_temp:INT := temp_args[i];
+      if (ith_temp > 0) then
+	 GLOBAL_PROC::cprint_ctemp_name(ith_temp, outfile);
+      else
+	 args[i].cprint_act_code(outfile);
+      end; -- if 
+   end; -- cprint_ith_arg_act_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Preliminary code needed for a class-referenced feature for its arguments.
+   cprint_pre_code(outfile:SAT_OUTFILE) is
+      i:INT;
+      sz:INT := args.insert;
+      loop until!(i >= sz);
+	 cprint_ith_arg_pre_code(i, outfile);
+	 i := i + 1;
+      end; -- loop
+      
+      if (GLOBAL_PROC::check_is_on) then
+	 if (rt_type /= 0) then
+	    GLOBAL_PROC::cprint_curr_exp_code(self, temp_name_tpchk, outfile);
+	 end; -- if
+      end; -- if
+   end; -- cprint_pre_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   gen_temps:LIST{INT} is
+      -- The type specification cannot be dispatched, so the only source
+      -- of temporaries are the arguments.
+
+      res := args.gen_temps;
+      if (args /= void) then
+	 res := args.gen_temps;
+      end; -- if
+
+      -- We need to generate temporary for current expression if the type
+      -- of current expression is to be checked.
+      if (GLOBAL_PROC::check_is_on) then
+	 if (rt_type /= 0) then
+	    temp_name_tpchk := GLOBAL_PROC::global_key;
+	    temp_ctype_tpchk := res_type.ctype;
+	    if (res /= void) then
+	       res := res.push(temp_name_tpchk).push(temp_ctype_tpchk);
+	    else
+	       res := LIST{INT}::create(2).push(temp_name_tpchk).
+	                               push(temp_ctype_tpchk);
+	    end; -- if
+	 end; -- if
+      end; -- if
+
+      -- The temporaries to be generated include those for holding
+      -- values of pre-evaluated arguments.
+      if (has_pre_eval_args) then
+	 i:INT := 0;
+	 sz:INT := args.insert;
+	 loop until!(i >= sz);
+	    if (temp_args[i] > 0) then
+	       if (res /= void) then
+		  res := res.push(temp_args[i]).push(temp_args_ctype[i]);
+	       else
+		  res := LIST{INT}::create(2).push(temp_args[i]).
+		                          push(temp_args_ctype[i]);
+	       end; -- if
+	    end; -- if
+	    i := i + 1;
+	 end; -- loop
+      end; -- if
+   end; -- gen_temps
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_ext_strs is
+      args.get_ext_strs;	-- "args" is guaranteed to be non-void.
+      
+      -- Also remember to record references to string constants (in the
+      -- form of constant features) in other classes in "ext_strs" 
+      -- field of CLASSOB_S.
+      co:CLASSOB_S := type_spec.inst_cls;
+      cls_ind:INT := co.index;
+      if (cls_ind = RESERVED_CLASSES::C_ici) then
+      else
+	 -- This is to avoid cases when we have 
+	 -- class FOO is
+	 --     FOO::y  (where "FOO::y" refers to a constant feature)
+	 -- end; -- class
+	 if (cls_ind /= (GLOBALS::curr_class_inst).index) then
+		  
+-- NOTE: Only record if it is a different class.
+	    if (referrent /= void) then
+	       if (referrent.type = CONST_DECL_FEATOB_S::type) then
+		  const_feat:CONST_DECL_FEATOB_S := referrent;
+		  temp:INT := const_feat.is_a_str_const;
+		  if (temp > 0) then
+		     -- NOTE: We record the reference in the current
+		     -- class, not the class of the object.
+		     (GLOBALS::curr_class_inst).ext_strs := 
+		     (GLOBALS::curr_class_inst).ext_strs.insert(temp);
+		  end; -- if
+	       end; -- if
+	    end; -- if
+	 end; -- if
+      end; -- if
+   end; -- get_ext_strs
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Continuation codes
+   const cont1:INT := 1;	-- Print parameters for "new" (non-array)
+   const cont2:INT := 2;	
+      -- Print parameters for "new" (1-dim array); default may be supplied
+      
+   const cont3:INT := 3;
+      -- Print parameters for "new" (2-dim array); default may be supplied
+
+   const cont4:INT := 4;
+      -- Print parameters for "new" (3-dim array); default may be supplied
+
+   const cont5:INT := 5;
+      -- Print parameters for "new" (4-dim array); default may be supplied
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cont_cprint_code(outfile:SAT_OUTFILE; cont:INT) is
+      case (cont)
+      when cont1 then
+	 outfile.i(res_type.inst_ind).c(',').
+	         i(res_type.inst_cls.atomic_p);
+
+      when cont2 then
+	 num_args:INT;
+	 if (args /= void) then
+	    num_args := args.insert;
+	 end; -- if
+	 outfile.i(res_type.inst_ind);
+	 if (num_args /= 1) then
+	    outfile.s(",3,");
+	 else
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(0, outfile);
+	    outfile.c(',');
+	 end; -- if
+	 outfile.i(res_type.inst_cls.atomic_p);
+
+      when cont3 then
+	 num_args:INT;
+	 if (args /= void) then
+	    num_args := args.insert;
+	 end; -- if
+	 outfile.i(res_type.inst_ind);
+	 if (num_args /= 2) then
+	    outfile.s(",3,3,");
+	 else
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(0, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(1, outfile);
+	    outfile.c(',');
+	 end; -- if
+	 outfile.i(res_type.inst_cls.atomic_p);
+	 
+      when cont4 then
+	 num_args:INT;
+	 if (args /= void) then
+	    num_args := args.insert;
+	 end; -- if
+	 outfile.i(res_type.inst_ind);
+	 if (num_args /= 3) then
+	    outfile.s(",3,3,3,");
+	 else
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(0, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(1, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(2, outfile);
+	    outfile.c(',');
+	 end; -- if
+	 outfile.i(res_type.inst_cls.atomic_p);
+
+      when cont5 then
+	 num_args:INT;
+	 if (args /= void) then
+	    num_args := args.insert;
+	 end; -- if
+	 outfile.i(res_type.inst_ind);
+	 if (num_args /= 4) then
+	    outfile.s(",3,3,3,3,");
+	 else
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(0, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(1, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(2, outfile);
+	    outfile.c(',');
+	    cprint_ith_arg_act_code(3, outfile);
+	    outfile.c(',');
+	 end; -- if
+	 outfile.i(res_type.inst_cls.atomic_p);
+
+      else
+	 ERR_INFO::compiler_error_msg("TYPESPEC_ARGS_EXPROB_S",
+	           STR::create.s("Unknown continuation #").
+	                    i(cont));
+      end; -- case
+   end; -- cont_cprint_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   cprint_act_code(outfile:SAT_OUTFILE) is
+      if (printed_times > GLOBALS::g_tag) then
+	 if (temp_name_tpchk > 0) then
+	    GLOBAL_PROC::cprint_ctemp_name(temp_name_tpchk, outfile);
+	    return;
+	 else 
+	    ERR_INFO::compiler_error_msg("TYPESPEC_ARGS_EXPROB_S",
+	              STR::create.s("Invalid printing count = ").
+	                       i(printed_times).s(" > ").
+	                       i(GLOBALS::g_tag).
+	                       s(" in TYPESPEC_ARGS_EXPROB_S"));
+	 end; -- if
+      end; -- if
+      printed_times := printed_times + 1;
+	 
+      -- In the "semant" phase, we have already checked that the type
+      -- specification is not dispatched.
+      
+      num_args:INT := 0;
+      if (args /= void) then
+	 num_args := args.insert;
+      end; -- if
+      if (referrent = void) then
+	 case (feat)
+	 when RESERVED_WORDS::type_ind then
+	    outfile.i(type_spec.inst_ind);
+	 when RESERVED_WORDS::new_ind then
+	    if (res_type.array_type_p) then
+	       if (num_args /= 1) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"new\" operator on array object; default size provided"));
+	       end; -- if
+	       PRINT_C_CODE::cprint_new(outfile, 1, cont2, self);
+
+	    elsif (res_type.array2_type_p) then
+	       if (num_args /= 2) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"new\" operator on array object; default size provided"));
+	       end; -- if
+	       PRINT_C_CODE::cprint_new(outfile, 2, cont3, self);
+
+	    elsif (res_type.array3_type_p) then
+	       if (num_args /= 3) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"new\" operator on array object; default size provided"));
+	       end; -- if
+	       PRINT_C_CODE::cprint_new(outfile, 3, cont4, self);
+
+	    elsif (res_type.array4_type_p) then
+	       if (num_args /= 4) then
+		  ERR_INFO::format_error_msg(
+		            lineno,
+		            STR::create.s("(TYPESPEC_ARGS_EXPROB_S): Incorrect number of arguments supplied for \"new\" operator on array object; default size provided"));
+	       end; -- if
+	       PRINT_C_CODE::cprint_new(outfile, 4, cont5, self);
+
+	    elsif (res_type.nonptr_p) then
+	       outfile.s("/* new is not applicable to non-pointer type */");
+	    else
+               PRINT_C_CODE::cprint_new(outfile, 0, cont1, self);
+	    end; -- if
+	 else	
+	    -- Including "self", "void", "res", "extend", "asize", "asize1", 
+	    -- "asize2", "asize3", "asize4", "copy", /* "deep_copy", */
+	    outfile.s("/* Invalid reference \"").
+	            s((GLOBALS::str_table).at_index(feat)).
+	            s("\" */");
+	 end; -- case
+      else
+	 cprint_cast_code(outfile);
+	 if (type_spec.inst_ind = RESERVED_CLASSES::C_ici) then
+	    case (referrent.type)
+	       -- Referrents found to be parameters, locals or attributes
+	       -- would have caused the program to exit in "semant" phase.
+	    when CONST_DECL_FEATOB_S::type, SHARED_DECL_FEATOB_S::type then
+	       outfile.s((GLOBALS::str_table).at_index(feat));
+
+	    when ROUT_FEATOB_S::type then
+	       outfile.s((GLOBALS::str_table).at_index(feat)).
+	               c('(');
+	       i:INT;
+	       loop until!(i >= num_args);
+		  cprint_ith_arg_act_code(i, outfile);
+		  i := i + 1;
+		  if (i < num_args) then
+		     outfile.c(',');
+		  end; -- if
+	       end; -- loop
+	       outfile.c(')');
+	    else
+	       outfile.s("/* Unknown feature reference \"").
+	               s((GLOBALS::str_table).at_index(feat)).
+	               s("\" */");
+	    end; -- case
+	 else
+	    case (referrent.type)
+	       -- Referrents found to be parameters, locals or attributes
+	       -- would have caused the program to exit in "semant" phase.
+	    when CONST_DECL_FEATOB_S::type, SHARED_DECL_FEATOB_S::type then
+	       referrent.cprint_access_value(outfile);
+		  -- bombs on REAL descendents of value 0 (rather than 0.0)
+		  --	    when ROUT_FEATOB_S::type then
+		  --	       referrent.cprint_cname(outfile);
+		  --	       outfile.s("(0");
+		  --	       if (num_args >= 1) then
+		  --		  i:INT;
+		  --		  loop until!((i >= num_args));
+		  --		     outfile.c(',');
+		  --		     cprint_ith_arg_act_code(i, outfile);
+		  --		     i := i + 1;
+		  --		  end; -- loop
+		  --	       end; -- if
+	    when ROUT_FEATOB_S::type then
+	       referrent.cprint_cname(outfile);
+	       outfile.c('(');
+		  -- We have to take note whether the class FOO in "FOO::fun"
+		  -- is a descendent of DOUBLE or FLOAT.
+	       is_float_or_double:BOOL :=
+		     (type_spec.real_type_p) or (type_spec.double_type_p);
+	       if (is_float_or_double) then
+		  outfile.s("0.0");
+	       else
+		  outfile.s("0");
+	       end; -- if
+	       if (num_args >= 1) then
+		  i:INT;
+		  loop until!(i >= num_args);
+		     outfile.c(',');
+		     cprint_ith_arg_act_code(i, outfile);
+		     i := i + 1;
+		  end; -- loop
+	       end; -- if
+	       outfile.c(')');
+	    else
+	       outfile.s("/* Unknown feature reference \"").
+	       s((GLOBALS::str_table).at_index(feat)).
+	       s("\" */");
+	    end; -- case
+	 end; -- if
+      end; -- if
+   end; -- cprint_act_code
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   shared init_expr_explicit_p: BOOL;
+   cprint_init_code(outfile:SAT_OUTFILE) is
+      args.cprint_init_code(outfile);
+      if (referrent /= void) then
+	 -- All calls with explicit reference to classes are of this
+	 -- class (TYPESPEC_ARGS_EXPROB_S).
+	 -- For routines referred to, let them know it was explicit.
+	 init_expr_explicit_p := true;
+	 referrent.cprint_init_code(outfile);
+	 init_expr_explicit_p := false;
+      end; -- if
+   end; -- cprint_init_code
+
+end; -- class TYPESPEC_ARGS_EXPROB_S
+
+--------------------------------------------------------------------

@@ -1,0 +1,556 @@
+-- -*- Mode: Sather;  -*-
+-- File: stmtob.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU) and Jeff Bilmes
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Statement nodes in Sather class definition.
+--*
+--* RCS: $Id: stmtob.sa,v 1.1 1994/02/12 03:21:54 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 05:12 1993 (hws)
+--*  Oct 17 05:12 1993 (hws): Sather 1 syntax, copyright note
+--*  Oct 15 18:53 1993 (hws): make EXCEPT_STMT work when AGAINST missing.
+--*  Mar  2 02:19 1993 (hws): delete DEBUG_STMTOB
+--*  Feb 21 20:16 1993 (hws): alias -> define
+--* Created: Thu Jun  7 14:55:18 1990 (clim)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class STMTOB is
+   -- Statements.
+   PARSEROB;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):$STMTOB_S is
+      res := STMTOB_S::create(lineno);
+   end; -- pcopy
+
+end; -- class STMTOB
+   
+------------------------------------------------------------------------
+   
+class LOCAL_DECL_STMTOB is
+   -- Local variable declaration used temporarily for create 
+   --   LVAR_DECL_STMTOB's when appended to statement list
+   STMTOB;
+   DECLOB;
+
+   attr names:LIST{INT};		-- List of variable name indices   
+   attr init_expr:$EXPROB;		-- Initialization expression, if any
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(decl:ANY_DECLOB; exp:$EXPROB):SAME is
+      -- The given declaration should be an ANY_DECLOB with a list of
+      --   names and without initialization expression).  Leave
+      --   list of names as it is and make a LOCAL_DECL_STMTOB instead.
+      res := new; 
+      res.names := decl.names;
+      res.type_spec := decl.type_spec;
+      res.init_expr := exp;
+      res.lineno := GLOBALS::curr_lineno;
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+-- This routine is not used but is necessary to overcome the consistent
+-- definitions of "pcopy" in STMTOB, DECLOB, and LOCAL_DECL_STMTOB.
+
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):LVAR_DECL_STMTOB_S is
+      -- The parameters are a list of indices for type parameter
+      --   names and a list of keys for the type instantiations.
+      if (init_expr /= void) then
+	 res := res.create(names[0],
+	                type_spec.pcopy(pl, pi),
+                        init_expr.pcopy(pl, pi),
+                        lineno);
+      else
+	 res := res.create(names[0],
+	                type_spec.pcopy(pl, pi),
+                        void,
+                        lineno);
+      end; -- if
+   end; -- pcopy
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create_lst(decl:LOCAL_DECL_STMTOB):LST_STMTOB is
+      -- Given a LOCAL_DECL_STMTOB, take the list of identifiers in
+      --   LOCAL_DECL_STMTOB, and make a list of $STMTOB's (in
+      --   particular a list of LVAR_DECL_STMTOB's).
+      
+      i:INT := 0;
+      num_names:INT;
+      if (decl.names /= void) then
+	 num_names := decl.names.insert;
+      end; -- if
+      res := res.create(num_names);	
+	 -- Only allocate necessary amount of space
+      
+      first:INT;
+      if (num_names = 0) then
+	 -- *! Exit for the moment; the alternative remedy is to just
+	 -- ignore the declaration.  
+	 ERR_INFO::error_exit(
+	            STR::create.s(ERR_INFO::filename).c('(').
+	            i(decl.lineno).c(')').
+	            s(" (LOCAL_DECL_STMTOB) : No name found in declaration\n"));
+      else
+	 -- If there is an initialization expression, it is executed only
+	 --   once and the rest are assigned from the first constant
+	 --   attribute.
+	 first := decl.ith_name(0);
+      end; -- if
+
+      -- The initial expression is executed only once when assigned to
+      --   the first constant attribute.
+      
+      -- *! This conversion is different from the one currently implemented
+      --    in the C compiler.
+      nm:INT;
+      tp:$TYPEOB;
+      lv_stmtob:LVAR_DECL_STMTOB;
+
+      loop until!(i >= num_names);
+	 nm := decl.ith_name(i);
+	 tp := decl.type_spec;
+	 if (i > 0) and (decl.init_expr /= void) then
+	    -- If there is an initialization expression and this is not
+	    --   the first shared attribute in the list, get the initial
+	    --   value from the first shared attribute.
+	    lv_stmtob := lv_stmtob.create(nm, tp, ID_EXPROB::create(first), decl.lineno);
+	 else
+	    lv_stmtob := lv_stmtob.create(nm, tp, decl.init_expr, decl.lineno);
+	 end;
+ 	 res := res.push(lv_stmtob);
+	 i := i + 1;
+      end; -- loop
+   end; -- create_lst
+     
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   ith_name(i:INT):INT is
+      res := names[i];
+   end; -- ith_name
+
+end; -- class LOCAL_DECL_STMTOB 
+   
+------------------------------------------------------------------------   
+
+class LVAR_DECL_STMTOB is
+   -- Local variable declaration
+   STMTOB;
+   DECLOB;
+
+-- Computed during parsing
+   attr name:INT;			-- Variable name index
+   attr init_expr:$EXPROB;		-- Initialization expression, if any
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(nm:INT; tp:$TYPEOB; exp:$EXPROB; ln:INT):SAME is
+      res := new; 
+      if (GLOBALS::str_table).reserved_name_p(nm) then
+	 ERR_INFO::error_msg(
+	           STR::create.s(ERR_INFO::filename).c('(').i(ln).c(')').
+	           s(" (LVAR_DECL_STMTOB) : Error in redefining \"").
+	           s((GLOBALS::str_table).at_index(nm)).s("\"\n"));
+      end; -- if
+      res.name := nm;
+      res.type_spec := tp;
+      res.init_expr := exp;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):LVAR_DECL_STMTOB_S is
+      -- The parameters are a list of indices for type parameter
+      --   names and a list of keys for the type instantiations.
+      if (init_expr /= void) then
+	 res := res.create(name,	
+	                type_spec.pcopy(pl, pi),
+                        init_expr.pcopy(pl, pi),
+                        lineno);
+      else
+	 res := res.create(name,	
+	                type_spec.pcopy(pl, pi),
+                        void,
+                        lineno);
+      end; -- if
+   end; -- pcopy
+
+end; -- class LVAR_DECL_STMTOB
+
+------------------------------------------------------------------------   
+
+class ASSIGN_STMTOB is
+   -- Assignments.
+   STMTOB;
+   
+-- Computed during parsing
+   attr lval:$EXPROB;		-- Left side of assignment
+   attr expr:$EXPROB;		-- Right side of assignment
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(lv:$EXPROB; exp:$EXPROB; ln:INT ):SAME is
+      res := new;
+      res.lval := lv;
+      res.expr := exp;
+      -- res.lineno := GLOBALS::curr_lineno;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):ASSIGN_STMTOB_S is
+      -- The parameters are a list of indices for type parameter
+      --   names and a list of keys for the type instantiations.
+      res := res.create(lval.pcopy(pl, pi),
+                     expr.pcopy(pl, pi),
+                     lineno);
+   end; -- pcopy
+
+end; -- class ASSIGN_STMTOB
+   
+------------------------------------------------------------------------   
+   
+class COND_STMTOB is
+   -- Conditionals.
+   STMTOB;
+   
+-- Computed during parsing
+   attr test:$EXPROB;		-- Boolean test.
+   attr then_part:LST_STMTOB;	-- List of statements in then-clause.
+   
+   attr elsif_part:LST_STMTOB;	
+      -- Elsif clauses, if any.  This should contain only ELSIF_STMTOB's.
+      -- This is guaranteed to be non-null (by parser).
+   attr else_part:LST_STMTOB;        -- List of statements in else-clause, if any.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(t:$EXPROB; tp:LST_STMTOB; eip:LST_STMTOB; ep:LST_STMTOB; ln:INT):SAME is
+      res := new;
+      res.test := t;
+      res.then_part := tp;
+      res.elsif_part := eip;
+      res.else_part := ep;
+      -- res.lineno := t.lineno;
+      res.lineno := ln;
+   end; -- create
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):COND_STMTOB_S is
+      -- The parameters are a list of indices for type parameter
+      --   names and a list of keys for the type instantiations.
+      if (else_part /= void) then
+	 res := res.create(test.pcopy(pl, pi),
+                        then_part.pcopy(pl, pi),
+                        elsif_part.pcopy(pl, pi),
+                        else_part.pcopy(pl, pi),
+                        lineno);
+      else
+	 res := res.create(test.pcopy(pl, pi),
+                        then_part.pcopy(pl, pi),
+                        elsif_part.pcopy(pl, pi),
+                        void,
+                        lineno);
+      end; -- if
+   end; -- pcopy
+
+end; -- class COND_STMTOB
+
+------------------------------------------------------------------------
+
+class EXCEPT_STMTOB is
+   -- An except clause.
+
+   STMTOB;
+   
+-- Computed during parsing
+
+   attr norm_part, except_part: LST_STMTOB; -- normal and exceptional
+      -- a `void' except_part indicates a degenerate construct with no handlers.
+
+   attr exc_decl: LST_STMTOB;	-- identifier and type
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(norm, hdlr: LST_STMTOB; err: ANY_DECLOB; ln: INT):SAME is
+      res := new;
+      res.norm_part := norm;
+      if hdlr /= void then
+	 res.exc_decl :=
+	       LOCAL_DECL_STMTOB::create_lst(
+		  LOCAL_DECL_STMTOB::create(err,void));
+      end;
+      res.except_part := hdlr;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):EXCEPT_STMTOB_S is
+      -- The parameters are a list of indices for type parameter
+      --   names and a list of keys for the type instantiations.
+      if except_part = void then
+	 res := res.create(
+	    norm_part.pcopy(pl, pi), void, void, 
+	    lineno);
+      else
+	 res := res.create(
+	    norm_part.pcopy(pl, pi),
+	    except_part.pcopy(pl, pi),
+	    exc_decl.pcopy(pl, pi),
+	    lineno);
+      end;
+   end; -- pcopy
+
+end;
+      
+------------------------------------------------------------------------
+
+class ELSIF_STMTOB is
+   -- An elsif clause.
+   STMTOB;
+   
+-- Computed during parsing
+   attr test:$EXPROB;
+   attr then_part:LST_STMTOB;	-- List of statements in then-clause.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(t:$EXPROB; tp:LST_STMTOB; ln:INT):SAME is
+      res := new;
+      res.test := t;
+      res.then_part := tp;
+      -- res.lineno := GLOBALS::curr_lineno;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):ELSIF_STMTOB_S is
+      -- The parameters are a list of indices for type parameter
+      --   names and a list of keys for the type instantiations.
+      res := res.create(test.pcopy(pl, pi),
+                     then_part.pcopy(pl, pi),
+                     lineno);
+   end; -- pcopy
+
+end; -- class ELSIF_STMTOB
+
+------------------------------------------------------------------------
+
+class LOOP_STMTOB is
+   -- Loops.
+   STMTOB;
+   
+-- Computed during parsing
+   attr test:$EXPROB;		-- Termination test, if any.
+   attr stmts:LST_STMTOB;		-- Body of loop.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(t:$EXPROB; s:LST_STMTOB; ln:INT):SAME is
+      res := new;
+      res.test := t;
+      res.stmts := s;
+      -- res.lineno := GLOBALS::curr_lineno;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):LOOP_STMTOB_S is
+      -- The parameters are a list of indices for type parameter
+      --   names and a list of keys for the type instantiations.
+      if (test /= void) then
+	 res := res.create(test.pcopy(pl, pi),
+	                stmts.pcopy(pl, pi),
+                        lineno);
+      else
+	 res := res.create(void,
+	                stmts.pcopy(pl, pi),
+                        lineno);	 
+      end; -- if
+   end; -- pcopy
+
+end; -- class LOOP_STMTOB
+
+------------------------------------------------------------------------
+
+class SWITCH_STMTOB is
+   -- Switch statements.
+   STMTOB;
+   
+-- Computed during parsing
+   attr test:$EXPROB;
+   attr when_part:LST_WHEN_STMTOB;	
+      -- List of when clauses.  The objects should all be "WHEN_STMTOB"'s.
+   attr else_part:LST_STMTOB;	
+      -- List of statements at end, if any.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(t:$EXPROB; wp:LST_WHEN_STMTOB; ep:LST_STMTOB; ln:INT):SAME is
+      res := new;
+      res.test := t;
+      res.when_part := wp;
+      res.else_part := ep;
+      -- res.lineno := GLOBALS::curr_lineno;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):SWITCH_STMTOB_S is
+      -- The parameters are a list of indices for type parameter
+      --   names and a list of keys for the type instantiations.
+      if (else_part /= void) then
+	 res := res.create(test.pcopy(pl, pi),
+                        when_part.pcopy(pl, pi),
+                        else_part.pcopy(pl, pi),
+                        lineno);
+      else
+	 res := res.create(test.pcopy(pl, pi),
+                        when_part.pcopy(pl, pi),
+                        void,
+                        lineno);
+      end; -- if
+   end; -- pcopy
+
+end; -- class SWITCH_STMTOB
+
+------------------------------------------------------------------------
+
+class WHEN_STMTOB is
+   -- When clauses in switch statments.
+   STMTOB;
+
+-- Computed during parsing
+   attr exprs:LST_EXPROB;		-- List of values to match
+   attr then_part:LST_STMTOB;	-- Statements to execute otherwise
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(e:LST_EXPROB; t:LST_STMTOB):SAME is
+      res := new;
+      res.exprs := e;
+      res.then_part := t;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):WHEN_STMTOB_S is
+      -- The parameters are a list of indices for type parameter
+      --   names and a list of keys for the type instantiations.
+      res := res.create(exprs.pcopy(pl, pi),
+                     then_part.pcopy(pl, pi),
+                     lineno);
+   end; -- pcopy
+
+end; -- class WHEN_STMTOB
+
+------------------------------------------------------------------------
+
+class BREAK_STMTOB is
+   -- Break statements.
+   STMTOB;
+   attr expr: $EXPROB;
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   define inhcreate create;
+   create(expr:$EXPROB): SAME is
+      res := inhcreate;
+      res.expr := expr;
+   end;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):BREAK_STMTOB_S is
+      res := res.create(lineno);
+      if expr/=void then res.expr := expr.pcopy(pl,pi); end;
+   end; -- pcopy
+
+end; -- class BREAK_STMTOB
+
+--------------------------------------------------------------------
+
+class RETURN_STMTOB is
+   -- Return statements.
+   STMTOB;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):RETURN_STMTOB_S is
+      res := res.create(lineno);
+   end; -- pcopy
+
+end; -- class RETURN_STMTOB
+
+--------------------------------------------------------------------
+   
+class CALL_STMTOB is
+   -- Calls.
+   STMTOB;
+   attr expr:$EXPROB;			-- EXPROB representation of the call
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(exp:$EXPROB):SAME is
+      res := new;
+      res.expr := exp;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):CALL_STMTOB_S is
+      -- The parameters are a list of indices for type parameter
+      --   names and a list of keys for the type instantiations.
+      res := res.create(expr.pcopy(pl, pi), lineno);
+   end; -- pcopy
+
+end; -- class CALL_STMTOB
+
+------------------------------------------------------------------------
+   
+class OPT_STMTOB is
+   -- Represent statements which can be turned on/off by an identifier key
+   STMTOB;
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create:SAME is
+      res := new;
+      res.lineno := GLOBALS::curr_lineno;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):OPT_STMTOB_S is
+      -- The parameters are a list of indices for type parameter
+      --   names and a list of keys for the type instantiations.
+      res := res.create(lineno);
+   end; -- pcopy
+
+end; -- class OPT_STMTOB
+
+--------------------------------------------------------------------
+
+class ASSERT_STMTOB is
+   -- Assertions can be turned on/off by a key
+   OPT_STMTOB;
+      -- Key name index stored in OPT_STMTOB
+   
+-- Computed during parsing
+   attr as_exp:$EXPROB;		-- Assertion
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create(a:$EXPROB; ln:INT):SAME is
+      res := new;
+      res.as_exp:= a;
+      -- Line number is simply that of the end of assert statement. (not any more).
+      -- res.lineno := GLOBALS::curr_lineno;
+      res.lineno := ln;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   pcopy(pl:LIST{INT}; pi:LST_TYPEOB_S):ASSERT_STMTOB_S is
+      res := res.create(as_exp.pcopy(pl, pi),
+		lineno);
+   end; -- pcopy
+
+end; -- class ASSERT_STMTOB
+
+------------------------------------------------------------------------
+

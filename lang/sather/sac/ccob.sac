@@ -1,0 +1,88 @@
+-- -*- Mode: Sather;  -*-
+-- File: ccob.sac
+-- Author: Heinz Schmidt (hws@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION:  COMMON C OBJECTS. A foreign function ADT in support of 
+--*            COB classes.
+--* 
+--* NOTE: The .sac version of this code cannot be used directly with the 
+--*   Sather compiler. The file contains foreign abstract type definitions. 
+--*   to be converted to Sather and C code.
+--*
+--* RELATED FILES: cob.sa, cob.c
+--*
+--* HISTORY:
+--* Last edited: May 20 23:51 1991 (hws)
+--*  Sep 15 00:54 1993 (hws): cast strdup_ properly
+--*  Sep  1 15:36 1993 (oscar): use our (GC safe) strdup_ instead of strdup
+--* Created: Mon Dec 17 08:37:25 1990
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+--*
+--* From Sather runtime: Strings
+--*
+   
+   function str_ptr(s:STR):$CSTR is -- ptr to the str in `s'
+
+      -- does cs fix the result type of str_ptr_ to INT?
+      "str_ptr_(" s ")";
+   end; 
+   function make_str_(s:$CSTR):STR is implemented -- a copy of s as string.
+   end;
+
+--*  
+--* Instances
+--*
+   
+   function ob_base_size(typ:INT):INT is -- size of Sather ob fix part.
+      "safe_ob_base_size_(" typ ",\"C::ob_base_size access error.\")";
+   end;
+
+--*  
+--* Sather INTs and COBs -- the macro versions cast only
+--*
+   
+   function to_cob(ob:$OB):$COB is ob; end;
+   function to_int(i:$COB):INT is i; end; 
+   function from_int(i:INT):$COB is i; end;
+   
+--*
+--*  C strings
+--*
+-- We rely on Sather runtime fns str_ptr_ and makestr_
+
+   function to_cstr(s:STR):$CSTR is "strdup_((ptr)str_ptr_(" s "))"; end;
+   function to_str(s:$CSTR):STR is "makestr_(" s ")"; end;
+
+-- consider using to_str and OUT instead.
+   function print_cstr(s:$CSTR) is "printf(" s ")"; end;  
+
+--*
+--* C string arrays
+--*
+
+-- constructor   
+   function strtok_cstray(s1:STR; s2:STR):$CSTRAY is implemented 
+      -- strtok s1 with separators s2.
+   end;
+   
+-- printing
+   function print_cstray(s:$CSTRAY) is
+      "  int i;"
+      "  for (i = 0;" s "[i] != 0; i++)"
+      "    printf(\"%s\\n\"," s "[i])" ;
+   end;
+
+--*
+--* C arrays
+--*
+   
+   function create_carray(len:INT):$CARRAY is "malloc(4*" len ")"; end;
+   function carray_get(array:$CARRAY; index:INT):$COB is 
+      array "[" index "]"; 
+   end;
+   
+   function carray_set(array:$CARRAY; index:INT; val:$COB) is 
+      array "[" index "] = " val; 
+   end;

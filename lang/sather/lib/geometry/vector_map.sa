@@ -1,0 +1,559 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/geometry/vector_map.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+--         and Subutai Ahmad
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Maps from vectors to vectors.
+--*
+--* CLASSES: VECTOR_MAP, COMPOSITION_VECTOR_MAP{M1,M2},
+--*          PRODUCT_VECTOR_MAP{M1,M2}, SUBSET_VECTOR_MAP, RANGE_VECTOR_MAP,
+--*          CONSTANT_VECTOR_MAP, LEARNED_VECTOR_MAP, LINEAR_VECTOR_MAP,
+--*          AFFINE_VECTOR_MAP, VECTOR_MAP_TEST.
+--* 
+--* REQUIRED FILES: geometry/vector.sa, geometry/matrix.sa,
+--*          data_structure/list.sa
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: vector_map.sa,v 1.1 1994/02/12 03:23:19 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:35 1993 (hws)
+--*  Oct 17 06:35 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 27 14:49 1993 (hws): require -> pre
+--*  Apr  3 16:57 1993 (hws): assert(pre) -> require
+--* Created: Wed Oct  3 14:42:06 1990 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class VECTOR_MAP is
+   -- A mapping from vectors to vectors. To be inherited.
+   -- Descendents should define `create', `map_in', `in_dim', and `out_dim'.
+   
+   map(v:VECTOR):VECTOR is
+      -- The value of the map on `v'. Creates a new vector for output.
+      res:=VECTOR::new(out_dim); map_in(v,res);
+   end;
+   
+   map_in(vi,vo:VECTOR) is
+      -- Evaluate the map on `vi' and put the result into `vo'. 
+      -- This is the primitive operation which descendents should define.
+      ERR::s("VECTOR_MAP: `map_in' not redefined").nl;
+   end; -- map_in
+
+   map_vector_list(vl:VECTOR_LIST):VECTOR_LIST is
+      -- Apply the mapping in `self' to all vectors in `vl'.
+      res:=VECTOR_LIST::create;
+      i:INT; loop until!(i=vl.size);
+	 res:=res.push(map(vl[i]));
+	 i:=i+1
+      end; -- loop
+   end; -- map_vector_list
+   
+   in_dim:INT is
+      -- The dimension of the input space.
+      ERR::s("VECTOR_MAP: `in_dim' not redefined").nl;
+   end; -- in_dim
+   
+   out_dim:INT is
+      -- The dimension of the output space.
+      ERR::s("VECTOR_MAP: `out_dim' not redefined").nl;
+   end; -- out_dim
+   
+   mse(in,out:VECTOR_LIST):REAL
+   pre in.size=out.size and in.dim=in_dim and out.dim=out_dim 
+   is
+      -- The mean squared error of map on corresponding input/output pairs
+      -- in the lists `in' and `out'.
+      v:VECTOR:=v.create(out_dim);
+      i:INT; loop until!(i=in.size);
+	 map_in(in[i],v);
+	 serr:REAL:=v.square_distance_to(out[i]);
+	 res:=res+serr;
+	 i:=i+1;
+      end; -- loop
+      res:=res/in.size
+   end; -- mse
+   
+end; -- class VECTOR_MAP
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class COMPOSITION_VECTOR_MAP{M1,M2} is
+   -- The composition of maps of type `M1' and `M2'.
+   
+   VECTOR_MAP;
+   
+   attr m1:M1;
+   attr m2:M2;			-- The two maps.
+   attr v:VECTOR;		-- Used to hold the intermediate result.
+   
+   create(m1:M1; m2:M2):SAME pre m1.in_dim=m2.out_dim is
+      -- A map which is the composition of `m1' and `m2', computes
+      -- `m1(m2(x))'.
+      res:=new; res.m1:=m1; res.m2:=m2; res.v:=VECTOR::new(m1.in_dim);
+   end; -- create
+   
+   map_in(vi,vo:VECTOR) pre vi.dim=in_dim and vo.dim=out_dim is
+      -- Evaluate the composition of `m1' and `m2' on `vi' and put the
+      -- result into `vo'.
+      m2.map_in(vi,v); m1.map_in(v,vo);
+   end; -- map_in
+   
+   in_dim:INT is
+      -- The dimension of the input space.
+      res:=m2.in_dim
+   end; -- in_dim
+   
+   out_dim:INT is
+      -- The dimension of the output space.
+      res:=m1.out_dim
+   end; -- out_dim
+   
+end; -- class COMPOSITION_VECTOR_MAP{M1,M2}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class PRODUCT_VECTOR_MAP{M1,M2} is
+   -- The product of two mappings of types `M1' and `M2'.
+   
+   VECTOR_MAP;
+   
+   attr m1:M1;
+   attr m2:M2;			-- The two maps.
+   attr v1i,v2i,v1o,v2o:VECTOR;	-- Used to hold intermediates.
+   
+   create(m1:M1; m2:M2):SAME is
+      -- A map whose input space and output spaces are the products of
+      -- those of `m1' and `m2' (ie. the dimensions are the sums of the 
+      -- corresponding dimensions).
+      res:=new; res.m1:=m1; res.m2:=m2;
+      res.v1i:=VECTOR::new(m1.in_dim);
+      res.v2i:=VECTOR::new(m2.in_dim);
+      res.v1o:=VECTOR::new(m1.out_dim);
+      res.v2o:=VECTOR::new(m2.out_dim);
+   end; -- create
+   
+   map_in(vi,vo:VECTOR)
+   pre vi.dim=in_dim and vo.dim=out_dim is
+      -- Evaluate the product of `m1' and `m2' on `vi' and put the result
+      -- into `vo'.
+      i:INT; loop until!(i=m1.in_dim); v1i[i]:=vi[i]; i:=i+1 end;
+      j:INT; loop until!(j=m2.in_dim); v2i[j]:=vi[i+j]; j:=j+1 end;
+      m1.map_in(v1i,v1o); m2.map_in(v2i,v2o);
+      i:INT:=0; loop until!(i=m1.out_dim); vo[i]:=v1o[i]; i:=i+1 end;
+      j:INT:=0; loop until!(j=m2.out_dim); vo[i+j]:=v2o[j]; j:=j+1 end;
+   end; -- map_in
+   
+   in_dim:INT is
+      -- The input dimension of the map.
+      res:=m1.in_dim+m2.in_dim
+   end; -- in_dim
+   
+   out_dim:INT is
+      -- The output dimension of the map.
+      res:=m1.out_dim+m2.out_dim
+   end; -- out_dim
+   
+end; -- class PRODUCT_VECTOR_MAP{M1,M2}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class SUBSET_VECTOR_MAP is
+   -- A map whose output components are a permuted subset of the
+   -- components of the input.
+
+   VECTOR_MAP;
+   
+   attr perm:LIST{INT};		-- The permutation.
+   attr in_d:INT;			-- The input dimension.
+   
+   create(in_d:INT; perm:LIST{INT}):SAME is
+      -- The input has dimension `in_d'. The output vector will have a
+      -- dimension = `perm.size'. The `i'th component of the output is
+      -- the `p[i]'th component of the input.
+      res:=new; res.perm:=perm; res.in_d:=in_d;
+   end; -- create
+   
+   map_in(vi,vo:VECTOR) pre vi.dim=in_dim and vo.dim=out_dim is
+      -- Fill in `vo' with the permuted components of `vi'.
+      i:INT; loop until!(i=perm.size); vo[i]:=vi[perm[i]]; i:=i+1 end;
+   end; -- map_in
+   
+   in_dim:INT is
+      -- The input dimension.
+      res:=in_d;
+   end; -- in_dim
+   
+   out_dim:INT is
+      -- The output dimension.
+      res:=perm.size
+   end; -- out_dim
+      
+end; -- class SUBSET_VECTOR_MAP
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class RANGE_VECTOR_MAP is
+   -- The output is just a given range of indices of input.
+   
+   VECTOR_MAP;
+   
+   attr in_d,l,u:INT;
+   
+   create(in_d,l,u:INT):SAME pre l>=0 and l<=u and u<in_d is
+      -- A map on vectors of dimension `in_d' defined by extracting
+      -- components `l' through `u'.
+      res:=new; res.in_d:=in_d; res.l:=l; res.u:=u;
+   end; -- create
+   
+   map_in(vi,vo:VECTOR) pre vi.dim=in_dim and vo.dim=out_dim is
+      -- Put components `l' through `u' of `vi' into `vo'.
+      i:INT:=l; loop until!(i>u); vo[i-l]:=vi[i]; i:=i+1 end; 
+   end; -- map_in
+   
+   in_dim:INT is
+      -- The input dimension.
+      res:=in_d;
+   end; -- in_dim
+   
+   out_dim:INT is
+      -- The output dimension.
+      res:=u-l+1
+   end; -- out_dim
+   
+end; -- class RANGE_VECTOR_MAP
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class CONSTANT_VECTOR_MAP is
+   -- The output is a constant vector, independent of the input.
+   
+   VECTOR_MAP;
+
+   attr in_d:INT;			-- The input dimension.
+   attr v:VECTOR;			-- The constant output vector.
+   
+   create(ind:INT; v:VECTOR):SAME is
+      -- A new map with input dimension `ind' and constant output value `v'.
+      res:=new; res.v:=v; res.in_d:=ind;
+   end; -- create
+   
+   map_in(vi,vo:VECTOR) pre vi.dim=in_dim and vo.dim=out_dim is
+      -- Fill `vo' with the constant vector value.
+      vo.to(v)
+   end; -- map_in
+      
+   in_dim:INT is
+      -- The input dimension.
+      res:=in_d;
+   end; -- in_dim
+   
+   out_dim:INT is
+      -- The output dimension.
+      res:=v.dim
+   end; -- out_dim
+   
+end; -- class CONSTANT_VECTOR_MAP
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class LEARNED_VECTOR_MAP is
+   -- A `VECTOR_MAP' which is learned from examples.
+
+   VECTOR_MAP;
+   
+   train(in,out:VECTOR_LIST) is
+      -- Use the corresponding vectors in the lists `in' and `out' to
+      -- train the map.
+      ERR::s("LEARNED_VECTOR_MAP: `train' not redefined.").nl;
+   end; -- train
+   
+end; -- class LEARNED_VECTOR_MAP
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+class LINEAR_VECTOR_MAP is
+   -- Maps whose output is a linear transformation of the input.
+   
+   LEARNED_VECTOR_MAP;
+   
+   attr m:MATRIX;			-- The matrix defining the linear map.
+   
+   create(in_dim,out_dim:INT):SAME is
+      -- A new linear map with given dimensions.
+      res:=new; res.m:=MATRIX::new(out_dim,in_dim);
+   end; -- create
+   
+   create_with_matrix(m:MATRIX):SAME is
+      -- A new linear map with matrix `m'.
+      res:=new; res.m:=m;
+   end; -- create_with_matrix
+   
+   map_in(vi,vo:VECTOR) pre vi.dim=in_dim and vo.dim=out_dim is
+      -- Evaluate the linear map `m' on `vi' and put the result in `vo'.
+      m.act_on_in(vi,vo);
+   end; -- map_in
+   
+   in_dim:INT is
+      -- The input dimension.
+      res:=m.nc;
+   end; -- in_dim
+   
+   out_dim:INT is
+      -- The output dimension.
+      res:=m.nr
+   end; -- out_dim
+
+   train(in,out:VECTOR_LIST) is
+      -- Use the corresponding vectors in the lists `in' and `out' to
+      -- train the map.
+      m.to_linear_fit_of(in,out);
+   end; -- train
+
+end; -- class LINEAR_VECTOR_MAP
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class AFFINE_VECTOR_MAP is
+   -- Maps whose output is an affine transformation of the input.
+   
+   LEARNED_VECTOR_MAP;
+   
+   attr m:MATRIX;			-- The matrix defining the affine map.
+   
+   create(in_dim,out_dim:INT):SAME is
+      -- A new affine map with given dimensions.
+      res:=new; res.m:=MATRIX::new(out_dim,in_dim+1);
+   end; -- create
+   
+   create_with_matrix(m:MATRIX):SAME is
+      -- A new affine map with matrix `m'.
+      res:=new; res.m:=m;
+   end; -- create_with_matrix
+   
+   map_in(vi,vo:VECTOR) pre vi.dim=in_dim and vo.dim=out_dim is
+      -- Evaluate the affine map `m' on `vi' and put the results in `vo'.
+      m.affine_act_on_in(vi,vo);
+   end; -- map_in
+   
+   in_dim:INT is
+      -- The input dimension.
+      res:=m.nc-1
+   end; -- in_dim
+   
+   out_dim:INT is
+      -- The output dimension.
+      res:=m.nr
+   end; -- out_dim
+
+   train(in,out:VECTOR_LIST) is
+      -- Use the corresponding vectors in the lists `in' and `out' to
+      -- train the map.
+      m.to_affine_fit_of(in,out);
+   end; -- train
+
+end; -- class AFFINE_VECTOR_MAP
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class VECTOR_MAP_TEST is
+   -- Test of `VECTOR_MAP', `COMPOSITION_VECTOR_MAP{M1,M2}',
+   -- `PRODUCT_VECTOR_MAP{M1,M2}', `SUBSET_VECTOR_MAP', `RANGE_VECTOR_MAP',
+   -- `CONSTANT_VECTOR_MAP', `LEARNED_VECTOR_MAP', `LINEAR_VECTOR_MAP',
+   -- `AFFINE_VECTOR_MAP'.
+
+   TEST;
+
+   main is
+      -- Test of `VECTOR_MAP', `COMPOSITION_VECTOR_MAP{M1,M2}',
+      -- `PRODUCT_VECTOR_MAP{M1,M2}', `SUBSET_VECTOR_MAP', `RANGE_VECTOR_MAP',
+      -- `CONSTANT_VECTOR_MAP', `LEARNED_VECTOR_MAP', `LINEAR_VECTOR_MAP',
+      -- `AFFINE_VECTOR_MAP'.
+      constant_test; range_test; subset_test;
+      composition_test; product_test;
+      linear_test; affine_test;
+   end; -- main
+
+   constant_test is
+      -- Test `CONSTANT_VECTOR_MAP'.
+      class_name("CONSTANT_VECTOR_MAP");
+      STR::precision:=2;
+      c:CONSTANT_VECTOR_MAP:=c.create(1,
+	 VECTOR::create_from_s("(1., 2., 3.)"));
+      v:VECTOR:=VECTOR::create_from_s("(1.)");
+      vo:VECTOR:=VECTOR::create(3);
+      test("map", c.map(v).to_s, "(1.00, 2.00, 3.00)");
+      c.map_in(v,vo);
+      test("map_in", vo.to_s, "(1.00, 2.00, 3.00)");
+      vl:VECTOR_LIST:=vl.create; vl:=vl.push(v); vl:=vl.push(v);
+      vl2:VECTOR_LIST:=c.map_vector_list(vl);
+      test("map_vector_list", vl2.to_s,
+	 "((1.00, 2.00, 3.00), (1.00, 2.00, 3.00))");
+      test("in_dim", c.in_dim.to_s, "1");
+      test("out_dim", c.out_dim.to_s, "3");
+      test("mse", c.mse(vl,vl2).to_s, "0.00");
+      finish;
+   end; -- constant_test
+
+   range_test is
+      -- Test `RANGE_VECTOR_MAP'.
+      class_name("RANGE_VECTOR_MAP");
+      STR::precision:=2;
+      c:RANGE_VECTOR_MAP:=c.create(4, 1, 2);
+      v:VECTOR:=VECTOR::create_from_s("(1.,2.,3.,4.)");
+      vo:VECTOR:=VECTOR::create(2);
+      test("map", c.map(v).to_s, "(2.00, 3.00)");
+      c.map_in(v,vo);
+      test("map_in", vo.to_s, "(2.00, 3.00)");
+      vl:VECTOR_LIST:=vl.create; vl:=vl.push(v); vl:=vl.push(v);
+      vl2:VECTOR_LIST:=c.map_vector_list(vl);
+      test("map_vector_list", vl2.to_s,
+	 "((2.00, 3.00), (2.00, 3.00))");
+      test("in_dim", c.in_dim.to_s, "4");
+      test("out_dim", c.out_dim.to_s, "2");
+      test("mse", c.mse(vl,vl2).to_s, "0.00");
+      finish;
+   end; -- range_test
+
+   subset_test is
+      -- Test `SUBSET_VECTOR_MAP'.
+      class_name("SUBSET_VECTOR_MAP");
+      STR::precision:=2;
+      p:LIST{INT}:=p.create; p:=p.push(2); p:=p.push(1); p:=p.push(1); 
+      c:SUBSET_VECTOR_MAP:=c.create(4, p);
+      v:VECTOR:=VECTOR::create_from_s("(1.,2.,3.,4.)");
+      vo:VECTOR:=VECTOR::create(3);
+      test("map", c.map(v).to_s, "(3.00, 2.00, 2.00)");
+      c.map_in(v,vo);
+      test("map_in", vo.to_s, "(3.00, 2.00, 2.00)");
+      vl:VECTOR_LIST:=vl.create; vl:=vl.push(v); vl:=vl.push(v);
+      vl2:VECTOR_LIST:=c.map_vector_list(vl);
+      test("map_vector_list", vl2.to_s,
+	 "((3.00, 2.00, 2.00), (3.00, 2.00, 2.00))");
+      test("in_dim", c.in_dim.to_s, "4");
+      test("out_dim", c.out_dim.to_s, "3");
+      test("mse", c.mse(vl,vl2).to_s, "0.00");
+      finish;
+   end; -- subset_test
+   
+   composition_test is
+      -- Test of `COMPOSITION_VECTOR_MAP{RANGE_VECTOR_MAP,
+      -- CONSTANT_VECTOR_MAP}'.
+      class_name("COMPOSITION_VECTOR_MAP");
+      STR::precision:=2;
+      rm:RANGE_VECTOR_MAP:=rm.create(3, 1, 2);
+      cm:CONSTANT_VECTOR_MAP:=cm.create(1,
+	 VECTOR::create_from_s("(1., 2., 3.)"));
+      c:COMPOSITION_VECTOR_MAP{RANGE_VECTOR_MAP, CONSTANT_VECTOR_MAP};
+      c:=c.create(rm,cm);
+      v:VECTOR:=VECTOR::create_from_s("(1.)");
+      vo:VECTOR:=VECTOR::create(2);
+      test("map", c.map(v).to_s, "(2.00, 3.00)");
+      c.map_in(v,vo);
+      test("map_in", vo.to_s, "(2.00, 3.00)");
+      vl:VECTOR_LIST:=vl.create; vl:=vl.push(v); vl:=vl.push(v);
+      vl2:VECTOR_LIST:=c.map_vector_list(vl);
+      test("map_vector_list", vl2.to_s,
+	 "((2.00, 3.00), (2.00, 3.00))");
+      test("in_dim", c.in_dim.to_s, "1");
+      test("out_dim", c.out_dim.to_s, "2");
+      test("mse", c.mse(vl,vl2).to_s, "0.00");
+      finish;
+   end; -- composition_test
+
+   product_test is
+      -- Test of `PRODUCT_VECTOR_MAP{RANGE_VECTOR_MAP,
+      -- CONSTANT_VECTOR_MAP}'.
+      class_name("PRODUCT_VECTOR_MAP");
+      STR::precision:=2;
+      rm:RANGE_VECTOR_MAP:=rm.create(3, 1, 2);
+      cm:CONSTANT_VECTOR_MAP:=cm.create(1,
+	 VECTOR::create_from_s("(1., 2., 3.)"));
+      c:PRODUCT_VECTOR_MAP{RANGE_VECTOR_MAP, CONSTANT_VECTOR_MAP};
+      c:=c.create(rm,cm);
+      v:VECTOR:=VECTOR::create_from_s("(1.,2.,3.,4.)");
+      vo:VECTOR:=VECTOR::create(5);
+      test("map", c.map(v).to_s, "(2.00, 3.00, 1.00, 2.00, 3.00)");
+      c.map_in(v,vo);
+      test("map_in", vo.to_s, "(2.00, 3.00, 1.00, 2.00, 3.00)");
+      vl:VECTOR_LIST:=vl.create; vl:=vl.push(v); vl:=vl.push(v);
+      vl2:VECTOR_LIST:=c.map_vector_list(vl);
+      test("map_vector_list", vl2.to_s,
+	 "((2.00, 3.00, 1.00, 2.00, 3.00), (2.00, 3.00, 1.00, 2.00, 3.00))");
+      test("in_dim", c.in_dim.to_s, "4");
+      test("out_dim", c.out_dim.to_s, "5");
+      test("mse", c.mse(vl,vl2).to_s, "0.00");
+      finish;
+   end; -- product_test
+
+   linear_test is
+      -- Test of "LINEAR_VECTOR_MAP".
+      class_name("LINEAR_VECTOR_MAP");
+      m:MATRIX:=MATRIX::create_from_s("((1.,2.,3.),(4.,5.,6.))");
+      c:LINEAR_VECTOR_MAP:=c.create_with_matrix(m);
+      v:VECTOR:=VECTOR::create_from_s("(1.,1.,1.)");
+      vo:VECTOR:=VECTOR::create(2);
+      test("map", c.map(v).to_s, "(6.00, 15.00)");
+      c.map_in(v,vo);
+      test("map_in", vo.to_s, "(6.00, 15.00)");
+      vl:VECTOR_LIST:=vl.create; vl:=vl.push(v); vl:=vl.push(v);
+      vl2:VECTOR_LIST:=c.map_vector_list(vl);
+      test("map_vector_list", vl2.to_s, "((6.00, 15.00), (6.00, 15.00))");
+      test("in_dim", c.in_dim.to_s, "3");
+      test("out_dim", c.out_dim.to_s, "2");
+      test("mse", c.mse(vl,vl2).to_s, "0.00");
+      vt:VECTOR_LIST:=vt.create;
+      vt:=vt.push(VECTOR::create_from_s("(0.,1.,2.)"));
+      vt:=vt.push(VECTOR::create_from_s("(1.,1.,4.)"));
+      vt:=vt.push(VECTOR::create_from_s("(1.,0.,0.)"));
+      vt:=vt.push(VECTOR::create_from_s("(8.,9.,7.)"));
+      vto:VECTOR_LIST:=c.map_vector_list(vt);
+      c2:LINEAR_VECTOR_MAP:=c.create(3,2);
+      c2.train(vt,vto);
+      test("mse", c2.mse(vt,vto).to_s, "0.00");
+      finish;
+   end; -- linear_test
+
+   affine_test is
+      -- Test of "AFFINE_VECTOR_MAP".
+      class_name("AFFINE_VECTOR_MAP");
+      m:MATRIX:=MATRIX::create_from_s("((1.,2.,3.),(4.,5.,6.))");
+      c:AFFINE_VECTOR_MAP:=c.create_with_matrix(m);
+      v:VECTOR:=VECTOR::create_from_s("(1.,1.)");
+      vo:VECTOR:=VECTOR::create(2);
+      test("map", c.map(v).to_s, "(6.00, 15.00)");
+      c.map_in(v,vo);
+      test("map_in", vo.to_s, "(6.00, 15.00)");
+      vl:VECTOR_LIST:=vl.create; vl:=vl.push(v); vl:=vl.push(v);
+      vl2:VECTOR_LIST:=c.map_vector_list(vl);
+      test("map_vector_list", vl2.to_s, "((6.00, 15.00), (6.00, 15.00))");
+      test("in_dim", c.in_dim.to_s, "2");
+      test("out_dim", c.out_dim.to_s, "2");
+      test("mse", c.mse(vl,vl2).to_s, "0.00");
+      vt:VECTOR_LIST:=vt.create;
+      vt:=vt.push(VECTOR::create_from_s("(0.,1.)"));
+      vt:=vt.push(VECTOR::create_from_s("(1.,1.)"));
+      vt:=vt.push(VECTOR::create_from_s("(1.,0.)"));
+      vt:=vt.push(VECTOR::create_from_s("(8.,9.)"));
+      vto:VECTOR_LIST:=c.map_vector_list(vt);
+      c2:AFFINE_VECTOR_MAP:=c2.create(2,2);
+      c2.train(vt,vto);
+      test("mse", c2.mse(vt,vto).to_s, "0.00");
+      finish;
+   end; -- affine_test
+
+end; -- class VECTOR_MAP_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

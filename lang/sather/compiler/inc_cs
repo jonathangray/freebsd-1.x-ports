@@ -1,0 +1,105 @@
+
+Notes on incremental compilation:
+---------------------------------
+
+C files need to be generated for Sather class S when:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Notation: A function f' refers to the mapping in previous compilation,
+while f'' refers to the mapping in current compilation.  The first
+section keeps track of information that is needed.  (**) denotes more
+refined analysis.
+
+
+Requirements:
+-------------
+
+(a) FS=Set of generated C file names.
+
+(b) Mapping f1 :  f1(S) -> Z    S=Sather class, Z=Integer 
+f1 keeps track of the mapping in previous compilation.
+
+(c) Mapping f2 :  f2(S) -> F    S=Sather class, F=File
+f2 keeps track of the file in which the definition of a Sather class
+(parametrized or not) is found.
+
+(d) Mapping f3 :  f3(F) -> T    F=File, T=Time
+f3 keeps track of the time a file is last updated (in previous 
+compilation).
+
+(e) Mapping f4 :  f4(S) -> Tp   S=Sather class, Tp=C type
+f4 keeps track of the C type of a Sather class.
+
+======================================================================
+
+(1)  S is a new class instance (parametrized or not).
+S is a new class instance iff index(S) did not appear in previous
+compilation, that is f''(S) \= f'(S1) for all S1 in previous
+compilation.
+
+(2)  Sather class S (parametrized or not) exists in previous
+compilation.  But S may have been updated if file F in which S is
+defined is updated.
+NOTE:  If S is parametrized, then file F contains the definition
+of S.
+
+(3)  If cases (1) and (2) do not hold, then class S exists in previous
+compilation and file F containing definition of S has the same time of
+update as in previous compilation.  Then we have to consider the
+relation of S with the other classes.
+
+----------------------------------------------------------------------
+Mark "tbg" ("to_be_generated") a Sather class S if the C file for S
+needs to be regenerated.
+
+(a) S is marked "tbg" if S is in categories (1) or (2).
+(**) 
+If S contains only attributes (ie no routines/shareds/constants), if
+the list of attributes/constants/shareds are the same (in terms of
+<name, C type>), then S does not need to be regenerated.  Otherwise,
+if S has at least one routine or shared or constant, there is no way
+to tell if one of the routines has been changed (with current amount
+of information), so the compiler has to make a conservative guess.
+The problem with shared/constant feature is that the initialization
+expression may have changed.  The analysis can be extended to
+non-initialized shared feature.
+
+Alternatively, if S contains the same list of features (whether
+attribute, routine, shared or constant), (in terms of <name, C type>),
+the compiler can go into an interactive mode to query the user about
+the status of a class definition.
+
+
+
+
+(b) If S is in category (3), we consider the following possibilities:
+
+-- If S inherits from S' (marked "tbg"), then S is marked "tbg".
+(**)
+If S redefines all the routines in S', and S''s attribute / constant /
+shared features have not changed from previous compilation, then we
+avoid marking S "tbg".
+
+-- If all (direct) parents of S are not marked "tbg", then S can be
+related to another Sather class S' (marked "tbg") in the following
+way:
+
+a)  S' exists only as the type of one of the attributes / constants /
+shareds.  If the C type of S' is the same as in previous compilation,
+then S is not marked.
+
+b)  
+
+
+
+(3)  Delete old C files
+
+
+
+
+
+Data structure
+--------------
+
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+

@@ -1,0 +1,446 @@
+-- -*- Mode: Sather;  -*-
+-- File: sather/lib/data_structure/str_hash.sa
+-- Author: Stephen M. Omohundro (om@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Extendible hash tables for representing sets of strings
+--*           and mappings from sets of string keys to objects of a
+--*           specified type.
+--*
+--* CLASSES:  STR_HASH_MAP_ELT{T}, STR_HASH_MAP{T}, STR_HASH_MAP_CURSOR{T},
+--*           STR_HASH_SET_ELT, STR_HASH_SET, STR_HASH_SET_CURSOR,
+--*           STR_HASH_TEST
+--* 
+--* REQUIRED FILES: ./genrl_hash.sa, ../base/test.sa
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: str_hash.sa,v 1.1 1994/02/12 03:23:26 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:34 1993 (hws)
+--*  Oct 17 06:34 1993 (hws): Sather 1 syntax, copyright note
+--*  May 26 15:20 1991 (hws): adapt CURSOR classes to standard cursor
+--*                           protocol
+--* Created: Fri May  3 12:04:13 1991 (om)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- To implement sets of strings use `STR_HASH_SET' and `STR_HASH_CURSOR'. 
+-- To implement maps from strings to `INT''s or objects of other types,
+-- use `STR_HASH_MAP{T}' and `STR_HASH_MAP_CURSOR{T}'.
+   
+class STR_HASH_MAP_ELT{T} is
+   -- This class is used in implementing `STR_HASH_MAP{T}' and will not
+   -- be directly useful to most people.
+   -- `STR_HASH_MAP{T}' is implemented using `GENERAL_HASH{T}'. This
+   -- class defines an object which packages up a string and an associated
+   -- object.
+
+   attr str: STR;			-- The string.
+   attr hash: INT;			-- The `INT' hash value of `str'.
+   attr val: T;			-- The entity associated with `str'.
+   
+   create(str: STR; val: T): SAME is
+      -- A new object that associates `val' with `str'.
+      res := SAME::new; res.str := str; res.val := val; res.set_hash;
+   end; -- create
+
+   set_hash is
+      -- Set `hash' to be the hash value corresponding to `str'.
+      hash := str.hash;
+   end; -- set_hash
+   
+   is_equal(e: STR_HASH_MAP_ELT{T}): BOOL is
+      -- True if `self' and `e' have the same string.
+      if e.hash = hash then res := str.is_equal(e.str) end;
+   end; -- is_equal
+   
+end; -- class STR_HASH_MAP_ELT{T}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class STR_HASH_MAP{T} is
+   -- Hash tables which associate entities of type `T' to strings.
+   
+   attr tbl: GENERAL_HASH{STR_HASH_MAP_ELT{T}}; -- The table.
+   attr tmp: STR_HASH_MAP_ELT{T};	-- A temporary element for queries.
+   
+   create: SAME is
+      -- An empty mapping.
+      res := SAME::new;
+      res.tbl := res.tbl.create;
+      res.tmp := res.tmp.new;
+   end; -- create
+
+   size: INT is
+      -- Number of strings in the map.
+      res := tbl.size
+   end; -- size
+   
+   get(s: STR): T is
+      -- The entry associated with `s' or `void' if absent.
+      tmp.str := s; tmp.set_hash;
+      te: STR_HASH_MAP_ELT{T} := tbl.get(tmp);
+      if te /= void then res := te.val end;
+   end; -- get
+
+   test(s: STR): BOOL is
+      -- True if `s' is stored in the table.
+      tmp.str := s; tmp.set_hash;
+      te: STR_HASH_MAP_ELT{T} := tbl.get(tmp);
+      if te /= void then res := true end;
+   end; -- get
+   
+   insert(s: STR; v: T) is
+      -- Map `s' into `v', overwriting if there is a previous value.
+      tbl.insert(STR_HASH_MAP_ELT{T}::create(s,v))
+   end; -- insert
+   
+   delete(s: STR) is
+      -- Delete `s' if present.
+      tmp.str := s; tmp.set_hash;
+      tbl.delete(tmp);
+   end; -- delete
+   
+   clear is			
+      -- Clear the table.
+      tbl.clear;
+   end; -- clear
+
+   cursor: STR_HASH_MAP_CURSOR{T} is
+      -- A cursor into the table.
+      -- res := STR_HASH_MAP_CURSOR{T}::create(self);
+      res := res.create(self);
+   end; -- cursor
+
+   is_empty: BOOL is
+      -- True if map is empty.
+      res := tbl.is_empty;
+   end; -- is_empty
+   
+end; -- class STR_HASH_MAP{T}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class STR_HASH_MAP_CURSOR{T} is
+   -- A cursor into `STR_HASH_MAP{T}' tables for stepping through all
+   -- entries.
+   
+   attr cursor: GENERAL_HASH_CURSOR{STR_HASH_MAP_ELT{T}}; -- The cursor.
+   
+   create(m: STR_HASH_MAP{T}): SAME is
+      -- A cursor into `m' which is initialized to the first element.
+      res := SAME::new;
+      res.cursor := GENERAL_HASH_CURSOR{STR_HASH_MAP_ELT{T}}::create(m.tbl);
+   end; -- create
+
+   is_done: BOOL is
+      -- True if all entries have been visited.
+      res := cursor.is_done;
+   end; -- is_done
+   
+   first: T is
+      -- Set the cursor to the first location, if any.
+      cursor.first;
+      res := item;
+   end; -- first
+
+   key: STR is
+      -- The current key string.
+      if not cursor.is_done then
+	 res := cursor.item.str;
+      end; -- if
+   end; -- key
+
+   item: T is
+      -- The item assoicated with the current string.
+      if not cursor.is_done then
+	 res := cursor.item.val;
+      end; -- if
+   end; -- item
+
+   next: T is
+      -- Move the cursor to the next location
+      cursor.next;
+      res := item;
+   end; -- next
+   
+end; -- class STR_HASH_MAP_CURSOR{T}
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class STR_HASH_SET_ELT is
+   -- This class is used in the implementation of `STR_HASH_SET' and
+   -- will not be directly useful to most people.
+   -- `STR_HASH_SET' is implemented using `GENERAL_HASH{T}'. This
+   -- class defines an object which packages up a string with its hash value.
+
+   attr str: STR;			-- The string.
+   attr hash: INT;			-- The `INT' hash value of `str'.
+   
+   create(str: STR): SAME is
+      -- A new object holding `nst'.
+      res := SAME::new; res.str := str; res.set_hash;
+   end; -- create
+
+   set_hash is
+      -- Set `hash' to be the hash value corresponding to `str'.
+      hash := str.hash;
+   end; -- set_hash
+
+   is_equal(e: STR_HASH_SET_ELT): BOOL is
+      -- True if `self' and `e' have the same string.
+      if e.hash = hash then res := str.is_equal(e.str) end;
+   end; -- is_equal
+   
+end; -- class STR_HASH_SET_ELT
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class STR_HASH_SET is
+   -- Sets of strings represented by extendible hash tables. 
+   attr tbl: GENERAL_HASH{STR_HASH_SET_ELT}; -- The table.
+   attr tmp: STR_HASH_SET_ELT;	-- A temporary element for queries.
+
+   create: SAME is
+      -- An empty set of strings.
+      res := SAME::new;
+      res.tbl := res.tbl.create;
+      res.tmp := res.tmp.new;
+   end; -- create
+
+   size: INT is
+      -- Number of strings in the set.
+      res := tbl.size;
+   end; -- size
+
+   test(s: STR): BOOL is
+      -- True if `s' is in the set.
+      tmp.str := s; tmp.set_hash;
+      te: STR_HASH_SET_ELT := tbl.get(tmp);
+      if te /= void then res := true end;
+   end; -- get
+
+   insert(s: STR) is
+      -- Insert `s' into the set.
+      tbl.insert(STR_HASH_SET_ELT::create(s));
+   end; -- insert
+
+   delete(s: STR) is
+      -- Delete `s' if present.
+      tmp.str := s; tmp.set_hash;
+      tbl.delete(tmp);
+   end; -- delete
+
+   clear is			
+      -- Clear the table.
+      tbl.clear;
+   end; -- clear
+
+   cursor: STR_HASH_SET_CURSOR is
+      -- A cursor into the table.
+      res := STR_HASH_SET_CURSOR::create(self);
+   end; -- cursor
+   
+   is_empty: BOOL is
+      -- True if map is empty.
+      res := tbl.is_empty;
+   end; -- is_empty
+
+   union(s: STR_HASH_SET): STR_HASH_SET is
+      -- A new set of strings which is the union of `self' and `s'.
+      res := new; res.tmp := res.tmp.new;
+      res.tbl := tbl.union(s.tbl);
+   end; -- union
+   
+   intersection(s: STR_HASH_SET): STR_HASH_SET is
+      -- A new set of strings which is the intersection of `self' and `s'.
+      res := new; res.tmp := res.tmp.new;
+      res.tbl := tbl.intersection(s.tbl);
+   end; -- intersection
+
+   difference(s: STR_HASH_SET): STR_HASH_SET is
+      -- A new set of strings which is the difference of `self' and `s'.
+      res := new; res.tmp := res.tmp.new;
+      res.tbl := tbl.difference(s.tbl);
+   end; -- difference 
+   
+   sym_difference(s: STR_HASH_SET): STR_HASH_SET is
+      -- A new set of strings which is the symmetric difference of
+      -- `self' and `s'.
+      res := new; res.tmp := res.tmp.new;
+      res.tbl := tbl.sym_difference(s.tbl);
+   end; -- sym_difference
+   
+   is_a_subset_of(s: STR_HASH_SET): BOOL is
+      -- True if the strings in `self' are a subset of those in `s'.
+      res := tbl.is_a_subset_of(s.tbl);
+   end; -- is_a_subset_of
+   
+end; -- class STR_HASH_SET
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class STR_HASH_SET_CURSOR is
+   -- A cursor into `STR_HASH_SET' tables for stepping through all
+   -- entries.
+   
+   attr cursor: GENERAL_HASH_CURSOR{STR_HASH_SET_ELT}; -- The cursor.
+   
+   create(s: STR_HASH_SET): SAME is
+      -- A cursor into `s' which is initialized to the first element.
+      res := SAME::new;
+      res.cursor := GENERAL_HASH_CURSOR{STR_HASH_SET_ELT}::create(s.tbl);
+   end; -- create
+
+   is_done: BOOL is
+      -- True if all entries have been visited.
+      res := cursor.is_done;
+   end; -- is_done
+   
+   first: STR is
+      -- Set the cursor to the first location, if any.
+      cursor.first;
+      res := item;
+   end; -- first
+
+   item: STR is
+      -- The current key string.
+      if not cursor.is_done then
+	 res := cursor.item.str;
+      end; -- if
+   end; -- key
+
+   next: STR is
+      -- Move the cursor to the next location
+      cursor.next;
+      res := item;
+   end; -- next
+
+end; -- class STR_HASH_SET_CURSOR
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class STRH_TEST is
+   -- Test of `STR_HASH_MAP_ELT{T}', `STR_HASH_MAP{T}',
+   -- `STR_HASH_MAP_CURSOR{T}', `STR_HASH_SET_ELT', `STR_HASH_SET',
+   -- `STR_HASH_SET_CURSOR', `GENERAL_HASH{T}', and `GENERAL_HASH_CURSOR{T}'.
+   TEST;
+
+   main is
+      -- Test of `STR_HASH_MAP_ELT{T}', `STR_HASH_MAP{T}',
+      -- `STR_HASH_MAP_CURSOR{T}', `STR_HASH_SET_ELT', `STR_HASH_SET',
+      -- `STR_HASH_SET_CURSOR', `GENERAL_HASH{T}',
+      -- and `GENERAL_HASH_CURSOR{T}'.
+      str_hash_map_test;
+      str_hash_set_test;
+   end; -- main
+
+   str_hash_map_test is
+      -- Test of classes related to `STR_HASH_MAP{INT}'.
+      class_name("STR_HASH_MAP{INT}");
+      m: STR_HASH_MAP{INT} := STR_HASH_MAP{INT}::create;
+      m.insert("one",1); m.insert("two",2); m.insert("three",3);
+      m.insert("four",4); m.insert("five",5); m.insert("six",6);
+      m.insert("seven",7); m.insert("eight",8); m.insert("nine",9);
+      m.insert("ten",10); m.insert("eleven",11); m.insert("twelve",12);
+      test("initial map", str_of_map(m)
+	    , "six:6, five:5, two:2, one:1, ten:10, seven:7, eleven:11, eight:8, nine:9, twelve:12, three:3, four:4");
+      test("size", m.size.to_s, "12");
+      test("get 1", m.get("four").to_s, "4");
+      test("get 2", m.get("thirteen").to_s, "0");
+      test("test 1", m.test("four").to_s, "T");
+      test("test 2", m.test("thirteen").to_s, "F");
+      m.insert("thirteen", 13);
+      test("insert", m.get("thirteen").to_s, "13");
+      m.delete("seven");
+      test("delete", m.get("seven").to_s, "0");
+      test("current map", str_of_map(m)
+	    ,"six:6, five:5, two:2, one:1, ten:10, eleven:11, eight:8, nine:9, twelve:12, thirteen:13, three:3, four:4");
+      m.clear;
+      test("clear", str_of_map(m), "");
+      test("is_empty", m.is_empty.to_s, "T");
+      finish;
+   end; -- str_hash_map_test
+
+   str_of_map(s: STR_HASH_MAP{INT}): STR is
+      -- A string containing the elements of `s' separated by commas.
+      -- Of the form `"one:1, two:2"'.
+      res := STR::create;
+      c: STR_HASH_MAP_CURSOR{INT} := s.cursor;
+      loop until!(c.is_done);
+	 res := res.s(c.key).s(":").i(c.item);
+	 c.next;
+	 if not c.is_done then res := res.s(", ") end;
+      end; -- loop
+   end; -- str_of_map
+   
+   str_hash_set_test is
+      -- Test of classes related to `STR_HASH_SET'.
+      class_name("STR_HASH_SET");
+      m: STR_HASH_SET := STR_HASH_SET::create;
+      m.insert("one"); m.insert("two"); m.insert("three");
+      m.insert("four"); m.insert("five"); m.insert("six");
+      m.insert("seven"); m.insert("eight"); m.insert("nine");
+      m.insert("ten"); m.insert("eleven"); m.insert("twelve");
+      test("initial set",str_of_set(m) 
+	    ,"six, five, two, one, ten, seven, eleven, eight, nine, twelve, three, four");
+      test("size", m.size.to_s, "12");
+      test("get 1", m.test("four").to_s, "T");
+      test("get 2", m.test("thirteen").to_s, "F");
+      m.insert("thirteen");
+      test("insert", m.test("thirteen").to_s, "T");
+      m.delete("seven");
+      test("delete", m.test("seven").to_s, "F");
+      test("current set",str_of_set(m) 
+	    ,"six, five, two, one, ten, eleven, eight, nine, twelve, thirteen, three, four");
+      m.clear;
+      test("clear", str_of_set(m), "");
+      test("is_empty", m.is_empty.to_s, "T");
+      s1: STR_HASH_SET := STR_HASH_SET::create;
+      s2: STR_HASH_SET := STR_HASH_SET::create;
+      s1.insert("a"); s1.insert("b"); s1.insert("c");
+      s1.insert("d"); s1.insert("e"); s1.insert("f");
+      s2.insert("d"); s2.insert("e"); s2.insert("f");
+      s2.insert("g"); s2.insert("h"); s2.insert("i");
+      test("s1", str_of_set(s1), "a, b, c, d, e, f");
+      test("s2", str_of_set(s2), "d, e, f, g, h, i");
+      test("union", str_of_set(s1.union(s2))
+	    ,"a, b, c, d, e, f, g, h, i");
+      test("intersection", str_of_set(s1.intersection(s2))
+	    ,"d, e, f");
+      test("difference", str_of_set(s1.difference(s2))
+	    ,"a, b, c");
+      test("sym_difference", str_of_set(s1.sym_difference(s2))
+	    ,"a, b, c, g, h, i");
+      test("is_a_subset_of 1", s1.is_a_subset_of(s2).to_s, "F");
+      test("is_a_subset_of 2",
+	 s1.intersection(s2).is_a_subset_of(s2).to_s, "T");
+      finish;
+   end; -- str_hash_set_test
+
+   str_of_set(s: STR_HASH_SET): STR is
+      -- A string containing the elements of `s' separated by commas.
+      -- Of the form `"one, two"'.
+      res := STR::create;
+      c: STR_HASH_SET_CURSOR := s.cursor;
+      loop until!(c.is_done);
+	 res := res.s(c.item);
+	 c.next;
+	 if not c.is_done then res := res.s(", ") end;
+      end; -- loop
+   end; -- str_of_map
+   
+end; -- class STRH_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

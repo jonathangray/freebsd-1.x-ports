@@ -1,0 +1,283 @@
+-- File: inc_compile.sa
+-- Author: Chu-Cheow Lim
+-- Created: Tue Jan 15 11:06:48 1991
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION:
+--* 
+--* CLASSES:
+--*
+--* RELATED PACKAGES:
+--*
+--* RCS: $Id: inc_compile.sa,v 1.1 1994/02/12 03:21:52 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 04:46 1993 (hws)
+--*  Oct 17 04:45 1993 (hws): Sather 1 syntax, copyright note
+--*  Mar  1 18:44 1993 (hws): don't show "previous compilation" msg with -ncs
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class OLDNEW_HANDLER is
+   -- This class contains definitions of routines which manages the 
+   -- classes with respect to the previous compilation.
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   install_new_classob_s(loc:INT; k:LSTINT_KEY; co:CLASSOB_S) is
+      if (COMPILER_OPTIONS::new_compilation) then
+--	 OUT::s("New compilation :");
+	 if (loc > 0) then
+	    (GLOBALS::class_inst).add_unique_obj_at(k, co, loc);
+	 else
+	    -- If it is a new compilation, then try to assign the same
+	    -- class index for CLASSOB_S with the same string name.
+	    prev_ind:INT := (GLOBALS::class_stat_tbl).get_ind(co.full_name);
+	    if (prev_ind > 0) then
+	       (GLOBALS::class_inst).add_unique_obj_at(k, co, prev_ind);
+	    else
+	       (GLOBALS::class_inst).add_unique_obj(k, co);
+	    end; -- if
+	 end; -- if
+      else
+	 -- Install the class according to the number assigned in previous
+	 -- compilation.
+	 prev_ind:INT := (GLOBALS::class_stat_tbl).get_ind(co.full_name);
+--	 OUT::s("Incremental compilation :Prev. index = ").
+--	      i(prev_ind).c('\n');
+	 
+	 if (loc > 0) then
+	    if (prev_ind > 0) then
+	       if (prev_ind /= loc) then
+		  ERR::s("Warning: Numbering of predefined class \"").
+		       s(co.full_name).
+	               s("\" has changed from ").
+	               i(prev_ind).
+	               s(" to ").
+	               i(loc).
+	               c('\n');
+	       end; -- if
+	    end; -- if
+	    (GLOBALS::class_inst).add_unique_obj_at(k, co, loc);
+	 else
+	    if (prev_ind > 0) then
+	       -- This class C1 has a previously used index; we want to
+	       -- reuse the same index.  But first we must check if 
+	       -- another class C2 has used the index.  If so, we must
+	       -- move C2 to a different location.  (All these are handled
+	       -- automatically by CLASSOB_S_TABLE).
+	       (GLOBALS::class_inst).add_unique_obj_at(k, co, prev_ind);
+	    else
+	       -- At this point, the class C1 has no index from previous
+	       -- compilation.  Hence, it can be inserted into the
+	       -- CLASSOB_S_TABLE at any location.
+	       (GLOBALS::class_inst).add_unique_obj(k, co);
+	    end; -- if
+	 end; -- if
+      end; -- if
+   end; -- install_new_classob_s
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   updated_p(co:CLASSOB_S):BOOL is
+      -- A class is considered updated if either its interface or some
+      -- internals might have changed.
+      res := (co.structure_updated) or (co.internal_updated);
+   end; -- updated_p
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_def_time_stamp(co:CLASSOB_S):TIME_INT is
+      c_stat:CLASS_STAT := (GLOBALS::class_stat_tbl).at_index(co.index);
+      if (c_stat = void) then
+--	 OUT::c('"').
+--	      s(co.full_name).
+--	      s("\" is a new class\n");
+	 return;
+      end; -- if
+      res := c_stat.def_time_stamp;
+   end; -- get_def_time_stamp
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_time_stamp(co:CLASSOB_S):TIME_INT is
+      c_stat:CLASS_STAT := (GLOBALS::class_stat_tbl).at_index(co.index);
+      if (c_stat = void) then
+--	 OUT::c('"').
+--	      s(co.full_name).
+--	      s("\" is a new class\n");
+	 return;
+      end; -- if
+      res := c_stat.time_stamp;
+   end; -- get_time_stamp
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   get_ctype(co:CLASSOB_S):INT is
+      -- Returns the C type of given class object in previous compilation.
+      -- If such a class did not exist, return -1.
+      i:INT := (GLOBALS::class_stat_tbl).map_str_to_int.get(co.full_name);
+      if (i <= 0) then
+	 res := -1;
+      else
+	 c_stat:CLASS_STAT := (GLOBALS::class_stat_tbl).at_index(i);
+	 if (c_stat = void) then
+	    res := -1;
+	 else
+	    res := c_stat.ctype;
+	 end; -- if
+      end; -- if
+   end; -- get_ctype
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   init_class_stat_tbl is
+      -- Create the global variable "class_stat_tbl" from a file whose
+      -- name is computed.
+      fn:STR := STR::create.s(COMPILER_OPTIONS::target_dir).
+                         s(INSTALL_CONSTS::class_stat_file);
+      if (COMPILER_OPTIONS::new_compilation) then
+	 GLOBALS::class_stat_tbl := CLASS_STAT_TBL::alloc_create;
+      else
+	 GLOBALS::class_stat_tbl := CLASS_STAT_TBL::create(fn);
+      end; -- if
+      if (GLOBALS::class_stat_tbl).new_p then
+	 COMPILER_OPTIONS::new_compilation := true;
+      end; -- if
+      
+      -- Check previous compilation.
+      if ((GLOBALS::class_stat_tbl).chk_opt /= COMPILER_OPTIONS::rt_code_check)
+      then
+	 if not COMPILER_OPTIONS::new_compilation then
+	    OUT::s("Previous compilation: -chk is ");
+	    if ((GLOBALS::class_stat_tbl).chk_opt) then
+	       OUT::s(" on\n");
+	    else
+	       OUT::s(" off\n");
+	    end; -- if
+	 end;
+	 OUT::s("Current compilation: -chk is ");
+         if (COMPILER_OPTIONS::rt_code_check) then
+	    OUT::s(" on\n");
+	 else
+	    OUT::s(" off\n");
+	 end; -- if
+	 COMPILER_OPTIONS::new_compilation := true;
+      end; -- if
+      if ((GLOBALS::class_stat_tbl).bro_opt /= 
+	 (COMPILER_OPTIONS::compiler_mode = COMPILER_OPTIONS::browser_mode)) then
+	 COMPILER_OPTIONS::new_compilation := true;
+      end; -- if
+      if ((GLOBALS::class_stat_tbl).all_opt /= COMPILER_OPTIONS::gen_all) then
+	 COMPILER_OPTIONS::new_compilation := true;
+      end; -- if
+      if ((GLOBALS::class_stat_tbl).gen_opt /= COMPILER_OPTIONS::gen_base) then
+	 COMPILER_OPTIONS::new_compilation := true;
+      end; -- if
+      if ((GLOBALS::class_stat_tbl).ver_opt /= COMPILER_OPTIONS::verbose_code) 
+      then
+	 COMPILER_OPTIONS::new_compilation := true;
+      end; -- if
+      if (GLOBALS::class_stat_tbl).prev_target_dir /= void then
+	 if not ((GLOBALS::class_stat_tbl).prev_target_dir).is_equal(
+	    COMPILER_OPTIONS::target_dir) then
+	    COMPILER_OPTIONS::new_compilation := true;
+	 end; -- if
+      end; -- if
+
+      -- Check commands from previous compilation.
+      if ((GLOBALS::class_stat_tbl).sather_home /= void) and
+	 (COMPILER_OPTIONS::sather_home /= void) then
+	 -- If it's already a new compilation, let it stay so.
+	 if not (COMPILER_OPTIONS::new_compilation) then
+	    COMPILER_OPTIONS::new_compilation := not ((GLOBALS::class_stat_tbl).sather_home.is_equal(COMPILER_OPTIONS::sather_home)); 
+	 end; -- if
+      else
+	 COMPILER_OPTIONS::new_compilation := true;
+      end; -- if
+      
+      if (GLOBALS::cc_flags /= void) then
+	 if ((GLOBALS::class_stat_tbl).cc_flags /= void) then
+	    i:INT := 0;
+	    sz:INT := (GLOBALS::cc_flags).asize;
+	    loop until!(i >= sz);
+	       if not (GLOBALS::class_stat_tbl).cc_flags.
+		                                get((GLOBALS::cc_flags)[i]) then
+		  COMPILER_OPTIONS::new_compilation := true;
+		  break!;
+	       end; -- if
+	       i := i + 1;
+	    end; -- loop
+	 else
+	    COMPILER_OPTIONS::new_compilation := true;
+	 end; -- if
+      else
+	 if ((GLOBALS::class_stat_tbl).cc_flags /= void) then
+	    if ((GLOBALS::class_stat_tbl).cc_flags.size /= 0) then
+	       COMPILER_OPTIONS::new_compilation := true;
+	    end; -- if
+	 end; -- if
+      end; -- if
+   end; -- init_class_stat_tbl
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   adjust_tables is
+      if ((GLOBALS::class_stat_tbl).last_class_ind /= 0) then
+	 (GLOBALS::class_inst).expand((GLOBALS::class_stat_tbl).last_class_ind + 1);
+      end; -- if
+   end; -- adjust_tables
+   
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   store_class_stat_tbl is
+      fn:STR := STR::create.s(COMPILER_OPTIONS::target_dir).
+                         s(INSTALL_CONSTS::class_stat_file);
+      if (GLOBALS::class_stat_tbl = void) then
+	 ERR::s("NOTE: No class status information stored\n");
+      end; -- if
+      (GLOBALS::class_stat_tbl).record_curr_compilation;
+      
+      -- Store compiler options used in prevoius compilation.
+      (GLOBALS::class_stat_tbl).chk_opt := COMPILER_OPTIONS::rt_code_check;
+      (GLOBALS::class_stat_tbl).bro_opt := 
+          (COMPILER_OPTIONS::compiler_mode = COMPILER_OPTIONS::browser_mode);
+      (GLOBALS::class_stat_tbl).all_opt := COMPILER_OPTIONS::gen_all;
+      (GLOBALS::class_stat_tbl).gen_opt := COMPILER_OPTIONS::gen_base;
+      (GLOBALS::class_stat_tbl).ver_opt := COMPILER_OPTIONS::verbose_code;
+      (GLOBALS::class_stat_tbl).prev_target_dir := COMPILER_OPTIONS::target_dir;
+      
+      (GLOBALS::class_stat_tbl).persist(fn);
+   end; -- store_class_stat_tbl
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   store_name_ind_map is
+      -- We have to store this mapping in order to keep the use of 
+      -- integers as names consistent, especially since these integers 
+      -- are used in dispatching.
+      fn:STR := STR::create.s(COMPILER_OPTIONS::target_dir).
+                         s(INSTALL_CONSTS::name_ind_file);
+      f:STR_TAB_FILE := STR_TAB_FILE::new;
+      f.open_for_write(fn);
+      if (f.error /= 0) then
+	 ERR_INFO::compiler_error_msg("OLDNEW_HANDLER",
+	    "Compiler error (code 2) in incremental compilation information; Please report");
+      else
+	 -- NOTE: We record the indices for reserved words
+	 --       and keywords.
+	 i:INT := 1;
+	 sz:INT := (GLOBALS::str_table).next_ind;
+	 loop until!(i >= sz);
+	    f.i(i).c('$').s((GLOBALS::str_table).stable[i]).c('\001');
+	    i := i + 1;
+	 end; -- loop
+	 f.close;
+      end; -- if
+   end; -- store_name_ind_map
+
+end; -- class OLDNEW_HANDLER
+
+--------------------------------------------------------------------
+

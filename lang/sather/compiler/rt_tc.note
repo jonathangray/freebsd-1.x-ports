@@ -1,0 +1,76 @@
+
+Runtime type-checking Problem:
+------------------------------
+
+Example:
+--------
+
+        LIST                 POLYGON
+         |                      |
+        QUEUE                 SQUARE
+
+class POLYGON is
+    ...
+    f:$QUEUE is
+       res := QUEUE::new;
+    end;
+end; -- POLYGON
+
+
+class SQUARE is
+    ...
+    f:$LIST is
+       res := LIST::new;
+    end;
+end; -- SQUARE
+
+
+g:$POLYGON;
+q:$QUEUE;
+
+    g := SQUARE::new;
+    q := g.f; -- (*)
+    q.f1(1); -- (+)
+
+The problem with (*) is that for each assignment in the code, no
+runtime type-checking is necessary.  (In checking types for (*), 
+"g.f" has type $QUEUE (since g has type "$POLYGON"), and "q" has type
+$QUEUE.)  Suppose, "f1" is defined in QUEUE but not LIST, then we get
+an error in calling "q.f1(1)" (at runtime) because q is actually LIST
+during runtime.
+
+Possible solutions:
+-------------------
+
+1)  Check conformance of types for all descendent features with the
+type to be assigned to.  In the above example, we have to check the
+conformance of $QUEUE (returned type of "f" in POLYGON) to $QUEUE
+(type of "q"), and conformance of $LIST (returned type of "f" in
+SQUARE) to $QUEUE (type of "q").  This has to be done for every
+dispatched type and will be costly.  (Currently, we only need to check
+that $LIST (returned type of "f" in SQUARE) conforms to $QUEUE
+(returned type of "f" in POLYGON), and this is only done once.)
+
+2)  Generate runtime type checking for all assignments, calls etc.
+This should be avoided, because it leads to large amount of code.
+
+3)  Current solution is to generate a warning message during
+compilation about possibility of runtime error. *NOT IMPLEMENTED*
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Problem with Execution of Runtime Type-check
+--------------------------------------------
+In file "/usr/local/src/sather/datastr/gen_hash.sa", the constant
+feature "del_key" is declared to be an non-basic object, and assigned
+a dummy value which is non-void (value = 1).  Runtime type-checking
+code is generated when "del_key" is initialized, but because the value
+is non-void, the type-checking code ("TYPECHK_") cannot just test for
+the object being void, but instead we have reserved a range of numbers
+for invalid objects.
+
+In general, the problem is that a C integer declared as a Sather
+object will have runtime type-checking code generated on the integer.
+Hence, even though the program may run correctly without runtime
+type-checking, it will break with runtime type-checking.
+

@@ -1,0 +1,105 @@
+-- -*- Mode: Sather;  -*-
+-- File: timer.sa
+-- Author: Chu-Cheow Lim (clim@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Keeps track of both user and system time of current process.
+--*
+--* CLASSES: TIMER
+--* 
+--* REQUIRED FILES: timer.c
+--*
+--* RCS: $Id: timer.sa,v 1.1 1994/02/12 03:21:50 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 05:17 1993 (hws)
+--*  Oct 17 05:17 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep  5 12:30 1993 (hws): avoid timer_create name clash under OSF/1
+--*  Jun 28 16:58 1992 (hws): fix confusing msg of time_syscall on fork failure.
+--* Created: Mon Dec 10 14:23:38 1990 (clim)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class TIMER is
+   
+   attr u_time,s_time:DOUBLE;	-- User/System time.
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   create:TIMER is
+      -- Create a timer object by calling C routine.
+      res := C::create_timer;
+   end; -- create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   c_timer_create(u_time:DOUBLE;s_time:DOUBLE):TIMER is
+      -- Called from C and given all the appropriate timer values.
+      res := new;
+      res.u_time := u_time;
+      res.s_time := s_time;
+   end; -- c_timer_create
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   time_syscall(com:STR):TIMER is
+      -- Returns the timer object for executing the command.
+      pid:INT := C::fork;
+
+      if (pid = 0) then
+	 -- Child process
+	 status:INT := UNIX::system(com);
+	 if (status.bit_and(0xFF00).rshift(8) = 0xFF) then
+	    ERR_INFO::warning_msg(STR::create.s("*** Shell command \"").
+	    s(com).
+	    s("\" not executed. Reason: ").
+	    i(UNIX::unix_error).s(", cf <errno.h> ***\n\n"));
+	 end; -- if
+	 UNIX::exit(0);
+	 -- We should probably use "exevce" system here, but
+	 -- there is the complication of passing the argument.
+      else
+	 if (pid = -1) then 
+	    -- Parent process gets -1, ie no child process created.
+            -- we don't use subprocess make any longer.
+	 else
+	    -- Parent process gets the child time usage.
+	    res := C::report_timer(pid);
+	 end; -- if
+      end; -- if
+   end; -- time_syscall
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   minus_time(t:TIMER):DOUBLE is
+      -- Time difference wrt another TIMER object.
+      res := (u_time - t.u_time) + (s_time - t.s_time);
+   end; -- diff_total_time
+
+-- ++++++++++++++++++++++++++++++++++++++++++++++++++
+   time_spent:DOUBLE is
+      -- Total time spent is user + system time.
+      if (self /= void) then
+	 res := u_time + s_time;
+      end; -- if
+   end; -- time_spent
+
+end; -- class TIMER
+
+--------------------------------------------------------------------
+   
+class C is
+   -- C support routines.
+   create_timer:TIMER is end;
+   report_timer(pid:INT):TIMER is end;
+   fork:INT is end;
+end; -- class C
+
+--------------------------------------------------------------------
+

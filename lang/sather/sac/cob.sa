@@ -1,0 +1,160 @@
+-- -*- Mode: Sather;  -*-
+-- File: cob.sa
+-- Author: Heinz Schmidt (hws@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1990, 1991
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION:  Primitives for passing objects between Sather and C.
+--*            Strings may be duplicated or passed by reference.
+--* 
+--* CLASSES: COB,CKEY,CHAN,CSTR,CARRAY,CSTRAY
+--* 
+--* RELATED FILES: ccob.sac,ccob.sa,ccob.c,ccob.macros
+--*
+--* HISTORY:
+--* Last edited: Oct  4 09:53 1993 (hws)
+--*  May 29 09:53 1991 (hws): correct documentation
+--*  Feb 20 09:50 1991 (hws): adapted to use the new F_OB type
+--* Created: Thu Oct 18 14:35:06 1990 (hws)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The following 'C classes' are used as types not as classes. They
+-- are descendends of F_OB the type of foreign objects. Some related
+-- functions are contained in ccob.sa (ccob.sac). COB classes reflect a
+-- foreign type hierarchy and DO NOT HAVE ASSOCIATED SATHER INSTANCES.
+-- Instances of type COB and/or subtypes are created and handled entirely
+-- by C functions. Cf. sac/SAC.txt for more details.
+--
+-- The few functions living in these classes wrap small functions
+-- around C functions for readability, or serve to pass Sather objects
+-- to C without interfering with the GC.
+   
+class COB is
+
+   F_OB;
+   
+   -- foreign C objects, the clay that holds foreign C functions together.
+   -- COB is used for modeling a foreign type hierarchy.  Most of the COB
+   -- types inherit directly from COB so that the type-checker can find many
+   -- more illegal uses of foreign C functions than would be possible by
+   -- declaring everything as INT or CHAR.  If COB data is actually INT or
+   -- CHAR, conversion functions can be used. Most of them come with macro
+   -- implementations (cf. cob.macros) to be used in optimized code.
+   -- The macro implmentation do not incur any runtime cost but are actually
+   -- implemented by casting, while the equivalent C function implementations
+   -- of these conversions provide a safe back-up version to be used
+   -- with the debugger/interpreter.
+   
+   -- Temporary passing of Sather data to C requires that there remains
+   -- at least one reference to the Sather object known in Sather.
+   -- An internal table is hidden here in COB for this purpose   
+
+   const c_resources:LIST{$OB} := c_resources.create_sized(256);
+
+   -- INT and COB hierarchy are disjoint.
+   -- id can be used in all COB classes A at the 'characteristic identity'
+   -- id: ALL -> A
+   to_int:INT is res := C::to_int(self) end;
+   from_int(i:INT): SAME is res := C::from_int(i) end;
+   id(ob:$OB): SAME is res := C::to_cob(ob) end;
+      
+end;
+   
+class CSTR is -- foreign C string (char *)
+
+   COB;
+   
+   from_str_(a:STR):SAME is -- ptr to CSTR in STR
+      c_resources.push(a);
+      res := C::str_ptr(a); 
+   end;      
+
+   from_str(a:STR):SAME is -- safe copy of a
+      res := C::to_cstr(a);
+   end;
+   
+   to_str:STR is -- copy of a
+      res := C::to_str(self);
+   end; 
+   
+end;
+   
+class CKEY is -- foreign keys are integer constants
+   -- that are not normally used with integer operations.
+   COB;
+end;
+   
+class CHAN is -- foreign handle (to ptr to relocatable C object)
+   CKEY;
+end;
+
+class CARRAY is -- foreign array of foreign objects
+
+   COB;
+   
+   from_list_(a:LIST{$COB}):SAME is -- convert to C array.
+      c_resources.push(a);
+      res := from_int(C::ob_id(a)+C::ob_base_size(LIST{$COB}::type));
+   end;
+
+   from_list(a:LIST{$COB}):CARRAY is -- convert to C array.
+      l:INT := a.asize;
+      i:INT := 0;
+      res := C::create_carray(l+1);
+      loop until!(i=l);
+	 C::carray_set(res,i,a[i]);
+	 i:=i+1;
+      end;
+	 -- make sure it is null terminated
+      C::carray_set(res,l,from_int(0));
+   end;
+   
+end;
+  
+class CSTRAY is -- foreign C string array (char **)
+
+   CARRAY;
+   
+   strtok(a,b:STR):CSTRAY is -- convert via strtok to C str array.
+      res := C::strtok_cstray(a,b);
+   end;
+
+end;
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 
+class CSTR_TEST is  -- test normal case
+   main is
+      OUT::s(C::from_cstr(C::to_cstr("hello world\n")));
+      C::print_c_str(C::to_cstr("hello too\n"));
+      OUT::nl.s("Str Array:").nl;
+      i: INT:=C::to_cstrar("one two three \t four \nfive\n "," \t\n");
+      C::print_cstray(i);
+   end;
+end; -- class CSTR_TEST
+
+--------------------------------------------------------------------
+
+class CSTR_TEST2 is  -- test error
+   main is
+      i: INT:=C::to_cstrar(	
+                            "1 2 3 4 5 6 7 8 9 10". -- how many to break?
+                         s(" 11 12 13 14 15 16 17 18 19 20").
+                         s(" 21 22 23 24 25 26 27 28 29 30").
+                         s(" 31 32 33 34 35 36 37 38 39 40").
+                         s(" 41 42 43 44 45 46 47 48 49 50").
+                         s(" 51 52 53 54 55 56 57 58 59 60").
+                         s(" 61 62 63 64 65 66 67 68 69 70").
+                         s(" 71 72 73 74 75 76 77 78 79 80").
+                         s(" 81 82 83 84 85 86 87 88 89 90").
+                         s(" 91 92 93 94 95 96 97 98 99 100").
+                         s(" 101 102 103 104 105 106 107 108 109 110").
+                         s(" 111 112 113 114 115 116 117 118 119 120").
+                         s(" 121 122 123 124 125 126 127 128 129 130")  , 
+                         " "	-- separator
+                        );
+      OUT::nl.s("Str Array:").nl;
+      C::print_cstray(i);
+   end;
+end; -- class CSTR_TEST2
+
+--------------------------------------------------------------------
+   

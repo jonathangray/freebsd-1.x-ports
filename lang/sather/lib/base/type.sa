@@ -1,0 +1,354 @@
+-- -*- Mode: Sather;  -*-
+-- File: type.sa
+-- Author: Heinz Schmidt (hws@ICSI.Berkeley.EDU)
+-- Copyright (C) International Computer Science Institute, 1991, 1992, 1993
+--
+-- COPYRIGHT NOTICE: This code is provided "AS IS" WITHOUT ANY WARRANTY
+-- and is subject to the terms of the SATHER LIBRARY GENERAL PUBLIC
+-- LICENSE contained in the file: "sather/doc/license.txt" of the Sather
+-- distribution. The license is also available from ICSI, 1947 Center
+-- St., Suite 600, Berkeley CA 94704, USA.
+--
+-- Changes: Heinz W. Schmidt (hws@csis.dit.csiro.au)
+-- (c) Commonwealth Scientific and Industrial Research Organisation (CSIRO),
+-- Australia, 1992, 1993.
+-- The modifications are provided "AS IS" WITHOUT ANY WARRANTY and are subject
+-- to the terms of the SATHER LIBRARY GENERAL PUBLIC LICENCE referred to above.
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--* FUNCTION: Interface to runtime subtyping information. Additionally
+--*           provide a means to treat basic and foreign types as tagged
+--*           by wrapping a small object (mainly the type tag) around them.
+--*           So they can be passed in a uniform way as $OBs. This is
+--*           useful for containers that want to hold OB's together with
+--*           basic and foreign objects.
+--*           The whole hierarchy then looks as follows:
+--*             ANY_OB
+--*               BASIC
+--*                  BOOL_OB
+--*                  CHAR_OB
+--*                  INT_OB
+--*                  REAL_OB
+--*                  DOUBLE_OB
+--*               FOREIGN{T}   T only F_OB's
+--*               ... <others> 
+--*         
+--* CLASSES: TYPE,CELL,BOOL_OB,CHAR_OB,INT_OB,REAL_OB,DOUBLE_OB,FOREIGN,
+--*          CONFORMS_TO
+--* 
+--* REQUIRED FILES:
+--*    only with -chk: base/sys.sa,
+--*                    data_structure/list.sa,
+--*                    data_structure/genrl_hash.sa,
+--*                    data_structure/str_hash.sa
+--*
+--*    only for TYPE_TEST: sac/cob.sa,sac/ccob.sa,sac/ccob.c,sac/cstraux.c
+--*
+--* RELATED FILES:
+--*
+--* RCS: $Id: type.sa,v 1.1 1994/02/12 03:23:17 hsu Exp $
+--* HISTORY:
+--* Last edited: Oct 17 06:28 1993 (hws)
+--*  Oct 17 06:28 1993 (hws): Sather 1 syntax, copyright note
+--*  Sep 27 14:19 1993 (hws): switch -> case, ensure -> post
+--*  Jun  7 00:15 1993 (hws): improve doco
+--*  Mar 22 11:35 1993 (hws): change assert -> require/ensure
+--*  Sep  3 21:42 1991 (hws): allow set on CELL
+--*  Jun  5 19:03 1991 (hws): change mention of -bro to -info
+--* Created: Fri May 24 23:33:31 1991 (hws)
+--*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class TYPE is
+   -- Ease writing of sybtype predicate and coercions.  Subtype information
+   -- is not included in the Sather binary by default.  A special option
+   -- (currently -info) needs to be used, if features in this class are used.
+   -- Here we do not refer to the names of classes, though, at runtime, so
+   -- perhaps the browser information -info includes too much.
+
+   less(t1,t2: INT): BOOL is
+      -- `TYPE::lseq(t1,t2)=true' iff `t1' < `t2' in the type hierarchy.
+      res := SYS::is_a_descendent_of(t1,t2);
+   end;
+   
+   lseq(t1,t2: INT): BOOL is
+      -- `TYPE::lseq(t1,t2)=true' iff `t1' <= `t2' in the type hierarchy.
+      res := (t1 = t2) or less(t1,t2);
+   end;
+   
+   is_of(other_type: INT): BOOL is
+      -- `x.is_of(SOME::type)=true' iff type of `x' <= `other_type'.
+      res := lseq(type,other_type);
+   end;
+   
+   as(other_type: INT): $OB post res /= void is
+      -- Coerce `self' to `other_type' if this is legal.
+      if is_of(other_type) then
+	 res := self;
+      end;
+   end;
+
+-- - Monotypes and Polytypes, ie. dispatched and non-dispatched
+--
+-- `type' always returns the montype of a class (FOO::type) or instance
+-- (x.type). Use `poly(t)' to get the corresponding polytype.
+
+   poly(t: INT): INT is -- the polymorphic (dispatched) version of `t'.
+      res := t;
+      if res > 0 then res := -res end;
+   end;
+
+   is_mono(t: INT): BOOL is
+      -- is this the monomorphic (non-dispatched) type `t'.
+      res := (0 < t) and (t <= SYS::number_of_classes) 
+   end;
+   
+   is_poly(t: INT): BOOL is -- is this a polymorphic (dispatched) type `$t'.
+      res := is_mono( -t);
+   end;
+   
+-- - Metatypes: Types of classes
+-- Three disjoint class families, OB types ($OB subtypes), F_OB types ($F_OB
+-- subtypes) and basic types. There is no root for the basic type hierarchy.
+   
+   is_basic_type(t: INT): BOOL is
+      -- is `t' one of `BOOL', `CHAR', `INT', `REAL' or `DOUBLE'.
+      
+      -- compare to avoid messing with the C representation.
+      res := (t = BOOL::type or t = CHAR::type or t = INT::type or
+	 t = REAL::type or t = DOUBLE::type);
+   end;
+
+--- Foreign type info not included into the executable currently.
+--- You need to use the FOREIGN type (and use it exclusively) for
+--- this purpose.
+   is_foreign_type(t: INT): BOOL is -- `t' conforms to $F_OB.
+      -- `lesq(t,F_OB::type)' does not work for now. If foreign type information
+      -- is needed at runtime, you need to provide it using `FOREIGN'.
+      -- For now we only check whether `t' conforms to `$FOREIGN{$F_OB}'.
+      res := lseq(t,FOREIGN{$F_OB}::type);
+   end;
+
+   is_ob_type(t: INT): BOOL is -- `t' conforms to $OB.
+      res := not(is_basic_type(t) or is_foreign_type(t));
+   end;
+      
+end; -- class TYPE
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class CELL{T} is -- simple container.
+   attr val: T;
+   set(v: T) is val := v end;
+   
+   create(v: T): SAME is -- creates a cell containing `v'.
+      res := new;
+      res.val := v;
+   end;
+end;
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Perhaps put this in a separate file, so user's can mixin their
+-- particular functionality more easily.
+
+class ANY_OB is -- the root of the fully tagged type hierarchy.
+   TYPE;			-- support subtype information
+end; -- class ANY_OB
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- For some purposes it is nice to have tagged basic types. The Sather
+-- language does not rely on this. A Sather implementation may or may not
+-- tag basic values. The following classes conform too `$OB' but may require
+-- explicit coercion `x.val' to get the value.
+class BASIC is -- the supertype of all basic types.
+   ANY_OB;			-- support `is_of' and friends.
+end;
+   
+class BOOL_OB is BASIC; CELL{BOOL}; end; -- typed BOOL.
+class CHAR_OB is BASIC; CELL{CHAR}; end; -- typed CHAR.
+class INT_OB is BASIC; CELL{INT}; end; -- typed INT.
+class REAL_OB is BASIC; CELL{REAL}; end; -- typed REAL.
+class DOUBLE_OB is BASIC; CELL{DOUBLE}; end; -- typed DOUBLE.
+   
+class FOREIGN{T} is -- typed F_OB. Avoid $F_OB with x.val.
+   -- One should create only `FOREIGN{FOO}'s rather than `FOREIGN{$FOO}'s.
+   -- So the type tag is exactly `FOREIGN{FOO}::type' and one lets
+   -- the compiler assign a type tag representing the foreign type`FOO'.
+   -- `x.is_of(FOREIGN{$FOO})' then is a safe and portable conformance check.
+   
+   CELL{T}; CONFORMS_TO{T,$F_OB}; -- if not, compile time error
+   ANY_OB;			-- support `is_of' and friends
+   
+end;
+
+class CONFORMS_TO{X,Y} is -- let compiler check conformance
+   -- by including a construct that requires that `X' conforms to `Y'.
+   private conforms_to_compile_time_check_internal(y: Y) is end;
+   private check_conforms_to_internal is
+      x: X; conforms_to_compile_time_check_internal(x);
+   end;
+end;
+   
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class TEST_OB1 is
+   LIST{$OB};
+   ANY_OB;
+end;
+
+class TEST_FOB1 is F_OB; end;
+class TEST_FOB2 is TEST_FOB1; end;
+
+class TAGGED_FOB1 is FOREIGN{TEST_FOB1}; end;
+class TAGGED_FOB2 is FOREIGN{TEST_FOB2}; end;
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+class TYPE_TEST is
+   main is
+      OTYPE_TEST::main;
+      FTYPE_TEST::main;
+   end;
+end;
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+ 
+class OTYPE_TEST is
+   
+   TEST;
+   TYPE;			-- avoid the need to prefix TYPE::
+
+   main is
+      
+      class_name("TYPE");
+      poly_type_test;
+      basic_type_test;
+      ob_type_test;
+      finish;
+      
+   end;
+
+   poly_type_test is -- poly_types: non-dispatched vs. dispatched      
+      test("is_poly(poly(INT::type))",is_poly(poly(INT::type)).to_s,"T");
+      test("is_poly(INT::type)",is_poly(INT::type).to_s,"F");
+   end;
+
+   basic_type_test is      
+      test("INT <= INT",lseq(INT::type,INT::type).to_s,"T");
+      test("INT <= CHAR",lseq(INT::type,CHAR::type).to_s,"F");
+
+      test("INT is a basic type",is_basic_type(INT::type).to_s,"T");
+      test("CELL{INT} is a basic type",is_basic_type(CELL{INT}::type).to_s,"F");
+
+      test("INT_OB < BASIC",less(INT_OB::type,BASIC::type).to_s,"T");
+   end;
+
+   ob_type_test is -- OB types      
+      test("LIST{INT} < ARRAY{INT}",
+	 less(LIST{INT}::type,ARRAY{INT}::type).to_s,"T");
+      test("LIST{$LIST{LIST{INT}}} < ARRAY{$ARRAY{$ARRAY{INT}}}",
+	 less(LIST{$LIST{LIST{INT}}}::type,
+	    ARRAY{$ARRAY{$ARRAY{INT}}}::type).to_s,"T");
+
+      test("CELL{INT} is a obtype",is_ob_type(CELL{INT}::type).to_s,"T");
+      test("INT is a obtype",is_ob_type(INT::type).to_s,"F");
+   end;
+
+end; -- class OTYPE_TEST
+   
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+class FTYPE_TEST is
+
+   TEST;
+   TYPE;			-- avoid the need to prefix TYPE::
+
+   main is
+      class_name("FOREIGN");
+	 
+      foreign_type_test;
+      tagged_object_test;
+
+      finish;
+   end;
+   
+   tagged_object_test is
+      x: TEST_OB1 := x.create;
+      test("x.is_of(ARRAY{$OB}::type)",
+	    x.is_of(ARRAY{$OB}::type).to_s,"T"); --- ob types
+
+      --- Coercions
+      --- take a foreign object, convert it to an $ANY_OB and
+      --- reassign to the correct and some improper types.
+      
+      fob1: FOREIGN{CSTR} := FOREIGN{CSTR}::create(C::str_ptr("test1"));
+      fob2: $FOREIGN{$COB} := FOREIGN{$COB}::create(C::from_int(3));
+      i: $INT_OB := INT_OB::create(5);
+      lost: $ANY_OB := fob1;
+
+      --- type-safe reverse assignments
+      
+      if lost.is_of(FOREIGN{$COB}::type) then fob2 := lost;
+      elsif lost.is_of(INT_OB::type) then i := lost;
+      end;
+
+      test("Type-safe reverse assignment 1: still fob1: FOREIGN{CSTR}?",
+	 fob1.is_of(fob1.type).to_s,"T");
+      test("Type-safe reverse assignment 1: still fob2: $FOREIGN{$COB}?",
+	 fob2.is_of(fob2.type).to_s,"T");
+      test("Type-safe reverse assignment 1: still i: $INT_OB?",
+	 i.is_of(INT_OB::type).to_s,"T");
+
+      --- no monotype reassignment
+      fob2: $FOREIGN{$COB} := fob1;
+	 -- this time we don't use the type of the variable but that of the
+	 -- value.
+      fob3: $FOREIGN{$CSTRAY} :=
+	 FOREIGN{$CSTRAY}::create(C::strtok_cstray("a/b/c","/"));
+
+      t: INT := fob2.type;
+      case t
+      when FOREIGN{CSTR}::type then fob1 := fob2;
+      when FOREIGN{$CSTRAY}::type then fob3 := fob2;
+      end;
+      
+      test("Type-safe reverse assignment 2: still fob1: FOREIGN{CSTR}?",
+	 fob1.is_of(fob1.type).to_s,"T");
+      test("Type-safe reverse assignment 2: still fob2: $FOREIGN{$COB}?",
+	 fob2.is_of(fob2.type).to_s,"T");
+      test("Type-safe reverse assignment 2: still i: $INT_OB?",
+	 i.is_of(INT_OB::type).to_s,"T");
+
+      test("Type-safe reverse assignment 2: still fob3: $FOREIGN{$CSTRAY}?",
+	 fob3.is_of(FOREIGN{$CSTRAY}::type).to_s,"T");
+   end;
+
+      foreign_type_test is -- F_OB types
+---  F_OB type info not included in executable, save tests for later.
+---      test("less(TEST_FOB2::type,TEST_FOB1::type)",
+---	 less(TEST_FOB2::type,TEST_FOB1::type).to_s,"T");
+---      test("less(TEST_FOB1::type,TEST_FOB2::type)",
+---	 less(TEST_FOB2::type,TEST_FOB1::type).to_s,"F");
+      test("FOREIGN{TEST_FOB2} < FOREIGN{$TEST_FOB1}",
+	 less(FOREIGN{TEST_FOB2}::type,FOREIGN{$TEST_FOB1}::type).to_s,"T");
+      test("FOREIGN{$TEST_FOB2} < FOREIGN{$TEST_FOB1}",
+	 less(FOREIGN{$TEST_FOB2}::type,FOREIGN{$TEST_FOB1}::type).to_s,"T");
+      test("FOREIGN{TEST_FOB2} < FOREIGN{TEST_FOB1}",
+	 less(FOREIGN{TEST_FOB2}::type,FOREIGN{TEST_FOB1}::type).to_s,"F");
+      test("FOREIGN{CSTR} < FOREIGN{$COB}",
+	 less(FOREIGN{CSTR}::type,FOREIGN{$COB}::type).to_s,"T");
+	   
+      test("FOREIGN{TEST_FOB2} is a tagged foreign type",
+	 is_foreign_type(FOREIGN{TEST_FOB2}::type).to_s,"T");
+      test("FOREIGN{TEST_FOB2} is a obtype",
+	 is_ob_type(FOREIGN{TEST_FOB2}::type).to_s,"F");
+
+      test("CELL{INT} is a tagged foreign type",
+	 is_foreign_type(CELL{INT}::type).to_s,"F");
+
+      test("TEST_OB1 is a tagged foreign type",
+	 is_foreign_type(TEST_OB1::type).to_s,"F");
+   end;
+
+end; -- class FTYPE_TEST
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
