@@ -6,7 +6,7 @@ SUBDIR =
 G_SUBDIR =
 
 SUBDIR += aXe
-SUBDIR += emacs #	make: don't know how to make install. Stop
+G_SUBDIR += emacs
 SUBDIR += point
 SUBDIR += uemacs
 SUBDIR += vile
