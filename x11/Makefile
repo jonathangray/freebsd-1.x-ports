@@ -13,7 +13,7 @@ SUBDIR += pbmplus
 SUBDIR += tiff
 SUBDIR += tk #	depends on tcl, which is made by lang/Makefile
 SUBDIR += ups
-SUBDIR += urt
+#SUBDIR += urt
 SUBDIR += xlock
 SUBDIR += xv
 
