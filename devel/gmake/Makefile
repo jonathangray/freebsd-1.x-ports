@@ -29,8 +29,8 @@ srcdir = $(VPATH)
 
 CC = gcc
 
-CFLAGS = -g
-LDFLAGS = -g
+CFLAGS = -O
+LDFLAGS =
 
 # How to invoke ranlib.  This is only used by the `glob' subdirectory.
 RANLIB = ranlib
