@@ -22,7 +22,7 @@
 # software for any purpose.  It is provided "as is" without express or
 # implied warranty.
 #------------------------------------------------------------------------------
-# $Id: Config.mk,v 1.1 1994/02/09 01:53:35 jkh Exp $
+# $Id: Config.mk,v 1.2 1994/07/05 14:25:06 ache Exp $
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -68,7 +68,7 @@ TK_UCB_SRC=${srcbasedir}/../../x11/tk
 # stripped (debugging case).  Note that if debugging or profiling is enabled,
 # the DO_STRIPPING option must be disabled.
 
-CFLAGS=
+CFLAGS=-O2
 DO_STRIPPING=false
 #DO_STRIPPING=true
 
