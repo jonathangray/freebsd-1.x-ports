@@ -198,6 +198,7 @@ who most of the times displays nothing before the promt.
 if (match(output_pattern, output_string, O_DEBUG) != -1)
 */
 		{
+		query_gdb("set editing off\n",   PARSE_OFF | ECHO_OFF | FILTER_OFF);
    		query_gdb_directories();	/* will tell if running gdb 4.0 */
    		
 	    debug_handler();	/* some init to gdb, and try to display main() */
@@ -913,18 +914,20 @@ int flags;
 	/* keep reading until no more or until prompt arrives */
 	while (more = fgets(s, LINESIZ, dbxfp) && !Prompt)
 		{
+		int i, slen=strlen(s), plen=strlen(dbxprompt);
 	    if (debug)
 			fprintf(stderr, "=>%s", s);
 			
+	    for (i = 0; i <= slen - plen; i++)
 	    /* receive prompt? */
-	    if (strncmp(s, dbxprompt, strlen(dbxprompt)) == NULL)
+	    if (strncmp(s+i, dbxprompt, plen) == NULL)
 	    	{
 			Prompt = True;
 			
 			/* more stuff behind prompt? */
-			if (s[strlen(dbxprompt)])
+			if (s[i+plen])
 			    /* remember it */
-			    next_string = XtNewString(s+strlen(dbxprompt));
+			    next_string = XtNewString(s+i+plen);
 			
 			/* destroy contents */
 			strcpy(s, "");
