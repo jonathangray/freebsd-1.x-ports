@@ -31,6 +31,7 @@ Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 
 #ifdef __386BSD__
 # include <floatingpoint.h>
+# define FP_ALL (FP_X_OFL | FP_X_INV | FP_X_DZ | FP_X_UFL| FP_X_DNML | FP_X_IMP)
 #endif
 
 #ifdef NeXT
@@ -62,8 +63,8 @@ void
 sysdep_init (void)
 {
 #ifdef __386BSD__
-/* disable trapping on common exceptions */
-	fpsetmask(~(FP_X_OFL | FP_X_INV | FP_X_DZ));
+/* disable trapping on all exceptions */
+	fpsetmask(~(FP_ALL));
 #endif
 #ifdef NeXT
   NeXT_init ();
