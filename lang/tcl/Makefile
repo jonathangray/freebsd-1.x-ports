@@ -162,6 +162,14 @@ test: tcltest
 	cd $(SRC_DIR); TCL_LIBRARY=`pwd`/library; export TCL_LIBRARY; \
 	cd $$cwd; ( echo cd $(SRC_DIR)/tests\; source all ) | ./tcltest
 
+pkg:	pkg_src pkg_bin
+
+pkg_src: pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
+	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S tcl_src
+
+pkg_bin: pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B
+	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B tcl_bin
+
 install: install-binaries install-libraries install-man
 
 install-binaries: libtcl.a libtcl.so.${VERS_MAJOR}.${VERS_MINOR} tclsh
