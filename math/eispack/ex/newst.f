@@ -1,0 +1,133 @@
+C
+C     THIS PROGRAM WILL STRIP OFF SUBROUTINES AND FUNCTIONS
+C     FROM A SEQUENCIAL FILE. 
+C     THIS PROGRAM WILL CREATE FILES WITH THE NAMES OF THE 
+C     SUBPROGRAMS AS THE FILE NAMES. 
+C     USES FORTRAN 77 (WORKS FINE ON UNIX)
+C
+C     COMMENTS SHOULD BE DIRECTED TO:
+C
+C        JACK DONGARRA
+C        MATHEMATICS AND COMPUTER SCIENCE DIVISION
+C        ARGONNE NATIONAL LABORATORY
+C        ARGONNE, ILLINOIS 60439
+C
+C        PHONE: 312-972-7246
+C        ARPANET: DONGARRA@ANL-MCS
+C
+      INTEGER ISTAT
+      CHARACTER LINE*80,BLANK*1,PARN*1,ENDU*3,ENDL*3
+      CHARACTER FUNL*8,FUNU*8,SL*1,SU*1
+      CHARACTER NAME*20,FOR*9
+C
+      CHARACTER*16 NAMES,FILEN
+C
+      NAME = 'USR:MAIN.F          '
+      FOR = '.F       '
+      SL = 'S'
+      SU = 'S'
+      FUNL = 'FUNCTION'
+      FUNU = 'FUNCTION'
+      ENDL = 'END'
+      ENDU = 'END'
+      PARN = '('
+      BLANK = ' '
+      WRITE(6,6969)
+ 6969 FORMAT(' INPUT THE FILE NAME')
+      READ(5,6968) FILEN
+ 6968 FORMAT(A)
+      OPEN(UNIT=9,FILE=FILEN,IOSTAT=ISTAT)
+      WRITE(6,*)' FILE OPEN NAME=',FILEN
+      IF( ISTAT .NE. 0 ) WRITE(6,10) ISTAT
+   10 FORMAT(' ERROR FROM CALL TO FILE ON UNIT 9 ',I4)
+      REWIND 9
+      GO TO 3000
+   30 CONTINUE
+      READ(9,40,END=999)(LINE(I:I),I=1,80)
+   40 FORMAT(80A1)
+C      WRITE(6,41)(LINE(I:I),I=1,80)
+C   41 FORMAT(' **',80A1)
+      DO 45 IB = 1,80
+         J = 80 - IB + 1
+         IF( LINE(J:J) .NE. BLANK ) GO TO 46
+   45 CONTINUE
+   46 CONTINUE
+      J = J + 1
+      WRITE(4,40)(LINE(I:I),I=1,J)
+      IF( LINE(10:10) .NE. BLANK ) GO TO 30
+      IF( LINE(7:7) .NE. ENDL(1:1) .AND. 
+     $    LINE(7:7) .NE. ENDU(1:1) ) GO TO 30
+      IF( LINE(8:8) .NE. ENDL(2:2) .AND. 
+     $    LINE(8:8) .NE. ENDU(2:2) ) GO TO 30
+      IF( LINE(9:9) .NE. ENDL(3:3) .AND. 
+     $    LINE(9:9) .NE. ENDU(3:3) ) GO TO 30
+      CLOSE(UNIT=4)
+ 3000 CONTINUE
+      READ(9,40,END=999)(LINE(I:I),I=1,80)
+C
+C      CHECK IF SUBROUTINE
+C
+      IF( LINE(7:7) .NE. SL .AND. LINE(7:7) .NE. SU ) GO TO 1111
+      I1 = 18
+      I2 = 23
+      GO TO 49
+C
+C     LOOK FOR A FUNCTION
+C
+ 1111 CONTINUE
+      ISCAN = 7
+      DO 374 K = 1,8
+         LAST = 62 + K
+         DO 372 I = ISCAN,LAST
+            ISCAN = I + 1
+            IF( LINE(I:I) .EQ. FUNL(K:K) .OR. LINE(I:I) .EQ. FUNU(K:K) ) 
+     $            GO TO 374
+  372    CONTINUE
+C         WRITE(6,373)(LINE(I:I),I=1,80)
+C  373    FORMAT(' *****ERROR LINE IS NOT A FUNCTION OR  SUB. AFTER END'/
+C     $           1X,80A1)
+         GO TO 3000
+  374 CONTINUE
+      I1 = ISCAN + 1
+      I2 = ISCAN + 6
+   49 CONTINUE
+      J = 4
+      IJ = 0
+      DO 50 I = I1,I2
+         J = J + 1
+         IF( LINE(I:I) .EQ. BLANK ) GO TO 60
+         IF( LINE(I:I) .EQ. PARN ) GO TO 60
+         NAME(J:J) = LINE(I:I)
+         IJ = IJ + 1
+         NAMES(IJ:IJ) = LINE(I:I)
+   50 CONTINUE
+      J = J + 1
+   60 CONTINUE
+      I2 = J - 1
+      NAMES(IJ+1:IJ+2) = '.F'
+      IJ = IJ + 3
+      DO 61 I = IJ,16
+         NAMES(I:I) = ' '
+   61 CONTINUE
+      DO 70 I = 1,9
+         NAME(J:J) = FOR(I:I)
+         J = J + 1
+   70 CONTINUE
+      WRITE(6,88) NAMES
+   88 FORMAT(' PROCESSING ',A)
+      CLOSE(UNIT=4)
+      OPEN(UNIT=4,FILE=NAMES)
+      REWIND 4
+      DO 80 IB = 1,80
+         J = 80 - IB + 1
+         IF( LINE(J:J) .NE. BLANK ) GO TO 85
+   80 CONTINUE
+   85 CONTINUE
+      J = J + 1
+      WRITE(4,40)(LINE(I:I),I=1,J)
+      GO TO 30
+  999 CONTINUE
+      WRITE(6,1000)
+ 1000 FORMAT(' ALL DONE')
+      STOP
+      END
