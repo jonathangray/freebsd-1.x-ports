@@ -24,8 +24,14 @@ X11 = -lX11
 .sc.o:
 	scc -c ${SCFLAGS} $*.sc
 
-ezd:	${OBJS} ezdmain.o
+all:	ezd libezd.a # DECstation-ezd.o
+
+ezd:	${SCXL} ${OBJS} ezdmain.o
 	scc -o ezd ${SCFLAGS} ezdmain.o ${OBJS} ${SCXL} ${X11}
+
+${SCXL}:
+	@echo "Making required Scheme->C library first."
+	@(cd ../../lang/schemetoc; make all install)
 
 libezd.a:	${OBJS}
 	rm -f libezd.a
@@ -56,5 +62,3 @@ tartape:
 install:
 	install -c libezd.a /usr/local/lib
 	install -cs ezd /usr/local/bin
-
-all:	ezd libezd.a # DECstation-ezd.o
