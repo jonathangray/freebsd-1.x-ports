@@ -1,4 +1,6 @@
 #	@(#)Makefile	5.7 (Berkeley) 6/27/91
+SHLIB_MAJOR= 1
+SHLIB_MINOR= 0
 
 # BLAS sources
 LIB=cor
