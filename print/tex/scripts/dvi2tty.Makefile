@@ -31,6 +31,6 @@ install: disdvi dvi2tty
 	$(INSTALL) -m 644 dvi2tty.1 $(MANDIR)/man$(MANEXT)
 
 clean:
-	rm -f *.o core.* a.out
+	rm -f *.o core.* a.out disdvi dvi2tty
 
 veryclean: clean
