@@ -1,4 +1,4 @@
-# $Header: /a/cvs/386BSD/ports/lang/franz/lisplib/Makefile,v 1.1 1994/03/18 16:26:27 jkh Exp $
+# $Header: /a/cvs/386BSD/ports/lang/franz/lisplib/Makefile,v 1.2 1994/04/04 02:11:22 jkh Exp $
 #	Makefile for /usr/lib/lisp
 # this directory contains the lisp coded portion of the standard 
 # lisp system and other useful lisp programs. 
@@ -130,12 +130,12 @@ scriptcatxtra:
 # in place.
 
 as:
-	@echo "Grabbing as from /bin"
-#	cp /bin/as as
+	@echo "Grabbing as from /usr/bin"
+	cp /usr/bin/as as
 
 nld:
-	@echo "Grabbing nld from /bin"
-#	cp /bin/ld nld
+	@echo "Grabbing nld from /usr/bin"
+	cp /usr/bin/ld nld
 
 cleanreq:
 	-rm -f ${ReqObj}
