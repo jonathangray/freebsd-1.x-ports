@@ -379,8 +379,8 @@ ANSICCOPTIONS =
 CFILES.misc.3          =
 CFILES.misc.4          = convdup.c                               wckind.c                               xv_i18n.c                               xv_path.c
 
-OFILES.misc.3	= ${CFILES.misc.3:%.c=%.o}
-OFILES.misc.4	= ${CFILES.misc.4:%.c=%.o}
+OFILES.misc.3	= ${CFILES.misc.3:.c=.o}
+OFILES.misc.4	= ${CFILES.misc.4:.c=.o}
 
 HFILES.misc.3          =
 HFILES.misc.4          =
@@ -388,7 +388,7 @@ HFILES.misc.4          =
 GETTEXT.H		= gettext.h
 GETTEXT.C		= gettext.c
 
-GETTEXT.O		= ${GETTEXT.C:%.c=%.o}
+GETTEXT.O		= ${GETTEXT.C:.c=.o}
 
 HDRSPUBLIC=     cms_grays.h cms_mono.h cmsrainbow.h cms_rgb.h sun.h                 window_hs.h expandname.h xv_c_types.h attrol.h db.h 		xv_c_types.h xv_i18n.h xv_version.h xview.h
 
