@@ -17,7 +17,7 @@ OBJ=    alloc.o error.o hash.o swap.o str.o array.o object.o data.o path.o\
 ed.o comm.o call_out.o interpret.o config.o dgd.o
 
 all:
-	@cd src; $(DMAKE)
+	@cd src; $(DMAKE) 'CCFLAGS=$(CC_OPT)'
 
 package:	$(PKG)/+DESC $(PKG)/+ONELINE $(PKG)/+PLIST $(PKG)/+REQ
 	@cd $(PK); for dir in comp lex ed kfun lpc host; do if [ ! -d $$dir ]; then mkdir $$dir; fi; done
