@@ -15,7 +15,6 @@ SDEFS =
 #--------------------------------------------------------------------------
 
 PDEFS = -DGZCAT=\"/usr/bin/gzcat\" -DREADLINE -DCURSES -DNO_CURSES_H -DSYSLOG -DTRY_ABOR
-# Don't compile with readline, have ugly bug with SIGTSTP
 
 #PDEFS =
 #PDEFS = -DGETLINE
@@ -69,7 +68,7 @@ LIBS = -lreadline -ltermcap
 # getline or readline and they aren't installed system-wide, add the
 # extra directories to look in here, using -L's.
 #--------------------------------------------------------------------------
-LIBDIRS = -L/usr/gnu/lib
+#LIBDIRS = -L/usr/gnu/lib
 #LIBDIRS = -L../getline
 #LIBDIRS = -L../readline
 
@@ -88,7 +87,7 @@ LIBDIRS = -L/usr/gnu/lib
 #   <getline.h>.  If you had '/usr/local/getline/getline.h' you would use
 #   -I/usr/local/getline.
 #--------------------------------------------------------------------------
-HDRDIRS =-I/usr/gnu/include
+#HDRDIRS =-I/usr/gnu/include
 #HDRDIRS = -I../getline
 #HDRDIRS = -I..
 
