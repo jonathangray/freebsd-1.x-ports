@@ -14,7 +14,7 @@ SDEFS =
 # Program definitions.  See the README, part C.
 #--------------------------------------------------------------------------
 PDEFS = -DGZCAT=\"/usr/bin/gzcat\" -DREADLINE -DCURSES -DNO_CURSES_H \
-	-DSYSLOG -DTRY_ABOR -DPASSIVEMODE
+	-DSYSLOG -DTRY_ABOR -DPASSIVEMODE -DdMAXRECENTS=38
 #PDEFS = -DGETLINE
 #PDEFS = -DREADLINE -DCURSES
 #PDEFS = -DSOCKS
