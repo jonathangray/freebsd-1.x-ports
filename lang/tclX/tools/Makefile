@@ -13,7 +13,7 @@
 # software for any purpose.  It is provided "as is" without express or
 # implied warranty.
 #------------------------------------------------------------------------------
-# $Id: Makefile,v 1.1 1994/02/09 01:54:20 jkh Exp $
+# $Id: Makefile,v 1.2 1994/07/05 14:13:53 ache Exp $
 #------------------------------------------------------------------------------
 #
 SHELL = /bin/sh
@@ -22,8 +22,8 @@ SHELL = /bin/sh
 
 CC          = cc
 srcdir      = .
-srcbasedir  = /usr1/FreeBSD.ports/lang/tclX
-bldbasedir  = /usr1/FreeBSD.ports/lang/tclX
+srcbasedir  = /usr/ports/lang/tclX
+bldbasedir  = /usr/ports/lang/tclX
 VPATH       = .
 prefix      = /usr/local
 exec_prefix = /usr/local
@@ -38,7 +38,7 @@ CC_FLAGS = ${CPPFLAGS} ${XCFLAGS} ${CFLAGS} -I${srcbasedir}/src \
 
 .c.o:
 	${CC} ${CC_FLAGS} -c $<
- 
+
 #------------------------------------------------------------------------------
 
 all: tclxversion $(TK_BUILD) instcopy bldmanhelp cpmanpages cphelpdir
