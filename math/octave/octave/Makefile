@@ -23,7 +23,7 @@ DISTFILES = COPYING ChangeLog Makefile.in Makeconf.in NEWS README \
 DISTDIRS = dld
 
 # Subdirectories to run make in for the primary targets.
-SUBDIRS = libcruft liboctave  info readline src doc scripts 
+SUBDIRS = libcruft liboctave  info src doc scripts 
 
 # Subdirectories to run `make dist' in
 DISTSUBDIRS = $(SUBDIRS) test
@@ -57,10 +57,6 @@ dld:
 info:
 	cd info ; $(MAKE) all
 .PHONY: info
-
-readline:
-	cd readline ; $(MAKE) all
-.PHONY: readline
 
 src:
 	cd src ; $(MAKE) all

@@ -111,7 +111,7 @@ OBJECTS = arith-ops.o builtins.o error.o file-io.o g-builtins.o \
 	
 
 OCTAVE_LIBS = ../liboctave.a ../libcruft.a ../libinfo.a \
-	../libreadline.a 
+	-lreadline
 
 DISTFILES = Makefile.in move-if-change parse.cc lex.cc y.tab.h \
 	$(INCLUDES) $(SOURCES)
