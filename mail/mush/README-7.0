@@ -1,0 +1,321 @@
+
+This is the official release of the Mush port to SunView, referred to in
+alpha and beta versions as "mushview".  This file describes most of the
+changes from revision 6.5.6 of "mush" and "mushtool".  Sorry, IBM, we
+never managed to get the DOS code integrated.  Note that this is version
+7.0.0, not to be confused (we hope) with alpha-test releases that had a
+third zero appended to the number.  Check the dates if you aren't sure.
+
+Thanks up front to Rich Burridge of Sun Australia for his work on
+converting mush's SunWindows code to SunView, and for giving mush a really
+thorough linting, which it had needed for some time.  Thanks also to the
+many alpha and beta testers who sent valuable comments.
+
+Version 7.0.0 differs from the several 6.5.6 Beta releases in that a
+large portion of the Sun code has changed to use text subwindows instead
+of pixrects.  This is a significant enough change in "look and feel" that
+the release number was increased from 6 to 7.  Addition of file completion
+to the line/curses modes is also considered a major improvement, as are
+changes to the "mail" command (described below).
+
+Tool mode changes include:
+    * The message display window is a textsw, with scrollbars.
+    * The composition window is also a textsw, and opens in a separate
+      frame, so you can read messages in the main frame while composing.
+      You can still invoke an editor, and the default window size is
+      such that vi no longer gets confused (as far as we can tell).
+    * There are variables to control the sizes of most subwindows.
+    * Header-editing works in tool mode (in fact, you MUST use it).
+    * Help, options, and alias settings also pop up in their own frames.
+      The help descriptions have been improved (we believe).
+    * Interactive function-key binding is no longer supported; the clash
+      of mush function keys with SunView functions has been eliminated.
+    * The list of folders in your folder directory is made into a
+      walking menu.  (Handling of this may improve in future patches.)
+
+In addition to the SunView conversions and linting, which make up the bulk
+of the changes, there have been a number of bug fixes and enhancements to
+the 6.5.6 baseline.  These include:
+
+mush -h file
+mush -U -h file
+mush -U! -h file
+    The new -h (-draft) options allows mush to read in a prepared message
+    for sending, in the same manner as Rnmail.  The specified file must
+    contain the message headers (either when first read or after editing
+    by the user); mush will not add headers to it.  The intended use of
+    this option is to write a partially finished message to a file and
+    then return to it later.  (See commentary below on "mail -h".)  The
+    new -U (-send) option allows the draft file to be sent immediately
+    without editing (-U means "unedited").  Signatures and fortunes are
+    not appended when -U! is used ("unsigned" as well as unedited).
+
+mush -I file
+mush -I! file
+    The new -I (-init) option allows the user to specify an init file that
+    is read before any of the other init files.  -I! causes the specified
+    file to replace the system Mushrc file; otherwise, the given file and
+    the system Mushrc are both read.  -I has no effect on reading of the
+    user's own $HOME/.mushrc file (except that the indicated file could
+    "setenv MAILRC", thus changing the location of the user's file).
+
+mush -n
+mush -n!
+    The first form of this option now works like the ucbMail -n option,
+    that is, it prevents sourcing of the system Mushrc but the user's own
+    $HOME/.mushrc is still read.  The new -n! variation prevents either
+    file from being sourced, which was the old behavior of -n.  Using -n
+    does not change the effect of -I, so the following are equivalent:
+	    mush -n -I file			mush -I! file
+
+cd
+    The cdpath variable now works correctly when specified with either
+    colons or spaces separating the list of directories.
+
+help
+    The help facility has been expanded; there is now a help file entry
+    consisting of a usage line and short explanation for every documented
+    line-mode command except "debug" and "version", all accessible via
+    "? command" or "command -?".  In addition, there are variables:
+	set cmd_help = path	Give new location for cmd_help file
+	set tool_help = path	Give new location for tool_help file
+    These variables, which can be set in the system or user init files,
+    have replaced the old -1 and -2 startup options, i.e. cmd_help and
+    tool_help can no longer be specified on the mush command line.
+
+mail -E
+mail -h file
+mail -H file
+mail -I
+mail -u
+mail -U -h file
+    The new "-h file" option of the mail command corresponds to the -h
+    option of mush itself, and is intended for reading in previously
+    begun letters.  It implies -E (edit_hdrs).  The previous meaning of
+    -h (include and indent a message with its headers) is now supported
+    by the -I option, corresponding to the ~I escape (see below).  The
+    -H option is analogous to -h, except that the file need not contain
+    message headers (edit_hdrs is not implied).  (Some alpha versions
+    used -H for the function now supplied by -I.)
+	The -E option no longer implies autoedit.
+	The new -u option turns off autosign and fortune.  Most useful
+    with "-h file" when you want to continue editing the draft but a
+    signature or fortune has already been appended; but -h is not
+    required for -u.  The new -U option sends the file immediately; it
+    cannot be used without -h or -H, and will be ignored if no To:
+    address has been specified.
+	Also, the user is no longer required to provide a To: address in
+    order to begin composing a letter (one is still required before
+    sending it), and the To: address may be only files and/or pipes if
+    desired (in which case the MTA is not run).
+	Finally, the tilde-escape ~I has replaced ~H for purposes of
+    including a message and its headers in the letter being composed.
+    This is analagous to the -i and -I options and the ~i escape.
+
+my_hdr From: address
+    This is now allowed (it is allowed but neither documented nor correctly
+    used in 6.5.6, and was not allowed previously).  The user's From: header
+    is verified as best mush can, and used if it appears valid.  It is up
+    to the MTA to assure authenticity and/or add a Sender: header.  Mush
+    provides a From: if the user does not or if it cannot verify the one
+    given.
+
+pipe -p pattern unix-command
+    The pipe command has been modified to allow its use as a shell script
+    extractor.  See the man page and "pipe -?" for details.  KNOWN BUG:
+    given a list of messages, all are sent to the same unix process.
+    This can cause havoc e.g. when each of the messages is a shell script
+    intended to be run by a virgin shell.  Changes are being discussed.
+    Also, pipe is now affected by $alwaysignore (see below).
+
+Pipe
+    See the comments under "write" below.
+
+pwd
+    This now prints the actual current working directory rather than
+    simply echoing the value of $cwd.
+
+reply
+    Assorted repairs have been made to to take_me_off() (implements the
+    inverse of $metoo) and reply_to().  These include doing a better
+    (though still not perfect) job of getting the name and address to
+    match when replying to forwarded mail.
+
+sort
+    The current message now moves with the sort, that is, the same actual
+    message (not necessarily the same message *number*) will be the
+    current message after the sort as was current before the sort.
+
+save/copy
+    The 'p' (printed) and 'f' (forwarded) Status flags are now properly
+    saved when messages are saved/copied, and restored when the folders
+    are read.  Also, a "-f" (force) flag has been added, which has the
+    same meaning as the old "!" flag, that is, overwrite the file rather
+    than appending to it.  "save !" is still supported.
+
+undigest -p pattern
+    The specified pattern is used as the article separator for unpacking
+    digests.  The default is "--------".  A literal match (no regexps or
+    wildcards) is done at beginning-of-line.
+
+write
+    The write command (and other commands such as Pipe that omit message
+    headers) no longer outputs the blank line that separates the message
+    body from the headers, and also does not output the trailing blank
+    line that separates messages from one another.  (This applies only
+    when MSG_SEPARATOR is not defined during compilation.)  This makes
+    the command more useful for saving multi-part uuencoded files, etc.
+
+$$
+$name:l
+$name:u
+$name:<number>
+    Four new variable forms.  The first returns the PID of the running
+    mush; the second converts all alphabetics in the value of $name to
+    lower case; the third converts all alphabetics in the value of $name
+    to uppercase; the fourth splits the value into words and returns the
+    <number>th word.  Only one modifier can be used at a time.
+
+$[%fmt]
+    This special variable form expands %fmt (a string with no spaces) as
+    a hdr_format format.  E.g., $h%a is the author of the current message.
+    Any colon-modifier may be applied, e.g.
+	$[%n]:1		First name of author of current message
+
+$(%c)
+    This special variable form expands %c (c is a character) as a prompt
+    format.  E.g., $(%T) is the current time.  Colon-modifiers apply.
+
+$alwaysignore
+    This variable now actually works as documented.  If you've gotten used
+    to the old behavior, you'll need to set this.  Note, however, that the
+    documented behavior has changed slightly.  The (erroneous) behavior of
+    Mush 6.5.6 when this variable was UNset is now achieved by:
+	set alwaysignore = "include,forward,pipe"
+    Setting this variable with no value has the same effect as in 6.5.6.
+
+$autosign
+    You can now specify a program to be run, whose output will sign the
+    letter; the syntax is
+	set autosign = '|program-name'
+    This syntax has not been finalized and may change.  The argument list
+    passed to the program is the list of addresses that will go to the MTA,
+    in exactly the same form as that which will be used for the MTA (e.g.,
+    there may be a comma after each address).
+
+$complete
+    Mush now supports filename completion and will eventually support
+    command completion as well.  This variable has a two-character "string"
+    value; the first character is used for name completion, the second for
+    listing, ala ESC and ^D in 4.3 BSD csh.
+
+$domain_route
+    This variable allows the user to specify that domain short-circuiting
+    should be done in conjunction with auto_route.  Addresses that are
+    already in RFC822 domain form (user@domain) are not normally changed.
+    UUCP paths that contain fully-qualified domains are short-circuited
+    to the rightmost such domain.  Optionally, domain_route may be set
+    to a string, in which case all addresses are rewritten to UUCP form,
+    short-circuited, and the given string is then prepended as the first
+    host in the path.  This variable is intended for use at RFC976 Class 3
+    UUCP hosts, or UUCP sites with a connection to a Class 3 host.
+
+$fignore
+    This variable modifies the behavior of file completion by specifying
+    file name forms that should NOT be completed.  See the man page for
+    more details.
+
+$hdr_format
+    A new formatting string now allows access to *any* message header.
+    The format is:	%?header-name?
+    For example,
+	set hdr_format='%n "%?x-mailer?"'
+    might display
+	1 >   Barton E. Schaefer "Mail User's Shell (7.0.0 12/10/89)"
+    This can be used to avoid mush's TO: display for messages you
+    authored; just replace "%f" with "%?from?".
+
+$lister
+    Has been removed.  The "folders" command now supplies its own set
+    of flags to ls, and "cmd ls 'ls ...'" suffices for other uses.
+
+$quiet
+    This variable now has a value of one to six comma-delimited words.
+    For compatibility with previous versions, setting quiet without a
+    value has the original behavior of suppressing the startup message.
+    The recognized words are:
+	autosign	Don't tell me when a signature is appended
+	await		Await command doesn't ring for new mail
+	complete	Word completion doesn't ring on failure
+	fortune		Don't tell me when a fortune is appended
+	startup		Don't print the startup message
+	tool		Tool mode doesn't ring for new mail
+    Errors in autosigning or fortunes are still reported.  (Some beta
+    releases assigned three of these fields, with the on/off sense
+    reversed, to a variable named $bell; that variable is gone.)
+
+$version
+    The version string, as printed on startup.
+____________
+
+MMDF Changes and File Locking Improvements
+------------------------------------------
+
+The MMDF support code has been modified to use the MMDF library calls for
+file locking.  The files makefile.* were modified to make the need to link
+in the MMDF library more obvious, and the comments in config.h-dist now
+reflect the current (simpler) installation instructions for MMDF sites.
+
+In the course of these updates, the structure of the file locking calls
+was reworked to make open and lock a single (non-atomic) operation.  Many
+thanks to lmjm@doc.imperial.ac.uk (Lee McLoughlin) and marc@virginia.edu
+(Marc Rouleau) for instigation and help with implementation and testing of
+these changes.
+
+In the course of making these changes, a number of errors were discovered
+and repaired:
+
+    An "update" would remove empty files and then try to reload them,
+    generating error messages.  The copyback() function now returns -1 if
+    it removes a file; folder() recognizes this and does not attempt to
+    load_folder() on a removed file.
+
+    There was a remote possibility of a race condition in in copyback()
+    because open-and-lock is non-atomic.  copyback() now checks for new
+    mail AFTER locking the spool file; this guarantees the MTA can't
+    slip a new message into the file just before it gets truncated.  The
+    check_new_mail() function has been broken into three specialized
+    parts to allow this:  get_new_mail() and show_new_mail() work as you
+    probably expect, and check_new_mail() now calls them.
+
+    The mbox file ($HOME/mbox or whatever) is locked by copyback(), and
+    all folders are locked by save_msg().
+
+    The dead.letter file is locked by dead_letter().
+
+    "Reinitializing" of a folder that was modified behind mush's back
+    would do pretty strange things in curses mode.  It now behaves more
+    sensibly.  Also, if your spool folder shrinks while you are using a
+    non-spool folder, mush won't incorrectly re-initialize the current
+    folder (a bug no one ever saw, we hope).
+
+    All mailboxes are locked for reading when they are first loaded or
+    when new mail comes in, whenever possible (DOT_LOCK and old Xenix
+    installations cannot read-lock).  If the MTA also uses a compatible
+    locking scheme (as one would hope), this should prevent "truncation"
+    of new messages without unduly restricting the reading of folders.
+
+    NOTE:  All this precautionary locking has its drawbacks.  Sending
+    mail can deadlock if you mention the same file twice in the list
+    of addresses.  (Of course, before the advent of locking, this would
+    cause interleaved writes; which is the lesser evil?)  Be careful.
+
+Additional changes apply to installations where SYSV is defined:
+
+    Because lockf() requires a file open for writing, the locking code
+    has been rewritten to call fcntl(F_SETLK) directly.  Read and write
+    locks are used as appropriate.
+
+    This locking code has been only minimally tested, because none of the
+    authors has direct access to a true SysV machine.  Bug reports with
+    suggestions for improvement are requested.
