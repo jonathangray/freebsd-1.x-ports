@@ -8,7 +8,8 @@ EZD = ../libezd.a
 .sc.o:
 	scc -c ${SCFLAGS} $*.sc
 
-all:	color dragon goodbye goodbye2 puzzle_in_c puzzle clock
+#all:	color dragon goodbye goodbye2 puzzle_in_c puzzle clock
+all:	dragon puzzle_in_c puzzle clock xc
 
 dragon:	${EZD} dragon.o
 	scc -o dragon ${SCFLAGS} dragon.o ${EZD} ${XLIB}
