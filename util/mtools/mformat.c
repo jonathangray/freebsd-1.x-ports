@@ -12,6 +12,9 @@
 #include <ctype.h>
 #include "msdos.h"
 #include "patchlevel.h"
+#ifdef __386BSD__
+#include <machine/ioctl_fd.h>
+#endif
 
 int fd, dir_dirty, dir_entries;
 long dir_chain[MAX_DIR_SECS];
@@ -82,13 +85,30 @@ char *argv[];
 		fprintf(stderr, "Drive '%c:' not supported\n", drive);
 		exit(1);
 	}
-	if (dev->tracks == 0) {
-		fprintf(stderr, "Non-removable media is not supported\n");
-		exit(1);
-	}
 					/* find the right one */
 	if (!dev->gioctl) {
 		while (dev->drive == drive) {
+#ifdef __386BSD__
+			/* Special case, we need to get floppy parameters here */
+			if (dev->mode == -1) {
+				struct fd_type fdt;
+
+				name = expand(dev->name);
+				if ((fd = open(name, 0)) < 0)
+					goto cont;
+				if(ioctl(fd, FD_GTYPE, &fdt) < 0) {
+					close(fd);
+				cont:
+					dev++;
+					continue;
+				}
+				close(fd);
+				dev->tracks = fdt.tracks;
+				dev->heads = fdt.heads;
+				dev->sectors = fdt.sectrac;
+				dev->mode = 0;
+			}
+#endif
 			if ((!tracks || dev->tracks == tracks) && (!heads || dev->heads == heads) && (!sectors || dev->sectors == sectors))
 				break;
 			dev++;
@@ -96,6 +116,10 @@ char *argv[];
 	}
 	if (dev->drive != drive) {
 		fprintf(stderr, "%s: Paramaters not supported\n", argv[0]);
+		exit(1);
+	}
+	if (dev->tracks == 0) {
+		fprintf(stderr, "Non-removable media is not supported\n");
 		exit(1);
 	}
 					/* open the device */
@@ -209,7 +233,8 @@ char *argv[];
 	boot.nsect[1] = sectors / 0x100;
 	boot.nheads[0] = heads % 0x100;
 	boot.nheads[1] = heads / 0x100;
-	boot.signat = 0xaa55;
+	boot.signat[0] = 0x55;
+	boot.signat[1] = 0xaa;
 
 					/* write the boot */
 	lseek(fd, 0L, 0);

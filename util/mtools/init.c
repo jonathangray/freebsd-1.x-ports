@@ -8,7 +8,11 @@
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <errno.h>
 #include "msdos.h"
+#ifdef __386BSD__
+#include <machine/ioctl_fd.h>
+#endif
 
 #define FULL_CYL
 #define WORD(x) ((boot->x)[0] + ((boot->x)[1] << 8))
@@ -26,6 +30,8 @@ extern char *mcwd;
 extern unsigned char *fat_buf, *disk_buf, *dir_buf;
 extern struct device devices[];
 static struct bootsector *read_boot();
+static int lock_dev();
+static long find_partition();
 
 int
 init(drive, mode)
@@ -61,14 +67,27 @@ int mode;
 			break;
 
 		name = expand(dev->name);
-		if ((fd = open(name, mode | dev->mode)) < 0) {
-			sprintf(buf, "init: open \"%s\"", name);
-			perror(buf);
-			exit(1);
+#ifdef __386BSD__
+		/* Special case, we need to get floppy parameters here */
+		if (dev->mode == -1) {
+			struct fd_type fdt;
+
+			if ((fd = open(name, mode)) < 0)
+				goto try_again;
+			if(ioctl(fd, FD_GTYPE, &fdt) < 0)
+				goto try_again;
+			dev->tracks = fdt.tracks;
+			dev->heads = fdt.heads;
+			dev->sectors = fdt.sectrac;
+			dev->mode = 0;
 		}
+		else
+#endif
+		if ((fd = open(name, mode | dev->mode)) < 0)
+			goto try_again;
 					/* lock the device on writes */
 		if (mode == 2 && lock_dev(fd)) {
-			fprintf(stderr, "Device \"%s\" is busy\n", dev->name);
+			fprintf(stderr, "Device \"%s\" is busy\n", name);
 			exit(1);
 		}
 					/* set default parameters, if needed */
@@ -77,6 +96,11 @@ int mode;
 				goto try_again;
 		}
 					/* read the boot sector */
+		if (   dev->offset < 0
+		    && (dev->offset = find_partition(fd, &(dev->fat_bits))) < 0
+		   )
+			goto try_again;
+
 		disk_offset = dev->offset;
 		if ((boot = read_boot()) == NULL)
 			goto try_again;
@@ -158,13 +182,18 @@ int mode;
 		else
 			break;
 
-try_again:	close(fd);
+try_again:      if (fd >= 0) close(fd);
 		fd = -1;
 		dev++;
 	}
 	if (fd == -1) {
 		if (boot != NULL && dev->tracks)
 			fprintf(stderr, "No support for %d tracks, %d heads, %d sector diskettes\n", tracks, heads, sectors);
+		else {
+			sprintf(buf, "init: \"%s\"", name);
+			perror(buf);
+			exit(1);
+		}
 		return(1);
 	}
 					/* set new parameters, if needed */
@@ -336,15 +365,19 @@ int fd;
 #ifdef LOCKF
 #include <unistd.h>
 
-	if (lockf(fd, F_TLOCK, 0) < 0)
+	if (lockf(fd, F_TLOCK, 0) < 0) {
+		perror("lockf");
 		return(1);
+	}
 #endif /* LOCKF */
 
 #ifdef FLOCK
 #include <sys/file.h>
 
-	if (flock(fd, LOCK_EX|LOCK_NB) < 0)
+	if (flock(fd, LOCK_EX|LOCK_NB) < 0) {
+		perror("flock");
 		return(1);
+	}
 #endif /* FLOCK */
 
 #ifdef FCNTL
@@ -356,8 +389,45 @@ int fd;
 	flk.l_start = 0L;
 	flk.l_len = 0L;
 
-	if (fcntl(fd, F_SETLK, &flk) < 0)
+	if (fcntl(fd, F_SETLK, &flk) < 0) {
+		perror("fcntl");
 		return(1);
+	}
 #endif /* FCNTL */
 	return(0);
+}
+
+static long find_partition(fd, fat_bits)
+int *fat_bits;
+{
+	unsigned char buf [512];
+	int i;
+	struct partition {
+		unsigned char flag, bhead, bsect, bcyl;
+		unsigned char system, ehead, esect, ecyl;
+		unsigned long relsect, numsect;
+	} *p;
+
+	errno = EINVAL;
+	if (   read (fd, buf, 512) != 512
+	    || buf[510] != 0x55 || buf[511] != 0xaa
+	   )
+		return (-1);
+	p = (struct partition *) (buf + 0x1be);
+	for (i=0; i<4; ++i, ++p) {
+		if (p->flag != 0 && p->flag != 0x80)
+			return(-1);
+		else switch(p->system) {
+			case 1: /* DOS-12 */
+				errno = 0;
+				*fat_bits = 12;
+				return (p->relsect * 512);
+			case 4: /* DOS-16 */
+			case 6: /* BIGDOS */
+				errno = 0;
+				*fat_bits = 16;
+				return (p->relsect * 512);
+		}
+	}
+	return (-1);
 }
