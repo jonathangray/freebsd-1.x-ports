@@ -1,0 +1,522 @@
+
+                 The Satellite Tracking Program SatTrack V1.3
+              ==================================================
+
+                            Manfred Bester, DL5KR
+                              February 17, 1993
+
+
+GENERAL OVERVIEW
+
+    SatTrack is a satellite tracking program that has been written in 'C' 
+    code on a Sun/UNIX workstation in order to provide an alternative to PC 
+    oriented programs like InstantTrack or QuikTrak. SatTrack is based on 
+    program 'Orbit' by Robert W. Berger, N3EMO, but has been completely 
+    re-written and enhanced with many new features. It provides a live display 
+    which Orbit does not have, and other orbit prediction facilities, but no 
+    graphics either. Cursor controls used in the live display are compatible 
+    with the VT100 standard. The program reads the NORAD two-line element sets 
+    directly. Other input files are defaults.dat, sites.dat, cities.dat and 
+    modes.dat. These contain information on default parameters and various 
+    sites and satellite modes like beacon frequencies, launch dates, attitudes, 
+    transmission modes and so on. The file cities.dat contains the data base 
+    for the nearest city display. SatTrack can track a single satellite for a 
+    single ground station. There is no software for co-visibility between 
+    several satellites or between several ground stations installed in this 
+    release. 
+
+
+INSTALLATION
+
+    To install SatTrack on a Sun/UNIX workstation, place the distribution file 
+    'sattrack.tar.Z' into your home directory. Uncompress the file by typing 
+    'uncompress sattrack.tar'. Then unbundle the distribution file by typing 
+    'tar xvpf sattrack.tar'. This will create the following directories in 
+    your UNIX home directory:
+
+        SatTrack/Data
+        SatTrack/Doc
+        SatTrack/Object
+        SatTrack/Prediction
+        SatTrack/Run
+        SatTrack/Source
+
+    All source code will be placed in SatTrack/Source and all auxiliary data 
+    files (see below) in SatTrack/Data. Change directory to SatTrack/Source and 
+    edit the file sattrack.h in order to change the variable STATIONCALL to 
+    your call sign. To recompile sattrack type 'make clean' and 'make all'. 
+    Edit your .login and/or .cshrc files to include ~/SatTrack/Run in your path.
+
+    The Run directory will contain the executable files and the Object 
+    directory the object code. The Data directory contains the files with the 
+    NORAD two-line element sets as well as defaults.dat, modes.dat, cities.dat 
+    and sites.dat. Predictions can be written into an output file which will 
+    be placed in the Prediction directory. The Doc directory will contain all 
+    documentation on SatTrack. 
+
+
+INPUT DATA FILES
+
+    Program SatTrack requires five input data files, all in ASCII format:
+
+    tle.dat          contains NORAD or NASA two-line element sets
+    defaults.dat     contains default start-up parameters
+    sites.dat        contains the data base with ground station parameters
+                     (name, latitude, longitude, altitude)
+    cities.dat       contains data on nnn cities and other special locations; 
+                     this part is not finished yet; one location (KSC)
+                     is presently hardwired in satcity.c
+    modes.dat        contains additional information on satellites (beacon 
+                     frequencies, alias names, modes, launch dates etc.)
+
+
+    Example of tle.dat:
+
+        - Current Two-Line Element Sets #053 -
+        Mir        
+        1 16609U 86 17  A 92253.83202629  .00010821  00000-0  17200-3 0  5392
+        2 16609  51.6235 184.3926 0003511 132.9676 227.1601 15.53877561375443
+        COBE       
+        1 20322U 89 89  A 92253.56214384 -.00000059  00000-0 -26243-4 0  5574
+        2 20322  99.0083 266.1778 0008361 270.9185  89.1022 14.03352237143838
+        PACSAT     
+        1 20439U 90  5  D 92246.03439168  .00000070  00000-0  35288-4 0  4890
+        2 20439  98.6417 327.8611 0011066 315.7837  44.2460 14.29731036136265
+        DO-17      
+        1 20440U 90  5  E 92251.71853570  .00000070  00000-0  34955-4 0  4902
+        2 20440  98.6415 333.6363 0010985 298.5546  61.4530 14.29859354137082
+        TDRS 4     
+        1 21639U 91 54  B 92249.52615843  .00000111  00000-0  00000+0 0  2232
+        2 21639   0.0810 282.2753 0002729 241.6567 196.0869  1.00275770  2147
+        EUVE       
+        1 21987U 92 31  A 92232.33773712  .00002181  00000-0  10297-3 0    77
+        2 21987  28.4322 199.3801 0010738 262.4472  97.5038 15.15165949 11029
+        STS-47
+        1 22120U 92 61  A 92259.61569380 0.00076435  00000-0  25599-3 0   124
+        2 22120  56.9971  93.6720 0008801 289.1809  70.8314 15.89530661   497
+
+    The meaning of the numbers in each line are explained in the source 
+    code listing (see 'readnorad.c'). Elements sets like the above can be 
+    obtained from 'archive.afit.af.mil' (129.92.1.66) via anonymous FTP. 
+    Change into the directory '/pub/space' and get 'tle.new'. Then place this 
+    file as 'tle.dat' in the directory SatTrack/Data. This procedure can be 
+    automated in the following way. Use the command 'crontab -e' to create a 
+    crontab file with the following content:
+
+        0 15 * * *    HOME/SatTrack/Run/getElementSets
+
+    This will run 'getElementSets' every day at 15:00 h local time (in this 
+    example). The executable shell script 'getElementSets' that calls up 
+    'archive.afit.af.mil' (129.92.1.66) via anonymous FTP needs to be in the 
+    directory SatTrack/Run and contains the following nine lines: 
+
+        cd HOME/SatTrack/Data
+        ftp -n 129.92.1.66 << !
+        user anonymous LOGIN_NAME@HOST.LOCATION.NETWORK
+        cd /pub/space
+        get tle.new
+        quit
+        !
+        cp tle.dat tle.bak
+        cp tle.new tle.dat
+
+    LOGIN_NAME@HOST.INSTITUTION.NETWORK, your e-mail address, is the password 
+    used. The two-line element sets can also be obtained from the Celestial 
+    Bulletin Board System in Fairborn, Ohio, via modem line (513) 427-0674. 
+    Latest element sets for space shuttle missions can be obtained from 
+    'spacelink.msfc.nasa.gov' (192.149.89.61) via TELNET or via telephone by 
+    dialing (205) 895-0028. An element set for STS-47, for example, would be 
+    placed in SatTrack/Data as 'sts-47.dat'.
+
+
+    Example of defaults.dat:
+
+        Site:             Berkeley CA
+        Satellite:        Mir
+        Element set:      tle
+        Element set type: NORAD
+        Time zone:        PST
+        Duration:         3.0
+        Min elevation:    10.0
+
+    These parameters are the defaults that show up in <> brackets when 
+    starting program 'sattrack'. Options for the time zone are UTC, MEZ, MSZ, 
+    EST, EDT, CST, CDT, MST, MDT, PST,  PDT, and  HST. If other time zones 
+    are needed these will have to be added in 'sattrack.c'. If a time zone 
+    is entered that is not in this list the time zone is automatically set to 
+    UTC. Program 'sattrack' does not check for daylight savings time when 
+    reading the system time, since the UTC system time is used always. The 
+    other time zones are used only for the live display and the prediction 
+    tables. 
+
+
+    Example of sites.dat:
+
+        Auckland NZL            -36.000000 -174.500000     0.0
+        Berkeley CA              37.873931  122.240372   400.0
+        KSC FL                   28.475000   80.610000     5.0
+        Edwards AFB              34.940000  117.860000   200.0
+        Guam                     13.330000 -144.720000     5.0
+        Haleakala AMOS           20.708333  156.257500  3052.0
+        Honolulu HI              21.310000  157.850000     0.0
+        Houston JSC TX           29.875000   95.420000    50.0
+        Mauna Kea HI             19.826667  155.471667  4215.0
+        Midway Island            28.360000  177.380000     5.0
+        Moscow RUS               55.700000  -37.545000   195.0
+        Rio De Janeiro          -22.895000   43.223333    33.0
+        Washington DC            38.921667   77.066667    92.0
+
+    The length of the name of the ground station has to be 15 characters or 
+    less. Otherwise it will be truncated to a length of 15 characters. The 
+    first column of numbers is the geographical latitude [deg North], the 
+    second the geographical longitude [deg West], and the third the altitude 
+    [m]. Note that some other tracking programs count the longitude in eastern 
+    direction. Here the convention of positive signs for western longitudes is 
+    used. 
+
+
+    Example of cities.dat:
+
+    --- not yet required ---     (a city data base has not yet been located)
+
+
+    Example of modes.dat:
+
+        Satellite: OSCAR 10
+        Alias: AO-10
+        Beacon:          145.810000 MHz
+        Mode: B           000 - 256
+
+        Satellite: AO-13
+        Beacon:          145.812000 MHz
+        Attitude:        180.0  0.0 deg
+        Mode: B           000 - 100
+        Mode: JL          100 - 120
+        Mode: LS          120 - 135
+        Mode: JL          135 - 150
+        Mode: B           150 - 256
+
+        Satellite: PACSAT
+        Alias: AO-16
+        Beacon:          437.026250 MHz
+
+        Satellite: INFORMTR-1
+        Alias: AO-21
+        Beacon:          145.822000 MHz
+
+        Satellite: Mir
+        Beacon:          145.550000 MHz
+        Mode: FM            0 - 256
+
+        Satellite: STS-47
+        Alias: Endeavour
+        Beacon:          145.550000 MHz
+        Mode: FM            0 - 256
+        Launch:  12-09-92  14:23:00 UTC
+    
+    If the satellite to be tracked is not listed in modes.dat or if no beacon 
+    frequency is specified, the program will use a default value of 146.000 
+    MHz. Note that if a satellite is listed in modes.dat its name in the line 
+    'Satellite:' has to exactly match the name in the NORAD two-element data 
+    file with lower and upper case letters. For example, AO-10 has to be 
+    entered as OSCAR 10 and AO-21 as INFORMTR-1. An alias name can be 
+    specified in the 'Alias:' line. It has to be one word without blanks, like 
+    Fuji-2 or Columbia. This name will be used in addition to the NORAD 
+    satellite name for the live display and the prediction tables. If a launch 
+    date is specified in modes.dat the live display will show the mission 
+    elapsed time (MET). 
+
+
+PROGRAM START
+
+    To start the program type 'sattrack [-t] [-v]'. The options are as follows:
+
+    -t   allows specification of another time zone instead of the default time 
+         zone listed in defaults.dat. This is useful to quickly run off a 
+         prediction for a site elsewhere in the world without having to change 
+         the default data file. 
+
+    -v   enables the verbose mode. All default parameters, ground station data 
+         and detailed orbital elements will be displayed at program start. 
+
+    For all keyboard entries the default parameters are shown in <>. Hitting 
+    the RETURN key each time will use these. Otherwise, both lower and upper 
+    case letters will be accepted. In case of the site and the satellite name 
+    a fraction of the name will be sufficient. The program will take the first 
+    site or satellite name from the site list or the two-line element set that 
+    matches the character string. One can choose between a live display and an 
+    orbit prediction in a short and a long form. Examples of these are given 
+    below. 
+
+
+LIVE DISPLAY
+
+    Once in the live display mode, the program cycles through a full 
+    computation every 5 seconds and sleeps in between. In a strict sense, 
+    the live display is not a real-time display since it runs under UNIX. 
+    For most applications, however, this is not a disadvantage. It is very 
+    important that the UNIX system clock is set correctly, though. The live 
+    display is rather self-explanatory. An example of the screen layout is 
+    shown below.
+    
+    In case of the space shuttle, the computation of the orbit number is 
+    different from all other satellites. For the shuttle, the orbit 
+    number increments each time the satellite crosses the ascending node. 
+    The shuttle is launched into orbit #1. If the space shuttle is tracked, 
+    the source of the element set, i.e. the element set type has to be 
+    specified, since there is a difference in the convention for definition 
+    of the reference orbit between NASA and NORAD. For satellites other than 
+    the space shuttle the NORAD convention is used and the orbit number 
+    increments when the satellite passes through the perigee. 
+
+    The visibility display to the right of the percentage of the current orbit 
+    indicates if the satellite is in the day ('D') or night ('N') part of its 
+    orbit. If the satellite is above the horizon and in the day part of its 
+    orbit and at the same time the Sun is below the nautical twilight limit 
+    (-6 deg elevation), then the display shows 'V' (visible), since the 
+    satellite will be visible to the naked eye, at least for the larger 
+    satellites. However, the apparent brightness depends on the relative 
+    angles between the Sun, the satellite and the ground station, and on the 
+    shape, size and distance (range) of the satellite. 
+
+    The eclipse and visibility conditions are also indicated by 'D', 'N' or 
+    'V' in the lower right corner of the display for the circumstances of the 
+    next pass, i.e. acquisition of signal (AOS), maximum elevation (MEL) and 
+    loss of signal (LOS) of the satellite. 
+
+    Azimuth and elevation angles of the Sun are shown for the location of the 
+    ground station. 
+
+    The Doppler shift is calculated for the beacon frequency displayed one 
+    line above. The free-space path loss can be used for link quality 
+    calculations. 
+
+    The satellite mode depends on the phase of the satellite (the mean anomaly 
+    in units of 0-256), as specified in modes.dat. If no satellite mode is 
+    specified, the display shows blank. 
+
+    In case of the space shuttle, distances are displayed in nautical miles 
+    (NM) and otherwise they are in kilometers. Accordingly, velocities are 
+    in NM/s or km/s.  
+
+    The state vector of the satellite (position and velocity in cartesian 
+    coordinates) is displayed below the bearing and ground track information. 
+
+    The circumstances of the next pass are calculated and displayed in the 
+    lower part of the screen. If the next pass has a maximum elevation of more 
+    than 40 deg the maximum elevation and range at maximum elevation are shown 
+    in reverse video. The countdown time represents the time until next AOS or 
+    next LOS. One minute before AOS and during a satellite pass the countdown 
+    time is displayed in reverse video. 
+
+    The mission elapsed time (MET) will be displayed if the launch date and 
+    time are specified in modes.dat. 
+
+    The groundtrack location indicates the location of the sub-satellite 
+    point with respect to the nearest location in the city data base. For now, 
+    there is only one fixed location (Kennedy Space Center) hardwired in the 
+    code, since an appropriate city data base could not be obtained so far.  
+
+    An alarm (beep) is generated for each screen update less than one minute 
+    away from either AOS or LOS. When the satellite being tracked is above the 
+    horizon several numbers on the screen show up in reverse (the header line, 
+    azimuth, elevation, range, Doppler shift and path loss). 
+
+    Once the program is running in the live display mode, it can be frozen 
+    and unfrozen with ^S and ^Q, and aborted with <CR>. Hitting the <SPACE> 
+    bar will restart the program. 
+
+
+ORBIT PREDICTION
+
+    The orbit prediction mode allows the calculation of satellite passes for 
+    a given ground station. The data will be either displayed on the video 
+    terminal or written into a file in the Prediction directory which can 
+    later be obtained as a hardcopy. The program generates tables in a short 
+    and in a long form. The short form listing consists of one table per day 
+    with one line per pass, indicating the time at AOS, MEL and LOS, the 
+    duration of the pass, the azimuth at AOS, MEL and LOS, the maximum 
+    elevation of the pass, the visibility code for AOS, MEL and LOS, and 
+    number of the orbit in which the satellite is at AOS. Also, for the space 
+    shuttle, if a launch date is specified in 'modes.dat' an additional column 
+    shows the MET at AOS. Passes with a maximum elevation of more than 40 deg 
+    are marked with an asterisk next to the MEL value. 
+
+    The prediction in the long format consists of 12 columns. The first column 
+    is the time in specified fixed increments from line to line. Most of the 
+    table is self-explanatory. The column labeled 'Loss' is the free-space 
+    path loss in dB. The column labeled 'Phs' is the orbital phase of the 
+    satellite, i.e. the mean anomaly running from 0 through 256. The 'Md' 
+    column is the satellite mode, derived from the phase and the entries in 
+    modes.dat. This column will be blank if no modes are specified in 
+    modes.dat. The last column is the visibility code of the satellite ('D', 
+    'N' or 'V', see above). 
+
+    An example for a prediction table in the short and long form is given 
+    below. 
+
+
+BUGS AND IMPERFECTIONS
+
+    There is a number of inconveniences or imperfections that have not yet 
+    been fixed. These will be taken care off in a later version. 
+
+    1.   The 'nearest city' display is not yet implemented. It uses only one 
+         location (KSC) at this time. 
+
+    2.   The spacecraft's attitude can be specified in 'modes.dat', but is not 
+         taken into account yet for the calculation of the squint angle.
+
+    3.   The calculation of the height of the satellite does not take into 
+         account the geoid model of the Earth. 
+
+    4.   The azimuth and elevation angles of the Sun are precise within 
+         0.15 deg only. 
+
+
+AUXILIARY PROGRAMS
+
+    The following three programs are not used with SatTrack but are rather 
+    useful for other purposes.
+
+    amsat:        generates a data file 'amsat.dat' in SatTrack/Data with 
+                  orbital elements in the AMSAT format from a data file with 
+                  orbital elements in the NORAD two-line format.
+
+    checksum:     generates a two-line element file with the old checksum 
+                  convention needed with InstantTrack V1.0. The input file 
+                  is for example 'tle.dat' and the corresponding output file 
+                  is 'tle.chk', also created in SatTrack/Data.
+
+    readelements: reads two-line elements from a NORAD data file and displays 
+                  them in plain language.
+
+    selectsat:    generates a data file 'sel.dat' with a selected set of 
+                  two-line orbital elements from 'tle.dat'. The names of the 
+                  satellites selected are "hardwired" in the source code 
+                  selectsat.c in SatTrack/Source. 
+
+
+Example of the live display:
+
+
+
+
+SatTrack____________________STS-45_TRACKING_MONITOR______________________DL5KR
+
+Ground Stn :    Berkeley, CA    Date: 27-03-92    Radio Beacon :  145.5500 MHz
+Satellite  :        Atlantis    Day : 087--Fri    Doppler Shift:   +1.0119 kHz
+Inclination:      56.993 deg    UTC : 22:57:59    Path Loss    :  126.8000 dB 
+Orbit      :    72  37.0 % D    PST : 14:57:59    Phase (0-256):  147.6900    
+Sun Azi/Ele: 195.0  40.0 deg                      Mode  (ABJLS):        FM
+
+    Azimuth   :      267.153 deg            Latitude  N  :   +37.612 deg
+    Elevation :       61.409 deg            Longitude W  :  +124.043 deg
+    Range     :      187.995 NM             Height       :   162.093 NM 
+    Range Rate:       -1.125 NM/s           Velocity     :     4.170 NM/s
+
+
+State Vector X:  +1981.910 NM        Y:  +2057.186 NM        Z:  +2200.783 NM  
+            VX:     -0.783 NM/s     VY:     +3.319 NM/s     VZ:     -2.400 NM/s
+
+    Last AOS  :  87/14:54:13 PST            AOS Azimuth  :   315.112 deg  D
+    Duration  :   0/00:08:30                MEL Azimuth  :   232.474 deg  D
+    Next LOS  :  87/15:02:43 PST            LOS Azimuth  :   144.161 deg  D
+    Countdown :   0/00:04:44                Max Elevation:    66.566 deg
+    MET       :   4/08:30:25                MEL Range    :   406.270 NM 
+
+Groundtrack Location:  2000.0 NM   W of Kennedy Space Center, FL
+
+Example of a prediction table in short form:
+
+
+
+
+DL5KR SatTrack Prediction
+
+Satellite         : STS-47 (Endeavour)
+NORAD Data File   : STS-47
+Element Set       : 6
+Element Set Type  : NORAD
+Epoch             : 12-09-92  20:21:31.000 UTC
+Ground Station    : Berkeley CA
+Time Zone         : -7 (PDT)
+
+
+ Date (PDT)          Time (PDT) at        Duration   Azimuth at   Max  Vis Orbit
+                 AOS      MEL      LOS     of Pass  AOS MEL LOS  Elev
+
+Sun 13-09-92  15:26:44 15:27:39 15:28:22  00:01:38    5  16  25   0.2  DDD    22
+              16:58:43 17:02:34 17:06:33  00:07:50  337  33  93  10.9  DDD    23
+              18:32:09 18:36:40 18:41:15  00:09:06  312 234 150  45.0* DDD    24
+
+Mon 14-09-92  09:14:35 09:18:39 09:22:58  00:08:23  190 126  58  17.4  DDD    34
+              10:48:08 10:52:27 10:56:50  00:08:42  250 320  30  20.2  DDD    35
+              12:25:06 12:27:08 12:29:27  00:04:21  311 337   7   2.1  DDD    36
+              15:36:10 15:38:26 15:40:50  00:04:40  352  22  53   2.4  DDD    38
+              17:08:50 17:13:08 17:17:37  00:08:47  330  37 113  22.1  DDD    39
+              18:42:45 18:46:50 18:51:03  00:08:17  301 239 172  15.8  DDD    40
+
+Tue 15-09-92  07:55:26 07:55:53 07:56:20  00:00:54  120 115 109   0.1  DDD    49
+              09:24:25 09:28:57 09:33:31  00:09:06  212 124  46  51.3* DDD    50
+              10:59:12 11:03:03 11:06:52  00:07:39  270 327  22  10.1  DDD    51
+              12:37:48 12:38:01 12:38:31  00:00:43  342 345 351   0.0  DDD    52
+              15:45:58 15:49:08 15:52:32  00:06:34  344  27  75   5.9  DDD    54
+              17:18:59 17:23:31 17:28:13  00:09:15  321  33 132  58.3* DDD    55
+              18:53:51 18:57:02 19:00:04  00:06:12  284 240 198   5.4  DDD    56
+
+Wed 16-09-92  08:02:27 08:05:51 08:09:10  00:06:42  167 118  72   6.9  DDD    65
+              09:34:37 09:39:09 09:43:46  00:09:09  232 315  37  46.0* DDD    66
+              11:10:32 11:13:42 11:16:44  00:06:12  290 334  15   4.9  DDD    67
+              14:23:44 14:24:38 14:25:46  00:02:02    3  14  29   0.4  DDD    69
+              15:55:48 15:59:53 16:03:46  00:07:58  336  37  95  11.7  DDD    70
+              17:29:13 17:33:45 17:38:20  00:09:06  311 236 152  40.0* DDD    71
+
+
+Example of a prediction table in long form:
+
+
+
+
+DL5KR SatTrack Prediction
+
+Satellite         : STS-47 (Endeavour)
+NORAD Data File   : STS-47
+Element Set       : 6
+Element Set Type  : NORAD
+Epoch             : 12-09-92  20:21:31.000 UTC
+Ground Station    : Berkeley CA
+Time Zone         : -7 (PDT)
+Min. Elevation    : 10.0 deg
+Doppler Reference : 145.5500 MHz
+
+
+Sun 13-09-92  ---  Orbit 24  ---  MET:   0/00:00:00
+
+   PDT   Azimuth  Elev   Range    Lat    Long    Height  Doppler  Loss  Phs Md V
+          [deg]  [deg]    [NM]   [deg]   [deg]    [NM]    [kHz]   [dB]
+18:34:26  304.3   12.6    584.4  +42.4  +132.4    167.7   +3.23  136.4  144 FM D
+18:34:56  299.9   17.4    479.1  +41.0  +130.6    167.7   +3.07  134.7  146 FM D
+18:35:26  292.7   24.1    381.0  +39.6  +128.9    167.6   +2.77  132.7  147 FM D
+18:35:56  279.3   33.3    297.7  +38.2  +127.2    167.6   +2.15  130.5  148 FM D
+18:36:26  252.4   43.1    244.7  +36.8  +125.6    167.5   +0.91  128.8  150 FM D
+18:36:56  212.6   43.4    242.8  +35.3  +124.1    167.4   -0.80  128.8  151 FM D
+18:37:26  184.7   33.7    293.1  +33.8  +122.6    167.4   -2.09  130.4  153 FM D
+18:37:56  170.8   24.3    375.1  +32.3  +121.2    167.3   -2.74  132.5  154 FM D
+18:38:26  163.3   17.5    472.5  +30.8  +119.8    167.2   -3.06  134.5  156 FM D
+18:38:56  158.8   12.5    577.5  +29.3  +118.5    167.2   -3.22  136.3  157 FM D
+
+
+Mon 14-09-92 --- Orbit 34
+
+   PDT   Azimuth  Elev   Range    Lat    Long    Height  Doppler  Loss  Phs Md V
+          [deg]  [deg]    [NM]   [deg]   [deg]    [NM]    [kHz]   [dB]
+09:17:06  165.2   11.3    606.0  +28.5  +119.5    165.7   +2.22  136.7   78 FM D
+09:17:36  155.2   14.0    539.7  +30.1  +118.2    165.8   +1.72  135.7   79 FM D
+09:18:06  142.6   16.2    493.1  +31.6  +116.9    165.9   +1.04  134.9   81 FM D
+09:18:36  127.8   17.4    472.0  +33.1  +115.5    166.0   +0.20  134.5   82 FM D
+09:19:06  112.6   17.0    480.0  +34.6  +114.0    166.1   -0.67  134.7   84 FM D
+09:19:36   98.8   15.3    515.6  +36.1  +112.5    166.3   -1.44  135.3   85 FM D
+09:20:06   87.6   12.8    573.6  +37.5  +111.0    166.4   -2.02  136.2   86 FM D
+09:20:36   78.9   10.1    648.1  +39.0  +109.4    166.5   -2.43  137.3   88 FM D
+
