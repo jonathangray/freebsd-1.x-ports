@@ -20,5 +20,6 @@ clean:
 	cd gs; \
 	make clean
 
-ghostscript_bin.tgz:
+package:
+	strip /usr/gnu/bin/gs
 	pkg_create -v -c bin-desc -d README.FreeBSD -f bin-list ghostscript_bin.tgz
