@@ -1,5 +1,5 @@
 #ifndef lint
-static const char *rcsid = "$Id: perform.c,v 1.8 1994/05/19 18:27:41 alm Exp $";
+static const char *rcsid = "$Id: perform.c,v 1.9 1994/05/25 06:24:41 jkh Exp $";
 #endif
 
 /*
@@ -72,7 +72,7 @@ pkg_perform(char **pkgs)
      * Run down the list and see if we've named it, if not stick in a name
      * at the top.
      */
-    if (!in_plist(&plist, PLIST_NAME))
+    if (find_plist(&plist, PLIST_NAME) == NULL)
 	add_plist_top(&plist, PLIST_NAME, pkg);
 
     /* Make a directory to stomp around in */
