@@ -253,7 +253,7 @@ install-demos:
 	    do \
 	    chmod 755 $(TK_LIBRARY)/demos/$$i; \
 	    done;
-	@cd $(SRC_DIR)/library/demos/bitmaps; for i in *; \
+	@cd $(SRC_DIR)/library/demos/bitmaps; for i in [a-z]*; \
 	    do \
 	    echo "Installing library/demos/bitmaps/$$i"; \
 	    $(INSTALL_DATA) $$i $(TK_LIBRARY)/demos/bitmaps; \
