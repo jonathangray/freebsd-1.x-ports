@@ -1,0 +1,4919 @@
+\input texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename slib.info
+@settitle SLIB
+@setchapternewpage on
+@paragraphindent 2
+@c %**end of header
+@c Choices for setchapternewpage are {on,off,odd}.
+
+@iftex
+@finalout
+@c DL: lose the egregious vertical whitespace, esp. around examples
+@c but paras in @defun-like things don't have parindent
+@parskip 4pt plus 1pt
+@end iftex
+
+@ifinfo
+This file documents SLIB, the portable Scheme library.
+
+Copyright (C) 1993 Todd R. Eigenschink
+
+Permission is granted to make and distribute verbatim copies of
+this manual provided the copyright notice and this permission notice
+are preserved on all copies.
+
+@ignore
+Permission is granted to process this file through TeX and print the
+results, provided the printed document carries copying permission
+notice identical to this one except for the removal of this paragraph
+(this paragraph not being relevant to the printed manual).
+
+@end ignore
+Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided that the entire
+resulting derived work is distributed under the terms of a permission
+notice identical to this one.
+
+Permission is granted to copy and distribute translations of this manual
+into another language, under the above conditions for modified versions,
+except that this permission notice may be stated in a translation approved
+by the author.
+@end ifinfo
+
+@titlepage
+@title SLIB
+@subtitle The Portable Scheme Library
+@subtitle Edition 0.95, for SLIB version 1d2
+@subtitle May 1993
+@author by Todd R. Eigenschink
+@author with additions by Dave Love
+
+@page
+@vskip 0pt plus 1filll
+Copyright @copyright{} 1993 Todd R. Eigenschink
+
+Permission is granted to make and distribute verbatim copies of
+this manual provided the copyright notice and this permission notice
+are preserved on all copies.
+
+Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided that the entire
+resulting derived work is distributed under the terms of a permission
+notice identical to this one.
+
+Permission is granted to copy and distribute translations of this manual
+into another language, under the above conditions for modified versions,
+except that this permission notice may be stated in a translation approved
+by the author.
+@end titlepage
+
+
+
+
+
+@node Top, , , (dir)
+
+@ifinfo
+This file documents SLIB, the portable Scheme library.
+
+This manual format is much more stable than the last version.  It is now
+roughly 70 pages (printed).  (About 30 pages were removed by decreasing
+the amount of whitespace between paragraphs and such.)
+
+A lot of thanks goes to Dave Love (D.Love@@dl.ac.uk) for all the work he
+did fixing my typos, modifying the layout, and adding text.  His
+improvements add a great deal to this documentation.
+
+Todd Eigenschink
+(eigenstr@@CS.Rose-Hulman.Edu)
+@end ifinfo
+
+
+@menu
+* Overview::			What is SLIB?
+
+* Data Structures::		Various data structures.
+* Macro Implementations::	Various macro implementations.
+* Procedures::			Miscellaneous utility procedures.
+* Standards Support::		Support for Scheme Standards.
+* Session Support::		Debugging, Pathnames, Require, etc.
+* Syntax Extensions::		Extensions to syntax.
+
+* Procedure and Macro Index::
+* Variable Index::
+@end menu
+
+
+
+
+
+@node Overview, Data Structures, Top, Top
+@chapter Overview
+
+SLIB is a portable Scheme library meant to provide compatibility and
+utility functions for all standard Scheme implementations, and fixes
+several implementations which are non-conforming.  SLIB conforms to
+@cite{Revised^4 Report on the Algorithmic Language Scheme} and the IEEE
+P1178 specification.  SLIB supports Unix and similar systems, VMS, and
+MS-DOS.@refill
+
+The maintainer can be reached as jaffer@@ai.mit.edu or Aubrey Jaffer, 84
+Pleasant St., Wakefield, MA 01880.
+
+For a summary of what each file contains, see the file @file{README}.
+For a list of the features that have changed since the last SLIB
+release, see the file @file{ANNOUNCE}.
+
+
+@menu
+* Installation::		How to install SLIB on your system.
+* Coding Standards::		How to write modules for SLIB.
+* Manual Conventions::		Conventions used in this manual.
+@end menu
+
+
+@node Installation, Coding Standards, Overview, Overview
+@section Installation
+
+Check the manifest in @file{README} to see if a configuration file for
+your Scheme implementation has already been created.  If so, customize
+it and use it.  If not, you will have to create one.  Please mail new
+working configuration files to @code{jaffer@@ai.mit.edu} so that they
+can be included in the SLIB distribution.@refill
+
+@file{Template.scm} is an example configuration file.  The comments
+inside will direct you on how to customize it to reflect your system.
+Your customized version should then be loaded as part of your scheme
+implementation's initialization.  It will load @file{require.scm}
+(@xref{Require}) from the library; this will allow the use of
+@code{provide}, @code{provided?}, and @code{require} along with the
+@dfn{vicinity} functions (@code{vicinity} functions are documented in
+the section on Require.  @xref{Require}).  The rest of the library will
+then be accessible in a system independent fashion.@refill
+
+
+
+@node Coding Standards, Manual Conventions, Installation, Overview
+@section Coding Standards
+
+All library packages are written in IEEE P1178 Scheme and assume that a
+configuration file and @file{require.scm} package have already been
+loaded.  Other versions of Scheme can be supported in library packages
+as well by using @code{(provided? 'rev3-report)} or @code{(require
+'rev3-report)} (@xref{Require}).@refill
+
+@file{require.scm} defines @code{*catalog*}, an association list of
+module names and filenames.  When a new package is added to the library,
+an entry should be added to @file{require.scm}.  Local packages can also
+be added to @code{*catalog*} and even shadow entries already in the
+table.@refill
+
+The module name and @samp{:} should prefix each symbol defined in the
+package.  Definitions for external use should then be exported by having
+@code{(define foo module-name:foo)}.@refill
+
+Submitted packages should not duplicate routines which are already in
+SLIB files.  Use @code{require} to force those features to be supported
+in your package.  Care should be taken that there are no circularities
+in the @code{require}s and @code{load}s between the library
+packages.@refill
+
+Documentation should be provided in Emacs Texinfo format if possible,
+But documentation must be provided.
+
+
+
+@node Manual Conventions, , Coding Standards, Overview
+@section Manual Conventions
+
+Things that are labeled as Functions are called for their return values.
+Things that are labeled as Procedures are called primarily for their
+side effects.
+
+All examples throughout this text were produced using @code{scm}.
+
+At the beginning of each section, there is a line that looks something
+like
+
+@code{(require 'feature)}.
+
+@noindent
+This means that, in order to use @code{feature}, you must include the
+line @code{(require 'feature)} somewhere in your code prior to the use
+of that feature.  @code{require} will make sure that the feature is
+loaded.@refill
+
+
+
+
+
+@node Data Structures, Macro Implementations, Overview, Top
+@chapter Data Structures
+
+
+
+@menu
+* Arrays::                      'array
+* Array Mapping::               'array-for-each
+* Association Lists::           'alist
+* Collections::                 'collect
+* Dynamic Data Type::           'dynamic
+* Hash Tables::                 'hash-table
+* Hashing::                     'hash
+* Priority Queues::             'priority-queue
+* Queues::                      'queue
+* Records::                     'record
+* Red-Black Trees::             'red-black-tree
+* Structures::                  'struct, 'structure
+@end menu
+
+
+
+
+@node Arrays, Array Mapping, Data Structures, Data Structures
+@section Arrays
+
+@code{(require 'array)}
+ 
+@defun array? obj
+Returns @code{#t} if the @var{obj} is an array, and @code{#f} if not.
+@end defun
+
+@defun make-array initial-value bound1 bound2 @dots{}
+Creates and returns an array that has as many dimensins as there are
+@var{bound}s and fills it with @var{initial-value}.@refill
+@end defun
+
+When constructing an array, @var{bound} is either an inclusive range of
+indices expressed as a two element list, or an upper bound expressed as
+a single integer.  So@refill
+@lisp
+(make-array 'foo 3 3)
+@end lisp
+@noindent
+and
+@lisp
+(make-array 'foo '(0 2) '(0 2))
+@end lisp
+@noindent
+are equivalent
+
+@defun make-shared-array array mapper bound1 bound2 @dots{}
+@code{make-shared-array} can be used to create shared subarrays of other
+arrays.  The @var{mapper} is a function that translates coordinates in
+the new array into coordinates in the old array.  A @var{mapper} must be
+linear, and its range must stay within the bounds of the old array, but
+it can be otherwise arbitrary.  A simple example:@refill
+@lisp
+(define fred (make-array #f 8 8))
+(define freds-diagonal
+  (make-shared-array fred (lambda (i) (list i i)) 8))
+(array-set! freds-diagonal 'foo 3)
+(array-ref fred 3 3)
+   @result{} FOO
+(define freds-center
+  (make-shared-array fred (lambda (i j) (list (+ 3 i) (+ 3 j))) 2 2))
+(array-ref freds-center 0 0)
+   @result{} FOO
+@end lisp
+@end defun
+
+@defun array-rank obj
+Returns the number of dimensions of @var{obj}.  If @var{obj} is not an
+array, 0 is returned.
+@end defun
+
+@defun array-shape array
+@code{array-shape} returns a list of inclusive bounds.  So:
+@lisp
+(array-shape (make-array 'foo 3 5))
+   @result{} ((0 2) (0 4))
+@end lisp
+@end defun
+
+@defun array-dimensions array
+@code{array-dimensions} is similar to @code{array-shape} but replaces
+elements with a 0 minimum with one greater than the maximum. So:
+@lisp
+(array-dimensions (make-array 'foo 3 5))
+   @result{} (3 5)
+@end lisp
+@end defun
+
+@deffn Procedure array-in-bounds? array index1 index2 @dots{}
+Returns @code{#t} if its arguments would be acceptable to
+@code{array-ref}.
+@end deffn
+
+@defun array-ref array index1 index2 @dots{}
+Returns the element at the @code{(@var{index1}, @var{index2})} element
+in @var{array}.@refill
+@end defun
+
+@deffn Procedure array-set! array new-value index1 index2 @dots{}
+@end deffn
+
+@defun array-1d-ref array index
+@defunx array-2d-ref array index index
+@defunx array-3d-ref array index index index
+@end defun
+
+@deffn Procedure array-1d-set! array new-value index
+@deffnx Procedure array-2d-set! array new-value index index
+@deffnx Procedure array-3d-set! array new-value index index index
+@end deffn
+
+The functions are just fast versions of @code{array-ref} and
+@code{array-set!} that take a fixed number of arguments, and perform no
+bounds checking.@refill
+
+If you comment out the bounds checking code, this is about as efficient
+as you could ask for without help from the compiler.
+
+An exercise left to the reader: implement the rest of APL.
+
+
+
+@node Array Mapping, Association Lists, Arrays, Data Structures
+@section Array Mapping
+
+@code{(require 'array-for-each)}
+
+
+@defun array-map! <array0> <proc> <array1> @dots{}
+
+@var{array1}, @dots{} must have the same number of dimensions as
+@var{array0} and have a range for each index which includes the range
+for the corresponding index in @var{array0}.  @var{Proc} is applied to
+each tuple of elements of @var{array1} @dots{} and the result is stored
+as the corresponding element in @var{array0}.  The value returned is
+unspecified.  The order of application is unspecified.
+@end defun
+
+@defun array-for-each @var{proc} @var{array0} @dots{}
+
+@var{Proc} is applied to each tuple of elements of @var{array0} @dots{} in
+row-major order.  The value returned is unspecified.
+@end defun
+
+@defun array-indexes @var{array}
+
+Returns an array of lists of indexes for @var{array} such that, if
+@var{li} is a list of indexes for which @var{array} is defined, (equal?
+@var{li} (apply array-ref (array-indexes @var{array}) @var{li})).
+@end defun
+
+
+@node Association Lists, Collections, Array Mapping, Data Structures
+@section Association Lists
+
+@code{(require 'alist)}
+
+Alist functions provide utilities for treating a list of key-value pairs
+as an associative database.  These functions take an equality predicate,
+@var{pred}, as an argument.  This predicate should be repeatable,
+symmetric, and transitive.@refill
+
+Alist functions can be used with a secondary index method such as hash
+tables for improved performance.
+
+@defun predicate->asso pred
+Returns an @dfn{association function} (like @code{assq}, @code{assv}, or
+@code{assoc}) corresponding to @var{pred}.  The returned function
+returns a key-value pair whose key is @code{pred}-equal to its first
+argument or @code{#f} if no key in the alist is @var{pred}-equal to the
+first argument.@refill
+@end defun
+
+@defun alist-inquirer pred
+Returns a procedure of 2 arguments, @var{alist} and @var{key}, which
+returns the value associated with @var{key} in @var{alist} or @code{#f} if
+@var{key} does not appear in @var{alist}.@refill
+@end defun
+
+@defun alist-associator pred
+Returns a procedure of 3 arguments, @var{alist}, @var{key}, and
+@var{value}, which returns an alist with @var{key} and @var{value}
+associated.  Any previous value associated with @var{key} will be
+lost.  This returned procedure may or may not have side effects on its
+@var{alist} argument.  An example of correct usage is:@refill
+@lisp
+(define put (alist-associator string-ci=?))
+(define alist '())
+(set! alist (put alist "Foo" 9))
+@end lisp
+@end defun
+
+@defun alist-remover pred
+Returns a procedure of 2 arguments, @var{alist} and @var{key}, which
+returns an alist with an association whose @var{key} is key removed.
+This returned procedure may or may not have side effects on its
+@var{alist} argument.  An example of correct usage is:@refill
+@lisp
+(define rem (alist-remover string-ci=?))
+(set! alist (rem alist "foo"))
+@end lisp
+@end defun
+
+@defun alist-map proc alist
+Returns a new association list formed by mapping @var{proc} over the
+keys and values of @var{alist}.   @var{proc} must be a function of 2
+arguments which returns the new value part.
+@end defun
+
+@defun alist-for-each proc alist
+Applies @var{proc} to each pair of keys and values of @var{alist}.
+@var{proc} must be a function of 2 arguments.  The returned value is
+unspecified.
+@end defun
+
+
+@node Collections, Dynamic Data Type, Association Lists, Data Structures
+@section Collections
+
+@c Much of the documentation in this section was written by Dave Love
+@c (d.love@dl.ac.uk) -- don't blame Ken Dickey for its faults.
+
+@code{(require 'collect)}
+
+Routines for managing collections.  Collections are aggregate data
+structures supporting iteration over their elements, similar to the
+Dylan(TM) language, but with a different interface.  They have
+@dfn{elements} indexed by corresponding @dfn{keys}, although the keys
+may be implicit (as with lists).@refill
+
+New types of collections may be defined as YASOS objects (@xref{Yasos}).
+They must support the following operations:
+@itemize @bullet
+@item
+@code{(collection? @var{self})} (always returns @code{#t});
+
+@item
+@code{(size @var{self})} returns the number of elements in the collection;
+
+@item
+@code{(print @var{self} @var{port})} is a specialized print operation
+for the collection which prints a suitable representation on the given
+@var{port} or returns it as a string if @var{port} is @code{#t};@refill
+
+@item
+@code{(gen-elts @var{self})} returns a thunk which on successive
+invocations yields elements of @var{self} in order or gives an error if
+it is invoked more than @code{(size @var{self})} times;@refill
+
+@item
+@code{(gen-keys @var{self})} is like @code{gen-elts}, but yields the
+collection's keys in order.
+
+@end itemize
+They might support specialized @code{for-each-key} and
+@code{for-each-elt} operations.@refill
+
+@defun collection? obj
+A predicate, true initially of lists, vectors and strings.  New sorts of
+collections must answer @code{#t} to @code{collection?}.@refill
+@end defun
+
+@deffn Procedure map-elts proc . collections
+@deffnx Procedure do-elts proc . collections
+@var{proc} is a procedure taking as many arguments as there are
+@var{collections} (at least one).  The @var{collections} are iterated
+over in their natural order and @var{proc} is applied to the elements
+yielded by each iteration in turn.  The order in which the arguments are
+supplied corresponds to te order in which the @var{collections} appear.
+@code{do-elts} is used when only side-effects of @var{proc} are of
+interest and its return value is unspecified.  @code{map-elts} returns a
+collection (actually a vector) of the results of the applications of
+@var{proc}.@refill
+@end deffn
+ 
+@deffn Procedure map-keys proc . collections
+@deffnx Procedure do-keys proc . collections
+These are analogous to @code{map-elts} and @code{do-elts}, but each
+iteration is over the @var{collections}' @emph{keys} rather than their
+elements.@refill
+
+Example:
+@lisp
+(map-keys + (list 1 2 3) (vector 1 2 3))
+   @result{} #(2 4 6)
+(map-keys + (list 1 2 3) (vector 1 2 3))
+   @result{} #(0 2 4)
+@end lisp
+@end deffn
+
+
+@deffn Procedure for-each-key collection proc
+@deffnx Procedure for-each-elt collection proc
+These are like @code{do-keys} and @code{do-elts} but only for a single
+collection; they are potentially more efficient.
+@end deffn
+  
+@defun reduce proc seed . collections
+A generalization of the list-based @code{comlist:reduce-init}
+(@xref{Lists as sequences}) to collections which will shadow the
+list-based version if @code{(require 'collect)} follows @code{(require
+'common-list-functions)} (@xref{Common List Functions}).@refill
+
+Examples:
+@lisp
+(reduce + 0 (vector 1 2 3))
+   @result{} 6
+(reduce union '() '((a b c) (b c d) (d a)))
+   @result{} (c b d a).
+@end lisp
+@end defun
+
+@defun any? pred . collections
+A generalization of the list-based @code{some} (@xref{Lists as
+sequences}) to collections.@refill
+  
+Example:
+@lisp
+(any? odd? (list 2 3 4 5))
+   @result{} #t
+@end lisp
+@end defun
+  
+@defun every? pred . collections
+A generalization of the list-based @code{every} (@xref{Lists as
+sequences}) to collections.@refill
+  
+Example:
+@lisp
+(every? collection? '((1 2) #(1 2)))
+   @result{} #t
+@end lisp
+@end defun
+  
+@defun empty? collection
+Returns @code{#t} iff there are no elements in @var{collection}.
+ 
+@code{(empty? @var{collection}) @equiv{} (zero? (size @var{collection}))}
+@end defun
+  
+@defun size collection
+Returns the number of elements in @var{collection}.
+@end defun
+
+@deffn Setter list-ref
+See @xref{Setters} for a definition of @dfn{setter}.  N.B.
+@code{(setter list-ref)} doesn't work properly for element 0 of a
+list.@refill
+@end deffn
+
+Here is a sample collection: @code{simple-table} which is also a
+@code{table}.@refill
+@lisp
+(define-predicate TABLE?)
+(define-operation (LOOKUP table key failure-object))
+(define-operation (ASSOCIATE! table key value)) ;; returns key
+(define-operation (REMOVE! table key))          ;; returns value
+
+(define (MAKE-SIMPLE-TABLE)
+  (let ( (table (list)) )
+    (object
+      ;; table behaviors
+      ((TABLE? self) #t)
+      ((SIZE self) (size table))
+      ((PRINT self port) (format port "#<SIMPLE-TABLE>"))
+      ((LOOKUP self key failure-object)
+       (cond 
+         ((assq key table) => cdr)
+         (else failure-object)
+      ))
+      ((ASSOCIATE! self key value)
+       (cond
+         ((assq key table) => (lambda (bucket) (set-cdr! bucket value) key))
+         (else 
+           (set! table (cons (cons key value) table))
+           key)
+      ))
+      ((REMOVE! self key) ;; returns old value
+       (cond
+         ((null? table) (slib:error "TABLE:REMOVE! Key not found: " key))
+         ((eq? key (caar table))
+          (let ( (value (cdar table)) )
+             (set! table (cdr table))
+             value)
+         )
+         (else
+           (let loop ( (last table) (this (cdr table)) )
+             (cond
+               ((null? this) (slib:error "TABLE:REMOVE! Key not found: " key))
+               ((eq? key (caar this))
+                (let ( (value (cdar this)) )
+                  (set-cdr! last (cdr this))
+                 value)
+               )
+               (else
+                (loop (cdr last) (cdr this)))
+         ) ) )
+      ))
+      ;; collection behaviors
+      ((COLLECTION? self) #t)
+      ((GEN-KEYS self) (collect:list-gen-elts (map car table)))
+      ((GEN-ELTS self) (collect:list-gen-elts (map cdr table)))
+      ((FOR-EACH-KEY self proc)
+       (for-each (lambda (bucket) (proc (car bucket))) table)
+      )
+      ((FOR-EACH-ELT self proc)
+       (for-each (lambda (bucket) (proc (cdr bucket))) table)
+      )
+) ) )
+@end lisp
+
+
+
+
+
+@node Dynamic Data Type, Hash Tables, Collections, Data Structures
+@section Dynamic Data Type
+
+@code{(require 'dynamic)}
+
+@defun make-dynamic obj
+Create and returns a new @dfn{dynamic} whose global value is @var{obj}.
+@end defun
+
+@defun dynamic? obj
+Returns true if and only if @var{obj} is a dynamic.  No object
+satisfying @code{dynamic?} satisfies any of the other standard type
+predicates.@refill
+@end defun
+
+@defun dynamic-ref dyn
+Return the value of the given dynamic in the current dynamic
+environment.
+@end defun
+
+@deffn Procedure dynamic-set! dyn obj
+Change the value of the given dynamic to @var{obj} in the current
+dynamic environment.  The returned value is unspecified.@refill
+@end deffn
+
+@defun call-with-dynamic-binding dyn obj thunk
+Invoke and return the value of the given thunk in a new, nested dynamic
+environment in which the given dynamic has been bound to a new location
+whose initial contents are the value @var{obj}.  This dynamic
+environment has precisely the same extent as the invocation of the thunk
+and is thus captured by continuations created within that invocation and
+re-established by those continuations when they are invoked.@refill
+@end defun
+
+The @code{dynamic-bind} macro is not implemented.
+
+
+
+
+@node Hash Tables, Hashing, Dynamic Data Type, Data Structures
+@section Hash Tables
+
+@code{(require 'hash-table)}
+
+A hash table is a vector of association lists.
+
+@defun make-hash-table k
+Returns a vector of @var{k} empty (association) lists.
+@end defun
+
+Hash table functions provide utilities for an associative database.
+These functions take an equality predicate, @var{pred}, as an argument.
+@var{pred} should be @code{eq?}, @code{eqv?}, @code{equal?}, @code{=},
+@code{char=?}, @code{char-ci=?}, @code{string=?}, or
+@code{string-ci=?}.@refill
+
+@defun predicate->hash-asso pred
+Returns a hash association function of 2 arguments, @var{key} and
+@var{hashtab}, corresponding to @var{pred}.  The returned function
+returns a key-value pair whose key is @var{pred}-equal to its first
+argument or @code{#f} if no key in @var{hashtab} is @var{pred}-equal to
+the first argument.@refill
+@end defun
+
+@defun hash-inquirer pred
+Returns a procedure of 3 arguments, @code{hashtab}and @code{key}, which
+returns the value associated with @code{key} in @code{hashtab} or
+@code{#f} if key does not appear in @code{hashtab}.@refill
+@end defun
+
+@defun hash-associator pred
+Returns a procedure of 3 arguments, @var{hashtab}, @var{key}, and
+@var{value}, which modifies @var{hashtab} so that @var{key} and
+@var{value} associated.  Any previous value associated with @var{key}
+will be lost.@refill
+@end defun
+
+@defun hash-remover pred
+Returns a procedure of 2 arguments, @var{hashtab} and @var{key}, which
+modifies @var{hashtab} so that the association whose key is @var{key} is
+removed.@refill
+@end defun
+
+@defun hash-map proc hash-table
+Returns a new hash table formed by mapping @var{proc} over the
+keys and values of @var{hash-table}.  @var{proc} must be a function of 2
+arguments which returns the new value part.
+@end defun
+
+@defun hash-for-each proc hash-table
+Applies @var{proc} to each pair of keys and values of @var{hash-table}.
+@var{proc} must be a function of 2 arguments.  The returned value is
+unspecified.
+@end defun
+
+
+
+
+
+@node Hashing, Priority Queues, Hash Tables, Data Structures
+@section Hashing
+
+@code{(require 'hash)}
+
+These hashing functions are for use in quickly classifying objects.
+Hash tables use these functions.
+
+@defun hashq obj k
+@defunx hashv obj k
+@defunx hash obj k
+Returns an exact non-negative integer less than @var{k}.  For each
+non-negative integer less than @var{k} there are arguments @var{obj} for
+which the hashing functions applied to @var{obj} and @var{k} returns
+that integer.@refill
+
+For @code{hashq}, @code{(eq? obj1 obj2)} implies @code{(= (hashq obj1 k)
+(hashq obj2))}.@refill
+
+For @code{hashv}, @code{(eqv? obj1 obj2)} implies @code{(= (hashv obj1 k)
+(hashv obj2))}.@refill
+
+For @code{hash}, @code{(equal? obj1 obj2)} implies @code{(= (hash obj1 k)
+(hash obj2))}.@refill
+
+@code{hash}, @code{hashv}, and @code{hashq} return in time bounded by a
+constant.  Notice that @code{hash} implies @code{hashv} implies
+@code{hashq}.@refill
+@end defun
+
+@defun predicate->hash pred
+Returns a hash function (like @code{hashq}, @code{hashv}, or
+@code{hash}) corresponding to the equality predicate @var{pred}.
+@var{pred} should be @code{eq?}, @code{eqv?}, @code{equal?}, @code{=},
+@code{char=?}, @code{char-ci=?}, @code{string=?}, or
+@code{string-ci=?}.@refill
+@end defun
+
+
+
+
+
+@node Priority Queues, Queues, Hashing, Data Structures
+@section Priority Queues
+
+@code{(require 'priority-queue)}
+
+@defun make-heap pred<?
+Returns a binary heap suitable which can be used for priority queue
+operations.
+@end defun
+
+@deffn Procedure heap-insert heap item
+Inserts @var{item} into @var{heap}.  @var{item} can be inserted multiple
+times.  The value returned is unspecified.@refill
+@end deffn
+
+@defun heap-extract-max heap
+Returns the item which is larger than all others according to the
+@var{pred<?} argument to @code{make-heap}.  If there are no items in
+@var{heap}, an error is signaled.@refill
+@end defun
+
+The algorithm for priority queues was taken from @cite{Introduction to
+Algorithms} by T. Cormen, C. Leiserson, R. Rivest.  1989 MIT Press.
+
+
+
+
+
+@node Queues, Records, Priority Queues, Data Structures
+@section Queues
+
+@code{(require 'queue)}
+
+A @dfn{queue} is a list where elements can be added to both the front
+and rear, and removed from the front (i.e., they are what are often
+called @dfn{dequeues}).  A queue may also be used like a stack.@refill
+
+@defun make-queue
+Returns a new, empty queue.
+@end defun
+
+@defun queue? obj
+Returns @code{#t} if @var{obj} is a queue.
+@end defun
+
+@defun queue-empty? q
+Returns @code{#t} if the queue @var{q} is empty.
+@end defun
+
+@deffn Procedure queue-push! q datum
+Adds @var{datum} to the front of queue @var{q}.
+@end deffn
+
+@deffn Procedure enquque! q datum
+Adds @var{datum} to the rear of queue @var{q}.
+@end deffn
+
+All of the following functions raise an error if the queue @var{q} is
+empty.@refill
+
+@defun queue-front q
+Returns the datum at the front of the queue @var{q}.
+@end defun
+
+@defun queue-rear q
+Returns the datum at the rear of the queue @var{q}.
+@end defun
+
+@deffn Prcoedure queue-pop! q
+@deffnx Procedure dequeue! q
+Both of these procedures remove and return the datum at the front of the
+queue.  @code{queue-pop!} is used to suggest that the queue is being
+used like a stack.@refill
+@end deffn
+
+
+
+
+
+@node Records, Red-Black Trees, Queues, Data Structures
+@section Records
+
+@code{(require 'record)}
+
+The Record package provides a facility for user to define their own
+record data types.
+
+@defun make-record-type type-name field-names
+Returns a @dfn{record-type descriptor}, a value representing a new data
+type disjoint from all others.  The @var{type-name} argument must be a
+string, but is only used for debugging purposes (such as the printed
+representation of a record of the new type).  The @var{field-names}
+argument is a list of symbols naming the @dfn{fields} of a record of the
+new type.  It is an error if the list contains any duplicates.  It is
+unspecified how record-type descriptors are represented.@refill
+@end defun
+
+@defun make-record-sub-type type-name field-names rtd
+Returns a @dfn{record-type descriptor}, a value representing a new data
+type, disjoint from all others.  The @var{type-name} argument must be a
+string.  The @var{field-names} argument is a list of symbols naming the
+additional @dfn{fields} to be appended to @var{field-names} of
+@var{rtd}.  It is an error if the combinded list contains any
+duplicates.@refill
+
+Record-modifiers and record-accessors for @var{rtd} work for the new
+record-sub-type as well.  But record-modifiers and record-accessors for
+the new record-sub-type will not neccessarily work for @var{rtd}.@refill
+@end defun
+
+@defun record-constructor rtd [field-names]
+Returns a procedure for constructing new members of the type represented
+by @var{rtd}.  The returned procedure accepts exactly as many arguments
+as there are symbols in the given list, @var{field-names}; these are
+used, in order, as the initial values of those fields in a new record,
+which is returned by the constructor procedure.  The values of any
+fields not named in that list are unspecified.  The @var{field-names}
+argument defaults to the list of field names in the call to
+@code{make-record-type} that created the type represented by @var{rtd};
+if the @var{field-names} argument is provided, it is an error if it
+contains any duplicates or any symbols not in the default list.@refill
+@end defun
+
+@defun record-predicate rtd
+Returns a procedure for testing membership in the type represented by
+@var{rtd}.  The returned procedure accepts exactly one argument and
+returns a true value if the argument is a member of the indicated record
+type; it returns a false value otherwise.@refill
+@end defun
+
+@defun record-sub-predicate rtd
+Returns a procedure for testing membership in the type represented by
+@var{rtd} or its parents.  The returned procedure accepts exactly one
+argument and returns a true value if the argument is a member of the
+indicated record type or its parents; it returns a false value
+otherwise.@refill
+@end defun
+
+@defun record-accessor rtd field-name
+Returns a procedure for reading the value of a particular field of a
+member of the type represented by @var{rtd}.  The returned procedure
+accepts exactly one argument which must be a record of the appropriate
+type; it returns the current value of the field named by the symbol
+@var{field-name} in that record.  The symbol @var{field-name} must be a
+member of the list of field-names in the call to @code{make-record-type}
+that created the type represented by @var{rtd}.@refill
+@end defun
+
+
+@defun record-modifier rtd field-name
+Returns a procedure for writing the value of a particular field of a
+member of the type represented by @var{rtd}.  The returned procedure
+accepts exactly two arguments: first, a record of the appropriate type,
+and second, an arbitrary Scheme value; it modifies the field named by
+the symbol @var{field-name} in that record to contain the given value.
+The returned value of the modifier procedure is unspecified.  The symbol
+@var{field-name} must be a member of the list of field-names in the call
+to @code{make-record-type} that created the type represented by
+@var{rtd}.@refill
+@end defun
+
+@defun record? obj
+Returns a true value if @var{obj} is a record of any type and a false
+value otherwise.  Note that @code{record?} may be true of any Scheme
+value; of course, if it returns true for some particular value, then
+@code{record-type-descriptor} is applicable to that value and returns an
+appropriate descriptor.@refill
+@end defun
+
+@defun record-type-descriptor record
+Returns a record-type descriptor representing the type of the given
+record.  That is, for example, if the returned descriptor were passed to
+@code{record-predicate}, the resulting predicate would return a true
+value when passed the given record.  Note that it is not necessarily the
+case that the returned descriptor is the one that was passed to
+@code{record-constructor} in the call that created the constructor
+procedure that created the given record.@refill
+@end defun
+
+@defun record-type-name rtd
+Returns the type-name associated with the type represented by rtd.  The
+returned value is @code{eqv?} to the @var{type-name} argument given in
+the call to @code{make-record-type} that created the type represented by
+@var{rtd}.@refill
+@end defun
+
+@defun record-type-field-names rtd
+Returns a list of the symbols naming the fields in members of the type
+represented by @var{rtd}.  The returned value is @code{equal?} to the
+field-names argument given in the call to @code{make-record-type} that
+created the type represented by @var{rtd}.@refill
+@end defun
+
+
+
+
+
+@node Red-Black Trees, Structures, Records, Data Structures
+@section Red-Black Trees
+
+@code{(require 'red-black-tree)}
+
+This is an implementation of Red-Black trees in Scheme.
+
+@defun make-rb-tree left-rotation-field-maintainer right-rotation-field-maintainer insertion-field-maintainer deletion-field-maintainer prior?
+Makes an empty Red-Black tree based on the arguments:
+
+@table @var
+@item left-rotation-field-maintainer
+@item right-rotation-field-maintainer
+Invoked in rotations to maintain augmented fields.  Args are X and Y.
+If you have no augmented fields that depend explicitly on the structure
+of the tree, make these null.
+
+@item insertion-field-maintainer
+Invoked in insertion to maintain fields.  Invoked once, on node inserted
+after insertion is performed, but before rotations are performed to
+balance tree.  May also be invoked in one case of deletion.
+
+@item deletion-field-maintainer
+Invoked in deletion to maintain fields.  Invoked once, on node deleted
+after deletion is performed, but before rotations are performed to
+balance the tree.  May be invoked on non-garbage nodes during deletion,
+where node is spliced out of one place and into another.  The tree is
+always guaranteed connected from parent up.
+
+@item prior?
+@var{prior?} should be a binary predicate used for totally ordering the
+data fields of nodes.  The name @var{prior?} is just a mnemonic aid; it
+means that if the predicate is successful the first arg should go to the
+left of the second arg, where left is in tree fields.@refill
+@end table
+@end defun
+
+
+@deffn Procedure rb-delete! tree node
+Deletes @var{node} from @var{tree}.  The node that is actually deleted
+may not be the one passed in, so if a resource is being maintained, what
+should be put back on the freelist is the @var{node} returned by this
+procedure.@refill
+@end deffn
+
+
+@defun rb-node-successor node
+@defunx rb-node-predecessor node
+Return the successor and predecessor (as determined by the
+@var{prior?} argument to @code{make-rb-tree}) from the tree of which
+@var{node} is a member.@refill
+@end defun
+
+@defun rb-node-maximum node
+@defunx rb-node-minimum node
+Return the minimum and maximum nodes in the tree of which @var{node}
+is a member.@refill
+@end defun
+
+@defun rb-tree-maximum tree
+@defunx rb-tree-minimum tree
+Return the minimum and maximum nodes in @var{tree}.
+@end defun
+
+@deffn Procedure rb-insert! tree node
+Inserts @var{node} in @var{tree}.  The value returned is
+unspecified.@refill
+@end deffn
+
+@defun make-rb-node data
+Makes a node (suitable for insertion with @code{rb-insert!}) with datum
+@var{data}.@refill
+@end defun
+
+
+
+
+@node Structures, , Red-Black Trees, Data Structures
+@section Structures
+
+@code{(require 'struct)} for defmacros.
+@code{(require 'structure)} for syntax-case macros.
+
+@code{defmacro}s which implement @dfn{records} from the book
+@cite{Essentials of Programming Languages} by Daniel P. Friedman, M.
+Wand and C.T. Haynes.  Copyright 1992 Jeff Alexander, Shinnder Lee, and
+Lewis Patterson@refill
+
+@defmac define-record record-name fields
+@end defmac
+
+@defun variant-case record exps
+@end defun
+
+
+
+
+
+@node Macro Implementations, Procedures, Data Structures, Top
+@chapter Macro Implementations
+
+@menu
+* Defmacro::                    'defmacro
+* Macros That Work::            'macros-that-work
+* Syntactic Closures::          'syntactic-closures
+* Syntax-Case Macros::          'syntax-case
+@end menu
+
+
+
+
+
+@node Defmacro, Macros That Work, Macro Implementations, Macro Implementations
+@section Defmacro
+
+@code{(require 'defmacro)}
+
+@defun defmacro:macroexpand* e
+@end defun
+
+@defun defmacro:eval x
+@end defun
+
+@defun defmacro:load pathname
+@end defun
+
+@defun gentemp
+Returns a new (interned) symbol each time it is called.  The symbol
+names are implementation-dependent
+@lisp
+(gentemp) @result{} scm:G0
+(gentemp) @result{} scm:G1
+@end lisp
+@end defun
+
+
+
+
+
+@node Macros That Work, Syntactic Closures, Defmacro, Macro Implementations
+@section Macros That Work
+
+@code{(require 'macros-that-work)}
+
+References:
+
+The @cite{Revised^4 Report on the Algorithmic Language Scheme.} Clinger
+and Rees [editors].  To appear in LISP Pointers.  Also available as a
+technical report from the University of Oregon, MIT AI Lab, and
+Cornell.@refill
+
+@center Macros That Work.  Clinger and Rees.  POPL '91.
+
+The supported syntax differs from the R4RS in that vectors are allowed
+as patterns and as templates and are not allowed as pattern or template
+data.
+
+@example
+transformer spec  -->  (syntax-rules literals rules)
+
+rules  -->  ()
+         |  (rule . rules)
+
+rule  -->  (pattern template)
+
+pattern  -->  pattern_var      ; a symbol not in literals
+           |  symbol           ; a symbol in literals
+           |  ()
+           |  (pattern . pattern)
+           |  (ellipsis_pattern)
+           |  #(pattern*)                     ; extends R4RS
+           |  #(pattern* ellipsis_pattern)    ; extends R4RS
+           |  pattern_datum
+
+template  -->  pattern_var
+            |  symbol
+            |  ()
+            |  (template2 . template2)
+            |  #(template*)                   ; extends R4RS
+            |  pattern_datum
+
+template2  -->  template
+             |  ellipsis_template
+
+pattern_datum  -->  string                    ; no vector
+                 |  character
+                 |  boolean
+                 |  number
+
+ellipsis_pattern  --> pattern ...
+
+ellipsis_template  -->  template ...
+
+pattern_var  -->  symbol   ; not in literals
+
+literals  -->  ()
+            |  (symbol . literals)
+@end example
+
+@subsection Definitions
+
+@table @asis
+
+@item Scope of an ellipsis
+Within a pattern or template, the scope of an ellipsis (@code{...}) is
+the pattern or template that appears to its left.
+
+@item Rank of a pattern variable
+The rank of a pattern variable is the number of ellipses within whose
+scope it appears in the pattern.
+
+@item Rank of a subtemplate
+The rank of a subtemplate is the number of ellipses within whose scope
+it appears in the template.
+
+@item Template rank of an occurrence of a pattern variable
+The template rank of an occurrence of a pattern variable within a
+template is the rank of that occurrence, viewed as a subtemplate.
+
+@item Variables bound by a pattern
+The variables bound by a pattern are the pattern variables that appear
+within it.
+
+@item Referenced variables of a subtemplate
+The referenced variables of a subtemplate are the pattern variables that
+appear within it.
+
+@item Variables opened by an ellipsis template
+The variables opened by an ellipsis template are the referenced pattern
+variables whose rank is greater than the rank of the ellipsis template.
+
+@end table
+   
+
+@subsection Restrictions
+
+No pattern variable appears more than once within a pattern.
+
+For every occurrence of a pattern variable within a template, the
+template rank of the occurrence must be greater than or equal to the
+pattern variable's rank.
+
+Every ellipsis template must open at least one variable.
+   
+For every ellipsis template, the variables opened by an ellipsis
+template must all be bound to sequences of the same length.
+
+The compiled form of a @var{rule} is
+
+@example
+rule  -->  (pattern template inserted)
+
+pattern  -->  pattern_var
+           |  symbol
+           |  ()
+           |  (pattern . pattern)
+           |  ellipsis_pattern
+           |  #(pattern)
+           |  pattern_datum
+
+template  -->  pattern_var
+            |  symbol
+            |  ()
+            |  (template2 . template2)
+            |  #(pattern)
+            |  pattern_datum
+
+template2  -->  template
+             |  ellipsis_template
+
+pattern_datum  -->  string
+                 |  character
+                 |  boolean
+                 |  number
+
+pattern_var  -->  #(V symbol rank)
+
+ellipsis_pattern  -->  #(E pattern pattern_vars)
+
+ellipsis_template  -->  #(E template pattern_vars)
+
+inserted  -->  ()
+            |  (symbol . inserted)
+
+pattern_vars  -->  ()
+                |  (pattern_var . pattern_vars)
+
+rank  -->  exact non-negative integer
+@end example
+
+where V and E are unforgeable values.
+
+The pattern variables associated with an ellipsis pattern are the
+variables bound by the pattern, and the pattern variables associated
+with an ellipsis template are the variables opened by the ellipsis
+template.
+
+If the template contains a big chunk that contains no pattern variables
+or inserted identifiers, then the big chunk will be copied
+unnecessarily.  That shouldn't matter very often.
+
+
+
+
+
+@node Syntactic Closures, Syntax-Case Macros, Macros That Work, Macro Implementations
+@section Syntactic Closures
+
+@code{(require 'syntactic-closures)}
+
+Syntactic-closure macros.
+
+@defun macro:expand expression
+Returns scheme code with the macros and derived expression types of
+@var{expression} expanded to primitive expression types.@refill
+@end defun
+
+@defun macro:eval expression
+@code{macro:eval} returns the value of @var{expression} in the current
+top level environment.  @var{expression} can contain macro definitions.
+Side effects of @var{expression} will affect the top level
+environment.@refill
+@end defun
+
+@defun macro:load filename
+@var{filename} should be a string.  If filename names an existing file,
+the @code{macro:load} procedure reads Scheme source code expressions and
+definitions from the file and evaluates them sequentially.  These
+source code expressions and definitions may contain macro definitions.
+The @code{macro:load} procedure does not affect the values returned by
+@code{current-input-port} and @code{current-output-port}.@refill
+@end defun
+
+@subsection Syntactic Closure Macro Facility
+
+@center A Syntactic Closures Macro Facility
+@center by Chris Hanson
+@center 9 November 1991
+
+This document describes @dfn{syntactic closures}, a low-level macro
+facility for the Scheme programming language.  The facility is an
+alternative to the low-level macro facility described in the
+@cite{Revised^4 Report on Scheme.} This document is an addendum to that
+report.
+
+The syntactic closures facility extends the BNF rule for
+@var{transformer spec} to allow a new keyword that introduces a
+low-level macro transformer:@refill
+@example
+@var{transformer spec} := (transformer @var{expression})
+@end example
+
+Additionally, the following procedures are added:
+@lisp
+make-syntactic-closure
+capture-syntactic-environment
+identifier?
+identifier=?
+@end lisp
+
+The description of the facility is divided into three parts.  The first
+part defines basic terminology.  The second part describes how macro
+transformers are defined.  The third part describes the use of
+@dfn{identifiers}, which extend the syntactic closure mechanism to be
+compatible with @code{syntax-rules}.@refill
+
+@subsubsection Terminology
+
+This section defines the concepts and data types used by the syntactic
+closures facility.
+
+@itemize
+
+@item @dfn{Forms} are the syntactic entities out of which programs are
+recursively constructed.  A form is any expression, any definition, any
+syntactic keyword, or any syntactic closure.  The variable name that
+appears in a @code{set!} special form is also a form.  Examples of
+forms:@refill
+@lisp
+17
+#t
+car
+(+ x 4)
+(lambda (x) x)
+(define pi 3.14159)
+if
+define
+@end lisp
+
+@item An @dfn{alias} is an alternate name for a given symbol.  It can
+appear anywhere in a form that the symbol could be used, and when quoted
+it is replaced by the symbol; however, it does not satisfy the predicate
+@code{symbol?}.  Macro transformers rarely distinguish symbols from
+aliases, referring to both as identifiers.@refill
+
+@item A @dfn{syntactic} environment maps identifiers to their
+meanings.  More precisely, it determines whether an identifier is a
+syntactic keyword or a variable.  If it is a keyword, the meaning is an
+interpretation for the form in which that keyword appears.  If it is a
+variable, the meaning identifies which binding of that variable is
+referenced.  In short, syntactic environments contain all of the
+contextual information necessary for interpreting the meaning of a
+particular form.@refill
+
+@item A @dfn{syntactic closure} consists of a form, a syntactic
+environment, and a list of identifiers.  All identifiers in the form
+take their meaning from the syntactic environment, except those in the
+given list.  The identifiers in the list are to have their meanings
+determined later.  A syntactic closure may be used in any context in
+which its form could have been used.  Since a syntactic closure is also
+a form, it may not be used in contexts where a form would be illegal.
+For example, a form may not appear as a clause in the cond special form.
+A syntactic closure appearing in a quoted structure is replaced by its
+form.@refill
+
+@end itemize
+
+@subsubsection Transformer Definition
+
+This section describes the @code{transformer} special form and the
+procedures @code{make-syntactic-closure} and
+@code{capture-syntactic-environment}.@refill
+
+@deffn Syntax transformer expression
+
+Syntax: It is an error if this syntax occurs except as a
+@var{transformer spec}.@refill
+
+Semantics: The @var{expression} is evaluated in the standard transformer
+environment to yield a macro transformer as described below.  This macro
+transformer is bound to a macro keyword by the special form in which the
+@code{transformer} expression appears (for example,
+@code{let-syntax}).@refill
+
+A @dfn{macro transformer} is a procedure that takes two arguments, a
+form and a syntactic environment, and returns a new form.  The first
+argument, the @dfn{input form}, is the form in which the macro keyword
+occurred.  The second argument, the @dfn{usage environment}, is the
+syntactic environment in which the input form occurred.  The result of
+the transformer, the @dfn{output form}, is automatically closed in the
+@dfn{transformer environment}, which is the syntactic environment in
+which the @code{transformer} expression occurred.@refill
+
+For example, here is a definition of a push macro using
+@code{syntax-rules}:@refill
+@lisp
+(define-syntax  push
+  (syntax-rules ()
+    ((push item list)
+     (set! list (cons item list)))))
+@end lisp
+
+Here is an equivalent definition using @code{transformer}:
+@lisp
+(define-syntax push
+  (transformer
+   (lambda (exp env)
+     (let ((item
+	    (make-syntactic-closure env '() (cadr exp)))
+	   (list
+	    (make-syntactic-closure env '() (caddr exp))))
+       `(set! ,list (cons ,item ,list))))))
+@end lisp
+
+In this example, the identifiers @code{set!} and @code{cons} are closed
+in the transformer environment, and thus will not be affected by the
+meanings of those identifiers in the usage environment
+@code{env}.@refill
+
+Some macros may be non-hygienic by design.  For example, the following
+defines a loop macro that implicitly binds @code{exit} to an escape
+procedure.  The binding of @code{exit} is intended to capture free
+references to @code{exit} in the body of the loop, so @code{exit} must
+be left free when the body is closed:@refill
+@lisp
+(define-syntax loop
+  (transformer
+   (lambda (exp env)
+     (let ((body (cdr exp)))
+       `(call-with-current-continuation
+	 (lambda (exit)
+	   (let f ()
+	     ,@@(map (lambda  (exp)
+		       (make-syntactic-closure env '(exit)
+					       exp))
+		     body)
+	     (f))))))))
+@end lisp
+
+To assign meanings to the identifiers in a form, use
+@code{make-syntactic-closure} to close the form in a syntactic
+environment.@refill
+@end deffn
+
+@defun make-syntactic-closure environment free-names form
+
+@var{environment} must be a syntactic environment, @var{free-names} must
+be a list of identifiers, and @var{form} must be a form.
+@code{make-syntactic-closure} constructs and returns a syntactic closure
+of @var{form} in @var{environment}, which can be used anywhere that
+@var{form} could have been used.  All the identifiers used in
+@var{form}, except those explicitly excepted by @var{free-names}, obtain
+their meanings from @var{environment}.@refill
+
+Here is an example where @var{free-names} is something other than the
+empty list.  It is instructive to compare the use of @var{free-names} in
+this example with its use in the @code{loop} example above: the examples
+are similar except for the source of the identifier being left
+free.@refill
+@lisp
+(define-syntax let1
+  (transformer
+   (lambda (exp env)
+     (let ((id (cadr exp))
+	   (init (caddr exp))
+	   (exp (cadddr exp)))
+       `((lambda (,id)
+	   ,(make-syntactic-closure env (list id) exp))
+	 ,(make-syntactic-closure env '() init))))))
+@end lisp
+
+@code{let1} is a simplified version of @code{let} that only binds a
+single identifier, and whose body consists of a single expression.  When
+the body expression is syntactically closed in its original syntactic
+environment, the identifier that is to be bound by @code{let1} must be
+left free, so that it can be properly captured by the @code{lambda} in
+the output form.@refill
+
+To obtain a syntactic environment other than the usage environment, use
+@code{capture-syntactic-environment}.@refill
+@end defun
+
+@defun capture-syntactic-environment procedure
+
+@code{capture-syntactic-environment} returns a form that will, when
+transformed, call @var{procedure} on the current syntactic environment.
+@var{procedure} should compute and return a new form to be transformed,
+in that same syntactic environment, in place of the form.@refill
+
+An example will make this clear.  Suppose we wanted to define a simple
+@code{loop-until} keyword equivalent to@refill
+@lisp
+(define-syntax loop-until
+  (syntax-rules ()
+    ((loop-until id init test return step)
+     (letrec ((loop
+	       (lambda (id)
+		 (if test return (loop step)))))
+       (loop init)))))
+@end lisp
+
+The following attempt at defining @code{loop-until} has a subtle bug:
+@lisp
+(define-syntax loop-until
+  (transformer
+   (lambda (exp env)
+     (let ((id (cadr exp))
+	   (init (caddr exp))
+	   (test (cadddr exp))
+	   (return (cadddr (cdr exp)))
+	   (step (cadddr (cddr exp)))
+	   (close
+	    (lambda (exp free)
+	      (make-syntactic-closure env free exp))))
+       `(letrec ((loop
+		  (lambda (,id)
+		    (if ,(close test (list id))
+			,(close return (list id))
+			(loop ,(close step (list id)))))))
+	  (loop ,(close init '())))))))
+@end lisp
+
+This definition appears to take all of the proper precautions to prevent
+unintended captures.  It carefully closes the subexpressions in their
+original syntactic environment and it leaves the @code{id} identifier
+free in the @code{test}, @code{return}, and @code{step} expressions, so
+that it will be captured by the binding introduced by the @code{lambda}
+expression.  Unfortunately it uses the identifiers @code{if} and
+@code{loop} within that @code{lambda} expression, so if the user of
+@code{loop-until} just happens to use, say, @code{if} for the
+identifier, it will be inadvertently captured.@refill
+
+The syntactic environment that @code{if} and @code{loop} want to be
+exposed to is the one just outside the @code{lambda} expression: before
+the user's identifier is added to the syntactic environment, but after
+the identifier loop has been added.
+@code{capture-syntactic-environment} captures exactly that environment
+as follows:@refill
+@lisp
+(define-syntax loop-until
+  (transformer
+   (lambda (exp env)
+     (let ((id (cadr exp))
+	   (init (caddr exp))
+	   (test (cadddr exp))
+	   (return (cadddr (cdr exp)))
+	   (step (cadddr (cddr exp)))
+	   (close
+	    (lambda (exp free)
+	      (make-syntactic-closure env free exp))))
+       `(letrec ((loop
+		  ,(capture-syntactic-environment
+		    (lambda (env)
+		      `(lambda (,id)
+			 (,(make-syntactic-closure env '() `if)
+			  ,(close test (list id))
+			  ,(close return (list id))
+			  (,(make-syntactic-closure env '()
+						    `loop)
+			   ,(close step (list id)))))))))
+	  (loop ,(close init '())))))))
+@end lisp
+
+In this case, having captured the desired syntactic environment, it is
+convenient to construct syntactic closures of the identifiers @code{if}
+and the @code{loop} and use them in the body of the
+@code{lambda}.@refill
+
+A common use of @code{capture-syntactic-environment} is to get the
+transformer environment of a macro transformer:@refill
+@lisp
+(transformer
+ (lambda (exp env)
+   (capture-syntactic-environment
+    (lambda (transformer-env)
+      ...))))
+@end lisp
+@end defun
+
+@subsubsection Identifiers
+
+This section describes the procedures that create and manipulate
+identifiers.  Previous syntactic closure proposals did not have an
+identifier data type -- they just used symbols.  The identifier data
+type extends the syntactic closures facility to be compatible with the
+high-level @code{syntax-rules} facility.@refill
+
+As discussed earlier, an identifier is either a symbol or an
+@dfn{alias}.  An alias is implemented as a syntactic closure whose
+@dfn{form} is an identifier:@refill
+@lisp
+(make-syntactic-closure env '() 'a)
+   @result{} an @dfn{alias}
+@end lisp
+
+Aliases are implemented as syntactic closures because they behave just
+like syntactic closures most of the time.  The difference is that an
+alias may be bound to a new value (for example by @code{lambda} or
+@code{let-syntax}); other syntactic closures may not be used this way.
+If an alias is bound, then within the scope of that binding it is looked
+up in the syntactic environment just like any other identifier.@refill
+
+Aliases are used in the implementation of the high-level facility
+@code{syntax-rules}.  A macro transformer created by @code{syntax-rules}
+uses a template to generate its output form, substituting subforms of
+the input form into the template.  In a syntactic closures
+implementation, all of the symbols in the template are replaced by
+aliases closed in the transformer environment, while the output form
+itself is closed in the usage environment.  This guarantees that the
+macro transformation is hygienic, without requiring the transformer to
+know the syntactic roles of the substituted input subforms.
+
+@defun identifier?  object
+Returns @code{#t} if @var{object} is an identifier, otherwise returns
+@code{#f}.  Examples:@refill
+@lisp
+(identifier? 'a)
+   @result{} #t
+(identifier? (make-syntactic-closure env '() 'a))
+   @result{} #t
+(identifier? "a")
+   @result{} #f
+(identifier? #\a)
+   @result{} #f
+(identifier? 97)
+   @result{} #f
+(identifier? #f)
+   @result{} #f
+(identifier? '(a))
+   @result{} #f
+(identifier? '#(a))
+   @result{} #f
+@end lisp
+
+The predicate @code{eq?} is used to determine if two identifers are
+``the same''.  Thus @code{eq?} can be used to compare identifiers
+exactly as it would be used to compare symbols.  Often, though, it is
+useful to know whether two identifiers ``mean the same thing''.  For
+example, the @code{cond} macro uses the symbol @code{else} to identify
+the final clause in the conditional.  A macro transformer for
+@code{cond} cannot just look for the symbol @code{else}, because the
+@code{cond} form might be the output of another macro transformer that
+replaced the symbol @code{else} with an alias.  Instead the transformer
+must look for an identifier that ``means the same thing'' in the usage
+environment as the symbol @code{else} means in the transformer
+environment.@refill
+@end defun
+
+@defun identifier=? environment1 identifier1 environment2 identifier2
+@var{environment1} and @var{environment2} must be syntactic
+environments, and @var{identifier1} and @var{identifier2} must be
+identifiers.  @code{identifier=?} returns @code{#t} if the meaning of
+@var{identifier1} in @var{environment1} is the same as that of
+@var{identifier2} in @var{environment2}, otherwise it returns @code{#f}.
+Examples:@refill
+
+@lisp
+(let-syntax
+    ((foo
+      (transformer
+       (lambda (form env)
+	 (capture-syntactic-environment
+	  (lambda (transformer-env)
+	    (identifier=? transformer-env 'x env 'x)))))))
+  (list (foo)
+	(let ((x 3))
+	  (foo))))
+   @result{} (#t #f)
+@end lisp
+
+@lisp
+(let-syntax ((bar foo))
+  (let-syntax
+      ((foo
+	(transformer
+	 (lambda (form env)
+	   (capture-syntactic-environment
+	    (lambda (transformer-env)
+	      (identifier=? transformer-env 'foo
+			    env (cadr form))))))))
+    (list (foo foo)
+	  (foobar))))
+   @result{} (#f #t)
+@end lisp
+@end defun
+
+@subsubsection Acknowledgements
+
+The syntactic closures facility was invented by Alan Bawden and Jonathan
+Rees.  The use of aliases to implement @code{syntax-rules} was invented
+by Alan Bawden (who prefers to call them @dfn{synthetic names}).  Much
+of this proposal is derived from an earlier proposal by Alan
+Bawden.@refill
+
+
+
+
+
+@node Syntax-Case Macros, , Syntactic Closures, Macro Implementations
+@section Syntax-Case Macros
+
+@code{(require 'syntax-case)}
+
+This is version 2.1 of @code{syntax-case}, the low-level macro facility
+proposed and implemented by Robert Hieb and R. Kent Dybvig.
+
+This version is further adapted by Harald Hanche-Olsen
+<hanche@@imf.unit.no> to make it compatible with, and easily usable
+with, SLIB.  Mainly, these adaptations consisted of:
+
+@itemize @bullet
+@item
+Removing white space from @file{expand.pp} to save space in the
+distribution.  This file is not meant for human readers anyway@dots{}
+
+@item
+Removed a couple of Chez scheme dependencies.
+
+@item
+Renamed global variables used to minimize the possibility of name
+conflicts.
+
+@item
+Adding an SLIB-specific initialization file.
+
+@item
+Removing a couple extra files, most notably the documentation (but see
+below).
+@end itemize
+
+If you wish, you can see exactly what changes were done by reading the
+shell script in the file @file{syncase.sh}.
+
+The two PostScript files were omitted in order to not burden the SLIB
+distribution with them.  If you do intend to use @code{syntax-case},
+however, you should get these files and print them out on a PostScript
+printer.  They are available with the original @code{syntax-case}
+distribution by anonymous FTP in
+@file{cs.indiana.edu:/pub/scheme/syntax-case}.@refill
+
+In order to use syntax-case from an interactive top level, execute:
+@lisp
+(require 'syntax-case)
+(require 'repl)
+(repl:top-level macro:eval)
+@end lisp
+See the section Repl (@xref{Repl}) for more information.
+
+To check operation of syntax-case get
+@file{cs.indiana.edu:/pub/scheme/syntax-case}, and type
+@lisp
+(require 'syntax-case)
+(syncase:sanity-check)
+@end lisp
+
+Beware that @code{syntax-case} takes a long time to load -- about 20s on
+a SPARCstation SLC (with SCM) and about 90s on a Macintosh SE/30 (with
+Gambit).
+
+@subsection Notes
+
+All R4RS syntactic forms are defined, including @code{delay}.  Along
+with @code{delay} are simple definitions for @code{make-promise} (into
+which @code{delay} expressions expand) and @code{force}.@refill
+
+@code{syntax-rules} and @code{with-syntax} (described in TR356) are
+defined.@refill
+
+@code{syntax-case} is actually defined as a macro that expands into
+calls to the procedure @code{syntax-dispatch} and the core form
+@code{syntax-lambda}; do not redefine these names.@refill
+
+Several other top-level bindings not documented in TR356 are created:
+@itemize
+@item the ``hooks'' in @file{hooks.ss}
+@item the @code{build-} procedures in @file{output.ss}
+@item @code{expand-syntax} (the expander)
+@end itemize
+        
+The syntax of define has been extended to allow @code{(define @var{id})},
+which assigns @var{id} to some unspecified value.@refill
+
+We have attempted to maintain R4RS compatibility where possible.  The
+incompatibilities should be confined to @file{hooks.ss}.  Please let us
+know if there is some incompatibility that is not flagged as such.@refill
+
+Send bug reports, comments, suggestions, and questions to Kent Dybvig
+(dyb@@iuvax.cs.indiana.edu).
+
+
+
+
+@node Procedures, Standards Support, Macro Implementations, Top
+@chapter Procedures
+
+Anything that doesn't fall neatly into any of the other categories winds
+up here.
+
+@menu
+* Bit-Twiddling::               'logical
+* Common List Functions::       'common-list-functions
+* Format::                      'format
+* Generic-Write::               'generic-write
+* Line I/O::                    'line-i/o
+* Modular Arithmetic::          'modular
+* Multi-Processing::            'process
+* Object-To-String::            'object->string
+* Plotting::                    'charplot
+* Pretty-Print::                'pretty-print, 'pprint-file
+* Prime Factorization::         'prime
+* Random Numbers::              'random
+* Sorting::                     'sort
+* Standard I/O::                'stdio
+* String-Case::                 'string-case
+* String Ports::                'string-port
+* Tektronix Graphics Support::
+* Tree Operations::              'trees
+@end menu
+
+
+
+
+@node Bit-Twiddling, Common List Functions, Procedures, Procedures
+@section Bit-Twiddling
+
+@code{(require 'logical)}
+
+The bit-twiddling functions are made available through the use of the
+@code{logical} package.  @code{logical} is loaded by inserting
+@code{(require 'logical)} before the code that uses these
+functions.@refill
+
+@defun logand n1 n1
+Returns the integer which is the bit-wise AND of the two integer
+arguments.
+
+Example:
+@lisp
+(number->string (logand #b011 #b100) 2)
+   @result{} "0"
+(number->string (logand #b10111 #b01101) 2)
+   @result{} "101"
+@end lisp
+@end defun
+
+@defun logior n1 n2
+Returns the integer which is the bit-wise OR of the two integer
+arguments.
+
+Example:
+@lisp
+(number->string (logior #b10101010 #b01010101) 2)
+   @result{} "11111111"
+(number->string (logior #b10000000 #b00000001) 2)
+   @result{} "10000001" 
+@end lisp
+@end defun
+
+@defun logxor n1 n2
+Returns the integer which is the bit-wise XOR of the two integer
+arguments.
+
+Example:
+@lisp
+(number->string (logxor #b10101010 #b01010101) 2)
+   @result{} "11111111"
+(number->string (logxor #b111 #b010) 2)
+   @result{} "101"
+@end lisp
+@end defun
+
+@defun lognot n
+Returns the integer which is the 2s-complement of the integer argument.
+
+Example:
+@lisp
+(number->string (lognot #b10000000) 2)
+   @result{} "-10000001"
+(number->string (lognot #b0) 2)
+   @result{} "-1"
+@end lisp
+@end defun
+
+@defun ash int count
+Returns an integer equivalent to
+@code{(inexact->exact (floor (* @var{int} (expt 2 @var{count}))))}.@refill
+
+Example:
+@lisp
+(number->string (ash #b1 3) 2)
+   @result{} "1000"
+(number->string (ash #b1010 -1) 2)
+   @result{} "101"
+@end lisp
+@end defun
+
+@defun logcount n
+Returns the number of bits in integer @var{n}.  If integer is positive,
+the 1-bits in its binary representation are counted.  If negative, the
+0-bits in its two's-complement binary representation are counted.  If 0,
+0 is returned.
+
+Example:
+@lisp
+(logcount #b10101010)
+   @result{} 4
+(logcount 0)
+   @result{} 0
+(logcount -2)
+   @result{} 1
+@end lisp
+@end defun
+
+@defun integer-length n
+Returns the number of bits neccessary to represent @var{n}.
+
+Example:
+@lisp
+(integer-length #b10101010)
+   @result{} 8
+(integer-length 0)
+   @result{} 0
+(integer-length #b1111)
+   @result{} 4
+@end lisp
+@end defun
+
+@defun integer-expt n k
+Returns @var{n} raised to the non-negative integer exponent @var{k}.
+
+Example:
+@lisp
+(integer-expt 2 5)
+   @result{} 32
+(integer-expt -3 3)
+   @result{} -27
+@end lisp
+@end defun
+
+@defun bit-extract n start end
+Returns the integer composed of the @var{start} (inclusive) through
+@var{end} (exclusive) bits of @var{n}.  The @var{start}th bit becomes
+the 0-th bit in the result.@refill
+
+Example:
+@lisp
+(number->string (bit-extract #b10101010 0 4) 2)
+   @result{} "1010"
+(number->string (bit-extract #b11111111 4 9) 2)
+   @result{} "1111"
+@end lisp
+@end defun
+
+
+
+
+
+@node Common List Functions, Format, Bit-Twiddling, Procedures
+@section Common List Functions
+
+@code{(require 'common-list-functions)}
+
+The procedures below follow the Common LISP equivalents apart from
+optional arguments in some cases.
+
+@menu
+* List construction::
+* Lists as sets::
+* Lists as sequences::
+* Destructive list operations::
+* Non-Common LISP functions::
+@end menu
+
+
+
+
+
+@node List construction, Lists as sets, Common List Functions, Common List Functions
+@subsection List construction
+
+@defun identity x
+@var{identity} returns its argument.  (This probably shouldn't be in the
+``list construction'' section, since it doesn't construct anything, but
+this is the section that makes the most sense.)
+
+Example:
+@lisp
+(identity 3)
+   @result{} 3
+(identity '(foo bar))
+   @result{} (foo bar)
+(map identity @var{lst})
+   @equiv{} (copy-list @var{lst})
+@end lisp
+@end defun
+
+@defun make-list k . init
+@code{make-list} creates and returns a list of @var{k} elements.  If
+@var{init} is included, all elements in the list are initialized to
+@var{init}.@refill
+
+Example:
+@lisp
+(make-list 3)
+   @result{} (#<unspecified> #<unspecified> #<unspecified>)
+(make-list 5 'foo)
+   @result{} (foo foo foo foo foo)
+@end lisp
+@end defun
+
+
+@defun list* x . y
+Works like @code{list} except that the cdr of the last pair is the last
+argument unless there is only one argument, when the result is just that
+argument.  Sometimes called @code{cons*}.  E.g.:@refill
+@lisp
+(list* 1)
+   @result{} 1
+(list* 1 2 3)
+   @result{} (1 2 . 3)
+(list* 1 2 '(3 4))
+   @result{} (1 2 3 4)
+(list* @var{args} '())
+   @equiv{} (list @var{args})
+@end lisp
+@end defun
+
+@defun copy-list lst
+@code{copy-list} makes a copy of @var{lst} using new pairs and returns
+it. Only the top level of the list is copied, i.e., pairs forming
+elements of the copied list remain @code{eq?} to the corresponding
+elements of the original; the copy is, however, not @code{eq?} to the
+original, but is @code{equal?} to it.@refill
+
+Example:
+@lisp
+(copy-list '(foo foo foo))
+   @result{} (foo foo foo)
+(define q '(foo bar baz bang))
+(define p q)
+(eq? p q)
+   @result{} #t
+(define r (copy-list q))
+(eq? q r)
+   @result{} #f
+(equal? q r)
+   @result{} #t
+(define bar '(bar))
+(eq? bar (car (copy-list (list bar 'foo))))
+@result{} #t
+   @end lisp
+@end defun
+
+
+  
+
+
+
+
+@node Lists as sets, Lists as sequences, List construction, Common List Functions
+@subsection Lists as sets
+
+@code{eq?} is used to test for membership by all the procedures below
+which treat lists as sets.@refill
+
+@defun adjoin e l
+@code{adjoin} returns the adjoint of the element @var{e} and the list
+@var{l}.  That is, if @var{e} is in @var{l}, @code{adjoin} returns
+@var{l}, otherwise, it returns @code{(cons @var{e} @var{l})}.@refill
+
+Example:
+@lisp
+(adjoin 'baz '(bar baz bang))
+   @result{} (bar baz bang)
+(adjoin 'foo '(bar baz bang))
+   @result{} (foo bar baz bang)
+@end lisp
+@end defun
+
+@defun union l1 l2
+@code{union} returns the combination of @var{l1} and @var{l2} with
+duplicates removed.@refill
+
+Example:
+@lisp
+(union '(1 2 3 4) '(5 6 7 8))
+   @result{} (4 3 2 1 5 6 7 8)
+(union '(1 2 2 1) '(3 4 1 8))
+   @result{} (2 3 4 1 8)
+@end lisp
+@end defun
+
+@defun intersection l1 l2
+@code{intersection} returns all elements that are in both @var{l1} and
+@var{l2}.@refill
+
+Example:
+@lisp
+(intersection '(1 2 3 4) '(3 4 5 6))
+   @result{} (3 4)
+(intersection '(1 2 3 4) '(5 6 7 8))
+   @result{} ()
+@end lisp
+@end defun
+
+@defun set-difference l1 l2
+@code{set-difference} returns the union of all elements that are in
+@var{l1} but not in @var{l2}.@refill
+
+Example:
+@lisp
+(set-difference '(1 2 3 4) '(3 4 5 6))
+   @result{} (1 2)
+(set-difference '(1 2 3 4) '(1 2 3 4 5 6))
+   @result{} ()
+@end lisp
+@end defun
+
+@defun member-if pred lst
+@code{member-if} returns @var{lst} if @code{(@var{pred} @var{element})}
+is @code{#t} for any @var{element} in @var{lst}.  Returns @code{#f} if
+@var{pred} does not apply to any @var{element} in @var{lst}.@refill
+
+Example:
+@lisp
+(member-if vector? '(1 2 3 4))
+   @result{} #f
+(member-if number? '(1 2 3 4))
+   @result{} (1 2 3 4)
+@end lisp
+@end defun
+
+@defun some pred lst . more-lsts
+@var{pred} is a boolean function of as many arguments as there are list
+arguments to @code{some} i.e., @var{lst} plus any optional arguments.
+@var{pred} is applied to successive elements of the list arguments in
+order.  @code{some} returns @code{#t} as soon as one of these
+applications returns @code{#t}, and is @code{#f} if none returns
+@code{#t}.  All the lists should have the same length.@refill
+
+
+Example:
+@lisp
+(some odd? '(1 2 3 4))
+   @result{} #t
+
+(some odd? '(2 4 6 8))
+   @result{} #f
+
+(some > '(2 3) '(1 4))
+   @result{} #f
+@end lisp
+@end defun
+
+@defun every pred lst . more-lsts
+@code{every} is analogous to @code{some} except it returns @code{#t} if
+every application of @var{pred} is @code{#t} and @code{#f}
+otherwise.@refill
+
+Example:
+@lisp
+(every even? '(1 2 3 4))
+   @result{} #f
+
+(every even? '(2 4 6 8))
+   @result{} #t
+
+(every > '(2 3) '(1 4))
+   @result{} #f
+@end lisp
+@end defun
+
+@defun notany pred . lst
+@code{notany} is analogous to @code{some} but returns @code{#t} if no
+application of @var{pred} returns @code{#t} or @code{#f} as soon as any
+one does.@refill
+@end defun
+
+@defun notevery pred . lst
+@code{notevery} is analogous to @code{some} but returns @code{#t} as soon
+as an application of @var{pred} returns @code{#f}, and @code{#f}
+otherwise.@refill
+
+Example:
+@lisp
+(notevery even? '(1 2 3 4))
+   @result{} #t
+
+(notevery even? '(2 4 6 8))
+   @result{} #f
+@end lisp
+@end defun
+
+@defun find-if pred lst
+@code{find-if} searches for the first @var{element} in @var{lst} such
+that @code{(@var{pred} @var{element})} returns @code{#t}.  If it finds
+any such @var{element} in @var{lst}, @var{element} is returned.
+Otherwise, @code{#f} is returned.@refill
+
+Example:
+@lisp
+(find-if number? '(foo 1 bar 2))
+   @result{} 1
+
+(find-if number? '(foo bar baz bang))
+   @result{} #f
+
+(find-if symbol? '(1 2 foo bar))
+   @result{} foo
+@end lisp
+@end defun
+
+@defun remove elt lst
+@code{remove} removes all occurrences of @var{elt} from @var{lst} using
+@code{eqv?} to test for equality and returns everything that's left.
+N.B.: other implementations (Chez, Scheme->C and T, at least) use
+@code{equal?} as the equality test.@refill
+
+Example:
+@lisp
+(remove 1 '(1 2 1 3 1 4 1 5))
+   @result{} (2 3 4 5)
+
+(remove 'foo '(bar baz bang))
+   @result{} (bar baz bang)
+@end lisp
+@end defun
+
+@defun remove-if pred lst
+@code{remove-if} removes all @var{element}s from @var{lst} where
+@code{(@var{pred} @var{element})} is @code{#t} and returns everything
+that's left.@refill
+
+Example:
+@lisp
+(remove-if number? '(1 2 3 4))
+   @result{} ()
+
+(remove-if even? '(1 2 3 4 5 6 7 8))
+   @result{} (1 3 5 7)
+@end lisp
+@end defun
+
+@defun remove-if-not pred lst
+@code{remove-if-not} removes all @var{element}s from @var{lst} for which
+@code{(@var{pred} @var{element})} is @code{#f} and returns everything that's
+left.@refill
+
+Example:
+@lisp
+(remove-if-not number? '(foo bar baz))
+   @result{} ()
+(remove-if-not odd? '(1 2 3 4 5 6 7 8))
+   @result{} (1 3 5 7)
+@end lisp
+@end defun
+
+
+
+
+
+@node Lists as sequences, Destructive list operations, Lists as sets, Common List Functions
+@subsection Lists as sequences
+
+@defun position obj lst
+@code{position} returns the 0-based position of @var{obj} in @var{lst},
+or @code{#f} if @var{obj} does not occur in @var{lst}.@refill
+
+Example:
+@lisp
+(position 'foo '(foo bar baz bang))
+   @result{} 0
+(position 'baz '(foo bar baz bang))
+   @result{} 2
+(position 'oops '(foo bar baz bang))
+   @result{} #f
+@end lisp
+@end defun
+
+@defun reduce p lst
+@code{reduce} combines all the elements of a sequence using a binary
+operation (the combination is left-associative).  For example, using
+@code{+}, one can add up all the elements.  @code{reduce} allows you to
+apply a function which accepts only two arguments to more than 2
+objects.  Functional programmers usually refer to this as @dfn{foldl}.
+@code{collect:reduce} (@xref{Collections}) provides a version of
+@code{collect} generalized to collections.@refill
+
+Example:
+@lisp
+(reduce + '(1 2 3 4))
+   @result{} 10
+(define (bad-sum . l) (reduce + l))
+(bad-sum 1 2 3 4)
+   @equiv{} (reduce + (1 2 3 4))
+   @equiv{} (+ (+ (+ 1 2) 3) 4)
+@result{} 10
+(bad-sum)
+   @equiv{} (reduce + ())
+   @result{} ()
+(reduce string-append '("hello" "cruel" "world"))
+   @equiv{} (string-append (string-append "hello" "cruel") "world")
+   @result{} "hellocruelworld"
+(reduce anything '())
+   @result{} ()
+(reduce anything '(x))
+   @result{} x
+@end lisp
+
+What follows is a rather non-standard implementation of @code{reverse}
+in terms of @code{reduce} and a combinator elsewhere called
+@dfn{C}.@refill
+
+@lisp
+;;; Contributed by Jussi Piitulainen (jpiitula@@ling.helsinki.fi)
+
+(define commute
+  (lambda (f)
+    (lambda (x y)
+      (f y x))))
+
+(define reverse
+  (lambda (args)
+    (reduce-init (commute cons) args)))
+@end lisp
+@end defun
+
+@defun reduce-init p init lst
+@code{reduce-init} is the same as reduce, except that it implicitly
+inserts @var{init} at the start of the list.  @code{reduce-init} is
+preferred if you want to handle the null list, the one-element, and
+lists with two or more elements consistently.  It is common to use the
+operator's idempotent as the initializer.  Functional programmers
+usually call this @dfn{foldl}.@refill
+
+Example:
+@lisp
+(define (sum . l) (reduce-init + 0 l))
+(sum 1 2 3 4)
+   @equiv{} (reduce-init + 0 (1 2 3 4))
+   @equiv{} (+ (+ (+ (+ 0 1) 2) 3) 4)
+   @result{} 10
+(sum)
+   @equiv{} (reduce-init + 0 '())
+@result{} 0
+
+(reduce-init string-append "@@" '("hello" "cruel" "world"))
+   @equiv{} (string-append (string-append (string-append "@@" "hello") "cruel") "world")
+   @result{} "@@hellocruelworld"
+@end lisp
+
+Given a differentiation of 2 arguments, @code{diff}, the following will
+differentiate by any number of variables.
+@lisp
+(define (diff* exp . vars)
+  (reduce-init diff exp vars))
+@end lisp
+
+Example:
+@lisp
+;;; Real-world example:  Insertion sort using reduce-init.
+
+(define (insert l item)
+  (if (null? l)
+      (list item)
+      (if (< (car l) item)
+          (cons (car l) (insert (cdr l) item))
+          (cons item l))))
+(define (insertion-sort l) (reduce-init insert '() l))
+
+(insertion-sort '(3 1 4 1 5)
+   @equiv{} (reduce-init insert () (3 1 4 1 5))
+   @equiv{} (insert (insert (insert (insert (insert () 3) 1) 4) 1) 5)
+   @equiv{} (insert (insert (insert (insert (3)) 1) 4) 1) 5)
+   @equiv{} (insert (insert (insert (1 3) 4) 1) 5)
+   @equiv{} (insert (insert (1 3 4) 1) 5)
+   @equiv{} (insert (1 1 3 4) 5)
+   @result{} (1 1 3 4 5)
+   @end lisp
+@end defun
+
+@defun butlast lst n
+@code{butlast} returns all but the last @var{n} elements of
+@var{lst}.@refill
+
+Example:
+@lisp
+(butlast '(1 2 3 4) 3)
+   @result{} (1)
+(butlast '(1 2 3 4) 4)
+   @result{} ()
+@end lisp
+@end defun
+
+@defun nthcdr n lst
+@code{nthcdr} takes @var{n} @code{cdr}s of @var{lst} and returns the
+result.  Thus @code{(nthcdr 3 @var{lst})} @equiv{} @code{(cdddr
+@var{lst})}@refill
+
+Example:
+@lisp
+(nthcdr 2 '(1 2 3 4))
+   @result{} (3 4)
+(nthcdr 0 '(1 2 3 4))
+   @result{} (1 2 3 4)
+@end lisp
+@end defun
+
+@defun last lst n
+@code{last} returns the last @var{n} elements of @var{lst}.  @var{n}
+must be a non-negative integer.
+
+Example:
+@lisp
+(last '(foo bar baz bang) 2)
+   @result{} (baz bang)
+(last '(1 2 3) 0)
+   @result{} 0
+@end lisp
+@end defun
+
+
+
+
+
+
+@node Destructive list operations, Non-Common LISP functions, Lists as sequences, Common List Functions
+@subsection Destructive list operations
+
+These procedures may mutate the list they operate on, but any such
+mutation is undefined.
+
+@deffn Procedure nconc args
+@code{nconc} destructively concatenates its arguments.  (Compare this
+with @code{append}, which copies arguments rather than destroying them.)
+Sometimes called @code{append!} (@xref{Rev2 Procedures}).@refill
+
+Example:  You want to find the subsets of a set.  Here's the obvious way:
+
+@lisp
+(define (subsets set)
+  (if (null? set)
+      '(())
+      (append (mapcar (lambda (sub) (cons (car set) sub))
+                      (subsets (cdr set)))
+              (subsets (cdr set)))))
+@end lisp
+But that does way more consing than you need.  Instead, you could
+replace the @code{append} with @code{nconc}, since you don't have any
+need for all the intermediate results.@refill
+
+Example:
+@lisp
+(define x '(a b c))
+(define y '(d e f))
+(nconc x y)
+   @result{} (a b c d e f)
+x
+   @result{} (a b c d e f)
+@end lisp
+
+@code{nconc} is the same as @code{append!} in @file{sc2.scm}.
+@end deffn
+
+@deffn Procedure nreverse lst
+@code{nreverse} reverses the order of elements in @var{lst} by mutating
+@code{cdr}s of the list.  Sometimes called @code{reverse!}.@refill
+
+Example:
+@lisp
+(define foo '(a b c))
+(nreverse foo)
+   @result{} (c b a)
+foo
+   @result{} (a)
+@end lisp
+
+Some people have been confused about how to use @code{nreverse},
+thinking that it doesn't return a value.  It needs to be pointed out
+that@refill
+@lisp
+(set! lst (nreverse lst))
+@end lisp
+@noindent
+is the proper usage, not
+@lisp
+(nreverse lst)
+@end lisp
+The example should suffice to show why this is the case.
+@end deffn
+
+@deffn Procedure delete elt lst
+@deffnx Procedure delete-if pred lst
+@deffnx Procedure delete-if-not pred lst
+Destructive versions of @code{remove} @code{remove-if}, and
+@code{remove-if-not}.@refill
+
+Example:
+@lisp
+(define lst '(foo bar baz bang))
+(delete 'foo lst)
+   @result{} (bar baz bang)
+lst
+   @result{} (foo bar baz bang)
+
+(define lst '(1 2 3 4 5 6 7 8 9))
+(delete-if odd? lst)
+   @result{} (2 4 6 8)
+lst
+   @result{} (1 2 4 6 8)
+@end lisp
+
+Some people have been confused about how to use @code{delete},
+@code{delete-if}, and @code{delete-if}, thinking that they dont' return
+a value.  It needs to be pointed out that@refill
+@lisp
+(set! lst (delete el lst))
+@end lisp
+@noindent
+is the proper usage, not
+@lisp
+(delete el lst)
+@end lisp
+The examples should suffice to show why this is the case.
+@end deffn
+
+
+
+@node Non-Common LISP functions, , Destructive list operations, Common List Functions
+@subsection Non-Common LISP functions
+
+@defun and? . args
+@code{and?} checks to see if all its arguments are true.  If they are,
+@code{and?} returns @code{#t}, otherwise, @code{#f}.  (In contrast to
+@code{and}, this is a function, so all arguments are always evaluated
+and in an unspecified order.)@refill
+
+Example:
+@lisp
+(and? 1 2 3)
+   @result{} #t
+(and #f 1 2)
+   @result{} #f
+@end lisp
+@end defun
+
+@defun or? . args
+@code{or?} checks to see if any of its arguments are true.  If any is
+true, @code{or?} returns @code{#t}, and @code{#f} otherwise.  (To
+@code{or} as @code{and?} is to @code{and}.)@refill
+
+Example:
+@lisp
+(or? 1 2 #f)
+   @result{} #t
+(or? #f #f #f)
+   @result{} #f
+@end lisp
+@end defun
+
+@defun atom? object
+Returns @code{#t} if @var{object} is not a pair and @code{#f} if it is
+pair.  (Called @code{atom} in Common LISP.)
+@lisp
+(atom? 1)
+   @result{} #t
+(atom? '(1 2))
+   @result{} #f
+(atom? #(1 2))   ; dubious!
+   @result{} #t
+@end lisp
+@end defun
+
+
+
+
+
+
+
+
+
+
+@node Format, Generic-Write, Common List Functions, Procedures
+@section Format
+
+@code{(require 'format)}
+
+
+@subsection Format Interface
+
+@defun format destination format-string . arguments
+An almost complete implementation of Common LISP format description
+according to the CL reference book @cite{Common LISP} from Guy L.
+Steele, Digital Press.  Backward compatible to most of the available
+Scheme format implementations.
+
+Returns @code{#t}, @code{#f} or a string; has side effect of printing
+according to @var{format-string}.  If @var{destination} is @code{#t},
+the output is to the current output port and @code{#t} is returned.  If
+@var{destination} is @code{#f}, a formatted string is returned as the
+result of the call.  If @var{destination} is a string, the output is
+appended to that string by string-append (note that this returns a
+newly-allocated string).  Otherwise @var{destination} must be an output
+port and @code{#t} is returned.@refill
+
+@var{format-string} must be a string. In case of a formatting error
+format returns @code{#f} and prints a message on the current output
+port.  Characters are output as if the string were output by the
+@code{display} function with the exception of those prefixed by a tilde
+(@samp{~}).  For a detailed description of the @var{format-string}
+syntax please consult a Common LISP format reference manual.  For a
+quick overview of implemented, not supported and extended control
+properties of @var{format-string}, see the previous section. For a test
+suite to verify this format implementation load @file{formatst.scm}.
+
+@var{format} checks if the scheme interpreter supports flonums and loads
+@file{formatfl.scm} with @code{(require 'formatfl)} accordingly.  The
+request for floating point formatting can be disabled by setting the
+variable @var{format:floats} to @code{#f} in @file{format.scm}.
+@end defun
+
+@subsection Format Specification (Format version 2.3)
+
+Please consult a Common LISP format reference manual for a detailed
+description of the format string syntax.  For a demonstration of the
+implemented directives see @file{formatst.scm}.@refill
+
+This implementation supports directive parameters and modifiers
+(@samp{:} and @samp{@@} characters). Multiple parameters must be
+separated by a @samp{,}.  Parameters can be numerical parameters
+(positive or negative), character parameters (prefixed by a quote
+character), variable parameters (@samp{v}), number of rest arguments
+parameter (@samp{#}), empty and default parameters.  Directive
+characters are case independent. The general form of a directive
+is:@refill
+
+@noindent
+@var{directive} ::= ~@{@var{directive-parameter},@}[:][@@]@var{directive-character}
+
+@noindent
+@var{directive-parameter} ::= [ [-|+]@{0-9@}+ | '@var{character} | v | # ]
+
+
+@subsubsection Implemented Control Directives
+
+Documentation syntax: Uppercase characters represent the corresponding
+control directive characters. Lowercase characters represent control
+directive parameter descriptions.
+
+@table @samp
+@item ~A
+ASCII (print as @code{display} does).
+@table @asis
+@item ~@@A
+left pad.
+@item ~@var{mincol},@var{colinc},@var{minpad},@var{padchar}A
+padding (@var{colinc} is not supported).
+@end table
+@item ~S
+S-expression (print as @code{write} does).
+@table @asis
+@item ~@@S
+left pad.
+@item ~@var{mincol},@var{colinc},@var{minpad},@var{padchar}S
+padding (@var{colinc} is not supported).
+@end table
+@item ~D
+Decimal.
+@table @asis
+@item ~@@D
+print number sign.
+@item ~:D
+print comma separated.
+@item ~@var{mincol},@var{padchar},@var{commachar}D
+padding.
+@end table
+@item ~X
+Hexadecimal.
+@table @asis
+@item ~@@X
+print number sign.
+@item ~:X
+print comma separated.
+@item ~@var{mincol},@var{padchar},@var{commachar}X
+padding.
+@end table
+@item ~O
+Octal.
+@table @asis
+@item ~@@O
+print number sign.
+@item ~:O
+print comma separated.
+@item ~@var{mincol},@var{padchar},@var{commachar}O
+padding.
+@end table
+@item ~B
+Binary.
+@table @asis
+@item ~@@B
+print number sign.
+@item ~:B
+print comma separated.
+@item ~@var{mincol},@var{padchar},@var{commachar}B
+padding.
+@end table
+@item ~@var{n}R
+Radix (prints number to radix @var{n}).
+@table @asis
+@item ~@var{n}@@R
+print number sign.
+@item ~:B
+print comma separated.
+@item ~@var{n},@var{mincol},@var{padchar},@var{commachar}R
+padding.
+@end table
+@item ~P
+Plural.
+@table @asis
+@item ~@@P
+prints @samp{y} and @samp{ies}.
+@item ~:P
+as ~P but jumps 1 argument backward.
+@item ~:@@P
+as ~@@P but jumps 1 argument backward.
+@end table
+@item ~C
+Character.
+@table @asis
+@item ~@@C
+print as @code{write} does.
+@end table
+@item ~F
+Fixed-format floating-point (prints a flonum like @var{mmmnnn}).
+@table @asis
+@item ~@var{width},@var{digits},@var{scale},@var{overflowchar},@var{padchar}F
+@item ~...@@F
+If the number is positive a plus sign is printed.
+@end table
+@item ~E
+Exponential floating-point (prints a flonum like @var{mmm.nnnEee}).
+@table @asis
+@item ~@var{width},@var{digits},@var{exponentdigits},@var{scale},@var{overflowchar},@var{padchar},@var{exponentchar}E
+@item ~...@@E
+If the number is positive a plus sign is printed.
+@end table
+@item ~G
+General floating-point (prints a flonum either fixed or exponential).
+@table @asis
+@item ~@var{width},@var{digits},@var{exponentdigits},@var{scale},@var{overflowchar},@var{padchar},@var{exponentchar}G
+@item ~...@@G
+If the number is positive a plus sign is printed.
+@end table
+@item ~$
+Dollars floating-point (prints a flonum in fixed with signs separated).
+@table @asis
+@item ~@var{digits},@var{scale},@var{width},@var{padchar}$
+@item ~...@@$
+If the number is positive a plus sign is printed.
+@item ~...:@@$
+A sign is always printed and appears before the padding.
+@item ~...:$
+The sign appears before the padding.
+@end table
+@item ~%
+Newline.
+@table @asis
+@item ~@var{n}%
+prints @var{n} newlines.
+@end table
+@item ~|
+Page Separator.
+@item ~@var{n}|
+prints @var{n} page separators.
+@item ~~
+Tilde.
+@item ~@var{n}~
+prints @var{n} tildes.
+@item ~#\newline
+Continuation Line (#\newline stands for a newline character).
+@table @asis
+@item ~:#\newline
+newline is ignored, white space left.
+@item ~@@#\newline
+newline is left, white space ignored.
+@end table
+@item ~T
+Tabulator.
+@table @asis
+@item ~@var{n}T
+prints @var{n} tabs.
+@end table
+@item ~?
+Indirection (expects indirect arguments as a list).
+@table @asis
+@item ~@@?
+extracts indirect arguments from format arguments.
+@end table
+@item ~(@var{str}~)
+Case conversion (converts by @code{string-downcase}).
+@table @asis
+@item ~:(@var{str}~)
+converts by @code{string-capitalize}.
+@item ~@@(@var{str}~)
+converts by @code{string-capitalize-first}.
+@item ~:@@(@var{str}~)
+converts by @code{string-upcase}.
+@end table
+@item ~*
+Argument Jumping (jumps 1 argument forward).
+@table @asis
+@item ~@var{n}*
+jumps @var{n} arguments forward.
+@item ~:*
+jumps 1 argument backward.
+@item ~@var{n}:*
+jumps @var{n} arguments backward.
+@item ~@@*
+jumps to the 0th argument.
+@item ~@var{n}@@*
+jumps to the @var{n}th argument (beginning from 0)
+@end table
+@item ~[@var{str0}~;@var{str1}~;...~;@var{strn}~]
+Conditional Expression (numerical clause conditional).
+@table @asis
+@item ~@var{n}[
+take argument from @var{n}.
+@item ~@@[
+true test conditional.
+@item ~:[
+if-else-then conditional.
+@item ~;
+clause separator.
+@item ~:;
+default clause follows.
+@end table
+@item ~@{@var{str}~@}
+Iteration (args come from the next argument (a list)).
+@table @asis
+@item ~@var{n}@{
+at most @var{n} iterations.
+@item ~:@{
+args from next arg (a list of lists).
+@item ~@@@{
+args from the rest of arguments.
+@item ~:@@@{
+args from the rest args (lists).
+@end table
+@item ~^
+Up and out.
+@table @asis
+@item ~@var{n}^
+aborts if @var{n} = 0
+@item ~@var{n},@var{m}^
+aborts if @var{n} = @var{m}
+@item ~@var{n},@var{m},@var{k}^
+aborts if @var{n} <= @var{m} <= @var{k}
+@end table
+@end table
+
+
+@subsubsection Not Implemented Control Directives
+
+@table @samp
+@item ~:A
+(another meaning in SLIB format; see below)
+@item ~:S
+(another meaning in SLIB format; see below)
+@item ~R
+@item ~&
+@item ~@@T
+@item ~@var{colnum},@var{colinc}T
+@item ~<~>
+@item ~:^
+(what is the `entire' iteration process?)
+@end table
+
+
+@subsubsection Extended, Replaced and Added Control Directives
+
+@table @code
+@item ~@var{mincol},@var{padchar},@var{commachar},@var{commawidth}D
+@item ~@var{mincol},@var{padchar},@var{commachar},@var{commawidth}X
+@item ~@var{mincol},@var{padchar},@var{commachar},@var{commawidth}O
+@item ~@var{mincol},@var{padchar},@var{commachar},@var{commawidth}B
+@item ~@var{n},@var{mincol},@var{padchar},@var{commachar},@var{commawidth}R
+@var{commawidth} is the number of characters between two comma characters.
+@end table
+
+@table @samp
+@item ~-@var{mincol},@var{colinc},@var{minpad},@var{padchar}A
+@item ~-@var{mincol},@var{colinc},@var{minpad},@var{padchar}S
+@item ~-@var{mincol},@var{padchar},@var{commachar},@var{commawidth}D
+@item ~-@var{mincol},@var{padchar},@var{commachar},@var{commawidth}X
+@item ~-@var{mincol},@var{padchar},@var{commachar},@var{commawidth}O
+@item ~-@var{mincol},@var{padchar},@var{commachar},@var{commawidth}B
+@item ~@var{n},-@var{mincol},@var{padchar},@var{commachar},@var{commawidth}R
+A negative field width specified by @var{mincol} forces a field
+truncation to @var{mincol} characters. If the printed object exceeds the
+field width a @samp{>} or a @samp{<} character is added according to the
+padding direction.@refill
+@end table
+
+@table @samp
+@item ~Y
+Pretty print formatting of an argument for scheme code lists.  (Works
+only on @code{(current-output-port)}.)
+@item ~&
+Same as ~%.
+@item ~K
+Same as ~?.
+@item ~!
+Flushes the output if format destination is a port.
+@item ~_
+Prints a @code{#\space} character
+@item ~@var{n}_
+prints @var{n} @code{#\space} characters.
+@item ~@var{n}C
+Takes @var{n} as an integer representation for a character. No arguments
+are consumed. @var{n} is converted to a character by
+@code{integer->char}.  @var{n} must be a positive decimal number.@refill
+@item :S
+Print out readproof.  Prints out @samp{#<...>} as strings
+@samp{"#<...>"} so that the output can always be processed by
+@code{read}.@refill
+@item :A
+Print out readproof.  Prints out @samp{#<...>} as strings
+@samp{"#<...>"} so that the output can always be processed by
+@code{read}.@refill
+@end table
+
+@subsubsection Compatibility With Other @code{format} Implementations
+
+@table @asis
+@item SLIB format 2.x:
+See @file{format.scm}.
+
+@item SLIB format 1.4:
+Downward compatible except for padding support and @samp{~A}, @samp{~S},
+@samp{~P}, @samp{~X} uppercase printing.  SLIB format 1.4 uses C-style
+@code{printf} padding support which is completely replaced by the CL
+@code{format} padding style.
+
+@item MIT C-Scheme 7.1:
+Downward compatible except for @samp{~}, which is not documented
+(ignores all characters inside the format string up to a newline
+character).  (7.1 implements @samp{~a}, @samp{~s},
+@samp{~@var{newline}}, @samp{~~}, @samp{~%}, numerical and variable
+parameters and @samp{:/@@} modifiers in the CL sense).@refill
+
+@item Elk 1.5/2.0:
+Downward compatible except for @samp{~A} and @samp{~S} which print in
+uppercase.  (Elk implements @samp{~a}, @samp{~s}, @samp{~~}, and
+@samp{~%} (no directive parameters or modifiers)).@refill
+
+@item Scheme->C 01nov91:
+Downward compatible except for an optional destination parameter: S2C
+accepts a format call without a destination which returns a formatted
+string. This is equivalent to a #f destination in S2C. (S2C implements
+@samp{~a}, @samp{~s}, @samp{~c}, @samp{~%}, and @samp{~~} (no directive
+parameters or modifiers)).@refill
+
+@end table
+
+SLIB format may be used apart from the SLIB context. In this case you
+have to modify the implementation dependent code marked at the beginning
+of @file{format.scm}.@refill
+
+
+
+
+
+@node Generic-Write, Line I/O, Format, Procedures
+@section Generic-Write
+
+@code{(require 'generic-write)}
+
+@code{generic-write} is a procedure that transforms a Scheme data value
+(or Scheme program expression) into its textual representation and
+prints it.  The interface to the procedure is sufficiently general to
+easily implement other useful formatting procedures such as pretty
+printing, output to a string and truncated output.@refill
+
+@deffn Procedure generic-write obj display? width output
+@table @var
+@item obj
+Scheme data value to transform.
+@item display?
+Boolean, controls whether characters and strings are quoted.
+@item width
+Extended boolean, selects format:
+@table @asis
+@item #f
+single line format
+@item integer > 0
+pretty-print (value = max nb of chars per line)
+@end table
+@item output
+Procedure of 1 argument of string type, called repeatedly with
+successive substrings of the textual representation.  This procedure can
+return @code{#f} to stop the transformation.
+@end table
+
+The value returned by @code{generic-write} is undefined.
+
+Examples:
+@lisp
+(write obj) @equiv{} (generic-write obj #f #f @var{display-string})
+(display obj) @equiv{} (generic-write obj #t #f @var{display-string})
+@end lisp
+@noindent
+where
+@lisp
+@var{display-string} @equiv{}
+(lambda (s) (for-each write-char (string->list s)) #t)
+@end lisp
+@end deffn
+
+
+
+
+
+@node Line I/O, Modular Arithmetic, Generic-Write, Procedures
+@section Line I/O
+
+@code{(require 'line-i/o)}
+
+@defun read-line
+@defunx read-line port
+Returns a string of the characters up to, but not including a newline or
+end of file, updating @var{port} to point to the character following the
+newline.  If no characters are available, an end of file object is
+returned.  @var{port} may be ommited, in which case it defaults to the
+value returned by @code{current-input-port}.@refill
+@end defun
+
+@defun read-line! string
+@defunx read-line! string port
+Fills @var{string} with characters up to, but not including a newline or
+end of file, updating the port to point to the last character read or
+following the newline if it was read.  If no characters are available,
+an end of file object is returned.  If a newline or end of file was
+found, the number of characters read is returned.  Otherwise, @code{#f}
+is returned.  @var{port} may be ommited, in which case it defaults to
+the value returned by @code{current-input-port}.@refill
+@end defun
+
+@deffn write-line string
+@deffnx write-line string port
+Writes @var{string} followed by a newline to the given port and returns
+an unspecified value.  Port may be omited, in which case it defaults to
+the value returned by @code{current-input-port}.@refill
+@end deffn
+
+
+
+
+
+@node Modular Arithmetic, Multi-Processing, Line I/O, Procedures
+@section Modular Arithmetic
+
+@code{(require 'modular)}
+
+@defun extended-euclid n1 n2
+Returns a list of 3 integers @code{(d x y)} such that d = gcd(@var{n1},
+@var{n2}) = @var{n1} * x + @var{n2} * y.@refill
+
+For all of these procedure all arguments should be exact non-negative
+integers such that k1 > k2 and k1 > k3.  The returned value will be an
+exact non-negative integer less than k1.  If all the arguments are
+fixnums the computation will use only fixnums.
+@end defun
+
+@defun modular:invert k1 k2
+Returns an integer n such that 1 = (n * k2) mod k1.  If k2 has no
+inverse mod k1 an error is signaled.
+@end defun
+
+@defun modular:negate k1 k2
+Returns (@minus{}k2) mod k1.
+@end defun
+
+@defun modular:+ k1 k2 k3
+Returns (k2 + k3) mod k1.
+@end defun
+
+@defun modular:@minus{} k1 k2 k3
+Returns (k2 @minus{} k3) mod k1.
+@end defun
+
+@defun modular:* k1 k2 k3
+Returns (k2 * k3) mod k1.
+@end defun
+
+@defun modular:expt k1 k2 k3
+Returns (k2 ^ k3) mod k1.
+@end defun
+
+
+
+
+
+@node Multi-Processing, Object-To-String, Modular Arithmetic, Procedures
+@section Multi-Processing
+
+@code{(require 'process)}
+
+@deffn Procedure add-process! proc
+Adds proc, which must be a procedure (or continuation) capable of
+accepting accepting one argument, to the @code{process:queue}.  The
+value returned is unspecified.  The argument to @var{proc} should be
+ignored.  If @var{proc} returns, the process is killed.@refill
+@end deffn
+
+@deffn Procedure process:schedule!
+Saves the current process on @code{process:queue} and runs the next
+process from @code{process:queue}.  The value returned is
+unspecified.@refill
+@end deffn
+
+
+@deffn Procedure kill-process!
+Kills the current process and runs the next process from
+@code{process:queue}.  If there are no more processes on
+@code{process:queue}, @code{(quit)} is called. N.B.: @code{quit} is not
+a standard procedure, so you may have to define it appropriately.@refill
+@end deffn
+
+
+
+
+
+@node Object-To-String, Plotting, Multi-Processing, Procedures
+@section Object-To-String
+
+@code{(require 'object->string)}
+
+@defun object->string obj
+Returns the textual representation of @var{obj} as a string.
+@end defun
+
+
+
+@node Plotting, Pretty-Print, Object-To-String, Procedures
+@section Plotting on Character Devices
+
+@code{(require 'charplot)}
+
+The plotting procedure is made available through the use of the
+@code{charplot} package.  @code{charplot} is loaded by inserting
+@code{(require 'charplot)} before the code that uses this
+procedure.@refill
+
+@defvar charplot:rows
+The number of rows to make the plot vertically.
+@end defvar
+
+@defvar charplot:cols
+The number of columns to make the plot horizontally.
+@end defvar
+
+@deffn Procedure plot! coords x-label y-label
+@var{coords} is a list of pairs of x and y coordinates.  @var{x-label}
+and @var{y-label} are strings with which to label the x and y
+axes.@refill
+
+Example: (output edited slightly to fit across the page)
+@lisp
+(set! charplot:rows 24)
+(set! charplot:columns 65)
+
+(define (make-points n)
+  (if (zero? n)
+      '()
+      (cons (cons n (sin (/ n 3))) (make-points (1- n)))))
+
+(plot! (make-points 20) "x" "Sin(x)")
+@print{}
+@c I wonder why this drops the rhs middle `|'...
+@group
+Sin(x) ___________________________________________________________
+ +1.25|-                                                          |
+      |                                                           |
+     1|-         *  *                                             |
+      |       *        *                                          |
+ +0.75|-                  *                                       |
+      |    *                                                      |
+  +0.5|-                     *                                    |
+      | *                                                        *|
+ +0.25|-                                                          |
+      |                         *                                 |
+     0|-------------------------------------------------------*---|
+      |                                                           |
+ -0.25|-                           *                       *      |
+      |                                                           |
+  -0.5|-                              *                           |
+      |                                                 *         |
+ -0.75|-                                 *                        |
+      |                                     *        *            |
+    -1|-                                       *  *               |
+      |__________:_____._____:_____._____:_____._____:_____._____:|
+   x             4           8           12          16
+@end group
+@end lisp
+@end deffn
+
+
+
+
+
+@node Pretty-Print, Prime Factorization, Plotting, Procedures
+@section Pretty-Print
+
+@code{(require 'pretty-print)}
+
+@deffn Procedure pretty-print obj
+@deffnx Procedure pretty-print obj port
+
+@code{pretty-print}s @var{obj} on @var{port}.  If @var{port} is not
+specified, @code{current-output-port} is used.
+
+Example:
+@lisp
+(pretty-print '((1 2 3 4 5) (6 7 8 9 10) (11 12 13 14 15)
+                (16 17 18 19 20) (21 22 23 24 25)))
+   @print{} ((1 2 3 4 5)
+   @print{}  (6 7 8 9 10)
+   @print{}  (11 12 13 14 15)
+   @print{}  (16 17 18 19 20)
+   @print{}  (21 22 23 24 25))
+@end lisp
+@end deffn
+
+
+@code{(require 'ppfile)}
+
+
+@deffn Procedure pprint-file infile
+@deffnx Procedure pprint-file infile outfile
+Pretty-prints all the code in @var{infile}.  If @var{outfile} is
+specified, the output goes to @var{outfile}, otherwise it goes to
+@code{(current-output-port)}.@refill
+
+@strong{Warning}: Comments in @var{infile} will not appear in
+@var{outfile}.@refill
+@end deffn
+
+
+
+
+
+@node Prime Factorization, Random Numbers, Pretty-Print, Procedures
+@section Prime Factorization
+
+@code{(require 'prime)}
+
+See Robert Solovay and Volker Strassen, @cite{A Fast Monte-Carlo Test
+for Primality}, SIAM Journal on Computing, 1977, pp 84-85.
+
+@defun jacobi-symbol p q
+Returns the value (+1, @minus{}1, or 0) of the Jacobi-Symbol of exact
+non-negative integer @var{p} and exact positive odd integer
+@var{q}.@refill
+@end defun
+
+@defun prime? p
+Returns @code{#f} if @var{p} is composite; @code{#t} if @var{p} is
+prime.  There is a slight chance @code{(expt 2 (- prime:trials))} that a
+composite will return @code{#t}.@refill
+@end defun
+
+@defun prime:trials
+Is the maxinum number of iterations of Solovay-Strassen that will be
+done to test a number for primality.
+@end defun
+
+@defun factor k
+Returns a list of the prime factors of @var{k}.  The order of the
+factors is unspecified.  In order to obtain a sorted list do
+@code{(sort! (factor k) <)}.@refill
+@end defun
+
+
+
+
+@node Random Numbers, Sorting, Prime Factorization, Procedures
+@section Random Numbers
+
+@code{(require 'random)}
+
+
+@deffn Procedure random n
+@deffnx Procedure random n state
+Accepts a positive integer or real @var{n} and returns a number of the
+same type between zero (inclusive) and @var{n} (exclusive).  The values
+returned have a uniform distribution.@refill
+
+The optional argument @var{state} must be of the type produced by
+@code{(make-random-state)}.  It defaults to the value of the variable
+@code{*random-state*}.  This object is used to maintain the state of the
+pseudo-random-number generator and is altered as a side effect of the
+@code{random} operation.@refill
+@end deffn
+
+@defvar *random-state*
+Holds a data structure that encodes the internal state of the
+random-number generator that @code{random} uses by default.  The nature
+of this data structure is implementation-dependent.  It may be printed
+out and successfully read back in, but may or may not function correctly
+as a random-number state object in another implementation.@refill
+@end defvar
+
+@deffn Procedure make-random-state
+@deffnx Procedure make-random-state state
+Returns a new object of type suitable for use as the value of the
+variable @code{*random-state*} and as a second argument to
+@code{random}.  If argument @var{state} is given, a copy of it is
+returned.  Otherwise a copy of @code{*random-state*} is returned.@refill
+@end deffn
+
+If inexact numbers are support by the Scheme implementation,
+@file{randinex.scm} will be loaded as well.  @file{randinex.scm}
+contains procedures for generating inexact distributions.@refill
+
+@deffn Procedure random:uniform state
+Returns an uniformly distributed inexact real random number in the
+range between 0 and 1.
+@end deffn
+
+@deffn Procedure random:solid-sphere! vect
+@deffnx Procedure random:solid-sphere! vect state
+Fills @var{vect} with inexact real random numbers the sum of whose
+squares is less than 1.0.  Thinking of @var{vect} as coordinates in
+space of dimension @var{n} = @code{(vector-length @var{vect})}, the
+coordinates are uniformly distributed within the unit @var{n}-shere.
+The sum of the squares of the numbers is returned.@refill
+@end deffn
+
+@deffn Procedure random:hollow-sphere! vect
+@deffnx Procedure random:hollow-sphere! vect state
+Fills @var{vect} with inexact real random numbers the sum of whose
+squares is equal to 1.0.  Thinking of @var{vect} as coordinates in space
+of dimension n = @code{(vector-length @var{vect})}, the coordinates are
+uniformly distributed over the surface of the unit n-shere.@refill
+@end deffn
+
+@deffn Procedure random:normal
+@deffnx Procedure random:normal state
+Returns an inexact real in a normal distribution with mean 0 and
+standard deviation 1.  For a normal distribution with mean @var{m} and
+standard deviation @var{d} use @code{(+ @var{m} (* @var{d}
+(random:normal)))}.@refill
+@end deffn
+
+@deffn Procedure random:normal-vector! vect
+@deffnx Procedure random:normal-vector! vect state
+Fills @var{vect} with inexact real random numbers which are independent
+and standard normally distributed (i.e., with mean 0 and variance 1).
+@end deffn
+
+@deffn Procedure random:exp
+@deffnx Procedure random:exp state
+Returns an inexact real in an exponential distribution with mean 1.  For
+an exponential distribution with mean @var{u} use (* @var{u}
+(random:exp)).@refill
+@end deffn
+
+
+
+
+
+@node Sorting, Standard I/O, Random Numbers, Procedures
+@section Sorting
+
+@code{(require 'sort)}
+
+Many Scheme systems provide some kind of sorting functions.  They do
+not, however, always provide the @emph{same} sorting functions, and
+those that I have had the opportunity to test provided inefficient ones
+(a common blunder is to use quicksort which does not perform well).
+
+Because @code{sort} and @code{sort!} are not in the standard, there is
+very little agreement about what these functions look like.  For
+example, Dybvig says that Chez Scheme provides
+@lisp
+(merge predicate list1 list2)
+(merge! predicate list1 list2)
+(sort predicate list)
+(sort! predicate list)
+@end lisp
+@noindent
+while MIT Scheme 7.1, following Common LISP, offers unstable
+@lisp
+(sort list predicate)
+@end lisp
+@noindent
+TI PC Scheme offers
+@lisp
+(sort! list/vector predicate?)
+@end lisp
+@noindent
+and Elk offers
+@lisp
+(sort list/vector predicate?)
+(sort! list/vector predicate?)
+@end lisp
+
+Here is a comprehensive catalogue of the variations I have found.
+
+@enumerate
+@item
+Both @code{sort} and @code{sort!} may be provided.
+@item
+@code{sort} may be provided without @code{sort!}.
+@item
+@code{sort!} may be provided without @code{sort}.
+@item
+Neither may be provided.
+@item
+The sequence argument may be either a list or a vector.
+@item
+The sequence argument may only be a list.
+@item
+The sequence argument may only be a vector.
+@item
+The comparison function may be expected to behave like @code{<}.
+@item
+The comparison function may be expected to behave like @code{<=}.
+@item
+The interface may be @code{(sort predicate? sequence)}.
+@item
+The interface may be @code{(sort sequence predicate?)}.
+@item
+The interface may be @code{(sort sequence &optional (predicate? <))}.
+@item
+The sort may be stable.
+@item
+The sort may be unstable.
+@end enumerate
+
+All of this variation really does not help anybody.  A nice simple merge
+sort is both stable and fast (quite a lot faster than `quick' sort).
+
+I am providing this source code with no restrictions at all on its use
+(but please retain D.H.D.Warren's credit for the original idea).  You
+may have to rename some of these functions in order to use them in a
+system which already provides incompatible or inferior sorts.  For each
+of the functions, only the top-level define needs to be edited to do
+that.
+
+I could have given these functions names which would not clash with any
+Scheme that I know of, but I would like to encourage implementors to
+converge on a single interface, and this may serve as a hint.  The
+argument order for all functions has been chosen to be as close to
+Common LISP as made sense, in order to avoid NIH-itis.
+
+Each of the five functions has a required @emph{last} parameter which is
+a comparison function.  A comparison function @code{f} is a function of
+2 arguments which acts like @code{<}.  For example,@refill
+
+@lisp
+(not (f x x))
+(and (f x y) (f y z)) @equiv{} (f x z)
+@end lisp
+
+The standard functions @code{<}, @code{>}, @code{char<?}, @code{char>?},
+@code{char-ci<?}, @code{char-ci>?}, @code{string<?}, @code{string>?},
+@code{string-ci<?}, and @code{string-ci>?} are suitable for use as
+comparison functions.  Think of @code{(less? x y)} as saying when
+@code{x} must @emph{not} precede @code{y}.@refill
+
+@defun sorted? sequence less?
+Returns @code{#t} when the sequence argument is in non-decreasing order
+according to @var{less?} (that is, there is no adjacent pair @code{@dots{} x
+y @dots{}} for which @code{(less? y x)}).@refill
+
+Returns @code{#f} when the sequence contains at least one out-of-order
+pair.  It is an error if the sequence is neither a list nor a vector.
+@end defun
+
+@defun merge list1 list2 less?
+This merges two lists, producing a completely new list as result.  I
+gave serious consideration to producing a Common-LISP-compatible
+version.  However, Common LISP's @code{sort} is our @code{sort!} (well,
+in fact Common LISP's @code{stable-sort} is our @code{sort!}, merge sort
+is @emph{fast} as well as stable!) so adapting CL code to Scheme takes a
+bit of work anyway.  I did, however, appeal to CL to determine the
+@emph{order} of the arguments.
+@end defun
+
+@deffn Procedure merge! list1 list2 less?
+Merges two lists, re-using the pairs of @var{list1} and @var{list2} to
+build the result.  If the code is compiled, and @var{less?} constructs
+no new pairs, no pairs at all will be allocated.  The first pair of the
+result will be either the first pair of @var{list1} or the first pair of
+@var{list2}, but you can't predict which.
+    
+The code of @code{merge} and @code{merge!} could have been quite a bit
+simpler, but they have been coded to reduce the amount of work done per
+iteration.  (For example, we only have one @code{null?} test per
+iteration.)@refill
+@end deffn
+
+@defun sort sequence less?
+Accepts either a list or a vector, and returns a new sequence which is
+sorted.  The new sequence is the same type as the input.  Always
+@code{(sorted? (sort sequence less?) less?)}.  The original sequence is
+not altered in any way.  The new sequence shares its @emph{elements}
+with the old one; no elements are copied.@refill
+@end defun
+
+@deffn Procedure sort! sequence less?
+Returns its sorted result in the original boxes.  If the original
+sequence is a list, no new storage is allocated at all.  If the original
+sequence is a vector, the sorted elements are put back in the same
+vector.
+
+Some people have been confused about how to use @code{sort!}, thinking
+that it doesn't return a value.  It needs to be pointed out that
+@lisp
+(set! slist (sort! slist <))
+@end lisp
+@noindent
+is the proper usage, not
+@lisp
+(sort! slist <)
+@end lisp
+@end deffn
+
+Note that these functions do @emph{not} accept a CL-style @samp{:key}
+argument.  A simple device for obtaining the same expressiveness is to
+define@refill
+@lisp
+(define (keyed less? key)
+  (lambda (x y) (less? (key x) (key y))))
+@end lisp
+@noindent
+and then, when you would have written
+@lisp
+(sort a-sequence #'my-less :key #'my-key)
+@end lisp
+@noindent
+in Common LISP, just write
+@lisp
+(sort! a-sequence (keyed my-less? my-key))
+@end lisp
+@noindent
+in Scheme.
+
+
+
+
+
+@node Standard I/O, String-Case, Sorting, Procedures
+@section Standard I/O
+
+@code{(require 'stdio)}
+
+@deffn Procedure printf format . args
+@end deffn
+
+@deffn Procedure fprintf port format . args
+@end deffn
+
+@deffn Procedure sprintf str format . args
+@end deffn
+
+@defvar stdin
+Defined to be @code{(current-input-port)}.
+@end defvar
+@defvar stdout
+Defined to be @code{(current-output-port)}.
+@end defvar
+@defvar stderr
+Defined to be @code{(current-error-port)}.
+@end defvar
+
+@emph{Note:} Floating-point output is not handled yet.
+
+
+
+
+
+@node String-Case, String Ports, Standard I/O, Procedures
+@section String-Case
+
+@code{(require 'string-case)}
+
+@deffn Procedure string-upcase str
+@deffnx Procedure string-downcase str
+@deffnx Procedure string-capitalize str
+The obvious string conversion routines.  These are non-destructive.
+@end deffn
+
+@defun string-upcase! str
+@defunx string-downcase! str
+@defunx string-captialize! str
+The destructive versions of the functions above.
+@end defun
+
+
+
+
+
+@node String Ports, Tektronix Graphics Support, String-Case, Procedures
+@section String Ports
+
+@code{(require 'string-port)}
+
+@deffn Procedure call-with-output-string proc
+@var{proc} must be a procedure of one argument.  This procedure calls
+@var{proc} with one argument: a (newly created) output port.  When the
+function returns, the string composed of the characters written into the
+port is returned.@refill
+@end deffn
+
+@deffn Procedure call-with-input-string string proc
+@var{proc} must be a procedure of one argument.  This procedure calls
+@var{proc} with one argument: an (newly created) input port from which
+@var{string}'s contents may be read.  When @var{proc} returns, the port
+is closed and the value yielded by the procedure @var{proc} is
+returned.@refill
+@end deffn
+
+
+
+
+
+@node Tektronix Graphics Support, Tree Operations, String Ports, Procedures
+@section Tektronix Graphics Support
+
+@emph{Note:} The Tektronix graphics support files need more work, and
+are not complete.
+
+@subsection Tektronix 4000 Series Graphics
+
+The Tektronix 4000 series graphics protocol gives the user a 1024 by
+1024 square drawing area.  The origin is in the lower left corner of the
+screen.  Increasing y is up and increasing x is to the right.
+
+The graphics control codes are sent over the current-output-port and can
+be mixed with regular text and ANSI or other terminal control sequences.
+
+@deffn Procedure tek40:init
+@end deffn
+
+@deffn Procedure tek40:graphics
+@end deffn
+
+@deffn Procedure tek40:text
+@end deffn
+
+@deffn Procedure tek40:linetype linetype
+@end deffn
+
+@deffn Procedure tek40:move x y
+@end deffn
+
+@deffn Procedure tek40:draw x y
+@end deffn
+
+@deffn Procedure tek40:put-text x y str
+@end deffn
+
+@deffn Procedure tek40:reset
+@end deffn
+
+
+@subsection Tektronix 4100 Series Graphics
+
+The graphics control codes are sent over the current-output-port and can
+be mixed with regular text and ANSI or other terminal control sequences.
+
+@deffn Procedure tek41:init
+@end deffn
+
+@deffn Procedure tek41:reset
+@end deffn
+
+@deffn Procedure tek41:graphics
+@end deffn
+
+@deffn Procedure tek41:move x y
+@end deffn
+
+@deffn Procedure tek41:draw x y
+@end deffn
+
+@deffn Procedure tek41:point x y number
+@end deffn
+
+@deffn Procedure tek41:encode-x-y x y
+@end deffn
+
+@deffn Procedure tek41:encode-int number
+@end deffn
+
+
+
+
+
+@node Tree Operations, , Tektronix Graphics Support, Procedures
+@subsection Tree operations
+
+These are operations that treat lists a representations of trees.
+
+@defun subst new old tree
+@defunx substq new old tree
+@defunx substv new old tree
+@code{subst} makes a copy of @var{tree}, substituting @var{new} for
+every subtree or leaf of @var{tree} which is @code{equal?} to @var{old}
+and returns a modified tree.  The original @var{tree} is unchanged, but
+may share parts with the result.@refill
+
+@code{substq} and @code{substv} are similar, but test against @var{old}
+using @code{eq?} and @code{eqv?} respectively.@refill
+
+Examples:
+@lisp
+(substq 'tempest 'hurricane '(shakespeare wrote (the hurricane)))
+   @result{} (shakespeare wrote (the tempest))
+(substq 'foo '() '(shakespeare wrote (twelfth night)))
+   @result{} (shakespeare wrote (twelfth night . foo) . foo)
+(subst '(a . cons) '(old . pair) 
+       '((old . spice) ((old . shoes) old . pair) (old . pair)))
+   @result{} ((old . spice) ((old . shoes) a . cons) (a . cons))
+@end lisp
+@end defun
+
+@defun copy-tree tree
+Makes a copy of the nested list structure @var{tree} using new pairs and
+returns it.  All levels are copied, so that none of the pairs in the
+tree are @code{eq?} to the original ones -- only the leaves are.@refill
+
+Example:
+@lisp
+(define bar '(bar))
+(copy-list (list bar 'foo))
+   @result{} ((bar) foo)
+(eq? bar (car (copy-list (list bar 'foo))))
+   @result{} #f
+@end lisp
+@end defun
+
+
+
+
+
+@node Standards Support, Session Support, Procedures, Top
+@chapter Standards Support
+
+
+
+@menu
+* With-File::                   
+* Transcripts::                 
+* Rev2 Procedures::             'rev2-procedures
+* Rev3 Procedures::             'rev3-procedures
+* Rev4 Optional Procedures::    'rev4-optional-procedures
+* Multi-argument / and -::      'multiarg/and-
+* Multi-argument Apply::        'multiarg-apply
+* Rationalize::                 'rationalize
+* Promises::                    'promise
+* Dynamic-Wind::		'dynamic-wind
+* Values::			'values
+@end menu
+
+
+
+
+
+@node With-File, Transcripts, Standards Support, Standards Support
+@section With-File
+
+@code{(require 'with-file)}
+
+@defun with-input-from-file file thunk
+@defunx with-output-to-file file thunk
+Description found in R4RS.
+@end defun
+
+
+
+
+
+@node Transcripts, Rev2 Procedures, With-File, Standards Support
+@section Transcripts
+
+@code{(require 'transcript)}
+
+@defun transcript-on filename
+@defunx transcript-off filename
+Redefines @code{read-char}, @code{read}, @code{write-char},
+@code{write}, @code{display}, and @code{newline}.@refill
+@end defun
+
+
+
+
+
+@node Rev2 Procedures, Rev3 Procedures, Transcripts, Standards Support
+@section Rev2 Procedures
+
+@code{(require 'rev2-procedures)}
+
+The procedures below were specified in the @cite{Revised^2 Report on
+Scheme}.  @strong{N.B.}: The symbols @code{1+} and @code{-1+} are not
+@cite{R4RS} syntax.  Scheme->C, for instance, barfs on this
+module.@refill
+
+@deffn Procedure substring-move-left! string1 start1 end1 string2 start2
+@deffnx Procedure substring-move-right! string1 start1 end1 string2 start2
+@var{string1} and @var{string2} must be a strings, and @var{start1},
+@var{start2} and @var{end1} must be exact integers satisfying@refill
+
+@example
+0 <= @var{start1} <= @var{end1} <= (string-length @var{string1})
+0 <= @var{start2} <= @var{end1} - @var{start1} + @var{start2} <= (string-length @var{string2})
+@end example
+
+@code{substring-move-left!} and @code{substring-move-right!} store
+characters of @var{string1} beginning with index @var{start1}
+(inclusive) and ending with index @var{end1} (exclusive) into
+@var{string2} beginning with index @var{start2} (inclusive).@refill
+
+@code{substring-move-left!} stores characters in time order of
+increasing indices.  @code{substring-move-right!} stores characters in
+time order of increasing indeces.@refill
+@end deffn
+
+@deffn Procedure substring-fill! string start end char
+Fills the elements @var{start}--@var{end} of @var{string} with the
+character @var{char}.@refill
+@end deffn
+
+@defun string-null? str
+@equiv{} @code{(= 0 (string-length @var{str}))}
+@end defun
+
+@deffn Procedure append! . pairs
+Destructively appends its arguments.  Equivalent to @code{nconc}.
+@end deffn
+
+@defun 1+ n
+Adds 1 to @var{n}.
+@end defun
+
+@defun -1+ n
+Subtracts 1 from @var{n}.
+@end defun
+
+@defun <?
+@defunx <=?
+@defunx =?
+@defunx >?
+@defunx >=?
+These are equivalent to the procedures of the same name but without the
+trailing @samp{?}.
+@end defun
+
+
+
+
+
+@node Rev3 Procedures, Rev4 Optional Procedures, Rev2 Procedures, Standards Support
+@section Rev3 Procedures
+
+@code{(require 'rev3-procedures)}
+
+The procedures below were specified in the @cite{Revised^3 Report on
+Scheme}.
+
+@defun last-pair l
+Returns the last pair in the list @var{l}.  Example:
+@lisp
+(last-pair (cons 1 2))
+   @result{} (1 . 2)
+(last-pair '(1 2))
+   @result{} (2)
+    @equiv{} (cons 2 '())
+@end lisp
+@end defun
+
+@defvar t
+Derfined as @code{#t}.
+@end defvar
+
+@defvar nil
+Defined as @code{#f}.
+@end defvar
+
+
+
+
+
+@node Rev4 Optional Procedures, Multi-argument / and -, Rev3 Procedures, Standards Support
+@section Rev4 Optional Procedures
+
+@code{(require 'rev4-optional-procedures)}
+
+See @cite{R4RS} for the specification of these optional procedures.
+
+@defun list-tail l p
+@end defun
+
+@defun string->list s
+@end defun
+
+@defun list->string l
+@end defun
+
+@defun string-copy
+@end defun
+
+@deffn Procedure string-fill! s obj
+@end deffn
+
+@defun list->vector l
+@end defun
+
+@defun vector->list s
+@end defun
+
+@deffn Procedure vector-fill! s obj
+@end deffn
+
+
+
+
+
+@node Multi-argument / and -, Multi-argument Apply, Rev4 Optional Procedures, Standards Support
+@section Multi-argument / and -
+
+@code{(require 'mutliarg/and-)}
+
+See @cite{R4RS} for the specification of these optional forms.  The
+@code{two-arg:}* forms are only defined if the implementation does not
+support the many-argument forms.@refill
+
+@defun two-arg:/ n1 n2
+The original two-argument version of @code{/}.
+@end defun
+
+@defun / divident . divisors
+@end defun
+
+@defun two-arg:- n1 n2
+The original two-argument version of @code{-}.
+@end defun
+
+@defun - minuend . subtrahends
+@end defun
+
+
+
+
+
+@node Multi-argument Apply, Rationalize, Multi-argument / and -, Standards Support
+@section Multi-argument Apply
+
+See @cite{R4RS} for the specification of this optional form.                                    
+@code{(require 'multiarg-apply)}
+
+@defun two-arg:apply proc l
+The implementation's native @code{apply}.  Only defined for
+implementations which don't support the many-argument version.
+@end defun
+
+@defun apply proc . args
+@end defun
+
+
+
+
+
+@node Rationalize, Promises, Multi-argument Apply, Standards Support
+@section Rationalize
+
+@code{(require 'rationalize)}
+
+The procedure rationalize is interesting because most programming
+languages do not provide anything analogous to it.  For simplicity, we
+present an algorithm which computes the correct result for exact
+arguments (provided the implementation supports exact rational numbers
+of unlimited precision), and produces a reasonable answer for inexact
+arguments when inexact arithmetic is implemented using floating-point.
+We thank Alan Bawden for contributing this algorithm.
+
+@defun rationalize x e
+@end defun
+
+
+
+
+
+@node Promises, Dynamic-Wind, Rationalize, Standards Support
+@section Promises
+
+@code{(require 'promise)}
+
+@defun make-promise proc
+@end defun
+
+Change occurrences of @code{(delay @var{expression})} to
+@code{(make-promise (lambda () @var{expression}))} and @code{(define
+force promise:force)} to implement promises if your implementation
+doesn't support them (see @cite{R4RS}).@refill
+
+
+
+
+
+@node Dynamic-Wind, Values, Promises, Standards Support
+@section Dynamic-Wind
+
+@code{(require 'dynamic-wind)}
+
+This facility is a generalization of Common LISP @code{unwind-protect},
+designed to take into account the fact that continuations produced by
+@code{call-with-current-continuation} may be reentered.@refill
+
+@deffn Procedure dynamic-wind thunk1 thunk2 thunk3
+The arguments @var{thunk1}, @var{thunk2}, and @var{thunk3} must all be
+procedures of no arguments (thunks).@refill
+
+@code{dynamic-wind} calls @var{thunk1}, @var{thunk2}, and then
+@var{thunk3}.  The value returned by @var{thunk2} is returned as the
+result of @code{dynamic-wind}.  @var{thunk3} is also called just before
+control leaves the dynamic context of @var{thunk2} by calling a
+continuation created outside that context.  Furthermore, @var{thunk1} is
+called before reentering the dynamic context of @var{thunk2} by calling
+a continuation created inside that context.  (Control is inside the
+context of @var{thunk2} if @var{thunk2} is on the current return stack).
+
+@strong{Warning:} There is no provision for dealing with errors or
+interrupts.  If an error or interrupt occurs while using
+@code{dynamic-wind}, the dynamic environment will be that in effect at
+the time of the error or interrupt.@refill
+@end deffn
+
+
+
+
+@node Values, , Dynamic-Wind, Standards Support
+@section Values
+
+@code{(require 'values)}
+
+@defun values obj @dots{}
+@code{values} takes any number of arguments, and passes (returns) them
+to its continuation.@refill
+@end defun
+
+
+@defun call-with-values thunk proc
+@var{thunk} must be a procedure of no arguments, and @var{proc} must be
+a procedure.  @code{call-with-values} calls @var{thunk} with a
+continuation that, when passed some values, calls @var{proc} with those
+values as arguments.@refill
+
+Except for continuations created by the @code{call-with-values}
+procedure, all continuations take exactly one value, as now; the effect
+of passing no value or more than one value to continuations that were
+not created by the @code{call-with-values} procedure is
+unspecified.@refill
+@end defun
+
+
+
+
+
+@node Session Support, Syntax Extensions, Standards Support, Top
+@chapter Session Support
+
+@menu
+* Repl::                        'repl
+* Debug::                       'debug
+* Test::                        'test
+* Getopt::                      'getopt
+
+The features described in the following sections are supported by all
+implementations.
+
+* Require::
+* Vicinity::
+* Constants::
+* System::
+@end menu
+
+
+
+@node Repl, Debug, Session Support, Session Support
+@section Repl
+
+@code{(require 'repl)}
+
+Here is a read-eval-print-loop which, given an eval, evaluates forms.
+
+@deffn Procedure repl:top-level repl:eval
+@code{read}s, @code{repl:eval}s and @code{write}s expressions from
+@code{(current-input-port)} to @code{(current-output-port)} until an
+end-of-file is encountered.  @code{load}, @code{slib:eval},
+@code{slib:error}, and @code{repl:quit} dynamically bound during
+@code{repl:top-level}.@refill
+@end deffn
+
+@deffn Procedure repl:quit
+Exits from the invocation of @code{repl:top-level}.
+@end deffn
+
+The @code{repl:} procedures establish, as much as is possible to do
+portably, a top level environment supporting macros.
+@code{repl:top-level} uses @code{dynamic-wind} to catch error conditions
+and interrupts.  If your implementation supports this you are all set.
+
+Otherwise, if there is some way your implementation can catch error
+conditions and interrupts, then have them call @code{slib:error}.  It
+will display its arguments and reenter @code{repl:top-level}.
+@code{slib:error} dynamically bound by @code{repl:top-level}.@refill
+
+To have your top level loop always use macros, add any interrupt
+catching lines and the following lines to your Scheme init file:
+@lisp
+(require 'macro)
+(require 'repl)
+(repl:top-level macro:eval)
+@end lisp
+
+
+
+
+
+@node Debug, Test, Repl, Session Support
+@section Debug
+
+@code{(require 'debug)}
+
+@deffn Procedure print args
+Print writes all its arguments, separated by spaces.  Print outputs a
+newline at the end and returns the value of the last argument.  Note
+that @code{print} is also defined in the @code{yasos} module
+(@xref{Yasos}).@refill
+@end deffn
+
+@deffn Procedure qp args
+@deffnx Procedure qpn args
+@deffnx Procedure qpr args
+@code{qp} writes its arguments, separated by spaces, to
+@code{(current-output-port)}.  @code{qp} compresses printing by
+substituting @samp{...} for substructure it does not have sufficient
+room to print.  @code{qpn} is like @code{qp} but outputs a newline
+before returning.  @code{qpr} is like @code{qpn} except that it returns
+its last argument.@refill
+@end deffn
+
+@defvar *qp-width*
+@code{*qp-width*} is the largest number of characters that @code{qp}
+uses.@refill
+@end defvar
+
+@subsection Tracing
+
+To trace, type
+@lisp
+(set! @var{symbol} (tracef @var{symbol}))
+@end lisp
+@noindent
+or
+@lisp
+(set! @var{symbol} (tracef @var{symbol} '@var{symbol}))
+@end lisp
+@noindent
+or
+@lisp
+(define @var{symbol} (tracef @var{function}))
+@end lisp
+@noindent
+or
+@lisp
+(define @var{symbol} (tracef @var{function} '@var{symbol}))
+@end lisp
+To untrace, type
+@lisp
+(set! @var{symbol} (untracef @var{symbol}))
+@end lisp
+
+
+@subsection Breakpoints
+
+Typing @code{(init-debug)} at top level sets up a continuation for
+break.  When @code{(break arg1 @dots{})} is then called it returns from the
+top level continuation and pushes the continuation from which it was
+called on @code{debug:break-continuation-stack}.  If @code{(continue)}
+is later called, it pops the topmost continuation off of
+@code{debug:break-continuation-stack} and returns @code{#f} to
+it.@refill
+
+
+
+
+
+@node Test, Getopt, Debug, Session Support
+@section Test
+
+@code{(require 'test)}
+
+Routines for testing (specifically conformance to definitions in
+sections of a standard).  See @file{test.scm} in the source distribution
+of @code{scm} or the Scheme Repository
+(@code{nexus.yorku.ca:pub/scheme/}) for usage examples.@refill
+
+@defun test expected fun . args
+@end defun
+
+
+
+@node Getopt, Require, Test, Session Support
+@section Getopt
+
+@code{(require 'getopt)}
+
+This routine implements Posix command line argument parsing.
+
+@defvar *optind*
+Is the index of the current element of the command line.  It is
+initially one.
+@end defvar
+
+@defvar *optarg*
+Is set by getopt to the (string) option-argument of the current option.
+@end defvar
+
+@deffn Procedure getopt argc argv optstring
+Returns the next option letter in @var{argv} (starting from
+@code{(vector-ref argv *optind*)}) that matches a letter in
+@var{optstring}.  @var{argv} is a vector or list of strings, the 0th of
+which getopt usually ignores. @var{argc} is the argument count, usually
+the length of @var{argv}.  @var{optstring} is a string of recognized
+option characters; if a character is followed by a colon, the option
+takes an argument which may be immediately following it in the string or
+in the next element of @var{argv}.
+
+@var{*optind*} is the index of the next element of the @var{argv} vector
+to be processed.  It is initialized to 1 by @file{getopt.scm}, and
+@code{getopt} updates it when it finishes with each element of
+@var{argv}.
+
+@code{getopt} returns the next option character from @var{argv} that
+matches a character in @var{optstring}, if there is one that matches.
+If the option takes an argument, @code{getopt} sets the variable
+@var{*optarg*} to the option-argument as follows:
+
+@itemize @bullet
+@item
+If the option was the last character in the string pointed to by an
+element of @var{argv}, then @var{*optarg*} contains the next element of
+@var{argv}, and @var{*optind*} is incremented by 2.  If the resulting
+value of @var{*optind*} is greater than or equal to @var{argc}, this
+indicates a missing option argument, and @code{getopt} returns an error
+indication.
+
+@item
+Otherwise, @var{*optarg*} is set to the string following the option
+character in that element of @var{argv}, and @var{*optind*} is
+incremented by 1.
+@end itemize
+
+If, when @code{getopt} is called, the string @code{(vector-ref argv
+*optind*)} either does not begin with the character @code{#\-} or is
+just @code{"-"}, @code{getopt} returns @code{#f} without changing
+@var{*optind*}.  If @code{(vector-ref argv *optind*)} is the string
+@code{"--"}, @code{getopt} returns @code{#f} after incrementing
+@var{*optind*}.
+
+If @code{getopt} encounters an option character that is not contained in
+@var{optstring}, it returns the question-mark @code{#\?} character.  If
+it detects a missing option argument, it returns the colon character
+@code{#\:} if the first character of @var{optstring} was a colon, or a
+question-mark character otherwise.  In either case, @code{getopt} sets
+the variable @var{getopt:opt} to the option character that caused the
+error.
+
+The special option @code{"--"} can be used to delimit the end of the
+options; @code{#f} is returned, and @code{"--"} is skipped.
+
+RETURN VALUE
+
+@code{getopt} returns the next option character specified on the command
+line.  A colon @code{#\:} is returned if @code{getopt} detects a missing argument
+and the first character of @var{optstring} was a colon @code{#\:}.
+
+A question-mark @code{#\?} is returned if @code{getopt} encounters an option
+character not in @var{optstring} or detects a missing argument and the first
+character of @var{optstring} was not a colon @code{#\:}.
+
+Otherwise, @code{getopt} returns @code{#f} when all command line options have been
+parsed.
+
+Example:
+@lisp
+#! /usr/local/bin/scm
+;;;This code is SCM specific.
+(define argv (program-arguments))
+(require 'getopt.scm)
+(require 'debug)
+
+(define opts ":a:b:cd")
+(let loop ((opt (getopt (length argv) argv opts)))
+  (case opt
+    ((#\a) (print "option a: " *optarg*))
+    ((#\b) (print "option b: " *optarg*))
+    ((#\c) (print "option c"))
+    ((#\d) (print "option d"))
+    ((#\?) (print "error" getopt:opt))
+    ((#\:) (print "missing arg" getopt:opt))
+    ((#f) (if (< *optind* (length argv))
+	      (print "argv[" *optind* "]="
+		     (list-ref argv *optind*)))
+	  (set! *optind* (+ *optind* 1))))
+  (if (< *optind* (length argv))
+      (loop (getopt (length argv) argv opts))))
+
+(quit)
+@end lisp
+@end deffn
+
+
+
+
+
+@node Require, Vicinity, Getopt, Session Support
+@section Require
+
+@defvar *features*
+Is a list of symbols denoting features supported in this implementation.
+@end defvar
+
+@defvar *modules*
+Is a list of pathnames denoting files which have been loaded.
+@end defvar
+
+@defvar *catalog*
+Is an association list of features (symbols) and pathnames which will
+supply those features.
+@end defvar
+
+In the following three functions if @var{feature} is not a symbol it is
+assumed to be a pathname.@refill
+
+@defun provided? feature
+Returns @code{#t} if @var{feature} is a member of @code{*features*} or
+@code{*modules*} or if @var{feature} is supported by a file already
+loaded and @code{#f} otherwise.@refill
+@end defun
+
+@deffn Procedure require feature
+If @code{(not (provided? @var{feature}))} it is loaded if @var{feature}
+is a pathname or if @code{(assq @var{feature} *catalog*)}.  Otherwise an
+error is signaled.@refill
+@end deffn
+
+@deffn Procedure provide feature
+Assures that @var{feature} is contained in @code{*features*} if
+@var{feature} is a symbol and @code{*modules*} otherwise.@refill
+@end deffn
+
+@defun require:feature->path feature
+Returns @code{#t} if @var{feature} is a member of @code{*features*} or
+@code{*modules*} or if @var{feature} is supported by a file already
+loaded.  Returns a path if one was found in @code{*catalog*} under the
+feature name, and @code{#f} otherwise.  The path can either be a string
+suitable as an argument to load or a pair whose car is @code{'macro} and
+whose cdr is a string suitable as an argument to
+@code{macro:load}.@refill
+@end defun
+
+Below is a list of features that are automatically determined by
+@code{require}.  For each item, @code{(provided? '@var{feature})} will
+return @code{#t} if that feature is available, and @code{#f} if
+not.@refill
+
+@itemize @bullet
+@item
+'inexact
+@item
+'rational
+@item
+'real
+@item
+'complex
+@item
+'bignum
+@end itemize
+
+
+
+
+
+@node Vicinity, Constants, Require ,Session Support
+@section Vicinity
+
+
+A vicinity is a descriptor for a place in the file system.  Vicinities
+hide from the programmer the concepts of host, volume, directory, and
+version.  Vicinities express only the concept of a file environment
+where a file name can be resolved to a file in a system independent
+manner.  Vicinities can even be used on `flat' file systems (which have
+no directory structure) by having the vicinity express constraints on
+the file name.  On most systems a vicinity would be a string.  All of
+these procedures are file system dependent.
+
+@defun make-vicinity pathname
+Returns the vicinity of @var{pathname} for use by @code{in-vicinity}.
+@end defun
+
+@defun program-vicinity
+Returns the vicinity of the currently loading Scheme code.  For an
+interpreter this would be the directory containing source code.  For a
+compiled system (with multiple files) this would be the directory where
+the object or executable files are.  If no file is currently loading it
+the result is undefined.  @strong{Warning:} @code{program-vicinity} can
+return incorrectl values if your program escapes back into a
+@code{load}.@refill
+@end defun
+
+@defun library-vicinity
+Returns the vicinity of the shared Scheme library.
+@end defun
+
+@defun implementation-vicinity
+Returns the vicinity of the underlying Scheme implementation.  This
+vicinity will likely contain startup code and messages and a compiler.
+@end defun
+
+@defun user-vicinity
+Returns the vicinity of the current directory of the user.  On most
+systems this is @file{""} (the empty string).
+@end defun
+
+@defun scheme-file-suffix
+Returns the default filename suffix for scheme source files.  On most
+systems this is @samp{.scm}.@refill
+@end defun
+
+@defun in-vicinity vicinity filename
+@defunx in-vicinity vicinity filename suffix
+Returns a filename suitable for use by @code{load},
+@code{open-input-file}, @code{open-output-file}, etc.  The returned
+filename is @var{filename}, with optional @var{suffix} appended, in
+@var{vicinity}.  @code{in-vicinity} should allow @var{filename} to
+override @var{vicinity} when @var{filename} is an absolute pathname and
+@var{vicinity} is equal to the value of @code{(user-vicinity)}.  The
+behavior of @code{in-vicinity} when @var{filename} is absolute and
+@var{vicinity} is not equal to the value of @code{(user-vicinity)} is
+unspecified.  For most systems @code{in-vicinity} can be
+@code{string-append}.@refill
+@end defun
+
+@defun sub-vicinity vicinity name
+Returns the vicinity of @var{vicinity} restricted to @var{name}.  This
+is used for large systems where names of files in subsystems could
+conflict.  On systems with directory structure @code{sub-vicinity} will
+return a pathname of the subdirectory @var{name} of
+@var{vicinity}.@refill
+@end defun
+
+
+
+@node Constants, System, Vicinity ,Session Support
+@section Constants
+
+@defvr Constant software-type
+A symbol denoting the generic operating system type.  Examples are
+@code{unix}, @code{vms}, @code{macos}, @code{amiga}, and @code{msdos}.
+@end defvr
+
+@defvr Constant char-code-limit
+An integer 1 larger that the largest value which can be returned by
+@code{char->integer}.@refill
+@end defvr
+
+@defvr Constant most-positive-fixnum
+The immediate integer closest to positive infinity.
+@end defvr
+
+@defvr Constant slib:tab
+The tab character.
+@end defvr
+
+@defvr Constant slib:form-feed
+The form-feed character.
+@end defvr
+
+
+
+@node System, , Constants, Session Support
+@section System
+
+Certain features are so simple, system-dependent, or widely subcribed
+that they are supported as part of the @samp{*.init} files.
+
+@deffn Procedure output-port-width
+@deffnx Procedure output-port-width port
+
+Returns the width of @var{port}, which defaults to
+@code{(current-output-port)} if absent.  If the width cannot be
+determined 79 is returned.@refill
+@end deffn
+
+@deffn Procedure output-port-height
+@deffnx Procedure output-port-height port
+
+Returns the height of @var{port}, which defaults to
+@code{(current-output-port)} if absent.  If the height cannot be
+determined 24 is returned.@refill
+@end deffn
+
+@deffn Procedure current-error-port
+Returns the current port to which diagnostic and error output is
+directed.
+@end deffn
+
+@deffn Procedure tmpnam
+Returns a pathname for a file which will likely not be used by any other
+process.  Successive calls to @code{(tmpnam)} will return different
+pathnames.@refill
+@end deffn
+
+@deffn Procedure file-exists? filename
+Returns @code{#t} if the specified file exists.  Otherwise, returns
+@code{#f}.  If the underlying implementation does not support this
+feature then @code{#f} is always returned.
+@end deffn
+
+@deffn Procedure delete-file filename
+Deletes the file specified by @var{filename}.  If @var{filename} can not
+be deleted, @code{#f} is returned.  Otherwise, @code{#t} is
+returned.@refill
+@end deffn
+
+@deffn Procedure force-output
+@deffnx Procedure force-output port
+Forces any pending output on @var{port} to be delivered to the output
+device and returns an unspecified value.  The @var{port} argument may be
+omitted, in which case it defaults to the value returned by
+@code{(current-output-port)}.@refill
+@end deffn
+
+@deffn Procedure slib:eval obj
+@code{eval} returns the value of @var{obj} evaluated in the current top
+level environment.@refill
+@end deffn
+
+@deffn Procedure slib:error arg1 arg2 @dots{}
+Outputs an error message containing the arguments, aborts evaluation of
+the current form and responds in a system dependent way to the error.
+Typical responses are to abort the program or to enter a read-eval-print
+loop.@refill
+@end deffn
+
+
+
+@node Syntax Extensions, Procedure and Macro Index, Session Support, Top
+@chapter Syntax Extensions
+
+There are a couple syntax extensions included with SLIB.
+
+@menu
+* Fluid-Let::           'fluid-let
+* Yasos::               'yasos, 'oop, 'collect
+@end menu
+
+
+
+
+
+@node Fluid-Let, Yasos, Syntax Extensions, Syntax Extensions
+@section Fluid-Let
+
+@code{(require 'fluid-let)}
+
+@deffn Syntax fluit-let @code{(@var{bindings} @dots{})} @var{forms}@dots{}
+@end deffn
+@lisp
+(fluid-let ((@var{variable} @var{init}) @dots{})
+   @var{expression} @var{expression} @dots{})
+@end lisp
+
+The @var{init}s are evaluated in the current environment (in some
+unspecified order), the current values of the @var{variable}s are saved,
+the results are assigned to the @var{variable}s, the @var{expression}s
+are evaluated sequentially in the current environment, the
+@var{variable}s are restored to their original values, and the value of
+the last @var{expression} is returned.@refill
+
+The syntax of this special form is similar to that of @code{let}, but
+@code{fluid-let} temporarily rebinds existing @var{variable}s.  Unlike
+@code{let}, @code{fluid-let} creates no new bindings; instead it
+@emph{assigns} the values of each @var{init} to the binding (determined
+by the rules of lexical scoping) of its corresponding
+@var{variable}.@refill
+
+
+
+
+
+@node Yasos, , Fluid-Let, Syntax Extensions
+@section Yasos
+
+@c Much of the documentation in this section was written by Dave Love
+@c (d.love@dl.ac.uk) -- don't blame Ken Dickey for its faults.
+
+@code{(require 'oop)} or @code{(require 'yasos)}
+
+`Yet Another Scheme Object System'.  A simple object system for Scheme
+based on the paper by Norman Adams and Jonathan Rees: @cite{Object
+Oriented Programming in Scheme}, Proceedings of the 1988 ACM Conference
+on LISP and Functional Programming, July 1988 [ACM #552880].@refill
+
+@menu
+* Yasos terms::           Definitions and disclaimer.
+* Yasos interface::       The Yasos macros and procedures.
+* Setters::               Dylan-like setters in Yasos.
+* Yasos examples::        Usage of Yasos and setters.
+@end menu
+  
+
+
+
+
+@node Yasos terms, Yasos interface, Yasos, Yasos
+@subsection Terms
+  
+@table @asis
+@item @dfn{Object}
+Any Scheme data object.
+
+@item @dfn{Instance}
+An instance of the OO system; an @dfn{object}.
+
+@item @dfn{Operation}
+A @var{method}.
+@end table
+
+  
+@table @emph
+@item Notes:
+The object system supports multiple inheritance.  An instance can
+inherit from 0 or more ancestors.  In the case of multiple inherited
+operations with the same identity, the operation used is that from the
+first ancestor which contains it (in the ancestor @code{let}).  An
+operation may be applied to any Scheme data object---not just instances.
+As code which creates instances is just code, there are no @dfn{classes}
+and no meta-@var{anything}.  Method dispatch is by a procedure call a la
+CLOS rather than by `send' syntax a la Smalltalk.@refill
+
+@item Disclaimer:
+There are a number of optimizations which can be made.  This
+implementation is expository (although performance should be quite
+reasonable).  See the L&FP paper for some suggestions.@refill
+@end table
+
+
+
+
+
+@node Yasos interface, Setters, Yasos terms, Yasos
+@subsection Interface
+
+@deffn Syntax define-operation @code{(}opname self arg @dots{}@code{)} @var{default-body}
+Defines a default behavior for data objects which don't handle the
+operation @var{opname}.  The default default behavior (for an empty
+@var{default-body}) is to generate an error.@refill
+@end deffn
+
+@deffn Syntax define-predicate opname?
+Defines a predicate @var{opname?}, usually used for determining the
+@dfn{type} of an object, such that @code{(@var{opname?} @var{object})}
+returns @code{#t} if @var{object} has an operation @var{opname?} and
+@code{#f} otherwise.@refill
+@end deffn
+
+@deffn Syntax object @code{((@var{name} @var{self} @var{arg} @dots{}) @var{body})} @dots{} 
+Returns an object (an instance of the object system) with operations.
+Invoking @code{(@var{name} @var{object} @var{arg} @dots{}} executes the
+@var{body} of the @var{object} with @var{self} bound to @var{object} and
+with argument(s) @var{arg}@dots{}.@refill
+@end deffn
+
+@deffn Syntax object-with-ancestors @code{((}ancestor1 init1@code{)} @dots{}@code{)} operation @dots{}
+A @code{let}-like form of @code{object} for multiple inheritance.  It
+returns an object inheriting the behaviour of @var{ancestor1} etc.  An
+operation will be invoked in an ancestor if the object itself does not
+provide such a method.  In the case of multiple inherited operations
+with the same identity, the operation used is the one found in the first
+ancestor in the ancestor list.
+@end deffn
+
+@deffn Syntax operate-as component operation self arg @dots{}
+Used in an operation definition (of @var{self}) to invoke the
+@var{operation} in an ancestor @var{component} but maintain the object's
+identity.  Also known as ``send-to-super''.@refill
+@end deffn
+  
+@deffn Procedure print obj port
+A default @code{print} operation is provided which is just @code{(format
+@var{port} @var{obj})} (@xref{Format}) for non-instances and prints
+@var{obj} preceded by @samp{#<INSTANCE>} for instances.  Note that
+@code{print} is also defined in the @code{debug} module
+(@xref{Debug}) and these will conflict.@refill
+@end deffn
+
+@defun size obj
+The default method returns the number of elements in @var{obj} if it is
+a vector, string or list, @code{2} for a pair, @code{1} for a character
+and by default id an error otherwise.  Objects such as collections
+(@xref{Collections}) may override the default in an obvious way.@refill
+@end defun
+
+
+
+
+
+@node Setters, Yasos examples, Yasos interface, Yasos
+@subsection Setters
+
+@dfn{Setters} implement `generalized locations' for objects associated
+with some sort of mutable state.  A @dfn{getter} operation retrieves a
+value from a generalized location and the corresponding setter operation
+stores a value into the location.  Only the getter is named -- the
+setter is specified by a procedure call as below.  (Dylan uses special
+syntax.)  Typically, but not necessarily, getters are access operations
+to extract values from Yasos objects (@xref{Yasos}).  Several setters
+are predefined, corresponding to getters @code{car}, @code{cdr},
+@code{string-ref} and @code{vector-ref} e.g., @code{(setter car)} is
+equivalent to @code{set-car!}.
+
+This implementation of setters is similar to that in Dylan(TM)
+(@cite{Dylan: An object-oriented dynamic language}, Apple Computer
+Eastern Research and Technology).  Common LISP provides similar
+facilities through @code{setf}.
+
+@defun setter getter
+Returns the setter for the procedure @var{getter}.  E.g., since
+@code{string-ref} is the getter corresponding to a setter which is
+actually @code{string-set!}:
+@example
+(define foo "foo")
+((setter string-ref) foo 0 #\F) ; set element 0 of foo
+foo @result{} "Foo"
+@end example
+@end defun
+
+@deffn Syntax set place new-value
+If @var{place} is a variable name, @code{set} is equivalent to
+@code{set!}.  Otherwise, @var{place} must have the form of a procedure
+call, where the procedure name refers to a getter and the call indicates
+an accessible generalized location, i.e., the call would return a value.
+The return value of @code{set} is usually unspecified unless used with a
+setter whose definition guarantees to return a useful value.
+@example
+(set (string-ref foo 2) #\O)  ; generalized location with getter
+foo @result{} "FoO"
+(set foo "foo")               ; like set!
+foo @result{} "foo"
+@end example
+@end deffn
+
+@deffn Procedure add-setter getter setter
+Add procedures @var{getter} and @var{setter} to the (inaccessible) list
+of valid setter/getter pairs.  @var{setter} implements the store
+operation corresponding to the @var{getter} access operation for the
+relevant state.  The return value is unspecified.
+@end deffn
+
+@deffn Procedure remove-setter-for getter
+Removes the setter corresponding to the specified @var{getter} from the
+list of valid setters.  The return value is unspecified.
+@end deffn
+
+@deffn Syntax define-access-operation getter-name
+Shorthand for a Yasos @code{define-operation} defining an operation
+@var{getter-name} that objects may support to return the value of some
+mutable state.  The default operation is to signal an error.  The return
+value is unspecified.
+@end deffn
+
+
+
+
+
+@node Yasos examples, , Setters, Yasos
+@subsection Examples
+
+@lisp
+(define-operation (print obj port) 
+  (format port 
+          (if (instance? obj) "#<instance>" "~s") 
+	  obj))
+
+(define-operation (SIZE obj)
+  (cond 
+   ((vector? obj) (vector-length obj))
+   ((list?   obj) (length obj))
+   ((pair?   obj) 2)
+   ((string? obj) (string-length obj))
+   ((char?   obj) 1)
+   (else 
+    (error "Operation not supported: size" obj))))
+
+(define-predicate cell?)
+(define-operation (fetch obj))
+(define-operation (store! obj newValue))
+
+(define (make-cell value)
+  (object
+   ((cell? self) #t)
+   ((fetch self) value)
+   ((store! self newValue)
+    (set! value newValue)
+    newValue)
+   ((size self) 1)
+   ((print self port) 
+    (format port "#<Cell: ~s>" (fetch self)))))
+
+(define-operation (discard obj value)
+  (format #t "Discarding ~s~%" value))
+
+(define (make-filtered-cell value filter)
+  (object-with-ancestors ((cell (make-cell value)))
+			 ((store! self newValue)
+			  (if (filter newValue)
+			      (store! cell newValue)
+			      (discard self newValue)))))
+
+(define-predicate array?)
+(define-operation (array-ref array index))
+(define-operation (array-set! array index value))
+
+(define (make-array num-slots)
+  (let ((anArray (make-vector num-slots)))
+    (object
+     ((array? self) #t)
+     ((size self) num-slots)
+     ((array-ref self index)           (vector-ref  anArray index))
+     ((array-set! self index newValue) (vector-set! anArray index newValue))
+     ((print self port) (format port "#<Array ~s>" (size self))))))
+
+(define-operation (position obj))
+(define-operation (discarded-value obj))
+
+(define (make-cell-with-history value filter size)
+  (let ((pos 0) (most-recent-discard #f))
+    (object-with-ancestors 
+     ((cell (make-filtered-call value filter))
+      (sequence (make-array size)))
+     ((array? self) #f)
+     ((position self) pos)
+     ((store! self newValue)
+      (operate-as cell store! self newValue)
+      (array-set! self pos newValue)
+      (set! pos (+ pos 1)))
+     ((discard self value)
+      (set! most-recent-discard value))
+     ((discarded-value self) most-recent-discard)
+     ((print self port)
+      (format port "#<Cell-with-history ~s>" (fetch self))))))
+
+(define-access-operation fetch)
+(add-setter fetch store!)
+(define foo (make-cell 1))
+(print foo #f) 
+@result{} "#<Cell: 1>"
+(set (fetch foo) 2) 
+@result{}
+(print foo #f) 
+@result{} "#<Cell: 2>"
+(fetch foo) 
+@result{} 2
+@end lisp
+
+
+
+
+
+@node Procedure and Macro Index, Variable Index, Syntax Extensions, Top
+@unnumbered Procedure and Macro Index
+
+This is an alphabetical list of all the procedures and macros in SLIB.
+
+@printindex fn
+
+@node Variable Index, , Procedure and Macro Index, Top
+@unnumbered Variable Index
+
+This is an alphabetical list of all the global variables in SLIB.
+
+@printindex vr
+
+@contents
+@bye

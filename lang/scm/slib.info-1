@@ -1,0 +1,1011 @@
+This is Info file slib.info, produced by Makeinfo-1.49 from the input
+file slib.texi.
+
+  This file documents SLIB, the portable Scheme library.
+
+  Copyright (C) 1993 Todd R. Eigenschink
+
+  Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+  Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided that the
+entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+
+  Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions, except that this permission notice may be stated in a
+translation approved by the author.
+
+
+File: slib.info,  Node: Top,  Up: (dir)
+
+  This file documents SLIB, the portable Scheme library.
+
+  This manual format is much more stable than the last version.  It is
+now roughly 70 pages (printed).  (About 30 pages were removed by
+decreasing the amount of whitespace between paragraphs and such.)
+
+  A lot of thanks goes to Dave Love (D.Love@dl.ac.uk) for all the work
+he did fixing my typos, modifying the layout, and adding text.  His
+improvements add a great deal to this documentation.
+
+  Todd Eigenschink (eigenstr@CS.Rose-Hulman.Edu)
+
+* Menu:
+
+* Overview::			What is SLIB?
+
+* Data Structures::		Various data structures.
+* Macro Implementations::	Various macro implementations.
+* Procedures::			Miscellaneous utility procedures.
+* Standards Support::		Support for Scheme Standards.
+* Session Support::		Debugging, Pathnames, Require, etc.
+* Syntax Extensions::		Extensions to syntax.
+
+* Procedure and Macro Index::
+* Variable Index::
+
+
+File: slib.info,  Node: Overview,  Next: Data Structures,  Prev: Top,  Up: Top
+
+Overview
+********
+
+  SLIB is a portable Scheme library meant to provide compatibility and
+utility functions for all standard Scheme implementations, and fixes
+several implementations which are non-conforming.  SLIB conforms to
+`Revised^4 Report on the Algorithmic Language Scheme' and the IEEE
+P1178 specification.  SLIB supports Unix and similar systems, VMS, and
+MS-DOS.
+
+  The maintainer can be reached as jaffer@ai.mit.edu or Aubrey Jaffer,
+84 Pleasant St., Wakefield, MA 01880.
+
+  For a summary of what each file contains, see the file `README'. For
+a list of the features that have changed since the last SLIB release,
+see the file `ANNOUNCE'.
+
+* Menu:
+
+* Installation::		How to install SLIB on your system.
+* Coding Standards::		How to write modules for SLIB.
+* Manual Conventions::		Conventions used in this manual.
+
+
+File: slib.info,  Node: Installation,  Next: Coding Standards,  Prev: Overview,  Up: Overview
+
+Installation
+============
+
+  Check the manifest in `README' to see if a configuration file for
+your Scheme implementation has already been created.  If so, customize
+it and use it.  If not, you will have to create one.  Please mail new
+working configuration files to `jaffer@ai.mit.edu' so that they can be
+included in the SLIB distribution.
+
+  `Template.scm' is an example configuration file.  The comments inside
+will direct you on how to customize it to reflect your system. Your
+customized version should then be loaded as part of your scheme
+implementation's initialization.  It will load `require.scm' (*Note
+Require::) from the library; this will allow the use of `provide',
+`provided?', and `require' along with the "vicinity" functions
+(`vicinity' functions are documented in the section on Require.  *Note
+Require::).  The rest of the library will then be accessible in a
+system independent fashion.
+
+
+File: slib.info,  Node: Coding Standards,  Next: Manual Conventions,  Prev: Installation,  Up: Overview
+
+Coding Standards
+================
+
+  All library packages are written in IEEE P1178 Scheme and assume that
+a configuration file and `require.scm' package have already been
+loaded.  Other versions of Scheme can be supported in library packages
+as well by using `(provided? 'rev3-report)' or `(require 'rev3-report)'
+(*Note Require::).
+
+  `require.scm' defines `*catalog*', an association list of module
+names and filenames.  When a new package is added to the library, an
+entry should be added to `require.scm'.  Local packages can also be
+added to `*catalog*' and even shadow entries already in the table.
+
+  The module name and `:' should prefix each symbol defined in the
+package.  Definitions for external use should then be exported by having
+`(define foo module-name:foo)'.
+
+  Submitted packages should not duplicate routines which are already in
+SLIB files.  Use `require' to force those features to be supported in
+your package.  Care should be taken that there are no circularities in
+the `require's and `load's between the library packages.
+
+  Documentation should be provided in Emacs Texinfo format if possible,
+But documentation must be provided.
+
+
+File: slib.info,  Node: Manual Conventions,  Prev: Coding Standards,  Up: Overview
+
+Manual Conventions
+==================
+
+  Things that are labeled as Functions are called for their return
+values. Things that are labeled as Procedures are called primarily for
+their side effects.
+
+  All examples throughout this text were produced using `scm'.
+
+  At the beginning of each section, there is a line that looks something
+like
+
+  `(require 'feature)'.
+
+This means that, in order to use `feature', you must include the line
+`(require 'feature)' somewhere in your code prior to the use of that
+feature.  `require' will make sure that the feature is loaded.
+
+
+File: slib.info,  Node: Data Structures,  Next: Macro Implementations,  Prev: Overview,  Up: Top
+
+Data Structures
+***************
+
+* Menu:
+
+* Arrays::                      'array
+* Association Lists::           'alist
+* Collections::                 'collect
+* Dynamic Data Type::           'dynamic
+* Hash Tables::                 'hash-table
+* Hashing::                     'hash
+* Priority Queues::             'priority-queue
+* Queues::                      'queue
+* Records::                     'record
+* Red-Black Trees::             'red-black-tree
+* Structures::                  'struct, 'structure
+
+
+File: slib.info,  Node: Arrays,  Next: Association Lists,  Prev: Data Structures,  Up: Data Structures
+
+Arrays
+======
+
+  `(require 'array)'
+
+  The user interface consists of the following functions:
+
+ -- Function: array? OBJ
+     Returns `#t' if the OBJ is an array, and `#f' if not.
+
+ -- Function: make-array INITIAL-VALUE BOUND1 BOUND2 ...
+     Creates and returns an array that has as many dimensins as there
+     are BOUNDs and fills it with INITIAL-VALUE.
+
+ -- Function: array-ref ARRAY INDEX1 INDEX2 ...
+     Returns the element at the `(INDEX1, INDEX2)' element in ARRAY.
+
+ -- Procedure: array-set! ARRAY NEW-VALUE INDEX1 INDEX2 ...
+
+ -- Function: make-shared-array ARRAY MAPPER BOUND1 BOUND2 ...
+
+ -- Function: array-shape ARRAY
+
+  When constructing an array, BOUND is either an inclusive range of
+indices expressed as a two element list, or an upper bound expressed as
+a single integer.  So
+     (make-array 'foo 3 3)
+
+and
+     (make-array 'foo '(0 2) '(0 2))
+
+are equivalent
+
+  `array-shape' returns a list of inclusive bounds.  So:
+     (array-shape (make-array 'foo 3 5))
+        => ((0 2) (0 4))
+
+  `make-shared-array' can be used to create shared subarrays of other
+arrays.  The MAPPER is a function that translates coordinates in the
+new array into coordinates in the old array.  A MAPPER must be linear,
+and its range must stay within the bounds of the old array, but it can
+be otherwise arbitrary.  A simple example:
+     (define fred (make-array #f 8 8))
+     (define freds-diagonal
+       (make-shared-array fred (lambda (i) (list i i)) 8))
+     (array-set! freds-diagonal 'foo 3)
+     (array-ref fred 3 3)
+        => FOO
+     (define freds-center
+       (make-shared-array fred (lambda (i j) (list (+ 3 i) (+ 3 j))) 2 2))
+     (array-ref freds-center 0 0)
+        => FOO
+
+ -- Function: array-1d-ref ARRAY INDEX
+ -- Function: array-2d-ref ARRAY INDEX INDEX
+ -- Function: array-3d-ref ARRAY INDEX INDEX INDEX
+
+ -- Procedure: array-1d-set! ARRAY NEW-VALUE INDEX
+ -- Procedure: array-2d-set! ARRAY NEW-VALUE INDEX INDEX
+ -- Procedure: array-3d-set! ARRAY NEW-VALUE INDEX INDEX INDEX
+
+  The functions are just fast versions of `array-ref' and `array-set!'
+that take a fixed number of arguments, and perform no bounds checking.
+
+  If you comment out the bounds checking code, this is about as
+efficient as you could ask for without help from the compiler.
+
+  An exercise left to the reader: implement the rest of APL.
+
+
+File: slib.info,  Node: Association Lists,  Next: Collections,  Prev: Arrays,  Up: Data Structures
+
+Association Lists
+=================
+
+  `(require 'alist)'
+
+  Alist functions provide utilities for treating a list of key-value
+pairs as an associative database.  These functions take an equality
+predicate, PRED, as an argument.  This predicate should be repeatable,
+symmetric, and transitive.
+
+  Alist functions can be used with a secondary index method such as hash
+tables for improved performance.
+
+ -- Function: predicate->asso PRED
+     Returns an "association function" (like `assq', `assv', or
+     `assoc') corresponding to PRED.  The returned function returns a
+     key-value pair whose key is `pred'-equal to its first argument or
+     `#f' if no key in the alist is PRED-equal to the first argument.
+
+ -- Function: alist-inquirer PRED
+     Returns a procedure of 2 arguments, ALIST and KEY, which returns
+     the value associated with KEY in ALIST or `#f' if KEY does not
+     appear in ALIST.
+
+ -- Function: alist-associator PRED
+     Returns a procedure of 3 arguments, ALIST, KEY, and VALUE, which
+     returns an alist with KEY and VALUE associated.  Any previous
+     value associated with KEY will be lost.  This returned procedure
+     may or may not have side effects on its ALIST argument.  An
+     example of correct usage is:
+          (define put (alist-associator string-ci=?))
+          (define alist '())
+          (set! alist (put alist "Foo" 9))
+
+ -- Function: alist-remover PRED
+     Returns a procedure of 2 arguments, ALIST and KEY, which returns
+     an alist with an association whose KEY is key removed. This
+     returned procedure may or may not have side effects on its ALIST
+     argument.  An example of correct usage is:
+          (define rem (alist-remover string-ci=?))
+          (set! alist (rem alist "foo"))
+
+
+File: slib.info,  Node: Collections,  Next: Dynamic Data Type,  Prev: Association Lists,  Up: Data Structures
+
+Collections
+===========
+
+  `(require 'collect)'
+
+  Routines for managing collections.  Collections are aggregate data
+structures supporting iteration over their elements, similar to the
+Dylan(TM) language, but with a different interface.  They have
+"elements" indexed by corresponding "keys", although the keys may be
+implicit (as with lists).
+
+  New types of collections may be defined as YASOS objects (*Note
+Yasos::). They must support the following operations:
+   * `(collection? SELF)' (always returns `#t');
+
+   * `(size SELF)' returns the number of elements in the collection;
+
+   * `(print SELF PORT)' is a specialized print operation for the
+     collection which prints a suitable representation on the given
+     PORT or returns it as a string if PORT is `#t';
+
+   * `(gen-elts SELF)' returns a thunk which on successive invocations
+     yields elements of SELF in order or gives an error if it is
+     invoked more than `(size SELF)' times;
+
+   * `(gen-keys SELF)' is like `gen-elts', but yields the collection's
+     keys in order.
+
+  They might support specialized `for-each-key' and `for-each-elt'
+operations.
+
+ -- Function: collection? OBJ
+     A predicate, true initially of lists, vectors and strings.  New
+     sorts of collections must answer `#t' to `collection?'.
+
+ -- Procedure: map-elts PROC . COLLECTIONS
+ -- Procedure: do-elts PROC . COLLECTIONS
+     PROC is a procedure taking as many arguments as there are
+     COLLECTIONS (at least one).  The COLLECTIONS are iterated over in
+     their natural order and PROC is applied to the elements yielded by
+     each iteration in turn.  The order in which the arguments are
+     supplied corresponds to te order in which the COLLECTIONS appear.
+     `do-elts' is used when only side-effects of PROC are of interest
+     and its return value is unspecified.  `map-elts' returns a
+     collection (actually a vector) of the results of the applications
+     of PROC.
+
+ -- Procedure: map-keys PROC . COLLECTIONS
+ -- Procedure: do-keys PROC . COLLECTIONS
+     These are analogous to `map-elts' and `do-elts', but each
+     iteration is over the COLLECTIONS' *keys* rather than their
+     elements.
+
+     Example:
+          (map-keys + (list 1 2 3) (vector 1 2 3))
+             => #(2 4 6)
+          (map-keys + (list 1 2 3) (vector 1 2 3))
+             => #(0 2 4)
+
+ -- Procedure: for-each-key COLLECTION PROC
+ -- Procedure: for-each-elt COLLECTION PROC
+     These are like `do-keys' and `do-elts' but only for a single
+     collection; they are potentially more efficient.
+
+ -- Function: reduce PROC SEED . COLLECTIONS
+     A generalization of the list-based `comlist:reduce-init' (*Note
+     Lists as sequences::) to collections which will shadow the
+     list-based version if `(require 'collect)' follows `(require
+     'common-list-functions)' (*Note Common List Functions::).
+
+     Examples:
+          (reduce + 0 (vector 1 2 3))
+             => 6
+          (reduce union '() '((a b c) (b c d) (d a)))
+             => (c b d a).
+
+ -- Function: any? PRED . COLLECTIONS
+     A generalization of the list-based `some' (*Note Lists as
+     sequences::) to collections.
+
+     Example:
+          (any? odd? (list 2 3 4 5))
+             => #t
+
+ -- Function: every? PRED . COLLECTIONS
+     A generalization of the list-based `every' (*Note Lists as
+     sequences::) to collections.
+
+     Example:
+          (every? collection? '((1 2) #(1 2)))
+             => #t
+
+ -- Function: empty? COLLECTION
+     Returns `#t' iff there are no elements in COLLECTION.
+
+     `(empty? COLLECTION) == (zero? (size COLLECTION))'
+
+ -- Function: size COLLECTION
+     Returns the number of elements in COLLECTION.
+
+ -- Setter: list-ref
+     See *Note Setters:: for a definition of "setter".  N.B. `(setter
+     list-ref)' doesn't work properly for element 0 of a list.
+
+  Here is a sample collection: `simple-table' which is also a `table'.
+     (define-predicate TABLE?)
+     (define-operation (LOOKUP table key failure-object))
+     (define-operation (ASSOCIATE! table key value)) ;; returns key
+     (define-operation (REMOVE! table key))          ;; returns value
+     
+     (define (MAKE-SIMPLE-TABLE)
+       (let ( (table (list)) )
+         (object
+           ;; table behaviors
+           ((TABLE? self) #t)
+           ((SIZE self) (size table))
+           ((PRINT self port) (format port "#<SIMPLE-TABLE>"))
+           ((LOOKUP self key failure-object)
+            (cond
+              ((assq key table) => cdr)
+              (else failure-object)
+           ))
+           ((ASSOCIATE! self key value)
+            (cond
+              ((assq key table) => (lambda (bucket) (set-cdr! bucket value) key))
+              (else
+                (set! table (cons (cons key value) table))
+                key)
+           ))
+           ((REMOVE! self key) ;; returns old value
+            (cond
+              ((null? table) (slib:error "TABLE:REMOVE! Key not found: " key))
+              ((eq? key (caar table))
+               (let ( (value (cdar table)) )
+                  (set! table (cdr table))
+                  value)
+              )
+              (else
+                (let loop ( (last table) (this (cdr table)) )
+                  (cond
+                    ((null? this) (slib:error "TABLE:REMOVE! Key not found: " key))
+                    ((eq? key (caar this))
+                     (let ( (value (cdar this)) )
+                       (set-cdr! last (cdr this))
+                      value)
+                    )
+                    (else
+                     (loop (cdr last) (cdr this)))
+              ) ) )
+           ))
+           ;; collection behaviors
+           ((COLLECTION? self) #t)
+           ((GEN-KEYS self) (collect:list-gen-elts (map car table)))
+           ((GEN-ELTS self) (collect:list-gen-elts (map cdr table)))
+           ((FOR-EACH-KEY self proc)
+            (for-each (lambda (bucket) (proc (car bucket))) table)
+           )
+           ((FOR-EACH-ELT self proc)
+            (for-each (lambda (bucket) (proc (cdr bucket))) table)
+           )
+     ) ) )
+
+
+File: slib.info,  Node: Dynamic Data Type,  Next: Hash Tables,  Prev: Collections,  Up: Data Structures
+
+Dynamic Data Type
+=================
+
+  `(require 'dynamic)'
+
+ -- Function: make-dynamic OBJ
+     Create and returns a new "dynamic" whose global value is OBJ.
+
+ -- Function: dynamic? OBJ
+     Returns true if and only if OBJ is a dynamic.  No object
+     satisfying `dynamic?' satisfies any of the other standard type
+     predicates.
+
+ -- Function: dynamic-ref DYN
+     Return the value of the given dynamic in the current dynamic
+     environment.
+
+ -- Procedure: dynamic-set! DYN OBJ
+     Change the value of the given dynamic to OBJ in the current
+     dynamic environment.  The returned value is unspecified.
+
+ -- Function: call-with-dynamic-binding DYN OBJ THUNK
+     Invoke and return the value of the given thunk in a new, nested
+     dynamic environment in which the given dynamic has been bound to a
+     new location whose initial contents are the value OBJ.  This
+     dynamic environment has precisely the same extent as the
+     invocation of the thunk and is thus captured by continuations
+     created within that invocation and re-established by those
+     continuations when they are invoked.
+
+  The `dynamic-bind' macro is not implemented.
+
+
+File: slib.info,  Node: Hash Tables,  Next: Hashing,  Prev: Dynamic Data Type,  Up: Data Structures
+
+Hash Tables
+===========
+
+  `(require 'hash-table)'
+
+  A hash table is a vector of association lists.
+
+ -- Function: make-hash-table K
+     Returns a vector of K empty (association) lists.
+
+  Hash table functions provide utilities for an associative database.
+These functions take an equality predicate, PRED, as an argument. PRED
+should be `eq?', `eqv?', `equal?', `=', `char=?', `char-ci=?',
+`string=?', or `string-ci=?'.
+
+ -- Function: predicate->hash-asso PRED
+     Returns a hash association function of 2 arguments, KEY and
+     HASHTAB, corresponding to PRED.  The returned function returns a
+     key-value pair whose key is PRED-equal to its first argument or
+     `#f' if no key in HASHTAB is PRED-equal to the first argument.
+
+ -- Function: hash-inquirer PRED
+     Returns a procedure of 3 arguments, `hashtab'and `key', which
+     returns the value associated with `key' in `hashtab' or `#f' if
+     key does not appear in `hashtab'.
+
+ -- Function: hash-associator PRED
+     Returns a procedure of 3 arguments, HASHTAB, KEY, and VALUE, which
+     modifies HASHTAB so that KEY and VALUE associated.  Any previous
+     value associated with KEY will be lost.
+
+ -- Function: hash-remover PRED
+     Returns a procedure of 2 arguments, HASHTAB and KEY, which
+     modifies HASHTAB so that the association whose key is KEY is
+     removed.
+
+
+File: slib.info,  Node: Hashing,  Next: Priority Queues,  Prev: Hash Tables,  Up: Data Structures
+
+Hashing
+=======
+
+  `(require 'hash)'
+
+  These hashing functions are for use in quickly classifying objects.
+Hash tables use these functions.
+
+ -- Function: hashq OBJ K
+ -- Function: hashv OBJ K
+ -- Function: hash OBJ K
+     Returns an exact non-negative integer less than K.  For each
+     non-negative integer less than K there are arguments OBJ for which
+     the hashing functions applied to OBJ and K returns that integer.
+
+     For `hashq', `(eq? obj1 obj2)' implies `(= (hashq obj1 k) (hashq
+     obj2))'.
+
+     For `hashv', `(eqv? obj1 obj2)' implies `(= (hashv obj1 k) (hashv
+     obj2))'.
+
+     For `hash', `(equal? obj1 obj2)' implies `(= (hash obj1 k) (hash
+     obj2))'.
+
+     `hash', `hashv', and `hashq' return in time bounded by a constant.
+      Notice that `hash' implies `hashv' implies `hashq'.
+
+ -- Function: predicate->hash PRED
+     Returns a hash function (like `hashq', `hashv', or `hash')
+     corresponding to the equality predicate PRED. PRED should be
+     `eq?', `eqv?', `equal?', `=', `char=?', `char-ci=?', `string=?', or
+     `string-ci=?'.
+
+
+File: slib.info,  Node: Priority Queues,  Next: Queues,  Prev: Hashing,  Up: Data Structures
+
+Priority Queues
+===============
+
+  `(require 'priority-queue)'
+
+ -- Function: make-heap PRED<?
+     Returns a binary heap suitable which can be used for priority queue
+     operations.
+
+ -- Procedure: heap-insert HEAP ITEM
+     Inserts ITEM into HEAP.  ITEM can be inserted multiple times.  The
+     value returned is unspecified.
+
+ -- Function: heap-extract-max HEAP
+     Returns the item which is larger than all others according to the
+     PRED<? argument to `make-heap'.  If there are no items in HEAP, an
+     error is signaled.
+
+  The algorithm for priority queues was taken from `Introduction to
+Algorithms' by T. Cormen, C. Leiserson, R. Rivest.  1989 MIT Press.
+
+
+File: slib.info,  Node: Queues,  Next: Records,  Prev: Priority Queues,  Up: Data Structures
+
+Queues
+======
+
+  `(require 'queue)'
+
+  A "queue" is a list where elements can be added to both the front and
+rear, and removed from the front (i.e., they are what are often called
+"dequeues").  A queue may also be used like a stack.
+
+ -- Function: make-queue
+     Returns a new, empty queue.
+
+ -- Function: queue? OBJ
+     Returns `#t' if OBJ is a queue.
+
+ -- Function: queue-empty? Q
+     Returns `#t' if the queue Q is empty.
+
+ -- Procedure: queue-push! Q DATUM
+     Adds DATUM to the front of queue Q.
+
+ -- Procedure: enquque! Q DATUM
+     Adds DATUM to the rear of queue Q.
+
+  All of the following functions raise an error if the queue Q is empty.
+
+ -- Function: queue-front Q
+     Returns the datum at the front of the queue Q.
+
+ -- Function: queue-rear Q
+     Returns the datum at the rear of the queue Q.
+
+ -- Prcoedure: queue-pop! Q
+ -- Procedure: dequeue! Q
+     Both of these procedures remove and return the datum at the front
+     of the queue.  `queue-pop!' is used to suggest that the queue is
+     being used like a stack.
+
+
+File: slib.info,  Node: Records,  Next: Red-Black Trees,  Prev: Queues,  Up: Data Structures
+
+Records
+=======
+
+  `(require 'record)'
+
+  The Record package provides a facility for user to define their own
+record data types.
+
+ -- Function: make-record-type TYPE-NAME FIELD-NAMES
+     Returns a "record-type descriptor", a value representing a new data
+     type disjoint from all others.  The TYPE-NAME argument must be a
+     string, but is only used for debugging purposes (such as the
+     printed representation of a record of the new type).  The
+     FIELD-NAMES argument is a list of symbols naming the "fields" of a
+     record of the new type.  It is an error if the list contains any
+     duplicates.  It is unspecified how record-type descriptors are
+     represented.
+
+ -- Function: make-record-sub-type TYPE-NAME FIELD-NAMES RTD
+     Returns a "record-type descriptor", a value representing a new data
+     type, disjoint from all others.  The TYPE-NAME argument must be a
+     string.  The FIELD-NAMES argument is a list of symbols naming the
+     additional "fields" to be appended to FIELD-NAMES of RTD.  It is
+     an error if the combinded list contains any duplicates.
+
+     Record-modifiers and record-accessors for RTD work for the new
+     record-sub-type as well.  But record-modifiers and
+     record-accessors for the new record-sub-type will not neccessarily
+     work for RTD.
+
+ -- Function: record-constructor RTD [FIELD-NAMES]
+     Returns a procedure for constructing new members of the type
+     represented by RTD.  The returned procedure accepts exactly as
+     many arguments as there are symbols in the given list,
+     FIELD-NAMES; these are used, in order, as the initial values of
+     those fields in a new record, which is returned by the constructor
+     procedure.  The values of any fields not named in that list are
+     unspecified.  The FIELD-NAMES argument defaults to the list of
+     field names in the call to `make-record-type' that created the
+     type represented by RTD; if the FIELD-NAMES argument is provided,
+     it is an error if it contains any duplicates or any symbols not in
+     the default list.
+
+ -- Function: record-predicate RTD
+     Returns a procedure for testing membership in the type represented
+     by RTD.  The returned procedure accepts exactly one argument and
+     returns a true value if the argument is a member of the indicated
+     record type; it returns a false value otherwise.
+
+ -- Function: record-sub-predicate RTD
+     Returns a procedure for testing membership in the type represented
+     by RTD or its parents.  The returned procedure accepts exactly one
+     argument and returns a true value if the argument is a member of
+     the indicated record type or its parents; it returns a false value
+     otherwise.
+
+ -- Function: record-accessor RTD FIELD-NAME
+     Returns a procedure for reading the value of a particular field of
+     a member of the type represented by RTD.  The returned procedure
+     accepts exactly one argument which must be a record of the
+     appropriate type; it returns the current value of the field named
+     by the symbol FIELD-NAME in that record.  The symbol FIELD-NAME
+     must be a member of the list of field-names in the call to
+     `make-record-type' that created the type represented by RTD.
+
+ -- Function: record-modifier RTD FIELD-NAME
+     Returns a procedure for writing the value of a particular field of
+     a member of the type represented by RTD.  The returned procedure
+     accepts exactly two arguments: first, a record of the appropriate
+     type, and second, an arbitrary Scheme value; it modifies the field
+     named by the symbol FIELD-NAME in that record to contain the given
+     value. The returned value of the modifier procedure is
+     unspecified.  The symbol FIELD-NAME must be a member of the list
+     of field-names in the call to `make-record-type' that created the
+     type represented by RTD.
+
+ -- Function: record? OBJ
+     Returns a true value if OBJ is a record of any type and a false
+     value otherwise.  Note that `record?' may be true of any Scheme
+     value; of course, if it returns true for some particular value,
+     then `record-type-descriptor' is applicable to that value and
+     returns an appropriate descriptor.
+
+ -- Function: record-type-descriptor RECORD
+     Returns a record-type descriptor representing the type of the given
+     record.  That is, for example, if the returned descriptor were
+     passed to `record-predicate', the resulting predicate would return
+     a true value when passed the given record.  Note that it is not
+     necessarily the case that the returned descriptor is the one that
+     was passed to `record-constructor' in the call that created the
+     constructor procedure that created the given record.
+
+ -- Function: record-type-name RTD
+     Returns the type-name associated with the type represented by rtd.
+      The returned value is `eqv?' to the TYPE-NAME argument given in
+     the call to `make-record-type' that created the type represented by
+     RTD.
+
+ -- Function: record-type-field-names RTD
+     Returns a list of the symbols naming the fields in members of the
+     type represented by RTD.  The returned value is `equal?' to the
+     field-names argument given in the call to `make-record-type' that
+     created the type represented by RTD.
+
+
+File: slib.info,  Node: Red-Black Trees,  Next: Structures,  Prev: Records,  Up: Data Structures
+
+Red-Black Trees
+===============
+
+  `(require 'red-black-tree)'
+
+  This is an implementation of Red-Black trees in Scheme.
+
+ -- Function: make-rb-tree LEFT-ROTATION-FIELD-MAINTAINER
+          RIGHT-ROTATION-FIELD-MAINTAINER INSERTION-FIELD-MAINTAINER
+          DELETION-FIELD-MAINTAINER PRIOR?
+     Makes an empty Red-Black tree based on the arguments:
+
+    LEFT-ROTATION-FIELD-MAINTAINER
+    RIGHT-ROTATION-FIELD-MAINTAINER
+          Invoked in rotations to maintain augmented fields.  Args are
+          X and Y. If you have no augmented fields that depend
+          explicitly on the structure of the tree, make these null.
+
+    INSERTION-FIELD-MAINTAINER
+          Invoked in insertion to maintain fields.  Invoked once, on
+          node inserted after insertion is performed, but before
+          rotations are performed to balance tree.  May also be invoked
+          in one case of deletion.
+
+    DELETION-FIELD-MAINTAINER
+          Invoked in deletion to maintain fields.  Invoked once, on
+          node deleted after deletion is performed, but before
+          rotations are performed to balance the tree.  May be invoked
+          on non-garbage nodes during deletion, where node is spliced
+          out of one place and into another.  The tree is always
+          guaranteed connected from parent up.
+
+    PRIOR?
+          PRIOR? should be a binary predicate used for totally ordering
+          the data fields of nodes.  The name PRIOR? is just a mnemonic
+          aid; it means that if the predicate is successful the first
+          arg should go to the left of the second arg, where left is in
+          tree fields.
+
+ -- Procedure: rb-delete! TREE NODE
+     Deletes NODE from TREE.  The node that is actually deleted may not
+     be the one passed in, so if a resource is being maintained, what
+     should be put back on the freelist is the NODE returned by this
+     procedure.
+
+ -- Function: rb-node-successor NODE
+ -- Function: rb-node-predecessor NODE
+     Return the successor and predecessor (as determined by the PRIOR?
+     argument to `make-rb-tree') from the tree of which NODE is a
+     member.
+
+ -- Function: rb-node-maximum NODE
+ -- Function: rb-node-minimum NODE
+     Return the minimum and maximum nodes in the tree of which NODE is
+     a member.
+
+ -- Function: rb-tree-maximum TREE
+ -- Function: rb-tree-minimum TREE
+     Return the minimum and maximum nodes in TREE.
+
+ -- Procedure: rb-insert! TREE NODE
+     Inserts NODE in TREE.  The value returned is unspecified.
+
+ -- Function: make-rb-node DATA
+     Makes a node (suitable for insertion with `rb-insert!') with datum
+     DATA.
+
+
+File: slib.info,  Node: Structures,  Prev: Red-Black Trees,  Up: Data Structures
+
+Structures
+==========
+
+  `(require 'struct)' for defmacros. `(require 'structure)' for
+syntax-case macros.
+
+  `defmacro's which implement "records" from the book `Essentials of
+Programming Languages' by Daniel P. Friedman, M. Wand and C.T. Haynes. 
+Copyright 1992 Jeff Alexander, Shinnder Lee, and Lewis Patterson
+
+ -- Macro: define-record RECORD-NAME FIELDS
+
+ -- Function: variant-case RECORD EXPS
+
+
+File: slib.info,  Node: Macro Implementations,  Next: Procedures,  Prev: Data Structures,  Up: Top
+
+Macro Implementations
+*********************
+
+* Menu:
+
+* Defmacro::                    'defmacro
+* Macros That Work::            'macros-that-work
+* Syntactic Closures::          'syntactic-closures
+* Syntax-Case Macros::          'syntax-case
+
+
+File: slib.info,  Node: Defmacro,  Next: Macros That Work,  Prev: Macro Implementations,  Up: Macro Implementations
+
+Defmacro
+========
+
+  `(require 'defmacro)'
+
+ -- Function: defmacro:macroexpand* E
+
+ -- Function: defmacro:eval X
+
+ -- Function: defmacro:load PATHNAME
+
+ -- Function: gentemp
+     Returns a new (interned) symbol each time it is called.  The symbol
+     names are implementation-dependent
+          (gentemp) => scm:G0
+          (gentemp) => scm:G1
+
+
+File: slib.info,  Node: Macros That Work,  Next: Syntactic Closures,  Prev: Defmacro,  Up: Macro Implementations
+
+Macros That Work
+================
+
+  `(require 'macros-that-work)'
+
+  References:
+
+  The `Revised^4 Report on the Algorithmic Language Scheme.' Clinger
+and Rees [editors].  To appear in LISP Pointers.  Also available as a
+technical report from the University of Oregon, MIT AI Lab, and Cornell.
+
+            Macros That Work.  Clinger and Rees.  POPL '91.
+
+  The supported syntax differs from the R4RS in that vectors are allowed
+as patterns and as templates and are not allowed as pattern or template
+data.
+
+     transformer spec  -->  (syntax-rules literals rules)
+     
+     rules  -->  ()
+              |  (rule . rules)
+     
+     rule  -->  (pattern template)
+     
+     pattern  -->  pattern_var      ; a symbol not in literals
+                |  symbol           ; a symbol in literals
+                |  ()
+                |  (pattern . pattern)
+                |  (ellipsis_pattern)
+                |  #(pattern*)                     ; extends R4RS
+                |  #(pattern* ellipsis_pattern)    ; extends R4RS
+                |  pattern_datum
+     
+     template  -->  pattern_var
+                 |  symbol
+                 |  ()
+                 |  (template2 . template2)
+                 |  #(template*)                   ; extends R4RS
+                 |  pattern_datum
+     
+     template2  -->  template
+                  |  ellipsis_template
+     
+     pattern_datum  -->  string                    ; no vector
+                      |  character
+                      |  boolean
+                      |  number
+     
+     ellipsis_pattern  --> pattern ...
+     
+     ellipsis_template  -->  template ...
+     
+     pattern_var  -->  symbol   ; not in literals
+     
+     literals  -->  ()
+                 |  (symbol . literals)
+
+Definitions
+-----------
+
+Scope of an ellipsis
+     Within a pattern or template, the scope of an ellipsis (`...') is
+     the pattern or template that appears to its left.
+
+Rank of a pattern variable
+     The rank of a pattern variable is the number of ellipses within
+     whose scope it appears in the pattern.
+
+Rank of a subtemplate
+     The rank of a subtemplate is the number of ellipses within whose
+     scope it appears in the template.
+
+Template rank of an occurrence of a pattern variable
+     The template rank of an occurrence of a pattern variable within a
+     template is the rank of that occurrence, viewed as a subtemplate.
+
+Variables bound by a pattern
+     The variables bound by a pattern are the pattern variables that
+     appear within it.
+
+Referenced variables of a subtemplate
+     The referenced variables of a subtemplate are the pattern
+     variables that appear within it.
+
+Variables opened by an ellipsis template
+     The variables opened by an ellipsis template are the referenced
+     pattern variables whose rank is greater than the rank of the
+     ellipsis template.
+
+Restrictions
+------------
+
+  No pattern variable appears more than once within a pattern.
+
+  For every occurrence of a pattern variable within a template, the
+template rank of the occurrence must be greater than or equal to the
+pattern variable's rank.
+
+  Every ellipsis template must open at least one variable.
+
+  For every ellipsis template, the variables opened by an ellipsis
+template must all be bound to sequences of the same length.
+
+  The compiled form of a RULE is
+
+     rule  -->  (pattern template inserted)
+     
+     pattern  -->  pattern_var
+                |  symbol
+                |  ()
+                |  (pattern . pattern)
+                |  ellipsis_pattern
+                |  #(pattern)
+                |  pattern_datum
+     
+     template  -->  pattern_var
+                 |  symbol
+                 |  ()
+                 |  (template2 . template2)
+                 |  #(pattern)
+                 |  pattern_datum
+     
+     template2  -->  template
+                  |  ellipsis_template
+     
+     pattern_datum  -->  string
+                      |  character
+                      |  boolean
+                      |  number
+     
+     pattern_var  -->  #(V symbol rank)
+     
+     ellipsis_pattern  -->  #(E pattern pattern_vars)
+     
+     ellipsis_template  -->  #(E template pattern_vars)
+     
+     inserted  -->  ()
+                 |  (symbol . inserted)
+     
+     pattern_vars  -->  ()
+                     |  (pattern_var . pattern_vars)
+     
+     rank  -->  exact non-negative integer
+
+  where V and E are unforgeable values.
+
+  The pattern variables associated with an ellipsis pattern are the
+variables bound by the pattern, and the pattern variables associated
+with an ellipsis template are the variables opened by the ellipsis
+template.
+
+  If the template contains a big chunk that contains no pattern
+variables or inserted identifiers, then the big chunk will be copied
+unnecessarily.  That shouldn't matter very often.
+
+

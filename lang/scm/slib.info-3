@@ -1,0 +1,1452 @@
+This is Info file slib.info, produced by Makeinfo-1.49 from the input
+file slib.texi.
+
+  This file documents SLIB, the portable Scheme library.
+
+  Copyright (C) 1993 Todd R. Eigenschink
+
+  Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+  Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided that the
+entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+
+  Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions, except that this permission notice may be stated in a
+translation approved by the author.
+
+
+File: slib.info,  Node: Generic-Write,  Next: Line I/O,  Prev: Format,  Up: Procedures
+
+Generic-Write
+=============
+
+  `(require 'generic-write)'
+
+  `generic-write' is a procedure that transforms a Scheme data value
+(or Scheme program expression) into its textual representation and
+prints it.  The interface to the procedure is sufficiently general to
+easily implement other useful formatting procedures such as pretty
+printing, output to a string and truncated output.
+
+ -- Procedure: generic-write OBJ DISPLAY? WIDTH OUTPUT
+    OBJ
+          Scheme data value to transform.
+
+    DISPLAY?
+          Boolean, controls whether characters and strings are quoted.
+
+    WIDTH
+          Extended boolean, selects format:
+         #f
+               single line format
+
+         integer > 0
+               pretty-print (value = max nb of chars per line)
+
+    OUTPUT
+          Procedure of 1 argument of string type, called repeatedly with
+          successive substrings of the textual representation.  This
+          procedure can return `#f' to stop the transformation.
+
+     The value returned by `generic-write' is undefined.
+
+     Examples:
+          (write obj) == (generic-write obj #f #f DISPLAY-STRING)
+          (display obj) == (generic-write obj #t #f DISPLAY-STRING)
+
+     where
+          DISPLAY-STRING ==
+          (lambda (s) (for-each write-char (string->list s)) #t)
+
+
+File: slib.info,  Node: Line I/O,  Next: Modular Arithmetic,  Prev: Generic-Write,  Up: Procedures
+
+Line I/O
+========
+
+  `(require 'line-i/o)'
+
+ -- Function: read-line
+ -- Function: read-line PORT
+     Returns a string of the characters up to, but not including a
+     newline or end of file, updating PORT to point to the character
+     following the newline.  If no characters are available, an end of
+     file object is returned.  PORT may be ommited, in which case it
+     defaults to the value returned by `current-input-port'.
+
+ -- Function: read-line! STRING
+ -- Function: read-line! STRING PORT
+     Fills STRING with characters up to, but not including a newline or
+     end of file, updating the port to point to the last character read
+     or following the newline if it was read.  If no characters are
+     available, an end of file object is returned.  If a newline or end
+     of file was found, the number of characters read is returned. 
+     Otherwise, `#f' is returned.  PORT may be ommited, in which case
+     it defaults to the value returned by `current-input-port'.
+
+ -- write-line: string
+ -- write-line: string PORT
+     Writes STRING followed by a newline to the given port and returns
+     an unspecified value.  Port may be omited, in which case it
+     defaults to the value returned by `current-input-port'.
+
+
+File: slib.info,  Node: Modular Arithmetic,  Next: Multi-Processing,  Prev: Line I/O,  Up: Procedures
+
+Modular Arithmetic
+==================
+
+  `(require 'modular)'
+
+ -- Function: extended-euclid N1 N2
+     Returns a list of 3 integers `(d x y)' such that d = gcd(N1, N2) =
+     N1 * x + N2 * y.
+
+     For all of these procedure all arguments should be exact
+     non-negative integers such that k1 > k2 and k1 > k3.  The returned
+     value will be an exact non-negative integer less than k1.  If all
+     the arguments are fixnums the computation will use only fixnums.
+
+ -- Function: modular:invert K1 K2
+     Returns an integer n such that 1 = (n * k2) mod k1.  If k2 has no
+     inverse mod k1 an error is signaled.
+
+ -- Function: modular:negate K1 K2
+     Returns (-k2) mod k1.
+
+ -- Function: modular:+ K1 K2 K3
+     Returns (k2 + k3) mod k1.
+
+ -- Function: modular:- K1 K2 K3
+     Returns (k2 - k3) mod k1.
+
+ -- Function: modular:* K1 K2 K3
+     Returns (k2 * k3) mod k1.
+
+ -- Function: modular:expt K1 K2 K3
+     Returns (k2 ^ k3) mod k1.
+
+
+File: slib.info,  Node: Multi-Processing,  Next: Object-To-String,  Prev: Modular Arithmetic,  Up: Procedures
+
+Multi-Processing
+================
+
+  `(require 'process)'
+
+ -- Procedure: add-process! PROC
+     Adds proc, which must be a procedure (or continuation) capable of
+     accepting accepting one argument, to the `process:queue'.  The
+     value returned is unspecified.  The argument to PROC should be
+     ignored.  If PROC returns, the process is killed.
+
+ -- Procedure: process:schedule!
+     Saves the current process on `process:queue' and runs the next
+     process from `process:queue'.  The value returned is unspecified.
+
+ -- Procedure: kill-process!
+     Kills the current process and runs the next process from
+     `process:queue'.  If there are no more processes on
+     `process:queue', `(quit)' is called. N.B.: `quit' is not a
+     standard procedure, so you may have to define it appropriately.
+
+
+File: slib.info,  Node: Object-To-String,  Next: Plotting,  Prev: Multi-Processing,  Up: Procedures
+
+Object-To-String
+================
+
+  `(require 'object->string)'
+
+ -- Function: object->string OBJ
+     Returns the textual representation of OBJ as a string.
+
+
+File: slib.info,  Node: Plotting,  Next: Pretty-Print,  Prev: Object-To-String,  Up: Procedures
+
+Plotting on Character Devices
+=============================
+
+  `(require 'charplot)'
+
+  The plotting procedure is made available through the use of the
+`charplot' package.  `charplot' is loaded by inserting `(require
+'charplot)' before the code that uses this procedure.
+
+ -- Variable: charplot:rows
+     The number of rows to make the plot vertically.
+
+ -- Variable: charplot:cols
+     The number of columns to make the plot horizontally.
+
+ -- Procedure: plot! COORDS X-LABEL Y-LABEL
+     COORDS is a list of pairs of x and y coordinates.  X-LABEL and
+     Y-LABEL are strings with which to label the x and y axes.
+
+     Example: (output edited slightly to fit across the page)
+          (set! charplot:rows 24)
+          (set! charplot:columns 65)
+          
+          (define (make-points n)
+            (if (zero? n)
+                '()
+                (cons (cons n (sin (/ n 3))) (make-points (1- n)))))
+          
+          (plot! (make-points 20) "x" "Sin(x)")
+          -|
+          Sin(x) ___________________________________________________________
+           +1.25|-                                                          |
+                |                                                           |
+               1|-         *  *                                             |
+                |       *        *                                          |
+           +0.75|-                  *                                       |
+                |    *                                                      |
+            +0.5|-                     *                                    |
+                | *                                                        *|
+           +0.25|-                                                          |
+                |                         *                                 |
+               0|-------------------------------------------------------*---|
+                |                                                           |
+           -0.25|-                           *                       *      |
+                |                                                           |
+            -0.5|-                              *                           |
+                |                                                 *         |
+           -0.75|-                                 *                        |
+                |                                     *        *            |
+              -1|-                                       *  *               |
+                |__________:_____._____:_____._____:_____._____:_____._____:|
+             x             4           8           12          16
+
+
+File: slib.info,  Node: Pretty-Print,  Next: Prime Factorization,  Prev: Plotting,  Up: Procedures
+
+Pretty-Print
+============
+
+  `(require 'pretty-print)'
+
+ -- Procedure: pretty-print OBJ
+ -- Procedure: pretty-print OBJ PORT
+     `pretty-print's OBJ on PORT.  If PORT is not specified,
+     `current-output-port' is used.
+
+     Example:
+          (pretty-print '((1 2 3 4 5) (6 7 8 9 10) (11 12 13 14 15)
+                          (16 17 18 19 20) (21 22 23 24 25)))
+             -| ((1 2 3 4 5)
+             -|  (6 7 8 9 10)
+             -|  (11 12 13 14 15)
+             -|  (16 17 18 19 20)
+             -|  (21 22 23 24 25))
+
+  `(require 'ppfile)'
+
+ -- Procedure: pprint-file INFILE
+ -- Procedure: pprint-file INFILE OUTFILE
+     Pretty-prints all the code in INFILE.  If OUTFILE is specified,
+     the output goes to OUTFILE, otherwise it goes to
+     `(current-output-port)'.
+
+     *Warning*: Comments in INFILE will not appear in OUTFILE.
+
+
+File: slib.info,  Node: Prime Factorization,  Next: Random Numbers,  Prev: Pretty-Print,  Up: Procedures
+
+Prime Factorization
+===================
+
+  `(require 'prime)'
+
+  See Robert Solovay and Volker Strassen, `A Fast Monte-Carlo Test for
+Primality', SIAM Journal on Computing, 1977, pp 84-85.
+
+ -- Function: jacobi-symbol P Q
+     Returns the value (+1, -1, or 0) of the Jacobi-Symbol of exact
+     non-negative integer P and exact positive odd integer Q.
+
+ -- Function: prime? P
+     Returns `#f' if P is composite; `#t' if P is prime.  There is a
+     slight chance `(expt 2 (- prime:trials))' that a composite will
+     return `#t'.
+
+ -- Function: prime:trials
+     Is the maxinum number of iterations of Solovay-Strassen that will
+     be done to test a number for primality.
+
+ -- Function: factor K
+     Returns a list of the prime factors of K.  The order of the
+     factors is unspecified.  In order to obtain a sorted list do
+     `(sort! (factor k) <)'.
+
+
+File: slib.info,  Node: Random Numbers,  Next: Sorting,  Prev: Prime Factorization,  Up: Procedures
+
+Random Numbers
+==============
+
+  `(require 'random)'
+
+ -- Procedure: random N
+ -- Procedure: random N STATE
+     Accepts a positive integer or real N and returns a number of the
+     same type between zero (inclusive) and N (exclusive).  The values
+     returned have a uniform distribution.
+
+     The optional argument STATE must be of the type produced by
+     `(make-random-state)'.  It defaults to the value of the variable
+     `*random-state*'.  This object is used to maintain the state of the
+     pseudo-random-number generator and is altered as a side effect of
+     the `random' operation.
+
+ -- Variable: *random-state*
+     Holds a data structure that encodes the internal state of the
+     random-number generator that `random' uses by default.  The nature
+     of this data structure is implementation-dependent.  It may be
+     printed out and successfully read back in, but may or may not
+     function correctly as a random-number state object in another
+     implementation.
+
+ -- Procedure: make-random-state
+ -- Procedure: make-random-state STATE
+     Returns a new object of type suitable for use as the value of the
+     variable `*random-state*' and as a second argument to `random'. 
+     If argument STATE is given, a copy of it is returned.  Otherwise a
+     copy of `*random-state*' is returned.
+
+  If inexact numbers are support by the Scheme implementation,
+`randinex.scm' will be loaded as well.  `randinex.scm' contains
+procedures for generating inexact distributions.
+
+ -- Procedure: random:uniform STATE
+     Returns an uniformly distributed inexact real random number in the
+     range between 0 and 1.
+
+ -- Procedure: random:solid-sphere! VECT
+ -- Procedure: random:solid-sphere! VECT STATE
+     Fills VECT with inexact real random numbers the sum of whose
+     squares is less than 1.0.  Thinking of VECT as coordinates in
+     space of dimension N = `(vector-length VECT)', the coordinates are
+     uniformly distributed within the unit N-shere. The sum of the
+     squares of the numbers is returned.
+
+ -- Procedure: random:hollow-sphere! VECT
+ -- Procedure: random:hollow-sphere! VECT STATE
+     Fills VECT with inexact real random numbers the sum of whose
+     squares is equal to 1.0.  Thinking of VECT as coordinates in space
+     of dimension n = `(vector-length VECT)', the coordinates are
+     uniformly distributed over the surface of the unit n-shere.
+
+ -- Procedure: random:normal
+ -- Procedure: random:normal STATE
+     Returns an inexact real in a normal distribution with mean 0 and
+     standard deviation 1.  For a normal distribution with mean M and
+     standard deviation D use `(+ M (* D (random:normal)))'.
+
+ -- Procedure: random:normal-vector! VECT
+ -- Procedure: random:normal-vector! VECT STATE
+     Fills VECT with inexact real random numbers which are independent
+     and standard normally distributed (i.e., with mean 0 and variance
+     1).
+
+ -- Procedure: random:exp
+ -- Procedure: random:exp STATE
+     Returns an inexact real in an exponential distribution with mean
+     1.  For an exponential distribution with mean U use (* U
+     (random:exp)).
+
+
+File: slib.info,  Node: Sorting,  Next: Standard I/O,  Prev: Random Numbers,  Up: Procedures
+
+Sorting
+=======
+
+  `(require 'sort)'
+
+  Many Scheme systems provide some kind of sorting functions.  They do
+not, however, always provide the *same* sorting functions, and those
+that I have had the opportunity to test provided inefficient ones (a
+common blunder is to use quicksort which does not perform well).
+
+  Because `sort' and `sort!' are not in the standard, there is very
+little agreement about what these functions look like.  For example,
+Dybvig says that Chez Scheme provides
+     (merge predicate list1 list2)
+     (merge! predicate list1 list2)
+     (sort predicate list)
+     (sort! predicate list)
+
+while MIT Scheme 7.1, following Common LISP, offers unstable
+     (sort list predicate)
+
+TI PC Scheme offers
+     (sort! list/vector predicate?)
+
+and Elk offers
+     (sort list/vector predicate?)
+     (sort! list/vector predicate?)
+
+  Here is a comprehensive catalogue of the variations I have found.
+
+  1. Both `sort' and `sort!' may be provided.
+
+  2. `sort' may be provided without `sort!'.
+
+  3. `sort!' may be provided without `sort'.
+
+  4. Neither may be provided.
+
+  5. The sequence argument may be either a list or a vector.
+
+  6. The sequence argument may only be a list.
+
+  7. The sequence argument may only be a vector.
+
+  8. The comparison function may be expected to behave like `<'.
+
+  9. The comparison function may be expected to behave like `<='.
+
+ 10. The interface may be `(sort predicate? sequence)'.
+
+ 11. The interface may be `(sort sequence predicate?)'.
+
+ 12. The interface may be `(sort sequence &optional (predicate? <))'.
+
+ 13. The sort may be stable.
+
+ 14. The sort may be unstable.
+
+  All of this variation really does not help anybody.  A nice simple
+merge sort is both stable and fast (quite a lot faster than `quick'
+sort).
+
+  I am providing this source code with no restrictions at all on its use
+(but please retain D.H.D.Warren's credit for the original idea).  You
+may have to rename some of these functions in order to use them in a
+system which already provides incompatible or inferior sorts.  For each
+of the functions, only the top-level define needs to be edited to do
+that.
+
+  I could have given these functions names which would not clash with
+any Scheme that I know of, but I would like to encourage implementors to
+converge on a single interface, and this may serve as a hint.  The
+argument order for all functions has been chosen to be as close to
+Common LISP as made sense, in order to avoid NIH-itis.
+
+  Each of the five functions has a required *last* parameter which is a
+comparison function.  A comparison function `f' is a function of 2
+arguments which acts like `<'.  For example,
+
+     (not (f x x))
+     (and (f x y) (f y z)) == (f x z)
+
+  The standard functions `<', `>', `char<?', `char>?', `char-ci<?',
+`char-ci>?', `string<?', `string>?', `string-ci<?', and `string-ci>?'
+are suitable for use as comparison functions.  Think of `(less? x y)'
+as saying when `x' must *not* precede `y'.
+
+ -- Function: sorted? SEQUENCE LESS?
+     Returns `#t' when the sequence argument is in non-decreasing order
+     according to LESS? (that is, there is no adjacent pair `... x y
+     ...' for which `(less? y x)').
+
+     Returns `#f' when the sequence contains at least one out-of-order
+     pair.  It is an error if the sequence is neither a list nor a
+     vector.
+
+ -- Function: merge LIST1 LIST2 LESS?
+     This merges two lists, producing a completely new list as result. 
+     I gave serious consideration to producing a Common-LISP-compatible
+     version.  However, Common LISP's `sort' is our `sort!' (well, in
+     fact Common LISP's `stable-sort' is our `sort!', merge sort is
+     *fast* as well as stable!) so adapting CL code to Scheme takes a
+     bit of work anyway.  I did, however, appeal to CL to determine the
+     *order* of the arguments.
+
+ -- Procedure: merge! LIST1 LIST2 LESS?
+     Merges two lists, re-using the pairs of LIST1 and LIST2 to build
+     the result.  If the code is compiled, and LESS? constructs no new
+     pairs, no pairs at all will be allocated.  The first pair of the
+     result will be either the first pair of LIST1 or the first pair of
+     LIST2, but you can't predict which.
+
+     The code of `merge' and `merge!' could have been quite a bit
+     simpler, but they have been coded to reduce the amount of work
+     done per iteration.  (For example, we only have one `null?' test
+     per iteration.)
+
+ -- Function: sort SEQUENCE LESS?
+     Accepts either a list or a vector, and returns a new sequence
+     which is sorted.  The new sequence is the same type as the input. 
+     Always `(sorted? (sort sequence less?) less?)'.  The original
+     sequence is not altered in any way.  The new sequence shares its
+     *elements* with the old one; no elements are copied.
+
+ -- Procedure: sort! SEQUENCE LESS?
+     Returns its sorted result in the original boxes.  If the original
+     sequence is a list, no new storage is allocated at all.  If the
+     original sequence is a vector, the sorted elements are put back in
+     the same vector.
+
+     Some people have been confused about how to use `sort!', thinking
+     that it doesn't return a value.  It needs to be pointed out that
+          (set! slist (sort! slist <))
+
+     is the proper usage, not
+          (sort! slist <)
+
+  Note that these functions do *not* accept a CL-style `:key' argument.
+ A simple device for obtaining the same expressiveness is to define
+     (define (keyed less? key)
+       (lambda (x y) (less? (key x) (key y))))
+
+and then, when you would have written
+     (sort a-sequence #'my-less :key #'my-key)
+
+in Common LISP, just write
+     (sort! a-sequence (keyed my-less? my-key))
+
+in Scheme.
+
+
+File: slib.info,  Node: Standard I/O,  Next: String-Case,  Prev: Sorting,  Up: Procedures
+
+Standard I/O
+============
+
+  `(require 'stdio)'
+
+ -- Procedure: printf FORMAT . ARGS
+
+ -- Procedure: fprintf PORT FORMAT . ARGS
+
+ -- Procedure: sprintf STR FORMAT . ARGS
+
+ -- Variable: stdin
+     Defined to be `(current-input-port)'.
+
+ -- Variable: stdout
+     Defined to be `(current-output-port)'.
+
+ -- Variable: stderr
+     Defined to be `(current-error-port)'.
+
+  *Note:* Floating-point output is not handled yet.
+
+
+File: slib.info,  Node: String-Case,  Next: String Ports,  Prev: Standard I/O,  Up: Procedures
+
+String-Case
+===========
+
+  `(require 'string-case)'
+
+ -- Procedure: string-upcase STR
+ -- Procedure: string-downcase STR
+ -- Procedure: string-capitalize STR
+     The obvious string conversion routines.  These are non-destructive.
+
+ -- Function: string-upcase! STR
+ -- Function: string-downcase! STR
+ -- Function: string-captialize! STR
+     The destructive versions of the functions above.
+
+
+File: slib.info,  Node: String Ports,  Next: Tektronix Graphics Support,  Prev: String-Case,  Up: Procedures
+
+String Ports
+============
+
+  `(require 'string-port)'
+
+ -- Procedure: call-with-output-string PROC
+     PROC must be a procedure of one argument.  This procedure calls
+     PROC with one argument: a (newly created) output port.  When the
+     function returns, the string composed of the characters written
+     into the port is returned.
+
+ -- Procedure: call-with-input-string STRING PROC
+     PROC must be a procedure of one argument.  This procedure calls
+     PROC with one argument: an (newly created) input port from which
+     STRING's contents may be read.  When PROC returns, the port is
+     closed and the value yielded by the procedure PROC is returned.
+
+
+File: slib.info,  Node: Tektronix Graphics Support,  Next: Tree Operations,  Prev: String Ports,  Up: Procedures
+
+Tektronix Graphics Support
+==========================
+
+  *Note:* The Tektronix graphics support files need more work, and are
+not complete.
+
+Tektronix 4000 Series Graphics
+------------------------------
+
+  The Tektronix 4000 series graphics protocol gives the user a 1024 by
+1024 square drawing area.  The origin is in the lower left corner of the
+screen.  Increasing y is up and increasing x is to the right.
+
+  The graphics control codes are sent over the current-output-port and
+can be mixed with regular text and ANSI or other terminal control
+sequences.
+
+ -- Procedure: tek40:init
+
+ -- Procedure: tek40:graphics
+
+ -- Procedure: tek40:text
+
+ -- Procedure: tek40:linetype LINETYPE
+
+ -- Procedure: tek40:move X Y
+
+ -- Procedure: tek40:draw X Y
+
+ -- Procedure: tek40:put-text X Y STR
+
+ -- Procedure: tek40:reset
+
+Tektronix 4100 Series Graphics
+------------------------------
+
+  The graphics control codes are sent over the current-output-port and
+can be mixed with regular text and ANSI or other terminal control
+sequences.
+
+ -- Procedure: tek41:init
+
+ -- Procedure: tek41:reset
+
+ -- Procedure: tek41:graphics
+
+ -- Procedure: tek41:move X Y
+
+ -- Procedure: tek41:draw X Y
+
+ -- Procedure: tek41:point X Y NUMBER
+
+ -- Procedure: tek41:encode-x-y X Y
+
+ -- Procedure: tek41:encode-int NUMBER
+
+
+File: slib.info,  Node: Tree Operations,  Prev: Tektronix Graphics Support,  Up: Procedures
+
+Tree operations
+---------------
+
+  These are operations that treat lists a representations of trees.
+
+ -- Function: subst NEW OLD TREE
+ -- Function: substq NEW OLD TREE
+ -- Function: substv NEW OLD TREE
+     `subst' makes a copy of TREE, substituting NEW for every subtree
+     or leaf of TREE which is `equal?' to OLD and returns a modified
+     tree.  The original TREE is unchanged, but may share parts with
+     the result.
+
+     `substq' and `substv' are similar, but test against OLD using
+     `eq?' and `eqv?' respectively.
+
+     Examples:
+          (substq 'tempest 'hurricane '(shakespeare wrote (the hurricane)))
+             => (shakespeare wrote (the tempest))
+          (substq 'foo '() '(shakespeare wrote (twelfth night)))
+             => (shakespeare wrote (twelfth night . foo) . foo)
+          (subst '(a . cons) '(old . pair)
+                 '((old . spice) ((old . shoes) old . pair) (old . pair)))
+             => ((old . spice) ((old . shoes) a . cons) (a . cons))
+
+ -- Function: copy-tree TREE
+     Makes a copy of the nested list structure TREE using new pairs and
+     returns it.  All levels are copied, so that none of the pairs in
+     the tree are `eq?' to the original ones -- only the leaves are.
+
+     Example:
+          (define bar '(bar))
+          (copy-list (list bar 'foo))
+             => ((bar) foo)
+          (eq? bar (car (copy-list (list bar 'foo))))
+             => #f
+
+
+File: slib.info,  Node: Standards Support,  Next: Session Support,  Prev: Procedures,  Up: Top
+
+Standards Support
+*****************
+
+* Menu:
+
+* With-File::
+* Transcripts::
+* Rev2 Procedures::             'rev2-procedures
+* Rev3 Procedures::             'rev3-procedures
+* Rev4 Optional Procedures::    'rev4-optional-procedures
+* Multi-argument / and -::      'multiarg/and-
+* Multi-argument Apply::        'multiarg-apply
+* Rationalize::                 'rationalize
+* Promises::                    'promise
+* Dynamic-Wind::		'dynamic-wind
+* Values::			'values
+
+
+File: slib.info,  Node: With-File,  Next: Transcripts,  Prev: Standards Support,  Up: Standards Support
+
+With-File
+=========
+
+  `(require 'with-file)'
+
+ -- Function: with-input-from-file FILE THUNK
+ -- Function: with-output-to-file FILE THUNK
+     Description found in R4RS.
+
+
+File: slib.info,  Node: Transcripts,  Next: Rev2 Procedures,  Prev: With-File,  Up: Standards Support
+
+Transcripts
+===========
+
+  `(require 'transcript)'
+
+ -- Function: transcript-on FILENAME
+ -- Function: transcript-off FILENAME
+     Redefines `read-char', `read', `write-char', `write', `display',
+     and `newline'.
+
+
+File: slib.info,  Node: Rev2 Procedures,  Next: Rev3 Procedures,  Prev: Transcripts,  Up: Standards Support
+
+Rev2 Procedures
+===============
+
+  `(require 'rev2-procedures)'
+
+  The procedures below were specified in the `Revised^2 Report on
+Scheme'.  *N.B.*: The symbols `1+' and `-1+' are not `R4RS' syntax. 
+Scheme->C, for instance, barfs on this module.
+
+ -- Procedure: substring-move-left! STRING1 START1 END1 STRING2 START2
+ -- Procedure: substring-move-right! STRING1 START1 END1 STRING2 START2
+     STRING1 and STRING2 must be a strings, and START1, START2 and END1
+     must be exact integers satisfying
+
+          0 <= START1 <= END1 <= (string-length STRING1)
+          0 <= START2 <= END1 - START1 + START2 <= (string-length STRING2)
+
+     `substring-move-left!' and `substring-move-right!' store
+     characters of STRING1 beginning with index START1 (inclusive) and
+     ending with index END1 (exclusive) into STRING2 beginning with
+     index START2 (inclusive).
+
+     `substring-move-left!' stores characters in time order of
+     increasing indices.  `substring-move-right!' stores characters in
+     time order of increasing indeces.
+
+ -- Procedure: substring-fill! STRING START END CHAR
+     Fills the elements START--END of STRING with the character CHAR.
+
+ -- Function: string-null? STR
+     == `(= 0 (string-length STR))'
+
+ -- Procedure: append! . PAIRS
+     Destructively appends its arguments.  Equivalent to `nconc'.
+
+ -- Function: 1+ N
+     Adds 1 to N.
+
+ -- Function: -1+ N
+     Subtracts 1 from N.
+
+ -- Function: <?
+ -- Function: <=?
+ -- Function: =?
+ -- Function: >?
+ -- Function: >=?
+     These are equivalent to the procedures of the same name but
+     without the trailing `?'.
+
+
+File: slib.info,  Node: Rev3 Procedures,  Next: Rev4 Optional Procedures,  Prev: Rev2 Procedures,  Up: Standards Support
+
+Rev3 Procedures
+===============
+
+  `(require 'rev3-procedures)'
+
+  The procedures below were specified in the `Revised^3 Report on
+Scheme'.
+
+ -- Function: last-pair L
+     Returns the last pair in the list L.  Example:
+          (last-pair (cons 1 2))
+             => (1 . 2)
+          (last-pair '(1 2))
+             => (2)
+              == (cons 2 '())
+
+ -- Variable: t
+     Derfined as `#t'.
+
+ -- Variable: nil
+     Defined as `#f'.
+
+
+File: slib.info,  Node: Rev4 Optional Procedures,  Next: Multi-argument / and -,  Prev: Rev3 Procedures,  Up: Standards Support
+
+Rev4 Optional Procedures
+========================
+
+  `(require 'rev4-optional-procedures)'
+
+  See `R4RS' for the specification of these optional procedures.
+
+ -- Function: list-tail L P
+
+ -- Function: string->list S
+
+ -- Function: list->string L
+
+ -- Function: string-copy
+
+ -- Procedure: string-fill! S OBJ
+
+ -- Function: list->vector L
+
+ -- Function: vector->list S
+
+ -- Procedure: vector-fill! S OBJ
+
+
+File: slib.info,  Node: Multi-argument / and -,  Next: Multi-argument Apply,  Prev: Rev4 Optional Procedures,  Up: Standards Support
+
+Multi-argument / and -
+======================
+
+  `(require 'mutliarg/and-)'
+
+  See `R4RS' for the specification of these optional forms.  The
+`two-arg:'* forms are only defined if the implementation does not
+support the many-argument forms.
+
+ -- Function: two-arg:/ N1 N2
+     The original two-argument version of `/'.
+
+ -- Function: / DIVIDENT . DIVISORS
+
+ -- Function: two-arg:- N1 N2
+     The original two-argument version of `-'.
+
+ -- Function: - MINUEND . SUBTRAHENDS
+
+
+File: slib.info,  Node: Multi-argument Apply,  Next: Rationalize,  Prev: Multi-argument / and -,  Up: Standards Support
+
+Multi-argument Apply
+====================
+
+  See `R4RS' for the specification of this optional form. `(require
+'multiarg-apply)'
+
+ -- Function: two-arg:apply PROC L
+     The implementation's native `apply'.  Only defined for
+     implementations which don't support the many-argument version.
+
+ -- Function: apply PROC . ARGS
+
+
+File: slib.info,  Node: Rationalize,  Next: Promises,  Prev: Multi-argument Apply,  Up: Standards Support
+
+Rationalize
+===========
+
+  `(require 'rationalize)'
+
+  The procedure rationalize is interesting because most programming
+languages do not provide anything analogous to it.  For simplicity, we
+present an algorithm which computes the correct result for exact
+arguments (provided the implementation supports exact rational numbers
+of unlimited precision), and produces a reasonable answer for inexact
+arguments when inexact arithmetic is implemented using floating-point.
+We thank Alan Bawden for contributing this algorithm.
+
+ -- Function: rationalize X E
+
+
+File: slib.info,  Node: Promises,  Next: Dynamic-Wind,  Prev: Rationalize,  Up: Standards Support
+
+Promises
+========
+
+  `(require 'promise)'
+
+ -- Function: make-promise PROC
+
+  Change occurrences of `(delay EXPRESSION)' to `(make-promise (lambda
+() EXPRESSION))' and `(define force promise:force)' to implement
+promises if your implementation doesn't support them (see `R4RS').
+
+
+File: slib.info,  Node: Dynamic-Wind,  Next: Values,  Prev: Promises,  Up: Standards Support
+
+Dynamic-Wind
+============
+
+  `(require 'dynamic-wind)'
+
+  This facility is a generalization of Common LISP `unwind-protect',
+designed to take into account the fact that continuations produced by
+`call-with-current-continuation' may be reentered.
+
+ -- Procedure: dynamic-wind THUNK1 THUNK2 THUNK3
+     The arguments THUNK1, THUNK2, and THUNK3 must all be procedures of
+     no arguments (thunks).
+
+     `dynamic-wind' calls THUNK1, THUNK2, and then THUNK3.  The value
+     returned by THUNK2 is returned as the result of `dynamic-wind'. 
+     THUNK3 is also called just before control leaves the dynamic
+     context of THUNK2 by calling a continuation created outside that
+     context.  Furthermore, THUNK1 is called before reentering the
+     dynamic context of THUNK2 by calling a continuation created inside
+     that context.  (Control is inside the context of THUNK2 if THUNK2
+     is on the current return stack).
+
+     *Warning:* There is no provision for dealing with errors or
+     interrupts.  If an error or interrupt occurs while using
+     `dynamic-wind', the dynamic environment will be that in effect at
+     the time of the error or interrupt.
+
+
+File: slib.info,  Node: Values,  Prev: Dynamic-Wind,  Up: Standards Support
+
+Values
+======
+
+  `(require 'values)'
+
+ -- Function: values OBJ ...
+     `values' takes any number of arguments, and passes (returns) them
+     to its continuation.
+
+ -- Function: call-with-values THUNK PROC
+     THUNK must be a procedure of no arguments, and PROC must be a
+     procedure.  `call-with-values' calls THUNK with a continuation
+     that, when passed some values, calls PROC with those values as
+     arguments.
+
+     Except for continuations created by the `call-with-values'
+     procedure, all continuations take exactly one value, as now; the
+     effect of passing no value or more than one value to continuations
+     that were not created by the `call-with-values' procedure is
+     unspecified.
+
+
+File: slib.info,  Node: Session Support,  Next: Syntax Extensions,  Prev: Standards Support,  Up: Top
+
+Session Support
+***************
+
+* Menu:
+
+* Repl::                        'repl
+* Debug::                       'debug
+* Test::                        'test
+
+The features described in the following sections are supported by all
+implementations.
+
+* Require::
+* Vicinity::
+* Constants::
+* System::
+
+
+File: slib.info,  Node: Repl,  Next: Debug,  Prev: Session Support,  Up: Session Support
+
+Repl
+====
+
+  `(require 'repl)'
+
+  Here is a read-eval-print-loop which, given an eval, evaluates forms.
+
+ -- Procedure: repl:top-level REPL:EVAL
+     `read's, `repl:eval's and `write's expressions from
+     `(current-input-port)' to `(current-output-port)' until an
+     end-of-file is encountered.  `load', `slib:eval', `slib:error',
+     and `repl:quit' dynamically bound during `repl:top-level'.
+
+ -- Procedure: repl:quit
+     Exits from the invocation of `repl:top-level'.
+
+  The `repl:' procedures establish, as much as is possible to do
+portably, a top level environment supporting macros. `repl:top-level'
+uses `dynamic-wind' to catch error conditions and interrupts.  If your
+implementation supports this you are all set.
+
+  Otherwise, if there is some way your implementation can catch error
+conditions and interrupts, then have them call `slib:error'.  It will
+display its arguments and reenter `repl:top-level'. `slib:error'
+dynamically bound by `repl:top-level'.
+
+  To have your top level loop always use macros, add any interrupt
+catching lines and the following lines to your Scheme init file:
+     (require 'macro)
+     (require 'repl)
+     (repl:top-level macro:eval)
+
+
+File: slib.info,  Node: Debug,  Next: Test,  Prev: Repl,  Up: Session Support
+
+Debug
+=====
+
+  `(require 'debug)'
+
+ -- Procedure: print ARGS
+     Print writes all its arguments, separated by spaces.  Print
+     outputs a newline at the end and returns the value of the last
+     argument.  Note that `print' is also defined in the `yasos' module
+     (*Note Yasos::).
+
+ -- Procedure: qp ARGS
+ -- Procedure: qpn ARGS
+ -- Procedure: qpr ARGS
+     `qp' writes its arguments, separated by spaces, to
+     `(current-output-port)'.  `qp' compresses printing by substituting
+     `...' for substructure it does not have sufficient room to print. 
+     `qpn' is like `qp' but outputs a newline before returning.  `qpr'
+     is like `qpn' except that it returns its last argument.
+
+ -- Variable: *qp-width*
+     `*qp-width*' is the largest number of characters that `qp' uses.
+
+Tracing
+-------
+
+  To trace, type
+     (set! SYMBOL (tracef SYMBOL))
+
+or
+     (set! SYMBOL (tracef SYMBOL 'SYMBOL))
+
+or
+     (define SYMBOL (tracef FUNCTION))
+
+or
+     (define SYMBOL (tracef FUNCTION 'SYMBOL))
+  To untrace, type
+     (set! SYMBOL (untracef SYMBOL))
+
+Breakpoints
+-----------
+
+  Typing `(init-debug)' at top level sets up a continuation for break. 
+When `(break arg1 ...)' is then called it returns from the top level
+continuation and pushes the continuation from which it was called on
+`debug:break-continuation-stack'.  If `(continue)' is later called, it
+pops the topmost continuation off of `debug:break-continuation-stack'
+and returns `#f' to it.
+
+
+File: slib.info,  Node: Test,  Next: Require,  Prev: Debug,  Up: Session Support
+
+Test
+====
+
+  Routines for testing (specifically conformance to definitions in
+sections of a standard).  See `test.scm' in the source distribution of
+`scm' or the Scheme Repository (`nexus.yorku.ca:pub/scheme/') for usage
+examples.
+
+  `(require 'test)'
+
+ -- Function: test EXPECTED FUN . ARGS
+
+
+File: slib.info,  Node: Require,  Next: Vicinity,  Prev: Test,  Up: Session Support
+
+Require
+=======
+
+ -- Variable: *features*
+     Is a list of symbols denoting features supported in this
+     implementation.
+
+ -- Variable: *modules*
+     Is a list of pathnames denoting files which have been loaded.
+
+ -- Variable: *catalog*
+     Is an association list of features (symbols) and pathnames which
+     will supply those features.
+
+  In the following three functions if FEATURE is not a symbol it is
+assumed to be a pathname.
+
+ -- Function: provided? FEATURE
+     Returns `#t' if FEATURE is a member of `*features*' or `*modules*'
+     or if FEATURE is supported by a file already loaded and `#f'
+     otherwise.
+
+ -- Procedure: require FEATURE
+     If `(not (provided? FEATURE))' it is loaded if FEATURE is a
+     pathname or if `(assq FEATURE *catalog*)'.  Otherwise an error is
+     signaled.
+
+ -- Procedure: provide FEATURE
+     Assures that FEATURE is contained in `*features*' if FEATURE is a
+     symbol and `*modules*' otherwise.
+
+ -- Function: require:feature->path FEATURE
+     Returns `#t' if FEATURE is a member of `*features*' or `*modules*'
+     or if FEATURE is supported by a file already loaded.  Returns a
+     path if one was found in `*catalog*' under the feature name, and
+     `#f' otherwise.  The path can either be a string suitable as an
+     argument to load or a pair whose car is `'macro' and whose cdr is
+     a string suitable as an argument to `macro:load'.
+
+  Below is a list of features that are automatically determined by
+`require'.  For each item, `(provided? 'FEATURE)' will return `#t' if
+that feature is available, and `#f' if not.
+
+   * 'inexact
+
+   * 'rational
+
+   * 'real
+
+   * 'complex
+
+   * 'bignum
+
+
+File: slib.info,  Node: Vicinity,  Next: Constants,  Prev: Require,  Up: Session Support
+
+Vicinity
+========
+
+  A vicinity is a descriptor for a place in the file system.  Vicinities
+hide from the programmer the concepts of host, volume, directory, and
+version.  Vicinities express only the concept of a file environment
+where a file name can be resolved to a file in a system independent
+manner.  Vicinities can even be used on `flat' file systems (which have
+no directory structure) by having the vicinity express constraints on
+the file name.  On most systems a vicinity would be a string.  All of
+these procedures are file system dependent.
+
+ -- Function: make-vicinity PATHNAME
+     Returns the vicinity of PATHNAME for use by `in-vicinity'.
+
+ -- Function: program-vicinity
+     Returns the vicinity of the currently loading Scheme code.  For an
+     interpreter this would be the directory containing source code. 
+     For a compiled system (with multiple files) this would be the
+     directory where the object or executable files are.  If no file is
+     currently loading it the result is undefined.  *Warning:*
+     `program-vicinity' can return incorrectl values if your program
+     escapes back into a `load'.
+
+ -- Function: library-vicinity
+     Returns the vicinity of the shared Scheme library.
+
+ -- Function: implementation-vicinity
+     Returns the vicinity of the underlying Scheme implementation.  This
+     vicinity will likely contain startup code and messages and a
+     compiler.
+
+ -- Function: user-vicinity
+     Returns the vicinity of the current directory of the user.  On most
+     systems this is `""' (the empty string).
+
+ -- Function: scheme-file-suffix
+     Returns the default filename suffix for scheme source files.  On
+     most systems this is `.scm'.
+
+ -- Function: in-vicinity VICINITY FILENAME
+ -- Function: in-vicinity VICINITY FILENAME SUFFIX
+     Returns a filename suitable for use by `load', `open-input-file',
+     `open-output-file', etc.  The returned filename is FILENAME, with
+     optional SUFFIX appended, in VICINITY.  `in-vicinity' should allow
+     FILENAME to override VICINITY when FILENAME is an absolute
+     pathname and VICINITY is equal to the value of `(user-vicinity)'. 
+     The behavior of `in-vicinity' when FILENAME is absolute and
+     VICINITY is not equal to the value of `(user-vicinity)' is
+     unspecified.  For most systems `in-vicinity' can be
+     `string-append'.
+
+ -- Function: sub-vicinity VICINITY NAME
+     Returns the vicinity of VICINITY restricted to NAME.  This is used
+     for large systems where names of files in subsystems could
+     conflict.  On systems with directory structure `sub-vicinity' will
+     return a pathname of the subdirectory NAME of VICINITY.
+
+
+File: slib.info,  Node: Constants,  Next: System,  Prev: Vicinity,  Up: Session Support
+
+Constants
+=========
+
+ -- Constant: char-code-limit
+     An integer 1 larger that the largest value which can be returned by
+     `char->integer'.
+
+ -- Constant: most-positive-fixnum
+     The immediate integer closest to positive infinity.
+
+ -- Constant: slib:tab
+     The tab character.
+
+ -- Constant: slib:form-feed
+     The form-feed character.
+
+
+File: slib.info,  Node: System,  Prev: Constants,  Up: Session Support
+
+System
+======
+
+  Certain features are so simple, system-dependent, or widely subcribed
+that they are supported as part of the `*.init' files.
+
+ -- Procedure: output-port-width
+ -- Procedure: output-port-width PORT
+     Returns the width of PORT, which defaults to
+     `(current-output-port)' if absent.  If the width cannot be
+     determined 79 is returned.
+
+ -- Procedure: current-error-port
+     Returns the current port to which diagnostic and error output is
+     directed.
+
+ -- Procedure: tmpnam
+     Returns a pathname for a file which will likely not be used by any
+     other process.  Successive calls to `(tmpnam)' will return
+     different pathnames.
+
+ -- Procedure: file-exists? FILENAME
+     Returns `#t' if the specified file exists.  Otherwise, returns
+     `#f'.  If the underlying implementation does not support this
+     feature then `#f' is always returned.
+
+ -- Procedure: delete-file FILENAME
+     Deletes the file specified by FILENAME.  If FILENAME can not be
+     deleted, `#f' is returned.  Otherwise, `#t' is returned.
+
+ -- Procedure: force-output
+ -- Procedure: force-output PORT
+     Forces any pending output on PORT to be delivered to the output
+     device and returns an unspecified value.  The PORT argument may be
+     omitted, in which case it defaults to the value returned by
+     `(current-output-port)'.
+
+ -- Procedure: slib:eval OBJ
+     `eval' returns the value of OBJ evaluated in the current top level
+     environment.
+
+ -- Procedure: slib:error ARG1 ARG2 ...
+     Outputs an error message containing the arguments, aborts
+     evaluation of the current form and responds in a system dependent
+     way to the error. Typical responses are to abort the program or to
+     enter a read-eval-print loop.
+
+
+File: slib.info,  Node: Syntax Extensions,  Next: Procedure and Macro Index,  Prev: Session Support,  Up: Top
+
+Syntax Extensions
+*****************
+
+  There are a couple syntax extensions included with SLIB.
+
+* Menu:
+
+* Fluid-Let::           'fluid-let
+* Yasos::               'yasos, 'oop, 'collect
+
+
+File: slib.info,  Node: Fluid-Let,  Next: Yasos,  Prev: Syntax Extensions,  Up: Syntax Extensions
+
+Fluid-Let
+=========
+
+  `(require 'fluid-let)'
+
+ -- Syntax: fluit-let `(BINDINGS ...)' FORMS...
+
+     (fluid-let ((VARIABLE INIT) ...)
+        EXPRESSION EXPRESSION ...)
+
+  The INITs are evaluated in the current environment (in some
+unspecified order), the current values of the VARIABLEs are saved, the
+results are assigned to the VARIABLEs, the EXPRESSIONs are evaluated
+sequentially in the current environment, the VARIABLEs are restored to
+their original values, and the value of the last EXPRESSION is returned.
+
+  The syntax of this special form is similar to that of `let', but
+`fluid-let' temporarily rebinds existing VARIABLEs.  Unlike `let',
+`fluid-let' creates no new bindings; instead it *assigns* the values of
+each INIT to the binding (determined by the rules of lexical scoping)
+of its corresponding VARIABLE.
+
+
+File: slib.info,  Node: Yasos,  Prev: Fluid-Let,  Up: Syntax Extensions
+
+Yasos
+=====
+
+  `(require 'oop)' or `(require 'yasos)'
+
+  `Yet Another Scheme Object System'.  A simple object system for Scheme
+based on the paper by Norman Adams and Jonathan Rees: `Object Oriented
+Programming in Scheme', Proceedings of the 1988 ACM Conference on LISP
+and Functional Programming, July 1988 [ACM #552880].
+
+* Menu:
+
+* Yasos terms::           Definitions and disclaimer.
+* Yasos interface::       The Yasos macros and procedures.
+* Setters::               Dylan-like setters in Yasos.
+* Yasos examples::        Usage of Yasos and setters.
+
+
+File: slib.info,  Node: Yasos terms,  Next: Yasos interface,  Prev: Yasos,  Up: Yasos
+
+Terms
+-----
+
+"Object"
+     Any Scheme data object.
+
+"Instance"
+     An instance of the OO system; an "object".
+
+"Operation"
+     A METHOD.
+
+*Notes:*
+     The object system supports multiple inheritance.  An instance can
+     inherit from 0 or more ancestors.  In the case of multiple
+     inherited operations with the same identity, the operation used is
+     that from the first ancestor which contains it (in the ancestor
+     `let').  An operation may be applied to any Scheme data
+     object--not just instances. As code which creates instances is
+     just code, there are no "classes" and no meta-ANYTHING.  Method
+     dispatch is by a procedure call a la CLOS rather than by `send'
+     syntax a la Smalltalk.
+
+*Disclaimer:*
+     There are a number of optimizations which can be made.  This
+     implementation is expository (although performance should be quite
+     reasonable).  See the L&FP paper for some suggestions.
+
+
+File: slib.info,  Node: Yasos interface,  Next: Setters,  Prev: Yasos terms,  Up: Yasos
+
+Interface
+---------
+
+ -- Syntax: define-operation `('OPNAME SELF ARG ...`)' DEFAULT-BODY
+     Defines a default behavior for data objects which don't handle the
+     operation OPNAME.  The default default behavior (for an empty
+     DEFAULT-BODY) is to generate an error.
+
+ -- Syntax: define-predicate OPNAME?
+     Defines a predicate OPNAME?, usually used for determining the
+     "type" of an object, such that `(OPNAME? OBJECT)' returns `#t' if
+     OBJECT has an operation OPNAME? and `#f' otherwise.
+
+ -- Syntax: object `((NAME SELF ARG ...) BODY)' ...
+     Returns an object (an instance of the object system) with
+     operations. Invoking `(NAME OBJECT ARG ...' executes the BODY of
+     the OBJECT with SELF bound to OBJECT and with argument(s) ARG....
+
+ -- Syntax: object-with-ancestors `(('ANCESTOR1 INIT1`)' ...`)'
+          OPERATION ...
+     A `let'-like form of `object' for multiple inheritance.  It
+     returns an object inheriting the behaviour of ANCESTOR1 etc.  An
+     operation will be invoked in an ancestor if the object itself does
+     not provide such a method.  In the case of multiple inherited
+     operations with the same identity, the operation used is the one
+     found in the first ancestor in the ancestor list.
+
+ -- Syntax: operate-as COMPONENT OPERATION SELF ARG ...
+     Used in an operation definition (of SELF) to invoke the OPERATION
+     in an ancestor COMPONENT but maintain the object's identity.  Also
+     known as "send-to-super".
+
+ -- Procedure: print OBJ PORT
+     A default `print' operation is provided which is just `(format
+     PORT OBJ)' (*Note Format::) for non-instances and prints OBJ
+     preceded by `#<INSTANCE>' for instances.  Note that `print' is
+     also defined in the `debug' module (*Note Debug::) and these will
+     conflict.
+
+ -- Function: size OBJ
+     The default method returns the number of elements in OBJ if it is
+     a vector, string or list, `2' for a pair, `1' for a character and
+     by default id an error otherwise.  Objects such as collections
+     (*Note Collections::) may override the default in an obvious way.
+
+
+File: slib.info,  Node: Setters,  Next: Yasos examples,  Prev: Yasos interface,  Up: Yasos
+
+Setters
+-------
+
+  "Setters" implement `generalized locations' for objects associated
+with some sort of mutable state.  A "getter" operation retrieves a
+value from a generalized location and the corresponding setter operation
+stores a value into the location.  Only the getter is named -- the
+setter is specified by a procedure call as below.  (Dylan uses special
+syntax.)  Typically, but not necessarily, getters are access operations
+to extract values from Yasos objects (*Note Yasos::).  Several setters
+are predefined, corresponding to getters `car', `cdr', `string-ref' and
+`vector-ref' e.g., `(setter car)' is equivalent to `set-car!'.
+
+  This implementation of setters is similar to that in Dylan(TM)
+(`Dylan: An object-oriented dynamic language', Apple Computer Eastern
+Research and Technology).  Common LISP provides similar facilities
+through `setf'.
+
+ -- Function: setter GETTER
+     Returns the setter for the procedure GETTER.  E.g., since
+     `string-ref' is the getter corresponding to a setter which is
+     actually `string-set!':
+          (define foo "foo")
+          ((setter string-ref) foo 0 #\F) ; set element 0 of foo
+          foo => "Foo"
+
+ -- Syntax: set PLACE NEW-VALUE
+     If PLACE is a variable name, `set' is equivalent to `set!'. 
+     Otherwise, PLACE must have the form of a procedure call, where the
+     procedure name refers to a getter and the call indicates an
+     accessible generalized location, i.e., the call would return a
+     value. The return value of `set' is usually unspecified unless
+     used with a setter whose definition guarantees to return a useful
+     value.
+          (set (string-ref foo 2) #\O)  ; generalized location with getter
+          foo => "FoO"
+          (set foo "foo")               ; like set!
+          foo => "foo"
+
+ -- Procedure: add-setter GETTER SETTER
+     Add procedures GETTER and SETTER to the (inaccessible) list of
+     valid setter/getter pairs.  SETTER implements the store operation
+     corresponding to the GETTER access operation for the relevant
+     state.  The return value is unspecified.
+
+ -- Procedure: remove-setter-for GETTER
+     Removes the setter corresponding to the specified GETTER from the
+     list of valid setters.  The return value is unspecified.
+
+ -- Syntax: define-access-operation GETTER-NAME
+     Shorthand for a Yasos `define-operation' defining an operation
+     GETTER-NAME that objects may support to return the value of some
+     mutable state.  The default operation is to signal an error.  The
+     return value is unspecified.
+
+

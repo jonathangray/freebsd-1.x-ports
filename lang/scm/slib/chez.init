@@ -1,0 +1,187 @@
+;;;; Initialization file for SLIB for Chez Scheme        -*-scheme-*-
+;;; Copyright (C) 1993 dorai@cs.rice.edu (Dorai Sitaram)
+
+(define (software-type) 'UNIX)
+
+(define *features*
+  '(
+    char-ready?
+    delay
+    dynamic-wind
+    eval
+    fluid-let
+    format
+    full-continuation
+    getenv
+    ieee-p1178
+    macro
+    defmacro
+    multiarg/and-
+    multiarg-apply
+    pretty-print
+    random
+    random-inexact
+    rationalize
+    rev3-procedures
+    rev3-report
+    rev4-optional-procedures
+    rev4-report
+    sort
+    system
+    transcript
+    with-file
+    string-port
+    ))
+
+;R4RS define-syntax in terms of Chez's extend-syntax.
+;Caveat: no let-syntax
+
+(extend-syntax (define-syntax syntax-rules)
+  ((define-syntax name (syntax-rules kwds . clauses))
+   (extend-syntax (name . kwds) . clauses)))
+
+;DEFINED?
+(define-syntax defined?
+  (syntax-rules ()
+    ((defined? x) (or (bound? 'x) (get 'x '*expander*)))))
+
+;Chez's sort routines have the opposite parameter order to Slib's
+(define chez:sort sort)
+(define chez:sort! sort!)
+(define chez:merge merge)
+(define chez:merge! merge)
+
+(define sort
+  (lambda (s p)
+    (chez:sort p s)))
+(define sort!
+  (lambda (s p)
+    (chez:sort! p s)))
+(define merge
+  (lambda (s1 s2 p)
+    (chez:merge p s1 s2)))
+(define merge!
+  (lambda (s1 s2 p)
+    (chez:merge! p s1 s2)))
+
+;RENAME-FILE
+(define rename-file
+  (lambda (src dst)
+    (system (string-append "mv " src " " dst))))
+
+;OUTPUT-PORT-WIDTH
+(define output-port-width (lambda arg 79))
+
+;;; (OUTPUT-PORT-HEIGHT <port>)
+(define (output-port-height . arg) 24)
+
+;;; (CURRENT-ERROR-PORT)
+(define current-error-port
+  (let ((port (current-output-port)))
+    (lambda () port)))
+
+;;; (TMPNAM) makes a temporary file name.
+(define tmpnam
+  (let ((cntr 100))
+    (lambda () (set! cntr (+ 1 cntr))
+	    (let ((tmp (string-append "slib_" (number->string cntr))))
+	      (if (file-exists? tmp) (tmpnam) tmp)))))
+
+;GETENV
+(provide-foreign-entries '("getenv"))
+(define getenv
+  (foreign-procedure "getenv"
+    (string) string))
+
+;FORCE-OUTPUT
+(define force-output flush-output)
+
+;;; CALL-WITH-INPUT-STRING and CALL-WITH-OUTPUT-STRING are the string
+;;; port versions of CALL-WITH-*PUT-FILE.
+(define (call-with-output-string f)
+  (let ((outsp (open-output-string)))
+    (f outsp)
+    (let ((s (get-output-string outsp)))
+      (close-output-port outsp)
+      s)))
+
+(define (call-with-input-string s f)
+  (let* ((insp (open-input-string s))
+	 (res (f insp)))
+    (close-input-port insp)
+    res))
+
+;CHAR-CODE-LIMIT
+(define char-code-limit 256)
+
+;Chez's MOST-POSITIVE-FIXNUM is a thunk rather than a number
+(if (procedure? most-positive-fixnum)
+    (set! most-positive-fixnum (most-positive-fixnum)))
+
+(define slib:eval eval)
+
+(define-macro! defmacro z `(define-macro! ,@z))
+
+(define (macro? m) (get m '*expander*))
+
+(define macroexpand-1 expand-once)
+
+(define (macroexpand e)
+  (if (pair? e) (let ((a (car e)))
+		  (if (and (symbol? a) (getprop a '*expander*))
+		      (macroexpand (expand-once e))
+		      e))
+      e))
+
+(define gentemp
+  (let ((*gensym-counter* -1))
+    (lambda ()
+      (set! *gensym-counter* (+ *gensym-counter* 1))
+      (string->symbol
+       (string-append "slib:G" (number->string *gensym-counter*))))))
+
+(define defmacro:eval slib:eval)
+(define defmacro:load load)
+(define macro:eval slib:eval)
+(define macro:load load)
+
+;Chez's (FORMAT f . a) corresponds to Slib's (FORMAT #f f . a)
+
+(define chez:format format)
+(define format
+  (lambda (where how . args)
+    (let ((str (apply chez:format how args)))
+      (cond ((not where) str)
+	    ((eq? where #t) (display str))
+	    (else (display str where))))))
+
+(define slib:error
+  (lambda args
+    (let ((port (current-error-port)))
+      (display "Error: " port)
+      (for-each (lambda (x) (display x port)) args)
+      (error #f ""))))
+
+(define slib:tab #\tab)
+(define slib:form-feed #\page)
+
+;Chez's nil variable is bound to '() rather than #f
+
+(define nil #f)
+
+(define implementation-vicinity
+  (lambda () "/usr/local/lib/scheme/"))
+
+(define library-vicinity
+  (let ((library-path (or (getenv "SCHEME_LIBRARY_PATH")
+			  "/usr/local/lib/slib/")))
+    (lambda () library-path)))
+
+;Note however that ".ss" is a common Chez file suffix
+(define (scheme-file-suffix) ".scm")
+
+(define in-vicinity string-append)
+
+(load (in-vicinity (library-vicinity) "require" (scheme-file-suffix)))
+
+;end chez.init

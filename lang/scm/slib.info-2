@@ -1,0 +1,1536 @@
+This is Info file slib.info, produced by Makeinfo-1.49 from the input
+file slib.texi.
+
+  This file documents SLIB, the portable Scheme library.
+
+  Copyright (C) 1993 Todd R. Eigenschink
+
+  Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+  Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided that the
+entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+
+  Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions, except that this permission notice may be stated in a
+translation approved by the author.
+
+
+File: slib.info,  Node: Syntactic Closures,  Next: Syntax-Case Macros,  Prev: Macros That Work,  Up: Macro Implementations
+
+Syntactic Closures
+==================
+
+  `(require 'syntactic-closures)'
+
+  Syntactic-closure macros.
+
+ -- Function: macro:expand EXPRESSION
+     Returns scheme code with the macros and derived expression types of
+     EXPRESSION expanded to primitive expression types.
+
+ -- Function: macro:eval EXPRESSION
+     `macro:eval' returns the value of EXPRESSION in the current top
+     level environment.  EXPRESSION can contain macro definitions. Side
+     effects of EXPRESSION will affect the top level environment.
+
+ -- Function: macro:load FILENAME
+     FILENAME should be a string.  If filename names an existing file,
+     the `macro:load' procedure reads Scheme source code expressions and
+     definitions from the file and evaluates them sequentially.  These
+     source code expressions and definitions may contain macro
+     definitions. The `macro:load' procedure does not affect the values
+     returned by `current-input-port' and `current-output-port'.
+
+Syntactic Closure Macro Facility
+--------------------------------
+
+                  A Syntactic Closures Macro Facility
+
+                            by Chris Hanson
+
+                            9 November 1991
+
+  This document describes "syntactic closures", a low-level macro
+facility for the Scheme programming language.  The facility is an
+alternative to the low-level macro facility described in the `Revised^4
+Report on Scheme.' This document is an addendum to that report.
+
+  The syntactic closures facility extends the BNF rule for TRANSFORMER
+SPEC to allow a new keyword that introduces a low-level macro
+transformer:
+     TRANSFORMER SPEC := (transformer EXPRESSION)
+
+  Additionally, the following procedures are added:
+     make-syntactic-closure
+     capture-syntactic-environment
+     identifier?
+     identifier=?
+
+  The description of the facility is divided into three parts.  The
+first part defines basic terminology.  The second part describes how
+macro transformers are defined.  The third part describes the use of
+"identifiers", which extend the syntactic closure mechanism to be
+compatible with `syntax-rules'.
+
+Terminology
+...........
+
+  This section defines the concepts and data types used by the syntactic
+closures facility.
+
+   * "Forms" are the syntactic entities out of which programs are
+     recursively constructed.  A form is any expression, any
+     definition, any syntactic keyword, or any syntactic closure.  The
+     variable name that appears in a `set!' special form is also a
+     form.  Examples of forms:
+          17
+          #t
+          car
+          (+ x 4)
+          (lambda (x) x)
+          (define pi 3.14159)
+          if
+          define
+
+   * An "alias" is an alternate name for a given symbol.  It can appear
+     anywhere in a form that the symbol could be used, and when quoted
+     it is replaced by the symbol; however, it does not satisfy the
+     predicate `symbol?'.  Macro transformers rarely distinguish
+     symbols from aliases, referring to both as identifiers.
+
+   * A "syntactic" environment maps identifiers to their meanings. 
+     More precisely, it determines whether an identifier is a syntactic
+     keyword or a variable.  If it is a keyword, the meaning is an
+     interpretation for the form in which that keyword appears.  If it
+     is a variable, the meaning identifies which binding of that
+     variable is referenced.  In short, syntactic environments contain
+     all of the contextual information necessary for interpreting the
+     meaning of a particular form.
+
+   * A "syntactic closure" consists of a form, a syntactic environment,
+     and a list of identifiers.  All identifiers in the form take their
+     meaning from the syntactic environment, except those in the given
+     list.  The identifiers in the list are to have their meanings
+     determined later.  A syntactic closure may be used in any context
+     in which its form could have been used.  Since a syntactic closure
+     is also a form, it may not be used in contexts where a form would
+     be illegal. For example, a form may not appear as a clause in the
+     cond special form. A syntactic closure appearing in a quoted
+     structure is replaced by its form.
+
+Transformer Definition
+......................
+
+  This section describes the `transformer' special form and the
+procedures `make-syntactic-closure' and `capture-syntactic-environment'.
+
+ -- Syntax: transformer EXPRESSION
+     Syntax: It is an error if this syntax occurs except as a
+     TRANSFORMER SPEC.
+
+     Semantics: The EXPRESSION is evaluated in the standard transformer
+     environment to yield a macro transformer as described below.  This
+     macro transformer is bound to a macro keyword by the special form
+     in which the `transformer' expression appears (for example,
+     `let-syntax').
+
+     A "macro transformer" is a procedure that takes two arguments, a
+     form and a syntactic environment, and returns a new form.  The
+     first argument, the "input form", is the form in which the macro
+     keyword occurred.  The second argument, the "usage environment",
+     is the syntactic environment in which the input form occurred. 
+     The result of the transformer, the "output form", is automatically
+     closed in the "transformer environment", which is the syntactic
+     environment in which the `transformer' expression occurred.
+
+     For example, here is a definition of a push macro using
+     `syntax-rules':
+          (define-syntax  push
+            (syntax-rules ()
+              ((push item list)
+               (set! list (cons item list)))))
+
+     Here is an equivalent definition using `transformer':
+          (define-syntax push
+            (transformer
+             (lambda (exp env)
+               (let ((item
+          	    (make-syntactic-closure env '() (cadr exp)))
+          	   (list
+          	    (make-syntactic-closure env '() (caddr exp))))
+                 `(set! ,list (cons ,item ,list))))))
+
+     In this example, the identifiers `set!' and `cons' are closed in
+     the transformer environment, and thus will not be affected by the
+     meanings of those identifiers in the usage environment `env'.
+
+     Some macros may be non-hygienic by design.  For example, the
+     following defines a loop macro that implicitly binds `exit' to an
+     escape procedure.  The binding of `exit' is intended to capture
+     free references to `exit' in the body of the loop, so `exit' must
+     be left free when the body is closed:
+          (define-syntax loop
+            (transformer
+             (lambda (exp env)
+               (let ((body (cdr exp)))
+                 `(call-with-current-continuation
+          	 (lambda (exit)
+          	   (let f ()
+          	     ,@(map (lambda  (exp)
+          		       (make-syntactic-closure env '(exit)
+          					       exp))
+          		     body)
+          	     (f))))))))
+
+     To assign meanings to the identifiers in a form, use
+     `make-syntactic-closure' to close the form in a syntactic
+     environment.
+
+ -- Function: make-syntactic-closure ENVIRONMENT FREE-NAMES FORM
+     ENVIRONMENT must be a syntactic environment, FREE-NAMES must be a
+     list of identifiers, and FORM must be a form.
+     `make-syntactic-closure' constructs and returns a syntactic closure
+     of FORM in ENVIRONMENT, which can be used anywhere that FORM could
+     have been used.  All the identifiers used in FORM, except those
+     explicitly excepted by FREE-NAMES, obtain their meanings from
+     ENVIRONMENT.
+
+     Here is an example where FREE-NAMES is something other than the
+     empty list.  It is instructive to compare the use of FREE-NAMES in
+     this example with its use in the `loop' example above: the examples
+     are similar except for the source of the identifier being left
+     free.
+          (define-syntax let1
+            (transformer
+             (lambda (exp env)
+               (let ((id (cadr exp))
+          	   (init (caddr exp))
+          	   (exp (cadddr exp)))
+                 `((lambda (,id)
+          	   ,(make-syntactic-closure env (list id) exp))
+          	 ,(make-syntactic-closure env '() init))))))
+
+     `let1' is a simplified version of `let' that only binds a single
+     identifier, and whose body consists of a single expression.  When
+     the body expression is syntactically closed in its original
+     syntactic environment, the identifier that is to be bound by
+     `let1' must be left free, so that it can be properly captured by
+     the `lambda' in the output form.
+
+     To obtain a syntactic environment other than the usage
+     environment, use `capture-syntactic-environment'.
+
+ -- Function: capture-syntactic-environment PROCEDURE
+     `capture-syntactic-environment' returns a form that will, when
+     transformed, call PROCEDURE on the current syntactic environment.
+     PROCEDURE should compute and return a new form to be transformed,
+     in that same syntactic environment, in place of the form.
+
+     An example will make this clear.  Suppose we wanted to define a
+     simple `loop-until' keyword equivalent to
+          (define-syntax loop-until
+            (syntax-rules ()
+              ((loop-until id init test return step)
+               (letrec ((loop
+          	       (lambda (id)
+          		 (if test return (loop step)))))
+                 (loop init)))))
+
+     The following attempt at defining `loop-until' has a subtle bug:
+          (define-syntax loop-until
+            (transformer
+             (lambda (exp env)
+               (let ((id (cadr exp))
+          	   (init (caddr exp))
+          	   (test (cadddr exp))
+          	   (return (cadddr (cdr exp)))
+          	   (step (cadddr (cddr exp)))
+          	   (close
+          	    (lambda (exp free)
+          	      (make-syntactic-closure env free exp))))
+                 `(letrec ((loop
+          		  (lambda (,id)
+          		    (if ,(close test (list id))
+          			,(close return (list id))
+          			(loop ,(close step (list id)))))))
+          	  (loop ,(close init '())))))))
+
+     This definition appears to take all of the proper precautions to
+     prevent unintended captures.  It carefully closes the
+     subexpressions in their original syntactic environment and it
+     leaves the `id' identifier free in the `test', `return', and
+     `step' expressions, so that it will be captured by the binding
+     introduced by the `lambda' expression.  Unfortunately it uses the
+     identifiers `if' and `loop' within that `lambda' expression, so if
+     the user of `loop-until' just happens to use, say, `if' for the
+     identifier, it will be inadvertently captured.
+
+     The syntactic environment that `if' and `loop' want to be exposed
+     to is the one just outside the `lambda' expression: before the
+     user's identifier is added to the syntactic environment, but after
+     the identifier loop has been added.
+     `capture-syntactic-environment' captures exactly that environment
+     as follows:
+          (define-syntax loop-until
+            (transformer
+             (lambda (exp env)
+               (let ((id (cadr exp))
+          	   (init (caddr exp))
+          	   (test (cadddr exp))
+          	   (return (cadddr (cdr exp)))
+          	   (step (cadddr (cddr exp)))
+          	   (close
+          	    (lambda (exp free)
+          	      (make-syntactic-closure env free exp))))
+                 `(letrec ((loop
+          		  ,(capture-syntactic-environment
+          		    (lambda (env)
+          		      `(lambda (,id)
+          			 (,(make-syntactic-closure env '() `if)
+          			  ,(close test (list id))
+          			  ,(close return (list id))
+          			  (,(make-syntactic-closure env '()
+          						    `loop)
+          			   ,(close step (list id)))))))))
+          	  (loop ,(close init '())))))))
+
+     In this case, having captured the desired syntactic environment,
+     it is convenient to construct syntactic closures of the
+     identifiers `if' and the `loop' and use them in the body of the
+     `lambda'.
+
+     A common use of `capture-syntactic-environment' is to get the
+     transformer environment of a macro transformer:
+          (transformer
+           (lambda (exp env)
+             (capture-syntactic-environment
+              (lambda (transformer-env)
+                ...))))
+
+Identifiers
+...........
+
+  This section describes the procedures that create and manipulate
+identifiers.  Previous syntactic closure proposals did not have an
+identifier data type -- they just used symbols.  The identifier data
+type extends the syntactic closures facility to be compatible with the
+high-level `syntax-rules' facility.
+
+  As discussed earlier, an identifier is either a symbol or an "alias".
+ An alias is implemented as a syntactic closure whose "form" is an
+identifier:
+     (make-syntactic-closure env '() 'a)
+        => an "alias"
+
+  Aliases are implemented as syntactic closures because they behave just
+like syntactic closures most of the time.  The difference is that an
+alias may be bound to a new value (for example by `lambda' or
+`let-syntax'); other syntactic closures may not be used this way. If an
+alias is bound, then within the scope of that binding it is looked up
+in the syntactic environment just like any other identifier.
+
+  Aliases are used in the implementation of the high-level facility
+`syntax-rules'.  A macro transformer created by `syntax-rules' uses a
+template to generate its output form, substituting subforms of the
+input form into the template.  In a syntactic closures implementation,
+all of the symbols in the template are replaced by aliases closed in
+the transformer environment, while the output form itself is closed in
+the usage environment.  This guarantees that the macro transformation
+is hygienic, without requiring the transformer to know the syntactic
+roles of the substituted input subforms.
+
+ -- Function: identifier? OBJECT
+     Returns `#t' if OBJECT is an identifier, otherwise returns `#f'. 
+     Examples:
+          (identifier? 'a)
+             => #t
+          (identifier? (make-syntactic-closure env '() 'a))
+             => #t
+          (identifier? "a")
+             => #f
+          (identifier? #\a)
+             => #f
+          (identifier? 97)
+             => #f
+          (identifier? #f)
+             => #f
+          (identifier? '(a))
+             => #f
+          (identifier? '#(a))
+             => #f
+
+     The predicate `eq?' is used to determine if two identifers are
+     "the same".  Thus `eq?' can be used to compare identifiers exactly
+     as it would be used to compare symbols.  Often, though, it is
+     useful to know whether two identifiers "mean the same thing".  For
+     example, the `cond' macro uses the symbol `else' to identify the
+     final clause in the conditional.  A macro transformer for `cond'
+     cannot just look for the symbol `else', because the `cond' form
+     might be the output of another macro transformer that replaced the
+     symbol `else' with an alias.  Instead the transformer must look
+     for an identifier that "means the same thing" in the usage
+     environment as the symbol `else' means in the transformer
+     environment.
+
+ -- Function: identifier=? ENVIRONMENT1 IDENTIFIER1 ENVIRONMENT2
+          IDENTIFIER2
+     ENVIRONMENT1 and ENVIRONMENT2 must be syntactic environments, and
+     IDENTIFIER1 and IDENTIFIER2 must be identifiers.  `identifier=?'
+     returns `#t' if the meaning of IDENTIFIER1 in ENVIRONMENT1 is the
+     same as that of IDENTIFIER2 in ENVIRONMENT2, otherwise it returns
+     `#f'. Examples:
+
+          (let-syntax
+              ((foo
+                (transformer
+                 (lambda (form env)
+          	 (capture-syntactic-environment
+          	  (lambda (transformer-env)
+          	    (identifier=? transformer-env 'x env 'x)))))))
+            (list (foo)
+          	(let ((x 3))
+          	  (foo))))
+             => (#t #f)
+
+          (let-syntax ((bar foo))
+            (let-syntax
+                ((foo
+          	(transformer
+          	 (lambda (form env)
+          	   (capture-syntactic-environment
+          	    (lambda (transformer-env)
+          	      (identifier=? transformer-env 'foo
+          			    env (cadr form))))))))
+              (list (foo foo)
+          	  (foobar))))
+             => (#f #t)
+
+Acknowledgements
+................
+
+  The syntactic closures facility was invented by Alan Bawden and
+Jonathan Rees.  The use of aliases to implement `syntax-rules' was
+invented by Alan Bawden (who prefers to call them "synthetic names"). 
+Much of this proposal is derived from an earlier proposal by Alan
+Bawden.
+
+
+File: slib.info,  Node: Syntax-Case Macros,  Prev: Syntactic Closures,  Up: Macro Implementations
+
+Syntax-Case Macros
+==================
+
+  `(require 'syntax-case)'
+
+  This is version 2.1 of `syntax-case', the low-level macro facility
+proposed and implemented by Robert Hieb and R. Kent Dybvig.
+
+  This version is further adapted by Harald Hanche-Olsen
+<hanche@imf.unit.no> to make it compatible with, and easily usable
+with, SLIB.  Mainly, these adaptations consisted of:
+
+   * Removing white space from `expand.pp' to save space in the
+     distribution.  This file is not meant for human readers anyway...
+
+   * Removed a couple of Chez scheme dependencies.
+
+   * Renamed global variables used to minimize the possibility of name
+     conflicts.
+
+   * Adding an SLIB-specific initialization file.
+
+   * Removing a couple extra files, most notably the documentation (but
+     see below).
+
+  If you wish, you can see exactly what changes were done by reading the
+shell script in the file `syncase.sh'.
+
+  The two PostScript files were omitted in order to not burden the SLIB
+distribution with them.  If you do intend to use `syntax-case',
+however, you should get these files and print them out on a PostScript
+printer.  They are available with the original `syntax-case'
+distribution by anonymous FTP in
+`cs.indiana.edu:/pub/scheme/syntax-case'.
+
+  To load syntax-case, execute:
+     (require 'syntax-case)
+     (require 'repl)
+     (repl:top-level macro:eval)
+
+  To check your sanity, run
+     (syncase:sanity-check)
+
+  Beware that `syntax-case' takes a long time to load -- about 20s on a
+SPARCstation SLC (with SCM) and about 90s on a Macintosh SE/30 (with
+Gambit).
+
+Notes
+-----
+
+  All R4RS syntactic forms are defined, including `delay'.  Along with
+`delay' are simple definitions for `make-promise' (into which `delay'
+expressions expand) and `force'.
+
+  `syntax-rules' and `with-syntax' (described in TR356) are defined.
+
+  `syntax-case' is actually defined as a macro that expands into calls
+to the procedure `syntax-dispatch' and the core form `syntax-lambda';
+do not redefine these names.
+
+  Several other top-level bindings not documented in TR356 are created:
+   * the "hooks" in `hooks.ss'
+
+   * the `build-' procedures in `output.ss'
+
+   * `expand-syntax' (the expander)
+
+  The syntax of define has been extended to allow `(define ID)', which
+assigns ID to some unspecified value.
+
+  We have attempted to maintain R4RS compatibility where possible.  The
+incompatibilities should be confined to `hooks.ss'.  Please let us know
+if there is some incompatibility that is not flagged as such.
+
+  Send bug reports, comments, suggestions, and questions to Kent Dybvig
+(dyb@iuvax.cs.indiana.edu).
+
+
+File: slib.info,  Node: Procedures,  Next: Standards Support,  Prev: Macro Implementations,  Up: Top
+
+Procedures
+**********
+
+  Anything that doesn't fall neatly into any of the other categories
+winds up here.
+
+* Menu:
+
+* Bit-Twiddling::               'logical
+* Common List Functions::       'common-list-functions
+* Format::                      'format
+* Generic-Write::               'generic-write
+* Line I/O::                    'line-i/o
+* Modular Arithmetic::          'modular
+* Multi-Processing::            'process
+* Object-To-String::            'object->string
+* Plotting::                    'charplot
+* Pretty-Print::                'pretty-print, 'pprint-file
+* Prime Factorization::         'prime
+* Random Numbers::              'random
+* Sorting::                     'sort
+* Standard I/O::                'stdio
+* String-Case::                 'string-case
+* String Ports::                'string-port
+* Tektronix Graphics Support::
+* Tree Operations::              'trees
+
+
+File: slib.info,  Node: Bit-Twiddling,  Next: Common List Functions,  Prev: Procedures,  Up: Procedures
+
+Bit-Twiddling
+=============
+
+  `(require 'logical)'
+
+  The bit-twiddling functions are made available through the use of the
+`logical' package.  `logical' is loaded by inserting `(require
+'logical)' before the code that uses these functions.
+
+ -- Function: logand N1 N1
+     Returns the integer which is the bit-wise AND of the two integer
+     arguments.
+
+     Example:
+          (number->string (logand #b011 #b100) 2)
+             => "0"
+          (number->string (logand #b10111 #b01101) 2)
+             => "101"
+
+ -- Function: logior N1 N2
+     Returns the integer which is the bit-wise OR of the two integer
+     arguments.
+
+     Example:
+          (number->string (logior #b10101010 #b01010101) 2)
+             => "11111111"
+          (number->string (logior #b10000000 #b00000001) 2)
+             => "10000001"
+
+ -- Function: logxor N1 N2
+     Returns the integer which is the bit-wise XOR of the two integer
+     arguments.
+
+     Example:
+          (number->string (logxor #b10101010 #b01010101) 2)
+             => "11111111"
+          (number->string (logxor #b111 #b010) 2)
+             => "101"
+
+ -- Function: lognot N
+     Returns the integer which is the 2s-complement of the integer
+     argument.
+
+     Example:
+          (number->string (lognot #b10000000) 2)
+             => "-10000001"
+          (number->string (lognot #b0) 2)
+             => "-1"
+
+ -- Function: ash INT COUNT
+     Returns an integer equivalent to `(inexact->exact (floor (* INT
+     (expt 2 COUNT))))'.
+
+     Example:
+          (number->string (ash #b1 3) 2)
+             => "1000"
+          (number->string (ash #b1010 -1) 2)
+             => "101"
+
+ -- Function: logcount N
+     Returns the number of bits in integer N.  If integer is positive,
+     the 1-bits in its binary representation are counted.  If negative,
+     the 0-bits in its two's-complement binary representation are
+     counted.  If 0, 0 is returned.
+
+     Example:
+          (logcount #b10101010)
+             => 4
+          (logcount 0)
+             => 0
+          (logcount -2)
+             => 1
+
+ -- Function: integer-length N
+     Returns the number of bits neccessary to represent N.
+
+     Example:
+          (integer-length #b10101010)
+             => 8
+          (integer-length 0)
+             => 0
+          (integer-length #b1111)
+             => 4
+
+ -- Function: integer-expt N K
+     Returns N raised to the non-negative integer exponent K.
+
+     Example:
+          (integer-expt 2 5)
+             => 32
+          (integer-expt -3 3)
+             => -27
+
+ -- Function: bit-extract N START END
+     Returns the integer composed of the START (inclusive) through END
+     (exclusive) bits of N.  The STARTth bit becomes the 0-th bit in
+     the result.
+
+     Example:
+          (number->string (bit-extract #b10101010 0 4) 2)
+             => "1010"
+          (number->string (bit-extract #b11111111 4 9) 2)
+             => "1111"
+
+
+File: slib.info,  Node: Common List Functions,  Next: Format,  Prev: Bit-Twiddling,  Up: Procedures
+
+Common List Functions
+=====================
+
+  `(require 'common-list-functions)'
+
+  The procedures below follow the Common LISP equivalents apart from
+optional arguments in some cases.
+
+* Menu:
+
+* List construction::
+* Lists as sets::
+* Lists as sequences::
+* Destructive list operations::
+* Non-Common LISP functions::
+
+
+File: slib.info,  Node: List construction,  Next: Lists as sets,  Prev: Common List Functions,  Up: Common List Functions
+
+List construction
+-----------------
+
+ -- Function: identity X
+     IDENTITY returns its argument.  (This probably shouldn't be in the
+     "list construction" section, since it doesn't construct anything,
+     but this is the section that makes the most sense.)
+
+     Example:
+          (identity 3)
+             => 3
+          (identity '(foo bar))
+             => (foo bar)
+          (map identity LST)
+             == (copy-list LST)
+
+ -- Function: make-list K . INIT
+     `make-list' creates and returns a list of K elements.  If INIT is
+     included, all elements in the list are initialized to INIT.
+
+     Example:
+          (make-list 3)
+             => (#<unspecified> #<unspecified> #<unspecified>)
+          (make-list 5 'foo)
+             => (foo foo foo foo foo)
+
+ -- Function: list* X . Y
+     Works like `list' except that the cdr of the last pair is the last
+     argument unless there is only one argument, when the result is
+     just that argument.  Sometimes called `cons*'.  E.g.:
+          (list* 1)
+             => 1
+          (list* 1 2 3)
+             => (1 2 . 3)
+          (list* 1 2 '(3 4))
+             => (1 2 3 4)
+          (list* ARGS '())
+             == (list ARGS)
+
+ -- Function: copy-list LST
+     `copy-list' makes a copy of LST using new pairs and returns it.
+     Only the top level of the list is copied, i.e., pairs forming
+     elements of the copied list remain `eq?' to the corresponding
+     elements of the original; the copy is, however, not `eq?' to the
+     original, but is `equal?' to it.
+
+     Example:
+          (copy-list '(foo foo foo))
+             => (foo foo foo)
+          (define q '(foo bar baz bang))
+          (define p q)
+          (eq? p q)
+             => #t
+          (define r (copy-list q))
+          (eq? q r)
+             => #f
+          (equal? q r)
+             => #t
+          (define bar '(bar))
+          (eq? bar (car (copy-list (list bar 'foo))))
+          => #t
+
+
+File: slib.info,  Node: Lists as sets,  Next: Lists as sequences,  Prev: List construction,  Up: Common List Functions
+
+Lists as sets
+-------------
+
+  `eq?' is used to test for membership by all the procedures below
+which treat lists as sets.
+
+ -- Function: adjoin E L
+     `adjoin' returns the adjoint of the element E and the list L. 
+     That is, if E is in L, `adjoin' returns L, otherwise, it returns
+     `(cons E L)'.
+
+     Example:
+          (adjoin 'baz '(bar baz bang))
+             => (bar baz bang)
+          (adjoin 'foo '(bar baz bang))
+             => (foo bar baz bang)
+
+ -- Function: union L1 L2
+     `union' returns the combination of L1 and L2 with duplicates
+     removed.
+
+     Example:
+          (union '(1 2 3 4) '(5 6 7 8))
+             => (4 3 2 1 5 6 7 8)
+          (union '(1 2 2 1) '(3 4 1 8))
+             => (2 3 4 1 8)
+
+ -- Function: intersection L1 L2
+     `intersection' returns all elements that are in both L1 and L2.
+
+     Example:
+          (intersection '(1 2 3 4) '(3 4 5 6))
+             => (3 4)
+          (intersection '(1 2 3 4) '(5 6 7 8))
+             => ()
+
+ -- Function: set-difference L1 L2
+     `set-difference' returns the union of all elements that are in L1
+     but not in L2.
+
+     Example:
+          (set-difference '(1 2 3 4) '(3 4 5 6))
+             => (1 2)
+          (set-difference '(1 2 3 4) '(1 2 3 4 5 6))
+             => ()
+
+ -- Function: member-if PRED LST
+     `member-if' returns LST if `(PRED ELEMENT)' is `#t' for any
+     ELEMENT in LST.  Returns `#f' if PRED does not apply to any
+     ELEMENT in LST.
+
+     Example:
+          (member-if vector? '(1 2 3 4))
+             => #f
+          (member-if number? '(1 2 3 4))
+             => (1 2 3 4)
+
+ -- Function: some PRED LST . MORE-LSTS
+     PRED is a boolean function of as many arguments as there are list
+     arguments to `some' i.e., LST plus any optional arguments. PRED is
+     applied to successive elements of the list arguments in order. 
+     `some' returns `#t' as soon as one of these applications returns
+     `#t', and is `#f' if none returns `#t'.  All the lists should have
+     the same length.
+
+     Example:
+          (some odd? '(1 2 3 4))
+             => #t
+          
+          (some odd? '(2 4 6 8))
+             => #f
+          
+          (some > '(2 3) '(1 4))
+             => #f
+
+ -- Function: every PRED LST . MORE-LSTS
+     `every' is analogous to `some' except it returns `#t' if every
+     application of PRED is `#t' and `#f' otherwise.
+
+     Example:
+          (every even? '(1 2 3 4))
+             => #f
+          
+          (every even? '(2 4 6 8))
+             => #t
+          
+          (every > '(2 3) '(1 4))
+             => #f
+
+ -- Function: notany PRED . LST
+     `notany' is analogous to `some' but returns `#t' if no application
+     of PRED returns `#t' or `#f' as soon as any one does.
+
+ -- Function: notevery PRED . LST
+     `notevery' is analogous to `some' but returns `#t' as soon as an
+     application of PRED returns `#f', and `#f' otherwise.
+
+     Example:
+          (notevery even? '(1 2 3 4))
+             => #t
+          
+          (notevery even? '(2 4 6 8))
+             => #f
+
+ -- Function: find-if PRED LST
+     `find-if' searches for the first ELEMENT in LST such that `(PRED
+     ELEMENT)' returns `#t'.  If it finds any such ELEMENT in LST,
+     ELEMENT is returned. Otherwise, `#f' is returned.
+
+     Example:
+          (find-if number? '(foo 1 bar 2))
+             => 1
+          
+          (find-if number? '(foo bar baz bang))
+             => #f
+          
+          (find-if symbol? '(1 2 foo bar))
+             => foo
+
+ -- Function: remove ELT LST
+     `remove' removes all occurrences of ELT from LST using `eqv?' to
+     test for equality and returns everything that's left. N.B.: other
+     implementations (Chez, Scheme->C and T, at least) use `equal?' as
+     the equality test.
+
+     Example:
+          (remove 1 '(1 2 1 3 1 4 1 5))
+             => (2 3 4 5)
+          
+          (remove 'foo '(bar baz bang))
+             => (bar baz bang)
+
+ -- Function: remove-if PRED LST
+     `remove-if' removes all ELEMENTs from LST where `(PRED ELEMENT)'
+     is `#t' and returns everything that's left.
+
+     Example:
+          (remove-if number? '(1 2 3 4))
+             => ()
+          
+          (remove-if even? '(1 2 3 4 5 6 7 8))
+             => (1 3 5 7)
+
+ -- Function: remove-if-not PRED LST
+     `remove-if-not' removes all ELEMENTs from LST for which `(PRED
+     ELEMENT)' is `#f' and returns everything that's left.
+
+     Example:
+          (remove-if-not number? '(foo bar baz))
+             => ()
+          (remove-if-not odd? '(1 2 3 4 5 6 7 8))
+             => (1 3 5 7)
+
+
+File: slib.info,  Node: Lists as sequences,  Next: Destructive list operations,  Prev: Lists as sets,  Up: Common List Functions
+
+Lists as sequences
+------------------
+
+ -- Function: position OBJ LST
+     `position' returns the 0-based position of OBJ in LST, or `#f' if
+     OBJ does not occur in LST.
+
+     Example:
+          (position 'foo '(foo bar baz bang))
+             => 0
+          (position 'baz '(foo bar baz bang))
+             => 2
+          (position 'oops '(foo bar baz bang))
+             => #f
+
+ -- Function: reduce P LST
+     `reduce' combines all the elements of a sequence using a binary
+     operation (the combination is left-associative).  For example,
+     using `+', one can add up all the elements.  `reduce' allows you to
+     apply a function which accepts only two arguments to more than 2
+     objects.  Functional programmers usually refer to this as "foldl".
+     `collect:reduce' (*Note Collections::) provides a version of
+     `collect' generalized to collections.
+
+     Example:
+          (reduce + '(1 2 3 4))
+             => 10
+          (define (bad-sum . l) (reduce + l))
+          (bad-sum 1 2 3 4)
+             == (reduce + (1 2 3 4))
+             == (+ (+ (+ 1 2) 3) 4)
+          => 10
+          (bad-sum)
+             == (reduce + ())
+             => ()
+          (reduce string-append '("hello" "cruel" "world"))
+             == (string-append (string-append "hello" "cruel") "world")
+             => "hellocruelworld"
+          (reduce anything '())
+             => ()
+          (reduce anything '(x))
+             => x
+
+     What follows is a rather non-standard implementation of `reverse'
+     in terms of `reduce' and a combinator elsewhere called "C".
+
+          ;;; Contributed by Jussi Piitulainen (jpiitula@ling.helsinki.fi)
+          
+          (define commute
+            (lambda (f)
+              (lambda (x y)
+                (f y x))))
+          
+          (define reverse
+            (lambda (args)
+              (reduce-init (commute cons) args)))
+
+ -- Function: reduce-init P INIT LST
+     `reduce-init' is the same as reduce, except that it implicitly
+     inserts INIT at the start of the list.  `reduce-init' is preferred
+     if you want to handle the null list, the one-element, and lists
+     with two or more elements consistently.  It is common to use the
+     operator's idempotent as the initializer.  Functional programmers
+     usually call this "foldl".
+
+     Example:
+          (define (sum . l) (reduce-init + 0 l))
+          (sum 1 2 3 4)
+             == (reduce-init + 0 (1 2 3 4))
+             == (+ (+ (+ (+ 0 1) 2) 3) 4)
+             => 10
+          (sum)
+             == (reduce-init + 0 '())
+          => 0
+          
+          (reduce-init string-append "@" '("hello" "cruel" "world"))
+             == (string-append (string-append (string-append "@" "hello") "cruel") "world")
+             => "@hellocruelworld"
+
+     Given a differentiation of 2 arguments, `diff', the following will
+     differentiate by any number of variables.
+          (define (diff* exp . vars)
+            (reduce-init diff exp vars))
+
+     Example:
+          ;;; Real-world example:  Insertion sort using reduce-init.
+          
+          (define (insert l item)
+            (if (null? l)
+                (list item)
+                (if (< (car l) item)
+                    (cons (car l) (insert (cdr l) item))
+                    (cons item l))))
+          (define (insertion-sort l) (reduce-init insert '() l))
+          
+          (insertion-sort '(3 1 4 1 5)
+             == (reduce-init insert () (3 1 4 1 5))
+             == (insert (insert (insert (insert (insert () 3) 1) 4) 1) 5)
+             == (insert (insert (insert (insert (3)) 1) 4) 1) 5)
+             == (insert (insert (insert (1 3) 4) 1) 5)
+             == (insert (insert (1 3 4) 1) 5)
+             == (insert (1 1 3 4) 5)
+             => (1 1 3 4 5)
+
+ -- Function: butlast LST N
+     `butlast' returns all but the last N elements of LST.
+
+     Example:
+          (butlast '(1 2 3 4) 3)
+             => (1)
+          (butlast '(1 2 3 4) 4)
+             => ()
+
+ -- Function: nthcdr N LST
+     `nthcdr' takes N `cdr's of LST and returns the result.  Thus
+     `(nthcdr 3 LST)' == `(cdddr LST)'
+
+     Example:
+          (nthcdr 2 '(1 2 3 4))
+             => (3 4)
+          (nthcdr 0 '(1 2 3 4))
+             => (1 2 3 4)
+
+ -- Function: last LST N
+     `last' returns the last N elements of LST.  N must be a
+     non-negative integer.
+
+     Example:
+          (last '(foo bar baz bang) 2)
+             => (baz bang)
+          (last '(1 2 3) 0)
+             => 0
+
+
+File: slib.info,  Node: Destructive list operations,  Next: Non-Common LISP functions,  Prev: Lists as sequences,  Up: Common List Functions
+
+Destructive list operations
+---------------------------
+
+  These procedures may mutate the list they operate on, but any such
+mutation is undefined.
+
+ -- Procedure: nconc ARGS
+     `nconc' destructively concatenates its arguments.  (Compare this
+     with `append', which copies arguments rather than destroying them.)
+     Sometimes called `append!' (*Note Rev2 Procedures::).
+
+     Example:  You want to find the subsets of a set.  Here's the
+     obvious way:
+
+          (define (subsets set)
+            (if (null? set)
+                '(())
+                (append (mapcar (lambda (sub) (cons (car set) sub))
+                                (subsets (cdr set)))
+                        (subsets (cdr set)))))
+     But that does way more consing than you need.  Instead, you could
+     replace the `append' with `nconc', since you don't have any need
+     for all the intermediate results.
+
+     Example:
+          (define x '(a b c))
+          (define y '(d e f))
+          (nconc x y)
+             => (a b c d e f)
+          x
+             => (a b c d e f)
+
+     `nconc' is the same as `append!' in `sc2.scm'.
+
+ -- Procedure: nreverse LST
+     `nreverse' reverses the order of elements in LST by mutating
+     `cdr's of the list.  Sometimes called `reverse!'.
+
+     Example:
+          (define foo '(a b c))
+          (nreverse foo)
+             => (c b a)
+          foo
+             => (a)
+
+     Some people have been confused about how to use `nreverse',
+     thinking that it doesn't return a value.  It needs to be pointed
+     out that
+          (set! lst (nreverse lst))
+
+     is the proper usage, not
+          (nreverse lst)
+     The example should suffice to show why this is the case.
+
+ -- Procedure: delete ELT LST
+ -- Procedure: delete-if PRED LST
+     Destructive versions of `remove' and `remove-if', called `delete'
+     and `delete-if' in Common LISP.
+
+     Example:
+          (define lst '(foo bar baz bang))
+          (delete 'foo lst)
+             => (bar baz bang)
+          lst
+             => (foo bar baz bang)
+          
+          (define lst '(1 2 3 4 5 6 7 8 9))
+          (delete-if odd? lst)
+             => (2 4 6 8)
+          lst
+             => (1 2 4 6 8)
+
+     Some people have been confused about how to use `delete' or
+     `delete-if', thinking that they dont' return a value.  It needs to
+     be pointed out that
+          (set! lst (delete el lst))
+
+     is the proper usage, not
+          (delete el lst)
+     The examples should suffice to show why this is the case.
+
+
+File: slib.info,  Node: Non-Common LISP functions,  Prev: Destructive list operations,  Up: Common List Functions
+
+Non-Common LISP functions
+-------------------------
+
+ -- Function: and? . ARGS
+     `and?' checks to see if all its arguments are true.  If they are,
+     `and?' returns `#t', otherwise, `#f'.  (In contrast to `and', this
+     is a function, so all arguments are always evaluated and in an
+     unspecified order.)
+
+     Example:
+          (and? 1 2 3)
+             => #t
+          (and #f 1 2)
+             => #f
+
+ -- Function: or? . ARGS
+     `or?' checks to see if any of its arguments are true.  If any is
+     true, `or?' returns `#t', and `#f' otherwise.  (To `or' as `and?'
+     is to `and'.)
+
+     Example:
+          (or? 1 2 #f)
+             => #t
+          (or? #f #f #f)
+             => #f
+
+ -- Function: atom? OBJECT
+     Returns `#t' if OBJECT is not a pair and `#f' if it is pair. 
+     (Called `atom' in Common LISP.)
+          (atom? 1)
+             => #t
+          (atom? '(1 2))
+             => #f
+          (atom? #(1 2))   ; dubious!
+             => #t
+
+
+File: slib.info,  Node: Format,  Next: Generic-Write,  Prev: Common List Functions,  Up: Procedures
+
+Format
+======
+
+  `(require 'format)'
+
+Format Interface
+----------------
+
+ -- Function: format DESTINATION FORMAT-STRING . ARGUMENTS
+     An almost complete implementation of Common LISP format description
+     according to the CL reference book `Common LISP' from Guy L.
+     Steele, Digital Press.  Backward compatible to most of the
+     available Scheme format implementations.
+
+     Returns `#t', `#f' or a string; has side effect of printing
+     according to FORMAT-STRING.  If DESTINATION is `#t', the output is
+     to the current output port and `#t' is returned.  If DESTINATION
+     is `#f', a formatted string is returned as the result of the call.
+      If DESTINATION is a string, the output is appended to that string
+     by string-append (note that this returns a newly-allocated
+     string).  Otherwise DESTINATION must be an output port and `#t' is
+     returned.
+
+     FORMAT-STRING must be a string. In case of a formatting error
+     format returns `#f' and prints a message on the current output
+     port.  Characters are output as if the string were output by the
+     `display' function with the exception of those prefixed by a tilde
+     (`~').  For a detailed description of the FORMAT-STRING syntax
+     please consult a Common LISP format reference manual.  For a quick
+     overview of implemented, not supported and extended control
+     properties of FORMAT-STRING, see the previous section. For a test
+     suite to verify this format implementation load `formatst.scm'.
+
+     FORMAT checks if the scheme interpreter supports flonums and loads
+     `formatfl.scm' with `(require 'formatfl)' accordingly.  The
+     request for floating point formatting can be disabled by setting
+     the variable FORMAT:FLOATS to `#f' in `format.scm'.
+
+Format Specification (Format version 2.3)
+-----------------------------------------
+
+  Please consult a Common LISP format reference manual for a detailed
+description of the format string syntax.  For a demonstration of the
+implemented directives see `formatst.scm'.
+
+  This implementation supports directive parameters and modifiers (`:'
+and `@' characters). Multiple parameters must be separated by a `,'. 
+Parameters can be numerical parameters (positive or negative),
+character parameters (prefixed by a quote character), variable
+parameters (`v'), number of rest arguments parameter (`#'), empty and
+default parameters.  Directive characters are case independent. The
+general form of a directive is:
+
+DIRECTIVE ::= ~{DIRECTIVE-PARAMETER,}[:][@]DIRECTIVE-CHARACTER
+
+DIRECTIVE-PARAMETER ::= [ [-|+]{0-9}+ | 'CHARACTER | v | # ]
+
+Implemented Control Directives
+..............................
+
+  Documentation syntax: Uppercase characters represent the corresponding
+control directive characters. Lowercase characters represent control
+directive parameter descriptions.
+
+`~A'
+     ASCII (print as `display' does).
+    ~@A
+          left pad.
+
+    ~MINCOL,COLINC,MINPAD,PADCHARA
+          padding (COLINC is not supported).
+
+`~S'
+     S-expression (print as `write' does).
+    ~@S
+          left pad.
+
+    ~MINCOL,COLINC,MINPAD,PADCHARS
+          padding (COLINC is not supported).
+
+`~D'
+     Decimal.
+    ~@D
+          print number sign.
+
+    ~:D
+          print comma separated.
+
+    ~MINCOL,PADCHAR,COMMACHARD
+          padding.
+
+`~X'
+     Hexadecimal.
+    ~@X
+          print number sign.
+
+    ~:X
+          print comma separated.
+
+    ~MINCOL,PADCHAR,COMMACHARX
+          padding.
+
+`~O'
+     Octal.
+    ~@O
+          print number sign.
+
+    ~:O
+          print comma separated.
+
+    ~MINCOL,PADCHAR,COMMACHARO
+          padding.
+
+`~B'
+     Binary.
+    ~@B
+          print number sign.
+
+    ~:B
+          print comma separated.
+
+    ~MINCOL,PADCHAR,COMMACHARB
+          padding.
+
+`~NR'
+     Radix (prints number to radix N).
+    ~N@R
+          print number sign.
+
+    ~:B
+          print comma separated.
+
+    ~N,MINCOL,PADCHAR,COMMACHARR
+          padding.
+
+`~P'
+     Plural.
+    ~@P
+          prints `y' and `ies'.
+
+    ~:P
+          as ~P but jumps 1 argument backward.
+
+    ~:@P
+          as ~@P but jumps 1 argument backward.
+
+`~C'
+     Character.
+    ~@C
+          print as `write' does.
+
+`~F'
+     Fixed-format floating-point (prints a flonum like MMMNNN).
+    ~WIDTH,DIGITS,SCALE,OVERFLOWCHAR,PADCHARF
+    ~...@F
+          If the number is positive a plus sign is printed.
+
+`~E'
+     Exponential floating-point (prints a flonum like MMM.NNNEEE).
+    ~WIDTH,DIGITS,EXPONENTDIGITS,SCALE,OVERFLOWCHAR,PADCHAR,EXPONENTCHARE
+    ~...@E
+          If the number is positive a plus sign is printed.
+
+`~G'
+     General floating-point (prints a flonum either fixed or
+     exponential).
+    ~WIDTH,DIGITS,EXPONENTDIGITS,SCALE,OVERFLOWCHAR,PADCHAR,EXPONENTCHARG
+    ~...@G
+          If the number is positive a plus sign is printed.
+
+`~$'
+     Dollars floating-point (prints a flonum in fixed with signs
+     separated).
+    ~DIGITS,SCALE,WIDTH,PADCHAR$
+    ~...@$
+          If the number is positive a plus sign is printed.
+
+    ~...:@$
+          A sign is always printed and appears before the padding.
+
+    ~...:$
+          The sign appears before the padding.
+
+`~%'
+     Newline.
+    ~N%
+          prints N newlines.
+
+`~|'
+     Page Separator.
+
+`~N|'
+     prints N page separators.
+
+`~~'
+     Tilde.
+
+`~N~'
+     prints N tildes.
+
+`~#\newline'
+     Continuation Line (#\newline stands for a newline character).
+    ~:#\newline
+          newline is ignored, white space left.
+
+    ~@#\newline
+          newline is left, white space ignored.
+
+`~T'
+     Tabulator.
+    ~NT
+          prints N tabs.
+
+`~?'
+     Indirection (expects indirect arguments as a list).
+    ~@?
+          extracts indirect arguments from format arguments.
+
+`~(STR~)'
+     Case conversion (converts by `string-downcase').
+    ~:(STR~)
+          converts by `string-capitalize'.
+
+    ~@(STR~)
+          converts by `string-capitalize-first'.
+
+    ~:@(STR~)
+          converts by `string-upcase'.
+
+`~*'
+     Argument Jumping (jumps 1 argument forward).
+    ~N*
+          jumps N arguments forward.
+
+    ~:*
+          jumps 1 argument backward.
+
+    ~N:*
+          jumps N arguments backward.
+
+    ~@*
+          jumps to the 0th argument.
+
+    ~N@*
+          jumps to the Nth argument (beginning from 0)
+
+`~[STR0~;STR1~;...~;STRN~]'
+     Conditional Expression (numerical clause conditional).
+    ~N[
+          take argument from N.
+
+    ~@[
+          true test conditional.
+
+    ~:[
+          if-else-then conditional.
+
+    ~;
+          clause separator.
+
+    ~:;
+          default clause follows.
+
+`~{STR~}'
+     Iteration (args come from the next argument (a list)).
+    ~N{
+          at most N iterations.
+
+    ~:{
+          args from next arg (a list of lists).
+
+    ~@{
+          args from the rest of arguments.
+
+    ~:@{
+          args from the rest args (lists).
+
+`~^'
+     Up and out.
+    ~N^
+          aborts if N = 0
+
+    ~N,M^
+          aborts if N = M
+
+    ~N,M,K^
+          aborts if N <= M <= K
+
+Not Implemented Control Directives
+..................................
+
+`~:A'
+     (another meaning in SLIB format; see below)
+
+`~:S'
+     (another meaning in SLIB format; see below)
+
+`~R'
+`~&'
+`~@T'
+`~COLNUM,COLINCT'
+`~<~>'
+`~:^'
+     (what is the `entire' iteration process?)
+
+Extended, Replaced and Added Control Directives
+...............................................
+
+`~MINCOL,PADCHAR,COMMACHAR,COMMAWIDTHD'
+`~MINCOL,PADCHAR,COMMACHAR,COMMAWIDTHX'
+`~MINCOL,PADCHAR,COMMACHAR,COMMAWIDTHO'
+`~MINCOL,PADCHAR,COMMACHAR,COMMAWIDTHB'
+`~N,MINCOL,PADCHAR,COMMACHAR,COMMAWIDTHR'
+     COMMAWIDTH is the number of characters between two comma
+     characters.
+
+`~-MINCOL,COLINC,MINPAD,PADCHARA'
+`~-MINCOL,COLINC,MINPAD,PADCHARS'
+`~-MINCOL,PADCHAR,COMMACHAR,COMMAWIDTHD'
+`~-MINCOL,PADCHAR,COMMACHAR,COMMAWIDTHX'
+`~-MINCOL,PADCHAR,COMMACHAR,COMMAWIDTHO'
+`~-MINCOL,PADCHAR,COMMACHAR,COMMAWIDTHB'
+`~N,-MINCOL,PADCHAR,COMMACHAR,COMMAWIDTHR'
+     A negative field width specified by MINCOL forces a field
+     truncation to MINCOL characters. If the printed object exceeds the
+     field width a `>' or a `<' character is added according to the
+     padding direction.
+
+`~Y'
+     Pretty print formatting of an argument for scheme code lists. 
+     (Works only on `(current-output-port)'.)
+
+`~&'
+     Same as ~%.
+
+`~K'
+     Same as ~?.
+
+`~!'
+     Flushes the output if format destination is a port.
+
+`~_'
+     Prints a `#\space' character
+
+`~N_'
+     prints N `#\space' characters.
+
+`~NC'
+     Takes N as an integer representation for a character. No arguments
+     are consumed. N is converted to a character by `integer->char'.  N
+     must be a positive decimal number.
+
+`:S'
+     Print out readproof.  Prints out `#<...>' as strings `"#<...>"' so
+     that the output can always be processed by `read'.
+
+`:A'
+     Print out readproof.  Prints out `#<...>' as strings `"#<...>"' so
+     that the output can always be processed by `read'.
+
+Compatibility With Other `format' Implementations
+.................................................
+
+SLIB format 2.x:
+     See `format.scm'.
+
+SLIB format 1.4:
+     Downward compatible except for padding support and `~A', `~S',
+     `~P', `~X' uppercase printing.  SLIB format 1.4 uses C-style
+     `printf' padding support which is completely replaced by the CL
+     `format' padding style.
+
+MIT C-Scheme 7.1:
+     Downward compatible except for `~', which is not documented
+     (ignores all characters inside the format string up to a newline
+     character).  (7.1 implements `~a', `~s', `~NEWLINE', `~~', `~%',
+     numerical and variable parameters and `:/@' modifiers in the CL
+     sense).
+
+Elk 1.5/2.0:
+     Downward compatible except for `~A' and `~S' which print in
+     uppercase.  (Elk implements `~a', `~s', `~~', and `~%' (no
+     directive parameters or modifiers)).
+
+Scheme->C 01nov91:
+     Downward compatible except for an optional destination parameter:
+     S2C accepts a format call without a destination which returns a
+     formatted string. This is equivalent to a #f destination in S2C.
+     (S2C implements `~a', `~s', `~c', `~%', and `~~' (no directive
+     parameters or modifiers)).
+
+  SLIB format may be used apart from the SLIB context. In this case you
+have to modify the implementation dependent code marked at the beginning
+of `format.scm'.
+
+

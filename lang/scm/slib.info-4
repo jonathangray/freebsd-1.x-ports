@@ -1,0 +1,438 @@
+This is Info file slib.info, produced by Makeinfo-1.49 from the input
+file slib.texi.
+
+  This file documents SLIB, the portable Scheme library.
+
+  Copyright (C) 1993 Todd R. Eigenschink
+
+  Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+  Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided that the
+entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+
+  Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions, except that this permission notice may be stated in a
+translation approved by the author.
+
+
+File: slib.info,  Node: Yasos examples,  Prev: Setters,  Up: Yasos
+
+Examples
+--------
+
+     (define-operation (print obj port)
+       (format port
+               (if (instance? obj) "#<instance>" "~s")
+     	  obj))
+     
+     (define-operation (SIZE obj)
+       (cond
+        ((vector? obj) (vector-length obj))
+        ((list?   obj) (length obj))
+        ((pair?   obj) 2)
+        ((string? obj) (string-length obj))
+        ((char?   obj) 1)
+        (else
+         (error "Operation not supported: size" obj))))
+     
+     (define-predicate cell?)
+     (define-operation (fetch obj))
+     (define-operation (store! obj newValue))
+     
+     (define (make-cell value)
+       (object
+        ((cell? self) #t)
+        ((fetch self) value)
+        ((store! self newValue)
+         (set! value newValue)
+         newValue)
+        ((size self) 1)
+        ((print self port)
+         (format port "#<Cell: ~s>" (fetch self)))))
+     
+     (define-operation (discard obj value)
+       (format #t "Discarding ~s~%" value))
+     
+     (define (make-filtered-cell value filter)
+       (object-with-ancestors ((cell (make-cell value)))
+     			 ((store! self newValue)
+     			  (if (filter newValue)
+     			      (store! cell newValue)
+     			      (discard self newValue)))))
+     
+     (define-predicate array?)
+     (define-operation (array-ref array index))
+     (define-operation (array-set! array index value))
+     
+     (define (make-array num-slots)
+       (let ((anArray (make-vector num-slots)))
+         (object
+          ((array? self) #t)
+          ((size self) num-slots)
+          ((array-ref self index)           (vector-ref  anArray index))
+          ((array-set! self index newValue) (vector-set! anArray index newValue))
+          ((print self port) (format port "#<Array ~s>" (size self))))))
+     
+     (define-operation (position obj))
+     (define-operation (discarded-value obj))
+     
+     (define (make-cell-with-history value filter size)
+       (let ((pos 0) (most-recent-discard #f))
+         (object-with-ancestors
+          ((cell (make-filtered-call value filter))
+           (sequence (make-array size)))
+          ((array? self) #f)
+          ((position self) pos)
+          ((store! self newValue)
+           (operate-as cell store! self newValue)
+           (array-set! self pos newValue)
+           (set! pos (+ pos 1)))
+          ((discard self value)
+           (set! most-recent-discard value))
+          ((discarded-value self) most-recent-discard)
+          ((print self port)
+           (format port "#<Cell-with-history ~s>" (fetch self))))))
+     
+     (define-access-operation fetch)
+     (add-setter fetch store!)
+     (define foo (make-cell 1))
+     (print foo #f)
+     => "#<Cell: 1>"
+     (set (fetch foo) 2)
+     =>
+     (print foo #f)
+     => "#<Cell: 2>"
+     (fetch foo)
+     => 2
+
+
+File: slib.info,  Node: Procedure and Macro Index,  Next: Variable Index,  Prev: Syntax Extensions,  Up: Top
+
+Procedure and Macro Index
+*************************
+
+  This is an alphabetical list of all the procedures and macros in SLIB.
+
+* Menu:
+
+* -:                                    Multi-argument / and -.
+* -1+:                                  Rev2 Procedures.
+* /:                                    Multi-argument / and -.
+* 1+:                                   Rev2 Procedures.
+* <=?:                                  Rev2 Procedures.
+* <?:                                   Rev2 Procedures.
+* =?:                                   Rev2 Procedures.
+* >=?:                                  Rev2 Procedures.
+* >?:                                   Rev2 Procedures.
+* add-process!:                         Multi-Processing.
+* add-setter:                           Setters.
+* adjoin:                               Lists as sets.
+* alist-associator:                     Association Lists.
+* alist-inquirer:                       Association Lists.
+* alist-remover:                        Association Lists.
+* and?:                                 Non-Common LISP functions.
+* any?:                                 Collections.
+* append!:                              Rev2 Procedures.
+* apply:                                Multi-argument Apply.
+* array-1d-ref:                         Arrays.
+* array-1d-set!:                        Arrays.
+* array-2d-ref:                         Arrays.
+* array-2d-set!:                        Arrays.
+* array-3d-ref:                         Arrays.
+* array-3d-set!:                        Arrays.
+* array-ref:                            Arrays.
+* array-set!:                           Arrays.
+* array-shape:                          Arrays.
+* array?:                               Arrays.
+* ash:                                  Bit-Twiddling.
+* atom?:                                Non-Common LISP functions.
+* bit-extract:                          Bit-Twiddling.
+* butlast:                              Lists as sequences.
+* call-with-dynamic-binding:            Dynamic Data Type.
+* call-with-input-string:               String Ports.
+* call-with-output-string:              String Ports.
+* call-with-values:                     Values.
+* capture-syntactic-environment:        Syntactic Closures.
+* collection?:                          Collections.
+* copy-list:                            List construction.
+* copy-tree:                            Tree Operations.
+* current-error-port:                   System.
+* define-access-operation:              Setters.
+* define-operation:                     Yasos interface.
+* define-predicate:                     Yasos interface.
+* define-record:                        Structures.
+* defmacro:eval:                        Defmacro.
+* defmacro:load:                        Defmacro.
+* defmacro:macroexpand*:                Defmacro.
+* delete:                               Destructive list operations.
+* delete-file:                          System.
+* delete-if:                            Destructive list operations.
+* dequeue!:                             Queues.
+* do-elts:                              Collections.
+* do-keys:                              Collections.
+* dynamic-ref:                          Dynamic Data Type.
+* dynamic-set!:                         Dynamic Data Type.
+* dynamic-wind:                         Dynamic-Wind.
+* dynamic?:                             Dynamic Data Type.
+* empty?:                               Collections.
+* enquque!:                             Queues.
+* every:                                Lists as sets.
+* every?:                               Collections.
+* extended-euclid:                      Modular Arithmetic.
+* factor:                               Prime Factorization.
+* file-exists?:                         System.
+* find-if:                              Lists as sets.
+* fluit-let:                            Fluid-Let.
+* for-each-elt:                         Collections.
+* for-each-key:                         Collections.
+* force-output:                         System.
+* force-output:                         System.
+* format:                               Format.
+* fprintf:                              Standard I/O.
+* generic-write:                        Generic-Write.
+* gentemp:                              Defmacro.
+* hash:                                 Hashing.
+* hash-associator:                      Hash Tables.
+* hash-inquirer:                        Hash Tables.
+* hash-remover:                         Hash Tables.
+* hashq:                                Hashing.
+* hashv:                                Hashing.
+* heap-extract-max:                     Priority Queues.
+* heap-insert:                          Priority Queues.
+* identifier=?:                         Syntactic Closures.
+* identifier?:                          Syntactic Closures.
+* identity:                             List construction.
+* implementation-vicinity:              Vicinity.
+* in-vicinity:                          Vicinity.
+* in-vicinity:                          Vicinity.
+* integer-expt:                         Bit-Twiddling.
+* integer-length:                       Bit-Twiddling.
+* intersection:                         Lists as sets.
+* jacobi-symbol:                        Prime Factorization.
+* kill-process!:                        Multi-Processing.
+* last:                                 Lists as sequences.
+* last-pair:                            Rev3 Procedures.
+* library-vicinity:                     Vicinity.
+* list*:                                List construction.
+* list->string:                         Rev4 Optional Procedures.
+* list->vector:                         Rev4 Optional Procedures.
+* list-ref:                             Collections.
+* list-tail:                            Rev4 Optional Procedures.
+* logand:                               Bit-Twiddling.
+* logcount:                             Bit-Twiddling.
+* logior:                               Bit-Twiddling.
+* lognot:                               Bit-Twiddling.
+* logxor:                               Bit-Twiddling.
+* macro:eval:                           Syntactic Closures.
+* macro:expand:                         Syntactic Closures.
+* macro:load:                           Syntactic Closures.
+* make-array:                           Arrays.
+* make-dynamic:                         Dynamic Data Type.
+* make-hash-table:                      Hash Tables.
+* make-heap:                            Priority Queues.
+* make-list:                            List construction.
+* make-promise:                         Promises.
+* make-queue:                           Queues.
+* make-random-state:                    Random Numbers.
+* make-random-state:                    Random Numbers.
+* make-rb-node:                         Red-Black Trees.
+* make-rb-tree:                         Red-Black Trees.
+* make-record-sub-type:                 Records.
+* make-record-type:                     Records.
+* make-shared-array:                    Arrays.
+* make-syntactic-closure:               Syntactic Closures.
+* make-vicinity:                        Vicinity.
+* map-elts:                             Collections.
+* map-keys:                             Collections.
+* member-if:                            Lists as sets.
+* merge:                                Sorting.
+* merge!:                               Sorting.
+* modular::                             Modular Arithmetic.
+* modular:*:                            Modular Arithmetic.
+* modular:+:                            Modular Arithmetic.
+* modular:expt:                         Modular Arithmetic.
+* modular:invert:                       Modular Arithmetic.
+* modular:negate:                       Modular Arithmetic.
+* nconc:                                Destructive list operations.
+* notany:                               Lists as sets.
+* notevery:                             Lists as sets.
+* nreverse:                             Destructive list operations.
+* nthcdr:                               Lists as sequences.
+* object:                               Yasos interface.
+* object->string:                       Object-To-String.
+* object-with-ancestors:                Yasos interface.
+* operate-as:                           Yasos interface.
+* or?:                                  Non-Common LISP functions.
+* output-port-width:                    System.
+* output-port-width:                    System.
+* plot!:                                Plotting.
+* position:                             Lists as sequences.
+* pprint-file:                          Pretty-Print.
+* pprint-file:                          Pretty-Print.
+* predicate->asso:                      Association Lists.
+* predicate->hash:                      Hashing.
+* predicate->hash-asso:                 Hash Tables.
+* pretty-print:                         Pretty-Print.
+* pretty-print:                         Pretty-Print.
+* prime:trials:                         Prime Factorization.
+* prime?:                               Prime Factorization.
+* print:                                Debug.
+* print:                                Yasos interface.
+* printf:                               Standard I/O.
+* process:schedule!:                    Multi-Processing.
+* program-vicinity:                     Vicinity.
+* provide:                              Require.
+* provided?:                            Require.
+* qp:                                   Debug.
+* qpn:                                  Debug.
+* qpr:                                  Debug.
+* queue-empty?:                         Queues.
+* queue-front:                          Queues.
+* queue-pop!:                           Queues.
+* queue-push!:                          Queues.
+* queue-rear:                           Queues.
+* queue?:                               Queues.
+* random:                               Random Numbers.
+* random:                               Random Numbers.
+* random:exp:                           Random Numbers.
+* random:exp:                           Random Numbers.
+* random:hollow-sphere!:                Random Numbers.
+* random:hollow-sphere!:                Random Numbers.
+* random:normal:                        Random Numbers.
+* random:normal:                        Random Numbers.
+* random:normal-vector!:                Random Numbers.
+* random:normal-vector!:                Random Numbers.
+* random:solid-sphere!:                 Random Numbers.
+* random:solid-sphere!:                 Random Numbers.
+* random:uniform:                       Random Numbers.
+* rationalize:                          Rationalize.
+* rb-delete!:                           Red-Black Trees.
+* rb-insert!:                           Red-Black Trees.
+* rb-node-maximum:                      Red-Black Trees.
+* rb-node-minimum:                      Red-Black Trees.
+* rb-node-predecessor:                  Red-Black Trees.
+* rb-node-successor:                    Red-Black Trees.
+* rb-tree-maximum:                      Red-Black Trees.
+* rb-tree-minimum:                      Red-Black Trees.
+* read-line:                            Line I/O.
+* read-line:                            Line I/O.
+* read-line!:                           Line I/O.
+* read-line!:                           Line I/O.
+* record-accessor:                      Records.
+* record-constructor:                   Records.
+* record-modifier:                      Records.
+* record-predicate:                     Records.
+* record-sub-predicate:                 Records.
+* record-type-descriptor:               Records.
+* record-type-field-names:              Records.
+* record-type-name:                     Records.
+* record?:                              Records.
+* reduce:                               Lists as sequences.
+* reduce:                               Collections.
+* reduce-init:                          Lists as sequences.
+* remove:                               Lists as sets.
+* remove-if:                            Lists as sets.
+* remove-if-not:                        Lists as sets.
+* remove-setter-for:                    Setters.
+* repl:quit:                            Repl.
+* repl:top-level:                       Repl.
+* require:                              Require.
+* require:feature->path:                Require.
+* scheme-file-suffix:                   Vicinity.
+* set:                                  Setters.
+* set-difference:                       Lists as sets.
+* setter:                               Setters.
+* size:                                 Collections.
+* size:                                 Yasos interface.
+* slib:error:                           System.
+* slib:eval:                            System.
+* some:                                 Lists as sets.
+* sort:                                 Sorting.
+* sort!:                                Sorting.
+* sorted?:                              Sorting.
+* sprintf:                              Standard I/O.
+* string:                               Line I/O.
+* string:                               Line I/O.
+* string->list:                         Rev4 Optional Procedures.
+* string-capitalize:                    String-Case.
+* string-captialize!:                   String-Case.
+* string-copy:                          Rev4 Optional Procedures.
+* string-downcase:                      String-Case.
+* string-downcase!:                     String-Case.
+* string-fill!:                         Rev4 Optional Procedures.
+* string-null?:                         Rev2 Procedures.
+* string-upcase:                        String-Case.
+* string-upcase!:                       String-Case.
+* sub-vicinity:                         Vicinity.
+* subst:                                Tree Operations.
+* substq:                               Tree Operations.
+* substring-fill!:                      Rev2 Procedures.
+* substring-move-left!:                 Rev2 Procedures.
+* substring-move-right!:                Rev2 Procedures.
+* substv:                               Tree Operations.
+* tek40:draw:                           Tektronix Graphics Support.
+* tek40:graphics:                       Tektronix Graphics Support.
+* tek40:init:                           Tektronix Graphics Support.
+* tek40:linetype:                       Tektronix Graphics Support.
+* tek40:move:                           Tektronix Graphics Support.
+* tek40:put-text:                       Tektronix Graphics Support.
+* tek40:reset:                          Tektronix Graphics Support.
+* tek40:text:                           Tektronix Graphics Support.
+* tek41:draw:                           Tektronix Graphics Support.
+* tek41:encode-int:                     Tektronix Graphics Support.
+* tek41:encode-x-y:                     Tektronix Graphics Support.
+* tek41:graphics:                       Tektronix Graphics Support.
+* tek41:init:                           Tektronix Graphics Support.
+* tek41:move:                           Tektronix Graphics Support.
+* tek41:point:                          Tektronix Graphics Support.
+* tek41:reset:                          Tektronix Graphics Support.
+* test:                                 Test.
+* tmpnam:                               System.
+* transcript-off:                       Transcripts.
+* transcript-on:                        Transcripts.
+* transformer:                          Syntactic Closures.
+* two-arg:-:                            Multi-argument / and -.
+* two-arg:/:                            Multi-argument / and -.
+* two-arg:apply:                        Multi-argument Apply.
+* union:                                Lists as sets.
+* user-vicinity:                        Vicinity.
+* values:                               Values.
+* variant-case:                         Structures.
+* vector->list:                         Rev4 Optional Procedures.
+* vector-fill!:                         Rev4 Optional Procedures.
+* with-input-from-file:                 With-File.
+* with-output-to-file:                  With-File.
+
+
+File: slib.info,  Node: Variable Index,  Prev: Procedure and Macro Index,  Up: Top
+
+Variable Index
+**************
+
+  This is an alphabetical list of all the global variables in SLIB.
+
+* Menu:
+
+* *catalog*:                            Require.
+* *features*:                           Require.
+* *modules*:                            Require.
+* *qp-width*:                           Debug.
+* *random-state*:                       Random Numbers.
+* char-code-limit:                      Constants.
+* charplot:cols:                        Plotting.
+* charplot:rows:                        Plotting.
+* most-positive-fixnum:                 Constants.
+* nil:                                  Rev3 Procedures.
+* slib:form-feed:                       Constants.
+* slib:tab:                             Constants.
+* stderr:                               Standard I/O.
+* stdin:                                Standard I/O.
+* stdout:                               Standard I/O.
+* t:                                    Rev3 Procedures.
+
+

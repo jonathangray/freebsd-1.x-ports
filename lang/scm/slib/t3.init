@@ -1,0 +1,327 @@
+;;;; Initialization file for SLIB for T3.1. -*- Scheme -*-
+;;; Copyright (C) 1991, 1992 David Carlton and Stephen Bevan, 1993 and
+;;; F. Javier Thayer.
+;;; File has T syntax, and should be compiled in standard-env.
+;;; Compiled file has .so suffix.
+;;; File (or compiled version) should be loaded into scheme-env.
+
+;;; This is provided with ABSOLUTELY NO GUARANTEE.
+(herald t3)
+
+(define load
+  (let ((t:load (*value standard-env 'load)))
+    (lambda (filespec . x)
+      (apply t:load (->filename filespec) x))))
+
+(define (software-type) 'UNIX)
+
+;;; *FEATURES* should be set to a list of symbols describing features
+;;; of this implementation.  See Template.scm for the list of feature
+;;; names.
+
+(define *features*
+      '(
+	rev3-report
+	rev4-optional-procedures
+	rev3-procedures
+	rev2-procedures
+	multiarg/and-
+	multiarg-apply
+	rationalize
+	object-hash
+	delay
+	i/o-redirection
+	char-ready?
+	with-file
+	transcript
+	eval
+	full-continuation
+	pretty-print
+	format
+	program-arguments
+	))
+
+(define substring
+  (let ((primitive-substring (*value standard-env 'substring)))
+    (lambda (string start end)
+      (primitive-substring string start (max 0 (- end 1))))))
+
+; Modify substring as T's substring takes (start,count) instead of
+; (start,end)
+
+(set (syntax-table-entry (env-syntax-table scheme-env) 'require) '#f)
+
+; Turn off the macro REQUIRE so that it can be rebound as a function
+; later.
+
+; extend <, >, <= and >= so that they take more than two arguments.
+
+(define <
+  (let ((primitive< (*value standard-env '<)))
+    (labels ((v (lambda (a b . rest)
+		  (if (null? rest)
+		      (primitive< a b)
+		      (and (primitive< a b)
+			   (apply v b (car rest) (cdr rest)))))))
+	    v)))
+
+(define >
+  (let ((primitive> (*value standard-env '>)))
+    (labels ((v (lambda (a b . rest)
+		  (if (null? rest)
+		      (primitive> a b)
+		      (and (primitive> a b)
+			   (apply v b (car rest) (cdr rest)))))))
+	    v)))
+
+(define <=
+  (let ((primitive<= (*value standard-env '<=)))
+    (labels ((v (lambda (a b . rest)
+		  (if (null? rest)
+		      (primitive<= a b)
+		      (and (primitive<= a b)
+			   (apply v b (car rest) (cdr rest)))))))
+	    v)))
+
+(define >=
+  (let ((primitive>= (*value standard-env '>=)))
+    (labels ((v (lambda (a b . rest)
+		  (if (null? rest)
+		      (primitive>= a b)
+		      (and (primitive>= a b)
+			   (apply v b (car rest) (cdr rest)))))))
+	    v)))
+
+(define =
+  (let ((primitive= (*value standard-env '=)))
+    (labels ((v (lambda (a b . rest)
+		  (if (null? rest)
+		      (primitive= a b)
+		      (and (primitive= a b)
+			   (apply v b (car rest) (cdr rest)))))))
+	    v)))
+
+(define gcd
+  (let ((prim (*value standard-env 'gcd)))
+    (labels ((v (lambda x
+		  (cond ((null? x) 0)
+			((= (length x) 1) (car x))
+			('#t (prim (car x) (apply v (cdr x))))))))
+	    v)))
+
+(define list? (*value standard-env 'proper-list?))
+
+(define program-arguments command-line)
+
+;;; (OUTPUT-PORT-WIDTH <port>)
+(define output-port-width
+  (lambda x
+    (if (null? x) (line-length (standard-input))
+	(line-length (car x)))))
+
+;;; (OUTPUT-PORT-HEIGHT <port>)
+(define (output-port-height . arg) 24)
+
+;;; (CURRENT-ERROR-PORT)
+(define current-error-port
+  (let ((port (current-output-port)))
+    (lambda () port)))
+
+;;; (TMPNAM) makes a temporary file name.
+(define tmpnam
+  (let ((cntr 100))
+    (lambda () (set! cntr (+ 1 cntr))
+	    (let ((tmp (string-append "slib_" (number->string cntr))))
+	      (if (file-exists? tmp) (tmpnam) tmp)))))
+
+(define delete-file file-delete)
+
+;;; CHAR-CODE-LIMIT is one greater than the largest integer which can
+;;; be returned by CHAR->INTEGER.
+(define char-code-limit 256)
+
+;;; MOST-POSITIVE-FIXNUM is used in modular.scm
+;;; T already has it.
+
+;;; If your implementation provides eval, SLIB:EVAL is single argument
+;;; eval using the top-level (user) environment.
+(define (slib:eval form) (eval form scheme-env))
+
+;;; If your implementation provides R4RS macros:
+;(define macro:eval slib:eval)
+;(define macro:load load)
+
+;;; define an error procedure for the library
+(define slib:error error)
+
+;;; define these as appropriate for your system.
+(define slib:tab #\tab)
+(define slib:form-feed #\form)
+
+;;; Define these if your implementation's syntax can support it and if
+;;; they are not already defined.
+
+;(define (1+ n) (+ n 1))
+(define (1- n) (+ n -1))
+;(define (-1+ n) (+ n -1))
+
+;;; (implementation-vicinity) should be defined to be the pathname of
+;;; the directory where any auxillary files to your Scheme
+;;; implementation reside. It is settable.
+
+(define implementation-vicinity
+  (make-simple-switch 'implementation-vicinity
+		      (lambda (x) (or (string? x) (false? x)))
+		      '#f))
+(set (implementation-vicinity) "/usr/local/lib/tsystem/")
+
+;;; (library-vicinity) should be defined to be the pathname of the
+;;; directory where files of Scheme library functions reside. It is settable.
+
+(define library-vicinity
+  (make-simple-switch 'library-vicinity
+		      (lambda (x) (or (string? x) (false? x)))
+		      '#f))
+(set (library-vicinity) "/usr/local/lib/slib/")
+;;Obviously put your value here.
+
+(define program-vicinity
+  (make-simple-switch 'program-vicinity
+		      (lambda (x) (or (string? x) (false? x)))
+		      '#f))
+
+(define (scheme-file-suffix) "")
+
+(define in-vicinity string-append)
+
+(define (string . args) (apply string-append (map char->string args)))
+
+(define make-string
+  (let ((t:make-string (*value standard-env 'make-string)))
+    (lambda (a . b)
+      (let ((str (t:make-string a)))
+	(if b (map-string! (lambda (x) (ignore x) (car b)) str) str)))))
+
+(define (string>? a b)
+  (labels ((aux
+	    (lambda (n a b)
+	      ;;start off with n<=(string-length b) and n<=(string-length a)
+	      ;;a,b coincide for chars <n
+	      (cond ((= (string-length a) n) (< n (string-length b)))
+					;;now (< n (string-length a))
+		    ((= (string-length b) n) '#f)
+					;;now (< n (string-length a))
+		    ((char=? (nthchar a n) (nthchar b n) ) (aux (+ 1 n) a b))
+		    ('#t (char<? (nthchar b n) (nthchar a n)))))))
+    (aux 0 a b)))
+
+(define (string<? a b) (string>? b a))
+(define (string<=? a b) (not (string>? a b)))
+(define (string>=? a b) (not (string<? a b)))
+
+(define (string-ci<? a b)
+  (string<? (string-upcase a) (string-upcase b)))
+
+(define (string-ci>? a b)
+  (string>? (string-upcase a) (string-upcase b)))
+
+(define (string-ci<=? a b)
+  (string<=? (string-upcase a) (string-upcase b)))
+
+(define (string-ci>=? a b)
+  (string>=? (string-upcase a) (string-upcase b)))
+
+;;; FORCE-OUTPUT flushes any pending output on optional arg output port
+;;; use this definition if your system doesn't have such a procedure.
+;;; T already has it, but requires 1 argument.
+
+(define force-output
+  (let ((t:force-output (*value standard-env 'force-output)))
+    (lambda x
+      (if x
+	  (t:force-output (car x))
+	  (t:force-output (current-output-port))))))
+
+;;; CALL-WITH-INPUT-STRING and CALL-WITH-OUTPUT-STRING are the string
+;;; port versions of CALL-WITH-*PUT-FILE.
+(define (call-with-output-string proc)
+  (with-output-to-string var (proc var)))
+
+(define (call-with-input-string string proc)
+  (with-input-from-string (variable string) (proc variable)))
+
+(define (string->number s . x)
+  (let ((base (if x (car x) 10))
+	(s (string-upcase s)))
+    (or (mem? = base '(8 10 16))
+	(error (format (current-error-port) "Bad radix ~A" base)))
+    (if (= (string-length s) 0) '()
+	(let ((char->number
+	       (lambda (ch)
+		 (cdr (ass char=? ch
+			   '((#\0 . 0)
+			     (#\1 . 1) (#\2 . 2) (#\3 . 3) (#\4 . 4)
+			     (#\5 . 5) (#\6 . 6) (#\7 . 7) (#\8 . 8)
+			     (#\9 . 9) (#\A . 10) (#\B . 11) (#\C . 12)
+			     (#\D . 13) (#\E . 14) (#\F . 15)))))))
+	  (catch not-num
+		 (iterate loop ((pos (- (string-length s) 1))
+				(power 1) (accum 0))
+			  (if (< pos 0) accum
+			      (let ((num (char->number (string-ref s pos))))
+				(or num (not-num '()))
+				(or  (< num base) (not-num '()))
+				(loop (- pos 1)
+				      (* power base)
+				      (+ accum (*  num power)))))))))))
+
+(define (number->string n . x)
+  (let ((rad (if (car x) (car x) 10)))
+    (format nil
+	    (case rad
+	      ((8) "~O")
+	      ((10) "~D")
+	      ((16) "~X")
+	      (else (error (format (current-error-port)
+				   "Bad radix ~A" (car x)))))
+	    n)))
+
+(define (inexact? f)
+  (float? f))
+
+(define (exact? f)
+  (not (inexact? f)))
+
+(define exact->inexact ->float)
+
+(define peek-char
+  (let ((t:peek-char (*value standard-env 'peek-char)))
+    (lambda p
+      (let ((port (if p (car p) (current-input-port))))
+	(t:peek-char port)))))
+
+;;;(set ((*value scheme-env 'standard-early-binding-env) 'load) '#f)
+;;;(set ((*value scheme-env 'standard-early-binding-env) 'substring) '#f)
+(set ((*value scheme-env 'standard-early-binding-env) 'less?) '#f)
+(set ((*value scheme-env 'standard-early-binding-env) 'greater?) '#f)
+(set ((*value scheme-env 'standard-early-binding-env) 'not-less?) '#f)
+(set ((*value scheme-env 'standard-early-binding-env) 'not-greater?) '#f)
+(set ((*value scheme-env 'standard-early-binding-env) 'number-equal?) '#f)
+(set ((*value scheme-internal-env 'standard-early-binding-env) 'list?) '#f)
+
+(set ((*value t-implementation-env 'SOURCE-FILE-EXTENSION)) 'scm)
+
+(load (in-vicinity (library-vicinity) "require") scheme-env)
+
+;;;(define scheme-read-table
+;;;  (make-read-table standard-read-table 'modified-read-table))
+;;;
+;;;(set (read-table-entry scheme-read-table '#\#)
+;;;     (lambda  (p ch rtable)
+;;;       (ignore ch) (ignore rtable)
+;;;       ((*value scheme-env 'string->number)
+;;;	(symbol->string (read-refusing-eof p)) 16)))
+;;;
+;;;(set (port-read-table (standard-input)) scheme-read-table)
+
+; eof
