@@ -1,22 +1,17 @@
-# : Makefile.SH,v 5501Revision: 1.1.1.1 5501Date: 1993/08/23 21:29:33 $
+# : Makefile.SH,v 16408Revision: 1.3 16408Date: 1993/12/30 01:32:17 $
 #
 # $Log: Makefile,v $
-# Revision 1.5  1994/01/06 07:00:55  jkh
-# Prepare for new ports organization.  Remove old src target, clean up pkg
-# data files accordingly.
+# Revision 1.6  1994/03/05 01:28:13  ache
+# 1) Perl uses scrambler crypt() version from libc instead of proper one
+# from -lcrypt (if exist)
+# 2) We have now all sem/shm/msg stuff, add it to perl too
 #
-# Revision 1.4  1993/12/30  05:00:07  smace
-# Changed default install path back to /usr/local per Nate's request
-#
-# Revision 1.3  1993/12/30  01:32:15  smace
+# Revision 1.3  1993/12/30  01:32:17  smace
 # correct pkg target to make src packages build first
 #
-# Revision 1.2  1993/12/29  23:50:39  smace
+# Revision 1.2  1993/12/29  23:50:40  smace
 # 1. added pkg target and datafiles made perl install in /usr/gnu
 # 2. removed perly.h (build during make process)
-#
-# Revision 1.1  1993/12/29  21:01:07  smace
-# Ran Configure
 #
 # Revision 1.1.1.1  1993/08/23  21:29:33  nate
 # PERL!
@@ -45,10 +40,10 @@
 
 CC = cc
 YACC = /usr/bin/yacc
-bin = /usr/local/bin
-scriptdir = /usr/local/bin
-privlib = /usr/local/lib/perl
-mansrc = /usr/local/man/man1
+bin = /usr/gnu/bin
+scriptdir = /usr/gnu/bin
+privlib = /usr/gnu/lib/perl
+mansrc = /usr/gnu/man/man1
 manext = 1
 LDFLAGS = 
 CLDFLAGS = 
@@ -59,7 +54,7 @@ mallocobj = malloc.o
 SLN = ln -s
 RMS = rm -f
 
-libs = -lm 
+libs = -lm -lcrypt
 
 public = perl taintperl suidperl
 
@@ -350,10 +345,13 @@ shlist:
 	echo $(sh) | tr ' ' '\012' >.shlist
 
 
-pkg:	pkg_bin
+pkg:	pkg_src pkg_bin
 
-pkg_bin: install pkg/+DESC pkg/+ONELINE pkg/+PLIST
-	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST perl_bin
+pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
+	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S perl_src
+
+pkg_bin: install pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B
+	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B perl_bin
 
 # AUTOMATICALLY GENERATED MAKE DEPENDENCIES--PUT NOTHING BELOW THIS LINE
 $(obj) hash.o:

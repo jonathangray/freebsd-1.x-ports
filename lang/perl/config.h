@@ -309,31 +309,31 @@
  *	This symbol, if defined, indicates that the entire msg*(2) library is
  *	supported.
  */
-/*#undef	HAS_MSG		/**/
+#define	HAS_MSG		/**/
 
 /* HAS_MSGCTL
  *	This symbol, if defined, indicates that the msgctl() routine is
  *	available to control message passing.
  */
-/*#undef	HAS_MSGCTL		/**/
+#define	HAS_MSGCTL		/**/
 
 /* HAS_MSGGET
  *	This symbol, if defined, indicates that the msgget() routine is
  *	available to get messages.
  */
-/*#undef	HAS_MSGGET		/**/
+#define	HAS_MSGGET		/**/
 
 /* HAS_MSGRCV
  *	This symbol, if defined, indicates that the msgrcv() routine is
  *	available to receive messages.
  */
-/*#undef	HAS_MSGRCV		/**/
+#define	HAS_MSGRCV		/**/
 
 /* HAS_MSGSND
  *	This symbol, if defined, indicates that the msgsnd() routine is
  *	available to send messages.
  */
-/*#undef	HAS_MSGSND		/**/
+#define	HAS_MSGSND		/**/
 
 /* HAS_NDBM
  *	This symbol, if defined, indicates that ndbm.h exists and should
@@ -395,25 +395,25 @@
  *	This symbol, if defined, indicates that the entire sem*(2) library is
  *	supported.
  */
-/*#undef	HAS_SEM		/**/
+#define	HAS_SEM		/**/
 
 /* HAS_SEMCTL
  *	This symbol, if defined, indicates that the semctl() routine is
  *	available to control semaphores.
  */
-/*#undef	HAS_SEMCTL		/**/
+#define	HAS_SEMCTL		/**/
 
 /* HAS_SEMGET
  *	This symbol, if defined, indicates that the semget() routine is
  *	available to get semaphores ids.
  */
-/*#undef	HAS_SEMGET		/**/
+#define	HAS_SEMGET		/**/
 
 /* HAS_SEMOP
  *	This symbol, if defined, indicates that the semop() routine is
  *	available to perform semaphore operations.
  */
-/*#undef	HAS_SEMOP		/**/
+#define	HAS_SEMOP		/**/
 
 /* HAS_SETEGID
  *	This symbol, if defined, indicates that the setegid routine is available
@@ -485,7 +485,7 @@
  *	This symbol, if defined, indicates that the entire shm*(2) library is
  *	supported.
  */
-/*#undef	HAS_SHM		/**/
+#define	HAS_SHM		/**/
 
 /* HAS_SHMAT
  *	This symbol, if defined, indicates that the shmat() routine is
@@ -495,27 +495,27 @@
  *	This symbol, if defined, indicates that the shmat() routine
  *	returns a pointer of type void*.
  */
-/*#undef	HAS_SHMAT		/**/
+#define	HAS_SHMAT		/**/
 
-/*#undef	VOIDSHMAT		/**/
+#define	VOIDSHMAT		/**/
 
 /* HAS_SHMCTL
  *	This symbol, if defined, indicates that the shmctl() routine is
  *	available to control a shared memory segment.
  */
-/*#undef	HAS_SHMCTL		/**/
+#define	HAS_SHMCTL		/**/
 
 /* HAS_SHMDT
  *	This symbol, if defined, indicates that the shmdt() routine is
  *	available to detach a shared memory segment.
  */
-/*#undef	HAS_SHMDT		/**/
+#define	HAS_SHMDT		/**/
 
 /* HAS_SHMGET
  *	This symbol, if defined, indicates that the shmget() routine is
  *	available to get a shared memory segment id.
  */
-/*#undef	HAS_SHMGET		/**/
+#define	HAS_SHMGET		/**/
 
 /* HAS_SOCKET
  *	This symbol, if defined, indicates that the BSD socket interface is

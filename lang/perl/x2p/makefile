@@ -1,11 +1,10 @@
-# : Makefile.SH,v 5501Revision: 1.1.1.1 5501Date: 1993/08/23 21:30:10 $
+# : Makefile.SH,v 16408Revision: 1.1.1.1 16408Date: 1993/08/23 21:30:10 $
 #
 # $Log: makefile,v $
-# Revision 1.1  1993/12/29 23:06:37  smace
-# add files that `make all' depends on
-#
-# Revision 1.1  1993/12/29  21:01:29  smace
-# Ran Configure
+# Revision 1.2  1994/03/05 01:28:46  ache
+# 1) Perl uses scrambler crypt() version from libc instead of proper one
+# from -lcrypt (if exist)
+# 2) We have now all sem/shm/msg stuff, add it to perl too
 #
 # Revision 1.1.1.1  1993/08/23  21:30:10  nate
 # PERL!
