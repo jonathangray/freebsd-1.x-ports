@@ -1,5 +1,5 @@
 #ifndef lint
-static const char *rcsid = "$Id: perform.c,v 1.2 1993/09/03 23:01:07 jkh Exp $";
+static const char *rcsid = "$Id: perform.c,v 1.3 1993/09/05 04:54:17 jkh Exp $";
 #endif
 
 /*
@@ -71,7 +71,7 @@ pkg_do(char *pkg)
     if (fexists(pkg)) {
 	char fname[FILENAME_MAX];
 
-	home = make_playpen();
+	home = make_playpen(PlayPen);
 	if (pkg[0] == '/')
 	    strcpy(fname, pkg);
 	else

@@ -1,4 +1,4 @@
-/* $Id: lib.h,v 1.2 1993/09/03 23:01:14 jkh Exp $ */
+/* $Id: lib.h,v 1.3 1993/09/05 04:54:21 jkh Exp $ */
 
 /*
  * FreeBSD install - a package for the installation and maintainance
@@ -93,8 +93,9 @@ typedef struct _pack Package;
 /* Misc */
 int		vsystem(const char *, ...);
 void		cleanup(int);
-char		*make_playpen(void);
+char		*make_playpen(char *);
 void		leave_playpen(void);
+char		*where_playpen(void);
 
 /* String */
 char 		*get_dash_string(char **);
@@ -124,6 +125,7 @@ Boolean		y_or_n(Boolean, const char *, ...);
 PackingList	new_plist_entry(void);
 PackingList	last_plist(Package *);
 Boolean		in_plist(Package *, plist_t);
+void		plist_delete(Package *, Boolean, plist_t, char *);
 void		free_plist(Package *);
 void		mark_plist(Package *);
 void		csum_plist_entry(char *, PackingList);

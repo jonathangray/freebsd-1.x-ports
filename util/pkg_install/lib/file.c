@@ -1,5 +1,5 @@
 #ifndef lint
-static const char *rcsid = "$Id: file.c,v 1.2 1993/09/03 23:01:13 jkh Exp $";
+static const char *rcsid = "$Id: file.c,v 1.3 1993/09/05 04:54:20 jkh Exp $";
 #endif
 
 /*
@@ -135,6 +135,9 @@ copy_hierarchy(char *dir, char *fname, Boolean to)
     }
     else
 	sprintf(cmd, "tar cf - %s | tar xpf - -C %s", fname, dir);
+#ifdef DEBUG
+    printf("Using '%s' to copy trees.\n", cmd);
+#endif
     if (system(cmd))
 	barf("copy_file: Couldn't perform '%s'", cmd);
 }

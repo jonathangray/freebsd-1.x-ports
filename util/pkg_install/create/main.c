@@ -1,5 +1,5 @@
 #ifndef lint
-static const char *rcsid = "$Id: main.c,v 1.2 1993/09/03 23:00:54 jkh Exp $";
+static const char *rcsid = "$Id: main.c,v 1.3 1993/09/05 04:54:06 jkh Exp $";
 #endif
 
 /*
@@ -16,7 +16,7 @@ static const char *rcsid = "$Id: main.c,v 1.2 1993/09/03 23:00:54 jkh Exp $";
 #include "lib.h"
 #include "create.h"
 
-static char Options[] = "hvf:p:c:d:i:k:r:";
+static char Options[] = "hvf:p:c:d:i:k:r:t:";
 
 char	*Prefix		= NULL;
 char	*Comment        = NULL;
@@ -25,6 +25,7 @@ char	*Install	= NULL;
 char	*DeInstall	= NULL;
 char	*Contents	= NULL;
 char	*Require	= NULL;
+char	*PlayPen	= NULL;
 
 int
 main(int argc, char **argv)
@@ -66,6 +67,10 @@ main(int argc, char **argv)
 
 	case 'r':
 	    Require = optarg;
+	    break;
+
+	case 't':
+	    PlayPen = optarg;
 	    break;
 
 	case 'h':
@@ -120,6 +125,7 @@ usage(const char *name, const char *fmt, ...)
     fprintf(stderr, "-p arg     install prefix will be arg\n");
     fprintf(stderr, "-k script  de-install script\n");
     fprintf(stderr, "-r script  pre/post requirements script\n");
+    fprintf(stderr, "-t temp    use temp as template for mktemp()\n");
     fprintf(stderr, "-v         verbose\n");
     exit(1);
 }

@@ -1,5 +1,5 @@
 #ifndef lint
-static char *rcsid = "$Header: /a/cvs/386BSD/ports/util/pkg_install/info/main.c,v 1.2 1993/09/03 23:01:06 jkh Exp $";
+static char *rcsid = "$Header: /a/cvs/386BSD/ports/util/pkg_install/info/main.c,v 1.3 1993/09/05 04:54:16 jkh Exp $";
 #endif
 
 /*
@@ -31,6 +31,7 @@ static char Options[] = "acdfikrpIvhl:";
 int	Flags		= 0;
 Boolean AllInstalled	= FALSE;
 char *InfoPrefix	= "";
+char *PlayPen		= NULL;
 
 int
 main(int argc, char **argv)
@@ -89,6 +90,10 @@ main(int argc, char **argv)
 	    InfoPrefix = optarg;
 	    break;
 
+	case 't':
+	    PlayPen = optarg;
+	    break;
+
 	case 'h':
 	case '?':
 	default:
@@ -139,6 +144,7 @@ usage(const char *name, const char *fmt, ...)
     fprintf(stderr, "-p         show prefix\n");
     fprintf(stderr, "-l <str>   Prefix each info catagory with <str>\n");
     fprintf(stderr, "-v         show all information\n");
+    fprintf(stderr, "-t temp    use temp as template for mktemp()\n");
     fprintf(stderr, "\n[no args = -c -d]\n");
     exit(1);
 }

@@ -1,5 +1,5 @@
 #ifndef lint
-static const char *rcsid = "$Id: perform.c,v 1.3 1993/09/04 18:19:41 jkh Exp $";
+static const char *rcsid = "$Id: perform.c,v 1.4 1993/09/05 04:54:07 jkh Exp $";
 #endif
 
 /*
@@ -76,7 +76,7 @@ pkg_perform(char **pkgs)
 	add_plist_top(&plist, PLIST_NAME, pkg);
 
     /* Make a directory to stomp around in */
-    home = make_playpen();
+    home = make_playpen(PlayPen);
     signal(SIGINT, cleanup);
     signal(SIGHUP, cleanup);
 
