@@ -214,6 +214,8 @@ install:	scm scm.1
 	-cp COPYING $(IMPLPATH)
 	-mkdir -p /usr/local/lib
 	-cp -r slib /usr/local/lib
+	-mkdir -p /usr/gnu/info
+	install -c -m 444 slib.info slib.info-1 slib.info-2 slib.info-3 slib.info-4 /usr/gnu/info
 
 tar:	scm.tar
 scm.tar:	temp/scm
