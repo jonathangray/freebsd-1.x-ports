@@ -764,14 +764,20 @@ int arg;
 	static int trapregs[N_UREGS] = {
 		tEAX, tECX, tEDX, tEBX, tESP, tEBP, tESI, tEDI, tEIP
 	};
+#if !defined __FreeBSD__
 	static int syscallregs[N_UREGS] = {
 		sEAX, sECX, sEDX, sEBX, sESP, sEBP, sESI, sEDI, sEIP
 	};
+#endif
 	taddr_t addr;
 	int flags, offset, i, *regmap;
 
+#if defined __FreeBSD__
+	regmap = trapregs;
+#else
 	flags = (*get_uarea_word)(arg, (int)U_OFFSET(u_pcb.pcb_flags));
 	regmap = ((flags & FM_TRAP) != 0) ? trapregs : syscallregs;
+#endif
 
 	addr = (*get_uarea_word)(arg, (int)U_OFFSET(u_kproc.kp_proc.p_regs));
 	offset = addr - USRSTACK;
