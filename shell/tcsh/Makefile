@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.8 1993/12/29 01:16:59 smace Exp $
+# $Id: Makefile,v 1.9 1993/12/30 01:13:35 smace Exp $
 #	Makefile.std	4.3	6/11/83
 #
 # C Shell with process control; VM/UNIX VAX Makefile
@@ -487,7 +487,7 @@ ftp: tcsh-${VERSION}.tar.Z tcsh.tahoe-${VERSION}.tar.Z
 	cp tcsh.man ${FTPAREA}
 
 
-pkg:	pkg_bin pkg_src
+pkg:	pkg_src pkg_bin
 
 pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
 	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S tcsh_src

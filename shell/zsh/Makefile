@@ -3,7 +3,7 @@
 SUBDIR=src
 
 
-pkg:	pkg_bin pkg_src
+pkg:	pkg_src pkg_bin
 
 pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
 	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S zsh_src
