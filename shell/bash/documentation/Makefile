@@ -56,7 +56,8 @@ distclean:
 
 realclean:	clean
 
-install: features.info
-	$(CP) bash.1 $(mandir)
-	sed 's:so bash.1:so man1/bash.1:' < bash_builtins.1 > $(mandir)/bash_builtins.1
-	$(CP) features.info $(infodir)/bash.info
+install:
+#install: features.info
+#        $(CP) bash.1 $(mandir)
+#        sed 's:so bash.1:so man1/bash.1:' < bash_builtins.1 > $(mandir)/bash_builtins.1
+#        $(CP) features.info $(infodir)/bash.info
