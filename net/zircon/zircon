@@ -1,4 +1,4 @@
-#!/usr/local/bin/dpwish -f
+#!/bin/dpwish -f
 #
 #	ZIRCON - an X11 interface to the Internet Relay Chat
 #
@@ -10,20 +10,21 @@
 #
 #	See the file COPYRIGHT for details
 #
-
 #
 #	Initialise some variables that *might* get set in the rc file
 #
+set history 50
 set checkTime 0
-set nickname ""
-set ircname ""
+set nickname {}
+set nicks {}
+set ircname {}
+set ircnames {}
 set ircport 6667
 set defaultPort 6667
-set nicks {}
-set aways {}
+set server {}
 set servers {}
+set aways {}
 set actions {}
-set server ""
 set serverInfo {}
 set channels {}
 set showLocal 1
@@ -32,8 +33,10 @@ set showPrivate 0
 set topicOnly 0
 set minMembers 3
 set noRefresh 1
+set ircOperator {}
 set operPW {}
 set operNick {}
+set operServer {}
 set monitorOut 0
 set monitorIn 0
 set signoff {I run Zircon}
@@ -57,7 +60,7 @@ if {[file exist ~/.zirconrc]} { source ~/.zirconrc }
 #
 # Re-Initialise things in case they were set in the rc file....
 #
-set version "0.43Beta"
+set version "0.44Beta"
 set away 0
 set sock {}
 set startup 1
@@ -80,7 +83,41 @@ set whoTxt ""
 # Some command information
 set serverOps { Links Version Time Trace Admin Lusers Info Stats Oper \
 	Connect Rehash Restart }
-set ircOpCmd { Connect Rehash Restart }
+set ircSrvCmd { Connect Rehash Restart }
+set userOps { Who Whois Whowas Mode Invite Msg Time Kill }
+set userMenuOps { Whois Msg Send Time CTCP Speak Chanop Kick Kill }
+set opUsrCmd { Speak Chanop Kick }
+set ircUsrCmd { Kill }
+#
+# Proc to truncate window history
+#
+proc chopText {chan txt} {
+    global history
+    set lng [lindex [split [$txt index end] .] 0]
+    if {$lng > $history} {
+	incr lng -$history
+	$txt delete 1.0 "1.0 + $lng lines"
+    }
+}
+#
+# alter menu item states - used for oping and ircoping
+#
+proc setState {name ops pick state} {
+    foreach cmd $pick {
+	$name entryconfigure [lsearch $ops $cmd] -state $state
+    }
+}
+#
+# Make an entry with some emacs-like edit keys......
+#
+proc emacsEntry {args} {
+    set name [entry $args]
+    bind $name <Control-a> { %W icursor 0 }
+    bind $name <Control-e> { %w icursor end }
+    bind $name <Control-k> { %W delete insert end }
+    bind $name <Control-d> { %W delete insert }
+    return $name
+}
 #
 #
 #	Procedure used to shorten menu labels to 10 characters. Used
@@ -127,7 +164,7 @@ proc mkDialog {kind w title msgText entries args} {
     }
     set just [expr {$kind == "WHO" ? "left" : "center"}]
     catch {destroy $w}
-    toplevel $w -class Dialog
+    toplevel $w -class Zircon
     wm title $w "$title"
 
     frame $w.top -relief raised -border 2
@@ -221,20 +258,20 @@ proc makeSystem {} {
 }
 
 proc keepAway {value} {
-    awayAction "$value"
-    .@ctrl.oFrm.c1BtnFrm.awayBtn.menu add command -label "[prune $value]" \
-      -command "awayAction {$value}"
+    doAway "$value"
+    .@ctrl.oFrm.bf1.away.menu add command -label "[prune $value]" \
+      -command "doAway {$value}"
 }
 
 proc getAway {} {
     mkDialog {} .@ctrl.away "Away Message" "Enter your away message:" \
       {{Away {}}} \
-      "OK {awayAction}" "Keep {keepAway}" {Back {awayAction {}}} {Cancel {}}
+      "OK {doAway}" "Keep {keepAway}" {Back {doAway {}}} {Cancel {}}
 }
 
 proc keepAction {chan value} {
     actionToChannel ${chan} "$value"
-    .${chan}.oFrm.cmdBtnFrm.actionBtn.actionMenu add command -label "[prune $value]" \
+    .${chan}.oFrm.cmdBtnFrm.action.actionMenu add command -label "[prune $value]" \
       -command "actionToChannel ${chan} {$value}"
 }
 
@@ -313,8 +350,8 @@ proc makeChannel {name type} {
 	set bits [split $name .]
 	set name [lindex $bits 0]
 	set win .$name
-	toplevel $win
-   set prv $win
+	toplevel $win -class Zircon
+	set prv $win
 	foreach bit [lrange $bits 1 end] {
 	    append name ".$bit"
 	    frame .$name -border 0
@@ -323,7 +360,7 @@ proc makeChannel {name type} {
 	}
     } {
 	set win .$name
-	toplevel $win
+	toplevel $win -class Zircon
     }
     lappend channels $name
     if {$realChan} {
@@ -337,8 +374,6 @@ proc makeChannel {name type} {
     }
     wm maxsize $win 2000 2000
     wm iconname $win $name
-    global autoIcon
-    if {[lsearch $autoIcon $name] >= 0} { wm iconify $win }
 
     global autoDeicon
     set ${name}Auto [expr {[lsearch $autoDeicon $name] >= 0}]
@@ -348,40 +383,40 @@ proc makeChannel {name type} {
 
     if {$realChan} {
 	frame $win.users -border 2 -relief raised
+
+	scrollbar $win.users.vscroller -relief raised \
+	  -command "$win.users.userList yview" 
+
+	canvas $win.users.userList -relief raised \
+	  -yscrollcommand "$win.users.vscroller set"
+
+	frame $win.users.userList.frame -border 0
+
+	$win.users.userList create window 0 0 \
+	  -window $win.users.userList.frame -anchor nw
+
+	pack append $win.users \
+	  $win.users.userList {left frame center filly} \
+	  $win.users.vscroller {left frame center filly} 
+
         global lcNickname
 	global nickname
 	global ${name}Op
 	global ${name}Spk
 	set ${name}Op($lcNickname) 0
 	set ${name}Spk($lcNickname) 0
-	menubutton $win.users.thisUser \
-	  -text $nickname -width 10  -relief raised \
-	  -menu $win.users.thisUser.menu
+	menubutton $win.users.userList.frame.@me -text $nickname \
+	  -width 10 -relief raised -menu $win.users.userList.frame.@me.menu
 
-	makeUserMenu ${name} $win.users.thisUser.menu $lcNickname 0 0
+	makeUserMenu ${name} $win.users.userList.frame.@me.menu $lcNickname 0 0
 
-	frame $win.users.lFrm -border 2 -relief raised
+	set wd [winfo reqwidth $win.users.userList.frame.@me]
+	set ht [winfo reqheight $win.users.userList.frame.@me] 
+	$win.users.userList configure \
+	  -width $wd -scrollregion [list 0 0 $wd $ht] -scrollincrement $ht
 
-	scrollbar $win.users.lFrm.vscroller \
-	  -command "$win.users.lFrm.userList yview"\
-	  -relief {raised}
-
-	canvas $win.users.lFrm.userList \
-	  -width 100 -relief flat \
-	  -yscrollcommand "$win.users.lFrm.vscroller set"
-
-	frame $win.users.lFrm.userList.frame -border 2 -relief raised
-
-	$win.users.lFrm.userList create window 0 0 \
-	  -window $win.users.lFrm.userList.frame -anchor nw
-
-	pack append $win.users.lFrm \
-	  $win.users.lFrm.userList {left frame center filly} \
-	  $win.users.lFrm.vscroller {left frame center filly} 
-
-	pack append $win.users \
-	  $win.users.thisUser {top frame center } \
-	  $win.users.lFrm {top frame center expand filly}
+        pack append  $win.users.userList.frame \
+	  $win.users.userList.frame.@me {top frame center}
 
 	frame $oFrm.topicFrm -border 2
 
@@ -425,77 +460,69 @@ proc makeChannel {name type} {
 	   -command "setLimit $name" -state disabled -label Limit
 	$oFrm.cmdBtnFrm.mode.menu add command -command "setKey $name"\
 	   -state disabled -label Key
+
+	menubutton $oFrm.cmdBtnFrm.channel -relief raised \
+	  -menu "$oFrm.cmdBtnFrm.channel.menu" -text Channel
+
+	menu $oFrm.cmdBtnFrm.channel.menu
+
+	$oFrm.cmdBtnFrm.channel.menu add command \
+	  -command "global whoTxt; set whoTxt {} ; sendIRC WHO $name" \
+	  -label Who
+	$oFrm.cmdBtnFrm.channel.menu add command \
+	  -command "channelInvite $name" -label Invite
+	$oFrm.cmdBtnFrm.channel.menu add command \
+	  -command "channelNotice $name" -label Notice
+	addCTCPMenu $oFrm.cmdBtnFrm.channel.menu $name
     } {
-	menubutton $oFrm.cmdBtnFrm.chanBtn \
+	menubutton $oFrm.cmdBtnFrm.channel \
 	  -text User -relief raised \
-	  -menu "$oFrm.cmdBtnFrm.chanBtn.menu"
+	  -menu "$oFrm.cmdBtnFrm.channel.menu"
 
-	menu $oFrm.cmdBtnFrm.chanBtn.menu
+	menu $oFrm.cmdBtnFrm.channel.menu
 
-	$oFrm.cmdBtnFrm.chanBtn.menu add command \
+	$oFrm.cmdBtnFrm.channel.menu add command \
 	  -command "sendIRC WHOIS ${name}" -label Whois
-	$oFrm.cmdBtnFrm.chanBtn.menu add command \
-	  -command "channelNotice ${name}" -label Notice
-	addCTCPMenu $oFrm.cmdBtnFrm.chanBtn.menu ${name}
-
-	pack append $oFrm.cmdBtnFrm \
-	  $oFrm.cmdBtnFrm.chanBtn {left frame center expand fillx}
+	$oFrm.cmdBtnFrm.channel.menu add command \
+	  -command "channelNotice $name" -label Notice
+	addCTCPMenu $oFrm.cmdBtnFrm.channel.menu $name
     }
+    pack append $oFrm.cmdBtnFrm \
+      $oFrm.cmdBtnFrm.mode {left frame center expand fillx} \
+      $oFrm.cmdBtnFrm.channel {left frame center expand fillx}
 
-    menubutton $oFrm.cmdBtnFrm.actionBtn \
+    menubutton $oFrm.cmdBtnFrm.action \
       -text Action -relief raised \
-      -menu "$oFrm.cmdBtnFrm.actionBtn.actionMenu"
+      -menu "$oFrm.cmdBtnFrm.action.menu"
 
-    menu $oFrm.cmdBtnFrm.actionBtn.actionMenu
+    menu $oFrm.cmdBtnFrm.action.menu
 
-    $oFrm.cmdBtnFrm.actionBtn.actionMenu add command \
+    $oFrm.cmdBtnFrm.action.menu add command \
        -label Other -command "getAction $name"
-    $oFrm.cmdBtnFrm.actionBtn.actionMenu add separator
+    $oFrm.cmdBtnFrm.action.menu add separator
 
     global actions
     foreach act $actions {
-	$oFrm.cmdBtnFrm.actionBtn.actionMenu add command \
+	$oFrm.cmdBtnFrm.action.menu add command \
 	  -label "[prune $act]" -command "actionToChannel $name {$act}"
     }
+    pack append $oFrm.cmdBtnFrm \
+      $oFrm.cmdBtnFrm.action {left frame center expand fillx}
 
-    if {$realChan} {
-	menubutton $oFrm.cmdBtnFrm.chanBtn -relief raised \
-	  -menu "$oFrm.cmdBtnFrm.chanBtn.menu" \
-	  -text Channel
-
-	menu $oFrm.cmdBtnFrm.chanBtn.menu
-
-	$oFrm.cmdBtnFrm.chanBtn.menu add command \
-	  -command "sendIRC WHO $name" -label Who
-	$oFrm.cmdBtnFrm.chanBtn.menu add command \
-	  -command "channelInvite $name" -label Invite
-	$oFrm.cmdBtnFrm.chanBtn.menu add command \
-	  -command "channelNotice $name" -label Notice
-	addCTCPMenu $oFrm.cmdBtnFrm.chanBtn.menu $name
-    }
-
-    button $oFrm.cmdBtnFrm.quitBtn \
-      -command "leaveChannel $name"\
-      -text {Leave}
-
+    button $oFrm.cmdBtnFrm.quit -command "leaveChannel $name" -text Leave
 
     pack append $oFrm.cmdBtnFrm \
-      $oFrm.cmdBtnFrm.actionBtn {left frame center expand fillx}
-    if {$realChan} {
-	pack append $oFrm.cmdBtnFrm \
-	  $oFrm.cmdBtnFrm.chanBtn {left frame center expand fillx}
-    }
-    pack append $oFrm.cmdBtnFrm \
-      $oFrm.cmdBtnFrm.quitBtn {left frame center expand fillx} 
+      $oFrm.cmdBtnFrm.quit {left frame center expand fillx} 
+
+    tk_menuBar $oFrm.cmdBtnFrm $oFrm.cmdBtnFrm.mode \
+      $oFrm.cmdBtnFrm.channel $oFrm.cmdBtnFrm.action
 
     frame $oFrm.cmdLine -border 2 -relief raised
 
-     scrollbar $oFrm.cmdLine.cscroller \
-      -orient horizontal \
-      -command "$oFrm.cmdLine.commandLine view" \
-      -relief {raised}
+    scrollbar $oFrm.cmdLine.cscroller -orient horizontal -relief raised \
+      -command "$oFrm.cmdLine.commandLine view"
 
-     entry $oFrm.cmdLine.commandLine -relief sunken \
+    entry $oFrm.cmdLine.commandLine -relief raised \
       -scrollcommand "$oFrm.cmdLine.cscroller set"
 
     pack append $oFrm.cmdLine \
@@ -538,7 +565,7 @@ proc makeChannel {name type} {
 	%W delete 0 end
     "
 
-    bind $oFrm.cmdLine.commandLine <Control-v> " insertSelect $name %W "
+    bind $oFrm.cmdLine.commandLine <Control-v> " %W insert insert %A "
     bind $oFrm.cmdLine.commandLine <ButtonPress-2> " insertSelect $name %W "
 
     bind $oFrm.cmdLine.commandLine <Escape> "\
@@ -547,6 +574,7 @@ proc makeChannel {name type} {
     "
 
     focus $oFrm.cmdLine.commandLine
+    global autoIcon ; if {[lsearch $autoIcon $name] >= 0} { wm iconify $win }
 #
 # ask for the channel's mode so we can set the button array
 #
@@ -593,13 +621,45 @@ ScottM, jim_bob, Fizzy, Mikero, dl, Vesa, GiGi, janl Avalon\n\
 tcl Version [info tclversion]\n\
 tk Version $tk_version" {} {OK {}}
 }
-
+#
+#
+#
 proc setFlag {flag} {
     global $flag
     global nickname
     setMode $nickname [expr {[set $flag] ? "+" : "-"}][string index $flag 0]
 }
+#
+# Build the Nickname, Ircname and server entries for the control window
+#
+proc NNSBuild {lbl def lst} {
+    set frm .@ctrl.oFrm.nSFrm
+    set name [string tolower $lbl]
+    pack append $frm [frame $frm.$name -border 2] \
+      {top frame center expand fillx}
+    set name $frm.$name
 
+    menubutton $name.label -text $lbl \
+      -menu $name.label.menu  -width 10 -relief raised
+
+    menu $name.label.menu
+
+    if {[lsearch $lst $def] < 0} {
+	$name.label.menu add command -label "$def" -command "change${lbl} {$def}"
+    }
+    foreach nn $lst {
+	$name.label.menu add command -label "$nn" -command "change${lbl} {$nn}"
+    }
+
+    entry $name.entry -relief raised
+
+    bind $name.entry <Return> "change${lbl} \[%W get\]"
+
+    pack append $name \
+      $name.label {left frame center} \
+      $name.entry {left frame center expand fillx} 
+    $name.entry insert end $def
+}
 #
 #	Build the Zircon control window
 #
@@ -609,91 +669,14 @@ proc makeControl {} {
     global nickname
     global nicks
     global ircname
+    global ircnames
 
-    toplevel .@ctrl
+    toplevel .@ctrl -class Zircon
     wm title .@ctrl "Zircon Control Window"
     wm maxsize .@ctrl 2000 2000
 
     set oFrm .@ctrl.oFrm
     frame $oFrm -border 2 -relief raised
-    frame $oFrm.nSFrm -border 2
-    frame $oFrm.nSFrm.nickFrm -border 2
-
-    menubutton $oFrm.nSFrm.nickFrm.nickLab -text Nickname\
-      -menu $oFrm.nSFrm.nickFrm.nickLab.menu  -width 10 \
-      -relief raised
-
-    menu $oFrm.nSFrm.nickFrm.nickLab.menu
-
-    if {[lsearch $nicks $nickname] < 0} {
-	$oFrm.nSFrm.nickFrm.nickLab.menu add command \
-	  -label $nickname -command "changeNick $nickname"
-    }
-    foreach nn $nicks {
-	$oFrm.nSFrm.nickFrm.nickLab.menu add command \
-	  -label $nn -command "changeNick $nn"
-    }
-
-    entry $oFrm.nSFrm.nickFrm.nickEntry  -relief raised
-
-    bind $oFrm.nSFrm.nickFrm.nickEntry <Return> {
-	changeNick [.@ctrl.oFrm.nSFrm.nickFrm.nickEntry get]
-    }
-
-    pack append $oFrm.nSFrm.nickFrm \
-      $oFrm.nSFrm.nickFrm.nickLab {left frame center} \
-      $oFrm.nSFrm.nickFrm.nickEntry {left frame center expand fillx} 
-
-    frame $oFrm.nSFrm.nameFrm -border 2
-
-    label $oFrm.nSFrm.nameFrm.nameLab -text IRCName\
-      -width 10 -relief raised
-
-    entry $oFrm.nSFrm.nameFrm.nameEntry -relief raised
-    $oFrm.nSFrm.nameFrm.nameEntry insert end $ircname
-    $oFrm.nSFrm.nameFrm.nameEntry configure -state disabled
-
-    pack append $oFrm.nSFrm.nameFrm \
-      $oFrm.nSFrm.nameFrm.nameLab {left frame center} \
-      $oFrm.nSFrm.nameFrm.nameEntry {left frame center expand fillx} 
-
-    frame $oFrm.nSFrm.serverFrm -border 2
-
-    menubutton $oFrm.nSFrm.serverFrm.serverBtn -text Server\
-      -menu $oFrm.nSFrm.serverFrm.serverBtn.menu -width 10\
-      -relief raised
-
-    menu $oFrm.nSFrm.serverFrm.serverBtn.menu
-
-    global server
-    global servers
-    global defaultPort
-    global ircport
-    if {[lsearch $servers $server*] < 0} {
-	.@ctrl.oFrm.nSFrm.serverFrm.serverBtn.menu add command \
-	  -label $server -command "changeServer $server $ircport"
-    }
-    foreach nn $servers {
-	if {[set p [lindex $nn 1]] == ""} { set p $defaultPort}
-	$oFrm.nSFrm.serverFrm.serverBtn.menu add command \
-	  -label $nn -command "changeServer [lindex $nn 0] $p"
-    }
-
-    entry $oFrm.nSFrm.serverFrm.serverEntry -relief raised
-
-    bind $oFrm.nSFrm.serverFrm.serverEntry <Return> { \
-	changeServer [%W get] $defaultPort
-    }
-
-    bind $oFrm.nSFrm.serverFrm.serverEntry <Escape> { \
-	set h [%W get]
-	mkDialog {} .@port "Port Number" "Enter port number for $h:" \
-	  "{Port $defaultPort}" "OK {changeServer $h}" {Cancel {}}
-    }
-
-    pack append $oFrm.nSFrm.serverFrm \
-      $oFrm.nSFrm.serverFrm.serverBtn {left frame center} \
-      $oFrm.nSFrm.serverFrm.serverEntry {left frame center expand fillx} 
 
     global version
     frame $oFrm.helpFrm -border 2
@@ -720,34 +703,28 @@ proc makeControl {} {
 	  .@ctrl.oFrm.debug.min {left frame center} 
     }
 
+    frame $oFrm.nSFrm -border 2
+
     frame $oFrm.nSFrm.cr -border 2
 
     global invisible
     global wallops
     global srvmsg
-    checkbutton $oFrm.nSFrm.cr.invis \
-      -relief flat -text "Invisible" \
-      -command "setFlag invisible" \
-      -variable invisible
+    checkbutton $oFrm.nSFrm.cr.invis -relief flat -text "Invisible" \
+      -command "setFlag invisible" -variable invisible
 
-    checkbutton $oFrm.nSFrm.cr.wallop \
-      -relief flat -text "Wallop" \
-      -command {setFlag wallops} \
-      -variable wallops
+    checkbutton $oFrm.nSFrm.cr.wallop -relief flat -text "Wallop" \
+      -command {setFlag wallops} -variable wallops
 
-    checkbutton $oFrm.nSFrm.cr.srvmsg \
-      -relief flat -text "SrvMsg" \
-      -command {setFlag srvmsg} \
-      -variable srvmsg
+    checkbutton $oFrm.nSFrm.cr.srvmsg -relief flat -text "SrvMsg" \
+      -command {setFlag srvmsg} -variable srvmsg
 
     global nickname
     global ircop
 
-    checkbutton $oFrm.nSFrm.cr.ircop \
-      -relief flat -text "IRC Op" \
-      -command deIRCOp -state disabled -variable ircop
-
-    if {$ircop} { $oFrm.nSFrm.cr.ircop configure -state normal }
+    checkbutton $oFrm.nSFrm.cr.ircop -relief flat -text "IRC Op" \
+      -command deIRCOp -variable ircop \
+      -state [expr {$ircop ? "normal" : "disabled"}]
 
     pack append $oFrm.nSFrm.cr \
       $oFrm.nSFrm.cr.invis {left frame center} \
@@ -755,106 +732,146 @@ proc makeControl {} {
       $oFrm.nSFrm.cr.srvmsg {left frame center} \
       $oFrm.nSFrm.cr.ircop {left frame center}
 
+    pack append $oFrm.nSFrm $oFrm.nSFrm.cr {top frame center expand}
+
+    NNSBuild Nickname $nickname $nicks
+    NNSBuild IRCName $ircname $ircnames
+
+    frame $oFrm.nSFrm.server -border 2
+
+    menubutton $oFrm.nSFrm.server.label -text Server\
+      -menu $oFrm.nSFrm.server.label.menu -width 10\
+      -relief raised
+
+    menu $oFrm.nSFrm.server.label.menu
+
+    global server
+    global servers
+    global defaultPort
+    global ircport
+    if {[lsearch $servers $server*] < 0} {
+	.@ctrl.oFrm.nSFrm.server.label.menu add command \
+	  -label $server -command "changeServer $server $ircport"
+    }
+    foreach nn $servers {
+	if {[set p [lindex $nn 1]] == ""} { set p $defaultPort}
+	$oFrm.nSFrm.server.label.menu add command \
+	  -label $nn -command "changeServer [lindex $nn 0] $p"
+    }
+
+    entry $oFrm.nSFrm.server.entry -relief raised
+
+    bind $oFrm.nSFrm.server.entry <Return> { \
+	changeServer [%W get] $defaultPort
+    }
+
+    bind $oFrm.nSFrm.server.entry <Escape> { \
+	set h [%W get]
+	mkDialog {} .@port "Port Number" "Enter port number for $h:" \
+	  "{Port $defaultPort}" "OK {changeServer $h}" {Cancel {}}
+    }
+
+    pack append $oFrm.nSFrm.server \
+      $oFrm.nSFrm.server.label {left frame center} \
+      $oFrm.nSFrm.server.entry {left frame center expand fillx} 
+
     pack append $oFrm.nSFrm \
-      $oFrm.nSFrm.cr {top frame center expand} \
-      $oFrm.nSFrm.nickFrm {top frame center expand fillx } \
-      $oFrm.nSFrm.nameFrm {top frame center expand fillx } \
-      $oFrm.nSFrm.serverFrm {top frame center expand fillx}
+      $oFrm.nSFrm.server {top frame center expand fillx}
 
-    frame $oFrm.c3BtnFrm -border 2
+    $oFrm.nSFrm.server.entry insert end "$server"
 
-    menubutton $oFrm.c3BtnFrm.srvops \
-      -menu $oFrm.c3BtnFrm.srvops.menu \
+    frame $oFrm.bf2 -border 2
+
+    menubutton $oFrm.bf2.servers \
+      -menu $oFrm.bf2.servers.menu \
       -width 10 -text Servers -relief raised
 
-    menu $oFrm.c3BtnFrm.srvops.menu
+    menu $oFrm.bf2.servers.menu
 
     global serverOps
     foreach cmd $serverOps {
-	$oFrm.c3BtnFrm.srvops.menu add command -label $cmd \
+	$oFrm.bf2.servers.menu add command -label $cmd \
 	  -command "serverCmd ${cmd}"
     }
     if {!$ircop} {
-	global ircOpCmd
-	foreach cmd $ircOpCmd {
-	   $oFrm.c3BtnFrm.srvops.menu entryconfigure \
-	    [lsearch $serverOps $cmd] -state disabled
-	}
+	global ircSrvCmd
+	setState $oFrm.bf2.servers.menu $serverOps $ircSrvCmd disabled
     }
 
-    menubutton $oFrm.c3BtnFrm.usrops \
-      -menu $oFrm.c3BtnFrm.usrops.menu \
+    menubutton $oFrm.bf2.users \
+      -menu $oFrm.bf2.users.menu \
       -width 10 -text Users -relief raised
 
-    menu $oFrm.c3BtnFrm.usrops.menu
+    menu $oFrm.bf2.users.menu
 
-    foreach cmd "Who Whois Whowas Mode Invite Msg Kill" {
-	$oFrm.c3BtnFrm.usrops.menu add command -label $cmd \
+    global userOps
+    foreach cmd $userOps {
+	$oFrm.bf2.users.menu add command -label $cmd \
 	  -command "userCmd ${cmd}"
     }
     if {!$ircop} {
-	$oFrm.c3BtnFrm.usrops.menu entryconfigure 6 -state disabled
+	global ircUsrCmd
+	setState $oFrm.bf2.users.menu $userOps $ircUsrCmd disabled
     }
 
-    menubutton $oFrm.c3BtnFrm.chanops \
-      -menu $oFrm.c3BtnFrm.chanops.menu \
+    menubutton $oFrm.bf2.channels \
+      -menu $oFrm.bf2.channels.menu \
       -width 10 -text Channels -relief raised
 
-    menu $oFrm.c3BtnFrm.chanops.menu
+    menu $oFrm.bf2.channels.menu
 
     foreach cmd "Join Who List Names Notice" {
-	$oFrm.c3BtnFrm.chanops.menu add command -label $cmd \
+	$oFrm.bf2.channels.menu add command -label $cmd \
 	  -command "channel${cmd} \[.@ctrl.oFrm.cmdLine.channel get\]"
     }
 
-    addCTCPMenu $oFrm.c3BtnFrm.chanops.menu \
+    addCTCPMenu $oFrm.bf2.channels.menu \
       {[.@ctrl.oFrm.cmdLine.channel get]}
 
     global favourites
     if {$favourites != {}} {
-	$oFrm.c3BtnFrm.chanops.menu add separator
+	$oFrm.bf2.channels.menu add separator
 	foreach chan $favourites {
-	    $oFrm.c3BtnFrm.chanops.menu add command -label $chan \
+	    $oFrm.bf2.channels.menu add command -label $chan \
 	      -command "channelJoin $chan"
 	}
 
     }
 
-    frame $oFrm.c1BtnFrm -border 2
+    tk_menuBar $oFrm.bf2 $oFrm.bf2.servers \
+      $oFrm.bf2.users $oFrm.bf2.channels
 
-    menubutton $oFrm.c1BtnFrm.awayBtn \
-      -menu $oFrm.c1BtnFrm.awayBtn.menu \
+    frame $oFrm.bf1 -border 2
+
+    menubutton $oFrm.bf1.away \
+      -menu $oFrm.bf1.away.menu \
       -width 10 -text Away -relief raised
 
-    menu $oFrm.c1BtnFrm.awayBtn.menu
+    menu $oFrm.bf1.away.menu
 
-    $oFrm.c1BtnFrm.awayBtn.menu add command \
-       -label Back -command "awayAction {}"
-    $oFrm.c1BtnFrm.awayBtn.menu add command \
-       -label Other -command "getAway"
-    $oFrm.c1BtnFrm.awayBtn.menu add separator
+    $oFrm.bf1.away.menu add command -label Back -command "doAway {}"
+    $oFrm.bf1.away.menu add command -label Other -command "getAway"
+    $oFrm.bf1.away.menu add separator
 
     global aways
     foreach act $aways {
-	$oFrm.c1BtnFrm.awayBtn.menu add command \
-	  -label "[prune $act]" -command "awayAction {$act}"
+	$oFrm.bf1.away.menu add command \
+	  -label "[prune $act]" -command "doAway {$act}"
     }
 
-    button $oFrm.c1BtnFrm.brbBtn -command brbAction \
-    -width 10 -text BRB
+    button $oFrm.bf1.brb -command doBRB -width 10 -text BRB
 
-    button $oFrm.c1BtnFrm.quitBtn -command quitZircon \
-      -width 10 -text Quit
+    button $oFrm.bf1.quit -command quitZircon -width 10 -text Quit
 
-    pack append $oFrm.c1BtnFrm \
-      $oFrm.c1BtnFrm.awayBtn {left frame center expand fillx} \
-      $oFrm.c1BtnFrm.brbBtn {left frame center expand fillx} \
-      $oFrm.c1BtnFrm.quitBtn {left frame center expand fillx} 
+    pack append $oFrm.bf1 \
+      $oFrm.bf1.away {left frame center expand fillx} \
+      $oFrm.bf1.brb {left frame center expand fillx} \
+      $oFrm.bf1.quit {left frame center expand fillx} 
 
-    pack append $oFrm.c3BtnFrm \
-      $oFrm.c3BtnFrm.srvops {left frame center expand fillx} \
-      $oFrm.c3BtnFrm.usrops {left frame center expand fillx} \
-      $oFrm.c3BtnFrm.chanops {left frame center expand fillx}
+    pack append $oFrm.bf2 \
+      $oFrm.bf2.servers {left frame center expand fillx} \
+      $oFrm.bf2.users {left frame center expand fillx} \
+      $oFrm.bf2.channels {left frame center expand fillx}
 
     global showLocal
     global showPublic
@@ -932,8 +949,8 @@ proc makeControl {} {
     pack append $oFrm \
       $oFrm.helpFrm {top frame center fillx} \
       $oFrm.nSFrm {top frame center fillx} \
-      $oFrm.c1BtnFrm {top frame center fillx} \
-      $oFrm.c3BtnFrm {top frame center fillx} \
+      $oFrm.bf1 {top frame center fillx} \
+      $oFrm.bf2 {top frame center fillx} \
       $oFrm.filter {top frame center fillx} \
       $oFrm.textFrm {top frame center expand fillx filly} \
       $oFrm.hsFrm {top frame center fillx} \
@@ -941,10 +958,7 @@ proc makeControl {} {
 
     pack append .@ctrl $oFrm {top frame center expand fill} 
 
-    bind $oFrm.cmdLine.channel <Return> { \
-	channelJoin [%W get] ""
-	%W delete 0 end
-    }
+    bind $oFrm.cmdLine.channel <Return> { channelJoin [%W get] "" }
 
     bind $oFrm.textFrm.text <Double-Button-1> {
 	channelJoin [lindex $allChannels [%W nearest %y]] ""
@@ -960,24 +974,19 @@ proc makeControl {} {
 	  "[lindex $allChannels [%W nearest %y]]"
     }
     focus default $oFrm.cmdLine.channel
-    global nickname
-    global server
-    $oFrm.nSFrm.nickFrm.nickEntry insert end "$nickname"
-    $oFrm.nSFrm.serverFrm.serverEntry insert end "$server"
 }
 
 proc chText {text} {
+    global history
+    wm deiconify .
     .oFrm.textFrm.text configure -state normal
     .oFrm.textFrm.text insert end "$text\n"
+    chopText @info .oFrm.textFrm.text
     .oFrm.textFrm.text yview -pickplace end
     .oFrm.textFrm.text configure -state disabled
 }
 
-proc addText {chan text args} {
-    set chan [string tolower ${chan}]
-    global ${chan}Auto ; if {[set ${chan}Auto]} { wm deiconify .${chan} }
-    global ${chan}Active ; set ${chan}Active 1
-    set name .${chan}.oFrm.textFrm.text
+proc doAddText {name chan text args} {
     $name configure -state normal
     set ln [$name index end]
     set bold {}
@@ -1018,8 +1027,12 @@ proc addText {chan text args} {
 		    set ulEnd {}
 		}
 		if {$invEnd != {}} {
-		    set fg [option get $name foreground Foreground]
-		    set bg [option get $name background Background]
+		    if {[set fg [lindex [$name configure -foreground] 4]] == ""} {
+			set fg [option get $name foreground Foreground]
+		    }
+		    if {[set bg [lindex [$name configure -background] 4]] == ""} {
+			set bg [option get $name background Background]
+		    }
 		    $name tag add vert $invert $invEnd
 		    $name tag configure vert -foreground $bg -background $fg
 		    set invert {}
@@ -1040,11 +1053,32 @@ proc addText {chan text args} {
 	$name tag configure uline -underline 1
     }
     if {$invEnd != {}} {
-	set fg [option get $name foreground Foreground]
-	set bg [option get $name background Background]
+	if {[set fg [lindex [$name configure -foreground] 4]] == ""} {
+	    set fg [option get $name foreground Foreground]
+	}
+	if {[set bg [lindex [$name configure -background] 4]] == ""} {
+	    set bg [option get $name background Background]
+	}
 	$name tag add vert $invert $invEnd
 	$name tag configure vert -foreground $bg -background $fg
     }
+    chopText $chan $name
+}
+
+proc addText {chan text args} {
+    set chan [string tolower ${chan}]
+    global ${chan}Active ; set ${chan}Active 1
+    set name .${chan}.oFrm.textFrm.text
+    doAddText $name $chan $text $args
+    if {$args == {}} { $name yview -pickplace end }
+    $name configure -state disabled
+}
+
+proc noPopAdd {chan text args} {
+    set chan [string tolower ${chan}]
+    global ${chan}Active ; set ${chan}Active 1
+    set name .${chan}.oFrm.textFrm.text
+    doAddText $name $chan $text $args
     if {$args == {}} { $name yview -pickplace end }
     $name configure -state disabled
 }
@@ -1126,10 +1160,14 @@ proc inactiveTest {args} {
 #
 #	Send string to channel and echo to channel window
 #
-proc sendToChannel {chan string} {
+proc sendToChannel {chan string args} {
     if {$string != ""} {
 	sendIRC PRIVMSG ${chan} $string
-	addText ${chan} "> $string"
+	if {$args == {}} {
+	    addText ${chan} "> $string"
+	} {
+	    noPopAdd ${chan} "> $string"
+	}
     }
 }
 
@@ -1193,14 +1231,15 @@ proc changeServer {host port} {
 	catch "shutdown $sock all"
 	close $sock
 	set sock {}
+	after 5000
     }
     set startup 1
     if {[startIRC $host $port]} {
 	set server $host
 	set ircport port
 	unmakeIRCOp 0
-	.@ctrl.oFrm.nSFrm.serverFrm.serverEntry delete 0 end
-	.@ctrl.oFrm.nSFrm.serverFrm.serverEntry insert end "$host"
+	.@ctrl.oFrm.nSFrm.server.entry delete 0 end
+	.@ctrl.oFrm.nSFrm.server.entry insert end "$host"
     }
 }
 
@@ -1238,7 +1277,7 @@ proc kill {who} {
 #
 #	Sets or clears the Away message at the server
 #
-proc awayAction {args} {
+proc doAway {args} {
     if {$args != {} && [lindex $args 0] != ""} {
 	sendIRC AWAY [join $args]
     } {
@@ -1249,17 +1288,17 @@ proc awayAction {args} {
 #
 #	Called when the BRB button is pressed
 #
-proc brbAction {args} {
+proc doBRB {args} {
     global channels
     global away
     if {$away == 0} {
-	.@ctrl.oFrm.c1BtnFrm.brbBtn configure -text "Back"
-	foreach chans $channels { sendToChannel ${chans} brb }
-	awayAction "Back soon."
+	.@ctrl.oFrm.bf1.brb configure -text "Back"
+	foreach chans $channels { sendToChannel ${chans} brb -nopop }
+	doAway "Back soon."
     } {
-	.@ctrl.oFrm.c1BtnFrm.brbBtn configure -text "BRB"
-	foreach chans $channels { sendToChannel ${chans} back }
-	awayAction ""
+	.@ctrl.oFrm.bf1.brb configure -text "BRB"
+	foreach chans $channels { sendToChannel ${chans} back -nopop }
+	doAway ""
     }
 }
 
@@ -1355,6 +1394,13 @@ proc userCmd {cmd} {
     Invite { userInvite }
     Msg {userMsg}
     Kill {userKill}
+    Who {
+	    global whoTxt
+	    set whoTxt {}
+	    mkDialog {} .@$cmd "$cmd" "Enter user pattern:" \
+	      {{User ""}}\
+	      "OK {sendIRC [string toupper $cmd]}" {Cancel {}}
+	}
     default {
 	    mkDialog {} .@$cmd "$cmd" "Enter user pattern:" \
 	      {{User ""}}\
@@ -1396,6 +1442,8 @@ proc channelJoin {chan args} {
 }
 
 proc channelWho {chan} {
+    global whoTxt
+    set whoTxt {}
     if {${chan} != "" } { sendIRC WHO ${chan} } { sendIRC WHO }
 }
 
@@ -1472,9 +1520,10 @@ proc addCTCPMenu {name nk} {
     $name add cascade -label CTCP -menu $name.ctcp
     menu $name.ctcp
     foreach cmd \
-      {CLIENTINFO VERSION USERINFO ERRMSG PID \
-       SOURCE FINGER SED TIME ECHO PING} {
-	$name.ctcp add command -label $cmd -command "doCtcp $cmd $nk"
+      {Clientinfo Echo Errmsg Finger Pid Ping
+       Sed Source Time Version Userinfo} {
+	$name.ctcp add command -label $cmd \
+	  -command "doCtcp [string toupper $cmd] $nk"
     }
 }
 
@@ -1484,19 +1533,18 @@ proc makeUserMenu {chan name nk oper spk} {
     $name add command -label Whois -command "sendIRC WHOIS $nk"
     $name add command -label Msg -command "makeChannel $nk C"
     $name add command -label Send -command "DCCsend $nk"
+    $name add command -label Time -command "sendIRC TIME $nk"
     addCTCPMenu $name $nk
     $name add checkbutton -label Speak -variable ${chan}Spk($nk) \
-      -command "chngMode $nk ${chan} v" -state disabled
+      -command "chngMode $nk ${chan} v" \
+      -state [expr {[operator ${chan}] ? "normal" : "disabled"}]
     $name add checkbutton -label ChanOp -variable ${chan}Op($nk) \
-      -command "chngMode $nk ${chan} o" -state disabled
-    $name add command -label Kick -command "kick $nk ${chan}" -state disabled
-    $name add command -label Kill -command "kill $nk" -state disabled
-    if {[operator ${chan}]} {
-	$name entryconfigure 4 -state normal
-	$name entryconfigure 5 -state normal
-	$name entryconfigure 6 -state normal
-    }
-    if {$ircop} { $name entryconfigure 7 -state normal }
+      -command "chngMode $nk ${chan} o" \
+      -state [expr {[operator ${chan}] ? "normal" : "disabled"}]
+    $name add command -label Kick -command "kick $nk ${chan}" \
+      -state [expr {[operator ${chan}] ? "normal" : "disabled"}]
+    $name add command -label Kill -command "kill $nk" \
+      -state [expr {$ircop ? "normal" : "disabled"}]
     return $name
 }
 
@@ -1514,11 +1562,11 @@ proc makeUserButton {chan win nk nm op sp} {
 	if {$sp} { markButton $win.$nk speaker }
     }
     pack append $win $win.$nk {top frame center}
-    .${chan}.users.lFrm.userList configure \
-	-scrollregion [list 0 0 \
-	[winfo reqwidth .${chan}.users.lFrm.userList.frame] \
-	[winfo reqheight .${chan}.users.lFrm.userList.frame]] \
-	-scrollincrement [winfo reqheight $win.$nk]
+    set wd [winfo reqwidth $win.$nk]
+    set ht [winfo reqheight $win.$nk]
+    set ht [expr { $ht * [llength [winfo children $win]]}]
+    .${chan}.users.userList configure \
+	-scrollregion [list 0 0 $wd $ht]
     return
 }
 
@@ -1530,7 +1578,7 @@ proc ircJOIN {prefix param args} {
     } {
 	set chan [string tolower $param]
 	optText JOIN 	${chan} "*** $nk ([lindex $nkinfo 3]) has joined channel $param"
-	makeUserButton ${chan} .${chan}.users.lFrm.userList.frame \
+	makeUserButton ${chan} .${chan}.users.userList.frame \
 	  [lindex $nkinfo 2] $nk 0 0
     }
 }
@@ -1539,8 +1587,14 @@ proc killUser {chan who} {
     global ${chan}Op
     global ${chan}Spk
     set who [string tolower $who]
-    catch "pack unpack .${chan}.users.lFrm.userList.frame.$who"
-    catch "destroy .${chan}.users.lFrm.userList.frame.$who"
+    set win .${chan}.users.userList.frame
+    catch "pack unpack $win.frame.$who"
+    catch "destroy $win.$who"
+    set wd [winfo reqwidth $win.@me]
+    set ht [winfo reqheight $win.@me]
+    set ht [expr { $ht * [llength [winfo children $win]]}]
+    .${chan}.users.userList configure \
+	-scrollregion [list 0 0 $wd $ht]
     catch "unset ${chan}Op($who)"
     catch "unset ${chan}Spk($who)"
 }
@@ -1553,17 +1607,22 @@ proc ircNICK {prefix param args} {
 	global channels
 	set nk [lindex $nkinfo 0]
 	set lnk [lindex $nkinfo 2]
+	set lpr [string tolower $param]
 	foreach chan "$channels" {
-	    if {[winfo exists .${chan}.users.lFrm.userList.frame.$lnk]} {
+	    if {[winfo exists .${chan}.users.userList.frame.$lnk]} {
 		global ${chan}Op
 		global ${chan}Spk
 		set op [set ${chan}Op($lnk)]
 		set sp [set ${chan}Spk($lnk)]
 		killUser ${chan} $lnk
-		makeUserButton ${chan} .${chan}.users.lFrm.userList.frame \
-		  [string tolower $param] $param $op $sp
+		makeUserButton ${chan} .${chan}.users.userList.frame \
+		  $lpr $param $op $sp
 		optText NICK ${chan} "*** $nk is now known as $param"
 	    }
+	}
+	if {[winfo exists .$lnk]} {
+	    wm title .$lnk "Conversation with $param"
+	    rename .$lnk .$lpr
 	}
     }
 }
@@ -1576,7 +1635,7 @@ proc killChannel {chan} {
     global ${chan}Active
     global ${chan}Key
     set chan [string tolower ${chan}]
-    destroy .${chan}
+    destroy .[lindex [split $chan .] 0]
     catch "unset ${chan}Op"
     catch "unset ${chan}Spk"
     catch "unset ${chan}Key"
@@ -1599,13 +1658,30 @@ proc ircINVITE {prefix param args} {
       "Join {channelJoin $param}" {Ignore {}}
 }
 
+proc ircKILL {prefix param args} {
+    set nkinfo [mungPrefix $prefix]
+    set who [string tolower [lindex $args 0]]
+    if {[me $who]} {
+	global sock
+	shutdown $sock all
+	close $sock
+	mkDialog KILLED .@killed "Killed"\
+	  "You have been killed by [lindex $nkinfo 0] ($param)" \
+	  {} {OK {}}
+    } {
+	optText KILL ${chan} \
+	  "*** $who has been killed by [lindex $nkinfo 0] ($param)"
+	killUser ${chan} $who
+   }
+}
+
 proc ircKICK {prefix param args} {
     set nkinfo [mungPrefix $prefix]
     set chan [lindex $args 0]
     set who [string tolower [lindex $args 1]]
     if {[me $who]} {
 	killChannel ${chan}
-	mkDialog KICKED .@killed "Kicked from ${chan}"\
+	mkDialog KICKED .@kicked "Kicked from ${chan}"\
 	  "You have been kicked off channel ${chan} by [lindex $nkinfo 0] ($param)" \
 	  {} {OK {}}
     } {
@@ -1616,17 +1692,14 @@ proc ircKICK {prefix param args} {
 }
 
 proc opItems {chan state} {
-    foreach name [winfo children .${chan}.users.lFrm.userList.frame] {
-	$name.menu entryconfigure 4 -state $state
-	$name.menu entryconfigure 5 -state $state
-	$name.menu entryconfigure 6 -state $state
+    global userMenuOps
+    global opUsrCmd
+    foreach name [winfo children .${chan}.users.userList.frame] {
+	setState $name.menu $userMenuOps $opUsrCmd $state
     }
-    foreach vl {1 2 3 4 5 6} {
+    foreach vl {1 2 3 4 5 6 7 8 9} {
 	.${chan}.oFrm.cmdBtnFrm.mode.menu entryconfigure $vl -state $state
     }
-    .${chan}.users.thisUser.menu entryconfigure 4 -state $state
-    .${chan}.users.thisUser.menu entryconfigure 5 -state $state
-    .${chan}.users.thisUser.menu entryconfigure 6 -state $state
 }
 
 proc markButton {name which} {
@@ -1663,11 +1736,10 @@ proc markButton {name which} {
 proc markOp {chan who} {
     global ${chan}Op ; set ${chan}Op($who) 1
     if {[me $who]} {
-	markButton .${chan}.users.thisUser operator
 	opItems $chan normal
-    } {
-	markButton .${chan}.users.lFrm.userList.frame.$who operator
+	set who @me
     }
+    markButton .${chan}.users.userList.frame.$who operator
 }
 
 proc unmarkOp {chan who} {
@@ -1676,20 +1748,21 @@ proc unmarkOp {chan who} {
     set par [expr  {[set ${chan}Spk($who)] ? "speaker" : ""}]
     if {[me $who]} {
 	opItems $chan disabled
-	markButton .${chan}.users.thisUser $par
-    } {
-	markButton .${chan}.users.lFrm.userList.frame.$who par
+	set who @me
     }
+    markButton .${chan}.users.userList.frame.$who $par
 }
 
 proc markV {chan who} {
     global ${chan}Spk ; set ${chan}Spk($who) 1
     if {[me $who]} {
-	if {![operator ${chan}]} { markButton .${chan}.users.thisUser speaker }
+	if {![operator ${chan}]} {
+	    markButton .${chan}.users.userList.frame.@me speaker
+	 }
     } {
 	global ${chan}Op
 	if {![set ${chan}Op($who)]} {
-	    markButton .${chan}.users.lFrm.userList.frame.$who speaker
+	    markButton .${chan}.users.userList.frame.$who speaker
 	}
     }
 }
@@ -1697,11 +1770,13 @@ proc markV {chan who} {
 proc unmarkV {chan who} {
     global ${chan}Spk ; set ${chan}Spk($who) 0
     if {[me $who]} {
-	if {![operator ${chan}]} { markButton .${chan}.users.thisUser ""}
+	if {![operator ${chan}]} {
+	    markButton .${chan}.users.userList.frame.@me ""
+	}
     } {
 	global ${chan}Op
 	if {![set ${chan}Op($who)]} {
-	    markButton .${chan}.users.lFrm.userList.frame.$who ""
+	    markButton .${chan}.users.userList.frame.$who ""
 	}
     }
 }
@@ -1922,15 +1997,16 @@ proc ircPRIVMSG {prefix param args} {
 proc ircQUIT {prefix param args} {
     global toInfo    
     set nkinfo [mungPrefix $prefix]
+    set nk [lindex $nkinfo 0]
     set lnk [lindex $nkinfo 2]
     if {[set ti [expr {[lsearch $toInfo SIGNOFF] >=0}]]} {
-	chText "*** Signoff: [lindex $nkinfo 0] ($param)"
+	chText "*** Signoff: $nk ($param)"
     }
     global channels
     foreach chan "$channels" {
-	if {[winfo exists  .${chan}.users.lFrm.userList.frame.$lnk]} {
+	if {[winfo exists  .${chan}.users.userList.frame.$lnk]} {
 	    if {!$ti} {
-		optText QUIT ${chan} "*** Signoff: [lindex $nkinfo 0] ($param)"
+		optText QUIT ${chan} "*** Signoff: $nk ($param)"
 	    }
 	    killUser ${chan} $lnk
 	} {
@@ -1957,20 +2033,22 @@ proc irc001 {prefix param args} {
     global startup
     global operPW
     global operNick
+    global operServer
     global nickname
     global invisible
     global wallops
     global srvmsg
+    global server
     set startup 0
-    if {$operPW != ""} {
+    if {$operServer == $server && $operPW != ""} {
 	sendIRC OPER [expr {$operNick == "" ? $nickname : $operNick}] $operPW
     }
     if {$invisible} { setMode $nickname "+i" }
     if {$wallops} { setMode $nickname "+w" }
     if {$srvmsg} { setMode $nickname "+s" }
-    set tmp $channels
-    set channels {}
-    foreach ch $tmp { channelJoin $ch {} }
+#    set tmp $channels
+#    set channels {}
+    foreach ch $channels { channelJoin $ch {} }
     chText "*** $param"
 }
 
@@ -1994,14 +2072,14 @@ proc ircNUM {number prefix param args} {
 	    mkDialog ERROR .@err$number "Error $number" "$txt" {} {OK {}}
 	}
     default {
+	    wm deiconify .
 	    .oFrm.textFrm.text configure -state normal
 	    .oFrm.textFrm.text insert end "***"
 	    foreach arg [lrange $args 1 end] {
-		if {$arg != {}} {
-		    .oFrm.textFrm.text insert end " $arg"
-		}
+		if {$arg != {}} { .oFrm.textFrm.text insert end " $arg"	}
 	    }
 	    .oFrm.textFrm.text insert end " $param\n"
+	    chopText @info .oFrm.textFrm.text
 	    .oFrm.textFrm.text configure -state disabled
 	    .oFrm.textFrm.text yview -pickplace end
 	}
@@ -2027,19 +2105,19 @@ proc setNickname {nk} {
     global nickname
     global lcNickname
     global channels
-    .@ctrl.oFrm.nSFrm.nickFrm.nickEntry delete 0 end
-    .@ctrl.oFrm.nSFrm.nickFrm.nickEntry insert end $nk
+    .@ctrl.oFrm.nSFrm.nickname.entry delete 0 end
+    .@ctrl.oFrm.nSFrm.nickname.entry insert end $nk
     set lcn [string tolower $nk]
     foreach chan $channels {
-	if {[winfo exists .${chan}.users.thisUser]} {
-	    .${chan}.users.thisUser configure -text $nk
+	if {[winfo exists .${chan}.users.userList.frame.@me]} {
+	    .${chan}.users.userList.frame.@me configure -text $nk
 	    global ${chan}Op
 	    global ${chan}Spk
 	    set op [set ${chan}Op($lcn) [set ${chan}Op($lcNickname)]]
 	    set sp [set ${chan}Spk($lcn) [set ${chan}Spk($lcNickname)]]
-	    destroy .${chan}.users.thisUser.menu
-	    makeUserMenu ${chan} .${chan}.users.thisUser.menu $lcn \
-	      $op $sp
+	    destroy .${chan}.users.userList.frame.@me.menu
+	    makeUserMenu ${chan} .${chan}.users.userList.frame.@me.menu \
+	      $lcn $op $sp
 	    unset ${chan}Spk($lcNickname)
 	    unset ${chan}Op($lcNickname)
 	}
@@ -2049,28 +2127,26 @@ proc setNickname {nk} {
 }
 
 proc resetNick {} {
-    global startup
     global nickname
-    global user
-    .@ctrl.oFrm.nSFrm.nickFrm.nickEntry delete 0 end
-    .@ctrl.oFrm.nSFrm.nickFrm.nickEntry insert end "$nickname"
+    .@ctrl.oFrm.nSFrm.nickname.entry delete 0 end
+    .@ctrl.oFrm.nSFrm.nickname.entry insert end "$nickname"
 }
 
 proc irc432 {prefix param args} {
     resetNick
-    mkDialog ERROR .@nicker "Error 432" "[lindex $args 1] : $param" \
+    mkDialog ERROR .@nicker "Nickname Error" "[lindex $args 1] : $param" \
       {} {OK {}}
 }
 
 proc irc433 {prefix param args} {
     resetNick
-    mkDialog ERROR .@nicker "Error 433" "[lindex $args 1] : $param" \
+    mkDialog ERROR .@nicker "Nickname Error" "[lindex $args 1] : $param" \
       {} {OK {}}
 }
 
 proc irc471 {prefix param args} {
     set chan [lindex $args 1]
-    mkDialog {} .@full "Error 471" "Channel ${chan} if full!" \
+    mkDialog {} .@full "Channel Full" "Channel ${chan} if full!" \
       {} {OK {}} "{Try Again} {channelJoin ${chan}}"
 }
 
@@ -2085,21 +2161,19 @@ proc irc474 {prefix param args} {
 proc irc475 {prefix param args} {
     set chan [lindex $args 1]
     if {[info exists ${chan}Key]} {
-	mkDialog {} .@key "Error 475" \
+	mkDialog {} .@key "Bad Key" \
 	  "Bad key for channel ${chan}!" "{Key ${chan}Key}" \
 	  "{Try Again} {channelJoin ${chan}}" {Cancel {}}
     } {
 	mkDialog {} .@key "Key" "Enter key for channel ${chan}:" \
-	  "{Key ${chan}Key}" \
-	  "Join {channelJoin ${chan}}" {Cancel {}}
+	  "{Key ${chan}Key}" "Join {channelJoin ${chan}}" {Cancel {}}
     }
 }
 
 proc irc301 {prefix param args} {
     global whoisInfo
-    global whoisAway
     if {$whoisInfo != {}} {
-	set whoisAway $param
+	global whoisAway ; set whoisAway $param
     } {
 	chText "*** [lindex "$args" 1] is away: $param"
     }
@@ -2114,19 +2188,21 @@ proc invert {button} {
 
 proc irc305 {prefix param args} {
     global away
-    if {$away} { invert .@ctrl.oFrm.c1BtnFrm.awayBtn }
+    if {$away} { invert .@ctrl.oFrm.bf1.away }
     set away 0
 }
 proc irc306 {prefix param args} {
     global away
-    if {!$away} { invert .@ctrl.oFrm.c1BtnFrm.awayBtn }
+    if {!$away} { invert .@ctrl.oFrm.bf1.away }
     set away 1
 }
 
 proc irc311 {prefix param args} {
     global whoisInfo
-    set whoisInfo [list [lindex $args 1] [lindex $args 2] [lindex $args 3] "$param"]
+    set whoisInfo \
+      [list [lindex $args 1] [lindex $args 2] [lindex $args 3] "$param"]
 }
+
 proc irc312 {prefix param args} {
     global whoisInfo
     lappend  whoisInfo [lindex $args 2] "$param"
@@ -2327,32 +2403,39 @@ proc irc353 {prefix param args} {
 	    if {[me $n]} {
 		if {$op} { markOp $chan $n } { if {$sp} { markV $chan $n }}
 	    } {
-		makeUserButton $chan .${chan}.users.lFrm.userList.frame $n \
+		makeUserButton $chan .${chan}.users.userList.frame $n \
 		  $nm $op $sp
 	    }
 	}
     }
 }
-proc irc366 {prefix param args} {}
+
+proc irc366 {prefix param args} {
+    set chan [lindex $args 1]
+    if {[winfo exists .$chan]} {
+    }
+}
+
 proc irc374 {prefix param args} {}
 proc irc376 {prefix param args} {}
 
 proc ircItems {state} {
     global channels
     foreach chan $channels {
-	if {[winfo exists .${chan}.users.lFrm.userList.frame] } {
-	    .${chan}.users.thisUser.menu entryconfigure 7 -state $state
-	    foreach name [winfo children .${chan}.users.lFrm.userList.frame] {
-		$name.menu entryconfigure 7 -state $state
+	if {[winfo exists .${chan}.users.userList.frame] } {
+	    global userMenuOps
+	    global ircUsrCmd
+	    foreach name [winfo children .${chan}.users.userList.frame] {
+		setState $name.menu $userMenuOps $ircUsrCmd $state
 	    }
 	}
     }
     global serverOps
-    global ircOpCmd
-    foreach cmd $ircOpCmd {
-	.@ctrl.oFrm.c3BtnFrm.srvops.menu entryconfigure \
-	  [lsearch $serverOps $cmd] -state $state
-    }
+    global ircSrvCmd
+    global userOps
+    global ircUsrCmd
+    setState .@ctrl.oFrm.bf2.servers.menu $serverOps $ircSrvCmd $state
+    setState .@ctrl.oFrm.bf2.users.menu $userOps $ircUsrCmd $state
     .@ctrl.oFrm.nSFrm.cr.ircop configure -state $state
 }
 
@@ -2474,13 +2557,19 @@ proc ircInput {mode conn} {
     }
 }
 
-proc changeNick {name} {
+proc changeIRCName {name} {
+    mkDialog "" .@warn Warning \
+      "Change will not take effect until next server change." {} "OK {}"
+       global ircname; set ircname $name
+}
+
+proc changeNickname {name} {
     global startup
     if {$startup} {
 	setNickname $name
     } {
-	.@ctrl.oFrm.nSFrm.nickFrm.nickEntry delete 0 end
-	.@ctrl.oFrm.nSFrm.nickFrm.nickEntry insert end "$name"
+	.@ctrl.oFrm.nSFrm.nickname.entry delete 0 end
+	.@ctrl.oFrm.nSFrm.nickname.entry insert end "$name"
     }
     sendIRC NICK $name
 }
