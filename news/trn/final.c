@@ -1,4 +1,4 @@
-/* $Id: final.c,v 1.5 1994/02/22 01:45:09 nate Exp $
+/* $Id: final.c,v 1.6 1994/06/25 12:58:32 ats Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -96,7 +96,7 @@ int status;
     nntp_cleanup();
 #endif
     if (status < 0) {
-	chdir("/usr/tmp");
+	chdir("/var/tmp");
 	sigset(SIGILL,SIG_DFL);
 #ifdef HAS_SIGBLOCK
 	sigsetmask(sigblock(0) & ~(sigmask(SIGILL) | sigmask(SIGIOT)));
