@@ -149,7 +149,7 @@ typedef struct _yuser {
 #define KILL	edit[1]
 #define WORD	edit[2]
 #define CLR	edit[3]
-#define RUBDEF	0xfe
+#define RUBDEF  0x7f
 
 /* ---- Ytalk version 3.* out-of-band data ---- */
 
