@@ -73,7 +73,7 @@ LOADLIBES =
 extras =  getloadavg.o
 
 # Common prefix for machine-independent installed files.
-prefix = /usr/local
+prefix = /usr/gnu
 # Common prefix for machine-dependent installed files.
 exec_prefix = $(prefix)
 
