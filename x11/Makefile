@@ -20,6 +20,8 @@ SUBDIR += ezd
 SUBDIR += xview
 SUBDIR += xpm
 SUBDIR += fvwm # depends on xpm
+SUBDIR += piewm # depends on xpm
+SUBDIR += xphoon
 
 .if !defined(AVOID)
 SUBDIR += xxgdb
