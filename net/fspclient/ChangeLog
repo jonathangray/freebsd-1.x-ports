@@ -1,0 +1,709 @@
+*** 20th May 1993:
+    ##	emergency pre-alpha release of fspclient.0.0-h+
+     -	changed `continue' to `break' in the main download loop
+	in client/util.c:util_download_main() -- this fixes a SERIOUS
+	bug
+
+*** 6th May 1993:
+    ##	pre-alpha release of fspclient.0.0-h
+     -	added a `LITERAL_DIR' to the validate_operation_mask() check
+	in client/remote/rpro.c:set_pro() -- the wrong directory
+	permissions were being checked
+     -	prevented the client from aborting when a SIGPIPE was received
+	with a `ls | head -1' type command
+     -	deleted bsd/random.c -- a question: why have I had it in for the
+	last 7 versions?  It is never used--it was needed for the server!
+	(Stoopid!)
+     -	tidied up some of the documentation files
+     -	stopped `macro -l' segmenting when not given a macro name
+	(changed `argc < 2' in client/local/lmacro.c to `argc == optind)
+
+*** 4th May 1993:
+     -	eventually got annoyed enough to add the appropriate `const' to
+	client/util.c:validate_operation_mask()'s first argument.  No more
+	annoying `argument passing discards const' warnings :-)
+     -	added checks into client/remote/rrm*.c to make sure that the file
+	that has been requested to be deleted (i) exists; and (ii) is of
+	the appropriate type
+     -	reset the value of burst_count in client/lib.c at the start of the
+	loop -- bogus `r's were being printed
+     -	checked for burst_count < burst_max in the conditional to determine
+	whether to blank over the last character -- without it, `r's were
+	being left displayed when they should have been cleaned up
+
+*** 3rd May 1993:
+     -	caught a few small errors by recompiling with -Wall for a change...
+     -  tidied up the prototyping and extern's for the bsd directory
+	(yes, most of that was done by hand)
+     -	removed common/__p.h and put in function-by-function protoization
+	with ANSI_PROTOTYPES as the selector... (no, I didn't do it by hand)
+
+*** 30th April 1993:
+     -	made the client_get_key() routines interruptable; locks will never
+	be broken, but an attempt to get the key can be aborted
+     -	added a check for `sincetime' into client/util.c:util_process_file()
+	this means that sincetime is now used for get's, tar's, etc as well
+	as for ls -- it makes sense, at long last
+
+*** 27th April 1993:
+     -	changed a putchar('\n') into a putc('\n', STDOUT) in bsd/ls.c
+     -	added a check for client tracing level in client/remote/rtar.c
+	to prevent printing of the downloading message
+	(both bugs reported by Alan Ruttenberg)
+
+*** 26th April 1993:
+     -  yet another rewrite of the Makefiles -- I have removed my own
+	configuration stuff and replaced it with GNU autoconf generated
+	configuration; this has led to a slight tidying up of the
+	#include's as well...
+
+*** 19th April 1993:
+     -	fixed the `skipto' command -- it would give an error if a label
+	was encountered when it wasn't skipping (changes to client/main.c
+	in the main execution loop for commands)
+     -	fixed buglet in the `open' command; not specifying a port did
+	not lead to the documented `default 21' behaviour... it left
+	the port number unchanged
+     -	added a #ifdef _IBMR2, #include <sys/select.h>, #endif into the
+	configure script section checking the presence of fd_set -- this
+	fixed the problem whereby the configure generated a NEED_FDSET;
+	unfortunately, I had this #ifdef in common/common.h so this lead
+	to a conflicting definition... ooops.
+
+*** 17th April 1993:
+     -	fixed the problem whereby error messages got printed twice -- I
+	wasn't checking the interrupt status where I should have
+     -	added a client_finish_key() to client/lib.c (and appropriate
+	definitions to client/lock.c).	This fixed a one file descriptor
+	per host-change leak that has existed since the inception of
+	the client... it was only discovered after I decided to write a
+	site-ping script (I _knew_ the iferror and skipto commands would be
+	useful :-)).
+     -	added a validate_operation() call to client/util.c:get_dir_blk()
+	this is the lowest level directory fetching routine, and hence
+	is the way to prevent unnecessary directory fetches... as a side
+	effect, this means I don't need to worry about doing anything
+	to the ls command (I hope)
+
+*** 16th April 1993:
+     -	added a new rule to ./configure -- now the variable `MAKE' is checked
+	within `make' -- if it isn't defined, then a value of `MAKE = make'
+	is added to the Makefile.cfg
+     -	removed some const's from bsd_src/getopt.c (thanks to Patrick
+	Allen again)
+
+*** 15th April 1993:
+     -	rewrote Makefile system AGAIN to cope with systems which don't have
+	make programs which understand the `include' directive; this meant
+	adding a few new scripts, and another layer of wrapping to the
+	top-level Makefile
+     -	thanks to Patrick Allen for a few prototyping slips and minor fixes
+	to make the code compile under HP-UX (hiya Patrick!); some systems
+	need to use their own getopt() functions -- currently this is set
+	to hpux and sun -- add others to the #if at the start of
+	bsd_src/getopt.c if needed (and mail me!)
+     -	reorganised the order of #include's in bsd_src/print.c and
+	client/glob.c
+
+*** 14th April 1993:
+    ##	pre-alpha release of fspclient.0.0-g
+     -	decided that it was time to get the code out
+     -	re-purified the code and caught a 1 byte memory leak repeated 60 times
+     -	threw out my old way of testing permissions for commands and rewrote
+	by putting the calls in explicitly; this made everything a lot more
+	sensible
+     -	changed the way Makefile's included the configuration stuff to be
+	more generic (i.e., dumb)
+
+*** 13th April 1993:
+     -	got bored with writing ChangeLog entries and decided to have some
+	chocolate... I wonder if anybody apart from me reads this rubbish
+     -	modified all the remote commands to list which of the permission
+	bits they require to be set in order to have a chance of working;
+	combined with the new GET_PRO protocol, this allows the client to
+	prevent packets being sent to the server which it knows are going
+	to be rejected
+     -	modified README file handling so that the readme information is
+	treated seperately -- this allows the creation of the `readme'
+	command to limit how often and when the readme file is seen
+     -	added in the changes to handle the modified protocols for CC_GET_PRO
+	and CC_VERSION
+     -	removed modification to client_interact() which set the `.pos'
+	field to be the packet length; the new commands use the `.pos' field
+	to be the length of the second field
+     -	added limiter to the client/lib.c:client_interact() code to prevent
+	the retry period from dropping below 500 msec
+     -	renamed the CHANGELOG file to ChangeLog because it looks prettier
+
+*** 10th April 1993:
+     -	removed the local command `errexit' and replaced it with local commands
+	`iferror', `ifok', and  `onerror'.  When combined with the `skipto'
+	command this allows _very_ basic control flow.  How it _is_ useful
+	for FSP client scripts...  (note that `errexit' is replacable by
+	`iferror exit')
+     -	added the local commands `skipto'; this eats input until a line
+	is given with a label (i.e., first parameter terminated by `:')
+	that matches the `skipto' argument.  e.g.,
+		skipto fred
+		wibble
+		bibble
+		fred:
+	will eat all the text between the skipto and the `fred:'
+
+*** 9th April 1993:
+     -	changed client/lib.c:client_interact() so that the returned UBUF
+	had the field `.pos' set to the length of the data area returned;
+	this allows access to the second field of the reply.  This doesn't
+	break anything since nothing ever uses the `.pos' field returned.
+     -	modified the recursion code in client/util.c:util_process_file()
+	so that the `recursive' field was in fact a counter which was
+	decremented on each recursive call.  This allows a limit to be
+	put on the depth of the recursion...
+     -	added util_print_protection() to client/util.c; this allowed its
+	removal from client/local/l{pro,cd}.c; rehashed client/util.c
+	protection caching so that errors could be cached (and incorporated
+	a 32 byte bitfield for the server extension).
+
+*** 4th April 1993:
+     -	removed last vestiges of individual clients from the commands in
+	client/remote/r*.c -- i.e., they no longer perform something
+	special if compiled without `main' being defined
+     -  extended the `exit' command to behave like `errexit' -- the only
+        difference is that `exit' exits regardless of the previous
+	commands exit status -- if exit is given no argument, the return
+	code is the same as the previous command.  `quit' is identical
+	to `exit 0'.  Terminating a session by giving an EOF to fspclient
+	will cause the same effect as `exit'.
+     -  added the command `errexit' (to client/local/lquit.c); this
+	command will cause the script to terminate if the previous
+	command had an error -- the actual error code returned to the
+	environment can be set as an argument; if no argument is set,
+	then the value returned is the value of the last command.
+     -	wrote scripts to maintain the table of commands (formally
+	client/table.h and client/fsputil.h; now are remote/table.h
+	and local/table.h).  The make dependencies, make rules,
+	and command despatch tables are now all generated from the
+	source files -- the leading `INFO' block comment in each file
+	specifies the command names possible for invoking the `main'
+	of the file, the type of globbing used, and the help message;
+	also, any special make flags that are needed can be included.
+	This makes makefile maintainance a lot easier...
+     -	decided that the code looked asymetrical; moved all the f*.c type
+	commands into a directory client/remote/.  Renamed all the files
+	to be more consistent with their use; so fgetcmd.c became rget.c
+	(`r' for `remote'), fput.c became rput.c, etc.
+     -	decided that client/fsputil.c was getting too long, and split it
+	into its component functions -- this required the creating
+	of client/local/, which in turn has its own make system, and
+	generates liblocal.a (which main.o is linked with)
+     -	ran `Purify'(TM) on the code -- detected a couple of minor memory
+	leaks in the bsd_src/ls.c code, and a few other miscellaneous
+	ones; after the ls bug, none of the others amounted to more than
+	about 32 bytes each...
+     -	the whole of the argument globbing system was rewritten -- rather
+	than each command have its own code for expanding the command
+	line, I added a function client/util.c:util_process_arglist()
+	which scans along an arglist, expands each argument by globbing
+	it, and then performs a callback to the calling routine via a
+	supplied function; this appreciably tidied up the code
+     -	the addition of the tar function necessitated changes to the
+	way that client/util.c:util_download() is called -- firstly,
+	there has been a change from FILE streams to straight forward file
+	descriptors -- the buffering was not needed, and _much_ better
+	error handling is possible.  secondly, the download functions
+	take starting offset and length parameters.  thirdly, all the
+	code for performing restarts was moved into client/fgetcmd.c;
+	this code was a hinderance in the past for the `cat' command,
+	and became a right pain when trying to do `tar'.
+     -	added the `tar' command (with both non-recursive and recursive
+	modes of operation); uses the util_process_files() function...
+     -	added the `du' command (with both non-recursive and recursive
+	modes of operation, summary and non-summary modes); uses the
+	util_process_files() function...
+     -	added recursive modes of operation to the `cat' and `get'
+	commands; this was done by creating the function
+	client/util.c:util_process_files() which traverses the remote
+	directory tree, using callback functions on directory and
+	files that are found; private data can be kept per directory
+	(it should be malloc()'d and a routine is called after the
+	directory has been processed with a pointer to this data --
+	util_process_files() performs the necessary free() operation!!).
+	A useful general purpose function...
+     -	tidied up the error handling code throughout the package;
+	the changes for this affected practically every file!  Basically,
+	each command now sets an error flag properly, and the error
+	propogates back in a moderately intuitive way... this leaves
+	the way open for the `errexit' command -- exit if an error has
+	occurred in the previous command -- useful for scripts... when
+	combined with the `timeout' command, a script will be able to do:
+		timeout 30
+		ver
+		errexit
+		timeout 0
+		...
+	If there is no response after 30 seconds, abort the script,
+	otherwise, remove the timeout and continue...
+     -	added the `timeout' command -- an alarm can now be set on
+	communication to the remote server -- if the alarm goes before
+	a response has been elicited (no matter how many packets we
+	have sent), then the function client/lib.c:client_interact()
+	returns with an error (returns NULL).  This means a simple ping
+	operation can be done by using `ver'
+     -	added a file bsd_src/getopt.c which is used when the OS is Linux;
+	this gets round a problem in GNU libc (or linux libc) which
+	causes repeated invocations of getopt() with different arguments
+	to behave oddly
+     -	ho hum -- time to catch up on the changelog... lots of changes
+	in the last few days...
+
+*** 30th March 1993:
+     -	changed the the st_maxlen and st_btotal defines in bsd_src/ls.h to
+	be 2 new LS structure elements; under SunOS, they were reusing
+	elements of type dev_t which is only u_short -- it was not large
+	enough to store some block totals and these block totals were
+	then being printed as extremely large values...  This needed
+	changes making to bsd_src/print.c and bsd_src/ls.c
+
+*** 26th March 1993:
+    ##	started fspclient.0.0-g
+
+*** 22nd March 1993:
+     -	remove the check for conflict between the common/common.h extern
+	defn's for standard library functions -- from now on, live
+	with the implicit declaration warnings
+     -	remove much of the vfork checking; simplify the situation down
+	to: if vfork.h exists, include it, and use vfork, otherwise,
+	use fork.
+     -  set the install program to `cp' in all cases; trying to second
+	guess what `install' is is too messy :-)
+
+*** 16th March 1993:
+     -	if a pager was set in the .fsprc, the signal handler was not enabled;
+	this was fixed by very minor patch to client/main.c
+
+*** 14th March 1993:
+    ##	pre-alpha release of fspclient.0.0-f
+     -  tracked down and fixed a bug in client/util.c:my_fgets() which
+	could cause segmentation faults on INTR signals
+     -	added support for piping the output of fsp commands into a shell
+	pipeline (changes to client/parse.c and client/main.c)
+     -  fixed a slight bug in the support of README files -- the cached
+	information of directory protection was being modified and not
+	repaired (change to client/fprocmd.c)
+
+*** 2nd November 1992:
+     -	deleted client/DIFFERENCES -- the differences are now to pronounced
+	to be able to summarised by a file renaming... in general, what
+	was client_X.c has become client/X.c, although I wouldn't suggest
+	doing a diff :-}
+     -	deleted client/extras.c
+     -	deleted all the original manual pages for the client front-ends
+     -	removed all vestiges of the individual clients from the Makefiles;
+	the code is now geared to only acting as a combined program
+	(although it can be invoked by the old names and still function
+	in the same way that the original programs worked)
+
+*** 31st October 1992:
+     -	fixed a mistaken stderr -> STDERR replacement in common/misc.c
+	(report from pre-pre-alpha tester)
+
+*** 28th October 1992:
+    ##	pre-pre-alpha release of fspclient.0.0-f to selected testers :-)
+     -	changed the way that returned directory entries are stored --
+	they are now malloc'd individually.  Without this modification
+	it is impossible to flush the information under GNU malloc() --
+	the code generates a SEGV
+     -	renamed STAT to GLOBSTAT, and MAXSEG to GLOBMAXSEG, in client/glob.c
+	to stop them from interfering with system defined macros
+     -	added a definition of MAXNAMLEN into client/glob.c for those
+	syetems which `need' it...
+     -	sorted the order of commands in fsputil.h
+     -	changed the stat()'s in fgetcmd.c into access(...,W_OK)
+     -	changed utimes() in client/fgetcmd.c into a utime() call
+	(and included <utime.h>) -- this makes it more POSIX.
+     -	changed the ftell(fs) in client/util.c into a
+	lseek(fileno(fs),0,SEEK_END) -- ftell() doesn't function
+	as expected on all system -- in particular, ftell() on a file
+	opened with mode "a+" returns 0 when nothing has been written.
+     -	updated client/man/fsp.1 with the `bug' described next:
+     -	added a putenv("POSIXLY_CORRECT=") to client/main.c in order to
+	make the internal ls work properly with GNU getopt.  *sigh*  This
+	needs to be replaced with a more generic fix -- but getopt() isn't
+	at all consistent between systems about how it copes with being
+	invoked on multiple argument lists.
+     -	added a `#include <client.h>' to bsd_src/util.c; removed the
+	malloc() extern.
+     -	in bsd_src/ls.c, changed the reference to dp->d_ino into a
+	reference to dp->d_fileno (d_ino does not exist in the structure --
+	it was relying on there being a #define in tweak.h).
+     -	made `ls' print out the name of any flag which was wrong (set
+	opterr = 1)
+     -	minor (very minor) memory leak in client/flscmd.c fixed --
+	interrupting a listing could cause a leak of the CWD.
+     -	added a few `const char *'s into function prototypes
+     -	tidied up the whole approach of doing redirection of output;
+	rather than creating global variables stdprompt, etc, I have
+	collected together all output streams into a global structure
+	global_iostreams (of type iostreams).  All references to stdin,
+	..., stddbg have now been replaced by references to STDIN, ...,
+	STDDBG.  These values are macros that are just global_iostreams.in,
+	..., global_iostreams.dbg.  This allows the redirection of output
+	(as needed by things like `source') to be done properly -- the
+	old method was a hack which failed to work with GNU libc.
+	the iobuffers structure is defined in client/client.h
+     -	added support for the macros FD_SET if they are missing
+     -	started documenting the changes I've made since the last entry;
+	this entry contains work carried out since the 23th October 1992.
+
+*** 13th September 1992:
+    ##	started fspclient.0.0-f
+     -	prevented the environment variable (or lack of one) from clobbering
+	the value of pager_command set by the .fsprc in client/main.c
+
+*** 11th September 1992:
+     -	moved the setting of the FSPFILE environment variable in
+	client/fcatcmd.c to before the popen(); means that the pager
+	command now has the correct value supplied
+
+*** 10th September 1992:
+    ##	pre-alpha release of fspclient.0.0-e
+     -	added the setting of the FSPFILE environment to fcatcmd.c;
+	updated client/man/fsp.1
+     -	tidied up ./configure to find out whether ranlib exists,
+	and also to automatically check for NOSYSPROTOS.
+
+*** 9th September 1992:
+     -	implemented directory protection caching -- this speeds up
+	`cd's into directories which have already been entered; ditto for
+	`pro's...  the directory protection setting will mark the
+	directory as dirty after a successful `pro [+|-][c|d]'; unfortunately,
+	it will also mark it dirty after an unsuccessful one as well...
+	The problem is that the server doesn't set the command field of
+	the UBUF to CC_ERR... Needed a whole suite of things to be added
+	to util.c, and modifications to fprocmd.c and fcdcmd.c
+     -	added pager support to the `cat' command.  If the environment
+	variable `PAGER' is set, then this will be invoked on every file
+	that is `cat'd.  This can be overridden by the `pager' command.
+	These involved changes to fcatcmd.c, main.c (to initialise the
+	pager_command variable), and fsputil.[ch] to add the `pager'
+	command.  Calling `pager' with either no, or a null argument
+	will make `cat' take its previous behaviour.  Note, that the
+	command can be a pipeline -- so "tee /tmp/fsp.cat | less" is
+	quite reasonable as a setting for `pager' (and actually quite
+	useful...)
+     -	improved the help facility; it now gives help on commands and
+	macros.  If invoked as `help' it will print a command/macro list
+	summary.  If invoked as `help x' it will print the help string
+	associated with command/macro `x'.  If invoked as `help all'
+	it will print the long descriptions associated with all commands
+	and macros.
+     -	made the second argument to the `macro' command be the help
+	string associated with it -- changes made to macro.c.  Also
+	added functions to print help information on macros (involved
+	changes to macro.h (adding prototypes) as well as macro.c).
+
+*** 8th September 1992:
+     -	modified the startup system considerably; if the program is
+	invoked with a name of one of the standalone clients it will
+	(hopefully) behave like that client.  If it isn't a standalone
+	client, then the command line will be executed as a macro (if
+	such a macro exists) -- after the macro has been run, the
+	program behaves normally.  Otherwise the command line will be
+	interpreted as a host.  All these changes were made in
+	client/main.c .
+     -  slight fix to redirect.c so that debug output is sent to stderr.
+	This replaces the previous mode in which debug output was sent
+	to stderr if and only if the program was started with debugging
+	turned on.
+     -	added the `debug' command to allow the setting/querying of
+	debug levels within the client itself.
+     -  slight fix to fcdcmd.c so that the directory protection is
+	printed to stderr rather than stdout...
+     -	added packet tracing debugging information to client/lib.c .
+	It is now possible to see the header information of each packet
+	sent/received -- may be useful when debugging those connections
+	where UDP packet sizes cause problems...
+     -	reduced the number of " \b" that get printed by the tracing
+	mode; changes made to client/lib.c (i.e., the string doesn't
+	get printed if no idling/retry characters have been printed).
+
+*** 7th September 1992:
+     -  rewrote all Makefiles to use libraries rather than explicit
+	references to object files -- tidies up the linking in of the
+	object files from common/ and bsd_src/ quite considerably...
+     -	got bored with work, decided to do some more work on fsp...
+
+*** 25th August 1992:
+     -	renamed fsp_util.c to fsputil.c because I was annoyed with it.
+     -	(change made on 30th March, but not documented -- ooops):
+	Attempting to compile the client with NOLOCKING fails; a
+	definition of key_persists needs adding to lock.c.
+     -	Made changes introduced in FSP 2.6. -- changes to lock.c,
+	tiny change to util.c (didn't incorporate the cd ., cd ..
+	checks), didn't include fcatcmd.c change (not needed),
+	ditto for fcdcmd.c, fgetcmd.c, fgrabcmd.c, flscmd.c,
+	fmkdir.c, fprocmd.c, fput.c, frmcmd.c, and frmdir.c.
+	Also didn't bother with change to fver.c -- fspclient version
+	can be printed by specifying command line -v switch.
+
+*** 29th June 1992:
+     -  modified client/fgetcmd.c so that the appropriate operation
+	was performed for opening the file that would be written to.
+	This involves checking whether `file' exists, then checking for
+	`.in.file' if it doesn't.  The first rename() has now been
+	bypassed in the cases where the file is being created...
+	this removes one possible race condition that could have occured
+	before.
+
+*** 26th June 1992:
+     -  wrote the `./configure' script; this meant modifying the
+	`INSTALLATION' file (old copy is called `INSTALL.old'),
+	splitting `Makefile.cfg' into the human editable part
+	`Makefile.hum' and the automatically generated 'Makefile.cfg'.
+
+*** 25th June 1992:
+     -  fixed a nagging bug to do with bsd_src/ls.c; if there is an
+	error in the command line args, then the remainder of the flags
+	were inherited by the next invocation of ls.  I moved the usage()
+	and exit from ls to after all the args had been swallowed by
+	getopt()...
+
+*** 19th June 1992:
+     -  applied the patches from Paul Smith which fixed a couple of bugs
+	in the command line parsing in client/main.c (one typo, one dumbo).
+	Specifying the remote host on the command line now actually works!
+	and also made the interrupt handling more portable -- now reinstates
+	the handler at the end of the interrupt routine.
+
+*** 15th June 1992:
+     -	combined in the NeXT patches uploaded to the caltech; hopefully this
+	means that things should compile properly now -- hmmm... maybe not.
+
+*** 13th June 1992:
+    ##	started fspclient.0.0-e
+    ##	pre-alpha release of fspclient.0.0-d
+     -	updated man/fsp.1 to include the `touch' command
+     -	added a util_dirtydir() call to frmdircmd.c
+     -	added a util_dirtydir() call to frmcmd.c
+     -	added a util_dirtydir() call to fput.c
+     -	added a util_dirtydir() call to fmkdir.c
+     -	added a util_dirtydir() call to fgrabcmd.c
+     -	added a util_dirtydir() call to fsp_touch() for cases where a
+        `touch' has been successful (not needed if all touches either
+	failed or weren't needed 'cos the file already existed)
+     -	added the util_dirtydir() function call to util.c; it takes a
+	directory name and removes it from the directory cache (if that
+	exists); now to add directory dirty information to any command
+	which we know has modified the directory contents at the remote
+	end
+     -  added the `touch' command to create a zero-length `message' file
+	(hopefully to stop people performing the same task by creating
+	 directories) -- function is fsp_touch() in fsp_util.c
+
+*** 11th June 1992:
+     -  updated manual page man/fsp.1 to include `datestamp'
+     -	created redirect.c/.h (and made suitable changes to Makefile.fsp)
+	this will be the file for putting the redirection code into...
+	currently all that happens is that main.c:main() calls
+	redirect.c:initialise_stdio() and the file descriptors from
+	3 upto 6 (incl) are used if available for prompt, info, warn,
+	and dbg steams.  Useful for shell scripts only, at the mo...
+     -	fixed a file descriptor leak in lib.c:init_client() caused when
+	a server address couldn't be bound to.
+
+*** 29th May 1992:
+     -	modified lib.c:init_client() so as to return a value denoting
+	success or failure; then modified main.c to take account of this
+	return value and to not execute a command make sure not_connected
+	remains correct
+     -	added command line option parsing; so far only have -d (debug)
+	-v (print version header) and -V (same as -v, but die immediately
+	after printing the message)
+     -	created patchlevel.h (generated from the name of the current
+	directory)
+     -	added new command `datestamp' which makes `get' set the access
+	and modification time of files downloaded to the same as those
+	on the remote end
+     -	added the missing documentation for `burst' to the man page fsp.1
+     -	added total_sent to lib.c and modified print_comm_stats() to
+	print out stats about number of packets sent/received
+     -	modified the fsp_help() command in main.c so that it could
+	cope with commands which didn't have help text (in preparation
+	for adding `help' text to macros)
+    ##	started fspclient.0.0-d
+
+*** 25th May 1992:
+    ##	made the fspclient.0.0-c+ diffs from fspclient.0.0-c
+     -	fixed minor memory leaks in f*.c (needed to free(op)); also
+	fixed major bug in interrupt handling code for those clients
+	which did client_interact() calls -- they now actually take
+	notice of the client_intr_state on return
+    ##	realised there was a bug; made fspclient.0.0-c+ the new
+	interim release name for the package
+    ##	pre-alpha release of fspclient.0.0-c
+     -	fixed minor bug in lib.c:client_interact(); if the x_select()
+	was interrupted by ^C, then the function returned before updating
+	the sequence number (myseq) -- this meant that the next packet
+	fetched was quite often the end of the previous download, which
+	didn't tend to work very well...
+     -	modified main.c so that, dependent on isatty(0), stdprompt and
+	stdinfo are set to either (tty) stdout/stdout or 0/stderr.
+	this change means that redirecting stdin for `fsp' will
+	(sort of!) work; i.e., it is now possible to use `fsp' in
+	a script...
+     -	removed all occurences of isatty(0)/isatty(fileno(stdin));
+	they either aren't necessary -- 'cos stdprompt will redirect
+	output nowhere; or they can be replaced by stdprompt != (FILE*)0
+	modified util.c:env_client() to set stdprompt properly for the
+	standalone clients.
+
+*** 24th May 1992:
+     -	changed *every* fprintf in the client and bsd_src directories
+	into a ffprintf to the proper stream; also made miscellaneous
+	fixes to the output and formatting of quite a few of the f*.c
+	files; all that's needed now is to rationalise which streams
+	are redirected where when `source' and `macro's are executed.
+	(new streams are stdprompt for prompt messages, stdinfo for
+	informational (chatter) messages, stdwarn for warning messages,
+	stddbg for debug messages).
+     -	changed all printf()'s into fprintf(stdout, ...) in preparation
+	for sorting out the way I print out results and messages...
+     -	made `lcd' do local globbing; change to fsp_lcd in fsp_util.c
+
+*** 22th May 1992:
+     -	fixed a minor bug in connecting to the remote site -- if the host
+	specified doesn't exist, then the program used to die with a
+	fatal `exit()' -- this now just prints up a message and aborts
+	the current command.
+
+*** 20th May 1992:
+     -	added interrupt handling to the client; this involved fairly
+	messy modifications to a quite a few functions (egrep for
+	`client_intr' to find all places which are likely to have
+	changed).  I tried to preserve the meaning of client_intr_state
+	but had to modify it a bit... no longer is it a good idea to
+	check just for (clientintr_state == 2); you should check > 1
+	instead.  ../bsd_src/ls.c needed the most hacking.  For that
+	reason, most of the bigs are probably something to do with that.
+	The changes involved the creation of client_intr_cnt which
+	counts the number of interrupts since the last interrupt
+	reset.
+
+*** 10th May 1992:
+     -	modified fgetcmd.c so that the file is initially got into
+	a file prefixed with `.in.'  This prevents shifting or otherwise
+	using a partially completed file.
+
+*** 7th May 1992:
+     -	updated man page.  yawn.
+     -	made FSP 2.5 changes.  Urgle.  Added the command `buffer' to set
+	the size of data packets sent around (complements FSP_BUF_SIZE).
+     -	pondered adding crypt code on gets and puts; will probably do it,
+	but not sure about the exact semantics.  I'll use the recently
+	released fast des_crypt package (not the *very* fast one, though,
+	the other has better library support).  Ok, so this isn't a change.
+	Sue me.
+     -	added `prompt' command so that if turned off, it will always be
+	assumed that you wish to continue.  This needed the creation of
+	the variable `askprompt' in fsp_util.c; this then required
+	adding it to `extra.c'
+     -	added check to see if whole file had been downloaded and to print
+	out slightly more informative messages for all 3 downloading cases
+     -	fixed continue/restart :-)  Always a good idea to start from the
+	offset rather than 0 when requesting file blocks...
+     -	tidied up burst code so that it functions for *all* retries
+	(including idle retries)
+
+*** 6th May 1992:
+     -	added continue/restart to download (in util.c); this needed a tiny
+	mod to fgetcmd.c (changed fopen(..."w") to fopen(..."a+")) --
+	now it is possible to continue from where you left off...
+     -	added burst_max to lib.c and client.h which controls the number
+	of retries that are made at the `R' timeout period -- don't know
+	if it is going to make any improvement; also modified fsp_util.c
+	and fsputil.h so that a new command `burst' could set this value
+
+*** 5th April 1992:
+     -	made uploading consistent with downloading in terms of what
+	gets printed; prints size of the file it is going to upload,
+	and also transfer times to milliseconds rather than seconds
+    ##	started fspclient.0.0-c !
+    ##  pre-alpha release of fspclient.0.0-b
+     -	changed the client/lib.c retry algorithm; the procedure now is
+	to record the average round trip time for a request/result
+	action.  The initial timeout period is set to 3 times this;
+	next time we move step this up by a factor of 1.5.  After that
+	we move into idle operation; keep doubling the amount of
+	time between retries until we reach 256 times longer than first
+	retry time.  Then hold steady at that.  When we get a packet
+	through, the idle time is preserved, so if the next packet
+	fails twice then we go back to maximum retry period.  However,
+	if we get packets through within the first 2 tries we halve
+	the idle period.  This means that the if the connection breaks
+	we will end up trying approx every 10 minutes; and as soon as it
+	comes back, we can start reducing our delays again...
+	Ahem, this still needs work, to be honest :-}
+     -	found out what was causing a SEGV in the macro routines; it was
+	simply a realloc which I had accidently messed up (missed out 
+	the sizeof(char*) to increase size of memory block)
+     -	decided that `+' form of Makefile's aren't robust enough, so
+	given up on them for the moment...
+
+*** 3rd April 1992:
+     -	created the `+' form of the Makefile's in preparation for the
+	next release; any time now...
+     -	when a file is downloaded the date stamp is set back to that of
+	the remote file
+     -	ahem, made make install-man work...
+
+*** 2nd April 1992:
+     -	modified the way in which downloads are done (cosmetically);
+	the remote file is now stat'd before any remote requests are made;
+	this allows (i) the expected file size to be printed; (ii)
+	most `file not found' errors to be caught without remote
+	communication
+
+*** 1st April 1992:
+     -	added the `delay' command to allow user control over minimum retry
+	period
+
+*** 31st March 1992:
+     -	changed the start-up file from $(HOME)/.fsprc to ~/.fsprc (i.e.,
+	globbing is now used on the start-up filename)
+     -	created client/ADDING.THINGS
+
+*** 30th March 1992:
+     -	tracked down the bug in client/macro.c which caused a SEGV on some
+	systems; I now actually zero the memory instead of just thinking I do
+     -  did a little more work on the Makefiles; I am now using dumb Makefiles
+	rather than intelligent ones even though the `clever' ones are about
+	half the length and much easier to modify.  Sheesh, I wish everybody
+	had GNU make  :-)
+
+*** 29th March 1992:
+     -	updated my code to the add all facilities from FSP 2.4;
+	fgrabcmd.c, lock.c are new; util.c and lib.c were both modified
+
+*** 26th March 1992:
+     -  reverted bsd_src/print.c back to what it used to do to calculate
+	the number of characters printed; the return value of printf()
+	does not seem to always be what it is supposed to be :-(
+     -  wrote a manual page (client/man/fsp.1) for fsp and updated Makefile
+     -  started work on the dumb Makefiles...
+
+*** 25th March 1992:
+     -  complete restructuring of the source code directories
+     -  all file names were changed
+     -  Makefiles completely rewritten
+     -  added the `since' command (required modifying bsd_src/ls.c,
+	as well as client/fsp_util.c and friends)
+     -  minor changes made to the globbing file; the remote globbing
+	functions have been moved from client/main.c to client/glob.c...
+	makes things more symmetrical
+     -  removed a number of memory leaks from bsd_src/ls.c
+     -  removed (unintentional) restriction on macro's not being able
+	to call other macros; also put in check for recursion
+    ##  stared work on pre-alpha fspclient.0.0-b
+
+*** 24th March 1992:
+    ##  initial pre-alpha release of fspclient.0.0-a

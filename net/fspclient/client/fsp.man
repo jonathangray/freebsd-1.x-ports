@@ -1,0 +1,478 @@
+.\" Copyright (C) 1992, 193 Philip Richards
+.TH FSP 1 "5 April 1993" LOCAL
+.SH NAME 
+fsp \- an all-in-one FSP client
+.SH SYNOPSIS
+.B fsp
+[\-dvV] [[macro [parameters]] | [host [port [directory]]]]
+.SH DESCRIPTION
+.BR fsp
+is an
+.BR ftp
+like client for an anonymous-ftp style archive system called FSP.  See
+.BR fspd(1)
+for further details on FSP.  When given the
+.I \-d
+flag, the client enters
+debugging mode; this is generally not a good idea, and only exists for
+development purposes.  The
+.I \-v
+and
+.I \-V
+flags print out a copyright
+banner; they differ in that
+.I \-V
+causes the program to immediately exit rather than continuing into
+interactive mode.
+.LP
+When started
+.BR fsp
+attempts to read a startup file (see
+.BR FILES
+below).  If the input is a terminal, it then enters interactive mode,
+and awaits user commands.  If no host has been specified on the command
+line, then one must be specified before any remote commands can be
+executed.  If the input is not a tty, then commands are read until
+end-of-file is reached.  If an unquoted `|' is the first character in
+a command line argument then the rest of the line is considered to be
+a shell command, and the output of the command preceeding the `|' is
+sent to that command.  The available remote commands are:
+.TP 10
+.B "cat [\-r] file [files...]"
+Same as
+.B get
+but the files are written to the screen rather than to files.  If the
+.I \-r
+flag is specified, then directories that are found are entered and
+searched recursively for files to view.  See the environment variable
+.B PAGER
+and the command 
+.B pager
+for how to make this command automatically pass output into another
+program (for example,
+.B more
+).
+.TP
+.B "cd [directory]"
+Change directory on the remote system.  The permissions on the remote
+directory are printed if the command was successful.
+.TP
+.B "du [\-rcas] [files...]"
+Calculate the disk usage of the files specified; if no files given, default
+to the current directory (`.').  If the
+.I \-r
+flag is given, descend into subdirectories.  If
+.I \-c
+is given, give a grand total of filesizes at the end (assuming there is
+more than one file given on the command line).  If
+.I \-a
+is given, show all files rather than just directory totals.  If
+.I \-s
+is given, then summarise the totals for each of the arguments given on
+the command line rather than showing subdirectories individually.
+.I \-s
+and
+.I \-a
+are incompatible.
+.TP
+.B "get [-r] file [files...]"
+Download a copy of the list of files specified; globbing is performed
+on the filenames given in the style of the Bourne shell.  If the
+.I \-r
+flag is given, then the remote directory structure is copied locally;
+directories are entered, and files within them copied.  Without the
+.I \-r
+flag all files are copied into to the local directory, and directories
+in the arguments are ignored.
+.TP
+.B "grab file [files...]"
+An atomic action which performs a
+.B get
+followed by a
+.B delete.
+Two attempts to
+.B grab
+the same file will result in only one of them actually suceeding.  There
+is no
+.I \-r
+version.
+.TP
+.B "ls [flags] [files]"
+Get a directory listing of remote files.  This behaves practically
+identically to BSD4.2
+.B ls;
+see the manual page for
+.B ls(1)
+for options if you are using a BSD system, or guess if you aren't.  The
+fsp
+.B ls
+command behaves differently to standard FTP
+.B ls.
+Notably, once it
+has fetched a directory listing it does not query the remote server for
+that listing again:  the listing is held on the local end.  This has 2
+effects; the second directory listing you request is (practically)
+instantaneous since it is not necessary to ask for it again; and,
+secondly, if there are any modifications to the remote directory whilst
+you are connected, you will not see them.  Use the
+.B rehash
+command if you want to scratch the clients copy of the remote systems
+directory listings and protections.
+.TP
+.B "mkdir directory [directories...]"
+Make the specified directories on the remote system.  The site that
+created the directories is labelled their owner.
+.TP
+.B "pro [[\-|+][permission]] [files...]"
+Return or set the protection for the remote directory.  If the server is
+an advanced server then this command also gives the local client
+knowledge about what operations can and can't be done in the remote
+directory; these will be rejected by the client rather than the server
+in order to save bandwidth.  No facilities that the server allows will
+be restricted; only commands which are guaranteed to fail will be
+prevented.
+.B permission
+can be either `c' or `d' in the standard server; these refer to
+`create' and `delete' permissions.  Prefixing by `+' sets the
+permission, `\-' removes it.  Only the owner of a directory can set the
+permissions.  If no permissions are given, the current settings are
+printed.
+.TP
+.B "put file [files...]"
+Upload a copy of the list of files specified; as for
+.B get,
+globbing is performed on the filenames.  In order to upload a file, you
+must have `create' permission on the remote directory.
+.TP
+.B "rm file [files...]"
+Remove the specified files.  Globbing is performed as for
+.B get.
+In order for this command to succeed you must have `delete' permission
+on the remote directory.
+.TP
+.B "rmdir directory [directories...]"
+Remove the specified directories on the remote system.  Only the owner
+can do this, and the remote directories must be empty for it to work.
+.TP
+.B "tar [-r] tarfile file [files...]"
+Create a tarfile locally called
+.I tarfile
+which is made up of the listed files.  If the
+.I \-r
+flag is given, then behave in a similar recursive manner to
+.B get.
+The names of the files within the archive are precisely those that would
+be created if the command was
+.B get.
+.TP
+.B "touch file [files...]"
+If the specified files do not exist on the remote server, then the files
+are created zero-length.  If they do exist, then nothing is done.  This
+is a much better method than using
+.B mkdir
+to send messages!
+.TP
+.B ver
+Return the version string of the remote system.  This information is
+cached locally.  If the server is an advanced server, then this command
+also gives the local client knowledge about what can and cannot be done;
+for example, the client will prevent attempts to upload to a read-only
+server since attempts to perform that operation are guaranteed to be
+rejected.
+.LP
+In addition to these commands, there is a set of commands which are
+purely local in their action.  Note that some of the commands you would
+have expected to be remote are in fact local.  Primarily,
+.B open
+does not contact the remote site.  Contact is only ever made with the
+server when you want to ask it something.  Further,
+.B ls
+is remote for only as long as it needs to be; as soon as the directory
+information is transferred, further
+.B ls
+'s of the same directory act
+purely locally.
+.TP 10
+.B "buffer [size|?]"
+Set the size of the data packets to be transferred.  This can be at
+most 1024 bytes, but some systems may need the number to be lowered in
+order to get the packets through gateways.
+.TP
+.B "builtin command [args]"
+Guarantee that the builtin version of
+.B command
+is executed.  This can be abbreviated to @.  i.e.,
+.B @ls
+is identical to
+.B "builtin ls"
+and both run the `proper' version of ls.
+.TP
+.B "burst [count|?]"
+When a request is made from the server for another piece of
+information, either the request or reply can get lost.  In this case,
+the client needs to try again; and again, and again...  The current
+method of doing this is to try once, wait a bit, try again, wait for a
+bit longer, etc, with the retry period increasing at each failure.  The
+.B burst
+command sets the number of `quick' retries that are made at each of
+these increasing time steps; the long retry period can stretch to about
+10 minutes -- this command allows the number of attempts made after each
+10 minute period to be set.  (The default is 1; you don't gain much by
+setting it at more than about 4.)
+.TP
+.B "datestamp [on|off|?]"
+When a file is downloaded, this controls whether the access dates on
+the file are set to the same as those on the remote end.  This may or
+may not be useful...
+.TP
+.B "debug [level]"
+Set the debug level to the value specified, or print the current level
+if no argument is given.  Most people won't want to see the output that
+this generates... (specifying `debug n' is the same as giving `n'
+.I \-d
+flags on the command line).
+.TP
+.B "delay [period|?]"
+Set the minimum retry period (in milliseconds); the default is 3000,
+the minimum allowed is 1000.  This value is used as a baseline and each
+retry has progressively longer gaps.  Note that this value is modified
+by performance of the connection -- if the connection generally allows
+faster communication, the retry period will be automatically changed
+to take account of it.
+.TP
+.B "echo [text]"
+.TP
+.B "echon [text]"
+Echo the supplied text to the user; these commands differ in whether
+they also print a newline character at the end of the text;
+.B echon
+does not.  These commands are only of any real use in files that are to
+be sourced, or in macros.
+.TP
+.B "iferror command"
+If the last command caused an error, execute
+.I command.
+.TP
+.B "ifok command"
+If the last command completed successfully, execute
+.I command.
+.TP
+.B "onerror command"
+Whenever an error occurs, execute
+.I command.
+.TP
+.B "skipto label"
+Ignore all input lines until a line which begins with
+.I label:
+Execute the command on that line (possibly a null command).  This is
+useful in scripts for ignoring a block of commands depending on the
+error code of a command.
+.TP
+.B "exit [n]"
+This command terminates the client with the error code of the previous
+command.  If the optional argument is supplied, then the program exits
+with that value as the return code.
+.TP
+.B hash
+Same as
+.B trace hash.
+.TP
+.B help [ all | name ... ]
+With no parameters, this prints out a list of the commands and macros
+that are defined.  With the argument
+.B all
+a long description of each command is given, as well as a long description
+of each macro for which a help string was provided.  Otherwise, the
+argument list is assumed to be a list of commands, and the long help
+string for each command is printed.
+.B ?
+is an alias for this command.
+.TP
+.B host
+Same as
+.B open.
+.TP
+.B "lcd directory"
+Change directory on the local machine.
+.TP
+.B "macro [\-[rl]] name [help]"
+Without either the
+.I \-r
+or
+.I \-l
+flags, this defines a macro called
+.B name
+and, if the help string is supplied (which must be a quoted single
+argument to the command), then this will be printed when
+.B help
+is invoked on the macro name.
+If a macro is defined, then it will be executed whenever its name is
+typed as a command.  Macros take precedence over builtin commands; this
+means that you can alias commands out of existence.  If you want to
+guarantee that you execute the builtin version of a command precede it
+by the command
+.B builtin.
+Enter the macro line-by-line, and terminate it with a single `.' on a
+line of its own (no leading whitespace).  Macros can not (currently) be
+either self-recursive or mutually recursive; if a recursion loop is
+detected then the attempt to recurse is ignored and the macro continues
+regardless.
+
+If the
+.I \-r
+flag is given then the specified macro is removed.  If
+.I \-l
+is given, then the macro is listed.
+.TP
+.B "open name [port [directory]]"
+Set the host of the remote system; also, possibly set the port number
+and directory.  Note that if either the port or the directory are
+omitted, they default to the values 21 and / respectively.
+.TP
+.B "pager [command]"
+Set the `pager' to the command specified.  The pager is invoked by the
+.B cat
+command, which filters its output though it.  The value will tend
+to be something like
+.B more
+or
+.B less.
+Supplying no parameter turns off the pager.  The initial pager command
+is given by the environment variable
+.B PAGER.
+When the pager command is invoked, the environment variable
+.B FSPFILE
+is set to the name of the file that is being
+.B cat
+'d.
+.TP
+.B "port number"
+Set the port number of the connection.
+.TP
+.B "prompt [on|off|?]"
+When a download operation is performed, a check is made to see if the
+file that you are trying to download already exists; if it does, you
+are prompted for whether you want to continue the download, or whether
+you want to restart it.  This turns on/off those questions.  If it is
+set to `off' then the a continue operation is always performed.
+.TP
+.B pwd
+Print the current host, port, and directory on the remote system.  The
+client holds all this information.
+.TP
+.B quit
+Finish your interaction with
+.B fsp.
+The program exits with a return value of 0.  This is the same as
+.B "exit 0".
+.TP
+.B "readme [never|once|always]"
+Determine how often (if ever) README files should be read.  The options
+are (hopefully) self explanatory.  A README can be force-read for the
+current directory by typing the command without any arguments.
+.TP
+.B "rehash"
+Drop all information about the remote site.  The local copies of the
+remote directory structure and permissions will be lost.
+.TP
+.B "shell command [args]"
+Run a `shell' command on the specified command and arguments.  In fact,
+this is currently a lie.  The command is executed by a direct fork; in
+a future version this will be implemented properly.
+.B shell
+can be replaced by `!' (no space needed after the `!').
+.TP
+.B "since [time|local-file]"
+When a `ls' is performed the date stamps on files are compared against
+the time specified to determine whether they are printed.  The interface
+to this command leaves a lot to be desired; the time must be specified
+as the number of seconds since 1st January 1970, or it can be specified
+as the date stamp on a local file.  (Only the latter form is really
+any use.)
+.TP
+.B "source file [files...]"
+Treat the contents of the specified as if they were typed at the
+keyboard.
+.TP
+.B "timeout n"
+If a single communication attempt (i.e., one packet of any transfer)
+takes longer than
+.I n
+seconds, then cause the command to return an error.  If
+.I n
+is set to 0, then assume an infinite timeout period.  This is useful
+when combined with the
+.B iferror
+command -- it allows a script to terminate a session if the remote
+server is not detected.
+.TP
+.B "touch file [files...]"
+Create the specified files in the remote directory.  If the file
+already exists, nothing is done, otherwise a zero length file is
+`uploaded'.  You must have `create' permission in the remote directory.
+.TP
+.B "trace [off|on|all|hash|?]"
+Sets the type of tracing used on file transfers.  `off' ensures that
+FSP keeps quiet during file transfers; no information is printed about
+the transaction.  `on' causes the number of Kbytes transferred to be
+printed, as well as retry information (the character `R', which turns
+into a spinning bar for each retry of a get/put of a Kbyte of data).
+`hash' behaves rather more like
+.B ftp;
+each Kbyte transferred causes a hash to be printed, and information
+about file size and speed are printed.  `all' causes statistics about
+the packet transfers to be printed after each file copy operation.  If
+`?' is given, the current mode is printed.  If no parameter is supplied
+then the current value is advanced (with wrap-around) through the list
+given above.
+.SH FILES
+.PD 0
+.TP 10
+.B ~/.fsprc
+If this file exists it is used as a start-up script.  It is useful for
+executing personalisation commands and macro definitions.
+.PD
+.SH ENVIRONMENT
+.TP
+.B FSPRC
+If this variable is set, then it overrides the default file from which
+start-up instructions are read.
+.TP
+.B PAGER
+Determine the initial setting of the pager used by the
+.B cat
+command.
+.TP
+.B FSPFILE
+This environment variable is set by the
+.B cat
+command to allow the pager command to know the name of the file it is
+being fed.
+.SH "SEE ALSO"
+fspd(1)
+.SH AUTHORS
+The original (individual) clients were written by Wen-King Su
+<wen-king@vlsi.cs.caltech.edu>.  They, and some library code, was then
+modified, and the front-end parser, macro's, local commands and general
+glue were written by Phil Richards <pgr@prg.oxford.ac.uk> in order to
+form this client.  The initial globbing code was written by Rene
+Seindal for an ftpd, and modified minutely to fit with the scheme of
+things by Phil Richards.
+.SH BUGS
+Quite a lot, thank you very much.  As they are found, they are listed
+and slowly fixed.  Pipes inside macros can cause unexpected behaviour if
+the macro is then fed into another pipe (unexpected = I don't know what
+will happen).  Other major ones that have to fixed at the moment are:
+brace expansion needs adding to the globbing code; positional parameters,
+environment variables, and local variables should be added (this would
+allow a number of parameter setting commands to be removed, or turned
+into macro's); the shell command should be one -- there should also be
+a non-shell command for fast exec'ing of commands.
+.LP
+Note that the entire macro, command line, and client code is undergoing
+a total rewrite, so it is unlikely that these bugs will be `fixed' in the
+0.0 version of the client - they will (hopefully) be non-existant in the
+next version.
+.LP
+All bug reports on this code should be directed to Phil Richards
+<pgr@prg.oxford.ac.uk>.

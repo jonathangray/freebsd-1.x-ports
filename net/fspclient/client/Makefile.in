@@ -1,0 +1,115 @@
+### Start of system configuration section ###
+
+srcdir	= @srcdir@
+VPATH	= @srcdir@
+
+CC	= @CC@
+
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+
+DEFS = @DEFS@
+LIBS = @LIBS@
+
+CFLAGS = -g
+LDFLAGS = -g
+
+prefix = /usr/local
+exec_prefix = $(prefix)
+
+bindir = $(exec_prefix)/bin
+
+mandir = $(prefix)/man
+man1dir = $(mandir)/man1
+man1ext = .1
+
+### End of system configuration section ###
+
+SHELL = /bin/sh
+
+locallib = liblocal.a
+remotelib = libremote.a
+localdir = local
+remotedir = remote
+
+MDEFINES = configdir='../$(configdir)' \
+	   commondir='../$(commondir)' bsddir='../$(bsddir)' clientdir='..' \
+	   locallib='$(locallib)' localdir='$(localdir)' \
+	   remotelib='$(remotelib)' remotedir='$(remotedir)' \
+	   LIBS='$(LIBS)' AR='$(AR)' RANLIB='$(RANLIB)' \
+	   DEFS='$(DEFS)' CFLAGS='$(CFLAGS)' LDFLAGS='$(LDFLAGS)' \
+	   LIBS='$(LIBS)' CC='$(CC)'
+
+OBJS = main.c lib.c util.c lock.c parse.c macro.c redirect.c glob.c
+OBJS = main.o lib.o util.o lock.o parse.o macro.o redirect.o glob.o
+PROGS = fsp
+
+all: $(PROGS)
+
+INCLUDES = -I$(configdir) -I$(srcdir) -I$(srcdir)/$(commondir) -I$(srcdir)/$(bsddir)
+
+.c.o:
+	$(CC) -c $(CFLAGS) $(CPPFLAGS) $(DEFS) $(INCLUDES) $<
+
+install: all
+	$(INSTALL_PROGRAM) fsp $(bindir)/fsp
+	-$(INSTALL_DATA) $(srcdir)/fsp.man $(man1dir)/fsp$(man1ext)
+
+uninstall:
+	rm -f $(bindir)/fsp $(man1dir)/fsp$(man1ext)
+
+OTHERLIBS = $(localdir)/$(locallib) $(remotedir)/$(remotelib) \
+	    $(bsddir)/$(bsdlib) $(commondir)/$(commonlib)
+
+fsp: LocalLib RemoteLib $(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(OTHERLIBS) $(LIBS)
+
+clean:
+	-rm -f *.o $(PROGS) *.a
+	@echo "making \`clean' in $(localdir)"
+	@cd $(localdir); $(MAKE) $(MDEFINES) clean
+	@echo "making \`clean' in $(remotedir)"
+	@cd $(remotedir); $(MAKE) $(MDEFINES) clean
+
+mostlyclean: clean
+
+distclean: clean
+	-rm -f Makefile
+
+realclean: distclean
+
+dist:
+
+depend:
+	$(commondir)/makedepend Makefile.in $(CFLAGS) $(CPPFLAGS) $(DEFS) $(INCLUDES) $(SRCS)
+	@echo "making \`$@' in $(localdir)"
+	@cd $(localdir); $(MAKE) $(MDEFINES) $@
+	@echo "making \`$@' in $(remotedir)"
+	@cd $(remotedir); $(MAKE) $(MDEFINES) $@
+
+#############################################################################
+
+COMMON = $(commondir)/common.h
+
+LocalLib:
+	@echo "making \`all' in $(localdir)"
+	@cd $(localdir); $(MAKE) $(MDEFINES) all
+
+RemoteLib:
+	@echo "making \`all' in $(remotedir)"
+	@cd $(remotedir); $(MAKE) $(MDEFINES) all
+
+#############################################################################
+
+lib.o:		lib.c lock.h client.h $(COMMON)
+util.o:		util.c client.h $(COMMON)
+lock.o:		lock.c lock.h client.h $(COMMON)
+parse.o:	parse.c parse.h main.h $(COMMON)
+macro.o:	macro.c macro.h main.h $(COMMON)
+redirect.o:	redirect.c redirect.h $(COMMON)
+glob.o:		glob.c $(COMMON)
+main.o:		main.c patchlevel.h main.h \
+		$(remotedir)/remote.h $(localdir)/local.h \
+		$(remotedir)/table.h $(localdir)/table.h \
+		parse.h redirect.h $(COMMON)

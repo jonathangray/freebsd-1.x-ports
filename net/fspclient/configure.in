@@ -1,0 +1,122 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(common/common.h)
+AC_CONFIG_HEADER(config.h)
+AC_PROG_CC
+AC_PROG_CPP
+AC_AIX
+AC_DYNIX_SEQ
+if test -n "$SEQUENT"; then
+  LIBS="-lsocket -linet -lnsl $LIBS"
+  CC=cc
+  GCC=
+fi
+AC_PROG_INSTALL
+AC_PROG_RANLIB
+AC_DIR_HEADER
+AC_STDC_HEADERS
+echo checking for compiler handling ANSI function prototypes
+cat > conftest.c <<EOF
+int main(int argc, char **argv) { return 0; }
+EOF
+if eval $compile; then
+  AC_DEFINE(ANSI_PROTOTYPES)
+  echo checking for broken ANSI function prototypes in structures
+  cat > conftest.c <<EOF
+struct brokent { int (*m)(int argc, char **argv); };
+int main() { return 0; }
+EOF
+  if eval $compile; then
+    :
+  else
+    AC_DEFINE(BROKEN_STRUCT_PROTOTYPES)
+  fi
+fi
+AC_UNISTD_H
+AC_XENIX_DIR
+AC_HAVE_HEADERS(string.h memory.h)
+AC_HEADER_CHECK(utime.h, AC_DEFINE(HAVE_UTIME_H),
+ AC_HEADER_CHECK(utimes.h, AC_DEFINE(HAVE_UTIMES_H))
+)
+AC_RETSIGTYPE
+AC_VFORK
+AC_CONST
+AC_INLINE
+AC_HAVE_FUNCS(strdup putenv)
+dnl WARNING: autoheader needed modifying (read `fixing') to be able
+dnl          to process the following block correctly...
+# these tests are organised in the same order as in client/lock.c
+AC_FUNC_CHECK(flock,
+ AC_DEFINE(HAVE_FLOCK),
+ AC_FUNC_CHECK(lockf,
+  AC_DEFINE(HAVE_LOCKF),
+  [
+   echo checking for working shmget
+   LOCKPATH="conftestlock"
+   AC_TEST_PROGRAM([
+#include <sys/types.h>
+#include <fcntl.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#define LOCKPATH "$LOCKPATH"
+
+int
+main() {
+  key_t ky;
+  int sh;
+  int rv;
+  int fd;
+
+  fd = open(LOCKPATH, O_RDWR | O_CREAT, 0666);
+  if (fd < 0)
+    return 1;
+  rv = 0;
+  ky = ftok(LOCKPATH, 2001);
+  if (ky == (key_t)-1)
+    rv = 1;
+  else {
+    struct shmid_ds smbuf;
+    sh = shmget(ky, 1, IPC_CREAT | 0666);
+    if (sh < 0)
+      rv = 1;
+    else
+      shmctl(sh, IPC_RMID, &smbuf);
+  }
+  close(fd);
+
+  return rv;
+}
+], AC_DEFINE(HAVE_SHMGET))dnl
+   rm -f $LOCKPATH conftest.c
+  ]dnl
+ )dnl
+)
+# these tests are organised in the same order as in common/common.h
+AC_COMPILE_CHECK([fd_set in sys/types.h],
+ [#include <sys/types.h>], [fd_set t;], AC_DEFINE(FD_SET_IN_SYS_TYPES_H),
+ AC_COMPILE_CHECK([fd_set in sys/select.h],
+  [#include <sys/select.h>], [fd_set t;], AC_DEFINE(FD_SET_IN_SYS_SELECT_H),
+  AC_COMPILE_CHECK([fd_set in sys/inet.h],
+   [#include <sys/inet.h>], [fd_set t;], AC_DEFINE(FD_SET_IN_SYS_INET_H)
+  )
+ )
+)
+#
+echo generating the list of local commands
+localsrcs=`cd $srcdir/client/local; ls l*.c`
+LOCALSRCS=`echo $localsrcs`
+AC_SUBST(LOCALSRCS)
+#
+localobjs=`echo "$localsrcs" | sed -e 's/\.c$/.o/'`
+LOCALOBJS=`echo $localobjs`
+AC_SUBST(LOCALOBJS)
+#
+echo generating the list of remote commands
+remotesrcs=`cd $srcdir/client/remote; ls r*.c`
+REMOTESRCS=`echo $remotesrcs`
+AC_SUBST(REMOTESRCS)
+#
+remoteobjs=`echo "$remotesrcs" | sed -e 's/\.c$/.o/'`
+REMOTEOBJS=`echo $remoteobjs`
+AC_SUBST(REMOTEOBJS)
+#
+AC_OUTPUT(Makefile common/Makefile bsd/Makefile client/Makefile client/remote/Makefile client/local/Makefile)
