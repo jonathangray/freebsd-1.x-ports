@@ -76,7 +76,7 @@ DOBJECTS= jdmain.o $(DLIBOBJECTS) $(COMOBJECTS)
 LIBOBJECTS= $(CLIBOBJECTS) $(DLIBOBJECTS) $(COMOBJECTS)
 
 
-all: cjpeg djpeg 
+all: cjpeg djpeg
 # By default, libjpeg.a is not built unless you explicitly request it.
 # You can add libjpeg.a to the line above if you want it built by default.
 
@@ -100,7 +100,7 @@ jmemsys.c:
 	exit 1
 
 clean:
-	$(RM) *.o cjpeg djpeg libjpeg.a core testout.* 
+	$(RM) *.o cjpeg djpeg libjpeg.a core testout.*
 
 distribute:
 	$(RM) jpegsrc.tar*
