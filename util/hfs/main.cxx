@@ -18,57 +18,7 @@
 // along with hfs; see the file COPYING.  If not, write to
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
-// $Id: main.cxx,v 1.2 1994/05/15 06:19:30 rich Exp $
-// $Log: main.cxx,v $
-// Revision 1.2  1994/05/15 06:19:30  rich
-// hfs for FreeBSD.
-//
-// hfs allows files to be copied off a Macintosh HFS disk on a
-// non-Macintosh computer.  Written by Craig Southeren,
-// geoffw@extro.ucc.su.oz.au.
-//
-// Revision 1.1.1.1  1994/05/15  05:44:53  rich
-// hfs 0.3 from sunsite
-//
-// Revision 1.12  1994/01/11  02:29:25  craigs
-// Fixed warning when compiling at O6 level
-//
-// Revision 1.11  1994/01/11  00:44:13  craigs
-// Improved cat function and added options
-// Changed to accept any executable name starting with hfs
-//
-// Revision 1.10  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.9  1993/12/30  07:56:51  craigs
-// Changed to validate command before attempting to access the
-// HFS disk
-//
-// Revision 1.8  1993/12/23  22:43:56  craigs
-// Removed redundant error message on pwd
-//
-// Revision 1.7  1993/12/23  15:18:05  craigs
-// Completely re-organised to handle new args object, and moved
-// Ls and Copy functions to separate files
-//
-// Revision 1.6  1993/11/25  22:04:24  craigs
-// Added hpwd command and ability to print the version number
-//
-// Revision 1.5  1993/11/24  21:36:05  craigs
-// Various changes remove warnings under MSDOS/NT
-//     by robertj
-//
-// Revision 1.4  1993/11/23  22:21:48  craigs
-// Fixed problem with volume name being corrupted in .macdir file
-//
-// Revision 1.3  1993/11/23  20:22:45  craigs
-// Added MSDOS/Windows compatibility
-//     robertj
-//
-// Revision 1.1  1993/11/22  22:25:55  craigs
-// Initial revision
-//
-//
+// $Id: main.cxx,v 1.3 1994/05/15 06:36:15 rich Exp $
 //
 
 #include <iostream.h>

@@ -19,44 +19,7 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: fs.h,v 1.2 1994/05/15 06:19:24 rich Exp $
-// $Log: fs.h,v $
-// Revision 1.2  1994/05/15 06:19:24  rich
-// hfs for FreeBSD.
-//
-// hfs allows files to be copied off a Macintosh HFS disk on a
-// non-Macintosh computer.  Written by Craig Southeren,
-// geoffw@extro.ucc.su.oz.au.
-//
-// Revision 1.1.1.1  1994/05/15  05:44:53  rich
-// hfs 0.3 from sunsite
-//
-// Revision 1.8  1994/01/11  00:43:00  craigs
-// Added Unmount call
-//
-// Revision 1.7  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.6  1993/12/30  07:55:14  craigs
-// Changed GetFreeSpace to GetVolFreeSpace to avoid conflict
-// with an obsolete NT function of the same name
-//
-// Revision 1.5  1993/12/23  22:41:30  craigs
-// Changed for changes to catfile->FindDir
-//
-// Revision 1.4  1993/12/23  15:20:04  craigs
-// Rehashed to copy with ResolvePath and extents functions
-//
-// Revision 1.3  1993/12/16  20:16:53  craigs
-// Added extents file
-//
-// Revision 1.2  1993/11/23  20:28:25  craigs
-// Removed reference to std.h
-//
-// Revision 1.1  1993/11/22  22:27:51  craigs
-// Initial revision
-//
-//
+// $Id: fs.h,v 1.3 1994/05/15 06:36:10 rich Exp $
 //
 
 #ifndef _FS_H

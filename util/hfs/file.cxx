@@ -19,39 +19,7 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: file.cxx,v 1.1 1994/05/15 05:44:52 rich Exp $
-// $Log: file.cxx,v $
-// Revision 1.1  1994/05/15 05:44:52  rich
-// Initial revision
-//
-// Revision 1.9  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.8  1993/12/30  07:49:19  craigs
-// Removed unused dump_file parameter from CopyToOS
-//
-// Revision 1.7  1993/12/23  15:16:29  craigs
-// Changed Cat function to Copy function
-// Added OS dependent newline conversion
-//
-// Revision 1.6  1993/12/16  20:15:50  craigs
-// Final extents file handling
-//
-// Revision 1.4  1993/11/24  21:36:05  craigs
-// Various changes remove warnings under MSDOS/NT
-//     by robertj
-//
-// Revision 1.3  1993/11/23  22:20:55  craigs
-// Initial implementation of extents - only using first
-// extent now
-//
-// Revision 1.2  1993/11/23  20:30:19  craigs
-// Added capability to use all of first extent record
-//
-// Revision 1.1  1993/11/22  22:25:55  craigs
-// Initial revision
-//
-//
+// $Id: file.cxx,v 1.2 1994/05/15 06:36:08 rich Exp $
 //
 
 #include <stdio.h>

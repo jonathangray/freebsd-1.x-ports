@@ -19,42 +19,7 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: copy.cxx,v 1.2 1994/05/15 06:19:17 rich Exp $
-// $Log: copy.cxx,v $
-// Revision 1.2  1994/05/15 06:19:17  rich
-// hfs for FreeBSD.
-//
-// hfs allows files to be copied off a Macintosh HFS disk on a
-// non-Macintosh computer.  Written by Craig Southeren,
-// geoffw@extro.ucc.su.oz.au.
-//
-// Revision 1.1.1.1  1994/05/15  05:44:52  rich
-// hfs 0.3 from sunsite
-//
-// Revision 1.8  1994/01/11  00:41:50  craigs
-// Added additional name mangling for MSDOS/NT
-//
-// Revision 1.7  1994/01/06  03:09:01  craigs
-// Changed hget to hread
-//
-// Revision 1.6  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.5  1993/12/31  02:32:11  craigs
-// Removed non-globbing copy code
-//
-// Revision 1.4  1993/12/30  07:48:49  craigs
-// Added filename globbing
-//
-// Revision 1.3  1993/12/23  22:50:51  craigs
-// Removed warning about uninitialised variable
-//
-// Revision 1.2  1993/12/23  22:39:39  craigs
-// Removed redundant error messag
-//
-// Revision 1.1  1993/12/23  14:59:45  craigs
-// Initial revision
-//
+// $Id: copy.cxx,v 1.3 1994/05/15 06:36:02 rich Exp $
 //
 
 #include <iostream.h>

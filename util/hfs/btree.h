@@ -19,46 +19,7 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: btree.h,v 1.2 1994/05/15 06:19:12 rich Exp $
-// $Log: btree.h,v $
-// Revision 1.2  1994/05/15 06:19:12  rich
-// hfs for FreeBSD.
-//
-// hfs allows files to be copied off a Macintosh HFS disk on a
-// non-Macintosh computer.  Written by Craig Southeren,
-// geoffw@extro.ucc.su.oz.au.
-//
-// Revision 1.1.1.1  1994/05/15  05:44:52  rich
-// hfs 0.3 from sunsite
-//
-// Revision 1.8  1994/01/11  00:37:39  craigs
-// Removed declaration of ResumeSearch
-// Added BTreeFile destructor
-//
-// Revision 1.7  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.6  1994/01/01  16:03:31  craigs
-// Removed ResumeSearch
-//
-// Revision 1.5  1993/12/16  20:14:19  craigs
-// Added ResumeSearch feature - not sure if it will or should be used,
-// but it's there if I need it!
-//
-// Revision 1.4  1993/11/24  21:36:05  craigs
-// Various changes remove warnings under MSDOS/NT
-//     by robertj
-//
-// Revision 1.3  1993/11/23  22:19:37  craigs
-// Btree is now a descendant of MacFile - so extents now work!
-//
-// Revision 1.2  1993/11/23  20:29:37  craigs
-// Changed unsigned long to ULONG, and short to BOOL
-//
-// Revision 1.1  1993/11/22  22:27:51  craigs
-// Initial revision
-//
-//
+// $Id: btree.h,v 1.3 1994/05/15 06:35:57 rich Exp $
 //
 
 #ifndef _BTREE_H

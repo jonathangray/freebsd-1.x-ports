@@ -19,17 +19,7 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: extent.cxx,v 1.1 1994/05/15 05:44:52 rich Exp $
-// $Log: extent.cxx,v $
-// Revision 1.1  1994/05/15 05:44:52  rich
-// Initial revision
-//
-// Revision 1.2  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.1  1993/12/16  20:16:12  craigs
-// Initial revision
-//
+// $Id: extent.cxx,v 1.2 1994/05/15 06:36:06 rich Exp $
 //
 
 #include <iostream.h>

@@ -19,44 +19,7 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: catalog.h,v 1.2 1994/05/15 06:19:14 rich Exp $
-// $Log: catalog.h,v $
-// Revision 1.2  1994/05/15 06:19:14  rich
-// hfs for FreeBSD.
-//
-// hfs allows files to be copied off a Macintosh HFS disk on a
-// non-Macintosh computer.  Written by Craig Southeren,
-// geoffw@extro.ucc.su.oz.au.
-//
-// Revision 1.1.1.1  1994/05/15  05:44:52  rich
-// hfs 0.3 from sunsite
-//
-// Revision 1.8  1994/01/11  00:40:40  craigs
-// General cleanups
-//
-// Revision 1.7  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.6  1993/12/30  07:48:24  craigs
-// Removed redundant dirname attribute from FileBuffer
-//
-// Revision 1.5  1993/12/23  22:39:12  craigs
-// Changed FindDir to be bit more intelligent
-//
-// Revision 1.4  1993/12/23  15:15:27  craigs
-// Added copy constructor for FileBuffer
-// Added extra functions for FileBuffer
-//
-// Revision 1.3  1993/11/23  22:20:20  craigs
-// Btree is now a descendant of MacFile, so extents now work!
-//
-// Revision 1.2  1993/11/23  20:29:37  craigs
-// Changed unsigned long to ULONG, and short to BOOL
-//
-// Revision 1.1  1993/11/22  22:27:51  craigs
-// Initial revision
-//
-//
+// $Id: catalog.h,v 1.3 1994/05/15 06:35:59 rich Exp $
 //
 
 #ifndef _CATALOG_H

@@ -19,20 +19,7 @@
  * the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
  *
  *
- * $Id: mdirent.h,v 1.1 1994/05/15 05:44:52 rich Exp $
- * $Log: mdirent.h,v $
- * Revision 1.1  1994/05/15 05:44:52  rich
- * Initial revision
- *
- * Revision 1.3  1994/01/06  03:05:08  craigs
- * Final checkin to include GNU header
- *
- * Revision 1.2  1993/12/31  02:33:44  craigs
- * Added mac_MACPATHLEN macro
- *
- * Revision 1.1  1993/12/30  07:45:17  craigs
- * Initial revision
- *
+ * $Id: mdirent.h,v 1.2 1994/05/15 06:36:18 rich Exp $
  */
 
 #ifndef _MDIRENT_H_

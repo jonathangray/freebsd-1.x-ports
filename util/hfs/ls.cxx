@@ -19,37 +19,7 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: ls.cxx,v 1.2 1994/05/15 06:19:27 rich Exp $
-// $Log: ls.cxx,v $
-// Revision 1.2  1994/05/15 06:19:27  rich
-// hfs for FreeBSD.
-//
-// hfs allows files to be copied off a Macintosh HFS disk on a
-// non-Macintosh computer.  Written by Craig Southeren,
-// geoffw@extro.ucc.su.oz.au.
-//
-// Revision 1.1.1.1  1994/05/15  05:44:53  rich
-// hfs 0.3 from sunsite
-//
-// Revision 1.6  1994/01/11  00:43:35  craigs
-// Cleaned up
-//
-// Revision 1.5  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.4  1993/12/31  02:33:06  craigs
-// Changed to use normalised dates
-//
-// Revision 1.3  1993/12/30  07:56:31  craigs
-// Changed GetFreeSpace to GetVolFreeSpace to avoid conflict
-// with an obsolete NT function of the same name
-//
-// Revision 1.2  1993/12/23  22:41:50  craigs
-// Added -R to ls, and made dir look like MSDOS version
-//
-// Revision 1.1  1993/12/23  14:59:45  craigs
-// Initial revision
-//
+// $Id: ls.cxx,v 1.3 1994/05/15 06:36:11 rich Exp $
 //
 
 #include <iostream.h>

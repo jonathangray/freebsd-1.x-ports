@@ -19,37 +19,7 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: args.h,v 1.2 1994/05/15 06:19:10 rich Exp $
-// $Log: args.h,v $
-// Revision 1.2  1994/05/15 06:19:10  rich
-// hfs for FreeBSD.
-//
-// hfs allows files to be copied off a Macintosh HFS disk on a
-// non-Macintosh computer.  Written by Craig Southeren,
-// geoffw@extro.ucc.su.oz.au.
-//
-// Revision 1.1.1.1  1994/05/15  05:44:52  rich
-// hfs 0.3 from sunsite
-//
-// Revision 1.5  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.4  1993/12/16  20:13:02  craigs
-// Separated parsing of program name and options, and removed
-// indirection on argc and argv
-//
-// Revision 1.3  1993/11/24  21:30:35  craigs
-// Added pragma to disable warnings under MSDOS
-//   by robertj
-//
-// Revision 1.2  1993/11/23  20:03:32  craigs
-// Added MSDOS/Windows compatibility
-//   by robertj
-//
-// Revision 1.1  1993/11/22  22:27:51  craigs
-// Initial revision
-//
-//
+// $Id: args.h,v 1.3 1994/05/15 06:35:55 rich Exp $
 //
 
 #ifndef _ARGS_H

@@ -19,50 +19,7 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: mac.h,v 1.2 1994/05/15 06:19:29 rich Exp $
-// $Log: mac.h,v $
-// Revision 1.2  1994/05/15 06:19:29  rich
-// hfs for FreeBSD.
-//
-// hfs allows files to be copied off a Macintosh HFS disk on a
-// non-Macintosh computer.  Written by Craig Southeren,
-// geoffw@extro.ucc.su.oz.au.
-//
-// Revision 1.1.1.1  1994/05/15  05:44:53  rich
-// hfs 0.3 from sunsite
-//
-// Revision 1.10  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.9  1993/12/31  02:33:26  craigs
-// Normalised dates to Unix standard time
-//
-// Revision 1.8  1993/12/28  13:19:28  craigs
-// Changed CatDatRec::GetFileData to non-inline
-//
-// Revision 1.7  1993/12/23  22:43:10  craigs
-// Removed unecessary OSType abstraction
-//
-// Revision 1.6  1993/12/23  15:17:36  craigs
-// Moved large inline functions into mac.cxx
-//
-// Revision 1.5  1993/12/16  20:17:15  craigs
-// Renamed GetFNum function
-//
-// Revision 1.4  1993/11/24  21:36:05  craigs
-// Various changes remove warnings under MSDOS/NT
-//     by robertj
-//
-// Revision 1.3  1993/11/23  22:21:26  craigs
-// Added FileRef, AllBlkNum and LogBlkNum types
-//
-// Revision 1.2  1993/11/23  20:27:22  craigs
-// Changed unsigned longs to ULONGs and shorts to BOOLS
-//
-// Revision 1.1  1993/11/22  22:27:51  craigs
-// Initial revision
-//
-//
+// $Id: mac.h,v 1.3 1994/05/15 06:36:14 rich Exp $
 //
 
 #ifndef _MAC_H

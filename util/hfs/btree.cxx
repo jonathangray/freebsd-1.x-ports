@@ -19,55 +19,7 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: btree.cxx,v 1.2 1994/05/15 06:19:11 rich Exp $
-// $Log: btree.cxx,v $
-// Revision 1.2  1994/05/15 06:19:11  rich
-// hfs for FreeBSD.
-//
-// hfs allows files to be copied off a Macintosh HFS disk on a
-// non-Macintosh computer.  Written by Craig Southeren,
-// geoffw@extro.ucc.su.oz.au.
-//
-// Revision 1.1.1.1  1994/05/15  05:44:52  rich
-// hfs 0.3 from sunsite
-//
-// Revision 1.10  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.9  1994/01/01  16:02:13  craigs
-// Removed ResumeSearch
-// Corrected problem with searching index nodes starting with
-// the search key
-//
-// Revision 1.8  1993/12/23  22:50:51  craigs
-// Removed warning about uninitialised variable
-//
-// Revision 1.7  1993/12/23  15:13:48  craigs
-// Fixed warning regarding duplicate default initialiser under DOS/NT
-//
-// Revision 1.6  1993/12/16  20:14:19  craigs
-// Added ResumeSearch feature - not sure if it will or should be used,
-// but it's there if I need it!
-//
-// Revision 1.5  1993/11/25  22:01:34  craigs
-// Fixed problems with not traversing link lists of index nodes, removed
-// requirement for IsLeaf argument to OnFound function of search keys (
-// (although kept it because it's useful for debugging!) and fixed handling
-// for rightmost nodes of each tree level
-//
-// Revision 1.4  1993/11/24  21:31:58  craigs
-// Various changes for clean compile under MSDOS/NT
-//
-// Revision 1.3  1993/11/23  22:19:37  craigs
-// Btree is now a descendant of MacFile - so extents now work!
-//
-// Revision 1.2  1993/11/23  20:29:37  craigs
-// Changed unsigned long to ULONG, and short to BOOL
-//
-// Revision 1.1  1993/11/22  22:25:55  craigs
-// Initial revision
-//
-//
+// $Id: btree.cxx,v 1.3 1994/05/15 06:35:56 rich Exp $
 //
 
 #include <iostream.h>

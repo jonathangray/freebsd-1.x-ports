@@ -19,59 +19,7 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: catalog.cxx,v 1.2 1994/05/15 06:19:13 rich Exp $
-// $Log: catalog.cxx,v $
-// Revision 1.2  1994/05/15 06:19:13  rich
-// hfs for FreeBSD.
-//
-// hfs allows files to be copied off a Macintosh HFS disk on a
-// non-Macintosh computer.  Written by Craig Southeren,
-// geoffw@extro.ucc.su.oz.au.
-//
-// Revision 1.1.1.1  1994/05/15  05:44:52  rich
-// hfs 0.3 from sunsite
-//
-// Revision 1.11  1994/01/11  00:38:27  craigs
-// Fixed problem with halting catalog searches on finding filename that
-// matched a prefix of the required one
-// Added STRNICMP macro to deal with portability of strncasecmp
-// General cleaning up declarations to reduce compiler warning under MSDOS/NT
-//
-// Revision 1.10  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.9  1994/01/01  16:03:44  craigs
-// Added completely optimised searching for FindNext, FindFile and FindDir
-//
-// Revision 1.8  1993/12/30  07:46:30  craigs
-// Removed redundant dirname attribute from FileBuffer
-// Removed while(1) construct to avoid MSVC warning
-//
-// Revision 1.7  1993/12/23  22:38:39  craigs
-// Fixed FindDir to act intelligently when not constructing pathnames
-//
-// Revision 1.6  1993/12/23  15:14:47  craigs
-// Added copy constructor for FileBuffer
-// Initial stab at optimised FindNextKey
-//
-// Revision 1.5  1993/11/25  22:03:27  craigs
-// Added extra debugging, simplified FirstFirstKey::Compare, fixed
-// swapped return values from FindDirKey::OnFound
-//
-// Revision 1.4  1993/11/24  21:36:05  craigs
-// Various changes remove warnings under MSDOS/NT
-//     by robertj
-//
-// Revision 1.3  1993/11/23  22:20:20  craigs
-// Btree is now a descendant of MacFile, so extents now work!
-//
-// Revision 1.2  1993/11/23  20:29:37  craigs
-// Changed unsigned long to ULONG, and short to BOOL
-//
-// Revision 1.1  1993/11/22  22:25:55  craigs
-// Initial revision
-//
-//
+// $Id: catalog.cxx,v 1.3 1994/05/15 06:35:58 rich Exp $
 //
 
 #include <iostream.h>

@@ -19,44 +19,7 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: fs.cxx,v 1.2 1994/05/15 06:19:23 rich Exp $
-// $Log: fs.cxx,v $
-// Revision 1.2  1994/05/15 06:19:23  rich
-// hfs for FreeBSD.
-//
-// hfs allows files to be copied off a Macintosh HFS disk on a
-// non-Macintosh computer.  Written by Craig Southeren,
-// geoffw@extro.ucc.su.oz.au.
-//
-// Revision 1.1.1.1  1994/05/15  05:44:53  rich
-// hfs 0.3 from sunsite
-//
-// Revision 1.8  1994/01/11  00:43:00  craigs
-// Added Unmount call
-//
-// Revision 1.7  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.6  1993/12/30  07:54:52  craigs
-// Added handling for "." to ResolvePath
-//
-// Revision 1.5  1993/12/23  22:40:32  craigs
-// Fixed problem with ResolvePath assuming root-based paths actually start at the current
-// directory!
-//
-// Revision 1.4  1993/12/23  15:20:39  craigs
-// Added ResolvePath function
-//
-// Revision 1.3  1993/12/16  20:16:53  craigs
-// Added extents file
-//
-// Revision 1.2  1993/11/23  22:22:26  craigs
-// Changed CatalogFile constructor
-//
-// Revision 1.1  1993/11/22  22:25:55  craigs
-// Initial revision
-//
-//
+// $Id: fs.cxx,v 1.3 1994/05/15 06:36:09 rich Exp $
 //
 
 #include <iostream.h>

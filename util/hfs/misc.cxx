@@ -19,24 +19,7 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: misc.cxx,v 1.1 1994/05/15 05:44:52 rich Exp $
-// $Log: misc.cxx,v $
-// Revision 1.1  1994/05/15 05:44:52  rich
-// Initial revision
-//
-// Revision 1.4  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.3  1993/12/23  22:44:23  craigs
-// Added strprepend function
-//
-// Revision 1.2  1993/11/23  20:28:49  craigs
-// Removed reference to std.h
-//
-// Revision 1.1  1993/11/22  22:25:55  craigs
-// Initial revision
-//
-//
+// $Id: misc.cxx,v 1.2 1994/05/15 06:36:19 rich Exp $
 //
 
 #include <stdio.h>

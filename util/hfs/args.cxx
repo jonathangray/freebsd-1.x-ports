@@ -19,40 +19,7 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: args.cxx,v 1.2 1994/05/15 06:19:09 rich Exp $
-// $Log: args.cxx,v $
-// Revision 1.2  1994/05/15 06:19:09  rich
-// hfs for FreeBSD.
-//
-// hfs allows files to be copied off a Macintosh HFS disk on a
-// non-Macintosh computer.  Written by Craig Southeren,
-// geoffw@extro.ucc.su.oz.au.
-//
-// Revision 1.1.1.1  1994/05/15  05:44:52  rich
-// hfs 0.3 from sunsite
-//
-// Revision 1.6  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.5  1993/12/30  07:47:48  craigs
-// Changed to use DIR_SEP macro
-// Added strlwr on programName for MSDOS/NT
-//
-// Revision 1.4  1993/12/23  15:12:56  craigs
-// Fixed error regarding undeclared variable for DOS/NT
-//
-// Revision 1.3  1993/12/16  20:12:18  craigs
-// Separated program name parsing from option parsing, and
-// removed indirection from argc and argv
-//
-// Revision 1.2  1993/11/23  20:03:32  craigs
-// Added MSDOS/Windows compatibility
-//   by robertj
-//
-// Revision 1.1  1993/11/22  22:25:55  craigs
-// Initial revision
-//
-//
+// $Id: args.cxx,v 1.3 1994/05/15 06:35:54 rich Exp $
 //
 
 #include <string.h>

@@ -19,25 +19,7 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: paranoid.h,v 1.2 1994/05/15 06:19:33 rich Exp $
-// $Log: paranoid.h,v $
-// Revision 1.2  1994/05/15 06:19:33  rich
-// hfs for FreeBSD.
-//
-// hfs allows files to be copied off a Macintosh HFS disk on a
-// non-Macintosh computer.  Written by Craig Southeren,
-// geoffw@extro.ucc.su.oz.au.
-//
-// Revision 1.1.1.1  1994/05/15  05:44:54  rich
-// hfs 0.3 from sunsite
-//
-// Revision 1.2  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.1  1993/11/22  22:27:51  craigs
-// Initial revision
-//
-//
+// $Id: paranoid.h,v 1.3 1994/05/15 06:36:22 rich Exp $
 //
 
 #ifndef _PARANOID_H

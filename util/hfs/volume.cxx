@@ -19,42 +19,7 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: volume.cxx,v 1.2 1994/05/15 06:19:35 rich Exp $
-// $Log: volume.cxx,v $
-// Revision 1.2  1994/05/15 06:19:35  rich
-// hfs for FreeBSD.
-//
-// hfs allows files to be copied off a Macintosh HFS disk on a
-// non-Macintosh computer.  Written by Craig Southeren,
-// geoffw@extro.ucc.su.oz.au.
-//
-// Revision 1.1.1.1  1994/05/15  05:44:54  rich
-// hfs 0.3 from sunsite
-//
-// Revision 1.7  1994/01/11  02:39:55  craigs
-// Added newline to end of cannot open file message
-//
-// Revision 1.6  1994/01/11  00:45:48  craigs
-// Added InvalidateCache call so Filesystem::Unmount will work properly
-//
-// Revision 1.5  1994/01/06  03:05:08  craigs
-// Final checkin to include GNU header
-//
-// Revision 1.4  1993/12/23  15:19:30  craigs
-// Changed to accept A: and B: as device names under Unix
-//
-// Revision 1.3  1993/11/24  21:36:05  craigs
-// Various changes remove warnings under MSDOS/NT
-//     by robertj
-//
-// Revision 1.2  1993/11/23  20:18:51  craigs
-// Added MSDOS/Windows compatibility
-//     by robertj
-//
-// Revision 1.1  1993/11/22  22:25:55  craigs
-// Initial revision
-//
-//
+// $Id: volume.cxx,v 1.3 1994/05/15 06:36:25 rich Exp $
 //
 
 #include <iostream.h>
