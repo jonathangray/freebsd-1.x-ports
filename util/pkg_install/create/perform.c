@@ -1,5 +1,5 @@
 #ifndef lint
-static const char *rcsid = "$Id: perform.c,v 1.2 1993/09/03 23:00:55 jkh Exp $";
+static const char *rcsid = "$Id: perform.c,v 1.3 1993/09/04 18:19:41 jkh Exp $";
 #endif
 
 /*
@@ -140,6 +140,7 @@ make_dist(char *home, char *pkg, char *suffix, Package *plist)
     char tball[FILENAME_MAX];
     char args[10];
 
+    args[0] = '\0';
     sprintf(tball, "%s/%s.%s", home, pkg, suffix);
     if (index(suffix, 'z'))	/* Compress/gzip? */
 	strcpy(args, "z");
