@@ -21,7 +21,7 @@ esac
 echo "Extracting Makefile (with variable substitutions)"
 cat >Makefile <<!GROK!THIS!
 #
-# $Id: Makefile.SH,v 1.5 1993/12/28 04:19:46 smace Exp $
+# $Id: Makefile.SH,v 1.6 1993/12/28 05:24:34 smace Exp $
 #
 #  Makefile for the entire ELM mail system
 #
@@ -29,8 +29,11 @@ cat >Makefile <<!GROK!THIS!
 #         (C) Copyright 1988-1992, USENET Community Trust
 #
 #  $Log: Makefile.SH,v $
-#  Revision 1.5  1993/12/28 04:19:46  smace
-#  corrected `pkg' targets and added necessary datafiles
+#  Revision 1.6  1993/12/28 05:24:34  smace
+#  remove empyt +REQ's...
+#
+# Revision 1.5  1993/12/28  04:19:46  smace
+# corrected `pkg' targets and added necessary datafiles
 #
 # Revision 1.4  1993/12/28  03:40:43  smace
 # added elm_src.tgz target (we don't make elm binaries yet)
@@ -142,8 +145,8 @@ _utils:
 
 pkg:    pkg_src
 
-pkg_src: +DESC_S +ONELINE_S +PLIST_S +REQ_S
-        pkg_create -c +ONELINE_S -d +DESC_S -f +PLIST_S -r +REQ_S elm_src
+pkg_src: +DESC_S +ONELINE_S +PLIST_S
+        pkg_create -c +ONELINE_S -d +DESC_S -f +PLIST_S elm_src
 
 
 !NO!SUBS!
