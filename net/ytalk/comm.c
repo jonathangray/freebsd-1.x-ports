@@ -1157,7 +1157,7 @@ process_esc:
     }
     for(; len > 0; len--, buf++)
     {
-	if(*buf >= ' ' && *buf <= '~')
+	if(*buf >= ' ' && *buf <= '~' || *buf >= 0xA0)
 	{
 	    if(user->x + 1 >= user->cols)
 	    {

@@ -279,7 +279,7 @@ addch_term(user, c)
   register yuser *user;
   register ychar c;
 {
-    if(c >= ' ' && c <= '~')
+    if(c >= ' ' && c <= '~' || c >= 0xA0)
     {
 	_addch_term(user, c);
 	user->scr[user->y][user->x] = c;
@@ -1163,7 +1163,7 @@ raw_term(user, y, x, str, len)
     {
 	if(*c == '\0')
 	    c = str;
-	if(*c < ' ' || *c > '~')
+	if(*c < ' ' || *c > '~' && *c < 0xA0)
 	    return;
 	_addch_term(user, *c);
     }
