@@ -1,9 +1,11 @@
-# /usr/ports/lang/Makefile V2.4	Jan 94	Julian Stacey <stacey@guug.de>
+# /usr/ports/lang/Makefile Thu Feb 17 17:26:04 MEZ 1994	Julian Stacey <stacey@guug.de>
 #	Copyright Julian Stacey, Munich Dec. 93, Free Software, No Liability.
 #	For details see `Legalities' in /sys/Makefile.
 
 SUBDIR =
 G_SUBDIR =
+
+SUBDIR += bwbasic
 
 .if !defined(AVOID)
 install:
@@ -17,13 +19,13 @@ SUBDIR += gcc1 #	Not in sup ports dir, but was on Gary's ports CD
 #	"Makefile", line 8: Could not find ../../Makefile.inc
 .endif
 
-SUBDIR += bwbasic
 SUBDIR += perl
-SUBDIR += xlispstat
 SUBDIR += sather
+SUBDIR += scm
 SUBDIR += sml	# (cd src; makeml -i386 FreeBSD) cd: can't cd to src
 SUBDIR += tcl
 SUBDIR += tclX
+SUBDIR += xlispstat
 
 .include <bsd.subdir_ports.mk>
 

@@ -1,4 +1,4 @@
-# /usr/ports/devel/Makefile V2.3	Jan 94	Julian Stacey <stacey@guug.de>
+# /usr/ports/devel/Makefile Thu Feb 17 17:26:04 MEZ 1994	by Julian Stacey <stacey@guug.de>
 #	Copyright Julian Stacey, Munich Dec. 93, Free Software, No Liability.
 #	For details see `Legalities' in /sys/Makefile.
 
@@ -11,17 +11,11 @@ G_SUBDIR =
 SUBDIR += cflow
 SUBDIR += dejagnu
 SUBDIR += gdb
-#	For version do grep VERSION gdb/Makefile.in
-#	FreeBSD CD is 4.11 but cant understand
-#	shared library executables.
-#	Gary Jennejohn has (to a 4.11 base) added stuff
-#	subsequently to cater for shared libraries
 .if defined(WAIT_OK)
 SUBDIR += gic
 .endif
 SUBDIR += gmake
-#SUBDIR += mprof30	# name told me by jkh ?
-#SUBDIR += mprof		# probable proper name
+SUBDIR += mprof
 
 .include <bsd.subdir_ports.mk>
 

@@ -1,12 +1,10 @@
-# /usr/ports/Makefile V2.3	by Julian Stacey <stacey@guug.de>
+# /usr/ports/Makefile Thu Feb 17 17:26:04 MEZ 1994	by Julian Stacey <stacey@guug.de>
 #	Copyright Julian Stacey, Munich Dec. 93, Free Software, No Liability.
 #	For details see `Legalities' in /sys/Makefile.
 
-# 2.3 sent to jkh 940216
-
-# This Makefile & ports/*/Makefile are still in development.
-# Some comments detailing bugs are suposedly no longer valid,
-# but until I can manage to sup all of ports/ I can't prove bugs are gone,
+# This Makefile still in development.
+# Some comments detailing bugs are possibly no longer valid,
+# but until I can manage to sup all of ports/ I can't check bugs are gone,
 # so comments stay for a while as a warning to check.
 
 MAKE_X_MIT ?= YES
@@ -37,24 +35,26 @@ display:
 	@echo	BINDIR is	${BINDIR}
 	@echo	MAKE_X_MIT is	${MAKE_X_MIT}
 
-#	cleandist:
-#	.if !defined(NOCLEANDIR)
-#		@echo " Cleaning up the source tree, and rebuilding the obj tree"
-#		here=`pwd`; dest=/usr/obj/`echo $$here`; \
-#		cd $$dest; rm -rf ${SUBDIR}
-#		find . -name obj | xargs -n30 rm -rf
-#	.if defined(MAKE_LOCAL) & exists(local) & exists(local/Makefile)
-#		# The cd is done as local may well be a symbolic link
-#		-cd local ; find . -name obj -type l | xargs -n30 rm -rf
-#	.endif
-#	.if defined(MAKE_PORTS) & exists(ports) & exists(ports/Makefile)
-#		-cd ports ; find . -name obj -type l | xargs -n30 rm -rf
-#	.endif
-#		make cleandir
-#		make obj
+# cleandist:
+# .if !defined(NOCLEANDIR)
+#	@echo " Cleaning up the source tree, and rebuilding the obj tree"
+#	here=`pwd`; dest=/usr/obj/`echo $$here`; \
+#	cd $$dest; rm -rf ${SUBDIR}
+#	find . -name obj | xargs -n30 rm -rf
+#	@# Need a for loop as some SUBDIRS
+#	@# such as x-mit will be sym links.
+#	for i in ${SUBDIR} do
+#		if type dir $i && exist $i/Makefile
+#		find . -name obj -type l | xargs -n30 rm -rf
+#		done
+#	make cleandir
+#	make obj
 #	.endif
 
-after_all:
+# all:
+#	done in bsd.subdir_ports.mk
+
+after_all:	# not called anywhere right now
 .if !defined(AVOID)
 	@echo "Making packages that require special make labels."
 	-cd xview; ${MAKE} World # ar: notifydata.o: Too many open files
@@ -99,8 +99,6 @@ clean:	_SUBDIRUSE
 
 # Directories each containing numerous packages
 SUBDIR =
-G_SUBDIR =
-
 SUBDIR += audio
 SUBDIR += comm
 SUBDIR += db
@@ -115,9 +113,8 @@ SUBDIR += print
 SUBDIR += shell
 SUBDIR += util
 SUBDIR += x11
-
-.if defined(MAKE_X_MIT) 
-SUBDIR += x-mit	# do last as Very big
+.if defined(MAKE_X_MIT)
+SUBDIR += x-mit		# Done last, as Very big, & time consuming
 .endif
 
 .include <bsd.subdir_ports.mk>

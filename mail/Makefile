@@ -1,11 +1,11 @@
-# /usr/ports/mail/Makefile V2.3	Jan 94	Julian Stacey <stacey@guug.de>
+# /usr/ports/mail/Makefile Thu Feb 17 17:26:04 MEZ 1994	Julian Stacey <stacey@guug.de>
 #	Copyright Julian Stacey, Munich Dec. 93, Free Software, No Liability.
 #	For details see `Legalities' in /sys/Makefile.
 
 SUBDIR =
 G_SUBDIR =
 
-SUBDIR += elm #
+SUBDIR += elm
 
 .if defined(WAIT_OK)
 SUBDIR += exmh
@@ -18,7 +18,7 @@ SUBDIR += exmh
 .endif
 
 SUBDIR += mh	# vmh.c:1125: structure has no member named `_y'
-SUBDIR += mush	# main.c:154: structure has no member named `sg_flags'
+SUBDIR += mush	# nate's looking at this dir. main.c:154: structure has no member named `sg_flags'
 SUBDIR += popper
 
 .include <bsd.subdir_ports.mk>

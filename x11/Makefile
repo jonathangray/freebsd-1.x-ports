@@ -1,4 +1,4 @@
-# /usr/ports/x11/Makefile V2.4	Jan 94	Julian Stacey <stacey@guug.de>
+# /usr/ports/x11/Makefile Thu Feb 17 17:26:04 MEZ 1994	Julian Stacey <stacey@guug.de>
 #	Copyright Julian Stacey, Munich Dec. 93, Free Software, No Liability.
 #	For details see `Legalities' in /sys/Makefile.
 
@@ -9,11 +9,13 @@ SUBDIR += blt
 SUBDIR += ghostscript
 SUBDIR += ghostview
 SUBDIR += jpeg
-SUBDIR += tiff
 SUBDIR += pbmplus
+SUBDIR += tiff
+SUBDIR += tk #	depends on tcl, which is made by lang/Makefile
 SUBDIR += ups
 SUBDIR += urt
-SUBDIR += tk #	depends on tcl
+SUBDIR += xlock
+SUBDIR += xv
 
 .if !defined(AVOID)
 G_SUBDIR += xview
@@ -27,8 +29,6 @@ G_SUBDIR += xview
 #	even make clean blows up :-(
 .endif
 
-SUBDIR += xlock
-
 .if !defined(AVOID)
 SUBDIR += xxgdb
 #	calldbx.c:77: termio.h: No such file or directory
@@ -36,8 +36,6 @@ SUBDIR += xxgdb
 #	/usr/include/sys/param.h:164: warning: `MAXPATHLEN' redefined
 #	global.h:72: warning: this is the location of the previous definition
 .endif
-
-SUBDIR += xv
 
 .include <bsd.subdir_ports.mk>
 

@@ -1,4 +1,4 @@
-# /usr/ports/util/Makefile V2.3	Jan 94	Julian Stacey <stacey@guug.de>
+# /usr/ports/util/Makefile Thu Feb 17 17:26:04 MEZ 1994	Julian Stacey <stacey@guug.de>
 #	Copyright Julian Stacey, Munich Dec. 93, Free Software, No Liability.
 #	For details see `Legalities' in /sys/Makefile.
 
@@ -6,16 +6,16 @@ SUBDIR =
 G_SUBDIR =
 
 SUBDIR += archivers
-SUBDIR += mtools
-SUBDIR += screen
-SUBDIR += tcx #	mkdir /var/exec
-SUBDIR += zcrypt
-SUBDIR += expect # `expect' requires `tcl' solution: make ports directory twice
-SUBDIR += pkg_install
-SUBDIR += ss #	/usr/man/manl/ss.l: No such file or directory
-SUBDIR += top #	make: don't know how to make machine.c. Stop
+SUBDIR += expect # requires `tcl' which gets made from ports/lang/Makefile
+SUBDIR += ile
+SUBDIR += iozone
 SUBDIR += less
+SUBDIR += md5
+SUBDIR += mtools
+SUBDIR += pkg_install
 SUBDIR += sc
+SUBDIR += screen
+SUBDIR += ss #	/usr/man/manl/ss.l: No such file or directory
 
 .if !defined(AVOID)
 SUBDIR += syscons_xtra
@@ -23,7 +23,11 @@ SUBDIR += syscons_xtra
 #	mkkbdfil.c:22: directory `../kbdmaps/CVS' specified in #include
 .endif
 
+SUBDIR += tcx	#	mkdir /var/exec
+SUBDIR += top	#	make: don't know how to make machine.c. Stop
 SUBDIR += unshar
+SUBDIR += wine
+SUBDIR += zcrypt
 
 .include <bsd.subdir_ports.mk>
 

@@ -1,4 +1,4 @@
-# /usr/ports/math/Makefile V2.3	Jan 94	Julian Stacey <stacey@guug.de>
+# /usr/ports/math/Makefile Thu Feb 17 17:26:04 MEZ 1994	Julian Stacey <stacey@guug.de>
 #	Copyright Julian Stacey, Munich Dec. 93, Free Software, No Liability.
 #	For details see `Legalities' in /sys/Makefile.
 
@@ -6,6 +6,8 @@ SUBDIR =
 G_SUBDIR =
 
 SUBDIR += blas
+SUBDIR += eispack
+SUBDIR += linpack
 
 G_SUBDIR += octave/octave
 #	g++ -I. -I./../liboctave -I./../dld -I./.. -I. -I../liboctave -I../dld -I.. -D>
@@ -19,9 +21,6 @@ G_SUBDIR += octave/octave
 # -ln -s /usr/local/bin/f2c /usr/bin/f2c
 # octave requires the next line
 # -ln -s /usr/local/include/f2c.h /usr/include/f2c.h
-
-SUBDIR += eispack
-SUBDIR += linpack
 
 .include <bsd.subdir_ports.mk>
 
