@@ -78,6 +78,9 @@ execute_builtin(int argc, char **argv, char **envp)
 {
     int  i;
 
+    if (argc < 1)
+	return 1;
+
     i = 0;
     while (dispatch_table[i].com && strcmp(dispatch_table[i].com, argv[0]))
 	i++;
