@@ -20,7 +20,7 @@
 # to the "configure" script.
 
 exec_prefix =	${prefix}
-prefix =	/usr/site/tcl7.3
+prefix =	/usr/local
 
 # Directory in which to install the library of Tcl scripts (note:
 # you can set the TCL_LIBRARY environment variable at run-time to
