@@ -1,0 +1,81 @@
+#!/bin/sh
+#
+#   This script file makes a new TeX MF font, because one wasn't
+#   found.  Usage:
+#
+#   MakeTeXMF name [mode]
+#
+#   `name' is the name of the font, such as `cmr10'.
+#   `mode', if supplied, is the METAFONT mode to use.
+#
+# The root of where to put the new file. The Makefile substitutes for this.
+# (Using the sh construct ${var=value} lets an environment variable
+# `var' override the value given here.)
+: ${DESTDIR=${MTM_DESTDIR-@mtm_destdir@}}
+
+# If this directory doesn't exist, the Sauter stuff won't be attempted.
+: ${sauterdir=@sauterdir@}
+
+# TEMPDIR needs to be unique for each process because of the possibility
+# of simultaneous processes running this script.
+TEMPDIR=${TMPDIR-/tmp}/mtmf.$$
+NAME=`basename "$1" .mf`
+MODE=${2-@default_mfmode@}
+
+MFNAME=$NAME.'mf'
+
+# check also in the standard place
+if test -r $DESTDIR/$MFNAME; then
+   echo "$DESTDIR/$MFNAME already exists!" >&2
+   exit 0
+fi
+
+# Clean up on normal or abnormal exit
+trap "cd /; rm -rf $TEMPDIR $DESTDIR/mftmp.$$" 0 1 2 15
+
+test -d $TEMPDIR || mkdir -p $TEMPDIR 
+cd $TEMPDIR || exit 1
+
+# Which version of Metafont shall we use?
+case $NAME in
+  cm*) mf=cmmf;;
+    *) mf=mf;;
+esac
+
+if test -d $sauterdir && test $mf = cmmf; then
+  echo "Trying interpolated/extrapolated (Sauter) CM source." >&2
+  # Perhaps no such MF source file, and it's CM.  Try Sauter's scripts.
+  cd $sauterdir
+  rootfont=`expr "$NAME" : '\([^0-9]*\)'`
+  pointsize=`expr "$NAME" : '[^0-9]*\(.*\)'`
+  make-mf $rootfont $pointsize >&2
+  echo "Running $mf \mode:=$MODE; mag:=1; scrollmode; input mf/$NAME" >&2
+  $mf "\mode:=$MODE; mag:=1; scrollmode; input mf/$NAME" </dev/null >&2
+  if test $? -eq 0 && test -r $MFNAME; then
+    mv $MFNAME $TEMPDIR
+  fi
+  rm -f $NAME.log
+  cd $TEMPDIR
+fi
+
+if test ! -r $MFNAME; then
+   echo "MakeTeXMF failed to make $MFNAME" >&2
+   exit 1
+fi
+
+# If we get here, we've succeeded and we're supposed to move the final
+# font to $DESTDIR.
+test -d $DESTDIR \
+  || mkdir -p $DESTDIR \
+  || (echo "${DESTDIR}: MakeTeXMF could not create directory." >&2; exit 1)
+
+# Install the MF file carefully, since others may be working simultaneously.
+mv $MFNAME $DESTDIR/mftmp.$$ \
+  || (echo "$0: Could not mv $MFNAME $DESTDIR/mftmp.$$." >&2; exit 1)
+
+cd $DESTDIR || exit 1
+mv mftmp.$$ $MFNAME
+
+# If this line (or an equivalent) is not present, TeX
+# will think MakeTeXMF failed.  Any other output to stdout will also.
+echo $DESTDIR/$MFNAME

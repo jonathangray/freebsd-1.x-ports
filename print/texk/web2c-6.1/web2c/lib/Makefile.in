@@ -10,9 +10,11 @@ exec_prefix = $(prefix)
 bindir = $(exec_prefix)/bin
 scriptdir = $(bindir)
 
-# Where MakeTeXPK/MakeTeXTFM put PK/TFM files. Making these names include 
-# `pk' and `tfm' simplifies the default in kpathsea/paths.h[.in].
-# By default, MakeTeXPK/MakeTeXTFM appends /<mode> to this.
+# Where MakeTeXMF/PK/TFM put MF/PK/TFM files. Making these names include 
+# `mf', `pk' and `tfm' simplifies the default in kpathsea/paths.h[.in].
+# By default, MakeTeXPK appends /<mode> to this (since it is 
+# device-dependent).
+mtm_destdir = $(fontdir)/tmp/mf
 mtp_destdir = $(fontdir)/tmp/pk
 mtt_destdir = $(fontdir)/tmp/tfm
 
@@ -42,7 +44,7 @@ objs = alloca.o eofeoln.o fprintreal.o getopt.o getopt1.o inputint.o \
 default: all
 triptrap: all
 
-all: $(lib) MakeTeXTFM
+all: $(lib) MakeTeXTFM MakeTeXMF
 
 $(lib): $(objs)
 	rm -f $(lib)
@@ -57,6 +59,14 @@ alloca.o: alloca.c
 Makefile: Makefile.in ../config.status
 	cd ..; $(SHELL) config.status
 
+MakeTeXMF: $(srcdir)/MakeTeXMF.in
+	rm -f MakeTeXMF
+	sed -e 's,@mtm_destdir@,$(mtm_destdir),' \
+	    -e 's,@sauterdir@,$(sauterdir),' \
+	    -e 's,@default_mfmode@,$(default_mfmode),' \
+	  $(srcdir)/MakeTeXMF.in >MakeTeXMF
+	-chmod a+x MakeTeXMF
+
 MakeTeXTFM: $(srcdir)/MakeTeXTFM.in
 	rm -f MakeTeXTFM
 	sed -e 's,@mtt_destdir@,$(mtt_destdir),' \
@@ -70,9 +80,11 @@ uninstall: uninstall-exec uninstall-data
 
 install-exec: all
 	$(INSTALL_PROGRAM) MakeTeXTFM $(scriptdir)/MakeTeXTFM
+	$(INSTALL_PROGRAM) MakeTeXMF $(scriptdir)/MakeTeXMF
 
 uninstall-exec:
 	rm -f $(bindir)/MakeTeXTFM
+	rm -f $(bindir)/MakeTeXMF
 
 $(srcdir)/../lib/c-auto.h.in: $(srcdir)/../lib/c-auto.h.start \
                               $(configure_in) $(autoheader) 
