@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/config_f.h,v 1.1 1993/07/20 10:48:46 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/config_f.h,v 1.2 1993/07/21 19:38:51 smace Exp $ */
 /*
  * config_f.h -- configure various defines for tcsh
  *
@@ -90,7 +90,7 @@
  *		on the name of the tty, and environment.
  *		Does not make sense in the modern window systems!
  */
-#define AUTOLOGOUT
+#undef AUTOLOGOUT
 
 /*
  * SUSPENDED	Newer shells say 'Suspended' instead of 'Stopped'.
