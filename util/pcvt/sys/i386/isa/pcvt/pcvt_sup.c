@@ -1614,7 +1614,7 @@ switch_screen(int n, int dontsave)
 
 #if PCVT_NETBSD
 	pcconsp = pc_tty[n];		/* current tty */
-#elif PCVT_FREEBSD && PCVT_FREEBSD > 102
+#elif PCVT_FREEBSD && PCVT_FREEBSD > 110
 	pcconsp = pccons[n];		/* current tty */
 #else
 	pcconsp = &pccons[n];		/* current tty */
