@@ -13,6 +13,7 @@ extern int how_search;
 extern int caseless;
 extern int linenums;
 extern int jump_sline;
+static int match(char *pattern, char *buf);
 
 /*
  * Search for the n-th occurrence of a specified pattern, 
