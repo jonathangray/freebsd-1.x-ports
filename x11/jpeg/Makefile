@@ -79,7 +79,7 @@ DOBJECTS= jdmain.o
 LIBOBJECTS= $(CLIBOBJECTS) $(DLIBOBJECTS) $(COMOBJECTS)
 
 
-all: cjpeg djpeg libjpeg.a
+all: libjpeg.a cjpeg djpeg
 # By default, libjpeg.a is not built unless you explicitly request it.
 # You can add libjpeg.a to the line above if you want it built by default.
 
