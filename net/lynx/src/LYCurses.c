@@ -26,10 +26,6 @@ PUBLIC void start_curses NOARGS
     if(first_time) {
         initscr();	/* start curses */
         first_time = FALSE;
-#ifdef __FreeBSD__
-        /* disable clear to EOL feature -- FreeBSD curses misuses it */
-        CE = 0;
-#endif
     }
 
 #else
