@@ -78,5 +78,5 @@ widget.o: widget.c dgl.h
 
 portio.o: portio.s
 
-dgl.h: compiler.h macros.h prototypes.p
+dgl.h: compiler.h macros.h # prototypes.p
 
