@@ -1,0 +1,34 @@
+#
+# Makefile for host dependent object files for SunOS 4.x
+#
+HOST=	SUNOS4
+DEFINES=-D$(HOST)
+DEBUG=	-g -DDEBUG
+CCFLAGS=$(DEFINES) $(DEBUG)
+CFLAGS=	-I. -I.. $(CCFLAGS)
+CC=	gcc
+
+SRC=	local.c random.c path.c dirent.c time.c alarm.c connect.c xfloat.c
+OBJ=	local.o random.o path.o dirent.o time.o alarm.o connect.o xfloat.o
+SUBOBJ=	local.o random.o path.o dirent.o time.o xfloat.o
+
+dgd:	$(OBJ)
+	@for i in $(OBJ); do echo host/$$i; done > dgd
+
+sub:	$(SUBOBJ)
+	@for i in $(SUBOBJ); do echo ../host/$$i; done > sub
+
+clean:
+	rm -f dgd sub $(SRC) $(OBJ)
+
+
+local.c random.c path.c dirent.c time.c alarm.c connect.c: unix/$@
+	cp unix/$@ $@
+
+xfloat.c: simfloat.c
+	cp simfloat.c xfloat.c
+
+$(OBJ):	../dgd.h ../host.h ../config.h ../alloc.h ../error.h
+path.o: ../path.h
+connect.o: ../str.h ../array.h ../object.h ../comm.h
+xfloat.o: ../xfloat.h

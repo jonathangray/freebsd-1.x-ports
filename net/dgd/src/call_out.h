@@ -1,0 +1,10 @@
+extern void	co_init		P((uindex, int));
+extern uindex	co_new		P((object*, string*, Int, int));
+extern Int	co_del		P((object*, uindex));
+extern array   *co_list		P((object*));
+extern void	co_call		P((void));
+extern void	co_info    	P((uindex*, uindex*));
+extern long	co_swaprate1 	P((void));
+extern long	co_swaprate5 	P((void));
+extern bool	co_dump		P((int));
+extern void	co_restore	P((int, long));
