@@ -1,0 +1,67 @@
+
+#ifndef HTForms_H
+#define HTForms_H
+
+#ifndef LYSTRUCTS_H
+#include "LYStructs.h"
+#endif
+
+/* in LYForms.c */
+extern int change_form_link PARAMS((struct link *form_link, int mode,
+                                    document *newdoc, BOOLEAN *refresh_screen));
+
+/* InputFieldData is used to pass the info between
+ * HTML.c and Gridtext.c in HText_beginInput()
+ */
+typedef struct _InputFieldData {
+    	char *name;
+	char *value;
+	char *size;
+	char *maxlength;
+	char *type;
+	int   checked;
+} InputFieldData;
+
+/* the FormInfo structure is used to contain the form field
+ * data within each anchor
+ * A pointer to this structure is in the TextAnchor struct.
+ */
+typedef struct _FormInfo {
+	char *			name;  /* the name of the link */
+	int			number; /*which form is the link within*/
+	int			type;	 /* string, int, etc. */
+	char *			value;   /* user entered string data */
+	char *			orig_value;  /* the original value */
+	int			size;    /* width on the screen */
+	int			maxlength; /* max width of data */
+	int			group;	   /* a group associated with the link
+					    *  this is used for select's
+					    */
+	int			num_value;  /*value of the numerical fields*/
+	int 			hrange;  /* high numerical range */
+	int			lrange;   /* low numerical range */
+        char *                  submit_action;
+        int                     submit_method;
+} FormInfo;
+
+#define HYPERTEXT_ANCHOR 1
+#define INPUT_ANCHOR     2   /* forms mode input fields */
+
+#define F_TEXT_TYPE	1
+#define F_PASSWORD_TYPE 2
+#define F_CHECKBOX_TYPE 3
+#define F_RADIO_TYPE	4
+#define F_SUBMIT_TYPE	5
+#define F_RESET_TYPE	6
+
+#define WWW_FORM_LINK_TYPE  1
+#define WWW_LINK_TYPE   2
+#define STARS(n) (&star_string[(LINESIZE-1) - (n)])
+/* #define different lynx modes */
+#define NORMAL_LYNX_MODE 1
+#define FORMS_LYNX_MODE  2
+
+#define FORM_UP   1
+#define FORM_DOWN 2
+
+#endif /* HTForms_H */
