@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/x11/ghostscript/gs/gdevtiff.c,v 1.1 1993/08/09 11:02:24 alm Exp $ */
+/* $Header: /a/cvs/386BSD/ports/x11/ghostscript/gs/gdevtiff.c,v 1.2 1994/03/14 16:27:49 jkh Exp $ */
 
 /*
  * Copyright (c) 1992, 1993 Sam Leffler
@@ -274,6 +274,8 @@ faxout_begin_page(TIFFOUT *faxp, gx_device_printer* pdev)
     short dircount;
     TIFFDirectory dir;
 
+    if (gdev_prn_file_is_new(pdev))
+      faxp->diroff = 0;
     /*
      * Writing the header is delayed to here because the
      * FILE* is not setup when faxout_open is called.
