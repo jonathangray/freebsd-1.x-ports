@@ -2,156 +2,182 @@
 #  Server Operations
 #
 proc doStats {query srv} {
-    if {[set param $query] == {}} {
+    if [string match {} $query] {
 	sendIRC STATS
     } {
-	if {$srv != {}} {append param " $srv"}
-	sendIRC STATS $param
+	sendIRC STATS $query $srv
     }
 }
-
+#
 proc serverCmd {cmd} {
-    case $cmd {
+    global zircon
+    set srv [$zircon(host) host]
+    set def "(Default host is $srv)"
+    switch $cmd {
     Oper {
-	    global nickname
-	    global server
-	    set opStuff [serverData $server]
-	    set nk [lindex [lindex $opStuff 2] 0]
-	    set pw [lindex [lindex $opStuff 2] 1]
-	    mkEntryBox .@oper "Oper" "Enter name and password:" \
-	      "{Name [expr {$nk == {} ? $nickname : $nk}]} \
-	      {Password $pw}" \
-	      {OK doOper} {Cancel {}}
+	    global myid
+	    set opStuff [$zircon(host) oper]
+	    set nk [lindex $opStuff 0]
+	    set pw [lindex $opStuff 1]
+	    mkEntryBox .@oper Oper {Enter name and password:} \
+	      "{Name [expr {$nk == {} ? [$myid name] : $nk}]} \
+	      {Password $pw}" {OK doOper} {Cancel {}}
 	}
-    {Rehash Restart} {
+    Rehash -
+    Restart {
     	    set ucmd [string toupper $cmd]
-	    mkDialog $ucmd .@$cmd "$cmd" "Really $cmd?" \
+	    mkDialog $ucmd .@$cmd $cmd "Really $cmd $srv?" \
 	      {} "OK {sendIRC $ucmd}" {Cancel {}}
 	}
     Stats {
-	    global statsInfo ; set statsInfo {}
-	    global server
-	    mkEntryBox .@$cmd "$cmd" "Enter Stats parameters:" \
-	      "{Query {}} {Server $server}" \
-	     "OK {sendIRC [string toupper $cmd]}" {Cancel {}}
+	    global statsInfo
+	    set statsInfo {}
+	    mkEntryBox .@Stats Stats "Enter Stats parameters $def:" \
+	      {{Query {}} {Server {}}} {OK {sendIRC STATS}} {Cancel {}}
 	}
     Links {
-	    global linksInfo ; set linksInfo {}
-	    global server
-	    mkEntryBox .@$cmd "$cmd" "Enter Links parameters:" \
-	      [list [list "Ask from:" $server] [list "Ask what:" ""]] \
-	      "OK {sendIRC [string toupper $cmd]}" {Cancel {}}
+	    global linksInfo
+	    set linksInfo {}
+	    mkEntryBox .@Links Links "Enter Links parameters $def:" \
+	      {{Server {}} {Mask {}}} {OK {sendIRC LINKS}} {Cancel {}}
 	}
     Connect {
-	    global server
-	    mkEntryBox .@$cmd "$cmd" "Enter Connect parameters:" \
-	      "{Server $server} {Port {}} {Remote {}}" \
-	      "OK {sendIRC [string toupper $cmd]}" {Cancel {}}
+	    mkEntryBox .@Connect Connect "Enter Connect parameters $def:" \
+	      {{Server {}} {Port {}} {Remote {}}} \
+	      {OK {sendIRC CONNECT}} {Cancel {}}
 	}
     Info {
-	    global infoInfo ; set infoInfo {}
-	    global server
-	    mkEntryBox .@$cmd "$cmd" "Enter Server name:" "{Server $server}"\
-	      "OK {sendIRC [string toupper $cmd]}" {Cancel {}}
+	    global infoInfo
+	    set infoInfo {}
+	    mkEntryBox .@Info Info "Enter Server name $def:" {{Server {}}}\
+	      {OK {sendIRC INFO}} {Cancel {}}
 	}
     Trace {
-	    global traceInfo ; set traceInfo {}
-	    global server
-	    mkEntryBox .@$cmd "$cmd" "Enter server name:" "{Server $server}"\
-	      "OK {sendIRC [string toupper $cmd]}" {Cancel {}}
+	    global traceInfo
+	    set traceInfo {}
+	    mkEntryBox .@Trace Trace "Enter server name $def:" {{Server {}}}\
+	      {OK {sendIRC TRACE}} {Cancel {}}
+	}
+    Motd {
+	    mkEntryBox .@Trace MOTD "Enter server name $def:" {{Server {}}}\
+	      {OK {sendIRC MOTD}} {Cancel {}}
 	}
     default {
-	    global server
-	    mkEntryBox .@$cmd "$cmd" "Enter pattern:" "{Server $server}"\
-	      "OK {sendIRC [string toupper $cmd]}" {Cancel {}}
+	    set ucmd [string toupper $cmd]
+	    mkEntryBox .@$cmd $cmd "Enter server pattern $def:" {{Server {}}}\
+	      "OK {sendIRC $ucmd}" {Cancel {}}
 	}
     }
 }
-
+#
 proc doOper {nick string} {
-    if {$string != ""} { sendIRC OPER  $nick $string }
+    if ![string match {} $string] { sendIRC OPER  $nick $string }
 }
-
+#
 proc unmakeIRCOp {doit} {
-    global ircop
-    if {$ircop || $doit} {
-	set ircop 0
+    global zircon
+    if {$zircon(ircop) || $doit} {
+	set zircon(ircop) 0
 	ircItems disabled
     }
 }
-
-proc makeIRCOp {} {global ircop ; if !$ircop {set ircop 1 ; ircItems normal}}
-
+#
+proc makeIRCOp {} {
+    global zircon
+    if !$zircon(ircop) { set zircon(ircop) 1 ; ircItems normal }
+}
+#
 proc kill {who} {
-    mkDialog {} .@kick "Kill" "Really kill $who?" \
+    mkDialog {} .@kill Kill "Really kill $who?" \
       {{Message {}}} "OK {sendIRC KILL $who}" {Cancel {}}
 }
-
+#
+proc doKill {nk msg} {
+    if ![string match {} $nk] { sendIRC KILL $nk $msg }
+}
+#
 proc userKill {} {
     mkEntryBox .@ukill "Kill" {Enter user name and message:} \
-      {{User {}} {Message {}}} {OK {sendIRC KILL}} {Cancel {}}
+      {{User {}} {Message {}}} {OK doKill} {Cancel {}}
 }
 
 proc statsProc {prefix param args} {
     global statsInfo
-    foreach a [lindex $args 0] {
-	if {$a != {}} {append statsInfo " $a"}
+    set p [string range $prefix 1 end]:
+    foreach a [lrange [lindex $args 0] 1 end] {
+	if ![string match {} $a] {append p " $a"}
     }
-    append statsInfo "\n"
+    if ![string match {} $param] {append p " $param"}
+    append statsInfo "$p\n"
 }
 
-proc traceProc {prefix param args} {
-    set p {}
-    foreach a [lindex $args 0] {
-	if {$a != {}} {append p " $a"}
+proc traceProc {net prefix param args} {
+    set p [string range $prefix 1 end]:
+    foreach a [lrange [lindex $args 0] 1 end] {
+	if ![string match {} $a] {append p " $a"}
     }
-    addText {} @info "[string range $prefix 1 end] : $p"
+    if ![string match {} $param] {append p " $param"}
+    $net display {} $p
 }
 
-proc irc200 {prefix param args} { traceProc $prefix $param $args }
-proc irc201 {prefix param args} { traceProc $prefix $param $args }
-proc irc202 {prefix param args} { traceProc $prefix $param $args }
-proc irc203 {prefix param args} { traceProc $prefix $param $args }
-proc irc204 {prefix param args} { traceProc $prefix $param $args }
-proc irc205 {prefix param args} { traceProc $prefix $param $args }
-proc irc206 {prefix param args} { traceProc $prefix $param $args }
-proc irc208 {prefix param args} { traceProc $prefix $param $args }
-proc irc261 {prefix param args} { traceProc $prefix $param $args }
+proc irc200 {net prefix param pargs} { traceProc $net $prefix $param $pargs }
+proc irc201 {net prefix param pargs} { traceProc $net $prefix $param $pargs }
+proc irc202 {net prefix param pargs} { traceProc $net $prefix $param $pargs }
+proc irc203 {net prefix param pargs} { traceProc $net $prefix $param $pargs }
+proc irc204 {net prefix param pargs} { traceProc $net $prefix $param $pargs }
+proc irc205 {net prefix param pargs} { traceProc $net $prefix $param $pargs }
+proc irc206 {net prefix param pargs} { traceProc $net $prefix $param $pargs }
+proc irc208 {net prefix param pargs} { traceProc $net $prefix $param $pargs }
+proc irc261 {net prefix param pargs} { traceProc $net $prefix $param $pargs }
 
-proc irc211 {prefix param args} { statsProc $prefix $param $args }
-proc irc212 {prefix param args} { statsProc $prefix $param $args }
-proc irc213 {prefix param args} { statsProc $prefix $param $args }
-proc irc214 {prefix param args} { statsProc $prefix $param $args }
-proc irc215 {prefix param args} { statsProc $prefix $param $args }
-proc irc216 {prefix param args} { statsProc $prefix $param $args }
-proc irc218 {prefix param args} { statsProc $prefix $param $args }
-proc irc241 {prefix param args} { statsProc $prefix $param $args }
-proc irc242 {prefix param args} { statsProc $prefix $param $args }
-proc irc243 {prefix param args} { statsProc $prefix $param $args }
-proc irc244 {prefix param args} { statsProc $prefix $param $args }
-proc irc249 {prefix param args} { statsProc $prefix $param $args }
+proc irc211 {net prefix param pargs} { statsProc $prefix $param $pargs }
+proc irc212 {net prefix param pargs} { statsProc $prefix $param $pargs }
+proc irc213 {net prefix param pargs} { statsProc $prefix $param $pargs }
+proc irc214 {net prefix param pargs} { statsProc $prefix $param $pargs }
+proc irc215 {net prefix param pargs} { statsProc $prefix $param $pargs }
+proc irc216 {net prefix param pargs} { statsProc $prefix $param $pargs }
+proc irc218 {net prefix param pargs} { statsProc $prefix $param $pargs }
+proc irc241 {net prefix param pargs} { statsProc $prefix $param $pargs }
+proc irc242 {net prefix param pargs} { statsProc $prefix $param $pargs }
+proc irc243 {net prefix param pargs} { statsProc $prefix $param $pargs }
+proc irc244 {net prefix param pargs} { statsProc $prefix $param $pargs }
+proc irc249 {net prefix param pargs} { statsProc $prefix $param $pargs }
 
-proc irc219 {prefix param args} {
+proc irc219 {net prefix param pargs} {
     global statsInfo
-    mkInfoBox STATS .@stats Stats $statsInfo {OK {unset statsInfo}}
+    set w .@[newName stats]
+    mkInfoBox STATS $w "[string range $prefix 1 end] Stats [exec date]" $statsInfo {OK {}}
+    unset statsInfo
 }
 
-proc irc364 {prefix param args} {
+proc irc364 {net prefix param pargs} {
     global linksInfo
-    append linksInfo "[lindex $args 1] [lindex $args 2] ${param}\n"
+    append linksInfo "[lindex $pargs 1] [lindex $pargs 2] ${param}\n"
 }
 
-proc irc365 {prefix param args} {
+proc irc365 {net prefix param pargs} {
     global linksInfo
-    mkInfoBox LINKS .@slnk Links $linksInfo {OK {unset linksInfo}}
+    set w .@[newName links]
+    mkInfoBox LINKS $w "[string range $prefix 1 end] Links [exec date]" $linksInfo {OK {}}
+    unset linksInfo
 }
-
-proc irc371 {prefix param args} {
-    global infoInfo ; append infoInfo "${param}\n"
-}
-
-proc irc374 {prefix param args} {
+#
+proc irc371 {net prefix param pargs} {
     global infoInfo
-    mkInfoBox INFO .@sinf Info $infoInfo {OK {unset infoInfo}}
+    append infoInfo "${param}\n"
+}
+#
+proc irc374 {net prefix param pargs} {
+    global infoInfo
+    set w .@[newName info]
+    mkInfoBox INFO $w "[string range $prefix 1 end] Info [exec date]" $infoInfo {OK {}}
+    unset infoInfo
+}
+#
+proc ircItems {state} {
+    foreach cid [Channel :: list] { $cid ircOp $state }
+    setState .oFrm.bf2.servers.menu ircSrv $state
+    setState .oFrm.bf2.users.menu ircop $state
+    .oFrm.nSFrm.cr.ircop conf -state $state
 }
 

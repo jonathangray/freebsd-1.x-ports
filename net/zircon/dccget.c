@@ -116,4 +116,3 @@ char *argv[];
     close(info);
     exit(0);
 }
-

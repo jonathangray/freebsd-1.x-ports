@@ -14,36 +14,24 @@ set zircon(lib) /usr/local/lib/zircon
 lappend auto_path $zircon(lib)/lib
 
 if ![string match "7*" [info tclversion]] {
-    proc dp_connect args { eval connect $args }
-    proc dp_filehandler args { eval filehandler $args }
-    proc dp_address args { eval address $args }
-    proc dp_accept args { eval accept $args }
-    proc dp_shutdown args {eval shutdown $args }
-    proc raise args { }
-    proc pid {} { return 42 }
+    puts stdout {*** Sorry, you need tcl 7.* in order to run Zircon}
+    exit
 }
 #
 InitGlobals
-makeControl
-makeInfo
+Control .
+set mainInfo [Info .@info]
 setNickname $nickname
 #
 # save some space!!!
 #
-rename InitGlobals ""
-rename makeControl ""
-rename makeInfo ""
-set ix 0
-set srv $server
-set prt $ircport
-while {$server != {} && ![startIRC $server $ircport]} {
-    while {$srv == $server && $prt == $ircport} {
-	set sx [lindex $servers $ix]
-	set srv [lindex $sx 0]
-	if {[set prt [lindex $sx 1]] == {}} { set prt $defaultPort }
-	incr ix
-    }
-    set server $srv
-    set ircport $prt
+rename InitGlobals {}
+set s [Server :: list]
+set v [lsearch $s $zircon(host)]
+listdel s $v
+while {![startIRC $zircon(host)]} {
+    if [string match {} $s] { break }
+    set zircon(host) [lindex $s 0]
+    set s [lrange $s 1 end]
     update
 }

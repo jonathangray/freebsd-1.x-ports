@@ -1,73 +1,34 @@
 global dccInfo
 set dccInfo {}
-
+#
 proc acceptChat {mode conn} {
-    global Chat
-    case $mode {
-    r {
-	    global ${conn}Who
-	    set nk [set ${conn}Who]
-	    set Chat($nk) [lindex [dp_accept $conn] 0]
-	    global $Chat($nk)Who ; set $Chat($nk)Who $nk
-	    catch "dp_filehandler $conn"
-	    catch "close $conn"
-	    unset ${conn}Who
-	    makeChannel $nk D
-	    dp_filehandler $Chat($nk) re dccChat
-	    global AChat ; unset AChat($nk);
-	}
-    e { addText ERROR @info {*** Error on DCC Chat accept}}
-    }
-}
-
-proc insertDCCSelect {chan ent} {
-    if {[catch {set bf [selection get]}] == 0} {
-	while {[set nl [string first "\012" $bf]] >= 0} {
-	    $ent insert insert [string range $bf 0 [incr nl -1]]
-	    tk_entrySeeCaret $ent
-	    sendToDCC $chan [$ent get]
-	    $ent delete 0 end
-	    set bf [string range $bf [incr nl 2] end]
-	}
-	if {$bf != ""} { $ent insert insert $bf ; tk_entrySeeCaret $ent }
-    }
-}
-proc sendToDCC {chan string args} {
-    if {$string != ""} {
-	global Chat
-	if [info exists Chat($chan)] {
-	    if [catch [list puts $Chat($chan) $string] err] {
-		addText {} ~${chan} "*** Error : $err"
+    global monitorIn
+    switch $mode {
+    r   {
+	    if ![catch  {dp_accept $conn} cls] {
+		global AChat Chat Cwho Cobj
+		set usr $Cwho($conn)
+		set cht [Chat [$usr name]]
+		$cht show
+		$cht addUser $usr 0 0
+		set newc [set Chat($cht) [lindex $cls 0]]
+		set Cwho($newc) $usr
+		set Cobj($newc) $cht
+		dp_filehandler $newc re dccChat
+		unset Cwho($conn) AChat($usr)
+		if $monitorIn { puts stderr "Chat Accept : [$usr name]" }
 	    } {
-		flush $Chat($chan)
-		addText @me ~${chan} "= $string"
+		if $monitorIn { puts stderr "Error on Accept : $conn" }
 	    }
-	} {
-	    addText {} ~${chan} {*** Connection is closed!!!!}
+	    catch {dp_filehandler $conn}
+	    catch {close $conn}
 	}
+    e   { net0 display ERROR {*** Error on DCC Chat accept}}
     }
 }
-
-proc doDCCLeave {chan} {
-    killChannel ~${chan}
-    global Chat
-    if [info exists Chat($chan)] {
-	set sock $Chat($chan)
-	catch "dp_filehandler $sock"
-	catch "close $sock"
-	global $Chat($chan)Who ; unset $Chat($chan)Who
-	unset Chat($chan)
-    }
-}
-
-proc leaveDCC {chan} {
-    mkDialog LEAVE .@${chan} "Leave ${chan}" \
-      "Really leave DCC chat with ${chan}?" {} \
-      "OK {doDCCLeave ${chan}}" {Cancel {}}
-}
-
-proc DCCSend {nk file} {
-    if {$file == {}} return
+#
+proc DCCSend {usr file} {
+    if [string match {} $file] { return }
     if [file exists $file] {
 	if ![file readable $file] {
 	    mkDialog ERROR .@fe {File error} "Cannot read file $file." \
@@ -76,105 +37,80 @@ proc DCCSend {nk file} {
 	}
 	set file [glob $file]
 	set xfile [file tail $file]
-	global zircon
-	global hostIPAddress
-	set port [split [exec $zircon(lib)/dccsend $file [setInfo] $nk]]
-	sendCtcp DCC $nk "SEND $xfile [ipPack $hostIPAddress] [lindex $port 0]"
-	global ASend ; lappend ASend($nk) [list [lindex $port 1] $file]
+	global zircon hostIPAddress ASend
+	set port [split [exec $zircon(lib)/dccsend $file [setInfo] $usr]]
+	sendCtcp DCC [$usr name] "SEND $xfile [ipPack $hostIPAddress] [lindex $port 0]"
+	lappend ASend($usr) [list [lindex $port 1] $file]
 	if [winfo exists .@dcclist] buildDCCList
     } {
 	mkDialog ERROR .@fe {File error} "File $file does not exist." \
 	  {} {OK {}}
     }
 }
-
+#
 proc doDCC {cmd nk} {
-    if {$nk == {}} return
-    set lnk [string tolower $nk]
-    case $cmd {
-    SEND {
-	    mkFileBox .@dccSend$nk "Send $nk" "File to send to $nk" {}\
-	      "Send {DCCSend $lnk}" {Cancel {}}
-	}
-    CHAT {
-	    global AChat;
-	    if [info exist AChat($lnk)] {
-		mkDialog {} .@chat$nk "Chat" \
-		  "You already have a chat request open to $nk."  \
-		  {} \
-		  "Close {unChat $lnk}" {Keep {}}
-	    } {
-		global hostIPAddress
-		if ![catch {dp_connect -server {} 0} sk] {
-		    set sock [lindex $sk 0]
-		    global ${sock}Who ; set ${sock}Who $lnk
-		    global AChat ; set AChat($lnk) $sock
-		    dp_filehandler $sock re acceptChat
-		    sendCtcp DCC $lnk \
-		      "CHAT chat [ipPack $hostIPAddress] [lindex $sk 1]"
-		} {
-		    addText ERROR @info "*** $host : $sk"
-		}
-	    }
-	}
+    if {![string match {} $nk] && ![string match {[#&]*} $nk]} {
+	[User :: make $nk] dcc $cmd
     }
 }
-
-proc closeChat {who conn} {
-    if [winfo exists .~$who] {
-	addText $who ~$who "*** $who has closed the connection"
+#
+proc closeChat {cht who conn} {
+    dp_filehandler $conn
+    close $conn
+    global Chat Cwho Cobj
+    unset Cwho($conn) Cobj($conn) Chat($cht)
+    if ![string match {} [info proc $cht]] {
+	$cht addText $who "*** $who has closed the connection"
     }
-    catch "dp_filehandler $conn"
-    catch "close $conn"
-    global ${conn}Who ; catch "unset ${conn}Who"
-    global Chat ; catch "unset Chat($who)"
 }
-
+#
 proc dccChat {mode conn} {
-    global ${conn}Who
-    set who [set ${conn}Who]
-    case $mode in {
+    global Cwho Cobj monitorIn
+    set who [$Cwho($conn) name]
+    set cht $Cobj($conn)
+    switch $mode {
     r   {
-	    if {[catch "gets $conn" buffer] || [eof $conn]} {
-		closeChat $who $conn
+	    if {[catch {gets $conn} buffer] || \
+	      ([string match {} $buffer] && [eof $conn])} {
+		closeChat $cht $who $conn
 	    } {
-		addText ${who} ~${who} "=$who= $buffer"
+		$cht addText $who "=$who= $buffer"
+		if $monitorIn { puts stderr "<= $buffer" }
 	    }
 	}
-    e   {  addText {} @info "*** Error on DCC Chat connection with $who" }
+    e   {  info0 addText {} "*** Error on DCC Chat connection with $who" }
     }
 }
 
 proc handleInfo {mode conn} {
-    case $mode {
+    switch $mode {
     r   {
-	    if {[catch "gets $conn" msg] || [eof $conn]} {
-	 	catch "dp_shutdown $conn all"
-		catch "close $conn"
+	    if {[catch {gets $conn} msg] || \
+	      ([string match {} $msg] && [eof $conn])} {
+	 	catch {dp_shutdown $conn all}
+		catch {close $conn}
 	    } {
-		global ASend
-		global Send
-		global Get
+		global ASend Send Get
 		set sp [split $msg]
 		set who [lindex $sp 5]
 		set pid [lindex $sp 0]
-		set msg [join [lrange $sp 1 end]]
-		case $msg {
-		{{DCC Send acc*}} { return }
-		{{DCC Send conn*}} {
+		set msg [join [lreplace [lrange $sp 1 end] 4 4 [$who name]]]
+		switch -glob -- $msg {
+		{DCC Get conn*} -
+		{DCC Send acc*} { return }
+		{DCC Send conn*} {
 			set x [lsearch $ASend($who) "$pid*"]
 			lappend Send($who) [lindex $ASend($who) $x]
 			listdel ASend($who) $x
-			if {$ASend($who) == {}} {
+			if [string match {} $ASend($who)] {
 			    unset ASend($who)
 			}
 			if [winfo exists .@dcclist] buildDCCList
 		    }
-		{{DCC Get conn*}} { return }
-		{{DCC Send*}} {
+		{DCC Send*} {
 			set x [lsearch $Send($who) "$pid*"]
 			listdel Send($who) $x
-			if {$Send($who) == {}} {
+			if [string match {} $Send($who)] {
 			    unset Send($who)
 			}
 			if [winfo exists .@dcclist] buildDCCList
@@ -182,7 +118,7 @@ proc handleInfo {mode conn} {
 		default {
 			set x [lsearch $Get($who) "$pid*"]
 			listdel Get($who) $x
-			if {$Get($who) == {}} {
+			if [string match {} $Get($who)] {
 			    unset Get($who)
 			}
 			if [winfo exists .@dcclist] buildDCCList
@@ -191,43 +127,53 @@ proc handleInfo {mode conn} {
 		mkInfoBox DCCINFO .@dcc$conn {DCC Info} $msg {OK {}}
 	    }
 	}
-    e   {  addText {} @info "*** Error on DCC Info connection." }
+    e   {  info0 addText {} "*** Error on DCC Info connection." }
     }
 }
 
 proc acceptInfo {mode conn} {
+    global monitorIn
     case $mode {
     r   {
 	    set sk [lindex [dp_accept $conn] 0]
 	    dp_filehandler $sk re handleInfo
+	    if $monitorIn { puts stderr "Info Accept" }
 	}
-    e   {  addText {} @info "*** Error on DCC Info connection (accept)." }
+    e   {  info0 addText {} "*** Error on DCC Info connection (accept)." }
     }
 }
 
 proc setInfo {} {
     global dccInfo
-    if {$dccInfo == {}} {
-	if [catch {dp_connect -server {} 0} dccInfo] {
-	    addText {} @info "*** Cannot set up info socket - $dccInfo"
+    if [string match {} $dccInfo] {
+	if [catch {dp_connect -server 0} dccInfo] {
+	    info0 addText {} "*** Cannot set up info socket - $dccInfo"
 	    return {}
 	}
 	dp_filehandler [lindex $dccInfo 0] re acceptInfo
     }
     return [lindex $dccInfo 1]
 }
-
-proc doGetDCC {wh lnk addr port args} {
+#
+proc tkerror {args} {
+    global errorCode errorInfo
+    puts stderr "$errorCode $errorInfo"
+}
+#
+proc doGetDCC {wh usr addr port args} {
     set host [dectonet $addr]
-    if {$wh == "Chat"} {
-	if [catch "dp_connect $host $port" val] {
-	    addText {} @info "*** Cannot connect to host $host ($val)"
+    if [string match {Chat} $wh] {
+	if [catch {dp_connect $host $port} val] {
+	    info0 addText {} "*** Cannot connect to host $host ($val)"
 	    return 0
 	}
 	set sok [lindex $val 0]
-	global ${sok}Who ; set ${sok}Who $lnk
-	makeChannel $lnk D
-	global Chat ; set Chat($lnk) $sok
+	global Cwho Cobj Chat 
+	set Cwho($sok) $usr
+	set Cobj($sok) [set this [Chat [$usr name]]]
+	$this show
+	$this addUser $Cwho($sok) 0 0
+	set Chat($this) $sok
 	dp_filehandler $sok re dcc${wh}
     } {
 	set file [lindex $args 0]
@@ -238,14 +184,15 @@ proc doGetDCC {wh lnk addr port args} {
 		return
 	    }
 	}
-	global zircon
+	global zircon Get
 	set file [file dirname $file]/[file tail $file]
-	set pid [exec $zircon(lib)/dccget $host $port $file [setInfo] $lnk]
-	global Get ; lappend Get($lnk) [list $pid $file]
+	set pid [exec $zircon(lib)/dccget $host $port $file [setInfo] $usr]
+	lappend Get($usr) [list $pid $file]
     }
 }
 
-proc handleDCC {nk lnk param} {
+proc handleDCC {usr param} {
+#    global DCCReq
     set pars [split $param]
     case [lindex $pars 1] {
     SEND {
@@ -254,20 +201,22 @@ proc handleDCC {nk lnk param} {
 	    }
 	    set addr [lindex $pars 3]
 	    set port [lindex $pars 4]
-	    set msg "DCC Send request ($fln) received from $nk"
-	    mkFileBox .@dcc "DCC Get $fln" "$msg" $fln \
-	      "Accept {doGetDCC Get $lnk $addr $port}" {Cancel {}}
+#	    lappend DCCReq [list Send $usr $fln $addr $port]
+	    set msg "DCC Send request ($fln) received from [$usr name]"
+	    mkFileBox .@dcc "DCC Send $fln" $msg $fln \
+	      "Accept {doGetDCC Get $usr $addr $port}" {Cancel {}}
 	}  
     CHAT {
 	    set addr [lindex $pars 3]
 	    set port [lindex $pars 4]
-	    set msg "DCC Chat request ([lindex $pars 2]) received from $nk"
-	    mkDialog {} .@dcc "DCC Chat Request" "$msg" {} \
-	      "Accept {doGetDCC Chat $lnk $addr $port}" {Cancel {}}
+#	    lappend DCCReq [list Chat $usr $addr $port]
+	    set msg "DCC Chat request received from [$usr name]"
+	    mkDialog {} .@dcc "DCC Chat Request" $msg {} \
+	      "Accept {doGetDCC Chat $usr $addr $port}" {Cancel {}}
 	}
     }
 }
-
+#
 proc ipPack {ip} {
     set val 0
     foreach x [split $ip "."] {
@@ -275,7 +224,7 @@ proc ipPack {ip} {
     }
     return [format %u $val]
 }
-
+#
 proc dectonet {dec} {
     if {[string length $dec] == 10 && [set first [string index $dec 0]] > 1} {
 	case $first {
@@ -298,42 +247,88 @@ proc dectonet {dec} {
 
     return "$internet(3).$internet(2).$internet(1).$internet(0)"
 }
-
-proc killDel {arr who file} {
+#
+proc killDel {arr usr file} {
     global $arr
     set i 0
-    foreach p [set ${arr}($who)] {
+    foreach p [set ${arr}($usr)] {
 	if {[lindex $p 1] == $file} {
-	    catch "exec kill [lindex $p 0]"
-	    listdel ${arr}($who) $i
-	    if {[set ${arr}($who)] == {}} { unset ${arr}($who) }
+	    catch {exec kill [lindex $p 0]}
+	    listdel ${arr}($usr) $i
+	    if [string match {} [set ${arr}($usr)]] { unset ${arr}($usr) }
 	    return
 	}
 	incr i
     }
 }
-
-proc unChat who {
-    global AChat
-    global $AChat($who)Who
-    unset $AChat($who)Who
-    catch "dp_filehandler $AChat($who)"
-    catch "close $AChat($who)"
-    unset AChat($who)
-}
-
-proc dccClose win {
+#
+proc dccClose {win} {
     foreach t [$win curselection] {
 	set x [split [$win get $t]]
-	set who [lindex $x 2]
+	set usr [User :: find [set who [lindex $x 2]]]
 	set file [lindex $x 4]
-	case [lindex $x 0] {
-	Call* {unChat $who }
-	Chat* {doDCCLeave $who}
-	Offer* { killDel ASend $who $file }
-	Send* { killDel Send $who $file }
-	Get* { killDel Get $who $file }
+	switch -glob -- [lindex $x 0] {
+	{Call to*} {$usr unChat }
+	{Call from*} { }
+	Chat* {[Chat :: find $who] leave}
+	Offer* { killDel ASend $usr $file }
+	Request* { }
+	Send* { killDel Send $usr $file }
+	Get* { killDel Get $usr $file }
 	}
     }
     foreach t [$win curselection] { $win delete $t }
+}
+#
+proc buildDCCList {args} {
+    set w .@dcclist
+    if [winfo exists $w] {
+	popup $w
+	if [string match {} $args] { $oFrm.dcc.l delete 0 end }
+    } {
+	toplevel $w -class Zircon -relief raised -borderwidth 2
+	wm title $w {DCC Connections}
+	wm minsize $w 10 1
+	makeLB $w.dcc -setgrid 1
+	frame $w.btn
+	button $w.btn.ok -text OK -command {destroy .@dcclist} -relief raised
+	button $w.btn.clear -text Close -relief raised \
+	  -command { dccClose .@dcclist.dcc.l }
+	pack $w.btn.ok $w.btn.clear -side left -expand 1 -fill x
+	pack $w.dcc -fill both
+	pack $w.btn -fill x
+    }
+    global AChat Chat ASend Send Get
+    foreach nn [array names AChat] {
+	$w.dcc.l insert end "Call to [$nn name]"
+    }
+    foreach nn [array names Chat] {
+	$w.dcc.l insert end "Chat to [$nn name]"
+    }
+    foreach nn [array names ASend] {
+	foreach fl $ASend($nn) {
+	    $w.dcc.l insert end "Offer to [$nn name] : [lindex $fl 1]"
+	}
+    }
+    foreach nn [array names Send] {
+	foreach fl $Send($nn) {
+	    $w.dcc.l insert end "Send to [$nn name] : [lindex $fl 1]"
+	}
+    }
+    foreach nn [array names Get] {
+	foreach fl $Get($nn) {
+	    $w.dcc.l insert end "Get from [$nn name] : [lindex $fl 1]"
+	}
+    }
+}
+#
+proc usersDCC {cmd} {
+    switch $cmd {
+    List -
+    Close { buildDCCList }
+    default {
+	    mkEntryBox .@$cmd $cmd "Enter user name for DCC $cmd:" \
+	      {{User {}}} "OK {doDCC [string toupper $cmd]}" {Cancel {}}
+	}
+    }
 }

@@ -1,29 +1,25 @@
-#
-# Procedure to put up a dialog box. The code is based on that
-# provided in one of the tk demos, but has been altered to allow
-# dialog boxes with entry fields in them. It also takes a window
-# title.
-#
 proc doButtons {w param lv pars} {
     if {[llength $pars] > 0} {
 	set arg [lindex $pars 0]
 	frame $w.bot.0 -relief raised -border 1
-	zpack $w.bot 0 {left expand fillx}
+	pack $w.bot.0 -side left -expand 1 -fill x -padx 5 -padx 5
 	if {[set cmd [lindex $arg 1]] != {}} { append cmd " $param" }
-	if {$lv != {}} {
+	if ![string match {} $lv] {
 	   bind $lv <Return> "$cmd ; killWindow $w ; notIdle {}"
 	   bind $lv <Tab> "focus $w.top.v0.value ; notIdle {}"
 	}
 	button $w.bot.0.button -text [lindex $arg 0] \
 		-command "$cmd ; killWindow $w"
-	zpack $w.bot.0 button {expand fillx padx 12 pady 12}
+	pack $w.bot.0.button -expand 1 -fill x -padx 5 -pady 5
 	bind $w <Return> "$cmd ; killWindow %W ; notIdle {}"
 	set i 1
 	foreach arg [lrange $pars 1 end] {
-	    if {[set cmd [lindex $arg 1]] != {}} { append cmd " $param" }
+	    if ![string match {} [set cmd [lindex $arg 1]]] {
+		append cmd " $param"
+	    }
 	    button $w.bot.$i -text [lindex $arg 0] \
 	      -command "$cmd ; killWindow $w"
-	    zpack $w.bot $i {left expand fillx}
+	    pack $w.bot.$i -side left -expand 1 -fill x -padx 5 -pady 5
 	    incr i
 	}
     }
@@ -31,7 +27,7 @@ proc doButtons {w param lv pars} {
 }
 
 proc mkDialog {kind w title msgText entries args} {
-    if {$kind != {}} {
+    if ![string match {} $kind] {
 	global noConfirm
 	if {[lsearch $noConfirm $kind] >= 0} {
 	    set param {}
@@ -50,7 +46,7 @@ proc mkDialog {kind w title msgText entries args} {
 	}
 	global toInfo
 	if {[lsearch $toInfo $kind] >= 0} {
-	    addText {} @info "*** $msgText"
+	    info0 addText {} "*** $msgText"
 	    return
 	}
     }
@@ -59,22 +55,21 @@ proc mkDialog {kind w title msgText entries args} {
     killWindow $w
     toplevel $w -class Zircon
     wm title $w "$title"
-
     frame $w.top -relief raised
     frame $w.bot -relief raised
-    zpack $w top {fill expand}
-    zpack $w bot {fillx}
+    pack $w.top -fill both -expand 1
+    pack $w.bot -fill x
     if {$just == "left"} {
 	scrollbar $w.top.vscroller -command "$w.top.message yview"
 	text $w.top.message -yscrollcommand "$w.top.vscroller set"
 	$w.top.message insert insert $msgText
 	set ln [lindex [split [$w.top.message index end] .] 0]
 	$w.top.message conf -state disabled -height $ln
-	zpack $w.top message {left expand fill}
-	zpack $w.top vscroller {left filly}
+	pack $w.top.message -side left -expand 1 -fill both
+	pack $w.top.vscroller -side left -fill y
     } {
 	message $w.top.message -justify $just -text "$msgText" -aspect 500
-	zpack $w.top message {expand fill}
+	pack $w.top.message -expand 1 -fill both
     }
 
     set param {}
@@ -87,9 +82,10 @@ proc mkDialog {kind w title msgText entries args} {
 	emacsEntry $name
 	if {[set init [lindex $entry 1]] != {}} { $name insert end $init }
 	append param " \[${name} get\]"
-	zpack $w.top.v${vb} label {left padx 5 pady 5}
-	zpack $w.top.v${vb} value {left expand fillx padx 5 pady 5}
-	zpack $w.top v${vb} {fillx padx 5 pady 5}
+	pack $w.top.v${vb}.label -side left -padx 5 -pady 5
+	pack $w.top.v${vb}.value -side left -expand 1 -fill x \
+	  -padx 10 -pady 10
+	pack $w.top.v${vb} -fill x -padx 5 -pady 5
 	set lv $w.top.v${vb}.value
 	incr vb
 	bind $lv <Return> "notIdle {} ; focus $w.top.v${vb} "
@@ -108,10 +104,10 @@ proc mkEntryBox {w title msgText entries args} {
 
     frame $w.top -relief raised
     frame $w.bot -relief raised
-    zpack $w top {fill expand}
-    zpack $w bot {fillx}
+    pack $w.top -fill both -expand 1
+    pack $w.bot -fill x
     message $w.top.message -text "$msgText" -aspect 500
-    zpack $w.top message {expand fill}
+    pack $w.top.message -expand 1 -fill both
 
     set param {}
     set vb 0
@@ -123,9 +119,10 @@ proc mkEntryBox {w title msgText entries args} {
 	emacsEntry $name
 	if {[set init [lindex $entry 1]] != {}} { $name insert end $init }
 	append param " \[${name} get\]"
-	zpack $w.top.v${vb} label {left padx 5 pady 5}
-	zpack $w.top.v${vb} value {left expand fillx padx 5 pady 5}
-	zpack $w.top v${vb} {fillx padx 5 pady 5}
+	pack $w.top.v${vb}.label -side left -padx 5 -pady 5
+	pack $w.top.v${vb}.value -side left -expand 1 -fill x \
+	  -padx 10 -pady 10
+	pack $w.top.v${vb} -fill x -padx 5 -pady 5
 	set lv $w.top.v${vb}.value
 	incr vb
 	bind $lv <Return> "notIdle {} ; focus $w.top.v${vb} "
@@ -134,56 +131,65 @@ proc mkEntryBox {w title msgText entries args} {
     doButtons $w $param $lv $args
     focus $w
 }
-
+#
 proc mkInfoBox {kind w title msgText args} {
-    if {$kind != {}} {
-	global noConfirm
+    if ![string match {} $kind] {
+	global noConfirm toInfo
 	if {[lsearch $noConfirm $kind] >= 0} {
 	    if {[llength $args] > 0} {
 		eval [lindex [lindex $args 0] 1]
 	    }
-	    return
+	    return [info0 text]
 	}
-	global toInfo
 	if {[lsearch $toInfo $kind] >= 0} {
-	    addText {} @info $msgText
-	    return
+	    info0 addText {} $msgText
+	    return [info0 text]
 	}
     }
     set just [expr {[lsearch \
-      {DCC WHO STATS INFO LINKS WHOIS} $kind] >= 0 ? "left" : "center"}]
+      {DCC WHO STATS INFO LINKS WHOIS} $kind] >= 0 ? {left} : {center}}]
     killWindow $w
     toplevel $w -class Zircon
-    wm title $w "$title"
-
+    wm title $w $title
+    wm minsize $w 10 2
     frame $w.top -relief raised
+    bind $w.top <Destroy> { }
     frame $w.bot -relief raised
-    zpack $w top {fill expand}
-    zpack $w bot {fillx}
+    pack $w.bot -fill x -expand 1 -side bottom
+    pack $w.top -fill both -expand 1 -side top
     if {$just == "left"} {
 	scrollbar $w.top.vscroller -command "$w.top.message yview"
-	text $w.top.message -yscrollcommand "$w.top.vscroller set"
-	$w.top.message insert insert $msgText
-	set ln [lindex [split [$w.top.message index end] .] 0]
-	$w.top.message conf -state disabled -height $ln
-	zpack $w.top message {left expand fill}
-	zpack $w.top vscroller {left filly}
+	text $w.top.message -width 80 -height 10 \
+	  -yscrollcommand "$w.top.vscroller set"
+	if ![string match {} $msgText] {
+	    $w.top.message insert insert $msgText
+	    set ln [lindex [split [$w.top.message index end] .] 0]
+	    set ln [expr $ln > 24 ? 24 : $ln]
+	    $w.top.message conf -state disabled -height $ln
+	}
+	pack $w.top.vscroller -side right -fill y
+	pack $w.top.message -side left -expand 1 -fill both
     } {
-	message $w.top.message -justify $just -text "$msgText"
-	zpack $w.top message {expand fill}
+	message $w.top.message -justify $just -text $msgText
+	pack $w.top.message -expand 1 -fill both
     }
     doButtons $w {} {} $args
+    return $w.top.message
 }
-
+#
 proc setFile {w y cmd} {
     set x [$w nearest $y]
     set fn [$w get $x]
     if [file isdirectory $fn] {
 	cd $fn
 	$w delete 1 end
-	foreach fn [lsort [glob *]] {
-	    $w insert end $fn
+	if ![catch {set fls [glob *]}] {
+	    foreach fl [lsort $fls] {
+		if [file isdirectory $fl] { append fl / }
+		$w insert end $fl
+	    }
 	}
+	foreach fn [lsort [glob *]] { $w insert end $fn	}
     } {
 	eval $cmd $fn
 	killWindow [winfo toplevel $w]
@@ -199,39 +205,24 @@ proc mkFileBox {w title msgText init args} {
     frame $w.top -relief raised
     frame $w.mid -borderwidth 0
     frame $w.bot -relief raised
-    zpack $w {top mid} {fill expand}
-    zpack $w bot {fillx}
-    if {$msgText != {}} {
+    pack $w.top $w.mid -fill both -expand 1
+    pack $w.bot -fill x
+    if ![string match {} $msgText] {
 	message $w.top.message -text "$msgText" -aspect 500
-	zpack $w.top message {expand fill}
+	pack $w.top.message -expand 1 -fill both
     }
-    frame $w.mid.flist -borderwidth 0
-    scrollbar $w.mid.flist.vscroller -command "$w.mid.flist.list yview"
-    listbox $w.mid.flist.list \
-      -xscrollcommand "$w.mid.hsFrm.hscroller set" \
-      -yscrollcommand "$w.mid.flist.vscroller set" -setgrid 1
-
-    zpack $w.mid.flist list {left expand fill}
-    zpack $w.mid.flist vscroller {left filly} 
-
-    frame $w.mid.hsFrm
-    scrollbar $w.mid.hsFrm.hscroller -command "$w.mid.flist.list xview" \
-      -orient horizontal
-
-    frame $w.mid.hsFrm.pf0
-    zpack $w.mid.hsFrm hscroller {left expand fillx}
-    zpack $w.mid.hsFrm pf0 {left padx 20} 
-    zpack $w.mid flist {expand fill}
-    zpack $w.mid hsFrm {fillx}
+    makeLB $w.mid.flist -setgrid 1
+    pack $w.mid.flist -expand 1 -fill both
     labelEntry 0 $w.mid.fn {-text Filename} $init {}
-    zpack $w.mid fn {expand fillx}
-    $w.mid.flist.list insert end ..
+    pack $w.mid.fn -expand 1 -fill x
+    $w.mid.flist.l insert end ../
     if ![catch {set fls [glob *]}] {
 	foreach fl [lsort $fls] {
-	    $w.mid.flist.list insert end $fl
+	    if [file isdirectory $fl] { append fl / }
+	    $w.mid.flist.l insert end $fl
 	}
     }
-    bind $w.mid.flist.list <1> "
+    bind $w.mid.flist.l <1> "
 	set x \[%W nearest %y\]
 	set f \[%W get \$x\]
 	entrySet $w.mid.fn.entry \
@@ -239,26 +230,27 @@ proc mkFileBox {w title msgText init args} {
 	%W select from \$x
     "
     set cmd [lindex [lindex $args 0] 1]
-    bind $w.mid.flist.list <Double-1> "setFile %W %y {$cmd}"
-    if {$args != {}} {
+    bind $w.mid.flist.l <Double-1> "setFile %W %y {$cmd}"
+    if ![string match {} $args] {
 	set arg [lindex $args 0]
 	frame $w.bot.0 -relief raised -border 1
-	zpack $w.bot 0 {left expand fillx}
+	pack $w.bot.0 -side left -expand 1 -fill x -padx 5 -pady 5
 	set cmd [lindex $arg 1]
-	if {$cmd != {}} { append cmd " \[$w.mid.fn.entry get\]" }
+	if ![string match {} $cmd] { append cmd " \[$w.mid.fn.entry get\]" }
 	button $w.bot.0.button -text [lindex $arg 0] \
 		-command "$cmd ; killWindow $w ; notIdle {}"
-	zpack $w.bot.0 button {expand fillx padx 12 pady 12}
+	pack $w.bot.0.button -expand 1 -fill x -padx 5 -pady 5
 	bind $w <Return> "$cmd ; killWindow %W ; notIdle {}"
 	focus $w
-
 	set i 1
 	foreach arg [lrange $args 1 end] {
 	    set cmd [lindex $arg 1]
-	    if {$cmd != {}} { append cmd " \[$w.mid.fn.entry get\]" }
+	    if ![string match {} $cmd] {
+		append cmd "\[$w.mid.fn.entry get\]"
+	    }
 	    button $w.bot.$i -text [lindex $arg 0] \
 	      -command "$cmd ; killWindow $w"
-	    zpack $w.bot $i {left expand fillx}
+	    pack $w.bot.$i -side left -expand 1 -fill x
 	    incr i
 	}
     }

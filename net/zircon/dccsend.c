@@ -142,7 +142,7 @@ char *argv[];
     }
     st = time((time_t *) 0);
     
-    while ((l = read(g, buffer, 1024)) > 0)
+    while ((l = read(g, buffer, 2048)) > 0)
     {
 	tl += l;
 	if (write(fd, buffer, l) != l) 
@@ -196,4 +196,3 @@ char *argv[];
     close(info);
     exit(0);
 }
-

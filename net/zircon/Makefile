@@ -29,15 +29,16 @@ SHELL=/bin/sh
 #
 #--------------------------------------------------
 
-version = 1.14
-srcs = zircon
-objs = dccget.o dccsend.o
+version = 1.15
+srcs = zircon dccget.c dccsend.c crypt.c
+objs = dccget.o dccsend.o crypt.o zping.o
+execs = dccget dccsend crypt zping
 libs = lib
+index = lib/tclIndex
 aux = zircon.ad rc
-others = FAQ README CHANGES COPYRIGHT DOTzirconrc MANUAL Makefile \
-	 dccget.c dccsend.c
+others = FAQ README CHANGES COPYRIGHT DOTzirconrc MANUAL Makefile TODO
 bitmaps = bitmaps
-distrib = $(srcs) $(libs) $(bitmaps) $(aux) $(others)
+distrib = $(index) $(srcs) $(libs) $(bitmaps) $(aux) $(others)
 
 #LIBS =  -lsocket -linet -lnsl -lseq 
 #
@@ -45,9 +46,9 @@ distrib = $(srcs) $(libs) $(bitmaps) $(aux) $(others)
 #LIBS= -lsocket -lnsl -lelf -lucb
 
 
-all: zircon dccget dccsend
+all: zircon $(execs)
 
-zircon: Makefile tclIndex
+zircon: Makefile $(index)
 	mv zircon zircon.src
 	echo '#!$(WISH) -f' > zircon
 	echo 'set zircon(lib) $(LIBDIR)' >> zircon
@@ -58,19 +59,25 @@ zircon: Makefile tclIndex
 dccget:	dccget.o
 	$(CC) -o dccget -s -O dccget.c $(LIBS)
 
+zping: zping.c
+	$(CC) -o zping -s -O zping.c
+
+crypt: crypt.c
+	$(CC) -o crypt -s -O crypt.c
+
 dccsend:	dccsend.o
 	$(CC) -o dccsend -s -O dccsend.c $(LIBS)
 
-tclIndex:
-	cd lib ;  echo 'auto_mkindex . *.tcl ; exit' | $(WISH)
+$(index):
+	cd lib ;  echo 'auto_mkindex . *.tcl ; exit' | $(WISH) -notk
 
-install: zircon tclIndex dccget dccsend $(libs) $(bitmaps) $(aux) Makefile
+install: all zircon $(libs) $(bitmaps) $(aux)
 	@if [ -d $(BINDIR) ]; then set +x; \
 	else (set -x; mkdir $(BINDIR)); fi
 	cp zircon $(BINDIR)
 	@if [ -d $(LIBDIR) ]; then set +x; \
 	else (set -x; mkdir $(LIBDIR)); fi
-	cp -r dccget dccsend $(libs) $(bitmaps) $(LIBDIR)
+	cp -r $(execs) $(libs) $(bitmaps) $(LIBDIR)
 	@if [ ! -f $(LIBDIR)/rc ]; then cp rc $(LIBDIR); \
 	echo Remember to configure $(LIBDIR)/rc; fi
 	@if [ ! -f $(LIBDIR)/zircon.ad ]; then cp zircon.ad $(LIBDIR); fi
