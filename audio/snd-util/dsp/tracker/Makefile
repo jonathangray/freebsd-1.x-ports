@@ -4,8 +4,8 @@ UI = Unix/./
 BIN_DIR = /usr/local/bin
 MAN_DIR = /usr/local/man
 INSTALL = install
-INST_BIN_OPT = -s -o bin -g bin
-INST_MAN_OPT = -m 644 -o bin -g bin
+INST_BIN_OPT = -c -s -o bin -g bin
+INST_MAN_OPT = -c -m 644 -o bin -g bin
 
 CFLAGS = -O2 -funroll-loops
 LIBS = -lm
