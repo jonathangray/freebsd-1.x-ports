@@ -238,7 +238,7 @@ vdcomp: vdcomp.c
 xcmap:  xcmap.c
 	$(CC) $(CFLAGS) -o xcmap xcmap.c $(LIBS)
 
-install: xv bggen vdcomp xcmap
+install: all
 	install -c -s xv bggen vdcomp xcmap /usr/X386/bin
 
 xvclean:
