@@ -104,7 +104,7 @@ COMPAT_SOBJS =
 
 AC_FLAGS =
 
-INSTALL =		/usr/local/bin/install -c
+INSTALL =		/usr/bin/install -c
 INSTALL_PROGRAM =	$(INSTALL)
 INSTALL_DATA =		$(INSTALL) -m 644
 RANLIB =		ranlib
@@ -210,7 +210,7 @@ install-man:
 		else true; \
 		fi; \
 	    done;
-	@cd $(SRC_DIR)/doc; for i in *.1; \
+	@cd $(SRC_DIR)/doc; for i in *.[3n]; \
 	    do \
 	    echo "Installing doc/$$i"; \
 	    rm -f $(MAN1_DIR)/$$i; \
