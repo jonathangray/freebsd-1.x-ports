@@ -31,7 +31,7 @@ int sig_number (const char *abbrev);
 
 /* Avoid conflicts with a system header file that might define these two.  */
 
-#if !defined (HAVE_SYS_SIGLIST) && !defined (HAVE_PSIGNAL)
+#ifndef HAVE_PSIGNAL
 /* Print to standard error the name of SIGNAL, preceded by MESSAGE and
    a colon, and followed by a newline.  */
 void psignal (int signal, const char *message);

@@ -36,6 +36,14 @@ try_implicit_rule (file, depth)
 {
   DEBUGPR ("Looking for an implicit rule for `%s'.\n");
 
+  /* The order of these searches was previously reversed.  My logic now is
+     that since the non-archive search uses more information in the target
+     (the archive search omits the archive name), it is more specific and
+     should come first.  */
+
+  if (pattern_search (file, 0, depth, 0))
+    return 1;
+
 #ifndef	NO_ARCHIVES
   /* If this is an archive member reference, use just the
      archive member name to search for implicit rules.  */
@@ -47,7 +55,7 @@ try_implicit_rule (file, depth)
     }
 #endif
 
-  return pattern_search (file, 0, depth, 0);
+  return 0;
 }
 
 #define DEBUGP2(msg, a1, a2)						      \
@@ -113,7 +121,8 @@ pattern_search (file, archive, depth, recursions)
 
   /* Buffer in which we store all the rules that are possibly applicable.  */
   struct rule **tryrules
-    = (struct rule **) alloca (num_pattern_rules * sizeof (struct rule *));
+    = (struct rule **) alloca (num_pattern_rules * max_pattern_targets
+			       * sizeof (struct rule *));
 
   /* Number of valid elements in TRYRULES.  */
   unsigned int nrules;
@@ -164,9 +173,6 @@ pattern_search (file, archive, depth, recursions)
   nrules = 0;
   for (rule = pattern_rules; rule != 0; rule = rule->next)
     {
-      int specific_rule_may_have_matched = 0;
-      int check_lastslash;
-
       /* If the pattern rule has deps but no commands, ignore it.
 	 Users cancel built-in rules by redefining them without commands.  */
       if (rule->deps != 0 && rule->cmds == 0)
@@ -184,6 +190,7 @@ pattern_search (file, archive, depth, recursions)
 	{
 	  char *target = rule->targets[i];
 	  char *suffix = rule->suffixes[i];
+	  int check_lastslash;
 
 	  /* Rules that can match any filename and are not terminal
 	     are ignored if we're recursing, so that they cannot be
@@ -237,29 +244,21 @@ pattern_search (file, archive, depth, recursions)
 
 	  /* Record if we match a rule that not all filenames will match.  */
 	  if (target[1] != '\0')
-	    specific_rule_may_have_matched = 1;
+	    specific_rule_matched = 1;
 
-	  /* We have a matching target.  Don't search for any more.  */
-	  break;
+	  /* A rule with no dependencies and no commands exists solely to set
+	     specific_rule_matched when it matches.  Don't try to use it.  */
+	  if (rule->deps == 0 && rule->cmds == 0)
+	    continue;
+
+	  /* Record this rule in TRYRULES and the index of the matching
+	     target in MATCHES.  If several targets of the same rule match,
+	     that rule will be in TRYRULES more than once.  */
+	  tryrules[nrules] = rule;
+	  matches[nrules] = i;
+	  checked_lastslash[nrules] = check_lastslash;
+	  ++nrules;
 	}
-
-      /* None of the targets matched.  */
-      if (rule->targets[i] == 0)
-	continue;
-
-      specific_rule_matched |= specific_rule_may_have_matched;
-
-      /* A rule with no dependencies and no commands exists solely to set
-	 specific_rule_matched when it matches.  Don't try to use it.  */
-      if (rule->deps == 0 && rule->cmds == 0)
-	continue;
-
-      /* Record this rule in TRYRULES and the index
-	 of the (first) matching target in MATCHES.  */
-      tryrules[nrules] = rule;
-      matches[nrules] = i;
-      checked_lastslash[nrules] = check_lastslash;
-      ++nrules;
     }
 
   /* If we have found a matching rule that won't match all filenames,
@@ -408,10 +407,13 @@ pattern_search (file, archive, depth, recursions)
 		      p = savestring (p, strlen (p));
 		      intermediate_patterns[deps_found]
 			= intermediate_file->name;
-		      found_files[deps_found] = p;
 		      intermediate_file->name = p;
 		      intermediate_files[deps_found] = intermediate_file;
 		      intermediate_file = 0;
+		      /* Allocate an extra copy to go in FOUND_FILES,
+			 because every elt of FOUND_FILES is consumed
+			 or freed later.  */
+		      found_files[deps_found] = savestring (p, strlen (p));
 		      ++deps_found;
 		      continue;
 		    }
@@ -513,7 +515,14 @@ pattern_search (file, archive, depth, recursions)
       if (recursions == 0)
 	{
 	  dep->name = 0;
-	  dep->file = enter_file (s);	
+	  dep->file = lookup_file (s);
+	  if (dep->file == 0)
+	    /* enter_file consumes S's storage.  */
+	    dep->file = enter_file (s);
+	  else
+	    /* A copy of S is already allocated in DEP->file->name.
+	       So we can free S.  */
+	    free (s);
 	}
       else
 	{

@@ -14,16 +14,16 @@ AC_AIX
 AC_ISC_POSIX
 AC_MINIX
 AC_STDC_HEADERS
-AC_UNISTD_H
 AC_DIR_HEADER
 AC_UID_T			dnl Also does gid_t.
 AC_GETGROUPS_T
 AC_PID_T
 AC_RETSIGTYPE
-AC_HAVE_HEADERS(limits.h sys/param.h fcntl.h string.h memory.h)
+AC_HAVE_HEADERS(unistd.h limits.h sys/param.h fcntl.h string.h memory.h \
+	        sys/timeb.h)
 AC_MINUS_C_MINUS_O
 AC_CONST			dnl getopt needs this.
-AC_USG
+AC_STAT_MACROS_BROKEN
 
 AC_SUBST(LIBOBJS)
 
@@ -54,14 +54,19 @@ pid = waitpid (-1, &status, 0);
 ],
 		 AC_DEFINE(HAVE_UNION_WAIT))
 
-AC_COMPILE_CHECK(sys_siglist declaration in signal.h,
-		 [#include <signal.h>], [char *msg = *(sys_siglist + 1);],
+AC_COMPILE_CHECK(sys_siglist declaration in signal.h or unistd.h,
+		 [#include <signal.h>
+/* NetBSD declares sys_siglist in <unistd.h>.  */
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif], [char *msg = *(sys_siglist + 1);],
 		 AC_DEFINE(SYS_SIGLIST_DECLARED))
 
 # The presence of the following is not meant to imply
 # that make necessarily works on those systems.
 AC_DYNIX_SEQ
 AC_XENIX_DIR
+AC_IRIX_SUN
 
 AC_SUBST(REMOTE) REMOTE=stub
 AC_WITH(customs, [REMOTE=cstms
@@ -75,6 +80,9 @@ else
 fi
 
 AC_OUTPUT(Makefile build.sh glob/Makefile)
+# Makefile uses this timestamp file to know when to remake Makefile,
+# build.sh, and glob/Makefile.
+touch stamp-config
 
 dnl Local Variables:
 dnl comment-start: "dnl "

@@ -19,8 +19,15 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 #include <sys/types.h>		/* Some systems need this for <signal.h>.  */
 #include <signal.h>
 
-#ifdef	HAVE_CONFIG_H
+#ifdef HAVE_CONFIG_H
+#if defined (emacs) || defined (CONFIG_BROKETS)
+/* We use <config.h> instead of "config.h" so that a compilation
+   using -I. -I$srcdir will use ./config.h rather than $srcdir/config.h
+   (which it would do because it found this file in $srcdir).  */
+#include <config.h>
+#else
 #include "config.h"
+#endif
 #endif
 
 /* Some systems do not define NSIG in <signal.h>.  */
@@ -45,7 +52,14 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 static const char undoc[] = "unknown signal";
 
 const char *sys_siglist[NSIG];
-#endif /* !HAVE_SYS_SIGLIST */
+
+#else	/* HAVE_SYS_SIGLIST.  */
+
+#ifndef SYS_SIGLIST_DECLARED
+extern char *sys_siglist[];
+#endif	/* Not SYS_SIGLIST_DECLARED.  */
+
+#endif	/* Not HAVE_SYS_SIGLIST.  */
 
 /* Table of abbreviations for signals.  Note:  A given number can
    appear more than once with different abbreviations.  */
@@ -251,7 +265,7 @@ sig_number (abbrev)
   return -1;
 }
 
-#ifndef HAVE_SYS_SIGLIST
+#ifndef HAVE_PSIGNAL
 /* Print to standard error the name of SIGNAL, preceded by MESSAGE and
    a colon, and followed by a newline.  */
 

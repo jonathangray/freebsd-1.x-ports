@@ -116,6 +116,10 @@ extern int getdtablesize ();
 #else
 #include <sys/param.h>
 #define getdtablesize() NOFILE
+#if !defined (NOFILE) && defined (NOFILES_MAX)
+/* SCO 3.2 "devsys 4.2" defines NOFILES_{MIN,MAX} in lieu of NOFILE.  */
+#define NOFILE	NOFILES_MAX
+#endif
 #endif
 #endif
 
@@ -204,6 +208,7 @@ reap_children (block, err)
       int exit_code, exit_sig, coredump;
       register struct child *lastc, *c;
       int child_failed;
+      int any_remote, any_local;
 
       if (err && dead_children == 0)
 	{
@@ -227,24 +232,47 @@ reap_children (block, err)
       if (dead_children != 0)
 	--dead_children;
 
-      if (debug_flag)
-	for (c = children; c != 0; c = c->next)
-	  printf ("Live child 0x%08lx PID %d%s\n",
-		  (unsigned long int) c,
-		  c->pid, c->remote ? " (remote)" : "");
+      any_remote = 0;
+      any_local = shell_function_pid != -1;
+      for (c = children; c != 0; c = c->next)
+	{
+	  any_remote |= c->remote;
+	  any_local |= ! c->remote;
+	  if (debug_flag)
+	    printf ("Live child 0x%08lx PID %d%s\n",
+		    (unsigned long int) c,
+		    c->pid, c->remote ? " (remote)" : "");
+	}
 
       /* First, check for remote children.  */
-      pid = remote_status (&exit_code, &exit_sig, &coredump, 0);
-      if (pid <= 0)
+      if (any_remote)
+	pid = remote_status (&exit_code, &exit_sig, &coredump, 0);
+      else
+	pid = 0;
+      if (pid < 0)
+	{
+	remote_status_lose:
+#ifdef	EINTR
+	  if (errno == EINTR)
+	    continue;
+#endif
+	  pfatal_with_name ("remote_status");
+	}
+      else if (pid == 0)
 	{
 	  /* No remote children.  Check for local children.  */
 
+	  if (any_local)
+	    {
 #ifdef	WAIT_NOHANG
-	  if (!block)
-	    pid = WAIT_NOHANG (&status);
-	  else
+	      if (!block)
+		pid = WAIT_NOHANG (&status);
+	      else
 #endif
-	    pid = wait (&status);
+		pid = wait (&status);
+	    }
+	  else
+	    pid = 0;
 
 	  if (pid < 0)
 	    {
@@ -255,8 +283,24 @@ reap_children (block, err)
 	      pfatal_with_name ("wait");
 	    }
 	  else if (pid == 0)
-	    /* No local children.  */
-	    break;
+	    {
+	      /* No local children.  */
+	      if (block && any_remote)
+		{
+		  /* Now try a blocking wait for a remote child.  */
+		  pid = remote_status (&exit_code, &exit_sig, &coredump, 1);
+		  if (pid < 0)
+		    goto remote_status_lose;
+		  else if (pid == 0)
+		    /* No remote children either.  Finally give up.  */
+		    break;
+		  else
+		    /* We got a remote child.  */
+		    remote = 1;
+		}
+	      else
+		break;
+	    }
 	  else
 	    {
 	      /* Chop the status word up.  */
@@ -460,6 +504,8 @@ start_job_command (child)
     {
       if (*p == '@')
 	flags |= COMMANDS_SILENT;
+      else if (*p == '+')
+	flags |= COMMANDS_RECURSE;
       else if (*p == '-')
 	child->noerror = 1;
       else if (!isblank (*p) && *p != '+')
@@ -1137,7 +1183,7 @@ construct_command_argv_internal (line, restp, shell, ifs)
      char *line, **restp;
      char *shell, *ifs;
 {
-  static char sh_chars[] = "#;\"*?[]&|<>(){}=$`";
+  static char sh_chars[] = "#;\"*?[]&|<>(){}$`^";
   static char *sh_cmds[] = { "cd", "eval", "exec", "exit", "login",
 			     "logout", "set", "umask", "wait", "while", "for",
 			     "case", "if", ":", ".", "break", "continue",
@@ -1147,7 +1193,7 @@ construct_command_argv_internal (line, restp, shell, ifs)
   register char *p;
   register char *ap;
   char *end;
-  int instring;
+  int instring, word_has_equals, seen_nonequals;
   char **new_argv = 0;
 
   if (restp != NULL)
@@ -1181,7 +1227,7 @@ construct_command_argv_internal (line, restp, shell, ifs)
 
   /* I is how many complete arguments have been found.  */
   i = 0;
-  instring = 0;
+  instring = word_has_equals = seen_nonequals = 0;
   for (p = line; *p != '\0'; ++p)
     {
       if (ap > end)
@@ -1202,6 +1248,17 @@ construct_command_argv_internal (line, restp, shell, ifs)
 	/* Not a special char.  */
 	switch (*p)
 	  {
+	  case '=':
+	    /* Equals is a special character in leading words before the
+	       first word with no equals sign in it.  This is not the case
+	       with sh -k, but we never get here when using nonstandard
+	       shell flags.  */
+	    if (! seen_nonequals)
+	      goto slow;
+	    word_has_equals = 1;
+	    *ap++ = '=';
+	    break;
+
 	  case '\\':
 	    /* Backslash-newline combinations are eaten.  */
 	    if (p[1] == '\n')
@@ -1253,6 +1310,16 @@ construct_command_argv_internal (line, restp, shell, ifs)
 	       Terminate the text of the argument.  */
 	    *ap++ = '\0';
 	    new_argv[++i] = ap;
+
+	    /* Update SEEN_NONEQUALS, which tells us if every word
+	       heretofore has contained an `='.  */
+	    seen_nonequals |= ! word_has_equals;
+	    if (word_has_equals && ! seen_nonequals)
+	      /* An `=' in a word before the first
+		 word without one is magical.  */
+	      goto slow;
+	    word_has_equals = 0; /* Prepare for the next word.  */
+
 	    /* If this argument is the command name,
 	       see if it is a built-in shell command.
 	       If so, have the shell handle it.  */
@@ -1390,9 +1457,19 @@ construct_command_argv (line, restp, file)
      char *line, **restp;
      struct file *file;
 {
-  char *shell = allocated_variable_expand_for_file ("$(SHELL)", file);
-  char *ifs = allocated_variable_expand_for_file ("$(IFS)", file);
+  char *shell, *ifs;
   char **argv;
+
+  {
+    /* Turn off --warn-undefined-variables while we expand SHELL and IFS.  */
+    int save = warn_undefined_variables_flag;
+    warn_undefined_variables_flag = 0;
+
+    shell = allocated_variable_expand_for_file ("$(SHELL)", file);
+    ifs = allocated_variable_expand_for_file ("$(IFS)", file);
+
+    warn_undefined_variables_flag = save;
+  }
 
   argv = construct_command_argv_internal (line, restp, shell, ifs);
 

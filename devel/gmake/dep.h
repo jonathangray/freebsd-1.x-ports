@@ -1,4 +1,4 @@
-/* Copyright (C) 1988, 1989, 1991, 1992 Free Software Foundation, Inc.
+/* Copyright (C) 1988, 1989, 1991, 1992, 1993 Free Software Foundation, Inc.
 This file is part of GNU Make.
 
 GNU Make is free software; you can redistribute it and/or modify
@@ -40,7 +40,11 @@ struct nameseq
 
 
 extern struct nameseq *multi_glob (), *parse_file_seq ();
+extern char *tilde_expand ();
 
+#ifndef NO_ARCHIVES
+extern struct nameseq *ar_glob ();
+#endif
 
 #ifndef	iAPX286
 #define dep_name(d) ((d)->name == 0 ? (d)->file->name : (d)->name)
@@ -48,3 +52,14 @@ extern struct nameseq *multi_glob (), *parse_file_seq ();
 /* Buggy compiler can't hack this.  */
 extern char *dep_name ();
 #endif
+
+extern struct dep *read_all_makefiles ();
+
+/* Flag bits for the second argument to `read_makefile'.
+   These flags are saved in the `changed' field of each
+   `struct dep' in the chain returned by `read_all_makefiles'.  */
+#define RM_NO_DEFAULT_GOAL	(1 << 0) /* Do not set default goal.  */
+#define RM_INCLUDED		(1 << 1) /* Search makefile search path.  */
+#define RM_DONTCARE		(1 << 2) /* No error if it doesn't exist.  */
+#define RM_NO_TILDE		(1 << 3) /* Don't expand ~ in file name.  */
+#define RM_NOFLAG		0

@@ -1,4 +1,4 @@
-char *version_string = "3.67";
+char *version_string = "3.69";
 
 /*
   Local variables:

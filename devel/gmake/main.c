@@ -24,10 +24,6 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 #include "getopt.h"
 
 
-extern char *version_string;
-
-extern struct dep *read_all_makefiles ();
-
 extern void print_variable_data_base ();
 extern void print_dir_data_base ();
 extern void print_rule_data_base ();
@@ -49,35 +45,7 @@ static void log_working_directory ();
 static void print_data_base (), print_version ();
 static void decode_switches (), decode_env_switches ();
 static void define_makeflags ();
-
-
-#if 0 /* dummy tag */
-flags () {}
-#endif
-/* Flags:
- *	-b ignored for compatibility with System V Make
- *	-C change directory
- *	-d debug
- *	-e env_overrides
- *	-f makefile
- *	-i ignore_errors
- *	-j job_slots
- *	-k keep_going
- *	-l max_load_average
- *	-m ignored for compatibility with something or other
- *	-n just_print
- *	-o consider file old
- *	-p print_data_base
- *	-q question
- *	-r no_builtin_rules
- *	-s silent
- *	-S turn off -k
- *	-t touch
- *	-v print version information
- *	-w log working directory
- *	-W consider file new (with -n, `what' if effect)
- */
-
+
 /* The structure that describes an accepted command switch.  */
 
 struct command_switch
@@ -203,7 +171,7 @@ static unsigned int inf_jobs = 0;
 double max_load_average = -1.0;
 double default_load_average = -1.0;
 
-/* List of directories given with -c switches.  */
+/* List of directories given with -C switches.  */
 
 static struct stringlist *directories = 0;
 
@@ -222,6 +190,11 @@ static struct stringlist *new_files = 0;
 /* If nonzero, we should just print usage and exit.  */
 
 static int print_usage_flag = 0;
+
+/* If nonzero, we should print a warning message
+   for each reference to an undefined variable.  */
+
+int warn_undefined_variables_flag;
 
 /* The table of command switches.  */
 
@@ -303,6 +276,9 @@ static const struct command_switch switches[] =
     { 'W', string, (char *) &new_files, 0, 0, 0, 0, 0,
 	"what-if", "FILE",
 	"Consider FILE to be infinitely new" },
+    { 2, flag, (char *) &warn_undefined_variables_flag, 1, 1, 0, 0, 0,
+	"warn-undefined-variables", 0,
+	"Warn when an undefined variable is referenced" },
     { '\0', }
   };
 
@@ -365,6 +341,41 @@ int fatal_signal_mask;
 #endif
 #endif
 
+static struct file *
+enter_command_line_file (name)
+     char *name;
+{
+  if (name[0] == '~')
+    {
+      char *expanded = tilde_expand (name);
+      if (expanded != 0)
+	name = expanded;	/* Memory leak; I don't care.  */
+    }
+
+  /* This is also done in parse_file_seq, so this is redundant
+     for names read from makefiles.  It is here for names passed
+     on the command line.  */
+  while (name[0] == '.' && name[1] == '/' && name[2] != '\0')
+    {
+      name += 2;
+      while (*name == '/')
+	/* Skip following slashes: ".//foo" is "foo", not "/foo".  */
+	++name;
+    }
+  
+  if (*name == '\0')
+    {
+      /* It was all slashes!  Move back to the dot and truncate
+	 it after the first slash, so it becomes just "./".  */
+      do
+	--name;
+      while (name[0] != '.');
+      name[2] = '\0';
+    }
+
+  return enter_file (savestring (name, strlen (name)));
+}
+
 int
 main (argc, argv, envp)
      int argc;
@@ -378,7 +389,6 @@ main (argc, argv, envp)
   register char *cmd_defs;
   register unsigned int cmd_defs_len, cmd_defs_idx;
   char **p;
-  time_t now;
   struct dep *goals = 0;
   register struct dep *lastgoal;
   struct dep *read_makefiles;
@@ -485,15 +495,26 @@ main (argc, argv, envp)
   for (i = 0; envp[i] != 0; ++i)
     {
       register char *ep = envp[i];
-      while (*ep++ != '=')
-	;
-      (void) define_variable (envp[i], ep - envp[i] - 1, ep, o_env, 1);
+      while (*ep != '=')
+	++ep;
+      define_variable (envp[i], ep - envp[i], ep + 1, o_env, 1)
+	/* Force exportation of every variable culled from the environment.
+	   We used to rely on target_environment's v_default code to do this.
+	   But that does not work for the case where an environment variable
+	   is redefined in a makefile with `override'; it should then still
+	   be exported, because it was originally in the environment.  */
+	->export = v_export;
     }
 
   /* Decode the switches.  */
 
   decode_env_switches ("MAKEFLAGS", 9);
+#if 0
+  /* People write things like:
+     	MFLAGS="CC=gcc -pipe" "CFLAGS=-g"
+     and we set the -p, -i and -e switches.  Doesn't seem quite right.  */
   decode_env_switches ("MFLAGS", 6);
+#endif
   decode_switches (argc, argv, 0);
 
   /* Print version information.  */
@@ -540,7 +561,7 @@ main (argc, argv, envp)
 	  
 	  while (*p != '\0')
 	    {
-	      if (index (";'\"*?[]$<>(){}|&~`\\ \t\r\n\f\v", *p) != 0)
+	      if (index ("^;'\"*?[]$<>(){}|&~`\\ \t\r\n\f\v", *p) != 0)
 		cmd_defs[cmd_defs_idx++] = '\\';
 	      cmd_defs[cmd_defs_idx++] = *p++;
 	    }
@@ -550,7 +571,7 @@ main (argc, argv, envp)
 	{
 	  /* It was not a variable definition, so it is a target to be made.
 	     Enter it as a file and add it to the dep chain of goals.  */
-	  f = enter_file (other_args->list[i]);
+	  f = enter_command_line_file (other_args->list[i]);
 	  f->cmd_target = 1;
 	  
 	  if (goals == 0)
@@ -599,8 +620,16 @@ main (argc, argv, envp)
     for (i = 0; directories->list[i] != 0; ++i)
       {
 	char *dir = directories->list[i];
+	if (dir[0] == '~')
+	  {
+	    char *expanded = tilde_expand (dir);
+	    if (expanded != 0)
+	      dir = expanded;
+	  }
 	if (chdir (dir) < 0)
 	  pfatal_with_name (dir);
+	if (dir != directories->list[i])
+	  free (dir);
       }
 
   /* Figure out the level of recursion.  */
@@ -663,9 +692,6 @@ main (argc, argv, envp)
 	    static char name[] = "/tmp/GmXXXXXX";
 	    FILE *outfile;
 
-	    /* Free the storage allocated for "-".  */
-	    free (makefiles->list[i]);
-
 	    /* Make a unique filename.  */
 	    (void) mktemp (name);
 
@@ -686,7 +712,13 @@ main (argc, argv, envp)
 
 	    /* Replace the name that read_all_makefiles will
 	       see with the name of the temporary file.  */
-	    makefiles->list[i] = savestring (name, sizeof name - 1);
+	    {
+	      char *temp;
+	      /* SGI compiler requires alloca's result be assigned simply.  */
+	      temp = (char *) alloca (sizeof (name));
+	      bcopy (name, temp, sizeof (name));
+	      makefiles->list[i] = temp;
+	    }
 
 	    /* Make sure the temporary file will not be remade.  */
 	    f = enter_file (savestring (name, sizeof name - 1));
@@ -714,6 +746,14 @@ main (argc, argv, envp)
 
   set_default_suffixes ();
 
+  /* Define the file rules for the built-in suffix rules.  These will later
+     be converted into pattern rules.  We used to do this in
+     install_default_implicit_rules, but since that happens after reading
+     makefiles, it results in the built-in pattern rules taking precedence
+     over makefile-specified suffix rules, which is wrong.  */
+
+  install_default_suffix_rules ();
+
   /* Define some internal and special variables.  */
 
   define_automatic_variables ();
@@ -735,7 +775,9 @@ main (argc, argv, envp)
 
   /* Decode switches again, in case the variables were set by the makefile.  */
   decode_env_switches ("MAKEFLAGS", 9);
+#if 0
   decode_env_switches ("MFLAGS", 6);
+#endif
 
   /* Set up MAKEFLAGS and MFLAGS again, so they will be right.  */
 
@@ -750,16 +792,19 @@ main (argc, argv, envp)
 
   snap_deps ();
 
-  /* Install the default implicit rules.
+  /* Convert old-style suffix rules to pattern rules.  It is important to
+     do this before installing the built-in pattern rules below, so that
+     makefile-specified suffix rules take precedence over built-in pattern
+     rules.  */
+
+  convert_to_pattern ();
+
+  /* Install the default implicit pattern rules.
      This used to be done before reading the makefiles.
      But in that case, built-in pattern rules were in the chain
      before user-defined ones, so they matched first.  */
 
   install_default_implicit_rules ();
-
-  /* Convert old-style suffix rules to pattern rules.  */
-
-  convert_to_pattern ();
 
   /* Compute implicit rule limits.  */
 
@@ -770,13 +815,13 @@ main (argc, argv, envp)
   build_vpath_lists ();
 
   /* Mark files given with -o flags as very old (00:00:01.00 Jan 1, 1970)
-     and as having been updated already, and files given with -W flags
-     as brand new (time-stamp of now).  */
+     and as having been updated already, and files given with -W flags as
+     brand new (time-stamp as far as possible into the future).  */
 
   if (old_files != 0)
     for (p = old_files->list; *p != 0; ++p)
       {
-	f = enter_file (*p);
+	f = enter_command_line_file (*p);
 	f->last_mtime = (time_t) 1;
 	f->updated = 1;
 	f->update_status = 0;
@@ -785,11 +830,10 @@ main (argc, argv, envp)
 
   if (new_files != 0)
     {
-      now = time ((time_t *) 0);
       for (p = new_files->list; *p != 0; ++p)
 	{
-	  f = enter_file (*p);
-	  f->last_mtime = now;
+	  f = enter_command_line_file (*p);
+	  f->last_mtime = NEW_MTIME;
 	}
     }
 
@@ -894,7 +938,7 @@ main (argc, argv, envp)
 			any_remade |= (file_mtime_no_search (d->file)
 				       != makefile_mtimes[i]);
 		      }
-		    else if (d->changed != 1)
+		    else if (! (d->changed & RM_DONTCARE))
 		      {
 			time_t mtime;
 			/* The update failed and this makefile was not
@@ -908,23 +952,20 @@ main (argc, argv, envp)
 		  }
 		else
 		  /* This makefile was not found at all.  */
-		  switch (d->changed)
+		  if (! (d->changed & RM_DONTCARE))
 		    {
-		    case 0:
-		      /* A normal makefile.  We must die later.  */
-		      error ("Makefile `%s' was not found", dep_name (d));
-		      any_failed = 1;
-		      break;
-		    case 1:
-		      /* A makefile from the MAKEFILES variable.
-			 We don't care.  */
-		      break;
-		    case 2:
-		      /* An included makefile.  We don't need
-			 to die, but we do want to complain.  */
-		      error ("Included makefile `%s' was not found.",
-			     dep_name (d));
-		      break;
+		      /* This is a makefile we care about.  See how much.  */
+		      if (d->changed & RM_INCLUDED)
+			/* An included makefile.  We don't need
+			   to die, but we do want to complain.  */
+			error ("Included makefile `%s' was not found.",
+			       dep_name (d));
+		      else
+			{
+			  /* A normal makefile.  We must die later.  */
+			  error ("Makefile `%s' was not found", dep_name (d));
+			  any_failed = 1;
+			}
 		    }
 
 		free ((char *) d);
@@ -939,18 +980,23 @@ main (argc, argv, envp)
 	  }
 
 	case 0:
-	re_exec:;
+	re_exec:
 	  /* Updated successfully.  Re-exec ourselves.  */
+
+	  remove_intermediates (0);
+
+	  if (print_data_base_flag)
+	    print_data_base ();
+
 	  if (print_directory_flag)
 	    log_working_directory (0);
-	  if (debug_flag)
-	    puts ("Re-execing myself....");
+
 	  if (makefiles != 0)
 	    {
 	      /* These names might have changed.  */
 	      register unsigned int i, j = 0;
 	      for (i = 1; i < argc; ++i)
-		if (!strcmp (argv[i], "-f"))
+		if (!strcmp (argv[i], "-f")) /* XXX */
 		  {
 		    char *p = &argv[i][2];
 		    if (*p == '\0')
@@ -960,6 +1006,7 @@ main (argc, argv, envp)
 		    ++j;
 		  }
 	    }
+
 	  if (directories != 0 && directories->idx > 0)
 	    {
 	      char bad;
@@ -978,8 +1025,7 @@ main (argc, argv, envp)
 	      if (bad)
 		fatal ("Couldn't change back to original directory.");
 	    }
-	  fflush (stdout);
-	  fflush (stderr);
+
 	  for (p = environ; *p != 0; ++p)
 	    if (!strncmp (*p, "MAKELEVEL=", 10))
 	      {
@@ -992,6 +1038,19 @@ main (argc, argv, envp)
 		sprintf (*p, "MAKELEVEL=%u", makelevel);
 		break;
 	      }
+
+	  if (debug_flag)
+	    {
+	      char **p;
+	      fputs ("Re-executing:", stdout);
+	      for (p = argv; *p != 0; ++p)
+		printf (" %s", *p);
+	      puts ("");
+	    }
+
+	  fflush (stdout);
+	  fflush (stderr);
+
 	  exec_command (argv, environ);
 	  /* NOTREACHED */
 	}
@@ -1135,7 +1194,7 @@ decode_switches (argc, argv, env)
       other_args->max = argc + 1;
       other_args->list = (char **) xmalloc ((argc + 1) * sizeof (char *));
       other_args->idx = 1;
-      other_args->list[0] = savestring (argv[0], strlen (argv[0]));
+      other_args->list[0] = argv[0];
     }
 
   /* getopt does most of the parsing for us.
@@ -1205,7 +1264,7 @@ decode_switches (argc, argv, env)
 			xrealloc ((char *) sl->list,
 				  sl->max * sizeof (char *));
 		    }
-		  sl->list[sl->idx++] = savestring (optarg, strlen (optarg));
+		  sl->list[sl->idx++] = optarg;
 		  sl->list[sl->idx] = 0;
 		  break;
 
@@ -1279,7 +1338,7 @@ positive integral argument",
       fputs ("Options:\n", stderr);
       for (cs = switches; cs->c != '\0'; ++cs)
 	{
-	  char buf[1024], arg[50], *p;
+	  char buf[1024], shortarg[50], longarg[50], *p;
 
 	  if (cs->description[0] == '-')
 	    continue;
@@ -1287,13 +1346,15 @@ positive integral argument",
 	  switch (long_options[cs - switches].has_arg)
 	    {
 	    case no_argument:
-	      arg[0] = '\0';
+	      shortarg[0] = longarg[0] = '\0';
 	      break;
 	    case required_argument:
-	      sprintf (arg, " %s", cs->argdesc);
+	      sprintf (longarg, "=%s", cs->argdesc);
+	      sprintf (shortarg, " %s", cs->argdesc);
 	      break;
 	    case optional_argument:
-	      sprintf (arg, " [%s]", cs->argdesc);
+	      sprintf (longarg, "[=%s]", cs->argdesc);
+	      sprintf (shortarg, " [%s]", cs->argdesc);
 	      break;
 	    }
 
@@ -1301,7 +1362,7 @@ positive integral argument",
 
 	  if (isalnum (cs->c))
 	    {
-	      sprintf (buf, "  -%c%s", cs->c, arg);
+	      sprintf (buf, "  -%c%s", cs->c, shortarg);
 	      p += strlen (p);
 	    }
 	  if (cs->long_name != 0)
@@ -1309,14 +1370,15 @@ positive integral argument",
 	      unsigned int i;
 	      sprintf (p, "%s--%s%s",
 		       !isalnum (cs->c) ? "  " : ", ",
-		       cs->long_name, arg);
+		       cs->long_name, longarg);
 	      p += strlen (p);
 	      for (i = 0; i < (sizeof (long_option_aliases) /
 			       sizeof (long_option_aliases[0]));
 		   ++i)
 		if (long_option_aliases[i].val == cs->c)
 		  {
-		    sprintf (p, ", --%s%s", long_option_aliases[i].name, arg);
+		    sprintf (p, ", --%s%s",
+			     long_option_aliases[i].name, longarg);
 		    p += strlen (p);
 		  }
 	    }
@@ -1329,11 +1391,11 @@ positive integral argument",
 		  /* This is another switch that does the same
 		     one as the one we are processing.  We want
 		     to list them all together on one line.  */
-		  sprintf (p, ", -%c%s", ncs->c, arg);
+		  sprintf (p, ", -%c%s", ncs->c, shortarg);
 		  p += strlen (p);
 		  if (ncs->long_name != 0)
 		    {
-		      sprintf (p, ", --%s%s", ncs->long_name, arg);
+		      sprintf (p, ", --%s%s", ncs->long_name, longarg);
 		      p += strlen (p);
 		    }
 		}
@@ -1387,8 +1449,10 @@ decode_env_switches (envar, len)
     return;
 
   /* Make a copy of the value in ARGS, where we will munge it.
-     If it does not begin with a dash, prepend one.  */
-  args = (char *) alloca (1 + len + 2);
+     If it does not begin with a dash, prepend one.
+     We must allocate lasting storage for this (and we never free it) because
+     decode_switches may save pointers into it for string-valued switches.  */
+  args = (char *) xmalloc (1 + len + 2);
   if (value[0] != '-')
     args[0] = '-';
   bcopy (value, value[0] == '-' ? args : &args[1], len + 1);
@@ -1594,14 +1658,24 @@ define_makeflags (all, makefile)
       *p = '\0';
     }
 
-  (void) define_variable ("MAKEFLAGS", 9,
-			  /* On Sun, the value of MFLAGS starts with a `-' but
-			     the value of MAKEFLAGS lacks the `-'.
-			     Be compatible with this unless FLAGSTRING starts
-			     with a long option `--foo', since removing the
-			     first dash would result in the bogus `-foo'.  */
-			  flagstring[1] == '-' ? flagstring : &flagstring[1],
-			  o_env, 0);
+  define_variable ("MAKEFLAGS", 9,
+		   /* On Sun, the value of MFLAGS starts with a `-' but
+		      the value of MAKEFLAGS lacks the `-'.
+		      Be compatible with this unless FLAGSTRING starts
+		      with a long option `--foo', since removing the
+		      first dash would result in the bogus `-foo'.  */
+		   flagstring[1] == '-' ? flagstring : &flagstring[1],
+		   /* This used to use o_env, but that lost when a
+		      makefile defined MAKEFLAGS.  Makefiles set
+		      MAKEFLAGS to add switches, but we still want
+		      to redefine its value with the full set of
+		      switches.  Of course, an override or command
+		      definition will still take precedence.  */
+		   o_file, 0)
+    /* Always export MAKEFLAGS.  */
+    ->export = v_export;
+  /* Since MFLAGS is not parsed for flags, there is no reason to
+     override any makefile redefinition.  */
   (void) define_variable ("MFLAGS", 6, flagstring, o_env, 0);
 }
 
@@ -1612,7 +1686,6 @@ print_version ()
 {
   static int printed_version = 0;
 
-  extern char *remote_description;
   char *precede = print_data_base_flag ? "# " : "";
 
   if (printed_version)

@@ -43,10 +43,10 @@ The distinction between @file{./} and @file{$(srcdir)/} is important
 when using the @samp{--srcdir} option to @file{configure}.  A rule of
 the form:
 
-@example
+@smallexample
 foo.1 : foo.man sedscript
         sed -e sedscript foo.man > foo.1
-@end example
+@end smallexample
 
 @noindent
 will fail when the current directory is not the source directory,
@@ -59,18 +59,18 @@ since the @file{make} automatic variable @samp{$<} will represent the
 source file wherever it is.  (Many versions of @code{make} set @samp{$<}
 only in implicit rules.)  A makefile target like
 
-@example
+@smallexample
 foo.o : bar.c
         $(CC) -I. -I$(srcdir) $(CFLAGS) -c bar.c -o foo.o
-@end example
+@end smallexample
 
 @noindent
 should instead be written as
 
-@example
+@smallexample
 foo.o : bar.c
         $(CC) $(CFLAGS) $< -o $@@
-@end example
+@end smallexample
 
 @noindent
 in order to allow @samp{VPATH} to work correctly.  When the target has
@@ -78,10 +78,10 @@ multiple dependencies, using an explicit @samp{$(srcdir)} is the easiest
 way to make the rule work well.  For example, the target above for
 @file{foo.1} is best written as:
 
-@example
+@smallexample
 foo.1 : foo.man sedscript
         sed -s $(srcdir)/sedscript $(srcdir)/foo.man > foo.1
-@end example
+@end smallexample
 
 @node Utilities in Makefiles
 @section Utilities in Makefiles
@@ -131,29 +131,62 @@ All GNU programs should have the following targets in their Makefiles:
 @table @samp
 @item all
 Compile the entire program.  This should be the default target.  This
-target need not rebuild any documentation files; info files should
+target need not rebuild any documentation files; Info files should
 normally be included in the distribution, and DVI files should be made
 only when explicitly asked for.
 
 @item install
 Compile the program and copy the executables, libraries, and so on to
 the file names where they should reside for actual use.  If there is a
-simple test to verify that a program is properly installed then run that
-test.
+simple test to verify that a program is properly installed, this target
+should run that test.
+
+The commands should create all the directories in which files are to be
+installed, if they don't already exist.  This includes the directories
+specified as the values of the variables @code{prefix} and
+@code{exec_prefix}, as well as all subdirectories that are needed.
+One way to do this is by means of an @code{installdirs} target
+as described below.
 
 Use @samp{-} before any command for installing a man page, so that
 @code{make} will ignore any errors.  This is in case there are systems
 that don't have the Unix man page documentation system installed.
 
-In the future, when we have a standard way of installing info files,
-@samp{install} targets will be the proper place to do so.
+The way to install Info files is to copy them into @file{$(infodir)}
+with @code{$(INSTALL_DATA)} (@pxref{Command Variables}), and then run
+the @code{install-info} program if it is present.  @code{install-info}
+is a script that edits the Info @file{dir} file to add or update the
+menu entry for the given Info file; it will be part of the Texinfo package.
+Here is a sample rule to install an Info file:
+
+@comment This example has been carefully formatted for the Make manual.
+@comment Please do not reformat it without talking to roland@gnu.ai.mit.edu.
+@smallexample
+$(infodir)/foo.info: foo.info
+# There may be a newer info file in . than in srcdir.
+        -if test -f foo.info; then d=.; \
+         else d=$(srcdir); fi; \
+        $(INSTALL_DATA) $$d/foo.info $@@; \
+# Run install-info only if it exists.
+# Use `if' instead of just prepending `-' to the
+# line so we notice real errors from install-info.
+# We use `$(SHELL) -c' because some shells do not
+# fail gracefully when there is an unknown command.
+        if $(SHELL) -c 'install-info --version' \
+           >/dev/null 2>&1; then \
+          install-info --infodir=$(infodir) $$d/foo.info; \
+        else true; fi
+@end smallexample
 
 @item uninstall
 Delete all the installed files that the @samp{install} target would
 create (but not the noninstalled files such as @samp{make all} would
 create).
 
+@comment The gratuitous blank line here is to make the table look better
+@comment in the printed Make manual.  Please leave it in.
 @item clean
+
 Delete all files from the current directory that are normally created by
 building the program.  Don't delete the files that record the
 configuration.  Also preserve files that could be made by building, but
@@ -176,8 +209,8 @@ is rarely necessary and takes a lot of time.
 @item realclean
 Delete everything from the current directory that can be reconstructed
 with this Makefile.  This typically includes everything deleted by
-distclean, plus more: C source files produced by Bison, tags tables,
-info files, and so on.
+@code{distclean}, plus more: C source files produced by Bison, tags tables,
+Info files, and so on.
 
 One exception, however: @samp{make realclean} should not delete
 @file{configure} even if @file{configure} can be remade using a rule in
@@ -189,34 +222,35 @@ and then begin to build the program.
 Update a tags table for this program.
 
 @item info
-Generate any info files needed.  The best way to write the rules is as
+Generate any Info files needed.  The best way to write the rules is as
 follows:
 
-@example
-info:  foo.info
+@smallexample
+info: foo.info
 
-foo.info: $(srcdir)/foo.texi $(srcdir)/chap1.texi $(srcdir)/chap2.texi
+foo.info: foo.texi chap1.texi chap2.texi
         $(MAKEINFO) $(srcdir)/foo.texi
-@end example
+@end smallexample
 
 @noindent
-You must define the variable @code{MAKEINFO} in the Makefile.
-It should run the Makeinfo program, which is part of the Texinfo2 distribution.
+You must define the variable @code{MAKEINFO} in the Makefile.  It should
+run the @code{makeinfo} program, which is part of the Texinfo
+distribution.
 
 @item dvi
 Generate DVI files for all TeXinfo documentation.  
 For example:
 
-@example
+@smallexample
 dvi: foo.dvi
 
-foo.dvi: $(srcdir)/foo.texi $(srcdir)/chap1.texi $(srcdir)/chap2.texi
+foo.dvi: foo.texi chap1.texi chap2.texi
         $(TEXI2DVI) $(srcdir)/foo.texi
-@end example
+@end smallexample
 
 @noindent
 You must define the variable @code{TEXI2DVI} in the Makefile.  It should
-run the program @code{texi2dvi}, which is part of the Texinfo2
+run the program @code{texi2dvi}, which is part of the Texinfo
 distribution.  Alternatively, write just the dependencies, and allow GNU
 Make to provide the command.
 
@@ -245,8 +279,8 @@ the self-tests so that they work when the program is built but not
 installed.
 @end table
 
-  The following target is suggested as a conventional name, for programs
-in which it is useful.
+The following targets are suggested as conventional names, for programs
+in which they are useful.
 
 @table @code
 @item installcheck
@@ -257,24 +291,20 @@ the program before running the tests.  You should not assume that
 @item installdirs
 It's useful to add a target named @samp{installdirs} to create the
 directories where files are installed, and their parent directories.
+There is a script called @file{mkinstalldirs} which is convenient for
+this; find it in the Texinfo package.@c It's in /gd/gnu/lib/mkinstalldirs.
 You can use a rule like this:
 
-@example
-# Make sure all installation directories, e.g. $(bindir) actually exist by
-# making them if necessary.
-installdirs:
-        for file in $(bindir) $(datadir) $(libdir) $(infodir) $(mandir) ; do \
-           oIFS="$$@{IFS@}"; IFS='/'; set - $$@{file@}; IFS="$$@{oIFS@}"; \
-           pathcomp=''; test ".$$@{1@}" = "." && shift; \
-           while test $$# -ne 0 ; do \
-             pathcomp="$$@{pathcomp@}/$$@{1@}"; shift; \
-             if test ! -d "$$@{pathcomp@}"; then \
-                echo "making directory $$pathcomp" 1>&2 ; \
-                mkdir "$$@{pathcomp@}"; \
-             fi; \
-           done; \
-        done
-@end example
+@comment This has been carefully formatted to look decent in the Make manual.
+@comment Please be sure not to make it extend any further to the right.--roland
+@smallexample
+# Make sure all installation directories (e.g. $(bindir))
+# actually exist by making them if necessary.
+installdirs: mkinstalldirs
+        $(srcdir)/mkinstalldirs $(bindir) $(datadir) \
+                                $(libdir) $(infodir) \
+                                $(mandir)
+@end smallexample
 @end table
 
 @node Command Variables
@@ -308,12 +338,12 @@ Instead, arrange to pass the necessary options to the C compiler
 independently of @code{CFLAGS}, by writing them explicitly in the
 compilation commands or by defining an implicit rule, like this:
 
-@example
+@smallexample
 CFLAGS = -g
 ALL_CFLAGS = -I. $(CFLAGS)
 .c.o:
         $(CC) -c $(CPPFLAGS) $(ALL_CFLAGS) $<
-@end example
+@end smallexample
 
 Do include the @samp{-g} option in @code{CFLAGS}, because that is not
 @emph{required} for proper compilation.  You can consider it a default
@@ -328,8 +358,8 @@ override the others.
 Every Makefile should define the variable @code{INSTALL}, which is the
 basic command for installing a file into the system.
 
-Every Makefile should also define variables @code{INSTALL_PROGRAM} and
-@code{INSTALL_DATA}.  (The default for each of these should be
+Every Makefile should also define the variables @code{INSTALL_PROGRAM}
+and @code{INSTALL_DATA}.  (The default for each of these should be
 @code{$(INSTALL)}.)  Then it should use those variables as the commands
 for actual installation, for executables and nonexecutables
 respectively.  Use these variables as follows:
@@ -358,7 +388,7 @@ below.  The default value of @code{prefix} should be @file{/usr/local}
 (at least for now).
 
 @item exec_prefix
-A prefix used in constructing the default values of the some of the
+A prefix used in constructing the default values of some of the
 variables listed below.  The default value of @code{exec_prefix} should
 be @code{$(prefix)}.
 
@@ -422,14 +452,15 @@ file in the @code{oldincludedir} directory if either (1) there is no
 @file{foo.h} there or (2) the @file{foo.h} that exists came from the Foo
 package.
 
-The way to tell whether @file{foo.h} came from the Foo package is to put
-a magic string in the file---part of a comment---and grep for that
-string.
+To tell whether @file{foo.h} came from the Foo package, put a magic
+string in the file---part of a comment---and grep for that string.
 
 @item mandir
 The directory for installing the man pages (if any) for this package.
 It should include the suffix for the proper section of the
-manual---usually @samp{1} for a utility.
+manual---usually @samp{1} for a utility.  It will normally be
+@file{/usr/local/man/man1}, but you should write it as
+@file{$(prefix)/man/man1}. 
 
 @item man1dir
 The directory for installing section 1 man pages.
@@ -446,10 +477,18 @@ application only.}
 
 @item manext
 The file name extension for the installed man page.  This should contain
-a period followed by the appropriate digit.
+a period followed by the appropriate digit; it should normally be @samp{.1}.
+
+@item man1ext
+The file name extension for installed section 1 man pages.
+@item man2ext
+The file name extension for installed section 2 man pages.
+@item @dots{}
+Use these names instead of @samp{manext} if the package needs to install man
+pages in more than one section of the manual.
 
 @item infodir
-The directory for installing the info files for this package.  By
+The directory for installing the Info files for this package.  By
 default, it should be @file{/usr/local/info}, but it should be written
 as @file{$(prefix)/info}.
 
@@ -460,7 +499,7 @@ variable is normally inserted by the @code{configure} shell script.
 
 For example:
 
-@example
+@smallexample
 @c I have changed some of the comments here slightly to fix an overfull
 @c hbox, so the make manual can format correctly. --roland
 # Common prefix for installation directories.
@@ -473,7 +512,7 @@ bindir = $(exec_prefix)/bin
 libdir = $(exec_prefix)/lib
 # Where to put the Info files.
 infodir = $(prefix)/info
-@end example
+@end smallexample
 
 If your program installs a large number of files into one of the
 standard user-specified directories, it might be useful to group them

@@ -31,6 +31,9 @@ CC = @CC@
 CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
 
+# How to invoke ranlib.  This is only used by the `glob' subdirectory.
+RANLIB = @RANLIB@
+
 # Define these for your system as follows:
 #	-DNO_ARCHIVES		To disable `ar' archive support.
 #	-DNO_FLOAT		To avoid using floating-point numbers.
@@ -39,6 +42,7 @@ LDFLAGS = @LDFLAGS@
 #				without complaint but produce losing code,
 #				so beware.
 # NeXT 1.0a uses an old version of GCC, which required -D__inline=inline.
+# See also `config.h'.
 defines = @DEFS@ -DLIBDIR=\"$(libdir)\" -DINCLUDEDIR=\"$(includedir)\"
 
 # Which flavor of remote job execution support to use.
@@ -134,13 +138,14 @@ srcs = $(srcdir)/commands.c $(srcdir)/job.c $(srcdir)/dir.c		\
 
 
 .SUFFIXES:
-.SUFFIXES: .o .c .h .ps .dvi .texinfo
+.SUFFIXES: .o .c .h .ps .dvi .info .texinfo
 
-.PHONY: all check info dvi
 all: make
 check: # No tests.
 info: make.info
 dvi: make.dvi
+# Some makes apparently use .PHONY as the default goal is it is before `all'.
+.PHONY: all check info dvi
 
 make.info: make.texinfo
 	$(MAKEINFO) -I$(srcdir) $(srcdir)/make.texinfo -o make.info
@@ -164,11 +169,12 @@ make: $(objs)
 SHELL = /bin/sh
 MAKE = make
 
-glob/libglob.a: force
+glob/libglob.a: FORCE config.h
 	cd glob; $(MAKE) CC='$(CC)' CFLAGS='$(CFLAGS) -I..' \
 			 CPPFLAGS='$(CPPFLAGS) -DHAVE_CONFIG_H' \
+			 RANLIB='$(RANLIB)' \
 			 libglob.a
-force:
+FORCE:
 
 tagsrcs = $(srcs) $(srcdir)/remote-*.c
 TAGS: $(tagsrcs)
@@ -178,39 +184,65 @@ tags: $(tagsrcs)
 
 .PHONY: install installdirs
 install: installdirs \
-	 $(bindir)/$(instname) $(infodir)/$(instname).info \
+	 $(bindir)/$(instname) $(infodir)/make.info \
 	 $(mandir)/$(instname).$(manext)
 
 installdirs:
-	$(SHELL) ${srcdir}/mkinstalldirs $(bindir) $(libdir) \
-		$(includedir) $(infodir) $(mandir)
+	$(SHELL) ${srcdir}/mkinstalldirs $(bindir) $(infodir) $(mandir)
 
 $(bindir)/$(instname): make
 	$(INSTALL_PROGRAM) make $@.new
-# These are necessary for load-average checking to work on most Unix machines.
-	if $(install_setgid); then \
-	  chgrp $(group) $@.new && chmod g+s $@.new; \
-	else true; fi
+	@if $(install_setgid); then \
+	   if chgrp $(group) $@.new && chmod g+s $@.new; then \
+	     echo "chgrp $(group) $@.new && chmod g+s $@.new"; \
+	   else \
+	     echo "$@ needs to be owned by group $(group) and setgid;"; \
+	     echo "otherwise the \`-l' option will probably not work."; \
+	     echo "You may need special priveleges to install $@."; \
+	   fi; \
+	 else true; fi
 # Some systems can't deal with renaming onto a running binary.
 	-rm -f $@.old
 	-mv $@ $@.old
 	mv $@.new $@
 
-$(infodir)/$(instname).info: make.info
-	for file in make.info*; do \
+$(infodir)/make.info: make.info
+	if [ -r ./make.info ]; then dir=.; else dir=$(srcdir); fi; \
+	for file in $${dir}/make.info*; do \
+	  name="`basename $$file`"; \
 	  $(INSTALL_DATA) $$file \
-	    `echo $@ | sed "s,$(instname).info\$$,$$file,"`; \
+	    `echo $@ | sed "s,make.info\$$,$$name,"`; \
 	done
+# Run install-info only if it exists.
+# Use `if' instead of just prepending `-' to the
+# line so we notice real errors from install-info.
+# We use `$(SHELL) -c' because some shells do not
+# fail gracefully when there is an unknown command.
+	if $(SHELL) -c 'install-info --version' >/dev/null 2>&1; then \
+	  install-info --infodir=$(infodir) $$d/foo.info; \
+	else true; fi
 
 $(mandir)/$(instname).$(manext): make.man
 	$(INSTALL_DATA) $(srcdir)/make.man $@
 
+
+loadavg: getloadavg.c config.h
+	$(CC) $(defines) -DTEST -I. -I$(srcdir) $(CFLAGS) $(LDFLAGS) \
+	      $(srcdir)/getloadavg.c $(LOADLIBES) -o $@
+check-loadavg: loadavg
+	@echo The system uptime program believes the load average to be:
+	-uptime
+	@echo The GNU load average checking code believes:
+	./loadavg
+check: check-loadavg
+
+
 .PHONY: clean realclean distclean mostlyclean
 clean: glob-clean
-	-rm -f make *.o core
+	-rm -f make loadavg *.o core make.info* make.dvi
 distclean: clean glob-realclean
-	-rm -f Makefile config.h config.status build.sh
-	-rm -f TAGS tags make.info* make.dvi
+	-rm -f Makefile config.h config.status build.sh stamp-config
+	-rm -f TAGS tags
 	-rm -f make.?? make.??s make.log make.toc make.*aux
 realclean: distclean
 mostlyclean: clean
@@ -234,27 +266,30 @@ config.h.in: configure.in
 # This tells versions [3.59,3.63) of GNU make not to export all variables.
 .NOEXPORT:
 
+# The automatically generated dependencies below may omit config.h
+# because it is included with ``#include <config.h>'' rather than
+# ``#include "config.h"''.  So we add the explicit dependency to make sure.
+$(objs): config.h
+
 # Automatically generated dependencies will be put at the end of the file.
 
 # Automatically generated dependencies.
-commands.o : commands.c make.h config.h dep.h commands.h file.h variable.h \
-  job.h 
-job.o : job.c make.h config.h commands.h job.h file.h variable.h 
+commands.o : commands.c make.h dep.h commands.h file.h variable.h job.h 
+job.o : job.c make.h commands.h job.h file.h variable.h 
 dir.o : dir.c make.h config.h 
-file.o : file.c make.h config.h commands.h dep.h file.h variable.h 
-main.o : main.c make.h config.h commands.h dep.h file.h variable.h job.h \
-  getopt.h 
-read.o : read.c make.h config.h commands.h dep.h file.h variable.h glob/glob.h 
-remake.o : remake.c make.h config.h commands.h job.h dep.h file.h 
-rule.o : rule.c make.h config.h commands.h dep.h file.h variable.h rule.h 
-implicit.o : implicit.c make.h config.h rule.h dep.h file.h 
-default.o : default.c make.h config.h rule.h dep.h file.h commands.h variable.h 
-variable.o : variable.c make.h config.h commands.h variable.h dep.h file.h 
-expand.o : expand.c make.h config.h commands.h file.h variable.h 
-function.o : function.c make.h config.h variable.h dep.h commands.h job.h 
+file.o : file.c make.h commands.h dep.h file.h variable.h 
+misc.o : misc.c make.h config.h dep.h 
+read.o : read.c make.h commands.h dep.h file.h variable.h glob/glob.h 
+remake.o : remake.c make.h commands.h job.h dep.h file.h 
+rule.o : rule.c make.h commands.h dep.h file.h variable.h rule.h 
+implicit.o : implicit.c make.h rule.h dep.h file.h 
+default.o : default.c make.h rule.h dep.h file.h commands.h variable.h 
+variable.o : variable.c make.h commands.h variable.h dep.h file.h 
+expand.o : expand.c make.h commands.h file.h variable.h 
+function.o : function.c make.h variable.h dep.h commands.h job.h 
 vpath.o : vpath.c make.h config.h file.h variable.h 
 version.o : version.c 
-ar.o : ar.c make.h config.h file.h 
+ar.o : ar.c make.h config.h file.h dep.h 
 arscan.o : arscan.c make.h config.h 
 signame.o : signame.c config.h signame.h 
 remote-stub.o : remote-stub.c make.h config.h commands.h 

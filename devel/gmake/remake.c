@@ -341,16 +341,14 @@ update_file_1 (file, depth)
       if (try_implicit_rule (file, depth))
 	DEBUGPR ("Found an implicit rule for `%s'.\n");
       else
-	{
-	  DEBUGPR ("No implicit rule found for `%s'.\n");
-	  if (!file->is_target
-	      && default_file != 0 && default_file->cmds != 0)
-	    {
-	      DEBUGPR ("Using default commands for `%s'.\n");
-	      file->cmds = default_file->cmds;
-	    }
-	}
+	DEBUGPR ("No implicit rule found for `%s'.\n");
       file->tried_implicit = 1;
+    }
+  if (file->cmds == 0 && !file->is_target
+      && default_file != 0 && default_file->cmds != 0)
+    {
+      DEBUGPR ("Using default commands for `%s'.\n");
+      file->cmds = default_file->cmds;
     }
 
   /* Update all non-intermediate files we depend on, if necessary,
@@ -523,7 +521,7 @@ update_file_1 (file, depth)
       must_make = 1;
       DEBUGPR ("Target `%s' is double-colon and has no dependencies.\n");
     }
-  else if (file->is_target && !deps_changed && file->cmds == 0)
+  else if (!noexist && file->is_target && !deps_changed && file->cmds == 0)
     {
       must_make = 0;
       DEBUGPR ("No commands for `%s' and no dependencies actually changed.\n");
@@ -616,7 +614,7 @@ notice_finished_file (file)
     {
       if (just_print_flag || question_flag
 	  || (file->is_target && file->cmds == 0))
-	file->last_mtime = time ((time_t *) 0);
+	file->last_mtime = NEW_MTIME;
       else
 	file->last_mtime = 0;
     }

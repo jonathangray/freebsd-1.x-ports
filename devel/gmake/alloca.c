@@ -22,10 +22,18 @@
    your main control loop, etc. to force garbage collection.  */
 
 #ifdef HAVE_CONFIG_H
+#if defined (emacs) || defined (CONFIG_BROKETS)
+#include <config.h>
+#else
 #include "config.h"
 #endif
+#endif
 
-/* If compiling with GCC, this file's not needed.  */
+/* If compiling with GCC 2, this file's not needed.  */
+#if !defined (__GNUC__) || __GNUC__ < 2
+
+/* If someone has defined alloca as a macro,
+   there must be some other way alloca is supposed to work.  */
 #ifndef alloca
 
 #ifdef emacs
@@ -45,7 +53,7 @@ lose
 /* If your stack is a linked list of frames, you have to
    provide an "address metric" ADDRESS_FUNCTION macro.  */
 
-#ifdef CRAY
+#if defined (CRAY) && defined (CRAY_STACKSEG_END)
 long i00afunc ();
 #define ADDRESS_FUNCTION(arg) (char *) i00afunc (&(arg))
 #else
@@ -59,6 +67,21 @@ typedef char *pointer;
 #endif
 
 #define	NULL	0
+
+/* Different portions of Emacs need to call different versions of
+   malloc.  The Emacs executable needs alloca to call xmalloc, because
+   ordinary malloc isn't protected from input signals.  On the other
+   hand, the utilities in lib-src need alloca to call malloc; some of
+   them are very simple, and don't have an xmalloc routine.
+
+   Non-Emacs programs expect this to call use xmalloc.
+
+   Callers below should use malloc.  */
+
+#ifndef emacs
+#define malloc xmalloc
+#endif
+extern pointer malloc ();
 
 /* Define STACK_DIRECTION if you know the direction of stack
    growth for your system; otherwise it will be automatically
@@ -189,7 +212,7 @@ alloca (size)
   }
 }
 
-#ifdef CRAY
+#if defined (CRAY) && defined (CRAY_STACKSEG_END)
 
 #ifdef DEBUG_I00AFUNC
 #include <stdio.h>
@@ -458,3 +481,4 @@ i00afunc (long address)
 #endif /* CRAY */
 
 #endif /* no alloca */
+#endif /* not GCC version 2 */

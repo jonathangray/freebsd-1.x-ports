@@ -347,11 +347,20 @@ define_automatic_variables ()
 {
   extern char default_shell[];
   register struct variable *v;
-  char buf[100];
+  char buf[200];
 
   sprintf (buf, "%u", makelevel);
   (void) define_variable ("MAKELEVEL", 9, buf, o_env, 0);
 
+  sprintf (buf, "%s%s%s",
+	   version_string,
+	   (remote_description == 0 || remote_description[0] == '\0')
+	   ? "" : "-",
+	   (remote_description == 0 || remote_description[0] == '\0')
+	   ? "" : remote_description);
+  (void) define_variable ("MAKE_VERSION", 12, buf, o_default, 0);
+
+  
   /* This won't override any definition, but it
      will provide one if there isn't one there.  */
   v = define_variable ("SHELL", 5, default_shell, o_default, 0);
@@ -389,12 +398,14 @@ define_automatic_variables ()
 int export_all_variables;
 
 /* Create a new environment for FILE's commands.
+   If FILE is nil, this is for the `shell' function.
    The child's MAKELEVEL variable is incremented.  */
 
 char **
 target_environment (file)
      struct file *file;
 {
+  struct variable_set_list *set_list;
   register struct variable_set_list *s;
   struct variable_bucket
     {
@@ -408,14 +419,19 @@ target_environment (file)
   char **result;
   unsigned int mklev_hash;
 
+  if (file == 0)
+    set_list = current_variable_set_list;
+  else
+    set_list = file->variables;
+
   /* Find the lowest number of buckets in any set in the list.  */
-  s = file->variables;
+  s = set_list;
   buckets = s->set->buckets;
   for (s = s->next; s != 0; s = s->next)
     if (s->set->buckets < buckets)
       buckets = s->set->buckets;
 
-  /* Find the hash value of `MAKELEVEL' will fall into.  */
+  /* Find the hash value of the bucket `MAKELEVEL' will fall into.  */
   {
     char *p = "MAKELEVEL";
     mklev_hash = 0;
@@ -431,7 +447,7 @@ target_environment (file)
   /* Run through all the variable sets in the list,
      accumulating variables in TABLE.  */
   nvariables = 0;
-  for (s = file->variables; s != 0; s = s->next)
+  for (s = set_list; s != 0; s = s->next)
     {
       register struct variable_set *set = s->set;
       for (i = 0; i < set->buckets; ++i)
@@ -439,7 +455,6 @@ target_environment (file)
 	  register struct variable *v;
 	  for (v = set->table[i]; v != 0; v = v->next)
 	    {
-	      extern char *getenv ();
 	      unsigned int j = i % buckets;
 	      register struct variable_bucket *ov;
 	      register char *p = v->name;
@@ -457,10 +472,9 @@ target_environment (file)
 		    /* Only export default variables by explicit request.  */
 		    continue;
 
-		  if (!export_all_variables
+		  if (! export_all_variables
 		      && v->origin != o_command
-		      && v->origin != o_env && v->origin != o_env_override
-		      && !(v->origin == o_file && getenv (p) != 0))
+		      && v->origin != o_env && v->origin != o_env_override)
 		    continue;
 
 		  if (*p != '_' && (*p < 'A' || *p > 'Z')

@@ -31,7 +31,7 @@
 				the nlist n_name element is a pointer,
 				not an array.
    NLIST_NAME_UNION		struct nlist has an n_un member, not n_name.
-   LINUX_LDAV_FILE		[LINUX]: Name of file containing load averages.
+   LINUX_LDAV_FILE		[__linux__]: File containing load averages.
 
    Specific system predefines this file uses, aside from setting
    default values if not emacs:
@@ -49,8 +49,9 @@
    UMAX
    UMAX4_3
    VMS
-   LINUX			Linux: assumes /proc filesystem mounted.
+   __linux__			Linux: assumes /proc filesystem mounted.
    				Support from Michael K. Johnson.
+   __NetBSD__			NetBSD: assumes /kern filesystem mounted.
 
    In addition, to avoid nesting many #ifdefs, we internally set
    LDAV_DONE to indicate that the load average has been computed.
@@ -69,8 +70,22 @@
 
 
 #ifdef HAVE_CONFIG_H
+#if defined (emacs) || defined (CONFIG_BROKETS)
+/* We use <config.h> instead of "config.h" so that a compilation
+   using -I. -I$srcdir will use ./config.h rather than $srcdir/config.h
+   (which it would do because it found this file in $srcdir).  */
+#include <config.h>
+#else
 #include "config.h"
 #endif
+#endif
+
+
+/* Exclude all the code except the test program at the end
+   if the system has its own `getloadavg' function.  */
+
+#ifndef HAVE_GETLOADAVG
+
 
 /* The existing Emacs configuration files define a macro called
    LOAD_AVE_CVT, which accepts a value of type LOAD_AVE_TYPE, and
@@ -124,7 +139,7 @@
 #define SUNOS_5
 #endif
 
-#if defined (__osf__) && defined (__alpha__)
+#if defined (__osf__) && (defined (__alpha) || defined (__alpha__))
 #define OSF_ALPHA
 #endif
 
@@ -141,9 +156,60 @@
 #endif
 
 
-/* VAX C can't handle multi-line #ifs.  */
-#if (defined(MORE_BSD) || defined(sun) || defined(decstation) || defined(_SEQUENT_) || defined(sgi) || defined(SVR4) || defined(sony_news) || defined(sequent) || defined (OSF_ALPHA) || (defined (ardent) && defined (titan)) || defined (tek4300))
+/* VAX C can't handle multi-line #ifs, or lines longer than 256 chars.  */
+#ifndef LOAD_AVE_TYPE
+
+#ifdef MORE_BSD
 #define LOAD_AVE_TYPE long
+#endif
+
+#ifdef sun
+#define LOAD_AVE_TYPE long
+#endif
+
+#ifdef decstation
+#define LOAD_AVE_TYPE long
+#endif
+
+#ifdef _SEQUENT_
+#define LOAD_AVE_TYPE long
+#endif
+
+#ifdef sgi
+#define LOAD_AVE_TYPE long
+#endif
+
+#ifdef SVR4
+#define LOAD_AVE_TYPE long
+#endif
+
+#ifdef sony_news
+#define LOAD_AVE_TYPE long
+#endif
+
+#ifdef sequent
+#define LOAD_AVE_TYPE long
+#endif
+
+#ifdef OSF_ALPHA
+#define LOAD_AVE_TYPE long
+#endif
+
+#if defined (ardent) && defined (titan)
+#define LOAD_AVE_TYPE long
+#endif
+
+#ifdef tek4300
+#define LOAD_AVE_TYPE long
+#endif
+
+#endif /* No LOAD_AVE_TYPE.  */
+
+#ifdef OSF_ALPHA
+/* <sys/param.h> defines an incorrect value for FSCALE on Alpha OSF/1,
+   according to ghazi@noc.rutgers.edu.  */
+#undef FSCALE
+#define FSCALE 1024.0
 #endif
 
 
@@ -160,6 +226,9 @@
 #endif
 
 #if defined (sgi) || defined (sequent)
+/* Sometimes both MIPS and sgi are defined, so FSCALE was just defined
+   above under #ifdef MIPS.  But we want the sgi value.  */
+#undef FSCALE
 #define	FSCALE 1000.0
 #endif
 
@@ -177,10 +246,58 @@
 #define	LDAV_CVT(n) (((double) (n)) / FSCALE)
 #endif
 
-/* VAX C can't handle multi-line #ifs.  */
-#if !defined(NLIST_STRUCT) && (defined(MORE_BSD) || defined(sun) || defined(decstation) || defined(hpux) || defined(_SEQUENT_) || defined(sequent) || defined(sgi) || defined(SVR4) || defined(sony_news) || defined (OSF_ALPHA) || (defined (ardent) && defined (titan)) || defined (tek4300) || defined (butterfly))
+/* VAX C can't handle multi-line #ifs, or lines longer that 256 characters.  */
+#ifndef NLIST_STRUCT
+
+#ifdef MORE_BSD
 #define NLIST_STRUCT
 #endif
+
+#ifdef sun
+#define NLIST_STRUCT
+#endif
+
+#ifdef decstation
+#define NLIST_STRUCT
+#endif
+
+#ifdef hpux
+#define NLIST_STRUCT
+#endif
+
+#if defined (_SEQUENT_) || defined (sequent)
+#define NLIST_STRUCT
+#endif
+
+#ifdef sgi
+#define NLIST_STRUCT
+#endif
+
+#ifdef SVR4
+#define NLIST_STRUCT
+#endif
+
+#ifdef sony_news
+#define NLIST_STRUCT
+#endif
+
+#ifdef OSF_ALPHA
+#define NLIST_STRUCT
+#endif
+
+#if defined (ardent) && defined (titan)
+#define NLIST_STRUCT
+#endif
+
+#ifdef tex4300
+#define NLIST_STRUCT
+#endif
+
+#ifdef butterfly
+#define NLIST_STRUCT
+#endif
+
+#endif /* defined (NLIST_STRUCT) */
 
 
 #if defined(sgi) || (defined(mips) && !defined(BSD))
@@ -345,7 +462,7 @@ static kvm_t *kd;
 
 /* Put the 1 minute, 5 minute and 15 minute load averages
    into the first NELEM elements of LOADAVG.
-   Return the number written (never more than 3),
+   Return the number written (never more than 3, but may be less than NELEM),
    or -1 if an error occurred.  */
 
 int
@@ -355,7 +472,15 @@ getloadavg (loadavg, nelem)
 {
   int elem = 0;			/* Return value.  */
 
-#if !defined (LDAV_DONE) && defined (LINUX)
+#ifdef NO_GET_LOAD_AVG
+#define LDAV_DONE
+  /* Set errno to zero to indicate that there was no particular error;
+     this function just can't work at all on this system.  */
+  errno = 0;
+  elem = -1;
+#endif
+
+#if !defined (LDAV_DONE) && defined (__linux__)
 #define LDAV_DONE
 #undef LOAD_AVE_TYPE
 
@@ -385,7 +510,36 @@ getloadavg (loadavg, nelem)
 
   return elem;
 
-#endif /* LINUX */
+#endif /* __linux__ */
+
+#if !defined (LDAV_DONE) && defined (__NetBSD__)
+#define LDAV_DONE
+#undef LOAD_AVE_TYPE
+
+#ifndef NETBSD_LDAV_FILE
+#define NETBSD_LDAV_FILE "/kern/loadavg"
+#endif
+
+  unsigned long int load_ave[3], scale;
+  int count;
+  FILE *fp;
+
+  fp = fopen (NETBSD_LDAV_FILE, "r");
+  if (fp == NULL)
+    return -1;
+  count = fscanf (fp, "%lu %lu %lu %lu\n",
+		  &load_ave[0], &load_ave[1], &load_ave[2],
+		  &scale);
+  (void) fclose (fp);
+  if (count != 4)
+    return -1;
+
+  for (elem = 0; elem < nelem; elem++)
+    loadavg[elem] = (double) load_ave[elem] / (double) scale;
+
+  return elem;
+
+#endif /* __NetBSD__ */
 
 #if !defined (LDAV_DONE) && defined (NeXT)
 #define LDAV_DONE
@@ -395,12 +549,8 @@ getloadavg (loadavg, nelem)
   struct processor_set_basic_info info;
   unsigned info_count;
 
-  if (nelem > 1)
-    {
-      /* We only know how to get the 1-minute average for this system.  */
-      errno = EINVAL;
-      return -1;
-    }
+  /* We only know how to get the 1-minute average for this system,
+     so even if the caller asks for more than 1, we only return 1.  */
 
   if (!getloadavg_initialized)
     {
@@ -540,13 +690,13 @@ getloadavg (loadavg, nelem)
 
 #if !defined (LDAV_DONE) && defined (OSF_MIPS)
 #define LDAV_DONE
-#define LDAV_PRIVILEGED
 
   struct tbl_loadavg load_ave;
   table (TBL_LOADAVG, 0, &load_ave, 1, sizeof (load_ave));
-  loadavg[elem++] = (load_ave.tl_lscale == 0
-		     ? load_ave.tl_avenrun.d[0]
-		     : (load_ave.tl_avenrun.l[0] / load_ave.tl_lscale));
+  loadavg[elem++]
+    = (load_ave.tl_lscale == 0
+       ? load_ave.tl_avenrun.d[0]
+       : (load_ave.tl_avenrun.l[0] / (double) load_ave.tl_lscale));
 #endif	/* OSF_MIPS */
 
 #if !defined (LDAV_DONE) && defined (VMS)
@@ -600,7 +750,6 @@ getloadavg (loadavg, nelem)
   /* Get the address of LDAV_SYMBOL.  */
   if (offset == 0)
     {
-#ifndef SUNOS_5
 #ifndef sgi
 #ifndef NLIST_STRUCT
       strcpy (nl[0].n_name, LDAV_SYMBOL);
@@ -615,6 +764,7 @@ getloadavg (loadavg, nelem)
 #endif /* not NLIST_NAME_UNION */
 #endif /* NLIST_STRUCT */
 
+#ifndef SUNOS_5
       if (nlist (KERNEL_FILE, nl) >= 0)
 	/* Omit "&& nl[0].n_type != 0 " -- it breaks on Sun386i.  */
 	{
@@ -623,6 +773,7 @@ getloadavg (loadavg, nelem)
 #endif
 	  offset = nl[0].n_value;
 	}
+#endif  /* !SUNOS_5 */
 #else /* sgi */
       int ldav_off;
 
@@ -630,7 +781,6 @@ getloadavg (loadavg, nelem)
       if (ldav_off != -1)
 	offset = (long) ldav_off & 0x7fffffff;
 #endif /* sgi */
-#endif  /* !SUNOS_5 */
     }
 
   /* Make sure we have /dev/kmem open.  */
@@ -641,10 +791,14 @@ getloadavg (loadavg, nelem)
       if (channel >= 0)
 	getloadavg_initialized = 1;
 #else /* SUNOS_5 */
+      /* We pass 0 for the kernel, corefile, and swapfile names
+	 to use the currently running kernel.  */
       kd = kvm_open (0, 0, 0, O_RDONLY, 0);
       if (kd != 0) 
 	{
+	  /* nlist the currently running kernel.  */
 	  kvm_nlist (kd, nl);
+	  offset = nl[0].n_value;
 	  getloadavg_initialized = 1;
 	}
 #endif /* SUNOS_5 */
@@ -696,6 +850,8 @@ getloadavg (loadavg, nelem)
   return -1;
 #endif
 }
+
+#endif /* ! HAVE_GETLOADAVG */
 
 #ifdef TEST
 void
@@ -707,9 +863,6 @@ main (argc, argv)
 
   if (argc > 1)
     naptime = atoi (argv[1]);
-
-  if (naptime == 0)
-    naptime = 5;
 
   while (1)
     {
@@ -731,7 +884,12 @@ main (argc, argv)
 	printf ("15-minute: %f  ", avg[2]);
       if (loads > 0)
 	putchar ('\n');
+
+      if (naptime == 0)
+	break;
       sleep (naptime);
     }
+
+  exit (0);
 }
 #endif /* TEST */

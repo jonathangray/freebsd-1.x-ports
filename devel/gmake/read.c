@@ -122,9 +122,19 @@ read_all_makefiles (makefiles)
      default makefiles and don't let the default goal come from there.  */
 
   {
-    char *value = allocated_variable_expand ("$(MAKEFILES)");
+    char *value;
     char *name, *p;
     unsigned int length;
+
+    {
+      /* Turn off --warn-undefined-variables while we expand MAKEFILES.  */
+      int save = warn_undefined_variables_flag;
+      warn_undefined_variables_flag = 0;
+
+      value = allocated_variable_expand ("$(MAKEFILES)");
+
+      warn_undefined_variables_flag = save;
+    }
 
     /* Set NAME to the start of next token and LENGTH to its length.
        MAKEFILES is updated for finding remaining tokens.  */
@@ -133,7 +143,7 @@ read_all_makefiles (makefiles)
       {
 	if (*p != '\0')
 	  *p++ = '\0';
-	read_makefile (name, 1);
+	read_makefile (name, RM_NO_DEFAULT_GOAL | RM_INCLUDED | RM_DONTCARE);
       }
 
     free (value);
@@ -155,7 +165,6 @@ read_all_makefiles (makefiles)
 	  d = d->next;
 
 	/* Use the storage read_makefile allocates.  */
-	free (*makefiles);
 	*makefiles = dep_name (d);
 	++num_makefiles;
 	++makefiles;
@@ -184,10 +193,9 @@ read_all_makefiles (makefiles)
 	      d->name = 0;
 	      d->file = enter_file (*p);
 	      d->file->dontcare = 1;
-	      /* Setting the `changed' member to 1 will make failure to
-		 update or find this makefile as if it had come from the
-		 MAKEFILES variable: we don't care, so we won't die.  */
-	      d->changed = 1;
+	      /* Tell update_goal_chain to bail out as soon as this file is
+		 made, and main not to die if we can't make this file.  */
+	      d->changed = RM_DONTCARE;
 	      if (tail == 0)
 		read_makefiles = d;
 	      else
@@ -204,18 +212,14 @@ read_all_makefiles (makefiles)
 
 /* Read file FILENAME as a makefile and add its contents to the data base.
 
-   TYPE indicates what flavor of makefile this is: 0 => a default or -f
-   makefile (the basis for comparison); 1 => from the MAKEFILES variable:
-   cannot determine the default goal, is searched for in the search path,
-   and it's not an error if it doesn't exist; 2 => an included makefile:
-   is searched for in the search path.
+   FLAGS contains bits as above.
 
    FILENAME is added to the `read_makefiles' chain.  */
 
 static void
-read_makefile (filename, type)
+read_makefile (filename, flags)
      char *filename;
-     int type;
+     int flags;
 {
   static char *collapsed = 0;
   static unsigned int collapsed_length = 0;
@@ -245,7 +249,8 @@ read_makefile (filename, type)
       if (filenames != 0)						      \
 	record_files (filenames, pattern, pattern_percent, deps,	      \
 		      commands_started, commands, commands_idx,		      \
-		      two_colon, filename, lineno, type != 1);		      \
+		      two_colon, filename, lineno,			      \
+		      !(flags & RM_NO_DEFAULT_GOAL));		     	      \
       filenames = 0;							      \
       commands_idx = 0;							      \
       pattern = 0;							      \
@@ -257,15 +262,25 @@ read_makefile (filename, type)
 
   /* First, get a stream to read.  */
 
+  /* Expand ~ in FILENAME unless it came from `include',
+     in which case it was already done.  */
+  if (!(flags & RM_NO_TILDE) && filename[0] == '~')
+    {
+      char *expanded = tilde_expand (filename);
+      /* This is a possible memory leak, but I don't care.  */
+      if (expanded != 0)
+	filename = expanded;
+    }
+
   infile = fopen (filename, "r");
   /* Save the error code so we print the right message later.  */
   makefile_errno = errno;
 
   /* If the makefile wasn't found and it's either a makefile from
-     the `MAKEFILES' variable (type 1) or an included makefile (type 2),
+     the `MAKEFILES' variable or an included makefile,
      search the included makefile search path for this makefile.  */
 
-  if (infile == 0 && (type == 1 || type == 2) && *filename != '/')
+  if (infile == 0 && (flags & RM_INCLUDED) && *filename != '/')
     {
       register unsigned int i;
       for (i = 0; include_directories[i] != 0; ++i)
@@ -291,12 +306,12 @@ read_makefile (filename, type)
   if (deps->file == 0)
     {
       deps->file = enter_file (savestring (filename, strlen (filename)));
-      if (type == 1)
+      if (flags & RM_DONTCARE)
 	deps->file->dontcare = 1;
     }
   filename = deps->file->name;
   deps->file->precious = 1;
-  deps->changed = type;
+  deps->changed = flags;
   deps = 0;
 
   /* If the makefile can't be found at all,
@@ -304,7 +319,7 @@ read_makefile (filename, type)
 
   if (infile == 0)
     {
-      if (type != 1)
+      if (! (flags & RM_DONTCARE))
 	{
 	  /* If we did some searching, errno has the error
 	     from the last attempt, rather from FILENAME itself.  */
@@ -488,17 +503,22 @@ read_makefile (filename, type)
 	      v->export = v_noexport;
 	    }
 	}
-      else if (word1eq ("include", 7))
+      else if (word1eq ("include", 7) || word1eq ("-include", 8))
 	{
 	  /* We have found an `include' line specifying a nested
 	     makefile to be read at this point.  */
 	  struct conditionals *save, new_conditionals;
 	  struct nameseq *files;
+	  /* "-include" (vs "include") says no
+	     error if the file does not exist.  */
+	  int noerror = p[0] == '-';
 
-	  p = allocated_variable_expand (next_token (p + 8));
+	  p = allocated_variable_expand (next_token (p + (noerror ? 9 : 8)));
 	  if (*p == '\0')
 	    {
-	      makefile_error (filename, lineno, "no file name for `include'");
+	      makefile_error (filename, lineno,
+			      "no file name for `%sinclude'",
+			      noerror ? "-" : "");
 	      continue;
 	    }
 
@@ -528,8 +548,15 @@ read_makefile (filename, type)
 	      free (files);
 	      files = next;
 
-	      read_makefile (name, 2);
+	      read_makefile (name, (RM_INCLUDED | RM_NO_TILDE
+				    | (noerror ? RM_DONTCARE : 0)));
 	    }
+
+	  /* Free any space allocated by conditional_line.  */
+	  if (conditionals->ignoring)
+	    free (conditionals->ignoring);
+	  if (conditionals->seen_else)
+	    free (conditionals->seen_else);
 
 	  /* Restore state.  */
 	  conditionals = save;
@@ -613,9 +640,9 @@ read_makefile (filename, type)
 	    }
 
 	  filenames = multi_glob (parse_file_seq (&p2, ':',
-						  sizeof (struct nameseq)),
-				  sizeof (struct nameseq),
-				  1);
+						  sizeof (struct nameseq),
+						  1),
+				  sizeof (struct nameseq));
 	  if (*p2++ == '\0')
 	    makefile_fatal (filename, lineno, "missing separator");
 	  /* Is this a one-colon or two-colon entry?  */
@@ -659,9 +686,8 @@ read_makefile (filename, type)
 
 	  /* Parse the dependencies.  */
 	  deps = (struct dep *)
-	    multi_glob (parse_file_seq (&p2, '\0', sizeof (struct dep)),
-			sizeof (struct dep),
-			1);
+	    multi_glob (parse_file_seq (&p2, '\0', sizeof (struct dep), 1),
+			sizeof (struct dep));
 
 	  commands_idx = 0;
 	  if (cmdleft != 0)
@@ -1489,6 +1515,99 @@ parse_file_seq (stringp, stopchar, size, strip)
       new = new1;
     }
 
+#ifndef NO_ARCHIVES
+
+  /* Look for multi-word archive references.
+     They are indicated by a elt ending with an unmatched `)' and
+     an elt further down the chain (i.e., previous in the file list)
+     with an unmatched `(' (e.g., "lib(mem").  */
+
+  for (new1 = new; new1 != 0; new1 = new1->next)
+    if (new1->name[0] != '('	/* Don't catch "(%)" and suchlike.  */
+	&& new1->name[strlen (new1->name) - 1] == ')'
+	&& index (new1->name, '(') == 0)
+      {
+	/* NEW1 ends with a `)' but does not contain a `('.
+	   Look back for an elt with an opening `(' but no closing `)'.  */
+
+	struct nameseq *n = new1->next, *lastn = new1;
+	char *paren;
+	while (n != 0 && (paren = index (n->name, '(')) == 0)
+	  {
+	    lastn = n;
+	    n = n->next;
+	  }
+	if (n != 0
+	    /* Ignore something starting with `(', as that cannot actually
+	       be an archive-member reference (and treating it as such
+	       results in an empty file name, which causes much lossage).  */
+	    && n->name[0] != '(')
+	  {
+	    /* N is the first element in the archive group.
+	       Its name looks like "lib(mem" (with no closing `)').  */
+
+	    char *libname;
+
+	    /* Copy "lib(" into LIBNAME.  */
+	    ++paren;
+	    libname = (char *) alloca (paren - n->name + 1);
+	    bcopy (n->name, libname, paren - n->name);
+	    libname[paren - n->name] = '\0';
+
+	    if (*paren == '\0')
+	      {
+		/* N was just "lib(", part of something like "lib( a b)".
+		   Edit it out of the chain and free its storage.  */
+		lastn->next = n->next;
+		free (n->name);
+		free ((char *) n);
+		/* LASTN->next is the new stopping elt for the loop below.  */
+		n = lastn->next;
+	      }
+	    else
+	      {
+		/* Replace N's name with the full archive reference.  */
+		name = concat (libname, paren, ")");
+		free (n->name);
+		n->name = name;
+	      }
+
+	    if (new1->name[1] == '\0')
+	      {
+		/* NEW1 is just ")", part of something like "lib(a b )".
+		   Omit it from the chain and free its storage.  */
+		lastn = new1;
+		new1 = new1->next;
+		if (new == lastn)
+		  new = new1;
+		free (lastn->name);
+		free ((char *) lastn);
+	      }
+	    else
+	      {
+		/* Replace also NEW1->name, which already has closing `)'.  */
+		name = concat (libname, new1->name, "");
+		free (new1->name);
+		new1->name = name;
+		new1 = new1->next;
+	      }
+
+	    /* Trace back from NEW1 (the end of the list) until N
+	       (the beginning of the list), rewriting each name
+	       with the full archive reference.  */
+	    
+	    while (new1 != n)
+	      {
+		name = concat (libname, new1->name, ")");
+		free (new1->name);
+		new1->name = name;
+		new1 = new1->next;
+	      }
+	  }
+      }
+
+#endif
+
   *stringp = p;
   return new;
 }
@@ -1610,6 +1729,14 @@ construct_include_path (arg_dirs)
     while (*arg_dirs != 0)
       {
 	char *dir = *arg_dirs++;
+
+	if (dir[0] == '~')
+	  {
+	    char *expanded = tilde_expand (dir);
+	    if (expanded != 0)
+	      dir = expanded;
+	  }
+
 	if (stat (dir, &stbuf) == 0 && S_ISDIR (stbuf.st_mode))
 	  {
 	    if (idx == max - 1)
@@ -1620,6 +1747,8 @@ construct_include_path (arg_dirs)
 	      }
 	    dirs[idx++] = dir;
 	  }
+	else if (dir != arg_dirs[-1])
+	  free (dir);
       }
 
   /* Now add at the end the standard default dirs.  */
@@ -1649,6 +1778,76 @@ construct_include_path (arg_dirs)
   include_directories = dirs;
 }
 
+/* Expand ~ or ~USER at the beginning of NAME.
+   Return a newly malloc'd string or 0.  */
+
+char *
+tilde_expand (name)
+     char *name;
+{
+  if (name[1] == '/' || name[1] == '\0')
+    {
+      extern char *getenv ();
+      char *home_dir;
+      int is_variable;
+
+      {
+	/* Turn off --warn-undefined-variables while we expand HOME.  */
+	int save = warn_undefined_variables_flag;
+	warn_undefined_variables_flag = 0;
+
+	home_dir = allocated_variable_expand ("$(HOME)");
+
+	warn_undefined_variables_flag = save;
+      }
+  
+      is_variable = home_dir[0] != '\0';
+      if (!is_variable)
+	{
+	  free (home_dir);
+	  home_dir = getenv ("HOME");
+	}
+      if (home_dir == 0 || home_dir[0] == '\0')
+	{
+	  extern char *getlogin ();
+	  char *name = getlogin ();
+	  home_dir = 0;
+	  if (name != 0)
+	    {
+	      struct passwd *p = getpwnam (name);
+	      if (p != 0)
+		home_dir = p->pw_dir;
+	    }
+	}
+      if (home_dir != 0)
+	{
+	  char *new = concat (home_dir, "", name + 1);
+	  if (is_variable)
+	    free (home_dir);
+	  return new;
+	}
+    }
+  else
+    {
+      struct passwd *pwent;
+      char *userend = index (name + 1, '/');
+      if (userend != 0)
+	*userend = '\0';
+      pwent = getpwnam (name + 1);
+      if (pwent != 0)
+	{
+	  if (userend == 0)
+	    return savestring (pwent->pw_dir, strlen (pwent->pw_dir));
+	  else
+	    return concat (pwent->pw_dir, "/", userend + 1);
+	}
+      else if (userend != 0)
+	*userend = '/';
+    }
+
+  return 0;
+}
+
 /* Given a chain of struct nameseq's describing a sequence of filenames,
    in reverse of the intended order, return a new chain describing the
    result of globbing the filenames.  The new chain is in forward order.
@@ -1671,68 +1870,38 @@ multi_glob (chain, size)
   for (old = chain; old != 0; old = nexto)
     {
       glob_t gl;
+#ifndef NO_ARCHIVES
+      char *memname;
+#endif
 
       nexto = old->next;
 
       if (old->name[0] == '~')
 	{
-	  if (old->name[1] == '/' || old->name[1] == '\0')
+	  char *newname = tilde_expand (old->name);
+	  if (newname != 0)
 	    {
-	      extern char *getenv ();
-	      char *home_dir = allocated_variable_expand ("$(HOME)");
-	      int is_variable = home_dir[0] != '\0';
-	      if (!is_variable)
-		{
-		  free (home_dir);
-		  home_dir = getenv ("HOME");
-		}
-	      if (home_dir == 0 || home_dir[0] == '\0')
-		{
-		  extern char *getlogin ();
-		  char *name = getlogin ();
-		  home_dir = 0;
-		  if (name != 0)
-		    {
-		      struct passwd *p = getpwnam (name);
-		      if (p != 0)
-			home_dir = p->pw_dir;
-		    }
-		}
-	      if (home_dir != 0)
-		{
-		  char *new = concat (home_dir, "", old->name + 1);
-		  if (is_variable)
-		    free (home_dir);
-		  free (old->name);
-		  old->name = new;
-		}
-	    }
-	  else
-	    {
-	      struct passwd *pwent;
-	      char *userend = index (old->name + 1, '/');
-	      if (userend != 0)
-		*userend = '\0';
-	      pwent = getpwnam (old->name + 1);
-	      if (pwent != 0)
-		{
-		  if (userend == 0)
-		    {
-		      free (old->name);
-		      old->name = savestring (pwent->pw_dir,
-					      strlen (pwent->pw_dir));
-		    }
-		  else
-		    {
-		      char *new = concat (pwent->pw_dir, "/", userend + 1);
-		      free (old->name);
-		      old->name = new;
-		    }
-		}
-	      else if (userend != 0)
-		*userend = '/';
+	      free (old->name);
+	      old->name = newname;
 	    }
 	}
+
+#ifndef NO_ARCHIVES
+      if (ar_name (old->name))
+	{
+	  /* OLD->name is an archive member reference.
+	     Replace it with the archive file name,
+	     and save the member name in MEMNAME.
+	     We will glob on the archive name and then
+	     reattach MEMNAME later.  */
+	  char *arname;
+	  ar_parse_name (old->name, &arname, &memname);
+	  free (old->name);
+	  old->name = arname;
+	}
+      else
+	memname = 0;
+#endif
 
       switch (glob (old->name, GLOB_NOCHECK, NULL, &gl))
 	{
@@ -1741,11 +1910,52 @@ multi_glob (chain, size)
 	    register int i = gl.gl_pathc;
 	    while (i-- > 0)
 	      {
-		struct nameseq *elt = (struct nameseq *) xmalloc (size);
-		elt->name = savestring (gl.gl_pathv[i],
-					strlen (gl.gl_pathv[i]));
-		elt->next = new;
-		new = elt;
+#ifndef NO_ARCHIVES
+		if (memname != 0)
+		  {
+		    /* Try to glob on MEMNAME within the archive.  */
+		    struct nameseq *found
+		      = ar_glob (gl.gl_pathv[i], memname, size);
+		    if (found == 0)
+		      {
+			/* No matches.  Use MEMNAME as-is.  */
+			struct nameseq *elt
+			  = (struct nameseq *) xmalloc (size);
+			unsigned int alen = strlen (gl.gl_pathv[i]);
+			unsigned int mlen = strlen (memname);
+			elt->name = (char *) xmalloc (alen + 1 + mlen + 2);
+			bcopy (gl.gl_pathv[i], elt->name, alen);
+			elt->name[alen] = '(';
+			bcopy (memname, &elt->name[alen + 1], mlen);
+			elt->name[alen + 1 + mlen] = ')';
+			elt->name[alen + 1 + mlen + 1] = '\0';
+			elt->next = new;
+			new = elt;
+		      }
+		    else
+		      {
+			/* Find the end of the FOUND chain.  */
+			struct nameseq *f = found;
+			while (f->next != 0)
+			  f = f->next;
+
+			/* Attach the chain being built to the end of the FOUND
+			   chain, and make FOUND the new NEW chain.  */
+			f->next = new;
+			new = found;
+		      }
+
+		    free (memname);
+		  }
+		else
+#endif
+		  {
+		    struct nameseq *elt = (struct nameseq *) xmalloc (size);
+		    elt->name = savestring (gl.gl_pathv[i],
+					    strlen (gl.gl_pathv[i]));
+		    elt->next = new;
+		    new = elt;
+		  }
 	      }
 	    globfree (&gl);
 	    free (old->name);

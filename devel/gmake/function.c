@@ -324,7 +324,7 @@ expand_function (o, function, text, end)
       
     case function_shell:
       {
-	char **argv;
+	char **argv, **envp;
 	char *error_prefix;
 	int pipedes[2];
 	int pid;
@@ -336,6 +336,19 @@ expand_function (o, function, text, end)
 	argv = construct_command_argv (text, (char *) NULL, (struct file *) 0);
 	if (argv == 0)
 	  break;
+
+	/* Using a target environment for `shell' loses in cases like:
+	   	export var = $(shell echo foobie) 
+	   because target_environment hits a loop trying to expand $(var)
+	   to put it in the environment.  This is even more confusing when
+	   var was not explicitly exported, but just appeared in the
+	   calling environment.  */
+#if 1
+	envp = environ;
+#else
+	/* Construct the environment.  */
+	envp = target_environment ((struct file *) 0);
+#endif
 
 	/* For error messages.  */
 	if (reading_filename != 0)
@@ -357,17 +370,33 @@ expand_function (o, function, text, end)
 	if (pid < 0)
 	  perror_with_name (error_prefix, "fork");
 	else if (pid == 0)
-	  child_execute_job (0, pipedes[1], argv, environ);
+	  child_execute_job (0, pipedes[1], argv, envp);
 	else
 	  {
-	    /* We are the parent.  Set up and read from the pipe.  */
-	    char *buffer = (char *) xmalloc (201);
-	    unsigned int maxlen = 200;
+	    /* We are the parent.  */
+
+	    char *buffer;
+	    unsigned int maxlen;
 	    int cc;
 
-	    /* Record the PID for child_handler.  */
+	    /* Free the storage only the child needed.  */
+	    free (argv[0]);
+	    free ((char *) argv);
+#if 0
+	    for (i = 0; envp[i] != 0; ++i)
+	      free (envp[i]);
+	    free ((char *) envp);
+#endif
+
+	    /* Record the PID for reap_children.  */
 	    shell_function_pid = pid;
 	    shell_function_completed = 0;
+
+
+	    /* Set up and read from the pipe.  */
+
+	    maxlen = 200;
+	    buffer = (char *) xmalloc (maxlen + 1);
 
 	    /* Close the write side of the pipe.  */
 	    (void) close (pipedes[1]);
@@ -433,8 +462,6 @@ expand_function (o, function, text, end)
 		  }
 	      }
 
-	    free (argv[0]);
-	    free ((char *) argv);
 	    free (buffer);
 	  }
 
@@ -500,7 +527,7 @@ expand_function (o, function, text, end)
 	  {
 	    if (wordi >= nwords - 1)
 	      {
-		nwords += 5;
+		nwords *= 2;
 		words = (char **) xrealloc ((char *) words,
 					    nwords * sizeof (char *));
 	      }	
@@ -1152,12 +1179,13 @@ string_glob (line)
   register struct nameseq *chain;
   register unsigned int idx;
 
-  chain = multi_glob (parse_file_seq (&line, '\0', sizeof (struct nameseq), 0),
-		      sizeof (struct nameseq),
-		      /* We do not want parse_file_seq to strip `./'s.
-			 That would break examples like:
-			   $(patsubst ./%.c,obj/%.o,$(wildcard ./*.c))  */
-		      0);
+  chain = multi_glob (parse_file_seq
+		      (&line, '\0', sizeof (struct nameseq),
+		       /* We do not want parse_file_seq to strip `./'s.
+			  That would break examples like:
+			  $(patsubst ./%.c,obj/%.o,$(wildcard ./*.c)).  */
+		       0),
+		      sizeof (struct nameseq));
 
   if (result == 0)
     {

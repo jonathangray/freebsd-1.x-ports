@@ -21,7 +21,10 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
  #pragma alloca
 #endif
 
-#include "config.h"
+/* We use <config.h> instead of "config.h" so that a compilation
+   using -I. -I$srcdir will use ./config.h rather than $srcdir/config.h
+   (which it would do because make.h was found in $srcdir).  */
+#include <config.h>
 #undef	HAVE_CONFIG_H
 #define HAVE_CONFIG_H
 
@@ -37,6 +40,12 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 #include <signal.h>
 #include <stdio.h>
 #include <ctype.h>
+#ifdef HAVE_SYS_TIMEB_H
+/* SCO 3.2 "devsys 4.2" has a prototype for `ftime' in <time.h> that bombs
+   unless <sys/timeb.h> has been included first.  Does every system have a
+   <sys/timeb.h>?  If any does not, configure should check for it.  */
+#include <sys/timeb.h>
+#endif
 #include <time.h>
 #include <errno.h>
 
@@ -55,10 +64,15 @@ extern int errno;
 #endif
 #endif
 
-#ifdef butterfly
-/* The BBN Butterfly has <unistd.h> that defines _POSIX_VERSION,
-   but isn't really a POSIX.1 system.  */
+/* Some systems define _POSIX_VERSION but are not really POSIX.1.  */
+#if (defined (butterfly) || \
+     (defined (__mips) && defined (_SYSTYPE_SVR3)) || \
+     (defined (sequent) && defined (i386)))
 #undef POSIX
+#endif
+
+#if !defined (POSIX) && defined (_AIX) && defined (_POSIX_SOURCE)
+#define POSIX
 #endif
 
 #if !defined (HAVE_SYS_SIGLIST) && defined (HAVE__SYS_SIGLIST)
@@ -121,14 +135,14 @@ extern unsigned int get_path_max ();
 #define	PATH_VAR(var)	char *var = (char *) alloca (GET_PATH_MAX)
 #endif
 
-#ifdef	uts
+#ifdef	STAT_MACROS_BROKEN
 #ifdef	S_ISREG
 #undef	S_ISREG
 #endif
 #ifdef	S_ISDIR
 #undef	S_ISDIR
 #endif
-#endif	/* uts.  */
+#endif	/* STAT_MACROS_BROKEN.  */
 
 #ifndef	S_ISREG
 #define	S_ISREG(mode)	(((mode) & S_IFMT) == S_IFREG)
@@ -256,9 +270,9 @@ extern void file_impossible ();
 extern char *dir_name ();
 
 extern void define_default_variables ();
-extern void set_default_suffixes (), install_default_implicit_rules ();
-extern void convert_to_pattern (), count_implicit_rule_limits ();
-extern void create_pattern_rule ();
+extern void set_default_suffixes (), install_default_suffix_rules ();
+extern void install_default_implicit_rules (), count_implicit_rule_limits ();
+extern void convert_to_pattern (), create_pattern_rule ();
 
 extern void build_vpath_lists (), construct_vpath_list ();
 extern int vpath_search ();
@@ -306,7 +320,7 @@ extern unsigned int *reading_lineno_ptr;
 extern int just_print_flag, silent_flag, ignore_errors_flag, keep_going_flag;
 extern int debug_flag, print_data_base_flag, question_flag, touch_flag;
 extern int env_overrides, no_builtin_rules_flag, print_version_flag;
-extern int print_directory_flag;
+extern int print_directory_flag, warn_undefined_variables_flag;
 
 extern unsigned int job_slots;
 extern double max_load_average;
@@ -314,6 +328,7 @@ extern double max_load_average;
 extern char *program;
 extern char *starting_directory;
 extern unsigned int makelevel;
+extern char *version_string, *remote_description;
 
 extern unsigned int commands_started;
 
