@@ -1,0 +1,457 @@
+Satoshi Asami (asami@freefall.cdrom.com) ported piewm to FreeBSD.
+
+From the README:
+------------------
+This is an experimental version of tvtwm with pie menus.
+
+Pie menu tracking (optimized for speed) and layout (optimized for
+screen space) designed and implemented by Don Hopkins.
+These algorithms are not patented or restricted.  Feel free to 
+use and improve upon them.
+
+The rest of this file is the standard tvtwm README. 
+I haven't documented the pie menu changes yet, 
+but you can look in system.uwmrc to see how to define your own. 
+
+Oh by the way, I've added support for pixmap pie menu labels.
+Just use a menu label that begins with an underscore followed by 
+the name of a pixmap, using the normal pixmap naming conventions.
+
+Also I fixed a bug using xpm with multi headed servers.  The code needed
+to pass in an attribute structure to the xpm library describing the 
+appropriate visual and colormap, since xbm would otherwise use the
+default visual on the default screen (which was wrong for one of them). 
+
+	-Don Hopkins
+	 hopkins+@cs.cmu.edu, don@toad.com
+
+========================================================================
+
+  Welcome to tvtwm.  This code is a derivation off of MIT's X11 twm
+program.  For those of your who are used to twm, this should be an
+easy transition, that has *much* to offer you.  This README file
+will mainly outline the differences between tvtwm, and other
+windows managers.  As well as a detail about what makes this release
+different from past releases of tvtwm.
+
+  The first section below, was written by Tom LaStrange, the author
+of this code as I first started with it.  The section below his, is
+a list and decription of the changes that have been made to tvtwm
+since I've been hacking on it.
+
+				  - Chris Ross
+				   cross@eng.umd.edu
+
+
+For those of you like me who want to try software before reading
+the instructions, all you have to do to get started is add a single
+line to your .twmrc file.  Something like this:
+
+  VirtualDesktop "3000x2000"
+
+Now for the verbose description:
+
+This is yet another, different implementation of the Virtual Desktop
+concept for twm.  I call this version tvtwm (Tom's Virtual twm).  It is
+based on the R4 version of twm with up to fix-14 installed.  This
+implementation is modeled after swm (Solbourne Window Manager) and
+includes the very nice ability to move windows into and out of the
+panner.  It should be noted that none of this code came from the vtwm
+implementation.  If you have problems and/or patches you can email me
+at the address at the end of this file.
+
+If we look at different implementations of the Virtual Desktop, I think
+we can relate them to soft drinks:
+
+swm   - Classic Coke  "The Real Thing"
+tvtwm - Diet Coke     "Same as Coke but not as sweet"
+vtwm  - Diet Pepsi    "Not as sweet as Coke, some people may
+		       prefer it to any flavor of Coke"
+
+There are pros and cons to the vtwm and swm/tvtwm implementations.  Most
+revolve around whether or not to use an additional window for the
+scrolling desktop or to simply move windows around on the actual
+root window.
+
+vtwm moves windows on the actual root window, swm/tvtwm use an
+additional window to perform the scrolling.
+
+Pros:
+  vtwm    Simple to implement.
+          Programs like xsetroot continue to work.
+
+  tvtwm   Half the network traffic when the desktop scrolls,
+	    only a ConfigureNotify event has to be sent.
+	  Faster scrolling of the desktop.
+	  Desktop background image will actually scroll.
+	  Opens the door for possible multiple Virtual Desktop
+	    windows.
+Cons:
+  vtwm	  Twice as much network traffic when the desktop scrolls,
+	    each window has to be moved and then a ConfigureNotify
+	    event must be sent.
+	  Slower scrolling of the desktop.
+	  Desktop background image does not scroll.
+
+  tvtwm	  Programs like xsetroot no longer work, additional work
+	    needs to be done to find the Virtual Desktop window.
+	  Programs that attempt to find the size of the window
+	    manager decoration may fail if the traverse the window
+	    tree until they run into the actual root window.
+
+The ICCCM states that more work needs to be done in the area of
+virtual root windows, so there isn't any clear answer on the right
+way to implement this feature.  Having said that, let me describe
+how I've butchered the code, what currently doesn't work, what would
+be nice if it worked, etc.
+
+1. First a description of how the panner works.  Basically,
+   mouse button 1 allows you to change your position in the
+   desktop.  Mouse button 2 allows you to drag any of the
+   small "virtual" windows.  During a window move operation
+   you can move the pointer into and out of the panner.
+   Resizing the panner will of course resize the desktop.
+
+2. I completely re-wrote the window move code.  In menus.c I 
+   simply commented out the window move code that is there and
+   didn't touch any code related to window moves in events.c.
+   The new window move code is in a new file called move.c.
+
+3. Rather than the f.nail and "NailedDown" features of vtwm, tvtwm
+   uses the same terminology as swm.  In tvtwm, windows that do
+   not move when the desktop is panned are called "sticky" windows.
+   There is a command called f.stick and a "Sticky" list of windows
+   that will be sticky when started.  Sticky windows used to always
+   be physically above non-sticky windows.  This is no longer the case 
+   but if you have gotten used to it, you can place the "StickyAbove"
+   keyword in your .{tv}twmrc file.  The sticky-ness of a window is
+   remembered during an f.restart if RestartPreviousState is set.
+
+4. USPosition vs. PPosition - When a window has USPosition hints
+   set, the window will be positioned at that exact pixel location.
+   When PPosition hints are set, the window will be positioned at 
+   the pixel location plus the current offset of the Virtual Desktop.
+   For example, if the desktop has been panned to +200+500 and 
+   a window is mapped with PPosition +100+100, the window will be
+   positioned at +300+600 on the desktop.
+
+5. How does the icon gravity stuff work in relation to different areas
+   of the Virtual Desktop?  I don't know, and I don't really have the
+   time to look into the problem.  It might be nice to have separate icon
+   regions in different quadrants of the Virtual Desktop.  If you use
+   icon managers and make them sticky then you don't have any problems.
+
+6. The initialization files .tvtwmrc.<screen number> and .tvtwmrc will
+   be attempted before .twmrc.<screen number> .twmrc.
+
+
+New Variables:
+
+VirtualDesktop "WIDTHxHEIGHT"
+  This variable simply specified the initial size of the Virtual Desktop.
+  Specifying this variable enables the Virtual Desktop feature.
+  Why didn't I use the same syntax as vtwm and also specify the panner
+  scale and geometry?  I don't know, lazy I guess.
+
+VirtualDesktopBackgroundPixmap "filename"
+  The pixmap image to display as the background of the Virtual Desktop window.
+
+VirtualDesktopBackground "color"
+  The background color of the VirtualDesktop window.  If
+  VirtualDesktopBackgroundPixmap is not set, the VirtualDesktop will have a
+  solid background of this color.
+
+VirtualDesktopForeground "color"
+  This color is only used if VirtualDesktopBackgroundPixmap is set.
+
+VirtualForeground "color" [ { window list } ]
+  Specifies the foreground color for the small virtual panner windows.
+
+VirtualBackground "color" [ { window list } ]
+  Specifies the background color for the small virtual panner windows.
+
+VirtualFont "5x8"
+  The font to use when ShowVirtualNames is specified.
+
+ShowVirtualNames
+  This causes the window name to be displayed in the small virtual
+  panner window.  The VirtualFont is used to display the name.
+
+PannerGeometry "+-X+-Y"
+  Specifies the geometry at which the panner is to be placed.  The
+  default is "-0-0".
+
+PannerState "state"
+  This specifies the initial state of the panner.  Possible values
+  include "withdrawn", "iconic", and "normal".  The default state
+  is "normal".
+
+PannerScale scale
+  This specifies the scale of the panner.  The default number is 20.
+
+PannerBackgroundPixmap "filename"
+  The pixmap image to display as the background of the panner window.
+
+PannerBackground "color"
+  The background color of the panner window.  If PannerBackgroundPixmap
+  is not set, the panner will have a solid background of this color.
+
+PannerForeground "color"
+  This color is only used if PannerBackgroundPixmap is set.
+
+ScrollDistanceX	percentage
+ScrollDistanceY percentage
+  The percentage of the display width/height to move for the f.scroll
+  commands
+
+Sticky { window list }
+  A list of windows that will come up in a sticky state.
+
+StickyAbove
+  Causes sticky windows to always be physically above non-sticky windows.
+
+NoIconTitle [ { window list } ]
+  Specifies that no titles should be displayed below icons.  If the
+  optional window list is present then only those clients will
+  not have icon titles.
+
+IconTitle { window list }
+  Specifies a list of clients that will have icon titles.  Useful
+  when NoIconTitle has been specified alone.
+
+New Commands:
+
+f.panner		- toggle making the panner visible
+f.scroll "position"	- scroll to a specific position
+f.scrollhome		- scroll the desktop to 0,0
+f.scrollup		- scroll the desktop up ScrollDistanceY
+f.scrolldown		- scroll the desktop down ScrollDistanceY
+f.scrollleft		- scroll the desktop left ScrollDistanceX
+f.scrollright		- scroll the desktop right ScrollDistanceX
+f.scrollback		- scroll back to the previous location
+f.panup			- same as f.scrollup
+f.pandown		- same as f.scrolldown
+f.panleft		- same as f.scrollleft
+f.panright		- same as f.scrollright
+f.stick			- toggle making a window sticky or not
+
+
+A version of xsetroot, called ssetroot has been included as an
+example of how to find the Virtual Desktop window.
+
+--
+Tom LaStrange
+Solbourne Computer Inc.    ARPA: toml@Solbourne.COM
+1900 Pike Rd.              UUCP: ...!{boulder,sun}!stan!toml
+Longmont, CO  80501
+
+--------------------------------------------------------------------
+
+
+Things not added by Tom, bugs in them aren't his fault:
+
+Shaped Icons:
+
+  There are two implementations of icon shaping in this release of tvtwm.
+I will explain them both in this section, though the second is *much*
+easier to comprehend, and I advise ignoring the first icon-shaping
+description.  Though both are active in the code, and functional, the
+existence of the built-in shaping in Xpm format pixmaps makes that
+the obviously simpler way to do things.  I have added this code, so that
+Xpm format pixmaps with built-in shape masks work, but have yet to remove
+the old code for shaped icons, as described in the next paragraph.
+	*** Important!! ***
+  I *do* intend to remove this code.  You can, if you want, utilize this
+form of icon-shaping, but later releases of tvtwm will likely not continue
+to support it.
+
+(Old, 3-bitmap, method):
+  Shaped icons have 3 parts, one of which is optional.  The first part is
+the image.  It is a normal icon, so you can use any of the ones you had all
+along.  The second part is the clip.  tvtwm will look for a file of the
+format "<filename>clp" where <filename> is the name of the bitmap to be
+used as an icon.  A file followed by "clp" is a clip file for that icon.
+In this file, if a pixel is "on", the pixels in the image will be taken;
+and where the pixel is "off", the pixels from the mask (described below)
+will be placed.  The third and optional part is the mask.  Masks are
+searched for in the bitmapFilePath, as are the clip files, and are found by
+the iconname plus "msk".  Pixels set to "on" in the mask and "off" in the
+clip are drawn in the IconBorderColor, pixels set to "off" in the mask and
+"on" in the clip are "holes" (whatever is under the icon will show through,
+and button presses there will go to the window under the icon (normally the
+root window)).  The setting of a mask pixel where that clip pixel is "on"
+is ignored.  If you don't give a mask, one will be created for temporary
+use.  The mask that tvtwm creates will be two pixels wider then the clip
+(i.e. a two pixel border).  It is often easier to let tvtwm generate the
+mask file, but that is up to your personal preference, and to the specific
+icon in question.  All 3 parts must be bitmaps of the same height and width
+(even if the mask is automagicly created, it will not be created larger
+then the other two parts).
+
+(New, better, shaped Xpm method):
+  The current version of the Xpm library supports built-in shape masks.
+For a detailed description of how XPM works, please look at the
+documentation provided with Xpm.  Xpm should be available in it's current
+form (which is required for this release of tvtwm.  Version 3.0 (4-Oct-91)
+or higher.) on the R5 contrib tape, or if it's not, it can be obtained at
+either export.lcs.mit.edu or avahi.inria.fr.  To detail how to use Xpm's
+built in shaping support, I will tell you the little you need to know in
+particular.  If you have an xpm format pixmap file in a directory which is
+in your *bitmapFilePath X resource, then you can simply load the pixmap as
+"filename", just as you are used to doing with Xbm format bitmaps.  If the
+file you specify can be found, and is a valid Xpm format file, then it will
+be read.  If you have pixels in the pixmap defined as color "None", then a
+shape mask will be returned by the Xpm read functions, and tvtwm will use
+such a returned mask as an icon shape-mask.  The result of which, is shaped
+icons.  I will provide a few Xpm format icons in the icons/ directory.  If
+you simply move one or more of these files into a directory which is an
+element of your *bitmapFilePath, then specify them as icons in your .twmrc
+file, you can see for yourself how they work.  Also, I will include a
+couple sample titlebar button Xpm pixmaps.  These are all pixmaps which I
+use regularly, and have grown fond of.  I hope you find them as enjoyable.
+
+M4:
+
+  Your .twmrc file is fed to m4 before being parsed by tvtwm.  Taking this
+approach to configuration is useful for keeping centrally maintained menus,
+making your setup work regardless of variables such as display size, and
+(though not at the moment) controlling who sees what of the .twmrc setup
+files.  To help you make use of m4, and to give you something to program
+around, the following symbols are defined by tvtwm:
+
+  SERVERHOST, CLIENTHOST, HOSTNAME, USER, HOME, VERSION, REVISION,
+  VENDOR, RELEASE, WIDTH, HEIGHT, X_RESOLUTION, Y_RESOLUTION, 
+  PLANES, BITS_PER_RGB, TWM_TYPE, CLASS, and COLOR.
+
+  For detailed explanations of what each of the above declarations is
+useful for, and what they are set to, look under M4 PREPROCESSING in the
+man page.
+
+Useful tricks with M4:
+
+# Use different pictures on color and black & white screen:
+ifelse(PLANES, 1, `
+VirtualDesktopBackgroundPixmap  "/homes/elves/lib/rasters/space.rast"
+PannerBackgroundPixmap "/homes/elves/lib/rasters/space2.xbm"',
+`VirtualDesktopBackgroundPixmap  "/homes/elves/lib/rasters/space.color.gif"
+PannerBackgroundPixmap "/homes/elves/lib/rasters/space2.xpm"')
+
+# Centrally maintained menus:
+include(/local/skel/X/twm-logins)
+
+# Place icons on the lower half and right third of the screen:
+define(IRegion, translit(eval(WIDTH/3)*eval(HEIGHT/2)+eval(WIDTH-WIDTH/3)-0, *, x))
+IconRegion  "IRegion" SOUTH EAST 75 25
+
+# Create menus on the fly (possibly dependent on machine, lab, or arch):
+define(`TMPFILE', maketemp(`/tmp/twigm4XXXXXX'))
+syscmd(`sh /local/software/bin/twig.twm.sh >' TMPFILE)
+menu "Automagic"
+{
+"Magic" ("ivory1":"ivory4") f.title
+include(TMPFILE)
+syscmd(`rm' TMPFILE)
+}
+
+# Capitalize host name for use in window titles:
+define(LOWER_CASE,abcdefghijklmnopqrstuvwxyz)
+define(UPPER_CASE,ABCDEFGHIJKLMNOPQRSTUVWXYZ)
+"New Window"                    !"xterm -geometry 80x24 -T 'translit(substr(SERV
+ERHOST,0,1),LOWER_CASE,UPPER_CASE)`'substr(SERVERHOST,1)' &"
+
+
+XPM Support:
+
+  This version of tvtwm has support for X Pixmaps.  By using X Pixmaps, you
+can get multi-color (meaning more than just the foreground and background
+colors.  I personally have some 16 or 32 color icons now...) icons,
+titlebar buttons, and panner backgrounds.  This code is conditional.  If
+you simply comment out the two lines in the Imakefile which set the -DXPM
+and the location for the Xpm library, it will compile cleanly without
+support for Xpm's.  To get this support, you must have the header file and
+library for Xpm.  This release of tvtwm needs Xpm v3.0 (4-Oct-91) or
+higher, which can be found on the R5 contrib tape, or can be obtained via
+anonymous ftp from export.lcs.mit.edu or avahi.inria.fr.  Once you have
+this installed on you system, you can use the Xpm code.  When running tvtwm
+with Xpm support, tvtwm will search along bitmapFilePath (defined in your
+.Xdefaults) for Xpm pixmaps.  (Note:  tvtwm will *not* load Xpm version 1
+pixmaps, or version 2 pixmaps other than C format.  What the Xpm library
+will and won't load is not up to me, and may change.  I suggest trying to
+use strictly XPM v3 format pixmaps.  If you have other versions, there are
+converter scripts available.)  When it finds a bitmap/pixmap with the
+correct file name, it will try to load it as an Xpm.  If this fails, it
+will attempt to load the same file as a standard bitmap.  So, you can keep
+bitmaps and they will work just as well as they have in previous versions
+of tvtwm, but if you choose to, you can switch them to pixmaps.  Both will
+work.  As is, it does a fairly good job of falling back to reading it as an
+xbm file.
+
+  Right now, tvtwm is modified to use either pixmaps or bitmaps for icons,
+titlebar menu buttons, or the background of the panner window.  And,
+actually, there is Xpm code for loading the VirtualDesktopBackgroundPixmap,
+too, but assuming you use the XLOADIMAGE def (explained below), I don't
+think you'll ever care that the Xpm code is there.  It will only get
+compiled if notdef XLOADIMAGE.  In theory, there could be code added to
+display pixmaps in other places as well, but we didn't see anything else
+that needed it.  I hope to be adding it to the pullright pixmap soon, and
+maybe in a couple of the built-in pixmaps, but I'm not sure there is reason
+for it.  If anyone has any suggestions, please feel free to mail me and let
+me know.
+
+Xloadimage for desktop background:
+
+  I have modified tvtwm slightly so that if you choose to compile it to do
+so (which I recomment heartily), it will fork() and exec() the xloadimage
+program (written by Jim Frost  <jimf@saber.com>).  Tvtwm creates a
+"virtual" root window over top of the real root window, and the will load a
+bitmap onto it automatically.  With this modification, you can now specify
+VirtualDesktopBackgroundPixmap to be an image of nearly any format.  Any
+format that xloadimage supports.  xloadimage can load gif's, rasterfiles,
+xbm's, and many other common graphic types.  This makes it much easier to
+load a colorful or large file, and have it be stored in the smallest
+possible format, as xloadimage also knows how to load compressed (.Z)
+files.
+
+  xloadimage is available from export.lcs.mit.edu and most other common ftp
+sites.  It may well be on the R5 contrib tape, but I am not sure of this.
+
+  Side note:  With tvtwm createing it's "virtual" root window, many
+programs that try to look for the root window (editres, xwd, xsetroot) will
+not work as expected.  To fix many of these problems, there is a vroot.h
+header file that has been made available by Andreas Stolcke
+<stolcke@ICSI.Berkeley.EDU>, which redefines all of the standard X macros
+for the root window (RootWindow(), RootWindowOfScreen(), and
+DefaultRootWindow()).  Most programs can be fixed by including the header
+file after Xlib.h in the source code.  As for xsetroot, there is a program
+named ssetroot which is included with this distribution which is a complete
+superset of xsetroot.  If you would like to do so, you can uncomment the
+line in the Imakefile that instructs the make to install this program over
+top of your xsetroot program.  In most cases, this is advised.  There is
+little or no reason to keep both copies.
+
+New Functions:
+
+  In this version of tvtwm, there are also a few extra functions.  Most
+of these are simply override options, to perform a function without
+having to explicitly ask for it.  For example, if you want to assign
+a button to perform an opaque move, even if OpaqueMove isn't set, then
+you can bind that button to f.opaquemove, instead of f.move.  The new
+functions are as follows:
+
+  f.constrainedmove	Does a constrained move without need to double click.
+
+  f.opaquemove		Opaque move even when OpaqueMove is deactivated.
+
+  f.relativeresize	Do a relative resize without need to double click.
+
+
+  I hope you enjoy tvtwm, and I hope that I have helped in such.  If you
+have any questions/comments/etc, please mail me at cross@eng.umd.edu.
+Best wishes.
+
+                                 - Chris P. Ross
+
+--
+Chris P. Ross                         University Of Maryland
+cross@eng.umd.edu                     Engineering Computer Facility
+Work#: (301)/405-3689                 Project GLUE
