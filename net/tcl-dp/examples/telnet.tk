@@ -1,0 +1,26 @@
+if {$argc != 2} {
+    puts stderr "Usage: $argv0 server ?port?"
+    exit
+}
+
+set server [lindex $argv 0]
+set port [lindex $argv 1]
+
+proc get_remote {mode fid} {
+    # Check if remote connection was closed on us
+    set input [dp_receive $fid]
+    if {$input == ""} {
+	puts stdout "Connection closed by foreign host."
+	exit
+    }
+    puts stdout $input nonewline
+}
+
+proc get_local {remote mode fid} {
+    gets stdin input ;
+    dp_send $remote $input
+}
+
+set remote [lindex [dp_connect $server $port] 0]
+dp_filehandler $remote r get_remote
+dp_filehandler stdin r "get_local $remote"

@@ -1,0 +1,194 @@
+if {[string compare test [info procs test]] == 1} then {source defs}
+
+# source tests/defs
+
+#
+# Determine a port number 
+#
+set S_PORT [dp_MakeRPCServer 0]
+close file3
+incr S_PORT 10
+
+#
+# Setup: Start a server as another process, and use it to connect.
+#
+exec $argv0 -notk -f server $S_PORT &
+dp_after 2000
+
+proc ignore args {}
+
+proc MakeInetAddr {name} {
+    set addr [dp_address create $name 0]
+    set x [dp_address info $addr]
+    dp_address delete $addr
+    lindex $x 0
+}
+set hostname [exec hostname]
+set hostinet [MakeInetAddr $hostname]
+
+#------------------------------------------------------------------------------
+#
+# Connectivity tests
+#
+test rpc-1.2 {creation of rpc client using hostname} {
+    list [catch {dp_MakeRPCClient $hostname $S_PORT} msg] $msg
+} {0 file3}
+
+test rpc-1.3 {creation of rpc client using internet address} {
+    list [catch {dp_MakeRPCClient $hostinet $S_PORT} msg] $msg
+} {0 file4}
+
+#------------------------------------------------------------------------------
+#
+# Basic message passing tests
+#
+test rpc-2.1 {Basic message passing} {
+    dp_RPC file3 set argv
+} $S_PORT
+
+test rpc-2.2 {basic error handling} {
+    list [catch {dp_RPC file3 set a} msg] $msg
+} {1 {can't read "a": no such variable}}
+
+test rpc-2.3 {timeout routines} {
+    list [catch {dp_RPC file3 -timeout 50 dp_after 1000} msg] $msg
+} {1 {dp_RPC timed out on file3}}
+
+proc errorTest {file} {
+    return "Caught error on $file"
+}
+
+test rpc-2.4 {timeout routines} {
+    list [catch {dp_RPC file3 -timeout 50 \
+			  -timeoutReturn errorTest dp_after 1000} msg] $msg
+} {0 {Caught error on file3}}
+
+#------------------------------------------------------------------------------
+#
+# RDO tests
+#
+
+test rpc-3.1 {Basic RDO} {
+    dp_RPC file3 catch {unset a}
+    dp_RDO file3 set a rpc-3.1;
+    dp_RPC file3 set a
+} rpc-3.1
+
+test rpc-3.2 {Basic RDO with callback} {
+    set rdoResults 0
+    dp_RDO file3 set a rpc-3.2
+    dp_RDO file3 -callback "set rdoResults" set a
+    dp_RPC file3 set a synchronize
+    set rdoResults
+} rpc-3.2
+
+test rpc-3.3 {Multiple RDOs, each with callback} {
+    set RDO1 0
+    set RDO2 0
+    dp_RDO file3 -callback "set RDO1" set a 3.3a
+    dp_RDO file3 -callback "set RDO2" set a 3.3b
+    dp_RPC file3 -events all set a synchronize
+    list $RDO1 $RDO2
+} {3.3a 3.3b}
+
+test rpc-3.4 {Basic RDO error handling} {
+    set RDOerr 0
+    dp_RPC file3 unset a
+    dp_RDO file3 -onerror "set RDOerr" set a
+    dp_RPC file3 set a synchronize
+    set RDOerr
+} {can't read "a": no such variable}
+
+test rpc-3.5 {Basic RDO error generation (error will crash test)} {
+    dp_RPC file3 unset a
+    catch {dp_RDO file3 set a}
+} 0
+
+test rpc-3.6 {RDO error handling for multiple RDO's} {
+    set RDOerr1 rpc-3.6a
+    set RDOerr2 rpc-3.6b
+    dp_RDO file3 unset a
+    dp_RDO file3 unset b
+    dp_RDO file3 -onerror "set RDOerr1" set a
+    dp_RDO file3 -onerror "set RDOerr2" set b
+    dp_RPC file3 set a synchronize
+    list $RDOerr1 $RDOerr2
+} {{can't read "a": no such variable} {can't read "b": no such variable}}
+
+test rpc-3.7 {RDO callback handling for multiple RDO's} {
+    set RDO1    rpc3.7a
+    set RDO2    rpc3.7b
+    dp_RDO file3 set a rpc3.7c
+    dp_RDO file3 unset b
+    dp_RDO file3 -callback "set RDO1" set a
+    dp_RDO file3 -callback "set RDO2" set b
+    dp_RPC file3 set a synchronize
+    list $RDO1 $RDO2
+} {rpc3.7c rpc3.7b}
+
+test rpc-3.8 {Mixed RDO error and callback handling for multiple RDO's} {
+    set RDOerr1 rpc3.8a
+    set RDOerr2 rpc3.8b
+    set RDO1    rpc3.8c
+    set RDO2    rpc3.8d
+    dp_RDO file3 set a hello
+    dp_RDO file3 unset b
+    dp_RDO file3 -callback "set RDO1" -onerror "set RDOerr1" set a
+    dp_RDO file3 -callback "set RDO2" -onerror "set RDOerr2" set b
+    dp_RPC file3 set a synchronize
+    list $RDOerr1 $RDOerr2 $RDO1 $RDO2
+} {rpc3.8a {can't read "b": no such variable} hello rpc3.8d}
+
+test rpc-3.9 {mixed RPC and RDO with timeout} {
+    set RDO1    rpc3.9a
+    set RDO2    rpc3.9b
+    dp_RDO file3 -callback "set RDO1" set a rpc3.9c
+    set rv1 [catch {dp_RPC file3 -timeout 50 dp_after 1000} msg1]
+    dp_RDO file3 -callback "set RDO2" set a rpc3.9d
+    set rv2 [catch {dp_RPC file3 set a rpc3.9e} msg2]
+    list $rv1 $rv2 $RDO1 $RDO2 $msg1 $msg2
+} {1 0 rpc3.9c rpc3.9d {dp_RPC timed out on file3} rpc3.9e}
+
+
+#------------------------------------------------------------------------------
+#
+# Shutdown protocol tests
+#
+test rpc-4.1 {proper closing one end of an RPC} {
+    catch {close file3}
+} 0
+
+test rpc-4.2 {check dp_atexit list} {
+    dp_atexit list
+} {{close file4}}
+
+test rpc-4.3 {proper closing another end of an RPC} {
+    set remFile [dp_RPC file4 set rpcFile]
+    catch {dp_RDO file4 close $remFile}
+} 0
+
+test rpc-4.4 {improper closing another end of an RPC} {
+    set f [dp_MakeRPCClient $hostname $S_PORT]
+    set remFile [dp_RPC $f set rpcFile]
+    list [catch {dp_RPC $f close $remFile} msg] $msg
+} {1 {Error receiving RPC on file3 -- Closing connection}}
+
+catch {close file4}
+
+test rpc-4.5 {check dp_atclose list} {
+    list [dp_atclose file3 list] [dp_atclose file4 list]
+} {{} {}}
+
+dp_MakeRPCClient $hostname $S_PORT
+
+test rpc-4.6 {check server crashing} {
+    list [catch {dp_RPC file3 exit} msg] $msg
+} {1 {Error receiving RPC on file3 -- Closing connection}}
+
+test rpc-4.7 {check number 2 of server closure} {
+    list [catch {dp_MakeRPCClient $hostname $S_PORT} msg] $msg
+} [list 1 "Couldn't open connection to $hostname:$S_PORT : Connection refused"]
+
+test rpc-4.8 {check server crashing} {
+    list [catch {close file3} msg] $msg
+} {1 {file "file3" isn't open}}

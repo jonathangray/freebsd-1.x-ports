@@ -1,0 +1,98 @@
+Tcl-DP, Version 3.0
+December 11, 1993
+
+This is to announce the official release of Tcl-DP, version 3.0.  You
+can get Tcl-DP 3.0 from mm-ftp.cs.berkeley.edu [128.32.149.117] in the
+/pub/multimedia/Tcl-DP directory.  The rest of this file describes the
+major changes since version 2.0.
+
+This version of Tcl-DP constitutes the first major rewrite of the code
+since I first released it.  This file describes the major new features
+in this release.  These changes address three parts of Tcl-DP:
+installation, robustness, and security.
+
+The first, most visible change is in the installation procedure.  I
+used the GNU autoconfigure utility to generate configuration files, so
+the installation procedure is nearly identical to that of Tcl and Tk.
+Moreover, the Tcl-DP scripts now reside in their own directory,
+typically /usr/local/lib/dp.  The procedure is the same as used in Tk:
+the dp_library stores the location of the Tcl-DP scripts, and the
+compiled in value of this variable can be over-ridden by setting the
+DP_LIBRARY environment variable.
+
+For increased robustness, I added the dp_atclose command, added
+exception handling routines to RDO, corrected problems in the
+distributed object system, and constructed a test suite for Tcl-DP
+similar to the test suite used in Tcl and Tk.
+
+Dp_atclose is another feature useful for bulletproofing applications.
+Dp_atclose maintains a list of tcl clean up commands that are executed
+when a file or socket closes (either locally or because a connection
+died).  Dp_atclose allows both clients and servers to clean up
+associated data structures when connections die unexpectedly.
+Dp_atclose and dp_atexit are entirely implemented in Tcl.
+
+RDO commands now trap errors in remote processing via the
+"-onerror" flag, which can be used to specify a callback that takes
+the error message from the remote invocation as a parameter.  For
+backwards compatibility, the default action when an error occurs in an
+RDO is to ignore the error.
+
+Distributed objects are more robust than before, both in the handling
+of unexpected events (e.g., connections dying) and the handling of an
+objects being distributed multiple times.  Should a connection die,
+objects whose origin was on the far side of the breached connection are
+automatically cleaned up.  Should an object be distributed multiple
+times, a reference count is increment if both copies comes from the
+same process, and an error is triggered if the copies come from
+different processes (i.e., a name conflict).
+
+In the "tests" subdirectory, you'll find many test cases (82) that test
+the robustness of file handlers, objects, connection management Tcl-DP,
+and the UDP library.  You can try them out by running "make test" in
+this directory, or by starting dpwish in the tests directory and
+entering the command "source all."  It may not be a perfect test suite,
+but it's a start.  If there are any cases I've missed, I'd appreciate
+hearing about them.
+
+Two security features have been added to Tcl-DP.  One is an xhost type
+mechanism that allows you to authorize certain hosts to connect.  Hosts
+are added to the access control list by the dp_Host command.  The hosts
+that are permitted to connect (or not) can be specified either using
+the host name (e.g., "dp_Host -toe.cs.berkeley.edu" prevents toe from
+connecting) or wildcards using the internet address (e.g., "dp_Host
++128.32.149.*" allows anyone on the specified subnet to connect).  The
+access control mechanism is written entirely in Tcl, so you can replace
+or augment it if doesn't meet your needs.
+
+The second security feature allows servers to provide a restricted
+command set to clients.  A parameter to dp_MakeRPCServer allows you to
+specify a "Check Function", which is called to verify that the command
+specified in an inbound RPC or RDO call is allowed before the command
+is executed.  The check command can choose to abort the RPC, with or
+without an error, or allow continued processing of the RPC (and
+optionally check nested commands).  See the dp_SetCheckCmd entry in the
+dp_rpc manual page for more details.
+
+Finally, I've made a few other random changes that folks might find
+useful.  A new command, "dp_socketOption," allows some socket options
+(e.g., buffer size) to be set and read.  The "dp_isready" command can
+be used to check whether a socket is readable or writeable.  And the
+transmission commands now have support for non blocking I/O.
+
+The last change was the addition of a set of commands for manipulating
+triggers on changes to distributed objects.  See the dp_AppendTrigger,
+dp_AppendTriggerUnique, dp_ReleaseTrigger, dp_ClearTriggers, and
+dp_GetTriggers entries in the dp_distribObj manual page for more
+details.
+
+Many people have helped put this together, but two people deserve
+special recognition.  Lou Salkind (Lou-Salkind@deshaw.com) and Lindsay
+Todd from Rensselaer Polytechnic Institute contributed many of the
+features in this version.
+
+If anyone has any comments on Tcl-DP, ideas for improvements, features
+you'd like to see added, etc. I'd love to hear them.  E-mail them
+to tcl-dp@roger-rabbit.cs.berkeley.edu.  Enjoy!
+
+Brian Smith (bsmith@cs.Berkeley.EDU)

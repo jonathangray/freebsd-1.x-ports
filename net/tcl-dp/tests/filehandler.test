@@ -1,0 +1,39 @@
+if {[string compare test [info procs test]] == 1} then {source defs}
+
+proc ignore args {}
+
+set src [lindex [dp_connect -udp 2349] 0]
+set dest [lindex [dp_connect -udp 2350] 0]
+set addr [dp_address create [exec hostname] 2350]
+
+proc RecvPacket {mode file} {
+    global recvData
+    set recvData [lindex [dp_receiveFrom $file] 1]
+}
+
+proc RecvPacket2 {mode file} {
+    global recvData2
+    set recvData2 [lindex [dp_receiveFrom $file] 1]
+}
+
+test filehandler-1.0 {test of filehandler read routines for udp} {
+    set recvData ""
+    dp_filehandler $dest r RecvPacket
+    dp_sendTo $src first $addr
+    dp_sendTo $src filehandler-1.0 $addr
+    dp_update
+    set recvData
+} filehandler-1.0
+
+test filehandler-1.1 {test of switching filehandler callback} {
+    set recvData ""
+    set recvData2 ""
+    dp_filehandler $dest r RecvPacket2
+    dp_sendTo $src filehandler-1.1 $addr
+    dp_update
+    list $recvData $recvData2
+} {{} filehandler-1.1}
+
+dp_filehandler $dest
+close $src
+close $dest

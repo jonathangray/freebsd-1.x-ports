@@ -1,0 +1,227 @@
+Compatible with Tcl 7.3 / Tk 3.6.  Not compatible with earlier versions.
+
+1. Small robustness changes to the Makefile to improve installation.
+   (courtesy Lou-Salkind@deshaw.com)
+
+2. Bug fix: Replaced call in to "filehandler" in dprpc.c with calls to
+   "dp_filehandler." (courtesy Lou-Salkind@deshaw.com)
+
+3. Added dp_socketOption command to allow some socket options to be set
+   and read.  This command can be used to support non-blocking I/O.
+
+4. Renamed atexit and atclose to dp_atexit and dp_atclose, moved the
+   implementation of these functions into tcl, and added commands to
+   examine the current list of atclose or atexit clenup functions.
+   See the dp_atexit and dp_atclose manual pages for details.
+   For backwards compatibility:
+	1. change all calls of the form
+	      atexit <args>
+	   to
+	      dp_atexit append <args>
+
+	2. change all calls of the form
+	      atclose <file> <args>
+	   to
+	      dp_atexit <file> append <args>
+   *** POTENTIAL INCOMPATIBILITY ***
+    
+
+5. Removed dputil.c and the library it created, libdputil.a, since
+   Most of this file implemented the atexit function.  All other
+   functions are now in libdpnetwork.a.  For backwards compatibility,
+   delete all references to libdputil.a in your Makefiles.
+   *** POTENTIAL INCOMPATIBILITY ***
+
+6. Made port parameter to dp_MakeRPCServer optional.  The default value
+   is 0, which means the system selects the port number.
+
+7. Added -onerror flag to dp_RDO to report errors.  See the dp_rpc
+   manual page for details.
+
+8. Fixed several bugs associated with RPC timeouts.  This includes bugs
+   associated with timeout commands and timeout implementation.  Other
+   bugs include the proper flushing of return values from a timed-out
+   RPC call.
+
+9. Changed default value for -events in RPC calls with a timeout to be
+   timer events, since this was essential for the implementation.  In
+   the past, if "-events" was not specified, the timeout was ignored.
+   For backwards compatibility:
+   1. Change all calls to the form
+	dp_RPC <file> -timeout <arg1> <args>
+      to
+	dp_RPC <file> <args>
+   *** POTENTIAL INCOMPATIBILITY ***
+
+10. Added the "dp_isready" command to check whether a socket has
+    input pending, or whether the buffer has cleared so it can be written.
+    This is useful for checking the input on a file without going back
+    into the event loop, and for non-blocking sends of large amounts of
+    data.
+
+11. Built testing suite for Tcl-DP.  See the tests directory.
+
+12. Added dp_library and dp_version variables.  Dp_library can be 
+    also be set as an environment variable.
+
+13. Made a seperate dp library for Tcl-DP.  If the tcl initialization
+    scripts are installed in /usr/local/lib/tk, the tk initialization
+    scripts will usually go in /usr/local/lib/dp.
+
+14. Changed dp_accept to return two values: the newly created socket
+    (as before), and the internet address of the conencting party.
+    This change was necessary to allow only a restrcited set of clients
+    to connect.  For backwards compatibility:
+    1. Change all call of the form
+	 dp_accept <file>
+       to
+	 lindex [dp_accept <file> 0]
+    *** POTENTIAL INCOMPATIBILITY ***
+
+15. Unified namespace so all commands are preceded by "dp_".  Several
+    slipped through on the list try -- I think I've caught them all this
+    time.  Note the this includes all the distributed object commands,
+    the procedural object commands, and the service commands.
+    *** POTENTIAL INCOMPATIBILITY ***
+
+16. Changed dp_SetTrigger to take a "before" or "after" as the first argument,
+    indicating the trigger should be evaluated before or after the change
+    takes place.  
+    For backwards compatibility, change all calls of the form
+	SetTrigger <args>
+    to
+	dp_SetTrigger after <args>
+    *** POTENTIAL INCOMPATIBILITY ***
+
+17. Added several functions for manipulating lists of triggers:
+    dp_AppendTrigger, dp_AppendTriggerUnique, dp_ReleaseTrigger,
+    dp_ClearTriggers, dp_GetTriggers.  See the dp_distribObj manual
+    page for more details.
+
+18. Removed RPROC.  Use proc instead.  For backwards compatibility, change
+    all calls of the form
+	RPROC <args>
+    to
+	proc <args>
+    *** POTENTIAL INCOMPATIBILITY ***
+
+19. Removed dp_send and dp_receive, since they provided a subset of the
+    functionality of puts and gets.  Use puts and gets instead.  I'd be
+    interested in hearing about any cases where this dowsn't work.  For
+    backwards compatibility, change all calls of the form
+	dp_send <args>
+    to
+	puts <args>
+    and
+	dp_receive <args>
+    to
+	gets <args>
+
+    *** POTENTIAL INCOMPATIBILITY ***
+
+20. (bug fix) Changed dp_DistributeObject to signal an error if an
+    object is distributed that already exists on the remote
+    interpreter.  In previous releases, the new object overwrote the
+    old object without telling the owner of the old object.
+
+21. (bug fix) Changed dp_DistributeObject and dp_UndistributeObject
+    to keep reference counts when distributing objects.  Previous
+    versions did not do this, so code had to cooperate when a single
+    object was distributed several times.
+
+22. (bug fix) Changed distributed object system to automatically
+    destroy distributed objects when a connection dies.
+
+23. (new feature) Added access control list functions dp_Host for
+    login security.  The mechanism is similar to xhost, with pattern
+    matching of ip addresses allowed.  For example, the command
+	"dp_Host +128.32.149.*"
+    will allow any host on the 128.32.149 subnet to connect.
+
+24. (new feature) Created the dp_SetCheckCmd function, which allows
+    any inbound RPC or RDO requests to be passed through a command
+    checking filter before evaluation.  This features allows a
+    primitive form of security.
+
+25. (new feature) Created the dp_update and dp_after commands.  These
+    are exactly the same as the corresponding Tk commands, except they
+    don't require a connection to the X server.  They are needed for
+    the "-notk" mode in dpwish.
+
+26. Removed the "host" parameter from the "dp_connect -server host port"
+    command.  Not only did it not work as intended, but anything other
+    than a blank string or the local hostname caused a failure.  For
+    backwards compatibility, change all calls of the form
+	dp_connect -server host <port>
+    to
+	dp_connect -server <port>
+    *** POTENTIAL INCOMPATIBILITY ***
+
+27. (bug fix) Changed dp_receive and dp_packetReceive to correctly handle
+    partial messages.  This lead to unstable behavior in previous
+    releases.
+
+28. 11/28/93 (new feature) Added -noaddr option to dp_receiveFrom to
+   suppress putting address in return value.  This is considerably
+   more efficient when receiving large amounts of data, since it
+   avoids a data copy.
+
+29. 11/28/93 (bug fix) Fixed typo relating to -peek in dp_receive command.
+
+30. 11/30/93(new feature) Courtesy Lou Salkind <Lou-Salkind@deshaw.com>.
+    Added dp_aitvariable that works like "tkwait variable", but works
+    with "-notk" flag to dpwish.
+
+31. 12/1/93 (port) Courtesy R Lindsay Todd <toddr@rpi.edu>.  Ported to
+    linux.
+
+32. 12/1/93 (bug fix) Changed all calls of sprintf(interp->result... to
+    Tcl_AppendResult.  This was causing strange errors in rpc, when
+    interp->result pointed to a variables value.
+
+33. 12/2/93 (new feature) Added autoClose option to dp_SocketOption to
+    enable/disable automatic cleanup on sockets when they detect a closed
+    connection.  Dp_receive now returns an error if it encounters
+    an eof and auto close is disabled.
+
+34. 12/2/93 (new feature) Courtesy R Lindsay Todd <toddr@rpi.edu>.  New
+    security features.  Check commands associated with an RPC connection
+    now check nested commands.  If the check command returns TCL_OK,
+    then the traced command will be executed normally.  If it returns
+    TCL_CONTINUE, then the traced command will be executed, but any
+    commands it issues will also be traced.  If TCL_RETURN is returned,
+    then the result of the check command is returned as the result of
+    the command.  If TCL_ERROR is returned, the traced command will not
+    be executed, and the error message from the check command will be
+    used as the error message from the traced command.  Any other
+    results of the check command (TCL_BREAK, etc.) will prevent the
+    traced command from being executed, and an error message will be
+    created.
+
+35. 12/2/93 (bug fix) Courtesy R Lindsay Todd <toddr@rpi.edu>.  Changed
+    tkMain.c so that it won't dump core when built with gcc without the
+    -fwritable-strings flag.
+
+36. 12/6/93 (bug fix) Courtesy R Lindsay Todd <toddr@rpi.edu>.  Changed
+    dp_accept to properly return the source address when accepting a
+    connection from a unix-domain socket.
+
+37. 12/6/93 Courtesy R Lindsay Todd <toddr@rpi.edu>.  Made Tcl-DP
+    filehandlers evaluate using Tcl_GlobalEval rather that Tcl_VarEval.
+    This is more consistent with how Tk and addinput work, and gives
+    a more consistent environment for the file handler.
+
+-----------------------------------------------------------------------------
+Version 2.0
+
+Compatible with Tcl 7.0b3 / Tk 3.3b3.  Not compatible with earlier versions.
+
+1. Unified name space: All commands now preceded by "dp_" (e.g., RPC is now
+   "dp_RPC") *** POTENTIAL INCOMPATIBILITY ***
+
+2. Extended name server:  See services directory.  Name server for
+   establishing well behaved RPC connections.
+
+3. dpwish: new -notk and -bg flags. 
+	-notk runs dpwish without windows
+	-bg is used for daemons processing background events

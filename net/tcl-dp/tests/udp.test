@@ -1,0 +1,135 @@
+if {[string compare test [info procs test]] == 1} then {source defs}
+
+#
+# Figure out the processor type. This will give us the
+# default buffer size
+#
+proc machtype {} {
+    case [lindex [exec file /bin/ls] 1] in {
+    COFF {return alpha}
+    s800 {return hp700}
+    mipsel {return dec5000}
+    sparc {return sparc}
+    }
+}
+
+proc UdpSendSize {} {
+    case [machtype] in {
+    alpha	{return 9216}
+    sparc	{return 9000}
+    dec5000	{return 9000}
+    hp700	{return 9216}
+    }
+}
+
+proc UdpRecvSize {} {
+    case [machtype] in {
+    alpha	{return 41600}
+    sparc	{return 18032}
+    dec5000	{return 9000}
+    hp700	{return 9360}
+    }
+}
+
+proc ignore args {}
+
+test udp-1.1 {creation of udp socket with port} {
+    dp_connect -udp 2345
+} {file3 2345}
+
+test udp-1.2 {creation of udp socket without port} {
+    set x [dp_connect -udp 0]
+    set sendPort [lindex $x 1]
+    lindex $x 0
+} file4
+
+proc MakeInetAddr {name} {
+    set addr [dp_address create $name 0]
+    set x [dp_address info $addr]
+    dp_address delete $addr
+    lindex $x 0
+}
+set hostname [exec hostname]
+regexp {[^ ]*$} [exec nslookup $hostname | grep Address] hostinet
+
+test udp-1.3 {Address Information} {
+    global hostinet
+    global hostname
+    string compare $hostinet [MakeInetAddr $hostname]
+} 0
+
+test udp-1.4 {send message between two udp sockets} {
+    set addr [dp_address create $hostname 2345]
+    dp_sendTo file4 "test udp-1.3" $addr
+    set x [dp_receiveFrom file3]
+    list [dp_address info [lindex $x 0]] [lindex $x 1]
+} [list [list $hostinet $sendPort] {test udp-1.3}]
+
+test udp-2.0 {test of dp_socketOption sendBuffer} {
+    dp_socketOption file4 sendBuffer
+} [UdpSendSize]
+
+test udp-2.1 {test of dp_socketOption recvBuffer} {
+    dp_socketOption file4 recvBuffer
+} [UdpRecvSize]
+
+test udp-2.2 {test of dp_socketOption} {
+    dp_socketOption file4 sendBuffer 32000
+    dp_socketOption file4 sendBuffer
+} 32000
+
+test udp-2.3 {test of dp_socketOption} {
+    dp_socketOption file3 recvBuffer 200
+    dp_socketOption file3 recvBuffer
+} 200
+
+test udp-2.4 {send a message between two udp sockets that should be dropped} {
+    set data [format "%300s" "a 300 byte message"]
+    dp_sendTo file4 $data $addr
+    dp_sendTo file4 "A short message" $addr
+    set x [dp_receiveFrom file3]
+    lindex $x 1
+} {A short message}
+
+test udp-2.5 {send a message between two udp sockets that should be dropped} {
+    dp_socketOption file4 sendBuffer 200
+    set data [format "%300s" "a 300 byte message"]
+    list [catch {dp_sendTo file4 $data $addr} msg] $msg
+} {1 {error writing file4: Message too long}}
+
+#-------------------------------------------------------------------------
+#
+# Shutdown tests.  shutdown doesn't work on udp sockets under ultrix.  Sigh.
+#
+if {[string compare [machtype] dec5000] != 0} {
+    test udp-3.1 {null test of dp_shutdown} {
+	dp_shutdown file4 receives
+	dp_shutdown file3 sends
+	dp_sendTo file4 "test udp-1.4" $addr
+	set x [dp_receiveFrom file3]
+	list [dp_address info [lindex $x 0]] [lindex $x 1]
+    } [list [list $hostinet $sendPort] {test udp-1.4}]
+	    
+    test udp-3.2 {test of dp_shutdown for send} {
+	set addr2 [dp_address create $hostname $sendPort]
+	list [catch {dp_sendTo file3 "test udp-1.5" $addr2} msg] $msg
+    } {1 {"file3" wasn't opened for writing}}
+
+    test udp-3.3 {test of dp_shutdown for receiving} {
+	list [catch {dp_receiveFrom file4} msg] $msg
+    } {1 {"file4" wasn't opened for reading}}
+
+    test udp-3.4 {test of invalid dp_shutdown (closed socket)} {
+	close file3
+	list [catch {dp_shutdown file3 both} msg] $msg
+    } {1 {file "file3" isn't open}}
+
+    test udp-3.5 {test of invalid dp_shutdown (non-socket)} {
+	list [catch {dp_shutdown file2 both} msg] $msg
+    } {1 {shutdown: Socket operation on non-socket}}
+
+} else {
+    close file3
+}
+
+close file4

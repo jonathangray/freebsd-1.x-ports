@@ -1,0 +1,177 @@
+if {[string compare test [info procs test]] == 1} then {source defs}
+
+# source tests/defs
+
+#
+# Determine a port number
+#
+set S_PORT [dp_MakeRPCServer 0]
+close file3
+incr S_PORT 10
+
+#
+# Setup: Start a server as another process, and use it to connect.
+#
+exec $argv0 -notk -f server $S_PORT &
+dp_after 2000
+
+proc ignore args {}
+
+set hostname [exec hostname]
+set rhost [dp_MakeRPCClient $hostname $S_PORT]
+
+source point.lib
+
+#-----------------------------------------------------------------
+#
+# Test the point object out
+#
+test object-1.0 {test of object create routine} {
+    MakePoint myPoint;
+} myPoint
+
+test object-1.1 {test of object configure routine} {
+    myPoint configure -x 10 -y 20;
+    myPoint configure
+} {{-x {} 10} {-y {} 20}}
+
+test object-1.2 {test of object slot-value routine} {
+    list [myPoint slot-value x] [myPoint slot-value y]
+} {10 20}
+
+test object-1.3 {test of object unknown method} {
+    list [catch {myPoint draw} msg] $msg
+} {1 {bad option "draw"}}
+
+test object-1.4 {test of object exists} {
+    list [dp_objectExists myPoint] [dp_objectExists p1]
+} {1 0}
+
+test object-1.5 {test of dynamically adding slots} {
+    dp_objectSlotSet myPoint z 0
+    myPoint configure
+} {{-x {} 10} {-y {} 20} {-z {} 0}}
+
+test object-1.6 {test of querying slots} {
+    dp_objectSlots myPoint
+} {x y z}
+
+test object-1.7 {test of object slot append} {
+    dp_objectSlotAppend myPoint x 0
+    myPoint configure
+} {{-x {} {10 0}} {-y {} 20} {-z {} 0}}
+
+test object-1.8 {test of deleting object} {
+    dp_objectFree myPoint;
+    list [dp_objectExists myPoint] [catch {myPoint configure} msg] $msg
+} {0 1 {invalid command name: "myPoint"}}
+
+#-----------------------------------------------------------------
+#
+# Tests for distributed objects.
+#
+
+test object-2.0 {test of distribute object routine} {
+    MakePoint dPoint;
+    catch {dp_DistributeObject dPoint $rhost MakePoint}
+} 0
+
+test object-2.1 {test of local distributed setf} {
+    dp_setf dPoint x 30
+    dp_RPC $rhost dp_getf dPoint x
+} 30
+
+test object-2.2 {test of remote distributed setf} {
+    dp_RPC $rhost dp_setf dPoint y 40
+    dp_getf dPoint y
+} 40
+
+test object-2.3 {test of local triggers} {
+    set dPointXCount 0
+    dp_SetTrigger after dPoint x "incr dPointXCount; ignore" 
+    dp_setf dPoint x 0
+    set dPointXCount
+} 1
+
+test object-2.4 {test of multiple local triggers} {
+    set dPointYCount 0
+    dp_AppendTrigger after dPoint y "incr dPointYCount; ignore" 
+    dp_AppendTrigger after dPoint y "incr dPointYCount; ignore" 
+    dp_setf dPoint y 1
+    set dPointYCount
+} 2
+
+test object-2.5 {test of dp_AppendTriggerUnique} {
+    dp_AppendTriggerUnique after dPoint x "incr dPointXCount; ignore"     
+    dp_setf dPoint x 1
+    set dPointXCount
+} 2
+
+test object-2.6 {test of deleting triggers} {
+    dp_AppendTrigger after dPoint x "incr a; ignore"
+    dp_ReleaseTrigger after dPoint x "incr a; ignore"
+    set a 0
+    dp_setf dPoint x 2
+    set a
+} 0
+
+test object-2.7 {test of getting triggers} {
+    dp_GetTriggers after dPoint y
+} {{{incr dPointYCount; ignore}} {{incr dPointYCount; ignore}}}
+
+test object-2.8 {test of clearing triggers} {
+    dp_ClearTriggers after dPoint y
+    dp_GetTriggers after dPoint y
+} {}
+
+test object-2.9 {distribution of multiple copies} {
+    dp_setf dPoint y -1
+    dp_DistributeObject dPoint $rhost MakePoint
+    dp_UndistributeObject dPoint $rhost
+    list [catch {dp_RPC $rhost dp_getf dPoint y} msg] $msg
+} {0 -1}
+
+test object-2.10 {distribution of multiple copies, number 2} {
+    dp_setf dPoint y -2
+    dp_UndistributeObject dPoint $rhost
+    list [catch {dp_RPC $rhost dp_getf dPoint y} msg] $msg
+} {1 {invalid command name "dPoint"}}
+
+#-----------------------------------------------------------------
+#
+# Check cleanup code...
+#
+
+test object-3.1 {distributed object cleanup} {
+    MakePoint p3
+    dp_DistributeObject p3 $rhost MakePoint
+    close $rhost
+    set rhost [dp_MakeRPCClient $hostname $S_PORT]
+    list [catch {dp_RPC $rhost dp_getf p3 y} msg] $msg
+} {1 {invalid command name "p3"}}
+
+test object-3.2 {distributed object cleanup, other side} {
+    dp_RPC $rhost MakePoint p4
+    set remFile [dp_RPC $rhost set rpcFile]
+    dp_RPC $rhost dp_DistributeObject p4 $remFile MakePoint
+    close $rhost
+    info procs p4
+} {}
+
+test object-3.3 {connection closure} {
+    set rhost [dp_MakeRPCClient $hostname $S_PORT]
+    MakePoint p5
+    dp_DistributeObject p5 $rhost MakePoint
+    close $rhost
+    catch {set objInfo(p4,$rhost)}
+} 1
+
+test object-3.4 {distributed object cleanup, kill other side} {
+    set rhost [dp_MakeRPCClient $hostname $S_PORT]
+    dp_RPC $rhost MakePoint p6
+    set remFile [dp_RPC $rhost set rpcFile]
+    dp_RPC $rhost dp_DistributeObject p6 $remFile MakePoint
+    catch {dp_RPC $rhost exit}
+    dp_update
+    info procs p6
+} {}
