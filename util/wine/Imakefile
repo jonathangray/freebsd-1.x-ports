@@ -1,0 +1,112 @@
+#include "Wine.tmpl"
+
+#if defined(i386FreeBsd)
+MAKE = gmake
+CC = gcc -D__FreeBSD__
+#endif
+
+/*
+ * This is the second try at using Imakefiles. There are probably many
+ * problems and things I haven't even considered. I do not have a fixed
+ * Linux system to test them on, but thanks to Thomas Michlmayr
+ * <tmichl@cosy.sbg.ac.at> for use of one of his boxes. 
+ *
+ * SEE BELOW ABOUT DEBUGGING AND LINUX
+ *
+ * Peter Galbavy, 31st Jan 1994: peter@wonderland.org
+ */
+
+#define IHaveSubdirs
+#define	PassCDebugFlags 'CDEBUGFLAGS=$(CDEBUGFLAGS)' 'CC=$(CC)' 'MAKE=$(MAKE)'
+
+COMMONSUBDIRS = \
+	controls \
+	etc \
+	include \
+	misc \
+	objects \
+	test \
+	windows
+
+EMUSUBDIRS = \
+	tools \
+	debugger \
+	if1632 \
+	loader \
+	memory \
+	miscemu
+
+LIBSUBDIRS = \
+	toolkit
+
+SUBDIRS = $(COMMONSUBDIRS) $(EMUSUBDIRS) $(LIBSUBDIRS)
+
+/*
+ * due to me not having the time and resources to test this, debugging
+ * has been left out by for now of the Imakefiles. To put it back you have
+ * to add:
+ *	debugger
+ * to the SUBDIRS list and:
+ *	debugger
+ *	readline.o
+ * to the OBJS list.
+ *
+ * Not doing this will make the build fail in loader/signal.c, with an
+ * unresolved reference to wine_debug. Comment out the line for now...
+ * sigh. Fixed soon.
+ */
+
+WINEDIR = $(LIBDIR)/wine
+
+COMMONOBJS = \
+	controls.o \
+	misc.o \
+	objects.o \
+	windows.o
+
+/*
+ * WARNING: if1632.o must be the first object file because its code must be
+ *          linked at the lowest possible addresses.
+ */
+EMUOBJS = \
+	if1632.o \
+	debugger.o \
+	loader.o \
+	memory.o \
+	miscemu.o \
+	readline.o
+
+LIBOBJS = \
+	toolkit.o
+
+OBJS = $(COMMONOBJS) $(EMUOBJS) $(LIBOBJS)
+
+#ifdef i386BsdArchitecture
+#if defined(i386NetBsd)
+SYSLIBS = -ll -lm -li386 -lgnumalloc
+#elif defined(i386FreeBsd)
+SYSLIBS = -ll -lm -lgnumalloc
+#endif
+#else
+#ifdef LinuxArchitecture
+SYSLIBS = -lm
+#endif
+#endif
+
+MakeSubdirs($(SUBDIRS))
+DependSubdirs($(SUBDIRS))
+
+#ifdef i386BsdArchitecture
+AllTarget(wine)
+#endif
+
+NormalProgramTarget(wine,$(EMUOBJS) $(COMMONOBJS),XawClientDepLibs,XawClientLibs,$(SYSLIBS))
+NormalLibraryTarget(wine,$(LIBOBJS) $(COMMONOBJS))
+
+#ifdef LinuxArchitecture
+AllTarget(wine)
+#endif
+
+depend::
+
+install::
