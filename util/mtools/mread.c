@@ -300,11 +300,17 @@ unsigned char *time_field, *date_field;
 	tzset();
 	tzone = timezone;
 #endif /* BSD */
-
+#ifdef __386BSD__
+	tzone = 0;
+#endif
 	answer = sec_leap + sec_year + sec_mon + sec_mday + sec_hour + sec_min + sec + tzone;
 					/* correct for Daylight Saving Time */
 	tmbuf = localtime(&answer);
+#ifdef __386BSD__
+	dst = -tmbuf->tm_gmtoff;
+#else
 	dst = (tmbuf->tm_isdst) ? (-60L * 60L) : 0L;
+#endif
 	answer += dst;
 	
 	return(answer);
