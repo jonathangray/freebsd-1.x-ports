@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  */
 
-#if !defined(hpux) && !defined(sun)
+#if !defined(hpux) && !defined(sun) && !defined(FreeBSD)
 
 /* guarantee that we have a `working' getopt() function */
 #if defined(LIBC_SCCS) && !defined(lint)
