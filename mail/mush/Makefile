@@ -71,10 +71,7 @@ install: mush
 	chmod 0644 $(MRCDIR)/Mushrc
 
 
-pkg:	pkg_src pkg_bin
+pkg:	pkg_bin
 
-pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S 
-	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S mush_src
-
-pkg_bin: install pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B 
-	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B mush_bin
+pkg_bin: install pkg/+DESC pkg/+ONELINE pkg/+PLIST 
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST mush_bin
