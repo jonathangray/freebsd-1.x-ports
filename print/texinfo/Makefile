@@ -46,6 +46,7 @@ CFLAGS = -g
 LDFLAGS = -g
 
 prefix = /usr/local
+infoprefix = /usr/gnu
 exec_prefix = $(prefix)
 bindir = $(exec_prefix)/bin
 # Prefix for each installed program, normally empty or `g'.
@@ -55,7 +56,7 @@ libdir = $(prefix)/lib
 manprefix = 
 mandir = $(prefix)/man/man1
 manext = 1
-infodir = $(prefix)/info
+infodir = $(infoprefix)/info
 
 # For info program. 
 DEFAULT_INFOPATH = $(infodir):.
