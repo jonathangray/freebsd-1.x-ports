@@ -1,5 +1,5 @@
 #
-# @(#): Makefile.SH,v 5.5 1993/06/06 17:35:04 syd Exp $
+# @(#): Makefile.SH,v 1.2 1993/08/27 00:54:08 smace Exp $
 #  Makefile for the Elm system filter program
 #
 #         (C) Copyright 1986,1987, by Dave Taylor
@@ -11,8 +11,11 @@
 #			dsinc!elm
 #
 #  $Log: Makefile,v $
-#  Revision 1.3  1993/08/27 00:54:07  smace
-#  Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+#  Revision 1.4  1993/08/30 05:39:26  smace
+#  compile only with -traditional
+#
+# Revision 1.2  1993/08/27  00:54:08  smace
+# Upgrade elm2.4 pl23beta elm2.4 pl23beta2
 #
 # Revision 5.5  1993/06/06  17:35:04  syd
 # Remove useless buffer.c
@@ -37,7 +40,7 @@
 # Variables
 #	Variables established by Configure
 CC		=	gcc
-CCFLAGS		=	-fpcc-struct-return -traditional 
+CCFLAGS		=	-traditional 
 CHGRP		=	/usr/bin/chgrp
 CHMOD		=	/bin/chmod
 CP		=	/bin/cp

@@ -1,5 +1,5 @@
 
-# @(#): Makefile.SH,v 5.5 1993/05/31 19:17:28 syd Exp $
+# @(#): Makefile.SH,v 1.2 1993/08/27 00:57:13 smace Exp $
 #
 #  Makefile for the Elm system utilities
 #
@@ -12,7 +12,10 @@
 #			dsinc!elm
 #
 # $Log: Makefile,v $
-# Revision 1.3  1993/08/27 00:57:12  smace
+# Revision 1.4  1993/08/30 05:39:54  smace
+# compile only with -traditional
+#
+# Revision 1.2  1993/08/27  00:57:13  smace
 # Upgrade elm2.4 pl23beta elm2.4 pl23beta2
 #
 # Revision 5.5  1993/05/31  19:17:28  syd
@@ -39,7 +42,7 @@
 # Variables
 #	Variables established by Configure
 CC		=	gcc
-CCFLAGS		=	-fpcc-struct-return -traditional 
+CCFLAGS		=	-traditional 
 CHMOD		=	/bin/chmod
 CP		=	/bin/cp
 DEST		=	/usr/local/bin

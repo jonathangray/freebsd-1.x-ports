@@ -1,5 +1,5 @@
 #
-# : Makefile.SH,v 5.3 1993/04/21 01:53:10 syd Exp $
+# : Makefile.SH,v 1.2 1993/08/27 00:53:37 smace Exp $
 #
 #  Makefile for the entire ELM mail system
 #
@@ -7,8 +7,11 @@
 #         (C) Copyright 1988-1992, USENET Community Trust
 #
 #  $Log: Makefile,v $
-#  Revision 1.3  1993/08/27 00:53:36  smace
-#  Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+#  Revision 1.4  1993/08/30 05:39:11  smace
+#  compile only with -traditional
+#
+# Revision 1.2  1993/08/27  00:53:37  smace
+# Upgrade elm2.4 pl23beta elm2.4 pl23beta2
 #
 # Revision 5.3  1993/04/21  01:53:10  syd
 # take out parallelism, effects standard make

@@ -1,4 +1,4 @@
-# : Makefile.SH,v 5.1 1992/10/03 22:58:40 syd Exp $
+# : Makefile.SH,v 1.2 1993/08/27 00:55:56 smace Exp $
 #
 #  Makefile for the ELM mail program.
 #
@@ -11,7 +11,10 @@
 #			dsinc!elm
 #
 # $Log: Makefile,v $
-# Revision 1.3  1993/08/27 00:55:55  smace
+# Revision 1.4  1993/08/30 05:39:48  smace
+# compile only with -traditional
+#
+# Revision 1.2  1993/08/27  00:55:56  smace
 # Upgrade elm2.4 pl23beta elm2.4 pl23beta2
 #
 # Revision 5.1  1992/10/03  22:58:40  syd
@@ -25,7 +28,7 @@
 # Variables
 #	Variables established by Configure
 CC		=	gcc
-CCFLAGS		=	-fpcc-struct-return -traditional 
+CCFLAGS		=	-traditional 
 CHGRP		=	/usr/bin/chgrp
 CHMOD		=	/bin/chmod
 CP		=	/bin/cp
