@@ -57,7 +57,7 @@ char *input;
  * Miscellaneous routines probably missing from Bezerkely
  */
 
-#ifdef BSD
+#if defined(BSD) && !defined(__386BSD__)
 /*
  * Return ptr to first occurrence of any character from `brkset'
  * in the character string `string'; NULL if none exists.
