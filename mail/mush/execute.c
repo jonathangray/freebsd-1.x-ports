@@ -88,7 +88,7 @@ char **argv;
 execute(argv)
 char **argv;
 {
-#ifdef SYSV
+#if defined(SYSV) || defined(FreeBSD)
     int status;
 #else
     union wait status;
@@ -142,7 +142,7 @@ char **argv;
 SIGRET
 sigchldcatcher()
 {
-#ifdef SYSV
+#if defined(SYSV) || defined(FreeBSD)
     int status;
 #else
     union wait status;

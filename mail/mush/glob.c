@@ -8,6 +8,8 @@
  * been added (patterns are split at '/' characters when file globbing).
  */
 
+static int sglob();
+
 #ifdef TEST	/* Define TEST to build a stand-alone file globbing program */
 
 extern char *malloc(), *realloc();

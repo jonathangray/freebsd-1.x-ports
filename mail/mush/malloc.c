@@ -109,6 +109,9 @@ union	overhead {
 static	union overhead *nextf[NBUCKETS];
 extern	char *sbrk();
 
+static morecore();
+static findbucket();
+
 #ifdef MSTATS
 /*
  * nmalloc[i] is the difference between the number of mallocs and frees

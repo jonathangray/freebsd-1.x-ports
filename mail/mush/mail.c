@@ -21,6 +21,7 @@ static u_long flags;
 static SIGRET (*oldterm)(), (*oldint)(), (*oldquit)();
 static int finish_up_letter(), send_it(), start_file();
 static long add_headers();
+static mail_someone();
 static jmp_buf cntrl_c_buf;
 static char *Hfile, *edfile;
 FILE *ed_fp;

@@ -12,12 +12,12 @@ static char subsort[16];
 
 static int depth, order, ignore_case;
 static jmp_buf sortbuf;
+static msg_cmp(struct msg *msg1, struct msg *msg2);
 
 sort(argc, argv, list)
 register int argc;
 register char *argv[], list[];
 {
-    int msg_cmp();
     SIGRET (*oldint)(), (*oldquit)();
     int n, offset = -1, range = 0;
     long curr_msg_off = msg[current_msg].m_offset;
