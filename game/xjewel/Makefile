@@ -2,7 +2,7 @@
 # $XConsortium: imake.c,v 1.65 91/07/25 17:50:17 rws Exp $
 
 # -------------------------------------------------------------------------
-# Makefile generated from "Imake.tmpl" and </tmp/IIf.022594>
+# Makefile generated from "Imake.tmpl" and </tmp/IIf.019897>
 # $XFree86: mit/config/Imake.tmpl,v 1.17 1993/06/03 15:26:36 dawes Exp $
 # $XConsortium: Imake.tmpl,v 1.139 91/09/16 08:52:48 rws Exp $
 #
@@ -157,7 +157,7 @@ _percentC_ = %C
            TWMDIR = $(LIBDIR)/twm
           MANPATH = 	/usr/X386/man
     MANSOURCEPATH = 	$(MANPATH)/man
-        MANSUFFIX = 1x
+        MANSUFFIX = 1
      LIBMANSUFFIX = 3
            MANDIR = 	$(MANSOURCEPATH)1
         LIBMANDIR = $(MANSOURCEPATH)3
@@ -345,6 +345,10 @@ $(FONT).pcf.Z:  $(FONT).bdf
 
 # FORCE FONT TO BE BUILT
 all:: $(CFONT)
+
+# FORCE FONT TO BE REMOVED
+clean::
+	$(RM) $(CFONT) bitmaps/fonts.dir
 
 install::
 	touch  $(HSCORE_FILE)
