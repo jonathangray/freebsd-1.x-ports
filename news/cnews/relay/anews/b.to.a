@@ -1,0 +1,35 @@
+#! /bin/sh
+# bnewstoa: B-format news to A-format converter (why, oh, why?) (thanks, Norman)
+PATH=/bin:/usr/bin:/usr/ucb; export PATH
+
+awk '
+NR==1,/^$/	{		# headers: save A headers only
+	if ($0 ~ /^Message-ID: /)
+		msgid=$2
+	else if ($0 ~ /^Newsgroups: /)
+		ngs=$2
+	else if ($0 ~ /^Path: /)
+		path=$2
+	else if ($0 ~ /^Date: /) {
+		date = $2	# skip "Date:"
+		for (i = 3; i <= NF; i++)
+			date = date " " $i	# append remaining fields
+	} else if ($0 ~ /^Subject: /)
+		subj=$2
+	else if ($0 ~ /^$/) {	# end of headers: spew out A-format equivalent
+		print "A" msgid
+		print ngs
+		print path
+		print date
+		print subj
+		inbody = "yes"
+		noblanksyet = "yes"
+	}
+}
+inbody=="yes"	{	# copy body except first blank line, if present
+	if ($0 ~ /^$/ && noblanksyet == "yes")
+		noblanksyet = "no"
+	else
+		print
+}
+'
