@@ -8,106 +8,64 @@
  *	things needed by any of the Tcl core files.  This file
  *	depends on configuration #defines in tclConfig.h
  *
- *	The material in this file was originally contributed by
- *	Karl Lehenbauer, Mark Diekhans and Peter da Silva.
+ *	Much of the material in this file was originally contributed
+ *	by Karl Lehenbauer, Mark Diekhans and Peter da Silva.
  *
- * Copyright 1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that this copyright
- * notice appears in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1991-1993 The Regents of the University of California.
+ * All rights reserved.
  *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+ *
+ * $Header: /a/cvs/386BSD/ports/lang/tcl/tclUnix.h,v 1.3 1993/12/27 07:06:18 rich Exp $ SPRITE (Berkeley)
  */
 
 #ifndef _TCLUNIX
 #define _TCLUNIX
 
-/*
- * The following #defines are used to distinguish between different
- * UNIX systems.  These #defines are normally set by the "config" script
- * based on information it gets by looking in the include and library
- * areas.  The defaults below are for BSD-based systems like SunOS
- * or Ultrix.
- *
- * TCL_GETTOD -			1 means there exists a library procedure
- *				"gettimeofday" (e.g. BSD systems).  0 means
- *				have to use "times" instead.
- * TCL_GETWD -			1 means there exists a library procedure
- *				"getwd" (e.g. BSD systems).  0 means
- *				have to use "getcwd" instead.
- * TCL_SYS_ERRLIST -		1 means that the array sys_errlist is
- *				defined as part of the C library.
- * TCL_SYS_TIME_H -		1 means there exists an include file
- *				<sys/time.h> (e.g. BSD derivatives).
- * TCL_SYS_WAIT_H -		1 means there exists an include file
- *				<sys/wait.h> that defines constants related
- *				to the results of "wait".
- * TCL_UNION_WAIT -		1 means that the "wait" system call returns
- *				a structure of type "union wait" (e.g. BSD
- *				systems).  0 means "wait" returns an int
- *				(e.g. System V and POSIX).
- * TCL_PID_T -			1 means that <sys/types> defines the type
- *				pid_t.  0 means that it doesn't.
- * TCL_UID_T -			1 means that <sys/types> defines the type
- *				uid_t.  0 means that it doesn't.
- */
-
-#ifndef TCL_PID_T
-#define TCL_PID_T 1
-#endif
-
-#ifndef TCL_GETTOD
-#define TCL_GETTOD 1
-#endif /* TCL_GETTOD */
-
-#ifndef TCL_GETWD
-#define TCL_GETWD 1
-#endif /* TCL_GETWD */
-
-#ifndef TCL_SYS_ERRLIST
-#define TCL_SYS_ERRLIST 1
-#endif /* TCL_SYS_ERRLIST */
-
-#ifndef TCL_SYS_TIME_H
-#define TCL_SYS_TIME_H 1
-#endif /* TCL_SYS_TIME_H */
-
-#ifndef TCL_SYS_WAIT_H
-#define TCL_SYS_WAIT_H 1
-#endif /* TCL_SYS_WAIT_H */
-
-#ifndef TCL_UNION_WAIT
-#define TCL_UNION_WAIT 1
-#endif /* TCL_UNION_WAIT */
-
-#ifndef TCL_UID_T
-#define TCL_UID_T 1
-#endif /* TCL_UID_T */
-
 #include <errno.h>
 #include <fcntl.h>
-#include <limits.h>
 #include <pwd.h>
 #include <signal.h>
 #include <sys/param.h>
 #include <sys/types.h>
-#ifdef HAVE_DIRENT
-#  include <dirent.h>
+#ifdef USE_DIRENT2_H
+#   include "compat/dirent2.h"
 #else
-#  include "compat/dirent.h"
+#   ifdef NO_DIRENT_H
+#	include "compat/dirent.h"
+#   else
+#	include <dirent.h>
+#   endif
 #endif
 #include <sys/file.h>
 #include <sys/stat.h>
-#if TCL_SYS_TIME_H
+#ifndef NO_SYS_TIME_H
 #   include <sys/time.h>
 #else
 #   include <time.h>
 #endif
-#if TCL_SYS_WAIT_H
+#ifndef NO_SYS_WAIT_H
 #   include <sys/wait.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#   include <unistd.h>
+#else
+#   include "compat/unistd.h"
 #endif
 
 /*
@@ -117,18 +75,20 @@
  */
 
 extern int errno;
-extern int sys_nerr;
-extern char *sys_errlist[];
 
 /*
  * The type of the status returned by wait varies from UNIX system
  * to UNIX system.  The macro below defines it:
  */
 
-#if TCL_UNION_WAIT
+#ifdef AIX
+#   define WAIT_STATUS_TYPE pid_t
+#else
+#ifndef NO_UNION_WAIT
 #   define WAIT_STATUS_TYPE union wait
 #else
 #   define WAIT_STATUS_TYPE int
+#endif
 #endif
 
 /*
@@ -185,7 +145,7 @@ extern char *sys_errlist[];
  * some might not even have HZ.
  */
 
-#if ! TCL_GETTOD
+#ifdef NO_GETTOD
 #   include <sys/times.h>
 #   include <sys/param.h>
 #   ifndef CLK_TCK
@@ -291,15 +251,27 @@ extern char *sys_errlist[];
 #endif
 
 /*
- * Define pid_t and uid_t if they're not already defined.
+ * Make sure that L_tmpnam is defined.
  */
 
-#if ! TCL_PID_T
-#   define pid_t int
+#ifndef L_tmpnam
+#   define L_tmpnam 100
 #endif
-#if ! TCL_UID_T
-#   define uid_t int
-#endif
+
+/*
+ * Substitute Tcl's own versions for several system calls.  The
+ * Tcl versions retry automatically if interrupted by signals.
+ * (see tclUnixUtil.c).
+ */
+
+#define open(a,b,c) TclOpen(a,b,c)
+#define read(a,b,c) TclRead(a,b,c)
+#define waitpid(a,b,c) TclWaitpid(a,b,c)
+#define write(a,b,c) TclWrite(a,b,c)
+EXTERN int	TclOpen _ANSI_ARGS_((char *path, int oflag, int mode));
+EXTERN int	TclRead _ANSI_ARGS_((int fd, VOID *buf, size_t numBytes));
+EXTERN int	TclWaitpid _ANSI_ARGS_((pid_t pid, int *statPtr, int options));
+EXTERN int	TclWrite _ANSI_ARGS_((int fd, VOID *buf, size_t numBytes));
 
 /*
  * Variables provided by the C library:
@@ -309,31 +281,5 @@ extern char *sys_errlist[];
 #define environ _environ
 #endif
 extern char **environ;
-
-/*
- * Library procedures used by Tcl but not declared in a header file:
- */
-
-#ifndef _CRAY
-extern int	access	   _ANSI_ARGS_((CONST char *path, int mode));
-extern int	chdir	   _ANSI_ARGS_((CONST char *path));
-extern int	close	   _ANSI_ARGS_((int fd));
-extern int	dup2	   _ANSI_ARGS_((int src, int dst));
-extern void	endpwent   _ANSI_ARGS_((void));
-extern int	execvp	   _ANSI_ARGS_((CONST char *name, char **argv));
-extern void	_exit 	   _ANSI_ARGS_((int status));
-extern pid_t	fork	   _ANSI_ARGS_((void));
-extern uid_t	geteuid	   _ANSI_ARGS_((void));
-extern pid_t	getpid	   _ANSI_ARGS_((void));
-extern char *	getwd  	   _ANSI_ARGS_((char *buffer));
-extern int	kill	   _ANSI_ARGS_((pid_t pid, int sig));
-extern long	lseek	   _ANSI_ARGS_((int fd, int offset, int whence));
-extern char *	mktemp	   _ANSI_ARGS_((char *template));
-extern int	pipe	   _ANSI_ARGS_((int *fdPtr));
-extern int	read	   _ANSI_ARGS_((int fd, char *buf, int numBytes));
-extern int	readlink   _ANSI_ARGS_((CONST char *path, char *buf, int size));
-extern int	unlink 	   _ANSI_ARGS_((CONST char *path));
-extern int	write	   _ANSI_ARGS_((int fd, char *buf, int numBytes));
-#endif /* _CRAY */
 
 #endif /* _TCLUNIX */

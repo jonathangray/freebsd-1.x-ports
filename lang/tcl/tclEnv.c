@@ -4,18 +4,43 @@
  *	Tcl support for environment variables, including a setenv
  *	procedure.
  *
- * Copyright 1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that this copyright
- * notice appears in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1991-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
+#ifndef lint
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclEnv.c,v 1.2 1993/12/27 07:06:02 rich Exp $ SPRITE (Berkeley)";
+#endif /* not lint */
+
+/*
+ * The putenv and setenv definitions below cause any system prototypes for
+ * those procedures to be ignored so that there won't be a clash when the
+ * versions in this file are compiled.
+ */
+
+#define putenv ignore_putenv
+#define setenv ignore_setenv
 #include "tclInt.h"
 #include "tclUnix.h"
+#undef putenv
+#undef setenv
 
 /*
  * The structure below is used to keep track of all of the interpereters
@@ -53,9 +78,9 @@ static char *		EnvTraceProc _ANSI_ARGS_((ClientData clientData,
 			    int flags));
 static int		FindVariable _ANSI_ARGS_((CONST char *name,
 			    int *lengthPtr));
-void			_setenv _ANSI_ARGS_((CONST char *name,
+void			TclSetEnv _ANSI_ARGS_((CONST char *name,
 			    CONST char *value));
-void			_unsetenv _ANSI_ARGS_((CONST char *name));
+void			TclUnsetEnv _ANSI_ARGS_((CONST char *name));
 
 /*
  *----------------------------------------------------------------------
@@ -179,11 +204,14 @@ FindVariable(name, lengthPtr)
 /*
  *----------------------------------------------------------------------
  *
- * _setenv --
+ * TclSetEnv --
  *
  *	Set an environment variable, replacing an existing value
  *	or creating a new variable if there doesn't exist a variable
- *	by the given name.
+ *	by the given name.  This procedure is intended to be a
+ *	stand-in for the  UNIX "setenv" procedure so that applications
+ *	using that procedure will interface properly to Tcl.  To make
+ *	it a stand-in, the Makefile must define "TclSetEnv" to "setenv".
  *
  * Results:
  *	None.
@@ -196,7 +224,7 @@ FindVariable(name, lengthPtr)
  */
 
 void
-_setenv(name, value)
+TclSetEnv(name, value)
     CONST char *name;		/* Name of variable whose value is to be
 				 * set. */
     CONST char *value;		/* New value for variable. */
@@ -235,7 +263,7 @@ _setenv(name, value)
 	/*
 	 * Compare the new value to the existing value.  If they're
 	 * the same then quit immediately (e.g. don't rewrite the
-	 * value or propagate it to other interpeters).  Otherwise,
+	 * value or propagate it to other interpreters).  Otherwise,
 	 * when there are N interpreters there will be N! propagations
 	 * of the same value among the interpreters.
 	 */
@@ -271,14 +299,15 @@ _setenv(name, value)
 /*
  *----------------------------------------------------------------------
  *
- * putenv --
+ * Tcl_PutEnv --
  *
  *	Set an environment variable.  Similar to setenv except that
  *	the information is passed in a single string of the form
  *	NAME=value, rather than as separate name strings.  This procedure
- *	is a stand-in for the standard UNIX procedure by the same name,
+ *	is intended to be a stand-in for the  UNIX "putenv" procedure
  *	so that applications using that procedure will interface
- *	properly to Tcl.
+ *	properly to Tcl.  To make it a stand-in, the Makefile will
+ *	define "Tcl_PutEnv" to "putenv".
  *
  * Results:
  *	None.
@@ -290,14 +319,9 @@ _setenv(name, value)
  *----------------------------------------------------------------------
  */
 
-#if 0
-/*
- * no one appears to use this code.   zoo 03/19/93
- *
- */
 int
-putenv(string)
-    char *string;		/* Info about environment variable in the
+Tcl_PutEnv(string)
+    CONST char *string;		/* Info about environment variable in the
 				 * form NAME=value. */
 {
     int nameLength;
@@ -309,7 +333,7 @@ putenv(string)
 
     /*
      * Separate the string into name and value parts, then call
-     * setenv to do all of the real work.
+     * TclSetEnv to do all of the real work.
      */
 
     value = strchr(string, '=');
@@ -320,22 +344,24 @@ putenv(string)
     if (nameLength == 0) {
 	return 0;
     }
-    name = ckalloc(nameLength+1);
+    name = ckalloc((unsigned) nameLength+1);
     memcpy(name, string, nameLength);
     name[nameLength] = 0;
-    _setenv(name, value+1);
+    TclSetEnv(name, value+1);
     ckfree(name);
     return 0;
 }
-#endif /* 0 -- putenv */
 
 /*
  *----------------------------------------------------------------------
  *
- * _unsetenv --
+ * TclUnsetEnv --
  *
  *	Remove an environment variable, updating the "env" arrays
- *	in all interpreters managed by us.
+ *	in all interpreters managed by us.  This function is intended
+ *	to replace the UNIX "unsetenv" function (but to do this the
+ *	Makefile must be modified to redefine "TclUnsetEnv" to
+ *	"unsetenv".
  *
  * Results:
  *	None.
@@ -347,7 +373,7 @@ putenv(string)
  */
 
 void
-_unsetenv(name)
+TclUnsetEnv(name)
     CONST char *name;			/* Name of variable to remove. */
 {
     int index, dummy;
@@ -449,15 +475,15 @@ EnvTraceProc(clientData, interp, name1, name2, flags)
     }
 
     /*
-     * If a value is being set, call setenv to do all of the work.
+     * If a value is being set, call TclSetEnv to do all of the work.
      */
 
     if (flags & TCL_TRACE_WRITES) {
-	_setenv(name2, Tcl_GetVar2(interp, "env", name2, TCL_GLOBAL_ONLY));
+	TclSetEnv(name2, Tcl_GetVar2(interp, "env", name2, TCL_GLOBAL_ONLY));
     }
 
     if (flags & TCL_TRACE_UNSETS) {
-	_unsetenv(name2);
+	TclUnsetEnv(name2);
     }
     return NULL;
 }

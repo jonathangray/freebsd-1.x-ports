@@ -6,15 +6,30 @@
  *	executed, and it provides a command that may be used to perform
  *	history substitutions.
  *
- * Copyright 1990-1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
+
+#ifndef lint
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclHistory.c,v 1.2 1993/12/27 07:06:09 rich Exp $ SPRITE (Berkeley)";
+#endif /* not lint */
 
 #include "tclInt.h"
 
@@ -89,6 +104,7 @@ static void		DoRevs _ANSI_ARGS_((Interp *iPtr));
 static HistoryEvent *	GetEvent _ANSI_ARGS_((Interp *iPtr, char *string));
 static char *		GetWords _ANSI_ARGS_((Interp *iPtr, char *command,
 			    char *words));
+static void		InitHistory _ANSI_ARGS_((Interp *iPtr));
 static void		InsertRev _ANSI_ARGS_((Interp *iPtr,
 			    HistoryRev *revPtr));
 static void		MakeSpace _ANSI_ARGS_((HistoryEvent *hPtr, int size));
@@ -100,7 +116,7 @@ static int		SubsAndEval _ANSI_ARGS_((Interp *iPtr, char *cmd,
 /*
  *----------------------------------------------------------------------
  *
- * Tcl_InitHistory --
+ * InitHistory --
  *
  *	Initialize history-related state in an interpreter.
  *
@@ -113,11 +129,10 @@ static int		SubsAndEval _ANSI_ARGS_((Interp *iPtr, char *cmd,
  *----------------------------------------------------------------------
  */
 
-void
-Tcl_InitHistory(interp)
-    Tcl_Interp *interp;		/* Interpreter to initialize. */
+static void
+InitHistory(iPtr)
+    register Interp *iPtr;		/* Interpreter to initialize. */
 {
-    register Interp *iPtr = (Interp *) interp;
     int i;
 
     if (iPtr->numEvents != 0) {
@@ -133,8 +148,6 @@ Tcl_InitHistory(interp)
     }
     iPtr->curEvent = 0;
     iPtr->curEventNum = 0;
-    Tcl_CreateCommand((Tcl_Interp *) iPtr, "history", Tcl_HistoryCmd,
-	    (ClientData) NULL, (void (*)()) NULL);
 }
 
 /*
@@ -173,7 +186,7 @@ Tcl_RecordAndEval(interp, cmd, flags)
     int length, result;
 
     if (iPtr->numEvents == 0) {
-	Tcl_InitHistory(interp);
+	InitHistory(iPtr);
     }
     DoRevs(iPtr);
 
@@ -181,7 +194,7 @@ Tcl_RecordAndEval(interp, cmd, flags)
      * Don't record empty commands.
      */
 
-    while (isspace(*cmd)) {
+    while (isspace(UCHAR(*cmd))) {
 	cmd++;
     }
     if (*cmd == '\0') {
@@ -220,8 +233,8 @@ Tcl_RecordAndEval(interp, cmd, flags)
     if (flags != TCL_NO_EVAL) {
 	iPtr->historyFirst = cmd;
 	iPtr->revDisables = 0;
-	result = Tcl_Eval(interp, cmd, flags | TCL_RECORD_BOUNDS,
-		(char **) NULL);
+	iPtr->evalFlags = flags | TCL_RECORD_BOUNDS;
+	result = Tcl_Eval(interp, cmd);
     }
     iPtr->revDisables = 1;
     return result;
@@ -256,6 +269,10 @@ Tcl_HistoryCmd(dummy, interp, argc, argv)
     register HistoryEvent *eventPtr;
     int length;
     char c;
+
+    if (iPtr->numEvents == 0) {
+	InitHistory(iPtr);
+    }
 
     /*
      * If no arguments, treat the same as "history info".
@@ -464,7 +481,7 @@ Tcl_HistoryCmd(dummy, interp, argc, argv)
 	    return TCL_ERROR;
 	}
 	RevCommand(iPtr, eventPtr->command);
-	return Tcl_Eval(interp, eventPtr->command, 0, (char **) NULL);
+	return Tcl_Eval(interp, eventPtr->command);
     } else if ((c == 's') && (strncmp(argv[1], "substitute", length)) == 0) {
 	if ((argc > 5) || (argc < 4)) {
 	    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
@@ -691,7 +708,7 @@ RevResult(iPtr, string)
 	if (*evalFirst == '[') {
 	    break;
 	}
-	if (!isspace(*evalFirst)) {
+	if (!isspace(UCHAR(*evalFirst))) {
 	    return;
 	}
     }
@@ -820,7 +837,7 @@ GetEvent(iPtr, string)
      * First check for a numeric specification of an event.
      */
 
-    if (isdigit(*string) || (*string == '-')) {
+    if (isdigit(UCHAR(*string)) || (*string == '-')) {
 	if (Tcl_GetInt((Tcl_Interp *) iPtr, string, &eventNum) != TCL_OK) {
 	    return NULL;
 	}
@@ -945,7 +962,7 @@ SubsAndEval(iPtr, cmd, old, new)
     }
 
     RevCommand(iPtr, newCmd);
-    result = Tcl_Eval((Tcl_Interp *) iPtr, newCmd, 0, (char **) NULL);
+    result = Tcl_Eval((Tcl_Interp *) iPtr, newCmd);
     ckfree(newCmd);
     return result;
 }
@@ -1003,7 +1020,7 @@ GetWords(iPtr, command, words)
 	    goto error;
 	}
 	first = -1;
-    } else if (isdigit(*words)) {
+    } else if (isdigit(UCHAR(*words))) {
 	first = strtoul(words, &start, 0);
 	if (*start == 0) {
 	    last = first;
@@ -1011,7 +1028,7 @@ GetWords(iPtr, command, words)
 	    start++;
 	    if (*start == '$') {
 		start++;
-	    } else if (isdigit(*start)) {
+	    } else if (isdigit(UCHAR(*start))) {
 		last = strtoul(start, &start, 0);
 	    } else {
 		goto error;
@@ -1035,15 +1052,15 @@ GetWords(iPtr, command, words)
 
     result = (char *) ckalloc((unsigned) (strlen(command) + 1));
     dst = result;
-    for (next = command; isspace(*next); next++) {
+    for (next = command; isspace(UCHAR(*next)); next++) {
 	/* Empty loop body:  just find start of first word. */
     }
     for (index = 0; *next != 0; index++) {
 	start = next;
-	end = TclWordEnd(next, 0);
+	end = TclWordEnd(next, 0, (int *) NULL);
 	if (*end != 0) {
 	    end++;
-	    for (next = end; isspace(*next); next++) {
+	    for (next = end; isspace(UCHAR(*next)); next++) {
 		/* Empty loop body:  just find start of next word. */
 	    }
 	}

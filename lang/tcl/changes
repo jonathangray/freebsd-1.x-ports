@@ -294,7 +294,7 @@ is nested;  needed in order to allow "history" to be invoked from
 
 81. 9/13/91 Changed "panic" not to use vfprintf (it's uglier and less
 general now, but makes it easier to run Tcl on systems that don't
-have vfprintf).  Also changed "strerror" not to reclare sys_errlist.
+have vfprintf).  Also changed "strerror" not to redeclare sys_errlist.
 
 82. 9/19/91 Lots of changes to improve portability to different UNIX
 systems, including addition of "config" script to adapt Tcl to the
@@ -321,7 +321,7 @@ before converting:  on some systems, "tolower" and "toupper" assume
 that character already has particular case.
 
 88. 9/30/91 Fixed bug in Tcl_SetResult:  wasn't always setting freeProc
-correcly when called with NULL value.  This tended to cause memory
+correctly when called with NULL value.  This tended to cause memory
 allocation errors later.
 
 89. 10/3/91 Added "upvar" command.
@@ -357,7 +357,7 @@ to be space characters by the parser.
 
 99. 10/31/91 Added TCL_LEAVE_ERR_MSG flag to procedures like Tcl_SetVar.
 
-100. 11/7/91 Fixed bug in "case" where "in" argument couldn't be ommitted
+100. 11/7/91 Fixed bug in "case" where "in" argument couldn't be omitted
 if all case branches were embedded in a single list.
 
 101. 11/7/91 Switched to use "pid_t" and "uid_t" and other official
@@ -481,7 +481,7 @@ switches to pass to "nm".
 Used to forget about traces in progress and make extra recursive calls
 on trace procs.
 
-136. 9/28/92 Fixed but in auto_reset where it was unsetting variables
+136. 9/28/92 Fixed bug in auto_reset where it was unsetting variables
 that might not exist.
 
 137. 10/7/92 Changed "parray" library procedure to print any array
@@ -492,7 +492,7 @@ values among interpreters took N! time if there exist N interpreters.
 
 139. 10/16/92 Changed auto_reset procedure so that it also deletes any
 existing procedures that are in the auto_load index (the assumption is
-that they should be re-loaded to get the latest vesions).
+that they should be re-loaded to get the latest versions).
 
 140. 10/21/92 Fixed bug that caused lists to be incorrectly generated
 for elements that contained backslash-newline sequences.
@@ -552,3 +552,407 @@ and tried to use strncasecmp.c instead of strcasecmp.c.
 Sys-V configuration, added SHELL variable for SGI systems.
 
 ----------------- Released version 6.7, 2/11/93 ------------------
+
+153. 2/6/93 Changes in backslash processing:
+    - \Cx, \Mx, \CMx, \e sequences no longer special
+    - \<newline> also eats up any space after the newline, replacing
+      the whole sequence with a single space character
+    - Hex sequences like \x24 are now supported, along with ANSI C's \a.
+    - "format" no longer does backslash processing on its format string
+    - there is no longer any special meaning to a 0 return value from
+      Tcl_Backslash
+    - unknown backslash sequences, like (e.g. \*), are replaced with
+      the following character (e.g. *), instead of just treating the
+      backslash as an ordinary character.
+*** POTENTIAL INCOMPATIBILITY ***
+
+154. 2/6/93 Updated all copyright notices.  The meaning hasn't changed
+at all but the wording does a better job of protecting U.C. from
+liability (according to U.C. lawyers, anyway).
+
+155. 2/6/93 Changed "regsub" so that it overwrites the result variable
+in all cases, even if there is no match.
+*** POTENTIAL INCOMPATIBILITY ***
+
+156. 2/8/93 Added support for XPG3 %n$ conversion specifiers to "format"
+command.
+
+157. 2/17/93 Fixed bug in Tcl_Eval where errors due to infinite
+recursion could result in core dumps.
+
+158. 2/17/93 Improved the auto-load mechanism to deal gracefully (i.e.
+return an error) with a situation where a library file that supposedly
+defines a procedure doesn't actually define it.
+
+159. 2/17/93 Renamed Tcl_UnixError procedure to Tcl_PosixError, and
+changed errorCode variable usage to use POSIX as keyword instead of
+UNIX.
+*** POTENTIAL INCOMPATIBILITY ***
+
+160. 2/19/93 Changes to exec and process control:
+    - Added support for >>, >&, >>&, |&, <@, >@, and >&@ forms of redirection.
+    - When exec puts processes into background, it returns a list of
+      their pids as result.
+    - Added support for <file, >file, etc. (i.e. no space between
+      ">" and file name.
+    - Added -keepnewline option.
+    - Deleted Tcl_Fork and Tcl_WaitPids procedures (just use fork and
+      waitpid instead).
+    - Added waitpid compatibility procedure for systems that don't have
+      it.
+    - Added Tcl_ReapDetachedProcs procedure.
+    - Changed "exec" to return an error if there is stderr output, even
+      if the command returns a 0 exit status (it's always been documented
+      this way, but the implementation wasn't correct).
+    - If a process returns a non-zero exit status but doesn't generate
+      any diagnostic output, then Tcl generates an error message for it.
+*** POTENTIAL INCOMPATIBILITY ***
+
+161. 2/25/93 Fixed two memory-management problems having to do with
+managing the old result during variable trace callbacks.
+
+162. 3/1/93 Added dynamic string library:  Tcl_DStringInit, Tcl_DStringAppend,
+Tcl_DStringFree, Tcl_DStringResult, etc.
+
+163. 3/1/93 Modified glob command to only return the names of files that
+exist, and to only return names ending in "/" if the file is a directory.
+*** POTENTIAL INCOMPATIBILITY ***
+
+164. 3/19/93 Modified not to use system calls like "read" directly,
+but instead to use special Tcl procedures that retry automatically
+if interrupted by signals.
+
+165. 4/3/93 Eliminated "noSep" argument to Tcl_AppendElement, plus
+TCL_NO_SPACE flag for Tcl_SetVar and Tcl_SetVar2.
+*** POTENTIAL INCOMPATIBILITY ***
+
+166. 4/3/93 Eliminated "flags" and "termPtr" arguments to Tcl_Eval.
+*** POTENTIAL INCOMPATIBILITY ***
+
+167. 4/3/93 Changes to expressions:
+    - The "expr" command now accepts multiple arguments, which are
+      concatenated together with space separators.
+    - Integers aren't automatically promoted to floating-point if they
+      overflow the word size:  errors are generated instead.
+    - Tcl can now handle "NaN" and other special values if the underlying
+      library procedures handle them.
+    - When printing floating-point numbers, Tcl ensures that there is a "."
+      or "e" in the number, so it can't be treated as an integer accidentally.
+      The procedure Tcl_PrintDouble is available to provide this function
+      in other contexts.  Also, the variable "tcl_precision" can be used
+      to set the precision for printing (must be a decimal number giving
+      digits of precision).
+    - Expressions now support transcendental and other functions, e.g. sin,
+      acos, hypot, ceil, and round.  Can add new math functions with
+      Tcl_CreateMathFunc().
+    - Boolean expressions can now have any of the string values accepted
+      by Tcl_GetBoolean, such as "yes" or "no".
+*** POTENTIAL INCOMPATIBILITY ***
+
+168. 4/5/93 Changed Tcl_UnsetVar and Tcl_UnsetVar2 to return TCL_OK
+or TCL_ERROR instead of 0 or -1.
+*** POTENTIAL INCOMPATIBILITY ***
+
+169. 4/5/93 Eliminated Tcl_CmdBuf structure and associated procedures;
+can use Tcl_DStrings instead.
+*** POTENTIAL INCOMPATIBILITY ***
+
+170. 4/8/93 Changed interface to Tcl_TildeSubst to use a dynamic
+string for buffer space.  This makes the procedure re-entrant and
+thread-safe, whereas it wasn't before.
+*** POTENTIAL INCOMPATIBILITY ***
+
+171. 4/14/93 Eliminated tclHash.h, and moved everything from it to
+tcl.h
+*** POTENTIAL INCOMPATIBILITY ***
+
+172. 4/15/93 Eliminated Tcl_InitHistory, made "history" command always
+be part of interpreter.
+*** POTENTIAL INCOMPATIBILITY ***
+
+173. 4/16/93 Modified "file" command so that "readable" option always
+exists, even on machines that don't support symbolic links (always returns
+same error as if the file wasn't a symbolic link).
+
+174. 4/26/93 Fixed bugs in "regsub" where ^ patterns didn't get handled
+right (pretended not to match when it really did, and looped infinitely
+if -all was specified).
+
+175. 4/29/93 Various improvements in the handling of variables:
+    - Can create variables and array elements during a read trace.
+    - Can delete variables during traces (note: unset traces will be
+      invoked when this happens).
+    - Can upvar to array elements.
+    - Can retarget an upvar to another variable by re-issuing the
+      upvar command with a different "other" variable.
+
+176. 5/3/93 Added Tcl_GetCommandInfo, which returns info about a Tcl
+command such as whether it exists and its ClientData.  Also added
+Tcl_SetCommandInfo, which allows any of this information to be modified
+and also allows a command's delete procedure to have a different
+ClientData value than its command procedure.
+
+177. 5/5/93 Added Tcl_RegExpMatch procedure.
+
+178. 5/6/93 Fixed bug in "scan" where it didn't properly handle
+%% conversion specifiers.  Also changed "scan" to use Tcl_PrintDouble
+for printing real values.
+
+179. 5/7/93 Added "-exact", "-glob", and "-regexp" options to "lsearch"
+command to allow different kinds of pattern matching.
+
+180. 5/7/93 Added many new switches to "lsort" to control the sorting
+process: "-ascii", "-integer", "-real", "-command", "-increasing",
+and "-decreasing".
+
+181. 5/10/93 Changes to file I/O:
+    - Modified "open" command to support a list of POSIX access flags
+      like {WRONLY CREAT TRUNC} in addition to current fopen-style
+      access modes.  Also added "permissions" argument to set permissions
+      of newly-created files.
+    - Fixed Scott Bolte's bug (can close stdin etc. in application and
+      then re-open them with Tcl commands).
+    - Exported access to Tcl's file table with new procedures Tcl_EnterFile
+      and Tcl_GetOpenFile.
+
+182. 5/15/93 Added new "pid" command, which can be used to retrieve
+either the current process id or a list of the process ids in a
+pipeline opened with "open |..."
+
+183. 6/3/93 Changed to use GNU autoconfig for configuration instead of
+the home-brew "config" script.  Also made many other configuration-related
+changes, such as using <unistd.h> instead of explicitly declaring system
+calls in tclUnix.h.
+
+184. 6/4/93 Fixed bug where core-dumps could occur if a procedure
+redefined itself (the memory for the procedure's body could get
+reallocated in the middle of evaluating the body);  implemented
+simple reference count mechanism.
+
+185. 6/5/93 Changed tclIndex file format in two ways:  (a) it's now
+eval-ed instead of parsed, which makes it 3-4x faster; (b) the entries
+in auto_index are now commands to evaluate, which allows commands to
+be loaded in different ways such as dynamic-loading of C code.  The
+old tclIndex file format is still supported.
+
+186. 6/7/93 Eliminated tclTest program, added new "tclsh" program
+that is more like wish (allows script files to be invoked automatically
+using "#!/usr/local/bin/tclsh", makes arguments available to script,
+etc.).  Added support for Tcl_AppInit plus default version;  this
+allows new Tcl applications to be created without modifying the
+main program for tclsh.
+
+187. 6/7/93 Fixed bug in TclWordEnd that kept backslash-newline from
+working correctly in some cases during interactive input.
+
+188. 6/9/93 Added Tcl_LinkVar and related procedures, which automatically
+keep a Tcl variable in sync with a C variable.
+
+189. 6/16/93 Increased maximum nesting depth from 100 to 1000.
+
+190. 6/16/93 Modified "trace var" command so that error messages from
+within traces are returned properly as the result of the variable
+access, instead of the generic "access disallowed by trace command"
+message.
+
+191. 6/16/93 Added Tcl_CallWhenDeleted to provide callbacks when an
+interpreter is deleted (same functionality as Tcl_WatchInterp, which
+used to exist in versions before 6.0).
+
+193. 6/16/93 Added "-code" argument to "return" command;  it's there
+primarily for completeness, so that procedures implementing control
+constructs can reflect exceptional conditions back to their callers.
+
+194. 6/16/93 Split up Tcl.n to make separate manual entries for each
+Tcl command.  Tcl.n now contains a summary of the language syntax.
+
+195. 6/17/93 Added new "switch" command to replace "case": allows
+alternate forms of pattern matching (exact, glob, regexp), replaces
+pattern lists with single patterns (but you can use "-" bodies to
+share one body among several patterns), eliminates "in" noise word.
+"Case" command is now obsolete.
+
+196. 6/17/93 Changed the "exec", "glob", "regexp", and "regsub" commands
+to include a "--" switch.  All initial arguments starting with "-" are now
+treated as switches unless a "--" switch is present to end the list.
+*** POTENTIAL INCOMPATIBILITY ***
+
+197. 6/17/93 Changed auto-exec so that the subprocess gets stdin, stdout,
+and stderr from the parent.  This allows truly interactive sub-processes
+(e.g. vi) to be auto-exec'ed from a tcl shell command line.
+
+198. 6/18/93 Added patchlevel.h, for use in coordinating future patch
+releases, and also added "info patchlevel" command to make the patch
+level available to Tcl scripts.
+
+199. 6/19/93 Modified "glob" command so that a leading "//" in a name
+gets left as is (this is needed for systems like Apollos where "//" is
+the super-root;  Tcl used to collapse the two slashes into a single
+slash).
+
+200. 7/7/93 Added Tcl_SetRecursionLimit procedure so that the maximum
+allowable nesting depth can be controlled for an interpreter from C.
+
+----------------- Released version 7.0 Beta 1, 7/9/93 ------------------
+
+201. 7/12/93 Modified Tcl_GetInt and tclExpr.c so that full-precision
+unsigned integers can be specified without overflow errors.
+
+202. 7/12/93 Configuration changes:  eliminate leading blank line in
+configure script;  provide separate targets in Makefile for installing
+binary and non-binary information; check for size_t and a few other
+potentially missing typedefs; don't put tclAppInit.o into libtcl.a;
+better checks for matherr support.
+
+203. 7/14/93 Changed tclExpr.c to check the termination pointer before
+errno after strtod calls, to avoid problems with some versions of
+strtod that set errno in unexpected ways.
+
+204. 7/16/93 Changed "scan" command to be more ANSI-conformant:
+eliminated %F, %D, etc., added code to ignore "l", "h", and "L"
+modifiers but always convert %e, %f, and %g with implicit "l";
+also added support for %u and %i.  Also changed "format" command
+to eliminate %D, %U, %O, and add %i.
+*** POTENTIAL INCOMPATIBILITY ***
+
+205. 7/17/93 Changed "uplevel" and "upvar" so that they can be used
+from global level to global level:  this used to generate an error.
+
+206. 7/19/93 Renamed "setenv", "putenv", and "unsetenv" procedures
+to avoid conflicts with system procedures with the same names.  If
+you want Tcl's procedures to override the system procedures, do it
+in the Makefile (instructions are in the Makefile).
+*** POTENTIAL INCOMPATIBILITY ***
+
+----------------- Released version 7.0 Beta 2, 7/21/93 ------------------
+
+207. 7/21/93 Fixed bug in tclVar.c where freed memory was accidentally
+used if a procedure returned an element of a local array.
+
+208. 7/22/93 Fixed bug in "unknown" where it didn't properly handle
+errors occurring in the "auto_load" procedure, leaving its state
+inconsistent.
+
+209. 7/23/93 Changed exec's ">2" redirection operator to "2>" for
+consistency with sh.  This is incompatible with earlier beta releases
+of 7.0 but not with pre-7.0 releases, which didn't support either
+operator.
+
+210. 7/28/93 Changed backslash-newline handling so that the resulting
+space character *is* treated as a word separator unless the backslash
+sequence is in quotes or braces.  This is incompatible with 7.0b1
+and 7.0b2 but is more compatible with pre-7.0 versions that the b1
+and b2 releases were.
+
+211. 7/28/93 Eliminated Tcl_LinkedVarWritable, added TCL_LINK_READ_ONLY to
+Tcl_LinkVar to accomplish same purpose.  This change is incompatible
+with earlier beta releases, but not with releases before Tcl 7.0.
+
+212. 7/29/93 Renamed regexp C functions so they won't clash with POSIX
+regexp functions that use the same name.
+
+213. 8/3/93 Added "-errorinfo" and "-errorcode" options to "return"
+command: these allow for much better handling of the errorInfo
+and errorCode variables in some cases.
+
+214. 8/12/93 Changed "expr" so that % always returns a remainder with
+the same sign as the divisor and absolute value smaller than the
+divisor.
+
+215. 8/14/93 Turned off auto-exec in "unknown" unless the command
+was typed interactively.  This means you must use "exec" when
+invoking subprocesses, unless it's a command that's typed interactively.
+*** POTENTIAL INCOMPATIBILITY ***
+
+216. 8/14/93 Added support for tcl_prompt1 and tcl_prompt2 variables
+to tclMain.c:  makes prompts user-settable.
+
+217. 8/14/93 Added asynchronous handlers (Tcl_AsyncCreate etc.) so
+that signals can be taken cleanly by Tcl applications.
+
+218. 8/16/93 Moved information about open files from the interpreter
+structure to global variables so that a file can be opened in one
+interpreter and read or written in another.
+
+219. 8/16/93 Removed ENV_FLAGS from Makefile, so that there's no
+official support for overriding setenv, unsetenv, and putenv.
+
+220. 8/20/93 Various configuration improvements:  coerce chars
+to unsigned chars before using macros like isspace;  source ~/.tclshrc
+file during initialization if it exists and program is running
+interactively;  allow there to be directories in auto_path that don't
+exist or don't have tclIndex files (ignore them); added Tcl_Init
+procedure and changed Tcl_AppInit to call it.
+
+221. 8/21/93 Fixed bug in expr where "+", "-", and " " were all
+getting treated as integers with value 0.
+
+222. 8/26/93 Added "tcl_interactive" variable to tclsh.
+
+223. 8/27/93 Added procedure Tcl_FilePermissions to return whether a
+given file can be read or written or both.  Modified Tcl_EnterFile
+to take a permissions mask rather than separate read and write arguments.
+
+224. 8/28/93 Fixed performance bug in "glob" command (unnecessary call
+to "access" for each file caused a 5-10x slow-down for big directories).
+
+----------------- Released version 7.0 Beta 3, 8/28/93 ------------------
+
+225. 9/9/93 Renamed regexp.h to tclRegexp.h to avoid conflicts with system
+include file by same name.
+
+226. 9/9/93 Added Tcl_DontCallWhenDeleted.
+
+227. 9/16/93 Changed not to call exit C procedure directly;  instead
+always invoke "exit" Tcl command so that application can redefine the
+command to do additional cleanup.
+
+228. 9/17/93 Changed auto-exec to handle names that contain slashes
+(i.e. don't use PATH for them).
+
+229. 9/23/93 Fixed bug in "read" and "gets" commands where they didn't
+clear EOF conditions.
+
+----------------- Released version 7.0, 9/29/93 ------------------
+
+230. 10/7/93 "Scan" command wasn't properly aligning things in memory,
+so segmentation faults could arise under some circumstances.
+
+231. 10/7/93 Fixed bug in Tcl_ConvertElement where it forgot to
+backslash leading curly brace when creating lists.
+
+232. 10/7/93 Eliminated dependency of tclMain.c on tclInt.h and
+tclUnix.h, so that people can copy the file out of the Tcl source
+directory to make modified private versions.
+
+233. 10/8/93 Fixed bug in auto-loader that reversed the priority order
+of entries in auto_path for new-style index files.  Now things are
+back to the way they were before 3.0:  first in auto_path is always
+highest priority.
+
+234. 10/13/93 Fixed bug where Tcl_CommandComplete didn't recognize
+comments and treat them as such.  Thus if you typed the line
+    # {
+interactively, Tcl would think that the command wasn't complete and
+wait for more input before evaluating the script.
+
+235. 10/14/93 Fixed bug where "regsub" didn't set the output variable
+if the input string was empty.
+
+236. 10/23/93 Fixed bug where Tcl_CreatePipeline didn't close off enough
+file descriptors in child processes, causing children not to exit
+properly in some cases.
+
+237. 10/28/93 Changed "list" and "concat" commands not to generate
+errors if given zero arguments, but instead to just return an empty
+string.
+
+----------------- Released version 7.1, 11/4/93 ------------------
+
+Note: there is no 7.2 release.  It was flawed and was thus withdrawn
+shortly after it was released.
+
+238. 11/10/93 TclMain.c didn't compile on some systems because of
+R_OK in call to "access".  Changed to eliminate call to "access".
+
+----------------- Released version 7.3, 11/26/93 ------------------

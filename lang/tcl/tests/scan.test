@@ -4,531 +4,137 @@
 # built-in commands.  Sourcing this file into Tcl runs the tests and
 # generates output for errors.  No output means no errors were found.
 #
-# Copyright 1991 Regents of the University of California
-# Permission to use, copy, modify, and distribute this
-# software and its documentation for any purpose and without
-# fee is hereby granted, provided that this copyright notice
-# appears in all copies.  The University of California makes no
-# representations about the suitability of this software for any
-# purpose.  It is provided "as is" without express or implied
-# warranty.
+# Copyright (c) 1991-1993 The Regents of the University of California.
+# All rights reserved.
 #
-# $Header: /a/cvs/386BSD/ports/lang/tcl/tests/scan.test,v 1.1 1993/08/09 10:57:45 alm Exp $ (Berkeley)
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the
+# above copyright notice and the following two paragraphs appear in
+# all copies of this software.
+#
+# IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+# OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+# CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+# AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+# ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+# PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+#
+# $Header: /a/cvs/386BSD/ports/lang/tcl/tests/scan.test,v 1.2 1993/12/27 07:08:48 rich Exp $ (Berkeley)
 
 if {[string compare test [info procs test]] == 1} then {source defs}
 
 test scan-1.1 {integer scanning} {
     set a {}; set b {}; set c {}; set d {}
-    scan "-20 1476 \n33 0" "%d %d %d %d" a b c d
-} 4
+    list [scan "-20 1476 \n33 0" "%d %d %d %d" a b c d] $a $b $c $d
+} {4 -20 1476 33 0}
 test scan-1.2 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "-20 1476 \n33 0" "%d %d %d %d" a b c d
-    set a
-} -20
+    set a {}; set b {}; set c {}
+    list [scan "-45 16 7890 +10" "%2d %*d %10d %d" a b c] $a $b $c
+} {3 -4 16 7890}
 test scan-1.3 {integer scanning} {
     set a {}; set b {}; set c {}; set d {}
-    scan "-20 1476 \n33 0" "%d %d %d %d" a b c d
-    set b
-} 1476
+    list [scan "-45 16 +10 987" "%ld %d %ld %d" a b c d] $a $b $c $d
+} {4 -45 16 10 987}
 test scan-1.4 {integer scanning} {
     set a {}; set b {}; set c {}; set d {}
-    scan "-20 1476 \n33 0" "%d %d %d %d" a b c d
-    set c
-} 33
+    list [scan "14 1ab 62 10" "%d %x %lo %x" a b c d] $a $b $c $d
+} {4 14 427 50 16}
 test scan-1.5 {integer scanning} {
     set a {}; set b {}; set c {}; set d {}
-    scan "-20 1476 \n33 0" "%d %d %d %d" a b c d
-    set d
-} 0
+    list [scan "12345670 1234567890ab cdefg" "%o	 %o %x %lx" a b c d] \
+	    $a $b $c $d
+} {4 2739128 342391 561323 52719}
 test scan-1.6 {integer scanning} {
-    set a {}; set b {}; set c {}
-    scan "-45 16 7890 +10" "%2d %*d %10d %d" a b c
-} 3
+    set a {}; set b {}; set c {}; set d {}
+    list [scan "ab123-24642" "%2x %3x %3o %2o" a b c d] $a $b $c $d
+} {4 171 291 -20 52}
 test scan-1.7 {integer scanning} {
-    set a {}; set b {}; set c {}
-    scan "-45 16 7890 +10" "%2d %*d %10d %d" a b c
-    set a
-} -4
+    set a {}; set b {}
+    list [scan "1234567 234 567  " "%*3x %x %*o %4o" a b] $a $b
+} {2 17767 375}
 test scan-1.8 {integer scanning} {
-    set a {}; set b {}; set c {}
-    scan "-45 16 7890 +10" "%2d %*d %10d %d" a b c
-    set b
-} 16
+    set a {}; set b {}
+    list [scan "a	1234" "%d %d" a b] $a $b
+} {0 {} {}}
 test scan-1.9 {integer scanning} {
-    set a {}; set b {}; set c {}
-    scan "-45 16 7890 +10" "%2d %*d %10d %d" a b c
-    set c
-} 7890
-
-# Capitalized format specifiers don't work on some systems, so
-# only run the following tests at Berkeley.
-
+    set a {}; set b {}; set c {}; set d {};
+    list [scan "12345678" "%2d %2d %2ld %2d" a b c d] $a $b $c $d
+} {4 12 34 56 78}
+test scan-1.10 {integer scanning} {
+    set a {}; set b {}; set c {}; set d {}
+    list [scan "1 2 " "%hd %d %d %d" a b c d] $a $b $c $d
+} {2 1 2 {} {}}
 if $atBerkeley {
-    test scan-1.10 {integer scanning} {
-	set a {}; set b {}; set c {}; set d {}
-	scan "-45 16 +10 987" "%D %d %D %d" a b c d
-    } 4
     test scan-1.11 {integer scanning} {
-	set a {}; set b {}; set c {}; set d {}
-	scan "-45 16 +10 987" "%D %d %D %d" a b c d
-	set a
-    } -45
-    test scan-1.12 {integer scanning} {
-	set a {}; set b {}; set c {}; set d {}
-	scan "-45 16 +10 987" "%D %d%D %d" a b c d
-	set b
-    } 16
-    test scan-1.13 {integer scanning} {
-	set a {}; set b {}; set c {}; set d {}
-	scan "-45 16 +10 987" "%D %d %D %d" a b c d
-	set c
-    } 10
-    test scan-1.14 {integer scanning} {
-	set a {}; set b {}; set c {}; set d {}
-	scan "-45 16 +10 987" "%D %d %D %d" a b c d
-	set d
-    } 987
-    test scan-1.15 {integer scanning} {
-	set a {}; set b {}; set c {}; set d {}
-	scan "14 1ab 62 10" "%d %x %O %x" a b c d
-    } 4
-    test scan-1.16 {integer scanning} {
-	set a {}; set b {}; set c {}; set d {}
-	scan "14 1ab 62 10" "%d %x %O %x" a b c d
-	set a
-    } 14
-    test scan-1.17 {integer scanning} {
-	set a {}; set b {}; set c {}; set d {}
-	scan "14 1ab 62 10" "%d %x %O %x" a b c d
-	set b
-    } 427
-    test scan-1.18 {integer scanning} {
-	set a {}; set b {}; set c {}; set d {}
-	scan "14 1ab 62 10" "%d %x %O %x" a b c d
-	set c
-    } 50
-    test scan-1.19 {integer scanning} {
-	set a {}; set b {}; set c {}; set d {}
-	scan "14 1ab 62 10" "%d %x %O %x" a b c d
-	set d
-    } 16
-    test scan-1.20 {integer scanning} {
-	set a {}; set b {}; set c {}; set d {}
-	scan "12345670 1234567890ab cdefg" "%o	 %o %x %X" a b c d
-    } 4
+	set a {}; set b {};
+	list [scan "4294967280 4294967280" "%u %d" a b] $a $b
+    } {2 4294967280 -16}
 }
-test scan-1.21 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "12345670 1234567890ab cdefg" "%o	 %o %x %X" a b c d
-    set a
-} 2739128
-test scan-1.22 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "12345670 1234567890ab cdefg" "%o	 %o %x %X" a b c d
-    set b
-} 342391
-test scan-1.23 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "12345670 1234567890ab cdefg" "%o	 %o %x %X" a b c d
-    set c
-} 561323
-test scan-1.24 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "12345670 1234567890ab cdefg" "%o	 %o %x %X" a b c d
-    set d
-} 52719
-test scan-1.25 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "ab123-24642" "%2x %3x %3o %2o" a b c d
-} 4
-test scan-1.26 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "ab123-24642" "%2x %3x %3o %2o" a b c d
-    set a
-} 171
-test scan-1.27 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "ab123-24642" "%2x %3x %3o %2o" a b c d
-    set b
-} 291
-test scan-1.28 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "ab123-24642" "%2x %3x %3o %2o" a b c d
-    set c
-} -20
-test scan-1.29 {integer scanning} {
-    set a {}; set b {}
-    scan "ab123-24642" "%2x %3x %3o %2o" a b c d
-    set d
-} 52
-test scan-1.30 {integer scanning} {
-    set a {}; set b {}
-    scan "1234567 234 567  " "%*3x %x %*o %4o" a b
-} 2
-test scan-1.31 {integer scanning} {
-    set a {}; set b {}
-    scan "1234567 234 567  " "%*3x %x %*o %4o" a b
-    set a
-} 17767
-test scan-1.32 {integer scanning} {
-    set a {}; set b {}
-    scan "a	1234" "%d %d" a b
-} 0
-test scan-1.33 {integer scanning} {
-    set a {}
-    scan "a	1234" "%d %d" a b
-    set a
-} {}
-test scan-1.34 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {};
-    scan "12345678" "%2d %2d %2d %2d" a b c d
-} 4
-test scan-1.35 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {};
-    scan "12345678" "%2d %2d %2d %2d" a b c d
-    set a
-} 12
-test scan-1.36 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "12345678" "%2d %2d %2d %2d" a b c d
-    set b
-} 34
-test scan-1.37 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "12345678" "%2d %2d %2d %2d" a b c d
-    set c
-} 56
-test scan-1.38 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "12345678" "%2d %2d %2d %2d" a b c d
-    set d
-} 78
-test scan-1.39 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "1 2 " "%d %d %d %d" a b c d
-} 2
-test scan-1.40 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "1 2 " "%d %d %d %d" a b c d
-    set a
-} 1
-test scan-1.41 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "1 2 " "%d %d %d %d" a b c d
-    set b
-} 2
-test scan-1.42 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "1 2 " "%d %d %d %d" a b c d
-} 2
-test scan-1.43 {integer scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "1 2 " "%d %d %d %d" a b c d
-    set d
-} {}
 
 test scan-2.1 {floating-point scanning} {
     set a {}; set b {}; set c {}; set d {}
-    scan "2.1 -3.0e8 .99962 a" "%f%f%f%f" a b c d
-} 3
+    list [scan "2.1 -3.0e8 .99962 a" "%f%g%e%f" a b c d] $a $b $c $d
+} {3 2.1 -3e+08 0.99962 {}}
 test scan-2.2 {floating-point scanning} {
     set a {}; set b {}; set c {}; set d {}
-    scan "2.1 -3.0e8 .99962 a" "%f%f%f%f" a b c d
-    set a
-} 2.1
+    list [scan "-1.2345 +8.2 9" "%3e %3lf %f %f" a b c d] $a $b $c $d
+} {4 -1.0 234.0 5.0 8.2}
 test scan-2.3 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "2.1 -3.0e8 .99962 a" "%f%f%f%f" a b c d
-    set b
-} -3e+08
-test scan-2.4 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "2.1 -3.0e8 .99962 a" "%f%f%f%f" a b c d
-    set c
-} 0.99962
-test scan-2.5 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "2.1 -3.0e8 .99962 a" "%f%f%f%f" a b c d
-    set d
-} {}
+    set a {}; set b {}; set c {}
+    list [scan "1e00004 332E-4 3e+4" "%Lf %*2e %f %f" a b c] $a $c
+} {3 10000.0 30000.0}
+if $atBerkeley {
+    test scan-2.4 {floating-point scanning} {
+	set a {}; set b {}; set c {}
+	list [scan "1. 47.6 2.e2 3.e-" "%f %*f %f %f" a b c] $a $b $c
+    } {3 1.0 200.0 3.0}
+    test scan-2.5 {floating-point scanning} {
+	set a {}; set b {}
+	list [scan "1.eabc" "%f %x" a b] $a $b
+    } {2 1.0 2748}
+}
 test scan-2.6 {floating-point scanning} {
     set a {}; set b {}; set c {}; set d {}
-    scan "-1.2345 +8.2 9" "%3e %3f %f %f" a b c d
-} 4
+    list [scan "4.6 99999.7 876.43e-1 118" "%f %f %f %e" a b c d] $a $b $c $d
+} {4 4.6 99999.7 87.643 118.0}
 test scan-2.7 {floating-point scanning} {
     set a {}; set b {}; set c {}; set d {}
-    scan "-1.2345 +8.2 9" "%3e %3f %f %f" a b c d
-    set a
-} -1
+    list [scan "1.2345 697.0e-3 124 .00005" "%f %e %f %e" a b c d] $a $b $c $d
+} {4 1.2345 0.697 124.0 5e-05}
 test scan-2.8 {floating-point scanning} {
     set a {}; set b {}; set c {}; set d {}
-    scan "-1.2345 +8.2 9" "%3e %3f %f %f" a b c d
-    set b
-} 234
+    list [scan "4.6abc" "%f %f %f %f" a b c d] $a $b $c $d
+} {1 4.6 {} {} {}}
 test scan-2.9 {floating-point scanning} {
     set a {}; set b {}; set c {}; set d {}
-    scan "-1.2345 +8.2 9" "%3e %3f %f %f" a b c d
-    set c
-} 5
-test scan-2.10 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "-1.2345 +8.2 9" "%3e %3f %f %f" a b c d
-    set d
-} 8.2
-test scan-2.11 {floating-point scanning} {
-    set a {}; set b {}; set c {}
-    scan "1e00004 332E-4 3e+4" "%f %*2e %f %f" a b c
-} 3
-test scan-2.12 {floating-point scanning} {
-    set a {}; set b {}; set c {}
-    scan "1e00004 332E-4 3e+4" "%f %*2e %f %f" a b c
-    set a
-} 10000
-test scan-2.13 {floating-point scanning} {
-    set a {}; set b {}; set c {}
-    scan "1e00004 332E-4 3e+4" "%f %*2e %f %f" a b c
-    set c
-} 30000
-if $atBerkeley {
-    test scan-2.14 {floating-point scanning} {
-	set a {}; set b {}; set c {}
-	scan "1. 47.6 2.e2 3.e-" "%f %*f %f %f" a b c
-    } 3
-}
-test scan-2.15 {floating-point scanning} {
-    set a {}; set b {}; set c {}
-    scan "1. 47.6 2.e2 3.e-" "%f %*f %f %f" a b c
-    set a
-} 1
-test scan-2.16 {floating-point scanning} {
-    set a {}; set b {}; set c {}
-    scan "1. 47.6 2.e2 3.e-" "%f %*f %f %f" a b c
-    set b
-} 200
-if $atBerkeley {
-    test scan-2.17 {floating-point scanning} {
-	set a {}; set b {}; set c {}
-	scan "1. 47.6 2.e2 3.e-" "%f %*f %f %f" a b c
-	set c
-    } 3
-    test scan-2.18 {floating-point scanning} {
-	set a {}; set b {}
-	scan "1.eabc" "%f %x" a b
-    } 2
-    test scan-2.19 {floating-point scanning} {
-	set a {}; set b {}
-	scan "1.eabc" "%f %x" a b
-	set a
-    } 1
-}
-test scan-2.20 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "4.6 99999.7 876.43e-1 118" "%f %f %f %e" a b c d
-} 4
-test scan-2.21 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "4.6 99999.7 876.43e-1 118" "%f %f %f %e" a b c d
-    set a
-} 4.6
-test scan-2.22 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "4.6 99999.7 876.43e-1 118" "%f %f %f %e" a b c d
-    set b
-} 99999.7
-test scan-2.23 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "4.6 99999.7 876.43e-1 118" "%f %f %f %e" a b c d
-    set c
-} 87.643
-test scan-2.24 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "4.6 99999.7 876.43e-1 118" "%f %f %f %e" a b c d
-    set d
-} 118
-test scan-2.25 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "1.2345 697.0e-3 124 .00005" "%f %e %f %e" a b c d
-} 4
-test scan-2.26 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "1.2345 697.0e-3 124 .00005" "%f %e %f %e" a b c d
-    set a
-} 1.2345
-test scan-2.27 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "1.2345 697.0e-3 124 .00005" "%f %e %f %e" a b c d
-    set b
-} 0.697
-test scan-2.28 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "1.2345 697.0e-3 124 .00005" "%f %e %f %e" a b c d
-    set c
-} 124
-test scan-2.29 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "1.2345 697.0e-3 124 .00005" "%f %e %f %e" a b c d
-    set d
-} 5e-05
-test scan-2.30 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "4.6abc" "%f %f %f %f" a b c d
-} 1
-test scan-2.31 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "4.6abc" "%f %f %f %f" a b c d
-    set a
-} 4.6
-test scan-2.32 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "4.6abc" "%f %f %f %f" a b c d
-    set b
-} {}
-test scan-2.33 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "4.6abc" "%f %f %f %f" a b c d
-    set c
-} {}
-test scan-2.34 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "4.6abc" "%f %f %f %f" a b c d
-    set d
-} {}
-test scan-2.35 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "4.6 5.2" "%f %f %f %f" a b c d
-} 2
-test scan-2.36 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "4.6 5.2" "%f %f %f %f" a b c d
-    set a
-} 4.6
-test scan-2.37 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "4.6 5.2" "%f %f %f %f" a b c d
-    set b
-} 5.2
-test scan-2.38 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "4.6 5.2" "%f %f %f %f" a b c d
-    set c
-} {}
-test scan-2.39 {floating-point scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "4.6 5.2" "%f %f %f %f" a b c d
-    set d
-} {}
+    list [scan "4.6 5.2" "%f %f %f %f" a b c d] $a $b $c $d
+} {2 4.6 5.2 {} {}}
 
 test scan-3.1 {string and character scanning} {
     set a {}; set b {}; set c {}; set d {}
-    scan "abc defghijk dum " "%s %3s %20s %s" a b c d
-} 4
+    list [scan "abc defghijk dum " "%s %3s %20s %s" a b c d] $a $b $c $d
+} {4 abc def ghijk dum}
 test scan-3.2 {string and character scanning} {
     set a {}; set b {}; set c {}; set d {}
-    scan "abc defghijk dum " "%s %3s %20s %s" a b c d
-    set a
-} abc
+    list [scan "a       bcdef" "%c%c%1s %s" a b c d] $a $b $c $d
+} {4 97 32 b cdef}
 test scan-3.3 {string and character scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "abc defghijk dum " "%s %3s %20s %s" a b c d
-    set b
-} def
+    set a {}; set b {}; set c {}
+    list [scan "123456 test " "%*c%*s %s %s %s" a b c] $a $b $c
+} {1 test {} {}}
 test scan-3.4 {string and character scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "abc defghijk dum " "%s %3s %20s %s" a b c d
-    set c
-} ghijk
+    set a {}; set b {}; set c {}; set d
+    list [scan "ababcd01234  f 123450" {%4[abcd] %4[abcd] %[^abcdef] %[^0]} a b c d] $a $b $c $d
+} {4 abab cd {01234  } {f 12345}}
 test scan-3.5 {string and character scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "abc defghijk dum " "%s %3s %20s %s" a b c d
-    set d
-} dum
-test scan-3.6 {string and character scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "a       bcdef" "%c%c%1s %s" a b c d
-} 4
-test scan-3.7 {string and character scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "a       bcdef" "%c%c%1s %s" a b c d
-    set a
-} 97
-test scan-3.8 {string and character scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "a       bcdef" "%c%c%1s %s" a b c d
-    set b
-} 32
-test scan-3.9 {string and character scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "a       bcdef" "%c%c%1s %s" a b c d
-    set c
-} b
-test scan-3.10 {string and character scanning} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "a       bcdef" "%c%c%1s %s" a b c d
-    set d
-} cdef
-test scan-3.11 {string and character scanning} {
     set a {}; set b {}; set c {}
-    scan "123456 test " "%*c%*s %s %s %s" a b c
-} 1
-test scan-3.12 {string and character scanning} {
-    set a {}; set b {}; set c {}
-    scan "123456 test " "%*c%*s %s %s %s" a b c
-    set a
-} test
-test scan-3.13 {string and character scanning} {
-    set a {}; set b {}; set c {}
-    scan "123456 test " "%*c%*s %s %s %s" a b c
-    set b
-} {}
-test scan-3.14 {string and character scanning} {
-    set a {}; set b {}; set c {}
-    scan "123456 test " "%*c%*s %s %s %s" a b c
-    set c
-} {}
-test scan-3.15 {string and character scanning} {
-    set a {}; set b {}; set c {}; set d
-    scan "ababcd01234  f 123450" {%4[abcd] %4[abcd] %[^abcdef] %[^0]} a b c d
-} 4
-test scan-3.16 {string and character scanning} {
-    set a {}; set b {}; set c {}; set d
-    scan "ababcd01234  f 123450" {%4[abcd] %4[abcd] %[^abcdef] %[^0]} a b c d
-    set a
-} abab
-test scan-3.17 {string and character scanning} {
-    set a {}; set b {}; set c {}; set d
-    scan "ababcd01234  f 123450" {%4[abcd] %4[abcd] %[^abcdef] %[^0]} a b c d
-    set b
-} cd
-test scan-3.18 {string and character scanning} {
-    set a {}; set b {}; set c {}; set d
-    scan "ababcd01234  f 123450" {%4[abcd] %4[abcd] %[^abcdef] %[^0]} a b c d
-    set c
-} {01234  }
-test scan-3.19 {string and character scanning} {
-    set a {}; set b {}; set c {}; set d
-    scan "ababcd01234  f 123450" {%4[abcd] %4[abcd] %[^abcdef] %[^0]} a b c d
-    set d
-} {f 12345}
-test scan-3.20 {string and character scanning} {
-    set a {}; set b {}; set c {}
-    scan "aaaaaabc aaabcdefg  + +  XYZQR" {%*4[a] %s %*4[a]%s%*4[ +]%c} a b c
-} 3
-test scan-3.21 {string and character scanning} {
-    set a {}; set b {}; set c {}
-    scan "aaaaaabc aaabcdefg  + +  XYZQR" {%*4[a] %s %*4[a]%s%*4[ +]%c} a b c
-    set a
-} aabc
-test scan-3.22 {string and character scanning} {
-    set a {}; set b {}; set c {}
-    scan "aaaaaabc aaabcdefg  + +  XYZQR" {%*4[a] %s %*4[a]%s%*4[ +]%c} a b c
-    set b
-} bcdefg
-test scan-3.23 {string and character scanning} {
-    set a {}; set b {}; set c {}
-    scan "aaaaaabc aaabcdefg  + +  XYZQR" {%*4[a] %s %*4[a]%s%*4[ +]%c} a b c
-    set c
-} 43
+    list [scan "aaaaaabc aaabcdefg  + +  XYZQR" {%*4[a] %s %*4[a]%s%*4[ +]%c} a b c] $a $b $c
+} {3 aabc bcdefg 43}
 
 test scan-4.1 {error conditions} {
     catch {scan a}
@@ -545,101 +151,61 @@ test scan-4.4 {error conditions} {
     set msg
 } {too many fields to scan}
 test scan-4.5 {error conditions} {
-    catch {scan a %z}
-} 1
+    list [catch {scan a %D} msg] $msg
+} {1 {bad scan conversion character "D"}}
 test scan-4.6 {error conditions} {
-    catch {scan a %z} msg
-    set msg
-} {bad scan conversion character "z"}
+    list [catch {scan a %O} msg] $msg
+} {1 {bad scan conversion character "O"}}
 test scan-4.7 {error conditions} {
-    catch {scan a "%d %d" a}
-} 1
+    list [catch {scan a %X} msg] $msg
+} {1 {bad scan conversion character "X"}}
 test scan-4.8 {error conditions} {
-    catch {scan a "%d %d" a} msg
-    set msg
-} {different numbers of variable names and field specifiers}
+    list [catch {scan a %F} msg] $msg
+} {1 {bad scan conversion character "F"}}
 test scan-4.9 {error conditions} {
-    catch {scan a "%d %d" a b c}
-} 1
+    list [catch {scan a %E} msg] $msg
+} {1 {bad scan conversion character "E"}}
 test scan-4.10 {error conditions} {
-    catch {scan a "%d %d" a b c} msg
-    set msg
-} {different numbers of variable names and field specifiers}
+    list [catch {scan a "%d %d" a} msg] $msg
+} {1 {different numbers of variable names and field specifiers}}
 test scan-4.11 {error conditions} {
-    set a {}; set b {}; set c {}; set d {}
-    expr {[scan "  a" " a %d %d %d %d" a b c d] <= 0}
-} 1
+    list [catch {scan a "%d %d" a b c} msg] $msg
+} {1 {different numbers of variable names and field specifiers}}
 test scan-4.12 {error conditions} {
     set a {}; set b {}; set c {}; set d {}
-    scan "  a" " a %d %d %d %d" a b c d
-    set a
-} {}
+    list [expr {[scan "  a" " a %d %d %d %d" a b c d] <= 0}] $a $b $c $d
+} {1 {} {} {} {}}
 test scan-4.13 {error conditions} {
     set a {}; set b {}; set c {}; set d {}
-    scan "  a" " a %d %d %d %d" a b c d
-    set b
-} {}
+    list [scan "1 2" "%d %d %d %d" a b c d] $a $b $c $d
+} {2 1 2 {} {}}
 test scan-4.14 {error conditions} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "  a" " a %d %d %d %d" a b c d
-    set c
-} {}
-test scan-4.15 {error conditions} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "  a" " a %d %d %d %d" a b c d
-    set d
-} {}
-test scan-4.16 {error conditions} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "1 2" "%d %d %d %d" a b c d
-} 2
-test scan-4.17 {error conditions} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "1 2" "%d %d %d %d" a b c d
-    set a
-} 1
-test scan-4.18 {error conditions} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "1 2" "%d %d %d %d" a b c d
-    set b
-} 2
-test scan-4.19 {error conditions} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "1 2" "%d %d %d %d" a b c d
-    set c
-} {}
-test scan-4.20 {error conditions} {
-    set a {}; set b {}; set c {}; set d {}
-    scan "1 2" "%d %d %d %d" a b c d
-    set d
-} {}
-test scan-4.21 {error conditions} {
     catch {unset a}
     set a(0) 44
     list [catch {scan 44 %d a} msg] $msg
 } {1 {couldn't set variable "a"}}
-test scan-4.22 {error conditions} {
+test scan-4.15 {error conditions} {
     catch {unset a}
     set a(0) 44
     list [catch {scan 44 %c a} msg] $msg
 } {1 {couldn't set variable "a"}}
-test scan-4.23 {error conditions} {
+test scan-4.16 {error conditions} {
     catch {unset a}
     set a(0) 44
     list [catch {scan 44 %s a} msg] $msg
 } {1 {couldn't set variable "a"}}
-test scan-4.24 {error conditions} {
+test scan-4.17 {error conditions} {
     catch {unset a}
     set a(0) 44
     list [catch {scan 44 %f a} msg] $msg
 } {1 {couldn't set variable "a"}}
-test scan-4.25 {error conditions} {
+test scan-4.18 {error conditions} {
     catch {unset a}
     set a(0) 44
     list [catch {scan 44 %f a} msg] $msg
 } {1 {couldn't set variable "a"}}
 catch {unset a}
-test scan-4.26 {error conditions} {
+test scan-4.19 {error conditions} {
     list [catch {scan 44 %2c a} msg] $msg
 } {1 {field width may not be specified in %c conversion}}
 
@@ -650,3 +216,61 @@ test scan-5.2 {lots of arguments} {
     scan "10 20 30 40 50 60 70 80 90 100 110 120 130 140 150 160 170 180 190 200" "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d" a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 a16 a17 a18 a19 a20
     set a20
 } 200
+
+test scan-6.1 {miscellaneous tests} {
+    set a {}
+    list [scan ab16c ab%dc a] $a
+} {1 16}
+test scan-6.2 {miscellaneous tests} {
+    set a {}
+    list [scan ax16c ab%dc a] $a
+} {0 {}}
+test scan-6.3 {miscellaneous tests} {
+    set a {}
+    list [catch {scan ab%c114 ab%%c%d a} msg] $msg $a
+} {0 1 114}
+test scan-6.4 {miscellaneous tests} {
+    set a {}
+    list [catch {scan ab%c14 ab%%c%d a} msg] $msg $a
+} {0 1 14}
+test scan-6.5 {miscellaneous tests} {
+    catch {unset tcl_precision}
+    set a {}
+    scan 1.111122223333 %f a
+    set a
+} {1.11112}
+test scan-6.6 {miscellaneous tests} {
+    set tcl_precision 10
+    set a {}
+    scan 1.111122223333 %lf a
+    unset tcl_precision
+    set a
+} {1.111122223}
+test scan-6.7 {miscellaneous tests} {
+    set tcl_precision 10
+    set a {}
+    scan 1.111122223333 %f a
+    unset tcl_precision
+    set a
+} {1.111122223}
+
+test scan-7.1 {alignment in results array (TCL_ALIGN)} {
+    scan "123 13.6" "%s %f" a b
+    set b
+} 13.6
+test scan-7.2 {alignment in results array (TCL_ALIGN)} {
+    scan "1234567 13.6" "%s %f" a b
+    set b
+} 13.6
+test scan-7.3 {alignment in results array (TCL_ALIGN)} {
+    scan "12345678901 13.6" "%s %f" a b
+    set b
+} 13.6
+test scan-7.4 {alignment in results array (TCL_ALIGN)} {
+    scan "123456789012345 13.6" "%s %f" a b
+    set b
+} 13.6
+test scan-7.5 {alignment in results array (TCL_ALIGN)} {
+    scan "1234567890123456789 13.6" "%s %f" a b
+    set b
+} 13.6

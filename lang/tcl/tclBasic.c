@@ -5,17 +5,35 @@
  *	including interpreter creation and deletion, command creation
  *	and deletion, and command parsing and execution.
  *
- * Copyright 1987-1992 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1987-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
+#ifndef lint
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclBasic.c,v 1.2 1993/12/27 07:05:56 rich Exp $ SPRITE (Berkeley)";
+#endif
+
 #include "tclInt.h"
+#ifndef TCL_GENERIC_ONLY
+#   include "tclUnix.h"
+#endif
 
 /*
  * The following structure defines all of the commands in the Tcl core,
@@ -50,6 +68,7 @@ static CmdInfo builtInCmds[] = {
     {"foreach",		Tcl_ForeachCmd},
     {"format",		Tcl_FormatCmd},
     {"global",		Tcl_GlobalCmd},
+    {"history",		Tcl_HistoryCmd},
     {"if",		Tcl_IfCmd},
     {"incr",		Tcl_IncrCmd},
     {"info",		Tcl_InfoCmd},
@@ -72,6 +91,7 @@ static CmdInfo builtInCmds[] = {
     {"set",		Tcl_SetCmd},
     {"split",		Tcl_SplitCmd},
     {"string",		Tcl_StringCmd},
+    {"switch",		Tcl_SwitchCmd},
     {"trace",		Tcl_TraceCmd},
     {"unset",		Tcl_UnsetCmd},
     {"uplevel",		Tcl_UplevelCmd},
@@ -93,6 +113,7 @@ static CmdInfo builtInCmds[] = {
     {"gets",		Tcl_GetsCmd},
     {"glob",		Tcl_GlobCmd},
     {"open",		Tcl_OpenCmd},
+    {"pid",		Tcl_PidCmd},
     {"puts",		Tcl_PutsCmd},
     {"pwd",		Tcl_PwdCmd},
     {"read",		Tcl_ReadCmd},
@@ -118,7 +139,8 @@ static CmdInfo builtInCmds[] = {
  *
  * Side effects:
  *	The command interpreter is initialized with an empty variable
- *	table and the built-in commands.
+ *	table and the built-in commands.  SIGPIPE signals are set to
+ *	be ignored (see comment below for details).
  *
  *----------------------------------------------------------------------
  */
@@ -130,17 +152,23 @@ Tcl_CreateInterp()
     register Command *cmdPtr;
     register CmdInfo *cmdInfoPtr;
     int i;
+    static int firstInterp = 1;
 
     iPtr = (Interp *) ckalloc(sizeof(Interp));
     iPtr->result = iPtr->resultSpace;
     iPtr->freeProc = 0;
     iPtr->errorLine = 0;
     Tcl_InitHashTable(&iPtr->commandTable, TCL_STRING_KEYS);
+    Tcl_InitHashTable(&iPtr->mathFuncTable, TCL_STRING_KEYS);
     Tcl_InitHashTable(&iPtr->globalTable, TCL_STRING_KEYS);
     iPtr->numLevels = 0;
+    iPtr->maxNestingDepth = 1000;
     iPtr->framePtr = NULL;
     iPtr->varFramePtr = NULL;
     iPtr->activeTracePtr = NULL;
+    iPtr->returnCode = TCL_OK;
+    iPtr->errorInfo = NULL;
+    iPtr->errorCode = NULL;
     iPtr->numEvents = 0;
     iPtr->events = NULL;
     iPtr->curEvent = 0;
@@ -152,18 +180,20 @@ Tcl_CreateInterp()
     iPtr->appendResult = NULL;
     iPtr->appendAvl = 0;
     iPtr->appendUsed = 0;
-    iPtr->numFiles = 0;
-    iPtr->filePtrArray = NULL;
     for (i = 0; i < NUM_REGEXPS; i++) {
 	iPtr->patterns[i] = NULL;
 	iPtr->patLengths[i] = -1;
 	iPtr->regexps[i] = NULL;
     }
+    strcpy(iPtr->pdFormat, DEFAULT_PD_FORMAT);
+    iPtr->pdPrec = DEFAULT_PD_PREC;
     iPtr->cmdCount = 0;
     iPtr->noEval = 0;
+    iPtr->evalFlags = 0;
     iPtr->scriptFile = NULL;
     iPtr->flags = 0;
     iPtr->tracePtr = NULL;
+    iPtr->deleteCallbackPtr = NULL;
     iPtr->resultSpace[0] = 0;
 
     /*
@@ -183,15 +213,159 @@ Tcl_CreateInterp()
 	    cmdPtr->proc = cmdInfoPtr->proc;
 	    cmdPtr->clientData = (ClientData) NULL;
 	    cmdPtr->deleteProc = NULL;
+	    cmdPtr->deleteData = (ClientData) NULL;
 	    Tcl_SetHashValue(hPtr, cmdPtr);
 	}
     }
 
 #ifndef TCL_GENERIC_ONLY
     TclSetupEnv((Tcl_Interp *) iPtr);
+
+    /*
+     * The code below causes SIGPIPE (broken pipe) errors to
+     * be ignored.  This is needed so that Tcl processes don't
+     * die if they create child processes (e.g. using "exec" or
+     * "open") that terminate prematurely.  The signal handler
+     * is only set up when the first interpreter is created; 
+     * after this the application can override the handler with
+     * a different one of its own, if it wants.
+     */
+
+    if (firstInterp) {
+	(void) signal(SIGPIPE, SIG_IGN);
+	firstInterp = 0;
+    }
 #endif
 
+    Tcl_TraceVar2((Tcl_Interp *) iPtr, "tcl_precision", (char *) NULL,
+	    TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+	    TclPrecTraceProc, (ClientData) NULL);
     return (Tcl_Interp *) iPtr;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tcl_Init --
+ *
+ *	This procedure is typically invoked by Tcl_AppInit procedures
+ *	to perform additional initialization for a Tcl interpreter,
+ *	such as sourcing the "init.tcl" script.
+ *
+ * Results:
+ *	Returns a standard Tcl completion code and sets interp->result
+ *	if there is an error.
+ *
+ * Side effects:
+ *	Depends on what's in the init.tcl script.
+ *
+ *----------------------------------------------------------------------
+ */
+
+int
+Tcl_Init(interp)
+    Tcl_Interp *interp;		/* Interpreter to initialize. */
+{
+    static char initCmd[] =
+	"if [file exists [info library]/init.tcl] {\n\
+	    source [info library]/init.tcl\n\
+	} else {\n\
+	    set msg \"can't find [info library]/init.tcl; perhaps you \"\n\
+	    append msg \"need to\\ninstall Tcl or set your TCL_LIBRARY \"\n\
+	    append msg \"environment variable?\"\n\
+	    error $msg\n\
+	}";
+
+    return Tcl_Eval(interp, initCmd);
+}
+
+/*
+ *--------------------------------------------------------------
+ *
+ * Tcl_CallWhenDeleted --
+ *
+ *	Arrange for a procedure to be called before a given
+ *	interpreter is deleted.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	When Tcl_DeleteInterp is invoked to delete interp,
+ *	proc will be invoked.  See the manual entry for
+ *	details.
+ *
+ *--------------------------------------------------------------
+ */
+
+void
+Tcl_CallWhenDeleted(interp, proc, clientData)
+    Tcl_Interp *interp;		/* Interpreter to watch. */
+    Tcl_InterpDeleteProc *proc;	/* Procedure to call when interpreter
+				 * is about to be deleted. */
+    ClientData clientData;	/* One-word value to pass to proc. */
+{
+    DeleteCallback *dcPtr, *prevPtr;
+    Interp *iPtr = (Interp *) interp;
+
+    dcPtr = (DeleteCallback *) ckalloc(sizeof(DeleteCallback));
+    dcPtr->proc = proc;
+    dcPtr->clientData = clientData;
+    dcPtr->nextPtr = NULL;
+    if (iPtr->deleteCallbackPtr == NULL) {
+	iPtr->deleteCallbackPtr = dcPtr;
+    } else {
+	prevPtr = iPtr->deleteCallbackPtr;
+	while (prevPtr->nextPtr != NULL) {
+	    prevPtr = prevPtr->nextPtr;
+	}
+	prevPtr->nextPtr = dcPtr;
+    }
+}
+
+/*
+ *--------------------------------------------------------------
+ *
+ * Tcl_DontCallWhenDeleted --
+ *
+ *	Cancel the arrangement for a procedure to be called when
+ *	a given interpreter is deleted.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	If proc and clientData were previously registered as a
+ *	callback via Tcl_CallWhenDeleted, they are unregistered.
+ *	If they weren't previously registered then nothing
+ *	happens.
+ *
+ *--------------------------------------------------------------
+ */
+
+void
+Tcl_DontCallWhenDeleted(interp, proc, clientData)
+    Tcl_Interp *interp;		/* Interpreter to watch. */
+    Tcl_InterpDeleteProc *proc;	/* Procedure to call when interpreter
+				 * is about to be deleted. */
+    ClientData clientData;	/* One-word value to pass to proc. */
+{
+    DeleteCallback *prevPtr, *dcPtr;
+    Interp *iPtr = (Interp *) interp;
+
+    for (prevPtr = NULL, dcPtr = iPtr->deleteCallbackPtr;
+	    dcPtr != NULL; prevPtr = dcPtr, dcPtr = dcPtr->nextPtr) {
+	if ((dcPtr->proc != proc) || (dcPtr->clientData != clientData)) {
+	    continue;
+	}
+	if (prevPtr == NULL) {
+	    iPtr->deleteCallbackPtr = dcPtr->nextPtr;
+	} else {
+	    prevPtr->nextPtr = dcPtr->nextPtr;
+	}
+	ckfree((char *) dcPtr);
+	break;
+    }
 }
 
 /*
@@ -221,6 +395,7 @@ Tcl_DeleteInterp(interp)
     Tcl_HashEntry *hPtr;
     Tcl_HashSearch search;
     register Command *cmdPtr;
+    DeleteCallback *dcPtr;
     int i;
 
     /*
@@ -233,6 +408,17 @@ Tcl_DeleteInterp(interp)
     }
 
     /*
+     * Invoke deletion callbacks.
+     */
+
+    while (iPtr->deleteCallbackPtr != NULL) {
+	dcPtr = iPtr->deleteCallbackPtr;
+	iPtr->deleteCallbackPtr = dcPtr->nextPtr;
+	(*dcPtr->proc)(dcPtr->clientData, interp);
+	ckfree((char *) dcPtr);
+    }
+
+    /*
      * Free up any remaining resources associated with the
      * interpreter.
      */
@@ -241,12 +427,31 @@ Tcl_DeleteInterp(interp)
 	    hPtr != NULL; hPtr = Tcl_NextHashEntry(&search)) {
 	cmdPtr = (Command *) Tcl_GetHashValue(hPtr);
 	if (cmdPtr->deleteProc != NULL) { 
-	    (*cmdPtr->deleteProc)(cmdPtr->clientData);
+	    (*cmdPtr->deleteProc)(cmdPtr->deleteData);
 	}
 	ckfree((char *) cmdPtr);
     }
     Tcl_DeleteHashTable(&iPtr->commandTable);
+    for (hPtr = Tcl_FirstHashEntry(&iPtr->mathFuncTable, &search);
+	    hPtr != NULL; hPtr = Tcl_NextHashEntry(&search)) {
+	ckfree((char *) Tcl_GetHashValue(hPtr));
+    }
+    Tcl_DeleteHashTable(&iPtr->mathFuncTable);
     TclDeleteVars(iPtr, &iPtr->globalTable);
+
+    /*
+     * Free up the result *after* deleting variables, since variable
+     * deletion could have transferred ownership of the result string
+     * to Tcl.
+     */
+
+    Tcl_FreeResult(interp);
+    if (iPtr->errorInfo != NULL) {
+	ckfree(iPtr->errorInfo);
+    }
+    if (iPtr->errorCode != NULL) {
+	ckfree(iPtr->errorCode);
+    }
     if (iPtr->events != NULL) {
 	int i;
 
@@ -264,30 +469,6 @@ Tcl_DeleteInterp(interp)
     if (iPtr->appendResult != NULL) {
 	ckfree(iPtr->appendResult);
     }
-#ifndef TCL_GENERIC_ONLY
-    if (iPtr->numFiles > 0) {
-	for (i = 0; i < iPtr->numFiles; i++) {
-	    OpenFile *filePtr;
-    
-	    filePtr = iPtr->filePtrArray[i];
-	    if (filePtr == NULL) {
-		continue;
-	    }
-	    if (i >= 3) {
-		fclose(filePtr->f);
-		if (filePtr->f2 != NULL) {
-		    fclose(filePtr->f2);
-		}
-		if (filePtr->numPids > 0) {
-		    Tcl_DetachPids(filePtr->numPids, filePtr->pidPtr);
-		    ckfree((char *) filePtr->pidPtr);
-		}
-	    }
-	    ckfree((char *) filePtr);
-	}
-	ckfree((char *) iPtr->filePtrArray);
-    }
-#endif
     for (i = 0; i < NUM_REGEXPS; i++) {
 	if (iPtr->patterns[i] == NULL) {
 	    break;
@@ -349,7 +530,7 @@ Tcl_CreateCommand(interp, cmdName, proc, clientData, deleteProc)
 
 	cmdPtr = (Command *) Tcl_GetHashValue(hPtr);
 	if (cmdPtr->deleteProc != NULL) {
-	    (*cmdPtr->deleteProc)(cmdPtr->clientData);
+	    (*cmdPtr->deleteProc)(cmdPtr->deleteData);
 	}
     } else {
 	cmdPtr = (Command *) ckalloc(sizeof(Command));
@@ -358,6 +539,91 @@ Tcl_CreateCommand(interp, cmdName, proc, clientData, deleteProc)
     cmdPtr->proc = proc;
     cmdPtr->clientData = clientData;
     cmdPtr->deleteProc = deleteProc;
+    cmdPtr->deleteData = clientData;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tcl_SetCommandInfo --
+ *
+ *	Modifies various information about a Tcl command.
+ *
+ * Results:
+ *	If cmdName exists in interp, then the information at *infoPtr
+ *	is stored with the command in place of the current information
+ *	and 1 is returned.  If the command doesn't exist then 0 is
+ *	returned.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+int
+Tcl_SetCommandInfo(interp, cmdName, infoPtr)
+    Tcl_Interp *interp;			/* Interpreter in which to look
+					 * for command. */
+    char *cmdName;			/* Name of desired command. */
+    Tcl_CmdInfo *infoPtr;		/* Where to store information about
+					 * command. */
+{
+    Tcl_HashEntry *hPtr;
+    Command *cmdPtr;
+
+    hPtr = Tcl_FindHashEntry(&((Interp *) interp)->commandTable, cmdName);
+    if (hPtr == NULL) {
+	return 0;
+    }
+    cmdPtr = (Command *) Tcl_GetHashValue(hPtr);
+    cmdPtr->proc = infoPtr->proc;
+    cmdPtr->clientData = infoPtr->clientData;
+    cmdPtr->deleteProc = infoPtr->deleteProc;
+    cmdPtr->deleteData = infoPtr->deleteData;
+    return 1;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tcl_GetCommandInfo --
+ *
+ *	Returns various information about a Tcl command.
+ *
+ * Results:
+ *	If cmdName exists in interp, then *infoPtr is modified to
+ *	hold information about cmdName and 1 is returned.  If the
+ *	command doesn't exist then 0 is returned and *infoPtr isn't
+ *	modified.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+int
+Tcl_GetCommandInfo(interp, cmdName, infoPtr)
+    Tcl_Interp *interp;			/* Interpreter in which to look
+					 * for command. */
+    char *cmdName;			/* Name of desired command. */
+    Tcl_CmdInfo *infoPtr;		/* Where to store information about
+					 * command. */
+{
+    Tcl_HashEntry *hPtr;
+    Command *cmdPtr;
+
+    hPtr = Tcl_FindHashEntry(&((Interp *) interp)->commandTable, cmdName);
+    if (hPtr == NULL) {
+	return 0;
+    }
+    cmdPtr = (Command *) Tcl_GetHashValue(hPtr);
+    infoPtr->proc = cmdPtr->proc;
+    infoPtr->clientData = cmdPtr->clientData;
+    infoPtr->deleteProc = cmdPtr->deleteProc;
+    infoPtr->deleteData = cmdPtr->deleteData;
+    return 1;
 }
 
 /*
@@ -395,7 +661,7 @@ Tcl_DeleteCommand(interp, cmdName)
     }
     cmdPtr = (Command *) Tcl_GetHashValue(hPtr);
     if (cmdPtr->deleteProc != NULL) {
-	(*cmdPtr->deleteProc)(cmdPtr->clientData);
+	(*cmdPtr->deleteProc)(cmdPtr->deleteData);
     }
     ckfree((char *) cmdPtr);
     Tcl_DeleteHashEntry(hPtr);
@@ -425,16 +691,10 @@ Tcl_DeleteCommand(interp, cmdName)
  */
 
 int
-Tcl_Eval(interp, cmd, flags, termPtr)
+Tcl_Eval(interp, cmd)
     Tcl_Interp *interp;		/* Token for command interpreter (returned
 				 * by a previous call to Tcl_CreateInterp). */
     char *cmd;			/* Pointer to TCL command to interpret. */
-    int flags;			/* OR-ed combination of flags like
-				 * TCL_BRACKET_TERM and TCL_RECORD_BOUNDS. */
-    char **termPtr;		/* If non-NULL, fill in the address it points
-				 * to with the address of the char. just after
-				 * the last one that was part of cmd.  See
-				 * the man page for details on this. */
 {
     /*
      * The storage immediately below is used to generate a copy
@@ -464,12 +724,14 @@ Tcl_Eval(interp, cmd, flags, termPtr)
     char termChar;			/* Return when this character is found
 					 * (either ']' or '\0').  Zero means
 					 * that newlines terminate commands. */
+    int flags;				/* Interp->evalFlags value when the
+					 * procedure was called. */
     int result;				/* Return value. */
     register Interp *iPtr = (Interp *) interp;
     Tcl_HashEntry *hPtr;
     Command *cmdPtr;
-    char *dummy;			/* Make termPtr point here if it was
-					 * originally NULL. */
+    char *termPtr;			/* Contains character just after the
+					 * last one in the command. */
     char *cmdStart;			/* Points to first non-blank char. in
 					 * command (used in calling trace
 					 * procedures). */
@@ -492,18 +754,6 @@ Tcl_Eval(interp, cmd, flags, termPtr)
     result = TCL_OK;
 
     /*
-     * Check depth of nested calls to Tcl_Eval:  if this gets too large,
-     * it's probably because of an infinite loop somewhere.
-     */
-
-    iPtr->numLevels++;
-    if (iPtr->numLevels > MAX_NESTING_DEPTH) {
-	iPtr->numLevels--;
-	iPtr->result =  "too many nested calls to Tcl_Eval (infinite loop?)";
-	return TCL_ERROR;
-    }
-
-    /*
      * Initialize the area in which command copies will be assembled.
      */
 
@@ -513,16 +763,28 @@ Tcl_Eval(interp, cmd, flags, termPtr)
     pv.clientData = (ClientData) NULL;
 
     src = cmd;
+    flags = iPtr->evalFlags;
+    iPtr->evalFlags = 0;
     if (flags & TCL_BRACKET_TERM) {
 	termChar = ']';
     } else {
 	termChar = 0;
     }
-    if (termPtr == NULL) {
-	termPtr = &dummy;
-    }
-    *termPtr = src;
+    termPtr = src;
     cmdStart = src;
+
+    /*
+     * Check depth of nested calls to Tcl_Eval:  if this gets too large,
+     * it's probably because of an infinite loop somewhere.
+     */
+
+    iPtr->numLevels++;
+    if (iPtr->numLevels > iPtr->maxNestingDepth) {
+	iPtr->numLevels--;
+	iPtr->result =  "too many nested calls to Tcl_Eval (infinite loop?)";
+	iPtr->termPtr = termPtr;
+	return TCL_ERROR;
+    }
 
     /*
      * There can be many sub-commands (separated by semi-colons or
@@ -581,8 +843,8 @@ Tcl_Eval(interp, cmd, flags, termPtr)
 
 	    maxArgs = argSize - argc - 2;
 	    result = TclParseWords((Tcl_Interp *) iPtr, src, flags,
-		    maxArgs, termPtr, &newArgs, &argv[argc], &pv);
-	    src = *termPtr;
+		    maxArgs, &termPtr, &newArgs, &argv[argc], &pv);
+	    src = termPtr;
 	    if (result != TCL_OK) {
 		ellipsis = "...";
 		goto done;
@@ -701,6 +963,9 @@ Tcl_Eval(interp, cmd, flags, termPtr)
 	iPtr->result = iPtr->resultSpace;
 	iPtr->resultSpace[0] = 0;
 	result = (*cmdPtr->proc)(cmdPtr->clientData, interp, argc, argv);
+	if (tcl_AsyncReady) {
+	    result = Tcl_AsyncInvoke(interp, result);
+	}
 	if (result != TCL_OK) {
 	    break;
 	}
@@ -759,7 +1024,7 @@ Tcl_Eval(interp, cmd, flags, termPtr)
 		iPtr->errorLine++;
 	    }
 	}
-	for ( ; isspace(*p) || (*p == ';'); p++) {
+	for ( ; isspace(UCHAR(*p)) || (*p == ';'); p++) {
 	    if (*p == '\n') {
 		iPtr->errorLine++;
 	    }
@@ -789,6 +1054,7 @@ Tcl_Eval(interp, cmd, flags, termPtr)
     } else {
 	iPtr->flags &= ~ERR_ALREADY_LOGGED;
     }
+    iPtr->termPtr = termPtr;
     return result;
 }
 
@@ -993,7 +1259,7 @@ Tcl_VarEval(iPtr, p, va_alist)
     /*
      * Copy the strings one after the other into a single larger
      * string.  Use stack-allocated space for small commands, but if
-     * the commands gets too large than call ckalloc to create the
+     * the command gets too large than call ckalloc to create the
      * space.
      */
 
@@ -1026,7 +1292,7 @@ Tcl_VarEval(iPtr, p, va_alist)
     va_end(argList);
     cmd[spaceUsed] = '\0';
 
-    result = Tcl_Eval(interp, cmd, 0, (char **) NULL);
+    result = Tcl_Eval(interp, cmd);
     if (cmd != fixedSpace) {
 	ckfree(cmd);
     }
@@ -1064,7 +1330,40 @@ Tcl_GlobalEval(interp, command)
 
     savedVarFramePtr = iPtr->varFramePtr;
     iPtr->varFramePtr = NULL;
-    result = Tcl_Eval(interp, command, 0, (char **) NULL);
+    result = Tcl_Eval(interp, command);
     iPtr->varFramePtr = savedVarFramePtr;
     return result;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tcl_SetRecursionLimit --
+ *
+ *	Set the maximum number of recursive calls that may be active
+ *	for an interpreter at once.
+ *
+ * Results:
+ *	The return value is the old limit on nesting for interp.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+int
+Tcl_SetRecursionLimit(interp, depth)
+    Tcl_Interp *interp;			/* Interpreter whose nesting limit
+					 * is to be set. */
+    int depth;				/* New value for maximimum depth. */
+{
+    Interp *iPtr = (Interp *) interp;
+    int old;
+
+    old = iPtr->maxNestingDepth;
+    if (depth > 0) {
+	iPtr->maxNestingDepth = depth;
+    }
+    return old;
 }

@@ -5,18 +5,32 @@
  *	(both scalars and arrays).
  *
  *	The implementation of arrays is modelled after an initial
- *	implementation by Karl Lehenbauer, Mark Diekhans and
- *	Peter da Silva.
+ *	implementation by Mark Diekhans and Karl Lehenbauer.
  *
- * Copyright 1987-1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1987-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
+
+#ifndef lint
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclVar.c,v 1.2 1993/12/27 07:06:25 rich Exp $ SPRITE (Berkeley)";
+#endif
 
 #include "tclInt.h"
 
@@ -29,24 +43,172 @@ static char *noSuchVar =	"no such variable";
 static char *isArray =		"variable is array";
 static char *needArray =	"variable isn't array";
 static char *noSuchElement =	"no such element in array";
-static char *traceActive =	"trace is active on variable";
+static char *danglingUpvar =	"upvar refers to element in deleted array";
+
+/*
+ * Creation flag values passed in to LookupVar:
+ *
+ * CRT_PART1 -		1 means create hash table entry for part 1 of
+ *			name, if it doesn't already exist.  0 means
+ *			return an error if it doesn't exist.
+ * CRT_PART2 -		1 means create hash table entry for part 2 of
+ *			name, if it doesn't already exist.  0 means
+ *			return an error if it doesn't exist.
+ */
+
+#define CRT_PART1	1
+#define CRT_PART2	2
 
 /*
  * Forward references to procedures defined later in this file:
  */
 
 static  char *		CallTraces _ANSI_ARGS_((Interp *iPtr, Var *arrayPtr,
-			    Tcl_HashEntry *hPtr, char *part1, char *part2,
+			    Var *varPtr, char *part1, char *part2,
 			    int flags));
+static void		CleanupVar _ANSI_ARGS_((Var *varPtr, Var *arrayPtr));
 static void		DeleteSearches _ANSI_ARGS_((Var *arrayVarPtr));
 static void		DeleteArray _ANSI_ARGS_((Interp *iPtr, char *arrayName,
 			    Var *varPtr, int flags));
-static Var *		NewVar _ANSI_ARGS_((int space));
+static Var *		LookupVar _ANSI_ARGS_((Tcl_Interp *interp, char *part1,
+			    char *part2, int flags, char *msg, int create,
+			    Var **arrayPtrPtr));
+static int		MakeUpvar _ANSI_ARGS_((Interp *iPtr,
+			    CallFrame *framePtr, char *otherP1,
+			    char *otherP2, char *myName));
+static Var *		NewVar _ANSI_ARGS_((void));
 static ArraySearch *	ParseSearchId _ANSI_ARGS_((Tcl_Interp *interp,
 			    Var *varPtr, char *varName, char *string));
 static void		VarErrMsg _ANSI_ARGS_((Tcl_Interp *interp,
 			    char *part1, char *part2, char *operation,
 			    char *reason));
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * LookupVar --
+ *
+ *	This procedure is used by virtually all of the variable
+ *	code to locate a variable given its name(s).
+ *
+ * Results:
+ *	The return value is a pointer to the variable indicated by
+ *	part1 and part2, or NULL if the variable couldn't be found.
+ *	If the variable is found, *arrayPtrPtr is filled in with
+ *	the address of the array that contains the variable (or NULL
+ *	if the variable is a scalar).  Note:  it's possible that the
+ *	variable returned may be VAR_UNDEFINED, even if CRT_PART1 and
+ *	CRT_PART2 are specified (these only cause the hash table entry
+ *	and/or array to be created).
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static Var *
+LookupVar(interp, part1, part2, flags, msg, create, arrayPtrPtr)
+    Tcl_Interp *interp;		/* Interpreter to use for lookup. */
+    char *part1;		/* If part2 is NULL, this is name of scalar
+				 * variable.  Otherwise it is name of array. */
+    char *part2;		/* Name of an element within array, or NULL. */
+    int flags;			/* Only the TCL_GLOBAL_ONLY and
+				 * TCL_LEAVE_ERR_MSG bits matter. */
+    char *msg;			/* Verb to use in error messages, e.g.
+				 * "read" or "set".  Only needed if
+				 * TCL_LEAVE_ERR_MSG is set in flags. */
+    int create;			/* OR'ed combination of CRT_PART1 and
+				 * CRT_PART2.  Tells which entries to create
+				 * if they don't already exist. */
+    Var **arrayPtrPtr;		/* If part2 is non-NULL, *arrayPtrPtr gets
+				 * filled in with address of array variable. */
+{
+    Interp *iPtr = (Interp *) interp;
+    Tcl_HashTable *tablePtr;
+    Tcl_HashEntry *hPtr;
+    Var *varPtr;
+    int new;
+
+    /*
+     * Lookup part1.
+     */
+
+    *arrayPtrPtr = NULL;
+    if ((flags & TCL_GLOBAL_ONLY) || (iPtr->varFramePtr == NULL)) {
+	tablePtr = &iPtr->globalTable;
+    } else {
+	tablePtr = &iPtr->varFramePtr->varTable;
+    }
+    if (create & CRT_PART1) {
+	hPtr = Tcl_CreateHashEntry(tablePtr, part1, &new);
+	if (new) {
+	    varPtr = NewVar();
+	    Tcl_SetHashValue(hPtr, varPtr);
+	    varPtr->hPtr = hPtr;
+	}
+    } else {
+	hPtr = Tcl_FindHashEntry(tablePtr, part1);
+	if (hPtr == NULL) {
+	    if (flags & TCL_LEAVE_ERR_MSG) {
+		VarErrMsg(interp, part1, part2, msg, noSuchVar);
+	    }
+	    return NULL;
+	}
+    }
+    varPtr = (Var *) Tcl_GetHashValue(hPtr);
+    if (varPtr->flags & VAR_UPVAR) {
+	varPtr = varPtr->value.upvarPtr;
+    }
+
+    if (part2 == NULL) {
+	return varPtr;
+    }
+
+    /*
+     * We're dealing with an array element, so make sure the variable
+     * is an array and lookup the element (create it if desired).
+     */
+
+    if (varPtr->flags & VAR_UNDEFINED) {
+	if (!(create & CRT_PART1)) {
+	    if (flags & TCL_LEAVE_ERR_MSG) {
+		VarErrMsg(interp, part1, part2, msg, noSuchVar);
+	    }
+	    return NULL;
+	}
+	varPtr->flags = VAR_ARRAY;
+	varPtr->value.tablePtr = (Tcl_HashTable *)
+		ckalloc(sizeof(Tcl_HashTable));
+	Tcl_InitHashTable(varPtr->value.tablePtr, TCL_STRING_KEYS);
+    } else if (!(varPtr->flags & VAR_ARRAY)) {
+	if (flags & TCL_LEAVE_ERR_MSG) {
+	    VarErrMsg(interp, part1, part2, msg, needArray);
+	}
+	return NULL;
+    }
+    *arrayPtrPtr = varPtr;
+    if (create & CRT_PART2) {
+	hPtr = Tcl_CreateHashEntry(varPtr->value.tablePtr, part2, &new);
+	if (new) {
+	    if (varPtr->searchPtr != NULL) {
+		DeleteSearches(varPtr);
+	    }
+	    varPtr = NewVar();
+	    Tcl_SetHashValue(hPtr, varPtr);
+	    varPtr->hPtr = hPtr;
+	}
+    } else {
+	hPtr = Tcl_FindHashEntry(varPtr->value.tablePtr, part2);
+	if (hPtr == NULL) {
+	    if (flags & TCL_LEAVE_ERR_MSG) {
+		VarErrMsg(interp, part1, part2, msg, noSuchElement);
+	    }
+	    return NULL;
+	}
+    }
+    return (Var *) Tcl_GetHashValue(hPtr);
+}
 
 /*
  *----------------------------------------------------------------------
@@ -146,58 +308,13 @@ Tcl_GetVar2(interp, part1, part2, flags)
     int flags;			/* OR-ed combination of TCL_GLOBAL_ONLY
 				 * or TCL_LEAVE_ERR_MSG bits. */
 {
-    Tcl_HashEntry *hPtr;
-    Var *varPtr;
+    Var *varPtr, *arrayPtr;
     Interp *iPtr = (Interp *) interp;
-    Var *arrayPtr = NULL;
 
-    /*
-     * Lookup the first name.
-     */
-
-    if ((flags & TCL_GLOBAL_ONLY) || (iPtr->varFramePtr == NULL)) {
-	hPtr = Tcl_FindHashEntry(&iPtr->globalTable, part1);
-    } else {
-	hPtr = Tcl_FindHashEntry(&iPtr->varFramePtr->varTable, part1);
-    }
-    if (hPtr == NULL) {
-	if (flags & TCL_LEAVE_ERR_MSG) {
-	    VarErrMsg(interp, part1, part2, "read", noSuchVar);
-	}
+    varPtr = LookupVar(interp, part1, part2, flags, "read", CRT_PART2,
+	    &arrayPtr);
+    if (varPtr == NULL) {
 	return NULL;
-    }
-    varPtr = (Var *) Tcl_GetHashValue(hPtr);
-    if (varPtr->flags & VAR_UPVAR) {
-	hPtr = varPtr->value.upvarPtr;
-	varPtr = (Var *) Tcl_GetHashValue(hPtr);
-    }
-
-    /*
-     * If this is an array reference, then remember the traces on the array
-     * and lookup the element within the array.
-     */
-
-    if (part2 != NULL) {
-	if (varPtr->flags & VAR_UNDEFINED) {
-	    if (flags & TCL_LEAVE_ERR_MSG) {
-		VarErrMsg(interp, part1, part2, "read", noSuchVar);
-	    }
-	    return NULL;
-	} else if (!(varPtr->flags & VAR_ARRAY)) {
-	    if (flags & TCL_LEAVE_ERR_MSG) {
-		VarErrMsg(interp, part1, part2, "read", needArray);
-	    }
-	    return NULL;
-	}
-	arrayPtr = varPtr;
-	hPtr = Tcl_FindHashEntry(varPtr->value.tablePtr, part2);
-	if (hPtr == NULL) {
-	    if (flags & TCL_LEAVE_ERR_MSG) {
-		VarErrMsg(interp, part1, part2, "read", noSuchElement);
-	    }
-	    return NULL;
-	}
-	varPtr = (Var *) Tcl_GetHashValue(hPtr);
     }
 
     /*
@@ -208,28 +325,38 @@ Tcl_GetVar2(interp, part1, part2, flags)
 	    || ((arrayPtr != NULL) && (arrayPtr->tracePtr != NULL))) {
 	char *msg;
 
-	msg = CallTraces(iPtr, arrayPtr, hPtr, part1, part2,
+	msg = CallTraces(iPtr, arrayPtr, varPtr, part1, part2,
 		(flags & TCL_GLOBAL_ONLY) | TCL_TRACE_READS);
 	if (msg != NULL) {
 	    VarErrMsg(interp, part1, part2, "read", msg);
-	    return NULL;
+	    goto cleanup;
 	}
-
-	/*
-	 * Watch out!  The variable could have gotten re-allocated to
-	 * a larger size.  Fortunately the hash table entry will still
-	 * be around.
-	 */
-
-	varPtr = (Var *) Tcl_GetHashValue(hPtr);
     }
-    if (varPtr->flags & (VAR_UNDEFINED|VAR_UPVAR|VAR_ARRAY)) {
-	if (flags & TCL_LEAVE_ERR_MSG) {
-	    VarErrMsg(interp, part1, part2, "read", noSuchVar);
+    if (!(varPtr->flags & (VAR_UNDEFINED|VAR_UPVAR|VAR_ARRAY))) {
+	return varPtr->value.string;
+    }
+    if (flags & TCL_LEAVE_ERR_MSG) {
+	char *msg;
+
+	if ((varPtr->flags & VAR_UNDEFINED) && (arrayPtr != NULL)
+		&& !(arrayPtr->flags & VAR_UNDEFINED)) {
+	    msg = noSuchElement;
+	} else {
+	    msg = noSuchVar;
 	}
-	return NULL;
+	VarErrMsg(interp, part1, part2, "read", msg);
     }
-    return varPtr->value.string;
+
+    /*
+     * If the variable doesn't exist anymore and no-one's using it,
+     * then free up the relevant structures and hash table entries.
+     */
+
+    cleanup:
+    if (varPtr->flags & VAR_UNDEFINED) {
+	CleanupVar(varPtr, arrayPtr);
+    }
+    return NULL;
 }
 
 /*
@@ -262,8 +389,7 @@ Tcl_SetVar(interp, varName, newValue, flags)
     char *newValue;		/* New value for varName. */
     int flags;			/* Various flags that tell how to set value:
 				 * any of TCL_GLOBAL_ONLY, TCL_APPEND_VALUE,
-				 * TCL_LIST_ELEMENT, TCL_NO_SPACE, or
-				 * TCL_LEAVE_ERR_MSG. */
+				 * TCL_LIST_ELEMENT, or TCL_LEAVE_ERR_MSG. */
 {
     register char *p;
 
@@ -332,69 +458,54 @@ Tcl_SetVar2(interp, part1, part2, newValue, flags)
     char *newValue;		/* New value for variable. */
     int flags;			/* Various flags that tell how to set value:
 				 * any of TCL_GLOBAL_ONLY, TCL_APPEND_VALUE,
-				 * TCL_LIST_ELEMENT, and TCL_NO_SPACE, or
-				 * TCL_LEAVE_ERR_MSG . */
+				 * TCL_LIST_ELEMENT, or TCL_LEAVE_ERR_MSG . */
 {
-    Tcl_HashEntry *hPtr;
-    register Var *varPtr = NULL;
-				/* Initial value only used to stop compiler
-				 * from complaining; not really needed. */
+    register Var *varPtr;
     register Interp *iPtr = (Interp *) interp;
-    int length, new, listFlags;
-    Var *arrayPtr = NULL;
+    int length, listFlags;
+    Var *arrayPtr;
+    char *result;
+
+    varPtr = LookupVar(interp, part1, part2, flags, "set", CRT_PART1|CRT_PART2,
+	    &arrayPtr);
+    if (varPtr == NULL) {
+	return NULL;
+    }
 
     /*
-     * Lookup the first name.
+     * If the variable's hPtr field is NULL, it means that this is an
+     * upvar to an array element where the array was deleted, leaving
+     * the element dangling at the end of the upvar.  Generate an error
+     * (allowing the variable to be reset would screw up our storage
+     * allocation and is meaningless anyway).
      */
 
-    if ((flags & TCL_GLOBAL_ONLY) || (iPtr->varFramePtr == NULL)) {
-	hPtr = Tcl_CreateHashEntry(&iPtr->globalTable, part1, &new);
-    } else {
-	hPtr = Tcl_CreateHashEntry(&iPtr->varFramePtr->varTable,
-		part1, &new);
-    }
-    if (!new) {
-	varPtr = (Var *) Tcl_GetHashValue(hPtr);
-	if (varPtr->flags & VAR_UPVAR) {
-	    hPtr = varPtr->value.upvarPtr;
-	    varPtr = (Var *) Tcl_GetHashValue(hPtr);
+    if (varPtr->hPtr == NULL) {
+	if (flags & TCL_LEAVE_ERR_MSG) {
+	    VarErrMsg(interp, part1, part2, "set", danglingUpvar);
 	}
+	return NULL;
     }
 
     /*
-     * If this is an array reference, then create a new array (if
-     * needed), remember any traces on the array, and lookup the
-     * element within the array.
+     * Clear the variable's current value unless this is an
+     * append operation.
      */
 
-    if (part2 != NULL) {
-	if (new) {
-	    varPtr = NewVar(0);
-	    Tcl_SetHashValue(hPtr, varPtr);
-	    varPtr->flags = VAR_ARRAY;
-	    varPtr->value.tablePtr = (Tcl_HashTable *)
-		    ckalloc(sizeof(Tcl_HashTable));
-	    Tcl_InitHashTable(varPtr->value.tablePtr, TCL_STRING_KEYS);
-	} else {
-	    if (varPtr->flags & VAR_UNDEFINED) {
-		varPtr->flags = VAR_ARRAY;
-		varPtr->value.tablePtr = (Tcl_HashTable *)
-			ckalloc(sizeof(Tcl_HashTable));
-		Tcl_InitHashTable(varPtr->value.tablePtr, TCL_STRING_KEYS);
-	    } else if (!(varPtr->flags & VAR_ARRAY)) {
-		if (flags & TCL_LEAVE_ERR_MSG) {
-		    VarErrMsg(interp, part1, part2, "set", needArray);
-		}
-		return NULL;
-	    }
-	    arrayPtr = varPtr;
+    if (varPtr->flags & VAR_ARRAY) {
+	if (flags & TCL_LEAVE_ERR_MSG) {
+	    VarErrMsg(interp, part1, part2, "set", isArray);
 	}
-	hPtr = Tcl_CreateHashEntry(varPtr->value.tablePtr, part2, &new);
+	return NULL;
+    }
+    if (!(flags & TCL_APPEND_VALUE) || (varPtr->flags & VAR_UNDEFINED)) {
+	varPtr->valueLength = 0;
     }
 
     /*
-     * Compute how many bytes will be needed for newValue (leave space
-     * for a separating space between list elements).
+     * Compute how many total bytes will be needed for the variable's
+     * new value (leave space for a separating space between list
+     * elements).  Allocate new space for the value if needed.
      */
 
     if (flags & TCL_LIST_ELEMENT) {
@@ -402,55 +513,30 @@ Tcl_SetVar2(interp, part1, part2, newValue, flags)
     } else {
 	length = strlen(newValue);
     }
-
-    /*
-     * If the variable doesn't exist then create a new one.  If it
-     * does exist then clear its current value unless this is an
-     * append operation.
-     */
-
-    if (new) {
-	varPtr = NewVar(length);
-	Tcl_SetHashValue(hPtr, varPtr);
-	if ((arrayPtr != NULL) && (arrayPtr->searchPtr != NULL)) {
-	    DeleteSearches(arrayPtr);
-	}
-    } else {
-	varPtr = (Var *) Tcl_GetHashValue(hPtr);
-	if (varPtr->flags & VAR_ARRAY) {
-	    if (flags & TCL_LEAVE_ERR_MSG) {
-		VarErrMsg(interp, part1, part2, "set", isArray);
-	    }
-	    return NULL;
-	}
-	if (!(flags & TCL_APPEND_VALUE) || (varPtr->flags & VAR_UNDEFINED)) {
-	    varPtr->valueLength = 0;
-	}
-    }
-
-    /*
-     * Make sure there's enough space to hold the variable's
-     * new value.  If not, enlarge the variable's space.
-     */
-
-    if ((length + varPtr->valueLength) >= varPtr->valueSpace) {
-	Var *newVarPtr;
+    length += varPtr->valueLength;
+    if (length >= varPtr->valueSpace) {
+	char *newValue;
 	int newSize;
 
 	newSize = 2*varPtr->valueSpace;
-	if (newSize <= (length + varPtr->valueLength)) {
-	    newSize += length;
+	if (newSize <= length) {
+	    newSize = length + 1;
 	}
-	newVarPtr = NewVar(newSize);
-	newVarPtr->valueLength = varPtr->valueLength;
-	newVarPtr->upvarUses = varPtr->upvarUses;
-	newVarPtr->tracePtr = varPtr->tracePtr;
-	newVarPtr->searchPtr = varPtr->searchPtr;
-	newVarPtr->flags = varPtr->flags;
-	strcpy(newVarPtr->value.string, varPtr->value.string);
-	Tcl_SetHashValue(hPtr, newVarPtr);
-	ckfree((char *) varPtr);
-	varPtr = newVarPtr;
+	if (newSize < 24) {
+	    /*
+	     * Don't waste time with teensy-tiny variables;  we'll
+	     * just end up expanding them later.
+	     */
+
+	    newSize = 24;
+	}
+	newValue = ckalloc((unsigned) newSize);
+	if (varPtr->valueSpace > 0) {
+	    strcpy(newValue, varPtr->value.string);
+	    ckfree(varPtr->value.string);
+	}
+	varPtr->valueSpace = newSize;
+	varPtr->value.string = newValue;
     }
 
     /*
@@ -459,16 +545,18 @@ Tcl_SetVar2(interp, part1, part2, newValue, flags)
      */
 
     if (flags & TCL_LIST_ELEMENT) {
-	if ((varPtr->valueLength > 0) && !(flags & TCL_NO_SPACE)) {
-	    varPtr->value.string[varPtr->valueLength] = ' ';
+	char *dst = varPtr->value.string + varPtr->valueLength;
+
+	if ((varPtr->valueLength > 0) && ((dst[-1] != '{')
+		|| ((varPtr->valueLength > 1) && (dst[-2] == '\\')))) {
+	    *dst = ' ';
+	    dst++;
 	    varPtr->valueLength++;
 	}
-	varPtr->valueLength += Tcl_ConvertElement(newValue,
-		varPtr->value.string + varPtr->valueLength, listFlags);
-	varPtr->value.string[varPtr->valueLength] = 0;
+	varPtr->valueLength += Tcl_ConvertElement(newValue, dst, listFlags);
     } else {
 	strcpy(varPtr->value.string + varPtr->valueLength, newValue);
-	varPtr->valueLength += length;
+	varPtr->valueLength = length;
     }
     varPtr->flags &= ~VAR_UNDEFINED;
 
@@ -480,22 +568,37 @@ Tcl_SetVar2(interp, part1, part2, newValue, flags)
 	    || ((arrayPtr != NULL) && (arrayPtr->tracePtr != NULL))) {
 	char *msg;
 
-	msg = CallTraces(iPtr, arrayPtr, hPtr, part1, part2,
+	msg = CallTraces(iPtr, arrayPtr, varPtr, part1, part2,
 		(flags & TCL_GLOBAL_ONLY) | TCL_TRACE_WRITES);
 	if (msg != NULL) {
 	    VarErrMsg(interp, part1, part2, "set", msg);
-	    return NULL;
+	    result = NULL;
+	    goto cleanup;
 	}
-
-	/*
-	 * Watch out!  The variable could have gotten re-allocated to
-	 * a larger size.  Fortunately the hash table entry will still
-	 * be around.
-	 */
-
-	varPtr = (Var *) Tcl_GetHashValue(hPtr);
     }
-    return varPtr->value.string;
+
+    /*
+     * If the variable was changed in some gross way by a trace (e.g.
+     * it was unset and then recreated as an array) then just return
+     * an empty string;  otherwise return the variable's current
+     * value.
+     */
+
+    if (!(varPtr->flags & (VAR_UNDEFINED|VAR_UPVAR|VAR_ARRAY))) {
+	return varPtr->value.string;
+    }
+    result = "";
+
+    /*
+     * If the variable doesn't exist anymore and no-one's using it,
+     * then free up the relevant structures and hash table entries.
+     */
+
+    cleanup:
+    if (varPtr->flags & VAR_UNDEFINED) {
+	CleanupVar(varPtr, arrayPtr);
+    }
+    return result;
 }
 
 /*
@@ -506,7 +609,7 @@ Tcl_SetVar2(interp, part1, part2, newValue, flags)
  *	Delete a variable, so that it may not be accessed anymore.
  *
  * Results:
- *	Returns 0 if the variable was successfully deleted, -1
+ *	Returns TCL_OK if the variable was successfully deleted, TCL_ERROR
  *	if the variable can't be unset.  In the event of an error,
  *	if the TCL_LEAVE_ERR_MSG flag is set then an error message
  *	is left in interp->result.
@@ -568,7 +671,7 @@ Tcl_UnsetVar(interp, varName, flags)
  *	Delete a variable, given a 2-part name.
  *
  * Results:
- *	Returns 0 if the variable was successfully deleted, -1
+ *	Returns TCL_OK if the variable was successfully deleted, TCL_ERROR
  *	if the variable can't be unset.  In the event of an error,
  *	if the TCL_LEAVE_ERR_MSG flag is set then an error message
  *	is left in interp->result.
@@ -590,114 +693,68 @@ Tcl_UnsetVar2(interp, part1, part2, flags)
     int flags;			/* OR-ed combination of any of
 				 * TCL_GLOBAL_ONLY or TCL_LEAVE_ERR_MSG. */
 {
-    Tcl_HashEntry *hPtr, dummyEntry;
     Var *varPtr, dummyVar;
     Interp *iPtr = (Interp *) interp;
-    Var *arrayPtr = NULL;
+    Var *arrayPtr;
+    ActiveVarTrace *activePtr;
+    int result;
 
-    if ((flags & TCL_GLOBAL_ONLY) || (iPtr->varFramePtr == NULL)) {
-	hPtr = Tcl_FindHashEntry(&iPtr->globalTable, part1);
-    } else {
-	hPtr = Tcl_FindHashEntry(&iPtr->varFramePtr->varTable, part1);
+    varPtr = LookupVar(interp, part1, part2, flags, "unset", 0,  &arrayPtr);
+    if (varPtr == NULL) {
+	return TCL_ERROR;
     }
-    if (hPtr == NULL) {
-	if (flags & TCL_LEAVE_ERR_MSG) {
-	    VarErrMsg(interp, part1, part2, "unset", noSuchVar);
-	}
-	return -1;
-    }
-    varPtr = (Var *) Tcl_GetHashValue(hPtr);
+    result = (varPtr->flags & VAR_UNDEFINED) ? TCL_ERROR : TCL_OK;
 
-    /*
-     * For global variables referenced in procedures, leave the procedure's
-     * reference variable in place, but unset the global variable.  Can't
-     * decrement the actual variable's use count, since we didn't delete
-     * the reference variable.
-     */
-
-    if (varPtr->flags & VAR_UPVAR) {
-	hPtr = varPtr->value.upvarPtr;
-	varPtr = (Var *) Tcl_GetHashValue(hPtr);
-    }
-
-    /*
-     * If the variable being deleted is an element of an array, then
-     * remember trace procedures on the overall array and find the
-     * element to delete.
-     */
-
-    if (part2 != NULL) {
-	if (!(varPtr->flags & VAR_ARRAY)) {
-	    if (flags & TCL_LEAVE_ERR_MSG) {
-		VarErrMsg(interp, part1, part2, "unset", needArray);
-	    }
-	    return -1;
-	}
-	if (varPtr->searchPtr != NULL) {
-	    DeleteSearches(varPtr);
-	}
-	arrayPtr = varPtr;
-	hPtr = Tcl_FindHashEntry(varPtr->value.tablePtr, part2);
-	if (hPtr == NULL) {
-	    if (flags & TCL_LEAVE_ERR_MSG) {
-		VarErrMsg(interp, part1, part2, "unset", noSuchElement);
-	    }
-	    return -1;
-	}
-	varPtr = (Var *) Tcl_GetHashValue(hPtr);
-    }
-
-    /*
-     * If there is a trace active on this variable or if the variable
-     * is already being deleted then don't delete the variable:  it
-     * isn't safe, since there are procedures higher up on the stack
-     * that will use pointers to the variable.  Also don't delete an
-     * array if there are traces active on any of its elements.
-     */
-
-    if (varPtr->flags &
-	    (VAR_TRACE_ACTIVE|VAR_ELEMENT_ACTIVE)) {
-	if (flags & TCL_LEAVE_ERR_MSG) {
-	    VarErrMsg(interp, part1, part2, "unset", traceActive);
-	}
-	return -1;
+    if ((part2 != NULL) && (arrayPtr->searchPtr != NULL)) {
+	DeleteSearches(arrayPtr);
     }
 
     /*
      * The code below is tricky, because of the possibility that
      * a trace procedure might try to access a variable being
-     * deleted.  To handle this situation gracefully, copy the
-     * contents of the variable and its hash table entry to
-     * dummy variables, then clean up the actual variable so that
-     * it's been completely deleted before the traces are called.
-     * Then call the traces, and finally clean up the variable's
-     * storage using the dummy copies.
+     * deleted.  To handle this situation gracefully, do things
+     * in three steps:
+     * 1. Copy the contents of the variable to a dummy variable
+     *    structure, and mark the original structure as undefined.
+     * 2. Invoke traces and clean up the variable, using the copy.
+     * 3. If at the end of this the original variable is still
+     *    undefined and has no outstanding references, then delete
+     *	  it (but it could have gotten recreated by a trace).
      */
 
     dummyVar = *varPtr;
-    Tcl_SetHashValue(&dummyEntry, &dummyVar);
-    if (varPtr->upvarUses == 0) {
-	Tcl_DeleteHashEntry(hPtr);
-	ckfree((char *) varPtr);
-    } else {
-	varPtr->flags = VAR_UNDEFINED;
-	varPtr->tracePtr = NULL;
-    }
+    varPtr->valueSpace = 0;
+    varPtr->flags = VAR_UNDEFINED;
+    varPtr->tracePtr = NULL;
 
     /*
      * Call trace procedures for the variable being deleted and delete
-     * its traces.
+     * its traces.  Be sure to abort any other traces for the variable
+     * that are still pending.  Special tricks:
+     * 1. Increment varPtr's refCount around this:  CallTraces will
+     *    use dummyVar so it won't increment varPtr's refCount.
+     * 2. Turn off the VAR_TRACE_ACTIVE flag in dummyVar: we want to
+     *    call unset traces even if other traces are pending.
      */
 
     if ((dummyVar.tracePtr != NULL)
 	    || ((arrayPtr != NULL) && (arrayPtr->tracePtr != NULL))) {
-	(void) CallTraces(iPtr, arrayPtr, &dummyEntry, part1, part2,
+	varPtr->refCount++;
+	dummyVar.flags &= ~VAR_TRACE_ACTIVE;
+	(void) CallTraces(iPtr, arrayPtr, &dummyVar, part1, part2,
 		(flags & TCL_GLOBAL_ONLY) | TCL_TRACE_UNSETS);
 	while (dummyVar.tracePtr != NULL) {
 	    VarTrace *tracePtr = dummyVar.tracePtr;
 	    dummyVar.tracePtr = tracePtr->nextPtr;
 	    ckfree((char *) tracePtr);
 	}
+	for (activePtr = iPtr->activeTracePtr; activePtr != NULL;
+		activePtr = activePtr->nextPtr) {
+	    if (activePtr->varPtr == varPtr) {
+		activePtr->nextTracePtr = NULL;
+	    }
+	}
+	varPtr->refCount--;
     }
 
     /*
@@ -710,14 +767,23 @@ Tcl_UnsetVar2(interp, part1, part2, flags)
 	DeleteArray(iPtr, part1, &dummyVar,
 	    (flags & TCL_GLOBAL_ONLY) | TCL_TRACE_UNSETS);
     }
-    if (dummyVar.flags & VAR_UNDEFINED) {
+    if (dummyVar.valueSpace > 0) {
+	ckfree(dummyVar.value.string);
+    }
+    if (result == TCL_ERROR) {
 	if (flags & TCL_LEAVE_ERR_MSG) {
 	    VarErrMsg(interp, part1, part2, "unset", 
 		    (part2 == NULL) ? noSuchVar : noSuchElement);
 	}
-	return -1;
     }
-    return 0;
+
+    /*
+     * Finally, if the variable is truly not in use then free up its
+     * record and remove it from the hash table.
+     */
+
+    CleanupVar(varPtr, arrayPtr);
+    return result;
 }
 
 /*
@@ -824,68 +890,13 @@ Tcl_TraceVar2(interp, part1, part2, flags, proc, clientData)
 				 * invoked upon varName. */
     ClientData clientData;	/* Arbitrary argument to pass to proc. */
 {
-    Tcl_HashEntry *hPtr;
-    Var *varPtr = NULL;		/* Initial value only used to stop compiler
-				 * from complaining; not really needed. */
-    Interp *iPtr = (Interp *) interp;
+    Var *varPtr, *arrayPtr;
     register VarTrace *tracePtr;
-    int new;
 
-    /*
-     * Locate the variable, making a new (undefined) one if necessary.
-     */
-
-    if ((flags & TCL_GLOBAL_ONLY) || (iPtr->varFramePtr == NULL)) {
-	hPtr = Tcl_CreateHashEntry(&iPtr->globalTable, part1, &new);
-    } else {
-	hPtr = Tcl_CreateHashEntry(&iPtr->varFramePtr->varTable, part1, &new);
-    }
-    if (!new) {
-	varPtr = (Var *) Tcl_GetHashValue(hPtr);
-	if (varPtr->flags & VAR_UPVAR) {
-	    hPtr = varPtr->value.upvarPtr;
-	    varPtr = (Var *) Tcl_GetHashValue(hPtr);
-	}
-    }
-
-    /*
-     * If the trace is to be on an array element, make sure that the
-     * variable is an array variable.  If the variable doesn't exist
-     * then define it as an empty array.  Then find the specific
-     * array element.
-     */
-
-    if (part2 != NULL) {
-	if (new) {
-	    varPtr = NewVar(0);
-	    Tcl_SetHashValue(hPtr, varPtr);
-	    varPtr->flags = VAR_ARRAY;
-	    varPtr->value.tablePtr = (Tcl_HashTable *)
-		    ckalloc(sizeof(Tcl_HashTable));
-	    Tcl_InitHashTable(varPtr->value.tablePtr, TCL_STRING_KEYS);
-	} else {
-	    if (varPtr->flags & VAR_UNDEFINED) {
-		varPtr->flags = VAR_ARRAY;
-		varPtr->value.tablePtr = (Tcl_HashTable *)
-			ckalloc(sizeof(Tcl_HashTable));
-		Tcl_InitHashTable(varPtr->value.tablePtr, TCL_STRING_KEYS);
-	    } else if (!(varPtr->flags & VAR_ARRAY)) {
-		iPtr->result = needArray;
-		return TCL_ERROR;
-	    }
-	}
-	hPtr = Tcl_CreateHashEntry(varPtr->value.tablePtr, part2, &new);
-    }
-
-    if (new) {
-	if ((part2 != NULL) && (varPtr->searchPtr != NULL)) {
-	    DeleteSearches(varPtr);
-	}
-	varPtr = NewVar(0);
-	varPtr->flags = VAR_UNDEFINED;
-	Tcl_SetHashValue(hPtr, varPtr);
-    } else {
-	varPtr = (Var *) Tcl_GetHashValue(hPtr);
+    varPtr = LookupVar(interp, part1, part2, (flags | TCL_LEAVE_ERR_MSG),
+	    "trace", CRT_PART1|CRT_PART2, &arrayPtr);
+    if (varPtr == NULL) {
+	return TCL_ERROR;
     }
 
     /*
@@ -997,37 +1008,14 @@ Tcl_UntraceVar2(interp, part1, part2, flags, proc, clientData)
 {
     register VarTrace *tracePtr;
     VarTrace *prevPtr;
-    Var *varPtr;
+    Var *varPtr, *arrayPtr;
     Interp *iPtr = (Interp *) interp;
-    Tcl_HashEntry *hPtr;
     ActiveVarTrace *activePtr;
 
-    /*
-     * First, lookup the variable.
-     */
-
-    if ((flags & TCL_GLOBAL_ONLY) || (iPtr->varFramePtr == NULL)) {
-	hPtr = Tcl_FindHashEntry(&iPtr->globalTable, part1);
-    } else {
-	hPtr = Tcl_FindHashEntry(&iPtr->varFramePtr->varTable, part1);
-    }
-    if (hPtr == NULL) {
+    varPtr = LookupVar(interp, part1, part2, flags & TCL_GLOBAL_ONLY,
+	    (char *) NULL, 0, &arrayPtr);
+    if (varPtr == NULL) {
 	return;
-    }
-    varPtr = (Var *) Tcl_GetHashValue(hPtr);
-    if (varPtr->flags & VAR_UPVAR) {
-	hPtr = varPtr->value.upvarPtr;
-	varPtr = (Var *) Tcl_GetHashValue(hPtr);
-    }
-    if (part2 != NULL) {
-	if (!(varPtr->flags & VAR_ARRAY)) {
-	    return;
-	}
-	hPtr = Tcl_FindHashEntry(varPtr->value.tablePtr, part2);
-	if (hPtr == NULL) {
-	    return;
-	}
-	varPtr = (Var *) Tcl_GetHashValue(hPtr);
     }
 
     flags &= (TCL_TRACE_READS | TCL_TRACE_WRITES | TCL_TRACE_UNSETS);
@@ -1060,6 +1048,15 @@ Tcl_UntraceVar2(interp, part1, part2, flags, proc, clientData)
 	prevPtr->nextPtr = tracePtr->nextPtr;
     }
     ckfree((char *) tracePtr);
+
+    /*
+     * If this is the last trace on the variable, and the variable is
+     * unset and unused, then free up the variable.
+     */
+
+    if (varPtr->flags & VAR_UNDEFINED) {
+	CleanupVar(varPtr, (Var *) NULL);
+    }
 }
 
 /*
@@ -1168,36 +1165,12 @@ Tcl_VarTraceInfo2(interp, part1, part2, flags, proc, prevClientData)
 				 * first trace. */
 {
     register VarTrace *tracePtr;
-    Var *varPtr;
-    Interp *iPtr = (Interp *) interp;
-    Tcl_HashEntry *hPtr;
+    Var *varPtr, *arrayPtr;
 
-    /*
-     * First, lookup the variable.
-     */
-
-    if ((flags & TCL_GLOBAL_ONLY) || (iPtr->varFramePtr == NULL)) {
-	hPtr = Tcl_FindHashEntry(&iPtr->globalTable, part1);
-    } else {
-	hPtr = Tcl_FindHashEntry(&iPtr->varFramePtr->varTable, part1);
-    }
-    if (hPtr == NULL) {
+    varPtr = LookupVar(interp, part1, part2, flags & TCL_GLOBAL_ONLY,
+	    (char *) NULL, 0, &arrayPtr);
+    if (varPtr == NULL) {
 	return NULL;
-    }
-    varPtr = (Var *) Tcl_GetHashValue(hPtr);
-    if (varPtr->flags & VAR_UPVAR) {
-	hPtr = varPtr->value.upvarPtr;
-	varPtr = (Var *) Tcl_GetHashValue(hPtr);
-    }
-    if (part2 != NULL) {
-	if (!(varPtr->flags & VAR_ARRAY)) {
-	    return NULL;
-	}
-	hPtr = Tcl_FindHashEntry(varPtr->value.tablePtr, part2);
-	if (hPtr == NULL) {
-	    return NULL;
-	}
-	varPtr = (Var *) Tcl_GetHashValue(hPtr);
     }
 
     /*
@@ -1305,7 +1278,7 @@ Tcl_UnsetCmd(dummy, interp, argc, argv)
 	return TCL_ERROR;
     }
     for (i = 1; i < argc; i++) {
-	if (Tcl_UnsetVar(interp, argv[i], TCL_LEAVE_ERR_MSG) != 0) {
+	if (Tcl_UnsetVar(interp, argv[i], TCL_LEAVE_ERR_MSG) != TCL_OK) {
 	    return TCL_ERROR;
 	}
     }
@@ -1458,7 +1431,7 @@ Tcl_ArrayCmd(dummy, interp, argc, argv)
     }
     varPtr = (Var *) Tcl_GetHashValue(hPtr);
     if (varPtr->flags & VAR_UPVAR) {
-	varPtr = (Var *) Tcl_GetHashValue(varPtr->value.upvarPtr);
+	varPtr = varPtr->value.upvarPtr;
     }
     if (!(varPtr->flags & VAR_ARRAY)) {
 	goto notArray;
@@ -1539,7 +1512,7 @@ Tcl_ArrayCmd(dummy, interp, argc, argv)
 		continue;
 	    }
 	    Tcl_AppendElement(interp,
-		    Tcl_GetHashKey(varPtr->value.tablePtr, hPtr), 0);
+		    Tcl_GetHashKey(varPtr->value.tablePtr, hPtr));
 	}
     } else if ((c == 'n') && (strncmp(argv[1], "nextelement", length) == 0)
 	    && (length >= 2)) {
@@ -1633,6 +1606,96 @@ Tcl_ArrayCmd(dummy, interp, argc, argv)
 /*
  *----------------------------------------------------------------------
  *
+ * MakeUpvar --
+ *
+ *	This procedure does all of the work of the "global" and "upvar"
+ *	commands.
+ *
+ * Results:
+ *	A standard Tcl completion code.  If an error occurs then an
+ *	error message is left in iPtr->result.
+ *
+ * Side effects:
+ *	The variable given by myName is linked to the variable in
+ *	framePtr given by otherP1 and otherP2, so that references to
+ *	myName are redirected to the other variable like a symbolic
+*	link.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static int
+MakeUpvar(iPtr, framePtr, otherP1, otherP2, myName)
+    Interp *iPtr;		/* Interpreter containing variables.  Used
+				 * for error messages, too. */
+    CallFrame *framePtr;	/* Call frame containing "other" variable.
+				 * NULL means use global context. */
+    char *otherP1, *otherP2;	/* Two-part name of variable in framePtr. */
+    char *myName;		/* Name of variable in local table, which
+				 * will refer to otherP1/P2.  Must be a
+				 * scalar. */
+{
+    Tcl_HashEntry *hPtr;
+    Var *otherPtr, *varPtr, *arrayPtr;
+    CallFrame *savedFramePtr;
+    int new;
+
+    /*
+     * In order to use LookupVar to find "other", temporarily replace
+     * the current frame pointer in the interpreter.
+     */
+
+    savedFramePtr = iPtr->varFramePtr;
+    iPtr->varFramePtr = framePtr;
+    otherPtr = LookupVar((Tcl_Interp *) iPtr, otherP1, otherP2,
+	    TCL_LEAVE_ERR_MSG, "access", CRT_PART1|CRT_PART2, &arrayPtr);
+    iPtr->varFramePtr = savedFramePtr;
+    if (otherPtr == NULL) {
+	return TCL_ERROR;
+    }
+    if (iPtr->varFramePtr != NULL) {
+	hPtr = Tcl_CreateHashEntry(&iPtr->varFramePtr->varTable, myName, &new);
+    } else {
+	hPtr = Tcl_CreateHashEntry(&iPtr->globalTable, myName, &new);
+    }
+    if (new) {
+	varPtr = NewVar();
+	Tcl_SetHashValue(hPtr, varPtr);
+	varPtr->hPtr = hPtr;
+    } else {
+	/*
+	 * The variable already exists.  If it's not an upvar then it's
+	 * an error.  If it is an upvar, then just disconnect it from the
+	 * thing it currently refers to.
+	 */
+
+	varPtr = (Var *) Tcl_GetHashValue(hPtr);
+	if (varPtr->flags & VAR_UPVAR) {
+	    Var *upvarPtr;
+
+	    upvarPtr = varPtr->value.upvarPtr;
+	    if (upvarPtr == otherPtr) {
+		return TCL_OK;
+	    }
+	    upvarPtr->refCount--;
+	    if (upvarPtr->flags & VAR_UNDEFINED) {
+		CleanupVar(upvarPtr, (Var *) NULL);
+	    }
+	} else if (!(varPtr->flags & VAR_UNDEFINED)) {
+	    Tcl_AppendResult((Tcl_Interp *) iPtr, "variable \"", myName,
+		"\" already exists", (char *) NULL);
+	    return TCL_ERROR;
+	}
+    }
+    varPtr->flags = (varPtr->flags & ~VAR_UNDEFINED) | VAR_UPVAR;
+    varPtr->value.upvarPtr = otherPtr;
+    otherPtr->refCount++;
+    return TCL_OK;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
  * Tcl_GlobalCmd --
  *
  *	This procedure is invoked to process the "global" Tcl command.
@@ -1655,10 +1718,7 @@ Tcl_GlobalCmd(dummy, interp, argc, argv)
     int argc;				/* Number of arguments. */
     char **argv;			/* Argument strings. */
 {
-    Var *varPtr, *gVarPtr;
     register Interp *iPtr = (Interp *) interp;
-    Tcl_HashEntry *hPtr, *hPtr2;
-    int new;
 
     if (argc < 2) {
 	Tcl_AppendResult((Tcl_Interp *) iPtr, "wrong # args: should be \"",
@@ -1670,31 +1730,10 @@ Tcl_GlobalCmd(dummy, interp, argc, argv)
     }
 
     for (argc--, argv++; argc > 0; argc--, argv++) {
-	hPtr = Tcl_CreateHashEntry(&iPtr->globalTable, *argv, &new);
-	if (new) {
-	    gVarPtr = NewVar(0);
-	    gVarPtr->flags |= VAR_UNDEFINED;
-	    Tcl_SetHashValue(hPtr, gVarPtr);
-	} else {
-	    gVarPtr = (Var *) Tcl_GetHashValue(hPtr);
+	if (MakeUpvar(iPtr, (CallFrame *) NULL, *argv, (char *) NULL, *argv)
+		!= TCL_OK) {
+	    return TCL_ERROR;
 	}
-	hPtr2 = Tcl_CreateHashEntry(&iPtr->varFramePtr->varTable, *argv, &new);
-	if (!new) {
-	    Var *varPtr;
-	    varPtr = (Var *) Tcl_GetHashValue(hPtr2);
-	    if (varPtr->flags & VAR_UPVAR) {
-		continue;
-	    } else {
-		Tcl_AppendResult((Tcl_Interp *) iPtr, "variable \"", *argv,
-		    "\" already exists", (char *) NULL);
-		return TCL_ERROR;
-	    }
-	}
-	varPtr = NewVar(0);
-	varPtr->flags |= VAR_UPVAR;
-	varPtr->value.upvarPtr = hPtr;
-	gVarPtr->upvarUses++;
-	Tcl_SetHashValue(hPtr2, varPtr);
     }
     return TCL_OK;
 }
@@ -1727,11 +1766,7 @@ Tcl_UpvarCmd(dummy, interp, argc, argv)
     register Interp *iPtr = (Interp *) interp;
     int result;
     CallFrame *framePtr;
-    Var *varPtr = NULL;
-    Tcl_HashTable *upVarTablePtr;
-    Tcl_HashEntry *hPtr, *hPtr2;
-    int new;
-    Var *upVarPtr;
+    register char *p;
 
     if (argc < 3) {
 	upvarSyntax:
@@ -1750,146 +1785,47 @@ Tcl_UpvarCmd(dummy, interp, argc, argv)
 	return TCL_ERROR;
     }
     argc -= result+1;
-    argv += result+1;
-    if (framePtr == NULL) {
-	upVarTablePtr = &iPtr->globalTable;
-    } else {
-	upVarTablePtr = &framePtr->varTable;
-    }
-
     if ((argc & 1) != 0) {
 	goto upvarSyntax;
     }
+    argv += result+1;
 
     /*
-     * Iterate over all the pairs of (local variable, other variable)
-     * names.  For each pair, create a hash table entry in the upper
-     * context (if the name wasn't there already), then associate it
-     * with a new local variable.
+     * Iterate over all the pairs of (other variable, local variable)
+     * names.  For each pair, divide the other variable name into two
+     * parts, then call MakeUpvar to do all the work of creating linking
+     * it to the local variable.
      */
 
-    while (argc > 0) {
-        hPtr = Tcl_CreateHashEntry(upVarTablePtr, argv[0], &new);
-        if (new) {
-            upVarPtr = NewVar(0);
-            upVarPtr->flags |= VAR_UNDEFINED;
-            Tcl_SetHashValue(hPtr, upVarPtr);
-        } else {
-            upVarPtr = (Var *) Tcl_GetHashValue(hPtr);
-	    if (upVarPtr->flags & VAR_UPVAR) {
-		hPtr = upVarPtr->value.upvarPtr;
-		upVarPtr = (Var *) Tcl_GetHashValue(hPtr);
+    for ( ; argc > 0; argc -= 2, argv += 2) {
+	for (p = argv[0]; *p != 0; p++) {
+	    if (*p == '(') {
+		char *open = p;
+
+		do {
+		    p++;
+		} while (*p != '\0');
+		p--;
+		if (*p != ')') {
+		    goto scalar;
+		}
+		*open = '\0';
+		*p = '\0';
+		result = MakeUpvar(iPtr, framePtr, argv[0], open+1, argv[1]);
+		*open = '(';
+		*p = ')';
+		goto checkResult;
 	    }
-        }
+	}
+	scalar:
+	result = MakeUpvar(iPtr, framePtr, argv[0], (char *) NULL, argv[1]);
 
-        hPtr2 = Tcl_CreateHashEntry(&iPtr->varFramePtr->varTable,
-                    argv[1], &new);
-        if (!new) {
-            Tcl_AppendResult((Tcl_Interp *) iPtr, "variable \"", argv[1],
-                "\" already exists", (char *) NULL);
-            return TCL_ERROR;
-        }
-        varPtr = NewVar(0);
-        varPtr->flags |= VAR_UPVAR;
-        varPtr->value.upvarPtr = hPtr;
-        upVarPtr->upvarUses++;
-        Tcl_SetHashValue(hPtr2, varPtr);
-
-        argc -= 2;
-        argv += 2;
+	checkResult:
+	if (result != TCL_OK) {
+	    return TCL_ERROR;
+	}
     }
     return TCL_OK;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TclDeleteVars --
- *
- *	This procedure is called to recycle all the storage space
- *	associated with a table of variables.  For this procedure
- *	to work correctly, it must not be possible for any of the
- *	variable in the table to be accessed from Tcl commands
- *	(e.g. from trace procedures).
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	Variables are deleted and trace procedures are invoked, if
- *	any are declared.
- *
- *----------------------------------------------------------------------
- */
-
-void
-TclDeleteVars(iPtr, tablePtr)
-    Interp *iPtr;		/* Interpreter to which variables belong. */
-    Tcl_HashTable *tablePtr;	/* Hash table containing variables to
-				 * delete. */
-{
-    Tcl_HashSearch search;
-    Tcl_HashEntry *hPtr;
-    register Var *varPtr;
-    int flags, globalFlag;
-
-    flags = TCL_TRACE_UNSETS;
-    if (tablePtr == &iPtr->globalTable) {
-	flags |= TCL_INTERP_DESTROYED | TCL_GLOBAL_ONLY;
-    }
-    for (hPtr = Tcl_FirstHashEntry(tablePtr, &search); hPtr != NULL;
-	    hPtr = Tcl_NextHashEntry(&search)) {
-	varPtr = (Var *) Tcl_GetHashValue(hPtr);
-
-	/*
-	 * For global/upvar variables referenced in procedures, free up the
-	 * local space and then decrement the reference count on the
-	 * variable referred to.  If there are no more references to the
-	 * global/upvar and it is undefined and has no traces set, then
-	 * follow on and delete the referenced variable too.
-	 */
-
-	globalFlag = 0;
-	if (varPtr->flags & VAR_UPVAR) {
-	    hPtr = varPtr->value.upvarPtr;
-	    ckfree((char *) varPtr);
-	    varPtr = (Var *) Tcl_GetHashValue(hPtr);
-	    varPtr->upvarUses--;
-	    if ((varPtr->upvarUses != 0) || !(varPtr->flags & VAR_UNDEFINED)
-		    || (varPtr->tracePtr != NULL)) {
-		continue;
-	    }
-	    globalFlag = TCL_GLOBAL_ONLY;
-	}
-
-	/*
-	 * Invoke traces on the variable that is being deleted, then
-	 * free up the variable's space (no need to free the hash entry
-	 * here, unless we're dealing with a global variable:  the
-	 * hash entries will be deleted automatically when the whole
-	 * table is deleted).
-	 */
-
-	if (varPtr->tracePtr != NULL) {
-	    (void) CallTraces(iPtr, (Var *) NULL, hPtr,
-		    Tcl_GetHashKey(tablePtr, hPtr), (char *) NULL,
-		    flags | globalFlag);
-	    while (varPtr->tracePtr != NULL) {
-		VarTrace *tracePtr = varPtr->tracePtr;
-		varPtr->tracePtr = tracePtr->nextPtr;
-		ckfree((char *) tracePtr);
-	    }
-	}
-	if (varPtr->flags & VAR_ARRAY) {
-	    DeleteArray(iPtr, Tcl_GetHashKey(tablePtr, hPtr), varPtr,
-		    flags | globalFlag);
-	}
-	if (globalFlag) {
-	    Tcl_DeleteHashEntry(hPtr);
-	}
-	ckfree((char *) varPtr);
-    }
-    Tcl_DeleteHashTable(tablePtr);
 }
 
 /*
@@ -1918,14 +1854,13 @@ TclDeleteVars(iPtr, tablePtr)
  */
 
 static char *
-CallTraces(iPtr, arrayPtr, hPtr, part1, part2, flags)
+CallTraces(iPtr, arrayPtr, varPtr, part1, part2, flags)
     Interp *iPtr;			/* Interpreter containing variable. */
     register Var *arrayPtr;		/* Pointer to array variable that
 					 * contains the variable, or NULL if
 					 * the variable isn't an element of an
 					 * array. */
-    Tcl_HashEntry *hPtr;		/* Hash table entry corresponding to
-					 * variable whose traces are to be
+    Var *varPtr;			/* Variable whose traces are to be
 					 * invoked. */
     char *part1, *part2;		/* Variable's two-part name. */
     int flags;				/* Flags to pass to trace procedures:
@@ -1934,23 +1869,20 @@ CallTraces(iPtr, arrayPtr, hPtr, part1, part2, flags)
 					 * TCL_GLOBAL_ONLY and
 					 * TCL_INTERP_DESTROYED. */
 {
-    Var *varPtr;
     register VarTrace *tracePtr;
     ActiveVarTrace active;
     char *result;
-    int savedArrayFlags = 0;		/* (Initialization not needed except
-					 * to prevent compiler warning) */
 
     /*
      * If there are already similar trace procedures active for the
      * variable, don't call them again.
      */
 
-    varPtr = (Var *) Tcl_GetHashValue(hPtr);
     if (varPtr->flags & VAR_TRACE_ACTIVE) {
 	return NULL;
     }
     varPtr->flags |= VAR_TRACE_ACTIVE;
+    varPtr->refCount++;
 
     /*
      * Invoke traces on the array containing the variable, if relevant.
@@ -1960,8 +1892,8 @@ CallTraces(iPtr, arrayPtr, hPtr, part1, part2, flags)
     active.nextPtr = iPtr->activeTracePtr;
     iPtr->activeTracePtr = &active;
     if (arrayPtr != NULL) {
-	savedArrayFlags = arrayPtr->flags;
-	arrayPtr->flags |= VAR_ELEMENT_ACTIVE;
+	arrayPtr->refCount++;
+	active.varPtr = arrayPtr;
 	for (tracePtr = arrayPtr->tracePtr;  tracePtr != NULL;
 		tracePtr = active.nextTracePtr) {
 	    active.nextTracePtr = tracePtr->nextPtr;
@@ -1987,6 +1919,7 @@ CallTraces(iPtr, arrayPtr, hPtr, part1, part2, flags)
     if (flags & TCL_TRACE_UNSETS) {
 	flags |= TCL_TRACE_DESTROYED;
     }
+    active.varPtr = varPtr;
     for (tracePtr = varPtr->tracePtr; tracePtr != NULL;
 	    tracePtr = active.nextTracePtr) {
 	active.nextTracePtr = tracePtr->nextPtr;
@@ -2006,17 +1939,15 @@ CallTraces(iPtr, arrayPtr, hPtr, part1, part2, flags)
 
     /*
      * Restore the variable's flags, remove the record of our active
-     * traces, and then return.  Remember that the variable could have
-     * been re-allocated during the traces, but its hash entry won't
-     * change.
+     * traces, and then return.
      */
 
     done:
     if (arrayPtr != NULL) {
-	arrayPtr->flags = savedArrayFlags;
+	arrayPtr->refCount--;
     }
-    varPtr = (Var *) Tcl_GetHashValue(hPtr);
     varPtr->flags &= ~VAR_TRACE_ACTIVE;
+    varPtr->refCount--;
     iPtr->activeTracePtr = active.nextPtr;
     return result;
 }
@@ -2026,14 +1957,13 @@ CallTraces(iPtr, arrayPtr, hPtr, part1, part2, flags)
  *
  * NewVar --
  *
- *	Create a new variable with a given initial value.
+ *	Create a new variable with a given amount of storage
+ *	space.
  *
  * Results:
  *	The return value is a pointer to the new variable structure.
- *	The variable will not be part of any hash table yet, and its
- *	upvarUses count is initialized to 0.  Its initial value will
- *	be empty, but "space" bytes will be available in the value
- *	area.
+ *	The variable will not be part of any hash table yet.  Its
+ *	initial value is empty.
  *
  * Side effects:
  *	Storage gets allocated.
@@ -2042,26 +1972,19 @@ CallTraces(iPtr, arrayPtr, hPtr, part1, part2, flags)
  */
 
 static Var *
-NewVar(space)
-    int space;		/* Minimum amount of space to allocate
-			 * for variable's value. */
+NewVar()
 {
-    int extra;
     register Var *varPtr;
 
-    extra = space - sizeof(varPtr->value);
-    if (extra < 0) {
-	extra = 0;
-	space = sizeof(varPtr->value);
-    }
-    varPtr = (Var *) ckalloc((unsigned) (sizeof(Var) + extra));
+    varPtr = (Var *) ckalloc(sizeof(Var));
     varPtr->valueLength = 0;
-    varPtr->valueSpace = space;
-    varPtr->upvarUses = 0;
+    varPtr->valueSpace = 0;
+    varPtr->value.string = NULL;
+    varPtr->hPtr = NULL;
+    varPtr->refCount = 0;
     varPtr->tracePtr = NULL;
     varPtr->searchPtr = NULL;
-    varPtr->flags = 0;
-    varPtr->value.string[0] = 0;
+    varPtr->flags = VAR_UNDEFINED;
     return varPtr;
 }
 
@@ -2169,6 +2092,114 @@ DeleteSearches(arrayVarPtr)
 /*
  *----------------------------------------------------------------------
  *
+ * TclDeleteVars --
+ *
+ *	This procedure is called to recycle all the storage space
+ *	associated with a table of variables.  For this procedure
+ *	to work correctly, it must not be possible for any of the
+ *	variable in the table to be accessed from Tcl commands
+ *	(e.g. from trace procedures).
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	Variables are deleted and trace procedures are invoked, if
+ *	any are declared.
+ *
+ *----------------------------------------------------------------------
+ */
+
+void
+TclDeleteVars(iPtr, tablePtr)
+    Interp *iPtr;		/* Interpreter to which variables belong. */
+    Tcl_HashTable *tablePtr;	/* Hash table containing variables to
+				 * delete. */
+{
+    Tcl_HashSearch search;
+    Tcl_HashEntry *hPtr;
+    register Var *varPtr;
+    Var *upvarPtr;
+    int flags;
+    ActiveVarTrace *activePtr;
+
+    flags = TCL_TRACE_UNSETS;
+    if (tablePtr == &iPtr->globalTable) {
+	flags |= TCL_INTERP_DESTROYED | TCL_GLOBAL_ONLY;
+    }
+    for (hPtr = Tcl_FirstHashEntry(tablePtr, &search); hPtr != NULL;
+	    hPtr = Tcl_NextHashEntry(&search)) {
+	varPtr = (Var *) Tcl_GetHashValue(hPtr);
+
+	/*
+	 * For global/upvar variables referenced in procedures, decrement
+	 * the reference count on the variable referred to, and free up
+	 * the referenced variable if it's no longer needed.
+	 */
+
+	if (varPtr->flags & VAR_UPVAR) {
+	    upvarPtr = varPtr->value.upvarPtr;
+	    upvarPtr->refCount--;
+	    if (upvarPtr->flags & VAR_UNDEFINED) {
+		CleanupVar(upvarPtr, (Var *) NULL);
+	    }
+	}
+
+	/*
+	 * Invoke traces on the variable that is being deleted, then
+	 * free up the variable's space (no need to free the hash entry
+	 * here, unless we're dealing with a global variable:  the
+	 * hash entries will be deleted automatically when the whole
+	 * table is deleted).
+	 */
+
+	if (varPtr->tracePtr != NULL) {
+	    (void) CallTraces(iPtr, (Var *) NULL, varPtr,
+		    Tcl_GetHashKey(tablePtr, hPtr), (char *) NULL, flags);
+	    while (varPtr->tracePtr != NULL) {
+		VarTrace *tracePtr = varPtr->tracePtr;
+		varPtr->tracePtr = tracePtr->nextPtr;
+		ckfree((char *) tracePtr);
+	    }
+	    for (activePtr = iPtr->activeTracePtr; activePtr != NULL;
+		    activePtr = activePtr->nextPtr) {
+		if (activePtr->varPtr == varPtr) {
+		    activePtr->nextTracePtr = NULL;
+		}
+	    }
+	}
+	if (varPtr->flags & VAR_ARRAY) {
+	    DeleteArray(iPtr, Tcl_GetHashKey(tablePtr, hPtr), varPtr, flags);
+	}
+	if (varPtr->valueSpace > 0) {
+	    /*
+	     * SPECIAL TRICK:  it's possible that the interpreter's result
+	     * currently points to this variable (for example, a "set" or
+	     * "lappend" command was the last command in a procedure that's
+	     * being returned from).  If this is the case, then just pass
+	     * ownership of the value string to the Tcl interpreter.
+	     */
+
+	    if (iPtr->result == varPtr->value.string) {
+		iPtr->freeProc = (Tcl_FreeProc *) free;
+	    } else {
+		ckfree(varPtr->value.string);
+	    }
+	    varPtr->valueSpace = 0;
+	}
+	varPtr->hPtr = NULL;
+	varPtr->tracePtr = NULL;
+	varPtr->flags = VAR_UNDEFINED;
+	if (varPtr->refCount == 0) {
+	    ckfree((char *) varPtr);
+	}
+    }
+    Tcl_DeleteHashTable(tablePtr);
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
  * DeleteArray --
  *
  *	This procedure is called to free up everything in an array
@@ -2181,7 +2212,7 @@ DeleteSearches(arrayVarPtr)
  *
  * Side effects:
  *	All storage associated with varPtr's array elements is deleted
- *	(including the hash table).  Any delete trace procedures for
+ *	(including the hash table).  Delete trace procedures for
  *	array elements are invoked.
  *
  *----------------------------------------------------------------------
@@ -2201,27 +2232,99 @@ DeleteArray(iPtr, arrayName, varPtr, flags)
     Tcl_HashSearch search;
     register Tcl_HashEntry *hPtr;
     register Var *elPtr;
+    ActiveVarTrace *activePtr;
 
     DeleteSearches(varPtr);
     for (hPtr = Tcl_FirstHashEntry(varPtr->value.tablePtr, &search);
 	    hPtr != NULL; hPtr = Tcl_NextHashEntry(&search)) {
 	elPtr = (Var *) Tcl_GetHashValue(hPtr);
+	if (elPtr->valueSpace != 0) {
+	    /*
+	     * SPECIAL TRICK:  it's possible that the interpreter's result
+	     * currently points to this element (for example, a "set" or
+	     * "lappend" command was the last command in a procedure that's
+	     * being returned from).  If this is the case, then just pass
+	     * ownership of the value string to the Tcl interpreter.
+	     */
+
+	    if (iPtr->result == elPtr->value.string) {
+		iPtr->freeProc = (Tcl_FreeProc *) free;
+	    } else {
+		ckfree(elPtr->value.string);
+	    }
+	    elPtr->valueSpace = 0;
+	}
+	elPtr->hPtr = NULL;
 	if (elPtr->tracePtr != NULL) {
-	    (void) CallTraces(iPtr, (Var *) NULL, hPtr, arrayName,
+	    elPtr->flags &= ~VAR_TRACE_ACTIVE;
+	    (void) CallTraces(iPtr, (Var *) NULL, elPtr, arrayName,
 		    Tcl_GetHashKey(varPtr->value.tablePtr, hPtr), flags);
 	    while (elPtr->tracePtr != NULL) {
 		VarTrace *tracePtr = elPtr->tracePtr;
 		elPtr->tracePtr = tracePtr->nextPtr;
 		ckfree((char *) tracePtr);
 	    }
+	    for (activePtr = iPtr->activeTracePtr; activePtr != NULL;
+		    activePtr = activePtr->nextPtr) {
+		if (activePtr->varPtr == elPtr) {
+		    activePtr->nextTracePtr = NULL;
+		}
+	    }
 	}
-	if (elPtr->flags & VAR_SEARCHES_POSSIBLE) {
-	    panic("DeleteArray found searches on array alement!");
+	elPtr->flags = VAR_UNDEFINED;
+	if (elPtr->refCount == 0) {
+	    ckfree((char *) elPtr);
 	}
-	ckfree((char *) elPtr);
     }
     Tcl_DeleteHashTable(varPtr->value.tablePtr);
     ckfree((char *) varPtr->value.tablePtr);
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * CleanupVar --
+ *
+ *	This procedure is called when it looks like it may be OK
+ *	to free up the variable's record and hash table entry, and
+ *	those of its containing parent.  It's called, for example,
+ *	when a trace on a variable deletes the variable.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	If the variable (or its containing array) really is dead then
+ *	its record, and possibly its hash table entry, gets freed up.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void
+CleanupVar(varPtr, arrayPtr)
+    Var *varPtr;		/* Pointer to variable that may be a
+				 * candidate for being expunged. */
+    Var *arrayPtr;		/* Array that contains the variable, or
+				 * NULL if this variable isn't an array
+				 * element. */
+{
+    if ((varPtr->flags & VAR_UNDEFINED) && (varPtr->refCount == 0)
+	    && (varPtr->tracePtr == NULL)) {
+	if (varPtr->hPtr != NULL) {
+	    Tcl_DeleteHashEntry(varPtr->hPtr);
+	}
+	ckfree((char *) varPtr);
+    }
+    if (arrayPtr != NULL) {
+	if ((arrayPtr->flags & VAR_UNDEFINED) && (arrayPtr->refCount == 0)
+		&& (arrayPtr->tracePtr == NULL)) {
+	    if (arrayPtr->hPtr != NULL) {
+		Tcl_DeleteHashEntry(arrayPtr->hPtr);
+	    }
+	    ckfree((char *) arrayPtr);
+	}
+    }
+    return;
 }
 
 /*

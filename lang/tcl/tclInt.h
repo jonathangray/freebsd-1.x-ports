@@ -3,15 +3,27 @@
  *
  *	Declarations of things used internally by the Tcl interpreter.
  *
- * Copyright 1987-1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1987-1993 The Regents of the University of California.
+ * All rights reserved.
  *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+ *
+ * $Header: /a/cvs/386BSD/ports/lang/tcl/tclInt.h,v 1.2 1993/12/27 07:06:10 rich Exp $ SPRITE (Berkeley)
  */
 
 #ifndef _TCLINT
@@ -32,16 +44,26 @@
 #ifndef _TCL
 #include "tcl.h"
 #endif
-#ifndef _TCLHASH
-#include "tclHash.h"
-#endif
 #ifndef _REGEXP
-#include "regexp.h"
+#include "tclRegexp.h"
 #endif
 
 #include <ctype.h>
-#include <stdlib.h>
+#ifdef NO_LIMITS_H
+#   include "compat/limits.h"
+#else
+#   include <limits.h>
+#endif
+#ifdef NO_STDLIB_H
+#   include "compat/stdlib.h"
+#else
+#   include <stdlib.h>
+#endif
+#ifdef NO_STRING_H
+#include "compat/string.h"
+#else
 #include <string.h>
+#endif
 #include <varargs.h>
 
 /*
@@ -88,6 +110,7 @@ typedef struct VarTrace {
  */
 
 typedef struct ActiveVarTrace {
+    struct Var *varPtr;		/* Variable that's being traced. */
     struct ActiveVarTrace *nextPtr;
 				/* Next in list of all active variable
 				 * traces for the interpreter, or NULL
@@ -138,34 +161,38 @@ typedef struct Var {
 				 * For array and global variables this is
 				 * meaningless. */
     int valueSpace;		/* Total number of bytes of space allocated
-				 * at value. */
-    int upvarUses;		/* Counts number of times variable is
-				 * is referenced via global or upvar variables
-				 * (i.e. how many variables have "upvarPtr"
-				 * pointing to this variable).  Variable
-				 * can't be deleted until this count reaches
-				 * 0. */
+				 * at value.string.  0 means there is no
+				 * space allocated. */
+    union {
+	char *string;		/* String value of variable, used for scalar
+				 * variables and array elements.  Malloc-ed. */
+	Tcl_HashTable *tablePtr;/* For array variables, this points to
+				 * information about the hash table used
+				 * to implement the associative array. 
+				 * Points to malloc-ed data. */
+	struct Var *upvarPtr;	/* If this is a global variable being
+				 * referred to in a procedure, or a variable
+				 * created by "upvar", this field points to
+				 * the record for the higher-level variable. */
+    } value;
+    Tcl_HashEntry *hPtr;	/* Hash table entry that refers to this
+				 * variable, or NULL if the variable has
+				 * been detached from its hash table (e.g.
+				 * an array is deleted, but some of its
+				 * elements are still referred to in upvars). */
+    int refCount;		/* Counts number of active uses of this
+				 * variable, not including its main hash
+				 * table entry: 1 for each additional variable
+				 * whose upVarPtr points here, 1 for each
+				 * nested trace active on variable.  This
+				 * record can't be deleted until refCount
+				 * becomes 0. */
     VarTrace *tracePtr;		/* First in list of all traces set for this
 				 * variable. */
     ArraySearch *searchPtr;	/* First in list of all searches active
 				 * for this variable, or NULL if none. */
     int flags;			/* Miscellaneous bits of information about
 				 * variable.  See below for definitions. */
-    union {
-	char string[4];		/* String value of variable.  The actual
-				 * length of this field is given by the
-				 * valueSpace field above. */
-	Tcl_HashTable *tablePtr;/* For array variables, this points to
-				 * information about the hash table used
-				 * to implement the associative array. 
-				 * Points to malloc-ed data. */
-	Tcl_HashEntry *upvarPtr;
-				/* If this is a global variable being
-				 * referred to in a procedure, or a variable
-				 * created by "upvar", this field points to
-				 * the hash table entry for the higher-level
-				 * variable. */
-    } value;			/* MUST BE LAST FIELD IN STRUCTURE!!! */
 } Var;
 
 /*
@@ -184,10 +211,6 @@ typedef struct Var {
  *				variable has a trace on it, or if it is
  *				a global variable being used by a procedure,
  *				then it stays around even when undefined.
- * VAR_ELEMENT_ACTIVE -		Used only in array variables;  1 means that
- *				an element of the array is currently being
- *				manipulated in some way, so that it isn't
- *				safe to delete the whole array.
  * VAR_TRACE_ACTIVE -		1 means that trace processing is currently
  *				underway for a read or write access, so
  *				new read or write accesses should not cause
@@ -198,9 +221,7 @@ typedef struct Var {
 #define VAR_ARRAY		1
 #define VAR_UPVAR		2
 #define VAR_UNDEFINED		4
-#define VAR_ELEMENT_ACTIVE	0x10
-#define VAR_TRACE_ACTIVE	0x20
-#define VAR_SEARCHES_POSSIBLE	0x40
+#define VAR_TRACE_ACTIVE	0x10
 
 /*
  *----------------------------------------------------------------
@@ -236,6 +257,11 @@ typedef struct Arg {
 typedef struct Proc {
     struct Interp *iPtr;	/* Interpreter for which this command
 				 * is defined. */
+    int refCount;		/* Reference count:  1 if still present
+				 * in command table plus 1 for each call
+				 * to the procedure that is currently
+				 * active.  This structure can be freed
+				 * when refCount becomes zero. */
     char *command;		/* Command that constitutes the body of
 				 * the procedure (dynamically allocated). */
     Arg *argPtr;		/* Pointer to first of procedure's formal
@@ -254,6 +280,19 @@ typedef struct Trace {
     ClientData clientData;	/* Arbitrary value to pass to proc. */
     struct Trace *nextPtr;	/* Next in list of traces for this interp. */
 } Trace;
+
+/*
+ * The stucture below defines a deletion callback, which is
+ * a procedure to invoke just before an interpreter is deleted.
+ */
+
+typedef struct DeleteCallback {
+    Tcl_InterpDeleteProc *proc;	/* Procedure to call. */
+    ClientData clientData;	/* Value to pass to procedure. */
+    struct DeleteCallback *nextPtr;
+				/* Next in list of callbacks for this
+				 * interpreter (or NULL for end of list). */
+} DeleteCallback;
 
 /*
  * The structure below defines a frame, which is a procedure invocation.
@@ -341,8 +380,8 @@ typedef struct OpenFile {
 				 * a command pipeline with pipes for both
 				 * input and output, this is a stdio file
 				 * to use for writing to the pipeline. */
-    int readable;		/* Non-zero means file may be read. */
-    int writable;		/* Non-zero means file may be written. */
+    int permissions;		/* OR-ed combination of TCL_FILE_READABLE
+				 * and TCL_FILE_WRITABLE. */
     int numPids;		/* If this is a connection to a process
 				 * pipeline, gives number of processes
 				 * in pidPtr array below;  otherwise it
@@ -355,6 +394,28 @@ typedef struct OpenFile {
 				 * output from pipeline.  -1 means not
 				 * used (i.e. this is a normal file). */
 } OpenFile;
+
+/*
+ *----------------------------------------------------------------
+ * Data structures related to expressions.  These are used only in
+ * tclExpr.c.
+ *----------------------------------------------------------------
+ */
+
+/*
+ * The data structure below defines a math function (e.g. sin or hypot)
+ * for use in Tcl expressions.
+ */
+
+#define MAX_MATH_ARGS 5
+typedef struct MathFunc {
+    int numArgs;		/* Number of arguments for function. */
+    Tcl_ValueType argTypes[MAX_MATH_ARGS];
+				/* Acceptable types for each argument. */
+    Tcl_MathProc *proc;		/* Procedure that implements this function. */
+    ClientData clientData;	/* Additional argument to pass to the function
+				 * when invoking it. */
+} MathFunc;
 
 /*
  *----------------------------------------------------------------
@@ -372,6 +433,8 @@ typedef struct Command {
     Tcl_CmdDeleteProc *deleteProc;
 				/* Procedure to invoke when deleting
 				 * command. */
+    ClientData deleteData;	/* Arbitrary value to pass to deleteProc
+				 * (usually the same as clientData). */
 } Command;
 
 #define CMD_SIZE(nameLength) ((unsigned) sizeof(Command) + nameLength - 3)
@@ -397,6 +460,10 @@ typedef struct Interp {
     Tcl_HashTable commandTable;	/* Contains all of the commands currently
 				 * registered in this interpreter.  Indexed
 				 * by strings; values have type (Command *). */
+    Tcl_HashTable mathFuncTable;/* Contains all of the math functions currently
+				 * defined for the interpreter.  Indexed by
+				 * strings (function names);  values have
+				 * type (MathFunc *). */
 
     /*
      * Information related to procedures and variables.  See tclProc.c
@@ -410,6 +477,9 @@ typedef struct Interp {
 				 * interpreter.  It's used to delay deletion
 				 * of the table until all Tcl_Eval invocations
 				 * are completed. */
+    int maxNestingDepth;	/* If numLevels exceeds this value then Tcl
+				 * assumes that infinite recursion has
+				 * occurred and it generates an error. */
     CallFrame *framePtr;	/* Points to top-most in stack of all nested
 				 * procedure invocations.  NULL means there
 				 * are no active procedures. */
@@ -421,6 +491,12 @@ typedef struct Interp {
     ActiveVarTrace *activeTracePtr;
 				/* First in list of active traces for interp,
 				 * or NULL if no active traces. */
+    int returnCode;		/* Completion code to return if current
+				 * procedure exits with a TCL_RETURN code. */
+    char *errorInfo;		/* Value to store in errorInfo if returnCode
+				 * is TCL_ERROR.  Malloc'ed, may be NULL */
+    char *errorCode;		/* Value to store in errorCode if returnCode
+				 * is TCL_ERROR.  Malloc'ed, may be NULL */
 
     /*
      * Information related to history:
@@ -462,22 +538,6 @@ typedef struct Interp {
 				 * stored at partialResult. */
 
     /*
-     * Information related to files.  See tclUnixAZ.c and tclUnixUtil.c
-     * for details.
-     */
-
-    int numFiles;		/* Number of entries in filePtrArray
-				 * below.  0 means array hasn't been
-				 * created yet. */
-    OpenFile **filePtrArray;	/* Pointer to malloc-ed array of pointers
-				 * to information about open files.  Entry
-				 * N corresponds to the file with fileno N.
-				 * If an entry is NULL then the corresponding
-				 * file isn't open.  If filePtrArray is NULL
-				 * it means no files have been used, so even
-				 * stdin/stdout/stderr entries haven't been
-				 * setup yet. */
-    /*
      * A cache of compiled regular expressions.  See TclCompileRegexp
      * in tclUtil.c for details.
      */
@@ -494,6 +554,14 @@ typedef struct Interp {
 				/* Compiled forms of above strings.  Also
 				 * malloc-ed, or NULL if not in use yet. */
 
+    /*
+     * Information used by Tcl_PrintDouble:
+     */
+
+    char pdFormat[10];		/* Format string used by Tcl_PrintDouble. */
+    int pdPrec;			/* Current precision (used to restore the
+				 * the tcl_precision variable after a bogus
+				 * value has been put into it). */
 
     /*
      * Miscellaneous information:
@@ -505,6 +573,13 @@ typedef struct Interp {
 				 * be executed:  just parse only.  Used in
 				 * expressions when the result is already
 				 * determined. */
+    int evalFlags;		/* Flags to control next call to Tcl_Eval.
+				 * Normally zero, but may be set before
+				 * calling Tcl_Eval to an OR'ed combination
+				 * of TCL_BRACKET_TERM and TCL_RECORD_BOUNDS. */
+    char *termPtr;		/* Character just after the last one in
+				 * a command.  Set by Tcl_Eval before
+				 * returning. */
     char *scriptFile;		/* NULL means there is no nested source
 				 * command active;  otherwise this points to
 				 * the name of the file being sourced (it's
@@ -512,6 +587,9 @@ typedef struct Interp {
 				 * to Tcl_EvalFile. */
     int flags;			/* Various flag bits.  See below. */
     Trace *tracePtr;		/* List of traces for this interpreter. */
+    DeleteCallback *deleteCallbackPtr;
+				/* First in list of callbacks to invoke when
+				 * interpreter is deleted. */
     char resultSpace[TCL_RESULT_SIZE+1];
 				/* Static space for storing small results. */
 } Interp;
@@ -534,12 +612,22 @@ typedef struct Interp {
  *			called to record information for the current
  *			error.  Zero means Tcl_Eval must clear the
  *			errorCode variable if an error is returned.
+ * EXPR_INITIALIZED:	1 means initialization specific to expressions has
+ *			been carried out.
  */
 
 #define DELETED			1
 #define ERR_IN_PROGRESS		2
 #define ERR_ALREADY_LOGGED	4
 #define ERROR_CODE_SET		8
+#define EXPR_INITIALIZED	0x10
+
+/*
+ * Default value for the pdPrec and pdFormat fields of interpreters:
+ */
+
+#define DEFAULT_PD_PREC 6
+#define DEFAULT_PD_FORMAT "%g"
 
 /*
  *----------------------------------------------------------------
@@ -620,16 +708,35 @@ extern char tclTypeTable[];
 #define TCL_RECORD_BOUNDS	0x100
 
 /*
- * Maximum number of levels of nesting permitted in Tcl commands.
+ * Maximum number of levels of nesting permitted in Tcl commands (used
+ * to catch infinite recursion).
  */
 
-#define MAX_NESTING_DEPTH	100
+#define MAX_NESTING_DEPTH	1000
+
+/*
+ * The macro below is used to modify a "char" value (e.g. by casting
+ * it to an unsigned character) so that it can be used safely with
+ * macros such as isspace.
+ */
+
+#define UCHAR(c) ((unsigned char) (c))
+
+/*
+ * Given a size or address, the macro below "aligns" it to the machine's
+ * memory unit size (e.g. an 8-byte boundary) so that anything can be
+ * placed at the aligned address without fear of an alignment error.
+ */
+
+#define TCL_ALIGN(x) ((x + 7) & ~7)
 
 /*
  * Variables shared among Tcl modules but not used by the outside
  * world:
  */
 
+extern int		tclNumFiles;
+extern OpenFile **	tclOpenFiles;
 extern char *		tclRegexpError;
 
 /*
@@ -657,11 +764,7 @@ extern int		TclGetFrame _ANSI_ARGS_((Tcl_Interp *interp,
 			    char *string, CallFrame **framePtrPtr));
 extern int		TclGetListIndex _ANSI_ARGS_((Tcl_Interp *interp,
 			    char *string, int *indexPtr));
-extern int		TclGetOpenFile _ANSI_ARGS_((Tcl_Interp *interp,
-			    char *string, OpenFile **filePtrPtr));
 extern Proc *		TclIsProc _ANSI_ARGS_((Command *cmdPtr));
-extern void		TclMakeFileTable _ANSI_ARGS_((Interp *iPtr,
-			    int index));
 extern int		TclParseBraces _ANSI_ARGS_((Tcl_Interp *interp,
 			    char *string, char **termPtr, ParseValue *pvPtr));
 extern int		TclParseNestedCmd _ANSI_ARGS_((Tcl_Interp *interp,
@@ -674,8 +777,12 @@ extern int		TclParseWords _ANSI_ARGS_((Tcl_Interp *interp,
 			    char *string, int flags, int maxWords,
 			    char **termPtr, int *argcPtr, char **argv,
 			    ParseValue *pvPtr));
+extern char *		TclPrecTraceProc _ANSI_ARGS_((ClientData clientData,
+			    Tcl_Interp *interp, char *name1, char *name2,
+			    int flags));
 extern void		TclSetupEnv _ANSI_ARGS_((Tcl_Interp *interp));
-extern char *		TclWordEnd _ANSI_ARGS_((char *start, int nested));
+extern char *		TclWordEnd _ANSI_ARGS_((char *start, int nested,
+			    int *semiPtr));
 
 /*
  *----------------------------------------------------------------
@@ -757,6 +864,8 @@ extern int	Tcl_SplitCmd _ANSI_ARGS_((ClientData clientData,
 		    Tcl_Interp *interp, int argc, char **argv));
 extern int	Tcl_StringCmd _ANSI_ARGS_((ClientData clientData,
 		    Tcl_Interp *interp, int argc, char **argv));
+extern int	Tcl_SwitchCmd _ANSI_ARGS_((ClientData clientData,
+		    Tcl_Interp *interp, int argc, char **argv));
 extern int	Tcl_TraceCmd _ANSI_ARGS_((ClientData clientData,
 		    Tcl_Interp *interp, int argc, char **argv));
 extern int	Tcl_UnsetCmd _ANSI_ARGS_((ClientData clientData,
@@ -799,6 +908,8 @@ extern int	Tcl_GlobCmd _ANSI_ARGS_((ClientData clientData,
 extern int	Tcl_OpenCmd _ANSI_ARGS_((ClientData clientData,
 		    Tcl_Interp *interp, int argc, char **argv));
 extern int	Tcl_PutsCmd _ANSI_ARGS_((ClientData clientData,
+		    Tcl_Interp *interp, int argc, char **argv));
+extern int	Tcl_PidCmd _ANSI_ARGS_((ClientData clientData,
 		    Tcl_Interp *interp, int argc, char **argv));
 extern int	Tcl_PwdCmd _ANSI_ARGS_((ClientData clientData,
 		    Tcl_Interp *interp, int argc, char **argv));

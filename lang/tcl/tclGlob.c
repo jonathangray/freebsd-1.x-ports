@@ -4,15 +4,30 @@
  *	This file provides procedures and commands for file name
  *	manipulation, such as tilde expansion and globbing.
  *
- * Copyright 1990-1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
+
+#ifndef lint
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclGlob.c,v 1.2 1993/12/27 07:06:06 rich Exp $ SPRITE (Berkeley)";
+#endif /* not lint */
 
 #include "tclInt.h"
 #include "tclUnix.h"
@@ -38,81 +53,8 @@ typedef struct {
  * Declarations for procedures local to this file:
  */
 
-static void		AppendResult _ANSI_ARGS_((Tcl_Interp *interp,
-			    char *dir, char *separator, char *name,
-			    int nameLength));
 static int		DoGlob _ANSI_ARGS_((Tcl_Interp *interp, char *dir,
 			    char *rem));
-
-/*
- *----------------------------------------------------------------------
- *
- * AppendResult --
- *
- *	Given two parts of a file name (directory and element within
- *	directory), concatenate the two together and append them to
- *	the result building up in interp.
- *
- * Results:
- *	There is no return value.
- *
- * Side effects:
- *	Interp->result gets extended.
- *
- *----------------------------------------------------------------------
- */
-
-static void
-AppendResult(interp, dir, separator, name, nameLength)
-    Tcl_Interp *interp;		/* Interpreter whose result should be
-				 * appended to. */
-    char *dir;			/* Name of directory, without trailing
-				 * slash except for root directory. */
-    char *separator;		/* Separator string so use between dir and
-				 * name:  either "/" or "" depending on dir. */
-    char *name;			/* Name of file withing directory (NOT
-				 * necessarily null-terminated!). */
-    int nameLength;		/* Number of characters in name. */
-{
-    int dirFlags, nameFlags;
-    char *p, saved;
-
-    /*
-     * Next, see if we can put together a valid list element from dir
-     * and name by calling Tcl_AppendResult.
-     */
-
-    if (*dir == 0) {
-	dirFlags = 0;
-    } else {
-	Tcl_ScanElement(dir, &dirFlags);
-    }
-    saved = name[nameLength];
-    name[nameLength] = 0;
-    Tcl_ScanElement(name, &nameFlags);
-    if ((dirFlags == 0) && (nameFlags == 0)) {
-	if (*interp->result != 0) {
-	    Tcl_AppendResult(interp, " ", dir, separator, name, (char *) NULL);
-	} else {
-	    Tcl_AppendResult(interp, dir, separator, name, (char *) NULL);
-	}
-	name[nameLength] = saved;
-	return;
-    }
-
-    /*
-     * This name has weird characters in it, so we have to convert it to
-     * a list element.  To do that, we have to merge the characters
-     * into a single name.  To do that, malloc a buffer to hold everything.
-     */
-
-    p = (char *) ckalloc((unsigned) (strlen(dir) + strlen(separator)
-	    + nameLength + 1));
-    sprintf(p, "%s%s%s", dir, separator, name);
-    name[nameLength] = saved;
-    Tcl_AppendElement(interp, p, 0);
-    ckfree(p);
-}
 
 /*
  *----------------------------------------------------------------------
@@ -156,31 +98,32 @@ DoGlob(interp, dir, rem)
      * in the remainder.
      */
 
+    Tcl_DString newName;		/* Holds new name consisting of
+					 * dir plus the first part of rem. */
     register char *p;
     register char c;
-    char *openBrace, *closeBrace;
-    int gotSpecial, result;
-    char *separator;
+    char *openBrace, *closeBrace, *name, *dirName;
+    int gotSpecial, baseLength;
+    int result = TCL_OK;
+    struct stat statBuf;
 
     /*
-     * Figure out whether we'll need to add a slash between the directory
-     * name and file names within the directory when concatenating them
-     * together.
+     * Make sure that the directory part of the name really is a
+     * directory.  If the directory name is "", use the name "."
+     * instead, because some UNIX systems don't treat "" like "."
+     * automatically. Keep the "" for use in generating file names,
+     * otherwise "glob foo.c" would return "./foo.c".
      */
 
-    if ((dir[0] == 0) || ((dir[0] == '/') && (dir[1] == 0))) {
-	separator = "";
+    if (*dir == '\0') {
+	dirName = ".";
     } else {
-	separator = "/";
+	dirName = dir;
     }
-
-    /*
-     * When generating information for the next lower call,
-     * use static areas if the name is short, and malloc if the name
-     * is longer.
-     */
-
-#define STATIC_SIZE 200
+    if ((stat(dirName, &statBuf) != 0) || !S_ISDIR(statBuf.st_mode)) {
+	return TCL_OK;
+    }
+    Tcl_DStringInit(&newName);
 
     /*
      * First, find the end of the next element in rem, checking
@@ -191,13 +134,13 @@ DoGlob(interp, dir, rem)
     openBrace = closeBrace = NULL;
     for (p = rem; ; p++) {
 	c = *p;
-	if ((c == '\0') || (c == '/')) {
+	if ((c == '\0') || ((openBrace == NULL) && (c == '/'))) {
 	    break;
 	}
 	if ((c == '{') && (openBrace == NULL)) {
 	    openBrace = p;
 	}
-	if ((c == '}') && (closeBrace == NULL)) {
+	if ((c == '}') && (openBrace != NULL) && (closeBrace == NULL)) {
 	    closeBrace = p;
 	}
 	if ((c == '*') || (c == '[') || (c == '\\') || (c == '?')) {
@@ -214,41 +157,42 @@ DoGlob(interp, dir, rem)
      */
 
     if (openBrace != NULL) {
-	int remLength, l1, l2;
-	char static1[STATIC_SIZE];
-	char *element, *newRem;
+	char *element;
 
 	if (closeBrace == NULL) {
 	    Tcl_ResetResult(interp);
 	    interp->result = "unmatched open-brace in file name";
-	    return TCL_ERROR;
+	    result = TCL_ERROR;
+	    goto done;
 	}
-	remLength = strlen(rem) + 1;
-	if (remLength <= STATIC_SIZE) {
-	    newRem = static1;
-	} else {
-	    newRem = (char *) ckalloc((unsigned) remLength);
-	}
-	l1 = openBrace-rem;
-	strncpy(newRem, rem, l1);
-	p = openBrace;
+	Tcl_DStringAppend(&newName, rem, openBrace-rem);
+	baseLength = newName.length;
 	for (p = openBrace; *p != '}'; ) {
 	    element = p+1;
 	    for (p = element; ((*p != '}') && (*p != ',')); p++) {
-		/* Empty loop body:  just find end of this element. */
+		/* Empty loop body. */
 	    }
-	    l2 = p - element;
-	    strncpy(newRem+l1, element, l2);
-	    strcpy(newRem+l1+l2, closeBrace+1);
-	    if (DoGlob(interp, dir, newRem) != TCL_OK) {
-		return TCL_ERROR;
+	    Tcl_DStringAppend(&newName, element, p-element);
+	    Tcl_DStringAppend(&newName, closeBrace+1, -1);
+	    result = DoGlob(interp, dir, newName.string);
+	    if (result != TCL_OK) {
+		goto done;
 	    }
+	    newName.length = baseLength;
 	}
-	if (remLength > STATIC_SIZE) {
-	    ckfree(newRem);
-	}
-	return TCL_OK;
+	goto done;
     }
+
+    /*
+     * Start building up the next-level name with dir plus a slash if
+     * needed to separate it from the next file name.
+     */
+
+    Tcl_DStringAppend(&newName, dir, -1);
+    if ((dir[0] != 0) && (newName.string[newName.length-1] != '/')) {
+	Tcl_DStringAppend(&newName, "/", 1);
+    }
+    baseLength = newName.length;
 
     /*
      * If there were any pattern-matching characters, then scan through
@@ -258,42 +202,25 @@ DoGlob(interp, dir, rem)
     if (gotSpecial) {
 	DIR *d;
 	struct dirent *entryPtr;
-	int l1, l2;
-	char *pattern, *newDir, *dirName;
-	char static1[STATIC_SIZE], static2[STATIC_SIZE];
-	struct stat statBuf;
+	char savedChar;
 
-	/*
-	 * Be careful not to do any actual file system operations on a
-	 * directory named "";  instead, use ".".  This is needed because
-	 * some versions of UNIX don't treat "" like "." automatically.
-	 */
-
-	if (*dir == '\0') {
-	    dirName = ".";
-	} else {
-	    dirName = dir;
-	}
-	if ((stat(dirName, &statBuf) != 0) || !S_ISDIR(statBuf.st_mode)) {
-	    return TCL_OK;
-	}
 	d = opendir(dirName);
 	if (d == NULL) {
 	    Tcl_ResetResult(interp);
 	    Tcl_AppendResult(interp, "couldn't read directory \"",
-		    dirName, "\": ", Tcl_UnixError(interp), (char *) NULL);
-	    return TCL_ERROR;
+		    dirName, "\": ", Tcl_PosixError(interp), (char *) NULL);
+	    result = TCL_ERROR;
+	    goto done;
 	}
-	l1 = strlen(dir);
-	l2 = (p - rem);
-	if (l2 < STATIC_SIZE) {
-	    pattern = static2;
-	} else {
-	    pattern = (char *) ckalloc((unsigned) (l2+1));
-	}
-	strncpy(pattern, rem, l2);
-	pattern[l2] = '\0';
-	result = TCL_OK;
+
+	/*
+	 * Temporarily store a null into rem so that the pattern string
+	 * is now null-terminated.
+	 */
+
+	savedChar = *p;
+	*p = 0;
+
 	while (1) {
 	    entryPtr = readdir(d);
 	    if (entryPtr == NULL) {
@@ -305,25 +232,16 @@ DoGlob(interp, dir, rem)
 	     * present in the pattern.
 	     */
 
-	    if ((*entryPtr->d_name == '.') && (*pattern != '.')) {
+	    if ((*entryPtr->d_name == '.') && (*rem != '.')) {
 		continue;
 	    }
-	    if (Tcl_StringMatch(entryPtr->d_name, pattern)) {
-		int nameLength = strlen(entryPtr->d_name);
-		if (*p == 0) {
-		    AppendResult(interp, dir, separator, entryPtr->d_name,
-			    nameLength);
+	    if (Tcl_StringMatch(entryPtr->d_name, rem)) {
+		newName.length = baseLength;
+		Tcl_DStringAppend(&newName, entryPtr->d_name, -1);
+		if (savedChar == 0) {
+		    Tcl_AppendElement(interp, newName.string);
 		} else {
-		    if ((l1+nameLength+2) <= STATIC_SIZE) {
-			newDir = static1;
-		    } else {
-			newDir = (char *) ckalloc((unsigned) (l1+nameLength+2));
-		    }
-		    sprintf(newDir, "%s%s%s", dir, separator, entryPtr->d_name);
-		    result = DoGlob(interp, newDir, p+1);
-		    if (newDir != static1) {
-			ckfree(newDir);
-		    }
+		    result = DoGlob(interp, newName.string, p+1);
 		    if (result != TCL_OK) {
 			break;
 		    }
@@ -331,42 +249,40 @@ DoGlob(interp, dir, rem)
 	    }
 	}
 	closedir(d);
-	if (pattern != static2) {
-	    ckfree(pattern);
-	}
-	return result;
+	*p = savedChar;
+	goto done;
     }
 
     /*
-     * This is the simplest case:  just another path element.  Move
-     * it to the dir side and recurse (or just add the name to the
-     * list, if we're at the end of the path).
+     * The current element is a simple one with no fancy features.  Add
+     * it to the new name.  If there are more elements still to come,
+     * then recurse to process them.
      */
 
-    if (*p == 0) {
-	AppendResult(interp, dir, separator, rem, p-rem);
-    } else {
-	int l1, l2;
-	char *newDir;
-	char static1[STATIC_SIZE];
-
-	l1 = strlen(dir);
-	l2 = l1 + (p - rem) + 2;
-	if (l2 <= STATIC_SIZE) {
-	    newDir = static1;
-	} else {
-	    newDir = (char *) ckalloc((unsigned) l2);
-	}
-	sprintf(newDir, "%s%s%.*s", dir, separator, p-rem, rem);
-	result = DoGlob(interp, newDir, p+1);
-	if (newDir != static1) {
-	    ckfree(newDir);
-	}
-	if (result != TCL_OK) {
-	    return TCL_ERROR;
-	}
+    Tcl_DStringAppend(&newName, rem, p-rem);
+    if (*p != 0) {
+	result = DoGlob(interp, newName.string, p+1);
+	goto done;
     }
-    return TCL_OK;
+
+    /*
+     * There are no more elements in the pattern.  Check to be sure the
+     * file actually exists, then add its name to the list being formed
+     * in interp-result.
+     */
+
+    name = newName.string;
+    if (*name == 0) {
+	name = ".";
+    }
+    if (access(name, F_OK) != 0) {
+	goto done;
+    }
+    Tcl_AppendElement(interp, name);
+
+    done:
+    Tcl_DStringFree(&newName);
+    return result;
 }
 
 /*
@@ -380,43 +296,37 @@ DoGlob(interp, dir, rem)
  *
  * Results:
  *	The result is a pointer to a static string containing
- *	the new name.  This name will only persist until the next
- *	call to Tcl_TildeSubst;  save it if you care about it for
- *	the long term.  If there was an error in processing the
+ *	the new name.  If there was an error in processing the
  *	tilde, then an error message is left in interp->result
- *	and the return value is NULL.
+ *	and the return value is NULL.  The result may be stored
+ *	in bufferPtr; the caller must call Tcl_DStringFree(bufferPtr)
+ *	to free the name.
  *
  * Side effects:
- *	None that the caller needs to worry about.
+ *	Information may be left in bufferPtr.
  *
  *----------------------------------------------------------------------
  */
 
 char *
-Tcl_TildeSubst(interp, name)
+Tcl_TildeSubst(interp, name, bufferPtr)
     Tcl_Interp *interp;		/* Interpreter in which to store error
 				 * message (if necessary). */
     char *name;			/* File name, which may begin with "~/"
 				 * (to indicate current user's home directory)
 				 * or "~<user>/" (to indicate any user's
 				 * home directory). */
+    Tcl_DString *bufferPtr;	/* May be used to hold result.  Must not hold
+				 * anything at the time of the call, and need
+				 * not even be initialized. */
 {
-#define STATIC_BUF_SIZE 50
-    static char staticBuf[STATIC_BUF_SIZE];
-    static int curSize = STATIC_BUF_SIZE;
-    static char *curBuf = staticBuf;
     char *dir;
-    int length;
-    int fromPw = 0;
     register char *p;
 
+    Tcl_DStringInit(bufferPtr);
     if (name[0] != '~') {
 	return name;
     }
-
-    /*
-     * First, find the directory name corresponding to the tilde entry.
-     */
 
     if ((name[1] == '/') || (name[1] == '\0')) {
 	dir = getenv("HOME");
@@ -426,56 +336,29 @@ Tcl_TildeSubst(interp, name)
 		    "variable to expand \"", name, "\"", (char *) NULL);
 	    return NULL;
 	}
-	p = name+1;
+	Tcl_DStringAppend(bufferPtr, dir, -1);
+	Tcl_DStringAppend(bufferPtr, name+1, -1);
     } else {
 	struct passwd *pwPtr;
 
 	for (p = &name[1]; (*p != 0) && (*p != '/'); p++) {
 	    /* Null body;  just find end of name. */
 	}
-	length = p-&name[1];
-	if (length >= curSize) {
-	    length = curSize-1;
-	}
-	memcpy((VOID *) curBuf, (VOID *) (name+1), length);
-	curBuf[length] = '\0';
-	pwPtr = getpwnam(curBuf);
+	Tcl_DStringAppend(bufferPtr, name+1, p - (name+1));
+	pwPtr = getpwnam(bufferPtr->string);
 	if (pwPtr == NULL) {
 	    endpwent();
 	    Tcl_ResetResult(interp);
-	    Tcl_AppendResult(interp, "user \"", curBuf,
+	    Tcl_AppendResult(interp, "user \"", bufferPtr->string,
 		    "\" doesn't exist", (char *) NULL);
 	    return NULL;
 	}
-	dir = pwPtr->pw_dir;
-	fromPw = 1;
-    }
-
-    /*
-     * Grow the buffer if necessary to make enough space for the
-     * full file name.
-     */
-
-    length = strlen(dir) + strlen(p);
-    if (length >= curSize) {
-	if (curBuf != staticBuf) {
-	    ckfree(curBuf);
-	}
-	curSize = length + 1;
-	curBuf = (char *) ckalloc((unsigned) curSize);
-    }
-
-    /*
-     * Finally, concatenate the directory name with the remainder
-     * of the path in the buffer.
-     */
-
-    strcpy(curBuf, dir);
-    strcat(curBuf, p);
-    if (fromPw) {
+	Tcl_DStringFree(bufferPtr);
+	Tcl_DStringAppend(bufferPtr, pwPtr->pw_dir, -1);
+	Tcl_DStringAppend(bufferPtr, p, -1);
 	endpwent();
     }
-    return curBuf;
+    return bufferPtr->string;
 }
 
 /*
@@ -503,42 +386,55 @@ Tcl_GlobCmd(dummy, interp, argc, argv)
     int argc;				/* Number of arguments. */
     char **argv;			/* Argument strings. */
 {
-    int i, result, noComplain;
+    int i, result, noComplain, firstArg;
 
     if (argc < 2) {
 	notEnoughArgs:
 	Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
-		" ?-nocomplain? name ?name ...?\"", (char *) NULL);
+		" ?switches? name ?name ...?\"", (char *) NULL);
 	return TCL_ERROR;
     }
     noComplain = 0;
-    if ((argv[1][0] == '-') && (strcmp(argv[1], "-nocomplain") == 0)) {
-	if (argc < 3) {
-	    goto notEnoughArgs;
+    for (firstArg = 1; (firstArg < argc) && (argv[firstArg][0] == '-');
+	    firstArg++) {
+	if (strcmp(argv[firstArg], "-nocomplain") == 0) {
+	    noComplain = 1;
+	} else if (strcmp(argv[firstArg], "--") == 0) {
+	    firstArg++;
+	    break;
+	} else {
+	    Tcl_AppendResult(interp, "bad switch \"", argv[firstArg],
+		    "\": must be -nocomplain or --", (char *) NULL);
+	    return TCL_ERROR;
 	}
-	noComplain = 1;
+    }
+    if (firstArg >= argc) {
+	goto notEnoughArgs;
     }
 
-    for (i = 1 + noComplain; i < argc; i++) {
+    for (i = firstArg; i < argc; i++) {
 	char *thisName;
+	Tcl_DString buffer;
 
-	/*
-	 * Do special checks for names starting at the root and for
-	 * names beginning with ~.  Then let DoGlob do the rest.
-	 */
-
-	thisName = argv[i];
-	if (*thisName == '~') {
-	    thisName = Tcl_TildeSubst(interp, thisName);
-	    if (thisName == NULL) {
-		return TCL_ERROR;
-	    }
+	thisName = Tcl_TildeSubst(interp, argv[i], &buffer);
+	if (thisName == NULL) {
+	    return TCL_ERROR;
 	}
 	if (*thisName == '/') {
-	    result = DoGlob(interp, "/", thisName+1);
+	    if (thisName[1] == '/') {
+		/*
+		 * This is a special hack for systems like those from Apollo
+		 * where there is a super-root at "//":  need to treat the
+		 * double-slash as a single name.
+		 */
+		result = DoGlob(interp, "//", thisName+2);
+	    } else {
+		result = DoGlob(interp, "/", thisName+1);
+	    }
 	} else {
 	    result = DoGlob(interp, "", thisName);
 	}
+	Tcl_DStringFree(&buffer);
 	if (result != TCL_OK) {
 	    return result;
 	}
@@ -548,7 +444,7 @@ Tcl_GlobCmd(dummy, interp, argc, argv)
 
 	Tcl_AppendResult(interp, "no files matched glob pattern",
 		(argc == 2) ? " \"" : "s \"", (char *) NULL);
-	for (i = 1; i < argc; i++) {
+	for (i = firstArg; i < argc; i++) {
 	    Tcl_AppendResult(interp, sep, argv[i], (char *) NULL);
 	    sep = " ";
 	}

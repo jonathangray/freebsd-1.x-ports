@@ -1,17 +1,30 @@
 '\"
-'\" Copyright 1989 Regents of the University of California
-'\" Permission to use, copy, modify, and distribute this
-'\" documentation for any purpose and without fee is hereby
-'\" granted, provided that this notice appears in all copies.
-'\" The University of California makes no representations about
-'\" the suitability of this material for any purpose.  It is
-'\" provided "as is" without express or implied warranty.
+'\" Copyright (c) 1989-1993 The Regents of the University of California.
+'\" All rights reserved.
+'\"
+'\" Permission is hereby granted, without written agreement and without
+'\" license or royalty fees, to use, copy, modify, and distribute this
+'\" documentation for any purpose, provided that the above copyright
+'\" notice and the following two paragraphs appear in all copies.
+'\"
+'\" IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY
+'\" FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+'\" ARISING OUT OF THE USE OF THIS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+'\" CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+'\"
+'\" THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+'\" INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+'\" AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+'\" ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+'\" PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+'\" 
+'\" $Header: /a/cvs/386BSD/ports/lang/tcl/doc/CrtCommand.3,v 1.2 1993/12/27 07:07:41 rich Exp $ SPRITE (Berkeley)
 '\" 
 .so man.macros
-.HS Tcl_CreateCommand tcl
+.HS Tcl_CreateCommand tclc
 .BS
 .SH NAME
-Tcl_CreateCommand, Tcl_DeleteCommand \- define application-specific command bindings
+Tcl_CreateCommand, Tcl_DeleteCommand, Tcl_GetCommandInfo, Tcl_SetCommandInfo \- implement new commands in C
 .SH SYNOPSIS
 .nf
 \fB#include <tcl.h>\fR
@@ -20,12 +33,20 @@ Tcl_CreateCommand, Tcl_DeleteCommand \- define application-specific command bind
 .sp
 int
 \fBTcl_DeleteCommand\fR(\fIinterp, cmdName\fR)
+.sp
+.VS
+int
+\fBTcl_GetCommandInfo\fR(\fIinterp, cmdName, infoPtr\fR)
+.sp
+int
+\fBTcl_SetCommandInfo\fR(\fIinterp, cmdName, infoPtr\fR)
+.VE
 .SH ARGUMENTS
-.AS Tcl_CmdDeleteProc (*deleteProc)()
+.AS Tcl_CmdDeleteProc **deleteProcPtr
 .AP Tcl_Interp *interp in
 Interpreter in which to create new command.
 .AP char *cmdName in
-Name of command to create or delete.
+Name of command.
 .AP Tcl_CmdProc *proc in
 Implementation of new command:  \fIproc\fR will be called whenever
 \fIcmdName\fR is invoked as a command.
@@ -35,6 +56,11 @@ Arbitrary one-word value to pass to \fIproc\fR and \fIdeleteProc\fR.
 Procedure to call before \fIcmdName\fR is deleted from the interpreter;
 allows for command-specific cleanup.  If NULL, then no procedure is
 called before the command is deleted.
+.AP Tcl_CmdInfo *infoPtr in/out
+.VS
+Pointer to structure containing various information about a
+Tcl command.
+.VE
 .BE
 
 .SH DESCRIPTION
@@ -83,18 +109,18 @@ Before invoking a command procedure,
 \fBTcl_Eval\fR sets \fIinterp->result\fR to point to an empty string, so simple
 commands can return an empty result by doing nothing at all.
 .PP
-The contents of the \fIargv\fR array are copies made by the Tcl interpreter
-for the use of \fIproc\fR.  \fIProc\fR may alter any of the strings
-in \fIargv\fR.  However, the \fIargv\fR array
-is recycled as soon as \fIproc\fR returns, so \fIproc\fR must not set
-\fIinterp->result\fR to point anywhere within the \fIargv\fR values
-(call Tcl_SetResult
-with status \fBTCL_VOLATILE\fR if you want to return something from the
-\fIargv\fR array).
+.VS
+The contents of the \fIargv\fR array belong to Tcl and are not
+guaranteed to persist once \fIproc\fR returns:  \fIproc\fR should
+not modify them, nor should it set \fIinterp->result\fR to point
+anywhere within the \fIargv\fR values.
+Call \fBTcl_SetResult\fR with status \fBTCL_VOLATILE\fR if you want
+to return something from the \fIargv\fR array.
+.VE
 .PP
 \fIDeleteProc\fR will be invoked when (if) \fIcmdName\fR is deleted.
 This can occur through a call to \fBTcl_DeleteCommand\fR or \fBTcl_DeleteInterp\fR,
-or by replacing \fIcmdName\fR in another call to Tcl_CreateCommand.
+or by replacing \fIcmdName\fR in another call to \fBTcl_CreateCommand\fR.
 \fIDeleteProc\fR is invoked before the command is deleted, and gives the
 application an opportunity to release any structures associated
 with the command.  \fIDeleteProc\fR should have arguments and
@@ -117,6 +143,30 @@ If \fIcmdName\fR isn't bound as a command in \fIinterp\fR then
 it returns 0.
 There are no restrictions on \fIcmdName\fR:  it may refer to
 a built-in command, an application-specific command, or a Tcl procedure.
+.PP
+.VS
+\fBTcl_GetCommandInfo\fR checks to see whether its \fIcmdName\fR argument
+exists as a command in \fIinterp\fR.  If not then it returns 0.
+Otherwise it places information about the command in the structure
+pointed to by \fIinfoPtr\fR and returns 1.
+Tcl_CmdInfo structures have fields named \fIproc\fR, \fIclientData\fR,
+and \fIdeleteProc\fR, which have the same meaning as the corresponding
+arguments to \fBTcl_CreateCommand\fR.
+There is also a field \fIdeleteData\fR, which is the ClientData value
+to pass to \fIdeleteProc\fR;  it is normally the same as
+\fIclientData\fR but may be set independently using the
+\fBTcl_SetCommandInfo\fR procedure.
+.PP
+\fBTcl_SetCommandInfo\fR is used to modify the procedures and
+ClientData values associated with a command.
+Its \fIcmdName\fR argument is the name of a command in \fIinterp\fR.
+If this command exists then \fBTcl_SetCommandInfo\fR returns 0.
+Otherwise, it copies the information from \fI*infoPtr\fR to
+Tcl's internal structure for the command and returns 1.
+Note that this procedure allows the ClientData for a command's
+deletion procedure to be given a different value than the ClientData
+for its command procedure.
+.VE
 
 .SH KEYWORDS
 bind, command, create, delete, interpreter

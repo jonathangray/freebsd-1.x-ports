@@ -4,23 +4,32 @@
  *	Implementation of in-memory hash tables for Tcl and Tcl-based
  *	applications.
  *
- * Copyright 1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that this copyright
- * notice appears in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1991-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
+
+#ifndef lint
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclHash.c,v 1.2 1993/12/27 07:06:07 rich Exp $ SPRITE (Berkeley)";
+#endif /* not lint */
 
 #include "tclInt.h"
-
-/*
- * Imported library procedures for which there are no header files:
- */
-
-extern void panic();
 
 /*
  * When there are this many entries per bucket, on average, rebuild
@@ -347,7 +356,7 @@ Tcl_HashStats(tablePtr)
 		i, count[i]);
 	p += strlen(p);
     }
-    sprintf(p, "number of buckets with more %d or more entries: %d\n",
+    sprintf(p, "number of buckets with %d or more entries: %d\n",
 	    NUM_COUNTERS, overflow);
     p += strlen(p);
     sprintf(p, "average search distance for entry: %.1f", average);

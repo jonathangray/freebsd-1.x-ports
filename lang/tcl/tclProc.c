@@ -4,15 +4,30 @@
  *	This file contains routines that implement Tcl procedures,
  *	including the "proc" and "uplevel" commands.
  *
- * Copyright 1987-1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1987-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
+
+#ifndef lint
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclProc.c,v 1.2 1993/12/27 07:06:15 rich Exp $ SPRITE (Berkeley)";
+#endif
 
 #include "tclInt.h"
 
@@ -20,6 +35,7 @@
  * Forward references to procedures defined later in this file:
  */
 
+static void	CleanupProc _ANSI_ARGS_((Proc *procPtr));
 static  int	InterpProc _ANSI_ARGS_((ClientData clientData,
 		    Tcl_Interp *interp, int argc, char **argv));
 static  void	ProcDeleteProc _ANSI_ARGS_((ClientData clientData));
@@ -65,6 +81,7 @@ Tcl_ProcCmd(dummy, interp, argc, argv)
 
     procPtr = (Proc *) ckalloc(sizeof(Proc));
     procPtr->iPtr = iPtr;
+    procPtr->refCount = 1;
     procPtr->command = (char *) ckalloc((unsigned) strlen(argv[3]) + 1);
     strcpy(procPtr->command, argv[3]);
     procPtr->argPtr = NULL;
@@ -185,19 +202,15 @@ TclGetFrame(interp, string, framePtrPtr)
 				 * if global frame indicated). */
 {
     register Interp *iPtr = (Interp *) interp;
-    int level, result;
+    int curLevel, level, result;
     CallFrame *framePtr;
-
-    if (iPtr->varFramePtr == NULL) {
-	iPtr->result = "already at top level";
-	return -1;
-    }
 
     /*
      * Parse string to figure out which level number to go to.
      */
 
     result = 1;
+    curLevel = (iPtr->varFramePtr == NULL) ? 0 : iPtr->varFramePtr->level;
     if (*string == '#') {
 	if (Tcl_GetInt(interp, string+1, &level) != TCL_OK) {
 	    return -1;
@@ -208,13 +221,13 @@ TclGetFrame(interp, string, framePtrPtr)
 		    (char *) NULL);
 	    return -1;
 	}
-    } else if (isdigit(*string)) {
+    } else if (isdigit(UCHAR(*string))) {
 	if (Tcl_GetInt(interp, string, &level) != TCL_OK) {
 	    return -1;
 	}
-	level = iPtr->varFramePtr->level - level;
+	level = curLevel - level;
     } else {
-	level = iPtr->varFramePtr->level - 1;
+	level = curLevel - 1;
 	result = 0;
     }
 
@@ -302,12 +315,12 @@ Tcl_UplevelCmd(dummy, interp, argc, argv)
      */
 
     if (argc == 1) {
-	result = Tcl_Eval(interp, argv[0], 0, (char **) NULL);
+	result = Tcl_Eval(interp, argv[0]);
     } else {
 	char *cmd;
 
 	cmd = Tcl_Concat(argc, argv);
-	result = Tcl_Eval(interp, cmd, 0, (char **) NULL);
+	result = Tcl_Eval(interp, cmd);
 	ckfree(cmd);
     }
     if (result == TCL_ERROR) {
@@ -419,10 +432,10 @@ InterpProc(clientData, interp, argc, argv)
 {
     register Proc *procPtr = (Proc *) clientData;
     register Arg *argPtr;
-    register Interp *iPtr = (Interp *) interp;
+    register Interp *iPtr;
     char **args;
     CallFrame frame;
-    char *value, *end;
+    char *value;
     int result;
 
     /*
@@ -442,6 +455,7 @@ InterpProc(clientData, interp, argc, argv)
     frame.callerVarPtr = iPtr->varFramePtr;
     iPtr->framePtr = &frame;
     iPtr->varFramePtr = &frame;
+    iPtr->returnCode = TCL_OK;
 
     /*
      * Match the actual arguments against the procedure's formal
@@ -492,9 +506,26 @@ InterpProc(clientData, interp, argc, argv)
      * Invoke the commands in the procedure's body.
      */
 
-    result = Tcl_Eval(interp, procPtr->command, 0, &end);
+    procPtr->refCount++;
+    result = Tcl_Eval(interp, procPtr->command);
+    procPtr->refCount--;
+    if (procPtr->refCount <= 0) {
+	CleanupProc(procPtr);
+    }
     if (result == TCL_RETURN) {
-	result = TCL_OK;
+	result = iPtr->returnCode;
+	iPtr->returnCode = TCL_OK;
+	if (result == TCL_ERROR) {
+	    Tcl_SetVar2(interp, "errorCode", (char *) NULL,
+		    (iPtr->errorCode != NULL) ? iPtr->errorCode : "NONE",
+		    TCL_GLOBAL_ONLY);
+	    iPtr->flags |= ERROR_CODE_SET;
+	    if (iPtr->errorInfo != NULL) {
+		Tcl_SetVar2(interp, "errorInfo", (char *) NULL,
+			iPtr->errorInfo, TCL_GLOBAL_ONLY);
+		iPtr->flags |= ERR_IN_PROGRESS;
+	    }
+	}
     } else if (result == TCL_ERROR) {
 	char msg[100];
 
@@ -540,7 +571,9 @@ InterpProc(clientData, interp, argc, argv)
  *	None.
  *
  * Side effects:
- *	Memory gets freed.
+ *	Memory gets freed, unless the procedure is actively being
+ *	executed.  In this case the cleanup is delayed until the
+ *	last call to the current procedure completes.
  *
  *----------------------------------------------------------------------
  */
@@ -549,7 +582,36 @@ static void
 ProcDeleteProc(clientData)
     ClientData clientData;		/* Procedure to be deleted. */
 {
-    register Proc *procPtr = (Proc *) clientData;
+    Proc *procPtr = (Proc *) clientData;
+
+    procPtr->refCount--;
+    if (procPtr->refCount <= 0) {
+	CleanupProc(procPtr);
+    }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * CleanupProc --
+ *
+ *	This procedure does all the real work of freeing up a Proc
+ *	structure.  It's called only when the structure's reference
+ *	count becomes zero.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	Memory gets freed.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void
+CleanupProc(procPtr)
+    register Proc *procPtr;		/* Procedure to be deleted. */
+{
     register Arg *argPtr;
 
     ckfree((char *) procPtr->command);

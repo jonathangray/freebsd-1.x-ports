@@ -1,5 +1,5 @@
 /*
- * regcomp and regexec -- regsub and regerror are elsewhere
+ * TclRegComp and TclRegExec -- TclRegSub and TclRegError are elsewhere
  *
  *	Copyright (c) 1986 by University of Toronto.
  *	Written by Henry Spencer.  Not derived from licensed software.
@@ -22,9 +22,15 @@
  * precedence is structured in regular expressions.  Serious changes in
  * regular-expression syntax might require a total rethink.
  *
- * *** NOTE: this code has been altered slightly for use in Tcl. ***
- * *** The only change is to use ckalloc and ckfree instead of   ***
- * *** malloc and free.						 ***
+ * *** NOTE: this code has been altered slightly for use in Tcl: ***
+ * *** 1. Use ckalloc and ckfree instead of  malloc and free.	 ***
+ * *** 2. Add extra argument to regexp to specify the real	 ***
+ * ***    start of the string separately from the start of the	 ***
+ * ***    current search. This is needed to search for multiple	 ***
+ * ***    matches within a string.				 ***
+ * *** 3. Names have been changed, e.g. from regcomp to		 ***
+ * ***    TclRegComp, to avoid clashes with other 		 ***
+ * ***    regexp implementations used by applications. 		 ***
  */
 #include "tclInt.h"
 
@@ -41,11 +47,11 @@
  * Regstart and reganch permit very fast decisions on suitable starting points
  * for a match, cutting down the work a lot.  Regmust permits fast rejection
  * of lines that cannot possibly match.  The regmust tests are costly enough
- * that regcomp() supplies a regmust only if the r.e. contains something
+ * that TclRegComp() supplies a regmust only if the r.e. contains something
  * potentially expensive (at present, the only such thing detected is * or +
  * at the start of the r.e., which can involve a lot of backup).  Regmlen is
- * supplied because the test in regexec() needs it and regcomp() is computing
- * it anyway.
+ * supplied because the test in TclRegExec() needs it and TclRegComp() is
+ * computing it anyway.
  */
 
 /*
@@ -131,7 +137,7 @@
 #define	UCHARAT(p)	((int)*(p)&CHARBITS)
 #endif
 
-#define	FAIL(m)	{ regerror(m); return(NULL); }
+#define	FAIL(m)	{ TclRegError(m); return(NULL); }
 #define	ISMULT(c)	((c) == '*' || (c) == '+' || (c) == '?')
 #define	META	"^$.[()|?+*\\"
 
@@ -144,7 +150,7 @@
 #define	WORST		0	/* Worst case. */
 
 /*
- * Global work variables for regcomp().
+ * Global work variables for TclRegComp().
  */
 static char *regparse;		/* Input-scan pointer. */
 static int regnpar;		/* () count. */
@@ -160,7 +166,7 @@ static long regsize;		/* Code size. */
 
 
 /*
- * Forward declarations for regcomp()'s friends.
+ * Forward declarations for TclRegComp()'s friends.
  */
 #ifndef STATIC
 #define	STATIC	static
@@ -180,7 +186,7 @@ STATIC int strcspn();
 #endif
 
 /*
- - regcomp - compile a regular expression into internal code
+ - TclRegComp - compile a regular expression into internal code
  *
  * We can't allocate space until we know how big the compiled form will be,
  * but we can't compile it (and thus know how big it is) until we've got a
@@ -195,7 +201,7 @@ STATIC int strcspn();
  * of the structure of the compiled regexp.
  */
 regexp *
-regcomp(exp)
+TclRegComp(exp)
 char *exp;
 {
 	register regexp *r;
@@ -260,7 +266,7 @@ char *exp;
 			longest = NULL;
 			len = 0;
 			for (; scan != NULL; scan = regnext(scan))
-				if (OP(scan) == EXACTLY && strlen(OPERAND(scan)) >= len) {
+				if (OP(scan) == EXACTLY && ((int) strlen(OPERAND(scan))) >= len) {
 					longest = OPERAND(scan);
 					len = strlen(OPERAND(scan));
 				}
@@ -680,11 +686,11 @@ char *val;
 }
 
 /*
- * regexec and friends
+ * TclRegExec and friends
  */
 
 /*
- * Global work variables for regexec().
+ * Global work variables for TclRegExec().
  */
 static char *reginput;		/* String-input pointer. */
 static char *regbol;		/* Beginning of input, for ^ check. */
@@ -705,24 +711,25 @@ STATIC char *regprop();
 #endif
 
 /*
- - regexec - match a regexp against a string
+ - TclRegExec - match a regexp against a string
  */
 int
-regexec(prog, string)
+TclRegExec(prog, string, start)
 register regexp *prog;
 register char *string;
+char *start;
 {
 	register char *s;
 
 	/* Be paranoid... */
 	if (prog == NULL || string == NULL) {
-		regerror("NULL parameter");
+		TclRegError("NULL parameter");
 		return(0);
 	}
 
 	/* Check validity of program. */
 	if (UCHARAT(prog->program) != MAGIC) {
-		regerror("corrupted program");
+		TclRegError("corrupted program");
 		return(0);
 	}
 
@@ -739,7 +746,7 @@ register char *string;
 	}
 
 	/* Mark beginning of line for ^ . */
-	regbol = string;
+	regbol = start;
 
 	/* Simplest case:  anchored match need be tried only once. */
 	if (prog->reganch)
@@ -978,7 +985,7 @@ char *prog;
 			/* NOTREACHED */
 			break;
 		default:
-			regerror("memory corruption");
+			TclRegError("memory corruption");
 			return(0);
 			/* NOTREACHED */
 			break;
@@ -991,7 +998,7 @@ char *prog;
 	 * We get here only if there's trouble -- normally "case END" is
 	 * the terminating point.
 	 */
-	regerror("corrupted pointers");
+	TclRegError("corrupted pointers");
 	return(0);
 }
 
@@ -1032,7 +1039,7 @@ char *p;
 		}
 		break;
 	default:		/* Oh dear.  Called inappropriately. */
-		regerror("internal foulup");
+		TclRegError("internal foulup");
 		count = 0;	/* Best compromise. */
 		break;
 	}
@@ -1184,7 +1191,7 @@ char *op;
 		p = "PLUS";
 		break;
 	default:
-		regerror("corrupted opcode");
+		TclRegError("corrupted opcode");
 		break;
 	}
 	if (p != NULL)

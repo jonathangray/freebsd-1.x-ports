@@ -4,16 +4,27 @@
 # built-in commands.  Sourcing this file into Tcl runs the tests and
 # generates output for errors.  No output means no errors were found.
 #
-# Copyright 1991 Regents of the University of California
-# Permission to use, copy, modify, and distribute this
-# software and its documentation for any purpose and without
-# fee is hereby granted, provided that this copyright notice
-# appears in all copies.  The University of California makes no
-# representations about the suitability of this software for any
-# purpose.  It is provided "as is" without express or implied
-# warranty.
+# Copyright (c) 1991-1993 The Regents of the University of California.
+# All rights reserved.
 #
-# $Header: /a/cvs/386BSD/ports/lang/tcl/tests/glob.test,v 1.1 1993/08/09 10:57:42 alm Exp $ (Berkeley)
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the
+# above copyright notice and the following two paragraphs appear in
+# all copies of this software.
+#
+# IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+# OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+# CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+# AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+# ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+# PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+#
+# $Header: /a/cvs/386BSD/ports/lang/tcl/tests/glob.test,v 1.2 1993/12/27 07:08:26 rich Exp $ (Berkeley)
 
 if {[string compare test [info procs test]] == 1} then {source defs}
 
@@ -30,45 +41,68 @@ exec cat << abc > globTest/.1
 exec cat << abc > globTest/a1/b1/x2.c
 exec cat << abc > globTest/a1/b2/y2.c
 
-test glob-1.1 {simple globbing} {glob a} a
-test glob-1.2 {simple globbing} {glob aaa bbb ccc} {aaa bbb ccc}
+test glob-1.1 {simple globbing} {
+    lsort [glob globTest/x1.c globTest/y1.c globTest/foo]
+} {globTest/x1.c globTest/y1.c}
+test glob-1.2 {simple globbing} {
+    glob {}
+} .
 
-test glob-2.1 {globbing with braces} {glob "{a1,a2}"} "a1 a2"
-test glob-2.2 {globbing with braces} {glob a/{x,y}{123,456}/z} \
-	"a/x123/z a/x456/z a/y123/z a/y456/z"
+test glob-2.1 {globbing with braces} {
+    glob -nocomplain "{a1,a2}"
+} {}
+test glob-2.2 {globbing with braces} {
+    lsort [glob globTest/{a,b,x,y}1.c]
+} {globTest/x1.c globTest/y1.c}
+test glob-2.3 {globbing with braces} {
+    lsort [glob {globTest/{x1,y2,weird name}.c}]
+} {{globTest/weird name.c} globTest/x1.c}
+test glob-2.4 {globbing with braces} {
+    lsort [glob globTest/{x1.c,a1/*}]
+} {globTest/a1/b1 globTest/a1/b2 globTest/x1.c}
 
-test glob-3.1 {asterisks and question marks} {lsort [glob g*/*.c]} \
-	"{globTest/weird name.c} globTest/x1.c globTest/y1.c globTest/z1.c"
-test glob-3.2 {asterisks and question marks} {lsort [glob globTest/?1.c]} \
-	"globTest/x1.c globTest/y1.c globTest/z1.c"
-test glob-3.3 {asterisks and question marks} {lsort [glob */*/*/*.c]} \
-	"globTest/a1/b1/x2.c globTest/a1/b2/y2.c"
-test glob-3.4 {asterisks and question marks} {lsort [glob globTest/*]} \
-	"globTest/a1 globTest/a2 globTest/a3 {globTest/weird name.c} globTest/x1.c globTest/y1.c globTest/z1.c"
-test glob-3.5 {asterisks and question marks} {lsort [glob globTest/.*]} \
-	"globTest/. globTest/.. globTest/.1"
-test glob-3.6 {asterisks and question marks} {lsort [glob globTest/*/*]} \
-	"globTest/a1/b1 globTest/a1/b2 globTest/a2/b3"
-test glob-3.7 {asterisks and question marks} {lsort [glob {globTest/[xy]1.*}]} \
-	"globTest/x1.c globTest/y1.c"
+test glob-3.1 {asterisks, question marks, and brackets} {
+    lsort [glob g*/*.c]
+} {{globTest/weird name.c} globTest/x1.c globTest/y1.c globTest/z1.c}
+test glob-3.2 {asterisks, question marks, and brackets} {
+    lsort [glob globTest/?1.c]
+} {globTest/x1.c globTest/y1.c globTest/z1.c}
+test glob-3.3 {asterisks, question marks, and brackets} {
+    lsort [glob */*/*/*.c]
+} {globTest/a1/b1/x2.c globTest/a1/b2/y2.c}
+test glob-3.4 {asterisks, question marks, and brackets} {
+    lsort [glob globTest/*]
+} {globTest/a1 globTest/a2 globTest/a3 {globTest/weird name.c} globTest/x1.c globTest/y1.c globTest/z1.c}
+test glob-3.5 {asterisks, question marks, and brackets} {
+    lsort [glob globTest/.*]
+} {globTest/. globTest/.. globTest/.1}
+test glob-3.6 {asterisks, question marks, and brackets} {
+    lsort [glob globTest/*/*]
+} {globTest/a1/b1 globTest/a1/b2 globTest/a2/b3}
+test glob-3.7 {asterisks, question marks, and brackets} {
+    lsort [glob {globTest/[xyab]1.*}]
+} {globTest/x1.c globTest/y1.c}
+test glob-3.8 {asterisks, question marks, and brackets} {
+    lsort [glob globTest/*/]
+} {globTest/a1/ globTest/a2/ globTest/a3/}
 
 # The tests immediately below can only be run at Berkeley, where
 # the file-system structure is well-known.
 
-if {[string compare [glob ~] /users/ouster] == 0} {
+if $atBerkeley {
     test glob-4.1 {tildes} {glob ~/.csh*} "/users/ouster/.cshrc"
-    test glob-4.2 {tildes} {glob ~/.csh*} "/users/ouster/.cshrc"
+    test glob-4.2 {tildes} {glob ~ouster/.csh*} "/users/ouster/.cshrc"
 } 
 
 test glob-5.1 {error conditions} {
     list [catch {glob} msg] $msg
-} {1 {wrong # args: should be "glob ?-nocomplain? name ?name ...?"}}
+} {1 {wrong # args: should be "glob ?switches? name ?name ...?"}}
 test glob-5.2 {error conditions} {
-    list [catch {glob a/{b,c,d}/\{} msg] $msg
+    list [catch {glob globTest/\{} msg] $msg
 } {1 {unmatched open-brace in file name}}
 test glob-5.3 {error conditions} {
-    list [catch {glob goo/*} msg] $msg
-} {1 {no files matched glob pattern "goo/*"}}
+    list [catch {glob globTest/*/gorp} msg] $msg
+} {1 {no files matched glob pattern "globTest/*/gorp"}}
 test glob-5.4 {error conditions} {
     list [catch {glob goo/* x*z foo?q} msg] $msg
 } {1 {no files matched glob patterns "goo/* x*z foo?q"}}
@@ -85,23 +119,35 @@ test glob-5.7 {error conditions} {
     set env(HOME) $home
     set x
 } {1 {couldn't find HOME environment variable to expand "~/*"}}
+test glob-5.8 {error conditions} {
+    list [catch {glob globTest/{a1,a2}/\{} msg] $msg
+} {1 {unmatched open-brace in file name}}
+test glob-5.9 {error conditions} {
+    list [catch {glob globTest/*/\{} msg] $msg
+} {1 {unmatched open-brace in file name}}
 
 exec chmod 000 globTest
 if {$user != "root"} {
     test glob-6.1 {setting errorCode variable} {
 	string tolower [list [catch {glob globTest/*} msg]  $msg $errorCode]
-    } {1 {couldn't read directory "globtest": permission denied} {unix eacces {permission denied}}}
+    } {1 {couldn't read directory "globtest": permission denied} {posix eacces {permission denied}}}
 }
 exec chmod 755 globTest
 
-test glob-7.1 {-nocomplain option} {
+test glob-7.1 {-nocomplain switch} {
     list [catch {glob -nocomplai} msg] $msg
-} {0 -nocomplai}
-test glob-7.2 {-nocomplain option} {
+} {1 {bad switch "-nocomplai": must be -nocomplain or --}}
+test glob-7.2 {-nocomplain switch} {
     list [catch {glob -nocomplain} msg] $msg
-} {1 {wrong # args: should be "glob ?-nocomplain? name ?name ...?"}}
-test glob-7.3 {-nocomplain option} {
+} {1 {wrong # args: should be "glob ?switches? name ?name ...?"}}
+test glob-7.3 {-nocomplain switch} {
     list [catch {glob -nocomplain goo/*} msg] $msg
 } {0 {}}
+test glob-7.4 {-- switch} {
+    list [catch {glob -- -nocomplain} msg] $msg
+} {1 {no files matched glob patterns "-nocomplain"}}
+test glob-7.5 {bogus switch} {
+    list [catch {glob -gorp} msg] $msg
+} {1 {bad switch "-gorp": must be -nocomplain or --}}
 
 exec rm -rf globTest

@@ -5,15 +5,30 @@
  *	other forms, like integers or floating-point numbers or
  *	booleans, doing syntax checking along the way.
  *
- * Copyright 1990-1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1990-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
+
+#ifndef lint
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclGet.c,v 1.2 1993/12/27 07:06:05 rich Exp $ SPRITE (Berkeley)";
+#endif /* not lint */
 
 #include "tclInt.h"
 
@@ -43,11 +58,26 @@ Tcl_GetInt(interp, string, intPtr)
 				 * integer in a form acceptable to strtol. */
     int *intPtr;		/* Place to store converted result. */
 {
-    char *end;
+    char *end, *p;
     int i;
 
-    i = strtol(string, &end, 0);
-    while ((*end != '\0') && isspace(*end)) {
+    /*
+     * Note: use strtoul instead of strtol for integer conversions
+     * to allow full-size unsigned numbers, but don't depend on strtoul
+     * to handle sign characters;  it won't in some implementations.
+     */
+
+    for (p = string; isspace(UCHAR(*p)); p++) {
+	/* Empty loop body. */
+    }
+    if (*p == '-') {
+	i = -strtoul(p+1, &end, 0);
+    } else if (*p == '+') {
+	i = strtoul(p+1, &end, 0);
+    } else {
+	i = strtoul(p, &end, 0);
+    }
+    while ((*end != '\0') && isspace(UCHAR(*end))) {
 	end++;
     }
     if ((end == string) || (*end != 0)) {
@@ -90,7 +120,7 @@ Tcl_GetDouble(interp, string, doublePtr)
     double d;
 
     d = strtod(string, &end);
-    while ((*end != '\0') && isspace(*end)) {
+    while ((*end != '\0') && isspace(UCHAR(*end))) {
 	end++;
     }
     if ((end == string) || (*end != 0)) {

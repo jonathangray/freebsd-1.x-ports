@@ -7,17 +7,40 @@
  *	This implementation of floating-point support was modelled
  *	after an initial implementation by Bill Carpenter.
  *
- * Copyright 1987-1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1987-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
+#ifndef lint
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclExpr.c,v 1.2 1993/12/27 07:06:04 rich Exp $ SPRITE (Berkeley)";
+#endif
+
 #include "tclInt.h"
+#ifdef NO_FLOAT_H
+#   include "compat/float.h"
+#else
+#   include <float.h>
+#endif
+#ifndef TCL_NO_MATH
+#include <math.h>
+#endif
 
 /*
  * The stuff below is a bit of a hack so that this file can be used
@@ -27,8 +50,14 @@
 
 #ifndef TCL_GENERIC_ONLY
 #include "tclUnix.h"
+extern int errno;
 #else
+#define NO_ERRNO_H
+#endif
+
+#ifdef NO_ERRNO_H
 int errno;
+#define EDOM 33
 #define ERANGE 34
 #endif
 
@@ -60,7 +89,6 @@ typedef struct {
 #define TYPE_DOUBLE	1
 #define TYPE_STRING	2
 
-
 /*
  * The data structure below describes the state of parsing an expression.
  * It's passed among the routines in this module.
@@ -68,7 +96,7 @@ typedef struct {
 
 typedef struct {
     char *originalExpr;		/* The entire expression, as originally
-				 * passed to Tcl_Expr. */
+				 * passed to Tcl_ExprString et al. */
     char *expr;			/* Position to the next character to be
 				 * scanned from the expression string. */
     int token;			/* Type of the last token to be parsed from
@@ -86,8 +114,9 @@ typedef struct {
 #define VALUE		0
 #define OPEN_PAREN	1
 #define CLOSE_PAREN	2
-#define END		3
-#define UNKNOWN		4
+#define COMMA		3
+#define END		4
+#define UNKNOWN		5
 
 /*
  * Binary operators:
@@ -154,18 +183,131 @@ char *operatorStrings[] = {
 };
 
 /*
+ * The following slight modification to DBL_MAX is needed because of
+ * a compiler bug on Sprite (4/15/93).
+ */
+
+#ifdef sprite
+#undef DBL_MAX
+#define DBL_MAX 1.797693134862316e+307
+#endif
+
+/*
+ * Macros for testing floating-point values for certain special
+ * cases.  Test for not-a-number by comparing a value against
+ * itself;  test for infinity by comparing against the largest
+ * floating-point value.
+ */
+
+#define IS_NAN(v) ((v) != (v))
+#ifdef DBL_MAX
+#   define IS_INF(v) (((v) > DBL_MAX) || ((v) < -DBL_MAX))
+#else
+#   define IS_INF(v) 0
+#endif
+
+/*
+ * The following global variable is use to signal matherr that Tcl
+ * is responsible for the arithmetic, so errors can be handled in a
+ * fashion appropriate for Tcl.  Zero means no Tcl math is in
+ * progress;  non-zero means Tcl is doing math.
+ */
+
+int tcl_MathInProgress = 0;
+
+/*
+ * The variable below serves no useful purpose except to generate
+ * a reference to matherr, so that the Tcl version of matherr is
+ * linked in rather than the system version.  Without this reference
+ * the need for matherr won't be discovered during linking until after
+ * libtcl.a has been processed, so Tcl's version won't be used.
+ */
+
+#ifdef NEED_MATHERR
+extern int matherr();
+int (*tclMatherrPtr)() = matherr;
+#endif
+
+/*
  * Declarations for local procedures to this file:
  */
 
+static int		ExprAbsFunc _ANSI_ARGS_((ClientData clientData,
+			    Tcl_Interp *interp, Tcl_Value *args,
+			    Tcl_Value *resultPtr));
+static int		ExprBinaryFunc _ANSI_ARGS_((ClientData clientData,
+			    Tcl_Interp *interp, Tcl_Value *args,
+			    Tcl_Value *resultPtr));
+static int		ExprDoubleFunc _ANSI_ARGS_((ClientData clientData,
+			    Tcl_Interp *interp, Tcl_Value *args,
+			    Tcl_Value *resultPtr));
+static void		ExprFloatError _ANSI_ARGS_((Tcl_Interp *interp,
+			    double value));
 static int		ExprGetValue _ANSI_ARGS_((Tcl_Interp *interp,
 			    ExprInfo *infoPtr, int prec, Value *valuePtr));
+static int		ExprIntFunc _ANSI_ARGS_((ClientData clientData,
+			    Tcl_Interp *interp, Tcl_Value *args,
+			    Tcl_Value *resultPtr));
 static int		ExprLex _ANSI_ARGS_((Tcl_Interp *interp,
 			    ExprInfo *infoPtr, Value *valuePtr));
-static void		ExprMakeString _ANSI_ARGS_((Value *valuePtr));
+static void		ExprMakeString _ANSI_ARGS_((Tcl_Interp *interp,
+			    Value *valuePtr));
+static int		ExprMathFunc _ANSI_ARGS_((Tcl_Interp *interp,
+			    ExprInfo *infoPtr, Value *valuePtr));
 static int		ExprParseString _ANSI_ARGS_((Tcl_Interp *interp,
 			    char *string, Value *valuePtr));
+static int		ExprRoundFunc _ANSI_ARGS_((ClientData clientData,
+			    Tcl_Interp *interp, Tcl_Value *args,
+			    Tcl_Value *resultPtr));
 static int		ExprTopLevel _ANSI_ARGS_((Tcl_Interp *interp,
 			    char *string, Value *valuePtr));
+static int		ExprUnaryFunc _ANSI_ARGS_((ClientData clientData,
+			    Tcl_Interp *interp, Tcl_Value *args,
+			    Tcl_Value *resultPtr));
+
+/*
+ * Built-in math functions:
+ */
+
+typedef struct {
+    char *name;			/* Name of function. */
+    int numArgs;		/* Number of arguments for function. */
+    Tcl_ValueType argTypes[MAX_MATH_ARGS];
+				/* Acceptable types for each argument. */
+    Tcl_MathProc *proc;		/* Procedure that implements this function. */
+    ClientData clientData;	/* Additional argument to pass to the function
+				 * when invoking it. */
+} BuiltinFunc;
+
+static BuiltinFunc funcTable[] = {
+#ifndef TCL_NO_MATH
+    {"acos", 1, {TCL_DOUBLE}, ExprUnaryFunc, (ClientData) acos},
+    {"asin", 1, {TCL_DOUBLE}, ExprUnaryFunc, (ClientData) asin},
+    {"atan", 1, {TCL_DOUBLE}, ExprUnaryFunc, (ClientData) atan},
+    {"atan2", 2, {TCL_DOUBLE, TCL_DOUBLE}, ExprBinaryFunc, (ClientData) atan2},
+    {"ceil", 1, {TCL_DOUBLE}, ExprUnaryFunc, (ClientData) ceil},
+    {"cos", 1, {TCL_DOUBLE}, ExprUnaryFunc, (ClientData) cos},
+    {"cosh", 1, {TCL_DOUBLE}, ExprUnaryFunc, (ClientData) cosh},
+    {"exp", 1, {TCL_DOUBLE}, ExprUnaryFunc, (ClientData) exp},
+    {"floor", 1, {TCL_DOUBLE}, ExprUnaryFunc, (ClientData) floor},
+    {"fmod", 2, {TCL_DOUBLE, TCL_DOUBLE}, ExprBinaryFunc, (ClientData) fmod},
+    {"hypot", 2, {TCL_DOUBLE, TCL_DOUBLE}, ExprBinaryFunc, (ClientData) hypot},
+    {"log", 1, {TCL_DOUBLE}, ExprUnaryFunc, (ClientData) log},
+    {"log10", 1, {TCL_DOUBLE}, ExprUnaryFunc, (ClientData) log10},
+    {"pow", 2, {TCL_DOUBLE, TCL_DOUBLE}, ExprBinaryFunc, (ClientData) pow},
+    {"sin", 1, {TCL_DOUBLE}, ExprUnaryFunc, (ClientData) sin},
+    {"sinh", 1, {TCL_DOUBLE}, ExprUnaryFunc, (ClientData) sinh},
+    {"sqrt", 1, {TCL_DOUBLE}, ExprUnaryFunc, (ClientData) sqrt},
+    {"tan", 1, {TCL_DOUBLE}, ExprUnaryFunc, (ClientData) tan},
+    {"tanh", 1, {TCL_DOUBLE}, ExprUnaryFunc, (ClientData) tanh},
+#endif
+    {"abs", 1, {TCL_EITHER}, ExprAbsFunc, 0},
+    {"double", 1, {TCL_EITHER}, ExprDoubleFunc, 0},
+    {"int", 1, {TCL_EITHER}, ExprIntFunc, 0},
+    {"round", 1, {TCL_EITHER}, ExprRoundFunc, 0},
+
+    {0},
+};
 
 /*
  *--------------------------------------------------------------
@@ -196,43 +338,58 @@ ExprParseString(interp, string, valuePtr)
     Value *valuePtr;		/* Where to store value information. 
 				 * Caller must have initialized pv field. */
 {
-    register char c;
+    char *term, *p, *start;
 
-    /*
-     * Try to convert the string to a number.
-     */
-
-    c = *string;
-    if (((c >= '0') && (c <= '9')) || (c == '-') || (c == '.')) {
-	char *term;
-
+    if (*string != 0) {
 	valuePtr->type = TYPE_INT;
 	errno = 0;
-	valuePtr->intValue = strtol(string, &term, 0);
-	c = *term;
-	if ((c == '\0') && (errno != ERANGE)) {
+
+	/*
+	 * Note: use strtoul instead of strtol for integer conversions
+	 * to allow full-size unsigned numbers, but don't depend on
+	 * strtoul to handle sign characters;  it won't in some
+	 * implementations.
+	 */
+
+	for (p = string; isspace(UCHAR(*p)); p++) {
+	    /* Empty loop body. */
+	}
+	if (*p == '-') {
+	    start = p+1;
+	    valuePtr->intValue = -strtoul(start, &term, 0);
+	} else if (*p == '+') {
+	    start = p+1;
+	    valuePtr->intValue = strtoul(start, &term, 0);
+	} else {
+	    start = p;
+	    valuePtr->intValue = strtoul(start, &term, 0);
+	}
+	if (errno == ERANGE) {
+	    /*
+	     * This procedure is sometimes called with string in
+	     * interp->result, so we have to clear the result before
+	     * logging an error message.
+	     */
+
+	    Tcl_ResetResult(interp);
+	    interp->result = "integer value too large to represent";
+	    Tcl_SetErrorCode(interp, "ARITH", "IOVERFLOW", interp->result,
+		    (char *) NULL);
+	    return TCL_ERROR;
+	}
+	if ((term != start) && (*term == '\0')) {
 	    return TCL_OK;
 	}
-	if ((c == '.') || (c == 'e') || (c == 'E') || (errno == ERANGE)) {
-	    errno = 0;
-	    valuePtr->doubleValue = strtod(string, &term);
-	    if (errno == ERANGE) {
+	errno = 0;
+	valuePtr->doubleValue = strtod(p, &term);
+	if ((term != p) && (*term == '\0')) {
+	    if (errno != 0) {
 		Tcl_ResetResult(interp);
-		if (valuePtr->doubleValue == 0.0) {
-		    Tcl_AppendResult(interp, "floating-point value \"",
-			    string, "\" too small to represent",
-			    (char *) NULL);
-		} else {
-		    Tcl_AppendResult(interp, "floating-point value \"",
-			    string, "\" too large to represent",
-			    (char *) NULL);
-		}
+		ExprFloatError(interp, valuePtr->doubleValue);
 		return TCL_ERROR;
 	    }
-	    if (*term == '\0') {
-		valuePtr->type = TYPE_DOUBLE;
-		return TCL_OK;
-	    }
+	    valuePtr->type = TYPE_DOUBLE;
+	    return TCL_OK;
 	}
     }
 
@@ -290,69 +447,88 @@ ExprLex(interp, infoPtr, valuePtr)
 					 * must have initialized pv field
 					 * correctly. */
 {
-    register char *p, c;
+    register char *p;
     char *var, *term;
     int result;
 
     p = infoPtr->expr;
-    c = *p;
-    while (isspace(c)) {
+    while (isspace(UCHAR(*p))) {
 	p++;
-	c = *p;
     }
-    infoPtr->expr = p+1;
-    switch (c) {
-	case '0':
-	case '1':
-	case '2':
-	case '3':
-	case '4':
-	case '5':
-	case '6':
-	case '7':
-	case '8':
-	case '9':
-	case '.':
+    if (*p == 0) {
+	infoPtr->token = END;
+	infoPtr->expr = p;
+	return TCL_OK;
+    }
 
+    /*
+     * First try to parse the token as an integer or floating-point number.
+     * A couple of tricky points:
+     *
+     * 1. Can't just check for leading digits to see if there's a number
+     *    there, because it could be a special value like "NaN".
+     * 2. Don't want to check for a number if the first character is "+"
+     *    or "-".  If we do, we might treat a binary operator as unary
+     *    by mistake, which will eventually cause a syntax error.
+     * 3. First see if there's an integer, then if there's stuff after
+     *    the integer that looks like it could be a floating-point number
+     *    (or if there wasn't even a sensible integer), then try to parse
+     *    as a floating-point number.  The check for the characters '8'
+     *	  or '9' is to handle floating-point numbers like 028.6:  the
+     *    leading zero causes strtoul to interpret the number as octal
+     *    and stop when it gets to the 8.
+     */
+
+    if ((*p != '+')  && (*p != '-')) {
+	errno = 0;
+	valuePtr->intValue = strtoul(p, &term, 0);
+	if ((term == p) || (*term == '.') || (*term == 'e') ||
+		(*term == 'E') || (*term == '8') || (*term == '9')) {
+	    char *term2;
+    
 	    /*
-	     * Number.  First read an integer.  Then if it looks like
-	     * there's a floating-point number (or if it's too big a
-	     * number to fit in an integer), parse it as a floating-point
-	     * number.
+	     * The code here is a bit tricky:  we want to use a floating-point
+	     * number if there is one, but if there isn't then fall through to
+	     * use the integer that was already parsed, if there was one.
 	     */
-
-	    infoPtr->token = VALUE;
-	    valuePtr->type = TYPE_INT;
+    
 	    errno = 0;
-	    valuePtr->intValue = strtoul(p, &term, 0);
-	    c = *term;
-	    if ((c == '.') || (c == 'e') || (c == 'E') || (errno == ERANGE)) {
-		char *term2;
-
-		errno = 0;
-		valuePtr->doubleValue = strtod(p, &term2);
-		if (errno == ERANGE) {
-		    Tcl_ResetResult(interp);
-		    if (valuePtr->doubleValue == 0.0) {
-			interp->result =
-				"floating-point value too small to represent";
-		    } else {
-			interp->result =
-				"floating-point value too large to represent";
-		    }
+	    valuePtr->doubleValue = strtod(p, &term2);
+	    if (term2 != p) {
+		if (errno != 0) {
+		    ExprFloatError(interp, valuePtr->doubleValue);
 		    return TCL_ERROR;
 		}
-		if (term2 == infoPtr->expr) {
-		    interp->result = "poorly-formed floating-point value";
-		    return TCL_ERROR;
-		}
-		valuePtr->type = TYPE_DOUBLE;
+		infoPtr->token = VALUE;
 		infoPtr->expr = term2;
-	    } else {
-		infoPtr->expr = term;
+		valuePtr->type = TYPE_DOUBLE;
+		return TCL_OK;
 	    }
+	    if (term != p) {
+		interp->result = "poorly-formed floating-point value";
+		return TCL_ERROR;
+	    }
+	}
+	if (term != p) {
+	    /*
+	     * No floating-point number, but there is an integer.
+	     */
+    
+	    if (errno == ERANGE) {
+		interp->result = "integer value too large to represent";
+		Tcl_SetErrorCode(interp, "ARITH", "IOVERFLOW", interp->result,
+			(char *) NULL);
+		return TCL_ERROR;
+	    }
+	    infoPtr->token = VALUE;
+	    infoPtr->expr = term;
+	    valuePtr->type = TYPE_INT;
 	    return TCL_OK;
+	}
+    }
 
+    infoPtr->expr = p+1;
+    switch (*p) {
 	case '$':
 
 	    /*
@@ -365,6 +541,7 @@ ExprLex(interp, infoPtr, valuePtr)
 	    if (var == NULL) {
 		return TCL_ERROR;
 	    }
+	    Tcl_ResetResult(interp);
 	    if (((Interp *) interp)->noEval) {
 		valuePtr->type = TYPE_INT;
 		valuePtr->intValue = 0;
@@ -374,8 +551,9 @@ ExprLex(interp, infoPtr, valuePtr)
 
 	case '[':
 	    infoPtr->token = VALUE;
-	    result = Tcl_Eval(interp, p+1, TCL_BRACKET_TERM,
-		    &infoPtr->expr);
+	    ((Interp *) interp)->evalFlags = TCL_BRACKET_TERM;
+	    result = Tcl_Eval(interp, p+1);
+	    infoPtr->expr = ((Interp *) interp)->termPtr;
 	    if (result != TCL_OK) {
 		return result;
 	    }
@@ -400,6 +578,7 @@ ExprLex(interp, infoPtr, valuePtr)
 	    if (result != TCL_OK) {
 		return result;
 	    }
+	    Tcl_ResetResult(interp);
 	    return ExprParseString(interp, valuePtr->pv.buffer, valuePtr);
 
 	case '{':
@@ -409,6 +588,7 @@ ExprLex(interp, infoPtr, valuePtr)
 	    if (result != TCL_OK) {
 		return result;
 	    }
+	    Tcl_ResetResult(interp);
 	    return ExprParseString(interp, valuePtr->pv.buffer, valuePtr);
 
 	case '(':
@@ -417,6 +597,10 @@ ExprLex(interp, infoPtr, valuePtr)
 
 	case ')':
 	    infoPtr->token = CLOSE_PAREN;
+	    return TCL_OK;
+
+	case ',':
+	    infoPtr->token = COMMA;
 	    return TCL_OK;
 
 	case '*':
@@ -523,12 +707,11 @@ ExprLex(interp, infoPtr, valuePtr)
 	    infoPtr->token = BIT_NOT;
 	    return TCL_OK;
 
-	case 0:
-	    infoPtr->token = END;
-	    infoPtr->expr = p;
-	    return TCL_OK;
-
 	default:
+	    if (isalpha(UCHAR(*p))) {
+		infoPtr->expr = p;
+		return ExprMathFunc(interp, infoPtr, valuePtr);
+	    }
 	    infoPtr->expr = p+1;
 	    infoPtr->token = UNKNOWN;
 	    return TCL_OK;
@@ -609,9 +792,7 @@ ExprGetValue(interp, infoPtr, prec, valuePtr)
 	    goto done;
 	}
 	if (infoPtr->token != CLOSE_PAREN) {
-	    Tcl_ResetResult(interp);
-	    Tcl_AppendResult(interp,
-		    "unmatched parentheses in expression \"",
+	    Tcl_AppendResult(interp, "unmatched parentheses in expression \"",
 		    infoPtr->originalExpr, "\"", (char *) NULL);
 	    result = TCL_ERROR;
 	    goto done;
@@ -692,7 +873,8 @@ ExprGetValue(interp, infoPtr, prec, valuePtr)
 	operator = infoPtr->token;
 	value2.pv.next = value2.pv.buffer;
 	if ((operator < MULT) || (operator >= UNARY_MINUS)) {
-	    if ((operator == END) || (operator == CLOSE_PAREN)) {
+	    if ((operator == END) || (operator == CLOSE_PAREN)
+		    || (operator == COMMA)) {
 		result = TCL_OK;
 		goto done;
 	    } else {
@@ -767,7 +949,7 @@ ExprGetValue(interp, infoPtr, prec, valuePtr)
 	    goto done;
 	}
 	if ((infoPtr->token < MULT) && (infoPtr->token != VALUE)
-		&& (infoPtr->token != END)
+		&& (infoPtr->token != END) && (infoPtr->token != COMMA)
 		&& (infoPtr->token != CLOSE_PAREN)) {
 	    goto syntaxError;
 	}
@@ -830,11 +1012,11 @@ ExprGetValue(interp, infoPtr, prec, valuePtr)
 	    case EQUAL: case NEQ:
 		if (valuePtr->type == TYPE_STRING) {
 		    if (value2.type != TYPE_STRING) {
-			ExprMakeString(&value2);
+			ExprMakeString(interp, &value2);
 		    }
 		} else if (value2.type == TYPE_STRING) {
 		    if (valuePtr->type != TYPE_STRING) {
-			ExprMakeString(valuePtr);
+			ExprMakeString(interp, valuePtr);
 		    }
 		} else if (valuePtr->type == TYPE_DOUBLE) {
 		    if (value2.type == TYPE_INT) {
@@ -899,26 +1081,49 @@ ExprGetValue(interp, infoPtr, prec, valuePtr)
 		}
 		break;
 	    case DIVIDE:
+	    case MOD:
 		if (valuePtr->type == TYPE_INT) {
+		    int divisor, quot, rem, negative;
 		    if (value2.intValue == 0) {
 			divideByZero:
 			interp->result = "divide by zero";
+			Tcl_SetErrorCode(interp, "ARITH", "DIVZERO",
+				interp->result, (char *) NULL);
 			result = TCL_ERROR;
 			goto done;
 		    }
-		    valuePtr->intValue /= value2.intValue;
+
+		    /*
+		     * The code below is tricky because C doesn't guarantee
+		     * much about the properties of the quotient or
+		     * remainder, but Tcl does:  the remainder always has
+		     * the same sign as the divisor and a smaller absolute
+		     * value.
+		     */
+
+		    divisor = value2.intValue;
+		    negative = 0;
+		    if (divisor < 0) {
+			divisor = -divisor;
+			valuePtr->intValue = -valuePtr->intValue;
+			negative = 1;
+		    }
+		    quot = valuePtr->intValue / divisor;
+		    rem = valuePtr->intValue % divisor;
+		    if (rem < 0) {
+			rem += divisor;
+			quot -= 1;
+		    }
+		    if (negative) {
+			rem = -rem;
+		    }
+		    valuePtr->intValue = (operator == DIVIDE) ? quot : rem;
 		} else {
 		    if (value2.doubleValue == 0.0) {
 			goto divideByZero;
 		    }
 		    valuePtr->doubleValue /= value2.doubleValue;
 		}
-		break;
-	    case MOD:
-		if (value2.intValue == 0) {
-		    goto divideByZero;
-		}
-		valuePtr->intValue %= value2.intValue;
 		break;
 	    case PLUS:
 		if (valuePtr->type == TYPE_INT) {
@@ -1074,7 +1279,6 @@ ExprGetValue(interp, infoPtr, prec, valuePtr)
     return result;
 
     syntaxError:
-    Tcl_ResetResult(interp);
     Tcl_AppendResult(interp, "syntax error in expression \"",
 	    infoPtr->originalExpr, "\"", (char *) NULL);
     result = TCL_ERROR;
@@ -1108,7 +1312,9 @@ ExprGetValue(interp, infoPtr, prec, valuePtr)
  */
 
 static void
-ExprMakeString(valuePtr)
+ExprMakeString(interp, valuePtr)
+    Tcl_Interp *interp;			/* Interpreter to use for precision
+					 * information. */
     register Value *valuePtr;		/* Value to be converted. */
 {
     int shortfall;
@@ -1120,7 +1326,7 @@ ExprMakeString(valuePtr)
     if (valuePtr->type == TYPE_INT) {
 	sprintf(valuePtr->pv.buffer, "%ld", valuePtr->intValue);
     } else if (valuePtr->type == TYPE_DOUBLE) {
-	sprintf(valuePtr->pv.buffer, "%g", valuePtr->doubleValue);
+	Tcl_PrintDouble(interp, valuePtr->doubleValue, valuePtr->pv.buffer);
     }
     valuePtr->type = TYPE_STRING;
 }
@@ -1159,6 +1365,22 @@ ExprTopLevel(interp, string, valuePtr)
     ExprInfo info;
     int result;
 
+    /*
+     * Create the math functions the first time an expression is
+     * evaluated.
+     */
+
+    if (!(((Interp *) interp)->flags & EXPR_INITIALIZED)) {
+	BuiltinFunc *funcPtr;
+
+	((Interp *) interp)->flags |= EXPR_INITIALIZED;
+	for (funcPtr = funcTable; funcPtr->name != NULL;
+		funcPtr++) {
+	    Tcl_CreateMathFunc(interp, funcPtr->name, funcPtr->numArgs,
+		    funcPtr->argTypes, funcPtr->proc, funcPtr->clientData);
+	}
+    }
+
     info.originalExpr = string;
     info.expr = string;
     valuePtr->pv.buffer = valuePtr->pv.next = valuePtr->staticSpace;
@@ -1173,6 +1395,15 @@ ExprTopLevel(interp, string, valuePtr)
     if (info.token != END) {
 	Tcl_AppendResult(interp, "syntax error in expression \"",
 		string, "\"", (char *) NULL);
+	return TCL_ERROR;
+    }
+    if ((valuePtr->type == TYPE_DOUBLE) && (IS_NAN(valuePtr->doubleValue)
+	    || IS_INF(valuePtr->doubleValue))) {
+	/*
+	 * IEEE floating-point error.
+	 */
+
+	ExprFloatError(interp, valuePtr->doubleValue);
 	return TCL_ERROR;
     }
     return TCL_OK;
@@ -1271,8 +1502,7 @@ Tcl_ExprBoolean(interp, string, ptr)
 	} else if (value.type == TYPE_DOUBLE) {
 	    *ptr = value.doubleValue != 0.0;
 	} else {
-	    interp->result = "expression didn't have numeric value";
-	    result = TCL_ERROR;
+	    result = Tcl_GetBoolean(interp, value.pv.buffer, ptr);
 	}
     }
     if (value.pv.buffer != value.staticSpace) {
@@ -1314,7 +1544,7 @@ Tcl_ExprString(interp, string)
 	if (value.type == TYPE_INT) {
 	    sprintf(interp->result, "%ld", value.intValue);
 	} else if (value.type == TYPE_DOUBLE) {
-	    sprintf(interp->result, "%g", value.doubleValue);
+	    Tcl_PrintDouble(interp, value.doubleValue, interp->result);
 	} else {
 	    if (value.pv.buffer != value.staticSpace) {
 		interp->result = value.pv.buffer;
@@ -1329,4 +1559,447 @@ Tcl_ExprString(interp, string)
 	ckfree(value.pv.buffer);
     }
     return result;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tcl_CreateMathFunc --
+ *
+ *	Creates a new math function for expressions in a given
+ *	interpreter.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	The function defined by "name" is created;  if such a function
+ *	already existed then its definition is overriden.
+ *
+ *----------------------------------------------------------------------
+ */
+
+void
+Tcl_CreateMathFunc(interp, name, numArgs, argTypes, proc, clientData)
+    Tcl_Interp *interp;			/* Interpreter in which function is
+					 * to be available. */
+    char *name;				/* Name of function (e.g. "sin"). */
+    int numArgs;			/* Nnumber of arguments required by
+					 * function. */
+    Tcl_ValueType *argTypes;		/* Array of types acceptable for
+					 * each argument. */
+    Tcl_MathProc *proc;			/* Procedure that implements the
+					 * math function. */
+    ClientData clientData;		/* Additional value to pass to the
+					 * function. */
+{
+    Interp *iPtr = (Interp *) interp;
+    Tcl_HashEntry *hPtr;
+    MathFunc *mathFuncPtr;
+    int new, i;
+
+    hPtr = Tcl_CreateHashEntry(&iPtr->mathFuncTable, name, &new);
+    if (new) {
+	Tcl_SetHashValue(hPtr, ckalloc(sizeof(MathFunc)));
+    }
+    mathFuncPtr = (MathFunc *) Tcl_GetHashValue(hPtr);
+    if (numArgs > MAX_MATH_ARGS) {
+	numArgs = MAX_MATH_ARGS;
+    }
+    mathFuncPtr->numArgs = numArgs;
+    for (i = 0; i < numArgs; i++) {
+	mathFuncPtr->argTypes[i] = argTypes[i];
+    }
+    mathFuncPtr->proc = proc;
+    mathFuncPtr->clientData = clientData;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * ExprMathFunc --
+ *
+ *	This procedure is invoked to parse a math function from an
+ *	expression string, carry out the function, and return the
+ *	value computed.
+ *
+ * Results:
+ *	TCL_OK is returned if all went well and the function's value
+ *	was computed successfully.  If an error occurred, TCL_ERROR
+ *	is returned and an error message is left in interp->result.
+ *	After a successful return infoPtr has been updated to refer
+ *	to the character just after the function call, the token is
+ *	set to VALUE, and the value is stored in valuePtr.
+ *
+ * Side effects:
+ *	Embedded commands could have arbitrary side-effects.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static int
+ExprMathFunc(interp, infoPtr, valuePtr)
+    Tcl_Interp *interp;			/* Interpreter to use for error
+					 * reporting. */
+    register ExprInfo *infoPtr;		/* Describes the state of the parse.
+					 * infoPtr->expr must point to the
+					 * first character of the function's
+					 * name. */
+    register Value *valuePtr;		/* Where to store value, if that is
+					 * what's parsed from string.  Caller
+					 * must have initialized pv field
+					 * correctly. */
+{
+    Interp *iPtr = (Interp *) interp;
+    MathFunc *mathFuncPtr;		/* Info about math function. */
+    Tcl_Value args[MAX_MATH_ARGS];	/* Arguments for function call. */
+    Tcl_Value funcResult;		/* Result of function call. */
+    Tcl_HashEntry *hPtr;
+    char *p, *funcName;
+    int i, savedChar, result;
+
+    /*
+     * Find the end of the math function's name and lookup the MathFunc
+     * record for the function.
+     */
+
+    p = funcName = infoPtr->expr;
+    while (isalnum(UCHAR(*p)) || (*p == '_')) {
+	p++;
+    }
+    infoPtr->expr = p;
+    result = ExprLex(interp, infoPtr, valuePtr);
+    if ((result != TCL_OK) || (infoPtr->token != OPEN_PAREN)) {
+	goto syntaxError;
+    }
+    savedChar = *p;
+    *p = 0;
+    hPtr = Tcl_FindHashEntry(&iPtr->mathFuncTable, funcName);
+    if (hPtr == NULL) {
+	Tcl_AppendResult(interp, "unknown math function \"", funcName,
+		"\"", (char *) NULL);
+	*p = savedChar;
+	return TCL_ERROR;
+    }
+    *p = savedChar;
+    mathFuncPtr = (MathFunc *) Tcl_GetHashValue(hPtr);
+
+    /*
+     * Scan off the arguments for the function, if there are any.
+     */
+
+    if (mathFuncPtr->numArgs == 0) {
+	result = ExprLex(interp, infoPtr, valuePtr);
+	if ((result != TCL_OK) || (infoPtr->token != CLOSE_PAREN)) {
+	    goto syntaxError;
+	}
+    } else {
+	for (i = 0; ; i++) {
+	    valuePtr->pv.next = valuePtr->pv.buffer;
+	    result = ExprGetValue(interp, infoPtr, -1, valuePtr);
+	    if (result != TCL_OK) {
+		return result;
+	    }
+	    if (valuePtr->type == TYPE_STRING) {
+		interp->result =
+			"argument to math function didn't have numeric value";
+		return TCL_ERROR;
+	    }
+    
+	    /*
+	     * Copy the value to the argument record, converting it if
+	     * necessary.
+	     */
+    
+	    if (valuePtr->type == TYPE_INT) {
+		if (mathFuncPtr->argTypes[i] == TCL_DOUBLE) {
+		    args[i].type = TCL_DOUBLE;
+		    args[i].doubleValue = valuePtr->intValue;
+		} else {
+		    args[i].type = TCL_INT;
+		    args[i].intValue = valuePtr->intValue;
+		}
+	    } else {
+		if (mathFuncPtr->argTypes[i] == TCL_INT) {
+		    args[i].type = TCL_INT;
+		    args[i].intValue = valuePtr->doubleValue;
+		} else {
+		    args[i].type = TCL_DOUBLE;
+		    args[i].doubleValue = valuePtr->doubleValue;
+		}
+	    }
+    
+	    /*
+	     * Check for a comma separator between arguments or a close-paren
+	     * to end the argument list.
+	     */
+    
+	    if (i == (mathFuncPtr->numArgs-1)) {
+		if (infoPtr->token == CLOSE_PAREN) {
+		    break;
+		}
+		if (infoPtr->token == COMMA) {
+		    interp->result = "too many arguments for math function";
+		    return TCL_ERROR;
+		} else {
+		    goto syntaxError;
+		}
+	    }
+	    if (infoPtr->token != COMMA) {
+		if (infoPtr->token == CLOSE_PAREN) {
+		    interp->result = "too few arguments for math function";
+		    return TCL_ERROR;
+		} else {
+		    goto syntaxError;
+		}
+	    }
+	}
+    }
+
+    /*
+     * Invoke the function and copy its result back into valuePtr.
+     */
+
+    tcl_MathInProgress++;
+    result = (*mathFuncPtr->proc)(mathFuncPtr->clientData, interp, args,
+	    &funcResult);
+    tcl_MathInProgress--;
+    if (result != TCL_OK) {
+	return result;
+    }
+    if (funcResult.type == TCL_INT) {
+	valuePtr->type = TYPE_INT;
+	valuePtr->intValue = funcResult.intValue;
+    } else {
+	valuePtr->type = TYPE_DOUBLE;
+	valuePtr->doubleValue = funcResult.doubleValue;
+    }
+    infoPtr->token = VALUE;
+    return TCL_OK;
+
+    syntaxError:
+    Tcl_AppendResult(interp, "syntax error in expression \"",
+	    infoPtr->originalExpr, "\"", (char *) NULL);
+    return TCL_ERROR;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * ExprFloatError --
+ *
+ *	This procedure is called when an error occurs during a
+ *	floating-point operation.  It reads errno and sets
+ *	interp->result accordingly.
+ *
+ * Results:
+ *	Interp->result is set to hold an error message.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void
+ExprFloatError(interp, value)
+    Tcl_Interp *interp;		/* Where to store error message. */
+    double value;		/* Value returned after error;  used to
+				 * distinguish underflows from overflows. */
+{
+    char buf[20];
+
+    if ((errno == EDOM) || (value != value)) {
+	interp->result = "domain error: argument not in valid range";
+	Tcl_SetErrorCode(interp, "ARITH", "DOMAIN", interp->result,
+		(char *) NULL);
+    } else if ((errno == ERANGE) || IS_INF(value)) {
+	if (value == 0.0) {
+	    interp->result = "floating-point value too small to represent";
+	    Tcl_SetErrorCode(interp, "ARITH", "UNDERFLOW", interp->result,
+		    (char *) NULL);
+	} else {
+	    interp->result = "floating-point value too large to represent";
+	    Tcl_SetErrorCode(interp, "ARITH", "OVERFLOW", interp->result,
+		    (char *) NULL);
+	}
+    } else {
+	sprintf(buf, "%d", errno);
+	Tcl_AppendResult(interp, "unknown floating-point error, ",
+		"errno = ", buf, (char *) NULL);
+	Tcl_SetErrorCode(interp, "ARITH", "UNKNOWN", interp->result,
+		(char *) NULL);
+    }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Math Functions --
+ *
+ *	This page contains the procedures that implement all of the
+ *	built-in math functions for expressions.
+ *
+ * Results:
+ *	Each procedure returns TCL_OK if it succeeds and places result
+ *	information at *resultPtr.  If it fails it returns TCL_ERROR
+ *	and leaves an error message in interp->result.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static int
+ExprUnaryFunc(clientData, interp, args, resultPtr)
+    ClientData clientData;		/* Contains address of procedure that
+					 * takes one double argument and
+					 * returns a double result. */
+    Tcl_Interp *interp;
+    Tcl_Value *args;
+    Tcl_Value *resultPtr;
+{
+    double (*func)() = (double (*)()) clientData;
+
+    errno = 0;
+    resultPtr->type = TCL_DOUBLE;
+    resultPtr->doubleValue = (*func)(args[0].doubleValue);
+    if (errno != 0) {
+	ExprFloatError(interp, resultPtr->doubleValue);
+	return TCL_ERROR;
+    }
+    return TCL_OK;
+}
+
+static int
+ExprBinaryFunc(clientData, interp, args, resultPtr)
+    ClientData clientData;		/* Contains address of procedure that
+					 * takes two double arguments and
+					 * returns a double result. */
+    Tcl_Interp *interp;
+    Tcl_Value *args;
+    Tcl_Value *resultPtr;
+{
+    double (*func)() = (double (*)()) clientData;
+
+    errno = 0;
+    resultPtr->type = TCL_DOUBLE;
+    resultPtr->doubleValue = (*func)(args[0].doubleValue, args[1].doubleValue);
+    if (errno != 0) {
+	ExprFloatError(interp, resultPtr->doubleValue);
+	return TCL_ERROR;
+    }
+    return TCL_OK;
+}
+
+	/* ARGSUSED */
+static int
+ExprAbsFunc(clientData, interp, args, resultPtr)
+    ClientData clientData;
+    Tcl_Interp *interp;
+    Tcl_Value *args;
+    Tcl_Value *resultPtr;
+{
+    resultPtr->type = TCL_DOUBLE;
+    if (args[0].type == TCL_DOUBLE) {
+	resultPtr->type = TCL_DOUBLE;
+	if (args[0].doubleValue < 0) {
+	    resultPtr->doubleValue = -args[0].doubleValue;
+	} else {
+	    resultPtr->doubleValue = args[0].doubleValue;
+	}
+    } else {
+	resultPtr->type = TCL_INT;
+	if (args[0].intValue < 0) {
+	    resultPtr->intValue = -args[0].intValue;
+	    if (resultPtr->intValue < 0) {
+		interp->result = "integer value too large to represent";
+		Tcl_SetErrorCode(interp, "ARITH", "IOVERFLOW", interp->result,
+			(char *) NULL);
+		return TCL_ERROR;
+	    }
+	} else {
+	    resultPtr->intValue = args[0].intValue;
+	}
+    }
+    return TCL_OK;
+}
+
+	/* ARGSUSED */
+static int
+ExprDoubleFunc(clientData, interp, args, resultPtr)
+    ClientData clientData;
+    Tcl_Interp *interp;
+    Tcl_Value *args;
+    Tcl_Value *resultPtr;
+{
+    resultPtr->type = TCL_DOUBLE;
+    if (args[0].type == TCL_DOUBLE) {
+	resultPtr->doubleValue = args[0].doubleValue;
+    } else {
+	resultPtr->doubleValue = args[0].intValue;
+    }
+    return TCL_OK;
+}
+
+	/* ARGSUSED */
+static int
+ExprIntFunc(clientData, interp, args, resultPtr)
+    ClientData clientData;
+    Tcl_Interp *interp;
+    Tcl_Value *args;
+    Tcl_Value *resultPtr;
+{
+    resultPtr->type = TCL_INT;
+    if (args[0].type == TCL_INT) {
+	resultPtr->intValue = args[0].intValue;
+    } else {
+	if (args[0].doubleValue < 0) {
+	    if (args[0].doubleValue < (double) (long) LONG_MIN) {
+		tooLarge:
+		interp->result = "integer value too large to represent";
+		Tcl_SetErrorCode(interp, "ARITH", "IOVERFLOW",
+			interp->result, (char *) NULL);
+		return TCL_ERROR;
+	    }
+	} else {
+	    if (args[0].doubleValue > (double) LONG_MAX) {
+		goto tooLarge;
+	    }
+	}
+	resultPtr->intValue = args[0].doubleValue;
+    }
+    return TCL_OK;
+}
+
+	/* ARGSUSED */
+static int
+ExprRoundFunc(clientData, interp, args, resultPtr)
+    ClientData clientData;
+    Tcl_Interp *interp;
+    Tcl_Value *args;
+    Tcl_Value *resultPtr;
+{
+    resultPtr->type = TCL_INT;
+    if (args[0].type == TCL_INT) {
+	resultPtr->intValue = args[0].intValue;
+    } else {
+	if (args[0].doubleValue < 0) {
+	    if (args[0].doubleValue <= (((double) (long) LONG_MIN) - 0.5)) {
+		tooLarge:
+		interp->result = "integer value too large to represent";
+		Tcl_SetErrorCode(interp, "ARITH", "IOVERFLOW",
+			interp->result, (char *) NULL);
+		return TCL_ERROR;
+	    }
+	    resultPtr->intValue = (args[0].doubleValue - 0.5);
+	} else {
+	    if (args[0].doubleValue >= (((double) LONG_MAX + 0.5))) {
+		goto tooLarge;
+	    }
+	    resultPtr->intValue = (args[0].doubleValue + 0.5);
+	}
+    }
+    return TCL_OK;
 }

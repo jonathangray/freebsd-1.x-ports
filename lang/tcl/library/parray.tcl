@@ -1,16 +1,27 @@
 # parray:
 # Print the contents of a global array on stdout.
 #
-# $Header: /a/cvs/386BSD/ports/lang/tcl/library/parray.tcl,v 1.1 1993/08/09 10:57:40 alm Exp $ SPRITE (Berkeley)
+# $Header: /a/cvs/386BSD/ports/lang/tcl/library/parray.tcl,v 1.2 1993/12/27 07:08:05 rich Exp $ SPRITE (Berkeley)
 #
-# Copyright 1991 Regents of the University of California
-# Permission to use, copy, modify, and distribute this
-# software and its documentation for any purpose and without
-# fee is hereby granted, provided that this copyright
-# notice appears in all copies.  The University of California
-# makes no representations about the suitability of this
-# software for any purpose.  It is provided "as is" without
-# express or implied warranty.
+# Copyright (c) 1991-1993 The Regents of the University of California.
+# All rights reserved.
+#
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the
+# above copyright notice and the following two paragraphs appear in
+# all copies of this software.
+#
+# IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+# OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+# CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+# AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+# ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+# PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 #
 
 proc parray a {

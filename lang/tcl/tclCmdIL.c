@@ -6,17 +6,58 @@
  *	I through L.  It contains only commands in the generic core
  *	(i.e. those that don't depend much upon UNIX facilities).
  *
- * Copyright 1987-1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1987-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
+#ifndef lint
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclCmdIL.c,v 1.2 1993/12/27 07:05:59 rich Exp $ SPRITE (Berkeley)";
+#endif
+
 #include "tclInt.h"
+#include "patchlevel.h"
+
+/*
+ * The variables below are used to implement the "lsort" command.
+ * Unfortunately, this use of static variables prevents "lsort"
+ * from being thread-safe, but there's no alternative given the
+ * current implementation of qsort.  In a threaded environment
+ * these variables should be made thread-local if possible, or else
+ * "lsort" needs internal mutual exclusion.
+ */
+
+static Tcl_Interp *sortInterp;		/* Interpreter for "lsort" command. */
+static enum {ASCII, INTEGER, REAL, COMMAND} sortMode;
+					/* Mode for sorting: compare as strings,
+					 * compare as numbers, or call
+					 * user-defined command for
+					 * comparison. */
+static Tcl_DString sortCmd;		/* Holds command if mode is COMMAND.
+					 * pre-initialized to hold base of
+					 * command. */
+static int sortIncreasing;		/* 0 means sort in decreasing order,
+					 * 1 means increasing order. */
+static int sortCode;			/* Anything other than TCL_OK means a
+					 * problem occurred while sorting; this
+					 * executing a comparison command, so
+					 * the sort was aborted. */
 
 /*
  * Forward declarations for procedures defined in this file:
@@ -81,7 +122,7 @@ Tcl_IfCmd(dummy, interp, argc, argv)
 	    return TCL_ERROR;
 	}
 	if (value) {
-	    return Tcl_Eval(interp, argv[i], 0, (char **) NULL);
+	    return Tcl_Eval(interp, argv[i]);
 	}
 
 	/*
@@ -115,7 +156,7 @@ Tcl_IfCmd(dummy, interp, argc, argv)
 	    return TCL_ERROR;
 	}
     }
-    return Tcl_Eval(interp, argv[i], 0, (char **) NULL);
+    return Tcl_Eval(interp, argv[i]);
 }
 
 /*
@@ -240,7 +281,7 @@ Tcl_InfoCmd(dummy, interp, argc, argv)
 	}
 	for (argPtr = procPtr->argPtr; argPtr != NULL;
 		argPtr = argPtr->nextPtr) {
-	    Tcl_AppendElement(interp, argPtr->name, 0);
+	    Tcl_AppendElement(interp, argPtr->name);
 	}
 	return TCL_OK;
     } else if ((c == 'b') && (strncmp(argv[1], "body", length)) == 0) {
@@ -277,7 +318,7 @@ Tcl_InfoCmd(dummy, interp, argc, argv)
 	    if ((argc == 3) && !Tcl_StringMatch(name, argv[2])) {
 		continue;
 	    }
-	    Tcl_AppendElement(interp, name, 0);
+	    Tcl_AppendElement(interp, name);
 	}
 	return TCL_OK;
     } else if ((c == 'c') && (strncmp(argv[1], "complete", length) == 0)
@@ -366,7 +407,7 @@ Tcl_InfoCmd(dummy, interp, argc, argv)
 	    }
 	    varPtr = (Var *) Tcl_GetHashValue(hPtr);
 	    if (varPtr->flags & VAR_UPVAR) {
-		varPtr = (Var *) Tcl_GetHashValue(varPtr->value.upvarPtr);
+		varPtr = varPtr->value.upvarPtr;
 	    }
 	    if (!(varPtr->flags & VAR_ARRAY)) {
 		goto noVar;
@@ -392,7 +433,7 @@ Tcl_InfoCmd(dummy, interp, argc, argv)
 	    if ((argc == 3) && !Tcl_StringMatch(name, argv[2])) {
 		continue;
 	    }
-	    Tcl_AppendElement(interp, name, 0);
+	    Tcl_AppendElement(interp, name);
 	}
 	return TCL_OK;
     } else if ((c == 'l') && (strncmp(argv[1], "level", length) == 0)
@@ -475,10 +516,20 @@ Tcl_InfoCmd(dummy, interp, argc, argv)
 	    if ((argc == 3) && !Tcl_StringMatch(name, argv[2])) {
 		continue;
 	    }
-	    Tcl_AppendElement(interp, name, 0);
+	    Tcl_AppendElement(interp, name);
 	}
 	return TCL_OK;
-    } else if ((c == 'p') && (strncmp(argv[1], "procs", length)) == 0) {
+    } else if ((c == 'p') && (strncmp(argv[1], "patchlevel", length) == 0)
+	    && (length >= 2)) {
+	if (argc != 2) {
+	    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
+		    " patchlevel\"", (char *) NULL);
+	    return TCL_ERROR;
+	}
+	sprintf(interp->result, "%d", TCL_PATCH_LEVEL);
+	return TCL_OK;
+    } else if ((c == 'p') && (strncmp(argv[1], "procs", length) == 0)
+	    && (length >= 2)) {
 	if (argc > 3) {
 	    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
 		    " procs [pattern]\"", (char *) NULL);
@@ -495,7 +546,7 @@ Tcl_InfoCmd(dummy, interp, argc, argv)
 	    if ((argc == 3) && !Tcl_StringMatch(name, argv[2])) {
 		continue;
 	    }
-	    Tcl_AppendElement(interp, name, 0);
+	    Tcl_AppendElement(interp, name);
 	}
 	return TCL_OK;
     } else if ((c == 's') && (strncmp(argv[1], "script", length) == 0)) {
@@ -505,7 +556,13 @@ Tcl_InfoCmd(dummy, interp, argc, argv)
 	    return TCL_ERROR;
 	}
 	if (iPtr->scriptFile != NULL) {
-	    interp->result = iPtr->scriptFile;
+	    /*
+	     * Can't depend on iPtr->scriptFile to be non-volatile:
+	     * if this command is returned as the result of the script,
+	     * then iPtr->scriptFile will go away.
+	     */
+
+	    Tcl_SetResult(interp, iPtr->scriptFile, TCL_VOLATILE);
 	}
 	return TCL_OK;
     } else if ((c == 't') && (strncmp(argv[1], "tclversion", length) == 0)) {
@@ -546,15 +603,15 @@ Tcl_InfoCmd(dummy, interp, argc, argv)
 	    if ((argc == 3) && !Tcl_StringMatch(name, argv[2])) {
 		continue;
 	    }
-	    Tcl_AppendElement(interp, name, 0);
+	    Tcl_AppendElement(interp, name);
 	}
 	return TCL_OK;
     } else {
 	Tcl_AppendResult(interp, "bad option \"", argv[1],
 		"\": should be args, body, cmdcount, commands, ",
 		"complete, default, ",
-		"exists, globals, level, library, locals, procs, ",
-		"script, tclversion, or vars",
+		"exists, globals, level, library, locals, ",
+		"patchlevel, procs, script, tclversion, or vars",
 		(char *) NULL);
 	return TCL_ERROR;
     }
@@ -732,7 +789,7 @@ Tcl_LinsertCmd(dummy, interp, argc, argv)
 
 	end = element+size;
 	if (element != argv[1]) {
-	    while ((*end != 0) && !isspace(*end)) {
+	    while ((*end != 0) && !isspace(UCHAR(*end))) {
 		end++;
 	    }
 	}
@@ -747,7 +804,7 @@ Tcl_LinsertCmd(dummy, interp, argc, argv)
      */
 
     for (i = 3; i < argc; i++) {
-	Tcl_AppendElement(interp, argv[i], 0);
+	Tcl_AppendElement(interp, argv[i]);
     }
 
     /*
@@ -785,13 +842,10 @@ Tcl_ListCmd(dummy, interp, argc, argv)
     int argc;				/* Number of arguments. */
     char **argv;			/* Argument strings. */
 {
-    if (argc < 2) {
-	Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
-		" arg ?arg ...?\"", (char *) NULL);
-	return TCL_ERROR;
+    if (argc >= 2) {
+	interp->result = Tcl_Merge(argc-1, argv+1);
+	interp->freeProc = (Tcl_FreeProc *) free;
     }
-    interp->result = Tcl_Merge(argc-1, argv+1);
-    interp->freeProc = (Tcl_FreeProc *) free;
     return TCL_OK;
 }
 
@@ -924,7 +978,7 @@ Tcl_LrangeCmd(notUsed, interp, argc, argv)
      * Chop off trailing spaces.
      */
 
-    while (isspace(end[-1])) {
+    while (isspace(UCHAR(end[-1]))) {
 	end--;
     }
     c = *end;
@@ -1024,7 +1078,7 @@ Tcl_LreplaceCmd(notUsed, interp, argc, argv)
 
     p1 = element+size;
     if (element != argv[1]) {
-	while ((*p1 != 0) && !isspace(*p1)) {
+	while ((*p1 != 0) && !isspace(UCHAR(*p1))) {
 	    p1++;
 	}
     }
@@ -1038,7 +1092,7 @@ Tcl_LreplaceCmd(notUsed, interp, argc, argv)
      */
 
     for (i = 4; i < argc; i++) {
-	Tcl_AppendElement(interp, argv[i], 0);
+	Tcl_AppendElement(interp, argv[i]);
     }
 
     /*
@@ -1080,26 +1134,58 @@ Tcl_LsearchCmd(notUsed, interp, argc, argv)
     int argc;				/* Number of arguments. */
     char **argv;			/* Argument strings. */
 {
+#define EXACT	0
+#define GLOB	1
+#define REGEXP	2
     int listArgc;
     char **listArgv;
-    int i, match;
+    int i, match, mode, index;
 
-    if (argc != 3) {
+    mode = GLOB;
+    if (argc == 4) {
+	if (strcmp(argv[1], "-exact") == 0) {
+	    mode = EXACT;
+	} else if (strcmp(argv[1], "-glob") == 0) {
+	    mode = GLOB;
+	} else if (strcmp(argv[1], "-regexp") == 0) {
+	    mode = REGEXP;
+	} else {
+	    Tcl_AppendResult(interp, "bad search mode \"", argv[1],
+		    "\": must be -exact, -glob, or -regexp", (char *) NULL);
+	    return TCL_ERROR;
+	}
+    } else if (argc != 3) {
 	Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
-		" list pattern\"", (char *) NULL);
+		" ?mode? list pattern\"", (char *) NULL);
 	return TCL_ERROR;
     }
-    if (Tcl_SplitList(interp, argv[1], &listArgc, &listArgv) != TCL_OK) {
+    if (Tcl_SplitList(interp, argv[argc-2], &listArgc, &listArgv) != TCL_OK) {
 	return TCL_ERROR;
     }
-    match = -1;
+    index = -1;
     for (i = 0; i < listArgc; i++) {
-	if (Tcl_StringMatch(listArgv[i], argv[2])) {
-	    match = i;
+	match = 0;
+	switch (mode) {
+	    case EXACT:
+		match = (strcmp(listArgv[i], argv[argc-1]) == 0);
+		break;
+	    case GLOB:
+		match = Tcl_StringMatch(listArgv[i], argv[argc-1]);
+		break;
+	    case REGEXP:
+		match = Tcl_RegExpMatch(interp, listArgv[i], argv[argc-1]);
+		if (match < 0) {
+		    ckfree((char *) listArgv);
+		    return TCL_ERROR;
+		}
+		break;
+	}
+	if (match) {
+	    index = i;
 	    break;
 	}
     }
-    sprintf(interp->result, "%d", match);
+    sprintf(interp->result, "%d", index);
     ckfree((char *) listArgv);
     return TCL_OK;
 }
@@ -1129,32 +1215,189 @@ Tcl_LsortCmd(notUsed, interp, argc, argv)
     int argc;				/* Number of arguments. */
     char **argv;			/* Argument strings. */
 {
-    int listArgc;
+    int listArgc, i, c, length;
     char **listArgv;
+    char *command = NULL;		/* Initialization needed only to
+					 * prevent compiler warning. */
 
-    if (argc != 2) {
+    if (argc < 2) {
 	Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
-		" list\"", (char *) NULL);
+		" ?-ascii? ?-integer? ?-real? ?-increasing? ?-decreasing?",
+		" ?-command string? list\"", (char *) NULL);
 	return TCL_ERROR;
     }
-    if (Tcl_SplitList(interp, argv[1], &listArgc, &listArgv) != TCL_OK) {
+
+    /*
+     * Parse arguments to set up the mode for the sort.
+     */
+
+    sortInterp = interp;
+    sortMode = ASCII;
+    sortIncreasing = 1;
+    sortCode = TCL_OK;
+    for (i = 1; i < argc-1; i++) {
+	length = strlen(argv[i]);
+	if (length < 2) {
+	    badSwitch:
+	    Tcl_AppendResult(interp, "bad switch \"", argv[i],
+		    "\": must be -ascii, -integer, -real, -increasing",
+		    " -decreasing, or -command", (char *) NULL);
+	    return TCL_ERROR;
+	}
+	c = argv[i][1];
+	if ((c == 'a') && (strncmp(argv[i], "-ascii", length) == 0)) {
+	    sortMode = ASCII;
+	} else if ((c == 'c') && (strncmp(argv[i], "-command", length) == 0)) {
+	    if (i == argc-2) {
+		Tcl_AppendResult(interp, "\"-command\" must be",
+			" followed by comparison command", (char *) NULL);
+		return TCL_ERROR;
+	    }
+	    sortMode = COMMAND;
+	    command = argv[i+1];
+	    i++;
+	} else if ((c == 'd')
+		&& (strncmp(argv[i], "-decreasing", length) == 0)) {
+	    sortIncreasing = 0;
+	} else if ((c == 'i') && (length >= 4)
+		&& (strncmp(argv[i], "-increasing", length) == 0)) {
+	    sortIncreasing = 1;
+	} else if ((c == 'i') && (length >= 4)
+		&& (strncmp(argv[i], "-integer", length) == 0)) {
+	    sortMode = INTEGER;
+	} else if ((c == 'r')
+		&& (strncmp(argv[i], "-real", length) == 0)) {
+	    sortMode = REAL;
+	} else {
+	    goto badSwitch;
+	}
+    }
+    if (sortMode == COMMAND) {
+	Tcl_DStringInit(&sortCmd);
+	Tcl_DStringAppend(&sortCmd, command, -1);
+    }
+
+    if (Tcl_SplitList(interp, argv[argc-1], &listArgc, &listArgv) != TCL_OK) {
 	return TCL_ERROR;
     }
     qsort((VOID *) listArgv, listArgc, sizeof (char *), SortCompareProc);
-    interp->result = Tcl_Merge(listArgc, listArgv);
-    interp->freeProc = (Tcl_FreeProc *) free;
+    if (sortCode == TCL_OK) {
+	Tcl_ResetResult(interp);
+	interp->result = Tcl_Merge(listArgc, listArgv);
+	interp->freeProc = (Tcl_FreeProc *) free;
+    }
+    if (sortMode == COMMAND) {
+	Tcl_DStringFree(&sortCmd);
+    }
     ckfree((char *) listArgv);
-    return TCL_OK;
+    return sortCode;
 }
-
+
 /*
- * The procedure below is called back by qsort to determine
- * the proper ordering between two elements.
+ *----------------------------------------------------------------------
+ *
+ * SortCompareProc --
+ *
+ *	This procedure is invoked by qsort to determine the proper
+ *	ordering between two elements.
+ *
+ * Results:
+ *	< 0 means first is "smaller" than "second", > 0 means "first"
+ *	is larger than "second", and 0 means they should be treated
+ *	as equal.
+ *
+ * Side effects:
+ *	None, unless a user-defined comparison command does something
+ *	weird.
+ *
+ *----------------------------------------------------------------------
  */
 
 static int
 SortCompareProc(first, second)
     CONST VOID *first, *second;		/* Elements to be compared. */
 {
-    return strcmp(*((char **) first), *((char **) second));
+    int order;
+    char *firstString = *((char **) first);
+    char *secondString = *((char **) second);
+
+    order = 0;
+    if (sortCode != TCL_OK) {
+	/*
+	 * Once an error has occurred, skip any future comparisons
+	 * so as to preserve the error message in sortInterp->result.
+	 */
+
+	return order;
+    }
+    if (sortMode == ASCII) {
+	order = strcmp(firstString, secondString);
+    } else if (sortMode == INTEGER) {
+	int a, b;
+
+	if ((Tcl_GetInt(sortInterp, firstString, &a) != TCL_OK)
+		|| (Tcl_GetInt(sortInterp, secondString, &b) != TCL_OK)) {
+	    Tcl_AddErrorInfo(sortInterp,
+		    "\n    (converting list element from string to integer)");
+	    sortCode = TCL_ERROR;
+	    return order;
+	}
+	if (a > b) {
+	    order = 1;
+	} else if (b > a) {
+	    order = -1;
+	}
+    } else if (sortMode == REAL) {
+	double a, b;
+
+	if ((Tcl_GetDouble(sortInterp, firstString, &a) != TCL_OK)
+		|| (Tcl_GetDouble(sortInterp, secondString, &b) != TCL_OK)) {
+	    Tcl_AddErrorInfo(sortInterp,
+		    "\n    (converting list element from string to real)");
+	    sortCode = TCL_ERROR;
+	    return order;
+	}
+	if (a > b) {
+	    order = 1;
+	} else if (b > a) {
+	    order = -1;
+	}
+    } else {
+	int oldLength;
+	char *end;
+
+	/*
+	 * Generate and evaluate a command to determine which string comes
+	 * first.
+	 */
+
+	oldLength = Tcl_DStringLength(&sortCmd);
+	Tcl_DStringAppendElement(&sortCmd, firstString);
+	Tcl_DStringAppendElement(&sortCmd, secondString);
+	sortCode = Tcl_Eval(sortInterp, Tcl_DStringValue(&sortCmd));
+	Tcl_DStringTrunc(&sortCmd, oldLength);
+	if (sortCode != TCL_OK) {
+	    Tcl_AddErrorInfo(sortInterp,
+		    "\n    (user-defined comparison command)");
+	    return order;
+	}
+
+	/*
+	 * Parse the result of the command.
+	 */
+
+	order = strtol(sortInterp->result, &end, 0);
+	if ((end == sortInterp->result) || (*end != 0)) {
+	    Tcl_ResetResult(sortInterp);
+	    Tcl_AppendResult(sortInterp,
+		    "comparison command returned non-numeric result",
+		    (char *) NULL);
+	    sortCode = TCL_ERROR;
+	    return order;
+	}
+    }
+    if (!sortIncreasing) {
+	order = -order;
+    }
+    return order;
 }

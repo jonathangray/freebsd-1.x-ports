@@ -6,58 +6,80 @@
  *	core.  For example, they do file manipulation and process
  *	manipulation.
  *
- *	The Tcl_Fork and Tcl_WaitPids procedures are based on code
- *	contributed by Karl Lehenbauer, Mark Diekhans and Peter
- *	da Silva.
+ *	Parts of this file are based on code contributed by Karl
+ *	Lehenbauer, Mark Diekhans and Peter da Silva.
  *
- * Copyright 1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that this copyright
- * notice appears in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1991-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
+
+#ifndef lint
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclUnixUtil.c,v 1.2 1993/12/27 07:06:22 rich Exp $ SPRITE (Berkeley)";
+#endif /* not lint */
 
 #include "tclInt.h"
 #include "tclUnix.h"
 
 /*
- * Data structures of the following type are used by Tcl_Fork and
- * Tcl_WaitPids to keep track of child processes.
+ * A linked list of the following structures is used to keep track
+ * of child processes that have been detached but haven't exited
+ * yet, so we can make sure that they're properly "reaped" (officially
+ * waited for) and don't lie around as zombies cluttering the
+ * system.
  */
 
-typedef struct {
-    int pid;			/* Process id of child. */
-    WAIT_STATUS_TYPE status;	/* Status returned when child exited or
-				 * suspended. */
-    int flags;			/* Various flag bits;  see below for
-				 * definitions. */
-} WaitInfo;
+typedef struct Detached {
+    int pid;				/* Id of process that's been detached
+					 * but isn't known to have exited. */
+    struct Detached *nextPtr;		/* Next in list of all detached
+					 * processes. */
+} Detached;
+
+static Detached *detList = NULL;	/* List of all detached proceses. */
 
 /*
- * Flag bits in WaitInfo structures:
- *
- * WI_READY -			Non-zero means process has exited or
- *				suspended since it was forked or last
- *				returned by Tcl_WaitPids.
- * WI_DETACHED -		Non-zero means no-one cares about the
- *				process anymore.  Ignore it until it
- *				exits, then forget about it.
+ * The following variables are used to keep track of all the open files
+ * in the process.  These files can be shared across interpreters, so the
+ * information can't be put in the Interp structure.
  */
 
-#define WI_READY	1
-#define WI_DETACHED	2
+int tclNumFiles = 0;		/* Number of entries in tclOpenFiles below.
+				 * 0 means array hasn't been created yet. */
+OpenFile **tclOpenFiles;	/* Pointer to malloc-ed array of pointers
+				 * to information about open files.  Entry
+				 * N corresponds to the file with fileno N.
+				 * If an entry is NULL then the corresponding
+				 * file isn't open.  If tclOpenFiles is NULL
+				 * it means no files have been used, so even
+				 * stdin/stdout/stderr entries haven't been
+				 * setup yet. */
 
-static WaitInfo *waitTable = NULL;
-static int waitTableSize = 0;	/* Total number of entries available in
-				 * waitTable. */
-static int waitTableUsed = 0;	/* Number of entries in waitTable that
-				 * are actually in use right now.  Active
-				 * entries are always at the beginning
-				 * of the table. */
-#define WAIT_TABLE_GROW_BY 4
+/*
+ * Declarations for local procedures defined in this file:
+ */
+
+static int		FileForRedirect _ANSI_ARGS_((Tcl_Interp *interp,
+			    char *spec, int atOk, char *arg, int flags,
+			    char *nextArg, int *skipPtr, int *closePtr));
+static void		MakeFileTable _ANSI_ARGS_((Interp *iPtr, int index));
+static void		RestoreSignals _ANSI_ARGS_((void));
 
 /*
  *----------------------------------------------------------------------
@@ -85,43 +107,44 @@ Tcl_EvalFile(interp, fileName)
 {
     int fileId, result;
     struct stat statBuf;
-    char *cmdBuffer, *end, *oldScriptFile;
+    char *cmdBuffer, *oldScriptFile;
     Interp *iPtr = (Interp *) interp;
+    Tcl_DString buffer;
 
     oldScriptFile = iPtr->scriptFile;
     iPtr->scriptFile = fileName;
-    fileName = Tcl_TildeSubst(interp, fileName);
+    fileName = Tcl_TildeSubst(interp, fileName, &buffer);
     if (fileName == NULL) {
 	goto error;
     }
     fileId = open(fileName, O_RDONLY, 0);
     if (fileId < 0) {
 	Tcl_AppendResult(interp, "couldn't read file \"", fileName,
-		"\": ", Tcl_UnixError(interp), (char *) NULL);
+		"\": ", Tcl_PosixError(interp), (char *) NULL);
 	goto error;
     }
     if (fstat(fileId, &statBuf) == -1) {
 	Tcl_AppendResult(interp, "couldn't stat file \"", fileName,
-		"\": ", Tcl_UnixError(interp), (char *) NULL);
+		"\": ", Tcl_PosixError(interp), (char *) NULL);
 	close(fileId);
 	goto error;
     }
     cmdBuffer = (char *) ckalloc((unsigned) statBuf.st_size+1);
-    if (read(fileId, cmdBuffer, (int) statBuf.st_size) != statBuf.st_size) {
+    if (read(fileId, cmdBuffer, (size_t) statBuf.st_size) != statBuf.st_size) {
 	Tcl_AppendResult(interp, "error in reading file \"", fileName,
-		"\": ", Tcl_UnixError(interp), (char *) NULL);
+		"\": ", Tcl_PosixError(interp), (char *) NULL);
 	close(fileId);
 	ckfree(cmdBuffer);
 	goto error;
     }
     if (close(fileId) != 0) {
 	Tcl_AppendResult(interp, "error closing file \"", fileName,
-		"\": ", Tcl_UnixError(interp), (char *) NULL);
+		"\": ", Tcl_PosixError(interp), (char *) NULL);
 	ckfree(cmdBuffer);
 	goto error;
     }
     cmdBuffer[statBuf.st_size] = 0;
-    result = Tcl_Eval(interp, cmdBuffer, 0, &end);
+    result = Tcl_Eval(interp, cmdBuffer);
     if (result == TCL_RETURN) {
 	result = TCL_OK;
     }
@@ -138,199 +161,13 @@ Tcl_EvalFile(interp, fileName)
     }
     ckfree(cmdBuffer);
     iPtr->scriptFile = oldScriptFile;
+    Tcl_DStringFree(&buffer);
     return result;
 
     error:
     iPtr->scriptFile = oldScriptFile;
+    Tcl_DStringFree(&buffer);
     return TCL_ERROR;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * Tcl_Fork --
- *
- *	Create a new process using the vfork system call, and keep
- *	track of it for "safe" waiting with Tcl_WaitPids.
- *
- * Results:
- *	The return value is the value returned by the vfork system
- *	call (0 means child, > 0 means parent (value is child id),
- *	< 0 means error).
- *
- * Side effects:
- *	A new process is created, and an entry is added to an internal
- *	table of child processes if the process is created successfully.
- *
- *----------------------------------------------------------------------
- */
-
-int
-Tcl_Fork()
-{
-    WaitInfo *waitPtr;
-    pid_t pid;
-
-    /*
-     * Disable SIGPIPE signals:  if they were allowed, this process
-     * might go away unexpectedly if children misbehave.  This code
-     * can potentially interfere with other application code that
-     * expects to handle SIGPIPEs;  what's really needed is an
-     * arbiter for signals to allow them to be "shared".
-     */
-
-    if (waitTable == NULL) {
-	(void) signal(SIGPIPE, SIG_IGN);
-    }
-
-    /*
-     * Enlarge the wait table if there isn't enough space for a new
-     * entry.
-     */
-
-    if (waitTableUsed == waitTableSize) {
-	int newSize;
-	WaitInfo *newWaitTable;
-
-	newSize = waitTableSize + WAIT_TABLE_GROW_BY;
-	newWaitTable = (WaitInfo *) ckalloc((unsigned)
-		(newSize * sizeof(WaitInfo)));
-	memcpy((VOID *) newWaitTable, (VOID *) waitTable,
-		(waitTableSize * sizeof(WaitInfo)));
-	if (waitTable != NULL) {
-	    ckfree((char *) waitTable);
-	}
-	waitTable = newWaitTable;
-	waitTableSize = newSize;
-    }
-
-    /*
-     * Make a new process and enter it into the table if the fork
-     * is successful.
-     */
-
-    waitPtr = &waitTable[waitTableUsed];
-    pid = fork();
-    if (pid > 0) {
-	waitPtr->pid = pid;
-	waitPtr->flags = 0;
-	waitTableUsed++;
-    }
-    return pid;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * Tcl_WaitPids --
- *
- *	This procedure is used to wait for one or more processes created
- *	by Tcl_Fork to exit or suspend.  It records information about
- *	all processes that exit or suspend, even those not waited for,
- *	so that later waits for them will be able to get the status
- *	information.
- *
- * Results:
- *	-1 is returned if there is an error in the wait kernel call.
- *	Otherwise the pid of an exited/suspended process from *pidPtr
- *	is returned and *statusPtr is set to the status value returned
- *	by the wait kernel call.
- *
- * Side effects:
- *	Doesn't return until one of the pids at *pidPtr exits or suspends.
- *
- *----------------------------------------------------------------------
- */
-
-int
-Tcl_WaitPids(numPids, pidPtr, statusPtr)
-    int numPids;		/* Number of pids to wait on:  gives size
-				 * of array pointed to by pidPtr. */
-    int *pidPtr;		/* Pids to wait on:  return when one of
-				 * these processes exits or suspends. */
-    int *statusPtr;		/* Wait status is returned here. */
-{
-    int i, count, pid;
-    register WaitInfo *waitPtr;
-    int anyProcesses;
-    WAIT_STATUS_TYPE status;
-
-    while (1) {
-	/*
-	 * Scan the table of child processes to see if one of the
-	 * specified children has already exited or suspended.  If so,
-	 * remove it from the table and return its status.
-	 */
-
-	anyProcesses = 0;
-	for (waitPtr = waitTable, count = waitTableUsed;
-		count > 0; waitPtr++, count--) {
-	    for (i = 0; i < numPids; i++) {
-		if (pidPtr[i] != waitPtr->pid) {
-		    continue;
-		}
-		anyProcesses = 1;
-		if (waitPtr->flags & WI_READY) {
-		    *statusPtr = *((int *) &waitPtr->status);
-		    pid = waitPtr->pid;
-		    if (WIFEXITED(waitPtr->status)
-			    || WIFSIGNALED(waitPtr->status)) {
-			*waitPtr = waitTable[waitTableUsed-1];
-			waitTableUsed--;
-		    } else {
-			waitPtr->flags &= ~WI_READY;
-		    }
-		    return pid;
-		}
-	    }
-	}
-
-	/*
-	 * Make sure that the caller at least specified one valid
-	 * process to wait for.
-	 */
-
-	if (!anyProcesses) {
-	    errno = ECHILD;
-	    return -1;
-	}
-
-	/*
-	 * Wait for a process to exit or suspend, then update its
-	 * entry in the table and go back to the beginning of the
-	 * loop to see if it's one of the desired processes.
-	 */
-
-	pid = wait(&status);
-	if (pid < 0) {
-	    return pid;
-	}
-	for (waitPtr = waitTable, count = waitTableUsed; ;
-		waitPtr++, count--) {
-	    if (count == 0) {
-		break;			/* Ignore unknown processes. */
-	    }
-	    if (pid != waitPtr->pid) {
-		continue;
-	    }
-
-	    /*
-	     * If the process has been detached, then ignore anything
-	     * other than an exit, and drop the entry on exit.
-	     */
-
-	    if (waitPtr->flags & WI_DETACHED) {
-		if (WIFEXITED(status) || WIFSIGNALED(status)) {
-		    *waitPtr = waitTable[waitTableUsed-1];
-		    waitTableUsed--;
-		}
-	    } else {
-		waitPtr->status = status;
-		waitPtr->flags |= WI_READY;
-	    }
-	    break;
-	}
-    }
 }
 
 /*
@@ -339,9 +176,9 @@ Tcl_WaitPids(numPids, pidPtr, statusPtr)
  * Tcl_DetachPids --
  *
  *	This procedure is called to indicate that one or more child
- *	processes have been placed in background and are no longer
- *	cared about.  They should be ignored in future calls to
- *	Tcl_WaitPids.
+ *	processes have been placed in background and will never be
+ *	waited for;  they should eventually be reaped by
+ *	Tcl_ReapDetachedProcs.
  *
  * Results:
  *	None.
@@ -356,38 +193,61 @@ void
 Tcl_DetachPids(numPids, pidPtr)
     int numPids;		/* Number of pids to detach:  gives size
 				 * of array pointed to by pidPtr. */
-    int *pidPtr;		/* Array of pids to detach:  must have
-				 * been created by Tcl_Fork. */
+    int *pidPtr;		/* Array of pids to detach. */
 {
-    register WaitInfo *waitPtr;
-    int i, count, pid;
+    register Detached *detPtr;
+    int i;
 
     for (i = 0; i < numPids; i++) {
-	pid = pidPtr[i];
-	for (waitPtr = waitTable, count = waitTableUsed;
-		count > 0; waitPtr++, count--) {
-	    if (pid != waitPtr->pid) {
-		continue;
-	    }
+	detPtr = (Detached *) ckalloc(sizeof(Detached));
+	detPtr->pid = pidPtr[i];
+	detPtr->nextPtr = detList;
+	detList = detPtr;
+    }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tcl_ReapDetachedProcs --
+ *
+ *	This procedure checks to see if any detached processes have
+ *	exited and, if so, it "reaps" them by officially waiting on
+ *	them.  It should be called "occasionally" to make sure that
+ *	all detached processes are eventually reaped.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	Processes are waited on, so that they can be reaped by the
+ *	system.
+ *
+ *----------------------------------------------------------------------
+ */
 
-	    /*
-	     * If the process has already exited then destroy its
-	     * table entry now.
-	     */
+void
+Tcl_ReapDetachedProcs()
+{
+    register Detached *detPtr;
+    Detached *nextPtr, *prevPtr;
+    int status, result;
 
-	    if ((waitPtr->flags & WI_READY) && (WIFEXITED(waitPtr->status)
-		    || WIFSIGNALED(waitPtr->status))) {
-		*waitPtr = waitTable[waitTableUsed-1];
-		waitTableUsed--;
-	    } else {
-		waitPtr->flags |= WI_DETACHED;
-	    }
-	    goto nextPid;
+    for (detPtr = detList, prevPtr = NULL; detPtr != NULL; ) {
+	result = waitpid(detPtr->pid, &status, WNOHANG);
+	if ((result == 0) || ((result == -1) && (errno != ECHILD))) {
+	    prevPtr = detPtr;
+	    detPtr = detPtr->nextPtr;
+	    continue;
 	}
-	panic("Tcl_Detach couldn't find process");
-
-	nextPid:
-	continue;
+	nextPtr = detPtr->nextPtr;
+	if (prevPtr == NULL) {
+	    detList = detPtr->nextPtr;
+	} else {
+	    prevPtr->nextPtr = detPtr->nextPtr;
+	}
+	ckfree((char *) detPtr);
+	detPtr = nextPtr;
     }
 }
 
@@ -427,7 +287,7 @@ Tcl_CreatePipeline(interp, argc, argv, pidArrayPtr, inPipePtr,
     int argc;			/* Number of entries in argv. */
     char **argv;		/* Array of strings describing commands in
 				 * pipeline plus I/O redirection with <,
-				 * <<, and >.  Argv[argc] must be NULL. */
+				 * <<,  >, etc.  Argv[argc] must be NULL. */
     int **pidArrayPtr;		/* Word at *pidArrayPtr gets filled in with
 				 * address of array of pids for processes
 				 * in pipeline (first pid is first process
@@ -451,7 +311,10 @@ Tcl_CreatePipeline(interp, argc, argv, pidArrayPtr, inPipePtr,
 				 * The file will be removed already, so
 				 * closing this descriptor will be the end
 				 * of the file.  If this is NULL, then
-				 * all stderr output goes to our stderr. */
+				 * all stderr output goes to our stderr.
+				 * If the pipeline specifies redirection
+				 * then the fill will still be created
+				 * but it will never get any data. */
 {
     int *pidPtr = NULL;		/* Points to malloc-ed array holding all
 				 * the pids of child processes. */
@@ -459,32 +322,39 @@ Tcl_CreatePipeline(interp, argc, argv, pidArrayPtr, inPipePtr,
 				 * at *pidPtr right now. */
     int cmdCount;		/* Count of number of distinct commands
 				 * found in argc/argv. */
-    char *input = NULL;		/* Describes input for pipeline, depending
-				 * on "inputFile".  NULL means take input
-				 * from stdin/pipe. */
-    int inputFile = 0;		/* Non-zero means input is name of input
-				 * file.  Zero means input holds actual
-				 * text to be input to command. */
-    char *output = NULL;	/* Holds name of output file to pipe to,
-				 * or NULL if output goes to stdout/pipe. */
-    int inputId = -1;		/* Readable file id input to current command in
-				 * pipeline (could be file or pipe).  -1
-				 * means use stdin. */
-    int outputId = -1;		/* Writable file id for output from current
+    char *input = NULL;		/* If non-null, then this points to a
+				 * string containing input data (specified
+				 * via <<) to be piped to the first process
+				 * in the pipeline. */
+    int inputId = -1;		/* If >= 0, gives file id to use as input for
+				 * first process in pipeline (specified via
+				 * < or <@). */
+    int closeInput = 0;		/* If non-zero, then must close inputId
+				 * when cleaning up (zero means the file needs
+				 * to stay open for some other reason). */
+    int outputId = -1;		/* Writable file id for output from last
 				 * command in pipeline (could be file or pipe).
 				 * -1 means use stdout. */
-    int errorId = -1;		/* Writable file id for all standard error
-				 * output from all commands in pipeline.  -1
-				 * means use stderr. */
-    int lastOutputId = -1;	/* Write file id for output from last command
-				 * in pipeline (could be file or pipe).
-				 * -1 means use stdout. */
+    int closeOutput = 0;	/* Non-zero means must close outputId when
+				 * cleaning up (similar to closeInput). */
+    int errorId = -1;		/* Writable file id for error output from
+				 * all commands in pipeline. -1 means use
+				 * stderr. */
+    int closeError = 0;		/* Non-zero means must close errorId when
+				 * cleaning up. */
     int pipeIds[2];		/* File ids for pipe that's being created. */
     int firstArg, lastArg;	/* Indexes of first and last arguments in
 				 * current command. */
+    int skip;			/* Number of arguments to skip (because they
+				 * specify redirection). */
+    int maxFd;			/* Highest known file descriptor (used to
+				 * close off extraneous file descriptors in
+				 * child process). */
     int lastBar;
     char *execName;
     int i, j, pid;
+    char *p;
+    Tcl_DString buffer;
 
     if (inPipePtr != NULL) {
 	*inPipePtr = -1;
@@ -499,146 +369,202 @@ Tcl_CreatePipeline(interp, argc, argv, pidArrayPtr, inPipePtr,
 
     /*
      * First, scan through all the arguments to figure out the structure
-     * of the pipeline.  Count the number of distinct processes (it's the
-     * number of "|" arguments).  If there are "<", "<<", or ">" arguments
-     * then make note of input and output redirection and remove these
-     * arguments and the arguments that follow them.
+     * of the pipeline.  Process all of the input and output redirection
+     * arguments and remove them from the argument list in the pipeline.
+     * Count the number of distinct processes (it's the number of "|"
+     * arguments plus one) but don't remove the "|" arguments.
      */
 
     cmdCount = 1;
     lastBar = -1;
     for (i = 0; i < argc; i++) {
-	if ((argv[i][0] == '|') && ((argv[i][1] == 0))) {
+	if ((argv[i][0] == '|') && (((argv[i][1] == 0))
+		|| ((argv[i][1] == '&') && (argv[i][2] == 0)))) {
 	    if ((i == (lastBar+1)) || (i == (argc-1))) {
-		interp->result = "illegal use of | in command";
+		interp->result = "illegal use of | or |& in command";
 		return -1;
 	    }
 	    lastBar = i;
 	    cmdCount++;
 	    continue;
 	} else if (argv[i][0] == '<') {
-	    if (argv[i][1] == 0) {
-		input = argv[i+1];
-		inputFile = 1;
-	    } else if ((argv[i][1] == '<') && (argv[i][2] == 0)) {
-		input = argv[i+1];
-		inputFile = 0;
-	    } else {
-		continue;
+	    if ((inputId >= 0) && closeInput) {
+		close(inputId);
 	    }
-	} else if ((argv[i][0] == '>') && (argv[i][1] == 0)) {
-	    output = argv[i+1];
+	    inputId = -1;
+	    skip = 1;
+	    if (argv[i][1] == '<') {
+		input = argv[i]+2;
+		if (*input == 0) {
+		    input = argv[i+1];
+		    if (input == 0) {
+			Tcl_AppendResult(interp, "can't specify \"", argv[i],
+				"\" as last word in command", (char *) NULL);
+			goto error;
+		    }
+		    skip = 2;
+		}
+	    } else {
+		input = 0;
+		inputId = FileForRedirect(interp, argv[i]+1, 1, argv[i],
+			O_RDONLY, argv[i+1], &skip, &closeInput);
+		if (inputId < 0) {
+		    goto error;
+		}
+	    }
+	} else if (argv[i][0] == '>') {
+	    int append, useForStdErr, useForStdOut, mustClose, fd, atOk, flags;
+
+	    skip = atOk = 1;
+	    append = useForStdErr = 0;
+	    useForStdOut = 1;
+	    if (argv[i][1] == '>') {
+		p = argv[i] + 2;
+		append = 1;
+		atOk = 0;
+		flags = O_WRONLY|O_CREAT;
+	    } else {
+		p = argv[i] + 1;
+		flags = O_WRONLY|O_CREAT|O_TRUNC;
+	    }
+	    if (*p == '&') {
+		useForStdErr = 1;
+		p++;
+	    }
+	    fd = FileForRedirect(interp, p, atOk, argv[i], flags, argv[i+1],
+		    &skip, &mustClose);
+	    if (fd < 0) {
+		goto error;
+	    }
+	    if (append) {
+		lseek(fd, 0L, 2);
+	    }
+
+	    /*
+	     * Got the file descriptor.  Now use it for standard output,
+	     * standard error, or both, depending on the redirection.
+	     */
+
+	    if (useForStdOut) {
+		if ((outputId > 0) && closeOutput) {
+		    close(outputId);
+		}
+		outputId = fd;
+		closeOutput = mustClose;
+	    }
+	    if (useForStdErr) {
+		if ((errorId > 0) && closeError) {
+		    close(errorId);
+		}
+		errorId = fd;
+		closeError = (useForStdOut) ? 0 : mustClose;
+	    }
+	} else if ((argv[i][0] == '2') && (argv[i][1] == '>')) {
+	    int append, atOk, flags;
+
+	    if ((errorId > 0) && closeError) {
+		close(errorId);
+	    }
+	    skip = 1;
+	    p = argv[i] + 2;
+	    if (*p == '>') {
+		p++;
+		append = 1;
+		atOk = 0;
+		flags = O_WRONLY|O_CREAT;
+	    } else {
+		append = 0;
+		atOk = 1;
+		flags = O_WRONLY|O_CREAT|O_TRUNC;
+	    }
+	    errorId = FileForRedirect(interp, p, atOk, argv[i], flags,
+		    argv[i+1], &skip, &closeError);
+	    if (errorId < 0) {
+		goto error;
+	    }
+	    if (append) {
+		lseek(errorId, 0L, 2);
+	    }
 	} else {
 	    continue;
 	}
-	if (i >= (argc-1)) {
-	    Tcl_AppendResult(interp, "can't specify \"", argv[i],
-		    "\" as last word in command", (char *) NULL);
-	    return -1;
+	for (j = i+skip; j < argc; j++) {
+	    argv[j-skip] = argv[j];
 	}
-	for (j = i+2; j < argc; j++) {
-	    argv[j-2] = argv[j];
-	}
-	argc -= 2;
-	i--;			/* Process new arg from same position. */
+	argc -= skip;
+	i -= 1;			/* Process next arg from same position. */
     }
     if (argc == 0) {
 	interp->result =  "didn't specify command to execute";
 	return -1;
     }
 
-    /*
-     * Set up the redirected input source for the pipeline, if
-     * so requested.
-     */
-
-    if (input != NULL) {
-	if (!inputFile) {
-	    /*
-	     * Immediate data in command.  Create temporary file and
-	     * put data into file.
-	     */
-
-#	    define TMP_STDIN_NAME "/tmp/tcl.in.XXXXXX"
-	    char inName[sizeof(TMP_STDIN_NAME) + 1];
+    if (inputId < 0) {
+	if (input != NULL) {
+	    char inName[L_tmpnam];
 	    int length;
 
-	    strcpy(inName, TMP_STDIN_NAME);
-	    mktemp(inName);
+	    /*
+	     * The input for the first process is immediate data coming from
+	     * Tcl.  Create a temporary file for it and put the data into the
+	     * file.
+	     */
+
+	    tmpnam(inName);
 	    inputId = open(inName, O_RDWR|O_CREAT|O_TRUNC, 0600);
+	    closeInput = 1;
 	    if (inputId < 0) {
 		Tcl_AppendResult(interp,
 			"couldn't create input file for command: ",
-			Tcl_UnixError(interp), (char *) NULL);
+			Tcl_PosixError(interp), (char *) NULL);
 		goto error;
 	    }
 	    length = strlen(input);
-	    if (write(inputId, input, length) != length) {
+	    if (write(inputId, input, (size_t) length) != length) {
 		Tcl_AppendResult(interp,
 			"couldn't write file input for command: ",
-			Tcl_UnixError(interp), (char *) NULL);
+			Tcl_PosixError(interp), (char *) NULL);
 		goto error;
 	    }
 	    if ((lseek(inputId, 0L, 0) == -1) || (unlink(inName) == -1)) {
 		Tcl_AppendResult(interp,
 			"couldn't reset or remove input file for command: ",
-			Tcl_UnixError(interp), (char *) NULL);
+			Tcl_PosixError(interp), (char *) NULL);
 		goto error;
 	    }
-	} else {
+	} else if (inPipePtr != NULL) {
 	    /*
-	     * File redirection.  Just open the file.
+	     * The input for the first process in the pipeline is to
+	     * come from a pipe that can be written from this end.
 	     */
 
-	    inputId = open(input, O_RDONLY, 0);
-	    if (inputId < 0) {
+	    if (pipe(pipeIds) != 0) {
 		Tcl_AppendResult(interp,
-			"couldn't read file \"", input, "\": ",
-			Tcl_UnixError(interp), (char *) NULL);
+			"couldn't create input pipe for command: ",
+			Tcl_PosixError(interp), (char *) NULL);
 		goto error;
 	    }
+	    inputId = pipeIds[0];
+	    closeInput = 1;
+	    *inPipePtr = pipeIds[1];
+	    pipeIds[0] = pipeIds[1] = -1;
 	}
-    } else if (inPipePtr != NULL) {
-	if (pipe(pipeIds) != 0) {
-	    Tcl_AppendResult(interp,
-		    "couldn't create input pipe for command: ",
-		    Tcl_UnixError(interp), (char *) NULL);
-	    goto error;
-	}
-	inputId = pipeIds[0];
-	*inPipePtr = pipeIds[1];
-	pipeIds[0] = pipeIds[1] = -1;
     }
 
     /*
-     * Set up the redirected output sink for the pipeline from one
-     * of two places, if requested.
+     * Set up a pipe to receive output from the pipeline, if no other
+     * output sink has been specified.
      */
 
-    if (output != NULL) {
-	/*
-	 * Output is to go to a file.
-	 */
-
-	lastOutputId = open(output, O_WRONLY|O_CREAT|O_TRUNC, 0666);
-	if (lastOutputId < 0) {
-	    Tcl_AppendResult(interp,
-		    "couldn't write file \"", output, "\": ",
-		    Tcl_UnixError(interp), (char *) NULL);
-	    goto error;
-	}
-    } else if (outPipePtr != NULL) {
-	/*
-	 * Output is to go to a pipe.
-	 */
-
+    if ((outputId < 0) && (outPipePtr != NULL)) {
 	if (pipe(pipeIds) != 0) {
 	    Tcl_AppendResult(interp,
 		    "couldn't create output pipe: ",
-		    Tcl_UnixError(interp), (char *) NULL);
+		    Tcl_PosixError(interp), (char *) NULL);
 	    goto error;
 	}
-	lastOutputId = pipeIds[1];
+	outputId = pipeIds[1];
+	closeOutput = 1;
 	*outPipePtr = pipeIds[0];
 	pipeIds[0] = pipeIds[1] = -1;
     }
@@ -653,29 +579,53 @@ Tcl_CreatePipeline(interp, argc, argv, pidArrayPtr, inPipePtr,
      */
 
     if (errFilePtr != NULL) {
-#	define TMP_STDERR_NAME "/tmp/tcl.err.XXXXXX"
-	char errName[sizeof(TMP_STDERR_NAME) + 1];
+	char errName[L_tmpnam];
 
-	strcpy(errName, TMP_STDERR_NAME);
-	mktemp(errName);
-	errorId = open(errName, O_WRONLY|O_CREAT|O_TRUNC, 0600);
-	if (errorId < 0) {
+	tmpnam(errName);
+	*errFilePtr = open(errName, O_RDONLY|O_CREAT|O_TRUNC, 0600);
+	if (*errFilePtr < 0) {
 	    errFileError:
 	    Tcl_AppendResult(interp,
 		    "couldn't create error file for command: ",
-		    Tcl_UnixError(interp), (char *) NULL);
+		    Tcl_PosixError(interp), (char *) NULL);
 	    goto error;
 	}
-	*errFilePtr = open(errName, O_RDONLY, 0);
-	if (*errFilePtr < 0) {
-	    goto errFileError;
+	if (errorId < 0) {
+	    errorId = open(errName, O_WRONLY|O_CREAT|O_TRUNC, 0600);
+	    if (errorId < 0) {
+		goto errFileError;
+	    }
+	    closeError = 1;
 	}
 	if (unlink(errName) == -1) {
 	    Tcl_AppendResult(interp,
 		    "couldn't remove error file for command: ",
-		    Tcl_UnixError(interp), (char *) NULL);
+		    Tcl_PosixError(interp), (char *) NULL);
 	    goto error;
 	}
+    }
+
+    /*
+     * Find the largest file descriptor used so far, so that we can
+     * clean up all the extraneous file descriptors in the child
+     * processes we create.
+     */
+
+    maxFd = inputId;
+    if (outputId > maxFd) {
+	maxFd = outputId;
+    }
+    if (errorId > maxFd) {
+	maxFd = errorId;
+    }
+    if ((inPipePtr != NULL) && (*inPipePtr > maxFd)) {
+	maxFd = *inPipePtr;
+    }
+    if ((outPipePtr != NULL) && (*outPipePtr > maxFd)) {
+	maxFd = *outPipePtr;
+    }
+    if ((errFilePtr != NULL) && (*errFilePtr > maxFd)) {
+	maxFd = *errFilePtr;
     }
 
     /*
@@ -687,66 +637,86 @@ Tcl_CreatePipeline(interp, argc, argv, pidArrayPtr, inPipePtr,
     for (i = 0; i < numPids; i++) {
 	pidPtr[i] = -1;
     }
+    Tcl_ReapDetachedProcs();
     for (firstArg = 0; firstArg < argc; numPids++, firstArg = lastArg+1) {
+	int joinThisError;
+	int curOutputId;
+
+	joinThisError = 0;
 	for (lastArg = firstArg; lastArg < argc; lastArg++) {
-	    if ((argv[lastArg][0] == '|') && (argv[lastArg][1] == 0)) {
-		break;
+	    if (argv[lastArg][0] == '|') {
+		if (argv[lastArg][1] == 0) {
+		    break;
+		}
+		if ((argv[lastArg][1] == '&') && (argv[lastArg][2] == 0)) {
+		    joinThisError = 1;
+		    break;
+		}
 	    }
 	}
 	argv[lastArg] = NULL;
 	if (lastArg == argc) {
-	    outputId = lastOutputId;
+	    curOutputId = outputId;
 	} else {
 	    if (pipe(pipeIds) != 0) {
 		Tcl_AppendResult(interp, "couldn't create pipe: ",
-			Tcl_UnixError(interp), (char *) NULL);
+			Tcl_PosixError(interp), (char *) NULL);
 		goto error;
 	    }
-	    outputId = pipeIds[1];
+	    curOutputId = pipeIds[1];
+	    if (pipeIds[0] > maxFd) {
+		maxFd = pipeIds[0];
+	    }
+	    if (pipeIds[1] > maxFd) {
+		maxFd = pipeIds[1];
+	    }
 	}
-	execName = Tcl_TildeSubst(interp, argv[firstArg]);
-	pid = Tcl_Fork();
-	if (pid == -1) {
-	    Tcl_AppendResult(interp, "couldn't fork child process: ",
-		    Tcl_UnixError(interp), (char *) NULL);
-	    goto error;
-	}
+	execName = Tcl_TildeSubst(interp, argv[firstArg], &buffer);
+	pid = fork();
 	if (pid == 0) {
 	    char errSpace[200];
 
 	    if (((inputId != -1) && (dup2(inputId, 0) == -1))
-		    || ((outputId != -1) && (dup2(outputId, 1) == -1))
-		    || ((errorId != -1) && (dup2(errorId, 2) == -1))) {
+		    || ((curOutputId != -1) && (dup2(curOutputId, 1) == -1))
+		    || (joinThisError && (dup2(1, 2) == -1))
+		    || (!joinThisError && (errorId != -1)
+			    && (dup2(errorId, 2) == -1))) {
 		char *err;
 		err = "forked process couldn't set up input/output\n";
-		write(errorId < 0 ? 2 : errorId, err, strlen(err));
+		write(errorId < 0 ? 2 : errorId, err, (size_t) strlen(err));
 		_exit(1);
 	    }
-	    for (i = 3; (i <= outputId) || (i <= inputId) || (i <= errorId);
-		    i++) {
+	    for (i = 3; i <= maxFd; i++) {
 		close(i);
 	    }
+	    RestoreSignals();
 	    execvp(execName, &argv[firstArg]);
 	    sprintf(errSpace, "couldn't find \"%.150s\" to execute\n",
 		    argv[firstArg]);
-	    write(2, errSpace, strlen(errSpace));
+	    write(2, errSpace, (size_t) strlen(errSpace));
 	    _exit(1);
-	} else {
-	    pidPtr[numPids] = pid;
 	}
+	Tcl_DStringFree(&buffer);
+	if (pid == -1) {
+	    Tcl_AppendResult(interp, "couldn't fork child process: ",
+		    Tcl_PosixError(interp), (char *) NULL);
+	    goto error;
+	}
+	pidPtr[numPids] = pid;
 
 	/*
 	 * Close off our copies of file descriptors that were set up for
 	 * this child, then set up the input for the next child.
 	 */
 
-	if (inputId != -1) {
+	if ((inputId != -1) && closeInput) {
 	    close(inputId);
 	}
-	if (outputId != -1) {
-	    close(outputId);
+	if ((curOutputId != -1) && (curOutputId != outputId)) {
+	    close(curOutputId);
 	}
 	inputId = pipeIds[0];
+	closeInput = 1;
 	pipeIds[0] = pipeIds[1] = -1;
     }
     *pidArrayPtr = pidPtr;
@@ -756,13 +726,13 @@ Tcl_CreatePipeline(interp, argc, argv, pidArrayPtr, inPipePtr,
      */
 
 cleanup:
-    if (inputId != -1) {
+    if ((inputId != -1) && closeInput) {
 	close(inputId);
     }
-    if (lastOutputId != -1) {
-	close(lastOutputId);
+    if ((outputId != -1) && closeOutput) {
+	close(outputId);
     }
-    if (errorId != -1) {
+    if ((errorId != -1) && closeError) {
 	close(errorId);
     }
     return numPids;
@@ -807,7 +777,168 @@ cleanup:
 /*
  *----------------------------------------------------------------------
  *
- * Tcl_UnixError --
+ * FileForRedirect --
+ *
+ *	This procedure does much of the work of parsing redirection
+ *	operators.  It handles "@" if specified and allowed, and a file
+ *	name, and opens the file if necessary.
+ *
+ * Results:
+ *	The return value is the descriptor number for the file.  If an
+ *	error occurs then -1 is returned and an error message is left
+ *	in interp->result.  Several arguments are side-effected; see
+ *	the argument list below for details.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static int
+FileForRedirect(interp, spec, atOk, arg, flags, nextArg, skipPtr, closePtr)
+    Tcl_Interp *interp;			/* Intepreter to use for error
+					 * reporting. */
+    register char *spec;			/* Points to character just after
+					 * redirection character. */
+    int atOk;				/* Non-zero means '@' notation is
+					 * OK, zero means it isn't. */
+    char *arg;				/* Pointer to entire argument
+					 * containing spec:  used for error
+					 * reporting. */
+    int flags;				/* Flags to use for opening file. */
+    char *nextArg;			/* Next argument in argc/argv
+					 * array, if needed for file name.
+					 * May be NULL. */
+    int *skipPtr;			/* This value is incremented if
+					 * nextArg is used for redirection
+					 * spec. */
+    int *closePtr;			/* This value is set to 1 if the file
+					 * that's returned must be closed, 0
+					 * if it was specified with "@" so
+					 * it must be left open. */
+{
+    int writing = (flags & O_WRONLY);
+    FILE *f;
+    int fd;
+
+    if (atOk && (*spec == '@')) {
+	spec++;
+	if (*spec == 0) {
+	    spec = nextArg;
+	    if (spec == NULL) {
+		goto badLastArg;
+	    }
+	    *skipPtr += 1;
+	}
+	if (Tcl_GetOpenFile(interp, spec, writing, 1, &f) != TCL_OK) {
+	    return -1;
+	}
+	*closePtr = 0;
+	fd = fileno(f);
+    } else {
+	if (*spec == 0) {
+	    spec = nextArg;
+	    if (spec == NULL) {
+		goto badLastArg;
+	    }
+	    *skipPtr += 1;
+	}
+	fd = open(spec, flags, 0666);
+	if (fd < 0) {
+	    Tcl_AppendResult(interp, "couldn't ",
+		    (writing) ? "write" : "read", " file \"", spec, "\": ",
+		    Tcl_PosixError(interp), (char *) NULL);
+	    return -1;
+	}
+	*closePtr = 1;
+    }
+    return fd;
+
+    badLastArg:
+    Tcl_AppendResult(interp, "can't specify \"", arg,
+	    "\" as last word in command", (char *) NULL);
+    return -1;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * RestoreSignals --
+ *
+ *	This procedure is invoked in a forked child process just before
+ *	exec-ing a new program to restore all signals to their default
+ *	settings.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	Signal settings get changed.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void
+RestoreSignals()
+{
+#ifdef SIGABRT
+    signal(SIGABRT, SIG_DFL);
+#endif
+#ifdef SIGALRM
+    signal(SIGALRM, SIG_DFL);
+#endif
+#ifdef SIGFPE
+    signal(SIGFPE, SIG_DFL);
+#endif
+#ifdef SIGHUP
+    signal(SIGHUP, SIG_DFL);
+#endif
+#ifdef SIGILL
+    signal(SIGILL, SIG_DFL);
+#endif
+#ifdef SIGINT
+    signal(SIGINT, SIG_DFL);
+#endif
+#ifdef SIGPIPE
+    signal(SIGPIPE, SIG_DFL);
+#endif
+#ifdef SIGQUIT
+    signal(SIGQUIT, SIG_DFL);
+#endif
+#ifdef SIGSEGV
+    signal(SIGSEGV, SIG_DFL);
+#endif
+#ifdef SIGTERM
+    signal(SIGTERM, SIG_DFL);
+#endif
+#ifdef SIGUSR1
+    signal(SIGUSR1, SIG_DFL);
+#endif
+#ifdef SIGUSR2
+    signal(SIGUSR2, SIG_DFL);
+#endif
+#ifdef SIGCHLD
+    signal(SIGCHLD, SIG_DFL);
+#endif
+#ifdef SIGCONT
+    signal(SIGCONT, SIG_DFL);
+#endif
+#ifdef SIGTSTP
+    signal(SIGTSTP, SIG_DFL);
+#endif
+#ifdef SIGTTIN
+    signal(SIGTTIN, SIG_DFL);
+#endif
+#ifdef SIGTTOU
+    signal(SIGTTOU, SIG_DFL);
+#endif
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tcl_PosixError --
  *
  *	This procedure is typically called after UNIX kernel calls
  *	return errors.  It stores machine-readable information about
@@ -825,7 +956,7 @@ cleanup:
  */
 
 char *
-Tcl_UnixError(interp)
+Tcl_PosixError(interp)
     Tcl_Interp *interp;		/* Interpreter whose $errorCode variable
 				 * is to be changed. */
 {
@@ -833,14 +964,14 @@ Tcl_UnixError(interp)
 
     id = Tcl_ErrnoId();
     msg = strerror(errno);
-    Tcl_SetErrorCode(interp, "UNIX", id, msg, (char *) NULL);
+    Tcl_SetErrorCode(interp, "POSIX", id, msg, (char *) NULL);
     return msg;
 }
 
 /*
  *----------------------------------------------------------------------
  *
- * TclMakeFileTable --
+ * MakeFileTable --
  *
  *	Create or enlarge the file table for the interpreter, so that
  *	there is room for a given index.
@@ -856,8 +987,9 @@ Tcl_UnixError(interp)
  *----------------------------------------------------------------------
  */
 
-void
-TclMakeFileTable(iPtr, index)
+	/* ARGSUSED */
+static void
+MakeFileTable(iPtr, index)
     Interp *iPtr;		/* Interpreter whose table of files is
 				 * to be manipulated. */
     int index;			/* Make sure table is large enough to
@@ -868,51 +1000,48 @@ TclMakeFileTable(iPtr, index)
      * entries for standard files.
      */
 
-    if (iPtr->numFiles == 0) {
-	OpenFile *filePtr;
+    if (tclNumFiles == 0) {
+	OpenFile *oFilePtr;
 	int i;
 
 	if (index < 2) {
-	    iPtr->numFiles = 3;
+	    tclNumFiles = 3;
 	} else {
-	    iPtr->numFiles = index+1;
+	    tclNumFiles = index+1;
 	}
-	iPtr->filePtrArray = (OpenFile **) ckalloc((unsigned)
-		((iPtr->numFiles)*sizeof(OpenFile *)));
-	for (i = iPtr->numFiles-1; i >= 0; i--) {
-	    iPtr->filePtrArray[i] = NULL;
+	tclOpenFiles = (OpenFile **) ckalloc((unsigned)
+		((tclNumFiles)*sizeof(OpenFile *)));
+	for (i = tclNumFiles-1; i >= 0; i--) {
+	    tclOpenFiles[i] = NULL;
 	}
 
-	filePtr = (OpenFile *) ckalloc(sizeof(OpenFile));
-	filePtr->f = stdin;
-	filePtr->f2 = NULL;
-	filePtr->readable = 1;
-	filePtr->writable = 0;
-	filePtr->numPids = 0;
-	filePtr->pidPtr = NULL;
-	filePtr->errorId = -1;
-	iPtr->filePtrArray[0] = filePtr;
+	oFilePtr = (OpenFile *) ckalloc(sizeof(OpenFile));
+	oFilePtr->f = stdin;
+	oFilePtr->f2 = NULL;
+	oFilePtr->permissions = TCL_FILE_READABLE;
+	oFilePtr->numPids = 0;
+	oFilePtr->pidPtr = NULL;
+	oFilePtr->errorId = -1;
+	tclOpenFiles[0] = oFilePtr;
 
-	filePtr = (OpenFile *) ckalloc(sizeof(OpenFile));
-	filePtr->f = stdout;
-	filePtr->f2 = NULL;
-	filePtr->readable = 0;
-	filePtr->writable = 1;
-	filePtr->numPids = 0;
-	filePtr->pidPtr = NULL;
-	filePtr->errorId = -1;
-	iPtr->filePtrArray[1] = filePtr;
+	oFilePtr = (OpenFile *) ckalloc(sizeof(OpenFile));
+	oFilePtr->f = stdout;
+	oFilePtr->f2 = NULL;
+	oFilePtr->permissions = TCL_FILE_WRITABLE;
+	oFilePtr->numPids = 0;
+	oFilePtr->pidPtr = NULL;
+	oFilePtr->errorId = -1;
+	tclOpenFiles[1] = oFilePtr;
 
-	filePtr = (OpenFile *) ckalloc(sizeof(OpenFile));
-	filePtr->f = stderr;
-	filePtr->f2 = NULL;
-	filePtr->readable = 0;
-	filePtr->writable = 1;
-	filePtr->numPids = 0;
-	filePtr->pidPtr = NULL;
-	filePtr->errorId = -1;
-	iPtr->filePtrArray[2] = filePtr;
-    } else if (index >= iPtr->numFiles) {
+	oFilePtr = (OpenFile *) ckalloc(sizeof(OpenFile));
+	oFilePtr->f = stderr;
+	oFilePtr->f2 = NULL;
+	oFilePtr->permissions = TCL_FILE_WRITABLE;
+	oFilePtr->numPids = 0;
+	oFilePtr->pidPtr = NULL;
+	oFilePtr->errorId = -1;
+	tclOpenFiles[2] = oFilePtr;
+    } else if (index >= tclNumFiles) {
 	int newSize;
 	OpenFile **newPtrArray;
 	int i;
@@ -920,30 +1049,102 @@ TclMakeFileTable(iPtr, index)
 	newSize = index+1;
 	newPtrArray = (OpenFile **) ckalloc((unsigned)
 		((newSize)*sizeof(OpenFile *)));
-	memcpy((VOID *) newPtrArray, (VOID *) iPtr->filePtrArray,
-		iPtr->numFiles*sizeof(OpenFile *));
-	for (i = iPtr->numFiles; i < newSize; i++) {
+	memcpy((VOID *) newPtrArray, (VOID *) tclOpenFiles,
+		tclNumFiles*sizeof(OpenFile *));
+	for (i = tclNumFiles; i < newSize; i++) {
 	    newPtrArray[i] = NULL;
 	}
-	ckfree((char *) iPtr->filePtrArray);
-	iPtr->numFiles = newSize;
-	iPtr->filePtrArray = newPtrArray;
+	ckfree((char *) tclOpenFiles);
+	tclNumFiles = newSize;
+	tclOpenFiles = newPtrArray;
     }
 }
 
 /*
  *----------------------------------------------------------------------
  *
- * TclGetOpenFile --
+ * Tcl_EnterFile --
+ *
+ *	This procedure is used to enter an already-open file into the
+ *	file table for an interpreter so that the file can be read
+ *	and written with Tcl commands.
+ *
+ * Results:
+ *	There is no return value, but interp->result is set to
+ *	hold Tcl's id for the open file, such as "file4".
+ *
+ * Side effects:
+ *	"File" is added to the files accessible from interp.
+ *
+ *----------------------------------------------------------------------
+ */
+
+void
+Tcl_EnterFile(interp, file, permissions)
+    Tcl_Interp *interp;		/* Interpreter in which to make file
+				 * available. */
+    FILE *file;			/* File to make available in interp. */
+    int permissions;		/* Ops that may be done on file:  OR-ed
+				 * combinination of TCL_FILE_READABLE and
+				 * TCL_FILE_WRITABLE. */
+{
+    Interp *iPtr = (Interp *) interp;
+    int fd;
+    register OpenFile *oFilePtr;
+
+    fd = fileno(file);
+    if (fd >= tclNumFiles) {
+	MakeFileTable(iPtr, fd);
+    }
+    oFilePtr = tclOpenFiles[fd];
+
+    /*
+     * It's possible that there already appears to be a file open in
+     * the slot.  This could happen, for example, if the application
+     * closes a file behind our back so that we don't have a chance
+     * to clean up.  This is probably a bad idea, but if it happens
+     * just discard the information in the old record (hopefully the
+     * application is smart enough to have really cleaned everything
+     * up right).
+     */
+
+    if (oFilePtr == NULL) {
+	oFilePtr = (OpenFile *) ckalloc(sizeof(OpenFile));
+	tclOpenFiles[fd] = oFilePtr;
+    }
+    oFilePtr->f = file;
+    oFilePtr->f2 = NULL;
+    oFilePtr->permissions = permissions;
+    oFilePtr->numPids = 0;
+    oFilePtr->pidPtr = NULL;
+    oFilePtr->errorId = -1;
+    if (fd <= 2) {
+	if (fd == 0) {
+	    interp->result = "stdin";
+	} else if (fd == 1) {
+	    interp->result = "stdout";
+	} else {
+	    interp->result = "stderr";
+	}
+    } else {
+	sprintf(interp->result, "file%d", fd);
+    }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tcl_GetOpenFile --
  *
  *	Given a string identifier for an open file, find the corresponding
  *	open file structure, if there is one.
  *
  * Results:
  *	A standard Tcl return value.  If the open file is successfully
- *	located, *filePtrPtr is modified to point to its structure.
- *	If TCL_ERROR is returned then interp->result contains an error
- *	message.
+ *	located and meets any usage check requested by checkUsage, TCL_OK
+ *	is returned and *filePtr is modified to hold a pointer to its
+ *	FILE structure.  If an error occurs then TCL_ERROR is returned
+ *	and interp->result contains an error message.
  *
  * Side effects:
  *	None.
@@ -952,12 +1153,17 @@ TclMakeFileTable(iPtr, index)
  */
 
 int
-TclGetOpenFile(interp, string, filePtrPtr)
+Tcl_GetOpenFile(interp, string, forWriting, checkUsage, filePtr)
     Tcl_Interp *interp;		/* Interpreter in which to find file. */
     char *string;		/* String that identifies file. */
-    OpenFile **filePtrPtr;	/* Address of word in which to store pointer
-				 * to structure about open file. */
+    int forWriting;		/* 1 means the file is going to be used
+				 * for writing, 0 means for reading. */
+    int checkUsage;		/* 1 means verify that the file was opened
+				 * in a mode that allows the access specified
+				 * by "forWriting". */
+    FILE **filePtr;		/* Store pointer to FILE structure here. */
 {
+    OpenFile *oFilePtr;
     int fd = 0;			/* Initial value needed only to stop compiler
 				 * warnings. */
     Interp *iPtr = (Interp *) interp;
@@ -988,9 +1194,9 @@ TclGetOpenFile(interp, string, filePtrPtr)
 	return TCL_ERROR;
     }
 
-    if (fd >= iPtr->numFiles) {
-	if ((iPtr->numFiles == 0) && (fd <= 2)) {
-	    TclMakeFileTable(iPtr, fd);
+    if (fd >= tclNumFiles) {
+	if ((tclNumFiles == 0) && (fd <= 2)) {
+	    MakeFileTable(iPtr, fd);
 	} else {
 	    notOpen:
 	    Tcl_AppendResult(interp, "file \"", string, "\" isn't open",
@@ -998,9 +1204,182 @@ TclGetOpenFile(interp, string, filePtrPtr)
 	    return TCL_ERROR;
 	}
     }
-    if (iPtr->filePtrArray[fd] == NULL) {
+    oFilePtr = tclOpenFiles[fd];
+    if (oFilePtr == NULL) {
 	goto notOpen;
     }
-    *filePtrPtr = iPtr->filePtrArray[fd];
+    if (forWriting) {
+	if (checkUsage && !(oFilePtr->permissions & TCL_FILE_WRITABLE)) {
+	    Tcl_AppendResult(interp, "\"", string,
+		    "\" wasn't opened for writing", (char *) NULL);
+	    return TCL_ERROR;
+	}
+	if (oFilePtr->f2 != NULL) {
+	    *filePtr = oFilePtr->f2;
+	} else {
+	    *filePtr = oFilePtr->f;
+	}
+    } else {
+	if (checkUsage && !(oFilePtr->permissions & TCL_FILE_READABLE)) {
+	    Tcl_AppendResult(interp, "\"", string,
+		    "\" wasn't opened for reading", (char *) NULL);
+	    return TCL_ERROR;
+	}
+	*filePtr = oFilePtr->f;
+    }
     return TCL_OK;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tcl_FilePermissions --
+ *
+ *	Given a FILE * pointer, return the read/write permissions
+ *	associated with the open file.
+ *
+ * Results:
+ *	If file is currently open, the return value is an OR-ed
+ *	combination of TCL_FILE_READABLE and TCL_FILE_WRITABLE,
+ *	which indicates the operations permitted on the open file.
+ *	If the file isn't open then the return value is -1.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+int
+Tcl_FilePermissions(file)
+    FILE *file;			/* File for which permissions are wanted. */
+{
+    register OpenFile *oFilePtr;
+    int i, fd;
+
+    /*
+     * First try the entry in tclOpenFiles given by the file descriptor
+     * for the file.  If that doesn't match then search all the entries
+     * in tclOpenFiles.
+     */
+
+    if (file != NULL) {
+	fd = fileno(file);
+	if (fd < tclNumFiles) {
+	    oFilePtr = tclOpenFiles[fd];
+	    if ((oFilePtr != NULL) && (oFilePtr->f == file)) {
+		return oFilePtr->permissions;
+	    }
+	}
+    }
+    for (i = 0; i < tclNumFiles; i++) {
+	oFilePtr = tclOpenFiles[i];
+	if (oFilePtr == NULL) {
+	    continue;
+	}
+	if ((oFilePtr->f == file) || (oFilePtr->f2 == file)) {
+	    return oFilePtr->permissions;
+	}
+    }
+    return -1;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * TclOpen, etc. --
+ *
+ *	Below are a bunch of procedures that are used by Tcl instead
+ *	of system calls.  Each of the procedures executes the
+ *	corresponding system call and retries automatically
+ *	if the system call was interrupted by a signal.
+ *
+ * Results:
+ *	Whatever the system call would normally return.
+ *
+ * Side effects:
+ *	Whatever the system call would normally do.
+ *
+ * NOTE:
+ *	This should be the last page of this file, since it undefines
+ *	the macros that redirect read etc. to the procedures below.
+ *
+ *----------------------------------------------------------------------
+ */
+
+#undef open
+int
+TclOpen(path, oflag, mode)
+    char *path;
+    int oflag;
+    int mode;
+{
+    int result;
+    while (1) {
+	result = open(path, oflag, mode);
+	if ((result != -1) || (errno != EINTR)) {
+	    return result;
+	}
+    }
+}
+
+#undef read
+int
+TclRead(fd, buf, numBytes)
+    int fd;
+    VOID *buf;
+    size_t numBytes;
+{
+    int result;
+    while (1) {
+	result = read(fd, buf, (size_t) numBytes);
+	if ((result != -1) || (errno != EINTR)) {
+	    return result;
+	}
+    }
+}
+
+#undef waitpid
+extern pid_t waitpid _ANSI_ARGS_((pid_t pid, int *stat_loc, int options));
+
+/*
+ * Note:  the #ifdef below is needed to avoid compiler errors on systems
+ * that have ANSI compilers and also define pid_t to be short.  The
+ * problem is a complex one having to do with argument type promotion.
+ */
+
+#ifdef _USING_PROTOTYPES_
+int
+TclWaitpid _ANSI_ARGS_((pid_t pid, int *statPtr, int options))
+#else
+int
+TclWaitpid(pid, statPtr, options)
+    pid_t pid;
+    int *statPtr;
+    int options;
+#endif /* _USING_PROTOTYPES_ */
+{
+    int result;
+    while (1) {
+	result = waitpid(pid, statPtr, options);
+	if ((result != -1) || (errno != EINTR)) {
+	    return result;
+	}
+    }
+}
+
+#undef write
+int
+TclWrite(fd, buf, numBytes)
+    int fd;
+    VOID *buf;
+    size_t numBytes;
+{
+    int result;
+    while (1) {
+	result = write(fd, buf, (size_t) numBytes);
+	if ((result != -1) || (errno != EINTR)) {
+	    return result;
+	}
+    }
 }

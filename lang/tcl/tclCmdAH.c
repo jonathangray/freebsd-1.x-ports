@@ -5,15 +5,30 @@
  *	the Tcl built-in commands whose names begin with the letters
  *	A to H.
  *
- * Copyright 1987-1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1987-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
+
+#ifndef lint
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclCmdAH.c,v 1.2 1993/12/27 07:05:58 rich Exp $ SPRITE (Berkeley)";
+#endif
 
 #include "tclInt.h"
 
@@ -129,7 +144,7 @@ Tcl_CaseCmd(dummy, interp, argc, argv)
 	 */
 
 	for (p = caseArgv[i]; *p != 0; p++) {
-	    if (isspace(*p) || (*p == '\\')) {
+	    if (isspace(UCHAR(*p)) || (*p == '\\')) {
 		break;
 	    }
 	}
@@ -168,7 +183,7 @@ Tcl_CaseCmd(dummy, interp, argc, argv)
 
     match:
     if (body != -1) {
-	result = Tcl_Eval(interp, caseArgv[body], 0, (char **) NULL);
+	result = Tcl_Eval(interp, caseArgv[body]);
 	if (result == TCL_ERROR) {
 	    char msg[100];
 	    sprintf(msg, "\n    (\"%.50s\" arm line %d)", caseArgv[body-1],
@@ -223,7 +238,7 @@ Tcl_CatchCmd(dummy, interp, argc, argv)
 		argv[0], " command ?varName?\"", (char *) NULL);
 	return TCL_ERROR;
     }
-    result = Tcl_Eval(interp, argv[1], 0, (char **) NULL);
+    result = Tcl_Eval(interp, argv[1]);
     if (argc == 3) {
 	if (Tcl_SetVar(interp, argv[2], interp->result, 0) == NULL) {
 	    Tcl_SetResult(interp, "couldn't save command result in variable",
@@ -261,14 +276,10 @@ Tcl_ConcatCmd(dummy, interp, argc, argv)
     int argc;				/* Number of arguments. */
     char **argv;			/* Argument strings. */
 {
-    if (argc == 1) {
-	Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
-		" arg ?arg ...?\"", (char *) NULL);
-	return TCL_ERROR;
+    if (argc >= 2) {
+	interp->result = Tcl_Concat(argc-1, argv+1);
+	interp->freeProc = (Tcl_FreeProc *) free;
     }
-
-    interp->result = Tcl_Concat(argc-1, argv+1);
-    interp->freeProc = (Tcl_FreeProc *) free;
     return TCL_OK;
 }
 
@@ -384,7 +395,7 @@ Tcl_EvalCmd(dummy, interp, argc, argv)
 	return TCL_ERROR;
     }
     if (argc == 2) {
-	result = Tcl_Eval(interp, argv[1], 0, (char **) NULL);
+	result = Tcl_Eval(interp, argv[1]);
     } else {
     
 	/*
@@ -393,7 +404,7 @@ Tcl_EvalCmd(dummy, interp, argc, argv)
 	 */
     
 	cmd = Tcl_Concat(argc-1, argv+1);
-	result = Tcl_Eval(interp, cmd, 0, (char **) NULL);
+	result = Tcl_Eval(interp, cmd);
 	ckfree(cmd);
     }
     if (result == TCL_ERROR) {
@@ -429,13 +440,27 @@ Tcl_ExprCmd(dummy, interp, argc, argv)
     int argc;				/* Number of arguments. */
     char **argv;			/* Argument strings. */
 {
-    if (argc != 2) {
+    Tcl_DString buffer;
+    int i, result;
+
+    if (argc < 2) {
 	Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
-		" expression\"", (char *) NULL);
+		" arg ?arg ...?\"", (char *) NULL);
 	return TCL_ERROR;
     }
 
-    return Tcl_ExprString(interp, argv[1]);
+    if (argc == 2) {
+	return Tcl_ExprString(interp, argv[1]);
+    }
+    Tcl_DStringInit(&buffer);
+    Tcl_DStringAppend(&buffer, argv[1], -1);
+    for (i = 2; i < argc; i++) {
+	Tcl_DStringAppend(&buffer, " ", 1);
+	Tcl_DStringAppend(&buffer, argv[i], -1);
+    }
+    result = Tcl_ExprString(interp, buffer.string);
+    Tcl_DStringFree(&buffer);
+    return result;
 }
 
 /*
@@ -471,7 +496,7 @@ Tcl_ForCmd(dummy, interp, argc, argv)
 	return TCL_ERROR;
     }
 
-    result = Tcl_Eval(interp, argv[1], 0, (char **) NULL);
+    result = Tcl_Eval(interp, argv[1]);
     if (result != TCL_OK) {
 	if (result == TCL_ERROR) {
 	    Tcl_AddErrorInfo(interp, "\n    (\"for\" initial command)");
@@ -486,10 +511,8 @@ Tcl_ForCmd(dummy, interp, argc, argv)
 	if (!value) {
 	    break;
 	}
-	result = Tcl_Eval(interp, argv[4], 0, (char **) NULL);
-	if (result == TCL_CONTINUE) {
-	    result = TCL_OK;
-	} else if (result != TCL_OK) {
+	result = Tcl_Eval(interp, argv[4]);
+	if ((result != TCL_OK) && (result != TCL_CONTINUE)) {
 	    if (result == TCL_ERROR) {
 		char msg[60];
 		sprintf(msg, "\n    (\"for\" body line %d)", interp->errorLine);
@@ -497,7 +520,7 @@ Tcl_ForCmd(dummy, interp, argc, argv)
 	    }
 	    break;
 	}
-	result = Tcl_Eval(interp, argv[3], 0, (char **) NULL);
+	result = Tcl_Eval(interp, argv[3]);
 	if (result == TCL_BREAK) {
 	    break;
 	} else if (result != TCL_OK) {
@@ -566,7 +589,7 @@ Tcl_ForeachCmd(dummy, interp, argc, argv)
 	    break;
 	}
 
-	result = Tcl_Eval(interp, argv[3], 0, (char **) NULL);
+	result = Tcl_Eval(interp, argv[3]);
 	if (result != TCL_OK) {
 	    if (result == TCL_CONTINUE) {
 		result = TCL_OK;
@@ -642,8 +665,14 @@ Tcl_FormatCmd(dummy, interp, argc, argv)
 				 * in dst (not including null terminator. */
     int noPercent;		/* Special case for speed:  indicates there's
 				 * no field specifier, just a string to copy. */
-    char **curArg;		/* Remainder of argv array. */
+    int argIndex;		/* Index of argument to substitute next. */
+    int gotXpg = 0;		/* Non-zero means that an XPG3 %n$-style
+				 * specifier has been seen. */
+    int gotSequential = 0;	/* Non-zero means that a regular sequential
+				 * (non-XPG3) conversion specifier has been
+				 * seen. */
     int useShort;		/* Value to be printed is short (half word). */
+    char *end;			/* Used to locate end of numerical fields. */
 
     /*
      * This procedure is a bit nasty.  The goal is to use sprintf to
@@ -663,8 +692,7 @@ Tcl_FormatCmd(dummy, interp, argc, argv)
 		" formatString ?arg arg ...?\"", (char *) NULL);
 	return TCL_ERROR;
     }
-    curArg = argv+2;
-    argc -= 2;
+    argIndex = 2;
     for (format = argv[1]; *format != 0; ) {
 	register char *newPtr = newFormat;
 
@@ -672,26 +700,16 @@ Tcl_FormatCmd(dummy, interp, argc, argv)
 
 	/*
 	 * Get rid of any characters before the next field specifier.
-	 * Collapse backslash sequences found along the way.
 	 */
 
 	if (*format != '%') {
 	    register char *p;
-	    int bsSize;
 
 	    oneWordValue = p = format;
 	    while ((*format != '%') && (*format != 0)) {
-		if (*format == '\\') {
-		    *p = Tcl_Backslash(format, &bsSize);
-		    if (*p != 0) {
-			p++;
-		    }
-		    format += bsSize;
-		} else {
-		    *p = *format;
-		    p++;
-		    format++;
-		}
+		*p = *format;
+		p++;
+		format++;
 	    }
 	    size = p - oneWordValue;
 	    noPercent = 1;
@@ -715,26 +733,55 @@ Tcl_FormatCmd(dummy, interp, argc, argv)
 	*newPtr = '%';
 	newPtr++;
 	format++;
+	if (isdigit(UCHAR(*format))) {
+	    int tmp;
+
+	    /*
+	     * Check for an XPG3-style %n$ specification.  Note: there
+	     * must not be a mixture of XPG3 specs and non-XPG3 specs
+	     * in the same format string.
+	     */
+
+	    tmp = strtoul(format, &end, 10);
+	    if (*end != '$') {
+		goto notXpg;
+	    }
+	    format = end+1;
+	    gotXpg = 1;
+	    if (gotSequential) {
+		goto mixedXPG;
+	    }
+	    argIndex = tmp+1;
+	    if ((argIndex < 2) || (argIndex >= argc)) {
+		goto badIndex;
+	    }
+	    goto xpgCheckDone;
+	}
+
+	notXpg:
+	gotSequential = 1;
+	if (gotXpg) {
+	    goto mixedXPG;
+	}
+
+	xpgCheckDone:
 	while ((*format == '-') || (*format == '#') || (*format == '0')
 		|| (*format == ' ') || (*format == '+')) {
 	    *newPtr = *format;
 	    newPtr++;
 	    format++;
 	}
-	if (isdigit(*format)) {
-	    width = atoi(format);
-	    do {
-		format++;
-	    } while (isdigit(*format));
+	if (isdigit(UCHAR(*format))) {
+	    width = strtoul(format, &end, 10);
+	    format = end;
 	} else if (*format == '*') {
-	    if (argc <= 0) {
-		goto notEnoughArgs;
+	    if (argIndex >= argc) {
+		goto badIndex;
 	    }
-	    if (Tcl_GetInt(interp, *curArg, &width) != TCL_OK) {
+	    if (Tcl_GetInt(interp, argv[argIndex], &width) != TCL_OK) {
 		goto fmtError;
 	    }
-	    argc--;
-	    curArg++;
+	    argIndex++;
 	    format++;
 	}
 	if (width != 0) {
@@ -748,20 +795,17 @@ Tcl_FormatCmd(dummy, interp, argc, argv)
 	    newPtr++;
 	    format++;
 	}
-	if (isdigit(*format)) {
-	    precision = atoi(format);
-	    do {
-		format++;
-	    } while (isdigit(*format));
+	if (isdigit(UCHAR(*format))) {
+	    precision = strtoul(format, &end, 10);
+	    format = end;
 	} else if (*format == '*') {
-	    if (argc <= 0) {
-		goto notEnoughArgs;
+	    if (argIndex >= argc) {
+		goto badIndex;
 	    }
-	    if (Tcl_GetInt(interp, *curArg, &precision) != TCL_OK) {
+	    if (Tcl_GetInt(interp, argv[argIndex], &precision) != TCL_OK) {
 		goto fmtError;
 	    }
-	    argc--;
-	    curArg++;
+	    argIndex++;
 	    format++;
 	}
 	if (precision != 0) {
@@ -781,51 +825,41 @@ Tcl_FormatCmd(dummy, interp, argc, argv)
 	*newPtr = *format;
 	newPtr++;
 	*newPtr = 0;
-	if (argc <= 0) {
-	    goto notEnoughArgs;
+	if (argIndex >= argc) {
+	    goto badIndex;
 	}
 	switch (*format) {
-	    case 'D':
-	    case 'O':
-	    case 'U':
-		if (!useShort) {
-		    newPtr++;
-		} else {
-		    useShort = 0;
-		}
-		newPtr[-1] = tolower(*format);
-		newPtr[-2] = 'l';
-		*newPtr = 0;
+	    case 'i':
+		newPtr[-1] = 'd';
 	    case 'd':
 	    case 'o':
 	    case 'u':
 	    case 'x':
 	    case 'X':
-		if (Tcl_GetInt(interp, *curArg, (int *) &oneWordValue)
+		if (Tcl_GetInt(interp, argv[argIndex], (int *) &oneWordValue)
 			!= TCL_OK) {
 		    goto fmtError;
 		}
 		size = 40;
 		break;
 	    case 's':
-		oneWordValue = *curArg;
-		size = strlen(*curArg);
+		oneWordValue = argv[argIndex];
+		size = strlen(argv[argIndex]);
 		break;
 	    case 'c':
-		if (Tcl_GetInt(interp, *curArg, (int *) &oneWordValue)
+		if (Tcl_GetInt(interp, argv[argIndex], (int *) &oneWordValue)
 			!= TCL_OK) {
 		    goto fmtError;
 		}
 		size = 1;
 		break;
-	    case 'F':
-		newPtr[-1] = tolower(newPtr[-1]);
 	    case 'e':
 	    case 'E':
 	    case 'f':
 	    case 'g':
 	    case 'G':
-		if (Tcl_GetDouble(interp, *curArg, &twoWordValue) != TCL_OK) {
+		if (Tcl_GetDouble(interp, argv[argIndex], &twoWordValue)
+			!= TCL_OK) {
 		    goto fmtError;
 		}
 		useTwoWords = 1;
@@ -842,8 +876,7 @@ Tcl_FormatCmd(dummy, interp, argc, argv)
 		sprintf(interp->result, "bad field specifier \"%c\"", *format);
 		goto fmtError;
 	}
-	argc--;
-	curArg++;
+	argIndex++;
 	format++;
 
 	/*
@@ -900,8 +933,17 @@ Tcl_FormatCmd(dummy, interp, argc, argv)
     }
     return TCL_OK;
 
-    notEnoughArgs:
-    interp->result = "not enough arguments for all format specifiers";
+    mixedXPG:
+    interp->result = "cannot mix \"%\" and \"%n$\" conversion specifiers";
+    goto fmtError;
+
+    badIndex:
+    if (gotXpg) {
+	interp->result = "\"%n$\" argument index out of range";
+    } else {
+	interp->result = "not enough arguments for all format specifiers";
+    }
+
     fmtError:
     if (dstSpace != TCL_RESULT_SIZE) {
 	ckfree(dst);

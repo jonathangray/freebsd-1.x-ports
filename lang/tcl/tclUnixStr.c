@@ -5,15 +5,30 @@
  *	corresponding to various UNIX-related codes, such
  *	as errno and signals.
  *
- * Copyright 1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that this copyright
- * notice appears in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1991-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
+
+#ifndef lint
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclUnixStr.c,v 1.2 1993/12/27 07:06:21 rich Exp $ SPRITE (Berkeley)";
+#endif /* not lint */
 
 #include "tclInt.h"
 #include "tclUnix.h"
@@ -298,7 +313,7 @@ Tcl_ErrnoId()
 #ifdef ENOSR
 	case ENOSR: return "ENOSR";
 #endif
-#ifdef ENOSTR
+#if defined(ENOSTR) && (!defined(ENOTTY) || (ENOTTY != ENOSTR))
 	case ENOSTR: return "ENOSTR";
 #endif
 #ifdef ENOSYM
@@ -565,10 +580,10 @@ Tcl_SignalId(sig)
 #if defined(SIGURG) && (!defined(SIGIO) || (SIGURG != SIGIO))
 	case SIGURG: return "SIGURG";
 #endif
-#ifdef SIGUSR1
+#if defined(SIGUSR1) && (!defined(SIGIO) || (SIGUSR1 != SIGIO))
 	case SIGUSR1: return "SIGUSR1";
 #endif
-#ifdef SIGUSR2
+#if defined(SIGUSR2) && (!defined(SIGURG) || (SIGUSR2 != SIGURG))
 	case SIGUSR2: return "SIGUSR2";
 #endif
 #ifdef SIGVTALRM
@@ -697,10 +712,10 @@ Tcl_SignalMsg(sig)
 #if defined(SIGURG) && (!defined(SIGIO) || (SIGURG != SIGIO))
 	case SIGURG: return "urgent I/O condition";
 #endif
-#ifdef SIGUSR1
+#if defined(SIGUSR1) && (!defined(SIGIO) || (SIGUSR1 != SIGIO))
 	case SIGUSR1: return "user-defined signal 1";
 #endif
-#ifdef SIGUSR2
+#if defined(SIGUSR2) && (!defined(SIGURG) || (SIGUSR2 != SIGURG))
 	case SIGUSR2: return "user-defined signal 2";
 #endif
 #ifdef SIGVTALRM

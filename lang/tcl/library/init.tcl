@@ -3,17 +3,30 @@
 # Default system startup file for Tcl-based applications.  Defines
 # "unknown" procedure and auto-load facilities.
 #
-# $Header: /a/cvs/386BSD/ports/lang/tcl/library/init.tcl,v 1.1 1993/08/09 10:57:40 alm Exp $ SPRITE (Berkeley)
+# $Header: /a/cvs/386BSD/ports/lang/tcl/library/init.tcl,v 1.2 1993/12/27 07:08:02 rich Exp $ SPRITE (Berkeley)
 #
-# Copyright 1991-1992 Regents of the University of California
-# Permission to use, copy, modify, and distribute this
-# software and its documentation for any purpose and without
-# fee is hereby granted, provided that this copyright
-# notice appears in all copies.  The University of California
-# makes no representations about the suitability of this
-# software for any purpose.  It is provided "as is" without
-# express or implied warranty.
+# Copyright (c) 1991-1993 The Regents of the University of California.
+# All rights reserved.
 #
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the
+# above copyright notice and the following two paragraphs appear in
+# all copies of this software.
+#
+# IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+# OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+# CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+# AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+# ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+# PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+#
+
+set auto_path [info library]
 
 # unknown:
 # Invoked when a Tcl command is invoked that doesn't exist in the
@@ -31,7 +44,7 @@
 #		command.  If so, invoke the command.
 
 proc unknown args {
-    global auto_noexec auto_noload env unknown_pending;
+    global auto_noexec auto_noload env unknown_pending tcl_interactive;
 
     set name [lindex $args 0]
     if ![info exists auto_noload] {
@@ -40,35 +53,38 @@ proc unknown args {
 	#
 	if [info exists unknown_pending($name)] {
 	    unset unknown_pending($name)
-	    if ![array size unknown_pending] {
+	    if {[array size unknown_pending] == 0} {
 		unset unknown_pending
 	    }
-	    error "self-referential recursion in \"unknown\" for command \"$name\"";
+	    return -code error "self-referential recursion in \"unknown\" for command \"$name\"";
 	}
 	set unknown_pending($name) pending;
-	set ret [auto_load $name];
+	set ret [catch {auto_load $name} msg]
 	unset unknown_pending($name);
+	if {$ret != 0} {
+	    return -code $ret "error while autoloading \"$name\": $msg"
+	}
 	if ![array size unknown_pending] {
 	    unset unknown_pending
 	}
-	if $ret {
+	if $msg {
 	    return [uplevel $args]
 	}
     }
-    if ![info exists auto_noexec] {
-	if [auto_execok $name] {
-	    return [uplevel exec $args]
+    if {([info level] == 1) && ([info script] == "") && $tcl_interactive} {
+	if ![info exists auto_noexec] {
+	    if [auto_execok $name] {
+		return [uplevel exec >&@stdout <@stdin $args]
+	    }
 	}
-    }
-    if {([info level] == 1) && ([info script] == "")} {
 	if {$name == "!!"} {
 	    return [uplevel {history redo}]
 	}
 	if [regexp {^!(.+)$} $name dummy event] {
-	    return [uplevel history redo $event]
+	    return [uplevel [list history redo $event]]
 	}
-	if [regexp {^\^(.*)\^(.*)^?$} $name dummy old new] {
-	    return [uplevel history substitute $old $new]
+	if [regexp {^\^([^^]*)\^([^^]*)\^?$} $name dummy old new] {
+	    return [uplevel [list history substitute $old $new]]
 	}
 	set cmds [info commands $name*]
 	if {[llength $cmds] == 1} {
@@ -76,13 +92,14 @@ proc unknown args {
 	}
 	if {[llength $cmds] != 0} {
 	    if {$name == ""} {
-		error "empty command name \"\""
+		return -code error "empty command name \"\""
 	    } else {
-		error "ambiguous command name \"$name\": [lsort $cmds]"
+		return -code error \
+			"ambiguous command name \"$name\": [lsort $cmds]"
 	    }
 	}
     }
-    error "invalid command name \"$name\""
+    return -code error "invalid command name \"$name\""
 }
 
 # auto_load:
@@ -92,10 +109,10 @@ proc unknown args {
 # loaded the procedure, 0 otherwise.
 
 proc auto_load cmd {
-    global auto_index auto_oldpath auto_path env
+    global auto_index auto_oldpath auto_path env errorInfo errorCode
 
     if [info exists auto_index($cmd)] {
-	uplevel #0 source $auto_index($cmd)
+	uplevel #0 $auto_index($cmd)
 	return 1
     }
     if [catch {set path $auto_path}] {
@@ -112,31 +129,41 @@ proc auto_load cmd {
     }
     set auto_oldpath $path
     catch {unset auto_index}
-    foreach dir $path {
+    for {set i [expr [llength $path] - 1]} {$i >= 0} {incr i -1} {
+	set dir [lindex $path $i]
 	set f ""
-	catch {
-	    set f [open $dir/tclIndex]
-	    if {[gets $f] != "# Tcl autoload index file: each line identifies a Tcl"} {
-		puts stdout "Bad id line in file $dir/tclIndex"
-		error done
-	    }
-	    while {[gets $f line] >= 0} {
-		if {([string index $line 0] == "#") || ([llength $line] != 2)} {
-		    continue
-		}
-		set name [lindex $line 0]
-		if {![info exists auto_index($name)]} {
-		    set auto_index($name) $dir/[lindex $line 1]
-		}
-	    }
+	if [catch {set f [open $dir/tclIndex]}] {
+	    continue
 	}
+	set error [catch {
+	    set id [gets $f]
+	    if {$id == "# Tcl autoload index file, version 2.0"} {
+		eval [read $f]
+	    } elseif {$id == "# Tcl autoload index file: each line identifies a Tcl"} {
+		while {[gets $f line] >= 0} {
+		    if {([string index $line 0] == "#")
+			    || ([llength $line] != 2)} {
+			continue
+		    }
+		    set name [lindex $line 0]
+		    set auto_index($name) "source $dir/[lindex $line 1]"
+		}
+	    } else {
+		error "$dir/tclIndex isn't a proper Tcl index file"
+	    }
+	} msg]
 	if {$f != ""} {
 	    close $f
 	}
+	if $error {
+	    error $msg $errorInfo $errorCode
+	}
     }
     if [info exists auto_index($cmd)] {
-	uplevel #0 source $auto_index($cmd)
-	return 1
+	uplevel #0 $auto_index($cmd)
+	if {[info commands $cmd] != ""} {
+	    return 1
+	}
     }
     return 0
 }
@@ -153,6 +180,12 @@ proc auto_execok name {
 	return $auto_execs($name)
     }
     set auto_execs($name) 0
+    if {[string first / $name] >= 0} {
+	if {[file executable $name] && ![file isdirectory $name]} {
+	    set auto_execs($name) 1
+	}
+	return $auto_execs($name)
+    }
     foreach dir [split $env(PATH) :] {
 	if {[file executable $dir/$name] && ![file isdirectory $dir/$name]} {
 	    set auto_execs($name) 1
@@ -182,27 +215,31 @@ proc auto_reset {} {
 }
 
 # auto_mkindex:
-# Regenerate a tclIndex file from Tcl source files.  Takes two arguments:
+# Regenerate a tclIndex file from Tcl source files.  Takes as argument
 # the name of the directory in which the tclIndex file is to be placed,
-# and a glob pattern to use in that directory to locate all of the relevant
-# files.
+# floowed by any number of glob patterns to use in that directory to
+# locate all of the relevant files.
 
-proc auto_mkindex {dir files} {
+proc auto_mkindex {dir args} {
     global errorCode errorInfo
     set oldDir [pwd]
     cd $dir
     set dir [pwd]
-    append index "# Tcl autoload index file: each line identifies a Tcl\n"
-    append index "# procedure and the file where that procedure is\n"
-    append index "# defined.  Generated by the \"auto_mkindex\" command.\n"
-    append index "\n"
-    foreach file [glob $files] {
+    append index "# Tcl autoload index file, version 2.0\n"
+    append index "# This file is generated by the \"auto_mkindex\" command\n"
+    append index "# and sourced to set up indexing information for one or\n"
+    append index "# more commands.  Typically each line is a command that\n"
+    append index "# sets an element in the auto_index array, where the\n"
+    append index "# element name is the name of a command and the value is\n"
+    append index "# a script that loads the command.\n\n"
+    foreach file [eval glob $args] {
 	set f ""
 	set error [catch {
 	    set f [open $file]
 	    while {[gets $f line] >= 0} {
 		if [regexp {^proc[ 	]+([^ 	]*)} $line match procName] {
-		    append index "[list $procName $file]\n"
+		    append index "set [list auto_index($procName)]"
+		    append index " \"source \$dir/$file\"\n"
 		}
 	    }
 	    close $f
@@ -210,7 +247,7 @@ proc auto_mkindex {dir files} {
 	if $error {
 	    set code $errorCode
 	    set info $errorInfo
-	    catch [close $f]
+	    catch {close $f}
 	    cd $oldDir
 	    error $msg $info $code
 	}

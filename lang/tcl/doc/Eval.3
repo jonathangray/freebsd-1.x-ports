@@ -1,14 +1,27 @@
 '\"
-'\" Copyright 1989 Regents of the University of California
-'\" Permission to use, copy, modify, and distribute this
-'\" documentation for any purpose and without fee is hereby
-'\" granted, provided that this notice appears in all copies.
-'\" The University of California makes no representations about
-'\" the suitability of this material for any purpose.  It is
-'\" provided "as is" without express or implied warranty.
+'\" Copyright (c) 1989-1993 The Regents of the University of California.
+'\" All rights reserved.
+'\"
+'\" Permission is hereby granted, without written agreement and without
+'\" license or royalty fees, to use, copy, modify, and distribute this
+'\" documentation for any purpose, provided that the above copyright
+'\" notice and the following two paragraphs appear in all copies.
+'\"
+'\" IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY
+'\" FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+'\" ARISING OUT OF THE USE OF THIS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+'\" CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+'\"
+'\" THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+'\" INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+'\" AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+'\" ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+'\" PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+'\" 
+'\" $Header: /a/cvs/386BSD/ports/lang/tcl/doc/Eval.3,v 1.2 1993/12/27 07:07:44 rich Exp $ SPRITE (Berkeley)
 '\" 
 .so man.macros
-.HS Tcl_Eval tcl
+.HS Tcl_Eval tclc 7.0
 .BS
 .SH NAME
 Tcl_Eval, Tcl_VarEval, Tcl_EvalFile, Tcl_GlobalEval \- execute Tcl commands
@@ -17,7 +30,9 @@ Tcl_Eval, Tcl_VarEval, Tcl_EvalFile, Tcl_GlobalEval \- execute Tcl commands
 \fB#include <tcl.h>\fR
 .sp
 int
-\fBTcl_Eval\fR(\fIinterp, cmd, flags, termPtr\fR)
+.VS
+\fBTcl_Eval\fR(\fIinterp, cmd\fR)
+.VE
 .sp
 int
 \fBTcl_VarEval\fR(\fIinterp, string, string, ... \fB(char *) NULL\fR)
@@ -25,10 +40,8 @@ int
 int
 \fBTcl_EvalFile\fR(\fIinterp, fileName\fR)
 .sp
-.VS
 int
 \fBTcl_GlobalEval\fR(\fIinterp, cmd\fR)
-.VE
 .SH ARGUMENTS
 .AS Tcl_Interp **termPtr;
 .AP Tcl_Interp *interp in
@@ -36,22 +49,7 @@ Interpreter in which to execute the command.  String result will be
 stored in \fIinterp->result\fR.
 .AP char *cmd in
 Command (or sequence of commands) to execute.  Must be in writable
-memory (Tcl_Eval makes temporary modifications to the command).
-.AP int flags in
-Either \fBTCL_BRACKET_TERM\fR or 0.
-If 0, then \fBTcl_Eval\fR will process commands from \fIcmd\fR until
-it reaches the null character at the end of the string.
-If \fBTCL_BRACKET_TERM\fR,
-then \fBTcl_Eval\fR will process comands from \fIcmd\fR until either it
-reaches a null character or it encounters a close bracket that isn't
-backslashed or enclosed in braces, at which point it will return.
-Under normal conditions, \fIflags\fR should be 0.
-.AP char **termPtr out
-If \fItermPtr\fR is non-NULL, \fBTcl_Eval\fR fills in *\fItermPtr\fR with
-the address of the character just after the last one in the last command
-successfully executed (normally the null character at the end of \fIcmd\fR).
-If an error occurs in the first command in \fIcmd\fR, then \fI*termPtr\fR
-will be set to \fIcmd\fR.
+memory (\fBTcl_Eval\fR makes temporary modifications to the command).
 .AP char *string in
 String forming part of Tcl command.
 .AP char *fileName in
@@ -63,8 +61,9 @@ Name of file containing Tcl command string.
 All four of these procedures execute Tcl commands.
 \fBTcl_Eval\fR is the core procedure:  it parses commands
 from \fIcmd\fR and executes them in
-order until either an error occurs or \fBTcl_Eval\fR reaches a terminating
-character (']' or '\e0', depending on the value of \fIflags\fR).
+.VS
+order until either an error occurs or it reaches the end of the string.
+.VE
 The return value from \fBTcl_Eval\fR is one
 of the Tcl return codes \fBTCL_OK\fR, \fBTCL_ERROR\fR, \fBTCL_RETURN\fR, \fBTCL_BREAK\fR, or
 \fBTCL_CONTINUE\fR, and \fIinterp->result\fR will point to
@@ -88,13 +87,11 @@ file.
 If the file couldn't be read then a Tcl error is returned to describe
 why the file couldn't be read.
 .PP
-.VS
 \fBTcl_GlobalEval\fR is similar to \fBTcl_Eval\fR except that it
 processes the command at global level.
 This means that the variable context for the command consists of
 global variables only (it ignores any Tcl procedure that is active).
 This produces an effect similar to the Tcl command ``\fBuplevel 0\fR''.
-.VE
 .PP
 During the processing of a Tcl command it is legal to make nested
 calls to evaluate other commands (this is how conditionals, loops,

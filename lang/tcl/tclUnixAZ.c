@@ -7,34 +7,61 @@
  *	in this file is based on earlier versions contributed
  *	by Karl Lehenbauer, Mark Diekhans and Peter da Silva.
  *
- * Copyright 1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that this copyright
- * notice appears in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1991-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
+
+#ifndef lint
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclUnixAZ.c,v 1.2 1993/12/27 07:06:19 rich Exp $ SPRITE (Berkeley)";
+#endif /* not lint */
 
 #include "tclInt.h"
 #include "tclUnix.h"
 
 /*
  * The variable below caches the name of the current working directory
- * in order to avoid repeated calls to getwd.  The string is malloc-ed.
+ * in order to avoid repeated calls to getcwd.  The string is malloc-ed.
  * NULL means the cache needs to be refreshed.
  */
 
 static char *currentDir =  NULL;
 
 /*
+ * If the system doesn't define the EWOULDBLOCK errno, just #define it
+ * to a bogus value that will never occur.
+ */
+
+#ifndef EWOULDBLOCK
+#define EWOULDBLOCK -1901
+#endif
+
+/*
  * Prototypes for local procedures defined in this file:
  */
 
 static int		CleanupChildren _ANSI_ARGS_((Tcl_Interp *interp,
-			    int numPids, int *pidPtr, int errorId));
+			    int numPids, int *pidPtr, int errorId,
+			    int keepNewline));
 static char *		GetFileType _ANSI_ARGS_((int mode));
+static char *		GetOpenMode _ANSI_ARGS_((Tcl_Interp *interp,
+			    char *string, int *modePtr));
 static int		StoreStatData _ANSI_ARGS_((Tcl_Interp *interp,
 			    char *varName, struct stat *statPtr));
 
@@ -64,6 +91,8 @@ Tcl_CdCmd(dummy, interp, argc, argv)
     char **argv;			/* Argument strings. */
 {
     char *dirName;
+    Tcl_DString buffer;
+    int result;
 
     if (argc > 2) {
 	Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
@@ -76,7 +105,7 @@ Tcl_CdCmd(dummy, interp, argc, argv)
     } else {
 	dirName = "~";
     }
-    dirName = Tcl_TildeSubst(interp, dirName);
+    dirName = Tcl_TildeSubst(interp, dirName, &buffer);
     if (dirName == NULL) {
 	return TCL_ERROR;
     }
@@ -84,12 +113,14 @@ Tcl_CdCmd(dummy, interp, argc, argv)
 	ckfree(currentDir);
 	currentDir = NULL;
     }
+    result = TCL_OK;
     if (chdir(dirName) != 0) {
 	Tcl_AppendResult(interp, "couldn't change working directory to \"",
-		dirName, "\": ", Tcl_UnixError(interp), (char *) NULL);
-	return TCL_ERROR;
+		dirName, "\": ", Tcl_PosixError(interp), (char *) NULL);
+	result = TCL_ERROR;
     }
-    return TCL_OK;
+    Tcl_DStringFree(&buffer);
+    return result;
 }
 
 /*
@@ -117,34 +148,38 @@ Tcl_CloseCmd(dummy, interp, argc, argv)
     int argc;				/* Number of arguments. */
     char **argv;			/* Argument strings. */
 {
-    OpenFile *filePtr;
+    OpenFile *oFilePtr;
     int result = TCL_OK;
+    FILE *f;
 
     if (argc != 2) {
 	Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
 		" fileId\"", (char *) NULL);
 	return TCL_ERROR;
     }
-    if (TclGetOpenFile(interp, argv[1], &filePtr) != TCL_OK) {
+    if (Tcl_GetOpenFile(interp, argv[1], 0, 0, &f) != TCL_OK) {
 	return TCL_ERROR;
     }
-    ((Interp *) interp)->filePtrArray[fileno(filePtr->f)] = NULL;
+    oFilePtr = tclOpenFiles[fileno(f)];
+    tclOpenFiles[fileno(f)] = NULL;
 
     /*
      * First close the file (in the case of a process pipeline, there may
      * be two files, one for the pipe at each end of the pipeline).
      */
 
-    if (filePtr->f2 != NULL) {
-	if (fclose(filePtr->f2) == EOF) {
+    if (oFilePtr->f2 != NULL) {
+	clearerr(oFilePtr->f2);
+	if (fclose(oFilePtr->f2) == EOF) {
 	    Tcl_AppendResult(interp, "error closing \"", argv[1],
-		    "\": ", Tcl_UnixError(interp), "\n", (char *) NULL);
+		    "\": ", Tcl_PosixError(interp), "\n", (char *) NULL);
 	    result = TCL_ERROR;
 	}
     }
-    if (fclose(filePtr->f) == EOF) {
+    clearerr(oFilePtr->f);
+    if (fclose(oFilePtr->f) == EOF) {
 	Tcl_AppendResult(interp, "error closing \"", argv[1],
-		"\": ", Tcl_UnixError(interp), "\n", (char *) NULL);
+		"\": ", Tcl_PosixError(interp), "\n", (char *) NULL);
 	result = TCL_ERROR;
     }
 
@@ -153,14 +188,14 @@ Tcl_CloseCmd(dummy, interp, argc, argv)
      * associated with the child processes.
      */
 
-    if (filePtr->numPids > 0) {
-	if (CleanupChildren(interp, filePtr->numPids, filePtr->pidPtr,
-		filePtr->errorId) != TCL_OK) {
+    if (oFilePtr->numPids > 0) {
+	if (CleanupChildren(interp, oFilePtr->numPids, oFilePtr->pidPtr,
+		oFilePtr->errorId, 0) != TCL_OK) {
 	    result = TCL_ERROR;
 	}
     }
 
-    ckfree((char *) filePtr);
+    ckfree((char *) oFilePtr);
     return result;
 }
 
@@ -189,17 +224,17 @@ Tcl_EofCmd(notUsed, interp, argc, argv)
     int argc;				/* Number of arguments. */
     char **argv;			/* Argument strings. */
 {
-    OpenFile *filePtr;
+    FILE *f;
 
     if (argc != 2) {
 	Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
 		" fileId\"", (char *) NULL);
 	return TCL_ERROR;
     }
-    if (TclGetOpenFile(interp, argv[1], &filePtr) != TCL_OK) {
+    if (Tcl_GetOpenFile(interp, argv[1], 0, 0, &f) != TCL_OK) {
 	return TCL_ERROR;
     }
-    if (feof(filePtr->f)) {
+    if (feof(f)) {
 	interp->result = "1";
     } else {
 	interp->result = "0";
@@ -237,22 +272,55 @@ Tcl_ExecCmd(dummy, interp, argc, argv)
     int errorId;			/* File id for temporary file
 					 * containing error output. */
     int *pidPtr;
-    int numPids, result;
+    int numPids, result, keepNewline;
+    int firstWord;
+
+    /*
+     * Check for a leading "-keepnewline" argument.
+     */
+
+    keepNewline = 0;
+    for (firstWord = 1; (firstWord < argc) && (argv[firstWord][0] == '-');
+	    firstWord++) {
+	if (strcmp(argv[firstWord], "-keepnewline") == 0) {
+	    keepNewline = 1;
+	} else if (strcmp(argv[firstWord], "--") == 0) {
+	    firstWord++;
+	    break;
+	} else {
+	    Tcl_AppendResult(interp, "bad switch \"", argv[firstWord],
+		    "\": must be -keepnewline or --", (char *) NULL);
+	    return TCL_ERROR;
+	}
+    }
+
+    if (argc <= firstWord) {
+	Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
+		" ?switches? arg ?arg ...?\"", (char *) NULL);
+	return TCL_ERROR;
+    }
 
     /*
      * See if the command is to be run in background;  if so, create
-     * the command, detach it, and return.
+     * the command, detach it, and return a list of pids.
      */
 
     if ((argv[argc-1][0] == '&') && (argv[argc-1][1] == 0)) {
+	int i;
+	char id[50];
+
 	argc--;
 	argv[argc] = NULL;
-	numPids = Tcl_CreatePipeline(interp, argc-1, argv+1, &pidPtr,
-		(int *) NULL, (int *) NULL, (int *) NULL);
+	numPids = Tcl_CreatePipeline(interp, argc-firstWord, argv+firstWord,
+		&pidPtr, (int *) NULL, (int *) NULL, (int *) NULL);
 	if (numPids < 0) {
 	    return TCL_ERROR;
 	}
 	Tcl_DetachPids(numPids, pidPtr);
+	for (i = 0; i < numPids; i++) {
+	    sprintf(id, "%d", pidPtr[i]);
+	    Tcl_AppendElement(interp, id);
+	}
 	ckfree((char *) pidPtr);
 	return TCL_OK;
     }
@@ -261,8 +329,8 @@ Tcl_ExecCmd(dummy, interp, argc, argv)
      * Create the command's pipeline.
      */
 
-    numPids = Tcl_CreatePipeline(interp, argc-1, argv+1, &pidPtr,
-	    (int *) NULL, &outputId, &errorId);
+    numPids = Tcl_CreatePipeline(interp, argc-firstWord, argv+firstWord,
+	    &pidPtr, (int *) NULL, &outputId, &errorId);
     if (numPids < 0) {
 	return TCL_ERROR;
     }
@@ -278,7 +346,7 @@ Tcl_ExecCmd(dummy, interp, argc, argv)
 	    char buffer[BUFFER_SIZE+1];
 	    int count;
     
-	    count = read(outputId, buffer, BUFFER_SIZE);
+	    count = read(outputId, buffer, (size_t) BUFFER_SIZE);
     
 	    if (count == 0) {
 		break;
@@ -287,7 +355,7 @@ Tcl_ExecCmd(dummy, interp, argc, argv)
 		Tcl_ResetResult(interp);
 		Tcl_AppendResult(interp,
 			"error reading from output pipe: ",
-			Tcl_UnixError(interp), (char *) NULL);
+			Tcl_PosixError(interp), (char *) NULL);
 		result = TCL_ERROR;
 		break;
 	    }
@@ -297,7 +365,8 @@ Tcl_ExecCmd(dummy, interp, argc, argv)
 	close(outputId);
     }
 
-    if (CleanupChildren(interp, numPids, pidPtr, errorId) != TCL_OK) {
+    if (CleanupChildren(interp, numPids, pidPtr, errorId, keepNewline)
+	    != TCL_OK) {
 	result = TCL_ERROR;
     }
     return result;
@@ -342,6 +411,7 @@ Tcl_ExitCmd(dummy, interp, argc, argv)
 	return TCL_ERROR;
     }
     exit(value);
+    /*NOTREACHED*/
     return TCL_OK;			/* Better not ever reach this! */
 }
 
@@ -371,11 +441,12 @@ Tcl_FileCmd(dummy, interp, argc, argv)
     char **argv;			/* Argument strings. */
 {
     char *p;
-    int length, statOp;
+    int length, statOp, result;
     int mode = 0;			/* Initialized only to prevent
 					 * compiler warning message. */
     struct stat statBuf;
     char *fileName, c;
+    Tcl_DString buffer;
 
     if (argc < 3) {
 	Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
@@ -384,14 +455,16 @@ Tcl_FileCmd(dummy, interp, argc, argv)
     }
     c = argv[1][0];
     length = strlen(argv[1]);
+    result = TCL_OK;
 
     /*
      * First handle operations on the file name.
      */
 
-    fileName = Tcl_TildeSubst(interp, argv[2]);
+    fileName = Tcl_TildeSubst(interp, argv[2], &buffer);
     if (fileName == NULL) {
-	return TCL_ERROR;
+	result = TCL_ERROR;
+	goto done;
     }
     if ((c == 'd') && (strncmp(argv[1], "dirname", length) == 0)) {
 	if (argc != 3) {
@@ -399,7 +472,8 @@ Tcl_FileCmd(dummy, interp, argc, argv)
 	    not3Args:
 	    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
 		    " ", argv[1], " name\"", (char *) NULL);
-	    return TCL_ERROR;
+	    result = TCL_ERROR;
+	    goto done;
 	}
 	p = strrchr(fileName, '/');
 	if (p == NULL) {
@@ -411,7 +485,7 @@ Tcl_FileCmd(dummy, interp, argc, argv)
 	    Tcl_SetResult(interp, fileName, TCL_VOLATILE);
 	    *p = '/';
 	}
-	return TCL_OK;
+	goto done;
     } else if ((c == 'r') && (strncmp(argv[1], "rootname", length) == 0)
 	    && (length >= 2)) {
 	char *lastSlash;
@@ -429,7 +503,7 @@ Tcl_FileCmd(dummy, interp, argc, argv)
 	    Tcl_SetResult(interp, fileName, TCL_VOLATILE);
 	    *p = '.';
 	}
-	return TCL_OK;
+	goto done;
     } else if ((c == 'e') && (strncmp(argv[1], "extension", length) == 0)
 	    && (length >= 3)) {
 	char *lastSlash;
@@ -443,7 +517,7 @@ Tcl_FileCmd(dummy, interp, argc, argv)
 	if ((p != NULL) && ((lastSlash == NULL) || (lastSlash < p))) {
 	    Tcl_SetResult(interp, p, TCL_VOLATILE);
 	}
-	return TCL_OK;
+	goto done;
     } else if ((c == 't') && (strncmp(argv[1], "tail", length) == 0)
 	    && (length >= 2)) {
 	if (argc != 3) {
@@ -456,7 +530,7 @@ Tcl_FileCmd(dummy, interp, argc, argv)
 	} else {
 	    Tcl_SetResult(interp, fileName, TCL_VOLATILE);
 	}
-	return TCL_OK;
+	goto done;
     }
 
     /*
@@ -465,7 +539,8 @@ Tcl_FileCmd(dummy, interp, argc, argv)
      */
 
     if (fileName == NULL) {
-	return TCL_ERROR;
+	result = TCL_ERROR;
+	goto done;
     }
     if ((c == 'r') && (strncmp(argv[1], "readable", length) == 0)
 	    && (length >= 5)) {
@@ -480,7 +555,7 @@ Tcl_FileCmd(dummy, interp, argc, argv)
 	} else {
 	    interp->result = "1";
 	}
-	return TCL_OK;
+	goto done;
     } else if ((c == 'w') && (strncmp(argv[1], "writable", length) == 0)) {
 	if (argc != 3) {
 	    argv[1] = "writable";
@@ -519,7 +594,7 @@ Tcl_FileCmd(dummy, interp, argc, argv)
 	    goto badStat;
 	}
 	sprintf(interp->result, "%ld", statBuf.st_atime);
-	return TCL_OK;
+	goto done;
     } else if ((c == 'i') && (strncmp(argv[1], "isdirectory", length) == 0)
 	    && (length >= 3)) {
 	if (argc != 3) {
@@ -538,15 +613,18 @@ Tcl_FileCmd(dummy, interp, argc, argv)
 	if (argc != 4) {
 	    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
 		    " lstat name varName\"", (char *) NULL);
-	    return TCL_ERROR;
+	    result = TCL_ERROR;
+	    goto done;
 	}
 
 	if (lstat(fileName, &statBuf) == -1) {
 	    Tcl_AppendResult(interp, "couldn't lstat \"", argv[2],
-		    "\": ", Tcl_UnixError(interp), (char *) NULL);
-	    return TCL_ERROR;
+		    "\": ", Tcl_PosixError(interp), (char *) NULL);
+	    result = TCL_ERROR;
+	    goto done;
 	}
-	return StoreStatData(interp, argv[3], &statBuf);
+	result = StoreStatData(interp, argv[3], &statBuf);
+	goto done;
     } else if ((c == 'm') && (strncmp(argv[1], "mtime", length) == 0)) {
 	if (argc != 3) {
 	    argv[1] = "mtime";
@@ -556,18 +634,13 @@ Tcl_FileCmd(dummy, interp, argc, argv)
 	    goto badStat;
 	}
 	sprintf(interp->result, "%ld", statBuf.st_mtime);
-	return TCL_OK;
+	goto done;
     } else if ((c == 'o') && (strncmp(argv[1], "owned", length) == 0)) {
 	if (argc != 3) {
 	    argv[1] = "owned";
 	    goto not3Args;
 	}
 	statOp = 0;
-#ifdef S_IFLNK
-    /*
-     * This option is only included if symbolic links exist on this system
-     * (in which case S_IFLNK should be defined).
-     */
     } else if ((c == 'r') && (strncmp(argv[1], "readlink", length) == 0)
 	    && (length >= 5)) {
 	char linkValue[MAXPATHLEN+1];
@@ -577,16 +650,30 @@ Tcl_FileCmd(dummy, interp, argc, argv)
 	    argv[1] = "readlink";
 	    goto not3Args;
 	}
+
+	/*
+	 * If S_IFLNK isn't defined it means that the machine doesn't
+	 * support symbolic links, so the file can't possibly be a
+	 * symbolic link.  Generate an EINVAL error, which is what
+	 * happens on machines that do support symbolic links when
+	 * you invoke readlink on a file that isn't a symbolic link.
+	 */
+
+#ifndef S_IFLNK
+	linkLength = -1;
+	errno = EINVAL;
+#else
 	linkLength = readlink(fileName, linkValue, sizeof(linkValue) - 1);
+#endif /* S_IFLNK */
 	if (linkLength == -1) {
 	    Tcl_AppendResult(interp, "couldn't readlink \"", argv[2],
-		    "\": ", Tcl_UnixError(interp), (char *) NULL);
-	    return TCL_ERROR;
+		    "\": ", Tcl_PosixError(interp), (char *) NULL);
+	    result = TCL_ERROR;
+	    goto done;
 	}
 	linkValue[linkLength] = 0;
 	Tcl_SetResult(interp, linkValue, TCL_VOLATILE);
-	return TCL_OK;
-#endif
+	goto done;
     } else if ((c == 's') && (strncmp(argv[1], "size", length) == 0)
 	    && (length >= 2)) {
 	if (argc != 3) {
@@ -597,22 +684,25 @@ Tcl_FileCmd(dummy, interp, argc, argv)
 	    goto badStat;
 	}
 	sprintf(interp->result, "%ld", statBuf.st_size);
-	return TCL_OK;
+	goto done;
     } else if ((c == 's') && (strncmp(argv[1], "stat", length) == 0)
 	    && (length >= 2)) {
 	if (argc != 4) {
 	    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
 		    " stat name varName\"", (char *) NULL);
-	    return TCL_ERROR;
+	    result = TCL_ERROR;
+	    goto done;
 	}
 
 	if (stat(fileName, &statBuf) == -1) {
 	    badStat:
 	    Tcl_AppendResult(interp, "couldn't stat \"", argv[2],
-		    "\": ", Tcl_UnixError(interp), (char *) NULL);
-	    return TCL_ERROR;
+		    "\": ", Tcl_PosixError(interp), (char *) NULL);
+	    result = TCL_ERROR;
+	    goto done;
 	}
-	return StoreStatData(interp, argv[3], &statBuf);
+	result = StoreStatData(interp, argv[3], &statBuf);
+	goto done;
     } else if ((c == 't') && (strncmp(argv[1], "type", length) == 0)
 	    && (length >= 2)) {
 	if (argc != 3) {
@@ -623,23 +713,21 @@ Tcl_FileCmd(dummy, interp, argc, argv)
 	    goto badStat;
 	}
 	interp->result = GetFileType((int) statBuf.st_mode);
-	return TCL_OK;
+	goto done;
     } else {
 	Tcl_AppendResult(interp, "bad option \"", argv[1],
 		"\": should be atime, dirname, executable, exists, ",
 		"extension, isdirectory, isfile, lstat, mtime, owned, ",
-		"readable, ",
-#ifdef S_IFLNK
-		"readlink, ",
-#endif
+		"readable, readlink, ",
 		"root, size, stat, tail, type, ",
 		"or writable",
 		(char *) NULL);
-	return TCL_ERROR;
+	result = TCL_ERROR;
+	goto done;
     }
     if (stat(fileName, &statBuf) == -1) {
 	interp->result = "0";
-	return TCL_OK;
+	goto done;
     }
     switch (statOp) {
 	case 0:
@@ -657,7 +745,10 @@ Tcl_FileCmd(dummy, interp, argc, argv)
     } else {
 	interp->result = "0";
     }
-    return TCL_OK;
+
+    done:
+    Tcl_DStringFree(&buffer);
+    return result;
 }
 
 /*
@@ -810,7 +901,6 @@ Tcl_FlushCmd(notUsed, interp, argc, argv)
     int argc;				/* Number of arguments. */
     char **argv;			/* Argument strings. */
 {
-    OpenFile *filePtr;
     FILE *f;
 
     if (argc != 2) {
@@ -818,22 +908,13 @@ Tcl_FlushCmd(notUsed, interp, argc, argv)
 		" fileId\"", (char *) NULL);
 	return TCL_ERROR;
     }
-    if (TclGetOpenFile(interp, argv[1], &filePtr) != TCL_OK) {
+    if (Tcl_GetOpenFile(interp, argv[1], 1, 1, &f) != TCL_OK) {
 	return TCL_ERROR;
     }
-    if (!filePtr->writable) {
-	Tcl_AppendResult(interp, "\"", argv[1],
-		"\" wasn't opened for writing", (char *) NULL);
-	return TCL_ERROR;
-    }
-    f = filePtr->f2;
-    if (f == NULL) {
-	f = filePtr->f;
-    }
+    clearerr(f);
     if (fflush(f) == EOF) {
 	Tcl_AppendResult(interp, "error flushing \"", argv[1],
-		"\": ", Tcl_UnixError(interp), (char *) NULL);
-	clearerr(f);
+		"\": ", Tcl_PosixError(interp), (char *) NULL);
 	return TCL_ERROR;
     }
     return TCL_OK;
@@ -867,20 +948,14 @@ Tcl_GetsCmd(notUsed, interp, argc, argv)
 #   define BUF_SIZE 200
     char buffer[BUF_SIZE+1];
     int totalCount, done, flags;
-    OpenFile *filePtr;
-    register FILE *f;
+    FILE *f;
 
     if ((argc != 2) && (argc != 3)) {
 	Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
 		" fileId ?varName?\"", (char *) NULL);
 	return TCL_ERROR;
     }
-    if (TclGetOpenFile(interp, argv[1], &filePtr) != TCL_OK) {
-	return TCL_ERROR;
-    }
-    if (!filePtr->readable) {
-	Tcl_AppendResult(interp, "\"", argv[1],
-		"\" wasn't opened for reading", (char *) NULL);
+    if (Tcl_GetOpenFile(interp, argv[1], 0, 1, &f) != TCL_OK) {
 	return TCL_ERROR;
     }
 
@@ -892,7 +967,7 @@ Tcl_GetsCmd(notUsed, interp, argc, argv)
     totalCount = 0;
     done = 0;
     flags = 0;
-    f = filePtr->f;
+    clearerr(f);
     while (!done) {
 	register int c, count;
 	register char *p;
@@ -900,13 +975,22 @@ Tcl_GetsCmd(notUsed, interp, argc, argv)
 	for (p = buffer, count = 0; count < BUF_SIZE-1; count++, p++) {
 	    c = getc(f);
 	    if (c == EOF) {
-		if (ferror(filePtr->f)) {
+		if (ferror(f)) {
+		    /*
+		     * If the file is in non-blocking mode, return any
+		     * bytes that were read before a block would occur.
+		     */
+
+		    if ((errno == EWOULDBLOCK)
+			    && ((count > 0 || totalCount > 0))) {
+			done = 1;
+			break;
+		    }
 		    Tcl_ResetResult(interp);
 		    Tcl_AppendResult(interp, "error reading \"", argv[1],
-			    "\": ", Tcl_UnixError(interp), (char *) NULL);
-		    clearerr(filePtr->f);
+			    "\": ", Tcl_PosixError(interp), (char *) NULL);
 		    return TCL_ERROR;
-		} else if (feof(filePtr->f)) {
+		} else if (feof(f)) {
 		    if ((totalCount == 0) && (count == 0)) {
 			totalCount = -1;
 		    }
@@ -964,61 +1048,44 @@ Tcl_OpenCmd(notUsed, interp, argc, argv)
     int argc;				/* Number of arguments. */
     char **argv;			/* Argument strings. */
 {
-    Interp *iPtr = (Interp *) interp;
-    int pipeline, fd;
+    int pipeline, fd, mode, prot, readWrite, permissions;
     char *access;
-    register OpenFile *filePtr;
+    FILE *f, *f2;
 
-    if (argc == 2) {
-	access = "r";
-    } else if (argc == 3) {
-	access = argv[2];
-    } else {
+    if ((argc < 2) || (argc > 4)) {
 	Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
-		" filename ?access?\"", (char *) NULL);
+		" filename ?access? ?permissions?\"", (char *) NULL);
 	return TCL_ERROR;
     }
+    prot = 0666;
+    if (argc == 2) {
+	mode = O_RDONLY;
+	access = "r";
+    } else {
+	access = GetOpenMode(interp, argv[2], &mode);
+	if (access == NULL) {
+	    return TCL_ERROR;
+	}
+	if (argc == 4) {
+	    if (Tcl_GetInt(interp, argv[3], &prot) != TCL_OK) {
+		return TCL_ERROR;
+	    }
+	}
+    }
 
-    filePtr = (OpenFile *) ckalloc(sizeof(OpenFile));
-    filePtr->f = NULL;
-    filePtr->f2 = NULL;
-    filePtr->readable = 0;
-    filePtr->writable = 0;
-    filePtr->numPids = 0;
-    filePtr->pidPtr = NULL;
-    filePtr->errorId = -1;
-
-    /*
-     * Verify the requested form of access.
-     */
+    f = f2 = NULL;
+    readWrite = mode & (O_RDWR|O_RDONLY|O_WRONLY);
+    if (readWrite == O_RDONLY) {
+	permissions = TCL_FILE_READABLE;
+    } else if (readWrite == O_WRONLY) {
+	permissions = TCL_FILE_WRITABLE;
+    } else {
+	permissions = TCL_FILE_READABLE|TCL_FILE_WRITABLE;
+    }
 
     pipeline = 0;
     if (argv[1][0] == '|') {
 	pipeline = 1;
-    }
-    switch (access[0]) {
-	case 'r':
-	    filePtr->readable = 1;
-	    break;
-	case 'w':
-	    filePtr->writable = 1;
-	    break;
-	case 'a':
-	    filePtr->writable = 1;
-	    break;
-	default:
-	    badAccess:
-	    Tcl_AppendResult(interp, "illegal access mode \"", access,
-		    "\"", (char *) NULL);
-	    goto error;
-    }
-    if (access[1] == '+') {
-	filePtr->readable = filePtr->writable = 1;
-	if (access[2] != 0) {
-	    goto badAccess;
-	}
-    } else if (access[1] != 0) {
-	goto badAccess;
     }
 
     /*
@@ -1026,100 +1093,256 @@ Tcl_OpenCmd(notUsed, interp, argc, argv)
      */
 
     if (!pipeline) {
-	char *fileName = argv[1];
+	char *fileName;
+	Tcl_DString buffer;
 
-	if (fileName[0] == '~') {
-	    fileName = Tcl_TildeSubst(interp, fileName);
-	    if (fileName == NULL) {
-		goto error;
-	    }
+	fileName = Tcl_TildeSubst(interp, argv[1], &buffer);
+	if (fileName == NULL) {
+	    return TCL_ERROR;
 	}
-	filePtr->f = fopen(fileName, access);
-	if (filePtr->f == NULL) {
+	fd = open(fileName, mode, prot);
+	Tcl_DStringFree(&buffer);
+	if (fd < 0) {
 	    Tcl_AppendResult(interp, "couldn't open \"", argv[1],
-		    "\": ", Tcl_UnixError(interp), (char *) NULL);
-	    goto error;
+		    "\": ", Tcl_PosixError(interp), (char *) NULL);
+	    return TCL_ERROR;
 	}
+	f = fdopen(fd, access);
+	if (f == NULL) {
+	    close(fd);
+	    return TCL_ERROR;
+	}
+	Tcl_EnterFile(interp, f, permissions);
     } else {
 	int *inPipePtr, *outPipePtr;
-	int cmdArgc, inPipe, outPipe;
+	int cmdArgc, inPipe, outPipe, numPids, *pidPtr, errorId;
 	char **cmdArgv;
+	OpenFile *oFilePtr;
 
 	if (Tcl_SplitList(interp, argv[1]+1, &cmdArgc, &cmdArgv) != TCL_OK) {
-	    goto error;
+	    return TCL_ERROR;
 	}
-	inPipePtr = (filePtr->writable) ? &inPipe : NULL;
-	outPipePtr = (filePtr->readable) ? &outPipe : NULL;
-	inPipe = outPipe = -1;
-	filePtr->numPids = Tcl_CreatePipeline(interp, cmdArgc, cmdArgv,
-		&filePtr->pidPtr, inPipePtr, outPipePtr, &filePtr->errorId);
+	inPipePtr = (permissions & TCL_FILE_WRITABLE) ? &inPipe : NULL;
+	outPipePtr = (permissions & TCL_FILE_READABLE) ? &outPipe : NULL;
+	inPipe = outPipe = errorId = -1;
+	numPids = Tcl_CreatePipeline(interp, cmdArgc, cmdArgv,
+		&pidPtr, inPipePtr, outPipePtr, &errorId);
 	ckfree((char *) cmdArgv);
-	if (filePtr->numPids < 0) {
-	    goto error;
+	if (numPids < 0) {
+	    pipelineError:
+	    if (f != NULL) {
+		fclose(f);
+	    }
+	    if (f2 != NULL) {
+		fclose(f2);
+	    }
+	    if (numPids > 0) {
+		Tcl_DetachPids(numPids, pidPtr);
+		ckfree((char *) pidPtr);
+	    }
+	    if (errorId != -1) {
+		close(errorId);
+	    }
+	    return TCL_ERROR;
 	}
-	if (filePtr->readable) {
+	if (permissions & TCL_FILE_READABLE) {
 	    if (outPipe == -1) {
 		if (inPipe != -1) {
 		    close(inPipe);
 		}
 		Tcl_AppendResult(interp, "can't read output from command:",
 			" standard output was redirected", (char *) NULL);
-		goto error;
+		goto pipelineError;
 	    }
-	    filePtr->f = fdopen(outPipe, "r");
+	    f = fdopen(outPipe, "r");
 	}
-	if (filePtr->writable) {
+	if (permissions & TCL_FILE_WRITABLE) {
 	    if (inPipe == -1) {
 		Tcl_AppendResult(interp, "can't write input to command:",
 			" standard input was redirected", (char *) NULL);
-		goto error;
+		goto pipelineError;
 	    }
-	    if (filePtr->f != NULL) {
-		filePtr->f2 = fdopen(inPipe, "w");
+	    if (f != NULL) {
+		f2 = fdopen(inPipe, "w");
 	    } else {
-		filePtr->f = fdopen(inPipe, "w");
+		f = fdopen(inPipe, "w");
 	    }
 	}
+	Tcl_EnterFile(interp, f, permissions);
+	oFilePtr = tclOpenFiles[fileno(f)];
+	oFilePtr->f2 = f2;
+	oFilePtr->numPids = numPids;
+	oFilePtr->pidPtr = pidPtr;
+	oFilePtr->errorId = errorId;
     }
-
-    /*
-     * Enter this new OpenFile structure in the table for the
-     * interpreter.  May have to expand the table to do this.
-     */
-
-    fd = fileno(filePtr->f);
-    TclMakeFileTable(iPtr, fd);
-    if (iPtr->filePtrArray[fd] != NULL) {
-	panic("Tcl_OpenCmd found file already open");
-    }
-    iPtr->filePtrArray[fd] = filePtr;
-    sprintf(interp->result, "file%d", fd);
     return TCL_OK;
-
-    error:
-    if (filePtr->f != NULL) {
-	fclose(filePtr->f);
-    }
-    if (filePtr->f2 != NULL) {
-	fclose(filePtr->f2);
-    }
-    if (filePtr->numPids > 0) {
-	Tcl_DetachPids(filePtr->numPids, filePtr->pidPtr);
-	ckfree((char *) filePtr->pidPtr);
-    }
-    if (filePtr->errorId != -1) {
-	close(filePtr->errorId);
-    }
-    ckfree((char *) filePtr);
-    return TCL_ERROR;
 }
 
 /*
  *----------------------------------------------------------------------
  *
- * Tcl_PwdCmd --
+ * GetOpenMode --
  *
- *	This procedure is invoked to process the "pwd" Tcl command.
+ *	description.
+ *
+ * Results:
+ *	Normally, sets *modePtr to an access mode for passing to "open",
+ *	and returns a string that can be used as the access mode in a
+ *	subsequent call to "fdopen".  If an error occurs, then returns
+ *	NULL and sets interp->result to an error message.
+ *
+ * Side effects:
+ *	None.
+ *
+ * Special note:
+ *	This code is based on a prototype implementation contributed
+ *	by Mark Diekhans.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static char *
+GetOpenMode(interp, string, modePtr)
+    Tcl_Interp *interp;			/* Interpreter to use for error
+					 * reporting. */
+    char *string;			/* Mode string, e.g. "r+" or
+					 * "RDONLY CREAT". */
+    int *modePtr;			/* Where to store mode corresponding
+					 * to string. */
+{
+    int mode, modeArgc, c, i, gotRW;
+    char **modeArgv, *flag;
+#define RW_MODES (O_RDONLY|O_WRONLY|O_RDWR)
+
+    /*
+     * Check for the simpler fopen-like access modes (e.g. "r").  They
+     * are distinguished from the POSIX access modes by the presence
+     * of a lower-case first letter.
+     */
+
+    mode = 0;
+    if (islower(UCHAR(string[0]))) {
+	switch (string[0]) {
+	    case 'r':
+		mode = O_RDONLY;
+		break;
+	    case 'w':
+		mode = O_WRONLY|O_CREAT|O_TRUNC;
+		break;
+	    case 'a':
+		mode = O_WRONLY|O_CREAT|O_APPEND;
+		break;
+	    default:
+		error:
+		Tcl_AppendResult(interp,
+			"illegal access mode \"", string, "\"", (char *) NULL);
+		return NULL;
+	}
+	if (string[1] == '+') {
+	    mode &= ~(O_RDONLY|O_WRONLY);
+	    mode |= O_RDWR;
+	    if (string[2] != 0) {
+		goto error;
+	    }
+	} else if (string[1] != 0) {
+	    goto error;
+	}
+	*modePtr = mode;
+	return string;
+    }
+
+    /*
+     * The access modes are specified using a list of POSIX modes
+     * such as O_CREAT.
+     */
+
+    if (Tcl_SplitList(interp, string, &modeArgc, &modeArgv) != TCL_OK) {
+	Tcl_AddErrorInfo(interp, "\n    while processing open access modes \"");
+	Tcl_AddErrorInfo(interp, string);
+	Tcl_AddErrorInfo(interp, "\"");
+	return NULL;
+    }
+    gotRW = 0;
+    for (i = 0; i < modeArgc; i++) {
+	flag = modeArgv[i];
+	c = flag[0];
+	if ((c == 'R') && (strcmp(flag, "RDONLY") == 0)) {
+	    mode = (mode & ~RW_MODES) | O_RDONLY;
+	    gotRW = 1;
+	} else if ((c == 'W') && (strcmp(flag, "WRONLY") == 0)) {
+	    mode = (mode & ~RW_MODES) | O_WRONLY;
+	    gotRW = 1;
+	} else if ((c == 'R') && (strcmp(flag, "RDWR") == 0)) {
+	    mode = (mode & ~RW_MODES) | O_RDWR;
+	    gotRW = 1;
+	} else if ((c == 'A') && (strcmp(flag, "APPEND") == 0)) {
+	    mode |= O_APPEND;
+	} else if ((c == 'C') && (strcmp(flag, "CREAT") == 0)) {
+	    mode |= O_CREAT;
+	} else if ((c == 'E') && (strcmp(flag, "EXCL") == 0)) {
+	    mode |= O_EXCL;
+	} else if ((c == 'N') && (strcmp(flag, "NOCTTY") == 0)) {
+#ifdef O_NOCTTY
+	    mode |= O_NOCTTY;
+#else
+	    Tcl_AppendResult(interp, "access mode \"", flag,
+		    "\" not supported by this system", (char *) NULL);
+	    ckfree((char *) modeArgv);
+	    return NULL;
+#endif
+	} else if ((c == 'N') && (strcmp(flag, "NONBLOCK") == 0)) {
+#ifdef O_NONBLOCK
+	    mode |= O_NONBLOCK;
+#else
+	    mode |= O_NDELAY;
+#endif
+	} else if ((c == 'T') && (strcmp(flag, "TRUNC") == 0)) {
+	    mode |= O_TRUNC;
+	} else {
+	    Tcl_AppendResult(interp, "invalid access mode \"", flag,
+		    "\": must be RDONLY, WRONLY, RDWR, APPEND, CREAT",
+		    " EXCL, NOCTTY, NONBLOCK, or TRUNC", (char *) NULL);
+	    ckfree((char *) modeArgv);
+	    return NULL;
+	}
+    }
+    ckfree((char *) modeArgv);
+    if (!gotRW) {
+	Tcl_AppendResult(interp, "access mode must include either",
+		" RDONLY, WRONLY, or RDWR", (char *) NULL);
+	return NULL;
+    }
+    *modePtr = mode;
+
+    /*
+     * The calculation of fdopen access mode below isn't really correct,
+     * but it doesn't have to be.  All it has to do is to disinguish
+     * read and write permissions, plus indicate append mode.
+     */
+
+    i = mode & RW_MODES;
+    if (i == O_RDONLY) {
+	return "r";
+    }
+    if (mode & O_APPEND) {
+	if (i == O_WRONLY) {
+	    return "a";
+	} else {
+	    return "a+";
+	}
+    }
+    if (i == O_WRONLY) {
+	return "w";
+    }
+    return "r+";
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tcl_PidCmd --
+ *
+ *	This procedure is invoked to process the "pid" Tcl command.
  *	See the user documentation for details on what it does.
  *
  * Results:
@@ -1133,42 +1356,34 @@ Tcl_OpenCmd(notUsed, interp, argc, argv)
 
 	/* ARGSUSED */
 int
-Tcl_PwdCmd(dummy, interp, argc, argv)
+Tcl_PidCmd(dummy, interp, argc, argv)
     ClientData dummy;			/* Not used. */
     Tcl_Interp *interp;			/* Current interpreter. */
     int argc;				/* Number of arguments. */
     char **argv;			/* Argument strings. */
 {
-    char buffer[MAXPATHLEN+1];
+    FILE *f;
+    OpenFile *oFilePtr;
+    int i;
+    char string[50];
 
-    if (argc != 1) {
+    if (argc > 2) {
 	Tcl_AppendResult(interp, "wrong # args: should be \"",
-		argv[0], "\"", (char *) NULL);
+		argv[0], " ?fileId?\"", (char *) NULL);
 	return TCL_ERROR;
     }
-    if (currentDir == NULL) {
-#if TCL_GETWD
-	if (getwd(buffer) == NULL) {
-	    Tcl_AppendResult(interp, "error getting working directory name: ",
-		    buffer, (char *) NULL);
+    if (argc == 1) {
+	sprintf(interp->result, "%d", getpid());
+    } else {
+	if (Tcl_GetOpenFile(interp, argv[1], 0, 0, &f) != TCL_OK) {
 	    return TCL_ERROR;
 	}
-#else
-	if (getcwd(buffer, MAXPATHLEN) == NULL) {
-	    if (errno == ERANGE) {
-		interp->result = "working directory name is too long";
-	    } else {
-		Tcl_AppendResult(interp,
-			"error getting working directory name: ",
-			Tcl_UnixError(interp), (char *) NULL);
-	    }
-	    return TCL_ERROR;
+	oFilePtr = tclOpenFiles[fileno(f)];
+	for (i = 0; i < oFilePtr->numPids; i++) {
+	    sprintf(string, "%d", oFilePtr->pidPtr[i]);
+	    Tcl_AppendElement(interp, string);
 	}
-#endif
-	currentDir = (char *) ckalloc((unsigned) (strlen(buffer) + 1));
-	strcpy(currentDir, buffer);
     }
-    interp->result = currentDir;
     return TCL_OK;
 }
 
@@ -1197,7 +1412,6 @@ Tcl_PutsCmd(dummy, interp, argc, argv)
     int argc;				/* Number of arguments. */
     char **argv;			/* Argument strings. */
 {
-    OpenFile *filePtr;
     FILE *f;
     int i, newline;
     char *fileId;
@@ -1234,29 +1448,70 @@ Tcl_PutsCmd(dummy, interp, argc, argv)
 	i++;
     }
 
-    if (TclGetOpenFile(interp, fileId, &filePtr) != TCL_OK) {
+    if (Tcl_GetOpenFile(interp, fileId, 1, 1, &f) != TCL_OK) {
 	return TCL_ERROR;
-    }
-    if (!filePtr->writable) {
-	Tcl_AppendResult(interp, "\"", fileId,
-		"\" wasn't opened for writing", (char *) NULL);
-	return TCL_ERROR;
-    }
-    f = filePtr->f2;
-    if (f == NULL) {
-	f = filePtr->f;
     }
 
+    clearerr(f);
     fputs(argv[i], f);
     if (newline) {
 	fputc('\n', f);
     }
     if (ferror(f)) {
 	Tcl_AppendResult(interp, "error writing \"", fileId,
-		"\": ", Tcl_UnixError(interp), (char *) NULL);
-	clearerr(f);
+		"\": ", Tcl_PosixError(interp), (char *) NULL);
 	return TCL_ERROR;
     }
+    return TCL_OK;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tcl_PwdCmd --
+ *
+ *	This procedure is invoked to process the "pwd" Tcl command.
+ *	See the user documentation for details on what it does.
+ *
+ * Results:
+ *	A standard Tcl result.
+ *
+ * Side effects:
+ *	See the user documentation.
+ *
+ *----------------------------------------------------------------------
+ */
+
+	/* ARGSUSED */
+int
+Tcl_PwdCmd(dummy, interp, argc, argv)
+    ClientData dummy;			/* Not used. */
+    Tcl_Interp *interp;			/* Current interpreter. */
+    int argc;				/* Number of arguments. */
+    char **argv;			/* Argument strings. */
+{
+    char buffer[MAXPATHLEN+1];
+
+    if (argc != 1) {
+	Tcl_AppendResult(interp, "wrong # args: should be \"",
+		argv[0], "\"", (char *) NULL);
+	return TCL_ERROR;
+    }
+    if (currentDir == NULL) {
+	if (getcwd(buffer, MAXPATHLEN+1) == NULL) {
+	    if (errno == ERANGE) {
+		interp->result = "working directory name is too long";
+	    } else {
+		Tcl_AppendResult(interp,
+			"error getting working directory name: ",
+			Tcl_PosixError(interp), (char *) NULL);
+	    }
+	    return TCL_ERROR;
+	}
+	currentDir = (char *) ckalloc((unsigned) (strlen(buffer) + 1));
+	strcpy(currentDir, buffer);
+    }
+    interp->result = currentDir;
     return TCL_OK;
 }
 
@@ -1285,11 +1540,11 @@ Tcl_ReadCmd(dummy, interp, argc, argv)
     int argc;				/* Number of arguments. */
     char **argv;			/* Argument strings. */
 {
-    OpenFile *filePtr;
     int bytesLeft, bytesRead, count;
 #define READ_BUF_SIZE 4096
     char buffer[READ_BUF_SIZE+1];
     int newline, i;
+    FILE *f;
 
     if ((argc != 2) && (argc != 3)) {
 	Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
@@ -1303,13 +1558,7 @@ Tcl_ReadCmd(dummy, interp, argc, argv)
 	newline = 0;
 	i++;
     }
-
-    if (TclGetOpenFile(interp, argv[i], &filePtr) != TCL_OK) {
-	return TCL_ERROR;
-    }
-    if (!filePtr->readable) {
-	Tcl_AppendResult(interp, "\"", argv[i],
-		"\" wasn't opened for reading", (char *) NULL);
+    if (Tcl_GetOpenFile(interp, argv[i], 0, 1, &f) != TCL_OK) {
 	return TCL_ERROR;
     }
 
@@ -1318,7 +1567,7 @@ Tcl_ReadCmd(dummy, interp, argc, argv)
      * newline should be dropped.
      */
 
-    if ((argc >= (i + 2)) && isdigit(argv[i+1][0])) {
+    if ((argc >= (i + 2)) && isdigit(UCHAR(argv[i+1][0]))) {
 	if (Tcl_GetInt(interp, argv[i+1], &bytesLeft) != TCL_OK) {
 	    return TCL_ERROR;
 	}
@@ -1346,18 +1595,28 @@ Tcl_ReadCmd(dummy, interp, argc, argv)
      */
 
     bytesRead = 0;
+    clearerr(f);
     while (bytesLeft > 0) {
 	count = READ_BUF_SIZE;
 	if (bytesLeft < READ_BUF_SIZE) {
 	    count = bytesLeft;
 	}
-	count = fread(buffer, 1, count, filePtr->f);
-	if (ferror(filePtr->f)) {
-	    Tcl_ResetResult(interp);
-	    Tcl_AppendResult(interp, "error reading \"", argv[i],
-		    "\": ", Tcl_UnixError(interp), (char *) NULL);
-	    clearerr(filePtr->f);
-	    return TCL_ERROR;
+	count = fread(buffer, 1, count, f);
+	if (ferror(f)) {
+	    /*
+	     * If the file is in non-blocking mode, break out of the
+	     * loop and return any bytes that were read.
+	     */
+
+	    if ((errno == EWOULDBLOCK) && ((count > 0) || (bytesRead > 0))) {
+		clearerr(f);
+		bytesLeft = count;
+	    } else {
+		Tcl_ResetResult(interp);
+		Tcl_AppendResult(interp, "error reading \"", argv[i],
+			"\": ", Tcl_PosixError(interp), (char *) NULL);
+		return TCL_ERROR;
+	    }
 	}
 	if (count == 0) {
 	    break;
@@ -1399,7 +1658,7 @@ Tcl_SeekCmd(notUsed, interp, argc, argv)
     int argc;				/* Number of arguments. */
     char **argv;			/* Argument strings. */
 {
-    OpenFile *filePtr;
+    FILE *f;
     int offset, mode;
 
     if ((argc != 3) && (argc != 4)) {
@@ -1407,7 +1666,7 @@ Tcl_SeekCmd(notUsed, interp, argc, argv)
 		" fileId offset ?origin?\"", (char *) NULL);
 	return TCL_ERROR;
     }
-    if (TclGetOpenFile(interp, argv[1], &filePtr) != TCL_OK) {
+    if (Tcl_GetOpenFile(interp, argv[1], 0, 0, &f) != TCL_OK) {
 	return TCL_ERROR;
     }
     if (Tcl_GetInt(interp, argv[2], &offset) != TCL_OK) {
@@ -1432,10 +1691,10 @@ Tcl_SeekCmd(notUsed, interp, argc, argv)
 	    return TCL_ERROR;
 	}
     }
-    if (fseek(filePtr->f, (long) offset, mode) == -1) {
+    clearerr(f);
+    if (fseek(f, (long) offset, mode) == -1) {
 	Tcl_AppendResult(interp, "error during seek: ",
-		Tcl_UnixError(interp), (char *) NULL);
-	clearerr(filePtr->f);
+		Tcl_PosixError(interp), (char *) NULL);
 	return TCL_ERROR;
     }
 
@@ -1500,17 +1759,17 @@ Tcl_TellCmd(notUsed, interp, argc, argv)
     int argc;				/* Number of arguments. */
     char **argv;			/* Argument strings. */
 {
-    OpenFile *filePtr;
+    FILE *f;
 
     if (argc != 2) {
 	Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
 		" fileId\"", (char *) NULL);
 	return TCL_ERROR;
     }
-    if (TclGetOpenFile(interp, argv[1], &filePtr) != TCL_OK) {
+    if (Tcl_GetOpenFile(interp, argv[1], 0, 0, &f) != TCL_OK) {
 	return TCL_ERROR;
     }
-    sprintf(interp->result, "%d", ftell(filePtr->f));
+    sprintf(interp->result, "%d", ftell(f));
     return TCL_OK;
 }
 
@@ -1541,13 +1800,13 @@ Tcl_TimeCmd(dummy, interp, argc, argv)
 {
     int count, i, result;
     double timePer;
-#if TCL_GETTOD
+#if NO_GETTOD
+    struct tms dummy2;
+    long start, stop;
+#else
     struct timeval start, stop;
     struct timezone tz;
     int micros;
-#else
-    struct tms dummy2;
-    long start, stop;
 #endif
 
     if (argc == 2) {
@@ -1561,13 +1820,13 @@ Tcl_TimeCmd(dummy, interp, argc, argv)
 		" command ?count?\"", (char *) NULL);
 	return TCL_ERROR;
     }
-#if TCL_GETTOD
-    gettimeofday(&start, &tz);
-#else
+#if NO_GETTOD
     start = times(&dummy2);
+#else
+    gettimeofday(&start, &tz);
 #endif
     for (i = count ; i > 0; i--) {
-	result = Tcl_Eval(interp, argv[1], 0, (char **) NULL);
+	result = Tcl_Eval(interp, argv[1]);
 	if (result != TCL_OK) {
 	    if (result == TCL_ERROR) {
 		char msg[60];
@@ -1578,14 +1837,14 @@ Tcl_TimeCmd(dummy, interp, argc, argv)
 	    return result;
 	}
     }
-#if TCL_GETTOD
+#if NO_GETTOD
+    stop = times(&dummy2);
+    timePer = (((double) (stop - start))*1000000.0)/CLK_TCK;
+#else
     gettimeofday(&stop, &tz);
     micros = (stop.tv_sec - start.tv_sec)*1000000
 	    + (stop.tv_usec - start.tv_usec);
     timePer = micros;
-#else
-    stop = times(&dummy2);
-    timePer = (((double) (stop - start))*1000000.0)/CLK_TCK;
 #endif
     Tcl_ResetResult(interp);
     sprintf(interp->result, "%.0f microseconds per iteration", timePer/count);
@@ -1608,30 +1867,33 @@ Tcl_TimeCmd(dummy, interp, argc, argv)
  *
  * Side effects:
  *	If the last character of interp->result is a newline, then it
- *	is removed.  File errorId gets closed, and pidPtr is freed
- *	back to the storage allocator.
+ *	is removed unless keepNewline is non-zero.  File errorId gets
+ *	closed, and pidPtr is freed back to the storage allocator.
  *
  *----------------------------------------------------------------------
  */
 
 static int
-CleanupChildren(interp, numPids, pidPtr, errorId)
+CleanupChildren(interp, numPids, pidPtr, errorId, keepNewline)
     Tcl_Interp *interp;		/* Used for error messages. */
     int numPids;		/* Number of entries in pidPtr array. */
     int *pidPtr;		/* Array of process ids of children. */
     int errorId;		/* File descriptor index for file containing
 				 * stderr output from pipeline.  -1 means
 				 * there isn't any stderr output. */
+    int keepNewline;		/* Non-zero means don't discard trailing
+				 * newline. */
 {
     int result = TCL_OK;
-    int i, pid, length;
+    int i, pid, length, abnormalExit;
     WAIT_STATUS_TYPE waitStatus;
 
+    abnormalExit = 0;
     for (i = 0; i < numPids; i++) {
-	pid = Tcl_WaitPids(1, &pidPtr[i], (int *) &waitStatus);
+	pid = waitpid(pidPtr[i], (int *) &waitStatus, 0);
 	if (pid == -1) {
 	    Tcl_AppendResult(interp, "error waiting for process to exit: ",
-		    Tcl_UnixError(interp), (char *) NULL);
+		    Tcl_PosixError(interp), (char *) NULL);
 	    continue;
 	}
 
@@ -1651,6 +1913,7 @@ CleanupChildren(interp, numPids, pidPtr, errorId)
 		sprintf(msg2, "%d", WEXITSTATUS(waitStatus));
 		Tcl_SetErrorCode(interp, "CHILDSTATUS", msg1, msg2,
 			(char *) NULL);
+		abnormalExit = 1;
 	    } else if (WIFSIGNALED(waitStatus)) {
 		char *p;
 	
@@ -1689,15 +1952,16 @@ CleanupChildren(interp, numPids, pidPtr, errorId)
 	    char buffer[BUFFER_SIZE+1];
 	    int count;
     
-	    count = read(errorId, buffer, BUFFER_SIZE);
+	    count = read(errorId, buffer, (size_t) BUFFER_SIZE);
     
 	    if (count == 0) {
 		break;
 	    }
+	    result = TCL_ERROR;
 	    if (count < 0) {
 		Tcl_AppendResult(interp,
 			"error reading stderr output file: ",
-			Tcl_UnixError(interp), (char *) NULL);
+			Tcl_PosixError(interp), (char *) NULL);
 		break;
 	    }
 	    buffer[count] = 0;
@@ -1707,13 +1971,27 @@ CleanupChildren(interp, numPids, pidPtr, errorId)
     }
 
     /*
+     * If a child exited abnormally but didn't output any error information
+     * at all, generate an error message here.
+     */
+
+    if (abnormalExit && (*interp->result == 0)) {
+	Tcl_AppendResult(interp, "child process exited abnormally",
+		(char *) NULL);
+    }
+
+    /*
      * If the last character of interp->result is a newline, then remove
      * the newline character (the newline would just confuse things).
+     * Special hack: must replace the old terminating null character
+     * as a signal to Tcl_AppendResult et al. that we've mucked with
+     * the string.
      */
 
     length = strlen(interp->result);
-    if ((length > 0) && (interp->result[length-1] == '\n')) {
+    if (!keepNewline && (length > 0) && (interp->result[length-1] == '\n')) {
 	interp->result[length-1] = '\0';
+	interp->result[length] = 'x';
     }
 
     return result;

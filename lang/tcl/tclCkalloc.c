@@ -3,14 +3,25 @@
  *    Interface to malloc and free that provides support for debugging problems
  *    involving overwritten, double freeing memory and loss of memory.
  *
- * Copyright 1991 Regents of the University of California
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1991-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  *
  * This code contributed by Karl Lehenbauer and Mark Diekhans
  *
@@ -34,6 +45,7 @@ struct mem_header {
         int                line;
         struct mem_header *flink;
         struct mem_header *blink;
+	int		   dummy;	/* Aligns body on 8-byte boundary. */
         unsigned char      low_guard[GUARD_SIZE];
         char               body[1];
 };
@@ -53,13 +65,19 @@ static int maximum_malloc_packets = 0;
 static int break_on_malloc = 0;
 static int trace_on_at_malloc = 0;
 static int  alloc_tracing = FALSE;
-static int  init_malloced_bodies = FALSE;
+static int  init_malloced_bodies = TRUE;
 #ifdef MEM_VALIDATE
     static int  validate_memory = TRUE;
 #else
     static int  validate_memory = FALSE;
 #endif
 
+/*
+ * Prototypes for procedures defined in this file:
+ */
+
+static int		MemoryCmd _ANSI_ARGS_((ClientData clientData,
+			    Tcl_Interp *interp, int argc, char **argv));
 
 /*
  *----------------------------------------------------------------------
@@ -114,7 +132,7 @@ ValidateMemory (memHeaderP, file, line, nukeGuards)
             fflush (stdout);
 	    byte &= 0xff;
             fprintf(stderr, "low guard byte %d is 0x%x  \t%c\n", idx, byte,
-	    	    (isprint(byte) ? byte : ' '));
+		    (isprint(UCHAR(byte)) ? byte : ' '));
         }
     }
     if (guard_failed) {
@@ -135,7 +153,7 @@ ValidateMemory (memHeaderP, file, line, nukeGuards)
             fflush (stdout);
 	    byte &= 0xff;
             fprintf(stderr, "hi guard byte %d is 0x%x  \t%c\n", idx, byte,
-	    	    (isprint(byte) ? byte : ' '));
+		    (isprint(UCHAR(byte)) ? byte : ' '));
         }
     }
 
@@ -204,9 +222,6 @@ Tcl_DumpActiveMemory (fileName)
         fprintf (fileP, "%8lx - %8lx  %7d @ %s %d", address,
                  address + memScanP->length - 1, memScanP->length,
                  memScanP->file, memScanP->line);
-        if (strcmp(memScanP->file, "tclHash.c") == 0 && memScanP->line == 518){
-	    fprintf(fileP, "\t|%s|", ((Tcl_HashEntry *) address)->key.string);
-	}
 	(void) fputc('\n', fileP);
     }
     fclose (fileP);
@@ -252,13 +267,20 @@ Tcl_DbCkalloc(size, file, line)
     }
 
     /*
-     * Fill in guard zones and size.  Link into allocated list.
+     * Fill in guard zones and size.  Also initialize the contents of
+     * the block with bogus bytes to detect uses of initialized data.
+     * Link into allocated list.
      */
+    if (init_malloced_bodies) {
+        memset ((VOID *) result, GUARD_VALUE,
+		size + sizeof(struct mem_header) + GUARD_SIZE);
+    } else {
+	memset ((char *) result->low_guard, GUARD_VALUE, GUARD_SIZE);
+	memset (result->body + size, GUARD_VALUE, GUARD_SIZE);
+    }
     result->length = size;
     result->file = file;
     result->line = line;
-    memset ((char *) result->low_guard, GUARD_VALUE, GUARD_SIZE);
-    memset (result->body + size, GUARD_VALUE, GUARD_SIZE);
     result->flink = allocHead;
     result->blink = NULL;
     if (allocHead != NULL)
@@ -286,7 +308,7 @@ Tcl_DbCkalloc(size, file, line)
                 total_mallocs);
         fprintf(stderr, "program will now enter C debugger\n");
         (void) fflush(stderr);
-        kill (getpid(), SIGINT);
+	abort();
     }
 
     current_malloc_packets++;
@@ -295,9 +317,6 @@ Tcl_DbCkalloc(size, file, line)
     current_bytes_malloced += size;
     if (current_bytes_malloced > maximum_bytes_malloced)
         maximum_bytes_malloced = current_bytes_malloced;
-
-    if (init_malloced_bodies)
-        memset (result->body, 0xff, (int) size);
 
     return result->body;
 }
@@ -332,7 +351,11 @@ Tcl_DbCkfree(ptr, file, line)
     /*
      * Since header ptr is zero, body offset will be size
      */
+#ifdef _CRAYCOM
+    memp = (struct mem_header *)((char *) ptr  - (sizeof(int)*((unsigned)&(memp->body))));
+#else
     memp = (struct mem_header *)(((char *) ptr) - (int)memp->body);
+#endif
 
     if (alloc_tracing)
         fprintf(stderr, "ckfree %lx %ld %s %d\n", memp->body, 
@@ -342,6 +365,9 @@ Tcl_DbCkfree(ptr, file, line)
         Tcl_ValidateAllMemory (file, line);
 
     ValidateMemory (memp, file, line, TRUE);
+    if (init_malloced_bodies) {
+	memset((VOID *) ptr, GUARD_VALUE, memp->length);
+    }
 
     total_frees++;
     current_malloc_packets--;
@@ -380,9 +406,20 @@ Tcl_DbCkrealloc(ptr, size, file, line)
     int line;
 {
     char *new;
+    unsigned int copySize;
+    struct mem_header *memp = 0;  /* Must be zero for size calc */
 
+#ifdef _CRAYCOM
+    memp = (struct mem_header *)((char *) ptr  - (sizeof(int)*((unsigned)&(memp->body))));
+#else
+    memp = (struct mem_header *)(((char *) ptr) - (int)memp->body);
+#endif
+    copySize = size;
+    if (copySize > memp->length) {
+	copySize = memp->length;
+    }
     new = Tcl_DbCkalloc(size, file, line);
-    memcpy((VOID *) new, (VOID *) ptr, (int) size);
+    memcpy((VOID *) new, (VOID *) ptr, (int) copySize);
     Tcl_DbCkfree(ptr, file, line);
     return(new);
 }
@@ -407,12 +444,14 @@ Tcl_DbCkrealloc(ptr, size, file, line)
 	/* ARGSUSED */
 static int
 MemoryCmd (clientData, interp, argc, argv)
-    char       *clientData;
+    ClientData  clientData;
     Tcl_Interp *interp;
     int         argc;
     char      **argv;
 {
     char *fileName;
+    Tcl_DString buffer;
+    int result;
 
     if (argc < 2) {
 	Tcl_AppendResult(interp, "wrong # args:  should be \"",
@@ -463,11 +502,13 @@ MemoryCmd (clientData, interp, argc, argv)
 		    argv[0], " active file", (char *) NULL);
 	    return TCL_ERROR;
 	}
-        fileName = argv [2];
-        if (fileName [0] == '~')
-            if ((fileName = Tcl_TildeSubst (interp, fileName)) == NULL)
-                return TCL_ERROR;
-        if (Tcl_DumpActiveMemory (fileName) != TCL_OK) {
+	fileName = Tcl_TildeSubst(interp, argv[2], &buffer);
+	if (fileName == NULL) {
+	    return TCL_ERROR;
+	}
+	result = Tcl_DumpActiveMemory (fileName);
+	Tcl_DStringFree(&buffer);
+	if (result != TCL_OK) {
 	    Tcl_AppendResult(interp, "error accessing ", argv[2], 
 		    (char *) NULL);
 	    return TCL_ERROR;
@@ -502,8 +543,8 @@ void
 Tcl_InitMemory(interp)
     Tcl_Interp *interp;
 {
-Tcl_CreateCommand (interp, "memory", MemoryCmd, (ClientData)NULL, 
-                  (void (*)())NULL);
+Tcl_CreateCommand (interp, "memory", MemoryCmd, (ClientData) NULL, 
+                  (Tcl_CmdDeleteProc *) NULL);
 }
 
 #else

@@ -8,8 +8,8 @@
  *
  */
 
-#include <tclInt.h>
-#include <tclUnix.h>
+#include "tclInt.h"
+#include "tclUnix.h"
 
 #undef DIRSIZ
 #define DIRSIZ(dp) \

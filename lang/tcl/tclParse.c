@@ -5,15 +5,30 @@
  *	to parse Tcl commands or parts of commands (like quoted
  *	strings or nested sub-commands).
  *
- * Copyright 1991 Regents of the University of California.
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies.  The University of California
- * makes no representations about the suitability of this
- * software for any purpose.  It is provided "as is" without
- * express or implied warranty.
+ * Copyright (c) 1987-1993 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Permission is hereby granted, without written agreement and without
+ * license or royalty fees, to use, copy, modify, and distribute this
+ * software and its documentation for any purpose, provided that the
+ * above copyright notice and the following two paragraphs appear in
+ * all copies of this software.
+ * 
+ * IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+ * DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+ * OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+ * CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+ * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
+
+#ifndef lint
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclParse.c,v 1.2 1993/12/27 07:06:14 rich Exp $ SPRITE (Berkeley)";
+#endif
 
 #include "tclInt.h"
 
@@ -107,14 +122,9 @@ static char *	VarNameEnd _ANSI_ARGS_((char *string));
  *
  * Results:
  *	The return value is the character that should be substituted
- *	in place of the backslash sequence that starts at src, or 0
- *	if the backslash sequence should be replace by nothing (e.g.
- *	backslash followed by newline).  If readPtr isn't NULL then
- *	it is filled in with a count of the number of characters in
- *	the backslash sequence.  Note:  if the backslash isn't followed
- *	by characters that are understood here, then the backslash
- *	sequence is only considered to be one character long, and it
- *	is replaced by a backslash char.
+ *	in place of the backslash sequence that starts at src.  If
+ *	readPtr isn't NULL then it is filled in with a count of the
+ *	number of characters in the backslash sequence.
  *
  * Side effects:
  *	None.
@@ -136,11 +146,11 @@ Tcl_Backslash(src, readPtr)
     count = 2;
 
     switch (*p) {
+	case 'a':
+	    result = 0x7;	/* Don't say '\a' here, since some compilers */
+	    break;		/* don't support it. */
 	case 'b':
 	    result = '\b';
-	    break;
-	case 'e':
-	    result = 033;
 	    break;
 	case 'f':
 	    result = '\f';
@@ -157,70 +167,47 @@ Tcl_Backslash(src, readPtr)
 	case 'v':
 	    result = '\v';
 	    break;
-	case 'C':
-	    p++;
-	    if (isspace(*p) || (*p == 0)) {
-		result = 'C';
-		count = 1;
-		break;
+	case 'x':
+	    if (isxdigit(UCHAR(p[1]))) {
+		char *end;
+
+		result = strtoul(p+1, &end, 16);
+		count = end - src;
+	    } else {
+		count = 2;
+		result = 'x';
 	    }
-	    count = 3;
-	    if (*p == 'M') {
-		p++;
-		if (isspace(*p) || (*p == 0)) {
-		    result = 'M' & 037;
-		    break;
-		}
-		count = 4;
-		result = (*p & 037) | '\200';
-		break;
-	    }
-	    count = 3;
-	    result = *p & 037;
-	    break;
-	case 'M':
-	    p++;
-	    if (isspace(*p) || (*p == 0)) {
-		result = 'M';
-		count = 1;
-		break;
-	    }
-	    count = 3;
-	    result = *p + '\200';
-	    break;
-	case '}':
-	case '{':
-	case ']':
-	case '[':
-	case '$':
-	case ' ':
-	case ';':
-	case '"':
-	case '\\':
-	    result = *p;
 	    break;
 	case '\n':
-	    result = 0;
+	    do {
+		p++;
+	    } while (isspace(UCHAR(*p)));
+	    result = ' ';
+	    count = p - src;
+	    break;
+	case 0:
+	    result = '\\';
+	    count = 1;
 	    break;
 	default:
-	    if (isdigit(*p)) {
+	    if (isdigit(UCHAR(*p))) {
 		result = *p - '0';
 		p++;
-		if (!isdigit(*p)) {
+		if (!isdigit(UCHAR(*p))) {
 		    break;
 		}
 		count = 3;
 		result = (result << 3) + (*p - '0');
 		p++;
-		if (!isdigit(*p)) {
+		if (!isdigit(UCHAR(*p))) {
 		    break;
 		}
 		count = 4;
 		result = (result << 3) + (*p - '0');
 		break;
 	    }
-	    result = '\\';
-	    count = 1;
+	    result = *p;
+	    count = 2;
 	    break;
     }
 
@@ -337,9 +324,7 @@ TclParseQuotes(interp, string, termChar, flags, termPtr, pvPtr)
 
 	    src--;
 	    *dst = Tcl_Backslash(src, &numRead);
-	    if (*dst != 0) {
-		dst++;
-	    }
+	    dst++;
 	    src += numRead;
 	    continue;
 	} else if (c == '\0') {
@@ -395,7 +380,9 @@ TclParseNestedCmd(interp, string, flags, termPtr, pvPtr)
     int result, length, shortfall;
     Interp *iPtr = (Interp *) interp;
 
-    result = Tcl_Eval(interp, string, flags | TCL_BRACKET_TERM, termPtr);
+    iPtr->evalFlags = flags | TCL_BRACKET_TERM;
+    result = Tcl_Eval(interp, string);
+    *termPtr = iPtr->termPtr;
     if (result != TCL_OK) {
 	/*
 	 * The increment below results in slightly cleaner message in
@@ -502,8 +489,8 @@ TclParseBraces(interp, string, termPtr, pvPtr)
 	     */
 
 	    if (*src == '\n') {
-		dst--;
-		src++;
+		dst[-1] = Tcl_Backslash(src-1, &count);
+		src += count - 1;
 	    } else {
 		(void) Tcl_Backslash(src-1, &count);
 		while (count > 1) {
@@ -682,10 +669,20 @@ TclParseWords(interp, string, flags, maxWords, termPtr, argcPtr, argv, pvPtr)
 		    int numRead;
     
 		    *dst = Tcl_Backslash(src, &numRead);
-		    if (*dst != 0) {
-			dst++;
+
+		    /*
+		     * The following special check allows a backslash-newline
+		     * to be treated as a word-separator, as if the backslash
+		     * and newline had been collapsed before command parsing
+		     * began.
+		     */
+
+		    if (src[1] == '\n') {
+			src += numRead;
+			goto wordEnd;
 		    }
 		    src += numRead;
+		    dst++;
 		} else {
 		    goto copy;
 		}
@@ -725,6 +722,12 @@ TclParseWords(interp, string, flags, maxWords, termPtr, argcPtr, argv, pvPtr)
 	    } else if (type == TCL_OPEN_BRACE) {
 		result = TclParseBraces(interp, src+1, termPtr, pvPtr);
 	    } else if ((type == TCL_BACKSLASH) && (src[1] == '\n')) {
+		/*
+		 * This code is needed so that a backslash-newline at the
+		 * very beginning of a word is treated as part of the white
+		 * space between words and not as a space within the word.
+		 */
+
 		src += 2;
 		goto skipSpace;
 	    } else {
@@ -869,18 +872,39 @@ TclExpandParseValue(pvPtr, needed)
  */
 
 char *
-TclWordEnd(start, nested)
+TclWordEnd(start, nested, semiPtr)
     char *start;		/* Beginning of a word of a Tcl command. */
     int nested;			/* Zero means this is a top-level command.
 				 * One means this is a nested command (close
 				 * brace is a word terminator). */
+    int *semiPtr;		/* Set to 1 if word ends with a command-
+				 * terminating semi-colon, zero otherwise.
+				 * If NULL then ignored. */
 {
     register char *p;
     int count;
 
-    p = start;
-    while (isspace(*p)) {
-	p++;
+    if (semiPtr != NULL) {
+	*semiPtr = 0;
+    }
+
+    /*
+     * Skip leading white space (backslash-newline must be treated like
+     * white-space, except that it better not be the last thing in the
+     * command).
+     */
+
+    for (p = start; ; p++) {
+	if (isspace(UCHAR(*p))) {
+	    continue;
+	}
+	if ((p[0] == '\\') && (p[1] == '\n')) {
+	    if (p[2] == 0) {
+		return p+2;
+	    }
+	    continue;
+	}
+	break;
     }
 
     /*
@@ -923,7 +947,7 @@ TclWordEnd(start, nested)
     while (1) {
 	if (*p == '[') {
 	    for (p++; *p != ']'; p++) {
-		p = TclWordEnd(p, 1);
+		p = TclWordEnd(p, 1, (int *) NULL);
 		if (*p == 0) {
 		    return p;
 		}
@@ -946,8 +970,11 @@ TclWordEnd(start, nested)
 	     * Include the semi-colon in the word that is returned.
 	     */
 
+	    if (semiPtr != NULL) {
+		*semiPtr = 1;
+	    }
 	    return p;
-	} else if (isspace(*p)) {
+	} else if (isspace(UCHAR(*p))) {
 	    return p-1;
 	} else if ((*p == ']') && nested) {
 	    return p-1;
@@ -1005,7 +1032,7 @@ QuoteEnd(string, term)
 	    p += count;
 	} else if (*p == '[') {
 	    for (p++; *p != ']'; p++) {
-		p = TclWordEnd(p, 1);
+		p = TclWordEnd(p, 1, (int *) NULL);
 		if (*p == 0) {
 		    return p;
 		}
@@ -1058,7 +1085,7 @@ VarNameEnd(string)
 	}
 	return p;
     }
-    while (isalnum(*p) || (*p == '_')) {
+    while (isalnum(UCHAR(*p)) || (*p == '_')) {
 	p++;
     }
     if ((*p == '(') && (p != string+1)) {
@@ -1141,7 +1168,7 @@ Tcl_ParseVar(interp, string, termPtr)
 	string++;
     } else {
 	name1 = string;
-	while (isalnum(*string) || (*string == '_')) {
+	while (isalnum(UCHAR(*string)) || (*string == '_')) {
 	    string++;
 	}
 	if (string == name1) {
@@ -1176,6 +1203,7 @@ Tcl_ParseVar(interp, string, termPtr)
 		}
 		goto done;
 	    }
+	    Tcl_ResetResult(interp);
 	    string = end;
 	    name2 = pv.buffer;
 	}
@@ -1197,4 +1225,53 @@ Tcl_ParseVar(interp, string, termPtr)
 	ckfree(pv.buffer);
     }
     return result;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tcl_CommandComplete --
+ *
+ *	Given a partial or complete Tcl command, this procedure
+ *	determines whether the command is complete in the sense
+ *	of having matched braces and quotes and brackets.
+ *
+ * Results:
+ *	1 is returned if the command is complete, 0 otherwise.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+int
+Tcl_CommandComplete(cmd)
+    char *cmd;			/* Command to check. */
+{
+    register char *p = cmd;
+    int commentOK = 1;
+
+    while (1) {
+	while (isspace(UCHAR(*p))) {
+	    if (*p == '\n') {
+		commentOK = 1;
+	    }
+	    p++;
+	}
+	if ((*p == '#') && commentOK) {
+	    do {
+		p++;
+	    } while ((*p != '\n') && (*p != 0));
+	    continue;
+	}
+	if (*p == 0) {
+	    return 1;
+	}
+	p = TclWordEnd(p, 0, &commentOK);
+	if (*p == 0) {
+	    return 0;
+	}
+	p++;
+    }
 }

@@ -4,9 +4,37 @@
 # built-in commands.  Sourcing this file into Tcl runs the tests and
 # generates output for errors.  No output means no errors were found.
 #
-# $Header: /a/cvs/386BSD/ports/lang/tcl/tests/expr.test,v 1.1 1993/08/09 10:57:42 alm Exp $ (Berkeley)
+# Copyright (c) 1991-1993 The Regents of the University of California.
+# All rights reserved.
+#
+# Permission is hereby granted, without written agreement and without
+# license or royalty fees, to use, copy, modify, and distribute this
+# software and its documentation for any purpose, provided that the
+# above copyright notice and the following two paragraphs appear in
+# all copies of this software.
+#
+# IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT
+# OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+# CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+# AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+# ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+# PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+#
+# $Header: /a/cvs/386BSD/ports/lang/tcl/tests/expr.test,v 1.2 1993/12/27 07:08:21 rich Exp $ (Berkeley)
 
 if {[string compare test [info procs test]] == 1} then {source defs}
+
+if {([catch {expr T1()} msg] == 1) && ($msg == {unknown math function "T1"})} {
+    set gotT1 0
+    puts "This application hasn't been compiled with the \"T1\" and"
+    puts "\"T2\" math functions, so I'll skip some of the expr tests."
+} else {
+    set gotT1 1
+}
 
 # First, test all of the integer operators individually.
 
@@ -51,6 +79,14 @@ test expr-1.38 {integer operators} {expr 3||0} 1
 test expr-1.39 {integer operators} {expr 0||0} 0
 test expr-1.40 {integer operators} {expr 3>2?44:66} 44
 test expr-1.41 {integer operators} {expr 2>3?44:66} 66
+test expr-1.42 {integer operators} {expr 36/5} 7
+test expr-1.43 {integer operators} {expr 36%5} 1
+test expr-1.44 {integer operators} {expr -36/5} -8
+test expr-1.45 {integer operators} {expr -36%5} 4
+test expr-1.46 {integer operators} {expr 36/-5} -8
+test expr-1.47 {integer operators} {expr 36%-5} -4
+test expr-1.48 {integer operators} {expr -36/-5} 7
+test expr-1.49 {integer operators} {expr -36%-5} -1
 
 # Check the floating-point operators individually, along with
 # automatic conversion to integers where needed.
@@ -60,7 +96,7 @@ test expr-2.2 {floating-point operators} {expr -(1.1+4.2)} -5.3
 test expr-2.3 {floating-point operators} {expr !2.1} 0
 test expr-2.4 {floating-point operators} {expr !0.0} 1
 test expr-2.5 {floating-point operators} {expr 4.2*6.3} 26.46
-test expr-2.6 {floating-point operators} {expr 36.0/12.0} 3
+test expr-2.6 {floating-point operators} {expr 36.0/12.0} 3.0
 test expr-2.7 {floating-point operators} {expr 27/4.0} 6.75
 test expr-2.8 {floating-point operators} {expr 2.3+2.1} 4.4
 test expr-2.9 {floating-point operators} {expr 2.3-6.5} -4.2
@@ -90,6 +126,9 @@ test expr-2.32 {floating-point operators} {expr 1.3||0.0} 1
 test expr-2.33 {floating-point operators} {expr 3.3||0.0} 1
 test expr-2.34 {floating-point operators} {expr 3.3>2.3?44.3:66.3} 44.3
 test expr-2.35 {floating-point operators} {expr 2.3>3.3?44.3:66.3} 66.3
+test expr-2.36 {floating-point operators} {
+    list [catch {expr 028.1 + 09.2} msg] $msg
+} {0 37.3}
 
 # Operators that aren't legal on floating-point numbers
 
@@ -143,8 +182,11 @@ test expr-4.14 {string operators} {expr {"abd" == "abd"}} 1
 test expr-4.15 {string operators} {expr {"abc" != "abd"}} 1
 test expr-4.16 {string operators} {expr {"abd" != "abd"}} 0
 test expr-4.17 {string operators} {expr {"0y" < "0x12"}} 1
-test expr-4.18 {string operators} {expr {1?"foo":"bar"}} foo
-test expr-4.19 {string operators} {expr {0?"foo":"bar"}} bar
+test expr-4.18 {string operators} {expr {"." < " "}} 0
+test expr-4.19 {string operators} {expr {"0" == "+"}} 0
+test expr-4.20 {string operators} {expr {"0" == "-"}} 0
+test expr-4.21 {string operators} {expr {1?"foo":"bar"}} foo
+test expr-4.22 {string operators} {expr {0?"foo":"bar"}} bar
 
 # Operators that aren't legal on string operands.
 
@@ -289,8 +331,13 @@ test expr-22.2 {embedded variables} {
     set y 10
     expr {$x + $y}
 } {5}
-test expr-22.3 {embedded commands and variables} {expr {[set a] - 14}} 2
-test expr-22.4 {embedded commands and variables} {
+test expr-22.3 {embedded variables} {
+    set x "  -5"
+    set y "  +10"
+    expr {$x + $y}
+} {5}
+test expr-22.4 {embedded commands and variables} {expr {[set a] - 14}} 2
+test expr-22.5 {embedded commands and variables} {
     list [catch {expr {12 - [bad_command_name]}} msg] $msg
 } {1 {invalid command name: "bad_command_name"}}
 
@@ -306,7 +353,7 @@ test expr-23.3 {double-quotes} {
     expr {"$b2$b2$b2.[set b2].[set b2]"}
 } xyxxyxxyx.xyx.xyx
 test expr-23.4 {double-quotes} {expr {"11\}\}22"}} 11}}22
-test expr-23.5 {double-quotes} {expr {"\abc"}} {\abc}
+test expr-23.5 {double-quotes} {expr {"\*bc"}} {*bc}
 test expr-23.6 {double-quotes} {
     catch {unset bogus__}
     list [catch {expr {"$bogus__"}} msg] $msg
@@ -339,6 +386,9 @@ test expr-25.14 {type conversions} {expr {"24.1a" > 24.1}} 1
 test expr-25.15 {type conversions} {expr {24.1 > "24.1a"}} 0
 test expr-25.16 {type conversions} {expr 2+2.5} 4.5
 test expr-25.17 {type conversions} {expr 2+2.5} 4.5
+test expr-25.18 {type conversions} {expr 2.0e2} 200.0
+test expr-25.19 {type conversions} {expr 2.0e15} 2e+15
+test expr-25.20 {type conversions} {expr 10.0} 10.0
 
 # Various error conditions.
 
@@ -366,26 +416,26 @@ test expr-26.7 {error conditions} {
     list [catch {expr {2+(4}} msg] $msg
 } {1 {unmatched parentheses in expression "2+(4"}}
 test expr-26.8 {error conditions} {
-    list [catch {expr 2/0} msg] $msg
-} {1 {divide by zero}}
+    list [catch {expr 2/0} msg] $msg $errorCode
+} {1 {divide by zero} {ARITH DIVZERO {divide by zero}}}
 test expr-26.9 {error conditions} {
-    list [catch {expr 2%0} msg] $msg
-} {1 {divide by zero}}
+    list [catch {expr 2%0} msg] $msg $errorCode
+} {1 {divide by zero} {ARITH DIVZERO {divide by zero}}}
 test expr-26.10 {error conditions} {
+    list [catch {expr 2.0/0.0} msg] $msg $errorCode
+} {1 {divide by zero} {ARITH DIVZERO {divide by zero}}}
+test expr-26.11 {error conditions} {
     list [catch {expr 2#} msg] $msg
 } {1 {syntax error in expression "2#"}}
-test expr-26.11 {error conditions} {
+test expr-26.12 {error conditions} {
     list [catch {expr a.b} msg] $msg
 } {1 {syntax error in expression "a.b"}}
-test expr-26.12 {error conditions} {
+test expr-26.13 {error conditions} {
     list [catch {expr {"a"/"b"}} msg] $msg
 } {1 {can't use non-numeric string as operand of "/"}}
-test expr-26.13 {error conditions} {
+test expr-26.14 {error conditions} {
     list [catch {expr 2:3} msg] $msg
 } {1 {can't have : operator without ? first}}
-test expr-26.14 {error conditions} {
-    list [catch {expr a@b} msg] $msg
-} {1 {syntax error in expression "a@b"}}
 test expr-26.15 {error conditions} {
     list [catch {expr a@b} msg] $msg
 } {1 {syntax error in expression "a@b"}}
@@ -401,6 +451,9 @@ test expr-26.18 {error conditions} {
 test expr-26.19 {error conditions} {
     list [catch {expr a} msg] $msg
 } {1 {syntax error in expression "a"}}
+test expr-26.20 {error conditions} {
+    list [catch expr msg] $msg
+} {1 {wrong # args: should be "expr arg ?arg ...?"}}
 
 # Cancelled evaluation.
 
@@ -436,42 +489,62 @@ test expr-27.6 {cancelled evaluation} {
 
 test expr-28.1 {Tcl_ExprBoolean usage} {
     set a 1
-    if {2} {
-	set a 2
-    }
+    if {2} {set a 2}
     set a
 } 2
 test expr-28.2 {Tcl_ExprBoolean usage} {
     set a 1
-    if {0} {
-	set a 2
-    }
+    if {0} {set a 2}
     set a
 } 1
 test expr-28.3 {Tcl_ExprBoolean usage} {
     set a 1
-    if {1.2} {
-	set a 2
-    }
+    if {1.2} {set a 2}
     set a
 } 2
 test expr-28.4 {Tcl_ExprBoolean usage} {
     set a 1
-    if {-1.1} {
-	set a 2
-    }
+    if {-1.1} {set a 2}
     set a
 } 2
 test expr-28.5 {Tcl_ExprBoolean usage} {
     set a 1
-    if {0.0} {
-	set a 2
-    }
+    if {0.0} {set a 2}
     set a
 } 1
-test expr-28.6 {Tcl_ExprBool usage} {
+test expr-28.6 {Tcl_ExprBoolean usage} {
+    set a 1
+    if {"YES"} {set a 2}
+    set a
+} 2
+test expr-28.7 {Tcl_ExprBoolean usage} {
+    set a 1
+    if {"no"} {set a 2}
+    set a
+} 1
+test expr-28.8 {Tcl_ExprBoolean usage} {
+    set a 1
+    if {"true"} {set a 2}
+    set a
+} 2
+test expr-28.9 {Tcl_ExprBoolean usage} {
+    set a 1
+    if {"fAlse"} {set a 2}
+    set a
+} 1
+test expr-28.10 {Tcl_ExprBoolean usage} {
+    set a 1
+    if {"on"} {set a 2}
+    set a
+} 2
+test expr-28.11 {Tcl_ExprBoolean usage} {
+    set a 1
+    if {"Off"} {set a 2}
+    set a
+} 1
+test expr-28.12 {Tcl_ExprBool usage} {
     list [catch {if {"abc"} {}} msg] $msg
-} {1 {expression didn't have numeric value}}
+} {1 {expected boolean value but got "abc"}}
 
 # Operands enclosed in braces
 
@@ -496,3 +569,254 @@ test expr-30.2 {long values} {
     set a "$a$a$a$a$a$a$a$a$a$a$a$a$a$a$a$a${a}5"
     expr $a
 } 5
+
+# Expressions spanning multiple arguments
+
+test expr-31.1 {multiple arguments to expr command} {
+    expr 4 + ( 6 *12) -3
+} 73
+test expr-31.2 {multiple arguments to expr command} {
+    list [catch {expr 2 + (3 + 4} msg] $msg
+} {1 {unmatched parentheses in expression "2 + (3 + 4"}}
+test expr-31.3 {multiple arguments to expr command} {
+    list [catch {expr 2 + 3 +} msg] $msg
+} {1 {syntax error in expression "2 + 3 +"}}
+test expr-31.4 {multiple arguments to expr command} {
+    list [catch {expr 2 + 3 )} msg] $msg
+} {1 {syntax error in expression "2 + 3 )"}}
+
+# Math functions
+
+test expr-32.1 {math functions in expressions} {
+    expr acos(0.5)
+} {1.0472}
+test expr-32.2 {math functions in expressions} {
+    expr asin(0.5)
+} {0.523599}
+test expr-32.3 {math functions in expressions} {
+    expr atan(1.0)
+} {0.785398}
+test expr-32.4 {math functions in expressions} {
+    expr atan2(2.0, 2.0)
+} {0.785398}
+test expr-32.5 {math functions in expressions} {
+    expr ceil(1.999)
+} {2.0}
+test expr-32.6 {math functions in expressions} {
+    expr cos(.1)
+} {0.995004}
+test expr-32.7 {math functions in expressions} {
+    expr cosh(.1)
+} {1.005}
+test expr-32.8 {math functions in expressions} {
+    expr exp(1.0)
+} {2.71828}
+test expr-32.9 {math functions in expressions} {
+    expr floor(2.000)
+} {2.0}
+test expr-32.10 {math functions in expressions} {
+    expr floor(2.001)
+} {2.0}
+test expr-32.11 {math functions in expressions} {
+    expr fmod(7.3, 3.2)
+} {0.9}
+test expr-32.12 {math functions in expressions} {
+    expr hypot(3.0, 4.0)
+} {5.0}
+test expr-32.13 {math functions in expressions} {
+    expr log(2.8)
+} {1.02962}
+test expr-32.14 {math functions in expressions} {
+    expr log10(2.8)
+} {0.447158}
+test expr-32.15 {math functions in expressions} {
+    expr pow(2.1, 3.1)
+} {9.97424}
+test expr-32.16 {math functions in expressions} {
+    expr sin(.1)
+} {0.0998334}
+test expr-32.17 {math functions in expressions} {
+    expr sinh(.1)
+} {0.100167}
+test expr-32.18 {math functions in expressions} {
+    expr sqrt(2.0)
+} {1.41421}
+test expr-32.19 {math functions in expressions} {
+    expr tan(0.8)
+} {1.02964}
+test expr-32.20 {math functions in expressions} {
+    expr tanh(0.8)
+} {0.664037}
+test expr-32.21 {math functions in expressions} {
+    expr abs(-1.8)
+} {1.8}
+test expr-32.22 {math functions in expressions} {
+    expr abs(10.0)
+} {10.0}
+test expr-32.23 {math functions in expressions} {
+    expr abs(-4)
+} {4}
+test expr-32.24 {math functions in expressions} {
+    expr abs(66)
+} {66}
+if ($atBerkeley) {
+    test expr-32.25 {math functions in expressions} {
+	list [catch {expr abs(0x80000000)} msg] $msg
+    } {1 {integer value too large to represent}}
+}
+test expr-32.26 {math functions in expressions} {
+    expr double(1)
+} {1.0}
+test expr-32.27 {math functions in expressions} {
+    expr double(1.1)
+} {1.1}
+test expr-32.28 {math functions in expressions} {
+    expr int(1)
+} {1}
+test expr-32.29 {math functions in expressions} {
+    expr int(1.4)
+} {1}
+test expr-32.30 {math functions in expressions} {
+    expr int(1.6)
+} {1}
+test expr-32.31 {math functions in expressions} {
+    expr int(-1.4)
+} {-1}
+test expr-32.32 {math functions in expressions} {
+    expr int(-1.6)
+} {-1}
+test expr-32.33 {math functions in expressions} {
+    list [catch {expr int(1e60)} msg] $msg
+} {1 {integer value too large to represent}}
+test expr-32.34 {math functions in expressions} {
+    list [catch {expr int(-1e60)} msg] $msg
+} {1 {integer value too large to represent}}
+test expr-32.35 {math functions in expressions} {
+    expr round(1.49)
+} {1}
+test expr-32.36 {math functions in expressions} {
+    expr round(1.51)
+} {2}
+test expr-32.37 {math functions in expressions} {
+    expr round(-1.49)
+} {-1}
+test expr-32.38 {math functions in expressions} {
+    expr round(-1.51)
+} {-2}
+test expr-32.39 {math functions in expressions} {
+    list [catch {expr round(1e60)} msg] $msg
+} {1 {integer value too large to represent}}
+test expr-32.40 {math functions in expressions} {
+    list [catch {expr round(-1e60)} msg] $msg
+} {1 {integer value too large to represent}}
+test expr-32.41 {math functions in expressions} {
+    list [catch {expr pow(1.0 + 3.0 - 2, .8 * 5)} msg] $msg
+} {0 16.0}
+test expr-32.42 {math functions in expressions} {
+    list [catch {expr hypot(5*.8,3)} msg] $msg
+} {0 5.0}
+if $gotT1 {
+    test expr-32.43 {math functions in expressions} {
+	expr 2*T1()
+    } 246
+    test expr-32.44 {math functions in expressions} {
+	expr T2()*3
+    } 1035
+}
+
+test expr-33.1 {conversions and fancy args to math functions} {
+    expr hypot ( 3 , 4 )
+} 5.0
+test expr-33.2 {conversions and fancy args to math functions} {
+    expr hypot ( (2.0+1.0) , 4 )
+} 5.0
+test expr-33.3 {conversions and fancy args to math functions} {
+    expr hypot ( 3 , (3.0 + 1.0) )
+} 5.0
+test expr-33.4 {conversions and fancy args to math functions} {
+    expr cos(acos(0.1))
+} 0.1
+
+test expr-34.1 {errors in math functions} {
+    list [catch {expr func_2(1.0)} msg] $msg
+} {1 {unknown math function "func_2"}}
+test expr-34.2 {errors in math functions} {
+    list [catch {expr func|(1.0)} msg] $msg
+} {1 {syntax error in expression "func|(1.0)"}}
+test expr-34.3 {errors in math functions} {
+    list [catch {expr {hypot("a b", 2.0)}} msg] $msg
+} {1 {argument to math function didn't have numeric value}}
+test expr-34.4 {errors in math functions} {
+    list [catch {expr hypot(1.0 2.0)} msg] $msg
+} {1 {syntax error in expression "hypot(1.0 2.0)"}}
+test expr-34.5 {errors in math functions} {
+    list [catch {expr hypot(1.0, 2.0} msg] $msg
+} {1 {syntax error in expression "hypot(1.0, 2.0"}}
+test expr-34.6 {errors in math functions} {
+    list [catch {expr hypot(1.0 ,} msg] $msg
+} {1 {syntax error in expression "hypot(1.0 ,"}}
+test expr-34.7 {errors in math functions} {
+    list [catch {expr hypot(1.0)} msg] $msg
+} {1 {too few arguments for math function}}
+test expr-34.8 {errors in math functions} {
+    list [catch {expr hypot(1.0, 2.0, 3.0)} msg] $msg
+} {1 {too many arguments for math function}}
+test expr-34.9 {errors in math functions} {
+    list [catch {expr acos(-2.0)} msg] $msg $errorCode
+} {1 {domain error: argument not in valid range} {ARITH DOMAIN {domain error: argument not in valid range}}}
+if $atBerkeley {
+    test expr-34.10 {errors in math functions} {
+	list [catch {expr pow(-3, 1000001)} msg] $msg $errorCode
+    } {1 {floating-point value too large to represent} {ARITH OVERFLOW {floating-point value too large to represent}}}
+}
+test expr-34.11 {errors in math functions} {
+    list [catch {expr pow(3, 1000001)} msg] $msg $errorCode
+} {1 {floating-point value too large to represent} {ARITH OVERFLOW {floating-point value too large to represent}}}
+test expr-34.12 {errors in math functions} {
+    list [catch {expr -14.0*exp(100000)} msg] $msg $errorCode
+} {1 {floating-point value too large to represent} {ARITH OVERFLOW {floating-point value too large to represent}}}
+test expr-34.13 {errors in math functions} {
+    list [catch {expr int(1.0e30)} msg] $msg $errorCode
+} {1 {integer value too large to represent} {ARITH IOVERFLOW {integer value too large to represent}}}
+test expr-34.14 {errors in math functions} {
+    list [catch {expr int(-1.0e30)} msg] $msg $errorCode
+} {1 {integer value too large to represent} {ARITH IOVERFLOW {integer value too large to represent}}}
+test expr-34.15 {errors in math functions} {
+    list [catch {expr round(1.0e30)} msg] $msg $errorCode
+} {1 {integer value too large to represent} {ARITH IOVERFLOW {integer value too large to represent}}}
+test expr-34.16 {errors in math functions} {
+    list [catch {expr round(-1.0e30)} msg] $msg $errorCode
+} {1 {integer value too large to represent} {ARITH IOVERFLOW {integer value too large to represent}}}
+if $gotT1 {
+    test expr-34.17 {errors in math functions} {
+	list [catch {expr T1(4)} msg] $msg
+    } {1 {syntax error in expression "T1(4)"}}
+}
+
+catch {unset tcl_precision}
+test expr-35.1 {tcl_precision variable} {
+    expr 2.0/3
+} 0.666667
+set tcl_precision 1
+test expr-35.2 {tcl_precision variable} {
+    expr 2.0/3
+} 0.7
+test expr-35.3 {tcl_precision variable} {
+    expr 2.0/3
+} 0.7
+test expr-35.4 {tcl_precision variable} {
+    list [catch {set tcl_precision 0} msg] $msg [expr 2.0/3]
+} {1 {can't set "tcl_precision": improper value for precision} 0.7}
+test expr-35.5 {tcl_precision variable} {
+    list [catch {set tcl_precision 101} msg] $msg [expr 2.0/3]
+} {1 {can't set "tcl_precision": improper value for precision} 0.7}
+test expr-35.6 {tcl_precision variable} {
+    list [catch {set tcl_precision {}} msg] $msg [expr 2.0/3]
+} {1 {can't set "tcl_precision": improper value for precision} 0.7}
+test expr-35.7 {tcl_precision variable} {
+    list [catch {set tcl_precision {1 2 3}} msg] $msg [expr 2.0/3]
+} {1 {can't set "tcl_precision": improper value for precision} 0.7}
+catch {unset tcl_precision}
+test expr-35.8 {tcl_precision variable} {
+    expr 2.0/3
+} 0.666667
