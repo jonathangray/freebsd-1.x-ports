@@ -1,0 +1,188 @@
+This is C News.
+
+C News is a reimplementation of the transport and storage subsystems of the
+news software -- basically, everything except news readers.  We supply a
+simple news reader (written by Michael Rourke, included by permission,
+slightly modified [so bugs are probably our fault]) as a replacement for
+B-News readnews suited to use by occasional users.  For regular news users,
+there are several more sophisticated readers widely available, and all should
+work with C News.  We use Larry Wall's "rn" ourselves; we have not included
+it because this distribution is already rather big.
+
+C News's major advantage over B News is that it is much faster.  Timings
+quite a while ago gave C News a speed advantage of roughly a factor of 25
+in processing incoming batches.  This has probably improved a bit since.
+C News is now, on good machines with good C libraries, mostly system-call
+bound.  Use of system calls has been optimized with some care, so it's
+unlikely that further big speed improvements can be made at user level
+without sacrificing backward compatibility.  See our paper in the Winter '87
+Usenix proceedings for some discussion of how the speed was achieved.
+
+C News also wins over B News on simplicity and robustness.  We provide
+(in our opinion) everything that's necessary, and avoid the frills that
+run up the complexity and decrease reliability.  We have not attempted to
+provide every feature anyone can think of, and have no plans to do so
+in future either.  (This is one reason why we've stayed out of the news-
+reader business, which generally has a bad case of feature-of-the-week
+syndrome.)
+
+C News's files are fully compatible with those of B News for any program
+that does not read log files and does not inspect the middle field of the
+history file closely.  (The one major program that does is "nntp"; current
+versions (1.5.8 and later) include our C News support, including a significant
+speedup.)  C News complies fully with RFC 1036 (nee RFC 850), the official
+definition of news interchange format.
+
+C News is, by intent and *we think* in practice, compatible with B News
+at the level of most interfaces to the normal user, which basically means
+the semantics and options of "inews".  It is *not* compatible on the
+system-administration level, although we think most of the changes are
+improvements or worthwhile simplifications.  The "postnews" that we supply
+is not compatible with that of B News; it is purely interactive, as news
+that is already formatted can simply be fed to "inews -h".
+
+For those who now run one of our ancient pre-alpha versions, many things
+have changed, and in particular the four-field history file format is gone.
+C News has also changed quite a bit since the alpha release that went out
+on Usenet some time ago.
+
+For our beta testers, build and the Makefiles have changed quite a bit but
+the software itself needed only fairly trivial fixes.
+
+We know of three things that could still use work in this release:
+
+	1. The documentation could use work, especially for naive customers.
+	As it stands, it pretty much assumes a general knowledge of news
+	software.
+
+	2. There are a great number of small improvements that could
+	be made to the installation process, especially to permit still more
+	customization via the "build" program.
+
+	3. The fgetmfs function (in the libc directory) assumes that fgets
+	does not alter the buffer beyond the end of the string.  We are not
+	sure how portable this is, although it works on all our beta-test
+	systems, and may revise fgetmfs someday.
+
+The active file format is the 4-field one that B news introduced midway
+through 2.10, with minor additions: an `x' in the 4th field means
+``discard articles in this newsgroup'', and `=group' in the 4th field
+means ``file articles for this newsgroup under `group' instead''.
+
+The history file format is like B with one exception:  the second field,
+which few programs ever look at, now consists of two subfields separated
+by a tilde (~).  The first is the arrival date as a decimal number, the
+second is the expiry date (if any) as a human-readable date (as emitted by
+rnews) or a decimal number (after expire has gotten its hands on it once).
+Expire is tolerant of human-readable dates in both those places, but other
+things may not be.  The best way to get the history file into the new
+format is to rebuild it completely (this is RELATIVELY quick).
+
+The sys file format is like a late-model B news with two extensions.
+First, the second field (groups and distributions) may optionally be
+split into two subfields (newsgroups and distributions, respectively)
+with a slash. This permits solutions to various tricky problems that can
+arise in odd situations if it is impossible to tell what's a newsgroup
+name and what's a distribution.  Second, there is a new flag in the
+third field:  f is like F except that its output has the size
+information that the C batcher wants for accurate limiting of batch
+size.
+
+The way the news articles themselves are stored is totally unchanged; we
+have been unable to think of any changes that are worth the trouble.
+
+There are some new control files in /usr/lib/news, to control the smarter
+expire and batcher.  (Old C News sites, note some format changes.)
+
+File organization:  the one change is that programs are now kept mostly
+in /usr/lib/newsbin, with /usr/lib/news reserved for control files etc.
+
+B News sites note:  /bin/rnews is now a front end for the input spooler.
+The real news-filing program is called relaynews and is not in /bin.
+
+C News is meant to run adequately on a 16-bit machine, although this has
+not been tested thoroughly since utzoo became a Sun.
+
+Most (by intent all) of the programs understand seven key environment
+variables: NEWSARTS specifies location of articles (default
+/usr/spool/news), NEWSCTL specifies location of control files (default
+/usr/lib/news), NEWSBIN gives location of programs (default
+/usr/lib/newsbin), NEWSUMASK gives the umask to be used in creating
+files (default 002), NEWSPATH gives the path used to find "normal" programs
+(default /bin:/usr/bin), NEWSMASTER is the address to which problem
+reports should be mailed (default usenet), and NEWSCONFIG is the full
+pathname of a little file that shell programs can use to pick up local
+default settings for all these things (the equivalent for the C programs
+is in the C News library) (default /usr/lib/news/bin/config).  The
+environment variables override the defaults for testing and for operation
+in funny situations.  Note that one or two things (e.g. relaynews), as
+distributed, will insist on renouncing setuid privileges if invoked with
+these overrides.
+
+Be warned that the simple news reader in
+rna has not been gone over very well to make sure that it uses the
+standard configuration mechanisms.  Hardwired pathnames may be present there,
+and in general the stuff there is not well fitted into our automatic-install
+machinery.
+
+See ROADMAP for a run-down on what's where in the distribution.  See
+doc/install for how to install it.  You may wish to read notebook/problems,
+which discusses common difficulties.  Conf/build is the interactive setup
+program that does most of the work, or rather, sets up shell files which,
+when run, do most of the work.  Even if your system is odd enough that
+you don't want to run the shell files conf/build generates -- doit.bin and
+friends -- as is, you are most strongly advised to run conf/build and use
+the resulting shell files as guides, rather than trying to "wing it"
+yourself.  Getting the library built correctly is *NOT* trivial, because
+we try to cater to all 57000 different variants of Unix and there are a lot
+of decisions that have to be made.  This is why we supply a 31KB shell
+program to generate the configure+compile+install instructions, rather than
+just sending a complete pre-cooked recipe embodied in a Makefile:  there are
+too many variables affecting how it should be done.
+
+For general background and information on running a news system, we highly
+recommend the Nutshell Handbook:
+
+	"Managing UUCP and Usenet", by Tim O'Reilly and Grace Todino,
+	O'Reilly & Associates, 1989, ISBN 0-937175-48-X.  This latest
+	edition covers C News as well as B News.  It's not perfect but
+	it's lots better than nothing.  Inquiries to nuts@ora.com or
+	uunet!ora!nuts.
+
+C News has been tested pretty thoroughly.  We're also thoroughly sick of
+it and make no promises that there will ever be another release.  We may,
+repeat *may*, provide updates via some appropriate newsgroup (currently
+the best choice is "news.software.b", although there is some sentiment for
+folding all the subgroups there into just "news.software"; we oppose
+creation of "news.software.c" because we don't think there will be enough
+traffic to justify a whole newsgroup).
+
+If you've found a problem, we definitely do want to hear about it.  But,
+we *do not* want to see 2000 lines of diff listing!  What we want to see
+is a concise human-readable description of what the problem is and how, 
+if at all, you solved it.  If we want the diff listing, we will ask.
+Similarly, we are interested in hearing about changes and improvements,
+but want to see terse descriptions first.
+
+If you want us to consider changes/fixes/etc, send them to us, don't just
+post them to the net.  We don't necessarily read all possibly-relevant
+groups.  Only postings from us are officially part of C News.
+
+To send comments, complaints, problem reports, etc., do *not* mail to
+Geoff or Henry personally, but to:
+
+	c-news@zoo.toronto.edu
+aka	c-news@zoo.utoronto.ca
+aka	utzoo!c-news
+
+(Note that this has changed, c-news used to be on utstat.)
+
+The current C News distribution can currently always be retrieved by
+anonymous ftp from ftp.cs.toronto.edu in file pub/c-news/c-news.Z (a shell
+archive) or pub/c-news/c-news.tar.Z (a tar archive) and the complete set
+of patches can also be found on ftp.cs.toronto.edu in the directory
+pub/c-news/patches.  FTP during our peak hours (12h00-17h00 Eastern) is
+not encouraged.
+
+					Geoff Collyer
+					Henry Spencer
