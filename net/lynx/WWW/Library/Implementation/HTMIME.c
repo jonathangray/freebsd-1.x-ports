@@ -20,10 +20,14 @@
 */
 
 PUBLIC char * redirecting_url=0;
+extern int loading_length; /* from HTFormat.c (for HTCopy) */
 
 typedef enum _MIME_state {
 	MIME_TRANSPARENT,	/* put straight through to target ASAP! */
 	BEGINNING_OF_LINE,
+	CONTENT_,
+	CONTENT_ENCODING,
+	CONTENT_LENGTH,
 	CONTENT_T,
 	CONTENT_TRANSFER_ENCODING,
 	CONTENT_TYPE,
@@ -38,7 +42,7 @@ typedef enum _MIME_state {
 	/* TRANSPARENT and IGNORE are defined as stg else in _WINDOWS */
 } MIME_state;
 
-#define VALUE_SIZE 128		/* @@@@@@@ Arbitrary? */
+#define VALUE_SIZE 1024		/* @@@@@@@ Arbitrary? */
 struct _HTStream {
 	CONST HTStreamClass *	isa;
 	
@@ -58,6 +62,8 @@ struct _HTStream {
 	char *			boundary;	/* For multipart */
 	
 	HTFormat		encoding;	/* Content-Transfer-Encoding */
+	char *			compression_encoding;
+	int			content_length;
 	HTFormat		format;		/* Content-Type */
 	HTStream *		target;		/* While writing out */
 	HTStreamClass		targetClass;
@@ -121,8 +127,8 @@ PRIVATE void HTMIME_put_character ARGS2(HTStream *, me, char, c)
         switch(c) {
 	case 'c':
 	case 'C':
-	    me->check_pointer = "ontent-t";
-	    me->if_ok = CONTENT_T;
+	    me->check_pointer = "ontent-";
+	    me->if_ok = CONTENT_;
 	    me->state = CHECK;
 	    break;
 	case 'l':
@@ -175,8 +181,53 @@ PRIVATE void HTMIME_put_character ARGS2(HTStream *, me, char, c)
 	}
 	break;
 	
-    case CONTENT_T:
+    case CONTENT_:
+	if (TRACE)
+           fprintf (stderr,
+                 "[MIME] in case CONTENT_\n");
         switch(c) {
+        case 't':
+        case 'T':
+          me->state = CONTENT_T;
+          if (TRACE)
+            fprintf (stderr,
+                     "[MIME] Was CONTENT_, found T, state now CONTENT_T\n");
+          break;
+
+        case 'e':
+        case 'E':
+          me->check_pointer = "ncoding:";
+          me->if_ok = CONTENT_ENCODING;
+          me->state = CHECK;
+          if (TRACE)
+            fprintf (stderr,
+                     "[MIME] Was CONTENT_, found E, checking for 'ncoding:'\n");
+          break;
+
+        case 'l':
+        case 'L':
+          me->check_pointer = "ength:";
+          me->if_ok = CONTENT_LENGTH;
+          me->state = CHECK;
+          if (TRACE)
+            fprintf (stderr,
+                     "[MIME] Was CONTENT_, found L, checking for 'ength:'\n");
+          break;
+
+        default:
+          if (TRACE)
+            fprintf (stderr,
+                     "[MIME] Was CONTENT_, found nothing; bleah\n");
+          goto bad_field_name;
+
+        } /* switch on character */
+      break;
+
+    case CONTENT_T:
+      if (TRACE)
+        fprintf (stderr,
+                 "[MIME] in case CONTENT_T\n");
+      switch(c) {
 	case 'r':
 	case 'R':
 	    me->check_pointer = "ansfer-encoding:";
@@ -199,6 +250,8 @@ PRIVATE void HTMIME_put_character ARGS2(HTStream *, me, char, c)
 	
     case CONTENT_TYPE:
     case CONTENT_TRANSFER_ENCODING:
+    case CONTENT_ENCODING:
+    case CONTENT_LENGTH:
     case LOCATION:
         me->field = me->state;		/* remember it */
 	me->state = SKIP_GET_VALUE;
@@ -225,6 +278,24 @@ PRIVATE void HTMIME_put_character ARGS2(HTStream *, me, char, c)
 	    case CONTENT_TRANSFER_ENCODING:
 	        me->encoding = HTAtom_for(me->value);
 		break;
+            case CONTENT_ENCODING:
+		me->compression_encoding=0;
+                StrAllocCopy(me->compression_encoding, me->value);
+		
+                if (TRACE)
+                  fprintf (stderr,
+                       "[MIME_put_char] Picked up compression encoding '%s'\n",
+                        me->compression_encoding);
+              break;
+	    case CONTENT_LENGTH:
+                me->content_length = atoi (me->value);
+                /* This is TEMPORARY. */
+                loading_length = me->content_length;
+                if (TRACE)
+                  fprintf (stderr,
+                         "[MIME_put_char] Picked up content length '%d'\n",
+                         me->content_length);
+                break;
 	    case LOCATION:
 		redirecting_url = 0;
 		StrAllocCopy(redirecting_url, me->value);

@@ -3,7 +3,7 @@ LYMail.o HTAlert.o GridText.o LYGetFile.o \
 LYMain.o LYMainLoop.o LYCurses.o LYBookmark.o LYUtils.o \
 LYOptions.o LYReadCFG.o LYSearch.o LYHistory.o \
 LYForms.o LYPrint.o LYrcFile.o LYDownload.o LYNews.o LYKeymap.o \
-HTML.o HTFWriter.o HTInit.o DefaultStyles.o 
+HTML.o HTFWriter.o HTInit.o DefaultStyles.o LYLocal.o LYUpload.o
 
 CFLAGS= $(MCFLAGS) -I..
 
@@ -32,7 +32,7 @@ lint:
 	lint *.c  > ../lint.out
 
 clean:
-	rm -f core lynx *.[ob]
+	rm -f lynx core *.[ob]
 
 LYMain.o: ../userdefs.h 
 LYMainLoop.o: ../userdefs.h

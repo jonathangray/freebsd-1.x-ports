@@ -260,7 +260,7 @@ PUBLIC HTStream* HTSaveAndExecute ARGS3(
     if (suffix) strcat(fnam, suffix);
 #endif /* NOT */
     
-    me->fp = fopen (fnam, "w");
+    me->fp = fopen (fnam, "wb");
     if (!me->fp) {
 	HTAlert("Can't open temporary file!");
         free(fnam);
@@ -357,7 +357,7 @@ PUBLIC HTStream* HTSaveToFile ARGS3(
 */
     tempname(fnam,NEW_FILE);
 
-    ret_obj->fp = fopen (fnam, "w");
+    ret_obj->fp = fopen (fnam, "wb");
     if (!ret_obj->fp) {
         HTAlert("Can't open output file! Cancelling");
         free(ret_obj);

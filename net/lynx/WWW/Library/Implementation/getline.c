@@ -26,7 +26,14 @@ Cambridge, MA 02139, USA.  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <tcp.h>
+#include "tcp.h"
+#if defined(VAXC) && !defined(__DECC)
+#define malloc	VAXC$MALLOC_OPT
+#define calloc	VAXC$CALLOC_OPT
+#define free	VAXC$FREE_OPT
+#define cfree	VAXC$CFREE_OPT
+#define realloc	VAXC$REALLOC_OPT
+#endif /* VAXC && !__DECC */
 
 /* Read up to (and including) a newline from STREAM into *LINEPTR
    (and null-terminate it). *LINEPTR is a pointer returned from malloc (or

@@ -26,7 +26,7 @@ LYK_REFRESH,      LYK_ACTIVATE,     LYK_DOWN_TWO,     0,
 LYK_UP_TWO,             0,          LYK_RELOAD,       0,
 /* ^P */            /* XON */       /* ^R */      /* XOFF */
 
-0,                      0,              0,        LYK_REFRESH,
+LYK_TRACE_TOGGLE,       0,              0,        LYK_REFRESH,
 /* ^T */            /* ^U */        /* ^V */      /* ^W */
 
 0,                      0,              0,            0,
@@ -62,8 +62,18 @@ LYK_8,            LYK_9,                0,             0,
 0,              LYK_ADD_BOOKMARK, LYK_PREV_PAGE,    LYK_COMMENT,
 /* @ */              /* A */         /* B */        /* C */
 
-LYK_DOWNLOAD,     LYK_EDIT,             0,          LYK_GOTO,
-/* D */              /* E */         /* F */        /* G */
+LYK_DOWNLOAD,     LYK_EDIT,             
+/* D */              /* E */         
+
+#ifdef DIRED_SUPPORT
+LYK_DIRED_MENU,
+#else
+0,          
+#endif /* DIRED_SUPPORT */
+/* F */        
+
+LYK_GOTO,
+/* G */
 
 LYK_HELP,         LYK_INDEX,            0,             0,
 /* H */              /* I */         /* J */        /* K */
@@ -71,11 +81,18 @@ LYK_HELP,         LYK_INDEX,            0,             0,
 0,                LYK_MAIN_MENU,  LYK_NEXT,         LYK_OPTIONS,
 /* L */              /* M */         /* N */        /* O */
 
-LYK_PRINT,        LYK_ABORT,           0,           LYK_INDEX_SEARCH,
+LYK_PRINT,        LYK_ABORT,      LYK_DEL_BOOKMARK, LYK_INDEX_SEARCH,
 /* P */              /* Q */         /* R */        /* S */
 
-0,                LYK_PREV_DOC,   LYK_VIEW_BOOKMARK,   0,
-/* T */              /* U */         /* V */        /* W */
+#ifdef DIRED_SUPPORT
+LYK_TAG_LINK,     
+#else
+0,
+#endif /* DIRED_SUPPORT */
+/* T */
+
+ 	          LYK_PREV_DOC,   LYK_VIEW_BOOKMARK,   0,
+                     /* U */         /* V */        /* W */
 
 LYK_FORM_UP,            0,        LYK_FORM_DOWN,       0,
 /* X */              /* Y */         /* Z */        /* [ */
@@ -86,8 +103,18 @@ LYK_SOURCE,             0,              0,             0,
 0,             LYK_ADD_BOOKMARK,  LYK_PREV_PAGE,    LYK_COMMENT,
 /* ` */              /* a */         /* b */        /* c */
 
-LYK_DOWNLOAD,     LYK_EDIT,             0,          LYK_GOTO,
-/* d */              /* e */         /* f */        /* g */
+LYK_DOWNLOAD,     LYK_EDIT,             
+/* d */              /* e */         
+
+#ifdef DIRED_SUPPORT
+LYK_DIRED_MENU,
+#else
+0,          
+#endif /* DIRED_SUPPORT */
+/* f */        
+
+LYK_GOTO,
+/* g */
 
 LYK_HELP,         LYK_INDEX,            0,             0,
 /* h */              /* i */         /* j */        /* k */
@@ -95,11 +122,18 @@ LYK_HELP,         LYK_INDEX,            0,             0,
 0,                LYK_MAIN_MENU,  LYK_NEXT,         LYK_OPTIONS,
 /* l */              /* m */         /* n */        /* o */
 
-LYK_PRINT,        LYK_QUIT,            0,           LYK_INDEX_SEARCH,
+LYK_PRINT,        LYK_QUIT,       LYK_DEL_BOOKMARK, LYK_INDEX_SEARCH,
 /* p */              /* q */         /* r */        /* s */
 
-0,                LYK_PREV_DOC,   LYK_VIEW_BOOKMARK,   0,
-/* t */              /* u */         /* v */         /* w */
+#ifdef DIRED_SUPPORT
+LYK_TAG_LINK,     
+#else
+0,
+#endif /* DIRED_SUPPORT */
+/* t */
+
+                    LYK_PREV_DOC,   LYK_VIEW_BOOKMARK,   0,
+                     /* u */         /* v */         /* w */
 
 LYK_FORM_UP,            0,          LYK_FORM_DOWN,     0,
 /* x */              /* y */          /* z */       /* { */
@@ -122,6 +156,132 @@ LYK_UP_TWO,       LYK_DOWN_TWO,
 LYK_DO_NOTHING,
 /* DO_NOTHING*/
 };
+
+/* this table is used to override the standard keyboard assignments
+ * when lynx_edit_mode is in effect and keyboard overrides have been
+ * allowed at compile time.
+ */
+
+#if defined(DIRED_SUPPORT) && defined(OK_OVERRIDE)
+
+char override[] = {
+
+    0,
+/* EOF */
+
+    0,                  0,              0,            0,
+/* nul */           /* ^A */        /* ^B */      /* ^C */
+
+    0,                  0,              0,            0,
+/* ^D */            /* ^E */        /* ^F */      /* ^G */
+
+    0,                  0,              0,            0,
+/* bs */            /* ht */        /* nl */      /* ^K */
+
+    0,                  0,              0,            0,
+/* ^L */            /* cr */        /* ^N */      /* ^O */
+
+    0,                  0,              0,            0,
+/* ^P */            /* XON */       /* ^R */      /* XOFF */
+
+    0,            LYK_PREV_DOC,         0,            0,
+/* ^T */            /* ^U */        /* ^V */      /* ^W */
+
+    0,                  0,              0,            0,
+/* ^X */            /* ^Y */        /* ^Z */      /* ESC */
+
+    0,                  0,              0,            0,
+/* ^\ */            /* ^] */        /* ^^ */      /* ^_ */
+
+    0,                 0,              0,            0,
+/* sp */            /* ! */         /* " */       /* # */
+
+   0,                  0,              0,            0,
+/* $ */             /* % */         /* & */       /* ' */
+
+    0,                 0,              0,            0,
+/* ( */             /* ) */         /* * */       /* + */
+
+    0,                 0,         LYK_TAG_LINK,      0,
+/* , */             /* - */         /* . */       /* / */
+
+   0,                 0,               0,            0,
+/* 0 */             /* 1 */        /* 2 */        /* 3 */
+
+   0,                 0,               0,            0,
+/* 4 */             /* 5 */        /* 6 */        /* 7 */
+
+   0,                 0,              0,             0,
+/* 8 */             /* 9 */        /* : */        /* ; */
+
+   0,                 0,              0,             0,
+/* < */             /* = */        /* > */        /* ? */
+
+   0,                  0,              0,         LYK_CREATE,
+/* @ */             /* A */         /* B */        /* C */
+
+   0,                  0,        LYK_DIRED_MENU,       0,
+/* D */             /* E */         /* F */        /* G */
+
+   0,                  0,              0,             0,
+/* H */             /* I */         /* J */        /* K */
+
+   0,             LYK_MODIFY,          0,             0,
+/* L */             /* M */         /* N */        /* O */
+
+   0,                  0,         LYK_REMOVE,         0,
+/* P */             /* Q */         /* R */        /* S */
+
+LYK_TAG_LINK,     LYK_UPLOAD,          0,             0,
+/* T */             /* U */         /* V */        /* W */
+
+   0,                  0,              0,             0,
+/* X */             /* Y */         /* Z */        /* [ */
+
+   0,                  0,              0,             0,
+/* \ */             /* ] */         /* ^ */        /* _ */
+
+0,                     0,              0,         LYK_CREATE,
+/* ` */             /* a */         /* b */        /* c */
+
+   0,                  0,       LYK_DIRED_MENU,       0,
+/* d */             /* e */         /* f */        /* g */
+
+   0,                  0,              0,             0,
+/* h */             /* i */         /* j */        /* k */
+
+0,                LYK_MODIFY,          0,             0,
+/* l */             /* m */         /* n */        /* o */
+
+   0,                  0,          LYK_REMOVE,        0,
+/* p */             /* q */         /* r */        /* s */
+
+LYK_TAG_LINK,      LYK_UPLOAD,         0,             0,
+/* t */             /* u */         /* v */         /* w */
+
+   0,                  0,               0,            0,
+/* x */             /* y */          /* z */       /* { */
+
+   0,                   0,             0,              0,
+/* | */              /* } */         /* ~ */       /* del */
+
+   0,                   0,             0,              0,
+/* UPARROW */     /* DNARROW */     /* RTARROW */   /* LTARROW */
+
+   0,                  0,              0,              0,
+/* PGDOWN */      /* PGUP */        /* HOME */      /* END */
+
+   0,                  0,              0,              0,
+/* F1*/ 	  /* Do key */      /* Find key */  /* Select key */
+
+   0,                  0,
+/* Insert key */  /* Remove key */
+
+LYK_DO_NOTHING,
+/* DO_NOTHING*/
+};
+
+#endif
 
 PRIVATE char *revmap[] = {
 "UNMAPPED",
@@ -174,6 +334,7 @@ PRIVATE char *revmap[] = {
 "VIEW_BOOKMARK",
 "SHELL",
 "DOWNLOAD",
+"TRACE_TOGGLE",
 "DO_NOTHING",
 NULL
 };
@@ -272,7 +433,7 @@ PUBLIC void reset_emacs_keys NOARGS
       did_emacs_keys = FALSE;
 }
 
-static char saved_number_keys[8];
+static char saved_number_keys[9];
 static BOOLEAN did_number_keys;
 
 PUBLIC void set_numbers_as_arrows NOARGS
@@ -294,6 +455,10 @@ PUBLIC void set_numbers_as_arrows NOARGS
       saved_number_keys[7] = keymap['3'+1];
       keymap['3'+1] = LYK_NEXT_PAGE;
 
+	/* disable the 5 */
+      saved_number_keys[8] = keymap['5'+1];
+      keymap['5'+1] = LYK_DO_NOTHING;
+
       did_number_keys = TRUE;
 }
 
@@ -310,6 +475,7 @@ PUBLIC void reset_numbers_as_arrows NOARGS
       keymap['1'+1] = saved_number_keys[5];
       keymap['9'+1] = saved_number_keys[6];
       keymap['3'+1] = saved_number_keys[7];
+      keymap['5'+1] = saved_number_keys[8];
 
       did_number_keys = FALSE;
 }

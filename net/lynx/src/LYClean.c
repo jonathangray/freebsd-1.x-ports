@@ -59,7 +59,9 @@ PUBLIC void cleanup_sig ARGS1(int,sig)
 #ifdef VMS
     exit(0);
 #else /* not VMS */
-    exit(sig);
+    if(sig)
+       exit(sig);
+	/* otherwise return and don't exit */
 #endif /* VMS */
 }
 

@@ -36,15 +36,10 @@ struct _HTStream
 
 extern char * HTAppName;	/* Application name: please supply */
 extern char * HTAppVersion;	/* Application version: please supply */
-extern char * HTLocalUserName;	/* User's name/email address */
+extern char * personal_mail_address;	/* User's name/email address */
 
 extern BOOL using_proxy;    /* are we using an HTTP gateway? */
 extern char LYUserSpecifiedURL; /* is the URL a goto? */
-
-/* Variables that control whether we do a POST or a GET,
-   and if a POST, what and how we POST. */
-char *post_content_type = NULL;
-char *post_data = NULL;
 
 
 /*		Load Document from HTTP Server			HTLoadHTTP()
@@ -91,7 +86,7 @@ PUBLIC int HTLoadHTTP ARGS4 (
   int length, doing_redirect, rv;
   int already_retrying = 0;
 
-  if(post_data)
+  if(anAnchor->post_data)
       do_post=TRUE;
   
   if (!arg)
@@ -151,7 +146,10 @@ PUBLIC int HTLoadHTTP ARGS4 (
    */        
   {
     char * p1 = HTParse(arg, "", PARSE_PATH|PARSE_PUNCTUATION);
-    command = malloc(5 + strlen(p1)+ 2 + 31);
+    command = malloc(5 + strlen(p1)+ 2 + 31 + 
+		/* Referer: field */
+		(LYUserSpecifiedURL ? 0 : 
+				(strlen((char *)HTLoadedDocumentURL()) + 10)));
 
     if (do_post)
       strcpy(command, "POST ");
@@ -186,10 +184,13 @@ PUBLIC int HTLoadHTTP ARGS4 (
       for(i=0; i<n; i++) 
         {
           HTPresentation * pres = HTList_objectAt(HTPresentations, i);
-          if (pres->rep_out == WWW_PRESENT) 
+          if (pres->rep_out == WWW_PRESENT)
             {
-              sprintf(line, "Accept: %s%c%c",
-                      HTAtom_name(pres->rep), CR, LF);
+	      if(pres->rep == WWW_SOURCE) 
+		  sprintf(line, "Accept: */*%c%c", CR, LF);
+  	      else
+                  sprintf(line, "Accept: %s%c%c", 
+					HTAtom_name(pres->rep), CR, LF);
               StrAllocCat(command, line);
             }
         }
@@ -200,14 +201,17 @@ PUBLIC int HTLoadHTTP ARGS4 (
               HTLibraryVersion, CR, LF);
       StrAllocCat(command, line);
 
-      sprintf(line, "From:  %s%c%c", HTLocalUserName, CR,LF);
-      StrAllocCat(command, line);
-
-      if(!LYUserSpecifiedURL) {
-          sprintf(line, "Referer:  %s%c%c",HTLoadedDocumentURL(), CR, LF);
+      if(personal_mail_address) {
+          sprintf(line, "From:  %s%c%c", personal_mail_address, CR,LF);
           StrAllocCat(command, line);
       }
 
+      if(!LYUserSpecifiedURL) {
+          StrAllocCat(command, "Referer:  ");
+          StrAllocCat(command, HTLoadedDocumentURL());
+          sprintf(line, "%c%c", CR, LF);
+          StrAllocCat(command, line);
+      }
       
       {
         char *docname;
@@ -247,16 +251,17 @@ PUBLIC int HTLoadHTTP ARGS4 (
     {
       if (TRACE)
         fprintf (stderr, "HTTP: Doing post, content-type '%s'\n",
-                 post_content_type);
+                 anAnchor->post_content_type);
       sprintf (line, "Content-type: %s%c%c",
-               post_content_type ? post_content_type : "lose", CR, LF);
+               anAnchor->post_content_type ? anAnchor->post_content_type 
+							: "lose", CR, LF);
       StrAllocCat(command, line);
       {
         int content_length;
-        if (!post_data)
+        if (!anAnchor->post_data)
           content_length = 4; /* 4 == "lose" :-) */
         else
-          content_length = strlen (post_data);
+          content_length = strlen (anAnchor->post_data);
         sprintf (line, "Content-length: %d%c%c",
                  content_length, CR, LF);
         StrAllocCat(command, line);
@@ -264,13 +269,7 @@ PUBLIC int HTLoadHTTP ARGS4 (
       
       StrAllocCat(command, crlf);	/* Blank line means "end" */
       
-      if (post_data) {
-        StrAllocCat(command, post_data);
-	free(post_data);
-	post_data=0;
-      } else {
-        StrAllocCat(command, "lose");
-      }
+      StrAllocCat(command, anAnchor->post_data);
     }
 
   StrAllocCat(command, crlf);	/* Blank line means "end" */
@@ -543,11 +542,19 @@ PUBLIC int HTLoadHTTP ARGS4 (
                 /* length -= start_of_data - text_buffer; */
                 if (HTAA_shouldRetryWithAuth(start_of_data, length, s)) 
                   {
+                    extern BOOLEAN dump_output_immediately;
+
                     (void)NETCLOSE(s);
                     if (line_buffer) 
                       free(line_buffer);
                     if (line_kept_clean) 
                       free(line_kept_clean);
+                    if(dump_output_immediately)	{
+                      fprintf(stderr, "HTTP:  Access authorization required.\n");
+                      fprintf(stderr, "       Cannot retrieve non-interactively.\n");
+                      status = HT_NO_DATA;
+                      goto clean_up;
+                    }
 
                     if (TRACE) 
                       fprintf(stderr, "%s %d %s\n",
@@ -592,6 +599,10 @@ PUBLIC int HTLoadHTTP ARGS4 (
             break;
             
           case 2:		/* Good: Got MIME object */
+	    if(server_status == 204) {
+	        status = HT_NO_DATA;
+	        goto done;
+	    }
             break;
             
           default:		/* bad number */
@@ -622,15 +633,18 @@ PUBLIC int HTLoadHTTP ARGS4 (
 
   /* Go pull the bulk of the data down. */
   rv = HTCopy(s, target);
+
   if (rv == -1)
     {
-      /* (*target->isa->abort)(target, NULL); already done in HTCopy */
+      /* Intentional interrupt before data were received, not an error */
+      /* (*target->isa->abort)(target, NULL);/* already done in HTCopy */
       status = HT_INTERRUPTED;
+      NETCLOSE(s);
       goto clean_up;
     }
   if (rv == -2 && !already_retrying && !do_post)
-    {
-      /* Aw hell. */
+    { 
+      /* Aw hell, a REAL error, maybe cuz it's a dumb HTTP0 server */
       if (TRACE)
         fprintf (stderr, "HTTP: Trying again with HTTP0 request.\n");
       /* May as well consider it an interrupt -- right? */
@@ -647,9 +661,14 @@ PUBLIC int HTLoadHTTP ARGS4 (
       goto try_again;
     }
 
-  /* Close socket before doing free. */
-  NETCLOSE(s);
-  (*target->isa->free)(target);
+  /* 
+   * Close socket if partial transmission (was freed on abort)
+   * Free if complete transmission (socket was closed before return)
+   */
+  if (rv == HT_INTERRUPTED)
+      NETCLOSE(s);
+  else
+      (*target->isa->free)(target);
 
   if (doing_redirect)
     {
@@ -661,6 +680,7 @@ PUBLIC int HTLoadHTTP ARGS4 (
     }
   else
     {
+      /* If any data were received, treat as a complete transmission */
       status = HT_LOADED;
     }
 

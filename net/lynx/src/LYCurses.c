@@ -25,11 +25,11 @@ PUBLIC void start_curses NOARGS
 	 */
     if(first_time) {
         initscr();	/* start curses */
-#ifdef __FreeBSD__
-	/* disable clear to EOL feature -- FreeBSD curses misuses it */
-	CE = 0;
-#endif
         first_time = FALSE;
+#ifdef __FreeBSD__
+        /* disable clear to EOL feature -- FreeBSD curses misuses it */
+        CE = 0;
+#endif
     }
 
 #else
@@ -42,7 +42,11 @@ PUBLIC void start_curses NOARGS
     crmode();
     raw();
 #else
+#ifdef NO_CBREAK
+    crmode();
+#else
     cbreak();
+#endif /* NO_CBREAK */
     signal(SIGINT, cleanup_sig);
 #endif /* VMS */
 
@@ -71,6 +75,9 @@ PUBLIC void stop_curses NOARGS
 
     LYCursesON = FALSE;
 
+#ifdef UNIX
+    signal(SIGINT, SIG_IGN);
+#endif
 }
 
 
@@ -106,6 +113,7 @@ PUBLIC BOOLEAN setup ARGS1(char *,terminal)
 	    printf("\n");
 	    return(FALSE);
 	}
+	strcpy(term,"vt100");
     }
 
     ttopen();
@@ -293,8 +301,12 @@ PUBLIC void VMSexit NOARGS
      *  the terminal.
      */
      if (!DidCleanup) {
-          fprintf(stderr,"\nPlease report this error to Lou Montulli:");
-          fprintf(stderr,"\n    montulli@ukanaix.cc.ukans.edu");
+          fprintf(stderr,
+"\nA Fatal error has occured in Lynx Ver. %s\n\
+Please report this error to the Lynx development team\n",LYNX_VERSION);
+          fprintf(stderr,"\
+with a description of what you were doing at the time of the crash:");
+          fprintf(stderr,"\n    lynx-bug@ukanaix.cc.ukans.edu");
           fprintf(stderr,"\nPress RETURN to clean up: ");
 	  (void) getchar();
           cleanup();
@@ -562,10 +574,12 @@ PRIVATE int spawn_DCLprocess ARGS1(char *,command)
      if (command == "")
           status = lib$spawn(0);
      else {
+#ifndef __ALPHA /** OpenVMS/AXP v6.1FT still lacks the TRUSTED flag **/
 	  if(VersionVMS[1] >= '6')
 	       /** Include TRUSTED flag **/
                status = lib$spawn(&command_desc,0,0,&CLI$M_TRUSTED);
 	  else
+#endif /* __ALPHA */
 	       status = lib$spawn(&command_desc);
      }
      return(status);

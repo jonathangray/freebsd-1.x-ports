@@ -29,7 +29,7 @@ PUBLIC void mailmsg ARGS4(int,cur, char *,owner_address,
 
 #ifdef UNIX
 #ifdef MMDF
-	sprintf(cmd, "%s -mlrxto,cc*",SYSTEM_MAIL);
+	sprintf(cmd, "%s -mlruxto,cc\\*",SYSTEM_MAIL);
 #else
 	sprintf(cmd, "%s -t -oi", SYSTEM_MAIL);
 #endif /* MMDF */
@@ -120,11 +120,11 @@ PRIVATE void remove_tildes PARAMS((char *string));
 
 PUBLIC void reply_by_mail ARGS2(char *,mail_address, char *,filename)
 {
-	char subject[256];
 	char user_input[1000];
 	FILE *fd;
 	char c;  /* user input */
 	char tmpfile[100], cmd[256];
+	static char * personal_name=0;
 #ifdef VMS
 	char *tmptr, *address_ptr1, *address_ptr2;
 	BOOLEAN first=TRUE;
@@ -159,7 +159,11 @@ PUBLIC void reply_by_mail ARGS2(char *,mail_address, char *,filename)
 
 
 	addstr(" Please enter your name, or leave it blank if you wish to remain anonymous\n");
-	strcpy(user_input,"Personal_Name: ");
+	addstr("Personal Name: ");
+	if(personal_name == NULL)
+	    *user_input = '\0';
+	else
+	    strcpy(user_input, personal_name);
 	if (LYgetstr(user_input, VISIBLE) < 0 || term_letter) {
 	    statusline("Comment request cancelled!!!");
 	    fclose(fd);  /* close the temp file */
@@ -168,14 +172,17 @@ PUBLIC void reply_by_mail ARGS2(char *,mail_address, char *,filename)
 	}
 
 	remove_tildes(user_input);
+	StrAllocCopy(personal_name, user_input);
 
 	term_letter=FALSE;
-	fprintf(fd,"%s\n",user_input);
+	fprintf(fd,"X-Personal_name: %s\n",user_input);
 
 	addstr("\n\n Please enter a mail address or some other\n");
 	addstr(" means to contact you, if you desire a response.\n");
+	addstr("From: ");
 	/* add the mail address if there is one */
-	sprintf(user_input,"From: %s",personal_mail_address);
+	sprintf(user_input,"%s", (personal_mail_address ? 
+					personal_mail_address : ""));
 
 	if (LYgetstr(user_input, VISIBLE) < 0 || term_letter) {
 	    statusline("Comment request cancelled!!!");
@@ -185,24 +192,23 @@ PUBLIC void reply_by_mail ARGS2(char *,mail_address, char *,filename)
 	}
 	remove_tildes(user_input);
 
-	fprintf(fd,"%s\n",user_input);
+	fprintf(fd,"From: %s\n",user_input);
 
 	addstr("\n\n Please enter a subject line\n");
-	strcpy(user_input,"Subject: ");
+	addstr("Subject: ");
+	*user_input = '\0';
 	if (LYgetstr(user_input, VISIBLE) < 0 || term_letter) {
 	    statusline("Comment request cancelled!!!");
 	    sleep(1);
 	    fclose(fd);  /* close the temp file */
 	    goto cleanup;
 	}
-	if(*filename == '\0')
-	    strncpy(subject, user_input,255);
-
 	remove_tildes(user_input);
 
-	fprintf(fd,"%s\n\n",user_input);
+	fprintf(fd,"Subject: %s\n\n",user_input);
 
-	if(!no_editor && *editor != '\0') {
+	if(!no_editor && editor && *editor != '\0' && 
+					strcmp(HTLoadedDocumentURL(),"")) {
             /* ask if the user wants to include the original message */
             statusline("Do you wish to inlude the original message? (y/n) ");
             c=0;
@@ -310,7 +316,7 @@ PUBLIC void reply_by_mail ARGS2(char *,mail_address, char *,filename)
 	 */
 	statusline("Sending your message....");
 #ifdef MMDF
-	sprintf(cmd, "%s -mlrxto,cc* < %s",SYSTEM_MAIL, tmpfile);
+	sprintf(cmd, "%s -mlruxto,cc\\* < %s",SYSTEM_MAIL, tmpfile);
 #else
 	sprintf(cmd,"%s -t -oi < %s", SYSTEM_MAIL, tmpfile);
 #endif /* MMDF */

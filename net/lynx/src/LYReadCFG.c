@@ -6,6 +6,14 @@
 #include "LYCharSets.h"
 #include "LYKeymap.h"
 
+PUBLIC BOOLEAN have_read_cfg=FALSE;
+
+#ifdef VMS
+#define DISPLAY "DECW$DISPLAY"
+#else
+#define DISPLAY "DISPLAY"
+#endif /* VMS */
+
 PRIVATE int is_true ARGS1(char *,string)
 {
    if(!strncasecomp(string,"TRUE",4))
@@ -14,17 +22,102 @@ PRIVATE int is_true ARGS1(char *,string)
 	return(FALSE);
 }
 
+PRIVATE void add_item_to_list ARGS2(char *,buffer, lynx_html_item_type **,list_ptr)
+{
+   char *colon, *next_colon;
+   lynx_html_item_type *cur_item, *prev_item;
+
+   /* make a linked list */
+
+   if(*list_ptr == NULL) {  /* first item */
+      
+      cur_item =(lynx_html_item_type *)calloc(sizeof(lynx_html_item_type),1);
+      
+      if(cur_item == NULL)
+	perror("Out of memory in read_cfg");
+      
+      *list_ptr = cur_item;
+      
+   } else {
+      
+      /* find the last item */
+      for(prev_item = *list_ptr; prev_item->next != NULL;
+	  prev_item = prev_item->next)
+	;  /* null body */
+      
+      cur_item = (lynx_html_item_type *)calloc(sizeof(lynx_html_item_type),1);
+      
+      if(cur_item == NULL)
+	perror("Out of memory in read_cfg");
+      else
+	prev_item->next = cur_item;
+   }
+   
+   cur_item->next = NULL;
+   cur_item->name = NULL;
+   cur_item->command = NULL;
+   cur_item->always_enabled = FALSE;
+   
+   /* find first colon */
+   colon = (char *)strchr(buffer,':');
+   /* make sure it isn't escaped by a backslash */
+   while(colon!=NULL && *(colon-1)=='\\')
+     /* if it was escaped, try again */
+     colon = (char *)strchr(colon+1,':');
+   
+   if(colon!=NULL) {
+
+      cur_item->name = calloc((colon-buffer+1),sizeof(char));
+      if(cur_item->name == NULL)
+	perror("Out of memory in read_cfg");
+      
+      LYstrncpy(cur_item->name, buffer, colon-buffer);	
+      
+      remove_backslashes(cur_item->name);
+      
+      next_colon = (char *)strchr(colon+1,':');
+      /* make sure it isn't escaped by a backslash */
+      while(next_colon!=NULL && *(next_colon-1)=='\\')
+	/* if it was escaped, try again */
+	next_colon = (char *)strchr(next_colon+1,':');
+      
+      if(next_colon!=NULL) {
+	 
+	 cur_item->command = calloc(next_colon-colon, 
+				       sizeof(char));
+	 
+	 if(cur_item->command == NULL)
+	   perror("Out of memory in read_cfg");
+	 
+	 LYstrncpy(cur_item->command, colon+1, 
+		   next_colon-(colon+1));
+	 
+	 remove_backslashes(cur_item->command);
+	 
+	 cur_item->always_enabled = is_true(next_colon+1);
+      }
+   }
+}
+
 PUBLIC void read_cfg ARGS1(char *,cfg_filename)
 {
     FILE *fp;
     char buffer[501];
     char *line_feed;
 
-    if(cfg_filename == NULL || (fp = fopen(cfg_filename,"r")) == NULL) {
-	if(TRACE && cfg_filename != NULL)
+    if (!cfg_filename || strlen(cfg_filename) == 0) {
+	if(TRACE)
+	    fprintf(stderr,"No filename following -cfg switch!\n");
+	return;
+    }
+
+    if((fp = fopen(cfg_filename,"r")) == NULL) {
+	if(TRACE)
 	    fprintf(stderr,"lynx.cfg file not found as %s\n",cfg_filename);
 	return;
     }
+
+    have_read_cfg=TRUE;
 
     while(fgets(buffer, 500, fp) != NULL) {
 
@@ -38,6 +131,48 @@ PUBLIC void read_cfg ARGS1(char *,cfg_filename)
 	} else if(buffer[0] == '\0') {
 	    /* nothing */
 
+        } else if(!strncasecomp(buffer,"SUFFIX:",7)) {
+	    char *extention;
+	    char *mime_type;
+
+	    if(strlen(buffer) > 9) {
+	        extention = buffer + 7;
+	        if((mime_type = strchr(extention, ':')) != NULL) 
+		    *mime_type++ = '\0';
+		    HTSetSuffix(extention, mime_type, "binary", 1.0);
+	    }
+
+        } else if(!strncasecomp(buffer,"VIEWER:",7)) {
+	    char *mime_type;
+	    char *viewer;
+	    char *environment;
+
+	    if(strlen(buffer) > 9) {
+	        mime_type = buffer + 7;
+	        if((viewer = strchr(mime_type, ':')) != NULL) 
+		    *viewer++ = '\0';
+		    if((environment = strchr(viewer, ':')) != NULL) {
+			*environment++ = '\0';
+			/* if environment equals xwindows then only
+			 * assign the presentation if there is a display
+			 * variable
+			 */
+			if(!strcasecomp(environment,"XWINDOWS")) {
+			    if(getenv(DISPLAY)) 
+		      		HTSetPresentation(mime_type, viewer, 1.0, 	
+								      3.0, 0.0);
+			} else if(!strcasecomp(environment,"NON_XWINDOWS")) {
+			    if(!getenv(DISPLAY)) 
+		      		HTSetPresentation(mime_type, viewer, 1.0, 	
+								      3.0, 0.0);
+			} else {
+		            HTSetPresentation(mime_type, viewer, 1.0, 3.0, 0.0);
+			}
+		    } else {
+		        HTSetPresentation(mime_type, viewer,  1.0, 3.0, 0.0);
+		    }
+	    }
+
         } else if(!strncasecomp(buffer,"KEYMAP:",7)) {
             char *key;
             char *func;
@@ -48,6 +183,22 @@ PUBLIC void read_cfg ARGS1(char *,cfg_filename)
             if (!remap(key, func))
                 fprintf(stderr, "key remapping of %s to %s failed\n",key,func);
 
+	} else if(!strncasecomp(buffer,"GLOBAL_MAILCAP:",15)) {
+
+	    StrAllocCopy(global_type_map, buffer+15);
+
+	} else if(!strncasecomp(buffer,"GLOBAL_EXTENSION_MAP:",21)) {
+
+	    StrAllocCopy(global_extension_map, buffer+21);
+
+	} else if(!strncasecomp(buffer,"PERSONAL_MAILCAP:",17)) {
+
+            StrAllocCopy(personal_type_map, buffer+17);
+
+        } else if(!strncasecomp(buffer,"PERSONAL_EXTENSION_MAP:",23)) {
+
+            StrAllocCopy(personal_extension_map, buffer+23);
+
 	} else if(!strncasecomp(buffer,"CHARACTER_SET:",14)) {
 	    int i=0;
 	    for(; LYchar_set_names[i]; i++)
@@ -57,25 +208,15 @@ PUBLIC void read_cfg ARGS1(char *,cfg_filename)
 		}
 
 	} else if(!strncasecomp(buffer,"STARTFILE:",10)) {
-	    int length = strlen(buffer)-9;
 
-	    startfile = (char *) calloc(length, sizeof(char));
-	    if(startfile==NULL)
-		perror("Out of memory in read_cfg");
-	    else
-	        strcpy(startfile, buffer+10);
+	    StrAllocCopy(startfile, buffer+10);
 
 	} else if(!strncasecomp(buffer,"HELPFILE:",9)) {
-	    int length = strlen(buffer)-8;
 
-	    helpfile = (char *) calloc(length, sizeof(char));
-	    if(helpfile==NULL)
-		perror("Out of memory in read_cfg");
-	    else
-	        strcpy(helpfile, buffer+9);
+	    StrAllocCopy(helpfile, buffer+9);
 
 	} else if(!strncasecomp(buffer,"DEFAULT_INDEX_FILE:",19)) {
-	    strcpy(indexfile, buffer+19);
+	    StrAllocCopy(indexfile, buffer+19);
 
 #if defined(EXEC_LINKS) || defined(EXEC_SCRIPTS)
 	} else if(!strncasecomp(buffer,
@@ -115,160 +256,21 @@ PUBLIC void read_cfg ARGS1(char *,cfg_filename)
 		   user_mode = ADVANCED_MODE;
 
 	} else if(!strncasecomp(buffer,"DEFAULT_BOOKMARK_FILE:",22)) {
-		LYstrncpy(bookmark_page,buffer+22,250);
+		StrAllocCopy(bookmark_page,buffer+22);
 
 	} else if(!strncasecomp(buffer,"DEFAULT_EDITOR:",15)) {
-		LYstrncpy(editor,buffer+15,250);
+		StrAllocCopy(editor,buffer+15);
 
 	} else if(!strncasecomp(buffer,"PRINTER:",8)) {
-	        char *colon, *next_colon;
-	        printer_type *cur_printer, *prev_printer;
-
-	        /* make linked list of printers */
-	        if(printers == NULL) {  /* first printer */
-		
-	            cur_printer =(printer_type *)calloc(sizeof(printer_type),1);
-		
-	            if(cur_printer == NULL)
-		        perror("Out of memory in read_cfg");
-
-		    printers = cur_printer;
-		
-	        } else {
-
-		   /* find the last printer */
-		   for(prev_printer=printers; prev_printer->next != NULL;
-				  	     prev_printer = prev_printer->next)
-			   ;  /* null body */
-
-	            cur_printer = (printer_type *)calloc(sizeof(printer_type),1);
-		
-	            if(cur_printer == NULL)
-		        perror("Out of memory in read_cfg");
-		    else
-		        prev_printer->next = cur_printer;
-	        }
-		
-		cur_printer->next = NULL;
-		cur_printer->name = NULL;
-		cur_printer->command = NULL;
-		cur_printer->always_enabled = FALSE;
-
-		/* find first colon */
-		colon = (char *)strchr(buffer+8,':');
-		/* make sure it isn't escaped by a backslash */
-		while(colon!=NULL && *(colon-1)=='\\')
-			/* if it was escaped, try again */
-		    colon = (char *)strchr(colon+1,':');
-	
-		if(colon!=NULL) {
-		
-		    cur_printer->name = calloc((colon-(buffer+7)),sizeof(char));
-		    if(cur_printer->name == NULL)
-		        perror("Out of memory in read_cfg");
-
-		    LYstrncpy(cur_printer->name, buffer+8, colon-(buffer+8));	
-
-		    remove_backslashes(cur_printer->name);
-
-		    next_colon = (char *)strchr(colon+1,':');
-		    /* make sure it isn't escaped by a backslash */
-		    while(next_colon!=NULL && *(next_colon-1)=='\\')
-			/* if it was escaped, try again */
-		        next_colon = (char *)strchr(next_colon+1,':');
-
-		    if(next_colon!=NULL) {
-			
-			cur_printer->command = calloc(next_colon-colon, 
-								sizeof(char));
-
-			if(cur_printer->command == NULL)
-                            perror("Out of memory in read_cfg");
-
-			LYstrncpy(cur_printer->command, colon+1, 
-							next_colon-(colon+1));
-
-		        remove_backslashes(cur_printer->command);
-			
-		        cur_printer->always_enabled = is_true(next_colon+1);
-		    }
-		}
+	        add_item_to_list (&buffer[8],&printers);
 
 	} else if(!strncasecomp(buffer,"DOWNLOADER:",11)) {
-	        char *colon, *next_colon;
-	        download_type *cur_download, *prev_download;
+	        add_item_to_list(&buffer[11],&downloaders);
 
-	        /* make linked list of printers */
-	        if(downloaders == NULL) {  /* first downloader */
-		
-	            cur_download =
-		  	     (download_type *)calloc(sizeof(download_type),1);
-		
-	            if(cur_download == NULL)
-		        perror("Out of memory in read_cfg");
-
-		    downloaders = cur_download;
-		
-	        } else {
-
-		   /* find the last download */
-		   for(prev_download=downloaders; prev_download->next != NULL;
-			  	           prev_download = prev_download->next)
-			   ;  /* null body */
-
-	            cur_download = (download_type *)calloc(sizeof(download_type),1);
-		
-	            if(cur_download == NULL)
-		        perror("Out of memory in read_cfg");
-		    else
-		        prev_download->next = cur_download;
-	        }
-		
-		cur_download->next = NULL;
-		cur_download->name = NULL;
-		cur_download->command = NULL;
-		cur_download->always_enabled = FALSE;
-
-		/* find first colon */
-		colon = (char *)strchr(buffer+11,':');
-		/* make sure it isn't escaped by a backslash */
-		while(colon!=NULL && *(colon-1)=='\\')
-			/* if it was escaped, try again */
-		    colon = (char *)strchr(colon+1,':');
-	
-		if(colon!=NULL) {
-		
-		    cur_download->name = 
-				    calloc((colon-(buffer+10)),sizeof(char));
-		    if(cur_download->name == NULL)
-		        perror("Out of memory in read_cfg");
-
-		    LYstrncpy(cur_download->name,buffer+11,colon-(buffer+11));	
-
-		    remove_backslashes(cur_download->name);
-
-		    next_colon = (char *)strchr(colon+1,':');
-		    /* make sure it isn't escaped by a backslash */
-		    while(next_colon!=NULL && *(next_colon-1)=='\\')
-			/* if it was escaped, try again */
-		        next_colon = (char *)strchr(next_colon+1,':');
-
-		    if(next_colon!=NULL) {
-			
-			cur_download->command = calloc(next_colon-colon, 
-								sizeof(char));
-
-			if(cur_download->command == NULL)
-                            perror("Out of memory in read_cfg");
-
-			LYstrncpy(cur_download->command, colon+1, 
-							next_colon-(colon+1));
-
-		        remove_backslashes(cur_download->command);
-			
-		        cur_download->always_enabled = is_true(next_colon+1);
-		    }
-		}
+#ifdef DIRED_SUPPORT
+	} else if(!strncasecomp(buffer,"UPLOADER:",9)) {
+	        add_item_to_list(&buffer[9],&uploaders);
+#endif
         }  /* end of Huge if */
     } /* end if while */
 }

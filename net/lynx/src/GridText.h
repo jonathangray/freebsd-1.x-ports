@@ -4,11 +4,15 @@
 
 #ifndef HTForms_H
 #include "HTForms.h"
-#endif
+#endif /* HTForms_H */
 
 #define LY_UNDERLINE_START_CHAR '\003'
 #define LY_UNDERLINE_END_CHAR   '\004'
+#define LY_BOLD_START_CHAR      '\005'
+#define LY_BOLD_END_CHAR        '\006'
+#define IsSpecialAttrChar(a)  ((a > '\002') && (a < '\007'))
 
+extern int HTCurSelectGroupType;
 
 #ifdef SHORT_NAMES
 #define HText_childNumber		HTGTChNu
@@ -54,14 +58,16 @@ extern void HTuncache_current_document();
 extern int HText_getTopOfScreen ();
 extern int HText_getNumOfLines();
 extern int do_www_search PARAMS((document *doc));
+extern char * HTLoadedDocumentURL();
 
 /* forms stuff */
 extern void HText_beginForm PARAMS((char *action, char *method));
 extern void HText_endForm();
 extern void HText_beginSelect PARAMS((char *name, BOOLEAN multiple));
-extern void HText_setLastOptionValue PARAMS((HText *text, char *value));
+extern char * HText_setLastOptionValue PARAMS((HText *text, char *value, 
+						int order, BOOLEAN checked));
 extern int HText_beginInput PARAMS((HText *text, InputFieldData *I));
-extern char * HText_SubmitForm PARAMS((FormInfo *form));
+extern void HText_SubmitForm PARAMS((FormInfo *sumbit_item, document *doc));
 extern void HText_ResetForm PARAMS((FormInfo *form));
 extern void HText_activateRadioButton PARAMS((FormInfo *form));
 

@@ -11,6 +11,8 @@
 #ifndef HTACCESS_H
 #define HTACCESS_H
 
+extern char * use_this_url_instead;
+
 /*      Definition uses:
 */
 #include "HTUtils.h"
@@ -137,7 +139,7 @@ Load a document from absolute name
   NO                      Failure
                          
  */
-extern BOOL HTLoadAbsolute PARAMS((CONST char * addr));
+extern BOOL HTLoadAbsolute PARAMS((CONST DocAddress * addr));
 
 
 /*

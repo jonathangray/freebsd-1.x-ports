@@ -19,6 +19,8 @@
 PUBLIC float HTMaxSecs = 1e10;		/* No effective limit */
 PUBLIC float HTMaxLength = 1e10;	/* No effective limit */
 
+PUBLIC int loading_length= -1;
+
 #ifdef unix
 #ifdef NeXT
 #define PRESENT_POSTSCRIPT "open %s; /bin/rm -f %s\n"
@@ -133,12 +135,7 @@ PUBLIC void HTSetConversion ARGS6(
     
     if (!HTPresentations) HTPresentations = HTList_new();
     
-    if (strcmp(representation_in, "*")==0) {
-        if (default_presentation) free(default_presentation);
-	default_presentation = pres;
-    } else {
-        HTList_addObject(HTPresentations, pres);
-    }
+    HTList_addObject(HTPresentations, pres);
 }
 
 
@@ -220,6 +217,28 @@ PUBLIC int HTOutputBinary ARGS2( int, 		input,
     } while (YES);
 }
 
+/* match maintype/* to  any MIME type starting with maintype
+ *  for example   image/gif should match image/*
+ */
+PRIVATE int half_match ARGS2(char *,trial_type, char *,target)
+{
+    char *cp=strchr(trial_type,'/');
+
+    /* if no '/' or no '*' */
+    if(!cp || *(cp+1) != '*')
+	return 0;
+
+    if(TRACE)
+	fprintf(stderr,"HTFormat: comparing %s and %s for half match\n",
+						      trial_type, target);
+
+	/* main type matches */
+    if(!strncmp(trial_type, target, (cp-trial_type)-1)) 
+	return 1;
+
+    return 0;
+}
+
 
 /*		Create a filter stack
 **		---------------------
@@ -230,8 +249,6 @@ PUBLIC int HTOutputBinary ARGS2( int, 		input,
 **	MIME so far.  Storing the format of a stream in the stream might
 **	be a lot neater.
 **
-**	The www/source format is special, in that if you can take
-**	that you can take anything. However, we
 */
 PUBLIC HTStream * HTStreamStack ARGS4(
 	HTFormat,		rep_in,
@@ -250,51 +267,79 @@ PUBLIC HTStream * HTStreamStack ARGS4(
         * to make use of the source!!!!  LJM
         */
      /* if (rep_out == WWW_SOURCE ||
-       rep_out == rep_in) return sink;  LJM */
+       		rep_out == rep_in) return sink;  LJM */
 
      if(rep_out == rep_in) return sink;
 
-    if (!HTPresentations) HTFormatInit();	/* set up the list */
+	/* don't do anymore do it in the Lynx code at startup LJM */
+    /* if (!HTPresentations) HTFormatInit(); */	/* set up the list */
     
     {
 	int n = HTList_count(HTPresentations);
 	int i;
-	HTPresentation * pres, *match, *wildcard_match=0,
-			*source_match=0, *source_wildcard_match=0;
+	HTPresentation * pres, *match,
+			*strong_wildcard_match=0,
+			*weak_wildcard_match=0,
+			*last_default_match=0,
+			*strong_subtype_wildcard_match=0;
+
 	for(i=0; i<n; i++) {
 	    pres = HTList_objectAt(HTPresentations, i);
 	    if (pres->rep == rep_in) {
-	        if (pres->rep_out == rep_out)
-	            return (*pres->converter)(pres, anchor, sink);
-		if (pres->rep_out == wildcard) {
-		    wildcard_match = pres;
+	        if (pres->rep_out == rep_out) {
+		    if(TRACE)
+			fprintf(stderr,"StreamStack: found exact match: %s\n",HTAtom_name(pres->rep));
+	    	    return (*pres->converter)(pres, anchor, sink);
+
+		} else if (pres->rep_out == wildcard) {
+		    if(!strong_wildcard_match)
+		        strong_wildcard_match = pres;
+		    /* otherwise use the first one */
+		    if(TRACE)
+			fprintf(stderr,"StreamStack: found strong wildcard match: %s\n",HTAtom_name(pres->rep));
+		}
+
+	    } else if(half_match(HTAtom_name(pres->rep),
+						HTAtom_name(rep_in))) {
+		
+	        if (pres->rep_out == rep_out) {
+		    if(!strong_subtype_wildcard_match)
+		       strong_subtype_wildcard_match = pres;
+		    /* otherwise use the first one */
+		    if(TRACE)
+			fprintf(stderr,"StreamStack: found strong subtype wildcard match: %s\n",HTAtom_name(pres->rep));
 		}
 	    }
-	    if (pres->rep == source) {
-	        if (pres->rep_out == rep_out)
-	            source_match = pres;
-		if (pres->rep_out == wildcard) {
-		    source_wildcard_match = pres;
+
+	    if (pres->rep == WWW_SOURCE) {
+		if(pres->rep_out == rep_out) {
+		    if(!weak_wildcard_match)
+		        weak_wildcard_match = pres;
+		    /* otherwise use the first one */
+		    if(TRACE)
+			fprintf(stderr,"StreamStack: found weak wildcard match: %s\n",HTAtom_name(pres->rep_out));
+
 		}
-	    }
-	    if (pres->rep == wildcard) {
-		if(pres->rep_out == rep_out)
-		    return (*pres->converter)(pres, anchor, sink);
 		if(pres->rep_out == wildcard) {
-		    wildcard_match = pres;
+		    if(!last_default_match)
+		        last_default_match = pres;
+		    /* otherwise use the first one */
 		}
 	    }
 	}
 	
-	match = wildcard_match ? wildcard_match :
-		source_match ?	source_match : 
-		source_wildcard_match;
+	match = strong_subtype_wildcard_match ? strong_subtype_wildcard_match :
+		strong_wildcard_match ?	strong_wildcard_match : 
+		weak_wildcard_match ? weak_wildcard_match : 
+		last_default_match;
 	
 	if (match) {
 		HTPresentation temp;
 		temp = *match;			/* Specific instance */
 		temp.rep = rep_in;		/* yuk */
 		temp.rep_out = rep_out;		/* yuk */
+		if(TRACE)
+		    fprintf(stderr,"StreamStack: Using %s\n",HTAtom_name(temp.rep_out));
 		return (*match->converter)(&temp, anchor, sink);
         }
     }
@@ -327,7 +372,8 @@ PUBLIC float HTStackValue ARGS4(
     if (rep_out == WWW_SOURCE ||
     	rep_out == rep_in) return 0.0;
 
-    if (!HTPresentations) HTFormatInit();	/* set up the list */
+	/* don't do anymore do it in the Lynx code at startup LJM */
+    /* if (!HTPresentations) HTFormatInit(); */	/* set up the list */
     
     {
 	int n = HTList_count(HTPresentations);
@@ -371,6 +417,15 @@ PUBLIC int HTCopy ARGS2(
     HTStreamClass targetClass;    
     char line[256];
     int bytes=0;
+    int rv = 0;
+    char * msg;
+
+    if (loading_length == -1)
+        msg = "Read %d bytes of data.";
+    else
+        /* We have a loading_length. */
+        msg = "Read %d of %d bytes of data.";
+
     
 /*	Push the data down the stream
 **
@@ -383,11 +438,12 @@ PUBLIC int HTCopy ARGS2(
     */
     for(;;) {
         int status;
-	extern BOOLEAN LYCancelDownload;
+	extern char LYCancelDownload;
 
 	if (LYCancelDownload) {
 	    LYCancelDownload = FALSE;
-	    return -1;
+	    rv = -1;
+	    goto finished;
 	}
 
         if (HTCheckForInterrupt())
@@ -395,9 +451,10 @@ PUBLIC int HTCopy ARGS2(
             HTProgress ("Data transfer interrupted.");
             (*targetClass.abort)(sink, NULL);
 	    if(bytes)
-                return HT_INTERRUPTED;
+                rv = HT_INTERRUPTED;
 	    else
-		return -1;
+		rv = -1;
+	    goto finished;
           }
 
         status = NETREAD(file_number, input_buffer, INPUT_BUFFER_SIZE);
@@ -410,15 +467,17 @@ PUBLIC int HTCopy ARGS2(
                 HTProgress ("Data transfer interrupted.");
                 (*targetClass.abort)(sink, NULL);
 	        if(bytes)
-                    return HT_INTERRUPTED;
+                    rv = HT_INTERRUPTED;
 	        else
-		    return -1;
+		    rv = -1;
+	        goto finished;
               }
 	    else if (SOCKET_ERRNO == ENOTCONN || SOCKET_ERRNO == ECONNRESET 
 						   || SOCKET_ERRNO == EPIPE)
               {
                 /* Arrrrgh, HTTP 0/1 compability problem, maybe. */
-                return -2;
+		rv = -2;
+	        goto finished;
               }
             break;
 	}
@@ -435,14 +494,18 @@ PUBLIC int HTCopy ARGS2(
 	(*targetClass.put_block)(sink, input_buffer, status);
 
 	bytes += status;
-        sprintf(line, "Transfered %d bytes", bytes);
+        sprintf(line, msg, bytes, loading_length);
         HTProgress(line);
 
     } /* next bufferload */
 
     HTProgress("Data transfer complete");
     NETCLOSE(file_number);
-    return HT_LOADED;
+    rv = HT_LOADED;
+
+finished:
+    loading_length = -1;
+    return(rv);
 	
 }
 
@@ -544,7 +607,7 @@ PUBLIC int HTParseSocket ARGS5(
     HTStream * stream;
     HTStreamClass targetClass;
     int rv;
-    extern BOOLEAN LYCancelDownload;
+    extern char LYCancelDownload;
 
     stream = HTStreamStack(rep_in,
 			format_out,
@@ -600,6 +663,11 @@ PUBLIC int HTParseFile ARGS5(
     
     if (!stream) {
         char buffer[1024];	/* @@@@@@@@ */
+	extern char LYCancelDownload;
+        if (LYCancelDownload) {
+	    LYCancelDownload = FALSE;
+	    return -1;
+	}
 	sprintf(buffer, "Sorry, can't convert from %s to %s.",
 		HTAtom_name(rep_in), HTAtom_name(format_out));
 	if (TRACE) fprintf(stderr, "HTFormat(in HTParseFile): %s\n", buffer);

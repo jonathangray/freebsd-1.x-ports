@@ -24,6 +24,8 @@
 
 #define HT_EM_SPACE ((char)2)
 
+#define FREE(x) if (x) {free(x); x = NULL;}
+
 #include "HTUtils.h"
 
 #ifdef VMS
@@ -51,10 +53,11 @@ typedef struct _HTSuffix {
 } HTSuffix;
 
 #ifndef NGROUPS
-#ifndef NGROUPS_MAX
+#ifdef NGROUPS_MAX
+#define NGROUPS NGROUPS_MAX
+#else
 #define NGROUPS 32
 #endif /* NGROUPS_MAX */
-#define NGROUPS NGROUPS_MAX
 #endif /* NGROUPS */
 
 
@@ -82,7 +85,16 @@ struct _HTStructured {
 */
 
 PUBLIC int HTDirAccess = HT_DIR_OK;
+
+#ifdef DIRED_SUPPORT
+PUBLIC int HTDirReadme = HT_DIR_README_NONE;
+#define FILES_FIRST 1
+#define MIXED_STYLE 2
+extern BOOLEAN lynx_edit_mode;
+extern BOOLEAN dir_list_style;
+#else
 PUBLIC int HTDirReadme = HT_DIR_README_TOP;
+#endif
 
 PRIVATE char *HTMountRoot = "/Net/";		/* Where to find mounts */
 #ifdef VMS
@@ -232,9 +244,9 @@ PUBLIC char * HTCacheFileName ARGS1(CONST char *,name)
 	    +strlen(host)+strlen(path)+6+1);
     if (result == NULL) outofmem(__FILE__, "HTCacheFileName");
     sprintf(result, "%s/WWW/%s/%s%s", HTCacheRoot, access, host, path);
-    free(path);
-    free(access);
-    free(host);
+    FREE(path);
+    FREE(access);
+    FREE(host);
     return result;
 }
 
@@ -268,10 +280,10 @@ PUBLIC char * HTLocalName ARGS1(CONST char *,name)
     HTUnEscape(path);	/* Interpret % signs */
     
     if (0==strcmp(access, "file")) { /* local file */
-        free(access);	
+        FREE(access);	
 	if ((0==strcasecomp(host, HTHostName())) ||
 	    (0==strcasecomp(host, "localhost")) || !*host) {
-	    free(host);
+	    FREE(host);
 	    if (TRACE) fprintf(stderr, "Node `%s' means path `%s'\n", name, path);
 	    return(path);
 	} else {
@@ -279,8 +291,8 @@ PUBLIC char * HTLocalName ARGS1(CONST char *,name)
 	    			strlen("/Net/")+strlen(host)+strlen(path)+1);
               if (result == NULL) outofmem(__FILE__, "HTLocalName");
 	    sprintf(result, "%s%s%s", "/Net/", host, path);
-	    free(host);
-	    free(path);
+	    FREE(host);
+	    FREE(path);
 	    if (TRACE) fprintf(stderr, "Node `%s' means file `%s'\n", name, result);
 	    return result;
 	}
@@ -299,9 +311,9 @@ PUBLIC char * HTLocalName ARGS1(CONST char *,name)
 		strlen(home)+strlen(access)+strlen(host)+strlen(path)+6+1);
       if (result == NULL) outofmem(__FILE__, "HTLocalName");
 	sprintf(result, "%s/WWW/%s/%s%s", home, access, host, path);
-	free(path);
-	free(access);
-	free(host);
+	FREE(path);
+	FREE(access);
+	FREE(host);
 	return result;
     }
 }
@@ -355,6 +367,7 @@ PUBLIC CONST char * HTFileSuffix ARGS1(HTAtom*, rep)
     int n;
     int i;
 
+#define NO_INIT  /* dont init anymore since I do it in Lynx at startup */
 #ifndef NO_INIT    
     if (!HTSuffixes) HTFileInit();
 #endif
@@ -403,7 +416,7 @@ PUBLIC HTFormat HTFileFormat ARGS2 (
         int ls;
 	suff = HTList_objectAt(HTSuffixes, i);
 	ls = strlen(suff->suffix);
-	if ((ls <= lf) && 0==strcmp(suff->suffix, filename + lf - ls)) {
+	if ((ls <= lf) && 0==strcasecomp(suff->suffix, filename + lf - ls)) {
 	    int j;
 	    *pencoding = suff->encoding;
 	    if (suff->rep) return suff->rep;		/* OK -- found */
@@ -412,7 +425,7 @@ PUBLIC HTFormat HTFileFormat ARGS2 (
 		int ls2;
 		suff = HTList_objectAt(HTSuffixes, j);
 		ls2 = strlen(suff->suffix);
-		if ((ls <= lf) && 0==strncmp(
+		if ((ls <= lf) && 0==strncasecomp(
 			suff->suffix, filename + lf - ls -ls2, ls2)) {
 		    if (suff->rep) return suff->rep;
 		}
@@ -573,12 +586,9 @@ PUBLIC void HTDirEntry ARGS3(HTStructured *, target,
         if (relative == NULL) outofmem(__FILE__, "DirRead");
         sprintf(relative, "%s/%s", tail, escaped);
         HTStartAnchor(target, NULL, relative);
-        free(relative);
+        FREE(relative);
     }
-    free(escaped);
-    PUTS(entry);
-    END(HTML_A);
-    PUTS("\n");
+    FREE(escaped);
 }
  
 /*      Output parent directory entry
@@ -595,21 +605,35 @@ PUBLIC void HTDirTitles ARGS2(HTStructured *, target,
     char * current;
 
     current = strrchr(path, '/');	/* last part or "" */
-    free(logical);
+
+    FREE(logical);
 
     {
       char * printable = NULL;
+
+#ifdef DIRED_SUPPORT
+      StrAllocCopy(printable, path);
+#else 
       StrAllocCopy(printable, (current + 1));
+#endif
+
       HTUnEscape(printable);
       START(HTML_TITLE);
       PUTS(*printable ? printable : "Welcome ");
       PUTS(" directory");
       END(HTML_TITLE);    
-    
+
+#ifdef DIRED_SUPPORT
+      START(HTML_H2);
+      PUTS(*printable ? "Current directory is " : "");
+      PUTS(*printable ? printable : "Welcome");
+      END(HTML_H2);
+#else
       START(HTML_H1);
       PUTS(*printable ? printable : "Welcome");
       END(HTML_H1);
-      free(printable);
+#endif
+      FREE(printable);
     }
 
     /*  Make link back to parent directory
@@ -625,23 +649,34 @@ PUBLIC void HTDirTitles ARGS2(HTStructured *, target,
 	if (relative == NULL) outofmem(__FILE__, "DirRead");
 	sprintf(relative, "%s/..", current);
 	HTStartAnchor(target, "", relative);
-	free(relative);
+	FREE(relative);
 
-	PUTS("Up to ");
+#ifdef DIRED_SUPPORT
+	if (dir_list_style != MIXED_STYLE)
+#endif /* DIRED_SUPPORT */
+	    PUTS("Up to ");
 	if (parent) {
-	  char * printable = NULL;
-	  StrAllocCopy(printable, parent + 1);
-	  HTUnEscape(printable);
-	  PUTS(printable);
-	  free(printable);
+#ifdef DIRED_SUPPORT
+	   if (dir_list_style == MIXED_STYLE) {
+	      PUTS("../");
+	   } else {
+#else
+	   {
+#endif /* DIRED_SUPPORT */
+	      char * printable = NULL;
+	      StrAllocCopy(printable, parent + 1);
+	      HTUnEscape(printable);
+	      PUTS(printable);
+	      FREE(printable);
+	   }
 	} else {
 	  PUTS("/");
 	}
 
 	END(HTML_A);
-
     }
-    free(path);
+
+    FREE(path);
 }
 		
 
@@ -666,17 +701,40 @@ PUBLIC int HTLoadFile ARGS4 (
 )
 {
     char * filename;
+    char * access;
     HTFormat format;
     char * nodename = 0;
     char * newname=0;	/* Simplified name of file */
     HTAtom * encoding;	/* @@ not used yet */
+
+
+    FREE(nodename);	/* From prev call - Leak fixed AL 6 Feb 1994 */
     
 /*	Reduce the filename to a basic form (hopefully unique!)
 */
     StrAllocCopy(newname, addr);
     filename=HTParse(newname, "", PARSE_PATH|PARSE_PUNCTUATION);
     nodename=HTParse(newname, "", PARSE_HOST);
-    free(newname);
+    
+    /* If access is ftp, or file is on another host, invoke ftp now */
+    access = HTParse(newname, "", PARSE_ACCESS);
+    if(strcmp("ftp", access) == 0 ||
+       (strcmp("localhost", nodename) != 0 &&
+#ifdef VMS
+        strcasecomp(nodename, HTHostName()) != 0))
+#else
+        strcmp(nodename, HTHostName()) != 0))
+#endif
+    {
+        FREE(newname);
+        FREE(access);
+	FREE(filename);
+        return HTFTPLoad(addr, anchor, format_out, sink);
+    } else {
+        FREE(newname);
+        FREE(access);
+    }
+
     
     format = HTFileFormat(filename, &encoding);
 
@@ -713,12 +771,14 @@ PUBLIC int HTLoadFile ARGS4 (
 	    }
 	    HTParseFile(format, format_out, anchor, fp, sink);
 	    fclose(fp);
+	    FREE(filename);
             return HT_LOADED;
         }  /* If successfull open */
+	FREE(filename);
     }
 #else
 
-    free(filename);
+    FREE(filename);
     
 /*	For unix, we try to translate the name into the name of a transparently
 **	mounted file.
@@ -760,7 +820,7 @@ PUBLIC int HTLoadFile ARGS4 (
 	    dp = opendir(localname);
 	    if (!dp) {
 forget_multi:
-		free(localname);
+		FREE(localname);
 		return HTLoadError(sink, 500,
 			"Multiformat: directory scan failed.");
 	    }
@@ -803,7 +863,7 @@ forget_multi:
 		goto open_file;
 		
 	    } else { 			/* If not found suitable file */
-		free(localname);
+		FREE(localname);
 		return HTLoadError(sink, 403,	/* List formats? */
 		   "Could not find suitable representation for transmission.");
 	    }
@@ -853,7 +913,7 @@ forget_multi:
 **	marker file can be browsed
 */
 		if (HTDirAccess == HT_DIR_FORBID) {
-		    free(localname);
+		    FREE(localname);
 		    return HTLoadError(sink, 403,
 		    "Directory browsing is not allowed.");
 		}
@@ -867,7 +927,7 @@ forget_multi:
 		    strcat(enable_file_name, "/");
 		    strcat(enable_file_name, HT_DIR_ENABLE_FILE);
 		    if (stat(enable_file_name, &file_info) != 0) {
-			free(localname);
+			FREE(localname);
 			return HTLoadError(sink, 403,
 			"Selective access is not enabled for this directory");
 		    }
@@ -876,7 +936,7 @@ forget_multi:
  
 		dp = opendir(localname);
 		if (!dp) {
-		    free(localname);
+		    FREE(localname);
 		    return HTLoadError(sink, 403, "This directory is not readable.");
 		}
 
@@ -894,7 +954,7 @@ forget_multi:
         	    char * p = strrchr(pathname, '/');  /* find lastslash */
         	    StrAllocCopy(tail, p+1); /* take slash off the beginning */
     		  }
-    		free (pathname);
+    		FREE(pathname);
 		
 		target = HTML_new(anchor, format_out, sink);
 		targetClass = *target->isa;	/* Copy routine entry points */
@@ -906,6 +966,10 @@ forget_multi:
 		
                 HTDirTitles(target, (HTAnchor *)anchor);
 
+#ifdef DIRED_SUPPORT
+		HTAnchor_setFormat((HTParentAnchor *) anchor, WWW_DIRED);
+		lynx_edit_mode = TRUE;
+#endif
                 if (HTDirReadme == HT_DIR_README_TOP)
 		    do_readme(target, localname);
 		{
@@ -928,7 +992,7 @@ forget_multi:
 					    with '.' or ',' */
 
 			dirname = (HTBTElement *)malloc(
-					strlen(dirbuf->d_name) + 2);
+					strlen(dirbuf->d_name) + 4);
 			if (dirname == NULL) outofmem(__FILE__,"DirRead");
 			StrAllocCopy(tmpfilename,localname);
 			if (strcmp(localname,"/")) 
@@ -940,9 +1004,23 @@ forget_multi:
 			StrAllocCat(tmpfilename,dirbuf->d_name);
 			stat(tmpfilename, &file_info);
 			if (((file_info.st_mode) & S_IFMT) == S_IFDIR)
+#ifndef DIRED_SUPPORT
 		                sprintf((char *)dirname,"D%s",dirbuf->d_name);
 			else sprintf((char *)dirname,"F%s",dirbuf->d_name);
 			    /* D & F to have first directories, then files */
+#else
+			   if (dir_list_style == MIXED_STYLE)
+			     sprintf((char *)dirname," %s/",dirbuf->d_name);
+			   else
+			     sprintf((char *)dirname,"D%s",dirbuf->d_name);
+			else if (dir_list_style == MIXED_STYLE)
+			   sprintf((char *)dirname," %s",dirbuf->d_name);
+			else if (dir_list_style == FILES_FIRST)
+			   sprintf((char *)dirname,"C%s",dirbuf->d_name);
+			    /* C & D to have first files, then directories */
+			else
+			   sprintf((char *)dirname,"F%s",dirbuf->d_name);
+#endif
 			HTBTree_add(bt,dirname); /* Sort dirname in the tree bt */
 		    }
 
@@ -956,10 +1034,14 @@ forget_multi:
 			       D for directory file,
 			       F for file */
 			
+#ifdef DIRED_SUPPORT
+			char test;
+#endif
 			state = 'I';
 
 			while (next_element != NULL)
 		        {
+			    char *entry;
 			    StrAllocCopy(tmpfilename,localname);
 			    if (strcmp(localname,"/")) 
 
@@ -974,6 +1056,22 @@ forget_multi:
 			    if (strcmp((char *)
 					     (HTBTree_object(next_element)),"D.."))
 			    {			    
+#ifdef DIRED_SUPPORT
+			        test = *(char *) (HTBTree_object(next_element))=='D'?'D':'F';
+				if (state != test)
+				{
+				    if (dir_list_style == FILES_FIRST) {
+				       if (state == 'F')
+  					  END(HTML_DIR); 
+				    } else if (dir_list_style != MIXED_STYLE)
+				       if (state == 'D')
+  					  END(HTML_DIR); 
+				    state = *(char *)
+				        (HTBTree_object(next_element))=='D'?'D':'F';
+				    START(HTML_H2);
+				    if (dir_list_style != MIXED_STYLE)
+				       PUTS(state == 'D'?"Directories:":"Files");
+#else
 				if (state != *(char *)(HTBTree_object(next_element))) 
 				{
 				    if (state == 'D')
@@ -982,13 +1080,16 @@ forget_multi:
 				        (HTBTree_object(next_element))=='D'?'D':'F';
 				    START(HTML_H2);
 				    PUTS(state == 'D'?"Subdirectories:":"Files");
+#endif
 				    END(HTML_H2);
 				    START(HTML_DIR);
 				}
 			        START(HTML_LI);
 			    }
-			    HTDirEntry(target, tail,
-				       (char*)HTBTree_object(next_element) +1);
+			    entry = (char*)HTBTree_object(next_element)+1;
+			    HTDirEntry(target, tail, entry);
+			    PUTS(entry);
+    			    END(HTML_A);
 
 			    next_element = HTBTree_next(bt,next_element);
 			        /* pick up the next element of the list; 
@@ -1005,15 +1106,15 @@ forget_multi:
 
 		        /* end while directory entries left to read */
 		    closedir(dp);
-		    free(logical);
-		    free(tmpfilename);
-		    free(tail);
+		    FREE(logical);
+		    FREE(tmpfilename);
+		    FREE(tail);
 		    HTBTreeAndObject_free(bt);
 
 		    if (HTDirReadme == HT_DIR_README_BOTTOM)
 			  do_readme(target, localname);
 		    FREE_TARGET;
-		    free(localname);
+		    FREE(localname);
 		    return HT_LOADED;	/* document loaded */
 		}
 
@@ -1038,7 +1139,7 @@ open_file:
 			HTList_addObject(methods, put);
 		    }
 		}
-		free(localname);
+		FREE(localname);
 		HTParseFile(format, format_out, anchor, fp, sink);
 		fclose(fp);
 		return HT_LOADED;
@@ -1058,12 +1159,12 @@ open_file:
 #else
 	if (strcmp(nodename, HTHostName())!=0)
 #endif
-	if(!strncmp(addr,"file://localhost",16))
-	    return -1;  /* never go to ftp site when URL
-			 * is file://localhost
-			 */
-	else
-	    return HTFTPLoad(addr, anchor, format_out, sink);
+	    if(!strncmp(addr,"file://localhost",16))
+	        return -1;  /* never go to ftp site when URL
+			     * is file://localhost
+			     */
+	    else
+	        return HTFTPLoad(addr, anchor, format_out, sink);
     }
 #endif
 

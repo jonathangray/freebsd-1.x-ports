@@ -136,15 +136,15 @@ PRIVATE void write_anchor ARGS2(CONST char *,text, CONST char *,addr)
     
     for (i=0; i<HTML_A_ATTRIBUTES; i++) present[i]=0;
     present[HTML_A_HREF] = YES;
-    value[HTML_A_HREF] = addr;
+    ((CONST char **)value)[HTML_A_HREF] = addr;
     present[HTML_A_TITLE] = YES;
-    value[HTML_A_TITLE] = text;
+    ((CONST char **)value)[HTML_A_TITLE] = text;
 
     if(TRACE)
 	fprintf(stderr,"HTGopher: adding URL: %s\n",addr);
     
     HT_Is_Gopher_URL = TRUE;  /* tell HTML.c that this is a Gopher URL */
-    (*targetClass.start_element)(target, HTML_A, present, value);
+    (*targetClass.start_element)(target, HTML_A, present,(CONST char **)value);
 	    
     PUTS(text);
     END(HTML_A);
@@ -208,7 +208,7 @@ PRIVATE void parse_menu ARGS2 (
 	    gtype = *p++;
 
 	    if (bytes > BytesReported + 1024) {
-	        sprintf(buffer, "Transfered %d bytes", bytes);
+	        sprintf(buffer, "Transferred %d bytes", bytes);
                 HTProgress(buffer);
 		BytesReported = bytes;
 	    }
@@ -629,7 +629,8 @@ PUBLIC int HTLoadGopher ARGS4(
 	}
 	if (gtype == GOPHER_INDEX) {
 	    char * query;
-            HTAnchor_setIndex(anAnchor);	/* Search is allowed */
+	    /* Search is allowed */
+            HTAnchor_setIndex(anAnchor, anAnchor->address);	
 	    query = strchr(selector, '?');	/* Look for search string */
 	    if (!query || !query[1]) {		/* No search required */
 		target = HTML_new(anAnchor, format_out, sink);
@@ -651,10 +652,12 @@ PUBLIC int HTLoadGopher ARGS4(
 		    if (*p == '+') *p = ' ';
 		}
 	    }
-	    strcat(command, query);
+
+	    de_escape(&command[strlen(command)], query);/* bug fix LJM 940415 */
         } else if (gtype == GOPHER_CSO) {
             char * query;
-            HTAnchor_setIndex(anAnchor);        /* Search is allowed */
+	    /* Search is allowed */
+            HTAnchor_setIndex(anAnchor, anAnchor->address);	
             query = strchr(selector, '?');      /* Look for search string */
             if (!query || !query[1]) {          /* No search required */
 		target = HTML_new(anAnchor, format_out, sink);
@@ -676,7 +679,7 @@ PUBLIC int HTLoadGopher ARGS4(
                     if (*p == '+') *p = ' ';
                 }
             }
-            strcat(command, query);
+	    de_escape(&command[strlen(command)], query);/* bug fix LJM 940415 */
 
 	    
 	} else {				/* Not index */

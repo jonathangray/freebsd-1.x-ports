@@ -5,8 +5,11 @@
 #include "LYStructs.h"  /* includes HTForms.h */
 #include "LYStrings.h"
 #include "LYGlobalDefs.h"
+#include "LYKeymap.h"
 
 PRIVATE int form_getstr PARAMS((struct link * form_link));
+PRIVATE int popup_options PARAMS((int cur_selection, OptionType *list, 
+						   int ly, int lx, int width));
 
 PUBLIC int change_form_link ARGS4(struct link *, form_link, int, mode, 
 				document *,newdoc, BOOLEAN *,refresh_screen)
@@ -27,6 +30,20 @@ PUBLIC int change_form_link ARGS4(struct link *, form_link, int, mode,
 		form_link->hightext = checked_box;
 		form->num_value = 1;
 	    }
+	    break;
+
+	case F_OPTION_LIST_TYPE:
+	    form->num_value = popup_options(form->num_value, form->select_list,
+				form_link->ly, form_link->lx, form->size);
+
+	    {
+    	        OptionType * opt_ptr=form->select_list;
+		int i;
+    	        for(i=0; i<form->num_value; i++, opt_ptr = opt_ptr->next) 
+		    ; /* null body */
+		form->value = opt_ptr->name;   /* set the name */
+	    }
+	    c = 12;  /* CTRL-R for repaint */
 	    break;
 
 	case F_RADIO_TYPE:
@@ -64,6 +81,7 @@ PUBLIC int change_form_link ARGS4(struct link *, form_link, int, mode,
 	    break;
 
 	case F_TEXT_TYPE:
+	case F_TEXTAREA_TYPE:
 	case F_PASSWORD_TYPE:
 	    c = form_getstr(form_link);
 	    if(form->type == F_PASSWORD_TYPE) 
@@ -79,7 +97,7 @@ PUBLIC int change_form_link ARGS4(struct link *, form_link, int, mode,
 	
 	case F_SUBMIT_TYPE:
 		/* returns new document URL */
-	    newdoc->address = (char *)HText_SubmitForm(form);
+	    HText_SubmitForm(form, newdoc);
 	    newdoc->link = 0;
 	    break;
 
@@ -95,14 +113,13 @@ PUBLIC int change_form_link ARGS4(struct link *, form_link, int, mode,
 #define GetYX(y,x)   y = stdscr->_cury, x = stdscr->_curx
 #endif
 
-#define LEFT_MARGIN 8
-#define RIGHT_MARGIN 2
-
 PRIVATE int form_getstr ARGS1(struct link *, form_link)
 {
      FormInfo *form = form_link->form;
      int pointer = 0, tmp_pointer=0;
      int ch, i;
+     int left_margin=1;
+     int right_margin=2;
      int last_char, len;
      int max_length = (form->maxlength ? form->maxlength : 1024);
      char inputline[1024];
@@ -116,6 +133,16 @@ PRIVATE int form_getstr ARGS1(struct link *, form_link)
 #ifdef VMS
     extern BOOLEAN HadVMSInterrupt;/* Flag from cleanup_sig() AST       */
 #endif
+
+     /* get bigger margins if possible */
+     if(form->size > 9)
+	if(form->size > 19) {
+	    left_margin=10;
+	    right_margin=10;
+	} else {
+	    left_margin=5;
+	    right_margin=5;
+	}
 
      /* get the initial position of the cursor */
      GetYX(startline, startcol);
@@ -153,8 +180,8 @@ PRIVATE int form_getstr ARGS1(struct link *, form_link)
 top:
      /*** Check to see if there's something in the inputline already ***/
      len = strlen(inputline);
-     if(extend && len+startcol+LEFT_MARGIN > far_col) {
-	pointer = (len - (far_col - startcol)) + 5;
+     if(extend && len+startcol+right_margin > far_col) {
+	pointer = (len - (far_col - startcol)) + right_margin;
 	line_extended = TRUE;
      } else {
 	line_extended = FALSE;
@@ -233,10 +260,10 @@ top:
 		    pointer--;
 		    cur_col--;
 
-		    if(line_extended && cur_col+RIGHT_MARGIN+LEFT_MARGIN < far_col) {
-     			if(pointer + startcol+LEFT_MARGIN > far_col) {
+		    if(line_extended && (cur_col-left_margin< startcol)) {
+     			if(pointer + startcol + right_margin > far_col) {
 			    tmp_pointer = (pointer - (far_col - startcol)) 
-							      + RIGHT_MARGIN;
+							      + right_margin;
 			    if(tmp_pointer < 0) tmp_pointer=0;
 			} else {
 			    tmp_pointer = 0;
@@ -307,10 +334,11 @@ top:
 		    else
 		    	addch(ch);
 
-		    if(extend && cur_col+RIGHT_MARGIN > far_col) {
-			tmp_pointer = (pointer - (far_col - startcol)) + 10;
+		    if(extend && cur_col+2 > far_col) {
+			tmp_pointer = (pointer - (far_col - startcol)) 
+							    + right_margin;
 			if(tmp_pointer > pointer)
-			    tmp_pointer = 1;
+			    tmp_pointer = 0;
 			line_extended = TRUE;
 
 			move(startline, startcol);
@@ -352,3 +380,147 @@ top:
      }
 
 }
+
+
+PRIVATE int popup_options ARGS5(int,cur_selection, OptionType *,list, 
+						   int, ly, int, lx, int,width)
+{
+    int c=0, cmd=0, i=0;
+    int orig_selection = cur_selection;
+    WINDOW * form_window;
+    int num_options=0, top, bottom, length= -1;
+    OptionType * opt_ptr=list;
+    int window_offset=0;
+
+    for(; opt_ptr->next; num_options++, opt_ptr = opt_ptr->next)
+         ; /* null body */
+
+    top = ly - (cur_selection+1);
+    if(top < 0) top = 0;
+    bottom = top + num_options+3;
+
+    if(bottom > LYlines-2) {
+	if(num_options+3 > LYlines-2) {
+	    top = 0;
+            bottom = top + num_options+3;
+	    if(bottom > LYlines-2)
+	        bottom = LYlines-1;
+	} else {
+	    top = (LYlines-2) - (num_options+3);
+            bottom = top + num_options+3;
+	}
+    }
+
+    length = (bottom-top)-2;
+
+    form_window = newwin(length+2, width+4, top, lx-1);
+    scrollok(form_window, TRUE);
+
+	/* put up a border */
+    box(form_window, '*', '*');
+
+    if(cur_selection > length)
+        window_offset = cur_selection - length;
+
+    opt_ptr=list;
+    for(i=0; i<=num_options; i++, opt_ptr = opt_ptr->next) {
+	 if(i >= window_offset && i-window_offset < length) {
+             wmove(form_window,(i+1)-window_offset,2);
+             waddstr(form_window,opt_ptr->name);
+	 }
+    }
+
+    wrefresh(form_window);
+
+    opt_ptr=NULL;
+
+	/* loop on user input */
+    while(cmd != LYK_ACTIVATE) {
+
+	  /* unreverse cur selection */
+	 if(opt_ptr!=NULL) {
+             wmove(form_window,(i+1)-window_offset,2);
+             waddstr(form_window,opt_ptr->name);
+	 }
+
+         opt_ptr=list;
+         for(i=0; i<cur_selection; i++, opt_ptr = opt_ptr->next) 
+	     ; /* null body */
+
+         wstart_reverse(form_window);
+         wmove(form_window,(i+1)-window_offset,2);
+         waddstr(form_window,opt_ptr->name);
+         wstop_reverse(form_window);
+         wrefresh(form_window);
+
+         c = LYgetch();
+	 cmd = keymap[c+1];
+
+new_cmd:  /* jump here to skip user */
+
+         switch(cmd) {
+             case LYK_PREV_LINK:
+	     case LYK_UP_LINK:
+	
+		 if(cur_selection)
+                    cur_selection--;
+
+		  /* scroll the window up if neccessary */
+		 if(cur_selection-window_offset < 0) {
+		    wmove(form_window,1,2);
+		    winsertln(form_window);
+    		    box(form_window, '*', '*');
+		    window_offset--;
+		 }
+                 break;
+             case LYK_NEXT_LINK:
+	     case LYK_DOWN_LINK:
+		 if(cur_selection < num_options)
+                    cur_selection++;
+
+		  /* scroll the window down if neccessary */
+		 if(cur_selection-window_offset >= length) {
+		     /* remove the bottom border befor scrolling */
+		     wmove(form_window,length+1,1);
+		     wclrtoeol(form_window);
+		     scroll(form_window);
+    		     box(form_window, '*', '*');
+		     window_offset++;
+		 }
+                 break;
+
+	     case LYK_NEXT_PAGE:
+		if(cur_selection != length+window_offset-1)
+		    cur_selection = length+window_offset-1;
+		else
+		  {
+		    cmd = LYK_PREV_LINK;
+		    goto new_cmd;
+		  }
+		break;
+
+	     case LYK_PREV_PAGE:
+		if(cur_selection != window_offset)
+		   cur_selection = window_offset;
+		else
+		  {
+		    cmd = LYK_PREV_LINK;
+		    goto new_cmd;
+		  }
+		break;
+
+	     case LYK_QUIT:
+	     case LYK_ABORT:
+	     case LYK_PREV_DOC:
+		cur_selection = orig_selection;
+		cmd=LYK_ACTIVATE; /* to exit */
+		break;
+         }
+
+     }
+     delwin(form_window);
+     refresh();
+
+     return(cur_selection);
+}
+

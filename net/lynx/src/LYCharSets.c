@@ -1,3 +1,4 @@
+#include "HTUtils.h"
 /* INSTRUCTIONS for adding new character sets !!!!
  *
  * Make up a character set and add it in the same
@@ -86,7 +87,7 @@ static char * ISO_Latin1[] = {
   	"\371",	/* small u, grave accent */ 
   	"\374",	/* small u, dieresis or umlaut mark */ 
   	"\375",	/* small y, acute accent */ 
-  	"\377",	/* small y, dieresis or umlaut mark */ 
+  	"\377"	/* small y, dieresis or umlaut mark */ 
 };
 static char * DEC_Multinational[] = {
   	"\306",	/* capital AE diphthong (ligature) */ 
@@ -157,7 +158,7 @@ static char * DEC_Multinational[] = {
   	"\371",	/* small u, grave accent */ 
   	"\374",	/* small u, dieresis or umlaut mark */ 
   	"y'",	/* small y, acute accent */ 
-  	"\375",	/* small y, dieresis or umlaut mark */ 
+  	"\375"	/* small y, dieresis or umlaut mark */ 
 };
 static char * PC_charset[] = {
         "\222", /* capital AE diphthong (ligature) */
@@ -228,7 +229,7 @@ static char * PC_charset[] = {
         "\227", /* small u, grave accent */
         "\201", /* small u, dieresis or umlaut mark */
         "\354", /* small y, acute accent */
-        "\230", /* small y, dieresis or umlaut mark */
+        "\230" /* small y, dieresis or umlaut mark */
 };
 /*      Entity values -- 7 bit character approximations
 **
@@ -303,7 +304,79 @@ static char * SevenBitApproximations[] = {
         "u", /* small u, grave accent */
         "u", /* small u, dieresis or umlaut mark */
         "y", /* small y, acute accent */
-        "y", /* small y, dieresis or umlaut mark */
+        "y" /* small y, dieresis or umlaut mark */
+};
+
+static char * NeXT_Step[] = {
+      "\341", /* capital AE diphthong (ligature) */
+      "\202", /* capital A, acute accent */
+      "\203", /* capital A, circumflex accent */
+      "\201", /* capital A, grave accent */
+      "\206", /* capital A, ring */
+      "\204", /* capital A, tilde */
+      "\205", /* capital A, dieresis or umlaut mark */
+      "\207", /* capital C, cedilla */
+      "\220", /* capital Eth, Icelandic */
+      "\211", /* capital E, acute accent */
+      "\212", /* capital E, circumflex accent */
+      "\210", /* capital E, grave accent */
+      "\213", /* capital E, dieresis or umlaut mark */
+      "\215", /* capital I, acute accent */
+      "\216", /* capital I, circumflex accent */
+      "\214", /* capital I, grave accent */
+      "\217", /* capital I, dieresis or umlaut mark */
+      "\221", /* capital N, tilde */
+      "\223", /* capital O, acute accent */
+      "\224", /* capital O, circumflex accent */
+      "\222", /* capital O, grave accent */
+      "\351", /* capital O, slash */
+      "\225", /* capital O, tilde */
+      "\226", /* capital O, dieresis or umlaut mark */
+      "\234", /* capital THORN, Icelandic */
+      "\230", /* capital U, acute accent */
+      "\231", /* capital U, circumflex accent */
+      "\227", /* capital U, grave accent */
+      "\232", /* capital U, dieresis or umlaut mark */
+      "\233", /* capital Y, acute accent */
+      "\326", /* small a, acute accent */
+      "\327", /* small a, circumflex accent */
+      "\361", /* small ae diphthong (ligature) */
+      "\325", /* small a, grave accent */
+      "\046", /* ampersand */
+      "\332", /* small a, ring */
+      "\330", /* small a, tilde */
+      "\331", /* small a, dieresis or umlaut mark */
+      "\333", /* small c, cedilla */
+      "\335", /* small e, acute accent */
+      "\336", /* small e, circumflex accent */
+      "\334", /* small e, grave accent */
+      "\002", /* emsp, em space - not collapsed NEVER CHANGE THIS */
+      "\002", /* ensp, en space - not collapsed NEVER CHANGE THIS */
+      "\346", /* small eth, Icelandic */
+      "\337", /* small e, dieresis or umlaut mark */
+      "\076", /* greater than */
+      "\342", /* small i, acute accent */
+      "\344", /* small i, circumflex accent */
+      "\340", /* small i, grave accent */
+      "\345", /* small i, dieresis or umlaut mark */
+      "\074", /* less than */
+      "\001", /* nbsp non-breaking space NEVER CHANGE THIS*/
+      "\347", /* small n, tilde */
+      "\355", /* small o, acute accent */
+      "\356", /* small o, circumflex accent */
+      "\354", /* small o, grave accent */
+      "\371", /* small o, slash */
+      "\357", /* small o, tilde */
+      "\360", /* small o, dieresis or umlaut mark */
+      "\042", /* quote '"' */
+      "\373", /* small sharp s, German (sz ligature) */
+      "\374", /* small thorn, Icelandic */
+      "\363", /* small u, acute accent */
+      "\364", /* small u, circumflex accent */
+      "\362", /* small u, grave accent */
+      "\366", /* small u, dieresis or umlaut mark */
+      "\367", /* small y, acute accent */
+      "\375" /* small y, dieresis or umlaut mark */
 };
 
 
@@ -319,17 +392,18 @@ PUBLIC char ** LYCharSets[]={
         ISO_Latin1,
 	DEC_Multinational,
         PC_charset,
+	NeXT_Step,
         SevenBitApproximations
 };
 
 /* Add the name that the user will see below.
  * The order of LYCharSets and char_set_names MUST be the same
  */
-
 PUBLIC char * LYchar_set_names[]={
         "ISO Latin 1         ",
 	"DEC Multinational   ",
         "IBM PC character set",
+	"NeXT character set  ",
         "7 bit approximations",
         (char *) 0
 };

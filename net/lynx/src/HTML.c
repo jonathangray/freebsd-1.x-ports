@@ -32,9 +32,14 @@
 
 #include "GridText.h"
 
+#include "HTFont.h"
+
 #ifdef VMS
-#include <curses.h>
+#include "LYCurses.h"
 #endif
+
+#include"LYGlobalDefs.h"
+
 /* from Curses.h */
 extern int LYcols;
 
@@ -47,6 +52,9 @@ PRIVATE HTStyle *styles[HTML_ELEMENTS+25];  /* adding 24 nested list styles */
 PRIVATE HTStyle *default_style;
 PRIVATE char HTML_Last_Char='\0'; /* the last character put on the screen */
 PRIVATE char *textarea_name=0;
+PRIVATE char *textarea_cols=0;
+PRIVATE int textarea_rows=4;
+PRIVATE BOOLEAN LastOptionChecked=FALSE;
 
 /* used for nested lists */
 PRIVATE int List_Nesting_Level= -1;  /* counter for list nesting level */
@@ -54,7 +62,7 @@ PRIVATE int List_Nesting_Level= -1;  /* counter for list nesting level */
 /*		HTML Object
 **		-----------
 */
-#define MAX_NESTING 30		/* Should be checked by parser */
+#define MAX_NESTING 40		/* Should be checked by parser */
 
 typedef struct _stack_element {
         HTStyle *	style;
@@ -274,6 +282,10 @@ PRIVATE void HTML_put_string ARGS2(HTStructured *, me, CONST char*, s)
     	HTChunkPuts(&me->option, s);
 	break;
 	
+    case HTML_TEXTAREA:	
+    	HTChunkPuts(&me->textarea, s);
+	break;
+
     case HTML_LISTING:				/* Litteral text */
     case HTML_XMP:
     case HTML_PLAINTEXT:
@@ -394,6 +406,7 @@ PRIVATE void HTML_start_element ARGS4(
 	    }
 	    UPDATE_STYLE;
 	    HText_beginAnchor(me->text, source);
+	    HText_appendCharacter(me->text,LY_BOLD_START_CHAR);
 	}
     	break;
 
@@ -421,7 +434,8 @@ PRIVATE void HTML_start_element ARGS4(
 	    HText_beginForm(action, method);
 
 	    free(action);
-	    free(method);
+	    if(method)
+	        free(method);
 	}
 	break;
 
@@ -439,17 +453,17 @@ PRIVATE void HTML_start_element ARGS4(
 	    HTML_put_character(me,' ');
 
 	    if (present[HTML_INPUT_NAME])  
-		StrAllocCopy(I.name, value[HTML_INPUT_NAME]);
+		I.name = value[HTML_INPUT_NAME];
 	    if (present[HTML_INPUT_TYPE]) 
-		StrAllocCopy(I.type, value[HTML_INPUT_TYPE]);
+		I.type = value[HTML_INPUT_TYPE];
 	    if (present[HTML_INPUT_VALUE]) 
-		StrAllocCopy(I.value, value[HTML_INPUT_VALUE]);
+		I.value = value[HTML_INPUT_VALUE];
 	    if (present[HTML_INPUT_CHECKED]) 
 		I.checked = YES;
 	    if (present[HTML_INPUT_SIZE]) 
-		StrAllocCopy(I.size, value[HTML_INPUT_SIZE]);
+		I.size = value[HTML_INPUT_SIZE];
 	    if (present[HTML_INPUT_MAXLENGTH]) 
-		StrAllocCopy(I.maxlength, value[HTML_INPUT_MAXLENGTH]);
+		I.maxlength = value[HTML_INPUT_MAXLENGTH];
 
 	    chars = HText_beginInput(me->text, &I);
 	    for(; chars>0; chars--)
@@ -464,6 +478,16 @@ PRIVATE void HTML_start_element ARGS4(
 	    StrAllocCopy(textarea_name, value[HTML_TEXTAREA_NAME]);
 	else
 	    textarea_name = 0;
+
+	if (present[HTML_TEXTAREA_COLS])  
+	    StrAllocCopy(textarea_cols, value[HTML_TEXTAREA_COLS]);
+	else
+	    StrAllocCopy(textarea_cols, "60");
+
+	if (present[HTML_TEXTAREA_ROWS])  
+	    textarea_rows = atoi(value[HTML_TEXTAREA_ROWS]);
+	else
+	    textarea_rows = 4;
 	break;
 
 
@@ -493,31 +517,55 @@ PRIVATE void HTML_start_element ARGS4(
 	        /* finish the data off */
        	        HTChunkTerminate(&me->option);
 		/* finish the previous option @@@@@ */
-	        HText_setLastOptionValue(me->text, me->option.data);
+	        HText_setLastOptionValue(me->text, me->option.data, 
+				             MIDDLE_ORDER, LastOptionChecked);
 	    }
 
-	    /* start a newline before each option */
-            HText_appendCharacter(me->text,'\r');
+	    /* if its not a multiple option list then don't
+	     * use the checkbox method, and don't put
+	     * anything on the screen yet.
+	     */
+	    if(first_option || HTCurSelectGroupType == F_CHECKBOX_TYPE) {
 
-            /* init */
-            I.name=NULL; I.type=NULL; I.value=NULL;
-            I.checked=NO; I.size=NULL; I.maxlength=NULL;
 
-	    StrAllocCopy(I.type,"OPTION");
+		if(HTCurSelectGroupType == F_CHECKBOX_TYPE)
+	            /* start a newline before each option */
+                    HText_appendCharacter(me->text,'\r');
+		else
+		    /* add option list designation character */
+                    HText_appendCharacter(me->text,'[');
+		    
 
-	    if(present[HTML_OPTION_SELECTED])
-		I.checked=YES;
+                /* init */
+                I.name=NULL; I.type=NULL; I.value=NULL;
+                I.checked=NO; I.size=NULL; I.maxlength=NULL;
 
-	    HText_beginInput(me->text, &I);
-	    /* Get ready for the value */
+	        I.type = "OPTION";
+    
+	        if(present[HTML_OPTION_SELECTED])
+		    I.checked=YES;
+
+		if(present[HTML_OPTION_VALUE])
+		    I.value=value[HTML_OPTION_VALUE];
+
+	        HText_beginInput(me->text, &I);
+    
+	        first_option = FALSE;
+
+		if(HTCurSelectGroupType == F_CHECKBOX_TYPE) {
+	        /* put 3 underscores and one space before each option */
+                    for(i=0; i<3; i++)
+	    	        HText_appendCharacter(me->text, '_');
+	            HText_appendCharacter(me->text, ' ');
+		}
+	    }
+
+	    /* Get ready for the next value */
             HTChunkClear(&me->option);
-
-	    first_option = FALSE;
-
-	    /* put 3 underscores and one space before each option */
-            for(i=0; i<3; i++)
-	    	HText_appendCharacter(me->text, '_');
-	    HText_appendCharacter(me->text, ' ');
+	    if(present[HTML_OPTION_SELECTED])
+		LastOptionChecked=YES;
+	    else
+		LastOptionChecked=NO;
 
 	}
 	break;
@@ -553,7 +601,10 @@ PRIVATE void HTML_start_element ARGS4(
     	break;
 	
     case HTML_ISINDEX:
-   	HTAnchor_setIndex(me->node_anchor);
+	if(present && present[HTML_ISINDEX_ACTION])
+   	    HTAnchor_setIndex(me->node_anchor, value[HTML_ISINDEX_ACTION]);
+	else
+   	    HTAnchor_setIndex(me->node_anchor, me->node_anchor->address);
 	break;
 	
     case HTML_P:
@@ -607,17 +658,20 @@ PRIVATE void HTML_start_element ARGS4(
 	break;
 	
     case HTML_DD:
-        UPDATE_STYLE;
-	HText_appendCharacter(me->text, '\t');	/* Just tab out one stop */
+	HTML_Last_Char = ' ';  /* absorb white space */
+        if (!me->style_change) 
+	    HText_appendCharacter(me->text, '\r');
+	else 
+	  {
+            UPDATE_STYLE;
+	    HText_appendCharacter(me->text, '\t');
+	  }
 	me->in_word = NO;
 	break;
 
     case HTML_BR:
-	/* put in a dummy ' ' character so that any separaters after
-	 * the '/n' will be absorbed inside HTML_put_character
-	 */
         UPDATE_STYLE;
-	HTML_put_character(me, ' ');
+	HTML_Last_Char = ' ';  /* absorb white space */
 	HText_appendCharacter(me->text, '\r');
 	break;
 
@@ -765,6 +819,7 @@ PRIVATE void HTML_start_element ARGS4(
     
     case HTML_EM:			/* Logical character highlighting */
     case HTML_STRONG:
+	UPDATE_STYLE;
 	HText_appendCharacter(me->text,LY_UNDERLINE_START_CHAR);
 	if(TRACE)
 	   fprintf(stderr,"Beginning underline\n");
@@ -789,17 +844,15 @@ PRIVATE void HTML_start_element ARGS4(
     case HTML_ADDRESS:
     case HTML_BLOCKQUOTE:
     	change_paragraph_style(me, styles[element_number]);	/* May be postponed */
-	/* List_Nesting_Level = -1;  Go ahead and let people shoot themselves
-	 * in the foot
-	 */
 	break;
 
     } /* end switch */
 
     if (HTML_dtd.tags[element_number].contents!= SGML_EMPTY) {
 	if (me->sp == me->stack) {
-            fprintf(stderr, "HTML: ****** Maximum nesting of %d exceded!\n",
-            MAX_NESTING);
+            fprintf(stderr, 
+		"HTML: ****** Maximum nesting of %d tags exceeded!\n",
+            	MAX_NESTING);
             return;
         }
 
@@ -840,15 +893,20 @@ PRIVATE void HTML_end_element ARGS2(HTStructured *, me, int , element_number)
     }
 #endif
     
-    me->sp++;				/* Pop state off stack */
-
-    if(TRACE)
-	fprintf(stderr,"HTML:end_element: Popped style off stack - %s\n",me->sp->style->name);
+    if(me->sp < me->stack + MAX_NESTING+1) {
+        me->sp++;				/* Pop state off stack */
+        if(TRACE)
+	    fprintf(stderr,"HTML:end_element: Popped style off stack - %s\n",me->sp->style->name);
+    } else {
+	if(TRACE)
+	    fprintf(stderr,"Stack underflow error!  Tried to pop off more styles than exist in stack\n");
+    }
     
     switch(element_number) {
 
     case HTML_A:
 	UPDATE_STYLE;
+	HText_appendCharacter(me->text,LY_BOLD_END_CHAR);
 	HText_endAnchor(me->text);
 	break;
 
@@ -859,38 +917,80 @@ PRIVATE void HTML_end_element ARGS2(HTStructured *, me, int , element_number)
 	break;
 
     case HTML_SELECT:
-	/* finish the data off */
-       	HTChunkTerminate(&me->option);
-	/* finish the previous option @@@@@ */
-	HText_setLastOptionValue(me->text, me->option.data);
+	{
+	    char *ptr;
+	    /* finish the data off */
+       	    HTChunkTerminate(&me->option);
+	    /* finish the previous option @@@@@ */
+	    ptr = HText_setLastOptionValue
+		(me->text, me->option.data, LAST_ORDER, LastOptionChecked);
+
+	    LastOptionChecked = FALSE;
+
+	    if(HTCurSelectGroupType != F_CHECKBOX_TYPE) {
+	        /* output to screen but use non breaking spaces for output */
+	        for(; *ptr != '\0'; ptr++)
+		    if(*ptr == ' ')
+	    	        HText_appendCharacter(me->text,HT_NON_BREAK_SPACE); 
+		    else
+	    	        HText_appendCharacter(me->text,*ptr); 
+	         /* add end option character */
+	        HText_appendCharacter(me->text,']'); 
+	    }
+	}
 	break;
 
     case HTML_TEXTAREA:
         {
             InputFieldData I;
             int chars;
+ 	    char *cp=0;
+	    int i;
 
             /* init */
             I.name=NULL; I.type=NULL; I.value=NULL;
             I.checked=NO; I.size=NULL; I.maxlength=NULL;
 
-            /* before any input field add a space if necessary */
             UPDATE_STYLE;
+            /* before any input field add a space if necessary */
             HTML_put_character(me,' ');
+	    /* add a return */
 	    HText_appendCharacter(me->text,'\r');
 
 	    /* finish the data off */
             HTChunkTerminate(&me->textarea);
 
-	    /* type defaults to text */
-	    I.name= textarea_name;
-	    StrAllocCopy(I.value, me->textarea.data);
-	    StrAllocCopy(I.size,"60");
+	    I.type = "textarea";
+	    I.value = cp;  /* may be null */
+	    I.size = textarea_cols;
+	    I.name = textarea_name;
 
-            chars = HText_beginInput(me->text, &I);
-	    for(; chars>0; chars--)
-	    	HTML_put_character(me, '_');
-	    HText_appendCharacter(me->text,'\r');
+	    cp = strtok(me->textarea.data, "\n");
+	    for(i=0; i < textarea_rows; i++)
+	      {
+		I.value = cp;
+
+                chars = HText_beginInput(me->text, &I);
+	        for(; chars>0; chars--)
+	    	    HTML_put_character(me, '_');
+	        HText_appendCharacter(me->text,'\r');
+	
+		cp = strtok(NULL, "\n");
+	      }
+
+	    /* check for more data lines than the rows attribute 
+   	     */
+	    while(cp)
+	      {
+		I.value = cp;
+
+                chars = HText_beginInput(me->text, &I);
+                for(chars=atoi(textarea_cols); chars>0; chars--)
+                    HTML_put_character(me, '_');
+                HText_appendCharacter(me->text,'\r');
+        
+                cp = strtok(NULL, "\n");
+              }
 
 	    break;
 	}

@@ -4,7 +4,7 @@
 
 #ifndef LYSTRUCTS_H
 #include "LYStructs.h"
-#endif
+#endif /* LYSTRUCTS_H */
 
 /* in LYForms.c */
 extern int change_form_link PARAMS((struct link *form_link, int mode,
@@ -21,6 +21,13 @@ typedef struct _InputFieldData {
 	char *type;
 	int   checked;
 } InputFieldData;
+
+/* The OptionType structure is for a linked list of option entries
+ */
+typedef struct _OptionType {
+	char *			name; /* the name/value of the entry */
+	struct _OptionType *	next; /* the next entry */
+} OptionType;
 
 /* the FormInfo structure is used to contain the form field
  * data within each anchor
@@ -40,6 +47,7 @@ typedef struct _FormInfo {
 	int			num_value;  /*value of the numerical fields*/
 	int 			hrange;  /* high numerical range */
 	int			lrange;   /* low numerical range */
+	OptionType *		select_list;  /* array of option choices */
         char *                  submit_action;
         int                     submit_method;
 } FormInfo;
@@ -47,21 +55,27 @@ typedef struct _FormInfo {
 #define HYPERTEXT_ANCHOR 1
 #define INPUT_ANCHOR     2   /* forms mode input fields */
 
-#define F_TEXT_TYPE	1
-#define F_PASSWORD_TYPE 2
-#define F_CHECKBOX_TYPE 3
-#define F_RADIO_TYPE	4
-#define F_SUBMIT_TYPE	5
-#define F_RESET_TYPE	6
+#define F_TEXT_TYPE	   1
+#define F_PASSWORD_TYPE    2
+#define F_CHECKBOX_TYPE    3
+#define F_RADIO_TYPE	   4
+#define F_SUBMIT_TYPE	   5
+#define F_RESET_TYPE	   6
+#define F_OPTION_LIST_TYPE 7
+#define F_HIDDEN_TYPE      8
+#define F_TEXTAREA_TYPE    9
 
 #define WWW_FORM_LINK_TYPE  1
 #define WWW_LINK_TYPE   2
-#define STARS(n) (&star_string[(LINESIZE-1) - (n)])
 /* #define different lynx modes */
 #define NORMAL_LYNX_MODE 1
 #define FORMS_LYNX_MODE  2
 
 #define FORM_UP   1
 #define FORM_DOWN 2
+
+#define FIRST_ORDER  1
+#define MIDDLE_ORDER 2
+#define LAST_ORDER   3
 
 #endif /* HTForms_H */

@@ -10,7 +10,6 @@ ASIS_MACH = sun-4/sunos-5.2
 
 CFLAGS =  -DDEBUG -DNGROUPS=16 -Dd_namlen=d_reclen -DNO_BCOPY -DSOLARIS2 -DSVR4
 LFLAGS =
-CC = gcc
 
 # Directory for installed binary:
 BINDIR = /usr/local/bin

@@ -9,7 +9,7 @@ WTMP = ../..
 
 
 #CFLAGS = 
-CFLAGS = -DSYS5 -DUSE_DIRENT 
+CFLAGS = -DSYS5 
 CC = cc -g
 #LFLAGS =
 LFLAGS = 

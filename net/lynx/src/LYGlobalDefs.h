@@ -18,10 +18,24 @@
 #define NUMBERS_AS_ARROWS 0
 #define LINKS_ARE_NUMBERED 1
 
+#ifdef VMS
+#include<stdlib.h>
+#if defined(VAXC) && !defined(__DECC)
+#define malloc	VAXC$MALLOC_OPT
+#define calloc	VAXC$CALLOC_OPT
+#define free	VAXC$FREE_OPT
+#define cfree	VAXC$CFREE_OPT
+#define realloc	VAXC$REALLOC_OPT
+#endif /* VAXC && !__DECC */
+#endif /* VMS */
+
 #define NOVICE_MODE 	  0
 #define INTERMEDIATE_MODE 1
 #define ADVANCED_MODE 	  2
 
+#define MAX_LINE        300     /* Hope that no widow is larger than this */
+extern char * star_string; /* from GridText.c */
+#define STARS(n) (&star_string[(MAX_LINE-1) - (n)])
 #define DIRNAMESIZE 256
 extern BOOLEAN LYShowCursor;   /* show the cursor or hide it */
 extern BOOLEAN LYCursesON;  /* start_curses()->TRUE, stop_curses()->FALSE */
@@ -32,12 +46,9 @@ extern int display_lines; /* number of lines in the display */
 extern int www_search_result;
 extern char *checked_box;  /* form boxes */
 extern char *unchecked_box;  /* form boxes */
-extern char *star_string; /* a string of stars */
 extern char *empty_string;
 extern char *startfile;
 extern char *helpfile;
-extern char indexfile[256];
-extern char personal_mail_address[120];
 extern char *display;
 extern BOOLEAN LYforce_HTML_mode;
 extern BOOLEAN LYforce_no_cache;
@@ -45,8 +56,18 @@ extern BOOLEAN user_mode; /* novice or advanced */
 extern BOOLEAN is_www_index;
 extern BOOLEAN dump_output_immediately;
 extern BOOLEAN lynx_mode;
+
+#ifdef DIRED_SUPPORT
+extern BOOLEAN lynx_edit_mode;
+extern BOOLEAN dir_list_style;
+extern taglink *tagged;
+#define FILES_FIRST 1
+#define MIXED_STYLE 2
+#endif
+
 extern BOOLEAN recent_sizechange;
 extern BOOLEAN telnet_ok;
+extern BOOLEAN news_ok;
 extern BOOLEAN no_print;    /* TRUE to disable printing */
 #if defined(EXEC_LINKS) || defined(EXEC_SCRIPTS)
 extern BOOLEAN local_exec;  /* TRUE to enable local program execution */
@@ -64,6 +85,8 @@ extern BOOLEAN case_sensitive;    /* TRUE to turn on case sensitive search */
 
 extern BOOLEAN no_inside_telnet;  /* this and following are restrictions */
 extern BOOLEAN no_outside_telnet;
+extern BOOLEAN no_inside_news;  
+extern BOOLEAN no_outside_news;
 extern BOOLEAN no_suspend;
 extern BOOLEAN no_editor;
 extern BOOLEAN no_shell;
@@ -78,8 +101,18 @@ extern BOOLEAN no_goto;
 extern BOOLEAN no_file_url;
 extern BOOLEAN no_newspost;
 
-extern char editor[256];          /* if non empty it enables edit mode with
+#ifdef DIRED_SUPPORT
+extern BOOLEAN no_dired_support;
+#endif
+
+extern char *indexfile;
+extern char *personal_mail_address;
+extern char *editor;          /* if non empty it enables edit mode with
 				   * the editor that is named */
-extern char bookmark_page[256];
+extern char *bookmark_page;
+extern char *personal_type_map;
+extern char *global_type_map;
+extern char *global_extension_map;
+extern char *personal_extension_map;
 
 #endif /* GLOBAL_DEFS_H */

@@ -43,8 +43,9 @@
 PRIVATE int remote_session ARGS2(char *, access, char *, host)
 {
 	char * user = host;
-	char * hostname = strchr(host, '@');
-	char * port = strchr(host, ':');
+ 	char * cp;
+	char * hostname;
+	char * port;
 	char   command[256];
 	enum _login_protocol { telnet, rlogin, tn3270 } login_protocol =
 		strcmp(access, "rlogin") == 0 ? rlogin :
@@ -53,13 +54,28 @@ PRIVATE int remote_session ARGS2(char *, access, char *, host)
 	extern int DCLsystem PARAMS(char *command);
 #define system(a) DCLsystem(a) /* use LYCurses.c routines for spawns */
 #endif /* VMS */
-	
+
+	/* prevent telnet://hostname;rm -rf *  URL's (VERY BAD) 
+	 *  *cp=0;  /* terminate at any ;,<,>,`,|,",' or space or return
+	 *  or tab to prevent security whole 
+	 */
+	for(cp=host; *cp != '\0'; cp++)
+	    if(!isalnum(*cp) && *cp != '_' && *cp != '-' &&
+				*cp != ':' && *cp != '.' && *cp != '@') {
+	        *cp = '\0';
+	        break;
+	    }    
+
+	hostname = strchr(host, '@');
+	port = strchr(host, ':');
+
 	if (hostname) {
 	    *hostname++ = 0;	/* Split */
 	} else {
 	    hostname = host;
 	    user = 0;		/* No user specified */
 	}
+
 	if (port) *port++ = 0;	/* Split */
 
 
@@ -109,8 +125,7 @@ PRIVATE int remote_session ARGS2(char *, access, char *, host)
 #endif
 
 /* Most unix machines suppport username only with rlogin */
-		  /* Uncomment if using unix emulation of WIN_TCP */
-#if defined(unix) /* || defined(WIN_TCP) */
+#if defined(unix)
 #ifndef TELNET_DONE
 	if (login_protocol == rlogin) {
 	    sprintf(command, "%s %s%s%s", RLOGIN_COMMAND,
@@ -136,50 +151,112 @@ PRIVATE int remote_session ARGS2(char *, access, char *, host)
 #endif
 #endif
 
-/* VMS varieties -- Comment out WIN_TCP if using unix emulation */
-#if defined(MULTINET) || defined(WIN_TCP)
-	if (login_protocol == telnet) {
-	    sprintf(command, "TELNET %s%s %s",
-		port ? "/PORT=" : "",
-		port ? port : "",
-		hostname);
-	} else if (login_protocol == tn3270) {
-	    sprintf(command, "TELNET/TN3270 %s%s %s",
-		port ? "/PORT=" : "",
-		port ? port : "",
-		hostname);
-	} else {
+/* VMS varieties */
+#if defined(MULTINET)
+	if (login_protocol == rlogin) {
 	    sprintf(command, "RLOGIN%s%s%s%s %s",  /*lm 930713 */
 		user ? "/USERNAME=" : "",
 		user ? user : "",
 		port ? "/PORT=" : "",
 		port ? port : "",
 		hostname);
+
+	} else if (login_protocol == tn3270) {
+	    sprintf(command, "TELNET/TN3270 %s%s %s",
+		port ? "/PORT=" : "",
+		port ? port : "",
+		hostname);
+
+	} else {  /* TELNET */
+	    sprintf(command, "TELNET %s%s %s",
+		port ? "/PORT=" : "",
+		port ? port : "",
+		hostname);
 	}
+
 	if (TRACE) fprintf(stderr, "HTaccess: Command is: %s\n", command);
 	system(command);
 	return HT_NO_DATA;		/* Ok - it was done but no data */
 #define TELNET_DONE
-#endif
+#endif /* MULTINET */
+
+#if defined(WIN_TCP)
+        {
+            char *cp;
+    
+	    if ((cp=getenv("WINTCP_COMMAND_STYLE")) != NULL &&
+                0==strncasecomp(cp, "VMS", 3)) { /* VMS command syntax */ 
+	        if (login_protocol == rlogin) {
+	            sprintf(command, "RLOGIN%s%s%s%s %s",  /*lm 930713 */
+		        user ? "/USERNAME=" : "",
+		        user ? user : "",
+		        port ? "/PORT=" : "",
+		        port ? port : "",
+		        hostname);
+
+	        } else if (login_protocol == tn3270) {
+	            sprintf(command, "TELNET/TN3270 %s%s %s",
+		        port ? "/PORT=" : "",
+		        port ? port : "",
+		        hostname);
+
+	        } else {  /* TELNET */
+	            sprintf(command, "TELNET %s%s %s",
+		        port ? "/PORT=" : "",
+		        port ? port : "",
+		        hostname);
+	        }
+
+            } else { /* UNIX command syntax */
+	       if (login_protocol == rlogin) {
+	           sprintf(command, "RLOGIN %s%s%s", 
+		       hostname,
+		       user ? " -l " : "",
+		       user ? user : "");
+
+	        } else if (login_protocol == tn3270) {
+	            sprintf(command, "TN3270 %s %s",
+		        hostname,
+		        port ? port : "");
+
+	        } else {  /* TELNET */
+	            sprintf(command, "TELNET %s %s",
+		        hostname,
+		        port ? port : "");
+	        }
+            }
+
+	    if (TRACE) fprintf(stderr, "HTaccess: Command is: %s\n", command);
+	    system(command);
+	    return HT_NO_DATA;		/* Ok - it was done but no data */
+        }
+#define TELNET_DONE
+#endif /* WIN_TCP */
 
 #ifdef UCX
-	if (login_protocol == telnet) {
-	    sprintf(command, "TELNET %s %s",
-		hostname,
-		port ? port : "");
-	} else if (login_protocol == rlogin) {
+	if (login_protocol == rlogin) {
 	    sprintf(command, "RLOGIN%s%s %s %s",
 		user ? "/USERNAME=" : "",
 		user ? user : "",
 		hostname,
 		port ? port : "");
+
+	} else if (login_protocol == tn3270) {
+	    sprintf(command, "TN3270 %s %s",
+		hostname,
+		port ? port : "");
+
+	} else {  /* TELNET */
+	    sprintf(command, "TELNET %s %s",
+		hostname,
+		port ? port : "");
 	}
-	if (login_protocol != tn3270) {  /* No tn3270 */
-	    if (TRACE) fprintf(stderr, "HTaccess: Command is: %s\n", command);
-	    system(command);
-	    return HT_NO_DATA;		/* Ok - it was done but no data */
-	}
-#endif
+
+	if (TRACE) fprintf(stderr, "HTaccess: Command is: %s\n", command);
+	system(command);
+	return HT_NO_DATA;		/* Ok - it was done but no data */
+#define TELNET_DONE
+#endif /* UCX */
 
 #ifdef VM
 #define SIMPLE_TELNET

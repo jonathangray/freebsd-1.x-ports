@@ -76,6 +76,13 @@ typedef HTAtom * HTFormat;
  */
 #define WWW_UNKNOWN     HTAtom_for("www/unknown")
 
+#ifdef DIRED_SUPPORT
+/*
+   www/dired signals directory edit mode.
+*/
+#define WWW_DIRED      HTAtom_for("www/dired")
+#endif
+
 /*
 
    These are regular MIME types.  HTML is assumed to be added by the W3 code.

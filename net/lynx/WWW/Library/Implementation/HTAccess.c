@@ -112,6 +112,83 @@ GLOBALREF  HTProtocol HTWAIS;
 }
 #endif
 
+ /*                                                  override_proxy()
+ **
+ **  Check the no_proxy environment variable to get the list
+ **  of hosts for which proxy server is not consulted.
+ **
+ **  no_proxy is a comma- or space-separated list of machine
+ **  or domain names, with optional :port part.  If no :port
+ **  part is present, it applies to all ports on that domain.
+ **
+ **  Example:
+ **          no_proxy="cern.ch,some.domain:8001"
+ **
+ */
+ PRIVATE BOOL override_proxy ARGS1(CONST char *, addr)
+{
+    CONST char * no_proxy = getenv("no_proxy");
+    char * p = NULL;
+    char * host = NULL;
+    int port = 0;
+    int h_len = 0;
+
+    if (!no_proxy || !addr || !(host = HTParse(addr, "", PARSE_HOST)))
+    return NO;
+    if (!*host) { free(host); return NO; }
+
+    if (p = strchr(host, ':')) {    /* Port specified */
+    *p++ = 0;                       /* Chop off port */
+    port = atoi(p);
+    }
+    else {                          /* Use default port */
+    char * access = HTParse(addr, "", PARSE_ACCESS);
+    if (access) {
+        if      (!strcmp(access,"http"))    port = 80;
+        else if (!strcmp(access,"gopher"))  port = 70;
+        else if (!strcmp(access,"ftp"))     port = 21;
+        free(access);
+    }
+    }
+    if (!port) port = 80;           /* Default */
+    h_len = strlen(host);
+
+    while (*no_proxy) {
+    CONST char * end;
+    CONST char * colon = NULL;
+    int templ_port = 0;
+    int t_len;
+
+    while (*no_proxy && (WHITE(*no_proxy) || *no_proxy==','))
+        no_proxy++;                 /* Skip whitespace and separators */
+
+    end = no_proxy;
+    while (*end && !WHITE(*end) && *end != ',') {   /* Find separator */
+        if (*end==':') colon = end;                 /* Port number given */
+        end++;
+    }
+
+    if (colon) {
+        templ_port = atoi(colon+1);
+        t_len = colon - no_proxy;
+    }
+    else {
+        t_len = end - no_proxy;
+    }
+
+    if ((!templ_port || templ_port == port)  &&
+        (t_len > 0  &&  t_len <= h_len  &&
+         !strncmp(host + h_len - t_len, no_proxy, t_len))) {
+        free(host);
+        return YES;
+    }
+    if (*end) no_proxy = end+1;
+    else break;
+    }
+
+    free(host);
+    return NO;
+}
 
 /*		Find physical name and access protocol
 **		--------------------------------------
@@ -153,7 +230,12 @@ PRIVATE int get_physical ARGS2(
 */
 #define USE_GATEWAYS
 #ifdef USE_GATEWAYS
-    {
+	/*
+	 *	Make sure the using_proxy variable is false.
+	 */
+	using_proxy = NO;
+
+    if(!override_proxy(addr)) {
 	char * gateway_parameter, *gateway, *proxy;
 
 	/* search for gateways */
@@ -179,10 +261,7 @@ PRIVATE int get_physical ARGS2(
 	if (!gateway && 0==strcmp(access, "wais")) {
 	    gateway = DEFAULT_WAIS_GATEWAY;
 	}
-#endif /* USE_GATEWAYS */
-
-	/* make sure the using_proxy variable is false */
-	using_proxy = NO;
+#endif /* direct wais */
 
 	/* proxy servers have precedence over gateway servers */
 	if(proxy) {
@@ -211,7 +290,7 @@ PRIVATE int get_physical ARGS2(
     		"http:", PARSE_ACCESS);
 	} 
     }
-#endif
+#endif /* use gateways */
 
 
 /*	Search registered protocols to find suitable one
@@ -272,7 +351,6 @@ PRIVATE int HTLoad ARGS4(
     			anchor, format_out, sink);
 }
 
-
 /*		Get a save stream for a document
 **		--------------------------------
 */
@@ -315,16 +393,27 @@ PRIVATE BOOL HTLoadDocument ARGS4(
 {
     int	        status;
     HText *	text;
+    char * address_to_load = (char *)full_address;
     extern char LYforce_no_cache;  /* from GridText.c */
-    use_this_url_instead = NULL;
+
+#ifdef DIRED_SUPPORT
+    extern BOOLEAN lynx_edit_mode;
+#endif
+
+    use_this_url_instead = 0;
 
     if (TRACE) fprintf (stderr,
-      "HTAccess: loading document %s\n", full_address);
+      "HTAccess: loading document %s\n", address_to_load);
 
     if (!LYforce_no_cache && (text=(HText *)HTAnchor_document(anchor))) {	
 	/* Already loaded */
         if (TRACE) fprintf(stderr, "HTAccess: Document already in memory.\n");
         HText_select(text);
+
+#ifdef DIRED_SUPPORT
+	if (HTAnchor_format(anchor) == WWW_DIRED)
+	   lynx_edit_mode = TRUE;
+#endif
 	return YES;
     }
 
@@ -332,7 +421,7 @@ PRIVATE BOOL HTLoadDocument ARGS4(
     
     /* I LOVE goto's! */
 try_again:
-    status = HTLoad(full_address, anchor, format_out, sink);
+    status = HTLoad(address_to_load, anchor, format_out, sink);
 
     
 /*	Log the access if necessary
@@ -369,23 +458,18 @@ try_again:
         if (TRACE)
           {
             fprintf (stderr, "HTAccess: '%s' is a redirection URL.\n",
-                     full_address);
+                     address_to_load);
             fprintf (stderr, "HTAccess: Redirecting to '%s'\n",
-                     redirecting_url);
+                     address_to_load);
           }
 	/* prevent circular references */
-	if(strcmp(full_address, redirecting_url))  /* if different */
-            full_address = redirecting_url;
-        use_this_url_instead = full_address;
-        goto try_again;
-      }
-
-    if (status == HT_INTERRUPTED)
-      {
-        if (TRACE)
-          fprintf (stderr,
-                   "HTAccess: We were interrupted.\n");
-        return -1;
+	if(strcmp(address_to_load, redirecting_url)) {  /* if different */
+            address_to_load = redirecting_url;
+            use_this_url_instead = redirecting_url;
+	    StrAllocCopy(anchor->address, redirecting_url);
+	    anchor->post_data = 0;
+            goto try_again;
+	}
       }
 
     if (status == HT_NO_DATA) {
@@ -443,14 +527,16 @@ try_again:
 **
 */
 
-PUBLIC BOOL HTLoadAbsolute ARGS1(CONST char *,addr)
+PUBLIC BOOL HTLoadAbsolute ARGS1(CONST DocAddress *,docaddr)
 {
-   return HTLoadDocument( addr,
-       		HTAnchor_parent(HTAnchor_findAddress(addr)),
+   return HTLoadDocument(docaddr->address,
+       		HTAnchor_parent(HTAnchor_findAddress(docaddr)),
        			HTOutputFormat ? HTOutputFormat : WWW_PRESENT,
 			HTOutputStream);
 }
 
+
+#ifdef NOT_USED_CODE
 
 /*		Load a document from absolute name to stream
 **		--------------------------------------------
@@ -477,6 +563,7 @@ PUBLIC BOOL HTLoadToStream ARGS3(
 			sink);
 }
 
+#endif /* NOT_USED_CODE */
 
 
 
@@ -498,21 +585,25 @@ PUBLIC BOOL HTLoadRelative ARGS2(
 		CONST char *,		relative_name,
 		HTParentAnchor *,	here)
 {
-    char * 		full_address = 0;
+    DocAddress 		full_address;
     BOOL       		result;
     char * 		mycopy = 0;
     char * 		stripped = 0;
     char *		current_address =
     				HTAnchor_address((HTAnchor*)here);
 
+    full_address.address = 0;
+    full_address.post_data = 0;
+    full_address.post_content_type = 0;
+
     StrAllocCopy(mycopy, relative_name);
 
     stripped = HTStrip(mycopy);
-    full_address = HTParse(stripped,
+    full_address.address = HTParse(stripped,
 	           current_address,
 		   PARSE_ACCESS|PARSE_HOST|PARSE_PATH|PARSE_PUNCTUATION);
-    result = HTLoadAbsolute(full_address);
-    free(full_address);
+    result = HTLoadAbsolute(&full_address);
+    free(full_address.address);
     free(current_address);
     free(mycopy);  /* Memory leak fixed 10/7/92 -- JFG */
     return result;
@@ -593,10 +684,9 @@ PUBLIC BOOL HTSearch ARGS2(
 
     char *q, *u;
     CONST char * p, *s, *e;		/* Pointers into keywords */
-    char * address = HTAnchor_address((HTAnchor*)here);
+    char * address = 0;
     BOOL result;
     char * escaped = malloc(strlen(keywords)*3+1);
-
     static CONST BOOL isAcceptable[96] =
 
     /*   0 1 2 3 4 5 6 7 8 9 A B C D E F */
@@ -609,6 +699,7 @@ PUBLIC BOOL HTSearch ARGS2(
 
     if (escaped == NULL) outofmem(__FILE__, "HTSearch");
     
+    StrAllocCopy(address, here->isIndexAction);
 
 /*	Convert spaces to + and hex escape unacceptable characters
 */
@@ -656,12 +747,17 @@ PUBLIC BOOL HTSearchAbsolute ARGS2(
 	CONST char *, 	keywords,
 	CONST char *, 	indexname)
 {
-    HTParentAnchor * anchor =
-    	(HTParentAnchor*) HTAnchor_findAddress(indexname);
+    DocAddress abs_doc;
+    HTParentAnchor * anchor;
+    abs_doc.address = (char *)indexname;
+    abs_doc.post_data = 0;
+    abs_doc.post_content_type = 0;
+
+    anchor = (HTParentAnchor*) HTAnchor_findAddress(&abs_doc);
     return HTSearch(keywords, anchor);
 }
 
-
+#ifdef NOT_USED_CODE
 /*		Generate the anchor for the home page
 **		-------------------------------------
 **
@@ -751,5 +847,5 @@ PUBLIC HTParentAnchor * HTHomeAnchor NOARGS
     free(ref);
     return anchor;
 }
-
+#endif /* NOT_USED_CODE */
 

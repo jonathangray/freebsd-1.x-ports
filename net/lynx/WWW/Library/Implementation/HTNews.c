@@ -98,13 +98,6 @@ PRIVATE BOOL initialized = NO;
 PRIVATE BOOL initialize NOARGS
 {
     CONST struct hostent  *phost;	  /* Pointer to host - See netdb.h */
-    struct sockaddr_in* sin = &soc_address;
-
-        
-/*  Set up defaults:
-*/
-    sin->sin_family = AF_INET;	    	/* Family = internet, host order  */
-    sin->sin_port = htons(NEWS_PORT);   /* Default: new port,    */
 
 /*   Get name of Host
 */
@@ -132,32 +125,6 @@ PRIVATE BOOL initialize NOARGS
     }
     if (!HTNewsHost) HTNewsHost = DEFAULT_NEWS_HOST;
 #endif
-
-    if (*HTNewsHost>='0' && *HTNewsHost<='9') {   /* Numeric node address: */
-	sin->sin_addr.s_addr = inet_addr((char *)HTNewsHost); /* See arpa/inet.h */
-
-    } else {		    /* Alphanumeric node name: */
-	phost=gethostbyname((char*)HTNewsHost);	/* See netdb.h */
-	if (!phost) {
-	    char message[150];		/* @@@ */
-	    sprintf(message, 
-	    "HTNews: Can't find news host `%s'.\n%s",HTNewsHost,
-	    "Please define your NNTP server");
-	    HTAlert(message);
-	    CTRACE(tfp,
-	      "HTNews: Can't find news host `%s'.\n",HTNewsHost);
-	    return NO;  /* Fail */
-	}
-	memcpy(&sin->sin_addr, phost->h_addr, phost->h_length);
-    }
-
-    if (TRACE) fprintf(stderr,  
-	"HTNews: Parsed address as port %4x, inet %d.%d.%d.%d\n",
-		(unsigned int)ntohs(sin->sin_port),
-		(int)*((unsigned char *)(&sin->sin_addr)+0),
-		(int)*((unsigned char *)(&sin->sin_addr)+1),
-		(int)*((unsigned char *)(&sin->sin_addr)+2),
-		(int)*((unsigned char *)(&sin->sin_addr)+3));
 
     s = -1;		/* Disconnected */
     
@@ -271,6 +238,47 @@ PRIVATE char * author_name ARGS1 (char *,email)
     return HTStrip(email);		/* Default to the whole thing */
 
 }
+/*      Find Author's mail address
+**      --------------------------
+**
+** On exit,
+**      THE EMAIL ADDRESS IS CORRUPTED
+**
+** For example, returns "montulli@spaced.out.galaxy.net" if given any of
+**      " Lou Montulli <montulli@spaced.out.galaxy.net> "
+**  or  " montulli@spacedout.galaxy.net ( Lou "The Stud" Montulli ) "
+*/
+PRIVATE char * author_address ARGS1(char *,email)
+{
+    char *s, *e;
+
+    if(TRACE)
+        fprintf(stderr,"Trying to find address in: %s\n",email);
+
+    if ((s=strchr(email,'<')))
+      {
+        if((e=strchr(email, '>')))
+            *e = 0;               /* Remove > */
+        return HTStrip(s+1);      /* Remove leading and trailing spaces */
+      }
+
+    if ((s=strchr(email,'(')) && (e=strchr(email, ')')))
+        if (e>s)
+          {
+            *s=0;                       /* Chop off everything after the ')'  */
+            return HTStrip(email);      /* Remove leading and trailing spaces */
+          }
+
+    /* Default to the first word */
+    s = email;
+    while(isspace(*s)) s++; /* find first non-space */
+    e = s;
+    while(!isspace(*e) && *e != '\0') e++; /* find next space or end */
+    *e=0; /* terminate space */
+
+    return(s);
+}
+
 
 /*	Start anchor element
 **	--------------------
@@ -285,8 +293,8 @@ PRIVATE void start_anchor ARGS1(CONST char *,  href)
     	for(i=0; i<HTML_A_ATTRIBUTES; i++)
 	    present[i] = (i==HTML_A_HREF);
     }
-    value[HTML_A_HREF] = href;
-    (*targetClass.start_element)(target, HTML_A , present, value);
+    ((CONST char **)value)[HTML_A_HREF] = href;
+    (*targetClass.start_element)(target, HTML_A , present,(CONST char **)value);
 
 }
 
@@ -303,9 +311,10 @@ PRIVATE void start_link ARGS2(CONST char *,  href, CONST char *, rev)
         for(i=0; i<HTML_LINK_ATTRIBUTES; i++)
             present[i] = (i==HTML_LINK_HREF || i==HTML_LINK_REV);
     }
-    value[HTML_LINK_HREF] = href;
-    value[HTML_LINK_REV]  = rev;
-    (*targetClass.start_element)(target, HTML_LINK , present, value);
+    ((CONST char **)value)[HTML_LINK_HREF] = href;
+    ((CONST char **)value)[HTML_LINK_REV]  = rev;
+    (*targetClass.start_element)(target, HTML_LINK , present,
+							(CONST char **)value);
 
 }
 
@@ -448,20 +457,15 @@ PRIVATE void read_article NOARGS
 		   char *cp1, *cp2;
 
 		   /* copy into temporary storage */
-		   StrAllocCopy(temp, strchr(line,':')+1);
+		   StrAllocCopy(temp, line+5);
 
-		   cp1=temp;
-		   while(isspace(*cp1)) cp1++;
-		   /* remove space and stuff after */
-		   if((cp2 = strchr(cp1,' ')) != NULL)
-		      *cp2 = '\0';
 
 		   StrAllocCopy(href,"mailto:");
-		   StrAllocCat(href,cp1);
+		   StrAllocCat(href,author_address(temp));
 
 		   start_anchor(href);
-		   PUTS("Reply to ");
-    		   PUTS(strchr(line,':')+1);
+		   PUTS("Reply to: ");
+    		   PUTS(author_name(line+5));
      		   END(HTML_A);
 		   START(HTML_BR);
 

@@ -12,6 +12,7 @@ extern void statusline PARAMS((char *text));
 extern void noviceline PARAMS((int more));
 extern int is_url PARAMS((char *filename));
 extern void remove_backslashes PARAMS((char *buf));
+extern void collapse_spaces PARAMS((char *string));
 extern BOOLEAN inlocaldomain PARAMS(());
 extern void size_change PARAMS((int sig));
 extern void change_sug_filename PARAMS((char *fname));
@@ -20,6 +21,8 @@ extern int HTCheckForInterrupt();
 extern int number2arrows PARAMS((int number));
 extern void highlight PARAMS((int flag, int cur));
 extern void parse_restrictions PARAMS((char *s));
+extern void free_and_clear PARAMS((char **obj));
+extern char * quote_pathname PARAMS((char * pathname));
 
 /* for is_url */
 /* universal document id types */
@@ -45,6 +48,10 @@ extern void parse_restrictions PARAMS((char *s));
 #define LYNXHIST_URL_TYPE      21
 #define LYNXDOWNLOAD_URL_TYPE  22
 #define LYNXEXEC_URL_TYPE      23
+
+#ifdef DIRED_SUPPORT
+#define LYNXDIRED_URL_TYPE     24
+#endif
 
 #define ON      1
 #define OFF     0

@@ -7,6 +7,7 @@
 #endif
 
 extern void read_cfg PARAMS((char *cfg_filename));
+extern BOOLEAN have_read_cfg;
 
 #endif /* LYReadCFG_H */
 

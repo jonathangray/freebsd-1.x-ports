@@ -73,7 +73,7 @@ static CONST char* entities[] = {
   "oslash",	/* small o, slash */ 
   "otilde",	/* small o, tilde */ 
   "ouml",	/* small o, dieresis or umlaut mark */ 
-  "quot",	/* quote '"' */
+  "quot",	/* quot '"' */
   "szlig",	/* small sharp s, German (sz ligature) */ 
   "thorn",	/* small thorn, Icelandic */ 
   "uacute",	/* small u, acute accent */ 
@@ -111,6 +111,11 @@ static attr img_attr[] = {			/* Anchor attributes */
 	{ 0 }	/* Terminate list */
 };	
 
+static attr isindex_attr[] = {			/* ISINDEX attributes */
+	{ "ACTION"},
+	{ 0 }	/* Terminate list */
+};	
+
 static attr link_attr[] = {
 	{ "HREF"},
 	{ "REL"},
@@ -120,6 +125,7 @@ static attr link_attr[] = {
 
 static attr form_attr[] = {
 	{ "ACTION"},
+	{ "ENCTYPE"},
 	{ "METHOD"},
 	{ 0 }	/* Terminate list */
 };
@@ -132,6 +138,7 @@ static attr select_attr[] = {
 
 static attr option_attr[] = {
 	{ "SELECTED"},
+	{ "VALUE"},
 	{ 0 }	/* Terminate list */
 };
 
@@ -203,7 +210,7 @@ static HTTag tags[HTML_ELEMENTS] = {
     { "I"	, no_attr,	0,		SGML_MIXED },
     { "IMG"     , img_attr,	HTML_IMG_ATTRIBUTES,	SGML_EMPTY },
     { "INPUT"   , input_attr,	HTML_INPUT_ATTRIBUTES,	SGML_EMPTY },
-    { "ISINDEX" , no_attr,	0,		SGML_EMPTY },
+    { "ISINDEX" , isindex_attr,	1,		SGML_EMPTY },
     { "KBD"	, no_attr,	0,		SGML_MIXED },
     { "LI"	, list_attr,	1,		SGML_EMPTY },
     { "LINK"	, link_attr,	HTML_LINK_ATTRIBUTES,	SGML_EMPTY },
@@ -263,11 +270,11 @@ PUBLIC void HTStartAnchor ARGS3(HTStructured *, obj,
     }
     if (name) {
     	present[HTML_A_NAME] = YES;
-	value[HTML_A_NAME] = name;
+	value[HTML_A_NAME] = (char *)name;
     }
     if (href) {
         present[HTML_A_HREF] = YES;
-        value[HTML_A_HREF] = href;
+        value[HTML_A_HREF] = (char *)href;
     }
     
     (*obj->isa->start_element)(obj, HTML_A , present, value);

@@ -20,6 +20,8 @@
 ** Authors
 **	TBL	Tim Berners-lee <timbl@info.cern.ch>
 **	DD	Denis DeLaRoca 310 825-4580 <CSP1DWD@mvs.oac.ucla.edu>
+**      LM      Lou Montulli <montulli@ukanaix.cc.ukans.edu>
+**      FM      Foteos Macrides <macrides@sci.wfeb.edu>
 ** History:
 **	 2 May 91	Written TBL, as a part of the WorldWideWeb project.
 **	15 Jan 92	Bug fix: close() was used for NETCLOSE for control soc
@@ -30,14 +32,23 @@
 **	27 Dec 93 (FM)  Fixed up so FTP now works with VMS hosts.  Path
 **			must be Unix-style and cannot include the device
 **			or top directory.
+**      ?? ??? ?? (LM)  Added code to prompt and send passwords for non
+**			anonymous FTP
+**      25 Mar 94 (LM)  Added code to recognize different ftp server types
+**                      and code to parse dates and sizes on most hosts.
+**	27 Mar 93 (FM)  Added code for getting dates and sizes on VMS hosts.
 **
 ** Options:
 **	LISTEN		We listen, the other guy connects for data.
 **			Otherwise, other way round, but problem finding our
 **			internet address!
 **
-** Bugs:
-**	No binary mode! Always uses ASCII! 
+** Notes:
+**     			Portions Copyright 1994 Trustees of Dartmouth College
+** 			Code for recognizing different FTP servers and
+**			parsing "ls -l" output taken from Macintosh Fetch
+**			program with permission from Jim Matthews,
+**			Dartmouth Software Development Team.
 */
 
 #define LISTEN	 /* @@@@ Test LJM */
@@ -47,7 +58,6 @@ BUGS:	@@@  	Limit connection cache size!
 		Error reporting to user.
 		400 & 500 errors are acked by user with windows.
 		Use configuration file for user names
-		Prompt user for password (FIXED!!!)
 		
 **		Note for portablility this version does not use select() and
 **		so does not watch the control and data channels at the
@@ -56,8 +66,8 @@ BUGS:	@@@  	Limit connection cache size!
 
 #include "HTFTP.h"	/* Implemented here */
 
-#define CR   FROMASCII('\015')	/* Must be converted to ^M for transmission */
-#define LF   FROMASCII('\012')	/* Must be converted to ^J for transmission */
+/* this define should be in HTFont.h :( */
+#define HT_NON_BREAK_SPACE ((char)1)   /* For now */
 
 #define REPEAT_PORT	/* Give the port number for each file */
 #define REPEAT_LISTEN	/* Close each listen socket and open a new one */
@@ -79,6 +89,7 @@ BUGS:	@@@  	Limit connection cache size!
 #include "HTFile.h"	/* For HTFileFormat() */
 #include "HTBTree.h"
 #include "HTChunk.h"
+#include "HTAlert.h"
 #ifndef IPPORT_FTP
 #define IPPORT_FTP	21
 #endif
@@ -116,6 +127,11 @@ struct _HTStructured {
 };
 
 
+/*	Global Variables
+**	---------------------
+*/
+PUBLIC BOOLEAN HTfileSortMethod = FILE_BY_NAME;
+
 /*	Module-Wide Variables
 **	---------------------
 */
@@ -123,7 +139,20 @@ PRIVATE connection * connections =0;	/* Linked list of connections */
 PRIVATE char    response_text[LINE_LENGTH+1];/* Last response from NewsHost */
 PRIVATE connection * control;		/* Current connection */
 PRIVATE int	data_soc = -1;		/* Socket for data transfer =invalid */
-PRIVATE BOOLEAN FTPISVMS = FALSE;	/* Becomes TRUE if FTP host is VMS */
+
+#define GENERIC_SERVER	0
+#define MACHTEN_SERVER 	1
+#define UNIX_SERVER 	2
+#define VMS_SERVER 	3
+#define CMS_SERVER 	4
+#define DCTS_SERVER    	5
+#define TCPC_SERVER	6
+#define PETER_LEWIS_SERVER	7
+#define NCSA_SERVER	8
+
+PRIVATE int     server_type = GENERIC_SERVER;   /* the type of ftp host */
+PRIVATE int     unsure_type = FALSE;            /* sure about the type? */
+PRIVATE BOOLEAN use_list = FALSE;		/* use the LIST command? */
 
 PRIVATE interrupted_in_next_data_char = FALSE;
 
@@ -204,6 +233,33 @@ PRIVATE int close_connection(con)
     return -1;		/* very strange -- was not on list. */
 }
 
+PRIVATE char *help_message_buffer = 0;  /* global :( */
+
+PRIVATE void init_help_message_cache NOARGS
+{
+    if(help_message_buffer) free(help_message_buffer);
+    help_message_buffer = 0;
+}
+
+PRIVATE void help_message_cache_add ARGS1(char *,string)
+{
+    if(help_message_buffer)
+        StrAllocCat(help_message_buffer, string);
+    else	
+        StrAllocCopy(help_message_buffer, string);
+
+    if(TRACE)
+	fprintf(stderr,"Adding message to help cache: %s\n",string);
+}
+
+PRIVATE char *help_message_cache_non_empty NOARGS
+{
+  return(help_message_buffer);
+}
+PRIVATE char *help_message_cache_contents NOARGS
+{
+   return(help_message_buffer);
+}
 
 /*	Execute Command and get Response
 **	--------------------------------
@@ -282,8 +338,13 @@ PRIVATE int response(cmd)
                     return HT_INTERRUPTED;
                   }
 
-		*p++=0;			/* Terminate the string */
+		*p=0;			/* Terminate the string */
 		if (TRACE) fprintf(stderr, "    Rx: %s", response_text);
+
+		if(server_type == UNIX_SERVER && 
+					!strncmp(response_text,"250-",4))
+		    help_message_cache_add(response_text+4);
+
 		sscanf(response_text, "%d%c", &result, &continuation);
 		if  (continuation_response == -1) {
 			if (continuation == '-')  /* start continuation */
@@ -325,6 +386,63 @@ PRIVATE int response(cmd)
     return result/100;
 }
 
+/* this function should try to set the macintosh server into binary mode
+ */
+PRIVATE int set_mac_binary NOARGS
+{
+	/* try to set mac binary mode */
+    return(2 == response("MACB\r\n"));
+}
+
+/* This function gets the current working directory to help
+ * determine what kind of host it is
+ */
+
+PRIVATE void get_ftp_pwd ARGS2(int *,server_type, BOOLEAN *,use_list) {
+
+    char *cp;
+    /* get the working directory (to see what it looks like) */
+    int status = response("PWD\r\n");
+    if (status < 0)
+        return;
+    else 
+     {
+
+	cp = strchr(response_text+5,'"');
+	if(cp) *cp = '\0';
+        if (*server_type == TCPC_SERVER)
+         {
+            *server_type = response_text[5] == '/' ? NCSA_SERVER : TCPC_SERVER;
+         }
+        else if (response_text[5] == '/')
+         {
+            /* path names beginning with / imply Unix,
+	     * right? 
+	     */
+	     if(set_mac_binary())
+		   *server_type = NCSA_SERVER;
+	     else
+		{
+                   *server_type = UNIX_SERVER;
+                   *use_list = TRUE;
+		}
+	     return;
+         }
+        else if (response_text[strlen(response_text)-1] == ']')
+         {
+             /* path names ending with ] imply VMS, right? */
+             *server_type = VMS_SERVER;
+	     *use_list = TRUE;
+         }
+        else
+             *server_type = GENERIC_SERVER;
+
+        if ((*server_type == NCSA_SERVER) ||
+               (*server_type == TCPC_SERVER) ||
+                    (*server_type == PETER_LEWIS_SERVER))
+            set_mac_binary();
+     }
+}
 
 /*	Get a valid connection to the host
 **	----------------------------------
@@ -344,6 +462,7 @@ PRIVATE int response(cmd)
 PRIVATE int get_connection ARGS1 (CONST char *,arg)
 {
     int status;
+    char * command;
     connection * con = (connection *)malloc(sizeof(*con));
 
     char * username=0;
@@ -456,7 +575,6 @@ PRIVATE int get_connection ARGS1 (CONST char *,arg)
         return HT_INTERRUPTED;
       }
     if (status == 2) {		/* Send username */
-        char * command;
 	if (username) {
 	    command = (char*)malloc(10+strlen(username)+2+1);
 	    if (command == NULL) outofmem(__FILE__, "get_connection");
@@ -480,7 +598,6 @@ PRIVATE int get_connection ARGS1 (CONST char *,arg)
           }
     }
     if (status == 3) {		/* Send password */
-        char * command;
 	if (password) {
 	    command = (char*)malloc(10+strlen(password)+2+1);
 	    if (command == NULL) outofmem(__FILE__, "get_connection");
@@ -495,9 +612,8 @@ PRIVATE int get_connection ARGS1 (CONST char *,arg)
 
 	    command = (char*)malloc(20+strlen(host)+2+1);
 	    if (command == NULL) outofmem(__FILE__, "get_connection");
-	    sprintf(command,
-	    "PASS %s@%s%c%c", user ? user : "WWWuser",
-	    host, CR, LF); /*@@*/
+	    sprintf(command, "PASS %s@%s%c%c", user ? user : "WWWuser",
+	    						host, CR, LF); /*@@*/
         }
 	status = response(command);
 	free(command);
@@ -536,6 +652,54 @@ PRIVATE int get_connection ARGS1 (CONST char *,arg)
         return -1;		/* Bad return */
     }
     if (TRACE) fprintf(stderr, "FTP: Logged in.\n");
+
+    /** Check for host type **/
+    server_type = GENERIC_SERVER;	/* reset */
+    use_list = FALSE; 			/* reset */
+    if ((status=response("SYST\r\n")) == 2) {
+                /* we got a line -- what kind of server are we talking to? */
+         if (strncmp(response_text+4, "UNIX Type: L8 MAC-OS MachTen", 28) == 0)
+          {
+             server_type = MACHTEN_SERVER;
+	     use_list = TRUE;
+          }
+         else if (strstr(response_text+4, "UNIX") != NULL)
+          {
+             server_type = UNIX_SERVER;
+	     use_list = TRUE;
+          }
+         else if (strncmp(response_text+4, "VMS", 3) == 0)
+	  {
+             server_type = VMS_SERVER;
+	     use_list = TRUE;
+	  }
+         else if ((strncmp(response_text+4, "VM/CMS", 6) == 0)
+				 || (strncmp(response_text+4, "VM ", 3) == 0))
+             server_type = CMS_SERVER;
+         else if (strncmp(response_text+4, "DCTS", 4) == 0)
+             server_type = DCTS_SERVER;
+         else if (strstr(response_text+4, "MAC-OS TCP/Connect II") != NULL)
+          {
+             server_type = TCPC_SERVER;
+             get_ftp_pwd(&server_type, &use_list);
+	     unsure_type = TRUE;   
+          }
+         else if (strncmp(response_text+4, "MACOS Peter's Server", 20) == 0)
+          {
+             server_type = PETER_LEWIS_SERVER;
+             use_list = TRUE;
+             set_mac_binary();
+          }
+	 else 
+	  {
+	     server_type = GENERIC_SERVER;
+             get_ftp_pwd(&server_type, &use_list);
+	     unsure_type = TRUE;   
+	  }
+    } else {
+	/* SYST fails :(  try to get the type from the PWD command */
+         get_ftp_pwd(&server_type, &use_list);
+    }
 
 /*	Now we inform the server of the port number we will listen on
 */
@@ -708,6 +872,472 @@ PRIVATE int get_listen_socket()
 } /* get_listen_socket */
 #endif
 
+typedef struct _EntryInfo {
+    char *       filename;
+    char *       type;
+    char *       date;
+    unsigned int size;
+    BOOLEAN      display;  /* show this entry? */
+} EntryInfo;
+
+PRIVATE void free_entryinfo_struct_contents ARGS1(EntryInfo *,entry_info)
+{
+    if(entry_info) {
+        if(entry_info->filename) free(entry_info->filename);
+        if(entry_info->type) free(entry_info->type);
+        if(entry_info->date) free(entry_info->date);
+    }
+   /* dont free the struct */
+}
+
+/*
+ * is_ls_date() --
+ *      Return TRUE if s points to a string of the form:
+ *              "Sep  1  1990 " or
+ *              "Sep 11 11:59 " or
+ *              "Dec 12 1989  " or
+ *              "FCv 23 1990  " ...
+ */
+PRIVATE BOOLEAN is_ls_date ARGS1(char *,s)
+{
+        /* must start with three alpha characters */
+        if (!isalpha(*s++) || !isalpha(*s++) || !isalpha(*s++))
+                return FALSE;
+
+        /* space */
+        if (*s++ != ' ')
+                return FALSE;
+
+        /* space or digit */
+        if ((*s != ' ') && !isdigit(*s))
+                return FALSE;
+        s++;
+
+        /* digit */
+        if (!isdigit(*s++))
+                return FALSE;
+
+        /* space */
+        if (*s++ != ' ')
+                return FALSE;
+
+        /* space or digit */
+        if ((*s != ' ') && !isdigit(*s))
+                return FALSE;
+        s++;
+
+        /* digit */
+        if (!isdigit(*s++))
+                return FALSE;
+
+        /* colon or digit */
+        if ((*s != ':') && !isdigit(*s))
+                return FALSE;
+        s++;
+
+        /* digit */
+        if (!isdigit(*s++))
+                return FALSE;
+
+        /* space or digit */
+        if ((*s != ' ') && !isdigit(*s))
+                return FALSE;
+        s++;
+
+        /* space */
+        if (*s++ != ' ')
+                return FALSE;
+
+        return TRUE;
+} /* is_ls_date() */
+
+
+/*
+ * parse_ls_line() --
+ *      Extract the name, size, and date from an ls -l line.
+ */
+PRIVATE void parse_ls_line ARGS2(char *,line, EntryInfo *,entry_info)
+{
+        short   i, j;
+        int    base=1;
+	int    size_num=0;
+
+        for (i = strlen(line) - 1;
+            (i > 13) && (!isspace(line[i]) || !is_ls_date(&line[i-12])); i--)
+                ; /* null body */
+        line[i] = '\0';
+        if (i > 13) {
+            StrAllocCopy(entry_info->date, &line[i-12]);
+	    /* replace the 4th location with nbsp if it is a space */
+	    if(entry_info->date[4] == ' ')
+		entry_info->date[4] = HT_NON_BREAK_SPACE;
+	} 
+        j = i - 14;
+        while (isdigit(line[j]))
+        {
+                size_num += (line[j] - '0') * base;
+                base *= 10;
+                j--;
+        }
+	entry_info->size = size_num;
+        StrAllocCopy(entry_info->filename, &line[i + 1]);
+} /* parse_ls_line() */
+
+/*
+ * parse_vms_dir_entry()
+ *      Format the name, date, and size from a VMS LIST line
+ *      into the EntryInfo structure
+ */
+PRIVATE void parse_vms_dir_entry ARGS2(char *,line, EntryInfo *,entry_info)
+{
+        int i, j, ialloc;
+        char *cp, *cpd, *cps, date[16], *sp = " ";
+	time_t NowTime;
+	static char ThisYear[8];
+	static BOOLEAN HaveYear = FALSE; 
+
+        /**  Get rid of blank lines, and information lines.  **/
+        /**  Valid lines have the ';' version number token.  **/
+        if (!strlen(line) || (cp=strchr(line, ';')) == NULL) {
+            entry_info->display = FALSE;
+            return;
+        }
+
+        /** Cut out file or directory name at VMS version number. **/
+	*cp++ ='\0';
+	StrAllocCopy(entry_info->filename,line);
+
+        /** Cast VMS file and directory names to lowercase. **/
+	for (i=0; entry_info->filename[i]; i++)
+            entry_info->filename[i] = tolower(entry_info->filename[i]);
+
+        /** Uppercase terminal .z's or _z's. **/
+	if ((--i > 2) && entry_info->filename[i] == 'z' &&
+             (entry_info->filename[i-1] == '.' ||
+            entry_info->filename[i-1] == '_'))
+            entry_info->filename[i] = 'Z';
+
+        /** Convert any tabs in rest of line to spaces. **/
+	cps = cp-1;
+        while ((cps=strchr(cps+1, '\t')) != NULL)
+            *cps = ' ';
+
+        /** Collapse serial spaces. **/
+        i = 0; j = 1;
+	cps = cp;
+        while (cps[j] != '\0') {
+            if (cps[i] == ' ' && cps[j] == ' ')
+                j++;
+            else
+                cps[++i] = cps[j++];
+        }
+        cps[++i] = '\0';
+
+        /** Save the current year, if we don't have it yet.  It  **/
+	/** could be wrong on New Year's Eve, if some poor soul  **/
+	/** is using Lynx instead of kissing his/her sweetheart. **/
+	if (!HaveYear) {
+	    NowTime = time(NULL);
+ 	    strcpy(ThisYear, (char *)ctime(&NowTime)+20);
+	    ThisYear[4] = '\0';
+	    HaveYear = TRUE;
+	}
+
+        /** Track down the date. **/
+        if ((cpd=strchr(cp, '-')) != NULL &&
+            strlen(cpd) > 9 && isdigit(*(cpd-1)) &&
+            isalpha(*(cpd+1)) && *(cpd+4) == '-') {
+
+	    /** Month **/
+            *(cpd+4) = '\0';
+            *(cpd+2) = tolower(*(cpd+2));
+            *(cpd+3) = tolower(*(cpd+3));
+	    sprintf(date, "%s ", cpd+1);
+	    *(cpd+4) = '-';
+
+	    /** Day **/
+	    *cpd = '\0';
+	    if (isdigit(*(cpd-2)))
+	        sprintf(date+4, "%s ", cpd-2);
+	    else
+	        sprintf(date+4, " %s ", cpd-1);
+	    *cpd = '-';
+
+	    /** Time or Year **/
+	    if (!strncmp(ThisYear, cpd+5, 4) &&
+	        strlen(cpd) > 15 && *(cpd+12) == ':') {
+	        *(cpd+15) = '\0';
+	        sprintf(date+7, "%s", cpd+10);
+	        *(cpd+15) = ' ';
+	    } else {
+	        *(cpd+9) = '\0';
+	        sprintf(date+7, " %s", cpd+5);
+	        *(cpd+9) = ' ';
+	    }
+
+            StrAllocCopy(entry_info->date, date);
+        }
+
+        /** Track down the size **/
+        if ((cpd=strchr(cp, '/')) != NULL) {
+            /* Appears be in used/allocated format */
+            cps = cpd;
+            while (isdigit(*(cps-1)))
+                cps--;
+            if (cps < cpd)
+                *cpd = '\0';
+            entry_info->size = atoi(cps);
+            cps = cpd+1;
+            while (isdigit(*cps))
+                cps++;
+            *cps = '\0';
+            ialloc = atoi(cpd+1);
+            /* Check if used is in blocks or bytes */
+            if (entry_info->size <= ialloc)
+                entry_info->size *= 512;
+        }
+        else if ((cps=strtok(cp, sp)) != NULL) {
+            /* We just initialized on the version number */
+            /* Now let's hunt for a lone, size number    */
+            while ((cps=strtok(NULL, sp)) != NULL) {
+               cpd = cps;
+               while (isdigit(*cpd))
+                   cpd++;
+               if (*cpd == '\0') {
+                   /* Assume it's blocks */
+                   entry_info->size = atoi(cps) * 512;
+                   break;
+               }
+           }
+        }
+
+        /** Wrap it up **/
+        if (TRACE) fprintf(stderr,
+                         "HTFTP: VMS filename: %s  date: %s  size: %d\n",
+                         entry_info->filename,
+                         entry_info->date ? entry_info->date : "",
+                         entry_info->size);
+        return;
+} /* parse_vms_dir_entry() */
+
+/*
+ *     parse_dir_entry() 
+ *      Given a line of LIST/NLST output in entry, return results 
+ *      and a file/dir name in entry_info struct
+ *
+ *      If first is true, this is the first name in a directory.
+ */
+
+PRIVATE EntryInfo * parse_dir_entry ARGS2(char *, entry, BOOLEAN *,first)
+{
+        EntryInfo *entry_info;
+        int  i;
+        int  len;
+	char *cp;
+	BOOLEAN remove_size=FALSE;
+
+        entry_info = (EntryInfo *)malloc(sizeof(EntryInfo));    
+	entry_info->type = 0;
+	entry_info->size = 0;
+	entry_info->date = 0;
+	entry_info->filename = 0;
+	entry_info->display = TRUE;
+
+        switch (server_type)
+        {
+        case UNIX_SERVER:
+        case PETER_LEWIS_SERVER:
+        case MACHTEN_SERVER:
+
+                /* interpret and edit LIST output from Unix server */
+               len = strlen(entry);
+		
+
+	       if (*first) {
+
+		   *first=FALSE;
+                   if(!strncmp(entry, "total ", 6) ||
+                       		(strstr(entry, "not available") != NULL))
+		     {
+		        entry_info->display=FALSE;
+		        return(entry_info);
+		     }
+		    else if(unsure_type)
+		      {
+                         /* this isn't really a unix server! */
+                         server_type = GENERIC_SERVER;
+		         entry_info->display=FALSE;
+		         return(entry_info);
+		      }
+	       }
+
+               /* check first character of ls -l output */
+               if (toupper(entry[0]) == 'D') 
+		 {
+                   /* it's a directory */
+                   StrAllocCopy(entry_info->type, "Directory"); 
+		   remove_size=TRUE; /* size is not useful */
+		 }
+               else if (entry[0] == 'l')
+		 {
+                    /* it's a symbolic link, does the user care about
+		     * knowing if it is symbolic?  I think so since
+		     * it might be a directory
+		     */
+                    StrAllocCopy(entry_info->type, "Symbolic Link"); 
+		    remove_size=TRUE; /* size is not useful */
+
+                    /* strip off " -> pathname" */
+                    for (i = len - 1; (i > 3) && (!isspace(entry[i])
+					|| (entry[i-1] != '>') 
+					|| (entry[i-2] != '-')
+					|| (entry[i-3] != ' ')); i--)
+                             ; /* null body */
+                    if (i > 3)
+                      {
+                        entry[i-3] = '\0';
+                        len = i - 3;
+                      }
+                  } /* link */
+
+	        parse_ls_line(entry, entry_info); 
+
+		if(!strcmp(entry_info->filename,"..") || 
+					!strcmp(entry_info->filename,"."))
+		    entry_info->display=FALSE;
+		
+		/* goto the bottom and get real type */
+                break;
+
+        case VMS_SERVER:
+                /* Interpret and edit LIST output from VMS server */
+		/* and convert information lines to zero length.  */
+		parse_vms_dir_entry(entry, entry_info);
+
+                /* Get rid of any junk lines */
+		if(!entry_info->display)
+		    return(entry_info);
+
+		/** Trim off VMS directory extensions **/
+		len = strlen(entry_info->filename);
+                if ((len > 4) && !strcmp(&entry_info->filename[len-4], ".dir"))
+		  {
+		    entry_info->filename[len-4] = '\0';
+                    StrAllocCopy(entry_info->type, "Directory"); 
+		    remove_size=TRUE; /* size is not useful */
+		  }
+		/* goto the bottom and get real type */
+                break;
+
+        case CMS_SERVER:
+		/* can't be directory... */
+		/*
+		 * "entry" already equals the correct filename
+		 */
+		StrAllocCopy(entry_info->filename,entry);
+		/* goto the bottom and get real type */
+                break;
+
+        case NCSA_SERVER:
+        case TCPC_SERVER:
+                /* directories identified by trailing "/" characters */
+		StrAllocCopy(entry_info->filename,entry);
+                len = strlen(entry);
+                if (entry[len-1] == '/')
+                {
+                        /* it's a dir, remove / and mark it as such */
+                        entry[len-1] = '\0';
+                        StrAllocCopy(entry_info->type, "Directory");
+			remove_size=TRUE; /* size is not useful */
+                }
+		/* goto the bottom and get real type */
+                break;
+	
+	default:
+		/* we cant tell if it is a directory since we only
+		 * did an NLST :(  List bad file types anyways? NOT!
+		 */
+		StrAllocCopy(entry_info->filename,entry);
+		return(entry_info); /* mostly empty info */
+		break; /* not needed */
+
+        } /* switch (server_type) */
+
+
+	if(remove_size && entry_info->size)
+	  {
+	    entry_info->size = 0;
+	  }
+
+	/* get real types eventually */
+	if(!entry_info->type) {
+	    int i=0;
+	    char *cp;
+    	    HTFormat format;
+    	    HTAtom * encoding;  /* @@ not used at all */
+    	    format = HTFileFormat(entry_info->filename, &encoding);
+
+	    if(!strncmp(HTAtom_name(format), "application",11)) 
+	      {
+		   cp = HTAtom_name(format) + 12;
+		   if(!strncmp(cp,"x-",2))
+			cp+=2;
+	      }
+	    else
+		cp = HTAtom_name(format);
+
+            StrAllocCopy(entry_info->type, cp);
+	}
+
+	return(entry_info);
+
+} /* parse_dir_entry */
+
+PUBLIC int compare_EntryInfo_structs ARGS2(EntryInfo *,entry1, 
+							EntryInfo *,entry2)
+{
+    int status;
+
+    switch(HTfileSortMethod)
+      {
+        case FILE_BY_SIZE:
+			/* both equal or both 0 */
+                        if(entry1->size == entry2->size)
+			    return(strcasecomp(entry1->filename, 
+							entry2->filename));
+			else
+			    if(entry1->size > entry2->size)
+				return(1);
+			    else
+				return(-1);
+                        break;
+        case FILE_BY_TYPE:
+                        if(entry1->type && entry2->type) {
+                            status = strcasecomp(entry1->type, entry2->type);
+			    if(status)
+				return(status);
+			    /* else fall to filename comparison */
+			}
+                        return (strcasecomp(entry1->filename, 
+							entry2->filename));
+                        break;
+        case FILE_BY_DATE:
+                        if(entry1->date && entry2->date) {
+                                /* We really should change the type :( */
+                            status = strcasecomp(entry1->date, entry2->date);
+			    if(status)
+				return(status);
+			    /* else fall to filename comparison */
+			}
+                        return (strcasecomp(entry1->filename, 
+							entry2->filename));
+                        break;
+        case FILE_BY_NAME:
+        default:
+                        return (strcasecomp(entry1->filename, 
+							entry2->filename));
+      }
+}
 
 
 /*	Read a directory into an hypertext object from the data socket
@@ -732,6 +1362,9 @@ ARGS4 (
     HTStructured* target = HTML_new(parent, format_out, sink);
     HTStructuredClass targetClass;
     char *filename = HTParse(address, "", PARSE_PATH + PARSE_PUNCTUATION);
+    EntryInfo *entry_info;
+    BOOLEAN first=TRUE;
+    char string_buffer[64];
 
     char c = 0;
 
@@ -758,17 +1391,15 @@ ARGS4 (
 
    
     {
-        HTBTree * bt = HTBTree_new((HTComparer)strcasecomp);
+        HTBTree * bt = HTBTree_new((HTComparer)compare_EntryInfo_structs);
         char c;
 	HTChunk * chunk = HTChunkCreate(128);
 	int BytesReceived = 0;
 	int BytesReported = 0;
-	char NumBytes[20];
-	START(HTML_MENU);
+	char NumBytes[64];
 	PUTS("\n");  /* prettier LJM */
 	for (c=0; c!=(char)EOF;)   /* For each entry in the directory */
 	{
-	    char * filename = NULL;
 	    char * p = entry;
 	    HTChunkClear(chunk);
 
@@ -788,6 +1419,7 @@ ARGS4 (
 	     */
 	    for(;;) {                 /* Read in one line as filename */
 		c = NEXT_DATA_CHAR;
+AgainForMultiNet:
 		if(interrupted_in_next_data_char) {
 	    	    WasInterrupted = TRUE;
 		    if(BytesReceived)
@@ -800,8 +1432,38 @@ ARGS4 (
                       }
 
 		} else if (c == '\r' || c == LF) {    /* Terminator? */ 
-		    if (chunk->size != 0)   /* got some text */
-		        break;                /* finish getting one entry */
+		    if (chunk->size != 0) {  /* got some text */
+		        /* Deal with MultiNet's wrapping of long lines */
+                        if (server_type == VMS_SERVER) {
+                        /* Deal with MultiNet's wrapping of long lines - F.M. */
+                            if (data_read_pointer < data_write_pointer &&
+                                *(data_read_pointer+1) == ' ')
+                                data_read_pointer++;
+                            else if (data_read_pointer >= data_write_pointer) {
+                                int status;
+                                status = NETREAD(data_soc, data_buffer,
+                                                 DATA_BUFFER_SIZE);
+                                if (status == HT_INTERRUPTED) {
+                                    interrupted_in_next_data_char = 1;
+                                    goto AgainForMultiNet;
+                                }
+                                if (status <= 0) {
+                                    c = (char)EOF;
+                                    break;
+                                }
+                                data_write_pointer = data_buffer + status;
+                                data_read_pointer = data_buffer;
+                                if (*data_read_pointer == ' ')
+                                    data_read_pointer++;
+                                else
+                                    break;
+                            }
+                            else
+                                break;
+                        }
+			else
+		            break;            /* finish getting one entry */
+		    }
 		} else if (c == (char)EOF) {
 		    break;             /* End of file */
 		} else {
@@ -812,51 +1474,25 @@ ARGS4 (
 
 	    BytesReceived += chunk->size;
 	    if (BytesReceived > BytesReported + 1024) {
-	        sprintf(NumBytes,"Transfered %d bytes",BytesReceived);
+	        sprintf(NumBytes,"Transferred %d bytes",BytesReceived);
 		HTProgress(NumBytes);
 		BytesReported = BytesReceived;
 	    }
 
-	    if (c == (char) EOF && chunk->size == 1)  /* 1 means empty: includes terminating 0 */
+	    if (c == (char) EOF && chunk->size == 1)
+	    /* 1 means empty: includes terminating 0 */
 	        break;
-            if(TRACE) fprintf(stderr, "HTFTP: file name in %s is %s\n", lastpath, chunk->data);
-	    if (FTPISVMS) {
-	    /** Make chunk->data strings from VMS hosts Unix-like **/
-	        char *cp, *cpd = NULL;
-		int i;
-		/** Trim off VMS version numbers **/
-		if ((cp=strrchr(chunk->data, ';')) != NULL)
-		    *cp = '\0';
-		/** Trim off VMS directory extensions **/
-	        if ((strlen(chunk->data) > 3) &&
-	            strncasecomp(chunk->data+strlen(chunk->data)-4,
-		    		 ".dir", 4) == 0)
-		    *(cpd=(chunk->data+(strlen(chunk->data)-4))) = '\0';
-		/** Cast VMS file and directory names to lowercase **/
-		for (i=0; chunk->data[i]; i++)
-		    chunk->data[i] = tolower(chunk->data[i]);
-		/** Uppercase terminal .z's or _z's **/
-		if ((--i > 2) && chunk->data[i] == 'z' &&
-		    (chunk->data[i-1] == '.' || chunk->data[i-1] == '_'))
-		    chunk->data[i] = 'Z';
-		/** Load doctored VMS filename **/
-		StrAllocCopy(filename, chunk->data);
-		/** Restore chunk->data string to original length **/
-		if (cpd != NULL)
-		    *cpd = '.';
-		if (cp != NULL)
-		    *cp = ';';
-	    }
-	    else
-	        StrAllocCopy(filename, chunk->data);
+            if(TRACE) fprintf(stderr, "HTFTP: Line in %s is %s\n",
+	    					lastpath, chunk->data);
 
-	    HTBTree_add(bt,filename); 
-	     
-#ifdef NOT
-	    /* Directories are not sorted ;-( */
-	     START(HTML_LI);
-	     HTDirEntry(target, lastpath, filename);
-#endif /* NOT */
+	    entry_info = parse_dir_entry(chunk->data, &first);
+	    if(entry_info->display)
+	      {
+		 if(TRACE)
+		    fprintf(stderr,"Adding file to BTree: %s\n",
+						entry_info->filename);
+	         HTBTree_add(bt, (EntryInfo *)entry_info); 
+	      }
 
 	}  /* next entry */
 
@@ -864,19 +1500,72 @@ unload_btree:
 
         HTChunkFree(chunk);
 
+	/* print out the handy help message if it exits :) */
+	if(server_type == UNIX_SERVER && help_message_cache_non_empty()) {
+	    START(HTML_HR);
+	    START(HTML_PRE);
+	    PUTS(help_message_cache_contents());
+	    init_help_message_cache();  /* to free memory */
+	    START(HTML_HR);
+	} else {
+	    START(HTML_PRE);
+	    PUTS("\n");
+	}
+
+	/* Put up header 
+	 */
+	/* PUTS("    Date        Type             Size     Filename\n"); 
+	 */
+	   
 	/* Run through tree printing out in order 
 	 */
 	{
 	    HTBTElement * ele;
+	    int i;
 	    for (ele = HTBTree_next(bt, NULL);
 		 ele != NULL;
 		 ele = HTBTree_next(bt, ele))
 	    {
-	        START(HTML_LI);
-		HTDirEntry(target, lastpath, (char *)HTBTree_object(ele));
+		entry_info = (EntryInfo *)HTBTree_object(ele);
+
+		if(entry_info->date) 
+		       {
+		             PUTS(entry_info->date);
+		             PUTS("  ");
+		       }
+		else
+			PUTS("     * ");
+
+		if(entry_info->type) 
+		  {
+		    for(i = 0; entry_info->type[i] != '\0' && i < 15; i++)
+		        PUTC(entry_info->type[i]);
+		    for(; i < 17; i++)
+		        PUTC(' ');
+
+		  }
+
+		/* start the anchor */
+		HTDirEntry(target, lastpath, entry_info->filename);  
+		PUTS(entry_info->filename);
+		END(HTML_A);
+
+		if(entry_info->size) 
+		  {
+		          if(entry_info->size < 1024)
+			      sprintf(string_buffer,"  %d bytes",
+							entry_info->size);
+			  else
+			      sprintf(string_buffer,"  %dKb",
+							entry_info->size/1024);
+			  PUTS(string_buffer);
+		  }
+
+		PUTC('\n'); /* end of this entry */
+
+		free_entryinfo_struct_contents(entry_info);
 	    }
 	}
-	END(HTML_MENU);
 	FREE_TARGET;
 	HTBTreeAndObject_free(bt);
     }
@@ -889,7 +1578,6 @@ unload_btree:
     }
     return response(NIL) == 2 ? HT_LOADED : -1;
 }
-
 
 /*	Retrieve File from Server
 **	-------------------------
@@ -914,6 +1602,13 @@ ARGS4 (
     HTFormat format;
     char command[LINE_LENGTH+1];
     
+
+    /* set use_list to NOT since we don't know what kind of server
+     * this is yet.  And set the type to GENERIC
+     */
+    use_list = FALSE;
+    server_type = GENERIC_SERVER;
+
     for (retry=0; retry<2; retry++) {	/* For timed out/broken connections */
     
 	status = get_connection(name);
@@ -1012,16 +1707,7 @@ ARGS4 (
 	char *fname = filename;	/** Save for subsequent free() **/
 	BOOL binary;
 	HTAtom * encoding;
-	FTPISVMS = FALSE;
-	/** Check for VMS host **/
-	sprintf(command, "SYST%c%c", CR, LF); /** All VMS hosts support SYST **/
-	if ((status=response(command)) == 2) {
-	    /** Assume SYST succeeded if it's a VMS host **/
-	    if (strncmp(response_text+4, "VMS", 3) == 0) {
-	        /** Set flag for VMS host **/
-	        FTPISVMS = TRUE;
-	    }
-	}
+
 	if (!*filename) StrAllocCopy(filename, "/");
 	HTUnEscape(filename);
 	if (TRACE) fprintf(stderr, "FTP: UnEscaped %d\n", filename);
@@ -1035,7 +1721,7 @@ ARGS4 (
 	    if (status != 2) return -status;
 	    control->binary = binary;
 	}
-	if (FTPISVMS) {
+	if (server_type == VMS_SERVER) {
 	    char *cp, *cp1, *cp2;
 	    /** Accept only Unix-style filename **/
 	    if (strchr(filename, ':') != NULL ||
@@ -1046,6 +1732,8 @@ ARGS4 (
 	    /** Trim trailing slash if filename is not the top directory **/
 	    if (strlen(filename) > 1 && filename[strlen(filename)-1] == '/')
 	        filename[strlen(filename)-1] = '\0';
+
+#ifdef MAINTAIN_CONNECTION /* Don't need this if always new connection - F.M. */
 	    /** Get the current default VMS device:[directory] **/ 
 	    sprintf(command, "PWD%c%c", CR, LF);
 	    status = response (command);
@@ -1067,14 +1755,17 @@ ARGS4 (
 		    return -status;
 		}
 	    }
+#endif /* MAINTAIN_CONNECTION */
+
 	    /** If we want the VMS account's top directory, list it now **/
 	    if (strlen(filename) == 1 && *filename == '/') {
 		isDirectory = YES;
-		sprintf(command, "NLST%c%c", CR, LF);
+		sprintf(command, "LIST%c%c", CR, LF);
 		status = response (command);
 		free(fname);
 		if (status != 1) return -status;  /* Action not started */
-		goto listen;
+
+		goto listen;  /* big goto */
 	    }
 	    /** Otherwise, go to appropriate directory and doctor filename **/
 	    if ((cp=strchr(filename, '/')) != NULL &&
@@ -1096,11 +1787,20 @@ ARGS4 (
 	sprintf(command, "RETR %s%c%c", filename, CR, LF);
 	status = response(command);
 	if (status != 1) {  /* Failed : try to CWD to it */
+
+	   /* save those handy help messages */
+	  if(server_type == UNIX_SERVER)
+	      init_help_message_cache();
+
 	  sprintf(command, "CWD %s%c%c", filename, CR, LF);
 	  status = response(command);
+
 	  if (status == 2) {  /* Successed : let's NAME LIST it */
 	    isDirectory = YES;
-	    sprintf(command, "NLST%c%c", CR, LF);
+	    if(use_list)
+	        sprintf(command, "LIST%c%c", CR, LF);
+	    else
+	        sprintf(command, "NLST%c%c", CR, LF);
 	    status = response (command);
 	  }
 	}

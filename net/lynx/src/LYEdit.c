@@ -21,7 +21,7 @@ PUBLIC int edit_current_file ARGS3(char *,newfile, int,cur, int,lineno)
 
 	char command[90];
         char *filename = NULL;
-	char *colon, *localhost_ptr;
+	char *colon, *localhost_ptr, *number_sign;
 	FILE *fp;
 	int url_type = is_url(newfile);
 
@@ -32,6 +32,10 @@ PUBLIC int edit_current_file ARGS3(char *,newfile, int,cur, int,lineno)
 	    return FALSE;
 	}
 
+	number_sign = strchr(newfile,'#');
+	if(number_sign)
+	    *number_sign = '\0';
+	   
 	 /* try and open it as a completely referenced file */
 	colon = strchr(newfile,':');
 	if((fp = fopen(colon+1,"r")) == NULL) {
@@ -49,7 +53,7 @@ PUBLIC int edit_current_file ARGS3(char *,newfile, int,cur, int,lineno)
 #endif /* VMS */
 	        statusline("Lynx cannot currently edit remote WWW files");
 	        sleep(1);
-	        return FALSE;
+		goto failure;
 	    } else {
 #ifdef VMS
 		if (filename == NULL)
@@ -77,7 +81,7 @@ PUBLIC int edit_current_file ARGS3(char *,newfile, int,cur, int,lineno)
 	if (access(filename,2)) {
 		statusline("You are not authorized to edit this file.");
 		sleep(1);
-		return FALSE;
+		goto failure;
 	}
         sprintf(command,"%s %s",editor, filename);
 
@@ -92,5 +96,13 @@ PUBLIC int edit_current_file ARGS3(char *,newfile, int,cur, int,lineno)
 	signal(SIGINT, cleanup_sig);
 #endif /* not VMS */
 	start_curses();
+
+	if(number_sign)
+	    *number_sign = '#';
 	return TRUE;
+
+failure:
+	if(number_sign)
+	    *number_sign = '#';
+	return FALSE;
 }

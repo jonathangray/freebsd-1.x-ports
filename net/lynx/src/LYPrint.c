@@ -41,9 +41,10 @@ PUBLIC int printfile ARGS1(document *,newdoc)
     int type, c;
     FILE *outfile_fp;
     char *cp;
-    printer_type *cur_printer;
+    lynx_html_item_type *cur_printer;
     char *sug_filename = 0;
     char *link_info = 0;
+    DocAddress WWWDoc;
 #ifdef VMS
     extern BOOLEAN HadVMSInterrupt;
 #endif /* VMS */
@@ -53,7 +54,10 @@ PUBLIC int printfile ARGS1(document *,newdoc)
 
 	/* reload the file we want to print into memory */
     pop(newdoc);
-    if(!HTLoadAbsolute(newdoc->address))
+    WWWDoc.address = newdoc->address;
+    WWWDoc.post_data = newdoc->post_data;
+    WWWDoc.post_content_type = newdoc->post_content_type;
+    if(!HTLoadAbsolute(&WWWDoc))
         return(NOT_FOUND);
   
     StrAllocCopy(sug_filename, newdoc->address); /* must be freed */
@@ -151,7 +155,8 @@ PUBLIC int printfile ARGS1(document *,newdoc)
 
 	case MAIL: 
 		statusline("Please enter a valid internet mail address: ");
-		strcpy(user_response, personal_mail_address);
+		strcpy(user_response, (personal_mail_address ?
+						personal_mail_address : ""));
 		if(LYgetstr(user_response, VISIBLE) < 0 
 						|| *user_response == '\0') {
 		    statusline("Mail request cancelled!!!");
@@ -164,7 +169,7 @@ PUBLIC int printfile ARGS1(document *,newdoc)
 		change_sug_filename(sug_filename);
 #ifndef VMS 
 #ifdef MMDF
-		sprintf(buffer,"%s -mlrxto,cc*", SYSTEM_MAIL);
+		sprintf(buffer,"%s -mlruxto,cc*", SYSTEM_MAIL);
 #else
 		sprintf(buffer,"%s -t -oi", SYSTEM_MAIL);
 #endif /* MMDF */
@@ -308,11 +313,12 @@ PUBLIC int printfile ARGS1(document *,newdoc)
 			; /* null body */
 		}
 
-		/* commands have the form "command %s [etc]"
-		 * where %s is the filename
+		/* commands have the form "command %s [%s] [etc]"
+		 * where %s is the filename and the second optional
+		 * %s is the suggested filename
 		 */
 		if(cur_printer->command != NULL) {
-		    sprintf(buffer,cur_printer->command,filename);
+		    sprintf(buffer,cur_printer->command,filename,sug_filename);
 		} else {
 		    statusline("ERROR! - printer is misconfigured");
 		    sleep(2);
@@ -339,6 +345,8 @@ PUBLIC int printfile ARGS1(document *,newdoc)
 		/* don't remove(filename); */
 	} /* end switch */
 
+     free(link_info);
+     free(sug_filename);
      return(NORMAL);
 }	
 
@@ -370,61 +378,76 @@ int remove_quotes ARGS1(char *,string)
 
 PUBLIC int print_options ARGS2(char **,newfile, int,lines_in_file)
 {
+    static char * tempfile=0;
+    char * print_filename=0;
     char buffer[LINESIZE];
-    static char print_filename[256];
     int count;
     int pages;
     FILE *fp0;
-    printer_type *cur_printer;
+    lynx_html_item_type *cur_printer;
 
     pages = lines_in_file/66 + 1;
 
-    tempname(buffer,NEW_FILE);
+    if(tempfile == NULL) {
+	tempfile = (char *) malloc(127);
+        tempname(tempfile,NEW_FILE);
+        /* make the file a URL now */
+#ifndef VMS
+    }
+#else
+    } else {
+        remove(tempfile);   /* put VMS code to remove duplicates here */
+    }
+#endif /* VMS */
 
-    if((fp0 = fopen(buffer,"wb")) == NULL) {
-        perror("Trying to open history file\n");
-        exit(1);
+#ifdef VMS
+	StrAllocCopy(print_filename,"file://localhost/");
+#else
+	StrAllocCopy(print_filename,"file://localhost");
+#endif /* VMS */
+	StrAllocCat(print_filename,tempfile);
+
+    if((fp0 = fopen(tempfile,"w")) == NULL) {
+        statusline("Unable to open print options file");
+        sleep(2);
+	return(0);
     }
 
-    /* make the file a URL now */
-#ifdef VMS
-    sprintf(print_filename,"file://localhost/%s",buffer);
-#else
-    sprintf(print_filename,"file://localhost%s",buffer);
-#endif /* VMS */
-    *newfile = print_filename;
+    StrAllocCopy(*newfile, print_filename);
+    LYforce_no_cache = TRUE;
 
     fprintf(fp0,"<head><title>%s</title></head><body>",PRINT_OPTIONS_TITLE);
 
-    fprintf(fp0,"\n<pre>\n                  Printing Options\n\n");
+    fprintf(fp0,"\n<h1>Printing Options</h1>");
 
 
-    sprintf(buffer,"    There are %d lines, or approximately %d page%s, to print.\n\n",lines_in_file, pages, (pages > 1 ? "s" : ""));
+    sprintf(buffer,"    There are %d lines, or approximately %d page%s, to print.<br>\n",lines_in_file, pages, (pages > 1 ? "s" : ""));
     fputs(buffer,fp0);
 
     if(no_print || child_lynx)
 	fputs("      Some print functions have been disabled!!!\n",fp0);
 
-    fputs("        You have the following print choices\n",fp0);
-    fputs("                     please select one\n\n",fp0);
+    fputs("        You have the following print choices<br>",fp0);
+    fputs("                     please select one:<dl>",fp0);
 
     if(child_lynx==FALSE && no_print==FALSE)
-         fprintf(fp0,"     <a href=\"LYNXPRINT://LOCAL_FILE/lines=%d\">Save to a local file</a>\n\n",lines_in_file);
-    fprintf(fp0,"     <a href=\"LYNXPRINT://MAIL_FILE/lines=%d\">Mail the file to yourself</a>\n\n",
+         fprintf(fp0,"<dt><a href=\"LYNXPRINT://LOCAL_FILE/lines=%d\">Save to a local file</a>\n",lines_in_file);
+    fprintf(fp0,"<dt><a href=\"LYNXPRINT://MAIL_FILE/lines=%d\">Mail the file to yourself</a>\n",
 								lines_in_file);
-    fprintf(fp0,"     <a href=\"LYNXPRINT://TO_SCREEN/lines=%d\">Print to the screen</a>\n\n",
+    fprintf(fp0,"<dt><a href=\"LYNXPRINT://TO_SCREEN/lines=%d\">Print to the screen</a>\n",
 								lines_in_file);
 
         for(count=0, cur_printer=printers; cur_printer != NULL; 
 				    cur_printer = cur_printer->next, count++) 
     	    if(no_print==FALSE || cur_printer->always_enabled) {
-	        fprintf(fp0,"     <a href=\"LYNXPRINT://PRINTER/number=%d/lines=%d\">", count,lines_in_file);
+	        fprintf(fp0,"<dt><a href=\"LYNXPRINT://PRINTER/number=%d/lines=%d\">", count,lines_in_file);
 
 		fprintf(fp0, (cur_printer->name ? 
 				cur_printer->name : "No Name Given"));
-		fprintf(fp0,"</a>\n\n");
+		fprintf(fp0,"</a>\n");
 	    }
     fclose(fp0);
 
+    LYforce_no_cache=TRUE;
     return(0);
 }

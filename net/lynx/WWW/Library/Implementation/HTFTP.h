@@ -15,6 +15,12 @@
 #include "HTStream.h"
 #include "HTParse.h"
 
+#define FILE_BY_NAME 0 
+#define FILE_BY_TYPE 1
+#define FILE_BY_SIZE 2
+#define FILE_BY_DATE 3
+extern BOOLEAN HTfileSortMethod;  /* specifies the method of sorting */
+
 /*
 
 Retrieve File from Server

@@ -73,7 +73,10 @@ Standard C library for malloc() etc
 #include <libc.h>       /* NeXT */
 #endif
 #ifndef MACH /* Vincent.Cate@furmint.nectar.cs.cmu.edu */
-#include <stdlib.h>     /* ANSI */
+#ifndef __STRICT_BSD__
+#include <stdlib.h>
+#endif
+
 #endif
 #else /* ultrix */
 #include <malloc.h>
@@ -83,9 +86,17 @@ Standard C library for malloc() etc
 #endif
 
 #else   /* VMS */
+#include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
-#endif
+#if defined(VAXC) && !defined(__DECC)
+#define malloc	VAXC$MALLOC_OPT
+#define calloc	VAXC$CALLOC_OPT
+#define free	VAXC$FREE_OPT
+#define cfree	VAXC$CFREE_OPT
+#define realloc	VAXC$REALLOC_OPT
+#endif /* VAXC && !__DECC */
+#endif /* VMS */
 
 /*
 
@@ -218,10 +229,12 @@ Sucess (>=0) and failure (<0) codes
 
 #include "HTString.h"   /* String utilities */
 
+#ifndef va_arg
 #ifdef __STDC__
 #include <stdarg.h>
 #else
 #include <varargs.h>
+#endif
 #endif
 
 /*
@@ -264,8 +277,8 @@ Upper- and Lowercase macros
 
 #ifndef TOLOWER
   /* Pyramid and Mips can't uppercase non-alpha */
-#define TOLOWER(c) (isupper(c) ? tolower(c) : (c))
-#define TOUPPER(c) (islower(c) ? toupper(c) : (c))
+#define TOLOWER(c) (isupper((unsigned char)c) ? tolower((unsigned char)c) : (c))
+#define TOUPPER(c) (islower((unsigned char)c) ? toupper((unsigned char)c) : (c))
 #endif /* ndef TOLOWER */
 
 /*

@@ -252,16 +252,27 @@ int dir;
       switch(*src)
       {
          case ':':  *(dst++) = '/'; break;
-         case '-': if (*(src-1) == '-') *(dst++) = '/';
-                   *(dst++) = '.'; 
-                   *(dst++) = '.'; 
+         case '-': if (dir)
+	 	   {
+	 	      if (*(src-1) == '-') *(dst++) = '/';
+                      *(dst++) = '.'; 
+                      *(dst++) = '.'; 
+		   }
+		   else
+		   {
+		      if (*(src-1) == ']') *(dst++) = '/';
+		      *(dst++) = '-';
+		   }
                    break;
          case '.': if (dir)
                    {
                       if (*(src-1) != '[') *(dst++) = '/';
                    }
                    else
+		   {
+		      if (*(src-1) == ']') *(dst++) = '/';
                       *(dst++) = '.';
+		   }
                    break;
          case '[': dir = 1; break;
          case ']': dir = 0; break;

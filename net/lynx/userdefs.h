@@ -42,16 +42,35 @@
  * LYNX_CFG_FILE is the location and name of the lynx system
  * configuration file.
  */
-#define LYNX_CFG_FILE "sys$public:lynx.cfg"
+#define LYNX_CFG_FILE "Lynx_Dir:lynx.cfg"
 
 /**************************
+ * The EXTENSION_MAP file allows you to map file suffix's to 
+ * mime types.
+ * These global and personal files can be overriden by lynx.cfg
+ */
+#define GLOBAL_EXTENSION_MAP "Lynx_Dir:mime.types"
+#define PERSONAL_EXTENSION_MAP "mime.types"
+
+/**************************
+ * The MAILCAP file allows you to map file MIME types to 
+ * external viewers.
+ * These global and personal files can be overriden by lynx.cfg
+ */ 
+#define GLOBAL_MAILCAP "Lynx_Dir:mailcap"
+#define PERSONAL_MAILCAP ".mailcap"
+
+/**************************
+ * This define will only be used for a default if you do not
+ * use a lynx.cfg file
+ *
  * the full path and name of the xloadimage command
  * put 'echo' or something like it here if you don't have it;
  * you may also use 'xv' or anything that will handle GIF,
  * TIFF and other popular image formats
- * You must also have a "%s" for the filename, "&" for backgroud is optional
+ * You must also have a "%s" for the filename
  */
-#define XLOADIMAGE_COMMAND "xv %s &"
+#define XLOADIMAGE_COMMAND "xv %s"
 
 /**************************
  * The full path and name of the standard VMS "mail" command.
@@ -95,6 +114,22 @@
  */
 #define LYNX_CFG_FILE "/usr/local/lib/lynx.cfg"
 
+/**************************
+ * The EXTENSION_MAP file allows you to map file suffix's to 
+ * mime types.
+ * These global and personal files can be overriden by lynx.cfg
+ */
+#define GLOBAL_EXTENSION_MAP "/usr/local/lib/mosaic/mime.types"
+#define PERSONAL_EXTENSION_MAP ".mime.types"
+
+/**************************
+ * The MAILCAP file allows you to map file MIME types to 
+ * external viewers.
+ * These global and personal files can be overriden by lynx.cfg
+ */
+#define GLOBAL_MAILCAP "/usr/local/lib/mosaic/mailcap"
+#define PERSONAL_MAILCAP ".mailcap"
+
 /*********************
  * LOCAL_DOMAIN is used to determine if a user is local
  * to your campus or organization
@@ -117,6 +152,9 @@
 #define RLOGIN_COMMAND "rlogin"
 
 /*************************
+ * This define will only be used for a default if you do not
+ * use a lynx.cfg file
+ *
  * if you don't have xloadimage just set this to "echo" or
  * something else that is harmless, 'xv' also works really well if
  * not better!
@@ -145,11 +183,7 @@
 #ifdef MMDF
 #define SYSTEM_MAIL "/usr/mmdf/bin/submit" 
 #else
-#ifdef __386BSD__
-#define SYSTEM_MAIL "/usr/sbin/sendmail"
-#else
 #define SYSTEM_MAIL "/usr/lib/sendmail" 
-#endif
 #endif /* MMDF */
 
 /**************************
@@ -157,18 +191,6 @@
  * UNIX systems
  */
 #define TEMP_SPACE "/tmp/"
-
-/**************************
- * this "utmp" stuff is used to determine the calling address of
- * the user.  
- * Do a "find / -name utmp -print" if you don't know where to find
- * the utmp file -- it's usually in /etc/utmp.
- * If your system doesn't have utmp support comment out the
- * following lines.
- */
-#include <sys/types.h>
-#include <utmp.h>
-#define UTMP_FNAME "/etc/utmp"
 
 #endif /* VMS OR UNIX */
 
@@ -184,8 +206,8 @@
  *       information on URL's
  */
 #define STARTFILE "http://www.cc.ukans.edu/about_lynx/www_start.html" /* */
-/* #define STARTFILE "http://info.cern.ch/default.html" /* */
-/* #define STARTFILE "http://kufacts.cc.ukans.edu/cwis/kufacts_start.html" /* */
+/* #define STARTFILE "http://info.cern.ch/default.html" */
+/* #define STARTFILE "http://kufacts.cc.ukans.edu/cwis/kufacts_start.html" */
 
 /*****************************
  *
@@ -258,14 +280,28 @@
  * who are calling from inside your local domain 
  * to be able to telnet back out
  */
-#define CAN_ANONYMOUS_INSIDE_DOMAIN_TELNET	       TRUE  
+#define CAN_ANONYMOUS_INSIDE_DOMAIN_TELNET	  TRUE  
 
 /*******************************
  * set to FALSE if you don't want users of your anonymous
  * account who are calling from outside your
  * local domain to be able to telnet back out
  */
-#define CAN_ANONYMOUS_OUTSIDE_DOMAIN_TELNET       TRUE  
+#define CAN_ANONYMOUS_OUTSIDE_DOMAIN_TELNET      TRUE 
+
+/*******************************
+ * set to FALSE if you don't want users of your anonymous account
+ * who are calling from inside your local domain
+ * to be able to read news
+ */
+#define CAN_ANONYMOUS_INSIDE_DOMAIN_READ_NEWS     TRUE
+
+/*******************************
+ * set to FALSE if you don't want users of your anonymous
+ * account who are calling from outside your
+ * local domain to be able to read news
+ */
+#define CAN_ANONYMOUS_OUTSIDE_DOMAIN_READ_NEWS    FALSE
 
 /*******************************
  * set to FALSE if you don't want users of your anonymous
@@ -286,9 +322,17 @@
  * local programs by activating links within Lynx.
  *
  * An execution link is of the form:
+ *
  *     lynxexec:<COMMAND>
+ * or:
+ *     lynxexec://<COMMAND>
+ *
  * where <COMMAND> is a command that Lynx will
  * run when the link is activated.
+ * The double-slash should be included if the
+ * command begins with an '@', as for executing
+ * VMS command files.  Otherwise, the double-
+ * slash can be omitted.
  *
  * Execution scripts take the form of a standard
  * URL.  Extension mapping or MIME typing is used
@@ -320,8 +364,8 @@
  * also see src/HTInit.c to verify/change the execution
  * script extensions and/or commands.
  */
-/* #define EXEC_LINKS /* */ 
-/* #define EXEC_SCRIPTS /* */ 
+/* #define EXEC_LINKS  */ 
+/* #define EXEC_SCRIPTS  */ 
 
 
 #if defined(EXEC_LINKS) || defined(EXEC_SCRIPTS)
@@ -331,7 +375,7 @@
  * is defined then the user will be able to change
  * the execution status within the options screen.
  */
-/* #define ALLOW_USERS_TO_CHANGE_EXEC_WITHIN_OPTIONS /* */
+/* #define ALLOW_USERS_TO_CHANGE_EXEC_WITHIN_OPTIONS */
 
 /**********
  * if NEVER_ALLOW_REMOTE_EXEC is defined then local execution 
@@ -340,7 +384,7 @@
  * and the options menu for "L)ocal executions links" will only
  * allow toggling between "ALWAYS OFF" and "FOR LOCAL FILES ONLY".
  */
-/* #define NEVER_ALLOW_REMOTE_EXEC /* */
+/* #define NEVER_ALLOW_REMOTE_EXEC */
 
 /*****************************
  * These are for executable shell scripts and links.
@@ -427,7 +471,8 @@
  *  		  have a good knowledge of the program
  */
 
-#define LYNX_VERSION "2.2"
+#define LYNX_NAME "Lynx"
+#define LYNX_VERSION "2.3 BETA"
 #ifndef MAXINT
 #define MAXINT 2147483647
 #endif /*MAXINT*/
@@ -445,6 +490,7 @@
 #define FORM_LINK_CHECKBOX_MESSAGE "(Checkbox Field)   Use right-arrow or <return> to toggle."
 #define FORM_LINK_SUBMIT_MESSAGE "(Form submit button)   Use right-arrow or <return> to submit form."
 #define FORM_LINK_RESET_MESSAGE "(Form reset button)   Use right-arrow or <return> to reset form to defaults."
+#define FORM_LINK_OPTION_LIST_MESSAGE "(Option list)  Hit return and use arrow keys and return to select option"
 #define NORMAL_LINK_MESSAGE "(NORMAL LINK)   Use right-arrow or <return> to activate"
 #define LINK_NOT_FOUND "The resource requested is not available at this time."
 #define WWW_WAIT_MESSAGE "Getting %s"
@@ -458,6 +504,10 @@
 #define NOVICE_LINE_TWO " H)elp O)ptions P)rint G)o M)ain screen Q)uit /=search [delete]=history list \n"
 #define FORM_NOVICELINE_ONE "            Enter text into the field by typing on the keyboard              "
 #define FORM_NOVICELINE_TWO "    Ctrl-U to delete all text in field, [Backspace] to delete a character    "
+
+#ifdef DIRED_SUPPORT
+#define DIRED_NOVICELINE "  C)reate  D)ownload  E)dit  F)ull menu  M)odify  R)emove  T)ag  U)pload     \n"
+#endif
 
 #define MAXBASE 100       /* max length of base directory */
 #define MAXHIGHLIGHT 160 /* max length of highlighted text */

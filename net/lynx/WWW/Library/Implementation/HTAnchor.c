@@ -135,12 +135,21 @@ PUBLIC HTChildAnchor * HTAnchor_findChildAndLink
        )
 {
   HTChildAnchor * child = HTAnchor_findChild(parent, tag);
+
+  if(TRACE)
+      fprintf(stderr,"Entered HTAnchor_findChildAndLink\n");
+
   if (href && *href) {
     char * relative_to = HTAnchor_address((HTAnchor *) parent);
-    char * parsed_address = HTParse(href, relative_to, PARSE_ALL);
-    HTAnchor * dest = HTAnchor_findAddress(parsed_address);
+    DocAddress parsed_doc;
+    HTAnchor * dest;
+
+    parsed_doc.address = HTParse(href, relative_to, PARSE_ALL);
+    parsed_doc.post_data = 0;
+    parsed_doc.post_content_type = 0;
+    dest = HTAnchor_findAddress(&parsed_doc);
     HTAnchor_link((HTAnchor *) child, dest, ltype);
-    free(parsed_address);
+    free(parsed_doc.address);
     free(relative_to);
   }
   return child;
@@ -156,20 +165,28 @@ PUBLIC HTChildAnchor * HTAnchor_findChildAndLink
 **	like with fonts.
 */
 
-HTAnchor * HTAnchor_findAddress
-  ARGS1 (CONST char *,address)
+HTAnchor * HTAnchor_findAddress ARGS1 (CONST DocAddress *,newdoc)
 {
-  char *tag = HTParse (address, "", PARSE_ANCHOR);  /* Anchor tag specified ? */
+  char *tag = HTParse (newdoc->address, "", PARSE_ANCHOR);  /* Anchor tag specified ? */
+
+  if(TRACE)
+	fprintf(stderr,"Entered HTAnchor_findAddress\n");
 
   /* If the address represents a sub-anchor, we recursively load its parent,
      then we create a child anchor within that document. */
   if (*tag) {
-    char *docAddress = HTParse(address, "", PARSE_ACCESS | PARSE_HOST |
-			                    PARSE_PATH | PARSE_PUNCTUATION);
-    HTParentAnchor * foundParent =
-      (HTParentAnchor *) HTAnchor_findAddress (docAddress);
-    HTChildAnchor * foundAnchor = HTAnchor_findChild (foundParent, tag);
-    free (docAddress);
+    DocAddress parsed_doc;
+    HTParentAnchor * foundParent;
+    HTChildAnchor * foundAnchor;
+
+    parsed_doc.address = HTParse(newdoc->address, "", 
+		PARSE_ACCESS | PARSE_HOST | PARSE_PATH | PARSE_PUNCTUATION);
+    parsed_doc.post_data = newdoc->post_data;
+    parsed_doc.post_content_type = newdoc->post_content_type;
+    
+    foundParent = (HTParentAnchor *) HTAnchor_findAddress (&parsed_doc);
+    foundAnchor = HTAnchor_findChild (foundParent, tag);
+    free (parsed_doc.address);
     free (tag);
     return (HTAnchor *) foundAnchor;
   }
@@ -185,7 +202,7 @@ HTAnchor * HTAnchor_findAddress
     free (tag);
     
     /* Select list from hash table */
-    for(p=address, hash=0; *p; p++)
+    for(p=newdoc->address, hash=0; *p; p++)
     	hash = (hash * 3 + (*(unsigned char*)p)) % HASH_SIZE;
     if (!adult_table)
         adult_table = (HTList**) calloc(HASH_SIZE, sizeof(HTList*));
@@ -195,9 +212,10 @@ HTAnchor * HTAnchor_findAddress
     /* Search list for anchor */
     grownups = adults;
     while (foundAnchor = HTList_nextObject (grownups)) {
-       if (equivalent(foundAnchor->address, address)) {
+       if (equivalent(foundAnchor->address, newdoc->address) &&
+	   equivalent(foundAnchor->post_data, newdoc->post_data)) {
 	if (TRACE) fprintf(stderr, "Anchor %p with address `%s' already exists.\n",
-			  (void*) foundAnchor, address);
+			  (void*) foundAnchor, newdoc->address);
 	return (HTAnchor *) foundAnchor;
       }
     }
@@ -205,8 +223,12 @@ HTAnchor * HTAnchor_findAddress
     /* Node not found : create new anchor */
     foundAnchor = HTParentAnchor_new ();
     if (TRACE) fprintf(stderr, "New anchor %p has hash %d and address `%s'\n",
-    	(void*)foundAnchor, hash, address);
-    StrAllocCopy(foundAnchor->address, address);
+    	(void*)foundAnchor, hash, newdoc->address);
+    StrAllocCopy(foundAnchor->address, newdoc->address);
+    if(newdoc->post_data)
+	StrAllocCopy(foundAnchor->post_data, newdoc->post_data);
+    if(newdoc->post_content_type)
+	StrAllocCopy(foundAnchor->post_content_type, newdoc->post_content_type);
     HTList_addObject (adults, foundAnchor);
     return (HTAnchor *) foundAnchor;
   }
@@ -279,6 +301,10 @@ PUBLIC BOOL HTAnchor_delete
   HTList_delete (me->children);
   HTList_delete (me->sources);
   free (me->address);
+  if(me->post_data)
+      free (me->post_data);
+  if(me->post_content_type)
+      free (me->post_content_type);
   /* Devise a way to clean out the HTFormat if no longer needed (ref count?) */
   free (me);
   return YES;  /* Parent deleted */
@@ -373,10 +399,12 @@ HTFormat HTAnchor_format
 
 
 void HTAnchor_setIndex
-  ARGS1 (HTParentAnchor *,me)
+  ARGS2 (HTParentAnchor *,me, char *,address)
 {
-  if (me)
+  if (me) {
     me->isIndex = YES;
+    StrAllocCopy(me->isIndexAction, address);
+  }
 }
 
 BOOL HTAnchor_isIndex
@@ -418,7 +446,7 @@ void HTAnchor_appendTitle
 CONST char * HTAnchor_owner
   ARGS1 (HTParentAnchor *,me)
 {
-  return me ? me->owner : 0;
+  return (me ? me->owner : 0);
 }
 
 void HTAnchor_setOwner

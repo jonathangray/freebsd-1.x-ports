@@ -25,12 +25,16 @@ PUBLIC int LYNewsPost ARGS1(document *,newdoc)
 	char c;  /* user input */
 	char tmpfile[100];
 	char cmd[130];
+        DocAddress WWWDoc;
 
 	term_message=FALSE;
 
 	/* pop previous document off of stack and load into main memory */
 	pop(newdoc);
-        if(!HTLoadAbsolute(newdoc->address))
+	WWWDoc.address = newdoc->address;
+	WWWDoc.post_data = newdoc->post_data;
+	WWWDoc.post_content_type = newdoc->post_content_type;
+        if(!HTLoadAbsolute(&WWWDoc))
             return(NOT_FOUND);
 
 	clear();
@@ -57,7 +61,7 @@ PUBLIC int LYNewsPost ARGS1(document *,newdoc)
 	addstr("\n\n Please enter your mail address\n");
 	strcpy(user_input,"From: ");
 	/* add the mail address if there is one */
-	if(*personal_mail_address != '\0')
+	if(personal_mail_address)
 	    strcat(user_input,personal_mail_address);
 
 	if (LYgetstr(user_input, VISIBLE) < 0 || term_message) {
@@ -90,7 +94,7 @@ PUBLIC int LYNewsPost ARGS1(document *,newdoc)
 	/* add Newsgroups: summary: and Keywords: */
 	fprintf(fd,"Newsgroups: %s\nSummary: \nKeywords: \n\n",newsgroups);
 
-	if(!no_editor && *editor != '\0') {
+	if(!no_editor && editor && *editor != '\0') {
 	    /* ask if the user wants to include the original message */
 	    statusline("Do you wish to inlude the original message? (y/n) ");
 	    c=0;

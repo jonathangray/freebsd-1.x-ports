@@ -81,7 +81,6 @@ $ cc [-.Implementation]HTBTree.c
 $ cc [-.Implementation]HTFTP.c
 $ cc [-.Implementation]HTTCP.c
 $ cc [-.Implementation]SGML.c
-$ cc [-.Implementation]HTML.c
 $ cc [-.Implementation]HTMLDTD.c
 $ cc [-.Implementation]HTChunk.c
 $ cc [-.Implementation]HTPlain.c

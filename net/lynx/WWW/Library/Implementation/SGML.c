@@ -558,10 +558,11 @@ PUBLIC void SGML_character ARGS2(HTStream *, context, char,c)
 	if (isalnum(c))
 	    HTChunkPutc(string, c);
 	else {				/* End of end tag name */
-	    HTTag * t;
+	    HTTag * t=0;
 	    HTChunkTerminate(string) ;
 	    if (!*string->data)	{	/* Empty end tag */
-	        t = context->element_stack->tag;
+		if(context->element_stack)
+	            t = context->element_stack->tag;
 	    } else {
 		t = SGMLFindTag(dtd, string->data);
 	    }

@@ -1,5 +1,6 @@
 #include "LYCurses.h"
 #include "HTUtils.h"
+#include "HTFTP.h"
 #include "HTML.h"
 #include "LYUtils.h"
 #include "LYStrings.h"
@@ -48,10 +49,12 @@ PRIVATE void option_statusline ARGS1(char *,text)
 
 PUBLIC void options ()
 {
-    int response=0;
+#ifdef ALLOW_USERS_TO_CHANGE_EXEC_WITHIN_OPTIONS
     int itmp;
+#endif
+    int response=0;
     /* if the user changes the display I need memory to put it in */
-    char display_option[128]; 
+    char display_option[256]; 
     static char putenv_command[138];
     char *choices[MAXCHOICES];
 
@@ -62,7 +65,7 @@ PUBLIC void options ()
     move(0,5);  addstr("                     Options Menu");
 
     move(L_EDITOR,5);  
-    printw("E)ditor                    : %s",(*editor=='\0'?"NONE":editor));
+    printw("E)ditor                    : %s",(!editor ? "NONE" : editor));
     move(L_DISPLAY,5);  
 #ifndef VMS
     printw("D)ISPLAY variable          : %s",(display==NULL? "NONE":display));
@@ -72,11 +75,19 @@ PUBLIC void options ()
 
     move(L_MAIL_ADDRESS,5);  
     printw("P)ersonal mail address     : %s",
-		(*personal_mail_address=='\0'?"NONE": personal_mail_address));
+		(!personal_mail_address ? "NONE": personal_mail_address));
     
     move(L_HOME,5);  
-    printw("B)ookmark file             : %s",(*bookmark_page=='\0'?"NONE": 
-							      bookmark_page));
+    printw("B)ookmark file             : %s",(bookmark_page ? bookmark_page :
+								"NONE")); 
+
+    move(L_FTPSTYPE,5);
+    printw("F)TP sort criteria         : %s",(HTfileSortMethod==FILE_BY_NAME ?
+					"By Filename" :
+					  (HTfileSortMethod==FILE_BY_SIZE ?
+					    "By Size" : 
+					      (HTfileSortMethod==FILE_BY_TYPE ?
+						"By Type" : "By Date"))));
     move(L_SSEARCH,5); 
     printw("S)earching type            : %s",(case_sensitive ?
 				        "CASE SENSITIVE" : "CASE INSENSITIVE"));
@@ -97,6 +108,15 @@ PUBLIC void options ()
 			   		(keypad_mode == NUMBERS_AS_ARROWS ? 
 					"Numbers act as arrows" : 
 				        "Links are numbered"));
+
+#ifdef DIRED_SUPPORT
+    move(L_DIRED,5);
+    printw("l(I)st directory style     : %s",
+                     (dir_list_style == FILES_FIRST ? "Files first          " :
+		     (dir_list_style == MIXED_STYLE ? "Mixed style          " : 
+                                                      "Directories first    ")));
+#endif
+
     move(L_USER_MODE,5);
     printw("U)ser mode                 : %s",
 			(user_mode == NOVICE_MODE ? "Novice" : 
@@ -132,16 +152,21 @@ PUBLIC void options ()
 	   switch(response) {
 	 	case 'e':  /* change the editor */
 		case 'E':
-			if(*editor=='\0') {  /* clear the NONE */
+			if(!editor) {  /* clear the NONE */
 			   move(L_EDITOR,34);
 			   addstr("    ");
 			}
 			option_statusline(ACCEPT_DATA);
 			move(L_EDITOR,34);  
 			standout();
-			LYgetstr(editor, VISIBLE);
+			if(editor)
+			    strcpy(display_option, editor);
+			else
+			    *display_option = '\0';
+			LYgetstr(display_option, VISIBLE);
 			standend();
 			move(L_EDITOR,34);
+			StrAllocCopy(editor,display_option);
 			addstr(editor);
 			break;
 #ifndef VMS
@@ -173,16 +198,21 @@ PUBLIC void options ()
 			 * change the bookmark page
 			 */
 			if(!no_bookmark) {
-			    if(*editor=='\0') {  /* clear the NONE */
+			    if(!bookmark_page) {  /* clear the NONE */
 			       move(L_HOME,34);
 			       addstr("    ");
 			    }
 			    option_statusline(ACCEPT_DATA);
 			    move(L_HOME,34); 
 			    standout();
-			    LYgetstr(bookmark_page, VISIBLE);
+			    if(bookmark_page)
+			  	strcpy(display_option, bookmark_page);
+			    else
+				*display_option = '\0';
+			    LYgetstr(display_option, VISIBLE);
 			    standend();
 			    move(L_HOME,34);
+			    StrAllocCopy(bookmark_page,display_option);
 			    addstr(bookmark_page);
 			} else { /* anonymous */
 			   option_statusline("you are not allowed to change the bookmark file!");
@@ -191,18 +221,40 @@ PUBLIC void options ()
     
 		case 'p':  /* change the bookmark page location */
 		case 'P':
-		 	if(*personal_mail_address=='\0') {/* clear the NONE */
+		 	if(!personal_mail_address) {/* clear the NONE */
 			   move(L_MAIL_ADDRESS,34);
 			   addstr("    ");
-			}
+			   *display_option = '\0';
+			} else
+			   strcpy(display_option,personal_mail_address);
 			option_statusline(ACCEPT_DATA);
 			move(L_MAIL_ADDRESS,34);
 			standout();
-			LYgetstr(personal_mail_address, VISIBLE);
+			LYgetstr(display_option, VISIBLE);
 			standend();
 			move(L_MAIL_ADDRESS,34);
+			StrAllocCopy(personal_mail_address,display_option);
 			addstr(personal_mail_address);
 			break;
+
+		case 'f':
+		case 'F':
+                        /* copy strings into choice array */
+                        choices[0] = (char *)0;
+                        StrAllocCopy(choices[0],"By Filename");
+                        choices[1] = (char *)0;
+                        StrAllocCopy(choices[1],"By Type    ");
+                        choices[2] = (char *)0;
+                        StrAllocCopy(choices[2],"By Size    ");
+                        choices[3] = (char *)0;
+                        StrAllocCopy(choices[3],"By Date    ");
+                        choices[4] = (char *)0;
+                        HTfileSortMethod = boolean_choice(HTfileSortMethod,
+                                               L_FTPSTYPE, choices);
+                        free(choices[0]);
+                        free(choices[1]);
+                        free(choices[2]);
+                        break;
 
 		case 's':
 		case 'S':
@@ -330,6 +382,24 @@ PUBLIC void options ()
 			free(choices[0]);
 			free(choices[1]);
 			break;
+#ifdef DIRED_SUPPORT
+		case 'i':
+		case 'I':
+			/* copy strings into choice array */
+			choices[0] = (char *)0;
+			StrAllocCopy(choices[0],"Directories first");
+			choices[1] = (char *)0;
+			StrAllocCopy(choices[1],"Files first      ");
+			choices[2] = (char *)0;
+			StrAllocCopy(choices[2],"Mixed style      ");
+			choices[3] = (char *)0;
+			dir_list_style = boolean_choice(dir_list_style,
+							L_DIRED, choices);
+			free(choices[0]);
+			free(choices[1]);
+			free(choices[2]);
+			break;
+#endif
 		case 'u':
 		case 'U':
 			/* copy strings into choice array */

@@ -74,21 +74,26 @@ Attribute numbers
 #define HTML_IMG_SRC            1
 #define HTML_IMG_ATTRIBUTES     2
 
+#define HTML_ISINDEX_ACTION     0
+#define HTML_ISINDEX_ATTRIBUTES 1
+
 #define HTML_LINK_HREF          0
 #define HTML_LINK_REL           1
 #define HTML_LINK_REV           2
 #define HTML_LINK_ATTRIBUTES    3
 
 #define HTML_FORM_ACTION	0
-#define HTML_FORM_METHOD	1
-#define HTML_FORM_ATTRIBUTES    2
+#define HTML_FORM_ENCTYPE	1
+#define HTML_FORM_METHOD	2
+#define HTML_FORM_ATTRIBUTES    3
 
 #define HTML_SELECT_MULTIPLE	0
 #define HTML_SELECT_NAME	1
 #define HTML_SELECT_ATTRIBUTES	2
 
 #define HTML_OPTION_SELECTED	0
-#define HTML_OPTION_ATTRIBUTES	1
+#define HTML_OPTION_VALUE       1
+#define HTML_OPTION_ATTRIBUTES	2
 
 #define HTML_TEXTAREA_COLS	0
 #define HTML_TEXTAREA_NAME	1

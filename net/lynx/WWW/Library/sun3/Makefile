@@ -11,7 +11,6 @@ BINDIR = /usr/local/bin
 
 CFLAGS = -DDEBUG -g
 LFLAGS =
-CC = gcc
 
 # Directory for installed binary:
 BINDIR = /usr/local/bin

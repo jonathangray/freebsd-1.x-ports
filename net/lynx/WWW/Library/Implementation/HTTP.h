@@ -9,13 +9,12 @@
 
 GLOBALREF HTProtocol HTTP;
 
-#define FORM_GET_METHOD  1
-#define FORM_POST_METHOD 2
+#define URL_GET_METHOD  1
+#define URL_POST_METHOD 2
 
 #ifdef UCX
 #define bcopy(s, d, n) memcpy((d), (s), (n))
 #endif
-
 
 #endif /* HTTP_H */
 

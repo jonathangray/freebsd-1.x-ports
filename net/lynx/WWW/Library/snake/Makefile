@@ -14,7 +14,7 @@ CFLAGS = -g
 LFLAGS = -lBSD
 
 #CC = cc
-CC = gcc
+#CC = gcc
 
 # Directory for installed binary:
 BINDIR = /usr/local/bin

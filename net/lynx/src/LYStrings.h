@@ -8,8 +8,8 @@ extern char * LYstrncpy PARAMS((char *dst, char *src, int n));
 extern int LYgetch NOPARAMS;
 extern int LYgetstr PARAMS((char *inputline, int hidden));
 extern char * LYstrstr PARAMS((char *chptr, char *tarptr));
-extern char * LYno_underline_strstr PARAMS((char *chptr, char *tarptr));
-extern char * LYno_underline_case_strstr PARAMS((char *chptr, char *tarptr));
+extern char * LYno_attr_char_strstr PARAMS((char *chptr, char *tarptr));
+extern char * LYno_attr_char_case_strstr PARAMS((char *chptr, char *tarptr));
 
 extern char * SNACopy PARAMS((char **dest, CONST char *src, int n));
 extern char * SNACat PARAMS((char **dest, CONST char *src, int n));

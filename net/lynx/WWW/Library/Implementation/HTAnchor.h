@@ -83,8 +83,11 @@ struct _HTParentAnchor {
   HTList *      sources;        /* List of anchors pointing to this, if any */
   HyperDoc *    document;       /* The document within which this is an anchor */
   char *        address;        /* Absolute address of this node */
+  char *	post_data;      /* posting data */
+  char * 	post_content_type;  /* type of post data */
   HTFormat      format;         /* Pointer to node format descriptor */
   BOOL          isIndex;        /* Acceptance of a keyword search */
+  char *        isIndexAction;  /* URL of isIndex server */
   char *        title;          /* Title of document */
   char *        owner;          /* Owner of document */
 
@@ -103,6 +106,16 @@ typedef struct {
   char *        tag;            /* Address of this anchor relative to parent */
 } HTChildAnchor;
 
+
+/* DocAddress structure is used for loading an absolute anchor with all
+ * needed information including posting data and post content type.
+ */
+
+typedef struct _DocAddress {
+    char * address;
+    char * post_data;
+    char * post_content_type;
+} DocAddress;
 
 /*      Create new or find old sub-anchor
 **      ---------------------------------
@@ -142,10 +155,7 @@ extern HTChildAnchor * HTAnchor_findChildAndLink
 **      like with fonts.
 */
 
-extern HTAnchor * HTAnchor_findAddress
-  PARAMS(
-     (CONST char * address)
-     );
+extern HTAnchor * HTAnchor_findAddress PARAMS((CONST DocAddress * address));
 
 
 /*      Delete an anchor and possibly related things (auto garbage collection)
@@ -220,9 +230,7 @@ extern HTFormat HTAnchor_format
      );
 
 extern void HTAnchor_setIndex
-  PARAMS(
-     (HTParentAnchor *me)
-     );
+  PARAMS( (HTParentAnchor *me, char * address ) );
 
 extern BOOL HTAnchor_isIndex
   PARAMS(

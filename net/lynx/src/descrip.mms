@@ -26,7 +26,7 @@ LYMail.obj, HTAlert.obj, GridText.obj, LYGetFile.obj, \
 LYMain.obj, LYMainLoop.obj, LYCurses.obj, LYBookmark.obj, LYUtils.obj, \
 LYOptions.obj, LYReadCFG.obj, LYSearch.obj, LYHistory.obj, \
 LYForms.obj, LYPrint.obj, LYrcFile.obj, LYDownload.obj, LYNews.obj, \
-LYKeymap.obj, \
+LYKeymap.obj, LYUpload.obj, \
 HTML.obj, HTFWriter.obj, HTInit.obj, DefaultStyles.obj, 
 
 .IFDEF MULTINET

@@ -2,10 +2,10 @@
 #   Use this as a template
 
 # For W3 distribution, machine type for subdirectories
-WWW_MACH = unix
+WWW_MACH = sco
 
 # The ASIS repository's name for the machine we are on
-ASIS_MACH = hardware/os
+ASIS_MACH = intel/sco
 
 
 CFLAGS =  -DDEBUG -DSVR4

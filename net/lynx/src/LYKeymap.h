@@ -3,15 +3,19 @@
 #define LYKEYMAP_H
 
 extern BOOLEAN remap PARAMS((char *key, char *func));
-extern void set_vms_keys();
-extern void set_vi_keys();
-extern void reset_vi_keys();
-extern void set_emacs_keys();
-extern void reset_emacs_keys();
-extern void set_numbers_as_arrows();
-extern void reset_numbers_as_arrows();
+extern void set_vms_keys NOPARAMS;
+extern void set_vi_keys NOPARAMS;
+extern void reset_vi_keys NOPARAMS;
+extern void set_emacs_keys NOPARAMS;
+extern void reset_emacs_keys NOPARAMS;
+extern void set_numbers_as_arrows NOPARAMS;
+extern void reset_numbers_as_arrows NOPARAMS;
 
 extern char keymap[]; /* main keymap matrix */
+
+#if defined(DIRED_SUPPORT) && defined(OK_OVERRIDE)
+extern char override[];
+#endif
 
 #define       LYK_1     	1
 #define       LYK_2     	2
@@ -62,6 +66,16 @@ extern char keymap[]; /* main keymap matrix */
 #define       LYK_VIEW_BOOKMARK 47
 #define       LYK_SHELL 	48
 #define       LYK_DOWNLOAD      49
-#define       LYK_DO_NOTHING    50
+#define       LYK_TRACE_TOGGLE  50
+#define       LYK_DO_NOTHING    51
+
+#ifdef DIRED_SUPPORT
+#define       LYK_CREATE        52
+#define       LYK_REMOVE        53
+#define       LYK_MODIFY        54
+#define       LYK_TAG_LINK      55
+#define       LYK_DIRED_MENU    56
+#define       LYK_UPLOAD        57
+#endif
 
 #endif /* LYKEYMAP_H */

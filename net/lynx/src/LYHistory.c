@@ -4,6 +4,11 @@
 #include "LYPrint.h"
 #include "LYDownload.h"
 #include "LYGlobalDefs.h"
+
+#ifdef DIRED_SUPPORT
+#include "LYUpload.h"
+#include "LYLocal.h"
+#endif
  
 /*
  * push the current filename, link and line number onto the history list
@@ -11,7 +16,6 @@
 
 PUBLIC void push ARGS1(document *,doc)
 {
-    char *temp_hightext, *temp_hfname;
 
     if( *doc->address == '\0')  /* dont push null file names */
 	return;
@@ -22,39 +26,32 @@ PUBLIC void push ARGS1(document *,doc)
 		!strcmp(doc->title, DOWNLOAD_OPTIONS_TITLE) )
 	return;
 
-    if(nhist>1 && STREQ(history[nhist-1].hfname, doc->address) &&
-        history[nhist-1].hpageno == doc->line )
+#ifdef DIRED_SUPPORT
+    if(!strcmp(doc->title, DIRED_MENU_TITLE) ||
+		!strcmp(doc->title, UPLOAD_OPTIONS_TITLE) )
+	return;
+#endif
+
+    if(nhist>1 && STREQ(history[nhist-1].address, doc->address)) 
         return;  /* file is identical to one before it don't push it */
 
-    if(nhist>2 && STREQ(history[nhist-2].hfname, doc->address) &&
-        history[nhist-2].hpageno == doc->line ) {
+    if(nhist>2 && STREQ(history[nhist-2].address, doc->address)) {
 	  nhist--; /* pop one off the stack */
           return;  /* file is identical to one two before it don't push it */
     }
 
     if (nhist<MAXHIST)  {
-        /* copy hightext and hfname to tempory holdings
-         * the doc-> address and title are sometimes the same
-         * variable since they may have come from the history
-         * list.  make hightext and hfname NULL so that they
-         * don't get free'd by StrAllocCopy and free them
-         * manually after the copy!
-         */
-        temp_hightext = history[nhist].hightext;
-        temp_hfname = history[nhist].hfname;
-        history[nhist].hightext = NULL;
-        history[nhist].hfname = NULL;
-
-	history[nhist].hlinkno = doc->link;
-	history[nhist].hpageno = doc->line;
-	StrAllocCopy(history[nhist].hightext, doc->title);
-	StrAllocCopy(history[nhist].hfname, doc->address);
+	history[nhist].link = doc->link;
+	history[nhist].page = doc->line;
+	history[nhist].title = 0;
+	StrAllocCopy(history[nhist].title, doc->title);
+	history[nhist].address = 0;
+	StrAllocCopy(history[nhist].address, doc->address);
+	history[nhist].post_data = 0;
+	StrAllocCopy(history[nhist].post_data, doc->post_data);
+	history[nhist].post_content_type = 0;
+	StrAllocCopy(history[nhist].post_content_type, doc->post_content_type);
 	nhist++;
-
-	if(temp_hightext!=NULL)
-	    free(temp_hightext);
-	if(temp_hfname!=NULL)
-	    free(temp_hfname);
 
         if(TRACE)
     	    fprintf(stderr,"\npush: address:%s\n      title:%s\n",
@@ -71,10 +68,16 @@ PUBLIC void pop ARGS1(document *,doc)
  
     if (nhist>0) {
 	nhist--;
-	doc->link = history[nhist].hlinkno;
-	doc->line = history[nhist].hpageno;
-	doc->title = history[nhist].hightext;
-	doc->address = history[nhist].hfname;
+	doc->link = history[nhist].link;
+	doc->line = history[nhist].page;
+	free_and_clear(&doc->title);
+	doc->title = history[nhist].title;    /* will be freed later */
+	free_and_clear(&doc->address);
+	doc->address = history[nhist].address;  /* will be freed later */
+	free_and_clear(&doc->post_data);
+	doc->post_data = history[nhist].post_data;
+	free_and_clear(&doc->post_content_type);
+	doc->post_content_type = history[nhist].post_content_type;
 
         if(TRACE)
 	    fprintf(stderr,"pop: address:%s\n     title:%s\n",
@@ -90,11 +93,13 @@ PUBLIC void pop ARGS1(document *,doc)
  */
 PUBLIC void pop_num ARGS2(int,number, document *,doc)
 {
-    if (nhist>= number) {
-	doc->link = history[number].hlinkno;
-	doc->line = history[number].hpageno;
-	doc->title = history[number].hightext;
-	doc->address = history[number].hfname;
+    if (nhist >= number) {
+	doc->link = history[number].link;
+	doc->line = history[number].page;
+	StrAllocCopy(doc->title, history[number].title);
+	StrAllocCopy(doc->address, history[number].address);
+	StrAllocCopy(doc->post_data, history[nhist].post_data);
+	StrAllocCopy(doc->post_content_type, history[nhist].post_content_type);
     }
 }
 
@@ -106,15 +111,22 @@ PUBLIC void pop_num ARGS2(int,number, document *,doc)
 PUBLIC void showhistory ARGS1(char **,newfile)
 {
 	int x=0;
-        char tmpfile[256];
+        static char *tmpfile=NULL;
 	static char hist_filename[256];
 	FILE *fp0;
 
-	*newfile = 0;  /* don't free current value */
+	if(tmpfile == NULL) {
+	    tmpfile = (char *) malloc(128);
+	    tempname(tmpfile,NEW_FILE);
+#ifndef VMS
+	} 
+#else
+	} else {
+	    remove(tmpfile);  /* put VMS code to remove duplicates here */
+	}
+#endif /* VMS */
 
-	tempname(tmpfile,NEW_FILE);
-
-	if((fp0 = fopen(tmpfile,"wb")) == NULL) {
+	if((fp0 = fopen(tmpfile,"w")) == NULL) {
 		perror("Trying to open history file\n");
 		exit(1);
 	}
@@ -125,8 +137,9 @@ PUBLIC void showhistory ARGS1(char **,newfile)
 #else
 	sprintf(hist_filename,"file://localhost%s",tmpfile);
 #endif /* VMS */
-	*newfile = hist_filename;
+	StrAllocCopy(*newfile, hist_filename);
 	LYforce_HTML_mode=TRUE; /* force this file to be HTML */
+	LYforce_no_cache=TRUE; /* force this file to be new */
 
 	fprintf(fp0,"<head><title>%s</title></head><body>\n",
 							HISTORY_PAGE_TITLE);
@@ -140,7 +153,7 @@ PUBLIC void showhistory ARGS1(char **,newfile)
 	   fprintf(fp0,
 		"\n\n  %d.  -- You selected:  <a href=\"LYNXHIST:%d\">%s</a>", 
 		x, x,
-	       (history[x].hightext!=NULL ? history[x].hightext : "no title"));
+	       (history[x].title!=NULL ? history[x].title : "no title"));
 	}
 
 	fprintf(fp0,"</pre>");

@@ -75,7 +75,7 @@ typedef struct sockaddr_in SockA;  /* See netinet/in.h */
 #endif
 
 /* Solaris. */
-#if defined(sun) && defined(__svr4__)
+#if defined(sun) && defined(__svr4__) && !defined(USE_DIRENT)
 #define USE_DIRENT              /* sys V style directory open */
 #endif
 
@@ -136,9 +136,10 @@ VAX/VMS
 #define SOCKET_READ(s,b,l)  ((s)>10 ? netread((s),(b),(l)) : read((s),(b),(l)))
 #define NETWRITE(s,b,l) ((s)>10 ? netwrite((s),(b),(l)) : write((s),(b),(l)))
 #define NETCLOSE(s)     ((s)>10 ? netclose(s) : close(s))
-#define IOCTL(a,b,c) -1 /* disables ioctl function */
-#define SOCKET_ERRNO neterrno /* probably wrong but it's my best guess */
-#endif
+#define IOCTL(a,b,c) -1 /* disables ioctl function	      */
+#define NO_IOCTL	/* flag to check if ioctl is disabled */
+#define SOCKET_ERRNO errno
+#endif /* WIN_TCP */
 
 #ifdef MULTINET
 #undef NETCLOSE
@@ -152,12 +153,7 @@ VAX/VMS
 #define NETCLOSE(s)     ((s)>10 ? socket_close(s) : close(s))
 #define IOCTL socket_ioctl
 #define SOCKET_ERRNO socket_errno
-#endif
-
-#ifdef UCX
-#undef IOCTL
-#define IOCTL(a,b,c) -1  /* disables ioctl function */
-#endif /* UCX */
+#endif /* MULTINET */
 
 /*      Certainly this works for UCX and Multinet; not tried for Wollongong
 */
@@ -165,7 +161,7 @@ VAX/VMS
 #include "multinet_root:[multinet.include.sys]types.h"
 #include "multinet_root:[multinet.include]errno.h"
 #include "multinet_root:[multinet.include.sys]time.h"
-#else
+#else /* not MULTINET */
 #include <types.h>
 #include <errno.h>
 #include <time.h>
@@ -194,7 +190,7 @@ VAX/VMS
 #include "multinet_root:[multinet.include]netdb.h"
 #include "multinet_root:[multinet.include.sys]ioctl.h"
 
-#else  /* not multinet */
+#else  /* not MULTINET */
 
 #ifdef DECNET
 #include "types.h"  /* for socket.h */
@@ -203,7 +199,7 @@ VAX/VMS
 #include "dnetdb"
 /* #include "vms.h" */
 
-#else /* UCX or WIN */
+#else /* UCX or WIN_TCP */
 #include <socket.h>
 #include <in.h>
 #include <inet.h>
@@ -212,12 +208,11 @@ VAX/VMS
 #ifdef UCX
 #include <ucx$inetdef.h>
 #define bcopy(s, d, n) memcpy((d), (s), (n))
-#else
-/* WIN: try this! if it doesn't work on your system look
- * for an include file that contains a definition for FIONBIO
- */
+#else /* WIN_TCP */
+#ifndef NO_IOCTL
 #include <ioctl.h>
-#endif /* UCX */
+#endif
+#endif /* UCX or WIN_TCP */
 
 #endif  /* not DECNET */
 #endif  /* of Multinet or other TCP includes */
@@ -304,10 +299,8 @@ Regular BSD unix versions
 
 /*                      Directory reading stuff - BSD or SYS V
 */
-#ifdef UNIX
-#ifndef unix
+#if defined(UNIX) && !defined(unix)
 #define unix
-#endif
 #endif
 
 #ifdef unix                    /* if this is to compile on a UNIX machine */
@@ -332,7 +325,9 @@ Defaults
   
  */
 #ifndef TCP_INCLUDES_DONE
+#ifndef NO_IOCTL
 #include <sys/ioctl.h> /* EJB */
+#endif
 #include <sys/socket.h>
 #include <netinet/in.h>
 #ifndef __hpux /* this may or may not be good -marc */

@@ -7,6 +7,10 @@
 **	25 Jun 92  JFG  Added DECNET option through TCP socket emulation.
 **	13 Sep 93  MD   Added correct return of vmserrorno for HTInetStatus.
 **			Added decoding of vms error message for MULTINET.
+**      7-DEC-1993 Bjorn S. Nilsson, ALEPH, CERN, VMS UCX ioctl() changes
+**			(done of Mosaic)
+**      19 Feb 94  Danny Mayer	Added Bjorn Fixes to Lynx version
+**	 7 Mar 94  Danny Mayer  Added Fix UCX version for full domain name
 */
 
 
@@ -21,7 +25,11 @@
 #endif
 
 #ifndef FD_SETSIZE
+#ifdef UCX
+#define FD_SETSIZE 32
+#else
 #define FD_SETSIZE 256
+#endif /* Limit # sockets to 32 for UCX, BSN */
 #endif
 
 /*	Module-Wide variables
@@ -73,6 +81,74 @@ extern int sys_nerr;
 #endif	/* VM */
 
 #endif	/* PCNFS */
+
+#ifdef UCX
+/*
+ * A routine to mimick the ioctl function for UCX.
+ * Bjorn S. Nilsson, 25-Nov-1993. Based on an example in the UCX manual.
+ */
+#include <iodef.h>
+#define IOC_OUT (int)0x40000000
+extern int vaxc$get_sdc(), sys$qiow();
+
+PUBLIC int ioctl ARGS3
+	(int,	d, 
+	int,	request,
+	char *, argp)
+{
+  int sdc, status;
+  unsigned short fun, iosb[4];
+  char *p5, *p6;
+  struct comm
+    {
+      int command;
+      char *addr;
+    } ioctl_comm;
+  struct it2
+    {
+      unsigned short len;
+      unsigned short opt;
+      struct comm *addr;
+    } ioctl_desc;
+  if ((sdc = vaxc$get_sdc (d)) == 0)
+    {
+      errno = EBADF;
+      return -1;
+    }
+  ioctl_desc.opt  = UCX$C_IOCTL;
+  ioctl_desc.len  = sizeof(struct comm);
+  ioctl_desc.addr = &ioctl_comm;
+  if (request & IOC_OUT)
+    {
+      fun = IO$_SENSEMODE;
+      p5 = 0;
+      p6 = (char *)&ioctl_desc;
+    }
+  else
+    {
+      fun = IO$_SETMODE;
+      p5 = (char *)&ioctl_desc;
+      p6 = 0;
+    }
+  ioctl_comm.command = request;
+  ioctl_comm.addr = argp;
+  status = sys$qiow (0, sdc, fun, iosb, 0, 0,
+    0, 0, 0, 0, p5, p6);
+  if (!(status & 01))
+    {
+      errno = status;
+      return -1;
+    }
+  if (!(iosb[0] & 01))
+    {
+      errno = iosb[0];
+      return -1;
+    }
+  return 0;
+}
+#include <perror.h> /* RJF */
+#endif /* VMS, UCX, BSN */
+
 
 /*	Report Internet Error
 **	---------------------
@@ -310,6 +386,9 @@ PRIVATE void get_host_details()
 
 {
     char name[MAXHOSTNAMELEN+1];	/* The name of this host */
+#ifdef UCX
+    char *domain_name;                   /* The name of this host domain */
+#endif
 #ifdef NEED_HOST_ADDRESS		/* no -- needs name server! */
     struct hostent * phost;		/* Pointer to host -- See netdb.h */
 #endif
@@ -317,12 +396,24 @@ PRIVATE void get_host_details()
     
     if (hostname) return;		/* Already done */
     gethostname(name, namelength);	/* Without domain */
-    CTRACE(tfp, "TCP: Local host name is %s\n", name);
     StrAllocCopy(hostname, name);
+#ifdef UCX
+    /*  UCX doesn't give the complete domain name. get rest from UCX$BIND_DOM
+    **  Logical
+    */
+    if(strchr(hostname,'.') == NULL) {           /* Not full address */
+        domain_name = getenv("UCX$BIND_DOMAIN");
+        if(domain_name != NULL) {
+            StrAllocCat(hostname, ".");
+            StrAllocCat(hostname, domain_name);
+        }
+     }
+#endif /* UCX */
+    CTRACE(tfp, "TCP: Local host name is %s\n", hostname);
 
 #ifndef DECNET  /* Decnet ain't got no damn name server 8#OO */
-#ifdef NEED_HOST_ADDRESS		/* no -- needs name server! */
-    phost=gethostbyname(name);		/* See netdb.h */
+#ifdef NEED_HOST_ADDRESS		 /* no -- needs name server! */
+    phost=gethostbyname(name);		 /* See netdb.h */
     if (!phost) {
 	if (TRACE) fprintf(stderr, 
 		"TCP: Can't find my own internet node address for `%s'!!\n",
@@ -402,7 +493,7 @@ PUBLIC int HTDoConnect ARGS4(char *,url, char *,protocol, int,default_port,
    * This means that when we issue the connect we should NOT
    * have to wait for the accept on the other end.
    */
-#if !defined(UCX) && !defined(WIN_TCP)
+#if !defined(NO_IOCTL)
   {
     int ret;
     int val = 1;
@@ -415,7 +506,7 @@ PUBLIC int HTDoConnect ARGS4(char *,url, char *,protocol, int,default_port,
         HTProgress(line);
       }
   }
-#endif /* not UCX nor WIN_TCP */
+#endif /* not NO_IOCTL */
 
   /*
    * Issue the connect.  Since the server can't do an instantaneous accept
@@ -490,7 +581,16 @@ PUBLIC int HTDoConnect ARGS4(char *,url, char *,protocol, int,default_port,
                */
               status = connect(*s, (struct sockaddr*)&soc_address,
                                sizeof(soc_address));
+#ifndef UCX
               if ((status < 0)&&(SOCKET_ERRNO == EISCONN))
+#else
+/*
+ * A UCX feature: Instead of returning EISCONN UCX returns EADDRINUSE.
+ * Test for this status also.
+ */
+              if ((status < 0)&&((SOCKET_ERRNO == EISCONN) ||
+				 (SOCKET_ERRNO == EADDRINUSE)))
+#endif /* VMS, UCX, BSN */
                 {
                   status = 0;
                 }
@@ -515,8 +615,18 @@ PUBLIC int HTDoConnect ARGS4(char *,url, char *,protocol, int,default_port,
               if ((status < 0)&&(SOCKET_ERRNO != EALREADY)&&
 			(SOCKET_ERRNO != EAGAIN)&&(SOCKET_ERRNO != EISCONN))
 #else
+#ifndef UCX
               if ((status < 0)&&(SOCKET_ERRNO != EALREADY)&&
 						(SOCKET_ERRNO != EISCONN))
+#else
+              /*
+               * UCX pre 3 apparently returns errno = 18242 instead of
+               * any of the EALREADY or EISCONN values.
+               */
+               if ((status < 0)&&(SOCKET_ERRNO != EALREADY)&&
+				 (SOCKET_ERRNO != EISCONN)&&
+                  		 (SOCKET_ERRNO != 18242))
+#endif /* UCX, BSN */
 #endif /* SVR4 */
                 {
                   break;
@@ -538,7 +648,7 @@ PUBLIC int HTDoConnect ARGS4(char *,url, char *,protocol, int,default_port,
    */
   if (status >= 0)
     {
-#if !defined(UCX) && !defined(WIN_TCP)
+#if !defined(NO_IOCTL)
       int ret;
       int val = 0;
       char line[256];
@@ -549,7 +659,7 @@ PUBLIC int HTDoConnect ARGS4(char *,url, char *,protocol, int,default_port,
           sprintf (line, "Could not restore socket to blocking.");
           HTProgress(line);
         }
-#endif /* not UCX nor WIN_TCP */
+#endif /* not NO_IOCTL */
     }
   /*
    * Else the connect attempt failed or was interrupted.
@@ -569,6 +679,9 @@ int HTDoRead ARGS3(int,fildes, void *,buf, unsigned,nbyte)
   int ready, ret, intr=0;
   fd_set readfds;
   struct timeval timeout;
+#ifdef UCX
+  int nb;
+#endif /* UCX, BSN */
 
   if (HTCheckForInterrupt())
     {
@@ -580,11 +693,11 @@ int HTDoRead ARGS3(int,fildes, void *,buf, unsigned,nbyte)
   timeout.tv_sec = 0;
   timeout.tv_usec = 100000;
 
-#if !defined(UCX) && !defined(WIN_TCP)
+#if !defined(NO_IOCTL)
   ready = 0;
 #else
   ready = 1;
-#endif /* bypass for UCX and WIN_TCP */
+#endif /* bypass for NO_IOCTL */
   while (!ready)
     {
         FD_ZERO(&readfds);
@@ -609,6 +722,22 @@ int HTDoRead ARGS3(int,fildes, void *,buf, unsigned,nbyte)
           }
     }
 
+#if !defined(UCX) || !defined(VAXC)
   return SOCKET_READ (fildes, buf, nbyte);
+#else                           /* VAXC and UCX problem only */
+  errno = vaxc$errno = 0;
+  nb = SOCKET_READ (fildes, buf, nbyte);
+  CTRACE(tfp, "Read - nb,errno,vaxc$errno: %d %d %d\n", nb,errno,vaxc$errno);
+  if ((nb <= 0) && TRACE)
+     perror ("HTTCP.C:HTDoRead:read");          /* RJF */
+  /*
+   * An errno value of EPIPE and nb < 0 indicates end-of-file on VAXC
+   */
+  if ((nb <= 0) && (errno == EPIPE)) {
+       nb = 0;
+       errno = 0;
+  }
+  return nb;
+#endif /* UCX, BSN */
 }
 

@@ -1,4 +1,5 @@
 #include "HTUtils.h"
+#include "HTFTP.h"
 #include "LYUtils.h"
 #include "LYrcFile.h"
 #include "LYStrings.h"
@@ -83,7 +84,7 @@ PUBLIC void read_rc()
 
 	       while(isspace(*cp)) cp++;  /* get rid of spaces */
 	
- 	       strcpy(editor, cp);
+ 	       StrAllocCopy(editor, cp);
 
 	/* bookmark file */
 	} else if((cp=LYstrstr(line_buffer,"bookmark_file"))!=NULL &&
@@ -94,7 +95,7 @@ PUBLIC void read_rc()
 
 	   while(isspace(*cp)) cp++;  /* get rid of spaces */
 
-	   strcpy(bookmark_page, cp);
+	   StrAllocCopy(bookmark_page, cp);
 
 	/* personal_mail_address */
 	} else if((cp=LYstrstr(line_buffer,"personal_mail_address"))!=NULL &&
@@ -105,7 +106,24 @@ PUBLIC void read_rc()
 
 	   while(isspace(*cp)) cp++;  /* get rid of spaces */
 
-	   strcpy(personal_mail_address, cp);
+	   StrAllocCopy(personal_mail_address, cp);
+
+	} else if((cp = LYstrstr(line_buffer,"file_sorting_method")) != NULL &&
+		cp-line_buffer < number_sign) {
+
+	   if((cp2 = (char *)strrchr(cp,'=')) != NULL)
+		cp = cp2+1;
+
+	   while(isspace(*cp)) cp++;  /* get rid of spaces */
+
+	   if(!strncasecomp(cp,"BY_FILENAME",11))
+		HTfileSortMethod = FILE_BY_NAME;
+	   else if(!strncasecomp(cp,"BY_TYPE",7))
+		HTfileSortMethod = FILE_BY_TYPE;
+	   else if(!strncasecomp(cp,"BY_SIZE",7))
+		HTfileSortMethod = FILE_BY_SIZE;
+	   else if(!strncasecomp(cp,"BY_DATE",7))
+		HTfileSortMethod = FILE_BY_DATE;
 
 	} else if((cp = LYstrstr(line_buffer,"case_sensitive_searching"))
 								   != NULL &&
@@ -116,7 +134,7 @@ PUBLIC void read_rc()
 
 	   while(isspace(*cp)) cp++;  /* get rid of spaces */
 
-	   if(!strncmp(cp,"on",2) || !strncmp(cp,"ON",2))
+	   if(!strncasecomp(cp,"on",2))
 	      case_sensitive=TRUE;
 	   else
 	      case_sensitive=FALSE;
@@ -242,13 +260,13 @@ PUBLIC int save_rc ()
 # file editor specifies the editor to be invoked when editing Lynx files.\n\
 # if no editor is specified then file editing is disabled unless it\n\
 # is activated from the command line\n");
-    fprintf(fp,"file_editor=%s\n\n",editor);
+    fprintf(fp,"file_editor=%s\n\n", (editor ? editor : ""));
 
     /* home file */
     fprintf(fp,"\
 # bookmark_file specifies the name and location of a custom file which the\n\
 # user can paste links to for easy access at a later date\n");
-    fprintf(fp,"bookmark_file=%s\n\n",bookmark_page);
+    fprintf(fp,"bookmark_file=%s\n\n", (bookmark_page ? bookmark_page : ""));
 
     /* personal_mail_address */
     fprintf(fp,"\
@@ -256,14 +274,29 @@ PUBLIC int save_rc ()
 # address will be sent during HTTP file tranfers for authorization and\n\
 # logging purposes, and for mailed comments.\n\
 # If you do not want this information given out, leave this field blank\n");
-    fprintf(fp,"personal_mail_address=%s\n\n",personal_mail_address);
+    fprintf(fp,"personal_mail_address=%s\n\n", (personal_mail_address ?
+						personal_mail_address : ""));
 
     /* case sensitive */
     fprintf(fp,"\
 # if case sensitive searching is on then when the user invokes a search\n\
 # using the 's' or '/' keys, the search performed will be case sensitive\n\
 # instead of case INsensitive.\n# the default is usually off\n");
-  fprintf(fp,"case_sensitive_searching=%s\n\n",(case_sensitive ? "on" : "off"));
+  fprintf(fp,"case_sensitive_searching=%s\n\n",(case_sensitive ? "ON" : "OFF"));
+
+    /* file sort method */
+    fprintf(fp,"\
+# The file sort method specifies which value to sort on when viewing file\n\
+# lists such as FTP directories.  The options are:\n\
+#    BY_FILENAME -- sorts on the name of the file\n\
+#    BY_TYPE     -- sorts on the type of the file\n\
+#    BY_SIZE     -- sorts on the size of the file\n\
+#    BY_DATE     -- sorts on the date of the file\n");
+  fprintf(fp,"file_sorting_method=%s\n\n",
+	  (HTfileSortMethod==FILE_BY_NAME ? "BY_FILENAME" : 
+	 	(HTfileSortMethod==FILE_BY_SIZE ? "BY_SIZE" :
+			(HTfileSortMethod==FILE_BY_TYPE ? "BY_TYPE" :
+				"BY_DATE"))));
 
     /* Character Set */
     fprintf(fp,"\

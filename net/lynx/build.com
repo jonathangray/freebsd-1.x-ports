@@ -102,6 +102,7 @@ $ cc LYrcFile
 $ cc LYDownload
 $ cc LYNews
 $ cc LYKeymap
+$ cc LYUpload
 $!
 $!	Link the objects and libaries.
 $!
@@ -133,6 +134,7 @@ LYrcFile.obj, -
 LYDownload.obj, -
 LYNews.obj, -
 LYKeymap.obj, -
+LYUpload.obj, -
 [-.WWW.Library.Implementation]WWWLib_'option'.olb/library, -
 []'option'_'compiler'.opt/opt
 $!

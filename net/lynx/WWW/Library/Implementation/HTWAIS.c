@@ -119,7 +119,8 @@ struct _HTStream {
 /* ------------------------------------------------------------------------ */
 
 /* Returns 1 on success, 0 on fail, -1 on interrupt. */
-static int fd_mosaic_connect_to_server(char *host_name, long port, long *fd)
+static int fd_mosaic_connect_to_server ARGS3(char *, host_name, long, port,
+long *, fd)
 {
   /* New version. */
   char dummy[256];
@@ -141,7 +142,8 @@ static int fd_mosaic_connect_to_server(char *host_name, long port, long *fd)
 }
 
 /* Returns 1 on success, 0 on fail, -1 on interrupt. */
-static int mosaic_connect_to_server(char *host_name, long port, FILE **fp)
+static int mosaic_connect_to_server ARGS3(char *, host_name, long, port,
+FILE **, fp)
 {
   FILE* file;
   long fd;
@@ -874,8 +876,9 @@ PUBLIC int HTLoadWAIS ARGS4(
 		    docid, 
 		    CT_byte,
 		    count * CHARS_PER_PAGE,
-		    (count + 1) * CHARS_PER_PAGE < document_length ?
-			(count + 1) * CHARS_PER_PAGE : document_length,
+		    ((count + 1) * CHARS_PER_PAGE <= document_length ?
+		             (count + 1) * CHARS_PER_PAGE :
+			     document_length),
 		    type,
 		    wais_database
 		    ))

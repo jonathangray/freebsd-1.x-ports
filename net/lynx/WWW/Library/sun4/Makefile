@@ -10,7 +10,6 @@ ASIS_MACH = sun-4/sunos-4.1.1
 
 CFLAGS =  -DDEBUG -g
 LFLAGS =
-CC = gcc
 
 # Directory for installed binary:
 BINDIR = /usr/local/bin

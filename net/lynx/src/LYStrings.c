@@ -31,8 +31,12 @@ PUBLIC char * LYstrncpy ARGS3(char *,dst, char *,src, int,n)
 #ifdef VMS
 #define GetChar() ttgetc()
 #else
+#ifdef SNAKE
+#define GetChar() wgetch(stdscr)
+#else /* everything but VMS and SNAKE */
 #define GetChar() getchar()  /* used to be "getc(stdin)" and "getch()" */
-#endif VMS
+#endif /* SNAKE */
+#endif /* VMS */
 
 
 /*
@@ -412,13 +416,15 @@ PUBLIC char * LYstrstr ARGS2(char *,chptr, char *,tarptr)
 }	
 
 /*
- * LYno_underline_strstr will find the first occurence of the string 
+ * LYno_attr_char_strstr will find the first occurence of the string 
  * pointed to by tarptr in the string pointed to by chptr.
  * it ignores the characters: LY_UNDERLINE_START_CHAR and
  * 			      LY_UNDERLINE_END_CHAR
+ * 			      LY_BOLD_START_CHAR
+ * 			      LY_BOLD_END_CHAR
  * It is a case insensitive search.
  */
-PUBLIC char * LYno_underline_case_strstr ARGS2(char *,chptr, char *,tarptr)
+PUBLIC char * LYno_attr_char_case_strstr ARGS2(char *,chptr, char *,tarptr)
 {
     register char *tmpchptr, *tmptarptr;
     register int offset=0;
@@ -435,9 +441,12 @@ PUBLIC char * LYno_underline_case_strstr ARGS2(char *,chptr, char *,tarptr)
             /* see if they line up */
 	    tmpchptr = chptr+1;
 	    tmptarptr = tarptr+1;
+
+	    if(*tmptarptr == '\0')  /* one char target */
+		 return(chptr-offset);
+
 	    while(1) {
-		 if(*tmpchptr != LY_UNDERLINE_START_CHAR &&
-			*tmpchptr != LY_UNDERLINE_END_CHAR) {
+		 if(!IsSpecialAttrChar(*tmpchptr)) {
 
                     if(toupper(*tmpchptr) != toupper(*tmptarptr))
 			break;
@@ -462,13 +471,15 @@ PUBLIC char * LYno_underline_case_strstr ARGS2(char *,chptr, char *,tarptr)
 }
 
 /*
- * LYno_underline_strstr will find the first occurence of the string
+ * LYno_attr_char_strstr will find the first occurence of the string
  * pointed to by tarptr in the string pointed to by chptr.
  * it ignores the characters: LY_UNDERLINE_START_CHAR and
  *                            LY_UNDERLINE_END_CHAR
+ *                            LY_BOLD_START_CHAR
+ *                            LY_BOLD_END_CHAR
  * It is a case sensitive search.
  */
-PUBLIC char * LYno_underline_strstr ARGS2(char *,chptr, char *,tarptr)
+PUBLIC char * LYno_attr_char_strstr ARGS2(char *,chptr, char *,tarptr)
 {
     register char *tmpchptr, *tmptarptr;
     register int offset=0;
@@ -485,9 +496,12 @@ PUBLIC char * LYno_underline_strstr ARGS2(char *,chptr, char *,tarptr)
             /* see if they line up */
             tmpchptr = chptr+1;
             tmptarptr = tarptr+1;
+
+	    if(*tmptarptr == '\0')  /* one char target */
+		 return(chptr-offset);
+
             while(1) {
-                 if(*tmpchptr != LY_UNDERLINE_START_CHAR &&
-                        *tmpchptr != LY_UNDERLINE_END_CHAR) {
+		 if(!IsSpecialAttrChar(*tmpchptr)) {
 
                     if((*tmpchptr) != (*tmptarptr))
                         break;
@@ -520,7 +534,10 @@ PUBLIC char * SNACopy ARGS3 (char **,dest, CONST char *,src, int,n)
     *dest = NULL;
   else {
     *dest = (char *) calloc (n + 1,1);
-    if (*dest == NULL) outofmem(__FILE__, "SNACopy");
+    if (*dest == NULL) {
+	fprintf(stderr,"Tried to malloc %d bytes\n",n);
+	outofmem(__FILE__, "SNACopy");
+    }
     strncpy (*dest, src, n);
     *(*dest + n) = '\0'; /* terminate */
   }

@@ -13,22 +13,22 @@
 #include "LYrcFile.h"
 #include "LYKeymap.h"
 
+#ifdef SUN
+#include<locale.h>
+#endif /* SUN */
+
 /* ahhhhhhhhhh!! Global variables :-< */
 int HTCacheSize = DEFAULT_CACHE_SIZE;  /* number of docs cached in memory */
-BOOLEAN LYShowCursor = SHOW_CURSOR;  /* to show or not to show */
 char *empty_string = "\0";
 int display_lines;  /* number of lines in display */
 int www_search_result= -1;
-printer_type *printers = NULL;    /* linked list of printers */
-download_type *downloaders = NULL;    /* linked list of download options*/
+lynx_html_item_type *printers = NULL;    /* linked list of printers */
+lynx_html_item_type *downloaders = NULL;    /* linked list of download options*/
+lynx_html_item_type *uploaders = NULL;
 char *log_file_name = NULL;  /* for WAIS log file name in libWWW */
 int port_syntax = 1;
-char *startfile = STARTFILE; /* the first file */
-char *helpfile = HELPFILE; /* the help file */
-char indexfile[256];  /* an index file if there is one */
-char personal_mail_address[120];  /* the users mail address */
-char *display=NULL;
-BOOLEAN LYforce_HTML_mode=FALSE;
+
+BOOLEAN LYShowCursor = SHOW_CURSOR;  /* to show or not to show */
 BOOLEAN LYforce_no_cache=FALSE;
 BOOLEAN LYUserSpecifiedURL=TRUE;  /* always true the first time */
 BOOLEAN recent_sizechange=FALSE;  /* the window size changed recently? */
@@ -36,6 +36,13 @@ BOOLEAN user_mode=NOVICE_MODE;
 BOOLEAN dump_output_immediately=FALSE;
 BOOLEAN is_www_index=FALSE;
 BOOLEAN lynx_mode=NORMAL_LYNX_MODE;
+
+#ifdef DIRED_SUPPORT
+BOOLEAN lynx_edit_mode = FALSE;
+BOOLEAN dir_list_style = MIXED_STYLE;
+taglink *tagged = NULL;
+#endif
+
 BOOLEAN child_lynx = FALSE;
 #if defined(EXEC_LINKS) || defined(EXEC_SCRIPTS)
 #ifndef NEVER_ALLOW_REMOTE_EXEC
@@ -51,8 +58,11 @@ BOOLEAN emacs_keys = EMACS_KEYS_ALWAYS_ON;
 BOOLEAN keypad_mode = DEFAULT_KEYPAD_MODE;
 BOOLEAN case_sensitive = CASE_SENSITIVE_ALWAYS_ON;
 BOOLEAN telnet_ok = TRUE;
+BOOLEAN news_ok = TRUE;
 BOOLEAN no_inside_telnet = FALSE;
 BOOLEAN no_outside_telnet = FALSE;
+BOOLEAN no_inside_news = FALSE;
+BOOLEAN no_outside_news = FALSE;
 BOOLEAN no_suspend = FALSE;
 BOOLEAN no_editor = FALSE;
 BOOLEAN no_shell = FALSE;
@@ -66,8 +76,23 @@ BOOLEAN exec_frozen = FALSE;
 BOOLEAN no_goto = FALSE;
 BOOLEAN no_file_url = FALSE;
 BOOLEAN no_newspost = FALSE;
-char editor[256];  /* the name of the current editor */
-char bookmark_page[256];   /* the name of the current bookmark page */
+
+#ifdef DIRED_SUPPORT
+BOOLEAN no_dired_support = FALSE;
+#endif
+
+BOOLEAN LYforce_HTML_mode=FALSE;
+char *editor = 0;  		/* the name of the current editor */
+char *bookmark_page = 0;   	/* the name of the current bookmark page */
+char *startfile = 0; 		/* the first file */
+char *helpfile = 0; 		/* the help file */
+char *indexfile = 0;  		/* an index file if there is one */
+char *personal_mail_address=0;  /* the users mail address */
+char *display=0;		/* display environment variable */
+char *personal_type_map = 0;    /* .mailcap */
+char *global_type_map = 0;	/* global mailcap */
+char *global_extension_map = 0; /* global mime.types */
+char *personal_extension_map = 0; /* .mime.types */
 int LYlines = 24;
 int LYcols = 80;
 
@@ -85,22 +110,38 @@ extern void mainloop();
 PUBLIC int main ARGS2(int,argc, char **,argv)
 {
     int  i;  /* indexing variable */
-    char *terminal;
+    char *terminal=NULL;
     char *cp;
+    char *lynx_version_putenv_command=0;
     BOOLEAN restrictions_set=FALSE;
     BOOLEAN stack_dump=FALSE;
 
+#ifdef SUN
+    /* SUN specific support for international characters. */
+    setlocale(LC_ALL, "");
+#endif /* SUN */
 
     /* initialize some variables */
-	/* use the home file specified by the environment if it exits */
-    terminal=NULL;
-    *editor='\0';   /* set it empty */
-    *bookmark_page='\0';
-    strcpy(indexfile, DEFAULT_INDEX_FILE);
-    *personal_mail_address = '\0';
+    StrAllocCopy(helpfile, HELPFILE);
+    StrAllocCopy(startfile, STARTFILE);
+    StrAllocCopy(indexfile, DEFAULT_INDEX_FILE);
+    StrAllocCopy(global_type_map, GLOBAL_MAILCAP);
+    StrAllocCopy(personal_type_map, PERSONAL_MAILCAP);
+    StrAllocCopy(global_extension_map, GLOBAL_EXTENSION_MAP);
+    StrAllocCopy(personal_extension_map, PERSONAL_EXTENSION_MAP);
+
+#ifdef UNIX
+    StrAllocCopy(lynx_version_putenv_command,"LYNX_VERSION=");
+    StrAllocCat(lynx_version_putenv_command,LYNX_VERSION);
+    putenv(lynx_version_putenv_command);
+#endif UNIX
 
     /* read the lynx.cfg file */
-    read_cfg(LYNX_CFG_FILE); 
+    read_cfg(LYNX_CFG_FILE);
+
+    /* set up the file extension and conversions */
+    HTFormatInit();
+    HTFileInit();
 
     /* get WWW_HOME environment variable if it exists) */
     if((cp = getenv("WWW_HOME")) != NULL)
@@ -138,6 +179,10 @@ PUBLIC int main ARGS2(int,argc, char **,argv)
    outside_telnet  disallow telnets for people coming from outside your\n\
                    domain.\n\
    shell           disallow shell escapes\n");
+#ifdef DIRED_SUPPORT
+	        printf("\
+                   dired_support   disallow local file management\n");
+#endif
 	        printf("\
    editor          disallow editing\n\
    bookmark        disallow changing the location of the bookmark file.\n\
@@ -156,14 +201,14 @@ PUBLIC int main ARGS2(int,argc, char **,argv)
 
 	} else if(strncmp(argv[i], "-editor", 7) == 0) {
 	    if((cp=strchr(argv[i],'=')) != NULL)
-	    	strcpy(editor,cp+1);
+	    	StrAllocCopy(editor,cp+1);
 	    else {
-	    	strcpy(editor,argv[i+1]);
+	    	StrAllocCopy(editor,argv[i+1]);
 		i++;
 	    }
 	} else if(strncmp(argv[i], "-display", 8) == 0) {
 
-	    char putenv_command[90];
+	    char *putenv_command;
 
 	    if((cp=strchr(argv[i],'=')) != NULL)
 	    	display = cp+1;
@@ -173,15 +218,16 @@ PUBLIC int main ARGS2(int,argc, char **,argv)
 	    }
 	    
 #ifdef UNIX
-	    sprintf(putenv_command,"DISPLAY=%s",display);
+	    StrAllocCopy(putenv_command,"DISPLAY=");
+	    StrAllocCopy(putenv_command,display);
 	    putenv(putenv_command);
 #endif UNIX
 
 	} else if(strncmp(argv[i], "-index", 6) == 0) {
 	    if((cp=strchr(argv[i],'=')) != NULL)
-	    	strcpy(indexfile, cp+1);
+	    	StrAllocCopy(indexfile, cp+1);
 	    else {
-	    	strcpy(indexfile, argv[i+1]);
+	    	StrAllocCopy(indexfile, argv[i+1]);
 		i++;
 	    }
 
@@ -218,7 +264,7 @@ PUBLIC int main ARGS2(int,argc, char **,argv)
 	    emacs_keys = TRUE;
 
 	} else if(strncmp(argv[i], "-version", 8) == 0) {
-	    printf("\nLynx Version %s\n(c)1994 University of Kansas\nLou Montulli@ukanaix.cc.ukans.edu\n\n",LYNX_VERSION);
+	    printf("\n%s Version %s\n(c)1994 University of Kansas\n<lynx-help@ukanaix.cc.ukans.edu>\n\n",LYNX_NAME, LYNX_VERSION);
 	    exit(0);
 
 	} else if(strncmp(argv[i], "-case", 5) == 0) {
@@ -332,6 +378,7 @@ PUBLIC int main ARGS2(int,argc, char **,argv)
 #endif /* NEVER_ALLOW_REMOTE_EXEC */
 #endif /* defined(EXEC_LINKS) || defined(EXEC_SCRIPTS) */
 
+
     if (emacs_keys)
         set_emacs_keys();
  
@@ -360,7 +407,9 @@ PUBLIC int main ARGS2(int,argc, char **,argv)
 #ifndef VMS
     if(!TRACE && !dump_output_immediately && !stack_dump) {
         (void) signal (SIGINT, cleanup_sig);
+#ifndef __linux__
         (void) signal (SIGBUS, FatalProblem);
+#endif /* __linux__ */
         (void) signal (SIGSEGV, FatalProblem);
         (void) signal (SIGILL, FatalProblem);
         /* Since we're doing lots of TCP, just ignore SIGPIPE altogether. */
@@ -386,11 +435,11 @@ PUBLIC int main ARGS2(int,argc, char **,argv)
 	   if(*old_startfile != '/') {
 #endif /* VMS */
                	char curdir[256];
-#ifdef NEXT
+#ifdef NO_GETCWD
       		getwd (curdir);
 #else
     		getcwd (curdir, DIRNAMESIZE);
-#endif /* NEXT */
+#endif /* NO_GETCWD */
 		StrAllocCat(startfile,curdir);
 
 #ifndef VMS
@@ -415,11 +464,17 @@ PUBLIC int main ARGS2(int,argc, char **,argv)
     }
 #endif /* VMS */
 
-    if(!inlocaldomain())
-        telnet_ok = !no_outside_telnet;
-    else
+    if(inlocaldomain()) {
+	if(TRACE)
+	   fprintf(stderr,"LYMain.c: User in Local domain");
         telnet_ok = !no_inside_telnet;
-
+	news_ok = !no_inside_news;
+    } else {
+	if(TRACE)
+	   fprintf(stderr,"LYMain.c: User in REMOTE domain");
+        telnet_ok = !no_outside_telnet;
+	news_ok = !no_outside_news;
+    }
 
 #ifdef SIGTSTP
     if(no_suspend)
@@ -450,17 +505,17 @@ PUBLIC int main ARGS2(int,argc, char **,argv)
 static void FatalProblem ARGS1(int,sig)
 {
 fprintf (stderr, "\r\n\
-Congratulations, you have found a bug in Lynx Ver. %s\r\n\
+Congratulations, you have found a bug in %s Ver. %s\r\n\
 If a core file was generated in your directory,\r\n\
 please run 'dbx lynx' (or 'dbx /path/lynx' if the\r\n\
 lynx executable is not in your current directory)\r\n\
-and then type:\r\n",LYNX_VERSION);
+and then type:\r\n",LYNX_NAME,LYNX_VERSION);
 fprintf (stderr, "\
   dbx> where\r\n\
 and mail the results, and a description of\r\n\
 what you were doing at the time of the error\r\n\
 including the URL of the document that caused the crash,\r\n\
-to montulli@ukanaix.cc.ukans.edu.\r\n\
+to lynx-bug@ukanaix.cc.ukans.edu.\r\n\
 Thank you for your support.\r\n\n\
 ...exiting Lynx now with signal:%d\r\n\n",sig);
 
@@ -470,12 +525,16 @@ Thank you for your support.\r\n\n\
 #ifndef VMS  /* use ttclose() from cleanup() for VMS */
     (void) signal (SIGINT, SIG_IGN);
 #endif
+#ifndef __linux__
      (void) signal (SIGBUS, SIG_IGN);
+#endif /* __linux__ */
      (void) signal (SIGSEGV, SIG_IGN);
      (void) signal (SIGILL, SIG_IGN);
 
-  cleanup_sig(sig);
+  cleanup_sig(0);
+#ifndef __linux__
   signal (SIGBUS, 0);
+#endif /* __linux__ */
   signal (SIGSEGV, 0);
   signal (SIGILL, 0);
   abort();  /* exit and dump core */

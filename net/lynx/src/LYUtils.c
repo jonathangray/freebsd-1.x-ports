@@ -6,11 +6,18 @@
 #include "LYStrings.h"
 #include "LYGlobalDefs.h"
 #include "LYSignal.h"
+#include "GridText.h"
+#ifdef UNIX
+#include <utmp.h>
+#endif /* UNIX */
 
 #ifndef       FD_SETSIZE
 #define       FD_SETSIZE   256
 #endif
 
+#ifndef UTMP_FILE
+#define UTMP_FILE "/etc/utmp"
+#endif
 
 /*
  * highlight (or unhighlight) a given link
@@ -18,6 +25,7 @@
 PUBLIC void highlight ARGS2(int,flag, int,cur)
 {
     char buffer[200];
+    int i;
 
     if (nlinks > 0) {
 	move(links[cur].ly, links[cur].lx);
@@ -54,9 +62,32 @@ PUBLIC void highlight ARGS2(int,flag, int,cur)
           addstr(buffer);  
       }
 
+      /* display a second line as well */
+      if(links[cur].hightext2 && links[cur].ly < display_lines) {
+	  if (flag == ON)
+	     stop_reverse();
+	  else 
+	     stop_bold();
+
+	  addch('\n');
+	  for(i=0; i < links[cur].hightext2_offset; i++)
+	 	addch(' ');
+
+	  if (flag == ON)
+	     start_reverse();
+	  else 
+	     start_bold();
+
+	  for(i=0; links[cur].hightext2[i] != '\0' &&
+			i+links[cur].hightext2_offset < LYcols; i++)
+	      if(!IsSpecialAttrChar(links[cur].hightext2[i]))
+	           addch(links[cur].hightext2[i]);
+      }
+
       if (flag == ON) 
           stop_reverse();
-      stop_bold();
+      else
+          stop_bold();
 
 #ifdef FANCY_CURSES
       if(!LYShowCursor)
@@ -69,6 +100,31 @@ PUBLIC void highlight ARGS2(int,flag, int,cur)
       if(flag)
           refresh();
     }
+}
+
+/* free_and_clear will free a pointer if it is non-zero and
+ * then set it to zero
+ */
+PUBLIC void free_and_clear ARGS1(char **,pointer)
+{
+    if(*pointer) {
+	free(*pointer);
+        *pointer = 0;
+    }
+}
+
+/* collapse (remove) all spaces in the string 
+ */
+PUBLIC void collapse_spaces ARGS1(char *,string)
+{
+    int i=0;
+    int j=0;
+
+    for(;string[i] != '\0'; i++) 
+	if(!isspace(string[i])) 
+	    string[j++] = string[i];
+
+    string[j] = '\0';  /* terminate */
 }
 
 /*
@@ -115,6 +171,13 @@ PUBLIC void noviceline ARGS1(int,more)
     clrtoeol();
     addstr(NOVICE_LINE_ONE);
     clrtoeol();
+
+#if defined(DIRED_SUPPORT ) && defined(OK_OVERRIDE)
+    if (lynx_edit_mode && !no_dired_support) 
+       addstr(DIRED_NOVICELINE);
+    else
+#endif
+
     addstr(NOVICE_LINE_TWO);
 
 #ifdef NOT
@@ -232,6 +295,11 @@ PUBLIC int is_url ARGS1(char *,filename)
     } else if(!strncmp(cp,"LYNXDOWNLOAD:",9)) {
 	return(LYNXDOWNLOAD_URL_TYPE);
 
+#ifdef DIRED_SUPPORT
+	/* special internal lynx type */
+    } else if(!strncmp(cp,"LYNXDIRED:",9)) {
+	return(LYNXDIRED_URL_TYPE);
+#endif
 	/* special internal lynx type */
     } else if(!strncmp(cp,"LYNXHIST:",9)) {
 	return(LYNXHIST_URL_TYPE);
@@ -317,6 +385,37 @@ PUBLIC void remove_backslashes ARGS1(char *,buf)
     *buf = '\0';
 }
 
+/* Quote the path to make it safe for shell command processing. */
+/* We use a simple technique which involves quoting the entire
+   string using single quotes, escaping the real single quotes
+   with double quotes. This may be gross but it seems to work. */
+
+PUBLIC char * quote_pathname ARGS1 (char *, pathname)
+{
+   int i,n=0;
+   char * result;
+  
+   for (i=0; i<strlen(pathname); ++i)
+     if (pathname[i] == '\'') ++n;
+   
+   result = (char *) malloc(strlen(pathname) + 5*n + 3);
+   if (result == NULL) outofmem(__FILE__, "quote_pathname");
+
+   result[0] = '\'';
+   for (i=0,n=1; i<strlen(pathname); i++)
+     if (pathname[i] == '\'') {
+        result[n++] = '\'';
+        result[n++] = '"';
+        result[n++] = '\'';
+        result[n++] = '"';
+        result[n++] = '\'';
+     } else
+        result[n++] = pathname[i];
+   result[n++] = '\'';
+   result[n] = '\0';
+   return result;
+}
+
 /*
  * checks to see if the current process is attached via a terminal in the
  * local domain
@@ -333,7 +432,7 @@ PUBLIC void remove_backslashes ARGS1(char *,buf)
 PUBLIC BOOLEAN inlocaldomain ()
 {
 #ifdef NO_UTMP
-    return(FALSE);
+    return(TRUE);
 #else
     int n;
     FILE *fp;
@@ -344,7 +443,7 @@ PUBLIC BOOLEAN inlocaldomain ()
     if ((cp=ttyname(0)))
 	mytty = strrchr(cp, '/');
 
-    if (mytty && (fp=fopen(UTMP_FNAME, "r")) != NULL) {
+    if (mytty && (fp=fopen(UTMP_FILE, "r")) != NULL) {
 	    mytty++;
 	    do {
 		n = fread((char *) &me, sizeof(struct utmp), 1, fp);
@@ -357,7 +456,11 @@ PUBLIC BOOLEAN inlocaldomain ()
 		  me.ut_host+strlen(me.ut_host)-strlen(LOCAL_DOMAIN)) )
 		return(TRUE);
 
+    } else {
+	if(TRACE)
+	   fprintf(stderr,"Could not get ttyname or open UTMP file");
     }
+
     return(FALSE);
 #endif /* NO_UTMP */
 }
@@ -676,6 +779,11 @@ PRIVATE char *restrict_name[] = {
        "goto"          ,
        "file_url"      ,
        "news_post"     ,
+       "inside_news"   ,
+       "outside_news"  ,
+#ifdef DIRED_SUPPORT
+       "dired_support"         ,
+#endif
        (char *) 0     };
 
 	/* restrict_name and restrict_flag structure order
@@ -698,6 +806,11 @@ PRIVATE BOOLEAN *restrict_flag[] = {
        &no_goto     ,
        &no_file_url ,
        &no_newspost ,
+       &no_inside_news,
+       &no_outside_news,
+#ifdef DIRED_SUPPORT
+       &no_dired_support,
+#endif
        (BOOLEAN *) 0  };
 
 PUBLIC void parse_restrictions ARGS1(char *,s)
@@ -718,13 +831,15 @@ PUBLIC void parse_restrictions ARGS1(char *,s)
           for(i=0; restrict_flag[i]; i++) 
               *restrict_flag[i] = TRUE;
 
-	   /* reset these to defaults */
-           no_inside_telnet = !(CAN_ANONYMOUS_INSIDE_DOMAIN_TELNET);
-          no_outside_telnet = !(CAN_ANONYMOUS_OUTSIDE_DOMAIN_TELNET);
-                   no_print = !(CAN_ANONYMOUS_PRINT);
-		    no_goto = !(CAN_ANONYMOUS_GOTO);
+	     /* reset these to defaults */
+             no_inside_telnet = !(CAN_ANONYMOUS_INSIDE_DOMAIN_TELNET);
+            no_outside_telnet = !(CAN_ANONYMOUS_OUTSIDE_DOMAIN_TELNET);
+                     no_print = !(CAN_ANONYMOUS_PRINT);
+		      no_goto = !(CAN_ANONYMOUS_GOTO);
+	       no_inside_news = !(CAN_ANONYMOUS_INSIDE_DOMAIN_READ_NEWS);
+	      no_outside_news = !(CAN_ANONYMOUS_OUTSIDE_DOMAIN_READ_NEWS);
 #if defined(EXEC_LINKS) || defined(EXEC_SCRIPTS)
-		    no_exec = LOCAL_EXECUTION_LINKS_ALWAYS_OFF_FOR_ANONYMOUS;
+		      no_exec = LOCAL_EXECUTION_LINKS_ALWAYS_OFF_FOR_ANONYMOUS;
 #endif
           return;
       }
@@ -749,7 +864,7 @@ PUBLIC void parse_restrictions ARGS1(char *,s)
       }
 }
 
-#ifdef NEXT
+#ifdef NO_PUTENV
 /* no putenv on the next so we use this code instead!
  */
 
@@ -853,4 +968,4 @@ putenv (string)
 
   return 0;
 }
-#endif NEXT
+#endif /* NO Putenv */

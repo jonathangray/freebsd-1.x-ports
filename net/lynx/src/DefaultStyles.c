@@ -17,11 +17,13 @@ PRIVATE HTTabStop tabs_8[] = {
 	{0, 0 }		/* Terminate */
 };
 
+#ifdef NOT_USED
 PRIVATE HTTabStop tabs_16[] = {
 	{ 0, 16 }, {0, 32}, {0, 48}, {0, 64}, {0, 80},
 	{0, 96}, {0, 112},
 	{0, 0 }		/* Terminate */
 };
+#endif /* NOT_USED */
 
 /* Template:
 **	link to next, name, tag,
@@ -132,14 +134,6 @@ PRIVATE HTStyle HTStyleMenu6= {
 	33, 38, 6, HT_LEFT,		1, 0,	0,
 	YES, YES, 0, 0,			0
 };
-
-/* forget about Dir, because it is now the same as Menu! */
-PRIVATE HTStyle HTStyleDirect = {
-	&HTStyleMenu,  "Dir", "DIR",
-	HT_FONT, 1.0, HT_BLACK,		0, 0,
-	6, 10, 6, HT_LEFT,		1, 0,	tabs_16,
-	YES, YES, 0, 0,			0
-};	
 
 PRIVATE HTStyle HTStyleGlossary = {
 	&HTStyleMenu6,  "Glossary", "DL",
