@@ -2,8 +2,8 @@
 # $XConsortium: imake.c,v 1.65 91/07/25 17:50:17 rws Exp $
 
 # -------------------------------------------------------------------------
-# Makefile generated from "Imake.tmpl" and </tmp/IIf.019897>
-# $XFree86: mit/config/Imake.tmpl,v 1.17 1993/06/03 15:26:36 dawes Exp $
+# Makefile generated from "Imake.tmpl" and </tmp/IIf.012226>
+# $XFree86: mit/config/Imake.tmpl,v 2.6 1993/10/02 07:11:59 dawes Exp $
 # $XConsortium: Imake.tmpl,v 1.139 91/09/16 08:52:48 rws Exp $
 #
 # Platform-specific parameters may be set in the appropriate <vendor>.cf
@@ -19,30 +19,30 @@
 # site-specific configuration parameters that need to come before
 # the platform-specific parameters - edit site.def to change
 
-# $XFree86: mit/config/site.def,v 1.65 1993/06/04 16:02:47 dawes Exp $
+# $XFree86: mit/config/site.def,v 2.23 1993/10/16 17:28:07 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
 # -------------------------------------------------------------------------
 # platform-specific configuration parameters - edit x386.cf to change
 
-# $XFree86: mit/config/x386.cf,v 1.90 1993/06/04 16:02:50 dawes Exp $
+# $XFree86: mit/config/x386.cf,v 2.28 1993/10/21 15:48:52 dawes Exp $
 # platform:  $XConsortium: x386.cf,v 1.7 91/08/16 19:30:10 gildea Exp $
 
 # -------------------------------------------------------------------------
 # XFree86 version definition
-# $XFree86: mit/config/xf86_vers.def,v 1.5 1993/06/01 09:12:47 dawes Exp $
+# $XFree86: mit/config/xf86_vers.def,v 2.7 1993/10/08 16:11:07 dawes Exp $
 
 # -------------------------------------------------------------------------
-# XFree86 version: 1300
+# XFree86 version: 2000
 # -------------------------------------------------------------------------
 
-# operating system:  		386BSD
+# operating system:  	FreeBSD
 
 # -------------------------------------------------------------------------
 # site-specific configuration parameters that go after
 # the platform-specific parameters - edit site.def to change
 
-# $XFree86: mit/config/site.def,v 1.65 1993/06/04 16:02:47 dawes Exp $
+# $XFree86: mit/config/site.def,v 2.23 1993/10/16 17:28:07 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
             SHELL = 	/bin/sh
@@ -51,7 +51,7 @@
       CURRENT_DIR = .
 
                AR = ar clq
-  BOOTSTRAPCFLAGS =
+  BOOTSTRAPCFLAGS = 	-DFreeBSD
                CC = 		gcc
                AS = as
 
@@ -78,11 +78,13 @@
          MSMACROS = -ms
               TBL = tbl
               EQN = eqn
+            NROFF = nroff
+             NEQN = neqn
      STD_INCLUDES =
-  STD_CPP_DEFINES = -traditional
-      STD_DEFINES =
+  STD_CPP_DEFINES = -traditional 		-DFreeBSD
+      STD_DEFINES = 		-DFreeBSD
  EXTRA_LOAD_FLAGS =
-  EXTRA_LIBRARIES =
+  EXTRA_LIBRARIES = 		-lgnumalloc
      OS_LIBRARIES =
              TAGS = ctags
 
@@ -96,7 +98,7 @@
      INSTINCFLAGS = -m 0444
      INSTMANFLAGS = -m 0444
      INSTDATFLAGS = -m 0444
-    INSTKMEMFLAGS = -m 4755
+    INSTKMEMFLAGS = 	-m 2755 -g kmem
 
       PROJECTROOT = 	/usr/X386
 
@@ -130,7 +132,7 @@
 
 # -------------------------------------------------------------------------
 # X Window System Build Parameters
-# $XFree86: mit/config/Project.tmpl,v 1.13 1993/03/27 03:32:45 dawes Exp $
+# $XFree86: mit/config/Project.tmpl,v 2.1 1993/09/17 16:10:43 dawes Exp $
 # $XConsortium: Project.tmpl,v 1.138.1.1 92/11/11 09:49:19 rws Exp $
 
 _percentC_ = %C
@@ -146,7 +148,7 @@ _percentC_ = %C
       BUILDINCDIR = $(BUILDINCROOT)/X11
       BUILDINCTOP = ..
            INCDIR = $(INCROOT)/X11
-           ADMDIR = /usr/adm
+           ADMDIR = 		/var/log
            LIBDIR = $(USRLIBDIR)/X11
         CONFIGDIR = $(LIBDIR)/config
        LINTLIBDIR = $(USRLIBDIR)/lint
@@ -156,11 +158,13 @@ _percentC_ = %C
            XDMDIR = $(LIBDIR)/xdm
            TWMDIR = $(LIBDIR)/twm
           MANPATH = 	/usr/X386/man
-    MANSOURCEPATH = 	$(MANPATH)/man
-        MANSUFFIX = 1
-     LIBMANSUFFIX = 3
-           MANDIR = 	$(MANSOURCEPATH)1
+    MANSOURCEPATH = $(MANPATH)/man
+        MANSUFFIX = 1x
+     LIBMANSUFFIX = 3x
+    FILEMANSUFFIX = 5x
+           MANDIR = $(MANSOURCEPATH)1
         LIBMANDIR = $(MANSOURCEPATH)3
+       FILEMANDIR = $(MANSOURCEPATH)5
            NLSDIR = $(LIBDIR)/nls
         PEXAPIDIR = $(LIBDIR)/PEX
       XAPPLOADDIR = $(LIBDIR)/app-defaults
@@ -264,7 +268,7 @@ _percentC_ = %C
 
 # -------------------------------------------------------------------------
 # Imake rules for building libraries, programs, scripts, and data files
-# $XFree86: mit/config/Imake.rules,v 1.9 1993/03/23 12:56:27 dawes Exp $
+# $XFree86: mit/config/Imake.rules,v 2.1 1993/09/29 11:06:00 dawes Exp $
 # rules:  $XConsortium: Imake.rules,v 1.123 91/09/16 20:12:16 rws Exp $
 
 # -------------------------------------------------------------------------
@@ -276,7 +280,8 @@ _percentC_ = %C
 CDEBUGFLAGS = -O
 
 # CHANGE HSCORE_FILE TO SUIT
-HSCORE_FILE=/usr/X386/lib/X11/games/xjewel.scores
+HSCORE_DIR=/usr/X386/lib/X11/games
+HSCORE_FILE=$(HSCORE_DIR)/xjewel.scores
 
 # ADD YOUR ARCHITECTURE IF YOU USE SELECT INSTEAD OF POLL
 
@@ -323,7 +328,6 @@ install:: xjewel
 install.man:: xjewel.man
 	@if [ -d $(DESTDIR)$(MANDIR) ]; then set +x; \
 	else (set -x; $(MKDIRHIER) $(DESTDIR)$(MANDIR)); fi
-	$(RM) $(DESTDIR)$(MANDIR)/xjewel.$(MANSUFFIX)*
 	$(INSTALL) -c $(INSTMANFLAGS) xjewel.man $(DESTDIR)$(MANDIR)/xjewel.$(MANSUFFIX)
 
 depend::
@@ -351,7 +355,9 @@ clean::
 	$(RM) $(CFONT) bitmaps/fonts.dir
 
 install::
-	touch  $(HSCORE_FILE)
+	@if [ -d $(HSCORE_DIR) ]; then set +x; \
+	else (set -x; $(MKDIRHIER) $(HSCORE_DIR)); fi
+	touch $(HSCORE_FILE)
 	chmod a+w $(HSCORE_FILE)
 
 pkg: pkg_bin
