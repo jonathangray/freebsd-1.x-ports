@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.10 1994/01/06 06:46:11 jkh Exp $
+# $Id: Makefile,v 1.11 1994/03/04 20:50:18 ache Exp $
 #	Makefile.std	4.3	6/11/83
 #
 # C Shell with process control; VM/UNIX VAX Makefile
@@ -46,7 +46,7 @@ LFLAGS=$(INCLUDES)
 #CFLAGS=-O $(INCLUDES)
 
 # gcc-2.1+
-CFLAGS=-O2 $(INCLUDES) -g
+CFLAGS=-O2 $(INCLUDES)
 
 # lucid c on suns
 #CFLAGS=-O5 $(INCLUDES)
