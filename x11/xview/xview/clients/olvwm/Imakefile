@@ -1,19 +1,106 @@
+/**/# If you want to install the help files for olvwm, set HasInfoFiles to YES
+#define HasInfoFiles	YES
+
+/**/# If you need the default menu file (you haven't installed OPENWINDOWS or
+/**/# you haven't installed olwm) set NeedMenuFile to YES
+#define NeedMenuFile	NO
+
+/**/# If you haven't installed olwm from xview3 or from Sun's OpenWindows,
+/**/# and you want to install the olwm man page (which discusses most of the
+/**/# window operations), defind NeedOlwmManPage to YES
+#define NeedOlwmManPage	NO
+
+/**/# If you don't want the compile date included in the executable, comment
+/**/# out this line
+VERSION = version.o
+
+/**/# No more changes needed
+
 #include <XView.tmpl>
 
-/**/##########################################################################
-/**/# @(#)Imakefile	1.6 28 Apr 1993 SMI
-/**/# Imakefile for contrib directory.
+/**/#########################################################################
+/**/# @(#)Imakefile	1.5 10/4/91 SMI
+/**/# Imakefile for olwm release 3.0.
 
-#define IHaveSubdirs 
-#define PassCDebugFlags 'CDEBUGFLAGS=$(CDEBUGFLAGS)'
+DEFINES =  -DOW_I18N_L3 -DSUNDAE -DSHAPE -DREGEXP
+INCLUDES = -I$(HEADER_DEST) -I$(TOP)
+SYS_LIBRARIES = -ll
+DEPLIBS = 
+LOCAL_LIBRARIES = $(OLGXLIB) $(XLIB)
 
-SUBDIRS = clock cmdtool olwm olvwm olwmslave 
+HEADERS = cmdstream.h cursors.h defaults.h environ.h events.h   \
+	  gettext.h globals.h group.h helpcmd.h i18n.h          \
+	  iconimage.h iconmask.h kbdfuncs.h list.h mem.h menu.h \
+	  notice.h olcursor.h olgx_impl.h ollocale.h olwm.h     \
+	  patchlevel.h properties.h resources.h screen.h slots.h\
+	  st.h virtual.h win.h
 
-DIRS_TO_CREATE = $(SRC_DEST) 
+INFOFILES = olvwm.info
+#if NeedOlwmManPage
+MANPAGES = olwm.man olvwmrc.man
+#else
+MANPAGES = olvwmrc.man
+#endif
+BITMAPS = iconbitmap.h
+SCRIPTS = 
+MISC 	= openwin-menu
 
-MakeSubdirs($(SUBDIRS))
-DependSubdirs($(SUBDIRS))
-MakeDirectories(install, $(DIRS_TO_CREATE))
-InstallSrcsSubdirs($(SUBDIRS))
-PopulateSubdirs($(SUBDIRS))
+SRCS	= Debug.c Error.c Notice.c Select.c WinInfo.c atom.c \
+	client.c cmdstream.c cursors.c defaults.c environ.c evbind.c \
+	events.c gettext.c group.c helpsend.c images.c kbdfuncs.c \
+	list.c mem.c menu.c moveresize.c ol_button.c olwm.c olvwmrc.c \
+	properties.c resources.c screen.c services.c slave.c slots.c \
+	st.c states.c usermenu.c usleep.c virtual.c win.c winbusy.c \
+	winbutton.c wincolor.c winframe.c wingframe.c \
+	winicon.c winipane.c winmenu.c winnofoc.c \
+	winpane.c winpinmenu.c winpush.c winresize.c \
+	winroot.c
 
+OBJS	= Debug.o Error.o Notice.o Select.o WinInfo.o atom.o \
+          client.o cmdstream.o cursors.o defaults.o environ.o evbind.o \
+          events.o gettext.o group.o helpsend.o images.o kbdfuncs.o \
+          list.o mem.o menu.o moveresize.o ol_button.o olwm.o olvwmrc.o \
+	  properties.o resources.o screen.o services.o slave.o slots.o \
+          st.o states.o usermenu.o usleep.o virtual.o win.o \
+	  winbusy.o winbutton.o wincolor.o winframe.o wingframe.o \
+          winicon.o winipane.o winmenu.o winnofoc.o \
+          winpane.o winpinmenu.o winpush.o winresize.o \
+          winroot.o ${VERSION}
+
+
+ALLFILES = \
+	${HEADERS} ${BITMAPS} ${SRCS} \
+	${MISC} ${INFOFILES} ${MANPAGES} ${SCRIPTS}
+
+ComplexProgramTarget(olvwm)
+
+#if NeedMenuFile
+InstallNonExecList($(MISC),$(LIBRARY_DEST))
+#endif
+
+parse.c: parse.l
+	lex -t parse.l > parse.c
+
+olvwmrc.c: olvwmrc.y
+	yacc olvwmrc.y
+	mv y.tab.c olvwmrc.c
+
+olvwmrc.o: parse.c olvwmrc.c
+
+version.c:: ${SRCS} ${HEADERS}
+	@/bin/sh -c 'echo -n "#ident \"@(#)olvwm version compiled "' > version.c
+	@/bin/sh -c 'echo `date` \"' >> version.c
+
+clean::
+	/bin/rm -f parse.c olvwmrc.c version.c
+
+install.man:: $(MANPAGES)
+	@if [ -d $(DESTDIR)$(MANDIR) ]; then set +x; \
+	else (set -x; $(MKDIRHIER) $(DESTDIR)$(MANDIR)); fi
+	@for i in $(MANPAGES) ;\
+	do \
+	echo "installing $$i"; \
+	$(INSTALL) -c $(INSTMANFLAGS) $$i $(DESTDIR)$(MANDIR)/`basename $$i .man`.$(MANSUFFIX) ; \
+	done
+
+#include <XView.prog>

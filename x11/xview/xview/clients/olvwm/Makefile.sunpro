@@ -1,0 +1,92 @@
+.KEEP_STATE:
+
+# Set this to the directory to place the olvwm executable
+INSTALLDIR = ${OPENWINHOME}/bin
+
+# If you want to use the OPENWINDOWS help facility, then set HELPDIR
+# to the directory where those files are kept.  If you cannot write
+# to that directory but still want to install the helpfile, set HELPDIR
+# to some other directory and add that directory to your HELPPATH.
+# If you don't want to install the help file at all, set HELPDIR to /dev/null.
+HELPDIR = ${OPENWINHOME}/lib/help
+
+# Where to install the man pages:  man1 dir is where olvwm.man will go;
+# and man5 dir is where olvwmrc.man will go; youmay want to set these
+# to a local directory somewhere.
+# If you don't want to install the man pages, set MAN?DIR to /dev/null.
+
+MAN1DIR = ${OPENWINHOME}/man/man1
+MAN5DIR = ${OPENWINHOME}/man/man5
+
+# If you don't have olwm installed anywhere and want to install the olwm
+# man page (which discusses most of the olvwm functionality too) uncomment
+# out the following lines
+#OLWMMAN = olwm.man
+
+# Set this to the debugging options you'd like
+DEBUG = -O
+
+# If you don't want the version string in the executable, comment out this
+# line
+VERSION = version.o
+
+#
+# You shouldn't need to change anything below this line
+
+INC = -I${OPENWINHOME}/include
+CFLAGS = ${INC} ${DEBUG} -DRLIMIT_NOFILE -DREGEXP -DMAXPID=32768 -DSHAPE
+
+HEADERS = cmdstream.h cursors.h defaults.h environ.h events.h gettext.h \
+	  globals.h group.h helpcmd.h i18n.h iconimage.h iconmask.h  \
+	  kbdfuncs.h list.h mem.h menu.h notice.h olcursor.h         \
+	  olgx_impl.h ollocale.h olwm.h patchlevel.h properties.h    \
+	  resources.h screen.h slots.h st.h virtual.h win.h
+
+SRCS = Debug.c Error.c Notice.c Select.c WinInfo.c atom.c client.c \
+	cmdstream.c cursors.c defaults.c environ.c evbind.c events.c gettext.c \
+	group.c helpsend.c i18n.c kbdfuncs.c list.c mem.c menu.c \
+ 	moveresize.c olwm.c properties.c resources.c screen.c services.c \
+	slave.c slots.c st.c states.c usermenu.c usleep.c virtual.c \
+	win.c winbusy.c winbutton.c wincolor.c winframe.c wingframe.c \
+	winicon.c winipane.c winmenu.c winnofoc.c winpane.c winpinmenu.c \
+	winpush.c winresize.c winroot.c olvwmrc.c images.c \
+	ol_button.c
+
+LDFLAGS = -L${OPENWINHOME}/lib
+LIBS = ${LDFLAGS} -lolgx -lX11 -lXext -ll -lm
+
+OBJS = ${SRCS:.c=.o} ${VERSION}
+
+olvwm : ${OBJS}
+	cc -o olvwm ${OBJS} ${LIBS}
+
+version.c : ${SRCS} ${HEADERS}
+	@/bin/sh -c 'echo -n "#ident \"@(#)olvwm version compiled "' > version.c
+	@/bin/sh -c 'echo `date` \"' >> version.c
+
+parse.c : parse.l
+	lex -t parse.l > parse.c   
+		 
+olvwmrc.c : olvwmrc.y 
+	yacc olvwmrc.y 
+	mv y.tab.c olvwmrc.c
+
+olvwmrc.o : parse.c olvwmrc.c 
+
+clean :
+	/bin/rm -f olvwm .make.state .nse_depinfo version.c parse.c olvwmrc.c *.o core errs ,* .emacs_* tags TAGS make.log MakeOut "#"*
+
+install:
+	@echo "Installing olvwm in $(INSTALLDIR)"
+	@/bin/cp olvwm $(INSTALLDIR)
+	@echo "Installing help file in $(HELPDIR)"
+	@/bin/cp olvwm.info $(HELPDIR)
+	@echo "Installing olvwm man page in $(MAN1DIR)"
+	@/bin/cp olvwm.man olvwm.1
+	@/bin/cp olvwm.1 $(MAN1DIR)
+	@/bin/rm -f olvwm.1
+	@echo "Installing olvwmrc man page in $(MAN5DIR)"
+	@/bin/cp olvwmrc.man olvwmrc.5
+	@/bin/cp olvwmrc.5 $(MAN5DIR)
+	@/bin/rm -f olvwmrc.5
+	-@/bin/cp ${OLWMMAN} ${MAN1DIR}/olwm.1 >/dev/null 2>&1
