@@ -2301,7 +2301,7 @@ ttres() {                               /* Restore the tty to normal. */
 
 /*  T T R P I D  --  Read pid from lockfile "name" (used by ttlock) */
 
-static int
+int
 ttrpid(name) char *name; {
     int x, fd, pid;
 
