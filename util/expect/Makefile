@@ -166,9 +166,9 @@ LIBEXPECT = libexpect.a
 LIBEXPECTK = libexpectk.a
 
 # X library
-X11_LIB_FLAGS=
-X11_LIB = 
-X11_PROGS = # no X support on this system
+X11_LIB_FLAGS= -L/usr/X386/lib
+X11_LIB = -lX11
+X11_PROGS = expectk $(LIBEXPTK)
 
 # expect must be setuid on crays in order to open ptys (and accordingly,
 # you must run this Makefile as root).
