@@ -28,11 +28,15 @@
  */
 
 #ifndef lint
-static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclTest.c,v 1.2 1993/12/27 07:06:17 rich Exp $ SPRITE (Berkeley)";
+static char rcsid[] = "$Header: /a/cvs/386BSD/ports/lang/tcl/tclTest.c,v 1.3 1993/12/27 07:17:55 rich Exp $ SPRITE (Berkeley)";
 #endif /* not lint */
 
 #include "tclInt.h"
 #include "tclUnix.h"
+#ifdef BSD_NET2
+#include <floatingpoint.h>
+#endif
+
 
 /*
  * The following variable is a special hack that allows applications
@@ -145,6 +149,11 @@ Tcl_AppInit(interp)
      *
      * where "Mod" is the name of the module.
      */
+
+#ifdef BSD_NET2
+    fpsetround(FP_RN);
+    fpsetmask(0L);
+#endif
 
     if (Tcl_Init(interp) == TCL_ERROR) {
 	return TCL_ERROR;

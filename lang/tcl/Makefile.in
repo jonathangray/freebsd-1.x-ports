@@ -75,6 +75,8 @@ GENERIC_FLAGS =
 #GENERIC_FLAGS = -DTCL_GENERIC_ONLY
 UNIX_OBJS = panic.o tclEnv.o tclGlob.o tclMain.o tclUnixAZ.o \
 	tclUnixStr.o tclUnixUtil.o
+UNIX_SOBJS = panic.so tclEnv.so tclGlob.so tclMain.so tclUnixAZ.so \
+	tclUnixStr.so tclUnixUtil.so
 #UNIX_OBJS =
 
 # To enable memory debugging reverse the comment characters on the following
@@ -95,6 +97,7 @@ SHELL =		/bin/sh
 #----------------------------------------------------------------
 
 COMPAT_OBJS =		@LIBOBJS@
+COMPAT_SOBJS =		@LIBSOBJS@
 AC_FLAGS =		@DEFS@
 INSTALL =		@INSTALL@
 INSTALL_PROGRAM =	@INSTALL_PROGRAM@
@@ -122,18 +125,33 @@ GENERIC_OBJS =	regexp.o tclAsync.o tclBasic.o tclCkalloc.o \
 
 OBJS = ${GENERIC_OBJS} ${UNIX_OBJS} ${COMPAT_OBJS}
 
-all: libtcl.a tclsh
+GENERIC_SOBJS =	regexp.so tclAsync.so tclBasic.so tclCkalloc.so \
+	tclCmdAH.so tclCmdIL.so tclCmdMZ.so tclExpr.so tclGet.so \
+	tclHash.so tclHistory.so tclLink.so tclParse.so tclProc.so \
+	tclUtil.so tclVar.so
+
+SOBJS = ${GENERIC_SOBJS} ${UNIX_SOBJS} ${COMPAT_SOBJS}
+
+VERS_MAJOR=7
+VERS_MINOR=3
+
+
+all: libtcl.a libtcl.so.${VERS_MAJOR}.${VERS_MINOR} tclsh
 
 libtcl.a: ${OBJS}
 	rm -f libtcl.a
 	ar cr libtcl.a ${OBJS}
 	$(RANLIB) libtcl.a
 
+libtcl.so.${VERS_MAJOR}.${VERS_MINOR}: ${SOBJS}
+	rm -f libtcl.so.${VERS_MAJOR}.${VERS_MINOR}
+	ld -Bshareable -Bforcearchive -o libtcl.so.${VERS_MAJOR}.${VERS_MINOR} ${SOBJS}
+
 tclsh: tclAppInit.o libtcl.a
-	${CC} ${CC_SWITCHES} tclAppInit.o libtcl.a ${MATH_LIBS} -o tclsh
+	${CC} ${CC_SWITCHES} tclAppInit.o -L. -ltcl ${MATH_LIBS} -o tclsh
 
 tcltest: tclTest.o libtcl.a
-	${CC} ${CC_SWITCHES} tclTest.o libtcl.a ${MATH_LIBS} -o tcltest
+	${CC} ${CC_SWITCHES} tclTest.o -L. -ltcl ${MATH_LIBS} -o tcltest
 
 test: tcltest
 	@cwd=`pwd`; \
@@ -142,7 +160,7 @@ test: tcltest
 
 install: install-binaries install-libraries install-man
 
-install-binaries: libtcl.a tclsh
+install-binaries: libtcl.a libtcl.so.${VERS_MAJOR}.${VERS_MINOR} tclsh
 	@for i in $(LIB_DIR) $(BIN_DIR) ; \
 	    do \
 	    if [ ! -d $$i ] ; then \
@@ -155,6 +173,8 @@ install-binaries: libtcl.a tclsh
 	@echo "Installing libtcl.a"
 	@$(INSTALL_DATA) libtcl.a $(LIB_DIR)
 	@$(RANLIB) $(LIB_DIR)/libtcl.a
+	@echo "Installing libtcl.so.${VERS_MAJOR}.${VERS_MINOR}"
+	@$(INSTALL_DATA) libtcl.so.${VERS_MAJOR}.${VERS_MINOR} $(LIB_DIR)
 	@echo "Installing tclsh"
 	@$(INSTALL_PROGRAM) tclsh $(BIN_DIR)
 
@@ -215,37 +235,66 @@ Makefile: $(SRC_DIR)/Makefile.in
 	$(SHELL) config.status
 
 clean:
-	rm -f *.a *.o core errs *~ \#* TAGS *.E a.out errors tclsh tcltest
+	rm -f *.a *.o *.so *.so.* core errs *~ \#* TAGS *.E a.out errors tclsh tcltest
 
 distclean: clean
 	rm -f Makefile config.status
 
+PICFLAGS=-fpic -DPIC
+
 getcwd.o: $(SRC_DIR)/compat/getcwd.c
 	$(CC) -c $(CC_SWITCHES) $(SRC_DIR)/compat/getcwd.c
+
+getcwd.so: $(SRC_DIR)/compat/getcwd.c
+	$(CC) $(PICFLAGS) -c $(CC_SWITCHES) $(SRC_DIR)/compat/getcwd.c -o getcwd.so
 
 opendir.o: $(SRC_DIR)/compat/opendir.c
 	$(CC) -c $(CC_SWITCHES) $(SRC_DIR)/compat/opendir.c
 
+opendir.so: $(SRC_DIR)/compat/opendir.c
+	$(CC) $(PICFLAGS) -c $(CC_SWITCHES) $(SRC_DIR)/compat/opendir.c -o opendir.so
+
 strerror.o: $(SRC_DIR)/compat/strerror.c
 	$(CC) -c $(CC_SWITCHES) $(SRC_DIR)/compat/strerror.c
+
+strerror.so: $(SRC_DIR)/compat/strerror.c
+	$(CC) $(PICFLAGS) -c $(CC_SWITCHES) $(SRC_DIR)/compat/strerror.c -o strerror.so
 
 strstr.o: $(SRC_DIR)/compat/strstr.c
 	$(CC) -c $(CC_SWITCHES) $(SRC_DIR)/compat/strstr.c
 
+strstr.so: $(SRC_DIR)/compat/strstr.c
+	$(CC) $(PICFLAGS) -c $(CC_SWITCHES) $(SRC_DIR)/compat/strstr.c -o strstr.so
+
 strtod.o: $(SRC_DIR)/compat/strtod.c
 	$(CC) -c $(CC_SWITCHES) $(SRC_DIR)/compat/strtod.c
+
+strtod.so: $(SRC_DIR)/compat/strtod.c
+	$(CC) $(PICFLAGS) -c $(CC_SWITCHES) $(SRC_DIR)/compat/strtod.c -o strtod.so
 
 strtol.o: $(SRC_DIR)/compat/strtol.c
 	$(CC) -c $(CC_SWITCHES) $(SRC_DIR)/compat/strtol.c
 
+strtol.so: $(SRC_DIR)/compat/strtol.c
+	$(CC) $(PICFLAGS) -c $(CC_SWITCHES) $(SRC_DIR)/compat/strtol.c -o strtol.so
+
 strtoul.o: $(SRC_DIR)/compat/strtoul.c
 	$(CC) -c $(CC_SWITCHES) $(SRC_DIR)/compat/strtoul.c
+
+strtoul.so: $(SRC_DIR)/compat/strtoul.c
+	$(CC) $(PICFLAGS) -c $(CC_SWITCHES) $(SRC_DIR)/compat/strtoul.c -o strtoul.so
 
 tmpnam.o: $(SRC_DIR)/compat/tmpnam.c
 	$(CC) -c $(CC_SWITCHES) $(SRC_DIR)/compat/tmpnam.c
 
+tmpnam.so: $(SRC_DIR)/compat/tmpnam.c
+	$(CC) $(PICFLAGS) -c $(CC_SWITCHES) $(SRC_DIR)/compat/tmpnam.c -o tmpnam.so
+
 waitpid.o: $(SRC_DIR)/compat/waitpid.c
 	$(CC) -c $(CC_SWITCHES) $(SRC_DIR)/compat/waitpid.c
+
+waitpid.so: $(SRC_DIR)/compat/waitpid.c
+	$(CC) $(PICFLAGS) -c $(CC_SWITCHES) $(SRC_DIR)/compat/waitpid.c -o waitpid.so
 
 .c.o:
 	$(CC) -c $(CC_SWITCHES) $<
@@ -253,3 +302,12 @@ waitpid.o: $(SRC_DIR)/compat/waitpid.c
 ${OBJS}: $(SRC_DIR)/tcl.h $(SRC_DIR)/tclInt.h
 ${UNIX_OBJS}: $(SRC_DIR)/tclUnix.h
 tclCmdIL.o: $(SRC_DIR)/patchlevel.h
+
+.SUFFIXES: .so
+
+.c.so:
+	$(CC) $(PICFLAGS) $(CC_SWITCHES) -c $< -o $@
+
+${SOBJS}: $(SRC_DIR)/tcl.h $(SRC_DIR)/tclInt.h
+${UNIX_SOBJS}: $(SRC_DIR)/tclUnix.h
+tclCmdIL.so: $(SRC_DIR)/patchlevel.h
