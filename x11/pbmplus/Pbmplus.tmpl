@@ -1,0 +1,211 @@
+/* Imake template and rules for PBMPLUS
+ *
+ * Copyright (C) 1991 Rainer Klute
+ *
+ * Permission to use, copy, modify, distribute, and sell this software and
+ * its documentation for any purpose is hereby granted without fee, provided
+ * that the above copyright notice appear in all copies and that both that
+ * copyright notice and this permission notice appear in supporting
+ * documentation, and that the copyright holder's name not be used in
+ * advertising or publicity pertaining to distribution of the software
+ * without specific, written prior permission. The copyright holder makes
+ * no representations about the suitability of this software for any
+ * purpose. It is provided "as is" without express or implied warranty.
+ */
+
+/* CONFIGURE: PBMPLUS's support for TIFF files depends on the library from
+ * Sam Leffler's TIFF Software package - see the OTHER.SYSTEMS file for a
+ * full description and access information.  To configure PBMPLUS to use the
+ * library: first, if necessary, fetch the TIFF Software, unpack it in a
+ * scratch directory somewhere, and move the libtiff subdirectory right here
+ * into the PBMPLUS top-level directory.  Then move the file Imakefile.tiff
+ * to libtiff/Imakefile.
+ *
+ * Libtiff is pretty good about portability, but there are some machines
+ * it has problems on.  If you run into problems, you may wish to contact
+ * Sam directly, at the address listed in the OTHER.SYSTEMS file.
+ *
+ * By the way, you must have at least version 2.4 of libtiff.  Earlier
+ * versions will not work.
+ */
+#ifndef BuildLibTiff
+#define BuildLibTiff     YES
+#endif
+
+/* CONFIGURE: You may edit the symbol definitions below as you see fit,
+ * e.g. change the definition of "InstallLibraries" and "InstallIncludes"
+ * to "YES" if you want to have the libraries and include files installed.
+ */
+#ifndef InstallBinaries
+#define InstallBinaries  YES
+#endif
+#ifndef InstallManuals
+#define InstallManuals   YES
+#endif
+#ifndef InstallLibraries
+#define InstallLibraries NO
+#endif
+#ifndef InstallIncludes
+#define InstallIncludes  NO
+#endif
+
+/* CONFIGURE: Normally the Imakefiles build and install separate binaries for
+ * each program.  However, on some systems (especially those without shared
+ * libraries) this can mean a lot of space.  In this case you might try
+ * building a "merge" instead.  The idea here is to link all the binaries
+ * together into one huge executable, with a tiny dispatch program as the
+ * main.  Then the merged binary is installed with file-system links for
+ * each program it includes.  The dispatch routine can tell which program
+ * to run by looking at argv[0].  On a Sun3 under SunOS 3.5 the space for
+ * executables went from 2.9 meg to .36 meg.
+ *
+ * Note that if you make a "merge", the executables don't get created
+ * until you do the install.
+ */
+#ifndef InstallMerged
+#define InstallMerged YES
+#endif
+
+
+/* CONFIGURE: Where to install PBMPLUS (defaults to the X11 directories). */
+#ifndef PbmplusDir
+#define PbmplusDir    /* defaults to nothing */
+#endif
+#ifndef PbmplusBinDir
+#define PbmplusBinDir $(BINDIR)
+#endif
+#ifndef PbmplusManDir
+#define PbmplusManDir /usr/X386/man
+#endif
+#ifndef PbmplusLibDir
+#define PbmplusLibDir $(USRLIBDIR)
+#endif
+#ifndef PbmplusIncDir
+#define PbmplusIncDir $(INCDIR)
+#endif
+
+/* End of configurable definitions. */
+
+/* Subdirectories: */
+#ifndef PbmDir
+#define PbmDir TOPDIR/pbm
+#endif
+#ifndef PgmDir
+#define PgmDir TOPDIR/pgm
+#endif
+#ifndef PpmDir
+#define PpmDir TOPDIR/ppm
+#endif
+#ifndef PnmDir
+#define PnmDir TOPDIR/pnm
+#endif
+#ifndef TiffDir
+#define TiffDir TOPDIR/libtiff
+#endif
+
+/* Libraries: */
+#ifndef LibPbm
+#define LibPbm $(PBMDIR)/libpbm.a
+#endif
+#ifndef LibPgm
+#define LibPgm $(PGMDIR)/libpgm.a
+#endif
+#ifndef LibPpm
+#define LibPpm $(PPMDIR)/libppm.a
+#endif
+#ifndef LibPnm
+#define LibPnm $(PNMDIR)/libpnm.a
+#endif
+#ifndef LibTiff
+#define LibTiff $(TIFFDIR)/libtiff.a
+#endif
+
+/* Dependency libraries: */
+#ifndef DepLibPbm
+#define DepLibPbm LibPbm
+#endif
+#ifndef DepLibPgm
+#define DepLibPgm LibPgm
+#endif
+#ifndef DepLibPpm
+#define DepLibPpm LibPpm
+#endif
+#ifndef DepLibPnm
+#define DepLibPnm LibPnm
+#endif
+#ifndef DepLibTiff
+#define DepLibTiff LibTiff
+#endif
+
+   PBMPLUSDIR = PbmplusDir
+PBMPLUSBINDIR = PbmplusBinDir
+PBMPLUSMANDIR = PbmplusManDir
+PBMPLUSLIBDIR = PbmplusLibDir
+PBMPLUSINCDIR = PbmplusIncDir
+
+       PBMDIR = PbmDir
+       PGMDIR = PgmDir
+       PPMDIR = PpmDir
+       PNMDIR = PnmDir
+      TIFFDIR = TiffDir
+
+       LIBPBM = LibPbm
+       LIBPGM = LibPgm
+       LIBPPM = LibPpm
+       LIBPNM = LibPnm
+      LIBTIFF = LibTiff
+    DEPLIBPBM = DepLibPbm
+    DEPLIBPGM = DepLibPgm
+    DEPLIBPPM = DepLibPpm
+    DEPLIBPNM = DepLibPnm
+   DEPLIBTIFF = DepLibTiff
+
+#if InstallMerged
+
+#ifndef InstallPbmplusPrograms
+#define InstallPbmplusPrograms(list,dest,flags)                             @@\
+install:: list                                                              @@\
+	MakeDir($(DESTDIR)dest)                                             @@\
+	@case '${MFLAGS}' in *[i]*) set +e;; esac; \                        @@\
+	for i in list; do \                                                 @@\
+		(set -x; cd $(DESTDIR)dest; $(RM) $$i;  \                   @@\
+		$(LN) $(MERGE) $$i); \                                      @@\
+	done
+#endif /* InstallPbmplusPrograms */
+
+#ifndef NormalPbmplusProgramTarget
+#define NormalPbmplusProgramTarget(program)                                 @@\
+program.o: program.c                                                        @@\
+	ObjectCompile("-Dmain=$*_main")                                     @@\
+	LinkFile(program,$(MERGE))
+#endif /* NormalPbmplusProgramTarget */
+
+#ifndef NormalPbmplusMathProgramTarget
+#define NormalPbmplusMathProgramTarget(program) \                           @@\
+NormalPbmplusProgramTarget(program)
+#endif /* NormalPbmplusMathProgramTarget */
+
+#else
+
+#ifndef NormalPbmplusProgramTarget
+#define NormalPbmplusProgramTarget(program) \                               @@\
+NormalProgramTarget(program,program.o,$(CURRENTDEPLIBS),$(CURRENTLIBS),)
+#endif /* NormalPbmplusProgramTarget */
+
+#ifndef NormalPbmplusMathProgramTarget
+#define NormalPbmplusMathProgramTarget(program)                             @@\
+NormalProgramTarget(program,program.o,$(CURRENTDEPLIBS),$(CURRENTLIBS),-lm)
+#endif /* NormalPbmplusMathProgramTarget */
+
+#ifndef InstallPbmplusPrograms
+#define InstallPbmplusPrograms(list,dest,flags)                             @@\
+install:: list                                                              @@\
+	MakeDir($(DESTDIR)dest)                                             @@\
+	@case '${MFLAGS}' in *[i]*) set +e;; esac; \                        @@\
+	for i in list; do \                                                 @@\
+		(set -x; $(RM) $(DESTDIR)dest/$$i; \                        @@\
+		$(INSTALL) -c flags $$i $(DESTDIR)dest); \                  @@\
+	done
+#endif /* InstallPbmplusPrograms */
+
+#endif /* InstallMerged */
