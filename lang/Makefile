@@ -1,4 +1,4 @@
-# /usr/ports/lang/Makefile V2.3	Jan 94	Julian Stacey <stacey@guug.de>
+# /usr/ports/lang/Makefile V2.4	Jan 94	Julian Stacey <stacey@guug.de>
 #	Copyright Julian Stacey, Munich Dec. 93, Free Software, No Liability.
 #	For details see `Legalities' in /sys/Makefile.
 
@@ -17,6 +17,7 @@ SUBDIR += gcc1 #	Not in sup ports dir, but was on Gary's ports CD
 #	"Makefile", line 8: Could not find ../../Makefile.inc
 .endif
 
+SUBDIR += bwbasic
 SUBDIR += perl
 SUBDIR += xlispstat
 SUBDIR += sather

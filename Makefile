@@ -2,6 +2,8 @@
 #	Copyright Julian Stacey, Munich Dec. 93, Free Software, No Liability.
 #	For details see `Legalities' in /sys/Makefile.
 
+# 2.3 sent to jkh 940216
+
 # This Makefile & ports/*/Makefile are still in development.
 # Some comments detailing bugs are suposedly no longer valid,
 # but until I can manage to sup all of ports/ I can't prove bugs are gone,

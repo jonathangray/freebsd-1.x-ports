@@ -1,10 +1,11 @@
-# /usr/ports/x11/Makefile V2.3	Jan 94	Julian Stacey <stacey@guug.de>
+# /usr/ports/x11/Makefile V2.4	Jan 94	Julian Stacey <stacey@guug.de>
 #	Copyright Julian Stacey, Munich Dec. 93, Free Software, No Liability.
 #	For details see `Legalities' in /sys/Makefile.
 
 SUBDIR =
 G_SUBDIR =
 
+SUBDIR += blt
 SUBDIR += ghostscript
 SUBDIR += ghostview
 SUBDIR += jpeg
