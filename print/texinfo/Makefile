@@ -161,7 +161,7 @@ force:
 pkg:    pkg_bin
 
 pkg_bin: install pkg/+DESC pkg/+ONELINE pkg/+PLIST
-	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST texinfo-bin
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST texinfo_bin
 
 # Prevent GNU make v3 from overflowing arg limit on SysV.
 .NOEXPORT:
