@@ -127,7 +127,7 @@ install: all
 	install -c -o bin -g bin -m 644 Mkmanifest.1 $(MANDIR)/mkmanifest.$(MANEXT)
 
 clean:
-	rm $(PROGS) *.o core a.out tags TAGS
+	rm -f $(PROGS) *.o core a.out tags TAGS
 
 lint:
 	$(LINT) mattrib.c buf_read.c buf_write.c devices.c dir_read.c \
