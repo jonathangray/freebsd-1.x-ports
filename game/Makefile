@@ -10,6 +10,7 @@ SUBDIR += seahaven
 SUBDIR += xjewel
 SUBDIR += xboing
 SUBDIR += xpilot
+SUBDIR += xtrek
 
 .include <bsd.subdir_ports.mk>
 
