@@ -1,17 +1,17 @@
 all: octave
 
 octave:
-	cd octave-0.74; \
+	cd octave; \
 	configure; \
 	gmake
 
 install: octave
-	cd octave-0.74; \
+	cd octave; \
 	gmake install
 clean:
-	cd octave-0.74; \
+	cd octave; \
 	gmake clean
 
-package:
+pkg:	all install pkg/+ONELINE pkg/+PLIST
 	strip /usr/gnu/bin/octave
-	pkg_create -v -c bin-desc -d README.FreeBSD -f bin-list octave_bin.tgz
+	pkg_create -v -c +ONELINE -d README.FreeBSD -f +PLIST octave_bin
