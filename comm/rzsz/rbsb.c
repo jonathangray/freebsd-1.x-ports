@@ -67,6 +67,7 @@ Howmany must be 255 or less
 #define xsendline(c) putc(c, Ttystream)
 
 FILE *Ttystream;
+FILE *Logstream;
 int Tty;
 char linbuf[HOWMANY];
 char xXbuf[BUFSIZ];
@@ -349,7 +350,7 @@ mode(n)
 		(void) tcflow(Tty, TCOON);	/* Restart output */
 #else
 		(void) ioctl(Tty, TCSBRK, 1);	/* Wait for output to drain */
-		(void) ioctl(Tty, TCFLSH, 1);	/* Flush input queue */
+		(void) ioctl(Tty, TCFLSH, 0);   /* Flush input queue */
 		(void) ioctl(Tty, TCSETAW, &oldtty);	/* Restore modes */
 		(void) ioctl(Tty, TCXONC,1);	/* Restart output */
 #endif
@@ -360,6 +361,13 @@ mode(n)
 		ioctl(Tty, TIOCNXCL, 0);
 #ifdef LLITOUT
 		ioctl(Tty, TIOCLSET, &Locmode);
+#endif
+#ifdef TIOCFLUSH
+		{ static int fread = 1;
+		ioctl(Tty, TIOCFLUSH, &fread);   /* Flush input queue */
+		}
+#else
+		lseek(Tty, 0L, 2);
 #endif
 #endif
 
@@ -374,7 +382,6 @@ sendbrk()
 #ifdef V7
 #ifdef TIOCSBRK
 #define CANBREAK
-	sleep(1);
 	ioctl(Tty, TIOCSBRK, 0);
 	sleep(1);
 	ioctl(Tty, TIOCCBRK, 0);
@@ -393,14 +400,10 @@ sendbrk()
 /* Initialize tty device for serial file xfer */
 inittty()
 {
-/*	Tty = open("/dev/tty", 2);
-*/
-	Tty = dup(0);
-	if (Tty < 0) {
-		perror("/dev/tty");  exit(2);
-	}
-	Ttystream = fdopen(Tty, "w");
-	setvbuf(Ttystream, xXbuf, _IOFBF, BUFSIZ);		
+	Tty = 0;
+	Ttystream = stdout;
+	Logstream = stderr;
+	setbuf(Ttystream, xXbuf);
 }
 
 flushmoc()
@@ -431,7 +434,7 @@ int timeout;
 
 	if (--Lleft >= 0) {
 		if (Verbose > 8) {
-			fprintf(stderr, "%02x ", *cdq&0377);
+			fprintf(Logstream, "%02x ", *cdq&0377);
 		}
 		return (*cdq++ & 0377);
 	}
@@ -439,15 +442,12 @@ int timeout;
 	if (n < 2)
 		n = 2;
 	if (Verbose > 5)
-		fprintf(stderr, "Calling read: alarm=%d  Readnum=%d ",
+		fprintf(Logstream, "Calling read: alarm=%d  Readnum=%d ",
 		  n, Readnum);
 	if (setjmp(tohere)) {
-#ifdef TIOCFLUSH
-/*		ioctl(Tty, TIOCFLUSH, 0); */
-#endif
-		Lleft = 0;
+		purgeline();
 		if (Verbose>1)
-			fprintf(stderr, "Readline:TIMEOUT\n");
+			fprintf(Logstream, "Readline:TIMEOUT\n");
 		return TIMEOUT;
 	}
 	signal(SIGALRM, alrm); alarm(n);
@@ -455,16 +455,16 @@ int timeout;
 	Lleft=read(Tty, cdq=linbuf, Readnum);
 	alarm(0);
 	if (Verbose > 5) {
-		fprintf(stderr, "Read returned %d bytes errno=%d\n",
+		fprintf(Logstream, "Read returned %d bytes errno=%d\n",
 		  Lleft, errno);
 	}
 	if (Lleft < 1)
 		return TIMEOUT;
 	if (Verbose > 8) {
 		for (n = Lleft; --n >= 0; ) {
-			fprintf(stderr, "%02x ", *cdq&0377);
+			fprintf(Logstream, "%02x ", *cdq&0377);
 		}
-		fprintf(stderr, "\n");
+		fprintf(Logstream, "\n");
 	}
 	--Lleft;
 	return (*cdq++ & 0377);
@@ -480,15 +480,46 @@ purgeline()
 	Lleft = 0;
 #ifdef USG
 #ifdef POSIX
-	tcflush(Tty, 0);
+	tcflush(Tty, TCIFLUSH);
 #else
 	ioctl(Tty, TCFLSH, 0);
 #endif
 #else
+#ifdef TIOCFLUSH
+	{ static int fread = 1;
+	ioctl(Tty, TIOCFLUSH, &fread);
+	}
+#else
 	lseek(Tty, 0L, 2);
+#endif
 #endif
 }
 
+
+/*
+ * Purge the modem output queue of all characters
+ */
+purgeout()
+{
+#ifdef __386BSD__
+	fpurge(Ttystream);
+#else
+	rewind(Ttystream);
+#endif
+#ifdef POSIX
+	tcflush(Tty, TCOFLUSH);
+#else
+#ifdef TCFLSH
+	ioctl(Tty, TCFLSH, 1);
+#else
+#ifdef TIOCFLUSH
+	{ static int fwrite = 2;
+	ioctl(Tty, TIOCFLUSH, &fwrite);
+	}
+#endif
+#endif
+#endif
+}
 
 /* send cancel string to get the other end to shut up */
 canit()
@@ -497,8 +528,8 @@ canit()
 	 24,24,24,24,24,24,24,24,24,24,8,8,8,8,8,8,8,8,8,8,0
 	};
 
+	purgeline();    /* Do read next time ... */
 	zmputs(canistr);
-	Lleft=0;	/* Do read next time ... */
 }
 
 /*
@@ -530,8 +561,8 @@ char *f;
 long a, b, c, d;
 {
 	if (Verbose > 2) {
-		fprintf(stderr, f, a, b, c, d);
-		fprintf(stderr, "\n");
+		fprintf(Logstream, f, a, b, c, d);
+		fprintf(Logstream, "\n");
 	}
 }
 

@@ -1,7 +1,5 @@
-# Makefile for Unix/Xenix rz and sz programs
 # the makefile is not too well tested yet
-CC=gcc
-CFLAGS+=-O
+CFLAGS=-O2
 LBIN_DIR=/usr/local/bin
 LCAT_DIR=/usr/local/man/cat1
 
@@ -76,7 +74,7 @@ posix:
 	ln rz rb
 	ln rz rx
 	ln rz rc
-	$(CC) $(CFLAGS) -DPOSIX sz.c -o sz
+	$(CC) $(CFLAGS) -DPOSIX -DTXBSIZE=32768 sz.c -o sz
 	size sz
 	-rm -f sb sx zcommand zcommandi
 	ln sz sb
@@ -91,7 +89,7 @@ bsd:
 	ln rz rb
 	ln rz rx
 	ln rz rc
-	$(CC) $(CFLAGS) $(OFLAG) -DV7 -DNFGVMIN sz.c -o sz
+	$(CC) $(CFLAGS) $(OFLAG) -DV7 -DNFGVMIN -DTXBSIZE=32768 sz.c -o sz
 	size sz
 	-rm -f sb sx zcommand zcommandi
 	ln sz sb
@@ -112,7 +110,7 @@ install:
 	install -cs -o bin -m 755 rz rb rx rc $(LBIN_DIR)
 	install -cs -o bin -m 755 sz sb sx zcommand zcommandi $(LBIN_DIR)
 	install -cs -o bin -m 755 crc $(LBIN_DIR)
-	install -cs -o bin -m 755 crc.doc minirb.doc rz.doc sz.doc $(LCAT_DIR)
+	install -c -o bin -m 755 crc.doc minirb.doc rz.doc sz.doc $(LCAT_DIR)
 
 clean:
-	rm -f core rz rb rx rc sz sb sx zcommand zcommandi crc
+	rm -f core* rz rb rx rc sz sb sx zcommand zcommandi crc

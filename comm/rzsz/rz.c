@@ -1,6 +1,9 @@
-#define VERSION "3.24 5-5-93"
+#define VERSION "3.24.4 11-04-93"
+#ifdef __386BSD__
+#define PUBDIR "/var/spool/uucppublic"
+#else
 #define PUBDIR "/usr/spool/uucppublic"
-
+#endif
 /*
  *
  * rz.c By Chuck Forsberg
@@ -136,7 +139,7 @@ int errors;
 int Restricted=0;	/* restricted; no /.. or ../ in filenames */
 
 #define DEFBYTL 2000000000L	/* default rx file size */
-unsigned long Bytesleft;	/* number of bytes of incoming file left */
+long Bytesleft;        /* number of bytes of incoming file left */
 long Modtime;		/* Unix style mod time for incoming file */
 int Filemode;		/* Unix style mode for incoming file */
 unsigned long Totalleft;
@@ -167,6 +170,8 @@ char ztrans;		/* ZMODEM file transport request */
 int Zctlesc;		/* Encode control characters */
 int Zrwindow = 1400;	/* RX window size (controls garbage count) */
 
+int log_to_screen = 0;  /* Don't make log file */
+
 /*
  * Log an error
  */
@@ -177,9 +182,9 @@ char *s, *p, *u;
 {
 	if (Verbose <= 0)
 		return;
-	fprintf(stderr, "Retry %d: ", errors);
-	fprintf(stderr, s, p, u);
-	fprintf(stderr, "\n");
+	fprintf(Logstream, "Retry %d: ", errors);
+	fprintf(Logstream, s, p, u);
+	fprintf(Logstream, "\n");
 }
 
 #include "zm.c"
@@ -194,7 +199,7 @@ bibi(n)
 	if (Zmodem)
 		zmputs(Attn);
 	canit(); mode(0);
-	fprintf(stderr, "rz: caught signal %d; exiting", n);
+	fprintf(Logstream, "rz: caught signal %d; exiting\n", n);
 	exit(3);
 }
 
@@ -208,7 +213,6 @@ char *argv[];
 	int exitcode = 0;
 
 	Rxtimeout = 100;
-	setbuf(stderr, NULL);
 	if ((cp=getenv("SHELL")) && (substr(cp, "rsh") || substr(cp, "rksh")))
 		Restricted=TRUE;
 
@@ -242,6 +246,9 @@ char *argv[];
 					}
 					Zrwindow = atoi(*++argv);
 					break;
+				case 'V':
+					log_to_screen = 1;
+					/* fall */
 				case 'v':
 					++Verbose; break;
 				default:
@@ -260,14 +267,14 @@ char *argv[];
 		usage();
 	if (Batch && npats)
 		usage();
-	if (Verbose) {
-		if (freopen(LOGFILE, "a", stderr)==NULL)
-			if (freopen(LOGFILE2, "a", stderr)==NULL) {
-				printf("Can't open log file!");
+	if (Verbose && !log_to_screen) {
+		if ((Logstream = fopen(LOGFILE, "a"))==NULL)
+			if ((Logstream = fopen(LOGFILE2, "a"))==NULL) {
+				fprintf(stderr, "Can't open log file!\n");
 				exit(2);
 			}
-		setbuf(stderr, NULL);
-		fprintf(stderr, "argv[0]=%s Progname=%s\n", virgin, Progname);
+		setbuf(Logstream, NULL);
+		fprintf(Logstream, "argv[0]=%s Progname=%s\n", virgin, Progname);
 	}
 	vfile("%s %s for %s\n", Progname, VERSION, OS);
 	mode(1);
@@ -282,19 +289,21 @@ char *argv[];
 		exitcode=1;
 		canit();
 	}
-	mode(0);
 	if (exitcode && !Zmodem)	/* bellow again with all thy might. */
 		canit();
-	if (endmsg[0])
+	mode(0);
+	if (endmsg[0]) {
 		fprintf(stderr, "  %s: %s\r\n", Progname, endmsg);
+		if (Verbose)
+			fprintf(Logstream, "%s\r\n", endmsg);
+	}
 	fprintf(stderr, "%s %s finished.\r\n", Progname, VERSION);
 	if(exitcode)
 		exit(1);
 #ifndef REGISTERED
 	/* Removing or disabling this code without registering is theft */
 	if (!Usevhdrs)  {
-		printf( "\n\n\nPlease read the License Agreement in rz.doc\n");
-		fflush(stdout);
+		fprintf(stderr, "\n\n\nPlease read the License Agreement in rz.doc\n");
 		sleep(10);
 	}
 #endif
@@ -309,10 +318,10 @@ usage()
 	fprintf(stderr,"%s %s for %s by Chuck Forsberg, Omen Technology INC\n",
 	  Progname, VERSION, OS);
 	fprintf(stderr, "\t\t\042The High Reliability Software\042\n\n");
-	fprintf(stderr,"Usage:	rz [-v]		(ZMODEM)\n");
-	fprintf(stderr,"or	rb [-av]	(YMODEM)\n");
-	fprintf(stderr,"or	rc [-av] file	(XMODEM-CRC)\n");
-	fprintf(stderr,"or	rx [-av] file	(XMODEM)\n\n");
+	fprintf(stderr,"Usage:  rz [-vV] [-w N] [-t N]  (ZMODEM)\n");
+	fprintf(stderr,"or      rb [-avV] [-t N]        (YMODEM)\n");
+	fprintf(stderr,"or      rc [-avV] [-t N] file   (XMODEM-CRC)\n");
+	fprintf(stderr,"or      rx [-avV] [-t N] file   (XMODEM)\n\n");
 	fprintf(stderr,
 "Supports incoming ZMODEM binary (-b), ASCII CR/LF>NL (-a), newer(-n),\n\
 	newer+longer(-N), protect (-p), Crash Recovery (-r),\n\
@@ -395,13 +404,13 @@ char *rpn;	/* receive a pathname */
 
 et_tu:
 	Firstsec=TRUE;  Eofseen=FALSE;
+	purgeline();    /* Do read next time ... */
 	sendline(Crcflg?WANTCRC:NAK);  flushmo();
-	Lleft=0;	/* Do read next time ... */
 	while ((c = wcgetsec(rpn, 100)) != 0) {
 		if (c == WCEOT) {
 			zperr( "Pathname fetch returned %d", c);
+			purgeline();    /* Do read next time ... */
 			sendline(ACK);  flushmo();
-			Lleft=0;	/* Do read next time ... */
 			readline(1);
 			goto et_tu;
 		}
@@ -427,9 +436,9 @@ wcrx()
 	sendchar=Crcflg?WANTCRC:NAK;
 
 	for (;;) {
+		purgeline();    /* Do read next time ... */
 		sendline(sendchar);	/* send it now, we're ready! */
 		flushmo();
-		Lleft=0;	/* Do read next time ... */
 		sectcurr=wcgetsec(secbuf, (sectnum&0177)?50:130);
 		if (sectcurr==(sectnum+1 &0377)) {
 			sectnum++;
@@ -447,8 +456,8 @@ wcrx()
 		else if (sectcurr==WCEOT) {
 			if (closeit())
 				return ERROR;
+			purgeline();    /* Do read next time ... */
 			sendline(ACK); flushmo();
-			Lleft=0;	/* Do read next time ... */
 			return OK;
 		}
 		else if (sectcurr==ERROR)
@@ -546,11 +555,11 @@ humbug:
 		while(readline(1)!=TIMEOUT)
 			;
 		if (Firstsec) {
+			purgeline();    /* Do read next time ... */
 			sendline(Crcflg?WANTCRC:NAK);  flushmo();
-			Lleft=0;	/* Do read next time ... */
 		} else {
+			purgeline();    /* Do read next time ... */
 			maxtime=40; sendline(NAK);  flushmo();
-			Lleft=0;	/* Do read next time ... */
 		}
 	}
 	/* try to stop the bubble machine. */
@@ -601,10 +610,10 @@ char *name;
 		  &dummy, &Filesleft, &Totalleft, &dummy, &dummy);
 		if (Filemode & UNIXFILE)
 			++Thisbinary;
-			fprintf(stderr,  "Incoming: %s %ld %lo %o\n",
-			  name, Bytesleft, Modtime, Filemode);
 		if (Verbose) {
-			fprintf(stderr,  "YMODEM header: %s\n", p);
+			fprintf(Logstream,  "Incoming: %s %ld %lo %o\n",
+			  name, Bytesleft, Modtime, Filemode);
+			fprintf(Logstream,  "YMODEM header: %s\n", p);
 		}
 	}
 
@@ -1146,9 +1155,8 @@ nxthdr:
 				zmputs(Attn);  continue;
 			}
 moredata:
-/*			if (Verbose>1)
-*/
-				fprintf(stderr, "\r%7ld ZMODEM%s    ",
+			if (Verbose>1)
+				fprintf(Logstream, "\r%7ld ZMODEM%s    ",
 				  rxbytes, Crc32r?" CRC-32":"");
 #ifdef SEGMENTS
 			if (chinseg >= (1024 * SEGMENTS)) {
