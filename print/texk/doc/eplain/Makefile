@@ -10,7 +10,7 @@ MAKEINFO_FLAGS = --paragraph-indent=2 -I$(gnuorg)
 gnuorg = $(HOME)/gnu/gnuorg
 # That -I is purely for my own benefit in doing `make dist'.  It won't
 # hurt anything for you (I hope).
-TEX = TEXINPUTS=..:$(gnuorg): tex '\nonstopmode \input'
+TEX = tex '\nonstopmode \input'
 TEXINDEX = texindex
 
 all: eplain.info eplain.dvi
@@ -53,7 +53,7 @@ dist:
 	mv $(distdir)/INSTALL $(distdir)/..
 
 clean mostlyclean:
-	rm -f eplain.?? *.dvi *.log
+	rm -f *.dvi *.?? *.aux
 
 distclean: clean
 	for f in eplain.??s; do if test ! -s $$f; then rm -f $$f; fi; done

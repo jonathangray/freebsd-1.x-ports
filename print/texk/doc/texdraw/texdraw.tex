@@ -1,0 +1,1126 @@
+% TeXdraw macros
+
+% $Id: texdraw.tex,v 1.1 1994/04/26 02:54:35 alm Exp $
+
+%   Copyright (C) 1991, 1992, 1993  Peter Kabal
+
+% The TeXdraw routines in this file are provided free of charge without
+% warranty of any kind.  Note that the TeXdraw routines are copyrighted.
+% They may be distributed freely provided that the recipients also
+% acquire the right to distribute them freely.  The notices to this
+% effect must be preserved when the files are distributed.
+
+%  Peter Kabal
+%  Department of Electrical Engineering
+%  McGill University
+%  3480 University
+%  Montreal, Quebec
+%  Canada  H3A 2A7
+
+%  kabal@TSP.EE.McGill.CA
+ 
+\def\setRevDate $#1 #2 #3${\def\TeXdrawId{TeXdraw V1R5 <#2>}}
+\setRevDate $Date: 1994/04/26 02:54:35 $
+
+% ===============================================================
+
+% The TeXdraw macros allow PostScript line drawings and such to be
+% generated from within TeX.
+% (1) TeXdraw allows TeX text (either horizontal or rotated) to be
+%     superimposed on the figure.
+% (2) TeXdraw implements a \bsegment-\dsegment environment which allows
+%     parameter changes and coordinate changes to be kept local.  In
+%     effect, these segments are self-contained relocatable procedures.
+% (3) TeX's macro facility can be used to advantage to modularize drawing
+%     units and produce more complex entities from simple elements.
+% (4) The drawing can be positioned on the page like any other TeX box.
+
+% TeXdraw coordinate units have positive X to the right and positive Y up.
+% The drawing units can be selected (initially inches).  In addition, two
+% scaling parameters - unit scale and segment scale - are available.  Their
+% effect is multiplicative.
+
+% Segments allow for relocatable drawing units.  Inside each segment the
+% coordinates are relative to the initial point, which becomes (0 0).
+% Scaling is local to segments.  Each segment inherits the unit scale
+% scaling outside, but any changes apply to that segment and inferior
+% segments.  The segment scale factor is reset to unity on entry to
+% each segment.
+
+% The coordinates given as command arguments are used to determine
+% the size of the drawing.  The size is returned in the TeX dimensions
+% \hdrawsize and \vdrawsize.  The width of the plot line, sizes of
+% arrowheads, arcs or text do not affect the size of the drawing.
+
+% This version writes PostScript commands to an intermediate file.  After
+% the drawing is finished, the PostScript file is included in the document
+% as a \special include file.
+
+% This version has been tested with dvips, version 5.490 (T. Rokicki).
+
+%  This file is divided into 4 parts,
+%  - TeXdraw user interface
+%  - Utility definitions
+%  - Low level definitions
+%  - PostScript file macros
+
+
+\chardef\catamp=\the\catcode`\@
+\catcode`\@=11
+
+% ===============================================================
+% ===== TeXdraw user interface ==================================
+\long                              % \centertexdraw needs to be very \long
+\def\centertexdraw #1{\hbox to \hsize{\hss
+                                      \btexdraw #1\etexdraw
+                                      \hss}}
+
+% ====== Begin TeXdraw
+% Inside the texdraw box:
+%   The \vbox should be of zero size, none of the TeXdraw commands generate
+%   text; the TeXdraw text commands generate zero size boxes.
+
+\def\btexdraw {\x@pix=0             \y@pix=0
+               \x@segoffpix=\x@pix  \y@segoffpix=\y@pix
+% Set the default values (define outside of the group so that \etexdraw can
+% see the scaling parameters)
+               \t@exdrawdef
+               \setbox\t@xdbox=\vbox\bgroup\offinterlineskip
+                   \global\d@bs=0           % pending segments
+                   \global\t@extonlytrue    % no PS commands yet
+                   \global\p@osinitfalse
+                   \s@avemove \x@pix \y@pix % capture the initial position
+                   \m@pendingfalse
+                   \global\p@osinitfalse    % capture the next move
+                   \p@athfalse
+                   \the\everytexdraw}
+
+% ====== End TeXdraw
+% Write out a trailer, close the file, bring in the PostScript code as
+% a special include file.  The \special is offset to position on the page
+% to be (llx,ury) in PostScript coordinates.
+
+% The drawing is placed in a \vbox of size \hdrawsize by \vdrawsize (zero
+% depth).  The temporary PostScript file is superimposed with offsets such
+% that the lower lefthand corner of the drawing aligns with the lower
+% lefthand of the box.  Then, the position is temporarily offset to that
+% corresponding to (0 0) to place the TeX text.  Note that TeX text goes
+% on top of the PostScript to allow for writing over filled areas.
+\def\etexdraw {\ift@extonly \else
+                 \t@drclose      % close the PostScript file
+               \fi
+               \egroup           % ends vbox \bgroup
+               \ifdim \wd\t@xdbox>0pt
+                 \errmessage{TeXdraw box non-zero size,
+                             possible extraneous text}%
+               \fi
+               \maxhvpos         % outside group, \hdrawsize \vdrawsize
+               \pixtodim \xminpix \l@lxpos  \pixtodim \yminpix \l@lypos
+               \vbox {\vskip \vdrawsize
+                      \t@xdinclude              % TeXdraw graphics
+                      \vskip \l@lypos
+                      \hbox {\hskip -\l@lxpos
+                             \box\t@xdbox       % TeX text
+                             \hskip \l@lxpos
+                             \hskip \hdrawsize}%
+                      \vskip -\l@lypos\relax}}
+
+% ===== Drawing scaling
+% The units in any segment may be scaled arbitrarily.  A unit scale is
+% local to a segment but affects enclosed segments unless specifically
+% overridden in that segment.  In addition there is a segment scale.  The
+% overall scale is the product of the two scaling factors.
+%
+% Scaling is handled entirely on the TeX side, the PostScript side gets
+% absolute pixel coordinates.
+
+% Drawing units, e.g. "in" or "cm"
+\def\drawdim #1 {\def\d@dim{#1\relax}}
+
+% \u@nitsc - unit scale
+% \s@egsc  - segment scale
+% \d@sc    - drawing scale, product of the unit scale and segment scale
+
+% Note that successive application of relative scale factors can lead
+% to poor accuracy of the final scale factor.  Each scale factor is
+% represented to about 5 decimal digits after the decimal point.
+\def\setunitscale #1 {\edef\u@nitsc{#1}%
+                      \realmult \u@nitsc  \s@egsc \d@sc}
+\def\relunitscale #1 {\realmult {#1}\u@nitsc \u@nitsc
+                      \realmult \u@nitsc \s@egsc \d@sc}
+\def\setsegscale #1 {\edef\s@egsc {#1}%
+                     \realmult \u@nitsc \s@egsc \d@sc}
+\def\relsegscale #1 {\realmult {#1}\s@egsc \s@egsc
+                     \realmult \u@nitsc \s@egsc \d@sc}
+
+% ===== Drawing segments
+% The position is restored after a segment.
+% Segments use TeX grouping on the TeX side and gsave/grestore on the
+% PostScript side to keep changes local.  On the TeX side segments have
+% (0 0) as the initial point, while the PostScript side sees no scale
+% changes or translations.
+\def\bsegment {\ifp@ath
+                 \f@lushbs
+                 \f@lushmove
+               \fi
+               \begingroup
+               \x@segoffpix=\x@pix
+               \y@segoffpix=\y@pix
+               \setsegscale 1
+               \global\advance \d@bs by 1\relax}
+\def\esegment {\endgroup
+               \ifnum \d@bs=0
+                 \writetx {es}%
+               \else
+                 \global\advance \d@bs by -1
+               \fi}
+
+% Save a position
+% Save each coordinate as the macro "*name".  The macro is defined to
+% be the pixel coordinate value.
+\def\savecurrpos (#1 #2){\getsympos (#1 #2)\a@rgx\a@rgy
+                         \s@etcsn \a@rgx {\the\x@pix}%
+                         \s@etcsn \a@rgy {\the\y@pix}}
+\def\savepos (#1 #2)(#3 #4){\getpos (#1 #2)\a@rgx\a@rgy
+                            \coordtopix \a@rgx \t@pixa
+                            \advance \t@pixa by \x@segoffpix
+                            \coordtopix \a@rgy \t@pixb
+                            \advance \t@pixb by \y@segoffpix
+                            \getsympos (#3 #4)\a@rgx\a@rgy
+                            \s@etcsn \a@rgx {\the\t@pixa}%
+                            \s@etcsn \a@rgy {\the\t@pixb}}
+
+% ===== Line parameters
+% The following parameters apply to subsequent lines.  Each of these
+% commands invokes a stroke to draw the previous line segments,
+% establishes the current point and then changes the line parameter.
+% The parameters are kept local by the PostScript gsave/grestore
+% mechanism.  We use \writetx here, instead of \writeps, since we
+% do not want to flush any moves.
+\def\linewd #1 {\coordtopix {#1}\t@pixa
+                \f@lushbs
+                \writetx {\the\t@pixa\space sl}}
+\def\setgray #1 {\f@lushbs
+                 \writetx {#1 sg}}
+\def\lpatt (#1){\listtopix (#1)\p@ixlist
+                \f@lushbs
+                \writetx {[\p@ixlist] sd}}
+
+% ===== Line drawing
+% PostScript uses the concept of a path consisting of line segments.
+% In this interface to PostScript, paths are continuous across the
+% beginning of segments.  Paths terminate at the end of a segment with
+% an implicit move.  In addition, paths are both terminated and started
+% with a move.  There is a current point at all times, starting with
+% initial position (0,0).
+\def\lvec (#1 #2){\getpos (#1 #2)\a@rgx\a@rgy
+                  \s@etpospix \a@rgx \a@rgy
+                  \writeps {\the\x@pix\space \the\y@pix\space lv}}
+\def\rlvec (#1 #2){\getpos (#1 #2)\a@rgx\a@rgy
+                   \r@elpospix \a@rgx \a@rgy
+                   \writeps {\the\x@pix\space \the\y@pix\space lv}}
+\def\move (#1 #2){\getpos (#1 #2)\a@rgx\a@rgy
+                  \s@etpospix \a@rgx \a@rgy
+                  \s@avemove \x@pix \y@pix}
+\def\rmove (#1 #2){\getpos (#1 #2)\a@rgx\a@rgy
+                   \r@elpospix \a@rgx \a@rgy
+                   \s@avemove \x@pix \y@pix}
+
+% ===== Circles, ellipses and arcs
+% Note that arcs do not update the size of the drawing.
+% \lcir, stroked circle
+%   r:#1 -  radius
+% \fcir, filled circle
+%   f:#1 - fill gray level, 0 is black, 1 is white
+%   r:#2 - radius
+% \ellip, stroked ellipse
+%   rx:#1 - x radius
+%   ry:#2 - y radius
+% \fellip, filled ellipse
+%   f:#1 - fill gray level, 0 is black, 1 is white
+%   rx:#1 - x radius
+%   ry:#2 - y radius
+% \larc, stroked counterclockwise arc, with the present position being
+%        the center of the arc.  Only the arc is drawn (not the line
+%        joining the center to the beginning of the arc)
+%   r:#1  - radius
+%   sd:#2 - start angle (degrees)
+%   ed:#3 - end angle (degrees)
+\def\lcir r:#1 {\coordtopix {#1}\t@pixa
+                \writeps {\the\t@pixa\space cr}%
+                \r@elupd \t@pixa \t@pixa
+                \r@elupd {-\t@pixa}{-\t@pixa}}
+\def\fcir f:#1 r:#2 {\coordtopix {#2}\t@pixa
+                     \writeps {\the\t@pixa\space #1 fc}%
+                     \r@elupd \t@pixa \t@pixa
+                     \r@elupd {-\t@pixa}{-\t@pixa}}
+\def\lellip rx:#1 ry:#2 {\coordtopix {#1}\t@pixa
+                     \coordtopix {#2}\t@pixb
+                     \writeps {\the\t@pixa\space \the\t@pixb\space el}%
+                     \r@elupd \t@pixa \t@pixb
+                     \r@elupd {-\t@pixa}{-\t@pixb}}
+\def\fellip f:#1 rx:#2 ry:#3 {\coordtopix {#2}\t@pixa
+                     \coordtopix {#3}\t@pixb
+                     \writeps {\the\t@pixa\space \the\t@pixb\space #1 fe}%
+                     \r@elupd \t@pixa \t@pixb
+                     \r@elupd {-\t@pixa}{-\t@pixb}}
+\def\larc r:#1 sd:#2 ed:#3 {\coordtopix {#1}\t@pixa
+                            \writeps {\the\t@pixa\space #2 #3 ar}}
+
+% ===== Fill commands
+% The form here completes a path with a closepath, applies the fill,
+% starts a newpath and moves to the current point.  The gray level has
+% 0 as black and 1 as white.  The current path is terminated.
+
+\def\ifill f:#1 {\writeps {#1 fl}}     % Fill only
+\def\lfill f:#1 {\writeps {#1 fp}}     % Stroke and fill
+
+% ===== Text
+% TeX text superimposed on the drawing
+%  \htext (x y){text} or \htext {text}
+%  \vtext (x y){text} or \vtext {text}
+%  \rtext td:angle (x y){text} or \rtext td:angle {text}
+%  \textref h:#1 v:#2
+
+% The TeX text (or whatever) is placed in an \hbox.  The box is rotated
+% for vertical text.  The text is placed on the drawing at the specified
+% location (coordinates specified) or the current location (coordinates
+% not specified).  The text reference point is placed at that location.
+% For the purposes of determining the drawing size, the text box is of
+% zero size.
+
+% Horizontal text
+% Check if the argument starts with a left parenthesis
+\def\htext #1{\def\testit {#1}%
+              \ifx \testit\l@paren
+                \let\next=\h@move
+              \else
+                \let\next=\h@text
+              \fi
+              \next {#1}}
+
+% Rotated text
+\def\rtext td:#1 #2{\def\testit {#2}%
+                    \ifx \testit\l@paren
+                      \let\next=\r@move
+                    \else
+                      \let\next=\r@text
+                    \fi
+                    \next td:#1 {#2}}
+
+% Vertical text
+\def\vtext {\rtext td:90 }
+
+% Text reference point
+%  h:#1  text horizontal reference point - L, C or R
+%  v:#2  text vertical reference point - T, C or B
+\def\textref h:#1 v:#2 {\ifx #1R%
+                          \edef\l@stuff {\hss}\edef\r@stuff {}%
+                        \else
+                          \ifx #1C%
+                            \edef\l@stuff {\hss}\edef\r@stuff {\hss}%
+                          \else  % default L
+                            \edef\l@stuff {}\edef\r@stuff {\hss}%
+                          \fi
+                        \fi
+                        \ifx #2T%
+                          \edef\t@stuff {}\edef\b@stuff {\vss}%
+                        \else
+                          \ifx #2C%
+                            \edef\t@stuff {\vss}\edef\b@stuff {\vss}%
+                          \else  % default B
+                            \edef\t@stuff {\vss}\edef\b@stuff {}%
+                          \fi
+                        \fi}
+
+% ===== Arrow vectors
+\def\avec (#1 #2){\getpos (#1 #2)\a@rgx\a@rgy
+                  \s@etpospix \a@rgx \a@rgy
+                  \writeps {\the\x@pix\space \the\y@pix\space (\a@type) %
+                            \the\a@lenpix\space \the\a@widpix\space av}}
+
+\def\ravec (#1 #2){\getpos (#1 #2)\a@rgx\a@rgy
+                   \r@elpospix \a@rgx \a@rgy
+                   \writeps {\the\x@pix\space \the\y@pix\space (\a@type) %
+                             \the\a@lenpix\space \the\a@widpix\space av}}
+
+% Arrowhead size
+%  l:#1 - length of the arrowhead
+%  w:#2 - width of the base of the arrowhead
+\def\arrowheadsize l:#1 w:#2 {\coordtopix{#1}\a@lenpix
+                              \coordtopix{#2}\a@widpix}
+% Arrowhead type
+%  t:#1 - arrowhead type, F  filled triangle (using current gray level)
+%                         T  empty closed triangle
+%                         W  white filled triangle
+%                         V  Vee shape, at the end of the vector
+%                         H  (or other character) Vee shape, vector stops
+%                            short of the Vee
+\def\arrowheadtype t:#1 {\edef\a@type{#1}}
+
+% ===== Bezier curve
+% The initial point is assumed to be the current point.  Only the last
+% coordinate affects the size of the plot.
+\def\clvec (#1 #2)(#3 #4)(#5 #6)%
+           {\getpos (#1 #2)\a@rgx\a@rgy
+            \coordtopix \a@rgx\t@pixa
+            \advance \t@pixa by \x@segoffpix
+            \coordtopix \a@rgy\t@pixb
+            \advance \t@pixb by \y@segoffpix
+            \getpos (#3 #4)\a@rgx\a@rgy
+            \coordtopix \a@rgx\t@pixc
+            \advance \t@pixc by \x@segoffpix
+            \coordtopix \a@rgy\t@pixd
+            \advance \t@pixd by \y@segoffpix
+            \getpos (#5 #6)\a@rgx\a@rgy
+            \s@etpospix \a@rgx \a@rgy
+            \writeps {\the\t@pixa\space \the\t@pixb\space
+                      \the\t@pixc\space \the\t@pixd\space
+                      \the\x@pix\space \the\y@pix\space cv}}
+
+% ===== Draw the bounding box
+\def\drawbb {\bsegment
+               \drawdim bp
+               \setunitscale 0.24
+               \linewd 1           % line width 1/300 inch = 0.24 bp
+               \writeps {\the\xminpix\space \the\yminpix\space mv}%
+               \writeps {\the\xminpix\space \the\ymaxpix\space lv}%
+               \writeps {\the\xmaxpix\space \the\ymaxpix\space lv}%
+               \writeps {\the\xmaxpix\space \the\yminpix\space lv}%
+               \writeps {\the\xminpix\space \the\yminpix\space lv}%
+             \esegment}
+
+
+% ===============================================================
+% ===== Utility macros used by TeXdraw ==========================
+
+% ===== Decode coordinates
+% Get coordinates
+% This macro is used to get two arguments separated by a blank, with
+% possible leading and trailing blanks.  Symbolic coordinates are
+% converted to user coordinates.
+%  (#1 #2) - coordinates
+%  #3 - macro name to receive the x-coordinate value
+%  #4 - macro name to receive the y-coordinate value
+\def\getpos (#1 #2)#3#4{\g@etargxy #1 #2 {} \\#3#4%
+                        \c@heckast #3%
+                        \ifa@st
+                          \g@etsympix #3\t@pixa
+                          \advance \t@pixa by -\x@segoffpix
+                          \pixtocoord \t@pixa #3%
+                        \fi
+                        \c@heckast #4%
+                        \ifa@st
+                          \g@etsympix #4\t@pixa
+                          \advance \t@pixa by -\y@segoffpix
+                          \pixtocoord \t@pixa #4%
+                        \fi}
+
+% Get symbolic coordinate names
+%  (#1 #2) - symbolic coordinates
+%  #3 - macro name to receive the symbolic x coordinate name
+%  #4 - macro name to receive the symbolic y coordinate name
+\def\getsympos (#1 #2)#3#4{\g@etargxy #1 #2 {} \\#3#4%
+                     \c@heckast #3%
+                     \ifa@st \else
+                       \errmessage {TeXdraw: invalid symbolic coordinate}%
+                     \fi
+                     \c@heckast #4%
+                     \ifa@st \else
+                       \errmessage {TeXdraw: invalid symbolic coordinate}%
+                     \fi}
+
+% ===== Convert a list of values to pixel values
+%  (#1) - blank separated list of values in user coordinates
+%  #2 - macro name to receive the blank separated list of pixel values
+\def\listtopix (#1)#2{\def #2{}%
+                      \edef\l@ist {#1 }%    % append a blank to the string
+                      \m@oretrue
+                      \loop
+                        \expandafter\g@etitem \l@ist \\\a@rgx\l@ist
+                        \a@pppix \a@rgx #2%
+                        \ifx \l@ist\empty
+                          \m@orefalse
+                        \fi
+                      \ifm@ore
+                      \repeat}
+
+% ===== Real multiplication
+% This function uses the property that a box dimension may be scaled by
+% a real value.  The values are converted to dimensions in units of pt.
+% This choice gives us a reasonable dynamic range.  The final step is to
+% clean off the "pt" on the resulting dimension.  Note that these are fixed
+% point operations with each operand represented to an accuracy of about 5
+% decimal places.
+
+% Note we must use magnified points not "true" points, since the answer is
+% expressed in magnified points.  The result will be calculated in the same
+% manner no matter what the magnification is.
+%  #1 and #2 are multiplicands
+%  #3 macro name to capture the real result
+\def\realmult #1#2#3{\dimen0=#1pt
+                     \dimen2=#2\dimen0
+                     \edef #3{\expandafter\c@lean\the\dimen2}}
+
+% ===== Divide integers, real result
+%  #1 integer numerator value
+%  #2 integer denominator (divisor) value
+%  #3 macro name to capture the real result
+\def\intdiv #1#2#3{\t@counta=#1
+                   \t@countb=#2
+%  Limitations: #1 must be negatable, i.e. it must not be the largest
+%                  magnitude negative number
+%               #2 must be able to be multiplied by 2 without overflow
+%  Calculate a*65536/b  where the factor 65536 converts from pt to sp.
+%  This operation can also be interpretated as an extended precision
+%  numerator divided by the denominator.  The scheme used is basically a
+%  long division, except that it is bootstrapped by an integer divide.
+%  The computations are carried out with positive numerator and
+%  denominator, with the appropriate restoration of sign at the end.
+%    \t@counta == remainder, r, initially set to a
+%    \t@countb == denominator, b
+%    \t@countc == quotient, q
+%    \t@countd == +1, a and b have the same sign
+%                 -1, a and b have opposite signs
+%    \t@counte == temporary register and loop counter
+	           \ifnum \t@countb<0
+                      \t@counta=-\t@counta
+                      \t@countb=-\t@countb
+                   \fi
+                   \t@countd=1                    % record the sign
+                   \ifnum \t@counta<0
+                      \t@counta=-\t@counta
+                      \t@countd=-1
+                   \fi
+%                                                 % q=a/b, r=a-q/b
+	           \t@countc=\t@counta  \divide \t@countc by \t@countb
+                   \t@counte=\t@countc  \multiply \t@counte by \t@countb
+                   \advance \t@counta by -\t@counte
+	           \t@counte=-1
+                   \loop
+                     \advance \t@counte by 1
+	             \ifnum \t@counte<16
+                       \multiply \t@countc by 2           % q=2q
+                       \multiply \t@counta by 2           % r=2r
+                       \ifnum \t@counta<\t@countb \else   % if ( r >= b )
+                         \advance \t@countc by 1          %   q=q+1
+                         \advance \t@counta by -\t@countb %   r=r-b
+                       \fi
+                   \repeat
+	           \divide \t@countb by 2         % rounding
+	           \ifnum \t@counta<\t@countb     % if ( r >= b/2 ) q=q+1
+                     \advance \t@countc by 1
+                   \fi
+                   \ifnum \t@countd<0             % restore the sign
+                     \t@countc=-\t@countc
+                   \fi
+                   \dimen0=\t@countc sp           % express as a dimension
+                   \edef #3{\expandafter\c@lean\the\dimen0}}
+
+% ===============================================================
+% ===== Internal TeXdraw macros =================================
+
+% ===== Macros for converting between dimensions and units
+% Convert drawing units (coordinate value, scaled by the unit scale and
+% segment scale) to pixels.  We use rounding to get more accurate results.
+%  #1 dimension in drawing units
+%  #2 count in pixels (returned into a count)
+\def\coordtopix #1#2{\dimen0=#1\d@dim
+                     \dimen2=\d@sc\dimen0
+                     \t@counta=\dimen2          % scaled dimension in sp
+                     \t@countb=\s@ppix
+                     \divide \t@countb by 2
+                     \ifnum \t@counta<0         % rounding
+                       \advance \t@counta by -\t@countb
+                     \else
+                       \advance \t@counta by \t@countb
+                     \fi
+                     \divide \t@counta by \s@ppix
+                     #2=\t@counta}
+
+% Convert from absolute pixels to relative scaled coordinates
+%  #1 - input integer pixel value
+%  #2 - macro name to receive the character string corresponding to the
+%       floating point coordinate value
+\def\pixtocoord #1#2{\t@counta=#1%
+                     \multiply \t@counta by \s@ppix
+                     \dimen0=\d@sc\d@dim
+                     \t@countb=\dimen0
+                     \intdiv \t@counta \t@countb #2}
+
+% Convert pixels to TeX dimensions.
+%  #1 - input integer pixel value
+%  #2 - returned dimension (returned into a dimension register)
+\def\pixtodim #1#2{\t@countb=#1%
+                   \multiply \t@countb by \s@ppix
+                   #2=\t@countb sp\relax}
+
+% Convert pixels to (integer) bp units
+%  #1 - input pixel value
+%  #2 - integer value, returned into a count
+\def\pixtobp #1#2{\dimen0=\p@sfactor pt
+                  \t@counta=\dimen0
+                  \multiply \t@counta by #1%
+                  \ifnum \t@counta < 0             % rounding
+                    \advance \t@counta by -32768
+                  \else
+                    \advance \t@counta by 32768
+                  \fi
+                  \divide \t@counta by 65536
+                  #2=\t@counta}
+                  
+% ===== Allocations for registers and counts
+% == Temporary count registers
+% NB: We try to economize on the use of temporary counts and dimensions.
+%     Several counts and dimenstions are in fact equivalent, with only the
+%     name being changed to be more meaningful.
+\newcount\t@counta    \newcount\t@countb   % Use at lowest levels
+\newcount\t@countc    \newcount\t@countd
+\newcount\t@counte
+\newcount\t@pixa      \newcount\t@pixb     % Use for pixel values
+\newcount\t@pixc      \newcount\t@pixd
+\let\l@lxbp=\t@pixa   \let\l@lybp=\t@pixb  % Use for (integer) bp values
+\let\u@rxbp=\t@pixc   \let\u@rybp=\t@pixd
+
+% == Temporary dimension registers
+\newdimen\t@xpos      \newdimen\t@ypos
+\let\l@lxpos=\t@xpos  \let\l@lypos=\t@ypos
+
+% == Position and parameter registers
+% The minimum and maximum extent in the X and Y direction in pixel units
+% (updated globally to reach outside segments)
+\newcount\xminpix      \newcount\xmaxpix
+\newcount\yminpix      \newcount\ymaxpix
+
+% == Arrowhead parameters
+\newcount\a@lenpix     \newcount\a@widpix
+
+% == Absolute pixel positions
+\newcount\x@pix        \newcount\y@pix
+\newcount\x@segoffpix  \newcount\y@segoffpix
+\newcount\x@savepix    \newcount\y@savepix
+
+% == Conversion factor
+\newcount\s@ppix       % sp/pixel 
+
+% == Pending segments count
+\newcount\d@bs
+
+% == Counter to form unique file names
+\newcount\t@xdnum
+\global\t@xdnum=0
+
+% == Drawing size in TeX dimensions
+\newdimen\hdrawsize    \newdimen\vdrawsize
+
+% == TeXdraw box
+\newbox\t@xdbox
+
+% == Output stream number for the PostScript file
+\newwrite\drawfile
+
+% == \newif
+\newif\ifm@pending
+\newif\ifp@ath
+\newif\ifa@st
+\newif\ifm@ore
+\newif \ift@extonly
+\newif\ifp@osinit
+
+% == \newtoks
+\newtoks\everytexdraw
+
+% ===== Character definitions
+\def\l@paren{(}
+\def\a@st{*}
+
+% ===== Special character macros
+% Need to be able to insert "%", "{" and "}" characters into the
+% PostScript file.
+% Define macros which have these characters with category "other".
+% We will assume, that these characters have the standard meanings --
+% after all, we use comments and braces in this code.
+\catcode`\%=12
+  \def\p@b {%!}  \def\p@p {%%}
+\catcode`\%=14
+\catcode`\{=12  \catcode`\}=12  \catcode`\u=1 \catcode`\v=2
+  \def\l@br u{v  \def\r@br u}v
+\catcode `\{=1  \catcode`\}=2   \catcode`\u=11 \catcode`\v=11
+
+% ===== Pixel conversion factors
+% The position is kept as an integer value (count).  It is set to a
+% resolution corresponding to 300 units/inch.  We refer to them as pixels,
+% but in fact the resolution is just that: movements are quantized to lie
+% on a grid with that resolution.
+
+% Using pixel units which correspond to the actual resolution of the device
+% has advantages in that all horizontal and vertical lines then will be
+% drawn with the same line thickness.  In addition the coordinates are
+% then integer values (no decimal point or leading zeros) which leads
+% to a more compact PostScript file.
+
+% The following macro sets the conversion from PostScript units (bp) to the
+% integer units (pixels).  The file inclusion \special environment in the
+% PostScript driver restores the context to default PostScript values
+% (bp or 72/in and origin in the lower lefthand corner).  A scaling value
+% of 0.24 converts to 300/inch.  Note that the PostScript commands written
+% to the temporary PostScript file do not depend on the TeX magnification
+% in effect.  Magnification will be handled by the dvi to PostScript driver
+% at the time that the file is included in the output.
+
+% Calculate the conversion factors
+% Let sppix = sp/pixel = u / p, where u = sp/unit and p = pix/unit (both
+% integer values).
+% We calculate sppix as
+%         s@ppix = [ (u+0.5p)/p ]
+% We also calculate the PostScript scale factor bp/pixel
+% Let b = sp/bp.  We want p@sfactor = s@ppix/b.  For 300 pixels/inch, this
+% gives p@sfactor=0.24.  Using rounding
+%         p@sfactor = [ (s@ppix+0.5b)/b ] .
+% To carry out the arithmetic, we will operate in sp units (integers) and
+% generate the answer in pt units (multiplying by sp/pt).  This result will
+% expressed as a character string representing a real number after the "pt"
+% designator is stripped off.
+
+{\catcode`\p=12 \catcode`\t=12
+ \gdef\c@lean #1pt{#1}}
+
+\def\sppix#1/#2 {\dimen0=1#2 \s@ppix=\dimen0
+                 \t@counta=#1%
+                 \divide \t@counta by 2
+                 \advance \s@ppix by \t@counta
+                 \divide \s@ppix by #1%             % \s@ppix available
+                 \t@counta=\s@ppix
+                 \multiply \t@counta by 65536       % 1 pt = 65536 sp
+                 \advance \t@counta by 32891        % 0.5 bp = 32890.88 sp
+                 \divide \t@counta by 65782         % 1 bp = 65781.76 sp
+                 \dimen0=\t@counta sp
+                 \edef\p@sfactor {\expandafter\c@lean\the\dimen0}}
+
+% ===== Low level coordinate decoding macros
+% Get two values, separated by a blank
+% Invoke as \g@etargxy <stuff> {} \\\ma\mb
+\def\g@etargxy #1 #2 #3 #4\\#5#6{\def #5{#1}%
+                           \ifx #5\empty
+                             \g@etargxy #2 #3 #4 \\#5#6%  leading blank
+                           \else
+                             \def #6{#2}%
+                             \def\next {#3}%
+                             \ifx \next\empty \else
+                               \errmessage {TeXdraw: invalid coordinate}%
+                             \fi
+                           \fi}
+
+% Check for a leading asterisk
+% Sets \a@stfalse or \a@sttrue, test with \ifa@st
+\def\c@heckast #1{\expandafter
+                  \c@heckastll #1\\}
+\def\c@heckastll #1#2\\{\def\testit {#1}%
+                        \ifx \testit\a@st
+                          \a@sttrue
+                        \else
+                          \a@stfalse
+                        \fi}
+
+% Decode a symbolic coordinate
+% Pixel value returned to a count
+\def\g@etsympix #1#2{\expandafter
+               \ifx \csname #1\endcsname \relax
+                 \errmessage {TeXdraw: undefined symbolic coordinate}%
+               \fi
+               #2=\csname #1\endcsname}
+
+% Set a macro named #1 to have value #2
+\def\s@etcsn #1#2{\expandafter
+                  \xdef\csname#1\endcsname {#2}}
+
+% ===== Low level list decoding macros
+% Pick off the first item -> #3, rest of string -> #4
+\def\g@etitem #1 #2\\#3#4{\edef #4{#2}\edef #3{#1}}
+\def\a@pppix #1#2{\edef\next {#1}%
+                  \ifx \next\empty \else
+                    \coordtopix {#1}\t@pixa
+                    \ifx #2\empty
+                      \edef #2{\the\t@pixa}%
+                    \else
+                      \edef #2{#2 \the\t@pixa}%
+                    \fi
+                  \fi}
+
+% ===== Macros for updating the position
+% Calculate the position in pixels and update the maximum excursions
+\def\s@etpospix #1#2{\coordtopix {#1}\x@pix
+                     \advance \x@pix by \x@segoffpix
+                     \coordtopix {#2}\y@pix
+                     \advance \y@pix by \y@segoffpix
+                     \u@pdateminmax \x@pix \y@pix}
+
+\def\r@elpospix #1#2{\coordtopix {#1}\t@pixa
+                     \advance \x@pix by \t@pixa
+                     \coordtopix {#2}\t@pixa
+                     \advance \y@pix by \t@pixa
+                     \u@pdateminmax \x@pix \y@pix}
+
+\def\r@elupd #1#2{\t@counta=\x@pix
+                  \advance\t@counta by #1%
+                  \t@countb=\y@pix
+                  \advance\t@countb by #2%
+                  \u@pdateminmax \t@counta \t@countb}
+
+\def\u@pdateminmax #1#2{\ifnum #1>\xmaxpix
+                          \global\xmaxpix=#1%
+                        \fi
+                        \ifnum #1<\xminpix
+                          \global\xminpix=#1%
+                        \fi
+                        \ifnum #2>\ymaxpix
+                          \global\ymaxpix=#2%
+                        \fi
+                        \ifnum #2<\yminpix
+                          \global\yminpix=#2%
+                        \fi}
+
+% Convert maximum excursions in pixel units to TeX dimensions
+% (\xminpix \yminpix) <-> (\xmaxpix \ymaxpix)  pixel units
+% \hdrawsize, \vdrawsize                     TeX dimensions
+\def\maxhvpos {\t@pixa=\xmaxpix
+               \advance \t@pixa by -\xminpix
+               \pixtodim  \t@pixa {\dimen2}%
+               \global\hdrawsize=\dimen2
+               \t@pixa=\ymaxpix
+               \advance \t@pixa by -\yminpix
+               \pixtodim \t@pixa {\dimen2}%
+               \global\vdrawsize=\dimen2\relax}
+
+% ===== Include the TeXdraw graphics
+% The drawing will be placed such that its lower left hand corner will
+% be at the current TeX position
+\def\t@xdinclude {\pixtobp {-\xminpix}\l@lxbp  \pixtobp {-\yminpix}\l@lybp
+                  \ift@extonly \else
+                    \special {psfile=\p@sfile\space
+                              hoffset=\the\l@lxbp\space
+                              voffset=\the\l@lybp}%
+                  \fi}
+
+% =====  Save moves / flush moves
+% A TeXdraw segment which generates only TeX text uses only move, begin
+% segment and end segment commands.  The goal is to avoid writing out
+% empty segments for such cases.  To this end, moves are held back and
+% only written out if necessary to set the position or terminate a path.
+% Also in this way, a TeXdraw drawing which generates only TeX text will
+% not generate a PostScript file.
+
+% Two flags are used.  Both flags are local to a segment.
+% - move pending:  Set when a move has been invokded but the move command
+%   has not been written out to the PostScript file
+% - path in progress:  Set when a PostScript path has been started but the
+%   path has not been terminated and stroked.
+% (1) Moves are kept back.  Using TeX's groups, a local flag and local
+%     position registers are used to keep track of whether the latest
+%     move applicable to a given segment has been written out or not.  In
+%     effect there is a stack of pending moves, one for each level of
+%     segment nesting.
+% (2) At the beginning of a segment, if a PS path is in progress and a
+%     a move is pending, the move is written out, terminating the path
+%     and stroking the path.  This is done to ensure that the path is
+%     stroked before lines and/or fills are executed in the segment.
+% (3) At the beginning of a segment, if a PS path is not in progress,
+%     any pending moves are kept back.  Effectively, the move will be
+%     transferred into the segment.  It will be written out only when
+%     the position needs to be updated for some other command.  Such
+%     moves which are transferred into segments may have to be repeated
+%     outside the segment.  The move pending flag will be restored to
+%     the value outside the segment on exit from the segment.
+% (4) A begin segment command is not written out, but instead a global
+%     segment backlog counter is incremented.  The backlog of begin
+%     segment commands is written out when a drawing command is
+%     encountered.
+% The effect of the above on the TeXdraw commands is as follows.
+% (a) move:
+%     - set the current position
+%     - record the position of the saved move
+%     - set the move pending flag
+% (b) begin segment:
+%     - if a path is in progress
+%         - if a move is pending
+%           - if there is a backlog of segments
+%             - write out enough begin segments to clear the backlog
+%           - write out the pending move
+%           - reset the move pending flag (local to the containing segment,
+%             but affects inferior segments)
+%           - reset the path in progress flag
+%     - increment the segment backlog counter
+%     - begin a group
+% (c) end segment:
+%     - end a group
+%     - if there is no backlog of segments
+%       - write an end segment command
+%     - if there is a backlog of segments
+%       - decrement the backlog counter, thereby omitting an empty
+%         empty segment.
+%     - the move pending flag and path in progress flag are automatically
+%       restored on leaving the TeX group
+% (d) text:
+%     - create a text box
+% (e) line parameters:
+%     - if there is a backlog of segments
+%        - write out enough begin segments to clear the backlog
+%     - clear the path in progress flag
+%     - write the PS command changing the line parameter
+% (f) other drawing commands:
+%     - update the current position
+%     - if there is a backlog of segments
+%        - write out enough begin segments to clear the backlog
+%     - if there is a pending move
+%        - write out the pending move
+%        - reset the move pending flag (local to this segment, but affects
+%          inferior segments)
+%     - set the path in progress flag
+%     - write the drawing command
+% Notes:
+% (1) The es PS command strokes the path at the end of a segment to
+%     ensure that the correct line parameters are used for the segment.
+%     The path before the corresponding bs command is restored and
+%     continued.
+% (2) The \f@lushbs and \f@lushmove commands must be invoked before each
+%     drawing command written to the PS file.  The macro \writeps includes
+%     these operations.
+
+% Another awkward business has to do with initialization.  We want a
+% default (0 0) initial position so that the user can draw vectors
+% immediately.  However, if the user specifies another move before
+% beginning to draw, that position should be the initial position.  The
+% importance of this initial position is that the determination of the
+% maximum excursion must take this value into account.  We handle the
+% initialization in the \s@avemove and \f@lushmove macros.  The macro
+% \ifp@osinit indicates whether the next move should be captured as the
+% initial values for \xminpix, \yminpix, \xmaxpix, and \ymaxpix.  However,
+% if a \f@lushmove is invoked, then we assume that the appropriate initial
+% values has already been set.  The "mv" command in PostScript is defined
+% to stroke the current path (if any) and move to the pixel coordinates
+% specified.
+
+% Note that \m@pendingtrue and \m@pendingfalse define the flag locally.
+% In addition, \x@savepix and \y@savepix are local variables.  We make
+% use of the fact that the values of the flag and positions propagate
+% down to inferior segments but not up to superior segments.  This
+% behaviour Is consistent with the gsave/grestore operation on the
+% PostScript side.
+\def\s@avemove #1#2{\x@savepix=#1\y@savepix=#2%
+                    \m@pendingtrue
+                    \ifp@osinit \else
+                      \global\p@osinittrue
+                      \global\xminpix=\x@savepix \global\yminpix=\y@savepix
+                      \global\xmaxpix=\x@savepix \global\ymaxpix=\y@savepix
+                    \fi}
+
+\def\f@lushmove {\global\p@osinittrue
+                 \ifm@pending
+                   \writetx {\the\x@savepix\space \the\y@savepix\space mv}%
+                   \m@pendingfalse
+                   \p@athfalse
+                 \fi}
+
+% =====  Flush begin segment
+% \f@lushbs flushes any saved up \bsegments.  Some of these may be
+% redundant, but we cannot know without looking ahead beyond the
+% \esegment.
+\def\f@lushbs {\loop
+                 \ifnum \d@bs>0
+                   \writetx {bs}%
+                   \global\advance \d@bs by -1
+               \repeat}
+               
+% ===== Internal text macros
+% Horizontal text, use only 3 levels of box nesting here
+\def\h@move #1#2 #3)#4{\move (#2 #3)%
+                       \h@text {#4}}
+\def\h@text #1{\pixtodim \x@pix \t@xpos
+               \pixtodim \y@pix \t@ypos
+               \vbox to 0pt{\normalbaselines
+                            \t@stuff
+                            \kern -\t@ypos
+                            \hbox to 0pt{\l@stuff
+                                         \kern \t@xpos
+                                         \hbox {#1}%
+                                         \kern -\t@xpos
+                                         \r@stuff}%
+                            \kern \t@ypos
+                            \b@stuff\relax}}
+
+% Rotated text
+% Uses 5 levels of box nesting here (so that the text reference point
+% is that <before> rotation).  This was done so that the reference point
+% definition makes sense with arbitrary angle rotation.  The text is
+% rotated with respect to the text reference point.  The result is zero
+% sized.  This macro generates in-line PostScript.
+% #1 - rotation angle in degrees
+% #2 - text to be rotated
+\def\r@move td:#1 #2#3 #4)#5{\move (#3 #4)%
+                             \r@text td:#1 {#5}}
+\def\r@text td:#1 #2{\pixtodim \x@pix \t@xpos
+                     \pixtodim \y@pix \t@ypos
+                     \vbox to 0pt{\kern -\t@ypos
+                                  \hbox to 0pt{\kern \t@xpos
+                                               \rottxt{#1}{#2}%
+                                               \hss}%
+                                  \vss}}
+
+\def\rottxt #1#2{\special{ps: gsave currentpoint currentpoint translate
+                              #1 neg rotate neg exch neg exch translate}%
+                 \z@sb{#2}%
+                 \special{ps: currentpoint grestore moveto}}
+\def\z@sb #1{\vbox to 0pt{\normalbaselines
+                          \t@stuff
+                          \hbox to 0pt{\l@stuff
+                                       \hbox {#1}%
+                                       \r@stuff}%
+                          \b@stuff}}
+
+% ===== Default values
+% These are reset each time TeXdraw is invoked
+\def\t@exdrawdef {\sppix 300/in            % 300 pixels/inch
+                  \drawdim in              % drawing units are inches
+                  \edef\u@nitsc {1}%       % unit scale 1 (has to be set
+                                           % before invoking \setsegscale)
+                  \setsegscale 1           % segment scale 1
+                  \arrowheadsize l:0.16 w:0.08
+                  \arrowheadtype t:T
+                  \textref h:L v:B }
+
+
+% ===============================================================
+% ===== PostScript file macros ==================================
+
+% ===== Write to the PostScript file
+% Macro to write PostScript commands to the temporary PostScript file
+% To decrease the size of the PostScript file, moves are kept back to
+% allow redundant multiple moves to be removed.  In addition empty gsave/
+% grestore pairs are not written.  The PostScript file is not opened if
+% TeXdraw has not generated any PostScript commands, i.e. it has produced
+% only TeX text.
+% \writeps : flushes the pending move to make sure things are positioned
+%            correctly and flushes pending begin segments before calling
+%            \writetx to write to the PostScript file
+% \writetx : writes directly to the PostScript file.  This version is used
+%            only for those commands which just change line parameters
+%            without drawing.  This routine opens the file and writes the
+%            PS file header the first time it is called.
+% \w@rps :   lowest level direct write to the PostScript file
+\def\writeps #1{\f@lushbs
+                \f@lushmove
+                \p@athtrue
+                \writetx {#1}}
+\def\writetx #1{\ift@extonly
+                  \global\t@extonlyfalse
+                  \t@dropen
+                \fi
+                \w@rps {#1}}
+\def\w@rps #1{\immediate\write\drawfile {#1}}
+
+% ===== Open a PostScript file
+% Open the file, write the definitions used by TeXdraw.
+\def\t@dropen {%
+  \global\advance \t@xdnum by 1
+  \ifnum \t@xdnum<10
+    \xdef\p@sfile {\jobname.ps\the\t@xdnum}
+  \else
+    \xdef\p@sfile {\jobname.p\the\t@xdnum}
+  \fi
+  \immediate\openout\drawfile=\p@sfile
+  \w@rps {\p@b PS-Adobe-3.0 EPSF-3.0}%
+  \w@rps {\p@p BoundingBox: (atend)}%
+  \w@rps {\p@p Title: TeXdraw drawing: \p@sfile}%
+  \w@rps {\p@p Pages: 1}%
+  \w@rps {\p@p Creator: \TeXdrawId}%
+  \w@rps {\p@p CreationDate: \the\year/\the\month/\the\day}%
+  \w@rps {50 dict begin}%
+  \w@rps {/mv {stroke moveto} def}%
+  \w@rps {/lv {lineto} def}%
+  \w@rps {/st {currentpoint stroke moveto} def}%
+  \w@rps {/sl {st setlinewidth} def}%
+  \w@rps {/sd {st 0 setdash} def}%
+  \w@rps {/sg {st setgray} def}%
+  \w@rps {/bs {gsave} def /es {stroke grestore} def}%
+  \w@rps {/fl \l@br gsave setgray fill grestore}%
+  \w@rps    { currentpoint newpath moveto\r@br\space def}%
+  \w@rps {/fp {gsave setgray fill grestore st} def}%
+  \w@rps {/cv {curveto} def}%
+  \w@rps {/cr \l@br gsave currentpoint newpath 3 -1 roll 0 360 arc}%
+  \w@rps    { stroke grestore\r@br\space def}%
+  \w@rps {/fc \l@br gsave setgray currentpoint newpath}%
+  \w@rps    { 3 -1 roll 0 360 arc fill grestore\r@br\space def}%
+  \w@rps {/ar {gsave currentpoint newpath 5 2 roll arc stroke grestore} def}%
+  \w@rps {/el \l@br gsave /svm matrix currentmatrix def}%
+  \w@rps    { currentpoint translate scale newpath 0 0 1 0 360 arc}%
+  \w@rps    { svm setmatrix stroke grestore\r@br\space def}%
+  \w@rps {/fe \l@br gsave setgray currentpoint translate scale newpath}%
+  \w@rps    { 0 0 1 0 360 arc fill grestore\r@br\space def}%
+  \w@rps {/av \l@br /hhwid exch 2 div def /hlen exch def}%
+  \w@rps    { /ah exch def /tipy exch def /tipx exch def}%
+  \w@rps    { currentpoint /taily exch def /tailx exch def}%
+  \w@rps    { /dx tipx tailx sub def /dy tipy taily sub def}%
+  \w@rps    { /alen dx dx mul dy dy mul add sqrt def}%
+  \w@rps    { /blen alen hlen sub def}%
+  \w@rps    { gsave tailx taily translate dy dx atan rotate}%
+  \w@rps    { (V) ah ne {blen 0 gt {blen 0 lineto} if} {alen 0 lineto} ifelse}%
+  \w@rps    { stroke blen hhwid neg moveto alen 0 lineto blen hhwid lineto}%
+  \w@rps    { (T) ah eq {closepath} if}%
+  \w@rps    { (W) ah eq {gsave 1 setgray fill grestore closepath} if}%
+  \w@rps    { (F) ah eq {fill} {stroke} ifelse}%
+  \w@rps    { grestore tipx tipy moveto\r@br\space def}%
+  \w@rps {\p@sfactor\space \p@sfactor\space scale}%
+  \w@rps {1 setlinecap 1 setlinejoin}%
+  \w@rps {3 setlinewidth [] 0 setdash}%
+  \w@rps {0 0 moveto}%
+}
+
+% Notes:
+% - mv (move to) This command includes a stroke before the moveto.  The
+%      stroke terminates a path and the move begins another path.
+% - bs (begin segment) encloses a segment in a gsave/grestore to keep
+%      changes to line parameters local.
+% - es (end segment) does a "stroke grestore" to make sure lines inside
+%      the segment use the line parameters local to that segment
+% - ar (arc) The path is generated and stroked inside a gsave/grestore,
+%      leaving the current path intact.
+% - cr (circle) The path is generated and stroked inside a gsave/grestore,
+%      leaving the current path intact.
+% - fc (filled circle) The path is generated and filled inside a gsave/
+%      grestore, keeping the fill level local to the circle.  The current
+%      path is left intact.
+% - el (ellipse) The path is generated and stroked inside a gsave/grestore,
+%      leaving the current path intact.  The elliptical path is defined
+%      with different x and y scaling, then stroked with default scaling
+%      to give a constant line thickness.
+% - fe (filled ellipse) The path is generated and filled inside a gsave/
+%      grestore, leaving the current path intact.
+% - fl (fill) The current path is closed and filled inside a gsave/restore,
+%      keeping the fill level local.  A newpath terminates the path.
+% - fp (fill path) The current path is closed and then filled inside a
+%      gsave/grestore.  Finally the closed path is stroked, implicitly
+%      terminating the path.
+% - av (arrow vector) The arrow vector is drawn inside a gsave/grestore.
+%      The line width and type are those currently in effect.  After the
+%      grestore, the current path is continued with a move to the tip of
+%      the vector.
+
+% ===== Close the PostScript file
+% Write a trailer with the BoundingBox, close the file.  Note that the
+% BoundingBox may be larger than the commands in the PostScript file
+% indicate.  This is due to the fact that multiple move commands in
+% a row are collapsed into a single move.  The BoundingBox information
+% includes the effect of the moves which were expunged.
+\def\t@drclose {%
+  \w@rps {stroke end showpage}%
+  \w@rps {\p@p Trailer:}%
+  \pixtobp \xminpix \l@lxbp  \pixtobp \yminpix \l@lybp
+  \pixtobp \xmaxpix \u@rxbp  \pixtobp \ymaxpix \u@rybp
+  \w@rps {\p@p BoundingBox: \the\l@lxbp\space \the\l@lybp\space
+                            \the\u@rxbp\space \the\u@rybp}%
+  \w@rps {\p@p EOF}%
+  \closeout\drawfile
+}
+
+% ===============================================================
+\catcode`\@=\catamp

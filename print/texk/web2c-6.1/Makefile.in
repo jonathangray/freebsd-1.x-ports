@@ -62,6 +62,11 @@ bh_fontdir = $(fontdir)/bh
 cg_fontdir = $(fontdir)/cg
 mt_fontdir = $(fontdir)/monotype
 
+# If you don't want latex.fmt to preload John Sauter's # true-size fonts,
+# then set install_sauter=false.  See the file `$(fontdir)/sauter/README'
+# for details.
+install_sauter = true
+
 # Where the configuration files get installed.
 dvips_prefix = $(texmf_prefix)/dvips
 configdir = $(dvips_prefix)
@@ -79,6 +84,14 @@ psmacrodir = $(texinputdir)/dvips
 default_bdpi = 300
 default_texsizes = @default_texsizes@
 
+# Where MakeTeXPK/MakeTeXTFM put PK/TFM files. Making these names include 
+# `pk' and `tfm' simplifies the default in kpathsea/paths.h[.in].
+# By default, MakeTeXPK/MakeTeXTFM appends /<mode> to this.
+mtp_destdir = $(fontdir)/tmp/pk
+mtt_destdir = $(fontdir)/tmp/tfm
+
+# Location of Sauter sources
+sauterdir = $(fontdir)/sauter
 
 # Full filename of the database file.  It is not an error for this file
 # not to exist.  See the `Filename database' node in the kpathsea
@@ -92,7 +105,7 @@ default_mfmode = CanonCX
 
 # Default LaserJet printer.  See the file `dviljk/INSTALL' for available
 # options
-default_lj = LJ4
+default_lj = dvilj dvilj2 dvilj4
 
 # End of installation directory definitions.
 
@@ -119,15 +132,19 @@ makeargs = $(MFLAGS) CFLAGS='$(CFLAGS)' SHELL='$(SHELL)' \
   fontdir=$(fontdir) \
   fmtdir=$(fmtdir) basedir=$(basedir) \
   texpooldir=$(texpooldir) mfpooldir=$(mfpooldir) \
+  db_name=$(db_name) db_dir=$(db_dir) \
+  sauterdir=$(sauterdir) \
+  install_sauter=$(install_sauter) \
   install_fonts=$(install_fonts) \
   ps_fontdir=$(ps_fontdir) bh_fontdir=$(bh_fontdir) \
   cg_fontdir=$(cg_fontdir) mt_fontdir=$(mt_fontdir) \
+  mtp_destdir=$(mtp_destdir) mtt_destdir=$(mtt_destdir) \
   dvips_prefix=$(dvips_prefix) configdir=$(configdir) \
   headerdir=$(headerdir) psmacrodir=$(psmacrodir) \
   default_texsizes='$(default_texsizes)' \
   default_bdpi=$(default_bdpi) \
   default_mfmode=$(default_mfmode) \
-  default_lj=$(default_lj) \
+  default_lj="$(default_lj)" \
   $(MAKEARGS)
 
 
@@ -146,10 +163,12 @@ uninstall uninstall-exec uninstall-data:
 	  if test -d $$d; then (cd $$d; $(MAKE) $(makeargs) $@); \
 	  else true; fi; done
 	ls -R $(texmf_prefix) >$(db_dir)/$(db_name)
-	if [ -f /etc/crontab ]; then \
-		echo "Adding $(db_name) update to /etc/crontab"; \
-		grep -q '>$(db_dir)/$(db_name)' /etc/crontab || \
-		echo "15	*	*	*	*	root	ls -R $(texmf_prefix) >$(db_dir)/$(db_name)" >>/etc/crontab; \
+	@if [ -f /etc/crontab ]; then \
+		if grep -q '$(db_dir)/$(db_name)' /etc/crontab; then :; \
+		else \
+			echo "Adding $(db_name) update to /etc/crontab"; \
+			echo "15	*	*	*	*	root	ls -R $(texmf_prefix) >$(db_dir)/$(db_name)" >>/etc/crontab; \
+		fi; \
 	fi
 
 # Do other standard targets everywhere.

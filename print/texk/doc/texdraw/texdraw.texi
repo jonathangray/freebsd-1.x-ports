@@ -1,0 +1,2951 @@
+% -*-texinfo-*-
+
+%  TeXdraw  texinfo file
+%  Edition 1.5
+
+%  $Id: texdraw.texi,v 1.1 1994/04/26 02:54:37 alm Exp $
+
+% To produce a TeX version of this manual, you must have the following
+% files accessible by TeX.
+%   texdraw.texi  - this file, the TeXdraw manual, part of the TeXdraw
+%                   distribution
+%   texdraw.tex   - the TeXdraw macro package, part of the TeXdraw
+%                   distribution
+%   txdtools.tex  - extra macros for TeXdraw, part of the TeXdraw
+%                   distribution
+%   texinfo.tex   - texinfo manual macros (distributed by FSF, for instance
+%                   with the GNUemacs editor).  This version of the manual
+%                   has been tested with version 2.100 of texinfo.tex.  A
+%                   version of texinfo.tex is available by anonymous ftp
+%                   as pub/gnu/texinfo-2.16.tar.Z on prep.ai.mit.edu.
+%
+\input texdraw    % bring in TeXdraw before texinfo changes "\" to "@"
+\input txdtools
+
+\input texinfo    @c -*-texinfo-*-
+@comment %**start of header
+@setfilename texdraw.info
+@settitle @TeX{}draw
+@comment %**end of header
+
+@ifinfo
+This file documents @TeX{}draw, a system for producing PostScript drawings
+from @TeX{}.
+
+Copyright @copyright{} 1993 Peter Kabal
+
+Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+@ignore
+Permission is granted to process this file through TeX and print the
+results, provided the printed document carries a copying permission
+notice identical to this one except for the removal of this paragraph
+(this paragraph not being relevant to the printed manual).
+
+@end ignore
+Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided that the
+entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+@end ifinfo
+
+@setchapternewpage odd
+@titlepage
+@title @TeX{}draw
+@subtitle PostScript Drawings from @TeX{}
+@subtitle Edition 1.5
+@subtitle April 1993
+
+@author Peter Kabal
+
+@page
+@vskip 0pt plus 1filll
+Copyright @copyright{} 1993 Peter Kabal
+
+@sp 2
+This is edition 1.5 of the documentation for the @TeX{}draw macros for
+the @TeX{} typesetting program.
+@sp 2
+
+Peter Kabal @*
+Department of Electrical Engineering @*
+McGill University @*
+3480 University @*
+Montreal, Quebec @*
+Canada {} H3A@thinspace 2A7
+
+@code{kabal@@TSP.EE.McGill.CA}
+
+@sp 2
+Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided that the
+entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+
+@end titlepage
+
+
+@ifinfo
+@node Top, Introduction, (dir), (dir)
+@top TeXdraw
+
+@TeX{}draw is a collection of macros that allow drawings to be created
+from @emph{within} @TeX{}.
+
+This is edition 1.5 of the @TeX{}draw documentation.
+@end ifinfo
+
+@menu
+* Introduction::
+* TeXdraw Commands::
+* Drawing Segments and Scaling::
+* Using TeXdraw with LaTeX::
+* More Details::
+* PostScript Commands::
+* TeXdraw Toolbox::
+* Examples::
+* Command Listing::
+
+Indices
+* Concept index::
+* Command index::
+
+ --- The Detailed Node Listing ---
+
+Introduction
+
+* History::
+* Distribution::
+
+TeXdraw Commands
+
+* Accessing TeXdraw::
+* Command syntax::
+* TeXdraw coordinates::
+* Coordinate specification::
+* Line vectors::
+* TeX text::
+* Circles and arcs::
+* Bezier curves::
+* Fill commands::
+
+Drawing Segments and Scaling
+
+* Drawing segments::
+* Drawing paths::
+* Saving positions::
+* Scaling coordinates::
+* Drawing size::
+* Initial current position::
+
+Using TeXdraw with LaTeX
+
+* Alternate command forms for LaTeX::
+
+More Details
+
+* Problems arising from TeXdraw::
+* Extending TeXdraw::
+* How TeXdraw merges graphics and text::
+
+Extending TeXdraw
+
+* Scaling::
+* Resolution::
+* Text placement::
+* Output PostScript file::
+
+PostScript Commands
+
+TeXdraw Toolbox
+
+* Coordinate parsing::
+* Real arithmetic::
+* Arrow curve::
+
+Examples
+
+* Block diagram::
+* Filter response graph::
+* Geometric construction::
+
+Command Listing
+
+Command Index
+
+Concept Index
+@end menu
+
+
+@node Introduction, TeXdraw commands, Top, Top
+@chapter Introduction
+
+@TeX{} is a powerful typesetting program written by D. Knuth.  It allows
+for complex text layouts but by itself lacks a general graphics
+capability.  However, when coupled with an appropriate printing program,
+external graphics files can be inserted into the printed document.  In
+this mode, @TeX{} is instructed to leave space for a drawing.  The
+drawing is inserted at print time by the print program.  The @TeX{}draw
+macros generate the external graphics file from within @TeX{} and
+generate the instructions to the the print program to position the
+graphics at the appropriate position on the page.  In this way,
+@TeX{}draw produces drawings from @emph{within} @TeX{}.
+
+@TeX{}draw consists of a set of @TeX{} macros that create line drawings
+and other figures.  The drawing primitives include solid lines,
+patterned lines, Bezier curves, circles and arrows.  Other commands
+allow for the filling of a region with a gray level.  The drawing
+commands generate PostScript code.  This limits @TeX{}draw to systems
+which use PostScript printers.  @TeX{}draw also provides commands to
+position @TeX{} text, including mathematics, on the drawing.  The final
+drawing, with text and graphics, can be positioned on the page like any
+other @TeX{} box.
+
+@TeX{}draw generates an intermediate PostScript file for the drawing
+commands.  This file is included in the final printout by invoking the
+@code{\special} command provided by @TeX{}.  The present version of
+@TeX{}draw uses the @code{\special} syntax recognized by the program
+@file{dvips} by Tom Rokicki.  The program @file{dvips} is used to
+process the device independent (dvi) output file produced by @TeX{}.
+The program @file{dvips} combines the PostScript drawing commands from
+the intermediate PostScript file and the text positioning information
+from the dvi file into a single PostScript file which can be printed on
+a PostScript printer.  The program @file{dvips} also automatically
+scales the PostScript figure to compensate for changes to the @TeX{}
+magnification, so that @TeX{} text and the PostScript graphics remain
+aligned.  The structure of @TeX{}draw is such that only minor changes
+need be made to allow it to be used with other dvi to PostScript drivers
+that allow for the inclusion of PostScript files, at least at nominal
+magnification.
+
+The basic @TeX{}draw macros provide only simple drawing commands.
+However, @TeX{}draw provides a drawing segment environment which allows
+parameter changes and coordinate scaling changes to be kept local to the
+drawing segment.  This facility, together with @TeX{}'s macro
+capabilities allows one to modularize drawing units and extend
+@TeX{}draw by building more complex graphics entities from simpler
+elements.  New user commands can be defined using the tools used to
+construct the basic @TeX{}draw commands.
+
+@menu
+* History::
+* Distribution::
+@end menu
+
+@node History, Distribution, , Introduction
+@section History
+@cindex history of @TeX{}draw
+@cindex predecessors to @TeX{}draw
+
+The @TeX{}draw macros have evolved from the @TeX{}graph macros, written
+by Michael Ferguson at INRS-Telecommunications, University of Quebec.
+In its first incarnation, @TeX{}graph generated output for a QMS (QUIC
+graphics language) laser printer.  A later version wrote PostScript
+output directly to the dvi file for subsequent printing by a modified
+version of the @file{dvialw} dvi to PostScript driver.
+
+The functional interface for @TeX{}draw is largely based on @TeX{}graph.
+However, @TeX{}draw writes PostScript commands to an intermediate file.
+This file is a PostScript file which can be printed on its own, although
+the position of the drawing may be offset with respect to the the
+printed page.  The intermediate file is printed as part of the document,
+correctly positioned using the @code{\special} command mechanism.
+
+@node Distribution, , History, Introduction
+@section Distribution information
+@cindex distribution
+
+The @TeX{}draw routines are provided free of charge without warranty of
+any kind.  Note that the @TeX{}draw routines are copyrighted.  They may
+be distributed freely provided that the recipients also acquire the
+right to distribute them freely.  The notices to this effect must be
+preserved when the source files are distributed.
+
+
+@node TeXdraw Commands, Drawing Segments and Scaling, Introduction, Top
+@chapter Using the @TeX{}draw Commands
+
+The @TeX{}draw macros (commands) are defined in file @file{texdraw.tex}.
+These macros enable the @TeX{}draw environment within the @TeX{}
+program.  The following sections describe the basic commands for
+@TeX{}draw.
+
+@menu
+* Accessing TeXdraw::
+* Command syntax::
+* TeXdraw coordinates::
+* Coordinate specification::
+* Line vectors::
+* TeX text::
+* Circles and arcs::
+* Bezier curves::
+* Fill commands::
+@end menu
+
+@node Accessing TeXdraw, Command syntax, , TeXdraw Commands
+@section Accessing @TeX{}draw
+@cindex accessing @TeX{}draw
+@cindex invoking @TeX{}draw
+
+From within a @TeX{} file, the user must read in the @TeX{}draw macros
+from the file @file{texdraw.tex}.
+@example
+@group
+\input texdraw            % Read in the TeXdraw macros
+ ...
+\btexdraw
+  ...                     % TeXdraw commands to generate a drawing
+\etexdraw
+@end group
+@end example
+
+The form of the user command to run the program @TeX{} depends on which
+version of @TeX{} is being used, and which other macro packages are
+preloaded as format files.  Typically, installations have at least two
+versions of @TeX{} --- plain @TeX{} which includes basic typesetting
+macros (usually invoked as @file{tex}) and La@TeX{} which includes the
+La@TeX{} typesetting macros (usually invoked as @file{latex}).  The
+@TeX{}draw macros can be used with plain @TeX{} or with La@TeX{}.
+Alternate forms of a few @TeX{}draw commands for use with La@TeX{} are
+introduced later (@pxref{Using TeXdraw with LaTeX, , Using @TeX{}draw
+with La@TeX{}}).  The @TeX{} commands, including @TeX{}draw commands,
+are processed by @TeX{} to produce a device independent (dvi) file.
+This file is passed to the program @file{dvips} which produces output
+that can be printed on a PostScript printer.  The output from
+@file{dvips} combines the results of the regular @TeX{} typesetting
+commands with the drawing produced by the @TeX{}draw commands.
+
+As the @TeX{}draw commands are processed by @TeX{}, an intermediate
+PostScript file is generated.  The intermediate PostScript has a name of
+the form @file{@var{name}.ps1}.  The name part is derived from the name
+of the main @TeX{} file being processed.  If more than one drawing is
+produced, the digit in the file name extension is
+incremented.@footnote{After the ninth PostScript file, the name of the
+intermediate PostScript file takes the form @file{@var{name}.p10}, with
+the number increasing from 10 with each file.}
+
+The high-level user interface to @TeX{}draw consists of four @TeX{}
+macros.  The basic macros to invoke @TeX{}draw are the @code{\btexdraw}
+and @code{\etexdraw} commands.  The @TeX{}draw commands to produce a
+drawing are inserted between the @code{\btexdraw} and @code{\etexdraw}
+macros.  These macros create a @TeX{} box of appropriate size containing
+the drawing generated by the @TeX{}draw commands.  The @TeX{}draw box
+can be positioned in a document like any other @TeX{} box.
+
+The third macro is a convenient form which centers the box generated by
+@TeX{}draw.  The vertical space taken up is equal to the vertical size
+of the drawing.  It is invoked as @code{\centertexdraw @{...@}}.  This
+macro is normally used in vertical mode (between paragraphs).  A
+@code{\par} command (a blank line will do also) before a
+@code{\centertexdraw} command will terminate horizontal mode and return
+to vertical mode.
+
+The @code{\everytexdraw} command can be used to define a set of
+@TeX{}draw commands that will be executed at the beginning of every
+@TeX{}draw drawing.  It is invoked as @code{\everytexdraw @{ ...@}},
+with the desired @TeX{}draw commands as arguments.
+
+@table @code
+@findex \btexdraw
+@item \btexdraw
+Start a @TeX{}draw drawing.  The drawing is terminated with an
+@code{\etexdraw} command.
+@findex \etexdraw
+@item \etexdraw
+End a @TeX{}draw drawing started with a @code{\btexdraw} command.  The
+resulting @TeX{}draw drawing is placed in a box with height equal to the
+height of the drawing and width equal to the width of the drawing.  The
+depth of the box is zero.
+@findex \centertexdraw
+@item \centertexdraw @{ ... @}
+Center a @TeX{}draw box.  The argument contains @TeX{}draw commands.
+The resulting box has the horizontal size @code{\hsize} and height equal
+to the height of the drawing.
+@findex \everytexdraw
+@item \everytexdraw @{ ... @}
+Specify @TeX{}draw commands to be executed at the beginning of every
+@TeX{}draw drawing.
+@end table
+
+@node Command syntax, TeXdraw coordinates, Accessing TeXdraw, TeXdraw Commands
+@section Command syntax
+@cindex command syntax
+@cindex syntax of commands
+
+Generally @TeX{}draw commands that take a single argument need a
+terminating blank or newline after the argument.  Arguments that are
+self-delimiting, such as coordinates within parentheses and text within
+braces, do not need the terminating blank.  However, even when not
+needed by the defining syntax of the command, blanks following command
+arguments are allowed and ignored within the @TeX{}draw environment.
+
+On entering the @TeX{}draw environment, @TeX{} is in internal vertical
+mode (vertical mode inside a @code{\vbox}).  In this mode, spaces can be
+placed freely between commands.  However, any other extraneous input not
+specifically intended for a @TeX{}draw command is disallowed.
+
+Blank lines are interpreted as paragraph breaks, equivalent to a
+@code{\par} command.  The @TeX{}draw macro @code{\centertexdraw} is
+defined with the @code{\long} attribute to allow @code{\par} commands
+and blank lines to be interspersed between @TeX{}draw commands.  The
+@code{\btexdraw} and @code{\etexdraw} commands also allow @code{\par}
+command and blank lines to be included.  Note, however, that enclosing
+macros may not be declared with @code{\long} and hence may not allow
+blank lines as part of their argument.
+
+@node TeXdraw coordinates, Coordinate specification, Command syntax, TeXdraw Commands
+@section @TeX{}draw coordinates
+@cindex coordinates
+
+The @TeX{}draw coordinate system has increasing @var{x} to the right and
+increasing @var{y} upward.  The coordinates (without the unit) are
+floating point numbers.  Integer values can be written without a decimal
+point.  The size of the drawing is determined by the maximum excursions
+of the coordinates specified in @TeX{}draw commands.
+@tex
+\bigskip
+\centertexdraw{
+  \avec (0 0.8) \textref h:C v:B \htext (0 0.9){\sl y}
+  \move (0 0) \avec (0.8 0) \textref h:L v:C \htext(0.9 0){\sl x}
+  \move (0 1.0)}
+@end tex
+
+Consider the following example of @TeX{}draw commands to draw a simple
+figure.
+@example
+@group
+\centertexdraw@{
+  \drawdim cm  \linewd 0.02
+  \move(2 2) \lvec(3 3) \lvec(2 4) \lvec(1 3) \lvec(2 2)
+  \textref h:C v:C \htext(2 3)@{$\sum \rho_n$@}
+@}
+@end group
+@end example
+@tex
+\bigskip
+\centertexdraw{
+  \drawdim{cm} \linewd 0.02
+  \move(2 2) \lvec(3 3) \lvec(2 4) \lvec(1 3) \lvec(2 2)
+  \textref h:C v:C \htext(2 3){$\sum \rho_n$}
+}
+@end tex
+
+This drawing uses units of centimetres, with a line width of 0.02 cm.
+The @var{x} coordinate ranges between 1 and 3 while the @var{y}
+coordinate ranges between 2 and 4.  When included into a document, the
+size of the drawing is 2 cm by 2 cm.  The drawing is placed in a @TeX{}
+box, with the lower lefthand corner of the box corresponding to
+@TeX{}draw coordinate @code{(1 2)} and the upper righthand corner at
+@code{(3 4)}.  The @code{\centertexdraw} command horizontally centers
+the drawing.  The @code{\textref} command controls the centering of the
+text.  The text in this drawing is centered (both horizontally and
+vertically) at the coordinate @code{(2 3)}.
+
+@node Coordinate specification, Line vectors, TeXdraw coordinates, TeXdraw Commands
+@section Coordinate specification
+@cindex coordinate specification
+@cindex position specification
+
+Coordinates are specified within parentheses, with blanks (but no comma)
+between the values.  Leading blanks and trailing blanks are permitted
+within the parentheses.  The coordinates refer to units, which are
+specified by the @code{\drawdim} command.  The default is inches, but
+any valid @TeX{} dimension unit can be specified.  Symbolic
+specification of saved coordinate values will be discused later
+(@pxref{Saving positions}).
+
+@table @code
+@findex \drawdim
+@item \drawdim @var{dim}
+Set the units to @var{dim}.  The argument @var{dim} can be any valid
+@TeX{} dimension unit.  The units are used to interpret coordinate
+values.  Examples of valid units: @code{cm}, @code{mm}, @code{in},
+@code{pt}, and @code{bp}.
+@end table
+
+Examples of coordinate and scaling specifications:
+@table @code
+@item \drawdim @{cm@} \move(2 2)
+Set the units to centimetres, move to a position 2 cm to the right and 2
+cm up from the origin of the drawing coordinate system.
+@item \drawdim bp
+Set the units to big points.
+@item \lvec ( 2.2 +5.5) \lvec(2.3 -2) \lvec(2.2 5.4 )
+Examples of acceptable coordinate specifications.
+@end table
+
+@node Line vectors, TeX text, Coordinate specification, TeXdraw Commands
+@section Line vectors
+@cindex lines
+@cindex vectors
+@cindex arrows
+@cindex moves
+@cindex current position
+
+@TeX{}draw implements moves, line vectors and arrow vectors.  There are
+both absolute and relative motion versions of these vector commands.
+@TeX{}draw maintains a current position.  Lines are drawn from the
+current position to a new coordinate, with the new coordinate becoming
+the new current position.  An explicit move can be used to establish an
+initial current position.  The position @code{(0 0)} is used if there is
+no move to an initial current position.
+
+The @code{\move} and @code{\rmove} commands establish a new current
+position without drawing a line.  The @code{\lvec} and @code{\rlvec}
+commands draw a line from the current position to a new position, which
+then becomes the new current position.  The @code{\avec} and
+@code{\ravec} commands draw a line with an arrowhead from the current
+position to a new coordinate, which then becomes the new current
+position.  The tip of the arrow is at the new current position.  The
+direction of the arrow follows the direction of the line.  Since this
+direction is undefined for zero length vectors, these are not allowed.
+Zero length arrow vectors will generate a PostScript print error:
+@code{undefinedresult}.  For any non-zero length vector, the full size
+arrowhead is drawn, even if that arrowhead is longer than the line
+length.
+
+The absolute motion versions of these commands specify the coordinate of
+the final position.
+
+@table @code
+@findex \move
+@item \move (@var{x} @var{y})
+Move to coordinate @code{(@var{x} @var{y})}.  The new current position
+is @code{(@var{x} @var{y})}.
+@findex \lvec
+@item \lvec (@var{x} @var{y})
+Draw a line from the current position to coordinate @code{(@var{x}
+@var{y})}.  The new current position is @code{(@var{x} @var{y})}.
+@findex \avec
+@item \avec (@var{x} @var{y})
+Draw a line with an arrowhead from the current position to
+@code{(@var{x} @var{y})}.  The new current position is @code{(@var{x}
+@var{y})}.  The arrowhead is aligned with the line, with the tip at
+@code{(@var{x} @var{y})}.
+@end table
+
+@cindex relative positioning
+The relative motion versions of these commands interpret the coordinates
+as displacements relative to the current position.  Given the
+displacements @code{(@var{dx} @var{dy})} as a parameter, each of the
+relative motion commands moves @var{dx} units in the @var{x} direction
+and @var{dy} units in the @var{y} direction.
+
+@table @code
+@findex \rmove
+@item \rmove (@var{dx} @var{dy})
+Move from the current position, @var{dx} units in the @var{x} direction
+and @var{dy} units in the @var{y} direction.  The final position becomes
+the new current position.
+@findex \rlvec
+@item \rlvec (@var{dx} @var{dy})
+Draw a line from the current position, @var{dx} units in the @var{x}
+direction and @var{dy} units in the @var{y} direction.  The final
+position becomes the new current position.
+@findex \ravec
+@item \ravec (@var{dx} @var{dy})
+Draw a line with an arrowhead from the current position, @var{dx} units
+in the @var{x} direction and @var{y} units in the @var{y} direction.
+The final position becomes the new current position.  The arrowhead is
+aligned with the line, with the tip at the new current position.
+@end table
+
+Lines can be customized with commands to change the line width, line
+pattern and line gray level rendition.  In addition, commands for
+changing the type and size of the arrowhead are available.
+
+@cindex line width
+@cindex width of lines
+@cindex dashed lines
+@cindex dotted lines
+@cindex gray levels for lines
+@cindex arrowhead parameters
+@table @code
+@findex \linewd
+@item \linewd @var{width}
+Set the line width to @var{width} units.  Initially @var{width} is 0.01
+inches (corresponding to 3 pixels at 300 pixels to the inch).
+@item \lpatt (@var{pattern})
+Set lines to have the pattern @code{(@var{pattern})}.  A pattern is a
+sequence of on/off lengths separated by blanks and enclosed in parentheses.
+The lengths alternately specify the length of a dash and the length of a
+gap between dashes.  Each length is interpreted using the current
+scaling and drawing units.  The pattern is used cyclically.  The empty
+pattern signifies a solid line.  The initial line pattern is a solid
+line, corresponding to the empty pattern @code{\lpatt ()}.
+@findex \setgray
+@item \setgray @var{level}
+Set the gray level of lines.  Gray levels are real values from 0 (black)
+through intermediate values (gray) to 1 (white).  The initial gray level
+is 0 corresponding to black.
+@findex \arrowheadtype
+@item \arrowheadtype t:@var{type}
+Set the arrowhead type to @var{type}, where @var{type} is one of
+@code{F}, @code{T}, @code{W}, @code{V}, or @code{H}.  There are two
+kinds of arrowheads.  The first kind is a triangle.  There are 3
+variants: type @code{T} is an empty triangle, type @code{F} is a filled
+triangle (using the current gray level), type @code{W} is a triangle
+filled with white.  The second kind of arrowhead is an open ended Vee.
+There are 2 variants: type @code{V} has the stem continue to the tip,
+type @code{H} has the stem stop at the base of the arrowhead.  The
+initial arrowhead type is @code{T}.
+@findex \arrowheadsize
+@item \arrowheadsize l:@var{length} w:@var{width}
+Set the arrowhead size to be @var{length} units long and @var{width}
+units wide.  The width is measured across the ``base'' of the arrowhead.
+The initial arrowhead size has a @var{length} of 0.16 inches and a
+@var{width} of 0.08 inches.
+@end table
+
+Note that the lines which outline the arrowhead will be drawn with the
+same line pattern used for the stem.  Normally, arrow vectors are drawn
+with the line pattern set for a solid line.  Note that the fill level
+used for the @code{F} variant of the arrowhead uses the same gray level
+as used for lines.  The difference between the @code{T} variant and the
+@code{W} variant only shows up if the arrowhead is placed over non-white
+areas of the drawing.  The @code{W} variant obliterates the area under
+the arrowhead.
+
+Examples of line parameter and arrowhead settings are shown in the
+following code.
+@example
+@group
+\centertexdraw@{
+  \drawdim in
+  \linewd 0.03 \setgray 0.6 \arrowheadtype t:F \avec(0 0.5)
+  \linewd 0.01 \setgray 0   \arrowheadtype t:V \avec(0.5 0.5)
+  \linewd 0.015 \lpatt(0.067 0.1) \lvec (1 0)
+  \linewd 0.02 \lpatt() \arrowheadtype t:T \avec(1.5 0.5)
+  \arrowheadtype t:H \avec(2.0 0.5)
+  \setgray 0.4 \arrowheadtype t:W \avec(3.0 0)
+@}
+@end group
+@end example
+@tex
+\bigskip
+\centertexdraw{
+  \drawdim in
+  \linewd 0.03 \setgray 0.6 \arrowheadtype t:F \avec(0.5 0.5)
+  \linewd 0.01 \setgray 0   \arrowheadtype t:V \avec(1.0 0.5)
+  \linewd 0.015 \lpatt(0.067 0.1) \lvec (1.5 0)
+  \linewd 0.02 \lpatt() \arrowheadtype t:T \avec(2.0 0.5)
+  \arrowheadtype t:H \avec(2.5 0.5)
+  \setgray 0.4 \arrowheadtype t:W \avec(3.0 0)
+  \textref h:R v:T \htext (0.35 0.50){\tt t:F}
+  \textref h:R v:T \htext (1.0 0.43){\tt t:V}
+  \textref h:R v:T \htext (1.82 0.50){\tt t:T}
+  \textref h:R v:T \htext (2.5 0.43){\tt t:H}
+  \textref h:R v:B \htext (2.8 0){\tt t:W}
+}
+@end tex
+
+@node TeX text, Circles and arcs, Line vectors, TeXdraw Commands
+@section @TeX{} text
+@cindex text commands
+
+Text may be superimposed on the drawing.  The text argument of the
+@code{\htext} command is in horizontal mode.  This text can be ordinary
+text, math mode expressions, or even more complicated boxes consisting
+of tables and the like.  The resulting @TeX{} text is placed in a box.
+The reference point of the box can be chosen to be one of nine
+locations: horizontally left, center or right; vertically top, center or
+bottom.  The @code{\htext} command takes one of two forms.
+
+@table @code
+@findex \htext
+@item \htext (@var{x} @var{y})@{@var{text}@}
+@itemx \htext @{@var{text}@}
+The first form of this command places the @TeX{} text @var{text}
+horizontally with the text reference point at the coordinate
+@code{(@var{x} @var{y})}.  The new current position is @code{(@var{x}
+@var{y})}.  The second form of this command places the @TeX{} text
+@var{text} horizontally with the text reference point at the current
+position.  The text reference point is set with the @code{\textref}
+command.
+@end table
+
+@cindex vertical text
+Text can be placed vertically using the @code{\vtext} command.  The text
+argument is in horizontal mode.  The @TeX{} text is placed in a box and
+then rotated counterclockwise.  The reference point is the point in the
+box, @emph{before} rotation of the text.
+
+@table @code
+@findex \vtext
+@item \vtext (x y)@{@var{text}@}
+@itemx \vtext @{@var{text}@}
+The first form of this command places the @TeX{} text @var{text}
+vertically with the text reference point at the coordinate
+@code{(@var{x} @var{y})}.  The new current position is @code{(@var{x}
+@var{y})}.  The second form of this command places the @TeX{} text
+@var{text} vertically with the text reference point at the current
+position.  In both cases, the @TeX{} text is placed in a box and the box
+is rotated counterclockwise by 90 degrees about the text reference
+point.  The text reference point is set with the @code{\textref}
+command.
+@end table
+
+@cindex rotated text
+Text can be placed at an arbitrary angle using the @code{\rtext}
+command.  The text argument is in horizontal mode.  The @TeX{} text is
+placed in a box and then rotated counterclockwise.  The reference point
+is the point in the box, @emph{before} rotation of the text.
+
+@table @code
+@findex \rtext
+@item \rtext td:@var{angle} (x y)@{@var{text}@}
+@itemx \rtext td:@var{angle} @{@var{text}@}
+The first form of this command places the @TeX{} text @var{text} at an
+angle with the text reference point at the coordinate @code{(@var{x}
+@var{y})}.  The new current position is @code{(@var{x} @var{y})}.  The
+second form of this command places the @TeX{} text @var{text} at an
+angle with the text reference point at the current position.  In both
+cases, the @TeX{} text is placed in a box and the box is rotated
+counterclockwise by @var{angle} degrees about the text reference point.
+The text reference point is set with the @code{\textref} command.
+@end table
+
+The reference point for subsequent @TeX{} text in a @code{\htext},
+@code{\vtext} or @code{\rtext} command is set with the @code{\textref}
+command.
+
+@table @code
+@findex \textref
+@item \textref h:@var{h-ref} v:@var{v-ref}
+Set the text reference point for subsequent text commands.  The
+horizontal reference point @var{h-ref} is one of @code{L}, @code{C} or
+@code{R} (left, center or right).  The vertical reference point
+@var{v-ref} is one of @code{T}, @code{C} or @code{B} (top, center or
+bottom).  For rotated text, the reference point is determined before
+rotation.  The initial text reference point corresponds to
+@code{\textref h:L v:B}.
+@end table
+@noindent
+
+@tex
+\centertexdraw{
+  \def\bdot {\bsegment
+               \fcir f:0 r:0.02
+             \esegment}
+  \def\Ttext #1{\bsegment
+                  \textref h:C v:B \htext (0 +0.06){#1}
+                \esegment}
+  \def\Btext #1{\bsegment
+                  \textref h:C v:T \htext (0 -0.06){#1}
+                \esegment}
+  \def\Ltext #1{\bsegment
+                  \textref h:R v:C \htext (-0.08 0){#1}
+                \esegment}
+  \def\Rtext #1{\bsegment
+                  \textref h:L v:C \htext (+0.08 0){#1}
+                \esegment}
+  \move (-1.5 0)
+  \bsegment
+    \move (+1.55 +0.45) \move (-1.55 -0.45) \move (0 0)
+    \Ttext{Horizontal Text}
+    \bdot                   \Btext{\tt h:C v:C}
+    \move (-0.9 0)    \bdot \Ltext{\tt h:L v:C}
+    \move (+0.9 0)    \bdot \Rtext{\tt h:R v:C}
+    \move (0 +0.3)    \bdot \Ttext{\tt h:C v:T}
+    \move (0 -0.3)    \bdot \Btext{\tt h:C v:B}
+    \move (-0.9 -0.3) \bdot \Ltext{\tt h:L v:B}
+    \lvec (-0.9 +0.3) \bdot \Ltext{\tt h:L v:T}
+    \lvec (+0.9 +0.3) \bdot \Rtext{\tt h:R v:T}
+    \lvec (+0.9 -0.3) \bdot \Rtext{\tt h:R v:B}
+    \lvec (-0.9 -0.3)
+  \esegment
+  \def\atext {\rtext td:45 }
+  \def\ATtext #1{\bsegment
+                   \setsegscale 0.707
+                   \textref h:C v:B \atext (-0.06 +0.06){#1}
+                 \esegment}
+  \def\ABtext #1{\bsegment
+                   \setsegscale 0.707
+                   \textref h:C v:T \atext (+0.060 -0.06){#1}
+                 \esegment}
+  \def\ALtext #1{\bsegment
+                   \setsegscale 0.707
+                   \textref h:R v:C \atext (-0.08 -0.08){#1}
+                 \esegment}
+  \def\ARtext #1{\bsegment
+                   \setsegscale 0.707
+                   \textref h:L v:C \atext (+0.08 +0.08){#1}
+                 \esegment}
+  \move (+1.5 0)
+  \bsegment
+    \move (+1.33 +1.33) \move (-1.33 -1.33) \move (0 0)
+    \setsegscale 0.707
+    \ATtext{Rotated Text}
+    \bdot                   \ABtext{\tt h:C v:C}
+    \move (-0.9 -0.9) \bdot \ALtext{\tt h:L v:C}
+    \move (+0.9 +0.9) \bdot \ARtext{\tt h:R v:C}
+    \move (-0.3 +0.3) \bdot \ATtext{\tt h:C v:T}
+    \move (+0.3 -0.3) \bdot \ABtext{\tt h:C v:B}
+    \move (-0.6 -1.2) \bdot \ALtext{\tt h:L v:B}
+    \lvec (-1.2 -0.6) \bdot \ALtext{\tt h:L v:T}
+    \lvec (+0.6 +1.2) \bdot \ARtext{\tt h:R v:T}
+    \lvec (+1.2 +0.6) \bdot \ARtext{\tt h:R v:B}
+    \lvec (-0.6 -1.2)
+  \esegment
+}
+@end tex
+
+The font used to render the text is determined as for any other @TeX{}
+text.  Normally the font used outside of @TeX{}draw is in effect.  If
+desired, other fonts can be specified as part of the text.  Any font
+changes within a @TeX{}draw text command remain local to that command.
+
+Only the coordinate of the text reference point in a @code{\htext},
+@code{\vtext} or @code{\rtext} command is used in calculating the size
+of the drawing.  This means that text itself can spill outside of the
+drawing area determined by @TeX{}draw.  The area of the drawing can be
+increased to enclose the text by issuing additional @code{\move}
+commands.
+
+@example
+@group
+\centertexdraw@{
+             \avec(-0.75 -0.25) \textref h:R v:C \htext@{H-text@}
+  \move(0 0) \avec(-0.75 +0.25) \textref h:R v:B \htext@{H-text@}
+  \move(0 0) \avec(0 +0.5)      \textref h:L v:T \vtext@{V-text@}
+  \move(0 0) \avec(+0.75 +0.25) \textref h:L v:B \htext@{H-text@}
+  \move(0 0) \avec(+0.75 -0.25) \textref h:L v:C \htext@{H-text@}
+@}
+@end group
+@end example
+@iftex
+Superimposed on this example is a shaded region showing the limits of
+the @TeX{}draw box as determined by the coordinates specified.
+@tex
+\bigskip
+\centertexdraw{
+  \move(-0.75 -0.25) \lvec (-0.75 +0.5) \lvec (+0.75 +0.5)
+  \lvec(+0.75 -0.25) \ifill f:0.9         % fill the region
+  \move(0 0)
+             \avec(-0.75 -0.25) \textref h:R v:C \htext{H-text}
+  \move(0 0) \avec(-0.75 +0.25) \textref h:R v:B \htext{H-text}
+  \move(0 0) \avec(0 +0.5)      \textref h:L v:T \vtext{V-text}
+  \move(0 0) \avec(+0.75 +0.25) \textref h:L v:B \htext{H-text}
+  \move(0 0) \avec(+0.75 -0.25) \textref h:L v:C \htext{H-text}
+  \move (-1.15 -0.3) \move (+1.15 +0.92)  % increase the size of the drawing
+}
+@end tex
+@end iftex
+
+@node Circles and arcs, Bezier curves, TeX text, TeXdraw Commands
+@section Circles, ellipses and arcs
+@cindex circles
+@cindex filled circles
+@cindex ellipses
+@cindex arcs
+
+@TeX{}draw supplies commands to generate circles, ellipses and arcs.
+There are two forms of the circle command.  The @code{\lcir} command
+draws a circle of given radius.  The @code{\fcir} command draws a filled
+circle.  In the latter case, the circle is filled by a specified gray
+level.  For the filled circle, the line defining the circumference of
+the circle is not drawn.  Note that the gray level area filled in by the
+@code{\fcir} command is opaque, even if the fill is chosen to be white.
+For either form of the circle command, the drawing size is increased if
+necessary to contain the circle.
+
+The @code{\lellip} command generates an ellipse specified by the radius
+of the ellipse in the @var{x} direction and the radius of the ellipse in
+the @var{y} direction.  The ellipse is symmetrical about horizontal and
+vertical lines drawn through the current point.  The @code{\fellip}
+command draws a filled ellipse.  In the latter case, the ellipse is
+filled by a specified gray level.  For the filled ellipse, the line
+defining the boundary of the ellipse is not drawn.  For either form of
+teh ellipse command, the drawing size is increased if necessary to
+contain the ellipse.
+
+
+The @code{\larc} command generates a counterclockwise arc specified by a
+start angle in degrees and an end angle in degrees.  The center of the
+arc is the current position.  Only the arc is drawn, not the line
+joining the center to the beginning of the arc.  Note that the
+@code{\larc} command does not affect the size of the drawing.
+
+@table @code
+@findex \lcir
+@item \lcir r:@var{radius}
+Draw a circle with center at the current position.  The radius is
+specified by @var{radius}.  This command draws a line along the
+circumference of the circle.  The drawing size is increased if necessary
+to contain the circle.
+@findex \fcir
+@item \fcir f:@var{level} r:@var{radius}
+Draw a filled circle with center at the current position.  The radius is
+specified by @var{radius}.  The circle is painted with the gray level
+specified by @var{level}.  A gray level of 1 corresponds to white, with
+decreasing values getting darker.  The level 0 is full black.  This
+command does not draw a line along the circumference.  The drawing size
+is increased if necessary to contain the circle.
+@findex \lellip
+@item \lellip rx:@var{x-radius} ry:@var{y-radius}
+Draw an ellipse with center at the current position.  The radius in the
+@var{x} direction is specified by @var{x-radius}.  The radius in the
+@var{y} direction is specified by @var{y-radius}.  The drawing size is
+increased if necessary to contain the ellipse.
+@findex \fellip
+@item \fellip f:@var{level} rx:@var{x-radius} ry:@var{y-radius}
+Draw a filled ellipse with center at the current position.  The radius
+in the @var{x} direction is specified by @var{x-radius}.  The radius in
+the @var{y} direction is specified by @var{y-radius}.  The ellipse is
+painted with the gray level specified by @var{level}.  A gray level of 1
+corresponds to white, with decreasing values getting darker.  The level
+0 is full black.  This command does not draw a line along the boundary
+of the ellipse.  The drawing size is increased if necessary to contain
+the ellipse.
+@findex \arc
+@item \larc r:@var{radius} sd:@var{start-angle} ed:@var{end-angle}
+Draw a counterclockwise arc.  The center of the arc is at the current
+position.  The radius is specified by @var{radius}.  The start and end
+angles (in degrees) are specified by @var{start-angle} and
+@var{end-angle}.  This command does not affect the limits (size) of the
+drawing.
+@end table
+
+As an example, the following commands draw a filled circle, and
+superimpose an arc.
+@example
+@group
+\centertexdraw@{
+  \linewd 0.02
+  \fcir f:0.7 r:1
+  \larc r:1 sd:45 ed:135
+  \lvec (+0.707 +0.707) \move (0 0) \lvec (-0.707 +0.707)
+@}
+@end group
+@end example
+@tex
+\bigskip
+\centertexdraw{
+  \linewd 0.02
+  \fcir f:0.7 r:1
+  \larc r:1 sd:45 ed:135
+  \lvec ( 0.707  0.707) \move (0 0) \lvec (-0.707 +0.707)
+}
+@end tex
+
+Note that for the arc command, the resulting figure can spill outside of
+the @TeX{}draw box as determined by the maximum excursions of the
+coordinates.  Extra moves can be used to compensate for the size of the
+arc.
+
+@node Bezier curves, Fill commands, Circles and arcs, TeXdraw Commands
+@section Bezier curves
+@cindex Bezier curves
+@cindex curves
+
+Bezier curves in @TeX{}draw use 4 reference coordinates, two as the end
+points and two others to control the shape of the curve.  Let the 4
+points be @code{(@var{x0} @var{y0})}, @code{(@var{x1} @var{y1})},
+@code{(@var{x2} @var{y2})} and @code{(@var{x3} @var{y3})}.  The curve
+starts out tangent to the line joining the first two points and ends up
+tangent to the line joining the second two points.  The control points
+``pull'' at the curve to control the curvature.  The amount of pull
+increases with the distance of the control point from the endpoint.
+
+@tex
+As the parameter $\mu$ varies from 0 to 1, the coordinates of the Bezier
+curve are given by a pair of parametric cubic equations,
+$$
+\def\x #1{\hbox{\sl x#1}}
+\def\y #1{\hbox{\sl y#1}}
+\eqalign{
+ \x{}(\mu) &= (1-\mu)^3 \x0 + 3\mu(1-\mu)^2 \x1 + 3\mu^2(1-\mu) \x2 + \mu^3 \x3 \cr
+ \y{}(\mu) &= (1-\mu)^3 \y0 + 3\mu(1-\mu)^2 \y1 + 3\mu^2(1-\mu) \y2 + \mu^3 \y3\ . \cr}
+$$
+@end tex
+@ifinfo
+As the parameter u varies from 0 to 1, the coordinates of the Bezier
+curve are given by a pair of parametric cubic equations,
+
+@noindent
+x(u) = (1-u)^3 x0  + 3u (1-u)^2 x1  + 3u^2 (1-u) x2  + u^3 x3
+@noindent
+y(u) = (1-u)^3 y0  + 3u (1-u)^2 y1  + 3u^2 (1-u) y2  + u^3 y3 .
+
+@end ifinfo
+
+
+@table @code
+@findex \clvec
+@item \clvec (@var{x1} @var{y1})(@var{x2} @var{y2})(@var{x3} @var{y3})
+Draw a Bezier curve from the current position to the coordinate
+@code{(@var{x3} @var{y3})} which becomes the new current position.  The
+coordinates @code{(@var{x1} @var{y1})} and @code{(@var{x2} @var{y2})}
+serve as control points for the curve.  Only the last coordinate given
+is used to update the size of the drawing.
+@end table
+@noindent
+Note that only 3 coordinate pairs are specified.  The other point is the
+current position before the @code{\clvec} command is executed.  Only the
+last coordinate specified in the @code{\clvec} command is used to
+determine the extent of the drawing.  While the Bezier curve passes
+through the old current position and the new current position, in
+general the curve will not reach the intermediate control points.  The
+curve is always entirely enclosed by the convex quadrilateral defined by
+the two end points and the two control points.  Note that the curve may
+pass outside the limits of the drawing as determined by the end point of
+the curve.
+
+A simple Bezier curve is produced by the following example.
+@example
+@group
+\btexdraw
+  \move (0 0)
+  \clvec (0 1)(1 0)(1 1)
+\etexdraw
+@end group
+@end example
+
+@iftex
+This example is the rightmost of the following Bezier curves.  The
+drawings also show the end points and the control points for each curve.
+@tex
+\bigskip
+\centertexdraw{
+  \def\Ltext #1{\bsegment
+                  \textref h:R v:C \htext (-0.08 0){#1}
+                \esegment}
+  \def\Rtext #1{\bsegment
+                  \textref h:L v:C \htext (+0.08 0){#1}
+                \esegment}
+  \def\bdot {\fcir f:0 r:0.02 }
+  \def\Ldot #1{\bdot \Ltext{#1}}
+  \def\Rdot #1{\bdot \Rtext{#1}}
+  \move (-2 0)
+  \bsegment
+    \lpatt (0.033)
+    \move (0 0) \Ldot{0} \lvec (0 1) \Ldot{1}
+    \lvec (1 1) \Rdot{2} \lvec (1 0) \Rdot{3}
+    \lpatt ()
+    \move (0 0) \clvec (0 1)(1 1)(1 0)
+  \esegment
+  \move (0 0)
+  \bsegment
+    \lpatt (0.033)
+    \move (0 0) \Ldot{0}  \lvec (0.5 0.8) \Ldot{1}
+    \lvec (1.5 0.8) \Rdot{2} \lvec (1 0) \Rdot{3}
+    \lpatt ()
+    \move (0 0) \clvec (0.5 1)(1.5 1)(1 0)
+  \esegment
+  \move ( 2 0)
+  \bsegment
+    \lpatt (0.033)
+    \move (0 0) \Ldot{0} \lvec (0 1) \Ldot{1}
+    \lvec (1 0) \Rdot{2} \lvec (1 1) \Rdot{3}
+    \lpatt ()
+    \move (0 0) \clvec (0 1)(1 0)(1 1)
+  \esegment
+}
+@end tex
+@end iftex
+
+@node Fill commands, , Bezier curves, TeXdraw Commands
+@section Fill commands
+@cindex filling regions
+@cindex painting regions
+@cindex paths
+
+PostScript deals with paths consisting of line segments.  The paths can
+be closed and the interior of the closed region filled.  From
+@TeX{}draw, paths start with a @code{\move} or @code{\rmove} command and
+continue with @code{\lvec}, @code{\rlvec} or @code{\clvec} commands.
+The @TeX{}draw fill commands close the path and fill the interior of the
+closed region.  Closing the path means that effectively another
+@code{\lvec} line is drawn from the last point specified to the initial
+point.  @TeX{}draw provides two forms of the fill command.  The
+@code{\ifill} fills the interior of the region with the given gray
+level.  The lines defining the path are not drawn.  The @code{\lfill}
+command fills the region defined by the closed path and draws a line
+along the enclosing path.  Note for both forms of the fill command, the
+gray level used for filling is opaque, even if the gray level is chosen
+to be white.
+
+@table @code
+@findex \lfill
+@item \lfill f:@var{level}
+Close the current path, draw the line around the path using the current
+grey level for lines and paint the interior of the region with specified
+gray level @var{level}.  Gray levels are real values from 0 (black)
+through intermediate values (grays) to 1 (white).
+@findex \ifill
+@item \ifill f:@var{level}
+Close the current path and paint the interior of the region with gray
+level @var{level}.  The line around the path is not drawn.  Gray levels
+are real values from 0 (black) through intermediate values (grays) to 1
+(white).
+@end table
+
+The following example draws a ``flag'' with the interior filled in.  The
+path around the boundary is given in a clockwise order to define a
+closed path.  We could take advantage of the fact that the fill command
+will close an open path to eliminate one of the @code{\lvec} commands.
+@example
+@group
+\centertexdraw@{
+\move (0.5 0)
+\lvec (0 0.5) \clvec (0.5 0.85)(1 0.65)(1.5 1)
+\lvec (2 0.5) \clvec (1.5 0.15)(1 0.35)(0.5 0)
+\lfill f:0.8
+@}
+@end group
+@end example
+@tex
+\bigskip
+\centertexdraw{
+\move (0.5 0)
+\lvec (0 0.5) \clvec (0.5 0.85)(1 0.65)(1.5 1)
+\lvec (2 0.5) \clvec (1.5 0.15)(1 0.35)(0.5 0)
+\lfill f:0.8
+}
+@end tex
+
+In @TeX{}draw, the @code{\move} command always terminates any previous
+paths and starts a new path.  Commands that change line parameters
+(e.g@.  @code{\setgray} or @code{\lpatt}) also terminate paths and start
+new paths.  The circle, ellipse and arc commands do not affect the
+definition of the current path.  The @code{\avec} command is not
+appropriate for defining a path to be filled.  It ends a subpath at its
+tail and begins a new subpath at its tip.  Filling a region defined by a
+path with subpaths is more complicated in that each subpath is closed
+before filling.
+
+
+@node Drawing Segments and Scaling, Using TeXdraw with LaTeX, TeXdraw Commands, Top
+@chapter Drawing Segments and Scaling
+
+@TeX{}draw provides individually scaled segments which can be used to
+create relocatable drawing modules.
+
+@menu
+* Drawing segments::
+* Drawing paths::
+* Saving positions::
+* Scaling coordinates::
+* Drawing size::
+* Initial current position::
+@end menu
+
+@node Drawing segments, Drawing paths, , Drawing Segments and Scaling
+@section Drawing segments
+@cindex segments
+@cindex drawing segments
+
+A @TeX{}draw drawing segment allows for local modifications of
+parameters and relative positioning.  A @TeX{}draw segment is delimited
+by a @code{\bsegment} command and an @code{\esegment} command.  Inside
+the segment, the initial current position is @code{(0 0)}.  Any changes
+to parameters such as the gray level and the line width, remain local to
+the segment.  Segments are implemented in @TeX{} using a
+@code{\begingroup} and @code{\endgroup}.  Segments can be nested.
+
+@table @code
+@findex \bsegment
+@item \bsegment
+Start a drawing segment.  The coordinate system is shifted such that the
+current position corresponds to the coordinate @code{(0 0)}.  Changes to
+scaling, position and line parameters stay local to the drawing segment.
+@findex \esegment
+@item \esegment
+End a drawing segment.  The current position in effect before the
+corresponding @code{\bsegment} command is restored.  The scaling and
+line parameter values revert to those in effect before the corresponding
+@code{\bsegment} command was invoked.
+@end table
+
+@node Drawing paths, Saving positions, Drawing segments, Drawing Segments and Scaling
+@section Drawing paths
+@cindex fill operations, interaction with drawing segments
+@cindex paths
+@cindex stroking lines
+Certain subtle interactions occur between drawing segments and fill
+operations.  In PostScript, lines are drawn by first defining a path,
+then later stroking the path to draw the line.  In @TeX{}draw, this
+stroking occurs when the line is terminated, say by a @code{\move}
+command.  PostScript paths are interrupted by, but continue after a
+drawing segment.  This means that a path started before a segment may
+not be stroked (drawn) until after the segment ends.  Consider the
+following example.
+@example
+@group
+\move (0 0)
+\lvec (1 1)
+\bsegment
+  \move (-0.25 -0.25)
+  \fcir f:0.8 r:0.5
+\esegment
+\move (0 0)
+@end group
+@end example
+A PostScript path is started at @code{(0 0)} and continues with a line
+to @code{(1 1)}.  This path is interrupted by the segment.  The filled
+circle is drawn next.  After the segment, the path continues and is not
+stroked until the @code{\move (0 0)} command after the end of the
+segment.  This means that the line appears on top of the filled region.
+
+If the fill operation is to cover the line, the path must be stroked
+before the fill operation.  From @TeX{}draw, the move commands
+@code{\move} and @code{\rmove}, and the end @TeX{}draw command
+@code{\etexdraw} terminate a path and cause it to be stroked.  Within a
+segment, the end segment command @code{\esegment} also terminates and
+strokes a path.  In the example above, the line can be stroked by
+inserting a move command (such as a @code{\rmove (0 0)} which does not
+affect the position), before the start of the segment.
+
+@node Saving positions, Scaling coordinates, Drawing paths, Drawing Segments and Scaling
+@section Saving positions
+@cindex saving positions
+@cindex positions, saving
+@cindex coordinate, symbolic
+@cindex symbolic coordinate
+
+The @code{\savecurrpos} command saves the current position.  The saved
+position is an absolute position, not one relative to a segment.  The
+position saving mechanism is global; the position can be saved within a
+nested segment and then used outside of the segment.  The @var{x} and
+@var{y} coordinates of the position are saved separately as named
+coordinates.  The names are of the form @code{*@var{name}}, with the
+leading @code{*} being obligatory.  A companion command,
+@code{\savepos}, saves a given coordinate (relative to the current
+segment) as an absolute symbolic position.
+
+@table @code
+@findex \savecurrpos
+@item \savecurrpos (*@var{px} *@var{py})
+Save the current position as the absolute position referenced by
+@code{(*@var{px} *@var{py})}.
+@findex \savepos
+@item \savepos (@var{x} @var{y})(*@var{px} *@var{py})
+Save the coordinate position @code{(@var{x} @var{y})} as the absolute
+position referenced by @code{(*@var{px} *@var{py})}.  The coordinate
+@code{(@var{x} @var{y})} is interpreted in the normal fashion as a
+coordinate relative to the current segment, using the current scaling
+factors and drawing unit.
+@end table
+
+The symbolic names used to specify a saved position can consist of any
+characters that are not special to @TeX{}, but must start with a
+@code{*} character.  The symbolic names can be used as the @var{x}
+and/or @var{y} coordinate in any command that needs a coordinate.
+Symbolic coordinates are not normally used with relative motion commands
+such as @code{\rlvec} or @code{\rmove}.  If used with relative motion,
+the corresponding displacement is equal to the symbolic coordinate
+value.
+
+On exit from a segment, the position and graphics state on entry is
+restored.  Any changes to line types, scaling and position are
+discarded.  However, it is sometimes useful alter the position on exit
+from a segment.  The @code{\savepos} command allows for the saving of a
+position within the segment.  This position can be restored after the
+@code{\esegment} with a @code{\move} command using the saved symbolic
+position.  This approach can be used to build modules which operate in a
+manner analogous to the basic relative motion line vector commands.
+
+The following example defines a macro which draws a box 0.75 inches wide
+by 0.5 inches high containing centered text.  On leaving the macro the
+position will be set at a point on the righthand side of the box.
+@example
+@group
+\def\tbox #1@{\bsegment
+               \lvec (0 +0.25)    \lvec (0.75 +0.25)
+               \lvec (0.75 -0.25) \lvec (0 -0.25) \lvec (0 0)
+               \textref h:C v:C \htext (0.375 0)@{#1@}
+               \savepos (0.75 0)(*ex *ey)
+             \esegment
+             \move (*ex *ey)@}
+@end group
+@end example
+With this definition, we can treat @code{\tbox} in the same way as the
+basic vector commands, stringing them together to form a block diagram
+as in this example.
+@example
+@group
+\centertexdraw@{
+  \ravec (1 0) \tbox@{$H(z)$@} \ravec (1 0)
+@}
+@end group
+@end example
+@tex
+\def\tbox #1{\bsegment
+               \lvec (0 +0.25)    \lvec (0.75 +0.25)
+               \lvec (0.75 -0.25) \lvec (0 -0.25) \lvec (0 0)
+               \textref h:C v:C \htext (0.375 0){#1}
+               \savepos (0.75 0)(*ex *ey)
+             \esegment
+             \move (*ex *ey)}
+\bigskip
+\centertexdraw{
+  \ravec (1 0) \tbox{$H(z)$} \ravec (1 0)
+}
+@end tex
+
+@node Scaling coordinates, Drawing size, Saving positions, Drawing Segments and Scaling
+@section Scaling coordinates
+@cindex scaling coordinates
+@cindex relative scaling
+@cindex segment scale
+@cindex unit scale
+
+There are two scale factors available, the unit scale factor and the
+segment scale factor.  The overall scale factor is the product of these
+two.  There are absolute and relative versions of commands to change
+these scale factors.
+
+The unit scale factor is normally used to affect global scale changes.
+Changes to the unit scale factor remains local to a segment, but
+propagate to inferior segments.  The default value is unity.
+
+The segment scale factor is used for local scale changes.  It remains
+local to a segment.  The segment scale factor is reset to unity on entry
+into each segment.  This means that changes to the segment scale factor
+do not propagate to inferior segments.
+
+@table @code
+@findex \setunitscale
+@item \setunitscale @var{scale}
+Set the unit scaling to @var{scale}.  The argument @var{scale} is a real
+number which is used to scale coordinate values.  The overall scaling
+factor is the product of the unit scale factor and the segment scale
+factor.
+@findex \relunitscale
+@item \relunitscale @var{value}
+Adjust the unit scale factor by multiplying by @var{value}.  This has
+the effect of multiplying the overall scale factor by the same factor.
+The overall scaling factor is the product of the unit scale factor and
+the segment scale factor.
+@findex \setsegscale
+@item \setsegscale @var{scale}
+Set the segment scale factor.  The argument @var{scale} is a real number
+which is used to scale coordinate values.  The overall scale factor is
+the product of the unit scale factor and the segment scale factor.
+@findex \relsegscale
+@item \relsegscale @var{value}
+Adjust the segment scale factor by multiplying by @var{value}.  This has
+the effect of multiplying the current overall scale factor by the same
+factor.  The overall scaling factor is the product of the unit scale
+factor and the segment scale factor.
+@end table
+
+In addition to the unit scale factor and the segment scale factor, the
+scaling can be controlled by the choice of drawing units with the
+command @code{\drawdim} (@pxref{Coordinate specification}).
+
+@table @code
+@item \drawdim cm \setunitscale 2.54
+Set the units to centimetres scaled by 2.54.  Together these commands
+are effectively the same as @code{\drawdim in}.
+@end table
+
+The segment scale can be used to allow scale changes in segments so that
+values are in more convenient units.  For example suppose dimensions in
+a segment are multiples of one third of an inch.  The segment scale can
+be set once to make 1 drawing unit equal 0.3333 inches.  From that point
+on, coordinates can be specified with integer values.
+
+The following example defines a macro to draw a rectangular box which is
+twice as wide as it is high.  The width is specified as an argument.
+@example
+@group
+\def\mybox #1@{\bsegment
+                \setsegscale #1
+                \lvec (0 +0.25) \lvec (1 +0.25) \lvec (1 -0.25)
+                \lvec (0 -0.25) \lvec (0 0)
+              \esegment@}
+@end group
+@end example
+
+@node Drawing size, Initial current position, Scaling coordinates, Drawing Segments and Scaling
+@section Drawing size
+@cindex size of the drawing
+
+The effective size of the drawing is determined by the maximum
+excursions of the coordinates supplied to @TeX{}draw commands.  The
+minimum and maximum scaled @var{x} and @var{y} coordinates are tallied.
+Note that @code{\move} commands contribute to the determination of the
+calculated size of the drawing, even though they do not generate visible
+lines.  The circle and ellipse commands add a compensation for the radii
+of circles and ellipses.  The final @TeX{}draw drawing is placed in a
+@TeX{} box with lower lefthand corner corresponding to
+@code{(}@var{x}-min @var{y}-min@code{)} and upper righthand corner at
+@code{(}@var{x}-max @var{y}-max@code{)}.
+
+Text generated by @code{\htext}, @code{\vtext} or @code{\rtext} can
+spill outside the box as determined above.  Only the text reference
+point is guaranteed to be in the drawing box.  Arcs can also spill
+outside the drawing box.  Note also that the widths of lines, and the
+sizes of arrowheads do not affect the size of the drawing.  The
+calculated size of the drawing will never be larger than the actual size
+of the drawing.  In extreme cases in which text or lines extend far
+outside the drawing, extra @code{\move} commands should be used to
+establish the size of the drawing so that the @TeX{}draw box includes
+all of the drawing.
+
+@TeX{}draw provides the @code{\drawbb} command to draw a box which
+indicates the effective size of the drawing.  Whenever @code{\drawbb} is
+invoked, a ruled box is drawn around the drawing as it has been sized up
+to that point.  Normally @code{\drawbb} is invoked just before the end
+of a drawing to indicate the effective size of the final drawing.
+
+@table @code
+@findex \drawbb
+@item \drawbb
+Draw a ruled box around the effective size of a drawing produced by
+@TeX{}draw commands.
+@end table
+
+@node Initial current position, , Drawing size, Drawing Segments and Scaling
+@section Initial current position
+@cindex current position
+@cindex initial current position
+
+The first operation in a drawing should be a move to establish the
+current position.  The current position can be established explicitly
+through a @code{\move} command or a text positioning command such as
+@code{\htext} with a coordinate.  However, if an attempt is made to use
+a drawing command which needs a current position and none has been
+established, @TeX{}draw implicitly sets the initial current position to
+@code{(0 0)}.  The size of the @TeX{}draw figure is normally determined
+from the sequence of coordinates specified, but will include the
+implicit initial position in case another initial position has not been
+explicitly specified.
+
+@node Using TeXdraw with LaTeX, More Details, Drawing Segments and Scaling, Top
+@chapter Using @TeX{}draw with La@TeX{}
+@cindex accessing @TeX{}draw
+@cindex invoking @TeX{}draw
+
+The La@TeX{} typesetting system uses a structured approach to declaring
+typesetting environments.  An interface to @TeX{}draw which follows
+these structuring conventions is provided on top of the basic @TeX{}draw
+commands.  Using this interface, @TeX{}draw is enabled as a
+document-style option, then invoked as a typesetting environment.  The
+@TeX{}draw environment is started with a @code{\begin@{texdraw@}}
+command and terminated with an @code{\end@{texdraw@}} command.  As an
+example, a La@TeX{} document to be typeset using the @code{article}
+style with the @code{12pt} option invokes @TeX{}draw as follows.
+@example
+@group
+\documentstyle [12pt,texdraw]@{article@}
+ ...
+\begin@{document@}
+ ...
+\begin@{texdraw@}
+ ...                  % TeXdraw commands to generate a drawing
+\end@{texdraw@}
+ ...
+\end@{document@}
+@end group
+@end example
+
+@menu
+* Alternate command forms for LaTeX::
+@end menu
+
+@node Alternate command forms for LaTeX, , , Using TeXdraw with LaTeX
+@section Alternate command forms for La@TeX{}
+@cindex La@TeX{} forms for @TeX{}draw commands
+
+All of the basic @TeX{}draw commands can be used with La@TeX{}.
+However, there are alternate forms for the commands used to invoke @TeX{}draw
+for use with La@TeX{}.  The @code{\begin@{texdraw@}} and @code{\end@{texdraw@}}
+commands are alternate forms for the @code{\btexdraw} and
+@code{\etexdraw} commands.
+
+@table @code
+@findex \begin@{texdraw@}
+@item \begin@{texdraw@}
+Start a @TeX{}draw drawing.  The drawing is terminated with an
+@code{\end@{texdraw@}} command.  This command is for use with La@TeX{}.
+@findex \end@{texdraw@}
+@item \end@{texdraw@}
+End a @TeX{}draw drawing started with a @code{\begin@{texdraw@}}
+command.  The resulting @TeX{}draw drawing is placed in a box with
+height equal to the height of the drawing and width equal to the width
+of the drawing.  The depth of the box is zero.  This command is for use
+with La@TeX{}.
+@end table
+
+A La@TeX{} specific variant of an earlier example can be
+constructed as follows.
+@example
+@group
+\newcommand@{\tbox@}[1]@{%
+   \bsegment
+     \lvec (0 +0.25)    \lvec (0.75 +0.25)
+     \lvec (0.75 -0.25) \lvec (0 -0.25) \lvec (0 0)
+     \textref h:C v:C \htext (0.375 0)@{#1@}
+     \savepos (0.75 0)(*ex *ey)
+   \esegment
+   \move (*ex *ey)@}
+\begin@{center@}
+\begin@{texdraw@}
+  \ravec (1 0) \tbox@{$H(z)$@} \ravec (1 0)
+\end@{texdraw@}
+\end@{center@}
+@end group
+@end example
+
+This example illustrates the use of the La@TeX{} command
+@code{\newcommand} as an alternative to the plain @TeX{} command
+@code{\def}.  Instead of the basic @TeX{}draw command
+@code{\centertexdraw}, a nested combination of the La@TeX{} centering
+environment and the @TeX{}draw environment is used.
+
+
+@node More Details, PostScript Commands, Using TeXdraw with LaTeX, Top
+@chapter More Details
+
+The first part of this chapter offers some suggestions for strategies to
+isolate errors in @TeX{} and @TeX{}draw input.  The second part of this
+chapter discusses implementational issues.  An awareness of these issues
+is useful if the @TeX{}draw package is to be extended.
+
+@menu
+* Problems arising from TeXdraw::
+* Extending TeXdraw::
+* How TeXdraw merges graphics and text::
+@end menu
+
+@node Problems arising from TeXdraw, Extending TeXdraw, , More Details
+@section Problems arising from @TeX{}draw
+@cindex problems arising from @TeX{}draw
+@cindex errors arising from @TeX{}draw
+
+@TeX{} input is notoriously difficult to debug.  If @TeX{} reports
+errors, so much the better.  If the cause is not immediately obvious,
+consider using a binary search strategy, removing sections of code with
+the premature insertion of the @code{\bye} command (with the appropriate
+closing of any open groups and the like).  Other strategies include the
+insertion of @code{\message@{I am here@}} at appropriate places.  Try
+using @code{\tracingmacros=1}.  Many problems turn out to be due to
+incorrect numbers of macro arguments or incorrectly delimited macro
+arguments.  The @code{\tracingmacros=1} option writes the macro
+arguments and macro expansions to the @TeX{} log file.
+
+Certain errors may not manifest themselves until well after the
+offending command.  For instance, if a closing parenthesis is missing
+from a @TeX{}draw coordinate, @TeX{} continues searching for the
+parenthesis.  If one is found, perhaps many lines later, the @TeX{}draw
+error message @code{invalid coordinate} will be printed at this later
+point.
+
+All input in the @TeX{}draw environment should be intended for
+interpretation by @TeX{}draw commands.  @TeX{}draw places text inside a
+zero size box (the text itself extends outside the box).  Extraneous
+input manifests itself as a non-zero size @TeX{}draw text box. This
+causes the @TeX{}draw text and the PostScript graphics to be displaced
+from one another.  An error message is issued if a non-zero width
+@TeX{}draw text box is detected.  If this error message appears, look
+for unintended character sequences amongst the commands to @TeX{}draw.
+
+Several @TeX{}draw commands pass their arguments ``raw'' to the
+PostScript file.  That means that invalid arguments can generate
+PostScript errors when the document is printed.  For instance the
+argument of the @code{\setgray} command is passed straight through to
+the PostScript file.  If this argument is non-numeric, a PostScript
+error results.  Not all PostScript printers report errors back to the
+user.  The print may just stop prematurely.  One approach to debugging
+is to use a PostScript previewer on a workstation. That way, one can
+determine at which point in the drawing the PostScript error occurs.
+
+@node Extending TeXdraw, How TeXdraw merges graphics and text, Problems arising from TeXdraw, More Details
+@section Extending @TeX{}draw
+@cindex implementation
+
+@TeX{}draw is implemented using a combination of @TeX{} commands and
+PostScript code.  This section discusses some of the implementational
+issues as they relate to extending @TeX{}draw.
+
+@TeX{}draw as implemented, offers a basic set of drawing features.
+These are adequate for certain tasks such as producing block diagrams.
+There are different approaches to extending @TeX{}draw to include other
+functions.  In some cases, the desired functionality can be achieved by
+writing a @TeX{} macro which builds on top of the existing @TeX{}draw
+commands.  As these extensions become more complex, the limitations of
+@TeX{} for computations become increasingly evident.  In other cases,
+access to different features of PostScript is desired.  The appropriate
+approach would be to write new PostScript procedures which can be
+accessed by @TeX{} macros.
+
+Included with @TeX{}draw are a set of macros for directly accessing
+PostScript functions.  These are described in an appendix
+(@pxref{PostScript Commands}).
+
+@TeX{}draw also comes with a toolbox of routines for handling much of
+the user interface, converting between different coordinate
+representations and the like.  The macros for coordinate decoding and
+for computations involving coordinates are described in an appendix
+(@pxref{TeXdraw Toolbox, , @TeX{}draw Toolbox}).
+
+@menu
+* Scaling::
+* Resolution::
+* Text placement::
+* Output PostScript file::
+@end menu
+
+@node Scaling, Resolution, , Extending TeXdraw
+@subsection Scaling
+@cindex scaling
+
+The scaling commands provided in @TeX{}draw are designed to affect only
+the coordinate values specified in commands.  For instance, changing the
+@code{\setunitscale} value changes the interpretation of the coordinate
+in an @code{\avec (@var{x} @var{y})} command, but does not change the
+line width or arrowhead sizes in effect.  None of the @TeX{}draw scaling
+commands affect the size of @TeX{} text produced by, for instance, the
+@code{\htext} command.  Scale changes will however affect the
+positioning of text for subsequent commands.
+
+The line parameters are changed only if the corresponding commands to
+change them are issued.  If the @code{\linewd} command is given, the
+current coordinate scaling is used to determine the line width.  To
+achieve a behaviour more like a global scaling, whenever the scale
+factor is changed, the line parameters must be set again.
+
+@node Resolution, Text placement, Scaling, Extending TeXdraw
+@subsection Resolution
+@cindex resolution
+
+@TeX{}draw scales coordinates before passing them to PostScript.
+Keeping track of the coordinate scaling is necessary, in any event, to
+allow @TeX{}draw to compute the maximum excursions of the coordinates.
+@TeX{}draw uses pixel units in its PostScript code.  These units
+correspond to 1/300 of an inch.  @TeX{}draw issues PostScript commands
+which use integer numbers of pixel units.  This sets the positioning
+resolution for @TeX{}draw.  The passing of integer valued coefficients
+which correspond to the device resolution keeps lines aligned with the
+device grid.  Parallel lines of the same width will be rendered with the
+same width.
+
+The position saving mechanism in @TeX{}draw (@pxref{Saving positions})
+associates the pixel coordinates of a position with the specified name.
+
+@TeX{}draw uses the limited real number representation provided by
+@TeX{}.  These operations are based on the representation of dimensions
+as real-valued numbers of points.  Internally in @TeX{}, dimensions are
+stored 32-bit values, normalized so that 1 pt corresponds to the scaled
+point (sp) value of 65536.  Dimensions with magnitudes between 0.000015
+pt and 32767 pt can be represented.  This is also the dynamic range of
+the @TeX{}draw pixel coordinates passed to PostScript.  @TeX{}draw must
+convert from user supplied coordinates using the scaling factor (which
+itself consists of two components, the unit scale and the segment scale)
+and a pixel conversion factor.  The use of limited precision real
+numbers in these computations can cause accumulation of error when
+relative scaling is used repeatedly.
+
+@node Text placement, Output PostScript file, Resolution, Extending TeXdraw
+@subsection Text placement
+
+While in the @TeX{}draw environment, @TeX{} text is placed directly in a
+@TeX{} box while PostScript code is being written to the intermediate
+file.  On leaving the @TeX{}draw environment, the size of the drawing is
+determined.  A @TeX{} @code{\vbox} of this size is created.  The @TeX{}
+@code{\special} mechanism is used to tell the dvi to PostScript driver
+to position the PostScript drawing information from the intermediate
+file in this area.  Next, the text generated by @TeX{}draw is positioned
+and placed in the box.  To adapt most of @TeX{}draw to another dvi to
+PostScript driver, only the @code{\special} command to position the
+PostScript include file need be modified.
+
+Note that when the document is printed, the PostScript drawing is placed
+on the page before the @TeX{} text, independently of the relative order
+of the text and drawing commands.  Generating @TeX{} text after the
+PostScript plot places text on top of filled areas.
+
+Rotated text is treated in a different manner.  The rotation is carried
+out with in-line PostScript code which does not appear in the
+intermediate PostScript file.  This code is sent to the dvi to
+PostScript driver with a @code{\special} command.  In effect this
+PostScript code is part of the dvi file.  To adapt this part of
+@TeX{}draw to another dvi to PostScript driver, a @code{\special} syntax
+for in-line PostScript compatible with the driver must be used.
+However, some dvi to PostScript drivers do not process the commands in
+sequence (for instance in OzTeX), or do not allow the effect of in-line
+PostScript to persist.  For those drivers, this method of rotating text
+will not work.
+
+@node Output PostScript file, , Text placement, Extending TeXdraw
+@subsection The output PostScript file
+@cindex Encapsulated PostScript File
+
+The intermediate PostScript file consists of a header, a body and a
+trailer following Encapsulated PostScript File (EPSF) standards.  The
+header sets up PostScript definitions and default parameter values.  The
+trailer includes BoundingBox information which gives the coordinates in
+default PostScript units (72 per inch) for the lower lefthand corner and
+the upper righthand corner of the drawing.  The body of the intermediate
+PostScript file contains the PostScript commands generated by
+@TeX{}draw.
+
+Many moves in @TeX{}draw serve only to position text or to reset saved
+positions.  @TeX{}draw buffers move commands in order to be able to
+collapse runs of moves.  Only the last move of a run of moves is
+actually written to the PostScript file.  However the intermediate moves
+still affect the size of the drawing.  The expunging of moves means that
+the PostScript file BoundingBox information may indicate a drawing size
+larger than the PostScript commands themselves would warrant.
+
+Drawing segments in @TeX{}draw show up in the PostScript file as saves
+and restores of the PostScript graphics state.  Segment starts are also
+buffered and only written out if necessary.  This way ``empty'' segments
+do not generate output to the PostScript file.  These empty segments
+arise if a segment contains only moves and text commands.  The moves
+inside the segment are not needed since they are local to the segment,
+and the text commands do not generate output to the PostScript file.
+
+If @TeX{}draw is used only for moves and text, no intermediate
+PostScript file will be created.
+
+The PostScript file produced by @TeX{}draw can be saved and used as an
+EPSF file to be included in documents.  As noted above, this file does
+not contain the commands to create the @TeX{} text.  Some procedures for
+including EPSF files will only look for the BoundingBox information in
+the header.  In that case, the BoundingBox statement must be moved from
+the trailer to the header of the EPSF file, replacing the
+@code{%%BoundingBox: (at end)} line in the header.
+
+@node How TeXdraw Merges Graphics and Text, , Extending TeXdraw, More Details
+@section How @TeX{}draw merges graphics and text
+@cindex graphics placement
+@cindex text placement
+@cindex placement of graphics and text
+
+An understanding of the mechanism used by @TeX{}draw to put text and
+graphics together is useful for porting @TeX{}draw to other dvi to
+PostScript drivers.  The final result of a sequence of @TeX{}draw
+commands will be placed within a @TeX{} box.  Both the graphics from the
+intermediate PostScript file and the @TeX{} text will be placed in that
+box.
+
+The graphics file that has been created by @TeX{}draw has the graphics
+contained within a box with lower lefthand corner at PostScript
+coordinates given by @code{\llxbp} and @code{\llybp}.  These are integer
+values in PostScript native units, referred to in @TeX{} as big points
+(bp).  There are 72 bp to one inch.
+
+A simplified version of the code to place graphics and text appears
+below.
+@example
+@group
+\vbox @{\vskip \vdrawsize
+       \special @{psfile=\psfile\space  % graphics file
+                 hoffset=\the\llxbp\space
+                 voffset=\the\llybp@}
+       \vskip \llypos
+       \hbox @{\hskip -\llxpos
+              \box\txdbox              % TeX text
+              \hskip \llxpos@}
+              \hskip \hdrawsize
+       \vskip -\llypos@}@}
+@end group
+@end example
+In this code fragment, a @TeX{} @code{\vbox} is placed at the current
+position on the page.  The size of this box is the drawing size
+(@code{\vdrawsize} high and @code{\hdrawsize} wide).
+
+After moving down vertically in the @code{\vbox} by the height of the
+box, the position for the @code{\special} command is at the bottom
+lefthand corner of the box.  The PostScript graphics contained in the
+file @code{\psfile} will be placed at this location.  With no further
+offset, this would place the origin of the PostScript space at that
+point.  However, the drawing has the lower lefthand corner at the
+PostScript position given by the PostScript coordinates @code{\llxbp}
+and @code{\llybp}.  The @code{\special} command instructs the dvi to
+PostScript driver to offset the graphics by this amount.  In this code,
+the dvi to PostScript driver is being asked to do the shifting.  An
+alternate approach is shift the position within @TeX{} before invoking
+the @code{\special} command.  In fact, moving the @code{\special}
+command to immediately precede the @TeX{} text placement command
+(@code{\box\txdbox}) results in the shifting being performed within
+@TeX{}.
+
+The @TeX{} text to be overlaid on the @TeX{}draw graphics is contained
+in a box (box @code{\txdbox}) of zero size, with the text extending
+outside this box.  The reference point for this box is @TeX{}draw
+coordinate @code{(0 0)}, so this box must be shifted to place the text
+correctly.  This is done by temporarily shifting the position both
+horizontally and vertically, placing the box, and then restoring the
+position.  The shift amounts, @code{\llxpos} and @code{\llypos}, are
+@TeX{} dimensions corresponding to the PostScript coordinate values
+@code{\llxbp} and @code{\llybp}.
+
+@node PostScript Commands, TeXdraw Toolbox, More Details, Top
+@appendix PostScript Commands
+@cindex PostScript commands
+
+This appendix describes a set of macros for accessing some of the
+PostScript builtin functions.  Each of these macros issues a single
+PostScript command.  The extra services provided by @TeX{}draw are the
+interpretation of coordinates in user units relative to the current
+drawing segment and the writing of a pending @TeX{}draw move to the
+PostScript file.  This last operation establishes the current point in
+PostScript.  The user of these commands should be familiar with the
+concepts of path construction and filling in PostScript.  Further
+details on the PostScript functions used can found in the
+@cite{PostScript Language Reference Manual, Second Edition}, Adobe
+Systems, Addison-Wesley, 1990.
+
+These macros are distributed in file @file{txdps.tex}.
+
+The @code{\PSsetlinecap} and @code{\PSsetlinejoin} commands control the
+way line ends and line joins are rendered.  The default values set by
+@TeX{}draw (round caps and round join) are appropriate for most
+drawings.  Changes to these parameters apply to the current and
+subsequent paths.
+
+@cindex line cap
+@cindex line join
+@table @code
+@findex setlinecap
+@findex \PSsetlinecap
+@item \PSsetlinecap @var{type}
+Set the line cap parameter.  The value @code{0} gives a butt cap;
+@code{1} gives a round cap; and @code{2} gives a projecting square cap.
+The initial value is corresponds to a round cap.
+@findex setlinejoin
+@findex \PSsetlinejoin
+@item \PSsetlinejoin @var{type}
+Set the line join parameter.  The value @code{0} gives a miter join;
+@code{1} gives a round join; and @code{2} gives a bevel join.  The
+initial value corresponds to a round join.
+@end table
+
+@cindex stroking lines
+@cindex filling regions
+@cindex paths
+@cindex current position in PostScript
+PostScript paths and fill operations can be controlled by a number of
+functions.  By design, @TeX{}draw always maintains a defined PostScript
+current point.  Some of the following macros cause the PostScript
+current point to become undefined.  The PostScript current point must be
+set again (say with a @code{\PSmoveto} command) before invoking basic
+@TeX{}draw commands.
+@table @code
+@findex stroke
+@findex \PSstroke
+@item \PSstroke
+Stroke a PostScript path.  The current path is stroked with the current
+gray level (set with @code{\setgray}) and the current line pattern (set
+with @code{\lpatt}).  The PostScript current point becomes undefined.
+@findex newpath
+@findex \PSnewpath
+@item \PSnewpath
+Establish a new path.  The PostScript current point becomes undefined.
+@findex closepath
+@findex \PSclosepath
+@item \PSclosepath
+Close a subpath.  A new subpath is started.
+@findex fill
+@findex \PSfill
+@item \PSfill
+Fill a region defined by a path.  Each subpath is closed and the
+enclosed regions painted with the current gray level.  The PostScript
+current point becomes undefined.  The gray level can be set with the
+@TeX{}draw command @code{\setgray}.
+@end table
+
+The following line commands interpret coordinates relative to the
+current @TeX{}draw scaling and drawing segment.  The specified
+coordinate affects the drawing size as determined by @TeX{}draw.
+@cindex lines
+@cindex moves
+@table @code
+@findex lineto
+@findex \PSlineto
+@item \PSlineto (@var{x} @var{y})
+Add a line segment to the current path.  This command is identical to
+the @TeX{}draw command @code{\lvec}.  The PostScript current point must
+be defined before this command is issued.
+@findex moveto
+@findex \PSmoveto
+@item \PSmoveto (@var{x} @var{y})
+Move to the coordinate specified by @code{(@var{x} @var{y})}.  The
+PostScript current point becomes defined.
+@end table
+
+The following macros provide access to the general arc commands in
+PostScript.  The coordinates are interpreted relative to the current
+@TeX{}draw scaling and drawing segment.  The specified coordinate
+affects the drawing size as determined by @TeX{}draw.
+@cindex arcs
+@table @code
+@findex arc
+@findex \PSarc
+@item \PSarc r:@var{radius} sd:@var{start-angle} ed:@var{end-angle} (@var{x} @var{y})
+Draw a counterclockwise arc.  The center of the arc is at the given
+position.  The radius is specified by @var{radius}.  The start and end
+angles (in degrees) are specified by @var{start-angle} and
+@var{end-angle}.  If the PostScript current point is defined, this
+command also draws the line from the current point to the beginning of
+the arc.  The line and arc become part of the current path. The current
+point becomes defined.
+@findex arcn
+@findex \PSarcn
+@item \PSarcn r:@var{radius} sd:@var{start-angle} ed:@var{end-angle} (@var{x} @var{y})
+Draw a clockwise arc.  The center of the arc is at the given position.
+The radius is specified by @var{radius}.  The start and end angles (in
+degrees) are specified by @var{start-angle} and @var{end-angle}.  If the
+PostScript current point is defined, this command also draws the line
+from the current point to the beginning of the arc.  The line and arc
+become part of the current path.  The current point becomes defined.
+@end table
+
+The macro @code{\writeps} provides the general facility to write
+arbitrary PostScript commands to the PostScript file.  This macro is
+used by the preceding commands and by the @TeX{}draw commands
+themselves.  This facility has to be used with care since any changes in
+position or scaling resulting from the PostScript commands are not known
+to @TeX{}draw.
+@table @code
+@findex \writeps
+@item \writeps @{@var{<ps-commands>}@}
+Write PostScript commands to the intermediate PostScript file.  Before
+the commands are inserted, any pending @TeX{}draw move is written to the
+PostScript file.  The PostScript scaling gives 300 units/inch.
+@end table
+
+
+@node TeXdraw Toolbox, Examples, PostScript Commands, Top
+@appendix @TeX{}draw Toolbox
+
+This appendix describes some of the macros supplied with @TeX{}draw
+which can be used to define additional commands for creating drawings.
+The macros described here work in the user specified coordinate system.
+Some of these toolbox macros are used by the @TeX{}draw commands
+themselves, others are supplied in an auxiliary file
+@file{txdtools.tex}.
+
+@menu
+* Coordinate parsing::
+* Real arithmetic::
+* Arrow curve::
+@end menu
+
+@node Coordinate parsing, Real arithmetic, , TeXdraw Toolbox
+@appendixsec Coordinate parsing
+
+The coordinate parsing macro @code{\getpos} is useful for creating new
+commands.  This macro takes care of stripping leading and trailing
+blanks from coordinates specified between parentheses.  In addition,
+symbolic coordinates are translated to the corresponding relative
+coordinate using the segment offset and scaling in effect.
+
+The macro @code{\currentpos} returns the relative coordinates of the
+current position.  The returned values are relative to the current
+segment and the current scaling.  The macro @code{\cossin} returns the
+real-valued cosine and sine of the direction of the line joining two
+points.  The macro @code{\vectlen} returns the length of a vector.  The
+results appear as the value of user supplied macro names.
+
+@cindex coordinate parsing
+@cindex current position
+@cindex angle of a vector
+@cindex direction of a line
+@cindex cosine of a vector direction
+@cindex sine of a vector direction
+@cindex length of a vector
+@table @code
+@findex \getpos
+@item \getpos (@var{x} @var{y})\@var{mx}\@var{my}
+Decode coordinate values. The coordinates specified by @code{(@var{x}
+@var{y})} are decoded. Symbolic coordinates are translated to the
+corresponding relative coordinate using the current segment offset and
+scaling.  The resulting character strings representing the real-valued
+coordinates are assigned to the macros specified by @code{\@var{mx}} and
+@code{\@var{my}}.
+@findex \currentpos
+@item \currentpos \@var{mx}\@var{my}
+Return the coordinates of the current position.  The coordinates are
+relative to the current segment offset and scaling.  The resulting
+character strings representing the real-valued coordinates are assigned
+to the macros specified by @code{\@var{mx}} and @code{\@var{my}}.
+@findex \cossin
+@item \cossin (@var{x1} @var{y1})(@var{x2} @var{y2})\@var{cosa}\@var{sina}
+Return the cosine and sine of the direction of a vector joining two
+points.  The cosine and sine of the angle of the vector which goes from
+@code{(@var{x1} @var{y1})} to @code{(@var{x2} @var{y2})}.  The character
+strings representing these real-valued quantities are assigned to the
+macros specified by @code{\@var{cosa}} and @code{\@var{sina}}.
+@findex \vectlen
+@item \vectlen (@var{x1} @var{y1})(@var{x2} @var{y2})\@var{len}
+Return the length of a vector joining two points.  The length of the
+vector is relative to the current scaling.  The character string
+representing the real-valued length is assigned to the macro specified
+by @code{\@var{len}}.
+@end table
+
+@node Real arithmetic, Arrow curve, Coordinate parsing, TeXdraw Toolbox
+@appendixsec Real arithmetic
+
+The @TeX{}draw toolbox supplies macros to perform real arithmetic on
+coordinate values.  The result appears as the value of a user supplied
+macro name.
+@table @code
+@findex \realadd
+@item \realadd @{@var{value1}@} @{@var{value2}@} \@var{sum}
+Add two real quantities, assigning the resultant character string
+representing the sum to the macro @code{\@var{sum}}.
+@findex \realmult
+@item \realmult @{@var{value1}@} @{@var{value2}@} \@var{prod}
+Multiply two real quantities, assigning the resultant character string
+representing the product to the macro @code{\@var{prod}}.
+@findex \realdiv
+@item \realdiv @{@var{value1}@} @{@var{value2}@} \@var{result}
+Divide two real quantities, assigning the resultant character string
+representing the result of @var{value1}/@var{value2} to the macro
+@code{\@var{result}}.
+@end table
+
+@node Arrow curve, , Real arithmetic, TeXdraw Toolbox
+@appendixsec Arrow curve
+@cindex example, arrow curve
+
+This example illustrates the use of the @TeX{}draw toolbox routines to
+do computations with the coordinates.  The problem will be tackled in
+two parts.  First, we will produce a macro to place an arrowhead on a
+Bezier curve.  Then given this macro, we will produce a macro which can
+draw a ``wiggly'' line from the current position to a given coordinate.
+
+@tex
+\bigskip
+\def\cavec (#1 #2)(#3 #4)(#5 #6){
+  \clvec (#1 #2)(#3 #4)(#5 #6)
+  \cossin (#3 #4)(#5 #6)\cosa\sina
+  \rmove (0 0) %stroke the Bezier curve
+  \bsegment
+    \drawdim in \setsegscale 0.05
+    \move ({-\cosa} -\sina)  \avec (0 0)
+  \esegment}
+
+\def\caw (#1 #2){
+  \currentpos \xa\ya
+  \cossin ({\xa} \ya)(#1 #2)\cosa\sina
+%
+% calculate the length of the vector, and the x and y displacements
+  \vectlen ({\xa} \ya)(#1 #2)\len
+  \getpos (#1 #2)\xb\yb
+  \realadd \xb {-\xa} \dx  \realadd \yb {-\ya} \dy
+%
+% calculate the offsets
+  \rotatecoord (0.4 0.1)\cosa\sina \du\dv
+%
+% draw the curve in normalized units
+  \bsegment
+    \setsegscale {\len}
+    \realadd \cosa \du \tmpa  \realadd \sina \dv \tmpb
+    \cavec ({\tmpa} \tmpb)({-\du} -\dv)({\cosa} \sina)
+  \esegment
+  \move (#1 #2)}
+
+\def\rotatecoord (#1 #2)#3#4#5#6{
+  \getpos (#1 #2)\xarg\yarg
+  \realmult \xarg {#3} \tmpa  \realmult \yarg {#4} \tmpb
+  \realadd \tmpa {-\tmpb} #5
+  \realmult \xarg {#4} \tmpa  \realmult \yarg {#3} \tmpb
+  \realadd \tmpa \tmpb #6}
+
+\centertexdraw{
+  \arrowheadtype t:W
+  \move (0 0)
+  \cavec (1.4 0.1)(-0.4 -0.1)(1 0)
+  \move (1 0) \caw (1 1) \htext{tip at \tt (1 1)}
+  \move (1 0) \caw (2 1) \htext{tip at \tt (2 1)}
+  \move (1 0) \caw (2 0) \htext{tip at \tt (2 0)}
+  \move (0 1.13) \move (0 -0.04)
+}
+@end tex
+
+The first macro, @code{\cavec}, uses the @code{\cossin} command to
+determine the the cosine and sine of the angle of the line joining the
+second control point to the end point of the Bezier curve.  Recall that
+the Bezier curve is tangent to this line at the end point.  After
+drawing the Bezier curve, the scaling is set locally to absolute units
+of 0.05 inches.  We go back down the line from the end point by 0.05
+inches and draw an arrow vector to the end point from there.  This arrow
+vector is mostly arrowhead, with little or no tail.
+
+@example
+@group
+\def\cavec (#1 #2)(#3 #4)(#5 #6)@{
+  \clvec (#1 #2)(#3 #4)(#5 #6)
+  \cossin (#3 #4)(#5 #6)\cosa\sina
+  \rmove (0 0)
+  \bsegment
+    \drawdim in \setsegscale 0.05
+    \move (@{-\cosa@} -\sina)  \avec (0 0)
+  \esegment@}
+@end group
+@end example
+
+Note the use of macros as arguments to a @code{\move} command.  Minus
+signs are put in front of the macros.  However, the value of the macro
+@code{\cosa} or @code{\sina} could be negative.  Fortunately, @TeX{}
+accepts two minus signs in a row and interprets the result as positive.
+Note that the @code{\rmove (0 0)} command before the beginning of the
+segment ensures that the Bezier curve is stroked before the arrowhead is
+drawn.
+
+The second macro @code{\caw} builds on @code{\cavec}.  The goal is to
+produce a wiggly vector that can be used as a pointer in a drawing.
+Consider the following normalized Bezier curve.
+@example
+\centertexdraw@{ \move (0 0) \cavec (1.4 0.1)(-0.4 -0.1)(1 0) @}
+@end example
+
+This curve has the appropriate wiggle.  Now we want to be able to draw
+this curve, appropriately scaled and rotated.  The macro @code{\caw}
+needs to do computations on the coordinates.  First, @code{\caw} uses
+the macros @code{\getpos} and @code{\currentpos} to get the positions of
+the end and start of the curve.  Next, the length of the vector is
+calculated using the macro @code{\vectlen}.  A local macro
+@code{\rotatecoord} is used to rotate a coordinate pair about the
+origin, using the cosine and sine of the rotation angle.  The vector
+length is used to scale the normalized curve.  The remaining code draws
+the rotated, normalized curve.
+
+@example
+\def\caw (#1 #2)@{
+  \currentpos \xa\ya
+  \cossin (@{\xa@} \ya)(#1 #2)\cosa\sina
+%
+% calculate the length of the vector, and the x and y displacements
+  \vectlen (@{\xa@} \ya)(#1 #2)\len
+  \getpos (#1 #2)\xb\yb
+  \realadd \xb @{-\xa@} \dx  \realadd \yb @{-\ya@} \dy
+%
+% calculate the offsets
+  \rotatecoord (0.4 0.1)\cosa\sina \du\dv
+%
+% draw the curve in normalized units
+  \bsegment
+    \setsegscale @{\len@}
+    \realadd \cosa \du \tmpa  \realadd \sina \dv \tmpb
+    \cavec (@{\tmpa@} \tmpb)(@{-\du@} -\dv)(@{\cosa@} \sina)
+  \esegment
+  \move (#1 #2)@}
+
+\def\rotatecoord (#1 #2)#3#4#5#6@{
+  \getpos (#1 #2)\xarg\yarg
+  \realmult \xarg @{#3@} \tmpa  \realmult \yarg @{#4@} \tmpb
+  \realadd \tmpa @{-\tmpb@} #5
+  \realmult \xarg @{#4@} \tmpa  \realmult \yarg @{#3@} \tmpb
+  \realadd \tmpa \tmpb #6@}
+@end example
+
+Finally, the new macro can be used as follows.
+@example
+\centertexdraw@{
+  \arrowheadtype t:W
+  \move (0 0)
+  \cavec (1.4 0.1)(-0.4 -0.1)(1 0)
+  \move (1 0) \caw (1 1) \htext@{tip at \tt (1 1)@}
+  \move (1 0) \caw (2 1) \htext@{tip at \tt (2 1)@}
+  \move (1 0) \caw (2 0) \htext@{tip at \tt (2 0)@}
+
+@}
+@end example
+
+Note that the Bezier curve in the macro @code{\cavec} lies below the
+arrowhead.  The example then draws an arrowhead of type @code{W} to
+erase the part of the line below the arrowhead.
+
+@node Examples, Command Listing, TeXdraw Toolbox, Top
+@appendix Examples
+@cindex example, block diagram
+
+This appendix shows examples of the use of @TeX{}draw.
+
+@menu
+* Block diagram::
+* Filter response graph::
+* Geometric construction::
+@end menu
+
+@node Block diagram, Filter response graph, , Examples
+@appendixsec Block diagram of a lattice filter
+
+The block diagram of a lattice filter uses a library of extended
+commands built from the basic @TeX{}draw commands.
+
+@tex
+\bigskip
+\bigskip
+\def\delay {\bsegment
+              \setsegscale 0.3
+              \lvec (0 +0.5) \lvec (1 +0.5) \lvec (1 -0.5)
+              \lvec (0 -0.5) \lvec (0 0)
+              \textref h:C v:C  \htext (0.5 0){$z^{-1}$}
+              \savepos (1 0)(*ex *ey)
+            \esegment
+            \move (*ex *ey)}
+\def\bdot {\fcir f:0 r:0.02 }
+\def\Ttext #1{\bsegment
+                \textref h:C v:B  \htext (0 +0.06){#1}
+              \esegment}
+\def\Btext #1{\bsegment
+                \textref h:C v:T  \htext (0 -0.06){#1}
+              \esegment}
+\def\Ltext #1{\bsegment
+                \textref h:R v:C  \htext (-0.06 0){#1}
+              \esegment}
+\def\Rtext #1{\bsegment
+                \textref h:L v:C  \htext (+0.06 0){#1}
+              \esegment}
+\def\cradius {0.08}
+\def\pluss {\bsegment
+              \setsegscale {\cradius}
+              \move (-0.5 0) \lvec (+0.5 0)
+              \move (0 -0.5) \lvec (0 +0.5)
+            \esegment}
+\def\pcir {\lcir r:{\cradius} \pluss}
+\def\puttext (#1 #2)#3{\bsegment
+                         \setsegscale {\cradius}
+                         \textref h:C v:C \htext (#1 #2){#3}
+                       \esegment}
+\def\putwnw #1{\puttext (-1.7 +1.2){#1}}
+\def\putwsw #1{\puttext (-1.7 -1.2){#1}}
+\def\putn   #1{\puttext ( 0   +2  ){#1}}
+\def\puts   #1{\puttext ( 0   -2  ){#1}}
+\def\avectoc (#1 #2){\currentpos \xa\ya
+                     \cossin ({\xa} \ya)(#1 #2)\cosa\sina
+                     \savepos (#1 #2)(*tx *ty)
+                     \bsegment
+                       \move (*tx *ty)
+                       \setsegscale {\cradius}
+                       \rmove ({-\cosa} -\sina)
+                       \savecurrpos (*ex *ey)
+                     \esegment
+                     \avec (*ex *ey)
+                     \move (#1 #2)}
+\def\avecfrc (#1 #2){\currentpos \xa\ya
+                     \cossin ({\xa} \ya)(#1 #2)\cosa\sina
+                     \bsegment
+                       \setsegscale {\cradius}
+                       \move ({\cosa} \sina)
+                       \savecurrpos (*ex *ey)
+                     \esegment
+                     \move (*ex *ey)
+                     \avec (#1 #2)}
+
+\centertexdraw{
+\drawdim in
+\arrowheadtype t:F  \arrowheadsize l:0.08 w:0.04
+\def\pl {{\sevenrm \char43}} \def\mn {{\sevensy \char0}}
+
+\move (0 +0.63) \move (0 -0.60) \move (0 0) % compensate for the text size
+
+% Input to the first stage
+\bsegment
+  \Ltext{$x(n)$}
+  \lvec (0.3 0) \bdot \lvec (0.3 +0.4)
+  \move (0.3 0) \lvec (0.3 -0.4)
+  \savepos (0.3 0)(*ex *ey)
+\esegment
+\move (*ex *ey)
+
+% first lattice stage
+\bsegment
+  \move (0 +0.4)  \avectoc (1.7 +0.4)
+  \pcir \putwnw{\pl} \puts{\mn}
+  \avecfrc (2.1 +0.4)
+  \move (0 -0.4)  \avec (0.4 -0.4) \delay \avectoc (1.7 -0.4)
+  \pcir \putwsw{\pl} \putn{\mn}
+  \avecfrc (2.1 -0.4)
+  \move (0.9 +0.4)  \bdot  \avectoc (1.7 -0.4)
+  \move (0.9 -0.4)  \bdot  \avectoc (1.7 +0.4)
+  \move (0.1 +0.42) \Ttext {$f_0(n)$}
+  \move (2.0 +0.42) \Ttext {$f_1(n)$}
+  \move (0.1 -0.4)  \Btext {$b_0(n)$}
+  \move (2.0 -0.4)  \Btext {$b_1(n)$}
+  \textref h:L v:B  \htext (1.15 +0.2){$K_1$}
+  \textref h:L v:T  \htext (1.15 -0.2){$K_1$}
+  \savepos (2.1 0)(*ex *ey)
+\esegment
+\move (*ex *ey)
+
+% center section
+\bsegment
+  \textref h:C v:C
+  \htext (0.3 +0.4){$\cdots$}
+  \htext (0.3 -0.4){$\cdots$}
+  \savepos (0.6 0)(*ex *ey)
+\esegment
+\move (*ex *ey)
+
+% last lattice stage
+\bsegment
+  \move (0 +0.4)  \avectoc (1.7 +0.4)
+  \pcir \putwnw{\pl} \puts{\mn}
+  \avecfrc (2.3 +0.4) \Rtext{$e(n)$}
+  \move (0 -0.4)  \avec (0.4 -0.4) \delay \avectoc (1.7 -0.4)
+  \pcir \putwsw{\pl} \putn{\mn}
+  \avecfrc (2.1 -0.4)
+  \move (0.9 +0.4)  \bdot  \avectoc (1.7 -0.4)
+  \move (0.9 -0.4)  \bdot  \avectoc (1.7 +0.4)
+  \move (0.1 +0.42) \Ttext {$f_{P-1}(n)$}
+  \move (2.0 +0.42) \Ttext {$f_P(n)$}
+  \move (0.1 -0.4)  \Btext {$b_{P-1}(n)$}
+  \move (2.0 -0.4)  \Btext {$b_P(n)$}
+  \textref h:L v:B  \htext (1.15 +0.2){$K_P$}
+  \textref h:L v:T  \htext (1.15 -0.2){$K_P$}
+\esegment
+}
+\bigskip
+@end tex
+
+The block diagram uses a ``delay'' block.  This is defined as a segment
+which leaves the current position at the end of this block.  A second
+macro, @code{\bdot}, draws a ``big'' dot which is used to mark junctions
+of lines.  The @code{\Ttext} command centers text above a given point.
+The offset to position the text is local to a segment, resulting in no
+change to the current point.  Similar macros to position text below a
+point (@code{\Btext}), to the left of a point (@code{\Ltext}) and to the
+right of a point (@code{\Rtext}) are used in the final drawing.
+@example
+\def\delay @{\bsegment
+              \setsegscale 0.3
+              \lvec (0 +0.5) \lvec (1 +0.5) \lvec (1 -0.5)
+              \lvec (0 -0.5) \lvec (0 0)
+              \textref h:C v:C  \htext (0.5 0)@{$z^@{-1@}$@}
+              \savepos (1 0)(*ex *ey)
+            \esegment
+            \move (*ex *ey)@}
+\def\bdot @{\fcir f:0 r:0.02 @}
+\def\Ttext #1@{\bsegment
+                \textref h:C v:B  \htext (0 +0.06)@{#1@}
+              \esegment@}
+@end example
+
+Several of the block diagram elements scale with the size of the summing
+nodes.  The radius of the circles for the summing nodes is defined as
+the macro @code{\cradius}.  The summing nodes will have enclosed plus
+signs, appropriately scaled.  The plus sign is drawn by the macro
+@code{\pluss}.  The macro @code{\pcir} draws both the circle and the
+plus sign.  The incoming lines to a summing node will be labelled with
+plus or minus signs (characters this time), placed at the appropriate
+position with respect to the center of the summing node.  These
+positions are given in terms of compass directions.  The macro
+@code{\putwnw} places text west by north-west relative to the center of
+the summing node.
+@example
+\def\cradius @{0.08@}
+\def\pluss @{\bsegment
+               \setsegscale @{\cradius@}
+               \move (-0.5 0) \lvec (+0.5 0)
+               \move (0 -0.5) \lvec (0 +0.5)
+             \esegment@}
+\def\pcir @{\lcir r:@{\cradius@} \pluss@}
+\def\puttext (#1 #2)#3@{\bsegment
+                         \setsegscale @{\cradius@}
+                         \textref h:C v:C \htext (#1 #2)@{#3@}
+                       \esegment@}
+\def\putwnw #1@{\puttext (-1.7 +1.2)@{#1@}@}
+@end example
+
+The block diagram has vectors arriving and departing from the summing
+nodes (circles).  One could calculate the points of intersection of the
+lines with the circles, and then enter the values into the @TeX{}draw
+code.  However, in this example, we implement an automated procedure.
+Two macros are needed, an arrow vector to a circle (@code{\avectoc}) and
+an arrow vector leaving from a circle (@code{\avecfrc}).  The macros
+will calculate the point of intersection with the circle and start or
+end the vector at the intersection point.
+
+The arrow macros use scaling and relative positioning inside of a
+drawing segment.  In the case of the macro @code{\avectoc}, a move is
+made to the final point (center of the circle), then within a drawing
+segment, a scaled move is made back towards the start to find the
+intersection point with the circle.
+
+@example
+\def\avectoc (#1 #2)@{\currentpos \xa\ya
+                     \cossin (@{\xa@} \ya)(#1 #2)\cosa\sina
+                     \savepos (#1 #2)(*tx *ty)
+                     \bsegment
+                       \move (*tx *ty)
+                       \setsegscale @{\cradius@}
+                       \rmove (@{-\cosa@} -\sina)
+                       \savecurrpos (*ex *ey)
+                     \esegment
+                     \avec (*ex *ey)
+                     \move (#1 #2)@}
+\def\avecfrc (#1 #2)@{\currentpos \xa\ya
+                     \cossin (@{\xa@} \ya)(#1 #2)\cosa\sina
+                     \bsegment
+                       \setsegscale @{\cradius@}
+                       \move (@{\cosa@} \sina)
+                       \savecurrpos (*ex *ey)
+                     \esegment
+                     \move (*ex *ey)
+                     \avec (#1 #2)@}
+@end example
+
+Using these macros, we are ready to draw the block diagram.  The first
+and last sections of the lattice filter are very similar, differing
+mainly in the text labels.  With more effort, code could be shared
+between the commands used to draw these blocks.
+@example
+\centertexdraw@{
+\drawdim in
+\arrowheadtype t:F  \arrowheadsize l:0.08 w:0.04
+\def\pl @{@{\sevenrm \char43@}@} \def\mn @{@{\sevensy \char0@}@}
+
+\move (0 +0.63) \move (0 -0.60) \move (0 0) % compensate for the text size
+
+% Input to the first stage
+\bsegment
+  \Ltext@{$x(n)$@}
+  \lvec (0.3 0) \bdot \lvec (0.3 +0.4) \move (0.3 0) \lvec (0.3 -0.4)
+  \savepos (0.3 0)(*ex *ey)
+\esegment
+\move (*ex *ey)
+
+% first lattice stage
+\bsegment
+  \move (0 +0.4)  \avectoc (1.7 +0.4)
+  \pcir \putwnw@{\pl@} \puts@{\mn@}
+  \avecfrc (2.1 +0.4)
+  \move (0 -0.4)  \avec (0.4 -0.4) \delay \avectoc (1.7 -0.4)
+  \pcir \putwsw@{\pl@} \putn@{\mn@}
+  \avecfrc (2.1 -0.4)
+  \move (0.9 +0.4)  \bdot  \avectoc (1.7 -0.4)
+  \move (0.9 -0.4)  \bdot  \avectoc (1.7 +0.4)
+  \move (0.1 +0.42) \Ttext @{$f_0(n)$@}
+  \move (2.0 +0.42) \Ttext @{$f_1(n)$@}
+  \move (0.1 -0.4)  \Btext @{$b_0(n)$@}
+  \move (2.0 -0.4)  \Btext @{$b_1(n)$@}
+  \textref h:L v:B  \htext (1.15 +0.2)@{$K_1$@}
+  \textref h:L v:T  \htext (1.15 -0.2)@{$K_1$@}
+  \savepos (2.1 0)(*ex *ey)
+\esegment
+\move (*ex *ey)
+
+% center section
+\bsegment
+  \textref h:C v:C \htext (0.3 +0.4)@{$\cdots$@}
+  \htext (0.3 -0.4)@{$\cdots$@}
+  \savepos (0.6 0)(*ex *ey)
+\esegment
+\move (*ex *ey)
+
+% last lattice stage
+\bsegment
+  \move (0 +0.4)  \avectoc (1.7 +0.4)
+  \pcir \putwnw@{\pl@} \puts@{\mn@}
+  \avecfrc (2.3 +0.4) \Rtext@{$e(n)$@}
+  \move (0 -0.4)  \avec (0.4 -0.4) \delay \avectoc (1.7 -0.4)
+  \pcir \putwsw@{\pl@} \putn@{\mn@}
+  \avecfrc (2.1 -0.4)
+  \move (0.9 +0.4)  \bdot  \avectoc (1.7 -0.4)
+  \move (0.9 -0.4)  \bdot  \avectoc (1.7 +0.4)
+  \move (0.1 +0.42) \Ttext @{$f_@{P-1@}(n)$@}
+  \move (2.0 +0.42) \Ttext @{$f_P(n)$@}
+  \move (0.1 -0.4)  \Btext @{$b_@{P-1@}(n)$@}
+  \move (2.0 -0.4)  \Btext @{$b_P(n)$@}
+  \textref h:L v:B  \htext (1.15 +0.2)@{$K_P$@}
+  \textref h:L v:T  \htext (1.15 -0.2)@{$K_P$@}
+\esegment
+@}
+@end example
+
+The macros used in this example are similar to the block diagram macros
+defined in the file @file{blockdiagram.tex}.
+
+@node Filter response graph, Geometric construction, Block diagram, Examples
+@appendixsec Filter response graph
+@cindex example, graph
+
+This example shows the response of a canonical filter.  @TeX{}draw is
+not well suited for general purpose graphing --- it has no coordinate
+translation facility nor does it have separate @var{x} and @var{y}
+scaling.  However, for certain simple graphs, @TeX{}draw is adequate.
+
+@tex
+\bigskip
+\centertexdraw{
+\arrowheadtype t:F  \arrowheadsize l:0.08 w:0.04
+\def\ds {\displaystyle}
+\def\ticklab (#1 #2)#3{\move(#1 #2)
+                       \bsegment
+                         \lvec (0 0.05)
+                         \textref h:C v:T \htext (0 -0.05){#3}
+                       \esegment}
+\def\Rtext #1{\bsegment
+                \textref h:L v:C \htext ( 0.08 0){#1}
+              \esegment}
+
+\move (2.4 -0.32)    % move to set the size
+
+\move (0 0)
+% Axes
+\avec (0  1.4)
+\move (0 0) \avec (2.2 0) \Rtext{$\omega$}
+\ticklab (0 0)   {0}
+\ticklab (0.8 0) {$\ds {\pi \over  2N} $}
+\ticklab (1.2 0) {$\omega_s$}
+\ticklab (1.6 0) {$\ds {\pi \over N} $}
+
+\linewd 0.025
+\move (0 1)
+\lvec (0.4 1)
+\lvec (0.44 0.998)
+\lvec (0.48 0.988)
+\lvec (0.52 0.973)
+\lvec (0.56 0.951)
+\lvec (0.60 0.923)
+\lvec (0.64 0.891)
+\lvec (0.68 0.852)
+\lvec (0.72 0.809)
+\lvec (0.76 0.760)
+\lvec (0.80 0.707)
+\lvec (0.84 0.649)
+\lvec (0.88 0.587)
+\lvec (0.92 0.522)
+\lvec (0.96 0.454)
+\lvec (1.00 0.382)
+\lvec (1.04 0.309)
+\lvec (1.08 0.233)
+\lvec (1.12 0.156)
+\lvec (1.16 0.078)
+\lvec (1.20 0)
+\lvec (1.9 0)
+}
+\bigskip
+@end tex
+
+In this example, macro @code{\ticklab} places a labelled axis tick at a
+given position.  The data is specified in a straightforward manner,
+having been scaled beforehand to give the desired aspect ratio for the
+graph.
+
+@example
+\centertexdraw@{
+\arrowheadtype t:F  \arrowheadsize l:0.08 w:0.04
+\def\ds @{\displaystyle@}
+\def\ticklab (#1 #2)#3@{\move(#1 #2)
+                       \bsegment
+                         \lvec (0 0.05)
+                         \textref h:C v:T \htext (0 -0.05)@{#3@}
+                       \esegment@}
+\def\Rtext #1@{\bsegment
+                \textref h:L v:C \htext (+0.08 0)@{#1@}
+              \esegment@}
+
+\move (2.4 -0.3)    % move to set the size
+
+\move (0 0)
+% Axes
+\avec (0 +1.4)
+\move (0 0) \avec (2.2 0) \Rtext@{$\omega$@}
+\ticklab (0 0)   @{0@}
+\ticklab (0.8 0) @{$\ds @{\pi \over 2N@} $@}
+\ticklab (1.2 0) @{$\omega_s$@}
+\ticklab (1.6 0) @{$\ds @{\pi \over N@} $@}
+
+\linewd 0.025
+\move (0 1)
+\lvec (0.4 1)
+\lvec (0.44 0.998)
+\lvec (0.48 0.988)
+\lvec (0.52 0.973)
+\lvec (0.56 0.951)
+ ...
+\lvec (1.08 0.233)
+\lvec (1.12 0.156)
+\lvec (1.16 0.078)
+\lvec (1.20 0)
+\lvec (1.9 0)
+@}
+@end example
+
+@node Geometric construction, , Filter response graph, Examples
+@appendixsec Geometric construction
+@cindex example, circle and ellipse
+
+This example shows a geometric construction which places an ellipse
+tangent to an enclosing circle.  The size of the ellipse is determined
+from geometric considerations.  Macros are used to modularize the code.
+The example alters the unit scale factor.  This allows the drawing to be
+carried out in units normalized to the radius of the circle.
+
+@tex
+\bigskip
+\centertexdraw{
+\arrowheadtype t:V \arrowheadsize l:0.08 w:0.04
+\linewd 0.01
+\setunitscale 1.5            % circle will have radius 1.5 inches
+
+\def\Btext #1{\bsegment
+                \textref h:C v:T \htext (0 -0.04){#1}
+              \esegment}
+\def\Ttext #1{\bsegment
+                \textref h:C v:B \htext (0  0.04){#1}
+              \esegment}
+\def\Ltext #1{\bsegment
+                \textref h:R v:C \htext (-0.04 0){#1}
+              \esegment}
+\def\bdot {\fcir f:0 r:0.0133 }
+\def\vtick {\bsegment
+               \move (0 -0.05) \lvec (0  0.05)
+            \esegment}
+\def\htick {\bsegment
+               \move (-0.05 0) \lvec ( 0.05 0)
+            \esegment}
+\def\Hlen (#1 #2)(#3 #4){\move (#1 #2) \vtick \move (#3 #4) \vtick
+                         \avec (#1 #2) \avec (#3 #4)}
+\def\Vlen (#1 #2)(#3 #4){\move (#1 #2) \htick \move (#3 #4) \htick
+                         \avec (#1 #2) \avec (#3 #4)}
+
+\lcir r:1                         % circle
+\move (-1.05 0) \lvec ( 1.05 0)   % axes
+\move (0 -1.05) \lvec (0  1.05)
+
+\move (0.707  0.707) \bdot \move (0.707 -0.707) \bdot
+\textref h:R v:T \htext(-0.02 -0.02){O}
+\textref h:L v:B \htext(0.725 0.725){X}
+\move (0 0) \lvec (0.707 0.707)
+
+\move (0.5 0)                     % center of ellipse
+\bsegment
+  \lellip rx:0.435 ry:0.804
+  \bdot \Btext {$\beta_2$}
+  \Hlen (0 0.15)(0.435 0.15) \move (0.218 0.15) \Ttext{$|\beta_1{+}\beta_3|$}
+  \Vlen (-0.7 0)(-0.7 0.804) \move (-0.7 0.402) \Ltext{$|\beta_1{-}\beta_3|$}
+\esegment
+}
+\bigskip
+@end tex
+@example
+\centertexdraw@{
+\arrowheadtype t:V \arrowheadsize l:0.08 w:0.04
+\linewd 0.01
+\setunitscale 1.5            % circle will have radius 1.5 inches
+
+\def\Btext #1@{\bsegment
+                \textref h:C v:T \htext (0 -0.04)@{#1@}
+              \esegment@}
+\def\Ttext #1@{\bsegment
+                \textref h:C v:B \htext (0 +0.04)@{#1@}
+              \esegment@}
+\def\Ltext #1@{\bsegment
+                \textref h:R v:C \htext (-0.04 0)@{#1@}
+              \esegment@}
+\def\bdot @{\fcir f:0 r:0.0133 @}
+\def\vtick @{\bsegment
+               \move (0 -0.05) \lvec (0 +0.05)
+            \esegment@}
+\def\htick @{\bsegment
+               \move (-0.05 0) \lvec (+0.05 0)
+            \esegment@}
+\def\Hlen (#1 #2)(#3 #4)@{\move (#1 #2) \vtick
+                         \move (#3 #4) \vtick
+                         \avec (#1 #2) \avec (#3 #4)@}
+\def\Vlen (#1 #2)(#3 #4)@{\move (#1 #2) \htick
+                         \move (#3 #4) \htick
+                         \avec (#1 #2) \avec (#3 #4)@}
+
+\lcir r:1                         % circle
+\move (-1.05 0) \lvec ( 1.05 0)   % axes
+\move (0 -1.05) \lvec (0  1.05)
+
+\move (0.707  0.707) \bdot \move (0.707 -0.707) \bdot
+\textref h:R v:T \htext(-0.02 -0.02)@{O@}
+\textref h:L v:B \htext(0.725 0.725)@{X@}
+\move (0 0) \lvec (0.707 0.707)
+
+\move (0.5 0)                     % center of ellipse
+\bsegment
+  \lellip rx:0.435 ry:0.804
+  \bdot \Btext @{$\beta_2$@}
+  \Hlen (0 0.15)(0.435 0.15) \move (0.218 0.15) \Ttext@{$|\beta_1@{+@}\beta_3|$@}
+  \Vlen (-0.7 0)(-0.7 0.804) \move (-0.7 0.402) \Ltext@{$|\beta_1@{-@}\beta_3|$@}
+\esegment
+@}
+@end example
+
+
+@node Command Listing, Command Index, Examples, Top
+@appendix Alphabetic listing of commands
+@cindex listing of commands
+
+@table @code
+
+@item \arrowheadsize l:@var{length} w:@var{width}
+Set the arrowhead size to be @var{length} units long and @var{width}
+units wide.  The width is measured across the ``base'' of the arrowhead.
+The initial arrowhead size has a @var{length} of 0.16 inches and a
+@var{width} of 0.08 inches.
+
+@item \arrowheadtype t:@var{type}
+Set the arrowhead type to @var{type}, where @var{type} is one of
+@code{F}, @code{T}, @code{W}, @code{V}, or @code{H}.  There are two
+kinds of arrowheads.  The first kind is a triangle.  There are 3
+variants: type @code{T} is an empty triangle, type @code{F} is a filled
+triangle (using the current gray level), type @code{W} is a triangle
+filled with white.  The second kind of arrowhead is an open ended Vee.
+There are 2 variants: type @code{V} has the stem continue to the tip,
+type @code{H} has the stem stop at the base of the arrowhead.  The
+initial arrowhead type is @code{T}.
+
+@item \avec (@var{x} @var{y})
+Draw a line with an arrowhead from the current position to
+@code{(@var{x} @var{y})}.  The new current position is @code{(@var{x}
+@var{y})}.  The arrowhead is aligned with the line, with the tip at
+@code{(@var{x} @var{y})}.
+
+@item \begin@{texdraw@}
+Start a @TeX{}draw drawing.  The drawing is terminated with an
+@code{\end@{texdraw@}} command.  This command is for use with La@TeX{}.
+
+@item \bsegment
+Start a drawing segment.  The coordinate system is shifted such that the
+current position corresponds to the coordinate @code{(0 0)}.  Changes to
+scaling, position and line parameters stay local to the drawing segment.
+
+@item \btexdraw
+Start a @TeX{}draw drawing.  The drawing is terminated with an
+@code{\etexdraw} command.
+
+@item \centertexdraw @{ ... @}
+Center a @TeX{}draw box.  The argument contains @TeX{}draw commands.
+The resulting box has the horizontal size @code{\hsize} and height equal
+to the height of the drawing.
+
+@item \clvec (@var{x1} @var{y1})(@var{x2} @var{y2})(@var{x3} @var{y3})
+Draw a Bezier curve from the current position to the coordinate
+@code{(@var{x3} @var{y3})} which becomes the new current position.  The
+coordinates @code{(@var{x1} @var{y1})} and @code{(@var{x2} @var{y2})}
+serve as control points for the curve.  Only the last coordinate given
+is used to update the size of the drawing.
+
+@item \drawbb
+Draw a ruled box around the effective size of a drawing produced by
+@TeX{}draw commands.
+
+@item \drawdim @var{dim}
+Set the units to @var{dim}.  The argument @var{dim} can be any valid
+@TeX{} dimension unit.  The units are used to interpret coordinate
+values.  Examples of valid units: @code{cm}, @code{mm}, @code{in},
+@code{pt}, and @code{bp}.
+
+@item \end@{texdraw@}
+End a @TeX{}draw drawing started with a @code{\begin@{texdraw@}}
+command.  The resulting @TeX{}draw drawing is placed in a box with
+height equal to the height of the drawing and width equal to the width
+of the drawing.  The depth of the box is zero.  This command is for use
+with La@TeX{}.
+
+@item \esegment
+End a drawing segment.  The current position in effect before the
+corresponding @code{\bsegment} command is restored.  The scaling and
+line parameter values revert to those in effect before the corresponding
+@code{\bsegment} was invoked.
+
+@item \etexdraw
+End a @TeX{}draw drawing started with a @code{\btexdraw} command.  The
+resulting @TeX{}draw drawing is placed in a box with height equal to the
+height of the drawing and width equal to the width of the drawing.  The
+depth of the box is zero.
+
+@item \everytexdraw @{ ... @}
+Specify @TeX{}draw commands to be executed at the beginning of every
+@TeX{}draw drawing.
+
+@item \fcir f:@var{level} r:@var{radius}
+Draw a filled circle with center at the current position.  The radius is
+specified by @var{radius}.  The circle is painted with the gray level
+specified by @var{level}.  A gray level of 1 corresponds to white, with
+decreasing values getting darker.  The level 0 is full black.  This
+command does not draw a line along the circumference.  The drawing size
+is increased if necessary to contain the circle.
+
+@item \fellip f:@var{level} rx:@var{x-radius} ry:@var{y-radius}
+Draw a filled ellipse with center at the current position.  The radius
+in the @var{x} direction is specified by @var{x-radius}.  The radius in
+the @var{y} direction is specified by @var{y-radius}.  The ellipse is
+painted with the gray level specified by @var{level}.  A gray level of 1
+corresponds to white, with decreasing values getting darker.  The level
+0 is full black.  This command does not draw a line along the boundary
+of the ellipse.  The drawing size is increased if necessary to contain
+the ellipse.
+
+@item \htext (@var{x} @var{y})@{@var{text}@}
+@itemx \htext @{@var{text}@}
+The first form of this command places the @TeX{} text @var{text}
+horizontally with the text reference point at the coordinate
+@code{(@var{x} @var{y})}.  The new current position is @code{(@var{x}
+@var{y})}.  The second form of this command places the @TeX{} text
+@var{text} horizontally with the text reference point at the current
+position.  The text reference point is set with the @code{\textref}
+command.
+
+@item \ifill f:@var{level}
+Close the current path and paint the interior of the region with gray
+level @var{level}.  The line around the path is not drawn.  Gray levels
+are real values from 0 (black) through intermediate values (grays) to 1
+(white).
+
+@item \larc r:@var{radius} sd:@var{start-angle} ed:@var{end-angle}
+Draw a counterclockwise arc.  The center of the arc is at the current
+position.  The radius is specified by @var{radius}.  The start and end
+angles (in degrees) are specified by @var{start-angle} and
+@var{end-angle}.  This command does not affect the limits (size) of the
+drawing.
+
+@item \lcir r:@var{radius}
+Draw a circle with center at the current position.  The radius is
+specified by @var{radius}.  This command draws a line along the
+circumference of the circle.  The drawing size is increased if necessary
+to contain the circle.
+
+@item \lellip rx:@var{x-radius} ry:@var{y-radius}
+Draw an ellipse with center at the current position.  The radius in the
+@var{x} direction is specified by @var{x-radius}.  The radius in the
+@var{y} direction is specified by @var{y-radius}.  The drawing size is
+increased if necessary to contain the ellipse.
+
+@item \lfill f:@var{level}
+
+Close the current path, draw the line around the path using the current
+grey level for lines and paint the interior of the region with specified
+gray level @var{level}.  Gray levels are real values from 0 (black)
+through intermediate values (grays) to 1 (white).
+
+@item \linewd @var{width}
+Set the line width to @var{width} units.  Initially @var{width} is 0.01
+inches (corresponding to 3 pixels at 300 pixels to the inch).
+
+@item \lpatt (@var{pattern})
+Set lines to have the pattern @code{(@var{pattern})}.  A pattern is a
+sequence of on/off lengths separated by blanks and enclosed in parentheses.
+The lengths alternately specify the length of a dash and the length of a
+gap between dashes.  Each length is interpreted using the current
+scaling and drawing units.  The pattern is used cyclically.  The empty
+pattern signifies a solid line.  The initial line pattern is a solid
+line, corresponding to the empty pattern @code{\lpatt ()}.
+
+@item \lvec (@var{x} @var{y})
+Draw a line from the current position to coordinate @code{(@var{x}
+@var{y})}.  The new current position is @code{(@var{x} @var{y})}.
+
+@item \move (@var{x} @var{y})
+Move to coordinate @code{(@var{x} @var{y})}.  The new current position
+is @code{(@var{x} @var{y})}.
+
+@item \ravec (@var{dx} @var{dy})
+Draw a line with an arrowhead from the current position, @var{dx} units
+in the @var{x} direction and @var{y} units in the @var{y} direction.
+The final position becomes the new current position.  The arrowhead is
+aligned with the line, with the tip at the new current position.
+
+@item \relsegscale @var{value}
+Adjust the segment scale factor by multiplying by @var{value}.  This has
+the effect of multiplying the current overall scale factor by the same
+factor.  The overall scaling factor is the product of the unit scale
+factor and the segment scale factor.
+
+@item \relunitscale @var{value}
+Adjust the unit scale factor by multiplying by @var{value}.  This has
+the effect of multiplying the overall scale factor by the same factor.
+The overall scaling factor is the product of the unit scale factor and
+the segment scale factor.
+
+@item \rlvec (@var{dx} @var{dy})
+Draw a line from the current position, @var{dx} units in the @var{x}
+direction and @var{dy} units in the @var{y} direction.  The final
+position becomes the new current position.
+
+@item \rmove (@var{dx} @var{dy})
+Move from the current position, @var{dx} units in the @var{x} direction
+and @var{dy} units in the @var{y} direction.  The final position becomes
+the new current position.
+
+@item \rtext td:@var{angle} (x y)@{@var{text}@}
+@itemx \rtext td:@var{angle} @{@var{text}@}
+The first form of this command places the @TeX{} text @var{text} at an
+angle with the text reference point at the coordinate @code{(@var{x}
+@var{y})}.  The new current position is @code{(@var{x} @var{y})}.  The
+second form of this command places the @TeX{} text @var{text} at an
+angle with the text reference point at the current position.  In both
+cases, the @TeX{} text is placed in a box and the box is rotated
+counterclockwise by @var{angle} degrees about the text reference point.
+The text reference point is set with the @code{\textref} command.
+
+@item \savecurrpos (*@var{px} *@var{py})
+Save the current position as the absolute position referenced by
+@code{(*@var{px} *@var{py})}.
+
+@item \savepos (@var{x} @var{y})(*@var{px} *@var{py})
+Save the coordinate position @code{(@var{x} @var{y})} as the absolute
+position referenced by @code{(*@var{px} *@var{py})}.  The coordinate
+@code{(@var{x} @var{y})} is interpreted in the normal fashion as a
+coordinate relative to the current segment, using the current scaling
+factors and drawing unit.
+
+@item \setgray @var{level}
+Set the gray level of lines.  Gray levels are real values from 0 (black)
+through intermediate values (gray) to 1 (white).  The initial gray level
+is 0 corresponding to black.
+
+@item \setsegscale @var{scale}
+Set the segment scale factor.  The argument @var{scale} is a real number
+which is used to scale coordinate values.  The overall scale factor is
+the product of the unit scale factor and the segment scale factor.
+
+@item \setunitscale @var{scale}
+Set the unit scaling to @var{scale}.  The argument @var{scale} is a real
+number which is used to scale coordinate values.  The overall scaling
+factor is the product of the unit scale factor and the segment scale
+factor.
+
+@item \texdrawbox @{ ... @}
+Create a @TeX{}draw box.  The argument contains @TeX{}draw commands.
+This macro returns a @TeX{} box with height equal to the height of the
+drawing and width equal to the width of the drawing.  The depth of the
+box is zero.
+
+@item \textref h:@var{h-ref} v:@var{v-ref}
+Set the text reference point for subsequent text commands.  The
+horizontal reference point @var{h-ref} is one of @code{L}, @code{C} or
+@code{R} (left, center or right).  The vertical reference point
+@var{v-ref} is one of @code{T}, @code{C} or @code{B} (top, center or
+bottom).  For rotated text, the reference point is determined before
+rotation.  The initial text reference point corresponds to
+@code{\textref h:L v:B}.
+
+@item \vtext (x y)@{@var{text}@}
+@itemx \vtext @{@var{text}@}
+The first form of this command places the @TeX{} text @var{text}
+vertically with the text reference point at the coordinate
+@code{(@var{x} @var{y})}.  The new current position is @code{(@var{x}
+@var{y})}.  The second form of this command places the @TeX{} text
+@var{text} vertically with the text reference point at the current
+position.  In both cases, the @TeX{} text is placed in a box and the box
+is rotated counterclockwise by 90 degrees about the text reference
+point.  The text reference point is set with the @code{\textref}
+command.
+
+@end table
+
+@node Command Index, Concept Index, Command Listing, Top
+@unnumbered Command Index
+@printindex fn
+
+@node Concept Index, , Command Index, Top
+@unnumbered Concept Index
+@printindex cp
+
+@page
+@contents
+@bye

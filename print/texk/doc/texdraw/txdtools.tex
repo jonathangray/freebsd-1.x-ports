@@ -1,0 +1,145 @@
+% TeXdraw toolbox macros, useful for extended TeXdraw commands
+
+% $Id: txdtools.tex,v 1.1 1994/04/26 02:54:41 alm Exp $
+
+%   Copyright (C) 1991,1992  Peter Kabal
+
+% The routines in this file are provided free of charge without
+% warranty of any kind.  Note that the TeXdraw routines are copyrighted.
+% They may be distributed freely provided that the recipients also
+% acquire the right to distribute them freely.  The notices to this
+% effect must be preserved when the files are distributed.
+
+%  Peter Kabal
+%  Department of Electrical Engineering
+%  McGill University
+%  3480 University
+%  Montreal, Quebec
+%  Canada  H3A 2A7
+
+%  kabal@TSP.EE.McGill.CA
+ 
+% ===============================================================
+
+% These macros use temporary count registers defined by TeXdraw
+%  \t@counta     \t@pixa
+%  \t@countb     \t@pixb
+%  \t@countc     \t@pixc
+%                \t@pixd
+
+\chardef\catamp=\the\catcode`\@
+\catcode`\@=11
+
+
+% ===== Real arithmetic
+% Real addition
+%  #1  - summand
+%  #2  - summand
+%  #3  - macro name to capture the real result
+\def\realadd #1#2#3{\dimen0=#1pt
+                    \dimen2=#2pt
+                    \advance \dimen0 by \dimen2
+                    \edef #3{\expandafter\c@lean\the\dimen0}}
+
+% Real division
+%  #1 - numerator
+%  #2 - denominator (divisor)
+%  #3 - macro name to capture the real result
+\def\realdiv #1#2#3{\dimen0=#1pt
+                    \t@counta=\dimen0
+                    \dimen0=#2pt
+                    \t@countb=\dimen0
+                    \intdiv \t@counta \t@countb #3}
+
+% ===== Integer arithmetic
+
+% Length of the hypotenuse
+% Find the length of a vector, lenhyp = sqrt(dx*dx + dy*dy)
+%  #1 - integer value, dx
+%  #2 - integer value, dy
+%  #3 - count register to capture the integer value
+\def\lenhyp #1#2#3{\t@counta=#1%
+                   \multiply \t@counta by \t@counta
+                   \t@countb=#2%
+                   \multiply \t@countb by \t@countb
+                   \advance \t@counta by \t@countb
+                   \sqrtnum \t@counta #3}
+
+% Square root of an integer
+% Newton-Raphson iteration to find the square root, integer argument
+% Let the current estimate of the square root of x be b(k).
+% Form an error function, e(k)=b(k)*b(k)-x. Follow the gradient of the
+% error to calculate the next guess,
+%
+%    e(k) - 0     d e(k)                          b(k) + x/b(k)
+%   ----------  = ------  = 2*b(k)  ==>  b(k+1) = -------------
+%   b(k)-b(k+1)   d b(k)                               2
+%
+% Note this iteration does not work for x=0, since the guess is then b(k)=0.
+% Rename the count registers to have more suggestive names
+\let\bk=\t@counta
+\let\bn=\t@countb
+\let\xval=\t@countc
+\def\sqrtnum #1#2{\xval=#1%
+                  \bk=\xval
+                  \loop
+                    \bn=\xval
+                    \divide \bn by \bk
+                    \advance \bn by \bk
+                    \advance \bn by 1            % rounding
+                    \divide \bn by 2
+                  \ifnum \bn < \bk
+                    \bk=\bn
+                  \repeat
+                  #2=\bn}
+
+% ===== Coordinate macros
+
+% Return the coordinates of the current position
+%  #1 - macro name to capture the x-coordinate
+%  #2 - macro name to capture the y-coordinate
+\def\currentpos #1#2{\t@pixa=\x@pix
+                     \advance \t@pixa by -\x@segoffpix
+                     \pixtocoord \t@pixa #1
+                     \t@pixa=\y@pix
+                     \advance \t@pixa by -\y@segoffpix
+                     \pixtocoord \t@pixa #2}
+
+% Length of a vector
+% Find the length of the vector between coordinate (#1 #2) and
+% coordiante (#3 #4). The length is expressed relative to the
+% current scaling.
+%  (#1 #2) - vector start coordinates
+%  (#3 #4) - vector end coordinates
+%  #5 - macro name to receive the length
+\def\vectlen (#1 #2)(#3 #4)#5{\getpos (#1 #2)\x@arga\y@arga
+                              \getpos (#3 #4)\x@argb\y@argb
+                              \coordtopix \x@arga \t@pixa
+                              \coordtopix \x@argb \t@pixb
+                              \advance \t@pixb by -\t@pixa
+                              \coordtopix \y@arga \t@pixc
+                              \coordtopix \y@argb \t@pixd
+                              \advance \t@pixd by -\t@pixc
+                              \lenhyp \t@pixb \t@pixd \t@pixc
+                              \pixtocoord \t@pixc #5}
+
+% Cossine and sine
+% Find the cosine and sine of the angle of a vector directed from
+% the coordinate (#1 #2) to the coordinate (#3 #4).
+%  (#1 #2) - start coordinates
+%  (#3 #4) - end coordinates
+%  #5 - macro name to receive the cosine of the angle
+%  #6 - macro name to receive the sine of the angle
+\def\cossin (#1 #2)(#3 #4)#5#6{\getpos (#1 #2)\x@arga\y@arga
+                               \getpos (#3 #4)\x@argb\y@argb
+                               \coordtopix \x@arga \t@pixa
+                               \coordtopix \x@argb \t@pixb
+                               \advance \t@pixb by -\t@pixa
+                               \coordtopix \y@arga \t@pixc
+                               \coordtopix \y@argb \t@pixd
+                               \advance \t@pixd by -\t@pixc
+                               \lenhyp \t@pixb \t@pixd \t@pixc
+                               \intdiv \t@pixb\t@pixc #5%
+                               \intdiv \t@pixd\t@pixc #6}
+
+\catcode`\@=\catamp

@@ -3,7 +3,7 @@
 version = 1.6
 
 # For make install.
-prefix = /usr/local
+prefix = /usr/gnu
 infodir = $(prefix)/info
 
 INSTALL = install -c
@@ -18,15 +18,13 @@ SHELL = /bin/sh
 
 doc = fontname
 
-default: dist
-
-all: info dvi
+all: $(doc).info dvi
 
 dvi $(doc).dvi:
 	$(TEXI2DVI) $(doc).texi
 
-info $(doc).info: $(doc).texi
-	$(MAKEINFO) $(MAKEINFO_FLAGS) $< -o $@
+$(doc).info: $(doc).texi
+	$(MAKEINFO) $(MAKEINFO_FLAGS) ${.ALLSRC} -o $@
 
 install: info
 	for i in $(doc).info*; do $(INSTALL_DATA) $$i $(infodir)/$$i; done

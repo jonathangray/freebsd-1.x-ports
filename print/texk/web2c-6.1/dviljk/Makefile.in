@@ -85,12 +85,12 @@ db_name = ls-R
 # of available modes.
 default_mfmode = CanonCX
 
-# Default LaserJet printer.  See the file `dviljk/INSTALL' for available
+# Default LaserJet printers.  See the file `dviljk/INSTALL' for available
 # options
-default_lj = LJ4
+default_lj = dvilj dvilj2 dvilj4
 
 # See INSTALL for compilation options.
-DEFS = -DMAKETEXPK_BY_DEFAULT -D$(default_lj) $(XDEFS) -DMFMODE=\"$(default_mfmode)\"
+DEFS = -DMAKETEXPK_BY_DEFAULT $(XDEFS)
 
 CC = @CC@
 # CFLAGS is used for both compilation and linking.
@@ -122,22 +122,32 @@ INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_DATA = @INSTALL_DATA@
 
 SHELL = /bin/sh
+LN = /bin/ln
 srcdir = @srcdir@
 VPATH = @srcdir@
 
-objects = dvi2xx.o tfm.o
+sources = dvi2xx.c tfm.c
 
 makeargs = $(MFLAGS) SHELL='$(SHELL)' CC='$(CC)' CFLAGS='$(CFLAGS)' $(MAKEARGS)
 installargs = INSTALL='$(INSTALL)' INSTALL_DATA='$(INSTALL_DATA)' \
   fontdir=$(fontdir) \
   bh_fontdir=$(bh_fontdir) cg_fontdir=$(cg_fontdir) mt_fontdir=$(mt_fontdir)
 
-program = dvilj
+programs = $(default_lj)
 
-all: $(program)
+all: $(programs)
 
-$(program): $(objects) $(kpathsea)
-	$(CC) $(LDFLAGS) -o $(program) $(objects) $(LOADLIBES)
+dvilj: $(sources) $(kpathsea)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -DLJ -DMFMODE=\"CanonCX\" \
+	    -o $@ $(sources) $(LOADLIBES)
+
+dvilj2: $(sources) $(kpathsea)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -DLJ2P -DMFMODE=\"CanonCX\" \
+	    -o $@ $(sources) $(LOADLIBES)
+
+dvilj4: $(sources) $(kpathsea)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -DLJ4 -DMFMODE=\"ljfour\" \
+	    -o $@ $(sources) $(LOADLIBES)
 
 $(kpathsea): $(kpathsea_srcdir)/*.c $(kpathsea_srcdir)/*.h
 	cd $(kpathsea_dir); $(MAKE) $(makeargs)
@@ -146,22 +156,31 @@ $(kpathsea): $(kpathsea_srcdir)/*.c $(kpathsea_srcdir)/*.h
 install: install-exec install-data
 uninstall: uninstall-exec uninstall-data
 
-install-exec: $(program)
+install-exec: $(programs)
 	$(SHELL) $(srcdir)/../mkdirchain $(bindir)
-	$(INSTALL_PROGRAM) $(program) $(bindir)/$(program)
+	for program in $(programs); do \
+		$(INSTALL_PROGRAM) $$program $(bindir)/$$program; \
+	done
 uninstall-exec:
-	rm -f $(bindir)/$(program)
+	for program in $(programs); do \
+		rm -f $(bindir)/$$program; \
+	done
 
 install-data:
 # Man page.
 	$(SHELL) $(srcdir)/../mkdirchain $(mandir)
-	$(INSTALL_DATA) $(srcdir)/dvilj.1 $(mandir)/dvilj.$(manext)
+	$(INSTALL_DATA) dvilj.1 $(mandir)/dvilj.$(manext)
+	-for program in $(programs); do \
+		$(LN) $(mandir)/dvilj.$(manext) $(mandir)/$$program.$(manext); \
+	done
 # Fonts.
 	($(install_fonts) && (cd fonts; $(MAKE) $(installargs) install)) \
 	  || true
 
 uninstall-data:
-	rm -f $(mandir)/dvilj.$(manext)
+	for program in $(programs); do \
+		rm -f $(mandir)/$$program.$(manext); \
+	done
 
 
 distname = dviljk

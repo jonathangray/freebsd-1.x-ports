@@ -230,7 +230,8 @@ static char *helparr[] = {
 "f*  Run as filter                  E*  Try to create EPSF",
 "h f Add header file                F*  Send control-D at end",
 "i*  Separate file per section      K*  Pull comments from inclusions",
-"k*  Print crop marks               M*  Don't make fonts",
+"                                   L*  Log missing fonts - don't make them",
+"k*  Print crop marks               M s METAFONT mode",
 "l # Last page                      N*  No structured comments",
 "m*  Manual feed                    O c Set/change paper offset",
 #if defined(MSDOS) || defined(OS2)
@@ -435,6 +436,7 @@ queryargs()
 /*
  *   Finally, our main routine.
  */
+char *configstring();
 extern void handlepapersize() ;
 #ifdef VMS
 int main()
@@ -744,8 +746,15 @@ case 'Y' :
 case 'F' :
                sendcontrolD = (*p != '0') ;
                break ;
-case 'M':
+case 'L':
                dontmakefont = (*p != '0') ;
+               break ;
+case 'M' :
+               if (*p == 0 && argv[i+1])
+                  p = argv[++i] ;
+               if ((mfmode = configstring(p, 0))==0)
+                  error("! Bad mfmode parameter (-M).") ;
+               xputenv ("MAKETEX_MODE", mfmode);
                break ;
 case 'N' :
                disablecomments = (*p != '0') ;

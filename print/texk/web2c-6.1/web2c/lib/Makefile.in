@@ -4,6 +4,18 @@ SHELL = /bin/sh
 srcdir = @srcdir@
 VPATH = @srcdir@
 
+# Generic installation directories.
+prefix = /usr/gnu
+exec_prefix = $(prefix)
+bindir = $(exec_prefix)/bin
+scriptdir = $(bindir)
+
+# Where MakeTeXPK/MakeTeXTFM put PK/TFM files. Making these names include 
+# `pk' and `tfm' simplifies the default in kpathsea/paths.h[.in].
+# By default, MakeTeXPK/MakeTeXTFM appends /<mode> to this.
+mtp_destdir = $(fontdir)/tmp/pk
+mtt_destdir = $(fontdir)/tmp/tfm
+
 # Unlike all other directories, we need @DEFS@ here because we need
 # -DHAVE_CONFIG_H to compile getopt.
 CC = @CC@
@@ -30,7 +42,7 @@ objs = alloca.o eofeoln.o fprintreal.o getopt.o getopt1.o inputint.o \
 default: all
 triptrap: all
 
-all: $(lib)
+all: $(lib) MakeTeXTFM
 
 $(lib): $(objs)
 	rm -f $(lib)
@@ -45,7 +57,22 @@ alloca.o: alloca.c
 Makefile: Makefile.in ../config.status
 	cd ..; $(SHELL) config.status
 
+MakeTeXTFM: $(srcdir)/MakeTeXTFM.in
+	rm -f MakeTeXTFM
+	sed -e 's,@mtt_destdir@,$(mtp_destdir),' \
+	    -e 's,@sauterdir@,$(sauterdir),' \
+	    -e 's,@default_mfmode@,$(default_mfmode),' \
+	  $(srcdir)/MakeTeXTFM.in >MakeTeXTFM
+	-chmod a+x MakeTeXTFM
+
 install install-exec install-data:
+uninstall: uninstall-exec uninstall-data
+
+install-exec:
+	$(INSTALL_PROGRAM) MakeTeXTFM $(scriptdir)/MakeTeXTFM
+
+uninstall-exec:
+	rm -f $(bindir)/MakeTeXTFM
 
 $(srcdir)/../lib/c-auto.h.in: $(srcdir)/../lib/c-auto.h.start \
                               $(configure_in) $(autoheader) 

@@ -39,8 +39,7 @@ MANEXT	=	1
 RM	=	/bin/rm -f
 SHELL	=	/bin/sh
 
-all:	makeindex.dvi makeindex.hlp makeindex.info makeindex.ps \
-	makeindex.vms manpages.dvi
+all:	makeindex.dvi manpages.dvi
 
 clean mostlyclean:
 	$(RM) *~

@@ -34,7 +34,7 @@ echo "Running MakeTeXPK $*" >&2
 : ${MAPFILE=@configdir@/psfonts.map}
 
 # If this directory doesn't exist, the Sauter stuff won't be attempted.
-: ${sauterdir=@texmf_prefix@/sauter}
+: ${sauterdir=@sauterdir@}
 
 # Likewise, for the F3 stuff.
 : ${f3dir=/groups/dtrg/typescaler/fonts/f3b}
@@ -78,6 +78,7 @@ fi
 umask 0
 
 GFNAME=$NAME.$DPI'gf'
+TFMNAME=$NAME.'tfm'
 PKNAME=$NAME.$DPI'pk'
 
 # Have we been spuriously called? No harm done, if so.
@@ -148,19 +149,20 @@ else
   # Run Metafont. 
   echo "Running $mf \mode:=$MODE; mag:=$MAG; scrollmode; input $NAME" >&2
   $mf "\mode:=$MODE; mag:=$MAG; scrollmode; input $NAME" </dev/null >&2
-
-  if test -d $sauterdir && test $? -eq 1 && test $mf = cmmf; then
+  if test $? -eq 1 && test -d $sauterdir && test $mf = cmmf; then
     echo "Trying interpolated/extrapolated (Sauter) CM source." >&2
     # Perhaps no such MF source file, and it's CM.  Try Sauter's scripts.
     cd $sauterdir
-    rootfont=`echo $NAME | sed 's/[0-9]*$//'`
-    pointsize=`echo $NAME | sed 's/^\(.*\)\([0-9]*\)$/\1/'`
-    make-mf $rootfont $pointsize
-    $mf "\mode:=$MODE; mag:=$MAG; scrollmode; input mf/$NAME" </dev/null
+    rootfont=`expr "$NAME" : '\([^0-9]*\)'`
+    pointsize=`expr "$NAME" : '[^0-9]*\(.*\)'`
+    make-mf $rootfont $pointsize >&2
+    echo "Running $mf \mode:=$MODE; mag:=$MAG; scrollmode; input mf/$NAME" >&2
+    $mf "\mode:=$MODE; mag:=$MAG; scrollmode; input mf/$NAME" </dev/null >&2
     if test $? -eq 0 && test -r $GFNAME; then
       mv $GFNAME $TEMPDIR
+      mv $TFMNAME tfm/
     fi
-    rm -f $NAME.log mf/$NAME
+    rm -f $NAME.log
     cd $TEMPDIR
   fi
 

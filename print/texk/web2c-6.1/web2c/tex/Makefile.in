@@ -124,11 +124,13 @@ fmts: $(fmts)
 # How automatic, huh?  I can hardly wait for LaTeX 3.
 amslatex.fmt: initex
 # Okay, so let's automate steps 1-5:
+	lfontsname=lfonts.ams; \
+	{ $(install_sauter) && lfontsname=lfonts.sau; } || true; \
 	lfontspath=`find $(texinputdir) -name lfonts.tex`; \
-	lfontsdir=`expr "$$lfontspath" : '\(.*\)lfonts.tex'`; \
-	if [ -n "$$lfontspath" -a -f "$$lfontsdir/lfonts.ams" ]; then \
+	lfontsdir=`expr "$$lfontspath" : '\(.*\)lfonts.tex$'`; \
+	if test -n "$$lfontspath" && test -f "$$lfontsdir/$$lfontsname"; then \
 		rm -f $$lfontspath; \
-		cp $$lfontsdir/lfonts.ams $$lfontspath; \
+		cp $$lfontsdir/$$lfontsname $$lfontspath; \
 	fi
 	$(initex) lplain \\dump
 	mv lplain.fmt amslatex.fmt
@@ -150,13 +152,14 @@ inrstex.fmt: initex
 	$(initex) inrstex \\dump
 
 latex.fmt: initex
-# In case we are building amslatex (see above), let's make sure that
-# we are using the right lfonts.tex.
+# Which lfonts.tex to use depends on whether we want Sauter's stuff
+	lfontsname=lfonts.lat; \
+	{ $(install_sauter) && lfontsname=lfonts.true; } || true; \
 	lfontspath=`find $(texinputdir) -name lfonts.tex`; \
 	lfontsdir=`expr "$$lfontspath" : '\(.*\)lfonts.tex'`; \
-	if [ -n "$$lfontspath" -a -f "$$lfontsdir/lfonts.lat" ]; then \
+	if test -n "$$lfontspath" && test -f "$$lfontsdir/$$lfontsname"; then \
 		rm -f $$lfontspath; \
-		cp $$lfontsdir/lfonts.lat $$lfontspath; \
+		cp $$lfontsdir/$$lfontsname $$lfontspath; \
 	fi
 	$(initex) lplain \\dump
 	mv lplain.fmt latex.fmt
