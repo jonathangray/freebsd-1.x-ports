@@ -691,12 +691,12 @@ pcstart(struct tty *tp)
 	
 	for(;;)
 	{
-		if (RB_LEN(&tp->t_out) <= tp->t_lowat)
+		if (RB_LEN(tp->t_out) <= tp->t_lowat)
 		{
 			if (tp->t_state&TS_ASLEEP)
 			{
 				tp->t_state &= ~TS_ASLEEP;
-				wakeup((caddr_t)&tp->t_out);
+				wakeup((caddr_t)tp->t_out);
 			}
 
 			if (tp->t_wsel)
@@ -707,12 +707,12 @@ pcstart(struct tty *tp)
 			}
 		}
 
-		if (RB_LEN(&tp->t_out) == 0)
+		if (RB_LEN(tp->t_out) == 0)
 		{
 			goto out;
 		}
 
-		c = getc(&tp->t_out);
+		c = getc(tp->t_out);
 
 		tp->t_state |= TS_BUSY;	/* patch from Frank Maclachlan */
 		splx(s);
