@@ -134,7 +134,7 @@
  * LOCAL_DOMAIN is used to determine if a user is local
  * to your campus or organization
  */
-#define LOCAL_DOMAIN "ukans.edu"		/* CHANGE THIS! */
+#define LOCAL_DOMAIN "localhost"                /* CHANGE THIS! */
 
 /**************************
  * the full path and name of the telnet command
@@ -183,7 +183,11 @@
 #ifdef MMDF
 #define SYSTEM_MAIL "/usr/mmdf/bin/submit" 
 #else
+#ifdef __FreeBSD__
+#define SYSTEM_MAIL "/usr/sbin/sendmail"
+#else
 #define SYSTEM_MAIL "/usr/lib/sendmail" 
+#endif
 #endif /* MMDF */
 
 /**************************
