@@ -11,8 +11,8 @@
 #			dsinc!elm
 #
 #  $Log: Makefile,v $
-#  Revision 1.4  1993/08/30 05:39:26  smace
-#  compile only with -traditional
+#  Revision 1.5  1993/09/28 18:57:43  smace
+#  Reran elm Configure set to not break on 8 bit chars
 #
 # Revision 1.2  1993/08/27  00:54:08  smace
 # Upgrade elm2.4 pl23beta elm2.4 pl23beta2
@@ -51,7 +51,7 @@ LIB		=	/usr/local/lib
 LIB2		= 	
 LIBS		=	-ltermlib 
 LINT		=	lint
-MAILGRP		=	wheel
+MAILGRP		=	bin
 MAILERMODE	=	2755
 MAKE		=	/usr/bin/make
 MV		=	/bin/mv

@@ -6,8 +6,8 @@
 #         (C) Copyright 1988-1992, USENET Community Trust
 #
 #  $Log: Makefile,v $
-#  Revision 1.4  1993/08/30 05:39:19  smace
-#  compile only with -traditional
+#  Revision 1.5  1993/09/28 18:57:37  smace
+#  Reran elm Configure set to not break on 8 bit chars
 #
 # Revision 1.2  1993/08/27  00:53:55  smace
 # Upgrade elm2.4 pl23beta elm2.4 pl23beta2
