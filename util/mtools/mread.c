@@ -230,7 +230,7 @@ int nowarn;
 			/* CONSTCOND */
 			while (1) {
 				printf("File \"%s\" exists, overwrite (y/n) ? ", target);
-				gets(ans);
+				fgets(ans, sizeof(ans), stdin);
 				if (ans[0] == 'n' || ans[0] == 'N')
 					return(NULL);
 				if (ans[0] == 'y' || ans[0] == 'Y')

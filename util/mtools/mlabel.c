@@ -98,7 +98,7 @@ char *argv[];
 
 					/* ask for new label */
 	printf("Enter the new volume label (11 characters): ");
-	gets(filename);
+	fgets(filename, sizeof(filename), stdin);
 	if (filename[0] != '\0') {
 		sprintf((char *) fixed, "%-11.11s", filename);
 		if (strlen(filename) > 11 && verbose)
@@ -109,7 +109,7 @@ char *argv[];
 			exit(0);
 
 		printf("Delete volume label (y/n): ");
-		gets(ans);
+		fgets(ans, sizeof(ans), stdin);
 		if (ans[0] == 'y' || ans[0] == 'Y') {
 			strcpy((char *) fixed, (char *) vol);
 			fixed[0] = 0xe5;

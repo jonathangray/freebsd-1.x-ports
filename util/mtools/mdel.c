@@ -103,7 +103,7 @@ char *argv[];
 				if (dir->attr & 0x01) {
 					while (!nogo) {
 						printf("%s: \"%s\" is read only, erase anyway (y/n) ? ", argv[0], newfile);
-						gets(ans);
+						fgets(ans, sizeof(ans), stdin);
 						if (ans[0] == 'y' || ans[0] == 'Y')
 							break;
 						if (ans[0] == 'n' || ans[0] == 'N')

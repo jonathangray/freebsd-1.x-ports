@@ -177,7 +177,7 @@ char *argv[];
 					/* CONSTCOND */
 					while (1) {
 						printf("File \"%s\" exists, overwrite (y/n) ? ", target);
-						gets(ans);
+						fgets(ans, sizeof(ans), stdin);
 						if (ans[0] == 'n' || ans[0] == 'N') {
 							nogo = 1;
 							break;

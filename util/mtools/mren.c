@@ -66,7 +66,7 @@ char *argv[];
 	if (strcmp(temp, new) && verbose) {
 		while (!nogo) {
 			printf("Do you accept \"%s\" as the new filename (y/n) ? ", new);
-			gets(ans);
+			fgets(ans, sizeof(ans), stdin);
 			if (ans[0] == 'y' || ans[0] == 'Y')
 				break;
 			if (ans[0] == 'n' || ans[0] == 'N')
