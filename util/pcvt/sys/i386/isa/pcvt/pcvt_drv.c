@@ -170,21 +170,35 @@ pcattach(struct isa_device *dev)
 
 	printf("kbd, [R%s]\n", PCVT_REL);
 
-#if PCVT_NETBSD
+#if PCVT_NETBSD || PCVT_FREEBSD
 	for(i = 0; i < totalscreens; i++)
 	{
+#if PCVT_NETBSD
 		pc_tty[i] = ttymalloc();		
 		vs[i].vs_tty = pc_tty[i];
+#else
+		pccons[i] = ttymalloc(pccons[i]);
+		vs[i].vs_tty = pccons[i];
+#endif
 	}
 
 #if PCVT_EMU_MOUSE
+#if PCVT_NETBSD
 	pc_tty[totalscreens] = ttymalloc(); /* the mouse emulator tty */
+#else
+	/* the mouse emulator tty */
+	pccons[totalscreens] = ttymalloc(pccons[totalscreens]);
+#endif
 #endif /* PCVT_EMU_MOUSE */
 
+#if PCVT_NETBSD
 	pcconsp = pc_tty[0];
+#else
+	pcconsp = pccons[0];
+#endif
 
-#endif /* PCVT_NETBSD */
-	
+#endif /* PCVT_NETBSD || PCVT_FREEBSD */
+
 #else /* !PCVT_NETBSD && !PCVT_FREEBSD*/
 
 	switch(adaptor_type)
@@ -241,11 +255,6 @@ pcattach(struct isa_device *dev)
 
 #endif  /* PCVT_NETBSD || PCVT_FREEBSD */
 
-#if !PCVT_NETBSD
-	for(i = 0; i < totalscreens; i++)
-		vs[i].vs_tty = &pccons[i];
-#endif /* !PCVT_NETBSD */
-
 	async_update(0);		/* start asynchronous updates */
 	return 1;
 }
@@ -258,15 +267,14 @@ struct tty *
 get_pccons(Dev_t dev)
 {
 	register int i = minor(dev);
-
 #if PCVT_EMU_MOUSE
  	if(i == totalscreens)
- 		return(&pccons[i]);
+ 		return(pccons[i]);
 #endif /* PCVT_EMU_MOUSE */
 
 	if(i >= PCVT_NSCREENS)
 		return(NULL);
-	return(&pccons[i]);
+	return(pccons[i]);
 }
 
 #else
@@ -756,7 +764,7 @@ pccnprobe(struct consdev *cp)
 	cp->cn_pri = CN_INTERNAL;
 
 #if !PCVT_NETBSD
-	cp->cn_tp = &pccons[0];
+	cp->cn_tp = pccons[0];
 #endif /* !PCVT_NETBSD */
 	return 1;
 }

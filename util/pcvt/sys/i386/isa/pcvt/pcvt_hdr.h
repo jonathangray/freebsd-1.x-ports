@@ -1018,13 +1018,13 @@ EXTERN	u_short	user_attr;		/* character attributes */
 #if PCVT_NETBSD
 EXTERN struct tty *pc_tty[PCVT_NSCREENS];
 #else
-EXTERN struct tty pccons[PCVT_NSCREENS];
+EXTERN struct tty *pccons[PCVT_NSCREENS];
 #endif /* PCVT_NETBSD */
 #else /* PCVT_EMU_MOUSE */
 #if PCVT_NETBSD
 EXTERN struct tty *pc_tty[PCVT_NSCREENS + 1];
 #else
-EXTERN struct tty pccons[PCVT_NSCREENS + 1];
+EXTERN struct tty *pccons[PCVT_NSCREENS + 1];
 #endif
 #endif /* PCVT_EMU_MOUSE */
 
@@ -1209,10 +1209,8 @@ u_char bgansitopc[] = {			/* background ANSI color -> pc */
 
 #if !PCVT_NETBSD
 u_short *Crtat	=	(u_short *)MONO_BUF;	/* screen start address */
-struct tty *pcconsp =	&pccons[0];		/* ptr to current device */
-#else
-struct tty *pcconsp;		/* ptr to current device, see pcattach() */
 #endif /* PCVT_NETBSD */
+struct tty *pcconsp;		/* ptr to current device, see pcattach() */
 
 #if PCVT_EMU_MOUSE
 struct mousestat	mouse = {0};
