@@ -1904,7 +1904,11 @@ extern int AppMenuFunc();
 #define ERROR(val)  regerr(val)
 #define TRUE 1
 #define FALSE 0
+#ifndef __FreeBSD__
 #include <regexp.h>
+#else
+#include <regex.h>
+#endif
 
 static
 regerr(val)
@@ -1955,8 +1959,12 @@ int val;
 }
 
 #ifdef REGEXP
+#ifndef __FreeBSD__
 #include <regexp.h>
 regexp *expbuf;
+#else
+regex_t *expbuf = NULL;
+#endif
 #else
 static char expbuf[256];
 #endif
@@ -1966,7 +1974,11 @@ rexMatch(string)
     char *string;
 {
 #ifdef REGEXP
+#ifndef __FreeBSD__
     return regexec(expbuf,string);
+#else
+    return !regexec(expbuf, string, 0, NULL, 0);
+#endif
 #else
     return step(string,expbuf);
 #endif
@@ -2001,7 +2013,13 @@ char newPattern[256],tmp[256];
     }
     newPattern[j++] = '$';
 #ifdef REGEXP
+#ifndef __FreeBSD__
     expbuf = regcomp (newPattern);
+#else
+    free(expbuf);
+    expbuf = malloc (sizeof(regex_t));
+    regcomp (expbuf, newPattern, 0);
+#endif
 #else
     compile(newPattern, expbuf, &expbuf[256], '\0');
 #endif
