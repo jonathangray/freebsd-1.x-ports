@@ -1,4 +1,6 @@
 #	@(#)Makefile	5.7 (Berkeley) 6/27/91
+LIBDIR= /usr/local/lib
+
 SHLIB_MAJOR= 1
 SHLIB_MINOR= 0
 
@@ -21,5 +23,8 @@ SRCS =	caxpy.f cblas1.f cblas2.f ccopy.f cdotc.f cdotu.f cgbmv.f cgemv.f \
 	sspr.f sspr2.f sswap.f ssymv.f ssyr.f ssyr2.f stbmv.f stbsv.f \
 	stpmv.f stpsv.f strmv.f strsv.f xerbla.f
 CLEANFILES+= *.c
+
+pkg:	install pkg/+DESC pkg/+ONELINE pkg/+PLIST
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST blas_bin
 
 .include <bsd.lib.mk>
