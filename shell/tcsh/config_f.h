@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/config_f.h,v 1.2 1993/07/21 19:38:51 smace Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/config_f.h,v 1.3 1993/11/13 01:06:36 ache Exp $ */
 /*
  * config_f.h -- configure various defines for tcsh
  *
@@ -56,7 +56,7 @@
  *		if you don't have <locale.h>, you don't want
  *		to define this.
  */
-#define NLS
+#undef NLS
 
 /*
  * LOGINFIRST   Source ~/.login before ~/.cshrc
