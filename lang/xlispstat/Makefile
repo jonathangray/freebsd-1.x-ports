@@ -31,8 +31,10 @@ GRAPHSYS = X11WINDOWS
 # Add a -I directive if the X11 include files are not in a standard place
 # For Sun's OpenLook, for example, add -I/usr/openwin/include
 
-UCFLAGS = -O -f68881
-ULDFLAGS = -f68881
+#UCFLAGS = -O -f68881
+#ULDFLAGS = -f68881
+UCFLAGS = -O3 -I/usr/X386/include
+ULDFLAGS =
 CC=cc
 LD=ld
 
@@ -48,7 +50,7 @@ LD=ld
 # as `generic'
 
 FOREIGN_FLAG = -DFOREIGNCALL
-MACHINE = sun3
+MACHINE = freebsd
 
 ##############################################################################
 ##############################################################################
@@ -61,7 +63,7 @@ EXTRAOBJS=
 ##############################################################################
 # Directory to search for X11 libraries (libX11.a, etc.)
 
-X11LIBDIR=/usr/local/lib
+X11LIBDIR=/usr/X386/lib
 
 ###############################################################################
 ###############################################################################
