@@ -66,5 +66,5 @@ cleanall:
 	rm -f *.o *.pro zsh core Makefile signals.h config.h
 
 install: zsh
-	install -s -m 755 zsh $(BINDIR)
-	install -m 444 ../man/man1/zsh.1 $(MANDIR)
+	install -c -s -m 755 zsh $(BINDIR)
+	install -c -m 444 ../man/man1/zsh.1 $(MANDIR)
