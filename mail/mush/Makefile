@@ -22,13 +22,15 @@ MAKES= makefile.bsd makefile.xenix makefile.sys.v makefile.hpux makefile.sun
 
 # See the README for changes needed to compile under Ultrix.
 # In particular, you may need -DSIGRET=void and/or -ltermcap.
-CFLAGS= -O -DCURSES -DBSD -fwritable-strings
+CFLAGS= -O -DCURSES -DBSD -DFreeBSD -fwritable-strings
 LDFLAGS=
 LINTFLAGS= -bxah -Dlint -DCURSES -DBSD
 LIBS= -lcurses -ltermlib
 OTHERLIBS=
 # Use some variant of this one if you #define MMDF in config.h
 #OTHERLIBS=/usr/src/mmdf/lib/libmmdf.a
+
+all: mush
 
 mush: $(OBJS)
 	@echo loading...
