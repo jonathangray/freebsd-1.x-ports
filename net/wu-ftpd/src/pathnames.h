@@ -29,13 +29,27 @@
  *
  * @(#)pathnames.h 5.2 (Berkeley) 6/1/90 */
 
+#ifndef _PATH_FTPUSERS
 #define _PATH_FTPUSERS  "/etc/ftpusers"
+#endif
+#ifndef _PATH_FTPACCESS
 #define _PATH_FTPACCESS "/usr/local/etc/ftpaccess"
+#endif
+#ifndef _PATH_EXECPATH
 #define _PATH_EXECPATH  "/bin/ftp-exec"
+#endif
+#ifndef _PATH_PIDNAMES
 #define _PATH_PIDNAMES  "/usr/local/daemon/ftpd/ftp.pids-%s"
+#endif
+#ifndef _PATH_CVT
 #define _PATH_CVT       "/usr/local/etc/ftpconversions"
+#endif
+#ifndef _PATH_XFERLOG
 #define _PATH_XFERLOG   "/usr/adm/xferlog"
+#endif
+#ifndef _PATH_PRIVATE
 #define _PATH_PRIVATE   "/etc/ftpgroups"
+#endif
 
 #ifndef _PATH_UTMP
 #define _PATH_UTMP      "/etc/utmp"
@@ -43,10 +57,16 @@
 #define _PATH_LASTLOG   "/usr/adm/lastlog"
 #endif
 
+#ifndef _PATH_BSHELL
 #define _PATH_BSHELL    "/bin/sh"
+#endif
+#ifndef _PATH_DEVNULL
 #define _PATH_DEVNULL   "/dev/null"
+#endif
 
 #ifdef  HOST_ACCESS
+#ifndef _PATH_FTPHOSTS
 #define _PATH_FTPHOSTS  "/usr/local/etc/ftphosts"
+#endif
 #endif
 
