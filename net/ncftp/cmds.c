@@ -1,8 +1,8 @@
 /* cmds.c */
 
 /*  $RCSfile: cmds.c,v $
- *  $Revision: 1.1 $
- *  $Date: 1994/03/01 00:31:49 $
+ *  $Revision: 1.2 $
+ *  $Date: 1994/03/21 18:01:23 $
  */
 
 #include "sys.h"
@@ -215,7 +215,7 @@ long GetDateAndSize(char *fName, unsigned long *mod_time)
 			if (quiet_command(cmd) == 2) {
 				if (sscanf(reply_string, "%*d %ld", &size) == 1)
 					have_size = 1;
-			} else
+			} else if (strncmp(reply_string, "550", (size_t)3) != 0)
 				gRmtInfo.hasSIZE = 0;
 		}
 
@@ -229,7 +229,7 @@ long GetDateAndSize(char *fName, unsigned long *mod_time)
 				mdtm = UnSIZEDate(reply_string);
 				if (mdtm != MDTM_UNKNOWN)
 					have_mdtm = 1;
-			} else
+			} else if (strncmp(reply_string, "550", (size_t)3) != 0)
 				gRmtInfo.hasMDTM = 0;
 		}
 #endif /* NO_MKTIME */
@@ -451,6 +451,7 @@ int rem_glob_one(char *pattern)
 	(void) recvrequest ("NLST", tname, pattern, "w");
 	verbose = oldverbose;
 	ftemp = fopen(tname, "r");
+	(void) chmod(tname, 0600);
 	if (ftemp == NULL || FGets(str, ftemp) == NULL) {
 		if (NOT_VQUIET)
 			(void) printf("%s: no match.\n", pattern);
@@ -646,6 +647,8 @@ xx:
 		errs = 0;
 		for (mode = "w", i=1; argv[i] != NULL; i++, mode = "a") {
 			result = recvrequest ("NLST", tmpname, argv[i], mode);
+			if (i == 1)
+				(void) chmod(tmpname, 0600);
 			if (result < 0) {
 				fprintf(stderr, "%s: %s.\n",
 					argv[i],
@@ -655,12 +658,12 @@ xx:
 				errs++;
 			}
 		}
+              verbose = oldverbose;
 		if (errs == (i - 1)) {
 			/* Every pattern was in error, so we can't try anything. */
 			(void) unlink(tmpname);		/* Shouldn't be there anyway. */
 			return NULL;
 		}
-		verbose = oldverbose;
 		ftemp = fopen(tmpname, "r");
 		if (ftemp == NULL) {
 			PERROR("remglob", tmpname);
@@ -1712,6 +1715,12 @@ int lookup(int argc, char **argv)
  		} else {
  			if (*host->h_name)
  				(void) Strncpy(lasthostname, host->h_name);
+			for (j=0; host->h_aliases[j] != NULL; j++) {
+				if (strlen(host->h_aliases[j]) >
+					strlen(host->h_name) &&
+					strstr(host->h_aliases[j],host->h_name) != NULL)
+						(void) Strncpy(lasthostname,host->h_aliases[j]);
+			}
 			if (NOT_VQUIET) {
 				(void) printf("%-32s  ", *host->h_name ? host->h_name : "???");
 				if (*host->h_addr_list) {
@@ -1738,16 +1747,20 @@ int getlocalhostname(char *host, size_t size)
 {
 	int oldv, r;
 	char *argv[2];
-#ifdef HAS_DOMAINNAME
 	char domain[64];
-#endif
 
 #ifdef HOSTNAME
 	(void) strncpy(host, HOSTNAME, size);
 	return NOERR;
 #else
-	*host = 0;
+	host[0] = '\0';
 	if ((r = gethostname(host, size)) == 0) {
+		if (host[0] == '\0') {
+			(void) fprintf(stderr,
+"Could not determine the hostname. Re-compile with HOSTNAME defined\n\
+to be the full name of your hostname.\n");
+			exit(1);
+		}
 		oldv = verbose;
 		verbose = V_QUIET;
 		argv[0] = "lookup";
@@ -1755,14 +1768,40 @@ int getlocalhostname(char *host, size_t size)
 		(void) makeargv();
 		if (lookup(margc, margv) == 0 && lasthostname[0]) {
 			(void) _Strncpy(host, lasthostname, size);
+			domain[0] = '\0';
 #ifdef HAS_DOMAINNAME
+			/* getdomainname() returns just the domain name, without a
+			 * preceding period.  For example, on "cse.unl.edu", it would
+			 * return "unl.edu".
+			 *
+			 * SunOS note: getdomainname will return an empty string if
+			 * this machine isn't on NIS.
+			 */
+			(void) getdomainname(domain, sizeof(domain) - 1);
+#endif
+#ifdef DOMAIN_NAME
+			if (domain[0] == '\0')
+				(void) Strncpy(domain, DOMAIN_NAME);
+#endif
 			if (index(host, '.') == NULL) {
-				if (getdomainname(domain + 1, sizeof(domain) - 1) == 0) {
-					domain[0] = '.';
+				/* If the hostname has periods we'll assume that the
+				 * it includes the domain name already.  Some gethostname()s
+				 * return the whole host name, others just the machine name.
+				 * If we have just the machine name and we successfully
+				 * found out the domain name (from above), we'll append
+				 * the domain to the machine to get a full hostname.
+				 */
+				if (domain[0]) {
+					(void) _Strncat(host, ".", size);
 					(void) _Strncat(host, domain, size);
+				} else {
+					fprintf(stderr,
+"WARNING: could not determine full host name (have: '%s').\n\
+The program should be re-compiled with DOMAIN_NAME defined to be the\n\
+domain name, i.e. -DDOMAIN_NAME=\\\"unl.edu\\\"\n\n",
+						host);
 				}
 			}
-#endif
 		}
 		verbose = oldv;
 	}
@@ -1885,6 +1924,12 @@ int show_version(int argc, char **argv)
 #endif
 #ifdef HAS_DOMAINNAME
 	DStrs[nDStrs++] = "HAS_DOMAINNAME";
+#endif
+#ifdef DOMAIN_NAME
+	DStrs[nDStrs++] = "DOMAIN_NAME";
+#endif
+#ifdef Solaris
+	DStrs[nDStrs++] = "Solaris";
 #endif
 #ifdef HOSTNAME
 	DStrs[nDStrs++] = "HOSTNAME";

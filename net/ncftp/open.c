@@ -1,8 +1,8 @@
 /* open.c */
 
 /*  $RCSfile: open.c,v $
- *  $Revision: 1.1 $
- *  $Date: 1994/03/01 00:31:50 $
+ *  $Revision: 1.2 $
+ *  $Date: 1994/03/21 18:01:59 $
  */
 
 #include "sys.h"
@@ -181,7 +181,7 @@ int GetOpenOptions(int argc, char **argv, OpenOptions *openopt)
 Try 'ncftp -m wuarchive.wustl.edu:/README'\n");
 					goto usage;
 				}
-				break;
+				/* break; */
 
 			case 'c':
 				/* ftpcat mode is only available from your shell command-line,
@@ -199,7 +199,7 @@ Try 'ncftp -m wuarchive.wustl.edu:/README'\n");
 Try 'ncftp -c wuarchive.wustl.edu:/README > file.'\n");
 					goto usage;
 				}
-				break;
+				/* break; */
 				
 			default:
 			usage:

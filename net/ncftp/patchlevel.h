@@ -179,15 +179,9 @@
  *  names with whitespace.  Opening msg uses a larger buffer, because of
  *  escape codes.  Philbar now prints K/sec stats.
  *
- * NOTE: I have not posted an official patch for any of the following
- *  maintenance releases.  They are all pretty insignificant, and I will post
- *  a single patch later that incorporates all these changes when it is
- *  worthwhile for people to update.
- *
  * v1.6.1 - November 5, 1993.
  *  Checking if we have permission to write over a file to fetch.
  *  A few very minor changes.  BSD no longer trying to use strchr :-)
- *  (No official patch yet).
  *
  * v1.6.2 - December 10, 1993.
  *  Term hack no longer depends on the PASV command (!).  The BROKEN_MEMCPY
@@ -196,29 +190,36 @@
  *  buffer.  Debug mode won't print your password.  Progress meters
  *  no longer goof up when the file is huge.  Added time-remaining to the
  *  Philbar.
- *  (No official patch yet).
  *
  * v1.6.3 - December 28, 1993.  Added a new diagnostic command, memchk,
  *  to print stats from a special malloc library if you used one.
  *  Using SIZE and MDTM when the remote site supports it.  Using a new
  *  set of routines for term (again).
- *  (No official patch yet).
  *
  * v1.6.4 - December 30, 1993.  Fixed rare problem with GetDateAndTime.
  *  confirm() will return true if you're running the init macro. 
- *  (No official patch yet).
  *
  * v1.6.5 - January 6, 1994.  Fixed error with an #ifndef/#endif block having
  *  whitespace before the #.  No longer confirming "ls >file" actions.
  *  Changed echo() to Echo().  AIX 3 uses TERMIOS.
- *  (No official patch yet).
  *
  * v1.6.6 - February 15, 1994.  Prevented scenario of fclosing a NULL FILE *.
  *  Edited term ftp's hookup() a little.  More defs for linux in sys.h.
  *  Not updating a recent entry unless you were fully logged in.
- *  (No official patch yet).
  *
  * v1.6.7 - February 20, 1994.  Using getpwnam() instead of getpwuid().
  *  Supporting WWW paths (i.e. ftp://host.name/path/name).
- *  (No official patch yet).
+ *
+ * v1.6.8 - March 4, 1994.  Ensuring that tmp files are not public.
+ *  Trying harder to get the real hostname, and fixed problem with
+ *  disappearing progress meters (both due to T. Lindgren).
+ *
+ * v1.6.9 - March 11, 1994.  Added DOMAIN_NAME and Solaris CPP symbols.
+ *  Better handling of getting the domain name, specifically with SunOS.
+ *  BSDi support added.
+ *
+ * v1.7.0 - March 14, 1994.  More verbose when logging to the system log,
+ *  and making sure that syslog() itself is called with a total of 5
+ *  or less parameters.  Official patch posted which incorporates all
+ *  the fixes to 1.6.0 (i.e. 1.6.1, 1.6.2, ... 1.6.9).
  */

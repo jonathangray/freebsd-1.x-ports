@@ -1,8 +1,8 @@
 /* glob.c */
 
 /*  $RCSfile: glob.c,v $
- *  $Revision: 1.1 $
- *  $Date: 1994/03/01 00:31:50 $
+ *  $Revision: 1.2 $
+ *  $Date: 1994/03/21 18:01:46 $
  */
 
 #include "sys.h"

@@ -1,13 +1,13 @@
 /* main.c */
 
 /*  $RCSfile: main.c,v $
- *  $Revision: 1.1 $
- *  $Date: 1994/03/01 00:31:50 $
+ *  $Revision: 1.2 $
+ *  $Date: 1994/03/21 18:01:51 $
  */
 
 #define _main_c_
 
-#define FTP_VERSION "1.6.7 (February 20, 1994)"
+#define FTP_VERSION "1.7.0 (St. Patrick's Day, 1994)"
 
 /* #define BETA 1 */ /* If defined, it prints a little warning message. */
 
@@ -405,6 +405,9 @@ int getuserinfo(void)
 	
 	home = uinfo.homedir;	/* for glob.c */
 	pw = NULL;
+#ifdef USE_GETPWUID
+	pw = getpwuid(getuid());
+#else
 	cp = getlogin();
 	if (cp == NULL) {
 		cp = getenv("LOGNAME");
@@ -413,6 +416,7 @@ int getuserinfo(void)
 	}
 	if (cp != NULL)
 		pw = getpwnam(cp);
+#endif
 	if (pw != NULL) {
 		uinfo.uid = pw->pw_uid;
 		(void) Strncpy(uinfo.username, pw->pw_name);

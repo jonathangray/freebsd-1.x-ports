@@ -3,8 +3,8 @@
  */
 
 /*  $RCSfile: sys.h,v $
- *  $Revision: 1.1 $
- *  $Date: 1994/03/01 00:31:50 $
+ *  $Revision: 1.2 $
+ *  $Date: 1994/03/21 18:02:06 $
  */
 
 #ifdef SVR4
@@ -32,10 +32,15 @@
 #	if !defined(__GNUC__) && !defined(__STDC__) && !defined(SunOverride)
 	^^^ "You need to use an ANSI C compiler.  Try using gcc or acc." ^^^
 #	endif
-#	define System "SunOS"
-#	ifndef RINDEX
-#		define RINDEX 1
-#	endif
+#	ifdef Solaris	/* not predefined. */
+#		define SYSV 1
+#		define System "Solaris"
+#	else
+#		define System "SunOS"
+#		ifndef RINDEX
+#			define RINDEX 1
+#		endif
+#	endif	/* not Solaris */
 #	ifndef TERMIOS
 #		define TERMIOS 1
 #	endif
@@ -339,11 +344,36 @@ extern int errno;
 #	endif
 #endif
 
+#ifdef __bsdi__
+#	define System "BSDi"
+#	ifndef BSD
+#		define BSD 1
+#	endif
+#	ifndef SYSSELECTH
+#		define SYSSELECTH 1
+#	endif
+#	ifndef GETCWDSIZET
+#		define GETCWDSIZET 1
+#	endif
+#	ifndef HERROR
+#		define HERROR 1
+#	endif
+#endif	/* BSDi */
+
 #ifdef __386BSD__
+#       ifdef __FreeBSD__
+#               define System "FreeBSD"
+#               define GZCAT "/usr/bin/gzcat"
+#		define HAS_DOMAINNAME 1
+#       endif
 #       include <sys/types.h>
-#       include <sys/param.h>
-#	define TERMIOS
-#       define NO_CONST 1       /* avoid prototype conflict */
+#       include <sys/param.h>   /* this two for BSD definition */
+				/* to avoid redefinition of it to 1 */
+#       define HERROR 1
+#	define TERMIOS 1
+#       define HAS_GETCWD 1
+#       define U_WAIT 1
+#	define NO_CONST 1       /* avoid prototype conflict */
 #endif
 
 #ifdef BSD
@@ -354,9 +384,6 @@ extern int errno;
 #		ifndef SGTTYB
 #			define SGTTYB
 #		endif
-#	endif
-#	ifndef SGTTYB
-#		define SGTTYB
 #	endif
 #endif
 

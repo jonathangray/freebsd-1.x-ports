@@ -4,8 +4,8 @@
 #define _set_h_
 
 /*  $RCSfile: set.h,v $
- *  $Revision: 1.1 $
- *  $Date: 1994/03/01 00:31:50 $
+ *  $Revision: 1.2 $
+ *  $Date: 1994/03/21 18:02:04 $
  */
 
 /* Variable types. */

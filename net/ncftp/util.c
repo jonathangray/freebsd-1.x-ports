@@ -1,8 +1,8 @@
 /* Util.c */
 
 /*  $RCSfile: util.c,v $
- *  $Revision: 1.1 $
- *  $Date: 1994/03/01 00:31:51 $
+ *  $Revision: 1.2 $
+ *  $Date: 1994/03/21 18:02:11 $
  */
 
 #include "sys.h"
@@ -50,6 +50,7 @@ extern struct cmd	cmdtab[];
 extern struct userinfo uinfo;
 
 #ifndef NO_VARARGS
+/*VARARGS*/
 void dbprintf(char *fmt, ...)
 {
 	va_list ap;
@@ -854,7 +855,7 @@ aa:			cp = LocalPath(path);
 #ifdef NO_STRSTR
 
 /*
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor

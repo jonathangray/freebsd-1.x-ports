@@ -1,8 +1,8 @@
 /* Getpass.c */
 
 /*  $RCSfile: getpass.c,v $
- *  $Revision: 1.1 $
- *  $Date: 1994/03/01 00:31:49 $
+ *  $Revision: 1.2 $
+ *  $Date: 1994/03/21 18:01:42 $
  */
 
 #include "sys.h"

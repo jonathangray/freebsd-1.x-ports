@@ -1,8 +1,8 @@
 /* ftp.c */
 
 /*  $RCSfile: ftp.c,v $
- *  $Revision: 1.1 $
- *  $Date: 1994/03/01 00:31:49 $
+ *  $Revision: 1.2 $
+ *  $Date: 1994/03/21 18:01:34 $
  */
 
 #include "sys.h"
@@ -83,7 +83,8 @@ int					buffer_only = 0;	/* True if reading into redir line
 
 /* ftp.c externs */
 extern FILE					*logf;
-extern string				cwd, anon_password;
+extern string				anon_password;
+extern longstring			cwd, lcwd;
 extern Hostname				hostname;
 extern int					verbose, debug, macnum, margc;
 extern int					curtype, creating, toatty;
@@ -814,70 +815,117 @@ int progress_report(int finish_up)
 
 
 
+
 void end_progress(char *direction, char *local, char *remote)
 {
-    struct timeval			td;
-    float					s, bs = 0.0;
-    char					*cp, *bsstr;
-	string					str;
+    struct timeval          td;
+    float                   s, bs = 0.0;
+    str32                   bsstr;
+    int                     doLastReport;
+	int						receiving;
+    longstring              fullRemote, fullLocal;
 
-	if (bytes <= 0)
-		return;
-	(void) progress_report(1);		/* tell progress proc to cleanup. */
+    doLastReport = ((UserLoggedIn()) && (cur_progress_meter != pr_none) &&
+        (NOT_VQUIET) && (bytes > 0));
 
-	tvsub(&td, &stop, &start);
-	s = td.tv_sec + (td.tv_usec / 1000000.0);
-	if (s != 0.0)
-		bs = bytes / s;
-	if (bs > 1024.0) {
-		bs /= 1024.0;
-		bsstr = "K/s.\n";
-	} else
-		bsstr = "Bytes/s.\n";
+	receiving = (direction[0] == 'r');
 
-	if (NOT_VQUIET) switch(cur_progress_meter) {
-		case pr_none:
-		zz:
-			(void) printf("%s: %ld bytes %s in %.2f seconds, %.2f %s", local, bytes, direction, s, bs, bsstr);
+	switch(FileType(local)) {
+		case IS_FILE:
+			(void) Strncpy(fullLocal, lcwd);
+			(void) Strncat(fullLocal, "/");
+			(void) Strncat(fullLocal, local);
 			break;
-		case pr_kbytes:
-		case pr_percent:
-			(void) printf("%s%ld bytes %s in %.2f seconds, %.2f %s",
-			cur_progress_meter == pr_kbytes ? "\b\b\b\b\b\b" : "\b\b\b\b",
-			bytes, direction, s, bs, bsstr);
-			Echo(stdin, 1);
+		case IS_PIPE:
+			doLastReport = 0;
+			local = Strncpy(fullLocal, local);
 			break;
-		case pr_philbar:
-			(void) printf("\n");
-			Echo(stdin, 1);
-			goto zz;
-		case pr_dots:
-			for (; dots < 10; dots++)
-				(void) fputc('.', stdout);
-			(void) fputc('\n', stdout);
-			Echo(stdin, 1);
-			goto zz;
+		case IS_STREAM:
+		default:
+			doLastReport = 0;
+			local = Strncpy(fullLocal, receiving ? "stdout" : "stdin");
 	}
-	
-	/* Save transfers to the logfile. */
-	/* if a simple path is given, try to log the full path */
-	if (rindex(remote, '/') == NULL && cwd != NULL) {
-		(void) sprintf(str, "%s/%s", cwd, remote);
-		 cp = str;
-	} else
-		cp = remote;
+
+    if (doLastReport)
+        (void) progress_report(1);      /* tell progress proc to cleanup. */
+
+    tvsub(&td, &stop, &start);
+    s = td.tv_sec + (td.tv_usec / 1000000.0);
+
+    bsstr[0] = '\0';
+    if (s != 0.0) {
+        bs = (float)bytes / s;
+        if (bs > 1024.0)
+            sprintf(bsstr, "%.2f K/s", bs / 1024.0);
+        else
+            sprintf(bsstr, "%.2f Bytes/sec", bs / 1024.0);
+    }
+
+    if (doLastReport) switch(cur_progress_meter) {
+        case pr_none:
+        zz:
+            (void) printf("%s: %ld bytes %s in %.2f seconds, %s.\n",
+                local, bytes, direction, s, bsstr);
+            break;
+        case pr_kbytes:
+        case pr_percent:
+            (void) printf("%s%ld bytes %s in %.2f seconds, %s.\n",
+            cur_progress_meter == pr_kbytes ? "\b\b\b\b\b\b" : "\b\b\b\b",
+            bytes, direction, s, bsstr);
+            Echo(stdin, 1);
+            break;
+        case pr_philbar:
+            (void) printf("\n");
+            Echo(stdin, 1);
+            goto zz;
+        case pr_dots:
+            for (; dots < 10; dots++)
+                (void) fputc('.', stdout);
+            (void) fputc('\n', stdout);
+            Echo(stdin, 1);
+            goto zz;
+    }
+
+    /* Save transfers to the logfile. */
+    /* if a simple path is given, try to log the full path */
+    if (*remote != '/') {
+        (void) Strncpy(fullRemote, cwd);
+        (void) Strncat(fullRemote, "/");
+        (void) Strncat(fullRemote, remote);
+    } else
+        (void) Strncpy(fullRemote, remote);
+
     if (logf != NULL) {
-		(void) fprintf(logf, "\t-> \"%s\" %s, %.2f %s", cp, direction, bs, bsstr);
-    } 
+        (void) fprintf(logf, "\t-> \"%s\" %s, %s\n",
+            fullRemote, direction, bsstr);
+    }
 #ifdef SYSLOG
-	if (direction[0] == 'r')
-		syslog (LOG_INFO, "%s received %s as %s from %s (%ld bytes).",
-			uinfo.username, cp, local, hostname, bytes);
-	else
-		syslog (LOG_INFO, "%s sent %s as %s to %s (%ld bytes).",
-			uinfo.username, local, cp, hostname, bytes);
-#endif
-}   /* end_progress */
+    {
+        longstring infoPart1;
+
+        /* Some syslog()'s can't take an unlimited number of arguments,
+         * so shorten our call to syslog to 5 arguments total.
+         */
+        Strncpy(infoPart1, uinfo.username);
+        if (receiving) {
+            Strncat(infoPart1, " received ");
+            Strncpy(infoPart1, fullRemote);
+            Strncat(infoPart1, " as ");
+            Strncat(infoPart1, fullLocal);
+            Strncat(infoPart1, " from ");
+        } else {
+            Strncat(infoPart1, " sent ");
+            Strncat(infoPart1, fullLocal);
+            Strncat(infoPart1, " as ");
+            Strncat(infoPart1, fullRemote);
+            Strncat(infoPart1, " to ");
+        }
+        Strncat(infoPart1, hostname);
+        syslog (LOG_INFO, "%s (%ld bytes, %s).", infoPart1, bytes, bsstr);
+    }
+#endif  /* SYSLOG */
+}	/* end_progress */
+
 
 
 
@@ -1099,8 +1147,7 @@ Done:
 	(void) Signal(SIGINT, oldintr);
 	if (oldintp)
 		(void) Signal(SIGPIPE, oldintp);
-	if (do_reports)
-		end_progress("sent", local, remote);
+	end_progress("sent", local, remote);
 xx:
 	return (result);
 Abort:
@@ -1628,7 +1675,7 @@ xx:
 	dbprintf("outfile closed.\n");
 	if (din)
 		(void) fclose(din);
-	if (do_reports)
+	if (is_retr)
 		end_progress("received", local, remote);
 	if (oldintr)
 		(void) Signal(SIGINT, oldintr);

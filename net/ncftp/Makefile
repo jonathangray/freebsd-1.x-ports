@@ -14,7 +14,7 @@ SDEFS =
 # Program definitions.  See the README, part C.
 #--------------------------------------------------------------------------
 
-PDEFS = -DCURSES -DNO_CURSES_H -DGZCAT=\"/usr/bin/gzcat\" -DSYSLOG -DTRY_ABOR
+PDEFS = -DCURSES -DNO_CURSES_H -DSYSLOG -DTRY_ABOR
 # Don't compile with readline, have ugly bug with SIGTSTP
 
 #PDEFS =
