@@ -1,6 +1,9 @@
 #	@(#)Makefile	5.7 (Berkeley) 6/27/91
 
 # LINPACK sources
+LIBDIR= /usr/local/lib
+NOPROFILE= no
+
 SHLIB_MAJOR= 1
 SHLIB_MINOR= 0
 LIB=linpack
@@ -29,6 +32,8 @@ SRCS =	cchdc.f cchdd.f cchex.f cchud.f cgbco.f cgbdi.f cgbfa.f cgbsl.f \
 	zsvdc.f ztrco.f ztrdi.f ztrsl.f
 CLEANFILES+= *.c
 
-.include <bsd.lib.mk>
+pkg:	install pkg/+DESC pkg/+ONELINE pkg/+PLIST
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST linpack_bin
 
+.include <bsd.lib.mk>
 
