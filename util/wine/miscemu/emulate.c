@@ -1,4 +1,4 @@
-static char RCSId[] = "$Id: emulate.c,v 1.1.1.2 1994/04/22 01:53:26 hsu Exp $";
+static char RCSId[] = "$Id: emulate.c,v 1.1.1.3 1994/05/19 08:00:38 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
 #include <stdlib.h>
@@ -18,8 +18,8 @@ struct Win87EmInfoStruct {
 int
 WIN87_fpmath()
 {
-  printf( "_fpmath: (%d)\n",_BX);
-
+  printf( "_fpmath: (%x:%x %x %x)\n",_CONTEXT->sc_cs, _CONTEXT->sc_eip, 
+	 _CONTEXT->sc_es, _BX);
 
   switch(_BX )
     {

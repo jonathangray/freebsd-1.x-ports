@@ -1,4 +1,4 @@
-static char RCSId[] = "$Id: heap.c,v 1.1.1.2 1994/04/22 01:52:41 hsu Exp $";
+static char RCSId[] = "$Id: heap.c,v 1.1.1.3 1994/05/19 07:58:43 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
 #include <stdio.h>
@@ -117,10 +117,24 @@ HEAP_ReAlloc(MDESC **free_list, void *old_block,
     MDESC *m_free;
     MDESC *m;
 
+
+    if (!old_block)
+	return HEAP_Alloc(free_list, flags, new_size);
+    
     /*
      * Check validity of block
      */
     m = (MDESC *) old_block - 1;
+
+#ifdef DEBUG_HEAP
+    printf("HEAP_ReAlloc new_size=%d !\n", new_size);
+    printf("HEAP_ReAlloc old_block=%08X !\n", old_block);
+    printf("HEAP_ReAlloc m=%08X free_list=%08X !\n", m, free_list);
+    printf("HEAP_ReAlloc m->prev=%08X !\n", m->prev);
+    printf("HEAP_ReAlloc m->next=%08X !\n", m->next);
+    printf("HEAP_ReAlloc *free_list=%08X !\n", *free_list);
+#endif
+
     if (m->prev != m || m->next != m || 
 	((int) m & 0xffff0000) != ((int) *free_list & 0xffff0000))
     {
@@ -134,6 +148,10 @@ HEAP_ReAlloc(MDESC **free_list, void *old_block,
     /*
      * Check for grow block
      */
+#ifdef DEBUG_HEAP
+    printf("HEAP_ReAlloc Check for grow block !\n");
+#endif
+
     if (new_size > m->length)
     {
 	m_free = m + 1 + m->length / sizeof(MDESC);
@@ -142,7 +160,6 @@ HEAP_ReAlloc(MDESC **free_list, void *old_block,
 	    m_free->length + sizeof(MDESC) < new_size)
 	{
 	    void *new_p = HEAP_Alloc(free_list, flags, new_size);
-	    
 	    if (new_p ==NULL)
 		return NULL;
 	    memcpy(new_p, old_block, m->length);
@@ -159,6 +176,9 @@ HEAP_ReAlloc(MDESC **free_list, void *old_block,
 	    m_free->next->prev = m_free->prev;
 	
 	m->length += sizeof(MDESC) + m_free->length;
+#ifdef DEBUG_HEAP
+	printf("HEAP_ReAlloc before GLOBAL_FLAGS_ZEROINIT !\n");
+#endif
 	if (flags & GLOBAL_FLAGS_ZEROINIT)
 	    memset(m_free, '\0', sizeof(MDESC) + m_free->length);
     }
@@ -166,6 +186,9 @@ HEAP_ReAlloc(MDESC **free_list, void *old_block,
     /*
      * Check for shrink block.
      */
+#ifdef DEBUG_HEAP
+	printf("HEAP_ReAlloc Check for shrink block !\n");
+#endif
     if (new_size < m->length - 4 * sizeof(MDESC))
     {
 	m_free = m + new_size / sizeof(MDESC) + 2;
@@ -422,7 +445,7 @@ WIN16_LocalInit(unsigned int segment, unsigned int start, unsigned int end)
 	HEAP_Init(&lh->free_list,
 		  (void *) ((segment << 16) | start), end - start + 1);
     }
-
+	printf("WIN16_LocalInit // return segment=%04X !\n", segment);
     return segment;
 }
 
@@ -447,10 +470,14 @@ WIN16_LocalLock(unsigned int handle)
  *					WIN16_LocalReAlloc
  */
 void *
-WIN16_LocalReAlloc(unsigned int handle, int flags, int bytes)
+WIN16_LocalReAlloc(unsigned int handle, int bytes, int flags)
 {
     void *m;
-    
+#ifdef DEBUG_HEAP
+	printf("WIN16_LocalReAlloc(%04X, %d, %04X); !\n",	handle, bytes, flags);
+	printf("WIN16_LocalReAlloc // LOCALHEAP()=%08X !\n", LOCALHEAP());
+	printf("WIN16_LocalReAlloc // *LOCALHEAP()=%08X !\n", *LOCALHEAP());
+#endif
     m = HEAP_ReAlloc(LOCALHEAP(), (void *)
 		     (((int) *LOCALHEAP() & 0xffff0000) | (handle & 0xffff)),
 		     bytes, flags);

@@ -1,4 +1,4 @@
-static char RCSId[] = "$Id: global.c,v 1.1.1.2 1994/04/22 01:52:40 hsu Exp $";
+static char RCSId[] = "$Id: global.c,v 1.1.1.3 1994/05/19 07:58:37 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
 #define GLOBAL_SOURCE
@@ -103,18 +103,20 @@ GlobalGetFreeSegments(unsigned int flags, int n_segments)
 	for (count = 0; count < n_segments; count++, s++)
 	{
 	    g = (GDESC *) malloc(sizeof(*g));
-	    if (g == NULL) {
+	    if (g == NULL) 
+	    {
 		printf("GlobalGetFreeSegments // bad GDESC malloc !\n");
 		return NULL;
-		}
-	    g->prev = g_prev;
-	    g->next = NULL;
-	    g->handle = s->selector;
-	    g->sequence = -1;
-	    g->addr = s->base_addr;
-	    g->length = s->length;
-	    g->linear_addr = NULL;
-	    g->linear_key = 0;
+	    }
+	    g->prev         = g_prev;
+	    g->next         = NULL;
+	    g->handle       = s->selector;
+	    g->sequence     = -1;
+	    g->addr         = s->base_addr;
+	    g->length       = s->length;
+	    g->alias        = 0;
+	    g->linear_addr  = NULL;
+	    g->linear_key   = 0;
 	    g->linear_count = 0;
 	    if (!(flags & GLOBAL_FLAGS_MOVEABLE))
 		g->lock_count = 1;
@@ -139,20 +141,31 @@ GlobalGetFreeSegments(unsigned int flags, int n_segments)
     g = g_start;
     for (i = 0; i < n_segments; i++, g = g->next)
     {
-	if (g == NULL) {
+	if (g == NULL) 
+	{
 	    printf("GlobalGetFreeSegments // bad Segments chain !\n");
 	    return NULL;
-	    }
-	g->sequence = i + 1;
-	g->length = n_segments;
-	g->linear_addr = NULL; 
-	g->linear_key = 0;
+	}
+	g->sequence     = i + 1;
+	g->length       = n_segments;
+	g->alias        = 0;
+	g->linear_addr  = NULL; 
+	g->linear_key   = 0;
 	g->linear_count = 0;
     }
 
     return g_start;
 }
 
+/**********************************************************************
+ *					WIN16_GlobalAlloc
+ */
+HANDLE
+WIN16_GlobalAlloc(unsigned int flags, unsigned long size)
+{
+    return GlobalAlloc(flags & ~GLOBAL_FLAGS_MOVEABLE, size);
+}
+
 /**********************************************************************
  *					GlobalAlloc
  */
@@ -162,6 +175,10 @@ GlobalAlloc(unsigned int flags, unsigned long size)
     GDESC *g;
     GDESC *g_prev;
     void *m;
+
+#ifdef DEBUG_HEAP
+	printf("GlobalAlloc flags %4X, size %d\n", flags, size);
+#endif
 
     /*
      * If this block is fixed or very big we need to allocate entire
@@ -230,14 +247,15 @@ GlobalAlloc(unsigned int flags, unsigned long size)
 	if (g == NULL)
 	    return 0;
 
-	g->handle = next_unused_handle;
-	g->sequence = 0;
-	g->addr = m;
-	g->linear_addr = NULL;
-	g->linear_key = 0;
+	g->handle       = next_unused_handle;
+	g->sequence     = 0;
+	g->addr         = m;
+	g->alias        = 0;
+	g->linear_addr  = NULL;
+	g->linear_key   = 0;
 	g->linear_count = 0;
-	g->length = size;
-	g->next = g_prev->next;
+	g->length       = size;
+	g->next         = g_prev->next;
 	if (g->next) g->next->prev = g;
 	g->lock_count = 0;
 
@@ -319,28 +337,15 @@ GlobalLock(unsigned int block)
 {
     GDESC *g;
 
-    if (block == 0)
+    if ((g = GlobalGetGDesc(block)) == NULL)
 	return 0;
 
-    /*
-     * Find GDESC for this block.
-     */
-    for (g = GlobalList; g != NULL; g = g->next)
-    {
-	if (g->handle == block)
-	{
-	    g->lock_count++;
-#ifdef DEBUG_HEAP
-	    printf("GlobalLock: returning %08x\n", g->addr);
-#endif
-	    return g->addr;
-	}
-    }
+    g->lock_count++;
 
 #ifdef DEBUG_HEAP
-    printf("GlobalLock: returning %08x\n", 0);
+    printf("GlobalLock: returning %08x\n", g->addr);
 #endif
-    return NULL;
+    return g->addr;
 }
 
 /**********************************************************************

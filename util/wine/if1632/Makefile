@@ -3,7 +3,7 @@
 
 # -------------------------------------------------------------------------
 # Makefile generated from "Imake.tmpl" and <Imakefile>
-# $XFree86: mit/config/Imake.tmpl,v 1.17 1993/06/03 15:26:36 dawes Exp $
+# $XFree86: mit/config/Imake.tmpl,v 2.6 1993/10/02 07:11:59 dawes Exp $
 # $XConsortium: Imake.tmpl,v 1.139 91/09/16 08:52:48 rws Exp $
 #
 # Platform-specific parameters may be set in the appropriate <vendor>.cf
@@ -19,30 +19,32 @@
 # site-specific configuration parameters that need to come before
 # the platform-specific parameters - edit site.def to change
 
-# $XFree86: mit/config/site.def,v 1.65 1993/06/04 16:02:47 dawes Exp $
+# $XFree86: mit/config/site.def,v 2.23 1993/10/16 17:28:07 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
 # -------------------------------------------------------------------------
 # platform-specific configuration parameters - edit x386.cf to change
 
-# $XFree86: mit/config/x386.cf,v 1.90 1993/06/04 16:02:50 dawes Exp $
+# $XFree86: mit/config/x386.cf,v 2.28 1993/10/21 15:48:52 dawes Exp $
 # platform:  $XConsortium: x386.cf,v 1.7 91/08/16 19:30:10 gildea Exp $
 
 # -------------------------------------------------------------------------
 # XFree86 version definition
-# $XFree86: mit/config/xf86_vers.def,v 1.5 1993/06/01 09:12:47 dawes Exp $
+# $XFree86: mit/config/xf86_vers.def,v 2.7 1993/10/08 16:11:07 dawes Exp $
 
 # -------------------------------------------------------------------------
-# XFree86 version: 1300
+# XFree86 version: 2000
 # -------------------------------------------------------------------------
 
-# operating system:  		386BSD
+# $XConsortium: bsdLib.rules,v 1.7 91/12/20 11:19:47 rws Exp $
+
+# operating system:  	FreeBSD
 
 # -------------------------------------------------------------------------
 # site-specific configuration parameters that go after
 # the platform-specific parameters - edit site.def to change
 
-# $XFree86: mit/config/site.def,v 1.65 1993/06/04 16:02:47 dawes Exp $
+# $XFree86: mit/config/site.def,v 2.23 1993/10/16 17:28:07 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
             SHELL = 	/bin/sh
@@ -51,7 +53,7 @@
       CURRENT_DIR = ./if1632
 
                AR = ar clq
-  BOOTSTRAPCFLAGS =
+  BOOTSTRAPCFLAGS = 	-DFreeBSD
                CC = 		gcc
                AS = as
 
@@ -78,13 +80,18 @@
          MSMACROS = -ms
               TBL = tbl
               EQN = eqn
+            NROFF = nroff
+             NEQN = neqn
      STD_INCLUDES =
-  STD_CPP_DEFINES = -traditional
-      STD_DEFINES =
+  STD_CPP_DEFINES = -traditional 		-DFreeBSD
+      STD_DEFINES = 		-DFreeBSD
  EXTRA_LOAD_FLAGS =
-  EXTRA_LIBRARIES =
+  EXTRA_LIBRARIES = 		-lgnumalloc
      OS_LIBRARIES =
              TAGS = ctags
+
+    SHAREDCODEDEF =
+         SHLIBDEF = -DBSDSHLIB
 
     PROTO_DEFINES =
 
@@ -96,7 +103,7 @@
      INSTINCFLAGS = -m 0444
      INSTMANFLAGS = -m 0444
      INSTDATFLAGS = -m 0444
-    INSTKMEMFLAGS = -m 4755
+    INSTKMEMFLAGS = 	-m 2755 -g kmem
 
       PROJECTROOT = 	/usr/X386
 
@@ -130,7 +137,7 @@
 
 # -------------------------------------------------------------------------
 # X Window System Build Parameters
-# $XFree86: mit/config/Project.tmpl,v 1.13 1993/03/27 03:32:45 dawes Exp $
+# $XFree86: mit/config/Project.tmpl,v 2.1 1993/09/17 16:10:43 dawes Exp $
 # $XConsortium: Project.tmpl,v 1.138.1.1 92/11/11 09:49:19 rws Exp $
 
 _percentC_ = %C
@@ -146,7 +153,7 @@ _percentC_ = %C
       BUILDINCDIR = $(BUILDINCROOT)/X11
       BUILDINCTOP = ..
            INCDIR = $(INCROOT)/X11
-           ADMDIR = /usr/adm
+           ADMDIR = 		/var/log
            LIBDIR = $(USRLIBDIR)/X11
         CONFIGDIR = $(LIBDIR)/config
        LINTLIBDIR = $(USRLIBDIR)/lint
@@ -156,11 +163,13 @@ _percentC_ = %C
            XDMDIR = $(LIBDIR)/xdm
            TWMDIR = $(LIBDIR)/twm
           MANPATH = 	/usr/X386/man
-    MANSOURCEPATH = 	$(MANPATH)/man
-        MANSUFFIX = 1
-     LIBMANSUFFIX = 3
-           MANDIR = 	$(MANSOURCEPATH)1
+    MANSOURCEPATH = $(MANPATH)/man
+        MANSUFFIX = 1x
+     LIBMANSUFFIX = 3x
+    FILEMANSUFFIX = 5x
+           MANDIR = $(MANSOURCEPATH)1
         LIBMANDIR = $(MANSOURCEPATH)3
+       FILEMANDIR = $(MANSOURCEPATH)5
            NLSDIR = $(LIBDIR)/nls
         PEXAPIDIR = $(LIBDIR)/PEX
       XAPPLOADDIR = $(LIBDIR)/app-defaults
@@ -212,34 +221,49 @@ _percentC_ = %C
         PEXLIBSRC = $(EXTENSIONSRC)/lib/PEXlib
       PHIGSLIBSRC = $(EXTENSIONSRC)/lib/PEX
 
-  DEPEXTENSIONLIB = $(USRLIBDIR)/libXext.a
-     EXTENSIONLIB = 			 -lXext
+# $XConsortium: sunLib.tmpl,v 1.14.1.2 92/11/11 09:52.02 rws Exp $
 
-          DEPXLIB = $(DEPEXTENSIONLIB) $(USRLIBDIR)/libX11.a
-             XLIB = $(EXTENSIONLIB) 			 -lX11
+SHLIBLDFLAGS = -Bshareable
+PICFLAGS = -fpic
+
+  DEPEXTENSIONLIB =
+     EXTENSIONLIB = -lXext
+
+          DEPXLIB = $(DEPEXTENSIONLIB)
+             XLIB = $(EXTENSIONLIB) -lX11
+
+        DEPXMULIB = $(USRLIBDIR)/libXmu.so.$(SOXMUREV)
+       XMULIBONLY = -lXmu
+           XMULIB = -lXmu
+
+       DEPOLDXLIB =
+          OLDXLIB = -loldX
+
+      DEPXTOOLLIB = $(USRLIBDIR)/libXt.so.$(SOXTREV)
+         XTOOLLIB = -lXt
+
+        DEPXAWLIB = $(USRLIBDIR)/libXaw.so.$(SOXAWREV)
+           XAWLIB = -lXaw
+
+        DEPXILIB =
+           XILIB = -lXi
+
+        DEPPEXLIB =
+           PEXLIB = -lPEX5
+
+        SOXLIBREV = 2.0
+          SOXTREV = 2.0
+         SOXAWREV = 2.0
+        SOOLDXREV = 2.0
+         SOXMUREV = 2.0
+        SOXEXTREV = 2.0
+      SOXINPUTREV = 2.0
+         SOPEXREV = 2.0
 
       DEPXAUTHLIB = $(USRLIBDIR)/libXau.a
          XAUTHLIB = 			 -lXau
       DEPXDMCPLIB = $(USRLIBDIR)/libXdmcp.a
          XDMCPLIB = 			 -lXdmcp
-
-        DEPXMULIB = $(USRLIBDIR)/libXmu.a
-           XMULIB = 			 -lXmu
-
-       DEPOLDXLIB = $(USRLIBDIR)/liboldX.a
-          OLDXLIB = 			 -loldX
-
-      DEPXTOOLLIB = $(USRLIBDIR)/libXt.a
-         XTOOLLIB = 			 -lXt
-
-        DEPXAWLIB = $(USRLIBDIR)/libXaw.a
-           XAWLIB = 			 -lXaw
-
-        DEPXILIB = $(USRLIBDIR)/libXi.a
-           XILIB = 			 -lXi
-
-       DEPPEXLIB = $(USRLIBDIR)/libPEX5.a
-          PEXLIB = 			 -lPEX5
 
         DEPPHIGSLIB = $(USRLIBDIR)/libphigs.a
            PHIGSLIB = 			 -lphigs
@@ -264,15 +288,15 @@ _percentC_ = %C
 
 # -------------------------------------------------------------------------
 # Imake rules for building libraries, programs, scripts, and data files
-# $XFree86: mit/config/Imake.rules,v 1.9 1993/03/23 12:56:27 dawes Exp $
+# $XFree86: mit/config/Imake.rules,v 2.1 1993/09/29 11:06:00 dawes Exp $
 # rules:  $XConsortium: Imake.rules,v 1.123 91/09/16 20:12:16 rws Exp $
 
 # -------------------------------------------------------------------------
 # start of Imakefile
 
-# $Id: Makefile,v 1.1 1994/02/24 08:05:32 hsu Exp $
+# $Id: Makefile,v 1.1.1.2 1994/05/19 07:55:41 hsu Exp $
 
-INCLUDES = -I$(TOP)/include
+INCLUDES = -I$(TOP)/include -I$(TOP)
 
 # Imake rules go here
 
@@ -282,67 +306,67 @@ MODULE = if1632
 
 SRCS = 	call.S 	callback.c 	relay.c
 
-OBJS = 	call.o 	callback.o 	relay.o
+DLLOBJS = 	dll_gdi.o 	dll_kernel.o 	dll_keyboard.o 	dll_mmsystem.o 	dll_shell.o 	dll_sound.o 	dll_stress.o 	dll_unixlib.o 	dll_user.o 	dll_win87em.o 	dll_winsock.o
 
-$(TOP)/$(MODULE).o: dll_gdi.o dll_gdi_tab.o
+OBJS1= $(SRCS:.S=.o)
+
+OBJS = $(DLLOBJS) $(OBJS1:.c=.o) $(DLLOBJS:.o=_tab.o)
 
 dll_gdi.S dll_gdi_tab.c: gdi.spec $(TOP)/tools/build
 	$(TOP)/tools/build gdi.spec
 
-$(TOP)/$(MODULE).o: dll_kernel.o dll_kernel_tab.o
-
 dll_kernel.S dll_kernel_tab.c: kernel.spec $(TOP)/tools/build
 	$(TOP)/tools/build kernel.spec
-
-$(TOP)/$(MODULE).o: dll_keyboard.o dll_keyboard_tab.o
 
 dll_keyboard.S dll_keyboard_tab.c: keyboard.spec $(TOP)/tools/build
 	$(TOP)/tools/build keyboard.spec
 
-$(TOP)/$(MODULE).o: dll_shell.o dll_shell_tab.o
-
 dll_shell.S dll_shell_tab.c: shell.spec $(TOP)/tools/build
 	$(TOP)/tools/build shell.spec
 
-$(TOP)/$(MODULE).o: dll_sound.o dll_sound_tab.o
+dll_mmsystem.S dll_mmsystem_tab.c: mmsystem.spec $(TOP)/tools/build
+	$(TOP)/tools/build mmsystem.spec
 
 dll_sound.S dll_sound_tab.c: sound.spec $(TOP)/tools/build
 	$(TOP)/tools/build sound.spec
 
-$(TOP)/$(MODULE).o: dll_unixlib.o dll_unixlib_tab.o
+dll_stress.S dll_stress_tab.c: stress.spec $(TOP)/tools/build
+	$(TOP)/tools/build stress.spec
 
 dll_unixlib.S dll_unixlib_tab.c: unixlib.spec $(TOP)/tools/build
 	$(TOP)/tools/build unixlib.spec
 
-$(TOP)/$(MODULE).o: dll_user.o dll_user_tab.o
-
 dll_user.S dll_user_tab.c: user.spec $(TOP)/tools/build
 	$(TOP)/tools/build user.spec
 
-$(TOP)/$(MODULE).o: dll_win87em.o dll_win87em_tab.o
-
 dll_win87em.S dll_win87em_tab.c: win87em.spec $(TOP)/tools/build
 	$(TOP)/tools/build win87em.spec
-
-$(TOP)/$(MODULE).o: dll_winsock.o dll_winsock_tab.o
 
 dll_winsock.S dll_winsock_tab.c: winsock.spec $(TOP)/tools/build
 	$(TOP)/tools/build winsock.spec
 
 all:: $(TOP)/$(MODULE).o
 
-$(TOP)/$(MODULE).o:
-	$(RM) $@
-	$(LD) $(LDCOMBINEFLAGS) *.o  -o $@
-
 $(TOP)/$(MODULE).o: $(OBJS)
-
-clean::
-	$(RM) dll*
+	$(RM) $@
+	$(LD) $(LDCOMBINEFLAGS)  $(OBJS) -o $@
 
 depend::
+	$(DEPEND) $(DEPENDFLAGS) -s "# DO NOT DELETE" -- $(ALLDEFINES) -- $(SRCS)
+
+clean::
+	$(RM_CMD) "#"*
+
+pop.h: $(TOP)/tools/build
+	$(TOP)/tools/build -p
 
 includes::
+
+install::
+
+clean::
+	$(RM) dll* dtb* pop.h
+	touch pop.h
 
 # -------------------------------------------------------------------------
 # common rules for all Makefiles - do not edit
@@ -381,3 +405,22 @@ includes::
 # -------------------------------------------------------------------------
 # dependencies generated by makedepend
 
+# DO NOT DELETE
+
+call.o: pop.h
+callback.o: /usr/include/stdio.h /usr/include/sys/cdefs.h
+callback.o: /usr/include/machine/ansi.h /usr/include/stdlib.h
+callback.o: /usr/include/sys/types.h .././include/windows.h
+callback.o: .././include/callback.h /usr/include/stdarg.h
+callback.o: /usr/include/machine/stdarg.h .././include/wine.h
+callback.o: .././include/dlls.h .././include/segmem.h /usr/include/setjmp.h
+relay.o: /usr/include/stdio.h /usr/include/sys/cdefs.h
+relay.o: /usr/include/machine/ansi.h /usr/include/stdlib.h
+relay.o: /usr/include/sys/types.h /usr/include/string.h
+relay.o: /usr/include/sys/stat.h /usr/include/fcntl.h /usr/include/unistd.h
+relay.o: /usr/include/sys/unistd.h /usr/include/sys/time.h
+relay.o: /usr/include/sys/time.h /usr/include/errno.h .././include/neexe.h
+relay.o: .././include/segmem.h .././include/wine.h .././include/dlls.h
+relay.o: .././include/prototypes.h .././include/heap.h .././include/regfunc.h
+relay.o: .././include/atom.h .././include/windows.h .././include/msdos.h
+relay.o: /usr/include/dirent.h .././include/options.h

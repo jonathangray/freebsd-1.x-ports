@@ -1,4 +1,4 @@
-static char RCSId[] = "$Id: wine.c,v 1.1.1.2 1994/04/22 01:52:33 hsu Exp $";
+static char RCSId[] = "$Id: wine.c,v 1.1.1.3 1994/05/19 07:58:06 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
 #include <stdio.h>
@@ -23,6 +23,7 @@ static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 #include "windows.h"
 #include "wineopts.h"
 #include "arch.h"
+#include "options.h"
 
 /* #define DEBUG_FIXUP */
 
@@ -334,7 +335,7 @@ int _WinMain(int argc, char **argv)
 
 	hSysRes = LoadLibrary(filename);
 	if (hSysRes == (HINSTANCE)NULL)
-		fprintf(stderr, "wine: can't find %s!.\n", filename);
+		fprintf(stderr, "wine: can't find %s!\n", filename);
  	else
  	    printf("System Resources Loaded // hSysRes='%04X'\n", hSysRes);
 	
@@ -377,6 +378,8 @@ int _WinMain(int argc, char **argv)
     ip_reg = wine_files->ne_header->ip;
     ss_reg = wine_files->selector_table[wine_files->ne_header->ss-1].selector;
     sp_reg = wine_files->ne_header->sp;
+
+    if (Options.debug) wine_debug(0, NULL);
 
     rv = CallToInit16(cs_reg << 16 | ip_reg, ss_reg << 16 | sp_reg, ds_reg);
     printf ("rv = %x\n", rv);

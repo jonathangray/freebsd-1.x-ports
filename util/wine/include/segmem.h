@@ -1,10 +1,12 @@
-/* $Id: segmem.h,v 1.1 1994/02/24 08:05:35 hsu Exp $
+/* $Id: segmem.h,v 1.1.1.2 1994/05/19 07:56:15 hsu Exp $
  */
 /*
  * Copyright  Robert J. Amstadt, 1993
  */
 #ifndef SEGMEM_H
 #define SEGMEM_H
+
+#include "wine.h"
 
 #ifdef __linux__
 #define HAVE_IPC
@@ -77,13 +79,10 @@ extern int IPCCopySelector(int i_old, unsigned long new, int swap_type);
 
 static __inline__ int Is16bitAddress(void *address)
 {
-    return ((int) address >= (((FIRST_SELECTOR << 3) | 0x0007) << 16));
+    return ((unsigned int) address 
+	    >= (((FIRST_SELECTOR << 3) | 0x0007) << 16));
 }
 
 extern SEGDESC Segments[];
 
 #endif /* SEGMEM_H */
-
-
-
-

@@ -1,4 +1,4 @@
-static char RCSId[] = "$Id: sound.c,v 1.1.1.2 1994/04/22 01:53:18 hsu Exp $";
+static char RCSId[] = "$Id: sound.c,v 1.1.1.3 1994/05/19 07:59:49 hsu Exp $";
 static char Copyright[] = "Copyright  Robert J. Amstadt, 1993";
 
 #include <stdlib.h>
@@ -63,6 +63,40 @@ int StopSound(void)
   return 0;
 }
 
+int WaitSoundState(int x)
+{
+	fprintf(stderr, "WaitSoundState(%d)\n", x);
+}
+
+SyncAllVoices(void)
+{
+	fprintf(stderr, "SyncAllVoices()\n");
+}
+
+int CountVoiceNotes(int x)
+{
+	fprintf(stderr, "CountVoiceNotes(%d)\n", x);
+}
+
+LPINT GetThresholdEvent(void)
+{
+	fprintf(stderr, "GetThresholdEvent()\n");
+}
+
+GetThresholdStatus(void)
+{
+	fprintf(stderr, "GetThresholdStatus()\n");
+}
+
+int SetVoiceThreshold(int a, int b)
+{
+	fprintf(stderr, "SetVoiceThreshold(%d,%d)\n", a, b);
+}
+
+void DoBeep(void)
+{
+	fprintf(stderr, "BEEP!\n");
+}
 
 /*
 11   pascal  WAITSOUNDSTATE(word) WaitSoundState(1)
@@ -71,7 +105,4 @@ int StopSound(void)
 14   pascal  GETTHRESHOLDEVENT() GetThresholdEvent()
 15   pascal  GETTHRESHOLDSTATUS() GetThresholdStatus()
 16   pascal  SETVOICETHRESHOLD(word word) SetVoiceThreshold(1 2)
-
-
-
 */

@@ -9,6 +9,8 @@
  */
 
 #include <stdio.h>
+#include <signal.h>
+
 #define YYSTYPE int
 
 #include "regpos.h"
@@ -17,19 +19,25 @@ unsigned int * regval = NULL;
 unsigned int dbg_mask = 0;
 unsigned int dbg_mode = 0;
 
-void issue_prompt();
+void issue_prompt(void);
+void mode_command(int);
 %}
 
 
 %token CONT
 %token QUIT
 %token HELP
+%token BACKTRACE
 %token INFO
 %token STACK
 %token REG
 %token REGS
 %token NUM
+%token ENABLE
+%token DISABLE
+%token BREAK
 %token SET
+%token MODE
 %token PRINT
 %token IDENTIFIER
 %token NO_SYMBOL
@@ -43,18 +51,23 @@ void issue_prompt();
 
  line:		'\n'
 	| infocmd '\n'
-	| error '\n'       {yyerrok; }
+	| error '\n'       { yyerrok; }
 	| QUIT  '\n'       { exit(0); };
 	| HELP  '\n'       { dbg_help(); };
 	| CONT '\n'        { return; };
 	| SYMBOLFILE IDENTIFIER '\n' { read_symboltable($2); };
 	| DEFINE IDENTIFIER expr '\n'  { add_hash($2, $3); };
+	| MODE NUM	   { mode_command($2); };
+	| ENABLE NUM	   { enable_break($2); };
+	| DISABLE NUM	   { disable_break($2); };
+	| BREAK '*' expr   { add_break($3); };
 	| x_command
+	| BACKTRACE '\n'   { dbg_bt(); };
 	| print_command
 	| deposit_command
 
 deposit_command:
-	SET REG '=' expr '\n' { regval[$2] = $4; }
+	SET REG '=' expr '\n' { if(regval) regval[$2] = $4; else application_not_running();}
 	| SET '*' expr '=' expr '\n' { *((unsigned int *) $3) = $5; }
 	| SET symbol '=' expr '\n' { *((unsigned int *) $2) = $4; }
 
@@ -83,7 +96,7 @@ x_command:
 			        }; 
 
  expr:  NUM			{ $$ = $1;	}
-	| REG			{ $$ = regval[$1]; }
+	| REG			{ if(regval) $$ = regval[$1]; else application_not_running();}
 	| symbol   		{ $$ = *((unsigned int *) $1); }
 	| expr '+' NUM		{ $$ = $1 + $3; }
 	| expr '-' NUM		{ $$ = $1 - $3; };
@@ -92,6 +105,7 @@ x_command:
 	
  infocmd: INFO REGS { info_reg(); }
 	| INFO STACK  { info_stack(); };
+	| INFO BREAK  { info_break(); };
 
 
 %%
@@ -103,10 +117,25 @@ issue_prompt(){
 #endif
 }
 
+void mode_command(int newmode)
+{
+  if(newmode == 16){
+    dbg_mask = 0xffff;
+    dbg_mode = 16;
+    return;
+  }
+  if(newmode == 32){ 
+    dbg_mask = 0xffffffff;
+    dbg_mode = 32;
+    return;
+  }
+  fprintf(stderr,"Invalid mode (use 16 or 32)\n");
+}
+
 static int loaded_symbols = 0;
 
 void
-wine_debug(int * regs)
+wine_debug(int signal, int * regs)
 {
 	int i;
 #ifdef YYDEBUG
@@ -133,6 +162,7 @@ wine_debug(int * regs)
 		dbg_mode = 16;
 	};
 #endif
+	fprintf(stderr,"In %d bit mode.\n", dbg_mode);
 
 	/* This is intended to read the entry points from the Windows image, and
 	   insert them in the hash table.  It does not work yet, so it is commented out. */
@@ -143,13 +173,31 @@ wine_debug(int * regs)
 	};
 #endif
 
+	/* Remove the breakpoints from memory... */
+	insert_break(0);
+
+	/* If we stopped on a breakpoint, report this fact */
+	if(signal == SIGTRAP)
+	  {
+	    unsigned int addr;
+	    addr = SC_EIP(dbg_mask);
+	    if((addr & 0xffff0000) == 0 && dbg_mode == 16)
+	      addr |= SC_CS << 16;
+	    fprintf(stderr,"Stopped on breakpoint %d\n", get_bpnum(addr));
+	  }
+
 	/* Show where we crashed */
-	examine_memory(SC_EIP(dbg_mask), 1, 'i');
+	if(regval)
+	  examine_memory(SC_EIP(dbg_mask), 1, 'i');
 
 	issue_prompt();
 
 	yyparse();
 	flush_symbols();
+
+	/* Re-insert the breakpoints from memory... */
+	insert_break(1);
+
 	fprintf(stderr,"Returning to Wine...\n");
 
 }

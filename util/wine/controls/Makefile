@@ -3,7 +3,7 @@
 
 # -------------------------------------------------------------------------
 # Makefile generated from "Imake.tmpl" and <Imakefile>
-# $XFree86: mit/config/Imake.tmpl,v 1.17 1993/06/03 15:26:36 dawes Exp $
+# $XFree86: mit/config/Imake.tmpl,v 2.6 1993/10/02 07:11:59 dawes Exp $
 # $XConsortium: Imake.tmpl,v 1.139 91/09/16 08:52:48 rws Exp $
 #
 # Platform-specific parameters may be set in the appropriate <vendor>.cf
@@ -19,30 +19,32 @@
 # site-specific configuration parameters that need to come before
 # the platform-specific parameters - edit site.def to change
 
-# $XFree86: mit/config/site.def,v 1.65 1993/06/04 16:02:47 dawes Exp $
+# $XFree86: mit/config/site.def,v 2.23 1993/10/16 17:28:07 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
 # -------------------------------------------------------------------------
 # platform-specific configuration parameters - edit x386.cf to change
 
-# $XFree86: mit/config/x386.cf,v 1.90 1993/06/04 16:02:50 dawes Exp $
+# $XFree86: mit/config/x386.cf,v 2.28 1993/10/21 15:48:52 dawes Exp $
 # platform:  $XConsortium: x386.cf,v 1.7 91/08/16 19:30:10 gildea Exp $
 
 # -------------------------------------------------------------------------
 # XFree86 version definition
-# $XFree86: mit/config/xf86_vers.def,v 1.5 1993/06/01 09:12:47 dawes Exp $
+# $XFree86: mit/config/xf86_vers.def,v 2.7 1993/10/08 16:11:07 dawes Exp $
 
 # -------------------------------------------------------------------------
-# XFree86 version: 1300
+# XFree86 version: 2000
 # -------------------------------------------------------------------------
 
-# operating system:  		386BSD
+# $XConsortium: bsdLib.rules,v 1.7 91/12/20 11:19:47 rws Exp $
+
+# operating system:  	FreeBSD
 
 # -------------------------------------------------------------------------
 # site-specific configuration parameters that go after
 # the platform-specific parameters - edit site.def to change
 
-# $XFree86: mit/config/site.def,v 1.65 1993/06/04 16:02:47 dawes Exp $
+# $XFree86: mit/config/site.def,v 2.23 1993/10/16 17:28:07 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
             SHELL = 	/bin/sh
@@ -51,7 +53,7 @@
       CURRENT_DIR = ./controls
 
                AR = ar clq
-  BOOTSTRAPCFLAGS =
+  BOOTSTRAPCFLAGS = 	-DFreeBSD
                CC = 		gcc
                AS = as
 
@@ -78,13 +80,18 @@
          MSMACROS = -ms
               TBL = tbl
               EQN = eqn
+            NROFF = nroff
+             NEQN = neqn
      STD_INCLUDES =
-  STD_CPP_DEFINES = -traditional
-      STD_DEFINES =
+  STD_CPP_DEFINES = -traditional 		-DFreeBSD
+      STD_DEFINES = 		-DFreeBSD
  EXTRA_LOAD_FLAGS =
-  EXTRA_LIBRARIES =
+  EXTRA_LIBRARIES = 		-lgnumalloc
      OS_LIBRARIES =
              TAGS = ctags
+
+    SHAREDCODEDEF =
+         SHLIBDEF = -DBSDSHLIB
 
     PROTO_DEFINES =
 
@@ -96,7 +103,7 @@
      INSTINCFLAGS = -m 0444
      INSTMANFLAGS = -m 0444
      INSTDATFLAGS = -m 0444
-    INSTKMEMFLAGS = -m 4755
+    INSTKMEMFLAGS = 	-m 2755 -g kmem
 
       PROJECTROOT = 	/usr/X386
 
@@ -130,7 +137,7 @@
 
 # -------------------------------------------------------------------------
 # X Window System Build Parameters
-# $XFree86: mit/config/Project.tmpl,v 1.13 1993/03/27 03:32:45 dawes Exp $
+# $XFree86: mit/config/Project.tmpl,v 2.1 1993/09/17 16:10:43 dawes Exp $
 # $XConsortium: Project.tmpl,v 1.138.1.1 92/11/11 09:49:19 rws Exp $
 
 _percentC_ = %C
@@ -146,7 +153,7 @@ _percentC_ = %C
       BUILDINCDIR = $(BUILDINCROOT)/X11
       BUILDINCTOP = ..
            INCDIR = $(INCROOT)/X11
-           ADMDIR = /usr/adm
+           ADMDIR = 		/var/log
            LIBDIR = $(USRLIBDIR)/X11
         CONFIGDIR = $(LIBDIR)/config
        LINTLIBDIR = $(USRLIBDIR)/lint
@@ -156,11 +163,13 @@ _percentC_ = %C
            XDMDIR = $(LIBDIR)/xdm
            TWMDIR = $(LIBDIR)/twm
           MANPATH = 	/usr/X386/man
-    MANSOURCEPATH = 	$(MANPATH)/man
-        MANSUFFIX = 1
-     LIBMANSUFFIX = 3
-           MANDIR = 	$(MANSOURCEPATH)1
+    MANSOURCEPATH = $(MANPATH)/man
+        MANSUFFIX = 1x
+     LIBMANSUFFIX = 3x
+    FILEMANSUFFIX = 5x
+           MANDIR = $(MANSOURCEPATH)1
         LIBMANDIR = $(MANSOURCEPATH)3
+       FILEMANDIR = $(MANSOURCEPATH)5
            NLSDIR = $(LIBDIR)/nls
         PEXAPIDIR = $(LIBDIR)/PEX
       XAPPLOADDIR = $(LIBDIR)/app-defaults
@@ -212,34 +221,49 @@ _percentC_ = %C
         PEXLIBSRC = $(EXTENSIONSRC)/lib/PEXlib
       PHIGSLIBSRC = $(EXTENSIONSRC)/lib/PEX
 
-  DEPEXTENSIONLIB = $(USRLIBDIR)/libXext.a
-     EXTENSIONLIB = 			 -lXext
+# $XConsortium: sunLib.tmpl,v 1.14.1.2 92/11/11 09:52.02 rws Exp $
 
-          DEPXLIB = $(DEPEXTENSIONLIB) $(USRLIBDIR)/libX11.a
-             XLIB = $(EXTENSIONLIB) 			 -lX11
+SHLIBLDFLAGS = -Bshareable
+PICFLAGS = -fpic
+
+  DEPEXTENSIONLIB =
+     EXTENSIONLIB = -lXext
+
+          DEPXLIB = $(DEPEXTENSIONLIB)
+             XLIB = $(EXTENSIONLIB) -lX11
+
+        DEPXMULIB = $(USRLIBDIR)/libXmu.so.$(SOXMUREV)
+       XMULIBONLY = -lXmu
+           XMULIB = -lXmu
+
+       DEPOLDXLIB =
+          OLDXLIB = -loldX
+
+      DEPXTOOLLIB = $(USRLIBDIR)/libXt.so.$(SOXTREV)
+         XTOOLLIB = -lXt
+
+        DEPXAWLIB = $(USRLIBDIR)/libXaw.so.$(SOXAWREV)
+           XAWLIB = -lXaw
+
+        DEPXILIB =
+           XILIB = -lXi
+
+        DEPPEXLIB =
+           PEXLIB = -lPEX5
+
+        SOXLIBREV = 2.0
+          SOXTREV = 2.0
+         SOXAWREV = 2.0
+        SOOLDXREV = 2.0
+         SOXMUREV = 2.0
+        SOXEXTREV = 2.0
+      SOXINPUTREV = 2.0
+         SOPEXREV = 2.0
 
       DEPXAUTHLIB = $(USRLIBDIR)/libXau.a
          XAUTHLIB = 			 -lXau
       DEPXDMCPLIB = $(USRLIBDIR)/libXdmcp.a
          XDMCPLIB = 			 -lXdmcp
-
-        DEPXMULIB = $(USRLIBDIR)/libXmu.a
-           XMULIB = 			 -lXmu
-
-       DEPOLDXLIB = $(USRLIBDIR)/liboldX.a
-          OLDXLIB = 			 -loldX
-
-      DEPXTOOLLIB = $(USRLIBDIR)/libXt.a
-         XTOOLLIB = 			 -lXt
-
-        DEPXAWLIB = $(USRLIBDIR)/libXaw.a
-           XAWLIB = 			 -lXaw
-
-        DEPXILIB = $(USRLIBDIR)/libXi.a
-           XILIB = 			 -lXi
-
-       DEPPEXLIB = $(USRLIBDIR)/libPEX5.a
-          PEXLIB = 			 -lPEX5
 
         DEPPHIGSLIB = $(USRLIBDIR)/libphigs.a
            PHIGSLIB = 			 -lphigs
@@ -264,15 +288,15 @@ _percentC_ = %C
 
 # -------------------------------------------------------------------------
 # Imake rules for building libraries, programs, scripts, and data files
-# $XFree86: mit/config/Imake.rules,v 1.9 1993/03/23 12:56:27 dawes Exp $
+# $XFree86: mit/config/Imake.rules,v 2.1 1993/09/29 11:06:00 dawes Exp $
 # rules:  $XConsortium: Imake.rules,v 1.123 91/09/16 20:12:16 rws Exp $
 
 # -------------------------------------------------------------------------
 # start of Imakefile
 
-# $Id: Makefile,v 1.1 1994/02/24 08:05:22 hsu Exp $
+# $Id: Makefile,v 1.1.1.2 1994/05/19 07:53:08 hsu Exp $
 
-INCLUDES = -I$(TOP)/include
+INCLUDES = -I$(TOP)/include -I$(TOP)
 
 # Imake rules go here
 
@@ -280,9 +304,9 @@ INCLUDES = -I$(TOP)/include
 
 MODULE = controls
 
-SRCS = 	button.c 	combo.c 	listbox.c 	menu.c 	scroll.c 	static.c 	widgets.c
+SRCS = 	button.c 	combo.c 	listbox.c 	menu.c 	scroll.c 	static.c 	edit.o 	desktop.c 	widgets.c
 
-OBJS = 	button.o 	combo.o 	listbox.o 	menu.o 	scroll.o 	static.o 	widgets.o
+OBJS = $(SRCS:.c=.o)
 
 all:: $(TOP)/$(MODULE).o
 
@@ -337,3 +361,77 @@ includes::
 # -------------------------------------------------------------------------
 # dependencies generated by makedepend
 
+# DO NOT DELETE
+
+button.o: .././include/windows.h .././include/win.h
+button.o: /usr/X386/include/X11/Xlib.h /usr/include/sys/types.h
+button.o: /usr/include/machine/ansi.h /usr/X386/include/X11/X.h
+button.o: /usr/X386/include/X11/Xfuncproto.h /usr/X386/include/X11/Xosdefs.h
+button.o: /usr/include/stddef.h .././include/user.h .././include/segmem.h
+button.o: .././include/wine.h .././include/dlls.h .././include/heap.h
+button.o: .././include/regfunc.h .././include/atom.h .././include/syscolor.h
+button.o: .././include/gdi.h
+combo.o: /usr/include/stdio.h /usr/include/sys/cdefs.h
+combo.o: /usr/include/machine/ansi.h /usr/include/stdlib.h
+combo.o: /usr/include/sys/types.h /usr/include/sys/stat.h
+combo.o: .././include/windows.h .././include/combo.h .././include/heap.h
+combo.o: .././include/segmem.h .././include/wine.h .././include/dlls.h
+combo.o: .././include/regfunc.h .././include/atom.h .././include/win.h
+combo.o: /usr/X386/include/X11/Xlib.h /usr/X386/include/X11/X.h
+combo.o: /usr/X386/include/X11/Xfuncproto.h /usr/X386/include/X11/Xosdefs.h
+combo.o: /usr/include/stddef.h .././include/prototypes.h .././include/neexe.h
+combo.o: .././include/msdos.h /usr/include/dirent.h
+listbox.o: /usr/include/stdio.h /usr/include/sys/cdefs.h
+listbox.o: /usr/include/machine/ansi.h /usr/include/stdlib.h
+listbox.o: /usr/include/sys/types.h /usr/include/sys/stat.h
+listbox.o: .././include/windows.h .././include/user.h .././include/segmem.h
+listbox.o: .././include/wine.h .././include/dlls.h .././include/heap.h
+listbox.o: .././include/regfunc.h .././include/atom.h .././include/win.h
+listbox.o: /usr/X386/include/X11/Xlib.h /usr/X386/include/X11/X.h
+listbox.o: /usr/X386/include/X11/Xfuncproto.h /usr/X386/include/X11/Xosdefs.h
+listbox.o: /usr/include/stddef.h .././include/msdos.h /usr/include/dirent.h
+listbox.o: .././include/listbox.h .././include/scroll.h
+listbox.o: .././include/prototypes.h .././include/neexe.h
+menu.o: /usr/include/stdlib.h /usr/include/sys/types.h
+menu.o: /usr/include/machine/ansi.h /usr/include/sys/cdefs.h
+menu.o: /usr/include/stdio.h .././include/windows.h .././include/sysmetrics.h
+menu.o: .././include/prototypes.h .././include/neexe.h .././include/segmem.h
+menu.o: .././include/wine.h .././include/dlls.h .././include/heap.h
+menu.o: .././include/regfunc.h .././include/atom.h .././include/msdos.h
+menu.o: /usr/include/dirent.h .././include/menu.h .././include/win.h
+menu.o: /usr/X386/include/X11/Xlib.h /usr/X386/include/X11/X.h
+menu.o: /usr/X386/include/X11/Xfuncproto.h /usr/X386/include/X11/Xosdefs.h
+menu.o: /usr/include/stddef.h
+scroll.o: /usr/include/stdlib.h /usr/include/sys/types.h
+scroll.o: /usr/include/machine/ansi.h /usr/include/sys/cdefs.h
+scroll.o: /usr/include/stdio.h /usr/include/sys/stat.h .././include/windows.h
+scroll.o: .././include/sysmetrics.h .././include/scroll.h .././include/heap.h
+scroll.o: .././include/segmem.h .././include/wine.h .././include/dlls.h
+scroll.o: .././include/regfunc.h .././include/atom.h .././include/win.h
+scroll.o: /usr/X386/include/X11/Xlib.h /usr/X386/include/X11/X.h
+scroll.o: /usr/X386/include/X11/Xfuncproto.h /usr/X386/include/X11/Xosdefs.h
+scroll.o: /usr/include/stddef.h .././include/prototypes.h
+scroll.o: .././include/neexe.h .././include/msdos.h /usr/include/dirent.h
+static.o: /usr/include/stdio.h /usr/include/sys/cdefs.h
+static.o: /usr/include/machine/ansi.h .././include/windows.h
+static.o: .././include/win.h /usr/X386/include/X11/Xlib.h
+static.o: /usr/include/sys/types.h /usr/X386/include/X11/X.h
+static.o: /usr/X386/include/X11/Xfuncproto.h /usr/X386/include/X11/Xosdefs.h
+static.o: /usr/include/stddef.h .././include/user.h .././include/segmem.h
+static.o: .././include/wine.h .././include/dlls.h .././include/heap.h
+static.o: .././include/regfunc.h .././include/atom.h
+desktop.o: /usr/include/stdio.h /usr/include/sys/cdefs.h
+desktop.o: /usr/include/machine/ansi.h /usr/include/string.h
+desktop.o: .././include/win.h /usr/X386/include/X11/Xlib.h
+desktop.o: /usr/include/sys/types.h /usr/X386/include/X11/X.h
+desktop.o: /usr/X386/include/X11/Xfuncproto.h /usr/X386/include/X11/Xosdefs.h
+desktop.o: /usr/include/stddef.h .././include/windows.h
+desktop.o: .././include/desktop.h
+widgets.o: .././include/win.h /usr/X386/include/X11/Xlib.h
+widgets.o: /usr/include/sys/types.h /usr/include/machine/ansi.h
+widgets.o: /usr/X386/include/X11/X.h /usr/X386/include/X11/Xfuncproto.h
+widgets.o: /usr/X386/include/X11/Xosdefs.h /usr/include/stddef.h
+widgets.o: .././include/windows.h .././include/desktop.h .././include/mdi.h
+widgets.o: .././include/gdi.h .././include/segmem.h .././include/wine.h
+widgets.o: .././include/dlls.h .././include/heap.h .././include/regfunc.h
+widgets.o: .././include/atom.h

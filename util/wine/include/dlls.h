@@ -1,4 +1,4 @@
-/* $Id: dlls.h,v 1.1.1.2 1994/04/22 01:51:49 hsu Exp $
+/* $Id: dlls.h,v 1.1.1.3 1994/05/19 07:56:01 hsu Exp $
  */
 /*
  * Copyright  Robert J. Amstadt, 1993
@@ -59,6 +59,7 @@ extern struct dll_table_entry_s USER_table[];
 extern struct dll_table_entry_s GDI_table[];
 extern struct dll_table_entry_s UNIXLIB_table[];
 extern struct dll_table_entry_s WIN87EM_table[];
+extern struct dll_table_entry_s MMSYSTEM_table[];
 extern struct dll_table_entry_s SHELL_table[];
 extern struct dll_table_entry_s SOUND_table[];
 extern struct dll_table_entry_s KEYBOARD_table[];

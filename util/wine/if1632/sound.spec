@@ -1,4 +1,4 @@
-# $Id: sound.spec,v 1.1 1994/02/24 08:05:34 hsu Exp $
+# $Id: sound.spec,v 1.1.1.2 1994/05/19 07:55:20 hsu Exp $
 #
 name	sound
 id	7
@@ -15,3 +15,10 @@ length	20
 8    pascal  SETVOICESOUND(word long word) SetVoiceSound(1 2 3)
 9    pascal  STARTSOUND() StartSound()
 10   pascal  STOPSOUND() StopSound()
+11   pascal  WAITSOUNDSTATE(word) WaitSoundState(1)
+12   pascal  SYNCALLVOICES() SyncAllVoices()
+13   pascal  COUNTVOICENOTES(word) CountVoiceNotes(1)
+14   pascal  GETTHRESHOLDEVENT() GetThresholdEvent()
+15   pascal  GETTHRESHOLDSTATUS() GetThresholdStatus()
+16   pascal  SETVOICETHRESHOLD(word word) SetVoiceThreshold(1 2)
+17   pascal  DOBEEP() DoBeep()

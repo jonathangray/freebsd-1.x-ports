@@ -3,7 +3,7 @@
 
 # -------------------------------------------------------------------------
 # Makefile generated from "Imake.tmpl" and <Imakefile>
-# $XFree86: mit/config/Imake.tmpl,v 1.17 1993/06/03 15:26:36 dawes Exp $
+# $XFree86: mit/config/Imake.tmpl,v 2.6 1993/10/02 07:11:59 dawes Exp $
 # $XConsortium: Imake.tmpl,v 1.139 91/09/16 08:52:48 rws Exp $
 #
 # Platform-specific parameters may be set in the appropriate <vendor>.cf
@@ -19,30 +19,32 @@
 # site-specific configuration parameters that need to come before
 # the platform-specific parameters - edit site.def to change
 
-# $XFree86: mit/config/site.def,v 1.65 1993/06/04 16:02:47 dawes Exp $
+# $XFree86: mit/config/site.def,v 2.23 1993/10/16 17:28:07 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
 # -------------------------------------------------------------------------
 # platform-specific configuration parameters - edit x386.cf to change
 
-# $XFree86: mit/config/x386.cf,v 1.90 1993/06/04 16:02:50 dawes Exp $
+# $XFree86: mit/config/x386.cf,v 2.28 1993/10/21 15:48:52 dawes Exp $
 # platform:  $XConsortium: x386.cf,v 1.7 91/08/16 19:30:10 gildea Exp $
 
 # -------------------------------------------------------------------------
 # XFree86 version definition
-# $XFree86: mit/config/xf86_vers.def,v 1.5 1993/06/01 09:12:47 dawes Exp $
+# $XFree86: mit/config/xf86_vers.def,v 2.7 1993/10/08 16:11:07 dawes Exp $
 
 # -------------------------------------------------------------------------
-# XFree86 version: 1300
+# XFree86 version: 2000
 # -------------------------------------------------------------------------
 
-# operating system:  		386BSD
+# $XConsortium: bsdLib.rules,v 1.7 91/12/20 11:19:47 rws Exp $
+
+# operating system:  	FreeBSD
 
 # -------------------------------------------------------------------------
 # site-specific configuration parameters that go after
 # the platform-specific parameters - edit site.def to change
 
-# $XFree86: mit/config/site.def,v 1.65 1993/06/04 16:02:47 dawes Exp $
+# $XFree86: mit/config/site.def,v 2.23 1993/10/16 17:28:07 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
             SHELL = 	/bin/sh
@@ -51,7 +53,7 @@
       CURRENT_DIR = ./misc
 
                AR = ar clq
-  BOOTSTRAPCFLAGS =
+  BOOTSTRAPCFLAGS = 	-DFreeBSD
                CC = 		gcc
                AS = as
 
@@ -78,13 +80,18 @@
          MSMACROS = -ms
               TBL = tbl
               EQN = eqn
+            NROFF = nroff
+             NEQN = neqn
      STD_INCLUDES =
-  STD_CPP_DEFINES = -traditional
-      STD_DEFINES =
+  STD_CPP_DEFINES = -traditional 		-DFreeBSD
+      STD_DEFINES = 		-DFreeBSD
  EXTRA_LOAD_FLAGS =
-  EXTRA_LIBRARIES =
+  EXTRA_LIBRARIES = 		-lgnumalloc
      OS_LIBRARIES =
              TAGS = ctags
+
+    SHAREDCODEDEF =
+         SHLIBDEF = -DBSDSHLIB
 
     PROTO_DEFINES =
 
@@ -96,7 +103,7 @@
      INSTINCFLAGS = -m 0444
      INSTMANFLAGS = -m 0444
      INSTDATFLAGS = -m 0444
-    INSTKMEMFLAGS = -m 4755
+    INSTKMEMFLAGS = 	-m 2755 -g kmem
 
       PROJECTROOT = 	/usr/X386
 
@@ -130,7 +137,7 @@
 
 # -------------------------------------------------------------------------
 # X Window System Build Parameters
-# $XFree86: mit/config/Project.tmpl,v 1.13 1993/03/27 03:32:45 dawes Exp $
+# $XFree86: mit/config/Project.tmpl,v 2.1 1993/09/17 16:10:43 dawes Exp $
 # $XConsortium: Project.tmpl,v 1.138.1.1 92/11/11 09:49:19 rws Exp $
 
 _percentC_ = %C
@@ -146,7 +153,7 @@ _percentC_ = %C
       BUILDINCDIR = $(BUILDINCROOT)/X11
       BUILDINCTOP = ..
            INCDIR = $(INCROOT)/X11
-           ADMDIR = /usr/adm
+           ADMDIR = 		/var/log
            LIBDIR = $(USRLIBDIR)/X11
         CONFIGDIR = $(LIBDIR)/config
        LINTLIBDIR = $(USRLIBDIR)/lint
@@ -156,11 +163,13 @@ _percentC_ = %C
            XDMDIR = $(LIBDIR)/xdm
            TWMDIR = $(LIBDIR)/twm
           MANPATH = 	/usr/X386/man
-    MANSOURCEPATH = 	$(MANPATH)/man
-        MANSUFFIX = 1
-     LIBMANSUFFIX = 3
-           MANDIR = 	$(MANSOURCEPATH)1
+    MANSOURCEPATH = $(MANPATH)/man
+        MANSUFFIX = 1x
+     LIBMANSUFFIX = 3x
+    FILEMANSUFFIX = 5x
+           MANDIR = $(MANSOURCEPATH)1
         LIBMANDIR = $(MANSOURCEPATH)3
+       FILEMANDIR = $(MANSOURCEPATH)5
            NLSDIR = $(LIBDIR)/nls
         PEXAPIDIR = $(LIBDIR)/PEX
       XAPPLOADDIR = $(LIBDIR)/app-defaults
@@ -212,34 +221,49 @@ _percentC_ = %C
         PEXLIBSRC = $(EXTENSIONSRC)/lib/PEXlib
       PHIGSLIBSRC = $(EXTENSIONSRC)/lib/PEX
 
-  DEPEXTENSIONLIB = $(USRLIBDIR)/libXext.a
-     EXTENSIONLIB = 			 -lXext
+# $XConsortium: sunLib.tmpl,v 1.14.1.2 92/11/11 09:52.02 rws Exp $
 
-          DEPXLIB = $(DEPEXTENSIONLIB) $(USRLIBDIR)/libX11.a
-             XLIB = $(EXTENSIONLIB) 			 -lX11
+SHLIBLDFLAGS = -Bshareable
+PICFLAGS = -fpic
+
+  DEPEXTENSIONLIB =
+     EXTENSIONLIB = -lXext
+
+          DEPXLIB = $(DEPEXTENSIONLIB)
+             XLIB = $(EXTENSIONLIB) -lX11
+
+        DEPXMULIB = $(USRLIBDIR)/libXmu.so.$(SOXMUREV)
+       XMULIBONLY = -lXmu
+           XMULIB = -lXmu
+
+       DEPOLDXLIB =
+          OLDXLIB = -loldX
+
+      DEPXTOOLLIB = $(USRLIBDIR)/libXt.so.$(SOXTREV)
+         XTOOLLIB = -lXt
+
+        DEPXAWLIB = $(USRLIBDIR)/libXaw.so.$(SOXAWREV)
+           XAWLIB = -lXaw
+
+        DEPXILIB =
+           XILIB = -lXi
+
+        DEPPEXLIB =
+           PEXLIB = -lPEX5
+
+        SOXLIBREV = 2.0
+          SOXTREV = 2.0
+         SOXAWREV = 2.0
+        SOOLDXREV = 2.0
+         SOXMUREV = 2.0
+        SOXEXTREV = 2.0
+      SOXINPUTREV = 2.0
+         SOPEXREV = 2.0
 
       DEPXAUTHLIB = $(USRLIBDIR)/libXau.a
          XAUTHLIB = 			 -lXau
       DEPXDMCPLIB = $(USRLIBDIR)/libXdmcp.a
          XDMCPLIB = 			 -lXdmcp
-
-        DEPXMULIB = $(USRLIBDIR)/libXmu.a
-           XMULIB = 			 -lXmu
-
-       DEPOLDXLIB = $(USRLIBDIR)/liboldX.a
-          OLDXLIB = 			 -loldX
-
-      DEPXTOOLLIB = $(USRLIBDIR)/libXt.a
-         XTOOLLIB = 			 -lXt
-
-        DEPXAWLIB = $(USRLIBDIR)/libXaw.a
-           XAWLIB = 			 -lXaw
-
-        DEPXILIB = $(USRLIBDIR)/libXi.a
-           XILIB = 			 -lXi
-
-       DEPPEXLIB = $(USRLIBDIR)/libPEX5.a
-          PEXLIB = 			 -lPEX5
 
         DEPPHIGSLIB = $(USRLIBDIR)/libphigs.a
            PHIGSLIB = 			 -lphigs
@@ -264,15 +288,15 @@ _percentC_ = %C
 
 # -------------------------------------------------------------------------
 # Imake rules for building libraries, programs, scripts, and data files
-# $XFree86: mit/config/Imake.rules,v 1.9 1993/03/23 12:56:27 dawes Exp $
+# $XFree86: mit/config/Imake.rules,v 2.1 1993/09/29 11:06:00 dawes Exp $
 # rules:  $XConsortium: Imake.rules,v 1.123 91/09/16 20:12:16 rws Exp $
 
 # -------------------------------------------------------------------------
 # start of Imakefile
 
-# $Id: Makefile,v 1.1 1994/02/24 08:05:46 hsu Exp $
+# $Id: Makefile,v 1.1.1.2 1994/05/19 08:00:33 hsu Exp $
 
-INCLUDES = -I$(TOP)/include
+INCLUDES = -I$(TOP)/include -I$(TOP)
 
 # Imake rules go here
 
@@ -280,7 +304,7 @@ INCLUDES = -I$(TOP)/include
 
 MODULE = misc
 
-SRCS = 	atom.c 	comm.c 	cursor.c 	dos.c 	dos_fs.c 	exec.c 	file.c 	keyboard.c 	lstr.c 	main.c 	message.c 	profile.c 	rect.c 	resource.c 	sound.c 	spy.c 	winsocket.o 	xt.c
+SRCS = 	atom.c 	clipboard.c 	comm.c 	cursor.c 	dos_fs.c 	exec.c 	file.c 	keyboard.c 	lstr.c 	main.c 	message.c 	mmsystem.c 	profile.c 	property.c 	rect.c 	shell.c 	sound.c 	spy.c 	stress.c 	user.c 	winsocket.c
 
 OBJS = $(SRCS:.c=.o)
 
@@ -337,3 +361,182 @@ includes::
 # -------------------------------------------------------------------------
 # dependencies generated by makedepend
 
+# DO NOT DELETE
+
+atom.o: /usr/include/stdlib.h /usr/include/sys/types.h
+atom.o: /usr/include/machine/ansi.h /usr/include/sys/cdefs.h
+atom.o: /usr/include/stdio.h /usr/include/string.h /usr/include/ctype.h
+atom.o: .././include/user.h .././include/segmem.h .././include/wine.h
+atom.o: .././include/dlls.h .././include/heap.h .././include/regfunc.h
+atom.o: .././include/atom.h .././include/windows.h .././include/prototypes.h
+atom.o: .././include/neexe.h .././include/msdos.h /usr/include/dirent.h
+clipboard.o: /usr/include/stdlib.h /usr/include/sys/types.h
+clipboard.o: /usr/include/machine/ansi.h /usr/include/sys/cdefs.h
+clipboard.o: /usr/include/stdio.h .././include/windows.h
+clipboard.o: /usr/include/sys/stat.h /usr/include/fcntl.h
+clipboard.o: /usr/include/unistd.h /usr/include/sys/unistd.h
+clipboard.o: /usr/include/sys/time.h /usr/include/sys/time.h
+clipboard.o: .././include/prototypes.h .././include/neexe.h
+clipboard.o: .././include/segmem.h .././include/wine.h .././include/dlls.h
+clipboard.o: .././include/heap.h .././include/regfunc.h .././include/atom.h
+clipboard.o: .././include/msdos.h /usr/include/dirent.h .././include/win.h
+clipboard.o: /usr/X386/include/X11/Xlib.h /usr/X386/include/X11/X.h
+clipboard.o: /usr/X386/include/X11/Xfuncproto.h
+clipboard.o: /usr/X386/include/X11/Xosdefs.h /usr/include/stddef.h
+comm.o: /usr/include/stdio.h /usr/include/sys/cdefs.h
+comm.o: /usr/include/machine/ansi.h /usr/include/stdlib.h
+comm.o: /usr/include/sys/types.h /usr/include/termios.h
+comm.o: /usr/include/sys/ttydefaults.h /usr/include/fcntl.h
+comm.o: /usr/include/string.h /usr/include/errno.h /usr/include/ctype.h
+comm.o: /usr/include/sys/stat.h /usr/include/unistd.h
+comm.o: /usr/include/sys/unistd.h /usr/include/sys/time.h
+comm.o: /usr/include/sys/time.h .././include/wine.h .././include/dlls.h
+comm.o: .././include/windows.h
+cursor.o: /usr/include/stdio.h /usr/include/sys/cdefs.h
+cursor.o: /usr/include/machine/ansi.h /usr/include/stdlib.h
+cursor.o: /usr/include/sys/types.h /usr/include/string.h
+cursor.o: /usr/include/sys/stat.h /usr/include/fcntl.h /usr/include/unistd.h
+cursor.o: /usr/include/sys/unistd.h /usr/include/sys/time.h
+cursor.o: /usr/include/sys/time.h /usr/X386/include/X11/cursorfont.h
+cursor.o: /usr/X386/include/X11/Xlib.h /usr/X386/include/X11/X.h
+cursor.o: /usr/X386/include/X11/Xfuncproto.h /usr/X386/include/X11/Xosdefs.h
+cursor.o: /usr/include/stddef.h .././include/prototypes.h
+cursor.o: .././include/neexe.h .././include/segmem.h .././include/wine.h
+cursor.o: .././include/dlls.h .././include/heap.h .././include/regfunc.h
+cursor.o: .././include/atom.h .././include/windows.h .././include/msdos.h
+cursor.o: /usr/include/dirent.h .././include/win.h .././include/gdi.h
+cursor.o: .././include/cursor.h
+dos_fs.o: /usr/include/ctype.h /usr/include/sys/cdefs.h /usr/include/stdio.h
+dos_fs.o: /usr/include/machine/ansi.h /usr/include/stdlib.h
+dos_fs.o: /usr/include/sys/types.h /usr/include/string.h
+dos_fs.o: /usr/include/sys/stat.h /usr/include/pwd.h /usr/include/dirent.h
+dos_fs.o: /usr/include/unistd.h /usr/include/sys/unistd.h
+dos_fs.o: /usr/include/sys/time.h /usr/include/sys/time.h
+dos_fs.o: /usr/include/fcntl.h .././include/windows.h .././include/msdos.h
+dos_fs.o: .././include/prototypes.h .././include/neexe.h
+dos_fs.o: .././include/segmem.h .././include/wine.h .././include/dlls.h
+dos_fs.o: .././include/heap.h .././include/regfunc.h .././include/atom.h
+dos_fs.o: .././autoconf.h
+exec.o: /usr/include/stdlib.h /usr/include/sys/types.h
+exec.o: /usr/include/machine/ansi.h /usr/include/sys/cdefs.h
+exec.o: /usr/include/stdio.h /usr/include/string.h /usr/include/unistd.h
+exec.o: /usr/include/sys/unistd.h /usr/include/sys/time.h
+exec.o: /usr/include/sys/time.h .././include/neexe.h .././include/segmem.h
+exec.o: .././include/wine.h .././include/dlls.h .././include/prototypes.h
+exec.o: .././include/heap.h .././include/regfunc.h .././include/atom.h
+exec.o: .././include/windows.h .././include/msdos.h /usr/include/dirent.h
+file.o: /usr/include/stdio.h /usr/include/sys/cdefs.h
+file.o: /usr/include/machine/ansi.h /usr/include/fcntl.h
+file.o: /usr/include/sys/types.h /usr/include/limits.h
+file.o: /usr/include/machine/limits.h /usr/include/sys/syslimits.h
+file.o: /usr/include/unistd.h /usr/include/sys/unistd.h
+file.o: /usr/include/sys/time.h /usr/include/sys/time.h
+file.o: .././include/windows.h .././include/prototypes.h .././include/neexe.h
+file.o: .././include/segmem.h .././include/wine.h .././include/dlls.h
+file.o: .././include/heap.h .././include/regfunc.h .././include/atom.h
+file.o: .././include/msdos.h /usr/include/dirent.h
+keyboard.o: /usr/include/stdlib.h /usr/include/sys/types.h
+keyboard.o: /usr/include/machine/ansi.h /usr/include/sys/cdefs.h
+keyboard.o: /usr/include/stdio.h .././include/prototypes.h
+keyboard.o: .././include/neexe.h .././include/segmem.h .././include/wine.h
+keyboard.o: .././include/dlls.h .././include/heap.h .././include/regfunc.h
+keyboard.o: .././include/atom.h .././include/windows.h .././include/msdos.h
+keyboard.o: /usr/include/dirent.h
+lstr.o: /usr/include/stdio.h /usr/include/sys/cdefs.h
+lstr.o: /usr/include/machine/ansi.h /usr/include/stdlib.h
+lstr.o: /usr/include/sys/types.h /usr/include/string.h /usr/include/ctype.h
+lstr.o: /usr/include/fcntl.h /usr/include/unistd.h /usr/include/sys/unistd.h
+lstr.o: /usr/include/sys/time.h /usr/include/sys/time.h
+lstr.o: .././include/prototypes.h .././include/neexe.h .././include/segmem.h
+lstr.o: .././include/wine.h .././include/dlls.h .././include/heap.h
+lstr.o: .././include/regfunc.h .././include/atom.h .././include/windows.h
+lstr.o: .././include/msdos.h /usr/include/dirent.h
+main.o: /usr/include/stdio.h /usr/include/sys/cdefs.h
+main.o: /usr/include/machine/ansi.h /usr/include/stdlib.h
+main.o: /usr/include/sys/types.h /usr/include/string.h
+main.o: /usr/X386/include/X11/Xlib.h /usr/X386/include/X11/X.h
+main.o: /usr/X386/include/X11/Xfuncproto.h /usr/X386/include/X11/Xosdefs.h
+main.o: /usr/include/stddef.h /usr/X386/include/X11/Xresource.h
+main.o: /usr/X386/include/X11/Xutil.h /usr/X386/include/X11/cursorfont.h
+main.o: .././include/msdos.h /usr/include/dirent.h .././include/windows.h
+main.o: .././include/options.h .././include/prototypes.h .././include/neexe.h
+main.o: .././include/segmem.h .././include/wine.h .././include/dlls.h
+main.o: .././include/heap.h .././include/regfunc.h .././include/atom.h
+message.o: /usr/include/stdlib.h /usr/include/sys/types.h
+message.o: /usr/include/machine/ansi.h /usr/include/sys/cdefs.h
+message.o: /usr/include/stdio.h /usr/include/string.h .././include/windows.h
+message.o: /usr/include/sys/stat.h /usr/include/fcntl.h /usr/include/unistd.h
+message.o: /usr/include/sys/unistd.h /usr/include/sys/time.h
+message.o: /usr/include/sys/time.h .././include/prototypes.h
+message.o: .././include/neexe.h .././include/segmem.h .././include/wine.h
+message.o: .././include/dlls.h .././include/heap.h .././include/regfunc.h
+message.o: .././include/atom.h .././include/msdos.h /usr/include/dirent.h
+message.o: .././include/win.h /usr/X386/include/X11/Xlib.h
+message.o: /usr/X386/include/X11/X.h /usr/X386/include/X11/Xfuncproto.h
+message.o: /usr/X386/include/X11/Xosdefs.h /usr/include/stddef.h
+mmsystem.o: /usr/include/stdio.h /usr/include/sys/cdefs.h
+mmsystem.o: /usr/include/machine/ansi.h .././include/win.h
+mmsystem.o: /usr/X386/include/X11/Xlib.h /usr/include/sys/types.h
+mmsystem.o: /usr/X386/include/X11/X.h /usr/X386/include/X11/Xfuncproto.h
+mmsystem.o: /usr/X386/include/X11/Xosdefs.h /usr/include/stddef.h
+mmsystem.o: .././include/windows.h .././include/mmsystem.h
+profile.o: /usr/include/stdio.h /usr/include/sys/cdefs.h
+profile.o: /usr/include/machine/ansi.h /usr/include/stdlib.h
+profile.o: /usr/include/sys/types.h /usr/include/string.h .././include/wine.h
+profile.o: .././include/dlls.h .././include/windows.h
+profile.o: .././include/prototypes.h .././include/neexe.h
+profile.o: .././include/segmem.h .././include/heap.h .././include/regfunc.h
+profile.o: .././include/atom.h .././include/msdos.h /usr/include/dirent.h
+property.o: /usr/include/stdlib.h /usr/include/sys/types.h
+property.o: /usr/include/machine/ansi.h /usr/include/sys/cdefs.h
+property.o: /usr/include/stdio.h /usr/include/string.h /usr/include/unistd.h
+property.o: /usr/include/sys/unistd.h /usr/include/sys/time.h
+property.o: /usr/include/sys/time.h .././include/windows.h
+property.o: .././include/heap.h .././include/segmem.h .././include/wine.h
+property.o: .././include/dlls.h .././include/regfunc.h .././include/atom.h
+property.o: .././include/win.h /usr/X386/include/X11/Xlib.h
+property.o: /usr/X386/include/X11/X.h /usr/X386/include/X11/Xfuncproto.h
+property.o: /usr/X386/include/X11/Xosdefs.h /usr/include/stddef.h
+rect.o: .././include/windows.h
+shell.o: /usr/include/stdlib.h /usr/include/sys/types.h
+shell.o: /usr/include/machine/ansi.h /usr/include/sys/cdefs.h
+shell.o: /usr/include/stdio.h /usr/include/string.h /usr/include/unistd.h
+shell.o: /usr/include/sys/unistd.h /usr/include/sys/time.h
+shell.o: /usr/include/sys/time.h .././include/windows.h
+sound.o: /usr/include/stdlib.h /usr/include/sys/types.h
+sound.o: /usr/include/machine/ansi.h /usr/include/sys/cdefs.h
+sound.o: /usr/include/stdio.h .././include/prototypes.h .././include/neexe.h
+sound.o: .././include/segmem.h .././include/wine.h .././include/dlls.h
+sound.o: .././include/heap.h .././include/regfunc.h .././include/atom.h
+sound.o: .././include/windows.h .././include/msdos.h /usr/include/dirent.h
+spy.o: /usr/include/stdlib.h /usr/include/sys/types.h
+spy.o: /usr/include/machine/ansi.h /usr/include/sys/cdefs.h
+spy.o: /usr/include/stdio.h /usr/X386/include/X11/Xlib.h
+spy.o: /usr/X386/include/X11/X.h /usr/X386/include/X11/Xfuncproto.h
+spy.o: /usr/X386/include/X11/Xosdefs.h /usr/include/stddef.h
+spy.o: /usr/X386/include/X11/Xresource.h /usr/include/string.h
+spy.o: .././include/wineopts.h .././include/windows.h .././include/wine.h
+spy.o: .././include/dlls.h .././include/options.h
+stress.o: /usr/include/stdio.h /usr/include/sys/cdefs.h
+stress.o: /usr/include/machine/ansi.h /usr/include/limits.h
+stress.o: /usr/include/machine/limits.h /usr/include/sys/syslimits.h
+stress.o: .././include/windows.h .././include/stress.h
+user.o: /usr/include/stdio.h /usr/include/sys/cdefs.h
+user.o: /usr/include/machine/ansi.h /usr/include/stdlib.h
+user.o: /usr/include/sys/types.h .././include/prototypes.h
+user.o: .././include/neexe.h .././include/segmem.h .././include/wine.h
+user.o: .././include/dlls.h .././include/heap.h .././include/regfunc.h
+user.o: .././include/atom.h .././include/windows.h .././include/msdos.h
+user.o: /usr/include/dirent.h .././include/user.h .././include/message.h
+winsocket.o: /usr/include/stdio.h /usr/include/sys/cdefs.h
+winsocket.o: /usr/include/machine/ansi.h /usr/include/string.h
+winsocket.o: /usr/include/signal.h /usr/include/machine/trap.h
+winsocket.o: /usr/include/sys/types.h /usr/include/sys/ipc.h
+winsocket.o: /usr/include/sys/socket.h /usr/include/netinet/in.h
+winsocket.o: /usr/include/arpa/inet.h /usr/include/fcntl.h
+winsocket.o: /usr/include/errno.h /usr/include/netdb.h /usr/include/unistd.h
+winsocket.o: /usr/include/sys/unistd.h /usr/include/sys/time.h
+winsocket.o: /usr/include/sys/time.h .././include/heap.h
+winsocket.o: .././include/segmem.h .././include/wine.h .././include/dlls.h
+winsocket.o: .././include/regfunc.h .././include/atom.h
+winsocket.o: .././include/windows.h .././include/winsock.h

@@ -1,4 +1,4 @@
-/* $Id: menu.h,v 1.1.1.2 1994/04/22 01:52:08 hsu Exp $
+/* $Id: menu.h,v 1.1.1.3 1994/05/19 07:56:39 hsu Exp $
  *
  * Menu definitions
  */
@@ -12,14 +12,12 @@ typedef struct tagMENUITEM
 {
     struct tagMENUITEM *next;
     struct tagMENUITEM *prev;
-    struct tagMENUITEM *child;
-    struct tagMENUITEM *parent;
+	HANDLE	hItem;	
     WORD	item_flags;
     WORD	item_id;
     WORD	sel_key;
-    char	*shortcut;
     char	*item_text;
-    char	menu_name[10];
+	HANDLE	hText;	
     RECT	rect;
     HBITMAP	hCheckBit;
     HBITMAP	hUnCheckBit;
