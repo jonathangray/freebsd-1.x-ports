@@ -1,0 +1,67 @@
+#
+# makefile for vile using DJGCC 1.09 and  GNU's MAKE 3.58
+#
+# T.DANG (dang@cogit.ign.fr)
+#
+# $Header: /a/cvs/386BSD/ports/editor/vile/makefile.djg,v 1.1 1994/02/01 03:29:32 jkh Exp $
+#
+# $Log: makefile.djg,v $
+# Revision 1.1  1994/02/01 03:29:32  jkh
+# Initial revision
+#
+# Revision 1.1  1993/09/03  09:11:54  pgf
+# tom's 3.60 changes
+#
+# Revision 1.0  1993/07/06  16:53:05  pgf
+# Initial revision
+#
+
+LONGARGS = gcc
+
+CFLAGS= -Wall -O -DIBMPC -Dscrn_chosen 
+
+# these are normal editable headers
+HDRS = estruct.h epath.h edef.h proto.h dirstuff.h glob.h
+
+# these headers are built by the mktbls program from the information in cmdtbl
+# and in modetbl
+BUILTHDRS = nebind.h nefunc.h nemode.h nename.h nevars.h
+
+SRC = 	main.c ibmpc.c basic.c bind.c buffer.c crypt.c \
+	csrch.c display.c eval.c exec.c externs.c fences.c file.c filec.c \
+	fileio.c finderr.c glob.c globals.c history.c input.c insert.c isearch.c \
+	line.c modes.c npopen.c oneliner.c opers.c path.c random.c regexp.c \
+	region.c search.c spawn.c tags.c tbuff.c termio.c tmp.c undo.c \
+	version.c vmalloc.c window.c word.c wordmov.c map.c
+
+OBJ = 	main.o ibmpc.o basic.o bind.o buffer.o crypt.o \
+      	csrch.o display.o eval.o exec.o externs.o fences.o file.o filec.o \
+	fileio.o finderr.o glob.o globals.o history.o input.o insert.o isearch.o \
+	line.o modes.o npopen.o oneliner.o opers.o path.o random.o regexp.o \
+	region.o search.o spawn.o tags.o tbuff.o termio.o tmp.o undo.o \
+	version.o vmalloc.o window.o word.o wordmov.o map.o
+
+%.o:	%.c estruct.h nemode.h edef.h proto.h 
+	gcc $(CFLAGS) -c $< -o $@ 
+
+vile: 	$(BUILTHDRS) $(OBJ)
+	gcc -o vile $(OBJ) -lpc 
+
+nebind.h \
+nefunc.h \
+nename.h \
+nevars.h :	cmdtbl mktbls.exe
+	mktbls.exe cmdtbl
+
+nemode.h:	modetbl mktbls.exe
+	mktbls.exe modetbl
+
+mktbls.exe:  mktbls.c
+	gcc mktbls.c -o mktbls
+	aout2exe mktbls
+	rm mktbls
+
+clean:
+	rm mktbls.exe
+	rm *.o
+	rm $(BUILTHDRS)

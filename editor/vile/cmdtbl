@@ -1,0 +1,1265 @@
+# This file contains all of the editor's command and key linkages.
+# It also contains data for tables which are automatically generated in the
+# editor.
+#
+# It should be processed by the "mktbls" program, which produces the
+#  headers #included by main.c
+#
+# All that is necessary to add a new function to the editor is to add
+#  an entry to this file, write the function, make sure it's in the
+#  makefile, and rebuild.  (This is not to be confused with adding a
+#  new key binding, which can be done with the rebind command if it
+#  was compiled in.)
+#
+# If you want to know which keyboard bindings are already taken, look
+#  at nebind.h, after you build it.
+#
+# The entries are functions within the editor.  They _must_ match the
+#  functions' names.  On the same line as the name is the set of flags
+#  describing that function.
+# Also accompanying each function is a list of english names  for the 
+#  command, in double quotes, and a list of keys bound to the command,
+#  in single quotes.  These are the default key bindings -- they can change
+#  at runtime.  English names must be all lowercase.
+# Any function, name, or key may be followed by a conditional, i.e. the
+#  name of a preprocessor #define which must be defined non-zero for that
+#  line to become part of the editor.  If a function name is made conditional,
+#  the names and keys listed with it will be conditional also.
+# The names and keys must be preceded by a tab character.
+# Blank lines must be completely empty.
+# For convenience only, this table is kept in roughly alphabetical order, 
+#  by first character of function name.
+#
+# For example, consider the following entry:
+#
+# 	somefunc	ABSM|MOTION		BSD|DOS
+#		"funkycom"
+#		'^X-F'
+#		'FN-2'				DOS
+#
+# This says that somefunc() is an absolute motion command, that it should
+#  only be included in the editor if we're running BSD or DOS, that its
+#  english name as one would type on the command line is "funkycom", and
+#  that it is bound to ^X-F, and also to function key 2 under DOS.
+#
+# Function flags have the following meanings:
+#	REDO means the dotcmd command recorder should be halted, so that
+#		the command can be redone.
+#	UNDO means the undo stacks should be cleared, in preparation for
+#		an undoable command.
+#	OPER means the command is an "operator", that is, it acts on a region
+#		demarcated by the current cursor position and the cursor position
+#		following a subsequent motion command.
+#	MOTION means this command moves dot, and specifically is compatible
+#		with the operator commands.
+#	FL only occurs with MOTION, means that if the motion is an argument
+#		to an operator, the operation should affect Full Lines
+#	ABSM only occurs with MOTION, means that the motion is absolute,
+#		i.e. not relative to the current position or screen.  It causes
+#		the "lastdotmark", ldmark to be set to dot before the move
+#		takes place.
+#	GOAL signifies a motion that will attempt to retain the 
+#		current column position after the motion.
+#	GLOBOK says the function can follow a global command
+#		(e.g. the 'd' in "g/pattern/d")
+#
+#	This file was designed and constructed by Paul Fox for vile, (c)1990
+#
+#	The flags given in parentheses are "ex" flags, related to what
+#		kind of line-range arguments the command can take.  Not all are
+#		currently used or implemented, but they were defined in the command
+#		table for the Steve Kirkendall's elvis editor, so I included them
+#		here for completeness.
+#
+# $Log: cmdtbl,v $
+# Revision 1.1  1994/02/01 03:29:13  jkh
+# Initial revision
+#
+# Revision 1.74  1993/09/10  16:06:49  pgf
+# tom's 3.61 changes
+#
+# Revision 1.73  1993/09/06  16:22:28  pgf
+# added "stop" command
+#
+# Revision 1.72  1993/09/03  09:11:54  pgf
+# tom's 3.60 changes
+#
+# Revision 1.71  1993/08/18  16:45:00  pgf
+# added VIEWOK flag for functions that execute macros.  it says it's okay
+# to execute them in view mode, even though they have the UNDO bit set
+#
+# Revision 1.70  1993/08/13  16:32:50  pgf
+# tom's 3.58 changes
+#
+# Revision 1.69  1993/08/05  14:35:57  pgf
+# changed name of setmode to avoid library conflict with djgpp compiler
+# (also changed delmode, setgmode, and delgmode to be consistent)
+#
+# Revision 1.68  1993/08/05  14:29:12  pgf
+# tom's 3.57 changes
+#
+# Revision 1.67  1993/07/15  10:37:58  pgf
+# see 3.55 CHANGES
+#
+# Revision 1.66  1993/06/30  10:05:54  pgf
+# change ABS to ABSM, since osf/1 defines ABS in a system header
+#
+# Revision 1.65  1993/06/25  11:25:55  pgf
+# patches for Watcom C/386, from Tuan DANG
+#
+# Revision 1.64  1993/06/22  10:28:03  pgf
+# new backundo and forwredo functions, for infinite undo
+#
+# Revision 1.63  1993/06/18  15:57:06  pgf
+# tom's 3.49 changes
+#
+# Revision 1.62  1993/06/10  14:58:10  pgf
+# initial :map support, from Otto Lind
+#
+# Revision 1.61  1993/05/05  13:39:00  pgf
+# changed special-prefix to function-prefix
+#
+# Revision 1.60  1993/05/04  17:05:14  pgf
+# see tom's CHANGES, 3.45
+#
+# Revision 1.59  1993/04/29  19:17:50  pgf
+# comment wording
+#
+# Revision 1.58  1993/04/20  12:18:32  pgf
+# see tom's 3.43 CHANGES
+#
+# Revision 1.57  1993/04/12  19:19:37  pgf
+# added finderrbuf routine
+#
+# Revision 1.56  1993/04/09  13:35:14  pgf
+# take "onamedcmd" out of action
+#
+# Revision 1.55  1993/04/08  15:08:16  pgf
+# new insstring and overwstring, bound to "insert-string" and
+# "overwrite-string"
+#
+# Revision 1.54  1993/03/31  19:31:48  pgf
+# make the godotplus() function bindable as "whole-lines"
+#
+# Revision 1.53  1993/03/17  10:01:18  pgf
+# overwrite() renamed to overwritechars()
+#
+# Revision 1.52  1993/03/16  10:53:21  pgf
+# see 3.36 section of CHANGES file
+#
+# Revision 1.51  1993/03/05  17:50:54  pgf
+# see CHANGES, 3.35 section
+#
+# Revision 1.50  1993/02/24  10:59:02  pgf
+# see 3.34 changes, in CHANGES file
+#
+# Revision 1.49  1993/02/08  14:53:35  pgf
+# see CHANGES, 3.32 section
+#
+# Revision 1.48  1993/01/26  22:44:07  foxharp
+# took out broken ifdef of "font" variable
+#
+# Revision 1.47  1993/01/23  14:26:19  foxharp
+# make '@' command undo/redoable
+#
+# Revision 1.46  1993/01/23  13:38:23  foxharp
+# tom's changes -- added variables and functions
+#
+# Revision 1.45  1993/01/16  10:25:33  foxharp
+# added tom's rewind, list-vars, and show-vars commands
+#
+# Revision 1.44  1992/12/20  14:37:35  foxharp
+# took RANGE out of opervglobals flags
+#
+# Revision 1.43  1992/11/19  08:56:35  foxharp
+# add "args" as a synonym for "list-buffers".  i know it's not much
+# like the vi "args" command, but it's about as close as i can get easily
+#
+# Revision 1.42  1992/08/20  23:40:48  foxharp
+# typo fixes -- thanks, eric
+#
+# Revision 1.41  1992/07/16  22:03:35  foxharp
+# made kbd_mac_exec undoable
+#
+# Revision 1.40  1992/07/15  19:26:18  foxharp
+# made dotcmdplay undoable
+#
+# Revision 1.39  1992/07/08  08:19:43  foxharp
+# added DOS function keys
+#
+# Revision 1.38  1992/06/01  20:44:47  foxharp
+# always define bktoshell -- we make it a null routine instead of leaving
+# it out...
+#
+# Revision 1.37  1992/05/25  21:06:46  foxharp
+# emacs --> vile !!  (about time)
+#
+# Revision 1.36  1992/03/19  23:42:49  pgf
+# took out scrsearchforwword stuff -- macros can handle i
+#
+# Revision 1.35  1992/03/13  08:10:37  pgf
+# added ZERO flag to gomark, so ":0" can work
+#
+# Revision 1.34  1992/03/07  10:19:17  pgf
+# added Eric Krohn's srcsearchword() functions.  All of this screen search
+# stuff could be done with macros if variables worked right.
+#
+# Revision 1.33  1991/12/24  09:18:47  pgf
+# added current/change directory support  (Dave Lemke's changes)
+#
+# Revision 1.32  1991/11/07  14:56:59  pgf
+# added "pop" synonym
+#
+# Revision 1.31  1991/11/06  23:28:08  pgf
+# getfence() will scan for a fence if not on one to begin with.  it'll
+# scan in either direction, depending on arg to matchfence or matchfenceback
+#
+# Revision 1.30  1991/11/03  17:45:15  pgf
+# change getfence to matchfence
+#
+# Revision 1.29  1991/11/01  14:21:17  pgf
+# cleanup
+#
+# Revision 1.28  1991/10/31  02:36:14  pgf
+# implement vi-like substagain
+#
+# Revision 1.27  1991/10/29  14:35:29  pgf
+# implemented the & commands: substagain
+#
+# Revision 1.26  1991/10/29  03:08:54  pgf
+# changes for new function keys (ESC O x and # x) bindings, for
+# executing named registers, for loading named registers, and for
+# saving the keyboard macro to a named register
+#
+# Revision 1.25  1991/10/26  00:13:48  pgf
+# the sentence motions are now implemented
+#
+# Revision 1.24  1991/10/20  23:33:06  pgf
+# made ^N, ^P, and ^T vi-compliant
+#
+# Revision 1.23  1991/09/17  13:02:57  pgf
+# added write-all and brethren
+#
+# Revision 1.22  1991/09/10  00:40:05  pgf
+# took out obsolete "showgmodes"
+#
+# Revision 1.21  1991/08/14  12:08:54  pgf
+# showmodes command now does new-style show
+#
+# Revision 1.20  1991/08/12  15:06:21  pgf
+# added ANSI_SPEC capability -- can now use the arrow keys from
+# command or insert mode
+#
+# Revision 1.19  1991/08/07  11:56:58  pgf
+# added RCS log entries
+#
+# revision 1.18
+# date: 1991/08/06 15:55:01;
+# added "Q!"
+# 
+# revision 1.17
+# date: 1991/08/06 15:28:15;
+# mode listing changes
+# 
+# revision 1.16
+# date: 1991/07/23 11:10:51;
+# made the top, bottom, and middle of screen commands (H,M,L) absolute
+# 
+# revision 1.15
+# date: 1991/07/19 17:18:58;
+# change over-wordy "end-of-line" and "begi..." to "eol" and "bol"
+# 
+# revision 1.14
+# date: 1991/06/26 09:34:53;
+# new, rationalized(?) names
+# 
+# revision 1.13
+# date: 1991/06/16 17:41:39;
+# added entab, detab, and trim operator commands
+# 
+# revision 1.12
+# date: 1991/06/15 09:08:01;
+# added new forwchar_to_eol, and backchar_to_eol
+# 
+# revision 1.11
+# date: 1991/06/13 15:19:03;
+# made "source" a synonym for "execute-file"
+# 
+# revision 1.10
+# date: 1991/06/03 17:34:59;
+# switch from "meta" etc. to "ctla" etc.
+# 
+# revision 1.9
+# date: 1991/06/03 15:53:18;
+# added "set-variable"
+# 
+# revision 1.8
+# date: 1991/06/03 12:19:25;
+# added some ifdefs for unresoved refs when TAGS, GLOBALS, or WORDPRO
+# is turned off
+# 
+# revision 1.7
+# date: 1991/06/03 10:27:54;
+# added rebind-key synonym for bind-key, and
+# took out named version and GLOBOK flag on "join", since it
+# doesn't work after "g" command anymore (need to take a region to
+# work now)
+# 
+# revision 1.6
+# date: 1991/05/31 11:37:16;
+# a bunch of changes for ex commands and line ranges
+# 
+# revision 1.5
+# date: 1991/04/04 09:35:07;
+# added filterregion, and some text improvements
+# 
+# revision 1.4
+# date: 1991/04/04 09:31:59;
+# added horiz. scrolling and window resizing commands
+# 
+# revision 1.3
+# date: 1990/10/12 19:33:30;
+# added ^A-/ for scrsearchpat
+# 
+# revision 1.2
+# date: 1990/10/01 10:38:25;
+# change execcmd to NEVER -- the routine itself has been ifdefed out
+# 
+# revision 1.1
+# date: 1990/09/21 10:24:53;
+# initial vile RCS revision
+#
+
+altbuff		NONE
+	"alternate-buffer"		!FEWNAMES
+	'^^'
+append		REDO|UNDO
+	"append-chars"			!FEWNAMES
+	'a'
+appendeol	REDO|UNDO
+	"append-chars-at-eol"			!FEWNAMES
+	'A'
+apro		NONE			APROP|REBIND
+	"apropos"
+	"list-commands-apropos-to"
+backchar	MOTION
+	"backward-character"		!FEWNAMES
+backchar_to_bol	MOTION
+	"backward-character-to-bol"	!FEWNAMES
+	'h'
+	'^H'
+	'^?'
+	'FN-D'				ANSI_SPEC
+	'FN-\113'			MSDOS
+backdelchar	REDO|UNDO
+	"delete-previous-character"	!FEWNAMES
+	'X'
+backhunt	ABSM|MOTION		!SMALLER
+	"hunt-backward"
+backhpage	MOTION
+	"previous-half-page"		!FEWNAMES
+	"back-half-page"		!FEWNAMES
+	"up-half-page"		!FEWNAMES
+	'^U'
+backline	GOAL|MOTION|FL
+	"previous-line"			!FEWNAMES
+	"back-line"			!FEWNAMES
+	"up-line"			!FEWNAMES
+	'k'
+	'^P'
+	'FN-A'				ANSI_SPEC
+	'FN-\110'			MSDOS
+backbline	MOTION|FL
+	"previous-line-at-bol"		!FEWNAMES
+	"back-line-at-bol"		!FEWNAMES
+	"up-line-at-bol"		!FEWNAMES
+	'-'
+backpage	MOTION
+	"previous-page"			!FEWNAMES
+	"back-page"			!FEWNAMES
+	'^B'
+	'FN-\111'			MSDOS
+backword	MOTION
+	"previous-word"			!FEWNAMES
+	"back-word"			!FEWNAMES
+	'B'
+	'FN-\163'			MSDOS
+backviword	MOTION
+	"previous-punctuated-word"		!FEWNAMES
+	"back-punctuated-word"		!FEWNAMES
+	'b'
+backsearch	ABSM|MOTION
+	"search-reverse"		!FEWNAMES
+	'?'
+bcsrch		MOTION
+	"backward-char-scan"		!FEWNAMES
+	'F'
+bcsrch_to	MOTION
+	"backward-char-scan-to"		!FEWNAMES
+	'T'
+bindkey		NONE			REBIND
+	"bind-key"
+	"rebind-key"
+bktoshell	NONE
+	"suspend-vile"			!FEWNAMES
+	"stop"
+	'^Z'
+cd		NONE
+	"cd"
+	"change-directory"
+cntl_xf		NONE
+	"cntl_x-prefix"
+	'^X'
+chgchar		REDO|UNDO
+	"change-char"			!FEWNAMES
+	"delete-char-and-insert-chars"		!FEWNAMES
+	's'
+chgline		REDO|UNDO
+	"change-line"			!FEWNAMES
+	"delete-line-and-insert-chars"		!FEWNAMES
+	'S'
+chgtoeol	REDO|UNDO
+	"change-to-eol"		!FEWNAMES
+	"delete-to-eol-and-insert-chars"	!FEWNAMES
+	'C'
+clrmes		NONE
+	"clear-message-line"		!FEWNAMES
+consearch	ABSM|MOTION
+	"continue-search"		!FEWNAMES
+	'n'
+wordcount	RANGE			WORDCOUNT
+	"count-words"
+opercopy		OPER|(RANGE|EXTRA)
+	"copy-til"
+	"c"
+kbd_mac_begin		NONE
+	"begin-keyboard-macro"		!FEWNAMES
+	'^X-('
+kbd_mac_end		NONE
+	"end-keyboard-macro"		!FEWNAMES
+	'^X-)'
+kbd_mac_exec		REDO|UNDO|VIEWOK
+	"execute-keyboard-macro"	!FEWNAMES
+	'^X-&'
+kbd_mac_save		NONE
+	"save-keyboard-macro"
+	'^X-^'
+cbuf1		REDO
+	"execute-macro-1"		!FEWNAMES
+	'FN-1'				UNIX
+	'FN-P'				ANSI_SPEC
+cbuf2		REDO
+	"execute-macro-2"		!FEWNAMES
+	'FN-2'				UNIX
+	'FN-Q'				ANSI_SPEC
+	'FN-\125'			MSDOS
+cbuf3		REDO
+	"execute-macro-3"		!FEWNAMES
+	'FN-3'				UNIX
+	'FN-R'				ANSI_SPEC
+	'FN-\126'			MSDOS
+cbuf4		REDO
+	"execute-macro-4"		!FEWNAMES
+	'FN-4'				UNIX
+	'FN-S'				ANSI_SPEC
+	'FN-\127'			MSDOS
+cbuf5		REDO
+	"execute-macro-5"		!FEWNAMES
+	'FN-5'				UNIX
+	'FN-\130'			MSDOS
+cbuf6		REDO
+	"execute-macro-6"		!FEWNAMES
+	'FN-6'				UNIX
+	'FN-\131'			MSDOS
+cbuf7		REDO
+	"execute-macro-7"		!FEWNAMES
+	'FN-7'				UNIX
+	'FN-\132'			MSDOS
+cbuf8		REDO
+	"execute-macro-8"		!FEWNAMES
+	'FN-8'				UNIX
+	'FN-\133'			MSDOS
+cbuf9		REDO
+	"execute-macro-9"		!FEWNAMES
+	'FN-9'				UNIX
+	'FN-\134'			MSDOS
+cbuf10		REDO
+	"execute-macro-10"		!FEWNAMES
+cbuf11		REDO			!SMALLER
+	"execute-macro-11"		!FEWNAMES
+cbuf12		REDO			!SMALLER
+	"execute-macro-12"		!FEWNAMES
+cbuf13		REDO			!SMALLER
+	"execute-macro-13"		!FEWNAMES
+cbuf14		REDO			!SMALLER
+	"execute-macro-14"		!FEWNAMES
+cbuf15		REDO			!SMALLER
+	"execute-macro-15"		!FEWNAMES
+cbuf16		REDO			!SMALLER
+	"execute-macro-16"		!FEWNAMES
+cbuf17		REDO			!SMALLER
+	"execute-macro-17"		!FEWNAMES
+cbuf18		REDO			!SMALLER
+	"execute-macro-18"		!FEWNAMES
+cbuf19		REDO			!SMALLER
+	"execute-macro-19"		!FEWNAMES
+cbuf20		REDO			!SMALLER
+	"execute-macro-20"		!FEWNAMES
+cbuf21		REDO			!SMALLER
+	"execute-macro-21"		!FEWNAMES
+cbuf22		REDO			!SMALLER
+	"execute-macro-22"		!FEWNAMES
+cbuf23		REDO			!SMALLER
+	"execute-macro-23"		!FEWNAMES
+cbuf24		REDO			!SMALLER
+	"execute-macro-24"		!FEWNAMES
+cbuf25		REDO			!SMALLER
+	"execute-macro-25"		!FEWNAMES
+cbuf26		REDO			!SMALLER
+	"execute-macro-26"		!FEWNAMES
+cbuf27		REDO			!SMALLER
+	"execute-macro-27"		!FEWNAMES
+cbuf28		REDO			!SMALLER
+	"execute-macro-28"		!FEWNAMES
+cbuf29		REDO			!SMALLER
+	"execute-macro-29"		!FEWNAMES
+cbuf30		REDO			!SMALLER
+	"execute-macro-30"		!FEWNAMES
+cbuf31		REDO			!SMALLER
+	"execute-macro-31"		!FEWNAMES
+cbuf32		REDO			!SMALLER
+	"execute-macro-32"		!FEWNAMES
+cbuf33		REDO			!SMALLER
+	"execute-macro-33"		!FEWNAMES
+cbuf34		REDO			!SMALLER
+	"execute-macro-34"		!FEWNAMES
+cbuf35		REDO			!SMALLER
+	"execute-macro-35"		!FEWNAMES
+cbuf36		REDO			!SMALLER
+	"execute-macro-36"		!FEWNAMES
+cbuf37		REDO			!SMALLER
+	"execute-macro-37"		!FEWNAMES
+cbuf38		REDO			!SMALLER
+	"execute-macro-38"		!FEWNAMES
+cbuf39		REDO			!SMALLER
+	"execute-macro-39"		!FEWNAMES
+cbuf40		REDO			!SMALLER
+	"execute-macro-40"		!FEWNAMES
+delwind		NONE
+	"delete-window"			!FEWNAMES
+	'^K'
+	'^X-0'
+deblank		REDO|UNDO		AEDIT
+	"delete-blank-lines"		!FEWNAMES
+	'^A-o'
+delglobmode	NONE
+	"delete-global-mode"		!FEWNAMES
+	"setgno"
+	"unsetg"
+	"setno"
+	"unset"
+dellocmode	NONE|(EXRCOK|EXTRA)
+	"delete-mode"			!FEWNAMES
+	"setlno"
+	"unsetl"
+deltoeol	REDO|UNDO
+	"delete-to-eol"		!FEWNAMES
+	'D'
+desbind		NONE			REBIND
+	"describe-bindings"
+	"list-bindings"
+deskey		NONE			REBIND
+	"describe-key"
+dotcmdplay	UNDO
+	"repeat-last-cmd"		!FEWNAMES
+	'.'
+ex	NONE|(BANG|FILE1)
+	"ex"
+execbuf		NONE			!SMALLER
+	"execute-buffer"		!FEWNAMES
+execcmd		NONE			NEVER
+	"execute-command-line"		!FEWNAMES
+execfile	NONE			!SMALLER
+	"execute-file"			!FEWNAMES
+	"source"
+execkreg	REDO|UNDO|VIEWOK
+	"execute-register"
+	'@'
+execproc	REDO			PROC
+	"execute-procedure"		!FEWNAMES
+	"run"
+enlargewind	NONE
+	"grow-window"			!FEWNAMES
+	'V'
+esc		NONE
+	"abort-command"			!FEWNAMES
+	'^['
+fcsrch		MOTION
+	"forward-char-scan"		!FEWNAMES
+	'f'
+fcsrch_to	MOTION
+	"forward-char-scan-up-to"	!FEWNAMES
+	't'
+filefind	NONE|(BANG|FILE1|PLUS)
+	"e"
+	"E"
+	"edit-file"			!FEWNAMES
+	"find-file"			!FEWNAMES
+	'^X-e'
+filename	NONE|(NAMEDF)
+	"change-file-name"		!FEWNAMES
+	"f"
+	"file"
+	"filename"
+fileread	NONE
+	"e!"
+	"replace-with-file"		!FEWNAMES
+filesave	NONE			!SMALLER
+	"save-file"
+filewrite	NONE
+#	"w"
+#	"W"
+	"write-file"			!FEWNAMES
+filter		REDO|UNDO
+	"|"
+	"filter-buffer"			!FEWNAMES
+finderr		NONE			FINDERR
+	"find-next-error"		!FEWNAMES
+	'^X-^X'
+finderrbuf	NONE			FINDERR
+	"find-next-error-buffer-name"
+	"error-buffer"
+firstbuffer	NONE
+	"rewind"
+firstnonwhite	MOTION
+	"first-nonwhite"		!FEWNAMES
+	'^'
+fisearch	NONE			ISRCH
+	"incremental-search"		!FEWNAMES
+	'^X-S'
+flipchar	REDO|UNDO
+	"flip-character"		!FEWNAMES
+	'~'
+fnclabel	NONE			FLABEL
+	"label-function-key"		!FEWNAMES
+	"label-fkey"
+forwdelchar	REDO|UNDO
+	"delete-next-character"		!FEWNAMES
+	'x'
+	'FN-\123'			MSDOS
+forwhpage	MOTION
+	"forward-half-page"		!FEWNAMES
+	"next-half-page"		!FEWNAMES
+	"down-half-page"		!FEWNAMES
+	'^D'
+forwchar	MOTION
+	"forward-character"		!FEWNAMES
+	"next-character"		!FEWNAMES
+forwchar_to_eol	MOTION
+	"forward-character-to-eol"	!FEWNAMES
+	"next-character-to-eol"		!FEWNAMES
+	' '
+	'l'
+	'FN-C'				ANSI_SPEC
+	'FN-\115'			MSDOS
+forwpage	MOTION
+	"forward-page"			!FEWNAMES
+	"next-page"			!FEWNAMES
+	"down-page"			!FEWNAMES
+	'^F'
+	'FN-\121'			MSDOS
+forwline	GOAL|MOTION|FL
+	"forward-line"			!FEWNAMES
+	"next-line"			!FEWNAMES
+	"down-line"			!FEWNAMES
+	'j'
+	'^J'
+	'^N'
+	'FN-B'				ANSI_SPEC
+	'FN-\120'			MSDOS
+forwbline	MOTION|FL
+	"forward-line-at-bol"		!FEWNAMES
+	"next-line-at-bol"		!FEWNAMES
+	"down-line-at-bol"		!FEWNAMES
+	'+'
+	'^M'
+forwword	MOTION
+	"forward-word"			!FEWNAMES
+	"next-word"			!FEWNAMES
+	'W'
+	'FN-\164'			MSDOS
+forwviword	MOTION
+	"forward-punctuated-word"		!FEWNAMES
+	"next-punctuated-word"		!FEWNAMES
+	'w'
+forwendw	MOTION
+	"forward-word-end"			!FEWNAMES
+	"next-word-end"			!FEWNAMES
+	'E'
+forwviendw	MOTION
+	"forward-punctuated-word-end"		!FEWNAMES
+	"next-punctuated-word-end"		!FEWNAMES
+	'e'
+forwhunt	ABSM|MOTION		!SMALLER
+	"hunt-forward"			!FEWNAMES
+forwsearch	ABSM|MOTION
+	"search-forward"		!FEWNAMES
+	'/'
+matchfence	ABSM|MOTION		CFENCE
+	"goto-matching-fence"		!FEWNAMES
+	'%'
+matchfenceback	ABSM|MOTION		CFENCE
+	"goto-matching-fence-behind"	!FEWNAMES
+	'^X-%'
+globals		NONE			GLOBALS
+	"og"
+
+# the gotdotplus() function is mostly for internal use only, for the
+# stuttered operator commands, but it corresponds to the real vi '_'
+# command, so we give it a name, so it can be bound to if desired.
+godotplus	MOTION|FL
+	"whole-lines"
+
+# this function is for internal use only, for ex commands
+gomark		MOTION|FL|(RANGE|ZERO)
+
+gotobop		ABSM|MOTION		WORDPRO
+	"previous-paragraph"		!FEWNAMES
+	"back-paragraph"		!FEWNAMES
+	"up-paragraph"			!FEWNAMES
+	'{'
+#	'FN-\204'			MSDOS
+gotoeop		ABSM|MOTION		WORDPRO
+	"forward-paragraph"		!FEWNAMES
+	"next-paragraph"		!FEWNAMES
+	"down-paragraph"		!FEWNAMES
+	'}'
+	'FN-\166'			MSDOS
+gotobob		ABSM|MOTION		!SMALLER
+	"beginning-of-file"		!FEWNAMES
+	"goto-beginning-of-file"	!FEWNAMES
+	'FN-\107'			MSDOS
+gotoeob		ABSM|MOTION		!SMALLER
+	"goto-end-of-file"		!FEWNAMES
+	"end-of-file"			!FEWNAMES
+	'FN-\117'			MSDOS
+gotobol		MOTION
+	"goto-bol"			!FEWNAMES
+	"beginning-of-line"		!FEWNAMES
+	"bol"				!FEWNAMES
+	'0'
+gotoeol		MOTION|GOAL
+	"goto-eol"			!FEWNAMES
+	"end-of-line"			!FEWNAMES
+	"eol"				!FEWNAMES
+	'$'
+gotobos		ABSM|MOTION|FL
+	"goto-beginning-of-screen"	!FEWNAMES
+	"beginning-of-screen"		!FEWNAMES
+	'H'
+gotomos		ABSM|MOTION|FL
+	"goto-middle-of-screen"		!FEWNAMES
+	"middle-of-screen"		!FEWNAMES
+	'M'
+gotoeos		ABSM|MOTION|FL
+	"goto-end-of-screen"		!FEWNAMES
+	"end-of-screen"			!FEWNAMES
+	'L'
+gotobosec	ABSM|MOTION		WORDPRO
+	"previous-section"		!FEWNAMES
+	"back-section"			!FEWNAMES
+	"up-section"			!FEWNAMES
+	'['
+gotoeosec	ABSM|MOTION		WORDPRO
+	"forward-section"		!FEWNAMES
+	"next-section"			!FEWNAMES
+	"down-section"			!FEWNAMES
+	']'
+gotobosent	ABSM|MOTION		WORDPRO
+	"previous-sentence"		!FEWNAMES
+	"back-sentence"			!FEWNAMES
+	"up-sentence"			!FEWNAMES
+	'('
+gotoeosent	ABSM|MOTION		WORDPRO
+	"forward-sentence"		!FEWNAMES
+	"next-sentence"			!FEWNAMES
+	"down-sentence"			!FEWNAMES
+	')'
+gototag		NONE			TAGS
+	"ta"
+	"tag"
+	"find-tag"			!FEWNAMES
+	'^]'
+gotocol		MOTION
+	"goto-column"			!FEWNAMES
+	'|'
+gotoline	ABSM|MOTION|FL|(RANGE)
+	"goto-line"			!FEWNAMES
+	'G'
+# golinenmmark and goexactnmmark are special cases--	
+# 	no ABSM even though they are absolute, since these are the commands
+#	that use the last-dot-mark
+golinenmmark	MOTION|FL
+	"goto-named-mark"		!FEWNAMES
+#  single quote -- can't use '''
+	'\047'
+goexactnmmark	MOTION
+	"goto-named-mark-exact"		!FEWNAMES
+	'`'
+help		NONE
+	"h"
+	"help"
+	"list-help"
+	'^A-h'
+	'^X-h'
+histbuff	NONE
+	"historical-buffer"		!FEWNAMES
+	'_'
+	"_"
+insert		REDO|UNDO
+	"insert-chars"			!FEWNAMES
+	'i'
+insertbol	REDO|UNDO
+	"insert-chars-at-bol"	!FEWNAMES
+	'I'
+insfile		REDO|UNDO|GLOBOK|(FROM|ZERO|NAMEDF)
+	"r"
+	"insert-file"			!FEWNAMES
+	"read-file"			!FEWNAMES
+	'^R'
+insspace	REDO|UNDO		!SMALLER
+	"insert-space"			!FEWNAMES
+insstring	REDO|UNDO		!SMALLER
+	"insert-string"
+joinlines	REDO|UNDO
+	"join-lines"			!FEWNAMES
+	'J'
+killbuffer	GOAL
+	"delete-buffer"			!FEWNAMES
+	"kill-buffer"			!FEWNAMES
+	"ki"
+	'^X-k'
+showlength	DFLALL|FROM|TO|NOMOVE
+	"buffer-length"			!FEWNAMES
+	"="
+lastnonwhite	MOTION			!SMALLER
+	"last-nonwhite"			!FEWNAMES
+listbuffers	NONE
+	"list-buffers"			!FEWNAMES
+	"args"
+	'^A-*'
+showhistory	NONE			OPT_HISTORY
+	"show-history"
+lineputafter	REDO|UNDO|GLOBOK|(FROM|ZERO|OPTREG)
+	"put-as-lines-after"		!FEWNAMES
+	"put"
+	'^X-p'
+lineputbefore	REDO|UNDO|GLOBOK|(FROM|OPTREG)
+	"put-as-lines-before"		!FEWNAMES
+	"Put"
+	'^X-P'
+lineundo	NONE
+	"undo-line-changes"		!FEWNAMES
+	'U'
+loadkreg	NONE
+	"load-register"
+showkreg	NONE			!SMALLER
+	"show-registers"
+	"showregisters"			!FEWNAMES
+	"list-registers"		!FEWNAMES
+map		NONE|(EXRCOK|BANG|EXTRA)
+	"map"
+map_proc		REDO|UNDO|VIEWOK
+	"map_proc"
+cntl_af		NONE
+	"cntl_a-prefix"
+	'^A'
+mvdnnxtwind	NONE
+	"move-next-window-down"		!FEWNAMES
+	'^A-^E'
+mvupnxtwind	NONE
+	"move-next-window-up"		!FEWNAMES
+	'^A-^Y'
+mvdnwind	GOAL
+	"move-window-down"		!FEWNAMES
+	'^E'
+mvupwind	GOAL
+	"move-window-up"		!FEWNAMES
+	'^Y'
+mvrightwind	GOAL
+	"move-window-right"		!FEWNAMES
+	'^X-^R'
+mvleftwind	GOAL
+	"move-window-left"		!FEWNAMES
+	'^X-^L'
+nextbuffer	NONE|(BANG|NAMEDFS)
+	"n"
+	"next-buffer"			!FEWNAMES
+namebuffer	NONE
+	"rename-buffer"
+newline		REDO|UNDO		!SMALLER
+	"newline"
+newlength	NONE
+	"screen-rows"
+newwidth	NONE
+	"screen-columns"
+nextwind	NONE
+	"next-window"			!FEWNAMES
+	'^X-o'
+#	'^N'
+nullproc	NONE
+	"nop"				!FEWNAMES
+	'^Q'
+	'^S'
+onamedcmd	NONE			UNUSED
+	"execute-named-command-old"	!FEWNAMES
+	'^A-:'
+namedcmd	NONE
+	"execute-named-command"		!FEWNAMES
+	":"
+	':'
+openup		REDO|UNDO|(FROM)
+	"open-line-above-and-insert-chars"	!FEWNAMES
+	"i"
+	'O'
+opendown	REDO|UNDO|(FROM|ZERO)
+	"open-line-below-and-append-chars"	!FEWNAMES
+	"a"
+	'o'
+operchg		OPER|REDO|UNDO
+	"change-til"			!FEWNAMES
+	"delete-and-insert-chars-til"			!FEWNAMES
+	'c'
+operdetab	OPER|REDO|UNDO|GLOBOK|(RANGE)	AEDIT
+	"detab-lines-til"		!FEWNAMES
+	'^A- '
+operentab	OPER|REDO|UNDO|GLOBOK|(RANGE)	AEDIT
+	"entab-lines-til"		!FEWNAMES
+	'^A-^I'
+opermove	OPER|(RANGE|EXTRA)
+	"move-til"
+	"m"
+operlinechg	OPER|REDO|UNDO|(RANGE)
+	"change-lines-til"		!FEWNAMES
+	"delete-lines-and-insert-chars-til"		!FEWNAMES
+	"ch"
+	'^X-c'
+operdel		OPER|REDO|UNDO
+	"delete-til"			!FEWNAMES
+	'd'
+operjoin	OPER|REDO|UNDO|GLOBOK|RANGE
+	"j"
+	"join-lines-til"		!FEWNAMES
+operlinedel	OPER|REDO|UNDO|GLOBOK|(RANGE|OPTREG)
+	"delete-lines-til"		!FEWNAMES
+	"d"
+	'^X-d'
+operfilter	OPER|REDO|UNDO|(EXRCOK|RANGE|NAMEDFS|DFLNONE|NL)
+	"filter-til"			!FEWNAMES
+	"!"
+	'!'
+operformat	OPER|REDO|UNDO|(RANGE)		WORDPRO
+	"format-til"			!FEWNAMES
+	'^A-f'
+	'^A-j'
+operflip	OPER|REDO|UNDO|GLOBOK|(RANGE)
+	"flip-til"			!FEWNAMES
+	"~"
+	'^A-~'
+# RANGE commented out, since it's not done.... 
+operglobals	(/*RANGE|*/BANG|EXTRA|DFLALL)	GLOBALS
+	"global"
+	"g"
+opervglobals	(/*RANGE|*/BANG|EXTRA|DFLALL)	GLOBALS
+	"vglobal"
+	"v"
+operlower	OPER|REDO|UNDO|GLOBOK|(RANGE)
+	"lower-til"			!FEWNAMES
+	"L"
+	'^A-l'
+operlist	OPER|GLOBOK|(RANGE)		GLOBALS
+	"list-lines-til"		!FEWNAMES
+	"l"
+operprint	OPER|GLOBOK|(RANGE)		GLOBALS
+	"print-lines-til"		!FEWNAMES
+	"p"
+operupper	OPER|REDO|UNDO|GLOBOK|(RANGE)
+	"upper-til"			!FEWNAMES
+	"U"
+	'^A-u'
+operlshift	OPER|REDO|UNDO|GLOBOK|(RANGE)
+	"shift-left-til"		!FEWNAMES
+	"<"
+	'<'
+operrshift	OPER|REDO|UNDO|GLOBOK|(RANGE)
+	"shift-right-til"		!FEWNAMES
+	">"
+	'>'
+opersubst	OPER|REDO|UNDO|GLOBOK|(RANGE|EXTRA)
+	"substitute-til"		!FEWNAMES
+	"s"
+	'^X-s'
+opertrim	REDO|UNDO|GLOBOK|UNDO|(RANGE)	AEDIT
+	"trim-lines-til"		!FEWNAMES
+	"trim"
+	'^A-t'
+operyank	OPER
+	"yank-til"			!FEWNAMES
+	'y'
+operlineyank	OPER|(RANGE|OPTREG|NOMOVE)
+	"yank-lines-til"		!FEWNAMES
+	"y"
+	'^X-y'
+opersubstagain	OPER|REDO|UNDO|GLOBOK|(RANGE|EXTRA)
+	"substitute-again-til"		!FEWNAMES
+	"&"
+	'^A-&'
+opertransf	OPER|(RANGE|EXTRA)
+	"transfer-til"
+	"t"
+operwrite	OPER|(RANGE|BANG|FILE1|DFLALL|NOMOVE)
+	"w"
+	"W"
+	"write-til"			!FEWNAMES
+	'^W'
+overwritechars	REDO|UNDO
+	"overwrite-chars"		!FEWNAMES
+	'R'
+overwstring	REDO|UNDO		!SMALLER
+	"overwrite-string"
+onlywind	NONE
+	"delete-other-windows"		!FEWNAMES
+	'^O'
+	'^X-1'
+poswind		NONE
+	"position-window"		!FEWNAMES
+	'z'
+prevwind	NONE
+	"previous-window"		!FEWNAMES
+	'^X-O'
+#	'^P'
+pipecmd		NONE
+	"pipe-command"			!FEWNAMES
+	'^X-!'
+putafter	REDO|UNDO
+	"put-after"			!FEWNAMES
+	'p'
+putbefore	REDO|UNDO
+	"put-before"			!FEWNAMES
+	'P'
+pwd		NONE
+	"pwd"
+	"print-directory"
+quit		NONE|(BANG)
+	"q"
+	"Q"
+	"exit"
+	"quit"
+	'Q'
+	'^X-^C'
+quithard	NONE
+	"quit-without-save"
+	"q!"
+	"Q!"
+quickexit	NONE|(BANG|NL)
+	"x"
+	"xit"
+	"wwq"
+	"write-changed-buffers-and-quit" !FEWNAMES
+	"quick-exit"			!FEWNAMES
+quote		REDO|UNDO
+	"quote-next-character"		!FEWNAMES
+	'^V'
+refresh		NONE
+	"clear-and-redraw"		!FEWNAMES
+	'^L'
+reposition	NONE			!SMALLER
+	"redraw-display"
+rep_csrch	MOTION
+	"repeat-char-scan"		!FEWNAMES
+	';'
+replacechar	REDO|UNDO
+	"replace-character"		!FEWNAMES
+	'r'
+respawn		NONE
+	"!!"
+	"rerun-shell-command"		!FEWNAMES
+resize		NONE			!SMALLER
+	"resize-window"
+restwnd		NONE			!SMALLER
+	"restore-window"
+rev_csrch	MOTION
+	"reverse-char-scan"		!FEWNAMES
+	','
+risearch	NONE			ISRCH
+	"reverse-incremental-search"	!FEWNAMES
+	'^X-R'
+revsearch	ABSM|MOTION
+	"reverse-search"		!FEWNAMES
+	'N'
+scrforwsearch	ABSM|MOTION
+	"screen-search-forward"		!FEWNAMES
+	'^X-/'
+scrbacksearch	ABSM|MOTION
+	"screen-search-reverse"		!FEWNAMES
+	'^X-?'
+scrsearchpat	NONE
+	"screen-search-pattern-grab"	!FEWNAMES
+	'^A-/'
+set_dosmode	NONE			DOSFILES
+	"set-dos-mode"
+settab		NONE
+	"handle-tab"			!FEWNAMES
+	"set-tab"
+	'^X-t'
+set_termchrs	NONE			REBIND&&!SMALLER
+	"set-terminal"
+show_termchrs	NONE			REBIND&&!SMALLER
+	"show-terminal"
+spawncli	NONE
+	"sh"
+	"shell"
+	"interactive-shell"		!FEWNAMES
+savewnd		NONE			!SMALLER
+	"save-window"
+scrnextup	NONE
+	"scroll-next-window-up"		!FEWNAMES
+	'^A-^U'
+scrnextdw	NONE
+	"scroll-next-window-down"	!FEWNAMES
+	'^A-^D'
+setfillcol	NONE
+	"set-fill-column"
+	'^X-f'
+ue_setkey	NONE			CRYPT
+	"set-crypt-key"
+	'^X-X'
+setlocmode	NONE|(EXRCOK|EXTRA)
+	"setl"
+	"set-mode"			!FEWNAMES
+setglobmode	NONE
+	"se"
+	"set"
+	"setg"
+	"set-global-mode"
+setnmmark	NONE|(FROM|EXTRA|NOMOVE)
+	"set-named-mark"		!FEWNAMES
+	"k"
+	'm'
+setvar		NONE			OPT_EVAL
+	"setv"
+	"set-variable"
+setvmalloc	NONE			VMALLOC
+	"vmalloc"
+	'^X-v'
+showcpos	NONE
+	"position"			!FEWNAMES
+	'^G'
+	'^X-='
+listmodes	NONE
+	"modes"
+	"show-modes"
+	"list-modes"
+	"setall"
+	"setgall"
+	"gmodes"
+	"show-global-modes"
+	"showmodes"
+	"showgmodes"
+listvars	NONE			!SMALLER
+	"list-vars"
+	"show-vars"
+	"showvars"
+showversion	NONE|(EXRCOK)
+	"version"
+showmemory	NONE			TURBO|WATCOM
+	"memory"
+showtagstack	NONE			!SMALLER
+	"tags"				!FEWNAMES
+	"tagstack"
+shrinkwind	NONE
+	"shrink-window"			!FEWNAMES
+	'v'
+source		NONE|(EXRCOK|NAMEDF)
+	"exsource"
+spawn		NONE
+#	"!"
+	"shell-command"			!FEWNAMES
+speckey		NONE
+	"function-prefix"
+	'#'
+splitwind	NONE
+	"split-current-window"		!FEWNAMES
+#	'^T'
+	'^X-2'
+storemac	NONE
+	"store-macro"
+storeproc	NONE			PROC
+	"store-procedure"
+subst_again	REDO|UNDO|GLOBOK
+	"substitute-again"		!FEWNAMES
+	'&'
+togglelistbuffers	NONE
+	"*"
+	"toggle-buffer-list"		!FEWNAMES
+	'*'
+twiddle		REDO|UNDO		!SMALLER
+	"transpose-characters"		!FEWNAMES
+unbindkey	NONE			REBIND
+	"unbind-key"
+undo		NONE
+	"undo-change"			!FEWNAMES
+	'u'
+backundo	NONE
+	"undo-changes-backward"		!FEWNAMES
+	'^X-u'
+forwredo	NONE
+	"redo-changes-forward"		!FEWNAMES
+	'^X-r'
+unarg		NONE
+	"universal-argument"		!FEWNAMES
+	'K'
+unimpl		NONE
+	"unimplemented-command"		!FEWNAMES
+unmark		NONE
+	"unmark-buffer"
+unmap		NONE|(EXRCOK|BANG|EXTRA)
+	"unmap"
+untagpop	NONE			TAGS
+	"pop"
+	"untag-pop"			!FEWNAMES
+	'^X-^]'
+	'^T'
+upscreen	NONE			!SMALLER
+	"update-screen"
+usebuffer	NONE
+	"b"
+	"buffer"
+	"select-buffer"			!FEWNAMES
+usekreg		REDO
+	"use-register"		!FEWNAMES
+	'"'
+visual		NONE
+	"visual"
+vglobals	NONE			GLOBALS
+	"ov"
+viewfile	NONE
+	"view-file"
+writeall	NONE|(NL)
+	"ww"
+	"write-changed-buffers"		!FEWNAMES
+writequit	NONE|(NL)
+	"wq"
+	"Wq"
+	"WQ"
+	"write-file-and-quit"		!FEWNAMES
+wrapword	REDO|UNDO		!SMALLER
+	"wrap-word"
+writemsg	NONE			!SMALLER
+	"write-message"
+yankline	NONE
+	"yank-line"			!FEWNAMES
+	'Y'
+zzquit		NONE|(BANG|NL)
+	'Z'
+	"stuttered-write-all-and-quit"
