@@ -1,5 +1,5 @@
 /*
-   crypt.c (full version) by Info-ZIP.        Last revised:  23 Oct 92
+   crypt.c (full version) by Info-ZIP.        Last revised:  1 Sep 93
 
    This code is not copyrighted and is put in the public domain.  The
    encryption/decryption parts (as opposed to the non-echoing password
@@ -19,6 +19,10 @@
 #include "zip.h"
 #include "crypt.h"
 
+#ifndef CRC32
+#  define CRC32  crc32   /* for compatibility with unzip 5.0p1 */
+#endif
+
 #ifndef UNZIP         /* time.h already included in unzip's zip.h */
 #  include <time.h>
 #endif
@@ -32,95 +36,104 @@
 #endif
 
 #ifndef __GNUC__
-void srand  OF((unsigned int));
+   void srand OF((unsigned int));
 #endif
-int  rand   OF((void));
+int rand OF((void));
 
 /* For now, assume DIRENT implies System V implies TERMIO */
-#if (defined(DIRENT) && !defined(NO_TERMIO) && !defined(TERMIO))
-#  define TERMIO
+#if defined(DIRENT) || defined(SYSV)
+#  if !defined(NO_TERMIO) && !defined(TERMIO)
+#    define TERMIO
+#  endif
 #endif
 
-#if (defined(DOS_OS2) || defined(VMS))
-#  ifndef MSVMS
-#    define MSVMS
-#  endif
-#  ifdef DOS_OS2
-#    ifdef __EMX__
-#      define getch() _read_kbd(0, 1, 0)
+#ifndef AMIGA  /* Amiga uses none of the following (see crypt.h) */
+#  if (defined(DOS_OS2) || defined(VMS))
+#    ifndef MSVMS
+#      define MSVMS
+#    endif
+#    ifdef DOS_OS2
+#      ifdef __EMX__
+#        define getch() _read_kbd(0, 1, 0)
+#      else
+#        ifdef __GO32__
+#          include <pc.h>
+#          define getch() getkey()
+#        else /* !__GO32__ */
+#          include <conio.h>
+#        endif /* ?__GO32__ */
+#      endif
+#    else /* !DOS_OS2 */
+#      define getch() getc(stderr)
+#      include <descrip.h>
+#      include <iodef.h>
+#      include <ttdef.h>
+#      if !defined(SS$_NORMAL)
+#        define SS$_NORMAL 1   /* only thing we need from <ssdef.h> */
+#      endif
+#    endif /* ?DOS_OS2 */
+#  else /* !(DOS_OS2 || VMS) */
+#    ifdef TERMIO       /* Amdahl, Cray, all SysV? */
+#      ifdef COHERENT
+#        include <termio.h>
+#      else
+#        ifdef LINUX
+#          include <termios.h>
+#        else
+#          include <sys/termio.h>
+#        endif
+#      endif /* ?COHERENT */
+#      define sgttyb termio
+#      define sg_flags c_lflag
+#      if !defined(__386BSD__) && !defined(SYSV)
+         int ioctl OF((int, int, voidp *)); /* already in unistd.h */
+#      endif
+#      define GTTY(f,s) ioctl(f,TCGETA,(voidp *)s)
+#      define STTY(f,s) ioctl(f,TCSETAW,(voidp *)s)
+#    else /* !TERMIO */
+#      if (!defined(MINIX) && !defined(__386BSD__))
+#        include <sys/ioctl.h>
+#      endif /* !MINIX && !__386BSD__ */
+#      include <sgtty.h>
+#      ifdef __386BSD__
+#        define GTTY(f, s) ioctl(f, TIOCGETP, (voidp *) s)
+#        define STTY(f, s) ioctl(f, TIOCSETP, (voidp *) s)
+#      else /* !__386BSD__ */
+#        define GTTY gtty
+#        define STTY stty
+         int gtty OF((int, struct sgttyb *));
+         int stty OF((int, struct sgttyb *));
+#      endif /* ?__386BSD__ */
+#    endif /* ?TERMIO */
+#    if defined(__386BSD__) || defined(SYSV) || defined(__convexc__)
+#      ifndef UNZIP
+#        include <fcntl.h>
+#      endif
 #    else
-#      ifdef __GO32__
-#        include <pc.h>
-#        define getch() getkey()
-#      else /* !__GO32__ */
-#        include <conio.h>
-#      endif /* ?__GO32__ */
+       char *ttyname OF((int));
 #    endif
-#  else /* !DOS_OS2 */
-#    define getch() getc(stderr)
-#    include <descrip.h>
-#    include <iodef.h>
-#    include <ttdef.h>
-#    if !defined(SS$_NORMAL)
-#      define SS$_NORMAL 1   /* only thing we need from <ssdef.h> */
-#    endif
-#  endif /* ?DOS_OS2 */
-#else /* !(DOS_OS2 || VMS) */
-#  ifdef TERMIO       /* Amdahl, Cray, all SysV? */
-#    ifdef COHERENT
-#      include <termio.h>
-#    else
-#     ifdef LINUX
-#      include <termios.h>
-#     else
-#      include <sys/termio.h>
-#     endif
-#    endif /* COHERENT */
-#    define sgttyb termio
-#    define sg_flags c_lflag
-#    if !defined(__386BSD__) && !defined(SYSV)
-       int ioctl OF((int, int, voidp *)); /* already in unistd.h */
-#    endif
-#    define GTTY(f,s) ioctl(f,TCGETA,(voidp *)s)
-#    define STTY(f,s) ioctl(f,TCSETAW,(voidp *)s)
-#  else /* !TERMIO */
-#    if (!defined(MINIX) && !defined(__386BSD__))
-#      include <sys/ioctl.h>
-#    endif /* !MINIX && !__386BSD__ */
-#    include <sgtty.h>
-#    ifdef __386BSD__
-#      define GTTY(f, s) ioctl(f, TIOCGETP, (voidp *) s)
-#      define STTY(f, s) ioctl(f, TIOCSETP, (voidp *) s)
-#    else /* !__386BSD__ */
-#      define GTTY gtty
-#      define STTY stty
-       int gtty OF((int, struct sgttyb *));
-       int stty OF((int, struct sgttyb *));
-#    endif /* ?__386BSD__ */
-#  endif /* ?TERMIO */
-#  if defined(__386BSD__) || defined(SYSV)
-#    if !defined(UNZIP)
-#      include <fcntl.h>
-#    endif
-#  else
-     int isatty OF((int));
-     char *ttyname OF((int));
-     /* int open OF((char *, int));  works in zipup.c but not here. Strange. */
-     int close OF((int));
-     int read OF((int, voidp *, int));
-#  endif
-#endif /* ?(DOS_OS2 || VMS) */
+#  endif /* ?(DOS_OS2 || VMS) */
+#endif /* !AMIGA */
 
-#if (defined(UNZIP) && !defined(FUNZIP))
+#if defined(UNZIP) && !defined(UNZIP50P1)
+  char *key = (char *)NULL;  /* password with which to decrypt data, or NULL */
+#endif
+
+int newzip = 0;
+/* Set to TRUE in extract.c for each new zipfile (for unzip only) */
+
+#if defined(UNZIP) && !defined(FUNZIP)
   local int testp OF((uch *h));
 #endif
 
 local ulg keys[3]; /* keys defining the pseudo-random sequence */
 
-#ifdef CRYPT_DEBUG
-#  define Tracecr(x) printf x
-#else
-#  define Tracecr(x)
+#ifndef Trace
+#  ifdef CRYPT_DEBUG
+#    define Trace(x) fprintf x
+#  else
+#    define Trace(x)
+#  endif
 #endif
 
 /***********************************************************************
@@ -175,6 +188,7 @@ void crypthead(passwd, crc, zfile)
     int n;                       /* index in random header */
     int t;                       /* temporary */
     int c;                       /* random byte */
+    int ztemp;                   /* temporary for zencoded value */
     uch header[RAND_HEAD_LEN-2]; /* random header */
     static unsigned calls = 0;   /* ensure different random header each time */
 
@@ -193,10 +207,13 @@ void crypthead(passwd, crc, zfile)
     /* Encrypt random header (last two bytes is high word of crc) */
     init_keys(passwd);
     for (n = 0; n < RAND_HEAD_LEN-2; n++) {
-        putc(zencode(header[n], t), zfile);
+        ztemp = zencode(header[n], t);
+        putc(ztemp, zfile);
     }
-    putc(zencode((int)(crc >> 16) & 0xff, t), zfile);
-    putc(zencode((int)(crc >> 24), t), zfile);
+    ztemp = zencode((int)(crc >> 16) & 0xff, t);
+    putc(ztemp, zfile);
+    ztemp = zencode((int)(crc >> 24) & 0xff, t);
+    putc(ztemp, zfile);
 }
 
 
@@ -216,6 +233,7 @@ int zipcloak(z, source, dest, passwd)
     ulg n;                  /* holds offset and counts size */
     ush flag;               /* previous flags */
     int t;                  /* temporary */
+    int ztemp;              /* temporary storage for zencode value */
 
     /* Set encrypted bit, clear extended local header bit and write local
        header to output file */
@@ -241,7 +259,8 @@ int zipcloak(z, source, dest, passwd)
         if ((c = getc(source)) == EOF) {
             return ferror(source) ? ZE_READ : ZE_EOF;
         }
-        putc(zencode(c, t), dest);
+        ztemp = zencode(c, t);
+        putc(ztemp, dest);
     }
     /* Skip extended local header in input file if there is one */
     if ((flag & 8) != 0 && fseek(source, 16L, SEEK_CUR)) {
@@ -283,11 +302,11 @@ int zipbare(z, source, dest, passwd)
         if ((c1 = getc(source)) == EOF) {
             return ferror(source) ? ZE_READ : ZE_EOF;
         }
-        Tracecr((" (%02x)", c1));
+        Trace((stdout, " (%02x)", c1));
         zdecode(c1);
-        Tracecr((" %02x", c1));
+        Trace((stdout, " %02x", c1));
     }
-    Tracecr(("\n"));
+    Trace((stdout, "\n"));
 
     /* If last two bytes of header don't match crc (or file time in the
      * case of an extended local header), back up and just copy. For
@@ -364,8 +383,8 @@ unsigned zfwrite(buf, item_size, nb, f)
 
 #endif /* ?UTIL */
 
+#ifndef UNZIP50P1 /* getp was in file_io for unzip 5.0p1 */
 
-#ifndef DOS_OS2
 #ifdef VMS
 
 /***********************************************************************
@@ -441,6 +460,7 @@ int echo(opt)
 
 
 #else /* !VMS */
+#if !defined(DOS_OS2) && !defined(AMIGA)
 
 static int echofd=(-1);       /* file descriptor whose echo is off */
 
@@ -473,15 +493,74 @@ void echon()
     }
 }
 
+#endif /* !(DOS_OS2 || AMIGA) */
 #endif /* ?VMS */
-#endif /* !DOS_OS2 */
 
+#ifdef AMIGA
 
 /***********************************************************************
  * Get a password of length n-1 or less into *p using the prompt *m.
- * The entered password is not echoed.  Return p on success, NULL on
- * failure (can't get controlling tty).
+ * The entered password is not echoed. 
+ *
+ * On AMIGA, SAS/C 6.x provides raw console input via getch().  This is
+ * also available in SAS/C 5.10b, if the separately chargeable ANSI
+ * libraries are used.
+ *
+ * Aztec C provides functions set_raw() and set_con() which we use for
+ * echoff() and echon().
+ *
+ * Code for other compilers needs to provide routines or macros for
+ * echoff() and echon() to either send ACTION_SET_CONSOLE packets or
+ * provice "pseudo non-echo" input by setting the background and
+ * foreground colors the same.  Then, only spaces visibly echo.  This
+ * approach is the default in crypt.h.  Unfortunately, the cursor
+ * cannot be held stationary during input because the standard getc()
+ * and getchar() system routines buffer input until CR entered (due to
+ * the lack of switchable raw I/O).  This may be considered an
+ * advantage since it allows feedback for backspacing errors.
+ *
+ * Simulating true raw I/O on systems without getch() introduces
+ * undesirable complexity and overhead, so we'll live with this 
+ * simpler method for those compilers.  
  */
+char *getp(m, p, n)
+
+    char *m,*p;
+    int n;
+{
+    int i;
+    int c;
+
+    fputs (m,stderr);                      /* display prompt and flush */
+    fflush(stderr);
+
+    echoff(2);
+
+    i = 0;
+    while ( i <= n ) {
+       c=getch();
+       if ( (c == '\n') || (c == '\r')) break;   /* until user hits CR */
+       if (c == 0x03) {  /* ^C in input */
+           Signal(FindTask(NULL), SIGBREAKF_CTRL_C);
+           break;
+       }
+       if (i < n) p[i++]=(char)c;                   /* truncate past n */
+    }
+
+    ECHO_NEWLINE();
+    echon();
+
+    i = (i<n) ? i : (n-1);
+    p[i]=0;                                        /* terminate string */
+    return p;
+}
+
+#endif /* AMIGA */
+
+
+
+#ifdef DOS_OS2
+
 char *getp(m, p, n)
     char *m;                  /* prompt for password */
     char *p;                  /* return value: line input */
@@ -491,36 +570,16 @@ char *getp(m, p, n)
     int i;                    /* number of characters input */
     char *w;                  /* warning on retry */
 
-#ifndef DOS_OS2
-#ifndef VMS
-    int f;                    /* file decsriptor for tty device */
-
-    /* turn off echo on tty */
-    if (!isatty(2))
-        return NULL;          /* error if not tty */
-    if ((f = open(ttyname(2), 0)) == -1)
-        return NULL;
-#endif /* !VMS */
-    echoff(f);                /* turn echo off */
-#endif /* !DOS_OS2 */
-
     /* get password */
     w = "";
     do {
-#ifdef VMS   /* bug:  VMS adds '\n' to NULL fputs (apparently) */
-        if (*w)
-#endif /* VMS */
-            fputs(w, stderr); /* warning if back again */
+        fputs(w, stderr);     /* warning if back again */
         fputs(m, stderr);     /* prompt */
         fflush(stderr);
         i = 0;
         do {                  /* read line, keeping n */
-#ifdef MSVMS
             if ((c = (char)getch()) == '\r')
                 c = '\n';
-#else /* !MSVMS */
-            read(f, &c, 1);
-#endif /* ?MSVMS */
             if (i < n)
                 p[i++] = c;
         } while (c != '\n');
@@ -529,19 +588,107 @@ char *getp(m, p, n)
     } while (p[i-1] != '\n');
     p[i-1] = 0;               /* terminate at newline */
 
-#ifndef DOS_OS2
-    echon();                  /* turn echo back on */
-#ifndef VMS
+    /* return pointer to password */
+    return p;
+}
+
+#endif /* DOS_OS2 */
+
+#ifdef UNIX
+
+char *getp(m, p, n)
+    char *m;                  /* prompt for password */
+    char *p;                  /* return value: line input */
+    int n;                    /* bytes available in p[] */
+{
+    char c;                   /* one-byte buffer for read() to use */
+    int i;                    /* number of characters input */
+    char *w;                  /* warning on retry */
+    int f;                    /* file descriptor for tty device */
+
+    /* turn off echo on tty */
+    if (!isatty(2))
+        return NULL;          /* error if not tty */
+
+    /* Convex C seems to want (char *) in front of ttyname:  compiler bug? */
+    if ((f = open((char*)ttyname(2), 0)) == -1)
+        return NULL;
+
+    /* get password */
+    w = "";
+    do {
+        fputs(w, stderr);     /* warning if back again */
+        fputs(m, stderr);     /* prompt */
+        fflush(stderr);
+        i = 0;
+        echoff(f);
+        do {                  /* read line, keeping n */
+            read(f, &c, 1);
+            if (i < n)
+                p[i++] = c;
+        } while (c != '\n');
+        echon();
+        putc('\n', stderr);  fflush(stderr);
+        w = "(line too long--try again)\n";
+    } while (p[i-1] != '\n');
+    p[i-1] = 0;               /* terminate at newline */
+
     close(f);
-#endif /* !VMS */
-#endif /* !DOS_OS2 */
 
     /* return pointer to password */
     return p;
 }
 
+#endif /* UNIX */
+
+#ifdef VMS
+
+char *getp(m, p, n)
+    char *m;                  /* prompt for password */
+    char *p;                  /* return value: line input */
+    int n;                    /* bytes available in p[] */
+{
+    char c;                   /* one-byte buffer for read() to use */
+    int i;                    /* number of characters input */
+    char *w;                  /* warning on retry */
+
+    /* get password */
+    w = "";
+    do {
+        if (*w)               /* bug: VMS adds \n to NULL fputs (apparently) */
+            fputs(w, stderr); /* warning if back again */
+        fputs(m, stderr);     /* prompt */
+        fflush(stderr);
+        i = 0;
+        echoff(f);
+        do {                  /* read line, keeping n */
+            if ((c = (char)getch()) == '\r')
+                c = '\n';
+            if (i < n)
+                p[i++] = c;
+        } while (c != '\n');
+        echon();
+        putc('\n', stderr);  fflush(stderr);
+        w = "(line too long--try again)\n";
+    } while (p[i-1] != '\n');
+    p[i-1] = 0;               /* terminate at newline */
+
+    /* return pointer to password */
+    return p;
+}
+
+#endif /* VMS */
+
+#endif /* UNZIP50P1 */
+
 
 #if (defined(UNZIP) && !defined(FUNZIP))
+
+#ifndef PK_COOL    /* compatibility with unzip 5.0p1 */
+#  define PK_COOL           0    /* no error */
+#  define PK_WARN           1    /* warning error */
+#  define PK_MEM2           5    /* insufficient memory */
+#endif
 
 /***********************************************************************
  * Get the password and set up keys for current zipfile member.  Return
@@ -555,7 +702,7 @@ int decrypt_member()
     char *m, *prompt;
     uch h[RAND_HEAD_LEN];
 
-    Tracecr(("\n[incnt = %d]: ", incnt));
+    Trace((stdout, "\n[incnt = %d]: ", incnt));
 
     /* get header once (turn off "encrypted" flag temporarily so we don't
      * try to decrypt the same data twice) */
@@ -563,9 +710,17 @@ int decrypt_member()
     for (n = 0; n < RAND_HEAD_LEN; n++) {
         ReadByte(&b);
         h[n] = (uch)b;
-        Tracecr((" (%02x)", h[n]));
+        Trace((stdout, " (%02x)", h[n]));
     }
     pInfo->encrypted = TRUE;
+
+    if (newzip) {         /* this is first encrypted member in this zipfile */
+        newzip = FALSE;
+        if (key) {        /* get rid of previous zipfile's key */
+            free(key);
+            key = NULL;
+        }
+    }
 
     /* if have key already, test it; else allocate memory for it */
     if (key) {
@@ -577,7 +732,8 @@ int decrypt_member()
         return PK_MEM2;
 
     if ((prompt = (char *)malloc(FILNAMSIZ+15)) != (char *)NULL) {
-        sprintf(prompt, "%s password: ", filename);
+        /* sprintf(prompt, "%s password: ", filename); */
+        sprintf(prompt, "[%s] %s password: ", zipfn, filename);
         m = prompt;
     } else
         m = "Enter password: ";
@@ -602,6 +758,7 @@ int decrypt_member()
     return PK_WARN;
 } /* end function decrypt_member() */
 
+
 /***********************************************************************
  * Test the password.  Return -1 if bad, 0 if OK.
  */
@@ -620,15 +777,17 @@ local int testp(h)
     /* check password */
     for (n = 0; n < RAND_HEAD_LEN; n++) {
         zdecode(hh[n]);
-        Tracecr((" %02x", hh[n]));
+        Trace((stdout, " %02x", hh[n]));
     }
     c = hh[RAND_HEAD_LEN-2], b = hh[RAND_HEAD_LEN-1];
 
-    Tracecr(("\n  lrec.crc= %08lx  crec.crc= %08lx  pInfo->ExtLocHdr= %s\n",
+    Trace((stdout,
+      "\n  lrec.crc= %08lx  crec.crc= %08lx  pInfo->ExtLocHdr= %s\n",
       lrec.crc32, pInfo->crc, pInfo->ExtLocHdr? "true":"false"));
-    Tracecr(("  incnt = %d  unzip offset into zipfile = %ld\n", incnt,
+    Trace((stdout, "  incnt = %d  unzip offset into zipfile = %ld\n", incnt,
       cur_zipfile_bufstart+(inptr-inbuf)));
-    Tracecr(("  (c | (b<<8)) = %04x  (crc >> 16) = %04x  lrec.time = %04x\n",
+    Trace((stdout,
+      "  (c | (b<<8)) = %04x  (crc >> 16) = %04x  lrec.time = %04x\n",
       (ush)(c | (b<<8)), (ush)(lrec.crc32 >> 16), lrec.last_mod_file_time));
 
     /* same test as in zipbare(): */
@@ -644,7 +803,7 @@ local int testp(h)
         return -1;  /* bad */
 #endif
     /* password OK:  decrypt current buffer contents before leaving */
-    for (n = (longint)incnt > csize ? (int)csize : incnt, p = inptr; n--; p++)
+    for (n = (long)incnt > csize ? (int)csize : incnt, p = inptr; n--; p++)
         zdecode(*p);
     return 0;       /* OK */
 
