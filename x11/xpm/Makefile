@@ -2,7 +2,7 @@
 # $XConsortium: imake.c,v 1.65 91/07/25 17:50:17 rws Exp $
 
 # -------------------------------------------------------------------------
-# Makefile generated from "Imake.tmpl" and </tmp/IIf.008755>
+# Makefile generated from "Imake.tmpl" and </tmp/IIf.008655>
 # $XFree86: mit/config/Imake.tmpl,v 2.6 1993/10/02 07:11:59 dawes Exp $
 # $XConsortium: Imake.tmpl,v 1.139 91/09/16 08:52:48 rws Exp $
 #
@@ -316,6 +316,11 @@ depend::
 	(cd $$i ; echo "depending" "in $(CURRENT_DIR)/$$i..."; \
 	$(MAKE) $(MFLAGS)  depend); \
 	done
+
+pkg: pkg_bin
+
+pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST all install install.man
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST xpm_bin
 
 # -------------------------------------------------------------------------
 # common rules for all Makefiles - do not edit
