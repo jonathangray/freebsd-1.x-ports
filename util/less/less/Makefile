@@ -1,6 +1,6 @@
 PROG=	less
 LDADD+= -ltermcap
-HELPFILE =		/usr/share/misc/less.hlp
+HELPFILE =		${LIBDIR}/less.hlp
 MAN1=	less.1
 
 CFLAGS+= -DHELPFILE=\"${HELPFILE}\" -DSHELL_CMD -DTAGS
@@ -16,6 +16,6 @@ SRCS=	ch.c cmdbuf.c command.c decode.c help.c input.c \
 
 beforeinstall:
 	install -c -o ${BINOWN} -g ${BINGRP} -m 444 ${.CURDIR}/less.hlp \
-	    ${DESTDIR}/usr/share/misc
+	    ${HELPFILE}
 
 .include <bsd.prog.mk>
