@@ -82,7 +82,7 @@ prefix = /usr/gnu
 exec_prefix = $(prefix)
 
 # Name under which to install GNU make.
-instname = make
+instname = gmake
 # Directory to install `make' in.
 bindir = $(exec_prefix)/bin
 # Directory to find libraries in for `-lXXX'.
@@ -263,6 +263,15 @@ configure: configure.in
 	autoconf $(ACFLAGS)
 config.h.in: configure.in
 	autoheader $(ACFLAGS)
+
+
+pkg:	pkg_bin pkg_src
+
+pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
+	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S gmake_src
+
+pkg_bin: install pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B
+	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B gmake_bin
 
 # This tells versions [3.59,3.63) of GNU make not to export all variables.
 .NOEXPORT:
