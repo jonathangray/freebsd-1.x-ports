@@ -1,6 +1,6 @@
-/* : sysdefs.SH,v 1.1.1.1 1993/08/14 22:36:20 smace Exp $ */
+/* : sysdefs.SH,v 5.4 1992/12/24 19:24:10 syd Exp $ */
 /*******************************************************************************
- *  The Elm Mail System  -  : 1.1.1.1 $   : Exp $
+ *  The Elm Mail System  -  : 5.4 $   : Exp $
  *
  * 			Copyright (c) 1988-1992 USENET Community Trust
  * 			Copyright (c) 1986,1987 Dave Taylor
@@ -12,13 +12,9 @@
  *
  *******************************************************************************
  * $Log: sysdefs.h,v $
- * Revision 1.2  1993/08/24 23:06:14  smace
- * Mime support not compiled in under default installation: elm get funky
- * when you say metamail exist but it does not...
+ * Revision 1.3  1993/08/27 00:54:38  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
  *
-# Revision 1.1.1.1  1993/08/14  22:36:20  smace
-# elm: 	elm-2.4pl23beta -- mail reader
-#
  * Revision 5.4  1992/12/24  19:24:10  syd
  * EDITOROPTS and DEFEDITOR appear to be unused but here is
  * a patch to make use of .

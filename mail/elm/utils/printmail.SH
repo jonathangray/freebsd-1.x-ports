@@ -17,7 +17,7 @@ echo "Extracting utils/printmail (with variable substitutions)"
 echo $startsh > printmail
 cat >>printmail <<'!NO!SUBS!'
 # printmail: part of the Elm mail system
-# @(#)$Id: printmail.SH,v 1.1 1993/08/14 22:36:34 smace Exp $
+# @(#)$Id: printmail.SH,v 1.2 1993/08/27 00:57:32 smace Exp $
 #		Copyright (c) 1988-1992 USENET Community Trust
 # 		Copyright (c) 1986,1987 Dave Taylor
  

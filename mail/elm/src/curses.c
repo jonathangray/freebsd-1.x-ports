@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: curses.c,v 1.1 1993/08/14 22:36:27 smace Exp $";
+static char rcsid[] = "@(#)$Id: curses.c,v 1.2 1993/08/27 00:56:12 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  * 			Copyright (c) 1988-1992 USENET Community Trust
  * 			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,14 @@ static char rcsid[] = "@(#)$Id: curses.c,v 1.1 1993/08/14 22:36:27 smace Exp $";
  *
  *******************************************************************************
  * $Log: curses.c,v $
- * Revision 1.1  1993/08/14 22:36:27  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:56:12  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ *
+ * Revision 5.13  1993/08/23  02:56:35  syd
+ * have Writechar() backspace over the left edge of the screen to the end
+ * of the previous line if the current line is not the first line on the
+ * screen.
+ * From: Jukka Ukkonen <ukkonen@csc.fi>
  *
  * Revision 5.12  1993/08/03  19:28:39  syd
  * Elm tries to replace the system toupper() and tolower() on current
@@ -720,10 +726,16 @@ register int ch;
 
 	/* if backspace, move back  one space  if not already in column 0 */
 	else if (ch == BACKSPACE) {
-	  if(_col != 0) {
-	    tputs(_left, 1, outchar);
-	    _col--;
-	  } /* else BACKSPACE does nothing */
+	    if (_col != 0) {
+		tputs(_left, 1, outchar);
+		_col--;
+	    }
+	    else if (_line > 0) {
+		_col = COLUMNS - 1;
+		_line--;
+		moveabsolute (_col, _line);
+	    }
+	    /* else BACKSPACE does nothing */
 	}
 
 	/* if bell, ring the bell but don't advance the column */

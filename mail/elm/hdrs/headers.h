@@ -1,8 +1,8 @@
 
-/* $Id: headers.h,v 1.1 1993/08/14 22:36:17 smace Exp $ */
+/* $Id: headers.h,v 1.2 1993/08/27 00:54:28 smace Exp $ */
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  * 			Copyright (c) 1988-1992 USENET Community Trust
  * 			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,8 @@
  *
  *******************************************************************************
  * $Log: headers.h,v $
- * Revision 1.1  1993/08/14 22:36:17  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:54:28  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
  *
  * Revision 5.11  1993/08/10  20:49:40  syd
  * Add raw_temp_dir

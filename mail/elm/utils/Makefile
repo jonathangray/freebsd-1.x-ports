@@ -1,5 +1,5 @@
 
-# @(#): Makefile.SH,v 1.1.1.1 1993/08/14 22:36:34 smace Exp $
+# @(#): Makefile.SH,v 5.5 1993/05/31 19:17:28 syd Exp $
 #
 #  Makefile for the Elm system utilities
 #
@@ -12,12 +12,8 @@
 #			dsinc!elm
 #
 # $Log: Makefile,v $
-# Revision 1.2  1993/08/24 23:06:29  smace
-# Mime support not compiled in under default installation: elm get funky
-# when you say metamail exist but it does not...
-#
-# Revision 1.1.1.1  1993/08/14  22:36:34  smace
-# elm: 	elm-2.4pl23beta -- mail reader
+# Revision 1.3  1993/08/27 00:57:12  smace
+# Upgrade elm2.4 pl23beta elm2.4 pl23beta2
 #
 # Revision 5.5  1993/05/31  19:17:28  syd
 # In the Makefile listalias was given only a+x permission

@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: a_quit.c,v 1.1 1993/08/14 22:36:26 smace Exp $";
+static char rcsid[] = "@(#)$Id: a_quit.c,v 1.2 1993/08/27 00:55:58 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  * 			Copyright (c) 1988-1992 USENET Community Trust
  * 			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,8 @@ static char rcsid[] = "@(#)$Id: a_quit.c,v 1.1 1993/08/14 22:36:26 smace Exp $";
  *
  *******************************************************************************
  * $Log: a_quit.c,v $
- * Revision 1.1  1993/08/14 22:36:26  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:55:58  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
  *
  * Revision 5.4  1993/04/12  02:34:36  syd
  * I have now added a parameter which controls whether want_to clears the

@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: can_open.c,v 1.1 1993/08/14 22:36:20 smace Exp $";
+static char rcsid[] = "@(#)$Id: can_open.c,v 1.2 1993/08/27 00:54:52 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,12 @@ static char rcsid[] = "@(#)$Id: can_open.c,v 1.1 1993/08/14 22:36:20 smace Exp $
  *
  *******************************************************************************
  * $Log: can_open.c,v $
- * Revision 1.1  1993/08/14 22:36:20  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:54:52  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ *
+ * Revision 5.4  1993/08/23  02:46:07  syd
+ * Don't declare _exit() if <unistd.h> already did it.
+ * From: decwrl!uunet.UU.NET!fin!chip (Chip Salzenberg)
  *
  * Revision 5.3  1993/08/03  19:28:39  syd
  * Elm tries to replace the system toupper() and tolower() on current
@@ -51,6 +55,10 @@ static char rcsid[] = "@(#)$Id: can_open.c,v 1.1 1993/08/14 22:36:20 smace Exp $
 # include <sys/wait.h>
 #endif
 
+#ifndef I_UNISTD
+void _exit();
+#endif
+
 extern int errno;		/* system error number */
 
 int
@@ -63,7 +71,6 @@ char *file, *mode;
 
 	FILE *fd;
 	int the_stat = 0, pid, w, preexisted = 0; 
-	void _exit();
 #if defined(BSD) && !defined(WEXITSTATUS)
 	union wait status;
 #else

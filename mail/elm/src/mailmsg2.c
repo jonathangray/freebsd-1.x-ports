@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: mailmsg2.c,v 1.1 1993/08/14 22:36:29 smace Exp $";
+static char rcsid[] = "@(#)$Id: mailmsg2.c,v 1.2 1993/08/27 00:56:36 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  * 			Copyright (c) 1988-1992 USENET Community Trust
  * 			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,13 @@ static char rcsid[] = "@(#)$Id: mailmsg2.c,v 1.1 1993/08/14 22:36:29 smace Exp $
  *
  *******************************************************************************
  * $Log: mailmsg2.c,v $
- * Revision 1.1  1993/08/14 22:36:29  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:56:36  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ *
+ * Revision 5.34  1993/08/23  03:26:24  syd
+ * Try setting group id separate from user id in chown to
+ * allow restricted systems to change group id of file
+ * From: Syd
  *
  * Revision 5.33  1993/08/10  18:53:31  syd
  * I compiled elm 2.4.22 with Purify 2 and fixed some memory leaks and
@@ -349,7 +354,8 @@ int  copy_msg, edit_message, form;
 	    return(need_redraw);
 	  }
 
-	chown (filename, userid, groupid);
+	chown (filename, -1, groupid);
+	chown (filename, userid, -1);
 
 	/* copy the message from standard input */
 	if (batch_only) {

@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: syscall.c,v 1.1 1993/08/14 22:36:32 smace Exp $";
+static char rcsid[] = "@(#)$Id: syscall.c,v 1.2 1993/08/27 00:57:02 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,13 +14,12 @@ static char rcsid[] = "@(#)$Id: syscall.c,v 1.1 1993/08/14 22:36:32 smace Exp $"
  *
  *******************************************************************************
  * $Log: syscall.c,v $
- * Revision 1.1  1993/08/14 22:36:32  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:57:02  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
  *
- * Revision 5.7  1993/01/20  03:48:08  syd
- * Fix not to use vfork if SY_ENV_SHELL is set, as this causes the
- * parent environment to be modified.
- * From: Syd
+ * Revision 5.8  1993/08/23  02:46:07  syd
+ * Don't declare _exit() if <unistd.h> already did it.
+ * From: decwrl!uunet.UU.NET!fin!chip (Chip Salzenberg)
  *
  * Revision 5.7  1993/01/20  03:48:08  syd
  * Fix not to use vfork if SY_ENV_SHELL is set, as this causes the
@@ -72,8 +71,11 @@ static char rcsid[] = "@(#)$Id: syscall.c,v 1.1 1993/08/14 22:36:32 smace Exp $"
 #  include <sys/wait.h>
 #endif
 
+#ifndef I_UNISTD
+void _exit();
+#endif
+
 char *argv_zero();	
-void  _exit();
 
 #ifdef ALLOW_SUBSHELL
 

@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: newmbox.c,v 1.1 1993/08/14 22:36:30 smace Exp $";
+static char rcsid[] = "@(#)$Id: newmbox.c,v 1.2 1993/08/27 00:56:40 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,17 @@ static char rcsid[] = "@(#)$Id: newmbox.c,v 1.1 1993/08/14 22:36:30 smace Exp $"
  *
  *******************************************************************************
  * $Log: newmbox.c,v $
- * Revision 1.1  1993/08/14 22:36:30  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:56:40  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ *
+ * Revision 5.30  1993/08/23  03:26:24  syd
+ * Try setting group id separate from user id in chown to
+ * allow restricted systems to change group id of file
+ * From: Syd
+ *
+ * Revision 5.29  1993/08/23  02:46:51  syd
+ * Test ANSI_C, not __STDC__ (which is not set on e.g. AIX).
+ * From: decwrl!uunet.UU.NET!fin!chip (Chip Salzenberg)
  *
  * Revision 5.28  1993/08/03  19:28:39  syd
  * Elm tries to replace the system toupper() and tolower() on current
@@ -180,7 +189,7 @@ extern int errno;
 
 char *error_description();
 long bytes();
-#ifndef __STDC__ /* avoid problemswith systems that declare atol as a macro */
+#ifndef ANSI_C /* avoid problems with systems that declare atol as a macro */
 extern void rewind();
 extern long atol();
 #endif
@@ -420,7 +429,8 @@ int add_new_only;
 	     rm_temps_exit();
 	    }
 	   copyit++;
-	   chown(cur_tempfolder, userid, groupid);
+	   chown(cur_tempfolder, -1, groupid);
+	   chown(cur_tempfolder, userid, -1);
 	   chmod(cur_tempfolder, 0700);	/* shut off file for other people! */
 	 }
 	 else {

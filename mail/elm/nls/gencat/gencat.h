@@ -79,47 +79,25 @@ up-to-date.  Many thanks.
 
 #define MAXTOKEN	1024
 
-extern void MCAddSet(
-#if defined(__STDC__) || defined(__cplusplus)
-		int setId, char *c
+#if !defined(ANSI_C) && (defined(__STDC__) || defined(_AIX))
+# define ANSI_C 1
 #endif
-		);
-extern void MCDelSet(
-#if defined(__STDC__) || defined(__cplusplus)
-		int setId
+
+#if ANSI_C || defined(__cplusplus)
+# define P_(x) x
+#else
+# define P_(x) /**/
 #endif
-		);
-extern void MCAddMsg(
-#if defined(__STDC__) || defined(__cplusplus)
-		int msgId, char *msg, char *c
-#endif
-		);
-extern void MCDelMsg(
-#if defined(__STDC__) || defined(__cplusplus)
-		int msgId
-#endif
-		);
-extern void MCParse(
-#if defined(__STDC__) || defined(__cplusplus)
-		int fd
-#endif
-		);
-extern void MCReadCat(
-#if defined(__STDC__) || defined(__cplusplus)
-		int fd
-#endif
-		);
-extern void MCWriteConst(
-#if defined(__STDC__) || defined(__cplusplus)
-		int fd, int type, int orConsts
-#endif
-		);
-extern void MCWriteCat(
-#if defined(__STDC__) || defined(__cplusplus)
-		int fd
-#endif
-		);
-extern long MCGetByteOrder();
+
+extern void MCAddSet P_((int setId, char *c));
+extern void MCDelSet P_((int setId));
+extern void MCAddMsg P_((int msgId, char *msg, char *c));
+extern void MCDelMsg P_((int msgId));
+extern void MCParse P_((int fd));
+extern void MCReadCat P_((int fd));
+extern void MCWriteConst P_((int fd, int type, int orConsts));
+extern void MCWriteCat P_((int fd));
+extern long MCGetByteOrder P_((void));
 
 #ifndef True
 # define True 	~0

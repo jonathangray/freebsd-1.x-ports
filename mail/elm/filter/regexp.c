@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: regexp.c,v 1.1 1993/08/14 22:36:16 smace Exp $";
+static char rcsid[] = "@(#)$Id: regexp.c,v 1.2 1993/08/27 00:54:14 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  * 			Copyright (c) 1992 USENET Community Trust
  *******************************************************************************
@@ -13,8 +13,8 @@ static char rcsid[] = "@(#)$Id: regexp.c,v 1.1 1993/08/14 22:36:16 smace Exp $";
  *
  *******************************************************************************
  * $Log: regexp.c,v $
- * Revision 1.1  1993/08/14 22:36:16  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:54:14  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
  *
  * Revision 5.7  1993/06/10  03:12:10  syd
  * Add missing rcs id lines

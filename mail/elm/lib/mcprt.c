@@ -1,5 +1,5 @@
 
-static char rcsid[] = "@(#)$Id: mcprt.c,v 1.1 1993/08/14 22:36:21 smace Exp $";
+static char rcsid[] = "@(#)$Id: mcprt.c,v 1.2 1993/08/27 00:55:13 smace Exp $";
 
 /***********************************************************
 Copyright 1990, by Alfalfa Software Incorporated, Cambridge, Massachusetts.
@@ -37,7 +37,7 @@ up-to-date.  Many thanks.
 
 01/18/91   3 hamilton	#if not rescanned
 01/12/91   1 schulert	conditionally use prototypes
-			rework to use either varargs or stdargs
+			rework to use either varargs or stdarg
 11/03/90   2 hamilton	Alphalpha->Alfalfa & OmegaMail->Poste
 08/10/90   1 nazgul	printf, sprintf and fprintf
 */
@@ -49,7 +49,7 @@ up-to-date.  Many thanks.
 #include "mcprt.h"
 #include "mcprtlib.h"
 
-#ifdef	__STDC__
+#ifdef	I_STDARG
 int	MCprintf(char *fmt, ...)
 #else
 int	MCprintf(fmt, va_alist)
@@ -71,7 +71,7 @@ va_dcl
     return len;
 }
 
-#ifdef	__STDC__
+#ifdef	I_STDARG
 int	MCfprintf(FILE *fptr, char *fmt, ...)
 #else
 int	MCfprintf(fptr, fmt, va_alist)
@@ -94,7 +94,7 @@ va_dcl
     return len;
 }
 
-#ifdef	__STDC__
+#ifdef	I_STDARG
 int	MCsprintf(char *cptr, char *fmt, ...)
 #else
 int	MCsprintf(cptr, fmt, va_alist)

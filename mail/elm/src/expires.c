@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: expires.c,v 1.1 1993/08/14 22:36:27 smace Exp $";
+static char rcsid[] = "@(#)$Id: expires.c,v 1.2 1993/08/27 00:56:20 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,8 @@ static char rcsid[] = "@(#)$Id: expires.c,v 1.1 1993/08/14 22:36:27 smace Exp $"
  *
  *******************************************************************************
  * $Log: expires.c,v $
- * Revision 1.1  1993/08/14 22:36:27  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:56:20  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
  *
  * Revision 5.4  1993/08/10  18:53:31  syd
  * I compiled elm 2.4.22 with Purify 2 and fixed some memory leaks and

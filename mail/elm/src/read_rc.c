@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: read_rc.c,v 1.1 1993/08/14 22:36:30 smace Exp $";
+static char rcsid[] = "@(#)$Id: read_rc.c,v 1.2 1993/08/27 00:56:47 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,13 @@ static char rcsid[] = "@(#)$Id: read_rc.c,v 1.1 1993/08/14 22:36:30 smace Exp $"
  *
  *******************************************************************************
  * $Log: read_rc.c,v $
- * Revision 1.1  1993/08/14 22:36:30  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:56:47  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ *
+ * Revision 5.25  1993/08/23  02:58:04  syd
+ * Call to expand_env for pager should be call to do_expand_env.
+ * temp_dir not initialized.
+ * From: Jan.Djarv@sa.erisoft.se (Jan Djarv)
  *
  * Revision 5.24  1993/08/10  18:49:32  syd
  * When an environment variable was given as the tmpdir definition the src
@@ -329,15 +334,14 @@ read_rc_file()
 	do_expand_env("shell", shell, raw_shell, sizeof(shell));
 
 	strcpy(raw_pager, ((cp = getenv("PAGER")) == NULL)? default_pager : cp);
-	expand_env(pager, raw_pager);
-
-	strcpy(raw_temp_dir, (cp = getenv("TMPDIR")) ? cp : default_temp);
-	if (raw_temp_dir[strlen (temp_dir)-1] != '/')
-	    strcat(raw_temp_dir, "/");
-
-	strcpy(raw_editor, ((cp = getenv("EDITOR")) == NULL)? default_editor:cp);
 	do_expand_env("pager", pager, raw_pager, sizeof(pager));
 
+	strcpy(raw_temp_dir, (cp = getenv("TMPDIR")) ? cp : default_temp);
+	do_expand_env("temp_dir", temp_dir, raw_temp_dir, sizeof(temp_dir));
+	if (temp_dir[strlen (temp_dir)-1] != '/')
+	    strcat(temp_dir, "/");
+
+	strcpy(raw_editor, ((cp = getenv("EDITOR")) == NULL)? default_editor:cp);
 	strcpy(alternative_editor, raw_editor);
 	do_expand_env("editor", editor, raw_editor, sizeof(editor));
 

@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: strfcpy.c,v 1.1 1993/08/14 22:36:22 smace Exp $";
+static char rcsid[] = "@(#)$Id: strfcpy.c,v 1.2 1993/08/27 00:55:31 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  * 			Copyright (c) 1993 USENET Community Trust
  *******************************************************************************
@@ -13,8 +13,8 @@ static char rcsid[] = "@(#)$Id: strfcpy.c,v 1.1 1993/08/14 22:36:22 smace Exp $"
  *
  *******************************************************************************
  * $Log: strfcpy.c,v $
- * Revision 1.1  1993/08/14 22:36:22  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:55:31  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
  *
  * Revision 5.1  1993/01/19  04:46:21  syd
  * Initial Checkin

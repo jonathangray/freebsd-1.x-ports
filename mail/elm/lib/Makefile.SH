@@ -36,7 +36,7 @@ esac
 
 echo "Extracting lib/Makefile (with variable substitutions)"
 cat >Makefile <<!GROK!THIS!
-# $Id: Makefile.SH,v 1.1 1993/08/14 22:36:19 smace Exp $
+# $Id: Makefile.SH,v 1.2 1993/08/27 00:54:46 smace Exp $
 #
 #  Makefile for the ELM mail program.
 #
@@ -49,8 +49,8 @@ cat >Makefile <<!GROK!THIS!
 #			dsinc!elm
 #
 # $Log: Makefile.SH,v $
-# Revision 1.1  1993/08/14 22:36:19  smace
-# Initial revision
+# Revision 1.2  1993/08/27 00:54:46  smace
+# Upgrade elm2.4 pl23beta elm2.4 pl23beta2
 #
 # Revision 5.15  1993/08/03  19:28:39  syd
 # Elm tries to replace the system toupper() and tolower() on current

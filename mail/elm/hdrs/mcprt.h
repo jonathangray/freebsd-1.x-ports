@@ -48,7 +48,7 @@ up-to-date.  Many thanks.
 #include <stdio.h>
 
 #ifdef USENLS
-#  ifdef    __STDC__
+#  ifdef I_STDARG
 extern int     	MCprintf(char *fmt, ...);
 extern int     	MCfprintf(FILE *fptr, char *fmt, ...);
 extern int     	MCsprintf(char *cptr, char *fmt, ...);

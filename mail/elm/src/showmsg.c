@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: showmsg.c,v 1.1 1993/08/14 22:36:31 smace Exp $";
+static char rcsid[] = "@(#)$Id: showmsg.c,v 1.2 1993/08/27 00:56:55 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  * 			Copyright (c) 1988-1992 USENET Community Trust
  * 			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,12 @@ static char rcsid[] = "@(#)$Id: showmsg.c,v 1.1 1993/08/14 22:36:31 smace Exp $"
  *
  *******************************************************************************
  * $Log: showmsg.c,v $
- * Revision 1.1  1993/08/14 22:36:31  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:56:55  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ *
+ * Revision 5.15  1993/08/23  02:46:07  syd
+ * Don't declare _exit() if <unistd.h> already did it.
+ * From: decwrl!uunet.UU.NET!fin!chip (Chip Salzenberg)
  *
  * Revision 5.14  1993/08/03  19:28:39  syd
  * Elm tries to replace the system toupper() and tolower() on current
@@ -106,10 +110,13 @@ static char rcsid[] = "@(#)$Id: showmsg.c,v 1.1 1993/08/14 22:36:31 smace Exp $"
 # include <sys/wait.h>
 #endif
 
+#ifndef I_UNISTD
+void _exit();
+#endif
+
 extern int errno;
 
 extern char *elm_date_str(), *error_description();
-void   _exit();
 
 int    memory_lock = FALSE;	/* is it available?? */
 int    pipe_abort  = FALSE;	/* did we receive a SIGNAL(SIGPIPE)? */

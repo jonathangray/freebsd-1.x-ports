@@ -41,7 +41,7 @@ up-to-date.  Many thanks.
 03/20/91   2 schulert	Ultrix cc has trouble with void*, so change them to int*
 01/18/91   3 hamilton	#if not rescanned
 01/12/91   1 schulert	conditionally use prototypes
-			rework to use either varargs or stdargs
+			rework to use either varargs or stdarg
 11/03/90   2 hamilton	Alphalpha->Alfalfa & OmegaMail->Poste
 08/10/90   1 nazgul	Initial version
 */
@@ -49,8 +49,8 @@ up-to-date.  Many thanks.
 /* taken from Xm/lib/VaSimple.h
    currently no one defines MISSING_STDARG_H */
  
-#ifdef	I_STDARGS
-# include <stdargs.h>
+#ifdef	I_STDARG
+# include <stdarg.h>
 # define Va_start(a,b) va_start(a,b)
 #else
 # include <varargs.h>

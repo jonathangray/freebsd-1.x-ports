@@ -65,18 +65,23 @@ up-to-date.  Many thanks.
  * will be in C syntax, in bar.H in C++ syntax.
  */
 
-static void writeIfChanged(
-#if defined(__STDC__) || defined(__cplusplus)
-		char *fname, int lang, int orConsts
+#if ANSI_C || defined(__cplusplus)
+# define P_(x) x
+#else
+# define P_(x) /**/
 #endif
-);
+
+static void writeIfChanged P_((char *fname, int lang, int orConsts));
+
+#undef P_
 
 void usage() {
-    fprintf(stderr, "Use: gencat [-new] [-or] [-lang C|C++|ANSIC] catfile msgfile [-h <header-file>]...\n");
+    fprintf(stderr, "Use: gencat [-new] [-or] [-lang C|C++|ANSIC]\n");
+    fprintf(stderr, "            catfile msgfile [-h <header-file>]...\n");
 }
 
 void main(
-#if defined(__STDC__) || defined(__cplusplus)
+#if ANSI_C || defined(__cplusplus)
 		int argc, char *argv[])
 #else
 		argc, argv)
@@ -164,7 +169,7 @@ char *argv[];
 }
 
 static void writeIfChanged(
-#if defined(__STDC__) || defined(__cplusplus)
+#if ANSI_C || defined(__cplusplus)
 		char *fname, int lang, int orConsts)
 #else
 		fname, lang, orConsts)

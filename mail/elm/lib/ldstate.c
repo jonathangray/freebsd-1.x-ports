@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: ldstate.c,v 1.1 1993/08/14 22:36:21 smace Exp $";
+static char rcsid[] = "@(#)$Id: ldstate.c,v 1.2 1993/08/27 00:55:09 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  *			Copyright (c) 1992 USENET Community Trust
  *******************************************************************************
@@ -13,8 +13,12 @@ static char rcsid[] = "@(#)$Id: ldstate.c,v 1.1 1993/08/14 22:36:21 smace Exp $"
  *
  *******************************************************************************
  * $Log: ldstate.c,v $
- * Revision 1.1  1993/08/14 22:36:21  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:55:09  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ *
+ * Revision 5.6  1993/08/23  02:46:51  syd
+ * Test ANSI_C, not __STDC__ (which is not set on e.g. AIX).
+ * From: decwrl!uunet.UU.NET!fin!chip (Chip Salzenberg)
  *
  * Revision 5.5  1993/02/03  15:26:13  syd
  * protect atol in ifndef __STDC__ as some make it a macro, and its in stdlib.h
@@ -60,8 +64,8 @@ static char rcsid[] = "@(#)$Id: ldstate.c,v 1.1 1993/08/14 22:36:21 smace Exp $"
  * the (struct folder_state) record.
  */
 
-#ifndef __STDC__ /* avoid problemswith systems that declare atol as a macro */
-    extern long atol();
+#if !ANSI_C  /* avoid problems with systems that declare atol as a macro */
+extern long atol();
 #endif
 
 static char *elm_fgetline(buf, buflen, fp)

@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: remail.c,v 1.1 1993/08/14 22:36:30 smace Exp $";
+static char rcsid[] = "@(#)$Id: remail.c,v 1.2 1993/08/27 00:56:48 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,13 @@ static char rcsid[] = "@(#)$Id: remail.c,v 1.1 1993/08/14 22:36:30 smace Exp $";
  *
  *******************************************************************************
  * $Log: remail.c,v $
- * Revision 1.1  1993/08/14 22:36:30  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:56:48  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ *
+ * Revision 5.12  1993/08/23  03:26:24  syd
+ * Try setting group id separate from user id in chown to
+ * allow restricted systems to change group id of file
+ * From: Syd
  *
  * Revision 5.11  1993/08/10  18:53:31  syd
  * I compiled elm 2.4.22 with Purify 2 and fixed some memory leaks and
@@ -142,7 +147,8 @@ remail()
 	/** now let's copy the message into the newly opened
 	    buffer... **/
 
-	chown (filename, userid, groupid);
+	chown (filename, -1, groupid);
+	chown (filename, userid, -1);
 
 #ifdef MMDF
 	if (strcmp(submitmail, mailer) == 0)

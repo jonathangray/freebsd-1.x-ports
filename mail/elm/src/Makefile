@@ -1,4 +1,4 @@
-# : Makefile.SH,v 1.1.1.1 1993/08/14 22:36:26 smace Exp $
+# : Makefile.SH,v 5.1 1992/10/03 22:58:40 syd Exp $
 #
 #  Makefile for the ELM mail program.
 #
@@ -11,12 +11,8 @@
 #			dsinc!elm
 #
 # $Log: Makefile,v $
-# Revision 1.2  1993/08/24 23:06:25  smace
-# Mime support not compiled in under default installation: elm get funky
-# when you say metamail exist but it does not...
-#
-# Revision 1.1.1.1  1993/08/14  22:36:26  smace
-# elm: 	elm-2.4pl23beta -- mail reader
+# Revision 1.3  1993/08/27 00:55:55  smace
+# Upgrade elm2.4 pl23beta elm2.4 pl23beta2
 #
 # Revision 5.1  1992/10/03  22:58:40  syd
 # Initial checkin as of 2.4 Release at PL0

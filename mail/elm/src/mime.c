@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: mime.c,v 1.1 1993/08/14 22:36:29 smace Exp $";
+static char rcsid[] = "@(#)$Id: mime.c,v 1.2 1993/08/27 00:56:38 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,12 @@ static char rcsid[] = "@(#)$Id: mime.c,v 1.1 1993/08/14 22:36:29 smace Exp $";
  *
  ******************************************************************************
  * $Log: mime.c,v $
- * Revision 1.1  1993/08/14 22:36:29  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:56:38  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ *
+ * Revision 5.15  1993/08/23  02:55:05  syd
+ * Add missing parens
+ * From: dwolfe@pffft.sps.mot.com (Dave Wolfe)
  *
  * Revision 5.14  1993/08/10  18:53:31  syd
  * I compiled elm 2.4.22 with Purify 2 and fixed some memory leaks and
@@ -320,7 +324,7 @@ char *s;
 	if (!s) return(1);
 	while (*s && isspace(*s)) ++s;
 	t = buf;
-	while (*s && !isspace(*s) && ((t-buf) < SLEN - 1)) *t++ = *s++;
+	while (*s && !isspace(*s) && ((t-buf) < (SLEN-1))) *t++ = *s++;
 	*t = '\0';
 	EncType = check_encoding(buf);
 	if ((EncType == ENCODING_NONE) ||

@@ -1,5 +1,5 @@
 
-static char rcsid[] = "@(#)$Id: mcprtlib.c,v 1.1 1993/08/14 22:36:21 smace Exp $";
+static char rcsid[] = "@(#)$Id: mcprtlib.c,v 1.2 1993/08/27 00:55:14 smace Exp $";
 
 /***********************************************************
 Copyright 1990, by Alfalfa Software Incorporated, Cambridge, Massachusetts.
@@ -293,6 +293,10 @@ char *fmt;
      * Set the correct types and figure out how many data segments we are going
      * to have.
      */
+    /* Initialize typeList */
+    for (i = 0; i < typeCnt; i++)
+      typeList[i].type = 0;
+
     for (replyCnt = i = 0; i < argCnt; ++i) {
 	if (argList[i].type) {
 	    pos = argList[i].pos-1;

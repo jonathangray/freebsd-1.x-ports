@@ -513,11 +513,11 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#undef!'
  */
 #$i_memory	I_MEMORY	/**/
 
-/* I_STDARGS:
- *	This symbol, if defined, indicates that the file stdargs.h
+/* I_STDARG:
+ *	This symbol, if defined, indicates that the file stdarg.h
  *	should be included instead of varargs
  */
-#$i_stdargs	I_STDARGS	/**/
+#$i_stdarg	I_STDARG	/**/
 
 /* I_STDLIB:
  *	This symbol, if defined, indicates that the file stdlib.h

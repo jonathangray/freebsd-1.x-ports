@@ -91,7 +91,7 @@
 /* CONFIGURE_DATE
  *	This symbol contains the last date that configure was run for elm -v output.
  */
-#define		CONFIGURE_DATE	"Tue Aug 24 16:02:23 PDT 1993"
+#define		CONFIGURE_DATE	"Thu Aug 26 17:42:15 PDT 1993"
 
 /* ASCII_CTYPE:
  *	This symbol, if defined, indicates that the ctype functions and
@@ -110,7 +110,7 @@
  *	should be supported.
  */
 #define	ENABLE_CALENDAR	/**/
-#define dflt_calendar_file	"calendar"	
+#define dflt_calendar_file	".calendar"	
 
 /* DONT_ESCAPE_MESSAGES:
  *	This symbol, if defined, indicates that a binary capable MTA is in use
@@ -499,11 +499,11 @@
  */
 #define	I_MEMORY	/**/
 
-/* I_STDARGS:
- *	This symbol, if defined, indicates that the file stdargs.h
+/* I_STDARG:
+ *	This symbol, if defined, indicates that the file stdarg.h
  *	should be included instead of varargs
  */
-/*#undef	I_STDARGS	/**/
+#define	I_STDARG	/**/
 
 /* I_STDLIB:
  *	This symbol, if defined, indicates that the file stdlib.h

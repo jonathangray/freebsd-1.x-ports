@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: leavembox.c,v 1.1 1993/08/14 22:36:29 smace Exp $";
+static char rcsid[] = "@(#)$Id: leavembox.c,v 1.2 1993/08/27 00:56:31 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,13 @@ static char rcsid[] = "@(#)$Id: leavembox.c,v 1.1 1993/08/14 22:36:29 smace Exp 
  *
  *******************************************************************************
  * $Log: leavembox.c,v $
- * Revision 1.1  1993/08/14 22:36:29  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:56:31  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ *
+ * Revision 5.19  1993/08/23  03:26:24  syd
+ * Try setting group id separate from user id in chown to
+ * allow restricted systems to change group id of file
+ * From: Syd
  *
  * Revision 5.18  1993/08/03  19:59:49  syd
  * Check for chown restricted and if so, do copyover and
@@ -550,7 +555,8 @@ int resyncing, quitting, prompt;
 	  }
 	  fclose(temp);
 	  dprint(2, (debugfile, "\n\n"));
-	  chown(recvd_mail, userid, groupid);
+	  chown(recvd_mail, -1, groupid);
+	  chown(recvd_mail, userid, -1);
 	}
 
 	/* If there are any messages to keep, first copy them to a

@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: posixsig.c,v 1.1 1993/08/14 22:36:21 smace Exp $";
+static char rcsid[] = "@(#)$Id: posixsig.c,v 1.2 1993/08/27 00:55:23 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,12 @@ static char rcsid[] = "@(#)$Id: posixsig.c,v 1.1 1993/08/14 22:36:21 smace Exp $
  *
  *******************************************************************************
  * $Log: posixsig.c,v $
- * Revision 1.1  1993/08/14 22:36:21  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:55:23  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ *
+ * Revision 5.8  1993/08/23  02:46:51  syd
+ * Test ANSI_C, not __STDC__ (which is not set on e.g. AIX).
+ * From: decwrl!uunet.UU.NET!fin!chip (Chip Salzenberg)
  *
  * Revision 5.7  1993/08/03  20:14:49  syd
  * Fix where some systems name SIG_ERR BADSIG
@@ -71,7 +75,7 @@ static char rcsid[] = "@(#)$Id: posixsig.c,v 1.1 1993/08/14 22:36:21 smace Exp $
  * This routine used to duplicate the old signal() calls
  */
 SIGHAND_TYPE
-#if (defined(__STDC__) && !defined(apollo))
+#if ANSI_C && !defined(apollo)
 (*posix_signal(signo, fun))(int)
 	int signo;
 	SIGHAND_TYPE (*fun)(int);

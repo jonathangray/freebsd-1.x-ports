@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: utils.c,v 1.1 1993/08/14 22:36:32 smace Exp $";
+static char rcsid[] = "@(#)$Id: utils.c,v 1.2 1993/08/27 00:57:04 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,13 @@ static char rcsid[] = "@(#)$Id: utils.c,v 1.1 1993/08/14 22:36:32 smace Exp $";
  *
  *******************************************************************************
  * $Log: utils.c,v $
- * Revision 1.1  1993/08/14 22:36:32  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:57:04  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ *
+ * Revision 5.12  1993/08/23  03:26:24  syd
+ * Try setting group id separate from user id in chown to
+ * allow restricted systems to change group id of file
+ * From: Syd
  *
  * Revision 5.11  1993/08/03  19:28:39  syd
  * Elm tries to replace the system toupper() and tolower() on current
@@ -105,7 +110,8 @@ create_new_folders()
 	(void) system_call(com, 0);
 #endif /* MKDIR */
 
-	chown(folders, userid, groupid);
+	chown(folders, -1, groupid);
+	chown(folders, userid, -1);
 }
 
 create_new_elmdir()
@@ -128,7 +134,8 @@ create_new_elmdir()
 	(void) system_call(com, 0);
 #endif /* MKDIR */
 
-	chown( source, userid, groupid);
+	chown( source, -1, groupid);
+	chown( source, userid, -1);
 }
 
 move_old_files_to_new()

@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: strftime.c,v 1.1 1993/08/14 22:36:22 smace Exp $";
+static char rcsid[] = "@(#)$Id: strftime.c,v 1.2 1993/08/27 00:55:32 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  * Public-domain relatively quick-and-dirty implemenation of
  * ANSI library routine for System V Unix systems.
@@ -19,8 +19,12 @@ static char rcsid[] = "@(#)$Id: strftime.c,v 1.1 1993/08/14 22:36:22 smace Exp $
  *
  *******************************************************************************
  * $Log: strftime.c,v $
- * Revision 1.1  1993/08/14 22:36:22  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:55:32  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ *
+ * Revision 5.8  1993/08/23  02:46:51  syd
+ * Test ANSI_C, not __STDC__ (which is not set on e.g. AIX).
+ * From: decwrl!uunet.UU.NET!fin!chip (Chip Salzenberg)
  *
  * Revision 5.7  1993/08/03  19:28:39  syd
  * Elm tries to replace the system toupper() and tolower() on current
@@ -107,21 +111,19 @@ static char rcsid[] = "@(#)$Id: strftime.c,v 1.1 1993/08/14 22:36:22 smace Exp $
 #  include <sys/time.h>
 #endif
 
-#ifndef __STDC__
-#define const	/**/
-
-#ifndef BSD
-extern void tzset();
-#endif
-static int weeknumber();
-#else /* __STDC__ */
-#ifndef BSD
-extern void tzset(void);
-#endif
-static int weeknumber(const struct tm *timeptr, int firstweekday);
+#if ANSI_C
+# define P_(x) x
+#else
+# define P_(x) /**/
+# define const	/**/
 #endif
 
 extern char *get_tz_name();
+
+#ifndef BSD
+extern void tzset P_((void));
+#endif
+static int weeknumber P_((const struct tm *timeptr, int firstweekday));
 
 /* defaults: season to taste */
 #define SYSV_EXT	1	/* stuff in System V ascftime routine */
@@ -159,7 +161,7 @@ adddecl(static int iso8601wknum();)
 
 /* minimum --- return minimum of two numbers */
 
-#ifndef __STDC__
+#if !ANSI_C
 static inline int
 minimum(a, b)
 int a, b;
@@ -173,7 +175,7 @@ minimum(int a, int b)
 
 /* maximum --- return maximum of two numbers */
 
-#ifndef __STDC__
+#if !ANSI_C
 static inline int
 maximum(a, b)
 int a, b;
@@ -187,7 +189,7 @@ maximum(int a, int b)
 
 /* strftime --- produce formatted time */
 
-#ifndef __STDC__
+#if !ANSI_C
 size_t
 strftime(s, maxsize, format, timeptr)
 char *s;
@@ -536,7 +538,7 @@ out:
 #ifdef POSIX2_DATE
 /* iso8601wknum --- compute week number according to ISO 8601 */
 
-#ifndef __STDC__
+#if !ANSI_C
 static int
 iso8601wknum(timeptr)
 const struct tm *timeptr;
@@ -598,7 +600,7 @@ iso8601wknum(const struct tm *timeptr)
 
 /* With thanks and tip of the hatlo to ado@elsie.nci.nih.gov */
 
-#ifndef __STDC__
+#if !ANSI_C
 static int
 weeknumber(timeptr, firstweekday)
 const struct tm *timeptr;

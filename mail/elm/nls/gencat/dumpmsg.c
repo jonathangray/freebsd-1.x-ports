@@ -57,7 +57,7 @@ void usage() {
 }
 
 void main(
-#if defined(__STDC__) || defined(__cplusplus)
+#if ANSI_C || defined(__cplusplus)
 		int argc, char *argv[])
 #else
 		argc, argv)

@@ -1,8 +1,8 @@
 
-/* $Id: defs.h,v 1.1 1993/08/14 22:36:17 smace Exp $ */
+/* $Id: defs.h,v 1.2 1993/08/27 00:54:24 smace Exp $ */
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  * 			Copyright (c) 1988-1992 USENET Community Trust
  * 			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,19 @@
  *
  *******************************************************************************
  * $Log: defs.h,v $
- * Revision 1.1  1993/08/14 22:36:17  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:54:24  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ *
+ * Revision 5.32  1993/08/23  02:46:51  syd
+ * Test ANSI_C, not __STDC__ (which is not set on e.g. AIX).
+ * From: decwrl!uunet.UU.NET!fin!chip (Chip Salzenberg)
+ *
+ * Revision 5.31  1993/08/23  02:45:29  syd
+ * The macro ctrl(c) did not work correctly for a DEL character
+ * neither did it make the backward mapping from a control char
+ * to the letter that is normally used with an up-arrow prefix
+ * to represent the control character.
+ * From: Jukka Ukkonen <ukkonen@csc.fi>
  *
  * Revision 5.30  1993/08/03  19:28:39  syd
  * Elm tries to replace the system toupper() and tolower() on current
@@ -340,8 +351,16 @@
 #define DECEMBER	11
 
 #define equal(s,w)	(strcmp(s,w) == 0)
-#define min(a,b)	a < b? a : b
-#define ctrl(c)	        c - 'A' + 1	/* control character mapping */
+#define min(a,b)	(a) < (b) ? (a) : (b)
+/*
+ *  Control character mapping like "c - 'A' + 1" does not work
+ *  correctly for a DEL. Neither does it allow mapping from
+ *  a control character to the letter that is normally used with
+ *  an up-arrow prefix to represent the control char.
+ *  The correct mapping should be done like this...
+ */
+#define ctrl(c)	        (((c) + '@') & 0x7f)
+
 #define plural(n)	n == 1 ? "" : "s"
 #define lastch(s)	s[strlen(s)-1]
 #define ifmain(a,b)	(inalias ? b : a)
@@ -633,11 +652,11 @@ char *strstr();
 
 #ifdef POSIX_SIGNALS
 #define signal posix_signal
-#ifdef __STDC__
+#if ANSI_C
 extern SIGHAND_TYPE (*posix_signal(int, SIGHAND_TYPE (*)(int)))(int);
-#else	/* __STDC__ */
+#else	/* ANSI_C */
 extern SIGHAND_TYPE (*posix_signal())();
-#endif	/* __STDC__ */
+#endif	/* ANSI_C */
 #else	/* POSIX_SIGNALS */
 #ifdef SIGSET
 #define signal sigset

@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: strtokq.c,v 1.1 1993/08/14 22:36:22 smace Exp $";
+static char rcsid[] = "@(#)$Id: strtokq.c,v 1.2 1993/08/27 00:55:36 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,8 @@ static char rcsid[] = "@(#)$Id: strtokq.c,v 1.1 1993/08/14 22:36:22 smace Exp $"
  *
  *******************************************************************************
  * $Log: strtokq.c,v $
- * Revision 1.1  1993/08/14 22:36:22  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:55:36  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
  *
  * Revision 5.3  1993/07/20  02:05:17  syd
  * A long-standing bug of handling replies to VMS systems.

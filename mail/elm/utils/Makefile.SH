@@ -16,7 +16,7 @@ esac
 echo "Extracting utils/Makefile (with variable substitutions)"
 cat >Makefile <<!GROK!THIS!
 
-# @(#)$Id: Makefile.SH,v 1.1 1993/08/14 22:36:33 smace Exp $
+# @(#)$Id: Makefile.SH,v 1.2 1993/08/27 00:57:13 smace Exp $
 #
 #  Makefile for the Elm system utilities
 #
@@ -29,8 +29,8 @@ cat >Makefile <<!GROK!THIS!
 #			dsinc!elm
 #
 # $Log: Makefile.SH,v $
-# Revision 1.1  1993/08/14 22:36:33  smace
-# Initial revision
+# Revision 1.2  1993/08/27 00:57:13  smace
+# Upgrade elm2.4 pl23beta elm2.4 pl23beta2
 #
 # Revision 5.5  1993/05/31  19:17:28  syd
 # In the Makefile listalias was given only a+x permission

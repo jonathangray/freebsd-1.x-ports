@@ -1,8 +1,8 @@
 
-static char rcsid[] ="@(#)$Id: filter.c,v 1.1 1993/08/14 22:36:16 smace Exp $";
+static char rcsid[] ="@(#)$Id: filter.c,v 1.2 1993/08/27 00:54:11 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  * 			Copyright (c) 1988-1992 USENET Community Trust
  * 			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,8 @@ static char rcsid[] ="@(#)$Id: filter.c,v 1.1 1993/08/14 22:36:16 smace Exp $";
  *
  *******************************************************************************
  * $Log: filter.c,v $
- * Revision 1.1  1993/08/14 22:36:16  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:54:11  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
  *
  * Revision 5.6  1993/08/03  19:28:39  syd
  * Elm tries to replace the system toupper() and tolower() on current

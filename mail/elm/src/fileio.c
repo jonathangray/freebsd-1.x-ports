@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: fileio.c,v 1.1 1993/08/14 22:36:28 smace Exp $";
+static char rcsid[] = "@(#)$Id: fileio.c,v 1.2 1993/08/27 00:56:23 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,17 @@ static char rcsid[] = "@(#)$Id: fileio.c,v 1.1 1993/08/14 22:36:28 smace Exp $";
  *
  *******************************************************************************
  * $Log: fileio.c,v $
- * Revision 1.1  1993/08/14 22:36:28  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:56:23  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ *
+ * Revision 5.12  1993/08/23  12:28:23  syd
+ * Fix placement of ifdef for PC_CHOWN
+ * From: syd
+ *
+ * Revision 5.11  1993/08/23  03:26:24  syd
+ * Try setting group id separate from user id in chown to
+ * allow restricted systems to change group id of file
+ * From: Syd
  *
  * Revision 5.10  1993/08/10  20:29:52  syd
  * add PC_CHOWN_RESTRICTED where needed
@@ -441,7 +450,8 @@ char *fname;
 	/*
 	 * Chown is restricted to root on BSD unix
 	 */
-	(void) chown(fname, new_owner, new_group);
+	(void) chown(fname, -1, new_group);
+	(void) chown(fname, new_owner, -1);
 #else
 #  ifdef _PC_CHOWN_RESTRICTED
 /*
@@ -457,6 +467,9 @@ char *fname;
 	    dprint(2, (debugfile, "** chown(%s, %d, %d) returns %d [errno=%d] **\n",
 		       fname, new_owner, new_group, i, errno));
 #  ifdef _PC_CHOWN_RESTRICTED
+	} else {
+	    (void) chown(fname, -1, new_group);
+	    (void) chown(fname, new_owner, -1);
 	}
 #  endif /* _PC_CHOWN_RESTRICTED */
 #endif /* BSD */

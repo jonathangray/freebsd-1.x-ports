@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: elmalias.c,v 1.1 1993/08/14 22:36:33 smace Exp $";
+static char rcsid[] = "@(#)$Id: elmalias.c,v 1.2 1993/08/27 00:57:19 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.1 $
+ *  The Elm Mail System  -  $Revision: 1.2 $
  *
  * 			Copyright (c) 1988-1992 USENET Community Trust
  * 			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,12 @@ static char rcsid[] = "@(#)$Id: elmalias.c,v 1.1 1993/08/14 22:36:33 smace Exp $
  *
  *******************************************************************************
  * $Log: elmalias.c,v $
- * Revision 1.1  1993/08/14 22:36:33  smace
- * Initial revision
+ * Revision 1.2  1993/08/27 00:57:19  smace
+ * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ *
+ * Revision 5.6  1993/08/23  02:44:41  syd
+ * fix where checkalias doesn't fully expand multi-database aliases
+ * From: Steve Wolf <woof@atl.hp.com>
  *
  * Revision 5.5  1993/08/03  19:23:25  syd
  * Added -d option to elmalias.
@@ -294,7 +298,7 @@ Alias:\t\t%a\n\
 	    ar = make_dummy_rec(argv[i]);
 	    print_alias(out_fmt, ar);
 	} else if (do_expand && (ar->type & GROUP)) {
-	    exp_print_alias(dblist[d], out_fmt, ar);
+	    exp_print_alias(dblist, out_fmt, ar);
 	} else {
 	    print_alias(out_fmt, ar);
 	}
@@ -357,8 +361,8 @@ char *val;
 /*
  * Recursively expand out a list of addresses and print the expansions.
  */
-void exp_print_alias(db, fmt, ar)
-DBZ *db;
+void exp_print_alias(dblist, fmt, ar)
+DBZ *dblist[];
 char *fmt;
 struct alias_rec *ar;
 {
@@ -366,6 +370,7 @@ struct alias_rec *ar;
     char *acurr;	/* pointer to current address within "abuf"	*/
     char *anext;	/* pointer to next address within "abuf"	*/
     struct alias_rec *ar0;
+    int d;		/* dblist index					*/
 
     /*
      * Create a copy of this address we can scribble upon.
@@ -379,10 +384,14 @@ struct alias_rec *ar;
      * Go through all of the addresses and expand them out.
      */
     while ((acurr = next_addr_in_list(&anext)) != NULL) {
-	if ((ar0 = fetch_alias(db, acurr)) == NULL)
+	for (d = 0 ; dblist[d] != NULL ; ++d) {
+	    if ((ar0 = fetch_alias(dblist[d], acurr)) != NULL)
+		break;
+	}
+	if (ar0 == NULL)
 	    ar0 = make_dummy_rec(acurr);
 	if (ar0->type & GROUP)
-	    exp_print_alias(db, fmt, ar0);
+	    exp_print_alias(dblist, fmt, ar0);
 	else
 	    print_alias(fmt, ar0);
 	(void) free((malloc_t)ar0);

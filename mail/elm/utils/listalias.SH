@@ -17,7 +17,7 @@ echo "Extracting utils/listalias (with variable substitutions)"
 echo $startsh > listalias
 cat >>listalias <<'!NO!SUBS!'
 # listalias: part of the Elm mail system
-# @(#)$Id: listalias.SH,v 1.1 1993/08/14 22:36:34 smace Exp $
+# @(#)$Id: listalias.SH,v 1.2 1993/08/27 00:57:25 smace Exp $
 #		Copyright (c) 1988-1992 USENET Community Trust
 # 		Copyright (c) 1986,1987 Dave Taylor
 

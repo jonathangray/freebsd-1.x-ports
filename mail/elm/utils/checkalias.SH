@@ -17,7 +17,7 @@ echo "Extracting utils/checkalias (with variable substitutions)"
 echo $startsh > checkalias
 cat >>checkalias <<!DO!SUBS!
 # checkalias: part of the Elm mail system
-# @(#)$Id: checkalias.SH,v 1.1 1993/08/14 22:36:33 smace Exp $
+# @(#)$Id: checkalias.SH,v 1.2 1993/08/27 00:57:18 smace Exp $
 #		Copyright (c) 1988-1992 USENET Community Trust
 # 		Copyright (c) 1986,1987 Dave Taylor
  
