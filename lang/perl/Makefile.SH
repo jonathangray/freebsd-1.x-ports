@@ -26,10 +26,13 @@ esac
 echo "Extracting Makefile (with variable substitutions)"
 rm -f Makefile
 cat >Makefile <<!GROK!THIS!
-# $RCSfile: Makefile.SH,v $$Revision: 1.2 $$Date: 1993/12/29 23:50:40 $
+# $RCSfile: Makefile.SH,v $$Revision: 1.3 $$Date: 1993/12/30 01:32:17 $
 #
 # $Log: Makefile.SH,v $
-# Revision 1.2  1993/12/29 23:50:40  smace
+# Revision 1.3  1993/12/30 01:32:17  smace
+# correct pkg target to make src packages build first
+#
+# Revision 1.2  1993/12/29  23:50:40  smace
 # 1. added pkg target and datafiles made perl install in /usr/gnu
 # 2. removed perly.h (build during make process)
 #
@@ -368,7 +371,7 @@ shlist:
 	echo $(sh) | tr ' ' '\012' >.shlist
 
 
-pkg:	pkg_bin pkg_src
+pkg:	pkg_src pkg_bin
 
 pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
 	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S perl_src
