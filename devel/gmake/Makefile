@@ -265,13 +265,10 @@ config.h.in: configure.in
 	autoheader $(ACFLAGS)
 
 
-pkg:	pkg_src pkg_bin
+pkg:	pkg_bin
 
-pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
-	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S gmake_src
-
-pkg_bin: install pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B 
-	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B gmake_bin
+pkg_bin: install pkg/+DESC pkg/+ONELINE pkg/+PLIST 
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST gmake_bin
 
 # This tells versions [3.59,3.63) of GNU make not to export all variables.
 .NOEXPORT:

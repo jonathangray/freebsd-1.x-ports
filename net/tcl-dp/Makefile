@@ -158,13 +158,10 @@ test: dpwish
 	cd $$cwd; cd $(SRC_DIR)/tests; \
 	( echo source all\; exit ) | $$cwd/dpwish -notk
 
-pkg:	pkg_src pkg_bin
+pkg:	pkg_bin
 
-pkg_src: pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S pkg/+REQ_S clean
-	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S -r pkg/+REQ_S tcl-dp_src
-
-pkg_bin: pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B all install
-	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B tcl-dp_bin
+pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST all install
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST tcl-dp_bin
 
 install: install-binaries install-libraries install-man
 

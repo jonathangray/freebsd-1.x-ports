@@ -89,10 +89,7 @@ tar:	tclIndex
 	@gzip -9vf zircon-$(version).tar
 	rm -rf zircon-$(version)
 
-pkg:	pkg_src pkg_bin
+pkg:	pkg_bin
 
-pkg_src: pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S pkg/+REQ_S clean
-	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S -r pkg/+REQ_S zircon_src
-
-pkg_bin: pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B pkg/+REQ_B all install
-	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B -r pkg/+REQ_B zircon_bin
+pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST pkg/+REQ all install
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST -r pkg/+REQ zircon_bin
