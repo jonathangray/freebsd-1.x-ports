@@ -2,16 +2,16 @@ BFD_MACHINES =  i386-dis.o
 # This file was generated automatically by configure.  Do not edit.
 VPATH = .
 links = sysdep.h
-host_alias = i386--freebsd
+host_alias = i386-unknown-freebsd
 host_cpu = i386
-host_vendor = 
+host_vendor = unknown
 host_os = freebsd
-host_canonical = i386--freebsd
-target_alias = i386--freebsd
+host_canonical = i386-unknown-freebsd
+target_alias = i386-unknown-freebsd
 target_cpu = i386
-target_vendor = 
+target_vendor = unknown
 target_os = freebsd
-target_canonical = i386--freebsd
+target_canonical = i386-unknown-freebsd
 target_makefile_frag = ./../bfd/config/i386-freebsd.mt
 host_makefile_frag = ../bfd/config/i386bsd.mh
 #    Makefile template for Configure for the opcodes library.
@@ -56,7 +56,7 @@ includedir = $(prefix)/include
 oldincludedir =
 docdir = $(srcdir)/doc
 
-SHELL = /bin/bash
+SHELL = /bin/sh
 
 INSTALL = install -c
 INSTALL_PROGRAM = $(INSTALL)

@@ -1,16 +1,16 @@
 # This file was generated automatically by configure.  Do not edit.
 VPATH = .
 links = 
-host_alias = i386--freebsd
+host_alias = i386-unknown-freebsd
 host_cpu = i386
-host_vendor = 
+host_vendor = unknown
 host_os = freebsd
-host_canonical = i386--freebsd
-target_alias = i386--freebsd
+host_canonical = i386-unknown-freebsd
+target_alias = i386-unknown-freebsd
 target_cpu = i386
-target_vendor = 
+target_vendor = unknown
 target_os = freebsd
-target_canonical = i386--freebsd
+target_canonical = i386-unknown-freebsd
 # 
 # Makefile.in for etc
 #
@@ -21,7 +21,7 @@ exec_prefix = $(prefix)
 srcdir = .
 bindir  = $(exec_prefix)/bin
 libdir  = $(exec_prefix)/lib
-tooldir = $(exec_prefix)/i386--freebsd
+tooldir = $(exec_prefix)/i386-unknown-freebsd
 datadir = $(prefix)/lib
 
 mandir  = $(prefix)/man
@@ -36,7 +36,7 @@ man8dir = $(mandir)/man8
 man9dir = $(mandir)/man9
 infodir = $(prefix)/info
 
-SHELL = /bin/bash
+SHELL = /bin/sh
 
 INSTALL 	= install -c
 INSTALL_PROGRAM = $(INSTALL)

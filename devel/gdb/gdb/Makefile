@@ -1,16 +1,16 @@
 # This file was generated automatically by configure.  Do not edit.
 VPATH = .
 links =  xm.h tm.h nm.h
-host_alias = i386--freebsd
+host_alias = i386-unknown-freebsd
 host_cpu = i386
-host_vendor = 
+host_vendor = unknown
 host_os = freebsd
-host_canonical = i386--freebsd
-target_alias = i386--freebsd
+host_canonical = i386-unknown-freebsd
+target_alias = i386-unknown-freebsd
 target_cpu = i386
-target_vendor = 
+target_vendor = unknown
 target_os = freebsd
-target_canonical = i386--freebsd
+target_canonical = i386-unknown-freebsd
 target_makefile_frag = config/i386/i386freebsd.mt
 host_makefile_frag = config/i386/i386freebsd.mh
 #Copyright 1989, 1990, 1991, 1992, 1993 Free Software Foundation, Inc.
@@ -37,7 +37,7 @@ program_transform_name =
 exec_prefix = $(prefix)
 bindir = $(exec_prefix)/bin
 libdir = $(exec_prefix)/lib
-tooldir = $(exec_prefix)/i386--freebsd
+tooldir = $(exec_prefix)/i386-unknown-freebsd
 
 datadir = $(prefix)/lib
 mandir = $(prefix)/man
@@ -54,7 +54,7 @@ infodir = $(prefix)/info
 includedir = $(prefix)/include
 docdir = $(datadir)/doc
 
-SHELL = /bin/bash
+SHELL = /bin/sh
 
 INSTALL = `cd $(srcdir)/..;pwd`/install.sh -c
 INSTALL_PROGRAM = $(INSTALL)

@@ -175,8 +175,10 @@ OBJ = main.$O $(SCREEN).$O basic.$O bind.$O buffer.$O crypt.$O \
 #	or without posix extensions.
 
 # please report bugs with these config options
-
 all:
+	make bsd386
+
+_all:
 	@echo "	there is no default unnamed target."			;\
 	echo "	please use one of the following:"			;\
 	echo "	make bsd	(for pure, older BSD systems)"		;\
@@ -547,7 +549,10 @@ random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: Makefile,v $
-# Revision 1.3  1994/04/11 14:59:00  jkh
+# Revision 1.4  1994/04/17 12:48:13  jkh
+# Fixed some bogus Makefiles.
+#
+# Revision 1.3  1994/04/11  14:59:00  jkh
 # rename pkg target to package to make Julian S. happy.
 #
 # Revision 1.2  1994/02/25  03:15:50  jkh

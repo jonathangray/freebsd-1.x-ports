@@ -1,16 +1,16 @@
 # This file was generated automatically by configure.  Do not edit.
 VPATH = .
 links = alloca-conf.h
-host_alias = i386--freebsd
+host_alias = i386-unknown-freebsd
 host_cpu = i386
-host_vendor = 
+host_vendor = unknown
 host_os = freebsd
-host_canonical = i386--freebsd
-target_alias = i386--freebsd
+host_canonical = i386-unknown-freebsd
+target_alias = i386-unknown-freebsd
 target_cpu = i386
-target_vendor = 
+target_vendor = unknown
 target_os = freebsd
-target_canonical = i386--freebsd
+target_canonical = i386-unknown-freebsd
 #
 # Makefile
 #   Copyright (C) 1990, 1991, 1992 Free Software Foundation
@@ -64,7 +64,7 @@ includedir = $(prefix)/include
 oldincludedir =
 docdir = $(datadir)/doc
 
-SHELL = /bin/bash
+SHELL = /bin/sh
 
 INSTALL = install -c
 INSTALL_PROGRAM = $(INSTALL)

@@ -265,7 +265,7 @@ config.h.in: configure.in
 	autoheader $(ACFLAGS)
 
 
-package:	pkg_bin
+pkg:	pkg_bin
 
 pkg_bin: install pkg/+DESC pkg/+ONELINE pkg/+PLIST 
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST gmake_bin
