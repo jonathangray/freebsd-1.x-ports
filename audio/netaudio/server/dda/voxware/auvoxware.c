@@ -46,7 +46,11 @@
 #include <sys/param.h>
 
 /* SGI's AudioLibrary interface (avoid name conflict with NetAudio's audio.h */
+#ifdef __FreeBSD__
+#include </usr/include/machine/soundcard.h>
+#else
 #include </usr/include/sys/soundcard.h>
+#endif
 
 #include <audio/audio.h>
 #include <audio/Aproto.h>
