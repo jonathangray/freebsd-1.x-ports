@@ -1,4 +1,4 @@
-/* $Id: term.h,v 1.4 1993/11/17 23:04:07 nate Exp $
+/* $Id: term.h,v 1.5 1993/12/01 06:38:43 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -21,18 +21,18 @@ EXT char lastchar;
 # ifdef FIONREAD
 EXT long iocount INIT(0);
 #  ifndef lint
-#define input_pending() (nextin!=nextout || (ioctl(0, FIONREAD, &iocount),(int)iocount))
+#define input_pending() (macro_pending() || (ioctl(0, FIONREAD, &iocount),(int)iocount))
 #  else
 #define input_pending() bizarre
 #  endif /* lint */
 # else /* FIONREAD */
 #  ifdef HAS_RDCHK
-#define input_pending() (nextin!=nextout || rdchk(0))
+#define input_pending() (macro_pending() || rdchk(0))
 #  else /*  HAS_RDCHK */
 int circfill();
 EXT int devtty INIT(0);
 #   ifndef lint
-#define input_pending() (nextin!=nextout || circfill())
+#define input_pending() (macro_pending() || circfill())
 #   else
 #define input_pending() bizarre
 #   endif /* lint */
@@ -40,7 +40,7 @@ EXT int devtty INIT(0);
 # endif /* FIONREAD */
 #else /* PENDING */
 # ifndef lint
-#define input_pending() (nextin!=nextout)
+#define input_pending() macro_pending()
 # else
 #define input_pending() bizarre
 # endif /* lint */
@@ -203,6 +203,8 @@ void	mac_init _((char*));
 void	mac_line _((char*,char*,int));
 void	show_macros _((void));
 char	putchr _((char_int));	/* routine for tputs to call */
+void	hide_pending _((void));
+bool	macro_pending _((void));
 bool	finish_command _((int));
 bool	finish_dblchar _((void));
 void	eat_typeahead _((void));
@@ -212,9 +214,7 @@ void	settle_down _((void));
 void	termlib_init _((void));
 void	termlib_reset _((void));
 #endif
-#ifndef read_tty
 int	read_tty _((char*,int));
-#endif
 void	underprint _((char*));
 #ifdef NOFIREWORKS
 void	no_sofire _((void));

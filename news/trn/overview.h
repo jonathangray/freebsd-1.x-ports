@@ -1,4 +1,4 @@
-/* $Id: overview.h,v 1.3 1993/11/17 23:03:37 nate Exp $
+/* $Id: overview.h,v 1.4 1993/12/01 06:38:27 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -31,8 +31,8 @@
 ** can define both OV_XREFS and OV_LAX_XREFS and trn accepts a field with
 ** or without the "Xref:" prefix. */
 
-#undef	OV_XREFS	/* only define when using non-standard .overview */
-#undef	OV_LAX_XREFS	/* allow xref field to have a header-prefix */
+/*#define OV_XREFS   8	*//* only define when using non-standard .overview */
+/*#define OV_LAX_XREFS	*//* allow xref field to have a header-prefix */
 
 /* What name to append to the directory name to read an overview file.
 ** This REQUIRES a leading slash unless you're getting fancy.

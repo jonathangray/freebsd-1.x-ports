@@ -1,4 +1,4 @@
-/* $Id: init.c,v 1.4 1993/11/17 23:03:01 nate Exp $
+/* $Id: init.c,v 1.5 1993/12/01 06:38:11 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -133,7 +133,8 @@ char *argv[];
 #ifdef USE_NNTP
 
     /* open connection to server if appropriate */
-    nntp_connect();
+    if (!nntp_connect())
+	finalize(1);
 
 #endif
 

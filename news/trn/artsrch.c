@@ -1,4 +1,4 @@
-/* $Id: artsrch.c,v 1.3 1993/11/17 23:02:30 nate Exp $
+/* $Id: artsrch.c,v 1.4 1993/12/01 06:37:53 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -65,6 +65,8 @@ int get_cmd;				/*   be set to FALSE!!! */
     char *srchhdr;		/* header to search if Hdr scope */
     bool doread;			/* search read articles? */
     bool foldcase = TRUE;		/* fold upper and lower case? */
+    int ignorethru = 0;			/* should we ignore the thru line? */
+
     ART_NUM srchfirst;
 
     int_count = 0;
@@ -91,7 +93,7 @@ int get_cmd;				/*   be set to FALSE!!! */
 	    lastpat = savestr(pattern);
 	}
 	if (*s) {			/* modifiers or commands? */
-	    for (s++; *s && index("KarchHf",*s); s++) {
+	    for (s++; *s && index("KarcfhHIN",*s); s++) {
 		if (*s == 'f')		/* scan from line */
 		    howmuch = ARTSCOPE_FROM;
 		else if (*s == 'H') {	/* scan a specific header */
@@ -116,12 +118,20 @@ int get_cmd;				/*   be set to FALSE!!! */
 		    saltaway = TRUE;
 		else if (*s == 'c')	/* make search case sensitive */
 		    foldcase = FALSE;
+		else if (*s == 'I')	/* ignore the killfile thru line */
+		    ignorethru = 1;
+		else if (*s == 'N')	/* override ignore if -k was used */
+		    ignorethru = -1;
 	    }
 	}
 	while (isspace(*s) || *s == ':')
 	    s++;
 	if (*s) {
+#ifdef OLD_RN_WAY
 	    if (*s == 'm' || *s == 'M')
+#else
+	    if (*s == 'm')
+#endif
 		doread = TRUE;
 	    if (*s == 'k')		/* grandfather clause */
 		*s = 'j';
@@ -142,6 +152,7 @@ int get_cmd;				/*   be set to FALSE!!! */
 	register char *h;
 
 	howmuch = ARTSCOPE_SUBJECT;	/* just search subjects */
+	srchhdr = Nullch;
 	doread = (cmdchr == Ctl('p'));
 	if (cmdchr == Ctl('n'))
 	    normal_return = SRCH_SUBJDONE;
@@ -156,9 +167,9 @@ int get_cmd;				/*   be set to FALSE!!! */
 		saltaway = TRUE;
 	    normal_return = SRCH_DONE;
 	    if (cmdchr == '+')
-		cmdlst = savestr("++");
+		cmdlst = savestr("I:++");
 	    else if (cmdchr == '.')
-		cmdlst = savestr(".");
+		cmdlst = savestr("I:.");
 	    else {
 		if (cmdchr == ',')
 		    cmdlst = savestr(",");
@@ -206,11 +217,17 @@ int get_cmd;				/*   be set to FALSE!!! */
     }
 #ifdef KILLFILES
     if (saltaway) {
-	char saltbuf[LBUFLEN];
+	char saltbuf[LBUFLEN], *f;
 
 	s = saltbuf;
-	sprintf(s,"/%s/",pattern);
-	s += strlen(s);
+	f = pattern;
+	*s++ = '/';
+	while (*f) {
+	    if (*f == '/')
+		*s++ = '\\';
+	    *s++ = *f++;
+	}
+	*s++ = '/';
 	if (doread)
 	    *s++ = 'r';
 	if (howmuch != ARTSCOPE_SUBJECT) {
@@ -245,9 +262,11 @@ int get_cmd;				/*   be set to FALSE!!! */
 	    doread = TRUE;
 	normal_return = SRCH_DONE;
     }
-    srchfirst = (doread? absfirst :
-	(mode == 'k' && (howmuch > ARTSCOPE_FROM || lastart - last_cached > 25)
-	 ? killfirst : firstart));
+    if (ignorethru == 0 && kill_thru_kludge && cmdlst
+     && (*cmdlst == '+' || *cmdlst == '.'))
+	ignorethru = 1;
+    srchfirst = doread? absfirst
+		      : (mode != 'k' || ignorethru > 0)? firstart : killfirst;
     if (backward) {
 	if (cmdlst && art <= lastart)
 	    art++;			/* include current article */

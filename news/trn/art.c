@@ -1,4 +1,4 @@
-/* $Id: art.c,v 1.4 1993/11/17 23:02:24 nate Exp $
+/* $Id: art.c,v 1.5 1993/12/01 06:37:52 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -88,7 +88,6 @@ display_mime()
     if (!getenv("NOMIME")) {
 	char oldmode = mode;
 
-	interp(cmd_buf,(sizeof cmd_buf),getval("MIMESHOW",MIMESHOW));
 	fputs("Process MIME article? [yn]",stdout);
 	fflush(stdout);
 	eat_typeahead();
@@ -110,6 +109,7 @@ display_mime()
 	    fflush(stdout);
 	    termlib_reset();
 	    resetty();
+	    interp(cmd_buf,(sizeof cmd_buf),getval("MIMESHOW",MIMESHOW));
 	    code = doshell(SH,cmd_buf);
 	    noecho();
 	    crmode();
@@ -300,8 +300,13 @@ do_article()
 		}
 #endif
 #ifdef MIME_SUPPORT
-		else if (in_header == CONTENT_LINE && !isspace(*art_buf)) {
-		    mime_article = nontext(art_buf+14);
+		else if (!isspace(*art_buf)) {
+		    int nontext _((char *));
+		    int nonprint _((char *));
+		    if (in_header == CONTENT_LINE)
+			mime_article = mime_article || nontext(art_buf+14);
+		    else if (in_header == CONTXFER_LINE)
+			mime_article = mime_article || nonprint(art_buf+27);
 		}
 #endif
 	    }
@@ -1009,26 +1014,29 @@ innermore()
 
 #ifdef MIME_SUPPORT
 int
-nontext(content_type)
-char *content_type;
+nontext(s)
+char *s;
 {
     char *t;
 
-    if (content_type[0] == '\n')
+    if (*s == '\n')
 	return 0;
-    while (content_type && isspace(*content_type))
-	content_type++;
-    t = index(content_type, ';');
+    while (isspace(*s))
+	s++;
+    t = index(s, ';');
     if (!t)
-	t = index(content_type, '\n');
+	t = index(s, '\n');
     if (t)
 	*t-- = '\0';
-    while (t && *t && t > content_type && isspace(*t))
-	*t-- = '\0';
-    if (notplain(content_type))
+    while (t >= s && isspace(*t))
+	t--;
+    *++t = '\0';
+    if (notplain(s))
 	return 1;
     return 0;
 }
+
+/* return true if this isn't "text" or "text/plain" */
 
 int
 notplain(s)
@@ -1037,33 +1045,53 @@ char *s;
     char *t;
     if (!s)
 	return 1;
-    while (*s && isspace(*s))
+    while (isspace(*s))
 	s++;
-    for (t=s; *t; ++t) {
-	if (isupper(*t))
-	    *t = tolower(*t);
-    }
-    while (t > s && isspace(*--t)) ;
-    if (((t-s) == 3) && !strncmp(s, "text", 4))
+    t = s + strlen(s) - 1;
+    while (t >= s && isspace(*t))
+	t--;
+    *++t = '\0';
+    if (t - s == 4 && !strncasecmp(s, "text", 4))
 	return 0;
-    if (strncmp(s, "text/plain", 10))
+    if (strncasecmp(s, "text/plain", 10))
 	return 1;
     t = index(s, ';');
     while (t) {
 	t++;
-	while (*t && isspace(*t)) t++;
-	if (!strncmp(t, "charset", 7)) {
+	while (isspace(*t))
+	    t++;
+	if (!strncasecmp(t, "charset", 7)) {
 	    s = index(t, '=');
 	    if (s) {
 		s++;
-		while (*s && isspace(*s)) s++;
-		if (!strncmp(s, "us-ascii", 8))
+		while (isspace(*s))
+		    s++;
+		if (!strncasecmp(s, "us-ascii", 8))
 		    return 0;
 	    }
-	    return(1);
+	    return 1;
 	}
 	t = index(t, ';');
     }
     return 0;	/* no charset, was text/plain */
+}
+
+/* return true if this isn't "7bit", "8bit", or "binary" */
+
+int
+nonprint(s)
+char *s;
+{
+    while (isspace(*s))
+	s++;
+    if (strncasecmp(s, "7bit", 4) == 0)
+	s += 4;
+    else if (strncasecmp(s, "8bit", 4) == 0)
+	s += 4;
+    else if (strncasecmp(s, "binary", 6) == 0)
+	s += 6;
+    else
+	return 1;
+    return !(*s == '\0' || isspace(*s) || *s == ';' || *s == '(');	/*)*/ 
 }
 #endif

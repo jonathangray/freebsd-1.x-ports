@@ -1,4 +1,4 @@
-/* $Id: nntp.c,v 1.3 1993/11/17 23:03:30 nate Exp $
+/* $Id: nntp.c,v 1.4 1993/12/01 06:38:22 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -107,7 +107,7 @@ ART_NUM artnum;
     fwrite(headbuf, 1, strlen(headbuf), fp);
     for (;;) {
 	nntp_gets(ser_line, sizeof ser_line);
-	if (ser_line[0] == '.' && ser_line[1] == '\0')
+	if (NNTP_LIST_END(ser_line))
 	    break;
 	fputs((ser_line[0] == '.' ? ser_line + 1 : ser_line), fp);
 	putc('\n', fp);
@@ -130,15 +130,14 @@ nntp_time()
     if (nntp_check(FALSE) != NNTP_CLASS_INF)
 	return time((time_t*)NULL);
 
-    s = ser_line + strlen(ser_line) - 1;
-
-    ss = (*s - '0') + (*--s - '0') * 10;
-    mm = (*--s - '0') + (*--s - '0') * 10;
-    hh = (*--s - '0') + (*--s - '0') * 10;
-    day = (*--s - '0') + (*--s - '0') * 10;
-    month = (*--s - '0') + (*--s - '0') * 10;
-    *s = '\0';
-    year = atoi(s-4);
+    s = rindex(ser_line, ' ') + 1;
+    month = (s[4] - '0') * 10 + (s[5] - '0');
+    day = (s[6] - '0') * 10 + (s[7] - '0');
+    hh = (s[8] - '0') * 10 + (s[9] - '0');
+    mm = (s[10] - '0') * 10 + (s[11] - '0');
+    ss = (s[12] - '0') * 10 + (s[13] - '0');
+    s[4] = '\0';
+    year = atoi(s);
 
     /* This simple algorithm will be valid until the year 2400 */
     if (year % 4)
@@ -176,7 +175,11 @@ time_t t;
 bool
 nntp_listgroup()
 {
+#ifdef NO_LISTGROUP
+    static bool listgroup_works = FALSE;
+#else
     static bool listgroup_works = TRUE;
+#endif
 
     if (!listgroup_works)
 	return FALSE;
@@ -231,6 +234,28 @@ nntp_artname()
     return artname;
 }
 
+char
+nntp_handle_timeout(strict)
+bool_int strict;
+{
+    static bool handling_timeout = FALSE;
+    extern char last_command[];
+    char last_command_save[NNTP_STRLEN];
+    char ch;
+
+    if (handling_timeout)
+	return NNTP_CLASS_FATAL;
+    handling_timeout = TRUE;
+    strcpy(last_command_save, last_command);
+    nntp_close(FALSE);
+    if (!nntp_connect() || (in_ng && !nntp_group(ngname, -1)))
+	fatal_error("\n503 Server timed out.\n");
+    nntp_command(last_command_save);
+    ch = nntp_check(strict);
+    handling_timeout = FALSE;
+    return ch;
+}
+
 /* cleanup the odds and ends associated with NNTP usage */
 
 void
@@ -239,7 +264,7 @@ nntp_cleanup()
     UNLINK(nntp_artname());
     if (*active_name)
 	UNLINK(active_name);
-    nntp_close();
+    nntp_close(TRUE);
 }
 
 #ifdef USE_XTHREAD

@@ -1,4 +1,4 @@
-/* $Id: help.c,v 1.3 1993/11/17 23:02:56 nate Exp $
+/* $Id: help.c,v 1.4 1993/12/01 06:38:10 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -252,7 +252,7 @@ P	Go to the previous newsgroup.\n\
 -	Go to the previously displayed newsgroup.\n\
 1	Go to the first newsgroup.\n\
 ^	Go to the first newsgroup with unread news.\n\
-$	Go to the last newsgroup.\n\
+$	Go to the end of newsgroups.\n\
 ",NOMARKING)) ||
     (cmd = print_lines("\
 g name	Go to the named newsgroup.  Subscribe to new newsgroups this way too.\n\

@@ -33,7 +33,7 @@
  */
 
 #include "patchlevel.h"
-static char rnid[] = "@(#)$Id: trn.c,v 1.3 1993/11/17 23:04:10 nate Exp $";
+static char rnid[] = "@(#)$Id: trn.c,v 1.4 1993/12/01 06:38:48 nate Exp $";
 static char patchlevel[] = PATCHLEVEL;
 
 #include "INTERN.h"
@@ -179,7 +179,8 @@ newsgroup use the g<newsgroup> command.\n\
 			    ng = current_ng;
 			    set_ngname(rcline[ng]);
 			}
-		    }
+		    } else
+			shoe_fits = TRUE;
 		    if (toread[ng] < (emptyOnly || special ? TR_NONE : TR_ONE)
 		     || !shoe_fits) {		/* unwanted newsgroup? */
 			ng += direction;	/* then skip it */
@@ -578,9 +579,8 @@ reask_abandon:
 		    goto reask_newsgroup;
 #endif
 		case 'v':
-		    printf("\n%s",rnid);
-		    printf("\n%s",patchlevel);
-		    printf("\nSend bugs to davison@borland.com\n") FLUSH;
+		    printf("\n%s\n%s\n",rnid,patchlevel);
+		    printf("Send bug reports to davison@borland.com\n") FLUSH;
 		    goto reask_newsgroup;
 		default:
 		    printf("\n%s",hforhelp) FLUSH;

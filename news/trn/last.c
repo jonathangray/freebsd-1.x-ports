@@ -1,4 +1,4 @@
-/* $Id: last.c,v 1.3 1993/11/17 23:03:09 nate Exp $
+/* $Id: last.c,v 1.4 1993/12/01 06:38:15 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -39,7 +39,16 @@ char *tcbuf;
 	if (fgets(tcbuf,1024,tmpfp) != Nullch)
 	    lastnewtime = atol(tcbuf);
 	else
-	    lastnewtime = (lasttime? lasttime : time(Null(time_t*))-24L*60*60);
+	    lastnewtime = lasttime;
+#if 1
+	/* If the time is in the future, rewind by thirty days */
+	if (lastnewtime > time(Null(time_t*)))
+	    lastnewtime = time(Null(time_t*)) - 30L*24*60*60;
+#endif
+	/* If the time wasn't set, just give them 2 days worth of groups */
+	if (!lastnewtime)
+	    lastnewtime = time(Null(time_t*)) - 2L*24*60*60;
+
 	if (fgets(tcbuf,1024,tmpfp) != Nullch)
 	    lastnewsize = atol(tcbuf);
 	else
@@ -51,8 +60,8 @@ char *tcbuf;
 	lasttime = 0;
 	lastactsiz = 0;
 	lastnewsize = 0;
-	/* Use yesterday as an initial value for finding new groups. */
-	lastnewtime = time(Null(time_t*)) - 24L*60*60;
+	/* Use two days ago as an initial value for finding new groups. */
+	lastnewtime = time(Null(time_t*)) - 2L*24*60*60;
     }
 }
 

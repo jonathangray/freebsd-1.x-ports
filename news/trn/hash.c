@@ -1,4 +1,4 @@
-/* $Id: hash.c,v 1.3 1993/11/17 23:02:52 nate Exp $
+/* $Id: hash.c,v 1.4 1993/12/01 06:38:06 nate Exp $
 */
 /* This file is an altered version of a set of hash routines by
 ** Geoffrey Collyer.  See the end of the file for his copyright.
@@ -36,11 +36,13 @@ int (*cmpfunc)();
 	HASHENT *hepa[1];	/* longer than it looks */
     } *aap;
 
+    if (size < 1)		/* size < 1 is nonsense */
+	size = 1;
     aap = (struct alignalloc*)
 	safemalloc(sizeof *aap + (size-1)*sizeof (HASHENT*));
     bzero((char*)aap, sizeof *aap + (size-1)*sizeof (HASHENT*));
     tbl = &aap->ht;
-    tbl->ht_size = (size == 0? 1: size);	/* size of 0 is nonsense */
+    tbl->ht_size = size;
     tbl->ht_magic = HASHMAG;
     tbl->ht_cmp = (cmpfunc == NULL? default_cmp: cmpfunc);
     tbl->ht_addr = aap->hepa;

@@ -1,4 +1,4 @@
-/* $Id: final.c,v 1.3 1993/11/17 23:02:50 nate Exp $
+/* $Id: final.c,v 1.4 1993/12/01 06:38:03 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -49,6 +49,12 @@ final_init()
 #endif
 #ifdef SIGWINCH
     sigset(SIGWINCH, winch_catcher);
+#endif
+
+#ifndef lint
+#ifdef SIGEMT
+    sigignore(SIGEMT);		/* Ignore EMT signals from old [t]rn's */
+#endif
 #endif
 
 #ifdef DEBUG

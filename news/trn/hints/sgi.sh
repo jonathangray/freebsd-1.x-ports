@@ -1,3 +1,3 @@
 d_voidsig=define
-d_novfork=define
+d_vfork=undef
 d_sigblock=undef

@@ -1,4 +1,4 @@
-/* $Id: cache.c,v 1.4 1993/11/17 23:02:44 nate Exp $
+/* $Id: cache.c,v 1.5 1993/12/01 06:37:55 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -233,11 +233,30 @@ register ARTICLE *ap;
 	    }
 	}
 	if (!(ap->flags & AF_FROMTRUNCED)) {
-	    if (instr(ap->from,phostname,FALSE)) {
-		if (instr(ap->from,loginName,TRUE))
+	    char *s = cmd_buf, *u, *h;
+	    strcpy(s,ap->from);
+	    if ((h=index(s,'<')) != Nullch) { /* grab the good part */
+		s = h+1;
+		if ((h=index(s,'>')) != Nullch)
+		    *h = '\0';
+	    } else if ((h=index(s,'(')) != Nullch) {
+		while (h-- != s && *h == ' ')
+		    ;
+		h[1] = '\0';		/* or strip the comment */
+	    }
+	    if ((h=index(s,'%'))!=Nullch || (h=index(s,'@'))!=Nullch) {
+		*h++ = '\0';
+		u = s;
+	    } else if ((u=rindex(s,'!')) != Nullch) {
+		*u++ = '\0';
+		h = s;
+	    } else
+		h = u = s;
+	    if (strEQ(u,loginName)) {
+		if (instr(h,phostname,FALSE))
 		    select_subthread(ap,AF_AUTOSELECT);
 		else {
-#ifdef SLOW_BUT_COMPLETE_POSTER_CHECKING
+#ifdef REPLYTO_POSTER_CHECKING
 		    char *reply_buf = fetchlines(article_num(ap),REPLY_LINE);
 		    if (instr(reply_buf,loginName,TRUE))
 			select_subthread(ap,AF_AUTOSELECT);
@@ -258,16 +277,21 @@ uncache_article(ap, remove_empties)
 register ARTICLE *ap;
 bool_int remove_empties;
 {
-    register ARTICLE *next, *ap2;
+    register ARTICLE *next;
 
     if (ap->subj) {
 	if ((ap->flags & (AF_CACHED|AF_MISSING)) == AF_CACHED) {
 	    if ((next = ap->subj->articles) == ap)
 		ap->subj->articles = ap->subj_next;
-	    else if (next) {
-		while (next && (next = (ap2 = next)->subj_next) != ap)
-		    ;
-		ap2->subj_next = next;
+	    else {
+		register ARTICLE *ap2;
+		while (next) {
+		    if ((ap2 = next->subj_next) == ap) {
+			next->subj_next = ap->subj_next;
+			break;
+		    }
+		    next = ap2;
+		}
 	    }
 	}
 	if (remove_empties && !ap->subj->articles) {
@@ -280,6 +304,7 @@ bool_int remove_empties;
 		last_subject = sp->prev;
 	    else
 		sp->next->prev = sp->prev;
+	    hashdelete(subj_hash, sp->str+4, strlen(sp->str+4));
 	    free((char*)sp);
 	    ap->subj = Nullsubj;
 	    subject_count--;
@@ -638,6 +663,7 @@ cache_xrefs()
 bool
 cache_all_arts()
 {
+    int old_last_cached = last_cached;
     if (!cached_all_in_range)
 	last_cached = first_cached-1;
     if (last_cached >= lastart && first_cached <= absfirst)
@@ -646,8 +672,12 @@ cache_all_arts()
     /* turn it on as late as possible to avoid fseek()ing openart */
     setspin(SPIN_BACKGROUND);
     if (last_cached < lastart) {
-	if (!art_data(last_cached+1, lastart, TRUE, TRUE))
+	if (ov_opened)
+	    ov_data(last_cached+1, lastart, TRUE);
+	if (!art_data(last_cached+1, lastart, TRUE, TRUE)) {
+	    last_cached = old_last_cached;
 	    return FALSE;
+	}
 	cached_all_in_range = TRUE;
     }
     if (first_cached > absfirst) {
@@ -656,13 +686,18 @@ cache_all_arts()
 	else
 	    art_data(absfirst, first_cached-1, TRUE, TRUE);
 	/* If we got interrupted, make a quick exit */
-	if (first_cached > absfirst)
+	if (first_cached > absfirst) {
+	    last_cached = old_last_cached;
 	    return FALSE;
+	}
     }
     /* We're all done threading the group, so if the current article is
     ** still in doubt, tell them it's missing. */
     if (curr_artp && !(curr_artp->flags & AF_CACHED) && !input_pending())
 	pushchar('\f' | 0200);
+    /* A completely empty group needs a count & a sort */
+    if (mode != 't' && !article_count && !selected_only)
+	thread_grow();
     return TRUE;
 }
 

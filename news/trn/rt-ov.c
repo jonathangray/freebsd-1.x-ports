@@ -1,4 +1,4 @@
-/* $Id: rt-ov.c,v 1.4 1993/11/17 23:03:47 nate Exp $
+/* $Id: rt-ov.c,v 1.5 1993/12/01 06:38:30 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -39,7 +39,7 @@ ov_init()
     if (*ser_line == NNTP_CLASS_OK) {
 	do {
 	    nntp_gets(ser_line, sizeof ser_line);
-	} while (*ser_line != '.');
+	} while (NNTP_LIST_END(ser_line));
     }
 #endif
     return TRUE;
@@ -88,8 +88,11 @@ beginning:
 	success = FALSE;
 	goto exit;
     }
-    if (!ov_opened)
-	printf("\nGetting overview file."), fflush(stdout);
+#ifdef VERBOSE
+    IF(verbose)
+	if (!ov_opened)
+	    printf("\nGetting overview file."), fflush(stdout);
+#endif
     ov_next_art = last+1;
 
 #else /* !USE_XOVER */
@@ -98,7 +101,10 @@ beginning:
 	if ((ov_in = fopen(ov_name(ngname), "r")) == Nullfp) {
 	    return FALSE;
 	}
-	printf("\nReading overview file."), fflush(stdout);
+#ifdef VERBOSE
+	IF(verbose)
+	    printf("\nReading overview file."), fflush(stdout);
+#endif
     }
     setspin(cheating? SPIN_BACKGROUND : SPIN_FOREGROUND);
 #endif /* !USE_XOVER */
@@ -108,7 +114,7 @@ beginning:
     for (;;) {
 #ifdef USE_XOVER
 	line = nntp_get_a_line(last_buf, last_buflen);
-	if (*line == '.')
+	if (NNTP_LIST_END(line))
 	    break;
 #else
 	if (!(line = get_a_line(last_buf, last_buflen, ov_in)))
@@ -118,9 +124,9 @@ beginning:
 	last_buflen = buflen_last_line_got;
 	artnum = atol(line);
 	spin(100);
-#ifndef USE_XOVER
 	if (artnum < first)
 	    continue;
+#ifndef USE_XOVER
 	if (artnum > last) {
 	    artnum = last;
 	    break;

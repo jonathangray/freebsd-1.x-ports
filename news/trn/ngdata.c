@@ -1,4 +1,4 @@
-/* $Id: ngdata.c,v 1.3 1993/11/17 23:03:24 nate Exp $
+/* $Id: ngdata.c,v 1.4 1993/12/01 06:38:19 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -137,8 +137,11 @@ ART_NUM newlast;
 #ifdef TERSE
 	    strcpy(buf, "More news -- auto-processing...\n\n");
 #endif
-	if (has_normal_kills)
+	if (has_normal_kills) {
+	    bool forcelast_save = forcelast;
 	    kill_unwanted(tmpfirst,buf,TRUE);
+	    forcelast = forcelast_save;
+	}
 #endif
 	art = tmpart;
     }

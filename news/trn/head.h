@@ -1,4 +1,4 @@
-/* $Id: head.h,v 1.3 1993/11/17 23:02:54 nate Exp $
+/* $Id: head.h,v 1.4 1993/12/01 06:38:09 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -27,8 +27,9 @@
 #define ACAT_LINE	(APPR_LINE+1)		/* ACategory (ClariNet) */
 #define ANPA_LINE	(ACAT_LINE+1)		/* ANPA (ClariNet) */
 #define CODES_LINE	(ANPA_LINE+1)		/* Codes (ClariNet) */
-#define CONTENT_LINE	(CODES_LINE+1)		/* MIME */
-#define CANCEL_LINE	(CONTENT_LINE+1)	/* cancel */
+#define CONTENT_LINE	(CODES_LINE+1)		/* Content-Type (MIME) */
+#define CONTXFER_LINE	(CONTENT_LINE+1)	/* Content-Transfer-Encoding */
+#define CANCEL_LINE	(CONTXFER_LINE+1)	/* cancel */
 #define DIST_LINE	(CANCEL_LINE+1)		/* distribution */
 #define DATE_LINE	(DIST_LINE+1)		/* date */
 #define RECEIVED_LINE	(DATE_LINE+1)		/* date-received */
@@ -89,8 +90,12 @@ struct headtype htype[HEAD_LAST] = {
     {"codes",		0,	0,	5,	HT_HIDE		},
 #ifdef MIME_SUPPORT
     {"content-type",	0,	0,	12,	HT_MAGIC	},
+    {"content-transfer-encoding",
+			0,	0,	25,	HT_MAGIC	},
 #else
     {"content-type",	0,	0,	12,	0		},
+    {"content-transfer-encoding",
+			0,	0,	25,	0		},
 #endif
     {"control",		0,	0,	7,	0		},
     {"distribution",	0,	0,	12,	0		},

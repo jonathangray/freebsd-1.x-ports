@@ -3,7 +3,7 @@ case $CONFIG in
 esac
 echo "Extracting Makefile (with variable substitutions)"
 $cat >Makefile <<!GROK!THIS!
-# $Id: Makefile.SH,v 1.4 1993/11/17 23:02:05 nate Exp $
+# $Id: Makefile.SH,v 1.5 1993/12/01 06:37:44 nate Exp $
 #
 # This software is Copyright 1991 by Stan Barber. 
 #
@@ -17,13 +17,15 @@ $cat >Makefile <<!GROK!THIS!
 # for any use whatsoever, and it is provided as is. Any use of this software
 # is at the user's own risk. 
 # 
+# optional defines you can add to the CFLAGS
+#    -DNO_INN_SUPPORT             avoids the MODE READER attempt
+#    -DNO_LISTGROUP               avoids attempting to use LISTGROUP
+#    -DREPLYTO_POSTER_CHECKING    makes -p also check Reply-To (slow)
 
 CC = $cc
-rnbin = $bin
-rnibin = $installbin
-rnlib = $privlib
-rnilib = $installprivlib
-mansrc = $mansrc
+rnbin = $installbin
+rnlib = $installprivlib
+mansrc = $installmansrc
 manext = $manext
 CFLAGS = $optimize $ccflags
 LDFLAGS = $ldflags
@@ -119,16 +121,16 @@ $(h):
 install: $(public) $(private) $(manpages)
 # won't work with csh
 	export PATH || exit 1
-	- (cd `./filexp $(rnibin)`; mv trn trn.old)
-	- if test `pwd` != `./filexp $(rnibin)`; then cp $(public) `./filexp $(rnibin)`; fi
-	- if test $(filexp) = Rnfilexp; then cp ./filexp `./filexp $(rnibin)/Rnfilexp`; fi
-	- ./makedir `./filexp $(rnilib)`
-	- if test `pwd` != `./filexp $(rnilib)`; then cp INIT filexp $(private) `./filexp $(rnilib)`; fi
-#NNTP	- if test `pwd` != `./filexp $(rnilib)`; then strip `./filexp $(rnilib)`/getactive ; fi
-	- if test ! -f `./filexp $(rnilib)/newsnews`; then cp newsnews `./filexp $(rnilib)`; fi
+	- (cd `./filexp $(rnbin)`; mv trn trn.old)
+	- if test `pwd` != `./filexp $(rnbin)`; then cp $(public) `./filexp $(rnbin)`; fi
+	- if test $(filexp) = Rnfilexp; then cp ./filexp `./filexp $(rnbin)/Rnfilexp`; fi
+	- ./makedir `./filexp $(rnlib)`
+	- if test `pwd` != `./filexp $(rnlib)`; then cp INIT filexp $(private) `./filexp $(rnlib)`; fi
+#NNTP	- if test `pwd` != `./filexp $(rnlib)`; then strip `./filexp $(rnlib)`/getactive ; fi
+	- if test ! -f `./filexp $(rnlib)/newsnews`; then cp newsnews `./filexp $(rnlib)`; fi
 	- if test "X$(mansrc)" != "X" -a "X`pwd`" != X`./filexp $(mansrc)`; then \
 for page in $(manpages); do \
-dest=`./filexp $(mansrc)`/`basename $$page .1`.$(manext); \
+dest=$(mansrc)/`basename $$page .1`.$(manext); \
 rm -f $$dest; cp $$page $$dest; chmod 444 $$dest; \
 done; \
 fi
@@ -145,7 +147,7 @@ realclean:
 	rm -f *.o core $(addedbymake) Makefile
 
 spotless:
-	rm -rf UU
+	rm -rf UU .config
 	rm -f *.o core $(addedbymake) Makefile filexp config.sh
 
 # The following lint has practically everything turned on.  Unfortunately,

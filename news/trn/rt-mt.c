@@ -1,4 +1,4 @@
-/* $Id: rt-mt.c,v 1.4 1993/11/17 23:03:45 nate Exp $
+/* $Id: rt-mt.c,v 1.5 1993/12/01 06:38:28 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -113,14 +113,20 @@ mt_data()
     if (size < 0)
 	return TRUE;
 
-    printf("\nGetting thread file."), fflush(stdout);
+#ifdef VERBOSE
+    IF(verbose)
+	printf("\nGetting thread file."), fflush(stdout);
+#endif
     if (nntp_read((char*)&total, (long)sizeof (TOTAL)) < sizeof (TOTAL))
 	goto exit;
 
 #else /* !USE_XTHREAD */
     if ((fp = fopen(mt_name(ngname), FOPEN_RB)) == Nullfp)
 	return TRUE;
-    printf("\nReading thread file."), fflush(stdout);
+#ifdef VERBOSE
+    IF(verbose)
+	printf("\nReading thread file."), fflush(stdout);
+#endif
 
     if (fread((char*)&total, 1, sizeof (TOTAL), fp) < sizeof (TOTAL))
 	goto exit;

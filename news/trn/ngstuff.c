@@ -1,4 +1,4 @@
-/* $Id: ngstuff.c,v 1.3 1993/11/17 23:03:28 nate Exp $
+/* $Id: ngstuff.c,v 1.4 1993/12/01 06:38:21 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -333,38 +333,33 @@ int toplevel;
 	    if (sel_rereading)
 		deselect_article(artp);
 	} else if (ch == '+') {
-	    if ((saveit || cmdlst[1] == '+') && artp->subj) {
+	    if (saveit || cmdlst[1] == '+') {
 		if (sel_mode == SM_THREAD)
-		    select_thread(artp->subj->thread,
-				  saveit? AF_AUTOSELECTALL : 0);
+		    select_arts_thread(artp, saveit? AF_AUTOSELECTALL : 0);
 		else
-		    select_subject(artp->subj, saveit? AF_AUTOSELECTALL : 0);
-		cmdlst++;
+		    select_arts_subject(artp, saveit? AF_AUTOSELECTALL : 0);
+		if (cmdlst[1] == '+')
+		    cmdlst++;
 	    } else
-		select_article(artp, (saveit? AF_AUTOSELECTALL : 0) | AF_ECHO);
+		select_article(artp, AF_ECHO);
 	} else if (ch == '.') {
 	    select_subthread(artp, saveit? AF_AUTOSELECT : 0);
 	} else if (ch == '-') {
-	    if (cmdlst[1] == '-' && artp->subj) {
+	    if (cmdlst[1] == '-') {
 		if (sel_mode == SM_THREAD)
-		    deselect_thread(artp->subj->thread);
+		    deselect_arts_thread(artp);
 		else
-		    deselect_subject(artp->subj);
+		    deselect_arts_subject(artp);
 		cmdlst++;
 	    } else
 		deselect_article(artp);
 	} else if (ch == ',') {
 	    kill_subthread(artp, saveit? (KF_ALL|KF_KILLFILE) : KF_ALL);
 	} else if (ch == 'J' || ch == 'j') {
-	    if (!artp->subj) {
-		set_read(artp);
-		artp->flags |= AF_AUTOKILLALL;
-	    } else if (sel_mode == SM_THREAD)
-		kill_thread(artp->subj->thread,
-			saveit? (KF_ALL|KF_KILLFILE) : KF_ALL);
+	    if (sel_mode == SM_THREAD)
+		kill_arts_thread(artp, saveit? (KF_ALL|KF_KILLFILE) : KF_ALL);
 	    else
-		kill_subject(artp->subj,
-			saveit? (KF_ALL|KF_KILLFILE) : KF_ALL);
+		kill_arts_subject(artp, saveit? (KF_ALL|KF_KILLFILE) : KF_ALL);
 	} else if (ch == 't') {
 	    entire_tree(artp);
 	} else if (ch == 'T') {

@@ -1,4 +1,4 @@
-/* $Id: getactive.c,v 1.3 1993/11/17 23:02:52 nate Exp $
+/* $Id: getactive.c,v 1.4 1993/12/01 06:38:05 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -41,7 +41,8 @@ char *argv[];
 	argc--;
 	argv++;
     }
-    nntp_connect();
+    if (!nntp_connect())
+	finalize(1);
     sprintf(command,"LIST %s",action);
     nntp_command(command); 
 #ifdef HAS_SIGHOLD
@@ -60,7 +61,7 @@ char *argv[];
     }
 
     while (nntp_gets(ser_line, sizeof ser_line) >= 0) {
-	if (ser_line[0] == '.')		/* while there's another line */
+	if (NNTP_LIST_END(ser_line))	/* while there's another line */
 	    break;			/* get it and write it to */
 	if (actfp != NULL) {		/* the temporary active file */
 	    fputs(ser_line, actfp);
@@ -80,7 +81,7 @@ char *argv[];
 #ifdef HAS_SIGHOLD
     sigrelse(SIGINT);
 #endif
-    nntp_close();
+    nntp_close(TRUE);
     return 0;
 }
 
@@ -88,6 +89,14 @@ void
 finalize(num)
 int num;
 {
-    nntp_close();
+    nntp_close(TRUE);
     exit(num);
+}
+
+char
+nntp_handle_timeout(strict)
+bool_int strict;
+{
+    fatal_error("\n503 Server timed out.\n");
+    return NNTP_CLASS_FATAL;
 }

@@ -1,4 +1,4 @@
-/* $Id: ng.c,v 1.3 1993/11/17 23:03:21 nate Exp $
+/* $Id: ng.c,v 1.4 1993/12/01 06:38:18 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -201,6 +201,7 @@ char *start_command;			/* command to fake up first */
 	if (!artp || (artp->flags & AF_TMPMEM) != AF_TMPMEM || art != 0)
 	    artp = find_article(art);
 	if (start_command) {		/* do we have an initial command? */
+	    hide_pending();
 	    pushstring(start_command, 0);
 	    free(start_command);
 	    start_command = Nullch;
@@ -220,8 +221,8 @@ char *start_command;			/* command to fake up first */
 		goto article_level;
 	    }
 	    count_subjects(CS_RETAIN);
-	    for (i=last_cached+1, ap=article_ptr(i); i<=lastart; i++, ap++)
-		if (!(ap->flags & AF_READ))
+	    for (i = absfirst, ap = article_ptr(i); i <= lastart; i++, ap++)
+		if (!(ap->flags & (AF_READ|AF_CACHED)))
 		    article_count++;
 	    toread[ng] = (ART_UNREAD)article_count;
 	    if (artp != curr_artp) {
@@ -540,7 +541,7 @@ n to change nothing.\n\
     }
     case '[':			/* goto parent article */
     case '{':			/* goto thread's root article */
-	if (artp) {
+	if (artp && ThreadedGroup) {
 	    if (!find_parent(*buf == '{')) {
 		register char *cp = (*buf=='['?"parent":"root");
 #ifdef VERBOSE
@@ -580,7 +581,7 @@ not_threaded:
 	return AS_ASK;
     case ']':			/* goto child article */
     case '}':			/* goto thread's leaf article */
-	if (artp) {
+	if (artp && ThreadedGroup) {
 	    if (!find_leaf(*buf == '}')) {
 #ifdef VERBOSE
 		IF(verbose)
@@ -599,7 +600,7 @@ This is the last leaf in this tree.\n",stdout) FLUSH;
 	goto not_threaded;
     case '(':			/* goto previous sibling */
     case ')':			/* goto next sibling */
-	if (artp) {
+	if (artp && ThreadedGroup) {
 	    if (!(*buf == '(' ? find_prev_sib() : find_next_sib())) {
 		register char *cp = (*buf == '(' ? "previous" : "next");
 #ifdef VERBOSE
@@ -657,7 +658,7 @@ This is the last leaf in this tree.\n",stdout) FLUSH;
 	if (!artp)
 	    goto not_threaded;
 	kill_subject(artp->subj,KF_ALL);
-	if (last_cached < lastart) {
+	if (!ThreadedGroup || last_cached < lastart) {
 	    *buf = 'k';
 	    goto normal_search;
 	}
@@ -772,6 +773,8 @@ This is the last leaf in this tree.\n",stdout) FLUSH;
 	    inc_art(FALSE,TRUE);
 	if (art <= lastart)
 	    reread = TRUE;
+	else
+	    forcelast = TRUE;
 #ifdef ARTSEARCH
 	srchahead = 0;
 #endif
@@ -1141,20 +1144,29 @@ run_the_selector:
 #endif
 	    return AS_NORM;
 	case '+':
+	    if (!artp)
+		goto not_threaded;
 	    if (ThreadedGroup) {
-		select_thread(artp->subj->thread, 0);
+		select_arts_thread(artp, 0);
 		printf("\nSelected all articles in this thread.\n");
 	    } else {
-		select_subject(artp->subj, 0);
+		select_arts_subject(artp, 0);
 		printf("\nSelected all articles in this subject.\n");
 	    }
-	    return AS_ASK;
+	    if ((artp = first_art(artp->subj)) != Nullart) {
+		if (art == article_num(artp))
+		    return AS_ASK;
+		art = article_num(artp);
+	    }
+	    return AS_NORM;
 	case '-':
+	    if (!artp)
+		goto not_threaded;
 	    if (sel_mode == SM_THREAD) {
-		deselect_thread(artp->subj->thread);
+		deselect_arts_thread(artp);
 		printf("\nDeselected all articles in this thread.\n");
 	    } else {
-		deselect_subject(artp->subj);
+		deselect_arts_subject(artp);
 		printf("\nDeselected all articles in this subject.\n");
 	    }
 	    return AS_ASK;
@@ -1354,9 +1366,9 @@ q aborts.\n\n\
 	} else
 	    ch = (use_one_line? '+' : '.');
 	if (thread_cmd)
-	    select_thread(artp->subj->thread, AF_AUTOSELECTALL);
+	    select_arts_thread(artp, AF_AUTOSELECTALL);
 	else
-	    select_subject(artp->subj, 0);
+	    select_arts_subject(artp, 0);
 	if (mode != 't')
 	    printf("\nSelection memorized.\n");
     } else if (ch == '.') {

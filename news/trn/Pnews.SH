@@ -4,7 +4,7 @@ esac
 echo "Extracting Pnews (with variable substitutions)"
 $spitshell >Pnews <<!GROK!THIS!
 $startsh
-# $Id: Pnews.SH,v 1.4 1993/11/17 23:02:08 nate Exp $
+# $Id: Pnews.SH,v 1.5 1993/12/01 06:37:47 nate Exp $
 # 
 # This software is Copyright 1991 by Stan Barber. 
 #
@@ -197,17 +197,24 @@ for ng in $hdr_newsgroups ; do
 done
 case $flag in
 1)
-    $echo " "
-    $echo "The original author has requested that messages be sent back via"
-    $echo "mail rather than posting to news.  Do you want to jump out of this"
-    $echo $n "and mail your reply instead? [yn] $c"
+    $cat <<'EOM'
+
+The original author has requested that messages be sent back via mail
+rather than posting to news.  Do you want to jump out of this and
+EOM
+    $echo $n "mail your reply instead? [yn] $c"
     read ans
     case $ans in
-	n*) ;;
+	n*) tweak="$tmp/Pntwk.$$"
+	    $sed '1,/^[	 ]*$/{/^Newsgroups:/d;
+		s/^X-ORIGINAL-NEWSGROUPS:/Newsgroups:/;}' $tmpart >$tweak
+	    cp $tweak $tmpart
+	    rm -f $tweak
+	    ;;
 	*)  exit ;;
     esac
     $echo " "
-    $echo "OK, but you will have to edit the 'Newsgroups:' line in the message."
+    $echo "The Cc: line should have the poster's requested return address."
     ;;
 esac
   
@@ -519,7 +526,7 @@ EOH
 			0) ;;
 			*)
 			    $echo Unable to mail to moderator $moderator
-			    state=rescue
+			    state=ask
 			    ;;
 			esac
 			;;
@@ -537,7 +544,7 @@ EOH
 		if $sed "$headerstrip" $tmpart | $inews -h ; then
 		    : null
 		else
-		    state=rescue
+		    state=ask
 		fi
 		cc=`$sed -n '1,/^[	 ]*$/{/^[Cc][Cc]:[	 ][^	 ]/p;}' $tmpart|
 		 $sed 's/^[Cc][Cc]:[	 ][	 ]*//'`

@@ -5,7 +5,7 @@ case "$0" in
 */*) cd `expr X$0 : 'X\(.*\)/'` ;;
 esac
 echo "Extracting config.h (with variable substitutions)"
-sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
+sed <<!GROK!THIS! >config.h -e 's!^#undef\(.*\)/\*!/\*#define\1\*//\*!'
 /*
  * This file was produced by running the config.h.SH script, which
  * gets its values from config.sh, which is generally produced by
@@ -15,7 +15,7 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  * that running config.h.SH again will wipe out any changes you've made.
  * For a more permanent change edit config.sh and rerun config.h.SH.
  *
- * \$Id: config.h.SH,v 1.4 1993/11/17 23:02:47 nate Exp $
+ * \$Id: config.h.SH,v 1.5 1993/12/01 06:37:59 nate Exp $
  */
 
 /* Configuration time: $cf_time
@@ -40,37 +40,43 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
 #$d_eunice EUNICE		/**/
 #$d_eunice VMS		/**/
 
-/* HAS_GETPWENT
+/* HAS_GETPWENT:
  *	This symbol, if defined, indicates that the getpwent() routine
  *	should be used instead of the getpw() routine.
  */
 #$d_getpwent HAS_GETPWENT	/**/
 
-/* HAS_TERMLIB
+/* HAS_TERMLIB:
  *	This symbol, when defined, indicates that termlib-style routines
  *	are available.  There is nothing to include.
  */
 #$d_havetlib	HAS_TERMLIB	/**/
 
-/* HAS_MEMCMP
+/* INTERNET:
+ *	This symbol, if defined, indicates that there is a mailer available
+ *	which supports internet-style addresses (user@site.domain).
+ */
+#$d_internet	INTERNET	/**/
+
+/* HAS_MEMCMP:
  *	This symbol, if defined, indicates that the memcmp routine is available
  *	to compare blocks of memory.
  */
 #$d_memcmp HAS_MEMCMP	/**/
 
-/* HAS_MEMCPY
+/* HAS_MEMCPY:
  *	This symbol, if defined, indicates that the memcpy routine is available
  *	to copy blocks of memory.
  */
 #$d_memcpy HAS_MEMCPY	/**/
 
-/* HAS_MEMSET
+/* HAS_MEMSET:
  *	This symbol, if defined, indicates that the memset routine is available
  *	to set blocks of memory.
  */
 #$d_memset HAS_MEMSET	/**/
 
-/* NEWS_ADMIN
+/* NEWS_ADMIN:
  *	This symbol, if defined, contains the login name of the news
  *	administrator.
  */
@@ -88,20 +94,14 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  */
 #$d_normsig NORMSIG		/**/
 
-/* vfork:
- *	This symbol, if defined, remaps the vfork routine to fork if the
- *	vfork() routine isn't supported here.
- */
-#$d_novfork vfork fork	/**/
-
-/* HAS_RDCHK
+/* HAS_RDCHK:
  *	This symbol, if defined, indicates that the rdchk routine is available
  *	to find out if there is input pending on an IO channel.  Generally
  *	the routine is used only if FIONREAD and O_NDELAY aren't available.
  */
 #$d_rdchk HAS_RDCHK		/**/
 
-/* HAS_RENAME
+/* HAS_RENAME:
  *	This symbol, if defined, indicates that the rename routine is available
  *	to rename files.  Otherwise you should do the unlink(), link(), unlink()
  *	trick.
@@ -121,18 +121,28 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
 #$d_sighold HAS_SIGHOLD	/**/
 
 /* HAS_STRCASECMP:
- *	This symbol, if defined, indicates that the strcasecmp routine is
+ *	This symbol, if defined, indicates that the strcasecmp() routine is
  *	available for case-insensitive string compares.
  */
-#$d_strcasecmp HAS_STRCASECMP	/**/
+#$d_strccmp HAS_STRCASECMP	/**/
 
-/* Signal_t
+/* HAS_VFORK:
+ *	This symbol, if defined, indicates that vfork() exists.
+ */
+#$d_vfork HAS_VFORK	/**/
+
+/* Signal_t:
  *	This symbol's value is either "void" or "int", corresponding to the
  *	appropriate return type of a signal handler.  Thus, you can declare
  *	a signal handler using "Signal_t (*handler)()", and define the
  *	handler using "Signal_t handler(sig)".
  */
 #define Signal_t $signal_t	/* Signal handler's return type */
+
+/* DEFEDITOR:
+ *	This symbol contains the full pathname of the default editor.
+ */
+#define DEFEDITOR "$defeditor"		/**/
 
 /* I_DIRENT:
  *	This symbol, if defined, indicates to the C program that it should
@@ -146,19 +156,25 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  */
 #$i_stdlib I_STDLIB		/**/
 
-/* I_SYS_DIR
+/* I_STRING:
+ *	This symbol, if defined, indicates to the C program that it should
+ *	include <string.h> (USG systems) instead of <strings.h> (BSD systems).
+ */
+#$i_string I_STRING		/**/
+
+/* I_SYS_DIR:
  *	This symbol, if defined, indicates to the C program that it should
  *	include <sys/dir.h>.
  */
 #$i_sysdir I_SYS_DIR		/**/
 
-/* I_SYS_IOCTL
+/* I_SYS_IOCTL:
  *	This symbol, if defined, indicates that <sys/ioctl.h> exists and should
  *	be included. Otherwise, include <sgtty.h> or <termio.h>.
  */
 #$i_sysioctl	I_SYS_IOCTL		/**/
 
-/* I_SYS_NDIR
+/* I_SYS_NDIR:
  *	This symbol, if defined, indicates to the C program that it should
  *	include <sys/ndir.h>.
  */
@@ -188,7 +204,7 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  *	This symbol, if defined, indicates to the C program that it should
  *	include <unistd.h>.
  */
-#$i_unistd	I_UNISTD		/**/
+#$i_unistd I_UNISTD		/**/
 
 /* I_VFORK:
  *	This symbol, if defined, indicates to the C program that it should
@@ -208,6 +224,18 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  *	of a mailbox file.
  */
 #define MBOXCHAR '$mboxchar'		/**/
+
+/* PASSNAMES:
+ *	This symbol, if defined, indicates that full names are stored in
+ *	the /etc/passwd file.
+ */
+/* BERKNAMES:
+ *	This symbol, if defined, indicates that full names are stored in
+ *	the /etc/passwd file in Berkeley format (name first thing, everything
+ *	up to first comma, with & replaced by capitalized login id, yuck).
+ */
+#$d_passnames PASSNAMES /*  (undef to take name from ~/.fullname) */
+#$d_berknames BERKNAMES /* (that is, ":name,stuff:") */
 
 /* ORGNAME:
  *	This symbol contains either the organizaton name or the full pathname
@@ -245,12 +273,12 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  */
 #$d_ftime HAS_FTIME		/**/
 
-/* HAS_GETHOSTNAME
+/* HAS_GETHOSTNAME:
  *	This symbol, if defined, indicates that the C program may use the
  *	gethostname() routine to derive the host name.  See also HAS_UNAME
  *	and PHOSTCMD.
  */
-/* HAS_UNAME
+/* HAS_UNAME:
  *	This symbol, if defined, indicates that the C program may use the
  *	uname() routine to derive the host name.  See also HAS_GETHOSTNAME
  *	and PHOSTCMD.
@@ -266,7 +294,7 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
 #$d_uname HAS_UNAME		/**/
 #$d_phostcmd PHOSTCMD "$aphostcmd"	/* How to get the host name */
 
-/* HAS_GETWD
+/* HAS_GETWD:
  *	This symbol, if defined, indicates that the getwd routine is
  *	available to get the working directory.
  */
@@ -283,12 +311,6 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  */
 #$d_ignoreorg IGNOREORG		/**/
 
-/* INTERNET:
- *	This symbol, if defined, indicates that there is a mailer available
- *	which supports internet-style addresses (user@site.domain).
- */
-#$d_internet	INTERNET	/**/
-
 /* MIME_SUPPORT:
  *	This symbol, if defined, indicates mime articles should be processed
  *	by an external program.
@@ -300,8 +322,8 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  *	This symbol points to the program to run to store a mime article.
  */
 #$d_mime MIME_SUPPORT	/**/
-#$d_mime MIMESHOW "$mimeshow"
-#$d_mime MIMESTORE "$mimestore"
+#$d_mime MIMESHOW "$mimeshow"	/**/
+#$d_mime MIMESTORE "$mimestore"	/**/
 
 /* USE_NNTP:
  *	This symbol, if defined, indicates that NNTP should be used.
@@ -337,9 +359,10 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
 
 /* HAS_STRCHR:
  *	This symbol is defined to indicate that the strchr()/strrchr()
- *	functions are available for string searching.
+ *	functions are available for string searching. If not, try the
+ *	index()/rindex() pair.
  */
-#$d_strchr	HAS_STRCHR	/**/
+#$d_strchr HAS_STRCHR	/**/
 
 /* HAS_STRFTIME:
  *	This symbol, if defined, indicates that the strftime routine is
@@ -358,45 +381,22 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
 #$d_usendir	EMULATE_NDIR		/**/
 #$d_libndir	I_NDIR		/**/
 
-/* DEFEDITOR:
- *	This symbol contains the full pathname of the default editor.
- */
-#define DEFEDITOR "$defeditor"		/**/
-
 /* I_PTEM:
  *	This symbol, if defined, indicates to the C program that it should
  *	include ptem.h.
  */
 #$i_ptem I_PTEM		/**/
 
-/* I_STRING:
- *	This symbol, if defined, indicates to the C program that it should
- *	include <string.h> (USG systems) instead of <strings.h> (BSD systems).
- */
-#$i_string I_STRING		/**/
-
-/* I_TIME
+/* I_TIME:
  *	This symbol, if defined, indicates to the C program that it should
  *	include <time.h>.
  */
-/* I_SYS_TIME
+/* I_SYS_TIME:
  *	This symbol, if defined, indicates to the C program that it should
  *	include <sys/time.h>.
  */
 #$i_time I_TIME		/**/
 #$i_systime I_SYS_TIME		/**/
-
-/* PASSNAMES:
- *	This symbol, if defined, indicates that full names are stored in
- *	the /etc/passwd file.
- */
-/* BERKNAMES:
- *	This symbol, if defined, indicates that full names are stored in
- *	the /etc/passwd file in Berkeley format (name first thing, everything
- *	up to first comma, with & replaced by capitalized login id, yuck).
- */
-#$d_passnames PASSNAMES /*  (undef to take name from ~/.fullname) */
-#$d_berknames BERKNAMES /* (that is, ":name,stuff:") */
 
 /* NEWSLIB:
  *	This symbol contains the name of the directory serving as the news
@@ -450,11 +450,11 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
 #define THREAD_INIT	$trn_init
 #define SELECT_INIT	$trn_select
 
-#undef	LONG_THREAD_NAMES	/**/
+/*#define LONG_THREAD_NAMES	*//**/
 
 #define CANCEL	"$inewsloc -h <%h"
 #define SPEED_OVER_MEM	/* use more memory to run faster */
-/*#define ANCIENT_NEWS	/* if your B news system is <= 2.10.1 */
+/*#define ANCIENT_NEWS	*//* if your B news system is <= 2.10.1 */
 
 #endif
 !GROK!THIS!

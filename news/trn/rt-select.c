@@ -1,4 +1,4 @@
-/* $Id: rt-select.c,v 1.3 1993/11/17 23:03:53 nate Exp $
+/* $Id: rt-select.c,v 1.4 1993/12/01 06:38:35 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -96,7 +96,7 @@ char_int cmd;
     sel_item_index = 0;
     *promptbuf = '\0';
     disp_status_line = FALSE;
-    if (added_articles > 0) {
+    if (added_articles) {
 	register long i = added_articles, j;
 	register ARTICLE *ap = article_ptr(lastart - i + 1);
 	for (j = 0; j < added_articles; j++, ap++) {
@@ -123,9 +123,9 @@ display_selector:
     display_page();
 
     /* Check if there is really anything left to display. */
-    if (!sel_item_cnt && !empty_ok) { /*TODO: this may not be needed anymore */
+    if (!sel_item_cnt && !empty_ok) {
 	empty_complaint();
-	sel_ret = '+';
+	sel_ret = 'q';
 	goto sel_exit;
     }
     empty_ok = FALSE;

@@ -1,4 +1,4 @@
-/* $Id: nntpclient.h,v 1.3 1993/11/17 23:03:32 nate Exp $
+/* $Id: nntpclient.h,v 1.4 1993/12/01 06:38:25 nate Exp $
 */ 
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -9,11 +9,13 @@
 
 int	server_init _((char*));
 
-void	nntp_connect _((void));
+int	nntp_connect _((void));
 void	nntp_command _((char*));
 char	nntp_check _((bool_int));
 int	nntp_gets _((char*, int));
-void	nntp_close _((void));
+void	nntp_close _((bool_int));
+
+#define NNTP_LIST_END(s)  ((s)[0]=='.' && ((s)[1]=='\0' || (s)[1]=='\r'))
 
 /* RFC 977 defines these, so don't change them */
 

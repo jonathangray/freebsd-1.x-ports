@@ -1,4 +1,4 @@
-/* $Id: common.h,v 1.4 1993/11/17 23:02:46 nate Exp $
+/* $Id: common.h,v 1.5 1993/12/01 06:37:57 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -84,7 +84,8 @@ char	*getenv();
 #define CBUFLEN 512	/* command buffer length */
 #define PUSHSIZE 256
 #define MAXFILENAME 512
-#define LONGKEY 15	/* longest keyword: currently "posting-version" */
+#define LONGKEY 25	/* longest keyword */
+			/* (currently "Content-Transfer-Encoding") */
 #define FINISHCMD 0177
 
 /* some handy defs */
@@ -581,7 +582,7 @@ char	*getenv();
 
 #ifndef NEWSHEADER		/* % */
 #   ifdef CONDSUB
-#	define NEWSHEADER "%(%[followup-to]=^$?:X-ORIGINAL-NEWSGROUPS: %n\n)Newsgroups: %(%F=^$?%C:%F)\nSubject: %(%S=^$?%\"\n\nSubject: \":Re: %S)\nSummary: \nExpires: \n%(%R=^$?:References: %R\n)Sender: \nFollowup-To: \n%(%{REPLYTO}=^$?:Reply-To: %{REPLYTO}\n)Distribution: %(%i=^$?%\"Distribution: \":%D)\nOrganization: %o\nKeywords: %[keywords]\nCc: \n\n"
+#	define NEWSHEADER "%(%[followup-to]=^$?:X-ORIGINAL-NEWSGROUPS: %n\n)Newsgroups: %(%F=^$?%C:%F)\nSubject: %(%S=^$?%\"\n\nSubject: \":Re: %S)\nSummary: \nExpires: \n%(%R=^$?:References: %R\n)Sender: \nFollowup-To: \n%(%{REPLYTO}=^$?:Reply-To: %{REPLYTO}\n)Distribution: %(%i=^$?%\"Distribution: \":%D)\nOrganization: %o\nKeywords: %[keywords]\nCc: %(%F=poster?%t:%(%F!=@?:%F))\n\n"
 #   else
 #	define NEWSHEADER "Newsgroups: %F\nSubject: Re: %S\nSummary: \nExpires: \nReferences: %R\nSender: \nFollowup-To: \nDistribution: %D\nOrganization: %o\nKeywords: %[keywords]\nCc: \n\n"
 #   endif
@@ -746,6 +747,10 @@ typedef unsigned int	MEM_SIZE;	/* for passing to malloc */
 # endif
 #endif
 
+#ifndef HAS_VFORK
+#   define vfork fork
+#endif
+
 /* *** end of the machine dependent stuff *** */
 
 /* GLOBAL THINGS */
@@ -802,6 +807,7 @@ EXT char end_select INIT('Z');
 EXT char page_select INIT('>');
 
 EXT bool dont_filter_control INIT(FALSE);		/* -j */
+EXT bool kill_thru_kludge INIT(TRUE);			/* -k */
 EXT bool mbox_always INIT(FALSE);			/* -M */
 EXT bool norm_always INIT(FALSE);			/* -N */
 EXT bool thread_always INIT(FALSE);			/* -a */
@@ -923,4 +929,5 @@ EXT bool mime_article INIT(FALSE);
 #endif
 
 #define advise(str) fputs(str,stdout)
+#define report_error(str) fputs(str,stderr)
 #define fatal_error(str) fputs(str,stderr), finalize(1)

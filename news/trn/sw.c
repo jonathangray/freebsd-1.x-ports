@@ -1,4 +1,4 @@
-/* $Id: sw.c,v 1.4 1993/11/17 23:04:03 nate Exp $
+/* $Id: sw.c,v 1.5 1993/12/01 06:38:41 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -317,6 +317,9 @@ register char *s;
 	case 'j':
 	    dont_filter_control = TRUE;
 	    break;
+	case 'k':
+	    kill_thru_kludge = upordown;
+	    break;
 	case 'l':
 	    muck_up_clear = upordown;
 	    break;
@@ -552,6 +555,7 @@ pr_switches()
     printf("-i%d ", initlines);
     printf("%cI ", mp[append_unsub]);
     printf("%cj ", mp[dont_filter_control]);
+    printf("%ck ", mp[kill_thru_kludge]);
     printf("%cl ", mp[muck_up_clear]);
 #ifdef CLEAREOL
     printf("%cL ", mp[can_home_clear]);

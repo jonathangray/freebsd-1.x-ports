@@ -4,7 +4,7 @@ esac
 echo "Extracting Speller (with variable substitutions)"
 $spitshell >Speller <<!GROK!THIS!
 $startsh
-# $Id: Speller.SH,v 1.4 1993/11/17 23:02:17 nate Exp $
+# $Id: Speller.SH,v 1.5 1993/12/01 06:37:50 nate Exp $
 #	Speller - a script to disassemble a posting; use ispell to spell-
 #	check the body along with the Subject, Keywords, and Summary lines;
 #	and put it all back together again.
@@ -130,7 +130,8 @@ while $test "$1" != ""; do
 
     if $test "$ispell " = "none "; then
 	($echo ---- misspelled words -------------------------------------
-	 spell $mine | fmt
+	 #spell $ispell_options $mine | fmt
+	 spell $ispell_options $mine | pr -t -4
 	 $echo -----------------------------------------------------------
 	) | $pager
     else

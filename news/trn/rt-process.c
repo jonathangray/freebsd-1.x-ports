@@ -1,4 +1,4 @@
-/* $Id: rt-process.c,v 1.3 1993/11/17 23:03:51 nate Exp $
+/* $Id: rt-process.c,v 1.4 1993/12/01 06:38:33 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -342,9 +342,9 @@ exit:
 	cache_article(article);
     if (select_this_art & AF_AUTOSELECTALL) {
 	if (sel_mode == SM_THREAD)
-	    select_thread(article->subj->thread, AF_AUTOSELECTALL);
+	    select_arts_thread(article, AF_AUTOSELECTALL);
 	else
-	    select_subject(article->subj, AF_AUTOSELECTALL);
+	    select_arts_subject(article, AF_AUTOSELECTALL);
     } else if (select_this_art & AF_AUTOSELECT)
 	select_subthread(article, AF_AUTOSELECT);
     if (kill_ap)

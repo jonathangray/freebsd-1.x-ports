@@ -1,4 +1,4 @@
-/* $Id: head.c,v 1.4 1993/11/17 23:02:53 nate Exp $
+/* $Id: head.c,v 1.5 1993/12/01 06:38:08 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -205,7 +205,7 @@ end_header()
 	uncache_article(ap,FALSE);
 	return;
 #else
-	set_subj_line(ap,"Subject: <none>",15);
+	set_subj_line(ap,"<NONE>",6);
 #endif
     }
 
@@ -383,7 +383,7 @@ bool_int copy;				/* do you want it savestr()ed? */
 		if (debug & DEB_NNTP)
 		    printf("<%s\n", ser_line) FLUSH;
 # endif
-		if (ser_line[0] == '.')
+		if (NNTP_LIST_END(ser_line))
 		    break;
 		if ((t = index(ser_line, '\r')) != Nullch)
 		    *t = '\0';

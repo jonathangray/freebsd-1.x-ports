@@ -1,4 +1,4 @@
-/* $Id: intrp.c,v 1.3 1993/11/17 23:03:04 nate Exp $
+/* $Id: intrp.c,v 1.4 1993/12/01 06:38:12 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -999,11 +999,6 @@ char *stoppers;
 		    if (i > sizeof scrbuf)	/* we truncated, ack! */
 			abort_interp();
 		}
-		if (tick_quote) {
-		    *dest++ = '\'';
-		    if ((destsize -= 2) <= 0)
-			abort_interp();
-		}
 		while (*s) {
 		    if ((re_quote && index(regexp_specials, *s))
 		     || (tick_quote && *s == '\'')) {
@@ -1013,8 +1008,6 @@ char *stoppers;
 		    }
 		    *dest++ = *s++;
 		}
-		if (tick_quote)
-		    *dest++ = '\'';
 	    } else {
 		/* straight copy. */
 		if (s == dest) {

@@ -1,4 +1,4 @@
-/* $Id: kfile.c,v 1.4 1993/11/17 23:03:07 nate Exp $
+/* $Id: kfile.c,v 1.5 1993/12/01 06:38:15 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -94,6 +94,8 @@ int entering;
     art = lastart+1;
     killfirst = firstart;
     fseek(kfp,0L,0);			/* rewind file */
+    if (entering)
+	localkf_changes |= 1;
     while (fgets(buf,LBUFLEN,kfp) != Nullch) {
 	if (*(cp = buf + strlen(buf) - 1) == '\n')
 	    *cp = '\0';
@@ -103,8 +105,6 @@ int entering;
 		killfirst = absfirst;
 	    if (killfirst > lastart)
 		killfirst = lastart+1;
-	    if (entering)
-		localkf_changes |= 1;
 	    continue;
 	}
 	if (*buf == 'X') {		/* exit command? */
@@ -320,6 +320,8 @@ int extra;
 		ch = '+';
 	    else if (flags & AF_AUTOSELECT)
 		ch = '.';
+	    else
+		ch = '?';
 	    fprintf(newkfp,"%s T%c\n", ap->msgid, ch);
 	}
     }

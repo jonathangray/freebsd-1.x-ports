@@ -1,4 +1,4 @@
-/* $Id: bits.c,v 1.4 1993/11/17 23:02:41 nate Exp $
+/* $Id: bits.c,v 1.5 1993/12/01 06:37:54 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -233,7 +233,7 @@ setmissingbits()				/* NNTP version */
 	return;
     for (priornum = absfirst-1, ap = article_ptr(absfirst);; ap++) {
 	nntp_gets(ser_line, sizeof ser_line);
-	if (*ser_line == '.')
+	if (NNTP_LIST_END(ser_line))
 	    break;
 	num = atol(ser_line);
 	while (++priornum < num)

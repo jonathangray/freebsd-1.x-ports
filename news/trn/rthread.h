@@ -1,4 +1,4 @@
-/* $Id: rthread.h,v 1.3 1993/11/17 23:04:00 nate Exp $
+/* $Id: rthread.h,v 1.4 1993/12/01 06:38:40 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -28,11 +28,15 @@ bool next_art_with_subj _((void));
 bool prev_art_with_subj _((void));
 
 void select_article _((ARTICLE*,int));
+void select_arts_subject _((ARTICLE*,int));
 void select_subject _((SUBJECT*,int));
+void select_arts_thread _((ARTICLE*,int));
 void select_thread _((ARTICLE*,int));
 void select_subthread _((ARTICLE*,int));
 void deselect_article _((ARTICLE*));
+void deselect_arts_subject _((ARTICLE*));
 void deselect_subject _((SUBJECT*));
+void deselect_arts_thread _((ARTICLE*));
 void deselect_thread _((ARTICLE*));
 void deselect_all _((void));
 void kill_subject _((SUBJECT*,int));

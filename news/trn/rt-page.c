@@ -1,4 +1,4 @@
-/* $Id: rt-page.c,v 1.4 1993/11/17 23:03:49 nate Exp $
+/* $Id: rt-page.c,v 1.5 1993/12/01 06:38:31 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -155,13 +155,14 @@ try_again:
 	if (sel_page_app) {
 	    int desired_flags = (sel_rereading? AF_READ : 0);
 	    limit = artptr_list + artptr_list_size;
+	    ap = Nullart;
 	    for (app = sel_page_app; app < limit; app++) {
 		ap = *app;
 		if ((ap->flags & (AF_MISSING|AF_READ)) == desired_flags)
 		    break;
 	    }
 	    sort_articles();
-	    if (app == limit)
+	    if (ap == Nullart)
 		sel_page_app = artptr_list + artptr_list_size;
 	    else {
 		for (app = artptr_list; app < limit; app++) {
@@ -467,7 +468,7 @@ try_again:
 	SUBJECT *sp;
 	int line_cnt;
 	bool etc;
-	char ch;
+	char ch = ' ';
 
 	sp = sel_page_sp;
 	do {

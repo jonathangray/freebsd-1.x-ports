@@ -6,7 +6,7 @@ echo "Extracting newsnews (with variable substitutions)"
 cat >newsnews <<!GROK!THIS!
 			*** NEWS NEWS ***
 
-Welcome to trn 3.3.  This is a minor update from 3.2 with some bug fixes
+Welcome to trn 3.4.  This is mainly a bugfix release of version 3.3
 and a few improvements.  Trn is "threaded read news", based on rn.
 
 You can type 'h' at any prompt to display a summary of the commands that
@@ -19,7 +19,7 @@ Wayne Davison  <davison@borland.com>
 !GROK!THIS!
 $eunicefix newsnews
 #
-# $Id: newsnews.SH,v 1.3 1993/11/17 23:03:20 nate Exp $
+# $Id: newsnews.SH,v 1.4 1993/12/01 06:38:16 nate Exp $
 #
 # This software is Copyright 1991 by Stan Barber. 
 #

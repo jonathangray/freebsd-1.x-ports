@@ -1,4 +1,4 @@
-/* $Id: nntpinit.c,v 1.3 1993/11/17 23:03:33 nate Exp $
+/* $Id: nntpinit.c,v 1.4 1993/12/01 06:38:26 nate Exp $
 */
 /* This software is Copyright 1992 by Stan Barber. 
  *
@@ -88,6 +88,7 @@ char *server;
     /* Now get the server's signon message */
     nntp_check(FALSE);
 
+#ifndef NO_INN_SUPPORT
     if (*ser_line == NNTP_CLASS_OK) {
 	/* Send a MODE READER command in case we're talking to innd.
 	** If understood, use that reply. */
@@ -96,6 +97,7 @@ char *server;
 	if (atoi(line2) != NNTP_BAD_COMMAND_VAL)
 	    strcpy(ser_line, line2);
     }
+#endif
     return atoi(ser_line);
 }
 
@@ -103,6 +105,7 @@ int
 get_tcp_socket(server)
 char *server;
 {
+    int portno;	
     int s;
     struct sockaddr_in sin;
 #ifdef __hpux
@@ -128,6 +131,7 @@ char *server;
 	fprintf(stderr, "nntp/tcp: Unknown service.\n");
 	return -1;
     }
+    portno = sp->s_port;
     /* If not a raw ip address, try nameserver */
     if (!isdigit(*server)
      || (long)(defaddr.s_addr = inet_addr(server)) == -1)
@@ -152,7 +156,7 @@ char *server;
 
     bzero((char *) &sin, sizeof(sin));
     sin.sin_family = hp->h_addrtype;
-    sin.sin_port = sp->s_port;
+    sin.sin_port = portno;
 #endif /* !NONETDB */
 
     /* The following is kinda gross.  The name server under 4.3

@@ -1,4 +1,4 @@
-/* $Id: addng.c,v 1.3 1993/11/17 23:02:19 nate Exp $
+/* $Id: addng.c,v 1.4 1993/12/01 06:37:51 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -142,7 +142,7 @@ find_new_groups()
 	if (debug & DEB_NNTP)
 	    printf("<%s\n", ser_line) FLUSH;
 #endif
-	if (ser_line[0] == '.')
+	if (NNTP_LIST_END(ser_line))
 	    break;
 	if ((s = index(ser_line, ' ')) != Nullch)
 	    *s = '\0';

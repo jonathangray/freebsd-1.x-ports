@@ -1,4 +1,4 @@
-/* $Id: nntp.h,v 1.3 1993/11/17 23:03:30 nate Exp $
+/* $Id: nntp.h,v 1.4 1993/12/01 06:38:23 nate Exp $
 */ 
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -16,6 +16,7 @@ bool	nntp_newgroups _((time_t));
 bool	nntp_listgroup _((void));
 char	*nntp_get_a_line _((char*, int));
 char	*nntp_artname _((void));
+char	nntp_handle_timeout _((bool_int));
 void	nntp_cleanup _((void));
 
 #ifdef USE_XTHREAD

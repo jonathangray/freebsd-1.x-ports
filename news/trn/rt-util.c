@@ -1,4 +1,4 @@
-/* $Id: rt-util.c,v 1.3 1993/11/17 23:03:54 nate Exp $
+/* $Id: rt-util.c,v 1.4 1993/12/01 06:38:38 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -160,6 +160,7 @@ int max;
     namelen = mid - name + 1;
     if (mid == s+1) {	/* no middle name */
 	mid = 0;
+	midlen = 0;
     } else {
 	*mid++ = '\0';
 	while (isspace(*mid)) {

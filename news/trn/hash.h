@@ -28,10 +28,9 @@ EXT void hashwalk _((HASHTABLE*,void(*)(),int));
 
 #ifdef DOINIT
 
-#define BADTBL(tbl)	(((tbl)->ht_magic&BYTEMASK) != HASHMAG)
+#define BADTBL(tbl)	((tbl)->ht_magic != HASHMAG)
 
-#define HASHMAG  0257
-#define BYTEMASK 0377
+#define HASHMAG  ((char)0257)
 
 #define HASHENT struct hashent
 

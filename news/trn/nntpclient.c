@@ -1,4 +1,4 @@
-/* $Id: nntpclient.c,v 1.3 1993/11/17 23:03:31 nate Exp $
+/* $Id: nntpclient.c,v 1.4 1993/12/01 06:38:24 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -18,7 +18,7 @@
 #define CANTUSE		\
 	"This machine does not have permission to use the %s news server.\n"
 
-void
+int
 nntp_connect()
 {
     char *server, filebuf[128];
@@ -45,7 +45,8 @@ nntp_connect()
 	    sprintf(ser_line, "\
 Couldn't get name of news server from %s\n\
 Either fix this file, or put NNTPSERVER in your environment.\n", SERVER_NAME);
-	    fatal_error(ser_line);
+	    report_error(ser_line);
+	    return 0;
 	}
     }
 
@@ -54,15 +55,17 @@ Either fix this file, or put NNTPSERVER in your environment.\n", SERVER_NAME);
 	if (atoi(ser_line) == response) {
 	    char tmpbuf[LBUFLEN];
 	    sprintf(tmpbuf,"News server %s unavailable: %s\n",server,&ser_line[4]);
-	    fatal_error(tmpbuf);
+	    report_error(tmpbuf);
+	    return 0;
 	}
     case -1:
 	sprintf(ser_line,"News server %s unavailable, try again later.\n",server);
-	fatal_error(ser_line);
+	report_error(ser_line);
+	return 0;
     case NNTP_ACCESS_VAL:
 	sprintf(ser_line,CANTUSE,server);
-	fatal_error(ser_line);
-	/* NOT REACHED */
+	report_error(ser_line);
+	return 0;
     case NNTP_NOPOSTOK_VAL:
 	advise(CANTPOST);
 	/* FALL THROUGH */
@@ -70,18 +73,23 @@ Either fix this file, or put NNTPSERVER in your environment.\n", SERVER_NAME);
 	break;
     default:
 	sprintf(ser_line,"Unknown response code %d from %s.\n", response, server);
-	fatal_error(ser_line);
+	report_error(ser_line);
+	return 0;
     }
+    return 1;
 }
+
+char last_command[NNTP_STRLEN];
 
 void
 nntp_command(buf)
 char *buf;
 {
-#ifdef DEBUG
+#if defined(DEBUG) && defined(FLUSH)
     if (debug & DEB_NNTP)
 	printf(">%s\n", buf) FLUSH;
 #endif
+    strcpy(last_command, buf);
     fprintf(ser_wr_fp, "%s\r\n", buf);
     fflush(ser_wr_fp);
 }
@@ -100,19 +108,29 @@ bool_int strict;
     sigrelse(SIGINT);
 #endif
     if (n < 0)
+#ifdef fatal_error
 	fatal_error("\nUnexpected close of server socket.\n");
+#else
+	return NNTP_CLASS_FATAL;
+#endif
     n = strlen(ser_line);
     if (n >= 2 && ser_line[n-1] == '\n' && ser_line[n-2] == '\r')
 	ser_line[n-2] = '\0';
-#ifdef DEBUG
+#if defined(DEBUG) && defined(FLUSH)
     if (debug & DEB_NNTP)
 	printf("<%s\n", ser_line) FLUSH;
 #endif
+    if (atoi(ser_line) == NNTP_TMPERR_VAL) {
+	/* See if this was really a timeout */
+	return nntp_handle_timeout(strict);
+    }
+#ifdef fatal_error
     if (strict && *ser_line == NNTP_CLASS_FATAL) {	/* Fatal error */
 	char tmpbuf[LBUFLEN];
 	sprintf(tmpbuf,"\n%s\n",ser_line);
 	fatal_error(tmpbuf);
     }
+#endif
     return *ser_line;
 }
 
@@ -131,7 +149,11 @@ int  len;
     sigrelse(SIGINT);
 #endif
     if (n < 0)
+#ifdef fatal_error
 	fatal_error("\nUnexpected close of server socket.\n");
+#else
+	return -1;
+#endif
     n = strlen(buf);
     if (n >= 2 && buf[n-1] == '\n' && buf[n-2] == '\r')
 	buf[n-2] = '\0';
@@ -139,14 +161,16 @@ int  len;
 }
 
 void
-nntp_close()
+nntp_close(send_quit)
+bool_int send_quit;
 {
     if (ser_wr_fp != NULL && ser_rd_fp != NULL) {
-	nntp_command("QUIT");
+	if (send_quit) {
+	    nntp_command("QUIT");
+	    nntp_check(FALSE);
+	}
 	fclose(ser_wr_fp);
 	ser_wr_fp = NULL;
-
-	nntp_check(FALSE);
 	fclose(ser_rd_fp);
 	ser_rd_fp = NULL;
     }

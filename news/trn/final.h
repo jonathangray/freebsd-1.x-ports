@@ -1,4 +1,4 @@
-/* $Id: final.h,v 1.3 1993/11/17 23:02:51 nate Exp $
+/* $Id: final.h,v 1.4 1993/12/01 06:38:04 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -35,4 +35,8 @@ Signal_t stop_catcher _((int));
 #endif
 
 void	final_init _((void));
-void	finalize _((int));
+void	finalize _((int))
+#if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR >= 5)
+  __attribute__((noreturn))
+#endif
+  ;

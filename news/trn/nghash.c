@@ -1,4 +1,4 @@
-/* $Id: nghash.c,v 1.3 1993/11/17 23:03:25 nate Exp $
+/* $Id: nghash.c,v 1.4 1993/12/01 06:38:20 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber.
  *
@@ -54,12 +54,13 @@ ngdatahash_init()
 
     while (1) {
 	nntp_gets(ser_line, sizeof ser_line);
-	if (ser_line[0] == '.')		/* while there's another line */
+	if (NNTP_LIST_END(ser_line))	/* while there's another line */
 	    break;			/* get it and write it to */
 	fputs(ser_line, actfp);
 	putc('\n', actfp);
     }
 
+    fflush(actfp);
     if (ferror(actfp)) {
 	printf("Error writing to active file %s.\n", active_name) FLUSH;
 	finalize(1);

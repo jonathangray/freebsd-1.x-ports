@@ -1,4 +1,4 @@
-/* $Id: term.c,v 1.4 1993/11/17 23:04:05 nate Exp $
+/* $Id: term.c,v 1.5 1993/12/01 06:38:42 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -493,6 +493,40 @@ register char_int ch;
     return((char) 0);
 }
 
+int not_echoing = 0;
+
+void
+hide_pending()
+{
+    not_echoing = 1;
+    pushchar(0200);
+}
+
+bool
+macro_pending()
+{
+    if (nextout != nextin) {
+	if (circlebuf[nextout] == '\200') {
+	    switch (not_echoing) {
+	    case 0:
+		break;
+	    case 1:
+		nextout++;
+		nextout %= PUSHSIZE;
+		not_echoing = 0;
+		break;
+	    default:
+		circlebuf[nextout] = '\n';
+		not_echoing = 0;
+		break;
+	    }
+	    return nextout != nextin;
+	}
+	return 1;
+    }
+    return 0;
+}
+
 /* input the 2nd and succeeding characters of a multi-character command */
 /* returns TRUE if command finished, FALSE if they rubbed out first character */
 
@@ -508,9 +542,13 @@ int donewline;
     s = buf;
     if (s[1] != FINISHCMD)		/* someone faking up a command? */
 	return TRUE;
+    if (not_echoing)
+	not_echoing = 2;
     do {
       top:
-	if (*(unsigned char *)s < ' ') {
+	if (not_echoing)
+	    ;
+	else if (*(unsigned char *)s < ' ') {
 	    putchar('^');
 	    putchar(*s | 64);
 	}
@@ -638,9 +676,12 @@ bool
 finish_dblchar()
 {
     bool ret;
+    int buflimit_save = buflimit;
+    int not_echoing_save = not_echoing;
     buflimit = 2;
     ret = finish_command(FALSE);
-    buflimit = LBUFLEN;
+    buflimit = buflimit_save;
+    not_echoing = not_echoing_save;
     return ret;
 }
 
@@ -649,7 +690,7 @@ finish_dblchar()
 void
 eat_typeahead()
 {
-    if (!typeahead && nextin==nextout) { /* cancel only keyboard stuff */
+    if (!typeahead && !macro_pending()) { /* cancel only keyboard stuff */
 #ifdef PENDING
 	while (input_pending())
 	    read_tty(buf,sizeof(buf));
@@ -699,7 +740,7 @@ read_tty(addr,size)
 char *addr;
 int size;
 {
-    if (nextout != nextin) {
+    if (macro_pending()) {
 	*addr = circlebuf[nextout++];
 	nextout %= PUSHSIZE;
 	return 1;
@@ -828,7 +869,11 @@ register char *whatbuf;
 
 tryagain:
     curmap = topmap;
-    no_macros = (whatbuf != buf && nextin == nextout); 
+#ifdef OLD_RN_WAY
+    no_macros = (whatbuf != buf && !macro_pending()); 
+#else
+    no_macros = (whatbuf != buf); 
+#endif
     for (;;) {
 	int_count = 0;
 	errno = 0;
@@ -1195,10 +1240,13 @@ int from,to;
 
     if (from == to)
 	return;
-    if (*CM && !muck_up_clear)
-	cmcost = strlen(str = tgoto(CM,0,to));
-    else
+    if (*CM && !muck_up_clear) {
+	str = tgoto(CM,0,to);
+	cmcost = strlen(str);
+    } else {
+	str = Nullch;
 	cmcost = 9999;
+    }
     if (to > from) {
       go_down:
 	if (to - from <= cmcost) {
