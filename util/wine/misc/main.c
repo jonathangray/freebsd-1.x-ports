@@ -236,7 +236,9 @@ static void MAIN_ParseOptions( int *argc, char *argv[] )
     }
 
       /* Use app-defaults */
-    display->db = db;
+/*    display->db = db; */
+    /* gross kludge to get this to compile on R6 XXX */
+    *((struct _XrmHashBucketRec **) display + 29) = db;
 
       /* Get all options */
     if (MAIN_GetResource( db, ".iconic", &value ))
