@@ -20,6 +20,9 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
 #ifndef NM_I386BSD_H
 #define NM_I386BSD_H
 
+/* Be shared lib aware */
+#include "solib.h"
+
 /* This is the amount to subtract from u.u_ar0
    to get the offset in the core file of the register values.  */
 
