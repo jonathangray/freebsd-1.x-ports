@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.15 1994/07/06 18:09:16 ache Exp $
+# $Id: Makefile,v 1.16 1994/07/07 07:58:54 ache Exp $
 #	Makefile.std	4.3	6/11/83
 #
 # C Shell with process control; VM/UNIX VAX Makefile
@@ -21,7 +21,7 @@ BUILD=tcsh
 SUF=o
 CF=-c
 
-INCLUDES=-I. -I..
+INCLUDES=
 
 LFLAGS=$(INCLUDES)
 #LFLAGS=$(INCLUDES) -Zn10000		# hpux lint
@@ -43,7 +43,7 @@ LFLAGS=$(INCLUDES)
 
 # gcc 2.0
 # On the sparc, don't use -O2; it breaks setjmp() and vfork()
-CFLAGS=-O -fomit-frame-pointer $(INCLUDES)
+CFLAGS+=$(INCLUDES)
 
 # gcc-2.1+
 #CFLAGS=-O2 $(INCLUDES)
