@@ -1,16 +1,16 @@
 # This file was generated automatically by configure.  Do not edit.
 VPATH = .
 links = 
-host_alias = i386--386bsd
+host_alias = i386--netbsd
 host_cpu = i386
 host_vendor = 
-host_os = bsd
-host_canonical = i386--bsd
-target_alias = i386--386bsd
+host_os = netbsd
+host_canonical = i386--netbsd
+target_alias = i386--netbsd
 target_cpu = i386
 target_vendor = 
-target_os = bsd
-target_canonical = i386--bsd
+target_os = netbsd
+target_canonical = i386--netbsd
 #
 # Makefile
 #   Copyright (C) 1990, 1991, 1992, 1993 Free Software Foundation
@@ -32,7 +32,7 @@ target_canonical = i386--bsd
 
 srcdir = .
 
-prefix = /usr/gnu
+prefix = /usr/local
 
 exec_prefix = $(prefix)
 bindir = $(exec_prefix)/bin

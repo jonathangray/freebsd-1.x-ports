@@ -1,16 +1,16 @@
 # This file was generated automatically by configure.  Do not edit.
 VPATH = .
 links =  xm.h tm.h nm.h
-host_alias = i386--386bsd
+host_alias = i386--netbsd
 host_cpu = i386
 host_vendor = 
-host_os = bsd
-host_canonical = i386--bsd
-target_alias = i386--386bsd
+host_os = netbsd
+host_canonical = i386--netbsd
+target_alias = i386--netbsd
 target_cpu = i386
 target_vendor = 
-target_os = bsd
-target_canonical = i386--bsd
+target_os = netbsd
+target_canonical = i386--netbsd
 target_makefile_frag = config/i386/i386bsd.mt
 host_makefile_frag = config/i386/i386bsd.mh
 #Copyright 1989, 1990, 1991, 1992, 1993 Free Software Foundation, Inc.
@@ -31,13 +31,13 @@ host_makefile_frag = config/i386/i386bsd.mh
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-prefix = /usr/gnu
+prefix = /usr/local
 
 program_transform_name = 
 exec_prefix = $(prefix)
 bindir = $(exec_prefix)/bin
 libdir = $(exec_prefix)/lib
-tooldir = $(exec_prefix)/i386--386bsd
+tooldir = $(exec_prefix)/i386--netbsd
 
 datadir = $(prefix)/lib
 mandir = $(prefix)/man

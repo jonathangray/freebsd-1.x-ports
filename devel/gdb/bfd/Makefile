@@ -1,22 +1,22 @@
 WORDSIZE=32
 ALL_BACKENDS=$(BFD32_BACKENDS)
-BFD_BACKENDS= i386bsd.o aout32.o stab-syms.o
+BFD_BACKENDS= netbsd386.o aout32.o stab-syms.o
 BFD_MACHINES= cpu-i386.o
-TDEFAULTS = -DDEFAULT_VECTOR=i386bsd_vec -DSELECT_VECS='&i386bsd_vec' -DSELECT_ARCHITECTURES='bfd_i386_arch'
+TDEFAULTS = -DDEFAULT_VECTOR=netbsd386_vec -DSELECT_VECS='&netbsd386_vec' -DSELECT_ARCHITECTURES='bfd_i386_arch'
 # This file was generated automatically by configure.  Do not edit.
 VPATH = .
 links = sysdep.h
-host_alias = i386--386bsd
+host_alias = i386--netbsd
 host_cpu = i386
 host_vendor = 
-host_os = bsd
-host_canonical = i386--bsd
-target_alias = i386--386bsd
+host_os = netbsd
+host_canonical = i386--netbsd
+target_alias = i386--netbsd
 target_cpu = i386
 target_vendor = 
-target_os = bsd
-target_canonical = i386--bsd
-target_makefile_frag = ./config/i386-bsd.mt
+target_os = netbsd
+target_canonical = i386--netbsd
+target_makefile_frag = ./config/i386-netbsd.mt
 host_makefile_frag = config/i386bsd.mh
 #    Makefile template for Configure for the BFD library.
 #    Copyright (C) 1990, 1991, 1992, 1993 Free Software Foundation, Inc.
@@ -40,7 +40,7 @@ host_makefile_frag = config/i386bsd.mh
 
 srcdir = .
 
-prefix = /usr/gnu
+prefix = /usr/local
 
 exec_prefix = $(prefix)
 bindir = $(exec_prefix)/bin
@@ -207,9 +207,9 @@ OPTIONAL_BACKENDS = \
 all:
 
 #### host and target dependent Makefile fragments come in here.
-# Target:  Intel 386 running bsd, using a.out
+# Target:  Intel 386 running netbsd, using (modified) a.out
 
-DEFAULT_VECTOR=i386bsd_vec
+DEFAULT_VECTOR=netbsd386_vec
 SELECT_ARCHITECTURES=bfd_i386_arch
 HDEFINES=-DTRAD_CORE
 HDEPFILES=trad-core.o
