@@ -116,6 +116,9 @@ install: ${PROGRAMS}
 	install -c -m 444 -o bin -g bin ${MAN1} ${NETBSD_MAN1}
 	install -c -m 444 -o bin -g bin ${MAN8} ${NETBSD_MAN8}
 
+pkg: install
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST sup_bin
+
 netcrypt.c: crypt.diffs
 .if defined(USE_CRYPT)
 	ed - crypt/crypt.c < crypt.diffs
