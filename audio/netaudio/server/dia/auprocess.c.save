@@ -1,0 +1,1391 @@
+/*
+ * Copyright 1993 Network Computing Devices, Inc.
+ * 
+ * Permission to use, copy, modify, distribute, and sell this software and its
+ * documentation for any purpose is hereby granted without fee, provided that
+ * the above copyright notice appear in all copies and that both that
+ * copyright notice and this permission notice appear in supporting
+ * documentation, and that the name Network Computing Devices, Inc. not be
+ * used in advertising or publicity pertaining to distribution of this
+ * software without specific, written prior permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED `AS-IS'.  NETWORK COMPUTING DEVICES, INC.,
+ * DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING WITHOUT
+ * LIMITATION ALL IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE, OR NONINFRINGEMENT.  IN NO EVENT SHALL NETWORK
+ * COMPUTING DEVICES, INC., BE LIABLE FOR ANY DAMAGES WHATSOEVER, INCLUDING
+ * SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES, INCLUDING LOSS OF USE, DATA,
+ * OR PROFITS, EVEN IF ADVISED OF THE POSSIBILITY THEREOF, AND REGARDLESS OF
+ * WHETHER IN AN ACTION IN CONTRACT, TORT OR NEGLIGENCE, ARISING OUT OF OR IN
+ * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ * 
+ * $NCDId: @(#)auprocess.c,v 1.11 1994/01/21 22:51:10 greg Exp $
+ */
+
+#include <audio/audio.h>
+#include <audio/Aproto.h>
+#include "au.h"
+
+AuInt32         auMinibufSamples;
+AuUint32        auPhysicalOutputBuffersSize;
+AuUint8        *auPhysicalOutputBuffers;
+
+extern AuUint32 auBytesPerSample[];
+
+static AuUint32 rateConvert8_1(), rateConvert16_1(),
+                rateConvert8_2(), rateConvert16_2(),
+                rateConvert8_n(), rateConvert16_n(),
+                noRateConvert(),
+                rateConvertMonitor_1(), rateConvertMonitor_2(),
+                rateConvertMonitor_n();
+static void     (*writePhysicalOutputs) ();
+static CompiledFlowPtr auFlow;
+static AuUint32 currentSampleRate,
+                readTag;
+static AuFixedPoint maxOutputGain = AuFixedPointFromSum(100, 0),
+                desiredOutputGain;
+static AuBool   processFlowEnabled;
+
+#define	PAD_VALUE	0x80
+
+static void     noop();
+void            AuULAW8ToNative(), AuNativeToULAW8(),
+                AuUnsigned8ToNative(), AuNativeToUnsigned8(),
+                AuSigned8ToNative(), AuNativeToSigned8(),
+                AuUnsigned16MSBToNative(),
+                AuSigned16LSBToNative(),
+                AuUnsigned16LSBToNative(), AuNativeToUnsigned16LSB();
+
+#define AuNativeToUnsigned16MSB 	AuUnsigned16MSBToNative
+#define AuNativeToSigned16LSB		AuSigned16LSBToNative
+
+static struct
+{
+    void            (*toNativeFormat) (),
+                    (*fromNativeFormat) ();
+}               converters[] =
+
+{
+    noop, noop,					/* unused */
+    AuULAW8ToNative, AuNativeToULAW8,		/* ULAW8 */
+    AuUnsigned8ToNative, AuNativeToUnsigned8,	/* LinUnsigned8 */
+    AuSigned8ToNative, AuNativeToSigned8,	/* LinSigned8 */
+    noop, noop,					/* LinSigned16MSB */
+    AuUnsigned16MSBToNative, AuNativeToUnsigned16MSB,	/* LinUnsigned16MSB */
+    AuSigned16LSBToNative, AuNativeToSigned16LSB,	/* LinSigned16LSB */
+    AuUnsigned16LSBToNative, AuNativeToUnsigned16LSB,	/* LinUnsigned16LSB */
+};
+
+static void
+noop()
+{
+}
+
+#define ulawToLinear(_x) ulawToLinearTable[_x]
+
+static AuUint16 ulawToLinearTable[] =
+{
+    0x8284, 0x8684, 0x8a84, 0x8e84, 0x9284, 0x9684, 0x9a84, 0x9e84,
+    0xa284, 0xa684, 0xaa84, 0xae84, 0xb284, 0xb684, 0xba84, 0xbe84,
+    0xc184, 0xc384, 0xc584, 0xc784, 0xc984, 0xcb84, 0xcd84, 0xcf84,
+    0xd184, 0xd384, 0xd584, 0xd784, 0xd984, 0xdb84, 0xdd84, 0xdf84,
+    0xe104, 0xe204, 0xe304, 0xe404, 0xe504, 0xe604, 0xe704, 0xe804,
+    0xe904, 0xea04, 0xeb04, 0xec04, 0xed04, 0xee04, 0xef04, 0xf004,
+    0xf0c4, 0xf144, 0xf1c4, 0xf244, 0xf2c4, 0xf344, 0xf3c4, 0xf444,
+    0xf4c4, 0xf544, 0xf5c4, 0xf644, 0xf6c4, 0xf744, 0xf7c4, 0xf844,
+    0xf8a4, 0xf8e4, 0xf924, 0xf964, 0xf9a4, 0xf9e4, 0xfa24, 0xfa64,
+    0xfaa4, 0xfae4, 0xfb24, 0xfb64, 0xfba4, 0xfbe4, 0xfc24, 0xfc64,
+    0xfc94, 0xfcb4, 0xfcd4, 0xfcf4, 0xfd14, 0xfd34, 0xfd54, 0xfd74,
+    0xfd94, 0xfdb4, 0xfdd4, 0xfdf4, 0xfe14, 0xfe34, 0xfe54, 0xfe74,
+    0xfe8c, 0xfe9c, 0xfeac, 0xfebc, 0xfecc, 0xfedc, 0xfeec, 0xfefc,
+    0xff0c, 0xff1c, 0xff2c, 0xff3c, 0xff4c, 0xff5c, 0xff6c, 0xff7c,
+    0xff88, 0xff90, 0xff98, 0xffa0, 0xffa8, 0xffb0, 0xffb8, 0xffc0,
+    0xffc8, 0xffd0, 0xffd8, 0xffe0, 0xffe8, 0xfff0, 0xfff8, 0x0000,
+    0x7d7c, 0x797c, 0x757c, 0x717c, 0x6d7c, 0x697c, 0x657c, 0x617c,
+    0x5d7c, 0x597c, 0x557c, 0x517c, 0x4d7c, 0x497c, 0x457c, 0x417c,
+    0x3e7c, 0x3c7c, 0x3a7c, 0x387c, 0x367c, 0x347c, 0x327c, 0x307c,
+    0x2e7c, 0x2c7c, 0x2a7c, 0x287c, 0x267c, 0x247c, 0x227c, 0x207c,
+    0x1efc, 0x1dfc, 0x1cfc, 0x1bfc, 0x1afc, 0x19fc, 0x18fc, 0x17fc,
+    0x16fc, 0x15fc, 0x14fc, 0x13fc, 0x12fc, 0x11fc, 0x10fc, 0x0ffc,
+    0x0f3c, 0x0ebc, 0x0e3c, 0x0dbc, 0x0d3c, 0x0cbc, 0x0c3c, 0x0bbc,
+    0x0b3c, 0x0abc, 0x0a3c, 0x09bc, 0x093c, 0x08bc, 0x083c, 0x07bc,
+    0x075c, 0x071c, 0x06dc, 0x069c, 0x065c, 0x061c, 0x05dc, 0x059c,
+    0x055c, 0x051c, 0x04dc, 0x049c, 0x045c, 0x041c, 0x03dc, 0x039c,
+    0x036c, 0x034c, 0x032c, 0x030c, 0x02ec, 0x02cc, 0x02ac, 0x028c,
+    0x026c, 0x024c, 0x022c, 0x020c, 0x01ec, 0x01cc, 0x01ac, 0x018c,
+    0x0174, 0x0164, 0x0154, 0x0144, 0x0134, 0x0124, 0x0114, 0x0104,
+    0x00f4, 0x00e4, 0x00d4, 0x00c4, 0x00b4, 0x00a4, 0x0094, 0x0084,
+    0x0078, 0x0070, 0x0068, 0x0060, 0x0058, 0x0050, 0x0048, 0x0040,
+    0x0038, 0x0030, 0x0028, 0x0020, 0x0018, 0x0010, 0x0008, 0x0000,
+};
+
+#ifndef AU_OPTIMIZE_SINGLE_SAMPLE
+#define _numSamples numSamples
+#else						/* AU_OPTIMIZE_SINGLE_SAMPLE */
+#define _numSamples 1
+#endif						/* AU_OPTIMIZE_SINGLE_SAMPLE */
+
+void
+AuULAW8ToNative(p, tracks, numSamples)
+AuUint8        *p;
+AuInt32         tracks,
+                numSamples;
+{
+    AuUint8        *s;
+    AuInt16         i,
+                   *d;
+
+    s = p + _numSamples * tracks - 1;
+    d = (AuInt16 *) (p + (_numSamples * tracks - 1) * 2);
+
+    for (i = 0; i < _numSamples * tracks; i++, s--, d--)
+	*d = ulawToLinear(*s);
+}
+
+/**
+ * This routine converts from linear to ulaw.
+ *
+ * Craig Reese: IDA/Supercomputing Research Center
+ * Joe Campbell: Department of Defense
+ * 29 September 1989
+ *
+ * References:
+ * 1) CCITT Recommendation G.711  (very difficult to follow)
+ * 2) "A New Digital Technique for Implementation of Any
+ *     Continuous PCM Companding Law," Villeret, Michel,
+ *     et al. 1973 IEEE Int. Conf. on Communications, Vol 1,
+ *     1973, pg. 11.12-11.17
+ * 3) MIL-STD-188-113,"Interoperability and Performance Standards
+ *     for Analog-to_Digital Conversion Techniques,"
+ *     17 February 1987
+ *
+ * Input: Signed 16 bit linear sample
+ * Output: 8 bit ulaw sample
+ */
+
+#if 0
+#define ZEROTRAP				/* turn on the trap as per
+						 * the MIL-STD */
+#define CLIP 32635
+#endif
+
+#define BIAS 0x84				/* define the add-in bias for
+						 * 16 bit samples */
+
+void
+AuNativeToULAW8(s, tracks, numSamples)
+AuInt16        *s;
+AuInt32         tracks,
+                numSamples;
+{
+    static AuInt32  exp_lut[256] =
+    {
+	0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3,
+	4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+	5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+	5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+	6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+	6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+	6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+	6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+	7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+	7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+	7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+	7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+	7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+	7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+	7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+	7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7
+    };
+    AuInt16         sign,
+                    exponent,
+                    mantissa,
+                    sample,
+                    i;
+    AuUint8         ulawbyte,
+                   *d;
+
+    d = (unsigned char *) s;
+
+    for (i = 0; i < _numSamples * tracks; i++, s++, d++)
+    {
+	sample = *s;
+
+	/* Get the sample into sign-magnitude. */
+	sign = (sample >> 8) & 0x80;	       /* set aside the sign */
+
+	if (sign)
+	    sample = -sample;		       /* get magnitude */
+#ifdef CLIP
+	if (sample > CLIP)
+	    sample = CLIP;		       /* clip the magnitude */
+#endif
+	/* Convert from 16 bit linear to ulaw. */
+	sample = sample + BIAS;
+	exponent = exp_lut[(sample >> 7) & 0xff];
+	mantissa = (sample >> (exponent + 3)) & 0xf;
+	ulawbyte = ~(sign | (exponent << 4) | mantissa);
+#ifdef ZEROTRAP
+	if (ulawbyte == 0)
+	    ulawbyte = 0x02;		       /* optional CCITT trap */
+#endif
+	if (ulawbyte == 0x80)
+	  ulawbyte = 0x255;                    /* sweet silence:) amancio */
+
+	*d = ulawbyte;
+    }
+}
+
+void
+AuSigned8ToNative(p, tracks, numSamples)
+AuUint8        *p;
+AuInt32         tracks,
+                numSamples;
+{
+    AuUint8        *s;
+    AuInt16        *d;
+    AuInt32         i;
+
+    s = p + _numSamples * tracks - 1;
+    d = (AuInt16 *) (p + (_numSamples * tracks - 1) * 2);
+
+    for (i = 0; i < _numSamples * tracks; i++, s--, d--)
+	*d = *s << 8;
+}
+
+void
+AuNativeToSigned8(s, tracks, numSamples)
+AuUint16       *s;
+AuInt32         tracks,
+                numSamples;
+{
+    AuUint8        *d = (AuUint8 *) s;
+    AuInt32         i;
+
+    for (i = 0; i < _numSamples * tracks; i++, s++, d++)
+	*d = *s >> 8;
+}
+
+void
+AuUnsigned8ToNative(p, tracks, numSamples)
+AuUint8        *p;
+AuInt32         tracks,
+                numSamples;
+{
+    AuUint8        *s;
+    AuInt16        *d;
+    AuInt32         i;
+
+    s = p + _numSamples * tracks - 1;
+    d = (AuInt16 *) (p + (_numSamples * tracks - 1) * 2);
+
+    for (i = 0; i < _numSamples * tracks; i++, s--, d--)
+	*d = (*s << 8) ^ 0x8000;
+}
+
+void
+AuNativeToUnsigned8(s, tracks, numSamples)
+AuInt16        *s;
+AuInt32         tracks,
+                numSamples;
+{
+    AuInt32         i;
+    AuUint8        *d = (AuUint8 *) s;
+
+    for (i = 0; i < _numSamples * tracks; i++, s++, d++)
+	*d = (*s ^ 0x8000) >> 8;
+}
+
+void
+AuUnsigned16MSBToNative(p, tracks, numSamples)
+AuUint16       *p;
+AuInt32         tracks,
+                numSamples;
+{
+    AuInt32         i;
+
+    for (i = 0; i < _numSamples * tracks; i++)
+	*p++ ^= 0x8000;
+}
+
+void
+AuUnsigned16LSBToNative(p, tracks, numSamples)
+AuUint16       *p;
+AuInt32         tracks,
+                numSamples;
+{
+    AuInt32         i;
+
+    for (i = 0; i < _numSamples * tracks; i++)
+	*p++ = (*((AuUint8 *) p) | (*((AuUint8 *) p + 1)) << 8) ^ 0x8000;
+}
+
+void
+AuNativeToUnsigned16LSB(p, tracks, numSamples)
+AuInt16        *p;
+AuInt32         tracks,
+                numSamples;
+{
+    AuInt32         i;
+
+    for (i = 0; i < _numSamples * tracks; i++)
+	*p++ = (*((AuUint8 *) p) | (*((AuUint8 *) p + 1)) << 8) ^ 0x0080;
+}
+
+void
+AuSigned16LSBToNative(p, tracks, numSamples)
+AuUint16       *p;
+AuInt32         tracks,
+                numSamples;
+{
+    AuInt32         i;
+
+    for (i = 0; i < _numSamples * tracks; i++)
+	*p++ = *((AuUint8 *) p) | (*((AuUint8 *) p + 1) << 8);
+}
+
+/* returns AuTrue if a flow was started */
+AuBool
+AuStartFlow(newFlow, pOldFlow)
+CompiledFlowPtr newFlow,
+               *pOldFlow;
+{
+    AuBool          status;
+    AuBlock         l;
+
+    if (newFlow)
+	AuCallback(AuSetWritePhysicalOutputFunctionCB,
+		   (newFlow, &writePhysicalOutputs));
+
+    l = AuBlockAudio();
+
+    *pOldFlow = auFlow;
+
+    if (newFlow && newFlow->numOutputs)
+    {
+	AuInt32         i,
+	                j;
+	CompiledFlowOutputPtr output;
+
+	auFlow = newFlow;
+	status = AuTrue;
+	readTag = 0;
+
+	for (i = 0; i < auFlow->numOutputs; i++)
+	{
+	    output = &auFlow->outputs[i];
+
+	    for (j = 0; j < output->numInputs; j++)
+		*output->inputs[j].preadTag = 0;
+	}
+    }
+    else
+    {
+	auFlow = (CompiledFlowPtr) 0;
+	status = AuFalse;
+    }
+
+    AuUnBlockAudio(l);
+
+    if (status)
+    {
+	if (!processFlowEnabled)
+	{
+	    AuCallback(AuEnableProcessFlowCB, ());
+	    processFlowEnabled = AuTrue;
+	}
+    }
+    else if (processFlowEnabled)
+    {
+	AuCallback(AuDisableProcessFlowCB, ());
+	processFlowEnabled = AuFalse;
+    }
+
+    return status;
+}
+
+static AuBool
+readWaveForm(input)
+CompiledFlowInputPtr input;
+{
+    ComponentPtr    c = input->component;
+    FlowElementPtr  flowEl = input->flowEl;
+    AuUint8        *s,
+                   *d;
+    AuUint32        size,
+                    bytesOut,
+                    bytesIn,
+                    available,
+                    wavePhase,
+                    waveMask,
+                   *plimit;
+
+    if (flowEl->parmsChanged)
+    {
+	int             scale = c->waveSize / auNativeBytesPerSample;
+
+	c->wavePhase = c->readPhase = 0;
+	flowEl->countSamples = flowEl->raw->importwaveform.num_samples !=
+	    AuUnlimitedSamples;
+
+	if (flowEl->countSamples)
+	    flowEl->numBytes = flowEl->raw->importwaveform.num_samples *
+		sizeofFormat(c->format) * c->numTracks * scale;
+
+	c->frequency = flowEl->raw->importwaveform.frequency * scale;
+
+	flowEl->parmsChanged = AuFalse;
+    }
+
+    wavePhase = c->wavePhase;
+    waveMask = c->waveSize - 1;
+    d = flowEl->minibuf;
+    plimit = flowEl->countSamples ? &flowEl->numBytes : &c->waveSize;
+
+    /* how much do we want */
+    size = flowEl->minibufChunk;
+
+    while (size && *plimit)
+    {
+	available = aumin(c->waveSize - wavePhase, *plimit);
+	s = c->read + wavePhase;
+
+	/* do the rate conversion */
+	bytesOut = rateConvert16_1(s, d, size, available, &bytesIn,
+				   c->frequency, currentSampleRate,
+				   &c->readPhase, c->lastRead, c->numTracks);
+	size -= bytesOut;
+	d += bytesOut;
+	flowEl->numBytes -= bytesIn;
+	wavePhase = (wavePhase + bytesIn) & waveMask;
+    }
+
+    c->wavePhase = wavePhase;
+
+    /* did we run out of data? */
+    if (flowEl->countSamples && size)
+    {
+	auset(d, PAD_VALUE, size);
+
+	return AuChangeElementState(flowEl->flow, flowEl->elementNum,
+				    AuStateStop, AuFalse, AuReasonEOF);
+    }
+
+    return AuFalse;
+}
+
+static AuBool
+readBucket(input)
+CompiledFlowInputPtr input;
+{
+    ComponentPtr    c = input->component;
+    FlowElementPtr  flowEl = input->flowEl;
+    AuUint8        *s,
+                   *d;
+    AuUint32        size,
+                    bytesOut,
+                    bytesIn,
+                    available;
+
+    if (flowEl->parmsChanged)
+    {
+	AuUint32        n;
+
+	flowEl->readPhase = 0;
+	n = sizeofFormat(c->format) * c->numTracks;
+	flowEl->read = c->data + flowEl->raw->importbucket.offset * n;
+
+	if (flowEl->countSamples)
+	    flowEl->numBytes = flowEl->raw->importbucket.num_samples * n;
+
+	flowEl->parmsChanged = AuFalse;
+    }
+
+    s = flowEl->read;
+    d = flowEl->minibuf;
+
+    /* how much do we want */
+    size = flowEl->minibufChunk;
+
+    /* how much can we get from the bucket */
+    available = c->dataEnd - s;
+
+    if (flowEl->countSamples)
+	available = aumin(available, flowEl->numBytes);
+
+    /* do the rate conversion */
+    bytesOut = (*input->rateConvert) (s, d, size, available, &bytesIn,
+				      flowEl->sampleRate, currentSampleRate,
+				      &flowEl->readPhase,
+				      flowEl->lastRead, c->numTracks);
+
+    flowEl->read = s + bytesIn;
+    flowEl->numBytes -= bytesIn;
+
+    /* did we run out of data? */
+    if (bytesOut < size)
+    {
+	auset(d + bytesOut, PAD_VALUE, size - bytesOut);
+
+	return AuChangeElementState(flowEl->flow, flowEl->elementNum,
+				    AuStateStop, AuFalse, AuReasonEOF);
+    }
+
+    return AuFalse;
+}
+
+static AuBool
+readClient(input)
+CompiledFlowInputPtr input;
+{
+    ComponentPtr    c = input->component;
+    FlowElementPtr  flowEl = input->flowEl;
+    AuUint8        *s,
+                   *d;
+    AuUint32        pass1,
+                    size,
+                    totalBytesIn,
+                    available,
+                    bytesOut,
+                    prevSize,
+                    newSize;
+
+    s = c->read;
+    d = flowEl->minibuf;
+
+    /* how much do we want */
+    size = flowEl->minibufChunk;
+
+    /* how much can we get from the port */
+    available = aumin(c->currentSize, size);
+
+    /* how much can we get before we need to wrap */
+    pass1 = aumin(c->dataEnd - s, c->currentSize);
+
+    /* do the rate conversion */
+    bytesOut = (*input->rateConvert) (s, d, size, pass1, &totalBytesIn,
+				      c->sampleRate, currentSampleRate,
+				  &c->readPhase, c->lastRead, c->numTracks);
+
+    /* wrap if necessary */
+    if ((s += totalBytesIn) == c->dataEnd)
+	s = c->data;
+
+    /* have we read all we can? */
+    if (bytesOut < available)
+    {
+	AuUint32        pass2 = aumin(c->dataEnd - s,
+				      c->currentSize - totalBytesIn),
+	                bytesIn;
+
+	d += bytesOut;
+	size -= bytesOut;
+
+	bytesOut += (*input->rateConvert) (s, d, size, pass2, &bytesIn,
+					   c->sampleRate, currentSampleRate,
+					   &c->readPhase, c->lastRead,
+					   c->numTracks);
+
+	s += bytesIn;
+	totalBytesIn += bytesIn;
+    }
+
+    c->read = s;
+    prevSize = c->currentSize;
+    newSize = c->currentSize -= totalBytesIn;
+
+    /* did we underrun? */
+    if (bytesOut < flowEl->minibufChunk)
+    {
+	AuInt32         newState,
+	                reason;
+
+	auset(flowEl->minibuf + bytesOut, PAD_VALUE,
+	      flowEl->minibufChunk - bytesOut);
+
+	/* if we've received an EOF then stop */
+	if (c->eof)
+	{
+	    newState = AuStateStop;
+	    reason = AuReasonEOF;
+	}
+	else
+	{
+	    /* otherwise pause */
+	    newState = AuStatePause;
+	    reason = AuReasonUnderrun;
+	}
+
+	return AuChangeElementState(flowEl->flow, flowEl->elementNum,
+				    newState, AuFalse, reason);
+    }
+
+    /*
+     * see if we hit the low water mark but don't ask for more if we've
+     * already received an EOF
+     */
+    if ((prevSize > c->lowWaterMark || !c->incoming) &&
+	newSize <= c->lowWaterMark && !c->eof)
+	AuRequestElementNotifyEvent(AuElementNotifyKindLowWater,
+				    AuReasonWatermark, flowEl);
+
+    return AuFalse;
+}
+
+static AuBool
+readDevice(input)
+CompiledFlowInputPtr input;
+{
+    FlowElementPtr  flowEl = input->flowEl;
+
+    if (flowEl->countSamples)
+	if (flowEl->numBytes < flowEl->minibufChunk)
+	    return AuChangeElementState(flowEl->flow, flowEl->elementNum,
+					AuStateStop, AuFalse, AuReasonEOF);
+	else
+	    flowEl->numBytes -= flowEl->minibufChunk;
+
+    return AuFalse;
+}
+
+static AuBool
+readInput(input)
+CompiledFlowInputPtr input;
+{
+    AuBool          flowStateChanged;
+    FlowElementPtr  flowEl = input->flowEl;
+
+    flowStateChanged = (*input->readInput) (input);
+
+    /* convert to native format */
+    (*flowEl->toNativeFormat)
+	(flowEl->minibuf, input->component->numTracks, auMinibufSamples);
+
+    *input->preadTag = readTag;
+
+    return flowStateChanged;
+}
+
+static AuBool
+writeClient(output)
+CompiledFlowOutputPtr output;
+{
+    ComponentPtr    c = output->component;
+    FlowElementPtr  flowEl = output->flowEl;
+    AuUint8        *s,
+                   *d;
+    AuUint32        pass1,
+                    size,
+                    bytesIn,
+                    bytesOut,
+                    prevSize,
+                    newSize;
+    AuBool          overrun;
+
+    s = flowEl->minibuf;
+    d = c->write;
+
+    /* how much do we want */
+    size = flowEl->minibufChunk;
+
+    overrun = size > (c->dataSize - c->currentSize);
+
+    /* how much can we send before we need to wrap */
+    pass1 = aumin(c->dataEnd - d, c->dataSize - c->currentSize);
+
+    /* do the rate conversion */
+    bytesOut = (*output->rateConvert) (s, d, pass1, size, &bytesIn,
+				       currentSampleRate, c->sampleRate,
+				&c->writePhase, c->lastWrite, c->numTracks);
+
+    /* wrap if necessary */
+    if ((d += bytesOut) == c->dataEnd)
+	d = c->data;
+
+    /* have we written all we can? */
+    if (pass1 < size)
+    {
+	AuUint32        pass2 = aumin(size - pass1, c->dataEnd - d),
+	                n;
+
+	s += bytesIn;
+	size -= bytesIn;
+
+	n = (*output->rateConvert) (s, d, pass2, size, &bytesIn,
+				    currentSampleRate, c->sampleRate,
+				    &c->writePhase, c->lastWrite,
+				    c->numTracks);
+
+	d += n;
+	bytesOut += n;
+    }
+
+    c->write = d;
+    prevSize = c->currentSize;
+    newSize = c->currentSize += bytesOut;
+
+    /* did we overrun? */
+    if (overrun)
+	return AuChangeElementState(flowEl->flow, flowEl->elementNum,
+				    AuStatePause, AuFalse,
+				    AuReasonOverrun);
+
+    /* see if we hit the high water mark */
+    if ((prevSize < c->highWaterMark || !c->outgoing) &&
+	newSize >= c->highWaterMark)
+	AuRequestElementNotifyEvent(AuElementNotifyKindHighWater,
+				    AuReasonWatermark, flowEl);
+
+    return AuFalse;
+}
+
+static AuBool
+writeBucket(output)
+CompiledFlowOutputPtr output;
+{
+    ComponentPtr    c = output->component;
+    FlowElementPtr  flowEl = output->flowEl;
+    AuUint8        *s,
+                   *d;
+    AuUint32        size,
+                    bytesIn,
+                    bytesOut;
+    AuBool          overrun;
+
+    if (flowEl->parmsChanged)
+    {
+	AuUint32        n;
+
+	flowEl->writePhase = 0;
+	n = sizeofFormat(c->format) * c->numTracks;
+	flowEl->write = c->data + flowEl->raw->exportbucket.offset * n;
+
+	if (flowEl->countSamples)
+	    flowEl->numBytes = flowEl->raw->exportbucket.num_samples * n;
+
+	flowEl->parmsChanged = AuFalse;
+    }
+
+    s = flowEl->minibuf;
+    d = flowEl->write;
+
+    /* how much do we want */
+    size = flowEl->minibufChunk;
+
+    overrun = size > (c->dataEnd - d);
+
+    if (flowEl->countSamples)
+	size = aumin(size, flowEl->numBytes);
+
+    /* do the rate conversion */
+    bytesOut = (*output->rateConvert) (s, d, c->dataEnd - d, size, &bytesIn,
+				       currentSampleRate, c->sampleRate,
+				       &flowEl->writePhase,
+				       flowEl->lastWrite, c->numTracks);
+
+    flowEl->write = d + bytesOut;
+    flowEl->numBytes -= bytesOut;
+
+    /* did we overrun? */
+    if (overrun)
+	return AuChangeElementState(flowEl->flow, flowEl->elementNum,
+				    AuStateStop, AuFalse, AuReasonEOF);
+
+    return AuFalse;
+}
+
+
+static AuBool
+writeMonitor(output)
+CompiledFlowOutputPtr output;
+{
+    ComponentPtr    c = output->component;
+    FlowElementPtr  flowEl = output->flowEl;
+    AuInt32         out;
+
+    if (out = (*flowEl->rateConvertMonitor) (c, flowEl))
+    {
+	AuInt16        *s = (AuInt16 *) c->write;
+
+	/* convert from native format */
+	(*flowEl->fromNativeFormat) (s, c->numTracks, out << 1);
+
+	while (out--)
+	{
+	    AuRequestMonitorNotifyEvent(flowEl, s);
+	    s += c->numTracks;
+	}
+
+	return AuTrue;
+    }
+
+    return AuFalse;
+}
+
+static AuBool
+writeDevice(output)
+CompiledFlowOutputPtr output;
+{
+    FlowElementPtr  flowEl = output->flowEl;
+
+    if (flowEl->countSamples)
+	if (flowEl->numBytes < flowEl->minibufChunk)
+	    return AuChangeElementState(flowEl->flow, flowEl->elementNum,
+					AuStateStop, AuFalse, AuReasonEOF);
+	else
+	    flowEl->numBytes -= flowEl->minibufChunk;
+
+    return AuFalse;
+}
+
+static AuBool
+writeOutput(output)
+CompiledFlowOutputPtr output;
+{
+    FlowElementPtr  flowEl = output->flowEl;
+
+    if (output->component->kind != AuComponentKindPhysicalOutput &&
+	flowEl->raw->type != AuElementTypeExportMonitor)
+	/* convert from native format */
+	(*flowEl->fromNativeFormat)
+	    (flowEl->minibuf, output->component->numTracks, auMinibufSamples);
+
+    return (*output->writeOutput) (output);
+}
+
+static void
+accumulateOutput(input, output)
+CompiledFlowInputPtr input;
+CompiledFlowOutputPtr output;
+{
+    AuInt16        *in,
+                   *out;
+    AuUint32        i,
+                    j;
+    AuInt32         multiplyConstant,
+                    addConstant;
+
+    in = (AuInt16 *) input->flowEl->minibuf;
+    out = (AuInt16 *) output->flowEl->minibuf;
+    multiplyConstant = input->multiplyConstant;
+    addConstant = input->addConstant;
+
+    /*
+     * input->numTracks == 0 means all input tracks map directly to the
+     * output tracks
+     */
+    if (input->numTracks)
+	for (i = 0; i < auMinibufSamples; i++,
+	     out += output->component->numTracks,
+	     in += input->component->numTracks)
+	    for (j = 0; j < input->numTracks; j++)
+		out[input->outTrack[j]] += (in[input->inTrack[j]] *
+				      multiplyConstant + addConstant) >> 16;
+    else
+	for (i = 0; i < auMinibufSamples; i++)
+	    for (j = 0; j < output->component->numTracks; j++)
+		*out++ += (*in++ * multiplyConstant + addConstant) >> 16;
+}
+
+static void
+accumulateOutputSimple(input, output)
+CompiledFlowInputPtr input;
+CompiledFlowOutputPtr output;
+{
+    AuInt16        *in,
+                   *out;
+    AuUint32        i;
+    AuInt32         multiplyConstant;
+
+    in = (AuInt16 *) input->flowEl->minibuf;
+    out = (AuInt16 *) output->flowEl->minibuf;
+    multiplyConstant = input->multiplyConstant;
+
+    for (i = 0; i < auMinibufSamples; i++)
+	*out++ += (*in++ * multiplyConstant) >> 16;
+}
+
+/* process an audio flow */
+void
+AuProcessFlow(fl, clocked)
+CompiledFlowPtr fl;
+AuBool          clocked;
+{
+    AuInt32         i,
+                    j;
+    CompiledFlowOutputPtr output;
+    CompiledFlowInputPtr input;
+    AuBool          flowStateChanged = AuFalse;
+
+    if (fl->physicalDeviceMask & AllPhysicalInputs)
+	AuCallback(AuReadPhysicalInputsCB, ());
+
+    readTag++;
+
+    /* clear the physical output buffers */
+    if (clocked)
+	auclr(auPhysicalOutputBuffers, auPhysicalOutputBuffersSize);
+
+    for (i = 0; i < fl->numOutputs; i++)
+    {
+	AuUint32        outputState;
+
+	output = &fl->outputs[i];
+	outputState = output->flowEl->state;
+
+	/* clear the output minibuffer */
+	if (output->component->kind != AuComponentKindPhysicalOutput)
+	    bzero(output->flowEl->minibuf, output->component->minibufSize);
+
+	for (j = 0; j < output->numInputs; j++)
+	{
+	    input = &output->inputs[j];
+
+	    if (input->flowEl->state == AuStateStart)
+	    {
+		if (*input->preadTag != readTag)
+		    flowStateChanged |= readInput(input);
+
+		if (outputState == AuStateStart)
+		    (*fl->accumulateOutput) (input, output);
+	    }
+	}
+
+	if (outputState == AuStateStart)
+	    flowStateChanged |= writeOutput(output);
+    }
+
+    if (clocked)
+    {
+	(*writePhysicalOutputs) (fl);
+
+	if (flowStateChanged)
+	    AuRequestElementNotifyEvent(AuElementNotifyKindSpecial, 0,
+					(FlowElementPtr) 0);
+    }
+}
+
+void
+AuProcessData()
+{
+    if (auFlow)
+	AuProcessFlow(auFlow, AuTrue);
+    else if (processFlowEnabled)
+    {
+	AuCallback(AuDisableProcessFlowCB, ());
+	processFlowEnabled = AuFalse;
+    }
+}
+
+void
+AuSetInputGainAndLineMode(gain, lineMode)
+AuFixedPoint    gain;
+AuUint8         lineMode;
+{
+    AuCallback(AuSetPhysicalInputGainAndLineModeCB, (gain, lineMode));
+}
+
+void
+AuSetOutputGain(gain)
+AuFixedPoint    gain;
+{
+    desiredOutputGain = gain;
+
+    if (gain > maxOutputGain)
+	gain = maxOutputGain;
+
+    AuCallback(AuSetPhysicalOutputGainCB, (gain));
+}
+
+AuFixedPoint
+AuGetOutputGain()
+{
+    return (AuFixedPoint) AuCallback(AuGetPhysicalOutputGainCB, ());
+}
+
+void
+AuSetMaxOutputGain(gain)
+AuFixedPoint    gain;
+{
+    maxOutputGain = gain;
+    AuSetOutputGain(desiredOutputGain);
+}
+
+AuUint32
+AuGetMaxOutputGain()
+{
+    return maxOutputGain;
+}
+
+static void
+doSetup(flowEl, rateConverter, globalRate)
+FlowElementPtr  flowEl;
+AuUint32        (**rateConverter) (),
+                globalRate;
+{
+    AuUint32        elementRate;
+    AuInt32         format,
+                    bytesPerSample;
+
+    format = flowEl->component->format;
+    bytesPerSample = auBytesPerSample[format];
+
+    if (!flowEl->setup)
+    {
+	flowEl->toNativeFormat = converters[format].toNativeFormat;
+	flowEl->fromNativeFormat = converters[format].fromNativeFormat;
+
+	if (flowEl->raw->type == AuElementTypeExportMonitor)
+	{
+	    flowEl->minibufChunk = (flowEl->component->minibufSize >> 1) /
+		flowEl->component->numTracks;
+	    if (flowEl->component->numTracks == 1)
+		flowEl->rateConvertMonitor = rateConvertMonitor_1;
+	    else if (flowEl->component->numTracks == 2)
+		flowEl->rateConvertMonitor = rateConvertMonitor_2;
+	    else
+		flowEl->rateConvertMonitor = rateConvertMonitor_n;
+	}
+	else
+	    flowEl->minibufChunk = flowEl->component->minibufSize;
+
+	if (bytesPerSample == 1)
+	    flowEl->minibufChunk >>= 1;
+
+	flowEl->setup = AuTrue;
+    }
+
+    elementRate = flowEl->raw->type == AuElementTypeImportBucket ?
+	flowEl->sampleRate : flowEl->component->sampleRate;
+
+    if (elementRate == globalRate)
+	*rateConverter = noRateConvert;
+    else if (flowEl->component->numTracks == 1)
+	*rateConverter = bytesPerSample == 1 ? rateConvert8_1 : rateConvert16_1;
+    else if (flowEl->component->numTracks == 2)
+	*rateConverter = bytesPerSample == 1 ? rateConvert8_2 : rateConvert16_2;
+    else
+	*rateConverter = bytesPerSample == 1 ? rateConvert8_n : rateConvert16_n;
+}
+
+void
+AuSetupCompiledFlow(fl, rate)
+CompiledFlowPtr fl;
+AuUint32        rate;
+{
+    CompiledFlowOutputPtr output;
+    CompiledFlowInputPtr input;
+    AuInt32         i,
+                    j;
+    AuBool          simple = AuTrue;
+    extern auConnSetup auSetup;
+    static AuBool   (*readInputTable[]) () =
+    {
+	readClient, readDevice, readBucket, readWaveForm
+    };
+    static AuBool   (*writeOutputTable[]) () =
+    {
+	writeClient, writeDevice, writeBucket, (AuBool (*) ()) noop,
+	writeMonitor
+    };
+
+    if (rate)
+    {
+	if (rate > auSetup.maxSampleRate)
+	    rate = auSetup.maxSampleRate;
+
+	if (rate < auSetup.minSampleRate)
+	    rate = auSetup.minSampleRate;
+
+	if (CallbackExists(AuSetSampleRateCB))
+	{
+	    currentSampleRate = rate =
+		(AuUint32) AuCallback(AuSetSampleRateCB, (rate));
+	}
+	else
+	    currentSampleRate = rate;
+    }
+
+    if (CallbackExists(AuSetupCompiledFlowCB))
+    {
+	AuCallback(AuSetupCompiledFlowCB, (fl, rate, readInputTable,
+					   writeOutputTable, doSetup));
+	return;
+    }
+
+    for (i = 0; i < fl->numOutputs; i++)
+    {
+	output = &fl->outputs[i];
+
+	if (output->component->numTracks > 1)
+	    simple = AuFalse;
+
+	for (j = 0; j < output->numInputs; j++)
+	{
+	    input = &output->inputs[j];
+
+	    if (input->addConstant || input->numTracks)
+		simple = AuFalse;
+
+	    input->readInput = readInputTable[input->flowEl->raw->type];
+	    doSetup(input->flowEl, &input->rateConvert, rate);
+	}
+
+	output->writeOutput = writeOutputTable[output->flowEl->raw->type -
+					       AuElementTypeExportClient];
+	doSetup(output->flowEl, &output->rateConvert, rate);
+    }
+
+    fl->accumulateOutput = simple ? accumulateOutputSimple : accumulateOutput;
+
+    return;
+}
+
+#define rateConvert(_name, _type, _bps, _copyIn, _copyOut, _tracks)	      \
+static AuUint32								      \
+_name(src, dst, wanted, available, bytesRead, fromRate, toRate, pphase, last, \
+      numTracks)							      \
+_type          *src,							      \
+               *dst,							      \
+               *last;							      \
+AuUint32        wanted,							      \
+                available,						      \
+               *bytesRead,						      \
+                numTracks;						      \
+long           *pphase,							      \
+                fromRate,						      \
+                toRate;							      \
+{									      \
+    AuUint32        size = _tracks * _bps,				      \
+                    read = 0,						      \
+                    written = 0;					      \
+    long            phase = *pphase;					      \
+									      \
+    while (wanted)							      \
+    {									      \
+	while (phase >= 0)						      \
+	{								      \
+	    if (!available)						      \
+	    {								      \
+		*pphase = phase;					      \
+		*bytesRead = read;					      \
+		return written;						      \
+	    }								      \
+									      \
+	    available -= size;						      \
+	    read += size;						      \
+	    phase -= toRate;						      \
+									      \
+	    _copyIn;							      \
+	}								      \
+									      \
+	wanted -= size;							      \
+	written += size;						      \
+	phase += fromRate;						      \
+									      \
+	_copyOut;							      \
+    }									      \
+									      \
+    *pphase = phase;							      \
+    *bytesRead = read;							      \
+    return written;							      \
+}
+
+#define COPY_IN_1	*last = *src++
+#define COPY_OUT_1	*dst++ = *last
+
+#define COPY_IN_2	last[0] = *src++; last[1] = *src++
+#define COPY_OUT_2	*dst++ = last[0]; *dst++ = last[1]
+
+#define COPY_IN_N	aucopy(src, last, size); src += numTracks
+#define COPY_OUT_N	aucopy(last, dst, size); dst += numTracks
+
+rateConvert(rateConvert16_1, AuUint16, 2, COPY_IN_1, COPY_OUT_1, 1)
+rateConvert(rateConvert8_1, AuUint8, 1, COPY_IN_1, COPY_OUT_1, 1)
+rateConvert(rateConvert16_2, AuUint16, 2, COPY_IN_2, COPY_OUT_2, 2)
+rateConvert(rateConvert8_2, AuUint8, 1, COPY_IN_2, COPY_OUT_2, 2)
+rateConvert(rateConvert16_n, AuUint16, 2, COPY_IN_N, COPY_OUT_N, numTracks)
+rateConvert(rateConvert8_n, AuUint8, 1, COPY_IN_N, COPY_OUT_N, numTracks)
+
+static AuUint32
+noRateConvert(src, dst, wanted, available, bytesRead, fromRate, toRate, pphase,
+	      last, numTracks)
+AuUint8        *src,
+               *dst,
+               *last;
+AuUint32        wanted,
+                available,
+               *bytesRead,
+                numTracks;
+long           *pphase,
+                fromRate,
+                toRate;
+{
+    AuInt32         size = aumin(wanted, available);
+
+    aucopy(src, dst, size);
+    *bytesRead = size;
+    return size;
+}
+
+#define INIT_VAL	0x7fff8001
+
+#define MM_1	AuInt16 *min = last, *max = last + 1;
+
+#undef COPY_IN_1
+#define COPY_IN_1							      \
+{									      \
+    AuInt16 val = *s++;							      \
+									      \
+    if (val < *min)							      \
+	*min = val;							      \
+									      \
+    if (val > *max)							      \
+	*max = val;							      \
+}
+
+#define MM_2	AuInt16 *min0 = last, *max0 = last + 1,			      \
+ 			*min1 = last + 2, *max1 = last + 3;
+
+#undef COPY_IN_2
+#define COPY_IN_2							      \
+{									      \
+    AuInt16         val = *s++;						      \
+									      \
+    if (val < *min0)							      \
+	*min0 = val;							      \
+									      \
+    if (val > *max0)							      \
+	*max0 = val;							      \
+									      \
+    val = *s++;								      \
+									      \
+    if (val < *min1)							      \
+	*min1 = val;							      \
+									      \
+    if (val > *max1)							      \
+	*max1 = val;							      \
+}
+
+#undef COPY_IN_N
+#define COPY_IN_N							      \
+{									      \
+    AuInt32 i;								      \
+    AuInt16 *p;								      \
+									      \
+    for (i = 0, p = last; i < numTracks; i++, p += 2)			      \
+    {									      \
+	AuInt16           val;						      \
+									      \
+	val = *s++;							      \
+									      \
+	/* look for a new min */					      \
+	if (val < p[0])							      \
+	    p[0] = val;							      \
+									      \
+	/* look for a new max */					      \
+	if (val > p[1])							      \
+	    p[1] = val;							      \
+    }									      \
+}
+
+#undef COPY_OUT_N
+#define COPY_OUT_N 	aucopy(last, d, numTracks << 2); d += numTracks
+
+#undef COPY_OUT_1
+#define COPY_OUT_1							      \
+{									      \
+    AuUint32 *_t;							      \
+									      \
+    _t = (AuUint32 *) d;						      \
+    *_t++ = *(AuUint32 *) last;						      \
+    d = (AuInt16 *) _t;							      \
+}
+
+#undef COPY_OUT_2
+#define COPY_OUT_2							      \
+{									      \
+    AuUint32 *_t;							      \
+									      \
+    COPY_OUT_1;								      \
+									      \
+    _t = (AuUint32 *) d;						      \
+    *_t++ = *(((AuUint32 *) last) + 1);					      \
+    d = (AuInt16 *) _t;							      \
+}
+
+#define INIT_1								      \
+{									      \
+    AuUint32 *_t;							      \
+									      \
+    _t = (AuUint32 *) last;						      \
+    *_t = INIT_VAL;							      \
+}
+
+#define INIT_2								      \
+{									      \
+    AuUint32 *_t;							      \
+   									      \
+    INIT_1;								      \
+    _t = ((AuUint32 *) last) + 1;					      \
+    *_t = INIT_VAL;							      \
+}
+
+#define INIT_N								      \
+{									      \
+    AuInt32 i;								      \
+    AuUint32 *p1;							      \
+									      \
+    for (i = 0, p1 = (AuUint32 *) last; i < numTracks; i++)		      \
+	*p1++ = INIT_VAL;						      \
+}
+
+#define rateConvertMonitor(_name, _copyIn, _copyOut, _init, _minmax)	      \
+static AuUint32								      \
+_name(c, flowEl)							      \
+ComponentPtr    c;							      \
+FlowElementPtr  flowEl;							      \
+{									      \
+    AuInt16        *s = (AuInt16 *) flowEl->minibuf,			      \
+                   *d = (AuInt16 *) c->write,				      \
+                   *last = (AuInt16 *) c->lastWrite;			      \
+    AuUint32        maxIn,						      \
+                    maxOut,						      \
+                    totalOut = 0,					      \
+                    fromRate = currentSampleRate,			      \
+                    toRate = c->sampleRate;				      \
+    AuInt32         writePhase = c->writePhase,				      \
+                    numTracks = c->numTracks;				      \
+    _minmax								      \
+									      \
+    maxIn = maxOut = flowEl->minibufChunk;				      \
+									      \
+    while (maxOut)							      \
+    {									      \
+	while (writePhase >= 0)						      \
+	{								      \
+	    if (!maxIn)							      \
+	    {								      \
+		c->writePhase = writePhase;				      \
+		return totalOut;					      \
+	    }								      \
+									      \
+	    maxIn--;							      \
+	    writePhase -= toRate;					      \
+	    _copyIn;							      \
+	}								      \
+									      \
+	maxOut--;							      \
+	totalOut++;							      \
+	writePhase += fromRate;						      \
+	_copyOut;							      \
+	_init;								      \
+    }									      \
+									      \
+    c->writePhase = writePhase;						      \
+    return totalOut;							      \
+}
+
+rateConvertMonitor(rateConvertMonitor_1, COPY_IN_1, COPY_OUT_1, INIT_1, MM_1)
+rateConvertMonitor(rateConvertMonitor_2, COPY_IN_2, COPY_OUT_2, INIT_2, MM_2)
+rateConvertMonitor(rateConvertMonitor_n, COPY_IN_N, COPY_OUT_N, INIT_N, /**/)

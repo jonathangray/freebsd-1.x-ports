@@ -1,0 +1,153 @@
+/*
+ * Copyright 1993 Network Computing Devices, Inc.
+ *
+ * Permission to use, copy, modify, distribute, and sell this software and
+ * its documentation for any purpose is hereby granted without fee, provided
+ * that the above copyright notice appear in all copies and that both that
+ * copyright notice and this permission notice appear in supporting
+ * documentation, and that the name Network Computing Devices, Inc. not be
+ * used in advertising or publicity pertaining to distribution of this 
+ * software without specific, written prior permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED `AS-IS'.  NETWORK COMPUTING DEVICES, INC.,
+ * DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING WITHOUT
+ * LIMITATION ALL IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE, OR NONINFRINGEMENT.  IN NO EVENT SHALL NETWORK
+ * COMPUTING DEVICES, INC., BE LIABLE FOR ANY DAMAGES WHATSOEVER, INCLUDING
+ * SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES, INCLUDING LOSS OF USE, DATA,
+ * OR PROFITS, EVEN IF ADVISED OF THE POSSIBILITY THEREOF, AND REGARDLESS OF
+ * WHETHER IN AN ACTION IN CONTRACT, TORT OR NEGLIGENCE, ARISING OUT OF OR IN
+ * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ * 
+ * $NCDId: @(#)Imakefile.rel,v 1.3 1993/11/06 00:24:24 greg Exp $
+ */
+
+XCOMM $NCDId: @(#)Imakefile.rel,v 1.3 1993/11/06 00:24:24 greg Exp $
+
+#include "NetAudio.tmpl"
+
+#define StdSubdirs dia os
+#define StdLibs $(DIA) $(OS)
+
+      OTHEREXTS = 
+      OTHERDEPDIRS =
+
+        DEPDIRS =
+     NONPEXEXTS = 
+     EXTENSIONS = 
+         XAULIB = 
+       XDMCPLIB = 
+             OS = os/libos.a $(XAULIB) $(XDMCPLIB)
+        BSDEMUL = $(LIBSRC)/Berk/Berklib.o
+            MFB =
+            CFB =
+           CFB8 =
+             MI =
+            DIX =
+            DIA = dia/libdia.a
+           FONT = 
+#if SystemV4 && !defined(SGIArchitecture)
+        SYSLIBS = /usr/ucblib/libucb.a
+#else
+        SYSLIBS =
+#endif
+           CBRT =
+
+XCOMM
+XCOMM This turns off the default rule for compiling .c files because
+XCOMM this makefile does not really know how to build it.  This is really
+XCOMM just a hack because of the Sun version of make and nfs.
+XCOMM
+.c.o:
+
+/*****************************************************************************
+ *		  ALL definitions, add one for each server                   *
+ *****************************************************************************/
+
+#ifdef SunArchitecture
+ALL1 = ausun
+#endif
+
+#ifdef LinuxArchitecture
+ALL1 = auvoxware
+#endif
+
+#ifdef __FreeBSD__
+ALL1 = auvoxware
+#endif
+
+
+#ifdef SGIArchitecture
+ALL1 = ausgi
+#endif
+
+ALL = $(ALL1)
+
+all: $(ALL)
+
+
+/*****************************************************************************
+ *		  Build rule blocks, add one for each server                 *
+ *****************************************************************************/
+
+#if defined(__FreeBSD__) || defined(LinuxArchitecture)
+XCOMM
+XCOMM voxware server
+XCOMM
+VOXWAREDIRS = StdSubdirs dda/voxware
+VOXWARELIBS = StdLibs dda/voxware/libvoxware.a
+VOXWARESYSLIBS = $(SYSLIBS)
+
+ServerTarget(auvoxware,$(VOXWAREDIRS),$(VOXWAREOBJS),$(VOXWARELIBS),$(VOXWARESYSLIBS))
+
+InstallMultipleFlags($(ALL),$(BINDIR),$(INSTPGMFLAGS))
+
+SUBDIRS = $(VOXWAREDIRS)
+#endif
+
+
+#ifdef SunArchitecture
+XCOMM
+XCOMM Sun server
+XCOMM
+SUNDIRS = StdSubdirs dda/sun
+SUNLIBS = StdLibs dda/sun/libsun.a
+SUNSYSLIBS = $(SYSLIBS)
+
+ServerTarget(ausun,$(SUNDIRS),$(SUNOBJS),$(SUNLIBS),$(SUNSYSLIBS))
+
+InstallMultipleFlags($(ALL),$(BINDIR),$(INSTPGMFLAGS))
+
+SUBDIRS = $(SUNDIRS)
+#endif
+
+
+
+#ifdef SGIArchitecture
+XCOMM
+XCOMM SGI server
+XCOMM
+SGIDIRS = StdSubdirs dda/sgi
+SGILIBS = StdLibs dda/sgi/libsgi.a
+SGISYSLIBS = $(SYSLIBS) -laudio
+
+ServerTarget(ausgi,$(SGIDIRS),$(SGIOBJS),$(SGILIBS),$(SGISYSLIBS))
+
+InstallMultipleFlags($(ALL),$(BINDIR),$(INSTPGMFLAGS))
+
+SUBDIRS = $(SGIDIRS)
+#endif
+
+install::
+	-(cd $(DESTDIR)$(BINDIR); $(RM) au; $(LN) $(ALL1) au)
+
+#define IHaveSubdirs
+#define PassCDebugFlags 'CDEBUGFLAGS=$(CDEBUGFLAGS)'
+
+DependSubdirs($(SUBDIRS))
+ForceSubdirs($(DEPDIRS) $(SUBDIRS))
+
+clean::
+	$(RM) $(ALL)
+
+InstallManPage(auserver,$(MANDIR))
