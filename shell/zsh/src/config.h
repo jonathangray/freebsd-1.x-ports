@@ -44,7 +44,7 @@
 /* #define NO_FIFOS */
 
 /* define this if you have strftime() */
-/* #define HAS_STRFTIME */
+#define HAS_STRFTIME
 
 #define HAS_TCSETPGRP
 
