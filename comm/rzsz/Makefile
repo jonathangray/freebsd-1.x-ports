@@ -103,14 +103,26 @@ rz: nothing
 rb: nothing
 
 crc:
-	$(CC) crc.c -o crc
+	$(CC) $(CFLAGS) crc.c -o crc
 
 
 install:
-	install -cs -o bin -m 755 rz rb rx rc $(LBIN_DIR)
-	install -cs -o bin -m 755 sz sb sx zcommand zcommandi $(LBIN_DIR)
-	install -cs -o bin -m 755 crc $(LBIN_DIR)
-	install -c -o bin -m 755 crc.doc minirb.doc rz.doc sz.doc $(LCAT_DIR)
+	install -cs -o bin -g bin -m 755 rz $(LBIN_DIR)
+	rm -f $(LBIN_DIR)/rx $(LBIN_DIR)/rb $(LBIN_DIR)/rc
+	ln $(LBIN_DIR)/rz $(LBIN_DIR)/rx
+	ln $(LBIN_DIR)/rz $(LBIN_DIR)/rb
+	ln $(LBIN_DIR)/rz $(LBIN_DIR)/rc
+	install -cs -o bin -g bin -m 755 sz $(LBIN_DIR)
+	rm -f $(LBIN_DIR)/sx $(LBIN_DIR)/sb $(LBIN_DIR)/zcommand $(LBIN_DIR)/zcommandi
+	ln $(LBIN_DIR)/sz $(LBIN_DIR)/sx
+	ln $(LBIN_DIR)/sz $(LBIN_DIR)/sb
+	ln $(LBIN_DIR)/sz $(LBIN_DIR)/zcommand
+	ln $(LBIN_DIR)/sz $(LBIN_DIR)/zcommandi
+	install -cs -o bin -g bin -m 755 crc $(LBIN_DIR)
+	install -c -o bin -g bin -m 644 crc.doc $(LCAT_DIR)/crc.0
+	install -c -o bin -g bin -m 644 minirb.doc $(LCAT_DIR)/minirb.0
+	install -c -o bin -g bin -m 644 rz.doc $(LCAT_DIR)/rz.0
+	install -c -o bin -g bin -m 644 sz.doc $(LCAT_DIR)/sz.0
 
 clean:
 	rm -f core* rz rb rx rc sz sb sx zcommand zcommandi crc
