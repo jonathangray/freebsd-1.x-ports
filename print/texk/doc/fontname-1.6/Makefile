@@ -18,9 +18,9 @@ SHELL = /bin/sh
 
 doc = fontname
 
-all: $(doc).info dvi
+all: $(doc).info $(doc).dvi
 
-dvi $(doc).dvi:
+dvi $(doc).dvi: $(doc).texi
 	$(TEXI2DVI) $(doc).texi
 
 $(doc).info: $(doc).texi

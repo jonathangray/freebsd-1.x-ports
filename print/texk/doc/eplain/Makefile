@@ -15,7 +15,7 @@ TEXINDEX = texindex
 
 all: eplain.info eplain.dvi
 
-eplain.dvi: eplain.cps
+eplain.dvi: eplain.texi
 	$(TEX) eplain.texi
 eplain.cps: eplain.cp
 	$(TEXINDEX) eplain.??
