@@ -331,6 +331,7 @@ char *argv[];
 	 *	   unbuffer output data from dbx
 	 *	   exec dbx with arguments
 	 */
+	char	      *s;
       
 #if defined(SYSV) && !defined(SVR4)		/* (MJH) */
         setpgrp();
@@ -390,6 +391,11 @@ char *argv[];
 #endif /* SVR4 */
 
 	argv[0] = debugger;
+
+	if ((s = getenv("TERMCAP")) != NULL && *s != '/')
+		unsetenv("TERMCAP");
+	putenv("TERM=dumb");
+
 	execvp(debugger, argv);
 	sprintf(errmsg, "%s error: cannot exec %s", progname, debugger);
 	perror(errmsg);
