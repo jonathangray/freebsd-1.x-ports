@@ -44,6 +44,7 @@ install: all
 # change the mode bits of ${GAME} to be 4755.
 	chmod 666 ${LIB}/scores
 	cp goldlev* default ${LIB}
+	-mkdir -p ${MAN}
 	cp golddig.p ${MAN}/golddig.${MANEXT}
 
 update: all
