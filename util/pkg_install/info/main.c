@@ -1,5 +1,5 @@
 #ifndef lint
-static char *rcsid = "$Header: /a/cvs/386BSD/ports/util/pkg_install/info/main.c,v 1.4 1993/09/05 22:36:49 jkh Exp $";
+static char *rcsid = "$Header: /a/cvs/386BSD/ports/util/pkg_install/info/main.c,v 1.5 1993/09/08 01:46:57 jkh Exp $";
 #endif
 
 /*
@@ -26,10 +26,11 @@ static char *rcsid = "$Header: /a/cvs/386BSD/ports/util/pkg_install/info/main.c,
 #include "lib.h"
 #include "info.h"
 
-static char Options[] = "acde:fikrpIvhl:";
+static char Options[] = "acde:fikrpLqIvhl:";
 
 int	Flags		= 0;
 Boolean AllInstalled	= FALSE;
+Boolean Quiet		= FALSE;
 char *InfoPrefix	= "";
 char *PlayPen		= NULL;
 char *CheckPkg		= NULL;
@@ -87,8 +88,16 @@ main(int argc, char **argv)
 	    Flags |= SHOW_REQUIRE;
 	    break;
 
+	case 'L':
+	    Flags |= SHOW_FILES;
+	    break;
+
 	case 'l':
 	    InfoPrefix = optarg;
+	    break;
+
+	case 'q':
+	    Quiet = TRUE;
 	    break;
 
 	case 't':

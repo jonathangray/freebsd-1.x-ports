@@ -1,5 +1,5 @@
 #ifndef lint
-static const char *rcsid = "$Id: perform.c,v 1.5 1993/09/07 01:01:32 jkh Exp $";
+static const char *rcsid = "$Id: perform.c,v 1.6 1993/09/08 01:46:57 jkh Exp $";
 #endif
 
 /*
@@ -125,7 +125,8 @@ pkg_do(char *pkg)
     }
     else {
 	/* Start showing the package contents */
-	printf("%sInformation for %s:\n\n", InfoPrefix, pkg);
+	if (!Quiet)
+	    printf("%sInformation for %s:\n\n", InfoPrefix, pkg);
 	if (Flags & SHOW_COMMENT)
 	    show_file("Comment:\n", COMMENT_FNAME);
 	if (Flags & SHOW_DESC)
@@ -138,7 +139,10 @@ pkg_do(char *pkg)
 	    show_file("De-Install script:\n", DEINSTALL_FNAME);
 	if (Flags & SHOW_PREFIX)
 	    show_plist("Prefix(s):\n", &plist, PLIST_CWD);
-	puts(InfoPrefix);
+	if (Flags & SHOW_FILES)
+	    show_files("Files:\n", &plist);
+	if (!Quiet)
+	    puts(InfoPrefix);
     }
     free_plist(&plist);
     leave_playpen();
