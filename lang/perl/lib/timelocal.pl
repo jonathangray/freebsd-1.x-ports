@@ -79,3 +79,4 @@ sub cheat {
     $guess -= $g[0] * $SEC + $g[1] * $MIN + $g[2] * $HR + $g[3] * $DAYS;
     $cheat{$ym} = $guess;
 }
+1;
