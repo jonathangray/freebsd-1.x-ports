@@ -1,4 +1,4 @@
-# $Header: /a/cvs/386BSD/ports/lang/franz/Makefile,v 1.2 1994/04/02 17:00:23 jkh Exp $
+# $Header: /a/cvs/386BSD/ports/lang/franz/Makefile,v 1.3 1994/04/04 02:14:12 jkh Exp $
 # $Locker:  $
 #  Makefile for total Franz Lisp system.
 #
@@ -95,7 +95,7 @@ fromasm:
 #   finally 'make clean'		to clean out objects
 #
 # the 'make all' is done when just a 'make' is done
-all: slow fixup
+all: fixup slow
 
 fixup:
 	@echo Fixing up symbolic links destroyed by CVS.
