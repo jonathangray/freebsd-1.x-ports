@@ -1,4 +1,4 @@
-/* $Id: add.h,v 1.2 1993/09/03 23:00:32 jkh Exp $ */
+/* $Id: add.h,v 1.3 1993/09/05 04:53:47 jkh Exp $ */
 
 /*
  * FreeBSD install - a package for the installation and maintainance
@@ -23,6 +23,8 @@
 #ifndef _INST_ADD_H_INCLUDE
 #define _INST_ADD_H_INCLUDE
 
+typedef enum { NORMAL, MASTER, SLAVE } add_mode_t;
+
 extern char	*Prefix;
 extern Boolean	NoInstall;
 extern Boolean	NoRecord;
@@ -31,6 +33,8 @@ extern char	*Owner;
 extern char	*Group;
 extern char	*Directory;
 extern char	*PkgName;
+extern char	*PlayPen;
+extern add_mode_t AddMode;
 
 int		make_hierarchy(char *);
 void		extract_plist(char *, Package *);
