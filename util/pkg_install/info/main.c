@@ -1,5 +1,5 @@
 #ifndef lint
-static char *rcsid = "$Header: /a/cvs/386BSD/ports/util/pkg_install/info/main.c,v 1.3 1993/09/05 04:54:16 jkh Exp $";
+static char *rcsid = "$Header: /a/cvs/386BSD/ports/util/pkg_install/info/main.c,v 1.4 1993/09/05 22:36:49 jkh Exp $";
 #endif
 
 /*
@@ -26,12 +26,13 @@ static char *rcsid = "$Header: /a/cvs/386BSD/ports/util/pkg_install/info/main.c,
 #include "lib.h"
 #include "info.h"
 
-static char Options[] = "acdfikrpIvhl:";
+static char Options[] = "acde:fikrpIvhl:";
 
 int	Flags		= 0;
 Boolean AllInstalled	= FALSE;
 char *InfoPrefix	= "";
 char *PlayPen		= NULL;
+char *CheckPkg		= NULL;
 
 int
 main(int argc, char **argv)
@@ -94,6 +95,10 @@ main(int argc, char **argv)
 	    PlayPen = optarg;
 	    break;
 
+	case 'e':
+	    CheckPkg = optarg;
+	    break;
+
 	case 'h':
 	case '?':
 	default:
@@ -113,7 +118,7 @@ main(int argc, char **argv)
 	*pkgs++ = *argv++;
 
     /* If no packages, yelp */
-    if (pkgs == start && !AllInstalled)
+    if (pkgs == start && !AllInstalled && !CheckPkg)
 	usage(prog_name, "Missing package name(s)");
     *pkgs = NULL;
     return pkg_perform(start);
