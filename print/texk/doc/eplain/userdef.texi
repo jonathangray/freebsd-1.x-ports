@@ -20,7 +20,8 @@ formatting are described in subsections.
 * Contents::             Making a table of contents.
 * Cross-references::     Symbolic references to equations, figures, etc.
 * Page references::      Symbolic references to page numbers.
-* Justification::        Left- or right-justification, or centering.
+* Indexing::		 Creating and typesetting indexes.
+* Justification::        Left- or right-justification by lines, or centering.
 * Tables::               Producing ordered tables.
 * Margins::              Changing the margins directly.
 * Multiple columns::     Getting output in two columns.
@@ -648,7 +649,7 @@ for example, part of a computer program.  The @code{\listing}
 @findex listing
 command is given one argument, a filename, and produces the contents of
 that file in your document.  @code{\listing} expands @code{\listingfont}
-to set the current font.  The default value of @code{listingfont}
+to set the current font.  The default value of @code{\listingfont}
 @findex listingfont
 is @code{\tt}.
 
@@ -714,11 +715,12 @@ help you (@pxref{Category codes}).
 
 @cindex table of contents
 @cindex contents
+
 Producing a table of contents that is both useful and aesthetic is one
 of the most difficult design problems in any work.  Naturally, Eplain
 does not pretend to solve the design problem.  Collecting the raw data
 for a table of contents, however, is much the same across documents. 
-Eplain uses an auxiliary file with extension @t{.toc}
+Eplain uses an auxiliary file with extension @file{.toc}
 @pindex .toc @r{file}
 (and the same root name as your document) to save the information.
 
@@ -728,61 +730,79 @@ To write an entry for the table of contents, you say
 where @var{part} is the type of part this entry is, e.g.,
 @samp{chapter}, and @var{text} is the text of the title. 
 @code{\writetocentry} puts an entry into the @t{.toc} file that looks
+@findex toc@dots{}entry
 like @code{\toc@var{part}entry@{@var{text}@}@{@var{page number}@}}.  The
 @var{text} is written unexpanded.
-@findex toc@dots{}entry
 
-A related command, @code{\writenumberedtocentry},
 @findex writenumberedtocentry
-takes one additional argument, and writes it unchanged.  The first token
-is expanded at the point of the @code{\writenumberedtocentry}, but the
-rest of the argument is not expanded.  The usual application is when the
-parts of the document are numbered.  On the other hand, the one-level
-expansion allows you to use the argument for other things as well
-(author's names in a proceedings, say), and not have accents or other
-control sequences expanded.  The downside is that if you @emph{want}
-full expansion of the third argument, you don't get it---you must expand
-it yourself, before you call @code{\writenumberedtocentry}.
+A related command, @code{\writenumberedtocentry}, takes one additional
+argument, the first token of which is expanded at the point of the
+@code{\writenumberedtocentry}, but the rest of the argument is not
+expanded.  The usual application is when the parts of the document are
+numbered.  On the other hand, the one-level expansion allows you to use
+the argument for other things as well (author's names in a proceedings,
+say), and not have accents or other control sequences expanded.  The
+downside is that if you @emph{want} full expansion of the third
+argument, you don't get it---you must expand it yourself, before you
+call @code{\writenumberedtocentry}.
 
-Here is a concrete example:
+For example:
+
 @example
 \writenumberedtocentry@{chapter@}@{A $\sin$ wave@}@{\the\chapno@}
 \writetocentry@{section@}@{A section title@}
 @end example
 
-Supposing @code{\the\chapno} expanded to @samp{3} and that the
-@code{\write}'s occurred on pages eight and nine, respectively, those
-lines would write the following to the @t{.toc} file:
+@noindent Supposing @code{\the\chapno} expanded to @samp{3} and that the
+@code{\write}'s occurred on pages eight and nine, respectively, the
+above writes the following to the @t{.toc} file:
+
 @example
 \tocchapterentry@{A $\sin$ wave@}@{3@}@{8@}
 \tocsectionentry@{A section title@}@{9@}
 @end example
 
-You read the @t{.toc} file with the command @code{\readtocfile}.
 @findex readtocfile
-Naturally, whatever @code{\toc @dots{} entry} commands that were written to
-the file must be defined when @code{\readtocfile} is invoked.
-Eplain has minimal definitions for @code{\tocchapterentry},
+You read the @t{.toc} file with the command @code{\readtocfile}.
+Naturally, whatever @code{\toc@dots{} entry} commands that were written
+to the file must be defined when @code{\readtocfile} is invoked.  Eplain
+has minimal definitions for @code{\tocchapterentry},
 @code{\tocsectionentry}, and @code{\tocsubsectionentry}, just to prevent
-undefined control sequence errors in common cases.
-They aren't suitable for anything but preliminary proofs.
+undefined control sequence errors in common cases.  They aren't suitable
+for anything but preliminary proofs.
 
 After reading the @t{.toc} file, @code{\readtocfile} opens the file
 for writing, thereby deleting the information from the previous run.  You
 should therefore arrange that @code{\readtocfile} be called
-@emph{before} the first call to a @code{\writetoc @dots{}} macro.
+@emph{before} the first call to a @code{\writetoc@dots{}} macro.
 On the other hand, if you don't want to rewrite the @t{.toc} file,
 perhaps because you are only running @TeX{} on part of your manuscript,
 you can set @code{\rewritetocfilefalse}.
 @findex ifrewritetocfile
 @findex rewritetocfile @r{(conditional)}
 
-By default, the @file{.toc} file has the root @code{\jobname}.  If
-your document has more than one contents---for example, if it
-is a collection of papers---you can tell Eplain to use a different root
-name by defining the control sequence
+By default, the @file{.toc} file has the root @code{\jobname}.  If your
+document has more than one contents---for example, if it is a collection
+of papers, some of which have their own contents---you can tell Eplain
+to use a different root name by defining the control sequence
 @code{\tocfilebasename}.
 @findex tocfilebasename
+
+@cindex list of figures
+@cindex list of tables
+@findex definecontentsfile
+In addition to the usual table of contents, you may want to have a list
+of figures, list of tables, or other such contents-like list. You can do
+this with @code{\definecontentsfile@{@var{abbrev}@}}.  All of the
+above commands are actually a special case that Eplain predefines with
+
+@example
+\definecontentsfile@{toc@}
+@end example
+
+@noindent The @var{abbrev} is used both for the file extension and in
+the control sequence names.
+
 
 
 @node Cross-references
@@ -1028,11 +1048,11 @@ For example:
 (If you are keeping the chapter number in a count register named
 @code{\chapternumber}, naturally.)
 
-The reason why both @code{\eqconstruct} and @code{\eqprint} may not be
-immediately apparent, since they appear to perform similar functions.
-The difference is that @code{\eqconstruct} affects the text that
-cross-reference label is defined to be, while @code{\eqprint} affects
-only what is typeset on the page.  The example just below might help.
+The reason for having both @code{\eqconstruct} and @code{\eqprint} may
+not be immediately apparent.  The difference is that @code{\eqconstruct}
+affects the text that cross-reference label is defined to be, while
+@code{\eqprint} affects only what is typeset on the page.  The example
+just below might help.
 
 Usually, you want equation labels to refer to equation numbers.  But
 sometimes you might want a more complicated text.  For example, you
@@ -1108,6 +1128,531 @@ like.  For example, this definition makes the labels print as `2a',
 @noindent Sadly, we must define a new count register, @code{\subref},
 instead of using the scratch count register @code{\count255}, because
 @samp{#1} might include other macro calls which use @code{\count255}.
+
+
+@node Indexing
+@section Indexing
+
+@cindex indexing
+@cindex sorting an index
+
+Eplain provides support for generating raw material for an index, and
+for typesetting a sorted index. A separate program must do the actual
+collection and sorting of terms, because @TeX{} itself has no support
+for sorting.
+
+@cindex ftp of MakeIndex
+@pindex makeindex
+Eplain's indexing commands were designed to work with the program
+MakeIndex, available from @samp{ftp.math.utah.edu} in the directory
+@file{pub/tex/makeindex}, and from CTAN hosts in
+@file{tex-archive/indexing/makeindex}; MakeIndex is also commonly
+included in prepackaged @TeX{} distributions.  It is beyond the scope of
+this manual to explain how to run MakeIndex, and all of its many
+options.  @xref{MAKEINDEX, , , makeindex, MakeIndex}.
+
+The basic strategy for indexing works like this:
+
+@enumerate
+
+@pindex .idx @r{files}
+@item For a document @file{foo.tex}, Eplain's indexing commands (e.g.,
+@code{\idx}; see the section `Indexing terms' below) write the raw index
+material to @file{foo.idx}.
+
+@pindex .ind @r{files}
+@item MakeIndex reads @file{foo.idx}, collects and sorts the index, and
+writes the result to @file{foo.ind}. 
+
+@item Eplain reads and typesets @file{foo.ind} on a subsequent run of
+@TeX{}. See the section `Typesetting an index' below.
+
+@end enumerate
+
+@cindex multiple indexes
+@cindex indexes, multiple
+@findex defineindex
+If your document needs more than one index, each must have its own
+file. Therefore, Eplain provides the command @code{\defineindex}, which
+takes an argument that is a single letter, which replaces @samp{i} in
+the filenames and in the indexing command names described below. For
+example,
+
+@example
+\defineindex@{m@}
+@end example
+
+@noindent defines the command @code{\mdx} to write to the file
+@file{foo.mdx}. Eplain simply does @code{\defineindex@{i@}} to define
+the default commands.
+
+@menu
+* Indexing terms::		Specifying what to index.
+* Typesetting an index::	Printing the sorted output.
+* Customizing indexing::	Creating commands and specifying extra actions.
+@end menu
+
+
+@node Indexing terms
+@subsection Indexing terms
+
+@cindex indexing terms
+@cindex silent indexing
+
+Indexing commands in Eplain come in pairs: one command that only
+writes the index entry to the @samp{.idx} file (see above section), and
+one that also typesets the term being indexed. The former always starts
+with @samp{s} (for ``silent''). In either case, the name always includes
+@samp{@var{I}dx}, where @var{I} is the index letter, also described
+above. Eplain defines the index @samp{i} itself, so that's what we'll
+use in the names below.
+
+@cindex subterm in indexing
+The silent form of the commands take a subterm as a trailing optional
+argument.  For example, @code{\sidx@{truth@}[definition of]} on page 75
+makes an index entry that will eventually be typeset (by default) as
+
+@display
+truth
+  definition of, 75
+@end display
+
+@cindex trailing spaces and indexing commands
+@cindex spaces, trailing and indexing commands
+@cindex indexing and trailing spaces
+Also, the silent commands ignore trailing spaces. The non-silent ones do not.
+
+@menu
+* Indexing commands::		Making index entries.
+* Modifying index entries::	Ranges, see/see also, page number typesetting.
+* Proofing index terms::	Noting index entries in the margins.
+@end menu
+
+
+@node Indexing commands
+@subsubsection Indexing commands
+
+@cindex indexing commands
+Here are the commands.
+
+@itemize @bullet
+
+@item
+@findex sidx
+@findex idx
+@code{\sidx@{@var{term}@}[@var{subterm}]} makes an index entry for
+@var{term}, optionally with subterm @var{subterm}.
+@code{\idx@{@var{term}@}} also produces @var{term} as output. Example:
+
+@example
+\sidx@{truth@}[beauty of]
+The beauty of truth is \idx@{death@}.
+@end example
+
+@item
+@findex sidxname
+@findex idxnameseparator
+@findex idxname
+\sidxname@{@var{First M.}@}@{@var{von Last}@}[@var{subterm}] makes an index
+entry for @samp{@var{von Last}, @var{First M.}}. You can change the
+@samp{, } by redefining @code{\idxnameseparator}.
+\idxname@{@var{First M.}@}@{@var{von Last}@} also produces @var{First M. von
+Last} as output. (These commands are useful special cases of @code{\idx}
+and @code{\sidx}.) Example:
+
+@example
+\sidxname@{Richard@}@{Stark@}
+\idxname@{Donald@}@{Westlake@} has written many kinds of novels, under
+almost as many names.
+@end example
+
+@item
+@findex sidxmarked
+@findex idxmarked
+@code{\sidxmarked\@var{cs}@{@var{term}@}[@var{subterm}]} makes an index
+entry for @code{@var{term}[@var{subterm}]}, but @var{term} will be put
+in the index as @code{\@var{cs}@{term@}}, but still sorted as just
+@var{term}.  @code{\idxmarked\@var{cs}@{@var{term}@}} also typesets
+@code{\@var{cs}@{term@}}.  This provides for the usual ways of changing
+the typesetting of index entries. Example:
+
+@example
+\def\article#1@{``#1''@}
+\sidxmarked\article@{Miss Elsa and Aunt Sophie@}
+Peter Drucker's \idxmarked\article@{The Polanyis@} is a remarkable essay
+about a remarkable family.
+@end example
+
+@item
+@findex idxsubmarked
+@findex sidxsubmarked
+@code{\sidxsubmarked@{@var{term}@}\@var{cs}@{subterm@}} makes an index
+entry for @var{term, subterm} as usual, but also puts @var{subterm} in
+the index as @code{\@var{cs}@{term@}}.
+@code{\idxsubmarked@{@var{term}@}\@var{cs}@{subterm@}} also typesets
+@code{@var{term} \@var{cs}@{subterm@}}, in the unlikely event that your
+syntax is convoluted enough to make this useful. Example:
+
+@example
+\def\title#1@{@{\sl #1@}@}
+\sidxsubmarked@{Anderson, Laurie@}\title@{Strange Angels@}
+The \idxsubmarked@{Anderson@}\title@{Carmen@} is a strange twist.
+@end example
+
+@end itemize
+
+@cindex index entry general sorting
+@cindex sorting of index entries
+The commands above rely on MakeIndex's feature for separating sorting of
+an index entry's from its typesetting. You can use this directly by
+specifying an index entry as @code{@var{sort}@@@var{typeset}}. For
+example:
+
+@example
+\sidx@{Ap-weight@@$A_\pi$-weight@}
+@end example
+
+@noindent will sort as @code{Ap-weight}, but print with the proper math.
+The @code{@@} here is MakeIndex's default character for this purpose.
+@xref{Style File-MakeIndex, , , makeindex, MakeIndex}. To make an index
+entry with an @code{@@} in it, you have to escape it with a backslash;
+Eplain provides no macros for doing this.
+
+@findex afterindexterm @r{hook}
+@cindex whatsits made by index entries
+After any index command, Eplain runs
+@code{\hookaction@{afterindexterm@}}. Because the index commands always
+add a whatsit item to the current list, you may wish to preserve a
+penalty or space past the new item. For example, given a conditional
+@code{\if@@aftersctnhead} set true when you're at a section heading, you
+could do:
+
+@example
+\hookaction@{afterindexterm@}@{\if@@aftersctnhead \nobreak \fi@}
+@end example
+
+
+@node Modifying index entries
+@subsubsection Modifying index entries
+
+@cindex modifying index entries' page numbers
+@cindex index entries' page numbers, modifying
+
+All the index commands described in the previous section take an initial
+optional argument before the index term, which modify the index entry's
+meaning in various ways.  You can specify only one of the following in
+any given command.
+
+These work via MakeIndex's ``encapsulation'' feature. @xref{Customizing
+indexing}, if you're not using the default characters for the
+MakeIndex operators.  The other optional argument (specifying a subterm)
+is independent of these.
+
+Here are the possibilities:
+
+@table @code
+
+@item begin
+@itemx end
+@findex begin @r{for index entries}
+@findex end @r{for index entries}
+@cindex index entries and ranges
+@cindex ranges and index entry
+These mark an index entry as the beginning or end of a range. The index
+entries must match exactly for MakeIndex to recognize them.
+Example:
+
+@example
+\sidx[begin]@{future@}[Cohen, Leonard]
+@dots{}
+\sidx[end]@{future@}[Cohen, Leonard]
+@end example
+
+@noindent will typeset as something like
+
+@display
+future,
+  Cohen, Leonard, 65--94
+@end display
+
+@item see
+@findex see @r{for index entries}
+@cindex see, and index entries
+@cindex cross-referencing index entries
+@cindex index entries, and cross-referencing
+This marks an index entry as pointing to another; the real index term is
+an additional (non-optional) argument to the command. Thus you can
+anticipate a term readers may wish to look up, yet which you have
+decided not to index. Example:
+
+@example
+\sidx[see]@{analysis@}[archetypal]@{archetypal criticism@}
+@end example
+
+@noindent becomes
+
+@display
+analysis,
+  archetypal,  See archetypal criticism
+@end display
+
+@item seealso
+@findex seealso @r{for index entries}
+Similar to @code{see} (the previous item), but also allows for normal
+index entries of the referencing term. Example:
+
+@example
+\sidx[seealso]@{archetypal criticism@}[elements of]@{dichotomies@}
+@end example
+
+@noindent becomes
+
+@display
+archetypal criticism,
+  elements of, 75, 97, 114, See also dichotomies
+@end display
+
+(Aside for the academically curious: The archetypally critical book I
+took these dichotomous examples from is Laurence Berman's @cite{The
+Musical Image}, which I happened to co-design and typeset.)
+
+@item pagemarkup=@var{cs}
+This puts @code{\@var{cs}} before the page number in the typeset index,
+thus allowing you to underline definitive entries, italicize examples,
+and the like. You do @emph{not} precede the control sequence @var{cs}
+with a backslash. (That just leads to expansive difficulties.) Naturally
+it is up to you to define the control sequences you want to use. Example:
+
+@example
+\def\defn#1@{@{\sl #1@}@}
+\sidx[pagemarkeup=defn]@{indexing@}
+@end example
+
+@noindent becomes something like
+
+@example
+indexing, @code{\defn@{75@}}
+@end example
+
+@end table
+
+
+@node Proofing index terms
+@subsubsection Proofing index terms
+
+@cindex proofing index terms
+@cindex index terms, proofing
+@cindex margins, index terms in
+
+As you are reading through a manuscript, it is helpful to see what terms
+have been indexed, so you can add others, catch miscellaneous errors,
+etc. (Speaking from bitter experience, I can say it is extremely
+error-prone to leave all indexing to the end of the writing, since it
+involves adding many @TeX{} commands to the source files.)
+
+@findex indexproofterm
+@findex indexprooffont
+@pindex cmtt8
+So Eplain puts index terms in the margin of each page, if you
+set @code{\indexproofingtrue}. It is @code{false} by default. The terms
+are typeset by the macro @code{\indexproofterm}, which takes a single
+argument, the term to be typeset. Eplain's definition of
+@code{\indexproofterm} just puts it into an @code{\hbox}, first doing
+@code{\indexprooffont}, which Eplain defines to select the font
+@code{cmtt8}. With this definition long terms run off the page, but
+since this is just for proofreading anyway, it seems acceptable.
+
+@findex pageno
+@findex insidemargin
+@findex hoffset
+@findex outsidemargin
+@findex indexsetmargins
+On the other hand, we certainly don't want the index term to run into
+the text of the page, so Eplain uses the right-hand side of the page
+rather than the left-hand page (assuming a language read left to right
+here). So @code{\ifodd\pageno}, Eplain kerns by @code{\outsidemargin},
+otherwise by @code{\insidemargin}. If those macros are undefined,
+@code{\indexsetmargins} defines them to be one inch plus @code{\hoffset}.
+
+@findex @@indexproof @r{insertion class}
+@findex indexproofunbox
+@findex makeheadline
+@cindex output routine and index proofing
+To get the proofing index entries on the proper page, Eplain defines a new
+insertion class @code{\@@indexproof}. To unbox any index proofing
+material, Eplain redefines @code{\makeheadline} to call
+@code{\indexproofunbox} before the original @code{\makeheadline}. Thus,
+if you have your own output routine, that redefines or doesn't use
+@code{\makeheadline}, it's up to you to call @code{\indexproofunbox} at
+the appropriate time.
+
+
+@node Typesetting an index
+@subsection Typesetting an index
+
+@cindex typesetting an index
+@cindex index typesetting
+@findex readindexfile
+
+The command @code{\readindexfile@{i@}} reads and typesets the
+@file{.ind} file that MakeIndex outputs (from the @file{.idx} file which
+the indexing commands in the previous sections write).  Eplain defines a
+number of commands that support the default MakeIndex output.
+
+@findex indexfilebasename
+@findex jobname
+More precisely, @code{\readindexfile} reads
+@code{\indexfilebasename.@var{index-letter}nd}, where the
+@var{index-letter} is the argument. @code{\indexfilebasename} is
+@code{\jobname} by default, but if you have different indexes in
+different parts of a book, you may wish to change it, just as with
+bibliographies (@pxref{Citations}).
+
+@findex begin@{theindex@}
+@findex end@{theindex@}
+MakeIndex was designed to work with La@TeX{}; therefore, by default the
+@file{.ind} file starts with @code{\begin@{theindex@}} and ends with
+@code{\end@{theindex@}}. If no @code{\begin} has been defined, Eplain
+defines one to ignore its argument and set up for typesetting the index
+(see below), and also defines a @code{\end} to ignore its argument. (In
+a group, naturally, since there is a primitive @code{\end}).
+
+@findex parindent @r{in indexes}
+@cindex index fonts
+@findex indexfonts
+@cindex double columns in indexes
+Eplain calls @code{\indexfonts}, sets @code{\parindent = 0pt}, and does
+@code{\doublecolumns} (@pxref{Multiple columns}) at the
+@code{\begin@{theindex@}}. @code{\indexfonts} does nothing by default;
+it's just there for you to override. (Indexes are usually typeset in
+smaller type than the main text.)
+
+@findex beginindex @r{hook}
+It ends the setup with @code{\hookrun@{beginindex@}}, so you can
+override anything you like in that hook (@pxref{Hooks}). For example:
+
+@example
+\hookaction@{beginindex@}@{\triplecolumns@}
+@end example
+
+@findex item @r{in indexes}
+@findex subitem @r{in indexes}
+@findex subsubitem @r{in indexes}
+@cindex index entry formatting
+@cindex formatting index entries
+@cindex space above index entries
+@cindex continued index entries
+@cindex index entry continuations
+MakeIndex turns each main index entry into an @code{\item}, subentries
+into @code{\subitem}, and subsubentries into @code{\subsubitem}. By
+default, the first line of main entries are not indented, and subentries
+are indented 1em per level. Main entries are preceded by a @code{\vskip}
+of @code{\aboveitemskipamount}, @code{0pt plus2pt} by default. Page
+breaks are encouraged before main entries (@code{\penalty -100}), but
+prohibited afterwards---Eplain has no provision for ``continued''
+index entries.
+
+All levels do the following:
+
+@findex hangindent @r{for index entries}
+@findex raggedright @r{for index entries}
+@findex hyphenpenalty @r{for index entries}
+@example
+\hangindent = 1em
+\raggedright
+\hyphenpenalty = 10000
+@end example
+
+@findex indexitem @r{hook}
+Each entry ends with @code{\hookrun@{indexitem@}}, so you can change any
+of this. For example, to increase the allowable rag:
+
+@example
+\hookaction@{indexitem@}@{\advance\rightskip by 2em@}
+@end example
+
+@findex indexspace
+@cindex index groupings
+Finally, MakeIndex outputs @code{\indexspace} between each group of
+entries in the @file{.ind} file. Eplain makes this equivalent to
+@code{\bigbreak}.
+
+
+@node Customizing indexing
+@subsection Customizing indexing
+
+@cindex customizing indexing
+
+@findex afterindexterm
+@cindex commas after index terms
+@cindex after index terms
+By default, MakeIndex outputs @samp{, } after each term in the index. To
+change this, you can add the following to your MakeIndex style
+(@file{.ist}) file:
+
+@example
+delim_0 "\\afterindexterm "
+delim_1 "\\afterindexterm "
+delim_2 "\\afterindexterm "
+@end example
+
+@noindent Eplain makes @code{\afterindexterm} equivalent to
+@code{\quad}.
+
+You can also change the keywords Eplain recognizes (@pxref{Modifying
+index entries}):
+
+@table @code
+
+@item \idxbeginrangeword
+@findex idxbeginrangeword
+`begin'
+
+@item \idxendrangeword
+@findex idxendrangeword
+`end
+
+@item \idxseeword
+@findex idxseeword
+`see
+
+@item \idxseealsoword
+@findex idxseealsoword
+`seealso'
+
+@end table
+
+You can also change the magic characters Eplain puts into the
+@file{.idx} file, in case you've changed them in the @code{.ist} file:
+
+@table @code
+
+@item \idxsubentryseparator
+@findex idxsubentryseparator
+@samp{!}
+
+@item \idxencapoperator
+@findex idxencapoperator
+@samp{|}
+
+@item \idxbeginrangemark
+@findex idxbeginrangemark
+@samp{(}
+
+@item \idxendrangemark
+@findex idxendrangemark
+@samp{)}
+
+@end table
+
+There is no macro for the @code{actual} (@samp{@@} by default)
+character, because it's impossible to make it expand properly.
+
+@findex idxpagenum
+@cindex see also index entries and sorting
+Finally, you can change the (imaginary) page number that ``see also''
+entries sort as by redefining @code{\idxmaxpagenum}. This is 99999 by
+default, which is one digit too many for old versions of MakeIndex.
 
 
 @node Justification

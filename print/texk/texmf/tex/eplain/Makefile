@@ -1,13 +1,13 @@
 # Makefile for eplain.
 
-version = 2.5
+version = 2.6
 
 # For `install'.
 prefix = /usr/local
 bindir = $(prefix)/bin
-texlibdir = $(prefix)/lib/tex
-texformatdir = $(texlibdir)/formats
-texmacrodir = $(texlibdir)/macros/plain
+texlibdir = $(prefix)/lib/texmf
+texformatdir = $(texlibdir)/ini
+texmacrodir = $(texlibdir)/tex/plain
 infodir = $(prefix)/info
 
 INITEX = initex
@@ -24,8 +24,7 @@ etex.fmt: eplain.tex
 	$(INITEX) \&plain etex | grep -v '^\\font'
 
 # We put several files together to make `eplain.tex'.  The shell script
-# `merge' does everything.  We depend on `Makefile' because that's where
-# the version number is set.
+# `merge' does everything.  
 eplain.tex: merge arrow.tex btxmac.tex xeplain.tex *.sty
 	version=$(version) ./merge
 
@@ -44,12 +43,14 @@ dist: eplain.tex
 	rm -rf $(distdir)
 	mkdir $(distdir)
 	ln $(topfiles) $(distdir)
+	rm $(distdir)/eplain.tex
+	cd $(distdir); $(MAKE) eplain.tex
 	cp -p $(HOME)/bin/fix-checksum $(distdir)
 	cp -p $(HOME)/bin/add-date $(distdir)
 	cp -p $(HOME)/bin/add-version $(distdir)
 	mkdir $(distdir)/doc $(distdir)/test
 	cd doc; $(MAKE) version=$(version) dist
-	ln test/*.tex test/*.bib test/ChangeLog $(distdir)/test
+	ln test/*.tex test/*.bib $(distdir)/test
 	GZIP=-9 tar czf $(distdir). $(distdir)
 # Put the new info files in the local directory.
 	cp $(distdir)/doc/eplain.info* $(info)

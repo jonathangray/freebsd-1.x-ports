@@ -1,12 +1,9 @@
 #!/bin/sh
-# 
-# Merge the non-BibTeX parts of btxmac.tex into xeplain.tex, producing
-# eplain.tex.
+# Merge the constituent files with xeplain.tex to produce eplain.tex.
  
 # Usually we are called from the Makefile, and the `version' variable is set.
-if test -z "$version"
-then
-  echo "No version number!"
+if test -z "$version"; then
+  echo "No version number, using xx!"
   version=xx
 fi
 
@@ -15,7 +12,8 @@ common1tmp=/tmp/mergec1$$
 common2tmp=/tmp/mergec2$$
 common3tmp=/tmp/mergec3$$
 eplaintmp=/tmp/mergepl$$
-arrowtmp=/tmp/mergear$$
+arrow1tmp=/tmp/mergea1$$
+arrow2tmp=/tmp/mergea2$$
 finaltmp=/tmp/mergefn$$
 pathtmp=/tmp/mergepa$$
 
@@ -37,7 +35,10 @@ egrep -v "$commentre|immediate" texnames.sty > $common3tmp
 egrep -v "$commentre|immediate" path.sty > $pathtmp
 
 # Get arrow.tex.
-egrep -v "$commentre" arrow.tex > $arrowtmp
+egrep -v "$commentre" arrow.tex \
+  | sed -n							\
+        -e '1,/catcode.*\&.*4/w '"$arrow1tmp"			\
+        -e '/catcode.*\&.*4/,$w '"$arrow2tmp"
 
 # Merge the above into xeplain, calling the result eplain.  Also change the
 # `filename' in the comment.
@@ -48,7 +49,8 @@ egrep -v "$commentre" xeplain.tex					\
         -e "/^%% \[\[\[here is the second.*\]\]\]/r $common2tmp"	\
         -e "/^%% \[\[\[include texnames.*\]\]\]/r $common3tmp"		\
         -e "/^%% \[\[\[include path.*\]\]\]/r $pathtmp"			\
-        -e "/^ *%% \[\[\[include arrow.*\]\]\]/r $arrowtmp"		\
+        -e "/^  %% \[\[\[include arrow1\]\]\]/r $arrow1tmp"		\
+        -e "/^  %% \[\[\[include arrow2\]\]\]/r $arrow2tmp"		\
     > $eplaintmp
 
 # Remove our [[[...]]] markers and \endinput's.
@@ -68,9 +70,9 @@ fix-checksum eplain.tex
 #  > eplain.tex
 
 chmod a-w eplain.tex
-ls -lt btxmac.tex path.sty texnames.sty xeplain.tex eplain.tex arrow.tex
-wc eplain.tex
-grep 'checksum.*=' eplain.tex
+#ls -lt btxmac.tex path.sty texnames.sty xeplain.tex eplain.tex arrow.tex
+#wc eplain.tex
+#grep 'checksum.*=' eplain.tex
 
 rm -f $btxtmp $eplaintmp $common1tmp $common2tmp $common3tmp $finaltmp
-rm -f $arrowtmp $pathtmp
+rm -f $arrow1tmp $arrow2tmp $pathtmp

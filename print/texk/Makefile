@@ -1,8 +1,11 @@
+SHELL=	/bin/sh
+
 all:
 	cp Makefile.in web2c*/
 	cd web2c*; \
 	if [ ! -f Makefile ]; then \
-		./configure; \
+		prefix=`sed -n '/^prefix *= *\([^ ]*\).*$$/s//\1/p' Makefile.in`; \
+		$(SHELL) ./configure --prefix=$$prefix; \
 	fi; \
 	make
 

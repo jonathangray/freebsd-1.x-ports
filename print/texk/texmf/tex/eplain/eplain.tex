@@ -1,11 +1,11 @@
 %% @texfile{
 %%   author = "Karl Berry",
-%%   version = "2.4",
-%%   date = "Wed Mar 30 13:30:44 EST 1994",
+%%   version = "2.6",
+%%   date = "Mon May  2 07:48:27 EDT 1994",
 %%   filename = "eplain.tex",
 %%   email = "karl@cs.umb.edu",
 %%   address = "135 Center Hill Rd. // Plymouth, MA 02360"
-%%   checksum = "1998    5069   68765",
+%%   checksum = "2301    5656   77376",
 %%   codetable = "ISO/ASCII",
 %%   supported = "yes",
 %%   docstring = "This file defines macros that extend and expand on
@@ -838,8 +838,8 @@
 \def\hidehrule#1#2{\kern-#1\hrule height#1 depth#2 \kern-#2}%
 \def\hidevrule#1#2{%
   \kern-#1%
-  \dimen0=#1\advance\dimen0 by #2%
-  \vrule width\dimen0
+  \dimen@=#1\advance\dimen@ by #2%
+  \vrule width\dimen@
   \kern-#2%
 }%
 \newdimen\boxitspace \boxitspace = 3pt
@@ -1086,6 +1086,10 @@
   \if&negarg \&tempdima\dimen@i \dimen@i\dimen@ii \dimen@ii\&tempdima\fi
   #3\dimen@i\relax #4\dimen@ii\relax }%
 \catcode`\&=4  % Back to alignment tab
+}%
+\catcode`& = 4
+\toks2 = {%
+\catcode`\&=4  % Back to alignment tab
 \def\generalhmap{\futurelet\next\@generalhmap}%
 \def\@generalhmap{\ifx\next^ \let\temp\generalhm@rph\else
   \ifx\next_ \let\temp\generalhm@rph\else \let\temp\m@kehmap\fi\fi \temp}%
@@ -1202,7 +1206,7 @@
 }%
 \let\newif = \@plainnewif
 \let\newdimen = \@plainnewdimen
-\ifx\noarrow\@undefined \the\toks0 \fi
+\ifx\noarrow\@undefined \the\toks0 \the\toks2 \fi
 \catcode`& = \@eplainoldandcode
 \def\environment#1{%
    \ifx\@groupname\@undefined\else
@@ -1310,7 +1314,7 @@
     \let\noalign = \@lefteqalignonoalign
     \vcenter{%
       \halign to\displaywidth{%
-         $\@lign\displaystyle{####}$\tabskip\z@skip
+         \hfil $\@lign\displaystyle{####}$\tabskip\z@skip
         &$\@lign\displaystyle{{}####}$\hfil\tabskip\centering
         &\llap{$\@lign####$}\tabskip\z@skip\crcr
         ##1\crcr}}}%
@@ -1524,43 +1528,53 @@
   \@makeverbatimescapechar
   \tt}
 \let\endverbatim = \endgroup
-\newif\if@tocfileopened
-\newwrite\tocfile
-\let\tocfilebasename = \jobname
-\def\opentocfile{%
-  \if@tocfileopened\else
-     \global\@tocfileopenedtrue
-     \immediate\openout\tocfile = \tocfilebasename.toc
+\def\definecontentsfile#1{%
+  \ece\innernewwrite{#1file}%
+  \ece\innernewif{if@#1fileopened}%
+  \ece\let{#1filebasename} = \jobname
+  \ece\def{open#1file}{\opencontentsfile{#1}}%
+  \ece\def{write#1entry}{\writecontentsentry{#1}}%
+  \ece\def{writenumbered#1entry}{\writenumberedcontentsentry{#1}}%
+  \ece\innernewif{ifrewrite#1file} \csname rewrite#1filetrue\endcsname
+  \ece\def{read#1file}{\readcontentsfile{#1}}%
+}%
+\definecontentsfile{toc}%
+\def\opencontentsfile#1{%
+  \csname if@#1fileopened\endcsname \else
+     \ece{\immediate\openout}{#1file} = \csname #1filebasename\endcsname.#1
+     \ece\global{@#1fileopenedtrue}%
   \fi
 }%
-\def\writetocentry#1#2{\writenumberedtocentry{#1}{#2}{}}%
-\def\writenumberedtocentry#1#2#3{%
-  \ifrewritetocfile
-    \opentocfile
-    \toks0 = {\expandafter\noexpand \csname toc#1entry\endcsname}%
-    \def\temp{#2}%
-    \toks2 = \expandafter{#3}%
+\def\writecontentsentry#1#2#3{\writenumberedcontentsentry{#1}{#2}{#3}{}}%
+\def\writenumberedcontentsentry#1#2#3#4{%
+  \csname ifrewrite#1file\endcsname
+    \csname open#1file\endcsname
+    \toks0 = {\expandafter\noexpand \csname #1#2entry\endcsname}%
+    \def\temp{#3}%
+    \toks2 = \expandafter{#4}%
     \edef\cs{\the\toks2}%
     \edef\@wr{%
-      \write\tocfile{%
-        \the\toks0
-        {\sanitize\temp}%
-        \ifx\empty\cs\else {\sanitize\cs}\fi
-        {\noexpand\folio}%
+      \write\csname #1file\endcsname{%
+        \the\toks0 % the \toc...entry control sequence
+        {\sanitize\temp}% the text
+        \ifx\empty\cs\else {\sanitize\cs}\fi % A secondary number, or nothing:
+        {\noexpand\folio}% the page number
       }%
     }%
     \@wr
   \fi
   \ignorespaces
 }%
-\newif\ifrewritetocfile   \rewritetocfiletrue
-\def\readtocfile{%
-   \testfileexistence[\tocfilebasename]{toc}%
+\def\readcontentsfile#1{%
+   \edef\temp{%
+     \noexpand\testfileexistence[\csname #1filebasename\endcsname]{toc}%
+   }\temp
    \if@fileexists
-      \input \tocfilebasename.toc
-      \ifrewritetocfile \opentocfile \fi
+      \input \csname #1filebasename\endcsname.#1\relax
+      \csname ifrewrite#1file\endcsname \csname open#1file\endcsname \endif
    \fi
 }%
+\def\endif{\fi}%
 \def\tocchapterentry#1#2{\line{\bf #1 \dotfill\ #2}}%
 \def\tocsectionentry#1#2{\line{\quad\sl #1 \dotfill\ \rm #2}}%
 \def\tocsubsectionentry#1#2{\line{\qquad\rm #1 \dotfill\ #2}}%
@@ -1691,6 +1705,295 @@
 \let\eqconstruct = \identity
 \def\eqprint#1{(#1)}%
 \def\eqsubreftext#1#2{#1.#2}%
+\let\extraidxcmdsuffixes = \empty
+\outer\def\defineindex#1{%
+  \def\@idxprefix{#1}%
+  \for\@idxcmd:=,marked,submarked,name%
+                \extraidxcmdsuffixes\do
+  {%
+    \@defineindexcmd\@idxcmd
+  }%
+  \ece\innernewwrite{@#1indexfile}%
+  \ece\innernewif{if@#1indexfileopened}%
+}%
+\newif\ifsilentindexentry
+\def\@defineindexcmd#1{%
+  \@defineoneindexcmd{s}{#1}\silentindexentrytrue
+  \@defineoneindexcmd{}{#1}\silentindexentryfalse
+}%
+\def\@defineoneindexcmd#1#2#3{%
+  \toks@ = {#3}%
+  \edef\temp{%
+    \def
+      \expandonce\csname#1\@idxprefix dx#2\endcsname % e.g., \idx or \sidxname.
+      {\def\noexpand\@idxprefix{\@idxprefix}% define \@idxprefix
+       \expandonce\csname @@#1idx#2\endcsname
+      }%
+    \def
+      \expandonce\csname @@#1idx#2\endcsname{% e.g., \@@idx
+        \the\toks@
+        \noexpand\@idxgetrange\expandonce\csname @#1idx#2\endcsname
+      }%
+  }%
+  \temp
+}%
+\let\indexfilebasename = \jobname
+\def\@idxwrite#1#2{%
+  \csname if@\@idxprefix indexfileopened\endcsname \else
+    \expandafter\immediate\openout\csname @\@idxprefix indexfile\endcsname =
+      \indexfilebasename.\@idxprefix dx
+    \expandafter\global\csname @\@idxprefix indexfileopenedtrue\endcsname
+  \fi
+  \def\temp{#1}%
+  \edef\@wr{%
+    \expandafter\write\csname @\@idxprefix indexfile\endcsname{%
+      \string\indexentry
+      {\sanitize\temp}%
+      {\noexpand#2}%
+    }%
+  }%
+  \@wr
+  \ifindexproofing \insert\@indexproof{\indexproofterm{#1}}\fi
+  \hookrun{afterindexterm}%
+  \ifsilentindexentry \expandafter\ignorespaces\fi
+}%
+\newif\ifindexproofing
+\newinsert\@indexproof
+\dimen\@indexproof = \maxdimen                  % No limit on number of terms.
+\count\@indexproof = 0  \skip\@indexproof = 0pt % They take up no space.
+\font\indexprooffont = cmtt8
+\def\indexproofterm#1{\hbox{\strut \indexprooffont #1}}%
+\let\@plainmakeheadline = \makeheadline
+\def\makeheadline{%
+  \indexproofunbox
+  \@plainmakeheadline
+}%
+\def\indexsetmargins{%
+  \ifx\undefined\outsidemargin
+    \dimen@ = 1in
+    \advance\dimen@ by \hoffset
+    \edef\outsidemargin{\the\dimen@}%
+    \let\insidemargin = \outsidemargin
+  \fi
+}%
+\def\indexproofunbox{%
+  \ifvoid\@indexproof\else
+    \indexsetmargins
+    \rlap{%
+      \kern\hsize
+      \ifodd\pageno \kern\outsidemargin \else \kern\insidemargin \fi
+      \vbox to 0pt{\unvbox\@indexproof\vss}%
+    }%
+  \fi
+}%
+\def\idxrangebeginword{begin}%
+\def\idxbeginrangemark{(}% the corresponding magic char to go in the idx file
+\def\idxrangeendword{end}%
+\def\idxendrangemark{)}%
+\def\idxseecmdword{see}%
+\def\idxseealsocmdword{seealso}%
+\newif\if@idxsee
+\let\@idxseenterm = \relax
+\def\idxpagemarkupcmdword{pagemarkup}%
+\let\@idxpagemarkup = \relax
+\def\@idxgetrange#1{%
+  \let\@idxrangestr = \empty
+  \let\@afteridxgetrange = #1%
+  \@getoptionalarg\@finidxgetopt
+}%
+\def\@finidxgetopt{%
+  \for\@idxarg:=\@optionalarg\do{%
+    \expandafter\@idxcheckpagemarkup\@idxarg=,%
+    \ifx\@idxarg\idxrangebeginword
+      \def\@idxrangestr{\idxencapoperator\idxbeginrangemark}%
+    \else
+      \ifx\@idxarg\idxrangeendword
+        \def\@idxrangestr{\idxencapoperator\idxendrangemark}%
+      \else
+        \ifx\@idxarg\idxseecmdword
+          \def\@idxpagemarkup{indexsee}%
+          \@idxseetrue
+        \else
+          \ifx\@idxarg\idxseealsocmdword
+            \def\@idxpagemarkup{indexseealso}%
+            \@idxseetrue
+          \else
+             \ifx\@idxpagemarkup\relax
+               \errmessage{Unrecognized index option `\@idxarg'}%
+             \fi
+          \fi
+        \fi
+      \fi
+    \fi
+  }%
+  \@afteridxgetrange
+}%
+\def\@idxcheckpagemarkup#1=#2,{%
+  \def\temp{#1}%
+  \ifx\temp\idxpagemarkupcmdword
+    \if ,#2, % If #2 is empty, complain.
+      \errmessage{Missing markup command to `pagemarkup'}%
+    \else
+      \def\temp##1={##1}%
+      \edef\@idxpagemarkup{\temp\string#2}%
+    \fi
+  \fi
+}%
+\def\idxsubentryseparator{!}%
+\def\idxencapoperator{|}%
+\def\idxmaxpagenum{99999}%
+\newtoks\@idxmaintoks
+\newtoks\@idxsubtoks
+\def\@idxtokscollect{%
+  \edef\temp{\the\@idxsubtoks}%
+  \edef\@indexentry{%
+    \the\@idxmaintoks
+    \ifx\temp\empty\else \idxsubentryseparator\the\@idxsubtoks \fi
+    \@idxrangestr
+  }%
+  \if@idxsee
+    \@idxseefalse % Reset so the next term won't be a `see'.
+    \edef\temp{\noexpand\@finidxtokscollect{\idxmaxpagenum}}%
+  \else
+    \def\temp{\@finfinidxtokscollect\folio}%
+  \fi
+  \temp
+}%
+\def\@finidxtokscollect#1#2{%
+  \def\@idxseenterm{#2}%
+  \@finfinidxtokscollect{#1}%
+}%
+\def\@finfinidxtokscollect#1{%
+  \ifx\@idxpagemarkup\relax \else
+    \toks@ = \expandafter{\@indexentry}%
+    \edef\@indexentry{\the\toks@ \idxencapoperator \@idxpagemarkup}%
+    \let\@idxpagemarkup = \relax
+  \fi
+  \ifx\@idxseenterm\relax \else
+    \toks@ = \expandafter{\@indexentry}%
+    \edef\@indexentry{\the\toks@{\sanitize\@idxseenterm}}%
+    \let\@idxseenterm = \relax
+  \fi
+  \expandafter\@idxwrite\expandafter{\@indexentry}{#1}%
+}%
+\def\@idxcollect#1#2{%
+  \@idxmaintoks = {#1}%
+  \@idxsubtoks = {#2}%
+  \@idxtokscollect
+}%
+\def\@idx#1{%
+  #1% Produce TERM as output.
+  \@idxcollect{#1}{}%
+}%
+\def\@sidx#1{\@idxmaintoks = {#1}\@getoptionalarg\@finsidx}%
+\def\@finsidx{%
+  \@idxsubtoks = \expandafter{\@optionalarg}%
+  \@idxtokscollect
+}%
+\def\idxsortkeysep{@}% This `@' is catcode 11, but it doesn't matter.
+\def\@idxconstructmarked#1#2#3{%
+  \toks@ = {#2}% The control sequence.
+  \toks2 = {#3}% The term.
+  \edef\temp{\the\toks2 \idxsortkeysep \the\toks@{\the\toks2}}%
+  #1 = \expandafter{\temp}%
+}%
+\def\@idxmarked#1#2{%
+  #1{#2}% Produce \CS{TERM} as output.
+  \@idxconstructmarked\@idxmaintoks{#1}{#2}%
+  \@idxsubtoks = {}%
+  \@idxtokscollect
+}%
+\def\@sidxmarked#1#2{%
+  \@idxconstructmarked\toks@{#1}{#2}%
+  \edef\temp{{\the\toks@}}%
+  \expandafter\@sidx\temp
+}%
+\def\@idxsubmarked#1#2#3{%
+  #1 #2{#3}% produce `TERM \CS{SUBTERM} as output.
+  \@sidxsubmarked{#1}{#2}{#3}%
+}%
+\def\@sidxsubmarked#1#2#3{%
+  \@idxmaintoks = {#1}%
+  \@idxconstructmarked\@idxsubtoks{#2}{#3}%
+  \@idxtokscollect
+}%
+\def\idxnameseparator{, }% as in `Tachikawa, Elizabeth'
+\def\@idxcollectname#1#2{%
+  \def\temp{#1}%
+  \ifx\temp\empty
+    \toks@ = {}%
+  \else
+    \toks@ = {\idxnameseparator #1}%
+  \fi
+  \toks2 = {#2}%
+  \edef\temp{\the\toks2 \the\toks@}%
+}%
+\def\@idxname#1#2{%
+  #1 #2% Separate the names by a space in the output.
+  \@idxcollectname{#1}{#2}%
+  \expandafter\@idxcollect\expandafter{\temp}{}%
+}%
+\def\@sidxname#1#2{%
+  \@idxcollectname{#1}{#2}%
+  \expandafter\@sidx\expandafter{\temp}%
+}%
+\let\indexfonts = \relax
+\def\readindexfile#1{%
+  \edef\@idxprefix{#1}%
+  \testfileexistence[\indexfilebasename]{\@idxprefix nd}%
+  \iffileexists \begingroup
+    \ifx\begin\undefined
+      \def\begin##1{\@beginindex}%
+      \let\end = \@gobble
+    \fi
+    \input \indexfilebasename.\@idxprefix nd
+    \singlecolumn
+  \endgroup
+  \else
+    \message{No index file \indexfilebasename.\@idxprefix nd.}%
+  \fi
+}%
+\def\@beginindex{%
+  \let\item = \@indexitem
+  \let\subitem = \@indexsubitem
+  \let\subsubitem = \@indexsubsubitem
+  \indexfonts
+  \doublecolumns
+  \parindent = 0pt
+  \hookrun{beginindex}%
+}%
+\let\indexspace = \bigbreak
+\let\afterindexterm = \quad
+\newskip\aboveindexitemskipamount  \aboveindexitemskipamount = 0pt plus2pt
+\def\aboveindexitemskip{\vskip\aboveindexitemskipamount}%
+\def\@indexitem{\begingroup
+  \@indexitemsetup
+  \leftskip = 0pt
+  \aboveindexitemskip
+  \penalty-100 % Encourage page breaks before items.
+  \def\par{\endgraf\endgroup\nobreak}%
+}%
+\def\@indexsubitem{%
+  \@indexitemsetup
+  \leftskip = 1em
+}%
+\def\@indexsubsubitem{%
+  \@indexitemsetup
+  \leftskip = 2em
+}%
+\def\@indexitemsetup{%
+  \par
+  \hangindent = 1em
+  \raggedright
+  \hyphenpenalty = 10000
+  \hookrun{indexitem}%
+}%
+\def\seevariant{\it}%
+\def\indexseeword{See}%
+\def\indexsee#1#2{{\seevariant \indexseeword\ }#1}%
+\def\indexseealsowords{see also}%
+\def\indexseealso#1#2{{\seevariant \indexseealsowords\ }#1}%
+\defineindex{i}%
 \begingroup
   \catcode `\^^M = \active %
   \gdef\flushleft{%
@@ -1806,9 +2109,9 @@
   \vskip\interfootnoteskip
   \indent\llap{#1\kern\footnotemarkseparation}\footstrut\futurelet\next\fo@t
 }%
-\def\footnoterule{\dimen0 = \footnoteruleheight
-  \advance\dimen0 by \belowfootnoterulespace
-  \kern-\dimen0
+\def\footnoterule{\dimen@ = \footnoteruleheight
+  \advance\dimen@ by \belowfootnoterulespace
+  \kern-\dimen@
   \hrule width\footnoterulewidth height\footnoteruleheight depth0pt
   \kern\belowfootnoterulespace
   \vskip-\interfootnoteskip
@@ -1818,31 +2121,31 @@
   \@plainfootnote{$^{\number\footnotenumber}$}%
 }%
 \newdimen\paperheight \paperheight = 11in
-\def\topmargin{\afterassignment\@finishtopmargin \dimen0}%
+\def\topmargin{\afterassignment\@finishtopmargin \dimen@}%
 \def\@finishtopmargin{%
   \dimen2 = \voffset		% Remember the old \voffset.
-  \voffset = \dimen0 \advance\voffset by -1in
+  \voffset = \dimen@ \advance\voffset by -1in
   \advance\dimen2 by -\voffset	% Compute the change in \voffset.
   \advance\vsize by \dimen2	% Change type area accordingly.
 }%
 \def\advancetopmargin{%
-  \dimen0 = 0pt \afterassignment\@finishadvancetopmargin \advance\dimen0
+  \dimen@ = 0pt \afterassignment\@finishadvancetopmargin \advance\dimen@
 }%
 \def\@finishadvancetopmargin{%
-  \advance\voffset by \dimen0
-  \advance\vsize by -\dimen0
+  \advance\voffset by \dimen@
+  \advance\vsize by -\dimen@
 }%
-\def\bottommargin{\afterassignment\@finishbottommargin \dimen0}%
+\def\bottommargin{\afterassignment\@finishbottommargin \dimen@}%
 \def\@finishbottommargin{%
   \@computebottommargin		% Result in \dimen2.
-  \advance\dimen2 by -\dimen0	% Compute the change in the bottom margin.
+  \advance\dimen2 by -\dimen@	% Compute the change in the bottom margin.
   \advance\vsize by \dimen2	% Change the type area.
 }%
 \def\advancebottommargin{%
-  \dimen0 = 0pt \afterassignment\@finishadvancebottommargin \advance\dimen0
+  \dimen@ = 0pt \afterassignment\@finishadvancebottommargin \advance\dimen@
 }%
 \def\@finishadvancebottommargin{%
-  \advance\vsize by -\dimen0
+  \advance\vsize by -\dimen@
 }%
 \def\@computebottommargin{%
   \dimen2 = \paperheight	% The total paper size.
@@ -1851,31 +2154,31 @@
   \advance\dimen2 by -1in	% Less the default offset.
 }%
 \newdimen\paperwidth \paperwidth = 8.5in
-\def\leftmargin{\afterassignment\@finishleftmargin \dimen0}%
+\def\leftmargin{\afterassignment\@finishleftmargin \dimen@}%
 \def\@finishleftmargin{%
   \dimen2 = \hoffset		% Remember the old \hoffset.
-  \hoffset = \dimen0 \advance\hoffset by -1in
+  \hoffset = \dimen@ \advance\hoffset by -1in
   \advance\dimen2 by -\hoffset	% Compute the change in \hoffset.
   \advance\hsize by \dimen2	% Change type area accordingly.
 }%
 \def\advanceleftmargin{%
-  \dimen0 = 0pt \afterassignment\@finishadvanceleftmargin \advance\dimen0
+  \dimen@ = 0pt \afterassignment\@finishadvanceleftmargin \advance\dimen@
 }%
 \def\@finishadvanceleftmargin{%
-  \advance\hoffset by \dimen0
-  \advance\hsize by -\dimen0
+  \advance\hoffset by \dimen@
+  \advance\hsize by -\dimen@
 }%
-\def\rightmargin{\afterassignment\@finishrightmargin \dimen0}%
+\def\rightmargin{\afterassignment\@finishrightmargin \dimen@}%
 \def\@finishrightmargin{%
   \@computerightmargin		% Result in \dimen2.
-  \advance\dimen2 by -\dimen0	% Compute the change in the right margin.
+  \advance\dimen2 by -\dimen@	% Compute the change in the right margin.
   \advance\hsize by \dimen2	% Change the type area.
 }%
 \def\advancerightmargin{%
-  \dimen0 = 0pt \afterassignment\@finishadvancerightmargin \advance\dimen0
+  \dimen@ = 0pt \afterassignment\@finishadvancerightmargin \advance\dimen@
 }%
 \def\@finishadvancerightmargin{%
-  \advance\hsize by -\dimen0
+  \advance\hsize by -\dimen@
 }%
 \def\@computerightmargin{%
   \dimen2 = \paperwidth		% The total paper size.
@@ -1994,5 +2297,5 @@
 \def\fmtname{eplain}%
 \def\eplain{t}%
 {\edef\plainversion{\fmtversion}%
- \xdef\fmtversion{2.4: 30 March 1994 (and plain \plainversion)}%
+ \xdef\fmtversion{2.6:  2 May 1994 (and plain \plainversion)}%
 }%

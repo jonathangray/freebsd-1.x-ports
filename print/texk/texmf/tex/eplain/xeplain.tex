@@ -513,8 +513,8 @@
 % 
 \def\hidevrule#1#2{%
   \kern-#1%
-  \dimen0=#1\advance\dimen0 by #2%
-  \vrule width\dimen0
+  \dimen@=#1\advance\dimen@ by #2%
+  \vrule width\dimen@
   \kern-#2%
 }%
 % 
@@ -565,11 +565,15 @@
 \edef\@eplainoldandcode{\the\catcode`& }%
 \catcode`& = 11
 \toks0 = {%
-  %% [[[include arrow]]]
+  %% [[[include arrow1]]]
+}%
+\catcode`& = 4
+\toks2 = {%
+  %% [[[include arrow2]]]
 }%
 \let\newif = \@plainnewif
 \let\newdimen = \@plainnewdimen
-\ifx\noarrow\@undefined \the\toks0 \fi
+\ifx\noarrow\@undefined \the\toks0 \the\toks2 \fi
 \catcode`& = \@eplainoldandcode
 % 
 % 
@@ -762,7 +766,7 @@
     \let\noalign = \@lefteqalignonoalign
     \vcenter{%
       \halign to\displaywidth{%
-         $\@lign\displaystyle{####}$\tabskip\z@skip
+         \hfil $\@lign\displaystyle{####}$\tabskip\z@skip
         &$\@lign\displaystyle{{}####}$\hfil\tabskip\centering
         &\llap{$\@lign####$}\tabskip\z@skip\crcr
         ##1\crcr}}}%
@@ -1172,22 +1176,33 @@
 % 
 % 
 % 
-%  Contents.
+%  Table of contents, list of figures, etc.
 % 
 % Entries for the table of contents are recorded in \jobname.toc, which
 % we open for writing at the first \writetocentry or when \readtocfile
-% is invoked (after we read it, in the latter case).  We use
-% \tocfilebasename as the root of the filename to read; this defaults to
-% \jobname.
-% 
-\newif\if@tocfileopened
-\newwrite\tocfile
-\let\tocfilebasename = \jobname
+% is invoked (after we read it, in the latter case).  Actually, we use
+% \tocfilebasename for the root of the filename to read; \jobname is
+% the default.
 %
-\def\opentocfile{%
-  \if@tocfileopened\else
-     \global\@tocfileopenedtrue
-     \immediate\openout\tocfile = \tocfilebasename.toc
+\def\definecontentsfile#1{%
+  \ece\innernewwrite{#1file}%
+  \ece\innernewif{if@#1fileopened}%
+  \ece\let{#1filebasename} = \jobname
+  \ece\def{open#1file}{\opencontentsfile{#1}}%
+  \ece\def{write#1entry}{\writecontentsentry{#1}}%
+  \ece\def{writenumbered#1entry}{\writenumberedcontentsentry{#1}}%
+  \ece\innernewif{ifrewrite#1file} \csname rewrite#1filetrue\endcsname
+  \ece\def{read#1file}{\readcontentsfile{#1}}%
+}%
+% 
+% We provide \opentocfile, \readtocfile, etc., by default.
+\definecontentsfile{toc}%
+%
+% And `toc' is just the argument to this macro.
+\def\opencontentsfile#1{%
+  \csname if@#1fileopened\endcsname \else
+     \ece{\immediate\openout}{#1file} = \csname #1filebasename\endcsname.#1
+     \ece\global{@#1fileopenedtrue}%
   \fi
 }%
 %
@@ -1211,7 +1226,9 @@
 % into a \leftline, say, there would be no legal breakpoint between the
 % boxes, and one extremely long line would result.
 % 
-\def\writetocentry#1#2{\writenumberedtocentry{#1}{#2}{}}%
+% `toc' is the first argument to this; \writetocentry is defined by
+% \definecontentsfile.
+\def\writecontentsentry#1#2#3{\writenumberedcontentsentry{#1}{#2}{#3}{}}%
 %
 % Sometimes you want the control sequence to take another number (e.g.,
 % a chapter number) as a parameter.  (Although you can pass anything you
@@ -1227,60 +1244,52 @@
 % 
 % if the second chapter started on page 14.
 % 
-\def\writenumberedtocentry#1#2#3{%
-  \ifrewritetocfile
-    \opentocfile
-    \toks0 = {\expandafter\noexpand \csname toc#1entry\endcsname}%
-    \def\temp{#2}%
+% `toc' is the first argument, as above.
+\def\writenumberedcontentsentry#1#2#3#4{%
+  \csname ifrewrite#1file\endcsname
+    \csname open#1file\endcsname
+    \toks0 = {\expandafter\noexpand \csname #1#2entry\endcsname}%
+    \def\temp{#3}%
     %
-    % Usually #3 is just `\the\register', which we want to expand.  But
+    % Usually #4 is just `\the\register', which we want to expand.  But
     % if it's not a number at all -- e.g., if it's an author's name, we
     % don't want to expand control sequences for accents and the like.
     % So we play some games here.
-    \toks2 = \expandafter{#3}%
+    \toks2 = \expandafter{#4}%
     \edef\cs{\the\toks2}%
     \edef\@wr{%
-      \write\tocfile{%
-        % The \toc...entry control sequence:
-        \the\toks0
-        %
-        % The text:
-        {\sanitize\temp}%
-        %
-        % A secondary number, or nothing:
-        \ifx\empty\cs\else {\sanitize\cs}\fi
-        %
-        % The page number:
-        {\noexpand\folio}%
+      \write\csname #1file\endcsname{%
+        \the\toks0 % the \toc...entry control sequence
+        {\sanitize\temp}% the text
+        \ifx\empty\cs\else {\sanitize\cs}\fi % A secondary number, or nothing:
+        {\noexpand\folio}% the page number
       }%
     }%
     \@wr
   \fi
   \ignorespaces
 }%
-%
 % 
 % The entries are read in when the user invokes \readtocfile (which
 % should be before the first \writetocentry).  The .toc file is also
 % opened for writing (i.e., emptied) here, unless \rewritetocfilefalse.
-% You might want to set that to, e.g., read it in twice.
-% 
-\newif\ifrewritetocfile   \rewritetocfiletrue
-%
-\def\readtocfile{%
-   \testfileexistence[\tocfilebasename]{toc}%
+% You might want to set that if you're reading it in twice to make a
+% short contents or some such.
+\def\readcontentsfile#1{%
+   \edef\temp{%
+     \noexpand\testfileexistence[\csname #1filebasename\endcsname]{toc}%
+   }\temp
    \if@fileexists
-      \input \tocfilebasename.toc
-      \ifrewritetocfile \opentocfile \fi
+      \input \csname #1filebasename\endcsname.#1\relax
+      \csname ifrewrite#1file\endcsname \csname open#1file\endcsname \endif
    \fi
 }%
+\def\endif{\fi}%
 %
-% 
 % Here are some sample definitions of the \toc...entry macros.  Perhaps
 % you or your book designer can come up with a better way of handling
-% contents than leaders.  These definitions are just as examples, not as
+% contents than leaders.  These definitions are just examples, not
 % something you might want to actually use to print a document.
-% 
 \def\tocchapterentry#1#2{\line{\bf #1 \dotfill\ #2}}%
 \def\tocsectionentry#1#2{\line{\quad\sl #1 \dotfill\ \rm #2}}%
 \def\tocsubsectionentry#1#2{\line{\qquad\rm #1 \dotfill\ #2}}%
@@ -1626,6 +1635,565 @@
 %
 %
 % 
+%  Indexing.
+% 
+% \defineindex{PREFIX} defines an index with ``prefix'' PREFIX.  The
+% prefix is used to construct the output filename and the various
+% commands.  We just define all the index commands for this index to
+% call the general commands with PREFIX.
+%
+\let\extraidxcmdsuffixes = \empty
+%
+\outer\def\defineindex#1{%
+  \def\@idxprefix{#1}%
+  %
+  % Define the indexing commands for this prefix. 
+  \for\@idxcmd:=,marked,submarked,name%
+                \extraidxcmdsuffixes\do
+  {%
+    \@defineindexcmd\@idxcmd
+  }%
+  %
+  % Allocate a stream for the output.
+  \ece\innernewwrite{@#1indexfile}%
+  %
+  % And a conditional to test whether we've opened the file.
+  \ece\innernewif{if@#1indexfileopened}%
+}%
+%
+%
+% \@defineindexcmd{SUFFIX} defines both silent and non-silent index
+% command for prefix \@idxprefix with suffix SUFFIX.  That is, we define
+% both `\@idxprefix dxSUFFIX' and `\s\@idxprefix dxSUFFIX' to call the
+% corresponding generic command with \@idxprefix.  \silentindexentry is
+% used to decide whether we should ignore following spaces.
+% 
+\newif\ifsilentindexentry
+%
+\def\@defineindexcmd#1{%
+  \@defineoneindexcmd{s}{#1}\silentindexentrytrue
+  \@defineoneindexcmd{}{#1}\silentindexentryfalse
+}%
+%
+%
+% \@defineoneindexcmd{PREFIX}{SUFFIX}{PRECALL} does just one silent or
+% non-silent commands.  We define the command `\@@PREFIXidxSUFFIX' to do
+% PRECALL, then define \@idxprefix, then call \@idxgetrange with an
+% argument of `\@@{,s}idxSUFFIX'.  (So far every indexing command 
+% should allow a range.  If not, you could redefine `\@@{,s}idxSUFFIX'
+% after this macro is called.)
+% 
+\def\@defineoneindexcmd#1#2#3{%
+  \toks@ = {#3}%
+  \edef\temp{%
+    \def
+      % We have to restrict expansion because the generic (\@@...)
+      % commands will be defined after the first call to \defineindex.
+      % Not expanding the user (\idx...) commands is unnecessary unless
+      % the user has defined some new commands, but may as well be cautious.
+      \expandonce\csname#1\@idxprefix dx#2\endcsname % e.g., \idx or \sidxname.
+      {\def\noexpand\@idxprefix{\@idxprefix}% define \@idxprefix
+       % call, e.g., \@@idx or \@@sidxname:
+       \expandonce\csname @@#1idx#2\endcsname
+      }%
+    \def
+      \expandonce\csname @@#1idx#2\endcsname{% e.g., \@@idx
+        % First do PRECALL.
+        \the\toks@
+        % Then call \@idxgetrange with, e.g., \@idx or \@sidxname as its arg.
+        \noexpand\@idxgetrange\expandonce\csname @#1idx#2\endcsname
+      }%
+  }%
+  \temp
+}%
+%
+%
+% \@idxwrite{TERM}{PAGENO} writes a general index entry for TERM on page
+% PAGENO to the index file `\@idxprefix indexfile'.  We open the stream
+% as `\indexfilebasename.\@idxprefix dx' if it isn't already open.
+%
+\let\indexfilebasename = \jobname
+%
+\def\@idxwrite#1#2{%
+  % Be sure the file is opened.
+  \csname if@\@idxprefix indexfileopened\endcsname \else
+    \expandafter\immediate\openout\csname @\@idxprefix indexfile\endcsname =
+      \indexfilebasename.\@idxprefix dx
+    \expandafter\global\csname @\@idxprefix indexfileopenedtrue\endcsname
+  \fi
+  %
+  % Save the index term.
+  \def\temp{#1}%
+  %
+  % Write the index term and page number.
+  \edef\@wr{%
+    \expandafter\write\csname @\@idxprefix indexfile\endcsname{%
+      \string\indexentry
+      {\sanitize\temp}%
+      {\noexpand#2}%
+    }%
+  }%
+  \@wr
+  % 
+  % Marginalize the index term, if desired.
+  \ifindexproofing \insert\@indexproof{\indexproofterm{#1}}\fi
+  %
+  % We just appended at least one non-discardable item (namely, the
+  % whatsit from the \write) to the current list.  So in case glue comes
+  % next (not unlikely), be sure we don't inadvertently make that glue a
+  % valid breakpoint, if it wouldn't have been without us.
+  \hookrun{afterindexterm}%
+  %
+  % This is the end of the index entry processing.  If this was a silent
+  % entry, ignore following spaces.
+  \ifsilentindexentry \expandafter\ignorespaces\fi
+}%
+%
+%
+% If this conditional is true, we output the index terms on the page
+% where they occur.
+\newif\ifindexproofing
+%
+% We need a new insertion class to collect the proofed terms.
+\newinsert\@indexproof
+\dimen\@indexproof = \maxdimen                  % No limit on number of terms.
+\count\@indexproof = 0  \skip\@indexproof = 0pt % They take up no space.
+%
+% This actually typesets the proofed term.  We don't go to any lengths
+% to provide nice-looking output; since the term might have all kinds of
+% weird characters in it, we just dump it in the smallest standard
+% Computer Modern typewriter font.
+% 
+% We put the term in an \hbox, even though that might make the output
+% run off the page, since we don't really need to see all of it, and
+% I think it's better to opt for simplicity -- one term per line.
+\font\indexprooffont = cmtt8
+\def\indexproofterm#1{\hbox{\strut \indexprooffont #1}}%
+%
+%
+% If \output doesn't use \makeheadline, or redefines it, it's up to the
+% new \output to call \indexproofunbox.
+\let\@plainmakeheadline = \makeheadline
+\def\makeheadline{%
+  \indexproofunbox
+  \@plainmakeheadline
+}%
+%
+% We want to put the proof index terms in the margin, outside the
+% printed area. So if \outsidemargin (for odd pages) and \insidemargin
+% (for even pages) are undefined, we define them (both) to be the default
+% TeX margin -- one inch + \hoffset.
+\def\indexsetmargins{%
+  \ifx\undefined\outsidemargin
+    \dimen@ = 1in
+    \advance\dimen@ by \hoffset
+    \edef\outsidemargin{\the\dimen@}%
+    \let\insidemargin = \outsidemargin
+  \fi
+}%
+%
+% We always put the terms in the right-hand margin, so long terms run
+% off the page, instead of into the text.
+\def\indexproofunbox{%
+  \ifvoid\@indexproof\else
+    \indexsetmargins
+    \rlap{%
+      \kern\hsize
+      \ifodd\pageno \kern\outsidemargin \else \kern\insidemargin \fi
+      \vbox to 0pt{\unvbox\@indexproof\vss}%
+    }%
+  \fi
+}%
+%
+%
+% \@idxgetrange\CS parses an optional argument which, if present, should
+% be either `begin' or `end', marking the beginning or ending of a range
+% for the index entry.  If we find this, we set the appropriate one of
+% \@idxrangestr.  Then we call \CS.
+% 
+% If the optional argument is `see' or `seealso' we read another
+% argument, namely, the entry to see.
+% 
+\def\idxrangebeginword{begin}%
+\def\idxbeginrangemark{(}% the corresponding magic char to go in the idx file
+%
+\def\idxrangeendword{end}%
+\def\idxendrangemark{)}%
+%
+\def\idxseecmdword{see}%
+\def\idxseealsocmdword{seealso}%
+\newif\if@idxsee
+\let\@idxseenterm = \relax
+%
+\def\idxpagemarkupcmdword{pagemarkup}%
+\let\@idxpagemarkup = \relax
+%
+\def\@idxgetrange#1{%
+  \let\@idxrangestr = \empty
+  \let\@afteridxgetrange = #1%
+  \@getoptionalarg\@finidxgetopt
+}%
+\def\@finidxgetopt{%
+  \for\@idxarg:=\@optionalarg\do{%
+    % These are ordered by my guess at frequency of use.
+    \expandafter\@idxcheckpagemarkup\@idxarg=,%
+    %
+    \ifx\@idxarg\idxrangebeginword
+      \def\@idxrangestr{\idxencapoperator\idxbeginrangemark}%
+    \else
+      \ifx\@idxarg\idxrangeendword
+        \def\@idxrangestr{\idxencapoperator\idxendrangemark}%
+      \else
+        \ifx\@idxarg\idxseecmdword
+          \def\@idxpagemarkup{indexsee}%
+          \@idxseetrue
+        \else
+          \ifx\@idxarg\idxseealsocmdword
+            \def\@idxpagemarkup{indexseealso}%
+            \@idxseetrue
+          \else
+             \ifx\@idxpagemarkup\relax
+               \errmessage{Unrecognized index option `\@idxarg'}%
+             \fi
+          \fi
+        \fi
+      \fi
+    \fi
+  }%
+  \@afteridxgetrange
+}%
+%
+%
+% Check for a command of the form `pagemarkup=\cmd', and if found, set
+% \@idxpagemarkup to `cmd'.
+% 
+\def\@idxcheckpagemarkup#1=#2,{%
+  \def\temp{#1}%
+  \ifx\temp\idxpagemarkupcmdword
+    \if ,#2, % If #2 is empty, complain.
+      \errmessage{Missing markup command to `pagemarkup'}%
+    \else
+      % Remove a trailing =.
+      \def\temp##1={##1}%
+      \edef\@idxpagemarkup{\temp\string#2}%
+    \fi
+  \fi
+}%
+%
+%
+% \@idxtokscollect uses \@idxmaintoks as the token list for the main
+% part of an index entry and \@idxsubtoks for the subpart.  Then it
+% calls \@idxwrite.
+% 
+\def\idxsubentryseparator{!}%
+\def\idxencapoperator{|}%
+\def\idxmaxpagenum{99999}%
+%
+\newtoks\@idxmaintoks
+\newtoks\@idxsubtoks
+%
+\def\@idxtokscollect{%
+  % Remember the subentry.
+  \edef\temp{\the\@idxsubtoks}%
+  %
+  % We want to expand the conditions, but not the terms.  The index
+  % entry starts simply with \@idxmaintoks and \@idxsubtoks.
+  \edef\@indexentry{%
+    \the\@idxmaintoks
+    \ifx\temp\empty\else \idxsubentryseparator\the\@idxsubtoks \fi
+    \@idxrangestr
+  }%
+  %
+  % If this is a `see' or `see also' entry, we need to read one more
+  % arg.  We use a giant page number so the entry will be last (for the
+  % benefit of `see also's).  MakeIndex rejects page numbers >=1000.
+  % 
+  \if@idxsee
+    \@idxseefalse % Reset so the next term won't be a `see'.
+    \edef\temp{\noexpand\@finidxtokscollect{\idxmaxpagenum}}%
+  \else
+    \def\temp{\@finfinidxtokscollect\folio}%
+  \fi
+  \temp
+}%
+%
+%
+% \@finidxtokscollect{PAGENO}{REAL-TERM} reads the final term for
+% see/see also entries.  We do not check if the person has put both a
+% range and a see in the same index term (which will confuse makeindex).
+% 
+\def\@finidxtokscollect#1#2{%
+  \def\@idxseenterm{#2}%
+  \@finfinidxtokscollect{#1}%
+}%
+%
+% \@finfinidxtokscollect{PAGENO} writes \@indexentry for page PAGENO.
+% Besides \@indexentry, if \@idxpagemarkup is not \relax we output an
+% index entry \@indexentry|\@idxpagemarkup{PAGENO}.  And if
+% \@idxseenterm is not \relax we output {\@idxseenterm} after the
+% \@idxpagemarkup.  (This will become an argument to the ``markup''
+% command, which will be \indexsee or \indexseealso.)
+% 
+\def\@finfinidxtokscollect#1{%
+  % If we've got a page markup command, append it.
+  \ifx\@idxpagemarkup\relax \else
+    \toks@ = \expandafter{\@indexentry}%
+    \edef\@indexentry{\the\toks@ \idxencapoperator \@idxpagemarkup}%
+    \let\@idxpagemarkup = \relax
+  \fi
+  %
+  % If we've got an argument to the ``page markup'' command, append it.
+  \ifx\@idxseenterm\relax \else
+    \toks@ = \expandafter{\@indexentry}%
+    \edef\@indexentry{\the\toks@{\sanitize\@idxseenterm}}%
+    \let\@idxseenterm = \relax
+  \fi
+  %
+  % Finally, write what we've constructed.
+  \expandafter\@idxwrite\expandafter{\@indexentry}{#1}%
+}%
+%
+%
+% \@idxcollect{MAIN}{SUB} sets up the token registers
+% \@idx{main,sub}toks, then calls \@idxtokscollect.  This is convenient
+% for some of the macros below.
+% 
+\def\@idxcollect#1#2{%
+  \@idxmaintoks = {#1}%
+  \@idxsubtoks = {#2}%
+  \@idxtokscollect
+}%
+%
+%
+% Following are the TeX macros that correspond to the commands
+% that actually appear in the document.
+%
+% \@idx{TERM} produces TERM in the output and then makes the index entry
+% for TERM as usual.  We don't allow a [SUBTERM] here since then we
+% would lose spaces after the command, which would be very inconvenient.
+%
+% As with all our index commands, we've already defined \@idxprefix (in
+% \idx or whatever), to save passing it around, and we've looked for a
+% range argument before TERM.
+% 
+\def\@idx#1{%
+  #1% Produce TERM as output.
+  \@idxcollect{#1}{}%
+}%
+%
+% \@sidx{TERM}[SUBTERM] produces an index entry TERM and no output.  If
+% SUBTERM is present, this is a subentry.  (At the moment, I don't
+% provide for subsubentries, since I've never needed that.)
+% 
+\def\@sidx#1{\@idxmaintoks = {#1}\@getoptionalarg\@finsidx}%
+\def\@finsidx{%
+  \@idxsubtoks = \expandafter{\@optionalarg}%
+  \@idxtokscollect
+}%
+%
+%
+% \@idxconstructmarked{TOKS-REG}\CS{TERM}
+% 
+\def\idxsortkeysep{@}% This `@' is catcode 11, but it doesn't matter.
+%
+\def\@idxconstructmarked#1#2#3{%
+  \toks@ = {#2}% The control sequence.
+  \toks2 = {#3}% The term.
+  %
+  % Construct TERM@\CS{TERM} as the string to write.
+  \edef\temp{\the\toks2 \idxsortkeysep \the\toks@{\the\toks2}}%
+  %
+  % Save it in TOKS-REG.
+  #1 = \expandafter{\temp}%
+}%
+%
+%
+% \@idxmarked\CS{TERM} outputs \CS{TERM} and then calls the main part of
+% \@sidxmarked.
+%
+\def\@idxmarked#1#2{%
+  #1{#2}% Produce \CS{TERM} as output.
+  \@idxconstructmarked\@idxmaintoks{#1}{#2}%
+  \@idxsubtoks = {}%
+  \@idxtokscollect
+}%
+%
+% \@sidxmarked\CS{TERM}[SUBTERM] outputs an index entry sorted by TERM
+% but producing \CS{TERM}.
+% 
+\def\@sidxmarked#1#2{%
+  \@idxconstructmarked\toks@{#1}{#2}%
+  \edef\temp{{\the\toks@}}%
+  \expandafter\@sidx\temp
+}%
+%
+%
+% \@idxsubmarked{TERM}\CS{SUBTERM} is like \@idxmarked, except that it's
+% SUBTERM that's marked instead of TERM.
+% 
+\def\@idxsubmarked#1#2#3{%
+  #1 #2{#3}% produce `TERM \CS{SUBTERM} as output.
+  \@sidxsubmarked{#1}{#2}{#3}%
+}%
+%
+% \@sidxsubmarked{TERM}\CS{SUBTERM} is to \@sidxmarked as \@idxsubmarked
+% is to \@idxmarked.
+% 
+\def\@sidxsubmarked#1#2#3{%
+  \@idxmaintoks = {#1}%
+  \@idxconstructmarked\@idxsubtoks{#2}{#3}%
+  \@idxtokscollect
+}%
+%
+%
+% \@idxcollectname{FIRST}{LAST} puts `LAST, FIRST' into \temp. (Well,
+% we use \idxnameseparator instead of hardwiring `, '.) If FIRST is
+% empty, don't include the separator.
+% 
+\def\idxnameseparator{, }% as in `Tachikawa, Elizabeth'
+%
+\def\@idxcollectname#1#2{%
+  \def\temp{#1}%
+  \ifx\temp\empty
+    \toks@ = {}%
+  \else
+    \toks@ = {\idxnameseparator #1}%
+  \fi
+  \toks2 = {#2}%
+  %
+  \edef\temp{\the\toks2 \the\toks@}%
+}%
+%
+%
+% \@idxname{FIRST}{LAST} also produces `FIRST LAST' in the output and an
+% index entry for `LAST, FIRST'.
+%
+\def\@idxname#1#2{%
+  #1 #2% Separate the names by a space in the output.
+  \@idxcollectname{#1}{#2}%
+  \expandafter\@idxcollect\expandafter{\temp}{}%
+}%
+%
+% \@sidxname{FIRST}{LAST}[SUBTERM] is to \@sidx as \@idxname is to
+% \@idx.
+% 
+\def\@sidxname#1#2{%
+  \@idxcollectname{#1}{#2}%
+  \expandafter\@sidx\expandafter{\temp}%
+}%
+%
+%
+% Now we come to actually producing the index, i.e., implementing the
+% formatting commands that MakeIndex outputs.
+%
+% \readindexfile is responsible for formatting and printing the index.
+% It reads \indexfilebasename.ind.  We implement the same commands that
+% LaTeX does.  I suppose we could allow for different indices having
+% different basenames, but I can't imagine when that would be useful.
+% 
+\let\indexfonts = \relax
+%
+\def\readindexfile#1{%
+  \edef\@idxprefix{#1}%
+  %
+  % Does the output file exist?
+  \testfileexistence[\indexfilebasename]{\@idxprefix nd}%
+  \iffileexists \begingroup
+    % If no \begin or \end, define them. The argument will be `{theindex}'.
+    \ifx\begin\undefined
+      \def\begin##1{\@beginindex}%
+      \let\end = \@gobble
+    \fi
+    %
+    % Read the file:
+    \input \indexfilebasename.\@idxprefix nd
+    % 
+    % \doublecolumns isn't affected by groups.
+    \singlecolumn
+  \endgroup
+  \else
+    \message{No index file \indexfilebasename.\@idxprefix nd.}%
+  \fi
+}%
+%
+% Here's the default for `\begin{theindex}', if \begin isn't defined.
+\def\@beginindex{%
+  % Define the commands MakeIndex outputs.
+  \let\item = \@indexitem
+  \let\subitem = \@indexsubitem
+  \let\subsubitem = \@indexsubsubitem
+  %
+  % Set up the default formatting:
+  \indexfonts
+  \doublecolumns
+  \parindent = 0pt
+  %
+  % Let the user override the defaults.
+  \hookrun{beginindex}%
+}%
+%
+% MakeIndex puts \indexspace between groups in the ind file.
+\let\indexspace = \bigbreak
+%
+% You can make \afterindexterm appear after the term and before the
+% first page with the following in the ist file:
+% delim_0 "\\afterindexterm "
+% delim_1 "\\afterindexterm "
+% delim_2 "\\afterindexterm "
+\let\afterindexterm = \quad
+%
+%
+% Top-level index entries start with \item.
+\newskip\aboveindexitemskipamount  \aboveindexitemskipamount = 0pt plus2pt
+\def\aboveindexitemskip{\vskip\aboveindexitemskipamount}%
+%
+\def\@indexitem{\begingroup
+  \@indexitemsetup
+  \leftskip = 0pt
+  \aboveindexitemskip
+  \penalty-100 % Encourage page breaks before items.
+  % 
+  % But forbid page breaks after items, in case a subitem follows.
+  \def\par{\endgraf\endgroup\nobreak}%
+}%
+%
+% Secondary index entries.
+\def\@indexsubitem{%
+  \@indexitemsetup
+  \leftskip = 1em
+}%
+%
+% And tertiary entries.
+\def\@indexsubsubitem{%
+  \@indexitemsetup
+  \leftskip = 2em
+}%
+%
+% Common setup for the formatting.
+\def\@indexitemsetup{%
+  \par
+  \hangindent = 1em
+  \raggedright
+  \hyphenpenalty = 10000
+  \hookrun{indexitem}%
+}%
+%
+%
+% \indexsee{TERM}{PAGENO} ignores PAGENO, and says `See TERM'.
+\def\seevariant{\it}%
+\def\indexseeword{See}%
+\def\indexsee#1#2{{\seevariant \indexseeword\ }#1}%
+%
+% \indexseealso{TERM}{PAGENO} is similar.
+\def\indexseealsowords{see also}%
+\def\indexseealso#1#2{{\seevariant \indexseealsowords\ }#1}%
+%
+%
+% We provide one index by default; commands are \idx, \sidx, etc.
+\defineindex{i}%
+%
+%
+% 
 %  Justification of multiple input lines.
 %
 % You use these by saying 
@@ -1833,9 +2401,9 @@
   \indent\llap{#1\kern\footnotemarkseparation}\footstrut\futurelet\next\fo@t
 }%
 %
-\def\footnoterule{\dimen0 = \footnoteruleheight
-  \advance\dimen0 by \belowfootnoterulespace
-  \kern-\dimen0
+\def\footnoterule{\dimen@ = \footnoteruleheight
+  \advance\dimen@ by \belowfootnoterulespace
+  \kern-\dimen@
   \hrule width\footnoterulewidth height\footnoteruleheight depth0pt
   \kern\belowfootnoterulespace
   \vskip-\interfootnoteskip
@@ -1860,33 +2428,33 @@
 % 
 \newdimen\paperheight \paperheight = 11in
 %
-\def\topmargin{\afterassignment\@finishtopmargin \dimen0}%
+\def\topmargin{\afterassignment\@finishtopmargin \dimen@}%
 \def\@finishtopmargin{%
   \dimen2 = \voffset		% Remember the old \voffset.
-  \voffset = \dimen0 \advance\voffset by -1in
+  \voffset = \dimen@ \advance\voffset by -1in
   \advance\dimen2 by -\voffset	% Compute the change in \voffset.
   \advance\vsize by \dimen2	% Change type area accordingly.
 }%
 \def\advancetopmargin{%
-  \dimen0 = 0pt \afterassignment\@finishadvancetopmargin \advance\dimen0
+  \dimen@ = 0pt \afterassignment\@finishadvancetopmargin \advance\dimen@
 }%
 \def\@finishadvancetopmargin{%
-  \advance\voffset by \dimen0
-  \advance\vsize by -\dimen0
+  \advance\voffset by \dimen@
+  \advance\vsize by -\dimen@
 }%
 %
 %
-\def\bottommargin{\afterassignment\@finishbottommargin \dimen0}%
+\def\bottommargin{\afterassignment\@finishbottommargin \dimen@}%
 \def\@finishbottommargin{%
   \@computebottommargin		% Result in \dimen2.
-  \advance\dimen2 by -\dimen0	% Compute the change in the bottom margin.
+  \advance\dimen2 by -\dimen@	% Compute the change in the bottom margin.
   \advance\vsize by \dimen2	% Change the type area.
 }%
 \def\advancebottommargin{%
-  \dimen0 = 0pt \afterassignment\@finishadvancebottommargin \advance\dimen0
+  \dimen@ = 0pt \afterassignment\@finishadvancebottommargin \advance\dimen@
 }%
 \def\@finishadvancebottommargin{%
-  \advance\vsize by -\dimen0
+  \advance\vsize by -\dimen@
 }%
 %
 % Find the current bottom margin, putting the result in \dimen2.
@@ -1901,33 +2469,33 @@
 % 
 \newdimen\paperwidth \paperwidth = 8.5in
 %
-\def\leftmargin{\afterassignment\@finishleftmargin \dimen0}%
+\def\leftmargin{\afterassignment\@finishleftmargin \dimen@}%
 \def\@finishleftmargin{%
   \dimen2 = \hoffset		% Remember the old \hoffset.
-  \hoffset = \dimen0 \advance\hoffset by -1in
+  \hoffset = \dimen@ \advance\hoffset by -1in
   \advance\dimen2 by -\hoffset	% Compute the change in \hoffset.
   \advance\hsize by \dimen2	% Change type area accordingly.
 }%
 \def\advanceleftmargin{%
-  \dimen0 = 0pt \afterassignment\@finishadvanceleftmargin \advance\dimen0
+  \dimen@ = 0pt \afterassignment\@finishadvanceleftmargin \advance\dimen@
 }%
 \def\@finishadvanceleftmargin{%
-  \advance\hoffset by \dimen0
-  \advance\hsize by -\dimen0
+  \advance\hoffset by \dimen@
+  \advance\hsize by -\dimen@
 }%
 %
 %
-\def\rightmargin{\afterassignment\@finishrightmargin \dimen0}%
+\def\rightmargin{\afterassignment\@finishrightmargin \dimen@}%
 \def\@finishrightmargin{%
   \@computerightmargin		% Result in \dimen2.
-  \advance\dimen2 by -\dimen0	% Compute the change in the right margin.
+  \advance\dimen2 by -\dimen@	% Compute the change in the right margin.
   \advance\hsize by \dimen2	% Change the type area.
 }%
 \def\advancerightmargin{%
-  \dimen0 = 0pt \afterassignment\@finishadvancerightmargin \advance\dimen0
+  \dimen@ = 0pt \afterassignment\@finishadvancerightmargin \advance\dimen@
 }%
 \def\@finishadvancerightmargin{%
-  \advance\hsize by -\dimen0
+  \advance\hsize by -\dimen@
 }%
 %
 % Find the current right margin, putting the result in \dimen2.
@@ -2046,7 +2614,7 @@
   \splittopskip = \topskip
   \splitmaxdepth = \baselineskip
   %
-  % \dimen0 will be the height that the double-column material on this
+  % \dimen@ will be the height that the double-column material on this
   % page should have, i.e., the height of the page (\singlecolumvsize)
   % minus single-column material, which includes insertions.  (If you
   % want your insertions to respect the columns, you will have to

@@ -10,17 +10,13 @@ MAKEINFO_FLAGS = --paragraph-indent=2 -I$(gnuorg)
 gnuorg = $(HOME)/gnu/gnuorg
 # That -I is purely for my own benefit in doing `make dist'.  It won't
 # hurt anything for you (I hope).
-TEX = tex '\nonstopmode \input'
+TEXI2DVI = TEXINPUTS=..:$(gnuorg):; export TEXINPUTS; texi2dvi
 TEXINDEX = texindex
 
 all: eplain.info eplain.dvi
 
-eplain.dvi: eplain.texi
-	$(TEX) eplain.texi
-eplain.cps: eplain.cp
-	$(TEXINDEX) eplain.??
-eplain.aux eplain.cp: *.texi
-	$(TEX) eplain.texi
+dvi eplain.dvi: *.texi
+	$(TEXI2DVI) eplain.texi
 
 info eplain.info: *.texi
 	$(MAKEINFO) $(MAKEINFO_FLAGS) eplain.texi
@@ -53,7 +49,7 @@ dist:
 	mv $(distdir)/INSTALL $(distdir)/..
 
 clean mostlyclean:
-	rm -f *.dvi *.?? *.aux
+	rm -f eplain.?? *.dvi *.log
 
 distclean: clean
 	for f in eplain.??s; do if test ! -s $$f; then rm -f $$f; fi; done
