@@ -61,8 +61,8 @@ INCLUDES = arith-ops.h builtins.h dynamic-ld.h error.h file-io.h \
 	xdiv.h xpow.h SLStack.h Stack.h
 
 SOURCES = arith-ops.cc builtins.cc dynamic-ld.cc error.cc file-io.cc \
-	g-builtins.cc gripes.cc help.cc idx-vector.cc input.cc lex.l \
-	mappers.cc octave.cc octave-hist.cc pager.cc parse.y \
+	g-builtins.cc gripes.cc help.cc idx-vector.cc input.cc lex.cc \
+	mappers.cc octave.cc octave-hist.cc pager.cc parse.cc \
 	pr-output.cc procstream.cc sighandlers.cc symtab.cc \
 	sysdep.cc t-builtins.cc tc-assign.cc tc-colloc.cc \
 	tc-dassl.cc tc-det.cc tc-eig.cc tc-extras.cc tc-fft.cc \
