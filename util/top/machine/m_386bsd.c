@@ -729,6 +729,8 @@ int pid;
 #include <sys/buf.h>
 #include <sys/conf.h>
 #include <sys/rlist.h>  /* swapmap defined here... */
+struct rlist *swapmap;	/* swapmap no longer defined in rlist.h, so place
+			it here temporary, ATS */
 
 
 static struct nlist nl[] = {{"_swapmap"},  /* list of free swap areas */
