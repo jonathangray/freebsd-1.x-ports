@@ -235,9 +235,9 @@ proc EditModules {} {
 
     global EditorCommand
     set env(PWD) [pwd]
-    eval [concat exec $EditorCommand modules/modules]
+    busy [concat exec $EditorCommand modules/modules]
     global CVSResults
-    set CVSResults [exec cvs commit modules/modules]
+    set CVSResults [busy [list exec cvs commit modules/modules]]
     exec echo y | cvs rel -d modules
 }
 
@@ -252,7 +252,7 @@ proc HelpAbout {} {
     toplevel .about
     label .about.icon -fg hotpink
     message .about.title -text "GIC\nThe Graphical Interface to CVS" -font -Adobe-times-bold-r-normal--*-240* -justify center -aspect 10000
-    message .about.version -text "Version 1.1b3\nAug 25, 1993" -width 200 -justify center
+    message .about.version -text "Version 1.1\nAug 31, 1993" -width 200 -justify center
     message .about.author -text "By David Marwood\n<marwood@cpsc.ucalgary.ca>" -width 300 -justify center
     button .about.ok -text "Close" -command "destroy .about"
     pack append .about .about.icon left .about.title top .about.version top .about.author top .about.ok bottom
@@ -479,7 +479,7 @@ proc slave_scroll { win_size  win_vis  vis_top  vis_bottom } {
 frame .menu -relief raised -borderwidth 1
 
 # The Item menu
-menubutton .menu.item -text "Item" -menu .menu.item.m -underline 7
+menubutton .menu.item -text "Item" -menu .menu.item.m
 menu .menu.item.m
 .menu.item.m add command -label "Add" -command "AddFile"
 .menu.item.m add command -label "Remove" -command "RemoveFile"
@@ -489,7 +489,7 @@ menu .menu.item.m
 .menu.item.m add command -label "Show Diff" -command "ShowDiff"
 
 # The Module menu
-menubutton .menu.module -text "Module" -menu .menu.module.m -underline 7
+menubutton .menu.module -text "Module" -menu .menu.module.m
 menu .menu.module.m
 .menu.module.m add command -label "Commit All" -command "CommitAll"
 .menu.module.m add command -label "Update" -command "UpdateFiles"
@@ -498,7 +498,7 @@ menu .menu.module.m
 .menu.module.m add command -label "Quit (no release)" -command "Quit"
 
 # The Help menu
-menubutton .menu.help -text "Help" -menu .menu.help.m -underline 7
+menubutton .menu.help -text "Help" -menu .menu.help.m
 menu .menu.help.m
 .menu.help.m add command -label "About" -command HelpAbout
 .menu.help.m add command -label "Overview" -command HelpOverview
