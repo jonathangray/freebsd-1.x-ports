@@ -2,7 +2,7 @@
 #
 MKBUILTINS = mkbuiltins
 RANLIB = /usr/bin/ranlib
-CFLAGS = -g -I.. -I.
+CFLAGS = -I.. -I. -O
 SHELL = /bin/sh
 # CC = cc
 AR = ar
