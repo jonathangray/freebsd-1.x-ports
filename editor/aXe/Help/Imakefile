@@ -1,0 +1,56 @@
+#include "../Axe.tmpl"
+#include "../Axe.rules"
+
+           SRCS = axinfo.c Hyper.c
+           OBJS = axinfo.o Hyper.o
+
+        DEFINES = -D_NO_PROTO
+ EXTRA_INCLUDES = -I../Widgets
+  LOCAL_LDFLAGS = ${XAW3D_LDFLAGS}
+LOCAL_LIBRARIES = ../Widgets/libaxe.a ${XAW3D_LIBS}
+  SYS_LIBRARIES = XawClientLibs
+        DEPLIBS = ../Widgets/libaxe.a XawClientDepLibs
+	
+ComplaxeProgramTarget(axinfo,${InfoBindir},${InfoMandir})
+InstallAxeDefaults(Axinfo,${InfoAppdir})
+InstallMultiple(axe.info axe.info-1 axe.info-2,${InfoLibdir})
+
+/*
+ * It ought to be possible to use NullParameter in place of
+ * -DDUMMY but that doesn't work everywhere, e.g. HP-UX 8.07
+ */ 
+SpecialObjectRule(axinfo.o,version.h,-DDUMMY)
+
+all::	Axinfo.ad
+
+MakeXaw3d(axinfo)
+
+Axinfo.ad:	Axinfo.ad.sed version.h ../Axe.tmpl
+	sed -e "s/VERSION/`sed -e 's/.*VERSION \(.*\)/\1/;q' <version.h`/" \
+	    -e "s+AXINFOLIBDIR+${InfoLibdir}+" <Axinfo.ad.sed >Axinfo.ad
+
+info:	axe.texi.sed axis.texi gnrl.texi bind.texi cust.texi lang.texi chng.texi 
+	sed -e 's/^A4//' <axe.texi.sed >axe.texi
+	${HOME}/texinfo-3.1/makeinfo/makeinfo axe.texi
+
+A4:	axe.texi.sed gnrl.texi bind.texi cust.texi lang.texi
+	sed -e 's/^A4//' <axe.texi.sed >axe.texi
+	${HOME}/texinfo-3.1/util/texi2dvi axe.texi
+
+letter: axe.texi.sed gnrl.texi bind.texi cust.texi lang.texi
+	sed -e 's/^A4/@c/' <axe.texi.sed >axe.texi
+	${HOME}/texinfo-3.1/util/texi2dvi axe.texi
+
+A4ps:	A4
+	dvips -M axe
+	psselect -p1,29,2-28 axe.ps axe.A4.ps
+
+letterps: letter
+	dvips -M axe
+	psselect -p1,31,2-30 axe.ps axe.letter.ps
+
+A4book:	A4ps
+	psbook axe.A4.ps | psnup -2 | psbind -2s >A4book.ps
+
+A4master:A4ps
+	psbook axe.A4.ps | psnup -2 >A4master.ps

@@ -1,0 +1,134 @@
+/* Where do you want the executables to be installed */
+Bindir = ${BINDIR}
+
+/* Where do you want the app defaults file to be installed */
+Appdir = ${XAPPLOADDIR}
+
+/* Where do you want the man page to be installed */
+Mandir = ${MANDIR}
+
+/* Where do you want the ancilliary files to be installed */
+AxeLibdir = ${LIBDIR}
+
+/* As of aXe 6.0 the help is presented using a separate application called   */
+/* axinfo. Repeat the above exercise for it.                                 */
+InfoBindir = ${Bindir}
+InfoAppdir = ${Appdir}
+InfoMandir = ${Mandir}
+InfoLibdir = ${AxeLibdir}
+
+
+
+/* Do you have Wcl 2.2 or later (just for the Table widget) installed?   */
+/* If not then the 2.5 Table widget that is provided will be compiled    */
+/* If you do, and want to use it, then uncomment and modify the next two */
+/* sections to say where...                                              */
+
+/*  ...the include files are, i.e. XpIncDir/X11/Xp exists */
+/* #define XpIncDir /usr/local/Wcl/include */
+
+/* ...and where the Xp and Wc libraries are */
+/*    i.e. XpLibDir/libXp.a (or .so.?.?) exists */
+/* #define XpLibDir /usr/local/Wcl/lib */
+
+
+
+/* If you want to incorporate the optional extension language feature first */
+/* read the file INSTALL for more information and uncomment the next line */
+#define Extension
+
+/*  ...and state where the Tcl include files are */
+#define TclIncDir /usr/local/include
+
+/* ...and where the library is, i.e. TclLibDir/libtcl.a (or .so.?.?) exists */
+#define TclLibDir /usr/local/lib
+
+
+
+/* Uncomment the next but one line if you want to build an Xaw3d version */
+/* Please read the file INSTALL for essential information in this area */
+/* #define ThreeD */
+
+/* ... and state the pathname of the directory containing the Xaw3d headers */
+/* #define Xaw3dIncDir /usr/local/Xaw3d/include/X11/Xaw3d */
+
+/* ... and where the Xaw3d library is to be found. This can be omitted */
+/* if the library is in the standard place in the installed X tree */
+/* #define Xaw3dLibDir /usr/local/Xaw3d/lib */
+
+
+
+/* Uncomment the next line if you have <sys/dir.h> rather than <dirent.h> */
+/* NB It is probably also necessary to specify this under SYSV to force the*/
+/*    inclusion of <sys/dir.h>. The symptons when it might be required are */
+/*    characters missing from the filenames in the file selector popup.    */ 
+/* #define NODIRENT */
+
+
+
+/* Uncomment the final line if you have X11R5 patched to >= patchlevel 20 */
+/* Otherwise a workaround for a bug that was fixed in that patch will be  */
+/* enabled. The workaround assists regular expression query replace.      */
+/* Query replace via the standard search popup will still be buggy though */
+/* HAVEX11R5PL20 = -DHAVEX11R5PL20 */
+
+
+
+/* If you know, or find, that your system doesn't have scandir/alphasort */
+/* you might like to try the supplied versions to see if they work. In   */
+/* which case uncomment the next line */
+/* #define NOSCANDIR */
+
+
+
+/* If you find that MAXPATHLEN is not defined then uncomment the next line */
+/* MAXPATHLEN = -DMAXPATHLEN=1024 */
+
+
+/*------ No need (hopefully) to change anything below this line ------*/
+
+#if ProjectX < 5
+R4ONLY_SRCS = Porthole.c
+R4ONLY_OBJS = Porthole.o
+#else
+R5ONLY_SRCS = Viewlist.c
+R5ONLY_OBJS = Viewlist.o
+#endif
+
+#ifdef XpLibDir
+TABLE_INCLUDES = -I/**/XpIncDir
+ TABLE_LDFLAGS = -L/**/XpLibDir
+    TABLE_LIBS = -lXp -lWc
+#else
+    TABLE_SRCS = Table.c TableVec.c TableLoc.c
+    TABLE_OBJS = Table.o TableVec.o TableLoc.o
+#endif
+
+#ifdef Extension
+    EXTN_SRCS = Language.c
+    EXTN_OBJS = Language.o
+EXTN_INCLUDES = -I/**/TclIncDir
+ EXTN_LDFLAGS = -L/**/TclLibDir
+    EXTN_LIBS = -ltcl -lm
+    EXTENSION = -DEXTENSION
+#endif
+    EXTN_DEPS = AxeEditor.o axe.o
+
+#ifdef ThreeD
+XAW3D_INCLUDES = -I./X11/Xaw3d
+#if defined(SunArchitecture) && (OSMajorVersion >= 5)
+ XAW3D_LDFLAGS = -t -L/**/Xaw3dLibDir
+#else
+ XAW3D_LDFLAGS = -L/**/Xaw3dLibDir
+#endif
+    XAW3D_LIBS = -lXaw3d
+         XAW3D = -DXAW3D
+#endif
+    XAW3D_DEPS = AxeCommand.o AxeMenuBtn.o AxeSmeBSB.o
+
+#ifdef NOSCANDIR
+  SCANDIR_SRCS = scandir.c
+  SCANDIR_OBJS = scandir.o
+#endif
+
+DEFINES = ${EXTENSION} ${XAW3D} ${HAVEX11R5PL20} ${MAXPATHLEN}

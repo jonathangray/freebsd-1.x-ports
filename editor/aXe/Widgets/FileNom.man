@@ -1,0 +1,224 @@
+'\" t
+.TH "FileNominator" "3n"
+.SH NAME
+FileNominator \- A file selector widget
+.SH DESCRIPTION
+.LP
+Application header file <FileNominator.h>
+.br
+Class header file       <FileNominatorP.h>
+.br
+Class                   fileNominatorWidgetClass
+.br
+Class Name              FileNominator
+.br
+Superclass              Core
+.LP
+The FileNominator widget is a directory browser and file selector. It
+consists of a scrollable list (List widget [instance name = list] inside
+a Viewlist [R5] or Viewport [R4] widget [viewport]) of directory entries,
+a button (Command widget) [Filter:],
+two one-line input areas (ScrollingText widget [filter], 
+and ScrollingText widget [filename]),
+and three buttons: a Command button [select]
+for selecting
+the nominated file or directory, a MenuButton button [path] whose defualt
+menu contains the
+elements of the path of the directory whose contents are displayed in
+the List widget
+and a Command button [cancel] for cancelling use of the widget.
+.LP
+The user may nominate a file by choosing from the list using mouse
+button 1 (causing the name to be entered into the filename input area),
+or by typing 
+into the input area, or by doing both. All keyboard input is directed
+to the filename widget when the FileNominator has the input focus, unless
+the pointer is in the filter widget, in which case it receives the input.
+The content of the input area is assumed to be relative to
+the directory currently displayed if not an absolute pathname. The selection
+is always taken
+from the nomination in the input area, and happens when the select
+button is clicked (button 1) or the Return key is pressed. If no
+modification is
+to be made then a choice from the List widget can be selected by
+double clicking mouse button 1 or by single clicking mouse
+button 2. 
+Further, an immediate selection of some other directory in the path of the
+displayed directory can be made by selecting from the "path" button menu.
+.LP
+A '~' as
+the first character in the input area is understood to mean the user's
+home directory. If a nomination begins with a '$' then the first component
+will be treated as a possible reference to an environment variable, with
+the expansion being made if a variable of that name exists.
+.LP
+In addition the user may define (see pathList under RESOURCES below) a list of
+potential nominations -
+either files or directories - to be added to the "path"
+button menu. Since selecting an entry from the menu
+is equivalent to entering the entry in the input area and
+selecting it in the normal way, i.e it is subject to the checks that
+would be applied if the user had typed the value as a nomination, then '~'
+and '$' may feature in the user-added entries.
+.LP
+When the selection is a directory the contents of the directory are filtered
+according to the pattern in the filter input area, so that a reduced subset
+of interest may be displayed. A new filter can be run on the current directory
+by hitting Return in the Filter input area or by clicking the Filter: button.
+.SH RESOURCES
+.LP
+When creating a FileNominator widget instance, the following
+additional resources (to those of Core) are
+retrieved from the argument list or from the resource database:
+.LP
+.TS
+tab(/) ;
+lB lB lB lB.
+NAME/CLASS/TYPE/DEFAULT VALUE
+.T&
+lB l l l.
+bellLevel/bellLevel/int/100
+cancelCallback/Callback/XtCallbackList/NULL
+initialDirectory/InitialDirectory/String/NULL
+filter/Filter/String/*
+margin/Margin/Dimension/10
+numberRows/NumberStrings/int/12
+selectCallback/Callback/XtCallbackList/NULL
+showDotFiles/ShowDotFiles/Boolean/True
+pathList/PathList/String/NULL
+userData/UserData/XtPointer/NULL
+.TE
+.IP \fBbellLevel\fP 1.5i
+How loud the keyboard bell should be rung. The value is passed
+unchanged to XBell.
+.IP \fBcancelCallback\fP 1.5i
+All functions on this list are called whenever the cancel buttons's
+\fBnotify\fP action is invoked.
+.IP \fBinitialDirectory\fP 1.5i
+The initial directory whose contents are to be displayed. The default, or if
+the supplied value is invalid, is the current working directory.
+.IP \fBfilter\fP 1.5i
+An initial filter pattern to be applied to the contents of 
+\fIinitialDirectory\fP. The default is "*", i.e. all filenames are displayed.
+.IP \fBmargin\fP 1.5i
+The default distance between component widgets and between the edges of
+the widget and components.
+.IP \fBnumberRows\fP 1.5i
+The number of rows of the List widget to display.
+.IP \fBselectCallback\fP 1.5i
+All functions on this list are called whenever the select buttons's
+\fBnotify\fP action is invoked.
+.IP \fBshowDotFiles\fP 1.5i
+This value of this boolean resource determines whether the names of "." 
+files are shown. The default is True. "." and ".." are always shown.
+.IP \fBpathList\fP 1.5i
+The value of this resource is a colon separated list of pathnames that
+are converted into menu entries and added to the path button menu.
+.IP \fBuserData\fP 1.5i
+This resource is provided for the programmar to use as they see fit.
+.SH ACTIONS
+.sp
+.LP
+The FileNominator widget supports the following actions:
+.IP o 5
+Processing file or directory nominations in the List widget with
+\fBNominate\fP. 
+.IP o 5
+Constructing a menu of path elements for the MenuButton widget.
+.IP o 5
+Toggling the display of "." files.
+.LP
+The following default translation tables are defined by the
+FileNominator Widget on its component widgets:
+.LP
+List widget default translation table
+.sp
+.TS
+lB.
+     <Btn1Up>(2): Set() Nominate() Unset()
+     <Btn1Down>,<Btn1Up>: Set() Notify()
+     <Btn2Up>: Set() Notify() Nominate() Unset()
+.TE
+.LP
+Filter widget default translation table
+.sp
+     <Key>Return: Filter()
+.LP
+Filename widget default translation table
+.sp
+     <Key>Return: Nominate()
+.LP
+Select button default translation table
+.sp
+.TS
+lB.
+     <Btn1Up>: Nominate() unset()
+.TE
+.LP
+MenuButton default translation table
+.sp
+.TS
+lB.
+     <BtnDown>: reset() MakeMenu() XawPositionSimpleMenu(menu)
+                MenuPopup(menu)
+.TE
+.sp
+.LP
+The full list of actions supported by FileNominator widget is:
+.IP \fBNominate\fP(\|) 1.5i
+\fInominates\fP the text in the text widget as the user's choice.
+If the nomination is a directory then the contents of the List widget
+will change. If the nomination is a file - which need not exist - then
+callbacks on the selectCallback list will be called.
+.IP \fBMakeMenu\fP(\|) 1.5i
+\fImakes\fP a SimpleMenu consisting of the path elements of the pathname of
+the current directory.
+.IP \fBToggleDotFiles\fP(\|) 1.5i
+toggles the value of the showDotFiles resource and causes the currently
+displayed directory to be rescanned with the new value effective. This
+action is bound to the Escape key by default.
+.SH CALLBACKS
+.LP
+All procedures on the FileNominator widget's selectCallback list will have a
+\fBFileNominatorStruct\fP passed to them as \fIcall_data\fP.  The
+structure is defined in the FileNominator widget's application header file.
+.LP
+typedef struct {
+    String  directoryPart;
+    int     directoryStatus;
+    String  filenamePart;
+    int     filenameStatus;
+.br
+} FileNominatorStruct;
+.LP
+The concatenation of directoryPart and filenamePart yield the pathname of
+the nominated file. directoryStatus and filenameStatus provide information
+about the access that the user has to the separate parts. Their values are
+the symbolic constant FileNominatorNonexistent or logical OR combinations of
+FileNominatorReadable, FileNominatorWritable and FileNominatorExecutable.
+.LP
+Note that the data pointed to by the String fields are owned by the
+FileNominator and should NOT be freed by the callback routines.
+.SH CONVENIENCE ROUTINES
+.LP
+To change the directory that is displayed, use
+.LP
+void FileNominatorSetDirectory(\fIw\fP, \fIdir\fP)
+.br
+     Widget \fIw\fP;
+.br
+     String * \fIdir\fP;
+.IP \fIw\fP 1i
+Specifies the FileNominator widget.
+.IP \fIdir\fP 1i
+Specifies the new directory for the FileNominator widget to display.
+.LP
+To get the name of the directory that is displayed, use
+.LP
+String FileNominatorGetDirectory()
+.LP
+\fBFileNominatorGetDirectory\fP returns the current directory of the 
+FileNominator widget.
+
+
+

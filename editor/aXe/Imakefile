@@ -1,0 +1,49 @@
+/*
+ * You shouldn't need to change anything in this file.
+ *      Customisation is carried out in Axe.tmpl
+ */
+
+#include "Axe.tmpl"
+#include "Axe.rules"
+
+#define IHaveSubdirs
+SUBDIRS = Widgets Help
+NamedTargetSubdirs(all,${SUBDIRS},Making,,all)
+NamedTargetSubdirs(Xaw3d,${SUBDIRS},Making,,Xaw3d)
+
+           SRCS = axe.c
+           OBJS = axe.o
+
+ EXTRA_INCLUDES = -I. -I./Widgets ${EXTN_INCLUDES}
+  LOCAL_LDFLAGS = ${TABLE_LDFLAGS} ${EXTN_LDFLAGS} ${XAW3D_LDFLAGS}
+  SYS_LIBRARIES = XawClientLibs
+LOCAL_LIBRARIES = Widgets/libaxe.a ${TABLE_LIBS} ${EXTN_LIBS} ${XAW3D_LIBS} 
+        DEPLIBS = Widgets/libaxe.a XawClientDepLibs 
+
+ComplaxeProgramTarget(axe,${Bindir},${Mandir})
+InstallAxeDefaults(Axe,${Appdir})
+InstallNonExecFile(axe.tcl,${AxeLibdir})
+
+/*
+ * It ought to be possible to use NullParameter in place of
+ * -DDUMMY but that doesn't work everywhere, e.g. HP-UX 8.07
+ */ 
+SpecialObjectRule(axe.o,version.h,-DDUMMY)
+
+AllTarget(coaxe)
+NormalProgramTarget(coaxe,coaxe.o,Widgets/libaxe.a,Widgets/libaxe.a,${XLIB})
+InstallCoaxe(${Bindir})
+
+#ifdef Extension
+MakeAxeDefaults(${AxeLibdir},)
+#else
+MakeAxeDefaults(${AxeLibdir},\/\*\*\/)
+#endif
+
+pkg: pkg_bin
+
+pkg_bin: install
+	pkg_create -c pkg/+COMMENT -f pkg/+CONTENTS -k pkg/+DEINSTALL \
+		-d pkg/+DESC -i pkg/+INSTALL aXe_bin
+
+MakeXaw3d(axe)

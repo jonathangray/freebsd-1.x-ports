@@ -1,0 +1,78 @@
+/* Borrowed from R5 for R4 case */
+/* if [ -d ] or [ ! -d ] causes make to fail, define this as - */
+#ifndef DirFailPrefix
+#define DirFailPrefix
+#endif
+
+#ifndef MakeDir
+#define MakeDir(dir) DirFailPrefix@if [ -d dir ]; then set +x; \        @@\
+		else (set -x; $(MKDIRHIER) dir); fi
+#endif
+
+/*
+ * InstallNonExecFile - generate rules to install a data file
+ */
+#ifndef InstallNonExecFile
+#define InstallNonExecFile(file,dest)                                   @@\
+install:: file                                                          @@\
+	MakeDir($(DESTDIR)dest)                                         @@\
+	$(INSTALL) -c $(INSTDATFLAGS) file $(DESTDIR)dest
+#endif /* InstallNonExecFile */
+/* End of R5 borrowing */
+
+#define MakeAxeDefaults(helpdir,interp)					@@\
+all::	Axe.ad								@@\
+									@@\
+Axe.ad:	Axe.ad.sed version.h Axe.tmpl					@@\
+	sed -e "s/VERSION/`sed -e 's/.*VERSION \(.*\)/\1/;q' <version.h`/" \@@\
+	    -e "s+EXTENSION+interp+"				       \@@\
+            -e "s+AXELIBDIR+helpdir+" <Axe.ad.sed >Axe.ad		@@\
+									@@\
+clean::									@@\
+	$(RM) Axe.ad
+
+#define MakeXaw3d(deps)							@@\
+Xaw3d::									@@\
+	$(RM) deps							@@\
+	MakeDir(X11/Xaw3d/X11)                                		@@\
+	@(set -x; cd X11/Xaw3d/X11; for i in Xaw Xaw3d; do \		@@\
+		$(RM) $$i; \                                            @@\
+		ln -s Xaw3dIncDir $$i; \				@@\
+	done)
+
+#define InstallAxeDefaults(class,dest)                                  @@\
+install:: class.ad                                                      @@\
+	MakeDir($(DESTDIR)dest)			                        @@\
+	$(INSTALL) -c $(INSTAPPFLAGS) class.ad $(DESTDIR)dest/class
+
+#define ComplaxeProgramTarget(program,bindest,mandest)			@@\
+        PROGRAM = program                                               @@\
+                                                                        @@\
+all::									@@\
+	@echo Making in .						@@\
+									@@\
+AllTarget(program)			                                @@\
+									@@\
+program: $(OBJS) $(DEPLIBS)                                             @@\
+	RemoveTargetProgram($@)                                         @@\
+	$(CC) -o $@ $(OBJS) $(LDOPTIONS) $(LOCAL_LIBRARIES) $(LDLIBS) $(EXTRA_LOAD_FLAGS) @@\
+                                                                        @@\
+InstallProgram(program,bindest)		                                @@\
+InstallManPage(program,mandest)						@@\
+DependTarget()                                                          @@\
+LintTarget()                                                            @@\
+                                                                        @@\
+clean::                                                                 @@\
+	$(RM) $(PROGRAM)						@@\
+									@@\
+extension::								@@\
+	$(RM) $(EXTN_DEPS)						@@\
+	$(MAKE)
+
+#define InstallCoaxe(bindest)						@@\
+InstallProgram(coaxe,bindest)						@@\
+install::								@@\
+	if [ -f bindest/faxe ]; then set +x; \				@@\
+	else (cd bindest; set -x; $(LN) coaxe faxe); fi			@@\
+	if [ -f bindest/poleaxe ]; then set +x; \			@@\
+	else (cd bindest; set -x; $(LN) coaxe poleaxe); fi

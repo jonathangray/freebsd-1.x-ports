@@ -1,0 +1,1095 @@
+This is Info file axe.info, produced by Makeinfo-1.55 from the input
+file axe.texi.
+
+
+File: axe.info,  Node: Actions,  Next: SampBinds,  Prev: SampRsrcs,  Up: Customise
+
+Actions specific to aXe
+=======================
+
+The main editing subwindow of a top-level aXe window is derived from an
+Athena Text Widget. Hence all of the default bindings of keys to Text
+Widget action routines apply. The Text Widget is fully described in
+'Athena Widget Set - C Language InterFace' of the 'MIT X Window System
+Manual Set', but for your convenience an extract from the section
+describing the default key bindings can be viewed on-line (*Note The
+default key bindings: Bindings.).  aXe extends the functionality of the
+Text Widget by providing additional action routines, but it does not
+set up any default key bindings for them, i.e. the new features are
+only available through the menu and button interfaces, or the
+minibuffer. If you wish to set up your own bindings then you need to
+know the names of the new action routines.
+
+They are
+
+             goto-line
+             search-caret
+             forward-search-selection
+             backward-search-selection
+     
+             include-file
+             include-selection
+             paste
+     
+             delete-word
+             delete-line
+             cut
+     
+             undo
+             where
+             centre-line
+             set-preferences
+     
+             new-window
+             close-window
+             close-all
+             iconify-all
+             deiconify-all
+     
+             new-buffer
+             clear-buffer
+             close-buffer
+     
+             save-and-close
+             save-all
+             save-file
+             save-as
+             load-file
+             reload-file
+     
+             size
+             match-parens
+             find-match
+             re-search
+             forward-line
+             backward-line
+             delete-selection-or-previous-character
+             insert-or-expand-tab
+             keymap
+     
+             set-mark
+             highlight-region
+             kill-region
+             copy-region
+             yank-region
+
+It should be obvious which menu entries/buttons those in the first
+eight groups correspond to.
+
+include-file inserts a file using the file selector, as distinct from
+insert-file, the Text Widget action bound to Meta-i that brings up the
+Text Widget's own insertFile dialogue box.
+
+new-window and new-buffer may be given the optional argument `load',
+causing the file selector to be popped up for the new window or buffer
+immediately it is created.
+
+Without an argument save-and-close saves and closes all buffers. With
+the argument `window' it saves and closes the current window; with the
+argument `buffer' it saves and closes the current buffer.
+
+The remaining actions are not available via the menus or buttons and
+hence must be bound to keystrokes or typed into the minibuffer (*Note
+How to use the minibuffer: Minibuffer.).
+
+size reports the size of the editing buffer in the information bar.
+
+match-parens, if bound to `)', `}' or `]', causes the matching closing
+bracket to be highlit for a period of time determined by the value of
+the *blinkPeriod* resource (*Note AxeiiText widget resources:
+AxeiiTextRsrcs.).
+
+find-match causes a search to be made for the character matching the
+`(', `)', `{', `}', `[' or `]' immediately to the right of the caret,
+and if successful, highlighting the text between the two characters,
+inclusive.
+
+re-search is like the standard search action except that regular
+expression searching is performed. It must be supplied with a direction
+argument of 'forward' or 'backward'. search and re-search share the
+same popup. The main observable difference when regular expression
+searching is in effect is that its title is 'RE search' rather than
+'search'. There are also minor differences in the messages
+
+The forward/backward-line actions are similar to the Text Widgets's
+next/previous-line actions except that they maintain position within
+the line if at all possible, i.e. the cursor does not gravitate towards
+the left margin as ever shorter lines are encountered.
+
+The delete-selection-or-previous-character action does what its name
+suggests.
+
+insert-or-expand-tab is bound to the Tab key by default, and operates
+in conjunction with the *expandTabs* resource (*Note AxeiiText widget
+resources: AxeiiTextRsrcs.).  If that resource is False then tabs are
+inserted, otherwise an appropriate number of spaces to take the
+insertion point up to the next tab stop is inserted.
+
+The keymap action enables an alternative set of bindings to be switched
+in. keymap takes a name as argument, which, together with the suffix
+Keymap, defines the name of a translations resource. A name of None
+restores the original translations, e.g.
+
+     *ed.translations:#override \n <Key>F1:keymap(foo) \n ...
+     
+     *ed.fooKeymap.translations:<Key>F1:keymap(None) \n ...
+
+The final set of actions allows selections to be manipulated via the
+keyboard. set-mark sets an invisible marker. It is initially at the
+beginning of the buffer. highlight-region highlights the region between
+the marker and the caret. kill-region deletes the region between the
+mark and the caret, and stores it in cut buffer 2.  copy-region copies
+the region between the mark and the caret to cut buffer 2. yank-region
+inserts the contents of cut buffer 2 at the current insertion point.
+
+
+File: axe.info,  Node: SampBinds,  Next: Minibuffer,  Prev: Actions,  Up: Customise
+
+Examples of binding actions to keystrokes
+=========================================
+
+Binding actions to keystrokes involves setting the translations
+resource of the Text Widget (instance name ed). Here is an example of
+how this might be done in a resources file.
+
+     Axe*ed.translations:   #override \n\
+                            <Key>Down:   forward-line()  \n\
+                            <Key>Up:     backward-line() \n\
+                            <Key>Delete: delete-selection-or-previous-character()
+
+Some of the features in aXe are implemented through setting ed's
+translations resource in the class resource file, but at Release 4 of X
+if you provide a value for the same resource it will completely
+override the application's. A mechanism, which aXe uses, has become
+available at Release 5 to overcome this difficulty. So if your aXe is
+an R5 one then you can skip the remainder of this section.
+
+If at R4 you don't want to lose any of the application's bindings then
+you will have to repeat in your value those you wish to keep. The
+features affected are the matching of parentheses and the reporting of
+the current line number on a button release. This is how they are
+implemented in the class resource file
+
+     Axe*ed.translations:   #override \n\
+                            <Key>): match-parens() \n\
+                            <Key>]: match-parens() \n\
+                            <Btn1Up>: extend-end(PRIMARY, CUT_BUFFER0) where() \n\
+                            <Btn2Up>: where() \n\
+                            <Btn3Up>: extend-end(PRIMARY, CUT_BUFFER0) where()
+
+and the following is an example of how a user supplied value might look
+
+     Axe*ed.translations:   #override \n\
+                            <Key>): match-parens() \n\
+                            <Key>]: match-parens() \n\
+                            <Key>Down: forward-line() \n\
+                            <Key>Up:   backward-line() \n\
+                            <Key>Delete: delete-selection-or-previous-character()
+                            Meta<Key>=: where()
+
+The matching of parentheses has been kept but the reporting of the
+current line number has been implemented another way, viz. by binding
+to Meta-=. The Btn?Up actions are not repeated because what is left
+after removing the where() action is the default behaviour that is
+defined by the Text Widget.
+
+
+File: axe.info,  Node: Minibuffer,  Next: Minimenu,  Prev: SampBinds,  Up: Customise
+
+How to use the minibuffer
+=========================
+
+Commands corresponding to the two *Search:Text* operations plus
+*Search:Line*, *Insert:File*, *File:SaveAs*  and *File:Load* can be
+entered directly into the minibuffer. The command names are styled
+after those of the Unix editor ed and are
+
+             /regular-expression
+             ?regular-expression
+             [0-9][0-9]*
+             r filename
+             w filename
+             e filename
+
+In addition pipe and shell commands have been introduced. Their names
+are `|' and `!' respectively.
+
+Execution of pipe has the effect of replacing the selected text, if
+any, in the editing buffer by the result of filtering by the command
+specified in the remainder of the minibuffer. If no text is selected
+then the output of running the command specified as the pipe argument
+is inserted at the current insertion point.
+
+Execution of shell has the effect of passing the whole buffer or the
+selected text to the shell command specified as argument and displaying
+the output, if any, of that command in a new aXe window, unless a `>'
+occurs in the command, in which case it is assumed that the user wishes
+to handle the output themself.
+
+The command names must occur in column 1 of the minibuffer, and
+whitespace preceding the argument of `r', `w', `e', `|' and `!'
+commands is mandatory.
+
+The minibuffer also recognises actions as commands. Thus it is not
+necessary restart aXe with new key bindings to experiment with untried
+features or to execute infrequently used actions - simply type them
+into the minibuffer, e.g. new-window() [or simply new-window] or
+new-window(load).
+
+New action routines have been defined so that the minibuffer can be
+enabled from the editing buffer. When they are used the normal editing
+buffer translations are suspended and replaced by a minimal set of
+editing bindings that take effect in the minibuffer, i.e it is not
+necessary to move the mouse into the minibuffer to execute commands in
+it. If they are found to be inadequate the mouse can always be moved
+into the minibuffer to gain access to full range of Text Widget key
+bindings. The names of the action routines are
+
+             mini-search
+             mini-insert
+             mini-saveas
+             mini-load
+             mini-pipe
+             mini-shell
+             mini-stuff
+
+mini-search may be given an argument of `forward' or `backward'; the
+default is forward. When the command is mini-insert, mini-saveas or
+mini-load the minibuffer is initialised with the directory already
+associated with the editing buffer. mini-pipe, mini-shell and
+mini-stuff may be given arguments with which to initialise the
+minibuffer, so frequently used filters and other minibuffer commands
+can be set up via user defined key bindings. If the last mini-pipe,
+mini-shell or mini-stuff argument ends with `\n' then the command will
+be executed right away.
+
+Four other action routines have been defined.  They are
+
+             mini-clear
+             mini-select
+             mini-commit
+             mini-abort
+
+mini-clear enables and flushes the minibuffer. There is no command
+corresponding to *Search:Line* so mini-clear could be bound to a key for
+the purpose as it would provide an empty minibuffer awaiting the entry
+of a line number. mini-select enables the minibuffer without altering
+it, so the previous command can then be repeated by simply hitting the
+Return key. mini-commit executes the command in the minibuffer.
+mini-abort is defined so that a minibuffer command can be aborted while
+the accelerators are in effect. The default minibuffer translations and
+accelerators (the bindings that get installed as the editing buffer
+translations when the minibuffer is enabled via the above action
+routines) have Return bound to mini-commit and mini-abort bound to both
+Escape and `Ctrl-g'.
+
+In all cases except mini-search, hitting the Return key causes
+reinstatement of the editing buffer translations after execution of the
+minibuffer command. The reason for this is so that repeated searches
+can be made simply by continuing to hit the Return key. Thus it is
+necessary to explicitly abort search operations.
+
+Note that the caret is only displayed in the minibuffer when it is
+active, either because the mouse pointer has been moved into it or
+because it has been enabled by execution of one of the mini- action
+routines, and further that the caret in the editing buffer is disabled
+in the latter case, although it won't always be easy to spot that that
+has happened.
+
+Here are some typical bindings that might be used
+
+             Meta<Key>G: mini-clear()
+             Ctrl<Key>S: mini-search()
+             Ctrl<Key>R: mini-search(backward)
+             Ctrl<Key>X,<Key>B: mini-select()
+             Ctrl<Key>X,<Key>O: mini-select()
+             Ctrl<key>X,Ctrl<Key>F: mini-load()
+             Ctrl<Key>X,Ctrl<Key>I: mini-insert()
+             Ctrl<Key>X,Ctrl<Key>W: mini-saveas()
+             Ctrl<Key>X,Ctrl<Key>X: mini-pipe("sed 's/^/> /'\n")
+             <Key>Print: mini-shell(lpr -Pprinter\n)
+
+The second last example will cause each line of the selected text to be
+prefixed by `> ', i.e. it might be used to annotate a section of a mail
+message or news article being replied to. It is best to quote the whole
+argument to mini-pipe because of the way it would otherwise be split on
+spaces and commas. aXe does try to piece the line together again but
+can't know whether a split was as a result of a space or a comma; it
+always assumes that it was a space.
+
+The last example causes the selected text or the whole of the text in
+the editing buffer to be queued for printing by printer `printer'. The
+minibuffer menu provides a few ready-made examples that are likely to
+be commonly used.
+
+* Menu:
+
+* Minimenu::             The minibuffer menu
+
+
+File: axe.info,  Node: Minimenu,  Next: Macro,  Prev: Minibuffer,  Up: Minibuffer
+
+The minibuffer menu
+-------------------
+
+The minibuffer menu provides easy access to a few selected external
+commands that it is hoped will be commonly required, e.g. printing,
+spelling checking, formatting and mailing. The mini-shell commands that
+implement them are:
+
+             mini-shell(lpr)
+             mini-shell(spell)
+             mini-shell(nroff)
+             mini-shell(mail)
+
+Those commands only place the commands `! lpr', `! spell' etc. into the
+minibuffer (with its accelerators enabled) so it is possible to add
+options to them before proceeding.
+
+For convenience, the menu also provides exec and abort entries; the
+first is simply equivalent to hitting Return, and causes the command in
+the minibuffer to be executed, while the second removes the
+accelerators so that keystrokes in the editing buffer will revert to
+being directed to that buffer instead of to the minibuffer.
+
+A further three entries are identical to the first three except that
+the commands are entered and executed in one operation. They are
+identifiable by having <RET> in the entry label, which is meant to
+convey that the command contains the Return to cause it to be executed.
+It does not make sense to replicate `mail' in this way since a
+recipient will always have to be added to the minibuffer command before
+execution.
+
+Although probably useful as it stands, the minbuffer menu is merely a
+demonstration of what can be done. It is totally customisable by the
+user by defining the *miniMenu* resource. Its value is a whitespace
+separated list of items. If a `:' occurs in an item then the left hand
+part will be taken as the corresponding menu entry label and the right
+hand part as the minibuffer action, otherwise the whole item will be
+used for both purposes. If the action part begins with `mini-' then it
+is left untouched, otherwise it is taken to be an argument to
+mini-shell. Furthermore, an item of `|' is interpreted to mean that a
+dividing line should be added to the menu at that position. An item of
+`+' means that the default menu should be substituted at that point,
+i.e. the user can either replace or add to the default menu. So
+
+             *miniMenu:who | +
+
+would add an item called who, that would execute the who command, to the
+top of the default menu, and separated from it by a dividing line,
+whereas
+
+             *miniMenu:who
+
+would generate a menu consisting of a single `who' entry.
+
+The resource value defining the default menu is:
+
+             print:lpr spell nroff mail | \
+             exec:mini-commit abort:mini-abort | \
+             print<RET>:lpr\n spell<RET>:spell\n nroff<RET>:nroff\n
+
+Labels and actions can be quoted using either the single or the double
+quote characters, e.g
+
+            "laser printer":'lpr -Plaser'    or    'laser printer':"lpr -Plaser"
+
+The " and ' characters themselves can only be included by using the
+other quote character to do the quoting, e.g.
+
+            "jim's printer"
+
+You can provide help to be displayed in the information bar when the
+mouse enters your menu items by setting each's help resource. The name
+of the widget is the same as the item's label, e.g.
+
+            *laser printer.help:Send to laser printer
+
+
+File: axe.info,  Node: Macro,  Next: Undo,  Prev: Minimenu,  Up: Customise
+
+Defining and using a keyboard macro
+===================================
+
+A single global keyboard macro can be defined. The following new action
+routines have been defined in this connection:
+
+             start-macro
+             end-macro
+             exec-macro
+             repeat-macro
+
+start-macro and end-macro should be self-explanatory. exec-macro
+executes the macro once. repeat-macro optionally takes an argument
+specifying a repeat count. This is most likely to be of use when the
+action is executed as a minibuffer command. Otherwise a repeat count is
+taken from the minibuffer and the macro is executed that many times.
+This is most likely to be of use when repeat-macro() is used from a key
+binding. If the conversion fails or the minibuffer has been suppressed
+then the repeat count defaults to 1.
+
+Here are some bindings that might be used:
+
+           Ctrl<Key>X,<Key>(: start-macro()
+           Ctrl<Key>X,<Key>): end-macro()
+           Ctrl<Key>X,<Key>E: exec-macro()
+           Ctrl<Key>X,<Key>R: repeat-macro()
+
+A macro is defined by executing start-macro and stepping through the
+sequence of actions that will constitute one invocation, followed by
+end-macro. The macro is effective in all buffers, not just the one in
+which it is defined, and gets replaced if start-macro is executed
+again. With these bindings the effect of the mini-pipe example above
+could equally well be accomplished, after moving the insertion point to
+the beginning of the first line to be annotated, by defining a macro
+with the following sequence of keystrokes
+
+           C-x (
+           >
+           <space>
+           C-a
+           C-n
+           C-x )
+
+and by executing `C-x e' for each subsequent line to be annotated, or by
+entering the number of remaining lines to be annotated in the
+minibuffer and executing `C-x r'.
+
+
+File: axe.info,  Node: Undo,  Next: Server,  Prev: Macro,  Up: Customise
+
+How the undo mechanism works
+============================
+
+The availability of undo is controlled by the resource *undo*, which is
+True by default. By default you are able to undo only the most recent
+operation that changed the file. If you wish to retain a greater
+history then set the *undoLevel* resource (*Note AxeiiText widget
+resources: AxeiiTextRsrcs.)  to the level you require. The default is
+1. A value of 0 means keeping unlimited information, but that could run
+away with large amounts of memory if editing over an extended period.
+The new action undo performs a single undo.
+
+Inserted characters, apart from control codes, which are dealt with
+individually, are handed back in units of uninterrupted runs of at most
+a line. A run is interrupted by any operation other than the insertion
+of a character, even if it doesn't change the file, e.g.  moving the
+caret. If you want to undo single characters then delete them in the
+normal way. Deleted characters can be undone individually.
+
+The implementation allows undos of undos. Once *undoLevel* consecutive
+undos have been performed the next (consecutive) undo will cause the
+most recent undo to be undone, the next the undo before that, and so on
+ad infinitum until some action other than undo breaks the sequence.
+Note that if you have a number of undos to perform it is quicker to
+type undo in the minibuffer and repeatedly re-execute it by hitting the
+Return key than by selecting *Undo* from the *Misc* menu each time.
+
+You should be aware that currently multiple changes arising from
+performing a single action, e.g. by doing a `replace All' or executing
+a keyboard macro, require multiple undos to get back to the position
+prior to the action being invoked, and may be impossible if *undoLevel*
+is not great enough.
+
+If you find that for some reason the undo information has got out of
+step then the easiest way to get back in sync is to save and reload the
+file. Loading or reloading a file causes all the current undo
+information to be thrown away and the mechanism to be reinitialised.
+
+
+File: axe.info,  Node: Server,  Next: Popups,  Prev: Undo,  Up: Customise
+
+aXe as a server of windows
+==========================
+
+There are two main differences when aXe is acting as a server: an
+additional window is created and aXe does not terminate when the number
+of windows reduces to zero. The function of the extra window is to
+provide a way of getting an editing window when there are no others to
+use as a launch pad, and to provide a way of shutting down the
+application. The default server window allows empty windows to be
+created and provides access to the help system. Alternatively, a
+FileNominator (*Note The file selector: Nominator.) can be used as the
+server window by setting the top level *fileServer* resource (*Note
+Application resources: AppRsrcs,).
+
+Additionally, editing windows can be obtained from a server by
+cooperating clients on the same host. Two such clients are provided:
+coaxe and faxe. Coaxe waits until it gets notification that its aXe
+window has been closed, whereas faxe terminates as soon as it has
+successfully contacted its server. Faxe can take several filename
+arguments, but coaxe is restricted to one. By default multiple files
+passed to faxe are assigned a window each. A group of files can be
+assigned to buffers of the same window by preceding the list by any
+leading substring of the keyword -buffer. The keyword may occur more
+than once on the command line. Coaxe and faxe start up aXe in
+non-server mode if a server is not already running, and coaxe is
+notified when the invocation terminates, i.e. when the last window is
+closed.
+
+A display can support servers for many hosts, but only one server per
+host is catered for. If a second server is started for some host when
+one is already running then the second will take over the role of
+server to the client programs, and the first will be uncontactable by
+them.
+
+Shutting down aXe from the server window is equivalent to doing a
+*Window:Close All*, i.e. a check is made for unsaved changes if any
+editing windows exist. A third client program, poleaxe, is also
+provided for shutting down the server, but checks are not carried out
+when it is used. It is not a serious client; it only came into being
+because of the pun afforded by its name.
+
+
+File: axe.info,  Node: Popups,  Next: Nominator,  Prev: Server,  Up: Top
+
+aXe's secondary popup windows
+*****************************
+
+From time to time as aXe is running windows other than the main editing
+windows and the initial server window, if running in server mode, that
+is, are popped up for the input and output of information.  Each type
+is briefly described in one of the menu items that now follow.
+
+* Menu:
+
+* Nominator::            The file selector
+* NumPad::               The numeric keypad
+* ControlCode::          The control code selector
+* Confirmer::            The confirmer
+* Preferences::          The preferences setter
+* Help::                 The help system
+
+
+File: axe.info,  Node: Nominator,  Next: NumPad,  Prev: Popups,  Up: Popups
+
+The file selector
+=================
+
+The FileNominator popup is popped up whenever a menu operation that
+requires a file name is selected, or an equivalent action routine has
+been activated through a key binding set up by the user.
+
+The FileNominator is both a directory browser and a file selector.  It
+consists of a scrollable list of the contents of the directory
+associated with the buffer from which it was popped up, or the
+directory last visited by the user in earlier usage, a filter section,
+which allows the user to filter the list of files displayed according
+to normal shell pattern matching rules, a 1-line text area in which the
+filename to be returned is assembled, and three buttons. The filter
+pattern that is initially applied may be something other than the
+default `*'. A different value is specified by setting the value of the
+resource *filter*, for example to `*[ch]'.
+
+A file may be nominated by choosing from the list using mouse button 1
+(causing the name to be entered into the filename input area), or by
+typing into the input area, or by doing both. All keyboard input is
+directed there when the list widget has the input focus. The content of
+the input is assumed to be relative to the directory currently
+displayed if not an absolute pathname. The selection is always taken
+from the nomination in the input area, and happens when the select
+button is clicked (mouse button 1) or the Return key is pressed. If no
+modification is to be made then a choice from the List can be selected
+by double clicking mouse button 1 or by single clicking mouse button 2.
+Further, an immediate selection of some other directory in the path of
+the displayed directory can be made by selecting from the `path' button
+menu.
+
+A `~' as the first character in the input area is understood to mean
+the user's home directory. If a nomination begins with a `$' then the
+first component will be treated as a possible reference to an
+environment variable, with the expansion being made if a variable of
+that name exists.
+
+In addition the user may define a list of potential nominations -
+either files or directories - to be added to the `path' button menu.
+Since selecting an entry from the menu is equivalent to entering the
+entry in the input area and selecting it in the normal way, i.e it is
+subject to the checks that would be applied if the user had typed the
+value as a nomination, then `~' and `$' may feature in the user-added
+entries. The user adds entries by providing a value for the *pathList*
+resource of the FileNominator. It is a colon separated list of
+pathnames that are converted into menu entries and added to the path
+button menu.
+
+When the selection is a directory the contents of the directory are
+filtered according to the pattern in the filter input area, so that a
+reduced subset of interest may be displayed. A new filter can be run on
+the current directory by hitting Return in the filter input area or by
+selecting Apply from the menu belonging to the filter menu button.  The
+menu has two other entries: `Apply to directories', which controls
+whether directories should always be displayed or whether they should
+also be subject to filtering, and `Apply to "." files', which controls
+whether names beginning with a `.' should be displayed or not. The last
+two entries are toggles, whose selection cause toggling of the setting
+and rescanning of the directory with the toggled value effective. The
+"." files entry takes precedence over the one for directories e.g. if
+the pattern is `*c' and there is a file called .filec, then it won't be
+shown unless there is a tick mark against the `Apply to "." files'
+entry.
+
+
+File: axe.info,  Node: NumPad,  Next: ControlCode,  Prev: Nominator,  Up: Popups
+
+The numeric keypad
+==================
+
+The NumericPad popup is popped up whenever the *Line* entry of the
+*Search* menu is selected, or the goto-line action invoked by other
+means. This popup is an instance of a general purpose widget for
+entering numeric data, and contains features that are probably
+inappropriate for aXe, like the ability to change the base to octal or
+hexadecimal.
+
+A number can be entered into the 1-line text area by clicking the digit
+buttons or from the keyboard whilst the popup has the input focus. A
+number is submitted to the application by clicking the enter button or
+by hitting either the Return or the Enter key. The cancel button is for
+dismissing the popup without entering a number.
+
+
+File: axe.info,  Node: ControlCode,  Next: Confirmer,  Prev: NumPad,  Up: Popups
+
+The control code selector
+=========================
+
+The ControlCodeSelector popup is popped up whenever the *Control Codes*
+entry of the *Insert* menu is selected, or the insert-control action is
+invoked by other means. Selecting an item in the table of control codes
+that is displayed causes the item to become highlighted and its ASCII
+code to be displayed in a label at the lower left of the popup. The
+widget that is at the heart of this popup has a resource, *base*, which
+controls how the numeric value of the code is displayed.  aXe displays
+the value to the base 8, i.e. in octal.
+
+The currently selected control code is entered into the current buffer
+of the window from which the popup was popped up by clicking the enter
+button with mouse button 1. Several consecutive control codes can be
+entered as the popup is only popped down when the cancel button is
+clicked. A code from the table can be entered directly into the current
+buffer by clicking the item with mouse button 2.
+
+
+File: axe.info,  Node: Confirmer,  Next: Preferences,  Prev: ControlCode,  Up: Popups
+
+The confirmer
+=============
+
+The Confirmer popup is popped up whenever the user is about to perform
+a potentially destructive act, like clearing a buffer that has unsaved
+changes.  Apart from a superfluous bitmap, it contains a message
+describing the reason why the user is being asked to confirm proceeding
+with the requested operation, and three buttons. The rightmost button -
+cancel - is for dismissing the popup by abandoning the requested
+operation. The remaining two buttons provide alternative courses of
+action.  If the middle button is greyed out then it means that there is
+only one possible action to take.
+
+The symbols at the right hand end of the button labels signify keyboard
+accelerators for selecting those buttons. `^A' is shorthand for hitting
+key A in conjunction with the Control key.  Thus, if the popup is
+popped up as a result of a keyboard event then in all probability the
+user will be able to make a choice without having to resort to the
+mouse since the popup is centred around the mouse pointer and a popular
+way of working is for the widget having the input focus to be
+determined by the location of the mouse.
+
+
+File: axe.info,  Node: Preferences,  Next: Help,  Prev: Confirmer,  Up: Popups
+
+The preferences setter
+======================
+
+The Preferences popup allows a selected number of user preferences
+(resources) to be changed at runtime. You should note that under `Wrap
+Mode' selection of `Auto Fill' automatically forces on `No Wrap', and
+selection of `Line' or `Word' automatically forces off `Auto Fill'.
+These are the combinations that it has been found work best.
+
+Any typing within the popup is directed to the `Tab Every' entry field
+as this is the only one which requires keyboard input.
+
+Although there is apparently provision for having the settings apply to
+just one buffer, all the buffers in one window, or to all buffers, only
+the first is possible. The buttons corresponding to the last two cases
+are insensitive to button presses, which is indicated by their being
+greyed out.
+
+
+File: axe.info,  Node: Help,  Next: Language,  Prev: Preferences,  Up: Popups
+
+The help system
+===============
+
+You have obviously already discovered the help system. If you require
+more information about how to use it then jump to the *Note Axinfo::,
+node.
+
+If a window fails to appear in response to requesting help then it is
+almost certain that the executable, axinfo, was not found on your shell
+command search path. If a small window appears containing a message
+that the application defaults file could not be found then axinfo has
+either not been installed properly or you have incorrectly overridden
+the default search path for application defaults files, for example by
+setting the environment variable XFILESEARCHPATH,
+
+Once axinfo has been started up it is independent of aXe, i.e.
+terminating the one does not terminate the other. On the other hand, if
+an axinfo is already running, as a result of having been started
+independently or remaining from an earlier invocation of aXe, when help
+is requested then aXe communicates with that axinfo rather than fire up
+a new one.
+
+
+File: axe.info,  Node: Language,  Next: Builtins,  Prev: Help,  Up: Top
+
+aXe's extension language
+************************
+
+aXe's extension language is Tcl. As Tcl is a separate package with its
+own documentation, which should be available locally, it is not
+described here. The language extension is an option at build time. If
+the *Help* menu does not contain an *Extension* entry then the option
+has not been configured into the version of aXe you are running.
+
+In order to integrate Tcl into aXe a new action routine, execute, has
+been introduced. It takes a Tcl command as argument. Thus Tcl commands
+can be bound to keystrokes, e.g.
+
+         *ed.translations:#override \n\
+                          Ctrl<Key>x,<Key>r:execute(prefix)
+
+where `prefix' might be the following procedure:
+
+         proc prefix {{text {> }}} {
+             with-selection action insert-string $text
+         }
+
+with-selection is a general purpose procedure that applies another
+procedure to each line of the selection in turn. The applied procedure
+and its arguments are passed as arguments to with-selection. In the
+example above the applied procedure is `action' and its arguments are
+`insert-string' and `$text'. with-selection is implemented as follows:
+
+         proc with-selection {func {args {}}} {
+             set selection [get-selection]
+             set start [lindex $selection 0]
+             set end   [lindex $selection 1]
+             set lines [lindex $selection 2]
+     
+             if {$start == $end} {return}
+     
+             set-position $start
+             for {set line 0} {$line < $lines} {incr line} {
+                 action beginning-of-line
+                 eval $func $args
+                 action next-line
+             }
+             action beginning-of-line
+             set-selection $start [get-position]
+         }
+
+By default prefix prepends `> ' to each line in the selection, but by
+supplying an argument a different prefix can be employed, e.g.
+
+         prefix "! "
+         prefix "    "
+
+prefix and with-selection make use of a number of builtin commands
+(*Note Builtin extension language commands: Builtins.) that have been
+defined.
+
+* Menu:
+
+* Builtins::             Built in extension language commands
+* Utilities::            Other extension language commands
+* UseLang::              Using the extension language
+
+
+File: axe.info,  Node: Builtins,  Next: Utilities,  Prev: Language,  Up: Language
+
+Builtin extension language commands
+===================================
+
+`action arg1 arg2 ...'
+     enables action routines to be executed from within Tcl commands.
+     Action routine arguments are separated by spaces, not enclosed in
+     parentheses, e.g. search forward, not search(forward).
+
+`eval-buffer'
+     evaluates the current buffer on the assumption that it contains a
+     Tcl script. In other words new commands can be entered and
+     immediately tried out.
+
+`get-selection'
+     returns a list consisting of the starting and finishing positions
+     of the selection, the number of lines spanned by it, and the
+     selection itself.
+
+`get-position'
+     returns the value of the insertion point.
+
+`set-position point'
+     sets the insertion point to the value of its argument.
+
+`set-selection start finish'
+     sets the selection to be the text spanned by the positions passed
+     as arguments.
+
+`set-value        resource value'
+`set-source-value resource value'
+`set-sink-value   resource value'
+     set the resource named in the first argument to the value in the
+     second for the text widget or its source or sink objects.
+
+
+File: axe.info,  Node: Utilities,  Next: UseLang,  Prev: Builtins,  Up: Language
+
+Other extension language commands
+=================================
+
+A small collection of commands built using the builtins (*Note Builtin
+extension language commands: Builtins.) and action routines should have
+been loaded when aXe was started up. It consists of the following
+commands.
+
+`with-selection proc args'
+     applies a procedure and its arguments to each line of the
+     selection in turn.
+
+     Example:
+          with-selection action insert-string "> "
+
+`prefix string'
+     prepends an optional string to each line of the selection. The
+     default string is `> '.
+
+`strip n'
+     removes a number of characters equal to the value of its argument
+     from the beginning of each line in the selection. If no argument is
+     given the default is 1.
+
+`join-lines n separator'
+     joins together the next n lines as given by the first argument
+     (default 1) to the current line, and inserts the text given by the
+     second argument (default " ") at the join.
+
+`format-all'
+     formats the entire buffer by applying the action form-paragraph to
+     successive paragraphs. On completion the caret is restored to the
+     character position it was originally at, but of course that is
+     likely to be correspond to a different place in the text.
+
+`upper'
+`lower'
+     convert the selection to upper and lower case respectively.
+
+
+File: axe.info,  Node: UseLang,  Next: Changes,  Prev: Utilities,  Up: Language
+
+Using the extension language
+============================
+
+User-defined commands that are to be loaded at startup should be stored
+in the file axe.tcl in the user's home directory. Commands can also be
+loaded dynamically at runtime from a file by executing `source
+pathname' in the minibuffer. If the file does not exist then the
+command will fail, and that failure will be reported identically to
+other errors, i.e. the keyboard bell will be rung and an appropriate
+message displayed in an alert popup.
+
+The easiest way to execute Tcl commands is to type them into the
+minibuffer. Thus the example given at the beginning (*Note aXe's
+extension language: Language.) could equally well be executed by typing
+`prefix' in the minibuffer, whereas making a selection and typing
+
+     prefix "    "
+
+will cause each line in the selection to be indented by 4 spaces.
+
+Using the minibuffer is especially convenient if you want to create and
+try out new commands from within aXe. If the current buffer contains a
+Tcl script defining some new procedures then these can be loaded into
+aXe by typing `eval-buffer' in the minibuffer. The new procedures may
+be tried out by issuing commands in the minibuffer to invoke them.
+Changes to the script can be made and the process repeated as often as
+necessary as defining a procedure replaces the existing definition, if
+any.
+
+The extension language makes it possible for things to be done in aXe
+that either I couldn't envisage users wanting to do or wouldn't want to
+implement as fixed features. Here are just a couple of examples that
+might set you thinking of the possibilities.
+
+`Example 1'
+     The following procedure demonstrates how the extension language
+     might be used to set up modes.
+
+          proc a-mode {} {
+              set-value tabEvery 4
+              set-value wrap word
+          }
+
+     Execution of the procedure will affect the current buffer of the
+     window in which it is executed. There are three ways in which it
+     could be executed:
+
+       1. by typing `a-mode' in the minibuffer.
+
+       2. by setting up a minibuffer menu entry and selecting it. The
+          entry might be set up using the following resource
+          specification:
+
+               *miniMenu:+ 'A mode':mini-stuff(a-mode\n)
+
+       3. by setting up a translation, such as the following:
+
+               *ed.translations: #override \n\
+                                 Meta<Key>m:execute(a-mode)
+
+          and typing `Meta-m' in the editing buffer to which it is to
+          be applied.
+
+
+`Example 2'
+     This example shows how a procedure defining a C++ template header
+     file might be set up.
+
+          proc class {class {baseclass {}}} {
+              action insert-string "#ifndef ${class}_h\n"
+              action insert-string "#define ${class}_h\n\n"
+              action insert-string "class $class"
+              if {$baseclass != {}} {
+                  action insert-string " : public $baseclass"
+              }
+              action insert-string "\n\{\npublic:\n"
+              action insert-string "	$class\(\);\n	~$class\(\);\n\n"
+              action insert-string "protected:\n\n"
+              action insert-string "private:\n\};\n\n#endif\n"
+          }
+
+     When invoked with two arguments, the name of the new class and the
+     name of the base class, then the following is generated at the
+     insertion point of the current buffer, assuming arguments of Foo
+     and Bar:
+
+          #ifndef Foo_h
+          #define Foo_h
+          
+          class Foo : public Bar
+          {
+          public:
+              Foo();
+              ~Foo();
+          
+          protected:
+          
+          private:
+          };
+          
+          #endif
+
+     If the second argument is not given then the `class' line becomes
+
+          class Foo
+
+
+File: axe.info,  Node: Changes,  Next: Change 1,  Prev: UseLang,  Up: Top
+
+Changes since the previous release
+==================================
+
+If this is the first time you have seen axinfo (aXe information system)
+then the minimum you need to know to begin to use it is that clicking
+on highlighted words using mouse button 1 will take you to other parts
+of the help. *Note Axinfo:: describes the system in more detail.
+
+* Menu:
+
+* Change 1::             Changes to the help system
+* Change 2::             Deleting the selection on text entry
+* Change 3::             Changes to the extension language
+* Change 4::             Setting of the WM_COMMAND property
+
+
+File: axe.info,  Node: Change 1,  Next: Change 2,  Prev: Changes,  Up: Changes
+
+Changes to the help system
+==========================
+
+aXe's help information is now displayed using a separate application
+(this program) that is either run standalone or invoked, if it is not
+already running, when an entry is selected from the *Help* menu.  *Note
+Axinfo:: describes the system in detail.
+
+The underlying documentation system that is used permits both on-line
+help and printed output to be generated from the same input file.
+Hence the help information is now available as a User Guide. It should
+have been provided as a PostScript file when your site acquired the aXe
+distribution. Check availability with your system administrator.
+
+
+File: axe.info,  Node: Change 2,  Next: Change 3,  Prev: Change 1,  Up: Changes
+
+Deleting the selection on text entry
+====================================
+
+A new AxeiiText widget resource `deleteOnInsert' has been introduced.
+It controls whether the entry of the first character via the keyboard
+(i.e. via the insert-char action) following the setting of the
+selection should delete the selection. The default value is `False'.
+
+
+File: axe.info,  Node: Change 3,  Next: Change 4,  Prev: Change 2,  Up: Changes
+
+Changes to the extension language
+=================================
+
+The supplied commands that manipulate the selection reselect the
+modified text so that it can be further operated on.
+
+Some new commands have been provided and others have been renamed.
+
+join and format have been renamed as join-lines and format-all because
+they masked Tcl procedures of the same names. getSelection, getPos,
+setPos and loopSel have been renamed as get-selection, get-position,
+set-position and with-selection.
+
+In addition get-selection provides the selection as an extra element of
+the returned list.
+
+The new commands are:-
+
+set-selection start finish
+     which sets the selection.
+
+eval-buffer
+     which evaluates the current buffer as a Tcl script, i.e. you can
+     compose, add and try out new commands from within aXe.
+
+set-value resource value
+set-source-value resource value
+set-sink-value resource value
+     which set the value of the named resource for the editing buffer
+     Text widget, or its source or sink object.
+
+upper
+lower
+     which convert the selection to upper or lower case respectively.
+
+
+File: axe.info,  Node: Change 4,  Prev: Change 3,  Up: Changes
+
+Setting of the WM_COMMAND property
+==================================
+
+When running in server mode aXe now sets the WM_COMMAND property on the
+server window. This means that an entry for aXe will now show up in the
+output of xlsclients, and that aXe will be visible to startup generator
+applications.
+
+The WM_COMMAND property is not set if aXe is not running in server mode
+- there is no window that can be guaranteed to survive the term of the
+invocation.
+
+

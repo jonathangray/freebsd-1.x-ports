@@ -1,0 +1,223 @@
+Index
+=====
+     Installation
+     Extension Language 
+     Xaw3d Compatability
+     Installing aXe outside the X tree
+     User Guide
+
+                         ---===---===---===---
+
+Installation
+============
+Check Axe.tmpl for any customisation that needs to be done.
+
+Then
+        xmkmf
+	make Makefiles
+        make Xaw3d       # If necessary - see *** below
+        make
+        make install
+	make install.man
+
+If you want to try out aXe from within the build directory then set
+AxeLibdir and InfoLibdir to `.' and `./Help' respectively in Axe.tmpl
+before doing the make. Then make the following environment variable
+setting
+
+	XFILESEARCHPATH=./%N.ad:./Help/%N.ad
+
+and ensure that ./Help is in your command search path before running
+axe. All that then needs to be done before installation is to set
+AxeLibdir and InfoLibdir to their correct values and do another make.
+
+Alternatively, with AxeLibdir and InfoLibdir set to their values for
+installation all is not lost from within the build directory provided
+you first load the resource setting
+
+	Axinfo*infoPath:./Help
+
+into the RESOURCE_MANAGER property of the root window, e.g. by executing
+
+	xrdb -merge
+	Axinfo*infoPath:./Help
+	^D
+
+interactively, and proceding as before.
+	
+The help system can also be tried out independently by cd'ing to the
+Help directory, setting the environment variable XFILESEARCHPATH to
+%N.ad, and executing
+
+	./axinfo -xrm '*infoPath:.'
+
+If you have specified the exension language then it won't be usable
+unless you explicitly source the startup file by typing `source
+axe.tcl' in the minibuffer, or start axe as follows:
+
+	./axe -xrm '*axeLibDir:.'
+
+*** If you have built for Xaw3d compatability and to want to build
+without, or vice versa, then modify Axe.tmpl appropriately and run
+through the build sequence from the top again. Note that `make Xaw3d'
+is also required in the case of undoing Xaw3d.
+
+
+SOLARIS WARNING: I have built aXe under SunOS 5.2 but the process was
+not straightforward for the following reasons:
+
+  1. xmkmf doesn't exist. I used `imake -I/usr/openwin/lib/config'
+
+  2. I don't know what Sun have done to the config files (which are
+     based on R4, not R5), but the `make Makefiles' stage failed. What
+     I ended up doing was cd'ing into the Widgets and Help subdirectories
+     and running `imake -I...' and `make' explicitly before returning
+     to the top directory and doing the same there. 
+
+  3. Because the header files are R5 (as identified by the value of
+     XtSpecificationRelease in /usr/openwin/include/X11/Intrinsic.h)
+     and the config files are R4 (as identified by the value of ProjectX
+     in /usr/openwin/lib/config/Project.tmpl) an incompatability arises
+     between what gets compiled and what gets linked. The answer is to
+     include the following in Axe.tmpl
+
+         #undef ProjectX
+         #define ProjectX 5
+
+     immediately before the test
+
+         #if ProjectX < 5
+
+  N.B. I simply gave aXe a quick test from the build directory without
+     doing an installation. I assume that all that will be necessary
+     will be to run `make install' and `make install.man' in the top
+     directory and the Help subdirectory - there is nothing to install
+     from the Widgets subdirectory. 
+
+                         ---===---===---===---
+
+Extension Language 
+================== 
+An optional extension language facility using Tcl (Tool Command
+Language) is supported. You must have Tcl installed before you can
+incorporate this feature though. As it is not an essential part of aXe
+I have not included Tcl in the distribution. It can be obtained by ftp
+from sprite.berkeley.edu (128.32.150.27) amongst other places. The
+extension language feature is compatible with major Tcl versions 6 and
+7.
+
+                         ---===---===---===---
+
+Xaw3d Compatability
+===================
+Unlike most other applications that use the Athena Widgets aXe cannot
+simply be relinked using an Xaw3d libray in place of the Xaw library
+to obtain an Xaw3d version. Because aXe subclasses some of the Xaw
+widgets it is necessary to take account of the extra information that
+Xaw3d introduces into the widget structures, i.e. the derived widgets
+have to be compiled differently to achieve Xaw3d compatability.
+
+I have tried to achieve that compatability by making as few changes as
+possible to my code. The upshot is that you will only be able to build
+an Xaw3d version using my procedure if your system supports symbolic
+links. The reason for this is that my modules #include <X11/Xaw/...>
+whereas the Xaw3d ones #include <X11/Xaw3d/..>, but in order that both
+should access the Xaw3d header files the build process creates an X11
+directory in the build directory containing symbolic links Xaw and
+Xaw3d that both point to the installed .../include/X11/Xaw3d directory.
+
+This version of aXe is only known to be compatible with versions 0.4,
+0.5 and 0.6 of Xaw3d.
+
+                         ---===---===---===---
+
+Installing aXe outside the X tree
+=================================
+If, like me, you don't like adding contributed software to the standard
+places within the installed X tree then you might be interested in the
+scheme that I use to avoid doing so. Of course, aXe's Imakefile is
+designed to make doing this easy.
+
+I set aside a directory, /usr/local/X11-local, for contributed X
+applications and install each in a subdirecory of its own.  The scheme
+allows for version subdirectories, but that is not mandatory. Each
+version or application directory has a minimum structure consisting of
+bin, lib and lib/app-defaults subdirectories. Others can be added as
+demanded by the application, e.g. man and man/man1. Thus the picture is
+like this:
+
+
+                                  usr
+                                   |
+                                 local
+                                   |
+                               X11-local
+                                   |
+                                 xappl
+                                   |
+                    +-----------------------------+
+                    |              |              |
+                 version1      version2  <---- current
+                                   |
+                    +-----------------------------+
+                    |              |              |
+                   bin            lib            man
+                    |              |              |
+                  xappl        app-defaults      man1
+                                   |              |
+                                 XAppl         xappl.1
+
+
+
+The symbolic link current points to the version currently released to
+users. Thus it is easy to install a new version alongside existing ones
+without affecting their use. Releasing a new version amounts to making
+current point to its version directory, and of course if there are
+problems with it it is easy to switch back to the old one as long as its
+directory hasn't been deleted. As you can see, deleting an old version
+is simplicity itself because it is not scattered across several
+directories.
+
+Therefore, when I build aXe I make assignments like these in the
+Imakefile:
+
+	Store   = /usr/local/X11-local/axe/3.1
+	Bindir  = ${Store}/bin
+	Appdir  = ${Store}/lib/app-defaults
+	Mandir  = ${Store}/man/man1
+	Helpdir = ${Store}/lib
+
+The key to making all this work is the script xany, which is included
+in the distribution. It should be installed in a directory where users
+normally find commands, e.g.  /usr/local/bin, and a link made to it for
+every application that falls within the scheme, e.g. ln xany axe.
+Briefly, what happens is that for application xappl it constructs and
+executes the command
+
+XFILESEARCHPATH=/usr/local/X11-local/xappl/current/lib/app-defaults/%N \
+                               /usr/local/X11-local/xappl/current/bin/xappl $@
+
+The component current is omitted if /usr/local/X11-local/xappl/current
+does not exist. 
+
+Note that the application directory name in /usr/local/X11-local must
+be the same as the command name, i.e. axe, not aXe.
+
+I always make any symbolic links that are needed, e.g. in
+/usr/local/man/man1 for the man page, in terms of current, so that once
+they have been made they are always up to date as versions come and go.
+
+                         ---===---===---===---
+
+User Guide
+==========
+Letter and A4 versions of the User Guide are available as compressed
+PostScript files in the Help subdirectory. The information is almost
+identical to that contained in the on-line help.
+
+
+Jim
+---
+J.K.Wight@newcastle.ac.uk
+Department of Computing Science, University of Newcastle,  Tel: +44 91 222 8238
+Newcastle upon Tyne, NE1 7RU, United Kingdom.              Fax: +44 91 222 8232
