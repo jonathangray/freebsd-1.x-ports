@@ -1117,12 +1117,18 @@ WINDOW *w;
 {
     register char  *cp;
     register struct line   *lp;
+    int x, y;
 
     if ((lp = (struct line  *) calloc ((unsigned) 1, sizeof *lp)) == NULL)
 	adios (NULLCP, "unable to allocate line storage");
 
     lp -> l_no = (ltail ? ltail -> l_no : 0) + 1;
-    lp -> l_buf = getcpy (w -> _y[w -> _cury]);
+    lp -> l_buf = calloc (w -> _maxx + 1, sizeof (char));
+    if (lp -> l_buf == NULL)
+	adios (NULLCP, "unable to allocate line buffer");
+    getyx (w, y, x);
+    for (x = 0; x < w -> _maxx; x++)
+	lp -> l_buf[x] = mvwinch (w, y, x);
     for (cp = lp -> l_buf + strlen (lp -> l_buf) - 1; cp >= lp -> l_buf; cp--)
 	if (isspace (*cp))
 	    *cp = 0;
