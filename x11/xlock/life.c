@@ -393,7 +393,7 @@ spawn(loc)
 
 
 static void
-kill(loc)
+_kill(loc)
     unsigned char *loc;
 {
     lifestruct *lp = &lifes[screen];
@@ -572,7 +572,7 @@ drawlife(win)
 		break;
 	    case DEATH:
 		if (*(loc + 1) & RT) {
-		    kill(loc);
+		    _kill(loc);
 		    erasecell(win, row, col);
 		}
 		break;
