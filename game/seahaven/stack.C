@@ -9,7 +9,6 @@
 #include "auto.h"
 
 #include <sys/time.h>		// For time()
-#include <math.h>		// For random()
 #include <stdlib.h>
 #include <X11/cursorfont.h>
 
@@ -21,7 +20,6 @@ Stack donestack[NUMSUITS];
 static Stack allstacks[100];
 static int numstacks = 0;
 
-static int initializing = False;
 static int undoing = False;
 
 class StackPlayRec : public StackRec {
@@ -32,6 +30,13 @@ class StackPlayRec : public StackRec {
   private:
 };
 
+// really want to make this static member of StackPlayRec
+static Bool initializing = False;
+
+// make this friend of StackPlayRec
+void SetInitializing(Bool onoff) {
+    initializing = onoff;
+}
 
 class StackSingleRec : public StackRec {
   public:
@@ -81,13 +86,13 @@ void UndoListRec::addBoundary() {
 
 
 void UndoListRec::doUndo() {
-    initializing = True;	// Hack to fool StackPlayRec::addCard.
+    SetInitializing(True);		// Hack to fool StackPlayRec::addCard.
     if (num > 0 && cards[num - 1] == NULL) num--;
     while (num > 0 && cards[num - 1] != NULL) {
 	num--;
 	stacks[num]->addCard(cards[num]);
     }
-    initializing = False;
+    SetInitializing(False);
     for (int i=0 ; i<NUMPLAYSTACK ; i++) playstack[i]->repositionAll();
 }
 
@@ -295,12 +300,6 @@ StackType StackDoneRec::getType() {
 }
 
 
-static int Random(int i) {
-    return random() % i;
-}
-
-
-
 void AutoMoves() {
     Bool found;
     int i;
@@ -363,54 +362,19 @@ Stack StackFromPoint(int x, int y) {
 }
 
 
-void NewGame() {
-    int i, j, k, w;
-    if (score) {
-	score->lostGame();	// Has no effect if wonGame() already called.
-	score->newGame();
-    }
-    initializing = True;
-    for (i=0 ; i<numstacks ; i++) {
+void ClearAllStacks() {
+    for (int i=0 ; i<numstacks ; i++) {
 	allstacks[i]->clear();
     }
-    Card deck[NUMSUITS * NUMVALUES];
-    i = 0;
-    for (int s = 0 ; s < NUMSUITS ; s++) {
-	for (int v = 0 ; v < NUMVALUES ; v++) {
-	    deck[i++] = cards[s][v];
-	    cards[s][v]->setStack(NULL);
-	}
-    }
-    if (score) score->saveGameBegin();
-    for (k=0 ; k<CARDSPERPLAYSTACK ; k++) {
-	for (j=0 ; j<NUMPLAYSTACK ; j++) {
-	    w = Random(i);
-	    playstack[j]->addCard(deck[w]);
-	    if (score) score->saveGameCard(deck[w]);
-	    deck[w] = deck[--i];
-	}
-    }
-    for (j=0 ; j<i ; j++) {
-	singlestack[j + 1]->addCard(deck[j]);
-	if (score) score->saveGameCard(deck[j]);
-    }
-    if (score) score->saveGameEnd();
-    initializing = False;
-
-    AutoMoves();
-    undostack.clear();
-    redostack.clear();
 }
-
 
 
 void LoadStacks(Card deck[52]) {
     int i, j, k, w;
-    initializing = True;
+    SetInitializing(True);
     for (i=0 ; i<numstacks ; i++) {
 	allstacks[i]->clear();
     }
-    initializing = True;
     for (int s = 0 ; s < NUMSUITS ; s++) {
 	for (int v = 0 ; v < NUMVALUES ; v++) {
 	    cards[s][v]->setStack(NULL);
@@ -425,7 +389,7 @@ void LoadStacks(Card deck[52]) {
     for (j=0 ; j<2 ; j++) {
 	singlestack[j + 1]->addCard(deck[w++]);
     }
-    initializing = False;
+    SetInitializing(False);
 
     AutoMoves();
     undostack.clear();
@@ -441,7 +405,7 @@ class StackNoticeExitRec {
 
 
 StackNoticeExitRec::~StackNoticeExitRec() {
-    if (score->getGameWonOrLost()) NewGame();	// Force save.
+    if (score->getGameWonOrLost()) score->NewGame(True);	// Force save.
 }
 
 

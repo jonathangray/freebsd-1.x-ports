@@ -8,25 +8,17 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>		// For getenv()
+#include <math.h>		// For random()
 
-ScoreRec::ScoreRec() {
-    int x = 10;
-    int y = GAMEHEIGHT - 20 - 5 * (font->ascent + font->descent);
-    XSetWindowAttributes attributes;
-    long valuemask = CWEventMask | CWBackPixel | CWWinGravity;
-    attributes.event_mask = ExposureMask;
-    attributes.background_pixel = GetColor("forestgreen",
-					   WhitePixel(dpy, screen));
-    attributes.win_gravity = SouthWestGravity;
-    window = XCreateWindow(dpy, toplevel, x, y,
-			   GAMEWIDTH, GAMEHEIGHT, 0, (int) CopyFromParent,
-			   InputOutput, (Visual *) CopyFromParent,
-			   valuemask, &attributes);
-    XLowerWindow(dpy, window);
-    XMapWindow(dpy, window);
-
-
+void ScoreInit() {
+    char savefile[512];
+    score = new ScoreRec();
     sprintf(savefile, "%s/.seahavensave", getenv("HOME"));
+    score->loadGame(savefile);
+}
+
+void ScoreRec::loadGame(char *filename){
+    (void) strcpy(savefile, filename);
     FILE *fid = fopen(savefile, "r");
     if (fid) {
 	fscanf(fid, "%d %d %d %d %d %d\n", &wins, &losses, &streak,
@@ -45,8 +37,70 @@ ScoreRec::ScoreRec() {
 	maxwinstreak = 0;
 	maxlosestreak = 0;
 	wonlast = True;
-	NewGame();
+	NewGame(False);
     }
+}
+
+
+static int Random(int i) {
+    return random() % i;
+}
+
+void ScoreRec::NewGame(Bool losegame) {
+    int i, j, k, w;
+    if (losegame) {
+	lostGame();	// Has no effect if wonGame() already called.
+	newGame();
+    }
+    SetInitializing(True);
+    ClearAllStacks();
+    Card deck[NUMSUITS * NUMVALUES];
+    i = 0;
+    for (int s = 0 ; s < NUMSUITS ; s++) {
+	for (int v = 0 ; v < NUMVALUES ; v++) {
+	    deck[i++] = cards[s][v];
+	    cards[s][v]->setStack(NULL);
+	}
+    }
+    saveGameBegin();
+    for (k=0 ; k<CARDSPERPLAYSTACK ; k++) {
+	for (j=0 ; j<NUMPLAYSTACK ; j++) {
+	    w = Random(i);
+	    playstack[j]->addCard(deck[w]);
+	    saveGameCard(deck[w]);
+	    deck[w] = deck[--i];
+	}
+    }
+    for (j=0 ; j<i ; j++) {
+	singlestack[j + 1]->addCard(deck[j]);
+	saveGameCard(deck[j]);
+    }
+    saveGameEnd();
+    SetInitializing(False);
+
+    AutoMoves();
+    extern UndoListRec undostack;
+    extern UndoListRec redostack;
+    undostack.clear();
+    redostack.clear();
+}
+
+ScoreRec::ScoreRec() {
+    int x = 10;
+    int y = GAMEHEIGHT - 20 - 5 * (font->ascent + font->descent);
+    XSetWindowAttributes attributes;
+    long valuemask = CWEventMask | CWBackPixel | CWWinGravity;
+    attributes.event_mask = ExposureMask;
+    attributes.background_pixel = GetColor("forestgreen",
+					   WhitePixel(dpy, screen));
+    attributes.win_gravity = SouthWestGravity;
+    window = XCreateWindow(dpy, toplevel, x, y,
+			   GAMEWIDTH, GAMEHEIGHT, 0, (int) CopyFromParent,
+			   InputOutput, (Visual *) CopyFromParent,
+			   valuemask, &attributes);
+    XLowerWindow(dpy, window);
+    XMapWindow(dpy, window);
+
     gc = XCreateGC(dpy, window, 0, NULL);
     XSetForeground(dpy, gc, GetColor("black", BlackPixel(dpy, screen)));
     XSetFont(dpy, gc, font->fid);

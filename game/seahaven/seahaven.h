@@ -98,6 +98,8 @@ class ScoreRec {
     void lostGame();
     void newGame();
     Bool getGameWonOrLost();
+    void loadGame(char *);
+    void NewGame(Bool losegame = True);
     void saveGameBegin();
     void saveGameCard(Card);
     void saveGameEnd();
@@ -167,6 +169,8 @@ global Bool inautoplay;
 
 void Punt(char *);
 
+// From score.C
+void ScoreInit();
 
 // From util.C
 
@@ -185,11 +189,12 @@ Bool CardHandleEvent(XEvent *);
 // From stack.C
 
 void StackInit();
-void NewGame();
 void AutoMoves();
+void SetInitializing(Bool);
 int NumAvailableSingles();
 Stack GetAvailableSingle();
 Stack StackFromPoint(int x, int y);
+void ClearAllStacks();
 void DoUndo();
 void DoRedo();
 void DoRestart();

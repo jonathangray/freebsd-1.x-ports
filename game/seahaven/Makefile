@@ -3,7 +3,7 @@
 
 # -------------------------------------------------------------------------
 # Makefile generated from "Imake.tmpl" and <Imakefile>
-# $XFree86: mit/config/Imake.tmpl,v 2.6 1993/10/02 07:11:59 dawes Exp $
+# $XFree86: mit/config/Imake.tmpl,v 1.17 1993/06/03 15:26:36 dawes Exp $
 # $XConsortium: Imake.tmpl,v 1.139 91/09/16 08:52:48 rws Exp $
 #
 # Platform-specific parameters may be set in the appropriate <vendor>.cf
@@ -19,30 +19,30 @@
 # site-specific configuration parameters that need to come before
 # the platform-specific parameters - edit site.def to change
 
-# $XFree86: mit/config/site.def,v 2.23 1993/10/16 17:28:07 dawes Exp $
+# $XFree86: mit/config/site.def,v 1.65 1993/06/04 16:02:47 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
 # -------------------------------------------------------------------------
 # platform-specific configuration parameters - edit x386.cf to change
 
-# $XFree86: mit/config/x386.cf,v 2.28 1993/10/21 15:48:52 dawes Exp $
+# $XFree86: mit/config/x386.cf,v 1.90 1993/06/04 16:02:50 dawes Exp $
 # platform:  $XConsortium: x386.cf,v 1.7 91/08/16 19:30:10 gildea Exp $
 
 # -------------------------------------------------------------------------
 # XFree86 version definition
-# $XFree86: mit/config/xf86_vers.def,v 2.7 1993/10/08 16:11:07 dawes Exp $
+# $XFree86: mit/config/xf86_vers.def,v 1.5 1993/06/01 09:12:47 dawes Exp $
 
 # -------------------------------------------------------------------------
-# XFree86 version: 2000
+# XFree86 version: 1300
 # -------------------------------------------------------------------------
 
-# operating system:  	FreeBSD
+# operating system:  		386BSD
 
 # -------------------------------------------------------------------------
 # site-specific configuration parameters that go after
 # the platform-specific parameters - edit site.def to change
 
-# $XFree86: mit/config/site.def,v 2.23 1993/10/16 17:28:07 dawes Exp $
+# $XFree86: mit/config/site.def,v 1.65 1993/06/04 16:02:47 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
             SHELL = 	/bin/sh
@@ -51,7 +51,7 @@
       CURRENT_DIR = .
 
                AR = ar clq
-  BOOTSTRAPCFLAGS = 	-DFreeBSD
+  BOOTSTRAPCFLAGS =
                CC = 		gcc
                AS = as
 
@@ -78,13 +78,11 @@
          MSMACROS = -ms
               TBL = tbl
               EQN = eqn
-            NROFF = nroff
-             NEQN = neqn
      STD_INCLUDES =
-  STD_CPP_DEFINES = -traditional 		-DFreeBSD
-      STD_DEFINES = 		-DFreeBSD
+  STD_CPP_DEFINES = -traditional
+      STD_DEFINES =
  EXTRA_LOAD_FLAGS =
-  EXTRA_LIBRARIES = 		-lgnumalloc
+  EXTRA_LIBRARIES =
      OS_LIBRARIES =
              TAGS = ctags
 
@@ -98,7 +96,7 @@
      INSTINCFLAGS = -m 0444
      INSTMANFLAGS = -m 0444
      INSTDATFLAGS = -m 0444
-    INSTKMEMFLAGS = 	-m 2755 -g kmem
+    INSTKMEMFLAGS = -m 4755
 
       PROJECTROOT = 	/usr/X386
 
@@ -132,7 +130,7 @@
 
 # -------------------------------------------------------------------------
 # X Window System Build Parameters
-# $XFree86: mit/config/Project.tmpl,v 2.1 1993/09/17 16:10:43 dawes Exp $
+# $XFree86: mit/config/Project.tmpl,v 1.13 1993/03/27 03:32:45 dawes Exp $
 # $XConsortium: Project.tmpl,v 1.138.1.1 92/11/11 09:49:19 rws Exp $
 
 _percentC_ = %C
@@ -148,7 +146,7 @@ _percentC_ = %C
       BUILDINCDIR = $(BUILDINCROOT)/X11
       BUILDINCTOP = ..
            INCDIR = $(INCROOT)/X11
-           ADMDIR = 		/var/log
+           ADMDIR = /usr/adm
            LIBDIR = $(USRLIBDIR)/X11
         CONFIGDIR = $(LIBDIR)/config
        LINTLIBDIR = $(USRLIBDIR)/lint
@@ -158,13 +156,11 @@ _percentC_ = %C
            XDMDIR = $(LIBDIR)/xdm
            TWMDIR = $(LIBDIR)/twm
           MANPATH = 	/usr/X386/man
-    MANSOURCEPATH = $(MANPATH)/man
-        MANSUFFIX = 1x
-     LIBMANSUFFIX = 3x
-    FILEMANSUFFIX = 5x
-           MANDIR = $(MANSOURCEPATH)1
+    MANSOURCEPATH = 	$(MANPATH)/man
+        MANSUFFIX = 1
+     LIBMANSUFFIX = 3
+           MANDIR = 	$(MANSOURCEPATH)1
         LIBMANDIR = $(MANSOURCEPATH)3
-       FILEMANDIR = $(MANSOURCEPATH)5
            NLSDIR = $(LIBDIR)/nls
         PEXAPIDIR = $(LIBDIR)/PEX
       XAPPLOADDIR = $(LIBDIR)/app-defaults
@@ -266,95 +262,10 @@ _percentC_ = %C
          DEPLIBS2 = $(DEPLIBS)
          DEPLIBS3 = $(DEPLIBS)
 
-#   $RCSfile: Makefile,v $ $Revision: 1.1 $ $Date: 1994/02/05 21:12:52 $
-
-              XTOP = $(TOP)
-              MTOP = $(TOP)
-     XBUILDINCROOT = $(XTOP)
-      XBUILDINCDIR = $(XBUILDINCROOT)/X11
-
-         CLIENTSRC = $(XTOP)/clients
-           DEMOSRC = $(XTOP)/demos
-            LIBSRC = $(XTOP)/lib
-           FONTSRC = $(XTOP)/fonts
-        INCLUDESRC = $(XTOP)/X11
-         SERVERSRC = $(XTOP)/server
-           UTILSRC = $(XTOP)/util
-        EXAMPLESRC = $(XTOP)/examples
-            DOCSRC = $(XTOP)/doc
-            RGBSRC = $(XTOP)/rgb
-      EXTENSIONSRC = $(XTOP)/extensions
-
-      TOP_INCLUDES = -I$(MINCLUDESRC) -I$(INCROOT)
-
-      UIL_INCLUDES = -I$(UILSRC)
-
-      USRINCDIR = 	/usr/X386/include
-         UIDDIR = $(LIBDIR)/uid
-        TESTSRC = $(MTOP)/tests
-        TESTLIB = $(TESTSRC)/lib
-  GENERALSRCLIB = $(TESTSRC)/General/lib
-  GENERALSRCBIN = $(TESTSRC)/General/bin
-   MANUALSRCLIB = $(TESTSRC)/Manual/lib
-   MANUALSRCBIN = $(TESTSRC)/Manual/bin
-     AUTOSRCLIB = $(TESTSRC)/Auto/lib
-     AUTOSRCBIN = $(TESTSRC)/Auto/bin
-       COMMONPP = $(GENERALSRCBIN)/Commonpp
-         GENRUN = $(GENERALSRCBIN)/Genrun
-         MANRUN = $(GENERALSRCBIN)/Manrun
-
-     TESTCOMSRC = $(MANUALSRCLIB)/Common
-
-    MTOOLKITSRC = $(TOOLKITSRC)
-    MINCLUDESRC = $(MTOP)/X11
-        MLIBSRC = $(MTOP)/lib
-     MCLIENTSRC = $(MTOP)/clients
-       MDEMOSRC = $(MTOP)/demos
-     MWIDGETSRC = $(MLIBSRC)/Xm
-   MRESOURCESRC = $(MLIBSRC)/Mrm
-         UILSRC = $(MCLIENTSRC)/uil
-
-            UIL = $(UILSRC)/uil
-         DEPUIL = $(UILSRC)/uil
-
-   XMEXTRA_LIBS = -lgnuregex
-
-DEPXMLIB = $(MWIDGETSRC)/libXm.a
-XMLIB = 			 $(DEPXMLIB)
-
-DEPMRESOURCELIB = $(MRESOURCESRC)/libMrm.a
-MRESOURCELIB = 			 $(DEPMRESOURCELIB)
-
-DEPUILLIB = $(UILSRC)/libUil.a
-UILLIB = 			 $(DEPUILLIB)
-
-DEPTESTCOMLIB = $(TESTCOMSRC)/libCommon.a
-TESTCOMLIB = 			 $(DEPTESTCOMLIB)
-
-  LINTMRESOURCE = $(MRESOURCESRC)/libMrm.a
-LINTXMWIDGETLIB = $(MWIDGETSRC)/llib-l/Xm.ln
-     LINTXMTOOL = $(MTOOLKITSRC)/llib-lXt.ln
-     LINTUILLIB = $(UILSRC)/llib-lUil.ln
-
-      YACCFLAGS =
-       UILFLAGS =
-
-         RM_CMD = $(RM) *.CKP *.ln *.BAK *.bak *.o core errs ,* *~ *.a .emacs_* tags TAGS make.log MakeOut   *.Dat
-
-    STD_DEFINES = 		-DFreeBSD 	 -DNO_REGEX
-
-        DEPLIBS = $(DEPXMLIB) $(DEPXTOOLLIB) $(DEPXLIB)
-
-        DEPLIBS1 = $(DEPLIBS)
-        DEPLIBS2 = $(DEPLIBS)
-        DEPLIBS3 = $(DEPLIBS)
-
 # -------------------------------------------------------------------------
 # Imake rules for building libraries, programs, scripts, and data files
-# $XFree86: mit/config/Imake.rules,v 2.1 1993/09/29 11:06:00 dawes Exp $
+# $XFree86: mit/config/Imake.rules,v 1.9 1993/03/23 12:56:27 dawes Exp $
 # rules:  $XConsortium: Imake.rules,v 1.123 91/09/16 20:12:16 rws Exp $
-
-#   $RCSfile: Makefile,v $ $Revision: 1.1 $ $Date: 1994/02/05 21:12:52 $
 
 # -------------------------------------------------------------------------
 # start of Imakefile
@@ -386,6 +297,7 @@ install:: seahaven
 install.man:: seahaven.man
 	@if [ -d $(DESTDIR)$(MANDIR) ]; then set +x; \
 	else (set -x; $(MKDIRHIER) $(DESTDIR)$(MANDIR)); fi
+	$(RM) $(DESTDIR)$(MANDIR)/seahaven.$(MANSUFFIX)*
 	$(INSTALL) -c $(INSTMANFLAGS) seahaven.man $(DESTDIR)$(MANDIR)/seahaven.$(MANSUFFIX)
 
 depend::
@@ -399,9 +311,14 @@ lint1:
 clean::
 	$(RM) $(PROGRAM)
 
+install::
+	@if [ -d /usr/X386/man/man6 ]; then set +x; \
+	else (set -x; $(MKDIRHIER) /usr/X386/man/man6); fi
+	$(INSTALL) -c $(INSTMANFLAGS) seahaven.6 /usr/X386/man/man6/seahaven.6
+
 pkg: pkg_bin
 
-pkg_bin:
+pkg_bin: install
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST seahaven_bin
 
 # -------------------------------------------------------------------------

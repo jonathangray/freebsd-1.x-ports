@@ -50,7 +50,6 @@ main(int argc, char **argv) {
     }
 
     inautoplay = False;
-    score = NULL;
 
     dpy = XOpenDisplay(displayname);
     if (!dpy) {
@@ -86,8 +85,7 @@ main(int argc, char **argv) {
 
     CardInit();
     StackInit();
-
-    score = new ScoreRec();
+    ScoreInit();
 
     int y = GAMEHEIGHT - font->ascent - font->descent - 10;
     int width, width2, width3;
@@ -133,7 +131,7 @@ main(int argc, char **argv) {
 			DoRedo();
 			break;
 		      case '\016':
-			NewGame();
+			score->NewGame(True);
 			break;
 		      case '\003':
 			XUnmapWindow(dpy, toplevel);
@@ -148,7 +146,7 @@ main(int argc, char **argv) {
 		else if (w == redobutton) DoRedo();
 		else if (w == restartbutton) DoRestart();
 		else if (w == autobutton) DoAutoPlay();
-		else if (w == newgamebutton) NewGame();
+		else if (w == newgamebutton) score->NewGame(True);
 		else if (w == quitbutton) {
 		    XUnmapWindow(dpy, toplevel);
 		    XFlush(dpy);
