@@ -74,12 +74,21 @@ static char *bkpt_names[] = {
 #ifndef SVR4_SHARED_LIBS
 
 #define DEBUG_BASE "_DYNAMIC"
+#ifdef OLD_FreeBSD_LD
 #define LM_ADDR(so) ((so) -> lm.lm_addr)
 #define LM_NEXT(so) ((so) -> lm.lm_next)
 #define LM_NAME(so) ((so) -> lm.lm_name)
 static struct link_dynamic dynamic_copy;
 static struct link_dynamic_2 ld_2_copy;
 static struct ld_debug debug_copy;
+#else
+#define LM_ADDR(so) ((so) -> lm.som_addr)
+#define LM_NEXT(so) ((so) -> lm.som_next)
+#define LM_NAME(so) ((so) -> lm.som_path)
+static struct _dynamic dynamic_copy;
+static struct section_dispatch_table ld_2_copy;
+static struct so_debug debug_copy;
+#endif
 static CORE_ADDR debug_addr;
 static CORE_ADDR flag_addr;
 
@@ -96,8 +105,13 @@ char shadow_contents[BREAKPOINT_MAX];	/* Stash old bkpt addr contents */
 
 struct so_list {
   struct so_list *next;			/* next structure in linked list */
+#ifdef OLD_FreeBSD_LD
   struct link_map lm;			/* copy of link map from inferior */
   struct link_map *lmaddr;		/* addr in inferior lm was read from */
+#else
+  struct so_map lm;			/* copy of link map from inferior */
+  struct so_map *lmaddr;		/* addr in inferior lm was read from */
+#endif
   CORE_ADDR lmend;			/* upper addr bound of mapped object */
   char so_name[MAX_PATH_SIZE];		/* shared object lib name (FIXME) */
   char symbols_loaded;			/* flag: symbols read in yet? */
@@ -139,7 +153,11 @@ symbol_add_stub PARAMS ((char *));
 static struct so_list *
 find_solib PARAMS ((struct so_list *));
 
+#ifdef OLD_FreeBSD_LD
 static struct link_map *
+#else
+static struct so_map *
+#endif
 first_link_map_member PARAMS ((void));
 
 static CORE_ADDR
@@ -590,14 +608,23 @@ DESCRIPTION
 	a pointer to the copy in our address space.
 */
 
+#ifdef OLD_FreeBSD_LD
 static struct link_map *
+#else
+static struct so_map *
+#endif
 first_link_map_member ()
 {
+#ifdef OLD_FreeBSD_LD
   struct link_map *lm = NULL;
+#else
+  struct so_map *lm = NULL;
+#endif
 
 #ifndef SVR4_SHARED_LIBS
 
   read_memory (debug_base, (char *) &dynamic_copy, sizeof (dynamic_copy));
+#ifdef OLD_FreeBSD_LD
   if (dynamic_copy.ld_version >= 2)
     {
       /* It is a version that we can deal with, so read in the secondary
@@ -606,7 +633,16 @@ first_link_map_member ()
 		   sizeof (struct link_dynamic_2));
       lm = ld_2_copy.ld_loaded;
     }
-
+#else
+  if (dynamic_copy.d_version >= 2)
+    {
+      /* It is a version that we can deal with, so read in the secondary
+	 structure and find the address of the link map list from it. */
+      read_memory ((CORE_ADDR) dynamic_copy.d_un.d_sdt, (char *) &ld_2_copy,
+		   sizeof (struct section_dispatch_table));
+      lm = ld_2_copy.sdt_loaded;
+    }
+#endif
 #else	/* SVR4_SHARED_LIBS */
 
   read_memory (debug_base, (char *) &debug_copy, sizeof (struct r_debug));
@@ -648,7 +684,11 @@ find_solib (so_list_ptr)
      struct so_list *so_list_ptr;	/* Last lm or NULL for first one */
 {
   struct so_list *so_list_next = NULL;
+#ifdef OLD_FreeBSD_LD
   struct link_map *lm = NULL;
+#else
+  struct so_map *lm = NULL;
+#endif
   struct so_list *new;
   
   if (so_list_ptr == NULL)
@@ -677,7 +717,11 @@ find_solib (so_list_ptr)
 	     added, but be quiet if we can't read from the target any more. */
 	  int status = target_read_memory ((CORE_ADDR) so_list_ptr -> lmaddr,
 					   (char *) &(so_list_ptr -> lm),
+#ifdef OLD_FreeBSD_LD
 					   sizeof (struct link_map));
+#else
+					   sizeof (struct so_map));
+#endif
 	  if (status == 0)
 	    {
 	      lm = LM_NEXT (so_list_ptr);
@@ -708,7 +752,11 @@ find_solib (so_list_ptr)
 	}      
       so_list_next = new;
       read_memory ((CORE_ADDR) lm, (char *) &(new -> lm),
+#ifdef OLD_FreeBSD_LD
 		   sizeof (struct link_map));
+#else
+		   sizeof (struct so_map));
+#endif
       /* For the SVR4 version, there is one entry that has no name
 	 (for the inferior executable) since it is not a shared object. */
       if (LM_NAME (new) != 0)
@@ -1029,9 +1077,15 @@ disable_break ()
 
   write_memory (flag_addr, (char *) &in_debugger, sizeof (in_debugger));
 
+#ifdef OLD_FreeBSD_LD
   breakpoint_addr = (CORE_ADDR) debug_copy.ldd_bp_addr;
   write_memory (breakpoint_addr, (char *) &debug_copy.ldd_bp_inst,
 		sizeof (debug_copy.ldd_bp_inst));
+#else
+  breakpoint_addr = (CORE_ADDR) debug_copy.dd_bpt_addr;
+  write_memory (breakpoint_addr, (char *) &debug_copy.dd_bpt_shadow,
+		sizeof (debug_copy.dd_bpt_shadow));
+#endif
 
 #else	/* SVR4_SHARED_LIBS */
 
@@ -1122,12 +1176,21 @@ enable_break ()
 
   /* Calc address of debugger interface structure */
 
+#ifdef OLD_FreeBSD_LD
   debug_addr = (CORE_ADDR) dynamic_copy.ldd;
+#else
+  debug_addr = (CORE_ADDR) dynamic_copy.d_debug;
+#endif
 
   /* Calc address of `in_debugger' member of debugger interface structure */
 
+#ifdef OLD_FreeBSD_LD
   flag_addr = debug_addr + (CORE_ADDR) ((char *) &debug_copy.ldd_in_debugger -
 					(char *) &debug_copy);
+#else
+  flag_addr = debug_addr + (CORE_ADDR) ((char *) &debug_copy.dd_in_debugger -
+					(char *) &debug_copy);
+#endif
 
   /* Write a value of 1 to this member.  */
 
@@ -1339,7 +1402,11 @@ struct so_list *so;
       /* FIXME, this needs work for cross-debugging of core files
 	 (byteorder, size, alignment, etc).  */
 
+#ifdef OLD_FreeBSD_LD
       debug_addr = (CORE_ADDR) dynamic_copy.ldd;
+#else
+      debug_addr = (CORE_ADDR) dynamic_copy.d_debug;
+#endif
     }
 
   /* Read the debugger structure from the inferior, just to make sure
@@ -1352,10 +1419,17 @@ struct so_list *so;
 
   /* Get common symbol definitions for the loaded object. */
 
-  if (debug_copy.ldd_cp)
+#ifdef OLD_FreeBSD_LD
+ if (debug_copy.ldd_cp)
     {
       solib_add_common_symbols (debug_copy.ldd_cp, so -> objfile);
     }
+#else
+  if (debug_copy.dd_cc)
+    {
+      solib_add_common_symbols (debug_copy.dd_cc, so -> objfile);
+    }
+#endif
 
 #endif	/* !SVR4_SHARED_LIBS */
 }
