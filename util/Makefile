@@ -9,6 +9,7 @@ SUBDIR += archivers
 SUBDIR += expect # requires `tcl' which gets made from ports/lang/Makefile
 SUBDIR += ile
 SUBDIR += iozone
+SUBDIR += ispell
 SUBDIR += less
 SUBDIR += mtools
 SUBDIR += pkg_install
