@@ -1,0 +1,159 @@
+# Generated automatically from Makefile.in by configure.
+# Makefile for GNUPLOT documentation
+#
+# Note that the top-level file for documentation is gnuplot.doc.
+# See README.
+#
+# To print manual:
+#    make gnuplot.dvi             (for latex)
+#    (print or view gnuplot.dvi)
+# OR
+#    make gnuplot.nroff           (for nroff)
+#    (print or view gnuplot.nroff)
+#   or
+#    make "TROFF=itroff" troff    (for troff; use your troff here)
+#
+
+.NOEXPORT:
+SHELL = /bin/sh
+
+srcdir = .
+
+prefix = /usr/local
+exec_prefix = $(prefix)
+bindir = $(exec_prefix)/bin
+datadir = $(prefix)/lib
+mandir = $(prefix)/man
+infodir = $(prefix)/info
+
+INSTALL = /usr/bin/install -c
+INSTALL_PROGRAM = ${INSTALL}
+INSTALL_DATA = ${INSTALL} -m 644
+
+CC     = gcc
+DEFS   =  -DREADLINE=1 -DNOCWDRC=1 -DX11=1 -DOLD_SELECT=1 -DTERMIOS=1 -DGAMMA=gamma -DGETCWD=1 -DMEMCPY=1 -DMEMSET=1 -DXPG3_LOCALE=1 -DUNIX=1 -DNOVFORK=1 -Dunix=1
+CFLAGS = -O2
+LDFLAGS = -s
+LIBS = 
+
+MAKEINFO = makeinfo
+
+# substitute your troff command (and any flags) for this one
+TROFF=troff
+
+# substitute your DVI to PostScript conversion program here
+DVIPS=dvips
+
+# default is what is needed for interactive gnuplot
+default: gnuplot.hlp gnuplot.gih
+
+### [tn]roff documentation
+troff: gnuplot.ms titlepag.ms
+	tbl $(srcdir)/gnuplot.ms | eqn | $(TROFF) -ms
+
+nroff: gnuplot.nroff
+
+gnuplot.nroff: gnuplot.ms titlepag.ms
+	tbl $(srcdir)/gnuplot.ms | neqn | nroff -ms | col > gnuplot.nroff
+
+ms: gnuplot.ms
+
+gnuplot.ms: doc2ms gnuplot.doc
+	./doc2ms $(srcdir)/gnuplot.doc gnuplot.ms
+
+doc2ms: doc2ms.o
+	$(CC) -o $@ doc2ms.o $(LDFLAGS) $(LIBS)
+
+### LaTeX documentation
+tex: gnuplot.tex
+
+gnuplot.tex: doc2tex gnuplot.doc
+	./doc2tex $(srcdir)/gnuplot.doc gnuplot.tex
+
+# this is how to make DVI files
+dvi: gnuplot.dvi gpcard.dvi
+
+gnuplot.dvi: gnuplot.tex titlepag.tex toc_entr.sty
+	latex gnuplot
+	latex gnuplot
+
+gpcard.dvi: gpcard.tex
+	tex gpcard
+
+# this is how to make PostScript files
+# if pslatex has been installed, add "times" to titlepage.tex
+ps: gnuplot.ps gpcard.ps
+
+gnuplot.ps: gnuplot.dvi
+	$(DVIPS) gnuplot
+
+gpcard.ps: gpcard.dvi
+	$(DVIPS) gpcard
+
+doc2tex: doc2tex.o
+	$(CC) -o $@ doc2tex.o $(LDFLAGS) $(LIBS)
+
+# this is how to make gnuplot.hlp
+hlp: gnuplot.hlp
+
+gnuplot.hlp: doc2hlp gnuplot.doc
+	./doc2hlp $(srcdir)/gnuplot.doc gnuplot.hlp
+
+# this is how to make gnuplot.gih
+gih: gnuplot.gih
+
+gnuplot.gih: doc2gih gnuplot.doc
+	./doc2gih $(srcdir)/gnuplot.doc gnuplot.gih
+
+doc2gih: doc2gih.o
+	$(CC) -o $@ doc2gih.o $(LDFLAGS) $(LIBS)
+
+# this is how to make Info documentation
+info: gnuplot.info
+
+gnuplot.info: gnuplot.doc
+	perl $(srcdir)/doc2info.pl $(srcdir)/gnuplot.doc > gpltinfo.tex
+	$(MAKEINFO) --fill-column=80 gpltinfo.tex
+	rm -f gpltinfo.tex
+
+tutorial: latextut/tutorial.tex
+	( cd latextut; $(MAKE) )
+
+# this is how to check the gnuplot.doc file
+check: checkdoc gnuplot.doc
+	./checkdoc < $(srcdir)/gnuplot.doc
+
+checkdoc: checkdoc.o
+	$(CC) -o $@ checkdoc.o $(LDFLAGS) $(LIBS)
+
+# For Unix and MSDOS only
+install: gnuplot.gih gnuplot.info
+	$(INSTALL_DATA) gnuplot.gih $(datadir)/gnuplot.gih
+	$(INSTALL_DATA) gnuplot.info* $(infodir)
+
+uninstall:
+	rm -f $(datadir)/gnuplot.gih
+
+# for VMS only
+install-vms: gnuplot.hlp
+	$(INSTALL_DATA) gnuplot.hlp $(datadir)/gnuplot.hlp
+
+# remove all derived files
+clean:
+	rm -f doc2ms gnuplot.nroff gnuplot.ms \
+              doc2tex gnuplot.tex gnuplot.dvi \
+              gnuplot.aux gnuplot.log gnuplot.toc \
+              gnuplot.ps gpcard.dvi gpcard.log gpcard.ps \
+              doc2hlp gnuplot.hlp \
+              doc2gih gnuplot.gih \
+              checkdoc *.o core a.out \
+              gnuplot.info* gpltinfo.tex
+	( cd latextut; $(MAKE) clean )
+
+mostlyclean: clean
+
+distclean: clean
+	rm -f Makefile
+
+realclean: distclean
+	rm -f TAGS
