@@ -1,0 +1,82 @@
+'\"
+'\" Copyright 1990 Regents of the University of California
+'\" Permission to use, copy, modify, and distribute this
+'\" documentation for any purpose and without fee is hereby
+'\" granted, provided that this notice appears in all copies.
+'\" The University of California makes no representations about
+'\" the suitability of this material for any purpose.  It is
+'\" provided "as is" without express or implied warranty.
+'\" 
+'\" $Header: /a/cvs/386BSD/ports/x11/tk/doc/ManageGeom.3,v 1.1 1993/08/09 01:21:00 jkh Exp $ SPRITE (Berkeley)
+'\" 
+.so man.macros
+.HS Tk_ManageGeometry tk
+.BS
+.SH NAME
+Tk_ManageGeometry \- arrange to handle geometry requests for a window
+.SH SYNOPSIS
+.nf
+\fB#include <tk.h>\fR
+.sp
+\fBTk_ManageGeometry\fR(\fItkwin, proc, clientData\fR)
+.SH ARGUMENTS
+.AS Tk_GeometryProc clientData
+.AP Tk_Window tkwin in
+Token for window to be managed.
+.AP Tk_GeometryProc *proc in
+Procedure to invoke to handle geometry requests on \fItkwin\fR, or
+NULL to indicate that \fItkwin\fR's geometry shouldn't be managed
+anymore.
+.AP ClientData clientData in
+Arbitrary one-word value to pass to \fIproc\fR.
+.BE
+
+.SH DESCRIPTION
+.PP
+\fBTk_ManageGeometry\fR arranges for \fIproc\fR to be invoked
+whenever \fBTk_GeometryRequest\fR is called to change the desired
+geometry for \fItkwin\fR.  \fBTk_ManageGeometry\fR is typically
+invoked by geometry managers when they take control of a window's
+geometry.
+.PP
+\fIProc\fP should have arguments and results that match the
+type \fBTk_GeometryProc\fR:
+.nf
+.RS
+typedef void Tk_GeometryProc(
+.RS
+ClientData \fIclientData\fR,
+Tk_Window \fItkwin\fR);
+.RE
+.RE
+.fi
+The parameters to \fIproc\fR will be identical to the
+corresponding parameters passed to \fBTk_ManageGeometry\fR.
+Typically, \fIclientData\fR points to a data
+structure containing application-specific information about
+how to manage \fItkwin\fR's geometry.
+.PP
+\fIProc\fR will be called during each call to \fBTk_GeometryRequest\fR
+for \fItkwin\fR.  \fIProc\fR can use macros like \fBTk_ReqWidth\fR
+to retrieve the arguments passed to \fBTk_GeometryRequest\fR.  It
+should do what it can to meet the request, subject to the space
+available in \fItkwin\fR's parent and its own policies for managing geometry.
+If \fIproc\fR can meet the request, it should call procedures like
+\fBTk_ResizeWindow\fR or \fBTk_MoveWindow\fR to carry out the actual
+geometry change.  In some cases it may make sense for \fIproc\fR not
+to process the geometry request immediately, but rather to schedule a
+procedure to do it later, using \fBTk_DoWhenIdle\fR.  This approach
+is likely to be more efficient in situations where several geometry
+requests occur simultaneously:  only a single geometry change will
+be made, after all the requests have been registered.
+.PP
+If \fIproc\fR is specified as NULL, then the geometry handler for
+\fItkwin\fR will be eliminated, leaving \fItkwin\fR unmanaged.
+Calls to \fBTk_GeometryRequest\fR have no effect for unmanaged
+windows except to store the requested size in a structure where
+they can be retrieved by macros like \fBTk_ReqWidth\fR.  If
+\fBTk_GeometryRequest\fR has never been invoked for a window then
+it is unmanaged.
+
+.SH KEYWORDS
+callback, geometry, managed, request, unmanaged
