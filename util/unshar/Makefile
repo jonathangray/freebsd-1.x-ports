@@ -57,6 +57,11 @@ clean:
 	rm -f *.[oa] *.$1 *.BAK $(PROGRAMS)
 	rm -f lint lib.ln tags core foo a.out Part?? all install
 
+pkg: pkg_bin
+
+pkg_bin: install
+        pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST unshar_bin
+
 
 ##  Creating manpages.
 .SUFFIXES:	.$1 .man
