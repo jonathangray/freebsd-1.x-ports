@@ -247,6 +247,11 @@ ORIGINAL-FILES= $(TeX)/Makefile $(Dvips)/Makefile $(Dvips)/config.ps \
 	$(TeX)/tex/convert $(TeX)/mf/convert $(TeX)/Install_INPUTS \
 	$(TeX)/site.h 
 
+pkg: pkg_bin
+
+pkg_bin:
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST tex_bin
+
 stamp-backup:
 	for i in $(ORIGINAL-FILES) ;\
 	do \
