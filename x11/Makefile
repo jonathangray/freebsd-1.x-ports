@@ -16,6 +16,7 @@ SUBDIR += blt
 SUBDIR += urt
 SUBDIR += xlock
 SUBDIR += xv
+SUBDIR += ezd
 
 .if !defined(AVOID)
 G_SUBDIR += xview
