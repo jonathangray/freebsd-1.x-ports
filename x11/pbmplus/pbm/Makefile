@@ -304,7 +304,7 @@ PBMPLUSINCDIR = $(INCDIR)
        PGMDIR = .././pgm
        PPMDIR = .././ppm
        PNMDIR = .././pnm
-      TIFFDIR = .././libtiff
+      TIFFDIR = .././../tiff
 
        LIBPBM = libpbm.a
        LIBPGM = $(PGMDIR)/libpgm.a
@@ -317,7 +317,7 @@ PBMPLUSINCDIR = $(INCDIR)
     DEPLIBPNM = $(PNMDIR)/libpnm.a
    DEPLIBTIFF = -ltiff
 
-package:	all install pkg/+ONELINE pkg/+DESC pkg/+PLIST
+pkg:	all install install.man pkg/+ONELINE pkg/+DESC pkg/+PLIST
 	pkg_create -v -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST pbmplus_bin
 
    CURRENTLIBS = $(LIBPBM)

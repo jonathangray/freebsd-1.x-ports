@@ -165,8 +165,10 @@ main( argc, argv )
 	    case PHOTOMETRIC_MASK:
 	    pm_error( "don't know how to handle PHOTOMETRIC_MASK" );
 
+#ifdef PHOTOMETRIC_DEPTH
 	    case PHOTOMETRIC_DEPTH:
 	    pm_error( "don't know how to handle PHOTOMETRIC_DEPTH" );
+#endif
 
 	    default:
 	    pm_error( "unknown photometric: %d", photomet );

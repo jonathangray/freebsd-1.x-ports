@@ -241,7 +241,7 @@ install-demos:
 		else true; \
 		fi; \
 	    done;
-	@cd $(SRC_DIR)/library/demos; for i in *; \
+	@cd $(SRC_DIR)/library/demos; for i in [a-z]*; \
 	    do \
 	    if [ -f $$i ] ; then \
 		echo "Installing library/demos/$$i"; \
