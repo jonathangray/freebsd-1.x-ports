@@ -119,7 +119,7 @@ flushshf(fd)
 	int fd;
 {
 	if (shf[fd] != NULL) {
-		fseek(shf[fd], 0L, 1); /* V7 derived */
+/*		fseek(shf[fd], 0L, 1);  V7 derived */
 		fflush(shf[fd]);	/* standard C */
 	}
 }
