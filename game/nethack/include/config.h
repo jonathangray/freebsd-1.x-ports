@@ -236,7 +236,7 @@
 
 #ifndef WIZARD		/* allow for compile-time or Makefile changes */
 # ifndef KR1ED
-#  define WIZARD  "wizard" /* the person allowed to use the -D option */
+#  define WIZARD  "games" /* the person allowed to use the -D option */
 # else
 #  define WIZARD
 #  define WIZARD_NAME "wizard"
@@ -261,12 +261,12 @@
 
 #ifdef UNIX
 /* path and file name extension for compression program */
-# define COMPRESS "/usr/ucb/compress"	     /* Lempel-Ziv compression */
-# define COMPRESS_EXTENSION ".Z"	     /* compress's extension */
+/*# define COMPRESS "/usr/ucb/compress"	     /* Lempel-Ziv compression */
+/*# define COMPRESS_EXTENSION ".Z"	     /* compress's extension */
 
 /* An example of one alternative you might want to use: */
-/* # define COMPRESS "/usr/local/bin/gzip"   /* FSF gzip compression */
-/* # define COMPRESS_EXTENSION ".gz"	     /* normal gzip extension */
+# define COMPRESS "/usr/bin/gzip"   /* FSF gzip compression */
+# define COMPRESS_EXTENSION ".gz"	     /* normal gzip extension */
 #endif
 #ifndef COMPRESS
 # define INTERNAL_COMP	/* control use of NetHack's compression routines */
@@ -288,7 +288,7 @@
  * If you define HACKDIR, then this will be the default playground;
  * otherwise it will be the current directory.
  */
-#define HACKDIR "/usr/games/lib/nethackdir" 	/* nethack directory */
+#define HACKDIR "/var/games/nethackdir" 	/* nethack directory */
 
 /*
  * Some system administrators are stupid enough to make Hack suid root

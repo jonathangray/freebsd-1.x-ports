@@ -41,11 +41,11 @@
 /* #define UNIXPC	/* use in addition to SYSV for AT&T 7300/3B1 */
 /* #define AIX_31	/* In AIX 3.1 (IBM RS/6000) use BSD ioctl's to gain
 			   job control (note that AIX is SYSV otherwise) */
-/* #define TEXTCOLOR	/* Use System V r3.2 terminfo color support */
+#define TEXTCOLOR	/* Use System V r3.2 terminfo color support */
 			/* or ANSI color support on termcap systems */
 			/* or X11 color	*/
-/* #define POSIX_JOB_CONTROL	/* use System V POSIX job control */
-/* #define POSIX_TYPES	/* use POSIX types for system calls and termios */
+#define POSIX_JOB_CONTROL	/* use System V POSIX job control */
+#define POSIX_TYPES	/* use POSIX types for system calls and termios */
                         /* define for platforms using the GNU libraries */
                         /* linux, etc .. */
 
@@ -63,7 +63,7 @@
 			   is available from your system */
 
 /* see sys/unix/snd86.shr for more information on these */
-/* #define UNIX386MUSIC	/* Play real music through speaker on systems with
+#define UNIX386MUSIC	/* Play real music through speaker on systems with
 			   music driver installed */
 /* #define VPIX_MUSIC	/* Play real music through speaker on systems with
 			   built-in VPIX support */
@@ -135,7 +135,7 @@
 #  ifdef AMS
 #define AMS_MAILBOX	"/Mailbox"
 #  else
-#define DEF_MAILREADER	"/usr/ucb/Mail"
+#define DEF_MAILREADER	"/usr/bin/Mail"
 #  endif
 #else
 # if defined(SYSV) || defined(DGUX) || defined(HPUX)
