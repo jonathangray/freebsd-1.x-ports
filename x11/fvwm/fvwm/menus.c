@@ -35,7 +35,7 @@
  * fvwm menu code
  *
  ***********************************************************************/
-#include "configure.h"
+#include "../configure.h"
 
 #include <stdio.h>
 #include <signal.h>

@@ -36,7 +36,7 @@
  *
  ***********************************************************************/
 
-#include "configure.h"
+#include "../configure.h"
 
 #ifdef ISC
 #include <sys/bsdtypes.h>

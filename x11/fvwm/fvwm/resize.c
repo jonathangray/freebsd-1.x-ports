@@ -35,7 +35,7 @@
  * window resizing borrowed from the "wm" window manager
  *
  ***********************************************************************/
-#include "configure.h"
+#include "../configure.h"
 
 #include <stdio.h>
 #include "fvwm.h"

@@ -32,7 +32,7 @@
  * as long as the copyright is kept intact.
  */
 
-#include "configure.h"
+#include "../../configure.h"
 #include <stdio.h>
 #include <signal.h>
 #include <fcntl.h>
@@ -43,8 +43,8 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <rplay.h>
-#include "module.h"
-#include "version.h"
+#include "../../fvwm/module.h"
+#include "../../version.h"
 
 char	*MyName;
 int	fd_width;

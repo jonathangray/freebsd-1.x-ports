@@ -34,7 +34,7 @@
  * fvwm - "F? Virtual Window Manager"
  ***********************************************************************/
 
-#include "configure.h"
+#include "../configure.h"
 
 #include <stdio.h>
 #include <stdlib.h>

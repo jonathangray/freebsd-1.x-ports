@@ -6,14 +6,14 @@
  * this program or anything related to it.
  ****************************************************************************/
 
-#include "configure.h"
+#include "../configure.h"
 
 #include <stdio.h>
 #include <signal.h>
 #include <string.h>
 #include <X11/Xos.h>
 #include <X11/Xatom.h>
-#include "xpm.h"
+#include "../fvwm/xpm.h"
 #include "../version.h"
 int save_colors = 0;
 Display *dpy;

@@ -12,7 +12,7 @@
  *
  ***********************************************************************/
 
-#include "configure.h"
+#include "../../configure.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -29,7 +29,7 @@
 #include "GoodStuff.h"
 
 #ifdef XPM
-#include "xpm.h"
+#include "../../fvwm/xpm.h"
 #endif /* XPM */
 #ifdef SHAPE
 #include <X11/extensions/shape.h>

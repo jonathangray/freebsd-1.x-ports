@@ -31,7 +31,7 @@
 #define YES "Yes"
 #define NO  "No"
 
-#include "configure.h"
+#include "../../configure.h"
 
 #include <stdio.h>
 #include <signal.h>
@@ -56,8 +56,8 @@
 #include <X11/Intrinsic.h>
 #include <X11/cursorfont.h>
 
-#include "module.h"
-#include "version.h"
+#include "../../fvwm/module.h"
+#include "../../version.h"
 #include "FvwmWinList.h"
 #include "ButtonArray.h"
 #include "List.h"

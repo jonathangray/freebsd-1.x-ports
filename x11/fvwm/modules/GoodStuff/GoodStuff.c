@@ -10,7 +10,7 @@
 #define TRUE 1
 #define FALSE 
 
-#include "configure.h"
+#include "../../configure.h"
 
 #ifdef ISC
 #include <sys/bsdtypes.h> /* Saul */
@@ -28,7 +28,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <stdlib.h>
-#include "module.h"
+#include "../../fvwm/module.h"
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -37,7 +37,7 @@
 #include <X11/Intrinsic.h>
 
 #include "GoodStuff.h"
-#include "version.h"
+#include "../../version.h"
 char *MyName;
 
 XFontStruct *font;

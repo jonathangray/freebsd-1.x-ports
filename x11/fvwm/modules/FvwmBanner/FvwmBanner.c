@@ -1,11 +1,11 @@
 /***************************************************************************
  * FvwmBanner                                                           
-*                                                                           
-*  Show Fvwm Banner
-*                                                                           
-***************************************************************************/
+ *                                                                           
+ *  Show Fvwm Banner
+ *                                                                           
+ ***************************************************************************/
 
-#include "configure.h"
+#include "../../configure.h"
 
 #ifdef ISC
 #include <sys/bsdtypes.h> /* Saul */
@@ -30,16 +30,16 @@
 #include <X11/Shell.h>
 #include <X11/extensions/shape.h>
 
-#include "xpm.h"
+#include "../../fvwm/xpm.h"
 
 #include "../../fvwm_icons/fvwm3.xpm"
 
 #ifdef BROKEN_SUN_HEADERS
-#include "sun_headers.h"
+#include "../../fvwm/sun_headers.h"
 #endif
 
 #ifdef NEEDS_ALPHA_HEADER
-#include "alpha_header.h"
+#include "../../fvwm/alpha_header.h"
 #endif /* NEEDS_ALPHA_HEADER */
 
 typedef struct _XpmIcon {

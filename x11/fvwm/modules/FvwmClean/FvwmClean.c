@@ -10,7 +10,7 @@
 #define TRUE 1
 #define FALSE 
 
-#include "configure.h"
+#include "../../configure.h"
 #ifdef ISC
 #include <sys/bsdtypes.h> /* Saul */
 #endif 
@@ -27,10 +27,10 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <stdlib.h>
-#include "module.h"
+#include "../../fvwm/module.h"
 
 #include "FvwmClean.h"
-#include "version.h"
+#include "../../version.h"
 
 char *MyName;
 int fd_width;

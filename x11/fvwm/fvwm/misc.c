@@ -37,7 +37,7 @@
  **************************************************************************/
 
 
-#include "configure.h"
+#include "../configure.h"
 
 #include <stdio.h>
 #include <string.h>

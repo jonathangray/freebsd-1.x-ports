@@ -10,7 +10,7 @@
 #define TRUE 1
 #define FALSE 
 
-#include "configure.h"
+#include "../../configure.h"
 
 #include <stdio.h>
 #include <signal.h>
@@ -35,11 +35,11 @@
 #include <X11/Xatom.h>
 #include <X11/Intrinsic.h>
 
-#include "module.h"
+#include "../../fvwm/module.h"
 
 #include "FvwmPager.h"
-#include "version.h"
-#include "fvwm.h"
+#include "../../version.h"
+#include "../../fvwm/fvwm.h"
 
 char *MyName;
 int fd_width;
