@@ -1,0 +1,192 @@
+An X window manager is a special X program that lets you interact
+with windows of many other X programs at once.
+A workstation has resources like the mouse, the keyboard, and space on
+the screen, that X programs must share.  
+
+The window manager usually puts frames around the windows, with
+controls on them for moving, resizing, and iconifying the window.  
+It provides menus for selecting commands and running programs.  
+It also lets you invoke programs and function from the keyboard or
+various combinations of mouse clicks and shift keys. 
+
+Because they have so many different tasks to perform, and everyone
+wants them to behave differently, window managers usualy have some
+sort of customization language.  With the "twm" window manager (and
+its descendants), you can define its behavior by binding events like
+mouse clicks and keys to build-in functions and external programs. You
+can create menus and buttons and attach them to window frames and
+backgrounds.  There are zillions of options you can configure, like
+fonts, colors, patterns, icons, styles, measurements, modes, and all
+sorts of ideosynchratic behaviors.   
+
+The "twm" window manager reads the file called ".twmrc" in your home
+directory when it starts up.  The twm manual explains the exact
+syntax and all the options in detail.  I will briefly demonstrate the
+syntax by giving a few simple examples.  
+
+# Comments start with hash marks.
+
+# Set modes by writing the name of the mode:
+NoGrabServer
+
+# Set variables by writing the name of the variable, 
+# one or more spaces or tabs, then the value.
+TitleFont "lucidasans-bold-14"
+BorderWidth 1
+
+There are all kinds of modes and variables you can set, but many of
+them are unimportant or simply too bizarre to mention.  
+Look at the commented example ".twmrc" file to find out about the
+interesting ones.  For some reason, you have to set the fonts and
+colors before you set the other variables.  That's just the way
+it is, unfortunatly.
+
+The color variables should take on different values depending on
+whether the screen is color or monochrome.  You can set color and
+monochrome values appropriatly for the screen you're using like this: 
+
+# If we're on a color screen, use these color settings.
+Color {
+  BorderColor "slategray"
+  DefaultBackground "pukegreen"
+# ...etc
+}
+
+# If we're on a monochrome screen, use these color settings.
+Monochrome {
+  BorderColor "black"
+  DefaultBackground "white"
+# ...etc
+}
+
+There are several other options that require lists as arguments (like
+lists of cursors, icons, or window names), and they all use braces in
+the same manner as the "Color" and "Monochrome" commands.  Look in the
+example and the manual to find out more, since most of those options
+are pretty advanced or esoteric. 
+
+The kind of customization you'll want to do most often is defining
+menus.  Each menu has a name and a list of items.  Each item has a
+label and an action.  The action is a built-in function that performs
+some window management task, or pops up another sub-menu, or runs a
+shell command. 
+
+# This is a simple top level menu, with entries that invoke submenus.
+menu "Windows" {
+  "Programs"		f.menu "Programs"
+  "Quit"		f.menu "Quit"
+}
+
+# This is a menu with entries that invoke shell commands. 
+menu "Programs" {
+  "Terminal"		!"xterm -sb -sl 500 &"
+  "Editor"		!"gnu-emacs &"
+  "Adventure"		!"xterm -sb -sl 2000 -e /usr/games/adventure &"
+  "Who's On"		!"xterm -sb -e /bin/csh -c 'finger | more ; cat' &"
+}
+
+# This is a menu with entries that invoke built-in functions. 
+menu "Quit" {
+  "Oops, never mind."	f.beep
+  "Yes, I'm sure!"	f.quit
+}
+
+Once you've defined some menus, you still have to tell the window
+manager what you do to invoke them.  Any menu can be invoked as a
+submenu of any of the other menus, but initially there must be a way 
+to call up the top level menu. To make that possible, you bind it to
+some input event like a mouse click or function key, in some
+particular context, like a window frame, button, or background.  
+
+Menus aren't the only way to invoke functions -- you can bind input
+events directly to functions.  In fact popping up a menu is just another
+function.  You create a binding by specifying an input event, a set of
+modifier keys, a context, and a function.  The event is the name of a
+mouse button or function key (Button1, Button2, Button3, "F1",
+"Home").  The modifier key set specifies which of the modifier keys
+(shift, meta, control) must be held down to invoke this binding.  The
+context defines where on the screen this binding is in effect (window,
+title, icon, root, all). The function of a binding is just like a menu
+action.   
+
+#Button =	KEYS :	CONTEXT :	FUNCTION
+#-----------------------------------------------
+Button1 =	:	root :		f.menu "Windows"
+Button1 =	:	title :		f.raiselower
+Button2 =	:	title :		f.move
+Button3 =	:	title :		f.menu "Frame"
+Button1 =	:	icon :		f.iconify
+Button2 =	:	icon :		f.move
+Button3 =	:	icon :		f.menu "Frame"
+"F1" =		:	all :		f.raiselower
+"F2" =		:	all :		f.iconify
+
+Another way you can invoke functions is by clicking on buttons in the
+title bars of your windows.  You can define your own title buttons and
+bind them to any function.  Your buttons are added to the left or right
+side of the title bar, in the order you specify.  To define a button
+you must give the name of a bitmap file or one of the built-in
+bitmaps, which is used to draw the button.  
+
+LeftTitleButton ":dot" = f.iconify
+RightTitleButton ":resize" = f.resize
+
+The "tvtwm" window manager is an extended version of "twm" that 
+supports a large virtual scrolling desktop.  It also runs your
+".twmrc" file through the "m4" macro preprocessor, defining certain
+useful constants that describe the envoronment.  This allows you to
+include other files, define macros and symbolic names, and
+conditionalize parts of your ".twmrc" file depending on the
+environment.  It's very powerful, and it lets you write one .piewm
+file that works across many different systems, but it can get pretty
+hairy.  Read the "m4" and window manager manuals for more information. 
+
+"Piewm" is an extended version of "tvtwm" that supports pie menus.  
+The labels of a pie menu are arranged in a circle around the cursor, 
+and the menu selection is based on the direction you move between
+clicking the button.  They are fast and easy to use because each of
+the target areas is a large wedge shaped area adjacent to the cursor.
+You can also display pixmaps as pie menu labels, by using a label
+beginning with an underscore followed by a bitmap or pixmap file 
+name.  You define pie menus the same way as regular linear menus,
+except using the word "piemenu" instead of "menu".  There is an
+extra optional argument following the menu name and an "@" sign, that
+specifies the direction of the first menu item, defaulting to 0 (to
+the right, increasing counter-clockwise).  To pop up a pie menu (in a
+binding or as a submenu), use the "f.piemenu" function instead of the
+"f.menu" function.  Pie menus can be submenus of linear menus, and the
+other way around, too.  
+
+# The first item goes at 0 degrees (to the right) and the rest are
+# layed out counter-clockwise evenly spaced around the circle.
+# (In directions appropriate for their function.)  
+piemenu "Pan" {
+	"Right"				f.scrollright
+	"Goto"				f.menu "TwmWindows"
+	"Up"				f.scrollup
+	"Home"				f.scrollhome
+	"Left"				f.scrollleft
+	"Back"				f.scrollback
+	"Down"				f.scrolldown
+	"Quad"				f.piemenu "Quad"
+}
+
+# The first item of this menu will be to the north-east, as the 
+# label suggests.  You can select between four quadrants, and the
+# virtual screen pans there. 
+piemenu "Quad" @ 45 {
+	"NE"				f.scroll "+1+0"
+	"NW"				f.scroll "+0+0"
+	"SW"				f.scroll "+0+1"
+	"SE"				f.scroll "+1+1"
+}
+
+# The first item of this menu will be at the top, so it's like an
+# on/off switch (in the US at least, they're the other way around
+# in other countries, so you can change the number after the @ to 
+# 270 if it'll make you feel more at home). 
+piemenu "Key Click" @ 90 {
+	"On"				!"xset c on"
+	"Off"				!"xset c off"
+}
+
