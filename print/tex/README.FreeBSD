@@ -1,0 +1,82 @@
+Notes on installing Gunther Schadow's TeX package under FreeBSD
+-----
+0) If you only got the binary distribution of FreeBSD TeX, then some
+   of the following doesn't apply.  In fact, attempts to reconfigure
+   the binary distribution may not work.  If MetaFont fails for some
+   reason, then you may need to reinstall the bases and formats.
+   The easiest way to do this is just build from source!
+
+1) By default, TeX is installed under /usr/local/ and fonts are 
+   generated for a laser printer (HP-style) at 300 dpi.  If you don't
+   have X, don't try to build xdvi.  Edit TeX0.15/Makefile for your 
+   site, then:
+	$ make
+	$ make 	# make stops after updating Makefile.inc, the first time
+	$ make install
+2) After TeX has been installed, you may want to copy the files in ./usr
+   to the HOME directory of each TeX user:
+   	$ cp ./usr/.Xdefauts* $HOME/.Xdefaults-`hostname`
+   	$ cp ./usr/texsetup.* $HOME/
+   	$ ( 
+   	cd $HOME
+   	cat >> .cshrc <<EOF
+   	source texsetup.csh
+   	EOF
+   	cat >> .bashrc <<EOF
+   	. texsetup.sh
+   	EOF
+   	)
+   And create a private TeX library in each TeX user's HOME directory:
+   	$ cp -R ./usr/TeX $HOME/
+
+[Note: This is no longer necessary, as a per-user TeX directory can be
+setup as outlined above, but it no required to run TeX. -Nate]
+
+3) When running tex or latex or texi2dvi, TeX sometimes complains
+   about missing metric files (.tfm).  If the corresponding MetaFont
+   (.mf) files exist (in lib/TeX/mf/inputs), the metric can be
+   built with the `mftopk' command.  First select a device from 
+   the list displayed by:
+	$ mftopk -d help
+   Then to build the missing metric with:
+	$ mftopk -d device-name font-name ...  
+   For example, if TeX stops with the error:
+
+! Font \textbf=cmb10 scaled 1095 not loadable: Metric (TFM) file not found.
+\mainmagstep ->1095
+
+   you must quit TeX and build the cmb10.tfm metric:
+	$ mftopk -d hplaser cmb10
+
+   [ Multiple device support: while font metrics are device 
+   independent, the font (.pk) files themselves in general are not.
+   Therefore separate logins may be necessary for each type of
+   printing device supported.  In this case, when using dvips(1),
+   be sure to specify a METAFONT mode via its -G option (see dvips(1)
+   and mftopk(1)).
+
+   Mathematically, if res1= res2*(1.2)^n, for some integer n >= 0,
+   where res is the device resolution, then the font files should
+   be kept separate.  E.g., 300 dpi and 360 dpi devices should use
+   separate logins. ]
+
+[Multiple devices are not supported in the current TeX package -
+this should be fixed shortly, hopefully.]
+
+4) If the default resolution of your printing device  (DEFRES in
+   the top-level Makefile) is not 300 dpi, then xdvi must be
+   invoked with the `-p dpi' option to work correctly.  Or, better
+   yet, just use Gunther's dvidr driver.  See the dvidr man page
+   for more details.  
+
+5) Finally, it is recommended that you get a copy of GNU's texinfo
+   (and, in particular, texi2dvi for converting GNUS's .texi
+   documenation files into TeX's .dvi format), and GNU's ghostscript
+   PostScript interpreter for converting PostScript data to
+   device-specific format (e.g., for printing on a dot-matrix
+   printer, or viewing under X).  If there is a dvixxx driver for
+   your printer, then you can print .dvi files directly.  Otherwise,
+   convert .dvi files to PostScript format using dvips(1), and
+   print using ghostscript.  Hint: look in the TeX01.5/dvips-*/contrib
+   directory for some interesting applications (like psfig, for
+   incorporating PostScript figures in a LaTeX document.)

@@ -24,15 +24,14 @@
 #
 # We should care on individual environment settings here...
 TEXDIR=$(LIBROOT_386BSD)
-LOCALDIR=$(LIBROOT_USER_386BSD)
-DESTTFMDIR=$(TFM_USER_386BSD)
+DESTTFMDIR=$(TFM_386BSD)
 STDPKDIR=$(PK_386BSD)
 #where to find askmf.mf
 PSDIR=$(PSLIB_386BSD)
 #where to find askmf.awk
 MFDIR=$(MFINPUTS_386BSD)
 # this should be no (!) path but point to only one place
-DESTPKDIR=$(PK_USER_386BSD)
+DESTPKDIR=$(PK_386BSD)
 #
 MODE=$(DEFDEV_386BSD)
 MAG="undef"
@@ -60,7 +59,9 @@ do
 echo "mode=help ;
 mode_setup ;
 end
-" |mf $MFDIR/askmf.mf |awk -f $PSDIR/askmf.awk |sed -e "s:_$::g" |column |more
+" |mf $MFDIR/askmf.mf |
+sed -e '1,/ASKMF_OUTPUT/d' -e '/help_ASKMF_OUTPUT/,$d'  -e "s:_$::g" |
+pr -2 -t -l1 |more
 rm askmf.log
 # puh ... done
 	     echo "see $(MFINPUTS_386BSD)/modes.mf for further description."
@@ -84,7 +85,7 @@ then
 else
   NAMES=$@
 fi
-if [ $MAG = undef ]
+if [ "$MAG" = "undef" ]
 then
   MAG=1
 fi
@@ -116,21 +117,22 @@ for NAME in $NAMES
 do
 #
 # construct filenames
-GFNAME=$NAME.$DPI'gf'
-PKNAME=$NAME.$DPI'pk'
-TFMNAME=$NAME.tfm
+GFNAME=`basename $NAME .mf`.${DPI}gf
+PKNAME=`basename $NAME .mf`.${DPI}pk
+TFMNAME=`basename $NAME .mf`.tfm
+
 #
 # check for already made font
-if [ -z $FORCE ]
+if [ -z "$FORCE" ]
 then
-  if [ -r $DESTPKDIR/$PKNAME ]
+  if [ -r "$DESTPKDIR/$PKNAME" ]
   then
     echo "$DESTPKDIR/$PKNAME already exists!"
     continue
   fi
 #
 # check also in the standard place(s)
-  if [ -r $STDPKDIR/$PKNAME ]
+  if [ -r "$STDPKDIR/$PKNAME" ]
   then
     echo $STDPKDIR/$PKNAME already exists!
     continue
@@ -142,7 +144,7 @@ echo "mf \mode:=$MODE; mag:=$MAG; scrollmode; input $NAME </dev/null"
 mf "\mode:=$MODE; mag:=$MAG; scrollmode; input $NAME" </dev/null
 #
 # a font file should have been created, otherwise...
-if test ! -r $GFNAME
+if [ ! -r "$GFNAME" ]
 then
    echo "Metafont failed for some reason on $GFNAME"
    exit 3
