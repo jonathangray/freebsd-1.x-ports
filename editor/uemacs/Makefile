@@ -37,8 +37,14 @@ OFILES =	$(F1) $(F2) $(F3) $(F4) $(F5) $(F6) $(F7) $(F8)
 uemacs:	$(OFILES)
 		$(CC) $(CFLAGS) $(OFILES) -ltermcap -lc -o uemacs
 
+install: uemacs
+	install -c -s -o bin -g bin -m 555 uemacs /usr/local/bin
+	@echo Place the cmd/*.cmd files somewhere in your path, where
+	@echo they can be read by uemacs, and copy cmd/emacs.rc to
+	@echo ~/.emacsrc in all users home directories who wish to
+	@echo use MicroEmacs.
 clean:
-	rm uemacs $(OFILES)
+	rm -f uemacs $(OFILES)
 
 $(OBJD)/basic.o: $(SRCD)/basic.c $(HFILES)
 	$(CC) $(CFLAGS) -c -o $(OBJD)/basic.o $(SRCD)/basic.c
