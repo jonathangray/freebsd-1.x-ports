@@ -62,7 +62,7 @@ LDOPTS=-L$(STD)
 XOBJS=
 
 # use -O if you trust it :-)
-DBG=-g -O
+DBG=
 CFLAGS = $(DBG) $(CONFIG) $(XINCL) $(XOPTS)
 
 LDFLAGS = $(DBG) $(LDOPTS)

@@ -3,7 +3,7 @@
 
 SHELL = /bin/sh
 MAKE  = make
-CC=gcc -pipe -g -O
+CC=gcc -O
 LN=ln -s
 #LN=ln
 #CONFIG= -D_SYSV
