@@ -1,0 +1,85 @@
+# $Header: /a/cvs/386BSD/ports/comm/flexfax/etc/config.usr-sportster,v 1.1 1993/08/31 23:41:30 ljo Exp $
+#
+# Configuration for using the Class 1 command interface with
+# a USR Sportster modem.  Beware that there are apparently two
+# different architectures for the modem.  Also, use of old
+# firmware can result in timing problems.  The following firmware
+# is known to work:
+#
+#		Rev	Date
+# Supervisor	4.1	04/22/93
+# DSP		10	03/23/93
+#
+# If you do not have up-to-date firmware and are experiencing
+# problems, contact USR to get an upgrade (apparently for free).
+#
+# XON/XOFF flow control is used.
+#
+# CONFIG: CLASS1: 1444: Manufacturer=USRobotics Model=Sportster
+#
+CountryCode:		1		# USA
+LongDistancePrefix:	1
+InternationalPrefix:	011
+AreaCode:		415
+DialStringRules:	etc/dialrules
+FAXNumber:		+1.415.965.7824
+ServerTracing:		1		# log server-related operations
+SessionTracing:		11		# log session-related operations
+RecvFileMode:		0600		# recvd facsimile are not public
+#QualifyTSI:		etc/tsi		# accept facsimile from anyone
+SpeakerVolume:		quiet		# audible confirmation
+RingsBeforeAnswer:	1		# answer on first ring
+#
+# Modem-related stuff: should reflect modem command interface
+# and hardware connection/cabling (e.g. flow control).
+#
+ModemType:		Class1		# use this to supply a hint
+ModemMaxRate:		38400		# max rate for DCE-DTE communication
+ModemXONXOFF:		yes		# SunOS does CTS but not RTS
+# NB:  Modem sets &H3&I2 on +FCLASS=1
+ModemSetupDTRCmd:	&D2		# setup so DTR drop resets modem
+ModemSetupDCDCmd:	&C1		# setup so DCD reflects carrier (or not)
+# NB:  Idle in class 0 to avoid jinxing dial out programs.
+# (See also ModemDialCmd and ModemAnswerCmd.)
+ModemSetupAACmd:	+FCLASS=0&H1&I0
+GettyArgs:		"du.38400 -"
+#
+# We normally append the "@" symbol to the dial string so that
+# the modem will wait 5 seconds before attempting to connect
+# and return result codes that distinguish between no carrier
+# and no answer.  This makes it possible to avoid problems with
+# repeatedly dialing a number that doesn't have a fax machine
+# (kudos to Stuart Lynne for this trick.)
+# [I found that I had trouble with machines that answered
+# in less than five seconds.  BK]
+#
+# NB: If you need to prefix phone numbers to get through a PBX,
+#     put it in the ModemDialCmd; e.g. "DT9%s@".
+#
+ModemDialCmd:		+FCLASS=1DT%s	# T for tone dialing
+ModemAnswerCmd:		+FCLASS=1A	# "generic" answer (counter 0 idle)
+#
+# HACK:  Make sure the phone is on on-hook before answering in data mode.
+# This allows a crude adaptive answer capability by taking advantage of
+# the fact that, in the US at least, the phone company won't drop the
+# caller for ten seconds.
+ModemAnswerDataCmd:	H+FCLASS=0A	# data answer
+ModemAnswerFaxCmd:	+FCLASS=1A	# fax answer
+ModemNoAutoAnswerCmd:	S0=0		# disable auto-answer
+#
+# Set modem speaker volume commands: OFF QUIET LOW MEDIUM HIGH.
+# Note that we both turn the speaker on/off and set volume.
+#
+ModemSetVolumeCmd:	"M0 M1 M1 M1 M1"
+ModemMfrQueryCmd:	!USR		# US Robotics
+ModemModelQueryCmd:	I3
+ModemRevQueryCmd:	I7
+#
+ModemRecvFillOrder:	LSB2MSB		# bit order of received facsimile
+ModemSendFillOrder:	LSB2MSB		# bit order modem expects for transmit
+#
+# A shorter than normal T1 timer is required for incoming calls
+# to avoid timing out most data callers if using dual mode.
+FaxT1IDTimer:		10000		# shorter T1 for incoming ID
+#DualModeAnswer:	yes		# answer data if fax answer fails
+AlternateAnswer:	yes		# alternate fax/data answer on error

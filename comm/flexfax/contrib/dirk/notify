@@ -1,0 +1,160 @@
+#!/usr/bin/perl
+# Copyright (C) Dirk Husemann, Computer Science Department IV, 
+# 		 University of Erlangen-Nuremberg, Germany, 1993
+# All rights reserved.
+# 
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+# 3. All advertising materials mentioning features or use of this software
+#    must display the following acknowledgement:
+#      This product includes software developed by the Dirk Husemann,
+#      University of Erlangen-N|rnberg, Germany.
+# 4. The name of the University may not be used to endorse or promote
+#    products derived from this software without specific prior written
+#    permission. 
+# 
+# THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY ``AS IS'' AND ANY EXPRESS OR
+# IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
+# EVENT SHALL THE UNIVERSITY BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+# OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+# ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+
+# debugging output
+#open(STDOUT, ">>/tmp/faxmailer.out");
+
+$faxmaster = "FaxMaster";
+$sendmail = "/usr/sbin/sendmail";
+$faxinfo = "/usr/spool/fax/bin/faxinfo";
+$fax2ps = "/usr/contrib/fax/bin/fax2ps";
+$mimencode = "/usr/contrib/metamail/bin/mimencode";
+$faxhome = "/usr/contrib/fax/bin";
+$hostname = `hostname`; chop $hostname;
+$myname = "i4fax-daemon";
+
+# get path right
+$execpath = $ENV{'PATH'};
+$execpath = $faxhome . ":" . $execpath;
+$ENV{'PATH'} = $execpath;
+
+sub normmonth {
+    local($_) = @_;
+
+    study;
+    s/oct|10/Oct/i;
+    s/nov|11/Nov/i;
+    s/dec|12/Dec/i;
+    s/jan|0?1/Jan/i;
+    s/feb|0?2/Feb/i;
+    s/mar|0?3/Mar/i;
+    s/apr|0?4/Apr/i;
+    s/may|0?5/May/i;
+    s/jun|0?6/Jun/i;
+    s/jul|0?7/Jul/i;
+    s/aug|0?8/Aug/i;
+    s/sep|0?9/Sep/i;
+    $_;
+}
+
+$received_fax = $ARGV[0];
+if (! defined($received_fax)) {
+   exit -1;
+}
+
+open(FAXINFO, "$faxinfo $received_fax|") || 
+              die "$faxinfo didn't work out...\n";
+@faxinfo = <FAXINFO>;
+close(FAXINFO);
+
+(($sender) = grep(/\s*Sender:/, @faxinfo)) && (chop $sender) 
+           && ($sender =~ /:\s*([+\d\s]+)$/) && ($sender = $1) && 
+           ($sender =~ s/\s/\./g);
+(($pages) = grep(/\s*Pages:/, @faxinfo)) && (chop $pages) 
+           && ($pages =~ /:\s*(\d+)$/) && ($pages = $1);
+(($quality) = grep(/\s*Quality:/, @faxinfo)) && (chop $quality) 
+           && ($quality =~ /:\s*(\w+)$/) && ($quality = $1);
+(($pagesize) = grep(/\s*Page:/, @faxinfo)) && (chop $pagesize) 
+           && ($pagesize =~ /:\s*([\w\d]+)$/) && ($pagesize = $1);
+(($timestamp) = grep(/\s*Received:/, @faxinfo)) && (chop $timestamp) 
+           && ($timestamp =~ /:\s*([:\d\s]+)$/) && ($timestamp = $1);
+
+($timestamp =~ /(\d+)\:(\d+)\:(\d+)\s+(\d+\:\d+:\d+)/)
+           && ($year = $1, $month = $2, $day = $3, $time = $4);
+
+$month = &normmonth($month);
+
+if ($pages > 1) {
+   $page_noun = "pages";
+} else {
+  $page_noun = "page";
+}
+
+$MIME_boundary = "MIME-FlexFax";
+open(NOTIFYMAIL, "|$sendmail -oib -f$myname -t") || 
+    die "Couldn't pipe to $sendmail ...\n";
+#open(NOTIFYMAIL, ">/tmp/faxnotify.$$") || 
+#    die "Couldn't open mail file ...\n";
+
+print NOTIFYMAIL <<END_OF_MAILHEAD;
+To: $faxmaster
+From: $sender@i4fax
+Subject: FAX from >$sender< ($pages $page_noun)
+MIME-Version: 1.0
+Content-Description: A MIME message composed by the I4FAX-Daemon.
+END_OF_MAILHEAD
+
+printf NOTIFYMAIL "Content-type: multipart/mixed;\n";
+printf NOTIFYMAIL "   boundary=$MIME_boundary\n";
+printf NOTIFYMAIL "\n";
+
+print NOTIFYMAIL <<END_OF_MIME_BLURB;
+> This is  a multimedia message in MIME  format.  If you are reading this
+> prefix, your mail reader does  not understand MIME.  You may wish
+> to look into upgrading to a newer version of  your mail reader.
+
+--$MIME_boundary
+Content-Type: text/plain; charset=ISO-8859-1
+Content-Transfer-Encoding: quoted-printable
+
+The following facsimile consisting of $pages $page_noun was received
+from >$sender< at $time on $month $day, $year.
+
+    Quality:            $quality
+    Pagesize:           $pagesize
+
+The facsimile has been enclosed as a PostScript image.
+
+    Sincerely,
+    i4fax-daemon
+
+--$MIME_boundary
+Content-Type: application/postscript
+Content-Transfer-Encoding: base64
+
+END_OF_MIME_BLURB
+
+close(STDERR);
+open(MIMENCODE, "$fax2ps -s $received_fax | $mimencode -b |");
+while ($mimeline = <MIMENCODE>) {
+      print NOTIFYMAIL $mimeline;
+}
+close(MIMENCODE);
+
+printf NOTIFYMAIL "\n--$MIME_boundary\n";
+close(NOTIFYMAIL);
+
+# dump tiff image file
+unlink($received_fax);
+
+exit;
+

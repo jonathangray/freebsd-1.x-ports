@@ -1,0 +1,54 @@
+$Header: /a/cvs/386BSD/ports/comm/flexfax/faxmail/README,v 1.1 1993/08/31 23:43:03 ljo Exp $
+
+It's easy to setup an email to fax gateway with these simple steps:
+
+Step 1.  Setup the FlexFAX software as usual.
+
+Step 2.  Edit your sendmail configuration.  Include the following
+mailer definition (or similar):
+
+Mfax,	P=/usr/local/lib/fax/mailfax, F=DFMhu, M=100000,
+	A=mailfax $u $h $f
+
+and add the following address rewriting rule to rule set 0:
+
+# forward FAX messages to FlexFAX software
+R$+<@$+.FAX>		$#fax $@ $2 $: $1		user@host.FAX
+
+Step 3.  Create a mailfax shell script that formats the mail and
+submits the result for transmission.  A simple one is:
+
+#! /bin/sh
+/usr/local/bin/faxmail | /usr/local/bin/sendfax -n -d "$1@$2" -f "$3"
+
+Note that the mailfax script must be invoked as either root, daemon, or
+uucp if the from address is to be changed with the -f option to sendfax.
+This is typically the case when sendmail invokes a mailer program and
+the from address identity is different that of the real uid.
+
+Step 4.  Restart sendmail, refreeze your configuration, or whatever is
+necessary to cause the configuration changes to be seen by the system.
+
+
+Voila!  Now mail to user@dest.fax will get formatted and submitted as a
+facsimile job to "user" at the specified "dest".  By writing a more
+involved mailfax script you can add things like different resolutions
+by parsing the "user" string.  For example, an X.400-style scheme might
+use:
+
+    user/R=low/N=done@host.fax
+
+where "R=low" specifies a low res facsimile and "N=done" requests
+notification when the job is done.  If you want symbolic destinations,
+then you can provide a host to phone number mapping facility.
+
+
+NOTE: The normal access control mechansims on submitting a facsimile
+for transmission are enforced--you may need to use them if you create
+an email to fax gateway on your machine!
+
+
+Dirk Husemann's more elaborate scheme is also included in the directory
+../contrib/dirk.
+
+	Sam

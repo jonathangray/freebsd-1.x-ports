@@ -1,0 +1,288 @@
+#!/usr/bin/perl
+# Copyright (C) Dirk Husemann, Computer Science Department IV, 
+# 		 University of Erlangen-Nuremberg, Germany, 1993
+# All rights reserved.
+# 
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+# 3. All advertising materials mentioning features or use of this software
+#    must display the following acknowledgement:
+#      This product includes software developed by the Dirk Husemann,
+#      University of Erlangen-N|rnberg, Germany.
+# 4. The name of the University may not be used to endorse or promote
+#    products derived from this software without specific prior written
+#    permission. 
+# 
+# THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY ``AS IS'' AND ANY EXPRESS OR
+# IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
+# EVENT SHALL THE UNIVERSITY BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+# OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+# ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+
+# debugging output
+#open(STDOUT, ">>/tmp/faxmailer.out");
+#exec "cat";
+
+$sendmail = "/usr/sbin/sendmail";
+$sendfax = "/usr/contrib/fax/bin/sendfax";
+$faxstat = "/usr/contrib/fax/bin/faxstat";
+$sendfaxtmp = "/tmp/.faxmailer.$$";
+$faxhome = "/usr/contrib/fax/bin";
+$hostname = `hostname`; chop $hostname;
+
+# get path right
+$execpath = $ENV{'PATH'};
+$execpath = $faxhome . ":" . $execpath;
+$ENV{'PATH'} = $execpath;
+
+sub faxargslice {
+    local ($pattern) = @_;
+    local ($returnme);
+
+    if (@fax_address_parts) {
+       (shift(@fax_address_parts) =~ /($pattern)/) && ($returnme = $1);
+    } else {
+       $returnme = "";
+   }
+
+   $returnme;
+}
+
+sub faxhdrslice {
+    local ($pattern, $prune) = @_;
+
+    @g = grep(/^$pattern:\s*/i, @mail_header);
+    $component = pop(@g);
+    ($prune == 0) && (return $component);
+    $component =~ s/^$pattern:\s*//i;
+    return $component;
+}
+
+sub faxproblemreport {
+    local ($originator, $subject, $to, $errmsg, $offender, $explain) = @_;
+
+    $originator =~ s/From:\s*//i;
+
+    (! $to) && ($to = "--- NO RECIPIENT NAMED ---");
+
+    open(SENDMAIL, "|$sendmail -oi -f$myname -t") || 
+                   die "$sendmail does not like us ...\n";
+    print SENDMAIL <<PROBLEM_REPORT_END;
+To: $originator
+Subject: FAX Problem Report --- $errmsg
+
+While trying to process your facsimile to
+             "$to"
+I stumbled over $errmsg:
+             $offender
+$explain
+
+Good luck the next time ...
+
+So long --- and thanks for all the fish,
+   Yours truly,
+   $myname
+
+   ----- Unsent message follows -----
+PROBLEM_REPORT_END
+    printf SENDMAIL "$mail_header\n";
+    while (<STDIN>) {
+          s/\r\n/\n/;
+          print SENDMAIL $_;
+    }
+    close(SENDMAIL);
+
+    exit;
+}
+
+sub faxbuildcmdline {
+    local($option, $argument) = @_;
+
+    $returnme = "";
+    ($argument) && ($returnme = " " . $option . " \"" . $argument . "\"");
+
+    return $returnme;
+}
+
+# check for number of arguements, we need two
+#       fax-hostname fax-address
+#
+# with fax-address being something like
+#      fax-number.to-person.to-organization.to-location@fax-hostname
+#
+# if we don't 
+#    - get TWO args
+#    - get a real-fax-number (composed of [0-9\.\+\-\x])
+# we need to return a trouble report to the originator of the fax.
+
+#if ($#ARGV <= 3) {
+#   goto trouble;
+#}
+
+$fax_address = $ARGV[$#ARGV];
+$myname = $ARGV[$#ARGV-1] . "-daemon";
+
+if ($fax_address eq $myname) {
+   exec("$sendmail -oi -f$myname FaxMaster");
+}
+
+@fax_address_parts = split(/\./,$fax_address);
+$fax_number = shift(@fax_address_parts);
+$fax_to = shift(@fax_address_parts);
+$fax_company = shift(@fax_address_parts);
+$fax_location = shift(@fax_address_parts);
+$fax_transmit_time = shift(@fax_address_parts);
+$fax_cover = shift(@fax_address_parts);
+$fax_modem = shift(@fax_address_parts);
+
+# get mail (header & content) and
+#    - check for X-xxxx components:     Regex to match it       alternatively?
+#            X-fax-number               [0-9\.\+\-x]
+#            X-fax-to                   .*$
+#            X-fax-company              .*$
+#            X-fax-location             .*$
+#            X-fax-comments             .*$                     drop it?
+#            X-fax-transmit-time        \d{1,2}[.:-]{1}\d{2}
+#            X-fax-return-number        [0-9\.\+\-x]
+#            X-fax-cover                boolean
+#      which will override the settings gleaned from the fax-number argument.
+#    - extract the ``From: ...'' line for permission checking.
+#    - extract the ``Subject: ...'' line
+
+$/ = "\r\n\r\n";
+$mail_header = <STDIN>;
+$/ = "\n";
+
+@mail_header = split(/\r\n/,$mail_header);
+$X_fax_number = &faxhdrslice("X-Fax-Number", 1);
+$X_fax_to = &faxhdrslice("X-Fax-To", 1);
+$X_fax_company = &faxhdrslice("X-Fax-Company", 1);
+$X_fax_location = &faxhdrslice("X-Fax-Location", 1);
+$X_fax_comments = &faxhdrslice("X-Fax-Comments", 1);
+$X_fax_transmit_time = &faxhdrslice("X-Fax-Transmit-Time", 1);
+$X_fax_return_number = &faxhdrslice("X-Fax-Return-Number", 1);
+$X_fax_cover = &faxhdrslice("X-Fax-Cover", 1);
+$X_fax_report = &faxhdrslice("X-Fax-Report", 0);
+$X_fax_modem = &faxhdrslice("X-Fax-Modem", 1);
+$X_fax_originator = &faxhdrslice("X-Fax-Originator", 1);
+
+# If $X_fax_originator is "FrameMaker" we per default don't want to have a
+# cover page.
+($X_fax_originator =~ /FrameMaker/i)  && 
+                   (($fax_cover) || ($fax_cover = "none"));
+($fax_cover) || ($fax_cover = "yes");
+
+$from = &faxhdrslice("From", 0);
+$fax_from = &faxhdrslice("From", 1);
+$subject = &faxhdrslice("Subject", 1);
+
+($X_fax_number) && ($fax_number = $X_fax_number);
+($X_fax_to) && ($fax_to = $X_fax_to);
+($X_fax_company) && ($fax_company = $X_fax_company);
+($X_fax_location) && ($fax_location = $X_fax_location);
+($X_fax_cover) && ($fax_cover = $X_fax_cover);
+($X_fax_comments) && ($fax_comments = $X_fax_comments);
+($X_fax_transmit_time) && ($fax_transmit_time = $X_fax_transmit_time);
+($X_fax_return_number) && ($fax_return_number = $X_fax_return_number);
+($X_fax_report) && ($fax_report = $X_fax_report);
+($X_fax_modem) && ($fax_modem = $X_fax_modem);
+
+# small consistency check for valid fax number: at least one digit, okay?
+($fax_number !~ /\d+/) &&
+    (&faxproblemreport($from, $subject, $fax_to, 
+                       "an invalid FAX number", $fax_number,
+                       "A valid FAX number needs to contain at least one digit."));
+
+$fax_destination = $fax_to . "@" . $fax_number;
+
+# avoid ':' in $fax_transmit_time, it confuses faxstat ...
+
+$fax_transmit_time =~ s/://g;
+$fax_transmit_time =~ s/\.//g;
+
+# open pipe to sendfax and call it with
+#      sendfax -a $fax_transmit_time -c $fax_comments -r $fax_subject_line \
+#      -x $fax_company -y $fax_location -d "$fax_to@$fax-number" \
+#      -f $fax_from -DR
+
+$fax_hostname = $hostname;
+($fax_modem) && ($fax_hostname .= ":$fax_modem");
+
+$cmdline = $sendfax;
+$cmdline .= &faxbuildcmdline("-a", $fax_transmit_time);
+$cmdline .= &faxbuildcmdline("-c", $fax_comments);
+$cmdline .= &faxbuildcmdline("-r", $subject);
+$cmdline .= &faxbuildcmdline("-x", $fax_company);
+$cmdline .= &faxbuildcmdline("-y", $fax_location);
+$cmdline .= &faxbuildcmdline("-d", $fax_destination);
+$cmdline .= &faxbuildcmdline("-f", $fax_from);
+$cmdline .= &faxbuildcmdline("-h", $fax_hostname);
+($fax_cover =~ /no/i) && ($cmdline .= " -n");
+$cmdline .= " -DR >& $sendfaxtmp";
+
+open(SENDFAX, "|$cmdline") || die "$cmdline wasn't that hot an idea ...\n";
+while (<STDIN>) {
+      s/\r\n/\n/;
+      print SENDFAX $_;
+}
+close(SENDFAX);
+
+# now collect sendfax results
+open(SENDFAX, "<$sendfaxtmp") || die "Somebody stole $sendfaxtmp ...\n";
+@sendfaxresult = <SENDFAX>;
+close(SENDFAX);
+unlink($sendfaxtmp);
+
+$got_job_id = 0;
+while (@sendfaxresult) {
+      $result = shift(@sendfaxresult);
+      ($result =~ /^request\s*id\s*is\s*(\d+)\s*for\s*host\s*(\w+).*$/) 
+           && ($jobid = $1, $host = $2, $got_job_id = 1) && next;
+      ($got_job_id) || (push(@sendfaxerrors, $result));
+}
+
+# if fax-transmit-time given do a faxstat and collect its output and send it
+# back to the originator.
+
+if ($fax_transmit_time || $fax_report) {
+   open(FAXSTAT, "$faxstat -a -h $hostname|") || 
+        die "$faxstat --- not in this universe it seems ...\n";
+   @faxstatresult = <FAXSTAT>;
+   close(FAXSTAT);
+   
+   ($fax_transmit_time) || ($lateron ="as soon as possible");
+   ($fax_transmit_time) && ($lateron ="at a later point in time");
+
+   open(SENDMAIL, "|$sendmail -oi -f$myname -t!") || 
+        die "$sendmail avoids me ...\n";
+   print SENDMAIL <<PROGRESS_REPORT_END;
+To: $fax_from
+Subject: FAX Progress Report
+
+Your facsimile to $fax_number has been queued for transmission
+$lateron (Job Queue Id #$jobid).
+
+The current FAX queue status is:
+
+@faxstatresult
+
+All the best,
+    Truly yours,
+    $myname
+PROGRESS_REPORT_END
+   close(SENDMAIL);
+}
+
+# BYE-BYE
+exit;

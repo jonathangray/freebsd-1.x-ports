@@ -1,0 +1,86 @@
+(Message flexfax:258)
+ -- using template mhl.format --
+Date:    Thu, 13 May 93 09:13:50 N
+
+To:      Richard.G.Rowe@cdc.com
+cc:      flexfax@sgi.sgi.com
+
+From:    Dirk Husemann <Dirk.Husemann@informatik.uni-erlangen.de>
+Subject: RE: EMail to FAX Gateway
+
+Return-Path: flexfax-request@whizzer.wpd.sgi.com 
+In-Reply-To: <9305122057.AA27859@sgi.sgi.com>
+References: <9305122057.AA27859@sgi.sgi.com>
+Sender:  flexfax-request@sgi.com
+
+>>>>> "Richard" == Richard Rowe <Richard.G.Rowe@cdc.com> writes:
+
+Richard> Subject: EMail to FAX Gateway 5/12/93 3:12 PM
+
+Richard> Hi, I have installed, and have FlexFAX working at our site and would
+Richard> like my EMail users to be able to use it for sending and recieving
+Richard> faxes.
+
+...
+
+Richard> What I'm trying to figure out, is what I need to do on the other
+Richard> systems so that a user that wants to send a fax can do so from where
+Richard> they normally access their mail.  If anyone has any experience
+Richard> implementing a Fax Gateway like this, I'd appreciate hearing from
+Richard> them. Thanks.
+
+Our environment is very similar to yours. I thought about installing the
+flexfax software as a package on one of our file servers, that way users could
+be using all the flexfax tools (sendfax, faxrm, faxstat, faxalter, ...), yet
+the unavailability of gcc 2.3.3 on our Sun Sparc machines (and the red tape to
+go thru to get that installed) caused me to re-think. Now we have the
+following setup:
+
+        - The faxd (in fact serveral of them, with one on a dedicated line) is
+          running on i486 machine under BSDi's BSD/386. That machine is known
+          as the i4fax server.
+
+        - Users on BSD/386 machines can (if they want to) use the flexfax
+          tools for submitting facsimiles.
+
+        - All other users can send mail to fax-number@i4fax, where fax-number
+          is something like
+                fax-phone-number[.fax-to[.fax-company[.fax-location]]]@i4fax
+
+          like
+                +49-9131-85-8732.Husemann.Uni-Erlangen.Germany@i4fax
+          or alternatively use X-fax headers (which give more flexibility) 
+                X-Fax-To: Dirk  Husemann
+                X-Fax-Company: University of Erlangen Nuremberg
+                X-Fax-Location: Erlangen, Germany
+                X-Fax-Transmit-Time: 22:00
+
+        - on the i4fax server all the mail arriving for i4fax is fed into a
+          perl script (faxmailer) that will look at the mail, extract all the
+          relevant fields and also the senders name and address and pipe all
+          into sendfax.
+
+        - Optionally the users can specify ``X-Fax-Report: do'' and get back
+          the status of the queue as soon as the job has been queued.
+
+        - Upon receipt of a facsimile a modified notify script (also in perl)
+          takes the TIFF file, converts it to PostScript (for the time being
+          at least) and sends the PostScript file as a MIME mail along with
+          the information about who called, how many pages, etc. to the
+          FaxMaster. The FaxMaster gets the MIME mail, views it with
+          Ghostview, decides whom to forward the MIME mail and does
+          accordingly (still as MIME mail).
+
+          Currently we're using PostScript for one reason --- the ghostview
+          user agent is quite comfortable: the user can page thru a recieved
+          facsimile backwards and forwards, she can print it with a key press,
+          mark specific pages for saving or printing, etc. If we were to do
+          OCR on the facsimile we'd probably be better of using the TIFF file
+          instead (and sent it instead/additionally in the MIME mail).
+
+If anyone is interested I'll mail the two perl scripts (faxmailer and the
+modified notify).
+
+        Dirk
+
+[Sam: Dirk's notify and faxmailer scripts are included in this directory.]
