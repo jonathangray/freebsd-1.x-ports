@@ -143,10 +143,10 @@ v2_Note
 C_COMPILE = $(CC) $(CFLAGS) $(DEFS) $(HDRDIRS)
 C_COMPILE2 = $(CC) $(CFLAGS) $(DEFS) -DMK='"$(MK)"' $(HDRDIRS)
 
+all: $(NAME) done
+
 package: install
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST -r pkg/+REQ ncftp_bin
-
-all: $(NAME) done
 
 $(NAME): $(OBJS)
 	$(CC) $(LFLAGS) $(LIBDIRS) $(OBJS)  -o $(NAME) $(LIBS)
