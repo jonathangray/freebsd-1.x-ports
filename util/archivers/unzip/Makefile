@@ -15,7 +15,7 @@ CLEANFILES=funzip.o zipinfo.o envargs_.o match_.o misc_.o funzip zipinfo
 
 afterinstall:
 	install -c -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
-	   ${.CURDIR}/funzip ${DESTDIR}${BINDIR}
+	   ${.CURDIR}/funzip ${.CURDIR}/zipinfo ${DESTDIR}${BINDIR}
 
 all: funzip zipinfo
 
