@@ -1,0 +1,309 @@
+#!/depot/path/expectk -f
+# tkpasswd - Change passwords using Expectk
+# Author: Don Libes, NIST, October 1, 1993
+# Version: 1.4
+
+frame .type -relief raised -bd 1
+radiobutton .passwd -text passwd -variable passwd_cmd \
+		-value {passwd {cat /etc/passwd}} \
+		-anchor w -command get_users -relief flat
+radiobutton .yppasswd -text yppasswd -variable passwd_cmd \
+		-value {yppasswd {ypcat passwd}} \
+		-anchor w -command get_users -relief flat
+pack .passwd .yppasswd -in .type -fill x 
+pack .type -fill x
+
+frame .sort -relief raised -bd 1
+radiobutton .unsorted -text unsorted -variable sort_cmd -value " " \
+		-anchor w -relief flat -command get_users
+radiobutton .name -text name -variable sort_cmd -value "| sort" \
+		-anchor w -relief flat -command get_users
+radiobutton .uid -text uid -variable sort_cmd -value "| sort -t: -n +2" \
+		 -anchor w -relief flat -command get_users
+pack .unsorted .name .uid -in .sort -fill x
+pack .sort -fill x
+
+frame .users -relief raised -bd 1
+# has to be wide enough for 8+1+5=14
+text .names -yscrollcommand ".scroll set" -width 14 -height 1 \
+		-font "*-bold-o-normal-*-120-*-m-*" -setgrid 1
+.names tag configure nopassword -relief raised
+.names tag configure selection -relief raised
+if {[tk colormodel .]=="color"} {
+	.names tag configure nopassword -background red
+	.names tag configure selection -background green
+} else {
+	.names tag configure nopassword -background  black -foreground white
+	.names tag configure selection -background white -foreground black
+}
+scrollbar .scroll -command ".names yview" -relief raised
+pack .scroll -in .users -side left -fill y
+pack .names  -in .users -side left -fill y
+pack .users -expand 1 -fill y
+
+wm minsize . 14 1
+wm maxsize . 14 999
+wm geometry . 14x10
+
+frame .password_frame -relief raised -bd 1
+entry .password -textvar password -relief sunken -width 1
+focus .password
+bind .password <Return> password_set
+label .prompt -text "Password:" -bd 0
+pack .prompt .password -in .password_frame -fill x -padx 2 -pady 2
+pack .password_frame -fill x
+
+set dict_loaded 0
+checkbutton .dict -text "test dictionary" -variable dict_check \
+		-command {if !$dict_loaded load_dict} \
+		-anchor w
+pack .dict -fill x -padx 2 -pady 2
+
+
+button .quit -text quit -command exit
+button .help_button -text help -command help
+pack .quit .help_button -side left -expand 1 -fill x -padx 2 -pady 2
+
+proc help {} {
+	catch {destroy .help}
+	toplevel .help
+	message .help.text -text \
+"tkpasswd - written by Don Libes, NIST, 10/1/93.
+
+Click on passwd (local users) or yppasswd (NIS users).\
+Select user using mouse (or keys - see below).\
+Enter password (and old password if requested) and press return to set it.\
+You must be root to set local passwords besides your own.
+
+You do not have to move mouse into password field(s) to enter password.\
+^U clears password field.\
+^N and ^P select next/previous user.\
+M-n and M-p select next/previous user with no password.\
+(Users with no passwords are highlighted.)  
+
+If the dictionary is enabled and the password is in it,\
+the password is rejected.\
+On the other hand, passwd's minimum length restrictions are ignored.\
+These are just done to illustrate the possibilities.\
+In fact, the whole program is not intended to be incredibly useful -\
+it is just meant to be an example of how to layer a GUI\
+on top of interactive programs (passwd and yppasswd in this case)."
+
+	button .help.ok -text "ok" -command {destroy .help}
+	pack .help.text
+	pack .help.ok -fill x -padx 2 -pady 2
+}
+
+# get list of local users
+proc get_users {} {
+	global sort_cmd passwd_cmd
+	global nopasswords	;# line numbers of entries with no passwords
+	global last_line	;# last line of text box
+	global selection_line
+
+	.names delete 1.0 end
+
+	set file [open "|[lindex $passwd_cmd 1] $sort_cmd"]
+	set last_line 1
+	set nopasswords {}
+	while {[gets $file buf] != -1} {
+		set buf [split $buf :]
+		if [llength $buf]>2 {
+			# normal password entry
+			.names insert end "[format "%-8s %5d" [lindex $buf 0] [lindex $buf 2]]\n"
+			if 0==[string compare [lindex $buf 1] ""] {
+				.names tag add nopassword \
+					{end - 1 line linestart} \
+					{end - 1 line lineend}
+				lappend nopasswords $last_line
+			}
+		} else {
+			# +name style entry
+			.names insert end "$buf\n"
+		}
+		incr last_line
+	}
+	incr last_line -1
+	close $file
+	set selection_line 0
+}
+
+proc feedback {msg} {
+	global password
+
+	set password $msg
+	.password select from 0
+	.password select to end
+	update
+}
+
+proc load_dict {} {
+	global dict dict_loaded
+
+	feedback "loading dictionary..."
+
+	if 0==[catch {open /usr/dict/words} file] {
+		rename set s
+		foreach w [split [read $file] "\n"] {s dict($w) ""}
+		close $file
+		rename s set
+		set dict_loaded 1
+		feedback "dictionary loaded"
+	} else {
+		feedback "dictionary missing"
+		.dict deselect
+	}
+}
+
+# put whatever security checks you like in here
+proc weak_password {password} {
+	global dict dict_check
+
+	if $dict_check {
+		feedback "checking password"
+
+		if [info exists dict($password)] {
+			feedback "sorry - in dictionary"
+			return 1
+		}
+	}
+	return 0
+}
+
+proc password_set {} {
+	global password passwd_cmd selection_line
+
+	set new_password $password
+
+	if {$selection_line==0} {
+		feedback "select a user first"
+		return
+	}
+	set user [lindex [.names get selection.first selection.last] 0]
+
+	if [weak_password $password] return
+
+	feedback "setting password . . ."
+
+	set cmd [lindex $passwd_cmd 0]
+	spawn -noecho $cmd $user
+	log_user 0
+	set last_msg "error in $cmd"
+	while 1 {
+		expect {
+			-nocase "old password:" {
+				exp_send "[get_old_password]\r"
+			} "assword:" {
+				exp_send "$new_password\r"
+			} -re "(.*)\r\n" {
+				set last_msg $expect_out(1,string)
+			} eof break
+		}
+	}
+	set status [wait]
+	if [lindex $status 3]==0 {
+		feedback "set successfully"
+	} else {
+		feedback $last_msg
+	}
+}
+
+proc get_old_password {} {
+	global old
+
+	toplevel .old
+	label .old.label -text "Old password:"
+	catch {unset old}
+	entry .old.entry -textvar old -relief sunken -width 1
+
+	pack .old.label
+	pack .old.entry -fill x -padx 2 -pady 2
+
+	bind .old <Return> {destroy .old}
+	bind .old.entry <Return> {destroy .old}
+	set oldfocus [focus]
+	focus .old.entry
+	tkwait visibility .old
+	grab .old
+	tkwait window .old
+	focus $oldfocus
+	return $old
+}
+
+.unsorted select
+.passwd invoke
+
+proc make_selection {} {
+	global selection_line last_line
+
+	.names tag remove selection 0.0 end
+
+	# don't let selection go off top of screen
+	if {$selection_line < 1} {
+		set selection_line $last_line
+	} elseif {$selection_line > $last_line} {
+		set selection_line 1
+	}
+	.names yview -pickplace [expr $selection_line-1]
+	.names tag add selection $selection_line.0 [expr 1+$selection_line].0
+}
+
+proc select_next_nopassword {direction} {
+	global selection_line last_line
+	global nopasswords
+	
+	if 0==[llength $nopasswords] {
+		feedback "no null passwords"
+		return
+	}
+
+	if $direction==1 {
+		# is there a better way to get last element of list?
+		if $selection_line>=[lindex $nopasswords [expr [llength $nopasswords]-1]] {
+			set selection_line 0
+		}
+		foreach i $nopasswords {
+			if $selection_line<$i break
+		}
+	} else {
+		if $selection_line<=[lindex $nopasswords 0] {
+			set selection_line $last_line
+		}
+		set j [expr [llength $nopasswords]-1]
+		for {} {$j>=0} {incr j -1} {
+			set i [lindex $nopasswords $j]
+			if $selection_line>$i break
+		}
+	}
+	set selection_line $i
+	make_selection
+}
+
+proc select {w coords} {
+	global selection_line
+
+	$w mark set insert "@$coords linestart"
+	$w mark set anchor insert
+	set first [$w index "anchor linestart"]
+	set last [$w index "insert lineend + 1c"]
+	scan $first %d selection_line
+
+	$w tag remove selection 0.0 end
+	$w tag add selection $first $last
+}
+
+bind Text <1> {select %W %x,%y}
+bind Text <Double-1> {select %W %x,%y}
+bind Text <Triple-1> {select %W %x,%y}
+bind Text <2> {select %W %x,%y}
+bind Text <3> {select %W %x,%y}
+bind Text <B1-Motion> {}
+bind Text <Shift-1> {}
+bind Text <Shift-B1-Motion> {}
+bind Text <B2-Motion> {}
+
+bind .password <Control-n>	{incr selection_line 1;	make_selection}
+bind .password <Control-p>	{incr selection_line -1;make_selection}
+bind .password <Meta-n>	{select_next_nopassword 1}
+bind .password <Meta-p>	{select_next_nopassword -1}
+bind Entry <Control-c>	{exit}

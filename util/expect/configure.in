@@ -1,0 +1,406 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(expect.h)
+AC_CONFIG_HEADER(expect_cf.h)
+AC_PROGRAM_CHECK(RANLIB, ranlib, ranlib, true)
+CC=${CC-cc}
+
+dnl AC_PROG_RANLIB
+
+AC_PID_T
+
+#
+# On a few systems, libm.a is the same as libc.a
+#
+AC_FUNC_CHECK(sin, , LIBS="-lm" ; test -n "$verbose" && echo "	Adding -lm to library list")
+#
+# Ok, lets find the tk source trees so we can use the headers
+# If the directory (presumably symlink) named "tk" exists, use that one
+# in preference to any others.  Same logic is used when choosing library
+# and again with Tcl.
+#
+no_tk=true
+echo "checking for Tk source directory"
+TKHDIR=""
+for i in `ls -d ${srcdir}/../tk* 2>/dev/null` ${srcdir}/../tk ; do
+  if test -f $i/tk.h ; then
+    TKHDIR="-I$i"
+  fi
+done
+# if we can't find it, see if one is installed
+if test x"$TKHDIR" = x ; then
+  AC_HEADER_CHECK(tk.h, installed=1, installed=0)
+  if test $installed -eq 0 ; then
+    TKHDIR="# no Tk directory found"
+    test -n "$verbose" && echo "	WARNING: Can't find Tk directory"
+  fi
+else
+  test -n "$verbose" && echo "	defining TKHDIR to be $i"
+  no_tk=
+fi
+
+#
+# Ok, lets find the tk library
+# First, look for one uninstalled.  
+#
+TKLIB=""
+echo "checking for Tk library"
+for i in `ls -d ../tk* 2>/dev/null` ../tk ; do
+  if test -f "$i/Makefile" ; then
+    TKLIB=$i/libtk.a
+  fi
+done    
+# If not found, look for installed version
+if test x"$TKLIB" = x ; then
+  AC_HAVE_LIBRARY(libtk.a, installed=1, installed=0)
+  if test $installed -eq 1 ; then
+    TKLIB="-ltk"
+  fi
+fi
+
+# If still not found, assume Tk simply hasn't been built yet
+if test x"$TKLIB" = x ; then
+  for i in `ls -d ../tk* 2>/dev/null` ../tk ; do
+    if test -f "$i/tk.h" ; then
+      TKLIB=$i/libtk.a
+  fi
+  done    
+fi
+
+if test x"$TKLIB" = x ; then
+    TKLIB="# no Tk library found"
+    echo "	WARNING: Can't find Tk library"
+    echo "      continuing, however you won't be able to build Tk-based programs"
+else
+    test -n "$verbose" && echo "	defining TKLIB to be $TKLIB"
+fi
+
+#
+# Ok, lets find the tcl source trees so we can use the headers
+#
+# Warning: transition of version 9 to 10 will break this algorithm
+# because 10 sorts before 9.
+#
+echo "checking for Tcl source directory"
+TCLHDIR=""
+for i in `ls -d ${srcdir}/../tcl* 2>/dev/null` ${srcdir}/../tcl ; do
+  if test -f $i/tclInt.h ; then
+    TCLHDIR="-I$i"
+  fi
+done
+# if we can't find it, see if one is installed
+if test x"$TCLHDIR" = x ; then
+  AC_HEADER_CHECK(tclInt.h, installed=1, installed=0)
+  if test $installed -eq 0 ; then
+    TCLHDIR="# no Tcl directory found"
+    echo "ERROR: Can't find Tcl directory"
+  fi
+else
+  test -n "$verbose" && echo "	defining TCLHDIR to be $i"
+fi
+
+#
+# Ok, lets find the tcl library
+# First, look for the latest uninstalled
+#
+TCLLIB=""
+echo "checking for Tcl library"
+for i in `ls -d ../tcl* 2>/dev/null` ../tcl ; do
+  if test -f "$i/Makefile" ; then
+    TCLLIB=$i/libtcl.a
+  fi
+done    
+# If not found, look for installed version
+if test x"$TCLLIB" = x ; then
+  AC_HAVE_LIBRARY(libtcl.a, installed=1, installed=0)
+  if test $installed -eq 1 ; then
+    TCLLIB="-ltcl"
+  fi
+fi
+# If still not found, assume Tcl simply hasn't been built yet
+if test x"$TCLLIB" = x ; then
+  for i in `ls -d ../tcl* 2>/dev/null` ../tcl ; do
+    if test -f "$i/tcl.h" ; then
+      TCLLIB=$i/libtcl.a
+  fi
+  done    
+fi
+
+if test x"$TCLLIB" = x ; then
+    TCLLIB="# no Tcl library found"
+    echo "	ERROR: Can't find Tcl library"
+else
+    test -n "$verbose" && echo "	defining TCLLIB to be $TCLLIB"
+fi
+
+
+
+#
+# Look for various header files
+#
+AC_HEADER_CHECK(sys/sysmacros.h, AC_DEFINE(HAVE_SYSMACROS_H))
+AC_HEADER_CHECK(stdlib.h, ,AC_DEFINE(NO_STDLIB_H))
+AC_HEADER_CHECK(unistd.h, AC_DEFINE(HAVE_UNISTD_H))
+AC_HEADER_CHECK(sys/wait.h, AC_DEFINE(HAVE_SYS_WAIT_H))
+AC_HEADER_CHECK(sys/stropts.h, AC_DEFINE(HAVE_STROPTS_H))
+AC_HEADER_CHECK(sys/sysconfig.h, AC_DEFINE(HAVE_SYSCONF_H))
+AC_HEADER_CHECK(sys/fcntl.h, AC_DEFINE(HAVE_SYS_FCNTL_H))
+
+#
+# Look for various functions
+#
+AC_FUNC_CHECK(memcpy, ,AC_DEFINE(NO_MEMCPY))
+AC_FUNC_CHECK(waitpid, ,AC_DEFINE(NOWAITPID))
+AC_FUNC_CHECK(wait4, AC_DEFINE(HAVE_WAIT4))
+AC_FUNC_CHECK(sysconf, AC_DEFINE(HAVE_SYSCONF))
+
+echo checking to see if wait expects union
+AC_COMPILE_CHECK([union wait], [#include <sys/types.h> 
+#include <sys/wait.h>], [
+union wait x;
+WIFEXITED(x);		/* Generates compiler error if WIFEXITED
+			 * uses an int. */
+], , AC_DEFINE(NO_UNION_WAIT))
+
+#
+# check how signals work
+#
+
+# Check for the data type of the mask used in select().
+# This picks up HP braindamage which defines fd_set and then 
+# proceeds to ignore it and use int.
+# Pattern matching on int could be loosened.
+# Can't use ac_header_egrep since that doesn't see prototypes with K&R cpp.
+echo checking mask type of select
+if egrep "select\(size_t, int" /usr/include/sys/time.h >/dev/null 2>&1; then
+  AC_DEFINE(SELECT_MASK_TYPE, int)
+fi
+
+# Check for the data type of the function used in signal(). This
+# must be before the test for rearming.
+echo checking return type of signal handlers
+AC_HEADER_EGREP([(void|sighandler_t).*signal], signal.h, retsigtype=void,AC_DEFINE(RETSIGTYPE, int) retsigtype=int)
+
+# FIXME: check to see if alarm exists
+# Check to see it signals need to be re-armed after use.
+echo checking to see if signals need to be re-armed
+AC_TEST_PROGRAM([
+#include <signal.h>
+#define RETSIGTYPE $retsigtype
+
+#ifndef SIGCHLD
+#  define SIGCHLD SIGCLD
+#endif
+
+int counter = 0;
+
+RETSIGTYPE
+sigchld_handler(n)
+int n;
+{
+	counter++;
+}
+
+main()
+{
+	signal(SIGCHLD, sigchld_handler);
+	kill(getpid(),SIGCHLD);
+	kill(getpid(),SIGCHLD);
+	exit((counter==2)?0:1);
+}], ,AC_DEFINE(REARM_SIG))
+
+# HPUX7 has trouble with the big cat so split it
+# Owen Rees <rtor@ansa.co.uk> 29Mar93 
+SEDDEFS="${SEDDEFS}CONFEOF
+cat >> conftest.sed <<CONFEOF
+"
+#
+echo checking to see if stty reads from stdin or stdout
+/bin/stty > /dev/null 2> /dev/null
+if test $? -ne 0 ; then
+    AC_DEFINE(STTY_READS_STDOUT)
+fi
+
+# Look for various features to determine what kind of pty
+# we have. For some weird reason, ac_compile_check would not
+# work, but ac_test_program does.
+#
+echo checking for HP style pty allocation
+# following test fails on DECstations and other things that don't grok -c
+# but that's ok, since they don't have PTYMs anyway
+if test -c /dev/ptym/ptyp0 2>>/dev/null ; then
+    AC_DEFINE(HAVE_PTYM)
+fi
+
+echo checking for HP style pty-trapping
+AC_HEADER_EGREP([struct.*request_info], sys/ptyio.h, AC_DEFINE(HAVE_PTYTRAP), )
+
+echo checking for AIX new-style pty allocation
+if test -r /dev/ptc -a -r /dev/pts ; then
+    AC_DEFINE(HAVE_PTC_PTS)
+fi
+
+echo checking for SGI old-style pty allocation
+if test -r /dev/ptc -a ! -r /dev/pts ; then
+    AC_DEFINE(HAVE_PTC)
+fi
+
+echo checking for SVR4 style pty allocation
+if test -r /dev/ptmx ; then
+  AC_DEFINE(HAVE_PTMX)
+  # aargg. Some systems need libpt.a to use /dev/ptmx
+    echo checking for libpt.a
+    AC_FUNC_CHECK(ptsname, ,LIBS="${LIBS} -lpt")
+fi
+
+# In OSF/1 case, SVR4 are somewhat different.
+# Gregory Depp <depp@osf.org> 17Aug93
+echo checking for OSF/1 style pty allocation
+if test -r /dev/ptmx_bsd ; then
+    AC_DEFINE(HAVE_PTMX_BSD)
+fi
+
+
+tcgetattr=0
+tcsetattr=0
+AC_FUNC_CHECK(tcgetattr, tcgetattr=1)
+AC_FUNC_CHECK(tcsetattr, tcsetattr=1)
+if test $tcgetattr -eq 1 -a $tcsetattr -eq 1 ; then
+    AC_DEFINE(POSIX)
+fi
+
+# first check for the pure bsd
+echo checking for struct sgttyb
+AC_TEST_PROGRAM([#include <sgtty.h>
+main()
+{
+  struct sgttyb tmp;
+  exit(0);
+}], AC_DEFINE(HAVE_SGTTYB) PTY_TYPE=sgttyb)
+
+# next check for the older style ttys
+# note that if we detect termio.h (only), we still set PTY_TYPE=termios
+# since that just controls which of pty_XXXX.c file is use and
+# pty_termios.c is set up to handle pty_termio.
+echo checking for struct termio
+AC_TEST_PROGRAM([#include <termio.h>
+main()
+{
+  struct termio tmp;
+  exit(0);
+}], AC_DEFINE(HAVE_TERMIO) PTY_TYPE=termios)
+
+# now check for the new style ttys (not yet posix)
+echo checking for struct termios
+AC_TEST_PROGRAM([#include <termios.h>
+main()
+{
+  struct termios tmp;
+  exit(0);
+}], AC_DEFINE(HAVE_TERMIOS) PTY_TYPE=termios)
+
+# finally check for Cray style ttys
+echo checking for Cray-style ptys
+SETUID="@:"
+AC_TEST_PROGRAM([
+main(){
+#ifdef CRAY
+	return 0;
+#else
+	return 1;
+#endif
+}
+], PTY_TYPE=unicos SETUID="chmod u+s", )
+#
+# Check for select and/or poll. If both exist, we prefer select.
+# if neither exists, define SIMPLE_EVENT.
+#
+select=0
+poll=0
+AC_FUNC_CHECK(select, select=1)
+AC_FUNC_CHECK(poll,   poll=1)
+if test $select -eq 1 ; then
+  EVENT_TYPE=select
+  test -n "$verbose" && echo "	found select"
+elif test $poll -eq 1 ; then
+  EVENT_TYPE=poll
+  test -n "$verbose" && echo "	found poll"
+else
+  EVENT_TYPE=simple
+    test -n "$verbose" && echo "	using simple"
+  AC_DEFINE(SIMPLE_EVENT)
+fi
+
+AC_HAVE_FUNCS(getpty)
+AC_HAVE_FUNCS(_getpty)
+
+#
+# Now check for the libraries. The first test merely looks in a few
+# different places.
+# 
+if test "ISC_${ISC}" = "ISC_1"   ;    then
+   # if on ISC check for -linet and add -linet to LIBS
+   AC_HAVE_LIBRARY(inet)
+   # if on ISC we need <sys/bsdtypes.h> to get FD_SET macros
+   AC_HAVE_HEADERS(sys/bsdtypes.h)
+fi
+
+#
+# Look for X11
+#
+
+AC_FIND_X
+
+#
+# Let a user override everything with an environment variable
+#
+if test x"$X11HDIR" != x ; then
+    XINCLUDES="-I$X11HDIR"
+    test -n "$verbose" && echo "	Using $X11HDIR for X headers"
+else
+    if test x"$x_includes" != x ; then
+    XINCLUDES="-I$x_includes"
+fi
+fi
+
+if test x"$X11LIBS" != x ; then
+    XLIBS="-L$X11LIBS -lX11"
+    test -n "$verbose" && echo "	Using $X11LIBS for X libraries"
+else
+    if test x"$x_libraries" != x ; then
+    XLIBS="-L$x_libraries -lX11"
+    else
+	XLIBS="-lX11"
+    fi
+fi
+
+#
+# HP-UX wants this instead of libX11
+#
+if test x"$x_libraries" = x ; then
+  AC_HAVE_LIBRARY(libXwindow.a, XLIBS="-lXwindow")
+fi
+
+if test "$no_x" != "true" && test "$no_tk" != "true" ; then
+  XPROGS="expectk \$(LIBEXPECTK)"
+else
+  XPROGS="# no X support on this system"
+  XINCLUDES=""
+  XLIBS=""
+  test -n "$verbose" && echo "	WARNING: No X based programs will be built"
+fi
+
+#
+# Set up makefile substitutions
+#
+AC_SUBST(CC)
+AC_SUBST(XINCLUDES)
+AC_SUBST(XLIBS)
+AC_SUBST(XPROGS)
+AC_SUBST(TCLHDIR)
+AC_SUBST(TCLLIB)
+AC_SUBST(TKHDIR)
+AC_SUBST(TKLIB)
+AC_SUBST(PTY_TYPE)
+AC_SUBST(EVENT_TYPE)
+AC_SUBST(SETUID)
+AC_OUTPUT(Makefile)
