@@ -1,0 +1,68 @@
+# @(#) $Header: /a/cvs/386BSD/ports/x11/xphoon/Imakefile,v 1.1 1994/05/18 14:07:11 asami Exp $ (LBL)
+#
+# Copyright (C) 1988, 1991 by Jef Poskanzer and Craig Leres.
+#
+# Permission to use, copy, modify, and distribute this software and its
+# documentation for any purpose and without fee is hereby granted, provided
+# that the above copyright notice appear in all copies and that both that
+# copyright notice and this permission notice appear in supporting
+# documentation.  This software is provided "as is" without express or
+# implied warranty.
+
+
+INCLUDES =		-I. -I$(TOP) -I$(TOP)/X11 -I$(TOP)/X11/bitmaps
+LOCAL_LIBRARIES =	$(XLIB)
+DEPLIBS =		$(DEPXLIB)
+LDLIBS =		-lm
+
+SRCS =			xphoon.c moon.c phase.c dtime.c
+OBJS =			xphoon.o moon.o phase.o dtime.o
+
+ComplexProgramTarget(xphoon)
+
+
+# Make the export sharchive.
+shar:		xphoon.shar1 xphoon.shar2 xphoon.shar3 xphoon.shar4
+
+xphoon.shar1:	README Imakefile xphoon.man xphoon.c moon.c phase.c dtime.c tws.h vroot.h
+	shar -v -c -p X README Imakefile xphoon.man xphoon.c moon.c phase.c dtime.c tws.h vroot.h  > xphoon.shar1
+
+moon.xbm.Z:	moon.xbm
+	compress -c moon.xbm > moon.xbm.Z
+
+moon.xbm.Z.uu:	moon.xbm.Z
+	uuencode moon.xbm.Z moon.xbm.Z > moon.xbm.Z.uu
+
+moon.xbm.Z.uuaa: moon.xbm.Z.uu
+	split -510 moon.xbm.Z.uu moon.xbm.Z.uu
+
+xphoon.shar2:	moon.xbm.Z.uuaa
+	shar -v -c -p X moon.xbm.Z.uuaa > xphoon.shar2
+
+xphoon.shar3:	moon.xbm.Z.uuaa
+	shar -v -c -p X moon.xbm.Z.uuab > xphoon.shar3
+
+xphoon.shar4:	moon.xbm.Z.uuaa
+	shar -v -c -p X moon.xbm.Z.uuac > xphoon.shar4
+
+# Unpack the compressed, uuencoded, shared bitmaps.
+unshar:
+	cat moon.xbm.Z.uu?? > moon.xbm.Z.uu
+	uudecode moon.xbm.Z.uu
+	uncompress moon.xbm.Z
+
+
+# Make the export tarchive.
+tar:		xphoon.tar.Z
+
+xphoon.tar.Z:	xphoon.tar
+	rm -f xphoon.tar.Z
+	compress xphoon.tar
+
+xphoon.tar:	README Imakefile xphoon.man xphoon.c moon.c phase.c dtime.c tws.h vroot.h moon.xbm
+	tar chf xphoon.tar README Imakefile xphoon.man xphoon.c moon.c phase.c dtime.c tws.h vroot.h moon.xbm
+
+
+# Extra clean target for shar and tar stuff.
+clean::
+	-rm -f moon.xbm.Z moon.xbm.Z.uu moon.xbm.Z.uu?? xphoon.shar? xphoon.tar.Z
