@@ -1,4 +1,4 @@
-/* $Id: common.h,v 1.3 1993/08/02 23:52:28 nate Exp $
+/* $Id: common.h,v 1.4 1993/11/17 23:02:46 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -297,7 +297,6 @@ char	*getenv();
 			/* /, ?, ^N, ^P, k, K */
 #define EDIT_DISTANCE	/* Allow -G to specify a fuzzy 'go' command */
 #undef	VALIDATE_XREF_SITE /* are xrefs possibly invalid? */
-#undef	METAMAIL	/* use metamail to process mime articles */
 
 /* some dependencies among options */
 
@@ -465,19 +464,6 @@ char	*getenv();
 #   define UNSHAR "/bin/sh"
 #endif
 
-#ifdef METAMAIL
-/* default MIME extraction program */
-#  ifndef MIMESTORE
-#    define MIMESTORE "/usr/local/bin/mh/mhn -store -auto -file "
-#  endif
-
-/* default MIME show program */
-#  ifndef MIMESHOW
-#    define MIMESHOW "metamail -e -p -m \"trn %s\" %A"
-#  endif
-#endif
-
-
 /* path to default editor */
 #ifndef DEFEDITOR
 #   define DEFEDITOR "/usr/ucb/vi"
@@ -617,7 +603,7 @@ char	*getenv();
 #   define EXSAVER "tail +%Bc %A | %e"
 #endif
 
-#ifdef METAMAIL
+#ifdef MIME_SUPPORT
 #  ifndef EXMIMESAVER
 #    define EXMIMESAVER "%e %A"
 #  endif
@@ -737,17 +723,27 @@ typedef unsigned int	MEM_SIZE;	/* for passing to malloc */
 /* some slight-of-hand for compatibility issues */
 
 #ifdef HAS_STRCHR
+# ifndef index
 #   define index strchr
+# endif
+# ifndef rindex
 #   define rindex strrchr
+# endif
 #endif
 #ifdef HAS_MEMCMP
+# ifndef bcmp
 #   define bcmp(s,d,l) memcmp((s),(d),(l))
+# endif
 #endif
 #ifdef HAS_MEMCPY
+# ifndef bcopy
 #   define bcopy(s,d,l) memcpy((d),(s),(l))
+# endif
 #endif
 #ifdef HAS_MEMSET
+# ifndef bzero
 #   define bzero(s,l) memset((s),0,(l))
+# endif
 #endif
 
 /* *** end of the machine dependent stuff *** */
@@ -760,7 +756,7 @@ EXT struct stat filestat;
 
 /* various things of type char */
 
-#ifdef SUPPLIMENT_STRING_H
+#ifdef SUPPLEMENT_STRING_H
 char	*index();
 char	*rindex();
 char	*strcat();
@@ -909,7 +905,7 @@ EXT char cantrecreate[] INIT("Can't recreate %s -- restoring older version.\n");
     EXT char nocd[] INIT("Can't find %s\n");
 #endif
 
-#ifdef METAMAIL
+#ifdef MIME_SUPPORT
 EXT bool mime_article INIT(FALSE);
 #endif
 

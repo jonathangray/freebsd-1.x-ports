@@ -1,4 +1,4 @@
-/* $Id: nntpinit.c,v 1.2 1993/07/26 19:13:03 nate Exp $
+/* $Id: nntpinit.c,v 1.3 1993/11/17 23:03:33 nate Exp $
 */
 /* This software is Copyright 1992 by Stan Barber. 
  *
@@ -105,6 +105,10 @@ char *server;
 {
     int s;
     struct sockaddr_in sin;
+#ifdef __hpux
+    int socksize = 0;
+    int socksizelen = sizeof socksize;
+#endif
 #ifdef NONETDB
     bzero((char *) &sin, sizeof(sin));
     sin.sin_family = AF_INET;
@@ -222,6 +226,21 @@ char *server;
 
 #endif /* !EXCELAN */
 #endif /* !h_addr */
+#ifdef __hpux	/* recommended by raj@cup.hp.com */
+#define	HPSOCKSIZE 0x8000
+    getsockopt(s, SOL_SOCKET, SO_SNDBUF, (caddr_t)&socksize, (caddr_t)&socksizelen);
+    if (socksize < HPSOCKSIZE) {
+	socksize = HPSOCKSIZE;
+	setsockopt(s, SOL_SOCKET, SO_SNDBUF, (caddr_t)&socksize, sizeof(socksize));
+    }
+    socksize = 0;
+    socksizelen = sizeof(socksize);
+    getsockopt(s, SOL_SOCKET, SO_RCVBUF, (caddr_t)&socksize, (caddr_t)&socksizelen);
+    if (socksize < HPSOCKSIZE) {
+	socksize = HPSOCKSIZE;
+	setsockopt(s, SOL_SOCKET, SO_RCVBUF, (caddr_t)&socksize, sizeof(socksize));
+    }
+#endif
     return s;
 }
 

@@ -1,4 +1,4 @@
-/* $Id: rt-mt.h,v 1.2 1993/07/26 19:13:18 nate Exp $
+/* $Id: rt-mt.h,v 1.3 1993/11/17 23:03:46 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -16,7 +16,11 @@ bool mt_data _((void));
 
 typedef char		BYTE;
 typedef short		WORD;
+#ifndef __alpha
 typedef long		LONG;
+#else
+typedef int		LONG;
+#endif
 
 #define ROOT_ARTICLE	0x0001		/* article flag definitions */
 #define HAS_XREFS	0x0004		/* article has an xref line */

@@ -1,4 +1,4 @@
-/* $Id: cache.c,v 1.3 1993/08/02 23:52:23 nate Exp $
+/* $Id: cache.c,v 1.4 1993/11/17 23:02:44 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -69,6 +69,10 @@ build_cache()
      && time((time_t*)NULL) < cached_time + 6*60*60L) {
 	grow_cache(lastart);
 	rc_to_bits();
+	if (sel_mode == SM_ARTICLE)
+	    set_selector(sel_mode, sel_artsort);
+	else
+	    set_selector(sel_threadmode, sel_threadsort);
 	thread_grow();
 	return;
     }

@@ -1,4 +1,4 @@
-/* $Id: rthread.c,v 1.3 1993/08/02 23:52:52 nate Exp $
+/* $Id: rthread.c,v 1.4 1993/11/17 23:03:59 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -140,6 +140,7 @@ thread_close()
     sel_last_ap = 0;
     sel_last_sp = 0;
     selected_only = FALSE;
+    sel_exclusive = 0;
     ov_close();
 }
 
@@ -256,8 +257,16 @@ bool_int sel_flag, rereading;
 		     || (sel_flag && !(ap->flags & AF_SEL))));
 	if ((artp = ap) != Nullart)
 	    art = article_num(ap);
-	else
-	    art = lastart+1;
+	else {
+	    if (art <= last_cached)
+		art = last_cached+1;
+	    else
+		art++;
+	    if (art <= lastart)
+		artp = article_ptr(art);
+	    else
+		art = lastart+1;
+	}
 	return;
     }
 
@@ -507,7 +516,7 @@ prev_art_with_subj()
 		art = lastart;
 	    return FALSE;
 	}
-    } while ((ap->flags & (AF_READ|AF_MISSING))
+    } while ((ap->flags & AF_MISSING)
 	  || (selected_only && !(ap->flags & AF_SEL)));
     artp = ap;
     art = article_num(ap);
@@ -1200,8 +1209,9 @@ int mode;
     if (last_cached >= lastart)
 	firstart = lastart+1;
 
-    for (sp = first_subject; sp; sp = sp->next)
-	sp->flags &= ~SF_VISIT;
+    if (mode != CS_RETAIN)
+	for (sp = first_subject; sp; sp = sp->next)
+	    sp->flags &= ~SF_VISIT;
     for (sp = first_subject; sp; sp = sp->next) {
 	subjdate = 0;
 	count = sel_count = 0;
@@ -1249,7 +1259,7 @@ int mode;
 	    }
 	}
     }
-    if (mode && !article_count && !selected_only) {
+    if (mode != CS_RETAIN && !article_count && !selected_only) {
 	for (sp = first_subject; sp; sp = sp->next)
 	    sp->flags |= SF_VISIT;
     }

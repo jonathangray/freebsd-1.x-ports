@@ -4,7 +4,7 @@ esac
 echo "Extracting makedepend (with variable substitutions)"
 $spitshell >makedepend <<!GROK!THIS!
 $startsh
-# $Id: makedepend.SH,v 1.2 1993/07/26 19:12:37 nate Exp $
+# $Id: makedepend.SH,v 1.3 1993/11/17 23:03:11 nate Exp $
 # 
 # This software is Copyright 1991 by Stan Barber. 
 #

@@ -1,4 +1,4 @@
-/* $Id: rthread.h,v 1.2 1993/07/26 19:13:34 nate Exp $
+/* $Id: rthread.h,v 1.3 1993/11/17 23:04:00 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -59,10 +59,11 @@ bool find_next_sib _((void));
 
 void sort_subjects _((void));
 void count_subjects _((int));
-#define CS_NORM        0
-#define CS_RESELECT    1
-#define CS_UNSELECT    2
-#define CS_UNSEL_STORE 3
+#define CS_RETAIN      0
+#define CS_NORM        1
+#define CS_RESELECT    2
+#define CS_UNSELECT    3
+#define CS_UNSEL_STORE 4
 
 int subjorder_date _((SUBJECT**, SUBJECT**));
 int subjorder_str _((SUBJECT**, SUBJECT**));

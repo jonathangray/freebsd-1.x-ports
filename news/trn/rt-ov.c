@@ -1,4 +1,4 @@
-/* $Id: rt-ov.c,v 1.3 1993/08/02 23:52:46 nate Exp $
+/* $Id: rt-ov.c,v 1.4 1993/11/17 23:03:47 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -171,8 +171,6 @@ beginning:
 	}
 #endif /* !USE_XOVER */
     }
-    if (last_buf != buf)
-	free(last_buf);
     cachemask = (ThreadedGroup? AF_THREADED : AF_CACHED);
     for (an = first, ap = article_ptr(an); an <= artnum; an++, ap++) {
 	if (!(ap->flags & cachemask)) {
@@ -214,6 +212,8 @@ beginning:
 	fseek(ov_in, 0L, 0);	/* rewind it for the cheating phase */
 #endif
     setspin(SPIN_POP);
+    if (last_buf != buf)
+	free(last_buf);
     return success;
 }
 

@@ -1,4 +1,4 @@
-/* $Id: respond.c,v 1.3 1993/08/02 23:52:43 nate Exp $
+/* $Id: respond.c,v 1.4 1993/11/17 23:03:44 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -54,7 +54,7 @@ save_article()
     if ((use_pref = isupper(cmd)) != 0)
 	cmd = tolower(cmd);
     parseheader(art);
-#ifdef METAMAIL
+#ifdef MIME_SUPPORT
     savefrom = (!mime_article && (cmd == 'w' || cmd == 'e'))
 #else
     savefrom = (cmd == 'w' || cmd == 'e')
@@ -166,7 +166,7 @@ Saving null articles is not very productive!  :-)\n\
 	    while(fgets(art_buf,LBUFLEN,artfp) != Nullch) {
 		if (*art_buf <= ' ')
 		    continue;	/* Ignore empty or initially-whitespace lines */
-#ifdef METAMAIL
+#ifdef MIME_SUPPORT
 		if (mime_article) {
 		    char oldmode = mode;
 		    if (!custom_extract) {

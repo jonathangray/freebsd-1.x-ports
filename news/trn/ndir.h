@@ -1,4 +1,4 @@
-/* $Id: ndir.h,v 1.2 1993/07/26 19:12:41 nate Exp $
+/* $Id: ndir.h,v 1.3 1993/11/17 23:03:16 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -18,7 +18,9 @@
 #else
 #ifdef I_DIRENT
 #include <dirent.h>
+#ifndef direct
 #define direct dirent
+#endif
 #else
 #ifdef I_SYS_NDIR
 #include <sys/ndir.h>

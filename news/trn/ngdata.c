@@ -1,4 +1,4 @@
-/* $Id: ngdata.c,v 1.2 1993/07/26 19:12:49 nate Exp $
+/* $Id: ngdata.c,v 1.3 1993/11/17 23:03:24 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -251,17 +251,32 @@ register NG_NUM num;
     if (!abs1st[num])
 	abs1st[num] = (ART_NUM)first;
     if (!in_ng) {
+	if (redirected) {
+	    if (redirected != nullstr)
+		free(redirected);
+	    redirected = Nullch;
+	}
 	switch (ch) {
-	case 'n': moderated = getval("NOPOSTRING"," (no posting)"); break;
-	case 'm': moderated = getval("MODSTRING", " (moderated)"); break;
-	/* This shouldn't even occur.  What are we doing in a non-existent
-	   group?  Disallow it. */
-	case 'x': return TR_BOGUS;
-	/* what should be done about refiled groups?  rn shouldn't even
-	   be in them (ie, if sci.aquaria is refiled to rec.aquaria, then
-	   get the news there) */
-	case '=': return TR_BOGUS;
-	default: moderated = nullstr;
+	case 'n':
+	    moderated = getval("NOPOSTRING"," (no posting)");
+	    break;
+	case 'm':
+	    moderated = getval("MODSTRING", " (moderated)");
+	    break;
+	case 'x':
+	    redirected = nullstr;
+	    moderated = " (DISABLED)";
+	    break;
+	case '=':
+	    len = strlen(tmpbuf);
+	    if (tmpbuf[len-1] == '\n')
+		tmpbuf[len-1] = '\0';
+	    redirected = savestr(rindex(tmpbuf, '=') + 1);
+	    moderated = " (REDIRECTED)";
+	    break;
+	default:
+	    moderated = nullstr;
+	    break;
 	}
     }
     if (last < ngmax[num])

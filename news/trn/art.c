@@ -1,4 +1,4 @@
-/* $Id: art.c,v 1.3 1993/08/02 23:52:19 nate Exp $
+/* $Id: art.c,v 1.4 1993/11/17 23:02:24 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -78,18 +78,18 @@ art_init()
     ;
 }
 
-#ifdef METAMAIL
+#ifdef MIME_SUPPORT
 #define VERY_LONG_STRING        200
 int
 display_mime()
 {
     int code = 1;
 
-    if (!getenv("NOMETAMAIL")) {
+    if (!getenv("NOMIME")) {
 	char oldmode = mode;
 
 	interp(cmd_buf,(sizeof cmd_buf),getval("MIMESHOW",MIMESHOW));
-	fputs("Display MIME article with metamail? [yn]",stdout);
+	fputs("Process MIME article? [yn]",stdout);
 	fflush(stdout);
 	eat_typeahead();
 #ifdef PENDING
@@ -102,8 +102,12 @@ display_mime()
 #ifdef VERIFY
 	printcmd();
 #endif
-	putchar('\n') FLUSH;
+	carriage_return();
+	erase_eol();	/* erase the prompt */
+	carriage_return();	/* Resets kernel's tab column counter to 0 */
 	if (*buf == 'y') {
+	    putchar('\n');
+	    fflush(stdout);
 	    termlib_reset();
 	    resetty();
 	    code = doshell(SH,cmd_buf);
@@ -133,14 +137,14 @@ do_article()
     bool notesfiles = FALSE;		/* might there be notesfiles junk? */
     char oldmode = mode;
     char *ctime();
-#ifdef METAMAIL
+#ifdef MIME_SUPPORT
     bool tried_display_mime = FALSE;
 #endif
 #ifdef INNERSEARCH
     register int outputok;
 #endif
 
-#ifdef METAMAIL
+#ifdef MIME_SUPPORT
     mime_article = FALSE;
 #endif
 
@@ -295,8 +299,8 @@ do_article()
 				 localtime(&curr_artp->date));
 		}
 #endif
-#ifdef METAMAIL
-		else if (in_header == CONTENT_LINE) {
+#ifdef MIME_SUPPORT
+		else if (in_header == CONTENT_LINE && !isspace(*art_buf)) {
 		    mime_article = nontext(art_buf+14);
 		}
 #endif
@@ -328,7 +332,7 @@ do_article()
 		linenum += tree_puts(art_buf,linenum+topline,0)-1;
 	    }
 	    else {			/* just a normal line */
-#ifdef METAMAIL
+#ifdef MIME_SUPPORT
 		if (mime_article && do_hiding && !tried_display_mime) {
 		    if (display_mime() == 0)
 			return DA_NORM;
@@ -1003,7 +1007,7 @@ innermore()
 }
 #endif
 
-#ifdef METAMAIL
+#ifdef MIME_SUPPORT
 int
 nontext(content_type)
 char *content_type;

@@ -1,4 +1,4 @@
-/* $Id: uudecode.c,v 1.2 1993/07/26 19:13:53 nate Exp $
+/* $Id: uudecode.c,v 1.3 1993/11/17 23:04:14 nate Exp $
  * 
  * Decode one or more uuencoded articles back to binary form.
  * Trn version created by Wayne Davison.

@@ -1,4 +1,4 @@
-/* $Id: rt-page.c,v 1.3 1993/08/02 23:52:48 nate Exp $
+/* $Id: rt-page.c,v 1.4 1993/11/17 23:03:49 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -428,6 +428,8 @@ display_page()
 #ifdef CLEAREOL
     maybe_eol();
 #endif
+    if (redirected && redirected != nullstr)
+	printf("\t** Please start using %s **", redirected);
     putchar('\n') FLUSH;
 try_again:
     sel_line = 2;

@@ -1,4 +1,4 @@
-/* $Id: ngdata.h,v 1.2 1993/07/26 19:12:50 nate Exp $
+/* $Id: ngdata.h,v 1.3 1993/11/17 23:03:24 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -29,6 +29,7 @@ EXT time_t lastactfetch INIT(0);
 EXT ART_NUM *abs1st INIT(NULL);	/* 1st real article in newsgroup */
 
 EXT char *moderated;
+EXT char *redirected;
 EXT bool ThreadedGroup;
 EXT long activeitems;			/* number of enties in active file */
 

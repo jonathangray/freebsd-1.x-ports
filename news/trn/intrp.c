@@ -1,4 +1,4 @@
-/* $Id: intrp.c,v 1.2 1993/07/26 19:12:31 nate Exp $
+/* $Id: intrp.c,v 1.3 1993/11/17 23:03:04 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -438,6 +438,7 @@ char *stoppers;
     bool upper = FALSE;
     bool lastcomp = FALSE;
     bool re_quote = FALSE;
+    bool tick_quote = FALSE;
     bool address_parse = FALSE;
     bool comment_parse = FALSE;
     bool proc_sprintf = FALSE;
@@ -452,6 +453,7 @@ char *stoppers;
 	    upper = FALSE;
 	    lastcomp = FALSE;
 	    re_quote = FALSE;
+	    tick_quote = FALSE;
 	    address_parse = FALSE;
 	    comment_parse = FALSE;
 	    proc_sprintf = FALSE;
@@ -465,6 +467,9 @@ char *stoppers;
 		    break;
 		case '\\':
 		    re_quote = TRUE;
+		    break;
+		case '\'':
+		    tick_quote = TRUE;
 		    break;
 		case '>':
 		    address_parse = TRUE;
@@ -501,12 +506,13 @@ char *stoppers;
 			    *s++ = 'r';
 			if (art_howmuch != ARTSCOPE_SUBJECT) {
 			    *s++ = scopestr[art_howmuch];
-			    if (art_howmuch == ARTSCOPE_ONEHDR)
+			    if (art_howmuch == ARTSCOPE_ONEHDR) {
 				safecpy(s,art_srchhdr,
 					(sizeof scrbuf) - (s-scrbuf));
-			    s = index(s,':') + 1;
-			    if (!s)
-				s = scrbuf+(sizeof scrbuf)-1;
+				s = index(s,':') + 1;
+				if (!s)
+				    s = scrbuf+(sizeof scrbuf)-1;
+			    }
 			}
 		    }
 		    *s = '\0';
@@ -984,23 +990,31 @@ char *stoppers;
 		    while (*s)
 			*dest++ = *s++ | i;
 		}
-	    } else if (re_quote) {
+	    } else if (re_quote || tick_quote) {
 		/* put a backslash before regexp specials while copying. */
 		if (s == dest) {
 		    /* copy out so we can copy in. */
 		    safecpy(scrbuf, s, sizeof scrbuf);
 		    s = scrbuf;
 		    if (i > sizeof scrbuf)	/* we truncated, ack! */
-			destsize += i - sizeof scrbuf;
+			abort_interp();
+		}
+		if (tick_quote) {
+		    *dest++ = '\'';
+		    if ((destsize -= 2) <= 0)
+			abort_interp();
 		}
 		while (*s) {
-		    if (index(regexp_specials, *s)) {
+		    if ((re_quote && index(regexp_specials, *s))
+		     || (tick_quote && *s == '\'')) {
 			if (--destsize <= 0)
 			    abort_interp();
 			*dest++ = '\\';
 		    }
 		    *dest++ = *s++;
 		}
+		if (tick_quote)
+		    *dest++ = '\'';
 	    } else {
 		/* straight copy. */
 		if (s == dest) {

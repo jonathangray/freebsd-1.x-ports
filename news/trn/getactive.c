@@ -1,4 +1,4 @@
-/* $Id: getactive.c,v 1.2 1993/07/26 19:12:22 nate Exp $
+/* $Id: getactive.c,v 1.3 1993/11/17 23:02:52 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -31,7 +31,7 @@ char *argv[];
     register FILE *actfp;
 
     if (argc < 2 || argc > 3) {
-	fprintf(stderr, "Usage: getactive [active|distributions|newsgroups] filename\n");
+	fprintf(stderr, "Usage: getactive [active|distributions|newsgroups|subscriptions] filename\n");
 	exit(1);
     }
     if (argc == 2)

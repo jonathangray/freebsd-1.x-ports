@@ -1,4 +1,4 @@
-/* $Id: rt-util.c,v 1.2 1993/07/26 19:13:28 nate Exp $
+/* $Id: rt-util.c,v 1.3 1993/11/17 23:03:54 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -76,8 +76,8 @@ char *name;
 ** initials and the middle name(s).  If we start with "Ross Douglas Ridge"
 ** we try "Ross D Ridge", "Ross Ridge", "R D Ridge" and finally "R Ridge"
 ** before simply truncating the thing.  We also turn "R. Douglas Ridge"
-** into "Douglas Ridge" if it fits, otherwise it goes through the normal
-** modification route.
+** into "Douglas Ridge" and "Ross Ridge D.D.S." into "Ross Ridge" as a
+** first step of the compaction, if needed.
 */
 char *
 compress_name(name, max)
@@ -131,6 +131,9 @@ int max;
 	if (len <= max) {
 	    return name;
 	}
+	/* If the last name is an abbreviation it's not the one we want. */
+	if (*s == '.')
+	    notlast = 1;
 	while (!isspace(*s)) {
 	    if (s == name) {	/* only one name */
 		name[max] = '\0';
@@ -337,10 +340,16 @@ compress_from(ap, size)
 ARTICLE *ap;
 int size;
 {
-    char *s;
+    char *s, *t;
     int len;
 
-    strcpy(cmd_buf, ap && ap->from? ap->from : nullstr);
+    for (t = cmd_buf, s = ap && ap->from? ap->from : nullstr; *s; ) {
+	if ((unsigned char)*s < ' ')
+	    *t++ = ' ', s++;
+	else
+	    *t++ = *s++;
+    }
+    *t = '\0';
     if ((s = extract_name(cmd_buf)) != NULL)
 	s = compress_name(s, size);
     else

@@ -6,20 +6,11 @@ echo "Extracting newsnews (with variable substitutions)"
 cat >newsnews <<!GROK!THIS!
 			*** NEWS NEWS ***
 
-Welcome to trn.  There are more options to trn than you want to think about,
-so we won't list them here.  If you want to find out about them, read the
-manpage.  There are some important things to remember, though:
+Welcome to trn 3.3.  This is a minor update from 3.2 with some bug fixes
+and a few improvements.  Trn is "threaded read news", based on rn.
 
-  * Trn is an extension of rn.  Where possible, the command syntax is the same.
-  * To access all the new features, specify the options -x and -X.  These
-    options MAY be on by default, but it won't hurt to be redundant.
-  * Single-character commands don't require a carriage return -- only
-    commands that let you type in an argument.
-  * At ANY prompt, you may type 'h' for help.  There are many different help
-    menus, depending on the context.  Also, typing <esc>h in the middle of a
-    multi-character command will list escape substitutions.
-  * Typing a space to any prompt means to do the normal thing.  You could
-    spend all day reading news and never hit anything but the space bar.
+You can type 'h' at any prompt to display a summary of the commands that
+are available.
 
 This message will not be displayed again unless it is updated with new
 information.
@@ -28,7 +19,7 @@ Wayne Davison  <davison@borland.com>
 !GROK!THIS!
 $eunicefix newsnews
 #
-# $Id: newsnews.SH,v 1.2 1993/07/26 19:12:46 nate Exp $
+# $Id: newsnews.SH,v 1.3 1993/11/17 23:03:20 nate Exp $
 #
 # This software is Copyright 1991 by Stan Barber. 
 #

@@ -4,7 +4,7 @@ esac
 echo "Extracting newsetup (with variable substitutions)"
 $spitshell >newsetup <<!GROK!THIS!
 $startsh
-# $Id: newsetup.SH,v 1.2 1993/07/26 19:12:42 nate Exp $
+# $Id: newsetup.SH,v 1.3 1993/11/17 23:03:17 nate Exp $
 # 
 # This software is Copyright 1991 by Stan Barber. 
 #
@@ -22,91 +22,86 @@ export PATH || (echo "OOPS, this isn't sh.  Desperation time.  I will feed mysel
 
 : syntax: newsetup
 
-: System dependencies
-: You will want to change the definitions below to reflect the distribution
-: areas around you.  If you have more areas than this you will need to modify
-: the sed below.
+case $d_portable in
+define)
+    # where recordings, distributions and moderators are kept
+    lib=\`$filexp $newslib\`
+    # where important rn things are kept
+    rnlib=\`$filexp $privlib\`
+    ;;
+undef)
+    # where recordings, distributions and moderators are kept
+    lib="$newslib"
+    # where important rn things are kept
+    rnlib="$privlib"
+    ;;
+esac
 
-locorg="$locdist"
-organization="$orgdist"
-city="$citydist"
-state="$statedist"
-cntry="$cntrydist"
-cont="$contdist"
-#NORMALactive="${active-/usr/lib/news/active}"
-#NNTPactive="/tmp/active.\$\$"
+test=${test-test}
+echo=${echo-echo}
+cat=${cat-cat}
+mv=${mv-mv}
+rm=${rm-rm}
 
-dotdir="\${DOTDIR-\${HOME-\$LOGDIR}}"
-newsrc="\${NEWSRC-\$dotdir/.newsrc}"
-$rm -f \$newsrc-old
-$echo "Creating \$newsrc to be used by news programs."
-#NNTPrnlib=$privlib
-#NNTPcase \$rnlib in
-#NNTP~*) rnlib=\`$filexp \$rnlib\` ;;
-#NNTPesac
-#NNTPif \$rnlib/getactive ACTIVE \$active; then
-#NNTP    true;
-#NNTPelse
-#NNTP    exit 1;
-#NNTPfi
-#NORMALcase \$active in
-#NORMAL~*) active=\`$filexp \$active\` ;;
-#NORMALesac
+!GROK!THIS!
+$cat >>newsetup <<'!NO!SUBS!'
+dotdir="${DOTDIR-${HOME-$LOGDIR}}"
+newsrc="${NEWSRC-$dotdir/.newsrc}"
+tmp="${TMPDIR-/tmp}"
 
-if $test -s \$newsrc ; then
-    $echo "Saving your current \$newsrc as \$newsrc-old..."
-    $mv -f \$newsrc \$newsrc-old
+subs="$lib/subscriptions"
+tmpsubs="$tmp/trnsubs.$$"
+
+$cat <<'EOH'
+
+Welcome to trn.  Here's some important things to remember:
+
+  o  Trn is an extension of rn and has a similar command syntax.
+  o  To access all the new features, specify the options -x and -X.  These
+     options MAY be on by default, but it won't hurt to be redundant.
+  o  Single-character commands don't require a carriage return -- only
+     commands that let you type in an argument.
+  o  At ANY prompt, you may type 'h' for help.  There are many different help
+     menus, depending on the context.  Also, typing <esc>h in the middle of a
+     multi-character command will list escape substitutions.
+  o  Typing a space to any prompt means to do the normal thing.  You could
+     spend all day reading news and never hit anything but the space bar.
+  o  If you have never used the news system before, you may find the articles
+     in news.announce.newusers to be helpful.
+  o  Please consult the man page for complete information.
+
+EOH
+
+$rm -f $newsrc-old
+$echo "Creating $newsrc to be used by news programs."
+
+if $test -s "$newsrc"; then
+    $echo "Saving your current one as $newsrc-old..."
+    $mv -f $newsrc $newsrc-old
 fi
 
-: newsrc order determined here
-
-$sed <\$active '
-	/^to\./d
-	/ [^mny][^ ]*$/d
-	s/ .*//
-	s/^/ /
-	s/^ '\$locorg'\./01&/
-	s/^ '\$organization'\./02&/
-	s/^ '\$city'\./03&/
-	s/^ '\$state'\./04&/
-	s/^ '\$cntry'\./05&/
-	s/^ '\$cont'\./06&/
-	s/^ news\./07&/
-	s/^ comp\./08&/
-	s/^ sci\./09&/
-	s/^ rec\./10&/
-	s/^ soc\./11&/
-	s/^ talk\./13&/
-	s/^ control\$/14&/
-	s/^ junk\$/14&/
-	s/^ test\$/14&/
-	/\.test\$/s/^[0-9]*/14/
-	s/^ .*\./12&/
-	s/^ /00&/
-' |
-$sort -u |
-$sed '
-	/^14 /!s/\$/:/
-	/^14 /s/\$/!/
-	s/^[0-9][0-9] //
-' >\$newsrc
-
-#NNTP$rm -f \$active
+if $test -r $subs; then
+    cp $subs $newsrc
+else
+    if $test -r $rnlib/getactive; then
+	$rnlib/getactive subscriptions $tmpsubs >/dev/null 2>&1
+    fi
+    if $test -s $tmpsubs; then
+	cp $tmpsubs $newsrc
+    else
+	$cat <<EOM >$newsrc
+news.announce.newusers: 
+EOM
+    fi
+    $rm -f $tmpsubs
+fi
 
 $cat <<'EOH'
 Done.
 
-If you have never used the news system before, you may find the articles
-in news.announce.newusers to be helpful.  There is also a manual entry for rn.
-
-To get rid of newsgroups you aren't interested in, use the 'u' command.
-Type h for help at any time while running rn.
+To add new group use "a pattern" or "g newsgroup.name".  To get rid of
+newsgroups you aren't interested in, use the 'u' command.
 EOH
-!GROK!THIS!
-case "$d_nntp" in
-define)  sed < newsetup -e '/^#NNTP/s/^#NNTP//' -e '/^#NORMAL/d' > newsetup.new ;;
-*) sed < newsetup -e '/^#NNTP/d' -e '/^#NORMAL/s/^#NORMAL//' > newsetup.new ;;
-esac
-mv newsetup.new newsetup
+!NO!SUBS!
 $eunicefix newsetup
 chmod 755 newsetup

@@ -1,4 +1,4 @@
-/* $Id: artcheck.c,v 1.2 1993/07/26 19:11:59 nate Exp $
+/* $Id: artcheck.c,v 1.3 1993/11/17 23:02:28 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -146,8 +146,8 @@ Warning: posting exceeds %d columns.  Line %d is the first long one:\n%s\n",
 		    }
 		}
 	    }
+	    fclose(fp_active);
 	}
-	fclose(fp_active);
 	if (fp_ng != NULL) {
 	    ngleft = ngcnt;
 	    while (fgets(buff, LBUFLEN, fp_ng)) {
@@ -171,8 +171,8 @@ Warning: posting exceeds %d columns.  Line %d is the first long one:\n%s\n",
 		    }
 		}
 	    }
+	    fclose(fp_ng);
 	}
-	fclose(fp_ng);
 	for (i = 0; i < ngcnt; i++) {
 	    if (!foundactive[i]) {
 		printf("%-23s ** invalid news group -- check spelling **\n",

@@ -1,4 +1,4 @@
-/* $Id: ng.c,v 1.2 1993/07/26 19:12:47 nate Exp $
+/* $Id: ng.c,v 1.3 1993/11/17 23:03:21 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -219,7 +219,7 @@ char *start_command;			/* command to fake up first */
 		strcpy(buf, "+");
 		goto article_level;
 	    }
-	    count_subjects(CS_NORM);
+	    count_subjects(CS_RETAIN);
 	    for (i=last_cached+1, ap=article_ptr(i); i<=lastart; i++, ap++)
 		if (!(ap->flags & AF_READ))
 		    article_count++;
@@ -252,7 +252,12 @@ char *start_command;			/* command to fake up first */
 		    printf("  (%ld article%s still unread)",
 			(long)article_count,article_count==1?nullstr:"s");
 	    }
-	    else if (!forcelast)
+	    if (redirected) {
+		if (redirected == nullstr)
+		    printf("\n\n** This group has been disabled by your news admin **");
+		else
+		    printf("\n\n** Please start using %s **", redirected);
+	    } else if (!article_count && !forcelast)
 		goto cleanup;		/* actually exit newsgroup */
 	    mode = 'e';
 	    prompt = whatnext;

@@ -1,4 +1,4 @@
-/* $Id: head.c,v 1.3 1993/08/02 23:52:34 nate Exp $
+/* $Id: head.c,v 1.4 1993/11/17 23:02:53 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -201,8 +201,12 @@ end_header()
     in_header = PAST_HEADER;	/* just to be sure */
 
     if (!ap->subj) {
+#if 0
 	uncache_article(ap,FALSE);
 	return;
+#else
+	set_subj_line(ap,"Subject: <none>",15);
+#endif
     }
 
 #ifndef DBM_XREFS
@@ -222,10 +226,12 @@ end_header()
 	    thread_article(ap);
 	    free(references);
 	    artp = artp_hold;
+	    check_poster(ap);
 	}
-    } else if (!(ap->flags & AF_CACHED))
+    } else if (!(ap->flags & AF_CACHED)) {
 	cache_article(ap);
-    check_poster(ap);
+	check_poster(ap);
+    }
 }
 
 /* read the header into memory and parse it if we haven't already */
@@ -359,14 +365,16 @@ bool_int copy;				/* do you want it savestr()ed? */
 	}
 	*s = '\0';
 	priornum = artnum-1;
-	lastnum = artnum + PREFETCH_SIZE - 1;
-	if (lastnum > lastart)
-	    lastnum = lastart;
-	if ((cached = (htype[which_line].ht_flags & HT_CACHED)) != 0)
+	if ((cached = (htype[which_line].ht_flags & HT_CACHED)) != 0) {
+	    lastnum = artnum + PREFETCH_SIZE - 1;
+	    if (lastnum > lastart)
+		lastnum = lastart;
 	    sprintf(ser_line,"XHDR %s %ld-%ld",htype[which_line].ht_name,
 		artnum,lastnum);
-	else
+	} else {
+	    lastnum = artnum;
 	    sprintf(ser_line,"XHDR %s %ld",htype[which_line].ht_name,artnum);
+	}
 	nntp_command(ser_line);
 	if (nntp_check(TRUE) == NNTP_CLASS_OK) {
 	    for (ap = find_article(artnum); ; ) {

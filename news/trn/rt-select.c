@@ -1,4 +1,4 @@
-/* $Id: rt-select.c,v 1.2 1993/07/26 19:13:25 nate Exp $
+/* $Id: rt-select.c,v 1.3 1993/11/17 23:03:53 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -791,8 +791,7 @@ q does nothing.\n\n\
 	    selected_subj_cnt = selected_count = 0;
 	    return DS_DISPLAY;
 	}
-	sprintf(buf,"That command does not work in the set-unread selector.");
-	return DS_STATUS;
+	return DS_QUIT;
     case 'T':
 	if (!ThreadedGroup) {
 	    sprintf(buf,"Group is not threaded.");

@@ -4,7 +4,7 @@ esac
 echo "Extracting Rnmail (with variable substitutions)"
 $spitshell >Rnmail <<!GROK!THIS!
 $startsh
-# $Id: Rnmail.SH,v 1.2 1993/07/26 19:11:53 nate Exp $
+# $Id: Rnmail.SH,v 1.3 1993/11/17 23:02:14 nate Exp $
 # 
 # This software is Copyright 1991 by Stan Barber. 
 #

@@ -1,4 +1,4 @@
-/* $Id: artsrch.c,v 1.2 1993/07/26 19:12:02 nate Exp $
+/* $Id: artsrch.c,v 1.3 1993/11/17 23:02:30 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -215,11 +215,12 @@ int get_cmd;				/*   be set to FALSE!!! */
 	    *s++ = 'r';
 	if (howmuch != ARTSCOPE_SUBJECT) {
 	    *s++ = scopestr[howmuch];
-	    if (howmuch == ARTSCOPE_ONEHDR)
+	    if (howmuch == ARTSCOPE_ONEHDR) {
 		safecpy(s,srchhdr,LBUFLEN-(s-saltbuf));
-	    s = index(s,':');
-	    if (!s)
-		s = saltbuf+LBUFLEN-2;
+		s = index(s,':');
+		if (!s)
+		    s = saltbuf+LBUFLEN-2;
+	    }
 	}
 	*s++ = ':';
 	if (!cmdlst)

@@ -1,4 +1,4 @@
-/* $Id: addng.c,v 1.2 1993/07/26 19:11:55 nate Exp $
+/* $Id: addng.c,v 1.3 1993/11/17 23:02:19 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -253,7 +253,7 @@ ART_NUM ngsize;
 #ifdef USE_NNTP		/* ngsize not used */
     long tot;
 
-    if (!nntp_group(ngnam,0))
+    if (!nntp_group(ngnam,-1))
 	return 0;	/* not a real group */
     (void) sscanf(ser_line,"%*d%ld",&tot);
     if (tot > 0)

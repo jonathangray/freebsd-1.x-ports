@@ -4,7 +4,7 @@ esac
 echo "Extracting Pnews (with variable substitutions)"
 $spitshell >Pnews <<!GROK!THIS!
 $startsh
-# $Id: Pnews.SH,v 1.3 1993/08/02 23:52:13 nate Exp $
+# $Id: Pnews.SH,v 1.4 1993/11/17 23:02:08 nate Exp $
 # 
 # This software is Copyright 1991 by Stan Barber. 
 #
@@ -248,6 +248,9 @@ case $dist in
     ;;
 esac
 
+case "$FAST_PNEWS" in
+y*) ;;
+*)
 # tell them what we think they are doing... !DIST!
 case $dist in
 world.*|comp.*|news.*|sci.*|rec.*|misc.*|soc.*|talk.*|alt.*|'')
@@ -314,13 +317,21 @@ EOH
     *) exit ;;
     esac
 done
+;;
+esac
 
 # run getactive in the background, if necessary
 if $test "$cmdlist"; then
     ( eval $cmdlist ) &
 fi
 
-file=h
+case "$FAST_PNEWS" in
+y*) file=''
+    $echo "" >> $tmpart
+    state=edit
+    ;;
+*)  file=h;;
+esac
 while $test "X$file" = Xh ; do
     $echo ""
     $echo $n "Prepared file to include [none]: $c"
@@ -412,7 +423,8 @@ EOH
 	
     check)
 	# wait for possible background getactive
-	wait
+	$test "$cmdlist" && wait
+
 	# warn about long lines, malformed headers, misspelled newsgroups
 	$artcheck $tmpart 79 $newsgroups $active
 	state=ask

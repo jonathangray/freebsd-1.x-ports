@@ -1,4 +1,4 @@
-/* $Id: rcstuff.c,v 1.3 1993/08/02 23:52:41 nate Exp $
+/* $Id: rcstuff.c,v 1.4 1993/11/17 23:03:42 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -107,7 +107,8 @@ rcstuff_init()
 	    softptr[newng] = atol(tmpbuf);
 	else
 	    softptr[newng] = 0;
-	some_buf[--length] = '\0';	/* wipe out newline */
+	if (some_buf[--length] == '\n')
+	    some_buf[length] = '\0';	/* wipe out newline */
 	if (checkflag)			/* no extra mallocs for -c */
 	    rcline[newng] = some_buf;
 	else if (some_buf == buf)
@@ -205,13 +206,15 @@ parse_rcline(ngnum)
 NG_NUM ngnum;
 {
     char *s;
+    int len;
 
-    for (s = rcline[ngnum]; *s && *s != ':' && *s != NEGCHAR; s++) ;
-    if (!*s && !checkflag) {
+    for (s=rcline[ngnum]; *s && *s!=':' && *s!=NEGCHAR && !isspace(*s); s++) ;
+    len = s - rcline[ngnum];
+    if ((!*s || isspace(*s)) && !checkflag) {
 #ifndef lint
-	rcline[ngnum] = saferealloc(rcline[ngnum],
-				(MEM_SIZE)(s - rcline[ngnum]) + 3);
-#endif /* lint */
+	rcline[ngnum] = saferealloc(rcline[ngnum],(MEM_SIZE)len + 3);
+#endif
+	s = rcline[ngnum] + len;
 	strcpy(s, ": ");
     }
     if (*s == ':' && s[1] && s[2] == '0') {
@@ -219,7 +222,7 @@ NG_NUM ngnum;
 	s[2] = '1';
     } else
 	rcchar[ngnum] = *s;	/* salt away the : or ! */
-    rcnums[ngnum] = (char)(s - rcline[ngnum]) + 1;
+    rcnums[ngnum] = (char)len + 1;
 				/* remember where the numbers are */
     *s = '\0';			/* null terminate newsgroup name */
 }
@@ -334,8 +337,8 @@ int flags;
 		sleep(2);
 	    goto check_fuzzy_match;
 	}
-	autosub = auto_subscribe(ngname);
-	if (!autosub) autosub = addnewbydefault;
+	if (mode != 'i' || !(autosub = auto_subscribe(ngname)))
+	    autosub = addnewbydefault;
 	if (autosub) {
 	    if (append_unsub) {
 		printf("(Adding %s to end of your .newsrc %ssubscribed)\n",
@@ -924,6 +927,8 @@ newsrc_check()
 #endif
 	    finalize(1);
 	}
+	get_anything();
+	putchar('\n') FLUSH;
     }
     else {
 	UNLINK(rcbname);		/* unlink backup file name */

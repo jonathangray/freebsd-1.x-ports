@@ -1,4 +1,4 @@
-/* $Id: bits.c,v 1.3 1993/08/02 23:52:21 nate Exp $
+/* $Id: bits.c,v 1.4 1993/11/17 23:02:41 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *

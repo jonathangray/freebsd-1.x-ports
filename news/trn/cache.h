@@ -1,4 +1,4 @@
-/* $Id: cache.h,v 1.3 1993/08/02 23:52:26 nate Exp $
+/* $Id: cache.h,v 1.4 1993/11/17 23:02:45 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -89,7 +89,7 @@ typedef struct rt_art {
 #define Nullart Null(ARTICLE*)
 #define Nullsubj Null(SUBJECT*)
 
-#define was_read(a)     ((a) >= absfirst && (article_ptr(a)->flags & AF_READ))
+#define was_read(a)     ((a) < absfirst || (article_ptr(a)->flags & AF_READ))
 
 /* These must never use their args more than once in the definition */
 #define article_num(ap)      (((ap)-article_list)+absfirst)

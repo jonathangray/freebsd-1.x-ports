@@ -15,7 +15,7 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  * that running config.h.SH again will wipe out any changes you've made.
  * For a more permanent change edit config.sh and rerun config.h.SH.
  *
- * \$Id: config.h.SH,v 1.3 1993/08/02 23:52:30 nate Exp $
+ * \$Id: config.h.SH,v 1.4 1993/11/17 23:02:47 nate Exp $
  */
 
 /* Configuration time: $cf_time
@@ -288,6 +288,20 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  *	which supports internet-style addresses (user@site.domain).
  */
 #$d_internet	INTERNET	/**/
+
+/* MIME_SUPPORT:
+ *	This symbol, if defined, indicates mime articles should be processed
+ *	by an external program.
+ */
+/* MIMESHOW:
+ *	This symbol points to the program to run to show a mime article.
+ */
+/* MIMESTORE:
+ *	This symbol points to the program to run to store a mime article.
+ */
+#$d_mime MIME_SUPPORT	/**/
+#$d_mime MIMESHOW "$mimeshow"
+#$d_mime MIMESTORE "$mimestore"
 
 /* USE_NNTP:
  *	This symbol, if defined, indicates that NNTP should be used.

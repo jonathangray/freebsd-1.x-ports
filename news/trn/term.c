@@ -1,4 +1,4 @@
-/* $Id: term.c,v 1.3 1993/08/02 23:52:56 nate Exp $
+/* $Id: term.c,v 1.4 1993/11/17 23:04:05 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -22,6 +22,10 @@
 #include "intrp.h"
 #include "INTERN.h"
 #include "term.h"
+
+#ifdef u3b2
+#undef TIOCGWINSZ
+#endif
 
 char ERASECH;		/* rubout character */
 char KILLCH;		/* line delete character */

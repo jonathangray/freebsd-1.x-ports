@@ -22,9 +22,9 @@
 # package, which includes metaconfig.)
 #
 
-# $Id: Configure,v 1.3 1993/08/02 23:52:04 nate Exp $
+# $Id: Configure,v 1.4 1993/11/17 23:01:59 nate Exp $
 #
-# Generated on Sat Jul 31 23:21:43 PDT 1993 [metaconfig 2.9dev PL20]
+# Generated on Sun Aug 15 13:19:02 PDT 1993 [metaconfig 2.9dev PL20]
 
 cat >/tmp/c1$$ <<EOF
 ARGGGHHHH!!!!!
@@ -124,6 +124,8 @@ ls=''
 mail=''
 mailx=''
 make=''
+metamail=''
+mhn=''
 mkdir=''
 more=''
 mv=''
@@ -196,6 +198,9 @@ d_internet=''
 d_memcmp=''
 d_memcpy=''
 d_memset=''
+d_mime=''
+mimeshow=''
+mimestore=''
 d_newsadm=''
 newsadmin=''
 d_nntp=''
@@ -868,6 +873,8 @@ ispell
 ksh
 less
 mail
+metamail
+mhn
 more
 nroff
 pg
@@ -2837,6 +2844,52 @@ eval $inlibc
 set memset d_memset
 eval $inlibc
 
+: see if they want mime support
+case "$d_mime" in
+'')	if $test "$metamail$mhn" != metamailmhn; then
+	    dflt=y
+	else
+	    dflt=n
+	fi
+	;;
+"$define") dflt=y;;
+*)	dflt=n;;
+esac
+$cat <<EOM
+
+$Package is able to use an external mime-processing program such as metamail
+or mhn to display and store non-text mime articles.  If you don't have any
+mime-processing programs installed at the moment answer no (you can come
+back and Configure it in later).
+
+EOM
+rp="Do you want to include mime support?"
+. ./myread
+case "$ans" in
+y*)	case "$mimeshow" in
+	'')	if $test "$metamail" != metamail; then
+		    dflt="$metamail -e -p -m 'trn %s' %A"
+		else
+		    dflt="$mhn -show -serialonly %A"
+		fi
+		;;
+	*)	dflt="$mimeshow";;
+	esac
+	rp="What command should be used for showing an article?"
+	. ./myread
+	mimeshow="$ans"
+	case "$mimestore" in
+	'')	dflt="$mhn -store -auto -file";;
+	*)	dflt="$mimestore";;
+	esac
+	rp="What command should be used for storing an article?"
+	. ./myread
+	mimestore="$ans"
+	d_mime="$define"
+	;;
+*)	d_mime="$undef";;
+esac
+
 : get news administrator name
 case "$newsadmin" in
 '')
@@ -3151,7 +3204,7 @@ n*)	databases=none
 	;;
 esac
 case "$threaddir" in
-'')	if $test "X$d_nntp" = "X$define" ; then
+'')	if $test "X$d_nntp" = "X$define" -a "$d_xdata" = "$undef"; then
 		dflt="/usr/spool/threads"
 	else
 		dflt="$newsspool"
@@ -3160,7 +3213,7 @@ case "$threaddir" in
 *)	dflt="$threaddir";;
 esac
 if $test "$d_xdata" = "$define" -o "$databases" = "none"; then
-	ans="/tmp"
+	ans="$dflt"
 else
 	$echo " "
 	$echo "$Package needs to know the base directory for the $xxx files"
@@ -3501,12 +3554,8 @@ case "$orgname" in
 	if $test $xxx != x; then
 		dflt=`$sed -n 's/^.*MYORG[ 	]*"\(.*\)".*$/\1/p' $xxx`
 	else
-		if $test "$d_portable" = "$define"; then
-			if $test -f /usr/lib/news/organi[sz]ation; then
-				dflt=/usr/lib/news/organi[sz]ation
-			else
-				dflt=''
-			fi
+		if $test -f /usr/lib/news/organi[sz]ation; then
+			dflt=/usr/lib/news/organi[sz]ation
 		else
 			dflt=''
 		fi
@@ -4025,6 +4074,8 @@ ls='$ls'
 mail='$mail'
 mailx='$mailx'
 make='$make'
+metamail='$metamail'
+mhn='$mhn'
 mkdir='$mkdir'
 more='$more'
 mv='$mv'
@@ -4097,6 +4148,9 @@ d_internet='$d_internet'
 d_memcmp='$d_memcmp'
 d_memcpy='$d_memcpy'
 d_memset='$d_memset'
+d_mime='$d_mime'
+mimeshow="$mimeshow"
+mimestore="$mimestore"
 d_newsadm='$d_newsadm'
 newsadmin='$newsadmin'
 d_nntp='$d_nntp'
@@ -4227,7 +4281,7 @@ echo "If you didn't make any mistakes, then just type a carriage return here."
 	case "$ans" in
 	'') ;;
 	*) : in case they cannot read
-		eval $ans;;
+	    sh 1>&4 -c "$ans";;
 	esac
 	;;
 esac
