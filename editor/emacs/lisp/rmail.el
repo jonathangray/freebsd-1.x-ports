@@ -283,7 +283,7 @@ that file, but does not copy any new mail into the file."
 	(let ((buffer-read-only nil))
 	  (message "Converting to Babyl format...")
 ;;; If file needs conversion, convert it all.
-;;;	  (narrow-to-region (point) (point-max))
+	  (narrow-to-region (point) (point-max))
 	  (rmail-convert-to-babyl-format)
 	  (message "Converting to Babyl format...done")))))
 
