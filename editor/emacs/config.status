@@ -10,8 +10,8 @@ for arg
 do
   case "$arg" in
     -recheck | --recheck | --rechec | --reche | --rech | --rec | --re | --r)
-    echo running /bin/sh ./configure i386--freebsd1.1.0 --srcdir=/usr/ports/editor/emacs
-    exec /bin/sh ./configure i386--freebsd1.1.0 --srcdir=/usr/ports/editor/emacs ;;
+    echo running ${CONFIG_SHELL-/bin/sh} ./configure i386--freebsd1.1.0 --srcdir=/usr/ports/editor/emacs
+    exec ${CONFIG_SHELL-/bin/sh} ./configure i386--freebsd1.1.0 --srcdir=/usr/ports/editor/emacs ;;
     *) echo "Usage: config.status --recheck" 2>&1; exit 1 ;;
   esac
 done
@@ -52,25 +52,35 @@ prefix='/usr/local'
 exec_prefix='${prefix}'
 prsub='s%^prefix\([ 	]*\)=\([ 	]*\).*$%prefix\1=\2/usr/local%
 s%^exec_prefix\([ 	]*\)=\([ 	]*\).*$%exec_prefix\1=\2${prefix}%'
+extrasub='/^VPATH[	 ]*=/c\
+vpath %.c $(srcdir)\
+vpath %.h $(srcdir)\
+vpath %.y $(srcdir)\
+vpath %.l $(srcdir)\
+vpath %.s $(srcdir)\
+vpath %.in $(srcdir)'
 
 top_srcdir=$srcdir
 
-# Allow make-time overrides of the generated file list.
-test -n "$gen_files" || gen_files="Makefile lib-src/Makefile oldXMenu/Makefile src/Makefile.in"
-
-for file in .. $gen_files; do if [ "x$file" != "x.." ]; then
+CONFIG_FILES=${CONFIG_FILES-"Makefile lib-src/Makefile oldXMenu/Makefile src/Makefile.in"}
+for file in .. ${CONFIG_FILES}; do if test "x$file" != x..; then
   srcdir=$top_srcdir
   # Remove last slash and all that follows it.  Not all systems have dirname.
   dir=`echo $file|sed 's%/[^/][^/]*$%%'`
   if test "$dir" != "$file"; then
     test "$top_srcdir" != . && srcdir=$top_srcdir/$dir
-    test ! -d $dir && mkdir $dir
+    test ! -d "$dir" && mkdir "$dir"
   fi
-  echo creating $file
-  rm -f $file
-  echo "# Generated automatically from `echo $file|sed 's|.*/||'`.in by configure." > $file
+  echo creating "$file"
+  rm -f "$file"
+  comment_str="Generated automatically from `echo $file|sed 's|.*/||'`.in by configure."
+  case "$file" in
+    *.c | *.h | *.C | *.cc | *.m )  echo "/* $comment_str */" > "$file" ;;
+    * )          echo "# $comment_str"     > "$file" ;;
+  esac
   sed -e "
 $prsub
+$extrasub
 s%@CC@%$CC%g
 s%@LN_S@%$LN_S%g
 s%@CPP@%$CPP%g
@@ -104,29 +114,34 @@ s%@CFLAGS@%$CFLAGS%g
 s%@LIBS@%$LIBS%g
 s%@DEFS@%-DHAVE_CONFIG_H%" $top_srcdir/${file}.in >> $file
 fi; done
-test -n "$gen_config" || gen_config=src/config.h
-echo creating $gen_config
+
+CONFIG_HEADERS=${CONFIG_HEADERS-"src/config.h"}
+for file in .. ${CONFIG_HEADERS}; do if test "x$file" != x..; then
+echo creating $file
+
 # These sed commands are put into SEDDEFS when defining a macro.
 # They are broken into pieces to make the sed script easier to manage.
 # They are passed to sed as "A NAME B NAME C VALUE D", where NAME
 # is the cpp macro being defined and VALUE is the value it is being given.
 # Each defining turns into a single global substitution command.
+# Hopefully no one uses "!" as a variable value.
+# Other candidates for the sed separators, like , and @, do get used.
 #
 # SEDd sets the value in "#define NAME VALUE" lines.
-SEDdA='s@^\([ 	]*\)#\([ 	]*define[ 	][ 	]*\)'
-SEDdB='\([ 	][ 	]*\)[^ 	]*@\1#\2'
+SEDdA='s!^\([ 	]*\)#\([ 	]*define[ 	][ 	]*\)'
+SEDdB='\([ 	][ 	]*\)[^ 	]*!\1#\2'
 SEDdC='\3'
-SEDdD='@g'
+SEDdD='!g'
 # SEDu turns "#undef NAME" with trailing blanks into "#define NAME VALUE".
-SEDuA='s@^\([ 	]*\)#\([ 	]*\)undef\([ 	][ 	]*\)'
-SEDuB='\([ 	]\)@\1#\2define\3'
+SEDuA='s!^\([ 	]*\)#\([ 	]*\)undef\([ 	][ 	]*\)'
+SEDuB='\([ 	]\)!\1#\2define\3'
 SEDuC=' '
-SEDuD='\4@g'
+SEDuD='\4!g'
 # SEDe turns "#undef NAME" without trailing blanks into "#define NAME VALUE".
-SEDeA='s@^\([ 	]*\)#\([ 	]*\)undef\([ 	][ 	]*\)'
-SEDeB='$@\1#\2define\3'
+SEDeA='s!^\([ 	]*\)#\([ 	]*\)undef\([ 	][ 	]*\)'
+SEDeB='$!\1#\2define\3'
 SEDeC=' '
-SEDeD='@g'
+SEDeD='!g'
 rm -f conftest.sed
 cat >> conftest.sed <<CONFEOF
 ${SEDdA}HAVE_SYS_TIMEB_H${SEDdB}HAVE_SYS_TIMEB_H${SEDdC}1${SEDdD}
@@ -276,7 +291,7 @@ CONFEOF
 rm -f conftest.h
 # Break up the sed commands because old seds have small limits.
 maxsedlines=20
-cp $top_srcdir/$gen_config.in conftest.h1
+cp $top_srcdir/$file.in conftest.h1
 while :
 do
   lines=`grep -c . conftest.sed`
@@ -290,18 +305,21 @@ do
   mv conftest.s2 conftest.sed
 done
 rm -f conftest.sed conftest.h
-echo "/* $gen_config.  Generated automatically by configure.  */" > conftest.h
+echo "/* $file.  Generated automatically by configure.  */" > conftest.h
 cat conftest.h1 >> conftest.h
 rm -f conftest.h1
-if cmp -s $gen_config conftest.h 2>/dev/null; then
+if cmp -s $file conftest.h 2>/dev/null; then
   # The file exists and we would not be changing it.
+  echo "$file is unchanged"
   rm -f conftest.h
 else
-  rm -f $gen_config
-  mv conftest.h $gen_config
+  rm -f $file
+  mv conftest.h $file
 fi
+fi; done
 
 
 
-echo "creating src/Makefile"; topsrcdir=/usr/ports/editor/emacs; ( cd ./src; sed -e 's/^# Generated.*//' -e 's%/\*\*/#.*%%' < Makefile.in > junk.c; eval `echo ${CPP} -I. -I${topsrcdir}/src ${CPPFLAGS} junk.c \>junk.cpp`; < junk.cpp sed -e 's/^#.*//' -e 's/^[ \f\t][ \f\t]*$//' -e 's/^ / /' | sed -n -e '/^..*$/p' > Makefile.new; chmod 444 Makefile.new; mv -f Makefile.new Makefile; rm -f junk.c junk.cpp; )
+
+echo "creating src/Makefile"; topsrcdir=/usr/ports/editor/emacs; ( cd ./src; rm -f junk.c; sed -e 's/^# Generated.*//' -e 's%/\*\*/#.*%%' < Makefile.in > junk.c; eval `echo ${CPP} -I. -I${topsrcdir}/src ${CPPFLAGS} junk.c \>junk.cpp`; < junk.cpp sed -e 's/^#.*//' -e 's/^[ \f\t][ \f\t]*$//' -e 's/^ / /' | sed -n -e '/^..*$/p' > Makefile.new; chmod 444 Makefile.new; mv -f Makefile.new Makefile; rm -f junk.c junk.cpp; )
 exit 0

@@ -108,6 +108,12 @@ infodir=${prefix}/info
 srcdir=/usr/ports/editor/emacs
 
 # Tell make where to find source files; this is needed for the makefiles.
+vpath %.c $(srcdir)
+vpath %.h $(srcdir)
+vpath %.y $(srcdir)
+vpath %.l $(srcdir)
+vpath %.s $(srcdir)
+vpath %.in $(srcdir)
 VPATH=/usr/ports/editor/emacs
 
 # ==================== Emacs-specific directories ====================
@@ -119,7 +125,6 @@ VPATH=/usr/ports/editor/emacs
 # Emacs.  This includes the Emacs version, so that the
 # lisp files for different versions of Emacs will install
 # themselves in separate directories.
-lispdir=${datadir}/emacs/${version}/lisp
 
 # Directories Emacs should search for lisp files specific
 # to this site (i.e. customizations), before consulting
