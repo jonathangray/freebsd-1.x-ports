@@ -2,6 +2,12 @@
 
 #include "mush.h"
 
+#if !defined(REGCMP) && !defined(REGEX)
+#include <regexp.h>
+#else
+#include <regex.h>
+#endif
+
 static int before, after, search_from, search_subj, search_to, xflg, icase;
 static u_long match_priority;
 static char search_hdr[64];
@@ -290,8 +296,11 @@ char check_list[], ret_list[];
     long bytes = 0;
     char buf[HDRSIZ];
     char *err = NULL;
-#ifdef REGCMP
+#if defined(REGCMP)
     char *regcmp(), *regex();
+#elif defined(REGEX)
+    regex_t re_pat;
+    regmatch_t match[1];
 #else /* REGCMP */
     char *re_comp();
 #endif /* REGCMP */
@@ -303,9 +312,16 @@ char check_list[], ret_list[];
     if (p && *p) {
 	if (icase)
 	    p = lcase_strcpy(buf, p);
-#ifdef REGCMP
+#if defined(REGCMP)
 	if (p && !(err = regcmp(p, NULL))) {
 	    print("regcmp error: %s\n", p);
+	    clear_msg_list(ret_list);
+	    return -1;
+	}
+#elif defined(REGEX)
+	printf("Pattern<%s>\n", p);
+	if ((regcomp(&re_pat, p, (icase == 1 ? 0: REG_ICASE)| REG_NOSUB) != 0)) {
+	    print("regcomp error: %s\n", p);
 	    clear_msg_list(ret_list);
 	    return -1;
 	}
@@ -393,8 +409,10 @@ char check_list[], ret_list[];
 		}
 		if (icase)
 		    p = lcase_strcpy(buf, p);
-#ifdef REGCMP
+#if defined(REGCMP)
 		val = !!regex(err, p, NULL); /* convert value to a boolean */
+#elif defined(REGEX)
+		val = regexec(&re_pat, p, 1, match, 0);
 #else /* REGCMP */
 		val = re_exec(p);
 #endif /* REGCMP */
@@ -403,7 +421,11 @@ char check_list[], ret_list[];
 		    clear_msg_list(ret_list); /* it doesn't matter, really */
 		    return -1;
 		}
+#if defined(REGEX)
+		if (val == 0) {
+#else
 		if (val) {
+#endif
 		    set_msg_bit(ret_list, n);
 		    cnt--, matches++;
 		    break;
@@ -414,9 +436,12 @@ char check_list[], ret_list[];
 		    bytes += strlen(p);
 	    }
 	}
-#ifdef REGCMP
+#if defined(REGCMP)
     if (err)
 	free(err);
+#elif defined(REGEX)
+    if (re_pat.re_nsub)
+	regfree(&re_pat);
 #endif /* REGCMP */
     return matches;
 }
@@ -436,8 +461,11 @@ register int flags;
     register int    this_msg = current_msg, val = 0;
     static char     *err = (char *)-1, direction;
     SIGRET	    (*oldint)(), (*oldquit)();
-#ifdef REGCMP
+#if defined(REGCMP)
     char *regex(), *regcmp();
+#elif defined(REGEX)
+    regex_t re_pat;
+    regmatch_t match[1];
 #else /* REGCMP */
     char *re_comp();
 #endif /* REGCMP */
@@ -456,7 +484,7 @@ register int flags;
 	    return 0;
 	else
 	    direction = !flags;
-#ifdef REGCMP
+#if defined(REGCMP)
     if (err != (char *)-1 && *pattern)
 	xfree(err);
     else if (err == (char *)-1 && !*pattern) {
@@ -467,9 +495,20 @@ register int flags;
 	print("Error in regcmp in %s", pattern);
 	return 0;
     }
+#elif defined(REGEX)
+    if (re_pat.re_nsub && *pattern)
+	regfree(&re_pat);
+    else if (!(*pattern)) {
+	print("No previous regular expression.");
+	return 0;
+    }
+    if ((regcomp(&re_pat, pattern, REG_BASIC)) != 0) {
+	print("Error in regcomp in %s", pattern);
+	return 0;
+    }
 #else /* REGCMP */
-    if (err = re_comp(pattern)) {
-	print(err);
+    if (val = re_comp(pattern)) {
+	print(val);
 	return 0;
     }
 #endif /* REGCMP */
@@ -483,14 +522,20 @@ register int flags;
 	    if (--current_msg < 0)
 		current_msg = msg_cnt-1;
 	p = compose_hdr(current_msg);
-#ifdef REGCMP
+#if defined(REGCMP)
 	val = !!regex(err, p, NULL); /* convert value to a boolean */
+#elif defined(REGEX)
+	val = regexec(&re_pat, p, 1, match, 0);
 #else /* REGCMP */
 	val = re_exec(p);
 #endif /* REGCMP */
 	if (val == -1)     /* doesn't apply in system V */
 	    print("Internal error for pattern search.\n");
+#if defined(REGEX)
+    } while (val != 0 && current_msg != this_msg && isoff(glob_flags, WAS_INTR));
+#else
     } while (!val && current_msg != this_msg && isoff(glob_flags, WAS_INTR));
+#endif
 
     if (ison(glob_flags, WAS_INTR)) {
 	print("Pattern search interrupted.");

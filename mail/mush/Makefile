@@ -7,12 +7,12 @@ SRCS= main.c init.c misc.c mail.c hdrs.c execute.c commands.c print.c dates.c \
       signals.c setopts.c msgs.c pick.c sort.c expr.c folders.c \
       loop.c viewopts.c curses.c curs_io.c bind.c file.c strings.c \
       lock.c macros.c options.c addrs.c malloc.c glob.c command2.c \
-      pop.c pmush.c xcreat.c regex.c
+      pop.c pmush.c xcreat.c
 OBJS= main.o init.o misc.o mail.o hdrs.o execute.o commands.o print.o file.o \
       signals.o setopts.o msgs.o pick.o sort.o expr.o strings.o \
       folders.o dates.o loop.o viewopts.o curses.o curs_io.o bind.o \
       lock.o macros.o options.o addrs.o malloc.o glob.o command2.o \
-      pop.o pmush.o xcreat.o regex.o
+      pop.o pmush.o xcreat.o
 
 HELP_FILES= README README-7.0 README-7.1 README-7.2.0 README-7.2.2 \
 	README-7.2.4 mush.1 cmd_help Mushrc Mailrc Gnurc \
@@ -22,7 +22,7 @@ MAKES= makefile.bsd makefile.xenix makefile.sys.v makefile.hpux makefile.sun
 
 # See the README for changes needed to compile under Ultrix.
 # In particular, you may need -DSIGRET=void and/or -ltermcap.
-CFLAGS= -O -DCURSES -DBSD -DFreeBSD -fwritable-strings
+CFLAGS= -O -DCURSES -DBSD -DFreeBSD -DREGEX -fwritable-strings
 LDFLAGS=
 LINTFLAGS= -bxah -Dlint -DCURSES -DBSD
 LIBS= -lcurses -ltermlib
@@ -71,9 +71,3 @@ install: mush
 	chmod 0644 $(LIBDIR)/cmd_help
 	cp Mushrc $(MRCDIR)/Mushrc
 	chmod 0644 $(MRCDIR)/Mushrc
-
-
-pkg:	pkg_bin
-
-pkg_bin: install pkg/+DESC pkg/+ONELINE pkg/+PLIST 
-	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST mush_bin

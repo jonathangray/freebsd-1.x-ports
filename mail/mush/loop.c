@@ -17,6 +17,12 @@
 #endif /* SYSV */
 #endif /* BSD */
 
+#if !defined(REGCMP) && !defined(REGEX)
+#include <regexp.h>
+#else
+#include <regex.h>
+#endif
+
 #define ever (;;)
 #define MAXARGS		100
 #define isdelimeter(c)	(index(" \t;|", c))
@@ -1185,11 +1191,14 @@ register int *hist_number;
     int 	  full_search = 0, len, found;
     char 	  buf[BUFSIZ];
     struct history *hist;
-#ifndef REGCMP
-    extern char   *re_comp();
-#else
+#if defined(REGCMP)
     char *rex = NULL;
     extern char   *regcmp();
+#elif defined(REGEX)
+    regex_t re_pat;
+    regmatch_t match[1];
+#else
+    extern char   *re_comp();
 #endif /* REGCMP */
 
     /* For !{something}, the {} are stripped in reference_hist() */
@@ -1206,10 +1215,12 @@ register int *hist_number;
 	c = *p, *p = 0;
     }
     if (*str) {
-#ifndef REGCMP
-	if (re_comp(str))
-#else
+#if defined(REGCMP)
 	if (!(rex = regcmp(str, NULL)))	/* Assign and test */
+#elif defined(REGEX)
+	if (regcomp(&re_pat, str, REG_NOSUB))
+#else
+	if (re_comp(str))
 #endif /* REGCMP */
 	{
 	    if (c)
@@ -1236,13 +1247,19 @@ register int *hist_number;
 	    found = !strncmp(buf, str, len);
 	} else
 	    found =
-#ifndef REGCMP
-		re_exec(buf)
-#else
+#if defined(REGCMP)
 		!!regex(rex, buf, NULL) /* convert to boolean value */
+#elif defined(REGEX)
+		regexec(&re_pat, buf, 1, match, 0)
+#else
+		re_exec(buf)
 #endif /* REGCMP */
 				== 1;
+#if defined(REGEX)
+	if (found == 0) {
+#else
 	if (found) {
+#endif
 	    *hist_number = hist->histno;
 	    Debug("Found it in history #%d\n", *hist_number);
 	    *p = c;
