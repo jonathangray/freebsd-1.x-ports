@@ -1,7 +1,4 @@
-all:
-	@echo Everything is done by make World
-
-install: World
+all install: World
 
 config:
 	(cd xview/config; $(MAKE) install)
