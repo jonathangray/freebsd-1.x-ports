@@ -12,7 +12,7 @@ CONFIG = -D_BSD
 
 LN = ln
 
-libs:	h libstdc.a libposix.a
+libs:	h # libstdc.a libposix.a
 
 h:
 #	mkdir h
