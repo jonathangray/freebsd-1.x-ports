@@ -1,0 +1,223 @@
+@c Copyright (C) 1992 John W. Eaton
+@c This is part of the Octave manual.
+@c For copying conditions, see the file gpl.texi.
+
+@node Programming Utilities, Amusements, Help, Top
+@chapter Programming Utilities
+
+@menu
+* Evaluating Strings as Commands::  
+* Miscellaneous Utilities::     
+@end menu
+
+@node Evaluating Strings as Commands, Miscellaneous Utilities, Programming Utilities, Programming Utilities
+@section Evaluating Strings as Commands
+
+@findex eval
+
+It is often useful to evaluate a string as if it were an Octave program,
+or use a string as the name of a function to call.  These functions are
+necessary in order to evaluate commands that are not known until run
+time, or to write functions that will need to call user-supplied
+functions.
+
+The function @code{eval (@var{command})} parses @var{command} and
+evaluates it as if it were an Octave program, returning the last value
+computed.  The @var{command} is evaluated in the current context, so any
+results remain available after @code{eval} returns.  For example,
+
+@example
+octave:13> a
+error: `a' undefined
+octave:14> eval ("a = 13")
+a = 13
+ans = 13
+octave:15> a
+a = 13
+@end example
+
+In this case, two values are printed:  one for the expression that was
+evaluated, and one for the value returned from @code{eval}.  Just as
+with any other expression, you can turn printing off by ending the
+expression in a semicolon.  For example,
+
+@example
+octave:13> a
+error: `a' undefined
+octave:14> eval ("a = 13;")
+ans = 13
+octave:15> a
+a = 13
+@end example
+
+@findex feval
+
+The function @code{feval (@var{name}, ...)} can be used to evaluate
+the function named @var{name}.  Any arguments after the first are passed
+on to the named function.  For example,
+
+@example
+octave:12> feval ("acos", -1)
+ans = 3.1416
+@end example
+
+@noindent
+calls the function @code{acos} with the argument @samp{-1}.
+
+The function @code{feval} is necessary in order to be able to write
+functions that call user-supplied functions.  For example, here is a
+simple-minded function for finding the root of a function of one
+variable:
+
+@cindex Fordyce, A. P.
+@findex newtroot
+
+@example
+@group
+function result = newtroot (f, x)
+
+  delta = tol = sqrt (eps);
+  maxit = 200;
+  fx = feval (f, x);
+  for i = 1:maxit
+    if (abs (fx) < tol)
+      result = x;
+      return;
+    else
+      fx_new = feval (f, x + delta);
+      deriv = (fx_new - fx) / delta;
+      x = x - fx / deriv;
+      fx = fx_new;
+    endif
+  endfor
+
+  result = x;
+
+endfunction
+@end group
+@end example
+
+Note that this is only meant to be an example of calling user-supplied
+functions and should not be taken too seriously.  In addition to using a
+more robust algorithm, any serious code would check the number and type
+of all the arguments, ensure that the supplied function really was a
+function, etc.
+
+
+@node Miscellaneous Utilities,  , Evaluating Strings as Commands, Programming Utilities
+@section Miscellaneous Utilities
+
+The following functions allow you to determine the size of a variable or
+expression, find out whether a variable exists, print error messages, or
+delete variable names from the symbol table.
+
+@ftable @code
+@item columns (@var{a})
+Return the number of columns of @var{a}.
+
+@item rows (@var{a})
+Return the number of rows of @var{a}.
+
+@item length (@var{a})
+Return the number of rows of @var{a} or the number of columns of
+@var{a}, whichever is larger.
+
+@item size (@var{a})
+Return the number rows and columns of @var{a}.  If there is only one
+output argument, the result is returned in a 2 element row vector.  If
+there are two output arguments, the number of rows is assigned to the
+first, and the number of columns to the second.  For example,
+
+@example
+@group
+octave:13> size ([1, 2; 3, 4; 5, 6])
+ans =
+
+  3  2
+
+octave:14> [nr, nc] = size ([1, 2; 3, 4; 5, 6])
+nr = 3
+
+nc = 2
+@end group
+@end example
+
+@item is_matrix (@var{a})
+Return 1 if @var{a} is a matrix.  Otherwise, return 0.
+
+@item is_vector (@var{a})
+Return 1 if @var{a} is a vector.  Otherwise, return 0.
+
+@item is_scalar (@var{a})
+Return 1 if @var{a} is a scalar.  Otherwise, return 0.
+
+@item is_square
+
+@example
+n = is_square (x)
+@end example
+
+If @code{x} is square, then return value @code{n}is the dimension of
+@code{x}.  Otherwise, return 0.
+
+@item is_symmetric
+
+@example
+n = is_symmetric (x, tol)
+@end example
+
+If @code{x} is symmetric, then return value is the dimension of @code{x}.
+Otherwise, return 0.
+
+@item isstr (@var{a})
+Return 1 if @var{a} is a string.  Otherwise, return 0.
+
+@item isempty (@var{a})
+Return 1 if @var{a} is an empty matrix (either the number of rows, or
+the number of columns, or both are zero).  Otherwise, return 0.
+
+@item clear @var{regexp} ...
+Delete the names matching the given regular expressions (in the sense of
+@code{ed(1)}) from the symbol table.
+
+For example, the command
+
+@example
+clear foo b.*r
+@end example
+
+@noindent
+clears the name @code{foo} and all names that begin with the letter
+@var{b} and end with the letter @code{r}.
+
+If @code{clear} is called without any arguments, all user-defined
+variables (local and global) are cleared from the symbol table.  If
+@code{clear} is called with at least one argument, only the visible
+names matching the arguments are cleared.  For example, suppose you have
+defined a function @code{foo}, and then hidden it by performing the
+assignemnt @code{foo = 2}.  Executing the command @samp{clear foo} once
+will clear the variable definition and restore the definition of
+@code{foo} as a function.  Executing @samp{clear foo} a second time will
+clear the function definition.
+
+This command may not be used within a function body.
+
+@item exist (@var{name})
+Return 1 if the name exists as a variable, and 2 if the name (after
+appending @samp{.m}) is an M-file in the path.  Otherwise, return 0.
+
+@item error (@var{msg})
+Print the message @var{msg} and return control to the top level.  This
+is useful for aborting from functions.
+
+@item perror (@var{name}, @var{num})
+Print the error message for function @var{name} corresponding to the
+error number @var{num}.  This function is intended to be used to print
+useful error messages for those functions that return numeric error
+codes.
+
+@item document
+@itemx menu
+@itemx who
+Not sure where these should go yet.
+@end ftable

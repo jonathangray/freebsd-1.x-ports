@@ -1,0 +1,91 @@
+#
+# Tests for npsol.
+#
+
+# A test from Reklaitis, Ravindran and Ragsdell
+
+set test npsol-setup
+send "clear
+function phi = f (x)
+  phi = 6*x(1)/x(2) + x(2)/x(1)/x(1);
+end
+
+function nlc = g (x)
+  nlc = x(1)*x(2) - 2;
+end
+
+c = \[1, 1\];
+
+x0 = \[2; 2\];
+
+\[x, phi, inform\] = npsol (x0, 'f', 1, c, 100, 0, 'g', 0);
+
+tol = 1.0e-5;
+
+x_opt = \[1; 2\];
+
+phi_opt = 5;\n"
+
+expect {
+	-re "$resync"
+}
+
+set test npsol-1
+send "info_bad = (inform != 0 && inform != 1 && inform != 6)\n"
+expect {
+	-re "info_bad = 0$nl.*$prompt$"		{ pass "$test" }
+	-re "info_bad = 1$nl.*$prompt$"		{ fail "$test" }
+}
+
+set test npsol-2
+send "solution_bad = sum (abs (x - x_opt) > tol)\n"
+expect {
+	-re "solution_bad = 0$nl.*$prompt$"	{ pass "$test" }
+	-re "solution_bad = 1$nl.*$prompt$"	{ fail "$test" }
+}
+
+set test npsol-3
+send "value_bad = sum (abs (phi - phi_opt) > tol)\n"
+expect {
+	-re "value_bad = 0$nl.*$prompt$"		{ pass "$test" }
+	-re "value_bad = 1$nl.*$prompt$"		{ fail "$test" }
+}
+
+# Rosenbrock's famouns function:
+
+send  "function obj = phi (x)
+  obj = 100 * (x(2) - x(1)^2)^2 + (1 - x(1))^2;
+end
+
+x0 = \[-1.2; 1\];
+
+\[x, phi, inform\] = npsol (x0, 'phi');
+
+x_opt = \[1; 1\];
+
+phi_opt = 0.0;\n"
+
+expect {
+	-re "$resync"
+}
+
+set test npsol-4
+send "info_bad = (inform != 0 && inform != 1 && inform != 6)\n"
+expect {
+	-re "info_bad = 0$nl.*$prompt$"		{ pass "$test" }
+	-re "info_bad = 1$nl.*$prompt$"		{ fail "$test" }
+}
+
+set test npsol-5
+send "solution_bad = sum (abs (x - x_opt) > tol)\n"
+expect {
+	-re "solution_bad = 0$nl.*$prompt$"	{ pass "$test" }
+	-re "solution_bad = 1$nl.*$prompt$"	{ fail "$test" }
+}
+
+set test npsol-6
+send "value_bad = sum (abs (phi - phi_opt) > tol)\n"
+expect {
+	-re "value_bad = 0$nl.*$prompt$"		{ pass "$test" }
+	-re "value_bad = 1$nl.*$prompt$"		{ fail "$test" }
+}
