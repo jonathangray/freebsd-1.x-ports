@@ -64,7 +64,8 @@ LIBS = -lutil
 CFLAGS =  $(CDEFS)
 LINTFLAGS = -x $(CDEFS)
 
-all: Makefile top.local.h top
+#all: Makefile top.local.h top
+all: top
 
 Makefile: Makefile.X
 	@echo 'You need to run the script "Configure" before running "make".'
