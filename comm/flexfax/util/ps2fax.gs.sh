@@ -1,5 +1,5 @@
 #!/bin/sh
-#	$Header: /a/cvs/386BSD/ports/comm/flexfax/util/ps2fax.gs.sh,v 1.1 1993/08/31 23:50:32 ljo Exp $
+#	$Header: /a/cvs/386BSD/ports/comm/flexfax/util/ps2fax.gs.sh,v 1.2 1994/06/15 04:00:19 jkh Exp $
 #
 # FlexFAX Facsimile Software
 #
@@ -38,7 +38,7 @@
 #     top of the spooling hierarchy -- s.t. the etc directory
 #     is present.
 #
-PS=/usr/local/bin/gs
+PS=/usr/gnu/bin/gs
 fil=
 out=ps.fax		# default output filename
 pagewidth=1728		# standard fax width
