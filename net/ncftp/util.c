@@ -1,8 +1,8 @@
 /* Util.c */
 
 /*  $RCSfile: util.c,v $
- *  $Revision: 1.4 $
- *  $Date: 1994/06/01 22:20:35 $
+ *  $Revision: 1.5 $
+ *  $Date: 1994/06/26 23:51:43 $
  */
 
 #include "sys.h"
@@ -878,7 +878,7 @@ aa:			cp = LocalPath(path);
 #ifdef NO_STRSTR
 
 /*
- *  The Elm Mail System  -  $Revision: 1.4 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.5 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor

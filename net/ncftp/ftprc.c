@@ -1,8 +1,8 @@
 /* ftprc.c */
 
 /*  $RCSfile: ftprc.c,v $
- *  $Revision: 1.4 $
- *  $Date: 1994/06/01 22:20:14 $
+ *  $Revision: 1.5 $
+ *  $Date: 1994/06/26 23:51:31 $
  */
 
 #include "sys.h"

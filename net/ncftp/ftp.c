@@ -1,8 +1,8 @@
 /* ftp.c */
 
 /*  $RCSfile: ftp.c,v $
- *  $Revision: 1.4 $
- *  $Date: 1994/06/01 22:20:11 $
+ *  $Revision: 1.5 $
+ *  $Date: 1994/06/26 23:51:29 $
  */
 
 #include "sys.h"
@@ -99,6 +99,9 @@ extern struct userinfo		uinfo;
 extern struct macel			macros[];
 extern struct lslist		*lshead, *lstail;
 extern int					is_ls;
+#ifdef PASSIVEMODE
+extern int					passivemode;
+#endif
 
 #ifdef GATEWAY
 extern string				gateway;
@@ -1773,8 +1776,65 @@ int initconn(void)
 	int					on = 1, rval;
 	string				str;
 	Sig_t				oldintr;
+#ifdef PASSIVEMODE
+	int					a1, a2, a3, a4, p1, p2;
+	unsigned char		n[6];
+#endif
+  
+  	oldintr = Signal(SIGINT, SIG_IGN);
 
-	oldintr = Signal(SIGINT, SIG_IGN);
+#ifdef PASSIVEMODE
+	if (passivemode) {
+		data = socket(AF_INET, SOCK_STREAM, 0);
+		if (data < 0) {
+			PERROR("initconn", "socket");
+			rval = 1;
+			goto Return;
+		}
+		if (options & SO_DEBUG &&
+			setsockopt(data, SOL_SOCKET, SO_DEBUG, (char *)&on, sizeof(on)) < 0 ) {
+				PERROR("initconn", "setscokopt (ignored)");
+		}
+		result = command("PASV");
+		if (result != COMPLETE) {
+			printf("Passive mode refused.\n");
+			rval = 1;
+			goto Return;
+		}
+		/*
+		 * What we've got here is a string of comma separated one-byte
+		 * unsigned integer values.  The first four are the IP address,
+		 * the fifth is the MSB of the port address, and the sixth is the
+		 * LSB of the port address.  Extract this data and prepare a
+		 * 'data_addr' (struct sockaddr_in).
+		 */
+		if (sscanf(reply_string+27, "%d,%d,%d,%d,%d,%d",
+				&a1, &a2, &a3, &a4, &p1, &p2) != 6) {
+			printf("Cannot parse PASV response: %s\n", reply_string);
+			rval = 1;
+			goto Return;
+		}
+		n[0] = (unsigned char) a1;
+		n[1] = (unsigned char) a2;
+		n[2] = (unsigned char) a3;
+		n[3] = (unsigned char) a4;
+		n[4] = (unsigned char) p1;
+		n[5] = (unsigned char) p2;
+
+		data_addr.sin_family = AF_INET;
+		bcopy( (void *)&n[0], (void *)&data_addr.sin_addr, 4 );
+		bcopy( (void *)&n[4], (void *)&data_addr.sin_port, 2 );
+
+		if (Connect( data, &data_addr, sizeof(data_addr) ) < 0 ) {
+			PERROR("initconn", "connect");
+			rval = 1;
+			goto Return;
+		}
+		rval = 0;
+		goto Return;
+	}
+#endif
+
 noport:
 	data_addr = myctladdr;
 	if (sendport)
@@ -1868,6 +1928,10 @@ dataconn(char *mode)
 #ifdef SOCKS
 	s = Raccept(data, (struct sockaddr *) &from, &fromlen);
 #else
+#ifdef PASSIVEMODE
+ 	if (passivemode)
+ 		return( fdopen( data, mode ));
+#endif
 	s = Accept(data, &from, &fromlen);
 #endif
 	if (s < 0) {

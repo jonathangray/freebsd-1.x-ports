@@ -13,20 +13,19 @@ SDEFS =
 
 # Program definitions.  See the README, part C.
 #--------------------------------------------------------------------------
-
-PDEFS = -DGZCAT=\"/usr/bin/gzcat\" -DREADLINE -DCURSES -DNO_CURSES_H -DSYSLOG -DTRY_ABOR
-
-#PDEFS =
+PDEFS = -DGZCAT=\"/usr/bin/gzcat\" -DREADLINE -DCURSES -DNO_CURSES_H \
+	-DSYSLOG -DTRY_ABOR -DPASSIVEMODE
 #PDEFS = -DGETLINE
 #PDEFS = -DREADLINE -DCURSES
 #PDEFS = -DSOCKS
+#PDEFS = -DPASSIVEMODE
 #PDEFS = -DDEBUG -DDB_ERRS
 
 
 # Choose your compiler and flags below.  Make sure you use an ANSI compiler
 # that handles new style function declarations and prototypes (gcc should).
 #--------------------------------------------------------------------------
-#CC = cc
+CC = cc
 #CC = gcc
 
 #CFLAGS = -O
@@ -56,13 +55,12 @@ LFLAGS =
 #   to use Socks.
 #--------------------------------------------------------------------------
 LIBS = -lreadline -ltermcap
-#LIBS =
 #LIBS = -ldbmalloc
 #LIBS = -lgetline
 #LIBS = -lreadline -lcurses
 #LIBS = ../lib/Rconnect.o
 #LIBS = -lnet -lnsl -lsocket -lcurses
-
+#LIBS = -lcurses -ltermcap
 
 # If the libraries are in a non-standard directory, or you if want to use
 # getline or readline and they aren't installed system-wide, add the
@@ -72,6 +70,9 @@ LIBS = -lreadline -ltermcap
 #LIBDIRS = -L../getline
 #LIBDIRS = -L../readline
 
+# To make term sources define this to your term directory
+TERMSRC =
+#TERMSRC  = /usr/local/src/term114
 
 # Additional headers.
 #
@@ -99,16 +100,15 @@ LIBS = -lreadline -ltermcap
 # locations.
 # To inhibit the installation of either, unset MANDIR/CATMANDIR.
 #--------------------------------------------------------------------------
-BINDIR = /usr/local/bin
 #BINDIR = /usr/lbin
+BINDIR = /usr/local/bin
 MANDIR = /usr/local/man/man1
-#MANDIR = /usr/man/man1
 #MANDIR = 
 #CATMANDIR = /usr/catman/LOCAL/g1
-CATMANDIR =/usr/local/man/cat1
+CATMANDIR =
 NROFF   = /usr/bin/nroff
 #NROFF   = /usr/ucb/nroff
-PACK    = pack
+PACK	= pack
 TEST	= test
 RM = rm -f
 CP = install -c
@@ -134,6 +134,7 @@ OBJS = cmds.o cmdtab.o ftp.o ftprc.o getpass.o glob.o main.o open.o set.o \
 tips.o util.o
 
 NAME = ncftp
+TNCFTP=tncftp
 MAN = ncftp.1
 CATMAN = ncftp.z
 ALL = $(SRCS) $(HEADERS) patchlevel.h Blurb README Makefile $(MAN) \
@@ -144,32 +145,56 @@ C_COMPILE2 = $(CC) $(CFLAGS) $(DEFS) -DMK='"$(MK)"' $(HDRDIRS)
 
 all: $(NAME) done
 
-package: install
-	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST -r pkg/+REQ ncftp_bin
+term: $(TNCFTP)
+	-@ls -l $(TNCFTP)
+	-@echo 'Done.'
 
 $(NAME): $(OBJS)
 	$(CC) $(LFLAGS) $(LIBDIRS) $(OBJS)  -o $(NAME) $(LIBS)
 
+$(TNCFTP):
+	$(MAKE) LIBS="$(LIBS) $(TERMSRC)/client.a" \
+		HDRDIRS="$(HDRDIRS) -I$(TERMSRC)" \
+		CFLAGS="$(CFLAGS) -DTERM_FTP" NAME=$(TNCFTP) $(TNCFTP)
+
+install_term: $(TNCFTP)
+	$(CP) $(TNCFTP) $(BINDIR)/$(TNCFTP)
+	@if $(TEST) -n '$(MANDIR)'; then \
+		$(MAKE) install_termman ; else true ;  fi
+	@if $(TEST) -n '$(CATMANDIR)'; then \
+		$(MAKE) install_termcatman ; else true ;  fi
+
 install: $(NAME)
-	$(CP) $(BINST) $(NAME) $(BINDIR)/$(NAME)
+	$(CP) $(NAME) $(BINDIR)/$(NAME)
 	@if $(TEST) -n '$(MANDIR)'; then \
 		$(MAKE) install_man ; else true ;  fi
-#	@if $(TEST) -n '$(CATMANDIR)'; then \
-#		$(MAKE) install_catman ; else true ;  fi
+	@if $(TEST) -n '$(CATMANDIR)'; then \
+		$(MAKE) install_catman ; else true ;  fi
 
 install_man: 
-	$(CP) $(MINST) $(MAN)  $(MANDIR)/$(MAN)
+	$(CP) $(MAN)  $(MANDIR)/$(MAN)
+
+install_termman: 
+	$(CP) $(MAN)  $(MANDIR)/term$(MAN)
 
 install_catman:  $(CATMAN)
-	$(CP) $(MINST) $(CATMAN)  $(CATMANDIR)/$(CATMAN)
+	$(CP) $(CATMAN)  $(CATMANDIR)/$(CATMAN)
+
+install_termcatman:  $(CATMAN)
+	$(CP) $(CATMAN)  $(CATMANDIR)/term$(CATMAN)
 
 uninstall:
 	$(RM) $(BINDIR)/$(NAME)
 	$(RM) $(MANDIR)/$(MAN)
 	$(RM) $(CATMANDIR)/$(CATMAN)
 
+uninstall_term:
+	$(RM) $(BINDIR)/$(TNCFTP)
+	$(RM) $(MANDIR)/term$(MAN)
+	$(RM) $(CATMANDIR)/term$(CATMAN)
+
 $(CATMAN): $(MAN)
-	rm -f tmp
+	$(RM) tmp
 	$(NROFF) -man -Tlp $(MAN) > tmp
 	$(PACK) -f tmp
 	mv tmp.z $(CATMAN)
@@ -185,7 +210,10 @@ done: $(NAME)
 	-@echo 'Done.'
 
 clean:
-	rm -f $(OBJS) $(NAME)
+	rm -f $(OBJS) $(NAME) $(TNCFTP)
+
+package: install
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST -r pkg/+REQ ncftp_bin
 
 # Dependencies:
 cmds.o: cmds.c 

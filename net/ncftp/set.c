@@ -1,8 +1,8 @@
 /* Set.c */
 
 /*  $RCSfile: set.c,v $
- *  $Revision: 1.4 $
- *  $Date: 1994/06/01 22:20:29 $
+ *  $Revision: 1.5 $
+ *  $Date: 1994/06/26 23:51:40 $
  */
 
 #include "sys.h"

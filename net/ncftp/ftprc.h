@@ -4,8 +4,8 @@
 #define _ftprc_h_
 
 /*  $RCSfile: ftprc.h,v $
- *  $Revision: 1.4 $
- *  $Date: 1994/06/01 22:20:15 $
+ *  $Revision: 1.5 $
+ *  $Date: 1994/06/26 23:51:32 $
  */
 
 #define NETRC "netrc"

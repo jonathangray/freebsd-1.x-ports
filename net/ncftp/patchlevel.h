@@ -1,3 +1,11 @@
+v1.7.7 - June 21, 1994.  Deleted a space in front of an " #endif".
+  No functionality change whatsoever...
+
+v1.7.6 - June 18, 1994.  Added commands and code to support the 
+  PASV command for passive negotiation of the data connection from
+  the host server to the client.  This facilitates operation of the
+  client software from within a firewall.  (J. B. Harrell)
+
 v1.7.5 - May 28, 1994.  Fixed a rare problem with dimmed text.  Fixed
   compilation problem with Dynix.  Defining the domain name now takes
   precedence over the getdomainname() function.

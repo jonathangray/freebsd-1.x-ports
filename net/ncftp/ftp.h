@@ -4,8 +4,8 @@
 #define _ftp_h_
 
 /*  $RCSfile: ftp.h,v $
- *  $Revision: 1.4 $
- *  $Date: 1994/06/01 22:20:13 $
+ *  $Revision: 1.5 $
+ *  $Date: 1994/06/26 23:51:30 $
  */
 
 #define IS_FILE 1

@@ -4,8 +4,8 @@
 #define _cmd_h_
 
 /*  $RCSfile: cmds.h,v $
- *  $Revision: 1.4 $
- *  $Date: 1994/06/01 22:20:06 $
+ *  $Revision: 1.5 $
+ *  $Date: 1994/06/26 23:51:26 $
  */
 
 /* Verbosity levels. */
@@ -121,6 +121,10 @@ int unimpl(int argc, char **argv);
 long GetDateSizeFromLSLine(char *fName, unsigned long *mod_time);
 long GetDateAndSize(char *fName, unsigned long *mod_time);
 int SetTypeByNumber(int i);
+#ifdef PASSIVEMODE
+int setpassive(int argc, char **argv);
+#endif
+
 
 /* In util.c: */
 void cmd_help(struct cmd *c);

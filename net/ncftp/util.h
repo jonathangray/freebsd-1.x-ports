@@ -4,8 +4,8 @@
 #define _util_h_
 
 /*  $RCSfile: util.h,v $
- *  $Revision: 1.4 $
- *  $Date: 1994/06/01 22:20:36 $
+ *  $Revision: 1.5 $
+ *  $Date: 1994/06/26 23:51:44 $
  */
 
 typedef char string[128], str32[32], longstring[512];

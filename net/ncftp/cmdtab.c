@@ -1,8 +1,8 @@
 /* cmdtab.c */
 
 /*  $RCSfile: cmdtab.c,v $
- *  $Revision: 1.4 $
- *  $Date: 1994/06/01 22:20:07 $
+ *  $Revision: 1.5 $
+ *  $Date: 1994/06/26 23:51:27 $
  */
 
 #include "sys.h"
@@ -89,6 +89,11 @@ Examples:\n\
 
 #define PAGEHELP "view a file on the remote host with your $PAGER"
 #define PAGEUSAGE REMOTEFILE
+
+#ifdef PASSIVEMODE
+#define PASSIVEHELP "enter passive transfer mode"
+#endif
+
 
 #define PDIRUSAGE " [flags] [remote-files]"
 
@@ -186,6 +191,9 @@ struct cmd cmdtab[] = {
 	{ "ntrans",        0,  1,  unimpl, UNIMPLHELP, UNIMPLUSAGE },
 	{ "open",  		   0,  0,  cmdOpen, OPENHELP, OPENUSAGE },
 	{ "p",  		   1,  1,  get, PAGEHELP, PAGEUSAGE },
+#ifdef PASSIVEMODE
+	{ "passive",	   0,  0,  setpassive, PASSIVEHELP, EMPTYSTR },
+#endif
 	{ "page",  		   1,  0,  get, PAGEHELP, PAGEUSAGE },
 	{ "pdir",  		   1,  0,  ls,
 		"view a remote directory listing (long mode) with your $PAGER",

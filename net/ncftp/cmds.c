@@ -1,8 +1,8 @@
 /* cmds.c */
 
 /*  $RCSfile: cmds.c,v $
- *  $Revision: 1.4 $
- *  $Date: 1994/06/01 22:20:04 $
+ *  $Revision: 1.5 $
+ *  $Date: 1994/06/26 23:51:25 $
  */
 
 #include "sys.h"
@@ -36,6 +36,9 @@
 #include "copyright.h"
 
 /* cmds.c globals */
+#ifdef PASSIVEMODE
+int					passivemode = 1;
+#endif
 int					curtype;			/* file transfer type */
 char				*typeabbrs = "abiet";
 str32				curtypename;		/* name of file transfer type */
@@ -2039,6 +2042,10 @@ int show_version(int argc, char **argv)
 #ifdef NET_ERRNO_H
 	DStrs[nDStrs++] = "NET_ERRNO_H";
 #endif
+#ifdef PASSIVEMODE
+	DStrs[nDStrs++] = "PASSIVEMODE";
+#endif
+
 
 /* DONE with #ifdefs for now! */
 
@@ -2190,5 +2197,15 @@ int unimpl(int argc, char **argv)
 		(void) printf("%s: command not supported. (and probably won't ever be).\n", argv[0]);
 	return (NOERR);
 }	/* unimpl */
+
+#ifdef PASSIVEMODE
+int setpassive(int argc, char **argv)
+{
+	passivemode = !passivemode;
+	printf( "Passive mode %s.\n", (passivemode ? "ON" : "OFF") );
+	return NOERR;
+}
+#endif
+
 
 /* eof cmds.c */

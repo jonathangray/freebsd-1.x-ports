@@ -1,8 +1,8 @@
 /* tips.c */
 
 /*  $RCSfile: tips.c,v $
- *  $Revision: 1.4 $
- *  $Date: 1994/06/01 22:20:33 $
+ *  $Revision: 1.5 $
+ *  $Date: 1994/06/26 23:51:42 $
  */
 
 #include "sys.h"
