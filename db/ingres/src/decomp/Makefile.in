@@ -1,0 +1,350 @@
+#
+#  Makefile for INGRES decomposition module
+#
+#	@(#)Makefile	8.3	12/18/85
+#
+
+INGRES=	../..
+H=	../h
+LIB=	$(INGRES)/lib
+
+CTLMOD=	$(LIB)/libctlmod.a
+OVQP=	$(LIB)/libovqp.a
+DBULIB=	$(LIB)/libdbu.a
+IUTIL=	$(LIB)/libiutil.a
+GUTIL=	$(LIB)/libgutil.a
+
+OBJS= 	qryproc.o de_init.o ret_unique.o \
+	aggregate.o ageval.o byeval.o makenode.o mapvar.o \
+	decomp.o pull_sq.o exec_sq.o tempvar.o reformat.o decision.o \
+	reduction.o openrs.o error.o prlinks.o rangetable.o \
+	rnum.o reinit.o selectv.o setvar.o usubr.o \
+	lockit.o pull_const.o \
+	call_ovqp.o mklist.o call_dbu.o
+
+LIBS=	$(CTLMOD) $(OVQP) $(DBULIB) $(IUTIL) $(GUTIL) -lm
+
+HDRS=	decomp.h globs.h
+SRCS= 	de_init.c qryproc.c ret_unique.c \
+	aggregate.c ageval.c byeval.c makenode.c mapvar.c \
+	decomp.c pull_sq.c exec_sq.c tempvar.c reformat.c decision.c \
+	reduction.c openrs.c error.c prlinks.c rangetable.c \
+	rnum.c reinit.c selectv.c setvar.c usubr.c mklist.c \
+	lockit.c pull_const.c \
+	call_ovqp.c call_dbu.c 
+
+CC= @CC@
+RANLIB= @RANLIB@
+DEFS= @DEFS@
+OPTIM= -O
+MOAN= -Wall
+LDFLAGS= $(OPTIM)
+CFLAGS= -DINGRES_DECOMP -I$(H) $(OPTIM) $(DEFS) $(MOAN)
+LINTFLAGS= -huc -I$H
+LDFLAGS=
+AR=	-ar
+ARFLAGS=rvu
+RANLIB=	ranlib
+CP=	cp
+CHMOD=	chmod
+LIBMODE=664
+BINMODE=4740
+ROMODE=	444
+GET=	sccs get
+REL=
+LINT=	lint
+PR=	print
+VGRIND=	csh /usr/ucb/vgrind
+HEADER=	Decomposition
+
+libdecomp.a: $(OBJS)
+	$(AR) $(ARFLAGS) libdecomp.a $(OBJS)
+	$(CHMOD) $(LIBMODE) libdecomp.a
+	$(RANLIB) libdecomp.a
+
+install: $(LIB)/libdecomp.a
+
+$(LIB)/libdecomp.a: libdecomp.a
+	$(CP) libdecomp.a $(LIB)/libdecomp.a
+	$(RANLIB) $(LIB)/libdecomp.a
+
+new:
+	rm -f libdecomp.a
+
+clean:
+	rm -f *.o
+	rm -f libdecomp.a a.out core
+
+sources: $(SRCS) $(HDRS)
+
+$(HDRS):
+	$(GET) $(REL) $@
+$(SRCS):
+	$(GET) $(REL) $@
+
+lint:
+	$(LINT) $(LINTFLAGS) $(SRCS)
+
+print: sources
+	$(PR) Makefile TraceFlags *.[hm] *.[csy]
+
+vgrind: sources
+	cp /dev/null index
+	$(VGRIND) -h "$(HEADER) (Release 8)" -n Makefile TraceFlags
+	$(VGRIND) -h "$(HEADER) (Release 8)" *.[hm] *.[csy]
+	sed /SCCSID/d < index > tmp
+	mv tmp index
+	$(VGRIND) -h "$(HEADER) (Release 8)" -x index
+
+tags: sources
+	-fgrep ../ tags > othertags
+	ctags  $(SRCS) $(HDRS)
+	sort -o tags tags othertags
+	-rm -f othertags
+
+#
+# DANGER	DANGER	DANGER	DANGER	DANGER	DANGER
+# The following two entries should NOT be executed by the user.
+# These entries are only for the Makefile in conf to construct
+# the system tag files.
+#
+systags: 
+	ctags $(SRCS) $(HDRS)
+	sed "s/	/	decomp\//" tags > systags
+	cat systags >> ../tags
+
+#
+# We assume that systags has already been done.
+#
+installtags:
+	sed "/	decomp/d" ../tags | sed "s/	/	..\//" > othertags
+	sort -o tags tags othertags
+	-rm -f othertags systags
+
+depend:
+	grep '^#[ 	]*include' $(SRCS) | sed -n -f ../h/depend.sed > makedep
+	echo '/^# DO NOT DELETE THIS LINE/+2,$$d' >eddep
+	echo '$$r makedep' >>eddep
+	echo 'w' >>eddep
+	cp Makefile Makefile.bak
+	ed - Makefile < eddep
+	rm eddep makedep
+	echo '# DEPENDENCIES MUST END AT END OF FILE' >> Makefile
+	echo '# IF YOU PUT STUFF HERE IT WILL GO AWAY' >> Makefile
+	echo '# see make depend above' >> Makefile
+
+# DO NOT DELETE THIS LINE -- make depend uses it
+
+de_init.o:$H/ingres.h
+de_init.o:$H/symbol.h
+de_init.o:$H/range.h
+de_init.o:globs.h
+de_init.o:$H/sccs.h
+de_init.o:protos.h
+qryproc.o:$H/ingres.h
+qryproc.o:$H/aux.h
+qryproc.o:$H/tree.h
+qryproc.o:$H/symbol.h
+qryproc.o:globs.h
+qryproc.o:$H/pv.h
+qryproc.o:$H/lock.h
+qryproc.o:$H/resp.h
+qryproc.o:$H/sccs.h
+qryproc.o:$H/errors.h
+qryproc.o:protos.h
+ret_unique.o:$H/ingres.h
+ret_unique.o:$H/symbol.h
+ret_unique.o:$H/aux.h
+ret_unique.o:$H/tree.h
+ret_unique.o:globs.h
+ret_unique.o:$H/errors.h
+ret_unique.o:$H/sccs.h
+ret_unique.o:protos.h
+aggregate.o:$H/ingres.h
+aggregate.o:$H/tree.h
+aggregate.o:$H/symbol.h
+aggregate.o:globs.h
+aggregate.o:$H/sccs.h
+aggregate.o:$H/errors.h
+aggregate.o:protos.h
+ageval.o:$H/ingres.h
+ageval.o:$H/tree.h
+ageval.o:$H/symbol.h
+ageval.o:$H/pv.h
+ageval.o:globs.h
+ageval.o:$H/errors.h
+ageval.o:$H/sccs.h
+ageval.o:protos.h
+byeval.o:$H/ingres.h
+byeval.o:$H/tree.h
+byeval.o:$H/symbol.h
+byeval.o:$H/pv.h
+byeval.o:globs.h
+byeval.o:$H/sccs.h
+byeval.o:$H/errors.h
+byeval.o:protos.h
+makenode.o:$H/ingres.h
+makenode.o:$H/aux.h
+makenode.o:$H/tree.h
+makenode.o:$H/symbol.h
+makenode.o:globs.h
+makenode.o:$H/sccs.h
+makenode.o:protos.h
+mapvar.o:$H/ingres.h
+mapvar.o:$H/aux.h
+mapvar.o:$H/tree.h
+mapvar.o:$H/symbol.h
+mapvar.o:$H/sccs.h
+mapvar.o:protos.h
+decomp.o:$H/ingres.h
+decomp.o:$H/aux.h
+decomp.o:$H/tree.h
+decomp.o:$H/symbol.h
+decomp.o:globs.h
+decomp.o:$H/sccs.h
+decomp.o:$H/errors.h
+decomp.o:protos.h
+pull_sq.o:$H/ingres.h
+pull_sq.o:$H/aux.h
+pull_sq.o:$H/tree.h
+pull_sq.o:$H/symbol.h
+pull_sq.o:globs.h
+pull_sq.o:$H/sccs.h
+pull_sq.o:protos.h
+exec_sq.o:$H/ingres.h
+exec_sq.o:$H/aux.h
+exec_sq.o:$H/tree.h
+exec_sq.o:$H/symbol.h
+exec_sq.o:$H/pv.h
+exec_sq.o:globs.h
+exec_sq.o:$H/sccs.h
+exec_sq.o:protos.h
+tempvar.o:$H/ingres.h
+tempvar.o:$H/tree.h
+tempvar.o:$H/symbol.h
+tempvar.o:$H/sccs.h
+tempvar.o:protos.h
+reformat.o:$H/ingres.h
+reformat.o:$H/catalog.h
+reformat.o:$H/aux.h
+reformat.o:$H/tree.h
+reformat.o:$H/symbol.h
+reformat.o:$H/pv.h
+reformat.o:globs.h
+reformat.o:$H/access.h
+reformat.o:$H/sccs.h
+reformat.o:protos.h
+decision.o:$H/ingres.h
+decision.o:$H/symbol.h
+decision.o:$H/aux.h
+decision.o:$H/tree.h
+decision.o:globs.h
+decision.o:$H/sccs.h
+decision.o:protos.h
+reduction.o:$H/ingres.h
+reduction.o:$H/symbol.h
+reduction.o:$H/aux.h
+reduction.o:$H/tree.h
+reduction.o:globs.h
+reduction.o:$H/sccs.h
+reduction.o:protos.h
+openrs.o:$H/ingres.h
+openrs.o:$H/aux.h
+openrs.o:$H/tree.h
+openrs.o:$H/symbol.h
+openrs.o:globs.h
+openrs.o:$H/sccs.h
+openrs.o:protos.h
+error.o:$H/ingres.h
+error.o:$H/aux.h
+error.o:$H/tree.h
+error.o:$H/symbol.h
+error.o:globs.h
+error.o:$H/sccs.h
+error.o:protos.h
+prlinks.o:$H/ingres.h
+prlinks.o:$H/aux.h
+prlinks.o:$H/tree.h
+prlinks.o:$H/symbol.h
+prlinks.o:globs.h
+prlinks.o:$H/sccs.h
+prlinks.o:protos.h
+rangetable.o:$H/ingres.h
+rangetable.o:$H/symbol.h
+rangetable.o:globs.h
+rangetable.o:$H/sccs.h
+rangetable.o:protos.h
+rnum.o:$H/ingres.h
+rnum.o:globs.h
+rnum.o:$H/sccs.h
+rnum.o:protos.h
+reinit.o:$H/ingres.h
+reinit.o:$H/aux.h
+reinit.o:$H/tree.h
+reinit.o:$H/symbol.h
+reinit.o:$H/lock.h
+reinit.o:$H/sccs.h
+reinit.o:protos.h
+selectv.o:$H/ingres.h
+selectv.o:$H/symbol.h
+selectv.o:$H/tree.h
+selectv.o:globs.h
+selectv.o:$H/sccs.h
+selectv.o:protos.h
+setvar.o:$H/ingres.h
+setvar.o:$H/aux.h
+setvar.o:$H/tree.h
+setvar.o:$H/symbol.h
+setvar.o:globs.h
+setvar.o:$H/sccs.h
+setvar.o:protos.h
+usubr.o:$H/ingres.h
+usubr.o:$H/aux.h
+usubr.o:$H/tree.h
+usubr.o:$H/symbol.h
+usubr.o:$H/access.h
+usubr.o:$H/pv.h
+usubr.o:globs.h
+usubr.o:$H/sccs.h
+usubr.o:protos.h
+mklist.o:$H/ingres.h
+mklist.o:$H/aux.h
+mklist.o:$H/tree.h
+mklist.o:$H/symbol.h
+mklist.o:globs.h
+mklist.o:$H/sccs.h
+mklist.o:protos.h
+lockit.o:$H/ingres.h
+lockit.o:$H/aux.h
+lockit.o:$H/tree.h
+lockit.o:globs.h
+lockit.o:$H/lock.h
+lockit.o:$H/sccs.h
+lockit.o:protos.h
+pull_const.o:$H/ingres.h
+pull_const.o:$H/symbol.h
+pull_const.o:$H/aux.h
+pull_const.o:$H/tree.h
+pull_const.o:globs.h
+pull_const.o:$H/sccs.h
+pull_const.o:protos.h
+call_ovqp.o:$H/errors.h
+call_ovqp.o:$H/ingres.h
+call_ovqp.o:$H/aux.h
+call_ovqp.o:$H/access.h
+call_ovqp.o:$H/tree.h
+call_ovqp.o:$H/symbol.h
+call_ovqp.o:globs.h
+call_ovqp.o:$H/sccs.h
+call_ovqp.o:protos.h
+call_dbu.o:$H/ingres.h
+call_dbu.o:$H/aux.h
+call_dbu.o:$H/tree.h
+call_dbu.o:$H/symbol.h
+call_dbu.o:$H/pv.h
+call_dbu.o:globs.h
+call_dbu.o:$H/sccs.h
+call_dbu.o:protos.h
+# DEPENDENCIES MUST END AT END OF FILE
+# IF YOU PUT STUFF HERE IT WILL GO AWAY
+# see make depend above

@@ -1,0 +1,510 @@
+#
+#  Makefile for INGRES util library
+#
+#	@(#)Makefile	8.4	6/12/88
+#
+
+INGRES=	../..
+H=	../h
+LIB=	$(INGRES)/lib
+
+OBJS1=	acc_addbuf.o add_prim.o batch.o batchxtra.o cleanrel.o \
+	closecat.o closer.o delete.o do_u_flag.o \
+	errfilen.o formatpg.o getnuser.o gettree.o getuser.o \
+	initucode.o dblocks.o inpcloser.o insert.o markopen.o \
+	noclose.o null_fn.o opencat.o cat_desc.o openr.o \
+	getequal.o get.o printdesc.o \
+	replace.o findbest.o add_ovflo.o cslocks.o \
+	find.o last_page.o ndxsearch.o compare.o newlino.o \
+	paramd.o out_arg.o rhash.o \
+	rllocks.o rub.o scan_dups.o setkey.o \
+	trim_relna.o tuple.o writebatch.o accbuf.o page.o \
+	pglocks.o globals.o readadmin.o checkadmin.o lockreq.o \
+	ingresname.o utility.o lock.o \
+	btree.o get_tid.o \
+	sort.o
+OBJS2=	append.o atof.o bequal.o bitcnt.o bitpos.o cat.o \
+	concat.o freebuf.o ftoa.o fullwait.o \
+	getufield.o iocv.o itoa.o length.o \
+	xalloc.o need.o oatoi.o pad.o pmove.o \
+	prargs.o scompare.o sequal.o set_si_buf.o set_so_buf.o \
+	setflag.o trace.o atol.o smove.o \
+	lprintf.o clrmem.o xputchar.o ztack.o syserr.o \
+	bmove.o perror.o locv.o capital.o extern.o sre.o
+
+SRCS1=	acc_addbuf.c add_prim.c batch.c batchxtra.c cleanrel.c \
+	closecat.c closer.c delete.c do_u_flag.c \
+	errfilen.c formatpg.c getnuser.c gettree.c getuser.c \
+	initucode.c dblocks.c inpcloser.c insert.c markopen.c \
+	noclose.c null_fn.c opencat.c cat_desc.c openr.c \
+	getequal.c get.c printdesc.c \
+	btree.c get_tid.c
+SRCS2=	replace.c findbest.c add_ovflo.c cslocks.c \
+	find.c last_page.c ndxsearch.c compare.c newlino.c \
+	paramd.c out_arg.c rhash.c \
+	rllocks.c rub.c scan_dups.c setkey.c \
+	trim_relna.c tuple.c writebatch.c accbuf.c page.c \
+	pglocks.c globals.c readadmin.c checkadmin.c lockreq.c \
+	ingresname.c utility.c lock.c \
+	sort.c
+SRCS3=	append.c atof.c bequal.c bitcnt.c bitpos.c cat.c \
+	concat.c freebuf.c ftoa.c fullwait.c \
+	getufield.c iocv.c itoa.c length.c \
+	xalloc.c need.c oatoi.c pad.c pmove.c capital.c extern.c
+SRCS4=	prargs.c scompare.c sequal.c set_si_buf.c set_so_buf.c \
+	setflag.c trace.c atol.c smove.c \
+	xputchar.c ztack.c syserr.c \
+	lprintf.c clrmem.c perror.c locv.c sre.c
+ASSRC=  bmove.c
+SRCS=	$(SRCS1) $(SRCS2) $(SRCS3) $(SRCS4) $(ASSRC)
+OBJS=	$(OBJS1) $(OBJS2)
+
+LINTFLAGS = -huc -I$H
+AR=	-ar
+ARFLAGS=urv
+CC= @CC@
+RANLIB=	@RANLIB@
+DEFS= @DEFS@
+OPTIM= -O
+MOAN= -Wall
+LDFLAGS= $(OPTIM)
+CFLAGS= -DINGRES_IUTIL -DINGRES_GUTIL -I$(H) $(OPTIM) $(DEFS) $(MOAN)
+GET=	sccs get
+REL=
+LINT = lint
+PR=	print
+VGRIND=	csh /usr/ucb/vgrind
+HEADER=	Iutil Library
+CP=	cp
+CHMOD=	chmod
+LIBMODE=664
+
+libutil.a: $(OBJS)
+	$(AR) $(ARFLAGS) libutil.a $(OBJS)
+	$(CHMOD) $(LIBMODE) libutil.a
+	$(RANLIB) libutil.a
+
+install: $(LIB)/libutil.a
+
+$(LIB)/libutil.a: libutil.a
+	$(CP) libutil.a $(LIB)/libutil.a
+	$(RANLIB) $(LIB)/libutil.a
+
+new:
+	rm -f libutil.a
+
+clean:
+	rm -f *.o
+	rm -f libutil.a a.out core
+
+lint:
+	$(LINT) $(LINTFLAGS) $(SRCS1) $(SRCS2)
+
+print: sources
+	$(PR) Makefile TraceFlags *.[hm] *.[csy]
+
+vgrind: sources
+	cp /dev/null index
+	$(VGRIND) -h "$(HEADER) (Release 8)" -n Makefile TraceFlags
+	$(VGRIND) -h "$(HEADER) (Release 8)" *.[csy]
+	$(VGRIND) -h "$(HEADER) (Release 8)" -x index
+
+sources: $(SRCS)
+
+$(SRCS1):
+	$(GET) $(REL) $@
+$(SRCS2):
+	$(GET) $(REL) $@
+
+tags: sources
+	-fgrep ../ tags > othertags
+	ctags  $(SRCS) $(HDRS)
+	sort -o tags tags othertags
+	-rm -f othertags
+
+#
+# DANGER	DANGER	DANGER	DANGER	DANGER	DANGER
+# The following two entries should NOT be executed by the user.
+# These entries are only for the Makefile in conf to construct
+# the system tag files.
+#
+systags: 
+	ctags $(SRCS) $(HDRS)
+	sed "s/	/	libutil.a\//" tags > systags
+	cat systags >> ../tags
+
+#
+# We assume that systags has already been done.
+#
+installtags:
+	sed "/	libutil.a/d" ../tags | sed "s/	/	..\//" > othertags
+	sort -o tags tags othertags
+	-rm -f othertags systags
+
+depend:
+	grep '^#[ 	]*include' $(SRCS) | sed -n -f ../h/depend.sed > makedep
+	echo '/^# DO NOT DELETE THIS LINE/+2,$$d' >eddep
+	echo '$$r makedep' >>eddep
+	echo 'w' >>eddep
+	cp Makefile Makefile.bak
+	ed - Makefile < eddep
+	rm eddep makedep
+	echo '# DEPENDENCIES MUST END AT END OF FILE' >> Makefile
+	echo '# IF YOU PUT STUFF HERE IT WILL GO AWAY' >> Makefile
+	echo '# see make depend above' >> Makefile
+
+# DO NOT DELETE THIS LINE -- make depend uses it
+
+acc_addbuf.o:$H/ingres.h
+acc_addbuf.o:$H/access.h
+acc_addbuf.o:$H/sccs.h
+acc_addbuf.o:protos.h
+add_prim.o:$H/ingres.h
+add_prim.o:$H/access.h
+add_prim.o:$H/sccs.h
+add_prim.o:protos.h
+batch.o:$H/ingres.h
+batch.o:$H/aux.h
+batch.o:$H/catalog.h
+batch.o:$H/symbol.h
+batch.o:$H/access.h
+batch.o:$H/batch.h
+batch.o:$H/btree.h
+batch.o:$H/sccs.h
+batch.o:protos.h
+batchxtra.o:$H/ingres.h
+batchxtra.o:$H/aux.h
+batchxtra.o:$H/symbol.h
+batchxtra.o:$H/access.h
+batchxtra.o:$H/batch.h
+batchxtra.o:$H/sccs.h
+batchxtra.o:protos.h
+cleanrel.o:$H/ingres.h
+cleanrel.o:$H/aux.h
+cleanrel.o:$H/access.h
+cleanrel.o:$H/sccs.h
+cleanrel.o:protos.h
+closecat.o:$H/ingres.h
+closecat.o:$H/aux.h
+closecat.o:$H/access.h
+closecat.o:$H/sccs.h
+closecat.o:protos.h
+closer.o:$H/ingres.h
+closer.o:$H/access.h
+closer.o:$H/catalog.h
+closer.o:$H/sccs.h
+closer.o:protos.h
+clr_tuple.o:$H/ingres.h
+clr_tuple.o:$H/symbol.h
+clr_tuple.o:$H/access.h
+clr_tuple.o:$H/sccs.h
+delete.o:$H/ingres.h
+delete.o:$H/access.h
+delete.o:$H/catalog.h
+delete.o:$H/batch.h
+delete.o:$H/btree.h
+delete.o:$H/sccs.h
+delete.o:protos.h
+do_u_flag.o:$H/ingres.h
+do_u_flag.o:$H/aux.h
+do_u_flag.o:$H/sccs.h
+do_u_flag.o:protos.h
+errfilen.o:$H/ingres.h
+errfilen.o:$H/aux.h
+errfilen.o:$H/version.h
+errfilen.o:$H/sccs.h
+errfilen.o:protos.h
+formatpg.o:$H/ingres.h
+formatpg.o:$H/access.h
+formatpg.o:$H/sccs.h
+formatpg.o:protos.h
+getnuser.o:$H/ingres.h
+getnuser.o:$H/aux.h
+getnuser.o:$H/sccs.h
+gettree.o:$H/ingres.h
+gettree.o:$H/catalog.h
+gettree.o:$H/tree.h
+gettree.o:$H/symbol.h
+gettree.o:$H/pv.h
+gettree.o:$H/sccs.h
+gettree.o:protos.h
+getuser.o:$H/ingres.h
+getuser.o:$H/aux.h
+getuser.o:$H/sccs.h
+initucode.o:$H/ingres.h
+initucode.o:$H/aux.h
+initucode.o:$H/version.h
+initucode.o:$H/access.h
+initucode.o:$H/lock.h
+initucode.o:$H/sccs.h
+initucode.o:protos.h
+dblocks.o:$H/ingres.h
+dblocks.o:$H/lock.h
+dblocks.o:$H/sccs.h
+dblocks.o:protos.h
+inpcloser.o:$H/ingres.h
+inpcloser.o:$H/access.h
+inpcloser.o:$H/sccs.h
+inpcloser.o:protos.h
+insert.o:$H/ingres.h
+insert.o:$H/access.h
+insert.o:$H/catalog.h
+insert.o:$H/btree.h
+insert.o:$H/sccs.h
+insert.o:protos.h
+markopen.o:$H/useful.h
+markopen.o:$H/sccs.h
+markopen.o:protos.h
+noclose.o:$H/ingres.h
+noclose.o:$H/aux.h
+noclose.o:$H/access.h
+noclose.o:$H/sccs.h
+noclose.o:protos.h
+null_fn.o:$H/sccs.h
+opencat.o:$H/ingres.h
+opencat.o:$H/aux.h
+opencat.o:$H/access.h
+opencat.o:$H/sccs.h
+opencat.o:protos.h
+cat_desc.o:$H/ingres.h
+cat_desc.o:$H/aux.h
+cat_desc.o:$H/access.h
+cat_desc.o:$H/sccs.h
+openr.o:$H/ingres.h
+openr.o:$H/aux.h
+openr.o:$H/access.h
+openr.o:$H/symbol.h
+openr.o:$H/catalog.h
+openr.o:$H/sccs.h
+openr.o:protos.h
+get_reltup.o:$H/ingres.h
+get_reltup.o:$H/access.h
+get_reltup.o:$H/aux.h
+get_reltup.o:$H/sccs.h
+get_reltup.o:protos.h
+getequal.o:$H/ingres.h
+getequal.o:$H/access.h
+getequal.o:$H/sccs.h
+getequal.o:protos.h
+get.o:$H/ingres.h
+get.o:$H/aux.h
+get.o:$H/access.h
+get.o:$H/sccs.h
+get.o:protos.h
+printdesc.o:$H/ingres.h
+printdesc.o:$H/sccs.h
+printdesc.o:protos.h
+create_btree.o:$H/btree.h
+create_btree.o:$H/ingres.h
+create_btree.o:$H/aux.h
+create_btree.o:$H/sccs.h
+create_btree.o:protos.h
+delete_btree.o:$H/btree.h
+delete_btree.o:$H/ingres.h
+delete_btree.o:$H/batch.h
+delete_btree.o:$H/sccs.h
+delete_btree.o:protos.h
+get_tid.o:$H/btree.h
+get_tid.o:$H/sccs.h
+get_tid.o:protos.h
+insert_mbtree.o:$H/ingres.h
+insert_mbtree.o:$H/access.h
+insert_mbtree.o:$H/catalog.h
+insert_mbtree.o:$H/btree.h
+insert_mbtree.o:$H/sccs.h
+insert_mbtree.o:protos.h
+replace.o:$H/ingres.h
+replace.o:$H/access.h
+replace.o:$H/catalog.h
+replace.o:$H/batch.h
+replace.o:$H/btree.h
+replace.o:$H/sccs.h
+replace.o:protos.h
+del_tuple.o:$H/ingres.h
+del_tuple.o:$H/access.h
+del_tuple.o:$H/sccs.h
+del_tuple.o:protos.h
+findbest.o:$H/ingres.h
+findbest.o:$H/aux.h
+findbest.o:$H/access.h
+findbest.o:$H/sccs.h
+findbest.o:protos.h
+add_ovflo.o:$H/ingres.h
+add_ovflo.o:$H/access.h
+add_ovflo.o:$H/aux.h
+add_ovflo.o:$H/lock.h
+add_ovflo.o:$H/sccs.h
+add_ovflo.o:protos.h
+cslocks.o:$H/ingres.h
+cslocks.o:$H/access.h
+cslocks.o:$H/lock.h
+cslocks.o:$H/sccs.h
+cslocks.o:protos.h
+find.o:$H/ingres.h
+find.o:$H/aux.h
+find.o:$H/symbol.h
+find.o:$H/access.h
+find.o:$H/lock.h
+find.o:$H/btree.h
+find.o:$H/sccs.h
+find.o:protos.h
+last_page.o:$H/ingres.h
+last_page.o:$H/access.h
+last_page.o:$H/sccs.h
+last_page.o:protos.h
+ndxsearch.o:$H/ingres.h
+ndxsearch.o:$H/aux.h
+ndxsearch.o:$H/symbol.h
+ndxsearch.o:$H/access.h
+ndxsearch.o:$H/lock.h
+ndxsearch.o:$H/sccs.h
+ndxsearch.o:protos.h
+compare.o:$H/ingres.h
+compare.o:$H/access.h
+compare.o:$H/symbol.h
+compare.o:$H/aux.h
+compare.o:$H/sccs.h
+compare.o:protos.h
+newlino.o:$H/ingres.h
+newlino.o:$H/access.h
+newlino.o:$H/sccs.h
+newlino.o:protos.h
+paramd.o:$H/ingres.h
+paramd.o:$H/aux.h
+paramd.o:$H/catalog.h
+paramd.o:$H/access.h
+paramd.o:$H/sccs.h
+paramd.o:protos.h
+printup.o:$H/ingres.h
+printup.o:$H/aux.h
+printup.o:$H/access.h
+printup.o:$H/symbol.h
+printup.o:$H/sccs.h
+printup.o:protos.h
+out_arg.o:$H/ingres.h
+out_arg.o:$H/aux.h
+out_arg.o:$H/sccs.h
+out_arg.o:protos.h
+put_tuple.o:$H/ingres.h
+put_tuple.o:$H/symbol.h
+put_tuple.o:$H/access.h
+put_tuple.o:$H/catalog.h
+put_tuple.o:$H/sccs.h
+put_tuple.o:protos.h
+rhash.o:$H/ingres.h
+rhash.o:$H/aux.h
+rhash.o:$H/symbol.h
+rhash.o:$H/access.h
+rhash.o:$H/lock.h
+rhash.o:$H/sccs.h
+rhash.o:protos.h
+rllocks.o:$H/ingres.h
+rllocks.o:$H/lock.h
+rllocks.o:$H/sccs.h
+rllocks.o:protos.h
+rub.o:$H/useful.h
+rub.o:$H/sccs.h
+rub.o:protos.h
+scan_dups.o:$H/ingres.h
+scan_dups.o:$H/symbol.h
+scan_dups.o:$H/access.h
+scan_dups.o:$H/lock.h
+scan_dups.o:$H/range.h
+scan_dups.o:$H/sccs.h
+scan_dups.o:protos.h
+get_tuple.o:$H/ingres.h
+get_tuple.o:$H/access.h
+get_tuple.o:$H/symbol.h
+get_tuple.o:$H/catalog.h
+get_tuple.o:$H/btree.h
+get_tuple.o:$H/sccs.h
+get_tuple.o:protos.h
+setkey.o:$H/ingres.h
+setkey.o:$H/symbol.h
+setkey.o:$H/sccs.h
+setkey.o:protos.h
+trim_relna.o:$H/ingres.h
+trim_relna.o:$H/sccs.h
+tup_len.o:$H/ingres.h
+tup_len.o:$H/access.h
+tup_len.o:$H/sccs.h
+tup_len.o:protos.h
+writebatch.o:$H/ingres.h
+writebatch.o:$H/aux.h
+writebatch.o:$H/symbol.h
+writebatch.o:$H/access.h
+writebatch.o:$H/batch.h
+writebatch.o:$H/sccs.h
+writebatch.o:protos.h
+accbuf.o:$H/ingres.h
+accbuf.o:$H/access.h
+accbuf.o:$H/aux.h
+accbuf.o:$H/lock.h
+accbuf.o:$H/sccs.h
+accbuf.o:protos.h
+page.o:$H/ingres.h
+page.o:$H/access.h
+page.o:$H/aux.h
+page.o:$H/lock.h
+page.o:$H/sccs.h
+page.o:protos.h
+pglocks.o:$H/ingres.h
+pglocks.o:$H/access.h
+pglocks.o:$H/lock.h
+pglocks.o:$H/sccs.h
+pglocks.o:protos.h
+globals.o:$H/sccs.h
+readadmin.o:$H/ingres.h
+readadmin.o:$H/access.h
+readadmin.o:$H/aux.h
+readadmin.o:$H/lock.h
+readadmin.o:$H/sccs.h
+readadmin.o:protos.h
+checkadmin.o:$H/ingres.h
+checkadmin.o:$H/version.h
+checkadmin.o:$H/access.h
+checkadmin.o:$H/sccs.h
+checkadmin.o:protos.h
+lockreq.o:$H/ingres.h
+lockreq.o:$H/ildr.h
+lockreq.o:$H/lock.h
+lockreq.o:$H/sccs.h
+lockreq.o:protos.h
+ingresname.o:$H/ingres.h
+ingresname.o:$H/sccs.h
+ingresname.o:protos.h
+utility.o:endian.h
+utility.o:$H/ingres.h
+utility.o:$H/access.h
+utility.o:$H/sccs.h
+utility.o:protos.h
+lock.o:$H/sccs.h
+lock.o:$H/ingres.h
+lock.o:protos.h
+insert_btree.o:$H/btree.h
+insert_btree.o:$H/ingres.h
+insert_btree.o:$H/batch.h
+insert_btree.o:$H/symbol.h
+insert_btree.o:$H/sccs.h
+btree_util.o:$H/btree.h
+btree_util.o:$H/ingres.h
+btree_util.o:$H/sccs.h
+btree_util.o:protos.h
+btreerange.o:$H/ingres.h
+btreerange.o:$H/btree.h
+btreerange.o:$H/sccs.h
+btreerange.o:protos.h
+btreename.o:$H/ingres.h
+btreename.o:$H/sccs.h
+btreename.o:protos.h
+sort.o:$H/ingres.h
+sort.o:$H/batch.h
+sort.o:$H/version.h
+sort.o:$H/pv.h
+sort.o:$H/symbol.h
+sort.o:$H/access.h
+sort.o:$H/sccs.h
+sort.o:protos.h
+# DEPENDENCIES MUST END AT END OF FILE
+# IF YOU PUT STUFF HERE IT WILL GO AWAY
+# see make depend above

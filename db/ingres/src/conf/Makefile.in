@@ -1,0 +1,385 @@
+###################################################################
+###################################################################
+###								###
+###								###
+###	*****    *   *    *****    ****     *****     ****	###
+###	  *      **  *    *        *   *    *        *    	###
+###	  *      * * *    * ***    ****     ***       *** 	###
+###	  *      *  **    *   *    *  *     *            *	###
+###	*****    *   *    *****    *   *    *****    **** 	###
+###								###
+###								###
+###	      A relational database management system		###
+###								###
+###			    RELEASE 8				###
+###								###
+###################################################################
+###################################################################
+#
+#	For information contact:
+#		Mike Stonebraker
+#		Dept. of Electrical Engineering &
+#		  Computer Science
+#		University of California
+#		Berkeley, California  94720
+#
+
+#
+#	@(#)Makefile	8.4	12/24/86
+#
+
+#
+#  This makefile compiles most of the modules for the bulk of
+#  the INGRES system.  The modules affected are those used by
+#  the "ingres" command itself.  Stand-alone utilities such as
+#  "printr" and "restore" are in the 'support' directory.
+#
+
+#
+#	Major recompilation will take place from this directory.
+#	There are several interesting entry points:
+#		allclean	cleans all cruft from all
+#				directories.
+#		allinstall	installs binaries in the INGRES
+#				bin directory.
+#			INSTALL=actual entry point called.
+#		sysinstall	installs that subset of the INGRES
+#				system in public directories.
+#			SYSBIN=	bin directory that the binaries
+#				should live in.
+#			SYSLIB=	directory that libraries should live
+#				in (typically /usr/lib).
+#	for all of these:
+#		CPUTYPE=type of cpu you are running on, either VAX
+#			or SUN.
+#
+#	Examples of usage:
+#		To recompile entire system from sources:
+#			make allclean allinstall
+#		To install INGRES for general users:
+#			make allinstall sysinstall
+#		To print the entire system:
+#			make install INSTALL=print
+#			{yes, this is cheating}
+#
+
+#
+#  General system paths
+#
+
+# the ingres subtree
+INGRES=	/usr/ingres
+# the location of the system header files
+H=	../h
+# the residence of the system (internal) libraries
+LIB=	$(INGRES)/lib
+# the residence of the system (internal) binaries
+# this entry must be reflected in the process table
+BIN=	$(INGRES)/bin
+# the location of user binaries
+SYSBIN=	/usr/local/bin
+# the location of user libraries (libq.a)
+SYSLIB=	/usr/lib
+# the cputype, VAX or SUN
+#ADDR_ROUNDUP should be set if addresses should be rounded up
+#to a word boundary - not necessary on VAX, or i386
+
+ALL=	monitor univingres sysmonitor sysmodfunc printadmin sysdump
+
+SRCS=	monitor.c univingres.c sysdump.c version.c sysmonitor.c sysmodfunc.c
+
+#
+#  Libraries
+#
+#	Libraries should be loaded in the order listed below.
+#
+LIBPATH= -L$(LIB)
+CTLMOD=	-lctlmod
+IUTIL=	-liutil
+GUTIL=	-lgutil
+UTIL=	-lutil
+MATH=	-lm
+#ALLLIB=	$(CTLMOD) $(IUTIL) $(GUTIL)
+ALLLIB=	$(CTLMOD) $(UTIL)
+
+DEPCTLMOD= $(LIB)/libctlmod.a
+DEPIUTIL= $(LIB)/libiutil.a
+DEPGUTIL= $(LIB)/libgutil.a
+DEPUTIL= $(LIB)/libutil.a
+#DEPALLLIB= $(DEPCTLMOD) $(DEPIUTIL) $(DEPGUTIL)
+DEPALLLIB= $(DEPCTLMOD) $(DEPUTIL)
+
+#
+#  Libraries
+#
+DEPMONITOR= $(LIB)/libmon.a
+DEPSYSMONITOR= $(LIB)/libsysmon.a
+DEPPARSER= $(LIB)/libparser.a
+DEPQRYMOD= $(LIB)/libqrymod.a
+DEPDECOMP= $(LIB)/libdecomp.a
+DEPOVQP= $(LIB)/libovqp.a
+DEPDBULIB= $(LIB)/libdbu.a
+MONITOR= -lmon
+SYSMONITOR= -lsysmon
+PARSER=	 -lparser
+QRYMOD=	 -lqrymod
+DECOMP=	 -ldecomp
+OVQP=	 -lovqp
+DBULIB=	 -ldbu
+EXTRALIB=
+
+#
+#  Assorted commands & other garbage
+#
+OPTIM= -O
+MOAN= -Wall
+DEFS= @DEFS@
+CFLAGS= -I$(H) $(DEFS) $(OPTIM) $(MOAN)
+LDFLAGS= $(OPTIM)
+
+CC = @CC@
+RANLIB= @RANLIB@
+CHMOD=	chmod
+BINMODE=751
+SUMODE=	4751
+CP=	cp
+GET=	sccs get
+REL=
+PR=	print
+VGRIND=	csh /usr/ucb/vgrind
+HEADER=	Configuration Tables
+MAKE=	make
+MFLAGS=	-k
+INSTALL=install
+
+#
+#  And the processes....
+#
+#	Proper loading order is:
+#		conf table
+#		library(s) for modules
+#		ctlmod library
+#		iutil library
+#		gutil library
+#
+#  Sysmodfunc
+
+
+#sysmodfunc: version.o sysmodfunc.o $(DEPDBULIB) $(DEPCTLMOD) $(DEPALLLIB)
+#	$(CC) $(LDFLAGS) version.o $@.o $(LIBPATH) $(DBULIB) $(OTHERS) $(ALLLIB) $(EXTRALIB) ../util/oatoi.o -o $@
+sysmodfunc: version.o sysmodfunc.o $(DEPDBULIB) $(DEPCTLMOD) $(DEPALLLIB)
+	$(CC) $(LDFLAGS) version.o $@.o $(LIBPATH) $(DBULIB) $(OTHERS) $(ALLLIB) $(EXTRALIB) -o $@
+	$(CHMOD) $(SUMODE) $@
+	ls -l $@; size $@
+
+#  Sysdump
+
+sysdump: version.o sysdump.o $(DEPCTLMOD) $(DEPALLLIB)
+	$(CC) $(LDFLAGS) version.o $@.o $(LIBPATH) $(OTHERS) $(ALLLIB) $(EXTRALIB) -o $@
+	$(CHMOD) $(SUMODE) $@
+	ls -l $@; size $@
+
+#  Monitor
+
+#monitor: version.o monitor.o $(DEPMONITOR) $(DEPCTLMOD) $(DEPIUTIL) $(DEPGUTIL)
+#	$(CC) $(LDFLAGS) version.o $@.o $(LIBPATH) $(OTHERS) $(MONITOR) $(CTLMOD) $(IUTIL) $(GUTIL) $(EXTRALIB) -o $@
+monitor: version.o monitor.o $(DEPMONITOR) $(DEPCTLMOD) $(DEPUTIL)
+	$(CC) $(LDFLAGS) version.o $@.o $(LIBPATH) $(OTHERS) $(MONITOR) $(CTLMOD) $(UTIL) $(EXTRALIB) -o $@
+	$(CHMOD) $(BINMODE) $@
+	ls -l $@; size $@
+
+#  SysMonitor 
+
+#sysmonitor: version.o sysmonitor.o $(DEPSYSMONITOR) $(DEPDBULIB) $(DEPIUTIL) $(DEPGUTIL)
+#	$(CC) $(LDFLAGS) version.o $@.o $(LIBPATH) $(OTHERS) $(SYSMONITOR) $(CTLMOD) $(IUTIL) $(GUTIL) $(EXTRALIB) -o $@
+sysmonitor: version.o sysmonitor.o $(DEPSYSMONITOR) $(DEPDBULIB) $(DEPUTIL)
+	$(CC) $(LDFLAGS) version.o $@.o $(LIBPATH) $(OTHERS) $(SYSMONITOR) $(CTLMOD) $(UTIL) $(EXTRALIB) -o $@
+	$(CHMOD) $(BINMODE) $@
+	ls -l $@; size $@
+
+#  Full System
+
+ALLLIBS=$(PARSER) $(QRYMOD) $(DECOMP) $(OVQP) $(DBULIB) $(ALLLIB)
+DEPALLLIBS= $(DEPPARSER) $(DEPQRYMOD) $(DEPDECOMP) $(DEPOVQP) $(DEPDBULIB) $(DEPALLLIB)
+
+univingres: version.o univingres.o $(DEPALLLIBS)
+	$(CC) $(LDFLAGS) version.o $@.o $(LIBPATH) $(OTHERS) $(ALLLIBS) $(MATH) $(EXTRALIB) -o $@
+	$(CHMOD) $(SUMODE) $@
+	ls -l $@; size $@
+
+#################################################################
+#
+#	Install the world
+#
+
+install: $(BIN)/univingres $(BIN)/sysdump $(BIN)/monitor \
+	 $(BIN)/sysmonitor $(BIN)/sysmodfunc
+
+$(BIN)/monitor: monitor
+	$(CP) monitor $(BIN)/monitor
+$(BIN)/sysmonitor: sysmonitor
+	$(CP) sysmonitor $(BIN)/sysmonitor
+$(BIN)/parser: parser
+	$(CP) parser $(BIN)/parser; $(CHMOD) $(SUMODE) $(BIN)/parser
+$(BIN)/qrymod: qrymod
+	$(CP) qrymod $(BIN)/qrymod; $(CHMOD) $(SUMODE) $(BIN)/qrymod
+$(BIN)/decomp: decomp
+	$(CP) decomp $(BIN)/decomp; $(CHMOD) $(SUMODE) $(BIN)/decomp
+$(BIN)/alldbu: alldbu
+	$(CP) alldbu $(BIN)/alldbu; $(CHMOD) $(SUMODE) $(BIN)/alldbu
+$(BIN)/univingres: univingres
+	$(CP) univingres $(BIN)/univingres; $(CHMOD) $(SUMODE) $(BIN)/univingres
+$(BIN)/sysdump: sysdump
+	$(CP) sysdump $(BIN)/sysdump; $(CHMOD) $(SUMODE) $(BIN)/sysdump
+$(BIN)/sysmodfunc: sysmodfunc
+	$(CP) sysmodfunc $(BIN)/sysmodfunc; $(CHMOD) $(SUMODE) $(BIN)/sysmodfunc
+
+allinstall: version.o all1 install
+
+#	cd ../gutil; $(MAKE) $(MFLAGS) $(INSTALL)
+#	cd ../iutil; $(MAKE) $(MFLAGS) $(INSTALL)
+all1:
+	cd ../h; $(MAKE) $(MFLAGS) $(INSTALL)
+	cd ../util; $(MAKE) $(MFLAGS) $(INSTALL)
+	cd ../ctlmod; $(MAKE) $(MFLAGS) $(INSTALL)
+	cd ../dbu; $(MAKE) $(MFLAGS) $(INSTALL)
+	cd ../decomp; $(MAKE) $(MFLAGS) $(INSTALL)
+	cd ../equel; $(MAKE) $(MFLAGS) $(INSTALL)
+	cd ../libq; $(MAKE) $(MFLAGS) $(INSTALL)
+	cd ../monitor; $(MAKE) $(MFLAGS) $(INSTALL)
+	cd ../ovqp; $(MAKE) $(MFLAGS) $(INSTALL)
+	cd ../parser; $(MAKE) $(MFLAGS) $(INSTALL)
+	cd ../qrymod; $(MAKE) $(MFLAGS) $(INSTALL)
+	cd ../support; $(MAKE) $(MFLAGS) $(INSTALL)
+
+# install the user programs
+sysinstall:
+	@echo 'you may have to be root for this to work....'
+	cd ../support; $(MAKE) $(MFLAGS) SYSBIN=$(SYSBIN) SYSLIB=$(SYSLIB) sysinstall
+	cd ../equel; $(MAKE) $(MFLAGS) SYSBIN=$(SYSBIN) SYSLIB=$(SYSLIB) sysinstall
+	cd ../libq; $(MAKE) $(MFLAGS) SYSBIN=$(SYSBIN) SYSLIB=$(SYSLIB) sysinstall
+
+#################################################################
+#
+#	Miscellaneous entries
+#
+
+new:
+	rm -f $(ALL)
+
+print: sources
+	$(PR) Makefile *.[csy]
+
+vgrind: sources
+	cp /dev/null index
+	$(VGRIND) -h "$(HEADER) (Release 8)" -n Makefile
+	$(VGRIND) -h "$(HEADER) (Release 8)" *.[csy]
+	$(VGRIND) -h "$(HEADER) (Release 8)" -x index
+
+clean: new
+	rm -f *.o
+	rm -f a.out core
+
+#	cd ../gutil; $(MAKE) $(MFLAGS) clean
+#	cd ../iutil; $(MAKE) $(MFLAGS) clean
+allclean: clean
+	cd ../h; $(MAKE) $(MFLAGS) clean
+	cd ../util; $(MAKE) $(MFLAGS) clean
+	cd ../ctlmod; $(MAKE) $(MFLAGS) clean
+	cd ../dbu; $(MAKE) $(MFLAGS) clean
+	cd ../decomp; $(MAKE) $(MFLAGS) clean
+	cd ../equel; $(MAKE) $(MFLAGS) clean
+	cd ../libq; $(MAKE) $(MFLAGS) clean
+	cd ../monitor; $(MAKE) $(MFLAGS) clean
+	cd ../ovqp; $(MAKE) $(MFLAGS) clean
+	cd ../parser; $(MAKE) $(MFLAGS) clean
+	cd ../qrymod; $(MAKE) $(MFLAGS) clean
+	cd ../support; $(MAKE) $(MFLAGS) clean
+
+#	cd ../gutil; $(MAKE) $(MFLAGS) depend
+#	cd ../iutil; $(MAKE) $(MFLAGS) depend
+alldepend:
+	cd ../util; $(MAKE) $(MFLAGS) depend
+	cd ../ctlmod; $(MAKE) $(MFLAGS) depend
+	cd ../dbu; $(MAKE) $(MFLAGS) depend
+	cd ../decomp; $(MAKE) $(MFLAGS) depend
+	cd ../equel; $(MAKE) $(MFLAGS) depend
+	cd ../libq; $(MAKE) $(MFLAGS) depend
+	cd ../monitor; $(MAKE) $(MFLAGS) depend
+	cd ../ovqp; $(MAKE) $(MFLAGS) depend
+	cd ../parser; $(MAKE) $(MFLAGS) depend
+	cd ../qrymod; $(MAKE) $(MFLAGS) depend
+	cd ../support; $(MAKE) $(MFLAGS) depend
+
+#	cd ../gutil; $(MAKE) $(MFLAGS) systags
+#	cd ../iutil; $(MAKE) $(MFLAGS) systags
+tags: 
+	cp /dev/null ../tags
+	cd ../h; $(MAKE) $(MFLAGS) systags
+	cd ../util; $(MAKE) $(MFLAGS) systags
+	cd ../ctlmod; $(MAKE) $(MFLAGS) systags
+	cd ../dbu; $(MAKE) $(MFLAGS) systags
+	cd ../decomp; $(MAKE) $(MFLAGS) systags
+	cd ../equel; $(MAKE) $(MFLAGS) systags
+	cd ../libq; $(MAKE) $(MFLAGS) systags
+	cd ../monitor; $(MAKE) $(MFLAGS) systags
+	cd ../ovqp; $(MAKE) $(MFLAGS) systags
+	cd ../parser; $(MAKE) $(MFLAGS) systags
+	cd ../qrymod; $(MAKE) $(MFLAGS) systags
+	cd ../support; $(MAKE) $(MFLAGS) systags
+	sort -o ../tags ../tags
+	cd ../h; $(MAKE) $(MFLAGS) installtags
+	cd ../util; $(MAKE) $(MFLAGS) installtags
+	cd ../ctlmod; $(MAKE) $(MFLAGS) installtags
+	cd ../dbu; $(MAKE) $(MFLAGS) installtags
+	cd ../decomp; $(MAKE) $(MFLAGS) installtags
+	cd ../equel; $(MAKE) $(MFLAGS) installtags
+	cd ../libq; $(MAKE) $(MFLAGS) installtags
+	cd ../monitor; $(MAKE) $(MFLAGS) installtags
+	cd ../ovqp; $(MAKE) $(MFLAGS) installtags
+	cd ../parser; $(MAKE) $(MFLAGS) installtags
+	cd ../qrymod; $(MAKE) $(MFLAGS) installtags
+	cd ../support; $(MAKE) $(MFLAGS) installtags
+
+
+sources: $(SRCS)
+
+$(SRCS):
+	$(GET) $(REL) $@
+
+depend:
+	grep '^#[ 	]*include' $(SRCS) | sed -n -f ../h/depend.sed > makedep
+	echo '/^# DO NOT DELETE THIS LINE/+2,$$d' >eddep
+	echo '$$r makedep' >>eddep
+	echo 'w' >>eddep
+	cp Makefile Makefile.bak
+	ed - Makefile < eddep
+	rm eddep makedep
+	echo '# DEPENDENCIES MUST END AT END OF FILE' >> Makefile
+	echo '# IF YOU PUT STUFF HERE IT WILL GO AWAY' >> Makefile
+	echo '# see make depend above' >> Makefile
+
+# DO NOT DELETE THIS LINE -- make depend uses it
+
+monitor.o:$H/ingres.h
+monitor.o:$H/func.h
+monitor.o:$H/sccs.h
+univingres.o:$H/ingres.h
+univingres.o:$H/aux.h
+univingres.o:$H/access.h
+univingres.o:$H/func.h
+univingres.o:$H/sccs.h
+sysdump.o:$H/ingres.h
+sysdump.o:$H/func.h
+sysdump.o:$H/sccs.h
+version.o:$H/sccs.h
+sysmonitor.o:$H/func.h
+sysmonitor.o:$H/sccs.h
+sysmodfunc.o:$H/ingres.h
+sysmodfunc.o:$H/aux.h
+sysmodfunc.o:$H/access.h
+sysmodfunc.o:$H/sccs.h
+sysmodfunc.o:$H/func.h
+# DEPENDENCIES MUST END AT END OF FILE
+# IF YOU PUT STUFF HERE IT WILL GO AWAY
+# see make depend above

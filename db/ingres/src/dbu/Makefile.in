@@ -1,0 +1,358 @@
+#
+#  Makefile for INGRES database utilities
+#
+#	@(#)Makefile	8.4 	12/18/85
+#
+
+INGRES=	../..
+H=	../h
+LIB=	$(INGRES)/lib
+BIN=	$(INGRES)/bin
+
+CTLMOD=	$(LIB)/libctlmod.a
+IUTIL=	$(LIB)/libiutil.a
+GUTIL=	$(LIB)/libgutil.a
+DBULIB=	$(LIB)/libdbu.a
+
+LIBS=	$(CTLMOD) $(IUTIL) $(GUTIL)
+LIBS1=	$(CTLMOD) $(DBULIB) $(IUTIL) $(GUTIL)
+OBJS=	index.o create.o modify.o modupdate.o destroy.o \
+	udestroy.o copy.o purgetup.o print.o rupdate.o \
+	help.o save.o update.o convert.o secupdate.o \
+	rdwrbatch.o resetrel.o seq_atts.o sysfunc.o \
+	get_p_tid.o display.o pr_prot.o pr_tree.o rmqm.o ksort.o \
+	btreeupdate.o
+HDRS=
+SRCS=	index.c create.c modify.c modupdate.c destroy.c udestroy.c \
+	purgetup.c print.c rupdate.c help.c save.c update.c convert.c \
+	secupdate.c rdwrbatch.c resetrel.c seq_atts.c \
+	get_p_tid.c copy.c ksort.c \
+	display.c rmqm.c pr_prot.c pr_tree.c  sysfunc.c btreeupdate.c 
+
+SOBJS=  sysmon.o
+
+SSRCS=  sysmon.c
+
+AR=	-ar
+ARFLAGS=rvu
+CC= @CC@
+RANLIB= @RANLIB@
+OPTIM= -O
+MOAN= -Wall
+LDFLAGS= $(OPTIM)
+DEFS= @DEFS@
+CFLAGS= -I$(H) -I../ctlmod -DINGRES_DBU $(DEFS) $(MOAN)
+CP=	cp
+CHMOD=	chmod
+LIBMODE=664
+BINMODE=4740
+ROMODE=	444
+GET=	sccs get
+REL=
+PR=	print
+VGRIND=	csh /usr/ucb/vgrind
+HEADER=	Database Utilities
+
+libdbu.a: $(OBJS)
+	$(AR) $(ARFLAGS) libdbu.a $(OBJS)
+	$(CHMOD) $(LIBMODE) libdbu.a
+	$(RANLIB) libdbu.a
+
+$(LIB)/libdbu.a: libdbu.a
+	$(CP) libdbu.a $(LIB)/libdbu.a
+	$(RANLIB) $(LIB)/libdbu.a
+
+install: $(LIB)/libdbu.a $(LIB)/libsysmon.a
+
+libsysmon.a: $(SOBJS)
+	$(AR) $(ARFLAGS) libsysmon.a $(SOBJS)
+	$(CHMOD) $(LIBMODE) libsysmon.a
+	$(RANLIB) libsysmon.a
+
+$(LIB)/libsysmon.a: libsysmon.a
+	$(CP) libsysmon.a $(LIB)/libsysmon.a
+	$(RANLIB) $(LIB)/libsysmon.a
+
+sysmonitor: $(LIB)/libsysmon.a
+	
+alldbu: $(OBJS) config.o
+	$(CC) config.o $(OBJS) $(LDFLAGS) $(LIBS) -o alldbu
+	$(CHMOD) $(BINMODE) alldbu
+
+new:
+	rm -f libdbu.a alldbu
+
+clean:
+	rm -f *.o
+	rm -f libdbu.a alldbu a.out core libsysmon.a
+
+sources: $(SRCS)
+
+$(SRCS):
+	$(GET) $(REL) $@
+
+print: sources
+	$(PR) Makefile TraceFlags *.[hm] *.[csy]
+
+vgrind: sources
+	cp /dev/null index
+	$(VGRIND) -h "$(HEADER) (Release 8)" -n Makefile TraceFlags
+	$(VGRIND) -h "$(HEADER) (Release 8)" *.[csy]
+	$(VGRIND) -h "$(HEADER) (Release 8)" -x index
+
+tags: sources
+	-fgrep ../ tags > othertags
+	ctags  $(SRCS) $(HDRS)
+	sort -o tags tags othertags
+	-rm -f othertags
+
+#
+# DANGER	DANGER	DANGER	DANGER	DANGER	DANGER
+# The following two entries should NOT be executed by the user.
+# These entries are only for the Makefile in conf to construct
+# the system tag files.
+#
+systags: 
+	ctags $(SRCS) $(HDRS)
+	sed "s/	/	dbu\//" tags > systags
+	cat systags >> ../tags
+
+#
+# We assume that systags has already been done.
+#
+installtags:
+	sed "/	dbu/d" ../tags | sed "s/	/	..\//" > othertags
+	sort -o tags tags othertags
+	-rm -f othertags systags
+
+depend:
+	grep '^#[ 	]*include' $(SRCS) | sed -n -f ../h/depend.sed > makedep
+	echo '/^# DO NOT DELETE THIS LINE/+2,$$d' >eddep
+	echo '$$r makedep' >>eddep
+	echo 'w' >>eddep
+	cp Makefile Makefile.bak
+	ed - Makefile < eddep
+	rm eddep makedep
+	echo '# DEPENDENCIES MUST END AT END OF FILE' >> Makefile
+	echo '# IF YOU PUT STUFF HERE IT WILL GO AWAY' >> Makefile
+	echo '# see make depend above' >> Makefile
+
+# DO NOT DELETE THIS LINE -- make depend uses it
+
+index.o:endian.h
+index.o:$H/pv.h
+index.o:$H/func.h
+index.o:$H/symbol.h
+index.o:$H/ingres.h
+index.o:$H/aux.h
+index.o:$H/catalog.h
+index.o:$H/access.h
+index.o:$H/lock.h
+index.o:$H/sccs.h
+index.o:$H/errors.h
+index.o:protos.h
+create.o:$H/pv.h
+create.o:$H/ingres.h
+create.o:$H/access.h
+create.o:$H/aux.h
+create.o:$H/catalog.h
+create.o:$H/symbol.h
+create.o:$H/lock.h
+create.o:$H/func.h
+create.o:$H/sccs.h
+create.o:$H/errors.h
+create.o:protos.h
+modify.o:$H/ingres.h
+modify.o:$H/pv.h
+modify.o:$H/aux.h
+modify.o:$H/access.h
+modify.o:$H/batch.h
+modify.o:$H/lock.h
+modify.o:$H/func.h
+modify.o:$H/version.h
+modify.o:$H/symbol.h
+modify.o:$H/catalog.h
+modify.o:$H/btree.h
+modify.o:$H/sccs.h
+modify.o:$H/errors.h
+modupdate.o:$H/pv.h
+modupdate.o:$H/ingres.h
+modupdate.o:$H/aux.h
+modupdate.o:$H/catalog.h
+modupdate.o:$H/access.h
+modupdate.o:$H/batch.h
+modupdate.o:$H/btree.h
+modupdate.o:$H/symbol.h
+modupdate.o:$H/sccs.h
+modupdate.o:protos.h
+destroy.o:$H/pv.h
+destroy.o:$H/ingres.h
+destroy.o:$H/aux.h
+destroy.o:$H/catalog.h
+destroy.o:$H/func.h
+destroy.o:$H/sccs.h
+destroy.o:$H/errors.h
+destroy.o:protos.h
+udestroy.o:$H/ingres.h
+udestroy.o:$H/aux.h
+udestroy.o:$H/catalog.h
+udestroy.o:$H/btree.h
+udestroy.o:$H/pv.h
+udestroy.o:$H/sccs.h
+udestroy.o:protos.h
+purgetup.o:$H/ingres.h
+purgetup.o:$H/access.h
+purgetup.o:$H/sccs.h
+purgetup.o:protos.h
+print.o:$H/pv.h
+print.o:$H/ingres.h
+print.o:$H/access.h
+print.o:$H/aux.h
+print.o:$H/lock.h
+print.o:$H/func.h
+print.o:$H/catalog.h
+print.o:$H/btree.h
+print.o:$H/sccs.h
+print.o:$H/errors.h
+print.o:protos.h
+rupdate.o:$H/pv.h
+rupdate.o:$H/ingres.h
+rupdate.o:$H/func.h
+rupdate.o:$H/sccs.h
+rupdate.o:protos.h
+help.o:$H/pv.h
+help.o:$H/ingres.h
+help.o:$H/aux.h
+help.o:$H/catalog.h
+help.o:$H/access.h
+help.o:$H/func.h
+help.o:$H/sccs.h
+help.o:$H/errors.h
+help.o:protos.h
+save.o:$H/pv.h
+save.o:$H/ingres.h
+save.o:$H/aux.h
+save.o:$H/func.h
+save.o:$H/sccs.h
+save.o:$H/errors.h
+save.o:protos.h
+update.o:$H/pv.h
+update.o:$H/ingres.h
+update.o:$H/resp.h
+update.o:$H/aux.h
+update.o:$H/symbol.h
+update.o:$H/access.h
+update.o:$H/batch.h
+update.o:$H/catalog.h
+update.o:$H/btree.h
+update.o:$H/version.h
+update.o:$H/sccs.h
+update.o:$H/errors.h
+convert.o:$H/ingres.h
+convert.o:$H/symbol.h
+convert.o:$H/sccs.h
+convert.o:protos.h
+secupdate.o:$H/ingres.h
+secupdate.o:$H/aux.h
+secupdate.o:$H/catalog.h
+secupdate.o:$H/symbol.h
+secupdate.o:$H/access.h
+secupdate.o:$H/batch.h
+secupdate.o:$H/sccs.h
+secupdate.o:protos.h
+rdwrbatch.o:$H/ingres.h
+rdwrbatch.o:$H/aux.h
+rdwrbatch.o:$H/symbol.h
+rdwrbatch.o:$H/access.h
+rdwrbatch.o:$H/batch.h
+rdwrbatch.o:$H/sccs.h
+rdwrbatch.o:protos.h
+resetrel.o:$H/pv.h
+resetrel.o:$H/ingres.h
+resetrel.o:$H/aux.h
+resetrel.o:$H/batch.h
+resetrel.o:$H/access.h
+resetrel.o:$H/func.h
+resetrel.o:$H/sccs.h
+resetrel.o:protos.h
+seq_atts.o:$H/ingres.h
+seq_atts.o:$H/access.h
+seq_atts.o:$H/sccs.h
+seq_atts.o:protos.h
+get_p_tid.o:$H/ingres.h
+get_p_tid.o:$H/catalog.h
+get_p_tid.o:$H/sccs.h
+get_p_tid.o:protos.h
+copy.o:$H/func.h
+copy.o:$H/pv.h
+copy.o:$H/ingres.h
+copy.o:$H/aux.h
+copy.o:$H/access.h
+copy.o:$H/symbol.h
+copy.o:$H/lock.h
+copy.o:$H/sccs.h
+copy.o:$H/errors.h
+copy.o:protos.h
+ksort.o:$H/ingres.h
+ksort.o:$H/aux.h
+ksort.o:$H/symbol.h
+ksort.o:$H/access.h
+ksort.o:$H/func.h
+ksort.o:$H/batch.h
+ksort.o:$H/catalog.h
+ksort.o:$H/pv.h
+ksort.o:$H/sccs.h
+ksort.o:protos.h
+display.o:$H/ingres.h
+display.o:$H/aux.h
+display.o:$H/catalog.h
+display.o:$H/tree.h
+display.o:$H/symbol.h
+display.o:$H/access.h
+display.o:$H/func.h
+display.o:$H/pv.h
+display.o:$H/errors.h
+display.o:$H/sccs.h
+display.o:protos.h
+rmqm.o:$H/pv.h
+rmqm.o:$H/ingres.h
+rmqm.o:$H/access.h
+rmqm.o:$H/aux.h
+rmqm.o:$H/catalog.h
+rmqm.o:$H/symbol.h
+rmqm.o:$H/func.h
+rmqm.o:$H/sccs.h
+rmqm.o:$H/errors.h
+rmqm.o:protos.h
+pr_prot.o:$H/ingres.h
+pr_prot.o:$H/tree.h
+pr_prot.o:$H/aux.h
+pr_prot.o:$H/catalog.h
+pr_prot.o:$H/symbol.h
+pr_prot.o:$H/sccs.h
+pr_prot.o:protos.h
+pr_tree.o:$H/symbol.h
+pr_tree.o:$H/ingres.h
+pr_tree.o:$H/tree.h
+pr_tree.o:$H/aux.h
+pr_tree.o:$H/sccs.h
+pr_tree.o:protos.h
+sysfunc.o:$H/ingres.h
+sysfunc.o:$H/aux.h
+sysfunc.o:$H/pv.h
+sysfunc.o:$H/sccs.h
+sysfunc.o:$H/symbol.h
+sysfunc.o:$H/func.h
+sysfunc.o:protos.h
+btreeupdate.o:$H/ingres.h
+btreeupdate.o:$H/aux.h
+btreeupdate.o:$H/catalog.h
+btreeupdate.o:$H/symbol.h
+btreeupdate.o:$H/access.h
+btreeupdate.o:$H/batch.h
+btreeupdate.o:$H/btree.h
+btreeupdate.o:$H/sccs.h
+btreeupdate.o:protos.h
+# DEPENDENCIES MUST END AT END OF FILE
+# IF YOU PUT STUFF HERE IT WILL GO AWAY
+# see make depend above
