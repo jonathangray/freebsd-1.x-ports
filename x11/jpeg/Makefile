@@ -122,6 +122,14 @@ install: all
 	install -c  -m 444 -o bin -g bin cjpeg.1 /usr/local/man/man1
 	install -c  -m 444 -o bin -g bin djpeg.1 /usr/local/man/man1
 
+jpeg_bin.tgz:
+	(cd /usr/local/bin; pkg_create -v -c $(.CURDIR)/jpeg-bin-desc -d $(.CURDIR)/README -f $(.CURDIR)/jpeg-bin-list jpeg_bin.tgz)
+	mv /usr/local/bin/jpeg_bin.tgz .
+
+jpeg_src.tgz:   clean
+	(cd ..; pkg_create -v -c $(.CURDIR)/jpeg-src-desc -d $(.CURDIR)/README -f $(.CURDIR)/jpeg-src-list jpeg_src.tgz)
+	mv ../jpeg_src.tgz .
+
 jbsmooth.o : jbsmooth.c jinclude.h jconfig.h jpegdata.h 
 jcarith.o : jcarith.c jinclude.h jconfig.h jpegdata.h 
 jccolor.o : jccolor.c jinclude.h jconfig.h jpegdata.h 
