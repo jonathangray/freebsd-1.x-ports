@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.1 1994/05/25 01:02:43 asami Exp $
+# $Id: Makefile,v 1.2 1994/05/25 01:27:24 asami Exp $
 #
 # Copyright 1992, 1993, Geoff Kuenning, Granada Hills, CA
 # All rights reserved.
@@ -47,7 +47,21 @@
 #   buildhash <dictfile> <affix-file> <outfile>
 
 # $Log: Makefile,v $
-# Revision 1.1  1994/05/25 01:02:43  asami
+# Revision 1.2  1994/05/25 01:27:24  asami
+# This is the FreeBSD port by Piero Serini (piero@strider.st.dsi.unimi.it).
+# Fixes include specifying correct dictionary (/usr/share/dict/words),
+# changing Makefiles, adding package target, etc.
+#
+# Note that this package requires an enormous amount of free disk space in
+# /usr/tmp (30MB according to Piero).  There is no /usr/tmp on freefall so
+# I couldn't compile it here but it worked at my home machine.
+#
+# Revision 1.2  1994/05/08  15:13:22  piero
+# fix bug in disctionaries target. Some people disagrred on this, but
+# the previous behaviour was wrong wrt POSIX. If someone finds a better
+# fix, please let me know.
+#
+# Revision 1.1  1994/05/08  12:56:24  piero
 # Initial revision
 #
 # Revision 1.86  1994/02/22  06:09:03  geoff
@@ -109,6 +123,11 @@ MAKE = make
 #	debug the complex shell commands.
 #
 SHELLDEBUG = +vx
+
+package: pkg_bin
+
+pkg_bin: install pkg/+DESC pkg/+ONELINE pkg/+PLIST
+	@pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST ispell_bin
 
 all:	unpacked
 all:	config.sh
@@ -232,7 +251,7 @@ language-subdirs:	config.sh
 		language=`echo "$$LANGUAGES" \
 		  | sed 's/[^{]*{\([^}]*\)}.*/\1/'`; \
 		IFS=,; \
-		set X,$${language},$(LANGUAGE_TARGET); shift; \
+		set X $${language} $(LANGUAGE_TARGET); shift; \
 		IFS="$$ifs"; \
 		set -x; \
 		cd languages/$$1; \

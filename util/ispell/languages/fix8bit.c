@@ -1,6 +1,6 @@
 #ifndef lint
 static char Rcs_Id[] =
-    "$Id: fix8bit.c,v 1.1 1994/05/25 01:02:52 asami Exp $";
+    "$Id: fix8bit.c,v 1.2 1994/05/25 01:29:01 asami Exp $";
 #endif
 
 /*
@@ -67,8 +67,14 @@ static char Rcs_Id[] =
 
 /*
  * $Log: fix8bit.c,v $
- * Revision 1.1  1994/05/25 01:02:52  asami
- * Initial revision
+ * Revision 1.2  1994/05/25 01:29:01  asami
+ * This is the FreeBSD port by Piero Serini (piero@strider.st.dsi.unimi.it).
+ * Fixes include specifying correct dictionary (/usr/share/dict/words),
+ * changing Makefiles, adding package target, etc.
+ *
+ * Note that this package requires an enormous amount of free disk space in
+ * /usr/tmp (30MB according to Piero).  There is no /usr/tmp on freefall so
+ * I couldn't compile it here but it worked at my home machine.
  *
  * Revision 1.3  1994/01/25  07:12:26  geoff
  * Get rid of all old RCS log lines in preparation for the 3.1 release.

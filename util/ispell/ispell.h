@@ -1,5 +1,5 @@
 /*
- * $Id: ispell.h,v 1.1 1994/05/25 01:02:42 asami Exp $
+ * $Id: ispell.h,v 1.2 1994/05/25 01:27:57 asami Exp $
  */
 
 /*
@@ -42,7 +42,16 @@
 
 /*
  * $Log: ispell.h,v $
- * Revision 1.1  1994/05/25 01:02:42  asami
+ * Revision 1.2  1994/05/25 01:27:57  asami
+ * This is the FreeBSD port by Piero Serini (piero@strider.st.dsi.unimi.it).
+ * Fixes include specifying correct dictionary (/usr/share/dict/words),
+ * changing Makefiles, adding package target, etc.
+ *
+ * Note that this package requires an enormous amount of free disk space in
+ * /usr/tmp (30MB according to Piero).  There is no /usr/tmp on freefall so
+ * I couldn't compile it here but it worked at my home machine.
+ *
+ * Revision 1.1  1994/05/08  12:56:24  piero
  * Initial revision
  *
  * Revision 1.58  1994/02/07  05:53:28  geoff

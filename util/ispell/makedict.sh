@@ -1,6 +1,6 @@
 : Use /bin/sh
 #
-# $Id: makedict.sh,v 1.1 1994/05/25 01:02:48 asami Exp $
+# $Id: makedict.sh,v 1.2 1994/05/25 01:28:03 asami Exp $
 #
 # Copyright 1987, 1988, 1989, 1992, 1993, Geoff Kuenning, Granada Hills, CA
 # All rights reserved.
@@ -52,7 +52,16 @@
 #	of this script through "munchlist" to get a final dictionary.
 #
 # $Log: makedict.sh,v $
-# Revision 1.1  1994/05/25 01:02:48  asami
+# Revision 1.2  1994/05/25 01:28:03  asami
+# This is the FreeBSD port by Piero Serini (piero@strider.st.dsi.unimi.it).
+# Fixes include specifying correct dictionary (/usr/share/dict/words),
+# changing Makefiles, adding package target, etc.
+#
+# Note that this package requires an enormous amount of free disk space in
+# /usr/tmp (30MB according to Piero).  There is no /usr/tmp on freefall so
+# I couldn't compile it here but it worked at my home machine.
+#
+# Revision 1.1  1994/05/08  12:56:24  piero
 # Initial revision
 #
 # Revision 1.9  1994/01/25  07:11:53  geoff

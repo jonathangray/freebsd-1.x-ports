@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.1 1994/05/25 01:03:00 asami Exp $
+# $Id: Makefile,v 1.2 1994/05/25 01:29:33 asami Exp $
 #
 # Copyright 1993, Geoff Kuenning, Granada Hills, CA
 # All rights reserved.
@@ -42,8 +42,14 @@
 # an example of a complex makefile, look at the makefile for English.
 #
 # $Log: Makefile,v $
-# Revision 1.1  1994/05/25 01:03:00  asami
-# Initial revision
+# Revision 1.2  1994/05/25 01:29:33  asami
+# This is the FreeBSD port by Piero Serini (piero@strider.st.dsi.unimi.it).
+# Fixes include specifying correct dictionary (/usr/share/dict/words),
+# changing Makefiles, adding package target, etc.
+#
+# Note that this package requires an enormous amount of free disk space in
+# /usr/tmp (30MB according to Piero).  There is no /usr/tmp on freefall so
+# I couldn't compile it here but it worked at my home machine.
 #
 # Revision 1.6  1994/02/22  06:09:16  geoff
 # Add SHELLDEBUG.

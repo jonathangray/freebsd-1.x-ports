@@ -52,12 +52,21 @@
  */
 
 /*
- * $Id: config.X,v 1.1 1994/05/25 01:02:42 asami Exp $
+ * $Id: config.X,v 1.2 1994/05/25 01:27:31 asami Exp $
  *
  * $Log: config.X,v $
- * Revision 1.1  1994/05/25 01:02:42  asami
- * Initial revision
+ * Revision 1.2  1994/05/25 01:27:31  asami
+ * This is the FreeBSD port by Piero Serini (piero@strider.st.dsi.unimi.it).
+ * Fixes include specifying correct dictionary (/usr/share/dict/words),
+ * changing Makefiles, adding package target, etc.
  *
+ * Note that this package requires an enormous amount of free disk space in
+ * /usr/tmp (30MB according to Piero).  There is no /usr/tmp on freefall so
+ * I couldn't compile it here but it worked at my home machine.
+ *
+# Revision 1.1  1994/05/08  12:56:24  piero
+# Initial revision
+#
  * Revision 1.64  1994/02/07  08:10:42  geoff
  * Add GENERATE_LIBRARY_PROTOS as a special variable for use only by me.
  *
@@ -220,7 +229,7 @@
 ** length parameters.
 */
 #ifndef LANGUAGES
-#define LANGUAGES "{english,MASTERDICTS=english.med+,HASHFILES=med+.hash,VARIANTS=american,EXTRADICT=/usr/dict/words}"
+#define LANGUAGES "{english,MASTERDICTS=english.med+,HASHFILES=med+.hash,VARIANTS=american,EXTRADICT=/usr/share/dict/words}"
 #endif /* LANGUAGES */
 
 /*
@@ -393,7 +402,7 @@
 /* path to wordlist for Lookup command (typically /usr/dict/{words|web2}) */
 /* note that /usr/dict/web2 is usually a bad idea due to obscure words */
 #ifndef WORDS
-#define WORDS	"/usr/dict/words"
+#define WORDS	"/usr/share/dict/words"
 #endif
 
 /* buffer size to use for file names if not in sys/param.h */

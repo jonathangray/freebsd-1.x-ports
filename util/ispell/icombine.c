@@ -1,6 +1,6 @@
 #ifndef lint
 static char Rcs_Id[] =
-    "$Id: icombine.c,v 1.1 1994/05/25 01:02:44 asami Exp $";
+    "$Id: icombine.c,v 1.2 1994/05/25 01:27:43 asami Exp $";
 #endif
 
 #define MAIN
@@ -54,7 +54,16 @@ static char Rcs_Id[] =
 
 /*
  * $Log: icombine.c,v $
- * Revision 1.1  1994/05/25 01:02:44  asami
+ * Revision 1.2  1994/05/25 01:27:43  asami
+ * This is the FreeBSD port by Piero Serini (piero@strider.st.dsi.unimi.it).
+ * Fixes include specifying correct dictionary (/usr/share/dict/words),
+ * changing Makefiles, adding package target, etc.
+ *
+ * Note that this package requires an enormous amount of free disk space in
+ * /usr/tmp (30MB according to Piero).  There is no /usr/tmp on freefall so
+ * I couldn't compile it here but it worked at my home machine.
+ *
+ * Revision 1.1  1994/05/08  12:56:24  piero
  * Initial revision
  *
  * Revision 2.24  1994/01/25  07:11:35  geoff

@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.1 1994/05/25 01:02:55 asami Exp $
+# $Id: Makefile,v 1.2 1994/05/25 01:29:18 asami Exp $
 #
 # Copyright 1993, Geoff Kuenning, Granada Hills, CA
 # All rights reserved.
@@ -49,8 +49,14 @@
 # simple Makefiles for another language distributed with ispell.
 #
 # $Log: Makefile,v $
-# Revision 1.1  1994/05/25 01:02:55  asami
-# Initial revision
+# Revision 1.2  1994/05/25 01:29:18  asami
+# This is the FreeBSD port by Piero Serini (piero@strider.st.dsi.unimi.it).
+# Fixes include specifying correct dictionary (/usr/share/dict/words),
+# changing Makefiles, adding package target, etc.
+#
+# Note that this package requires an enormous amount of free disk space in
+# /usr/tmp (30MB according to Piero).  There is no /usr/tmp on freefall so
+# I couldn't compile it here but it worked at my home machine.
 #
 # Revision 1.18  1994/02/23  04:52:30  geoff
 # Remove dictionaries being built if make is aborted early.
@@ -444,7 +450,9 @@ $(DBUILD)english.sml+:	british.0
 	done; \
 	trap "rm english.sml+" 1 2 15; \
 	set -x; \
-	PATH=$(PATHADDER):$$PATH munchlist -v -l $(AFFIXES) $$dicts \
+	PATH=$(PATHADDER):$$PATH ; \
+	pwd ; \
+	munchlist -v -l $(AFFIXES) $$dicts \
 	  > english.sml+
 
 $(DBUILD)english.med:	$(CONFIG)
@@ -482,7 +490,9 @@ $(DBUILD)english.med+:	british.1
 	done; \
 	trap "rm english.med+" 1 2 15; \
 	set -x; \
-	PATH=$(PATHADDER):$$PATH munchlist -v -l $(AFFIXES) $$dicts \
+	PATH=$(PATHADDER):$$PATH ; \
+	pwd ; \
+	munchlist -v -l $(AFFIXES) $$dicts \
 	  > english.med+
 
 $(DBUILD)english.lrg:	$(CONFIG)
@@ -528,7 +538,9 @@ $(DBUILD)english.lrg+:	british.2
 	done; \
 	trap "rm english.lrg+" 1 2 15; \
 	set -x; \
-	PATH=$(PATHADDER):$$PATH munchlist -v -l $(AFFIXES) $$dicts \
+	PATH=$(PATHADDER):$$PATH ; \
+	pwd ; \
+	munchlist -v -l $(AFFIXES) $$dicts \
 	  > english.lrg+
 
 $(DBUILD)english.xlg:	$(CONFIG)
@@ -576,7 +588,9 @@ $(DBUILD)english.xlg+:	english.3
 	done; \
 	trap "rm english.xlg+" 1 2 15; \
 	set -x; \
-	PATH=$(PATHADDER):$$PATH munchlist -v -l $(AFFIXES) $$dicts \
+	PATH=$(PATHADDER):$$PATH ; \
+	pwd ; \
+	munchlist -v -l $(AFFIXES) $$dicts \
 	  > english.xlg+
 
 #

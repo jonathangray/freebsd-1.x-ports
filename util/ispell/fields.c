@@ -1,11 +1,20 @@
 #ifndef lint
 static char Rcs_Id[] =
-    "$Id: fields.c,v 1.1 1994/05/25 01:02:43 asami Exp $";
+    "$Id: fields.c,v 1.2 1994/05/25 01:27:38 asami Exp $";
 #endif
 
 /*
  * $Log: fields.c,v $
- * Revision 1.1  1994/05/25 01:02:43  asami
+ * Revision 1.2  1994/05/25 01:27:38  asami
+ * This is the FreeBSD port by Piero Serini (piero@strider.st.dsi.unimi.it).
+ * Fixes include specifying correct dictionary (/usr/share/dict/words),
+ * changing Makefiles, adding package target, etc.
+ *
+ * Note that this package requires an enormous amount of free disk space in
+ * /usr/tmp (30MB according to Piero).  There is no /usr/tmp on freefall so
+ * I couldn't compile it here but it worked at my home machine.
+ *
+ * Revision 1.1  1994/05/08  12:56:24  piero
  * Initial revision
  *
  * Revision 1.7  1994/01/06  05:26:37  geoff

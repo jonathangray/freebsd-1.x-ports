@@ -314,6 +314,8 @@ This minimizes redisplay thrashing.")
 
 (defvar ispell-alternate-dictionary
   (cond ((file-exists-p "/usr/dict/web2") "/usr/dict/web2")
+	((file-exists-p "/usr/share/dict/web2") "/usr/share/dict/web2")
+	((file-exists-p "/usr/share/dict/words") "/usr/share/dict/words")
 	((file-exists-p "/usr/dict/words") "/usr/dict/words")
 	((file-exists-p "/usr/lib/dict/words") "/usr/lib/dict/words")
 	((file-exists-p "/sys/dict") "/sys/dict")
