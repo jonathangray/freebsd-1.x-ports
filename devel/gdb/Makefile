@@ -56,7 +56,7 @@ infodir = $(prefix)/info
 includedir = $(prefix)/include
 docdir = $(datadir)/doc
 
-SHELL = /bin/bash
+SHELL = /bin/sh
 
 INSTALL = $${srcroot}/install.sh -c
 INSTALL_PROGRAM = $(INSTALL)
