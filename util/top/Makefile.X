@@ -126,3 +126,13 @@ installmeta: top top.1
 	@$(INSTALL) -s -o $(OWNER) -m $(MODE) -g $(GROUP) \
 		top $(BINDIR)/top-`uname -m`-`uname -r`
 	$(INSTALL) -c top.1 $(MANDIR)/top.$(MANEXT)
+
+
+pkg:	pkg_src pkg_bin
+
+pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S 
+	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S top_src
+
+pkg_bin: install pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B 
+	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B top_bin
+
