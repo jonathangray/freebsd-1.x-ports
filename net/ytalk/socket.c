@@ -45,6 +45,22 @@ static readdr *readdr_list = NULL;	/* list of re-addresses */
 
 /* ---- local functions ---- */
 
+void s_in_assign(struct sockaddr_in * src, 
+#ifdef __386BSD__
+  struct osockaddr_in * dst)
+#else
+  struct sockaddr_in * dst)
+#endif
+  {
+   memcpy(dst, src, sizeof(struct sockaddr_in));
+
+   /* fix up the fields that are swapped around in 386bsd		*/
+   #ifdef __386BSD__
+     dst->sin_family = src->sin_family;
+     dst->sin_len = 0;
+   #endif
+  }
+
 /* Create a datagram socket.
  */
 static int
@@ -212,7 +228,11 @@ place_my_address(sock, addr)
 	}
     if(r == NULL)
 	IN_ADDR(*sock) = me->host_addr;
-    sock->sin_family = htons(AF_INET);
+    #ifdef __386BSD__
+      sock->sin_family = AF_INET;
+    #else
+      sock->sin_family = htons(AF_INET);
+    #endif
 }
 
 /* sendit() sends the completed message to the talk daemon at the given
@@ -402,16 +422,21 @@ find_daemon(addr)
 
     m1 = omsg;
     m2 = nmsg;
-    m1.ctl_addr = talkd[otalk].sock;
+    s_in_assign(&talkd[otalk].sock, &m1.ctl_addr);
     place_my_address(&(m1.ctl_addr), addr);
-    m2.ctl_addr = talkd[ntalk].sock;
+    s_in_assign(&talkd[ntalk].sock, &m2.ctl_addr);
     place_my_address(&(m2.ctl_addr), addr);
     m1.type = m2.type = LOOK_UP;
     m1.id_num = m2.id_num = htonl(0);
     m1.r_tty[0] = m2.r_tty[0] = '\0';
     strcpy(m1.r_name, "ytalk");
     strcpy(m2.r_name, "ytalk");
-    m1.addr.sin_family = m2.addr.sin_family = htons(AF_INET);
+    m1.addr.sin_family = m2.addr.sin_family = 
+    #ifdef __386BSD__
+      AF_INET;
+    #else
+      htons(AF_INET);
+    #endif
 
     out = 0;
     for(i = 0; i < 5; i++)
@@ -499,8 +524,8 @@ init_socket()
 
     strncpy(nmsg.l_name, me->user_name, NAME_SIZE);
 
-    omsg.ctl_addr = talkd[otalk].sock;
-    nmsg.ctl_addr = talkd[ntalk].sock;
+    s_in_assign(&talkd[otalk].sock, &omsg.ctl_addr);
+    s_in_assign(&talkd[ntalk].sock, &nmsg.ctl_addr);
     nmsg.vers = TALK_VERSION;
 
     (void)find_daemon(me->host_addr);
@@ -650,14 +675,16 @@ send_dgram(user, type)
 	strncpy(nmsg.r_name, user->user_name, NAME_SIZE);
 	strncpy(nmsg.r_tty, user->tty_name, TTY_SIZE);
     }
-    nmsg.addr = user->sock;
-    nmsg.addr.sin_family = htons(AF_INET);
+    s_in_assign(&user->sock, &nmsg.addr);
+    nmsg.addr.sin_family = 
+    #ifdef __386BSD__
+      AF_INET;
+    #else
+      htons(AF_INET);
+    #endif
+
     if(sendit(addr, d) != 0)
-    {
-	if(type == AUTO_LOOK_UP || type == AUTO_DELETE)
-	    strncpy(nmsg.l_name, me->user_name, NAME_SIZE);
 	return -2;
-    }
 
     switch(type)
     {
@@ -692,8 +719,13 @@ send_auto(type)
     nmsg.type = type;
     strcpy(nmsg.r_name, "+AUTO");
     nmsg.r_tty[0] = '\0';
-    nmsg.addr = autosock;
-    nmsg.addr.sin_family = htons(AF_INET);
+    s_in_assign(&autosock, &nmsg.addr);
+    nmsg.addr.sin_family = 
+    #ifdef __386BSD__
+      AF_INET;
+    #else
+      htons(AF_INET);
+    #endif
 
     rc = 0;
     dtype = find_daemon(me->host_addr);

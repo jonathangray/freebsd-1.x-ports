@@ -33,6 +33,17 @@ typedef struct _readdr {
 extern struct _talkd talkd[MAXDAEMON+1];
 extern int daemons;
 
+#ifdef __386BSD__
+struct osockaddr_in
+  {
+   u_char	sin_len;	/* ? */
+   u_char	sin_family;
+   u_short	sin_port;
+   struct	in_addr sin_addr;
+   char		sin_zero[8];
+  };
+#endif
+
 /* ---- talk daemon I/O structures ---- */
 
 #define NAME_SIZE 9
@@ -48,8 +59,13 @@ typedef struct {
 	ylong	id_num;
 	ylong	pid;
 	char	r_tty[TTY_SIZE];
-	struct	sockaddr_in addr;
-	struct	sockaddr_in ctl_addr;
+	#ifdef __386BSD__
+	  struct	osockaddr_in addr;
+	  struct	osockaddr_in ctl_addr;
+	#else
+	  struct	sockaddr_in addr;
+	  struct	sockaddr_in ctl_addr;
+	#endif
 } CTL_MSG;
 
 /* Control Response structure for earlier than BSD4.2
@@ -59,7 +75,11 @@ typedef struct {
 	char	answer;
 	u_short	filler;
 	ylong	id_num;
-	struct	sockaddr_in addr;
+	#ifdef __386BSD__
+	  struct	osockaddr_in addr;
+	#else
+	  struct  sockaddr_in addr;
+        #endif
 } CTL_RESPONSE;
 
 /* Control Message structure for BSD4.2
@@ -69,8 +89,13 @@ typedef struct {
 	char	type;
 	u_short	filler;
 	ylong	id_num;
-	struct	sockaddr_in addr;
-	struct	sockaddr_in ctl_addr;
+	#ifdef __386BSD__
+	  struct	osockaddr_in addr;
+	  struct	osockaddr_in ctl_addr;
+	#else
+	  struct	sockaddr_in addr;
+	  struct	sockaddr_in ctl_addr;
+	#endif
 	ylong	pid;
 	char	l_name[NAME_SIZE];
 	char	l_name_filler[3];
@@ -87,7 +112,11 @@ typedef struct {
 	char	answer;
 	char	filler;
 	ylong	id_num;
-	struct	sockaddr_in addr;
+        #ifdef __386BSD__
+	  struct	osockaddr_in addr;
+	#else
+	  struct	sockaddr_in addr;
+	#endif
 } CTL_RESPONSE42;
 
 #define	TALK_VERSION	1		/* protocol version */
