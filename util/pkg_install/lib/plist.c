@@ -1,5 +1,5 @@
 #ifndef lint
-static const char *rcsid = "$Id: plist.c,v 1.6 1994/05/25 06:27:24 jkh Exp $";
+static const char *rcsid = "$Id: plist.c,v 1.7 1994/07/11 01:11:14 jkh Exp $";
 #endif
 
 /*
@@ -214,7 +214,7 @@ read_plist(Package *pkg, FILE *fp)
 
 	while (isspace(pline[len]))
 	    pline[len--] = '\0';
-	if (!len)
+	if (len <= 0)
 	    continue;
 	cp = pline;
 	if (pline[0] == CMD_CHAR) {
