@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <sys/soundcard.h>
+#include <machine/soundcard.h>
 #include "midifile/midifile.h"
 
 int SECONDS;      /* global that tells whether to display seconds or ticks */

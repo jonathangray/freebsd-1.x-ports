@@ -9,7 +9,7 @@
 #endif
 #include <fcntl.h>
 #include <strings.h>
-#include <sys/soundcard.h>
+#include <machine/soundcard.h>
 
 #define DEFAULT_DSP_SPEED 8000
 

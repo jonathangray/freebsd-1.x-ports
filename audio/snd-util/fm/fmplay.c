@@ -19,7 +19,7 @@
 #include <getopt.h>   /* Why use 'crack' if we have GNU getopt? */
 #endif
 #include <sys/stat.h>
-#include <sys/soundcard.h>
+#include <machine/soundcard.h>
 #include "midifile/midifile.h"
 
 /* some prototypes */

@@ -7,7 +7,7 @@
 
 #include <stdio.h>
 #include <fcntl.h>
-#include <sys/soundcard.h>
+#include <machine/soundcard.h>
 
 char *names[SOUND_MIXER_NRDEVICES] = SOUND_DEVICE_NAMES;
 

@@ -4,8 +4,8 @@
 #include <strings.h>
 #include <sys/types.h>
 
-#ifdef linux
-#include <sys/soundcard.h>
+#if defined(linux) || defined(__386BSD__)
+#include <machine/soundcard.h>
 #endif
 
 #include "str.h"

@@ -10,7 +10,7 @@
 #ifndef __386BSD__
 #include <getopt.h>
 #endif
-#include <sys/soundcard.h>
+#include <machine/soundcard.h>
 
 struct sbi_instrument instr;
 static int sb;

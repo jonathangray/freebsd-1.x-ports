@@ -79,7 +79,7 @@ typedef unsigned int FLAG;
  * Sound Blaster include file for ioctls and such
  */
 #if defined(linux) || defined(__386BSD__)
-#include <sys/soundcard.h>
+#include <machine/soundcard.h>
 #else
 #include <i386at/sblast.h>
 #endif

@@ -20,7 +20,7 @@
 #include <getopt.h>   /* Why use 'crack' if we have GNU getopt? */
 #include <sys/stat.h>
 #include "midifile/midifile.h"
-#include <sys/soundcard.h>
+#include <machine/soundcard.h>
 
 SEQ_DEFINEBUF(2048);
 

@@ -2,7 +2,7 @@
 
 #include <unistd.h>
 #include <sys/ioctl.h>
-#include <sys/soundcard.h>
+#include <machine/soundcard.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
