@@ -36,7 +36,7 @@ static char *abscwd;
 static int recursive;
 
 typedef enum { GET_WHOLE, GET_HEAD, GET_MIDDLE, GET_TAIL } GetOp;
-static GetOp getmode;
+static GetOp fspgetmode;
 
 static int
 #ifndef ANSI_PROTOTYPES
@@ -87,7 +87,7 @@ get_file(char *name, struct stat *sbufp, int depth)
     else
 	remname = name;
 
-    switch (getmode)
+    switch (fspgetmode)
     {
       case GET_WHOLE:
 	if (access(path, W_OK) == 0)
@@ -304,11 +304,11 @@ main(int argc, char **argv, char **envp)
     errcnt = 0;
 
     if (strcmp(argv[0], "head") == 0)
-	getmode = GET_HEAD;
+	fspgetmode = GET_HEAD;
     else if (strcmp(argv[0], "tail") == 0)
-	getmode = GET_TAIL;
+	fspgetmode = GET_TAIL;
     else
-	getmode = GET_WHOLE;
+	fspgetmode = GET_WHOLE;
 
     while ((ch = getopt(argc, argv, "ftnr")) != EOF)
         switch (ch)
@@ -326,7 +326,7 @@ main(int argc, char **argv, char **envp)
         return 1;
 
 #if 0
-    if (getmode == GET_WHOLE && (frompos != 0 || getlen XXX))
+    if (fspgetmode == GET_WHOLE && (frompos != 0 || getlen XXX))
 	;
 #endif
 
