@@ -1,4 +1,4 @@
-# Makefile $Revision: 1.1 $
+# Makefile $Revision: 1.2 $
 #
 # 1) Select the proper EXDIR (path), MANDIR, MANEXT, LIBDIR, SIGVOID,
 #	RE_COMP/REGCMP, DFLT_PAGER, and FMOD. Most of the other things aren't
@@ -433,7 +433,7 @@ $(name).1:	sc.doc
 	name=$(name) NAME=$(NAME) LIBDIR=$(LIBDIR) sh torev sc.doc >  $(name).1
 #	sed -e s/pname/$(name)/g -e s/PNAME/$(NAME)/g \
 #	   -e s%#LIBDIR#%$(LIBDIR)%g sc.doc >  $(name).1
-#	REVISION=`sed -e '/Revision/!D' -e 's/.*$Revision: 1.1 $(
+#	REVISION=`sed -e '/Revision/!D' -e 's/.*$Revision: 1.2 $(
 #	sed -e s/pname/$(name)/g -e s/PNAME/$(NAME)/g \
 #		-e s%#LIBDIR#%$(LIBDIR)%g \
 #		-e 's/#REVISION#/$(REVISION)/' sc.doc >  $(name).1
@@ -474,3 +474,9 @@ patchfile: ${SRC} ${DOCS}
 
 files:
 	@find $(DOCS) $(SRC) -print
+
+pkg: pkg_bin
+
+pkg_bin: install
+        pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST sc_bin
+
