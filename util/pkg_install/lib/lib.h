@@ -1,4 +1,4 @@
-/* $Id: lib.h,v 1.4 1993/09/18 03:39:49 jkh Exp $ */
+/* $Id: lib.h,v 1.5 1994/04/05 14:08:46 jkh Exp $ */
 
 /*
  * FreeBSD install - a package for the installation and maintainance
@@ -46,6 +46,9 @@
 #ifndef FALSE
 #define FALSE	(0)
 #endif
+
+#define YES		2
+#define NO		1
 
 /* Usually "rm", but often "echo" during debugging! */
 #define REMOVE_CMD	"rm"
@@ -145,5 +148,6 @@ int		pkg_perform(char **);
 /* Externs */
 extern Boolean	Verbose;
 extern Boolean	Fake;
+extern int	AutoAnswer;
 
 #endif /* _INST_LIB_LIB_H_ */
