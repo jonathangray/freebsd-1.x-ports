@@ -740,7 +740,7 @@ CompiledFlowOutputPtr output;
     /* see if we hit the high water mark */
     if ((prevSize < c->highWaterMark || !c->outgoing) &&
 	newSize >= c->highWaterMark) {
-         fprintf(stderr, "I hit high water mark \n");
+/*         fprintf(stderr, "I hit high water mark \n"); */
 	AuRequestElementNotifyEvent(AuElementNotifyKindHighWater,
 				    AuReasonWatermark, flowEl);
       }
