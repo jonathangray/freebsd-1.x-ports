@@ -2,8 +2,8 @@
 # $XConsortium: imake.c,v 1.65 91/07/25 17:50:17 rws Exp $
 
 # -------------------------------------------------------------------------
-# Makefile generated from "Imake.tmpl" and </tmp/IIf.001509>
-# $XFree86: mit/config/Imake.tmpl,v 2.8 1993/12/18 11:42:19 dawes Exp $
+# Makefile generated from "Imake.tmpl" and </tmp/IIf.008755>
+# $XFree86: mit/config/Imake.tmpl,v 2.6 1993/10/02 07:11:59 dawes Exp $
 # $XConsortium: Imake.tmpl,v 1.139 91/09/16 08:52:48 rws Exp $
 #
 # Platform-specific parameters may be set in the appropriate <vendor>.cf
@@ -19,25 +19,24 @@
 # site-specific configuration parameters that need to come before
 # the platform-specific parameters - edit site.def to change
 
-# $XFree86: mit/config/site.def,v 2.33 1994/01/13 08:47:22 dawes Exp $
+# $XFree86: mit/config/site.def,v 2.23 1993/10/16 17:28:07 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
 # -------------------------------------------------------------------------
 # platform-specific configuration parameters - edit x386.cf to change
 
-# $XFree86: mit/config/x386.cf,v 2.36 1994/01/13 08:47:26 dawes Exp $
+# $XFree86: mit/config/x386.cf,v 2.28 1993/10/21 15:48:52 dawes Exp $
 # platform:  $XConsortium: x386.cf,v 1.7 91/08/16 19:30:10 gildea Exp $
 
 # -------------------------------------------------------------------------
 # XFree86 version definition
-# $XFree86: mit/config/xf86_vers.def,v 2.8 1993/12/23 13:22:41 dawes Exp $
+# $XFree86: mit/config/xf86_vers.def,v 2.7 1993/10/08 16:11:07 dawes Exp $
 
 # -------------------------------------------------------------------------
-# XFree86 version: 2001
+# XFree86 version: 2000
 # -------------------------------------------------------------------------
 
-# $XFree86: mit/config/bsdLib.rules,v 2.1 1993/12/03 13:11:55 dawes Exp $
-# $XConsortium: sunLib.rules,v 1.7 91/12/20 11:19:47 rws Exp $
+# $XConsortium: bsdLib.rules,v 1.7 91/12/20 11:19:47 rws Exp $
 
 # operating system:  	FreeBSD
 
@@ -45,7 +44,7 @@
 # site-specific configuration parameters that go after
 # the platform-specific parameters - edit site.def to change
 
-# $XFree86: mit/config/site.def,v 2.33 1994/01/13 08:47:22 dawes Exp $
+# $XFree86: mit/config/site.def,v 2.23 1993/10/16 17:28:07 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
             SHELL = 	/bin/sh
@@ -57,8 +56,7 @@
   BOOTSTRAPCFLAGS = 	-DFreeBSD
                CC = 		gcc
                AS = as
-              LEX = lex
-           LEXLIB =
+
              YACC = yacc
 
          COMPRESS = compress
@@ -88,7 +86,7 @@
   STD_CPP_DEFINES = -traditional 		-DFreeBSD
       STD_DEFINES = 		-DFreeBSD
  EXTRA_LOAD_FLAGS =
-  EXTRA_LIBRARIES =
+  EXTRA_LIBRARIES = 		-lgnumalloc
      OS_LIBRARIES =
              TAGS = ctags
 
@@ -115,9 +113,6 @@
         CCOPTIONS = -m486
     ANSICCOPTIONS =
 
-        LDRUNPATH =
-       LDLINKPATH = LdLinkPath
-
       ALLINCLUDES = $(INCLUDES) $(EXTRA_INCLUDES) $(TOP_INCLUDES) $(STD_INCLUDES)
        ALLDEFINES = $(ALLINCLUDES) $(STD_DEFINES) $(EXTRA_DEFINES) $(PROTO_DEFINES) $(DEFINES)
            CFLAGS = $(ANSICCOPTIONS) $(CDEBUGFLAGS) $(CCOPTIONS) $(ALLDEFINES)
@@ -125,7 +120,7 @@
 
            LDLIBS = $(OS_LIBRARIES) $(SYS_LIBRARIES) $(EXTRA_LIBRARIES)
 
-        LDOPTIONS = $(ANSICCOPTIONS) $(CDEBUGFLAGS) $(CCOPTIONS) $(LOCAL_LDFLAGS) -L$(USRLIBDIR) $(LDRUNPATH)
+        LDOPTIONS = $(ANSICCOPTIONS) $(CDEBUGFLAGS) $(CCOPTIONS) $(LOCAL_LDFLAGS) -L$(USRLIBDIR)
 
    LDCOMBINEFLAGS = -X -r
       DEPENDFLAGS =
@@ -142,7 +137,7 @@
 
 # -------------------------------------------------------------------------
 # X Window System Build Parameters
-# $XFree86: mit/config/Project.tmpl,v 2.4 1993/12/19 08:32:59 dawes Exp $
+# $XFree86: mit/config/Project.tmpl,v 2.1 1993/09/17 16:10:43 dawes Exp $
 # $XConsortium: Project.tmpl,v 1.138.1.1 92/11/11 09:49:19 rws Exp $
 
 _percentC_ = %C
@@ -206,7 +201,7 @@ _percentC_ = %C
        CONTRIBSRC = $(TOP)/../contrib
            DOCSRC = $(TOP)/doc
            RGBSRC = $(TOP)/rgb
-        DEPENDSRC = $(SCRIPTSRC)
+        DEPENDSRC = $(UTILSRC)/makedepend
          IMAKESRC = $(CONFIGSRC)
          XAUTHSRC = $(LIBSRC)/Xau
           XLIBSRC = $(LIBSRC)/X
@@ -226,7 +221,6 @@ _percentC_ = %C
         PEXLIBSRC = $(EXTENSIONSRC)/lib/PEXlib
       PHIGSLIBSRC = $(EXTENSIONSRC)/lib/PEX
 
-# $XFree86: mit/config/bsdLib.tmpl,v 2.1 1993/12/17 10:57:09 dawes Exp $
 # $XConsortium: sunLib.tmpl,v 1.14.1.2 92/11/11 09:52.02 rws Exp $
 
 SHLIBLDFLAGS = -Bshareable
