@@ -1,0 +1,376 @@
+*** lharc.c.orig	Fri Apr 24 11:01:24 1992
+--- lharc.c	Wed Sep 23 10:27:19 1992
+***************
+*** 25,30 ****
+--- 25,34 ----
+  /*  V0.03  LHa for UNIX				1991.12.17  M.Oki	*/
+  /*  V0.04  LHa for UNIX	beta version		1992.01.20  M.Oki	*/
+  /*  V1.00  LHa for UNIX	Fixed			1992.03.19  M.Oki	*/
++ /*  V1.01u LHa for UNIX	archive .lzh extension	1992.04.24  G.Roelofs	*/
++ /*    "     "   "   "   chmod/chown, suid	1992.05.02  T.Kloos	*/
++ /*    "     "   "   "   better extension fix	1992.06.27  J.P.Radley	*/
++ /*    "     "   "   "   chown(-1), =- bugfixes	1992.09.22  G.Roelofs	*/
+  /*----------------------------------------------------------------------*/
+  
+  #include "lharc.h"
+***************
+*** 48,53 ****
+--- 52,58 ----
+  char	expanded_archive_name[FILENAME_LENGTH];
+  char	temporary_name[FILENAME_LENGTH];
+  char	backup_archive_name[FILENAME_LENGTH];
++ char	*progname;
+  
+  /* static functions */
+  static void sort_files();
+***************
+*** 106,114 ****
+  LHx      for MSDOS V C2.01 Copyright(C) 1990  H.Yoshizaki\n\
+  LHx(arc) for OSK   V 2.01  Modified     1990  Momozou\n\
+  LHa      for UNIX  V 1.00  Copyright(C) 1992  Masaru Oki\n\
+  ");
+    fprintf(stderr, "\
+! usage: lha [-]{axelvudmcp}[qvnfodizg012][w=<dir>] archive_file [file...]\n\
+  commands:                           options:\n\
+   a   Add(or replace) to archive      q  quiet\n\
+   x,e EXtract from archive            v  verbose\n\
+--- 111,120 ----
+  LHx      for MSDOS V C2.01 Copyright(C) 1990  H.Yoshizaki\n\
+  LHx(arc) for OSK   V 2.01  Modified     1990  Momozou\n\
+  LHa      for UNIX  V 1.00  Copyright(C) 1992  Masaru Oki\n\
++ LHa      for UNIX  V 1.01u Tom Kloos, Jean-Pierre Radley, Greg Roelofs 1992\n\
+  ");
+    fprintf(stderr, "\
+! usage: %s [-]{axelvudmcp}[qvnfodizg012][w=<dir>] archive_file [file...]\n\
+  commands:                           options:\n\
+   a   Add(or replace) to archive      q  quiet\n\
+   x,e EXtract from archive            v  verbose\n\
+***************
+*** 122,128 ****
+                                       z  files not compress (a/u)\n\
+                                       g  [Generic] format (for compatibility)\n\
+                                       0/1/2 header level (a/u)\n\
+! ");
+  #ifdef EUC
+    fprintf (stderr, "\
+                                       e  TEXT code convert from/to EUC\n\
+--- 128,134 ----
+                                       z  files not compress (a/u)\n\
+                                       g  [Generic] format (for compatibility)\n\
+                                       0/1/2 header level (a/u)\n\
+! ", progname);
+  #ifdef EUC
+    fprintf (stderr, "\
+                                       e  TEXT code convert from/to EUC\n\
+***************
+*** 138,143 ****
+--- 144,151 ----
+  {
+    char *p , inpbuf[256];
+  
++   progname = argv[0];
++ 
+    if (argc < 2)
+      print_tiny_usage_and_exit ();
+    if (argc < 3) {
+***************
+*** 230,236 ****
+  		case '1':	header_level = HEADER_LEVEL1; break;
+  		case '2':	header_level = HEADER_LEVEL2; break;
+  		default:
+! 		  fprintf(stderr, "LHa: Unknown option '%c'.\n", p[-1]);
+  		  exit(1);
+  		}
+      }
+--- 238,244 ----
+  		case '1':	header_level = HEADER_LEVEL1; break;
+  		case '2':	header_level = HEADER_LEVEL2; break;
+  		default:
+! 		  fprintf(stderr, "%s: Unknown option '%c'.\n", progname, p[-1]);
+  		  exit(1);
+  		}
+      }
+***************
+*** 303,309 ****
+  message_1 (title, subject, name)
+       char *title, *subject, *name;
+  {
+!   fprintf (stderr, "LHa: %s%s ", title, subject);
+    fflush (stderr);
+  
+    if (errno == 0)
+--- 311,317 ----
+  message_1 (title, subject, name)
+       char *title, *subject, *name;
+  {
+!   fprintf (stderr, "%s: %s%s ", progname, title, subject);
+    fflush (stderr);
+  
+    if (errno == 0)
+***************
+*** 570,576 ****
+        {
+  	flags[i] = 0x04;
+  	fprintf (stderr,
+! 		 "LHa: Cannot access \"%s\", ignored.\n", filev[i]);
+        }
+      else
+        {
+--- 578,584 ----
+        {
+  	flags[i] = 0x04;
+  	fprintf (stderr,
+! 		 "%s: Cannot access \"%s\", ignored.\n", progname, filev[i]);
+        }
+      else
+        {
+***************
+*** 582,588 ****
+  	  {
+  	    flags[i] = 0x04;
+  	    fprintf (stderr,
+! 		     "LHa: Cannot archive \"%s\", ignored.\n", filev[i]);
+  	  }
+        }
+    errno = 0;
+--- 590,596 ----
+  	  {
+  	    flags[i] = 0x04;
+  	    fprintf (stderr,
+! 	         "%s: Cannot archive \"%s\", ignored.\n", progname, filev[i]);
+  	  }
+        }
+    errno = 0;
+***************
+*** 859,864 ****
+--- 867,873 ----
+        if (cmd == CMD_EXTRACT || cmd == CMD_LIST) return stdin;
+        else return NULL;
+      }
++ #ifndef USG
+    if (p = (char *)rindex(archive_name,'.'))
+  	{
+  	  if ( strucmp(".LZH",p)==0
+***************
+*** 872,877 ****
+--- 881,887 ----
+  		return fp;
+  	  }
+  	}
++ #endif
+  
+    if ( open_old_archive_1 (archive_name, &fp) )
+          return fp;
+***************
+*** 899,907 ****
+      return NULL;
+    }
+  */
+! /*  sprintf( expanded_archive_name , "%s.lzh",archive_name);
+    archive_name = expanded_archive_name;
+- */
+    return NULL;
+  }
+  
+--- 909,916 ----
+      return NULL;
+    }
+  */
+!   sprintf( expanded_archive_name , "%s.lzh",archive_name);
+    archive_name = expanded_archive_name;
+    return NULL;
+  }
+  
+*** lhext.c.orig	Fri Apr 24 11:01:26 1992
+--- lhext.c	Wed Sep 23 09:51:47 1992
+***************
+*** 131,136 ****
+--- 131,137 ----
+  LzHeader *hdr;
+  {
+    time_t utimebuf[2];
++   unsigned myuid;
+  
+    /* adjust file stamp */
+    utimebuf[0] = utimebuf[1] = hdr->unix_last_modified_stamp;
+***************
+*** 140,152 ****
+        || hdr->extend_type == EXTEND_OS68K
+        || hdr->extend_type == EXTEND_XOSK)
+  	{
+  #ifdef NOT_COMPATIBLE_MODE
+  	  Please need your modification in this space.
+  #else
+! 	  chmod (name, hdr->unix_mode);
+  #endif
+- 	  if(!getuid())
+- 	    chown (name, hdr->unix_uid, hdr->unix_gid);
+  	  errno = 0;
+  	}
+  }
+--- 141,159 ----
+        || hdr->extend_type == EXTEND_OS68K
+        || hdr->extend_type == EXTEND_XOSK)
+  	{
++ #if 0	  /* GRR:  chown(,-1,) is not valid argument */
++ 	  if (!myuid)
++ 	      chown (name, hdr->unix_uid, hdr->unix_gid);
++ 	  else if (myuid == hdr->unix_uid)
++ 	      chown (name, -1           , hdr->unix_gid);
++ #endif
++ 	  if ((myuid = getuid()) == hdr->unix_uid  ||  myuid == 0)
++ 	      chown (name, hdr->unix_uid, hdr->unix_gid);
+  #ifdef NOT_COMPATIBLE_MODE
+  	  Please need your modification in this space.
+  #else
+! 	  chmod (name, hdr->unix_mode); /* Do this after chown so suid stays */
+  #endif
+  	  errno = 0;
+  	}
+  }
+*** lhlist.c.orig	Fri Apr 24 11:01:32 1992
+--- lhlist.c	Sat May  2 16:27:32 1992
+***************
+*** 139,144 ****
+--- 139,145 ----
+    register int mode;
+    register char *p;
+    char method[6];
++   char modebits[10];
+  
+    if (verbose)
+      printf ("%s\n", hdr->name);
+***************
+*** 150,166 ****
+    {
+    	case EXTEND_UNIX:
+    	  mode=hdr->unix_mode;
+!       printf ("%c%c%c%c%c%c%c%c%c%4d/%-4d",
+! 	      ((mode & UNIX_OWNER_READ_PERM)  ? 'r' : '-'),
+! 	      ((mode & UNIX_OWNER_WRITE_PERM) ? 'w' : '-'),
+! 	      ((mode & UNIX_OWNER_EXEC_PERM)  ? 'x' : '-'),
+! 	      ((mode & UNIX_GROUP_READ_PERM)  ? 'r' : '-'),
+! 	      ((mode & UNIX_GROUP_WRITE_PERM) ? 'w' : '-'),
+! 	      ((mode & UNIX_GROUP_EXEC_PERM)  ? 'x' : '-'),
+! 	      ((mode & UNIX_OTHER_READ_PERM)  ? 'r' : '-'),
+! 	      ((mode & UNIX_OTHER_WRITE_PERM) ? 'w' : '-'),
+! 	      ((mode & UNIX_OTHER_EXEC_PERM)  ? 'x' : '-'),
+! 	      hdr->unix_uid, hdr->unix_gid);
+  	  break;
+  	case EXTEND_OS68K:
+  /**/	case EXTEND_XOSK: /**/
+--- 151,176 ----
+    {
+    	case EXTEND_UNIX:
+    	  mode=hdr->unix_mode;
+! 	  modebits[0]=((mode & UNIX_OWNER_READ_PERM)  ? 'r' : '-');
+! 	  modebits[1]=((mode & UNIX_OWNER_WRITE_PERM) ? 'w' : '-');
+! 	  if (mode & UNIX_SETUID)
+! 		modebits[2]='s';
+! 	  else
+! 		modebits[2]=((mode & UNIX_OWNER_EXEC_PERM) ? 'x' : '-');
+! 	  modebits[3]=((mode & UNIX_GROUP_READ_PERM)  ? 'r' : '-');
+! 	  modebits[4]=((mode & UNIX_GROUP_WRITE_PERM) ? 'w' : '-');
+! 	  if (mode & UNIX_SETGID)
+! 		modebits[5]='s';
+! 	  else
+! 		modebits[5]=((mode & UNIX_GROUP_EXEC_PERM) ? 'x' : '-');
+! 	  modebits[6]=((mode & UNIX_OTHER_READ_PERM)  ? 'r' : '-');
+! 	  modebits[7]=((mode & UNIX_OTHER_WRITE_PERM) ? 'w' : '-');
+! 	  if (mode & UNIX_STYCKYBIT)	/* STICKYBIT */
+! 		modebits[8]='t';
+! 	  else
+! 	  	modebits[8]=((mode & UNIX_OTHER_EXEC_PERM)  ? 'x' : '-');
+! 	  modebits[9]='\0';
+!       printf ("%s%4d/%-4d", modebits, hdr->unix_uid, hdr->unix_gid);
+  	  break;
+  	case EXTEND_OS68K:
+  /**/	case EXTEND_XOSK: /**/
+*** util.c.orig	Fri Apr 24 11:01:36 1992
+--- util.c	Thu Aug 27 23:40:13 1992
+***************
+*** 196,202 ****
+   */
+  
+  #if defined(NOBSTRING) && !defined(__STDC__)
+! void *
+  memmove( dst , src , cnt )
+  register char *dst , *src;
+  register int cnt;
+--- 196,202 ----
+   */
+  
+  #if defined(NOBSTRING) && !defined(__STDC__)
+! char *
+  memmove( dst , src , cnt )
+  register char *dst , *src;
+  register int cnt;
+***************
+*** 274,283 ****
+  	*(cmdname+strlen(RMDIRPATH))=' ';
+  	strcpy(cmdname+strlen(RMDIRPATH)+1,path);
+  	if ((stat = system(cmdname))<0)
+! 		rtn=-1;	/* fork or exec error */
+  	else if(stat){		/* RMDIR command error */
+  		errno = EIO;
+! 		rtn=-1;
+  	}
+  	free(cmdname);
+  	return(rtn);
+--- 274,283 ----
+  	*(cmdname+strlen(RMDIRPATH))=' ';
+  	strcpy(cmdname+strlen(RMDIRPATH)+1,path);
+  	if ((stat = system(cmdname))<0)
+! 		rtn = -1;	/* fork or exec error */
+  	else if(stat){		/* RMDIR command error */
+  		errno = EIO;
+! 		rtn = -1;
+  	}
+  	free(cmdname);
+  	return(rtn);
+*** Makefile.orig	Fri Apr 24 11:01:04 1992
+--- Makefile	Wed Sep 23 14:29:47 1992
+***************
+*** 12,20 ****
+  MAKE = make
+  CC = cc
+  
+! SWITCHES	= -DEUC
+! OPTIMIZE	= -g # -O -fstrength-reduce -fomit-frame-pointer
+  
+  BINDIR = /usr/local/bin
+  MANDIR = /usr/local/man
+  MANSECT = n
+--- 12,26 ----
+  MAKE = make
+  CC = cc
+  
+! # For Sun/SunOS 4.x:
+! SWITCHES	= -DUSESTRCASECMP # -DEUC
+! # For Amdahl/UTS:
+! #SWITCHES	= -DUSG -DSYSTIME_HAS_NO_TM -DNOBSTRING -DNOINDEX -DNOSTRDUP\
+! #		  -DFTIME -DTZSET -DSYSV_SYSTEM_DIR -DNOFTRUNCATE -DNOMKDIR
+  
++ #OPTIMIZE	= -g # -O -fstrength-reduce -fomit-frame-pointer
++ OPTIMIZE	= -O
++ 
+  BINDIR = /usr/local/bin
+  MANDIR = /usr/local/man
+  MANSECT = n
+***************
+*** 23,29 ****
+  INSTALLBIN = -s -m 755
+  INSTALLMAN = -m 644
+  
+! SUBDIRS = src man
+  
+  O		= .o
+  
+--- 29,35 ----
+  INSTALLBIN = -s -m 755
+  INSTALLMAN = -m 644
+  
+! SUBDIRS = src # man
+  
+  O		= .o
+  

@@ -1,0 +1,70 @@
+From sco!karll Mon Jul 22 18:05:51 1991
+Received: by One.NeoSoft.Com (smail2.5)
+	id AA00757; 22 Jul 91 18:05:50 PDT (Mon)
+Received: from marisco.sco.COM by sco.sco.COM
+	id aa13967; Mon, 22 Jul 91 17:37:52 PDT
+From: Karl Lehenbauer <karll@sco.COM>
+X-Mailer: SCO System V Mail (version 3.2)
+To: karl@one.neosoft.COM
+Subject: zoo speedup
+Date: Mon, 22 Jul 91 17:37:01 PDT
+Message-ID:  <9107221737.aa06379@marisco.sco.COM>
+Status: O
+
+Relay-Version: B 2.11 6/12/87; site scolex
+Path: uunet!uunet!zaphod.mps.ohio-state.edu!usc!apple!motcsd!dms!rains
+From: rains@dms.UUCP (Lyle Rains)
+Newsgroups: comp.compression
+Subject: Faster zoo 2.1 for UNIX
+Keywords: zoo
+Message-ID: <1269@dms.UUCP>
+Date: Fri, 19 Jul 91 17:30:22 PDT
+Organization: Atari Games Inc., Milpitas, CA
+Lines: 45
+
+
+In looking at the difference in speed between zoo 2.01 and zoo 2.10 on my SysV386
+system (ESIX 3.2D), I noticed that the user and system times appeared similar,
+but the elapsed time was 40% greater for the new zoo.  This smelled like an I/O
+problem, so I tried increasing the input buffer size in "zoomem.h" from 8k to
+32k (I also modified the MEM_BLOCK_SIZE #define to match the change) as follows:
+
+
+
+---------- CUT HERE ---------
+
+/*************************************************************/
+/* DO NOT CHANGE THE REST OF THIS FILE.                      */
+/*************************************************************/
+/*
+**  I noted this and cautiously proceeded with the change anyway :-). -LVR
+*/
+
+/*
+The main I/O buffer (called in_buf_adr in zoo.c) is reused
+in several places.
+*/
+
+#define  IN_BUF_SIZE       0x8000
+#define  OUT_BUF_SIZE      0x2000
+
+/* MEM_BLOCK_SIZE must be no less than (2 * DICSIZ + MAXMATCH)
+(see ar.h and lzh.h for values).  The buffer of this size will
+also hold an input buffer of IN_BUF_SIZE and an output buffer
+of OUT_BUF_SIZE.  FUDGE is a fudge factor, to keep some spare and
+avoid off-by-one errors. */
+
+#define FUDGE		8
+#define  MEM_BLOCK_SIZE    (IN_BUF_SIZE + OUT_BUF_SIZE + FUDGE)
+
+------ END CUT -------
+
+The result was that zoo 2.10 elapsed times decreased to that of version 2.01
+for the original LZW compression.
+
+-- 
+  wmm
+-/@-@\-   Lyle Rains    <--  motcsd!dms!rains  or  lrains@netcom.com
+( (_) )   Atari Games   <--  "Tube hits for two-bits"
+ \_o_/    Milpitas, CA  <--  With convenient parking in lots 237 and 880.
+
