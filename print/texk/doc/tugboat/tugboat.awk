@@ -73,6 +73,7 @@ BEGIN {
 
 /^[ \t]*\\TUBhead/	{
 	line = trim(strip_comments($0));
+	gsub(/{.*}/,"-",line);	# replace glue
 	gsub(/,/," ",line);	# remove commas
 	split(line,d," ");	# extract fields
 	volume = d[2];		# and save them
@@ -106,6 +107,7 @@ BEGIN {
 	gsub(/`!!/,"`\\\\",d[3]);
 #	printf("DEBUG: d[1] = <%s> d[2] = <%s> d[3] = <%s>\n",d[1],d[2],d[3]);
 
+
 	author = trim(d[1]);
 	gsub(/,/," and ",author);	# convert to BibTeX form
 	gsub(/\\and/,"and",author);
@@ -116,7 +118,8 @@ BEGIN {
 	author = fix_name(author," and Jr.",", Jr.");
 	author = fix_name(author," and Jr",", Jr");
 	author = fix_name(author," and S.J.",", S.J.");
-	gsub(/\\'\\i /,"{\\'{\\i}}",author);# fix D\'\i az to D{\'{\i}}az
+	gsub(/\\'\\i{}/,"{\\'{\\i}}",author); # fix  r\'\i{} to {r}{\'{\i}}
+	gsub(/\\'\\i /,"{\\'{\\i}}",author); # fix D\'\i az to D{\'{\i}}az
 	author = fix_accents(author);
 	author = fix_initials(author);
 
@@ -196,7 +199,7 @@ BEGIN {
 }
 
 /^[ \t]*\\def\\/	{
-	print $0 >>"tugboat.def";
+ 	print $0 >>"tugboat.def";
 }
 
 END {}
@@ -208,7 +211,7 @@ END {}
 # ones, with likely disasterous effects.
 #=======================================================================
 
-function fix_accents(t, k,s,t)	# convert \"x to {\"{x}} for " = ", `, '
+function fix_accents(t, k,s,r)	# convert \"x to {\"{x}} for " = ", `, '
 {
 #	Alas, awk does not allow the replacement pattern to specify
 #	\1, \2, etc to identify groups matched by a regular expression,
@@ -228,6 +231,7 @@ function fix_accents(t, k,s,t)	# convert \"x to {\"{x}} for " = ", `, '
 	gsub(/\\AA( |$)/,"{\\AA}",s);
 	gsub(/\\L( |$)/,"{\\L}",s);
 
+
 	for (k = 1; k < length(s); ++k)
 	{
 		if ( ( (substr(s,k,2) == "\\\"") ||
@@ -235,14 +239,14 @@ function fix_accents(t, k,s,t)	# convert \"x to {\"{x}} for " = ", `, '
 		      (substr(s,k,2) == "\\'") ) &&
 		     (substr(s,k+2,1) != "{") )
 		{
-			t = substr(s,1,k-1);
-			t = t "{";
-			t = t substr(s,k,2);
-			t = t "{";
-			t = t substr(s,k+2,1);
-			t = t "}}";
-			t = t substr(s,k+3);
-			s = t;
+			r = substr(s,1,k-1);
+			r = r "{";
+			r = r substr(s,k,2);
+			r = r "{";
+			r = r substr(s,k+2,1);
+			r = r "}}";
+			r = r substr(s,k+3);
+			s = r;
 		}
 	}
 	return (s);

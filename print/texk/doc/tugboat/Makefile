@@ -72,7 +72,7 @@ t-of-c/tb1392.cnt t-of-c/tb1493.cnt
 # TUGCONTENTS = tb0988.cnt
 
 all:	tugbib tugbib2 kwic guidepro.dvi tb0hyf.dvi tb0tree.dvi \
-	tubguide.dvi
+	tubguide.dvi tbcv05.dvi tbcv10.dvi tbcv15.dvi
 # tb0cyr.dvi  tugbot.dvi
 
 kwic:	kwic.dvi
@@ -114,10 +114,15 @@ tugbib2.dvi:	tugbib2.ltx tugboat.bib
 tugbib2.bbl:	tugbib2.aux tugboat.bib
 	- $(BIBTEX) tugbib2
 
-tugboat.bib:	$(TUGCONTENTS) tugboat.awk
-	$(AWK) -f tugboat.awk $(TUGCONTENTS) >tugboat.bib
+tugboat.bib:	$(TUGCONTENTS) tugboat.awk wcat
 #	$(AWK) -f tugboat.awk $(TUGCONTENTS) | bibclean >tugboat.bib
+	$(AWK) -f tugboat.awk $(TUGCONTENTS) | bibclean.sh >tugboat.bib
+#	Comment out the next line to extend the tail of tugboat.def
+	sed '/%EOF/q' tugboat.def > o.tmp; mv o.tmp tugboat.def
 	echo ==== Hand-edit tugboat.def to fix tail-end definitions ====
+
+bibclean.sh wcat: wcat.c
+	cc -O -o $@ $>
 
 guidepro.dvi: guidepro.tex
 	tex $<
@@ -137,6 +142,17 @@ tubguide.dvi: tubguide.tex
 tugbot.dvi: tugbot.tex
 	tex $<
 
+tbcv05.dvi: tbcv05.tex
+	tex $<
 
-clean realclean:
+tbcv10.dvi: tbcv10.tex
+	tex $<
+
+tbcv15.dvi: tbcv15.tex
+	tex $<
+
+clean: 
 	-$(RM) *.aux *.blg *.bbl *.dvi* *.log *.lst *.ptx *.kwic* ~*
+
+realclean: clean
+	-$(RM) *.bib wcat
