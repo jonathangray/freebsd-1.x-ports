@@ -1,5 +1,5 @@
-#! /bin/sh
-#	$Header: /a/cvs/386BSD/ports/comm/flexfax/etc/faxaddmodem.sh,v 1.1 1993/08/31 23:41:35 ljo Exp $
+#!/bin/bash
+#	$Header: /a/cvs/386BSD/ports/comm/flexfax/etc/faxaddmodem.sh,v 1.2 1994/06/15 04:04:07 jkh Exp $
 #
 # FlexFAX Facsimile Software
 #
