@@ -2352,7 +2352,9 @@ ttrpid(name) char *name; {
 #ifdef SVR4				/* Lockfile uses device numbers. */
 #ifndef LFDEVNO				/* Define this for SVR4 */
 #ifndef AIXRS				/* But not for RS/6000 AIX 3.2 */
+#ifndef __386BSD__			/* We use LCK on 386bsd */
 #define LFDEVNO				/* If anybody else needs it, */
+#endif /* __386BSD__ */
 #endif /* AIXRS */
 #endif /* LFDEVNO */			/* define it here or on CC */
 #endif /* SVR4 */			/* command line. */
