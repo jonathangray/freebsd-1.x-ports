@@ -10,11 +10,11 @@
 # (modify these lines to suit your system)
 #
 # the location of inetd on your system (usually /etc/inetd)
-MINETD=/etc/inetd
+MINETD=/usr/sbin/inetd
 # the location of the inetd configuration file (usually /etc/inetd.conf)
 MINETDCONFIG=/etc/inetd.conf
 # the location of nntpd following installation (usually /etc/nntpd)
-MNNTPD=/etc/nntpd
+MNNTPD=/usr/libexec/nntpd
 # the location of the hosts file (usually /etc/hosts)
 MHOSTFILE=/etc/hosts
 # the location of the services file (usually /etc/services)
@@ -22,14 +22,14 @@ MSERVICES=/etc/services
 # the location of the networks file (usually /etc/networks)
 MNETWORKFILE=/etc/networks
 # The location of the news spool directory (usually /usr/spool/news)
-MNEWSSPOOL=/usr/spool/news
+MNEWSSPOOL=/var/spool/news
 # The location of the news library directory (usually /usr/lib/news)
 MNEWSLIB=/usr/lib/news
 # The location of the file containing the name of the nntp server machine
 # (usually /usr/local/lib/rn/server)
-MSERVERFILE=/usr/local/lib/rn/server
+MSERVERFILE=/usr/local/lib/trn/server
 # The location of rn's local library (usually /usr/local/lib/rn)
-MRNLIB=/usr/local/lib/rn
+MRNLIB=/usr/local/lib/trn
 #
 # ------------ END OF SITE DEPENDENT STUFF ---------------------
 # (you should not have to touch anything below).

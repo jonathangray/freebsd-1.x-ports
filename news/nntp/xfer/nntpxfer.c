@@ -1,5 +1,5 @@
 #ifndef lint
-static char * scsid = "@(#)$Header: /a/cvs/386BSD/ports/news/nntp/xfer/nntpxfer.c,v 1.1 1993/07/19 20:04:34 nate Exp $";
+static char * scsid = "@(#)$Header: /a/cvs/386BSD/ports/news/nntp/xfer/nntpxfer.c,v 1.2 1994/04/25 23:58:34 adam Exp $";
 #endif
 /*
  * nntpxfer
@@ -448,7 +448,7 @@ char *buf;
 	if (setjmp(SFGstack)) {
 		(void) alarm(0);	/* reset alarm clock */
 		(void) signal(SIGALRM, SIG_DFL);
-#ifdef __386BSD__
+#ifdef __FreeBSD__
 		rd_fp->_flags |= __SERR;	/* set stdio error */
 #else
 		rd_fp->_flag |= _IOERR;	/* set stdio error */

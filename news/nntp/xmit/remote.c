@@ -1,5 +1,5 @@
 #ifndef lint
-static char * rcsid = "@(#)$Header: /a/cvs/386BSD/ports/news/nntp/xmit/remote.c,v 1.1 1993/07/19 20:04:35 nate Exp $";
+static char * rcsid = "@(#)$Header: /a/cvs/386BSD/ports/news/nntp/xmit/remote.c,v 1.2 1994/04/25 23:58:38 adam Exp $";
 #endif
 /*
 ** remote communication routines for NNTP/SMTP style communication.
@@ -332,7 +332,7 @@ FILE	*fp;
 #ifdef apollo
 		fp->_flag |= _SIERR;
 #else
-#ifdef __386BSD__
+#ifdef __FreeBSD__
 		fp->_flags |= __SERR;		/* set stdio error */
 #else
 		fp->_flag |= _IOERR;		/* set stdio error */

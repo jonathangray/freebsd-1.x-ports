@@ -1,12 +1,12 @@
 #
 # Makefile for NNTP intstallation
-# $Header: /a/cvs/386BSD/ports/news/nntp/Makefile,v 1.2 1993/08/22 00:35:57 alm Exp $
+# $Header: /a/cvs/386BSD/ports/news/nntp/Makefile,v 1.3 1994/04/25 23:57:05 adam Exp $
 # The program that knows how to deal with makefiles. [Uncomment if needed.]
 # MAKE=make
 # set CFLAGS to be -Ipath/to/special/includes if needed
 CFLAGS= -O -I../dbz
 # link with DBZ
-LIBS=../dbz/dbz.o
+LIBS=../libcnews.a -lcrypt
 
 DISTFILES = Makefile README CHANGES
 
@@ -30,7 +30,7 @@ make_:
 	@ echo "See README for details."
 
 make_server: /nowhere
-	cd dbz; $(MAKE)  it
+	cd dbz; $(MAKE) u
 	cd server; $(MAKE) $(MFLAGS) "LIBS=${LIBS}" "CFLAGS=${CFLAGS}"
 	cd support; $(MAKE) $(MFLAGS) "LIBS=${LIBS}" "CFLAGS=${CFLAGS}"
 	cd doc; $(MAKE) $(MFLAGS) "LIBS=${LIBS}" "CFLAGS=${CFLAGS}"

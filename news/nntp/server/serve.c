@@ -1,5 +1,5 @@
 #ifndef lint
-static char	*sccsid = "@(#)$Header: /a/cvs/386BSD/ports/news/nntp/server/serve.c,v 1.1 1993/07/19 20:04:32 nate Exp $";
+static char	*sccsid = "@(#)$Header: /a/cvs/386BSD/ports/news/nntp/server/serve.c,v 1.2 1994/04/25 23:58:27 adam Exp $";
 #endif
 
 /*
@@ -140,11 +140,7 @@ serve()
 #ifndef ALONE
 # ifdef SYSLOG
 #  ifdef BSD_42
-#   ifdef __386BSD__
-	openlog("nntpd", LOG_PID, SYSLOG);
-#   else
 	openlog("nntpd", LOG_PID);
-#   endif
 #  else
 	openlog("nntpd", LOG_PID, SYSLOG);
 #  endif

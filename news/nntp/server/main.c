@@ -1,5 +1,5 @@
 #ifndef lint
-static char	*sccsid = "@(#)$Header: /a/cvs/386BSD/ports/news/nntp/server/main.c,v 1.1 1993/07/19 20:04:31 nate Exp $";
+static char	*sccsid = "@(#)$Header: /a/cvs/386BSD/ports/news/nntp/server/main.c,v 1.2 1994/04/25 23:58:22 adam Exp $";
 #endif
 
 /*
@@ -55,11 +55,7 @@ char **argv, **envp;
 
 #ifdef SYSLOG
 #ifdef BSD_42
-#ifdef __386BSD__
-	openlog("nntpd", LOG_PID, SYSLOG);		/* fd 3 */
-#else /* !__386BSD__ */
 	openlog("nntpd", LOG_PID);			/* fd 3 */
-#endif /* __386BSD__ */
 #else /* !BSD_42 */
 	openlog("nntpd", LOG_PID, SYSLOG);		/* fd 3 */
 #endif /* BSD_42 */
@@ -225,11 +221,7 @@ char **argv, **envp;
 			       ERR_GOODBYE, load );
 #ifdef SYSLOG
 #ifdef BSD_42
-#ifdef __386BSD__
-			openlog("nntpd", LOG_PID, SYSLOG);
-#else /* !__386BSD__ */
 			openlog("nntpd", LOG_PID);
-#endif /* __386BSD__ */
 #else /* !BSD_42 */
 			openlog("nntpd", LOG_PID, SYSLOG);
 #endif /* BSD_42 */

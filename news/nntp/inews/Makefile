@@ -1,7 +1,7 @@
 #
 # Makefile for pseudo-inews
 #
-NEWSUSR=root
+NEWSUSR=news
 SRCS	=	inews.c uname.c postauth.c ../common/clientlib.c ../common/version.c ../server/strcasecmp.c
 OBJS	=	inews.o uname.o postauth.o ../common/clientlib.o ../common/version.o ../server/strcasecmp.o
 HFILES	=	../common/nntp.h ../common/conf.h

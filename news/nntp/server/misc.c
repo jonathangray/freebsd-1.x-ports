@@ -1,5 +1,5 @@
 #ifndef lint
-static char	*sccsid = "@(#)$Header: /a/cvs/386BSD/ports/news/nntp/server/misc.c,v 1.1 1993/07/19 20:04:31 nate Exp $";
+static char	*sccsid = "@(#)$Header: /a/cvs/386BSD/ports/news/nntp/server/misc.c,v 1.2 1994/04/25 23:58:24 adam Exp $";
 #endif
 
 #include "common.h"
@@ -705,8 +705,12 @@ int min_free;
  * A negative value is returned on error.
  */
 #ifndef READ_SUPER
-#if defined(sun) || defined(hpux) || defined(pyr) || defined(hp300) || defined(NeXT)
+#if defined(sun) || defined(hpux) || defined(pyr) || defined(hp300) || defined(NeXT) || defined(__FreeBSD__)
+#ifdef __FreeBSD__
+#include <sys/mount.h>
+#else
 #include <sys/vfs.h>
+#endif
 #define statfilesys	statfs		/* routine to call when trying to  */
 					/* stat a file system to get the # */
 					/* of free blocks available	   */
@@ -832,11 +836,7 @@ int free_space;
  * patches posted by Tad Guy <tadguy@cs.odu.edu>
  */
 
-#ifdef __386BSD__
-#include <ufs/fs.h>
-#else /* !__386BSD__ */
 #include <sys/fs.h>
-#endif /* __386BSD__ */
 #include <fstab.h>
 
 /*

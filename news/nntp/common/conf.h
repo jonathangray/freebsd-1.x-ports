@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/news/nntp/common/conf.h,v 1.3 1993/08/26 02:31:34 alm Exp $
+/* $Header: /a/cvs/386BSD/ports/news/nntp/common/conf.h,v 1.4 1994/04/25 23:58:01 adam Exp $
  * Configuration information for use by NNTP server and support
  * programs.  Change these as appropriate for your system.
  */
@@ -339,6 +339,10 @@
 #			endif
 #		endif
 #	endif
+#endif
+
+#ifdef __FreeBSD__
+#undef READ_SUPER
 #endif
 
 /*

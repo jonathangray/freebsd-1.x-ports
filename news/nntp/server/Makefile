@@ -1,4 +1,4 @@
-# $Header: /a/cvs/386BSD/ports/news/nntp/server/Makefile,v 1.2 1993/08/22 00:36:46 alm Exp $
+# $Header: /a/cvs/386BSD/ports/news/nntp/server/Makefile,v 1.3 1994/04/25 23:58:17 adam Exp $
 # Makefile for NNTP server
 #
 
@@ -19,13 +19,13 @@ SRVRINC = common.h ../common/conf.h ../common/nntp.h timer.h
 SRCS	= ${SRVRSRC}
 
 # -ldbm here if you've #define'ed DBM in ../common/conf.h
-LIBS	= -ldbm
+LIBS	= ../libcnews.a -lcrypt
 
 CFLAGS	= -O
 
 # Where nntpd is going to live
 
-DESTDIR	= /etc
+DESTDIR	= /usr/libexec
 
 all:	nntpd
 

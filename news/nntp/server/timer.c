@@ -6,12 +6,12 @@
 #ifdef TIMERS
 #ifndef lint
 static char rcsid[] =
-    "@(#) $Header: /a/cvs/386BSD/ports/news/nntp/server/timer.c,v 1.1 1993/07/19 20:04:32 nate Exp $ (NNTP with TIMERS)";
+    "@(#) $Header: /a/cvs/386BSD/ports/news/nntp/server/timer.c,v 1.2 1994/04/25 23:58:30 adam Exp $ (NNTP with TIMERS)";
 #endif
 #else
 #ifndef lint
 static char rcsid[] =
-    "@(#) $Header: /a/cvs/386BSD/ports/news/nntp/server/timer.c,v 1.1 1993/07/19 20:04:32 nate Exp $ (NNTP without TIMERS)";
+    "@(#) $Header: /a/cvs/386BSD/ports/news/nntp/server/timer.c,v 1.2 1994/04/25 23:58:30 adam Exp $ (NNTP without TIMERS)";
 #endif
 #endif
 
@@ -28,7 +28,7 @@ static char rcsid[] =
 #endif
 #endif
 /* non-portable */
-#ifdef __386BSD__
+#ifdef __FreeBSD__
 #define BUFFERED_DATA(f) ((f)->_r > 0)
 #else
 #define BUFFERED_DATA(f) ((f)->_cnt > 0)

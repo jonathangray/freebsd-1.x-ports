@@ -37,7 +37,7 @@ newsinstall:
 
 u:	dbz.o
 	ar ruv ../libcnews.a dbz.o
-	cmp dbz.h ../h/dbz.h
+#	cmp dbz.h ../h/dbz.h
 
 t:	tdbz fake
 
@@ -165,5 +165,5 @@ rclean:
 	test ! -d xx || rmdir xx
 
 clean:	rclean
-	rm -f *.o dbz [a-z]dbz [a-z][a-z]dbz junk* PostScript.out
+	rm -f *.o dbz ../libcnews.a [a-z]dbz [a-z][a-z]dbz junk* PostScript.out
 	rm -f hist* dbase* *.bak mon.out gmon.out core dbm.h
