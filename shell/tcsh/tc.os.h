@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.os.h,v 1.1.1.2 1994/07/05 20:39:39 ache Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/tc.os.h,v 1.2 1994/07/05 22:37:30 ache Exp $ */
 /*
  * tc.os.h: Shell os dependent defines
  */
@@ -72,7 +72,7 @@
 # define NOFILE 256
 #endif /* NOFILE */
 
-#if defined(linux) || defined(NetBSD) || SYSVREL >= 4 
+#if defined(linux) || defined(__NetBSD__) || defined(__FreeBSD__) || SYSVREL >= 4
 # undef NEEDstrerror
 #endif /* linux || NetBSD || SYSVREL >= 4 */
 #if defined(BSD) && BSD >= 199306
