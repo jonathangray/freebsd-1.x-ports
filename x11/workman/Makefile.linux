@@ -1,0 +1,157 @@
+# @(#)Makefile.linux	1.7 1/24/94
+
+# Uncomment the following if you're compiling on Solaris 2.  It adds an option
+# (-o) and changes the default device name of the CD-ROM.
+#SOL2 = -DSYSV
+
+# Set these to the locations of your XView include files and libraries.
+INCDIR = $(OPENWINHOME)/include
+LIBDIR = $(OPENWINHOME)/lib
+
+# Location of the X libraries
+XLIBDIR = /usr/X386/lib
+
+# If your linker supports the -R flag to set a default location for
+# shared libraries, uncomment this line.
+#LIBLOC = -R$(LIBDIR)
+
+# Set these to the directory names in which to install the software and
+# help files.
+BINDIR = $(OPENWINHOME)/bin
+HLPDIR = $(OPENWINHOME)/lib/help
+
+# Set this to the directory containing manual pages.  Manual pages will only
+# be installed if you "make install.man".
+MANDIR = $(OPENWINHOME)/man
+
+# Set these to the manual sections (e.g. 1, 4, 5, l) for the program and
+# database file manual pages, respectively.
+PEXT = 1
+DEXT = 5
+
+# And don't worry about anything from this line on.
+
+############################################################################
+# Parameters.
+
+PROGRAM = workman
+SOURCES.c = workman_stubs.c database.c cdinfo.c display.c setup.c \
+	ui_cdinfo.c plat_sun.c plat_hpux.c plat_linux.c plat_news.c \
+	plat_bsd386.c plat_ultrix.c cdrom.c scsi.c drv_toshiba.c drv_sony.c \
+	plat_svr4.c
+SOURCES.h = struct.h workman_ui.h
+
+OBJECTS = \
+	$(SOURCES.c:%.c=%.o)
+
+# Compiler flags.
+
+CFLAGS = -g -O6 -m486 -fwritable-strings -Dlinux -DLINUX_SCSI_PASSTHROUGH
+CPPFLAGS = -I$(INCDIR) $(SOL2)
+LDFLAGS = -L$(LIBDIR) -L$(XLIBDIR) $(LIBLOC)
+LDLIBS = -lxview -lolgx -lX11
+CC = gcc
+
+# Standard targets.
+
+all:	 $(PROGRAM) $(PROGRAM).doc workmandb.doc
+
+$(PROGRAM): $(SOURCES.c) $(OBJECTS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LDLIBS)
+
+clean:
+	$(RM) $(OBJECTS) *.BAK *.delta core
+
+install: $(PROGRAM)
+	cp $(PROGRAM) $(BINDIR)
+
+	chown root $(BINDIR)/$(PROGRAM)
+	chmod 4755 $(BINDIR)/$(PROGRAM)
+
+	cp $(PROGRAM).info $(HLPDIR)
+	chmod 644 $(HLPDIR)/$(PROGRAM).info
+
+install.man: workman.man workmandb.man $(MANDIR)/man$(PEXT) $(MANDIR)/man$(DEXT)
+	cp workman.man $(MANDIR)/man$(PEXT)/workman.$(PEXT)
+	chmod 644 $(MANDIR)/man$(PEXT)/workman.$(PEXT)
+	cp workmandb.man $(MANDIR)/man$(DEXT)/workmandb.$(DEXT)
+	chmod 644 $(MANDIR)/man$(DEXT)/workmandb.$(DEXT)
+
+display.o: display.c workman_ui.h
+setup.o: setup.c workman_ui.h
+workman_stubs.o: workman_stubs.c workman_ui.h
+ui_cdinfo.o: ui_cdinfo.c workman_ui.h
+# This next one isn't completely true, but close enough
+$(OBJECTS): struct.h
+
+$(PROGRAM).doc: $(PROGRAM).man
+	nroff -man $(PROGRAM).man > $(PROGRAM).doc
+workmandb.doc: workmandb.man
+	nroff -man workmandb.man > workmandb.doc
+
+#
+# These targets are for building the shar distribution.
+#
+shar: part01
+
+ALLFILES= README README.ultrix README.hpux ANSWERS INSTALLATION to-do \
+	$(PROGRAM)_ui.h \
+	$(PROGRAM).man $(PROGRAM).doc $(SOURCES.c) workmandb.man workmandb.doc \
+	CHANGELOG struct.h bitmaps bitmaps/loud.icon bitmaps/loud0.icon \
+	bitmaps/loud1.icon bitmaps/loud2.icon bitmaps/loud3.icon \
+	bitmaps/loud4.icon bitmaps/loud5.icon bitmaps/loud6.icon \
+	bitmaps/phones bitmaps/phones0 bitmaps/phonesl1 bitmaps/phonesl2 \
+	bitmaps/phonesl3 bitmaps/phonesr1 bitmaps/phonesr2 bitmaps/phonesr3 \
+	bitmaps/sink0 bitmaps/sink1 bitmaps/sink2 bitmaps/sink3 \
+	bitmaps/sink4 bitmaps/sink5 bitmaps/sink6 bitmaps/sink7 \
+	bitmaps/eject.button bitmaps/ff.button \
+	bitmaps/icon bitmaps/iconmask bitmaps/pause.button \
+	bitmaps/play.button bitmaps/rew.button bitmaps/stop.button \
+	$(PROGRAM).info Makefile Makefile.hpux Imakefile WorkMan.tmpl
+
+part01: $(ALLFILES)
+	makekit -s 60k -n part $(ALLFILES)
+
+#
+# The following builds a compressed tarfile for binary distribution.
+# It will require a little hacking to use on machines other than mine.
+#
+AUXDIR = /tmp
+
+AUXSTUFF = $(AUXDIR)/$(PROGRAM) $(AUXDIR)/ANSWERS \
+	$(AUXDIR)/$(PROGRAM).info $(AUXDIR)/CHANGELOG $(AUXDIR)/$(PROGRAM).doc \
+	$(AUXDIR)/$(PROGRAM).man $(AUXDIR)/workmandb.man $(AUXDIR)/workmandb.doc
+
+tarfile: $(AUXDIR)/$(PROGRAM).tar.Z
+
+$(AUXDIR)/$(PROGRAM).tar.Z: $(AUXSTUFF)
+	cd $(AUXDIR); tar cf - $(PROGRAM) \
+		$(PROGRAM).info CHANGELOG $(PROGRAM).man $(PROGRAM).doc \
+		workmandb.man workmandb.doc ANSWERS | \
+		compress > $@
+	chmod 644 $@
+
+$(AUXDIR)/$(PROGRAM): $(PROGRAM)
+	cp $(PROGRAM) $@
+	chmod 755 $@
+$(AUXDIR)/$(PROGRAM).info: $(PROGRAM).info
+	cp $(PROGRAM).info $(AUXDIR)
+	chmod 644 $@
+$(AUXDIR)/ANSWERS: ANSWERS
+	cp ANSWERS $@
+	chmod 644 $@
+$(AUXDIR)/CHANGELOG: CHANGELOG
+	cp CHANGELOG $@
+	chmod 644 $@
+$(AUXDIR)/workmandb.man: workmandb.man
+	cp workmandb.man $@
+	chmod 644 $@
+$(AUXDIR)/workmandb.doc: workmandb.doc
+	cp workmandb.4 $@
+	chmod 644 $@
+$(AUXDIR)/$(PROGRAM).man: $(PROGRAM).man
+	cp $(PROGRAM).man $@
+	chmod 644 $@
+$(AUXDIR)/$(PROGRAM).doc: $(PROGRAM).doc
+	cp $(PROGRAM).1 $@
+	chmod 644 $@

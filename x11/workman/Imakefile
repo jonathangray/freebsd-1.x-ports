@@ -1,0 +1,59 @@
+/**/# @(#)Imakefile	1.11 1/30/94
+
+/**/# Note: Sun users should use the supplied Makefile.  But if you need
+/**/# to use imake, uncomment this line if you are compiling for Solaris 2.
+/**/# SOLARIS2 = -DSYSV
+
+/**/# Set this to the manual section where you want to install workmandb.man
+DBMANSECTION = 5
+
+/**/# And you shouldn't need to touch anything below this.
+
+
+#include <XView.tmpl>
+#include "WorkMan.tmpl"
+
+#define HasInfoFiles YES
+
+DEFINES = $(SOLARIS2) $(LOCALDEFS)
+DEPLIBS = XViewClientDepLibs
+
+#ifdef SonyArchitecture
+LOCAL_LIBRARIES = XViewClientLibs -lCD
+#else
+#ifdef __bsdi__
+/* LOCALDEFS=-DSOUNDBLASTER */ /* turns on some different volume code */
+LOCAL_LIBRARIES = XViewClientLibs -lcdrom -lrpc -lcompat
+CFLAGS += -fwritable-strings
+#else
+LOCAL_LIBRARIES = XViewClientLibs
+#endif
+#endif
+
+INFOFILES = workman.info
+
+SRCS = cdinfo.c database.c display.c setup.c ui_cdinfo.c plat_sun.c cdrom.c \
+	plat_hpux.c plat_ultrix.c plat_linux.c plat_news.c plat_bsd386.c \
+	plat_freebsd.c \
+	workman_stubs.c scsi.c drv_toshiba.c drv_sony.c plat_svr4.c
+
+OBJS = cdinfo.o database.o display.o setup.o ui_cdinfo.o plat_sun.o cdrom.o \
+	plat_hpux.o plat_ultrix.o plat_linux.o plat_news.o plat_bsd386.o \
+	plat_freebsd.o \
+	workman_stubs.o scsi.o drv_toshiba.o drv_sony.o plat_svr4.o
+
+ComplexProgramTarget(workman)
+
+InstallSpecialManPage(workmandb,$(DBMANSECTION))
+
+#ifdef UltrixArchitecture
+SpecialObjectRule(database.o,database.c,-Olimit 600);
+#endif
+
+#include <XView.prog>
+
+pkg: pkg_bin
+
+pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST pkg/+REQ all install install.man
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST -r pkg/+REQ workman_bin
+ 
