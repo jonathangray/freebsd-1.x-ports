@@ -1,7 +1,7 @@
 all:
 	cp Makefile.in web2c*/
 	cd web2c*; \
-	if [ ! -f web2c*/Makefile ]; then \
+	if [ ! -f ./Makefile ]; then \
 		./configure; \
 	fi; \
 	make
