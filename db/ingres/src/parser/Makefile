@@ -1,0 +1,307 @@
+# Generated automatically from Makefile.in by configure.
+#
+#  makefile for INGRES parser
+#
+#	@(#)Makefile	8.4	12/18/85
+#
+
+INGRES=	../..
+H=	../h
+LIB=	$(INGRES)/lib
+
+SOBJS=	s_yylex.o s_inout.o s_name.o s_number.o s_operator.o s_string.o \
+	s_symtab.o s_comment.o s_cmap.o
+OBJS=	parser.o control.o grammar.o att_fcn.o xdot.o \
+	range_fcn.o tree.o norml.o \
+	call_tree.o format.o par_util.o get_scan.o \
+	par_init.o ack_err.o
+SSRCS1=	s_yylex.c s_inout.c s_name.c s_number.c s_operator.c s_string.c \
+	s_symtab.c s_comment.c s_cmap.c 
+SHDRS=	scanner.h
+SSRCS=	$(SSRCS1) $(SHDRS)
+SRCS1=	att_fcn.c xdot.c range_fcn.c tree.c norml.c \
+	call_tree.c control.c format.c par_util.c get_scan.c \
+	parser.c par_init.c ack_err.c 
+YSRCS=	yyerror.y tables.y grammar.y
+HDRS=	parser.h
+SRCS=	$(SRCS1) $(YSRCS)
+
+IUTIL=	$(LIB)/libiutil.a
+GUTIL=	$(LIB)/libgutil.a
+CTLMOD=	$(LIB)/libctlmod.a
+LIBS=	$(IUTIL) $(GUTIL)
+
+YFLAGS= 
+CC= gcc
+RANLIB= ranlib
+DEFS=  -DHAVE_STRING_H=1 -DHAVE_STDLIB_H=1 -DHAVE_UNISTD_H=1 -DHAVE_STDARG_H=1 -DHAVE_SGTTY_H=1 -DHAVE_FCNTL_H=1 -DHAVE_MACHINE_ENDIAN_H=1 -DHAVE_SYS_WAIT_H=1 -DHAVE_SYS_TIME_H=1 -DHAVE_SYS_FILE_H=1 -DHAVE_SYS_RESOURCE_H=1 -DTIME_WITH_SYS_TIME=1 -DRETSIGTYPE=void -DDIRENT=1 -DDECLARED_SYS_NERR=1 -DDECLARED_SYS_ERRLIST=1 -DHAVE_STRERROR=1 -DHAVE_STRCSPN=1
+OPTIM= -O
+MOAN= -Wall
+LDFLAGS= $(OPTIM)
+CFLAGS= -DINGRES_PARSER -I$(H) $(OPTIM) $(DEFS) $(MOAN)
+LINTFLAGS= -huc -I$H
+AR=	-ar
+ARFLAGS=rvu
+CHMOD=	chmod
+LIBMODE=664
+BINMODE=4740
+ROMODE=	444
+CP=	cp
+LINT=	lint
+GET=	sccs get
+REL=
+PR=	print
+VGRIND=	csh /usr/ucb/vgrind
+HEADER=	Parser
+
+libparser.a: $(OBJS) $(SOBJS)
+	$(AR) $(ARFLAGS) libparser.a $(OBJS) $(SOBJS)
+	$(CHMOD) $(LIBMODE) libparser.a
+	$(RANLIB) libparser.a
+
+install: $(LIB)/libparser.a
+
+$(LIB)/libparser.a: libparser.a
+	$(CP) libparser.a $(LIB)/libparser.a
+	$(RANLIB) $(LIB)/libparser.a
+
+#for non-distributed database
+#grammar.c: grammar.y
+#	grep -v "DDD" grammar.y > grammar.z
+#	$(YACC) $(YFLAGS) grammar.z
+#	mv y.tab.c grammar.c
+#	rm -f grammar.z
+
+#for distributed database
+grammar.c: grammar.y
+	$(YACC) $(YFLAGS) grammar.y
+	mv y.tab.c grammar.c
+
+grammar.o: tables.y yyerror.y scanner.h parser.h
+
+new:
+	rm -f parser libparser.a
+
+clean:
+	rm -f *.o
+	rm -f parser a.out core libparser.a grammar.c
+
+sources: $(SRCS) $(SSRCS) $(HDRS)
+
+lint:
+	$(LINT) $(LINTFLAGS) $(SRCS1) $(SSRCS1)
+
+print: sources
+	$(PR) Makefile TraceFlags *.[hm] *.[csy]
+
+vgrind: sources
+	cp /dev/null index
+	$(VGRIND) -h "$(HEADER) (Release 8)" -n Makefile TraceFlags
+	$(VGRIND) -h "$(HEADER) (Release 8)" *.[hm] *.[csy]
+	sed /SCCSID/d < index > tmp
+	mv tmp index
+	$(VGRIND) -h "$(HEADER) (Release 8)" -x index
+
+tags: sources
+	-fgrep ../ tags > othertags
+	ctags  $(SRCS) $(HDRS)
+	sort -o tags tags othertags
+	-rm -f othertags
+
+#
+# DANGER	DANGER	DANGER	DANGER	DANGER	DANGER
+# The following two entries should NOT be executed by the user.
+# These entries are only for the Makefile in conf to construct
+# the system tag files.
+#
+systags: 
+	ctags $(SRCS) $(HDRS)
+	sed "s/	/	parser\//" tags > systags
+	cat systags >> ../tags
+
+#
+# We assume that systags has already been done.
+#
+installtags:
+	sed "/	parser/d" ../tags | sed "s/	/	..\//" > othertags
+	sort -o tags tags othertags
+	-rm -f othertags systags
+
+$(SRCS) $(SSRCS):
+	$(GET) $(REL) $@
+
+depend:
+	grep '^#[ 	]*include' $(SRCS) $(SSRCS1) | sed -n -f ../h/depend.sed > makedep
+	echo '/^# DO NOT DELETE THIS LINE/+2,$$d' >eddep
+	echo '$$r makedep' >>eddep
+	echo 'w' >>eddep
+	cp Makefile Makefile.bak
+	ed - Makefile < eddep
+	rm eddep makedep
+	echo '# DEPENDENCIES MUST END AT END OF FILE' >> Makefile
+	echo '# IF YOU PUT STUFF HERE IT WILL GO AWAY' >> Makefile
+	echo '# see make depend above' >> Makefile
+
+# DO NOT DELETE THIS LINE -- make depend uses it
+
+att_fcn.o:$H/ingres.h
+att_fcn.o:$H/aux.h
+att_fcn.o:$H/tree.h
+att_fcn.o:$H/symbol.h
+att_fcn.o:parser.h
+att_fcn.o:$H/sccs.h
+att_fcn.o:$H/errors.h
+att_fcn.o:$H/protos.h
+xdot.o:$H/ingres.h
+xdot.o:$H/aux.h
+xdot.o:$H/tree.h
+xdot.o:$H/symbol.h
+xdot.o:parser.h
+xdot.o:$H/sccs.h
+xdot.o:$H/protos.h
+range_fcn.o:$H/ingres.h
+range_fcn.o:$H/aux.h
+range_fcn.o:$H/tree.h
+range_fcn.o:$H/symbol.h
+range_fcn.o:$H/range.h
+range_fcn.o:parser.h
+range_fcn.o:$H/sccs.h
+range_fcn.o:$H/errors.h
+range_fcn.o:$H/protos.h
+tree.o:$H/ingres.h
+tree.o:$H/aux.h
+tree.o:$H/tree.h
+tree.o:$H/pv.h
+tree.o:parser.h
+tree.o:$H/symbol.h
+tree.o:$H/sccs.h
+tree.o:$H/errors.h
+tree.o:$H/protos.h
+norml.o:$H/ingres.h
+norml.o:$H/aux.h
+norml.o:$H/tree.h
+norml.o:$H/symbol.h
+norml.o:parser.h
+norml.o:$H/sccs.h
+norml.o:$H/protos.h
+call_tree.o:$H/ingres.h
+call_tree.o:$H/symbol.h
+call_tree.o:$H/tree.h
+call_tree.o:$H/pv.h
+call_tree.o:parser.h
+call_tree.o:$H/sccs.h
+call_tree.o:$H/protos.h
+control.o:$H/ingres.h
+control.o:$H/aux.h
+control.o:$H/symbol.h
+control.o:$H/tree.h
+control.o:parser.h
+control.o:$H/pv.h
+control.o:scanner.h
+control.o:$H/sccs.h
+control.o:$H/errors.h
+control.o:$H/protos.h
+format.o:$H/ingres.h
+format.o:$H/aux.h
+format.o:$H/tree.h
+format.o:$H/symbol.h
+format.o:parser.h
+format.o:$H/sccs.h
+format.o:$H/errors.h
+format.o:$H/protos.h
+par_util.o:$H/ingres.h
+par_util.o:$H/aux.h
+par_util.o:$H/tree.h
+par_util.o:parser.h
+par_util.o:$H/catalog.h
+par_util.o:$H/pv.h
+par_util.o:$H/symbol.h
+par_util.o:$H/sccs.h
+par_util.o:scanner.h
+par_util.o:$H/errors.h
+par_util.o:$H/protos.h
+get_scan.o:$H/ingres.h
+get_scan.o:scanner.h
+get_scan.o:$H/sccs.h
+get_scan.o:$H/protos.h
+parser.o:$H/ingres.h
+parser.o:$H/range.h
+parser.o:$H/tree.h
+parser.o:$H/func.h
+parser.o:$H/pv.h
+parser.o:parser.h
+parser.o:../equel/constants.h
+parser.o:../equel/globals.h
+parser.o:$H/sccs.h
+parser.o:$H/errors.h
+parser.o:$H/protos.h
+par_init.o:$H/ingres.h
+par_init.o:$H/symbol.h
+par_init.o:parser.h
+par_init.o:$H/access.h
+par_init.o:$H/sccs.h
+par_init.o:$H/protos.h
+ack_err.o:$H/ingres.h
+ack_err.o:$H/pv.h
+ack_err.o:$H/sccs.h
+ack_err.o:$H/protos.h
+yyerror.o:$H/errors.h
+grammar.o:$H/ingres.h
+grammar.o:$H/aux.h
+grammar.o:$H/tree.h
+grammar.o:$H/symbol.h
+grammar.o:$H/pv.h
+grammar.o:parser.h
+grammar.o:$H/sccs.h
+grammar.o:$H/errors.h
+grammar.o:$H/protos.h
+grammar.o:scanner.h
+grammar.o:tables.y
+grammar.o:yyerror.y
+s_yylex.o:$H/ingres.h
+s_yylex.o:scanner.h
+s_yylex.o:$H/sccs.h
+s_yylex.o:$H/errors.h
+s_yylex.o:$H/protos.h
+s_inout.o:$H/ingres.h
+s_inout.o:scanner.h
+s_inout.o:$H/sccs.h
+s_inout.o:$H/protos.h
+s_name.o:$H/ingres.h
+s_name.o:scanner.h
+s_name.o:$H/sccs.h
+s_name.o:$H/errors.h
+s_name.o:$H/protos.h
+s_number.o:$H/ingres.h
+s_number.o:$H/aux.h
+s_number.o:scanner.h
+s_number.o:$H/sccs.h
+s_number.o:$H/errors.h
+s_number.o:$H/protos.h
+s_operator.o:$H/ingres.h
+s_operator.o:scanner.h
+s_operator.o:$H/sccs.h
+s_operator.o:$H/errors.h
+s_operator.o:$H/protos.h
+s_string.o:$H/ingres.h
+s_string.o:scanner.h
+s_string.o:$H/sccs.h
+s_string.o:$H/errors.h
+s_string.o:$H/protos.h
+s_symtab.o:$H/ingres.h
+s_symtab.o:$H/aux.h
+s_symtab.o:scanner.h
+s_symtab.o:$H/sccs.h
+s_symtab.o:$H/errors.h
+s_symtab.o:$H/protos.h
+s_comment.o:$H/ingres.h
+s_comment.o:scanner.h
+s_comment.o:$H/sccs.h
+s_comment.o:$H/errors.h
+s_comment.o:$H/protos.h
+s_cmap.o:scanner.h
+s_cmap.o:$H/sccs.h
+s_cmap.o:$H/protos.h
+# DEPENDENCIES MUST END AT END OF FILE
+# IF YOU PUT STUFF HERE IT WILL GO AWAY
+# see make depend above
