@@ -162,6 +162,10 @@ char *ckxsys = HERALD;
   PIDSTRING means use ASCII string to represent pid in lockfile.
 */
 #ifndef LOCK_DIR
+#ifdef __386BSD__
+#define PIDSTRING
+#define LOCK_DIR "/var/spool/lock";
+#else
 #ifdef BSD44
 #define LOCK_DIR "/var/spool/uucp";
 #else
@@ -218,6 +222,7 @@ char *ckxsys = HERALD;
 #endif /* RTAIX */
 #endif /* DGUX430 */
 #endif /* BSD44 */
+#endif /* __386BSD__ */
 #endif /* !LOCK_DIR (outside ifndef) */
    
 #endif /* !NOUUCP */
