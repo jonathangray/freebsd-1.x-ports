@@ -1,13 +1,13 @@
 #
 # Makefile for DGD, Dworkin's Game Driver
 #
-HOST=	SUNOS4
+HOST=	BSD386
 DEFINES=-D$(HOST)
 DEBUG=	-g -DDEBUG
 CCFLAGS=$(DEFINES) $(DEBUG)
 CFLAGS=	-I. -Icomp -Ilex -Ied -Ikfun $(CCFLAGS)
 LDFLAGS=
-LIBS=
+LIBS=	-lcrypt
 CC=	gcc
 LD=	$(CC)
 DMAKE=	make
@@ -26,7 +26,7 @@ a.out:	$(OBJ)
 	cd ed; $(MAKE) 'DMAKE=$(DMAKE)' 'CC=$(CC)' 'CCFLAGS=$(CCFLAGS)' dgd
 	cd kfun; $(MAKE) 'DMAKE=$(DMAKE)' 'CC=$(CC)' 'CCFLAGS=$(CCFLAGS)' dgd
 	cd lpc; $(MAKE) 'DMAKE=$(DMAKE)' 'CC=$(CC)' 'CCFLAGS=$(CCFLAGS)' dgd
-	cd host; $(MAKE) 'DMAKE=$(DMAKE)' 'CC=$(CC)' 'CCFLAGS=$(CCFLAGS)' dgd
+	cd host; MAKEOBJDIR=$(.CURDIR)/host $(MAKE) 'DMAKE=$(DMAKE)' 'CC=$(CC)' 'CCFLAGS=$(CCFLAGS)' dgd
 	$(LD) $(LDFLAGS) $(OBJ) `cat comp/dgd` `cat lex/dgd` `cat ed/dgd` \
 	      `cat kfun/dgd` `cat lpc/dgd` `cat host/dgd` $(LIBS)
 

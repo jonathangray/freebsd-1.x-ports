@@ -1,7 +1,7 @@
 #
 # Makefile for lexical scanner, part of DGD.
 #
-HOST=	SUNOS4
+HOST=	BSD386
 DEFINES=-D$(HOST)
 DEBUG=	-g -DDEBUG
 CCFLAGS=$(DEFINES) $(DEBUG)

@@ -1,7 +1,7 @@
 #
 # Makefile for LPC precompiler, part of DGD.
 #
-HOST=	SUNOS4
+HOST=	BSD386
 DEFINES=-D$(HOST)
 DEBUG=	-g -DDEBUG
 CCFLAGS=$(DEFINES) $(DEBUG)
@@ -22,7 +22,7 @@ a.out:	$(COMPOBJ)
 	cd ..; $(DMAKE) 'CC=$(CC)' 'CCFLAGS=$(CCFLAGS)' comp.sub
 	cd ../lex; $(DMAKE) 'CC=$(CC)' 'CCFLAGS=$(CCFLAGS)' comp
 	cd ../kfun; $(DMAKE) 'CC=$(CC)' 'CCFLAGS=$(CCFLAGS)' comp
-	cd ../host; $(DMAKE) 'DMAKE=$(DMAKE)' 'CC=$(CC)' 'CCFLAGS=$(CCFLAGS)' \
+	cd ../host; MAKEOBJDIR=$(.CURDIR)/../host $(DMAKE) 'DMAKE=$(DMAKE)' 'CC=$(CC)' 'CCFLAGS=$(CCFLAGS)' \
 			     sub
 	$(LD) $(LDFLAGS) $(COMPOBJ) `cat ../comp.sub` `cat ../lex/comp` \
 	      `cat ../kfun/comp` `cat ../host/sub` $(LIBS)
@@ -31,9 +31,9 @@ dgd:	$(DGDOBJ)
 	@for i in $(DGDOBJ); do echo comp/$$i; done > dgd
 
 parser.c parser.h: parser.y
-	$(YACC) -d parser.y
-	mv y.tab.c parser.c
-	mv y.tab.h parser.h
+	cd $(.CURDIR); $(YACC) -d parser.y
+	cd $(.CURDIR); mv y.tab.c $(MAKEOBJDIR)/parser.c
+	cd $(.CURDIR); mv y.tab.h parser.h
 
 clean:
 	rm -f dgd a.out $(OBJ)
