@@ -32,9 +32,16 @@ MANIFEST = README slurp.c newnews.c articles.c history.c time.c sockets.c \
 	   misc.c space.c fakesyslog.c conf.h slurp.h nntp.h fakesyslog.h \
 	   Makefile slurp.sys slurp.1 HISTORY
 
+all:
+	@echo "You will need to customize slurp."
+	@echo "please read README.FreeBSD and follow the instructions."
+
+install:	all
+
 
 slurp: ${OBJECT}
 	${CC} ${LDFLAGS} ${OBJECT} -o slurp ${LIBS}
+
 
 slurp.o: slurp.c slurp.h conf.h nntp.h
 newnews.o: newnews.c slurp.h conf.h nntp.h
