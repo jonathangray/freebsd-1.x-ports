@@ -1,8 +1,11 @@
-/* $RCSfile: malloc.c,v $$Revision: 1.1 $$Date: 1993/08/23 21:30:10 $
+/* $RCSfile: malloc.c,v $$Revision: 1.2 $$Date: 1993/08/24 17:57:39 $
  *
  * $Log: malloc.c,v $
- * Revision 1.1  1993/08/23 21:30:10  nate
- * Initial revision
+ * Revision 1.2  1993/08/24 17:57:39  nate
+ * Fix for ALIGN macros in PERL that conflict with 4.4 macros
+ *
+ * Revision 1.1.1.1  1993/08/23  21:30:11  nate
+ * PERL!
  *
  * Revision 4.0.1.4  92/06/08  14:28:38  lwall
  * patch20: removed implicit int declarations on functions
@@ -64,7 +67,7 @@ static findbucket(), morecore();
  */
 union	overhead {
 	union	overhead *ov_next;	/* when free */
-#if ALIGNBYTES > 4
+#if ALIGN_BYTES > 4
 	double	strut;			/* alignment problems */
 #endif
 	struct {
