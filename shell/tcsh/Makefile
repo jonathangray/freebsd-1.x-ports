@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.1 1993/07/20 10:48:58 smace Exp $
+# $Id: Makefile,v 1.2 1993/08/21 04:58:30 smace Exp $
 #	Makefile.std	4.3	6/11/83
 #
 # C Shell with process control; VM/UNIX VAX Makefile
@@ -382,7 +382,7 @@ vgrind:
 	@for i in *.c; do vgrind -t -h "C Shell" $$i >/crp/bill/csh/$$i.t; done
 	@vgrind -t -x -h Index index >/crp/bill/csh/index.t
 
-install: tcsh 
+install: tcsh manpage
 	-mv -f ${DESTBIN}/tcsh  ${DESTBIN}/tcsh.old
 	cp tcsh ${DESTBIN}/tcsh
 	-strip ${DESTBIN}/tcsh
