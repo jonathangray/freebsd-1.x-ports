@@ -1,0 +1,255 @@
+diff -u 386BSD/ports/net/wu-ftpd/Makefile:1.1.1.1 386BSD/ports/net/wu-ftpd/Makefile:1.2
+--- 386BSD/ports/net/wu-ftpd/Makefile:1.1.1.1	Sun Jun 19 19:35:58 1994
++++ 386BSD/ports/net/wu-ftpd/Makefile	Sun Jun 19 19:35:58 1994
+@@ -1,25 +1,55 @@
+ BINDIR=		/usr/local/bin
+ ETCDIR=		/usr/local/etc
++EXECDIR=	/usr/local/libexec
+ MANDIR=		/usr/local/man
+-MANEXT=		8
++SAMPLE?=	.sample
+ 
+ all:
+-	@ echo 'Use the "build" command (shell script) to make ftpd.'
+-	@ echo 'You can say "build help" for details on how it works.'
++	sh ${.CURDIR}/build fbs
+ 
+-install: bin/ftpd bin/ftpcount bin/ftpshut
+-	-mv -f ${ETCDIR}/ftpd ${ETCDIR}/ftpd-old
++install: bin/ftpd bin/ftpcount bin/ftpshut bin/ftpwho
+ 	@echo Installing binaries.
+-	install -o bin -g bin -m 755 bin/ftpd ${ETCDIR}/ftpd
+-	install -o bin -g bin -m 755 bin/ftpshut ${BINDIR}/ftpshut
+-	install -o bin -g bin -m 755 bin/ftpcount ${BINDIR}/ftpcount
+-	install -o bin -g bin -m 755 bin/ftpwho ${BINDIR}/ftpwho
++	install ${COPY} ${STRIP} -o bin -g bin -m 755 \
++		bin/ftpd ${EXECDIR}/ftpd
++	install ${COPY} ${STRIP} -o bin -g bin -m 755 \
++		bin/ftpcount ${BINDIR}/ftpcount
++	install ${COPY} ${STRIP} -o bin -g bin -m 755 \
++		bin/ftpshut ${BINDIR}/ftpshut
++	install ${COPY} ${STRIP} -o bin -g bin -m 755 \
++		bin/ftpwho ${BINDIR}/ftpwho
+ 	@echo Installing manpages.
+-	install -o bin -g bin -m 755 doc/ftpd.8 ${MANDIR}/man8/ftpd.8
+-	install -o bin -g bin -m 755 doc/ftpcount.1 ${MANDIR}/man1/ftpcount.1
+-	install -o bin -g bin -m 755 doc/ftpwho.1 ${MANDIR}/man1/ftpwho.1
+-	install -o bin -g bin -m 755 doc/ftpshut.8 ${MANDIR}/man8/ftpshut.8
+-	install -o bin -g bin -m 755 doc/ftpaccess.5 ${MANDIR}/man5/ftpaccess.5
+-	install -o bin -g bin -m 755 doc/ftphosts.5 ${MANDIR}/man5/ftphosts.5
+-	install -o bin -g bin -m 755 doc/ftpconversions.5 ${MANDIR}/man5/ftpconversions.5
+-	install -o bin -g bin -m 755 doc/xferlog.5 ${MANDIR}/man5/xferlog.5
++	install ${COPY} -o bin -g bin -m 755 \
++		doc/ftpcount.1 ${MANDIR}/man1/ftpcount.1
++	install ${COPY} -o bin -g bin -m 755 \
++		doc/ftpwho.1 ${MANDIR}/man1/ftpwho.1
++	install ${COPY} -o bin -g bin -m 755 \
++		doc/ftpaccess.5 ${MANDIR}/man5/ftpaccess.5
++	install ${COPY} -o bin -g bin -m 755 \
++		doc/ftphosts.5 ${MANDIR}/man5/ftphosts.5
++	install ${COPY} -o bin -g bin -m 755 \
++		doc/ftpconversions.5 ${MANDIR}/man5/ftpconversions.5
++	install ${COPY} -o bin -g bin -m 755 \
++		doc/xferlog.5 ${MANDIR}/man5/xferlog.5
++	install ${COPY} -o bin -g bin -m 755 \
++		doc/ftpd.8 ${MANDIR}/man8/ftpd.8
++	install ${COPY} -o bin -g bin -m 755 \
++		doc/ftpshut.8 ${MANDIR}/man8/ftpshut.8
++	@echo Installing config files.
++	install ${COPY} -o root -g wheel -m 644 \
++		doc/examples/ftpaccess ${ETCDIR}/ftpaccess${SAMPLE}
++	install ${COPY} -o root -g wheel -m 644 \
++		doc/examples/ftpconversions ${ETCDIR}/ftpconversions${SAMPLE}
++	install ${COPY} -o root -g wheel -m 644 \
++		doc/examples/ftpgroups ${ETCDIR}/ftpgroups${SAMPLE}
++	install ${COPY} -o root -g wheel -m 644 \
++		doc/examples/ftphosts ${ETCDIR}/ftphosts${SAMPLE}
++
++clean:
++	sh ${.CURDIR}/build clean
++
++package: install
++	pkg_create \
++		-c ${.CURDIR}/pkg/+ONELINE \
++		-d ${.CURDIR}/pkg/+DESC \
++		-f ${.CURDIR}/pkg/+PLIST \
++		wu-ftpd_bin
+diff -u 386BSD/ports/net/wu-ftpd/build:1.1.1.1 386BSD/ports/net/wu-ftpd/build:1.2
+--- 386BSD/ports/net/wu-ftpd/build:1.1.1.1	Sun Jun 19 19:35:59 1994
++++ 386BSD/ports/net/wu-ftpd/build	Sun Jun 19 19:35:59 1994
+@@ -8,6 +8,7 @@
+   aix    : IBM AIX
+   bsd    : BSDI bsd/386
+   dyn    : Dynix
++  fbs    : FreeBSD (tested on 1.1 and 1.1.5)
+   hpx    : HP-UX
+   lnx    : Linux (tested on 0.99p8)
+   nx2    : NeXTstep 2.x
+@@ -68,9 +69,11 @@
+         echo ''
+         echo "Linking Makefiles."
+ 		cd src
++		rm -f Makefile config.h
+ 		ln makefiles/Makefile.$maketarget Makefile
+ 		ln config/config.$maketarget config.h
+ 		cd ../support
++		rm -f Makefile
+ 		ln makefiles/Makefile.$maketarget Makefile
+         echo ''
+         echo "Making support library."
+@@ -92,12 +95,12 @@
+         cd ..
+         if [ ! -d bin ] ;  then    mkdir bin;        fi
+         cd bin
+-        rm -f ftpd ftpcount ftpshut
++        rm -f ftpd ftpcount ftpshut ftpwho ckconfig
+         if [ -s ../src/ftpd ] ;      then ln ../src/ftpd  ftpd      ; fi
+         if [ -s ../src/ftpcount ] ;  then ln ../src/ftpcount ftpcount ; fi
+         if [ -s ../src/ftpshut ] ;   then ln ../src/ftpshut ftpshut    ; fi
+-        if [ -s ../src/ftpshut ] ;   then ln ../src/ftpcount ftpwho    ; fi
+-		if [ -s ../src/ckconfig ] ;  then ln ../src/ckconfig ckconfig  ; fi
++        if [ -s ../src/ftpcount ] ;  then ln ../src/ftpcount ftpwho    ; fi
++        if [ -s ../src/ckconfig ] ;  then ln ../src/ckconfig ckconfig  ; fi
+         cd ..
+         echo ''
+         echo "Links to executables are in bin directory:"
+diff -u 386BSD/ports/net/wu-ftpd/doc/examples/ftpaccess:1.1.1.1 386BSD/ports/net/wu-ftpd/doc/examples/ftpaccess:1.2
+--- 386BSD/ports/net/wu-ftpd/doc/examples/ftpaccess:1.1.1.1	Sun Jun 19 19:36:01 1994
++++ 386BSD/ports/net/wu-ftpd/doc/examples/ftpaccess	Sun Jun 19 19:36:01 1994
+@@ -8,8 +8,8 @@
+ message /welcome.msg            login
+ message .message                cwd=*
+ 
+-compress        yes             local remote
+-tar             yes             local remote
++compress        yes             all
++tar             yes             all
+ 
+ log commands real
+ log transfers anonymous,real inbound,outbound
+diff -u 386BSD/ports/net/wu-ftpd/doc/examples/ftpconversions:1.1.1.1 386BSD/ports/net/wu-ftpd/doc/examples/ftpconversions:1.3
+--- 386BSD/ports/net/wu-ftpd/doc/examples/ftpconversions:1.1.1.1	Sun Jun 19 19:36:01 1994
++++ 386BSD/ports/net/wu-ftpd/doc/examples/ftpconversions	Sun Jun 19 19:36:01 1994
+@@ -1,7 +1,7 @@
+- :.Z:  :  :/bin/compress -d -c %s:T_REG|T_ASCII:O_UNCOMPRESS:UNCOMPRESS
+- :   : :.Z:/bin/compress -c %s:T_REG:O_COMPRESS:COMPRESS
+- :.gz: :  :/bin/gzip -cd %s:T_REG|T_ASCII:O_UNCOMPRESS:GUNZIP
+- :   : :.gz:/bin/gzip -9 -c %s:T_REG:O_COMPRESS:GZIP
+- :   : :.tar:/bin/tar -c -f - %s:T_REG|T_DIR:O_TAR:TAR
+- :   : :.tar.Z:/bin/tar -c -Z -f - %s:T_REG|T_DIR:O_COMPRESS|O_TAR:TAR+COMPRESS
+- :   : :.tar.gz:/bin/tar -c -z -f - %s:T_REG|T_DIR:O_COMPRESS|O_TAR:TAR+GZIP@
+\ No newline at end of file
++ :.Z:  :  :/usr/bin/compress -d -c %s:T_REG|T_ASCII:O_UNCOMPRESS:UNCOMPRESS
++ :   : :.Z:/usr/bin/compress -c %s:T_REG:O_COMPRESS:COMPRESS
++ :.gz: :  :/usr/bin/gzip -cd %s:T_REG|T_ASCII:O_UNCOMPRESS:GUNZIP
++ :   : :.gz:/usr/bin/gzip -9 -c %s:T_REG:O_COMPRESS:GZIP
++ :   : :.tar:/usr/bin/tar -c -f - %s:T_REG|T_DIR:O_TAR:TAR
++ :   : :.tar.Z:/usr/bin/tar -c -Z -f - %s:T_REG|T_DIR:O_COMPRESS|O_TAR:TAR+COMPRESS
++ :   : :.tar.gz:/usr/bin/tar -c -z -f - %s:T_REG|T_DIR:O_COMPRESS|O_TAR:TAR+GZIP
+diff -u 386BSD/ports/net/wu-ftpd/src/ckconfig.c:1.1.1.1 386BSD/ports/net/wu-ftpd/src/ckconfig.c:1.2
+--- 386BSD/ports/net/wu-ftpd/src/ckconfig.c:1.1.1.1	Sun Jun 19 19:36:03 1994
++++ 386BSD/ports/net/wu-ftpd/src/ckconfig.c	Sun Jun 19 19:36:03 1994
+@@ -29,8 +29,7 @@
+  * POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-#define  HOST_ACCESS  1
+-
++#include "config.h"
+ #include <stdio.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+diff -u 386BSD/ports/net/wu-ftpd/src/ftpcmd.y:1.1.1.1 386BSD/ports/net/wu-ftpd/src/ftpcmd.y:1.2
+--- 386BSD/ports/net/wu-ftpd/src/ftpcmd.y:1.1.1.1	Sun Jun 19 19:36:04 1994
++++ 386BSD/ports/net/wu-ftpd/src/ftpcmd.y	Sun Jun 19 19:36:04 1994
+@@ -1518,7 +1518,11 @@
+ void
+ print_groups()
+ {
++#ifdef __FreeBSD__
++    int    groups[NGROUPS_MAX];
++#else
+     gid_t  groups[NGROUPS_MAX];
++#endif
+     int    ngroups = 0;
+ 
+     if ( (ngroups = getgroups(NGROUPS_MAX, groups)) < 0 ) {
+diff -u 386BSD/ports/net/wu-ftpd/src/pathnames.h:1.1.1.1 386BSD/ports/net/wu-ftpd/src/pathnames.h:1.2
+--- 386BSD/ports/net/wu-ftpd/src/pathnames.h:1.1.1.1	Sun Jun 19 19:36:04 1994
++++ 386BSD/ports/net/wu-ftpd/src/pathnames.h	Sun Jun 19 19:36:04 1994
+@@ -29,13 +29,27 @@
+  *
+  * @(#)pathnames.h 5.2 (Berkeley) 6/1/90 */
+ 
++#ifndef _PATH_FTPUSERS
+ #define _PATH_FTPUSERS  "/etc/ftpusers"
++#endif
++#ifndef _PATH_FTPACCESS
+ #define _PATH_FTPACCESS "/usr/local/etc/ftpaccess"
++#endif
++#ifndef _PATH_EXECPATH
+ #define _PATH_EXECPATH  "/bin/ftp-exec"
++#endif
++#ifndef _PATH_PIDNAMES
+ #define _PATH_PIDNAMES  "/usr/local/daemon/ftpd/ftp.pids-%s"
++#endif
++#ifndef _PATH_CVT
+ #define _PATH_CVT       "/usr/local/etc/ftpconversions"
++#endif
++#ifndef _PATH_XFERLOG
+ #define _PATH_XFERLOG   "/usr/adm/xferlog"
++#endif
++#ifndef _PATH_PRIVATE
+ #define _PATH_PRIVATE   "/etc/ftpgroups"
++#endif
+ 
+ #ifndef _PATH_UTMP
+ #define _PATH_UTMP      "/etc/utmp"
+@@ -43,10 +57,16 @@
+ #define _PATH_LASTLOG   "/usr/adm/lastlog"
+ #endif
+ 
++#ifndef _PATH_BSHELL
+ #define _PATH_BSHELL    "/bin/sh"
++#endif
++#ifndef _PATH_DEVNULL
+ #define _PATH_DEVNULL   "/dev/null"
++#endif
+ 
+ #ifdef  HOST_ACCESS
++#ifndef _PATH_FTPHOSTS
+ #define _PATH_FTPHOSTS  "/usr/local/etc/ftphosts"
++#endif
+ #endif
+ 
+diff -u 386BSD/ports/net/wu-ftpd/src/makefiles/Makefile.gen:1.1.1.1 386BSD/ports/net/wu-ftpd/src/makefiles/Makefile.gen:1.2
+--- 386BSD/ports/net/wu-ftpd/src/makefiles/Makefile.gen:1.1.1.1	Sun Jun 19 19:36:06 1994
++++ 386BSD/ports/net/wu-ftpd/src/makefiles/Makefile.gen	Sun Jun 19 19:36:06 1994
+@@ -36,7 +36,7 @@
+ 
+ clean:
+ 	rm -f ${OBJS} ftpd ftpcmd.c ftpshut ftpshut.o ftpcount ftpcount.o
+-	rm -f core index index.o ckconfig ckconfig.o
++	rm -f core index index.o ckconfig ckconfig.o y.tab.h edit vers.c
+ 
+ cleandir: clean
+ 	rm -f tags .depend
+diff -u 386BSD/ports/net/wu-ftpd/support/authuser.c:1.1.1.1 386BSD/ports/net/wu-ftpd/support/authuser.c:1.2
+--- 386BSD/ports/net/wu-ftpd/support/authuser.c:1.1.1.1	Sun Jun 19 19:36:07 1994
++++ 386BSD/ports/net/wu-ftpd/support/authuser.c	Sun Jun 19 19:36:07 1994
+@@ -4,7 +4,6 @@
+ 
+ #include "../src/config.h"
+ 
+-#include <arpa/inet.h>
+ #include <ctype.h>
+ #include <errno.h>
+ #include <fcntl.h>
+@@ -15,6 +14,7 @@
+ #include <sys/socket.h>
+ #include <sys/stat.h>
+ #include <sys/types.h>
++#include <arpa/inet.h>
+ 
+ extern int errno;
+ 
