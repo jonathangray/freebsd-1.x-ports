@@ -5,11 +5,14 @@
 
 # Read SETUP instructions before saying "make" !!
 
+# The name of the shared lib
+SOVERSION = 4.0
+
 # The name of your C compiler:
 CC= cc
 
 # You may need to adjust these cc options:
-CFLAGS= -O
+CFLAGS= -O -fpic
 # In particular:
 #   Add -DBSD if on a pure BSD system (see jinclude.h).
 #   Add -DMEM_STATS to enable gathering of memory usage statistics.
@@ -66,26 +69,26 @@ COMOBJECTS= jutils.o jerror.o jmemmgr.o jmemsys.o
 CLIBOBJECTS= jcmaster.o jcdeflts.o jcarith.o jccolor.o jcexpand.o jchuff.o \
         jcmcu.o jcpipe.o jcsample.o jfwddct.o jwrjfif.o jrdgif.o jrdppm.o \
         jrdrle.o jrdtarga.o
-COBJECTS= jcmain.o $(CLIBOBJECTS) $(COMOBJECTS)
+COBJECTS= jcmain.o
 # decompression objectfiles
 DLIBOBJECTS= jdmaster.o jddeflts.o jbsmooth.o jdarith.o jdcolor.o jdhuff.o \
         jdmcu.o jdpipe.o jdsample.o jquant1.o jquant2.o jrevdct.o jrdjfif.o \
         jwrgif.o jwrppm.o jwrrle.o jwrtarga.o
-DOBJECTS= jdmain.o $(DLIBOBJECTS) $(COMOBJECTS)
+DOBJECTS= jdmain.o
 # These objectfiles are included in libjpeg.a
 LIBOBJECTS= $(CLIBOBJECTS) $(DLIBOBJECTS) $(COMOBJECTS)
 
 
-all: cjpeg djpeg
+all: cjpeg djpeg libjpeg.a
 # By default, libjpeg.a is not built unless you explicitly request it.
 # You can add libjpeg.a to the line above if you want it built by default.
 
 
 cjpeg: $(COBJECTS)
-	$(LN) $(LDFLAGS) -o cjpeg $(COBJECTS) $(LDLIBS)
+	$(LN) $(LDFLAGS) -o cjpeg $(COBJECTS) -L. -ljpeg
 
 djpeg: $(DOBJECTS)
-	$(LN) $(LDFLAGS) -o djpeg $(DOBJECTS) $(LDLIBS)
+	$(LN) $(LDFLAGS) -o djpeg $(DOBJECTS) -L. -ljpeg
 
 # libjpeg.a is useful if you are including the JPEG software in a larger
 # program; you'd include it in your link, rather than the individual modules.
@@ -93,6 +96,7 @@ libjpeg.a: $(LIBOBJECTS)
 	$(RM) libjpeg.a
 	$(AR) libjpeg.a  $(LIBOBJECTS)
 	$(AR2) libjpeg.a
+	ld -Bshareable -o libjpeg.so.$(SOVERSION) $(LIBOBJECTS)
 
 jmemsys.c:
 	echo You must select a system-dependent jmemsys.c file.
@@ -121,6 +125,9 @@ install: all
 	install -c -s -m 555 -o bin -g bin djpeg /usr/local/bin
 	install -c  -m 444 -o bin -g bin cjpeg.1 /usr/local/man/man1
 	install -c  -m 444 -o bin -g bin djpeg.1 /usr/local/man/man1
+	install -c -m 444 -o bin -g bin libjpeg.a /usr/local/lib
+	install -c -m 444 -o bin -g bin libjpeg.so.$(SOVERSION) /usr/local/lib
+
 
 
 pkg:	pkg_src
