@@ -26,10 +26,13 @@ esac
 echo "Extracting Makefile (with variable substitutions)"
 rm -f Makefile
 cat >Makefile <<!GROK!THIS!
-# $RCSfile: Makefile.SH,v $$Revision: 1.3 $$Date: 1993/12/30 01:32:17 $
+# $RCSfile: Makefile.SH,v $$Revision: 1.4 $$Date: 1994/04/18 12:33:55 $
 #
 # $Log: Makefile.SH,v $
-# Revision 1.3  1993/12/30 01:32:17  smace
+# Revision 1.4  1994/04/18 12:33:55  jkh
+# Fio the package rule.
+#
+# Revision 1.3  1993/12/30  01:32:17  smace
 # correct pkg target to make src packages build first
 #
 # Revision 1.2  1993/12/29  23:50:40  smace
@@ -371,10 +374,7 @@ shlist:
 	echo $(sh) | tr ' ' '\012' >.shlist
 
 
-pkg:	pkg_src pkg_bin
-
-pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
-	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S perl_src
+pkg:	pkg_bin
 
 pkg_bin: install pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B
 	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B perl_bin

@@ -1,7 +1,10 @@
 # : Makefile.SH,v 16408Revision: 1.3 16408Date: 1993/12/30 01:32:17 $
 #
 # $Log: Makefile,v $
-# Revision 1.7  1994/04/11 14:59:40  jkh
+# Revision 1.8  1994/04/18 12:33:53  jkh
+# Fio the package rule.
+#
+# Revision 1.7  1994/04/11  14:59:40  jkh
 # rename pkg target to package to make Julian S. happy.
 #
 # Revision 1.6  1994/03/05  01:28:13  ache
@@ -348,10 +351,7 @@ shlist:
 	echo $(sh) | tr ' ' '\012' >.shlist
 
 
-package:	pkg_src pkg_bin
-
-pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
-	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S perl_src
+package:	pkg_bin
 
 pkg_bin: install pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B
 	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B perl_bin
