@@ -1,5 +1,5 @@
 char *copyright =
-    "Copyright (c) 1984, 1992, William LeFebvre";
+    "Copyright (c) 1984 through 1993, William LeFebvre";
 
 /*
  *  Top users/processes display for Unix
@@ -42,6 +42,7 @@ char *copyright =
 #include "top.local.h"
 #include "boolean.h"
 #include "machine.h"
+#include "utils.h"
 
 /* Size of the stdio buffer given to stdout */
 #define Buffersize	2048
@@ -81,11 +82,9 @@ caddr_t malloc();
 /* routines that don't return int */
 
 char *username();
-char *itoa();
 char *ctime();
 char *kill_procs();
 char *renice_procs();
-char **argparse();
 
 extern int proc_compare();
 long time();
@@ -681,13 +680,11 @@ Usage: %s [-ISbinqu] [-d x] [-s x] [-U username] [number]\n",
 				{
 				    if (newval > max_topn)
 				    {
-					new_message(MT_standout,
+					new_message(MT_standout | MT_delayed,
 					  " This terminal can only display %d processes.",
 					  max_topn);
 					newval = max_topn;
-					no_command = Yes;
 					putchar('\r');
-					break;
 				    }
 
 				    if (newval == 0)

@@ -32,8 +32,7 @@
 #include <pwd.h>
 
 #include "top.local.h"
-
-char *itoa7();
+#include "utils.h"
 
 struct hash_el {
     int  uid;

@@ -37,6 +37,7 @@
 #include "top.local.h"
 #include "boolean.h"
 #include "machine.h"		/* we should eliminate this!!! */
+#include "utils.h"
 
 #ifdef DEBUG
 FILE *debug;
@@ -50,7 +51,6 @@ static int last_hi = 0;		/* used in u_process and u_endscreen */
 static int lastline = 0;
 
 char *printable();
-char *strecpy();
 
 /* things initialized by display_init and used thruout */
 
@@ -952,7 +952,11 @@ int line;
     } while (ch != '\0');
 
     /* zero out the rest of the line buffer -- MUST BE DONE! */
-    memzero(old, Display_width - newcol);
+    diff = Display_width - newcol;
+    if (diff > 0)
+    {
+	memzero(old, diff);
+    }
 
     /* remember where the current line is */
     if (cursor_on_line)

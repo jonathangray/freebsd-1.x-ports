@@ -17,13 +17,3 @@
 # define memzero(a, b)		memset((a), 0, (b))
   typedef void sigret_t;
 #endif
-
-/*
- * Empirical evidence suggests that Unix systems with TMP_MAX defined (in
- * stdio.h) also have a strerror function in libc.  This next section depends
- * on this always being true.  If you discover that this is not true, please
- * let the author know!
- */
-#ifndef TMP_MAX
-#define strerror(err) (sys_errlist[err])
-#endif

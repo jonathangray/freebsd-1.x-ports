@@ -19,4 +19,4 @@ DESCS=%descs%
 all: SYNOPSIS
 
 SYNOPSIS: $(DESCS)
-	fgrep SYNOPSIS: $(DESCS) | sed -e 's/^m_//' -e 's/.desc:.[^:]*: */:/' >SYNOPSIS
+	grep SYNOPSIS: $(DESCS) | sed -e 's@^machine/m_@@' -e 's@.desc:.[^:]*: *@:@' >SYNOPSIS

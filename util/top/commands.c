@@ -25,10 +25,9 @@
 
 #include "sigdesc.h"		/* generated automatically */
 #include "boolean.h"
+#include "utils.h"
 
 extern int  errno;
-extern int  sys_nerr;
-extern char *sys_errlist[];
 
 extern char *copyright;
 
@@ -240,7 +239,7 @@ int err;
     register char *msg;
     register int  msglen;
 
-    msg = err == 0 ? "Not a number" : strerror(err);
+    msg = err == 0 ? "Not a number" : errmsg(err);
     msglen = strlen(msg) + 2;
     if (len <= msglen)
     {
@@ -327,7 +326,7 @@ show_errors()
     while (cnt++ < errcnt)
     {
 	printf("%5s: %s\n", errp->arg,
-	    errp->errno == 0 ? "Not a number" : strerror(errp->errno));
+	    errp->errno == 0 ? "Not a number" : errmsg(errp->errno));
 	errp++;
     }
 }
@@ -438,7 +437,7 @@ char *str;
     uid = getuid();
 
     /* allow for negative priority values */
-    if ((negate = *str == '-'))
+    if ((negate = (*str == '-')) != 0)
     {
 	/* move past the minus sign */
 	str++;

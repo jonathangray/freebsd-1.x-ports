@@ -15,7 +15,7 @@
 
 #include "top.h"
 
-atoiwi(str)
+int atoiwi(str)
 
 char *str;
 
@@ -114,7 +114,7 @@ register int val;
  *	positive numbers.  If val <= 0 then digits(val) == 0.
  */
 
-digits(val)
+int digits(val)
 
 int val;
 
@@ -278,3 +278,29 @@ long *diffs;
     return(total_change);
 }
 
+/*
+ * errmsg(errnum) - return an error message string appropriate to the
+ *           error number "errnum".  This is a substitute for the System V
+ *           function "strerror" with one important difference:  the string
+ *           returned by this function does NOT end in a newline!
+ *           N.B.:  there appears to be no reliable way to determine if
+ *           "strerror" exists at compile time, so I make do by providing
+ *           something of similar functionality.
+ */
+
+/* externs referenced by errmsg */
+
+extern char *sys_errlist[];
+extern int sys_nerr;
+
+char *errmsg(errnum)
+
+int errnum;
+
+{
+    if (errnum > 0 && errnum < sys_nerr)
+    {
+	return(sys_errlist[errnum]);
+    }
+    return("No error");
+}

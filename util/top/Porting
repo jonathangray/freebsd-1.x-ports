@@ -37,7 +37,10 @@ capitals (such as "SYNOPSIS:" and "LIBS:").  Go look at m-template: it
 is fairly self-explanatory.  The text after "LIBS:" (on the same line)
 is extracted and included in the LIBS definition of the Makefile so
 that extra libraries which may be necessary on some machines (such as
-"-lkvm") can be specified in the module.
+"-lkvm") can be specified in the module.  The text after "CFLAGS:"
+(on the same line) is extracted and included as flags in the "CFLAGS"
+definition of the Makefile (thus in every compilation step).  This is
+used for rare circumstances only:  please don't abuse this hook.
 
 Some operating systems have idiosyncrasies which will affect the form
 and/or content of the information top displays.  You may wish to
@@ -87,7 +90,7 @@ flexibility in labeling the displayed values.
 Values in "cpustates" are displayed as a percentage * 10.  For
 example, the (integer) value 105 is displayed as 10.5%.
 
-These routines are defined by the machine dependent module.
+These routines must be defined by the machine dependent module.
 
 int machine_init(struct statics *)
 
@@ -115,10 +118,40 @@ int proc_compare(caddr_t, caddr_t)
 
 	qsort comparison function
 
+uid_t proc_owner(pid_t)
+
+	Returns the uid owner of the process specified by the pid argument.
+	This function is VERY IMPORTANT.  If it fails to do its job, then
+	top may pose a security risk.
+
 
 get_process_info is called immediately after get_system_info.  In
 fact, the two functions could be rolled in to one.  The reason they
 are not is mostly historical.
+
+Top relies on the existence of a function called "setpriority" to
+change a process's priority.  This exists as a kernel call on most 4.3
+BSD derived Unixes.  If neither your operating system nor your C
+library supplies such a function, then you will need to add one to the
+module.  It is defined as follows:
+
+	int setpriority (int dummy, int who, int niceval)
+
+	For the purposes of top, the first argument is meaningless.
+	The second is the pid and the third is the new nice value.
+	This function should behave just like a kernel call, setting
+	errno and returning -1 in case of an error.  This function MUST
+	check to make sure that a non-root user does not specify a nice
+	value less than the process's current value.  If it detects such
+	a condition, it should set errno to EACCES and return -1.
+	Other possible ERRNO values:  ESRCH when pid "who" does not exist,
+	EPERM when the invoker is not root and not the same as the
+	process owner.
+
+Note that top checks process ownership and should never call setpriority
+when the invoker's uid is not root and not the same as the process's owner
+uid.
+
 
 The file "machine.h" contains definitions which are useful to modules
 and to top.c (such as the structure definitions).  You SHOULD NOT need
@@ -129,5 +162,4 @@ files.  You should only need to add m_ files.  If you feel you need a
 change in one of the existing files, please contact me so that we can
 discuss the details.  I want to keep such changes as general as
 possible.
-
 

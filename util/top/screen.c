@@ -192,8 +192,8 @@ init_termcap()
 	    }
 	}
     }
-#endif TIOCGSIZE
-#endif TIOCGWINSZ
+#endif /* TIOCGSIZE */
+#endif /* TIOCGWINSZ */
 
     /* terminals that overstrike need special attention */
     overstrike = tgetflag("os");
