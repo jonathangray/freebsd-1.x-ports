@@ -129,7 +129,7 @@ rdchk(f)
 #ifdef O_NDELAY
 	fcntl(f, F_SETFL, savestat | O_NDELAY) ;
 #else
-  	fcntl(f, F_SETFL, savestat | O_NONBLOCK) ;
+	fcntl(f, F_SETFL, savestat | O_NONBLOCK) ;
 #endif
 	lf = read(f, &bchecked, 1) ;
 	fcntl(f, F_SETFL, savestat) ;
@@ -351,7 +351,7 @@ mode(n)
 		(void) tcflow(Tty, TCOON);	/* Restart output */
 #else
 		(void) ioctl(Tty, TCSBRK, 1);	/* Wait for output to drain */
-		(void) ioctl(Tty, TCFLSH, 0);   /* Flush input queue */
+		(void) ioctl(Tty, TCFLSH, 0);	/* Flush input queue */
 		(void) ioctl(Tty, TCSETAW, &oldtty);	/* Restore modes */
 		(void) ioctl(Tty, TCXONC,1);	/* Restart output */
 #endif
@@ -365,7 +365,7 @@ mode(n)
 #endif
 #ifdef TIOCFLUSH
 		{ static int fread = 1;
-		ioctl(Tty, TIOCFLUSH, &fread);   /* Flush input queue */
+		ioctl(Tty, TIOCFLUSH, &fread);	 /* Flush input	queue */
 		}
 #else
 		lseek(Tty, 0L, 2);
@@ -403,9 +403,9 @@ inittty()
 {
 	Tty = 0;
 	Ttystream = stdout;
-	Nametty = ttyname(Tty);
-	if (!Nametty || !*Nametty)
-		Nametty = "|pipe|";
+	Nametty	= ttyname(Tty);
+	if (!Nametty ||	!*Nametty)
+		Nametty	= "|pipe|";
 	Logstream = stderr;
 	setbuf(Ttystream, xXbuf);
 }
@@ -499,7 +499,6 @@ purgeline()
 #endif
 }
 
-
 /*
  * Purge the modem output queue of all characters
  */
@@ -532,7 +531,7 @@ canit()
 	 24,24,24,24,24,24,24,24,24,24,8,8,8,8,8,8,8,8,8,8,0
 	};
 
-	purgeline();    /* Do read next time ... */
+	purgeline();        /* Do read next time ... */
 	zmputs(canistr);
 }
 

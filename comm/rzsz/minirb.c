@@ -1,4 +1,4 @@
-char * Version = "minirb 3.00 05-02-93";
+char * Version = "minirb 3.01 03-06-94";
 
 #include <stdio.h>
 #include <signal.h>
@@ -77,7 +77,7 @@ wcrx() {
   sectcurr=wcgetsec(secbuf);
   if (sectcurr==(sectnum+1 & 0377)) {
    sectnum++; cblklen = Bytesleft>Blklen ? Blklen:Bytesleft;
-   putsec(secbuf, cblklen);
+   fwrite(secbuf, cblklen, 1, fout);
    if ((Bytesleft-=cblklen) < 0) Bytesleft = 0;
    sendchar=ACK;
   }
@@ -137,9 +137,6 @@ procheader(name) char *name; {
  if ((fout=fopen(name, "w")) == NULL) return ERROR;
  return OK;
 }
-
-putsec(p, n) char *p; int n;
-{ for (; --n>=0; ++p) putc(*p, fout); }
 
 sendline(c) { char d; d = c; write(1, &d, 1); }
 

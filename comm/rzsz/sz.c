@@ -1,9 +1,10 @@
-#define VERSION "3.32.2 03-15-94"
+#define VERSION "3.34.1 02-24-94"
 #ifdef __386BSD__
 #define PUBDIR "/var/spool/uucppublic"
 #else
 #define PUBDIR "/usr/spool/uucppublic"
 #endif
+
 /*
  **************************************************************************
  *
@@ -150,7 +151,7 @@ STATIC int BEofseen;		/* EOF seen on input set by fooseek */
 STATIC int Totsecs;		/* total number of sectors this file */
 STATIC int Filcnt=0;		/* count of number of files opened */
 STATIC unsigned Rxbuflen=16384;	/* Receiver's max buffer length */
-STATIC int Tframlen = 0;	/* Override for tx frame length */
+STATIC long Tframlen = 0;	/* Override for tx frame length */
 STATIC int blkopt=0;		/* Override value for zmodem blklen */
 STATIC int Rxflags = 0;
 STATIC long bytcnt;
@@ -283,13 +284,13 @@ char *argv[];
 					break;
 				case 'l':
 					if (isdigit(*cp))
-						Tframlen = atoi(cp);
+						Tframlen = atol(cp);
 					else {
 						if (--argc < 1)
 							usage();
-						Tframlen = atoi(*++argv);
+						Tframlen = atol(*++argv);
 					}
-					if (Tframlen<32 || Tframlen>1024)
+					if (Tframlen<32 || Tframlen>65535L)
 						usage();
 					break;
 				case 'N':
@@ -321,7 +322,7 @@ char *argv[];
 						if (--argc < 1)
 							usage();
 						Txwindow = atoi(*++argv);
-  					}
+					}
 					if (Txwindow < 256)
 						Txwindow = 256;
 					Txwindow = (Txwindow/64) * 64;
@@ -491,7 +492,6 @@ wcs(oname)
 char *oname;
 {
 	register c;
-	register char *p, *q;
 	struct stat f;
 	char name[PATHLEN];
 
@@ -824,8 +824,10 @@ zfilbuf()
 	return (vpos - bytcnt);
 #else
 	n = fread(txbuf, 1, blklen, in);
-	if (n < blklen)
+	if (n < blklen) {
 		Eofseen = 1;
+		vfile("zfilbuf: n=%d vpos=%lu Eofseen=%d", n, vpos, Eofseen);
+	}
 	return n;
 #endif
 }
@@ -972,7 +974,7 @@ getzrxinit()
 			Rxbuflen = (0377 & Rxhdr[ZP0])+((0377 & Rxhdr[ZP1])<<8);
 			if ( !(Rxflags & CANFDX))
 				Txwindow = 0;
-			vfile("Rxbuflen=%d Tframlen=%d", Rxbuflen, Tframlen);
+			vfile("Rxbuflen=%d Tframlen=%ld", Rxbuflen, Tframlen);
 			signal(SIGINT, SIG_IGN);
 #ifdef MODE2OK
 			mode(2);	/* Set cbreak, XON/XOFF, etc. */
@@ -1244,7 +1246,6 @@ gotack:
 					{
 					case CAN:
 					case ZPAD:
-						purgeout();
 						goto waitack;
 					case XOFF:	/* Wait for XON */
 						readline(100);
@@ -1264,12 +1265,9 @@ gotack:
 
 	do {
 		n = zfilbuf();
-		if (Eofseen) {
-			if ((Lrxpos == 0) || Unlinkafter | Txwindow)
-				e = ZCRCW;
-			else
-				e = ZCRCE;
-		} else if (junkcount > 3)
+		if (Eofseen)
+			e = ZCRCE;
+		else if (junkcount > 3)
 			e = ZCRCW;
 		else if (bytcnt == Lastsync)
 			e = ZCRCW;
@@ -1306,7 +1304,6 @@ gotack:
 				c = getinsync(1);
 				if (c == ZACK)
 					break;
-				purgeout();
 				/* zcrce - dinna wanna starta ping-pong game */
 				zsdata(txbuf, 0, ZCRCE);
 				goto gotack;
@@ -1324,7 +1321,6 @@ gotack:
 					zsdata(txbuf, 0, e = ZCRCQ);
 				c = getinsync(1);
 				if (c != ZACK) {
-					purgeout();
 					zsdata(txbuf, 0, ZCRCE);
 					goto gotack;
 				}

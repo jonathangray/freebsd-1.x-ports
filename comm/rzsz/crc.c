@@ -117,7 +117,7 @@ char **argv;
 {
 	register errors = 0;
 
-	if(argc < 2) {
+	if(argc	< 2) {
 		fprintf(stderr, "Usage: %s [-x] [-k] file ...\n", argv[0]);
 		exit(0);
 	}

@@ -1,9 +1,10 @@
-#define VERSION "3.32.1 02-18-94"
+#define VERSION "3.34.1 02-18-94"
 #ifdef __386BSD__
 #define PUBDIR "/var/spool/uucppublic"
 #else
 #define PUBDIR "/usr/spool/uucppublic"
 #endif
+
 /*
  *
  * rz.c By Chuck Forsberg
@@ -283,7 +284,7 @@ char *argv[];
 			if ((Logstream = fopen(LOGFILE2, "a"))==NULL) {
 				fprintf(stderr, "Can't open log file!\n");
 				exit(2);
-			}
+  			}
 		setbuf(Logstream, NULL);
 		fprintf(Logstream, "argv[0]=%s Progname=%s\n", virgin, Progname);
 	}
@@ -334,9 +335,10 @@ usage()
 	fprintf(stderr,"or      rc [-avV] [-t N] file   (XMODEM-CRC)\n");
 	fprintf(stderr,"or      rx [-avV] [-t N] file   (XMODEM)\n\n");
 	fprintf(stderr,
-"Supports incoming ZMODEM binary (-b), ASCII CR/LF>NL (-a), newer(-n),\n\
+"Supports the following incoming ZMODEM options given to the sending program:\n\
+	compression (-Z), binary (-b), ASCII CR/LF>NL (-a), newer(-n),\n\
 	newer+longer(-N), protect (-p), Crash Recovery (-r),\n\
-clobber (-y), match+clobber (-Y), compression (-Z), and append (-+).\n\n");
+	clobber (-y), match+clobber (-Y),  and append (-+).\n\n");
 	fprintf(stderr,"Copyright 1994 Omen Technology INC All Rights Reserved\n");
 	fprintf(stderr,
 	"See rz.doc for option descriptions and licensing information.\n\n");
@@ -886,7 +888,7 @@ char *name;
 	if (Restricted) {
 		if (fopen(name, "r") != NULL) {
 			canit();
-			fprintf(stderr, "\r\nrz: %s exists\n", name);
+			fprintf(stderr, "\r\nrz: %s exists\r\n", name);
 			bibi(-1);
 		}
 		/* restrict pathnames to current tree or uucppublic */
