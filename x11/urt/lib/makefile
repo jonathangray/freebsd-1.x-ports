@@ -4,7 +4,7 @@
 DEPTH = ../
 CONFIG = ../config/freebsd
 HERE = lib/
-# FreeBSD 1.0 EPSILON configuration file.
+# FreeBSD configuration file.
 # With X11
 # Most common conversion programs compiled.
 
@@ -21,8 +21,8 @@ INCPBMPLUS = -I$(PBMDIR) -I$(PBMDIR)/ppm -I$(PBMDIR)/pgm -I$(PBMDIR)/pbm
 LIBPBMPLUS = $(PBMDIR)/ppm/libppm.a $(PBMDIR)/pgm/libpgm.a \
 		$(PBMDIR)/pbm/libpbm.a 
 
-INCTIFF = -I../../pbmplus/libtiff
-LIBTIFF = -L../../pbmplus/libtiff -ltiff
+INCTIFF = -I../../tiff
+LIBTIFF = -L../../tiff -ltiff
 
 LIBX11 = -L/usr/X386/lib -lX11
 INCX11 = -I/usr/X386/include
@@ -34,7 +34,7 @@ ALLDIRS =
 PGMS =
 
 ExtraLIBS = 
-LIBS = $(RL)/librle.a $(DIRLIBS)  ${ExtraLIBS}
+LIBS = -L$(RL) -lrle $(DIRLIBS)  ${ExtraLIBS}
 
 MachFLAGS = 
 CFLAGS = -O $(DFLAGS) $(DIRFLAGS) $(ExtraCFLAGS) $(IFLAGS) $(MachFLAGS) 
@@ -70,10 +70,16 @@ OBJS = Runput.o buildmap.o cmd_name.o colorquant.o dither.o \
 	vaxshort.o \
 	$(OPT_OBJS)
 
+SOBJS= ${OBJS:.o=.so}
+
+.SUFFIXES: .so
+.c.so:
+	${CC} -fpic ${PICFLAG} -DPIC ${CFLAGS} -c $< -o $@
+
 LIBNAME = librle.a
 
 # Just rebuild the object files.
-objs: $(OBJS)
+objs: $(OBJS) ${SOBJS}
 
 # Copy the library to the destination directory.
 # (Install a second copy on the debug subdirectory, on the theory that it
@@ -81,8 +87,11 @@ objs: $(OBJS)
 # Do nothing if $(DEST) is empty (or not defined)
 install: buildlib
 	@sh -c "if test '$(DEST)x' != x ; then \
+		echo cp librle.so.3.0 $(DEST)/librle.so.3.0 ; \
+		cp librle.so.3.0 $(DEST)/librle.so.3.0 ; \
 		echo cp $(LIBNAME) $(DEST)/$(LIBNAME) ; \
 		cp $(LIBNAME) $(DEST)/$(LIBNAME) ; \
+		cp librle.so.3.0 $(DEST)/librle.so.3.0 ; \
 		if test x$(RANLIB) != x ; then \
 			echo ranlib $(DEST)/$(LIBNAME) ; \
 			ranlib $(DEST)/$(LIBNAME) ; \
@@ -91,6 +100,7 @@ install: buildlib
 		fi ; \
 		if test -d $(DEST)/debug ; then \
 			echo cp $(LIBNAME) $(DEST)/debug/$(LIBNAME) ; \
+			cp librle.so.3.0 $(DEST)/librle.so.3.0 ; \
 			if test x$(RANLIB) != x ; then \
 				cp $(LIBNAME) $(DEST)/debug/$(LIBNAME) ; \
 				echo ranlib $(DEST)/debug/$(LIBNAME) ; \
@@ -107,13 +117,14 @@ install: buildlib
 	touch install
 
 # Rebuild the library from all the .o files.
-buildlib: $(OBJS)
+buildlib: $(OBJS) $(SOBJS)
 	-rm -f $(LIBNAME)
 #ifdef WHY
 #@	ar rc $(LIBNAME)
 #@	ar q $(LIBNAME) $(OBJS)
 #else
 	ar cTq $(LIBNAME) `lorder ${OBJS} | tsort`
+	ld -Bshareable -o librle.so.3.0 ${SOBJS}
 #ifndef NO_RANLIB
 	ranlib $(LIBNAME)
 #endif

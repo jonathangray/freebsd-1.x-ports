@@ -4,7 +4,7 @@
 DEPTH = ../../
 CONFIG = ../../config/freebsd
 HERE = get/gmr27/
-# FreeBSD 1.0 EPSILON configuration file.
+# FreeBSD configuration file.
 # With X11
 # Most common conversion programs compiled.
 
@@ -21,8 +21,8 @@ INCPBMPLUS = -I$(PBMDIR) -I$(PBMDIR)/ppm -I$(PBMDIR)/pgm -I$(PBMDIR)/pbm
 LIBPBMPLUS = $(PBMDIR)/ppm/libppm.a $(PBMDIR)/pgm/libpgm.a \
 		$(PBMDIR)/pbm/libpbm.a 
 
-INCTIFF = -I../../pbmplus/libtiff
-LIBTIFF = -L../../pbmplus/libtiff -ltiff
+INCTIFF = -I../../tiff
+LIBTIFF = -L../../tiff -ltiff
 
 LIBX11 = -L/usr/X386/lib -lX11
 INCX11 = -I/usr/X386/include
@@ -34,7 +34,7 @@ ALLDIRS =
 PGMS =
 
 ExtraLIBS = 
-LIBS = $(RL)/librle.a $(DIRLIBS)  ${ExtraLIBS}
+LIBS = -L$(RL) -lrle $(DIRLIBS)  ${ExtraLIBS}
 
 MachFLAGS = 
 CFLAGS = -O $(DFLAGS) $(DIRFLAGS) $(ExtraCFLAGS) $(IFLAGS) $(MachFLAGS) 
