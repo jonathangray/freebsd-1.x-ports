@@ -29,8 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define  HOST_ACCESS  1
-
+#include "config.h"
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
