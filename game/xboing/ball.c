@@ -7,7 +7,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#ifdef __FreeBSD__
+#define MINFLOAT	((float)1.17549435082228750e-38)
+#else
 #include <values.h>
+#endif
 #include <xpm.h>
 
 #include "bitmaps/ball1.xpm"
