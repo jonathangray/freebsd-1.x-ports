@@ -62,5 +62,5 @@ pkg:	pkg_src pkg_bin
 pkg_src: pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
 	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S ksh_src
 
-pkg_bin: pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B pkg/+INST_B pkg/+DINST_B
-	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B -i pkg/+INST_B -k pkg/+DINST_B ksh_bin
+pkg_bin: pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B
+	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B ksh_bin
