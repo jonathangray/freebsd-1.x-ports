@@ -1,0 +1,89 @@
+   Lambda closures are a form of VBFC: a special data type that can be
+evaluated as code.  The data type is "closure".  An example of it's use
+is to give a closure value to a property, which is evaluated when
+queried.  Closures can make use of operators, efuns and non-static
+local functions.
+
+   A closure can be created with the lambda() efun.  There are two
+ways to use it.  The first creates a fast closure operator, directly
+based on an efun of operator: lambda(">") returns a closure for the
+larger-than operator.  It can be evaluated with the apply() efun:
+apply(lambda(">"), 2, 1) returns 1, because 2 is larger than 1.
+This type of simple closure is especially well-suited for use in
+efuns such as filter_array(), filter_mapping() etc.  For instance,
+sort_array(arr, lambda(">")) can be used.
+
+   The other kind of closure is created like this:
+
+    closure expr;
+
+    expr = lambda(({ "'x", "'y" }), ({ "->", "'x", "'y" }));
+
+The first argument to the lambda() efun is a array of parameter names.
+Parameter names must be strings that start with a quote, followed by
+an identifier.  The second argument is an array, of which the first
+element is an efun, an operator, a closure operator or a local function
+name (in the example above, it is the operator ->).  The other arguments
+must be expressions; parameter names will be replaced by the values
+that the closure is called with.  An expression can itself be a
+closure, for instance:
+
+    closure add, expr;
+
+    add = lambda(({ "'x", "'y" }), ({ "+", "'x", "'y" }));
+    expr = lambda(({ "'x", "'y", "'z" }),
+		  ({ "->", "'x", ({ add, "'y", "'z" }) }));
+
+This creates a closure "expr" with three arguments, the last two of which
+are added together to form the function name.  The above closure is
+equivalent with the following LPC code:
+
+    call_other(x, y + z);
+
+   There is an important difference between the "short" closures and
+the "long" closures: the "long" closures evaluate their arguments (if
+they are variables or a array, the first element of which is a closure);
+the "short" closures do not.  For example,
+
+    closure short, long;
+
+    short = lambda("+");
+    long = lambda(({ "'x", "'y" }), ({ "+", "'x", "'y" }));
+
+    apply(short, 1, 2) == 3
+    apply(long, 1, 2)  == 3
+
+    /* assume that 'a == 1 and 'b == 2 */
+    apply(short, "'a", "'b") == "'a'b"
+    apply(long, "'a", "'b")  == 3
+
+   Apart from efuns and operators, the following closure operators can be
+used:
+
+    ","	<expr>+				<expr1>, <expr2>, ..., <exprn>
+    "?" ( <test> <result> )* <default>	if (<test1>) return <result1>;
+					else if (<test2>) return <result2>;
+					...
+					else return <default>;
+    "?!" ( <test> <result> )* <default>	opposite of "?"
+    "while" <test> <result> <expr>	while (<test>) <expr>;
+					return <result>;
+    "do" <expr> <test> <result>		do <expr> while (<test>);
+					return <result>;
+    "=" ( <var> <expr> )+		<var1> = <expr1>;
+					<var2> = <expr2>;
+					...
+					<varn> = <exprn>;
+					(other assignment operators also work)
+    "[" <arrstr> <index>		<arrstr>[<index>]
+    "[.." <arrstr> <index1> <index2>	<arrstr>[<index1> .. <index2>]
+    "'" <expr>				<expr>, without evaluating it
+
+All of the closure operators above evaluate their arguments, except for
+"'", which should only be used as a "short" closure.
+
+   All efuns are supported, except for ed(), input_to() and set_light()
+(can you figure out why?).  If an efun supercedes a kfun, the kfun is not
+supported (for instance, "rm" works, "remove_file" doesn't).
+
+   The "closureness" of a value can be tested with the closurep() efun.
