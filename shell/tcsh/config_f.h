@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/config_f.h,v 1.4 1994/07/05 21:26:59 ache Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/config_f.h,v 1.5 1994/07/05 21:48:15 ache Exp $ */
 /*
  * config_f.h -- configure various defines for tcsh
  *
@@ -127,7 +127,7 @@
  *		successful, set $REMOTEHOST to the name or address of the
  *		host
  */
-#define REMOTEHOST
+#undef REMOTEHOST
 
 /*
  * RCSID	This defines if we want rcs strings in the binary or not
