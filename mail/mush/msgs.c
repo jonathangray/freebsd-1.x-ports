@@ -516,9 +516,9 @@ lost_lock:
 	struct utimbuf times[1];
 	(void) fflush(mail_fp); /* just in case */
 	times[0].modtime = time(&times[0].actime) - 2;
-#ifndef __386BSD__
+#ifndef FreeBSD
 	times[0].ausec = times[0].modusec = 0;
-#endif /* __386BSD__ */
+#endif /* FreeBSD */
 #else /* !POSIX_UTIME */
 	long times[2];
 	(void) fflush(mail_fp); /* just in case */

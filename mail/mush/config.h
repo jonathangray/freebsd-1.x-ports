@@ -47,7 +47,7 @@
 /* Headers that will NOT be included when forwarding mail */
 #define IGNORE_ON_FWD	"status,priority,return-receipt-to"
 
-#define	MAXMSGS	1000		/* Maximum number of messages we can read */
+#define	MAXMSGS	5000		/* Maximum number of messages we can read */
 #define HDRSIZ	(2*BUFSIZ)	/* This should not be < BUFSIZ! */
 
 /*
@@ -56,7 +56,7 @@
  * variant, you might notice a performance improvement if you define this
  * variable.  It uses the malloc distributed by Larry Wall for perl v2.
  */
-/* #define INTERNAL_MALLOC /**/
+#define INTERNAL_MALLOC /**/
 
 /*
  * Define TIMEZONE if your system has neither the SysV external variable
@@ -152,11 +152,11 @@
 #if defined(SYSV) && !defined(SVR4)
 #define MAILDIR		"/usr/mail"
 #else /* BSD || SVR4 */
-#ifdef __386BSD__
+#ifdef FreeBSD
 #define MAILDIR		"/var/mail"
 #else
 #define MAILDIR		"/usr/spool/mail"
-#endif /* __386BSD__ */
+#endif /* FreeBSD */
 #endif /* SYSV && !SVR4 */
 #endif /* MAILDIR */
 #endif /* HOMEMAIL */
@@ -190,13 +190,13 @@
  * is known not to be RFC822 compiant (xenix, older sys-v) or can be
  * counted on to pass through user-defined headers without modification.
  */
-/* #define PICKY_MAILER /**/
+#define PICKY_MAILER /**/
 
 /* If your system supports the vprintf() functions, True for sys-v and
  * later sun versions (3.0+ ?).  Typically not true for BSD systems, but
  * that will probably change in the future.
  */
-#if defined(SYSV) || defined(sun) || defined (__386BSD__)
+#if defined(SYSV) || defined(sun) || defined (FreeBSD)
 #define VPRINTF
 #endif /* SYSV || sun */
 
@@ -216,7 +216,7 @@
  * define POSIX_UTIME.  You may have to change <sys/utime.h> to <utime.h>
  * in mush.h.
  */
-#if (defined(SVR4) && !defined(sun)) || defined(__386BSD__)
+#if (defined(SVR4) && !defined(sun)) || defined(FreeBSD)
 #define POSIX_UTIME
 #endif /* SVR4 && !sun */
 
@@ -229,6 +229,7 @@
 #    undef SVR4
 #    undef SVR3
 #    undef SVR2
+#    define SIGRET void
 #endif /* BSD */
 #if defined(SUNTOOL) || defined(SUN_3_5) || defined(SUN_4_0) || defined(SUN_4_1)
 #if !defined(BSD) && !defined(SYSV)
