@@ -41,8 +41,14 @@
  *	across the network to save BandWidth
  *
  * $Log: supfilesrv.c,v $
- * Revision 1.1  1993/08/21 00:46:33  jkh
- * Initial revision
+ * Revision 1.2  1994/05/25 17:58:40  nate
+ * From Gene Stark
+ *
+ * system() returns non-zero status for errors, so check for non-zero
+ * status instead of < 0 which causes gzip/gunzip failures not to be noticed.
+ *
+ * Revision 1.1.1.1  1993/08/21  00:46:34  jkh
+ * Current sup with compression support.
  *
  * Revision 1.3  1993/06/05  21:32:17  cgd
  * use daemon() to put supfilesrv into daemon mode...
@@ -1102,7 +1108,7 @@ TREE *t;
 			if (docompress) {
 				tmpnam(temp_file);
 				sprintf(sys_com, "gzip -c < %s > %s\n", t->Tname, temp_file);
-				if (system(sys_com) < 0) {
+				if (system(sys_com) != 0) {
 					/* Just in case */
 					unlink(temp_file);
 					goaway ("We died trying to compress");

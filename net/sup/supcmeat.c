@@ -32,8 +32,14 @@
  *	across the network to save BandWidth
  *
  * $Log: supcmeat.c,v $
- * Revision 1.1  1993/08/21 00:46:33  jkh
- * Initial revision
+ * Revision 1.2  1994/05/25 17:58:38  nate
+ * From Gene Stark
+ *
+ * system() returns non-zero status for errors, so check for non-zero
+ * status instead of < 0 which causes gzip/gunzip failures not to be noticed.
+ *
+ * Revision 1.1.1.1  1993/08/21  00:46:34  jkh
+ * Current sup with compression support.
  *
  * Revision 1.2  1993/05/24  18:57:50  brezak
  * Use /var/tmp for NetBSD
@@ -1217,7 +1223,7 @@ char *from;		/* 0 if reading from network */
 	if (docompress) {
 		sprintf(sys_com, "gunzip < %s > %s\n", tname, to);
 		/* Uncompress it onto the destination */
-		if (system(sys_com) < 0) {
+		if (system(sys_com) != 0) {
 			notify ("SUP: Error in uncompressing file %s\n",
 				to);
 			(void) unlink (tname);
