@@ -1,6 +1,6 @@
-/* : sysdefs.SH,v 5.4 1992/12/24 19:24:10 syd Exp $ */
+/* : sysdefs.SH,v 1.3 1993/10/09 19:37:34 smace Exp $ */
 /*******************************************************************************
- *  The Elm Mail System  -  : 5.4 $   : Exp $
+ *  The Elm Mail System  -  : 1.3 $   : Exp $
  *
  * 			Copyright (c) 1988-1992 USENET Community Trust
  * 			Copyright (c) 1986,1987 Dave Taylor
@@ -12,9 +12,12 @@
  *
  *******************************************************************************
  * $Log: sysdefs.h,v $
- * Revision 1.6  1993/10/09 19:37:35  smace
- * Update to elm 2.4 pl23 release version
+ * Revision 1.7  1993/12/28 05:34:39  smace
+ * Reran configure to get new Makefile.SH to corretnly substitute variables
  *
+# Revision 1.3  1993/10/09  19:37:34  smace
+# Update to elm 2.4 pl23 release version
+#
  * Revision 5.4  1992/12/24  19:24:10  syd
  * EDITOROPTS and DEFEDITOR appear to be unused but here is
  * a patch to make use of .

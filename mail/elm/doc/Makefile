@@ -1,13 +1,16 @@
 #
-# : Makefile.SH,v 5.11 1993/04/12 02:12:07 syd Exp $
+# : Makefile.SH,v 1.3 1993/10/09 19:36:29 smace Exp $
 #
 #  Makefile for the documentation of the ELM mail system
 #
 #         (C) Copyright 1988-1992, USENET Community Trust
 #
 #  $Log: Makefile,v $
-#  Revision 1.6  1993/10/09 19:36:28  smace
-#  Update to elm 2.4 pl23 release version
+#  Revision 1.7  1993/12/28 05:34:22  smace
+#  Reran configure to get new Makefile.SH to corretnly substitute variables
+#
+# Revision 1.3  1993/10/09  19:36:29  smace
+# Update to elm 2.4 pl23 release version
 #
 # Revision 5.11  1993/04/12  02:12:07  syd
 # Added elmalias.1 man page.  Updated Users.guide to mention elmalias.

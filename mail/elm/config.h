@@ -91,7 +91,7 @@
 /* CONFIGURE_DATE
  *	This symbol contains the last date that configure was run for elm -v output.
  */
-#define		CONFIGURE_DATE	"Sat Oct  9 12:15:03 PDT 1993"
+#define		CONFIGURE_DATE	"Mon Dec 27 21:31:53 PST 1993"
 
 /* ASCII_CTYPE:
  *	This symbol, if defined, indicates that the ctype functions and
@@ -152,7 +152,7 @@
  *	file overrides the value of getdomainname().  If this variable is set
  *	MYDOMAIN (and therefore DEFAULT_DOMAIN) will be ignored.
  */
-/*#undef	GETDOMAINNAME		/**/
+#define	GETDOMAINNAME		/**/
 
 /*#undef	USEGETDOMAINNAME		/**/
 

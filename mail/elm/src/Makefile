@@ -1,4 +1,4 @@
-# : Makefile.SH,v 5.1 1992/10/03 22:58:40 syd Exp $
+# : Makefile.SH,v 1.3 1993/10/09 19:39:14 smace Exp $
 #
 #  Makefile for the ELM mail program.
 #
@@ -11,7 +11,10 @@
 #			dsinc!elm
 #
 # $Log: Makefile,v $
-# Revision 1.6  1993/10/09 19:39:13  smace
+# Revision 1.7  1993/12/28 05:34:58  smace
+# Reran configure to get new Makefile.SH to corretnly substitute variables
+#
+# Revision 1.3  1993/10/09  19:39:14  smace
 # Update to elm 2.4 pl23 release version
 #
 # Revision 5.1  1992/10/03  22:58:40  syd
