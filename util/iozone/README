@@ -1,0 +1,204 @@
+
+	IOZONE: Performance Test of Sequential File I/O  --  V1.16 (10/28/92)
+		By Bill Norcott
+
+	Operating System: ANSI C
+
+IOZONE: help mode
+
+       'IO Zone' Benchmark Program
+ 
+       Author: Bill Norcott (norcott_bill@tandem.com)
+               1060 Hyde Avenue
+               San Jose, CA  95129
+ 
+  Copyright 1991, 1992   William D. Norcott
+ 
+  License to freely use and distribute this software is hereby granted 
+  by the author, subject to the condition that this copyright notice 
+  remains intact.  The author retains the exclusive right to publish 
+  derivative works based on this work, including, but not limited to, 
+  revised versions of this work
+ 
+  This test writes a X MEGABYTE sequential file in Y byte chunks, then
+  rewinds it  and reads it back.  [The size of the file should be
+  big enough to factor out the effect of any disk cache.].  Finally,
+  IOZONE deletes the temporary file
+        
+  The file is written (filling any cache buffers), and then read.  If the
+  cache is >= X MB, then most if not all the reads will be satisfied from
+  the cache.  However, if it is less than or equal to .5X MB, then NONE of
+  the reads will be satisfied from the cache.  This is becase after the 
+  file is written, a .5X MB cache will contain the upper .5 MB of the test
+  file, but we will start reading from the beginning of the file (data
+  which is no longer in the cache)
+        
+  In order for this to be a fair test, the length of the test file must
+  be AT LEAST 2X the amount of disk cache memory for your system.  If
+  not, you are really testing the speed at which your CPU can read blocks
+  out of the cache (not a fair test)
+        
+  IOZONE does not normally test the raw I/O speed of your disk or system.
+  It tests the speed of sequential I/O to actual files.  Therefore, this
+  measurement factors in the efficiency of you machines file system,
+  operating system, C compiler, and C runtime library.  It produces a 
+  measurement which is the number of bytes per second that your system
+  can read or write to a file.  
+ 
+  You use IOZONE to test the I/O speed of a UNIX 'RAW DEVICE' such
+  as a tape drive, hard disk drive, floppy disk drive, etc.  To do this,
+  you must define the symbol NO_DELETE when you compile IOZONE.  If you
+  fail to define NO_DELETE, IOZONE will treat the raw device as a 
+  temporary file, and WILL DELETE THE RAW DEVICE after the test completes!
+  When testing raw devices, any UNIX buffer caching is bypassed.  IOZONE
+  still is using the read()/write() system calls, so you are not quite
+  testing the device at the low level of say, disk controller diagnostics.
+  On the other hand, that kind of testing is highly system- and device-
+  specific, and my goal for IOZONE has been to build a highly portable
+  benchmark -- not one which is tied to a particular operating system or
+  hardware configuration.  In practice, I have tested raw disk and tape
+  peripherals and the results are very close to the manufacturer's specs
+  for those devices.
+ 
+  For V1.06, IOZONE adds the 'auto test' feature.  This is activated
+  by the command:  'iozone auto' .  The auto test runs IOZONE repeatedly  
+  using record sizes from 512 to 8192 bytes, and file sizes from 1 to 16
+  megabytes.  It creates a table of results.
+        
+  For V1.06, IOZONE lets you specify the number of file system sizes and      
+  record lengths to test when using auto mode.  Define the constants
+  MEGABYTES_ITER_LIMIT and RECLEN_ITER_LIMIT as seen below      
+        
+  For V1.09 you can show the development help by typing 'iozone help'
+        
+  For V1.10 IOzone traps SIGINT (user interrupt) and SIGTERM
+  (kill from shell) signals and deletes the temporary file
+        
+  For V1.11 IOzone requires no compilation flags for AIX
+  Also, come miscellaneous cleanups have been made to the source
+        
+  For V1.12 IOzone support has been added for the MIPS RISCos,
+  Tandem Non-StopUX, and Tandem GUARDIAN 90 operating systems.
+  IOzone is now a 'Conforming POSIX.1 Application'  (IEEE Std 1003.1-1988)
+        
+  For V1.14 IOzone supports Next and QNX systems.  It also prints out
+  the name of the operating system when run.  There is now the option
+  to force IOzone to flush all writes to disk via fsync()
+  Defining USE_FSYNC will make IOzone include in its measurements the time
+  it takes to actually write the data onto disk, as opposed to
+  just writing into the system cache.  BSD UNIX and SVR4 support fsync(),
+  but SVR3 and generic POSIX systems do not.  I have enabled USE_FSYNC
+  for the systems which support it
+        
+  For V1.14, we now officially support AT&T SVR4.  It has worked just
+  fine using SVR4 with previous versions of IOzone.  Also, for systems
+  which use the times() function, we calculate the 'base time' the first
+  time we ever call time_so_far(), then subtract this time from all
+  future measurements.  This increases the precision of our measurement
+  and fixes a loss-of-precision problem which occurred on some systems
+        
+  For V1.15, add the NO_DELETE symbol.  If you define NO_DELETE during
+  the compilation (e.g., for UNIX systems compile with cc -DNO_DELETE),
+  IOzone will not delete the 'temporary' file which it reads & writes.
+  This is REQUIRED when testing RAW DEVICES such as disks and tape drives!
+        
+ 
+  This program has been ported and tested on the following computer
+  operating systems:
+ 
+    Vendor             Operating System    Notes on compiling IOzone
+    -------------------------------------------------------------------------
+    Apollo		  Domain/OS           no cc switches -- BSD domain
+    AT&T               UNIX System V Release 4
+    AT&T 6386WGS       AT&T UNIX 5.3.2     can't get it to compile with cc
+					      It should work with gcc via:
+					      'gcc -ansi -o iozone iozone.c'
+    Generic AT&T       UNIX System V R3    may need cc -DSVR3
+    Convergent         Unisys/AT&T Sys5r3  cc -DCONVERGENT -o iozone iozone.c
+    Digital Equipment  ULTRIX V4.1 
+    Digital Equipment  VAX/VMS V5.4        see below **         
+    Digital Equipment  VAX/VMS (POSIX) 
+    Hewlett-Packard    HP-UX 7.05
+    IBM                AIX Ver. 3 rel. 1
+    Interactive        UNIX System V R3    
+    Microsoft          MS-DOS 3.3          tested Borland, Microsoft C
+    MIPS               RISCos 4.52
+    NeXt               NeXt OS 2.x
+    OSF                OSF/1
+    Portable!          POSIX 1003.1-1988   may need to -D_POSIX_SOURCE
+    QNX                QNX 4.0
+    SCO                UNIX System V/386 3.2.2
+    SCO                XENIX 2.3
+    SCO                XENIX 3.2
+    Silicon Graphics   UNIX                cc -DSGI -o iozone iozone.c
+    Sony Microsystems  UNIX                same as MIPS
+    Sun Microsystems   SUNOS 4.1.1
+    Tandem Computers   GUARDIAN 90         1. call the source file IOZONEC
+                                           2. C/IN IOZONEC/IOZONE;RUNNABLE
+                                           3. RUN IOZONE
+    Tandem Computers   Non-Stop UX
+        
+    ** for VMS, define iozone as a foreign command via this DCL command:       
+ 
+       $IOZONE :== $SYS$DISK:[]IOZONE.EXE      
+ 
+       this lets you pass the command line arguments to IOZONE
+ 
+  Acknowledgements to the following persons for their feedback on IOzone:       
+ 
+  Andy Puchrik, Michael D. Lawler, Krishna E. Bera, Sam Drake, John H. Hartman, 
+  Ted Lyszczarz, Bill Metzenthen, Jody Winston, Clarence Dold, Axel
+  Dan Hildebrand, Joe Nordman, Bob Fritz, Jeff Johnson
+        
+  --- MODIFICATION HISTORY:
+ 
+ 
+    3/7/91 William D. Norcott (Bill.Norcott@nuo.mts.dec.com)
+                               created
+ 
+    3/22/91 Bill Norcott       tested on OSF/1 ... it works
+ 
+    3/24/91 Bill Norcott       V1.02 -- use calloc in TURBOC to
+                                       fix bug with their malloc
+ 
+    3/25/91 Bill Norcott       V1.03 -- add ifdef for XENIX
+                                       
+    3/27/91 Bill Norcott       V1.04 -- Includes for SCO UNIX
+                                       
+    4/26/91 Bill Norcott       V1.05 -- support AIX and SUNos, check
+                                       length of read() and write()
+    4/26/91 Bill Norcott       V1.06 -- tabulate results of a series 
+                                       of tests
+    5/17/91 Bill Norcott       V1.07 -- use time() for VMS
+    5/20/91 Bill Norcott       V1.08 -- use %ld for Turbo C and
+                                       use #ifdef sun to bypass
+                                       inclusion of limits.h
+    6/19/91 Bill Norcott       V1.09 -- rid #elif to support HP-UX and 
+                                       Silicon Graphics UNIX, and
+                                       add #ifdef SGI
+                                       add #ifdef CONVERGENT
+                                       for Convergent Technologies
+                                       also add help option
+    7/2/91 Bill Norcott        V1.10 -- delete file if get SIGINT
+                                       or SIGTERM
+    8/20/91 Bill Norcott       V1.11 -- require no flags with AIX
+    11/4/91 Bill Norcott       V1.12 -- support MIPS RISCos
+                                         Tandem NonStop-UX, and
+                                        IEEE Std POSIX 1003.1-1988
+    12/4/91 Bill Norcott       V1.13 -- support NeXT; tell host OS type
+    1/23/92 Bill Norcott      V1.14 -- support QNX & use calloc() for buffer
+    5/1/92 Bill Norcott      V1.15 -- support SVR4; fix loss of precision
+                                       in times() function.  
+                                       support Interactive UNIX
+                                       detect ANSI if no O/S
+                                       Also, define for generic SVR3
+                                       Apollo Domain/OS
+                                       Define NO_DELETE and iozone wont
+                                       delete the temp file.  Needed to
+                                       test raw devices without deleting
+                                       them
+    10/28/92 Bill Norcott    V1.16 -- bug fix: some unsigned longs changed
+                                      to unsigned in V1.15 caused problem
+                                      so change back.  Also, note problems
+					 with AT&T 6386WGS systems
+ 
