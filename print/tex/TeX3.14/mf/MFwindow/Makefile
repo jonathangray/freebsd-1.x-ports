@@ -11,7 +11,7 @@
 SITEDIR=..
 CC=gcc
 OPT=-g
-CFLAGS=$(OPT) -I../$(SITEDIR)
+CFLAGS=$(OPT) -I../$(SITEDIR) -I/usr/X386/include
 SHELL=/bin/sh
 RANLIB=/usr/bin/ranlib
 

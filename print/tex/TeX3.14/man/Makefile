@@ -75,7 +75,7 @@ stamp-manpages:	$(manfiles)
 		touch stamp-manpages
 
 install: stamp-manpages
-		-mkdir $(mandir)
+		-mkdir -p $(mandir)
 		for nameone in $(manfiles);				\
 	        do							\
                   name=`basename $${nameone} .1`;			\

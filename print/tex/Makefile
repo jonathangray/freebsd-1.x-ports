@@ -388,7 +388,7 @@ install.dviutils:
 # Cleanup targets
 #
 clean: $(ALL:S/^/clean./g)
-	rm -f *~ #*# a.out *.o stamp-*
+	rm -f *~ \#*\# a.out *.o stamp-*
 	cd ./scripts ; rm -f var.sed modes.mf dvidr.1 dvidr
 	rm -r -f ./usr/*
 
