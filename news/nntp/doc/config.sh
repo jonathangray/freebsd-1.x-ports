@@ -5,7 +5,6 @@
 # Created by Stan Barber; Mon Apr  6 13:25:27 CDT 1987
 # Modified by Phil Lapsley; Thu Oct 15 17:43:40 PDT 1987
 #
-
 #
 # ------------- SITE DEPENDENT STUFF ---------------------------
 # (modify these lines to suit your system)
