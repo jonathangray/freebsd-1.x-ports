@@ -98,7 +98,8 @@ gx_device_printer far_data gs_epson_device =
   prn_device(prn_eps_procs, "epson",
 	DEFAULT_WIDTH_10THS, DEFAULT_HEIGHT_10THS,
 	X_DPI, Y_DPI,
-	0.2, 0.95, 0, 1.0,			/* margins */
+	/* 0.2, 0.95, 0, 1.0,*/			/* margins */
+	0, 0, 0, 0,				/* margins */
 	1, eps_print_page1);
 
 /* High-res (interleaved) 9-pin device */
@@ -106,7 +107,8 @@ gx_device_printer far_data gs_eps9high_device =
   prn_device(prn_eps_procs, "eps9high",
 	DEFAULT_WIDTH_10THS, DEFAULT_HEIGHT_10THS,
 	X_DPI, 3*Y_BASERES,
-	0.2, 0.95, 0, 1.0,			/* margins */
+	/* 0.2, 0.95, 0, 1.0,*/			/* margins */
+	0, 0, 0, 0,				/* margins */
 	1, eps_print_page2);
 
 /* IBM ProPrinter device */
@@ -114,7 +116,8 @@ gx_device_printer far_data gs_ibmpro_device =
   prn_device(prn_eps_procs, "ibmpro",
 	DEFAULT_WIDTH_10THS, DEFAULT_HEIGHT_10THS,
 	X_DPI, Y_DPI,
-	0.2, 0.95, 0, 1.0,			/* margins */
+	/* 0.2, 0.95, 0, 1.0,*/			/* margins */
+	0, 0, 0, 0,				/* margins */
 	1, ibmpro_print_page);
 
 /* ------ Driver procedures ------ */
