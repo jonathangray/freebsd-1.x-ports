@@ -7,8 +7,11 @@
 #         (C) Copyright 1988-1992, USENET Community Trust
 #
 #  $Log: Makefile,v $
-#  Revision 1.11  1993/12/28 17:36:18  smace
-#  Added clean dependency for the pkg_src target
+#  Revision 1.12  1994/01/06 06:28:56  jkh
+#  Removed unnecessary src target
+#
+# Revision 1.11  1993/12/28  17:36:18  smace
+# Added clean dependency for the pkg_src target
 #
 # Revision 1.10  1993/12/28  05:58:30  smace
 # Moved + file to pkg directory and re-ran Configure
@@ -119,8 +122,5 @@ _utils:
 	cd utils; $(MAKE) $(MJ) -$(MAKEFLAGS) all
 
 
-pkg:	pkg_src
-
-pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
-	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S elm_src
-
+pkg:
+	@echo -n
