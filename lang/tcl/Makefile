@@ -52,7 +52,7 @@ MANN_DIR =	$(MAN_DIR)/mann
 
 # To change the compiler switches, for example to change from -O
 # to -g, change the following line:
-CFLAGS =-O2 -m486
+CFLAGS =-O2
 
 # To disable ANSI-C procedure prototypes reverse the comment characters
 # on the following lines:
