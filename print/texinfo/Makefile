@@ -45,9 +45,8 @@ SHELL = /bin/sh
 CFLAGS = -g
 LDFLAGS = -g
 
-prefix = /usr/local
-infoprefix = /usr/gnu
-exec_prefix = $(prefix)
+prefix = /usr/gnu
+exec_prefix = ${prefix}
 bindir = $(exec_prefix)/bin
 # Prefix for each installed program, normally empty or `g'.
 binprefix = 
@@ -56,7 +55,7 @@ libdir = $(prefix)/lib
 manprefix = 
 mandir = $(prefix)/man/man1
 manext = 1
-infodir = $(infoprefix)/info
+infodir = $(prefix)/info
 
 # For info program. 
 DEFAULT_INFOPATH = $(infodir):.

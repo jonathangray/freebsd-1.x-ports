@@ -43,8 +43,8 @@ SHELL = /bin/sh
 CFLAGS = -g
 LDFLAGS = -g
 
-prefix = /usr/local
-exec_prefix = $(prefix)
+prefix = /usr/gnu
+exec_prefix = ${prefix}
 bindir = $(exec_prefix)/bin
 # Prefix for each installed program, normally empty or `g'.
 binprefix = 
