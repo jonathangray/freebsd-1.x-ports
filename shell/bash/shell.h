@@ -8,6 +8,9 @@
 #include "maxpath.h"
 #include "unwind_prot.h"
 #include "command.h"
+#include "dispose_cmd.h"
+#include "make_cmd.h"
+#include "subst.h"
 
 extern int EOF_Reached;
 
@@ -33,6 +36,8 @@ extern jmp_buf top_level, catch;
 /* Special exit status used when the shell is asked to execute a
    binary file as a shell script. */
 #define EX_BINARY_FILE 126
+#define EX_NOEXEC 126
+#define EX_NOTFOUND 127
 
 /* The list of characters that are quoted in double-quotes with a
    backslash.  Other characters following a backslash cause nothing
@@ -64,3 +69,17 @@ struct fd_bitmap {
 };
 
 #define FD_BITMAP_SIZE 32
+
+#define CTLESC '\001'
+#define CTLNUL '\002'
+
+/* Information about the current user. */
+struct user_info {
+  int uid, euid;
+  int gid, egid;
+  char *user_name;
+  char *shell;		/* shell from the password file */
+  char *home_dir;
+};
+
+extern struct user_info current_user;

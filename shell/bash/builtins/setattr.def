@@ -22,10 +22,12 @@ Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 $PRODUCES setattr.c
 
 #include "../shell.h"
+#include "common.h"
+#include "bashgetopt.h"
 
 $BUILTIN export
 $FUNCTION export_builtin
-$SHORT_DOC export [-n] [-p] [-f] [name ...]
+$SHORT_DOC export [-n] [-f] [name ...] or export -p
 NAMEs are marked for automatic export to the environment of
 subsequently executed commands.  If the -f option is given,
 the NAMEs refer to functions.  If no NAMEs are given, or if `-p'
@@ -48,12 +50,14 @@ export_builtin (list)
 
 $BUILTIN readonly
 $FUNCTION readonly_builtin
-$SHORT_DOC readonly [-p] [-f] [name ...]
+$SHORT_DOC readonly [-n] [-f] [name ...] or readonly -p
 The given NAMEs are marked readonly and the values of these NAMEs may
 not be changed by subsequent assignment.  If the -f option is given,
 then functions corresponding to the NAMEs are so marked.  If no
 arguments are given, or if `-p' is given, a list of all readonly names
-is printed.  An argument of `--' disables further option processing.
+is printed.  An argument of `-n' says to remove the readonly property
+from subsequent NAMEs.  An argument of `--' disables further option
+processing.
 $END
 
 /* For each variable name in LIST, make that variable readonly.  Given an
@@ -73,42 +77,28 @@ set_or_show_attributes (list, attribute)
      int attribute;
 {
   register SHELL_VAR *var;
-  int assign, undo = 0, functions_only = 0;
+  int assign, undo = 0, functions_only = 0, any_failed = 0, opt;
   extern int array_needs_making;
 
   /* Read arguments from the front of the list. */
-  while (list)
+  reset_internal_getopt ();
+  while ((opt = internal_getopt (list, "nfp")) != -1)
     {
-      register char *name = list->word->word;
-
-      if (strcmp (name, "-n") == 0)
+      switch (opt)
 	{
-	  undo = 1;
-	  list = list->next;
+	  case 'n':
+	    undo = 1;
+	    break;
+	  case 'f':
+	    functions_only = 1;
+	    break;
+	  case 'p':
+	    break;
+	  default:
+	    return (EXECUTION_FAILURE);
 	}
-      else if (strcmp (name, "-f") == 0)
-	{
-	  functions_only = 1;
-	  list = list->next;
-	}
-      else if (strcmp (name, "-p") == 0)
-	{
-	  list = list->next;
-	  continue;
-	}
-      else if (strcmp (name, "--") == 0)
-	{
-	  list = list->next;
-	  break;
-	}
-      else if (*name == '-')
-	{
-	  bad_option (name);
-	  return (EXECUTION_FAILURE);
-	}
-      else
-	break;
     }
+  list = loptend;
 
   if (list)
     {
@@ -125,6 +115,7 @@ set_or_show_attributes (list, attribute)
 	      if (!var)
 		{
 		  builtin_error ("%s: not a function", name);
+		  any_failed++;
 		}
 	      else
 		{
@@ -220,7 +211,11 @@ set_or_show_attributes (list, attribute)
 		      printf ("declare -%s ", flags);
 
 		      if (!function_p (var))
-			printf ("%s=%s\n", var->name, value_cell (var));
+			{
+			  char *x = double_quote (value_cell (var));
+			  printf ("%s=%s\n", var->name, x);
+			  free (x);
+			}
 		      else
 			{
 			  char *named_function_string ();
@@ -234,5 +229,5 @@ set_or_show_attributes (list, attribute)
 	  free (variable_list);
 	}
     }
-  return (EXECUTION_SUCCESS);
+  return (any_failed == 0 ? EXECUTION_SUCCESS : EXECUTION_FAILURE);
 }

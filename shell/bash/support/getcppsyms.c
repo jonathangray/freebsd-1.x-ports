@@ -8,15 +8,24 @@
 #include <stdio.h>
 main ()
 {
+#if defined (__BSD_4_4__)
+  printf ("-D__BSD_4_4__");
+#endif /* __BSD_4_4__ */
 #if defined (CMU)
   printf (" -DCMU");
 #endif /* CMU */
+#if defined (_COFF)
+  printf (" -D_COFF");
+#endif /* _COFF */
 #if defined (DGUX)
   printf (" -DDGUX");
 #endif /* DGUX */
 #if defined (GOULD_PN)
   printf (" -DGOULD_PN");
 #endif /* GOULD_PN */
+#if defined (MACH)
+  printf (" -DMACH");
+#endif /* MACH */
 #if defined (MIPSEB)
   printf (" -DMIPSEB");
 #endif /* MIPSEB */
@@ -35,6 +44,15 @@ main ()
 #if defined (NeXT)
   printf (" -DNeXT");
 #endif /* NeXT */
+#if defined (__PARAGON__)
+  printf (" -D__PARAGON__");
+#endif /* __PARAGON__ */
+#if defined (_PGC_)
+  printf (" -D_PGC_");
+#endif /* _PGC_ */
+#if defined (__PGC__)
+  printf (" -D__PGC__");
+#endif /* __PGC__ */
 #if defined (RES)
   printf (" -DRES");
 #endif /* RES */
@@ -65,6 +83,12 @@ main ()
 #if defined (USGr4)
   printf (" -DUSGr4");
 #endif /* USGr4 */
+#if defined (USGr4_2)
+  printf (" -DUSGr4_2");
+#endif /* USGr4_2 */
+#if defined (__SVR4_2__)
+  printf (" -D__SVR4_2__");
+#endif /* __SVR4_2__ */
 #if defined (Xenix286)
   printf (" -DXenix286");
 #endif /* Xenix286 */
@@ -83,36 +107,30 @@ main ()
 #if defined (_M88K)
   printf (" -D_M88K");
 #endif /* _M88K */
+#if defined (_M88KBCS_TARGET)
+  printf (" -D_M88KBCS_TARGET");
+#endif /* _M88KBCS_TARGET */
 #if defined (__DGUX__)
   printf (" -D__DGUX__");
 #endif /* __DGUX__ */
 #if defined (__UMAXV__)
   printf (" -D__UMAXV__");
 #endif /* __UMAXV__ */
-#if defined (__hp9000s200)
-  printf (" -D__hp9000s200");
-#endif /* __hp9000s200 */
-#if defined (__hp9000s300)
-  printf (" -D__hp9000s300");
-#endif /* __hp9000s300 */
-#if defined (__hp9000s500)
-  printf (" -D__hp9000s500");
-#endif /* __hp9000s500 */
-#if defined (__hp9000s700)
-  printf (" -D__hp9000s700");
-#endif /* __hp9000s700 */
-#if defined (__hp9000s800)
-  printf (" -D__hp9000s800");
-#endif /* __hp9000s800 */
-#if defined (__hpux)
-  printf (" -D__hpux");
-#endif /* __hpux */
 #if defined (__m88k)
   printf (" -D__m88k");
 #endif /* __m88k */
 #if defined (__uxpm__)
   printf (" -DUSGr4 -Du370");
 #endif /* __uxpm__ */
+#if defined (alliant)
+  printf (" -Dalliant");
+#endif /* alliant */
+#if defined (alpha)
+  printf (" -Dalpha");
+#endif /* alpha */
+#if defined (__alpha)
+  printf (" -D__alpha");
+#endif /* __alpha */
 #if defined (aix)
   printf (" -Daix");
 #endif /* aix */
@@ -137,6 +155,15 @@ main ()
 #if defined (bsd4_3)
   printf (" -Dbsd4_3");
 #endif /* bsd4_3 */
+#if defined (__bsdi__)
+  printf (" -D__bsdi__");
+#endif /* __bsdi__ */
+#if defined (bsdi)
+  printf (" -Dbsdi");
+#endif /* bsdi */
+#if defined (__386BSD__)
+  printf (" -D__386BSD__");
+#endif /* __386BSD__ */
 #if defined (cadmus)
   printf (" -Dcadmus");
 #endif /* cadmus */
@@ -155,6 +182,9 @@ main ()
 #if defined (dmert)
   printf (" -Ddmert");
 #endif /* dmert */
+#if defined (__GNUC__)
+  printf (" -D__GNUC__");
+#endif /* __GNUC__ */
 #if defined (gcos)
   printf (" -Dgcos");
 #endif /* gcos */
@@ -173,30 +203,42 @@ main ()
 #if defined (host_mips)
   printf (" -Dhost_mips");
 #endif /* host_mips */
-#if defined (hp9000)
+#if defined (hp9000) || defined (__hp9000)
   printf (" -Dhp9000");
-#endif /* hp9000 */
-#if defined (hp9000s200)
+#endif /* hp9000 || __hp9000 */
+#if defined (hp9000s200) || defined (__hp9000s200)
   printf (" -Dhp9000s200");
-#endif /* hp9000s200 */
-#if defined (hp9000s300)
+#endif /* hp9000s200 || __hp9000s200 */
+#if defined (hp9000s300) || defined (__hp9000s300)
   printf (" -Dhp9000s300");
-#endif /* hp9000s300 */
-#if defined (hp9000s500)
+#endif /* hp9000s300 || __hp9000s300 */
+#if defined (hp9000s500) || defined (__hp9000s500)
   printf (" -Dhp9000s500");
-#endif /* hp9000s500 */
-#if defined (hp9000s700)
+#endif /* hp9000s500 || __hp9000s500 */
+#if defined (hp9000s700) || defined (__hp9000s700)
   printf (" -Dhp9000s700");
-#endif /* hp9000s700 */
-#if defined (hp9000s800)
+#endif /* hp9000s700 || __hp9000s700 */
+#if defined (hp9000s800) || defined (__hp9000s800)
   printf (" -Dhp9000s800");
-#endif /* hp9000s800 */
-#if defined (hpux)
+#endif /* hp9000s800 || __hp9000s800 */
+#if defined (hppa) || defined (__hppa)
+  printf (" -Dhppa");
+#endif /* hppa || __hppa */
+#if defined (hpux) || defined (__hpux)
   printf (" -Dhpux");
 #endif /* hpux */
+#if defined (__hp_osf)
+  printf (" -D__hp_osf");
+#endif /* __hp_osf */
 #if defined (i386)
   printf (" -Di386");
 #endif /* i386 */
+#if defined (__i860)
+  printf(" -D__i860");
+#endif /* __i860 */
+#if defined (__i860__)
+  printf(" -D__i860__");
+#endif /* __i860__ */
 #if defined (ibm)
   printf (" -Dibm");
 #endif /* ibm */
@@ -212,12 +254,24 @@ main ()
 #if defined (is68k)
   printf (" -Dis68k");
 #endif /* is68k */
+#if defined (ksr1)
+  printf (" -Dksr1");
+#endif /* ksr1 */
+#if defined (linux)
+  printf (" -Dlinux");
+#endif /* linux */
+#if defined (__linux__)
+  printf (" -D__linux__");
+#endif /* __linux__ */
 #if defined (luna88k)
   printf (" -Dluna88k");
 #endif /* luna88k */
 #if defined (m68k)
   printf (" -Dm68k");
 #endif /* m68k */
+#if defined (m88k)
+  printf (" -Dm88k");
+#endif /* m88k */
 #if defined (mc68010)
   printf (" -Dmc68010");
 #endif /* mc68010 */
@@ -242,12 +296,27 @@ main ()
 #if defined (os)
   printf (" -Dos");
 #endif /* os */
+#if defined (osf)
+  printf (" -Dosf");
+#endif /* osf */
+#if defined (__osf__)
+  printf (" -D__osf__");
+#endif /* __osf__ */
+#if defined (__OSF1__)
+  printf(" -D__OSF1__");
+#endif /* __OSF1__ */
 #if defined (pdp11)
   printf (" -Dpdp11");
 #endif /* pdp11 */
+#if defined (plexus)
+  printf (" -Dplexus")
+#endif /* plexus */
 #if defined (pyr)
   printf (" -Dpyr");
 #endif /* pyr */
+#if defined (scs)
+  printf (" -Dscs");
+#endif /* scs */
 #if defined (sequent)
   printf (" -Dsequent");
 #endif /* sequent */
@@ -263,6 +332,9 @@ main ()
 #if defined (stardent)
   printf (" -Dstardent");
 #endif /* stardent */
+#if defined (__STDC__)
+  printf (" -D__STDC__");
+#endif /* __STDC__ */
 #if defined (sun)
   printf (" -Dsun");
 #endif /* sun */
@@ -275,6 +347,9 @@ main ()
 #if defined (sun4)
   printf (" -Dsun4");
 #endif /* sun4 */
+#if defined (__svr4__)
+  printf (" -D__svr4__");
+#endif /* __svr4__ */
 #if defined (tower32)
   printf (" -Dtower32");
 #endif /* tower32 */
@@ -309,6 +384,3 @@ main ()
   printf ("\n");
   exit (0);
 }
-
-
-

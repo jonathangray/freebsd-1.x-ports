@@ -19,17 +19,23 @@
    Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 
 #include <stdio.h>
+#include <sys/types.h>
 #include <ctype.h>
 #include <pwd.h>
-#include <sys/types.h>
 
+#include "bashansi.h"
 #include "shell.h"
 #include "hash.h"
 #include "flags.h"
 
-#if defined (USG) && !defined (isc386) && !defined (sgi)
-struct passwd *getpwuid (), *getpwent ();
-#endif
+#include "builtins/common.h"
+
+extern char *indirection_level_string ();
+extern char *find_user_command ();
+extern char *tilde_expand (), *named_function_string ();
+
+extern int posixly_correct;
+extern struct user_info current_user;
 
 /* The list of shell variables that the user has created, or that came from
    the environment. */
@@ -46,6 +52,15 @@ int variable_context = 0;
 /* The array of shell assignments which are made only in the environment
    for a single command. */
 char **temporary_env = (char **)NULL;
+
+/* The array of shell assignments which are in the environment for the
+   execution of a shell function. */
+char **function_env = (char **)NULL;
+
+/* The array of shell assignments which are made only in the environment
+   for the execution of a shell builtin command which may cause more than
+   one command to be executed (e.g., "source"). */
+char **builtin_env = (char **)NULL;
 
 /* Some funky variables which are known about specially.  Here is where
    "$*", "$1", and all the cruft is kept. */
@@ -72,20 +87,32 @@ char **non_unsettable_vars = (char **)NULL;
 #define DEFAULT_MAIL_PATH "/usr/spool/mail/"
 #endif
 
+static char *have_local_variables;		/* XXX */
+static int local_variable_stack_size = 0;	/* XXX */
+
 /* Some forward declarations. */
 SHELL_VAR *set_if_not ();	/* returns new or existing entry */
 static void sbrand ();		/* set bash random number generator */
+void non_unsettable ();
 
 /* Make VAR be auto-exported.  VAR is a pointer to a SHELL_VAR. */
 #define set_auto_export(var) \
 { var->attributes |= att_exported; array_needs_making = 1; }
+
+#if defined (HISTORY)
+extern int remember_on_history;
+#endif /* HISTORY */
 
 /* Initialize the shell variables from the current environment. */
 initialize_shell_variables (env)
      char *env[];
 {
   extern char *primary_prompt, *secondary_prompt;
-  char *name, *string;
+  extern int interactive_shell;
+#if defined (HISTORY)
+  extern int remember_on_history;
+#endif /* HISTORY */
+  char *name, *string, *current_dir;
   int c, char_index;
   int string_index = 0;
   SHELL_VAR *temp_var;
@@ -96,23 +123,14 @@ initialize_shell_variables (env)
   if (!shell_functions)
     shell_functions = make_hash_table (0);
 
-  /* Set up $PWD. */
-  {
-    char *get_working_directory (), *cd;
-
-    cd = get_working_directory ("shell-init");
-    if (cd)
-      {
-	bind_variable ("PWD", cd);
-	free (cd);
-      }
-  }
-
   while (string = env[string_index++])
     {
+      int string_length;
+
       char_index = 0;
 
-      name = (char *)alloca (1 + strlen (string));
+      string_length = strlen (string);
+      name = (char *)alloca (1 + string_length);
 
       while ((c = *string++) && c != '=')
 	name[char_index++] = c;
@@ -120,29 +138,70 @@ initialize_shell_variables (env)
       name[char_index] = '\0';
 
       /* If exported function, define it now. */
-      /* Posix.2 style exported function: name()=value */
-      if (strncmp ("() {", string, 4) == 0 ||
-	  ((name[char_index - 1] == ')' &&
-	    name[char_index - 2] == '(' &&
-	    string[0] == '{')))
+      if (!privileged_mode && STREQN ("() {", string, 4))
 	{
+	  SHELL_VAR *f;
 	  char *eval_string;
 
-	  eval_string = (char *)xmalloc (3 + strlen (string) + strlen (name));
+	  eval_string = (char *)xmalloc (3 + string_length + strlen (name));
 	  sprintf (eval_string, "%s %s", name, string);
 	  parse_and_execute (eval_string, name);
 
 	  if (name[char_index - 1] == ')')
 	    name[char_index - 2] = '\0';
-	  set_func_auto_export (name);
+
+	  if (f = find_function (name))
+	    {
+	      f->attributes |= (att_exported | att_imported);
+	      array_needs_making = 1;
+	    }
+	  else
+	    report_error ("error importing function definition for `%s'", name);
 	}
       else
 	{
 	  SHELL_VAR *v;
 
 	  v = bind_variable (name, string);
-	  set_auto_export (v);
+	  v->attributes |= (att_exported | att_imported);
+	  array_needs_making = 1;
 	}
+    }
+
+  /* If we got PWD from the environment, update our idea of the current
+     working directory.  In any case, make sure that PWD exists before
+     checking it.  It is possible for getwd () to fail on shell startup,
+     and in that case, PWD would be undefined. */
+  temp_var = find_variable ("PWD");
+  if (temp_var && imported_p (temp_var))
+    {
+      char *curdir;
+
+      if (curdir = value_cell (temp_var))
+	{
+	  if (same_file
+	      (curdir, ".", (struct stat *)NULL, (struct stat *)NULL))
+	    set_working_directory (curdir);
+	  else
+	    {
+	      current_dir = get_working_directory ("shell-init");
+	      if (current_dir)
+		{
+		  bind_variable ("PWD", current_dir);
+		  free (current_dir);
+		}
+	    }
+	}
+    }
+  else
+    /* Set up $PWD. */
+    {
+      current_dir = get_working_directory ("shell-init");
+      if (current_dir)
+        {
+	  bind_variable ("PWD", current_dir);
+	  free (current_dir);
+        }
     }
 
   /* Remember this pid. */
@@ -156,29 +215,40 @@ initialize_shell_variables (env)
   temp_var = set_if_not ("TERM", "dumb");
   set_auto_export (temp_var);
 
-  set_if_not ("PS1", primary_prompt);
-  set_if_not ("PS2", secondary_prompt);
+  if (interactive_shell)
+    {
+      set_if_not ("PS1", primary_prompt);
+      set_if_not ("PS2", secondary_prompt);
+    }
+
+#if defined (INSECURITY)
   set_if_not ("IFS", " \t\n");
+#else
+  bind_variable ("IFS", " \t\n");
+#endif /* INSECURITY */
 
   /* Magic machine types.  Pretty convenient. */
   temp_var = set_if_not ("HOSTTYPE", HOSTTYPE);
   set_auto_export (temp_var);
 
-  /* Default MAILPATH, and MAILCHECK. */
-  set_if_not ("MAILCHECK", "60");
-  if ((get_string_value ("MAIL") == (char *)NULL) &&
-      (get_string_value ("MAILPATH") == (char *)NULL))
+  /* Default MAILPATH, and MAILCHECK for interactive shells. */
+  if (interactive_shell)
     {
-      extern char *current_user_name;
-      char *tem;
+      set_if_not ("MAILCHECK", "60");
 
-      tem = (char *)xmalloc (1 + sizeof (DEFAULT_MAIL_PATH)
-			   + strlen (current_user_name));
-      strcpy (tem, DEFAULT_MAIL_PATH);
-      strcat (tem, current_user_name);
+      if ((get_string_value ("MAIL") == (char *)NULL) &&
+	  (get_string_value ("MAILPATH") == (char *)NULL))
+	{
+	  char *tem;
 
-      bind_variable ("MAILPATH", tem);
-      free (tem);
+	  tem = (char *)xmalloc (1 + sizeof (DEFAULT_MAIL_PATH)
+				 + strlen (current_user.user_name));
+	  strcpy (tem, DEFAULT_MAIL_PATH);
+	  strcat (tem, current_user.user_name);
+
+	  bind_variable ("MAILPATH", tem);
+	  free (tem);
+	}
     }
 
   /* Do some things with shell level. */
@@ -190,13 +260,12 @@ initialize_shell_variables (env)
   {
     char *ppid;
     SHELL_VAR *v;
-    extern char *itos ();
 
     ppid = itos ((int) getppid ());
     v = find_variable ("PPID");
 
     if (v)
-      v->attributes &= ~att_readonly;
+      v->attributes &= ~(att_readonly | att_exported);
 
     v = bind_variable ("PPID", ppid);
     v->attributes |= (att_readonly | att_integer);
@@ -214,28 +283,17 @@ initialize_shell_variables (env)
   /* Get the full pathname to THIS shell, and set the BASH variable
      to it. */
   {
-    extern char *shell_name, *find_user_command (), *full_pathname ();
+    extern char *shell_name;
     extern int login_shell;
     char *tname = find_user_command (shell_name);
 
     if ((login_shell == 1) && (*shell_name != '/'))
       {
-	struct passwd *entry = getpwuid (getuid ());
+	/* If HOME doesn't exist, set it. */
+	temp_var = set_if_not ("HOME", current_user.home_dir);
+	temp_var->attributes |= att_exported;
 
-	if (entry)
-	  {
-	    /* If HOME doesn't exist, set it. */
-	    temp_var = (SHELL_VAR *)find_variable ("HOME");
-	    if (!temp_var)
-	      {
-		temp_var = bind_variable ("HOME", entry->pw_dir);
-		temp_var->attributes |= att_exported;
-	      }
-	    name = savestring (entry->pw_shell);
-	  }
-	else
-	  name = savestring ("a.out");
-	endpwent ();
+	name = savestring (current_user.shell);
       }
     else
       {
@@ -251,11 +309,11 @@ initialize_shell_variables (env)
 	  }
       }
 
-    /* Make the exported environment variable SHELL be whatever the name of
-       this shell is.  Note that the `tset' command looks at this variable
+    /* Make the exported environment variable SHELL be the user's login
+       shell.  Note that the `tset' command looks at this variable
        to determine what style of commands to output; if it ends in "csh",
        then C-shell commands are output, else Bourne shell commands. */
-    temp_var = set_if_not ("SHELL", name);
+    temp_var = set_if_not ("SHELL", current_user.shell);
     set_auto_export (temp_var);
 
     /* Make a variable called BASH, which is the name of THIS shell. */
@@ -267,48 +325,69 @@ initialize_shell_variables (env)
 
   /* Make a variable called BASH_VERSION which contains the version info. */
   {
-    char tt[12];
+    char tt[16];
     extern char *dist_version;
     extern int build_version;
 
-    sprintf (tt, "%s.%d", dist_version, build_version);
+    sprintf (tt, "%s.%d-CWRU", dist_version, build_version);
     bind_variable ("BASH_VERSION", tt);
   }
 
+#if defined (HISTORY)
   /* Set history variables to defaults, and then do whatever we would
-     do if the variable had just been set. */
-  {
-    char *tilde_expand ();
-    char *tem = tilde_expand ("~/.bash_history");
+     do if the variable had just been set.  Do this only in the case
+     that we are remembering commands on the history list. */
+  if (remember_on_history)
+    {
+      char *tem;
 
-    set_if_not ("HISTFILE", tem);
-    free (tem);
+      if (posixly_correct)
+	tem = tilde_expand ("~/.sh_history");
+      else
+	tem = tilde_expand ("~/.bash_history");
 
-    set_if_not ("HISTSIZE", "500");
-    sv_histsize ("HISTSIZE");
-  }
+      set_if_not ("HISTFILE", tem);
+      free (tem);
 
-  /* seed the random number generator */
+      set_if_not ("HISTSIZE", "500");
+      sv_histsize ("HISTSIZE");
+    }
+#endif /* HISTORY */
 
+  /* Seed the random number generator. */
   sbrand (dollar_dollar_pid);
 
-  /* If we have inherited `noclobber' from a previous shell, then set
-     noclobbering on. */
+  /* Handle some "special" variables that we may have inherited from a
+     parent shell. */
   {
     extern int noclobber;
 
-    noclobber = find_variable ("noclobber") != NULL;
+    noclobber = find_variable ("noclobber") != (SHELL_VAR *)NULL;
   }
 
-  /* Initialize the dynamic variables, and seed their values */
+#if defined (HISTORY)
+  {
+    extern int command_oriented_history;
+
+    if (interactive_shell && remember_on_history)
+      command_oriented_history =
+	find_variable ("command_oriented_history") != (SHELL_VAR *)NULL;
+  }
+#endif /* HISTORY */
+
+  /* Initialize the dynamic variables, and seed their values. */
   initialize_dynamic_variables ();
 
   non_unsettable ("PATH");
-  non_unsettable ("PS1");
-  non_unsettable ("PS2");
   non_unsettable ("IFS");
 
-  /* Get the users real user id, and save that in an readonly variable.
+  if (interactive_shell)
+    {
+      non_unsettable ("PS1");
+      non_unsettable ("PS2");
+    }
+
+  /* Get the users real user id, and save that in a readonly variable.
      To make the variable *really* readonly, we have added it to a special
      list of vars. */
 
@@ -324,13 +403,18 @@ adjust_shell_level (change)
      int change;
 {
   extern int shell_level;
-  extern char *itos ();
-  char *new_level;
+  char *new_level, *old_SHLVL;
   int old_level;
 
+  old_SHLVL = get_string_value ("SHLVL");
+  if (old_SHLVL)
+    old_level = atoi (old_SHLVL);
+  else
+    old_level = 0;
 
-  old_level = atoi (get_string_value ("SHLVL"));
   shell_level = old_level + change;
+  if (shell_level < 0)
+    shell_level = 0;
   new_level = itos (shell_level);
   bind_variable ("SHLVL", new_level);
   free (new_level);
@@ -338,6 +422,7 @@ adjust_shell_level (change)
 
 /* Add NAME to the list of variables that cannot be unset
    if it isn't already there. */
+void
 non_unsettable (name)
      char *name;
 {
@@ -350,7 +435,7 @@ non_unsettable (name)
     }
 
   for (i = 0; non_unsettable_vars[i]; i++)
-    if (strcmp (non_unsettable_vars[i], name) == 0)
+    if (STREQ (non_unsettable_vars[i], name))
       return;
 
   non_unsettable_vars = (char **)
@@ -412,7 +497,12 @@ int
 qsort_var_comp (var1, var2)
      SHELL_VAR **var1, **var2;
 {
-  return (strcmp ((*var1)->name, (*var2)->name));
+  int result;
+
+  if ((result = (*var1)->name[0] - (*var2)->name[0]) == 0)
+    result = strcmp ((*var1)->name, (*var2)->name);
+
+  return (result);
 }
 
 sort_variables (array)
@@ -510,12 +600,9 @@ print_var_value (var)
 print_var_function (var)
      SHELL_VAR *var;
 {
-  char *named_function_string ();
-
   if (function_p (var) && var->value)
     printf ("%s", named_function_string ((char *)NULL, var->value, 1));
 }
-
 
 /* **************************************************************** */
 /*                                                                  */
@@ -576,7 +663,6 @@ SHELL_VAR *
 get_seconds (var)
      SHELL_VAR *var;
 {
-  extern char *itos ();
   time_t time_since_start;
   char *p;
 
@@ -630,7 +716,6 @@ get_random (var)
 {
   int rv;
   char *p;
-  extern char *itos ();
 
   rv = brand ();
   p = itos ((int)rv);
@@ -649,7 +734,6 @@ get_lineno (var)
 {
   extern int line_number;
   char *p;
-  extern char *itos ();
 
   p = itos (line_number);
   if (var->value)
@@ -693,22 +777,24 @@ var_lookup (name, hashed_vars)
     return ((SHELL_VAR *)NULL);
 }
 
-/* Look up the variable entry whose name matches STRING.
-   Returns the entry or NULL. */
+/* Look up the variable entry named NAME.  If SEARCH_TEMPENV is non-zero,
+   then also search the temporarily built list of exported variables. */
 SHELL_VAR *
-find_variable (name)
+find_variable_internal (name, search_tempenv)
      char *name;
+     int search_tempenv;
 {
-  extern int variable_context;
-  extern Function *this_shell_builtin;
+  extern int subshell_environment;
   SHELL_VAR *find_tempenv_variable ();
   SHELL_VAR *var = (SHELL_VAR *)NULL;
 
-  /* If we are executing a function or builtin, first look in the
-     temporary environment for the variable.  This allows constructs
-     such as "foo=x eval 'echo $foo'" to get the `exported' value
-     of $foo. */
-  if (variable_context || this_shell_builtin)
+  /* If explicitly requested, first look in the temporary environment for
+     the variable.  This allows constructs such as "foo=x eval 'echo $foo'"
+     to get the `exported' value of $foo.  This happens if we are executing
+     a function or builtin, or if we are looking up a variable in a
+     "subshell environment". */
+  if ((search_tempenv || subshell_environment) &&
+      (temporary_env || builtin_env || function_env))
     var = find_tempenv_variable (name);
 
   if (!var)
@@ -721,6 +807,18 @@ find_variable (name)
     return ((*(var->dynamic_value)) (var));
   else
     return (var);
+}
+
+/* Look up the variable entry named NAME.  Returns the entry or NULL. */
+SHELL_VAR *
+find_variable (name)
+     char *name;
+{
+  extern int variable_context;
+  extern Function *this_shell_builtin;
+
+  return (find_variable_internal
+	  (name, (variable_context || this_shell_builtin)));
 }
 
 /* Look up the function entry whose name matches STRING.
@@ -797,6 +895,20 @@ make_local_variable (name)
     }
 
   new_var->context = variable_context;
+
+  /* XXX */
+  if (local_variable_stack_size <= variable_context)
+    {
+      int old_size = local_variable_stack_size;
+      while (local_variable_stack_size <= variable_context)
+        local_variable_stack_size += 8;
+      have_local_variables =
+        xrealloc (have_local_variables, local_variable_stack_size);
+      bzero (have_local_variables + old_size,
+	     local_variable_stack_size - old_size);
+    }
+  have_local_variables[variable_context] = 1;		/* XXX */
+
   return (new_var);
 }
 
@@ -847,6 +959,9 @@ bind_variable (name, value)
 	  return (entry);
 	}
 
+      /* Variables which are bound are visible. */
+      entry->attributes &= ~att_invisible;
+
       /* If this variable has had its type set to integer (via `declare -i'),
 	 then do expression evaluation on it and store the result.  The
 	 functions in expr.c (evalexp and bind_int_variable) are responsible
@@ -854,8 +969,7 @@ bind_variable (name, value)
 	 evaluation done. */
       if (integer_p (entry))
 	{
-	  long val, evalexp();
-	  extern char *itos();
+	  long val, evalexp ();
 
 	  val = evalexp (value);
 	  /* We cannot free () entry->value before this; what if the string
@@ -889,6 +1003,7 @@ bind_variable (name, value)
 }
 
 /* Dispose of the information attached to VAR. */
+void
 dispose_variable (var)
      SHELL_VAR *var;
 {
@@ -938,6 +1053,7 @@ makunbound (name, hash_list)
 {
   BUCKET_CONTENTS *elt;
   SHELL_VAR *old_var, *new_var;
+  char *t;
 
   elt = remove_hash_item (name, hash_list);
 
@@ -962,11 +1078,17 @@ makunbound (name, hash_list)
 	set_var_auto_export (new_var->name);
     }
 
+  /* Have to save a copy of name here, because it might refer to
+     old_var->name.  If so, stupidly_hack_special_variables will
+     reference freed memory. */
+  t = savestring (name);
+
   free (elt->key);
   free (elt);
 
   dispose_variable (old_var);
-  stupidly_hack_special_variables (name);
+  stupidly_hack_special_variables (t);
+  free (t);
   return (0);
 }
 
@@ -993,11 +1115,16 @@ variable_in_context (var)
   return (var && var->context == variable_context);
 }
 
+void
 kill_all_local_variables ()
 {
   register int i, pass;
   register SHELL_VAR *var, **list;
   HASH_TABLE *varlist;
+
+  /* XXX */
+  if (!have_local_variables || have_local_variables[variable_context] == 0)
+    return;
 
   for (pass = 0; pass < 2; pass++)
     {
@@ -1013,6 +1140,8 @@ kill_all_local_variables ()
 	  free (list);
 	}
     }
+
+  have_local_variables[variable_context] = 0;		/* XXX */
 }
 
 /* Delete the entire contents of the hash table. */
@@ -1224,7 +1353,7 @@ assignment (string)
   return (0);
 }
 
-int
+static int
 visible_var (var)
      SHELL_VAR *var;
 {
@@ -1258,7 +1387,7 @@ all_visible_functions ()
 }
 
 /* Return non-zero if the variable VAR is visible and exported. */
-int
+static int
 visible_and_exported (var)
      SHELL_VAR *var;
 {
@@ -1286,26 +1415,16 @@ make_var_array (hashed_vars)
 
   for (i = 0, list_index = 0; var = vars[i]; i++)
     {
-      char *value, *named_function_string ();
+      char *value;
 
       if (function_p (var))
-	{
-	  value =
-	    named_function_string ((char *)NULL,
-				   (COMMAND *)function_cell (var), 0);
-	}
+	value = named_function_string
+	  ((char *)NULL, (COMMAND *)function_cell (var), 0);
       else
 	value = value_cell (var);
 
       if (value)
 	{
-#if 0
-	  list[list_index] =
-	    (char *)xmalloc (2 + strlen (var->name) + strlen (value));
-
-	  sprintf (list[list_index], "%s=%s", var->name, value);
-#else
-	  /* Let's see if this makes any kind of performance difference. */
 	  int name_len = strlen (var->name);
 	  int value_len = strlen (value);
 	  char	*p;
@@ -1314,7 +1433,6 @@ make_var_array (hashed_vars)
 	  strcpy (p, var->name);
 	  p[name_len] = '=';
 	  strcpy (&p[name_len + 1], value);
-#endif
 	  list_index++;
 	}
     }
@@ -1337,8 +1455,7 @@ assign_in_env (string)
 
   if (name[offset] == '=')
     {
-      char *tilde_expand (), *string_list ();
-      WORD_LIST *list, *expand_string_unsplit ();
+      WORD_LIST *list;
 
       name[offset] = 0;
       temp = name + offset + 1;
@@ -1353,7 +1470,8 @@ assign_in_env (string)
       free (temp);
     }
 
-  if (!value) value = savestring ("");
+  if (!value)
+    value = savestring ("");
 
   temp = (char *)xmalloc (2 + strlen (name) + strlen (value));
   sprintf (temp, "%s=%s", name, value);
@@ -1377,36 +1495,39 @@ assign_in_env (string)
     {
       /* The K*rn shell prints the `+ ' in front of assignment statements,
 	 so we do too. */
-      extern char *indirection_level_string ();
       fprintf (stderr, "%s%s\n", indirection_level_string (), temp);
       fflush (stderr);
     }
+
+  return 1;
 }
 
-/* Find a variable in the temporary environment that is named NAME.
-   Return a consed variable, or NULL if not found. */
-SHELL_VAR *
-find_tempenv_variable (name)
+/* Search for NAME in ARRAY, an array of strings in the same format as the
+   environment array (i.e, name=value).  If NAME is present, make a new
+   variable and return it.  Otherwise, return NULL. */
+static SHELL_VAR *
+find_name_in_env_array (name, array)
      char *name;
+     char **array;
 {
   register int i, l = strlen (name);
 
-  if (!temporary_env)
+  if (!array)
     return ((SHELL_VAR *)NULL);
 
-  for (i = 0; temporary_env[i]; i++)
+  for (i = 0; array[i]; i++)
     {
-      if (strncmp (temporary_env[i], name, l) == 0 &&
-	  temporary_env[i][l] == '=')
+      if (STREQN (array[i], name, l) && array[i][l] == '=')
 	{
 	  SHELL_VAR *temp;
 
 	  temp = new_shell_variable (name);
 
-	  if (temporary_env[i][l + 1])
-	    temp->value = savestring (&temporary_env[i][l + 1]);
+	  if (array[i][l + 1])
+	    temp->value = savestring (&array[i][l + 1]);
 	  else
-	    temp->value = savestring ("");
+	    temp->value = (char *) NULL;
+
 	  temp->attributes = att_exported;
 	  temp->context = 0;
 	  temp->prev_context = (SHELL_VAR *)NULL;
@@ -1420,16 +1541,69 @@ find_tempenv_variable (name)
   return ((SHELL_VAR *)NULL);
 }
 
-/* Free the storage used in the variable array for temporary
-   environment variables. */
-dispose_used_env_vars ()
+/* Find a variable in the temporary environment that is named NAME.
+   The temporary environment can be either the environment provided
+   to a simple command, or the environment provided to a shell function.
+   We only search the function environment if we are currently executing
+   a shell function body (variable_context > 0).  Return a consed variable,
+   or NULL if not found. */
+SHELL_VAR *
+find_tempenv_variable (name)
+     char *name;
 {
-  if (!temporary_env)
+  SHELL_VAR *var = (SHELL_VAR *)NULL;
+
+  if (temporary_env)
+    var = find_name_in_env_array (name, temporary_env);
+
+  /* We don't check this_shell_builtin because the command that needs the
+     value from builtin_env may be a disk command run inside a script run
+     with `.' and a temporary env. */
+  if (!var && builtin_env)
+    var = find_name_in_env_array (name, builtin_env);
+
+  if (!var && variable_context && function_env)
+    var = find_name_in_env_array (name, function_env);
+
+  return (var);
+}
+
+/* Free the storage allocated to the string array pointed to by ARRAYP, and
+   make that variable have a null pointer as a value. */
+static void
+dispose_temporary_vars (arrayp)
+     char ***arrayp;
+{
+  if (!*arrayp)
     return;
 
-  free_array (temporary_env);
-  temporary_env = (char **)NULL;
+  free_array (*arrayp);
+  *arrayp = (char **)NULL;
   array_needs_making = 1;
+}
+
+/* Free the storage used in the variable array for temporary
+   environment variables. */
+void
+dispose_used_env_vars ()
+{
+  dispose_temporary_vars (&temporary_env);
+}
+
+/* Free the storage used for temporary environment variables given to
+   commands when executing inside of a function body. */
+void
+dispose_function_env ()
+{
+  dispose_temporary_vars (&function_env);
+}
+
+/* Free the storage used for temporary environment variables given to
+   commands when executing a builtin command such as "source". */
+void
+dispose_builtin_env ()
+{
+  dispose_temporary_vars (&builtin_env);
 }
 
 /* Stupid comparison routine for qsort () ing strings. */
@@ -1437,7 +1611,12 @@ int
 qsort_string_compare (s1, s2)
      register char **s1, **s2;
 {
-  return (strcmp (*s1, *s2));
+  int result;
+
+  if ((result = **s1 - **s2) == 0)
+    result = strcmp (*s1, *s2);
+
+  return (result);
 }
 
 /* Sort ARRAY, a null terminated array of pointers to strings. */
@@ -1467,7 +1646,7 @@ add_or_supercede (assign, array)
   if (assign[equal_offset + 1] == '(')
     equal_offset++;
 
-  for (i = 0; array[i]; i++)
+  for (i = 0; array && array[i]; i++)
     {
       if (STREQN (assign, array[i], equal_offset + 1))
 	{
@@ -1521,14 +1700,18 @@ maybe_make_export_env ()
 	export_env = add_or_supercede (temp_array[i], export_env);
       free_array (temp_array);
 
-      if (temporary_env)
-	{
-	  for (i = 0; temporary_env[i]; i++)
-	    export_env = add_or_supercede (temporary_env[i], export_env);
+      if (function_env)
+	for (i = 0; function_env[i]; i++)
+	  export_env = add_or_supercede (function_env[i], export_env);
 
-	  /* Sort the array alphabetically. */
-	  sort_char_array (export_env);
-	}
+      if (temporary_env)
+	for (i = 0; temporary_env[i]; i++)
+	  export_env = add_or_supercede (temporary_env[i], export_env);
+
+      /* If we changed the array, then sort it alphabetically. */
+      if (temporary_env || function_env)
+	sort_char_array (export_env);
+
       array_needs_making = 0;
     }
 }
@@ -1551,7 +1734,6 @@ put_command_name_into_env (command_name)
 
 /* We supply our own version of getenv () because we want library
    routines to get the changed values of exported variables. */
-char *last_tempenv_value = (char *)NULL;
 
 /* The NeXT C library has getenv () defined and used in the same file.
    This screws our scheme.  However, Bash will run on the NeXT using
@@ -1563,10 +1745,16 @@ char *last_tempenv_value = (char *)NULL;
 #  define _CONST_HACK
 #endif /* !__STDC__ */
 
-#if !defined (NeXT)
+#if !defined (NeXT) && !defined (HPOSF1)
+static char *last_tempenv_value = (char *)NULL;
+
 char *
 getenv (name)
+#if defined (Linux)
+     _CONST_HACK char *name;
+#else
      char _CONST_HACK *name;
+#endif /* !Linux */
 {
   SHELL_VAR *var = find_tempenv_variable (name);
 
@@ -1605,4 +1793,4 @@ getenv (name)
 
   return ((char *)NULL);
 }
-#endif /* NeXT */
+#endif /* !NeXT && !HPOSF1 */

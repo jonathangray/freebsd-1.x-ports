@@ -20,14 +20,24 @@ extern BUCKET_CONTENTS
   *find_hash_item (), *remove_hash_item (), *add_hash_item (),
   *get_hash_bucket ();
 
+/* Redefine the function as a macro for speed. */
+#define get_hash_bucket(bucket, table) \
+	((bucket < table->nbuckets) ?  \
+	table->bucket_array[bucket] : \
+	(BUCKET_CONTENTS *)NULL)
+
 extern int hash_string ();
 extern HASH_TABLE *make_hash_table ();
 
 /* Default number of buckets in the hash table. */
 #define DEFAULT_HASH_BUCKETS 107
 
-#ifndef NULL
-#define NULL 0x0
-#endif
+#if !defined (NULL)
+#  if defined (__STDC__)
+#    define NULL ((void *) 0)
+#  else
+#    define NULL 0x0
+#  endif /* !__STDC__ */
+#endif /* !NULL */
 
 #endif /* _HASH_H */

@@ -45,6 +45,7 @@ dispose_command (command)
     case cm_group:
       {
 	dispose_command (command->value.Group->command);
+	free (command->value.Group);
 	break;
       }
 
@@ -52,14 +53,18 @@ dispose_command (command)
       {
 	register CASE_COM *c = command->value.Case;
 	PATTERN_LIST *t, *p = c->clauses;
+
 	dispose_word (c->word);
-	while (p) {
-	  dispose_words (p->patterns);
-	  dispose_command (p->action);
-	  t = p;
-	  p = p->next;
-	  free (t);
-	}
+
+	while (p)
+	  {
+	    dispose_words (p->patterns);
+	    dispose_command (p->action);
+	    t = p;
+	    p = p->next;
+	    free (t);
+	  }
+	free (c);
 	break;
       }
 
@@ -67,6 +72,7 @@ dispose_command (command)
     case cm_while:
       {
 	register WHILE_COM *c = command->value.While;
+
 	dispose_command (c->test);
 	dispose_command (c->action);
 	free (c);
@@ -118,6 +124,7 @@ dispose_command (command)
 }
 
 /* How to free a WORD_DESC. */
+void
 dispose_word (word)
      WORD_DESC *word;
 {
@@ -126,6 +133,7 @@ dispose_word (word)
 }
 
 /* How to get rid of a linked list of words.  A WORD_LIST. */
+void
 dispose_words (list)
      WORD_LIST *list;
 {
@@ -140,6 +148,7 @@ dispose_words (list)
 }
 
 /* How to dispose of an array of pointers to char. */
+void
 dispose_word_array (array)
      char **array;
 {
@@ -152,6 +161,7 @@ dispose_word_array (array)
 }
 
 /* How to dispose of an list of redirections.  A REDIRECT. */
+void
 dispose_redirects (list)
      REDIRECT *list;
 {

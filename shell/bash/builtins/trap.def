@@ -40,6 +40,7 @@ $END
 #include <signal.h>
 #include "../shell.h"
 #include "../trap.h"
+#include "common.h"
 
 /* The trap command:
 
@@ -58,6 +59,8 @@ $END
 #define SET 0			/* Set this signal to first_arg. */
 #define REVERT 1		/* Revert to this signals original value. */
 #define IGNORE 2		/* Ignore this signal. */
+
+extern char *single_quote ();
 
 trap_builtin (list)
      WORD_LIST *list;
@@ -90,9 +93,18 @@ trap_builtin (list)
     {
       for (i = 0; i < NSIG; i++)
 	if (trap_list[i] != (char *)DEFAULT_SIG)
-	  printf ("trap -- '%s' %s\n",
-		  (trap_list[i] == (char *)IGNORE_SIG) ? "" : trap_list[i],
-		  signal_name (i));
+	  {
+	    char *t;
+	    if (trap_list[i] == (char *)IGNORE_SIG)
+	      t = (char *)NULL;
+	    else
+	      t = single_quote (trap_list[i]);
+
+	    printf ("trap -- %s %s\n", t ? t : "''", signal_name (i));
+
+	    if (t)
+	      free (t);
+	  }
       return (EXECUTION_SUCCESS);
     }
 
@@ -134,6 +146,8 @@ trap_builtin (list)
 
       while (list)
 	{
+	  extern sighandler sigint_sighandler ();
+	  extern sighandler termination_unwind_protect ();
 	  extern int interactive;
 	  int sig;
 
@@ -156,22 +170,30 @@ trap_builtin (list)
 		  case REVERT:
 		    restore_default_signal (sig);
 
-		    /* Always ignore SIGQUIT. */
-		    if (sig == SIGQUIT)
-		      signal (SIGQUIT, SIG_IGN);
-
-		    /* Ignore some other signals if we are interactive. */
-		    if (interactive)
+		    /* Signals that the shell treats specially need special
+		       handling. */
+		    switch (sig)
 		      {
-			if (sig  == SIGTERM)
-			  signal (SIGTERM, SIG_IGN);
+		      case SIGINT:
+			if (interactive)
+			  signal (SIGINT, sigint_sighandler);
+			else
+			  signal (SIGINT, termination_unwind_protect);
+			break;
 
+		      case SIGQUIT:
+			/* Always ignore SIGQUIT. */
+			signal (SIGQUIT, SIG_IGN);
+			break;
+		      case SIGTERM:
 #if defined (JOB_CONTROL)
-			if (sig == SIGTTIN ||
-			    sig == SIGTTOU ||
-			    sig == SIGTSTP)
-			  signal (sig, SIG_IGN);
+		      case SIGTTIN:
+		      case SIGTTOU:
+		      case SIGTSTP:
 #endif /* JOB_CONTROL */
+			if (interactive)
+			  signal (sig, SIG_IGN);
+			break;
 		      }
 		    break;
 

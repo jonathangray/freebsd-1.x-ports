@@ -1,7 +1,7 @@
 This file is jobs.def, from which is created jobs.c.
 It implements the builtin "jobs" in Bash.
 
-Copyright (C) 1987, 1989, 1991 Free Software Foundation, Inc.
+Copyright (C) 1987, 1989, 1991, 1992 Free Software Foundation, Inc.
 
 This file is part of GNU Bash, the Bourne Again SHell.
 
@@ -41,7 +41,9 @@ $END
 #include <signal.h>
 #include "../jobs.h"
 
-extern int job_control;
+#include "bashgetopt.h"
+
+extern int job_control, interactive_shell;
 static int execute_list_with_replacements ();
 
 /* The `jobs' command.  Prints outs a list of active jobs.  If the
@@ -55,43 +57,45 @@ int
 jobs_builtin (list)
      WORD_LIST *list;
 {
-  int form = JLIST_STANDARD;
+  int form = JLIST_STANDARD, execute = 0;
+  int opt;
+  int any_failed = 0;
 
-  if (!job_control)
+  if (!job_control && !interactive_shell)
     return (EXECUTION_SUCCESS);
 
-  while (list && (*list->word->word == '-'))
+  reset_internal_getopt ();
+  while ((opt = internal_getopt (list, "lpnx")) != -1)
     {
-      register char *arg = list->word->word;
-
-      if (strcmp (arg, "-l") == 0)
-	form = JLIST_LONG;
-      else if (strcmp (arg, "-p") == 0)
-	form = JLIST_PID_ONLY;
-      else if (strcmp (arg, "-n") == 0)
-	form = JLIST_CHANGED_ONLY;
-      else if (strcmp (arg, "-x") == 0)
+      switch (opt)
 	{
+	case 'l':
+	  form = JLIST_LONG;
+	  break;
+	case 'p':
+	  form = JLIST_PID_ONLY;
+	  break;
+	case 'n':
+	  form = JLIST_CHANGED_ONLY;
+	  break;
+	case 'x':
 	  if (form != JLIST_STANDARD)
 	    {
 	      builtin_error ("Other options not allowed with `-x'");
 	      return (EXECUTION_FAILURE);
 	    }
-	  list = list->next;
-	  return (execute_list_with_replacements (list));
-	}
-      else if (strcmp (arg, "--") == 0)
-	{
-	  list = list->next;
+	  execute++;
 	  break;
-	}
-      else
-	{
-	  bad_option (list->word->word);
+
+	default:
 	  return (EXECUTION_FAILURE);
 	}
-      list = list->next;
     }
+
+  list = loptend;
+
+  if (execute)
+    return (execute_list_with_replacements (list));
 
   if (!list)
     {
@@ -108,14 +112,17 @@ jobs_builtin (list)
       job = get_job_spec (list);
 
       if ((job == NO_JOB) || !jobs || !jobs[job])
-	builtin_error ("No such job %s", list->word->word);
+	{
+	  builtin_error ("No such job %s", list->word->word);
+	  any_failed++;
+	}
       else if (job != DUP_JOB)
 	list_one_job ((JOB *)NULL, form, 0, job);
 
       UNBLOCK_CHILD (oset);
       list = list->next;
     }
-    return (EXECUTION_SUCCESS);
+  return (any_failed ? EXECUTION_FAILURE : EXECUTION_SUCCESS);
 }
 
 static int
@@ -130,8 +137,6 @@ execute_list_with_replacements (list)
     {
       if (l->word->word[0] == '%')	/* we have a winner */
 	{
-	  extern char *itos ();
-
 	  job = get_job_spec (l);
 
 	  /* A bad job spec is not really a job spec! Pass it through. */
@@ -146,9 +151,6 @@ execute_list_with_replacements (list)
   /* Next make a new simple command and execute it. */
   begin_unwind_frame ("jobs_builtin");
   {
-    extern COMMAND *make_bare_simple_command ();
-    extern WORD_LIST *copy_word_list ();
-    extern void dispose_command ();
     COMMAND *command = (COMMAND *)NULL;
 
     add_unwind_protect (dispose_command, command);
@@ -166,4 +168,3 @@ execute_list_with_replacements (list)
   return (result);
 }
 #endif /* JOB_CONTROL */
-

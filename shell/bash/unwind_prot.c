@@ -24,10 +24,12 @@ Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 /*		      Unwind Protection Scheme for Bash		    */
 /*								    */
 /* **************************************************************** */
+#include <sys/types.h>
 #include <signal.h>
 #include "config.h"
 #include "general.h"
 #include "unwind_prot.h"
+#include "quit.h"
 
 /* If CLEANUP is null, then ARG contains a tag to throw back to. */
 typedef struct _uwp {
@@ -39,45 +41,28 @@ typedef struct _uwp {
 static void
   unwind_frame_discard_internal (), unwind_frame_run_internal (),
   add_unwind_protect_internal (), remove_unwind_protect_internal (),
-  run_unwind_protects_internal ();
+  run_unwind_protects_internal (), without_interrupts ();
 
 static UNWIND_ELT *unwind_protect_list = (UNWIND_ELT *)NULL;
 
-/* Run a function without interrupts. */
-void
+extern int interrupt_immediately;
+
+/* Run a function without interrupts.  This relies on the fact that the
+   FUNCTION cannot change the value of interrupt_immediately.  (I.e., does
+   not call QUIT (). */
+static void
 without_interrupts (function, arg1, arg2)
      VFunction *function;
      char *arg1, *arg2;
 {
-#if defined (_POSIX_VERSION)
-  sigset_t set, oset;
+  int old_interrupt_immediately;
 
-  sigemptyset (&set);
-  sigemptyset (&oset);
-
-  sigaddset (&set, SIGINT);
-  sigprocmask (SIG_BLOCK, &set, &oset);
-#else
-#  if defined (USG)
-  SigHandler *old_int;
-
-  old_int = (SigHandler *)signal (SIGINT, SIG_IGN);
-#  else
-  int oldmask = sigblock (SIGINT);
-#  endif
-#endif
+  old_interrupt_immediately = interrupt_immediately;
+  interrupt_immediately = 0;
 
   (*function)(arg1, arg2);
 
-#if defined (_POSIX_VERSION)
-  sigprocmask (SIG_SETMASK, &oset, (sigset_t *)NULL);
-#else
-#  if defined (USG)
-  signal (SIGINT, old_int);
-#  else
-  sigsetmask (oldmask);
-#  endif
-#endif
+  interrupt_immediately = old_interrupt_immediately;
 }
 
 /* Start the beginning of a region. */
@@ -93,7 +78,8 @@ void
 discard_unwind_frame (tag)
      char *tag;
 {
-  without_interrupts (unwind_frame_discard_internal, tag, (char *)NULL);
+  if (unwind_protect_list)
+    without_interrupts (unwind_frame_discard_internal, tag, (char *)NULL);
 }
 
 /* Run the unwind protects back to TAG. */
@@ -101,7 +87,8 @@ void
 run_unwind_frame (tag)
      char *tag;
 {
-  without_interrupts (unwind_frame_run_internal, tag, (char *)NULL);
+  if (unwind_protect_list)
+    without_interrupts (unwind_frame_run_internal, tag, (char *)NULL);
 }
 
 /* Add the function CLEANUP with ARG to the list of unwindable things. */
@@ -117,16 +104,18 @@ add_unwind_protect (cleanup, arg)
 void
 remove_unwind_protect ()
 {
-  without_interrupts
-    (remove_unwind_protect_internal, (char *)NULL, (char *)NULL);
+  if (unwind_protect_list)
+    without_interrupts
+      (remove_unwind_protect_internal, (char *)NULL, (char *)NULL);
 }
 
 /* Run the list of cleanup functions in unwind_protect_list. */
 void
 run_unwind_protects ()
 {
-  without_interrupts
-    (run_unwind_protects_internal, (char *)NULL, (char *)NULL);
+  if (unwind_protect_list)
+    without_interrupts
+      (run_unwind_protects_internal, (char *)NULL, (char *)NULL);
 }
 
 /* **************************************************************** */
@@ -214,7 +203,7 @@ unwind_frame_run_internal (tag)
       /* If tag, then compare. */
       if (!elt->cleanup)
 	{
-	  if (strcmp (elt->arg, tag) == 0)
+	  if (STREQ (elt->arg, tag))
 	    {
 	      free (elt);
 	      break;
@@ -238,29 +227,20 @@ typedef struct {
 } SAVED_VAR;
 
 /* Restore the value of a variable, based on the contents of SV.  If
-   sv->size is greater than sizeof (char *), sv->desired_setting points to
+   sv->size is greater than sizeof (int), sv->desired_setting points to
    a block of memory SIZE bytes long holding the value, rather than the
    value itself.  This block of memory is copied back into the variable. */
 static void
 restore_variable (sv)
      SAVED_VAR *sv;
 {
-
-  /* I wrote this switch statement not realizing how silly some compilers
-     can be.  Since we expect both cases to be the same size, it really
-     makes no difference (today), but it irks me that I cannot express the
-     thought clearly. */
-  switch (sv->size)
+  if (sv->size > sizeof (int))
     {
-    /* case sizeof (char *): */
-    case sizeof (int):
-      *(sv->variable) = (int)sv->desired_setting;
-      break;
-
-    default:
-      bcopy (sv->desired_setting, (char *)sv->variable, sv->size);
+      bcopy ((char *)sv->desired_setting, (char *)sv->variable, sv->size);
       free (sv->desired_setting);
     }
+  else
+    *(sv->variable) = (int)sv->desired_setting;
 
   free (sv);
 }
@@ -268,7 +248,7 @@ restore_variable (sv)
 /* Save the value of a variable so it will be restored when unwind-protects
    are run.  VAR is a pointer to the variable.  VALUE is the value to be
    saved.  SIZE is the size in bytes of VALUE.  If SIZE is bigger than what
-   can be saved in a char *, memory will be allocated and the value saved
+   can be saved in an int, memory will be allocated and the value saved
    into that using bcopy (). */
 void
 unwind_protect_var (var, value, size)
@@ -279,10 +259,10 @@ unwind_protect_var (var, value, size)
   SAVED_VAR *s = (SAVED_VAR *)xmalloc (sizeof (SAVED_VAR));
 
   s->variable = var;
-  if (size > sizeof (char *))
+  if (size > sizeof (int))
     {
       s->desired_setting = (char *)xmalloc (size);
-      bcopy (value, s->desired_setting, size);
+      bcopy (value, (char *)s->desired_setting, size);
     }
   else
     s->desired_setting = value;

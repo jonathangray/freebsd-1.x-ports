@@ -29,26 +29,32 @@ extern int interactive;
 
 $BUILTIN set
 $FUNCTION set_builtin
-$SHORT_DOC set [-abefhknotuvxldH] [arg ...]
-    -a  Mark variables which are modified or created for export
-    -b  Notify of job termination immediately
-    -e  Exit immediately if a command exits with a non-zero status
-    -f  Disable file name generation (globbing)
+$SHORT_DOC set [--abefhknotuvxldH] [arg ...]
+    -a  Mark variables which are modified or created for export.
+    -b  Notify of job termination immediately.
+    -e  Exit immediately if a command exits with a non-zero status.
+    -f  Disable file name generation (globbing).
     -h  Locate and remember function commands as functions are
         defined.  Function commands are normally looked up when
-        the function is executed
+        the function is executed.
+    -i  Force the shell to be an "interactive" one.  Interactive shells
+        always read `~/.bashrc' on startup.
     -k  All keyword arguments are placed in the environment for a
-        command, not just those that precede the command name
-    -m  Job control is enabled
-    -n  Read commands but do not execute them
+        command, not just those that precede the command name.
+    -m  Job control is enabled.
+    -n  Read commands but do not execute them.
     -o option-name
         Set the variable corresponding to option-name:
             allexport    same as -a
             braceexpand  the shell will perform brace expansion
+#if defined (READLINE)
             emacs        use an emacs-style line editing interface
+#endif /* READLINE */
             errexit      same as -e
             histexpand   same as -H
             ignoreeof    the shell will not exit upon reading EOF
+            interactive-comments
+                         allow comments to appear in interactive commands
             monitor      same as -m
             noclobber    disallow redirection to existing files
             noexec       same as -n
@@ -56,26 +62,35 @@ $SHORT_DOC set [-abefhknotuvxldH] [arg ...]
             nohash       same as -d
             notify       save as -b
             nounset      same as -u
+	    privileged   same as -p
             verbose      same as -v
+#if defined (READLINE)
             vi           use a vi-style line editing interface
+#endif /* READLINE */
             xtrace       same as -x
-    -t  Exit after reading and executing one command
-    -u  Treat unset variables as an error when substituting
-    -v  Print shell input lines as they are read
-    -x  Print commands and their arguments as they are executed
+    -p  Turned on whenever the real and effective user ids do not match.
+        Disables processing of the $ENV file and importing of shell
+        functions.  Turning this option off causes the effective uid and
+	gid to be set to the real uid and gid.
+    -t  Exit after reading and executing one command.
+    -u  Treat unset variables as an error when substituting.
+    -v  Print shell input lines as they are read.
+    -x  Print commands and their arguments as they are executed.
     -l  Save and restore the binding of the NAME in a FOR command.
     -d  Disable the hashing of commands that are looked up for execution.
         Normally, commands are remembered in a hash table, and once
-        found, do not have to be looked up again
+        found, do not have to be looked up again.
+#if defined (BANG_HISTORY)
     -H  Enable ! style history substitution.  This flag is on
         by default.
+#endif /* BANG_HISTORY */
     -C  If set, disallow existing regular files to be overwritten
         by redirection of output.
 
 Using + rather than - causes these flags to be turned off.  The
 flags can also be used upon invocation of the shell.  The current
-set of flags may be found in $-.  The remaining ARGs are positional
-parameters and are assigned, in order, to $1, $2, .. $9.  If no
+set of flags may be found in $-.  The remaining n ARGs are positional
+parameters and are assigned, in order, to $1, $2, .. $n.  If no
 ARGs are given, all shell variables are printed.
 $END
 
@@ -96,6 +111,7 @@ struct {
   { "notify",	  'b' },
 #endif /* JOB_CONTROL */
   {"nounset",	  'u' },
+  {"privileged",  'p' },
   {"verbose",	  'v' },
   {"xtrace",	  'x' },
   {(char *)NULL, 0},
@@ -107,7 +123,6 @@ list_long_opts ()
   register int	i;
   char *on = "on", *off = "off";
   extern int noclobber, no_brace_expansion;
-  extern SHELL_VAR *find_variable ();
 
 #if defined (READLINE)
   extern int rl_editing_mode, no_line_editing;
@@ -120,6 +135,9 @@ list_long_opts ()
     printf ("%-15s\t%s\n", "ignoreeof", on);
   else
     printf ("%-15s\t%s\n", "ignoreeof", off);
+
+  printf ("%-15s\t%s\n", "interactive-comments",
+	  interactive_comments ? on : off);
 
 #if defined (READLINE)
   if (no_line_editing)
@@ -179,7 +197,7 @@ set_minus_o_option (on_or_off, option_name)
 	bind_variable ("IGNOREEOF", "10");
       stupidly_hack_special_variables ("IGNOREEOF");
     }
-
+  
 #if defined (READLINE)
   else if ((strcmp (option_name, "emacs") == 0) ||
 	   (strcmp (option_name, "vi") == 0))
@@ -211,6 +229,8 @@ set_minus_o_option (on_or_off, option_name)
 	}
     }
 #endif /* READLINE */
+  else if (strcmp (option_name, "interactive-comments") == 0)
+    interactive_comments = (on_or_off == FLAG_ON);
   else
     {
       register int i;
@@ -458,10 +478,25 @@ unset_builtin (list)
 	}
       else
 	{
+	  SHELL_VAR *var;
+	  int tem;
+
+	  var = unset_function ? find_function (name) : find_variable (name);
+
+	  /* Posix.2 says that unsetting readonly variables is an error. */
+	  if (var && readonly_p (var))
+	    {
+	      builtin_error ("%s: cannot unset: readonly %s",
+			     name, unset_function ? "function" : "variable");
+	      any_failed++;
+	      list = list->next;
+	      continue;
+	    }
+
 	  /* Unless the -f option is supplied, the name refers to a
 	     variable. */
-	  int tem = makunbound (name,
-		  unset_function ? shell_functions : shell_variables);
+	  tem = makunbound
+	    (name, unset_function ? shell_functions : shell_variables);
 
 	  /* This is what Posix.2 draft 11+ says.  ``If neither -f nor -v
 	     is specified, the name refers to a variable; if a variable by

@@ -1,5 +1,8 @@
 /* variables.h -- data structures for shell variables. */
 
+#if !defined (_VARIABLES_H_)
+#define _VARIABLES_H_
+
 /* Shell variables and functions are stored in hash tables. */
 #include "hash.h"
 
@@ -30,6 +33,7 @@ typedef struct variable {
 #define att_nounset   0x10	/* %00010000 (cannot unset)	     */
 #define att_function  0x20	/* %00100000 (value is a function)   */
 #define att_integer   0x40	/* %01000000 (internal rep. is int)  */
+#define att_imported  0x80	/* %10000000 (came from environment) */
 
 #define exported_p(var)		((((var)->attributes) & (att_exported)))
 #define readonly_p(var)		((((var)->attributes) & (att_readonly)))
@@ -37,6 +41,7 @@ typedef struct variable {
 #define array_p(var)		((((var)->attributes) & (att_array)))
 #define function_p(var)		((((var)->attributes) & (att_function)))
 #define integer_p(var)		((((var)->attributes) & (att_integer)))
+#define imported_p(var)         ((((var)->attributes) & (att_imported)))
 
 #define value_cell(var) ((var)->value)
 #define function_cell(var) (COMMAND *)((var)->value)
@@ -45,9 +50,20 @@ typedef struct variable {
 extern HASH_TABLE *shell_variables, *shell_functions;
 extern SHELL_VAR *find_function (), *find_variable (), *variable_lookup ();
 extern SHELL_VAR *copy_variable (), *bind_variable (), *bind_function ();
+extern SHELL_VAR *find_variable_internal ();
+extern SHELL_VAR *find_tempenv_variable ();
 extern char *get_string_value (), *dollar_vars[];
 extern char **export_env;
 extern SHELL_VAR **map_over ();
 extern SHELL_VAR **all_shell_variables (), **all_shell_functions ();
+extern SHELL_VAR **all_visible_variables (), **all_visible_functions ();
 extern int variable_in_context ();
+extern int qsort_string_compare ();
+extern int assign_in_env ();
+
 extern int variable_context;
+
+extern void dispose_variable ();
+extern void dispose_function_env (), dispose_builtin_env ();
+
+#endif /* !_VARIABLES_H_ */

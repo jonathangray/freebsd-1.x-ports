@@ -22,6 +22,7 @@ Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 #include <sys/types.h>
 #include "posixstat.h"
 #include <sys/param.h>
+#include "bashansi.h"
 #include "shell.h"
 
 #include "maxpath.h"
@@ -29,6 +30,11 @@ Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 #ifndef NOW
 #define NOW ((time_t)time ((time_t *)0))
 #endif
+
+extern struct user_info current_user;
+
+extern char *extract_colon_unit ();
+extern char *tilde_expand ();
 
 typedef struct {
   char *name;
@@ -51,13 +57,28 @@ time_to_check_mail ()
 {
   char *temp = get_string_value ("MAILCHECK");
   time_t now = NOW;
-  unsigned seconds = 0;
+  long seconds = -1;
 
-  if ((!temp || sscanf (temp, "%u", &seconds) == 0) ||
-      ((now - last_time_mail_checked < seconds)))
+  /* Skip leading whitespace in MAILCHECK. */
+  if (temp)
+    {
+      while (whitespace (*temp))
+	temp++;
+
+      seconds = atoi (temp);
+    }
+
+  /* Negative number, or non-numbers (such as empty string) cause no checking
+     to take place. */
+  if (seconds < 0)
     return (0);
 
-  return (1);
+  /* Time to check if MAILCHECK is explicitly set to zero, or if enough
+     time has passed since the last check. */
+  if (!seconds || ((now - last_time_mail_checked) >= seconds))
+    return (1);
+
+  return (0);
 }
 
 /* Okay, we have checked the mail.  Perhaps I should make this function
@@ -81,11 +102,11 @@ find_mail_file (file)
 }
 
 /* Add this file to the list of remembered files. */
+void
 add_mail_file (file)
      char *file;
 {
   struct stat finfo;
-  char *full_pathname ();
   char *filename = full_pathname (file);
   int index = find_mail_file (file);
 
@@ -147,47 +168,6 @@ free_mail_files ()
 
   mailfiles_count = 0;
   mailfiles = (FILEINFO **)NULL;
-}
-
-/* Return the full pathname of FILE.  Easy.  Filenames that begin
-   with a '/' are returned as themselves.  Other filenames have
-   the current working directory prepended.  A new string is
-   returned in either case. */
-char *
-full_pathname (file)
-     char *file;
-{
-  char *tilde_expand (), *disposer;
-
-  if (*file == '~')
-    file = tilde_expand (file);
-  else
-    file = savestring (file);
-
-  if (absolute_pathname (file))
-    if (*file == '/')
-      return (file);
-
-  disposer = file;
-
-  {
-    char *current_dir = (char *)xmalloc (2 + MAXPATHLEN + strlen (file));
-    if (!getwd (current_dir))
-      {
-	report_error (current_dir);
-	free (current_dir);
-	return ((char *)NULL);
-      }
-    strcat (current_dir, "/");
-
-    /* Turn /foo/./bar into /foo/bar. */
-    if (strncmp (file, "./", 2) == 0)
-      file += 2;
-
-    strcat (current_dir, file);
-    free (disposer);
-    return (current_dir);
-  }
 }
 
 /* Return non-zero if FILE's mod date has changed. */
@@ -256,7 +236,6 @@ file_has_grown (file)
 char *
 get_mailpaths ()
 {
-  extern char *current_user_name;
   char *mailpaths;
 
   mailpaths = get_string_value ("MAILPATH");
@@ -267,32 +246,60 @@ get_mailpaths ()
   if (!mailpaths)
     {
       mailpaths = (char *)
-	alloca (1 + strlen (DEFAULT_MAIL_PATH) + strlen (current_user_name));
+	alloca (1 + strlen (DEFAULT_MAIL_PATH) + strlen (current_user.user_name));
 
-      sprintf (mailpaths, "%s%s", DEFAULT_MAIL_PATH, current_user_name);
+      sprintf (mailpaths, "%s%s", DEFAULT_MAIL_PATH, current_user.user_name);
     }
 
   return (savestring (mailpaths));
 }
 
+/* Take an element from $MAILPATH and return the portion from
+   the first unquoted `?' or `%' to the end of the string.  This is the
+   message to be printed when the file contents change. */
+static char *
+parse_mailpath_spec (str)
+     char *str;
+{
+  char *s;
+  int pass_next;
+
+  for (s = str, pass_next = 0; s && *s; s++)
+    {
+      if (pass_next)
+	{
+	  pass_next = 0;
+	  continue;
+	}
+      if (*s == '\\')
+	{
+	  pass_next++;
+	  continue;
+	}
+      if (*s == '?' || *s == '%')
+        return s;
+    }
+  return ((char *)NULL);
+}
+      
 /* Remember the dates of the files specified by MAILPATH, or if there is
    no MAILPATH, by the file specified in MAIL.  If neither exists, use a
    default value, which we randomly concoct from using Unix. */
 remember_mail_dates ()
 {
   char *mailpaths = get_mailpaths ();
-  char *mailfile, *extract_colon_unit ();
-  int index = 0;
+  char *mailfile, *mp;
+  int index = 0, pass_next = 0;
   
   while (mailfile = extract_colon_unit (mailpaths, &index))
     {
-      register int i;
-      for (i = 0;
-	   mailfile[i] && mailfile[i] != '?' && mailfile[i] != '%';
-	   i++);
-      mailfile[i] = '\0';
+      mp = parse_mailpath_spec (mailfile);
+      if (mp && *mp)
+	*mp = '\0';
       add_mail_file (mailfile);
+      free (mailfile);
     }
+  free (mailpaths);
 }
 
 /* check_mail () is useful for more than just checking mail.  Since it has
@@ -310,9 +317,8 @@ remember_mail_dates ()
 check_mail ()
 {
   register int string_index;
-  char *extract_colon_unit ();
   char *current_mail_file, *you_have_mail_message;
-  char *mailpaths = get_mailpaths ();
+  char *mailpaths = get_mailpaths (), *mp;
   int index = 0;
   char *dollar_underscore;
 
@@ -339,20 +345,17 @@ check_mail ()
       use_user_notification = 0;
       you_have_mail_message = "You have mail in $_";
 
-      for (string_index = 0; current_mail_file[string_index]; string_index++)
-	if (current_mail_file[string_index] == '?'
-	    || current_mail_file[string_index] == '%')
-	  {
-	    current_mail_file[string_index] = '\0';
-	    you_have_mail_message = current_mail_file + string_index + 1;
-	    use_user_notification++;
-	    break;
-	  }
+      mp = parse_mailpath_spec (current_mail_file);
+      if (mp && *mp)
+	{
+	  *mp = '\0';
+	  you_have_mail_message = ++mp;
+	  use_user_notification++;
+	}
 
       if (file_mod_date_changed (current_mail_file))
 	{
-	  WORD_LIST *tlist, *expand_string ();
-	  char *string_list ();
+	  WORD_LIST *tlist;
 	  int i, file_is_bigger;
 	  bind_variable ("_", current_mail_file);
 

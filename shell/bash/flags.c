@@ -21,10 +21,8 @@ Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 
 /* Flags hacking. */
 
-#include "config.h"
+#include "shell.h"
 #include "flags.h"
-#include "general.h"
-#include "quit.h"
 
 /* **************************************************************** */
 /*								    */
@@ -79,7 +77,7 @@ int echo_input_at_read = 0;
    before executing. */
 int echo_command_at_execute = 0;
 
-/* Non-zero means turn off the job control features. */
+/* Non-zero means turn on the job control features. */
 int jobs_m_flag = 0;
 
 /* Non-zero means this shell is interactive, even if running under a
@@ -102,9 +100,31 @@ int no_invisible_vars = 0;
 /* Non-zero means don't look up or remember command names in a hash table, */
 int hashing_disabled = 0;
 
+#if defined (HISTORY)
 /* Non-zero means that we are doing history expansion.  The default.
    This means !22 gets the 22nd line of history. */
 int history_expansion = 1;
+#endif /* HISTORY */
+
+/* Non-zero means that we allow comments to appear in interactive commands. */
+#if defined (INTERACTIVE_COMMENTS)
+int interactive_comments = 1;
+#else
+int interactive_comments = 0;
+#endif /* INTERACTIVE_COMMENTS */
+
+#if defined (RESTRICTED_SHELL)
+/* Non-zero means that this shell is `restricted'.  A restricted shell
+   disallows: changing directories, command or path names containing `/',
+   unsetting or resetting the values of $PATH and $SHELL, and any type of
+   output redirection. */
+int restricted = 0;
+#endif /* RESTRICTED_SHELL */
+
+/* Non-zero means that this shell is running in `privileged' mode.  This
+   mode is entered on startup if the real and effective uids or gids
+   differ. */
+int privileged_mode = 0;
 
 /* **************************************************************** */
 /*								    */
@@ -124,16 +144,19 @@ struct flags_alist shell_flags[] = {
   { "h", &locate_commands_in_functions }, /* Oh, yeah, good mnemonic. */
   { "i", &forced_interactive },
   { "k", &place_keywords_in_env },
+#if defined (JOB_CONTROL)
+  { "m", &jobs_m_flag },
+#endif /* JOB_CONTROL */
   { "n", &read_but_dont_execute },
+  { "p", &privileged_mode },
+#if defined (RESTRICTED_SHELL)
+  { "r", &restricted },
+#endif /* RESTRICTED_SHELL */
   { "t", &just_one_command },
   { "u", &unbound_vars_is_error },
   { "v", &echo_input_at_read },
   { "x", &echo_command_at_execute },
   { "C", &noclobber },
-
-#if defined (JOB_CONTROL)
-  { "m", &jobs_m_flag },
-#endif
 
   /* New flags that control non-standard things. */
   { "l", &lexical_scoping },
@@ -142,8 +165,10 @@ struct flags_alist shell_flags[] = {
   /* I want `h', but locate_commands_in_functions has it.  Great. */
   { "d", &hashing_disabled },
 
+#if defined (HISTORY)
   /* Once again, we don't have the right mnemonic. */
   { "H", &history_expansion },
+#endif /* HISTORY */
 
   {(char *)NULL, (int *)NULL}
 };
@@ -154,11 +179,12 @@ find_flag (name)
      char *name;
 {
   int i = 0;
-  while (shell_flags[i].name) {
-    if (strcmp (shell_flags[i].name, name) == 0)
-      return (shell_flags[i].value);
-    i++;
-  }
+  while (shell_flags[i].name)
+    {
+      if (strcmp (shell_flags[i].name, name) == 0)
+	return (shell_flags[i].value);
+      i++;
+    }
   return ((int *)FLAG_ERROR);
 }
 
@@ -184,8 +210,16 @@ change_flag (flag, on_or_off)
   int *value = find_flag (flag);
   int old_value;
 
-  if (value == (int *)FLAG_ERROR) return (FLAG_ERROR);
-  else old_value = *value;
+#if defined (RESTRICTED_SHELL)
+  /* Don't allow "set +r" in a shell which is `restricted'. */
+  if (restricted && flag[0] == 'r' && on_or_off == FLAG_OFF)
+    return (FLAG_ERROR);
+#endif /* RESTRICTED_SHELL */
+
+  if (value == (int *)FLAG_ERROR)
+    return (FLAG_ERROR);
+  else
+    old_value = *value;
 
   if (on_or_off == FLAG_ON)
     *value = 1;
@@ -205,6 +239,18 @@ change_flag (flag, on_or_off)
       set_job_control (on_or_off == '-');
     }
 #endif /* JOB_CONTROL */
+
+  /* The -p flag needs a special case as well. */
+  if (value == &privileged_mode)
+    {
+      if (on_or_off == '+')
+	{
+	  setuid (current_user.uid);
+	  setgid (current_user.gid);
+	  current_user.euid = current_user.uid;
+	  current_user.egid = current_user.gid;
+	}
+    }
     
   return (old_value);
 }

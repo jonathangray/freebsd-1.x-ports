@@ -13,11 +13,11 @@
    various machine specific entries. */
 
 /* If this file is being processed with Gcc, then the user has Gcc. */
-#if defined (__GNUC__)
+#if defined (__GNUC__) && !defined (NeXT)
 #  if !defined (HAVE_GCC)
 #    define HAVE_GCC
 #  endif /* HAVE_GCC */
-#endif /* __GNUC__ */
+#endif /* __GNUC__ && !NeXT */
 
 /* Assume that all machines have the getwd () system call.  We unset it
    for USG systems. */
@@ -47,6 +47,13 @@
    #undef USE_GNU_MALLOC in the machine description. */
 #define USE_GNU_MALLOC
 
+/* This causes the Gnu malloc library (from glibc) to be used. */
+/* #define USE_GNU_MALLOC_LIBRARY */
+
+/* Assume that every operating system supplies strchr () and strrchr ()
+   in a standard library until proven otherwise. */
+#define HAVE_STRCHR
+
 /* **************************************************************** */
 /*								    */
 /*			Sun Microsystems Machines	      	    */
@@ -54,99 +61,68 @@
 /* **************************************************************** */
 
 #if defined (sun)
+#  if defined (USGr4) || defined (__svr4__) || defined (__SVR4)
+#    define Solaris
+#  endif /* USGr4 || __svr4__ */
 
 /* We aren't currently using GNU Malloc on Suns because of a bug in Sun's
    YP which bites us when Sun free ()'s an already free ()'ed address.
    When Sun fixes their YP, we can start using our winning malloc again. */
-#  undef USE_GNU_MALLOC
+#  if !defined (Solaris)
+/* #    undef USE_GNU_MALLOC */
+#  endif /* !Solaris */
 
 /* Most Sun systems have signal handler functions that are void. */
 #  define VOID_SIGHANDLER
 
+/* Most Sun systems have the following. */
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_VFPRINTF
+#  define HAVE_GETGROUPS
+
 #  if defined (mc68010)
 #    define sun2
+#    define M_MACHINE "sun2"
 #  endif
 #  if defined (mc68020)
 #    define sun3
+#    define M_MACHINE "sun3"
 #  endif
-#  if defined (sparc)
+#  if defined (sparc) || defined (__sparc__)
 #    define sun4
+#    define M_MACHINE "sparc"
 #  endif
 #  if defined (i386)
 #    define Sun386i
-#  endif
-#if defined (HAVE_SHARED_LIBS)
-#  define M_OS SunOS4
-#  define SunOS4_SYSDEP_CFLAGS -DBSD_GETPGRP
-#else
-#  if !defined (sparc)
-#     undef VOID_SIGHANDLER
-#  endif
-#  define M_OS SunOS3
-#endif
+#    define done386
+#    define M_MACHINE "Sun386i"
+#  endif /* i386 */
+
+/* Check for SunOS4 or greater. */
+#  if defined (HAVE_SHARED_LIBS)
+#    if defined (Solaris)
+#      define M_OS "Solaris"
+#      define SYSDEP_CFLAGS -DUSGr4 -DUSG
+#      if !defined (HAVE_GCC)
+#        define REQUIRED_LIBRARIES -ldl
+#        define SYSDEP_LDFLAGS -Bdynamic
+#      endif /* !HAVE_GCC */
+       /* The following are only available thru the BSD compatability lib. */
+#      undef HAVE_GETWD
+#      undef HAVE_SETLINEBUF
+#    else /* !Solaris */
+#      define M_OS "SunOS4"
+#      define SYSDEP_CFLAGS -DBSD_GETPGRP
+#      define HAVE_DIRENT
+#    endif /* !Solaris */
+#  else /* !HAVE_SHARED_LIBS */
+#    if !defined (sparc) && !defined (__sparc__)
+#      undef VOID_SIGHANDLER
+#    endif /* !sparc */
+#    define M_OS "SunOS3"
+#  endif /* !HAVE_SHARED_LIBS */
 #endif /* sun */
-
-/* ************************ */
-/*			    */
-/*	    Sun2	    */
-/*			    */
-/* ************************ */
-#if defined (sun2)
-#define M_MACHINE "sun2"
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_VFPRINTF
-#define HAVE_GETGROUPS
-#endif /* sun2 */
-
-/* ************************ */
-/*			    */
-/*	    Sun3	    */
-/*			    */
-/* ************************ */
-#if defined (sun3)
-#define M_MACHINE "sun3"
-#if defined (SunOS4_SYSDEP_CFLAGS)
-#  define SYSDEP_CFLAGS SunOS4_SYSDEP_CFLAGS
-#endif /* SunOS4 */
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_VFPRINTF
-#define HAVE_GETGROUPS
-#endif /* sun3 */
-
-/* ************************ */
-/*			    */
-/*	    Sparc	    */
-/*			    */
-/* ************************ */
-#if defined (sun4)
-#define M_MACHINE "sparc"
-#if defined (SunOS4_SYSDEP_CFLAGS)
-#  define SYSDEP_CFLAGS SunOS4_SYSDEP_CFLAGS
-#endif /* SunOS4 */
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_VFPRINTF
-#define HAVE_GETGROUPS
-#endif /* sparc */
-
-/* ************************ */
-/*			    */
-/*	    Sun386i	    */
-/*			    */
-/* ************************ */
-#if defined (Sun386i)
-#define done386
-#define M_MACHINE "Sun386i"
-#if defined (SunOS4_SYSDEP_CFLAGS)
-#  define SYSDEP_CFLAGS SunOS4_SYSDEP_CFLAGS
-#endif /* SunOS4 */
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_VFPRINTF
-#define HAVE_GETGROUPS
-#endif /* Sun386i */
 
 /* **************************************************************** */
 /*								    */
@@ -155,32 +131,48 @@
 /* **************************************************************** */
 
 /* ************************ */
+/*                          */
+/*     Alpha with OSF/1     */
+/*                          */
+/* ************************ */
+#if defined (__alpha) || defined (alpha)
+#  define M_MACHINE "alpha"
+#  define M_OS "OSF1"
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_VFPRINTF
+#  define HAVE_STRERROR
+#  define HAVE_GETGROUPS
+#  define VOID_SIGHANDLER
+#  define USE_TERMCAP_EMULATION
+#  if !defined (__GNUC__)
+#    define SYSDEP_CFLAGS -DNLS -D_BSD
+#  endif /* !__GNUC__ */
+#  undef HAVE_ALLOCA
+#  undef USE_GNU_MALLOC
+#endif /* __alpha || alpha */
+
+/* ************************ */
 /*			    */
 /*	    Ultrix	    */
 /*			    */
 /* ************************ */
 #if defined (ultrix)
-#if defined (MIPSEL)
-#  undef HAVE_ALLOCA_H
-#  define M_MACHINE "MIPSEL"
-#  if !defined (HAVE_GCC)
-#    define MIPS_CFLAGS -Wf,-XNl3072
-#  endif
-#else /* !MIPSEL */
-#  define M_MACHINE "vax"
-#endif /* MIPSEL */
-#if defined (MIPS_CFLAGS)
-#  define SYSDEP_CFLAGS -DBSD_GETPGRP -DTERMIOS_MISSING MIPS_CFLAGS
-#else
+#  if defined (MIPSEL)
+#    undef HAVE_ALLOCA_H
+#    define M_MACHINE "MIPSEL"
+#  else /* !MIPSEL */
+#    define M_MACHINE "vax"
+#  endif /* !MIPSEL */
 #  define SYSDEP_CFLAGS -DBSD_GETPGRP -DTERMIOS_MISSING
-#endif
-#define M_OS Ultrix
-#define VOID_SIGHANDLER
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_VFPRINTF
-#define HAVE_GETGROUPS
-#undef HAVE_DUP2
+#  define M_OS "Ultrix"
+#  define HAVE_DIRENT
+#  define VOID_SIGHANDLER
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_VFPRINTF
+#  define HAVE_GETGROUPS
+#  undef HAVE_DUP2
 #endif /* ultrix */
 
 /* ************************ */
@@ -189,11 +181,12 @@
 /*			    */
 /* ************************ */
 #if defined (vax) && !defined (ultrix)
-#define M_MACHINE "vax"
-#define M_OS Bsd
-#define HAVE_SETLINEBUF
-#define HAVE_SYS_SIGLIST
-#define HAVE_GETGROUPS
+#  define M_MACHINE "vax"
+#  define M_OS "Bsd"
+#  define HAVE_SETLINEBUF
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_GETGROUPS
+#  define USE_VFPRINTF_EMULATION
 #endif /* vax && !ultrix */
 
 /* **************************************** */
@@ -211,20 +204,54 @@
 #    define M_OS "Irix4"
 #    define MIPS_CFLAGS -Wf,-XNl3072
 #  endif /* Irix4 */
-#define M_MACHINE "sgi"
-#define HAVE_GETGROUPS
-#define VOID_SIGHANDLER
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_VFPRINTF
-#define REQUIRED_LIBRARIES -lsun
-#if defined (HAVE_GCC) || !defined (mips)
-#  undef MIPS_CFLAGS
-#  define MIPS_CFLAGS
-#endif /* HAVE_GCC || !mips */
-#define SYSDEP_CFLAGS -DUSG -DPGRP_PIPE MIPS_CFLAGS
-#undef HAVE_GETWD
+#  define M_MACHINE "sgi"
+#  define HAVE_GETGROUPS
+#  define VOID_SIGHANDLER
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_VFPRINTF
+#  define REQUIRED_LIBRARIES -lsun
+#  if defined (HAVE_GCC) || !defined (mips)
+#    undef MIPS_CFLAGS
+#    define MIPS_CFLAGS
+#  endif /* HAVE_GCC || !mips */
+#  define SYSDEP_CFLAGS -DUSG -DPGRP_PIPE MIPS_CFLAGS
+#  define HAVE_GETWD
 #endif  /* sgi */
+
+/* ************************ */
+/*			    */
+/* 	  NEC EWS 4800	    */
+/*			    */
+/* ************************ */
+#if defined (nec_ews)
+#  if defined (SYSTYPE_SYSV) || defined (USGr4)
+#    define M_MACHINE "ews4800"
+#    define M_OS USG
+#    undef HAVE_GETWD
+#    define HAVE_VFPRINTF
+#    define VOID_SIGHANDLER
+     /* Alloca requires either Gcc or cc with -lucb. */
+#    if !defined (HAVE_GCC)
+#      define EXTRA_LIB_SEARCH_PATH /usr/ucblib
+#      define REQUIRED_LIBRARIES -lc -lucb
+#    endif /* !HAVE_GCC */
+#    if defined (MIPSEB)
+#      if !defined (HAVE_GCC)
+#        define SYSDEP_CFLAGS -Wf,-XNl3072 -DUSGr4 -DUSGr3 -D_POSIX_JOB_CONTROL
+#      else
+#        define SYSDEP_CFLAGS -DUSGr4 -DUSGr3 -D_POSIX_JOB_CONTROL
+#      endif /* HAVE_GCC */
+#    else /* !MIPSEB */
+#      define SYSDEP_CFLAGS -DUSGr4
+#    endif /* MIPSEB */
+#  else /* !SYSTYPE_SYSV && !USGr4 */
+#    define M_OS Bsd
+#  endif /* !SYSTYPE_SYSV && !USGr4 */
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_GETGROUPS
+#endif /* nec_ews */
 
 /* ************************ */
 /*			    */
@@ -232,37 +259,40 @@
 /*			    */
 /* ************************ */
 #if defined (sony)
-#if defined (MIPSEB)
-#  define M_MACHINE "MIPSEB"
-#else
-#  define M_MACHINE "sony"
-#endif
-
-#if defined (SYSTYPE_SYSV) || defined (USGr4)
-#  define M_OS USG
-#  undef HAVE_GETWD
-#  define HAVE_VFPRINTF
-#  define VOID_SIGHANDLER
-   /* Alloca requires either Gcc or cc with -lucb. */
-#  if !defined (HAVE_GCC)
-#    define EXTRA_LIB_SEARCH_PATH /usr/ucblib
-#    define REQUIRED_LIBRARIES -lc -lucb
-#  endif /* !HAVE_GCC */
 #  if defined (MIPSEB)
+#    define M_MACHINE "MIPSEB"
+#  else /* !MIPSEB */
+#    define M_MACHINE "sony"
+#  endif /* !MIPSEB */
+
+#  if defined (SYSTYPE_SYSV) || defined (USGr4)
+#    define M_OS "USG"
+#    undef HAVE_GETWD
+#    define HAVE_DIRENT
+#    define HAVE_STRERROR
+#    define HAVE_VFPRINTF
+#    define VOID_SIGHANDLER
+     /* Alloca requires either Gcc or cc with -lucb. */
 #    if !defined (HAVE_GCC)
-#      define SYSDEP_CFLAGS -Wf,-XNl3072 -DUSGr4
-#    else
+#      define EXTRA_LIB_SEARCH_PATH /usr/ucblib
+#      define REQUIRED_LIBRARIES -lc -lucb
+#    endif /* !HAVE_GCC */
+#    if defined (MIPSEB)
+#      if !defined (HAVE_GCC)
+#        define SYSDEP_CFLAGS -Wf,-XNl3072 -DUSGr4
+#      else
+#        define SYSDEP_CFLAGS -DUSGr4
+#      endif /* HAVE_GCC */
+#    else /* !MIPSEB */
 #      define SYSDEP_CFLAGS -DUSGr4
-#    endif /* HAVE_GCC */
-#  else
-#    define SYSDEP_CFLAGS -DUSGr4
-#  endif /* MIPSEB */
-#else
-#  define M_OS Bsd
-#endif /* SYSTYPE_SYSV */
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_GETGROUPS
+#    endif /* !MIPSEB */
+#  else /* !SYSTYPE_SYSV && !USGr4 */
+#    define M_OS "Bsd"
+#    define SYSDEP_CFLAGS -DHAVE_UID_T
+#  endif /* !SYSTYPE_SYSV && !USGr4 */
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_GETGROUPS
 #endif /* sony */
 
 /* ******************************** */
@@ -278,37 +308,37 @@
 */
 #if defined (mips) && !defined (M_MACHINE)
 
-#if defined (MIPSEB)
-#  define M_MACHINE "MIPSEB"
-#else
-#  if defined (MIPSEL)
-#    define M_MACHINE "MIPSEL"
-#  else
-#    define M_MACHINE "mips"
-#  endif /* MIPSEL */
-#endif /* MIPSEB */
+#  if defined (MIPSEB)
+#    define M_MACHINE "MIPSEB"
+#  else /* !MIPSEB */
+#    if defined (MIPSEL)
+#      define M_MACHINE "MIPSEL"
+#    else /* !MIPSEL */
+#      define M_MACHINE "mips"
+#    endif /* !MIPSEL */
+#  endif /* !MIPSEB */
 
-#define M_OS Bsd
+#  define M_OS "Bsd"
 
-/* Special things for machines from MIPS Co. */
-#define mips_CFLAGS -DOPENDIR_NOT_ROBUST -DPGRP_PIPE
+   /* Special things for machines from MIPS Co. */
+#  define MIPS_CFLAGS -DOPENDIR_NOT_ROBUST -DPGRP_PIPE
 
-#if defined (HAVE_GCC)
-#  define SYSDEP_CFLAGS mips_CFLAGS
-#else
-#  define SYSDEP_CFLAGS -Wf,-XNl3072 -systype bsd43 mips_CFLAGS
-#endif /* !HAVE_GCC */
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_VFPRINTF
-#define HAVE_GETGROUPS
-/* This is actually present but unavailable in the BSD universe? */
-#undef HAVE_UNISTD_H
-#if !defined (HAVE_RESOURCE)
-#  define HAVE_RESOURCE
-#endif
-/* Appears not to work correctly, so why use it? */
-#undef HAVE_WAIT_H
+#  if defined (HAVE_GCC)
+#    define SYSDEP_CFLAGS MIPS_CFLAGS
+#  else /* !HAVE_GCC */
+#    define SYSDEP_CFLAGS -Wf,-XNl3072 -systype bsd43 MIPS_CFLAGS
+#  endif /* !HAVE_GCC */
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_VFPRINTF
+#  define HAVE_GETGROUPS
+   /* This is actually present but unavailable in the BSD universe? */
+#  undef HAVE_UNISTD_H
+#  if !defined (HAVE_RESOURCE)
+#    define HAVE_RESOURCE
+#  endif /* !HAVE_RESOURCE */
+   /* /usr/include/sys/wait.h appears not to work correctly, so why use it? */
+#  undef HAVE_WAIT_H
 #endif /* mips */
 
 /* ************************ */
@@ -317,15 +347,15 @@
 /*			    */
 /* ************************ */
 #if defined (pyr)
-#define M_MACHINE "Pyramid"
-#define M_OS Bsd
-#if !defined (HAVE_GCC)
-#  undef HAVE_ALLOCA
-#endif /* HAVE_GCC */
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-/* #define HAVE_VFPRINTF */
-#define HAVE_GETGROUPS
+#  define M_MACHINE "Pyramid"
+#  define M_OS "Bsd"
+#  if !defined (HAVE_GCC)
+#    undef HAVE_ALLOCA
+#  endif /* HAVE_GCC */
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+   /* #define HAVE_VFPRINTF */
+#  define HAVE_GETGROUPS
 #endif /* pyr */
 
 /* ************************ */
@@ -333,24 +363,19 @@
 /*	    IBMRT	    */
 /*			    */
 /* ************************ */
-/* Notes:  Compiling with pcc seems to work better than compiling with
-   the hc compiler.  I had problems when compiling with hc with alloca,
-   even though the -ma flag was defined.  (bfox) */
 #if defined (ibm032)
-#define M_MACHINE "IBMRT"
-#define M_OS Bsd
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-/* Some systems cannot find vfprintf at load time. */
-/* #define HAVE_VFPRINTF */
-/* Alloca requires either gcc or pcc with -ma in SYSDEP_CFLAGS. */
-#if !defined (HAVE_GCC)
-#  define SYSDEP_CFLAGS -ma -U__STDC__
-#endif
-#define HAVE_GETGROUPS
+#  define M_MACHINE "IBMRT"
+#  define M_OS "Bsd"
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define USE_VFPRINTF_EMULATION
+   /* Alloca requires either gcc or hc or pcc with -ma in SYSDEP_CFLAGS. */
+#  if !defined (HAVE_GCC)
+#    define SYSDEP_CFLAGS -ma -U__STDC__
+#  endif /* !HAVE_GCC */
+#  define HAVE_GETGROUPS
 /* #define USE_GNU_TERMCAP */
 #endif /* ibm032 */
-
 
 /* **************************************************************** */
 /*								    */
@@ -360,35 +385,13 @@
 
 #if defined (i386)
 
-/* 386BSD */
-/* Use `$(CC) -E' instead of `/lib/cpp' in Makefile. */
-#  if !defined (done386) && defined (__386BSD__)
-#    define done386
-#    define M_MACHINE "i386"
-#    define M_OS Bsd
-#    define HAVE_SETLINEBUF
-#    define HAVE_SYS_SIGLIST
-#    define HAVE_VFPRINTF
-#    define HAVE_GETGROUPS
-/*#    define SYSDEP_CFLAGS -traditional ? */
-#    define HAVE_STRERROR
-#    define HAVE_RESOURCE
-#    define VOID_SIGHANDLER
-#    define HAVE_DIRENT
-#  endif /* i386 && __386BSD__ */
-
-/* **************************************************************** */
-/*                                                                  */
-/*                       Sequent Machines                           */
-/*                                                                  */
-/* **************************************************************** */
-
 /* Sequent Symmetry running Dynix/ptx (System V.3.2) */
 #  if !defined (done386) && defined (_SEQUENT_)
 #    define done386
 #    define M_MACHINE "Symmetry"
-#    define M_OS USG
-#    define SYSDEP_CFLAGS -DUSGr3
+#    define M_OS "USG"
+#    define SYSDEP_CFLAGS -DUSGr3 -DHAVE_GETDTABLESIZE -DHAVE_SETDTABLESIZE
+#    define HAVE_DIRENT
 #    define HAVE_VFPRINTF
 #    define VOID_SIGHANDLER
 #    define HAVE_ALLOCA
@@ -401,19 +404,36 @@
 #  if !defined (done386) && defined (sequent)
 #    define done386
 #    define M_MACHINE "Symmetry"
-#    define M_OS Bsd
+#    define M_OS "Bsd"
 #    define SYSDEP_CFLAGS -DCPCC -DHAVE_SETDTABLESIZE
 #    define HAVE_SETLINEBUF
 #    define HAVE_SYS_SIGLIST
 #    define HAVE_GETGROUPS
+#    define LD_HAS_NO_DASH_L
 #    undef HAVE_DUP2
 #  endif /* Sequent 386 */
+
+/* NeXT 3.x on i386 */
+#  if !defined (done386) && defined (NeXT)
+#    define done386
+#    define M_MACHINE "NeXT"
+#    define M_OS Bsd
+#    define HAVE_VFPRINTF
+#    define HAVE_SYS_SIGLIST
+#    define HAVE_GETGROUPS
+#    define HAVE_STRERROR
+#    define VOID_SIGHANDLER
+#    undef HAVE_GETWD
+#    undef HAVE_GETCWD
+#    undef USE_GNU_MALLOC
+#    define SYSDEP_CFLAGS -DHAVE_RESOURCE -DMKFIFO_MISSING
+#  endif
 
 /* Generic 386 clone running Mach (4.3 BSD-compatible). */
 #  if !defined (done386) && defined (MACH)
 #    define done386
 #    define M_MACHINE "i386"
-#    define M_OS Bsd
+#    define M_OS "Bsd"
 #    define HAVE_SETLINEBUF
 #    define HAVE_SYS_SIGLIST
 #    define HAVE_GETGROUPS
@@ -423,7 +443,7 @@
 #  if !defined (done386) && defined (aixpc)
 #    define done386
 #    define M_MACHINE "aixpc"
-#    define M_OS AIX
+#    define M_OS "AIX"
 #    define HAVE_VFPRINTF
 #    define VOID_SIGHANDLER
 #    define SYSDEP_CFLAGS -D_BSD
@@ -439,7 +459,8 @@
 #  if !defined (done386) && defined (USGr4)
 #    define done386
 #    define M_MACHINE "i386"
-#    define M_OS USG
+#    define M_OS "USG"
+#    define HAVE_DIRENT
 #    define HAVE_SYS_SIGLIST
 #    define HAVE_VFPRINTF
 #    define VOID_SIGHANDLER
@@ -449,7 +470,11 @@
 #      define REQUIRED_LIBRARIES -lc -lucb
 #    endif /* !HAVE_GCC */
 #    define HAVE_GETGROUPS
-#    define SYSDEP_CFLAGS -DUSGr4
+#    if defined (USGr4_2)
+#      define SYSDEP_CFLAGS -DUSGr4 -DUSGr4_2
+#    else
+#      define SYSDEP_CFLAGS -DUSGr4
+#    endif /* ! USGr4_2 */
 #    undef HAVE_GETWD
 #  endif /* System V Release 4 on i386 */
 
@@ -457,15 +482,14 @@
 #  if !defined (done386) && defined (isc386)
 #    define done386
 #    define M_MACHINE "isc386"
-#    define M_OS USG
+#    define M_OS "USG"
+#    define HAVE_DIRENT
 #    define HAVE_VFPRINTF
 #    define VOID_SIGHANDLER
 #    define HAVE_GETGROUPS
 #    if !defined (HAVE_GCC)
-#      define REQUIRED_LIBRARIES -lPW -lc_s
+#      define REQUIRED_LIBRARIES -lPW /* -lc_s */
 #      define SYSDEP_LDFLAGS -Xp
-       /* ISC's wait.h requires lots of POSIX junk.  Forget it. */
-#      undef HAVE_WAIT_H
 #    endif
 #    if defined (NOTDEF)
        /* libcposix.a contains putc, getc, fileno. */
@@ -488,37 +512,114 @@
 #    endif /* __STDC__ || HAVE_GCC */
 #  endif /* isc386 */
 
-/* Xenix386 machine. */
-#if !defined (done386) && defined (Xenix386)
-#  define done386
-#  define M_MACHINE "i386"
-#  define M_OS Xenix
-#  define SYSDEP_CFLAGS -DUSGr3 -DREVERSED_SETVBUF_ARGS
-#  define HAVE_VFPRINTF
-#  define VOID_SIGHANDLER
-#  define ALLOCA_ASM x386-alloca.s
-#  define REQUIRED_LIBRARIES -lx
-#  undef HAVE_ALLOCA
-#endif /* Xenix386 */
+/* Xenix386 machine (with help from Ronald Khoo <ronald@robobar.co.uk>). */
+#  if !defined (done386) && defined (Xenix386)
+#    define done386
+#    define M_MACHINE "i386"
+#    define M_OS "Xenix"
+#    define XENIX_CFLAGS -DUSG -DUSGr3
+
+#    if defined (XENIX_22)
+#      define XENIX_EXTRA -DREVERSED_SETVBUF_ARGS
+#      define REQUIRED_LIBRARIES -lx
+#    else /* !XENIX_22 */
+#      define HAVE_DIRENT
+#      if defined (XENIX_23)
+#        define XENIX_EXTRA
+#        define REQUIRED_LIBRARIES -ldir
+#      else /* !XENIX_23 */
+#        define XENIX_EXTRA -xenix
+#        define SYSDEP_LDFLAGS -xenix
+#        define REQUIRED_LIBRARIES -ldir -l2.3
+#      endif /* !XENIX_23 */
+#    endif /* !XENIX_22 */
+
+#    define SYSDEP_CFLAGS XENIX_CFLAGS XENIX_EXTRA
+#    define HAVE_VFPRINTF
+#    define VOID_SIGHANDLER
+#    define ALLOCA_ASM x386-alloca.s
+#    define ALLOCA_OBJ x386-alloca.o
+#    undef HAVE_ALLOCA
+#    undef HAVE_GETWD
+#  endif /* Xenix386 */
 
 /* SCO UNIX 3.2 chip@count.tct.com (Chip Salzenberg) */
 #  if !defined (done386) && defined (M_UNIX)
 #    define done386
 #    define M_MACHINE "i386"
-#    define M_OS SCO
-#    define SYSDEP_CFLAGS -DUSG -DUSGr3
+#    define M_OS "SCO"
+#    define SCO_CFLAGS -DUSG -DUSGr3 -DNO_DEV_TTY_JOB_CONTROL
+#    if defined (SCOv4)
+#      define SYSDEP_CFLAGS SCO_CFLAGS
+#    else /* !SCOv4 */
+#      define SYSDEP_CFLAGS SCO_CFLAGS -DBROKEN_SIGSUSPEND
+#    endif /* !SCOv4 */
 #    define HAVE_VFPRINTF
 #    define VOID_SIGHANDLER
 #    define HAVE_GETGROUPS
 #    undef HAVE_GETWD
 #    undef HAVE_RESOURCE
+/* advice from wbader@cess.lehigh.edu */
+#    if !defined (HAVE_GCC)
+#      define REQUIRED_LIBRARIES -lPW -lc_s
+#    endif /* !HAVE_GCC */
 #  endif /* SCO Unix on 386 boxes. */
+
+/* BSDI BSD/386 running on a 386 or 486. */
+#  if !defined (done386) && defined (bsdi)
+#    define done386
+#    define M_MACHINE "i386"
+#    define M_OS "BSD386"
+#    define HAVE_SYS_SIGLIST
+#    define HAVE_SETLINEBUF
+#    define HAVE_GETGROUPS
+#    define HAVE_VFPRINTF
+#    define HAVE_STRERROR
+#    define VOID_SIGHANDLER
+#    define HAVE_DIRENT
+#  endif /* !done386 && bsdi */
+
+/* Jolitz 386BSD running on a 386 or 486. */
+#  if !defined (done386) && defined (__386BSD__)
+#    define done386
+#    define M_MACHINE "i386"
+#    define M_OS "_386BSD"
+#    define HAVE_SYS_SIGLIST
+#    define HAVE_SETLINEBUF
+#    define HAVE_GETGROUPS
+#    define HAVE_VFPRINTF
+#    define HAVE_STRERROR
+#    define VOID_SIGHANDLER
+#    define HAVE_DIRENT
+#    define HAVE_UID_T
+#  endif /* !done386 && __386BSD__ */
+
+#  if !defined (done386) && (defined (__linux__) || defined (linux))
+#    define done386
+#    define M_MACHINE "i386"
+#    define M_OS Linux
+#    define SYSDEP_CFLAGS -DUSG -DUSGr3 -DHAVE_GETDTABLESIZE -DHAVE_BCOPY
+#    define REQUIRED_LIBRARIES
+#    define HAVE_ALLOCA
+#    define HAVE_GETGROUPS
+#    define HAVE_STRERROR
+#    define VOID_SIGHANDLER
+#    define HAVE_SYS_SIGLIST
+#    define HAVE_VFPRINTF
+#    define SEARCH_LIB_NEEDS_SPACE
+#    if defined (__GNUC__)
+#      define HAVE_FIXED_INCLUDES
+#    endif /* __GNUC__ */
+#    undef USE_GNU_MALLOC
+#    undef HAVE_SETLINEBUF
+#    undef HAVE_GETWD
+#  endif  /* !done386 && __linux__ */
 
 /* Assume a generic 386 running Sys V Release 3. */
 #  if !defined (done386)
 #    define done386
 #    define M_MACHINE "i386"
-#    define M_OS USG
+#    define M_OS "USG"
 #    define SYSDEP_CFLAGS -DUSGr3
 #    define HAVE_VFPRINTF
 #    define VOID_SIGHANDLER
@@ -530,6 +631,53 @@
 #  endif /* Generic i386 Box running Sys V release 3. */
 #endif /* All i386 Machines with an `i386' define in cpp. */
 
+/* **************************************************************** */
+/*			                                            */
+/*	                 Alliant FX/800                             */
+/*			                                            */
+/* **************************************************************** */
+/* Original descs flushed.  FX/2800 machine desc 1.13 bfox@ai.mit.edu.
+   Do NOT use -O with the stock compilers.  If you must optimize, use
+   -uniproc with fxc, and avoid using scc. */
+#if defined (alliant)
+#  define M_MACHINE "alliant"
+#  define M_OS "Concentrix"
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_GETGROUPS
+#  define HAVE_VFPRINTF
+#  define HAVE_RESOURCE
+#  define VOID_SIGHANDLER
+#  define HAVE_STRERROR
+#  define USE_GNU_MALLOC
+#  define LD_HAS_NO_DASH_L
+#  define SYSDEP_CFLAGS -DTERMIOS_MISSING -DMKFIFO_MISSING -DBSD_GETPGRP -w
+   /* Actually, Alliant does have unistd.h, but it defines _POSIX_VERSION,
+      and doesn't supply a fully compatible job control package.  We just
+      pretend that it doesn't have it. */
+#  undef HAVE_UNISTD_H
+#  undef HAVE_ALLOCA
+#endif /* alliant */
+
+/* **************************************************************** */
+/*                                                                  */
+/*            Motorola Delta series running System V R3V6/7         */
+/*                                                                  */
+/* **************************************************************** */
+/* Contributed by Robert L. McMillin (rlm@ms_aspen.hac.com).  */
+
+#if defined (m68k) && defined (sysV68)
+#  define M_MACHINE "Delta"
+#  define M_OS "USG"
+#  define SYSDEP_CFLAGS -DUSGr3
+#  define VOID_SIGHANDLER
+#  define HAVE_VFPRINTF
+#  define REQUIRED_LIBRARIES -lm881
+#  undef HAVE_GETWD
+#  undef HAVE_RESOURCE
+#  undef HAVE_DUP2
+#  undef HAVE_ALLOCA
+#endif /* Delta series */
 
 /* **************************************************************** */
 /*								    */
@@ -537,11 +685,11 @@
 /*								    */
 /* **************************************************************** */
 #if defined (gould)		/* Maybe should be GOULD_PN ? */
-#define M_MACHINE "gould"
-#define M_OS Bsd
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_GETGROUPS
+#  define M_MACHINE "gould"
+#  define M_OS "Bsd"
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_GETGROUPS
 #endif /* gould */
 
 /* ************************ */
@@ -549,65 +697,196 @@
 /*	    NeXT	    */
 /*			    */
 /* ************************ */
-#if defined (NeXT)
-#define M_MACHINE "NeXT"
-#define M_OS Bsd
-#define HAVE_VFPRINTF
-#define HAVE_SYS_SIGLIST
-#define HAVE_GETGROUPS
-#define HAVE_STRERROR
-#define VOID_SIGHANDLER
-#undef USE_GNU_MALLOC
-#endif
+#if defined (NeXT) && !defined (M_MACHINE)
+#  define M_MACHINE "NeXT"
+#  define M_OS "Bsd"
+#  define HAVE_VFPRINTF
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_GETGROUPS
+#  define HAVE_STRERROR
+#  define VOID_SIGHANDLER
+#  undef HAVE_GETWD
+#  undef HAVE_GETCWD
+#  define SYSDEP_CFLAGS -DHAVE_RESOURCE -DMKFIFO_MISSING
+#  undef USE_GNU_MALLOC
+#endif /* NeXT */
+
+/* ************************ */
+/*			    */
+/*	hp9000 4.4 BSD	    */
+/*			    */
+/* ************************ */
+#if defined (hp9000) && defined (__BSD_4_4__)
+#  define M_MACHINE "hp9000"
+#  define M_OS "BSD_4_4"
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_GETGROUPS
+#  define HAVE_STRERROR
+#  define HAVE_VFPRINTF
+#  define VOID_SIGHANDLER
+#  undef HAVE_ALLOCA
+#endif /* hp9000 && __BSD_4_4__ */
 
 /* ************************ */
 /*			    */
 /*	hp9000 4.3 BSD	    */
 /*			    */
 /* ************************ */
-#if defined (hp9000) && !defined (hpux)
-#define M_MACHINE "hp9000"
-#define M_OS Bsd
-#undef HAVE_ALLOCA
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_GETGROUPS
+#if defined (hp9000) && !defined (hpux) && !defined (M_MACHINE)
+#  define M_MACHINE "hp9000"
+#  define M_OS "Bsd"
+#  undef HAVE_ALLOCA
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_GETGROUPS
+#  define USE_VFPRINTF_EMULATION
 #endif /* hp9000 && !hpux */
 
 /* ************************ */
-/*			    */
-/*	    hpux	    */
-/*			    */
+/*                          */
+/*          hpux            */
+/*                          */
 /* ************************ */
 #if defined (hpux)
-#define M_MACHINE "hpux"
 
-/* This is for 6.2+ systems with job control. */
-#define M_OS HPUX
+/* HPUX comes in several different flavors, from pre-release 6.2 (basically
+   straight USG), to Posix compliant 9.0. */
 
-/* For HP-UX systems before 6.2, we don't have job control. */
-/* #undef M_OS */
-/* #define M_OS USG */
+   /* HP machines come in several processor types.
+      They are distinguished here. */
+#  if defined (hp9000s200) && !defined (hp9000s300)
+#    define M_MACHINE "hp9000s200"
+#  endif /* hp9000s200 */
+#  if defined (hp9000s300) && !defined (M_MACHINE)
+#    define M_MACHINE "hp9000s300"
+#  endif /* hp9000s300 */
+#  if defined (hp9000s500) && !defined (M_MACHINE)
+#    define M_MACHINE "hp9000s500"
+#  endif /* hp9000s500 */
+#  if defined (hp9000s700) && !defined (M_MACHINE)
+#    define M_MACHINE "hp9000s700"
+#  endif /* hp9000s700 */
+#  if defined (hp9000s800) && !defined (M_MACHINE)
+#    define M_MACHINE "hp9000s800"
+#  endif /* hp9000s800 */
+#  if defined (hppa) && !defined (M_MACHINE)
+#    define M_MACHINE "hppa"
+#  endif /* hppa */
 
-/* For HP-UX 7.0, we don't need the -lBSD. */
-#if defined (__hpux)
-#  define HPUX_70
-#endif
+/* Define the OS as the particular type that we are using. */
+/* This is for HP-UX systems earlier than HP-UX 6.2 -- no job control. */
+#  if defined (HPUX_USG)
+#    define M_OS "USG"
+#    define HPUX_SYSDEP_CFLAGS -Dhpux
+#    define REQUIRED_LIBRARIES -lPW -lBSD
+#    define HPUX_EXTRA
+#  else /* !HPUX_USG */
 
-#if defined (HPUX_70)
-#  define SYSDEP_CFLAGS -DHPUX_70
-#  define REQUIRED_LIBRARIES -lPW
-#  undef HAVE_GETWD
-#else /* Not 7.0 OS version. */
-#  define REQUIRED_LIBRARIES -lPW -lBSD
-#endif /* __hpux */
+/* All of the other operating systems need HPUX to be defined. */
+#    define HPUX_EXTRA -DHPUX
 
-#define HAVE_VFPRINTF
-#define VOID_SIGHANDLER
-#define HAVE_GETGROUPS
-#define HAVE_STRERROR
-#define SEARCH_LIB_NEEDS_SPACE
+     /* HPUX 6.2 .. 6.5 require -lBSD for getwd (), and -lPW for alloca (). */
+#    if defined (HPUX_6)
+#      define M_OS "hpux_6"
+#      define REQUIRED_LIBRARIES -lPW -lBSD
+#      undef HAVE_ALLOCA
+#    endif /* HPUX_6 */
+
+     /* On HP-UX 7.x, we do not link with -lBSD, so we don't have getwd (). */
+#    if defined (HPUX_7)
+#      define M_OS "hpux_7"
+#      define REQUIRED_LIBRARIES -lPW
+#      undef HAVE_GETWD
+#      undef USE_GNU_MALLOC
+#    endif /* HPUX_7 */
+
+     /* HP-UX 8.x systems do not have a working alloca () on all platforms.
+	This can cause us problems, especially when globbing. */
+#    if defined (HPUX_8)
+#      define M_OS "hpux_8"
+#      undef HAVE_ALLOCA
+#      undef HAVE_GETWD
+#    endif /* HPUX_8 */
+
+     /* HP-UX 9.0 reportedly fixes the alloca problems present in the 8.0
+        release.  If so, -lPW is required to include it. */
+#    if defined (HPUX_9)
+#      define M_OS "hpux_9"
+#      define REQUIRED_LIBRARIES -lPW
+#      undef HAVE_GETWD
+#    endif /* HPUX_9 */
+
+#  endif /* !HPUX_USG */
+
+   /* All of the HPUX systems that we have tested have the following. */
+#  define HAVE_DIRENT
+#  define HAVE_VFPRINTF
+#  define VOID_SIGHANDLER
+#  define HAVE_GETGROUPS
+#  define HAVE_STRERROR
+#  define USE_TERMCAP_EUMULATION
+#  define SEARCH_LIB_NEEDS_SPACE
+
+#  if defined (HPUX_SYSDEP_CFLAGS)
+#    define SYSDEP_CFLAGS HPUX_SYSDEP_CFLAGS HPUX_EXTRA
+#  else /* !HPUX_SYSDEP_CFLAGS */
+#    define SYSDEP_CFLAGS HPUX_EXTRA
+#  endif /* !HPUX_SYSDEP_CFLAGS */
+
 #endif /* hpux */
+
+/* ************************ */
+/*                          */
+/*        HP OSF/1          */
+/*                          */
+/* ************************ */
+#if defined (__hp_osf)
+#  define M_MACHINE "HPOSF1"
+#  define M_OS "OSF1"
+#  define SYSDEP_CFLAGS -q no_sl_enable
+#  define SYSDEP_LDFLAGS -q lang_level:classic
+#  define REQUIRED_LIBRARIES -lPW
+#  define HAVE_SETLINEBUF
+#  define HAVE_VFPRINTF
+#  define VOID_SIGHANDLER
+#  define HAVE_GETGROUPS
+#  define HAVE_STRERROR
+#  undef HAVE_ALLOCA
+#endif /* __hp_osf */
+
+/* ************************ */
+/*                          */
+/*        KSR1 OSF/1        */
+/*                          */
+/* ************************ */
+#if defined (ksr1)
+#  define M_MACHINE "KSR1"
+#  define M_OS "OSF1"
+#  define HAVE_SETLINEBUF
+#  define HAVE_VFPRINTF
+#  define VOID_SIGHANDLER
+#  define HAVE_GETGROUPS
+#  define HAVE_STRERROR
+#  undef HAVE_ALLOCA
+#  undef USE_GNU_MALLOC
+#endif /* ksr1 */
+
+/* ************************ */
+/*                          */
+/*   Intel Paragon - OSF/1  */
+/*                          */
+/* ************************ */
+#if defined (__i860) && defined (__PARAGON__)
+#  define M_MACHINE "Paragon"
+#  define M_OS "OSF1"
+#  define HAVE_GETGROUPS
+#  define HAVE_SETLINEBUF
+#  define HAVE_VFPRINTF
+#  define VOID_SIGHANDLER
+#  define HAVE_STRERROR
+#  define HAVE_SYS_SIGLIST
+#endif /* __i860 && __PARAGON__ */
 
 /* ************************ */
 /*			    */
@@ -615,24 +894,30 @@
 /*			    */
 /* ************************ */
 #if defined (Xenix286)
-#define M_MACHINE "i286"
-#define M_OS Xenix
-#undef HAVE_ALLOCA
-#define REQUIRED_LIBRARIES -lx
-#define SYSDEP_CFLAGS -DREVERSED_SETVBUF_ARGS
-#endif
+#  define M_MACHINE "i286"
+#  define M_OS "Xenix"
 
-/* Xenix 386 box not caught in i386 case above. */
-#if !defined (M_MACHINE) && defined (Xenix386)
-#  define M_MACHINE "i386"
-#  define M_OS Xenix
-#  define SYSDEP_CFLAGS -DUSGr3 -DREVERSED_SETVBUF_ARGS
-#  define HAVE_VFPRINTF
-#  define VOID_SIGHANDLER
-#  define ALLOCA_ASM x386-alloca.s
-#  define REQUIRED_LIBRARIES -lx
+#  define XENIX_CFLAGS -DUSG -DUSGr3
+
+#  if defined (XENIX_22)
+#    define XENIX_EXTRA -DREVERSED_SETVBUF_ARGS
+#    define REQUIRED_LIBRARIES -lx
+#  else /* !XENIX_22 */
+#    define HAVE_DIRENT
+#    if defined (XENIX_23)
+#      define XENIX_EXTRA
+#      define REQUIRED_LIBRARIES -ldir
+#    else /* !XENIX_23 */
+#      define XENIX_EXTRA -xenix
+#      define SYSDEP_LDFLAGS -xenix
+#      define REQUIRED_LIBRARIES -ldir -l2.3
+#    endif /* !XENIX_23 */
+#  endif /* !XENIX_22 */
+
+#  define SYSDEP_CFLAGS XENIX_CFLAGS XENIX_EXTRA
 #  undef HAVE_ALLOCA
-#endif /* Xenix386 */
+#  undef HAVE_GETWD
+#endif /* Xenix286 */
 
 /* ************************ */
 /*			    */
@@ -640,29 +925,37 @@
 /*			    */
 /* ************************ */
 #if defined (convex)
-#define M_MACHINE "convex"
-#define M_OS Bsd
-#undef HAVE_ALLOCA
-#define HAVE_SETLINEBUF
-#define HAVE_SYS_SIGLIST
-#define HAVE_GETGROUPS
+#  define M_MACHINE "convex"
+#  define M_OS "Bsd"
+#  undef HAVE_ALLOCA
+#  define HAVE_SETLINEBUF
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_GETGROUPS
 #endif /* convex */
 
 /* ************************ */
-/*			    */
-/*	    AIX/RT	    */
-/*			    */
+/*                          */
+/*          AIX/RT          */
+/*                          */
 /* ************************ */
 #if defined (aix) && !defined (aixpc)
-#define M_MACHINE "AIX"
-#define M_OS Bsd
-#undef HAVE_ALLOCA
-#define HAVE_VFPRINTF
-#define HAVE_SYS_SIGLIST
-#define VOID_SIGHANDLER
-#define HAVE_GETGROUPS
-#define USE_TERMCAP_EMULATION
-#endif /* AIX */
+#  define M_MACHINE "AIXRT"
+#  define M_OS "USG"
+#  define HAVE_DIRENT
+#  define HAVE_VFPRINTF
+#  define HAVE_SYS_SIGLIST
+#  define VOID_SIGHANDLER
+#  define HAVE_GETGROUPS
+#  define USE_TERMCAP_EMULATION
+#  if !defined (HAVE_GCC)
+#    define SYSDEP_CFLAGS -a -DNLS -DUSGr3 -DHAVE_BCOPY
+#  else /* HAVE_GCC */
+#    define SYSDEP_CFLAGS -DNLS -DUSGr3 -DHAVE_BCOPY
+#  endif /* HAVE_GCC */
+#  undef USE_GNU_MALLOC
+#  undef HAVE_ALLOCA
+#  undef HAVE_RESOURCE
+#endif /* aix && !aixpc */
 
 /* **************************************** */
 /*					    */
@@ -670,18 +963,19 @@
 /*					    */
 /* **************************************** */
 #if defined (RISC6000) || defined (_IBMR2)
-#define M_MACHINE "RISC6000"
-#define M_OS "AIX"
-#undef HAVE_GETWD
-#undef HAVE_ALLOCA
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_VFPRINTF
-#define VOID_SIGHANDLER
-#define USE_TERMCAP_EMULATION
-#define HAVE_GETGROUPS
-#define SYSDEP_CFLAGS -DNLS -DUSG
-#undef USE_GNU_MALLOC
+#  define M_MACHINE "RISC6000"
+#  define M_OS "AIX"
+#  define HAVE_DIRENT
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_VFPRINTF
+#  define VOID_SIGHANDLER
+#  define USE_TERMCAP_EMULATION
+#  define HAVE_GETGROUPS
+#  define SYSDEP_CFLAGS -DNLS -DUSGr3 -DHAVE_BCOPY
+#  undef HAVE_ALLOCA
+#  undef HAVE_GETWD
+#  undef USE_GNU_MALLOC
 #endif /* RISC6000 */
 
 /* **************************************** */
@@ -692,7 +986,7 @@
 #if defined (u370)
 #  if defined (_AIX370)
 #    define M_MACHINE "AIX370"
-#    define M_OS Bsd
+#    define M_OS "Bsd"
 #    define REQUIRED_LIBRARIES -lbsd
 #    define HAVE_SETLINEBUF
 #    define HAVE_VFPRINTF
@@ -703,9 +997,10 @@
 #  endif /* _AIX370 */
 #  if defined (USGr4) /* System V Release 4 on 370 series architecture. */
 #    define M_MACHINE "uxp"
-#    define M_OS USG
+#    define M_OS "USG"
+#    define HAVE_DIRENT
 #    define HAVE_SYS_SIGLIST
-#    define HAVE_VPRINTF
+#    define HAVE_VFPRINTF
 #    define USE_GNU_MALLOC
 #    define VOID_SIGHANDLER
 #    if !defined (HAVE_GCC)
@@ -717,7 +1012,7 @@
 #    define HAVE_RESOURCE
 #    define SYSDEP_CFLAGS -DUSGr4
 #    endif /* USGr4 */
-#endif /* u370 */  
+#endif /* u370 */
 
 /* ************************ */
 /*			    */
@@ -725,22 +1020,23 @@
 /*			    */
 /* ************************ */
 #if defined (att3b) || defined (u3b2)
-#if defined (att3b)
-#  define M_MACHINE "att3b"
-#  define HAVE_SYS_SIGLIST
-#else
-#  define M_MACHINE "u3b2"
-#endif
-#define M_OS USG
-#undef HAVE_GETWD
-#define HAVE_VFPRINTF
-#define VOID_SIGHANDLER
-/* For an AT&T Unix before V.3 take out the -DUSGr3 */
-#define SYSDEP_CFLAGS -DUSGr3
-/* Alloca requires either Gcc or cc with libPW.a. */
-#if !defined (HAVE_GCC)
-#  define REQUIRED_LIBRARIES -lPW
-#endif /* !HAVE_GCC */
+#  if defined (att3b)
+#    define M_MACHINE "att3b"
+#    define HAVE_SYS_SIGLIST
+#  else /* !att3b */
+#    define M_MACHINE "u3b2"
+#  endif /* !att3b */
+#  define M_OS "USG"
+#  undef HAVE_GETWD
+#  define HAVE_VFPRINTF
+#  define VOID_SIGHANDLER
+   /* For an AT&T Unix before V.3 take out the -DUSGr3 and the HAVE_DIRENT. */
+#  define SYSDEP_CFLAGS -DUSGr3
+#  define HAVE_DIRENT
+   /* Alloca requires either Gcc or cc with libPW.a. */
+#  if !defined (HAVE_GCC)
+#    define REQUIRED_LIBRARIES -lPW
+#  endif /* !HAVE_GCC */
 #endif /* att3b */
 
 /* ************************ */
@@ -749,19 +1045,41 @@
 /*			    */
 /* ************************ */
 #if defined (att386)
-#define M_MACHINE "att386"
-#define M_OS USG
-#undef HAVE_GETWD
-/* Alloca requires either Gcc or cc with libPW.a. */
-#if !defined (HAVE_GCC)
-#  define REQUIRED_LIBRARIES -lPW
-#endif /* HAVE_GCC */
-#define HAVE_SYS_SIGLIST
-#define HAVE_VFPRINTF
-#define VOID_SIGHANDLER
-/* For an AT&T Unix before V.3 take out the -DUSGr3 */
-#define SYSDEP_CFLAGS -DUSGr3
+#  define M_MACHINE "att386"
+#  define M_OS "USG"
+#  undef HAVE_GETWD
+   /* Alloca requires either Gcc or cc with libPW.a. */
+#  if !defined (HAVE_GCC)
+#    define REQUIRED_LIBRARIES -lPW
+#  endif /* HAVE_GCC */
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_VFPRINTF
+#  define VOID_SIGHANDLER
+   /* For an AT&T Unix before V.3 take out the -DUSGr3 and the HAVE_DIRENT. */
+#  define SYSDEP_CFLAGS -DUSGr3
+#  define HAVE_DIRENT
 #endif /* att386 */
+
+/* ************************ */
+/*			    */
+/*	 ATT UNIX PC	    */
+/*			    */
+/* ************************ */
+#if defined (unixpc)
+#  define M_MACHINE "unixpc"
+#  define M_OS "USG"
+#  define HAVE_VFPRINTF
+#  define HAVE_DIRENT
+#  if defined (HAVE_GCC)
+#    define REQUIRED_LIBRARIES -ldirent -shlib
+#  else /* !HAVE_GCC */
+#    define REQUIRED_LIBRARIES -ldirent
+#  endif /* !HAVE_GCC */
+#  undef HAVE_GETWD
+#  undef HAVE_DUP2
+#  undef VOID_SIGHANDLER
+#  undef HAVE_WAIT_H
+#endif /* unixpc */
 
 /* ************************ */
 /*			    */
@@ -775,17 +1093,18 @@
 #    define M_MACHINE "Multimax"
 #  endif /* n16 */
 #  if defined (UMAXV)
-#    define M_OS USG
+#    define M_OS "USG"
 #    define REQUIRED_LIBRARIES -lPW
 #    define SYSDEP_CFLAGS -DUSGr3
+#    define HAVE_DIRENT
 #    define HAVE_VFPRINTF
 #    define USE_TERMCAP_EMULATION
 #    define VOID_SIGHANDLER
 #  else
 #    if defined (CMU)
-#      define M_OS Mach
+#      define M_OS "Mach"
 #    else
-#      define M_OS Bsd
+#      define M_OS "Bsd"
 #    endif /* CMU */
 #    define HAVE_SYS_SIGLIST
 #    define HAVE_STRERROR
@@ -800,16 +1119,17 @@
 /*						*/
 /* ******************************************** */
 #if defined (__m88k) && defined (__UMAXV__)
-#define M_MACHINE "Gemini"
-#define M_OS USG
-#define REQUIRED_LIBRARIES -lPW
-#define USE_TERMCAP_EMULATION
-#define HAVE_VFPRINTF
-#define HAVE_GETGROUPS
-#define VOID_SIGHANDLER
-#define SYSDEP_CFLAGS -q ext=pcc -D_POSIX_JOB_CONTROL -D_POSIX_VERSION \
-		      -Dmalloc=_malloc -Dfree=_free -Drealloc=_realloc
-#endif  /* m88k */
+#  define M_MACHINE "Gemini"
+#  define M_OS "USG"
+#  define REQUIRED_LIBRARIES -lPW
+#  define USE_TERMCAP_EMULATION
+#  define HAVE_DIRENT
+#  define HAVE_GETGROUPS
+#  define HAVE_VFPRINTF
+#  define VOID_SIGHANDLER
+#  define SYSDEP_CFLAGS -q ext=pcc -D_POSIX_JOB_CONTROL -D_POSIX_VERSION \
+			-Dmalloc=_malloc -Dfree=_free -Drealloc=_realloc
+#endif  /* m88k && __UMAXV__ */
 
 /* ******************************************** */
 /*						*/
@@ -817,21 +1137,23 @@
 /*						*/
 /* ******************************************** */
 #if defined (drs6000)
-#define M_MACHINE "drs6000"
-#define M_OS USG
-#define SYSDEP_CFLAGS -Xa -DUSGr4 -Dsys_siglist=_sys_siglist
-#define EXTRA_LIB_SEARCH_PATH /usr/ucblib
-#define SEARCH_LIB_NEEDS_SPACE
-#define REQUIRED_LIBRARIES -lc -lucb
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_VFPRINTF
-#define HAVE_GETGROUPS
-#define HAVE_STRERROR
-#define VOID_SIGHANDLER
-#undef  HAVE_ALLOCA
-#undef	HAVE_ALLOCA_H
-#undef	USE_GNU_MALLOC
+#  define M_MACHINE "drs6000"
+#  define M_OS "USG"
+#  define SYSDEP_CFLAGS -I/usr/ucbinclude -Xa -DUSGr4 -Dsys_siglist=_sys_siglist
+#  define EXTRA_LIB_SEARCH_PATH /usr/ucblib
+#  define SEARCH_LIB_NEEDS_SPACE
+#  define REQUIRED_LIBRARIES -lsocket -lc -lucb
+#  define HAVE_DIRENT
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_VFPRINTF
+#  define HAVE_GETGROUPS
+#  define HAVE_STRERROR
+#  define VOID_SIGHANDLER
+#  define USE_GNU_TERMCAP
+#  undef HAVE_ALLOCA
+#  undef HAVE_ALLOCA_H
+#  undef USE_GNU_MALLOC
 #endif /* drs6000 */
 
 /* ******************************************** */
@@ -840,20 +1162,21 @@
 /*						*/
 /* ******************************************** */
 #if defined (amiga)
-#define M_MACHINE "amiga"
-#define M_OS USG
-#define SYSDEP_CFLAGS -DUSGr4
-#if !defined (HAVE_GCC)
-#  define EXTRA_LIB_SEARCH_PATH /usr/ucblib
-#  define REQUIRED_LIBRARIES -lc -lucb
-#endif /* !HAVE_GCC */
-#define HAVE_SYS_SIGLIST
-#define HAVE_VFPRINTF
-#define VOID_SIGHANDLER
-#define HAVE_GETGROUPS
-#define HAVE_STRERROR
-#undef HAVE_GETWD
-#undef USE_GNU_MALLOC
+#  define M_MACHINE "amiga"
+#  define M_OS "USG"
+#  define SYSDEP_CFLAGS -DUSGr4
+#  if !defined (HAVE_GCC)
+#    define EXTRA_LIB_SEARCH_PATH /usr/ucblib
+#    define REQUIRED_LIBRARIES -lc -lucb
+#  endif /* !HAVE_GCC */
+#  define HAVE_DIRENT
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_VFPRINTF
+#  define VOID_SIGHANDLER
+#  define HAVE_GETGROUPS
+#  define HAVE_STRERROR
+#  undef HAVE_GETWD
+#  undef USE_GNU_MALLOC
 #endif /* System V Release 4 on amiga */
 
 /* ************************ */
@@ -863,12 +1186,11 @@
 /* ************************ */
 /* This is for the Orion 1/05 (A BSD 4.2 box based on a Clipper processor) */
 #if defined (clipper)
-#define M_MACHINE "clipper"
-#define M_OS Bsd
-#define HAVE_SETLINEBUF
-#define HAVE_GETGROUPS
+#  define M_MACHINE "clipper"
+#  define M_OS "Bsd"
+#  define HAVE_SETLINEBUF
+#  define HAVE_GETGROUPS
 #endif  /* clipper */
-
 
 /* ******************************** */
 /*				    */
@@ -876,12 +1198,13 @@
 /*				    */
 /* ******************************** */
 #if defined (is68k)
-#define M_MACHINE "is68k"
-#define M_OS Bsd
-#undef HAVE_ALLOCA
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_GETGROUPS
+#  define M_MACHINE "is68k"
+#  define M_OS "Bsd"
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_GETGROUPS
+#  define USE_VFPRINTF_EMULATION
+#  undef HAVE_ALLOCA
 #endif /* is68k */
 
 /* ******************************** */
@@ -890,14 +1213,33 @@
 /*				    */
 /* ******************************** */
 #if defined (luna88k)
-#define M_MACHINE "Luna88k"
-#define M_OS Bsd
-#define HAVE_SYS_SIGLIST
-#define USE_GNU_MALLOC
+#  define M_MACHINE "Luna88k"
+#  define M_OS "Bsd"
+#  define HAVE_SYS_SIGLIST
+#  define USE_GNU_MALLOC
+#  define HAVE_SETLINEBUF
+#  define HAVE_VFPRINTF
+#  define HAVE_GETGROUPS
+#  define HAVE_VFPRINTF
+#endif /* luna88k */
+
+/* ************************ */
+/*			    */
+/*   BBN Butterfly GP1000   */
+/*   Mach 1000 v2.5	    */
+/*			    */
+/* ************************ */
+#if defined (butterfly) && defined (BFLY1)
+#define M_MACHINE "BBN Butterfly"
+#define M_OS "Mach 1000"
 #define HAVE_SETLINEBUF
-#define HAVE_VFPRINTF
+#define HAVE_SYS_SIGLIST
 #define HAVE_GETGROUPS
-#endif  /* luna88k */
+#define HAVE_VFPRINTF
+#  ifdef BUILDING_MAKEFILE
+MAKE = make
+#  endif /* BUILDING_MAKEFILE */
+#endif /* butterfly */
 
 /* **************************************** */
 /*					    */
@@ -906,13 +1248,15 @@
 /* **************************************** */
 /* This is for the Apollo DN3500 running SR10.2 BSD4.3 */
 #if defined (apollo)
-#define M_MACHINE "apollo"
-#define M_OS Bsd
-#define SYSDEP_CFLAGS -D_POSIX_VERSION -D_INCLUDE_BSD_SOURCE -D_INCLUDE_POSIX_SOURCE -DTERMIOS_MISSING -DBSD_GETPGRP -Dpid_t=int
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_GETGROUPS
-#endif  /* apollo */
+#  define M_MACHINE "apollo"
+#  define M_OS "Bsd"
+#  define SYSDEP_CFLAGS -D_POSIX_VERSION -D_INCLUDE_BSD_SOURCE \
+			-D_INCLUDE_POSIX_SOURCE -DTERMIOS_MISSING \
+			-DBSD_GETPGRP -Dpid_t=int
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_GETGROUPS
+#endif /* apollo */
 
 /* ************************ */
 /*			    */
@@ -921,38 +1265,34 @@
 /* ************************ */
 /* This is for the DG AViiON box (runs DG/UX with both AT&T & BSD features.) */
 #if defined (__DGUX__) || defined (DGUX)
-#define M_MACHINE "AViiON"
-#define M_OS USG
-#undef HAVE_GETWD
-#define SYSDEP_CFLAGS -D_DGUX_SOURCE -DPGRP_PIPE /* -D_M88K_SOURCE */
-/* DG/UX comes standard with gcc. */
-#define HAVE_GCC
-#define HAVE_FIXED_INCLUDES
-#define HAVE_STRERROR
-#define HAVE_GETGROUPS
-#define VOID_SIGHANDLER
-#undef USE_GNU_MALLOC
+#  define M_OS "USG"
+#  if !defined (_M88KBCS_TARGET)
+#    define M_MACHINE "AViiON"
+#    define SYSDEP_CFLAGS -D_DGUX_SOURCE -DPGRP_PIPE
+#    define REQUIRED_LIBRARIES -ldgc
+#  else /* _M88KBCS_TARGET */
+#    define M_MACHINE "m88kBCS_AV"
+#    define SYSDEP_CFLAGS -D_DGUX_SOURCE -D_M88K_SOURCE -DPGRP_PIPE
+#    undef HAVE_RESOURCE
+#  endif /* _M88KBCS_TARGET */
+   /* DG/UX comes standard with Gcc. */
+#  define HAVE_GCC
+#  define HAVE_FIXED_INCLUDES
+#  define HAVE_STRERROR
+#  define HAVE_GETGROUPS
+#  define VOID_SIGHANDLER
+#  undef HAVE_GETWD
+#  undef USE_GNU_MALLOC
 
 /* If you want to build bash for M88K BCS compliance on a DG/UX 5.4
    or above system, do the following:
-
-     - Add -D_M88K_SOURCE to SYSDEP_CFLAGS above.
-     - Before running "make" type: "eval `sde-target m88kbcs`" to set
-       the software development environment to build BCS objects. */
+     - If you have built in this directory before run "make clean" to
+       endure the Bash directory is clean.
+     - Run "eval `sde-target m88kbcs`" to set the software development
+       environment to build BCS objects.
+     - Run "make".
+     - Do "eval `sde-target default`" to reset the SDE. */
 #endif /* __DGUX__ */
-
-/* ************************ */
-/*                          */
-/*          XD88            */
-/*                          */
-/* ************************ */
-#if defined (m88k) && !defined (M_MACHNE)
-#define M_MACHINE "XD88"
-#define M_OS USG
-#define HAVE_VPRINTF
-#undef HAVE_GETWD
-#undef HAVE_ALLOCA
-#endif /* XD88 && ! M_MACHINE */
 
 /* ************************ */
 /*			    */
@@ -961,26 +1301,27 @@
 /* ************************ */
 /* This is for the Harris Night Hawk family. */
 #if defined (_CX_UX)
-#if defined (_M88K)
-# define M_MACHINE "nh4000"
-#else
-#  if defined (hcx)
-#    define M_MACHINE "nh2000"
-#  else
-#    if defined (gcx)
-#      define M_MACHINE "nh3000"
-#    endif
-#  endif
-#endif
-#define M_OS USG
-#define SYSDEP_CFLAGS -g -Xa -v -Dgetwd=bash_getwd -D_POSIX_SOURCE -D_POSIX_JOB_CONTROL
-#define USE_TERMCAP_EMULATION
-#define HAVE_VFPRINTF
-#define HAVE_GETGROUPS
-#define VOID_SIGHANDLER
-#undef USE_GNU_MALLOC
-#undef HAVE_GETWD
-#endif
+#  if defined (_M88K)
+#    define M_MACHINE "nh4000"
+#  else /* !_M88K */
+#    if defined (hcx)
+#      define M_MACHINE "nh2000"
+#    else /* !hcx */
+#      if defined (gcx)
+#        define M_MACHINE "nh3000"
+#      endif /* gcx */
+#    endif /* !hcx */
+#  endif /* !_M88K */
+#  define M_OS "USG"
+#  define SYSDEP_CFLAGS -g -Xa -v -Dgetwd=bash_getwd -D_POSIX_SOURCE \
+			-D_POSIX_JOB_CONTROL
+#  define USE_TERMCAP_EMULATION
+#  define HAVE_VFPRINTF
+#  define HAVE_GETGROUPS
+#  define VOID_SIGHANDLER
+#  undef USE_GNU_MALLOC
+#  undef HAVE_GETWD
+#endif /* _CX_UX */
 
 /* **************************************** */
 /*					    */
@@ -989,20 +1330,59 @@
 /* **************************************** */
 /* These are unproven as yet. */
 #if defined (Tek4132)
-#define M_MACHINE "Tek4132"
-#define M_OS Bsd
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_GETGROUPS
+#  define M_MACHINE "Tek4132"
+#  define M_OS "Bsd"
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_GETGROUPS
 #endif /* Tek4132 */
 
 #if defined (Tek4300)
-#define M_MACHINE "Tek4300"
-#define M_OS Bsd
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_GETGROUPS
+#  define M_MACHINE "Tek4300"
+#  define M_OS "Bsd"
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_GETGROUPS
 #endif /* Tek4300 */
+
+/* ************************ */
+/*                          */
+/*     Tektronix XD88       */
+/*                          */
+/* ************************ */
+#if defined (m88k) && defined (XD88)
+#  define M_MACHINE "XD88"
+#  define M_OS "USG"
+#  define HAVE_DIRENT
+#  define HAVE_VFPRINTF
+#  define HAVE_GETCWD
+#  define VOID_SIGHANDLER
+#  define HAVE_GETGROUPS
+#  undef HAVE_GETWD
+#  undef HAVE_ALLOCA
+#endif /* m88k && XD88 */
+
+/* ************************ */
+/*                          */
+/*     Motorola M88100      */
+/*                          */
+/* ************************ */
+#if defined (m88k) && defined (M88100)
+#  define M_MACHINE "M88100"
+#  define M_OS "USG"
+#  if defined (USGr4)
+#    define SYSDEP_CFLAGS -DUSGr4 -D_POSIX_JOB_CONTROL
+#  else
+#    define SYSDEP_CFLAGS -D_POSIX_JOB_CONTROL
+#  endif
+#  define HAVE_DIRENT
+#  define HAVE_VFPRINTF
+#  define VOID_SIGHANDLER
+#  define HAVE_GETGROUPS
+#  undef HAVE_GETWD
+#  undef HAVE_GETCWD
+#  undef HAVE_ALLOCA
+#endif /* m88k && M88100 */
 
 /* ************************ */
 /*			    */
@@ -1010,12 +1390,13 @@
 /*       (Dynix 3.x)	    */
 /* ************************ */
 #if defined (sequent) && !defined (M_MACHINE)
-#define M_MACHINE "Sequent"
-#define M_OS Bsd
-#undef HAVE_DUP2
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_GETGROUPS
+#  define M_MACHINE "Sequent"
+#  define M_OS "Bsd"
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_GETGROUPS
+#  define LD_HAS_NO_DASH_L
+#  undef HAVE_DUP2
 #endif /* sequent */
 
 /* ****************************************** */
@@ -1024,19 +1405,19 @@
 /*					      */
 /* ****************************************** */
 #if defined (tower32)
-#define M_MACHINE "tower32"
-#define M_OS USG
-#if !defined (HAVE_GCC)
-#  define REQUIRED_LIBRARIES -lPW
-   /* Disable stack/frame-pointer optimization, incompatible with alloca */
-#  define SYSDEP_CFLAGS -DUSGr3 -W2,-aat
-#else
-#  define SYSDEP_CFLAGS -DUSGr3
-#endif /* !HAVE_GCC */
-#define HAVE_VFPRINTF
-#define USE_TERMCAP_EMULATION
-#define VOID_SIGHANDLER
-#undef HAVE_GETWD
+#  define M_MACHINE "tower32"
+#  define M_OS "USG"
+#  if !defined (HAVE_GCC)
+#    define REQUIRED_LIBRARIES -lPW
+     /* Disable stack/frame-pointer optimization, incompatible with alloca */
+#    define SYSDEP_CFLAGS -DUSGr3 -W2,-aat
+#  else /* HAVE_GCC */
+#    define SYSDEP_CFLAGS -DUSGr3
+#  endif /* HAVE_GCC */
+#  define HAVE_VFPRINTF
+#  define USE_TERMCAP_EMULATION
+#  define VOID_SIGHANDLER
+#  undef HAVE_GETWD
 #endif /* tower32 */
 
 /* ************************ */
@@ -1045,18 +1426,18 @@
 /*			    */
 /* ************************ */
 #if defined (ardent)
-#define M_MACHINE "Ardent Titan"
-#define M_OS Bsd
-#if !defined (titan)
-#  define HAVE_GETGROUPS
-#endif
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define SYSDEP_CFLAGS -43 -w
-#define SYSDEP_LDFLAGS -43
-#undef HAVE_ALLOCA
-#undef USE_GNU_MALLOC
-#undef HAVE_VFPRINTF
+#  define M_MACHINE "Ardent Titan"
+#  define M_OS "Bsd"
+#  if !defined (titan)
+#    define HAVE_GETGROUPS
+#  endif /* !titan */
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define SYSDEP_CFLAGS -43 -w
+#  define SYSDEP_LDFLAGS -43
+#  undef HAVE_ALLOCA
+#  undef USE_GNU_MALLOC
+#  undef HAVE_VFPRINTF
 #endif /* ardent */
 
 /* ************************ */
@@ -1065,13 +1446,13 @@
 /*			    */
 /* ************************ */
 #if defined (stardent) && !defined (M_MACHINE)
-#define M_MACHINE "Stardent"
-#define M_OS USG
-#undef HAVE_GETWD
-#undef HAVE_ALLOCA
-#define HAVE_SYS_SIGLIST
-#define USE_TERMCAP_EMULATION
-#define VOID_SIGHANDLER
+#  define M_MACHINE "Stardent"
+#  define M_OS "USG"
+#  define HAVE_SYS_SIGLIST
+#  define USE_TERMCAP_EMULATION
+#  define VOID_SIGHANDLER
+#  undef HAVE_GETWD
+#  undef HAVE_ALLOCA
 #endif /* stardent */
 
 /* ************************ */
@@ -1080,14 +1461,13 @@
 /*			    */
 /* ************************ */
 #if defined (concurrent)
-/* Use the BSD universe (`universe ucb') */
-#define M_MACHINE "Concurrent"
-#define M_OS Bsd
-#define HAVE_SYS_SIGLIST
-#define HAVE_SETLINEBUF
-#define HAVE_GETGROUPS
+   /* Use the BSD universe (`universe ucb') */
+#  define M_MACHINE "Concurrent"
+#  define M_OS "Bsd"
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_SETLINEBUF
+#  define HAVE_GETGROUPS
 #endif /* concurrent */
-
 
 /* **************************************************************** */
 /*                                                                  */
@@ -1095,32 +1475,60 @@
 /*                                                                  */
 /* **************************************************************** */
 #if defined (hbullx20)
-#define M_MACHINE "Honeywell"
-#define M_OS USG
-#define SYSDEP_CFLAGS -DUSG
-/* Bull x20 needs -lposix for struct dirent. */
-#define REQUIRED_LIBRARIES -lPW -lposix
-#define HAVE_VFPRINTF
-#define VOID_SIGHANDLER
-#define USE_TERMCAP_EMULATION
-#undef HAVE_GETWD
+#  define M_MACHINE "Honeywell"
+#  define M_OS "USG"
+#  define SYSDEP_CFLAGS -DUSG
+   /* Bull x20 needs -lposix for struct dirent. */
+#  define REQUIRED_LIBRARIES -lPW -lposix
+#  define HAVE_DIRENT
+#  define HAVE_VFPRINTF
+#  define VOID_SIGHANDLER
+#  define USE_TERMCAP_EMULATION
+#  undef HAVE_GETWD
 #endif  /* hbullx20 */
 
 /* ************************ */
 /*			    */
-/*    Cadmus (tested once)  */
+/*	    CRAY	    */
 /*			    */
 /* ************************ */
-#if defined (cadmus) && !defined (M_MACHINE)
-#define M_MACHINE "cadmus"
-#define M_OS BrainDeath		/* By Far, the worst yet. */
-#define SYSDEP_CFLAGS -DUSG
-#define HAVE_VFPRINTF
-#define VOID_SIGHANDLER
-#define USE_TERMCAP_EMULATION
-#undef HAVE_GETWD
-#undef HAVE_ALLOCA
-#endif  /* cadmus */
+#if defined (OLD_CRAY_DEFINITION)
+#  if defined (CRAY)
+#    define M_MACHINE "CRAY"
+#    define M_OS "USG"
+#    define SYSDEP_CFLAGS -DCRAY
+#    define HAVE_DIRENT
+#    define HAVE_SETLINEBUF
+#    define VOID_SIGHANDLER
+#    undef HAVE_ALLOCA
+#    undef USE_GNU_MALLOC
+#    undef HAVE_VFPRINTF
+#  endif /* CRAY */
+#else /* !OLD_CRAY_DEFINITION */
+#  if defined (cray)
+#    if defined (Cray1) || defined (Cray2)
+#      define M_MACHINE "Cray"
+#    endif
+#    if defined (CrayXMP) && !defined (M_MACHINE)
+#      define M_MACHINE "CrayXMP"
+#    endif
+#    if defined (CrayYMP) && !defined (M_MACHINE)
+#      define M_MACHINE "CrayYMP"
+#    endif
+#    if !defined (M_MACHINE)
+#      define M_MACHINE "Cray"
+#    endif
+#    define M_OS "Unicos"
+#    define SYSDEP_CFLAGS -DUSG -DPGRP_PIPE
+#    define HAVE_VFPRINTF
+#    define HAVE_MULTIPLE_GROUPS
+#    define VOID_SIGHANDLER
+#    define USE_TERMCAP_EMULATION
+#    undef HAVE_ALLOCA
+#    undef HAVE_RESOURCE
+#    undef USE_GNU_MALLOC
+#  endif /* cray */
+#endif /* !OLD_CRAY_DEFINITION */
 
 /* ************************ */
 /*			    */
@@ -1128,15 +1536,90 @@
 /*			    */
 /* ************************ */
 #if defined (MagicStation)
-#define M_MACHINE "MagicStation"
-#define M_OS USG
-#define SYSDEP_CFLAGS -DUSGr4
-#define HAVE_GETGROUPS
-#define HAVE_STRERROR
+#  define M_MACHINE "MagicStation"
+#  define M_OS "USG"
+#  define SYSDEP_CFLAGS -DUSGr4
+#  define HAVE_DIRENT
+#  define HAVE_GETGROUPS
+#  define HAVE_STRERROR
+#  define VOID_SIGHANDLER
+#  undef HAVE_ALLOCA
+#  undef HAVE_GETWD
+#endif /* MagicStation */
+
+/* ************************ */
+/*			    */
+/*	   Plexus	    */
+/*			    */
+/* ************************ */
+#if defined (plexus)
+#  define M_MACHINE "plexus"
+#  define M_OS "USG"
+#  define REQUIRED_LIBRARIES -lndir
+#  define USE_TERMCAP_EMULATION
+#  undef HAVE_DUP2
+#  undef HAVE_GETWD
+#  define HAVE_VFPRINTF
+#  undef HAVE_ALLOCA		/* -lPW doesn't work w/bash-cc? */
+#endif /* plexus */
+
+/* ************************ */
+/*			    */   
+/*     Siemens MX500        */
+/*      (SINIX 5.2x)	    */
+/* ************************ */
+#ifdef sinix
+#define M_MACHINE "Siemens MX500"
+#define M_OS "SINIX V5.2x"
+#define USG
+
+#define HAVE_GETCWD
 #define VOID_SIGHANDLER
+#define HAVE_STRERROR
+#define HAVE_GETGROUPS
+#define HAVE_VFPRINTF
+#define HAVE_POSIX_SIGNALS
+#define HAVE_RESOURCE
+#define HAVE_DUP2
+#define USE_GNU_MALLOC
+#define SYSDEP_CFLAGS -DUSGr3 -DUSG
+#define REQUIRED_LIBRARIES syscalls.o
 #undef HAVE_ALLOCA
 #undef HAVE_GETWD
-#endif /* MagicStation */
+#endif /* sinix */
+
+/* ************************ */
+/*			    */
+/*  Symmetric 375 (4.2 BSD) */
+/*			    */
+/* ************************ */
+#if defined (scs) && !defined (M_MACHINE)
+#  define M_MACHINE "Symmetric_375"
+#  define M_OS "Bsd"
+#  define HAVE_SYS_SIGLIST
+#  define HAVE_GETGROUPS
+#  define HAVE_SETLINEBUF
+#  define USE_VFPRINTF_EMULATION
+#  define USE_GNU_MALLOC
+#  undef HAVE_STRCHR
+#endif /* scs */
+
+/* ************************ */
+/*			    */
+/*    PCS Cadmus System	    */
+/*			    */
+/* ************************ */
+#if defined (cadmus) && !defined (M_MACHINE)
+#  define M_MACHINE "cadmus"
+#  define M_OS "BrainDeath"
+#  define SYSDEP_CFLAGS -DUSG
+#  define HAVE_DIRENT
+#  define HAVE_VFPRINTF
+#  define VOID_SIGHANDLER
+#  define USE_TERMCAP_EMULATION
+#  undef HAVE_GETWD
+#  undef HAVE_ALLOCA
+#endif /* cadmus */
 
 /* **************************************************************** */
 /*								    */
@@ -1148,18 +1631,18 @@
    is loosely based on a Vax running Bsd. */
 
 #if !defined (M_MACHINE)
-#define UNKNOWN_MACHINE
+#  define UNKNOWN_MACHINE
 #endif
 
-#ifdef UNKNOWN_MACHINE
-#define M_MACHINE "UNKNOWN_MACHINE"
-#define M_OS UNKNOWN_OS
+#if defined (UNKNOWN_MACHINE)
+#  define M_MACHINE "UNKNOWN_MACHINE"
+#  define M_OS "UNKNOWN_OS"
 
 /* Required libraries for building on this system. */
-#define REQUIRED_LIBRARIES
+#  define REQUIRED_LIBRARIES
 
 /* Define HAVE_SYS_SIGLIST if your system has sys_siglist[]. */
-#define HAVE_SYS_SIGLIST
+#  define HAVE_SYS_SIGLIST
 
 /* Undef HAVE_ALLOCA if you are not using Gcc, and neither your library
    nor compiler has a version of alloca ().  In that case, we will use
@@ -1169,7 +1652,7 @@
 /* Undef USE_GNU_MALLOC if there appear to be library conflicts, or if you
    especially desire to use your OS's version of malloc () and friends.  We
    reccommend against this because GNU Malloc has debugging code built in. */
-#define USE_GNU_MALLOC
+#  define USE_GNU_MALLOC
 
 /* Define USE_GNU_TERMCAP if you want to use the GNU termcap library
    instead of your system termcap library. */
@@ -1179,11 +1662,15 @@
    stream library call.  Otherwise, setvbuf () will be used.  If
    neither of them work, you can edit in your own buffer control
    based upon your machines capabilities. */
-#define HAVE_SETLINEBUF
+#  define HAVE_SETLINEBUF
 
 /* Define HAVE_VFPRINTF if your machines has the vfprintf () library
    call.  Otherwise, printf will be used.  */
-#define HAVE_VFPRINTF
+#  define HAVE_VFPRINTF
+
+/* Define USE_VFPRINTF_EMULATION if you want to use the BSD-compatible
+   vfprintf() emulation in vprint.c. */
+/* #  define USE_VFPRINTF_EMULATION */
 
 /* Define HAVE_GETGROUPS if your OS allows you to be in multiple
    groups simultaneously by supporting the `getgroups' system call. */
@@ -1191,11 +1678,16 @@
 
 /* Define SYSDEP_CFLAGS to be the flags to cc that make your compiler
    work.  For example, `-ma' on the RT makes alloca () work. */
-#define SYSDEP_CFLAGS
+#  define SYSDEP_CFLAGS
 
 /* Define HAVE_STRERROR if your system supplies a definition for strerror ()
    in the C library, or a macro in a header file. */
 /* #define HAVE_STRERROR */
+
+/* Define HAVE_DIRENT if you have the dirent library and a definition of
+   struct dirent.  If not, the BSD directory reading library and struct
+   direct are assumed. */
+/* #define HAVE_DIRENT */
 
 /* If your system does not supply /usr/lib/libtermcap.a, but includes
    the termcap routines as a part of the curses library, then define
@@ -1218,8 +1710,15 @@
    this:
    	-L lib/readline -lreadline
    instead of:
-	-Llib/readline -lreadline
+   	-Llib/readline -lreadline
  */
 /* #define SEARCH_LIB_NEEDS_SPACE */
+
+/* Define LD_HAS_NO_DASH_L if your ld can't grok the -L flag in any way, or
+   if it cannot grok the -l<lib> flag, or both. */
+/* #define LD_HAS_NO_DASH_L */
+#  if defined (LD_HAS_NO_DASH_L)
+#   undef SEARCH_LIB_NEEDS_SPACE
+#  endif /* LD_HAS_NO_DASH_L */
 
 #endif  /* UNKNOWN_MACHINE */

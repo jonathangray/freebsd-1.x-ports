@@ -24,8 +24,16 @@ extern int
   locate_commands_in_functions, place_keywords_in_env, read_but_dont_execute,
   just_one_command, unbound_vars_is_error, echo_input_at_read,
   echo_command_at_execute, lexical_scoping, no_invisible_vars, noclobber,
-  hashing_disabled, forced_interactive, history_expansion,
-  asynchronous_notification;
+  hashing_disabled, forced_interactive, privileged_mode,
+  asynchronous_notification, interactive_comments;
+
+#if defined (HISTORY)
+extern int history_expansion;
+#endif /* HISTORY */
+
+#if defined (RESTRICTED_SHELL)
+extern int restricted;
+#endif /* RESTRICTED_SHELL */
 
 extern int *find_flag ();
 extern int change_flag (), change_flag_char ();

@@ -20,28 +20,24 @@
    Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 
 #include <stdio.h>
+#include "bashansi.h"
 #include "config.h"
 #include "general.h"
+#include "hash.h"
 #include "alias.h"
-
-/* The number of slots to allocate when we need new slots. */
-#define alias_list_grow_amount 50
 
 /* Non-zero means expand all words on the line.  Otherwise, expand
    after first expansion if the expansion ends in a space. */
 int alias_expand_all = 0;
 
 /* The list of aliases that we have. */
-ASSOC **aliases = (ASSOC **)NULL;
+HASH_TABLE *aliases = (HASH_TABLE *)NULL;
 
-/* The number of slots in the above list. */
-static int aliases_size = 0;
-
-/* The number of aliases that are in existence. */
-static int aliases_length = 0;
-
-/* The last alias index found with find_alias (). */
-static int last_alias_index = 0;
+initialize_aliases ()
+{
+  if (!aliases)
+    aliases = make_hash_table (0);
+}
 
 /* Scan the list of aliases looking for one with NAME.  Return NULL
    if the alias doesn't exist, else a pointer to the assoc. */
@@ -49,13 +45,17 @@ ASSOC *
 find_alias (name)
      char *name;
 {
-  register int i;
+  BUCKET_CONTENTS *al;
 
-  for (i = 0; i < aliases_length; i++)
-    if (STREQ (name, aliases[i]->name))
-      return (aliases[last_alias_index = i]);
+  if (!aliases)
+    return ((ASSOC *)NULL);
+  else
+    al = find_hash_item (name, aliases);
 
-  return ((ASSOC *)NULL);
+  if (al)
+    return ((ASSOC *)al->data);
+  else
+    return ((ASSOC *)NULL);
 }
 
 /* Return the value of the alias for NAME, or NULL if there is none. */
@@ -76,7 +76,12 @@ void
 add_alias (name, value)
      char *name, *value;
 {
-  ASSOC *temp = find_alias (name);
+  ASSOC *temp = (ASSOC *)NULL;
+
+  if (!aliases)
+    initialize_aliases ();
+  else
+    temp = find_alias (name);
 
   if (temp)
     {
@@ -85,61 +90,164 @@ add_alias (name, value)
     }
   else
     {
+      BUCKET_CONTENTS *elt;
+
       temp = (ASSOC *)xmalloc (sizeof (ASSOC));
       temp->name = savestring (name);
       temp->value = savestring (value);
 
-      if ((aliases_length + 1) >= aliases_size)
-	{
-	  aliases =
-	    (ASSOC **)xrealloc (aliases,
-				(aliases_size += alias_list_grow_amount)
-				* sizeof (ASSOC *));
-	}
-      aliases[aliases_length++] = temp;
-      aliases[aliases_length] = (ASSOC *)NULL;
+      elt = add_hash_item (savestring (name), aliases);
+      elt->data = (char *)temp;
     }
 }
 
-/* Remove the alias with name NAME from the alias list.  Returns
-   the index of the removed alias, or -1 if the alias didn't exist. */
+/* Remove the alias with name NAME from the alias table.  Returns
+   the number of aliases left in the table, or -1 if the alias didn't
+   exist. */
 int
 remove_alias (name)
      char *name;
 {
-  register int i;
+  BUCKET_CONTENTS *elt;
 
-  if (!find_alias (name))
+  if (!aliases)
     return (-1);
 
-  i = last_alias_index;
-  free (aliases[i]->name);
-  free (aliases[i]->value);
-  free (aliases[i]);
+  elt = remove_hash_item (name, aliases);
+  if (elt)
+    {
+      ASSOC *t;
 
-  for (; i < aliases_length; i++)
-    aliases[i] = aliases[i + 1];
+      t = (ASSOC *)elt->data;
+      free (t->name);
+      free (t->value);
+      free (elt->key);		/* alias name */
+      free (t);
 
-  aliases_length--;
-  aliases[aliases_length] = (ASSOC *)NULL;
+      return (aliases->nentries);
+    }
+  return (-1);
+}
 
-  return (last_alias_index);
+/* Delete a hash bucket chain of aliases. */
+static void
+delete_alias_list (alias_list)
+     BUCKET_CONTENTS *alias_list;
+{
+  register BUCKET_CONTENTS *bp, *temp;
+  register ASSOC *a;
+
+  for (bp = alias_list; bp; )
+    {
+      temp = bp->next;
+      a = (ASSOC *)bp->data;
+      free (a->value);
+      free (a->name);
+      free (bp->data);
+      free (bp->key);
+      free (bp);
+      bp = temp;
+    }
 }
 
 /* Delete all aliases. */
+void
 delete_all_aliases ()
 {
   register int i;
 
-  for (i = 0; i < aliases_length; i++)
-    {
-      free (aliases[i]->name);
-      free (aliases[i]->value);
-      free (aliases[i]);
-      aliases[i] = (ASSOC *)NULL;
-    }
+  if (!aliases)
+    return;
 
-  aliases_length = 0;
+  for (i = 0; i < aliases->nbuckets; i++)
+    {
+      register BUCKET_CONTENTS *bp;
+
+      bp = get_hash_bucket (i, aliases);
+      delete_alias_list (bp);
+    }
+  free (aliases);
+  aliases = (HASH_TABLE *)NULL;
+}
+
+/* Return an array of aliases that satisfy the conditions tested by FUNCTION.
+   If FUNCTION is NULL, return all aliases. */
+static ASSOC **
+map_over_aliases (function)
+     Function *function;
+{
+  register int i;
+  register BUCKET_CONTENTS *tlist;
+  ASSOC *alias, **list = (ASSOC **)NULL;
+  int list_index = 0, list_size = 0;
+
+  for (i = 0; i < aliases->nbuckets; i++)
+    {
+      tlist = get_hash_bucket (i, aliases);
+
+      while (tlist)
+	{
+	  alias = (ASSOC *)tlist->data;
+
+	  if (!function || (*function) (alias))
+	    {
+	      if (list_index + 1 >= list_size)
+		list = (ASSOC **)
+		  xrealloc (list, (list_size += 20) * sizeof (ASSOC *));
+
+	      list[list_index++] = alias;
+	      list[list_index] = (ASSOC *)NULL;
+	    }
+	  tlist = tlist->next;
+	}
+    }
+  return (list);
+}
+
+static int
+qsort_alias_compare (as1, as2)
+     ASSOC **as1, **as2;
+{
+  int result;
+  
+  if ((result = (*as1)->name[0] - (*as2)->name[0]) == 0)
+    result = strcmp ((*as1)->name, (*as2)->name);
+
+  return (result);
+}
+        
+static void
+sort_aliases (array)
+     ASSOC **array;
+{
+  qsort (array, array_len (array), sizeof (ASSOC *), qsort_alias_compare);
+}
+
+/* Return a sorted list of all defined aliases */     
+ASSOC **
+all_aliases ()
+{
+  ASSOC **list;
+
+  if (!aliases)
+    return ((ASSOC **)NULL);
+
+  list = map_over_aliases ((Function *)NULL);
+  if (list)
+    sort_aliases (list);
+  return (list);
+}
+
+char *
+alias_expand_word (s)
+     char *s;
+{
+  ASSOC *r = find_alias (s);
+
+  if (r)
+    return (savestring (r->value));
+  else
+    return ((char *)NULL);
 }
 
 /* Return non-zero if CHARACTER is a member of the class of characters
@@ -378,7 +486,7 @@ alias_expand (string)
       /* If there is a backslash-escaped character quoted in TOKEN,
 	 then we don't do alias expansion.  This should check for all
 	 other quoting characters, too. */
-      if (index(token,'\\'))
+      if (strchr (token, '\\'))
 	expand_this_token = 0;
 
       /* If we should be expanding here, if we are expanding all words, or if
@@ -395,37 +503,26 @@ alias_expand (string)
 	  int l = strlen (v);
       
 	  /* +3 because we possibly add one more character below. */
-	  if ((l + 3) > line_len - strlen (line))
+	  if ((l + 3) > line_len - (int)strlen (line))
 	    line = (char *)xrealloc (line, line_len += (50 + l));
 
 	  strcat (line, v);
 
-	  if ((expand_this_token && l && whitespace (v[l - 1])) || alias_expand_all)
+	  if ((expand_this_token && l && whitespace (v[l - 1])) ||
+	      alias_expand_all)
 	    expand_next = 1;
 	}
       else
 	{
 	  int ll = strlen (line);
-	  int tl = i - real_start; /* tl == strlen(token) */
+	  int tlen = i - real_start; /* tlen == strlen(token) */
 
-	  if (ll + tl + 2 > line_len)
-	    line = (char *)xrealloc (line, line_len += 50 + ll + tl);
+	  if (ll + tlen + 2 > line_len)
+	    line = (char *)xrealloc (line, line_len += 50 + ll + tlen);
 
-	  strncpy (line + ll, string + real_start, tl);
-	  line[ll + tl] = '\0';
+	  strncpy (line + ll, string + real_start, tlen);
+	  line[ll + tlen] = '\0';
 	}
       command_word = 0;
     }
-}
-
-char *
-alias_expand_word (s)
-     char *s;
-{
-  ASSOC *r = find_alias (s);
-
-  if (r)
-    return (savestring (r->value));
-  else
-    return ((char *)NULL);
 }

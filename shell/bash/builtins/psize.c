@@ -40,28 +40,16 @@ sigpipe (sig)
   exit (0);
 }
 
-#if !defined (NeXT)
-char *
-memset (s, c, n)
-     register char *s;
-     register int c, n;
-{
-  register char *p = s;
-
-  while (--n >= 0)
-    *s++ = c;
-
-  return (p);
-}
-#endif /* !NeXT */
-
 main (argc, argv)
      int argc;
      char **argv;
 {
   char buf[128];
+  register int i;
 
-  memset (buf, ' ', 128);
+  for (i = 0; i < 128; i++)
+    buf[i] = ' ';
+
   signal (SIGPIPE, sigpipe);
 
   nw = 0;

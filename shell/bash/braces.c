@@ -25,16 +25,18 @@
    isn't because of quoting hacks.  Once I rebuild quoting it will be
    true. */
 
+#if defined (HAVE_STRING_H)
+#  include <string.h>
+#else /* !HAVE_STRING_H */
+#  include <strings.h>
+#endif /* !HAVE_STRING_H */
+
 #if defined (SHELL)
 #include "shell.h"
 #endif /* SHELL */
 
 #include "general.h"
 #define brace_whitespace(c) (!(c) || (c) == ' ' || (c) == '\t' || (c) == '\n')
-
-#if !defined (NULL)
-#define NULL (char *)0x0
-#endif /* NULL */
 
 /* Basic idea:
 
@@ -49,7 +51,7 @@
 int brace_arg_separator = ',';
 
 static int brace_gobbler ();
-static char **expand_amble (), **array_concat (), **copy_array ();
+static char **expand_amble (), **array_concat ();
 
 /* Return an array of strings; the brace expansion of TEXT. */
 char **
@@ -85,18 +87,26 @@ brace_expand (text)
   /* What if there isn't a matching close brace? */
   if (!c)
     {
-#if defined (SHELL)
+#if defined (NOTDEF)
       register int j;
 
-      /* Well, if we found BRACE_ARG_SEPARATOR between START and I,
-	 then this should be an error.  Otherwise, it isn't. */
+      /* Well, if we found an unquoted BRACE_ARG_SEPARATOR between START
+	 and I, then this should be an error.  Otherwise, it isn't. */
       for (j = start; j < i; j++)
-	if (text[j] == brace_arg_separator)
-	  {
-	    free_array (result);
-	    report_error ("Missing `}'");
-	    throw_to_top_level ();
-	  }
+	{
+	  if (text[j] == '\\')
+	    {
+	      j++;
+	      continue;
+	    }
+
+	  if (text[j] == brace_arg_separator)
+	    {
+	      free_array (result);
+	      report_error ("Missing `}'");
+	      throw_to_top_level ();
+	    }
+	}
 #endif
       free (preamble);		/* Same as result[0]; see initialization. */
       result[0] = savestring (text);
@@ -108,15 +118,30 @@ brace_expand (text)
   amble[i - start] = '\0';
 
 #if defined (SHELL)
-  /* If the amble does not contain BRACE_ARG_SEPARATOR, then just return
-     without doing any expansion.  */
-  if (index (amble, brace_arg_separator) == NULL)
-    {
-      free (amble);
-      free (preamble);
-      result[0] = savestring (text);
-      return (result);
-    }
+  /* If the amble does not contain an unquoted BRACE_ARG_SEPARATOR, then
+     just return without doing any expansion.  */
+  {
+    register int j;
+
+    for (j = 0; amble[j]; j++)
+      {
+	if (amble[j] == '\\')
+	  {
+	    j++;
+	    continue;
+	  }
+	if (amble[j] == brace_arg_separator)
+	  break;
+      }
+
+    if (!amble[j])
+      {
+	free (amble);
+	free (preamble);
+	result[0] = savestring (text);
+	return (result);
+      }
+  }
 #endif /* SHELL */
 
   postamble = &text[i + 1];
@@ -187,20 +212,34 @@ brace_gobbler (text, index, satisfy)
      int *index;
      int satisfy;
 {
-  register int i, c, quoted, level;
+  register int i, c, quoted, level, pass_next;
 
-  level = quoted = 0;
+  level = quoted = pass_next = 0;
 
   for (i = *index; c = text[i]; i++)
     {
+      if (pass_next)
+	{
+	  pass_next = 0;
+	  continue;
+	}
+
+      /* A backslash escapes the next character.  This allows backslash to
+	 escape the quote character in a double-quoted string. */
+      if (c == '\\' && (quoted == '"' || quoted == '`'))
+        {
+          pass_next = 1;
+          continue;
+        }
+
       if (quoted)
 	{
-	  if ((quoted == '\\') || (c == quoted))
+	  if (c == quoted)
 	    quoted = 0;
 	  continue;
 	}
 
-      if (c == '"' || c == '\'' || c == '\\')
+      if (c == '"' || c == '\'' || c == '`')
 	{
 	  quoted = c;
 	  continue;
@@ -215,11 +254,13 @@ brace_gobbler (text, index, satisfy)
 	      ((!i || brace_whitespace (text[i - 1])) &&
 	       (brace_whitespace (text[i + 1]) || text[i + 1] == '}')))
 	    continue;
-#ifdef SHELL
+#if defined (SHELL)
 	  /* If this is being compiled as part of bash, ignore the `{'
 	     in a `${}' construct */
 	  if ((c != '{') || !i || (text[i - 1] != '$'))
-#endif
+#else /* !SHELL */
+	  if ((c != '{') || !i)
+#endif /* !SHELL */
 	    break;
 	}
 
@@ -277,26 +318,6 @@ array_concat (arr1, arr2)
   return (result);
 }
 
-static char **
-copy_array (array)
-     char **array;
-{
-  register int i;
-  char **new;
-
-  if (!array)
-    return (array);
-
-  new = (char **)xmalloc ((1 + array_len (array)) * sizeof (char *));
-
-  for (i = 0; array[i]; i++)
-    new[i] = savestring (array[i]);
-
-  new[i] = (char *)NULL;
-
-  return (new);
-}
-  
 #if defined (TEST)
 #include <stdio.h>
 
@@ -347,4 +368,4 @@ main ()
  * end:
  */
 
-#endif	/* TEST */
+#endif /* TEST */

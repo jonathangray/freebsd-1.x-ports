@@ -2,23 +2,23 @@
 
 /* This file works under BSD, System V, minix, and Posix systems. */
 
-/* Copyright (C) 1987,1989 Free Software Foundation, Inc.
+/* Copyright (C) 1987, 1989, 1992 Free Software Foundation, Inc.
 
-This file is part of GNU Bash, the Bourne Again SHell.
+   This file is part of GNU Bash, the Bourne Again SHell.
 
-Bash is free software; you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free
-Software Foundation; either version 1, or (at your option) any later
-version.
+   Bash is free software; you can redistribute it and/or modify it under
+   the terms of the GNU General Public License as published by the Free
+   Software Foundation; either version 1, or (at your option) any later
+   version.
 
-Bash is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or
-FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-for more details.
+   Bash is distributed in the hope that it will be useful, but WITHOUT ANY
+   WARRANTY; without even the implied warranty of MERCHANTABILITY or
+   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+   for more details.
 
-You should have received a copy of the GNU General Public License along
-with Bash; see the file COPYING.  If not, write to the Free Software
-Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
+   You should have received a copy of the GNU General Public License along
+   with Bash; see the file COPYING.  If not, write to the Free Software
+   Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -31,6 +31,10 @@ Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 #include "filecntl.h"
 #include "jobs.h"
 
+#if defined (BUFFERED_INPUT)
+#  include "input.h"
+#endif
+
 #if !defined (USG) && !defined (_POSIX_VERSION)
 #  include <sgtty.h>
 #else
@@ -38,7 +42,9 @@ Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 #    include <termios.h>
 #  else
 #    include <termio.h>
-#    include <sys/ttold.h>
+#    if !defined (AIXRT)
+#      include <sys/ttold.h>
+#    endif /* !AIXRT */
 #  endif /* !POSIX_VERSION */
 #endif /* USG && _POSIX_VERSION */
 
@@ -54,16 +60,138 @@ Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 #  define siginterrupt(sig, code)
 #endif /* USG */
 
-#if defned (_POSIX_VERSION)
+#if defined (_POSIX_VERSION)
 #  define WAITPID(pid, statusp, options) waitpid (pid, statusp, options)
 #else
 #  define WAITPID(pid, statusp, options) wait (statusp)
 #endif /* !_POSIX_VERSION */
 
-pid_t last_made_pid = (pid_t)-1;
-pid_t last_asynchronous_pid = (pid_t)-1;
-
+#if !defined (errno)
 extern int errno;
+#endif /* !errno */
+
+pid_t last_made_pid = NO_PID;
+pid_t last_asynchronous_pid = NO_PID;
+
+#if defined (_POSIX_VERSION)
+static void reap_zombie_children ();
+#endif
+
+struct proc_status {
+  pid_t pid;
+  int status;	/* Exit status of PID or 128 + fatal signal number */
+};
+
+static struct proc_status *pid_list = (struct proc_status *)NULL;
+static int pid_list_size = 0;
+
+#define PROC_BAD -1
+#define PROC_STILL_ALIVE -2
+
+/* Allocate new, or grow existing PID_LIST. */
+static void
+alloc_pid_list ()
+{
+  register int i;
+  int old = pid_list_size;
+
+  pid_list_size += 10;
+  pid_list = (struct proc_status *)
+    xrealloc (pid_list, pid_list_size * sizeof (struct proc_status));
+
+  /* None of the newly allocated slots have process id's yet. */
+  for (i = old; i < pid_list_size; i++)
+    pid_list[i].pid = NO_PID;  
+}
+
+/* Return the offset within the PID_LIST array of an empty slot.  This can
+   create new slots if all of the existing slots are taken. */
+static int
+find_proc_slot ()
+{
+  register int i;
+
+  for (i = 0; i < pid_list_size; i++)
+    if (pid_list[i].pid == NO_PID)
+      return (i);
+
+  if (i == pid_list_size)
+    alloc_pid_list ();
+
+  return (i);
+}
+
+/* Return the offset within the PID_LIST array of a slot containing PID,
+   or the value NO_PID if the pid wasn't found. */
+static int
+find_index_by_pid (pid)
+     pid_t pid;
+{
+  register int i;
+
+  for (i = 0; i < pid_list_size; i++)
+    if (pid_list[i].pid == pid)
+      return (i);
+
+  return (NO_PID);
+}
+
+/* Return the status of PID as looked up in the PID_LIST array.  A
+   return value of PROC_BAD indicates that PID wasn't found. */
+static int
+find_status_by_pid (pid)
+     pid_t pid;
+{
+  int i;
+
+  i = find_index_by_pid (pid);
+  if (i == NO_PID)
+    return (PROC_BAD);
+  return (pid_list[i].status);
+}
+
+/* Give PID the status value STATUS in the PID_LIST array. */
+static void
+set_pid_status (pid, status)
+     pid_t pid;
+     WAIT status;
+{
+  int slot;
+
+  slot = find_index_by_pid (pid);
+  if (slot == NO_PID)
+    return;
+
+  if (WIFSIGNALED (status))
+    pid_list[slot].status = 128 + WTERMSIG (status);
+  else
+    pid_list[slot].status = WEXITSTATUS (status);
+}
+
+static void
+add_pid (pid)
+     pid_t pid;
+{
+  int slot;
+
+  slot = find_proc_slot ();
+  pid_list[slot].pid = pid;
+  pid_list[slot].status = PROC_STILL_ALIVE;
+}
+
+int
+cleanup_dead_jobs ()
+{
+  register int i;
+
+#if defined (_POSIX_VERSION)
+  reap_zombie_children ();
+#endif
+
+  for (i = 0; i < pid_list_size; i++)
+    if (pid_list[i].status != PROC_STILL_ALIVE)
+      pid_list[i].pid = NO_PID;
+}
 
 /* Initialize the job control mechanism, and set up the tty stuff. */
 initialize_jobs ()
@@ -71,22 +199,43 @@ initialize_jobs ()
   get_tty_state ();
 }
 
+#if !defined (READLINE) && defined (TIOCGWINSZ) && defined (SIGWINCH)
+static SigHandler *old_winch;
+
+static sighandler
+sigwinch_sighandler (sig)
+     int sig;
+{
+  struct winsize win;
+
+#if defined (USG) && !defined (_POSIX_VERSION)
+  set_signal_handler (SIGWINCH, sigwinch_sighandler);
+#endif /* USG && !_POSIX_VERSION */
+  if ((ioctl (0, TIOCGWINSZ, &win) == 0) &&
+      win.ws_row > 0 && win.ws_col > 0)
+    set_lines_and_columns (win.ws_row, win.ws_col);
+}
+#endif /* !READLINE && TIOCGWINSZ && SIGWINCH */
+
 /* Setup this shell to handle C-C, etc. */
 initialize_job_signals ()
 {
   extern int login_shell;
   extern sighandler sigint_sighandler ();
 
-  signal (SIGINT, sigint_sighandler);
+  set_signal_handler (SIGINT, sigint_sighandler);
+#if !defined (READLINE) && defined (TIOCGWINSZ) && defined (SIGWINCH)
+  set_signal_handler (SIGWINCH, sigwinch_sighandler);
+#endif /* !READLINE && TIOCGWINSZ && SIGWINCH */
 
   /* If this is a login shell we don't wish to be disturbed by
      stop signals. */
   if (login_shell)
     {
-#ifdef SIGTSTP
-      signal (SIGTSTP, SIG_IGN);
-      signal (SIGTTOU, SIG_IGN);
-      signal (SIGTTIN, SIG_IGN);
+#if defined (SIGTSTP)
+      set_signal_handler (SIGTSTP, SIG_IGN);
+      set_signal_handler (SIGTTOU, SIG_IGN);
+      set_signal_handler (SIGTTIN, SIG_IGN);
 #endif
     }
 }
@@ -98,8 +247,11 @@ static void
 reap_zombie_children ()
 {
 #if defined (WNOHANG)
-  while (waitpid (-1, (int *)NULL, WNOHANG) != -1)
-    ;
+  pid_t pid;
+  WAIT status;
+
+  while ((pid = waitpid (-1, (int *)&status, WNOHANG)) > 0)
+    set_pid_status (pid, status);
 #endif /* WNOHANG */
 }
 #endif /* _POSIX_VERSION */
@@ -122,8 +274,15 @@ make_child (command, async_p)
   if (command)  
     free (command);
 
-  /* Make new environment array if neccessary. */
-  maybe_make_export_env ();
+#if defined (BUFFERED_INPUT)
+  /* If default_buffered_input is active, we are reading a script.  If
+     the command is asynchronous, we have already duplicated /dev/null
+     as fd 0, but have not changed the buffered stream corresponding to
+     the old fd 0.  We don't want to sync the stream in this case. */
+  if (default_buffered_input != -1 &&
+      (!async_p || default_buffered_input > 0))
+    sync_buffered_stream (default_buffered_input);
+#endif /* BUFFERED_INPUT */
 
   /* Create the child, handle severe errors. */
 #if defined (_POSIX_VERSION)
@@ -137,7 +296,7 @@ make_child (command, async_p)
 	 get another chance after zombies are reaped. */
       if (errno == EAGAIN && retry)
 	{
-	  reap_zombie_chilren ();
+	  reap_zombie_children ();
 	  retry = 0;
 	  goto retry_fork;
 	}
@@ -150,32 +309,45 @@ make_child (command, async_p)
  
   if (!pid)
     {
+#if defined (BUFFERED_INPUT)
+      if (default_buffered_input > 0)
+	{
+          close_buffered_fd (default_buffered_input);
+          default_buffered_input = -1;
+	}
+#endif /* BUFFERED_INPUT */
+
+#if 0
       /* Cancel shell traps. */
       restore_original_signals ();
+#endif
 
       /* Ignore INT and QUIT in asynchronous children. */
       if (async_p)
 	{
-	  signal (SIGINT, SIG_IGN);
-	  signal (SIGQUIT, SIG_IGN);
+	  set_signal_handler (SIGINT, SIG_IGN);
+	  set_signal_handler (SIGQUIT, SIG_IGN);
 	  last_asynchronous_pid = getpid ();
 	}
       else
 	{
 #if defined (SIGTSTP)
-	  signal (SIGTSTP, SIG_DFL);
-	  signal (SIGTTIN, SIG_DFL);
-	  signal (SIGTTOU, SIG_DFL);
+	  set_signal_handler (SIGTSTP, SIG_DFL);
+	  set_signal_handler (SIGTTIN, SIG_DFL);
+	  set_signal_handler (SIGTTOU, SIG_DFL);
 #endif
 	}
     }
   else
     {
       /* In the parent. */
+
       last_made_pid = pid;
 
       if (async_p)
 	last_asynchronous_pid = pid;
+
+      add_pid (pid);
     }
   return (pid);
 }
@@ -186,13 +358,15 @@ wait_for_single_pid (pid)
 {
   pid_t got_pid;
   WAIT status;
+  int pstatus;
 
-  /* Make sure that the process we are waiting for is valid. This
-     check is not necessary on Posix systems. */
-#if !defined (_POSIX_VERSION)
-  if ((kill (pid, 0) < 0) && errno == ESRCH)
+  pstatus = find_status_by_pid (pid);
+
+  if (pstatus == PROC_BAD)
     return (127);
-#endif /* !_POSIX_VERSION */
+
+  if (pstatus != PROC_STILL_ALIVE)
+    return (pstatus);
 
   siginterrupt (SIGINT, 1);
   while ((got_pid = WAITPID (pid, &status, 0)) != pid)
@@ -206,12 +380,22 @@ wait_for_single_pid (pid)
 	    }
 	  break;
 	}
+      else if (got_pid > 0)
+        set_pid_status (got_pid, status);
     }
+
+  set_pid_status (got_pid, status);
   siginterrupt (SIGINT, 0);
   QUIT;
+
+  if (WIFSIGNALED (status))
+    return (128 + WTERMSIG (status));
+  else
+    return (WEXITSTATUS (status));
 }
 
 /* Wait for all of the shell's children to exit. */
+void
 wait_for_background_pids ()
 {
   /* If we aren't using job control, we let the kernel take care of the
@@ -227,7 +411,8 @@ wait_for_background_pids ()
 
       /* Wait for ECHILD */
       while ((got_pid = WAITPID (-1, &status, 0)) != -1)
-	;
+	set_pid_status (got_pid, status);
+
       if (errno != EINTR && errno != ECHILD)
 	{
 	  siginterrupt (SIGINT, 0);
@@ -239,24 +424,48 @@ wait_for_background_pids ()
   QUIT;
 }
 
-/* Wait for pid (one of our children) to terminate. */
+/* Handle SIGINT while we are waiting for children in a script to exit.
+   All interrupts are effectively ignored by the shell, but allowed to
+   kill a running job. */
+static sighandler
+wait_sigint_handler (sig)
+     int sig;
+{
+#if 0
+  /* Run a trap handler if one has been defined. */
+  maybe_call_trap_handler (sig);
+#endif
+
+#if !defined (VOID_SIGHANDLER)
+  return (0);
+#endif /* !VOID_SIGHANDLER */
+}
+
+/* Wait for pid (one of our children) to terminate.  This is called only
+   by the execution code in execute_cmd.c. */
 int
 wait_for (pid)
      pid_t pid;
 {
-  extern int interactive;
-  int return_val;
+  extern int interactive, interactive_shell, last_command_exit_value;
+  int return_val, pstatus;
   pid_t got_pid;
   WAIT status;
+  SigHandler *old_sigint_handler;
 
-  /* Make sure that the process we are waiting for is valid.  This check
-     is not necessary on Posix systems. */
-#if !defined (_POSIX_VERSION)
-  if ((kill (pid, 0) < 0) && (errno == ESRCH))
+  pstatus = find_status_by_pid (pid);
+
+  if (pstatus == PROC_BAD)
     return (0);
-#endif /* !_POSIX_VERSION */
 
-  siginterrupt (SIGINT, 1);
+  if (pstatus != PROC_STILL_ALIVE)
+    return (pstatus);
+
+  /* If we are running a script, ignore SIGINT while we're waiting for
+     a child to exit.  The loop below does some of this, but not all. */
+  if (!interactive_shell)
+    old_sigint_handler = set_signal_handler (SIGINT, wait_sigint_handler);
+
   while ((got_pid = WAITPID (pid, &status, 0)) != pid)
     {
       if (got_pid < 0 && errno == ECHILD)
@@ -270,9 +479,29 @@ wait_for (pid)
 	}
       else if (got_pid < 0 && errno != EINTR)
 	programming_error ("got errno %d while waiting for %d", errno, pid);
+      else if (got_pid > 0)
+	set_pid_status (got_pid, status);
     }
-  siginterrupt (SIGINT, 0);
 
+  set_pid_status (got_pid, status);
+
+#if defined (_POSIX_VERSION)
+  if (got_pid >= 0)
+    reap_zombie_children ();
+#endif /* _POSIX_VERSION */
+
+  if (!interactive_shell)
+    {
+      set_signal_handler (SIGINT, old_sigint_handler);
+      /* If the job exited because of SIGINT, make sure the shell acts as if
+	 it had received one also. */
+      if (WIFSIGNALED (status) && (WTERMSIG (status) == SIGINT))
+	{
+	  if (maybe_call_trap_handler (SIGINT) == 0)
+	    (*old_sigint_handler) (SIGINT);
+	}
+    }
+	    
   /* Default return value. */
   /* ``a full 8 bits of status is returned'' */
   if (WIFSIGNALED (status))
@@ -283,18 +512,20 @@ wait_for (pid)
   if (!WIFSTOPPED (status) && WIFSIGNALED (status) &&
       (WTERMSIG (status) != SIGINT))
     {
-      extern char *sys_siglist[];
       fprintf (stderr, "%s", sys_siglist[WTERMSIG (status)]);
       if (WIFCORED (status))
 	fprintf (stderr, " (core dumped)");
       fprintf (stderr, "\n");
     }
 
-  if (WIFSIGNALED (status) || WIFSTOPPED (status))
-    set_tty_state ();
-  else
-    get_tty_state ();
-                            
+  if (interactive_shell)
+    {
+      if (WIFSIGNALED (status) || WIFSTOPPED (status))
+	set_tty_state ();
+      else
+	get_tty_state ();
+    }
+
   return (return_val);
 }
 

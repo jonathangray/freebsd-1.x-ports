@@ -31,12 +31,22 @@ commands is presented.
 $END
 
 #include <stdio.h>
+
+#if defined (HAVE_STRING_H)
+#  include <string.h>
+#else /* !HAVE_STRING_H */
+#  include <strings.h>
+#endif /* !HAVE_STRING_H */
+
 #include "../shell.h"
 #include "../builtins.h"
 #include "../flags.h"
 #include "hashcom.h"
+#include "common.h"
 
-void remember_filename ();
+void remember_filename ();		/* forward declaration */
+
+extern char *find_user_command ();
 
 void
 initialize_filename_hashing ()
@@ -108,6 +118,7 @@ hash_builtin (list)
 	    }
 	  bucket++;
 	}
+
       if (!any_printed)
 	printf ("No commands in hash table.\n");
 
@@ -142,8 +153,6 @@ hash_builtin (list)
   while (list)
     {
       /* Add or rehash the specified commands. */
-      extern Function *find_shell_builtin ();
-      extern char *find_user_command ();
       char *word;
       char *full_path;
       SHELL_VAR *var;
@@ -170,6 +179,9 @@ hash_builtin (list)
 	      any_failed++;
 	    }
 	}
+      if (full_path)
+	free (full_path);
+
       list = list->next;
     }
 
@@ -197,11 +209,11 @@ remember_filename (filename, full_pathname, check_dot)
   if (item->data)
     free (pathdata(item)->path);
   else
-    item->data = (char *)xmalloc (sizeof (PATH_DATA));
-
-  item->key = savestring (filename);
+    {
+      item->key = savestring (filename);
+      item->data = (char *)xmalloc (sizeof (PATH_DATA));
+    }
   pathdata(item)->path = savestring (full_pathname);
   pathdata(item)->check_dot = check_dot;
   item->times_found = 0;
 }
-

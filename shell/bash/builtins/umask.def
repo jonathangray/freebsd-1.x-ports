@@ -48,20 +48,18 @@ static int symbolic_umask ();
 
 /* Set or display the mask used by the system when creating files.  Flag
    of -S means display the umask in a symbolic mode. */
-   
 umask_builtin (list)
      WORD_LIST *list;
 {
+  int printed_mask = 0;
+  int print_symbolically = 0;
+
   while (list)
     {
       if (strcmp (list->word->word, "-S") == 0)
 	{
-	  int um;
-
-	  um = umask (022);
-	  umask (um);
-	  print_symbolic_umask (um);
 	  list = list->next;
+	  print_symbolically++;
 	  continue;
 	}
       else if (strcmp (list->word->word, "--") == 0)
@@ -72,7 +70,7 @@ umask_builtin (list)
       else if (*(list->word->word) == '-')
 	{
 	  bad_option (list->word->word);
-	  return (-1);
+	  return (EXECUTION_FAILURE);
 	}
       else
 	break;
@@ -104,13 +102,20 @@ umask_builtin (list)
 	    return (EXECUTION_FAILURE);
 	}
       umask (new_umask);
+      if (print_symbolically)
+	print_symbolic_umask (new_umask);
     }
-  else
+  else				/* Display the UMASK for this user. */
     {
-      /* Display the UMASK for this user. */
-      int old_umask = umask (022);
+      int old_umask;
+
+      old_umask = umask (022);
       umask (old_umask);
-      printf ("%03o\n", old_umask);
+
+      if (print_symbolically)
+	print_symbolic_umask (old_umask);
+      else
+	printf ("%03o\n", old_umask);
     }
   fflush (stdout);
   return (EXECUTION_SUCCESS);

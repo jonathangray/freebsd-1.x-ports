@@ -27,13 +27,19 @@
 #include <stdio.h>
 #include <sys/types.h>
 
-#if defined (STANDALONE)
+#if !defined (STANDALONE)
+#  include "posixstat.h"
+#  include "filecntl.h"
+#  include "shell.h"
+#else /* STANDALONE */
+#  include "system.h"
+#  if !defined (S_IXUGO)
+#    define S_IXUGO 0111
+#  endif
 #  if defined (HAVE_UNISTD_H)
 #    include <unistd.h>
 #  endif /* HAVE_UNISTD_H */
-#else /* !STANDALONE */
-#  include "shell.h"
-#endif /* !STANDALONE */
+#endif /* STANDALONE */
 
 #if !defined (_POSIX_VERSION)
 #  include <sys/file.h>
@@ -44,33 +50,16 @@
 extern int errno;
 #endif /* !errno */
 
-#if !defined (STANDALONE)
-#  include "posixstat.h"
-#  include "filecntl.h"
-#else /* STANDALONE */
-#  include "system.h"
-#  if !defined (S_IXUGO)
-#    define S_IXUGO 0111
-#  endif
-#endif /* STANDALONE */
-
 #if !defined (STREQ)
 #  define STREQ(a, b) ((a)[0] == (b)[0] && strcmp (a, b) == 0)
 #endif /* !STREQ */
 
 #if !defined (member)
-#  define member(c, s) (int)((c) ? index ((s), (c)) : 0)
+#  define member(c, s) (int)((c) ? (char *)strchr ((s), (c)) : 0)
 #endif /* !member */
 
-#if defined (STANDALONE) && (defined (USG) || defined (STDC_HEADERS))
-#  if !defined (index)
-#    define index strchr
-#    define rindex strrchr
-#  endif /* !index */
-#endif /* STANDALONE && (USG || STDC_HEADERS) */
-
 /* Make gid_t and uid_t mean something for non-posix systems. */
-#if !defined (_POSIX_VERSION)
+#if !defined (_POSIX_VERSION) && !defined (HAVE_UID_T)
 #  if !defined (gid_t)
 #    define gid_t int
 #  endif
@@ -79,8 +68,23 @@ extern int errno;
 #  endif
 #endif /* !_POSIX_VERSION */
 
-extern gid_t getgid (), getegid ();
+/* What type are the user and group ids?  GID_T is actually the type of
+   the array that getgroups(3) returns. */
+#if defined (SunOS4) || defined (__bsdi__)
+#  define GID_T int
+#  define UID_T int
+#else /* !SunOS4 && !__bsdi__*/
+#  define GID_T gid_t
+#  define UID_T uid_t
+#endif /* !SunOS4 && !__bsdi__ */
+
+#if !defined (Linux) && !defined (USGr4_2)
+extern gid_t getegid ();
 extern uid_t geteuid ();
+#  if !defined (sony)
+extern gid_t getgid ();
+#  endif /* !sony */
+#endif /* !Linux && !USGr4_2 */
 
 #if !defined (R_OK)
 #define R_OK 4
@@ -107,7 +111,8 @@ extern uid_t geteuid ();
 #else
    static jmp_buf test_exit_buf;
    static int test_error_return = 0;
-#  define test_exit(val) test_error_return = val, longjmp (test_exit_buf, 1)
+#  define test_exit(val) \
+	do { test_error_return = val; longjmp (test_exit_buf, 1); } while (0)
 #endif /* STANDALONE */
 
 static int pos;		/* The offset of the current argument in ARGV. */
@@ -167,7 +172,11 @@ eaccess (path, mode)
     return (-1);
 
   if (euid == -1)
+#if defined (SHELL)
+    euid = current_user.euid;
+#else
     euid = geteuid ();
+#endif
 
   if (euid == 0)
     {
@@ -195,20 +204,40 @@ eaccess (path, mode)
 #if defined (HAVE_GETGROUPS)
 /* The number of groups that this user is a member of. */
 static int ngroups = 0;
-static gid_t *group_array = (gid_t *)NULL;
+static GID_T *group_array = (GID_T *)NULL;
 static int default_group_array_size = 0;
 #endif /* HAVE_GETGROUPS */
+
+#if !defined (NOGROUP)
+#  define NOGROUP (GID_T) -1
+#endif
 
 /* Return non-zero if GID is one that we have in our groups list. */
 int
 group_member (gid)
-     gid_t gid;
+     GID_T gid;
 {
-#if !defined (HAVE_GETGROUPS)
-  return ((gid == getgid ()) || (gid == getegid ()));
-#else
-  register int i;
+  static GID_T pgid = NOGROUP;
+  static GID_T egid = NOGROUP;
 
+  if (pgid == NOGROUP)
+#if defined (SHELL)
+    pgid = (GID_T) current_user.gid;
+#else /* !SHELL */
+    pgid = (GID_T) getgid ();
+#endif /* !SHELL */
+
+  if (egid == NOGROUP)
+#if defined (SHELL)
+    egid = (GID_T) current_user.egid;
+#else /* !SHELL */
+    egid = (GID_T) getegid ();
+#endif /* !SHELL */
+
+  if (gid == pgid || gid == egid)
+    return (1);
+
+#if defined (HAVE_GETGROUPS)
   /* getgroups () returns the number of elements that it was able to
      place into the array.  We simply continue to call getgroups ()
      until the number of elements placed into the array is smaller than
@@ -218,9 +247,8 @@ group_member (gid)
     {
       default_group_array_size += 64;
 
-      group_array = (gid_t *)
-	xrealloc (group_array,
-		  default_group_array_size * sizeof (gid_t));
+      group_array = (GID_T *)
+	xrealloc (group_array, default_group_array_size * sizeof (GID_T));
 
       ngroups = getgroups (default_group_array_size, group_array);
     }
@@ -230,19 +258,23 @@ group_member (gid)
     return (0);
 
   /* Search through the list looking for GID. */
-  for (i = 0; i < ngroups; i++)
-    if (gid == group_array[i])
-      return (1);
+  {
+    register int i;
+
+    for (i = 0; i < ngroups; i++)
+      if (gid == group_array[i])
+	return (1);
+  }
+#endif /* HAVE_GETGROUPS */
 
   return (0);
-#endif /* HAVE_GETGROUPS */
 }
 
 /* Increment our position in the argument list.  Check that we're not
    past the end of the argument list.  This check is supressed if the
    argument is FALSE.  Made a macro for efficiency. */
 #if !defined (lint)
-#define advance(f)	(++pos, f && (pos < argc ? 0 : beyond()))
+#define advance(f) do { ++pos; if (f && pos >= argc) beyond (); } while (0)
 #endif
 
 #if !defined (advance)
@@ -257,7 +289,7 @@ advance (f)
 }
 #endif /* advance */
 
-#define unary_advance() (advance (1),++pos)
+#define unary_advance() do { advance (1); ++pos; } while (0)
 
 /*
  * beyond - call when we're beyond the end of the argument list (an
@@ -705,14 +737,18 @@ unary_operator ()
       if (test_stat (argv[pos - 1], &stat_buf) < 0)
 	return (FALSE);
 
-      return (TRUE == (geteuid () == stat_buf.st_uid));
+#if defined (SHELL)
+      return (TRUE == ((UID_T) current_user.euid == (UID_T) stat_buf.st_uid));
+#else
+      return (TRUE == ((UID_T) geteuid () == (UID_T) stat_buf.st_uid));
+#endif /* !SHEL */
 
     case 'G':			/* File is owned by your group? */
       unary_advance ();
       if (test_stat (argv[pos - 1], &stat_buf) < 0)
 	return (FALSE);
 
-      return (TRUE == (getegid () == stat_buf.st_gid));
+      return (TRUE == ((GID_T) getegid () == (GID_T) stat_buf.st_gid));
 
     case 'f':			/* File is a file? */
       unary_advance ();
@@ -1006,8 +1042,7 @@ test_command (margc, margv)
      int margc;
      char **margv;
 {
-  auto int value;
-  int expr ();
+  int value;
 
 #if !defined (STANDALONE)
   int code;

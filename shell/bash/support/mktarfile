@@ -4,7 +4,7 @@
 # $1 is the name of the program.
 # $2 is the version number.
 # Remaining args are files to tar.
-# Optional argument of ~+notar" means don't create the actual tar file,
+# Optional argument of "~+notar" means don't create the actual tar file,
 # just create the symlinked directory.
 
 tar_inhibited=""
@@ -16,12 +16,13 @@ fi
 PROGRAM=$1
 VERSION=$2
 
-shift; shift
-
 if [ "$PROGRAM" = "" -o "$VERSION" = "" ]; then
   echo "Usage: mktarfile [+notar] <progname> <version> <file ...>"
+  echo "Using the \`+notar' option causes a clone directory to be made."
   exit 2;
 fi
+
+shift; shift
 
 TARFILE=$PROGRAM.tar
 TARDIR=$PROGRAM-$VERSION
@@ -47,7 +48,7 @@ for i in $*; do
   filename=$i
   while [ "$filename" ]; do
     remainder=`echo $filename | sed 's@[-_a-zA-Z~0-9.]*/@@'`
-    dir=`echo $filename | sed "s@$remainder@@" | sed "s@/@@"`
+    dir=`echo $filename | sed "s@$remainder\\\$@@" | sed "s@/@@"`
     if [ "$dir" ]; then
        if [ ! -d $where_I_am/$dir ]; then
 	  echo "Making directory $where_I_am/$dir..."
@@ -64,7 +65,9 @@ for i in $*; do
 done
 
 if [ ! "$tar_inhibited" ]; then
+  echo "tar -chf $TARFILE $TARDIR"
   tar -chf $TARFILE $TARDIR
+  echo "rm -rf $TARDIR"
   rm -rf $TARDIR
 fi
 

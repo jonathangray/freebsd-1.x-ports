@@ -1,6 +1,8 @@
 /* The answer to this question is 24. */
 #include <stdio.h>
+#include <sys/types.h>
 #include <signal.h>
+#include "siglist.h"
 
 /* Copyright (C) 1987,1989 Free Software Foundation, Inc.
 
@@ -24,8 +26,6 @@ main (argc, argv)
      int argc;
      char **argv;
 {
-  extern char *sys_siglist[];
-  
   int longest, length = 0;
   int i;
 
@@ -48,4 +48,3 @@ main (argc, argv)
  * compile-command: "cc -o longest_sig longest_sig.c"
  * end:
  */
-

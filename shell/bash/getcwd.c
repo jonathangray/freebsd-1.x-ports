@@ -1,41 +1,102 @@
 /* Copyright (C) 1991 Free Software Foundation, Inc.
-This file is part of the GNU C Library.
+   This file is part of the GNU C Library.
 
-The GNU C Library is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 1, or (at your option)
-any later version.
+   The GNU C Library is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Library General Public License as
+   published by the Free Software Foundation; either version 2 of the
+   License, or (at your option) any later version.
 
-The GNU C Library is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+   The GNU C Library is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Library General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with the GNU C Library; see the file COPYING.  If not, write to
-the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
+   You should have received a copy of the GNU Library General Public
+   License along with the GNU C Library; see the file COPYING.LIB.  If
+   not, write to the Free Software Foundation, Inc., 675 Mass Ave,
+   Cambridge, MA 02139, USA.  */
 
-#include <errno.h>
-#include <limits.h>
-#include <stddef.h>
-#include <dirent.h>
-#include <unistd.h>
 #include <sys/types.h>
+#include <errno.h>
+
+#if defined (HAVE_LIMITS_H)
+#  include <limits.h>
+#endif
+
+#if defined (HAVE_DIRENT_H)
+#  include <dirent.h>
+#else
+#  include <sys/dir.h>
+#  if !defined (dirent)
+#    define dirent direct
+#  endif /* !dirent */
+#endif /* !HAVE_DIRENT_H */
+
+#if defined (HAVE_UNISTD_H)
+#  include <unistd.h>
+#endif
+
+#include "posixstat.h"
 #include "maxpath.h"
-#include <sys/stat.h>
-#include <stdlib.h>
-#include <string.h>
+#include "config.h"
+
+#if defined (HAVE_STDLIB_H)
+#  include <stdlib.h>
+#else
+#  include "ansi_stdlib.h"
+#endif /* !HAVE_STDLIB_H */
+
+#if defined (HAVE_STRING_H)
+#  include <string.h>
+#else
+#  include <strings.h>
+#endif /* !HAVE_STRING_H */
+
+/* Not all systems declare ERRNO in errno.h... and some systems #define it! */
+#if !defined (errno)
+extern int errno;
+#endif /* !errno */
+
+#if defined (__STDC__)
+#  define CONST const
+#  define PTR void *
+#else /* !__STDC__ */
+#  define CONST
+#  define PTR char *
+#endif /* !__STDC__ */
 
 #if !defined (PATH_MAX)
-#  if defined (_POSIX_PATH_MAX)
-#    define PATH_MAX _POSIX_PATH_MAX
-#  else
-#    if defined (MAXPATHLEN)
-#      define PATH_MAX MAXPATHLEN
-#    else
-#      define PATH_MAX 255
-#    endif
-#  endif
+#  if defined (MAXPATHLEN)
+#    define PATH_MAX MAXPATHLEN
+#  else /* !MAXPATHLEN */
+#    define PATH_MAX 1024
+#  endif /* !MAXPATHLEN */
+#endif /* !PATH_MAX */
+
+#if defined (_POSIX_VERSION) || defined (USGr3) || defined (HAVE_DIRENT_H)
+#  if !defined (HAVE_DIRENT)
+#    define HAVE_DIRENT
+#  endif /* !HAVE_DIRENT */
+#endif /* _POSIX_VERSION || USGr3 || HAVE_DIRENT_H */
+
+#if defined (HAVE_DIRENT)
+#  define D_NAMLEN(d)	(strlen ((d)->d_name))
+#else
+#  define D_NAMLEN(d)	((d)->d_namlen)
+#endif /* ! (_POSIX_VERSION || USGr3) */
+
+#if defined (USG) || defined (USGr3)
+#  define d_fileno d_ino
+#endif
+
+#if !defined (alloca)
+extern char *alloca ();
+#endif /* alloca */
+
+/* Heuristic to tell whether or not the current machine has lstat(2).
+   Can probably be fooled easily. */
+#if !defined (S_ISLNK)
+#  define lstat stat
 #endif
 
 /* Get the pathname of the current working directory,
@@ -45,36 +106,54 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
    an array is allocated with `malloc'; the array is SIZE
    bytes long, unless SIZE <= 0, in which case it is as
    big as necessary.  */
-#ifdef __STDC__
-char *getcwd(char *buf, int size) /* from <sys/unistd.h> */
-#else
+#if defined (__STDC__)
+char *
+getcwd (char *buf, int size)
+#else /* !__STDC__ */
 char *
 getcwd (buf, size)
      char *buf;
      size_t size;
-#endif
+#endif /* !__STDC__ */
 {
+  static CONST char dots[]
+    = "../../../../../../../../../../../../../../../../../../../../../../../\
+../../../../../../../../../../../../../../../../../../../../../../../../../../\
+../../../../../../../../../../../../../../../../../../../../../../../../../..";
+  CONST char *dotp, *dotlist;
+  size_t dotsize;
   dev_t rootdev, thisdev;
   ino_t rootino, thisino;
   char path[PATH_MAX + 1];
   register char *pathp;
+  char *pathbuf;
+  size_t pathsize;
   struct stat st;
 
-  pathp = &path[sizeof (path)];
+  if (buf != NULL && size == 0)
+    {
+      errno = EINVAL;
+      return ((char *)NULL);
+    }
+
+  pathsize = sizeof (path);
+  pathp = &path[pathsize];
   *--pathp = '\0';
+  pathbuf = path;
 
   if (stat (".", &st) < 0)
-    return (NULL);
-
+    return ((char *)NULL);
   thisdev = st.st_dev;
   thisino = st.st_ino;
 
   if (stat ("/", &st) < 0)
-    return (NULL);
-
+    return ((char *)NULL);
   rootdev = st.st_dev;
   rootino = st.st_ino;
 
+  dotsize = sizeof (dots) - 1;
+  dotp = &dots[sizeof (dots)];
+  dotlist = dots;
   while (!(thisdev == rootdev && thisino == rootino))
     {
       register DIR *dirstream;
@@ -82,69 +161,110 @@ getcwd (buf, size)
       dev_t dotdev;
       ino_t dotino;
       char mount_point;
+      int namlen;
 
-      /* Move up a directory.  */
-      if (chdir ("..") < 0)
+      /* Look at the parent directory.  */
+      if (dotp == dotlist)
 	{
-	  if (pathp != &path[sizeof (path) - 1])
+	  /* My, what a deep directory tree you have, Grandma.  */
+	  char *new;
+	  if (dotlist == dots)
 	    {
-	      /* Try to get back to the original directory.
-		 This is the only place where this is possible.  */
-	      int save = errno;
-	      (void) chdir (pathp);
-	      errno = save;
+	      new = malloc (dotsize * 2 + 1);
+	      if (new == NULL)
+		goto lose;
+	      memcpy (new, dots, dotsize);
 	    }
-	  return (NULL);
+	  else
+	    {
+	      new = realloc ((PTR) dotlist, dotsize * 2 + 1);
+	      if (new == NULL)
+		goto lose;
+	    }
+	  memcpy (&new[dotsize], new, dotsize);
+	  dotp = &new[dotsize];
+	  dotsize *= 2;
+	  new[dotsize] = '\0';
+	  dotlist = new;
 	}
 
-      /* Figure out if this directory is a mount point.  */
-      if (stat(".", &st) < 0)
-	return (NULL);
+      dotp -= 3;
 
+      /* Figure out if this directory is a mount point.  */
+      if (stat (dotp, &st) < 0)
+	goto lose;
       dotdev = st.st_dev;
       dotino = st.st_ino;
-      mount_point = (dotdev != thisdev);
+      mount_point = dotdev != thisdev;
 
       /* Search for the last directory.  */
-      dirstream = opendir(".");
+      dirstream = opendir (dotp);
       if (dirstream == NULL)
-	return (NULL);
-
-      while ((d = readdir(dirstream)) != NULL)
+	goto lose;
+      while ((d = readdir (dirstream)) != NULL)
 	{
 	  if (d->d_name[0] == '.' &&
-	      (d->d_name[1] == 0 ||
-	       (d->d_name[2] == 0 && d->d_name[1] == '.')))
+	      (d->d_name[1] == '\0' ||
+		(d->d_name[1] == '.' && d->d_name[2] == '\0')))
 	    continue;
-
-	  /* if (mount_point || d->d_fileno == thisino) */
-	  if (mount_point || d->d_ino == thisino)
+	  if (mount_point || d->d_fileno == thisino)
 	    {
-	      if (stat(d->d_name, &st) < 0)
+	      char *name;
+
+	      namlen = D_NAMLEN(d);
+	      name = (char *)
+		alloca (dotlist + dotsize - dotp + 1 + namlen + 1);
+	      memcpy (name, dotp, dotlist + dotsize - dotp);
+	      name[dotlist + dotsize - dotp] = '/';
+	      memcpy (&name[dotlist + dotsize - dotp + 1],
+		      d->d_name, namlen + 1);
+	      if (lstat (name, &st) < 0)
 		{
 		  int save = errno;
-		  (void) closedir(dirstream);
+		  (void) closedir (dirstream);
 		  errno = save;
-		  return (NULL);
+		  goto lose;
 		}
-
 	      if (st.st_dev == thisdev && st.st_ino == thisino)
 		break;
 	    }
 	}
-
       if (d == NULL)
 	{
 	  int save = errno;
 	  (void) closedir (dirstream);
 	  errno = save;
-	  return (NULL);
+	  goto lose;
 	}
       else
 	{
-	  int d_namlen=strlen(d->d_name); /* new line */
-	  pathp -= d_namlen;
-	  (void) memcpy(pathp, d->d_name, d_namlen);
+	  size_t space;
+
+	  while ((space = pathp - pathbuf) <= namlen)
+	    {
+	      char *new;
+
+	      if (pathbuf == path)
+		{
+		  new = malloc (pathsize * 2);
+		  if (!new)
+		    goto lose;
+		}
+	      else
+		{
+		  new = realloc ((PTR) pathbuf, (pathsize * 2));
+		  if (!new)
+		    goto lose;
+		  pathp = new + space;
+		}
+	      (void) memcpy (new + pathsize + space, pathp, pathsize - space);
+	      pathp = new + pathsize + space;
+	      pathbuf = new;
+	      pathsize *= 2;
+	    }
+
+	  pathp -= namlen;
+	  (void) memcpy (pathp, d->d_name, namlen);
 	  *--pathp = '/';
 	  (void) closedir (dirstream);
 	}
@@ -153,29 +273,70 @@ getcwd (buf, size)
       thisino = dotino;
     }
 
-  if (pathp == &path[sizeof (path) - 1])
+  if (pathp == &path[sizeof(path) - 1])
     *--pathp = '/';
 
-  if (chdir (pathp) < 0)
-    return (NULL);
+  if (dotlist != dots)
+    free ((PTR) dotlist);
 
   {
-    size_t len = &path[sizeof (path)] - pathp;
+    size_t len = pathbuf + pathsize - pathp;
     if (buf == NULL)
       {
 	if (len < (size_t) size)
 	  len = size;
 	buf = (char *) malloc (len);
 	if (buf == NULL)
-	  return (NULL);
+	  goto lose2;
       }
     else if ((size_t) size < len)
       {
 	errno = ERANGE;
-	return (NULL);
+	goto lose2;
       }
-    (void) memcpy ((char *) buf, (char *) pathp, len);
+    (void) memcpy((PTR) buf, (PTR) pathp, len);
   }
 
+  if (pathbuf != path)
+    free (pathbuf);
+
   return (buf);
+
+ lose:
+  if ((dotlist != dots) && dotlist)
+    {
+      int e = errno;
+      free ((PTR) dotlist);
+      errno = e;
+    }
+
+ lose2:
+  if ((pathbuf != path) && pathbuf)
+    {
+      int e = errno;
+      free ((PTR) pathbuf);
+      errno = e;
+    }
+  return ((char *)NULL);
 }
+
+#if defined (TEST)
+#  include <stdio.h>
+main (argc, argv)
+     int argc;
+     char **argv;
+{
+  char b[PATH_MAX];
+
+  if (getcwd(b, sizeof(b)))
+    {
+      printf ("%s\n", b);
+      exit (0);
+    }
+  else
+    {
+      perror ("cwd: getcwd");
+      exit (1);
+    }
+}
+#endif /* TEST */

@@ -23,13 +23,25 @@ $PRODUCES cd.c
 
 #include <stdio.h>
 #include <sys/param.h>
+
+#if defined (HAVE_STRING_H)
+#  include <string.h>
+#else /* !HAVE_STRING_H */
+#  include <strings.h>
+#endif /* !HAVE_STRING_H */
+
+#include <errno.h>
+
 #include "../shell.h"
 #include "../maxpath.h"
 
-static int change_to_directory (), cd_to_string ();
+#include "common.h"
 
-/* Keeps track of the current working directory. */
-extern char *the_current_working_directory;
+#if !defined (errno)
+extern int errno;
+#endif /* !errno */
+
+static int change_to_directory (), cd_to_string ();
 
 /* By default, follow the symbolic links as if they were real directories
    while hacking the `cd' command.  This means that `cd ..' moves up in
@@ -52,20 +64,27 @@ name.  If that variable has a value, then cd to the value of that
 variable.
 $END
 
+/* This builtin is ultimately the way that all user-visible commands should
+   change the current working directory.  It is called by cd_to_string (),
+   so the programming interface is simple, and it handles errors and
+   restrictions properly. */
 int
 cd_builtin (list)
      WORD_LIST *list;
 {
   char *dirname;
 
+#if defined (RESTRICTED_SHELL)
   {
     extern int restricted;
+
     if (restricted)
       {
-	builtin_error ("Privileged command");
+	builtin_error ("restricted");
 	return (EXECUTION_FAILURE);
       }
   }
+#endif /* RESTRICTED_SHELL */
 
   if (list)
     {
@@ -111,7 +130,6 @@ cd_builtin (list)
 		{
 		  if (strncmp (dir, "./", 2) != 0)
 		    printf ("%s\n", dir);
-		  dirname = dir;
 
 		  goto bind_and_exit;
 		}
@@ -164,14 +182,14 @@ cd_builtin (list)
 
     bind_and_exit:
       {
-	char *get_working_directory (), *get_string_value ();
-	char *directory = get_working_directory ("cd");
+	char *directory;
+
+	directory = get_working_directory ("cd");
 
 	bind_variable ("OLDPWD", get_string_value ("PWD"));
 	bind_variable ("PWD", directory);
 
-	if (directory)
-	  free (directory);
+	maybe_free (directory);
       }
       return (EXECUTION_SUCCESS);
     }
@@ -191,7 +209,7 @@ static int verbatim_pwd = 1;
 pwd_builtin (list)
      WORD_LIST *list;
 {
-  char *get_working_directory (), *getwd (), *directory;
+  char *getwd (), *directory;
 
   no_args (list);
 
@@ -240,8 +258,6 @@ dir	adds DIR to the directory stack at the top, making it the
 	new current working directory.
 
 You can see the directory stack with the `dirs' command.
-If the variable `pushd_silent' is not set and the pushd command
-was successful, a `dirs' is be performed as well.
 $END
 
 #if defined (PUSHD_AND_POPD)
@@ -259,7 +275,7 @@ static int directory_list_offset = 0;
 pushd_builtin (list)
      WORD_LIST *list;
 {
-  char *temp, *current_directory, *get_working_directory ();
+  char *temp, *current_directory;
   int j = directory_list_offset - 1;
   char direction = '+';
 
@@ -337,8 +353,7 @@ pushd_builtin (list)
 			free (temp);
 		      }
 
-		    if ((tt == EXECUTION_SUCCESS) &&
-			(!find_variable ("pushd_silent")))
+		    if ((tt == EXECUTION_SUCCESS))
 		      dirs_builtin ((WORD_LIST *)NULL);
 
 		    return (tt);
@@ -363,8 +378,7 @@ pushd_builtin (list)
 	    }
 	  pushd_directory_list[directory_list_offset++] = current_directory;
 
-	  if (!find_variable ("pushd_silent"))
-	    dirs_builtin ((WORD_LIST *)NULL);
+	  dirs_builtin ((WORD_LIST *)NULL);
 
 	  return (EXECUTION_SUCCESS);
 	}
@@ -396,7 +410,7 @@ dirs_builtin (list)
      WORD_LIST *list;
 {
   register int i, format = 0;
-  char *temp, *polite_directory_format (), *get_working_directory ();
+  char *temp, *polite_directory_format ();
 
   /* Maybe do long form? */
   if (list)
@@ -445,8 +459,6 @@ top directory.
 	removes the last directory, `popd -1' the next to last.
 
 You can see the directory stack with the `dirs' command.
-If the variable 'pushd_silent' is not set and the popd command
-was successful, a 'dirs' will be performed as well..
 $END
 
 #if defined (PUSHD_AND_POPD)
@@ -510,8 +522,7 @@ popd_builtin (list)
 	pushd_directory_list[i] = pushd_directory_list[i + 1];
     }
 
-  if (!find_variable ("pushd_silent"))
-    dirs_builtin ((WORD_LIST *)NULL);
+  dirs_builtin ((WORD_LIST *)NULL);
 
   return (EXECUTION_SUCCESS);
 }
@@ -519,20 +530,22 @@ popd_builtin (list)
 
 /* Do the work of changing to the directory NEWDIR.  Handle symbolic
    link following, etc. */
+
 static int
 change_to_directory (newdir)
      char *newdir;
 {
-  char *get_working_directory (), *make_absolute ();
   char *t;
 
   if (follow_symbolic_links)
     {
+      int chdir_return = 0;
+      char *tdir = (char *)NULL;
+
       if (!the_current_working_directory)
 	{
 	  t = get_working_directory ("cd_links");
-	  if (t)
-	    free (t);
+	  maybe_free (t);
 	}
 
       if (the_current_working_directory)
@@ -540,28 +553,56 @@ change_to_directory (newdir)
       else
 	t = savestring (newdir);
 
-      /* Get rid of trailing `/'. */
-      {
-	register int len_t = strlen (t);
-	if (len_t > 1)
-	  {
-	    --len_t;
-	    if (t[len_t] == '/')
-	      t[len_t] = '\0';
-	  }
-      }
+      /* TDIR is the canonicalized absolute pathname of the NEWDIR. */
+      tdir = canonicalize_pathname (t);
 
-      if (chdir (t) < 0)
+      /* Use the canonicalized version of NEWDIR, or, if canonicalization
+	 failed, use the non-canonical form. */
+      if (tdir && *tdir)
+	free (t);
+      else
 	{
-	  free (t);
-	  return (0);
+	  maybe_free (tdir);
+
+	  tdir = t;
 	}
 
-      if (the_current_working_directory)
-	strcpy (the_current_working_directory, t);
+      if (chdir (tdir) < 0)
+	{
+	  int err;
 
-      free (t);
-      return (1);
+	  chdir_return = 0;
+	  free (tdir);
+
+	  err = errno;
+
+	  /* We failed changing to the canonicalized directory name.  Try
+	     what the user passed verbatim.  If we succeed, reinitialize
+	     the_current_working_directory. */
+	  if (chdir (newdir) == 0)
+	    {
+	      chdir_return = 1;
+	      if (the_current_working_directory)
+		{
+		  free (the_current_working_directory);
+		  the_current_working_directory = (char *)NULL;
+		}
+
+	      tdir = get_working_directory ("cd");
+	      maybe_free (tdir);
+	    }
+	  else
+	    errno = err;
+	}
+      else
+	{
+	  chdir_return = 1;
+
+	  maybe_free (the_current_working_directory);
+	  the_current_working_directory = tdir;
+	}
+
+      return (chdir_return);
     }
   else
     {
@@ -579,10 +620,8 @@ static int
 cd_to_string (name)
      char *name;
 {
-  extern WORD_LIST *make_word_list ();
   WORD_LIST *tlist = make_word_list (make_word (name), NULL);
   int result = (cd_builtin (tlist));
   dispose_words (tlist);
   return (result);
 }
-

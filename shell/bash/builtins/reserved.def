@@ -1,8 +1,8 @@
 This file is reserved.def, in which the shell reserved words are defined.
-It has no direct C file production, but defines builtins for the help
-command.
+It has no direct C file production, but defines builtins for the Bash
+builtin help command.
 
-Copyright (C) 1987, 1989, 1991 Free Software Foundation, Inc.
+Copyright (C) 1987, 1989, 1991, 1992 Free Software Foundation, Inc.
 
 This file is part of GNU Bash, the Bourne Again SHell.
 
@@ -35,9 +35,13 @@ Selectively execute COMMANDS based upon WORD matching PATTERN.  The
 $END
 
 $BUILTIN if
-$SHORT_DOC if COMMANDS; then COMMANDS; [else COMMANDS;] fi
-`if' executes the `then' COMMANDS only if the final command in the
-`if' COMMANDS has an exit status of zero.
+$SHORT_DOC if COMMANDS; then COMMANDS; [ elif COMMANDS; then COMMANDS; ]... [ else COMMANDS; ] fi
+The if COMMANDS are executed.  If the exit status is zero, then the then
+COMMANDS are executed.  Otherwise, each of the elif COMMANDS are executed
+in turn, and if the exit status is zero, the corresponding then COMMANDS
+are executed and the if command completes.  Otherwise, the else COMMANDS
+are executed, if present.  The exit status is the exit status of the last
+command executed, or zero if no condition tested true.
 $END
 
 $BUILTIN while
@@ -82,10 +86,12 @@ BASH_VERSION    The version numbers of this Bash.
 CDPATH          A colon separated list of directories to search
 		when the argument to `cd' is not found in the current
 		directory.
+#if defined (HISTORY)
 HISTFILE        The name of the file where your command history is stored.
 HISTFILESIZE    The maximum number of lines this file can contain.
 HISTSIZE        The maximum number of history lines that a running
 		shell can access.
+#endif /* HISTORY */
 HOME            The complete pathname to your login directory.
 HOSTTYPE        The type of CPU and OS this version of Bash is running
 		under.
@@ -98,16 +104,33 @@ TERM            The name of the current terminal type (/etc/termcap).
 auto_resume     Non-null means a command word appearing on a line by
 		itself is first looked for in the list of currently
 		stopped jobs.  If found there, that job is foregrounded.
+#if defined (HISTORY)
+command_oriented_history
+                Non-null means to save multiple-line commands together on
+                a single history line.  For example:
+
+                   for i = *.c; do
+                     echo $i
+                   done
+
+                turns into:
+
+                   for i = *.c; do echo $i; done
+
+                when it is saved onto the history list.
+#  if defined (BANG_HISTORY)
 histchars       Characters controlling history expansion and quick
 		substitution.  The first character is the history
 		substitution character, usually `!'.  The second is
 		the `quick substition' character, usually `^'.
+#  endif /* BANG_HISTORY */
 history_control Set to a value of "ignorespace", it means don't enter
 		lines which begin with a SPC on the history list.  Set
 		to a value of "ignoredups", it means don't enter lines
 		which match the last entered line.  Unset, or any
 		other value than those above mean to save all lines
 		on the history list.
+#endif /* HISTORY */
 hostname_completion_file
 		Contains the name of a file in the same format as
 		`/etc/hosts' that should be read when Bash needs to
@@ -122,7 +145,9 @@ no_exit_on_failed_exec
 		If this variable exists, the shell will not exit in
 		the case that it couldn't execute the file specified
 		in the `exec' command.
+#if defined (JOB_CONTROL)
 notify          notify of job termination immediately.
+#endif
 $END
 
 

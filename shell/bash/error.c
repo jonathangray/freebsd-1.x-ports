@@ -1,17 +1,24 @@
 /* error.c -- Functions for handling errors. */
 
 #include <stdio.h>
+#include <fcntl.h>
 
 #if defined (HAVE_VFPRINTF)
 #include <varargs.h>
 #endif
 
 #include <errno.h>
+#if !defined (errno)
 extern int errno;
-extern char *strerror ();
+#endif /* !errno */
 
+#include "bashansi.h"
 #include "flags.h"
 #include "error.h"
+
+extern char *shell_name;
+extern char *base_pathname ();
+extern char *strerror ();
 
 /* Report an error having to do with FILENAME. */
 void
@@ -57,11 +64,7 @@ void
 report_error (format, arg1, arg2, arg3, arg4, arg5)
      char *format;
 {
-#if defined (NOTDEF)
-  extern char *shell_name, *base_pathname ();
-
   fprintf (stderr, "%s: ", base_pathname (shell_name));
-#endif /* NOTDEF */
 
   fprintf (stderr, format, arg1, arg2, arg3, arg4, arg5);
   fprintf (stderr, "\n");
@@ -77,14 +80,23 @@ fatal_error (format, arg1, arg2, arg3, arg4, arg5)
   exit (2);
 }
 
+void
+internal_error (format, arg1, arg2, arg3, arg4, arg5)
+     char *format;
+{
+  fprintf (stderr, "%s: ", base_pathname (shell_name));
+
+  fprintf (stderr, format, arg1, arg2, arg3, arg4, arg5);
+  fprintf (stderr, "\n");
+}
+
 #else /* We have VARARGS support, so use it. */
 
 void
 programming_error (va_alist)
      va_dcl
 {
-  extern char *the_current_maintainer, *shell_name;
-  extern char *base_pathname ();
+  extern char *the_current_maintainer;
   va_list args;
   char *format;
 
@@ -124,11 +136,7 @@ report_error (va_alist)
   va_list args;
   char *format;
 
-#if defined (NOTDEF)
-  extern char *shell_name, *base_pathname ();
-
   fprintf (stderr, "%s: ", base_pathname (shell_name));
-#endif /* NOTDEF */
   va_start (args);
   format = va_arg (args, char *);
   vfprintf (stderr, format, args);
@@ -145,7 +153,6 @@ fatal_error (va_alist)
 {
   va_list args;
   char *format;
-  extern char *shell_name, *base_pathname ();
 
   fprintf (stderr, "%s: ", base_pathname (shell_name));
   va_start (args);
@@ -156,4 +163,66 @@ fatal_error (va_alist)
   va_end (args);
   exit (2);
 }
+
+void
+internal_error (va_alist)
+     va_dcl
+{
+  va_list args;
+  char *format;
+
+  fprintf (stderr, "%s: ", base_pathname (shell_name));
+  va_start (args);
+  format = va_arg (args, char *);
+  vfprintf (stderr, format, args);
+  fprintf (stderr, "\n");
+
+  va_end (args);
+}
+
+itrace (va_alist)
+     va_dcl
+{
+  va_list args;
+  char *format;
+
+  fprintf(stderr, "TRACE: pid %d: ", getpid());
+  va_start (args);
+  format = va_arg (args, char *);
+  vfprintf (stderr, format, args);
+  fprintf (stderr, "\n");
+
+  va_end (args);
+
+  fflush(stderr);
+}
+
+#if 0
+/* A trace function for silent debugging -- doesn't require a control
+   terminal. */
+trace (va_alist)
+     va_dcl
+{
+  va_list args;
+  char *format;
+  static FILE *tracefp = (FILE *)NULL;
+
+  if (tracefp == NULL)
+    tracefp = fopen("/usr/tmp/bash-trace.log", "a+");
+
+  if (tracefp == NULL)
+    tracefp = stderr;
+  else
+    fcntl (fileno (tracefp), F_SETFD, 1);     /* close-on-exec */
+
+  va_start (args);
+  format = va_arg (args, char *);
+  vfprintf (tracefp, format, args);
+  fprintf (tracefp, "\n");
+
+  va_end (args);
+
+  fflush(tracefp);
+}
+#endif
 #endif /* HAVE_VFPRINTF */

@@ -30,15 +30,17 @@
   Sunday, January 10th, 1988.
   Initial author: Brian Fox
 */
+#define INSTALL_DEBUG_MODE
 
-#include <stdio.h>
 #include <sys/types.h>
+#include <stdio.h>
 #include <signal.h>
 #include <errno.h>
 #include <sys/file.h>
 #include <pwd.h>
 #include "posixstat.h"
 #include "filecntl.h"
+#include "bashansi.h"
 
 #if defined (HAVE_VFPRINTF)
 #include <varargs.h>
@@ -51,22 +53,40 @@
 #include "jobs.h"
 #endif /* JOB_CONTROL */
 
-#if defined (USG) && !defined (isc386) && !defined (sgi)
-struct passwd *getpwuid ();
+#if defined (BUFFERED_INPUT)
+#  include "input.h"
+#endif /* BUFFERED_INPUT */
+
+#if defined (USG) && !defined (isc386) && !defined (sgi) && !defined (Linux)
+extern struct passwd *getpwuid ();
 #endif
 
 extern char *dist_version;
 extern int build_version;
+
+#if defined (HISTORY)
 extern void using_history ();
+#endif /* HISTORY */
+
+extern char *find_path_file ();
+extern char *tilde_expand ();
+extern char *decode_prompt_string ();
 
 extern int yydebug;
 #if !defined (errno)
 extern int errno;
 #endif
 
+extern int subshell_environment; /* Found in execute_cmd.c. */
+
+#if defined (RESTRICTED_SHELL)
+/* Non-zero means this shell is restricted. */
+extern int restricted;		/* in flags.c */
+#endif
+
 /* Non-zero means that this shell has already been run; i.e. you should
    call shell_reinitialize () if you need to start afresh. */
-int shell_initialized = 0;
+static int shell_initialized = 0;
 
 /* The current maintainer of the shell.  You change this in the
    Makefile. */
@@ -76,15 +96,14 @@ int shell_initialized = 0;
 
 char *the_current_maintainer = MAINTAINER;
 
-#ifndef PPROMPT
-#define PPROMPT "bash\\$ "
+#if !defined (PPROMPT)
+#  define PPROMPT "bash\\$ "
 #endif
 char *primary_prompt = PPROMPT;
 
 #if !defined (SPROMPT)
 #  define SPROMPT "> "
 #endif
-
 char *secondary_prompt = SPROMPT;
 
 COMMAND *global_command = (COMMAND *)NULL;
@@ -92,8 +111,11 @@ COMMAND *global_command = (COMMAND *)NULL;
 /* Non-zero after SIGINT. */
 int interrupt_state = 0;
 
-/* The current user's name. */
-char *current_user_name = (char *)NULL;
+/* Information about the current user. */
+struct user_info current_user =
+{
+  -1, -1, -1, -1, (char *)NULL, (char *)NULL, (char *)NULL
+};
 
 /* The current host's name. */
 char *current_host_name = (char *)NULL;
@@ -113,13 +135,20 @@ int interactive = 0;
 /* Non-zero means that the shell was started as an interactive shell. */
 int interactive_shell = 0;
 
+/* Tells what state the shell was in when it started:
+	0 = non-interactive shell script
+	1 = interactive
+	2 = -c command
+   This is a superset of the information provided by interactive_shell.
+*/
+int startup_state = 0;
+
+#if defined (HISTORY)
 /* Non-zero means to remember lines typed to the shell on the history
    list.  This is different than the user-controlled behaviour; this
    becomes zero when we read lines from a file, for example. */
 int remember_on_history = 1;
-
-/* Non-zero means this shell is restricted. */
-int restricted = 0;
+#endif /* HISTORY */
 
 /* Special debugging helper. */
 int debugging_login_shell = 0;
@@ -156,46 +185,53 @@ char *shell_name = (char *)NULL;
 time_t shell_start_time;
 
 /* The name of the .(shell)rc file. */
-char *bashrc_file = "~/.bashrc";
+static char *bashrc_file = "~/.bashrc";
 
 /* Non-zero means to act more like the Bourne shell on startup. */
-int act_like_sh = 0;
+static int act_like_sh = 0;
 
 /* Values for the long-winded argument names. */
-int debugging = 0;		/* Do debugging things. */
-int no_rc = 0;			/* Don't execute ~/.bashrc */
-int no_profile = 0;		/* Don't execute .profile */
-int do_version = 0;		/* Display interesting version info. */
-int quiet = 0;			/* Be quiet when starting up. */
-int make_login_shell = 0;	/* Make this shell be a `-bash' shell. */
+static int debugging = 0;		/* Do debugging things. */
+static int no_rc = 0;			/* Don't execute ~/.bashrc */
+static int no_profile = 0;		/* Don't execute .profile */
+static int do_version = 0;		/* Display interesting version info. */
+static int quiet = 0;			/* Be quiet when starting up. */
+static int make_login_shell = 0;	/* Make this shell be a `-bash' shell. */
+
 int no_line_editing = 0;	/* Don't do fancy line editing. */
-int no_brace_expansion = 0;	/* Non-zero means no foo{a,b} -> fooa fooa. */
+int no_brace_expansion = 0;	/* Non-zero means no foo{a,b} -> fooa foob. */
+
+int posixly_correct = 0;	/* Non-zero means posix.2 superset. */
 
 /* Some long-winded argument names.  These are obviously new. */
 #define Int 1
 #define Charp 2
 struct {
   char *name;
-  int *value;
   int type;
+  int *int_value;
+  char **char_value;
 } long_args[] = {
-  { "debug", &debugging, Int },
-  { "norc", &no_rc, Int },
-  { "noprofile", &no_profile, Int },
-  { "rcfile", (int *)&bashrc_file, Charp},
-  { "version", &do_version, Int},
-  { "quiet", &quiet, Int},
-  { "login", &make_login_shell, Int},
-  { "nolineediting", &no_line_editing, Int},
-  { "nobraceexpansion", &no_brace_expansion, Int},
-  { (char *)NULL, (int *)0x0, 0 }
+  { "debug", Int, &debugging, (char **)0x0 },
+  { "norc", Int, &no_rc, (char **)0x0 },
+  { "noprofile", Int, &no_profile, (char **)0x0 },
+  { "rcfile", Charp, (int *)0x0, &bashrc_file },
+  { "version", Int, &do_version, (char **)0x0 },
+  { "quiet", Int, &quiet, (char **)0x0 },
+  { "login", Int, &make_login_shell, (char **)0x0 },
+  { "nolineediting", Int, &no_line_editing, (char **)0x0 },
+  { "nobraceexpansion", Int, &no_brace_expansion, (char **)0x0 },
+  { "posix", Int, &posixly_correct, (char **)0x0 },
+  { (char *)0x0, Int, (int *)0x0, (char **)0x0 }
 };
 
+#if defined (HISTORY)
 /* The number of lines that Bash has added to this history session. */
 int history_lines_this_session = 0;
 
 /* The number of lines that Bash has read from the history file. */
 int history_lines_in_file = 0;
+#endif /* HISTORY */
 
 /* These are extern so execute_simple_command can set them, and then
    longjmp back to main to execute a shell script, instead of calling
@@ -206,17 +242,25 @@ int subshell_argc;
 char **subshell_argv;
 char **subshell_envp;
 
+#if defined (BUFFERED_INPUT)
+/* The file descriptor from which the shell is reading input. */
+int default_buffered_input = -1;
+#endif
+
+static char *local_pending_command = (char *)NULL;
+
+static int issock ();
+static void run_startup_files ();
+
 main (argc, argv, env)
      int argc;
      char **argv, **env;
 {
   extern int last_command_exit_value;
-  extern char *base_pathname ();
   register int i;
   int arg_index, locally_skip_execution;
   int top_level_arg_index, read_from_stdin;
   FILE *default_input;
-  char *local_pending_command = (char *)NULL;
 #if defined (JOB_CONTROL)
   extern int job_control;
 #endif /* JOB_CONTROL */
@@ -249,6 +293,25 @@ main (argc, argv, env)
   /* Wait forever if we are debugging a login shell. */
   while (debugging_login_shell);
 
+  current_user.uid = getuid ();
+  current_user.gid = getgid ();
+  current_user.euid = geteuid ();
+  current_user.egid = getegid ();
+
+  /* See whether or not we are running setuid or setgid. */
+  privileged_mode = (current_user.uid != current_user.euid) ||
+		    (current_user.gid != current_user.egid);
+
+  posixly_correct = getenv ("POSIXLY_CORRECT") != (char *)NULL;
+
+#if defined (USE_GNU_MALLOC_LIBRARY)
+  {
+    extern void programming_error ();
+
+    mcheck (programming_error, (void (*) ())0);
+  }
+#endif /* USE_GNU_MALLOC_LIBRARY */
+
   if (setjmp (subshell_top_level))
     {
       argc = subshell_argc;
@@ -262,6 +325,9 @@ main (argc, argv, env)
   locally_skip_execution = 0;
   read_from_stdin = 0;
   default_input = stdin;
+#if defined (BUFFERED_INPUT)
+  default_buffered_input = -1;
+#endif
 
   /* Fix for the `infinite process creation' bug when running shell scripts
      from startup files on System V. */
@@ -312,7 +378,7 @@ main (argc, argv, env)
   shell_start_time = NOW;	/* NOW now defined in general.h */
 
   /* A program may start an interactive shell with
-        "execl ("/bin/bash", "-", NULL)".
+	  "execl ("/bin/bash", "-", NULL)".
      If so, default the name of this shell to our name. */
   if (!shell_name || !*shell_name || (strcmp (shell_name, "-") == 0))
     shell_name = "bash";
@@ -327,7 +393,7 @@ main (argc, argv, env)
 	  if (strcmp (&(argv[arg_index][1]), long_args[i].name) == 0)
 	    {
 	      if (long_args[i].type == Int)
-		*(long_args[i].value) = 1;
+		*(long_args[i].int_value) = 1;
 	      else
 		{
 		  if (!argv[++arg_index])
@@ -337,7 +403,7 @@ main (argc, argv, env)
 		      exit (1);
 		    }
 		  else
-		    *long_args[i].value = (int)argv[arg_index];
+		    *long_args[i].char_value = argv[arg_index];
 		}
 	      goto handle_next_arg;
 	    }
@@ -347,9 +413,16 @@ main (argc, argv, env)
       arg_index++;
     }
 
+  /* If we're in a strict Posix.2 mode, turn on interactive comments. */
+  if (posixly_correct)
+    interactive_comments = 1;
+
   /* If user supplied the "-login" flag, then set and invert LOGIN_SHELL. */
   if (make_login_shell)
-    login_shell = -++login_shell;
+    {
+      login_shell++;
+      login_shell = -login_shell;
+    }
 
   /* All done with full word args; do standard shell arg parsing.*/
   while (arg_index != argc && argv[arg_index] &&
@@ -437,15 +510,18 @@ main (argc, argv, env)
        isatty (fileno (stdin)) &&	/* Input is a terminal and */
        isatty (fileno (stdout))))	/* output is a terminal. */
     {
-      interactive_shell = 1;
+      interactive_shell = startup_state = 1;
       interactive = 1;
     }
   else
     {
+#if defined (HISTORY)
       history_expansion = 0;
       remember_on_history = 0;
-      interactive_shell = 0;
+#endif /* HISTORY */
+      interactive_shell = startup_state = 0;
       interactive = 0;
+      no_line_editing = 1;
 #if defined (JOB_CONTROL)
       job_control = 0;
 #endif /* JOB_CONTROL */
@@ -474,7 +550,7 @@ main (argc, argv, env)
 
   if (interactive_shell)
     {
-      char *term = (char *)getenv ("TERM");
+      char *term = getenv ("TERM");
       if (term && (strcmp (term, "emacs") == 0))
 	no_line_editing = 1;
     }
@@ -518,101 +594,47 @@ main (argc, argv, env)
     }
 
   if (!locally_skip_execution)
-    {
-      if (login_shell)
-	{
-	  /* We don't execute .bashrc for login shells. */
-	  no_rc++;
-#if defined (NOTDEF)
-	  if (getenv ("POSIXLY_CORRECT"))
-#endif /* NOTDEF */
-	    maybe_execute_file ("/etc/profile");
-	}
+    run_startup_files ();
 
-      if (login_shell && !no_profile)
-	{
-	  if (act_like_sh)
-	    maybe_execute_file ("~/.profile");
-	  else
-	    {
-	      if (maybe_execute_file ("~/.bash_profile") == 0)
-		if (maybe_execute_file ("~/.bash_login") == 0)
-		  maybe_execute_file ("~/.profile");
-	    }
+#if defined (RESTRICTED_SHELL)
+      /* I turn on the restrictions afterwards because it is explictly
+	 stated in the POSIX spec that PATH cannot be set in a restricted
+	 shell, except in .profile. */
+    maybe_make_restricted (shell_name);
+#endif /* RESTRICTED_SHELL */
 
-	/* I turn on the restrictions afterwards because it is explictly
-	   stated in the POSIX spec that PATH cannot be set in a restricted
-	   shell, except in .profile. */
-	  if (*++(argv[0]) == 'r')
-	    {
-	      set_var_read_only ("PATH");
-	      set_var_read_only ("SHELL");
-	      restricted++;
-	    }
-	}
+    if (local_pending_command)
+      {
+	/* Bind remaining args to $1 ... $n */
+	WORD_LIST *args = (WORD_LIST *)NULL;
+	while (arg_index != argc)
+	  args = make_word_list (make_word (argv[arg_index++]), args);
+	if (args)
+	  {
+	    args = (WORD_LIST *)reverse_list (args);
+	    if (posixly_correct)
+	      {
+		/* Posix.2 4.56.3 says that the first argument after
+		   sh -c command becomes $0, and the rest of the arguments
+		   are bound to $1 ... $N. */
+		shell_name = savestring (args->word->word);
+		dollar_vars[0] = savestring (shell_name);
+		remember_args (args->next, 1);
+	      }
+	    else
+	      remember_args (args, 1);
+	    dispose_words (args);
+	  }
 
-      /* Execute ~/.bashrc for most shells.  Never execute it if
-	 ACT_LIKE_SH is set, or if NO_RC is set.
-
-	 If the executable file "/usr/gnu/src/bash/foo" contains:
-
-	   #!/usr/gnu/bin/bash
-	   echo hello
-
-	 then:
-
-	 COMMAND	    EXECUTE BASHRC
-	 --------------------------------
-	 bash -c foo		NO
-	 bash foo		NO
-	 foo			NO
-	 rsh machine ls		YES (for rsh, which calls `bash -c')
-	 rsh machine foo	YES (for shell started by rsh) NO (for foo!)
-	 echo ls | bash		NO
-	 login			YES
-	 bash			YES
-      */
-      if (!act_like_sh && !no_rc &&
-	  (interactive_shell || (!isatty (fileno (stdin)) &&
-				 local_pending_command)))
-	maybe_execute_file (bashrc_file);
-
-      /* Try a TMB suggestion.  If running a script, then execute the
-	 file mentioned in the ENV variable. */
-      if (!interactive_shell)
-	{
-	  char *env_file = (char *)getenv ("ENV");
-	  if (env_file && *env_file)
-	    {
-	      WORD_LIST *list, *expand_string_unsplit ();
-	      char *expanded_file_name, *string_list ();
-
-	      list = expand_string_unsplit (env_file, 1);
-	      if (list)
-		{
-		  expanded_file_name = string_list (list);
-		  dispose_words (list);
-		  if (expanded_file_name && *expanded_file_name)
-		    maybe_execute_file (expanded_file_name);
-		  free (expanded_file_name);
-		}
-	    }
-	}
-
-      if (local_pending_command)
-	{
-	  /* Bind remaining args to $1 ... $n */
-	  WORD_LIST *args = (WORD_LIST *)NULL;
-	  while (arg_index != argc)
-	    args = make_word_list (make_word (argv[arg_index++]), args);
-	  args = (WORD_LIST *)reverse_list (args);
-	  remember_args (args, 1);
-	  dispose_words (args);
-
-	  with_input_from_string (local_pending_command, "-c");
-	  goto read_and_execute;
-	}
-    }
+	startup_state = 2;
+#if defined (ONESHOT)
+	run_one_command (local_pending_command);
+	goto exit_shell;
+#else /* ONESHOT */
+	with_input_from_string (local_pending_command, "-c");
+	goto read_and_execute;
+#endif /* !ONESHOT */
+      }
 
   /* Do the things that should be done only for interactive shells. */
   if (interactive_shell)
@@ -643,9 +665,11 @@ main (argc, argv, env)
 
       change_flag_char ('i', FLAG_ON);
 
+#if defined (HISTORY)
       /* Initialize the interactive history stuff. */
       if (!shell_initialized)
 	load_history ();
+#endif /* HISTORY */
 
       /* Initialize terminal state for interactive shells after the
 	 .bash_profile and .bashrc are interpreted. */
@@ -657,7 +681,6 @@ main (argc, argv, env)
     {
       int fd;
       char *filename;
-      extern char *find_path_file ();
 
       free (dollar_vars[0]);
       dollar_vars[0] = savestring (argv[arg_index]);
@@ -705,6 +728,36 @@ main (argc, argv, env)
 	  lseek (fd, 0L, 0);
 	}
 
+#if defined (BUFFERED_INPUT)
+      default_buffered_input = fd;
+      if (default_buffered_input == -1)
+	{
+	  file_error (filename);
+	  exit (127);
+	}
+      SET_CLOSE_ON_EXEC (default_buffered_input);
+
+#else /* !BUFFERED_INPUT */
+
+      /* Open the script.  But try to move the file descriptor to a randomly
+	 large one, in the hopes that any descriptors used by the script will
+	 not match with ours. */
+      {
+	int script_fd, nfds;
+
+	nfds = getdtablesize ();
+	if (nfds <= 0)
+	  nfds = 20;
+	if (nfds > 256)
+	  nfds = 256;
+	script_fd = dup2 (fd, nfds - 1);
+	if (script_fd)
+	  {
+	    close (fd);
+	    fd = script_fd;
+	  }
+      }
+
       default_input = fdopen (fd, "r");
 
       if (!default_input)
@@ -717,11 +770,16 @@ main (argc, argv, env)
       if (fileno (default_input) != fd)
 	SET_CLOSE_ON_EXEC (fileno (default_input));
 
+#endif /* !BUFFERED_INPUT */
+
       if (!interactive_shell || (!isatty (fd)))
 	{
+#if defined (HISTORY)
 	  history_expansion = 0;
 	  remember_on_history = 0;
+#endif /* HISTORY */
 	  interactive = interactive_shell = 0;
+	  no_line_editing = 1;
 #if defined (JOB_CONTROL)
 	  set_job_control (0);
 #endif /* JOB_CONTROL */
@@ -735,6 +793,14 @@ main (argc, argv, env)
 	  fclose (default_input);
 	}
     }
+  else if (!interactive)
+    /* In this mode, bash is reading a script from stdin, which is a
+       pipe or redirected file. */
+#if defined (BUFFERED_INPUT)
+    default_buffered_input = fileno (stdin);	/* == 0 */
+#else      
+    setbuf (default_input, (char *)NULL);
+#endif /* !BUFFERED_INPUT */
 
   /* Bind remaining args to $1 ... $n */
   {
@@ -746,15 +812,33 @@ main (argc, argv, env)
     dispose_words (args);
   }
 
+#if defined (BUFFERED_INPUT)
+  if (!interactive)
+    unset_nodelay_mode (default_buffered_input);
+  else
+    unset_nodelay_mode (fileno (stdin));
+#else
   unset_nodelay_mode (fileno (stdin));
+#endif /* !BUFFERED_INPUT */
 
   /* with_input_from_stdin really means `with_input_from_readline' */
   if (interactive && !no_line_editing)
     with_input_from_stdin ();
   else
+#if defined (BUFFERED_INPUT)
+    {
+      if (!interactive)
+	with_input_from_buffered_stream (default_buffered_input, dollar_vars[0]);
+      else
+	with_input_from_stream (default_input, dollar_vars[0]);
+    }
+#else /* !BUFFERED_INPUT */
     with_input_from_stream (default_input, dollar_vars[0]);
+#endif /* !BUFFERED_INPUT */
 
+#if !defined (ONESHOT)
  read_and_execute:
+#endif /* !ONESHOT */
 
   shell_initialized = 1;
 
@@ -765,24 +849,149 @@ main (argc, argv, env)
   /* Do trap[0] if defined. */
   run_exit_trap ();
 
-  maybe_save_shell_history ();
+#if defined (PROCESS_SUBSTITUTION)
+  unlink_fifo_list ();
+#endif /* PROCESS_SUBSTITUTION */
+
+#if defined (HISTORY)
+  if (interactive && remember_on_history)
+    maybe_save_shell_history ();
+#endif /* HISTORY */
 
 #if defined (JOB_CONTROL)
   /* If this shell is interactive, terminate all stopped jobs and
      restore the original terminal process group. */
-  if (interactive_shell)
-    {
-      terminate_stopped_jobs ();
-
-      if (original_pgrp >= 0)
-	give_terminal_to (original_pgrp);
-    }
+  end_job_control ();
 #endif /* JOB_CONTROL */
 
   /* Always return the exit status of the last command to our parent. */
   exit (last_command_exit_value);
 }
 
+#if !defined (SYS_PROFILE)
+#  define SYS_PROFILE "/etc/profile"
+#endif /* !SYS_PROFILE */
+
+/* Source the bash startup files.  If POSIXLY_CORRECT is non-zero, we obey
+   the Posix.2 startup file rules:  $ENV is expanded, and if the file it
+   names exists, that file is sourced.  The Posix.2 rules are in effect
+   for both interactive and non-interactive shells (section 4.56.5.3) */
+static void
+run_startup_files ()
+{
+  static int sourced_env = 0;
+
+  if (!posixly_correct)
+    {
+      if (login_shell)
+	{
+	  /* We don't execute .bashrc for login shells. */
+          no_rc++;
+          maybe_execute_file (SYS_PROFILE);
+        }
+
+      if (login_shell && !no_profile)
+        {
+          if (act_like_sh)
+            maybe_execute_file ("~/.profile");
+          else
+            {
+              if (maybe_execute_file ("~/.bash_profile") == 0)
+	        if (maybe_execute_file ("~/.bash_login") == 0)
+	          maybe_execute_file ("~/.profile");
+            }
+        }
+
+      /* Execute ~/.bashrc for most shells.  Never execute it if
+         ACT_LIKE_SH is set, or if NO_RC is set.
+
+         If the executable file "/usr/gnu/src/bash/foo" contains:
+
+           #!/usr/gnu/bin/bash
+           echo hello
+
+         then:
+
+         COMMAND	    EXECUTE BASHRC
+         --------------------------------
+         bash -c foo		NO
+         bash foo		NO
+         foo			NO
+         rsh machine ls		YES (for rsh, which calls `bash -c')
+         rsh machine foo	YES (for shell started by rsh) NO (for foo!)
+         echo ls | bash		NO
+         login			NO
+         bash			YES
+      */
+#if defined (S_ISSOCK)
+      if (!act_like_sh && !no_rc &&
+          (interactive_shell || (issock (fileno (stdin)) &&
+			         local_pending_command)))
+#else /* !S_ISSOCK */
+      if (!act_like_sh && !no_rc &&
+          (interactive_shell || (!isatty (fileno (stdin)) &&
+			         local_pending_command)))
+#endif /* !S_ISSOCK */
+        maybe_execute_file (bashrc_file);
+    }
+
+   /* Try a TMB suggestion.  If running a script, then execute the
+      file mentioned in the ENV variable. */
+   if (!privileged_mode && sourced_env++ == 0 &&
+       (posixly_correct || !interactive_shell))
+    {
+      char *env_file = (char *)NULL;
+
+      if (!posixly_correct)
+	env_file = getenv ("BASH_ENV");
+      if (!env_file)
+	env_file = getenv ("ENV");
+
+      if (env_file && *env_file)
+	{
+	  WORD_LIST *list;
+	  char *expanded_file_name;
+
+	  list = expand_string_unsplit (env_file, 1);
+	  if (list)
+	    {
+	      expanded_file_name = string_list (list);
+	      dispose_words (list);
+
+	      if (expanded_file_name && *expanded_file_name)
+		maybe_execute_file (expanded_file_name);
+
+	      if (expanded_file_name)
+		free (expanded_file_name);
+	    }
+	}
+    }
+}
+
+#if defined (RESTRICTED_SHELL)
+/* Perhaps make this shell a `restricted' one, based on NAME.
+   If the basename of NAME is "rbash", then this shell is restricted.
+   In a restricted shell, PATH and SHELL are read-only and non-unsettable.
+   Do this also if `restricted' is already set to 1; maybe the shell was
+   started with -r. */
+maybe_make_restricted (name)
+     char *name;
+{
+  char *temp;
+
+  temp = base_pathname (shell_name);
+  if (restricted || (strcmp (temp, "rbash") == 0))
+    {
+      set_var_read_only ("PATH");
+      non_unsettable ("PATH");
+      set_var_read_only ("SHELL");
+      non_unsettable ("SHELL");
+      restricted++;
+    }
+}
+#endif /* RESTRICTED_SHELL */
+
+#if defined (HISTORY)
 /* If this is an interactive shell, then append the lines executed
    this session to the history file. */
 int
@@ -821,6 +1030,58 @@ maybe_save_shell_history ()
   return (result);
 }
 
+/* Load the history list from the history file. */
+load_history ()
+{
+  char *hf;
+
+  /* Truncate history file for interactive shells which desire it.
+     Note that the history file is automatically truncated to the
+     size of HISTSIZE if the user does not explicitly set the size
+     differently. */
+  set_if_not ("HISTFILESIZE", get_string_value ("HISTSIZE"));
+  stupidly_hack_special_variables ("HISTFILESIZE");
+
+  /* Read the history in HISTFILE into the history list. */
+  hf = get_string_value ("HISTFILE");
+
+  if (hf && *hf)
+    {
+      struct stat buf;
+
+      if (stat (hf, &buf) == 0)
+	{
+	  read_history (hf);
+	  using_history ();
+	  history_lines_in_file = where_history ();
+	}
+    }
+}
+
+/* Write the existing history out to the history file. */
+save_history ()
+{
+  char *hf = get_string_value ("HISTFILE");
+
+  if (hf && *hf)
+    {
+      struct stat buf;
+
+      if (stat (hf, &buf) == 0)
+	{
+	  /* Append only the lines that occurred this session to
+	     the history file. */
+	  using_history ();
+
+	  if (history_lines_this_session < where_history ())
+	    append_history (history_lines_this_session, hf);
+	  else
+	    write_history (hf);
+	}
+    }
+}
+#endif /* HISTORY */
+
 /* Try to execute the contents of FNAME.  If FNAME doesn't exist,
    that is not an error, but other kinds of errors are.  Returns
    -1 in the case of an error, 0 in the case that the file was not
@@ -828,7 +1089,6 @@ maybe_save_shell_history ()
 maybe_execute_file (fname)
      char *fname;
 {
-  extern char *tilde_expand ();
   extern int return_catch_flag;
   extern jmp_buf return_catch;
   jmp_buf old_return_catch;
@@ -851,7 +1111,7 @@ file_error_and_exit:
   if (fstat (fd, &file_info) == -1)
     goto file_error_and_exit;
 
-  string = (char *)xmalloc (1 + file_info.st_size);
+  string = (char *)xmalloc (1 + (int)file_info.st_size);
   tresult = read (fd, string, file_info.st_size);
 
   {
@@ -887,9 +1147,39 @@ file_error_and_exit:
   return (1);
 }
 
+#if defined (ONESHOT)
+/* Run one command, given as the argument to the -c option.  Tell
+   parse_and_execute not to fork for a simple command. */
+run_one_command (command)
+     char *command;
+{
+  sighandler sigint_sighandler ();
+  int code;
+
+  code = setjmp (top_level);
+
+  if (code != NOT_JUMPED)
+    {
+#if defined (PROCESS_SUBSTITUTION)
+      unlink_fifo_list ();
+#endif /* PROCESS_SUBSTITUTION */
+      switch (code)
+	{
+	  /* Some kind of throw to top_level has occured. */
+	case FORCE_EOF:
+	case EXITPROG:
+	case DISCARD:
+	  return 0;
+	default:
+	  programming_error ("Bad jump %d", code);
+	}
+    }
+   return (parse_and_execute (savestring (command), "-c"));
+}
+#endif /* ONESHOT */
+
 reader_loop ()
 {
-  extern int indirection_level;
   int our_indirection_level;
   COMMAND *current_command = (COMMAND *)NULL;
 
@@ -903,21 +1193,12 @@ reader_loop ()
 
       code = setjmp (top_level);
 
-      if (interactive_shell)
-	{
-#if defined (_POSIX_VERSION)
-	  /* If we are running on a posix-compliant system, then do
-	     things the Posix way. */
-	  struct sigaction act;
+#if defined (PROCESS_SUBSTITUTION)
+      unlink_fifo_list ();
+#endif /* PROCESS_SUBSTITUTION */
 
-	  act.sa_handler = sigint_sighandler;
-	  act.sa_flags = 0;
-	  sigemptyset (&act.sa_mask);
-	  sigaction (SIGINT, &act, (struct sigaction *)NULL);
-#else /* !_POSIX_VERSION */
-	  signal (SIGINT, sigint_sighandler);
-#endif /* !_POSIX_VERSION */
-	}
+      if (interactive_shell)
+	set_signal_handler (SIGINT, sigint_sighandler);
 
       if (code != NOT_JUMPED)
 	{
@@ -934,6 +1215,11 @@ reader_loop ()
 
 	    case DISCARD:
 	      /* Obstack free command elements, etc. */
+	      if (current_command)
+		{
+		  dispose_command (current_command);
+		  current_command = (COMMAND *)NULL;
+		}
 	      break;
 
 	    default:
@@ -969,7 +1255,10 @@ reader_loop ()
 
 	    exec_done:
 	      if (current_command)
-		dispose_command (current_command);
+	        {
+		  dispose_command (current_command);
+		  current_command = (COMMAND *)NULL;
+	        }
 	      QUIT;
 	    }
 	}
@@ -992,8 +1281,7 @@ char *
 indirection_level_string ()
 {
   register int i, j;
-  char *get_string_value (), *ps4 = get_string_value ("PS4");
-  extern char *decode_prompt_string ();
+  char *ps4 = get_string_value ("PS4");
 
   if (!ps4)
     ps4 = savestring ("+ ");
@@ -1064,7 +1352,7 @@ read_command ()
 	  tmout_len = atoi (tmout_var->value);
 	  if (tmout_len > 0)
 	    {
-	      old_alrm = signal (SIGALRM, alrm_catcher);
+	      old_alrm = set_signal_handler (SIGALRM, alrm_catcher);
 	      alarm (tmout_len);
 	    }
 	}
@@ -1078,48 +1366,54 @@ read_command ()
   if (interactive && tmout_var && (tmout_len > 0))
     {
       alarm(0);
-      signal (SIGALRM, old_alrm);
+      set_signal_handler (SIGALRM, old_alrm);
     }
   return (result);
+}
+
+/* Cause STREAM to buffer lines as opposed to characters or blocks. */
+static void
+line_buffer_stream (stream)
+     FILE *stream;
+{
+  /* If your machine doesn't have either of setlinebuf or setvbuf,
+     you can just comment out the buffering commands, and the shell
+     will still work.  It will take more cycles, though. */
+#if defined (HAVE_SETLINEBUF)
+  setlinebuf (stream);
+#else
+#  if defined (_IOLBF)
+#    if defined (REVERSED_SETVBUF_ARGS)
+  setvbuf (stream, _IOLBF, (char *)NULL, BUFSIZ);
+#    else /* !REVERSED_SETVBUF_ARGS */
+  setvbuf (stream, (char *)NULL, _IOLBF, BUFSIZ);
+#    endif /* !REVERSED_SETVBUF_ARGS */
+#  endif /* _IOLBF */
+#endif /* !HAVE_SETLINEBUF */
 }
 
 /* Do whatever is necessary to initialize the shell.
    Put new initializations in here. */
 shell_initialize ()
 {
-  /* Line buffer output for stderr.
-     If your machine doesn't have either of setlinebuf or setvbuf,
-     you can just comment out the buffering commands, and the shell
-     will still work.  It will take more cycles, though. */
-#if defined (HAVE_SETLINEBUF)
-  setlinebuf (stderr);
-  setlinebuf (stdout);
-#else
-#  if defined (_IOLBF)
-#    if defined (REVERSED_SETVBUF_ARGS)
-  setvbuf (stderr, _IOLBF, (char *)NULL, BUFSIZ);
-  setvbuf (stdout, _IOLBF, (char *)NULL, BUFSIZ);
-#    else
-  setvbuf (stderr, (char *)NULL, _IOLBF, BUFSIZ);
-  setvbuf (stdout, (char *)NULL, _IOLBF, BUFSIZ);
-#    endif /* !REVERSED_SETVBUF_ARGS */
-#  endif /* _IOLBF */
-#endif /* HAVE_SETLINEBUF */
+  /* Line buffer output for stderr and stdout. */
+  line_buffer_stream (stderr);
+  line_buffer_stream (stdout);
 
   /* Sort the array of shell builtins so that the binary search in
      find_shell_builtin () works correctly. */
   initialize_shell_builtins ();
 
   /* Initialize the trap signal handlers before installing our own
-     signal handlers.  traps.c:restore_default_signal () is responsible
-     for restoring the original default signal handler.  That function
+     signal handlers.  traps.c:restore_original_signals () is responsible
+     for restoring the original default signal handlers.  That function
      is called from jobs.c when we make a new child. */
   initialize_traps ();
   initialize_signals ();
 
-  /* Initialize current_user_name and current_host_name. */
+  /* Initialize current_user.name and current_host_name. */
   {
-    struct passwd *entry = getpwuid (getuid ());
+    struct passwd *entry = getpwuid (current_user.uid);
     char hostname[256];
 
     if (gethostname (hostname, 255) < 0)
@@ -1128,9 +1422,21 @@ shell_initialize ()
       current_host_name = savestring (hostname);
 
     if (entry)
-      current_user_name = savestring (entry->pw_name);
+      {
+	current_user.user_name = savestring (entry->pw_name);
+	if (entry->pw_shell && entry->pw_shell[0])
+	  current_user.shell = savestring (entry->pw_shell);
+	else
+	  current_user.shell = savestring ("/bin/sh");
+	current_user.home_dir = savestring (entry->pw_dir);
+      }
     else
-      current_user_name = savestring ("I have no name!");
+      {
+	current_user.user_name = savestring ("I have no name!");
+	current_user.shell = savestring ("/bin/sh");
+	current_user.home_dir = savestring ("/");
+      }
+
     endpwent ();
   }
 
@@ -1170,10 +1476,18 @@ shell_reinitialize ()
   act_like_sh = 1;
 
   /* Things that get 0. */
-  login_shell = make_login_shell = interactive = restricted = executing = 0;
+  login_shell = make_login_shell = interactive = executing = 0;
   debugging = no_rc = no_profile = do_version = line_number = 0;
-  last_command_exit_value = remember_on_history = 0;
-  forced_interactive = interactive_shell = 0;
+  forced_interactive = interactive_shell = subshell_environment = 0;
+  last_command_exit_value = 0;
+
+#if defined (HISTORY)
+  remember_on_history = history_expansion = 0;
+#endif /* HISTORY */
+
+#if defined (RESTRICTED_SHELL)
+  restricted = 0;
+#endif /* RESTRICTED_SHELL */
 
   /* Ensure that the default startup file is used.  (Except that we don't
      execute this file for reinitialized shells). */
@@ -1198,120 +1512,133 @@ initialize_signals ()
 #endif
 }
 
+/* A structure describing a signal that terminates the shell if not
+   caught.  The orig_handler member is present so children can reset
+   these signals back to their original handlers. */
+struct termsig {
+     int signum;
+     SigHandler *orig_handler;
+};
+
+#define NULL_HANDLER (SigHandler *)SIG_DFL
+
 /* The list of signals that would terminate the shell if not caught.
    We catch them, but just so that we can write the history file,
    and so forth. */
-int terminating_signals[] = {
+static struct termsig terminating_signals[] = {
 #ifdef SIGHUP
-  SIGHUP,
+  SIGHUP, NULL_HANDLER,
 #endif
 
 #ifdef SIGINT
-  SIGINT,
-#endif
-
-#ifdef SIGQUIT
-  SIGQUIT,
+  SIGINT, NULL_HANDLER,
 #endif
 
 #ifdef SIGILL
-  SIGILL,
+  SIGILL, NULL_HANDLER,
 #endif
 
 #ifdef SIGTRAP
-  SIGTRAP,
+  SIGTRAP, NULL_HANDLER,
 #endif
 
 #ifdef SIGIOT
-  SIGIOT,
+  SIGIOT, NULL_HANDLER,
 #endif
 
 #ifdef SIGDANGER
-  SIGDANGER,
+  SIGDANGER, NULL_HANDLER,
 #endif
 
 #ifdef SIGEMT
-  SIGEMT,
+  SIGEMT, NULL_HANDLER,
 #endif
 
 #ifdef SIGFPE
-  SIGFPE,
-#endif
-
-#ifdef SIGKILL
-  SIGKILL,
+  SIGFPE, NULL_HANDLER,
 #endif
 
 #ifdef SIGBUS
-  SIGBUS,
+  SIGBUS, NULL_HANDLER,
 #endif
 
 #ifdef SIGSEGV
-  SIGSEGV,
+  SIGSEGV, NULL_HANDLER,
 #endif
 
 #ifdef SIGSYS
-  SIGSYS,
+  SIGSYS, NULL_HANDLER,
 #endif
 
 #ifdef SIGPIPE
-  SIGPIPE,
+  SIGPIPE, NULL_HANDLER,
 #endif
 
 #ifdef SIGALRM
-  SIGALRM,
+  SIGALRM, NULL_HANDLER,
 #endif
 
 #ifdef SIGTERM
-  SIGTERM,
+  SIGTERM, NULL_HANDLER,
 #endif
 
 #ifdef SIGXCPU
-  SIGXCPU,
+  SIGXCPU, NULL_HANDLER,
 #endif
 
 #ifdef SIGXFSZ
-  SIGXFSZ,
+  SIGXFSZ, NULL_HANDLER,
 #endif
 
 #ifdef SIGVTALRM
-  SIGVTALRM,
+  SIGVTALRM, NULL_HANDLER,
 #endif
 
 #ifdef SIGPROF
-  SIGPROF,
+  SIGPROF, NULL_HANDLER,
 #endif
 
 #ifdef SIGLOST
-  SIGLOST,
+  SIGLOST, NULL_HANDLER,
 #endif
 
 #ifdef SIGUSR1
-  SIGUSR1, SIGUSR2
+  SIGUSR1, NULL_HANDLER,
 #endif
-    };
 
-#define TERMSIGS_LENGTH (sizeof (terminating_signals) / sizeof (int))
-int termsigs_length = TERMSIGS_LENGTH;
+#ifdef SIGUSR2
+  SIGUSR2, NULL_HANDLER,
+#endif
+};
+
+#define TERMSIGS_LENGTH (sizeof (terminating_signals) / sizeof (struct termsig))
 
 /* This function belongs here? */
 sighandler
 termination_unwind_protect (sig)
      int sig;
 {
-  if (sig == SIGINT)
+  if (sig == SIGINT && signal_is_trapped (SIGINT))
     run_interrupt_trap ();
 
-  maybe_save_shell_history ();
+#if defined (HISTORY)
+  if (interactive && remember_on_history)
+    maybe_save_shell_history ();
+#endif /* HISTORY */
 
 #if defined (JOB_CONTROL)
-  if (sig == SIGHUP)
+  if (interactive && login_shell && sig == SIGHUP)
     {
       extern void hangup_all_jobs ();
 
       hangup_all_jobs ();
     }
+  end_job_control ();
 #endif /* JOB_CONTROL */
+
+#if defined (PROCESS_SUBSTITUTION)
+  unlink_fifo_list ();
+#endif /* PROCESS_SUBSTITUTION */
 
   run_exit_trap ();
   signal (sig, SIG_DFL);
@@ -1328,46 +1655,84 @@ initialize_terminating_signals ()
 {
   register int i;
 
+  /* The following code is to avoid an expensive call to
+     set_signal_handler () for each terminating_signals.  Fortunately,
+     this is possible in Posix.  Unfortunately, we have to call signal ()
+     on non-Posix systems for each signal in terminating_signals. */
 #if defined (_POSIX_VERSION)
-  /* If we're running on a Posix-compliant system, do things the Posix way. */
-
-  struct sigaction act;
+  struct sigaction act, oact;
 
   act.sa_handler = termination_unwind_protect;
   act.sa_flags = 0;
   sigemptyset (&act.sa_mask);
   for (i = 0; i < TERMSIGS_LENGTH; i++)
-    sigaddset (&act.sa_mask, terminating_signals[i]);
+    sigaddset (&act.sa_mask, terminating_signals[i].signum);
   for (i = 0; i < TERMSIGS_LENGTH; i++)
-    sigaction (terminating_signals[i], &act, (struct sigaction *)NULL);
-
-  /* For interactive login shells, use an empty signal mask.  Other
-     shells use what they have been given. */
-  sigemptyset (&top_level_mask);
-
-  if (login_shell)
     {
-      sigprocmask (SIG_SETMASK, &top_level_mask, (sigset_t *)NULL);
+      sigaction (terminating_signals[i].signum, &act, &oact);
+      terminating_signals[i].orig_handler = oact.sa_handler;
     }
-  else
-    {
-      sigprocmask (SIG_BLOCK, (sigset_t *)NULL, &top_level_mask);
-      sigdelset (&top_level_mask, SIGCHLD);
-    }
+
 #else /* !_POSIX_VERSION */
 
   for (i = 0; i < TERMSIGS_LENGTH; i++)
-    signal (terminating_signals[i], termination_unwind_protect);
+    terminating_signals[i].orig_handler =
+      signal (terminating_signals[i].signum, termination_unwind_protect);
 
 #endif /* !_POSIX_VERSION */
+
+#if defined (JOB_CONTROL) || defined (_POSIX_VERSION)
+  /* All shells use the signal mask they inherit, and pass it along
+     to child processes.  Children will never block SIGCHLD, though. */
+  sigemptyset (&top_level_mask);
+  sigprocmask (SIG_BLOCK, (sigset_t *)NULL, &top_level_mask);
+  sigdelset (&top_level_mask, SIGCHLD);
+#endif /* JOB_CONTROL || _POSIX_VERSION */
 
   /* And, some signals that are specifically ignored by the shell. */
   signal (SIGQUIT, SIG_IGN);
 
   if (interactive)
-    signal (SIGTERM, SIG_IGN);
+    {
+      extern sighandler sigint_sighandler ();
+
+      set_signal_handler (SIGINT, sigint_sighandler);
+      signal (SIGTERM, SIG_IGN);
+    }
 }
 
+void
+reset_terminating_signals ()
+{
+  register int i;
+
+#if defined (__POSIX_VERSION)
+  struct sigaction act;
+
+  act.sa_flags = 0;
+  sigemptyset (&act.sa_mask);
+  for (i = 0; i < TERMSIGS_LENGTH; i++)
+    {
+      /* Skip a signal if it's trapped or handled specially, because the
+	 trap code will restore the correct value. */
+      if (signal_is_trapped (i) || signal_is_special (i))
+	continue;
+
+      act.sa_handler = terminating_signals[i].orig_handler;
+      sigaction (terminating_signals[i].signum, &act, (struct sigaction *) NULL);
+    }
+#else
+  for (i = 0; i < TERMSIGS_LENGTH; i++)
+    {
+      if (signal_is_trapped (i) || signal_is_special (i))
+	continue;
+
+      signal (terminating_signals[i].signum,
+	      terminating_signals[i].orig_handler);
+    }
+#endif
+}
+  
 /* What to do when we've been interrupted, and it is safe to handle it. */
 void
 throw_to_top_level ()
@@ -1386,6 +1751,8 @@ throw_to_top_level ()
   if (interrupt_state)
     return;
 
+  last_command_exit_value |= 128;
+
   /* Run any traps set on SIGINT. */
   run_interrupt_trap ();
 
@@ -1395,8 +1762,11 @@ throw_to_top_level ()
 
 #if defined (JOB_CONTROL)
   give_terminal_to (shell_pgrp);
-  sigprocmask (SIG_SETMASK, &top_level_mask, (sigset_t *)NULL);
 #endif /* JOB_CONTROL */
+
+#if defined (JOB_CONTROL) || defined (_POSIX_VERSION)
+  sigprocmask (SIG_SETMASK, &top_level_mask, (sigset_t *)NULL);
+#endif
 
   reset_parser ();
 
@@ -1404,6 +1774,10 @@ throw_to_top_level ()
   if (interactive)
     bashline_reinitialize ();
 #endif /* READLINE */
+
+#if defined (PROCESS_SUBSTITUTION)
+  unlink_fifo_list ();
+#endif /* PROCESS_SUBSTITUTION */
 
   run_unwind_protects ();
   loop_level = continuing = breaking = 0;
@@ -1413,11 +1787,11 @@ throw_to_top_level ()
     {
       fflush (stdout);
       fprintf (stderr, "\n");
+      fflush (stderr);
     }
 
-  last_command_exit_value |= 128;
-
-  if (interactive)
+  /* An interrupted `wait' command in a script does not exit the script. */
+  if (interactive || (print_newline && signal_is_trapped (SIGINT)))
     longjmp (top_level, DISCARD);
   else
     longjmp (top_level, EXITPROG);
@@ -1439,6 +1813,7 @@ sigint_sighandler (sig)
      right.  Should it be set unconditionally? */
   if (!interrupt_state)
     interrupt_state++;
+
   if (interrupt_immediately)
     {
       interrupt_immediately = 0;
@@ -1449,65 +1824,16 @@ sigint_sighandler (sig)
 #endif /* VOID_SIGHANDLER */
 }
 
-/* Load the history list from the history file. */
-load_history ()
-{
-  char *hf;
-
-  /* Truncate history file for interactive shells which desire it.
-     Note that the history file is automatically truncated to the
-     size of HISTSIZE if the user does not explicitly set the size
-     differently. */
-  set_if_not ("HISTFILESIZE", get_string_value ("HISTSIZE"));
-  stupidly_hack_special_variables ("HISTFILESIZE");
-
-  /* Read the history in HISTFILE into the history list. */
-  hf = get_string_value ("HISTFILE");
-
-  if (hf && *hf)
-    {
-      struct stat buf;
-
-      if (stat (hf, &buf) == 0)
-	{
-	  read_history (hf);
-	  using_history ();
-	  history_lines_in_file = where_history ();
-	}
-    }
-}
-
-/* Write the existing history out to the history file. */
-save_history ()
-{
-  char *hf = get_string_value ("HISTFILE");
-
-  if (hf && *hf)
-    {
-      struct stat buf;
-
-      if (stat (hf, &buf) == 0)
-	{
-	  /* Append only the lines that occurred this session to
-	     the history file. */
-	  using_history ();
-
-	  if (history_lines_this_session < where_history ())
-	    append_history (history_lines_this_session, hf);
-	  else
-	    write_history (hf);
-	}
-    }
-
-}
-
 #if defined (MAKE_BUG_REPORTS)
 /* Make a bug report, even to the extent of mailing it.  Hope that it
    gets where it is supposed to go.  If not, maybe the user will send
    it back to me. */
-#include <readline/history.h>
-/* Number of commands to place in the bug report. */
-#define LAST_INTERESTING_HISTORY_COUNT 6
+#if defined (HISTORY)
+#  include <readline/history.h>
+
+  /* Number of commands to place in the bug report. */
+#  define LAST_INTERESTING_HISTORY_COUNT 6
+#endif /* HISTORY */
 
 #if defined (HAVE_VFPRINTF)
 make_bug_report (va_alist)
@@ -1517,12 +1843,14 @@ make_bug_report (reason, arg1, arg2)
      char *reason;
 #endif /* HAVE_VFPRINTF */
 {
-  extern char *current_host_name, *current_user_name, *the_current_maintainer;
+  extern char *current_host_name, *the_current_maintainer;
   extern int interactive, login_shell;
+  FILE *stream, *popen ();
+#if defined (HISTORY)
   register int len = where_history ();
   register int i = len - LAST_INTERESTING_HISTORY_COUNT;
-  FILE *stream, *popen ();
   HIST_ENTRY **list = history_list ();
+#endif /* HISTORY */
 
 #if defined (HAVE_VFPRINTF)
   char *reason;
@@ -1531,8 +1859,10 @@ make_bug_report (reason, arg1, arg2)
 
   stream = popen ("/bin/rmail bash-maintainers@ai.mit.edu", "w");
 
+#if defined (HISTORY)
   save_history ();
   if (i < 0) i = 0;
+#endif /* HISTORY */
 
   if (stream)
     {
@@ -1570,7 +1900,7 @@ The current environment is:\n",
 	       the_current_maintainer,
 	       get_string_value ("BASH"), full_pathname (dollar_vars[0]),
 	       dist_version, build_version, current_host_name,
-	       current_user_name, interactive ? "" : "not ",
+	       current_user.user_name, interactive ? "" : "not ",
 	       login_shell ? "" : "not ", SYSTEM_NAME, OS_NAME);
 
       {
@@ -1589,11 +1919,13 @@ The current environment is:\n",
 	  }
       }
 
+#if defined (HISTORY)
       fprintf (stream, "\nAnd here are the last %d commands.\n\n",
 	       LAST_INTERESTING_HISTORY_COUNT);
 
       for (; i < len; i++)
 	fprintf (stream, "%s\n", list[i]->line);
+#endif /* HISTORY */
 
       pclose (stream);
     }
@@ -1607,10 +1939,25 @@ The current environment is:\n",
 /* Give version information about this shell. */
 show_shell_version ()
 {
-  extern char *base_pathname ();
   extern char *shell_name;
   extern int version;
 
-  printf ("GNU %s, version %s.%d\n", base_pathname (shell_name),
+  printf ("GNU %s, version %s.%d-CWRU\n", base_pathname (shell_name),
 	  dist_version, build_version);
+}
+
+/* Is FD a socket? */
+static int
+issock (fd)
+     int fd;
+{
+#if defined (S_ISSOCK)
+  struct stat sb;
+
+  if (fstat(fd, &sb) < 0)
+    return 0;
+  return (S_ISSOCK (sb.st_mode) != 0);
+#else
+  return (0);
+#endif
 }

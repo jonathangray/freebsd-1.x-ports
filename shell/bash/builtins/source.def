@@ -39,11 +39,38 @@ $END
 #include <sys/types.h>
 #include <sys/file.h>
 #include <errno.h>
+
+#if defined (HAVE_STRING_H)
+#  include <string.h>
+#else /* !HAVE_STRING_H */
+#  include <strings.h>
+#endif /* !HAVE_STRING_H */
+
 #include "../shell.h"
 #include "../posixstat.h"
 #include "../filecntl.h"
 
+/* Not all systems declare ERRNO in errno.h... and some systems #define it! */
+#if !defined (errno)
 extern int errno;
+#endif /* !errno */
+
+/* If this . script is supplied arguments, we save the dollar vars and
+   replace them with the script arguments for the duration of the script's
+   execution.  If the script does not change the dollar vars, we restore
+   what we saved.  If the dollar vars are changed in the script, we leave
+   the new values alone and free the saved values. */
+static void
+maybe_pop_dollar_vars ()
+{
+  if (dollar_vars_changed ())
+    {
+      dispose_saved_dollar_vars ();
+      set_dollar_vars_unchanged ();
+    }
+  else
+    pop_dollar_vars ();
+}
 
 /* Read and execute commands from the file passed as argument.  Guess what.
    This cannot be done in a subshell, since things like variable assignments
@@ -62,6 +89,7 @@ source_builtin (list)
   if (list)
     {
       extern char *find_path_file ();
+      extern int posixly_correct;
       char *string, *filename, *tempfile;
       struct stat finfo;
       int fd, tt;
@@ -79,7 +107,7 @@ source_builtin (list)
 	  (fd = open (filename, O_RDONLY)) == -1)
 	goto file_error_exit;
 
-      string = (char *)xmalloc (1 + finfo.st_size);
+      string = (char *)xmalloc (1 + (int)finfo.st_size);
       tt = read (fd, string, finfo.st_size);
       string[finfo.st_size] = '\0';
 
@@ -92,16 +120,16 @@ source_builtin (list)
 
 	file_error_exit:
 	  file_error (filename);
-#if defined (ALLOW_RIGID_POSIX_COMPLIANCE)
+
 	  /* POSIX shells exit if non-interactive and file error. */
-	  if (getenv ("POSIX_PENDANTIC"))
+	  if (posixly_correct)
 	    {
 	      extern int interactive_shell;
 
 	      if (!interactive_shell)
 		longjmp (top_level, EXITPROG);
 	    }
-#endif /* ALLOW_RIGID_POSIX_COMPLIANCE */
+
 	  return (EXECUTION_FAILURE);
 	}
 
@@ -119,15 +147,17 @@ source_builtin (list)
 
       if (list->next)
 	{
-	  extern void pop_dollar_vars (), push_dollar_vars ();
+	  extern void push_dollar_vars ();
 
 	  push_dollar_vars ();
-	  add_unwind_protect ((Function *)pop_dollar_vars, (char *)NULL);
+	  add_unwind_protect ((Function *)maybe_pop_dollar_vars, (char *)NULL);
 	  remember_args (list->next, 1);
 	}
 
       unwind_protect_int (return_catch_flag);
       unwind_protect_jmp_buf (return_catch);
+
+      set_dollar_vars_unchanged ();
 
       return_catch_flag++;
       return_val = setjmp (return_catch);

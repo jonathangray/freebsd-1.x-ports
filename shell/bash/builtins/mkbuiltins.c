@@ -19,17 +19,42 @@ You should have received a copy of the GNU General Public License along
 with Bash; see the file COPYING.  If not, write to the Free Software
 Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 
+#if defined (HAVE_STDLIB_H)
+#  include <stdlib.h>
+#else
+#  include "ansi_stdlib.h"
+#endif /* HAVE_STDLIB_H */
+
+#include "../config.h"
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include "../filecntl.h"
 
+#if defined (HAVE_UNISTD_H)
+#  include <unistd.h>
+#endif /* HAVE_UNISTD_H */
+
+#if defined (HAVE_STRING_H)
+#  include <string.h>
+#else /* !HAVE_STRING_H */
+#  include <strings.h>
+#endif /* !HAVE_STRING_H */
+
 #define DOCFILE "builtins.texi"
 
 static char *xmalloc (), *xrealloc ();
+
+#if !defined (__STDC__) && !defined (strcpy)
+extern char *strcpy ();
+#endif /* !__STDC__ && !strcpy */
+
 #define savestring(x) (char *)strcpy (xmalloc (1 + strlen (x)), (x))
 #define whitespace(c) (((c) == ' ') || ((c) == '\t'))
+
+/* Flag values that builtins can have. */
+#define BUILTIN_FLAG_SPECIAL	0x01
 
 /* If this stream descriptor is non-zero, then write
    texinfo documentation to it. */
@@ -40,6 +65,10 @@ int only_documentation = 0;
 
 /* Non-zero means to not do any productions. */
 int inhibit_production = 0;
+
+#if !defined (OLDCODE)
+int no_long_document = 0;
+#endif /* !OLDCODE */
 
 /* The name of a directory to precede the filename when reporting
    errors. */
@@ -68,6 +97,7 @@ typedef struct {
   char *docname;	/* Possible name for documentation string. */
   ARRAY *longdoc;	/* The long documentation for this builtin. */
   ARRAY *dependencies;	/* Null terminated array of #define names. */
+  int flags;		/* Flags for this builtin. */
 } BUILTIN_DESC;
 
 /* Here is a structure which defines a DEF file. */
@@ -82,6 +112,15 @@ typedef struct {
 
 /* The array of all builtins encountered during execution of this code. */
 ARRAY *saved_builtins = (ARRAY *)NULL;
+
+/* The Posix.2 so-called `special' builtins. */
+char *special_builtins[] =
+{
+  ":", ".", "source", "break", "continue", "eval", "exec", "exit",
+  "export", "readonly", "return", "set", "shift", "trap", "unset",
+  (char *)NULL
+};
+static int is_special_builtin ();
 
 
 /* For each file mentioned on the command line, process it and
@@ -132,6 +171,10 @@ main (argc, argv)
 	  only_documentation = 1;
 	  documentation_file = fopen (documentation_filename, "w");
 	}
+#if !defined (OLDCODE)
+      else if (strcmp (arg, "-nodocument") == 0)
+	no_long_document = 1;
+#endif /* !OLDCODE */        
       else
 	{
 	  fprintf (stderr, "%s: Unknown flag %s.\n", argv[0], arg);
@@ -377,7 +420,7 @@ extract_info (filename, structfile, externfile)
   if (fd == -1)
     file_error (filename);
 
-  buffer = xmalloc (1 + finfo.st_size);
+  buffer = xmalloc (1 + (int)finfo.st_size);
 
   if (read (fd, buffer, finfo.st_size) != finfo.st_size)
     file_error (filename);
@@ -454,7 +497,8 @@ extract_info (filename, structfile, externfile)
 		{
 		  fprintf (defs->output, "#line %d \"%s%s\"\n",
 			   defs->line_number + 1,
-			   error_directory, defs->filename);
+			   error_directory ? error_directory : "./",
+			   defs->filename);
 		  output_cpp_line_info = 0;
 		}
 
@@ -634,6 +678,10 @@ builtin_handler (self, defs, arg)
     new->docname = (char *)NULL;
     new->longdoc = (ARRAY *)NULL;
     new->dependencies = (ARRAY *)NULL;
+    new->flags = 0;
+
+    if (is_special_builtin (name))
+      new->flags |= BUILTIN_FLAG_SPECIAL;
 
     array_add ((char *)new, defs->builtins);
     building_builtin = 1;
@@ -776,7 +824,8 @@ line_error (defs, format, arg1, arg2)
      char *format, *arg1, *arg2;
 {
   fprintf (stderr, "%s%s:%d:",
-	   error_directory, defs->filename, defs->line_number + 1);
+	   error_directory ? error_directory : "./",
+	   defs->filename, defs->line_number + 1);
   fprintf (stderr, format, arg1, arg2);
   fprintf (stderr, "\n");
   fflush (stderr);
@@ -889,7 +938,7 @@ char *structfile_header[] = {
   "/* This file is manufactured by ./mkbuiltins, and should not be",
   "   edited by hand.  See the source to mkbuiltins for details. */",
   "",
-  "/* Copyright (C) 1987, 1991 Free Software Foundation, Inc.",
+  "/* Copyright (C) 1987, 1991, 1992 Free Software Foundation, Inc.",
   "",
   "   This file is part of GNU Bash, the Bourne Again SHell.",
   "",
@@ -946,7 +995,6 @@ write_file_headers (structfile, externfile)
 
       fprintf (structfile, "#include \"%s\"\n",
 	       extern_filename ? extern_filename : "builtext.h");
-
       fprintf (structfile, "\nstruct builtin shell_builtins[] = {\n");
     }
 
@@ -1019,8 +1067,17 @@ write_builtins (defs, structfile, externfile)
 		  else
 		    fprintf (structfile, "(Function *)0x0, ");
 
-		  fprintf (structfile, "1, %s_doc,\n",
-			   builtin->docname ?builtin->docname : builtin->name);
+#define SPECIAL_FLAG_STRING "BUILTIN_ENABLED | STATIC_BUILTIN | SPECIAL_BUILTIN"
+#define NORMAL_FLAG_STRING "BUILTIN_ENABLED | STATIC_BUILTIN"
+
+		  fprintf (structfile, "%s, %s_doc,\n",
+		    (builtin->flags & BUILTIN_FLAG_SPECIAL) ?
+			SPECIAL_FLAG_STRING :
+			NORMAL_FLAG_STRING,
+		    builtin->docname ? builtin->docname : builtin->name);
+
+#undef SPECIAL_FLAG_STRING
+#undef NORMAL_FLAG_STRING
 
 		  fprintf
 		    (structfile, "     \"%s\" },\n",
@@ -1154,8 +1211,22 @@ write_documentation (stream, documentation, indentation, flags)
   if (string_array)
     fprintf (stream, " {\n");
 
+#if !defined (OLDCODE)
+  /* XXX -- clean me up; for experiment only */
+  if (no_long_document)
+    goto end_of_document;
+#endif /* !OLDCODE */
+
   for (i = 0; line = documentation[i]; i++)
     {
+      /* Allow #ifdef's to be written out verbatim. */
+      if (*line == '#')
+	{
+	  if (string_array)
+	    fprintf (stream, "%s\n", line);
+	  continue;
+	}
+
       if (string_array)
 	fprintf (stream, "  \"");
 
@@ -1203,6 +1274,22 @@ write_documentation (stream, documentation, indentation, flags)
 	fprintf (stream, "%s\n", line);
     }
 
+#if !defined (OLDCODE)
+end_of_document:
+#endif /* !OLDCODE */
+
   if (string_array)
     fprintf (stream, "  (char *)NULL\n};\n");
+}
+
+static int
+is_special_builtin (name)
+     char *name;
+{
+  register int i;
+
+  for (i = 0; special_builtins[i]; i++)
+    if (strcmp (name, special_builtins[i]) == 0)
+      return 1;
+  return 0;
 }

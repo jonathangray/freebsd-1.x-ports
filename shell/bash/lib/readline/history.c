@@ -1,6 +1,6 @@
 /* History.c -- standalone history library */
 
-/* Copyright (C) 1989 Free Software Foundation, Inc.
+/* Copyright (C) 1989, 1992 Free Software Foundation, Inc.
 
    This file contains the GNU History Library (the Library), a set of
    routines for managing the text of previously typed lines.
@@ -24,20 +24,39 @@
    don't have to know what data types are used, just what functions
    you can call.  I think I have done that. */
 
-/* Remove these declarations when we have a complete libgnu.a. */
-#if !defined (STATIC_MALLOC)
-extern char *xmalloc (), *xrealloc ();
-#else
+#if defined (STATIC_MALLOC)
 static char *xmalloc (), *xrealloc ();
-#endif
+#else
+extern char *xmalloc (), *xrealloc ();
+#endif /* STATIC_MALLOC */
 
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#if defined (HAVE_STDLIB_H)
+#  include <stdlib.h>
+#else
+#  include "ansi_stdlib.h"
+#endif /* HAVE_STDLIB_H */
+#if defined (HAVE_UNISTD_H)
+#  include <unistd.h>
+#endif
+#if defined (HAVE_STRING_H)
+#  include <string.h>
+#else
+#  include <strings.h>
+#endif /* !HAVE_STRING_H */
+#include <errno.h>
+
+/* Not all systems declare ERRNO in errno.h... and some systems #define it! */
+#if !defined (errno)
+extern int errno;
+#endif /* !errno */
 
 #if defined (__GNUC__)
+#  undef alloca
 #  define alloca __builtin_alloca
 #else
 #  if defined (sparc) || defined (HAVE_ALLOCA_H)
@@ -50,7 +69,11 @@ extern char *alloca ();
 #include "history.h"
 
 #ifndef savestring
-#define savestring(x) (char *)strcpy (xmalloc (1 + strlen (x)), (x))
+extern char *xmalloc ();
+#  ifndef strcpy
+extern char *strcpy ();
+#  endif
+#define savestring(x) strcpy (xmalloc (1 + strlen (x)), (x))
 #endif
 
 #ifndef whitespace
@@ -62,8 +85,15 @@ extern char *alloca ();
 #endif
 
 #ifndef member
-#define member(c, s) ((c) ? index ((s), (c)) : 0)
+#  ifndef strchr
+extern char *strchr ();
+#  endif
+#define member(c, s) ((c) ? ((char *)strchr ((s), (c)) != (char *)NULL) : 0)
 #endif
+
+static char error_pointer;
+
+static char *get_history_word_specifier ();
 
 /* **************************************************************** */
 /*								    */
@@ -115,6 +145,32 @@ char *history_no_expand_chars = " \t\n\r=";
 
 /* The logical `base' of the history array.  It defaults to 1. */
 int history_base = 1;
+
+/* Return the current HISTORY_STATE of the history. */
+HISTORY_STATE *
+history_get_history_state ()
+{
+  HISTORY_STATE *state;
+
+  state = (HISTORY_STATE *)xmalloc (sizeof (HISTORY_STATE));
+  state->entries = the_history;
+  state->offset = history_offset;
+  state->length = history_length;
+  state->size = history_size;
+
+  return (state);
+}
+
+/* Set the state of the current history array to STATE. */
+void
+history_set_history_state (state)
+     HISTORY_STATE *state;
+{
+  the_history = state->entries;
+  history_offset = state->offset;
+  history_length = state->length;
+  history_size = state->size;
+}
 
 /* Begin a session in which the history functions might be used.  This
    initializes interactive variables. */
@@ -187,7 +243,7 @@ add_history (string)
 		xrealloc (the_history,
 			  ((history_size += DEFAULT_HISTORY_GROW_SIZE)
 			   * sizeof (HIST_ENTRY *)));
-	  }
+	    }
 	  history_length++;
 	}
     }
@@ -378,6 +434,9 @@ void
 stifle_history (max)
      int max;
 {
+  if (max < 0)
+    max = 0;
+
   if (history_length > max)
     {
       register int i, j;
@@ -428,7 +487,7 @@ history_filename (filename)
 
   if (!return_val)
     {
-      char *home, *getenv ();
+      char *home;
 
       home = getenv ("HOME");
 
@@ -467,7 +526,6 @@ read_history_range (filename, from, to)
   char *input, *buffer = (char *)NULL;
   int file, current_line;
   struct stat finfo;
-  extern int errno;
 
   input = history_filename (filename);
   file = open (input, O_RDONLY, 0666);
@@ -476,13 +534,16 @@ read_history_range (filename, from, to)
       (stat (input, &finfo) == -1))
     goto error_and_exit;
 
-  buffer = (char *)xmalloc (finfo.st_size + 1);
+  buffer = (char *)xmalloc ((int)finfo.st_size + 1);
 
   if (read (file, buffer, finfo.st_size) != finfo.st_size)
   error_and_exit:
     {
       if (file >= 0)
 	close (file);
+
+      if (input)
+	free (input);
 
       if (buffer)
 	free (buffer);
@@ -528,17 +589,25 @@ read_history_range (filename, from, to)
 
 	line_start = line_end + 1;
       }
+
+  if (input)
+    free (input);
+
+  if (buffer)
+    free (buffer);
+
   return (0);
 }
 
 /* Truncate the history file FNAME, leaving only LINES trailing lines.
    If FNAME is NULL, then use ~/.history. */
+int
 history_truncate_file (fname, lines)
      char *fname;
      register int lines;
 {
   register int i;
-  int file;
+  int file, chars_read;
   char *buffer = (char *)NULL, *filename;
   struct stat finfo;
 
@@ -551,13 +620,16 @@ history_truncate_file (fname, lines)
   if (file == -1)
     goto truncate_exit;
 
-  buffer = (char *)xmalloc (finfo.st_size + 1);
-  read (file, buffer, finfo.st_size);
+  buffer = (char *)xmalloc ((int)finfo.st_size + 1);
+  chars_read = read (file, buffer, finfo.st_size);
   close (file);
+
+  if (chars_read <= 0)
+    goto truncate_exit;
 
   /* Count backwards from the end of buffer until we have passed
      LINES lines. */
-  for (i = finfo.st_size; lines && i; i--)
+  for (i = chars_read - 1; lines && i; i--)
     {
       if (buffer[i] == '\n')
 	lines--;
@@ -589,6 +661,7 @@ history_truncate_file (fname, lines)
     free (buffer);
 
   free (filename);
+  return 0;
 }
 
 #define HISTORY_APPEND 0
@@ -602,11 +675,9 @@ history_do_write (filename, nelements, overwrite)
      char *filename;
      int nelements, overwrite;
 {
-  extern int errno;
   register int i;
   char *output = history_filename (filename);
   int file, mode;
-  char cr = '\n';
 
   if (overwrite)
     mode = O_WRONLY | O_CREAT | O_TRUNC;
@@ -614,23 +685,49 @@ history_do_write (filename, nelements, overwrite)
     mode = O_WRONLY | O_APPEND;
 
   if ((file = open (output, mode, 0666)) == -1)
-    return (errno);
+    {
+      if (output)
+	free (output);
+
+      return (errno);
+    }
 
   if (nelements > history_length)
     nelements = history_length;
 
-  for (i = history_length - nelements; i < history_length; i++)
-    {
-      if (write (file, the_history[i]->line, strlen (the_history[i]->line)) < 0)
-	break;
-      if (write (file, &cr, 1) < 0)
-	break;
-    }
+  /* Build a buffer of all the lines to write, and write them in one syscall.
+     Suggested by Peter Ho (peter@robosts.oxford.ac.uk). */
+  {
+    register int j = 0;
+    int buffer_size = 0;
+    char *buffer;
+
+    /* Calculate the total number of bytes to write. */
+    for (i = history_length - nelements; i < history_length; i++)
+      buffer_size += 1 + strlen (the_history[i]->line);
+
+    /* Allocate the buffer, and fill it. */
+    buffer = (char *)xmalloc (buffer_size);
+
+    for (i = history_length - nelements; i < history_length; i++)
+      {
+	strcpy (buffer + j, the_history[i]->line);
+	j += strlen (the_history[i]->line);
+	buffer[j++] = '\n';
+      }
+
+    write (file, buffer, buffer_size);
+    free (buffer);
+  }
 
   close (file);
+
+  if (output)
+    free (output);
+
   return (0);
 }
-  
+
 /* Append NELEMENT entries to FILENAME.  The entries appended are from
    the end of the list minus NELEMENTs up to the end of the list. */
 int
@@ -701,13 +798,13 @@ HIST_ENTRY *
 history_get (offset)
      int offset;
 {
-  int index = offset - history_base;
+  int local_index = offset - history_base;
 
-  if (index >= history_length ||
-      index < 0 ||
+  if (local_index >= history_length ||
+      local_index < 0 ||
       !the_history)
     return ((HIST_ENTRY *)NULL);
-  return (the_history[index]);
+  return (the_history[local_index]);
 }
 
 /* Search for STRING in the history list.  DIR is < 0 for searching
@@ -802,7 +899,6 @@ get_history_event (string, caller_index, delimiting_quote)
     }
 
   /* Hack case of numeric line specification. */
- read_which:
   if (string[i] == '-')
     {
       sign = -1;
@@ -835,7 +931,7 @@ get_history_event (string, caller_index, delimiting_quote)
      a '?', then the string may be anywhere on the line.  Otherwise,
      the string must be found at the start of a line. */
   {
-    int index;
+    int local_index;
     char *temp;
     int substring_okay = 0;
 
@@ -845,17 +941,20 @@ get_history_event (string, caller_index, delimiting_quote)
 	i++;
       }
 
-    for (index = i; string[i]; i++)
+    for (local_index = i; string[i]; i++)
       if (whitespace (string[i]) ||
 	  string[i] == '\n' ||
 	  string[i] == ':' ||
 	  (substring_okay && string[i] == '?') ||
+#if defined (SHELL)
+	  member (string[i], ";&()|<>") ||
+#endif /* SHELL */
 	  string[i] == delimiting_quote)
 	break;
 
-    temp = (char *)alloca (1 + (i - index));
-    strncpy (temp, &string[index], (i - index));
-    temp[i - index] = '\0';
+    temp = (char *)alloca (1 + (i - local_index));
+    strncpy (temp, &string[local_index], (i - local_index));
+    temp[i - local_index] = '\0';
 
     if (string[i] == '?')
       i++;
@@ -864,19 +963,18 @@ get_history_event (string, caller_index, delimiting_quote)
 
   search_again:
 
-    index = history_search_internal
+    local_index = history_search_internal
       (temp, -1, substring_okay ? NON_ANCHORED_SEARCH : ANCHORED_SEARCH);
 
-    if (index < 0)
+    if (local_index < 0)
     search_lost:
       {
 	history_offset = history_length;
 	return ((char *)NULL);
       }
 
-    if (index == 0 || substring_okay)
+    if (local_index == 0 || substring_okay)
       {
-      search_won:
 	entry = current_history ();
 	history_offset = history_length;
 	
@@ -901,6 +999,28 @@ get_history_event (string, caller_index, delimiting_quote)
   }
 }
 
+#if defined (SHELL)
+/* Function for extracting single-quoted strings.  Used for inhibiting
+   history expansion within single quotes. */
+
+/* Extract the contents of STRING as if it is enclosed in single quotes.
+   SINDEX, when passed in, is the offset of the character immediately
+   following the opening single quote; on exit, SINDEX is left pointing
+   to the closing single quote. */
+static void
+rl_string_extract_single_quoted (string, sindex)
+     char *string;
+     int *sindex;
+{
+  register int i = *sindex;
+
+  while (string[i] && string[i] != '\'')
+    i++;
+
+  *sindex = i;
+}
+#endif /* SHELL */
+
 /* Expand the string STRING, placing the result into OUTPUT, a pointer
    to a string.  Returns:
 
@@ -923,8 +1043,6 @@ history_expand (string, output)
   char *word_spec, *event;
   int starting_index, only_printing = 0, substitute_globally = 0;
 
-  char *get_history_word_specifier (), *rindex ();
-
   /* The output string, and its length. */
   int len = 0;
   char *result = (char *)NULL;
@@ -933,7 +1051,7 @@ history_expand (string, output)
   char *temp, tt[2], tbl[3];
 
   /* Prepare the buffer for printing error messages. */
-  result = (char *)xmalloc (len = 255);
+  result = (char *)xmalloc (len = 256);
 
   result[0] = tt[1] = tbl[2] = '\0';
   tbl[0] = '\\';
@@ -965,11 +1083,37 @@ history_expand (string, output)
   /* `!' followed by one of the characters in history_no_expand_chars
      is NOT an expansion. */
   for (i = 0; string[i]; i++)
-    if (string[i] == history_expansion_char)
-      if (!string[i + 1] || member (string[i + 1], history_no_expand_chars))
-	continue;
-      else
-	goto grovel;
+    {
+      if (string[i] == history_expansion_char)
+	{
+	  if (!string[i + 1] || member (string[i + 1], history_no_expand_chars))
+	    continue;
+#if defined (SHELL)
+        /* The shell uses ! as a pattern negation character in globbing [...]
+	   expressions, so let those pass without expansion. */
+	  else if (i > 0 && (string[i - 1] == '[') && member (']', string + i))
+	    continue;
+#endif /* SHELL */
+	  else
+	    goto grovel;
+	}
+#if defined (SHELL)
+      else if (string[i] == '\'')
+	{
+	  /* If this is bash, single quotes inhibit history expansion. */
+	  i++;
+	  rl_string_extract_single_quoted (string, &i);
+	}
+      else if (string[i] == '\\')
+	{
+	  /* If this is bash, allow backslashes to quote single quotes and
+	     the history expansion character. */
+	  if (string[i + 1] == '\'' || (string[i + 1] == history_expansion_char))
+	    i++;
+	}
+#endif /* SHELL */
+    }
+	  
 
   free (result);
   *output = savestring (string);
@@ -979,9 +1123,17 @@ history_expand (string, output)
 
   for (i = j = 0; i < l; i++)
     {
+      int passc = 0;
       int tchar = string[i];
+
       if (tchar == history_expansion_char)
 	tchar = -3;
+
+      if (passc)
+        {
+          passc = 0;
+          goto add_char;
+        }
 
       switch (tchar)
 	{
@@ -993,7 +1145,27 @@ history_expand (string, output)
 	      goto do_add;
 	    }
 	  else
-	    goto add_char;
+	    {
+	      passc++;
+	      goto add_char;
+	    }
+
+#if defined (SHELL)
+	case '\'':
+	  {
+	    /* If this is bash, single quotes inhibit history expansion. */
+	    int quote = i, slen;
+
+	    ++i;
+	    rl_string_extract_single_quoted (string, &i);
+
+	    slen = i - quote + 2;
+	    temp = (char *)alloca (slen);
+	    strncpy (temp, string + quote, slen);
+	    temp[slen - 1] = '\0';
+	    goto do_add;
+	  }
+#endif /* SHELL */
 
 	  /* case history_expansion_char: */
 	case -3:
@@ -1042,14 +1214,13 @@ history_expand (string, output)
 	  if (!event)
 	  event_not_found:
 	    {
-	    int l = 1 + (i - starting_index);
+	    int ll = 1 + (i - starting_index);
 
-	    temp = (char *)alloca (1 + l);
-	    strncpy (temp, string + starting_index, l);
-	    temp[l - 1] = 0;
+	    temp = (char *)alloca (1 + ll);
+	    strncpy (temp, string + starting_index, ll);
+	    temp[ll - 1] = 0;
 	    sprintf (result, "%s: %s.", temp,
 		     word_spec_error ? "Bad word specifier" : "Event not found");
-	  error_exit:
 	    *output = result;
 	    return (-1);
 	  }
@@ -1062,12 +1233,11 @@ history_expand (string, output)
 	  /* There is no such thing as a `malformed word specifier'.  However,
 	     it is possible for a specifier that has no match.  In that case,
 	     we complain. */
-	  if (word_spec == (char *)-1)
-	  bad_word_spec:
-	  {
-	    word_spec_error++;
-	    goto event_not_found;
-	  }
+	  if (word_spec == (char *)&error_pointer)
+	    {
+	      word_spec_error++;
+	      goto event_not_found;
+	    }
 
 	  /* If no word specifier, than the thing of interest was the event. */
 	  if (!word_spec)
@@ -1098,28 +1268,28 @@ history_expand (string, output)
 
 		  /* :t discards all but the last part of the pathname. */
 		case 't':
-		  tstr = rindex (temp, '/');
+		  tstr = strrchr (temp, '/');
 		  if (tstr)
 		    temp = ++tstr;
 		  goto next_special;
 
 		  /* :h discards the last part of a pathname. */
 		case 'h':
-		  tstr = rindex (temp, '/');
+		  tstr = strrchr (temp, '/');
 		  if (tstr)
 		    *tstr = '\0';
 		  goto next_special;
 
 		  /* :r discards the suffix. */
 		case 'r':
-		  tstr = rindex (temp, '.');
+		  tstr = strrchr (temp, '.');
 		  if (tstr)
 		    *tstr = '\0';
 		  goto next_special;
 
 		  /* :e discards everything but the suffix. */
 		case 'e':
-		  tstr = rindex (temp, '.');
+		  tstr = strrchr (temp, '.');
 		  if (tstr)
 		    temp = tstr;
 		  goto next_special;
@@ -1127,12 +1297,19 @@ history_expand (string, output)
 		  /* :s/this/that substitutes `this' for `that'. */
 		  /* :gs/this/that substitutes `this' for `that' globally. */
 		case 'g':
+#ifdef NOTYET
+		  /* :g/this/that is equivalent to :gs/this/that */
+		  substitute_globally = 1;
+		  if (string[i + 2] == 's')
+		    i++;
+#else
 		  if (string[i + 2] == 's')
 		    {
 		      i++;
 		      substitute_globally = 1;
 		      goto substitute;
 		    }
+#endif
 		  else
 		    
 		case 's':
@@ -1247,8 +1424,8 @@ history_expand (string, output)
 
 	do_add:
 	  j += strlen (temp);
-	  while (j > len)
-	    result = (char *)xrealloc (result, (len += 255));
+	  while (j > (len - 1))
+	    result = (char *)xrealloc (result, (len += 256));
 
 	  strcpy (result + (j - strlen (temp)), temp);
 	}
@@ -1266,11 +1443,11 @@ history_expand (string, output)
 }
 
 /* Return a consed string which is the word specified in SPEC, and found
-   in FROM.  NULL is returned if there is no spec.  -1 is returned if
-   the word specified cannot be found.  CALLER_INDEX is the offset in
-   SPEC to start looking; it is updated to point to just after the last
-   character parsed. */
-char *
+   in FROM.  NULL is returned if there is no spec.  The address of
+   ERROR_POINTER is returned if the word specified cannot be found.
+   CALLER_INDEX is the offset in SPEC to start looking; it is updated
+   to point to just after the last character parsed. */
+static char *
 get_history_word_specifier (spec, from, caller_index)
      char *spec, *from;
      int *caller_index;
@@ -1328,7 +1505,6 @@ get_history_word_specifier (spec, from, caller_index)
       goto get_last;
     }
 
- get_first:
   if (digit (spec[i]) && expecting_word_spec)
     {
       sscanf (spec + i, "%d", &first);
@@ -1377,7 +1553,7 @@ get_history_word_specifier (spec, from, caller_index)
     if (result)
       return (result);
     else
-      return ((char *)-1);
+      return ((char *)&error_pointer);
   }
 }
 
@@ -1477,39 +1653,33 @@ history_tokenize (string)
       goto got_token;
     }
 
-  if (member (string[i], "<>;&|"))
+  if (member (string[i], "<>;&|$"))
     {
       int peek = string[i + 1];
 
-      if (peek == string[i])
+      if (peek == string[i] && peek != '$')
 	{
-	  if (peek ==  '<')
-	    {
-	      if (string[1 + 2] == '-')
-		i++;
-	      i += 2;
-	      goto got_token;
-	    }
-
-	  if (member (peek, ">:&|"))
-	    {
-	      i += 2;
-	      goto got_token;
-	    }
+	  if (peek == '<' && string[i + 2] == '-')
+	    i++;
+	  i += 2;
+	  goto got_token;
 	}
       else
 	{
 	  if ((peek == '&' &&
 	       (string[i] == '>' || string[i] == '<')) ||
-	      ((peek == '>') &&
-	       (string[i] == '&')))
+	      ((peek == '>') && (string[i] == '&')) ||
+	      ((peek == '(') && (string[i] == '$')))
 	    {
 	      i += 2;
 	      goto got_token;
 	    }
 	}
-      i++;
-      goto got_token;
+      if (string[i] != '$')
+	{
+	  i++;
+	  goto got_token;
+	}
     }
 
   /* Get word from string + i; */
@@ -1624,7 +1794,6 @@ memory_error_and_abort ()
   abort ();
 }
 #endif /* STATIC_MALLOC */
-
 
 /* **************************************************************** */
 /*								    */

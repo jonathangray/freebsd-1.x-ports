@@ -18,7 +18,11 @@
    along with Bash; see the file COPYING.  If not, write to the Free
    Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 
+#include <sys/types.h>
+#include "posixstat.h"
+
 #include <stdio.h>
+#include "bashansi.h"
 #include <readline/readline.h>
 #include <readline/history.h>
 #include "shell.h"
@@ -27,7 +31,15 @@
 /* Functions bound to keys in Readline for Bash users. */
 static void
   shell_expand_line (), insert_last_arg (), display_shell_version (),
-  operate_and_get_next ();
+  operate_and_get_next (), history_expand_line (), bash_ignore_filenames ();
+
+#if defined (BRACE_EXPANSION)
+#  define BRACE_COMPLETION
+#endif /* BRACE_EXPANSION */
+
+#if defined (BRACE_COMPLETION)
+extern void bash_brace_completion ();
+#endif /* BRACE_COMPLETION */
 
 /* Helper functions for Readline. */
 static void
@@ -41,11 +53,18 @@ static void
   snarf_hosts_from_file (), add_host_name (), sort_hostname_list ();
 
 /* Externally defined functions used by this file. */
-extern char
-  *get_string_value (), *filename_completion_function (),
-  *username_completion_function ();
+extern char *filename_completion_function ();
+extern char *username_completion_function ();
+extern char *get_working_directory ();
+extern char *pre_process_line (), *tilde_expand ();
+extern char *extract_colon_unit ();
 
 extern int show_shell_version ();
+
+extern int posixly_correct;
+
+extern char *rl_completer_quote_characters;
+extern char *rl_completer_word_break_characters;
 
 #define DYNAMIC_HISTORY_COMPLETION
 #if defined (DYNAMIC_HISTORY_COMPLETION)
@@ -76,7 +95,28 @@ static void
 /* Non-zero once initalize_readline () has been called. */
 int bash_readline_initialized = 0;
 
+#if defined (VI_MODE)
+static void vi_edit_and_execute_command ();
+#endif
+
+static Function *old_rl_startup_hook = (Function *) NULL;
+
+/* Change the readline VI-mode keymaps into or out of Posix.2 compliance.
+   Called when the shell is put into or out of `posix' mode. */
+void
+posix_readline_initialize (on_or_off)
+     int on_or_off;
+{
+#if defined (VI_MODE)
+  if (on_or_off)
+    rl_bind_key_in_map (CTRL('I'), rl_insert, vi_insertion_keymap);
+  else
+    rl_bind_key_in_map (CTRL('I'), rl_complete, vi_insertion_keymap);
+#endif
+} 
+
 /* Called once from parse.y if we are going to use readline. */
+void
 initialize_readline ()
 {
   if (bash_readline_initialized)
@@ -84,19 +124,23 @@ initialize_readline ()
 
   rl_terminal_name = get_string_value ("TERM");
   rl_instream = stdin, rl_outstream = stderr;
-  rl_special_prefixes = "$@%";
+  rl_special_prefixes = "$@";
 
   /* Allow conditional parsing of the ~/.inputrc file. */
   rl_readline_name = "Bash";
 
   /* Bind up our special shell functions. */
-  rl_add_defun
-    ("shell-expand-line", (Function *)shell_expand_line, META(CTRL('E')));
+  rl_add_defun ("shell-expand-line", (Function *)shell_expand_line, -1);
+  rl_bind_key_in_map
+    (CTRL('E'), (Function *)shell_expand_line, emacs_meta_keymap);
 
-  rl_add_defun
-    ("insert-last-argument", (Function *)insert_last_arg, META('.'));
+  /* Bind up our special shell functions. */
+  rl_add_defun ("history-expand-line", (Function *)history_expand_line, -1);
+  rl_bind_key_in_map ('^', (Function *)history_expand_line, emacs_meta_keymap);
 
-  rl_bind_key (META('_'), (Function *)insert_last_arg);
+  rl_add_defun ("insert-last-argument", (Function *)insert_last_arg, -1);
+  rl_bind_key_in_map ('.', (Function *)insert_last_arg, emacs_meta_keymap);
+  rl_bind_key_in_map ('_', (Function *)insert_last_arg, emacs_meta_keymap);
 
   rl_add_defun
     ("operate-and-get-next", (Function *)operate_and_get_next, CTRL('O'));
@@ -112,46 +156,56 @@ initialize_readline ()
      off this occasionally confusing behaviour. */
   rl_unbind_key_in_map (CTRL('J'), emacs_meta_keymap);
 
-#ifdef SPECIFIC_COMPLETION_FUNCTIONS
-  rl_add_defun ("complete-filename", bash_complete_filename, META('/'));
+#if defined (BRACE_COMPLETION)
+  rl_add_defun ("complete-into-braces", bash_brace_completion, -1);
+  rl_bind_key_in_map ('{', bash_brace_completion, emacs_meta_keymap);
+#endif /* BRACE_COMPLETION */
+
+#if defined (SPECIFIC_COMPLETION_FUNCTIONS)
+  rl_add_defun ("complete-filename", bash_complete_filename, -1);
+  rl_bind_key_in_map ('/', bash_complete_filename, emacs_meta_keymap);
   rl_add_defun ("possible-filename-completions",
 		bash_possible_filename_completions, -1);
   rl_bind_key_in_map ('/', bash_possible_filename_completions,
 		      emacs_ctlx_keymap);
 
-  rl_add_defun ("complete-username", bash_complete_username, META('~'));
+  rl_add_defun ("complete-username", bash_complete_username, -1);
+  rl_bind_key_in_map ('~', bash_complete_username, emacs_meta_keymap);
   rl_add_defun ("possible-username-completions",
 		bash_possible_username_completions, -1);
   rl_bind_key_in_map ('~', bash_possible_username_completions,
 		      emacs_ctlx_keymap);
 
-  rl_add_defun ("complete-hostname", bash_complete_hostname, META('@'));
+  rl_add_defun ("complete-hostname", bash_complete_hostname, -1);
+  rl_bind_key_in_map ('@', bash_complete_hostname, emacs_meta_keymap);
   rl_add_defun ("possible-hostname-completions",
 		bash_possible_hostname_completions, -1);
   rl_bind_key_in_map ('@', bash_possible_hostname_completions,
 		      emacs_ctlx_keymap);
 
-  rl_add_defun ("complete-variable", bash_complete_variable, META('$'));
+  rl_add_defun ("complete-variable", bash_complete_variable, -1);
+  rl_bind_key_in_map ('$', bash_complete_variable, emacs_meta_keymap);
   rl_add_defun ("possible-variable-completions",
 		bash_possible_variable_completions, -1);
   rl_bind_key_in_map ('$', bash_possible_variable_completions,
 		      emacs_ctlx_keymap);
 
-  rl_add_defun ("complete-command", bash_complete_command, META('!'));
+  rl_add_defun ("complete-command", bash_complete_command, -1);
+  rl_bind_key_in_map ('!', bash_complete_command, emacs_meta_keymap);
   rl_add_defun ("possible-command-completions",
 		bash_possible_command_completions, -1);
   rl_bind_key_in_map ('!', bash_possible_command_completions,
 		      emacs_ctlx_keymap);
 
-#endif  /* SPECIFIC_COMPLETION_FUNCTIONS */
+#endif /* SPECIFIC_COMPLETION_FUNCTIONS */
 
 #if defined (DYNAMIC_HISTORY_COMPLETION)
-  rl_add_defun
-    ("dynamic-complete-history", dynamic_complete_history, META(TAB));
+  rl_add_defun ("dynamic-complete-history", dynamic_complete_history, -1);
+  rl_bind_key_in_map (TAB, dynamic_complete_history, emacs_meta_keymap);
 #endif /* DYNAMIC_HISTORY_COMPLETION */
 
   /* Tell the completer that we want a crack first. */
-  rl_attempted_completion_function = (Function *)attempt_shell_completion;
+  rl_attempted_completion_function = (CPPFunction *)attempt_shell_completion;
 
   /* Tell the completer that we might want to follow symbolic links. */
   rl_symbolic_link_hook = (Function *)bash_symbolic_link_hook;
@@ -159,6 +213,18 @@ initialize_readline ()
   /* Tell the filename completer we want a chance to ignore some names. */
   rl_ignore_some_completions_function =
     (Function *)filename_completion_ignore;
+
+#if defined (VI_MODE)
+  rl_bind_key_in_map ('v', vi_edit_and_execute_command, vi_movement_keymap);
+#endif
+
+  rl_completer_quote_characters = "'\"";
+  /* Need to modify this from the default; `$' is not a word break
+     character. */
+  /* rl_completer_word_break_characters = " \t\n\"\\'`@><=;|&{("; */
+
+  if (posixly_correct)
+    posix_readline_initialize (1);
 
   bash_readline_initialized = 1;
 }
@@ -170,11 +236,11 @@ initialize_readline ()
    It's called from throw_to_top_level(). */
 bashline_reinitialize ()
 {
-  extern void tilde_initialize ();
-
   tilde_initialize ();
-  rl_attempted_completion_function = (Function *)attempt_shell_completion;
+  rl_attempted_completion_function = attempt_shell_completion;
   rl_symbolic_link_hook = (Function *)bash_symbolic_link_hook;
+  rl_ignore_some_completions_function =
+    (Function *)filename_completion_ignore;
 }
 
 /* Contains the line to push into readline. */
@@ -190,6 +256,7 @@ bash_push_line ()
       rl_insert_text (push_to_readline);
       free (push_to_readline);
       push_to_readline = (char *)NULL;
+      rl_startup_hook = old_rl_startup_hook;
     }
 }
 
@@ -203,6 +270,7 @@ bash_re_edit (line)
     free (push_to_readline);
 
   push_to_readline = savestring (line);
+  old_rl_startup_hook = rl_startup_hook;
   rl_startup_hook = (Function *)bash_push_line;
 
   return (0);
@@ -476,7 +544,7 @@ set_saved_history ()
 	}
     }
   saved_history_line_to_use = 0;
-  rl_startup_hook = (Function *)NULL;
+  rl_startup_hook = old_rl_startup_hook;
 }  
 
 static void
@@ -497,8 +565,49 @@ operate_and_get_next (count, c)
   else
     saved_history_line_to_use = where + 1;
 
+  old_rl_startup_hook = rl_startup_hook;
   rl_startup_hook = (Function *)set_saved_history;
 }
+
+#if defined (VI_MODE)
+/* This vi mode command causes VI_EDIT_COMMAND to be run on the current
+   command being entered (if no explicit argument is given), otherwise on
+   a command from the history file. */
+
+#define VI_EDIT_COMMAND "fc -e ${VISUAL:-${EDITOR:-vi}}"
+
+static void
+vi_edit_and_execute_command (count, c)
+{
+  extern int rl_explicit_arg;
+  char *command;
+
+  /* Accept the current line. */
+  rl_newline ();	
+
+  if (rl_explicit_arg)
+    {
+      command = (char *)xmalloc (strlen (VI_EDIT_COMMAND) + 8);
+      sprintf (command, "%s %d", VI_EDIT_COMMAND, count);
+    }
+  else
+    {
+      extern int history_lines_this_session;
+
+      /* Take the command we were just editing, add it to the history file,
+	 then call fc to operate on it.  We have to add a dummy command to
+	 the end of the history because fc ignores the last command (assumes
+	 it's supposed to deal with the command before the `fc'). */
+      using_history ();
+      add_history (rl_line_buffer);
+      add_history ("");
+      history_lines_this_session++;
+      using_history ();
+      command = savestring (VI_EDIT_COMMAND);
+    }
+  parse_and_execute (command, "v");
+}
+#endif /* VI_MODE */
 
 /* **************************************************************** */
 /*								    */
@@ -516,6 +625,9 @@ attempt_shell_completion (text, start, end)
   int in_command_position = 0;
   char **matches = (char **)NULL;
   char *command_separator_chars = ";|&{(";
+
+  rl_ignore_some_completions_function =
+    (Function *)filename_completion_ignore;
 
   /* Determine if this could be a command word.  It is if it appears at
      the start of the line (ignoring preceding whitespace), or if it
@@ -539,7 +651,30 @@ attempt_shell_completion (text, start, end)
     else
       {
 	if (member (rl_line_buffer[ti], command_separator_chars))
-	  in_command_position++;
+	  {
+	    /* Handle the two character tokens `>&', `<&', and `>|'.
+	       We are not in a command position after one of these. */
+	    if (ti == 0)
+	      in_command_position++;
+	    else
+	      {
+		register int this_char, prev_char;
+
+		this_char = rl_line_buffer[ti];
+		prev_char = rl_line_buffer[ti - 1];
+
+		if ((this_char == '&' &&
+		     (prev_char != '<' && prev_char != '>')) ||
+		    (this_char == '|' && prev_char != '>'))
+		  in_command_position++;
+	      }
+	  }
+	else
+	  {
+	    /* This still could be in command position.  It is possible
+	       that all of the previous words on the line are variable
+	       assignments. */
+	  }
       }
   }
 
@@ -549,7 +684,7 @@ attempt_shell_completion (text, start, end)
 
   /* If the word starts in `~', and there is no slash in the word, then
      try completing this word as a username. */
-  if (!matches && *text == '~' && !index (text, '/'))
+  if (!matches && *text == '~' && !strchr (text, '/'))
     matches = completion_matches (text, username_completion_function);
 
   /* Another one.  Why not?  If the word starts in '@', then look through
@@ -560,21 +695,30 @@ attempt_shell_completion (text, start, end)
   /* And last, (but not least) if this word is in a command position, then
      complete over possible command names, including aliases, functions,
      and command names. */
-  if (!matches && in_command_position && *text != '/')
-    matches = completion_matches (text, command_word_completion_function);
+  if (!matches && in_command_position)
+    {
+      matches = completion_matches (text, command_word_completion_function);
+      /* If we are attempting command completion and nothing matches, we
+	 do not want readline to perform filename completion for us.  We
+	 still want to be able to complete partial pathnames, so set the
+	 completion ignore function to something which will remove filenames
+	 and leave directories in the match list. */
+      if (!matches)
+	rl_ignore_some_completions_function = (Function *)bash_ignore_filenames;
+    }
 
   return (matches);
 }
 
-/* This is the function to call when the word to complete is at the start
-   of a line.  It grovels $PATH, looking for commands that match.  It also
-   scans aliases, function names, and the shell_builtin table. */
+/* This is the function to call when the word to complete is in a position
+   where a command word can be found.  It grovels $PATH, looking for commands
+   that match.  It also scans aliases, function names, and the shell_builtin
+   table. */
 static char *
 command_word_completion_function (hint_text, state)
      char *hint_text;
      int state;
 {
-  extern SHELL_VAR **all_visible_functions ();
   char *extract_colon_unit ();
   static char *hint = (char *)NULL;
   static char *path = (char *)NULL;
@@ -583,6 +727,9 @@ command_word_completion_function (hint_text, state)
   static int path_index, hint_len, istate;
   static int mapping_over, local_index;
   static SHELL_VAR **varlist = (SHELL_VAR **)NULL;
+#if defined (ALIAS)
+  static ASSOC **alias_list = (ASSOC **)NULL;
+#endif /* ALIAS */
 
   /* We have to map over the possibilities for command words.  If we have
      no state, then make one just for that purpose. */
@@ -592,14 +739,28 @@ command_word_completion_function (hint_text, state)
       if (hint)
 	free (hint);
 
-      path = get_string_value ("PATH");
-      path_index = 0;
-
       hint = savestring (hint_text);
       hint_len = strlen (hint);
 
       mapping_over = 0;
       val = (char *)NULL;
+
+      /* If this is an absolute program name, do not check it against
+	 aliases, reserved words, functions or builtins.  We must check
+	 whether or not it is unique, and, if so, whether that filename
+	 is executable. */
+      if (absolute_program (hint_text))
+	{
+	  if (filename_hint)
+	    free (filename_hint);
+	  filename_hint = savestring (hint_text);
+	  mapping_over = 4;
+	  istate = 0;
+	  goto inner;
+	}
+
+      path = get_string_value ("PATH");
+      path_index = 0;
 
       /* Initialize the variables for each type of command word. */
       local_index = 0;
@@ -608,6 +769,13 @@ command_word_completion_function (hint_text, state)
 	free (varlist);
 
       varlist = all_visible_functions ();
+
+#if defined (ALIAS)
+      if (alias_list)
+	free (alias_list);
+
+      alias_list = all_aliases ();
+#endif /* ALIAS */
     }
 
   /* mapping_over says what we are currently hacking.  Note that every case
@@ -617,11 +785,11 @@ command_word_completion_function (hint_text, state)
     {
     case 0:			/* Aliases come first. */
 #if defined (ALIAS)
-      while (aliases && aliases[local_index])
+      while (alias_list && alias_list[local_index])
 	{
 	  register char *alias;
 
-	  alias = aliases[local_index++]->name;
+	  alias = alias_list[local_index++]->name;
 
 	  if (strncmp (alias, hint, hint_len) == 0)
 	    return (savestring (alias));
@@ -663,8 +831,10 @@ command_word_completion_function (hint_text, state)
     case 3:			/* Then shell builtins. */
       for (; local_index < num_shell_builtins; local_index++)
 	{
+	  /* Ignore it if it doesn't have a function pointer or if it
+	     is not currently enabled. */
 	  if (!shell_builtins[local_index].function ||
-	      !shell_builtins[local_index].enabled)
+	      (shell_builtins[local_index].flags & BUILTIN_ENABLED) == 0)
 	    continue;
 
 	  if (strncmp
@@ -705,7 +875,6 @@ command_word_completion_function (hint_text, state)
 
       if (*current_path == '~')
 	{
-	  extern char *tilde_expand ();
 	  char *t;
 
 	  t = tilde_expand (current_path);
@@ -730,17 +899,42 @@ command_word_completion_function (hint_text, state)
 
   if (!val)
     {
+      /* If the hint text is an absolute program, then don't bother
+	 searching through PATH. */
+      if (absolute_program (hint))
+	return ((char *)NULL);
+
       goto outer;
     }
   else
     {
-      char *rindex (), *temp = rindex (val, '/');
-      temp++;
-      if ((strncmp (hint, temp, hint_len) == 0) && executable_file (val))
+      int match;
+      char *temp;
+
+      if (absolute_program (hint))
 	{
-	  temp = (savestring (temp));
+	  match = strncmp (val, hint, hint_len) == 0;
+	  temp = val;
+	}
+      else
+	{
+	  temp = (char *)strrchr (val, '/');
+
+	  if (temp)
+	    {
+	      temp++;
+	      match = strncmp (temp, hint, hint_len) == 0;
+	    }
+	  else
+	    match = 0;
+	}
+
+      /* If we have found a match, and it is an executable file, return it. */
+      if (match && executable_file (val))
+	{
+	  temp = savestring (temp);
 	  free (val);
-	  val = "";	/* So it won't be NULL. */
+	  val = "";		/* So it won't be NULL. */
 	  return (temp);
 	}
       else
@@ -763,8 +957,6 @@ variable_completion_function (text, state)
   static char *varname = (char *)NULL;
   static int namelen;
   static int first_char, first_char_loc;
-
-  extern SHELL_VAR **all_visible_variables ();
 
   if (!state)
     {
@@ -856,13 +1048,135 @@ hostname_completion_function (text, state)
     return ((char *)NULL);
 }
 
-/* History and alias expand the line.  But maybe do more?  This
-   is a test to see what users like.  Do expand_string on the string. */
+/* History and alias expand the line. */
+static char *
+history_expand_line_internal (line)
+     char *line;
+{
+  char *new_line;
+
+  new_line = pre_process_line (line, 0, 0);
+  return new_line;
+}
+
+#if defined (ALIAS)
+/* Perform alias expansion on LINE and return the new line. */
+static char *
+alias_expand_line_internal (line)
+     char *line;
+{
+  char *alias_expand (), *alias_line;
+
+  alias_line = alias_expand (line);
+  return alias_line;
+}
+#endif
+
+/* There was an error in expansion.  Let the preprocessor print
+   the error here. */
+static void
+cleanup_expansion_error ()
+{
+  char *to_free;
+
+  fprintf (rl_outstream, "\r\n");
+  to_free = pre_process_line (rl_line_buffer, 1, 0);
+  free (to_free);
+  putc ('\r', rl_outstream);
+  rl_forced_update_display ();
+}
+
+/* If NEW_LINE differs from what is in the readline line buffer, add an
+   undo record to get from the readline line buffer contents to the new
+   line and make NEW_LINE the current readline line. */
+static void
+maybe_make_readline_line (new_line)
+     char *new_line;
+{
+  if (strcmp (new_line, rl_line_buffer) != 0)
+    {
+      rl_point = rl_end;
+
+      rl_add_undo (UNDO_BEGIN, 0, 0, 0);
+      rl_delete_text (0, rl_point);
+      rl_point = rl_end = 0;
+      rl_insert_text (new_line);
+      rl_add_undo (UNDO_END, 0, 0, 0);
+    }
+}
+
+/* Make NEW_LINE be the current readline line.  This frees NEW_LINE. */
+static void
+set_up_new_line (new_line)
+     char *new_line;
+{
+  int old_point = rl_point;
+  int at_end = rl_point == rl_end;
+
+  /* If the line was history and alias expanded, then make that
+     be one thing to undo. */
+  maybe_make_readline_line (new_line);
+  free (new_line);
+
+  /* Place rl_point where we think it should go. */
+  if (at_end)
+    rl_point = rl_end;
+  else if (old_point < rl_end)
+    {
+      rl_point = old_point;
+      if (!whitespace (rl_line_buffer[rl_point]))
+	rl_forward_word (1);
+    }
+}
+
+/* History expand the line. */
+static void
+history_expand_line (ignore)
+     int ignore;
+{
+  char *new_line;
+
+  new_line = history_expand_line_internal (rl_line_buffer);
+
+  if (new_line)
+    set_up_new_line (new_line);
+  else
+    cleanup_expansion_error ();
+}
+  
+/* History and alias expand the line. */
+static void
+history_and_alias_expand_line (ignore)
+     int ignore;
+{
+  char *new_line;
+
+  new_line = pre_process_line (rl_line_buffer, 0, 0);
+
+#if defined (ALIAS)
+  if (new_line)
+    {
+      char *alias_expand (), *alias_line;
+
+      alias_line = alias_expand (new_line);
+      free (new_line);
+      new_line = alias_line;
+    }
+#endif /* ALIAS */
+
+  if (new_line)
+    set_up_new_line (new_line);
+  else
+    cleanup_expansion_error ();
+}
+
+/* History and alias expand the line, then perform the shell word
+   expansions by calling expand_string. */
 static void
 shell_expand_line (ignore)
      int ignore;
 {
-  char *pre_process_line (), *new_line;
+  char *new_line;
 
   new_line = pre_process_line (rl_line_buffer, 0, 0);
 
@@ -884,27 +1198,13 @@ shell_expand_line (ignore)
 
       /* If the line was history and alias expanded, then make that
 	 be one thing to undo. */
-
-      if (strcmp (new_line, rl_line_buffer) != 0)
-	{
-	  rl_point = rl_end;
-
-	  rl_add_undo (UNDO_BEGIN, 0, 0, 0);
-	  rl_kill_text (0, rl_point);
-	  rl_point = rl_end = 0;
-	  rl_insert_text (new_line);
-	  rl_add_undo (UNDO_END, 0, 0, 0);
-	}
-
+      maybe_make_readline_line (new_line);
       free (new_line);
 
       /* If there is variable expansion to perform, do that as a separate
 	 operation to be undone. */
       {
-	extern char *string_list ();
-	extern WORD_LIST *expand_string ();
 	WORD_LIST *expanded_string;
-	char *string_list ();
 
 	expanded_string = expand_string (rl_line_buffer, 0);
 	if (!expanded_string)
@@ -915,37 +1215,22 @@ shell_expand_line (ignore)
 	    dispose_words (expanded_string);
 	  }
 
-      if (strcmp (new_line, rl_line_buffer) != 0)
-	{
-	  rl_add_undo (UNDO_BEGIN, 0, 0 ,0);
-	  rl_kill_text (0, rl_end);
-	  rl_point = rl_end = 0;
-	  rl_insert_text (new_line);
-	  rl_add_undo (UNDO_END, 0, 0, 0);
-	}
+	maybe_make_readline_line (new_line);
+	free (new_line);
 
-      free (new_line);
-
-      /* Place rl_point where we think it should go. */
-      if (at_end)
-	rl_point = rl_end;
-      else if (old_point < rl_end)
-	{
-	  rl_point = old_point;
-	  if (!whitespace (rl_line_buffer[rl_point]))
-	    rl_forward_word (1);
-	}
+	/* Place rl_point where we think it should go. */
+	if (at_end)
+	  rl_point = rl_end;
+	else if (old_point < rl_end)
+	  {
+	    rl_point = old_point;
+	    if (!whitespace (rl_line_buffer[rl_point]))
+	      rl_forward_word (1);
+	  }
       }
     }
   else
-    {
-      /* There was an error in expansion.  Let the preprocessor print
-	 the error here.  Note that we know that pre_process_line ()
-	 will return NULL, since it just did. */
-      fprintf (rl_outstream, "\n\r");
-      pre_process_line (rl_line_buffer, 1, 0);
-      rl_forced_update_display ();
-    }
+    cleanup_expansion_error ();
 }
 
 /* Filename completion ignore.  Emulates the "fignore" facility of
@@ -971,7 +1256,6 @@ struct ign {
 static struct ign *ignores;	/* Store the ignore strings here */
 static int num_ignores;		/* How many are there? */
 static char *last_fignore;	/* Last value of fignore - cached for speed */
-extern char *extract_colon_unit (), *get_string_value ();
 
 static void
 setup_ignore_patterns ()
@@ -983,9 +1267,9 @@ setup_ignore_patterns ()
   char *this_fignore = get_string_value ("FIGNORE");
 
   /* If nothing has changed then just exit now. */
-  if (this_fignore &&
-      last_fignore && 
-      strcmp (this_fignore, last_fignore) == 0 ||
+  if ((this_fignore &&
+       last_fignore &&
+       strcmp (this_fignore, last_fignore) == 0) ||
       (!this_fignore && !last_fignore))
     {
       return;
@@ -1002,12 +1286,15 @@ setup_ignore_patterns ()
     }
 
   if (last_fignore)
-    free (last_fignore);
+    {
+      free (last_fignore);
+      last_fignore = (char *)NULL;
+    }
 
-  last_fignore = savestring (this_fignore);
-  
   if (!this_fignore || !*this_fignore)
     return;
+
+  last_fignore = savestring (this_fignore);
 
   numitems = maxitems = ptr = 0;
 
@@ -1042,21 +1329,22 @@ name_is_acceptable (name)
   return (1);
 }
 
+/* Internal function to test whether filenames in NAMES should be
+   ignored.  NAME_FUNC is a pointer to a function to call with each
+   name.  It returns non-zero if the name is acceptable to the particular
+   ignore function which called _ignore_names; zero if the name should
+   be removed from NAMES. */
 static void
-filename_completion_ignore (names)
+_ignore_names (names, name_func)
      char **names;
+     Function *name_func;
 {
   char **p;
   int idx;
 
-  setup_ignore_patterns ();
-
-  if (!num_ignores)
-    return;
-  
   for (p = names + 1, idx = -1; *p; p++)
     {
-      if (name_is_acceptable (*p))
+      if ((*name_func) (*p))
 	{
 	  if (idx == -1)	/* First match found. */
 	    idx = p - names;
@@ -1082,23 +1370,61 @@ filename_completion_ignore (names)
     }
 }
 
+static void
+filename_completion_ignore (names)
+     char **names;
+{
+  setup_ignore_patterns ();
+
+  if (num_ignores == 0)
+    return;
+
+  _ignore_names (names, name_is_acceptable);
+}
+
+/* Return 1 if NAME is a directory. */
+static int
+test_for_directory (name)
+     char *name;
+{
+  struct stat finfo;
+  char *fn;
+  int r;
+
+  fn = tilde_expand (name);
+  if (stat (fn, &finfo) != 0)
+    return 1;		/* let the completer figure this one out */
+  r = S_ISDIR (finfo.st_mode);
+  free (fn);
+  return r;
+}
+
+/* Remove files from NAMES, leaving directories. */
+static void
+bash_ignore_filenames (names)
+     char **names;
+{
+  _ignore_names (names, test_for_directory);
+}
+
 /* Handle symbolic link references while hacking completion. */
 static void
 bash_symbolic_link_hook (dirname)
      char **dirname;
 {
   extern int follow_symbolic_links;
-  char *make_absolute (), *temp_dirname;
 
   if (follow_symbolic_links && (strcmp (*dirname, ".") != 0))
     {
-      temp_dirname = make_absolute (*dirname, get_working_directory (""));
+      char *temp1, *temp2, *t;
 
-      if (temp_dirname)
-	{
-	  free (*dirname);
-	  *dirname = temp_dirname;
-	}
+      t = get_working_directory ("symlink-hook");
+      temp1 = make_absolute (*dirname, t);
+      free (t);
+      temp2 = canonicalize_pathname (temp1);
+      free (*dirname);
+      *dirname = temp2;
+      free (temp1);
     }
 }
 
@@ -1134,7 +1460,6 @@ build_history_completion_array ()
 
     if (hlist)
       {
-	extern int qsort_string_compare ();
 	register int j;
 
 	for (i = 0; hlist[i]; i++)
@@ -1201,12 +1526,12 @@ dynamic_complete_history (count, key)
 {
   extern Function *rl_last_func;
   Function *orig_func;
-  Function *orig_attempt_func;
+  CPPFunction *orig_attempt_func;
 
   orig_func = rl_completion_entry_function;
   orig_attempt_func = rl_attempted_completion_function;
   rl_completion_entry_function = (Function *)history_completion_generator;
-  rl_attempted_completion_function = (Function *)0x0;
+  rl_attempted_completion_function = (CPPFunction *)NULL;
 
   if (rl_last_func == (Function *)dynamic_complete_history)
     rl_complete_internal ('?');
@@ -1261,7 +1586,7 @@ bash_complete_filename_internal (what_to_do)
      int what_to_do;
 {
   Function  *orig_func;
-  Function *orig_attempt_func;
+  CPPFunction *orig_attempt_func;
   char *orig_rl_completer_word_break_characters;
   extern char *rl_completer_word_break_characters;
 
@@ -1269,7 +1594,7 @@ bash_complete_filename_internal (what_to_do)
   orig_attempt_func = rl_attempted_completion_function;
   orig_rl_completer_word_break_characters = rl_completer_word_break_characters;
   rl_completion_entry_function = (Function *)filename_completion_function;
-  rl_attempted_completion_function = (Function *)0x0;
+  rl_attempted_completion_function = (CPPFunction *)NULL;
   rl_completer_word_break_characters = " \t\n\"\'";
 
   rl_complete_internal (what_to_do);
@@ -1352,12 +1677,12 @@ bash_specific_completion (what_to_do, generator)
      Function *generator;
 {
   Function *orig_func;
-  Function *orig_attempt_func;
+  CPPFunction *orig_attempt_func;
 
   orig_func = rl_completion_entry_function;
   orig_attempt_func = rl_attempted_completion_function;
   rl_completion_entry_function = generator;
-  rl_attempted_completion_function = (Function *)0x0;
+  rl_attempted_completion_function = (CPPFunction *)NULL;
 
   rl_complete_internal (what_to_do);
 
@@ -1366,4 +1691,3 @@ bash_specific_completion (what_to_do, generator)
 }
 
 #endif	/* SPECIFIC_COMPLETION_FUNCTIONS */
-

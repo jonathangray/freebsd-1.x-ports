@@ -1,6 +1,7 @@
 /* trap.h -- data structures used in the trap mechanism. */
 
 #ifndef NSIG
+#include <sys/types.h>
 #include <signal.h>
 #endif
 
@@ -16,5 +17,4 @@
 
 extern char *trap_list[NSIG];
 extern char *signal_name ();
-extern int signal_decode ();
-
+extern int decode_signal ();

@@ -20,35 +20,40 @@
    based on specifications for the pattern matching.  --RMS.  */
 
 #if defined (SHELL)
+#  if defined (HAVE_STDLIB_H)
+#    include <stdlib.h>
+#  else
+#    include "ansi_stdlib.h"
+#  endif /* HAVE_STDLIB_H */
 #  include <config.h>
 #endif
 
-#if defined (USG) && !defined (Xenix)
-#  if !defined (USGr3)
-#    define USGr3
-#endif /* USGr3 */
-#endif /* USG && !Xenix */
-
 #include <sys/types.h>
 
-#if defined (_POSIX_VERSION) || defined (USGr3) || defined (DIRENT)
+#if !defined (SHELL) && (defined (_POSIX_VERSION) || defined (USGr3))
+#  if !defined (HAVE_DIRENT_H)
+#    define HAVE_DIRENT_H
+#  endif /* !HAVE_DIRENT_H */
+#endif /* !SHELL && (_POSIX_VERSION || USGr3) */
+
+#if defined (HAVE_DIRENT_H)
 #  include <dirent.h>
 #  if !defined (direct)
 #    define direct dirent
 #  endif /* !direct */
-#  define       D_NAMLEN(d) strlen((d)->d_name)
-#else
+#  define D_NAMLEN(d) strlen ((d)->d_name)
+#else /* !HAVE_DIRENT_H */
 #  define D_NAMLEN(d) ((d)->d_namlen)
-#  if defined (Xenix)
-#    include <sys/ndir.h>
-#  else
-#    if defined (USG)
+#  if defined (USG)
+#    if defined (Xenix)
+#      include <sys/ndir.h>
+#    else /* !Xenix (but USG...) */
 #      include "ndir.h"
-#     else
-#      include <sys/dir.h>
-#    endif
-#  endif
-#endif	/* USGr3 || DIRENT.  */
+#    endif /* !Xenix */
+#  else /* !USG */
+#    include <sys/dir.h>
+#  endif /* !USG */
+#endif /* !HAVE_DIRENT_H */
 
 #if defined (_POSIX_SOURCE)
 /* Posix does not require that the d_ino field be present, and some
@@ -58,25 +63,28 @@
 #  define REAL_DIR_ENTRY(dp) (dp->d_ino != 0)
 #endif /* _POSIX_SOURCE */
 
-#if defined (NeXT)
-#include <string.h>
-#else
-#if defined (USG)
-#if !defined (isc386)
-#  include <memory.h>
-#endif
-#include <string.h>
-#if defined (RISC6000)
-extern void bcopy ();
-#else /* RISC6000 */
-#define bcopy(s, d, n) ((void) memcpy ((d), (s), (n)))
-#endif /* RISC6000 */
-#define rindex	strrchr
+#if defined (USG) || defined (NeXT)
+#  if !defined (HAVE_STRING_H)
+#    define HAVE_STRING_H
+#  endif /* !HAVE_STRING_H */
+#endif /* USG || NeXT */
 
-#else /* !USG */
-#include <strings.h>
-#endif /* !USG */
-#endif /* !NeXT */
+#if defined (HAVE_STRING_H)
+#  include <string.h>
+#else /* !HAVE_STRING_H */
+#  include <strings.h>
+#endif /* !HAVE_STRING_H */
+
+#if defined (USG)
+#  if !defined (isc386)
+#    include <memory.h>
+#  endif /* !isc386 */
+#  if defined (RISC6000)
+extern void bcopy ();
+#  else /* !RISC6000 */
+#    define bcopy(s, d, n) ((void) memcpy ((d), (s), (n)))
+#  endif /* !RISC6000 */
+#endif /* USG */
 
 #include "fnmatch.h"
 
@@ -84,23 +92,36 @@ extern void bcopy ();
    then we consider that not robust.  Define OPENDIR_NOT_ROBUST in the
    SYSDEP_CFLAGS for your machines entry in machines.h. */
 #if defined (OPENDIR_NOT_ROBUST)
-#if defined (SHELL)
-# include "posixstat.h"
-#else
-# include <sys/stat.h>
-#endif /* SHELL */
+#  if defined (SHELL)
+#    include "posixstat.h"
+#  else /* !SHELL */
+#    include <sys/stat.h>
+#  endif /* !SHELL */
 #endif /* OPENDIR_NOT_ROBUST */
 
+#if !defined (HAVE_STDLIB_H)
 extern char *malloc (), *realloc ();
 extern void free ();
+#endif /* !HAVE_STDLIB_H */
 
-#ifndef NULL
-#define NULL 0
-#endif
+#if !defined (NULL)
+#  if defined (__STDC__)
+#    define NULL ((void *) 0)
+#  else
+#    define NULL 0x0
+#  endif /* __STDC__ */
+#endif /* !NULL */
+
+#if defined (SHELL)
+extern int interrupt_state;
+#endif /* SHELL */
 
 /* Global variable which controls whether or not * matches .*.
    Non-zero means don't match .*.  */
 int noglob_dot_filenames = 1;
+
+/* Global variable to return to signify an error in globbing. */
+char *glob_error_return;
 
 
 /* Return nonzero if PATTERN has any special globbing chars in it.  */
@@ -110,7 +131,7 @@ glob_pattern_p (pattern)
 {
   register char *p = pattern;
   register char c;
-  int	open = 0;
+  int open = 0;
 
   while ((c = *p++) != '\0')
     switch (c)
@@ -134,6 +155,27 @@ glob_pattern_p (pattern)
 
   return (0);
 }
+
+/* Remove backslashes quoting characters in PATHNAME by modifying PATHNAME. */
+static void
+dequote_pathname (pathname)
+     char *pathname;
+{
+  register int i, j;
+
+  for (i = j = 0; pathname && pathname[i]; )
+    {
+      if (pathname[i] == '\\')
+	i++;
+
+      pathname[j++] = pathname[i++];
+
+      if (!pathname[i - 1])
+	break;
+    }
+  pathname[j] = '\0';
+}
+
 
 /* Return a vector of names of files in directory DIR
    whose names match glob pattern PAT.
@@ -168,38 +210,55 @@ glob_vector (pat, dir)
   register struct globval *nextlink;
   register char *nextname;
   unsigned int count;
-  int lose;
+  int lose, skip;
   register char **name_vector;
   register unsigned int i;
 #if defined (OPENDIR_NOT_ROBUST)
   struct stat finfo;
 
   if (stat (dir, &finfo) < 0)
-    return ((char **) -1);
+    return ((char **) &glob_error_return);
 
   if (!S_ISDIR (finfo.st_mode))
-    return ((char **) -1);
+    return ((char **) &glob_error_return);
 #endif /* OPENDIR_NOT_ROBUST */
 
   d = opendir (dir);
   if (d == NULL)
-    return ((char **) -1);
+    return ((char **) &glob_error_return);
 
   lastlink = 0;
   count = 0;
   lose = 0;
+  skip = 0;
+
+  /* If PAT is empty, skip the loop, but return one (empty) filename. */
+  if (!pat || !*pat)
+    {
+      nextlink = (struct globval *)alloca (sizeof (struct globval));
+      nextlink->next = lastlink;
+      nextname = (char *) malloc (1);
+      if (!nextname)
+	lose = 1;
+      else
+	{
+	  lastlink = nextlink;
+	  nextlink->name = nextname;
+	  nextname[0] = '\0';
+	  count++;
+	}
+      skip = 1;
+    }
 
   /* Scan the directory, finding all names that match.
      For each name that matches, allocate a struct globval
      on the stack and store the name in it.
      Chain those structs together; lastlink is the front of the chain.  */
-  while (1)
+  while (!skip)
     {
       int flags;		/* Flags passed to fnmatch (). */
 #if defined (SHELL)
       /* Make globbing interruptible in the bash shell. */
-      extern int interrupt_state;
-
       if (interrupt_state)
 	{
 	  closedir (d);
@@ -256,6 +315,10 @@ glob_vector (pat, dir)
 	  free (lastlink->name);
 	  lastlink = lastlink->next;
 	}
+#if defined (SHELL)
+      if (interrupt_state)
+	throw_to_top_level ();
+#endif /* SHELL */
       return (NULL);
     }
 
@@ -270,9 +333,10 @@ glob_vector (pat, dir)
   return (name_vector);
 }
 
-/* Return a new array which is the concatenation
-   of each string in ARRAY to DIR. */
-
+/* Return a new array which is the concatenation of each string in ARRAY
+   to DIR.  This function expects you to pass in an allocated ARRAY, and
+   it takes care of free()ing that array.  Thus, you might think of this
+   function as side-effecting ARRAY. */
 static char **
 glob_dir_to_array (dir, array)
      char *dir, **array;
@@ -335,7 +399,7 @@ glob_filename (pathname)
   result[0] = NULL;
 
   /* Find the filename.  */
-  filename = rindex (pathname, '/');
+  filename = strrchr (pathname, '/');
   if (filename == NULL)
     {
       filename = pathname;
@@ -366,12 +430,12 @@ glob_filename (pathname)
 
       if (directories == NULL)
 	goto memory_error;
-      else if ((int) directories == -1)
-	return ((char **) -1);
+      else if (directories == (char **)&glob_error_return)
+	return ((char **) &glob_error_return);
       else if (*directories == NULL)
 	{
 	  free ((char *) directories);
-	  return ((char **) -1);
+	  return ((char **) &glob_error_return);
 	}
 
       /* We have successfully globbed the preceding directory name.
@@ -381,29 +445,15 @@ glob_filename (pathname)
 	{
 	  char **temp_results;
 
-	  if (filename && filename[0])
-	    temp_results = glob_vector (filename, directories[i]);
-	  else
-	    {
-	      /* Null pathname, do not scan the directory. */
-	      temp_results = (char **)malloc (2 * sizeof (char *));
-
-	      if (!temp_results)
-		goto memory_error;
-
-	      temp_results[0] = (char *)malloc (1);
-
-	      if (!temp_results[0])
-		goto memory_error;
-
-	      temp_results[0][0] = '\0';
-	      temp_results[1] = (char *)NULL;
-	    }
+	  /* Scan directory even on a NULL pathname.  That way, `*h/'
+	     returns only directories ending in `h', instead of all
+	     files ending in `h' with a `/' appended. */
+	  temp_results = glob_vector (filename, directories[i]);
 
 	  /* Handle error cases. */
 	  if (temp_results == NULL)
 	    goto memory_error;
-	  else if (temp_results == (char **)-1)
+	  else if (temp_results == (char **)&glob_error_return)
 	    /* This filename is probably not a directory.  Ignore it.  */
 	    ;
 	  else
@@ -455,19 +505,30 @@ glob_filename (pathname)
     }
   else
     {
-      /* Otherwise, just return what glob_vector
-	 returns appended to the directory name. */
-      char **temp_results = glob_vector (filename,
-					 (directory_len == 0
-					  ? "." : directory_name));
+      char **temp_results;
 
-      if (temp_results == NULL || temp_results == (char **)-1)
+      /* There are no unquoted globbing characters in DIRECTORY_NAME.
+	 Dequote it before we try to open the directory since there may
+	 be quoted globbing characters which should be treated verbatim. */
+      if (directory_len > 0)
+	dequote_pathname (directory_name);
+
+      /* We allocated a small array called RESULT, which we won't be using.
+	 Free that memory now. */
+      free (result);
+
+      /* Just return what glob_vector () returns appended to the
+	 directory name. */
+      temp_results =
+	glob_vector (filename, (directory_len == 0 ? "." : directory_name));
+
+      if (temp_results == NULL || temp_results == (char **)&glob_error_return)
 	return (temp_results);
 
       return (glob_dir_to_array (directory_name, temp_results));
     }
 
-  /* We get to memory error if the program has run out of memory, or
+  /* We get to memory_error if the program has run out of memory, or
      if this is the shell, and we have been interrupted. */
  memory_error:
   if (result != NULL)
@@ -478,17 +539,13 @@ glob_filename (pathname)
       free ((char *) result);
     }
 #if defined (SHELL)
-  {
-    extern int interrupt_state;
-
-    if (interrupt_state)
-      throw_to_top_level ();
-  }
+  if (interrupt_state)
+    throw_to_top_level ();
 #endif /* SHELL */
   return (NULL);
 }
 
-#ifdef TEST
+#if defined (TEST)
 
 main (argc, argv)
      int argc;
@@ -501,7 +558,7 @@ main (argc, argv)
       char **value = glob_filename (argv[i]);
       if (value == NULL)
 	puts ("Out of memory.");
-      else if ((int) value == -1)
+      else if (value == &glob_error_return)
 	perror (argv[i]);
       else
 	for (i = 0; value[i] != NULL; i++)

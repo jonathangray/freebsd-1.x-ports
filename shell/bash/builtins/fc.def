@@ -23,6 +23,7 @@ $PRODUCES fc.c
 
 $BUILTIN fc
 $FUNCTION fc_builtin
+$DEPENDS_ON HISTORY
 $SHORT_DOC fc [-e ename] [-nlr] [first] [last] or fc -s [pat=rep] [cmd]
 
 FIRST and LAST can be numbers specifying the range, or FIRST can be a
@@ -46,23 +47,24 @@ the last command.
 $END
 
 #include <stdio.h>
+#include "../bashansi.h"
+#include "../shell.h"
+#if defined (HISTORY)
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h>
 #include <errno.h>
-#include "../shell.h"
 #include "../builtins.h"
 #include "../flags.h"
 #include "../maxpath.h"
 #include <readline/history.h>
+#include "bashgetopt.h"
 
-#if defined (NULL)
-#undef NULL
-#endif
-#define NULL 0
-
+/* Not all systems declare ERRNO in errno.h... and some systems #define it! */
+#if !defined (errno)
 extern int errno;
+#endif /* !errno */
 
 /* **************************************************************** */
 /*								    */
@@ -138,7 +140,7 @@ fc_builtin (list)
   register int i;
   register char *sep;
   int numbering, reverse, listing, execute;
-  int histbeg, histend, last_hist, retval, first;
+  int histbeg, histend, last_hist, retval, first, opt;
   FILE *stream;
   REPL *rlist = (REPL *) NULL, *rl;
   char *ename = NULL, *command, *newcom, *line;
@@ -149,53 +151,37 @@ fc_builtin (list)
   reverse = listing = execute = 0;
 
   /* Parse out the options and set which of the two forms we're in. */
-  while (list && *list->word->word == '-')
-    {
-      register char *s = &((list->word->word)[1]);
-      register int c;
-
-      if (!isletter (*s))	/* for stuff like fc -e - -2 */
+  reset_internal_getopt ();
+  while ((opt = internal_getopt (list, "nlrse:")) != -1) {
+    switch (opt)
+      {
+      case 'n':
+	numbering = 0;
 	break;
 
-      while (c = *s++)
-	{
-	  switch (c)
-	    {
-	    case 'n':
-	      numbering = 0;
-	      break;
+      case 'l':
+	listing = 1;
+	break;
 
-	    case 'l':
-	      listing = 1;
-	      break;
+      case 'r':
+	reverse = 1;
+	break;
 
-	    case 'r':
-	      reverse = 1;
-	      break;
+      case 's':
+	execute = 1;
+	break;
 
-	    case 's':
-	      execute = 1;
-	      break;
+      case 'e':
+	ename = list_optarg;
+	break;
 
-	    case 'e':
-	      list = list->next;
+      default:
+	builtin_error (USAGE);
+	return (EXECUTION_FAILURE);
+      }
+  }
 
-	      if (list == NULL)
-		{
-		  builtin_error (USAGE);
-		  return (EXECUTION_FAILURE);
-		}
-
-	      ename = list->word->word;
-	      break;
-
-	    default:
-	      builtin_error (USAGE);
-	      return (EXECUTION_FAILURE);
-	    }
-	}
-      list = list->next;
-    }
+  list = loptend;
 
   if (ename && (*ename == '-') && (ename[1] == '\0'))
     execute = 1;
@@ -204,7 +190,7 @@ fc_builtin (list)
      substitutions). */
   if (execute)
     {
-      while (list && ((sep = (char *)index (list->word->word, '=')) != NULL))
+      while (list && ((sep = (char *)strchr (list->word->word, '=')) != NULL))
 	{
 	  *sep++ = '\0';
 	  rl = (REPL *)xmalloc (sizeof (REPL));
@@ -341,10 +327,8 @@ fc_builtin (list)
 	{
 	  QUIT;
 	  if (numbering)
-	    fprintf (stream, "%d\t%c", i + history_base,
-		     histdata (i) ? '*' : ' ');
-
-	  fprintf (stream, "%s\n", histline (i));
+	    fprintf (stream, "%d", i + history_base);
+	  fprintf (stream, "\t%c%s\n", histdata (i) ? '*' : ' ', histline (i));
 	}
     }
   else
@@ -353,9 +337,8 @@ fc_builtin (list)
 	{
 	  QUIT;
 	  if (numbering)
-	    fprintf (stream, "%d\t%c", i + history_base,
-		     histdata (i) ? '*' : ' ');
-	  fprintf (stream, "%s\n", histline (i));
+	    fprintf (stream, "%d", i + history_base);
+	  fprintf (stream, "\t%c%s\n", histdata (i) ? '*' : ' ', histline (i));
 	}
     }
 
@@ -410,6 +393,8 @@ fc_builtin (list)
 	}
       else
 	fc_addhist (line);
+
+      free (line);
     }
   fclose (stream);
 
@@ -633,7 +618,7 @@ fc_replhist (command)
   char *data;
   int n;
 
-  if (command == NULL || *command == NULL)
+  if (!command || !*command)
     return;
 
   hlist = history_list ();
@@ -687,3 +672,4 @@ fc_addhist (line)
   if (line && *line)
     add_history (line);
 }
+#endif /* HISTORY */

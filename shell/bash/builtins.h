@@ -25,17 +25,20 @@
 #include "alias.h"
 #endif
 
+/* Flags describing various things about a builtin. */
+#define BUILTIN_ENABLED 0x1	/* This builtin is enabled. */
+#define STATIC_BUILTIN  0x2	/* This builtin is not dynamically loaded. */
+#define SPECIAL_BUILTIN 0x4	/* This is a Posix `special' builtin. */
+
 /* The thing that we build the array of builtins out of. */
 struct builtin {
-  char *name;
-  Function *function;
-  int enabled;
+  char *name;			/* The name that the user types. */
+  Function *function;		/* The address of the invoked function. */
+  int flags;			/* One of the #defines above. */
   char **long_doc;		/* NULL terminated array of strings. */
-  char *short_doc;
+  char *short_doc;		/* Short version of documenation. */
 };
 
 /* Found in builtins.c, created by builtins/mkbuiltins. */
+extern int num_shell_builtins;	/* Number of shell builtins. */
 extern struct builtin shell_builtins[];
-extern int num_shell_builtins;
-
-

@@ -22,16 +22,25 @@ Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/file.h>
+#include "bashansi.h"
 #include "config.h"
 #include "general.h"
 #include "error.h"
 #include "command.h"
 #include "flags.h"
 #include "filecntl.h"
+#include "make_cmd.h"
+#include "subst.h"
 
 #if defined (JOB_CONTROL)
 #include "jobs.h"
 #endif
+
+extern int line_number, current_command_line_count;
+extern int disallow_filename_globbing;
+
+extern char *redirection_expand ();
+extern char *read_secondary_line ();
 
 WORD_DESC *
 make_word (string)
@@ -47,12 +56,26 @@ make_word (string)
     {
       if (*string == '$') temp->dollar_present = 1;
 
+#ifdef OLDCODE
       if (member (*string, "'`\\\""))
 	{
 	  temp->quoted = 1;
 	  if (*string == '\\')
 	    string++;
 	}
+#else
+      switch (*string)
+	{
+	  case '\\':
+	    string++;
+	    /*FALLTHROUGH*/
+	  case '\'':
+	  case '`':
+	  case '"':
+	    temp->quoted = 1;
+	    break;
+	}
+#endif
 
       if (*string)
 	(string++);
@@ -100,9 +123,8 @@ WORD_DESC *
 coerce_to_word (number)
      int number;
 {
-  char *string;
+  char string[24];
 
-  string = (char *)alloca (24);
   sprintf (string, "%d", number);
   return (make_word (string));
 }
@@ -167,13 +189,12 @@ make_case_command (word, clauses)
      WORD_DESC *word;
      PATTERN_LIST *clauses;
 {
-  extern GENERIC_LIST *reverse_list ();
   CASE_COM *temp;
 
   temp = (CASE_COM *)xmalloc (sizeof (CASE_COM));
   temp->flags = 0;
   temp->word = word;
-  temp->clauses = (PATTERN_LIST *)reverse_list (clauses);
+  temp->clauses = REVERSE_LIST (clauses, PATTERN_LIST *);
   return (make_command (cm_case, (SIMPLE_COM *)temp));
 }
 
@@ -240,6 +261,7 @@ make_bare_simple_command ()
   SIMPLE_COM *temp = (SIMPLE_COM *)xmalloc (sizeof (SIMPLE_COM));
 
   temp->flags = 0;
+  temp->line = line_number;
   temp->words = (WORD_LIST *)NULL;
   temp->redirects = (REDIRECT *)NULL;
   command = (COMMAND *)xmalloc (sizeof (COMMAND));
@@ -285,6 +307,7 @@ make_simple_command (element, command)
 }
 
 #define POSIX_HERE_DOCUMENTS
+void
 make_here_document (temp)
      REDIRECT *temp;
 {
@@ -303,8 +326,6 @@ make_here_document (temp)
 	/* ... */
       case r_reading_until:		/* <<foo */
 	{
-	  extern char *redirection_expand ();
-	  extern char *string_quote_removal ();
 	  char *redirectee_word;
 	  int len;
 
@@ -315,7 +336,6 @@ make_here_document (temp)
 	  /* Because of Bourne shell semantics, we turn off globbing, but
 	     only for this style of redirection.  I feel a little ill.  */
 	  {
-	    extern int disallow_filename_globbing;
 	    int old_value = disallow_filename_globbing;
 	    disallow_filename_globbing = 1;
 
@@ -352,14 +372,19 @@ make_here_document (temp)
 	     manufactured the document.  Otherwise, add the line to the
 	     list of lines in the document. */
 	  {
-	    extern char *read_secondary_line ();
 	    char *line;
 	    int l;
 
-	    while (line = read_secondary_line ())
+	    /* If the here-document delimiter was quoted, the lines should
+	       be read verbatim from the input.  If it was not quoted, we
+	       need to perform backslash-quoted newline removal. */
+	    while (line = read_secondary_line
+		     (temp->redirectee.filename->quoted == 0))
 	      {
 		if (!line)
 		  goto document_done;
+
+		line_number++;
 
 		if (kill_leading)
 		  {
@@ -407,18 +432,21 @@ make_here_document (temp)
 }
    
 /* Generate a REDIRECT from SOURCE, DEST, and INSTRUCTION. 
-   INSTRUCTION is the instruction type, SOURCE is an INT,
-   and DEST is an INT or a WORD_DESC *. */
+   INSTRUCTION is the instruction type, SOURCE is a file descriptor,
+   and DEST is a file descriptor or a WORD_DESC *. */
 REDIRECT *
-make_redirection (source, instruction, dest)
+make_redirection (source, instruction, dest_and_filename)
+     int source;
      enum r_instruction instruction;
+     WORD_DESC *dest_and_filename;
 {
   REDIRECT *temp = (REDIRECT *)xmalloc (sizeof (REDIRECT));
 
   /* First do the common cases. */
   temp->redirector = source;
-  temp->redirectee.dest = dest;
+  temp->redirectee.filename = dest_and_filename;
   temp->instruction = instruction;
+  temp->flags = 0;
   temp->next = (REDIRECT *)NULL;
 
   switch (instruction)
@@ -454,7 +482,7 @@ make_redirection (source, instruction, dest)
       break;
 
     case r_input_output:
-      temp->flags = O_RDWR;
+      temp->flags = O_RDWR | O_CREAT;
       break;
 
     default:
@@ -476,6 +504,7 @@ make_function_def (name, command)
   temp = (FUNCTION_DEF *)xmalloc (sizeof (FUNCTION_DEF));
   temp->command = command;
   temp->name = name;
+  command->line = line_number - current_command_line_count + 1;
   return (make_command (cm_function_def, (SIMPLE_COM *)temp));
 }
 
@@ -486,8 +515,6 @@ COMMAND *
 clean_simple_command (command)
      COMMAND *command;
 {
-  extern GENERIC_LIST *reverse_list ();
-
   if (command->type != cm_simple)
     {
       programming_error
@@ -496,9 +523,9 @@ clean_simple_command (command)
   else
     {
       command->value.Simple->words =
-	(WORD_LIST *)reverse_list (command->value.Simple->words);
+	REVERSE_LIST (command->value.Simple->words, WORD_LIST *);
       command->value.Simple->redirects = 
-	(REDIRECT *)reverse_list (command->value.Simple->redirects);
+	REVERSE_LIST (command->value.Simple->redirects, REDIRECT *);
     }
 
   return (command);

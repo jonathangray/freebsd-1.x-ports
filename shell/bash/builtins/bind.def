@@ -24,11 +24,15 @@ $PRODUCES bind.c
 $BUILTIN bind
 $DEPENDS_ON READLINE
 $FUNCTION bind_builtin
-$SHORT_DOC bind [-lvd] [-f filename] [-q name] [keyseq:readline-function]
+$SHORT_DOC bind [-lvd] [-m keymap] [-f filename] [-q name] [keyseq:readline-function]
 Bind a key sequence to a Readline function, or to a macro.  The
 syntax is equivalent to that found in ~/.inputrc, but must be
 passed as a single argument: bind '"\C-x\C-r": re-read-init-file'.
 Arguments we accept:
+  -m  keymap         Use `keymap' as the keymap for the duration of this
+                     command.  Acceptable keymap names are emacs,
+                     emacs-standard, emacs-meta, emacs-ctlx, vi, vi-move,
+                     vi-command, and vi-insert.
   -l                 List names of functions.
   -v                 List function names and bindings.
   -d                 Dump functions and bindings such that they
@@ -39,140 +43,184 @@ $END
 
 #include <stdio.h>
 #include "../shell.h"
+#if defined (READLINE)
+#include <errno.h>
+#if !defined (errno)
+extern int errno;
+#endif /* !errno */
 #include <readline/readline.h>
 #include <readline/history.h>
+#include "bashgetopt.h"
+
+static int query_bindings ();
+
+extern int bash_readline_initialized;
+extern int no_line_editing;
+
+extern Function *rl_named_function ();
+extern char **rl_invoking_keyseqs ();
+
+#define BIND_RETURN(x) \
+  do \
+    { \
+      return_code = x; goto bind_exit; \
+  } while (0)
+
+#define USAGE "usage: bind [-lvd] [-m keymap] [-f filename] [-q name] [keyseq:readline_func]"
 
 int
 bind_builtin (list)
      WORD_LIST *list;
 {
-  extern int bash_readline_initialized;
-  int processing_args = 1;
   int return_code = EXECUTION_SUCCESS;
+  FILE *old_rl_outstream;
+  Keymap kmap, saved_keymap;
+  int lflag, dflag, fflag, vflag, qflag, mflag, opt;
+  char *initfile, *map_name, *fun_name;
 
-  begin_unwind_frame ("bind");
-  unwind_protect_pointer (rl_outstream);
+  if (no_line_editing)
+    return (EXECUTION_FAILURE);
+
+  kmap = saved_keymap = (Keymap) NULL;
+  lflag = dflag = vflag = fflag = qflag = mflag = 0;
+  initfile = map_name = fun_name = (char *)NULL;
+
+  /* Cannot use unwind_protect_pointer () on "FILE *", it is only
+     guaranteed to work for strings. */
+  /* XXX -- see if we can use unwind_protect here */
+  old_rl_outstream = rl_outstream;
   rl_outstream = stdout;
 
   if (!bash_readline_initialized)
     initialize_readline ();
-    
-  while (processing_args && list && list->word->word[0] == '-')
+
+  reset_internal_getopt ();  
+  while ((opt = internal_getopt (list, "lvdf:q:m:")) != EOF)
     {
-      register int i;
-      extern void rl_function_dumper ();
-      char *word = list->word->word;
-
-      list = list->next;
-
-      for (i = 1; word[i]; i++)
+      switch (opt)
 	{
-	  switch (word[i])
-	    {
-	    case 'l':
-	      rl_list_funmap_names (0);
-	      break;
+	case 'l':
+	  lflag++;
+	  break;
 
-	    case 'v':
-	      rl_function_dumper (0);
-	      break;
+	case 'v':
+	  vflag++;
+	  break;
 
-	    case 'd':
-	      rl_function_dumper (1);
-	      break;
+	case 'd':
+	  dflag++;
+	  break;
 
-	    case 'f':
-	      if (!list)
-		{
-		  builtin_error ("-f requires a file name");
-		  goto error_exit;
-		}
-	      else
-		{
-		  extern int errno;
-		  char *initfile;
+	case 'f':
+	  fflag++;
+	  initfile = list_optarg;
+	  break;
 
-		  initfile = list->word->word;
+	case 'm':
+	  mflag++;
+	  map_name = list_optarg;
+	  break;
 
-		  if (rl_read_init_file (initfile) != 0)
-		    {
-		      builtin_error ("Cannot read %s: %s",
-				     initfile, strerror (errno));
-		      goto error_exit;
-		    }
-		  else
-		    list = list->next;
-		}
-	      break;
+	case 'q':
+	  qflag++;
+	  fun_name = list_optarg;
+	  break;
 
-	    case 'q':
-	      if (!list)
-		{
-		  builtin_error ("-q requires the name of a function");
-		  goto error_exit;
-		}
-	      else while (list)
-		{
-		  extern Function *rl_named_function ();
-		  extern char **rl_invoking_keyseqs ();
-		  Function *function;
-		  char *name, **keyseqs;
-
-		  name = list->word->word;
-		  list = list->next;
-
-		  function = rl_named_function (name);
-
-		  if (!function)
-		    {
-		      builtin_error ("Unknown function name `%s'", name);
-		      goto error_exit;
-		    }
-
-		  keyseqs = rl_invoking_keyseqs (function);
-
-		  if (!keyseqs)
-		    {
-		      printf ("%s is not bound to any keys.\n", name);
-		    }
-		  else
-		    {
-		      register int j;
-
-		      printf ("%s can be invoked via ", name);
-
-		      for (j = 0; j < 5 && keyseqs[j]; j++)
-			printf ("\"%s\"%s", keyseqs[j],
-				keyseqs[j + 1] ? ", " : ".\n");
-
-		      if (keyseqs[j])
-			printf ("...\n");
-
-		      free_array (keyseqs);
-		    }
-		}
-	      break;
-
-	    case '-':
-	      processing_args = 0;
-	      break;
-
-	    default:
-	      builtin_error ("Bad argument %c", word[i]);
-
-	    error_exit:
-	      return_code = EXECUTION_FAILURE;
-	      goto bind_exit;
-	    }
+	default:
+	  builtin_error (USAGE);
+	  BIND_RETURN (EXECUTION_FAILURE);
 	}
     }
 
+  list = loptend;
+
+  /* First, see if we need to install a special keymap for this
+     command.  Then start on the arguments. */
+
+  if (mflag && map_name)
+    {
+      kmap = rl_get_keymap_by_name (map_name);
+      if (!kmap)
+        {
+          builtin_error ("`%s': illegal keymap name", map_name);
+	  BIND_RETURN (EXECUTION_FAILURE);
+        }
+    }
+
+  if (kmap)
+    {
+      saved_keymap = rl_get_keymap ();
+      rl_set_keymap (kmap);
+    }
+
+  /* XXX - we need to add exclusive use tests here.  It doesn't make sense
+     to use some of these options together. */
+  /* Now hack the option arguments */
+  if (lflag)
+    rl_list_funmap_names (0);
+
+  if (vflag)
+    rl_function_dumper (0);
+
+  if (dflag)
+    rl_function_dumper (1);
+
+  if (fflag && initfile)
+    {
+      if (rl_read_init_file (initfile) != 0)
+	{
+	  builtin_error ("cannot read %s: %s\n", initfile, strerror (errno));
+	  BIND_RETURN (EXECUTION_FAILURE);
+	}
+    }
+
+  if (qflag && fun_name)
+    return_code = query_bindings (fun_name);
+
+  /* Process the rest of the arguments as binding specifications. */
   while (list)
     {
       rl_parse_and_bind (list->word->word);
       list = list->next;
     }
+
+  if (saved_keymap)
+    rl_set_keymap (saved_keymap);
+
  bind_exit:
-  run_unwind_frame ("bind");
+  rl_outstream = old_rl_outstream;
   return (return_code);
 }
+
+static int
+query_bindings (name)
+     char *name;
+{
+  Function *function;
+  char **keyseqs;
+  int j;
+
+  function = rl_named_function (name);
+  if (!function)
+    {
+      builtin_error ("unknown function name `%s'", name);
+      return EXECUTION_FAILURE;
+    }
+
+  keyseqs = rl_invoking_keyseqs (function);
+
+  if (!keyseqs)
+    {
+      printf ("%s is not bound to any keys.\n", name);
+      return EXECUTION_FAILURE;
+    }
+
+  printf ("%s can be invoked via ", name);
+  for (j = 0; j < 5 && keyseqs[j]; j++)
+    printf ("\"%s\"%s", keyseqs[j], keyseqs[j + 1] ? ", " : ".\n");
+  if (keyseqs[j])
+    printf ("...\n");
+  free_array (keyseqs);
+  return EXECUTION_SUCCESS;
+}
+#endif /* READLINE */

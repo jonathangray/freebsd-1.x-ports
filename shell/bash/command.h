@@ -42,15 +42,18 @@ typedef struct word_list {
 
 /* What a redirection descriptor looks like.  If FLAGS is IS_DESCRIPTOR,
    then we use REDIRECTEE.DEST, else we use the file specified. */
+
+typedef union {
+  long dest;			/* Place to redirect REDIRECTOR to, or ... */
+  WORD_DESC *filename;		/* filename to redirect to. */
+} REDIRECTEE;
+
 typedef struct redirect {
   struct redirect *next;	/* Next element, or NULL. */
   int redirector;		/* Descriptor to be redirected. */
   int flags;			/* Flag value for `open'. */
   enum r_instruction  instruction; /* What to do with the information. */
-  union {
-    int dest;			/* Place to redirect REDIRECTOR to, or ... */
-    WORD_DESC *filename;	/* filename to redirect to. */
-  } redirectee;
+  REDIRECTEE redirectee;	/* File descriptor or filename */
   char *here_doc_eof;		/* The word that appeared in <<foo. */
 } REDIRECT;
 
@@ -68,11 +71,13 @@ typedef struct element {
 #define CMD_IGNORE_RETURN  0x08	/* Ignore the exit value.  For set -e. */
 #define CMD_NO_FUNCTIONS   0x10 /* Ignore functions during command lookup. */
 #define CMD_INHIBIT_EXPANSION 0x20 /* Do not expand the command words. */
+#define CMD_NO_FORK	   0x40	/* Don't fork; just call execve */
 
 /* What a command looks like. */
 typedef struct command {
   enum command_type type;	/* FOR CASE WHILE IF CONNECTION or SIMPLE. */
   int flags;			/* Flags controlling execution environment. */
+  int line;			/* line number the command starts on */
   REDIRECT *redirects;		/* Special redirects for FOR CASE, etc. */
   union {
     struct for_com *For;
@@ -141,6 +146,7 @@ typedef struct simple_com {
   WORD_LIST *words;		/* The program name, the arguments,
 				   variable assignments, etc. */
   REDIRECT *redirects;		/* Redirections to perform. */
+  int line;			/* line number the command starts on */
 } SIMPLE_COM;
 
 /* The "function_def" command.  This isn't really a command, but it is
@@ -162,17 +168,22 @@ typedef struct group_com {
 } GROUP_COM;
 
 /* Forward declarations of functions called by the grammer. */
-extern REDIRECT *make_redirection ();
-extern WORD_LIST *make_word_list ();
-extern WORD_DESC *make_word ();
+extern REDIRECT *make_redirection (), *copy_redirect (), *copy_redirects ();
+extern WORD_LIST *make_word_list (), *copy_word_list ();
+extern WORD_DESC *make_word (), *copy_word ();
+extern char **make_word_array ();
 
-extern COMMAND
-  *make_for_command (), *make_case_command (), *make_if_command (),
-  *make_while_command (), *command_connect (), *make_simple_command (),
-  *make_function_def (), *clean_simple_command (), *make_until_command (),
-  *make_group_command ();
+extern COMMAND *make_for_command (), *make_case_command ();
+extern COMMAND *make_if_command (), *make_while_command ();
+extern COMMAND *command_connect (), *make_simple_command ();
+extern COMMAND *make_function_def (), *clean_simple_command ();
+extern COMMAND *make_until_command (), *make_group_command ();
+extern COMMAND *make_command (), *make_bare_simple_command ();
+extern COMMAND *copy_command ();
 
+extern void make_here_document ();
 extern PATTERN_LIST *make_pattern_list ();
-extern COMMAND *global_command, *copy_command ();
+
+extern COMMAND *global_command;
 
 #endif /* _COMMAND_H */

@@ -23,14 +23,23 @@ $PRODUCES command.c
 
 $BUILTIN command
 $FUNCTION command_builtin
-$SHORT_DOC command [-p] [command [arg ...]]
+$SHORT_DOC command [-pVv] [command [arg ...]]
 Runs COMMAND with ARGS ignoring shell functions.  If you have a shell
 function called `ls', and you wish to call the command `ls', you can
 say "command ls".  If the -p option is given, a default value is used
-for PATH that is guaranteed to find all of the standard utilities.
+for PATH that is guaranteed to find all of the standard utilities.  If
+the -V or -v option is given, a string is printed describing COMMAND.
+The -V option produces a more verbose description.
 $END
 
+#if defined (HAVE_STRING_H)
+#  include <string.h>
+#else /* !HAVE_STRING_H */
+#  include <strings.h>
+#endif /* !HAVE_STRING_H */
+
 #include "../shell.h"
+#include "bashgetopt.h"
 
 static void restore_path ();
 static char *get_standard_path ();
@@ -41,33 +50,51 @@ int
 command_builtin (list)
      WORD_LIST *list;
 {
-  int result;
-  int use_standard_path = 0;
+  int result, verbose = 0, use_standard_path = 0, opt;
   char *old_path;
-
-  while (list)
+  
+  reset_internal_getopt ();
+  while ((opt = internal_getopt (list, "pvV")) != -1)
     {
-      if (strcmp (list->word->word, "-p") == 0)
+      switch (opt)
 	{
+	case 'p':
 	  use_standard_path = 1;
-	  list = list->next;
-	}
-      else if (strcmp (list->word->word, "--") == 0)
-	{
-	  list = list->next;
 	  break;
-	}
-      else if (*list->word->word == '-')
-	{
-	  bad_option (list->word->word);
+	case 'V':
+	  verbose = 2;
+	  break;
+	case 'v':
+	  verbose = 4;
+	  break;
+
+	default:
+	  report_bad_option ();
 	  return (EXECUTION_FAILURE);
 	}
-      else
-	break;
     }
+  list = loptend;
 
   if (!list)
     return (EXECUTION_SUCCESS);
+
+  if (verbose)
+    {
+      int found, any_found = 0;
+
+      while (list)
+	{
+
+	  found = describe_command (list->word->word, verbose, 0);
+
+	  if (!found)
+	    builtin_error ("%s: not found", list->word->word);
+
+	  any_found += found;
+	  list = list->next;
+	}
+      return (any_found ? EXECUTION_SUCCESS : EXECUTION_FAILURE);
+    }
 
   begin_unwind_frame ("command_builtin");
 
@@ -75,9 +102,6 @@ command_builtin (list)
      just make a simple_command structure and call execute_command with it. */
   {
     COMMAND *command;
-    extern COMMAND *make_bare_simple_command ();
-    extern WORD_LIST *copy_word_list ();
-    extern void dispose_command ();
 
     if (use_standard_path)
       {
@@ -124,7 +148,7 @@ restore_path (var)
 static char *
 get_standard_path ()
 {
-#if defined (_CS_PATH) && !defined (HPUX_70)
+#if defined (_CS_PATH) && !defined (hpux_7)
   char *p;
   size_t len;
 
@@ -132,11 +156,11 @@ get_standard_path ()
   p = xmalloc ((int)len + 2);
   (void) confstr (_CS_PATH, p, len);
   return (p);
-#else /* !_CSPATH || HPUX_70 */
+#else /* !_CSPATH || hpux_7 */
 #  if defined (CS_PATH)
   return (savestring (CS_PATH));
 #  else
   return (savestring (STANDARD_UTILS_PATH));
 #  endif /* !CS_PATH */
-#endif /* !_CS_PATH || HPUX_70 */
+#endif /* !_CS_PATH || hpux_7 */
 }

@@ -22,16 +22,34 @@ echo "#  define _SYSDEFS_H_"					   >>$sysdefs
 # Removes any inherited definitions.
 SHLIB=
 SYSDEF=
+MAKE_ANSI=
+
+if [ -f /usr/bin/uname ] || [ -f /bin/uname ]; then
+	UNAME=`uname`
+	UNAME_R=`uname -r 2>/dev/null`
+	UNAME_M=`uname -m 2>/dev/null`
+	RELEASE=`expr $UNAME_R : '[^0-9]*\([0-9]*\)'`
+	RELEASE=`expr $RELEASE + 0`
+	LEVEL=`expr $UNAME_R : '[^0-9]*[0-9]*.\([0-9]*\)'`
+fi
 
 # Test for shared libraries (this is pretty Sunish).
-if test -f /lib/ld.so; then
+if [ -f /lib/ld.so ]; then
   SHLIB=-DHAVE_SHARED_LIBS
   echo ""					>>$sysdefs
   echo "#define HAVE_SHARED_LIBS"		>>$sysdefs
+  if [ "${UNAME}${RELEASE}" = "SunOS5" ]; then
+     SYSDEF=USGr4
+  fi
+fi
+# Test for NeXT
+  
+if [ -d /NextLibrary ]; then
+    MAKE_ANSI=true
 fi
 
 # Test for shared libraries (this is pretty sVr4ish).
-if test -f /usr/ccs/lib/libc.so; then
+if [ -f /usr/ccs/lib/libc.so ]; then
   if [ "$SHLIB" = "" ]; then
     SHLIB=-DHAVE_SHARED_LIBS
     echo ""					>>$sysdefs
@@ -53,7 +71,7 @@ if [ "$WHOAMI" = "" ]; then
   WHOAMI=`id | sed 's/uid=[01-9]*(//' | sed 's/) [) A-Za-z01-9(=,]*//'`
   if (hostname) >/dev/null 2>&1; then
     WHOAMI=$WHOAMI@`hostname`
-  elif test -f /usr/bin/uuname -o -f /bin/uuname; then
+  elif [ -f /usr/bin/uuname -o -f /bin/uuname ]; then
     WHOAMI=`uuname -l`!$WHOAMI
   fi
 fi
@@ -93,40 +111,57 @@ fi
 # Is this a Xenix system?
 #
 if [ -f /xenix ]; then
-  SYSDEF="Xenix"
- case "`/bin/uname -p`" in
-  *286) SYSDEF="Xenix286" ;;
-  *386) SYSDEF="Xenix386" ;;
- esac
+   SYSDEF="Xenix"
+   case "`/bin/uname -p`" in
+     *286) SYSDEF="Xenix286" ;;
+     *386) SYSDEF="Xenix386" ;;
+   esac
+
+   # Pass the release number of the OS through to the machine descriptions
+   # in machines.h.
+   if [ -f /etc/perms/soft ]; then
+      rel=`grep rel= /etc/perms/soft`
+      case "$rel" in
+	*2.2.*) XREL=XENIX_22 ;;
+	*2.3.*) XREL=XENIX_23 ;;
+	*3.2.*) XREL=XENIX_32 ;;
+	*) XREL=
+      esac
+
+      if [ "$XREL" ]; then
+	 echo ""					>>$sysdefs
+	 echo "#if !defined ($XREL)"			>>$sysdefs
+	 echo "#  define $XREL"				>>$sysdefs
+	 echo "#endif /* !$XREL */"			>>$sysdefs
+      fi
+   fi
 fi
 
 #
-# Is this a cadmus system?
+# Is this some kind of Sys Vish system?
 #
 if [ -f /unix ]; then
   if [ -d /generic ]; then   # This is an AIX system.
     SYSDEF="aixpc"
-    cat cpp-Makefile | grep -v '/\*\*/' >aix-Makefile
+    MAKE_ANSI=true
   elif [ -d /etc/conf/kconfig.d ] && [ -f /usr/include/sys/limits.h ]; then
     SYSDEF="isc386"			# This is a 386 running ISC?
   elif [ -f /etc/xlc.cfg ]; then
     if fgrep _IBMR2 /etc/xlc.cfg >/dev/null 2>&1; then
       SYSDEF=RISC6000
-      cat cpp-Makefile | grep -v '/\*\*/' >aix-Makefile
+      MAKE_ANSI=true
     fi
   elif [ -f /bin/4d -a -f /bin/uname ]; then
-    case "`uname -r`" in
+    case "$UNAME_R" in
       3.*) SYSDEF="Irix3" ;;
       4.*) SYSDEF="Irix4" ;;
       *)   SYSDEF="Irix3" ;;
     esac
   elif [ -d /usr/amiga ]; then
     SYSDEF="amiga"		# An Amiga running V.4.
+  elif [ -f /bin/fxc.info ]; then
+    SYSDEF="alliant"
   else
-    if [ "$SYSDEF" = "" ]; then
-      SYSDEF="cadmus"
-    fi
-
     if [ -f /shlib/libc_s ]; then
       SHLIB=-DHAVE_SHARED_LIBS
       echo ""					>>$sysdefs
@@ -137,6 +172,73 @@ if [ -f /unix ]; then
   fi
 fi
 
+# Is this a Unicos system?
+if [ -f /unicos ]; then
+   MAKE_ANSI=true
+   UnicosMachine=
+
+   # Test for the variaous flavors of Cray machines.
+   if [ -x /bin/cray1 ] && /bin/cray1 2>/dev/null; then
+      UnicosMachine=Cray1
+   fi
+
+   if [ -x /bin/cray2 ] && /bin/cray2 2>/dev/null; then
+      UnicosMachine=Cray2
+   fi
+
+   if [ -x /bin/crayxmp ] && /bin/crayxmp 2>/dev/null; then
+      UnicosMachine=CrayXMP
+   fi
+   if [ -x /bin/crayymp ] && /bin/crayymp 2>/dev/null; then
+      UnicosMachine=CrayYMP
+   fi
+
+   if [ "$UnicosMachine" ]; then
+      echo "#if !defined ($UnicosMachine)"	>>$sysdefs
+      echo "#  define $UnicosMachine"		>>$sysdefs
+      echo "#endif /* !$UnicosMachine"		>>$sysdefs
+   fi
+fi
+
+# Is this (and what kind of) a HPUX system?
+if [ -f /hp-ux ] && [ -x /bin/uname ]; then
+  SYSDEF=HPUX_${RELEASE}
+  if [ "$RELEASE" = 6 -a "$LEVEL" -lt 2 ]; then
+    SYSDEF=HPUX_USG
+  fi
+fi
+
+if [ "$SYSDEF" = "" -a -f /bin/uname ]; then
+  case "$UNAME_M" in
+    XD88*) SYSDEF=XD88 ;;
+    M88100) SYSDEF=M88100 ;;	# Motorola Delta 88K
+  esac
+fi
+
+# What release of SCO Unix is this?
+if [ "$SYSDEF" = "" -a -f /bin/uname ]; then
+  case `uname -X 2>/dev/null | grep '^Release' 2>/dev/null` in
+    *3.2v4.0*) SCOREL=SCOv4 ;;
+	    *) SCOREL= ;;
+  esac
+
+  if [ "$SCOREL" ]; then
+    echo ""					>>$sysdefs
+    echo "#if !defined ($SCOREL)"		>>$sysdefs
+    echo "#  define $SCOREL"			>>$sysdefs
+    echo "#endif /* !$SCOREL */"		>>$sysdefs
+  fi
+fi
+
+#
+# Default to cadmus for unknown SysVish systems
+#
+if [ -f /unix ]; then
+  if [ "$SYSDEF" = "" ]; then
+    SYSDEF="cadmus"
+  fi
+fi
+
 if [ "$SYSDEF" != "" ]; then
   echo ""					>>$sysdefs
   echo "#if !defined ($SYSDEF)"			>>$sysdefs
@@ -144,11 +246,39 @@ if [ "$SYSDEF" != "" ]; then
   echo "#endif /* $SYSDEF */"			>>$sysdefs
 fi
 
+if [ -f /usr/include/sys/ptem.h ]; then
+  echo ""					>>$sysdefs
+  echo "#if !defined (HAVE_SYS_PTEM_H)"		>>$sysdefs
+  echo "#  define HAVE_SYS_PTEM_H"		>>$sysdefs
+  echo "#endif /* HAVE_SYS_PTEM_H */"		>>$sysdefs
+fi
+
+if [ -f /usr/include/sys/pte.h ]; then
+  echo ""					>>$sysdefs
+  echo "#if !defined (HAVE_SYS_PTE_H)"		>>$sysdefs
+  echo "#  define HAVE_SYS_PTE_H"		>>$sysdefs
+  echo "#endif /* HAVE_SYS_PTE_H */"		>>$sysdefs
+fi
+
 if [ -f /usr/include/unistd.h ]; then
   echo ""					>>$sysdefs
   echo "#if !defined (HAVE_UNISTD_H)"		>>$sysdefs
   echo "#  define HAVE_UNISTD_H"		>>$sysdefs
   echo "#endif /* HAVE_UNISTD_H */"		>>$sysdefs
+fi
+
+if [ -f /usr/include/stdlib.h ]; then
+  echo ""					>>$sysdefs
+  echo "#if !defined (HAVE_STDLIB_H)"		>>$sysdefs
+  echo "#  define HAVE_STDLIB_H"		>>$sysdefs
+  echo "#endif /* HAVE_STDLIB_H */"		>>$sysdefs
+fi
+
+if [ -f /usr/include/limits.h ]; then
+  echo ""					>>$sysdefs
+  echo "#if !defined (HAVE_LIMITS_H)"		>>$sysdefs
+  echo "#  define HAVE_LIMITS_H"		>>$sysdefs
+  echo "#endif /* HAVE_LIMITS_H */"		>>$sysdefs
 fi
 
 if [ -f /usr/include/sys/wait.h ]; then
@@ -172,6 +302,69 @@ if [ -f /usr/include/sys/resource.h ]; then
   echo "#endif /* HAVE_RESOURCE */"		>>$sysdefs
 else
   RESOURCE=
+fi
+
+if [ -f /usr/include/dirent.h ]; then
+  echo ""					>>$sysdefs
+  echo "#if !defined (HAVE_DIRENT_H)"		>>$sysdefs
+  echo "#  define HAVE_DIRENT_H"		>>$sysdefs
+  echo "#endif /* HAVE_DIRENT_H */"		>>$sysdefs
+fi
+
+if [ -f /usr/include/string.h ]; then
+  echo ""					>>$sysdefs
+  echo "#if !defined (HAVE_STRING_H)"		>>$sysdefs
+  echo "#  define HAVE_STRING_H"		>>$sysdefs
+  echo "#endif /* HAVE_STRING_H */"		>>$sysdefs
+fi
+
+if [ -f /usr/include/varargs.h ]; then
+  echo ""					>>$sysdefs
+  echo "#if !defined (HAVE_VARARGS_H)"		>>$sysdefs
+  echo "#  define HAVE_VARARGS_H"		>>$sysdefs
+  echo "#endif /* HAVE_VARARGS_H */"		>>$sysdefs
+fi
+
+# Does the system have a /dev/fd directory?
+if [ -d /dev/fd ]; then
+  echo ""					>>$sysdefs
+  echo "#if !defined (HAVE_DEV_FD)"		>>$sysdefs
+  echo "#  define HAVE_DEV_FD"			>>$sysdefs
+  echo "#endif /* HAVE_DEV_FD */"		>>$sysdefs
+fi
+
+# Is this SVR4.2?  It's subtly different from USGr4
+if [ "$UNAME" = "UNIX_SV" ] && [ "$UNAME_R" = "4.2" ]; then
+  echo ""					>>$sysdefs
+  echo "#if !defined (USGr4_2)"		>>$sysdefs
+  echo "#  define USGr4_2"		>>$sysdefs
+  echo "#endif /* USGr4_2 */"		>>$sysdefs
+fi
+
+# If the user is using a recent Bash already, let's compile with that
+# as the $SHELL for Make.
+#
+# I stopped doing this because "make install" mv's the existing shell to
+# a new name before copying the new shell over.  Since the existing shell
+# is moved, there is no shell to do the "cp" command!
+# BashVersion=
+# 
+# if [ "$BASH" != "" ]; then
+#   if [ -f "$BASH" ]; then
+#      BashVersion=`$BASH -norc -c 'echo $BASH_VERSION' 2>/dev/null`
+#   fi
+# 
+#   if [ `expr $BashVersion \> 1.10 2>/dev/null` = "1" ]; then
+#     echo ""					>>$sysdefs
+#     echo "#define MAKE_SHELL $BASH"		>>$sysdefs
+#     echo "Bash will be compiled with \$SHELL = $BASH!"
+#   fi
+# fi
+
+# If this system's cpp might not like `/**/#' in cpp-Makefile, make an
+# alternate ansi-style cpp-Makefile.
+if [ "$MAKE_ANSI" = "true" ]; then
+   cat cpp-Makefile | grep -v '/\*\*/' >ansi-Makefile
 fi
 
 # These should be the last 2 lines in this file!

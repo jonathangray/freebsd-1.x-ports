@@ -24,12 +24,18 @@
  The following operators are handled, grouped into a set of levels in
  order of decreasing precedence.
 
-	"-"			[level 0 (unary negation)]
-	"!"			[level 1]
+	"-", "+"		[level 0 (unary operators)]
+	"!", "~"		[level 1]
 	"*", "/", "%"		[level 2]
 	"+", "-"		[level 3]
+	"<<", ">>"
 	"<=", ">=", "<", ">"	[level 4]
 	"==", "!="		[level 5]
+	"&"
+	"^"
+	"|"
+	"&&"
+	"||"
 	"="			[level 6 (assignment)]
 
  (Note that most of these operators have special meaning to bash, and an
@@ -55,39 +61,31 @@
 */
 
 #include <stdio.h>
+#include "bashansi.h"
 #include "shell.h"
 
 #define variable_starter(c) (isletter(c) || (c == '_'))
 #define variable_character(c) (isletter(c) || (c == '_') || digit(c))
 
-#if defined (NULL)
-#undef NULL
-#endif
-#define NULL 0
+/* Because of the $[...] construct, expressions may include newlines.
+   Here is a macro which accepts newlines, tabs and spaces as whitespace. */
+#define cr_whitespace(c) (whitespace(c) || ((c) == '\n'))
 
 static char	*expression = (char *) NULL;	/* The current expression */
 static char	*tp = (char *) NULL;		/* token lexical position */
 static int	curtok = 0;			/* the current token */
 static int	lasttok = 0;			/* the previous token */
+static int	assigntok = 0;			/* the OP in OP= */
 static char	*tokstr = (char *) NULL;	/* current token string */
 static int	tokval = 0;			/* current token value */
 static jmp_buf	evalbuf;
 
-static void	readtok();			/* lexical analyzer */
-static long	assignment(), exp0(), exp1(), exp2(), exp3(), exp4(), exp5();
-static long	strlong();
-static void	evalerror();
-
-/*
- * Because of the $[...] construct, expressions may include newlines.  This
- * redefines `whitespace' so that a newline is added.
- */
-
-#ifdef whitespace
-#undef whitespace
-#endif
-
-#define whitespace(c)	((c) == ' ' || (c) == '\t' || (c) == '\n')
+static void	readtok ();			/* lexical analyzer */
+static long	assignment (), exp0 (), exp1 (), exp2 (), exp3 (),
+		exp4 (), exp5 (), expshift (), expland (), explor (),
+		expband (), expbor (), expbxor ();
+static long	strlong ();
+static void	evalerror ();
 
 /* A structure defining a single expression context. */
 typedef struct {
@@ -110,8 +108,6 @@ static int expr_stack_size = 0;	   /* Number of slots already allocated. */
    "let num=num+2" is given.  I have to talk to Chet about this hack. */
 #define MAX_EXPR_RECURSION_LEVEL 1024
 
-extern long atol ();
-
 /* The Tokens.  Singing "The Lion Sleeps Tonight". */
 
 #define EQEQ	1	/* "==" */
@@ -120,6 +116,11 @@ extern long atol ();
 #define GEQ	4	/* ">=" */
 #define STR	5	/* string */
 #define NUM	6	/* number */
+#define LAND	7	/* "&&" Logical AND */
+#define LOR	8	/* "||" Logical OR */
+#define LSH	9	/* "<<" Left SHift */
+#define RSH    10	/* ">>" Right SHift */
+#define OP_ASSIGN 11	/* op= assignment as in Posix.2 */
 #define EQ	'='
 #define GT	'>'
 #define LT	'<'
@@ -131,6 +132,10 @@ extern long atol ();
 #define NOT	'!'
 #define LPAR	'('
 #define RPAR	')'
+#define BAND	'&'	/* Bitwise AND */
+#define BOR	'|'	/* Either Bitwise OR, or what Chet is. */
+#define BXOR	'^'	/* Bitwise eXclusive OR. */
+#define BNOT	'~'	/* Bitwise NOT; Two's complement. */
 
 /* Push and save away the contents of the globals describing the
    current expression context. */
@@ -196,7 +201,7 @@ evalexp (expr)
   long val = 0L;
   jmp_buf old_evalbuf;
 
-  if (expr == NULL || *expr == NULL)
+  if (expr == NULL || *expr == '\0')
     return (0);
 
   /* Save the value of evalbuf to protect it around possible recursive
@@ -237,6 +242,8 @@ evalexp (expr)
   if (curtok != 0) 
     evalerror ("syntax error in expression");
 
+  if (tokstr)
+    free (tokstr);
   if (expression)
     free (expression);
 
@@ -282,18 +289,66 @@ static long
 assignment ()
 {
   register long	value;
-  char *lhs;
-  char *rhs;
+  char *lhs, *rhs;
 
-  value = exp5 ();
-  if (curtok == EQ)
+  value = explor ();
+  if (curtok == EQ || curtok == OP_ASSIGN)
     {
+      int special = curtok == OP_ASSIGN;
+      int op;
+      long lvalue;
+
       if (lasttok != STR)
 	evalerror ("attempted assignment to non-variable");
+
+      if (special)
+	{
+	  op = assigntok;		/* a OP= b */
+	  lvalue = value;
+	}
 
       lhs = savestring (tokstr);
       readtok ();
       value = assignment ();
+
+      if (special)
+	{
+	  switch (op)
+	    {
+	    case MUL:
+	      lvalue *= value;
+	      break;
+	    case DIV:
+	      lvalue /= value;
+	      break;
+	    case MOD:
+	      lvalue %= value;
+	      break;
+	    case PLUS:
+	      lvalue += value;
+	      break;
+	    case MINUS:
+	      lvalue -= value;
+	      break;
+	    case LSH:
+	      lvalue <<= value;
+	      break;
+	    case RSH:
+	      lvalue >>= value;
+	      break;
+	    case BAND:
+	      lvalue &= value;
+	      break;
+	    case BOR:
+	      lvalue |= value;
+	      break;
+	    default:
+	      evalerror ("bug: bad assignment token %d", assigntok);
+	      break;
+	    }
+	  value = lvalue;
+	}
+
       rhs = itos (value);
       bind_int_variable (lhs, rhs);
       free (rhs);
@@ -302,6 +357,96 @@ assignment ()
       tokstr = (char *)NULL;		/* For freeing on errors. */
     }
   return (value);
+}
+
+/* Logical OR. */
+static long
+explor ()
+{
+  register long val1, val2;
+
+  val1 = expland ();
+
+  while (curtok == LOR)
+    {
+      readtok ();
+      val2 = expland ();
+      val1 = val1 || val2;
+    }
+
+  return (val1);
+}
+
+/* Logical AND. */
+static long
+expland ()
+{
+  register long val1, val2;
+
+  val1 = expbor ();
+
+  while (curtok == LAND)
+    {
+      readtok ();
+      val2 = expbor ();
+      val1 = val1 && val2;
+    }
+
+  return (val1);
+}
+
+/* Bitwise OR. */
+static long
+expbor ()
+{
+  register long val1, val2;
+
+  val1 = expbxor ();
+
+  while (curtok == BOR)
+    {
+      readtok ();
+      val2 = expbxor ();
+      val1 = val1 | val2;
+    }
+
+  return (val1);
+}
+
+/* Bitwise XOR. */
+static long
+expbxor ()
+{
+  register long val1, val2;
+
+  val1 = expband ();
+
+  while (curtok == BXOR)
+    {
+      readtok ();
+      val2 = expband ();
+      val1 = val1 ^ val2;
+    }
+
+  return (val1);
+}
+
+/* Bitwise AND. */
+static long
+expband ()
+{
+  register long val1, val2;
+
+  val1 = exp5 ();
+
+  while (curtok == BAND)
+    {
+      readtok ();
+      val2 = exp5 ();
+      val1 = val1 & val2;
+    }
+
+  return (val1);
 }
 
 static long
@@ -330,7 +475,7 @@ exp4 ()
 {
   register long val1, val2;
 
-  val1 = exp3 ();
+  val1 = expshift ();
   while ((curtok == LEQ) ||
 	 (curtok == GEQ) ||
 	 (curtok == LT) ||
@@ -339,7 +484,7 @@ exp4 ()
       int op = curtok;
 
       readtok ();
-      val2 = exp3 ();
+      val2 = expshift ();
 
       if (op == LEQ)
 	val1 = val1 <= val2;
@@ -350,6 +495,30 @@ exp4 ()
       else if (op == GT)
 	val1 = val1 > val2;
     }
+  return (val1);
+}
+
+/* Left and right shifts. */
+static long
+expshift ()
+{
+  register long val1, val2;
+
+  val1 = exp3 ();
+
+  while ((curtok == LSH) || (curtok == RSH))
+    {
+      int op = curtok;
+
+      readtok ();
+      val2 = exp3 ();
+
+      if (op == LSH)
+	val1 = val1 << val2;
+      else
+	val1 = val1 >> val2;
+    }
+
   return (val1);
 }
 
@@ -413,7 +582,12 @@ exp1 ()
   if (curtok == NOT)
     {
       readtok ();
-      val = !exp0 ();
+      val = !exp1 ();
+    }
+  else if (curtok == BNOT)
+    {
+      readtok ();
+      val = ~exp1 ();
     }
   else
     val = exp0 ();
@@ -431,6 +605,11 @@ exp0 ()
       readtok ();
       val = - exp0 ();
     }
+  else if (curtok == PLUS)
+    {
+      readtok ();
+      val = exp0 ();
+    }
   else if (curtok == LPAR)
     {
       readtok ();
@@ -441,7 +620,6 @@ exp0 ()
 
       /* Skip over closing paren. */
       readtok ();
-
     }
   else if ((curtok == NUM) || (curtok == STR))
     {
@@ -466,7 +644,7 @@ readtok ()
 
   /* Skip leading whitespace. */
   c = 0;
-  while (cp && (c = *cp) && (whitespace(c)))
+  while (cp && (c = *cp) && (cr_whitespace (c)))
     cp++;
 
   if (c)
@@ -494,6 +672,8 @@ readtok ()
       c = *--cp;
       *cp = '\0';
 
+      if (tokstr)
+        free (tokstr);
       tokstr = savestring (tp);
       value = get_string_value (tokstr);
 
@@ -518,7 +698,6 @@ readtok ()
       *cp = c;
       lasttok = curtok;
       curtok = NUM;
-
     }
   else
     {
@@ -531,6 +710,37 @@ readtok ()
 	c = GEQ;
       else if ((c == LT) && (c1 == EQ))
 	c = LEQ;
+      else if ((c == LT) && (c1 == LT))
+	{
+	  if (*cp == '=')	/* a <<= b */
+	    {
+	      assigntok = LSH;
+	      c = OP_ASSIGN;
+	      cp++;
+	    }
+	  else
+	    c = LSH;
+	}
+      else if ((c == GT) && (c1 == GT))
+	{
+	  if (*cp == '=')
+	    {
+	      assigntok = RSH;	/* a >>= b */
+	      c = OP_ASSIGN;
+	      cp++;
+	    }
+	  else
+	    c = RSH;
+	}
+      else if ((c == BAND) && (c1 == BAND))
+	c = LAND;
+      else if ((c == BOR) && (c1 == BOR))
+	c = LOR;
+      else if (c1 == EQ && member(c, "*/%+-&^|"))
+	{
+	  assigntok = c;	/* a OP= b */
+	  c = OP_ASSIGN;
+	}
       else
 	cp--;			/* `unget' the character */
       lasttok = curtok;
@@ -561,14 +771,14 @@ strlong (num)
   int base = 10;
   long val = 0L;
 
-  if (s == NULL || *s == NULL)
+  if (s == NULL || *s == '\0')
     return 0L;
 
   if (*s == '0')
     {
       s++;
 
-      if (s == NULL || *s == NULL)
+      if (s == NULL || *s == '\0')
 	return 0L;
       
        /* Base 16? */
@@ -614,3 +824,65 @@ strlong (num)
     }
   return (val);
 }
+
+#if defined (EXPR_TEST)
+char *
+xmalloc (n)
+     int n;
+{
+  extern char *malloc ();
+  return (malloc (n));
+}
+
+char *
+xrealloc (s, n)
+     char *s;
+     int n;
+{
+  extern char *realloc ();
+  return (realloc (s, n));
+}
+
+SHELL_VAR *find_variable () { return 0;}
+SHELL_VAR *bind_variable () { return 0; }
+
+char *get_string_value () { return 0; }
+
+jmp_buf top_level;
+
+main (argc, argv)
+     int argc;
+     char **argv;
+{
+  register int i;
+  long v;
+
+  if (setjmp (top_level))
+    exit (0);
+
+  for (i = 1; i < argc; i++)
+    {
+      v = evalexp (argv[i]);
+      printf ("'%s' -> %ld\n", argv[i], v);
+    }
+  exit (0);
+}
+
+int
+builtin_error (format, arg1, arg2, arg3, arg4, arg5)
+     char *format;
+{
+  fprintf (stderr, "expr: ");
+  fprintf (stderr, format, arg1, arg2, arg3, arg4, arg5);
+  fprintf (stderr, "\n");
+  return 0;
+}
+
+char *
+itos (n)
+     int n;
+{
+  return ("42");
+}
+
+#endif /* EXPR_TEST */

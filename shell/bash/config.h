@@ -18,34 +18,27 @@
    along with Bash; see the file COPYING.  If not, write to the Free
    Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 
-#ifndef _CONFIG_
-#define _CONFIG_
-
-#ifndef VOID
-#ifdef NO_VOID
-#define VOID char
-#else
-#define VOID void
-#endif
-#endif
+#if !defined (_CONFIG_H_)
+#define _CONFIG_H_
 
 #if defined (__GNUC__)
 #  if !defined (HAVE_ALLOCA)
 #    define HAVE_ALLOCA
 #  endif /* HAVE_ALLOCA */
 #  if !defined (BUILDING_MAKEFILE)
+#    undef alloca
 #    define alloca __builtin_alloca
-#  endif
-#else
+#  endif /* !BUILDING_MAKEFILE */
+#else /* !__GNUC__ */
 #  if defined (HAVE_ALLOCA_H)
 #    if !defined (HAVE_ALLOCA)
 #      define HAVE_ALLOCA
 #    endif /* HAVE_ALLOCA */
 #    if !defined (BUILDING_MAKEFILE)
 #      include <alloca.h>
-#    endif
+#    endif /* !BUILDING_MAKEFILE */
 #  endif /* HAVE_ALLOCA_H */
-#endif /* __GNUC__ */
+#endif /* !__GNUC__ */
 
 #if defined (HPUX) || defined (UNIXPC) || defined (Xenix)
 #  if !defined (USG)
@@ -64,8 +57,8 @@
 /* Note that vanilla System V machines don't support BSD job control,
    although some do support Posix job control. */
 #if defined (USG) && !defined (_POSIX_JOB_CONTROL)
-#undef JOB_CONTROL
-#endif /* USG */
+#  undef JOB_CONTROL
+#endif /* USG && !POSIX_JOB_CONTROL */
 
 /* Define ALIAS if you want the alias features. */
 #define ALIAS
@@ -74,17 +67,35 @@
    (Also the `dirs' commands.) */
 #define PUSHD_AND_POPD
 
+/* Define BRACE_EXPANSION if you want curly brace expansion a la Csh:
+   foo{a,b} -> fooa foob.  Even if this is compiled in (the default) you
+   can turn it off at shell startup with `-nobraceexpansion', or during
+   shell execution with `set +o braceexpand'. */
+#define BRACE_EXPANSION
+
 /* Define READLINE to get the nifty/glitzy editing features.
    This is on by default.  You can turn it off interactively
    with the -nolineediting flag. */
 #define READLINE
 
-/* If READLINE is defined, right now we assume that you have the full
-   source code.  If you simply have the library and header files installed,
-   then undefine HAVE_READLINE_SOURCE. */
-#if defined (READLINE)
-#  define HAVE_READLINE_SOURCE
-#endif /* READLINE */
+/* Define BANG_HISTORY if you want to have Csh style "!" history expansion.
+   This is unrelated to READLINE. */
+#define BANG_HISTORY
+
+/* Define HISTORY if you want to have access to previously typed commands.
+
+   If both HISTORY and READLINE are defined, you can get at the commands
+   with line editing commands, and you can directly manipulate the history
+   from the command line.
+
+   If only HISTORY is defined, the `fc' and `history' builtins are
+   available. */
+#define HISTORY
+
+#if defined (BANG_HISTORY) && !defined (HISTORY)
+   /* BANG_HISTORY requires HISTORY. */
+#  define HISTORY
+#endif /* BANG_HISTORY && !HISTORY */
 
 /* The default value of the PATH variable. */
 #define DEFAULT_PATH_VALUE \
@@ -114,11 +125,42 @@
 
 /* When ALLOW_RIGID_POSIX_COMPLIANCE is defined, you can turn on strictly
    Posix compliant behaviour by setting the environment variable
-   POSIX_PEDANTIC. */
+   POSIXLY_CORRECT. */
 #define ALLOW_RIGID_POSIX_COMPLIANCE
+
+/* Define RESTRICTED_SHELL if you want the generated shell to have the
+   ability to be a restricted one.  The shell thus generated can become
+   restricted by being run with the name "rbash", or by setting the -r
+   flag. */
+#define RESTRICTED_SHELL
 
 /* Define DISABLED_BUILTINS if you want "builtin foo" to always run the
    shell builtin "foo", even if it has been disabled with "enable -n foo". */
 /* #define DISABLED_BUILTINS */
 
-#endif	/* _CONFIG_ */
+/* Define PROCESS_SUBSTITUTION if you want the K*rn shell-like process
+   substitution features "<(file)". */
+/* Right now, you cannot do this on machines without fully operational
+   FIFO support.  This currently include NeXT and Alliant. */
+#if !defined (MKFIFO_MISSING)
+#  define PROCESS_SUBSTITUTION
+#endif /* !MKFIFO_MISSING */
+
+/* Define PROMPT_STRING_DECODE if you want the backslash-escaped special
+   characters in PS1 and PS2 expanded.  Variable expansion will still be
+   performed. */
+#define PROMPT_STRING_DECODE
+
+/* Define BUFFERED_INPUT if you want the shell to do its own input
+   buffering. */
+#define BUFFERED_INPUT
+
+/* Define INTERACTIVE_COMMENTS if you want # comments to work by default
+   when the shell is interactive, as Posix.2a specifies. */
+#define INTERACTIVE_COMMENTS
+
+/* Define ONESHOT if you want sh -c 'command' to avoid forking to execute
+   `command' whenever possible. */
+#define ONESHOT
+
+#endif	/* !_CONFIG_H_ */

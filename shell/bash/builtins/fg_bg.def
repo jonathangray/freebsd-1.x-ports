@@ -35,6 +35,7 @@ $END
 #include "../shell.h"
 #include "../jobs.h"
 
+#if defined (JOB_CONTROL)
 extern int job_control;
 static int fg_bg ();
 
@@ -47,7 +48,7 @@ fg_builtin (list)
   register WORD_LIST *t = list;
 
   if (!job_control)
-    return (EXECUTION_SUCCESS);
+    return (EXECUTION_FAILURE);
 
   /* If the last arg on the line is '&', then start this job in the
      background.  Else, fg the job. */
@@ -60,6 +61,7 @@ fg_builtin (list)
 
   return (fg_bg (list, fg_bit));
 }
+#endif /* JOB_CONTROL */
 
 $BUILTIN bg
 $FUNCTION bg_builtin
@@ -70,13 +72,14 @@ Place JOB_SPEC in the background, as if it had been started with
 job is used.
 $END
 
+#if defined (JOB_CONTROL)
 /* How to put a job into the background. */
 int
 bg_builtin (list)
      WORD_LIST *list;
 {
   if (!job_control)
-    return (EXECUTION_SUCCESS);
+    return (EXECUTION_FAILURE);
 
   return (fg_bg (list, 0));
 }
@@ -89,7 +92,7 @@ fg_bg (list, foreground)
 {
   extern char *this_command_name;
   sigset_t set, oset;
-  int job, status = EXECUTION_SUCCESS;
+  int job, status = EXECUTION_SUCCESS, old_async_pid;
 
   BLOCK_CHILD (set, oset);
   job = get_job_spec (list);
@@ -103,10 +106,16 @@ fg_bg (list, foreground)
     }
 
   /* Or if jobs[job]->pgrp == shell_pgrp. */
-  if (jobs[job]->job_control == 0)
+  if (!(jobs[job]->flags & J_JOBCONTROL))
     {
       builtin_error ("job %%%d started without job control", job + 1);
       goto failure;
+    }
+
+  if (!foreground)
+    {
+      old_async_pid = last_asynchronous_pid;
+      last_asynchronous_pid = jobs[job]->pgrp;	/* As per Posix.2 5.4.2 */
     }
 
   status = start_job (job, foreground);
@@ -120,7 +129,9 @@ fg_bg (list, foreground)
     {
     failure:
       UNBLOCK_CHILD (oset);
+      if (!foreground)
+	last_asynchronous_pid = old_async_pid;
       return (EXECUTION_FAILURE);
     }
 }
-
+#endif /* JOB_CONTROL */

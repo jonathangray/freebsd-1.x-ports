@@ -31,9 +31,12 @@ word to be checked for alias substitution.  Alias returns true
 unless a NAME is given for which no alias has been defined.
 $END
 
-#include <stdio.h>
 #include "../shell.h"
-#include "../alias.h"
+
+#if defined (ALIAS)
+#  include <stdio.h>
+#  include "../alias.h"
+#  include "common.h"
 
 extern int interactive;
 static void print_alias ();
@@ -47,12 +50,17 @@ alias_builtin (list)
   if (!list)
     {
       register int i;
+      ASSOC **alias_list;
 
       if (!aliases)
 	return (EXECUTION_FAILURE);
 
-      for (i = 0; aliases[i]; i++)
-	print_alias (aliases[i]);
+      alias_list = all_aliases ();
+
+      for (i = 0; alias_list[i]; i++)
+	print_alias (alias_list[i]);
+
+      free (alias_list);	/* XXX - Do not free the strings. */
     }
   else
     {
@@ -90,6 +98,7 @@ alias_builtin (list)
   else
     return (EXECUTION_SUCCESS);
 }
+#endif /* ALIAS */
 
 $BUILTIN unalias
 $FUNCTION unalias_builtin
@@ -98,6 +107,8 @@ $SHORT_DOC unalias [-a] [name ...]
 Remove NAMEs from the list of defined aliases.  If the -a option is given,
 then remove all alias definitions.
 $END
+
+#if defined (ALIAS)
 /* Remove aliases named in LIST from the aliases database. */
 unalias_builtin (list)
      register WORD_LIST *list;
@@ -149,32 +160,6 @@ unalias_builtin (list)
     return (EXECUTION_SUCCESS);
 }
 
-/* Return a new string which is the quoted version of STRING. */
-static char *
-single_quote (string)
-     char *string;
-{
-  register int i, j, c;
-  char *result;
-
-  result = (char *)xmalloc (3 + (2 * strlen (string)));
-
-  result[0] = '\'';
-
-  for (i = 0, j = 1; string && (c = string[i]); i++)
-    {
-      result[j++] = c;
-
-      if (c == '\'')
-	result[j++] = '\'';
-    }
-
-  result[j++] = '\'';
-  result[j] = '\0';
-
-  return (result);
-}
-
 /* Output ALIAS in such a way as to allow it to be read back in. */
 static void
 print_alias (alias)
@@ -187,3 +172,4 @@ print_alias (alias)
 
   fflush (stdout);
 }
+#endif /* ALIAS */

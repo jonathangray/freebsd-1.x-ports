@@ -1,14 +1,30 @@
 /* general.h -- defines that everybody likes to use. */
 
-#if !defined (_GENERAL_)
-#define _GENERAL_
+#if !defined (_GENERAL_H)
+#define _GENERAL_H
 
 #if !defined (NULL)
-#define NULL 0x0
-#endif
+#  if defined (__STDC__)
+#    define NULL ((void *) 0)
+#  else
+#    define NULL 0x0
+#  endif /* !__STDC__ */
+#endif /* !NULL */
 
-#ifndef savestring
-#define savestring(x) (char *)strcpy (xmalloc (1 + strlen (x)), (x))
+#if defined (HAVE_STRING_H)
+#  include <string.h>
+#else
+#  include <strings.h>
+#endif /* !HAVE_STRING_H */
+
+#define pointer_to_int(x) (int)((long)(x))
+
+#if !defined (savestring)
+   extern char *xmalloc ();
+#  if !defined (strcpy)
+   extern char *strcpy ();
+#  endif
+#  define savestring(x) (char *)strcpy (xmalloc (1 + strlen (x)), (x))
 #endif
 
 #ifndef whitespace
@@ -27,12 +43,19 @@
 #define digit_value(c) ((c) - '0')
 #endif
 
-#if !defined (__STDC__)
-char *index (), *rindex ();
-#endif
+#if !defined (maybe_free)
+#define maybe_free(x) do { if (x) free (x); } while (0)
+#endif /* !maybe_free */
+
+#if !defined (__STDC__) && !defined (strchr)
+extern char *strchr (), *strrchr ();
+#endif /* !strchr */
 
 #ifndef member
-#define member(c, s) (int)((c) ? index ((s), (c)) : 0)
+#  if defined (alpha) && defined (__GNUC__)
+     extern char *strchr ();
+#  endif
+#  define member(c, s) ((c) ? ((char *)strchr ((s), (c)) != (char *)NULL) : 0)
 #endif
 
 /* All structs which contain a `next' field should have that field
@@ -41,13 +64,17 @@ char *index (), *rindex ();
 typedef struct g_list {
   struct g_list *next;
 } GENERIC_LIST;
-  
+
 /* Here is a generic structure for associating character strings
    with integers.  It is used in the parser for shell tokenization. */
 typedef struct {
   char *word;
   int token;
 } STRING_INT_ALIST;
+
+/* A macro to avoid making an uneccessary function call. */
+#define REVERSE_LIST(list, type) \
+  ((list && list->next) ? (type)reverse_list (list) : (type)(list))
 
 /* String comparisons that possibly save a function call each. */
 #define STREQ(a, b) ((a)[0] == (b)[0] && strcmp(a, b) == 0)
@@ -58,15 +85,9 @@ typedef struct {
 #  define __FUNCTION_DEF
 typedef int Function ();
 typedef void VFunction ();
+typedef char *CPFunction ();
+typedef char **CPPFunction ();
 #endif /* _FUNCTION_DEF */
-
-#if defined (VOID_SIGHANDLER)
-#define sighandler void
-#else
-#define sighandler int
-#endif
-
-typedef sighandler SigHandler ();
 
 #define NOW	((time_t) time ((time_t *) 0))
 
@@ -76,7 +97,51 @@ typedef sighandler SigHandler ();
 #define FS_EXEC_PREFERRED 0x4
 #define FS_EXEC_ONLY	  0x8
 
-extern char *xmalloc (), *malloc (), *xrealloc (), *realloc ();
-extern char *itos ();
+/* Posix and USG systems do not guarantee to restart a read () that is
+   interrupted by a signal. */
+#if defined (USG) || defined (_POSIX_VERSION)
+#  define NO_READ_RESTART_ON_SIGNAL
+#endif /* USG || _POSIX_VERSION */
 
-#endif	/* _GENERAL_ */
+/* Here is a definition for set_signal_handler () which simply expands to
+   a call to signal () for non-Posix systems.  The code for set_signal_handler
+   in the Posix case resides in general.c. */
+
+#if defined (VOID_SIGHANDLER)
+#  define sighandler void
+#else
+#  define sighandler int
+#endif /* !VOID_SIGHANDLER */
+
+typedef sighandler SigHandler ();
+
+#if !defined (_POSIX_VERSION)
+#  define set_signal_handler(sig, handler) (SigHandler *)signal (sig, handler)
+#else
+extern SigHandler *set_signal_handler ();
+#endif /* _POSIX_VERSION */
+
+/* Declarations for non-int functions defined in general.c */
+extern GENERIC_LIST *reverse_list (), *delete_element (), *list_append ();
+extern char *xmalloc (), *xrealloc ();
+extern void vfree ();
+extern char *itos ();
+extern char *strerror ();
+extern void unset_nodelay_mode ();
+extern void map_over_list ();
+extern void map_over_words ();
+extern void free_array ();
+extern char **copy_array ();
+extern void strip_leading ();
+extern void strip_trailing ();
+extern char *canonicalize_pathname ();
+extern char *make_absolute ();
+extern char *base_pathname ();
+extern char *full_pathname ();
+extern char *strindex ();
+extern void set_lines_and_columns ();
+extern void tilde_initialize ();
+extern char *getwd ();
+extern char *polite_directory_format ();
+
+#endif	/* _GENERAL_H */

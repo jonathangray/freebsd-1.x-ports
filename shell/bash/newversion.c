@@ -20,7 +20,9 @@ You should have received a copy of the GNU General Public License along
 with Bash; see the file COPYING.  If not, write to the Free Software
 Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 
+#include <sys/types.h>
 #include <stdio.h>
+
 char *progname;
 
 main (argc, argv)
@@ -108,6 +110,11 @@ main (argc, argv)
 /* The distribution version number of this shell. */\n\
 #define DISTVERSION \"", distver, "\"\n\n/* The last built version of this shell. */\n\
 #define BUILDVERSION ", buildver);
+
+  fprintf (file, "\n/* A version string for use by sccs and the what command. */\n\n");
+  fprintf (file, "#define SCCSVERSION \"@(#)Bash version %.2f.%d GNU\"\n\n",
+    distver, buildver);
+
   fclose (file);
 
   file = must_open (".build", "w");

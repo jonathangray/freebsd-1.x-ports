@@ -19,15 +19,39 @@ Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 
 #include <stdio.h>
 
-#if defined (HAVE_VFPRINTF)
-#include <varargs.h>
+#if defined (HAVE_VARARGS_H)
+#  include <varargs.h>
 #endif
+
+#if defined (HAVE_STRING_H)
+#  include <string.h>
+#else /* !HAVE_STRING_H */
+#  include <strings.h>
+#endif /* !HAVE_STRING_H */
 
 #include "shell.h"
 #include "y.tab.h"
 
 static int indentation = 0;
 static int indentation_amount = 4;
+
+static void cprintf (), newline (), indent (), the_printed_command_resize ();
+static void semicolon ();
+
+static void make_command_string_internal ();
+static void command_print_word_list ();
+static void print_case_clauses ();
+static void print_redirection_list ();
+static void print_redirection ();
+
+static void print_for_command ();
+static void print_group_command ();
+static void print_case_command ();
+static void print_while_command ();
+static void print_until_command ();
+static void print_until_or_while ();
+static void print_if_command ();
+static void print_function_def ();
 
 #define PRINTED_COMMAND_GROW_SIZE 1024
 char *the_printed_command = (char *)NULL;
@@ -37,6 +61,10 @@ int command_string_index = 0;
 /* Non-zero means the stuff being printed is inside of a function def. */
 static int inside_function_def = 0;
 static int skip_this_indent = 0;
+
+/* The depth of the group commands that we are currently printing.  This
+   includes the group command that is a function body. */
+static int group_command_nesting = 0;
 
 /* Print COMMAND (a command tree) on standard output. */
 print_command (command)
@@ -61,6 +89,7 @@ make_command_string (command)
 }
 
 /* The internal function.  This is the real workhorse. */
+static void
 make_command_string_internal (command)
      COMMAND *command;
 {
@@ -195,6 +224,7 @@ print_word_list (list, separator)
     }
 }
 
+static void
 command_print_word_list (list, separator)
      WORD_LIST *list;
      char *separator;
@@ -208,6 +238,7 @@ command_print_word_list (list, separator)
     }
 }
 
+static void
 print_for_command (for_command)
      FOR_COM *for_command;
 {
@@ -217,33 +248,46 @@ print_for_command (for_command)
   newline ("do\n");
   indentation += indentation_amount;
   make_command_string_internal (for_command->action);
-  cprintf (";");
+  semicolon ();
   indentation -= indentation_amount;
   newline ("done");
 }
 
+static void
 print_group_command (group_command)
      GROUP_COM *group_command;
 {
+  group_command_nesting++;
   cprintf ("{ ");
 
   if (!inside_function_def)
     skip_this_indent++;
   else
-    cprintf ("\n");
+    {
+      /* This is a group command { ... } inside of a function
+	 definition, and should be handled as a `normal' group
+	 command, using the current indentation. */
+      cprintf ("\n");
+      indentation += indentation_amount;
+    }
 
   make_command_string_internal (group_command->command);
 
-  if (inside_function_def)
-#if 0
-    cprintf ("; \n}");
-#else
-    cprintf ("\n}");
-#endif
-  else
-    cprintf (" }");
+  cprintf ("\n");
+
+  if (group_command_nesting)
+    {
+      indentation -= indentation_amount;
+      indent (indentation);
+      if (!indentation)
+	cprintf (" ");
+    }
+      
+  cprintf ("}");
+  group_command_nesting--;
 }
 
+static void
 print_case_command (case_command)
      CASE_COM *case_command;
 {
@@ -253,6 +297,7 @@ print_case_command (case_command)
   newline ("esac");
 }
 
+static void
 print_case_clauses (clauses)
      PATTERN_LIST *clauses;
 {
@@ -271,18 +316,21 @@ print_case_clauses (clauses)
   indentation -= indentation_amount;
 }
 
+static void
 print_while_command (while_command)
      WHILE_COM *while_command;
 {
   print_until_or_while (while_command, "while");
 }
 
+static void
 print_until_command (while_command)
      WHILE_COM *while_command;
 {
   print_until_or_while (while_command, "until");
 }
 
+static void
 print_until_or_while (while_command, which)
      WHILE_COM *while_command;
      char *which;
@@ -290,35 +338,37 @@ print_until_or_while (while_command, which)
   cprintf ("%s ", which);
   skip_this_indent++;
   make_command_string_internal (while_command->test);
-  cprintf (";");
+  semicolon ();
   newline ("do\n");
   indentation += indentation_amount;
   make_command_string_internal (while_command->action);
   indentation -= indentation_amount;
-  cprintf (";");
+  semicolon ();
   newline ("done");
 }
 
+static void
 print_if_command (if_command)
      IF_COM *if_command;
 {
   cprintf ("if ");
   skip_this_indent++;
   make_command_string_internal (if_command->test);
-  cprintf (" ; then\n");
+  semicolon ();
+  cprintf (" then\n");
   indentation += indentation_amount;
   make_command_string_internal (if_command->true_case);
   indentation -= indentation_amount;
 
   if (if_command->false_case)
     {
-      cprintf (";");
+      semicolon ();
       newline ("else\n");
       indentation += indentation_amount;
       make_command_string_internal (if_command->false_case);
       indentation -= indentation_amount;
     }
-  cprintf (" ;");
+  semicolon ();
   newline ("fi");
 }
 
@@ -334,23 +384,27 @@ print_simple_command (simple_command)
     }
 }
 
+static void
 print_redirection_list (redirects)
      REDIRECT *redirects;
 {
   while (redirects)
     {
       print_redirection (redirects);
-      cprintf (" ");
       redirects = redirects->next;
+      if (redirects)
+	cprintf (" ");
     }
 }
 
+static void
 print_redirection (redirect)
      REDIRECT *redirect;
 {
   int kill_leading = 0;
   int redirector = redirect->redirector;
   WORD_DESC *redirectee = redirect->redirectee.filename;
+  int redir_fd = redirect->redirectee.dest;
 
   switch (redirect->instruction)
     {
@@ -383,24 +437,17 @@ print_redirection (redirect)
       if (redirector != 0)
 	cprintf ("%d", redirector);
       cprintf ("<<%s%s", kill_leading? "-" : "", redirect->here_doc_eof);
-      /* This is only important if we are printing a function definition
-	 for export.  If not, we could overrun the buffer that `cprintf'
-	 writes into, quite unexpectedly -- when unpacking shar files, for
-	 instance. */
-      if (inside_function_def)
-	{
-	  cprintf ("\n");
-	  cprintf ("%s%s", redirect->redirectee.filename->word,
-			   redirect->here_doc_eof);
-	}
+      cprintf ("\n");
+      cprintf ("%s%s",
+	       redirect->redirectee.filename->word, redirect->here_doc_eof);
       break;
 
     case r_duplicating_input:
-      cprintf ("%d<&%d", redirector, (int)redirectee);
+      cprintf ("%d<&%d", redirector, redir_fd);
       break;
 
     case r_duplicating_output:
-      cprintf ("%d>&%d", redirector, (int)redirectee);
+      cprintf ("%d>&%d", redirector, redir_fd);
       break;
 
     case r_duplicating_input_word:
@@ -440,18 +487,29 @@ reset_locals ()
   indentation = 0;
 }
 
+static void
 print_function_def (func)
      FUNCTION_DEF *func;
 {
   cprintf ("function %s () \n", func->name->word);
   add_unwind_protect (reset_locals, 0);
+
+  indent (indentation);
+  cprintf ("{ \n");
+
   inside_function_def++;
-  skip_this_indent++;
   indentation += indentation_amount;
-  make_command_string_internal (func->command);
+
+  if (func->command->type == cm_group)
+    make_command_string_internal (func->command->value.Group->command);
+  else
+    make_command_string_internal (func->command);
+    
   remove_unwind_protect ();
   indentation -= indentation_amount;
   inside_function_def--;
+
+  newline ("}");
 }
 
 /* Return the string representation of the named function.
@@ -487,12 +545,22 @@ named_function_string (name, command, multi_line)
     }
 
   inside_function_def++;
-  skip_this_indent++;
-  make_command_string_internal (command);
+
+  if (multi_line)
+    cprintf ("{ \n");
+  else
+    cprintf ("{ ");
+
+  if (command->type == cm_group)
+    make_command_string_internal (command->value.Group->command);
+  else
+    make_command_string_internal (command);
 
   indentation = old_indent;
   indentation_amount = old_amount;
   inside_function_def--;
+
+  newline ("}");
 
   result = the_printed_command;
 
@@ -515,6 +583,7 @@ named_function_string (name, command, multi_line)
   return (result);
 }
 
+static void
 newline (string)
      char *string;
 {
@@ -523,6 +592,7 @@ newline (string)
   cprintf ("%s", string);
 }
 
+static void
 indent (amount)
      int amount;
 {
@@ -530,57 +600,186 @@ indent (amount)
     cprintf (" ");
 }
 
-#if !defined (HAVE_VFPRINTF)
-/* How to make the string. */
-cprintf (control, arg1, arg2, arg3, arg4, arg5)
-     char *control;
+static void
+semicolon ()
 {
-  char temp_buffer[5000];
-  int l;
+  if (command_string_index > 0 && the_printed_command[command_string_index - 1] == '&')
+    return;
+  cprintf (";");
+}
 
-  sprintf (temp_buffer, control, arg1, arg2, arg3, arg4, arg5);
-  l = strlen (temp_buffer);
+#if !defined (HAVE_VARARGS_H)
+/* How to make the string. */
+static void
+cprintf (format, arg1, arg2)
+     char *format, *arg1, *arg2;
+{
+  register int i, len;
+  char *args[2];
+  int arg_index = 0;
 
-  if (!the_printed_command)
-    the_printed_command =
-      (char *)xmalloc (the_printed_command_size = PRINTED_COMMAND_GROW_SIZE);
+  args[0] = arg1;
+  args[1] = arg2;
 
-  while (the_printed_command_size <= command_string_index + l)
-    the_printed_command = (char *)
-      xrealloc (the_printed_command,
-		the_printed_command_size += PRINTED_COMMAND_GROW_SIZE);
+  len = strlen (format);
 
-  strcpy (the_printed_command + command_string_index, temp_buffer);
-  command_string_index += l;
+  the_printed_command_resize (len + 1);
+
+  for (i = 0; format[i]; i++)
+    {
+      if (format[i] != '%')
+	{
+	  the_printed_command[command_string_index++] = format[i];
+	  len--;
+	}
+      else
+	{
+	  char c;
+
+	  c = format[++i];
+	  switch (c)
+	    {
+	    case '%':
+	      the_printed_command_resize (len + 1);
+	      the_printed_command[command_string_index++] = '%';
+	      break;
+
+	    case 's':
+	      {
+		char *string;
+		int string_len;
+
+		string = (char *)args[arg_index++];
+		string_len = strlen (string);
+
+		the_printed_command_resize (len + string_len);
+		strcpy (the_printed_command + command_string_index, string);
+		the_printed_command[command_string_index + string_len] = '\0';
+		command_string_index += string_len;
+	      }
+	      break;
+
+	    case 'd':
+	      {
+	        int integer, int_len;
+	        char *sint;
+
+		integer = pointer_to_int (args[arg_index]);
+		arg_index++;
+
+		sint = itos (integer);
+		int_len = strlen (sint);
+		the_printed_command_resize (len + int_len);
+		strcpy (the_printed_command + command_string_index, sint);
+		the_printed_command[command_string_index + int_len] = '\0';
+		command_string_index += int_len;
+		free (sint);
+	      }
+	      break;
+
+	    case 'c':
+	      {
+		int character;
+
+		character = pointer_to_int (args[arg_index]);
+		arg_index++;
+
+		the_printed_command_resize (len + 1);
+		the_printed_command[command_string_index++] = character;
+	      }
+	      break;
+
+	    default:
+	      programming_error ("Bad `%%' argument to cprintf. (%c)", c);	      
+	    }
+	}
+    }
 }
 
 #else /* We have support for varargs. */
 
 /* How to make the string. */
+static void
 cprintf (va_alist)
      va_dcl
 {
-  char temp_buffer[5000];
-  int l;
-  char *control;
+  register char *s;
+  char *control, *temp_buffer, char_arg[2], *t, *argp;
+  int temp_len, arg_len, temp_index, digit_arg;
   va_list args;
 
   va_start (args);
   control = va_arg (args, char *);
-  vsprintf (temp_buffer, control, args);
-  va_end (args);
-  l = strlen (temp_buffer);
+  temp_buffer = xmalloc (temp_len = 64);
+  char_arg[1] = temp_buffer[0] = '\0';
+  for (temp_index = 0, s = control; s && *s; s++)
+    {
+      if (*s != '%')
+	{
+	  char_arg[0] = *s;
+	  argp = char_arg;
+	  arg_len = 1;
+	}
+      else
+	{
+	  s++;
+	  switch (*s)
+	    {
+	    case 'd':
+	      digit_arg = va_arg (args, int);
+	      argp = itos (digit_arg);
+	      arg_len = strlen (argp);
+	      break;
+	    case 's':
+	      t = va_arg (args, char *);
+	      argp = savestring (t);
+	      arg_len = strlen (argp);
+	      break;
+	    case 'c':
+	      char_arg[0] = va_arg (args, int);
+	      argp = char_arg;
+	      arg_len = 1;
+	      break;
+	    default:
+	      char_arg[0] = *s;
+	      argp = char_arg;
+	      arg_len = 1;
+	      break;
+	    }
+	}
+      while ((temp_index + arg_len + 2) > temp_len)
+        temp_buffer = xrealloc (temp_buffer, temp_len += 64);
+      for (t = argp; t && *t; )
+        temp_buffer[temp_index++] = *t++;
+      if (argp != char_arg)
+        free (argp);
+    }
 
+  temp_buffer[temp_index] = '\0';
+
+  the_printed_command_resize (temp_index + 1);
+
+  strcpy (the_printed_command + command_string_index, temp_buffer);
+  command_string_index += temp_index;
+  free (temp_buffer);
+}
+#endif /* HAVE_VARARGS_H */
+
+/* Ensure that there is enough space to stuff LENGTH characters into
+   THE_PRINTED_COMMAND. */
+static void
+the_printed_command_resize (length)
+     int length;
+{
   if (!the_printed_command)
-    the_printed_command =
-      (char *)xmalloc (the_printed_command_size = PRINTED_COMMAND_GROW_SIZE);
+    {
+      the_printed_command_size = length + 1;
+      the_printed_command = (char *)xmalloc (the_printed_command_size);
+      command_string_index = 0;
+    }
 
-  while (the_printed_command_size <= command_string_index + l)
+  while (the_printed_command_size <= command_string_index + length)
     the_printed_command = (char *)
       xrealloc (the_printed_command,
 		the_printed_command_size += PRINTED_COMMAND_GROW_SIZE);
-
-  strcpy (the_printed_command + command_string_index, temp_buffer);
-  command_string_index += l;
 }
-#endif /* HAVE_VFPRINTF */

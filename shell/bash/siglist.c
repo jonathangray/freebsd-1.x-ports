@@ -22,18 +22,13 @@ Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 #include <sys/types.h>
 #include <signal.h>
 
-#if !defined (NSIG)
-#  if defined (_NSIG)
-#    define NSIG _NSIG
-#  else
-#    define NSIG 64
-#  endif /* !_NSIG */
-#endif /* !NSIG */
+#include "siglist.h"
 
 char *sys_siglist[NSIG];
 
 extern char *xmalloc (), *malloc ();
 
+void
 initialize_siglist ()
 {
   register int i;

@@ -22,3 +22,4 @@
 
 char *dist_version = DISTVERSION;
 int build_version = BUILDVERSION;
+char *sccs_version = SCCSVERSION;

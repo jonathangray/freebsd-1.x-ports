@@ -1,67 +1,82 @@
 /* general.c -- Stuff that is used by all files. */
 
-/* Copyright (C) 1987,1989 Free Software Foundation, Inc.
+/* Copyright (C) 1987, 1988, 1989, 1990, 1991, 1992
+   Free Software Foundation, Inc.
 
-This file is part of GNU Bash, the Bourne Again SHell.
+   This file is part of GNU Bash, the Bourne Again SHell.
 
-Bash is free software; you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free
-Software Foundation; either version 1, or (at your option) any later
-version.
+   Bash is free software; you can redistribute it and/or modify it under
+   the terms of the GNU General Public License as published by the Free
+   Software Foundation; either version 2, or (at your option) any later
+   version.
 
-Bash is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or
-FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-for more details.
+   Bash is distributed in the hope that it will be useful, but WITHOUT ANY
+   WARRANTY; without even the implied warranty of MERCHANTABILITY or
+   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+   for more details.
 
-You should have received a copy of the GNU General Public License along
-with Bash; see the file COPYING.  If not, write to the Free Software
-Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
+   You should have received a copy of the GNU General Public License along
+   with Bash; see the file COPYING.  If not, write to the Free Software
+   Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 
 #include <stdio.h>
 #include <errno.h>
+#if !defined (errno)
+extern int errno;
+#endif /* !errno */
 #include <sys/types.h>
 #include <sys/param.h>
 #include "filecntl.h"
-
+#include "bashansi.h"
 #include "shell.h"
-#if defined (USG)
-#include <string.h>
-#else
-#include <strings.h>
-#endif /* USG */
 
 #if !defined (USG) || defined (HAVE_RESOURCE)
-#include <sys/time.h>
+#  include <sys/time.h>
 #endif
 
 #include <sys/times.h>
 #include "maxpath.h"
 
-#ifndef NULL
-#define NULL 0x0
-#endif
+extern char *tilde_expand ();
 
-extern int errno;
+/* Forward declarations. */
+extern char *canonicalize_pathname ();
 
-/* Make the functions index and rindex if they do not exist. */
-#if defined (USG) && !defined (sgi) && !defined (DGUX) && !defined (index)
+/* Make the functions strchr and strrchr if they do not exist. */
+#if !defined (HAVE_STRCHR)
 char *
-index (s, c)
-     char *s;
+strchr (string, c)
+     char *string;
+     int c;
 {
-  return ((char *)strchr (s, c));
-}
-#endif /* USG && !sgi && !DGUX && !index */
+  register int i;
 
-#if defined (USG) && !defined (sgi) && !DGUX && !defined (rindex)
-char *
-rindex (s, c)
-     char *s;
-{
-  return ((char *)strrchr (s, c));
+  for (i = 0; string && string[i]; i++)
+    if (string[i] == c)
+      return ((char *) (string + i));
+
+  return ((char *) NULL);
 }
-#endif /* USG && !sgi && !DUGX && !rindex */
+
+char *
+strrchr (string, c)
+     char *string;
+     int c;
+{
+  register int i;
+
+  if (string)
+    i = strlen (string) - 1;
+  else
+    i = -1;
+
+  for (; string && i > -1; i--)
+    if (string[i] == c)
+      return ((char *) (string + i));
+
+  return ((char *) NULL);
+}
+#endif /* !HAVE_STRCHR */
 
 /* **************************************************************** */
 /*								    */
@@ -99,6 +114,16 @@ xrealloc (pointer, size)
   return (temp);
 }
 
+#if !defined (NeXT)
+/* Use this as the function to call when adding unwind protects so we
+   don't need to know what free() returns. */
+void
+vfree (string)
+     char *string;
+{
+  free (string);
+}
+#endif /* !NeXT */
 
 /* **************************************************************** */
 /*								    */
@@ -156,6 +181,29 @@ all_digits (string)
 	return (0);
       else
 	string++;
+    }
+  return (1);
+}
+
+/* Return 1 if this token is a legal shell `identifier'; that is, it consists
+   solely of letters, digits, and underscores, and does not begin with a
+   digit. */
+int
+legal_identifier (name)
+     char *name;
+{
+  register char *s;
+
+  if (!name || !*name)
+    return (0);
+
+  if (digit (*name))
+    return (0);
+
+  for (s = name; s && *s; s++)
+    {
+      if (!isletter (*s) && !digit (*s) && (*s != '_'))
+        return (0);
     }
   return (1);
 }
@@ -240,12 +288,13 @@ reverse_list (list)
 {
   register GENERIC_LIST *next, *prev = (GENERIC_LIST *)NULL;
 
-  while (list) {
-    next = list->next;
-    list->next = prev;
-    prev = list;
-    list = next;
-  }
+  while (list)
+    {
+      next = list->next;
+      list->next = prev;
+      prev = list;
+      list = next;
+    }
   return (prev);
 }
 
@@ -259,6 +308,9 @@ list_length (list)
   for (i = 0; list; list = list->next, i++);
   return (i);
 }
+
+/* A global variable which acts as a sentinel for an `error' list return. */
+GENERIC_LIST global_error_list;
 
 /* Delete the element of LIST which satisfies the predicate function COMPARER.
    Returns the element that was deleted, so you can dispose of it, or -1 if
@@ -286,7 +338,7 @@ delete_element (list, comparer, arg)
     prev = temp;
     temp = temp->next;
   }
-  return ((GENERIC_LIST *)-1);
+  return ((GENERIC_LIST *)&global_error_list);
 }
 
 /* Find NAME in ARRAY.  Return the index of NAME, or -1 if not present.
@@ -326,6 +378,25 @@ free_array (array)
   while (array[i])
     free (array[i++]);
   free (array);
+}
+
+/* Allocate and return a new copy of ARRAY and its contents. */
+char **
+copy_array (array)
+     register char **array;
+{
+  register int i;
+  int len;
+  char **new_array;
+
+  len = array_len (array);
+
+  new_array = (char **)xmalloc ((len + 1) * sizeof (char *));
+  for (i = 0; array[i]; i++)
+    new_array[i] = savestring (array[i]);
+  new_array[i] = (char *)NULL;
+
+  return (new_array);
 }
 
 /* Append LIST2 to LIST1.  Return the header of the list. */
@@ -384,95 +455,130 @@ strip_trailing (string, newlines_only)
   string[len + 1] = '\0';
 }
 
-
-/* Remove the last N directories from PATH.  Do not PATH blank.
-   PATH must contain enoung space for MAXPATHLEN characters. */
-static void
-pathname_backup (path, n)
+/* Canonicalize PATH, and return a new path.  The new path differs from PATH
+   in that:
+	Multple `/'s are collapsed to a single `/'.
+	Leading `./'s and trailing `/.'s are removed.
+	Trailing `/'s are removed.
+	Non-leading `../'s and trailing `..'s are handled by removing
+	portions of the path. */
+char *
+canonicalize_pathname (path)
      char *path;
-     int n;
 {
-  register char *p;
+  register int i, start;
+  char stub_char;
+  char *result;
 
-  if (!*path)
-    return;
+  /* The result cannot be larger than the input PATH. */
+  result = savestring (path);
 
-  p = path + (strlen (path) - 1);
+  stub_char = (*path == '/') ? '/' : '.';
 
-  while (n--)
+  /* Walk along RESULT looking for things to compact. */
+  i = 0;
+  while (1)
     {
-      while (*p == '/' && p != path)
-	p--;
+      if (!result[i])
+	break;
 
-      while (*p != '/' && p != path)
-	p--;
+      while (result[i] && result[i] != '/')
+	i++;
 
-      *++p = '\0';
+      start = i++;
+
+      /* If we didn't find any slashes, then there is nothing left to do. */
+      if (!result[start])
+	break;
+
+      /* Handle multiple `/'s in a row. */
+      while (result[i] == '/')
+	i++;
+
+      if ((start + 1) != i)
+	{
+	  strcpy (result + start + 1, result + i);
+	  i = start + 1;
+	}
+
+      /* Handle backquoted `/'. */
+      if (start > 0 && result[start - 1] == '\\')
+	continue;
+
+      /* Check for trailing `/'. */
+      if (start && !result[i])
+	{
+	zero_last:
+	  result[--i] = '\0';
+	  break;
+	}
+
+      /* Check for `../', `./' or trailing `.' by itself. */
+      if (result[i] == '.')
+	{
+	  /* Handle trailing `.' by itself. */
+	  if (!result[i + 1])
+	    goto zero_last;
+
+	  /* Handle `./'. */
+	  if (result[i + 1] == '/')
+	    {
+	      strcpy (result + i, result + i + 1);
+	      i = start;
+	      continue;
+	    }
+
+	  /* Handle `../' or trailing `..' by itself. */
+	  if (result[i + 1] == '.' &&
+	      (result[i + 2] == '/' || !result[i + 2]))
+	    {
+	      while (--start > -1 && result[start] != '/');
+	      strcpy (result + start + 1, result + i + 2);
+	      i = start;
+	      continue;
+	    }
+	}
     }
+
+  if (!*result)
+    {
+      *result = stub_char;
+      result[1] = '\0';
+    }
+  return (result);
 }
 
-static char current_path[MAXPATHLEN];
-
 /* Turn STRING (a pathname) into an absolute pathname, assuming that
-   DOT_PATH contains the symbolic location of '.'.  This always
+   DOT_PATH contains the symbolic location of `.'.  This always
    returns a new string, even if STRING was an absolute pathname to
    begin with. */
 char *
 make_absolute (string, dot_path)
      char *string, *dot_path;
 {
-  register char *cp;
-
+  char *result;
+  
   if (!dot_path || *string == '/')
-    return (savestring (string));
-
-  strcpy (current_path, dot_path);
-
-  if (!current_path[0])
-    strcpy (current_path, "./");
-
-  cp = current_path + (strlen (current_path) - 1);
-
-  if (*cp++ != '/')
-    *cp++ = '/';
-
-  *cp = '\0';
-
-  while (*string)
+    result = savestring (string);
+  else
     {
-      if (*string == '.')
+      if (dot_path && dot_path[0])
 	{
-	  if (!string[1])
-	    return (savestring (current_path));
-
-	  if (string[1] == '/')
-	    {
-	      string += 2;
-	      continue;
-	    }
-
-	  if (string[1] == '.' && (string[2] == '/' || !string[2]))
-	    {
-	      string += 2;
-
-	      if (*string)
-		string++;
-
-	      pathname_backup (current_path, 1);
-	      cp = current_path + strlen (current_path);
-	      continue;
-	    }
+	  result = (char *)xmalloc (2 + strlen (dot_path) + strlen (string));
+	  strcpy (result, dot_path);
+	  if (result[strlen (result) - 1] != '/')
+	    strcat (result, "/");
+	}
+      else
+	{
+	  result = (char *)xmalloc (3 + strlen (string));
+	  strcpy (result, "./");
 	}
 
-      while (*string && *string != '/')
-	*cp++ = *string++;
-
-      if (*string)
-	*cp++ = *string++;
-
-      *cp = '\0';
+      strcat (result, string);
     }
-  return (savestring (current_path));
+
+  return (result);
 }
 
 /* Return 1 if STRING contains an absolute pathname, else 0. */
@@ -505,7 +611,7 @@ int
 absolute_program (string)
      char *string;
 {
-  return ((char *)index (string, '/') != (char *)NULL);
+  return ((char *)strchr (string, '/') != (char *)NULL);
 }
 
 /* Return the `basename' of the pathname in STRING (the stuff after the
@@ -514,7 +620,7 @@ char *
 base_pathname (string)
      char *string;
 {
-  char *p = (char *)rindex (string, '/');
+  char *p = (char *)strrchr (string, '/');
 
   if (!absolute_pathname (string))
     return (string);
@@ -523,6 +629,47 @@ base_pathname (string)
     return (++p);
   else
     return (string);
+}
+
+/* Return the full pathname of FILE.  Easy.  Filenames that begin
+   with a '/' are returned as themselves.  Other filenames have
+   the current working directory prepended.  A new string is
+   returned in either case. */
+char *
+full_pathname (file)
+     char *file;
+{
+  char *disposer;
+
+  if (*file == '~')
+    file = tilde_expand (file);
+  else
+    file = savestring (file);
+
+  if (absolute_pathname (file))
+    if (*file == '/')
+      return (file);
+
+  disposer = file;
+
+  {
+    char *current_dir = (char *)xmalloc (2 + MAXPATHLEN + strlen (file));
+    if (!getwd (current_dir))
+      {
+	report_error (current_dir);
+	free (current_dir);
+	return ((char *)NULL);
+      }
+    strcat (current_dir, "/");
+
+    /* Turn /foo/./bar into /foo/bar. */
+    if (strncmp (file, "./", 2) == 0)
+      file += 2;
+
+    strcat (current_dir, file);
+    free (disposer);
+    return (current_dir);
+  }
 }
 
 /* Determine if s2 occurs in s1.  If so, return a pointer to the
@@ -553,16 +700,19 @@ strindex (s1, s2)
 int
 strnicmp (string1, string2, count)
      char *string1, *string2;
+     int count;
 {
   register char ch1, ch2;
 
-  while (count) {
-    ch1 = *string1++;
-    ch2 = *string2++;
-    if (to_upper(ch1) == to_upper(ch2))
-      count--;
-    else break;
-  }
+  while (count)
+    {
+      ch1 = *string1++;
+      ch2 = *string2++;
+      if (to_upper(ch1) == to_upper(ch2))
+	count--;
+      else
+	break;
+    }
   return (count);
 }
 
@@ -573,13 +723,31 @@ stricmp (string1, string2)
 {
   register char ch1, ch2;
 
-  while (*string1 && *string2) {
-    ch1 = *string1++;
-    ch2 = *string2++;
-    if (to_upper(ch1) != to_upper(ch2))
-      return (1);
-  }
+  while (*string1 && *string2)
+    {
+      ch1 = *string1++;
+      ch2 = *string2++;
+      if (to_upper(ch1) != to_upper(ch2))
+	return (1);
+    }
   return (*string1 | *string2);
+}
+
+/* Set the environment variables $LINES and $COLUMNS in response to
+   a window size change. */
+void
+set_lines_and_columns (lines, cols)
+     int lines, cols;
+{
+  char *val;
+
+  val = itos (lines);
+  bind_variable ("LINES", val);
+  free (val);
+
+  val = itos (cols);
+  bind_variable ("COLUMNS", val);
+  free (val);
 }
 
 /* Return a string corresponding to the error number E.  From
@@ -667,6 +835,7 @@ int
 dup2 (fd1, fd2)
      int fd1, fd2;
 {
+  extern int getdtablesize ();
   int saved_errno, r;
 
   /* If FD1 is not a valid file descriptor, then return immediately with
@@ -720,7 +889,15 @@ dup2 (fd1, fd2)
  *
  */
 
-#if defined (USG) || defined (HPUX)
+#if !defined (USG) && !defined (HPUX)
+#  define HAVE_GETDTABLESIZE
+#endif /* !USG && !HPUX */
+
+#if defined (hppa) && defined (hpux_8)
+#  undef HAVE_GETDTABLESIZE
+#endif /* hppa && hpux_8 */
+
+#if !defined (HAVE_GETDTABLESIZE)
 int
 getdtablesize ()
 {
@@ -738,31 +915,16 @@ getdtablesize ()
 #    endif /* !USGr3 */
 #  endif /* ! (_POSIX_VERSION && _SC_OPEN_MAX) */
 }
-#endif /* USG && !defined USGr4 */
+#endif /* !HAVE_GETDTABLESIZE */
 
 #if defined (USG) && !defined (sgi)
 
-#if !defined (RISC6000)
-bcopy(s,d,n) char *d,*s; { memcpy (d, s, n); }
-bzero(s,n) char *s; int n; { memset(s, '\0', n); }
-#endif /* RISC6000 */
+#if !defined (HAVE_BCOPY)
+bcopy (s,d,n) char *d,*s; { memcpy (d, s, n); }
+bzero (s,n) char *s; int n; { memset(s, '\0', n); }
+#endif /* !HAVE_BCOPY */
 
-#if !defined (HAVE_GETWD)
-char *
-getwd (string)
-     char *string;
-{
-  extern char *getcwd ();
-  char *result;
-
-  result = getcwd (string, MAXPATHLEN);
-  if (result == NULL)
-    strcpy (string, "getwd: cannot access parent directories");
-  return (result);
-}
-#endif /* !HAVE_GETWD */
-
-#if !defined (HPUX)
+#if !defined (HPUX) && !defined (Linux)
 #include <sys/utsname.h>
 int
 gethostname (name, namelen)
@@ -782,6 +944,21 @@ gethostname (name, namelen)
 }
 #endif /* !HPUX */
 #endif /* USG && !sgi */
+
+#if !defined (HAVE_GETWD)
+char *
+getwd (string)
+     char *string;
+{
+  extern char *getcwd ();
+  char *result;
+
+  result = getcwd (string, MAXPATHLEN);
+  if (result == NULL)
+    strcpy (string, "getwd: cannot access parent directories");
+  return (result);
+}
+#endif /* !HAVE_GETWD */
 
 /* A slightly related function.  Get the prettiest name of this
    directory possible. */
@@ -806,9 +983,12 @@ polite_directory_format (name)
     return (name);
 }
 
-#if defined (USG) || (defined (_POSIX_VERSION) && defined (Ultrix))
+#if defined (NO_READ_RESTART_ON_SIGNAL)
+/* Posix and USG systems do not guarantee to restart read () if it is
+   interrupted by a signal.  We do the read ourselves, and restart it
+   if it returns EINTR. */
 int
-sysv_getc (stream)
+getc_with_restart (stream)
      FILE *stream;
 {
   int result;
@@ -828,11 +1008,14 @@ sysv_getc (stream)
 	return (EOF);
     }
 }
+#endif /* NO_READ_RESTART_ON_SIGNAL */
 
-/* USG and POSIX systems do not have killpg ().  But we use it in
-   jobs.c, nojobs.c and builtins.c. */
+#if defined (USG) || defined (AIX) || (defined (_POSIX_VERSION) && defined (Ultrix))
+/* USG and strict POSIX systems do not have killpg ().  But we use it in
+   jobs.c, nojobs.c and some of the builtins.  This can also be redefined
+   as a macro if necessary. */
 #if !defined (_POSIX_VERSION)
-#define pid_t int
+#  define pid_t int
 #endif /* _POSIX_VERSION */
 
 int
@@ -903,3 +1086,22 @@ tilde_initialize ()
     }
   times_called++;
 }
+
+#if defined (_POSIX_VERSION)
+#include <signal.h>
+
+SigHandler *
+set_signal_handler (sig, handler)
+     int sig;
+     SigHandler *handler;
+{
+  struct sigaction act, oact;
+
+  act.sa_handler = handler;
+  act.sa_flags = 0;
+  sigemptyset (&act.sa_mask);
+  sigemptyset (&oact.sa_mask);
+  sigaction (sig, &act, &oact);
+  return (oact.sa_handler);
+}
+#endif /* _POSIX_VERSION */

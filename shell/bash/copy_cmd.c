@@ -21,10 +21,14 @@
    Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 
 #include <stdio.h>
-#include "shell.h"
 
-/* Forward declaration. */
-extern COMMAND *copy_command ();
+#if defined (HAVE_STRING_H)
+#  include <string.h>
+#else /* !HAVE_STRING_H */
+#  include <strings.h>
+#endif /* !HAVE_STRING_H */
+
+#include "shell.h"
 
 WORD_DESC *
 copy_word (word)
@@ -52,10 +56,10 @@ copy_word_list (list)
       new_list->word = copy_word (list->word);
       list = list->next;
     }
-  return ((WORD_LIST *)reverse_list (new_list));
+  return (REVERSE_LIST (new_list, WORD_LIST *));
 }
 
-PATTERN_LIST *
+static PATTERN_LIST *
 copy_case_clause (clause)
      PATTERN_LIST *clause;
 {
@@ -65,7 +69,7 @@ copy_case_clause (clause)
   return (new_clause);
 }
 
-PATTERN_LIST *
+static PATTERN_LIST *
 copy_case_clauses (clauses)
      PATTERN_LIST *clauses;
 {
@@ -78,7 +82,7 @@ copy_case_clauses (clauses)
       new_list = new_clause;
       clauses = clauses->next;
     }
-  return ((PATTERN_LIST *)reverse_list (new_list));
+  return (REVERSE_LIST (new_list, PATTERN_LIST *));
 }
 
 /* Copy a single redirect. */
@@ -123,10 +127,10 @@ copy_redirects (list)
       new_list = temp;
       list = list->next;
     }
-  return ((REDIRECT *)reverse_list (new_list));
+  return (REVERSE_LIST (new_list, REDIRECT *));
 }
   
-FOR_COM *
+static FOR_COM *
 copy_for_command (com)
      FOR_COM *com;
 {
@@ -138,7 +142,7 @@ copy_for_command (com)
   return (new_for);
 }
 
-GROUP_COM *
+static GROUP_COM *
 copy_group_command (com)
      GROUP_COM *com;
 {
@@ -148,7 +152,7 @@ copy_group_command (com)
   return (new_group);
 }
 
-CASE_COM *
+static CASE_COM *
 copy_case_command (com)
      CASE_COM *com;
 {
@@ -160,7 +164,7 @@ copy_case_command (com)
   return (new_case);
 }
 
-WHILE_COM *
+static WHILE_COM *
 copy_while_command (com)
      WHILE_COM *com;
 {
@@ -172,7 +176,7 @@ copy_while_command (com)
   return (new_while);
 }
 
-IF_COM *
+static IF_COM *
 copy_if_command (com)
      IF_COM *com;
 {
@@ -185,7 +189,7 @@ copy_if_command (com)
   return (new_if);
 }
 
-SIMPLE_COM *
+static SIMPLE_COM *
 copy_simple_command (com)
      SIMPLE_COM *com;
 {
@@ -194,10 +198,11 @@ copy_simple_command (com)
   new_simple->flags = com->flags;
   new_simple->words = copy_word_list (com->words);
   new_simple->redirects = copy_redirects (com->redirects);
+  new_simple->line = com->line;
   return (new_simple);
 }
-  
-FUNCTION_DEF *
+
+static FUNCTION_DEF *
 copy_function_def (com)
      FUNCTION_DEF *com;
 {
@@ -222,6 +227,7 @@ copy_command (command)
       new_command = (COMMAND *)xmalloc (sizeof (COMMAND));
       bcopy (command, new_command, sizeof (COMMAND));
       new_command->flags = command->flags;
+      new_command->line = command->line;
 
       if (command->redirects)
 	new_command->redirects = copy_redirects (command->redirects);

@@ -27,8 +27,8 @@ $SHORT_DOC exec [ [-] file [redirection ...]]
 Exec FILE, replacing this shell with the specified program.
 If FILE is not specified, the redirections take effect in this
 shell.  If the first argument is `-', then place a dash in the
-zeroth arg passed to FILE.  This is what login does.  If the file
-cannot be exec'ed for some reason, the shell exits, unless the
+zeroth arg passed to FILE.  If the file cannot be exec'ed and
+the shell is not interactive, then the shell exits, unless the
 shell variable "no_exit_on_failed_exec" exists.
 $END
 
@@ -37,14 +37,22 @@ $END
 #include <signal.h>
 #include <errno.h>
 
-extern int interactive, errno;
+#include "common.h"
+
+/* Not all systems declare ERRNO in errno.h... and some systems #define it! */
+#if !defined (errno)
+extern int errno;
+#endif /* !errno */
+extern int interactive;
 extern REDIRECT *redirection_undo_list;
+
+extern char *find_user_command ();
 
 int
 exec_builtin (list)
      WORD_LIST *list;
 {
-  extern char *find_user_command ();
+  int exit_value = EXECUTION_FAILURE;
 
   maybe_make_export_env ();
 
@@ -71,7 +79,7 @@ exec_builtin (list)
       if (!list)
 	return (EXECUTION_SUCCESS);
 
-      args = (char **)make_word_array (list);
+      args = make_word_array (list);
 
       /* A command with a slash anywhere in its name is not looked up in
 	 the search path. */
@@ -82,10 +90,11 @@ exec_builtin (list)
       if (!command)
 	{
 	  builtin_error ("%s: not found", args[0]);
+	  exit_value = EX_NOTFOUND;	/* As per Posix.2, 3.14.6 */
 	  goto failed_exec;
 	}
 
-      command = (char *)full_pathname (command);
+      command = full_pathname (command);
       /* If the user wants this to look like a login shell, then
 	 prepend a `-' onto the first argument (argv[0]). */
       if (dash_name)
@@ -103,25 +112,38 @@ exec_builtin (list)
       adjust_shell_level (-1);
       maybe_make_export_env ();
 
+#if defined (HISTORY)
       maybe_save_shell_history ();
-
-      restore_default_signal (SIGINT);
-      restore_default_signal (SIGQUIT);
-      restore_default_signal (SIGTERM);
+#endif /* HISTORY */
       restore_original_signals ();
+
+#if defined (JOB_CONTROL)
+      end_job_control ();
+#endif /* JOB_CONTROL */
 
       shell_execve (command, args, export_env);
 
       adjust_shell_level (1);
 
       if (!executable_file (command))
-	builtin_error ("%s: cannot execute: %s", command, strerror (errno));
+	{
+	  builtin_error ("%s: cannot execute: %s", command, strerror (errno));
+	  exit_value = EX_NOEXEC;	/* As per Posix.2, 3.14.6 */
+	}
       else
 	file_error (command);
 
   failed_exec:
+      if (command)
+	free (command);
+
       if (!interactive && !find_variable ("no_exit_on_failed_exec"))
-	exit (EXECUTION_FAILURE);
-      return (EXECUTION_FAILURE);
+	exit (exit_value);
+
+#if defined (JOB_CONTROL)
+      restart_job_control ();
+#endif /* JOB_CONTROL */
+
+      return (exit_value);
     }
 }

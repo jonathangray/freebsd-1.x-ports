@@ -59,16 +59,28 @@ more arguments are given, they are parsed instead.
 $END
 
 #include <stdio.h>
-#include "../shell.h"
-#include "getopt.h"
 
-#ifndef NULL
-#define NULL		0
-#endif
+#if defined (HAVE_STRING_H)
+#  include <string.h>
+#else /* !HAVE_STRING_H */
+#  include <strings.h>
+#endif /* !HAVE_STRING_H */
+
+#include "../shell.h"
+
+#if defined (GETOPTS_BUILTIN)
+#include "getopt.h"
 
 #define G_EOF		(-1)
 #define G_ILLEGAL_OPT	(-2)
 #define G_ARG_MISSING	(-3)
+
+/* getopt.c is not compiled if __GNU_LIBRARY__ is defined, so this
+   function will come up as undefined.  More's the pity; the default
+   behavior of the GNU getopt() is not Posix.2 compliant. */
+#if defined (__GNU_LIBRARY__)
+#  define getopt_set_posix_option_order(x)
+#endif
 
 extern char *this_command_name;
 
@@ -270,3 +282,4 @@ getopts_builtin (list)
   free_array (av);
   return (ret);
 }
+#endif /* GETOPTS_BUILTIN */

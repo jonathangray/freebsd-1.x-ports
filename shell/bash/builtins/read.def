@@ -50,13 +50,11 @@ static int stream_close ();
 read_builtin (list)
      WORD_LIST *list;
 {
-  extern int interrupt_immediately, free ();
-  extern SHELL_VAR *bind_variable ();
-  extern char *string_list_dollar_star ();
+  extern int interrupt_immediately;
   register char *varname;
-  int size, c, i, fildes, raw_mode, pass_next;
+  int size, c, i, fildes, raw_mode, pass_next, saw_escape;
   char *input_string, *ifs_chars;
-  WORD_LIST *words, *rwords, *list_string ();
+  WORD_LIST *words, *rwords;
   FILE *input_stream;
 
   i = 0;		/* Index into the string that we are reading. */
@@ -82,12 +80,10 @@ read_builtin (list)
 
   setbuf (input_stream, (char *)NULL);
 
-  {
-    begin_unwind_frame ("read_builtin");
-    add_unwind_protect (free, input_string);
-    add_unwind_protect (stream_close, input_stream);
-    interrupt_immediately++;
-  }
+  begin_unwind_frame ("read_builtin");
+  add_unwind_protect (vfree, input_string);
+  add_unwind_protect (stream_close, input_stream);
+  interrupt_immediately++;
 
   while (list)
     {
@@ -111,6 +107,7 @@ read_builtin (list)
     }
 
   pass_next = 0;	/* Non-zero signifies last char was backslash. */
+  saw_escape = 0;	/* Non-zero signifies that we saw an escape char */
 
   while ((c = getc (input_stream)) != EOF)
     {
@@ -131,11 +128,16 @@ read_builtin (list)
       if (c == '\\' && !raw_mode)
 	{
 	  pass_next++;
+	  saw_escape++;
+	  input_string[i++] = CTLESC;
 	  continue;
 	}
 
       if (c == '\n')
 	break;
+
+      if (c == CTLESC || c == CTLNUL)
+	input_string[i++] = CTLESC;
 
       input_string[i++] = c;
     }
@@ -153,12 +155,19 @@ read_builtin (list)
     {
       SHELL_VAR *var;
 
+      if (saw_escape)
+	dequote_string (input_string);
       var = bind_variable ("REPLY", input_string);
       var->attributes &= ~att_invisible;
       free (input_string);
     }
   else
     {
+      /* This code implements the Posix.2 spec for splitting the words
+	 read and assigning them to variables.  If $IFS is unset, we
+	 use the default value of " \t\n". */
+      if (!ifs_chars)
+	ifs_chars = "";
       words = list_string (input_string, ifs_chars, 0);
       rwords = words;
 
@@ -172,12 +181,14 @@ read_builtin (list)
 
 	  if (!list->next)
 	    {
-	      /* Call string_list_dollar_star because P1003.2.9 specifies
+	      /* Call string_list_dollar_star because P1003.2 specifies
 		 that the intervening separators are preserved in the
 		 result of a read that specifies fewer variables than words
 		 read. */
 	      char *t = words ? string_list_dollar_star (words) : "";
 	      var = bind_variable (varname, t);
+	      if (words)
+		free (t);
 	    }
 	  else
 	    var = bind_variable (varname, words ? words->word->word : "");

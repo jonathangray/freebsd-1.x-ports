@@ -5,7 +5,7 @@
 
 /* Run a function without interrupts. */
 void
-  without_interrupts (), begin_unwind_frame (), discard_unwind_frame (),
+  begin_unwind_frame (), discard_unwind_frame (),
   run_unwind_frame (), add_unwind_protect (), remove_unwind_protect (),
   run_unwind_protects ();
 
@@ -13,7 +13,7 @@ void
 #define end_unwind_frame()
 
 /* How to protect an integer. */
-#define unwind_protect_int(X) unwind_protect_var (&(X), (X), sizeof (int))
+#define unwind_protect_int(X) unwind_protect_var (&(X), (char *)(X), sizeof (int))
 
 /* How to protect a pointer to a string. */
 #define unwind_protect_string(X) \
@@ -27,4 +27,3 @@ void
   unwind_protect_var ((int *)(X), (char *)(X), sizeof (jmp_buf))
 
 #endif /* _UNWIND_PROT_H */
-

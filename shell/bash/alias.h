@@ -21,27 +21,33 @@
 #if !defined (_ALIAS_)
 #define _ALIAS_
 
-extern char *xmalloc (), *malloc ();
+#include "hash.h"
 
-#ifndef whitespace
-#define whitespace(c) (((c) == ' ') || ((c) == '\t'))
-#endif
+extern char *xmalloc ();
 
-#ifndef savestring
-#define savestring(x) (char *)strcpy (xmalloc (1 + strlen (x)), (x))
-#endif
+#if !defined (whitespace)
+#  define whitespace(c) (((c) == ' ') || ((c) == '\t'))
+#endif /* !whitespace */
+
+#if !defined (savestring)
+#  define savestring(x) (char *)strcpy (xmalloc (1 + strlen (x)), (x))
+#endif /* !savestring */
+
+#if !defined (NULL)
+#  if defined (__STDC__)
+#    define NULL ((void *) 0)
+#  else
+#    define NULL 0x0
+#  endif /* !__STDC__ */
+#endif /* !NULL */
 
 typedef struct {
   char *name;
   char *value;
 } ASSOC;
 
-#ifndef NULL
-#define NULL 0x0
-#endif
-
 /* The list of known aliases. */
-extern ASSOC **aliases;
+extern HASH_TABLE *aliases;
 
 /* Scan the list of aliases looking for one with NAME.  Return NULL
    if the alias doesn't exist, else a pointer to the assoc. */
@@ -58,7 +64,10 @@ extern void add_alias ();
    the index of the removed alias, or -1 if the alias didn't exist. */
 extern int remove_alias ();
 
-/* Return a new line, with any aliases substituted. */
-extern char *alias_substitute ();
+/* Return a new line, with any aliases expanded. */
+extern char *alias_expand ();
+
+/* Return an array of all defined aliases. */
+extern ASSOC **all_aliases ();
 
 #endif /* _ALIAS_ */

@@ -1,5 +1,6 @@
 /* endian.c -- A trick for determining the byte order of a machine. */
 #include <stdio.h>
+#include "bashansi.h"
 
 /* The name of this program, as taken from argv[0]. */
 char *progname;
@@ -10,19 +11,27 @@ char source_name[256];
 /* The name of the define.  Either "BIG_ENDIAN" or "LITTLE_ENDIAN". */
 char *endian_define;
 
-/* Stuffed value of "ABCD" in a long, followed by a 0. */
-long int str[2] = { 0x41424344, 0x0 };
+char string[9];
+char nstring[9];
 
-/* Stuff "ABCD" into a long, and compare it against a character string
-   "ABCD".  If the results are EQ, the machine is big endian like a 68000
+/* Stuff "1234" into a long, and compare it against a character string
+   "1234".  If the results are EQ, the machine is big endian like a 68000
    or Sparc, otherwise it is little endian, like a Vax, or 386. */
 main (argc, argv)
      int argc;
      char **argv;
 {
+#if defined (__STDC__)
+  register size_t i;
+#else
   register int i;
+#endif /* !__STDC__ */
   FILE *stream = (FILE *)NULL;
   char *stream_name = "stdout";
+  union {
+      unsigned long l;
+      char s[sizeof (long)];
+  } u;
 
   progname = argv[0];
 
@@ -66,7 +75,37 @@ main (argc, argv)
       exit (2);
     }
 
-  if (strcmp ((char *)&str[0], "ABCD") == 0)
+  if (sizeof (long int) == 4)
+    {
+      u.l = 0x04030201L;
+      (void) strcpy (string, "4321");
+    }
+  else if (sizeof (long int) == 8)
+    {
+#if defined (__GNUC__)
+      unsigned long fake_out_gcc;
+
+      fake_out_gcc = (0x08070605L << 31);
+      fake_out_gcc = (fake_out_gcc << 1);
+      u.l = fake_out_gcc | 0x04030201L;
+#else
+      u.l = (0x08070605L << 32) | 0x04030201L;
+#endif /* !__GNUC__ */
+      (void) strcpy (string, "87654321");
+    }
+  else
+    {
+      fprintf (stderr,
+	       "%s: sizeof (long int) = %d, which isn't handled here.\n",
+	       progname, sizeof (long int));
+      exit (2);
+    }
+
+  for (i = 0; i < sizeof (long); i++)
+    nstring[i] = u.s[i] + '0';
+  nstring[i] = '\0';
+
+  if (strcmp (nstring, string) == 0)
     endian_define = "BIG_ENDIAN";
   else
     endian_define = "LITTLE_ENDIAN";

@@ -3,7 +3,7 @@
 # Convert Csh aliases to Bash aliases.  Adapted from a similar program
 # supplied with zsh.
 #
-# This is a quick script to convert csh aliases to bash aliases/functions.
+# This is a quick script to convert csh aliases to Bash aliases/functions.
 # Pipe the output of csh's alias command through this; it will generate
 # a series of alias/function definitions on stdout, suitable for
 # processing by bash.

@@ -1,107 +1,24 @@
-/* dynamic memory allocation for GNU.
-   Copyright (C) 1985, 1987 Free Software Foundation, Inc.
+/* dynamic memory allocation for GNU. */
 
-		       NO WARRANTY
+/*  Copyright (C) 1985, 1987 Free Software Foundation, Inc.
 
-  BECAUSE THIS PROGRAM IS LICENSED FREE OF CHARGE, WE PROVIDE ABSOLUTELY
-NO WARRANTY, TO THE EXTENT PERMITTED BY APPLICABLE STATE LAW.  EXCEPT
-WHEN OTHERWISE STATED IN WRITING, FREE SOFTWARE FOUNDATION, INC,
-RICHARD M. STALLMAN AND/OR OTHER PARTIES PROVIDE THIS PROGRAM "AS IS"
-WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING,
-BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS FOR A PARTICULAR PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY
-AND PERFORMANCE OF THE PROGRAM IS WITH YOU.  SHOULD THE PROGRAM PROVE
-DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR OR
-CORRECTION.
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 1, or (at your option)
+    any later version.
 
- IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW WILL RICHARD M.
-STALLMAN, THE FREE SOFTWARE FOUNDATION, INC., AND/OR ANY OTHER PARTY
-WHO MAY MODIFY AND REDISTRIBUTE THIS PROGRAM AS PERMITTED BELOW, BE
-LIABLE TO YOU FOR DAMAGES, INCLUDING ANY LOST PROFITS, LOST MONIES, OR
-OTHER SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE
-USE OR INABILITY TO USE (INCLUDING BUT NOT LIMITED TO LOSS OF DATA OR
-DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY THIRD PARTIES OR
-A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS) THIS
-PROGRAM, EVEN IF YOU HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH
-DAMAGES, OR FOR ANY CLAIM BY ANY OTHER PARTY.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-		GENERAL PUBLIC LICENSE TO COPY
-
-  1. You may copy and distribute verbatim copies of this source file
-as you receive it, in any medium, provided that you conspicuously and
-appropriately publish on each copy a valid copyright notice "Copyright
-(C) 1985 Free Software Foundation, Inc."; and include following the
-copyright notice a verbatim copy of the above disclaimer of warranty
-and of this License.  You may charge a distribution fee for the
-physical act of transferring a copy.
-
-  2. You may modify your copy or copies of this source file or
-any portion of it, and copy and distribute such modifications under
-the terms of Paragraph 1 above, provided that you also do the following:
-
-    a) cause the modified files to carry prominent notices stating
-    that you changed the files and the date of any change; and
-
-    b) cause the whole of any work that you distribute or publish,
-    that in whole or in part contains or is a derivative of this
-    program or any part thereof, to be licensed at no charge to all
-    third parties on terms identical to those contained in this
-    License Agreement (except that you may choose to grant more extensive
-    warranty protection to some or all third parties, at your option).
-
-    c) You may charge a distribution fee for the physical act of
-    transferring a copy, and you may at your option offer warranty
-    protection in exchange for a fee.
-
-Mere aggregation of another unrelated program with this program (or its
-derivative) on a volume of a storage or distribution medium does not bring
-the other program under the scope of these terms.
-
-  3. You may copy and distribute this program (or a portion or derivative
-of it, under Paragraph 2) in object code or executable form under the terms
-of Paragraphs 1 and 2 above provided that you also do one of the following:
-
-    a) accompany it with the complete corresponding machine-readable
-    source code, which must be distributed under the terms of
-    Paragraphs 1 and 2 above; or,
-
-    b) accompany it with a written offer, valid for at least three
-    years, to give any third party free (except for a nominal
-    shipping charge) a complete machine-readable copy of the
-    corresponding source code, to be distributed under the terms of
-    Paragraphs 1 and 2 above; or,
-
-    c) accompany it with the information you received as to where the
-    corresponding source code may be obtained.  (This alternative is
-    allowed only for noncommercial distribution and only if you
-    received the program in object code or executable form alone.)
-
-For an executable file, complete source code means all the source code for
-all modules it contains; but, as a special exception, it need not include
-source code for modules which are standard libraries that accompany the
-operating system on which the executable file runs.
-
-  4. You may not copy, sublicense, distribute or transfer this program
-except as expressly provided under this License Agreement.  Any attempt
-otherwise to copy, sublicense, distribute or transfer this program is void and
-your rights to use the program under this License agreement shall be
-automatically terminated.  However, parties who have received computer
-software programs from you with this License Agreement will not have
-their licenses terminated so long as such parties remain in full compliance.
-
-  5. If you wish to incorporate parts of this program into other free
-programs whose distribution conditions are different, write to the Free
-Software Foundation at 675 Mass Ave, Cambridge, MA 02139.  We have not yet
-worked out a simple rule that can be stated here, but we will often permit
-this.  We will be guided by the two goals of preserving the free status of
-all derivatives of our free software and of promoting the sharing and reuse of
-software.
-
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 In other words, you are welcome to use, share and improve this program.
 You are forbidden to forbid anyone else to use, share and improve
 what you give them.   Help stamp out software-hoarding!  */
-
 
 /*
  * @(#)nmalloc.c 1 (Caltech) 2/21/82
@@ -138,54 +55,52 @@ what you give them.   Help stamp out software-hoarding!  */
 #ifdef MSTATS
  * nmalloc[i] is the difference between the number of mallocs and frees
  * for a given block size.
-#endif /* MSTATS */
+#endif
+ */
 
 #if defined (emacs)
 #include "config.h"
 #endif /* emacs */
 
-#if defined (USG) || defined (HPUX) || defined (Xenix)
-#define SYSV
-#endif
+#if !defined (USG)
+#  if defined (HPUX) || defined (UnixPC) || defined (Xenix)
+#    define USG
+#  endif /* HPUX || UnixPC || Xenix */
+#endif /* !USG */
 
 /* Determine which kind of system this is.  */
 #include <sys/types.h>
 #include <signal.h>
-#ifndef SIGTSTP
-#ifndef VMS
-#ifndef SYSV
-#define SYSV
+
+#if !defined (USG) && !defined (USGr4)
+#  ifndef SIGTSTP
+#    ifndef USG
+#      define USG
+#    endif /* !USG */
+#  else /* SIGTSTP */
+#    ifdef SIGIO
+#      define BSD4_2
+#    endif /* SIGIO */
+#  endif /* SIGTSTP */
+#endif /* !USG && !USGr4 */
+
+#ifndef BSD4_2
+   /* Define getpagesize () if the system does not.  */
+#  include "getpagesize.h"
 #endif
-#endif /* not VMS */
-#else /* SIGTSTP */
-#ifdef SIGIO
-#define BSD42
-#endif /* SIGIO */
-#endif /* SIGTSTP */
 
-/* Define getpagesize () if the system does not.  */
-#include "getpagesize.h"
+#if defined (HAVE_RESOURCE)
+#  include <sys/time.h>
+#  include <sys/resource.h>
+#endif /* HAVE_RESOURCE */
 
-#ifndef BSD42
-#ifndef SYSV
-#include <sys/vlimit.h>		/* warn the user when near the end */
-#endif /* not SYSV */
-#else /* if BSD42 */
-#include <sys/time.h>
-#include <sys/resource.h>
-#endif /* BSD42 */
+/* Check for the needed symbols.  If they aren't present, this
+   system's <sys/resource.h> isn't very useful to us. */
+#if !defined (RLIMIT_DATA)
+#  undef HAVE_RESOURCE
+#endif
 
-extern char *start_of_data ();
-
-#ifdef BSD
-#ifndef DATA_SEG_BITS
 #define start_of_data() &etext
-#endif
-#endif
-
-#ifndef emacs
-#define start_of_data() &etext
-#endif
 
 #define ISALLOC ((char) 0xf7)	/* magic byte that implies allocation */
 #define ISFREE ((char) 0x54)	/* magic byte that implies free block */
@@ -196,6 +111,16 @@ extern char *start_of_data ();
 				     beginning of the block.  */
 
 extern char etext;
+
+#if !defined (NO_SBRK_DECL)
+#  if defined (hpux_8) || defined (hpux_9) || defined (Solaris)
+#    define NO_SBRK_DECL
+#  endif /* hpux_8 || Solaris */
+#endif /* !NO_SBRK_DECL */
+
+#if !defined (NO_SBRK_DECL)
+extern char *sbrk ();
+#endif /* !NO_SBRK_DECL */
 
 /* These two are for user programs to look at, when they are interested.  */
 
@@ -244,6 +169,14 @@ struct mhead {
 #    define botch(x) abort ()
 #  endif /* botch */
 
+#  if !defined (__STRING)
+#    if defined (__STDC__)
+#      define __STRING(x) #x
+#    else
+#      define __STRING(x) "x"
+#    endif
+#  endif
+
   /* To implement range checking, we write magic values in at the beginning
      and end of each allocated block, and make sure they are undisturbed
      whenever a free or a realloc occurs. */
@@ -252,13 +185,12 @@ struct mhead {
 #  define MAGIC1 0x55
   /* Written in the 4 bytes before the block's real space */
 #  define MAGIC4 0x55555555
-#  define ASSERT(p) if (!(p)) botch("p"); else
+#  define ASSERT(p) if (!(p)) botch(__STRING(p)); else
 #  define EXTRA  4		/* 4 bytes extra for MAGIC1s */
 #else /* !rcheck */
 #  define ASSERT(p)
 #  define EXTRA  0
 #endif /* rcheck */
-
 
 /* nextf[i] is free list of blocks of size 2**(i + 3)  */
 
@@ -319,17 +251,14 @@ static void
 morecore (nu)			/* ask system for more memory */
      register int nu;		/* size index to get more of  */
 {
-  char *sbrk ();
   register char *cp;
   register int nblks;
   register unsigned int siz;
   int oldmask;
 
-#ifdef BSD
-#ifndef BSD4_1
+#if defined (BSD4_2)
   oldmask = sigsetmask (-1);
-#endif
-#endif
+#endif /* BSD4_2 */
 
   if (!data_space_start)
     {
@@ -345,12 +274,6 @@ morecore (nu)			/* ask system for more memory */
 
   /* Find current end of memory and issue warning if getting near max */
 
-#ifndef VMS
-  /* Maximum virtual memory on VMS is difficult to calculate since it
-   * depends on several dynmacially changing things. Also, alignment
-   * isn't that important. That is why much of the code here is ifdef'ed
-   * out for VMS systems.
-   */
   cp = sbrk (0);
   siz = cp - data_space_start;
   malloc_sbrk_used = siz;
@@ -384,7 +307,6 @@ morecore (nu)			/* ask system for more memory */
 
   if ((int) cp & 0x3ff)	/* land on 1K boundaries */
     sbrk (1024 - ((int) cp & 0x3ff));
-#endif /* not VMS */
 
  /* Take at least 2k, and figure out how many blocks of the desired size
     we're about to get */
@@ -394,13 +316,12 @@ morecore (nu)			/* ask system for more memory */
 
   if ((cp = sbrk (1 << (siz + 3))) == (char *) -1)
     return;			/* no more room! */
-#ifndef VMS
+
   if ((int) cp & 7)
     {		/* shouldn't happen, but just in case */
       cp = (char *) (((int) cp + 8) & ~7);
       nblks--;
     }
-#endif /* not VMS */
 
  /* save new header and link the nblks blocks together */
   nextf[nu] = (struct mhead *) cp;
@@ -415,18 +336,15 @@ morecore (nu)			/* ask system for more memory */
     }
   CHAIN ((struct mhead *) cp) = 0;
 
-#ifdef BSD
-#ifndef BSD4_1
+#if defined (BSD4_2)
   sigsetmask (oldmask);
-#endif
-#endif
+#endif /* BSD4_2 */
 }
 
 static void
 getpool ()
 {
   register int nu;
-  char * sbrk ();
   register char *cp = sbrk (0);
 
   if ((int) cp & 0x3ff)	/* land on 1K boundaries */
@@ -530,6 +448,7 @@ malloc (n)		/* get a block */
   return (char *) (p + 1);
 }
 
+void
 free (mem)
      char *mem;
 {
@@ -649,8 +568,6 @@ realloc (mem, n)
   }
 }
 
-#ifndef VMS
-
 char *
 memalign (alignment, size)
      unsigned alignment, size;
@@ -675,7 +592,7 @@ memalign (alignment, size)
   return aligned;
 }
 
-#if !(defined (HPUX) || defined (Multimax) || defined (Multimax32k))
+#if !defined (HPUX) && !defined (Multimax) && !defined (Multimax32k)
 /* This runs into trouble with getpagesize on HPUX, and Multimax machines.
    Patching out seems cleaner than the ugly fix needed.  */
 char *
@@ -683,8 +600,7 @@ valloc (size)
 {
   return memalign (getpagesize (), size);
 }
-#endif /* not HPUX */
-#endif /* not VMS */
+#endif /* !HPUX && !Multimax && !Multimax32k */
 
 #ifdef MSTATS
 /* Return statistics describing allocation of blocks of size 2**n. */
@@ -727,10 +643,10 @@ malloc_stats (size)
  *	This function returns the total number of bytes that the process
  *	will be allowed to allocate via the sbrk(2) system call.  On
  *	BSD systems this is the total space allocatable to stack and
- *	data.  On SYSV systems this is the data space only.
+ *	data.  On USG systems this is the data space only.
  */
 
-#ifdef SYSV
+#if !defined (HAVE_RESOURCE)
 
 get_lim_data ()
 {
@@ -740,15 +656,7 @@ get_lim_data ()
   lim_data -= (long) data_space_start;
 }
 
-#else /* not SYSV */
-#ifndef BSD42
-
-get_lim_data ()
-{
-  lim_data = vlimit (LIM_DATA, -1);
-}
-
-#else /* BSD42 */
+#else /* HAVE_RESOURCE */
 
 get_lim_data ()
 {
@@ -762,77 +670,4 @@ get_lim_data ()
 #endif
 }
 
-#endif /* BSD42 */
-#endif /* not SYSV */
-
-#ifdef VMS
-/* There is a problem when dumping and restoring things on VMS. Calls
- * to SBRK don't necessarily result in contiguous allocation. Dumping
- * doesn't work when it isn't. Therefore, we make the initial
- * allocation contiguous by allocating a big chunk, and do SBRKs from
- * there. Once Emacs has dumped there is no reason to continue
- * contiguous allocation, malloc doesn't depend on it.
- *
- * There is a further problem of using brk and sbrk while using VMS C
- * run time library routines malloc, calloc, etc. The documentation
- * says that this is a no-no, although I'm not sure why this would be
- * a problem. In any case, we remove the necessity to call brk and
- * sbrk, by calling calloc (to assure zero filled data) rather than
- * sbrk.
- *
- * VMS_ALLOCATION_SIZE is the size of the allocation array. This
- * should be larger than the malloc size before dumping. Making this
- * too large will result in the startup procedure slowing down since
- * it will require more space and time to map it in.
- *
- * The value for VMS_ALLOCATION_SIZE in the following define was determined
- * by running emacs linked (and a large allocation) with the debugger and
- * looking to see how much storage was used. The allocation was 201 pages,
- * so I rounded it up to a power of two.
- */
-#ifndef VMS_ALLOCATION_SIZE
-#define VMS_ALLOCATION_SIZE	(512*256)
-#endif
-
-/* Use VMS RTL definitions */
-#undef sbrk
-#undef brk
-#undef malloc
-int vms_out_initial = 0;
-char vms_initial_buffer[VMS_ALLOCATION_SIZE];
-static char *vms_current_brk = &vms_initial_buffer;
-static char *vms_end_brk = &vms_initial_buffer[VMS_ALLOCATION_SIZE-1];
-
-#include <stdio.h>
-
-char *
-sys_sbrk (incr)
-     int incr;
-{
-  char *sbrk(), *temp, *ptr;
-
-  if (vms_out_initial)
-    {
-      /* out of initial allocation... */
-      if (!(temp = malloc (incr)))
-	temp = (char *) -1;
-    }
-  else
-    {
-      /* otherwise, go out of our area */
-      ptr = vms_current_brk + incr; /* new current_brk */
-      if (ptr <= vms_end_brk)
-	{
-	  temp = vms_current_brk;
-	  vms_current_brk = ptr;
-	}
-      else
-	{
-	  vms_out_initial = 1;	/* mark as out of initial allocation */
-	  if (!(temp = malloc (incr)))
-	    temp = (char *) -1;
-	}
-    }
-  return temp;
-}
-#endif /* VMS */
+#endif /* HAVE_RESOURCE */

@@ -3,7 +3,7 @@
 
 #define FILENAME_HASH_BUCKETS 631
 
-HASH_TABLE *hashed_filenames;
+extern HASH_TABLE *hashed_filenames;
 
 typedef struct {
   char *path;		/* The full pathname of the file. */

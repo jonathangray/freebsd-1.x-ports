@@ -1,0 +1,2132 @@
+#! /bin/sh
+# This is a shell archive, meaning:
+# 1.  Remove everything above the #! /bin/sh line.
+# 2.  Save the resulting test in a file
+# 3.  Execute the file with /bin/sh (not csh) to create the files:
+#
+#                Makefile
+#                Readme
+#                copyright
+#                items.c
+#                table.c
+#                tableme.h
+#                tablemm.h
+#                tablems.h
+#                texi2index
+#                texi2roff.1
+#                texi2roff.c
+#                texi2roff.h
+#                translate.c
+#
+# Created by chet (chet) on Wed Dec  4 09:13:30 EST 1991
+#
+if test -f 'Makefile'
+then
+echo shar: will not over-write existing file "'Makefile'"
+else
+echo extracting "'Makefile'"
+sed 's/^X//' >Makefile <<'SHAR_EOF'
+X
+X# Makefile for Texinfo to nroff/troff translator (texi2roff)
+X
+XCC = cc
+X
+X# Flags:
+X# -DBSD controls use of string(s).h and strchr/index only (not needed for Sun)
+X# use -Dvoid=int for System III and V7
+X
+X# problems have been reported for -O with Sun4's, SunOS 4.0.1
+XCFLAGS = -g
+X
+XOBJECTS = texi2roff.o table.o translate.o items.o
+X
+Xtexi2roff: $(OBJECTS)
+X	$(CC) -o $@ $(CFLAGS) $(OBJECTS)
+X
+Xtexi2roff.o : texi2roff.h
+X
+Xtranslate.o : texi2roff.h 
+X
+Xtable.o : texi2roff.h tablems.h tablemm.h tableme.h 
+X
+Xitems.o: texi2roff.h
+X
+Xlint:
+X	lint -ha *.c
+Xclean:
+X	-rm -f *.o core errs
+X
+Xbundle:
+X	bundle texi2roff.1 Readme copyright Makefile texi2index *.c >bundled.01
+X	ls -l bundled.01
+X	bundle *.h >bundled.02
+X	ls -l bundled.02
+X
+Xshar:
+X	bundle texi2roff.1 Readme copyright Makefile texi2index *.[ch] \
+X		| compress >texi2roff.shar.Z
+SHAR_EOF
+if test      809 -ne "`wc -c < 'Makefile'`"
+then
+echo shar: error transmitting "'Makefile'" '(should have been      809 characters)'
+fi
+fi
+if test -f 'Readme'
+then
+echo shar: will not over-write existing file "'Readme'"
+else
+echo extracting "'Readme'"
+sed 's/^X//' >Readme <<'SHAR_EOF'
+Xtexi2roff - Texinfo to nroff/troff translator
+X
+XCopyright 1988, 1989, 1990  Beverly A. Erlebacher  (see copyright file)
+X
+XNotes for Release 2
+X-------------------
+XThanks to everyone who wrote to me reporting new commands, problems or
+Xjust sending friendly thank you notes!  Special thanks to Len Tower and
+XBob Chassel at FSF for providing "inside info" on occasion, to David
+XMacKenzie for interesting and useful correspondence and to James Clark
+X(author of groff) for some extremely clever and knowledgable suggestions.
+X
+XThanks also to Norman Wilson, Henry Spencer, Ian Darwin and Geoff Collyer
+Xfor advising or commiserating with me about peculiarities of troff.
+X
+XSpecial thanks to Rayan Zachariassen for conning me into writing
+Xtexi2roff in the first place.  By distributing and supporting this
+Xprogram I've come to feel part of a very interesting global community.
+X
+XNew Features in Release 2
+X-------------------------
+X+  several dozen additional commands are supported, including the ones
+X   in the new elisp manual. 
+X+  tables of contents are generated. 
+X+  index entries are emitted and a script to generate indices is provided. 
+X+  file inclusion is supported (@include command)
+X+  appendices are "numbered" with letters. 
+X+  a font stack solves most nested font change problems
+X+  bug fixes, some prettier formatting, and somewhat tighter code.
+X
+XProblems in Release 2
+X---------------------
+XTexinfo remains a moving target.  I've given up trying to track all the
+Xsubtleties and little elegances of formatting and am just trying to
+Xprovide you with manuals that are convenient to read.  The new @def
+Xseries of commands are particularly difficult to emulate - I've tried
+Xto make them readable although the formatting is sometimes unaesthetic.
+X
+XPlease report any problems or "unrecognised command" messages to me. 
+XI usually don't know that a new manual with new commands is out there
+Xunless someone tells me about it.
+X
+XSeveral people complained about the line \input texinfo appearing on
+Xthe title page.  This is the directive to TeX to load the Texinfo
+Xmacros.  If it bothers you, delete it from the input file, or pipe the
+Xinput through sed. e.g.:
+X
+X	sed '/\\input texinfo/d' | texi2roff ....
+X
+XGoing with the Flow - Onward into the Future - Self Help Guide
+X--------------------------------------------------------------
+XIt's quite easy to add new commands yourself.  Find a command that is
+Xsyntactically similar to the new one and add the new command to the
+Xtables in a similar way.  This assumes you can figure out what the new
+Xcommand is supposed to be doing! texi2roff is table-driven, and the *.c
+Xfiles total less than 850 lines.  I added the new commands to this release
+Xwithout changing any of the .c files - I only modified translate.c for
+Xthe two newly supported command types INDEX and INCLUDE. These commands
+Xwere formerly discarded. If you add new commands yourself, please report
+Xthem to me anyway so other people can benefit.
+X
+XUsefulness
+X----------
+XI almost never print anything.  I find texi2roff useful for browsing
+XGNU documentation in a pipeline texi2roff | nroff | pager.  I like to
+Xuse the program 'less' for a pager since it allows string searches and
+Xscrolls both backward and forward.  I'm mentioning this here because
+Xthis use seems not to occur to people - some are surprised and pleased
+Xwhen I tell them about it.
+X
+XThere will soon be a standalone info file reader available from FSF.
+XIn the interim texi2roff can be used this way.
+X
+XPortability
+X-----------
+XTexi2roff was tested on a variety of machines and environments.  It
+Xeven runs under ms-dos!  There is a -DBSD directive in the program
+Xwhich only controls which string header to #include and which of
+Xstrchr() or index() is used.
+X
+XPlease report any portability (and other) problems you encounter.
+X
+XI'd like to thank the beta testers of version 1.0 and the new ones of
+Xversion 2.0: Jim Ingram, Marty, Richard Murphey, Scott Garfinkle and
+Xespecially Bob Willcox.  Had this small group of the many I sent source
+Xto not responded, I would have had to conclude that texi2roff was
+Xeither incomprehensible or perfect.
+X
+XTexinfo, LaTeX, TeX, troff, texi2roff...
+X----------------------------------------
+XTexi2roff translates Texinfo documents, *NOT* TeX or LaTeX documents.
+XNot all GNU documentation uses Texinfo, although most of the recent
+Xmaterial does.  Texinfo commands all start with @ while LaTeX and TeX
+Xcommands start with \.  Several people have asked me whether programs
+Xexist to convert TeX and LaTeX documents to troff.  I don't know of
+Xany.  If I were to write one, I think I would first write a customised
+Xmacro package for troff that a texi2roff-like program would translate to.
+X
+XIf someone would like to collaborate on such a project, please contact me.
+X
+XBeverly Erlebacher      ...uunet!utai!erlebach  erlebach@cs.toronto.edu
+X8 Roblocke Ave.
+XToronto, Ontario, Canada  M6G 3R7
+X
+SHAR_EOF
+if test     4866 -ne "`wc -c < 'Readme'`"
+then
+echo shar: error transmitting "'Readme'" '(should have been     4866 characters)'
+fi
+fi
+if test -f 'copyright'
+then
+echo shar: will not over-write existing file "'copyright'"
+else
+echo extracting "'copyright'"
+sed 's/^X//' >copyright <<'SHAR_EOF'
+XCopyright notice for texi2roff - Texinfo to troff translator:
+X
+X/*
+X * Copyright  1988, 1989, 1990 by  Beverly A. Erlebacher
+X * Written by Beverly A. Erlebacher.  Not derived from licensed software.
+X * This software is not subject to any license of the American Telephone
+X * and Telegraph Company or of the Regents of the University of California.
+X *
+X * Permission is granted to anyone to use this software for any purpose on
+X * any computer system, and to alter it and redistribute it freely, subject
+X * to the following restrictions:
+X *
+X * 1. The author is not responsible for the consequences of use of this
+X *    software, no matter how awful, even if they arise from flaws in it.
+X *
+X * 2. The origin of this software must not be misrepresented, either by
+X *    explicit claim or by omission.  Since few users ever read sources,
+X *    credits must appear in the documentation.
+X *
+X * 3. Altered versions must be plainly marked as such, and must not be
+X *    misrepresented as being the original software.  Since few users
+X *    ever read sources, credits must appear in the documentation.
+X *
+X * 4. This notice may not be removed or altered.
+X *
+X * 5. This release may be redistributed only in its original state:  existing
+X *    material (e.g. sources) may not be deleted, changes may not be made to
+X *    the originals, and new materials must be added as a supplementary
+X *    distribution rather than interspersed with the originals.
+X *
+X */
+X
+XBeverly Erlebacher 	uunet!utai!erlebach	erlebach@cs.toronto.edu
+X
+SHAR_EOF
+if test     1509 -ne "`wc -c < 'copyright'`"
+then
+echo shar: error transmitting "'copyright'" '(should have been     1509 characters)'
+fi
+fi
+if test -f 'items.c'
+then
+echo shar: will not over-write existing file "'items.c'"
+else
+echo extracting "'items.c'"
+sed 's/^X//' >items.c <<'SHAR_EOF'
+X/*
+X * items.c - handles itemized list commands (formerly part of translate.c)
+X *		Release 2.0	January 1990
+X *
+X * Copyright 1988, 1989, 1990  Beverly A.Erlebacher
+X * erlebach@cs.toronto.edu    ...uunet!utai!erlebach
+X *
+X */
+X
+X#include <stdio.h> 
+X#include "texi2roff.h"
+X
+X#define ITEMIZE	    0
+X#define ENUMERATE   1
+X#define TABLE	    2
+X#define APPLY	    3
+X
+X#define MAXILEVEL	10
+Xint  icount[MAXILEVEL];
+Xint  what[MAXILEVEL];
+Xchar item[MAXILEVEL][MAXLINELEN];
+X
+Xextern int  ilevel;
+Xextern char * gettoken();
+Xextern char * eatwhitespace();
+Xextern void errormsg();
+Xextern struct tablerecd * lookup();
+X
+X/*
+X * itemize - handle the itemizing start commands @enumerate, @itemize
+X *	and @table
+X */
+X
+Xchar * itemize(s, token)
+Xchar * s;
+Xchar * token;
+X{
+X    char *tag;
+X
+X    tag = item[ilevel];
+X    if (STREQ(token,"@itemize")) {
+X	what[ilevel] = ITEMIZE;
+X	s = gettoken(eatwhitespace(s),tag);
+X	if (*tag == '\n') { /* this is an error in the input */
+X	    --s;
+X	    *tag = '-';
+X	    errormsg("missing itemizing argument ","");
+X	} else {
+X	    if (*tag =='@') {
+X		if ((lookup(tag)==NULL) && (lookup(strcat(tag,"{"))==NULL))
+X		     errormsg("unrecognized itemizing argument ",tag);
+X		else
+X		    if (*(tag + strlen(tag) - 1) == '{')
+X		    	(void) strcat(tag,"}");
+X	    }
+X	}
+X	(void) strcat(tag, " ");
+X    } else if (STREQ(token,"@enumerate")) {
+X	what[ilevel] = ENUMERATE;
+X	icount[ilevel] = 1;
+X    } else if (STREQ(token,"@table")) {
+X	what[ilevel] = TABLE;
+X	s = gettoken(eatwhitespace(s),tag);
+X	if (*tag == '\n') {
+X	    *tag = '\0';  /* do nothing special */
+X	    --s;
+X	} else {
+X	    if (*tag =='@') {
+X		if ((lookup(tag)==NULL) && (lookup(strcat(tag,"{"))==NULL))
+X		    errormsg("unrecognized itemizing argument ",tag);
+X		else {
+X		    what[ilevel] = APPLY;
+X		    if (*(tag + strlen(tag) - 1) != '{')
+X		    	(void) strcat(tag,"{");
+X		}
+X	    }
+X	}
+X    }
+X    while (*s != '\n' && *s != '\0') 
+X	++s;  /* flush rest of line */
+X    return s;
+X}
+X
+X/*
+X * doitem - handle @item and @itemx
+X */
+X
+Xchar *
+Xdoitem(s, tag)
+Xchar * s;
+Xchar *tag;
+X{
+X    switch (what[ilevel]) {
+X    case ITEMIZE:
+X	(void) strcpy(tag, item[ilevel]);
+X	break;
+X    case ENUMERATE:
+X	(void) sprintf(tag, "%d.", icount[ilevel]++);
+X	break;
+X    case TABLE:
+X	s = eatwhitespace(s);
+X	if (*s == '\n') {
+X	    *tag++ = '-';
+X	    errormsg("missing table item tag","");
+X	} else 
+X	    while(*s != '\n')
+X		*tag++ = *s++;
+X	*tag = '\0';
+X	break;
+X    case APPLY:
+X	*tag = '\0';
+X	(void) strcat(tag,item[ilevel]);
+X	tag += strlen(tag);
+X	s = eatwhitespace(s);
+X	while(*s != '\n')
+X	    *tag++ = *s++;
+X	*tag++ = '}';
+X	*tag = '\0';
+X	break;
+X    }
+X    return s;
+X}
+SHAR_EOF
+if test     2561 -ne "`wc -c < 'items.c'`"
+then
+echo shar: error transmitting "'items.c'" '(should have been     2561 characters)'
+fi
+fi
+if test -f 'table.c'
+then
+echo shar: will not over-write existing file "'table.c'"
+else
+echo extracting "'table.c'"
+sed 's/^X//' >table.c <<'SHAR_EOF'
+X/*
+X * table.c - set up translation tables for texi2roff
+X *		Release 1.0a	August 1988
+X *		Release 2.0	January 1990
+X *
+X * Copyright 1988, 1989, 1990  Beverly A.Erlebacher
+X * erlebach@cs.toronto.edu    ...uunet!utai!erlebach
+X *
+X *
+X * When adding more commands: 
+X *
+X * - be sure that gettoken() can recognize not just the ending token
+X *   (texend) but also the end of the starting token (texstart) for
+X *   the command, if it doesnt already occur in a table.
+X *
+X * - keep the tables sorted
+X *
+X * - try to keep all troff strings here and in the table header files
+X *
+X * - strive diligently to keep the program table-driven
+X */
+X
+X#include <stdio.h>	/* just to get NULL */
+X#include "texi2roff.h"
+X#include "tablems.h"
+X#include "tableme.h"
+X#include "tablemm.h"
+X
+Xchar indexmacro[] = ".de iX \n.tm \\\\$1   \\\\n%\n..\n";
+Xchar trquotes[] = ".tr \\(is'\n.tr \\(if`\n.tr \\(pd\"\n";
+X
+Xstruct misccmds * cmds;
+Xstruct tablerecd * table, * endoftable;
+X
+Xvoid
+Xinitialize(macropkg, showInfo, makeindex)
+Xint macropkg;
+Xint showInfo;
+Xint makeindex;
+X{
+X    extern void patchtable();
+X    int tablesize;
+X
+X    switch (macropkg) {
+X    case MS:
+X	table = mstable;
+X	tablesize = sizeof mstable;
+X	cmds = &mscmds;
+X	break;
+X    case MM:
+X	table = mmtable;
+X	tablesize = sizeof mmtable;
+X	cmds = &mmcmds;
+X	break;
+X    case ME:
+X	table = metable;
+X	tablesize = sizeof metable;
+X	cmds = &mecmds;
+X	break;
+X    }
+X    endoftable = table + tablesize/sizeof table[0];
+X    if (showInfo == NO)
+X       (void) patchtable();
+X    if (makeindex == YES)
+X       puts(indexmacro);
+X    puts(cmds->init);
+X    puts(trquotes);
+X}
+X
+X 
+X/*
+X * lookup - linear search for texinfo command in table
+X * i used bsearch() for a while but it isnt portable and makes lint squawk.
+X */
+X
+Xstruct tablerecd *
+Xlookup(token)
+X    char	   *token;
+X{
+X    register struct tablerecd *tptr;
+X
+X    for (tptr = table; tptr < endoftable; ++tptr) {
+X	if (STREQ(tptr->texstart, token))
+X	    return tptr;
+X    }
+X    return NULL;
+X}
+X
+X/*
+X * real Texinfo has a sort of hypertext feature called Info files,
+X * using menus, nodes and 'ifinfo' sections. Although i can't simulate
+X * this here, and the material would not normally be printed by Texinfo,
+X * it could be useful to the user searching through a machine-readable
+X * manual. If the -I option is not specified, patch the table to discard 
+X * rather than display this material.
+X */
+X
+Xstatic void
+Xpatchtable()
+X{
+X    struct tablerecd *tp;
+X    char **p;
+X    static char *discard[] = { "@menu", "@node", "@ifinfo", "@inforef", 0 };
+X
+X    for (p = discard; *p != NULL; ++p)
+X	    if ((tp = lookup(*p)) != NULL) 
+X		tp->type = DISCARD;
+X}
+SHAR_EOF
+if test     2575 -ne "`wc -c < 'table.c'`"
+then
+echo shar: error transmitting "'table.c'" '(should have been     2575 characters)'
+fi
+fi
+if test -f 'tableme.h'
+then
+echo shar: will not over-write existing file "'tableme.h'"
+else
+echo extracting "'tableme.h'"
+sed 's/^X//' >tableme.h <<'SHAR_EOF'
+X/*
+X * tableme.h - -me macros table and other explicit troff command strings
+X *		Release 1.0a	August 1988
+X *		Release 2.0	January 1990
+X *
+X * Copyright 1988, 1989, 1990  Beverly A.Erlebacher
+X * erlebach@cs.toronto.edu    ...uunet!utai!erlebach
+X *
+X */
+X
+X/* 
+X * miscellaneous commands, described in texi2roff.h 
+X */
+Xstruct misccmds mecmds = { ".nr _- 0", "\n.pp\n", "\n.ip\n", "", ""};
+X
+Xstruct tablerecd metable[] = {
+X    "@*",		"",	"\n.br\n",	"",	"",	ESCAPED,
+X    "@.",		"",	"\\&.",		"",	"",	ESCAPED,
+X    "@:",		"",	"",		"",	"",	ESCAPED,
+X    "@@",		"",	"@",		"",	"",	ESCAPED,
+X    "@Arrow",		"\n",	"\\(rh",	"\n",	"",	CHAR,
+X    "@TeX{",		"}",	"TeX",		"",	"",	INPARA,
+X    "@appendix",	"\n",	
+X     "\n.if !\\n(_- \\{\\\n.nr _- 1\n.nr $1 0 1\n.af $1 A\\}\n.bp\n.ds __ ",
+X     "\n.sh 1 \\*(__ \n.(x \n\\n($1	\\*(__ \n.)x\n","\\fB",	HEADING,
+X    "@appendixsec",	"\n",	"\n.ds __ ",
+X	"\n.sh 2 \\*(__ \n.(x \n\\n($1.\\n($2      \\*(__ \n.)x\n",
+X							"\\fB",	HEADING,
+X    "@appendixsection",	"\n",	"\n.ds __ ",
+X	"\n.sh 2 \\*(__ \n.(x \n\\n($1.\\n($2      \\*(__ \n.)x\n",
+X							"\\fB",	HEADING,
+X    "@appendixsubsec",	"\n",	"\n.ds __ ",
+X	"\n.sh 3 \\*(__ \n.(x \n\\n($1.\\n($2.\\n($3    \\*(__ \n.)x\n",
+X							"\\fB",	HEADING,
+X    "@appendixsubsubsec","\n",	"\n.ds __ ",
+X	"\n.sh 4 \\*(__ \n.(x \n\\n($1.\\n($2.\\n($3.\\n($4  \\*(__ \n.)x\n",
+X							"\\fB",	HEADING,
+X    "@arrow",		"\n",	"\\(->",	"\n",	"",	CHAR,
+X    "@asis",		"\n",	"",		"\n",	"",	PARAGRAPH,
+X    "@asis{",		"}",	"",		"",	"",	INPARA,
+X    "@author",		"\n",	"\n.ce\n",	"\n",	"",	HEADING,
+X    "@br",		"\n",	"\n.br\n.sp\n", "",	"",	PARAGRAPH,
+X    "@bullet{",		"}",	"\\(bu",	"",	"",	CHAR,
+X    "@bye",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@b{",		"}",	"\\fB",		"",	"\\fB",	INPARA,
+X    "@c",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@center",		"\n",	"\n.ce\n",	"\n",	"",	HEADING,
+X    "@center{",		"}",	"\n.ce\n",	"",	"",	HEADING,
+X    "@chapter",		"\n",	"\n.bp\n.ds __ ",
+X	"\n.sh 1 \\*(__ \n.(x \n\\n($1	\\*(__ \n.)x\n","\\fB",	HEADING,
+X    "@cindex",		"\n",	"\n.iX \"c ",	"\"\n",	"",	INDEX,
+X    "@cite{",		"}",	"\\fI",		"",	"\\fI",	INPARA,
+X    "@code{",		"}",	"\\fR\\&\\f(CW","","\\fR\\&\\f(CW",INPARA,
+X    "@comment",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@contents",	"\n",	"\n.nr % 0 1\n.af % i\n.bp \\n%+1\n",
+X	".ce\n\\fBTable of Contents\\fR\n.sp 2\n.xp \n","",INPARA,
+X    "@copyright{",	"}",	"\\(co",	"",	"",	CHAR,
+X    "@ctrl{",		"}",	"\\fR\\&\\f(CW^","","\\fR\\&\\f(CW",INPARA,
+X    "@dag",		"}{",	"\\(dg",	"",	"",	CHAR,
+X    "@dag{",		"}",	"\\(dg",	"",	"",	CHAR,
+X    "@ddag",		"}{",	"\\(dd",	"",	"",	CHAR,
+X    "@ddag{",		"}",	"\\(dd",	"",	"",	CHAR,
+X    "@defcmd",		"@end", "\n.lp\n*\\ Command: ","","",	HEADING,
+X    "@defcmdx",		"\n", 	"\n.lp\n*\\ Command: ","\n.br\n","",HEADING,
+X    "@defconst",	"@end", "\n.lp\n*\\ Constant: ","","",	HEADING,
+X    "@defconstx",	"\n", 	"\n.lp\n*\\ Constant: ","\n.br\n","",HEADING,
+X    "@deffn",		"@end", "\n.lp\n*\\ ",	"",	"",	HEADING,
+X    "@deffnx",		"\n", 	"\n.lp\n*\\ ",	"\n.br\n","",	HEADING,
+X    "@defmac",		"@end", "\n.lp\n*\\ Macro: ","","",	HEADING,
+X    "@defmacx",		"\n", 	"\n.lp\n*\\ Macro: ","\n.br\n","",HEADING,
+X    "@defmethod",	"@end", "\n.lp\n*\\ Operation on ","","",HEADING,
+X    "@defmethodx",	"\n", 	"\n.lp\n*\\ Operation on ","\n.br\n",
+X							"",	HEADING,
+X    "@defopt",		"@end", "\n.lp\n*\\ User Option: ","","",HEADING,
+X    "@defoptx",		"\n", 	"\n.lp\n*\\ User Option: ","\n.br\n",
+X							"",	HEADING,
+X    "@defspec",		"@end", "\n.lp\n*\\ Special Form: ","","",HEADING,
+X    "@defspecx",	"\n", 	"\n.lp\n*\\ Special Form: ","\n.br\n",
+X							"",	HEADING,
+X    "@defun",		"@end", "\n.lp\n*\\ Function: ","","",	HEADING,
+X    "@defunx",		"\n", 	"\n.lp\n*\\ Function: ","\n.br\n","",HEADING,
+X    "@defvar",		"@end", "\n.lp\n*\\ Variable: ","","",	HEADING,
+X    "@defvarx",		"\n", 	"\n.lp\n*\\ Variable: ","\n.br\n","",HEADING,
+X    "@dfn{",		"}",	"\\fI",		"",	"\\fI",	INPARA,
+X    "@display",		"@end", "\n.(l I\n",	"\n.)l\n","",	DISPLAY,
+X    "@dots{",		"}",	"\\&...",	"",	"",	INPARA,
+X    "@eject",		"\n",	"\n.bp\n",	"",	"",	PARAGRAPH,
+X    "@emph{",		"}",	"\\fI",		"",	"\\fI",	INPARA,
+X    "@end",		"\n",	"",	"\n.sp\n.in\n", "",	END,
+X    "@enumerate",	"@end", "\n.(l L F\n.ba +5\n",
+X					"\n.ba -5\n.)l\n","",	ITEMIZING,
+X    "@equiv{",		"}",	"\\(==",	"",	"",	CHAR,
+X    "@error{",		"}",	"error->",	"",	"",	CHAR,
+X    "@example",		"@end", "\n.(l I\n\\fR\\&\\f(CW\n",
+X				"\n.)l\n","\\fR\\&\\f(CW",	DISPLAY,
+X    "@example{",	"}",	"\\fR\\&\\f(CW","","\\fR\\&\\f(CW",INPARA,
+X    "@exdent",		"\n",	"\n.lp\n",	"\n",	"",	PARAGRAPH,
+X    "@expansion{",	"}",	"\\(->",	"",	"",	CHAR,
+X    "@file{",		"}",	"\\fR\\&\\f(CW\\(if",
+X				"\\(is","\\fR\\&\\f(CW",	INPARA,
+X    "@finalout",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@findex",		"\n",	"\n.iX \"f ",	"\"\n",	"",	INDEX,
+X    "@footnote{",	"}",	"\n.(f \n",	"\n.)f\n","",	FOOTNOTE,
+X    "@group",		"@end", "\n.(b\n",	"\n.)b\n","",	PARAGRAPH,
+X    "@heading",		"\n",	"\n.bp\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@headings",	"\n",	"",		"",	"",	DISCARD,
+X    "@iappendix",	"\n",	"\n.bp\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@iappendixsec",	"\n",	"\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@iappendixsubsec",	"\n",	"\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@ichapter",	"\n",	"\n.bp\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@ifinfo",		"@end", "\n",		"\n",	"",	PARAGRAPH, 
+X    "@iftex",		"@end", "",		"",	"",	PARAGRAPH,
+X    "@ignore",		"@end", "",		"",	"",	DISCARD,
+X    "@include",		"\n",	"",		"",	"",	INCLUDE,
+X    "@inforef{",	"}",	"See Info file ","",	"",	PARAGRAPH,
+X    "@isection",	"\n", 	"\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@isubsection",	"\n", 	"\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@isubsubsection",	"\n", 	"\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@item",		"\n",	"\n.ip ",	"\\ \n","",	ITEM,
+X    "@itemize",		"@end", "\n.(l L F\n.ba +5\n",
+X					"\n.ba -5\n.)l\n","",	ITEMIZING,
+X    "@itemx",		"\n",	"\n.ip ",	"\\ \n","",	ITEM,
+X    "@iunnumbered",	"\n", 	"\n.bp\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@iunnumberedsec",	"\n", 	"\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@iunnumberedsubsec","\n", 	"\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@i{",		"}",	"\\fI",		"",	"\\fI",	INPARA,
+X    "@kbd{",		"}",	"\\fR\\&\\f(CW","","\\fR\\&\\f(CW",INPARA,
+X    "@key{",		"}",	"\\fR\\&\\f(CW","","\\fR\\&\\f(CW",INPARA,
+X    "@kindex",		"\n",	"\n.iX \"k ",	"\"\n",	"",	INDEX,
+X    "@majorheading",	"\n",	"\n.sp 4\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@menu",		"@end", "\n.(l I\n\\s8Menu: \n",
+X					"\\s0\n.)l\n","",	DISPLAY,
+X    "@minus{",		"}",	"\\-",		"",	"",	CHAR,
+X    "@need",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@node",		"\n", 	"\n.lp\n\\s8Node:",
+X					"\\s0\n.br\n","",	PARAGRAPH,
+X    "@noindent",	"\n",	"\n.lp\n",	"",	"",	PARAGRAPH,
+X    "@page",		"\n",	"\n.bp\n",	"",	"",	PARAGRAPH,
+X    "@pindex",		"\n",	"\n.iX \"p ",	"\"\n",	"",	INDEX,
+X    "@point{",		"}",	"*",		"",	"",	CHAR,
+X    "@printindex",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@prints{",		"}",	"-|",		"",	"",	CHAR,
+X    "@print{",		"}",	"-|",		"",	"",	CHAR,
+X    "@pxref{",		"}",	"see section  ","",	"",	PARAGRAPH,
+X    "@quotation",	"@end", "\n.(q\n.nh\n", "\n.)q\n","",	DISPLAY,
+X    "@refill",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@ref{",		"}",	"\\(if",	"\\(is","",	INPARA,
+X    "@result",		"\n",	"\\(rh",	"\n",	"",	CHAR,
+X    "@result{",		"}",	"\\(rh",	"",	"",	CHAR,
+X    "@r{",		"}",	"\\fR",		"",	"\\fR",	INPARA,
+X    "@samp{",		"}",	"\\fR\\&\\f(CW\\(if", "\\(is",
+X						"\\fR\\&\\f(CW",INPARA,
+X    "@sc{",		"}",	"\\fB",		"",	"\\fB",	INPARA,
+X    "@section",		"\n",	"\n.ds __ ",
+X     "\n.sh 2 \\*(__ \n.(x \n\\n($1.\\n($2      \\*(__ \n.)x\n",
+X							"\\fB",	HEADING,
+X    "@setchapternewpage","\n",	"",		"\n",	"",	DISCARD,
+X    "@setfilename",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@settitle",	"\n",	"\n.ds St ",
+X		"\n.oh '\\\\*(St''%'\n.eh '%''\\\\*(St'\n","",	HEADING,
+X    "@smallbook",	"\n",	"",		"",	"",	DISCARD,
+X    "@smallexample",	"@end", "\n.(l I\n\\fR\\&\\f(CW\n",
+X				"\n.)l\n",	"\\fR\\&\\f(CW",DISPLAY,
+X    "@sp",		"\n",	"\n.sp",	"\n",	"",	PARAGRAPH,
+X    "@sp2",		"\n",	"\n.sp 2",	"\n",	"",	PARAGRAPH,
+X    "@strong{",		"}",	"\\fB",		"",	"\\fB",	INPARA,
+X    "@subheading",	"\n",	"\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@subsection",	"\n",	"\n.ds __ ",
+X	"\n.sh 3 \\*(__ \n.(x \n\\n($1.\\n($2.\\n($3    \\*(__ \n.)x\n",
+X							"\\fB",	HEADING,
+X    "@subsubheading",	"\n",	"\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@subsubsection",	"\n",	"\n.ds __ ",
+X      "\n.sh 4 \\*(__ \n.(x \n\\n($1.\\n($2.\\n($3.\\n($4  \\*(__ \n.)x\n",
+X							"\\fB",	HEADING,
+X    "@subtext",		"\n",	"\n.ce\n",	"\n",	"",	HEADING,
+X    "@subtitle",	"\n",	"\n.ce\n",	"\n",	"",	HEADING,
+X    "@summarycontents",	"\n",	"\n.nr % 0 1\n.af % i\n.bp \\n%+1\n",
+X	".ce\n\\fBTable of Contents\\fR\n.sp 2\n.xp \n","",	INPARA,
+X    "@syncodeindex",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@synindex",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@t",		"\n",	"\t",		"\n",	"",	CHAR,
+X    "@table",		"@end", "\n.(l L F\n.ba +5\n",
+X					"\n.ba -5\n.)l\n","",	ITEMIZING,
+X    "@tex",		"@end", "",		"",	"",	DISCARD, 
+X    "@tindex",		"\n",	"\n.iX \"t ",	"\"\n",	"",	INDEX,
+X    "@title",		"\n",	"\n.ce\n",	"\n",	"",	HEADING,
+X    "@titlefont{",	"}",	"\n.sz +10\n.ce\n",
+X						"\n.sz -10\n","",PARAGRAPH,
+X    "@titlepage",	"@end", "\n.tp\n",	"\n.bp\n","",	PARAGRAPH,
+X    "@titlespec",	"@end", "\n.tp\n.ce \n\\&\\*(St \n",
+X						"\n",	"",	PARAGRAPH,
+X    "@t{",		"}",	"\\fR\\&\\f(CW","","\\fR\\&\\f(CW",INPARA,
+X    "@unnumbered",	"\n",	"\n.bp\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@unnumberedsec",	"\n",	"\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@unnumberedsubsec","\n",	"\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@unnumberedsubsubsec","\n","\n.ds __ ",
+X		"\n.(x \n\\*(__ \n.)x\n.uh  \\*(__ \n","\\fB",	HEADING,
+X    "@var{",		"}",	"\\fI",		"",	"\\fI",	INPARA,
+X    "@vfil", 		"\n",	"",		"\n",	"",	DISCARD,
+X    "@vindex",		"\n",	"\n.iX \"v ",	"\"\n",	"",	INDEX,
+X    "@vskip",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@w{",		"}",	"\n\\! ",	"\n",	"",	INPARA,
+X    "@xref{",		"}",	"See section ",	"",	"",	PARAGRAPH,
+X    "@{",		"",	"{",		"",	"",	ESCAPED,
+X    "@}",		"",	"}",		"",	"",	ESCAPED
+X};
+X
+SHAR_EOF
+if test    10564 -ne "`wc -c < 'tableme.h'`"
+then
+echo shar: error transmitting "'tableme.h'" '(should have been    10564 characters)'
+fi
+fi
+if test -f 'tablemm.h'
+then
+echo shar: will not over-write existing file "'tablemm.h'"
+else
+echo extracting "'tablemm.h'"
+sed 's/^X//' >tablemm.h <<'SHAR_EOF'
+X/*
+X * tablemm.h - -mm macros table and other explicit troff command strings
+X *		Release 1.0a	August 1988
+X *		Release 2.0	January 1990
+X *
+X * Copyright 1988, 1989, 1990  Beverly A.Erlebacher
+X * erlebach@cs.toronto.edu    ...uunet!utai!erlebach
+X *
+X */
+X
+X/*
+X * miscellaneous commands, described in texi2roff.h
+X */
+Xstruct misccmds mmcmds = { 
+X".nr _- 0\n.PH '''\n.SA 1\n.nr Cl 5\n.ds HP 14 14 14 14 14 14 14\n\
+X.ds HF 3 3 3 3 3 3 3\n.nr Hb 7\n.nr Hs 7\n.nr Pt 1", "\n.P 1\n",
+X				"\n.P 1\n.ti -\\n(Pin\n", "", "" };
+X
+Xstruct tablerecd mmtable[] = {
+X    "@*",		"",	"\n.br\n",	"",	"",	ESCAPED,
+X    "@.",		"",	"\\&.",		"",	"",	ESCAPED,
+X    "@:",		"",	"",		"",	"",	ESCAPED,
+X    "@@",		"",	"@",		"",	"",	ESCAPED,
+X    "@Arrow",		"\n",	"\\(rh",	"\n",	"",	CHAR,
+X    "@TeX{",		"}",	"TeX",		"",	"",	INPARA,
+X    "@appendix",	"\n",
+X	"\n.if !\\n(_- \\{\\\n.nr _- 1\n.nr H1 0 1\n.af H1 A\\}\n.bp\n.H 1 ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@appendixsec",	"\n",	"\n.sp .5\n.H 2 ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@appendixsection",	"\n",	"\n.sp .5\n.H 2 ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@appendixsubsec",	"\n",	"\n.sp .5\n.H 3 ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@appendixsubsubsec","\n",	"\n.sp .5\n.H 4 ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@arrow",		"\n",	"\\(->",	"\n",	"",	CHAR,
+X    "@asis",		"\n",	"",		"\n",	"",	PARAGRAPH,
+X    "@asis{",		"}",	"",		"",	"",	INPARA,
+X    "@author",		"\n",	"\n.ce\n",	"\n",	"",	HEADING,
+X    "@br",		"\n",	"\n.br\n.sp\n", "",	"",	PARAGRAPH,
+X    "@bullet{",		"}",	"\\(bu",	"",	"",	CHAR,
+X    "@bye",		"\n",	"",		"\n",	"",	DISCARD, 
+X    "@b{",		"}",	"\\fB",		"",	"\\fB",	INPARA,
+X    "@c",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@center",		"\n",	"\n.ce\n",	"\n",	"",	HEADING,
+X    "@center{",		"}",	"\n.ce\n",	"",	"",	HEADING,
+X    "@chapter",		"\n",	"\n.bp\n.H 1 ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@cindex",		"\n",	"\n.iX \"c ",	"\"\n",	"",	INDEX,
+X    "@cite{",		"}",	"\\fI",		"",	"\\fI",	INPARA,
+X    "@code{",		"}",	"\\fR\\&\\f(CW","","\\fR\\&\\f(CW",INPARA,
+X    "@comment",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@contents",	"\n",	"\n.TC 1 1 5 0\n", "",	"",	INPARA,
+X    "@copyright{",	"}",	"\\(co",	"",	"",	CHAR,
+X    "@ctrl{",		"}",	"\\fR\\&\\f(CW^","","\\fR\\&\\f(CW",INPARA,
+X    "@dag",		"}{",	"\\(dg",	"",	"",	CHAR,
+X    "@dag{",		"}",	"\\(dg",	"",	"",	CHAR,
+X    "@ddag",		"}{",	"\\(dd",	"",	"",	CHAR,
+X    "@ddag{",		"}",	"\\(dd",	"",	"",	CHAR,
+X    "@defcmd",		"@end", "\n.P 1\n.ti -\\n(Pin\n*\\ Command: ",
+X						"",	"",	HEADING,
+X    "@defcmdx",		"\n", 	"\n.P 1\n.ti -\\n(Pin\n*\\ Command: ",
+X						"\n.br\n","",	HEADING,
+X    "@defconst",	"@end", "\n.P 1\n.ti -\\n(Pin\n*\\ Constant: ",
+X						"",	"",	HEADING,
+X    "@defconstx",	"\n", 	"\n.P 1\n.ti -\\n(Pin\n*\\ Constant: ",
+X						"\n.br\n","",	HEADING,
+X    "@deffn",		"@end", "\n.P 1\n.ti -\\n(Pin\n*\\ ",	
+X						"",	"",	HEADING,
+X    "@deffnx",		"\n", 	"\n.P 1\n.ti -\\n(Pin\n*\\ ",	
+X						"\n.br\n","",	HEADING,
+X    "@defmac",		"@end", "\n.P 1\n.ti -\\n(Pin\n*\\ Macro: ",
+X						"",	"",	HEADING,
+X    "@defmacx",		"\n", 	"\n.P 1\n.ti -\\n(Pin\n*\\ Macro: ",
+X						"\n.br\n","",	HEADING,
+X    "@defmethod",	"@end", "\n.P 1\n.ti -\\n(Pin\n*\\ Operation on ",
+X						"",	"",	HEADING,
+X    "@defmethodx",	"\n", 	"\n.P 1\n.ti -\\n(Pin\n*\\ Operation on ",
+X						"\n.br\n", "",	HEADING,
+X    "@defopt",		"@end", "\n.P 1\n.ti -\\n(Pin\n*\\ User Option: ",
+X						"",	"",	HEADING,
+X    "@defoptx",		"\n", 	"\n.P 1\n.ti -\\n(Pin\n*\\ User Option: ",
+X						"\n.br\n", "",	HEADING,
+X    "@defspec",		"@end", "\n.P 1\n.ti -\\n(Pin\n*\\ Special Form: ",
+X						"",	"",	HEADING,
+X    "@defspecx",	"\n", 	"\n.P 1\n.ti -\\n(Pin\n*\\ Special Form: ",
+X						"\n.br\n", "",	HEADING,
+X    "@defun",		"@end", "\n.P 1\n.ti -\\n(Pin\n*\\ Function: ",
+X						"",	"",	HEADING,
+X    "@defunx",		"\n", 	"\n.P 1\n.ti -\\n(Pin\n*\\ Function: ",
+X						"\n.br\n","",	HEADING,
+X    "@defvar",		"@end", "\n.P 1\n.ti -\\n(Pin\n*\\ Variable: ",
+X						"",	"",	HEADING,
+X    "@defvarx",		"\n", 	"\n.P 1\n.ti -\\n(Pin\n*\\ Variable: ",
+X						"\n.br\n","",	HEADING,
+X    "@dfn{",		"}",	"\\fI",		"",	"\\fI",	INPARA,
+X    "@display",		"@end", "\n.DS\n",	"\n.DE\n","",	DISPLAY,
+X    "@dots{",		"}",	"\\&...",	"",	"",	INPARA,
+X    "@eject",		"\n",	"\n.bp\n",	"",	"",	PARAGRAPH,
+X    "@emph{",		"}",	"\\fI",		"",	"\\fI",	INPARA,
+X    "@end",		"\n",	"",		"\n.sp\n.in\n", "",END,
+X    "@enumerate",	"@end", "\n.VL 5 0\n",	"\n.LE\n","",	ITEMIZING,
+X    "@equiv{",		"}",	"\\(==",	"",	"",	CHAR,
+X    "@error{",		"}",	"error-->",	"",	"",	CHAR,
+X    "@example",		"@end", "\n.DS 1\n\\fR\\&\\f(CW\n",
+X				"\n.DE\n", "\\fR\\&\\f(CW",	DISPLAY,
+X    "@example{",	"}",	"\\fR\\&\\f(CW","","\\fR\\&\\f(CW",INPARA,
+X    "@exdent",		"\n",	"\n.P 1\n.ti -\\n(Pin\n",	
+X						"\n",	"",	PARAGRAPH,
+X    "@expansion{",	"}",	"\\(->",	"",	"",	CHAR,
+X    "@file{",		"}",	"\\fR\\&\\f(CW\\(if",	"\\(is",
+X					"\\fR\\&\\f(CW",	INPARA,
+X    "@finalout",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@findex",		"\n",	"\n.iX \"f ",	"\"\n",	"",	INDEX,
+X    "@footnote{",	"}",	"\n.FS \n",	"\n.FE\n","",	FOOTNOTE,
+X    "@group",		"@end", "\n.DS L F\n",	"\n.DE\n","",	PARAGRAPH,
+X    "@heading",		"\n",	"\n.sp 2\n.HU ",
+X					"\n.sp .5\n\n",	"\\fB",	HEADING,
+X    "@headings",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@iappendix",	"\n",	"\n.bp\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@iappendixsec",	"\n",	"\n.sp .5\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@iappendixsubsec",	"\n",	"\n.sp .5\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@ichapter",	"\n",	"\n.bp\n.sp .5\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@ifinfo",		"@end", "\n", 		"\n",	"",	PARAGRAPH,
+X    "@iftex",		"@end", "",		"",	"",	PARAGRAPH,
+X    "@ignore",		"@end", "",		"",	"",	DISCARD,
+X    "@include",		"\n",	"",		"\n",	"",	INCLUDE,
+X    "@inforef{",	"}",	"See Info file ","",	"",	PARAGRAPH,
+X    "@isection",	"\n",	"\n.sp .5\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@isubsection",	"\n",	"\n.sp .5\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@isubsubsection",	"\n",	"\n.sp .5\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@item",		"\n",	"\n.LI ",	"\\ \n","",	ITEM,
+X    "@itemize",		"@end", "\n.VL 5 0\n",	"\n.LE\n","",	ITEMIZING,
+X    "@itemx",		"\n",	"\n.LI ",	"\\ \n","",	ITEM,
+X    "@iunnumbered",	"\n",	"\n.bp\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@iunnumberedsec",	"\n",	"\n.sp .5\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@iunnumberedsubsec","\n",	"\n.sp .5\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@i{",		"}",	"\\fI",		"",	"\\fI",	INPARA,
+X    "@kbd{",		"}",	"\\fR\\&\\f(CW","","\\fR\\&\\f(CW",INPARA,
+X    "@key{",		"}",	"\\fR\\&\\f(CW","","\\fR\\&\\f(CW",INPARA,
+X    "@kindex",		"\n",	"\n.iX \"k ",	"\"\n",	"",	INDEX,
+X    "@majorheading",	"\n",	"\n.sp 4\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@menu",		"@end", "\n.DS L\n\\s8Menu: \n",
+X					"\\s0\n.DE\n",	"",	DISPLAY, 
+X    "@minus{",		"}",	"\\-",		"",	"",	CHAR,
+X    "@need",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@node",		"\n",	"\n.P 1\n.ti -\\n(Pin\n\\s8Node:",
+X					"\\s0\n.br\n",	"",	PARAGRAPH,
+X    "@noindent",	"\n",	"\n.P 1\n.ti -\\n(Pin\n","","",	PARAGRAPH,
+X    "@page",		"\n",	"\n.bp\n",	"",	"",	PARAGRAPH,
+X    "@pindex",		"\n",	"\n.iX \"p ",	"\"\n",	"",	INDEX,
+X    "@point{",		"}",	"*",		"",	"",	CHAR,
+X    "@printindex",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@prints{",		"}",	"-|",		"",	"",	CHAR,
+X    "@print{",		"}",	"-|",		"",	"",	CHAR,
+X    "@pxref{",		"}",	"see section ",	"",	"",	PARAGRAPH,
+X    "@quotation",	"@end", "\n.DS I F 5\n.nh\n", "\n.DE\n","",DISPLAY,
+X    "@refill",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@ref{",		"}",	"\\(if",	"\\(is","",	INPARA,
+X    "@result",		"\n",	"\\(rh",	"\n",	"",	CHAR,
+X    "@result{",		"}",	"\\(rh",	"",	"",	CHAR,
+X    "@r{",		"}",	"\\fR",		"",	"\\fR",	INPARA,
+X    "@samp{",		"}",	"\\fR\\&\\f(CW\\(if",
+X				"\\(is","\\fR\\&\\f(CW",	INPARA,
+X    "@sc{",		"}",	"\\fB",		"",	"\\fB",	INPARA,
+X    "@section",		"\n",	"\n.sp .5\n.H 2 ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@setchapternewpage","\n",	"",		"\n",	"",	DISCARD,
+X    "@setfilename",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@settitle",	"\n",	"\n.ds St ",
+X	     "\n.OH '\\\\*(St''%'\n.EH '%''\\\\*(St'\n","",	HEADING,
+X    "@smallbook",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@smallexample",	"@end", "\n.DS 1\n\\fR\\&\\f(CW\n",
+X				"\n.DE\n","\\fR\\&\\f(CW",	DISPLAY,
+X    "@sp",		"\n",	"\n.sp",	"\n",	"",	PARAGRAPH,
+X    "@sp2",		"\n",	"\n.sp 2",	"\n",	"",	PARAGRAPH,
+X    "@strong{",		"}",	"\\fB",		"",	"\\fB",	INPARA,
+X    "@subheading",	"\n",	"\n.sp .5\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@subsection",	"\n",	"\n.sp .5\n.H 3 ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@subsubheading",	"\n",	"\n.sp .5\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@subsubsection",	"\n",	"\n.sp .5\n.H 4 ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@subtext",		"\n",	"\n.ce\n",	"\n",	"",	HEADING,
+X    "@subtitle",	"\n",	"\n.ce\n",	"\n",	"",	HEADING,
+X    "@summarycontents", "\n",	"\n.TC 1 1 5 0 \n", "",	"",	INPARA,
+X    "@syncodeindex",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@synindex",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@t",		"\n",	"\t",		"\n",	"",	CHAR,
+X    "@table",		"@end", "\n.VL 5 0\n",	"\n.LE\n","",	ITEMIZING,
+X    "@tex",		"@end", "",		"",	"",	DISCARD, 
+X    "@tindex",		"\n",	"\n.iX \"t ",	"\"\n",	"",	INDEX,
+X    "@title",		"\n",	"\n.ce\n",	"\n",	"",	HEADING,
+X    "@titlefont{",	"}",	"\n.ps +10\n.ce\n",
+X					 "\n.ps -10\n",	"",	PARAGRAPH,
+X    "@titlepage",	"@end", "\n",		"\n.bp\n","",	PARAGRAPH,
+X    "@titlespec",	"@end", "\n.ce \n\\&\\*(St \n","\n","",	PARAGRAPH,
+X    "@t{",		"}",	"\\fR\\&\\f(CW","","\\fR\\&\\f(CW",INPARA,
+X    "@unnumbered",	"\n",	"\n.bp\n.sp .5\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@unnumberedsec",	"\n",	"\n.sp .5\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@unnumberedsubsec","\n",	"\n.sp .5\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@unnumberedsubsubsec","\n","\n.sp .5\n.HU ",
+X					"\n.sp .5\n",	"\\fB",	HEADING,
+X    "@var{",		"}",	"\\fI",		"",	"\\fI",	INPARA,
+X    "@vfil",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@vindex",		"\n",	"\n.iX \"v ",	"\"\n",	"",	INDEX,
+X    "@vskip",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@w{",		"}",	"\n\\! ",	"\n",	"",	INPARA,
+X    "@xref{",		"}",	"See section ",	"",	"",	PARAGRAPH,
+X    "@{",		"",	"{",		"",	"",	ESCAPED,
+X    "@}",		"",	"}",		"",	"",	ESCAPED
+X};
+SHAR_EOF
+if test    10199 -ne "`wc -c < 'tablemm.h'`"
+then
+echo shar: error transmitting "'tablemm.h'" '(should have been    10199 characters)'
+fi
+fi
+if test -f 'tablems.h'
+then
+echo shar: will not over-write existing file "'tablems.h'"
+else
+echo extracting "'tablems.h'"
+sed 's/^X//' >tablems.h <<'SHAR_EOF'
+X/*
+X * tablems.h - -ms macros table and other explicit troff command strings
+X *		Release 1.0a	August 1988
+X *		Release 2.0	January 1990
+X *
+X * Copyright 1988, 1989, 1990  Beverly A.Erlebacher
+X * erlebach@cs.toronto.edu    ...uunet!utai!erlebach
+X *
+X */
+X
+X/*
+X * miscellaneous commands, described in texi2roff.h
+X */
+Xstruct misccmds mscmds = { ".nr _- 0\n.ND",
+X			"\n.PP\n", "\n.IP\n", "\n.RS\n", "\n.RE\n"};
+X
+Xstruct tablerecd mstable[] = {
+X    "@*",		"",	"\n.br\n",	"",	"",	ESCAPED,
+X    "@.",		"",	"\\&.",		"",	"",	ESCAPED,
+X    "@:",		"",	"",		"",	"",	ESCAPED,
+X    "@@",		"",	"@",		"",	"",	ESCAPED,
+X    "@Arrow",		"\n",	"\\(rh",	"\n",	"",	CHAR,
+X    "@TeX{",		"}",	"TeX",		"",	"",	INPARA,
+X    "@appendix",	"\n",  
+X	"\n.if !\\n(_- \\{\\\n.nr _- 1\n.nr H1 0 1\n.af H1 A\\}\n.bp\n.ds __ ",
+X	"\n.NH 1\n\\*(__ \n.XS \n\\n(H1	\\*(__ \n.XE\n","\\fB",	HEADING,
+X    "@appendixsec",     "\n",   "\n.ds __ ",
+X	"\n.NH 2\n\\*(__ \n.XS \n\\n(H1.\\n(H2      \\*(__ \n.XE\n",
+X							"\\fB",	HEADING,
+X    "@appendixsection", "\n",   "\n.ds __ ",
+X	"\n.NH 2\n\\*(__ \n.XS \n\\n(H1.\\n(H2      \\*(__ \n.XE\n",
+X							"\\fB",	HEADING,
+X    "@appendixsubsec",  "\n",   "\n.ds __ ",
+X	"\n.NH 3\n\\*(__ \n.XS \n\\n(H1.\\n(H2.\\n(H3    \\*(__ \n.XE\n",
+X							"\\fB",	HEADING,
+X    "@appendixsubsubsec","\n",  "\n.ds __ ",
+X	"\n.NH 4\n\\*(__ \n.XS \n\\n(H1.\\n(H2.\\n(H3.\\n(H4  \\*(__ \n.XE\n",
+X							"\\fB",	HEADING,
+X    "@arrow",		"\n",	"\\(->",	"\n",	"",	CHAR,
+X    "@asis",		"\n",	"",		"\n",	"",	PARAGRAPH,
+X    "@asis{",		"}",	"",		"",	"",	INPARA,
+X    "@author",		"\n",	"\n.ce\n",	"\n",	"",	HEADING,
+X    "@br",		"\n",	"\n.br\n.sp\n", "",	"",	PARAGRAPH,
+X    "@bullet{",		"}",	"\\(bu",	"",	"",	CHAR,
+X    "@bye",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@b{",		"}",	"\\fB",		"",	"\\fB",	INPARA,
+X    "@c",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@center",		"\n",	"\n.ce\n",	"\n",	"",	HEADING,
+X    "@center{",		"}",	"\n.ce\n",	"",	"",	HEADING,
+X    "@chapter",	 "\n",   "\n.bp\n.ds __ ",
+X	"\n.NH 1\n\\*(__ \n.XS \n\\n(H1	\\*(__ \n.XE\n","\\fB",	HEADING,
+X    "@cindex",		"\n",	"\n.iX \"c ",	"\"\n",	"",	INDEX,
+X    "@cite{",		"}",	"\\fI",		"",	"\\fI",	INPARA,
+X    "@code{",		"}",	"\\fR\\&\\f(CW","","\\fR\\&\\f(CW",INPARA,
+X    "@comment",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@contents",	"\n",	"\n.nr % 0\n.af % i\n.bp\n.PX\n",
+X						"",	"",	INPARA,
+X    "@copyright{",	"}",	"\\(co",	"",	"",	CHAR,
+X    "@ctrl{",		"}",	"\\fR\\&\\f(CW^","","\\fR\\&\\f(CW",INPARA,
+X    "@dag",		"}{",	"\\(dg",	"",	"",	CHAR,
+X    "@dag{",		"}",	"\\(dg",	"",	"",	CHAR,
+X    "@ddag",		"}{",	"\\(dd",	"",	"",	CHAR,
+X    "@ddag{",		"}",	"\\(dd",	"",	"",	CHAR,
+X    "@defcmd",		"@end", "\n.LP\n*\\ Command: ","","",	HEADING,
+X    "@defcmdx",		"\n", 	"\n.LP\n*\\ Command: ","\n.br\n","",HEADING,
+X    "@defconst",	"@end", "\n.LP\n*\\ Constant: ","","",	HEADING,
+X    "@defconstx",	"\n", 	"\n.LP\n*\\ Constant: ","\n.br\n","",HEADING,
+X    "@deffn",		"@end", "\n.LP\n*\\ ",	"",	"",	HEADING,
+X    "@deffnx",		"\n", 	"\n.LP\n*\\ ",	"\n.br\n","",	HEADING,
+X    "@defmac",		"@end", "\n.LP\n*\\ Macro: ","","",	HEADING,
+X    "@defmacx",		"\n", 	"\n.LP\n*\\ Macro: ","\n.br\n","",HEADING,
+X    "@defmethod",	"@end", "\n.LP\n*\\ Operation on ","","",HEADING,
+X    "@defmethodx",	"\n", 	"\n.LP\n*\\ Operation on ","\n.br\n",
+X							"",	HEADING,
+X    "@defopt",		"@end", "\n.LP\n*\\ User Option: ","","",HEADING,
+X    "@defoptx",		"\n", 	"\n.LP\n*\\ User Option: ","\n.br\n",
+X							"",	HEADING,
+X    "@defspec",		"@end", "\n.LP\n*\\ Special Form: ","","",HEADING,
+X    "@defspecx",	"\n", 	"\n.LP\n*\\ Special Form: ","\n.br\n",
+X							"",	HEADING,
+X    "@defun",		"@end", "\n.LP\n*\\ Function: ","","",	HEADING,
+X    "@defunx",		"\n", 	"\n.LP\n*\\ Function: ","\n.br\n","",HEADING,
+X    "@defvar",		"@end", "\n.LP\n*\\ Variable: ","","",	HEADING,
+X    "@defvarx",		"\n", 	"\n.LP\n*\\ Variable: ","\n.br\n","",HEADING,
+X    "@dfn{",		"}",	"\\fI",		"",	"\\fI",	INPARA,
+X    "@display",		"@end", "\n.ID\n",	"\n.DE\n","",	DISPLAY,
+X    "@dots{",		"}",	"\\&...",	"",	"",	INPARA,
+X    "@eject",		"\n",	"\n.bp\n",	"",	"",	PARAGRAPH,
+X    "@emph{",		"}",	"\\fI",		"",	"\\fI",	INPARA,
+X    "@end",		"\n",	"",	"\n.sp\n.in\n", "",	END,
+X    "@enumerate",	"@end", "\n",		"\n",	"",	ITEMIZING,
+X    "@equiv{",		"}",	"\\(==",	"",	"",	CHAR,
+X    "@error{",		"}",	"error-->",	"",	"",	CHAR,
+X    "@example",		"@end", "\n.ID\n\\fR\\&\\f(CW\n", 
+X				"\n.DE\n","\\fR\\&\\f(CW",	DISPLAY,
+X    "@example{",	"}",	"\\fR\\&\\f(CW","","\\fR\\&\\f(CW",INPARA,
+X    "@exdent",		"\n",	"\n.LP\n",	"\n",	"",	PARAGRAPH,
+X    "@expansion{",	"}",	"\\(->",	"",	"",	CHAR,
+X    "@file{",		"}",	"\\fR\\&\\f(CW\\(if",
+X				"\\(is","\\fR\\&\\f(CW",	INPARA,
+X    "@finalout",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@findex",		"\n",	"\n.iX \"f ",	"\"\n",	"",	INDEX,
+X    "@footnote{",	"}",	"\n.FS \n",	"\n.FE\n","",	FOOTNOTE,
+X    "@group",		"@end", "\n.KS\n",	"\n.KE\n","",	PARAGRAPH,
+X    "@heading",	 "\n",   "\n.bp\n.ds __ ",
+X    	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n", 	"\\fB",	HEADING,
+X    "@headings",	"\n",   "",	     "",     	"",	DISCARD,
+X    "@iappendix",       "\n",   "\n.bp\n.ds __ ",
+X       	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n", 	"\\fB",	HEADING,
+X    "@iappendixsec",    "\n",   "\n.ds __ ",
+X	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n", 	"\\fB",	HEADING,
+X    "@iappendixsubsec", "\n",   "\n.ds __ ",
+X	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n", 	"\\fB",	HEADING,
+X    "@ichapter",	"\n",   "\n.bp\n.ds __ ",
+X	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n", 	"\\fB",	HEADING,
+X    "@ifinfo",		"@end", "\n",		"\n",	"",	PARAGRAPH,
+X    "@iftex",		"@end", "",		"",	"",	PARAGRAPH,
+X    "@ignore",		"@end", "",		"",	"",	DISCARD,
+X    "@include",		"\n",	"",		"\n",	"",	INCLUDE,
+X    "@inforef{",	"}",	"See Info file ","",	"",	PARAGRAPH,
+X    "@isection",	"\n",   "\n.ds __ ",
+X	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n",	"\\fB",	HEADING,
+X    "@isubsection",     "\n",   "\n.ds __ ",
+X 	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n",	"\\fB",	HEADING,
+X    "@isubsubsection",  "\n",   "\n.ds __ ",
+X  	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n",	"\\fB",	HEADING,
+X    "@item",		"\n",	"\n.IP ",	"\\ \n","",	ITEM,
+X    "@itemize",		"@end", "\n",		"\n",	"",	ITEMIZING,
+X    "@itemx",		"\n",	"\n.IP ",	"\\ \n","",	ITEM,
+X    "@iunnumbered",     "\n",   "\n.bp\n.ds __ ",
+X 	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n", 	"\\fB",	HEADING,
+X    "@iunnumberedsec",  "\n",   "\n.ds __ ",
+X	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n", 	"\\fB",	HEADING,
+X    "@iunnumberedsubsec","\n",  "\n.ds __ ",
+X       	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n", 	"\\fB",	HEADING,
+X    "@i{",		"}",	"\\fI",		"",	"\\fI",	INPARA,
+X    "@kbd{",		"}",	"\\fR\\&\\f(CW","","\\fR\\&\\f(CW",INPARA,
+X    "@key{",		"}",	"\\fR\\&\\f(CW","","\\fR\\&\\f(CW",INPARA,
+X    "@kindex",		"\n",	"\n.iX \"k ",	"\"\n",	"",	INDEX,
+X    "@majorheading",    "\n",   "\n.sp 4\n.ds __ ",
+X	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n",	"\\fB",	HEADING,
+X    "@menu",		"@end", "\n.LD\n\\s8Menu: \n",
+X					"\\s0\n.DE\n",	"",	DISPLAY,
+X    "@minus{",		"}",	"\\-",		"",	"",	CHAR,
+X    "@need",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@node",		"\n",	"\n.LP\n\\s8Node:",
+X					"\\s0\n.br\n",	"",	PARAGRAPH,
+X    "@noindent",	"\n",	"\n.LP\n",	"",	"",	PARAGRAPH,
+X    "@page",		"\n",	"\n.bp\n",	"",	"",	PARAGRAPH,
+X    "@pindex",		"\n",	"\n.iX \"p ",	"\"\n",	"",	INDEX,
+X    "@point{",		"}",	"*",		"",	"",	CHAR,
+X    "@printindex",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@prints{",		"}",	"-|",		"",	"",	CHAR,
+X    "@print{",		"}",	"-|",		"",	"",	CHAR,
+X    "@pxref{",		"}",	"see section ",	"",	"",	PARAGRAPH,
+X    "@quotation",	"@end", "\n.QP\n.nh\n", "\n.PP\n","",	DISPLAY,
+X    "@refill",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@ref{",		"}",	"\\(if",	"\\(is","",	INPARA,
+X    "@result",		"\n",	"\\(rh",	"\n",	"",	CHAR,
+X    "@result{",		"}",	"\\(rh",	"",	"",	CHAR,
+X    "@r{",		"}",	"\\fR",		"",	"\\fR",	INPARA,
+X    "@samp{",		"}",	"\\fR\\&\\f(CW\\(if",
+X				"\\(is","\\fR\\&\\f(CW",	INPARA,
+X    "@sc{",		"}",	"\\fB",		"",	"\\fB",	INPARA,
+X    "@section",	 "\n",   "\n.ds __ ",
+X      "\n.NH 2\n\\*(__ \n.XS \n\\n(H1.\\n(H2      \\*(__ \n.XE\n",
+X							"\\fB",	HEADING,
+X    "@setchapternewpage","\n",	"",		"\n",	"",	DISCARD,
+X    "@setfilename",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@settitle",	"\n",	"\n.ds St ",
+X	     "\n.OH '\\\\*(St''%'\n.EH '%''\\\\*(St'\n","",	HEADING,
+X    "@smallbook",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@smallexample",	"@end", "\n.ID\n\\fR\\&\\f(CW\n",
+X				"\n.DE\n","\\fR\\&\\f(CW",	DISPLAY,
+X    "@sp",		"\n",	"\n.sp",	"\n",	"",	PARAGRAPH,
+X    "@sp2",		"\n",	"\n.sp 2",	"\n",	"",	PARAGRAPH,
+X    "@strong{",		"}",	"\\fB",		"",	"\\fB",	INPARA,
+X    "@subheading",      "\n",   "\n.ds __ ",
+X 	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n",	"\\fB",	HEADING,
+X    "@subsection",      "\n",   "\n.ds __ ",
+X	"\n.NH 3\n\\*(__ \n.XS \n\\n(H1.\\n(H2.\\n(H3    \\*(__ \n.XE\n",
+X							"\\fB",	HEADING,
+X    "@subsubheading",   "\n",   "\n.ds __ ",
+X 	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n",	"\\fB",	HEADING,
+X    "@subsubsection",   "\n",   "\n.ds __ ",
+X	"\n.NH 4\n\\*(__ \n.XS \n\\n(H1.\\n(H2.\\n(H3.\\n(H4  \\*(__ \n.XE\n",
+X							"\\fB",	HEADING,
+X    "@subtext",		"\n",	"\n.ce\n",	"\n",	"",	HEADING,
+X    "@subtitle",	"\n",	"\n.ce\n",	"\n",	"",	HEADING,
+X    "@summarycontents",	"\n",	"\n.nr % 0\n.af % i\n.bp\n.PX\n",
+X						"",	"",	INPARA,
+X    "@syncodeindex",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@synindex",	"\n",	"",		"\n",	"",	DISCARD,
+X    "@t",		"\n",	"\t",		"\n",	"",	CHAR,
+X    "@table",		"@end", "\n",		"\n",	"",	ITEMIZING,
+X    "@tex",		"@end", "",		"",	"",	DISCARD, 
+X    "@tindex",		"\n",	"\n.iX \"t ",	"\"\n",	"",	INDEX,
+X    "@title",		"\n",	"\n.ce\n",	"\n",	"",	HEADING,
+X    "@titlefont{",	"}",	"\n.ps +10\n.ce\n",
+X					"\n.ps -10\n",	"",	PARAGRAPH,
+X    "@titlepage",	"@end", "\n",		"\n.bp\n","",	PARAGRAPH,
+X    "@titlespec",	"@end", "\n.ce \n\\&\\*(St \n","\n","",	PARAGRAPH,
+X    "@t{",		"}",	"\\fR\\&\\f(CW","","\\fR\\&\\f(CW",INPARA,
+X    "@unnumbered",      "\n",   "\n.bp\n.ds __ ",
+X       	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n",	"\\fB",	HEADING,
+X    "@unnumberedsec",   "\n",   "\n.ds __ ",
+X	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n",	"\\fB",	HEADING,
+X    "@unnumberedsubsec","\n",   "\n.ds __ ",
+X	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n",	"\\fB",	HEADING,
+X    "@unnumberedsubsubsec","\n","\n.ds __ ",
+X 	"\n.XS \n\\*(__ \n.XE\n.SH \n\\*(__ \n",	"\\fB",	HEADING,
+X    "@var{",		"}",	"\\fI",		"",	"\\fI",INPARA,
+X    "@vfil",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@vindex",		"\n",	"\n.iX \"v ",	"\"\n",	"",	INDEX,
+X    "@vskip",		"\n",	"",		"\n",	"",	DISCARD,
+X    "@w{",		"}",	"\n\\! ",	"\n",	"",	INPARA,
+X    "@xref{",		"}",	"See section ",	"",	"",	PARAGRAPH,
+X    "@{",		"",	"{",		"",	"",	ESCAPED,
+X    "@}",		"",	"}",		"",	"",	ESCAPED
+X};
+SHAR_EOF
+if test    10538 -ne "`wc -c < 'tablems.h'`"
+then
+echo shar: error transmitting "'tablems.h'" '(should have been    10538 characters)'
+fi
+fi
+if test -f 'texi2index'
+then
+echo shar: will not over-write existing file "'texi2index'"
+else
+echo extracting "'texi2index'"
+sed 's/^X//' >texi2index <<'SHAR_EOF'
+X#!/bin/sh
+X
+X# This script takes the file of index entries emitted to stderr by
+X# troff when processing the output of texi2roff -i and creates up
+X# to 6 indices (concept, function, keystroke, program, data type,
+X# variable) as troff input.  If there are no entries for a particular
+X# type of index, it won't be generated.
+X
+X# Run the output of this script through nroff or troff with one of
+X# -me, -mm or -ms.  The macros are necessary to provide pagination.
+X
+X# Credit for the creative use of tbl to a posting by jpr@dasys1.
+X# The tricky part with sed protects index entries beginning with
+X# characters that make troff drop lines and preserves sort order
+X# for index entries containing typesetting commands.
+X
+XFILE="$*"
+X
+Xsed -n "s/^../&\\\\\\&/p" $FILE \
+X| sed "
+X	s/.*/&~+~&/
+X	:repeat
+X	s/\\\\f[BIR]\(.*~+~\)/\1/
+X	s/\\\\f(CW\(.*~+~\)/\1/
+X	t repeat
+X" | sort -fd | sed -e 's/.*~+~//' -e 's/[0-9][0-9]*$/	&/'\
+X| awk '
+X	BEGIN	{
+X		titles["c"] = "Concept Index"
+X		titles["f"] = "Function Index"
+X		titles["k"] = "Keystroke Index"
+X		titles["p"] = "Program Index"
+X		titles["t"] = "Data Type Index"
+X		titles["v"] = "Variable Index"
+X		print ".nf"
+X	}
+X	{
+X		if ($1 != prev) {
+X			if (prev != "")
+X				print ".TE"
+X			print ".bp"
+X			print ".TS"; print "c s"; print "l r."
+X			print titles[$1]
+X			print ""
+X			prev = $1
+X		}
+X		print substr($0, 3, length($0)-2)
+X	}
+X	END {
+X		if (prev != "")
+X			print ".TE"
+X	} '  | tbl
+X
+SHAR_EOF
+if test     1390 -ne "`wc -c < 'texi2index'`"
+then
+echo shar: error transmitting "'texi2index'" '(should have been     1390 characters)'
+fi
+fi
+if test -f 'texi2roff.1'
+then
+echo shar: will not over-write existing file "'texi2roff.1'"
+else
+echo extracting "'texi2roff.1'"
+sed 's/^X//' >texi2roff.1 <<'SHAR_EOF'
+X.TH TEXI2ROFF 1
+X.DA 1 Jan 90
+X.SH NAME
+Xtexi2roff, texi2index \- convert Texinfo documents for formatting by troff.
+X.SH SYNOPSIS
+X.B texi2roff
+X[
+X.B  \-me \-mm \-ms
+X] [
+X.B  \-iIt
+X] [ file ... ]
+X.br
+X.B texi2index
+X[ file ... ]
+X.SH DESCRIPTION
+X.I Texi2roff
+Xtranslates the named
+X.IR file s
+Xfrom the Texinfo macro language for TeX to the language accepted by
+X.IR troff (1).
+XFiles are read and processed in order.
+XIf no
+X.I file
+Xis given or if the
+X.I file
+Xis
+X.B \-
+X.I texi2roff
+Xreads the standard input.
+X.PP
+X.I Texi2index
+Xgenerates indices for documents translated by
+X.IR texi2roff .
+X.SH OPTIONS
+X.I Texi2roff
+X.TP
+X.B \-me \-mm \-ms
+Xformat the output for use with the
+X.I troff
+Xmacro package named.
+X.TP
+X.B \-i
+Xtranslate Texinfo index commands into 
+X.I troff
+Xindex commands.
+X.I troff
+Xwill then emit index entries onto the standard error output.
+XYou may capture this output and use
+X.IR texi2index (1)
+Xand
+X.I troff
+Xto prepare indices from it.
+X.TP
+X.B \-I
+Xinclude Texinfo ``Info file'' menu and node contents and
+X.B @ifinfo
+Xtext in the output.
+XThis material does not appear
+Xin a Texinfo document formatted by TeX, but may contain interesting
+Xinformation or be useful when searching a machine-readable document.
+X.TP
+X.B \-t
+X(transparent) print text affected by otherwise discarded commands,
+Xfor people who are afraid of missing something.  For best results use
+X.BR \-It .
+X.SH EXAMPLES
+XTranslate
+X.B doc.texinfo
+Xusing the Bourne shell
+X.IR sh (1).
+XFormat with
+X.I troff
+Xand
+X.BR \-ms ,
+Xplacing the formatted output in
+X.BR doc ,
+Xindex entries in
+X.BR index ,
+Xand the formatted index in
+X.BR doc.index .
+X.sp
+X.nf
+X$ texi2roff \-i \-ms doc.texinfo | troff \-ms > doc 2> index
+X$ texi2index index | troff \-ms >doc.index
+X.fi
+X.sp
+XAs above, but use the C shell
+X.IR csh (1),
+X.I nroff
+Xwith
+X.BR \-me ,
+Xand transparent mode:
+X.sp
+X.nf
+X% (texi2roff \-iIt \-me doc.texinfo | nroff \-me > doc ) >& index
+X% texi2index index | nroff \-me >doc.index
+X.fi
+X.SH DIAGNOSTICS
+X.PP
+XErrors are reported giving file name and line number.
+X.SH AUTHOR
+XBeverly Erlebacher (erlebach@cs.toronto.edu).
+X.SH BUGS
+X.PP
+X.B \ef(CW
+Xis used to change to constant-width (typewriter-like) font.
+XIf this is not the standard at your site, run your
+X.I texi2roff
+Xoutput through
+X.IR sed (1)
+Xor edit
+X.IR texi2roff 's
+Xtranslation tables.
+X.PP
+XThere are a number of differences in formatting details
+Xcompared to Texinfo.
+XIndentation is occasionally imperfect.
+X.PP
+X.B @def
+Xcommands do not generate index entries.
+X.PP
+XAlthough Texinfo provides for a
+X.B @contents
+Xand
+X.B @summarycontents
+XTable of Contents, if both are specified
+Xonly the first one will appear if
+X.B \-ms
+Xis used.
+XTo prevent loss of detail,
+X.I texi2roff
+Xgenerates the same Table of Contents for both commands.
+X.PP
+XThe
+X.B \-mm
+Xmacro package regards keeps as a type of
+Xdisplay.  This can cause
+X.I troff
+Xto abort in the case of a keep nested
+Xin a display or vice versa.  Either use a different macro package or
+Xremove a pair of Texinfo commands to eliminate nesting.  Usually the
+X.B @group...@end group
+Xis the best to remove.
+SHAR_EOF
+if test     3001 -ne "`wc -c < 'texi2roff.1'`"
+then
+echo shar: error transmitting "'texi2roff.1'" '(should have been     3001 characters)'
+fi
+fi
+if test -f 'texi2roff.c'
+then
+echo shar: will not over-write existing file "'texi2roff.c'"
+else
+echo extracting "'texi2roff.c'"
+sed 's/^X//' >texi2roff.c <<'SHAR_EOF'
+X/*
+X * texi2roff.c - texi2roff mainline
+X * 		Release 1.0a 	August 1988
+X *		Release 2.0	January 1990
+X *
+X * Copyright 1988, 1989, 1990  Beverly A.Erlebacher
+X * erlebach@cs.toronto.edu    ...uunet!utai!erlebach
+X *
+X */
+X
+X#include <stdio.h>
+X#ifndef __TURBOC__
+X#include <sys/types.h>
+X#endif
+X#include <sys/stat.h>
+X#include "texi2roff.h"
+X
+Xchar *progname;
+Xint transparent = NO;	/* for -t flag */
+X
+X/*
+X * main - parse arguments, handle options
+X *	- initialize tables and other strings
+X * 	- open files and pass them to process().
+X */
+Xmain(argc, argv)
+Xint argc;
+Xchar *argv[];
+X{
+X    int c, errflg = 0;
+X    FILE *in;
+X    char *inname;
+X    int macropkg = NONE;	/* user's choice of MS, ME or MM */
+X    int showInfo = NO; 		/* -I : display Info file material?*/
+X    int makeindex = NO; 	/* -i : to emit index macros? */
+X
+X    extern int optind;
+X    extern char *optarg;
+X    extern int process();
+X    extern void initialize();
+X
+X    progname = argv[0];
+X
+X    while ((c = getopt(argc, argv, "itIm:--")) != EOF)
+X	switch (c) {
+X  	case 'i':
+X  	    makeindex  = YES;
+X  	    break;
+X  	case 't':
+X  	    transparent = YES;
+X  	    break;
+X	case 'I':
+X	    showInfo = YES;
+X	    break;
+X	case 'm':
+X	    if (macropkg != NONE) {
+X		errflg++;
+X	    } else {
+X		switch ( (char) *optarg) {
+X		case 's':
+X		    macropkg = MS;
+X		    break;
+X		case 'm':
+X		    macropkg = MM;
+X		    break;
+X		case 'e':
+X		    macropkg = ME;
+X		    break;
+X		default:
+X		    errflg++;
+X		    break;
+X		}
+X	    }
+X	    break;
+X	case '?':
+X	    errflg++;
+X	    break;
+X	}
+X
+X    if (macropkg == NONE) {
+X	errflg++;
+X	}
+X    if (errflg) {
+X	(void) fprintf(stderr,
+X	    "Usage: %s [ -me -mm -ms ] [ -iIt ] [ file ... ]\n", progname);
+X	exit(1);
+X    }
+X
+X    (void) initialize(macropkg, showInfo, makeindex);
+X
+X    if (optind >= argc) {
+X	errflg += process(stdin, "stdin");
+X	}
+X    else
+X	for (; optind < argc; optind++) {
+X	    if (STREQ(argv[optind], "-")) {
+X		inname = "stdin";
+X		in = stdin;
+X		}
+X	    else {
+X		if (( in = fopen(argv[optind], "r")) == NULL) {
+X		    (void) fprintf(stderr,"%s : can't open file %s\n",
+X			    progname, argv[optind]);
+X		    continue;
+X		}
+X		inname = argv[optind];
+X	    }
+X	    errflg += process(in, inname);
+X	    if (in != stdin)
+X		(void) fclose(in);
+X	}
+X    exit(errflg);
+X}
+X
+X/*
+X * process -  check opened files and pass them to translate().
+X *	   -  report on disastrous translation failures
+X */
+Xint
+Xprocess(fp, filename)
+X    FILE *fp;
+X    char *filename;
+X{
+X    struct stat statbuf;
+X    extern int translate(/* FILE *, char * */);
+X
+X    if (fstat(fileno(fp), &statbuf) != 0){
+X	(void) fprintf(stderr,"%s : can't fstat file %s\n", progname, 
+X								filename);
+X	return 1;
+X    }
+X    if ((statbuf.st_mode & S_IFMT)==S_IFDIR) {
+X	(void) fprintf(stderr, "%s : %s is a directory\n", progname,
+X								filename);
+X	return 1;
+X    }
+X    /* translate returns 0 (ok) or -1 (disaster). it isn't worthwhile
+X     * to try to recover from a disaster.
+X     */
+X    if (translate(fp, filename) < 0) {
+X	(void) fprintf(stderr,
+X		"%s: error while processing file %s, translation aborted\n",
+X		progname, filename);
+X	exit(1); 
+X    }
+X    return 0;
+X}
+SHAR_EOF
+if test     3050 -ne "`wc -c < 'texi2roff.c'`"
+then
+echo shar: error transmitting "'texi2roff.c'" '(should have been     3050 characters)'
+fi
+fi
+if test -f 'texi2roff.h'
+then
+echo shar: will not over-write existing file "'texi2roff.h'"
+else
+echo extracting "'texi2roff.h'"
+sed 's/^X//' >texi2roff.h <<'SHAR_EOF'
+X/*
+X * texi2roff.h - texi2roff general header
+X *		Release 1.0a	August 1988
+X *		Release 2.0	January 1990
+X *
+X * Copyright 1988, 1989, 1990  Beverly A.Erlebacher
+X * erlebach@cs.toronto.edu    ...uunet!utai!erlebach
+X *
+X */
+X
+X/* troff macro packages supported */
+X#define NONE	0	/* dummy value for error detection */
+X#define MS	1
+X#define ME	2
+X#define MM	3
+X
+X/* useful confusion-reducing things */
+X#define STREQ(s,t) (*(s)==*(t) && strcmp(s, t)==0)
+X#define NO	0
+X#define YES	1
+X#define ERROR	(-1)
+X
+X/* some [nt]roffs have big problems with long lines */
+X#define MAXLINELEN      1024
+X
+X/* miscellaneous troff command strings in macro header files. */
+Xstruct misccmds {
+X    char * init;	/* emit before the first input. this is the place to
+X			 * put troff commands controlling default point size,
+X			 * margin size, line length, etc.
+X			 */
+X    char * dfltpara;	/* emit when 2 consecutive newlines are detected */
+X			/* in the input and the indentation level is <= 1. */
+X    char * dfltipara;	/* same but for indentation level > 1.  */
+X    char * indentstart; /* emit to increase indent level for itemized list */
+X    char * indentend;	/* emit to decrease indent level for itemized list */
+X};
+X
+Xextern struct misccmds * cmds;
+X
+Xstruct tablerecd {
+X    char *  texstart;	/* starting token for a Texinfo command */
+X    char *  texend;	/* ending token for a Texinfo command */
+X    char *  trfstart;	/* troff commands to emit when texstart is found */
+X    char *  trfend;	/* troff commands to emit when texend is found */
+X    char *  font;	/* font in effect between trfstart & trfend */
+X    int	    type;	/* kind of Texinfo command, as #defined below */
+X};
+X
+X/* Texinfo command types */
+X
+X#define ESCAPED	    0	/* special character (special to Texinfo) */
+X#define INPARA	    1	/* in-paragraph command */
+X#define HEADING	    2	/* chapter structuring command */
+X#define DISCARD	    3	/* not supported - discard following text */
+X#define PARAGRAPH   4	/* applies to following paragraph */
+X#define ITEMIZING   5	/* starts itemized list */
+X#define ITEM	    6	/* item in list */
+X#define END	    7	/* end construct */
+X#define CHAR	    8	/* really special char: dagger, bullet - scary, eh? */
+X#define FOOTNOTE    9	/* footnote */
+X#define DISPLAY    10	/* text block of the kind called a 'display' */
+X#define INDEX	   11	/* index entry */
+X#define INCLUDE	   12	/* include file command */
+X 
+X/* portability */
+X#ifdef BSD
+X#include <strings.h>
+X#define strchr  index
+X#else
+X#include <string.h>
+X#endif
+X
+SHAR_EOF
+if test     2462 -ne "`wc -c < 'texi2roff.h'`"
+then
+echo shar: error transmitting "'texi2roff.h'" '(should have been     2462 characters)'
+fi
+fi
+if test -f 'translate.c'
+then
+echo shar: will not over-write existing file "'translate.c'"
+else
+echo extracting "'translate.c'"
+sed 's/^X//' >translate.c <<'SHAR_EOF'
+X/*
+X * translate.c - main guts of texi2roff
+X * 		Release 1.0a	August 1988
+X *		Release 2.0	January 1990
+X *
+X * Copyright 1988, 1989, 1990  Beverly A.Erlebacher
+X * erlebach@cs.toronto.edu    ...uunet!utai!erlebach
+X *
+X */
+X
+X#include <stdio.h>
+X#include "texi2roff.h"
+X
+Xextern int transparent;		/* -t flag: dont discard things	   */
+Xint	displaylevel = 0;	/* nesting level of 'display' text */
+Xint	inmacroarg = NO;	/* protect roff macro args flag */
+Xint     ilevel = 0;		/* nesting level of itemized lists */
+Xint	linecount;
+Xchar	*filename;
+Xchar 	*inp;			/* pointer into input buffer */
+X
+Xextern struct tablerecd * lookup();
+X
+X/* forward references */
+Xextern char * gettoken();
+Xextern char * eatwhitespace();
+Xextern char * itemize();
+Xextern char * doitem();
+Xextern char * interpret();
+X
+X/*
+X * errormsg - print error messages to stderr
+X */
+X
+Xvoid
+Xerrormsg( message, other)
+X    char	   *message;
+X    char	   *other;
+X{
+X    (void) fprintf(stderr, "%s line %d : %s%s\n",
+X	filename, linecount, message, other);
+X}
+X
+X/*
+X * translate - translate one Texinfo file
+X */
+X
+Xint 
+Xtranslate(in, inname)
+X    FILE	   *in;
+X    char	   *inname;
+X{
+X    char	   input[MAXLINELEN];
+X    char	   output[MAXLINELEN * 2];
+X    char	   token[MAXLINELEN];
+X    char	   *c, *cprev;
+X    static char	   lastchar;
+X    int		   savlinct;
+X    char	   *savfilnam;
+X
+X    /*
+X     * save global variables linecount and filename in case this is a
+X     * recursive call to translate an @include file.  these variables
+X     * are used by errormsg() which is called from many places.
+X     */
+X    savfilnam = filename;
+X    savlinct = linecount;
+X       
+X    filename = inname;
+X    linecount = 0;
+X    lastchar = '\n';
+X
+X    /*
+X     * if fgets() truncates a line in the middle of a token, a blank will
+X     * appear in the word containing the MAXLINELENth char in the absurdly
+X     * long line. this is handled by gettoken()
+X     */
+X
+X    while (fgets(input, MAXLINELEN, in) != NULL) {
+X	++linecount;
+X	inp = input;
+X	*output = 0;
+X	if (*inp == '.')		/* protect leading '.' in input */
+X	    (void) strcpy(output, "\\&");
+X	else if (*inp == '\n') {
+X	    if (displaylevel > 0)
+X		(void) strcat(output,"\\&\n");	  /* protect newline */
+X	    else if (ilevel > 0)	/* indented paragraph */
+X		(void) strcat(output, cmds->dfltipara);
+X	    else			/* default paragraph */
+X		(void) strcat(output,cmds->dfltpara);
+X	}
+X	while (*inp != '\0') {
+X	    inp = gettoken(inp, token);
+X	    inp = interpret(token, output);
+X	    if (inp == NULL)
+X		return ERROR;
+X	}
+X
+X	/*
+X	 * output, stripping surplus newlines when possible. 
+X	 * protect lines starting with ' or \ by adding leading \&.
+X	 */
+X	cprev = &lastchar;   /* character at end of previous output buffer */
+X	for( c = output; *c != '\0'; cprev = c, ++c) {
+X	    if (*c != '\n' || *cprev != '\n') {
+X		if ( *cprev == '\n' && (*c == '\\' || *c == '\''))
+X		    (void) fputs("\\&", stdout);
+X		(void) putc(*c, stdout);
+X	    }
+X	}
+X	lastchar = *cprev;
+X    }
+X    /* restore the globals */
+X    filename = savfilnam;
+X    linecount = savlinct;
+X    return 0;
+X}
+X
+X/*
+X * PUSH - macro to push pointer to table entry onto command stack
+X *	  and current font onto font stack
+X */
+X
+X#define MAXDEPTH    20
+X
+X#define PUSH(tptr)							\
+X    if (++stackptr == MAXDEPTH) {					\
+X	errormsg("stack overflow - commands nested too deeply", "");	\
+X	return NULL;							\
+X    }									\
+X    stack[stackptr] = tptr;						\
+X    (void) strcpy(fontstack[++fontptr], curfont);			\
+X    if (*tptr->font != '\0') 						\
+X	(void) strcpy(curfont, tptr->font);				
+X
+X
+X/*
+X * interpret - interprets and concatenates interpreted token onto outstring
+X */
+X
+Xchar *
+Xinterpret(token, outstring)
+Xchar	*token;
+Xchar	*outstring;
+X{
+X    static struct tablerecd *stack[MAXDEPTH];
+X    static int	    stackptr = 0; /* zeroth element is not used */
+X    static int      discarding = NO;
+X    static int	    discardlevel = MAXDEPTH;
+X    static int	    fontptr;
+X/* large enough for "\\fR\\&\\f(CW" */
+X#define FONTSTRSIZE 12
+X    static char	    fontstack[MAXDEPTH][FONTSTRSIZE];
+X    static char	    curfont[FONTSTRSIZE];
+X    static char	    defaultfont[] = "\\fR";
+X    static int	    init = NO;
+X    struct tablerecd *tptr;
+X    char	    *s, *cp, tempstr[MAXLINELEN],itemtag[MAXLINELEN];
+X    FILE	    *fp;	/* for @include files */
+X    extern int	    process();	/* for @include files */
+X
+X    if (init == NO) {
+X	(void) strcpy(fontstack[0], defaultfont);
+X	(void) strcpy(curfont, defaultfont);
+X	fontptr = 0;
+X	init = YES;
+X    }
+X    s = inp;
+X    if (stackptr > 0 && STREQ(token, stack[stackptr]->texend)) {
+X    /* have fetched closing token of current Texinfo command */
+X	if (STREQ(token, "@end")) {/* WARNING! only works from translate() */
+X	    s = gettoken(eatwhitespace(s),tempstr);
+X	    if	(! STREQ(&(stack[stackptr]->texstart[1]), tempstr) 
+X				&& !discarding) {
+X		errormsg("unexpected @end found for Texinfo cmd @", tempstr);
+X		return s;
+X	    }
+X	}
+X	if (!discarding)
+X	    (void) strcat(outstring, stack[stackptr]->trfend);
+X	
+X	/* restore previous active font */
+X	if (STREQ(curfont, fontstack[fontptr]) == NO) {
+X		(void) strcpy(curfont, fontstack[fontptr]);
+X		(void) strcat(outstring, curfont);
+X	}
+X	if (fontptr > 0)
+X		--fontptr;
+X
+X	if (stack[stackptr]->type == DISPLAY)
+X	    --displaylevel;
+X	else if (stack[stackptr]->type == ITEMIZING) {
+X	    --ilevel;
+X	    if (!discarding && ilevel > 0)
+X		(void) strcat(outstring, cmds->indentend);
+X	}
+X
+X	if (--stackptr < 0) {
+X	    errormsg("stack underflow", "");
+X	    return NULL;
+X	}
+X    	if (discarding && stackptr < discardlevel) {
+X	    discarding = NO;
+X	    discardlevel = MAXDEPTH;
+X    	}
+X	if (*token == '\n' || STREQ(token, "@end")) {
+X	    inmacroarg = NO;
+X	    return "";  		/* flush rest of line if any */
+X	}
+X    } else if (*token != '@') { 	/* ordinary piece of text */
+X	if (!discarding)
+X	    (void) strcat(outstring, token);
+X	if (*token == '\n') {
+X	    inmacroarg = NO;
+X	    return "";
+X	}
+X    } else {				/* start of Texinfo command */
+X	if ((tptr = lookup(token)) == NULL){
+X	    if (!discarding)
+X		errormsg("unrecognized Texinfo command ", token);
+X	} else {
+X	    switch (tptr->type) {
+X	    case ESCAPED:
+X		if (!discarding)
+X		    (void) strcat(outstring, tptr->trfstart);
+X		break;
+X	    case DISPLAY:
+X		++displaylevel;
+X		PUSH(tptr);
+X		if (!discarding)
+X		    (void) strcat(outstring, tptr->trfstart);
+X		break;
+X	    case HEADING:
+X		inmacroarg = YES;   /* protect ',", space in hdr macro args */
+X		/* fall through */
+X	    case INDEX:
+X		s = eatwhitespace(s);
+X		/* fall through */
+X	    case CHAR:	/* may be some need to distinguish these 3 in future */
+X	    case INPARA:
+X	    case PARAGRAPH:
+X		PUSH(tptr);
+X		if (!discarding)
+X		    (void) strcat(outstring, tptr->trfstart);
+X		break;
+X	    case DISCARD:
+X		PUSH(tptr);
+X		if (!discarding && !transparent) {
+X		    discarding = YES;
+X		    discardlevel = stackptr;
+X		}
+X		break;
+X	    case ITEMIZING:
+X		if (!discarding) {
+X		    (void) strcat(outstring, tptr->trfstart);
+X		    if (ilevel > 0)
+X			(void) strcat(outstring, cmds->indentstart);
+X		}
+X		PUSH(tptr);
+X		++ilevel;
+X		s = itemize(s, token);
+X		break;
+X	    case ITEM:
+X		PUSH(tptr);
+X		if (!discarding) {
+X		    (void) strcat(outstring, tptr->trfstart);
+X		    inmacroarg = YES;
+X		    /* set up, parse and interpret item tag */
+X		    s = doitem(eatwhitespace(s),itemtag);
+X		    cp = itemtag;
+X		    while (*cp != '\n' && *cp != '\0') {
+X			cp = gettoken(cp, tempstr);
+X			(void) interpret(tempstr, outstring);
+X		    }
+X		}
+X		break;
+X	    case END:
+X		s = gettoken(eatwhitespace(s),tempstr);
+X		if (!discarding) 
+X		 errormsg("unexpected @end found for Texinfo cmd @", tempstr);
+X		break;
+X	    case FOOTNOTE:
+X		PUSH(tptr);
+X		if (!discarding) {
+X		    s = gettoken(eatwhitespace(s),tempstr);
+X		    cp = outstring + strlen(outstring);
+X		    (void) interpret(tempstr, outstring);
+X		    (void) strcpy(tempstr, cp);
+X		    (void) strcat(outstring, tptr->trfstart);
+X			/* replicate footnote mark */
+X		    (void) strcat(outstring, tempstr);
+X		}
+X		break;
+X	    case INCLUDE:
+X		s = eatwhitespace(s);
+X		for (cp = tempstr; strchr(" \t\n",*s) == NULL; *cp++ = *s++)
+X			;
+X		*cp = '\0';
+X		if (!discarding && ( fp = fopen(tempstr, "r")) == NULL)
+X		    errormsg("can't open included file ", tempstr);
+X		else {
+X		    (void) process(fp, tempstr);
+X		    (void) fclose(fp);
+X		}
+X		break;
+X	    default:
+X		/* can't happen */
+X		errormsg("ack ptui, what was that thing? ", token);
+X	    }
+X	}
+X    }
+X    return s;
+X}	
+X
+X/*
+X * eatwhitespace - move input pointer to first char that isnt a blank or tab
+X *	(note that newlines are *not* whitespace)
+X */
+X
+Xchar	       *
+Xeatwhitespace(s)
+X    register char	   *s;
+X{
+X    while(*s == ' ' || *s == '\t')
+X	++s ;
+X    return s;
+X}
+X
+X
+X/* 
+X * strpbrk_like - returns pointer to the leftmost occurrence in str of any
+X *	character in set, else pointer to terminating null. 
+X*/
+X
+Xchar *
+Xstrpbrk_like(str, set)
+X    register char *str;
+X    char *set;
+X{
+X    static int inited_set = 0;
+X    static char set_vec[256] = { 0 };
+X
+X    if (!inited_set) {	/* we *know* it'll be the same every time... */
+X	while (*set)
+X 	    set_vec[(unsigned char)*set++] = 1;
+X	set_vec[0] = 1;
+X	inited_set = 1;
+X	}
+X    while (set_vec[*str] == 0)
+X	++str;
+X    return str;
+X}
+X
+X
+X/*
+X * gettoken - fetch next token from input buffer. leave the input pointer
+X *	pointing to char after token.	 may need to be modified when 
+X *	new Texinfo commands are added which use different token boundaries.
+X *
+X *	will handle case where fgets() has split a long line in the middle
+X *	of a token, but the token will appear to have been divided by a blank
+X */
+X 
+Xchar	       *
+Xgettoken(s, token)
+X    char	   *s;
+X    char	   *token;
+X{
+X    static char	   endchars[] = " \n\t@{}:.*";
+X    static char    singlequote[] = "\\(fm";
+X    static char    doublequote[] = "\\(pd";
+X    char	   *q, *t;
+X
+X    q = s;
+X    s = strpbrk_like(q, endchars);
+X    if (s != q) {
+X	switch (*s) {
+X	case ' ':
+X	case '\n':
+X	case '\t':
+X	case '@':
+X	case '}':
+X	case ':':
+X	case '.':
+X	case '*':
+X	case '\0':
+X	    --s;
+X	    break;
+X	case '{':
+X	    break;
+X	}
+X    } else {	/* *s == *q */
+X	switch (*s) {
+X	case ' ':
+X	case '\n':
+X	case '\t':
+X	case '{':
+X	case ':':
+X	case '.':
+X	case '*':
+X	case '\0':
+X	    break;
+X	case '}':
+X	    if (*(s+1) == '{') /* footnotes with daggers and dbl daggers!! */
+X		++s;
+X	    break;
+X	case '@':
+X	    s = strpbrk_like(q + 1, endchars );
+X	    /* handles 2 char @ tokens: @{ @} @@ @: @. @* */
+X	    if ( strchr("{}@:.*", *s) == NULL
+X			|| (s > q+1 && (*s =='}' || *s == '@')))
+X		--s;
+X	    break;
+X	}
+X    }
+X    for (t = token; q <= s; ++q, ++t) {
+X	switch (*q) {
+X	    case '\\' :		 /* replace literal \ with \e */
+X		*t = *q;
+X		*++t = 'e';
+X		break;
+X	    case ' '  :		/* protect spaces in macro args */
+X		if (inmacroarg == YES) {
+X		    *t = '\\';
+X		    *++t = *q;
+X		} else
+X		    *t = *q;
+X		break;
+X	    case '\'' :		/* convert ' to footmark in macro args */
+X		if (inmacroarg == YES) {
+X		    *t = 0;
+X		    (void) strcat(t,singlequote);
+X		    t += strlen(singlequote) - 1;
+X		} else
+X		    *t = *q;
+X		break;
+X	    case '\"' :		/* try to avoid " trouble in macro args */
+X		if (inmacroarg == YES) {
+X		    *t = 0;
+X		    (void) strcat(t,doublequote);
+X		    t += strlen(doublequote) - 1;
+X		} else
+X		    *t = *q;
+X		break;
+X	    case '\0':
+X		*t = ' ';
+X		break;
+X	    default   :
+X		*t = *q;
+X		break;
+X	}
+X    }
+X    *t = 0;
+X    return ++s;
+X}
+SHAR_EOF
+if test    11130 -ne "`wc -c < 'translate.c'`"
+then
+echo shar: error transmitting "'translate.c'" '(should have been    11130 characters)'
+fi
+fi
+# end of shell archive
+exit 0

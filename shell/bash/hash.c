@@ -21,6 +21,18 @@ Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. */
 /* There appears to be library functions for this stuff, but it seems like
    a lot of overhead, so I just implemented this hashing stuff on my own. */
 
+#if defined (HAVE_STRING_H)
+#  include <string.h>
+#else /* !HAVE_STRING_H */
+#  include <strings.h>
+#endif /* !HAVE_STRING_H */
+
+#if defined (HAVE_STDLIB_H)
+#  include <stdlib.h>
+#else
+#  include "ansi_stdlib.h"
+#endif /* HAVE_STDLIB_H */
+
 #include "shell.h"
 #include "hash.h"
 
@@ -28,11 +40,14 @@ HASH_TABLE *hashed_filenames;
 
 #define FILENAME_HASH_BUCKETS 107
 
+#if 0
+/* UNUSED */
 /* Create the hash table for filenames that we use in the shell. */
 initialize_hashed_filenames ()
 {
   hashed_filenames = make_hash_table (FILENAME_HASH_BUCKETS);
 }
+#endif
 
 /* Make a new hash table with BUCKETS number of buckets.  Initialize
    each slot in the table to NULL. */
@@ -42,7 +57,7 @@ make_hash_table (buckets)
 {
   HASH_TABLE *new_table = (HASH_TABLE *)xmalloc (sizeof (HASH_TABLE));
 
-  if (!buckets)
+  if (buckets == 0)
     buckets = DEFAULT_HASH_BUCKETS;
 
   new_table->bucket_array =
@@ -64,15 +79,21 @@ initialize_hash_table (table)
 
 /* Return the location of the bucket which should contain the data
    for STRING.  TABLE is a pointer to a HASH_TABLE. */
+
+#define ALL_ONES (~((unsigned long) 0))
+#define BITS(h, n) ((unsigned long)(h) & ~(ALL_ONES << (n)))
+
+int
 hash_string (string, table)
      char *string;
      HASH_TABLE *table;
 {
   register unsigned int i = 0;
 
-  while (*string) i += *string++;
-  i %= table->nbuckets;
-  return (i);
+  while (*string)
+    i = (i << 2) + *string++;
+
+  return (BITS (i, 31) % table->nbuckets);
 }
 
 /* Return a pointer to the hashed item, or NULL if the item
@@ -83,8 +104,11 @@ find_hash_item (string, table)
      HASH_TABLE *table;
 {
   BUCKET_CONTENTS *list;
+  int which_bucket;
 
-  list = table->bucket_array[hash_string (string, table)];
+  which_bucket = hash_string (string, table);
+
+  list = table->bucket_array[which_bucket];
 
   while (list)
     {
@@ -167,6 +191,7 @@ add_hash_item (string, table)
 
 /* Return the bucket_contents list of bucket BUCKET in TABLE.  If
    TABLE doesn't have BUCKET buckets, return NULL. */
+#undef get_hash_bucket
 BUCKET_CONTENTS *
 get_hash_bucket (bucket, table)
      int bucket;
@@ -186,6 +211,7 @@ get_hash_bucket (bucket, table)
 HASH_TABLE *table;
 #define NBUCKETS 107
 
+char *
 xmalloc (bytes)
      int bytes;
 {
@@ -195,7 +221,7 @@ xmalloc (bytes)
       fprintf (stderr, "Out of memory!");
       abort ();
     }
-  return ((int)result);
+  return (result);
 }
 
 main ()
@@ -206,17 +232,18 @@ main ()
 
   table = make_hash_table (NBUCKETS);
   
-  printf ("Enter some data to be hashed, a word at a time.\n\
-Type a blank line when done:\n\n");
-
   for (;;)
     {
-      char *temp_string = savestring (gets (string));
-      if (!*string) break;
+      char *temp_string;
+      if (fgets (string, sizeof (string), stdin) == 0)
+        break;
+      if (!*string)
+        break;
+      temp_string = savestring (string);
       tt = add_hash_item (temp_string, table);
       if (tt->times_found)
 	{
-	  printf ("\nYou have already added that item\n");
+	  fprintf (stderr, "You have already added item `%s'\n", string);
 	  free (temp_string);
 	}
       else
@@ -225,24 +252,25 @@ Type a blank line when done:\n\n");
 	}
     }
   
-  printf ("\nYou have entered %d (%d) items.  The items are:\n\n",
+  printf ("You have entered %d (%d) items.  The distribution is:\n",
 	  table->nentries, count);
 
+  /* Print out a count of how many strings hashed to each bucket, so we can
+     see how even the distribution is. */
   for (count = 0; count < table->nbuckets; count++)
     {
+      int bcount;
       register BUCKET_CONTENTS *list = get_hash_bucket (count, table);
     
-      if (list)
-	{
-	  printf ("%3d slot: ", count);
-	  while (list)
-	    {
-	      printf ("%s\n	     ", list->key);
-	      list = list->next;
-	    }
-	  printf ("\n");
-	}
+      printf ("slot %3d: ", count);
+      bcount = 0;
+
+      for (bcount = 0; list; list = list->next)
+        bcount++;
+
+      printf ("%d\n", bcount);
     }
+    exit (0);
 }
 
 #endif /* TEST_HASHING */

@@ -18,9 +18,16 @@
 
 #include <stdio.h>
 #include <sys/types.h>
-#if defined (HAVE_VPRINTF)
+#include <sys/stat.h>
+#if defined (HAVE_VFPRINTF)
 #include <varargs.h>
-#endif /* VPRINTF */
+#endif /* VFPRINTF */
+
+#if defined (HAVE_STRING_H)
+#  include <string.h>
+#else /* !HAVE_STRING_H */
+#  include <strings.h>
+#endif /* !HAVE_STRING_H */
 
 #include "../shell.h"
 #include "../unwind_prot.h"
@@ -31,6 +38,7 @@
 #include "hashcom.h"
 
 void no_args (), remember_args (), parse_and_execute_cleanup ();
+void set_dollar_vars_changed (), set_dollar_vars_unchanged ();
 extern int follow_symbolic_links, interactive;
 
 /* Read a numeric arg for this_command_name, the name of the shell builtin
@@ -43,8 +51,44 @@ get_numeric_arg (list)
 
   if (list)
     {
-      if (sscanf (list->word->word, "%d", &count) != 1)
+      register char *arg;
+      int sign = 1;
+
+      arg = list->word->word;
+      if (!arg)
+	goto bad_number;
+
+      /* Skip optional leading white space. */
+      while (whitespace (*arg))
+	arg++;
+
+      if (!*arg)
+        goto bad_number;
+
+      /* We allow leading `-' or `+'. */
+      if (*arg == '-' || *arg == '+')
 	{
+	  if (!digit (arg[1]))
+	    goto bad_number;
+
+	  if (*arg == '-')
+	    sign = -1;
+
+	  arg++;
+	}
+
+      for (count = 0; digit (*arg); arg++)
+	count = (count * 10) + digit_value (*arg);
+
+      /* Skip trailing whitespace, if any. */
+      while (whitespace (*arg))
+        arg++;
+
+      if (!*arg)
+        count = count * sign;
+      else
+	{
+  bad_number:
 	  builtin_error ("bad non-numeric arg `%s'", list->word->word);
 	  throw_to_top_level ();
 	}
@@ -56,8 +100,7 @@ get_numeric_arg (list)
 /* This is a lot like report_error (), but it is for shell builtins
    instead of shell control structures, and it won't ever exit the
    shell. */
-#if defined (HAVE_VPRINTF)
-/* VARARGS */
+#if defined (HAVE_VFPRINTF)
 builtin_error (va_alist)
      va_dcl
 {
@@ -74,8 +117,7 @@ builtin_error (va_alist)
   va_end (args);
   fprintf (stderr, "\n");
 }
-
-#else /* Without VARARGS. */
+#else /* !HAVE_VFPRINTF */
 builtin_error (format, arg1, arg2, arg3, arg4, arg5)
      char *format, *arg1, *arg2, *arg3, *arg4, *arg5;
 {
@@ -88,7 +130,7 @@ builtin_error (format, arg1, arg2, arg3, arg4, arg5)
   fprintf (stderr, "\n");
   fflush (stderr);
 }
-#endif /* HAVE_VPRINTF */
+#endif /* !HAVE_VFPRINTF */
 
 /* Remember LIST in $0 ... $9, and REST_OF_ARGS.  If DESTRUCTIVE is
    non-zero, then discard whatever the existing arguments are, else
@@ -99,7 +141,6 @@ remember_args (list, destructive)
      int destructive;
 {
   register int i;
-  extern WORD_LIST *copy_word_list ();
 
   for (i = 1; i < 10; i++)
     {
@@ -119,16 +160,17 @@ remember_args (list, destructive)
 	}
     }
 
-  /* If arguments remain, assign them to REST_OF_ARGS. */
-  if (!list)
+  /* If arguments remain, assign them to REST_OF_ARGS.
+     Note that copy_word_list (NULL) returns NULL, and
+     that dispose_words (NULL) does nothing. */
+  if (destructive || list)
     {
       dispose_words (rest_of_args);
-      rest_of_args = NULL;
+      rest_of_args = copy_word_list (list);
     }
-  else
-    {
-      rest_of_args = (WORD_LIST *)copy_word_list (list);
-    }
+
+  if (destructive)
+    set_dollar_vars_changed ();
 }
 
 /* Return if LIST is NULL else barf and jump to top_level. */
@@ -165,7 +207,7 @@ read_octal (string)
 }
 
 /* Temporary static. */
-char *dotted_filename = (char *)NULL;
+static char *dotted_filename = (char *)NULL;
 
 /* Return the full pathname that FILENAME hashes to.  If FILENAME
    is hashed, but data->check_dot is non-zero, check ./FILENAME
@@ -214,9 +256,9 @@ find_hashed_filename (filename)
 	    if (*path == '.')
 	      {
 		int same = 0;
-		char *rindex (), *tail;
+		char *tail;
 
-		tail = rindex (path, '/');
+		tail = (char *) strrchr (path, '/');
 
 		if (tail)
 		  {
@@ -236,23 +278,49 @@ find_hashed_filename (filename)
     return ((char *)NULL);
 }
 
+/* Remove FILENAME from the table of hashed commands. */
+void
+remove_hashed_filename (filename)
+     char *filename;
+{
+  extern HASH_TABLE *hashed_filenames;
+  extern int hashing_disabled;
+  register BUCKET_CONTENTS *item;
+
+  if (hashing_disabled)
+    return;
+
+  item = remove_hash_item (filename, hashed_filenames);
+  if (item)
+    {
+      if (item->data)
+        {
+	  free (pathdata(item)->path);
+	  free (item->data);
+        }
+      if (item->key)
+	free (item->key);
+      free (item);
+    }
+}
+
 /* **************************************************************** */
 /*								    */
 /*		    Pushing and Popping a Context		    */
 /*								    */
 /* **************************************************************** */
 
-WORD_LIST **dollar_arg_stack = (WORD_LIST **)NULL;
-int dollar_arg_stack_slots = 0;
-int dollar_arg_stack_index = 0;
+extern int variable_context;
+
+static WORD_LIST **dollar_arg_stack = (WORD_LIST **)NULL;
+static int dollar_arg_stack_slots = 0;
+static int dollar_arg_stack_index = 0;
 
 void push_dollar_vars (), pop_dollar_vars ();
 
 void
 push_context ()
 {
-  extern int variable_context;
-
   push_dollar_vars ();
   variable_context++;
 }
@@ -260,8 +328,6 @@ push_context ()
 void
 pop_context ()
 {
-  extern int variable_context;
-
   pop_dollar_vars ();
   kill_all_local_variables ();
   variable_context--;
@@ -271,17 +337,11 @@ pop_context ()
 void
 push_dollar_vars ()
 {
-  extern WORD_LIST *list_rest_of_args ();
-
   if (dollar_arg_stack_index + 2 > dollar_arg_stack_slots)
     {
-      if (!dollar_arg_stack)
-	{
-	  dollar_arg_stack =
-	    (WORD_LIST **)xrealloc (dollar_arg_stack,
-				    (dollar_arg_stack_slots += 10)
-				    * sizeof (WORD_LIST **));
-	}
+      dollar_arg_stack = (WORD_LIST **)
+	xrealloc (dollar_arg_stack, (dollar_arg_stack_slots += 10)
+		  * sizeof (WORD_LIST **));
     }
   dollar_arg_stack[dollar_arg_stack_index] = list_rest_of_args ();
   dollar_arg_stack[++dollar_arg_stack_index] = (WORD_LIST *)NULL;
@@ -297,6 +357,36 @@ pop_dollar_vars ()
   remember_args (dollar_arg_stack[--dollar_arg_stack_index], 1);
   dispose_words (dollar_arg_stack[dollar_arg_stack_index]);
   dollar_arg_stack[dollar_arg_stack_index] = (WORD_LIST *)NULL;
+}
+
+dispose_saved_dollar_vars ()
+{
+  if (!dollar_arg_stack || !dollar_arg_stack_index)
+    return;
+
+  dispose_words (dollar_arg_stack[dollar_arg_stack_index]);
+  dollar_arg_stack[dollar_arg_stack_index] = (WORD_LIST *)NULL;
+}
+
+static int changed_dollar_vars = 0;
+
+/* Have the dollar variables been reset to new values since we last
+   checked? */
+dollar_vars_changed ()
+{
+  return (changed_dollar_vars);
+}
+
+void
+set_dollar_vars_unchanged ()
+{
+  changed_dollar_vars = 0;
+}
+
+void
+set_dollar_vars_changed ()
+{
+  changed_dollar_vars  = 1;
 }
 
 /* Function called when one of the builtin commands detects a bad
@@ -331,8 +421,18 @@ get_working_directory (for_whom)
       directory = getwd (the_current_working_directory);
       if (!directory)
 	{
-	  fprintf (stderr, "%s: %s\n\r",
-		   for_whom, the_current_working_directory);
+	  extern char *shell_name;
+
+	  if (for_whom && *for_whom)
+	    fprintf (stderr, "%s: ", for_whom);
+	  else if (shell_name && *shell_name)
+	    fprintf (stderr, "%s: ", shell_name);
+	  else
+	    fprintf (stderr, "bash: ");
+
+	  fprintf (stderr, "could not get current directory: %s\n\r",
+		   the_current_working_directory);
+
 	  free (the_current_working_directory);
 	  the_current_working_directory = (char *)NULL;
 	  return (char *)NULL;
@@ -340,6 +440,17 @@ get_working_directory (for_whom)
     }
 
   return (savestring (the_current_working_directory));
+}
+
+/* Make NAME our internal idea of the current working directory. */
+void
+set_working_directory (name)
+     char *name;
+{
+  if (the_current_working_directory)
+    free (the_current_working_directory);
+
+  the_current_working_directory = savestring (name);
 }
 
 #if defined (JOB_CONTROL)
@@ -389,7 +500,6 @@ get_job_spec (list)
 	    if (jobs[i])
 	      {
 		register PROCESS *p = jobs[i]->pipe;
-		extern char *strindex ();
 		do
 		  {
 		    if ((substring && strindex (p->command, word)) ||
@@ -432,13 +542,19 @@ parse_and_execute (string, from_file)
      char *string;
      char *from_file;
 {
+#if defined (HISTORY)
   extern int remember_on_history;
+#  if defined (BANG_HISTORY)
   extern int history_expansion_inhibited;
+#  endif /* BANG_HISTORY */
+#endif /* HISTORY */
   extern int indirection_level;
-  extern int builtin_pipe_in, builtin_pipe_out;
+#if defined (ONESHOT)
+  extern int startup_state;
+#endif /* ONESHOT */
   extern COMMAND *global_command;
   extern char *indirection_level_string ();
-  extern int pop_stream (), free ();
+  extern int pop_stream ();
 
   int last_result = EXECUTION_SUCCESS;
   int code, jump_to_top_level = 0;
@@ -450,11 +566,17 @@ parse_and_execute (string, from_file)
     unwind_protect_jmp_buf (top_level);
     unwind_protect_int (indirection_level);
     unwind_protect_int (interactive);
+
+#if defined (HISTORY)
     unwind_protect_int (remember_on_history);
+#  if defined (BANG_HISTORY)
     unwind_protect_int (history_expansion_inhibited);
+#  endif /* BANG_HISTORY */
+#endif /* HISTORY */
+
     add_unwind_protect (pop_stream, (char *)NULL);
     if (orig_string)
-      add_unwind_protect (free, orig_string);
+      add_unwind_protect (vfree, orig_string);
   end_unwind_frame ();
 
   parse_and_execute_level++;
@@ -462,10 +584,14 @@ parse_and_execute (string, from_file)
   interactive = 0;
   indirection_level++;
 
+#if defined (HISTORY)
   /* We don't remember text read by the shell this way on
      the history list, and we don't use !$ in shell scripts. */
   remember_on_history = 0;
+#  if defined (BANG_HISTORY)
   history_expansion_inhibited = 1;
+#  endif /* BANG_HISTORY */
+#endif /* HISTORY */
 
   with_input_from_string (string, from_file);
   {
@@ -520,14 +646,16 @@ parse_and_execute (string, from_file)
 
 		global_command = (COMMAND *)NULL;
 
-		if (builtin_pipe_in != NO_PIPE)
-		  bitmap->bitmap[builtin_pipe_in] = 1;
-
-		if (builtin_pipe_out != NO_PIPE)
-		  bitmap->bitmap[builtin_pipe_out] = 1;
-
-		last_result =
-		  execute_command_internal
+#if defined (ONESHOT)
+	        if (startup_state == 2 && command->type == cm_simple &&
+		    !command->redirects && !command->value.Simple->redirects)
+		  {
+		    command->flags |= CMD_NO_FORK;
+		    command->value.Simple->flags |= CMD_NO_FORK;
+		  }
+#endif /* ONESHOT */
+    
+		last_result = execute_command_internal
 		    (command, 0, NO_PIPE, NO_PIPE, bitmap);
 
 		dispose_command (command);
@@ -560,7 +688,7 @@ parse_and_execute (string, from_file)
 
 /* Return the address of the builtin named NAME.
    DISABLED_OKAY means find it even if the builtin is disabled. */
-Function *
+static Function *
 builtin_address_internal (name, disabled_okay)
      char *name;
      int disabled_okay;
@@ -573,12 +701,18 @@ builtin_address_internal (name, disabled_okay)
   while (lo <= hi)
     {
       mid = (lo + hi) / 2;
-      j = strcmp (shell_builtins[mid].name, name);
+
+      j = shell_builtins[mid].name[0] - name[0];
+
+      if (!j)
+	j = strcmp (shell_builtins[mid].name, name);
 
       if (j == 0)
 	{
+	  /* It must have a function pointer.  It must be enabled, or we
+	     must have explicitly allowed disabled functions to be found. */
 	  if (shell_builtins[mid].function &&
-	      (shell_builtins[mid].enabled || disabled_okay))
+	      ((shell_builtins[mid].flags & BUILTIN_ENABLED) || disabled_okay))
 	    return (shell_builtins[mid].function);
 	  else
 	    return ((Function *)NULL);
@@ -614,7 +748,12 @@ static int
 shell_builtin_compare (sbp1, sbp2)
      struct builtin *sbp1, *sbp2;
 {
-  return (strcmp (sbp1->name, sbp2->name));
+  int result;
+
+  if ((result = sbp1->name[0] - sbp2->name[0]) == 0)
+    result = strcmp (sbp1->name, sbp2->name);
+
+  return (result);
 }
 
 /* Sort the table of shell builtins so that the binary search will work
@@ -623,4 +762,68 @@ initialize_shell_builtins ()
 {
   qsort (shell_builtins, num_shell_builtins, sizeof (struct builtin),
     shell_builtin_compare);
+}
+
+/* Return a new string which is the quoted version of STRING.  This is used
+   by alias and trap. */
+char *
+single_quote (string)
+     char *string;
+{
+  register int i, j, c;
+  char *result;
+
+  result = (char *)xmalloc (3 + (3 * strlen (string)));
+
+  result[0] = '\'';
+
+  for (i = 0, j = 1; string && (c = string[i]); i++)
+    {
+      result[j++] = c;
+
+      if (c == '\'')
+	{
+	  result[j++] = '\\';	/* insert escaped single quote */
+	  result[j++] = '\'';
+	  result[j++] = '\'';	/* start new quoted string */
+	}
+    }
+
+  result[j++] = '\'';
+  result[j] = '\0';
+
+  return (result);
+}
+
+char *
+double_quote (string)
+     char *string;
+{
+  register int i, j, c;
+  char *result;
+
+  result = (char *)xmalloc (3 + (3 * strlen (string)));
+
+  result[0] = '"';
+
+  for (i = 0, j = 1; string && (c = string[i]); i++)
+    {
+      switch (c)
+        {
+	case '"':
+	case '$':
+	case '`':
+	case '\n':
+	case '\\':
+	  result[j++] = '\\';
+	default:
+	  result[j++] = c;
+	  break;
+        }
+    }
+
+  result[j++] = '"';
+  result[j] = '\0';
+
+  return (result);
 }
