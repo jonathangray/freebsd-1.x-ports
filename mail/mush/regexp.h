@@ -1,9 +1,10 @@
-/*-
- * Copyright (c) 1992 The Regents of the University of California.
+/*
+ * Copyright (c) 1986 by University of Toronto.
+ * Copyright (c) 1989 The Regents of the University of California.
  * All rights reserved.
  *
- * This code is derived from software contributed to Berkeley by
- * James da Silva at the University of Maryland at College Park.
+ * This code is derived from software contributed to Berkeley
+ * by Henry Spencer.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,61 +33,37 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ *	@(#)regexp.h	5.2 (Berkeley) 4/3/91
  */
+
+#ifndef	_REGEXP_H_
+#define	_REGEXP_H_
 
 /*
- * Compatibility routines that implement the old re_comp/re_exec interface in
- * terms of the regcomp/regexec interface.  It's possible that some programs
- * rely on dark corners of re_comp/re_exec and won't work with this version,
- * but most programs should be fine.
+ * Definitions etc. for regexp(3) routines.
+ *
+ * Caveat:  this is V8 regexp(3) [actually, a reimplementation thereof],
+ * not the System V one.
  */
+#define NSUBEXP  10
+typedef struct regexp {
+	char *startp[NSUBEXP];
+	char *endp[NSUBEXP];
+	char regstart;		/* Internal use only. */
+	char reganch;		/* Internal use only. */
+	char *regmust;		/* Internal use only. */
+	int regmlen;		/* Internal use only. */
+	char program[1];	/* Unwarranted chumminess with compiler. */
+} regexp;
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)regex.c	5.1 (Berkeley) 3/29/92";
-#endif /* LIBC_SCCS and not lint */
+#include <sys/cdefs.h>
 
-#include <sys/types.h>
-#include <stddef.h>
-#include "regexp.h"
-#include <string.h>
-#include <stdlib.h>
+__BEGIN_DECLS
+regexp *regcomp __P((const char *));
+int regexec __P((const  regexp *, const char *));
+void regsub __P((const  regexp *, const char *, char *));
+void regerror __P((const char *));
+__END_DECLS
 
-static regexp *re_regexp;
-static int re_goterr;
-static char *re_errstr;
-
-char *
-re_comp(s)
-	char *s;
-{
-	if (s == NULL)
-		return (NULL);
-	if (re_regexp)
-		free(re_regexp);
-	if (re_errstr)
-		free(re_errstr);
-	re_goterr = 0;
-	re_regexp = regcomp(s);
-	return (re_goterr ? re_errstr : NULL);
-}
-
-int
-re_exec(s)
-	char *s;
-{
-	int rc;
-
-	re_goterr = 0;
-	rc = regexec(re_regexp, s);
-	return (re_goterr ? -1 : rc);
-}
-
-void
-regerror(s)
-	const char *s;
-{
-	re_goterr = 1;
-	if (re_errstr)
-		free(re_errstr);
-	re_errstr = strdup(s);
-}
+#endif /* !_REGEXP_H_ */
