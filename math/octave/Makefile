@@ -1,11 +1,11 @@
-all: octave
+all: make-octave
 
-octave:
+make-octave:
 	cd octave; \
-	configure; \
+	./configure; \
 	gmake
 
-install: octave
+install: make-octave
 	cd octave; \
 	gmake install
 clean:
