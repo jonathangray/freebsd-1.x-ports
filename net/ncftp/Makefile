@@ -144,7 +144,7 @@ C_COMPILE = $(CC) $(CFLAGS) $(DEFS) $(HDRDIRS)
 C_COMPILE2 = $(CC) $(CFLAGS) $(DEFS) -DMK='"$(MK)"' $(HDRDIRS)
 
 package: install
-	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST ncftp_bin
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST -r pkg/+REQ ncftp_bin
 
 all: $(NAME) done
 
