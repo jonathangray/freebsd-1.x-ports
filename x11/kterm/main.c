@@ -1,6 +1,6 @@
 #ifndef lint
 static char *rid="$XConsortium: main.c,v 1.200.1.1 93/11/02 17:14:14 gildea Exp $";
-static char *ktermid = "$Id: main.c,v 1.4 1994/06/27 17:46:16 asami Exp $";
+static char *ktermid = "$Id: main.c,v 1.5 1994/07/01 02:12:04 asami Exp $";
 #endif /* lint */
 
 /*
@@ -216,14 +216,14 @@ int	Ptyfd;
 
 #ifndef UTMP_FILENAME
 #ifdef __FreeBSD__
-#define UTMP_FILENAME "/var/run/utmp"
+#define UTMP_FILENAME _PATH_UTMP
 #else
 #define UTMP_FILENAME "/etc/utmp"
 #endif
 #endif
 #ifndef LASTLOG_FILENAME
 #ifdef __FreeBSD__
-#define LASTLOG_FILENAME "/var/run/lastlog"
+#define LASTLOG_FILENAME _PATH_LASTLOG
 #else
 #define LASTLOG_FILENAME "/usr/adm/lastlog"  /* only on BSD systems */
 #endif
@@ -233,7 +233,7 @@ int	Ptyfd;
 #define WTMP_FILENAME "/etc/wtmp"
 #else
 #ifdef __FreeBSD__
-#define WTMP_FILENAME "/var/log/wtmp"
+#define WTMP_FILENAME _PATH_WTMP
 #else
 #define WTMP_FILENAME "/usr/adm/wtmp"
 #endif
