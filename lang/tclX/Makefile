@@ -14,7 +14,7 @@
 # software for any purpose.  It is provided "as is" without express or
 # implied warranty.
 #------------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 1994/02/10 23:36:48 jkh Exp $
+# $Id: Makefile,v 1.3 1994/02/25 04:21:28 jkh Exp $
 #------------------------------------------------------------------------------
 #
 SHELL=/bin/sh
@@ -230,6 +230,9 @@ install: all TCLXINSTALL TCLXINSTALL-EXEC \
              ${TK_BUILD}MAYBE ${TK_BUILD}MAYBE-EXEC
 
 install-exec: all TCLXINSTALL-EXEC ${TK_BUILD}MAYBE-EXEC
+
+pkg:	install
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST tclX_bin
 
 TCLXINSTALL:
 	@echo ""
