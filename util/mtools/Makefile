@@ -175,6 +175,11 @@ shar:
 	Mkmanifest.out Mlabel.out Mmd.out Mrd.out Mread.out Mren.out \
 	Mtools.out Mtype.out Mwrite.out > mtools_sh.4
 
+pkg: pkg_bin
+
+pkg_bin: install
+        pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST mtools_bin
+
 buf_read.o:	msdos.h
 buf_write.o:	msdos.h
 devices.o:	msdos.h
