@@ -51,7 +51,7 @@ baud since that seems sufficient to keep the printer
 busy.
 
 The important thing is to be in 8-bit mode so that
-the graphics data can't match any Okidata commands
+the graphics data cant match any Okidata commands
 (This driver sets the high bit of graphics data to 1).
 
 #endif

@@ -120,6 +120,14 @@ FEATURE_DEVS=filter.dev dps.dev level2.dev
 # Choose the device(s) to include.  See devs.mak for details.
 
 DEVICE_DEVS=x11.dev epson.dev ljet2p.dev ljet3.dev tiffg3.dev
+DEVICE_DEVS1=bj10e.dev bj200.dev deskjet.dev djet500.dev laserjet.dev
+DEVICE_DEVS2=ljetplus.dev ljet4.dev cdeskjet.dev  cdjcolor.dev cdjmono.dev
+DEVICE_DEVS3=cdj500.dev cdj550.dev declj250.dev pj.dev pjxl.dev pjxl300.dev
+DEVICE_DEVS4=djet500c.dev eps9high.dev ibmpro.dev epsonc.dev escp2.dev
+DEVICE_DEVS5=lj250.dev paintjet.dev pjetxl.dev jetp3852.dev lbp8.dev
+DEVICE_DEVS6=ln03.dev la50.dev la75.dev m8510.dev necp6.dev oki182.dev
+DEVICE_DEVS7=r4081.dev
+DEVICE_DEVS8=t4693d2.dev t4693d4.dev t4693d8.dev tek4696.dev
 DEVICE_DEVS9=pbm.dev pbmraw.dev pgm.dev pgmraw.dev ppm.dev ppmraw.dev bit.dev
 
 # ---------------------------- End of options --------------------------- #
