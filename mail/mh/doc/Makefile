@@ -101,7 +101,7 @@ all:		# $(man1) $(man5) $(man8)
 
 install:	inst-all clean
 
-inst-all:	# inst-tmac $(inst-man1) $(inst-man5) $(inst-man8)
+inst-all:	inst-tmac $(inst-man1) $(inst-man5) $(inst-man8)
 
 tar:		# $(Tman1) $(Tman5) $(Tman8)
 		# @touch tmac.h $(Tman1) $(Tman5) $(Tman8)

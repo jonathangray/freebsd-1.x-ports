@@ -139,3 +139,8 @@ unclean:;	rm -f _* :* core
 cleandir:	unclean
 		rm -f config/version config/version.c doc/version.rf
 
+pkg:    pkg_bin
+
+pkg_bin: install pkg/+DESC pkg/+ONELINE pkg/+PLIST 
+        pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST mh_bin
+
