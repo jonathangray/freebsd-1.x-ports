@@ -1,0 +1,171 @@
+#!/project/tcl/bin/wish -f
+#
+# exmh.setup - User setup for exmh
+#
+# I cannot really vouch for this as I discovered an MH utility
+# to do user setup - oh well.
+#
+set templateDir /project/tcl/src/exmh
+
+set files {
+    {mh_profile		mh_profile	{MH environment/preference settings}}
+    {maildelivery	maildelivery	{MH pre-filtering commands}}
+}
+set fields {
+    {HOME		{Target dir}	{Your home directory}}
+    {LOGIN		{UNIX login}	{Your UNIX login id}}
+    {FULLNAME		{Your Name}	{Your full name}}
+    {MAILDROP		{/var/spool/mail/you}  {Your mail spool file}}
+    {PATH		{Mail}  {Your mail directory}}
+    {EDITOR		/project/tcl/bin/mxedit	{Your favorite editor}}
+    {NEXTEDIT		/usr/ucb/vi	{Your next favorite editor}}
+    {FOLDER-ORDER	{personal * sun }	{Flist folder order pattern}}
+}
+
+proc FieldVar { item } { lindex $item 0 }
+proc FieldDefault { item } { lindex $item 1 }
+proc FieldComment { item } { lindex $item 2 }
+
+message .msg -aspect 1000 -text "
+User setup for the MH Mail system.
+
+Set or verify the field settings and click Install.
+
+You will also want to edit your ~/.maildelivery
+filtering file according to your needs.
+"
+pack append . .msg {top expand fill}
+
+proc Feedback { text } {
+    global msg
+    catch {
+	$msg configure -text $text
+	update
+    }
+}
+set wuid 0
+proc DoField { item } {
+    global wuid
+    incr wuid
+    set f [frame .import$wuid -relief raised]
+    button $f.label -text [format "%-35s:" [FieldComment $item]] \
+	-command "ShowValue $f.entry [FieldVar $item]" -font fixed
+    entry $f.entry -bg white
+    $f.entry insert 0 [FieldDefault $item]
+    bind $f.entry <Return> "SetValue %W [FieldVar $item]"
+    SetValue $f.entry [FieldVar $item]
+    global Entries
+    set Entries([FieldVar $item]) $f.entry
+
+    pack append . $f {top expand fill}
+    pack append $f $f.label {left padx 3}
+    pack append $f $f.entry {right expand fill}
+}
+proc SetValue { entry var } {
+    set value [$entry get]
+    if [string match *(* $var] {
+	set arrayName [lindex [split $var (] 0]
+	global $arrayName
+    } else {
+	global $var
+    }
+    set $var $value
+    Feedback "$var $value"
+}
+proc GetValue { var } {
+    if [string match *(* $var] {
+	set arrayName [lindex [split $var (] 0]
+	global $arrayName
+    } else {
+	global $var
+    }
+    return [set $var]
+}
+proc ShowValue {entry var } {
+    SetValue $entry $var
+    $entry select from 0
+    $entry select to end
+    focus $entry
+}
+
+proc Sed { source target } {
+    set id 0
+    while {[catch {open /tmp/sed.$id w} script]} {
+	incr id
+	if {$id > 100} {
+	    Feedback "Test: Cannot create sed script in /tmp"
+	    return
+	}
+    }
+    global fields Entries
+    foreach item $fields {
+	set var [FieldVar $item]
+	set entry $Entries($var)
+	SetValue $entry $var
+	global $var
+	puts $script "s,[FieldVar $item],[GetValue $var],g"
+    }
+    Full_Name_Hack $script
+    close $script
+    if [catch {
+	exec sed -f /tmp/sed.$id < $source > $target
+#	exec rm /tmp/sed.$id
+    } msg] {
+	Feedback "sed error: $msg"
+    }
+}
+proc Full_Name_Hack { script } {
+    global FULLNAME
+    regsub " " $FULLNAME _ FULL_NAME
+    puts $script "s,FULL_NAME,$FULL_NAME,g"
+}
+
+proc Install { where } {
+    global files templateDir
+    foreach file $files {
+	set f [FieldDefault $file]
+	set template $templateDir/$f.template
+	set target $where/.$f
+	if [file exists $target] {
+	    if ![file exists ${target}.orig] {
+		exec cp $target ${target}.orig
+		Feedback "Saving $target.orig"
+	    }
+	}
+	Sed $template $target
+	lappend fileset $target
+	lappend short .$f
+    }
+    Feedback "Please edit $fileset"
+}
+
+foreach item $fields {
+    if [catch {
+	case [FieldVar $item] {
+	    HOME	{ set item [lreplace $item 1 1 $env(HOME)] }
+	    LOGIN	{ set item [lreplace $item 1 1 $env(USER)] }
+	    MAILDROP	{ set item [lreplace $item 1 1 $env(MAIL)] }
+	    EDITOR	{ if [info exists env(EDITOR)] {
+			    set item [lreplace $item 1 1 $env(EDITOR)]
+			}}
+	}
+	DoField $item
+    } msg] {
+	puts stderr $item
+	puts stderr $msg
+    }
+}
+set msg [label .feedback -text ""]
+pack append . $msg {top expand fill}
+
+frame .buttons -relief raised
+pack append . .buttons {top expand fill}
+
+button .buttons.quit -text "Quit" -command {destroy .}
+button .buttons.verify -text "Verify" -command {Install /tmp}
+button .buttons.install -text "Install" -command "Install $env(HOME)"
+
+pack append .buttons \
+    .buttons.verify left .buttons.install left \
+    .buttons.quit right
+

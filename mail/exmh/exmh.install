@@ -1,0 +1,101 @@
+#!wish -f
+#
+# Example client of the install.tcl infrastructure.
+#
+# The commands below set up default values for certain
+# system-dependent variables in the exmh program.
+# A dialog box is created that allows you to edit these
+# values, so you probably won't edit this file directly,
+# unless you are a developer that is adapting it to your tool.
+#
+# Invoke with:
+# wish -f ./example.install
+#
+source ./install.tcl
+
+set vers 1.3
+set date 4/7/94
+
+# Define app name and install save file
+install_init exmh ./.exmhinstall
+
+install_version	exmh(version) "version $vers $date" {Exmh Version number}
+
+# The following are settings inside exmh that depend on the local environment
+install_var	exmh(maintainer) exmhbugs@parc.xerox.com {Target of error mailings}
+install_dirVar	mh_path		/usr/local/bin		{MH binary directory}
+install_progVar	exmh(slocal)	/usr/local/lib/mh/slocal	{MH slocal program}
+install_dirVar	mime(dir)	/usr/local/bin    	{Metamail bin directory}
+install_expect	exmh(expect)	/usr/local/bin/expect	{expect program}
+install_dirVar	faces(dir)	/usr/local/faces/faces    {Root dir of faces store}
+install_var	faces(set)	{parc logos news facesaver} \
+						{Search path of face dirs}
+install_var	faces(defaultDomain) parc.xerox.com	{Your default domain}
+install_var	sound(cmd)	{/usr/demo/SOUND/play -v 38} \
+							{Audio play command}
+install_fileVar	sound(newMsg)	/usr/demo/SOUND/sounds/drip.au  \
+							{New message sound}
+install_fileVar	sound(error)	/usr/demo/SOUND/sounds/clink.au {Error feedback}
+
+install_libDir	exmh(library)	/usr/local/lib/exmh-$vers {Script library}
+install_testLib	./lib
+
+# The following are installation directories, which you may have to adjust,
+# and install file patterns (glob/sed), which should not be site dependent.
+install_dir  bin	/usr/local/bin		{Install bin directory}
+install_glob bin	exmh exmh-bg exmh-async ftp.expect
+install_sed  .MASTER	exmh exmh-bg exmh-async ftp.expect
+install_dir  man	/usr/man/man/manl	{Install man directory}
+install_glob man	exmh.l
+install_dir  lib	/usr/local/lib/exmh-$vers	{Install lib directory}
+install_glob lib	lib/*.tcl lib/*.bitmap lib/*.help lib/tclIndex lib/app-defaults
+
+# Define test command
+install_test exec ./exmh &
+
+# User information
+
+install_help "
+Installation for exmh, a TK front end to the MH mail system.
+
+Each entry you make is used to patch exmh.MASTER in order to
+make the exmh script.  So, make sure the file system
+pathnames are correct for your system.
+
+Note that the \"Script Library\" and the \"Install lib directory\"
+are usually the same place.  The script library is the runtime value
+of the library directory, while the install lib directory is the
+install-time value.  The Test button automatically switches the
+run-time value to \"./lib\" for the duration of the test.  If you
+have AFS, you might need to set these two differently because of
+read-only volumes.  Ordinarily they should be the same.
+
+The \"Script Library\" should be private to exmh (unshared with other apps).
+
+You may not have some support programs or packages.  In this
+case, just delete the default value and leave the field blank.
+Such things include:
+The expect program.  This can be used to do FTP transfers of MIME
+    message/external-body messages of subtype anon-ftp.
+The facesaver database.  Exmh needs to know the root directory
+    of the database and then the set of subdirectories under that
+    which contain directory trees of face bitmaps.
+The play program that plays audio files.
+The metamail program that handles unknown (by exmh) MIME formats.
+
+Reminder: check out the optional slocal.patch and folder.patch files.
+These are optional - see the man page for details.
+
+Use the Conf button to choose among ../*/.exmhinstall* files.
+
+After you set things up, then:
+1. Patch - apply site-dependent patches to exmh.
+2. TclIndex - compute the auto-load library index.
+3. Test - run the patched script.
+4. Verify - see what the Install will do.
+5. Install - install exmh.
+"
+
+# Go for it
+install_dialog
+

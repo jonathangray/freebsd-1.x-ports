@@ -1,0 +1,149 @@
+#!wish -f
+#
+# Background processing script for exmh.
+# This does stuff and then sends messages to the background module
+# in the main exmh application.  In particular, the time-consuming things
+# like running inc are done here instead of the main-line.
+#
+# Copyright (c) 1993 Xerox Corporation.
+# Use and copying of this software and preparation of derivative works based
+# upon this software are permitted. Any distribution of this software or
+# derivative works must comply with all applicable United States export
+# control laws. This software is made available AS IS, and Xerox Corporation
+# makes no warranty about the software, its performance or its conformity to
+# any specification.
+
+#CONFIGURATION
+#END CONFIGURATION
+
+wm withdraw .
+
+if {$argc < 3} {
+    puts stderr "exmh-bg requires some arguments:"
+    puts stderr "Usage: exmh-bg interpName libDirectory mh_path"
+    exit 1
+}
+
+set exmh(interp) [lindex $argv 0]
+set exmh(library) [lindex $argv 1]
+set mh_path [lindex $argv 2]
+
+proc auto_path_update { path } {
+    # Add library directories to the auto_path,
+    # ensuring that later paths have precedence
+    # and that function override works
+    global auto_path tk_version
+    if [file exists $path/tclIndex] {
+	if {[info tclversion] != 7.0} {
+	    set auto_path "$path $auto_path"
+	} else {
+	    lappend auto_path $path
+	}
+	catch {auto_reset}	;# breaks under TCLX
+    }
+}
+auto_path_update $exmh(library)
+
+# Make sure MH is on the path
+set hit 0
+foreach dir [split $env(PATH) :] {
+    if {[string compare $dir $mh_path] == 0} {
+	set hit 1
+	break
+    }
+}
+if {! $hit} {
+    set env(PATH) $mh_path:$env(PATH)
+}
+
+proc Exmh_Debug { args } {
+    global exmh
+    if [info exists exmh(pid)] {
+	BgRPC Exmh_Debug exmh-bg $args
+    } else {
+	catch {puts stderr "exmh-bg $args"}
+    }
+}
+# Register ourselves with the UI
+proc BgRegister { exmhInterp } {
+    global exmh
+    set exmh(sendErrors) 0
+    if {[catch {
+	send $exmhInterp [list Background_Register [winfo name .]]
+    } alist] == 0} {
+	# set bg parameters returned as a result of registration
+	foreach pair $alist {
+	    set _var [lindex $pair 0]
+	    set _val [lindex $pair 1]
+	    uplevel #0 set $_var $_val
+	}
+	return 1
+    } else {
+	if [regexp {no registered interpreter} $alist] {
+	    catch {puts stderr "exmh-bg lost UI - exiting."}
+	    exit
+	}
+	return 0
+    }
+}
+set ok 0
+foreach try {1 2 3 4 5} {
+    set ok [BgRegister $exmh(interp)]
+    if {$ok} {
+	break
+    }
+    exec sleep $try
+}
+if {! $ok} {
+    catch {puts stderr "exmh-bg cannot rendez-vous with UI - exiting."}
+    exit 1
+}
+
+proc Exmh_Status { string {color black} } {
+    global exmh
+    if [info exists exmh(instatus)] {
+	catch {puts stderr "exmh-bg: $string"}
+	return
+    }
+    set exmh(instatus) 1
+    if ![info exists exmh(c_st_background)] {
+	if {[tk colormodel .] == "color"} {
+	    set exmh(c_st_background) [option get . c_st_background {}]
+	    if {$exmh(c_st_background) == {}} {
+		set exmh(c_st_background) [option get . bgMsgColor {}]
+		if {$exmh(c_st_background) != {}} {
+		    puts stderr "Warning: old resource bgMsgColor, changed to c_st_background"
+		} else {
+		    set exmh(c_st_background) "medium sea green"
+		}
+	    }
+	} else {
+	    set exmh(c_st_background) [option get . c_st_background {}]
+	    if {$exmh(c_st_background) == {}} {set exmh(c_st_background) black}
+	    if {$exmh(c_st_background) != "white" && $exmh(c_st_background) != "black"} {
+		set exmh(c_st_background) black
+	    }
+	}
+    }
+    BgRPC Exmh_Status $string $exmh(c_st_background)
+    unset exmh(instatus)
+}
+
+proc Exmhbg_Done {} {
+    # Die asynchronously so the front-end gets a response
+    # to its send request first.
+    after 1 {destroy .}
+}
+
+# Now do things periodically.  We fault in routines from
+# the regular library of exmh procedures.  The Inc'ing
+# routines have been tweaked to understand the (possible)
+# split into a separate process, and the above hack to
+# Exmh_Status handles the simpler cases.
+
+Mh_Init
+Preferences_Init ~/.exmh-defaults $exmh(library)/app-defaults
+Inc_Init
+Flist_Init
+Background_Init
+Background_DoPeriodic

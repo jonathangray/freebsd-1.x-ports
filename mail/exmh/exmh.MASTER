@@ -1,0 +1,68 @@
+#!wish -f
+#
+# TK interface to the MH Mail utility
+# Brent Welch <welch@parc.xerox.com>
+# Original version by <Ed Oskiewicz (eo@ansa.co.uk)>
+#
+# Copyright (c) 1993 Xerox Corporation.
+# Use and copying of this software and preparation of derivative works based
+# upon this software are permitted. Any distribution of this software or
+# derivative works must comply with all applicable United States export
+# control laws. This software is made available AS IS, and Xerox Corporation
+# makes no warranty about the software, its performance or its conformity to
+# any specification.
+
+# The following lines are patched by exmh.install
+#CONFIGURATION
+#END CONFIGURATION
+
+if {$tk_version >= 3.3} {
+    # Do this so popups related to user initialization
+    # appear all alone.  However, in 3.2 there is a
+    # bug with updating windows that are unmapped.
+    wm withdraw .
+} else {
+    catch {puts stderr "Warning: EXMH may not work properly under TK 3.2 and older."}
+}
+
+proc auto_path_update { path } {
+    # Add library directories to the auto_path,
+    # ensuring that later paths have precedence
+    # and that function override works
+    global auto_path tk_version
+    if [file exists $path/tclIndex] {
+	if {[info tclversion] != 7.0} {
+	    set auto_path "$path $auto_path"
+	} else {
+	    lappend auto_path $path
+	}
+	catch {auto_reset}	;# breaks under TCLX
+    }
+}
+
+auto_path_update $exmh(library)
+auto_path_update [pwd]/lib		;# for testing before install
+
+if ![file exists $exmh(library)/tclIndex] {
+    if [file exists ./lib/tclIndex] {
+	puts stderr "Warning, using local script library, ./lib"
+	set exmh(library) ./lib
+    }
+}
+
+# Make sure MH is on the path
+set hit 0
+foreach dir [split $env(PATH) :] {
+    if {[string compare $dir $mh_path] == 0} {
+	set hit 1
+	break
+    }
+}
+if {! $hit} {
+    set env(PATH) $mh_path:$env(PATH)
+}
+
+# The rest of the application is defined by routines in the exmh library
+# The after 1 trick is to ensure we get the built-in error handler.
+
+after 1 {Exmh}

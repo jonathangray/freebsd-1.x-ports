@@ -1,0 +1,29 @@
+#!wish -f
+#
+# async editor frontend for exmh
+# Arg1: invoking interpreter's name (from [winfo name .])
+# Arg2-end: editor command, including pathname
+# LastArg: pathname of draft message
+#
+
+wm withdraw .
+
+# simple argv cracking
+set exmh [lindex $argv 0]
+set editorCmd [lrange $argv 1 end]
+set draftpath [lindex $argv [expr {[llength $argv] - 1}]]
+set draftm [file tail $draftpath]
+
+send $exmh [list Edit_Ident [winfo name .]]
+#
+# Double eval here to allow quoted -geom arguments.  A user can specify
+# xterm {-geom +0+0} -e {vi +/^[-]*$}
+# for example.
+
+if [catch {eval eval exec $editorCmd} err] {
+    send $exmh [list Exmh_Status "exmh-async: editor failed: $err" purple]
+} else {
+    send $exmh EditDialog $draftm
+}
+
+exit 0

@@ -1,0 +1,82 @@
+# Using emacsclient with exmh is straight-forward.
+# Basically it boils down to loading "server.el" in an emacs
+# and then setting your exmh editor command to be
+    exmh-async emacsclient
+
+# As usual, however, you can get arbitrarily more fancy.
+# The remainder of this file contains some more customized
+# elisp code from one exmh user.  I am not
+# an emacs user (viva mxedit!) so you'll have to contact
+# Tom directly if you have questions.  Brent Welch
+
+Here is an my version of mh-letter-mode-hook.el.
+
+I also tossed in a function to make "C-c C-y" (insert replied-to message)
+work correctly.  This is a bit crude; it works fine if you use supercite.el
+to format the inserted text (as I do) but is pretty dumb if you don't.
+
+You need to add
+	(load "server.el")
+	(server-start)
+to your .emacs file, and either include this in .emacs or load it from there:
+
+---------- cut here ------------
+
+;;
+;; mh-letter-mode-hook.el
+;;
+;; A server-visit-hook that lets mh-letter-mode be invoked when
+;; an mh draft is sent to emacs for editing by an emacs client.
+;;
+;; If the filename to be edited looks like an MH draft file,
+;; then we switch into mh-letter mode.  But "\C-c\C-c" is redefined
+;; so that 'server-edit is invoked to exit, instead of mh-send-letter.
+;; Also, "\C-c\C-y" is redefined to fetch the replied-to message properly.
+;;
+;; Tom Lane tgl@sss.pgh.pa.us 1/25/94.
+;; Based on an idea by Mario Silva msilva@cs.Berkeley.edu.
+
+;; customize server-temp-file-regexp
+(setq server-temp-file-regexp "^/tmp/Re\\|/Mail/drafts/")
+
+;; add mh-letter-mode to the autoload list.
+(autoload 'mh-letter-mode "mh-e" "mh mail letter mode (not loaded)")
+
+;; add a server-visit-hook that tests for editing a draft file.
+
+(add-hook 'server-visit-hook 'exmh-visit-draft)
+
+(defun exmh-visit-draft ()
+  "Test to see if we are told to edit an MH draft file.
+If so, switch to mh-letter mode, with a few changes for server mode."
+  (cond ((string-match "/Mail/drafts/" buffer-file-name)
+	 (mh-letter-mode)
+	 (local-set-key "\C-c\C-c" 'server-edit)
+	 (local-set-key "\C-c\C-y" 'exmh-mail-yank-original))))
+
+(defun exmh-mail-yank-original (&optional arg)
+  "Insert the message being replied to, if any.
+Puts point before the text and mark after.
+Just \\[universal-argument] as argument means insert literally, no citing."
+  (interactive "P")
+  (let ((filename (expand-file-name "~/@")))
+    (if (file-readable-p filename)
+	(let ((filelen (car (cdr (insert-file-contents filename)))))
+	  (push-mark (+ (point) filelen) t)
+	  (if (consp arg)
+	      nil
+	    (cond ((and (boundp 'mail-citation-hook) mail-citation-hook)
+		   (run-hooks 'mail-citation-hook))
+		  ((and (boundp 'mh-yank-hooks) mh-yank-hooks)
+		   (let ((mh-ins-string "> "))
+			 (run-hooks 'mh-yank-hooks)))))
+	  (if (not (eolp)) (insert ?\n))))))
+
+---------- cut here ------------
+
+I've tested this with Emacs 19.22 (in which server.el, mh-e.el, and
+supercite.el are all standard files).  Dunno if it will work with
+earlier versions.
+
+		regards, tom lane
+

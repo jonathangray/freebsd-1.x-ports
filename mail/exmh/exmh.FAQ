@@ -1,0 +1,189 @@
+Frequently Asked Questions about EXMH
+
+1. Is it possible to get the cursor keys working in the editor?
+1b. Can I paste with the middle mouse button?
+2. How do I display ISO-8859 fonts so that my special characters show up?
+3. I can't get background incorporate to work. What am I doing wrong?
+4. How do I start my X server so it does Xauthority right?
+5. Where do I find Faces and Metamail packages?
+6. How do you get an X-Face: line into your outgoing mail messages?
+7. Can I use EXMH as a news reader?
+8. How do I change those default wheat-colors for the widgets in EXMH?
+
+-------------------------------------------------------------------------
+
+1. Is it possible to get the cursor keys working in the editor?
+
+    Use the Bind dialog to set additional keystroke bindings for various
+    editting functions.  For cursor keys, you first need to figure out
+    what their X Keysyms are.  I use the "xev" program for this.  Assuming
+    the keysyms are Up, Down, Left, and Right, then you'd add
+    <Key-Up> to the up1line function, etc.  The Bind dialog lets you
+    have multiple sequences for a function - just space separate them.
+    You may have to drag the entry widget with the middle mouse button
+    to make room to add stuff to the end.
+
+1b. Can I paste with the middle mouse button?
+
+    Use the Bind dialog to do two things.  First, change the scrolling
+    binding away from Middle button.  This binding lets you "drag" a text
+    window around without having to hit the scrollbar.  So, change that
+    to right button or disable it altogether because the default is that
+    the middle button is used for this kind of scrolling.  Second, change
+    the selpaste binding to <Button-2> so you can paste with middle click.
+
+2. How do I display ISO-8859 fonts so that my special characters show up?
+
+    Put an Xresource specification into your ~/.exmh-defaults file:
+    *Text*font: -*-lucida-*-*-*-*-*-*-*-*-*-*-iso8859-*
+    *Ftoc*Text*font: -*-lucida-*-*-*-*-10-*-*-*-*-*-iso8859-*
+
+3. I can't get background incorporate to work. What am I doing wrong?
+
+    The most likely cause is that the TK send facility does not work for you
+    because of Xauthority issues.  "send" lets two TCL interpreters issue
+    commands to each other, and it uses X properties.  Begining with
+    TK 3.3, this also honors the Xauthority protocol, unless you compile
+    TK with -DNO_SECURITY.  You can test this by running "wish" and
+    trying out the following command:
+	    send exmh {Exmh_Status "Hello, world!"}
+    If this fails, you have two options.  First, disable the background process
+    so that all periodic activity is done in the front-end.  Do this via
+    the preferences entry for Background Processing.  Or, better, learn how
+    to start your X server so that it does Xauthority right.
+
+    Note that even if you set up Xauthority right, you need to
+    xhost -
+    to ensure that your xhost access list is empty.
+
+    Another cause that might disable inc completely is lack of the MAILDROP
+    environment variable.  This should be set to the name of the spool
+    file that contains incoming mail (unless you are using POP).  The
+    latest Exmh will warn you about this and try to choose a default
+    value, but to be safe you should set this up properly.
+
+4. How do I start my X server so it does Xauthority right?
+
+    The general picture of whats going on is this:
+    1) some program generates a magic cookie (arbitrary string) and writes
+    this to a file.
+    2) The name of this file is passed to the X server
+    3) The X server writes an entry for the DISPLAY into your ~/.Xauthority
+    file.
+    4) Xlib reads ~/.Xauthority when you create a window, and passes the
+    cookie value back to the X server.
+    
+    The specific details vary from server to server.
+
+    For SunOS and openwin, you should just be able to start up with:
+
+    openwin -auth magic-cookie
+
+    Another person had luck with:
+
+    BTW, the Xauthority stuff seems to work now. All I did was declare
+    and export XAUTHORITY from my .profile. I had't done it before since
+    the value ($HOME/.Xauthority) is supposed to be the default. We're
+    using XDM.
+
+
+    In more detail, here is what happens under the covers...
+
+    if [ ! \( -d $HOME -a -w $HOME \) ]; then
+      echo "Warning: Can't write X authority file" 1>&2 ;
+      auth_args=""
+    else
+      authfname=$HOME/.xnews.`uname -n`$DISPLAY
+      ${OPENWINHOME}/lib/mkcookie $authfname -auth magic-cookie
+      auth_args="-auth $authfname"
+    fi ;
+    ${OPENWINHOME}/bin/xnews $auth_args $server_args $xnews_config_args ;;
+    
+    There is a more lengthy example given in the misc/Xauthority file
+    that comes with the exmh distribution.
+
+5. Where do I find Faces and Metamail packages?
+
+    There are pointers to these packages at the end of the man page.
+
+6. How do you get an X-Face: line into your outgoing mail messages?
+
+    The compface program that is part of the faces package will generate
+    the X-Face hex string for you.  Check its man page for details.
+    Then, MH understands templates for new mail, replies, and forwarded
+    messages.  These are the ~/Mail/components, ~/Mail/replcomps, and
+    ~/Mail/forwcomps files, respectively.  Here are some examples.  The
+    components file is straight-forward.  The replcomps file requires
+    some quoting of % and \ in X-Face hex string, plus some complete
+    magic to generate the in-lined message you are replying to.  See
+    the repl man page for the details.
+
+    ---------cut here for sample components file-----------
+To: 
+Subject: 
+Fcc: outbox
+Cc: 
+X-Face: "HxE|?EnC9fVMV8f70H83&{fgLE.|FZ^$>@Q(yb#N,Eh~N]e&]=>r5~UnRml1:4EglY{9B+
+ :'wJq$@c_C!l8@<$t,{YUr4K,QJGHSvS~U]H`<+L*x?eGzSk>XH\W:AK\j?@?c1o<k;j'Ei/UL)!*0
+ ILwSR)J\bc)gjz!rrGQ2#i*f:M:ydhK}jp4dWQW?;0{,#iWrCV$4~%e/3)$1/D
+
+
+----------------------------------
+	Brent Welch	Xerox-PARC
+    ------------end sample components file-----------------
+
+    ---------cut here for replcomps------------------------
+%(lit)%(formataddr %<{reply-to}%|%<{from}%|%{sender}%>%>)\
+%<(nonnull)%(void(width))%(putaddr To: )\n%>\
+%(lit)%(formataddr{to})%(formataddr{cc})%(formataddr(me))\
+%<(nonnull)%(void(width))%(putaddr cc: )\n%>\
+%<{subject}Subject: Re: %{subject}\n%>\
+%<{date}In-reply-to: %<(mbox{from})%(mbox{from})%|%(friendly{from})%>\
+'s message of \
+%<(nodate{date})%{date}%|%(tws{date})%>.%<{message-id}
+	     %{message-id}%>\n%>\
+X-Face: "HxE|?EnC9fVMV8f70H83&{fgLE.|FZ^$>@Q(yb#N,Eh~N]e&]=>r5~UnRml1:4EglY{9B+
+ :'wJq$@c_C!l8@<$t,{YUr4K,QJGHSvS~U]H`<+L*x?eGzSk>XH\\W:AK\\j?@?c1o<k;j'Ei/UL)!*0
+ ILwSR)J\\bc)gjz!rrGQ2#i*f:M:ydhK}jp4dWQW?;0{,#iWrCV$4~%%e/3)$1/D
+Fcc: outbox\n
+
+    --------------end sample replcomps file----------------
+
+7. Can I use EXMH as a news reader?
+
+    Well, it actually works ok, but there are various things that would
+    make it better at reading news.  To get started, just make a symbolic
+    link from your ~/Mail directory into the news spool file system.
+    This requires access (e.g., NFS) to the news spool file system, of course.
+    You can do it for a single newsgroup, i.e. clari.feature.dilbert.
+    My symlink looks like:
+    Mail/dilbert -> /net/news/news-1/news/spool/clari/feature/dilbert
+    Or, you can link into the interior of the news hierarchy.
+    You might run into a problem from the MH folders command that
+    limits it to about 300 folders.  Change the NFOLDERS constant in MH
+    src/h/mh.h from 300 to 30,000 and you shouldn't have any more trouble ;-)
+
+8. How do I change those default wheat-colors for the widgets in EXMH?
+
+    (See also exmh.COLORS for more color schemes...)
+    Here is a set of Xresources that I use to get a grey-family for
+    my TK-based applications.  You can put this into your
+    ~/.exmh-defaults, or into your ~/.Xdefaults.  This works ok
+    on a monochrome screen, although buttons do not highlight
+    when you pass the mouse over them.
+
+*activeBackground:			#efefef
+*activeForeground:			black
+*selector:				black
+*background:				#dfdfdf
+*foreground:				black
+*selectBackground:			#bfdfff
+*Scale.activeForeground:		#efefef
+*Scale.sliderForeground:		#dfdfdf
+*Scrollbar.foreground:			#dfdfdf
+*Scrollbar.activeForeground:		#efefef
+*Button.disabledForeground:		#7f7f7f
+*Checkbutton.disabledForeground:	#7f7f7f
+*Radiobutton.disabledForeground:	#7f7f7f
+*Menu.disabledForeground:		#7f7f7f
+

@@ -1,0 +1,50 @@
+This patch applies to the MH 6.7 version of slocal.c
+Index: slocal.c
+***************
+*** 148,153 ****
+--- 148,155 ----
+      NULL
+  };
+  
++ static char *rcvstore;
++ 
+  /*  */
+  
+  extern char **environ;
+***************
+*** 265,270 ****
+--- 267,274 ----
+  
+  /*  */
+  
++     rcvstore = getcpy(libpath("rcvstore"));
++ 
+      if (addr == NULL)
+  	addr = getusr ();
+      if (user == NULL)
+***************
+*** 501,507 ****
+--- 505,527 ----
+  		status = usr_pipe (fd, tmpbuf, "/bin/sh", vec + 2);
+  		break;
+  
++ 	    case '+':
++ 	    dofolder:
++ 		if (*string == '+')
++ 		    strcpy(tmpbuf, string);
++ 		else
++ 		    sprintf(tmpbuf, "+%s", string);
++ 		vec[2] = "rcvstore";
++ 		vec[3] = tmpbuf;
++ 		vec[4] = NULL;
++ 		if (verbose)
++ 		    printf("rcvstore %s", vec[3]);
++ 		status = usr_pipe(fd, "rcvstore", rcvstore, vec + 2);
++ 		break;
++ 
+  	    case 'f': 
++ 		if (uleq(action, "folder"))
++ 		    goto dofolder;
+  		if (!uleq (action, "file"))
+  		    continue;	/* else fall */
+  	    case '>': 
