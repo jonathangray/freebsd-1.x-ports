@@ -1612,10 +1612,12 @@ switch_screen(int n, int dontsave)
 
 	current_video_screen = n;	/* current screen no */
 
-#if !PCVT_NETBSD
-	pcconsp = &pccons[n];		/* current tty */
-#else
+#if PCVT_NETBSD
 	pcconsp = pc_tty[n];		/* current tty */
+#elif PCVT_FREEBSD && PCVT_FREEBSD > 102
+	pcconsp = pccons[n];		/* current tty */
+#else
+	pcconsp = &pccons[n];		/* current tty */
 #endif /* !PCVT_NETBSD */
 
 	vsp = &vs[n];			/* current video state ptr */

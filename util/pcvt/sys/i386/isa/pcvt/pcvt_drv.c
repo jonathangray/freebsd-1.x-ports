@@ -970,7 +970,7 @@ pcvt_xmode_set(int on, struct proc *p)
 	extern u_short *Crtat;
 #endif /* PCVT_NETBSD */
 
-#if PCVT_NETBSD > 9
+#if (PCVT_NETBSD > 9) || (PCVT_FREEBSD && PCVT_FREEBSD > 102)
 	struct trapframe *fp;
 #else
 	struct syscframe *fp;
