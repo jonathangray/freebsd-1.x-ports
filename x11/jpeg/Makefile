@@ -123,12 +123,12 @@ install: all
 	install -c  -m 444 -o bin -g bin djpeg.1 /usr/local/man/man1
 
 
-pkg:	pkg_src pkg_bin
+pkg:	pkg_bin pkg_src
 
 pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
 	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S jpeg_src
 
-pkg_bin: pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B
+pkg_bin: install pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B
 	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B jpeg_bin
 
 jbsmooth.o : jbsmooth.c jinclude.h jconfig.h jpegdata.h 
