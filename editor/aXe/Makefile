@@ -306,6 +306,8 @@ EXTN_INCLUDES = -I/usr/local/include
 
 DEFINES = ${EXTENSION} ${XAW3D} ${HAVEX11R5PL20} ${MAXPATHLEN}
 
+default: all
+
 SUBDIRS = Widgets Help
 
 all::
