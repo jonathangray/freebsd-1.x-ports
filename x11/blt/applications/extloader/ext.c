@@ -258,7 +258,9 @@ Xldr_FindProc(handle, symbol)
 static char *
 Xldr_Error()
 {
+#ifndef __FreeBSD__
     return dlerror();
+#endif
 }
 
 #endif /* hpux */

@@ -3,9 +3,9 @@
 # 	Makefile for library files and directories of BLT library
 # ------------------------------------------------------------------------
 
-INSTALL      = /bin/install -c
+INSTALL      = /usr/bin/install -c
 INSTALL_DATA = $(INSTALL) -m 644
-BLT_LIBRARY  = /opt/cellar/deli/blt/library
+BLT_LIBRARY  = /usr/local/blt/library
 RM           = rm -f
 SHELL        = /bin/sh
 FILES        = bltGraph.pro

@@ -12,25 +12,25 @@ DEFINES      =
 CDEBUGFLAGS  = -O 
 CC 	     = cc
 
-TOPDIR	     = /opt/cellar/deli/blt
-BINDIR       = /opt/cellar/deli/blt/bin
+TOPDIR	     = /usr/local/blt
+BINDIR       = /usr/local/blt/bin
 
 # ------------------------------------------------------------------------
 #       Include directives for Tcl, Tk, and X include files 
 # ------------------------------------------------------------------------
 
-TCL_INCLUDE   = -I/opt/cellar/tcl/tcl7.3/include
-TK_INCLUDE    = -I/opt/cellar/tk/tk3.6/include
-X_INCLUDE     = -I/usr/X11/include
+TCL_INCLUDE   = -I/usr/local/include
+TK_INCLUDE    = -I/usr/local/include
+X_INCLUDE     = -I/usr/X386/include
 
 # ------------------------------------------------------------------------
 #       Libraries directives for Tcl, Tk, and X11
 # ------------------------------------------------------------------------
 
-X_LIB        = -L/usr/X11/lib -lX11
-TK_LIB       = -L/opt/cellar/tk/tk3.6/lib -ltk
-TCL_LIB      = -L/opt/cellar/tcl/tcl7.3/lib -ltcl
-EXTRA_LIBS   =  -lnsl -lm -ldl
+X_LIB        = -L/usr/X386/lib -lX11
+TK_LIB       = -L/usr/local/lib -ltk
+TCL_LIB      = -L/usr/local/lib -ltcl
+EXTRA_LIBS   =  -lm
 
 # ------------------------------------------------------------------------
 #       Don't edit anything beyond this point
@@ -42,13 +42,13 @@ program      = wish
 INCLUDES     = -I. $(TK_INCLUDE) $(TCL_INCLUDE) $(X_INCLUDE)
 CFLAGS 	     = $(CDEBUGFLAGS) $(DEFINES) $(INCLUDES)
 LIBRARIES    = $(TK_LIB) $(TCL_LIB) $(X_LIB) $(EXTRA_LIBS)
-INSTALL      = /bin/install -c
+INSTALL      = /usr/bin/install -c
 RANLIB 	     = @RANLIB@
 SHELL 	     = /bin/sh
 RM 	     = rm -f
 MAN_SECT     = n
-TOPDIR       = /opt/cellar/deli/blt
-MANDIR       = /opt/cellar/deli/blt/man
+TOPDIR       = /usr/local/blt
+MANDIR       = /usr/local/blt/man
 SECT_DIR     = $(MANDIR)/man$(MAN_SECT)
 srcdir	     = .
 

@@ -11,26 +11,26 @@ DEFINES      =
 CFLAGS       = -O
 CC 	     = cc
 
-TOPDIR	     = /opt/cellar/deli/blt
-BINDIR       = /opt/cellar/deli/blt/bin
+TOPDIR	     = /usr/local/blt
+BINDIR       = /usr/local/blt/bin
 
 # ------------------------------------------------------------------------
 #       Include directives for Tcl, Tk, and X include files 
 # ------------------------------------------------------------------------
 
-TCL_INCLUDE   = -I/opt/cellar/tcl/tcl7.3/include
-TK_INCLUDE    = -I/opt/cellar/tk/tk3.6/include
-X_INCLUDE     = -I/usr/X11/include
+TCL_INCLUDE   = -I/usr/local/include
+TK_INCLUDE    = -I/usr/local/include
+X_INCLUDE     = -I/usr/X386/include
 
 # ------------------------------------------------------------------------
 #       Libraries directives for Tcl, Tk, X11, and BLT
 # ------------------------------------------------------------------------
 
-X_LIB        = -L/usr/X11/lib -lX11
-TK_LIB       = -L/opt/cellar/tk/tk3.6/lib -ltk
-TCL_LIB      = -L/opt/cellar/tcl/tcl7.3/lib -ltcl
-BLT_LIB      = ./src/libBLT.a
-EXTRA_LIBS   =  -lnsl -lm #-R/opt/cellar/tk/tk3.6/lib:/opt/cellar/tcl/tcl7.3/lib:/usr/X11/lib
+X_LIB        = -L/usr/X386/lib -lX11
+TK_LIB       = -L/usr/local/lib -ltk
+TCL_LIB      = -L/usr/local/lib -ltcl
+BLT_LIB      = -L./src/shared -L./src -lBLT
+EXTRA_LIBS   =  -lm #-R/usr/local/lib:/usr/local/lib:/usr/X386/lib
 
 
 # ------------------------------------------------------------------------
@@ -41,7 +41,7 @@ demo 	     = blt_wish
 INCLUDES     = -I. $(TK_INCLUDE) $(TCL_INCLUDE) $(X_INCLUDE)
 CC_SWITCHES  = $(CFLAGS) $(DEFINES) $(INCLUDES)
 LIBRARIES    = $(BLT_LIB) $(TK_LIB) $(TCL_LIB) $(X_LIB) $(EXTRA_LIBS)
-INSTALL      = /bin/install -c
+INSTALL      = /usr/bin/install -c
 RANLIB 	     = ranlib
 SHELL 	     = /bin/sh
 RM 	     = rm -f
@@ -49,7 +49,7 @@ srcdir	     = .
 
 all: $(demo)
 
-$(demo): normallib
+$(demo): normallib sharedlib
 	@echo "linking BLT demo as \"$(demo)\"..."
 	$(CC) $(CC_SWITCHES) $(srcdir)/tkAppInit.c -o $(demo) $(LIBRARIES)
 	@echo "make finished on `date`"
@@ -80,7 +80,11 @@ install-lib:
 install-library:
 	@(cd library; $(MAKE) install)
 
-install: install-top install-library install-bin install-lib install-man 
+install: install-top install-library install-bin install-lib install-man \
+	install-apps
+
+package: install
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST -r pkg/+REQ blt_bin
 
 clean:
 	@echo "cleaning in ./src"
@@ -91,7 +95,17 @@ clean:
 	@(cd man; $(MAKE) clean)
 	@echo "cleaning in ./library"
 	@(cd library; $(MAKE) clean)
-	$(RM) $(demo) *\~ "#"*
+	@(cd ./applications/kosherdill; $(MAKE) clean)
+	@(cd ./applications/extloader; $(MAKE) clean)
+	$(RM) $(demo) blt_bin.tgz *\~ "#"*
+
+apps:
+	@(cd ./applications/kosherdill; $(MAKE))
+	@(cd ./applications/extloader; $(MAKE))
+
+install-apps: apps
+	@(cd ./applications/kosherdill; $(MAKE) install)
+	@(cd ./applications/extloader; $(MAKE) install)
 
 GENERATED_FILES = \
 	config.status \

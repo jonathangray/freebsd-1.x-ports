@@ -14,22 +14,22 @@ LIBNAME		= libBLT
 CC 		= cc
 CFLAGS 		= -O
 DEFINES 	=  -DBLT_LIBRARY=\"$(BLT_LIBRARY)\"
-SHLIB_CCFLAGS 	= -pic
-SHLIB_LDFLAGS 	= -assert pure-text
+SHLIB_CCFLAGS 	= -fpic
+SHLIB_LDFLAGS 	= -Bshareable
 SHLIB_LD 	= ld
 SHLIB_SUFFIX 	= .so.$(MAJOR_VERSION).$(MINOR_VERSION)
 SHARED_LIBRARY 	= $(LIBNAME)$(SHLIB_SUFFIX)
-TOPDIR 		= /opt/cellar/deli/blt
-LIBDIR 		= /opt/cellar/deli/blt/lib
-BLT_LIBRARY 	= /opt/cellar/deli/blt/library
+TOPDIR 		= /usr/local/blt
+LIBDIR 		= /usr/local/blt/lib
+BLT_LIBRARY 	= /usr/local/blt/library
 
 # ------------------------------------------------------------------------
 # 	Directories containing Tcl and Tk include files and libraries
 # ------------------------------------------------------------------------
 
-TCL_INCLUDE 	= -I/opt/cellar/tcl/tcl7.3/include
-TK_INCLUDE 	= -I/opt/cellar/tk/tk3.6/include
-X_INCLUDE 	= -I/usr/X11/include
+TCL_INCLUDE 	= -I/usr/local/include
+TK_INCLUDE 	= -I/usr/local/include
+X_INCLUDE 	= -I/usr/X386/include
 
 # ------------------------------------------------------------------------
 # 	Don't edit anything beyond this point
@@ -45,7 +45,7 @@ OBJS 		= bltGraph.o bltGrAxis.o bltGrBar.o bltGrElem.o \
 
 INCLUDES 	= -I. $(TK_INCLUDE) $(TCL_INCLUDE) $(X_INCLUDE)
 CC_SWITCHES	= $(SHLIB_CCFLAGS) $(CFLAGS) $(DEFINES) $(INCLUDES)
-INSTALL 	= /bin/install -c
+INSTALL 	= /usr/bin/install -c
 INSTALL_DATA 	= $(INSTALL) -m 644
 SHELL 		= /bin/sh
 RM 		= rm -f

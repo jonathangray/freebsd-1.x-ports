@@ -4,8 +4,8 @@
 # ------------------------------------------------------------------------
 
 MAN_SECT 	= n
-TOPDIR  	= /opt/cellar/deli/blt
-MANDIR  	= /opt/cellar/deli/blt/man
+TOPDIR  	= /usr/local/blt
+MANDIR  	= /usr/local/blt/man
 SECT_DIR 	= $(MANDIR)/man$(MAN_SECT)
 SHELL    	= /bin/sh
 RM		= rm -rf

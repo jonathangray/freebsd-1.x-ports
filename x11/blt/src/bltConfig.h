@@ -5,7 +5,7 @@
 /* #undef size_t */
 
 /* Define if you have the ANSI C header files.  */
-/* #undef STDC_HEADERS */
+#define STDC_HEADERS 1
 
 /* Define if you can safely include both <sys/time.h> and <time.h>.  */
 #define TIME_WITH_SYS_TIME 1
@@ -17,13 +17,13 @@
 #define HAVE_STRDUP 1
 
 /* Define if you have strerror.  */
-/* #undef HAVE_STRERROR */
+#define HAVE_STRERROR 1
 
 /* Define if you have the <errno.h> header file.  */
 #define HAVE_ERRNO_H 1
 
 /* Define if you have the <float.h> header file.  */
-/* #undef HAVE_FLOAT_H */
+#define HAVE_FLOAT_H 1
 
 /* Define if you have the <limits.h> header file.  */
 #define HAVE_LIMITS_H 1

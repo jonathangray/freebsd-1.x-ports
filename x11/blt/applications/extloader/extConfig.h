@@ -2,13 +2,13 @@
 /* extConfig.h.in.  Generated automatically from configure.in by autoheader.  */
 
 /* Define if you have the ANSI C header files.  */
-/* #undef STDC_HEADERS */
+#define STDC_HEADERS 1
 
 /* Define if you have the <dl.h> header file.  */
 /* #undef HAVE_DL_H */
 
 /* Define if you have the <dlfcn.h> header file.  */
-#define HAVE_DLFCN_H 1
+/* #undef HAVE_DLFCN_H */
 
 /* Define if you have the <errno.h> header file.  */
 #define HAVE_ERRNO_H 1
