@@ -2,7 +2,7 @@
 # $XConsortium: imake.c,v 1.65 91/07/25 17:50:17 rws Exp $
 
 # -------------------------------------------------------------------------
-# Makefile generated from "Imake.tmpl" and </tmp/IIf.026866>
+# Makefile generated from "Imake.tmpl" and </tmp/IIf.001922>
 # $XFree86: mit/config/Imake.tmpl,v 2.6 1993/10/02 07:11:59 dawes Exp $
 # $XConsortium: Imake.tmpl,v 1.139 91/09/16 08:52:48 rws Exp $
 #
@@ -294,7 +294,7 @@ PICFLAGS = -fpic
 # -------------------------------------------------------------------------
 # start of Imakefile
 
-# @(#) $Header: /a/cvs/386BSD/ports/x11/xphoon/Makefile,v 1.1 1994/05/18 16:59:46 asami Exp $ (LBL)
+# @(#) $Header: /a/cvs/386BSD/ports/x11/xphoon/Makefile,v 1.2 1994/06/09 11:18:40 asami Exp $ (LBL)
 #
 # Copyright (C) 1988, 1991 by Jef Poskanzer and Craig Leres.
 #
@@ -391,6 +391,26 @@ package: pkg_bin
 
 pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST all install install.man
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST xphoon_bin
+
+# make different sized moons
+
+fullmoon:
+	if [ -f moonorig.xbm ]; then cp moonorig.xbm moon.xbm; fi
+	$(MAKE) xphoon
+
+1280x1024: fullmoon
+
+1024x768:
+	reducemoon 0.7
+	$(MAKE) xphoon
+
+800x600:
+	reducemoon 0.5
+	$(MAKE) xphoon
+
+600x480:
+	reducemoon 0.3
+	$(MAKE) xphoon
 
 # -------------------------------------------------------------------------
 # common rules for all Makefiles - do not edit
