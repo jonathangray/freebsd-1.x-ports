@@ -1,4 +1,4 @@
-/* $RCSfile: doio.c,v $$Revision: 1.1 $$Date: 1993/08/23 21:29:35 $
+/* $RCSfile: doio.c,v $$Revision: 1.2 $$Date: 1994/03/09 22:24:27 $
  *
  *    Copyright (c) 1991, Larry Wall
  *
@@ -6,8 +6,11 @@
  *    License or the Artistic License, as specified in the README file.
  *
  * $Log: doio.c,v $
- * Revision 1.1  1993/08/23 21:29:35  nate
- * Initial revision
+ * Revision 1.2  1994/03/09 22:24:27  ache
+ * (cast) added for last argument of semctl
+ *
+ * Revision 1.1.1.1  1993/08/23  21:29:36  nate
+ * PERL!
  *
  * Revision 4.0.1.6  92/06/11  21:08:16  lwall
  * patch34: some systems don't declare h_errno extern in header files
@@ -2735,7 +2738,7 @@ int *arglast;
 	else if (cmd == GETALL || cmd == SETALL)
 	{
 	    struct semid_ds semds;
-	    if (semctl(id, 0, IPC_STAT, &semds) == -1)
+	    if (semctl(id, 0, IPC_STAT, (union semun)&semds) == -1)
 		return -1;
 	    getinfo = (cmd == GETALL);
 	    infosize = semds.sem_nsems * sizeof(short);
@@ -2782,7 +2785,7 @@ int *arglast;
 #endif
 #ifdef HAS_SEM
     case O_SEMCTL:
-	ret = semctl(id, n, cmd, a);
+	ret = semctl(id, n, cmd, (union semun)((int)a));
 	break;
 #endif
 #ifdef HAS_SHM
