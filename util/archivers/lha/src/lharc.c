@@ -263,8 +263,10 @@ work:
   	cmd_filec = 0;
 	if ( (xfilev = (char **)malloc(sizeof(char *) * xfilec)) == NULL)
 		fatal_error("Virtual memory exhausted\n");
- 	while ( gets( inpbuf ) )
+	while ( fgets( inpbuf , sizeof(inpbuf), stdin ) )
  	{
+		if (( p = strchr( inpbuf, '\n' )) != NULL)
+			*p = '\0';
 		if ( cmd_filec >= xfilec )
 		{
 			xfilec += 256;
