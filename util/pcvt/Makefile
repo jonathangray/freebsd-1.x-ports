@@ -7,4 +7,4 @@ clean:
 	@echo -n
 
 package:
-	pkg_create -c pkg/+DOC -d pkg/+DESC -f pkg/+PLIST pcvt_kern
+	pkg_create -c pkg/+DOC -d pkg/+DESC -f pkg/+PLIST pcvt_bin
