@@ -1,0 +1,718 @@
+SML/NJ Library Master Bug List
+
+-------------------------------------------------------------------------------
+1. Array2.tabulate doesn't work
+Submitter: 		Mark H. Linderman (linder@box.EE.CORNELL.EDU)
+Date: 			2/23/93
+System(s) and Version:	Library (0.1)
+SML/NJ Version: 	0.93
+Machine: 		all
+Severity: 		minor
+Problem: 		Array2.tabulate doesn't work
+Transcript:
+Comments:
+  I would expect tabulate(2,2,func) to return a 2x2 matrix.  Instead it
+  returns a 3x2 matrix, although Array2 treats it as a 2x2 matrix since
+  nrows and ncols are both set to 2.
+Fix:
+The error is in mkElems.  The conditional after the else clause should
+be changed.
+	      fun mkElems (i, j, elems) = if (j < nCols)
+		      then mkElems (i, j+1, f(i,j) :: elems)
+		    else if (i < nRows - 1 )  (* notice the -1 *)
+		      then mkElems (i+1, 0, elems)
+		      else Array.arrayoflist(rev elems)
+Status:			fixed in 0.2 (JHR; 02/23/93)
+
+-------------------------------------------------------------------------------
+2. SplayDict doesn't seem to work correctly.
+Submitter: 		Richard O'Neill <oneill@cs.sfu.ca>
+Date: 			March 3, 1993
+System(s) and Version:	Library (0.1)
+SML/NJ Version: 	0.93
+Machine: 		NeXTstation, NeXTSTEP 3.0
+Severity: 		Major
+Problem: 		SplayDict doesn't seem to work correctly.
+
+The SplayDict functor does not seem to give correct results (as compared
+to those of BinaryDict).
+
+After making the following (key, value) insertions:
+	(0,"this"),(4,"order"),(1,"should"),(3,"in"),(2,"be")
+
+with an expected typical integer ordering relation, one would expect
+listItems to return:
+	[(0,"this"),(1,"should"),(2,"be"),(3,"in"),(4,"order")]
+
+This happens in the case of BinaryDict, but not in the case of SplayDict,
+which returns:
+	[(0,"this"),(1,"should"),(2,"be"),(4,"order"),(3,"in")]
+
+Not surprisingly perhaps, the if "find(dict,4)" is attempted, the NotFound
+exeception can wind up being raised.
+
+Transcript: 
+
+(The exmaple code was typed is in the session transcript, to extract it pipe
+the transcript through " grep '^[-=] ' | sed -e 's/^..//' " )
+
+next_mach% sml-lib
+Standard ML of New Jersey, Version 0.93, February 15, 1993
+    with Standard ML of New Jersey Library, Version 0.1
+val it = () : unit
+- System.Control.Print.printDepth := 100;
+val it = () : unit
+- structure IntKey =
+=    struct
+=        type ord_key = int
+=        
+=        fun cmpKey (a:ord_key,b:ord_key) =
+=            case (a < b, a > b) of
+=               (true,false)  => LibBase.Less
+=             | (false,true)  => LibBase.Greater
+=             | (false,false) => LibBase.Equal
+=    end
+= 
+= structure IntDict = SplayDict(IntKey)  (* c.f. BinaryDict(IntKey) *)
+= 
+= open IntDict ;
+std_in:13.12-16.44 Warning: match nonexhaustive
+          (true,false) => ...
+          (false,true) => ...
+          (false,false) => ...
+  
+structure IntKey :
+  sig
+    eqtype ord_key
+    val cmpKey : ord_key * ord_key -> LibBase.relation
+  end
+structure IntDict : DICT
+open IntDict
+structure Key : ORD_KEY
+exception NotFound = NotFound
+val mkDict = fn : unit -> '1a dict
+val insert = fn : '1a dict * IntKey.ord_key * '1a -> '1a dict
+val find = fn : 'a dict * IntKey.ord_key -> 'a
+val peek = fn : 'a dict * IntKey.ord_key -> 'a option
+val remove = fn : '1a dict * IntKey.ord_key -> '1a dict * '1a
+val numItems = fn : 'a dict -> int
+val listItems = fn : 'a dict -> (IntKey.ord_key * 'a) list
+val app = fn : (IntKey.ord_key * 'a -> 'b) -> 'a dict -> unit
+val revapp = fn : (IntKey.ord_key * 'a -> 'b) -> 'a dict -> unit
+val fold = fn : (IntKey.ord_key * 'a * 'b -> 'b) -> 'a dict -> 'b -> 'b
+val revfold = fn : (IntKey.ord_key * 'a * 'b -> 'b) -> 'a dict -> 'b -> 'b
+val map = fn : (IntKey.ord_key * 'a -> '2b) -> 'a dict -> '2b dict
+val transform = fn : ('a -> '2b) -> 'a dict -> '2b dict
+- val dict0 = mkDict () : string dict
+= val list0 = listItems dict0 ;
+val dict0 = DICT {nobj=0,root=ref SplayNil} : string dict
+val list0 = [] : (IntKey.ord_key * string) list
+- val dict1 = insert (dict0, 0, "this")
+= val list1 = listItems dict1 ;
+val dict1 =
+  DICT
+    {nobj=1,
+     root=ref (SplayObj {left=SplayNil,right=SplayNil,value=(0,"this")})}
+  : string dict
+val list1 = [(0,"this")] : (IntKey.ord_key * string) list
+- val dict2 = insert (dict1, 4, "order")
+= val list2 = listItems dict2 ;
+val dict2 =
+  DICT
+    {nobj=2,
+     root=ref
+            (SplayObj
+               {left=SplayObj {left=SplayNil,right=SplayNil,value=(0,"this")},
+                right=SplayNil,value=(4,"order")})} : string dict
+val list2 = [(0,"this"),(4,"order")] : (IntKey.ord_key * string) list
+- val dict3 = insert (dict2, 1, "should")
+= val list3 = listItems dict3 ;
+val dict3 =
+  DICT
+    {nobj=3,
+     root=ref
+            (SplayObj
+               {left=SplayObj {left=SplayNil,right=SplayNil,value=(0,"this")},
+                right=SplayObj
+                        {left=SplayNil,right=SplayNil,value=(4,"order")},
+                value=(1,"should")})} : string dict
+val list3 = [(0,"this"),(1,"should"),(4,"order")]
+  : (IntKey.ord_key * string) list
+- val dict4 = insert (dict3, 3, "in")
+= val list4 = listItems dict4 ;
+val dict4 =
+  DICT
+    {nobj=4,
+     root=ref
+            (SplayObj
+               {left=SplayObj
+                       {left=SplayObj
+                               {left=SplayObj
+                                       {left=SplayNil,right=SplayNil,
+                                        value=(0,"this")},right=SplayNil,
+                                value=(1,"should")},right=SplayNil,
+                        value=(4,"order")},right=SplayNil,value=(3,"in")})}
+  : string dict
+val list4 = [(0,"this"),(1,"should"),(4,"order"),(3,"in")]
+  : (IntKey.ord_key * string) list
+- val dict5 = insert (dict4, 2, "be")
+= val list5 = listItems dict5 ;
+val dict5 =
+  DICT
+    {nobj=5,
+     root=ref
+            (SplayObj
+               {left=SplayObj
+                       {left=SplayObj
+                               {left=SplayNil,right=SplayNil,value=(0,"this")},
+                        right=SplayNil,value=(1,"should")},
+                right=SplayObj
+                        {left=SplayNil,
+                         right=SplayObj
+                                 {left=SplayNil,right=SplayNil,value=(3,"in")},
+                         value=(4,"order")},value=(2,"be")})} : string dict
+val list5 = [(0,"this"),(1,"should"),(2,"be"),(4,"order"),(3,"in")]
+  : (IntKey.ord_key * string) list
+- val four = find (dict5, 4);
+val four = "order" : string
+- val four = find (dict4, 4);
+
+uncaught exception NotFound
+- val four = find (dict3, 4);
+val four = "order" : string
+- 
+next_mach%
+
+Fix:
+Status:			fixed in 0.2 (ERG; 03/04/93)
+
+-------------------------------------------------------------------------------
+3. StringCvt does not accept "+" as a sign
+Submitter: 		John Reppy (jhr@research.att.com)
+Date: 			April 13, 1993
+System(s) and Version:	Library (0.1)
+SML/NJ Version: 	0.93
+Machine: 		all
+Severity: 		minor
+Problem: 		The StringCvt functions do not accept "+" as a valid
+			sign.
+Transcript:
+  - val x = StringCvt.atoi "+1";
+  
+  uncaught exception Convert
+  -
+Comments:		this should be fixed, since "+" can be produced by
+			Format (as well as by C).
+Fix:			modify eatNeg to accept "+"
+Status:			fixed in 0.93 (JHR; 08/07/93)
+
+-------------------------------------------------------------------------------
+4. Format.format produces bogus results
+Submitter: 		John Reppy (jhr@research.att.com)
+Date: 			April 16, 1993
+System(s) and Version:	Library (0.1)
+SML/NJ Version: 	0.93
+Machine: 		all
+Severity: 		major
+Problem: 		Format.format produces bogus results when using
+			Format.LEFT as an item.
+Transcript:
+  - fun indent i = Format.LEFT(i+i, Format.STR "");
+  val indent = fn : int -> Format.fmt_item
+  - Format.format "%s  nd%d -> nd%d;\n" [indent 1, Format.INT 2, Format.INT 3];
+  val it = "    nd2 -> nd3;\n  nd2 -> nd3;\n" : string
+  - Format.format "%s  nd%d -> nd%d;\n" [Format.STR "", Format.INT 2, Format.INT 3];
+  val it = "  nd2 -> nd3;\n" : string
+
+Comments:
+Fix:
+Status:			fixed in 0.2 (JHR; 07/19/93)
+
+-------------------------------------------------------------------------------
+5. BinarySet.union returns the wrong answer
+Submitter: 		Shawn Smith (ssmith@rice.edu)
+Date: 			Mon May 3, 1993
+System(s) and Version:	Library (0.1)
+SML/NJ Version: 	0.93
+Machine: 		SPARC SunOs 4.1
+Severity: 		major
+Problem: 		BinarySet.union returns the wrong answer
+Transcript:
+
+System.Control.Print.printDepth := 10;
+
+local
+  fun compare(a:string,b) =
+    if a < b then
+      LibBase.Less
+    else if a > b then
+      LibBase.Greater
+    else
+      LibBase.Equal
+in	   
+  structure StringSet = BinarySet(type ord_key = string  val cmpKey = compare)
+end
+
+local
+  open StringSet
+in
+  val a = add(add(add(empty,"A"),"B"),"D")
+  val b = add(a,"C")
+  val c = union(a,b)
+  val ns_str =
+    (ListFormat.formatList {init="",sep=" ",final="",fmt=(fn x => x)}) o
+    StringSet.listItems
+  val astr = ns_str(a)
+  val bstr = ns_str(b)
+  val cstr = ns_str(c)
+  val _ = output(std_out,astr^" + "^bstr^" <> "^cstr^"\n")
+end
+
+Comments:		I found the bug in the source code (change r to l below).
+Fix:
+*** original
+--- fixed
+***************
+*** 187,193 ****
+        fun trim (lo,hi,E) = E
+          | trim (lo,hi,s as T{elt=v,left=l,right=r,...}) =
+              if cmpKey(v,lo) = Greater
+!               then if cmpKey(v,hi) = Less then s else trim(lo,hi,r)
+                else trim(lo,hi,r)
+                  
+        fun uni_bd (s,E,_,_) = s
+--- 187,193 ----
+        fun trim (lo,hi,E) = E
+          | trim (lo,hi,s as T{elt=v,left=l,right=r,...}) =
+              if cmpKey(v,lo) = Greater
+!               then if cmpKey(v,hi) = Less then s else trim(lo,hi,l)
+                else trim(lo,hi,r)
+                  
+        fun uni_bd (s,E,_,_) = s
+
+Status:			fixed in 0.2 (ERG; 05/03/93)
+
+-------------------------------------------------------------------------------
+6. HashTable, Name, ... functions catching too many exceptions
+Submitter: 		Shawn Smith (ssmith@rice.edu)
+Date: 			Mon May 3, 1993
+System(s) and Version:	Library (0.1)
+SML/NJ Version: 	0.93
+Machine: 		SPARC SunOS 4.1
+Severity: 		major
+Problem: 		Many HashTable and Name functions like apply,
+                        map, transform, fold, ... handle *all*
+                        exceptions with "handle _ => ...".  Why can't
+                        they just "handle Array.Subscript => ..."?  I
+                        want to be able to raise exceptions that are
+                        handled by code outside these functions.
+Transcript:
+
+exception FatalErr
+exception TableNotFound
+open Name
+val table = mkNameTbl(3,TableNotFound) : int name_tbl
+val _ = insert table (mkName("blah"),100)
+val _ = insert table (mkName("blap"),120)
+fun check_legal(_,value) = if value = 120 then raise FatalErr else ()
+val ans = (apply check_legal table; "no error in table")
+		handle FatalErr => "fatal error in table"
+
+should return 'val ans = "fatal error in table" : string'
+
+Comments:
+  The problem is in the apply, map, filter and transform functions
+  in hash-table.sml and poly-hash-table.sml.  Restricting the handlers
+  to Array.Subscript is not enough, since the user functions could
+  also raise this exception. [JHR]
+Fix:			replace all occurrences of "handle _" with
+                        "handle Array.Subscript"
+See above comments; the fix is to do bounds checking.
+Status:			fixed in 0.2 (JHR; 08/07/93)
+
+-------------------------------------------------------------------------------
+7. UnixPath.getWD returns a string with a trailing newline
+Submitter: 		Pierre Cregut <cregut@ecrc.de>
+Date: 			Mon, 10 May 93
+System(s) and Version:	Library (0.1)
+SML/NJ Version: 	0.93
+Machine: 		any
+Severity: 		minor
+Problem:
+  getWD gives back a path, but as it is a call to an external function there is
+  a newline at the end.  It should be trimmed. As a consequence there is a newline
+  in the middle of mkAbsolutePath.
+Transcript: 		
+Comments:		
+Fix:			trim the result of IO.input_line
+Status:			fixed in 0.2 (JHR; 08/07/93)
+
+-------------------------------------------------------------------------------
+8. HashTable.filter does not update the table
+Submitter: 		La Monte H. Yarroll <piggy@baqaqi.chi.il.us>
+Date: 			Tue May 18 12:27:58 EST 1993
+System(s) and Version:	Library (0.1)
+SML/NJ Version: 	0.93
+Machine: 		SparcStation, SunOS 4.1.3
+Severity: 		major
+Problem: 		HashTable.filter does not update the table.
+Transcript: 		
+
+(* filter_bug.sml *)
+(* Demonstrate that filter does not work as advertised.  *)
+val Tbl : int Name.name_tbl = Name.mkNameTbl (10, myexn);
+Name.insert Tbl (Name.mkName "foo", 1);
+Name.insert Tbl (Name.mkName "bar", 2);
+(print "originial table:  "; map #2 (Name.listItems Tbl));
+(print "filtering through false...\n"; Name.filter (fn _ => false) Tbl);
+(print "final table:  "; map #2 (Name.listItems Tbl));
+
+- use "filter_bug.sml";
+[opening filter_bug.sml]
+val Tbl =
+  HT
+    {n_items=ref 0,not_found=myexn(-),
+     table=ref [|NIL,NIL,NIL,NIL,NIL,NIL,NIL,NIL,NIL,NIL,NIL,NIL,...|]}
+  : int Name.name_tbl
+val it = () : unit
+val it = () : unit
+originial table:  val it = [2,1] : int list
+filtering through false...
+val it = () : unit
+final table:  val it = [2,1] : int list
+val it = () : unit
+
+Comments:
+Notice that the elements of Table are completely unaltered even for the
+false filter.
+
+Note: this also applies to PolyHashtable. [JHR]
+
+Fix:  The fix is very simple; I just added the update.  Note that I
+tightened the handle statement too.  The original form could have
+masked bugs elsewhere in the system, e.g. in the predicate.
+
+  (* remove any hash table items that do not satisfy the given
+   * predicate.
+   *)
+    fun filter pred (HT{table, n_items, not_found}) = let
+	  fun filterP NIL = NIL
+	    | filterP (B(hash, key, item, rest)) = if (pred(key, item))
+		then B(hash, key, item, filterP rest)
+		else filterP rest
+	  val arr = !table
+	  fun filterTbl i =
+	      (Array.update (arr, i,
+			     filterP (Array.sub (arr, i)));
+	       filterTbl(i+1))
+	  in
+	    (filterTbl 0) handle Array.Subscript => ()
+	  end (* filter *)
+
+Status:			fixed in 0.2 (JHR; 08/07/93)
+
+-------------------------------------------------------------------------------
+9. Makestring.realGFormat produces incorrect results
+Submitter: 		Andrew Appel <appel@Princeton.EDU>
+Date: 			Wed, 9 Jun 1993
+System(s) and Version:	Library (0.1)
+SML/NJ Version: 	0.93
+Machine: 		any
+Severity: 		major
+Problem: 		
+  Bug in smlnj-lib-0.1, in Makestring.realGFormat, when exponent is
+  between -1 and -3:
+Transcript: 		
+
+-  val g = Makestring.realGFormat;
+val g = fn
+  : real * int -> {exp:int option, frac:string, sign:bool, whole:string}
+- g (0.02,10);
+val it = {exp=NONE,frac="2",sign=false,whole="0"}
+  : {exp:int option, frac:string, sign:bool, whole:string}
+
+Comments:		the bug was in the zero-padding of the fraction, which
+			wasn't taking the size of the non-zero part into
+			account.
+Fix:			(see Comments)
+Status:			fixed in 0.2 (JHR; 08/07/93)
+
+-------------------------------------------------------------------------------
+10. INTMAP (in intmap-sig) disagrees with the documentation
+Submitter: 		Andrew Appel <appel@Princeton.EDU>
+Date: 			Wed, 9 Jun 1993
+System(s) and Version:	Library (0.1)
+SML/NJ Version: 	0.93
+Machine: 		any
+Severity: 		minor
+Problem: 		
+  In smlnj-lib-0.1, intmap-sig.sml still has a couple of vestiges of
+  a non-applicative version, but just in the types of the map and
+  transform functions.  This disagrees with the manual.
+Transcript: 		
+Comments:		
+Fix:			Remove weak type variables from intmap-sig.sml
+Status:			fixed in 0.2 (ERG; 06/17/93)
+
+-------------------------------------------------------------------------------
+11. Format.scan does not accept %*
+Submitter:              Emden Gansner (erg@research.att.com)
+Date:                   April 17, 1993
+System(s) and Version:  Library (0.1)
+SML/NJ Version:         0.93
+Machine:                all
+Severity:               minor
+Problem:                Format.scan does not accept %*
+
+Transcript:
+  - Format.scan "%*s %*s %d %d";
+
+  uncaught exception BadFormat
+
+Comments:
+  This might be viewed as a feature, since it matches the documentation (JHR)
+Fix:
+Status:			open
+
+-------------------------------------------------------------------------------
+12.  Array2.tabulate is incorrect
+Submitter:              David Sitsky sits@arp.anu.edu.au
+Date:                   5 June 1993
+System(s) and Version:  Library
+SML/NJ Version:         0.93
+Machine:                sun4 SunOS 4.0.1
+Severity:               minor
+Problem:                Call tabulate is incorrect
+Transcript:
+- tabulate(2,2,fn (x,y) => (x,y));
+val it = A2 {elems=[|(0,0),(0,1),(1,0),(1,1),(2,0),(2,1)|],ncols=2,nrows=2}
+  : (int * int) array2
+
+Comments:		this is also bug #1
+Fix:
+Status:			fixed in 0.2 (see #001)
+
+-------------------------------------------------------------------------------
+13. Signatures DICT and INTMAP have inconsistant types for remove
+Submitter:              Rance Cleaveland (rance@csc.ncsu.edu)
+Date:                   24 June 1993
+System(s) and Version:  Library (0.1)
+SML/NJ Version:         <0.93>
+Machine:                SPARC, SunOS 4.1.2
+Severity:               minor
+Problem:                Types of "remove" are incompatible in signatures
+                        DICT and INTMAP
+Transcript:             
+                        
+Comments:               DICT- remove : ('1a dict * Key.ord_key) -> ('1a * '1a dict)
+                        INTMAP- remove : ('a intmap * int) -> 'a
+                        This is inconsistent with the documentation for INTMAP.
+
+Fix:                    change INTMAP.remove to conform to DICT.remove [ERG].
+                        (should we supply a version of remove for all DICT
+                        structures that doesn't return the value?)
+Status:			fixed in 0.2 (ERG; 08/12/93)
+
+-------------------------------------------------------------------------------
+14. Incorrect SourceGroups dependecy file
+Submitter:              Rance Cleaveland (rance@csc.ncsu.edu)
+Date:                   24 June 1993
+System(s) and Version:  Library (0.1)
+SML/NJ Version:         <0.93>
+Machine:                SPARC SunOS 4.1.2
+Severity:               minor
+Problem:                Error messages when using lib.deps and SourceGroup
+Transcript:
+- val libNJ = SourceGroup.create [SourceGroup.Connections ["/net/lib/sml-0.93/dist/smlnj-lib-0.1/library.dep"]];
+[Connections /net/lib/sml-0.93/dist/smlnj-lib-0.1/library.dep]
+% structure StringCvt undefined in /net/lib/sml-0.93/dist/smlnj-lib-0.1/format.sml
+% structure HashTable undefined in /net/lib/sml-0.93/dist/smlnj-lib-0.1/name.sml
+val libNJ = 38 : ?.group
+
+Comments:               The dependency file is not consistent with the library
+			source.
+Fix:                    fix it
+Status:			fixed in 0.2 (ERG; 08/23/93)
+
+-------------------------------------------------------------------------------
+15. Random.mkRandom(0) generates all zeros
+Submitter: 		Andrew Appel <appel@Princeton.EDU>
+Date: 			Thu, 29 Jul 1993
+System(s) and Version:	Library (0.1)
+SML/NJ Version: 	0.93
+Machine: 		any
+Severity: 		minor
+Problem:
+  The call (Random.mkRandom 0.0) yields a generator for a very
+  non-random sequence (all zeros).
+Transcript: 
+  - val f = Random.mkRandom 0.0;
+  val f = fn : unit -> real
+  - f();
+  val it = 0.0 : real
+  - f();
+  val it = 0.0 : real
+Comments:		
+  this will be fixed by providing a better random number generator.
+Fix:			add a caveat to the documentation
+Status:			fixed in 0.2 (08/12/93)
+
+-------------------------------------------------------------------------------
+16. StringUtil functions don't propage exceptions in predicates
+Submitter: 		John Reppy
+Date: 			August 7, 1993
+System(s) and Version:	Library (0.1)
+SML/NJ Version: 	0.93
+Machine: 		any
+Severity: 		minor
+Problem:
+  The predicate-based functions (indexp, revindexp, spanp, and cspanp) will
+  not propagate exceptions raised in the user-supplied predicate (cf., #6).
+Transcript: 		
+  - StringUtil.cspanp (fn _ => raise Fail "") ("abc", 0);
+  val it = 3 : int
+Comments:
+Fix:
+  The fix is the same as for #6: switch to explicit bounds checking.
+Status:			open
+
+-------------------------------------------------------------------------------
+17. find/remove in dictonaries cannot find items
+Submitter: 		GIRARD Pierre (girard@cert.fr)
+Date: 			Mon Aug 23 10:39:06 MET DST 1993
+SML/NJ Version: 	SML 0.93, Lexgen 1.4, MLYacc 2.1, Lib 0.1
+Machine: 		SPARC station ELC + SunOS Release 4.1.3 
+Severity: 		major
+Problem: 		functions find and remove of the signature for
+			applicatives dictionaries (DICT) in Lib
+			sometimes raise NotFound even if the element is present.
+Transcript: 		
+
+(* We will create a dictionnary witch matches an integer to a string *)
+
+(* First we need to define a structure for the dictionnary keys *)
+
+- structure ordKey : ORD_KEY =
+struct
+
+  type ord_key = string
+
+  fun cmpKey  (s1 : string , s2 : string) = 
+	
+	if s1 > s2 then
+		LibBase.Greater
+	else
+		if s1 < s2 then
+			LibBase.Less
+		else
+			LibBase.Equal
+
+  fun conv_ord_key_string s  = s : string
+
+  fun conv_string_ord_key s = s :ord_key
+end;
+
+structure ordKey : ORD_KEY
+-
+
+(* Now we can create a structure defining dictionnaries *)
+(* with string keys					*)
+
+- structure str_dic = SplayDict (ordKey);
+structure str_dic : DICT
+
+(* Let a_dic be a str_dic containning integers *)
+
+- val a_dic = str_dic.mkDict() : int str_dic.dict;
+val a_dic = DICT {nobj=0,root=ref SplayNil} : int str_dic.dict
+
+
+(* We can introduce some information in our dictionnary *)
+
+- val a_dic = str_dic.insert(a_dic, str_dic.Key.conv_string_ord_key "a" , 1);
+val a_dic =
+  DICT
+    {nobj=1,root=ref (SplayObj {left=SplayNil,right=SplayNil,value=("a",1)})}
+  : int str_dic.dict
+
+
+- val a_dic = str_dic.insert(a_dic, str_dic.Key.conv_string_ord_key "b" , 2);
+val a_dic =
+  DICT
+    {nobj=2,
+     root=ref
+            (SplayObj
+               {left=SplayObj {left=SplayNil,right=SplayNil,value=("a",1)},
+                right=SplayNil,value=("b",2)})} : int str_dic.dict
+
+
+-  val a_dic = str_dic.insert(a_dic, str_dic.Key.conv_string_ord_key "c" , 3);
+val a_dic =
+  DICT
+    {nobj=3,
+     root=ref
+            (SplayObj
+               {left=SplayObj
+                       {left=SplayObj
+                               {left=SplayNil,right=SplayNil,value=("a",1)},
+                        right=SplayNil,value=("b",2)},right=SplayNil,
+                value=("c",3)})} : int str_dic.dict
+
+
+
+-  val a_dic = str_dic.insert(a_dic, str_dic.Key.conv_string_ord_key "d" , 4);
+val a_dic =
+  DICT
+    {nobj=4,
+     root=ref
+            (SplayObj
+               {left=SplayObj
+                       {left=SplayObj
+                               {left=SplayObj
+                                       {left=SplayNil,right=SplayNil,
+                                        value=("a",1)},right=SplayNil,
+                                value=("b",2)},right=SplayNil,value=("c",3)},
+                right=SplayNil,value=("d",4)})} : int str_dic.dict
+
+-val a_dic = str_dic.insert(a_dic, str_dic.Key.conv_string_ord_key "bc" , 5);
+val a_dic =
+  DICT
+    {nobj=5,
+     root=ref
+            (SplayObj
+               {left=SplayObj
+                       {left=SplayObj
+                               {left=SplayNil,right=SplayNil,value=("a",1)},
+                        right=SplayNil,value=("b",2)},
+                right=SplayObj
+                        {left=SplayNil,
+                         right=SplayObj
+                                 {left=SplayNil,right=SplayNil,value=("d",4)},
+                         value=("c",3)},value=("bc",5)})} : int str_dic.dict
+
+
+
+(* Looking for the information in the dictionnary *)
+
+ic.find(a_dic , str_dic.Key.conv_string_ord_key "a");
+val it = 1 : int
+
+- str_dic.find(a_dic , str_dic.Key.conv_string_ord_key "c");
+uncaught exception NotFound
+
+- str_dic.remove(a_dic , str_dic.Key.conv_string_ord_key "c");
+uncaught exception NotFound
+
+
+(* We can list the dictionnary's elements *)
+
+str_dic.listItems(a_dic);
+
+- val it = [("a",1),("b",2),("bc",5),("c",3),("d",4)]
+  : (ordKey.ord_key * int) list
+
+Fix:			This is the same as 002
+Status:			fixed in 0.2 (ERG; 03/04/93)
+
+
+-------------------------------------------------------------------------------

@@ -1,0 +1,46 @@
+This directory contains an alternative implementation of instreams.
+This implementation provides what I believe to be correct behaviour.
+I don't make these the default because I believe that the compilers
+should provide this behaviour, because this implementation would use
+more space, and because the implementations provided by most compilers
+differ only slightly from the ideal.
+
+The problem with most implementations of instream is that when lookahead
+reaches an end-of-file on an interactive file, it consumes it.  Further
+calls to lookahead returns the character typed after the end-of-file.
+This destroys the referential transparency of lookahead, and makes it
+difficult to read polymorphic vectors from interactive streams.
+
+For example, suppose we are using the VectorParse.read function to
+read a vector of integers.  VectorParse.read has the following type:
+
+Vector.read: (instream -> 'a) -> instream -> 'a vector
+
+The argument function is called to read the elements of the vector.
+It is this function that will find the end-of-file, using lookahead.
+VectorParse.read will then call end_of_stream to test whether there
+is more input, and this call won't know about the end-of-file.
+
+You could program around this, for example by returning both a result
+and an indication of whether an end-of-stream marker was detected, but
+this gives a messy interface and makes programming more complicated.
+
+So I believe that lookahead should not consume end-of-files on streams.
+The input function should consume end-of-files; indeed after reading
+a vector of integers with VectorParse.read you will need to clear the
+end-of-file from the input stream if you want to type anymore on that
+stream.  Possibly compilers should provide an option to clear an
+end-of-file from std_in each time they prompt for input, to make std_in
+easier to use.
+
+
+(* RCS LOG *)
+
+$Log: README,v $
+Revision 1.1  1994/02/08 00:23:29  jkh
+Initial revision
+
+# Revision 1.1  91/02/12  16:10:13  16:10:13  db (Dave Berry)
+# Initial revision
+# 
+

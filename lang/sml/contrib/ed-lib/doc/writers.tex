@@ -1,0 +1,118 @@
+% RCS LOG
+%
+% $Log: writers.tex,v $
+% Revision 1.1  1994/02/08 00:23:12  jkh
+% Initial revision
+%
+%Revision 1.1  91/03/27  16:42:03  16:42:03  db (Dave Berry)
+%Initial revision
+%
+
+\chapter{Writing Library Entries.}		\label{implement}
+
+The library provides a consistent framework which can easily incorporate
+new entries.  New entries should use the same format as the existing
+entries, to keep the framework consistent.  For example, the standard
+names described in Section~\ref{names} should be used where appropriate.
+This chapter mentions some particular points that you should observe.
+
+Look at the existing entries before writing your own; this may
+help focus your ideas.  The library includes two skeleton files, one for
+signatures and one for functors.
+
+Don't use the identifiers {\tt import}, {\tt abstraction} and {\tt abstract}.
+The first two are keywords in Standard ML of New Jersey, and the third
+is proposed in an extension to the Definition of SML.  Using them will
+make your code non-portable.
+ 
+
+\section{Format of Signatures.}
+
+The format of user-visible signatures is described in Chapter~\ref{entries}.  
+New entries should be written in the same style, so that users can
+easily find the information they want.
+
+Some aspects of the format may not be immediately obvious:
+\begin{itemize}
+  \item The header section must include creation and maintenance details.
+	If no-one is maintaining this entry, the maintenance line should
+	be: {\tt Maintenance: None}.
+  \item The header section must also include a general description of
+	the entry.  The combination of this description and the comments
+	associated with each function should be suitable for on-line reading.
+	If more detailed documentation is needed, it should be put
+	in the {\tt doc} directory.
+  \item The only comments to begin in the left-most column are the header
+	section and the sub-headings used to structure the entry.
+  \item The comments associated with each object should immediately follow
+	its specification.
+\end{itemize}
+
+
+\section{Format of Structures and Functors.}
+
+A structure or functor that implements a user-visible signature should
+provide creation and maintenance details in the same format.  It may also
+include a general description of the implementation, but this is not
+required.
+
+Functors arguments should always be written in the form
+\verb+structure foo: FOO+.  The short form, \verb+functor F (foo: FOO) = ...+,
+should not be used.  Each
+functor that is intended to be visible to users should have argument and
+result signatures that meet the requirements of the previous section.  The
+header section should come after the arguments to the functor.
+
+
+\section{Installing A New Entry.}
+
+Each entry should be described by a signature.  This will usually be a
+new signature written for the entry, although some entries will be described
+by existing generic signatures.  New user-visible signatures should be
+placed in the {\tt signatures} sub-directory of the library.  They
+should include dependency declarations for the {\tt Make} system.  Most
+signatures will only depend on {\tt InstreamTypes} and {\tt GeneralTypes}.
+
+Many entries will be simple enough to be implemented by a single structure
+of functor.  In this case the structure or functor should be placed in 
+a file in the {\tt portable} subdirectory (or a system-specific distribution
+sub-directory if appropriate).  It should contain a dependency declaration
+for the {\tt Make} system, and also an application of the {\tt loadSig}
+function to a string containing the name of the user-visible signature.
+The latter is used by the {\tt build\_all.sml} and {\tt build\_core.sml}
+build files.
+
+More complex entries (such as the {\tt Make} system) will comprise
+several structures and functors, and more signatures than the
+user-visible one.  Such entries should be given a sub-directory in
+the {\tt portable} directory, containing all the files except the
+user-visible signature.  In the existing entries, I've prefixed
+all local structure and signature identifiers by the name of the
+whole package, to make them less likely to clash with existing or
+user-defined names.
+
+The local files of a complex package should be given dependency declarations
+for the {\tt Make} system, as usual.\footnote{The two existing sub-directories,
+{\tt Make} and {\tt Core}, don't have dependency declarations because
+they're loaded by {\tt build\_make.sml} itself.}
+In addition, they should use the
+{\tt loadLocalSig} and {\tt loadEntry} functions to load files in the correct
+sequence when they are built without {\tt Make}.  You will need to change
+the {\tt build\_all.sml}
+build file to load the package properly.  The function {\tt setLoadPrefix}
+must be applied to the name of the sub-directory before the call to
+{\tt loadEntry} that loads the package, and applied to the empty string
+afterwards.  Look at the existing code for the {\tt Make} and{\tt Core}
+sub-directories.
+
+You will also have to change the {\small\tt INSTALL} file for every
+new sub-directory that you create.  The first change is to generate
+the correct entries in the {\small\tt ML\_CONSULT} file used by the
+{\tt build\_make.sml} build file.  The second change is to ensure that
+the new entry is linked into all versions of the library.  Again, look at
+the existing code for the {\tt Make} and {\tt Core} subdirectories.
+
+After you've added a new entry, you should run the {\small\tt INSTALL}
+program to generate the new {\small\tt ML\_CONSULT} file for
+{\tt build\_make.sml}.
+

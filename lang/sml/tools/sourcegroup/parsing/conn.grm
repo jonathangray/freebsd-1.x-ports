@@ -1,0 +1,54 @@
+open AbSyn
+open ConnOperators
+fun stringTerm (str:string) = terminal (STRING_ str)
+fun idTerm (str:string) = terminal (ID_ str)
+fun idListTerm (lst:string list) = terminal (IDLIST_ lst)
+%%
+%header (functor ConnLrValsFun
+  (structure Token :TOKEN
+   structure AbSyn :ABSYN
+   structure ConnOperators :CONN_OPERATORS
+     sharing type AbSyn.operator = ConnOperators.operator) :Conn_LRVALS)
+%eop EOF
+%start start
+%pos int
+%term ID of string | STRING of string | SEMI | EOF |
+      EXPORT | IMPORT | SOURCE | NAMESPACE
+%nonterm
+   start       of ast
+ | sectionList of ast list
+ | section     of ast
+ | clauseList  of ast list
+ | clause      of ast
+ | idList      of string list
+%name Conn
+%keyword SEMI EXPORT IMPORT SOURCE
+%noshift EOF
+%value ID ("bogus")
+%value STRING ("")
+%%
+
+start:
+  sectionList  (ast CONN_ sectionList)
+
+sectionList:
+   section              ([section])
+ | section sectionList  (section :: sectionList)
+
+section:
+   NAMESPACE idList SEMI 
+     (ast NAMESPACE_ [idListTerm idList])
+ | SOURCE ID STRING clauseList SEMI 
+     (ast SOURCE_ ((idTerm ID)::((stringTerm STRING)::clauseList)))
+
+clauseList:
+   clause             ([clause])
+ | clause clauseList  (clause::clauseList)
+
+clause:
+   IMPORT ID idList  (ast IMPORT_ [idListTerm (ID::idList)])
+ | EXPORT ID idList  (ast EXPORT_ [idListTerm (ID::idList)])
+
+idList:
+   ID         ([ID])
+ | ID idList  (ID::idList)

@@ -1,0 +1,717 @@
+(* Copyright 1989,1992 by AT&T Bell Laboratories *)
+open Ast ErrorMsg Symbol FastSymbol AstUtil Fixity 
+
+type env = parseEnv
+type raw_symbol = FastSymbol.raw_symbol
+
+fun markexp (e as MarkExp _, _, _) = e
+  | markexp(e,a,b) = MarkExp(e,a,b)
+fun markdec((d as MarkDec _, e), _,_) = (d,e)
+  | markdec((d,e),a,b) = (MarkDec(d,a,b),e)
+
+fun identity x = x
+
+fun sequence (do1,do2) env =
+  let val r1 = do1 env
+    val r2 = do2 env
+  in r1 @ r2 end
+
+fun seqdec dcl env = let val (d,e) = dcl env in ([d],e) end
+
+val asteriskHash = StrgHash.hashString "*"
+val asteriskString = "*"
+val equalHash = StrgHash.hashString "="
+val equalString = "="
+val bogusHash = StrgHash.hashString "BOGUS"
+val bogusString = "BOGUS"
+val quotedBogusHash = StrgHash.hashString "'BOGUS"
+val quotedBogusString = "'BOGUS"
+val quotedBogusHash = StrgHash.hashString "'BOGUS"
+val quotedBogusString = "'BOGUS"
+
+%%
+%term
+    EOF | SEMICOLON
+  | ID of FastSymbol.raw_symbol | TYVAR of FastSymbol.raw_symbol
+  | INT of int | INT0 of int | REAL of string | STRING of string 
+  | ABSTRACTION | ABSTYPE | AND
+  | ARROW | AS | BAR | CASE | DATATYPE | DOTDOTDOT | ELSE | END | EQUAL
+  | EQTYPE | EXCEPTION | DO | DOT | DARROW | FN | FUN | FUNCTOR | HANDLE | HASH
+  | IF | IN | INCLUDE | INFIX | INFIXR | LET | LOCAL | NONFIX | OF | OP
+  | OPEN | OVERLOAD | RAISE | REC | SHARING | SIG | SIGNATURE | STRUCT
+  | STRUCTURE | THEN | TYPE | VAL | WHILE | WILD | WITH | WITHTYPE | ASTERISK
+  | COLON | COMMA | LBRACE | LBRACKET | LPAREN | RBRACE | RBRACKET | RPAREN
+  | ORELSE | ANDALSO | FUNSIG | VECTORSTART
+  | BEGINQ | ENDQ of string | OBJL of string | AQID of FastSymbol.raw_symbol
+
+%nonterm  ident of FastSymbol.raw_symbol
+	| id of FastSymbol.raw_symbol
+	| int of int
+	| op_op of unit -> unit
+	| opid of env -> symbol 
+	| qid of (FastSymbol.raw_symbol ->symbol) -> symbol list 
+	| selector of symbol
+	| tycon of symbol list
+	| tlabel of (symbol * ty)
+	| tlabels  of (symbol * ty) list 
+	| ty' of ty
+	| tuple_ty of ty list
+	| ty of ty
+	| ty0_pc of ty list
+	| match of env -> rule list
+	| rule of env -> rule
+	| elabel of env -> (symbol * exp)
+	| elabels of env -> (symbol * exp) list
+	| exp_ps of env -> exp list
+	| exp of env -> exp 
+	| app_exp of env -> exp precStack
+	| aexp of env -> exp
+	| exp_list of env -> exp list
+	| exp_2c  of env -> exp list
+	| quote of env -> exp list
+	| ot_list of env -> exp list
+	| pat of env -> pat
+	| pat' of env -> pat 
+	| pat'' of env -> pat
+	| apat of env -> (pat * fixity * complainer)
+	| apat' of env -> (pat * fixity * complainer)
+	| apat'' of env -> pat
+	| plabel of env -> (symbol * pat)
+	| plabels of env -> ((symbol * pat) list * bool)
+	| pat_2c of env -> pat list
+	| pat_list of env -> pat list
+	| vb of env -> vb list
+	| constraint of ty option
+	| rvb of env -> rvb list
+	| fb' of env -> rawclause list
+	| fb of env -> (rawclause list * linenum * linenum) list
+	| apats of env -> (pat * fixity * complainer) list
+	| clause' of env -> (symbol * pat list)
+	| clause of env -> rawclause
+	| tb of tb list
+	| tyvars of tyvar list
+	| tyvar_pc of tyvar list
+	| db of db list
+	| constrs of (symbol * ty option) list
+	| constr of symbol * ty option
+	| eb of eb list
+	| qid_p of Symbol.symbol list list
+	| fixity of unit -> fixity
+	| ldec of env -> dec * (env -> env)
+	| exp_pa of env ->  exp list
+	| ldecs of env -> dec * (env -> env)
+	| ops of symbol list
+	| spec_s of spec list
+	| spec of spec list
+	| idents of spec list
+	| strspec of (symbol * sigexp) list
+	| fctspec of (symbol * fsigexp) list
+	| tyspec of  (symbol * tyvar list) list
+	| valspec of (symbol * ty) list
+	| exnspec of (symbol * ty option) list
+	| sharespec of spec list
+	| patheqn of (FastSymbol.raw_symbol ->symbol) -> symbol list list
+	| sign of sigexp
+	| sigconstraint_op of sigexp option
+	| fsigconstraint_op of fsigexp option
+	| sigb of sigb list
+	| fsigb of fsigb list
+	| fsig of  fsigexp
+	| str of env -> strexp
+	| arg_fct of env -> (strexp * bool) list
+	| sdecs of env -> dec * (env -> env)
+ 	| sdecs' of env -> dec * (env -> env)
+	| sdec of env -> dec * (env -> env)
+	| strb of env -> strb list
+	| fparam of symbol option * sigexp
+	| fparamList of (symbol option * sigexp) list
+	| fctb of env -> fctb list
+	| fct_exp of env * fsigexp option -> fctexp
+	| interdec of env -> dec * env
+
+%pos int
+%arg (error) : pos * pos -> ErrorMsg.complainer
+%pure
+%start interdec
+%eop EOF SEMICOLON
+%noshift EOF
+
+%nonassoc WITHTYPE
+%right AND
+%right ARROW
+%right AS
+%right DARROW 
+%left DO
+%left ELSE
+%left RAISE
+%right HANDLE
+%left ORELSE
+%left ANDALSO
+%left COLON
+
+%name ML
+
+%keyword ABSTRACTION ABSTYPE AND AS CASE DATATYPE DOTDOTDOT ELSE END 
+  EQTYPE EXCEPTION  DO  DARROW  FN  FUN  FUNCTOR  HANDLE
+  IF IN INCLUDE  INFIX  INFIXR  LET  LOCAL  NONFIX  OF  OP
+  OPEN OVERLOAD  RAISE  REC  SHARING  SIG  SIGNATURE  STRUCT
+  STRUCTURE THEN TYPE VAL WHILE WITH WITHTYPE
+  ORELSE ANDALSO 
+
+%subst EQUAL for DARROW | DARROW for EQUAL | ANDALSO for AND | OF for COLON
+     | COMMA for SEMICOLON | SEMICOLON for COMMA
+%prefer VAL THEN ELSE LPAREN
+
+%value ID (rawSymbol(bogusHash,bogusString))
+%value TYVAR (rawSymbol(quotedBogusHash,quotedBogusString))
+%value INT (1)
+%value INT0 (0)
+%value REAL ("0.0")
+%value STRING ("")
+
+%%
+
+int	: INT		(INT)
+	| INT0		(INT0)
+
+id	: ID		(ID)
+	| ASTERISK	(rawSymbol (asteriskHash,asteriskString))
+
+ident	: ID 		(ID)
+	| ASTERISK	(rawSymbol (asteriskHash,asteriskString))
+	| EQUAL		(rawSymbol (equalHash,equalString))
+
+op_op	: OP		(fn()=> error (OPleft,OPright) WARN "unnecessary `op'"
+				      nullErrorBody)
+	| 		(fn()=>())
+
+opid	: id		(fn env => let val (v,f) = var'n'fix id
+				   in case lookFIX (env,f) of NONfix => ()
+				      | _ => error (idleft,idright) COMPLAIN
+						"nonfix identifier required"
+						nullErrorBody;
+				      v
+				   end)
+	| OP ident	(fn _ => varSymbol ident)
+
+qid	: ID DOT qid	(fn kind => strSymbol ID :: qid kind)
+	| ident		(fn kind => [kind ident])
+
+selector: id		(labSymbol id)
+	| INT		(Symbol.labSymbol(makestring INT))
+
+tycon   : ID DOT tycon		(strSymbol ID :: tycon)
+	| ID			([tycSymbol ID])
+
+tlabel	: selector COLON ty	(selector, ty )
+
+tlabels : tlabel COMMA tlabels	(tlabel :: tlabels)
+	| tlabel		([tlabel])
+
+ty'	: TYVAR		(MarkTy (VarTy(Tyv(tyvSymbol TYVAR)),
+				 TYVARleft,TYVARright))
+	| LBRACE tlabels
+		 RBRACE (MarkTy(RecordTy tlabels,LBRACEleft,RBRACEright))
+	| LBRACE RBRACE	(RecordTy [])
+	| LPAREN ty0_pc RPAREN tycon  
+			(MarkTy(ConTy(tycon,ty0_pc),tyconleft,tyconright))
+	| LPAREN ty RPAREN	(ty)
+	| ty' tycon	(MarkTy(ConTy(tycon,[ty']),tyconleft,tyconright))
+	| tycon		(MarkTy(ConTy(tycon,[]),tyconleft,tyconright))
+
+tuple_ty : ty' ASTERISK tuple_ty 	(ty' :: tuple_ty)
+	 | ty' ASTERISK ty'	 	([ty'1,ty'2])
+
+ty	: tuple_ty	(TupleTy(tuple_ty))
+	| ty ARROW ty	(ConTy([arrowTycon], [ty1,ty2]))
+	| ty' 		(ty')
+	
+ty0_pc	: ty COMMA ty		([ty1,ty2])
+	| ty COMMA ty0_pc 	(ty :: ty0_pc)
+
+match	: rule			(fn env => [rule env])
+	| rule BAR match	(fn env => rule env :: match env)
+
+rule	: pat DARROW exp	
+		(fn env => Rule{pat=pat env,
+				exp=markexp(exp env,expleft,expright)})
+
+		(* 	EXPRESSIONS	*)
+
+elabel	: selector EQUAL exp	(fn env => (selector,exp env))
+
+elabels : elabel COMMA elabels	(fn env => (elabel env :: elabels env))
+	| elabel	(fn env => [elabel env])
+
+exp_ps	: exp		(fn env => [exp env])
+	| exp SEMICOLON 
+		exp_ps	(fn env => exp env :: exp_ps env)
+
+exp	: exp HANDLE 
+		match	(fn env => HandleExp{expr=exp env,rules=match env})
+
+	| exp ORELSE exp
+			(fn env => OrelseExp
+				      (markexp(exp1 env,exp1left,exp1right),
+				       markexp(exp2 env,exp2left,exp2right)))
+	| exp ANDALSO exp (fn env=> AndalsoExp
+				      (markexp(exp1 env,exp1left,exp1right),
+				       markexp(exp2 env,exp2left,exp2right)))
+	| exp COLON ty	(fn env => ConstraintExp{expr=exp env,constraint=ty})
+	| app_exp	(fn env => 
+			   exp_finish(app_exp env,
+				      error(app_expright,app_expright)))
+
+	| FN match	(fn env=> markexp(FnExp(match env),FNleft,matchright))
+	| CASE exp OF match
+		(fn env=>markexp(CaseExp{expr=exp env,rules=match env},
+			         CASEleft,matchright))
+	| WHILE exp DO exp	
+		(fn env=> WhileExp{test=markexp(exp1 env,exp1left, exp1right),
+				   expr=markexp(exp2 env,exp2left, exp2right)})
+	| IF exp THEN exp ELSE exp 	
+		(fn env=>IfExp{test=exp1 env,
+			       thenCase=markexp(exp2 env,exp2left,exp2right),
+			       elseCase=markexp(exp3 env,exp3left,exp3right)})
+	| RAISE exp	
+		(fn env => markexp(markexp(RaiseExp(exp env),expleft,expright),
+				   RAISEleft,expright))
+
+app_exp	: aexp	(fn env => exp_start(markexp(aexp env,aexpleft,aexpright),
+				     NONfix, error (aexpleft,aexpright)))
+        | ident	(fn env => let val e = error(identleft,identright)
+			       val (v,f) = var'n'fix ident
+			   in exp_start(markexp(VarExp [v],
+						identleft,identright),
+					lookFIX (env,f), e)
+			   end)
+	| app_exp aexp	(fn env => exp_parse(app_exp env, 
+					markexp(aexp env, aexpleft,aexpright),
+					NONfix,
+					error (aexpleft,aexpright)))
+	| app_exp ident	(fn env => 
+			   let val e = error(identleft,identright)
+			       val (v,f) = var'n'fix ident
+			   in exp_parse(app_exp env, 
+					markexp(VarExp [v], 
+						identleft,identright),
+					lookFIX(env,f), e)
+			   end)
+
+aexp	: OP ident		(fn env => VarExp [varSymbol ident])
+	| ID DOT qid		(fn env => VarExp (strSymbol ID
+					   :: qid varSymbol))
+	| int			(fn env => IntExp int)
+	| REAL			(fn env => RealExp REAL)
+	| STRING		(fn env => StringExp STRING)
+	| HASH selector		(fn env => SelectorExp selector)
+	| LBRACE elabels RBRACE	
+		(fn env => markexp(RecordExp(elabels env),
+				   LBRACEleft,RBRACEright))
+	| LBRACE RBRACE		(fn env => RecordExp nil)
+	| LPAREN RPAREN		(fn env => unitExp)
+	| LPAREN exp_ps RPAREN	(fn env => SeqExp(exp_ps env))
+	| LPAREN exp_2c RPAREN	(fn env => TupleExp(exp_2c env))
+	| LBRACKET exp_list RBRACKET	
+				(fn env => ListExp(exp_list env))
+	| LBRACKET RBRACKET	(fn env => nilExp)
+        | VECTORSTART exp_list RBRACKET
+				(fn env => VectorExp(exp_list env))	  
+        | VECTORSTART RBRACKET
+				(fn env => VectorExp nil) 
+	| LET ldecs IN exp_ps END	
+				(fn env => 
+				    let val (d,f) = 
+					markdec(ldecs env,ldecsleft,ldecsright)
+				        val e = exp_ps (f env)
+				    in markexp
+					 (LetExp{dec=d,expr=SeqExp e},
+					  LETleft,ENDright)
+				    end)
+        | AQID                  (fn env => VarExp([varSymbol AQID]))
+        | quote                 (fn env => ListExp (quote env))
+
+quote   : BEGINQ ENDQ           (fn env => [QuoteExp ENDQ])
+        | BEGINQ ot_list ENDQ   (fn env => (ot_list env @ [QuoteExp ENDQ]))
+
+ot_list : OBJL aexp             (fn env => 
+				  [QuoteExp OBJL,AntiquoteExp (aexp env)])
+        | OBJL aexp ot_list     (fn env => (QuoteExp OBJL ::
+                                            AntiquoteExp (aexp env) ::
+                                            ot_list env))
+
+exp_2c	: exp COMMA exp_2c	(fn env => exp env :: exp_2c env)
+	| exp COMMA exp		(fn env => [exp1 env, exp2 env])
+
+exp_list : exp			(fn env=> [exp env])
+	 | exp COMMA exp_list	(fn env=> exp env :: exp_list env)
+
+pat	: pat'			(pat')
+	| apat apats		(fn env => make_app_pat(apat env ::apats env))
+
+pat'	: pat AS pat		(fn env => layered(pat1 env, pat2 env,
+						   error(pat1left,pat1right)))
+	| pat'' 		(pat'')
+
+pat''	: apat apats COLON ty	(fn env => 
+				   ConstraintPat
+				     {pattern=
+					make_app_pat(apat env ::apats env),
+				      constraint=ty})
+	| pat'' COLON ty	(fn env => ConstraintPat{pattern=pat'' env,
+							 constraint=ty})
+
+apat	: apat'			(apat')
+	| LPAREN pat RPAREN	(fn env =>(pat env,NONfix,
+					   error(LPARENleft,RPARENright)))
+
+apat'	: apat''		(fn env =>(apat'' env,NONfix,
+					   error(apat''left,apat''right)))
+	| id			(fn env  =>
+				 let val e = error(idleft,idright)
+				     val (v,f) = var'n'fix id
+				 in (VarPat [v], lookFIX(env,f), e) end)
+	| LPAREN RPAREN		(fn _ =>(unitPat,NONfix,
+					 error(LPARENleft,RPARENright)))
+	| LPAREN pat COMMA  pat_list RPAREN	
+		(fn env =>(TuplePat(pat env :: pat_list env),
+			   NONfix,error(LPARENleft,RPARENright)))
+
+apat''	: OP ident		(fn env => VarPat [varSymbol ident])
+	| ID DOT qid		
+	    (fn env => VarPat (strSymbol ID :: qid varSymbol))
+	| int			(fn _ =>IntPat int)
+	| REAL			(fn _ =>RealPat REAL)
+	| STRING		(fn _ =>StringPat STRING)
+	| WILD			(fn _ =>WildPat)
+	| LBRACKET RBRACKET	(fn _ =>ListPat nil)
+	| LBRACKET pat_list 
+		RBRACKET	(fn env => ListPat(pat_list env))
+        | VECTORSTART RBRACKET  (fn _ => VectorPat nil)
+	| VECTORSTART pat_list 
+		RBRACKET	(fn env => VectorPat(pat_list env))
+	| LBRACE RBRACE		(fn _ => unitPat)
+	| LBRACE plabels RBRACE	
+            (fn env => let val (d,f) = plabels env 
+                       in MarkPat(RecordPat{def=d,flexibility=f},
+				  LBRACEleft,RBRACEright) end)
+
+plabel	: selector EQUAL pat	(fn env => (selector,pat env))
+	| ID			(fn env => 
+				   (labSymbol ID, VarPat [varSymbol ID]))
+	| ID AS pat		(fn env => 
+				   (labSymbol ID, 
+				    LayeredPat{varPat=VarPat [varSymbol ID], 
+				    	       expPat=pat env}))
+	| ID COLON ty	
+		(fn env => (labSymbol ID,
+			    ConstraintPat{pattern=VarPat [varSymbol ID],
+					  constraint=ty}))
+	| ID COLON ty AS pat
+		(fn env => 
+		   (labSymbol ID,
+		    LayeredPat
+		      {varPat=ConstraintPat{pattern=VarPat [varSymbol ID],
+					    constraint=ty},
+		       expPat=pat env}))
+
+plabels : plabel COMMA plabels	
+		(fn env =>let val (a,(b,fx))=(plabel env,plabels env)
+			  in (a::b, fx) end)
+	| plabel	(fn env => ([plabel env],false))
+	| DOTDOTDOT	(fn _ => (nil, true))
+
+pat_list: pat			(fn env => [pat env])
+	| pat COMMA pat_list	(fn env => pat env :: pat_list env)
+
+vb	: vb AND vb	(fn env => vb1 env @ vb2 env)
+	| pat EQUAL exp	
+		(fn env => 
+		   [MarkVb(Vb{exp=exp env, pat=pat env},patleft,expright)])
+
+constraint :	 		(NONE)
+	   | COLON ty	 	(SOME ty)
+
+rvb	: opid constraint EQUAL FN match
+		(fn env =>[MarkRvb(Rvb{var=opid env,resultty=constraint,
+			       exp=FnExp(match env)},opidleft,matchright)])
+	| rvb AND rvb		(fn env => rvb1 env @ rvb2 env)
+
+fb'	: clause		(fn env =>[clause env])
+	| clause BAR fb'	(fn env =>clause env :: fb' env)
+
+fb	: fb'	
+	(fn env => [(checkFB(fb' env,error(fb'left,fb'right)),
+		     fb'left,fb'right)])
+	| fb' AND fb	
+	(fn env => (checkFB(fb' env,error(fb'left,fb'right)),fb'left,fb'right)
+		   :: fb env)
+
+clause'	: LPAREN apat apats RPAREN apats
+		(fn env =>makecl(apat env :: apats1 env,apats2 env))
+	| LPAREN pat' RPAREN apats
+		(fn env => makecl([],(pat' env, NONfix,
+				    error(LPARENleft,RPARENright))
+				   :: apats env))
+	| apat' apats		(fn env => makecl([],apat' env :: apats env))
+
+apats	:			(fn _ =>nil)
+	| apat apats		(fn env => apat env :: apats env) 
+
+clause	: clause' constraint EQUAL exp	
+		(fn env => let val (id,pats) = clause' env
+			   in {name=id,pats=pats,resultty=constraint,
+			       exp=fn env => markexp(exp env,expleft,expright),
+			       err=error(clause'left,clause'right)}
+			   end)
+
+tb	: tyvars ID EQUAL ty	([MarkTb(
+				   Tb{tyvars=tyvars,tyc=tycSymbol ID,def=ty},
+				   tyleft,tyright)])
+	| tb AND tb		(tb1 @ tb2)
+
+tyvars	: TYVAR			([MarkTyv(Tyv(tyvSymbol TYVAR),
+					 TYVARleft,TYVARright)])
+	| LPAREN tyvar_pc RPAREN  (tyvar_pc)
+	|			  (nil)
+
+tyvar_pc: TYVAR	([MarkTyv(Tyv(tyvSymbol TYVAR), TYVARleft,TYVARright)])
+	| TYVAR COMMA tyvar_pc
+		(MarkTyv(Tyv(tyvSymbol TYVAR),TYVARleft,TYVARright)
+		 :: tyvar_pc)
+
+db	: db AND db			(db1 @ db2)
+	| tyvars ident EQUAL constrs	(let val name = tycSymbol ident
+					 in [Db{tyc=name,tyvars=tyvars,
+					        def=constrs}] end)
+
+constrs : constr		([constr])
+	| constr BAR constrs	(constr :: constrs)
+
+constr	: op_op ident		(op_op ();(varSymbol ident,NONE))
+	| op_op ident OF ty	(op_op ();(varSymbol ident, SOME ty))
+
+eb	: op_op ident		
+		(op_op ();[EbGen{exn=(varSymbol ident),etype=NONE}])
+	| op_op ident OF ty	
+		(op_op ();[EbGen{exn=(varSymbol ident),etype=SOME ty}])
+	| op_op ident EQUAL qid	
+		(op_op ();[EbDef{exn=varSymbol ident,edef=qid varSymbol}])
+	| eb AND eb		(eb1 @ eb2)
+
+qid_p	: qid			([qid strSymbol])
+	| qid qid_p		(qid strSymbol :: qid_p)
+
+fixity	: INFIX			(fn _ => infixleft 0)
+	| INFIX int		(fn _ => infixleft (checkFix(int,error(intleft,intright))))
+	| INFIXR		(fn _ => infixright 0)
+	| INFIXR int		(fn _ => infixright (checkFix(int,error(intleft,intright))))
+	| NONFIX		(fn _ => NONfix)
+
+ldec	: VAL vb		(fn env => (ValDec (vb env),identity))
+	| VAL REC rvb		(fn env => (ValrecDec(rvb env),identity))
+	| FUN fb		(makeFUNdec(fb,error(FUNleft,fbright)))
+	| TYPE tb		(fn env => (TypeDec tb,identity))
+	| DATATYPE db		
+		(fn env => (DatatypeDec{datatycs=db,withtycs=[]},identity))
+ 	| DATATYPE db WITHTYPE tb
+		(fn env => (DatatypeDec{datatycs=db,withtycs=tb},identity))
+	| ABSTYPE db WITH ldecs END
+		(fn env => let val (d,f) = ldecs env
+                           in (AbstypeDec{abstycs=db,withtycs=[],
+				          body=d},f)
+			   end)
+	| ABSTYPE db WITHTYPE tb WITH ldecs END  
+		(fn env => let val (d,f) = ldecs env
+                           in (AbstypeDec{abstycs=db,withtycs=tb,
+				          body=d},f)
+			   end)
+	| EXCEPTION eb		(fn env => (ExceptionDec eb, identity))
+	| OPEN qid_p		(fn env => (OpenDec qid_p, identity))
+	| fixity ops		(makeFIXdec(fixity (), ops))
+	| OVERLOAD ident COLON ty AS exp_pa
+		(fn env => (OvldDec(varSymbol ident,ty,exp_pa env),identity))
+
+exp_pa	: exp			(fn env => [exp env])
+	| exp AND exp_pa	(fn env => exp env :: exp_pa env)
+
+ldecs	: 		(fn env => (SeqDec nil,identity))
+	| ldec ldecs
+		(makeSEQdec 
+		   (fn env => markdec(ldec env,ldecleft,ldecright), ldecs))
+	| SEMICOLON ldecs	(ldecs)
+	| LOCAL ldecs IN ldecs END ldecs	
+ 		(makeSEQdec
+ 		   (fn env => 
+ 			markdec(makeLOCALdec
+ 			         (fn env => markdec(ldecs1 env,
+ 						    ldecs1left,ldecs1right),
+ 				  fn env => markdec(ldecs2 env,
+ 					            ldecs2left,ldecs2right))
+ 				       env,
+    		     	              LOCALleft,ENDright),
+ 	            ldecs3))
+
+ops	: ident			([fixSymbol ident])
+	| ident ops 		(fixSymbol ident :: ops)
+
+spec_s	: 			([])
+	| spec spec_s		(spec @ spec_s)
+	| SEMICOLON spec_s	(spec_s)
+
+spec	: STRUCTURE strspec	([StrSpec strspec])
+        | FUNCTOR fctspec	([FctSpec fctspec])
+	| DATATYPE db		([DataSpec db])
+	| TYPE tyspec		([TycSpec(tyspec,false)])
+	| EQTYPE tyspec		([TycSpec(tyspec,true)])
+	| VAL valspec		([ValSpec valspec])
+	| EXCEPTION exnspec	([ExceSpec exnspec])
+	| fixity ops		([FixSpec {fixity=fixity (),ops=ops}])
+	| SHARING sharespec	(sharespec)
+	| OPEN qid_p		([OpenSpec qid_p])
+	| LOCAL spec_s IN spec_s END
+				([LocalSpec (spec_s1, spec_s2)])
+	| INCLUDE idents	(idents)
+
+idents	: ident			([IncludeSpec(FastSymbol.sigSymbol ident)])
+	| ident idents		(IncludeSpec(FastSymbol.sigSymbol ident)
+				 :: idents)
+
+strspec	: strspec AND strspec	(strspec1 @ strspec2)
+	| ident COLON sign	([(strSymbol ident,sign)])
+
+fctspec	: fctspec AND fctspec	(fctspec1 @ fctspec2)
+	| ident fsig		([(fctSymbol ident,fsig)])
+
+tyspec	: tyspec AND tyspec	(tyspec1 @ tyspec2)
+	| tyvars ID		([(tycSymbol ID,tyvars)])
+
+valspec	: valspec AND valspec	(valspec1 @ valspec2)
+	| op_op ident COLON ty	
+		(op_op ();[(varSymbol ident,ty)])
+
+
+exnspec : exnspec AND exnspec	(exnspec1 @ exnspec2)
+	| ident			([(varSymbol ident,NONE)])
+	| ident OF ty		([(varSymbol ident,SOME ty)])
+
+sharespec: sharespec AND sharespec	(sharespec1 @ sharespec2)
+	 | TYPE patheqn	([MarkSpec(ShatycSpec(patheqn tycSymbol),
+				   patheqnleft,patheqnright)])
+	 | patheqn	([MarkSpec (ShareSpec (patheqn strSymbol),
+				    patheqnleft,patheqnright)])
+	
+patheqn: qid EQUAL qid		(fn kind => [qid1 kind, qid2 kind])
+       | qid EQUAL patheqn	(fn kind => qid kind :: patheqn kind)
+
+sign	: ID			(MarkSig(VarSig (sigSymbol ID),IDleft,IDright))
+	| SIG spec_s END	(MarkSig(SigSig spec_s,spec_sleft,spec_sright))
+
+
+sigconstraint_op :		(NONE)
+	| COLON sign		(SOME sign)
+
+fsigconstraint_op :		(NONE)
+	| COLON ID		(SOME(VarFsig (fsigSymbol ID)))
+
+sigb	: sigb AND sigb		(sigb1 @ sigb2)
+	| ident EQUAL sign	([Sigb{name=sigSymbol ident,def=sign}])
+
+fsigb	: fsigb AND fsigb	(fsigb1 @ fsigb2)
+	| ident fparamList EQUAL sign
+		([Fsigb{name=fsigSymbol ident,
+			def=FsigFsig{param=fparamList,def=sign}}])
+
+fsig	: COLON ID	(VarFsig (fsigSymbol ID))
+	| fparamList COLON sign
+			(FsigFsig{param=fparamList,def=sign})
+
+str	: qid	(fn env => (MarkStr(VarStr(qid strSymbol),qidleft,qidright)))
+	| STRUCT sdecs END	
+		(fn env => let val (s,_) = sdecs env 
+			   in MarkStr(StructStr s,STRUCTleft,ENDright) end)
+	| qid arg_fct
+		(fn env => MarkStr(AppStr(qid fctSymbol,arg_fct env),
+				   qidleft,arg_fctright))
+	| LET sdecs IN str END	
+		(fn env => MarkStr(makeLETstr(sdecs ,str) env,
+				   LETleft,ENDright))
+
+arg_fct : LPAREN sdecs RPAREN arg_fct
+			(fn env => 
+			   let val arg = MarkStr(StructStr (#1 (sdecs env)),
+	 					 sdecsleft,sdecsright)
+			   in (arg,false) :: arg_fct env end)
+	| LPAREN str RPAREN arg_fct
+			(fn env => (str env,true) :: arg_fct env)
+	| LPAREN str RPAREN (fn env => [(str env,true)])
+	| LPAREN sdecs RPAREN 
+			(fn env => [(MarkStr(StructStr (#1 (sdecs env)),
+					    sdecsleft,sdecsright),
+				    false)])
+
+sdecs	: sdec sdecs		
+		(makeSEQdec (fn env => markdec(sdec env,sdecleft,sdecright),
+			     sdecs))
+	| SEMICOLON sdecs	(sdecs)
+	|			(fn env => (SeqDec[],identity))
+
+sdecs'	: sdec sdecs'		
+		(makeSEQdec (fn env => markdec(sdec env,sdecleft,sdecright),
+			     sdecs'))
+	| sdec	(fn env => markdec(sdec env,sdecleft,sdecright))
+
+sdec	: STRUCTURE strb	(fn env => (StrDec (strb env),identity))
+	| ABSTRACTION strb	(fn env => (AbsDec (strb env),identity))
+	| SIGNATURE sigb	(fn env => (SigDec sigb,identity))
+	| FUNSIG fsigb		(fn env => (FsigDec fsigb,identity))
+	| FUNCTOR fctb		(fn env => (FctDec (fctb env),identity))
+	| LOCAL sdecs IN sdecs END
+		(makeLOCALdec
+ 		  (fn env => markdec(sdecs1 env,sdecs1left,sdecs1right),
+ 		   fn env => markdec(sdecs2 env,sdecs2left,sdecs2right)))
+	| ldec
+		(fn env => markdec(ldec env,ldecleft,ldecright))
+
+strb	: ident sigconstraint_op EQUAL str
+	(fn env =>
+	   let val d = Strb{name = strSymbol ident,def = str env, 
+			    constraint=sigconstraint_op}
+	   in [MarkStrb(d,identleft,strright)] end)
+	| strb AND strb		(fn env => strb1 env @ strb2 env)
+
+fparam	: ID COLON sign	(SOME(strSymbol ID),sign)
+	| spec_s	(NONE,MarkSig(SigSig spec_s, spec_sleft,spec_sright))
+
+fparamList
+	: LPAREN fparam	RPAREN			([fparam])
+	| LPAREN fparam RPAREN fparamList	(fparam :: fparamList)
+
+fctb	: ident fparamList sigconstraint_op EQUAL str
+		(fn env => [MarkFctb(Fctb {name = fctSymbol ident,
+					   def = FctFct{params=fparamList,
+							body=str env,
+					  		constraint=
+							  sigconstraint_op}},
+			   identleft,strright)])
+	| ident fsigconstraint_op EQUAL fct_exp
+  		(fn env =>
+		    [MarkFctb(Fctb {name=fctSymbol ident,
+				    def=fct_exp (env,fsigconstraint_op)},
+			      identleft,fct_expright)])
+	| fctb AND fctb		(sequence (fctb1,fctb2))
+
+fct_exp: qid	(fn (env,constraint) => VarFct(qid fctSymbol,constraint))
+       | qid arg_fct
+  		(fn (env,constraint) =>
+		    MarkFct(AppFct(qid fctSymbol,arg_fct env,constraint),
+			    qidleft,arg_fctright))
+       | LET sdecs IN fct_exp END	
+		(fn (env,constraint) =>
+		   MarkFct(makeLETfct(sdecs, fct_exp) env constraint,
+		   LETleft,ENDright))
+
+interdec: sdecs'(fn env=>
+		   let val (ast,f) = markdec(sdecs' env,sdecs'left,sdecs'right)
+		   in (ast,f Env.empty) end)
+	| exp	(fn env => markdec(toplevelexp(env,exp),expleft,expright))

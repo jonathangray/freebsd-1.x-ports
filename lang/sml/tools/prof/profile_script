@@ -1,0 +1,403 @@
+(* Copyright 1989 by AT&T Bell Laboratories *)
+signature SORT =
+  sig
+    (* pass the gt predicate as an argument *)
+     val sort : ('a * 'a -> bool) -> 'a list -> 'a list  
+     val sorted : ('a * 'a -> bool) -> 'a list -> bool  
+  end
+
+structure Sort : SORT = struct
+
+(* smooth applicative merge sort
+ * Taken from, ML for the Working Programmer, LCPaulson. pg 99-100
+ *)
+fun sort (op > : 'a * 'a -> bool) ls = 
+    let fun merge([],ys) = ys
+	  | merge(xs,[]) = xs
+	  | merge(x::xs,y::ys) = 
+	    if x > y then y::merge(x::xs,ys) else x::merge(xs,y::ys)
+	fun mergepairs(ls as [l], k) = ls
+	  | mergepairs(l1::l2::ls,k) = 
+	    if k mod 2 = 1 then l1::l2::ls
+	    else mergepairs(merge(l1,l2)::ls, k div 2)
+	fun nextrun(run,[])    = (rev run,[])
+	  | nextrun(run,x::xs) = if x > hd run then nextrun(x::run,xs)
+				 else (rev run,x::xs)
+	fun samsorting([], ls, k)    = hd(mergepairs(ls,0))
+	  | samsorting(x::xs, ls, k) = 
+	    let val (run,tail) = nextrun([x],xs)
+	    in samsorting(tail, mergepairs(run::ls,k+1), k+1)
+	    end
+    in case ls of [] => [] | _ => samsorting(ls, [], 0)
+    end
+
+fun sorted (op >) =
+  let fun s (x::(rest as (y::_))) = not(x>y) andalso s rest
+        | s l = true
+  in s
+  end
+
+end
+
+signature PROFILE =
+sig
+  val profiling : bool ref	    (*controls profiling mode of compilation *)
+  val profileOn : unit -> unit      (* turn interrupt timer on *)
+  val profileOff : unit -> unit     (* turn interrupt timer off *)
+  val reset : unit -> unit          (* reset profiling counts to zero *)
+  val report : outstream -> unit    (* print profiling report to stream *)
+end
+
+
+structure Profile = struct
+
+    open Array List infix 9 sub
+
+    val profiling : bool ref = System.Unsafe.profiling
+    val current : int ref = System.Unsafe.Assembly.current
+
+    val times = System.Unsafe.Assembly.times
+    val _ = times := array(3,0)
+
+    fun increase(n) = if n <= Array.length(!times) then ()
+	else 
+	    let val t = !times
+	    val oldlen = Array.length t
+	    val newlen = n+n
+	    val new = array(newlen,0)
+	    fun copy(i) = if i<oldlen then (update(new,i,t sub i); copy(i+1))
+		           else ()
+         in copy(0);
+	    times := new
+	end
+
+    datatype compunit = UNIT of {base: int,
+				 size: int,
+				 counts: int array,
+				 names: string
+				}
+			   
+    val units = ref [ UNIT{base=0,size=3,counts=array(3,0),
+			   names="Other\nCompilation\nGarbage Collection\n"} ];
+
+    fun newlines s = 
+	let val n = size s
+	    fun f(i,count) = if i=n then count 
+			     else if substring(s,i,1)="\n"
+				      then f(i+1,count+1)
+				      else f(i+1,count)
+         in f(0,0)
+	end
+					     
+
+    fun register names =
+	let val ref (list as UNIT{base,size,...}::_) = units
+	    val count = newlines names
+	    val a = array(count,0)
+	    val b = base+size
+	 in increase(b+count);
+	     units := UNIT{base=b,size=count,counts=a,names=names}::list;
+	    (b,a,current)
+        end
+
+   val _ =  System.Hooks.profile_register := register;
+
+      local
+	open System.Timer
+	val t0 = TIME{sec=0, usec=0} and t10 = TIME{sec=0, usec=10000}
+      in
+      val timerval = (1 (* ITIMER_VIRTUAL *), t10, t10)
+      val timerval0 = (1 (* ITIMER_VIRTUAL *), t0, t0)
+      end
+
+   local open System.Signals
+    in 
+	fun profileOn () = 
+	    ((*setHandler(SIGVTALRM,
+			SOME(
+			fn (n,c) => let val t = !times and i = !current
+			             in update(t,i, t sub i + n);
+					c
+				    end)); *)
+	     System.Unsafe.CInterface.setitimer timerval; 
+	     ())
+        fun profileOff () = 
+	    (System.Unsafe.CInterface.setitimer timerval0; 
+	     (* setHandler(SIGVTALRM,NONE); *)
+	     ())
+    end
+
+    fun zero a = let val len = Array.length a
+	             fun f i = if i=len then () else (update(a,i,0); f(i+1))
+		  in f 0
+		 end
+
+    fun reset() = (zero (!times);
+		   app (fn UNIT{counts,...}=> zero counts) (!units))
+
+       
+
+    
+    datatype entry = ENTRY of {name: string, count: int, time: int}
+
+    fun splitlines "" = nil
+      | splitlines s =
+	let fun f(l,i,j) = if i=0 then substring(s,0,j-1)::l
+	                   else if substring(s,i-1,1)="\n"
+	                   then f(substring(s,i,j-i-1)::l,i-1,i)
+			       else f(l,i-1,j)
+	 in f(nil,size s - 1, size s)
+        end
+
+    fun join(entries, base, _, counts, times, nil) = entries
+      | join(entries, base, n, counts, times, line::lines) =
+          join(ENTRY{name=line,count=counts sub n,
+		     time = times sub (base+n)}::entries,
+	       base, n+1, counts, times, lines)
+
+    fun batch(UNIT{base,size,counts,names}) =
+	join(nil, base, 0, counts, !times, splitlines names)
+
+    fun log10 0 = 0
+      | log10 i = 1 + log10(i div 10)
+
+    fun field (st,w) = 
+	  let val s = "                    " ^ st
+	   in substring(s,String.length s - w, w)
+	  end
+
+    fun decimal(st,w) =
+	(substring(st,0,size st - w) handle Substring => "") ^ "." ^
+	      let val st' = "00000000000" ^ st
+	       in substring(st',size st' - w,w)
+	      end
+
+
+    fun muldiv(i,j,k) =
+	  (i*j div k) 
+	     handle Overflow => muldiv(i,j div 2, k div 2)
+
+    fun decfield(n,j,k,w1,w2) = 
+	  field(decimal(makestring (muldiv(n,j,k)),w1)
+		  handle Div => "",w2)
+
+    fun report outstream =
+	let val biglist = fold (op @) (map batch (!units)) nil
+
+	    val biglist' = Sort.sort 
+		             (fn (ENTRY{time=a,count=ca,name=na,...},
+				  ENTRY{time=b,count=cb,name=nb,...})=>
+			       a<b orelse 
+			       a=b andalso (ca<cb orelse 
+					    ca=cb andalso na>nb)
+			       )
+			     biglist
+
+	    val tot = fold(fn (ENTRY{time=a,...},b)=> a+b) biglist' 0
+	    val maxc = fold (fn (ENTRY{count=a,...},b)=> max(a,b)) biglist' 0
+
+	    val digits_cum = log10 tot
+            val digits_cnt = max(6,1+log10 maxc)
+
+	    val pr = outputc outstream
+
+	    fun printlines (ENTRY{time,name,count}::rest,cum) =
+		(pr(decfield(time,10000,tot,2,6));
+		 if (digits_cum > 4)
+		     then pr(field(makestring(cum+time+50 div 100),7))
+		     else pr(decfield(cum+time,1,1,2,7));
+		 pr(field(makestring count,digits_cnt));
+(*		 pr(decfield(time,50000,count,4,10)); *)
+		 pr "  "; pr name; pr "\n";
+		 printlines(rest,cum+time))
+	      | printlines (nil,_) = ()
+
+	 in pr(field("%time",6));
+	    pr(field("cumsec",7));
+	    pr(field("#call",digits_cnt));
+(*	    pr(field("ms/call",10)); *)
+	    pr("  name\n");
+	    printlines(biglist',0);
+	    flush_out outstream
+        end
+
+end;
+
+Profile.profiling := true;
+
+structure Ref = 
+struct 
+   open Ref
+   fun inc i = i := !i + 1
+   fun dec i = i := !i - 1
+end
+
+structure List : LIST =
+struct
+  open List
+      val length = fn x => length x
+      val op @ = fn x => op @ x
+      val rev = fn x => rev x
+      val nthtail = fn x => nthtail x
+      val nth = fn x => nth x
+  fun map f =
+      let fun m nil = nil
+            | m [a] = [f a]
+            | m [a,b] = [f a, f b]
+            | m [a,b,c] = [f a, f b, f c]
+            | m (a::b::c::d::r) = f a :: f b :: f c :: f d :: m r
+      in  m
+      end
+  fun fold f [] = (fn b => b)
+    | fold f (a::r) = (fn b => let fun f2(e,[]) = f(e,b)
+				     | f2(e,a::r) = f(e,f2(a,r))
+			       in f2(a,r)
+			       end)
+  fun revfold f [] = (fn b => b)
+    | revfold f (a::r) = (fn b => let fun f2(e,[],b) = f(e,b)
+					| f2(e,a::r,b) = f2(a,r,f(e,b))
+				  in f2(a,r,b)
+				  end)	
+  fun app f = let fun a2 (e::r) = (f e; a2 r) | a2 nil = () in a2 end
+  fun revapp f = let fun a2 (e::r) = (a2 r; f e; ()) | a2 nil = () in a2 end
+
+  fun exists pred =
+      let fun f nil = false
+	    | f (hd::tl) = pred hd orelse f tl
+      in  f
+      end
+end (* structure List *)
+
+structure Vector =
+  struct open Vector
+      fun tabulate(n,f) = 
+	  let fun tab j = if j<n then f j :: tab (j+1) else nil
+	  in vector(tab 0)
+	  end
+      val vector = fn x => vector x
+  end
+
+structure Array = 
+  struct open Array
+      val array = fn x => array x
+      val tabulate : int*(int -> '1a) -> '1a array = fn (i,f) =>
+      let fun tab j = if j<i then f j :: tab(j+1) else nil
+      in if i<0 then raise Size else arrayoflist (tab 0)
+      end
+      val arrayoflist = fn x => arrayoflist x
+  end
+
+structure ByteArray =
+  struct open ByteArray
+         infix 9 sub
+         val extract = fn x => extract x
+ local val op sub : bytearray * int -> int = System.Unsafe.cast(System.Unsafe.ordof)
+  in 
+  fun app f ba = 
+      let val len = length ba
+	  fun app' i = if i >= len then ()
+		       else (f(ba sub i); app'(i+1))
+      in  app' 0
+      end
+  fun revapp f ba = 
+      let fun revapp' i = if i < 0 then ()
+			  else (f(ba sub i); revapp'(i-1))
+      in  revapp'(length ba - 1)
+      end
+  fun fold f ba x = 
+      let fun fold'(i,x) = if i < 0 then x else fold'(i-1, f(ba sub i, x))
+      in  fold'(length ba - 1, x)
+      end
+  fun revfold f ba x = 
+      let val len = length ba
+	  fun revfold'(i,x) = if i >= len then x
+			      else revfold'(i+1,f(ba sub i, x))
+      in  revfold'(0,x)
+      end
+ end (*local*)
+  end
+
+structure IO : IO =
+  struct open IO
+      val open_in = fn x => open_in x
+      val open_out = fn x => open_out x
+      val open_append = fn x => open_append x
+      val open_string = fn x => open_string x
+      val close_in = fn x => close_in x
+      val close_out = fn x => close_out x
+      val output = fn x => output x
+      val outputc = fn x => outputc x
+      val input = fn x => input x
+      val inputc = fn x => inputc x
+      val input_line = fn x => input_line x
+      val lookahead = fn x => lookahead x
+      val end_of_stream = fn x => end_of_stream x
+      val can_input = fn x => can_input x
+      val flush_out = fn x => flush_out x
+      val is_term_in = fn x => is_term_in x
+      val is_term_out = fn x => is_term_out x
+      val set_term_in = fn x => set_term_in x
+      val set_term_out = fn x => set_term_out x
+      val execute = fn x => execute x
+      val execute_in_env = fn x => execute_in_env x
+      val exportML = fn x => exportML x
+      val exportFn = fn x => exportFn x
+  end
+
+structure Bool = 
+  struct open Bool
+    val print = fn x=> print x
+    val makestring = fn x=> makestring x
+   end
+
+structure String = 
+    struct open String
+      val substring = fn x => substring x
+      val explode = fn x => explode x
+      val implode = fn x => implode x
+      val op <= = fn x => op <= x
+      val op < = fn x => op < x
+      val op >=  = fn x => op >=  x
+      val op > = fn x => op > x
+      val op ^ = fn x => op ^ x
+      val print = fn x => print x
+    end
+
+structure Real = 
+  struct open Real
+      val real = fn x => real x
+      val sqrt = fn x => sqrt x
+      val sin = fn x => sin x
+      val cos = fn x => cos x
+      val arctan = fn x => arctan x
+      val exp = fn x => exp x
+      val ln = fn x => ln x
+      val print = fn x => print x
+      val makestring = fn x => makestring x
+  end;
+
+structure Overloads = (* New Jersey Overloads *)
+  struct
+    overload makestring : ('a -> string)
+	  as Bool.makestring and Integer.makestring and Real.makestring
+    overload print : ('a -> unit)
+	  as Bool.print and Integer.print and Real.print and String.print
+    overload ~ :   ('a -> 'a)        as Integer.~   and Real.~
+    overload + :   ('a * 'a -> 'a)   as Integer.+   and Real.+
+    overload - :   ('a * 'a -> 'a)   as Integer.-   and Real.-
+    overload * :   ('a * 'a -> 'a)   as Integer.*   and Real.*
+    overload < :   ('a * 'a -> bool) as Integer.<   and Real.<  and String.<
+    overload > :   ('a * 'a -> bool) as Integer.>   and Real.>  and String.>
+    overload <= :  ('a * 'a -> bool) as Integer.<=  and Real.<= and String.<=
+    overload >= :  ('a * 'a -> bool) as Integer.>=  and Real.>= and String.>=
+    overload abs : ('a -> 'a)        as Integer.abs and Real.abs
+
+  end; (* structure Overloads *)
+
+open Ref String List IO Bool Real;
+open Overloads;
+
+
+(exportML "smlp";
+outputc std_out (System.version ^ "[PROFILING]\n");
+Profile.profileOn());

@@ -1,0 +1,75 @@
+#!/bin/sh
+#
+# COPYRIGHT (c) 1993 by AT&T Bell Laboratories.  See COPYRIGHT file for details.
+#
+# Script to install eXene
+#
+
+CMD=$0
+LIB_DIR=/usr/local/sml/smlnj-lib
+CML=cml
+EXENE=eXene
+
+#
+# process command-line options
+#
+while test "$#" != "0"
+do
+    arg=$1
+    shift
+    case $arg in
+	-o)
+	    if test "$#" = "0"
+	    then
+		echo "$CMD must supply image name for -o option"
+		exit 1
+	    fi
+	    EXENE=$1
+	    shift
+	;;
+	-cml)
+	    if test "$#" = "0"
+	    then
+		echo "$CMD must supply image name for -cml option"
+		exit 1
+	    fi
+	    CML=$1
+	    shift
+	;;
+	-library|-lib)
+	    if test "$#" = "0"
+	    then
+		echo "$CMD must supply image name for -library option"
+		exit 1
+	    fi
+	    LIB_DIR=$1
+	    shift
+	;;
+	*)
+	    echo "$CMD unrecognized option $arg"
+	    exit 1
+	;;
+    esac
+done
+
+if [ ! -d "$LIB_DIR" ]; then
+  echo "$CMD: cannot find library source directory \"$LIB_DIR\""
+  exit 1
+fi
+
+$CML <<XXXX
+fun library s = "$LIB_DIR/"^s;
+
+use "util-lib/load-util";
+System.Directory.cd "lib";
+use "load-x";
+System.Directory.cd "../widgets";
+use "load-w";
+System.Directory.cd "..";
+
+(exportML "$EXENE";
+ print EXeneBase.versionName; print(chr(10));
+ print CML.versionName; print(chr(10));
+ print System.version; print(chr(10)));
+
+XXXX

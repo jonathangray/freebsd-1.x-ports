@@ -1,0 +1,268 @@
+MLDATA documentation  (@(#)doc.doc	1.1 92/09/11 15:39:10)
+
+	mldata - generate pretty-printers from ML type definitions
+	       - prettify ML programs
+
+*Synopsis
+
+	mldata [<switch> | <filename>]*
+
+*Switches
+
+    -pre    <string>    sets the pretty-printer prefix for non-built-in types
+    -prim   <string>    sets the pretty-printer prefix for built-in types
+    -string <string>    name of the procedure which writes strings
+    -can                ignore user-supplied formats and
+			produce canonical prettyprinters
+    -hom    <layer>     generate  <layer> morphisms
+    --hom               turn off -hom
+    --can               turn off -can
+    -width   <number>   limit output program width to <number> columns
+    -pretty  <file>     prettyprint file
+    -switches           show state of switches
+
+*Description
+
+When defining an ML type (or a collection of mutually recursive
+datatypes) it is often necessary to define ``pretty-printers'' for
+them. This program takes datatype and type declarations from its input
+files, and generates pretty-printers for them on its output stream.
+
+The printing format for a datatype is specified by writing an ML
+comment of the form
+
+	(*[ format ]*)
+
+to the right of each of its constructors.
+
+If a constructor of the type type is given as
+
+	constructor of type1 * type2 * ... typem  (*[format ]*)
+
+(where m may be 0) then the constructor case of the pretty-printer for
+type is defined as
+
+	|  constructor(S'1, ..., S'm) => (translation of format)
+
+If a constructor of the type type is given as
+
+	constructor of {id1:type1, .. idm: typem }  (*[format ]*)
+
+(where m may be 0) then the constructor case of the pretty-printer for
+type is defined as
+
+	|  constructor{id1=S'1, ..., idm=S'm} => (translation of format)
+
+Formats are translated into ML expressions by making the following
+substitutions:
+
+	@n              ->   Wtypen S'n
+	@<text>@n       ->  Wtypen "<text>" S'n
+	$<mltext>$n     ->  <mltext> S'n
+
+Each of the remaining fragments of text in the format is translated
+into
+
+	writestring "<fragment>"
+
+Within formats, the ``escape'' character is "`" and any character so
+prefixed -- in particular the special characters @, $, and ` -- is
+considered to be ordinary text.
+
+The program generates pretty-printers from type abbreviations in a
+similar way. Given a type definition of the form
+
+	type  name = type1 * type2 * ... typem  (*[ format ]*)
+
+the program generates a pretty-printing function definition of the form
+
+	Wname =  fn (S'1, ... S'm)   =>  translation of format
+
+Given a type definition of the form
+
+	type  name = {id1: type1 * ... idm: typem }  (*[ format ]*)
+
+the program generates a pretty-printing function definition of the form
+
+	Wname =  fn {id1=S'1, ... idm=S'm}   =>  translation of format
+
+If no format is given for a constructor or for the right-hand-side of a
+type abbreviation, then mldata generates a ``canonical'' pretty printer
+for that type. The canonical printing of function objects whose type is
+type is always "(fn : type)", and the canonical printer for objects of
+any other type prints the objects in a form readable by SML.
+
+If any typei is a type expression (rather than just a type name), then
+Wtypei is replaced by a canonical printer for objects of that type. The
+pretty-printer generated for a datatype with type parameters
+('a,'b,...) will be parameterised by a tuple of pretty-printers for
+types 'a, 'b, ...
+
+It is assumed that the user will define pretty-printers for the
+datatypes which appear free on the right-hand-sides of type and
+datatype definitions.
+
+*Naming Pretty-Printers
+
+The name of the pretty-printer for a built-in type named type is
+assumed to be writetype, unless mldata is given a -prim switch -- in
+which case its argument replaces the write prefix. The following types
+are considered to be built-in:
+
+	int, real, string, unit, 'a list, 'a option
+
+The name of the pretty-printer for a non-built-in type named type is
+assumed to be Wtype unless mldata is given a -pre switch -- in which
+case its argument replaces the W. The name of the function which prints
+strings is assumed to be writestring unless a -string argument is given
+-- in which case that argument replaces writestring.
+
+*Example 1 - Canonical Printers: the type definitions
+
+	datatype ('a, 'b)
+		 tree   =   empty
+			|    atom of 'b
+			|    node of 'a * ('a,'b) tree list
+	withtype 'a
+		IntReal = int*real*'a
+	and     RealInt = real*int;
+
+	type    FooBazT = (Foo, Baz) tree
+
+yield the following prettyprinter
+
+    val rec Wtree =
+    fn (W'a, W'b) =>
+       fn empty    => writestring ("empty")
+       |  atom S'1 => (writestring ("atom("); W'b S'1; writestring (")"))
+       |  node (S'1, S'2) =>
+	  ( writestring ("node(");
+	    W'a S'1;
+	    writestring (",");
+	    writelist (Wtree (W'a, W'b)) S'2;
+	    writestring (")")
+	  )
+
+    and WIntReal =
+    fn W'a =>
+       fn (S'1, S'2, S'3) =>
+	  ( writestring ("(");
+	    writeint S'1;
+	    writestring (",");
+	    writereal S'2;
+	    writestring (",");
+	    W'a S'3;
+	    writestring (")")
+	  )
+
+    and WRealInt =
+    fn (S'1, S'2) =>
+       ( writestring ("(");
+	 writereal S'1;
+	 writestring (",");
+	 writeint S'2;
+	 writestring (")")
+       );
+
+    val WFooBazT = Wtree (WFoo, WBaz);
+
+
+*Example 2 - A Customised Printer
+
+The type definitions
+
+    datatype ('a,'b) tree =
+	empty                            (*[()]*)
+      | remark of string option          (*[@no remark@1]*)
+      | atom   of 'b                     (*[@1]*)
+      | node   of 'a * ('a,'b) tree list (*[@1(@, @2)]*);
+
+    type RealInt = real * int;
+
+    type FooBazT = (Foo,Baz) tree
+
+    and  Twonk   = (int->int->int) * (real,real) tree(*[@1:@2]*);
+
+yield the following pretty printers
+
+    val rec Wtree =
+    fn (W'a, W'b) =>
+       fn S'1 as empty => (writestring ("()"))
+       |  remark S'1   => (writeoption writestring ("no remark") S'1)
+       |  atom S'1     => (W'b S'1)
+       |  node (S'1, S'2) =>
+	  ( W'a S'1;
+	    writestring ("(");
+	    writelist (Wtree (W'a, W'b)) (", ") S'2;
+	    writestring (")")
+	  );
+
+    val WRealInt =
+    fn (S'1, S'2) =>
+       ( writestring ("(");
+	 writereal S'1;
+	 writestring (",");
+	 writeint S'2;
+	 writestring (")")
+       );
+
+    val WFooBazT = Wtree (WFoo, WBaz)
+
+    and WTwonk =
+    fn (S'1, S'2) =>
+       ( (fn _ => writestring "fn: int -> int -> int") S'1;
+	 writestring (":");
+	 Wtree (writereal, writereal) S'2
+       );
+
+Notice that the extra text in the format for the node constructor is
+passed as an extra parameter to the function writelist, and that for
+the remark constructor is passed as an extra parameter to writeoption.
+Functions to print lists and options are present in the Oxford streamio
+library module, and accept parameters of the appropriate sort.
+
+*Prettyprinting
+
+The mldata program may also be used (with the -pretty switch) to
+reorganise the text of an input file by systematically indenting and
+folding it. At present the reorganisation is not parameterisable (you
+get what you're given), and doesn't really treat comments
+satisfactorily.
+
+
+*Augmenting structure bodies
+
+If mldata is presented with a file in which there are structure and /
+or functor definitions, then it will prettyprint these definitions in
+the usual way, but augment the body of each struct ...  end with
+appropriately-defined prettyprinters. For example:
+
+    structure lists =
+    struct
+       datatype 'a list = nil   |  cons of 'a * 'a list  ;
+
+       fun map f nil            = nil
+       |   map f (cons (x, xs)) = cons (f x, map f xs)
+    end;
+
+gets transformed into
+
+    structure lists =
+    struct
+       datatype 'a list = nil   |  cons of ('a * 'a list)  ;
+
+       fun map f nil            = nil
+       |   map f (cons (x, xs)) = cons (f x, map f xs);
+
+       val rec writelist =
+       fn W'a =>
+	  fn nil => writestring ("nil")
+	  |  cons (S'1, S'2) =>
+	     ( writestring ("cons(");
+	       W'a S'1;
+	       writestring (",");
+	       writelist W'a S'2;
+	       writestring (")")
+	     )
+    end;
+

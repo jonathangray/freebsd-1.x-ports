@@ -1,0 +1,226 @@
+	Interface Description Language Manual
+	Bernard Sufrin
+	Programming Research Group
+	Oxford
+	(Version 2.1 93/03/08 00:03:16)
+
+1. Introduction
+
+Interface Description Language (IDL) may be used to describe the
+interface between a Standard ML program and a server written in C.  It
+has hitherto been used to connect ML programs to HCI servers written
+using various X toolkits, but is in principle more versatile than
+that.
+
+The idl processor generates an SML file and a C file which together
+implement a remote-procedure-call interface between an ML and a C
+program. The ML program is the client, and the C program is the
+server. The standard idlbase library for SML is set up
+so that the server may be started by its client.
+
+2. The Client Server Model
+
+	................... (to be written)
+
+3. IDL notation
+
+	idlfile         ::=     paragraph
+			|       paragraph ; idlfile
+			|       paragraph   idlfile
+			|       Signature ; idlfile
+
+	paragraph       ::=     SMLinsert
+			|       Cinsert
+			|       Definition
+			|       Representation
+
+	SMLinsert       ::=     ${ any text whatsoever, ending with $}
+
+	Cinsert         ::=     %{ any text whatsoever, ending with %}
+
+	Signature       ::=     name ( parameterspecs | <empty> )
+			|       name ( parameterspecs | <empty> ) : resultspecs
+
+	Definition      ::=     Signature =  body
+			|       Signature => results
+
+	body            ::=     Cinsert
+			|       Cinsert => results
+
+	parameterspecs  ::=     name : typename
+			|       name : typename , parameterspecs
+
+	resultspecs     ::=     typename
+			|       typename resultspecs
+			|       typename * resultspecs
+
+	results         ::=     result
+			|       result => results
+
+	result          ::=     any C expression text not including =>
+
+	Representation  ::=     "type"    name = ctype protocoltype
+			|       "typedef" name = ctype protocoltype
+
+	ctype           ::=     a C type name followed by one or more *
+
+	protocoltype    ::=
+			|       => idltype
+
+
+Comments may appear in C-inserts, in SML-inserts, or at the top level
+of the IDL text. Those which appear in a C-insert should be delimited
+by C comment brackets; those which appear in SML-inserts should be
+delimited by SML comment brackets (not nested); those which appear at
+the top level of the IDL text may be delimited by either form of
+bracket.
+
+
+4. Translation
+
+The IDL processor translates a file called <name>.idl into a C file
+called <name>.c and a standard ML file called <name>.sml.
+
+Paragraphs which are
+
+	SML-inserts
+		are copied verbatim to the .sml file
+
+	C-inserts
+		are copied verbatim to the .c file
+
+	Signatures
+		specify the type structure of a C procedure
+
+
+	Definitions
+		(a) specify the type structure and body of a C procedure
+		    to be included in the .c file
+		(b) generate a serial number for the procedure
+		    in the remote procedure call protocol
+		(c) generate an ML procedure which, when called,
+		    uses the remote procedure call protocol to
+		    pass appropriate parameters to the C body
+		    of the procedure and (where appropriate)
+		    collect the results
+
+		    If the body of the procedure has a (results)
+		    component, then the specified results are
+		    transmitted back from the server using procedures
+		    appropriate for their types (which should have been
+		    specified in the (resultspecs) component of the
+		    (Signature) component of the definition.
+
+		    If the (Signature) component of a definition has a
+		    (resultspec) component, then the (results)
+		    component of the body should usually have the same
+		    number of expressions as there are result
+		    specifications.  Just occasionally it is necessary
+		    for some processing (such as the liberation of the
+		    storage used by a result or a structure containing
+		    a result) to take place in the body of the
+		    procedure after  results have been transmitted back
+		    to the client. To facilitate this, it is possible
+		    for the programmer to take responsibility for
+		    arranging that the body transmits the appropriate
+		    number and type of results back to the client. The
+		    is signified by giving a procedure with a non-null
+		    (resultspec) component a body with no (results)
+		    component.
+
+	Representations
+		    (a) Specify that objects of type (name) are
+		    represented by the distinct datatype (name) with
+		    sole constructor (name) in SML, and by the C-type
+		    (ctype) within C. If the protocoltype is of the
+		    form (=> idltype) then the objects are transmitted
+		    using procedures named (read_idltype,
+		    write_idltype); if the protocoltype is empty, and
+		    the (ctype) is a pointer type, then the objects are
+		    transmitted using (read_address, write_address); if
+		    the protocoltype is empty and the (ctype) is not a
+		    pointer type then the objects are transmitted using
+		    (read_ctype, write_ctype).
+
+		    (b) In the case of a "type" paragraph, the C-type is
+		    assumed already to have been defined; in the case of a
+		    "typedef" paragraph, a C typedef of the form
+
+				typedef ctype name;
+
+		    is made.
+
+		    It is not strictly necessary to include representation
+		    declarations in the .idl file; but doing so encourages
+		    the construction of type safe SML programs.
+
+
+The .sml file also contains a definition of a variable called
+Signature, which uniquely defines the protocol which the ML procedures
+expect to be using. It also contains a definition of a procedure
+GetSignature:unit->string, which obtains the server's version of the
+protocol-characterising string. The first thing that a sensible
+programmer will do after starting an IDL generated server is to ensure
+that Signature=GetSignature(), thereby guaranteeing that the server and
+ML client agree on (at least) the protocol to be used between them.
+
+The .c file contains the definition of a procedure
+
+	void idlevent()
+
+which dispatches a SINGLE remote procedure call to the appropriate
+C procedure, and a procedure
+
+	void idlserver() { while (idlcontinue) idlevent(); }
+
+5. Getting started
+
+See Xamples/{idlcurses.idl,idlcurses.run.sml} for a simple server which
+exploits the curses package, and a program which uses the server. `
+
+See Xamples/idlx.idl for a ``boilerplate'' server which delivers some
+of the features of the X toolkit via idl, and
+Xamples/{idlx.run.sml,idlx.canvas.sml} for examples of programs which
+use that server.
+
+See Xidl/SimpleCanvas{P.h,.h,.c} for the text of a widget which
+supports a very simple form of drawing and selection.
+
+See also: Xidl/{idlbase.sml,idlbase.c,idlxt.c}.
+
+A.1: Source Text
+
+The source text of the IDL processor is provided with this distribution
+and is known to compile under SML of NJ Version 0.75.
+
+A.2: Libraries
+
+Two standard C libraries are provided with the distribution:
+
+	idlbase.c       provides basic client-server communication
+			facilities.
+
+	idlxt.c         provides client-server communication with
+			an Xt-based server.
+
+A.3: Omissions
+
+I haven't felt the need to construct protocols for other than
+the simplest built-in SML types.
+
+A.4  Infelicities
+
+1.   Real/float isn't treated correctly
+
+There are bound to be many more infelicities: please report them to
+me.
+
+A.5 Usage
+
+	idl    <name>   -- generate <name>.c and <name>.sml from <name>.idl
+	idl -d <name>   -- ditto, with monitoring code in the C dispatcher
+
+A.6 Trivial Example
+
+	See triv.{idl,c,sml} for a useless example which simply shows
+	how idl performs its translations.

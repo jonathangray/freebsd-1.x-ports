@@ -1,0 +1,207 @@
+(* Copyright (c) 1992 by Carnegie Mellon University *)
+
+		 Introductory Guide to SourceGroup Release 3
+
+Gene Rollins (rollins+@cs.cmu.edu)
+School of Computer Science, Carnegie-Mellon Univ, Pittsburgh, PA 15213
+February 2, 1993
+
+SourceGroup is a programmable selective-recompilation system.  This
+"Introductory Guide" explains how to use the basic separate compilation
+mechanism. The "Advanced Guide" describes how to customize SourceGroup to
+special needs. SourceGroup Release 3, which works with SML/NJ 0.93, comprises
+all versions of SourceGroup called 3.x for some x.  Throughout these documents
+we will refer to structures, functors, signatures, and funsigs
+(functor-signatures) as modules.
+
+SourceGroup 3 is easier to use than release 1 because it uses new features in
+SML/NJ and it has a simplier interface.  SML/NJ 0.93 can compile and generate
+target files for source files containing open module references and
+definitions for any kind of module.  When creating a group, all you need to do
+is list the group's source files, including sml, lex, and yacc sources. If you
+used SourceGroup release 1, see the document "Differences between SourceGroup
+Releases 1 and 3" in sourcegroup/doc/SG-1-vs-3.doc.
+
+======================
+Creating Source Groups
+======================
+  A source group is a set of source files that form a linkable software
+system.  There should be only one definition for any given module identifier
+within one (source) group.  A group should be closed; that is, any module
+referenced in a source file in the group should be either a pervasive or
+should be defined in some source file in the group, or its subgroups.
+
+One can create a group as follows:
+    val rcsgroup = SourceGroup.create
+		     [SourceGroup.Sources ["util.sig", "util.sml", "rcs.sml"]]
+where:
+    datatype groupDescription =
+        Sources of string list
+      | SubGroups of group list
+      | Connections of string list
+
+    val create :SourceGroup.groupDescription list -> SourceGroup.group
+    val createInEnv :environment -> groupDescription list -> group
+
+The Sources constructor takes a list of names of source files to be included
+in the group.  The other contructors of groupDescription are described later.
+The function createInEnv is described in the Advanced Guide.
+
+The source files can be listed in any order. SourceGroup will analyze each
+source file to determine what modules the file defines and references.  From
+this information it creates a source dependency graph used during separate
+compilation.  
+
+The analyzer was designed to work on a single SML file in isolation.  So, it
+does not deal with open and include properly, and may report that a file needs
+to import a module, which is actually a substructure of an opened structure or
+included signature.  There is a write around for open, but not for include.
+If structure A contains B, then one can convert:
+  open A
+to
+  open A; structure B = A.B
+This will allow for correct analysis.
+
+==================
+Making SML Modules
+==================
+  One can make any of the modules defined within the group by calling the
+function make.
+    SourceGroup.make rcsgroup "structure RCS_Commands";
+
+This function call asks SourceGroup to build the structure RCS_Commands by
+compiling only those files necessary to build that structure.  The
+RCS_Commands structure should be defined by some file in rcsgroup.  Once a
+group is created, make can be called repeatedly.
+
+=========================
+The Compiling Environment
+=========================
+  In SourceGroup 3, the compiling environment is handled the same way as it
+was handled in Releases 1 and 2.
+
+The function "use" compiles in the Top-Level Environment, which is the
+environment you see from the interactive loop of the SML/NJ compiler.
+SourceGroup does compiling in a special Compiling Environment instead of the
+top-level environment.  When you first start sml-sg, the Compiling Environment
+contains only the pervasives.  Calls to make update the Compiling Environment
+with new definitions.  If you want to access any of the modules from the top
+level you can open the Compiling Environment in a manner similar to opening a
+structure.  This is done thru the call:
+    Compile.openEnv();
+
+After this call, all module definitions in the Compiling Environment are
+available in the Top-Level Environment.  Any module already in the Top-Level
+Environment with the same name as a module defined in the Compiling
+Environment is shadowed after this call. Four separate namespaces are
+maintained, one each for structures, functors, signatures, and funsigs.
+Shadowing is done separately in each namespace. For the new definitions to be
+visible, openEnv must be called after each call to make.
+
+================
+Complete Example
+================
+  A complete example that creates and compiles a group is as follows:
+
+    val rcsgroup = SourceGroup.create
+		     [SourceGroup.Sources ["util.sig", "util.sml", "rcs.sml"]];
+    SourceGroup.make rcsgroup "structure RCS_Commands";
+    Compile.openEnv();
+
+After editting some sources, one can repeat the last two lines to recompile
+only what is necessary to recreate the structure RCS_Commands.
+
+===============================
+More Details on Creating Groups
+===============================
+  Any source filename with the extension .grm is assumed to be a grammar file
+for ML Yacc.  When create is called, SourceGroup will call sml-yacc on each
+grammar file.  It will then analyze the structure and signature files produced
+by sml-yacc to determine the modules defined and referenced by them.
+
+Any source filename with the extension .lex is assumed to be a lexer file for
+ML Lex.  When create is called, SourceGroup will call sml-lex on each lexer
+file.  It will then analyze the structure files produced by sml-lex to
+determine the modules defined and referenced by it.
+
+Any source filenames with the extension .grm.sml, .grm.sig, or .lex.sml are
+ignored.  They are analyzed as part of the treatment of .grm and .lex files
+described above.
+
+One can build a nested set of module namespaces with subgroups.  For example:
+
+  val myGroup = SourceGroup.create
+	         [SourceGroup.Sources ["foo.sml", "foo.sig"],
+		  SourceGroup.SubGroups [rcsgroup]]
+
+In myGroup any the defining file of an imported module is looked for in the
+files of that group (foo.sml and foo.sig).  If the module is not found there,
+the lookup is attempted in the subgroups.  A call to make on myGroup may cause
+compilation of some files in rcsgroup.  A global file table is maintained so
+that groups can share information on source files and avoid unneccessary
+recompilation.
+
+One can create lists of source files through functions in the structure
+FileList (see fileList.doc).  In particular, if myFiles.txt contains the
+names of source files, one can create a list of source files as follows:
+
+  val myFiles = FileList.inFile ["myFiles.txt"]
+  val g = SourceGroup.create [SourceGroup.Sources myFiles]
+
+==========================
+More Details on using Make
+==========================
+  One can name several modules in a call to make as follows:
+    SourceGroup.make foogroup
+      "Foo FooBar signature FOO BAR FOOBAR functor FooFun structure Bar X";
+
+The keywords funsig, signature, structure, and functor are recognized.  Any
+identifiers listed in the beginning of the string, before any keyword, are
+assumed to be structures.  This call will attempt to build the following
+modules:
+  structures: Foo FooBar Bar X
+  signatures: FOO BAR FOOBAR
+    functors: FooFun
+
+If a source file in a group plays no role in defining any of the modules that
+are requested in a call to make, that source file will be ignored and will
+not be loaded or compiled.
+
+The function makeWhat takes the same arguments as make, but instead of
+doing the work, it just prints what make would do.
+
+==========================
+Upward Non-Compatatability
+==========================
+  Release 3 of SourceGroup is not upward compatible from Release 1.  It
+differs in the way it treats yacc and lex source files.  Uses of the
+constructor Connections in group creation that contain yacc or lex source
+files that worked in SourceGroup 1 will NOT work in SourceGroup 3.  These
+groups must be defined using the constructor Sources.
+
+The structure SourceAction has changed as well; many of the functions have new
+types.  Many of the old features of SourceGroup 1 are available in
+the structure SourceGroup.Expert. See the Advanced Guide for details.
+
+========================
+Signature of SourceGroup
+========================
+
+signature SOURCEGROUP = sig
+ val version :real
+ type group
+ exception CompilingError
+
+ datatype groupDescription =
+    Sources of string list
+  | SubGroups of group list
+  | Connections of string list
+
+ val create   :groupDescription list -> group
+ val createInEnv :environment -> groupDescription list -> group
+
+ val make     :group -> string -> unit
+ val makeWhat :group -> string -> unit
+
+ structure Expert :SOURCE_GROUP_EXPERT sharing type group = Expert.group
+end

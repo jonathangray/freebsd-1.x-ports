@@ -1,0 +1,2874 @@
+-*- Text -*-
+This is the file .../.Info/sml, which contains stuff about the
+Standard ML of New Jersey from AT&T.
+
+This file was cobbled together from various pieces of the SML/NJ
+distribution and messages on the SML mailing list.
+
+In order to install this file into your Gnu Info tree, you need to
+either:
+
+    i) edit your site's info directory "dir" file to contain a pointer to
+	this file, which you can copy to your site's info directory.
+
+or ii) create a subdirectory (I used .Info) in your home directory and
+	create softlinks to all the files in your site's info
+	directory, except for the "dir" file.  Copy the "dir" file to
+	your info directory and edit that file to contain an entry for
+	the SML info tree in the top-level menu.  Then add elisp code
+	to your .emacs to reset the variable Info-directory to point
+	to the directory you created.
+
+For information on the format of Gnu Info files, their format and use,
+see the info on Info. :-)
+
+If you make additions and/or changes to this info tree, please send a
+context diff (i.e. diff -c) to me at the e-mail address below (or to
+the SML mailing list, but I would prefer direct mail if possible).
+
+						-- Rich
+--
+UUCP: ...!uunet!dsd.es.com!rthomson			Rich Thomson
+Internet: rthomson@dsd.es.com	IRC: _Rich_		PEXt Programmer
+
+
+File: sml, Node: Top		Next: Running, Prev: Sigs, Up: (dir)
+This node is the top node in the SML Tree.
+
+* Menu:
+
+Basics for beginners:
+
+* Running::		Running Standard ML
+* Input::		Interactive input
+* Prompts::		Changing the prompts
+* Interrupts::		Interrupting parsing or computation
+* Exiting::		Exiting the interactive system
+* Loading::		Loading ML source text from a file
+* Saving::		Saving an image of the system
+* Commands::		Executing System commands and changing directories
+* Errors::		Error messages from the system
+* Flags::		Useful system flags
+* Timing::		Timing of code
+* Profiling::		Execution Profiling
+* Sigs::		Basic ML Environment Signatures
+* Mailing Lists::	Mailing lists of interest to SML users
+
+Advanced Topics:
+
+* Bootstrap::		How to bootstrap ML
+* BugForm::		Bug Report Template
+* CallCC::		Continuation Interface
+* CrossDev::		Procedure for cross-development
+* Differences::		Differences between SML/NJ and Def'n of Standard ML
+* Environment::		Problems & Proposed Changes to Def'n of SML, v2
+* LocalSpec::		The meaning of "local" and "open" in signatures?
+* Optimize::		How to make SML of NJ run faster
+* Weak Types::		References and weak polymorphism
+
+Definition Clarifiers by Robin Milner:
+
+* CL1::			Equality Types, 13/1/90
+* CL2::			Second-Order Unification, 13/1/90
+* CL3::			Equality Types -- General, 15/1/90
+* CL4::			Open Specifications, 16/1/90
+* CL5::			Generativity of Datatype, 19/1/90
+* CL6::			Properties of the State, 19/1/90
+* CL7::			Determinacy, 19/1/90
+* CL8::			Inaccessible Types, 31/1/90
+* CL9::			Principal Signatures, 14/2/90
+* CL10::		Principal Environments, 27/2/90
+* CL11::		Include, 27/2/90
+
+
+File: sml, Node: CL1		Next: CL2, Prev: CL11: Up: Top
+
+Date: Tue, 16 Jan 90 12:53:21 GMT
+From: rm%computer-lab.cambridge.ac.uk@NSFnet-Relay.AC.UK
+
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                 @                                     @
+                 @     SML Definition Clarifiers       @
+                 @                                     @
+                 @  CL1: EQUALITY TYPES    RM, 13/1/90 @
+                 @                                     @
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+Dave MacQueen (henceforth DMQ) asks whether the following is admissible:  
+
+  functor F(X: sig type t val x: t end) : sig end =
+  struct
+    datatype d = C of X.t
+    structure A : sig eqtype s sharing type s = X.t end =
+      struct
+        type s = X.t
+      end
+    val z = (X.x = X.x)
+    val w = (C(X.x) = C(X.x))
+  end
+
+It is not admissible, because the sharing spec will not elaborate.
+
+Using rule 99, the parameter signature expression  
+               sig type t val x: t end
+is elaborated to an equality-principal signature (N)S, and S is bound to X 
+for the functor body elaboration. In S, the type constructor t is bound to
+a type name -- which I shall also call t -- which doesn't admit equality
+(i.e. doesn't possess the equality attribute), according to the rules for
+equality-principal signatures on p36.  [NOTE: references are to Version 4,
+the published version.]
+
+The specification  eqtype s  must elaborate to an environment in which 
+the type constructor s is bound to some type function theta which admits
+equality (rule 72); so theta cannot be t, because t doesn't admit equality.
+
+Therefore no successful elaboration of the specification
+              sharing type s = X.t
+is possible.
+
+[NOTE: This exemplifies the decision that there can be no retrospective
+ influence on the elaboration of a signature expression. In particular,
+ no sharing spec which appears in a functor body can affect the
+ elaboration of the parameter signature; this elaboration is 
+ uniquely determined by the requirement that it be equality-principal
+ wrt the basis in which the functor declaration is elaborated.]
+
+CL3 will deal with equality types generally.
+
+Robin
+
+
+File: sml, Node: CL2		Next: CL3, Prev: CL1, Up: Top
+
+Date: Tue, 16 Jan 90 15:34:42 GMT
+From: rm%computer-lab.cambridge.ac.uk@NSFnet-Relay.AC.UK
+
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                 @                                     @
+                 @     SML Definition Clarifiers       @
+                 @                                     @
+                 @  CL2: SECOND-ORDER UNIFICATION      @
+                 @                         RM, 13/1/90 @
+                 @                                     @
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+DMQ suggests that the following use of  open  in a signature may 
+create a second-order unification problem:
+
+   functor F(type 'a t) =
+   struct
+     structure A =
+     struct
+       type u = int * int
+     end
+     structure B =
+     struct
+       type v = int t
+     end
+     structure C : sig open A B sharing type u = v end =
+     struct
+       type u = int * int
+       type v = int t
+     end
+   end
+
+I cannot see why the use of  open  is of primary importance here; if the above
+creates a second-order unification problem then so should the following (which
+doesn't contain  open ):
+
+   functor F(type 'a t) =
+   struct
+     type u = int * int
+     type v = int t
+     structure C : sig sharing type u = v end = ...
+   end
+
+This does not in fact create a second-order unification problem. 
+
+During the functor body elaboration, the type constructor t is bound to a new 
+type name (which I shall also call t); it cannot be bound to an arbitrary type
+function theta -- e.g. the type function LAMBDA t.t*t -- perhaps chosen 
+with later sharing constraints in mind.  This is due to the requirement that
+signatures -- in particular, the parameter signature of functor F --
+be equality-principal. (See also CL1; but note that equality is irrelevant 
+here.)
+
+Therefore u and v become bound to the two different (nullary) type functions
+                    LAMBDA().int*int
+                    LAMBDA().int t
+and the sharing constraint will fail to elaborate.  For those who like to
+think more operationally, the type name  t  is to be treated as a
+constant during the elaboration of the functor body; the unifier is therefore
+not confronted with the embarrassment of how to instantiate it.  
+[NOTE: This is not the whole story of how second-order unification is avoided,
+ but is an important part of it.]
+
+By taking account of the semantic rule for  open  specifications, rule 78,
+one can adapt this discussion to show that the sharing spec in DMQ's 
+original example (the first functor declaration above) will also fail to 
+elaborate.  
+
+CL4 will deal with  open  specs more generally.
+
+Robin
+
+
+File: sml, Node: CL3		Next: CL4, Prev: CL2, Up: Top
+
+Date: Tue, 16 Jan 90 16:44:05 GMT
+From: rm%computer-lab.cambridge.ac.uk@NSFnet-Relay.AC.UK
+
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                 @                                     @
+                 @     SML Definition Clarifiers       @
+                 @                                     @
+                 @  CL3: EQUALITY TYPES -- GENERAL     @
+                 @                         RM, 15/1/90 @
+                 @                                     @
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+ 
+This note roughly describes the handling of equality types in the definition. 
+It's convenient to work under two headings, DECLARATION and SPECIFICATION, 
+since the treatment of equality types has a different purpose in each case.  
+
+In declarations, the aim is to allow a type to admit equality whenever there 
+is no danger that, when the equality predicate is applied to two values of 
+that type, it will find itself trying to determine equality between functions
+or objects of an abstract type.     
+
+In specifications, beyond direct use of the EQTYPE specification, the aim is 
+to specify in a signature that a type should admit equality whenever it can be
+shown that the corresponding declared type, in any structure which matches the
+signature, will indeed admit equality.
+
+
+DECLARATIONS
+
+When a DATATYPE or ABSTYPE declaration is elaborated, each new type name t,
+corresponding to an n-ary datatype constructor declared by the declaration,
+is awarded the equality attribute only if
+
+   Whenever the polymorphic predicate is applied to two objects of type
+   (tau1,..,taun)t, where tau1,..,taun are types which admit
+   equality, then in its recursive evaluation it will never be applied
+   to functional values or to values of an abstract type. 
+
+A type environment TE is said to maximize equality if (nearly) as many of its 
+type names as possible are awarded the equality attribute under the above
+constraint; see Section 4.9.  This notion is only used in rules 19 and 20,
+where the TE created by a DATATYPE or ABSTYPE declaration is required to
+maximize equality. (Of course, in the case of ABSTYPE the relevant type
+names are divested of their equality attributes after the WITH part has
+been elaborated.)
+
+The DATATYPE or ABSTYPE declarations in the body of a functor F are
+elaborated only once, namely when the declaration of F is elaborated.
+They are not re-elaborated each time F is applied. This means that
+new type names generated at each application of F will only be awarded
+the equality attribute if there was enough information in the
+declaration of F to justify the award.  Here is an example from DMQ:
+
+   signature S = sig type T end
+
+   functor F(X:S) : sig end =
+   struct
+     datatype D = C of X.T
+   end
+
+   structure A = F(struct type T = int end)
+
+After this, (the type name corresponding to) A.D will not admit equality, 
+because the parameter signature S in the declaration of F doesn't provide the 
+information about (the type name corresponding to) X.T which would justify 
+this. (Of course, if we declared instead  signature S = sig eqtype T end  
+then A.D would admit equality.)
+
+To allow account to be taken of the actual parameter of such a functor F,
+so that the datatype created by applying F would admit equality for some
+applications and not for others, the rule for functor application 
+(rule 55) would become more complex; to retain a simple rule has some
+advantage.
+
+[NOTE: Version 3 of the definition appears to have been inconsistent
+ here.  In Section 4.9, condition 2 for well-formedness of a TE required
+ that it should maximize equality, and later in that section it was required
+ that every TE "occurring in the rules" should be well-formed. This is at odds
+ with the rule for functor application (which was the same as it now is); 
+ for, as we saw in the example, this rule is sometimes forced to create
+ a TE which doesn't maximize equality.]
+ 
+[NOTE: The use of "(nearly)" above should be explained. The shortfall is
+mainly because of irrelevant type parameters, as in
+            datatype 'a T = C of int
+ where 'a doesn't occur at all in the constructor type(s).  In such a
+ case, the type  (int->int)T  will not admit equality, by the rules in
+ Section 4.4.  To have catered for the relevance of each type parameter
+ of a datatype constructor (a kind of strictness) seemed to be 
+ disproportionately meticulous.]
+
+
+SPECIFICATIONS
+
+Apart from the EQTYPE specification, the only place where equality attributes
+are relevant in the rules for elaborating signature expressions (and their 
+parts) is in rule 65, where a signature expression is elaborated to an
+equality-principal signature. In Section 5.13, equality-principality is 
+defined in two phases.  For the first phase -- principality -- the equality 
+attribute is hardly relevant. In the second phase, an equality-principal
+signature is obtained from a principal signature (N)S by awarding the 
+equality attribute to as many as possible of the type names t in N which 
+represent datatypes, under the constraint that the corresponding datatype in 
+any structure which matches (N)S would necessarily admit equality.
+
+To a large extent therefore, the award of equality attributes to type names 
+in a signature is to inform the user more precisely as to which structures will
+match the signature.  But in one important respect it achieves more; when the
+signature corresponds to a functor parameter, it increases the possibility
+that types used in the functor body, and datatypes declared therein, will
+in their turn also admit equality.
+
+[NOTE:  Consider the signature expression
+
+   sig
+     eqtype T
+     type U
+     datatype D = C of U 
+     sharing type D = T
+   end
+
+ This will not elaborate, since the datatype D will admit equality -- 
+ because of the sharing spec -- even though the type U associated with its 
+ constructor C does not. In the jargon of Section 4.9, the type environment
+ corresponding to the datatype declaration doesn't respect equality. All that
+ is needed here is for the user to write  eqtype U  in place of  type U .
+    Note that the above phenomenon shows up as a failure of elaboration, 
+ which can be mended in the way suggested; it does not result in a signature 
+ with `too few' equality attributes.]
+
+
+Robin
+
+
+File: sml, Node: CL4		Next: CL5, Prev: CL3, Up: Top
+
+Date: Wed, 17 Jan 90 11:10:37 GMT
+From: rm%computer-lab.cambridge.ac.uk@NSFnet-Relay.AC.UK
+
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                 @                                     @
+                 @     SML Definition Clarifiers       @
+                 @                                     @
+                 @  CL4: OPEN SPECIFICATIONS           @
+                 @                         RM, 16/1/90 @
+                 @                                     @
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ 
+
+The introduction of the OPEN specification form -- as opposed to the OPEN
+declaration form -- was prompted by the need to define the derived forms 
+of functor declaration, functor application, and functor signature expressions
+(Appendix A, p66 and Figure 18, p68). It was felt to be justified for the 
+following reasons;
+
+  1) It would be intolerable to have two equally heavy sets of rules
+     for the two styles of using functors; a way had to be found to
+     express one in terms of the other.
+  2) The semantic rules for the OPEN spec are simple, and formally 
+     analogous with those for the OPEN dec. 
+
+All the same, understanding the OPEN spec is not fully analogous to 
+understanding the OPEN dec.  It must be understood somewhat differently
+for the different kinds of component in a structure. Here is an informal 
+understanding.
+
+
+Use of OPEN without LOCAL
+-------------------------
+Suppose that  OPEN A  occurs in a signature expression sigexp, of the form
+                           SIG  
+                             OPEN A
+                             spec
+                           END
+where of course A is a structure already declared (or already specified). 
+Then sigexp demands the following of any structure A' which matches it:
+
+  a) For any structure component B of A, A' must have identically the
+     same B component.
+  b) For any type constructor component T of A, A' must have identically
+     the same T component.
+  c) For any value component X of A, with typescheme sigma, A' must have
+     a value component X with typescheme sigma.
+  d) For any exception component E of A, with type tau, A' must have
+     an exception component E with type tau.
+ 
+Thus, for structure and type components, OPEN  specifies sharing with
+A; for value and exception components it specifies merely that they should
+be typed as in A. (Uses of the identifiers B or T within spec can be
+understood exactly as in the case when OPEN is LOCALised; see below.)
+
+The oddity, perhaps, is in the difference between a) and b) on one hand, and 
+c) and d) on the other. For example, a user might expect that d) should read
+         "... , A' must have identically the same E component." 
+This would be wrong, because signature matching is done during elaboration, 
+not evaluation, and exceptions are only represented by their types during 
+elaboration. 
+
+
+Use of OPEN in combination with LOCAL
+-------------------------------------
+In combination with LOCAL, the understanding of OPEN is simpler.  Suppose now
+that sigexp is
+                         SIG 
+                           LOCAL OPEN A IN spec END  
+                         END
+Then only the structure and type constructor components of A are relevant,
+since a specification  spec  cannot refer to external value and exception
+identifiers.  Now we can understand this in exactly the same way as
+                         LET OPEN A IN dec END
+-- namely, we are simply allowing ourselves to write B or T in  spec ,
+where we would otherwise have had to write A.B or A.T.
+
+
+Summary
+-------
+It seems that the best way to understand the OPEN spec is, first, in
+the special case of its use with LOCAL. This includes its use in deriving 
+the derived functor forms. It's quite likely that people will seldom wish 
+to use it in any other way.   
+
+
+Robin
+
+File: sml, Node: CL5		Next: CL6, Prev: CL4, Up: Top
+
+Date: Fri, 19 Jan 90 14:55:36 GMT
+From: rm%computer-lab.cambridge.ac.uk@NSFnet-Relay.AC.UK
+
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                 @                                     @
+                 @     SML Definition Clarifiers       @
+                 @                                     @
+                 @  CL5: GENERATIVITY OF DATATYPE      @
+                 @       DECLARATIONS      RM, 19/1/90 @
+                 @                                     @
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ 
+
+One of the first things to understand about the semantic treatment of
+types is that every DATATYPE declaration (as opposed to TYPE declaration) 
+creates one or more new type operators.  This is what we mean by generativity.
+Consider for example
+
+     fun f(y) =
+        let datatype T = A of int
+        in if y=A(3) then 5 else 6
+        end ;
+     datatype T = A of int;
+     f(A(4));
+
+(I put keywords into CAPS in running text, not in displayed examples).
+There are two DATATYPE declarations of identical form, each declaring a 
+type called T.  But they yield two different semantic types, so the program 
+will not elaborate successfully.  Because of the expression  y=A(3) , the 
+formal parameter  y  of the function  f  must elaborate to the type created 
+by the first of the declarations, while the actual parameter  A(4)  elaborates
+to the type created by the second.
+
+In some programming languages these two types would be the same, i.e.
+data-type declarations are not generative.  But in ML they are distinct for 
+greater security.  We argue that it should never be possible, outside the 
+scope of a DATATYPE declaration, to write an expression which tests or 
+analyses a value of that data-type.
+
+This explains why the semantic types, which are described in Figure 10 (p17), 
+are not exactly like the type expressions which can appear in programs; they 
+differ in that they may contain type names  t  (which are not identifiers) 
+instead of type constructors (which are identifiers).  
+
+To see how each DATATYPE declaration generates new type names,look at rule 20.
+It requires, for each type structure  (t,CE) associated with a type 
+constructor in the new type environment TE, that the type name  t  is not one 
+of those already generated (recorded in the T component of the context C).
+ 
+Although DATATYPE declarations are generative, TYPE declarations are not so.
+If two TYPE declarations have the same right-hand side,
+for example
+
+     type T1 = int * bool;
+     type T2 = int * bool;
+
+then the type constructors T1 and T2 will be associated with identical type 
+structures.    
+
+Robin Milner
+
+
+File: sml, Node: CL6		Next: CL7, Prev: CL5, Up: Top
+
+Date: Fri, 19 Jan 90 16:09:47 GMT
+From: rm%computer-lab.cambridge.ac.uk@NSFnet-Relay.AC.UK
+
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                 @                                     @
+                 @     SML Definition Clarifiers       @
+                 @                                     @
+                 @  CL6: PROPERTIES OF THE STATE       @
+                 @                         RM, 19/1/90 @
+                 @                                     @
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+ 
+(In this note, <  stands for subset and  /\  for intersection.)
+
+The semantic treatment of states  s = (mem,ens)  (p47) has several interesting
+consequences which are by no means obvious from the inference rules. It's
+illuminating to make some of these properties explicit.  People may also like
+to know that they are quite easy to prove.
+
+First, it is quite easy to prove that, for an inferred sentence
+
+                        s,A |- phrase => A',s'                              (*)
+
+where s=(mem,ens) and s'=(mem',ens'), the following relations hold:
+
+                        DOM(mem) < DOM(mem')
+                             ens < ens'
+
+The import of this is that the semantic definition does not cater for garbage 
+collection; the state is always growing, even though some addresses and some 
+exception names may become inaccessible - because all uses of them have been 
+erased from the basis by the superposition of new declarations.
+
+The proof of this fact (that the state is always growing) is by induction on 
+the depth of inference of the inferred  sentence (*).  It hinges on two 
+observations:
+
+   1. The only evaluation rules which mention state explicitly (and to which 
+      the state convention therefore does not apply) are 114, 115, 138 and 
+      158. If (*) is inferred by any of these rules, then both DOM(mem') and 
+      ens' can only be  greater than they would be if all state information 
+      were omitted from the rule (making it subject to the state convention).
+   2. If the state convention were applicable to every rule, then we would 
+      have  s=s' for any inferred sentence (*). 
+
+A simple way of permitting garbage collection, to occur only after the 
+evaluation of a top-level declaration, would be to add another rule to the 
+three rules 191-193 for topdecs.  Let us define  Addrs(B)  and  Ens(B)  to be
+the addresses and exception names which occur anywhere in a dynamic basis B. 
+Then the new rule might be (using f!D for the restriction of f to domain D):
+ 
+              s,B |- topdec => B',(mem',ens')   mem''= mem'!Addrs(B+B')
+                                                ens''= ens'/\Ens(B+B')
+          ---------------------
+              s,B |- topdec => B',(mem'',ens'')
+                     
+This is justified by the fact that, as shown by rule 196 for programs,
+the program which follows a topdec (whose evaluation is inferred by the 
+above new rule) will be evaluated in the basis B+B', and can therefore only 
+make use of addresses or exception names which occur in B+B'.
+
+Another fact, with a similar proof, is that no attempt is ever made to
+look up a memory address which is not in the domain of the current memory 
+- i.e. which is not currently associated with a value - or to raise an 
+exception whose name is not recorded in the current state.  Let us put this 
+precisely, and in a form which is amenable to inductive proof:
+
+       If the sentence (*) above is inferred, with s=(mem,ens) and 
+       s'=(mem',ens'), and moreover Addrs(A) < DOM(mem) and Ens(A) < ens,
+       then Addrs(A') < DOM(mem') and Ens(A') < ens'.
+
+Particularly interesting cases are, assuming the condition on (s,A):
+
+       If  s,A |- exp => a,(mem,ens)  then  a is in DOM(mem)
+
+       If  s,A |- exp => [en],(mem,ens)  then  en is in ens
+
+As a final example of interesting properties of state, we can show quite 
+simply that pattern-matching never has a side-effect (i.e. never changes the 
+state).  Formally this may be expressed as follows:  
+
+     If s,E,v |- pat => VE/FAIL,s'  can be inferred, then  s = s'
+
+This follows from the fact that rules 114, 115 and 138 - the only ones which 
+can change the state - cannot be used in the inference of a sentence of the 
+above form. In passing, note that this justifies the present form of rule 158;
+if pattern-matching could change the state then the right-hand side (above and 
+below the line in the rule) would have to be VE/FAIL,s' instead of VE/FAIL,s.
+
+Robin Milner
+
+
+File: sml, Node: CL7		Next: CL8, Prev: CL6, Up: Top
+
+Date: Fri, 19 Jan 90 16:10:00 GMT
+From: rm%computer-lab.cambridge.ac.uk@NSFnet-Relay.AC.UK
+
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                 @                                     @
+                 @     SML Definition Clarifiers       @
+                 @                                     @
+                 @  CL7: DETERMINACY       RM, 19/1/90 @
+                 @                                     @
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+ 
+A guiding principle of the definition is that the effect of each program
+should be completely determined, so that there is no chance for different
+implementations to make different arbitrary choices of interpretation
+when the language definition admits freedom of choice.  True, we have
+violated this principle in one or two cases.  One case is that the 
+range of integers, and the range and precision of reals, have not been
+specified; another is that the precise points at which a program may be
+interrupted (by a user-generated  Interrupt  exception) is not indicated.
+
+Notwithstanding these few shortcomings, the dynamic semantics is 
+determinate in (nearly) the following sense: for each (phrase,s) and
+each appropriate A there is at most one pair (A',s') such that the sentence
+
+                       s,A |- phrase => A',s'
+
+can be inferred. The only sense in which this is inaccurate is that a new 
+address  a , or a new exception name  en , may be chosen arbitrarily in
+rule 114 or 138.  A completely accurate statement, therefore, is as follows:  
+
+    If  s,A |- phrase => A',s'  and  s,A |- phrase => A'',s''  can both
+    be inferred, then (A'',s'') only differs from (A',s') by a one-to-one 
+    change of addresses and exception names which do not occur in (s,A). 
+
+As in CL6, this can be proved by induction on the depth of inference.
+
+So, up to variation of new addresses and new exception names, each evaluation 
+has at most one result.  Can we strengthen this to `exactly one result'?  No, 
+for two reasons.  First, some (recursive) evaluations do not terminate. 
+Second, there are phrases which do not involve recursion but for which no 
+evaluation can be inferred; an example is  5(true)  (apply 5 to true). There 
+are seven rules, 112-118, dealing with applications - phrases of the form 
+exp atexp  - and none of them deals with the case in which exp evaluates to 5.
+You may feel that an exception should have been provided in the language, to 
+be raised in case of such faulty applications.  But, in fact, the evaluation of
+these faulty applications will never be attempted in normal execution,
+since elaboration - i.e. type-checking - will reject them.  
+
+We believe, but are not certain, that every topdec which elaborates
+successfully and which does not involve recursion has  exactly one evaluation 
+under the rules (up to variation of new addresses and new exception names), 
+provided that the static and dynamic bases are appropriately related.
+
+Robin Milner
+
+File: sml, Node: CL8		Next: CL9, Prev: CL7, Up: Top
+
+Date: Wed, 31 Jan 90 10:35:35 GMT
+From: rm%computer-lab.cambridge.ac.uk@NSFnet-Relay.AC.UK
+
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                 @                                     @
+                 @     SML Definition Clarifiers       @
+                 @                                     @
+                 @  CL8: INACCESSIBLE TYPES            @
+                 @                         RM, 31/1/90 @
+                 @                                     @
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+ 
+In CL5 there was the following example to illustrate the failure of type 
+checking, due to the fact that two textually identical datatype declarations
+generation different types:
+
+     fun f(y) =
+        let datatype T = A of int
+        in if y=A(3) then 5 else 6
+        end ;
+     datatype T = A of int;
+     f(A(4));
+
+You may reasonably complain that even the function declaration alone should
+be faulted, independently of what follows, because the type of  f  involves
+its own inner-declared datatype, which could never be used outside. So 
+there are two questions: (1) What other example serves to illustrate the 
+failure of type checking due to generativity? (2) Why not fault  f ? 
+
+
+Answer (1): Modify the above example to
+
+     datatype T = A of int;
+     fun f(y) =
+        if y=A(3) then 5 else 6;
+     datatype T = A of int;
+     f(A(4));
+
+Then f(A(4)) will still fail to type-check.  There is nothing which
+prevents one datatype declaration overriding another.
+
+
+Answer (2): It would be easy to fault a function declaration (or, more
+generally, a FN expression)  whose type involves a datatype declared
+within.  But to do this would create an illusory sense of security!
+It would take a crippling flow analysis to determine that an inner
+datatype is never made externally accessible by other means, of which the
+most prominent is the raising of exceptions. The problem (if it is a
+problem) is that the exception-raising capability of a function is
+not reflected in its type. If it were so, then I believe this would have
+tipped the scale in the definition, and it would have been worth 
+banning function types containing inaccessible types.  (Of course,
+assignment to a reference is another way of exporting values of local
+type; but exceptions seem to be a more pervasive feature of ML programming.)
+
+All-right then, why didn't we reflect exception-raising power in the
+type of a function?  One can imagine a notion of type in which not only
+the type of NORMAL results is present, but also the types of each possible
+EXCEPTIONAL result.  Various people have considered this, over a long 
+period (including for example Mike Gordon). There are two reasons why
+one may not like the idea:  (a) It makes things more complicated; 
+(b) We might strongly resent the more refined type-checking which 
+could reject certain useful programs.  For example, if my program
+type-checks with the current  ord  function (which can only raise
+the exception  Ord ), and I redefine  ord  so that it will also raise an 
+exception  Nonchar  if its string argument contains more than one character,
+then my program might no longer type-check. (At least, there would be a
+difficult question as to what the type-checking discipline should be.)
+
+Robin Milner
+
+
+File: sml, Node: CL9		Next: CL10, Prev: CL8, Up: Top
+
+Date: Wed, 14 Feb 90 14:14:37 GMT
+From: rm%computer-lab.cambridge.ac.uk@NSFnet-Relay.AC.UK
+
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                 @                                     @
+                 @     SML Definition Clarifiers       @
+                 @                                     @
+                 @   CL9: PRINCIPAL SIGNATURES         @
+                 @                         RM, 14/2/90 @
+                 @                                     @
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+The backbone of the proof that principal signatures exist is the proof of the
+following:
+
+      For any basis B and signature expression  sigexp , if  
+      B |- sigexp => S  for some S, then there exists (independently
+      of S) a structure S* such that  B |- sigexp => S* , and (dependent
+      on S) a realization  phi  such that phi(B)=B and phi(S*)=S.
+
+Actually, something more general than this has to be proved by induction. Mads
+Tofte has done an independent proof of this now, so our confidence in it is 
+strengthened. But in doing the proof he also found a minor flaw in the claim 
+for principal signatures which we deduced from this. Below I explain some of 
+the subtleties involved, and how the flaw can be dealt with.  People who don't
+care much about the pathology of ML can ignore the subtleties and needn't 
+really worry about the flaw. (Dave Matthews pointed out to me that these 
+clarifying notes, because they deal with extreme cases, can put people off by 
+suggesting that the modules system is hard to use.  I hope it isn't hard to 
+use, but it wouldn't be the fault of these extreme cases!)
+ 
+The notion of "covering", in Section 5.3, was introduced in order to ensure 
+that, when  B |- sigexp => S  and  B covers S , then the signature  (N)S  will
+be well-formed provided that N is chosen to contain all names free in B but 
+not in S.  Here are a few clarifying points:
+
+
+1.Simon Finn of AHL pointed out the need for something like cover. He gave us 
+  this example, which cannot have a well-formed principal signature:
+
+           structure Empty = struct end 
+
+           signature SIG = 
+             sig
+               structure Nonempty: sig type T end
+               sharing Nonempty = Empty
+             end
+
+  The point is that the body of SIG elaborates to any structure of the form
+
+         S = (m,{ .. Nonempty |--> (m0,{.. T |--> (t, {})..})..})
+
+  (where ".." means that there are other empty environment components which 
+  don't concern us). Here m0 is fixed as the name of the declared structure 
+  Empty, but m and t can be chosen arbitrarily. Now to get a signature (N)S 
+  from this, using rule 65, we cannot include m0 in N -- because it is in the 
+  basis -- and therefore by the well-formedness condition in 5.3 we cannot 
+  include the type name t in N either.  This precludes  (N)S  from being 
+  principal; for whether we take N = {m} or {} (the only possibilities) we 
+  shall certainly not have S' as an instance of  (N)S  (as defined in 5.9),
+  where S' differs from S only at t, i.e.
+ 
+         S' = (m,{ .. Nonempty |--> (m0,{.. T |--> (t', {})..})..})         
+
+
+2.The definition of covering excludes this anomaly; we simply confine our
+  claim of principal signatures to the case when some elaboration yields
+  a structure covered by the basis, and in this case there is none. 
+
+
+3.Mads has found out that, in fact, covering is not quite enough to ensure a 
+  well-formed signature.  He gives the example
+ 
+           structure Empty = struct end 
+
+           signature SIG = 
+             sig
+               type T
+               structure Nonempty: sig val x:T end
+               sharing Nonempty = Empty
+             end
+
+  Now the body of SIG elaborates to any structure of the form
+
+       S = (m,{ .. T |--> (t, {}) .. Nonempty |--> (m0,{.. X |--> t ..})..})
+
+  (where m and t can be chosen arbitrarily), which will be covered by the 
+  basis, since covering doesn't say anything about the types in value 
+  specifications like  X |-> t .  But when we make this into a well-formed 
+  signature  (N)S  then we cannot put t into N, since it "lies below" m0 in S;
+  so again, we fail to get a principal signature.
+
+
+4.We conclude that, in our claim for principal signatures, we have to admit
+  them to be ill-formed just to the extent of the preceding example. But then 
+  they should still be rejected by rule 65 in elaboration, as they are now; 
+  so we only have to adjust our claim, not the language. 
+
+
+5.There are two slightly different things which could have been done. First,
+  we could have removed the covering condition, and indeed the concept of
+  cover, entirely.  This would mean that our principal signatures would not
+  not be well-formed even in the sense discussed in 1. above, as Simon's 
+  example showed; but then the well-formedness condition would still be 
+  imposed in rule 65. This would be a simplification, at a price; without
+  cover we would allow, I believe, more signatures to be declared which could 
+  never be matched by any structure.  
+
+  [We already allow some unmatchable signatures. But mainly, I think, this is
+   because we can specify that two structures share, but also that they have
+   incompatible types for the same component.  An example is 
+
+                 signature A1 = sig val X:int end
+                       and A2 = sig val X:bool end
+
+                 signature B  = sig structure S1:A1 and S2:A2
+                                    sharing S1 = S2
+                                end                                 ]
+
+
+6.The other thing we could have done is to weaken the well-formedness 
+  condition so that it excludes Simon's example (in 1.) but not Mads' example 
+  (in 3.).  This is actually quite natural, as we shall see in a moment. 
+  First, here is what the well-formedness condition in 5.3 could have been: 
+
+      A signature  (N)S  is well-formed if .. and also, whenever (m,E)
+      occurs in S with m not in N, and (m',E') is a structure or (theta,CE)
+      is a type structure occurring in E, then neither m' nor the type 
+      names in theta are in N.
+
+  The reason this is natural is that it harmonizes with the concept
+  of consistency (5.2) in placing no constraint upon the typeschemes
+  which are associated with variables or constructors (including exception
+  constructors). Also, Dave Matthews showed me that there are not entirely
+  useless structures which could match a signature satisfying this looser
+  well-formedness condition but failing the existing condition.   
+
+
+7.Actually we could also have mixed 5. and 6.; for example we could have
+  removed cover and ALSO weakened well-formedness.
+
+
+Robin Milner
+
+
+File: sml, Node: CL10		Next: CL11, Prev: CL9, Up: Top
+
+Date: Tue, 27 Feb 90 09:43:59 GMT
+From: rm%computer-lab.cambridge.ac.uk@NSFnet-Relay.AC.UK
+
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                 @                                     @
+                 @     SML Definition Clarifiers       @
+                 @                                     @
+                 @  CL10: PRINCIPAL ENVIRONMENTS       @
+                 @                         RM, 27/2/90 @
+                 @                                     @
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+There is a small flaw, not troublesome, in the definition of principal 
+environment (Section 4.12). Thanks to Colin Meldrum at Harlequin for pointing 
+this out.  It says 
+
+      " ... suppose that C |- dec => E .. .  Then E is principal (for
+      dec in the context C) if, for all E' for which C |- dec => E',
+      we have E > E'. "
+
+(Here ">" means enrichment, or generalisation between type-schemes.) It is
+then claimed that, if  dec  elaborates at all in C, it elaborates to a 
+principal E.  
+
+Now consider the topdec
+
+                            val x = ref [] 
+
+in the initial basis. Calling it also  dec , we get from rule 17
+
+                             C_0 |- dec => E'
+
+for any E' with VE-component  { x |-> tau list ref } , where  tau is any 
+imperative type -- and these are the only possible elaborations. No closure 
+(i.e quantification of type variables) is possible for the type  tau list ref,
+when rule 17 is applied, because of the side-condition about expansiveness.
+Of course, in rule 100 we are going to reject any case where tau contains an 
+imperative type variable; but meanwhile we are still claiming that  dec  has a
+principal E in C_0, and this isn't so; the only conceivable candidate is with 
+tau = '_a, but this isn't principal because e.g. '_a list ref > int list ref 
+is FALSE. (">" doesn't permit instantiation of FREE type variables.)
+
+All that needs to be done, to allow the claim to stand in these doomed
+cases, is to replace E by Clos_C(E) in the condition for principality,
+thus:
+
+      " ... suppose that C |- dec => E .. .  Then E is principal (for
+      dec in the context C) if, for all E' for which C |- dec => E',
+      we have Clos_C(E) > E'. "
+
+In other words, we consider the  type variables which are free in E
+(but not in C) to be instantiable just for the sake of principality, but
+the E which goes forward to rule 100 will still - in our example - contain
+'_a free and so be rejected.
+
+Robin Milner
+
+File: sml, Node: CL11		Next: CL1, Prev: CL10, Up: Top
+
+Date: Tue, 27 Feb 90 10:26:16 GMT
+From: rm%computer-lab.cambridge.ac.uk@NSFnet-Relay.AC.UK
+
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                 @                                     @
+                 @     SML Definition Clarifiers       @
+                 @                                     @
+                 @  CL11: INCLUDE          RM, 27/2/90 @
+                 @                                     @
+                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+In CL4, OPEN specifications were discussed. It was suggested that people might
+seldom wish to use OPEN except in conjunction with LOCAL.
+
+Whether or not this is true, I failed to distinguish between two different
+ways of combining LOCAL and OPEN; I only mentioned cases of the form
+
+                     LOCAL OPEN A IN  ... END
+
+But there is also the form
+
+                     LOCAL  ... IN OPEN A END
+
+Is this useful?  In a sense, yes; for if S is a signature identifier, then
+the following are equivalent:
+                         
+                            INCLUDE S
+
+                LOCAL STRUCTURE A:S IN OPEN A END      
+                    
+In other words (because this easily generalises to a sequence of signature
+identifiers) INCLUDE is really a derived form.  The equivalence is very
+easy to prove. 
+
+Robin Milner
+
+File: sml, Node: Bootstrap	Next: BugForm, Prev: Sigs, Up: Top
+
+			   How to bootstrap ML
+
+    This is stuff that "src/makeml" does for you, but if you're
+    implementing a new runtime system or a new code generator, you
+    need to know what makeml is doing.  This is a summary by Norman
+    Ramsey of information that Andrew Appel should have written down.
+
+    runtime/run is the ML loader.  It searches for things it needs in
+    the mo directory.  It takes one argument, which is the name of a
+    structure.  That structure is found in the mo directory and
+    executed for side effects.
+
+    runtime/run loads only 4 .mo files:
+	CoreFunc.mo  Math.mo Initial.mo Loader.mo
+    It passes its argument (a structure name) to Loader.mo, which then
+    loads many other .mo files (the entire DAG of dependencies whose
+    root is CompFoo.mo (or whatever)).
+
+    The mo directory contains mo files.  These carry names of
+    top-level structures or functors.  They are copies of the output
+    produced by the code generator.  As such they are
+    machine-dependent.  There is no software support for figuring out
+    to which code generator (or machine) a .mo file corresponds.  Thus
+    it is entirely up to the user to make sure that the .mo files in
+    the .mo directory make sense and are the right ones for the task
+    at hand.
+
+    The highest-level structure of a mo file is: 
+
+	fn () => (["a","b","c"], fn [a,b,c] =>
+		  top-level structure or functor)
+
+    where the ["a", "b", "c"] is a list of names of structures on
+    which the top-level thing depends, and the [a,b,c] are the
+    structures themselves.  Thus a, b, and c are the only free
+    variables in the top-level structure, and the thing in the mo file
+    is actually a closed lambda-term.  Only the run program reads .mo
+    files.
+
+    The CompFoo structure (created with the Batch functor) is a
+    structure that executes a small batch compiler as a side effect.
+    IntFoo is a structure that executes the full interactive system as
+    a side effect.  The only difference between the two is in the user
+    interface.  The `run' loader is typically used only on one of
+    these two structures, to execute either the batch or the
+    interactive system.  Both the batch and interactive systems
+    support an `export ML' command that saves the currently executing
+    system into a file in a.out format, so that it can be re-executed
+    at will.
+
+    The batch system has three interesting commands that deal with ML
+    source.  They are:
+
+    !file   compile file, and write a .mo file for each top-level structure
+    *file   compile file, and write a .s file for each top-level structure
+    <file   read in and parse the file
+
+    All three commands enter appropriate things into the batch
+    compiler's symbol table, so that later files can refer to them,
+    and the appropriate top-level references can be resolved.
+
+    It is possible to set batch options with
+	^option
+    The options ^printit and ^saveLvarNames will cause useful
+    intermediate code to be written to the .s file, in addition to the
+    assembly code.
+
+
+File: sml, Node: BugForm	Next: CallCC, Prev: Top, Up: Top
+
+The following is a suggested format for bug reports for 
+Standard ML of New Jersey.  Not all fields need to be included.  
+(You get maximum points for filling in the Fix: field!)
+
+Submitter:      <name and email address>
+Date:
+Version:        <SML of NJ version number, e.g. 0.43>
+System:         <hardware and OS version>
+Severity:       <minor, major, or critical>
+Problem:        <short statement of problem>
+Code:           <example code that reproduces the problem>
+Transcript:     <transcript of session illustrating problem>
+Comments:
+Fix:
+
+Bug reports are most useful if you can narrow down the cause of the bug
+to as small a fragment of code as possible.  Also, please check src/doc/bugs
+to see if your bug is already known.  Suggestions on how to improve the 
+compiler are also welcome, even if they don't identify a specific bug.  
+Examples of unhelpful error messages are also useful.
+
+Send bug reports to macqueen@research.att.com.
+
+
+File: sml, Node: CallCC		Next: Differences, Prev: BugForm, Up: Top
+
+A set of new primitives has been added to ML to give access to continuations:
+
+type 'a cont
+val callcc : ('a cont -> 'a) -> 'a
+val throw : 'a cont -> 'a -> 'b
+
+The continuation of an expression is an abstraction of what the system
+will do with the value of the expression. For example in the
+expression:
+
+                if a orelse b then foo() else goo()
+
+the continuation of the expression "a orelse b" can be described in
+words as "if the value is true then compute foo() otherwise compute
+goo()" and then continue in the context of the if-expression. Usually
+the continuation of an expression is implicit, however, the primitive
+callcc allows the programmer to capture and use these continuations.
+
+The primitive callcc takes a function as an argument and applies it to
+the current continuation.  The continuation of an expression of type 'a
+has type 'a cont and is a first-class object. To capture the
+continuation described above one would write:
+
+   if callcc(fn k => a orelse b) then foo() else goo
+
+Here the continuation of the callcc-application is captured by being
+bound to k, but it is not used. Because the continuation is not used
+the result is simply the result of the expression "a orelse b".  To
+use the continuation a value must be supplied, and the computation
+continues as if that value where the result of the callcc-application.
+This is called throwing the continuation a value; it is performed by
+applying "throw" to the continuation and the value.
+
+ if callcc(fn k => (throw k false) orelse b) then foo() else goo()
+
+Here, when the continuation k is thrown the value false, "orelse b" is simply
+ignored, the callcc-application returns false, and goo() is then evaluated.
+
+The type returned by a throw-expression is unconstrained like that of
+a raise-expression and for the same reason:  neither of these
+expressions ever return.
+
+One of the less interesting uses of callcc is as an alternative to
+exception handlers. For example:
+
+    exception Prod
+
+    fun prod l = let fun loop [] = 1
+		       | loop(0::r) = raise Prod
+		       | loop(a::r) = a * loop r
+		 in loop l handle Prod => 0
+		 end
+
+can be written with callcc as follows:
+
+    fun prod l = callcc(fn exit => 
+			   let fun loop [] = 1
+				 | loop(0::r) = throw exit 0
+				 | loop(a::r) = a * loop r
+			   in loop l
+			   end)
+
+But continuations are more general than exception handlers and can be
+used to implement sophisticated control structures. These more complex
+uses often involve subtle interactions with the type system.  For just
+a taste of the techniques involved consider the following example
+implementing an infinite loop.
+
+    datatype State = S of State cont 
+    fun state_throw (S k) = throw k
+
+    let val s = callcc S
+    in state_throw s s
+    end
+
+
+File: sml, Node: CrossDev	Next: Differences, Prev: CallCC, Up: Top
+
+
+		     Procedure for cross-development
+
+    Here's how to build a Mips ML, given a Vax ML.  To be able to
+    begin, we either have to have
+
+    a) the .mo files needed for a Vax image of a compiler for a Vax target 
+    or
+    b) a batch system running on the Vax that generates code for the Vax.
+
+    If we have a) we can get to b) by the following steps:
+       -- type `run CompVax'.  when the dust settles you will be running b).
+       -- type >batch to save the batch system
+
+    The structure CompMipsLittle specifies a batch compiler that will
+    generate code for a little-endian Mips.  Suppose this lives in
+    mipsglue.sml.  Then we run our `batch' with the command
+    !mipsglue.sml, which will create the CompMipsLittle.mo file.  We
+    go park that in the .mo directory.  Similarly we may need to
+    compile other parts of the Mips code generator and create mo files
+    for them.  The list of Mips files is in ./mipsall.
+
+    Now we can use the bootstrap loader (run) to create a new batch,
+    batchm, that runs on the Vax but generates code for the mips. `run
+    CompMipsLittle' will do the job, and then we can export the new
+    batch by `>batchm'.
+
+    Now we're in a position to throw out all of our old, boring Vax
+    .mo files, and to replace them with new, exciting Mips .mo files.
+    We're the only ones who will know the difference---we'll only be
+    able to tell the difference when' run fails to work. `mv mo
+    mo.vax' will save the vax mo files for a rainy day.
+
+    Then we run batchm on a long script that compiles the whole
+    compiler, this time generating Mips code.  This process may take
+    about an hour on notecnirp.  The long script is the famous `all'.
+    We'll then have to go park all the newly-created mo files in the
+    newly-created (Mips) mo directory.
+
+    Finally we have all our new improved Mips .mo files in place in
+    the mo directory.  We're not ready to go yet, though, because we
+    don't yet have a Mips loader.  If you've been wondering when we
+    would get a runtime system, this is it.  We move to the Mips, go
+    into ./runtime, remove all the object code, and adjust the
+    Makefile to indicate we're generating a system for the Mips.  We
+    then build a new loader with `make run'.  This will compile the
+    runtime system and the loader and will squirrel them both away in
+    `run'.  Next we `run CompMipsLittle' to get a Mips batch system.
+    We can also `run IntMipsLittle' to get a Mips interactive system.
+    We can run the interactive system, and we can use the batch system
+    to make a new compiler.
+
+
+			  Making a new compiler
+
+    Use the appropriate batch to generate appropriate .mo files.  Then
+    use the boot loader (run) to generate a new compiler.  There it is.
+
+
+				Baby steps
+
+    When debugging the mips code generator, it might be worth
+    replacing CoreFunc with a very simple structure ("hello world"),
+    then using batchm to generate a fake CoreFunc.mo. runtime/run
+    would execute CoreFunc before dying in Math or Initial.
+
+
+File: sml, Node: Differences	Next: Environment, Prev: CrossDev, Up: Top
+
+This node attempts to list differences between SML of New Jersey
+and the Definition of Standard ML (Milner/Tofte/Harper).
+
+- The arithmetic overflow exceptions are all identified (see above).
+	Sum, Prod, Diff, Neg, Exp, Floor are all equivalent to Overflow
+	Div and Mod are equivalent, distinct from Overflow
+	Ln is a distinct exception; Sqrt is a distinct exception 
+- Strings carried by the Io exception are more informative in SML-NJ.
+- Different right-associative operators of the same precedence
+	associate to the right in SML-NJ.
+- The @ operator is right-associative in SML-NJ.
+- "local" and "open" specs in signatures have a different semantics
+		(see doc/localspec)
+- The symbol "=" can be re-bound (though usually you get a warning message)
+- The construct   val ... and rec ...   is not permitted; the "rec"
+	must immediately follow the "val".
+- The Definition prohibits some, but not all, signatures that could
+	never be matched by any structure.  We are more liberal about
+	such signatures.
+- The initial basis is a superset of the one described in the Definition.
+	See the appendix to the user manual (in doc/refman) for
+	details.  Also:
+
+	The infix operators "quot" and "rem" implement rounding-towards-zero
+	division and remainder; on nonnegative numbers they are equivalent
+	to "div" and "mod," but are always faster.
+
+	There are two new functions:
+		outputc =  curry(output)
+		inputc:   a curried input function, but with a difference:
+			inputc f n 
+			returns "" on end-of-stream, and otherwise
+			returns a string of length k, 0<k<=n,
+			depending on what is available and convenient.
+
+
+File: sml, Node: Environment	Next: LocalSpec, Prev: Differences, Up: Top
+
+The following note by Andrew Appel points out a number of serious problems
+with the standard environment as defined in "Definition of Standard ML,
+Version 2", and proposes changes that would correct these problems.  These
+problems with the standard environment have come to our attention through
+using and implementing the language.  Unfortunately, the environment
+described in the Definition was (in our opinion, prematurely) frozen before
+the proposal was tested against "reality", but we hope that there is still
+enough flexibility within the ML community to allow us to make corrections to
+deal with these problems.  We hope that this note will bring these issues to
+the attention of the community. [DBM]
+
+
+			     PROPOSED CHANGES
+
+Andrew Appel proposes the following changes to the initial static environment
+in the "official" Definition of Standard ML.  These have not all been
+implemented, but we would like to implement them if no one objects.
+
+1.  input
+
+input(f,n) returns a string of length k <= n
+
+Current semantics:  if k<n then end-of-stream has been reached.
+New semantics: 
+    If no characters available, input blocks (as it does now).
+    If j>0 is the number of characters available, then k = min(j,n).
+    If (and only if)  end of stream is reached, the empty string is returned.
+
+The reason I suggest this change is that:
+
+A.  this primitive is much closer to the one provided by the operating system
+B.  the old primitive can be defined in terms of this one, but not the reverse
+C.  users often need this primitive and not the old one
+
+The old definition of input can be implemented using the new definition:
+
+fun old_input(f,n) =
+ case input(f,n)
+  of "" => ""
+   | s => if size(s) < n then s ^ old_input(f,n-size(s)) else s
+
+
+2.  Inequality operators for strings
+
+The operators < <= > >= should be supported for strings.  Even though
+they could be defined by users using the existing string primitives, it
+would be impossible for ordinary users to get them overloaded properly
+with the integer and real comparison operators.  There are many functions
+not in the standard that I would like in my environment, but I can simply
+define them; I am unable to define new overloadings, however.
+
+
+3.  Arithmetic exceptions
+
+The current set of arithmetic exceptions is unrealistic because it does
+not correspond with what is available in the hardware.  To correctly
+implement the current standard would add a very substantial overhead
+to each execution of an arithmetic operator.  Therefore, I propose:
+
+exception Div         for integer div and mod with a dividend of 0
+exception Overflow    for all integer operators with an out-of-range result
+
+exception Real of string   for all real operators with an out-of-range or
+                                other error result
+
+for floating point division by 0, I propose the use of the Div exception,
+although a separate exception could be defined for this if anyone cares.
+
+The exceptions Floor and Sqrt and Exp and Ln can be left as is.
+
+
+4.  div and mod
+
+The current language definition has perfectly reasonable definitions of
+div and mod.  The problem is that no machine supports these definitions;
+all that is supported is an integer divide (which I'll call div' )
+that always rounds towards zero. From this it is easy to synthesize modulus:
+
+fun a mod' b = a - b * (a div' b)
+
+These div and mod operators are not the ones in the language definition.
+However, it is possible to implement div and mod as defined in the standard:
+
+fun a div b = if a<0 then ... else if b<0 then ... else a div' b
+fun a mod b = a - b * (a div b)
+
+This is, of course, very slow.  However, any compiler that implements
+these directly will have to generate exactly the same (slow) code!
+The poor user who just wants to do div and mod on positive integers will pay
+a penalty.  And consider the hard-luck case who actually needs rounding
+towards zero; he would have to implement div'' and mod'' as:
+
+fun a div'' b = if a<0 then ... else if b<0 then ... else a div b
+
+That is, he'll have to insert tests that undo the test that the 
+standard-library functions are doing; no wonder he'll think that functional
+languages are slow.
+
+Therefore, I propose:
+
+div always rounds towards zero
+mod is just    fun a mod b = a - b * (a div b)
+
+If a user wants the current versions of div and mod, he can implement them;
+and his implementation will be no worse in performance
+than what happens now in the standard library functions!
+
+And remember, I don't make this proposal because it's more elegant than
+the current definition, just because it's what the machines actually do,
+and users can easily synthesize the functions they really want from
+the primitives.
+
+
+5.  Interrupt
+
+Consider the following:
+
+   fun f() = (process(input(std_in, 10)); f())  handle Interrupt => f()
+
+This is intended to be an Interrupt-proof loop (just like the "toplevel"
+of an interactive ML system).  However, if two interrupts arrive in very
+close succession, then the second will arrive in the exception handler
+and will cause execution to terminate.  The only safe way to handle this
+is to disable the interrupt button as soon as an Interrupt arrives,
+with an explicit re-enabling of interrupts at the discretion of the program.
+This requires the function:
+
+enable_interrupt : unit -> unit
+
+with (just for symmetry) a corresponding
+
+disable_interrupt : unit -> unit
+
+Then the function f() above can be written as
+
+   fun f() = (enable_interrupt();
+              process(input(std_in, 10)); f())  handle Interrupt => f()
+
+
+6.  Arrays
+
+I get tired of people telling me "ML doesn't have arrays, so I can't do X".
+Then I have to explain that every ML compiler has arrays, even though
+the language definition doesn't.  Perhaps it would be simpler to put them
+in the language definition.
+
+
+7.  Io exception
+
+The current Io exception carries a string approximately of the form
+"Cannot open s" where s is a filename. This is objectionable for two reasons.
+
+First, it's not possible to pattern-match on substrings;  if the strings
+are to be standardized, a datatype should be used.
+
+Second, there's no indication of why a file cannot be opened (or written,
+read, etc.).  Most operating systems are perfectly happy to provide a string
+explaining what failed, e.g. "No such file or directory" or 
+"Interrupted system call".  Therefore, I propose something like the following:
+
+exception Io of {operation : string, filename : string, reason : string}
+
+where operation is one of "open_in", "input", etc., filename is the
+name of the stream (given to open_in or open_out) and reason is an
+operating-system dependent explanation of what happened.
+
+Now it's much easier to pattern-match on Io failures, and the reasons for
+failures are explained.
+
+
+8.  curried input and output
+
+All of the first 7 proposals are in some sense fundamental; there's no way
+that a user can get the right effect by defining functions in his own
+environment.  Proposal #8 is just cosmetic:  we propose that the 
+input and output functions be curried.  We circulated this proposal about
+a year ago and got no response.  Is anyone listening out there?
+
+
+File: sml, Node: LocalSpec	Next: Top, Prev: Environment, Up: Top
+
+	What are the meaning of "local" and "open" in signatures?
+
+			David B. MacQueen
+
+I am not sure what the purpose of the local spec form was supposed to be.
+Specifications such as 
+
+   local val x : t
+    in val y : s
+   end
+
+are certainly useless, and
+
+   local type t
+    in val x : t
+   end
+
+does not seem very interesting either.  Presumably the purpose of local specs
+was to localize the scope of open specs, as in
+
+   structure A : sig type t ... end
+   local open A
+    in val x : t
+   end
+
+But I would argue that open specs are really just an abbreviation device and
+do not add specifications to a signature in any case.  The bindings in a
+structure, such as A above, are a different kind of entity from normal
+signature specifications, and they can be treated differently from
+specifications.  It makes sense to include the specifications in a signature
+in another signature, as is done by the include spec, but it does not make
+sense to include the components of a structure in a signature.  For instance,
+consider the following example:
+
+   structure A = struct type t = int val x = 3 end
+   signature SIG =
+   sig
+     open A
+   end
+
+What is the meaning of SIG?  Since the unconstrained structure A matches
+many different signatures, it would seem that SIG is not well defined.
+
+As we have implemented the open specification, it simply makes
+the identifiers inside the opened structures visible in unqualified form, so
+that "t" can be used as an abbreviation for "A.t" in the above example.  The
+scope of the open specification is by default the remainder of the signature
+expression, and an open specification does not add any new components to a
+signature.  Thus the above definition of SIG is equivalent to
+
+   signature SIG = sig end
+
+This view of open specs seems to eliminate any justification for local
+specs, so they are suppored only in a dummy form for compatibility.  The 
+meaning of
+
+   local spec1 in spec2 end
+
+is the same as
+
+   spec1 spec2
+
+except that the specifications in spec1 are ignored during signature
+matching.  If spec1 is an open spec, which is the only reasonable
+possibility, the open spec remains in force even after the end of the local
+spec.  For instance,
+
+  sig
+   structure A : sig type t ... end
+   type t
+   local open A in
+    in val x : t  (* t is A.t *)
+   end
+   val y : t  (* t is still A.t, not the top level t *)
+  end
+
+We would be interested to hear any arguments against this treatment.  If it
+is generally accepted, it would seem to make sense to delete local specs from
+the language.  In any case, it should be considered a dubious feature to be
+used only when necessary for compatibility.  I also consider the let
+structure expression a dubious feature, but it is at least fairly simple to
+implement.  
+
+
+File: sml, Node: Optimize	Next: Input, Prev: Top, Up: Top
+
+	     How to make Standard ML of New Jersey run faster
+
+1. Each compilation unit is compiled separately.  None of the 
+   optimizations take place across compilation-unit boundaries.   
+   Example:
+
+	fun f(x) = (x,x);
+        fun g 0 = nil | g i = f i :: g(i-1);
+        
+   This is two compilation units if typed at top level, or if loaded
+   from a file because at the first semicolon, the function f is compiled,
+   and then at the next semicolon, g is compiled.  The function g will run
+   significantly faster if any of the following is used instead:
+
+	fun f(x) = (x,x)
+        fun g 0 = nil | g i = f i :: g(i-1);
+
+	local fun f(x) = (x,x);
+          in  fun g 0 = nil | g i = f i :: g(i-1)
+         end;
+
+    structure S = struct 
+	fun f(x) = (x,x);
+        fun g 0 = nil | g i = f i :: g(i-1);
+     end;
+
+    In either of these last two, of course, the semicolons are optional.
+
+    Moral of the story:  use small compilation units while typing to
+    the interactive system and seeing how things work.  Use larger
+    compilation units when compiling large programs.  I recommend the
+    use of the module system, or of "let" and "local" declarations,
+    to bind things together in a well-structured way.
+
+    The use of signature constraints to minimize the number of things
+    exported from structures will reduce memory usage, and is just clean style.
+
+2.  For the fanatic:  (these are not guaranteed forever)
+
+	The initial environment (i.e. the List, Array, Ref, etc. structures)
+    is normally in a separate module from the user program.  If you
+    would like a copy of this stuff in your program so that calls to the
+    pervasive functions will have less overhead, textually insert
+    src/boot/fastlib.sml near the beginning of your own structure.
+    This only helps, of course, if fastlib.sml is put into the same
+    compilation unit as the functions calling it, using the module
+    system as described above.
+
+	You can nest structures.  To get better performance, after you
+    have developed your program, nest the whole thing in one huge
+    structure, e.g.
+
+	structure Whole : sig end = struct
+
+		your program
+	end
+
+    You can even put signatures and functors at top level inside such a
+    structure, although this is not "Standard" ML.
+
+
+3.  You can increase the level of optimization, if you want to wait
+    a bit longer for compiles.  To make things compile more slowly
+    but run faster, execute this before compiling your program:
+
+       System.Control.CG.reducemore := 0;
+       System.Control.CG.rounds := 10;
+       System.Control.CG.bodysize := 20;
+
+    To make things compile faster but run slower, try this:
+
+       System.Control.CG.reducemore := 10000;
+       System.Control.CG.rounds := 0;
+       System.Control.CG.bodysize := ~100;
+       System.Control.CG.reduce := false;
+
+4.  You can measure the execution time of your programs using the
+    functions in System.Timer.
+    (* in the initial environment,
+	signature TIMER =
+	  sig  
+	    datatype time = TIME of {sec : int, usec : int}
+	    type timer
+	    val start_timer : unit -> timer
+	    val check_timer : timer -> time
+	    val check_timer_gc: timer -> time
+	    val makestring : time -> string
+	    val add_time : time * time -> time
+	  end
+        structure System.Timer : TIMER 
+     *)
+
+      let val t = System.Timer.start_timer()
+          val _ = run_my_program()
+          val non_gc_time = System.Timer.check_timer t
+          val gc_time = System.Timer.check_timer_gc t
+          val total_time = System.Timer.add_time(non_gc_time,gc_time)
+       in print(System.Timer.makestring total_time)
+      end
+
+5.  You can also use the execution profiler, described in doc/profiling
+
+
+File: sml, Node: Weak Types	Next: Top, Prev: Optimize, Up: Top
+
+		     References and weak polymorphism
+
+The type checker in this version of the compiler uses weak type variables
+to support secure use of references and arrays and other objects like
+hash tables implemented in terms of references and arrays.  The following
+is a very brief and preliminary explanation of how they work, but you should
+try some experiments to become familiar with the behavior of weak polymorphism.
+
+As has been known for some time, mutable objects like references can
+be the source of type failures not detected by static type checking, if the
+reference primitives are treated as ordinary polymorphic values.  A standard
+example is
+
+   let val x = ref(fn x => x)
+    in x := (fn x => x+1)
+       !x true
+   end
+
+The basic principle we use to avoid such errors is that the contents
+of an "actual" reference must have monomorphic type.  Therefore,
+declarations such as
+
+   val x = ref []
+
+are now illegal and will cause an error message.   A function, like ref,
+that directly or indirectly creates references can have a polymorphic type,
+but of a special kind.  Thus the type of the ref constructor itself is now
+
+   ref: '1a -> '1a ref
+
+where the type variable '1a is a "weak type variable of degree 1".
+Basically, this type indicates that when the function ref is applied,
+its instantiation must be given a ground type.  But the notion of ground type
+must be interpreted relative to the context, e.g. bound type variables can
+be treated as type constants within the scope of their binding.  For example,
+
+   fun f(x:'1a) = ref [x]
+
+is ok, even though the type of the embedded ref expression is '1a list ref,
+because '1a is a bound type variable in this context.  The type of the
+function f is '1a -> '1a list ref.
+
+The degree of weakness (or perhaps strength is a better term) of a
+type variable reflects the number of lambda abstractions that have to
+be applied before the reference object is actually created and that
+type variable must be monomorphically instantiated.  Ordinary type
+variables can be considered to have strength infinity.  Each application
+weakens the operand type another step, and when the strength of a type
+variable becomes 0 it must be eliminated by instantiation to a ground
+type [weak type variables of degree zero are not allowed in a top-level type].
+Conversely, each surrounding lambda abstraction strengthens type
+variables.
+
+For example,
+
+   - val g = (fn x => (fn y => (ref x, ref(x,y))));
+   > val g = fn : '2a -> '2b -> ('2a ref * ('2a *'2b) ref)
+
+   - val h = g(nil);
+   > val h = fn :  '1a -> ('1b list ref * ('1b list * '1a) ref)
+
+   - h true;
+   Error: can't generalize weak type variable
+   ('0aA list ref*('0aA list*bool) ref)
+
+but
+
+   - (h true) : int list ref * (int list * bool) ref;
+   val it = (ref nil,ref ([],true)) : (int list ref*(int list*bool) ref)
+
+The type constraint is necessary to instantiate the weak type variable '1c
+when h is applied.
+
+If a component of a structure has a weak polymorphic type, then the
+corresponding signature specification should have at least as weak a
+type (the weaker-than relation between types should be fairly
+obvious).
+
+
+		      Weak variables and exceptions
+
+If the declared argument type of an exception constructor contains a
+type variable, then that type variable is bound in the appropriate
+surrounding context according to the usual rules (its binding scope is
+the rhs of the innermost let-binding containing the occurence of the
+type variable).  Furthermore, the type variable must be a weak
+variable of the same degree as it would have were it associated with
+a ref argument at that point (i.e. its weakness must agree with the 
+abstraction degree at the point of the exception declaration.)  This
+is because the creation of an exception constructor is conceptually
+similar to the creation of a reference value -- both can be used to
+transmit values between two textually unrelated points in the program.
+
+It is best if the type variable occurring in the exception declaration
+had already been introduced by appearance in a type constraint on a lambda
+binding.
+
+Here is an example:
+
+   fun f(l: '1a list, p: '1a -> bool) = 
+       let exception E of '1a list
+	   fun search(x::r) = if p x then raise E r else search r
+	     | search [] = []
+        in search r handle E l => l
+       end
+
+As an exercise, show how this rule prevents the usual type insecurity
+example associated with "polymorphic" references:
+
+   let val (r,h) = 
+       let exception E of 'a
+        in ((fn x => raise x), (fn f => f() handle E y => y))
+       end
+
+
+File: sml, Node: Running	Next: Input, Prev: Top, Up: Top
+
+			   Running Standard ML
+
+    Type "sml".  This puts you into the interactive system.  The top
+    level prompt is "- ", and the secondary prompt (printed when input
+    is incomplete) is "= ".  If you get the secondary prompt when you
+    don't expect it, typing ";<return>" will often complete your
+    input, or type your interrupt character (e.g. ^C) to cancel your
+    input and return you to top level.
+
+    If "sml" doesn't work, ask where sml has been installed on your
+    machine and use the appropriate path name or redefine your PATH
+    environment variable.
+
+
+File: sml, Node: Input		Next: Prompts, Prev: Running, Up: Top
+
+			    Interactive input
+
+    Input to the top level interpreter (i.e. declarations and
+    expressions) must be terminated by a semicolon (and carriage
+    return) before the system will evaluate it.  The system then
+    prints out a response indicating the effect of the evaluation.
+    Expressions are treated as implicit declarations of a standard
+    variable "it".  For example,
+
+       - 3; <return>	    <- user input after prompt
+       val it  = 3 : int    <- system response
+
+    This means that the value of the last top level expression
+    evaluated can be referred to using the variable "it".
+
+
+File: sml, Node: Prompts	Next: Interrupts, Prev: Running, Up: Top
+
+			   Changing the prompts
+
+    The primary and secondary prompt strings are the contents of the
+    references
+
+     System.Control.primaryPrompt
+     System.Control.secondaryPrompt	(*Note CONTROL::*)
+
+    These can be redefined by assignment, e.g.:
+
+     - System.Control.secondaryPrompt := "(**)";
+
+
+File: sml, Node: Interrupts	Next: Exiting, Prev: Prompts, Up: Top
+
+		   Interrupting parsing or computation
+
+    Typing your interrupt character should interrupt the compiler and
+    return you to top level, unless some function is catching the
+    Interrupt exception (a dangerous thing to do).
+
+
+File: sml, Node: Exiting	Next: Loading, Prev: Interrupts, Up: Top
+
+		      Exiting the interactive system
+
+    Typing ^D (EOF) at top level will cause an exit to the shell (or
+    the parent process from which sml was run).
+
+
+File: sml, Node: Loading	Next: Saving, Prev: Exiting, Up: Top
+
+		    Loading ML source text from a file
+
+    The operator use: string->unit interprets its argument as a Unix
+    file name relative to sml's current directory and loads the text
+    from that file as though it had been typed in.  "use" should
+    normally be executed at top level, but the loaded files can also
+    contain calls of use to recursively load other files.  It is a bad
+    idea to call use within an expression or declaration, because the
+    effects are not well-defined.
+
+
+File: sml, Node: Saving		Next: Commands, Prev: Loading, Up: Top
+
+		      Saving an image of the system
+
+    Use the function exportML: string->bool to dump an image of the
+    current sml system including the environment that you have built.
+    The argument is the path name of the image file that is created.
+    The result false is returned in the original system, while in the
+    saved image the value returned is true.  The call of exportML can
+    be embedded in an expression which will continue evaluation (e.g.
+    to print a message) in both the original system and in the image
+    when it is run, and its effect can depend on the result of the
+    exportML call.  For example:
+
+     if exportML("saved")
+     then print "this is the saved image\n"
+     else print "this is the original process\n"
+
+    The saved image file is an executable binary, and can be run by
+    typing the file name as a command to the shell.  (Access to
+    command-line arguments and Unix environment variables when running
+    the saved image may be accomplished by System.argv and
+    System.environ. *Note SYSTEM::)
+
+
+File: sml, Node: Commands	Next: Errors, Prev: Saving, Up: Top
+
+	    Executing System commands and changing directories
+
+    The function system : string->unit (*Note SYSTEM::) spawns a
+    process to execute its argument string as a shell command.  Thus
+    to find out what the current directory is within sml you can
+    evaluate the expression
+
+     system "pwd";
+
+    which will cause the current directory to be printed out (there is
+    no way at the moment to return the current directory as a string).
+    To change the current working directory of sml use the function
+    cd :string -> unit, whose argument should be a path name denoting
+    a directory.
+
+
+File: sml, Node: Errors		Next: Flags, Prev: Commands, Up: Top
+
+			      Error messages
+
+    The error messages produced by the compiler are not always as
+    helpful as they should be, and there are often too many of them.
+
+    The compiler attempts to recover from syntactic and type errors so
+    that it can detect as many errors as possible during a
+    compilation.  Unfortunately, it is not very graceful in recovery,
+    and the process can cause numerous spurious secondary error
+    messages.
+
+    When compiling files, the error messages include a line number.
+    For simple syntactic errors this line number is often accurate or
+    off by just one line.  For other classes of errors, including type
+    errors, the line number may not be very useful, since it will
+    often just indicate the end of the declaration containing the
+    error, and this declaration can be quite large.
+
+    There are a number of different forms of type error message, and
+    it may require some practice before you become adept at
+    interpreting them.  The most common form indicates a mismatch
+    between the type of a function (or operator) and its argument (or
+    operand).  A representation of the offending expression is usually
+    included, but this is an image of the internal abstract syntax for
+    the expression and may differ significantly from the original
+    source code.  For instance, an "if...then...else..." expression is
+    represented internally as a case expression over a boolean value:
+    "case ... of true => ... | false => ...".
+
+
+File: sml, Node: Flags		Next: Timing, Prev: Errors, Up: Top
+
+			   Useful system flags
+
+    There are a number of useful system flags and variables, which are
+    found in the structure System.Control and its substructures.  The
+    primary and secondary prompt variable have already been mentioned;
+    here are some more:
+
+   Printing:  System.Control.Print. ...		(*Note PRINTCONTROL::)
+   
+      printDepth : int ref
+        controls depth to which complex values and syntax trees are
+        printed (default 5)
+
+      stringDepth : int ref
+        controls how much of a long string will be printed (default 70)
+ 
+      signatures : int ref
+        the depth to which signatures, and the signatures of structures, will
+        be printed when these are defined at top level (default 2)
+
+   Garbage collection messages: 		(*Note RUNTIMECONTROL::)
+
+      System.Control.Runtime.gcmessages: int ref
+        when 0, no messages are printed
+	when 1, only major collections are reported  (the default)
+	when 2, major collections and heap resizings are reported
+	when 3, minor and major collections and heap resizings are reported
+
+   Memory use:
+
+      System.Control.Runtime.ratio : int ref
+        determines the desired ratio between size of live data and
+        total heap size.  Default is 5, and 3 is the smallest
+        acceptable value.  A higher ratio causes more aggressive use
+        of memory (up to the softmax bound).
+
+      System.Control.Runtime.softmax : int ref
+        suggested ceiling on heap size, in bytes.  Heap size will not
+        grow beyond this value except to maintain the "minimum" ratio
+        of 3.  Actually, when hard limits are reached (e.g. as
+        determined by limit datasize), the system can continue to run
+        as long as the actual ratio is greater than 2.  A good value
+        for softmax is one that reflects the amount of physical (not
+        virtual) memory that is expected to be available for the sml
+        process, for instance, 5000000 (5MB) might be appropriate on
+        an 8MB Sun 3. 
+
+
+File: sml, Node: Timing		Next: Profiling, Prev: Flags, Up: Top
+
+				  Timing
+
+    The structure System.Timer, which has the signature (*Note TIMER::)
+
+      signature TIMER =
+	sig  
+	  datatype time = TIME of {sec : int, usec : int}
+	  type timer
+	  val start_timer : unit -> timer
+	  val check_timer : timer -> time
+	  val makestring : time -> string
+	  val add_time : time * time -> time
+	end
+
+    provides basic facilities for timing your code.  Here is how a
+    typical timing function could be implemented:
+
+     fun timeit (f: unit->'a) =
+	 let open System.Timer
+	     val start = start_timer()
+	     val result = f()
+	  in print(makestring(check_timer(start)));
+	     print "\n";
+	     result
+	 end;
+
+
+File: sml, Node: Profiling	Next: Sigs, Prev: Timing, Up: Top
+
+			   Execution Profiling
+
+    You can use the built-in ML execution profiler to find out where
+    the bottlenecks in your programs are.  The profiler will tell how
+    much time is spent in each function and how many calls were made
+    to each function.  In order to profile a set of functions, those
+    functions must be compiled in "profiling mode".
+
+    Here's how to use the profiler: (*Note PROFILE::)
+
+    (1) System.Control.Profile.profiling := true;
+
+        This tells the compiler to insert profiling hooks in the
+        compiled code for any ML declarations that are compiled from
+        now on, or until this flag is set back to false.
+
+    (2) compile some ML code, either by typing it in to the interactive
+        system, or by means of the "use" function.
+
+    (3) System.Control.Profile.profileOn();
+
+        This starts the timer interrupts that are used for statistical
+        profiling. 
+
+    (4) execute your program
+
+    (5) System.Control.Profile.profileOff();
+
+        This turns off the timer interrupts.
+
+    (6) System.Control.Profile.report std_out;
+
+        This prints a report of profiling information on your screen.
+        For each function you will be told what percentage of the time
+        was spent in that function, how many calls were made, etc.
+        Instead of std_out you can call "report" with any outstream as
+        an argument if, for instance, you want the report sent to a
+        file. 
+
+    Other commands:
+
+    System.Control.Profile.reset: unit -> unit
+
+    The "reset" command sets all timing and call-count information to
+    zero, but remembers which functions have been profiled. 
+
+    System.Control.Profile.clear: unit -> unit
+
+    The "clear" command tells the system to forget about profiling any
+    functions that have been compiled so far, but allows you to
+    compile and profile further functions.
+
+    Of course, the long names can be avoided by first opening the
+    structure System.Control.Profile.
+
+    A slightly simpler way to use the profiler is as follows (after
+    having opened System.Control.Profile):
+
+    (1) profiling := true;
+    (2) profileOn();
+    (3) compile and execute some ML code
+    (4) report std_out;
+    (5) repeat from step (3)
+    (6) when finished profiling, execute profileOff() and profiling := false
+
+    The batch compiler can also be made to generate object files with
+    profiling code by toggling the flag "profiling" to true, using the
+    command "^profiling".  We use this method to profile the compiler
+    itself.
+
+    For more details about the profiler, and to learn more tricks you
+    can make it do, read the paper "Profiling in the presence of
+    optimization and garbage collection" provided in the doc/papers
+    directory.  Details of the implemention have changed since that
+    paper was written, but it is still basically accurate.
+
+
+File: sml, Node: Sigs		Next: Mailing Lists, Prev: Profiling, Up: Top
+
+		     Basic ML environment signatures
+
+
+		   "perv.sig" -- pervasive environment
+* Menu:
+* REF::			REF signature
+* LIST::		LIST signature
+* ARRAY::		ARRAY signature
+* BYTEARRAY::		BYTEARRAY signature
+* IO::			IO signature
+* BOOL::		BOOL signature
+* STRING::		STRING signature
+* INTEGER::		INTEGER signature
+* BITS::		BITS signature
+* REAL::		REAL signature
+* GENERAL::		GENERAL signature
+
+
+		   "system.sig" -- system environment
+
+* RUNTIMECONTROL::	RUNTIMECONTROL signature
+* MCCONTROL::		MCCONTROL signature
+* CGCONTROL::		CGCONTROL signature
+* PRINTCONTROL::	PRINTCONTROL signature
+* DEBUG::		DEBUG signature
+* PROFILE::		PROFILE signature
+* PROFILEINTERNALS::	PROFILEINTERNALS signature
+* CONTROL::		CONTROL signature
+* TIMER::		TIMER signature
+* TAGS::		TAGS signature
+* STATS::		STATS signature
+* CINTERFACE::		CINTERFACE signature
+* SYSIO::		SYSIO signature
+* CLEANUP::		CLEANUP signature
+* WEAK::		WEAK signature
+* UNSAFE::		UNSAFE signature
+* SIGNALS::		SIGNALS signature
+* DIRECTORY::		DIRECTORY signature
+* SYSTEM::		SYSTEM signature
+
+
+File: sml, Node: Mailing Lists	Next: Top, Prev: Sigs: Up: Top
+
+Date: Fri, 15 Dec 89 15:37:51 GMT
+From: Dave Berry <db%lfcs.edinburgh.ac.uk@NSFnet-Relay.AC.UK>
+To: sml@CS.CMU.EDU
+
+At the moment there are three international mailing lists for Standard ML:
+
+1. sml@cs.cmu.edu
+	You're reading this, so I assume that you know what it's about.
+
+2. ml-bugs@lfcs.ed.ac.uk
+	This was set up for implementors to compare notes and for people
+	to report bugs in the various implementations of Standard ML.
+	Sometimes the messages attempt an exegesis of the more obtuse
+	parts of the Definition of Standard ML.
+
+3. ml-lib@lfcs.ed.ac.uk
+	This was set up to discuss the design of a library of program
+	modules for Standard ML.  There's been no traffic on this for months.
+
+When sml@cs.cmu.edu was set up, we decided to keep the existing lists
+separate and see what happened.
+
+Some people have suggested that the lists should be combined.  ml-bugs and
+ml-lib are currently subsets of sml@cs.cmu.edu, so people on those lists
+already receive all messages.  The argument for combining the lists is
+that most people would find the messages on ml-bugs interesting.
+(It would also make administration easier, but both Benli and I are
+neutral on the issue.)
+
+The traffic on ml-bugs is about equal to the traffic on sml@cs.cmu.edu.
+Recent messages have been about parsing infixr operators (different
+operators associate to the left, if you didn't know), ambiguities in the
+derived forms, a bug in Poly/ML's implementation of "as", and problems
+with comments in ML-YACC.
+
+In the light of the requests received so far, I propose combining the
+three lists.  Please mail me if you feel strongly either way on this issue.
+If you think there are important arguments for or against that I haven't
+mentioned, or if you require more information to make a decision, please
+MAIL ME and I will post summaries of points made to the list.  Let's try
+and keep people's mailboxes free of convoluted arguments about this.
+
+Nothing will change until after the holidays.
+
+Dave Berry.
+
+
+File: sml, Node: REF		Next: LIST, Prev: SYSTEM, Up: Sigs
+
+signature REF =
+  sig
+    infix 3 :=
+    val ! : 'a ref -> 'a
+    val := : 'a ref * 'a -> unit
+    val inc : int ref -> unit
+    val dec : int ref -> unit
+  end
+
+
+File: sml, Node: LIST		Next: ARRAY, Prev: REF, Up: Sigs
+
+signature LIST =
+  sig
+    infixr 5 :: @
+    datatype 'a list = :: of ('a * 'a list) | nil
+    exception Hd
+    exception Tl
+    exception Nth
+    exception NthTail
+    val hd : 'a list -> 'a
+    val tl : 'a list -> 'a list 
+    val null : 'a list -> bool 
+    val length : 'a list -> int 
+    val @ : 'a list * 'a list -> 'a list
+    val rev : 'a list -> 'a list 
+    val map :  ('a -> 'b) -> 'a list -> 'b list
+    val fold : (('a * 'b) -> 'b) -> 'a list -> 'b -> 'b
+    val revfold : (('a * 'b) -> 'b) -> 'a list -> 'b -> 'b
+    val app : ('a -> 'b) -> 'a list -> unit
+    val revapp : ('a -> 'b) -> 'a list -> unit
+    val nth : 'a list * int -> 'a
+    val nthtail : 'a list * int -> 'a list
+    val exists : ('a -> bool) -> 'a list -> bool
+  end
+
+
+File: sml, Node: ARRAY		Next: BYTEARRAY, Prev: LIST, Up: Sigs
+
+signature ARRAY =
+  sig
+    infix 3 sub
+    type 'a array
+    exception Subscript
+    val array : int * '1a -> '1a array
+    val sub : 'a array * int -> 'a
+    val update : 'a array * int * 'a -> unit
+    val length : 'a array -> int
+    val arrayoflist : '1a list -> '1a array
+  end
+
+
+File: sml, Node: BYTEARRAY	Next: IO, Prev: ARRAY, Up: Sigs
+
+signature BYTEARRAY =
+  sig
+    infix 3 sub
+    eqtype bytearray
+    exception Subscript
+    exception Range
+    val array : int * int -> bytearray
+    val sub : bytearray * int -> int
+    val update : bytearray * int * int -> unit
+    val length : bytearray -> int
+    val extract : bytearray * int * int -> string
+    val fold : ((int * 'b) -> 'b) -> bytearray -> 'b -> 'b
+    val revfold : ((int * 'b) -> 'b) -> bytearray -> 'b -> 'b
+    val app : (int -> 'a) -> bytearray -> unit
+    val revapp : (int -> 'b) -> bytearray -> unit
+  end
+
+
+File: sml, Node: IO		Next: BOOL, Prev: BYTEARRAY, Up: Sigs
+
+signature IO =
+  sig
+    type instream 
+    type outstream
+    exception Io of string
+    val std_in : instream
+    val std_out : outstream
+    val std_err : outstream
+    val open_in : string -> instream
+    val open_out : string -> outstream
+    val open_append : string -> outstream
+    val open_string : string -> instream
+    val close_in : instream -> unit
+    val close_out : outstream -> unit
+    val output : outstream * string -> unit
+    val outputc : outstream -> string -> unit
+    val input : instream * int -> string
+    val inputc : instream -> int -> string
+    val input_line : instream -> string
+    val lookahead : instream -> string
+    val end_of_stream : instream -> bool
+    val can_input : instream -> int
+    val flush_out : outstream -> unit
+    val is_term_in : instream -> bool
+    val is_term_out : outstream -> bool
+    val set_term_in : instream * bool -> unit
+    val set_term_out : outstream * bool -> unit
+    val execute : string -> instream * outstream
+    val exportML : string -> bool
+    val exportFn : string * (string list * string list -> unit) -> unit
+    val use : string -> unit
+    val use_stream : instream -> unit
+  end
+
+
+File: sml, Node: BOOL		Next: STRING, Prev: IO, Up: Sigs
+
+signature BOOL =
+  sig
+    datatype bool = true | false
+    datatype 'a option = NONE | SOME of 'a  (* stuck in here for convenience *)
+    val not : bool -> bool
+    val print : bool -> unit
+    val makestring : bool -> string
+  end
+
+
+File: sml, Node: STRING		Next: INTEGER, Prev: BOOL, Up: Sigs
+
+signature STRING =
+  sig
+    infix 6 ^
+    infix 4 > < >= <=
+    type string
+    exception Substring
+    val length : string -> int
+    val size : string -> int
+    val substring : string * int * int -> string
+    val explode : string -> string list
+    val implode : string list -> string
+    val <= : string * string -> bool
+    val <  : string * string -> bool
+    val >= : string * string -> bool
+    val >  : string * string -> bool
+    val ^  : string * string -> string
+    exception Chr
+    val chr : int -> string 
+    exception Ord
+    val ord : string -> int 
+    val ordof : string * int -> int 
+    val print : string -> unit
+  end
+
+
+File: sml, Node: INTEGER	Next: BITS, Prev: STRING, Up: Sigs
+
+signature INTEGER =
+  sig
+    infix 7 * div mod quot rem
+    infix 6 + -
+    infix 4 > < >= <=
+    exception Sum and Diff and Prod and Neg
+    exception Div and Mod
+    exception Overflow
+    type int
+    val ~ : int -> int
+    val * : int * int -> int
+    val div : int * int -> int
+    val mod : int * int -> int
+    val quot : int * int -> int
+    val rem : int * int -> int
+    val + : int * int -> int
+    val - : int * int -> int
+    val >  : int * int -> bool
+    val >= : int * int -> bool
+    val <  : int * int -> bool
+    val <= : int * int -> bool
+    val min : int * int -> int
+    val max : int * int -> int
+    val abs : int -> int
+    val print : int -> unit
+    val makestring : int -> string
+  end
+
+
+File: sml, Node: BITS		Next: REAL, Prev: INTEGER, Up: Sigs
+
+signature BITS =
+  sig
+    type int
+    val orb : int * int -> int
+    val andb : int * int -> int
+    val xorb : int * int -> int
+    val lshift : int * int -> int
+    val rshift : int * int -> int
+    val notb : int * int -> int
+  end
+
+
+File: sml, Node: REAL		Next: GENERAL, Prev: BITS, Up: Sigs
+
+signature REAL =
+  sig
+    infix 7 * /
+    infix 6 + -
+    infix 4 > < >= <=
+    type real
+    exception Sum and Diff and Prod
+    exception Floor and Sqrt and Exp and Ln
+    exception Div
+    exception Overflow
+    val ~ : real -> real 
+    val + : (real * real) -> real 
+    val - : (real * real) -> real 
+    val * : (real * real) -> real 
+    val / : (real * real) -> real 
+    val > : (real * real) -> bool
+    val < : (real * real) -> bool
+    val >= : (real * real) -> bool
+    val <= : (real * real) -> bool
+    val abs : real ->  real
+    val real : int -> real
+    val floor : real -> int
+    val truncate : real -> int
+    val ceiling : real -> int
+    val sqrt : real -> real
+    val sin : real -> real
+    val cos : real -> real
+    val arctan : real -> real
+    val exp : real -> real
+    val ln : real -> real
+    val print : real -> unit
+    val makestring : real -> string
+  end
+
+
+File: sml, Node: GENERAL	Next: RUNTIMECONTROL, Prev: REAL, Up: Sigs
+
+signature GENERAL =
+  sig
+    infix 3 o
+    infix before
+    exception Bind
+    exception Match
+    exception Interrupt
+      (* NOTE: Interrupt is never raised by the system, but is included to
+       * provide some compatibility with the definition. *)
+
+    type 'a cont
+    val callcc : ('a cont -> 'a) -> 'a
+    val throw : 'a cont -> 'a -> 'b
+
+    val o : ('b -> 'c) * ('a -> 'b) -> ('a -> 'c)
+    val before : ('a * 'b) -> 'a
+
+    type exn
+    type unit
+    infix 4 = <>
+    val = : ''a * ''a -> bool
+    val <> : ''a * ''a -> bool
+  end
+
+
+File: sml, Node: RUNTIMECONTROL	Next: MCCONTROL, Prev: GENERAL, Up: Sigs
+
+signature RUNTIMECONTROL =
+  sig
+    val collected : int ref
+    val collectedfrom : int ref
+    val gcmessages : int ref		(*Note Flags::.)
+    val majorcollections : int ref
+    val minorcollections : int ref
+    val ratio : int ref			(*Note Flags::.)
+    val softmax : int ref		(*Note Flags::.)
+  end
+
+
+File: sml, Node: MCCONTROL	Next: CGCONTROL, Prev: Profiling, Up: Sigs
+
+signature MCCONTROL =
+  sig
+    val printArgs : bool ref
+    val printRet : bool ref
+    val bindContainsVar : bool ref
+    val bindExhaustive : bool ref
+    val matchExhaustive : bool ref
+    val matchRedundant : bool ref
+    val expandResult : bool ref
+  end
+
+
+File: sml, Node: CGCONTROL	Next: PRINTCONTROL, Prev: MCCONTROL, Up: Sigs
+
+signature CGCONTROL =
+  sig
+    structure M68 : sig val trapv : bool ref end
+    val tailrecur : bool ref
+    val recordopt : bool ref
+    val tail : bool ref
+    val profile : bool ref
+    val closureprint : bool ref
+    val closureStrategy : int ref
+    val cpsopt : bool ref
+    val rounds : int ref
+    val path : bool ref
+    val betacontract : bool ref
+    val eta : bool ref
+    val selectopt : bool ref
+    val dropargs : bool ref
+    val deadvars : bool ref
+    val flattenargs : bool ref
+    val switchopt : bool ref
+    val handlerfold : bool ref
+    val branchfold : bool ref
+    val arithopt : bool ref
+    val betaexpand : bool ref
+    val hoistup : bool ref
+    val hoistdown : bool ref
+    val maxregs : int ref
+    val recordcopy : bool ref
+    val tagopt : bool ref
+    val recordpath : bool ref
+    val machdep : bool ref
+    val misc1 : bool ref
+    val misc2 : bool ref
+    val misc3 : int ref
+    val misc4 : int ref
+    val hoist : bool ref
+    val argrep : bool ref
+    val reduce : bool ref
+    val bodysize : int ref
+    val reducemore : int ref
+    val alphac : bool ref
+    val comment : bool ref
+    val knowngen : int ref
+    val stdgen : int ref
+    val knowncl : int ref
+    val foldconst : bool ref
+    val etasplit : bool ref
+    val printit : bool ref
+    val printsize : bool ref
+    val scheduling : bool ref
+    val cse : bool ref
+    val optafterclosure : bool ref
+    val calleesaves : int ref
+    val extraflatten : bool ref
+    val uncurry : bool ref
+    val ifidiom : bool ref
+    val comparefold : bool ref
+    val csehoist : bool ref
+    val rangeopt : bool ref
+    val floatargs : int ref
+    val floatvars : int ref
+    val floatreg_params : bool ref
+  end
+
+
+File: sml, Node: PRINTCONTROL	Next: DEBUG, Prev: CGCONTROL, Up: Sigs
+
+signature PRINTCONTROL =
+  sig
+    val printDepth : int ref	(*Note Flags::.)
+    val printLength : int ref
+    val stringDepth : int ref	(*Note Flags::.)
+    val signatures : int ref	(*Note Flags::.)
+  end
+
+
+File: sml, Node: DEBUG		Next: PROFILE, Prev: PRINTCONTROL, Up: Sigs
+
+signature DEBUG =
+  sig
+    val debugging : bool ref
+    val getDebugf : (int -> 'a) ref
+    val interface : (int -> ('a -> 'b)) ref
+  end
+
+
+File: sml, Node: PROFILE	Next: PROFILEINTERNALS, Prev: DEBUG, Up: Sigs
+
+signature PROFILE =			(*Note Profiling::*)
+  sig
+    structure IO : sig type outstream end (*Note IO::*)
+    val profiling : bool ref       (* controls profiling mode of compilation *)
+    val profileOn : unit -> unit      (* turn interrupt timer on *)
+    val profileOff : unit -> unit     (* turn interrupt timer off *)
+    val clear : unit -> unit          (* clear profiling database *)
+    val reset : unit -> unit          (* reset profiling counts to zero *)
+    val report : IO.outstream -> unit (* print profiling report to stream *)
+  end
+
+
+File: sml, Node: PROFILEINTERNALS, Next: CONTROL, Prev: PROFILE, Up: Sigs
+
+signature PROFILEINTERNALS =
+  sig 
+    val add : 'a -> unit
+    val setToplevel : unit -> unit
+    val setOther : unit -> unit
+    structure P : PROFILE		(*Note PROFILE::*)
+  end
+
+
+File: sml, Node: CONTROL	Next: TIMER, Prev: PROFILEINTERNALS, Up: Sigs
+
+signature CONTROL =
+  sig
+    structure Runtime : RUNTIMECONTROL	(*Note RUNTIMECONTROL::*)
+    structure MC : MCCONTROL		(*Note MCCONTROL::*)
+    structure CG : CGCONTROL		(*Note CGCONTROL::*)
+    structure Print : PRINTCONTROL	(*Note PRINTCONTROL::*)
+    structure ProfileInternals : PROFILEINTERNALS (*Note PROFILEINTERNALS::*)
+    structure Profile : PROFILE		(*Note PROFILE::*)
+    structure Debug : DEBUG		(*Note DEBUG::*)
+    val prLambda : (unit -> unit) ref
+    val debugging : bool ref
+    val primaryPrompt : string ref	(*Note Prompts:: *)
+    val secondaryPrompt : string ref	(*Note Prompts:: *)
+    val internals : bool ref
+    val weakUnderscore : bool ref
+    val interp : bool ref
+    val debugLook : bool ref
+    val debugCollect : bool ref
+    val debugBind : bool ref
+    val saveLambda : bool ref
+    val saveLvarNames : bool ref
+    val timings : bool ref
+    val reopen : bool ref
+    val markabsyn : bool ref
+    val indexing : bool ref
+  end
+
+
+File: sml, Node: TIMER		Next: TAGS, Prev: CONTROL, Up: Sigs
+
+signature TIMER =			(*Note Timing::*)
+  sig
+    datatype time = TIME of {sec : int, usec : int}
+    type timer
+    val start_timer : unit -> timer
+    val check_timer : timer -> time
+    val check_timer_sys: timer -> time
+    val check_timer_gc: timer -> time
+    val makestring : time -> string
+    val add_time : time * time -> time
+    val sub_time : time * time -> time
+    val earlier : time * time -> bool
+  end
+
+
+File: sml, Node: TAGS		Next: STATS, Prev: TIMER, Up: Sigs
+
+signature TAGS =
+  sig
+    type tag
+    val width_tags : int (* number of bits to hold a tag *)
+  (* tag values *)
+    val tag_record : tag
+    val tag_array : tag
+    val tag_string : tag
+    val tag_real : tag
+    val tag_embedded_string : tag
+    val tag_embedded_real : tag
+    val tag_bytearray : tag
+    val tag_backptr : tag
+  (* build a descriptor from a tag and length *)
+    val make_desc : (int * tag) -> int
+  (* fixed descriptors *)
+    val desc_real : int
+    val desc_embedded_real : int
+  (* special descriptors *)
+    val desc_evaled_susp : int
+    val desc_unevaled_susp : int
+    val desc_weak : int
+    val desc_nulled_weak : int
+  end
+
+
+File: sml, Node: STATS		Next: CINTERFACE, Prev: TIMER, Up: Sigs
+
+signature STATS =
+  sig
+    structure Timer : TIMER		(*Note TIMER::*)
+    val lines : int ref
+    val parse : Timer.time ref
+    val translate : Timer.time ref
+    val codeopt : Timer.time ref
+    val convert : Timer.time ref
+    val hoist : Timer.time ref
+    val cpsopt : Timer.time ref
+    val closure : Timer.time ref
+    val globalfix : Timer.time ref
+    val spill : Timer.time ref
+    val codegen : Timer.time ref
+    val freemap : Timer.time ref
+    val execution : Timer.time ref
+    val codesize : int ref
+    val update : Timer.time ref * Timer.time -> unit
+    val summary : unit -> unit
+  end
+
+
+File: sml, Node: CINTERFACE	Next: SYSIO, Prev: STATS, Up: Sigs
+
+signature CINTERFACE =
+  sig
+    exception CFunNotFound of string
+    exception SysError of (int * string)
+    exception SystemCall of string
+
+    type time
+
+    val c_function : string -> ('a -> 'b)
+    val c_string : string -> string
+		(* insure that a string is safe to pass to C *)
+    val wrap_sysfn : string -> ('a -> 'b) -> 'a -> 'b
+
+  (* C functions *)
+    val argv	    : unit -> string list
+    val environ	    : unit -> string list
+    val gethostname : unit -> string
+    val exec	    : (string * string list * string list) -> (int * int)
+    val system      : string -> int
+    val export      : int -> bool
+    val blas	    : (int * 'a) -> 'a
+    val salb	    : string -> 'a
+    val gettime     : unit -> {usr : time, sys : time, gc : time}
+    val setitimer   : (int * time * time) -> unit
+    val flush_cache : string -> unit
+    val gc          : int -> unit
+    val syscall	    : (int * string list) -> int
+  (* System calls *)
+    val exit	    : int -> 'a
+    val getpid	    : unit -> int
+    val getuid	    : unit -> int
+    val getgid	    : unit -> int
+    val chdir	    : string -> unit
+  end (* CINTERFACE *)
+
+
+File: sml, Node: SYSIO		Next: CLEANUP, Prev: CINTERFACE, Up: Sigs
+
+signature SYSIO =
+  sig
+    type bytearray
+    type time
+
+    type fd
+    eqtype fileid
+    datatype fname	= DESC of fd | PATH of string
+    datatype mode	= O_READ | O_WRITE | O_APPEND
+    datatype whence	= L_SET | L_INCR | L_XTND
+    datatype access	= A_READ | A_WRITE | A_EXEC
+    datatype file_type	= F_REGULAR | F_DIR | F_SYMLINK | F_SOCK | F_CHR | F_BLK
+
+    val dtablesize	: int
+    val openf		: (string * mode) -> fd
+    val closef		: fd -> unit
+    val unlink		: string -> unit
+    val pipe		: unit -> (fd * fd)
+    val connect_unix	: string -> fd
+    val connect_inet	: (string * string) -> fd
+    val link		: (string * string) -> unit
+    val symlink		: (string * string) -> unit
+    val mkdir		: (string * int) -> unit
+    val dup		: fd -> fd
+
+    val read		: (fd * bytearray * int) -> int
+    val readi		: (fd * bytearray * int * int) -> int
+    val write		: (fd * bytearray * int) -> unit
+    val writei		: (fd * bytearray * int * int) -> unit
+    val writev		: (fd * (bytearray * int) list) -> unit
+    val send_obd	: (fd * bytearray * int) -> unit
+    val getdirent	: fd -> string list
+    val readlink	: string -> string
+    val truncate	: (fname * int) -> unit
+    val lseek		: (fd * int * whence) -> int
+
+    val getmod		: fname -> int
+    val chmod		: (fname * int) -> unit
+    val umask		: int -> int
+
+    val access		: (string * access list) -> bool
+    val isatty		: fd -> bool
+    val fionread	: fd -> int
+    val getfid		: fname -> fileid
+    val ftype		: fname -> file_type
+    val getownid	: fname -> (int * int)
+    val fsize		: fname -> int
+    val atime		: fname -> time
+    val ctime		: fname -> time
+    val mtime		: fname -> time
+    val select		: (fd list * fd list * fd list * time option)
+			    -> (fd list * fd list * fd list)
+  end (* SYSIO *)
+
+
+File: sml, Node: CLEANUP	Next: WEAK, Prev: SYSIO, Up: Sigs
+
+signature CLEANUP =
+  sig
+    datatype clean_mode
+      = CleanForExportML | CleanForExportFn | CleanForQuit | CleanForInit
+    val addCleaner : (string * (clean_mode -> unit)) -> bool
+    val removeCleaner : string -> unit
+    val cleanup : clean_mode -> unit
+    val shutdown : unit -> 'a
+  end (* CLEANUP *)
+
+
+File: sml, Node: WEAK		Next: UNSAFE, Prev: CLEANUP, Up: Sigs
+
+signature WEAK =
+  sig
+    type 'a weak
+    val weak : 'a -> 'a weak
+    val strong : 'a weak -> 'a option
+  end (* WEAK *)
+
+
+File: sml, Node: UNSAFE		Next: SIGNALS, Prev: WEAK, Up: Sigs
+
+signature UNSAFE =
+  sig
+    type object
+    structure Assembly : ASSEMBLY
+    structure CInterface : CINTERFACE	(*Note CINTERFACE::*)
+    structure SysIO : SYSIO		(*Note SYSIO::*)
+    structure CleanUp : CLEANUP		(*Note CLEANUP::*)
+    structure Weak : WEAK		(*Note WEAK::*)
+    val boxed : 'a -> bool
+    val ordof : 'a * int -> int
+    val slength : 'a -> int
+    val store : string * int * int -> unit
+    val bstore : Assembly.A.bytearray * int * int -> unit
+    val subscript : 'a array * int -> 'a
+    val update : 'a array * int * 'a -> unit
+    val delay : int * 'a -> 'a
+    val force : 'a -> 'a
+    type 'a control_cont
+    val capture : ('a control_cont -> 'a) -> 'a
+    val escape : 'a control_cont -> 'a -> 'b
+    val boot : string -> ('a -> 'b)
+    val cast : 'a -> 'b
+    val blast_write : 'outstream * 'a -> unit
+    val blast_read :  'instream -> 'a
+    val create_s : int -> string
+    val create_b : int -> Assembly.A.bytearray
+    val store_s : string * int * int -> unit
+    val lookup_r : (int -> object) ref
+    val lookup : int -> object
+    val isolate : ('a -> 'b) -> 'a -> 'b
+    val toplevelcont : unit cont ref
+    val pstruct : {core: object, initial: object, math: object} ref
+    exception Boxity
+    val tuple : object -> object array
+    val string : object -> string
+    val real : object -> real
+    val int : object -> int
+    val use_f : (string -> unit) ref
+    val use_s : ('instream -> unit) ref
+    val forcer_p : ('a -> 'a) ref
+    datatype datalist = DATANIL | DATACONS of (string * string * datalist)
+    val datalist : datalist
+  end
+
+
+File: sml, Node: SIGNALS	Next: DIRECTORY, Prev: UNSAFE, Up: Sigs
+
+signature SIGNALS =
+  sig
+    datatype signal
+      = SIGHUP | SIGINT | SIGQUIT | SIGALRM | SIGTERM | SIGURG
+      | SIGCHLD | SIGIO | SIGWINCH | SIGUSR1 | SIGUSR2
+      | SIGTSTP | SIGCONT (* not yet supported *)
+      | SIGGC
+    val setHandler : (signal * ((int * unit cont) -> unit cont) option) -> unit
+    val inqHandler : signal -> ((int * unit cont) -> unit cont) option
+    val maskSignals : bool -> unit
+    val pause : unit -> unit
+	(* sleep until the next signal *)
+  end
+
+
+File: sml, Node: DIRECTORY	Next: SYSTEM, Prev: SIGNALS, Up: Sigs
+
+signature DIRECTORY =
+  sig
+    val isDir : string -> bool
+        (* return true, if path is a directory *)
+    exception NotDirectory
+    val listDir : string -> string list
+        (* return a list of the files in the specified directory, raises NotDirectory *)
+    val cd : string -> unit
+        (* change directory, raises NotDirectory*)
+    val getWD : unit -> string
+        (* return the current working directory *)
+  end (* DIRECTORY *)
+
+
+File: sml, Node: SYSTEM		Next: REF, Prev: DIRECTORY, Up: Sigs
+
+signature SYSTEM =
+  sig
+    structure ByteArray : BYTEARRAY	(*Note BYTEARRAY::*)
+    structure Control : CONTROL		(*Note CONTROL::*)
+    structure Tags : TAGS		(*Note TAGS::*)
+    structure Timer : TIMER		(*Note TIMER::*)
+    structure Stats : STATS		(*Note STATS::*)
+    structure Unsafe : UNSAFE		(*Note UNSAFE::*)
+    structure Signals : SIGNALS		(*Note SIGNALS::*)
+    structure Directory : DIRECTORY	(*Note DIRECTORY::*)
+    val exn_name : exn -> string
+    val version : string
+    val interactive : bool ref
+    val system : string -> unit     (*Note execute a shell command: Commands.*)
+    val argv : unit -> string list	(*Note Saving::*)
+    val environ : unit -> string list	(*Note Saving::*)
+  end
+
+

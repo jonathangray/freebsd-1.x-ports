@@ -1,0 +1,408 @@
+(* Copyright (c) 1992 by Carnegie Mellon University *)
+
+		  Advanced Guide to SourceGroup Release 3
+
+Gene Rollins (rollins+@cs.cmu.edu)
+School of Computer Science, Carnegie-Mellon Univ, Pittsburgh, PA 15213
+February 2, 1993
+
+SourceGroup is a programmable selective-recompilation system.  The
+"Introductory Guide" explains how to use the basic separate compilation
+mechanism. The "Advanced Guide" describes how to customize SourceGroup to
+special needs.
+
+
+*** SourceGroup Control Variables ***
+
+*val issueWarnings :bool ref		      (* true *)
+*val quietCreation :bool ref		      (* false *)
+*val continueAfterError :bool ref	      (* true *)
+
+If issueWarnings is true, then SourceGroup will issue warnings if a group
+looks malformed (eg, module used but not defined).  If quietCreation is true,
+calls to create will not list each source file it analyzes.  If
+continueAfterError is true, then when make is applied and an error occurred
+while compiling a source file, make will continue to compile sources that do
+not depend on the error-producing source.
+
+
+*** Compilation Control Variables ***
+
+*val Compile.deleteTargets  :bool ref   (* true *)
+*val Compile.printFilenames :bool ref   (* true *)
+
+These are defined in the structure Compile.  If !Compile.deleteTargets, then
+before writing a new target file, delete the old one.  If not
+(!Compile.deleteTargets), then write target file without deleting the old one.
+By deleting targets before writing the new one, a symbolic link can be
+replaced without effecting the old target.  If !Compile.printFilenames, then
+when a source file is opened print "reading...", and when a target file is
+written print "writing...", else be silent.
+
+
+*** Defining Source Groups ***
+
+*datatype groupDescription =
+      Sources of string list
+    | SubGroups of group list
+    | Connections of string list
+
+*fun create (description:groupDescription list) :group
+  Defines a source group.  The constructor Sources enables one to list
+the source files to be included in the group.  
+
+One may set up a hierarchy of module namespaces by nesting groups using the
+SubGroups constructor.  In creating the group's source file dependency graph,
+SourceGroup looks up imported modules to see which source file defines
+the module.  First it checks if a source file in the group defines the
+module.  If not, it recursively checks the subgroups for a source file
+defining the module.
+
+Each source file imports and exports module identifiers.  A connections file
+describes the import/export interface (connections) of a set of source files.
+In the groupDescription, the Connections clauses provide lists of connections
+files. Each connection file has entries for source files that list the source
+file name, the tool (eg, sml, yacc, lex,...) that processes the source file,
+and the names that the source file imports and exports.  The following is an
+example of a clause for one source file:
+
+  source sml "join.sml"
+    import signature PARSER_DATA LEXER PARSER LR_PARSER 
+    export functor   Join ;
+
+The format of the file entries is described in the documentation for the
+function connections, given later.
+
+*val createInEnv :environment -> groupDescription list -> group
+
+One can create a group that depends upon symbols defined in the given
+environment (relative pervasives). The sources defining the relative
+pervasives are not mentioned, hence, SourceGroup does not analyze them or
+check for their currency.  With the current interface, it is only useful to
+use (!Compile.compilingEnv) as the first argument to createInEnv, since that
+is the environment that make starts from.
+
+Creating a group in this manner is good if you are using a stable large library
+such as CML and eXene.  If you define a group for the library, and compile
+it, then you can define the client group as follows:
+
+  val g = createInEnv (!Compile.compilingEnv) [Sources files]
+
+The function create remains for upward compatibility and is equivalent
+to createInEnv (!System.Env.emptyEnv()).
+
+Note that the compiling environment in sml-sg contains the library modules
+in sourcegroup/local.
+
+Warning
+------- 
+ Each time the source of a structure or functor is compiled, a new instance is
+generated.  A target file may depend on some externally-defined structures or
+functors.  The environment into which a target file is read must contain
+the same instances of those external modules which were defined when the
+target file was compiled from its source.
+
+When using createInEnv, one may use a different environment to create a group
+than was used previously.  In that case, the target files for the group may
+not be valid with the new environment.  If the compiler reads a target file
+that depends on a redefined module you will get the following error message:
+
+? Exception Compile raised: error while executing module
+
+In this case you must delete the target files that raise this error.  Then you
+can just remake the group.  Note that SourceGroup does not check to see if
+an environment used to create a group is compatible with existing targets.
+
+There are two ways to use createInEnv.  One can use a saved sml-image which
+contains the environment passed to createInEnv.  Or, one can use a stable set
+of target files to recreate compatible environments to pass to createInEnv.
+
+For an example see sourcegroup/test/go.sml.  If no target files exist for
+either clientGroup nor libGroup, then the first time you issue use "go.sml",
+the sources will be compiled and the targets created.  If you start SML over,
+and issue use "go.sml", the targets will be read and the compiling environment
+will be re-established, and the clientGroup targets will be valid.  At this
+point, if any library source is recompiled, even from the same source text,
+the client group's target files will become invalid.
+
+
+*** The Compilation Model ***
+
+SourceGroup is based on the following compilation model.  There are three
+areas: Source, Target, and Env.  These represent the source files, the target
+files, and the SML compiling environment, respectively.  Each tool provides
+functions that match the operations in this model.  The function that maps
+source file names to target file names is called targetNameOf.
+
+There are three basic operations: 
+  (loadSource f) loads the source file f into Env
+  (genTarget f) generates a target file (targetNameOf f) from the source file f
+  (loadTarget f) loads the target file (targetNameOf f) into Env
+
+Another operation is provided for convenience and/or efficiency.
+  (compileSource f) = (genTarget f; loadTarget f), but may be
+    implemented more efficiently, particularly for the SML compiler.
+
+A predicate on target files is:
+  (validTarget f) checks to see if the target file (targetNameOf f) exists and
+is valid in some tool-specific way (eg, for sml, the right target machine and
+compiler version).
+
+The time functions include these: 
+  (sourceTime s) is the modification time of the source object
+  (targetTime s) is the generation time of the target (targetOf s)
+  (envUpdateTime s) defined below
+  (envObjectTime s) defined below
+
+As part of each call to (loadSource s) the following assignments are made:
+  (envUpdateTime s) := (currentTime ());
+  (envObjectTime s) := (sourceTime s)
+
+The function (dependsOn f) gives the list of source files that f depends upon.
+
+In order to avoid unnecessary recompilation, SourceGroup determines for each
+source file in Source if Target and Env are current with respect to Source.
+For times, x>y means that x is newer than y.
+
+  FUN envCurrent s = ((envObjectTime s) >= (sourceTime s))
+      AND FOREACH d IN (dependsOn s). 
+            (envCurrent d) AND ((envUpdateTime s) >= (envUpdateTime d))
+
+  FUN targetCurrent s = (validTarget s) AND ((targetTime s) >= (sourceTime s))
+     AND FOREACH d IN (dependsOn s).
+           (targetCurrent d) AND ((targetTime s) >= (targetTime d))
+
+
+*** Make ***
+
+*fun makeAll (fileAction :sourceInfo -> unit) (group:group) :unit
+
+  Traverses the annotated dependency graph of source files in group applying
+the function fileAction to each source node.  If a source files depends on
+other source files, the others are visited before the dependent source.  The
+argument to fileAction is a record of information about the source node.
+The vocabulary defined in the description of the compilation model, above,
+will be used to describe the sourceInfo record.
+
+  datatype sourceInfo = SOURCE of
+    {sourceName    :string,      toolName      :string,        group :group,
+     targetName    :string, 	 dependsOn     :string list,
+     targetCurrent :bool,        envCurrent    :bool,
+     loadSource    :unit->unit,  genTarget     :unit->unit,
+     loadTarget    :unit->unit,  compileSource :unit->unit,  
+     checkLoad     :unit->unit}
+
+sourceName - the name of the source file.
+toolName - the name of the tool that will process the source file.
+group - the group in which the source belongs.
+
+The other fields correspond directly to components of the compilation model,
+with sourceName bound as the source file.  For example, when applied to () the
+field loadSource applies the model operation loadSource to sourceName.
+
+*** Predefined File Actions ***
+
+These functions are available in the structure SourceAction.
+
+  (* The following call to makeAll will bring the environment up to date with
+     respect to the source files in group g *)
+  fun doLoadSource (Source{envCurrent,loadSource,...}:sourceInfo) :unit =
+    if envCurrent then () else loadSource();
+  makeAll SourceAction.doLoad g;
+
+  (* The following call to makeAll will bring the environment and
+     the target files up to date with respect to the source files in group g *)
+  fun doCompile(Source{envCurrent,targetCurrent,loadTarget,compileSource,...})=
+    if targetCurrent
+      then if envCurrent then () else loadTarget ()
+      else compileSource ();
+  makeAll SourceActon.doCompile g;
+
+  (* The following call to makeAll will delete the target file of the source
+     files in group g *)
+  fun doClean (Source{targetName,...}) =
+    (System.Unsafe.SysIO.unlink targetName;
+     print targetName; print "\n")
+       handle _ => (print ("% "^targetName^" could not be removed\n"));
+  makeAll SourceAction.doClean g;
+
+  (* The following call to makeAll will bring the environment up to date with
+     respect to the source files in group g.  It will load target files
+     when they are available, but will not generate them *)
+  fun doLoadLibrary 
+        (Source{envCurrent,targetCurrent,loadSource,loadTarget,...}) =
+    if envCurrent then ()
+      else if targetCurrent then loadTarget() else loadSource()
+  makeAll SourceAction.doLoadLibrary g;
+
+*fun makeOnDemand (fileAction:sourceInfo->unit)(g:group)(demand:string) :unit
+
+  This function is like makeAll, except that it only traverses the part of the
+source dependency graph that plays a role in defining the modules requested in
+the argument demand.
+
+
+*** Target Naming ***
+
+Each tool has an associated structure that defines functions that implement
+the compilation-model operations.  Each tool structure has a default
+target naming function, and exports a ref variable targetNamer that can
+be updated by the user.  For example, one can update the sml target naming
+function as follows.
+
+  SMLTool.targetNamer := SourceAction.sysBinary
+
+Standard target naming functions are provided by the structure SourceAction.
+
+*fun appendBin (filename:string) :string
+  Creates a binary file name from filename by appending ".bin".  This is
+the default for SMLTool.
+(eg, (standardBinary "/usr/bar/foo.sig") => "/usr/bar/foo.sig.bin")
+
+*fun replaceExtension (filename:string) :string
+  Creates a binary file name from filename by stripping off the rightmost "."
+and all characters to its right, and appending ".bin". 
+(eg, (importBinary "/usr/bar/foo.sig.sml") = "/usr/bar/foo.sig.bin")
+
+*fun systemBinary (system:string) (filename:string) :string
+  Creates a binary file name from filename appending ".bin", and inserting
+system as the rightmost directory name (before the file name part).
+(eg, (systemBinary ".sun3" /usr/bar/foo.sig") = "/usr/bar/.sun3/foo.sig.bin")
+
+*fun architectureBinary (filename:string) :string =
+*       systemBinary (!System.architecture) filename
+(eg, (architectureBinary "/usr/bar/foo.sig") = "/usr/bar/.mipsel/foo.sig.bin")
+
+*fun sysBinary (filename :string) :string = systemBinary ".@sys" filename
+  This is particularly useful to those running the Mach operating system since
+@sys is replaced by a string representing the host machine type.
+(eg, (sysBinary "/usr/bar/foo.sig") = "/usr/bar/.@sys/foo.sig.bin")
+
+Target names are chosen at group creation time for each source file using the
+value of targetNamer at the time of group creation. When make is applied
+source files are looked up in a global table, and the target name is
+retrieved.  The value of targetNamer at the time make is applied is
+irrelevent.
+
+
+*** Indexing ***
+
+At group creation time, the value of System.Control.indexing is stored in the
+source file table for each source file.  When the sources are compiled,
+System.Control.indexing is temporarily set to the value in the table during
+compilation of that file.
+
+
+*** Source Connections ***
+
+*fun connections (outfile:string) (grp:group) :unit
+  Writes an entry for each file in group grp listing the modules that are
+imported and exported by that file.  The output of this function can be
+subsequently read by the function SourceGroup.create.  An example of such an
+entry is given here:
+
+  source sml "parsing/absyn.sml"
+    import signature OPERATOR 
+    export functor AbSynFun ;
+
+A grammar for an entry in the style of ML-YACC is given below. 
+  entry     : namespace | source
+  namespace : NAMESPACE idlist SEMICOLON
+  source    : SOURCE ID STRING portlist SEMICOLON
+  idlist    : ID | ID idlist
+  portlist  : port | port portlist
+  port      : EXPORT ID idlist | IMPORT ID idlist
+
+The ID after EXPORT or IMPORT is the name of a namespace.  For SML, standard
+namespaces include structure, functor, signature, and funsig.  Other
+namespaces can be used for other tools or languages.  Warnings will be issued
+if namespaces other than structure, functor, signature, and funsig are used
+without being declared.
+
+
+*** Exporting source files, and building stand-alone programs ***
+
+One can create a file to load a set of source file through the function "use".
+This is useful if you want to export source files to another site along with a
+file to load the sources.  Also, one can build a stand-alone program by
+loading the sources into sml-noshare and calling exportFn.  The function
+showUses and showDemandedUses will create a sequence of calls to "use" on the
+source files in an order that respects the module dependencies.  These
+functions are available in the structure SourceAction.
+
+
+*** Signatures ***
+
+signature SOURCE_GROUP_EXPERT = sig
+  type group
+
+  datatype sourceInfo = Source of
+      {sourceName     :string,
+       targetName     :string,
+       group          :group,
+       toolName       :string,
+       envCurrent     :bool,
+       targetCurrent  :bool,
+       dependsOn      :string list,
+       loadSource     :unit -> unit,
+       genTarget      :unit -> unit,
+       loadTarget     :unit -> unit,
+       checkLoad      :unit -> unit,
+       compileSource  :unit -> unit}
+
+  val makeAll       :(sourceInfo -> unit) -> group -> unit
+  val makeOnDemand  :(sourceInfo -> unit) -> group -> string -> unit
+  val connections   :string -> group -> unit
+  val connections'  :outstream -> group -> unit
+  val dependsOn     :string -> string list
+
+  val issueWarnings :bool ref
+  val quietCreation :bool ref
+  val continueAfterError :bool ref
+
+  structure ToolInternals :TOOL_INTERNALS
+end
+
+
+signature SOURCEGROUP = sig
+ val version :real
+ type group
+ exception CompilingError
+
+ datatype groupDescription =
+    Sources of string list
+  | SubGroups of group list
+  | Connections of string list
+
+ val create   :groupDescription list -> group
+ val createInEnv :environment -> groupDescription list -> group
+
+ val make     :group -> string -> unit
+ val makeWhat :group -> string -> unit
+
+ structure Expert :SOURCE_GROUP_EXPERT sharing type group = Expert.group
+end
+
+
+signature SOURCEACTION = sig
+  val doLoadSource   :SourceGroup.Expert.sourceInfo -> unit
+  val doCompile      :SourceGroup.Expert.sourceInfo -> unit
+  val doForceCompile :SourceGroup.Expert.sourceInfo -> unit
+  val doClean        :SourceGroup.Expert.sourceInfo -> unit
+  val doNothing      :SourceGroup.Expert.sourceInfo -> unit
+  val doLoadLibrary  :SourceGroup.Expert.sourceInfo -> unit
+  val doPrint        :SourceGroup.Expert.sourceInfo -> unit
+
+  val standardBinary :string -> string
+  val importBinary   :string -> string
+  val systemBinary   :string -> string -> string
+  val sysBinary      :string -> string
+
+  val showDemandedUses :string -> SourceGroup.group * string -> unit
+  val showUses         :string -> SourceGroup.group -> unit
+  val showDependencies :string -> SourceGroup.group -> unit
+
+  val showDemandedUses' :outstream -> SourceGroup.group * string -> unit
+  val showUses'         :outstream -> SourceGroup.group -> unit
+  val showDependencies' :outstream -> SourceGroup.group -> unit
+end

@@ -1,0 +1,294 @@
+
+% ML Parser Specification
+
+  This parser specification (mldata.MLG) is smllama-fodder;
+  it is used to generate the files
+
+     mldata.sym.sml
+     mldata.tab.sml
+     mldata.tab.data
+
+
+     (I'm a bit doubtful about precedences marked *)
+
+
+%
+
+#OPEN           Trees;
+#NON            NOTE;
+#NON            HIGH;
+#NON            COLON;                          %*%
+#RIGHT          AS;
+#LEFT           PROD;
+#RIGHT          ARROW;
+#RIGHT          BAR;                            %*%
+#RIGHT          HANDLE;
+#NON            RAISE;
+#LEFT           ORELSE;
+#LEFT           ANDALSO;
+#NON            IMP IF CASE WHILE FN;           %*%
+#LEFT           AND;
+#NON            WITHTYPE;
+#LEFT           SEMI;
+#TYPE           I, FORMAT, STRING, NUM : ID;
+
+file: UNIT              =   paras;
+
+note: LIT               =                               (CurrentNote());
+ndec: D                 =   note dec                    (mkNote CommentD $1 $2);
+nspec: SPEC             =   note spec                   (mkNote CommentS $1 $2);
+typen: T                =   type note                   (mkNote TComment $2 $1);
+
+paras:UNIT              =   decseq                      (process(mkD SeqDecs(rev $1)))
+			|   note expr                   (process(mkD CommentD($1, ItDec $2)))
+			|   note IMPORT strings         (process(mkD CommentD($1, Import $3)))
+			|   paras SEMI  paras           ()
+			|   %empty%                     ();
+
+decseq:DS               =   ndec                        ([$1])
+			|   decseq ndec                 ($2 :: $1);
+
+decls:D                 =   %empty%                     (mkD SeqDecs [])
+			|   decs                        (mkD SeqDecs(rev $1));
+
+decs:DS                 = ndec                          ([$1])
+			| decs ndec                     ($2 :: $1)
+			| decs  SEMI                    ($1);
+
+dec:D                   = DATATYPE datadecs             ((mkD Data(rev $2)))
+			| DATATYPE datadecs
+			  WITHTYPE typedecs             ((mkD With(rev $2, rev $4)))
+			| ABSTYPE  datadecs
+			  WITH     decls  END           ((mkD AbsData(rev $2, $4))
+			| ABSTYPE  datadecs
+			  WITHTYPE typedecs
+			  WITH     decls  END           ((mkD AbsWith(rev $2, rev $4, $6))
+			| TYPE typedecs                 ((mkD Type(rev $2)))
+			| FUN fundecs                   (mkD FunDecs((rev $2)))
+			| VAL valdecs                   (mkD ValDecs((rev $2)))
+			| VAL REC valdecs               (mkD RecDecs((rev $3)))
+			| EXCEPTION exndecs             (mkD ExnDecs(rev $2))
+			| STRUCTURE strdecs             (mkD StrDecs(rev $2))
+			| FUNCTOR funcdecs              (mkD FuncDecs(rev $2))
+			| SIGNATURE sigdecs             (mkD SigDecs(rev $2))
+			| LOCAL decls IN decls END      (mkD LocDecs($2, $4))
+			| directive                     (DirDec $1);
+
+directive:DIR           = OPEN cidseq                   (Open(rev $2))
+			| NONFIX opseq                  (Nonfix(rev $2))
+			| INFIX nopseq                  (Infix($2))
+			| INCLUDE opseq                 (Include($2))
+			| INFIXR nopseq                 (Infixr($2));
+
+strdecs:STRDECS         = strdec                        ([$1])
+			| strdecs AND strdec            ($3 :: $1);
+funcdecs:FUNCDECS       = funcdec                       ([$1])
+			| funcdecs AND funcdec          ($3 :: $1);
+sigdecs:SIGDECS         = sigdec                        ([$1])
+			| sigdecs AND sigdec            ($3 :: $1);
+datadecs:DYS            = datadec                       ([$1])
+			| datadecs AND datadec          ($3 :: $1);
+typedecs:TYS            = typedec                       ([$1])
+			| typedecs AND typedec          ($3 :: $1);
+fundecs:FUNS            = fundec                        ([(rev $1)])
+			| fundecs AND fundec            (rev $3 :: $1);
+valdecs:EQNS            = equation                      ([$1])
+			| valdecs AND equation          ($3 :: $1);
+exndecs:EXNDECS         = exndec                        ([$1])
+			| exndecs AND exndec            ($3 :: $1);
+
+strdec:STRDEC           = I sigopt EQ structure         ($1, $2, $4);
+funcdec:FUNCDEC         = I BRA funpar KET sigopt
+			  EQ structure                  ($1, $3, $5, $7);
+sigopt:SIGOPT           = COLON signature               (SomeSig $2)
+			| %empty%                       (NoSig);
+sigdec:SIGDEC           = I EQ signature                ($1, $3);
+
+funpar: FUNPAR          = I COLON signature             (ClosePar($1, $3))
+			| %empty%                       (OpenPar[])
+			| specs                         (OpenPar(rev $1));
+
+signature:SIG           = SIG specs END                 (Sig(rev $2))
+			| cid                           (SigId $1);
+
+specs:SPECS             = nspec                         ([$1])
+			| specs nspec                   ($2 :: $1)
+			| specs SEMI                    ($1);
+
+spec:SPEC               = VAL valspecs                  (ValSpecs(rev $2))
+			| TYPE typespecs                (TypeSpecs(rev $2))
+			| EQTYPE typespecs              (EqTypeSpecs(rev $2))
+			| STRUCTURE structspecs         (StructSpecs(rev $2))
+			| DATATYPE datadecs             (DataSpecs(rev $2))
+			| EXCEPTION exnspecs            (ExnSpecs(rev $2))
+			| SHARING sharespecs            (ShareSpecs(rev $2))
+			| LOCAL specs IN specs END      (LocSpecs(rev $2, rev $4))
+			| directive                     (DirSpec $1);
+
+valspecs:VSS            = valspec                       ([$1])
+			| valspecs AND valspec          ($3::$1);
+exnspecs:CASES          = case                          ([$1])
+			| exnspecs AND case             ($3::$1);
+typespecs:TS            = simpletype                    ([$1])
+			| typespecs AND simpletype      ($3::$1);
+structspecs:STRSPECS    = structspec                    ([$1])
+			| structspecs AND structspec    ($3::$1);
+sharespecs:SSS          = sharespec                     ([$1])
+			| sharespecs AND sharespec      ($3::$1);
+
+valspec:VS              = id COLON typen                ($1, $3);
+structspec:STRSPEC      = I COLON signature             ($1, $3);
+sharespec:SS            = TYPE cideqns                  (ShareTy(rev $2))
+			| cideqns                       (ShareStr(rev $1));
+
+cideqns:CIDS            = cid EQ cid                    ([$3, $1])
+			| cideqns EQ cid                ($3 :: $1);
+
+structure:STR           = STRUCT decls END              (Struct($2))
+			| LET decls IN structure END    (LetStruct($2, $4))
+			| cid                           (StrId $1)
+			| structure BRA structure KET   (FuncApStruct($1, $3))
+			| structure BRA decls KET       (FuncApDec($1, $3));
+
+datadec:DATA            = simpletype EQ cases           ($1, rev $3);
+
+cases:CASES             = case                          ([$1])
+			| cases BAR case                ($3 :: $1);
+
+case:CASE1              = IB OF type format note        (Construct($1, $3, $4, mkCom $5))
+			| IB format note                (Constant($1, $2, mkCom  $3));
+
+typedec:TY              = simpletype EQ type format note($1,$3,$4, mkCom  $5);
+
+type:T                  = simpletype
+			| type ARROW type               (mkT Fun($1, $3))
+			| simpletype PROD product       (mkT Prod($1 :: rev $3));
+
+product:TS              = simpletype                    ([$1])
+			| product PROD simpletype       ($3 :: $1);
+
+simpletype:T            = cid                           (Tid $1)
+			| simpletype cid                (mkT Inst($1, Tid $2))
+			| BRA typelist KET              (mkT Bra(rev $2))
+			| RECBRA fieldlist RECKET       (mkT Record(rev $2));
+
+typelist:TS             = type                          ([$1])
+			| typelist COMMA  type          ($3 :: $1);
+
+fieldlist:FS            = field                         ([$1])
+			| fieldlist COMMA  field        ($3 :: $1);
+
+field:FIELD             = selector COLON typen          ($1, $3);
+selector:ID             = I
+			| NUM;
+
+format:A                = %empty%                       (NONE)
+			| FORMAT                        (SOME $1);
+
+exndec:EXNDEC           = case                          (ExnCase $1)
+			| I EQ cid                      (ExnAbbrev($1, $3));
+
+
+fundec:EQNS             = funequation                   ([$1])
+			| fundec BAR funequation        ($3 :: $1);
+
+equation:EQN            = pattern EQ expr               ($1, $3);
+funequation:EQN         = heading EQ expr               ($1, $3);
+heading:E               = pattern                       ($1)
+			| pattern COLON type            (Has($1, $3)); %%
+
+pattern:E               = infixpat
+			| pattern COLON type #prec HIGH (Has($1, $3))
+			| pattern AS pattern            (As($1, $3));
+
+infixpat:E              = infpat                        (mkE Expression(rev $1));
+
+infpat:ES               = atpat                         ([$1])
+			| infpat atpat                  ($2::$1);
+
+atpat:E                 = id
+			| con
+			| BRA patlist KET               (mkE Tuple(rev $2))
+			| BRA KET                       (mkE Tuple[])
+			| LBRA patlist LKET             (mkE List(rev $2))
+			| LBRA LKET                     (List[])
+			| RECBRA recpats RECKET         (Rec(rev $2))
+			| RECBRA RECKET                 (Rec[]);
+
+matches:MATCHS          = match                         ([$1])
+			| matches BAR match             ($3 :: $1);
+
+match:MATCH             = pattern IMP expr              ($1, $3);
+
+expr:E                  = infexpr                       (mkE Expression(rev $1))
+			| bexpr                         ($1)
+			| infexpr bexpr                 (mkE Expression(rev($2::$1)))
+			| infexpr COLON type            (mkE Has(Expression(rev $1), $3))
+			| expr HANDLE matches           (mkE Handle($1, rev $3))
+			| expr ANDALSO expr             (mkE AndAlso($1, $3))
+			| expr ORELSE expr              (mkE OrElse($1, $3));
+
+bexpr:E                 = IF expr THEN expr ELSE expr   (mkE If($2, $4, $6))
+			| WHILE expr DO expr            (mkE While($2, $4))
+			| CASE expr OF matches          (mkE Case($2, rev $4))
+			| FN matches                    (mkE Fn(rev $2))
+			| RAISE expr                    (mkE Raise $2);
+
+infexpr:ES              = atexpr                        ([$1])
+			| simpleid                      ([$1])
+			| infexpr atexpr                ($2 :: $1)
+			| infexpr simpleid              ($2 :: $1);
+
+atexpr:E                = OP IB                         (Op $2)
+			| I DOT cidb                    (Id($1 :: rev $3))
+			| con
+			| LET decls IN exprseq END      (mkE Let($2, rev $4))
+			| BRA expr SEMI  exprseq KET    (mkE Tuple[Seq($2 :: rev $4)])
+			| BRA expr COMMA exprlist KET   (mkE Tuple($2 :: rev $4))
+			| BRA expr KET                  (mkE Tuple[$2])
+			| BRA KET                       (Tuple[])
+			| LBRA exprlist LKET            (mkE List(rev $2))
+			| LBRA LKET                     (List[])
+			| RECBRA receqs RECKET          (Rec(rev $2))
+			| RECBRA RECKET                 (Rec[]);
+
+receq:BIND              = selector EQ expr              (EqBind($1, $3));
+recpat:BIND             = selector EQ pattern           (EqBind($1, $3))
+			|  pattern                      (VarBind $1);
+
+recpats:BINDS           = recpat                        ([$1])
+			| recpats COMMA recpat          ($3 :: $1);
+receqs:BINDS            = receq                         ([$1])
+			| receqs COMMA receq            ($3 :: $1);
+exprlist:ES             = expr                          ([$1])
+			| exprlist COMMA expr           ($3 :: $1);
+patlist:ES              = pattern                       ([$1])
+			| patlist COMMA pattern         ($3 :: $1);
+exprseq:ES              = expr                          ([$1])
+			| exprseq SEMI expr             ($3 :: $1);
+cidseq:CIDS             = cid                           ([$1])
+			| cidseq cid                    ($2 :: $1);
+id:E                    = cid                           (Id $1)
+			| OP IB                         (Op $2);
+simpleid:E              = IB                            (Id [$1]);
+cidb:CID                = I                             ([$1])
+			| cidb DOT IB                   ($3 :: $1);
+IB:ID                   = I
+			| PROD                          ("*")
+			| EQ                            ("=")
+			| ARROW                         ("->");
+cid:CID                 = cidb                          (rev $1);
+builtinid:E             = PROD                          (Id ["*"])
+			| EQ                            (Id ["="]);
+con:E                   = STRING                        (String $1)
+			| NUM                           (Num $1);
+opseq:ES                = op                            ([$1])
+			| opseq op                      ($2 :: $1);
+nopseq:ES               = NUM opseq                     (Num $1 :: rev $2)
+			| opseq                         (rev $1);
+op:E                    = I                             (Id [$1])
+			| builtinid;
+strings:ES              = STRING                        ([String $1])
+			| STRING strings                (String $1 :: $2);
+
+SCCSID:ES               = ([] (* @(#)mlkernel.mlg	2.5 93/02/05 15:03:45 *));

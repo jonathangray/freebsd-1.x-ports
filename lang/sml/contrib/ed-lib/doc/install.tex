@@ -1,0 +1,159 @@
+% RCS LOG
+%
+% $Log: install.tex,v $
+% Revision 1.1  1994/02/08 00:23:12  jkh
+% Initial revision
+%
+%Revision 1.4  1991/10/29  19:46:27  db
+%Added paragraph on how to *use* the poly_make version of the library.
+%
+%Revision 1.3  1991/10/29  19:27:27  db
+%Added documentation of the -poly_make option to INSTALL.
+%
+%Revision 1.2  1991/10/22  20:01:04  db
+%Some minor formatting changes.
+%
+%Revision 1.1  91/03/27  16:41:11  16:41:11  db (Dave Berry)
+%Initial revision
+%
+
+\chapter{Installing the Library.}	\label{install}
+
+\section{Distribution.}
+
+The library is distributed with the following sub-directories:
+
+\begin{description}
+  \item[\tt signatures.] The signatures that the user can see.
+  \item[\tt portable.] The portable implementations of the functors
+	and structures that make up the library.
+  \item[\tt doc.] Copies of this documentation, in LaTeX format.
+  \item[\tt nj-sml.dist.] System-specific implementations of some entries
+	for Standard ML of New Jersey.
+  \item[\tt poly.dist.] System-specific implementations of some entries
+	for Poly/ML.
+  \item[\tt poplog.dist.] System-specific implementations of some entries
+	for Poplog ML.
+\end{description} 
+
+\section{Installation.}
+
+\newcommand{\install}{{\small\tt INSTALL}}
+
+The \install\ program does most of the work of installation.
+To use it, change directory to the directory containing the library,
+and call \install\ with a command line like the following:
+\begin{verbatim}
+INSTALL -poly -nj-sml -poplog -poly_make target
+\end{verbatim}
+All the arguments to \install\ are optional.
+
+\install\ copies the library to the {\tt target} directory.
+If no target directory is given,
+\install\ treats the current directory as the target.
+
+If the {\tt -nj-sml} flag is given, \install\ creates a new
+sub-directory called {\tt nj-sml}, and copies the compiler-specific
+implementations to that directory.  Then it adds links to the
+portable implementations of the remaining library entries, so
+that the new sub-directory contains a complete version of the
+library.  The {\tt -poly} and {\tt -poplog} flags have the same
+effect for the other compilers.
+
+If the {\tt -poly\_make} option is given, \install\ creates a
+new sub-directory called {\tt poly\_make}, and
+links all the files in the library to that directory.  Where the
+library contains versions specific to Poly/ML, it uses these.
+If users create a symbolic link to this directory, they can use
+the Poly/ML make facility ({\tt PolyML.make}) to load library
+entries.
+
+Finally, \install\ creates the SML build files.  You can then load
+the library into an SML session.  There are three build files that
+you can choose from; normally you will want to use {\tt build\_make.sml}
+or {\tt build\_all.sml}.  In addition, it's usually a good idea to
+save a core image or a persistent database containing the loaded
+library.  How to do this depends on which compiler(s) you are using,
+and is described below.
+
+
+\section{Building The Library.}
+
+The basic method of building the library is simple, and varies only
+slightly with the choice of compiler.  First, change directory to the
+subdirectory for the version that you want to build -- either
+the portable version or the version specific to the compiler
+that you're using.  Then run SML and {\tt use} the file {\tt poly.load},
+{\tt nj-sml.load} or {\tt poplog.load}, as appropriate.  This sets
+up a consistent set of load functions that is used by the rest of
+the library.  Then {\tt use} the build file that you want.
+
+In New Jersey ML, the {\tt use} function is available at top-level.
+In Poplog ML, it is in the {\tt Compile} structure. In Poly/ML, it is
+in the {\tt PolyML} structure.
+
+If you are using Poly/ML and you want to store the compiled library
+in a child database, you have to create the database in one Poly/ML
+session, (using the function {\tt PolyML.make\_database}), and then run
+Poly/ML again with this database to actually build the library.  When you
+leave Poly/ML, the database will contain everything that you evaluate
+in this session. It's usually a good idea to make the database read-only
+once you've built the library.
+
+If you are using Standard ML of New Jersey, you can save the library
+in a core image using the command {\tt exportML}.  The saved image can
+be executed directly.
+
+If you are using Poplog ML, you can save the library in a core image
+using either {\tt PML.System.make} or {\tt PML.System.save}.  The core image
+can be run by giving the file name as an argument to the {\tt pml}
+{\small UNIX} command, preceded by a \verb-+- character.  For example,
+on our systems, the file {\tt /usr/local/bin/pml-library} contains
+the line:
+
+{\tt pml +/usr/local/lib/poplog/library.psv}.
+
+Once you have created a saved-state that contains the library, you
+should add a user command to your system to start the version of SML
+that contains the library.  You may wish to make this version the
+default.
+
+If you are using the {\tt -poly\_make} option to \install, then users
+need to make a symbolic link to the {\tt poly\_make} directory, and
+load the {\tt poly\_make.load} file.  They can then use {\tt PolyML.make}
+to load the desired library entries.
+
+
+\section{Choice of Build File.}
+
+There are three ways that you can load the
+library, depending on which build file you use.  You can load all
+the files at once with the file {\tt build\_all.sml}; load just the
+make system with the file {\tt build\_make.sml}, and let {\tt Make} do
+the rest of the work when a new entry is needed; or use the file
+{\tt build\_core.sml}, which just loads a
+few functions that can find the library entries in the installation
+directory.
+
+If you load all the entries, then users will be able to use them
+immediately.  Also, you can move the source to another directory,
+since the system will never have to load it directly.  However,
+the saved state will be fairly large (the library is around 4
+megabytes).
+
+If you load just the make system, then the saved state will be
+quite small.  Users will load just the entries that they need.
+The make system will load all entries needed by those
+that the user wants.  However, the user will have to wait for
+a short period while the entries are compiled, and the source
+must remain in the installation directory.
+
+The third method uses virtually no space in the saved state.
+However, in addition to the disadvantages of the second option,
+it also requires the user to ensure that all entries are loaded
+in the correct order.  This is not a good choice for general use.
+I would only recommend it for the final build of a stand-alone
+package, in which case the user should access the library
+directly instead of using a more generally useful version.
+
+ 

@@ -1,0 +1,1079 @@
+\documentstyle [11pt]{article}
+\setlength{\textheight}{8.8in}
+\setlength{\textwidth}{6.5in}
+\setlength{\oddsidemargin}{0in}
+\setlength{\topmargin}{-.1in}
+\setlength{\headheight}{0in}
+\setlength{\headsep}{0in}
+
+\title{Debugging in Standard ML of New Jersey}
+\author{AT\&T Bell Laboratories\\
+and Princeton University}
+\begin{document}
+\maketitle
+\section{Introduction}
+\label{sec:intro}
+This is a reference
+manual for the Standard ML of New Jersey Debugger.
+It describes the system as of version 0.88. Changes from
+the previous version of the debugger (0.69) include mechanisms for 
+interpolating code sequences during a debugging section, e.g., to change
+the value of a {\tt ref} variable; replay support for programs using signals;
+more flexible breakpoint setting; improved dynamic type reconstruction;
+and numerous internal improvements.
+The Emacs interface has again changed
+slightly, so you will need to repeat the steps described in 
+Section~\ref{sec:setup} to make the new {\tt sml-debug.el} file accessible to Emacs.
+
+\paragraph{Credit and Blame}
+The debugger was designed and implemented by Andrew Tolmach.
+The Emacs interface was originally designed and implemented
+by Adam T. Dingle, who also wrote
+the original version of this manual.  The original 
+type reconstruction algorithm was created by David Tarditi.
+
+Bug reports should be sent to {\tt macqueen@research.att.com}.
+
+\section{The Debugger}
+\label{sec:general}
+The debugger is a specially-designed extension to the SML/NJ compiler.
+In its basic concepts and capabilities, the debugger resembles typical 
+source-level debuggers such as {\tt dbx}.  
+You can set breakpoints, single-step 
+execution, and display identifier values, while examining your source code 
+in a separate window (managed by GNU Emacs).  The debugger is implemented
+using a {\em source code instrumentation} technique.  When directed to 
+process programs
+for execution under debugger control, the compiler automatically inserts
+instrumentation code at all interesting {\em events}, including function
+applications, identifier bindings, the tops of function bodies, and so on.
+This instrumentation code allows the debugger to collect information and 
+optionally gain control at these points in the program.  Events are the
+units of single-stepping and setting breakpoints; thus, they
+play the role of line numbers in debuggers for conventional languages.
+
+The debugger's most unusual feature is that it supports 
+{\em reverse execution}; that is, it gives you the illusion of being able
+to execute your program backward as well as forward.  This feature is 
+implemented by taking periodic checkpoints of program state and logs of
+all I/O activities.  To jump back to a previous point in the program's 
+execution, the debugger restores the last known checkpoint prior to the
+target point, and then re-executes forwards.  (Checkpoints consist of
+stored continuations, as captured by the \verb'callcc' primitive, plus
+a description of the mutable \verb'ref' and \verb'array' data in the program.)
+To keep track of where it is in the program's execution, the debugger 
+increments a counter each time an event is encountered. 
+We refer to the value of this counter as the current {\em time}, 
+and many commands take or return times.
+
+In addition to being a valuable 
+user-level feature, reverse execution is used internally by the debugger
+to support location-based breakpoints and identifier value lookup.
+The debugger's implementation is described in detail in 
+Reference~\cite{thesis}.
+
+\section{Setting Up}
+\label{sec:setup}
+The SML/NJ debugger is intended to be run in GNU Emacs (or Epoch), 
+allowing screen- and mouse-oriented ``visual'' debugging.
+Events are displayed within the source text
+itself; an ML program can be single-stepped, breakpoints can be set,
+identifiers' values can be displayed and the call traceback can be
+examined by typing key sequences in the source text window.
+The implementation extends Lars Bo Nielsen's Emacs mode for
+editing SML programs, which is now part of the GNU Emacs distribution.
+
+To install, build a version of the compiler that includes the debugger if
+one does not already exist.  See the instructions on building the
+compiler; include the \verb'-debug' command line option to the {\tt makeml}
+program.  The executable image will be called {\tt smld}
+by default.  You will be
+able to use this image to compile code in debug mode or in the regular
+compilation mode; you may wish to hold onto the version of the compiler
+that does not support debugging since it is a few hundred kilobytes
+smaller.  When compiling code outside
+debug mode, compilation and execution times should not differ
+noticeably between the two compiler images unless you are very tight on memory.
+After building the debugger, the \verb'src/dbguser' directory should remain
+in place so that the debugger can find the special instrumented 
+versions of library structures that are defined there (see
+Section~\ref{sec:environment}.
+
+Secondly, place the files {\tt sml-mode.el}, {\tt sml-init.el} and 
+{\tt sml-debug.el}
+(found in the {\tt lib/emacs} directory of the SML distribution) in
+a directory where Emacs finds its Lisp code; you can find out what
+directories Emacs looks in by typing \verb'C-h v load-path' in Emacs.
+Alternatively, you can place these three files in a directory of your own
+and tell Emacs to include that directory in its search path for Lisp
+code; to do so, enter the following line in your {\tt .emacs} file (where
+\verb'/u/me/myEmacsDir' is the directory where you would like Emacs to
+look):
+
+\begin{verbatim}
+(setq load-path (cons "/u/me/myEmacsDir" load-path))
+\end{verbatim}
+
+Finally, add the following line to your .emacs file:
+
+\begin{verbatim}
+(load-library "sml-init")
+\end{verbatim}
+
+{\tt sml-init.el} includes code that sets up both sml-mode (the sml editing
+mode written by Lars Bo Neilsen) and sml-debug (debugging extensions
+to sml-mode).
+
+You should be running GNU Emacs with a version number of at least
+18.58.  The system will probably work on earlier versions of Emacs as
+well, but has only been tested on 18.58.  If you are running Epoch (a
+version of Emacs for the X Window System developed by Alan Carroll and
+Simon Kaplan at the University of Illinois at Urbana-Champaign), the
+debug mode will take advantage of Epoch's highlighting capabilities.
+You can obtain Epoch via anonymous ftp to cs.uiuc.edu.  The debugger 
+interface has been tested using Epoch 3.2-beta; it may not work properly
+with later versions of Epoch.
+
+\section{Getting Started}
+\label{sec:starting}
+From within Emacs, type the command \verb'M-x smld' to start up a
+window with the debugger version of SML running in it. This window is labeled
+\verb'*Inferior smld*'. 
+You use this window to start your program running, to provide
+keyboard input to the program, and to view output and final results.
+You can also use this window to issue typed commands to the debugger when
+you are stopped at a breakpoint (see Section~\ref{sec:breakpoints}); 
+a special prompt \verb'[dbg]-' indicates
+when the debugger is listening for such commands.
+
+Begin by typing 
+\verb'usedbg "<filename>"' to compile and execute the contents of a
+file in passive debug mode.  Typically, the file will contain function
+definitions.  (In this version of the debugger, you must explicitly
+apply \verb'usedbg' to every file to be compiled with debugging; nested
+\verb'use's will not work properly.)
+
+Type \verb'run "<declaration-or-expression>"' to compile and evaluate a
+given declaration or expression in active debug mode, which will allow you 
+to step through program execution in a visual way.  
+Typically, the argument to \verb'run' will be an expression that applies
+one of the functions that was loaded using the \verb'usedbg' command. 
+(The argument should be given just as you would normally type
+it to the interactive system, except that double quotes (\verb'"') must 
+be preceded by a backslash (\verb'\'). No trailing semicolon is needed.)
+
+In response to your \verb'run' command, an Emacs window named
+\verb'*sml-debug-command*' will be created containing the declaration or
+expression to be evaluated. The first {\em event} will be displayed 
+in brackets in that window; it will look something like
+
+\begin{verbatim}
+[START:4]
+\end{verbatim}
+where START indicates the type of the event and 4 is the current
+time.  (For various technical reasons time does not begin at 1.)
+
+Events are places in the ML program where you can stop execution to
+look at identifier values.  You can use the Emacs key sequence \verb'M-f' to
+{\em step} (execute forward one time step) until the next event is reached.
+(\verb'M-f', pronounced ``meta-f'', means that you should hold down
+the \verb'META' key (often labeled \verb'ALT') and press the \verb's'
+key.  If your keyboard does not have a \verb'META' key,
+type \verb'ESC' followed by \verb's'.  For more information, see an
+Emacs reference manual, or type \verb'C-h i' for information while in Emacs.)
+Try it.  Try stepping a number of times; see what different types of
+events you reach.
+
+As noted above, the SML/NJ debugger also permits you to step {\em}
+backward in time.  The key sequence \verb'M-b' steps backward one unit in
+time.  Try stepping backward to the beginning of your program.
+
+Sometimes you will want to ``step over'' a function call to stop at the
+next (or previous) event execution within the current function.
+You can skip forward in this way using \verb'M-s' and backward using 
+\verb'M-r'.\footnote{The skip mechanism may not work reliably if your
+program contains \verb'callcc's and \verb'throw's.}
+You can also jump forward or backward to arbitrary times in the 
+program's execution: type \verb'M-<time> M-t' (that is,
+hold down the \verb'META' key while you type the time number,
+then type \verb't' while still holding down \verb'META'.  If your
+keyboard does not have a META key, type \verb'C-u <time> ESC t'.)
+Your jumps will always be truncated so that they lie between the
+beginning and ending times of program execution.
+
+\section{Selecting Events}
+As your program executes, Emacs automatically displays the
+source file containing the current event.
+You can use the commands \verb'M-n' and \verb'M-p'
+to browse through events in your ML
+program.  \verb'M-n' moves the {\em event cursor} to the next event in the
+source code; \verb'M-p' moves to the previous event.  These commands do not
+cause any part of your program to be executed, or change the current
+time; they are simply a way of looking at the events that exist.  The
+position of the event cursor is denoted by an event surrounded by
+square brackets; when you move the event cursor away from the current
+event, the current event remains visible, but is surrounded by a pair
+of angle brackets (\verb'<' \verb'>') to distinguish it from the event
+cursor.  Typing \verb'M-c' will move the event cursor back to the
+current event.
+
+Sometimes you may wish to move the event cursor to a point that is far
+away in your program text.  To do so, move the Emacs
+cursor to the area of source code to which you wish to move the
+event cursor, then
+type the command \verb'M-e'.  The event cursor will jump to the event nearest
+to the Emacs cursor; you can then use the \verb'M-n' and
+\verb'M-p' commands to
+browse the events in that area.  To move the event cursor to a different
+source file from the one in which it currently rests, visit the file
+using the ordinary Emacs command \verb'M-x f', and then use \verb'M-e'. 
+
+If you are running Emacs under X, you can select events even more
+easily.  Point to a character in your source code that is near the
+event that you would like to select, then hold down META and press the
+middle pointer button.
+
+When two or more events are very closely related, so that the execution of
+one necessarily implies the immediate execution of the others, the debugger
+executes them all ``at the same time.''  Such a set of events forms 
+an {\em event cluster}. Any event in a cluster can be selected
+using the commands just described, but only the last event in a 
+cluster is ever displayed as the current event when 
+single-stepping, jumping, etc.  For example, in the program
+\begin{verbatim}
+let [VAL] val a = 5 
+    [VAL] val b = 6 
+in f [APP] (a+b)
+end
+\end{verbatim}
+all three events belong to the same cluster and will appear to be
+executed simultaneously; only the \verb'APP' event will ever be marked
+as current.   
+
+Section~\ref{sec:events} describes all the possible event types and
+where they are displayed.
+Displaying event markers in the text at the correct spots
+is complicated by the presence of derived forms.
+In particular, curried functions turn into a nested chain of simple function
+definitions; the entry point to each function has a separate \verb'[FN]' 
+event, but all these events are displayed at the same location (after the
+\verb'=' in the original \verb'fun' declaration. 
+
+You may occasionally notice that a command causes the Emacs bell to 
+ring and the message ``No source available for [{\em event}:{\em time}]''
+to appear in the Emacs status window.  This can occur for a number of
+reasons:
+\begin{itemize}
+\item If the {\em event} is \verb'IO', the debugger has halted within
+the standard IO library code. You can do single step backward using \verb'M-b'
+to find out where the IO function was called from.
+\item If the {\em event} is \verb'UNCAUGHT EXCEPTION', you can type the
+\verb'current()' command to display the exception; again, you can step
+backward with \verb'M-b' to find out where the exception was raised.
+\item If the source file from which the code you are executing was compiled
+has since been recompiled, the debugger assumes that it is inappropriate
+to display locations in this file.
+\item Signal handler execution is bracketed with \verb'ENTER SIGNAL HANDLER'
+and \verb'EXIT SIGNAL HANDLER' events.
+\end{itemize}
+
+\section{Breakpoints}
+\label{sec:breakpoints}
+To set a breakpoint at an event, move the event cursor to it and type
+the command \verb'M-k'.  The string \verb'bk:' will appear inside the event,
+indicating that a breakpoint is set at it.  The event will continue to
+be displayed even if you move the event cursor away from it.  Type \verb'M-k'
+again to remove the breakpoint at the event.
+
+Use the \verb'C-M-f' command to continue execution until the next breakpoint
+(or the end of your program) is reached.  The \verb'C-M-b' command moves 
+backward in time until a breakpoint (or the beginning of your program) is 
+reached.
+
+A breakpoint can be set on any member of an event cluster, but it is always
+the last member of the cluster that is displayed as 
+current when the breakpoint is reached.
+
+You can also set breakpoints at particular times: type
+\verb'M-<time> M-k'
+(that is, hold down the \verb'META' key while you type
+the time number, then type \verb'k' while still holding down \verb'META').
+Repeating the same command will delete the breakpoint
+you just created.  Type \verb'C-M-k' to get a list of time breakpoints.
+
+The \verb'M-- M-k' command deletes all existing breakpoints.
+(\verb'M--' is ``meta-hyphen''.)  
+
+You can also set and view breakpoints by typing commands in the 
+\verb'*Inferior smld*' window. 
+These commands use breakpoint {\em numbers}; each defined breakpoint gets
+a fresh number, which can later be used to identify or remove the breakpoint.
+The commands include:
+
+\begin{verbatim}
+- breakNear(<file>,<line number>,<line position>);
+\end{verbatim}
+
+Place a breakpoint at the first event at or after the specified location.
+Return the breakpoint number as an {\tt int option}, 
+if any suitable event found.
+
+\begin{verbatim}
+- showEvents <filename>;
+\end{verbatim}
+
+List all events defined for the specified filename; each
+event is identified by its location and type.  This command is handy
+for constructing appropriate arguments to \verb'breakNear'.
+
+\begin{verbatim}
+- breakWhen <time>;
+\end{verbatim}
+
+Set a breakpoint at the time of the argument and return the breakpoint
+number.
+
+\begin{verbatim}
+- showBreaks();
+\end{verbatim}
+
+Display a list of all breakpoints.
+
+\begin{verbatim}
+- deleteBreak <breakpoint number>;
+\end{verbatim}
+
+Delete the breakpoint with the specified number.
+
+\begin{verbatim}
+- clearBreaks();
+\end{verbatim}
+
+Delete all breakpoints.
+
+You can associate an ML function with a breakpoint; the function is
+called whenever the breakpoint is reached.  The function might print
+out the value of one or more identifiers.  To associate a function with
+a breakpoint at a given event, move the event cursor to the event and
+type \verb'bfunc <function>;' in the \verb'*Inferior smld*' window.  The
+function should have type \verb'unit -> unit'.
+
+For example, you might type
+
+\begin{verbatim}
+- bfunc (fn () => showVal "a");
+\end{verbatim}
+
+in order to display the value of variable \verb'a' (see 
+Section~\ref{sec:queries}) each time the
+breakpoint location is reached.
+
+To reset the function associated with a breakpoint at an event, move
+the event cursor to the event and type \verb'M-k M-k' (removing and
+reinstalling the breakpoint at the event).
+
+To associate a function with a breakpoint at a given time, type
+
+\begin{verbatim}
+- tfunc <time> <function>;
+\end{verbatim}
+To reset the function associated with a time breakpoint, type
+\begin{verbatim}
+- nofunc <time>;
+\end{verbatim}
+
+\section{Getting a call traceback and examining identifiers}
+\label{sec:queries}
+
+The {\em backtrace cursor} is used to examine the chain of function
+calls that led to the point where execution is currently stopped.
+\verb'M-u' moves the backtrace cursor, which initially rests on the current
+event, up one level in the function call chain.  The
+backtrace cursor contains the string \verb':bt' inside it, and also
+displays the time at which the corresponding function call occurred.
+The command \verb'M-d' moves the backtrace cursor down one level in
+the function call chain.  As a convenience, typing \verb'M-t' while a
+backtrace event is selected will jump to the time of the backtrace event.
+You can also use the typed command
+\begin{verbatim}
+- showCalls <frames>;
+\end{verbatim}
+which produces a formatted display of the specified number of call frames,
+including the values of the function parameters bound at each call.
+
+The debugger's {\em current scope} is the static scope of the program
+at the backtrace cursor (again, this is initially the current event, i.e.,
+the event where execution last stopped).
+To display the value of any identifier in the current scope, simply type it
+at the \verb'[dbg]-'
+prompt in the \verb'*Inferior smld*' window.  In fact, you can type
+any arbitrary ML expression; any identifiers mentioned will be bound to
+their values in the current scope.  Note that you can use expression 
+evaluation to pick apart complex values, e.g, to subscript into arrays.
+You may also invoke your own arbitrary ML functions (e.g., data structure
+pretty-printers) if they are defined in the current scope (i.e., in the
+program being debugged prior to the backtrace time or at top level before
+you started this debugging session).
+
+Expression evaluation of this sort never changes the behavior or state
+of the program being debugged; time ``stands still'' during the evaluation
+and any location breakpoints in functions being executed are ignored.
+Also, although you can execute {\tt ref} and array assignments, the effect of
+these assignments will be lost as soon as you resume program execution
+(see Section~\ref{sec:interpolations} to find out how to make assignments stick).
+You can, however, declare new values and functions in the usual manner at
+any time.
+Such ``hand-entered'' declarations (actually, you can \verb'use' them from
+a file) remain visible when you 
+execute to another point in the program, and even after the program completes.
+They can be very handy for temporarily holding values and specialized
+debugging functions.
+These declarations hide any program declarations 
+using the same identifier name, and the hiding effect can't be removed,
+so be careful!
+
+Sometimes it is useful to see the spot in your program where an identifier
+was bound.  To do this, type \verb'M-l' and enter the identifier's name
+in the Emacs minibuffer.  The identifier's value will be printed out, and
+the event cursor will
+move to the event at which the identifier's value was bound.  This is 
+particularly handy if the identifier represents a function. 
+If you are running Emacs under X, you can find an identifier's bounding
+location by pointing to its name, holding down META and pressing 
+the first mouse button.
+
+You can also use the typed command
+\begin{verbatim}
+- showVal <identifier name>;
+\end{verbatim}
+to display the value,type, and binding location of the specified identifier.
+It is normally easier just to type the variable at the \verb'[dbg]-' prompt,
+but \verb'showVal' can be handy in constructing macros or for the 
+\verb'bfunc' command (see Section~\ref{sec:breakpoints}).
+
+\section{Interrupting Execution}
+\label{sec:interrupts}
+You can halt your program at any time during forward execution 
+(e.g., if it enters an infinite loop)
+by typing the \verb'C-c C-c' command in the \verb'*Inferior smld*' window.
+The program will always halt on an event boundary, and the location and time
+should be shown in source code window.  You can then use the traceback 
+commands to find out where you are in the execution.
+
+\section{Executing Interpolations}
+\label{sec:interpolations}
+Interpolations are code sequences executed ``in the middle of'' 
+the ordinary user program, after stopping at some event under debugger
+control.  Unlike ordinary expression evaluation in the
+debug monitor, interpolations can alter the state of the user program,
+and they become a permanent part of the program's
+execution history.  Their main use is to update
+mutable variables (e.g., by executing assignments), but they may contain
+arbitrary code sequences.  Interpolations are parsed and executed in the
+environment corresponding to the event time at which they were 
+entered; thus, they can reference and side-effect
+variables in scope at that time.  They can also perform other side-effects,
+such as raising exceptions (which might be useful to test the program's
+handler code), perform I/O, etc.
+
+An interpolation is entered by typing 
+\verb'execute "<declaration or expression>"'. (As with the \verb'run'
+command, the argument should be given as you would normally type to the
+interactive system, except that double quotes (\verb'"') must be
+prceded by a backslash (\verb'\').) The argument string will be compiled and
+and evaluated immediately; evaluation will typically involve the execution of 
+several events, and will advance the current time by several steps.  At a
+minimum, each interpolation has an associated START and END event, similar
+to those for the entire program unit.  Execution will halt at the END event
+to allow further debugger commands to be entered.  All events executed
+during the interpolation become part of the program's history, and can be
+revisited using the normal time-travel commands, although this is not
+ordinarily useful. Since the interpolation may change the course of
+program execution, any existing program history for later times is erased
+when the interpolation is performed.
+Whenever the part of the program containing the
+interpolation time is re-executed, the interpolation itself will be 
+re-executed at the correct point; on re-execution, however, execution does
+not halt at the interpolation's END event, but continues to the next 
+event in the ordinary program.
+
+\section{Finishing Up}
+\label{sec:finishing}
+Two commands are available to exit from an active debugging session. The
+\verb'C-c C-d' command aborts execution of the program run you
+started with the \verb'run' command; no changes are made to the top-level
+environment. The \verb'C-M-c' command completes 
+execution of the program run; if the argument you gave to \verb'run' 
+included declarations, they are added to the top-level environment.
+Both commands remove all event labels from source code windows and delete
+the \verb'*sml-debug-command*' buffer.  The \verb'*Inferior smld*' window 
+will remain, so that you can load new code or specify another
+command to run.  
+
+While source code windows have events displayed in them, they are
+placed into Label mode, a read-only Emacs minor mode.  This prevents
+you from editing them and unintentionally saving event labels into
+your source files.  Before you edit a section of source code that is
+being debugged, you should use the \verb'C-c C-d' command to abort
+the debugging session and remove the labels.  If for some reason a
+window remains in Label mode after you have exited the debugging
+session (this should not happen) you can use the command \verb'C-x
+C-q' (exit-label-mode) to remove the labels from the window.
+
+\section{Running without Emacs}
+\label{sec:noemacs}
+You can run the {\tt smld} executable directly, just like ordinary \verb'sml'.
+Only the typed commands (summarized in Section~\ref{sec:summary})
+may be used.  The only difference in their behavior has to do with
+specifying and reporting source-code locations: file names are taken
+relative to the current working directory as in normal SML/NJ (rather than
+being expanded to absolute names under the Emacs-based debugger) and
+file positions are reported as line number and position (rather than as
+absolute character position).
+
+\section{Command and Function Summary}
+\label{sec:summary}
+The following commands are available within the \verb'*Inferior smld*'
+process as well as within windows containing source code.
+\verb'<left>' and \verb'<middle>' refer to the left and middle pointer
+buttons when running under the X window system.
+
+\begin{center}
+\begin{tabular}{|lll|}    \hline
+Emacs Command & Default Key Binding & Description \\ \hline
+\verb'sml-step' & \verb'M-f'             & single-step forward\\
+\verb'sml-step-backward' & \verb'M-b'           & single-step backward \\
+\verb'sml-skip' & \verb'M-s'      & skip forward\\
+\verb'sml-skip-backward' & \verb'M-r'  & skip backward\\
+\verb'sml-goto-time' & \verb'M-<time> M-t'    & go to specified time \\
+\verb'sml-select-next' & \verb'M-n'             & select next event \\
+\verb'sml-select-previous' & \verb'M-p'             & select previous event \\
+\verb'sml-select-current' & \verb'M-c'  & move event cursor to current event \\
+\verb'sml-select-near' & \verb'M-e' &
+	select event near cursor (source windows \\
+    & & only) \\
+\verb'sml-mouse-select-near' & \verb'M-<middle>' &
+	select event near pointer (source windows \\
+    & & only) \\
+\verb'sml-break' & \verb'M-k' & toggle breakpoint at selected event \\
+\verb'sml-break' & \verb'M-<time> M-k' & toggle breakpoint at given time \\
+\verb'sml-show-breaktimes' & \verb'C-M-k'           & list breakpoint times \\
+\verb'sml-break' & \verb'M-- M-k'         & delete all breakpoints \\
+\verb'sml-proceed-forward' & \verb'C-M-f' 
+	& execute forward to next breakpoint \\
+\verb'sml-proceed-backward' & \verb'C-M-b' &
+	execute backward to previous breakpoint \\
+\verb'sml-up-call-chain' & \verb'M-u' &
+	move backtrace cursor up the call chain \\
+\verb'sml-down-call-chain' & \verb'M-d' &
+	move backtrace cursor down the call chain \\
+\verb'sml-goto-time' & \verb'M-t' & go to time of selected backtrace event \\
+\verb'sml-variable-value' & \verb'M-l or M-<left>' &
+	show variable value and binding event \\
+\verb'sml-abort' & \verb'C-c C-d' &
+	abort program execution and \\
+    & & exit debugging session \\
+\verb'sml-complete' & \verb'C-M-c' & 
+	complete program execution and \\
+    & & exit debugging session \\
+\hline
+\end{tabular}
+\end{center}
+
+The following ML functions can be typed in the \verb'*Inferior smld*'
+window, and can also be used when running the debugger without Emacs. 
+
+\begin{verbatim}
+val usedbg: string -> unit
+\end{verbatim}
+
+Compile and execute a file in passive debug mode, so that compiled
+code will be instrumented for debugging.  All files used by
+the file will also be executed in passive debug mode.
+
+\begin{verbatim}
+val usedbg_string: string -> unit
+val usedbg_stream: instream -> unit
+\end{verbatim}
+
+Compile and execute the text of a string or an arbitrary 
+input stream in passive debug mode.
+
+\begin{verbatim}
+val usedbg_live: string -> unit
+\end{verbatim}
+
+Compile and execute a file in active debug mode.  For a typical file
+containing definitions of functions, structures, and functors, this
+is chiefly useful as a way to stepping through functor applications.
+
+\begin{verbatim}
+val usedbg_script: instream -> instream -> unit
+\end{verbatim}
+
+Compile and execute contents of first instream in active debug mode,
+taking debug commands from second instream.  Useful for testing.
+
+\begin{verbatim}
+val cd: string -> unit
+\end{verbatim}
+
+Change the directory for subsequent relative file names.
+
+\begin{verbatim}
+val run: string -> unit
+\end{verbatim}
+
+Compile and execute a command in active debug mode.
+
+\begin{verbatim}
+val execute: string -> unit
+\end{verbatim}
+
+Compile and execute an interpolation; see Section~\ref{sec:interpolations}.
+
+\begin{verbatim}
+val breakNear: string * int * int -> int option
+val showEvents: string -> unit
+val breakWhen: int -> int
+val showBreaks: unit -> unit
+val deleteBreak: int -> unit
+val clearBreaks: unit -> unit
+val bfunc: (unit -> unit) -> unit
+val tfunc: int -> (unit -> unit) -> unit
+val nofunc: int -> unit
+\end{verbatim}
+
+Breakpoint control commands, described in Section~\ref{sec:breakpoints}.
+
+\begin{verbatim}
+val current: unit -> unit
+\end{verbatim}
+
+Display information about the current event, including any uncaught 
+exception or pending interrupt.
+
+\begin{verbatim}
+val showCalls : int -> unit
+\end{verbatim}
+
+Display specified number of frames of the call stack; 
+see Section~\ref{sec:queries}.
+
+\begin{verbatim}
+val showVal : string -> unit
+\end{verbatim}
+
+Display value and binding location for specified variable; see
+Section~\ref{sec:queries}.
+
+\begin{verbatim}
+val forward: unit -> unit
+val backward: unit -> unit
+val jump: int -> unit
+\end{verbatim}
+
+Move forward or backward to the nearest breakpoint, or jump to specified time.
+
+\begin{verbatim}
+C-c C-c
+\end{verbatim}
+
+Halt forward execution of the current program.
+
+\begin{verbatim}
+val complete: unit -> unit
+val abort: unit -> unit
+\end{verbatim}
+
+Finish debugging program, adding any declarations to the top-level
+environment (\verb'complete') or discarding them (\verb'abort'); see
+Section~\ref{sec:finishing}.
+
+\begin{verbatim}
+val haltOnSignal: signal * bool -> unit
+val setSignal: signal -> unit
+val clearSignal: signal -> unit
+\end{verbatim}
+
+These commands are described in Appendex~\ref{sec:signals}.
+
+\section{Event Types}
+\label{sec:events}
+This section describes the event types may be displayed 
+inside the event cursor; an example is given for the common event types.
+The most common events are:
+\begin{itemize}
+
+\item{\verb'START'}
+Start of program execution or interpolation.
+
+\item{\verb'APP'} 
+Application event.  
+Occurs just before a function is applied to
+its argument; appears between the function and its argument.  When an
+infixed operator is applied, the event appears immediately following
+the operator.
+\begin{verbatim}
+let val a = myfun [APP] 7 in ...
+
+infix myOp
+let val b = 2 myOp [APP] 8 in ...
+\end{verbatim}
+
+\item{\verb'VAL'}
+Value binding event.  Occurs just after a value has been bound.
+\begin{verbatim}
+let [VAL] val a = f(7) in ...
+\end{verbatim}
+
+\item{\verb'VALREC'} 
+Recursive value binding event.  Analogous to \verb'VAL'.
+\begin{verbatim}
+let [VALREC] fun f x = if x = 0 then 1 else x * (f(x-1)) in ...
+\end{verbatim}
+
+\item{\verb'FN'}
+Function entry event.  Occurs just after a function has been
+entered.  If a function is defined by multiple rules, there is a different
+\verb'FN' event for each.
+If the function is curried, there will be separate \verb'FN' events for each 
+argument, all (confusingly) displayed at the same source code location
+(after the \verb'=').
+Extra \verb'FN' and \verb'RAISE' events (see below) are
+generated for the implicit branch generated
+by the compiler in case a pattern match fails; these events are displayed
+immediately after the last explicit clause but cannot be discovered
+by \verb'M-n', \verb'M-p', or \verb'M-e'.
+\begin{verbatim}
+fun f (SOME x) = [FN] g x
+  | f NONE = [FN] 0
+\end{verbatim}
+
+\item{\verb'CASE'}
+Case entry event; analogous to FN.
+\begin{verbatim}
+case d of SOME x => [CASE] g x
+        | NONE => [CASE] 0
+\end{verbatim}
+
+\item{\verb'RAISE'} 
+Exception raising event.  Occurs just before an explicit exception is raised.  
+See note on implicit Match exceptions in description of \verb'FN' events,
+above.
+\begin{verbatim}
+case v of SOME x => g x
+        | NONE => raise [RAISE] MyException
+\end{verbatim}
+
+\item{\verb'HANDLE'} 
+Exception handling event.  Occurs when an exception is
+handled, before the exception handling code is actually executed.
+\begin{verbatim}
+fun myHd x = SOME (hd x) handle Hd [HANDLE] => NONE
+\end{verbatim}
+
+\item{\verb'LET'} 
+Occurs after a set of {\tt let}-bound declarations
+but before the expression body has been evaluated; i.e., at
+point where the \verb'in' keyword appears in the program text.
+\begin{verbatim}
+let val a = 10 [LET] in a + 2 end
+\end{verbatim}
+
+\item{\verb'LOCAL'}
+Occurs before a set of local declarations are evaluated.
+
+\item{\verb'LOCAL IN'}
+Occurs after a set a local declarations are evaluated,
+but before the set of declarations which contain the local
+declarations in their score are evaluated, i.e., at
+the point where the \verb'in' keyword appears in the program text.
+
+\item{\verb'LOCAL END'} Occurs at the end of a local block.
+\begin{verbatim}
+local [LOCAL] val a = 10 in [LOCAL IN] val b = a [LOCAL END] end
+\end{verbatim}
+
+\item{\verb'END'}
+End of program execution or interpolation.
+
+\end{itemize}
+
+The following events are not associated with a particular location in
+your source text:
+
+\begin{itemize}
+\item{\verb'IO'}
+Occurs just before certain operations in the standard IO library.
+
+\item{\verb'UNCAUGHT EXCEPTION'}
+Occurs immediately after an uncaught exception is raised.
+
+\item{\verb'ENTER SIGNAL HANDLER'}
+Occurs immediately before executing a user signal handler.
+
+\item{\verb'EXIT SIGNAL HANDLER'}
+Occurs immediately after executing a user signal handler.
+
+\end{itemize}
+
+The remaining types of events are encountered less often, since code
+that contains these events is usually not executed in active debug mode.
+
+\begin{itemize}
+\item{\verb'STRUCTURE'} Structure declaration event.
+
+\item{\verb'ABSTRACTION'} Analagous to \verb'STRUCTURE'.
+
+\item{\verb'FUNCTOR'} Functor declaration event.
+
+\item{\verb'SIGNATURE'} Signature declaration event.
+
+\item{\verb'FUNCTOR ENTRY'} Occurs upon entry to a functor.
+
+\item{\verb'FUNCTOR APP'} Occurs just before a functor is applied to its
+argument.
+
+\item{\verb'STRUCTURE END'} Occurs at the end of the declarations in a
+structure.
+
+\item{\verb'STRUCTURE VAR'} Occurs just before a structure variable is used.
+
+\item{\verb'OPEN'} Occurs just before a structure is opened.
+
+\item{\verb'TYPE'} Type declaration event.
+
+\item{\verb'FIXITY'} Fixity declaration event.
+
+\item{\verb'EXCEPTION'} Exception declaration event.
+
+\end{itemize}
+
+\section{Environmental Issues}
+\label{sec:environment}
+``Debuggable'' code (i.e., code compiled via  \verb'usedbg', \verb'run', etc.)
+uses a special version of the pervasive environment.  In particular, it 
+redefines:
+\begin{itemize}
+\item the {\tt Ref} and {\tt Array} 
+structures to support checkpointing of the mutable store;
+\item the {\tt IO} structure to support logging of IO events;
+\item the {\tt System.Signals} structure to support logging of signals;
+\item various other structures that use {\tt Ref}, {\tt Array}, or {\tt IO}; 
+and
+\item the {\tt List} and {\tt General} structures, for reasons explained below.
+\end{itemize}
+These redefinitions should be transparent to you, unless, of course, you
+rebind these structures yourself. (Hint: Don't).  The debugger also defines
+top-level structure UserDebugCommands, which contains
+the commands described in this manual; don't redefine this structure! 
+
+The debugger copes adequately on code that performs its own \verb'callcc's,
+except that \verb'skip()' and \verb'skip_backward()' are unreliable.
+
+It is possible to mix non-debuggable with debuggable code under the
+following (rather heavy) restrictions:
+\begin{enumerate}
+\item The non-debuggable code must not update any arrays or 
+{\tt ref}s created by
+debuggable code, and must not create arrays or {\tt ref}s which are then passed
+to debuggable code.  (N.B. There are many ways to pass an object, including:
+as an argument to a function, as the value of a {\tt ref} or array, or as the
+argument to an exception constructor.)
+\item The non-debuggable code should not apply debuggable functions. 
+\end{enumerate}
+Special pre-instrumented 
+version of the {\tt List} and {\tt General} structures are
+provided because they would otherwise violate
+restriction 2; execution within functions in these structure can be traced
+in the normal manner, provided the {\tt dbguser} directory is left in 
+place after the debugger is built.
+
+\section{Performance}
+\label{sec:performance}
+Because it expands the effective size of the source code by instrumentation,
+the debugger can put heavy demands on system resources.  Compilation times,
+in particular, will suffer a many-fold increase, particularly in systems
+where memory is tight.  One partial solution is to use interpreted execution 
+mode where possible.  The interpreter is enabled by typing
+\begin{verbatim}
+- System.Control.interp := true;
+\end{verbatim}
+at top level.
+
+The I/O and reference memory logs can also occupy a great deal of memory. In
+particular, remember that every byte of input read (from a terminal or
+a file, in the present implementation) is stored in the I/O log and 
+becomes a permanent part of the program's live data.
+
+Execution times for debuggable code should normally be 2-4 times slower than
+ordinary code.  Heavy use of I/O and mutable store (particularly the creation
+of references and arrays) may lead to poorer performance.
+
+\section{Known Problems}
+\label{sec:bugs}
+
+\begin{itemize}
+\item Debugging of programs with byte arrays or real arrays is not
+supported.
+\item The \verb'M-e' key command doesn't work reliably.
+\item Superfluous messages can appear in the \verb'*Inferior smld*' window 
+when executing key commands in rapid succession.
+\item Type-ahead to the \verb'*Inferior smld*' window is usually lost.
+\item The types of identifiers within functor bodies that depend on 
+types in the functor parameter are not computed correctly.
+\item Some substructures are not properly constrained by signatures, so
+you can get values that should be hidden.
+\item Certain private 
+structures containing debugger control support functions and
+debugger versions of the pervasives are visible in {\tt smld}.
+\item Epoch support needs to be brought up to date.
+\end{itemize}
+
+\section{The Future}
+\label{sec:future}
+In addition to fixing some of the problems mentioned in this document
+(as well as the problems we don't know about yet) we plan the following
+major extensions to the debugger's functionality:
+\begin{itemize}
+\item There will be proper support for integrating debuggable code with 
+non-debuggable code in a single execution.
+\item We are investigating integration with the separate compilation 
+mechanism.
+\item We'll support more efficient logging of input from files, and more
+efficient logging of the mutable store using a new multi-generational garbage
+collector.
+\end{itemize}
+
+\appendix
+\section{Signals}
+\label{sec:signals}
+This appendix describes advanced features for debugging user programs
+that perform explicit signal handling.  The debugger supports signal
+handling by logging signals during recording
+phases of execution and simulating them during replay phases.
+Instrumented code is compiled using a special debugger version of the 
+signal primitives (as defined in System.Signals) to obtain debugger support.
+The debugger supports user programs handling all signal types supported by
+SML/NJ except {\tt SIGINT}, which is reserved for interrupting the debugger
+itself (see Section~\ref{sec:interrupts}).
+
+There are two stages to signal processing under debugger control. 
+In the first stage, signals are recorded in a {\em pending} vector.  This
+vector is updated when the debugger is in recording mode (i.e.,
+executing forward through a previously unexplored region in time)
+and receives an asynchronous signal in the usual way (e.g., from a 
+timer or other external agent).  
+In the second stage, a pending signal is {\em delivered} to the user's
+signal handler.  Delivery of signals is synchronized with debugger 
+events: deliveries always occur just after a debugger event has been
+executed, so they can be given precise time stamps.  Delivered signals
+are logged and re-delivered at the same time stamp during re-execution.
+
+You can alter normal signal handling behavior at several points.
+Entries in the pending vector can be explicitly set and cleared whenever
+the debugger is halted.
+You can also make the debugger halt and
+display a message prior to delivery of specified signal types; 
+if the relevant entry in the pending vector is cleared at this point, 
+the signal will not be delivered.
+
+\paragraph{Pending Vector}
+Signals are normally entered in the pending vector by the debugger's
+underlying signal handler. Signals are recorded in the vector only
+when the debugger is in recording mode; at other times the debugger's
+handler simply ignores them.
+Note that a signal might be received even during very brief
+recording phases (e.g., single-stepping) but is much more likely
+to occur during prolonged forward execution.  
+At most one signal of any type can be pending at any given time; 
+receipt of additional signals only increases the "count" of the 
+signal ultimately delivered. 
+
+The debugger always handles and 
+records signals for which user handlers have been installed.  
+In addition, it handles and records 
+signals which would normally cause SML/NJ to terminate if not handled, i.e.,
+{\tt SIGHUP}, {\tt SIGALRM}, {\tt SIGTERM}, {\tt SIGUSR1}, 
+{\tt SIGUSR2}, and {\tt SIGVTALRM}. 
+({\tt SIGINT} is handled separately by the debugger and cannot be handled by
+your program.) Other signal types are not handled by 
+the debugger unless you have installed a signal handler for them, so they are
+given SML/NJ's default treatment.  In particular, {\tt SIGQUIT} terminates
+the entire {\tt smld} execution; {\tt SIGURG}, {\tt SIGCHLD},{\tt SIGIO}, 
+{\tt SIGWINCH}, and {\tt SIGGC} are ignored.
+
+Any signal can be explicitly set in the pending vector by the command
+\begin{verbatim}
+- setSignal <signal>;
+\end{verbatim}
+which increments the pending count for the specified signal type.
+The specified type need not have a user handler installed.
+The command
+\begin{verbatim}
+- clearSignal <signal>;
+\end{verbatim}
+zeroes the pending count for the specified signal type.
+
+The pending signal vector is only relevant to execution in recording mode.
+The entire vector, including any explicit user alterations,
+is automatically cleared by any explicit reverse motion command (e.g.,
+jump to an earlier time).
+The \verb'setSignal' command can still be used after such a reverse motion;
+in addition to setting a pending vector entry, it erases any 
+subsequent execution history, including signal deliveries,
+I/O, interpolations, etc., to be discarded. Thus, any subsequent forward
+execution will place the debugger in recording mode, so the specified
+signal will be delivered immediately.  The \verb'clearSignal' command can also
+be used, but its only effect is to erase execution history, thus in particular
+preventing re-delivery of the specified signal (and any others!).  There
+is no mechanism for selectively editing the log of delivered signals.
+
+\paragraph{Signal Delivery}
+Signals are delivered during recording phase at the first possible
+event time following their entry in the pending vector. Usually this
+will be the first event following their entry, but delivery is delayed until
+(a) signals are not masked,
+(b) no signal handler is currently being executed, and
+(c) no interpolation is executing or has been set.
+Delivery of a signal clears it from the pending signal vector and enters
+it in the log.  On replay, the signal is re-delivered at the same 
+event time.
+
+At most one signal is delivered at any given event time. If multiple
+signals are pending, they are delivered in the numeric order of their
+codes as described in \verb'runtime/ml_signal.h'; each signal after the first
+is delayed until the previous signal's handler completes.
+
+Any signal type lacking a user-installed handler is given an implicit 
+nop handler, so there is no harm in delivering it. 
+
+\paragraph{Halting on Signals}
+By default, the debugger delivers signals to installed user handlers
+quietly, but halts before delivering signals for which 
+no user handler is installed, displaying the name of the signal.
+The user command
+\begin{verbatim}	
+- haltOnSignal(<signal>,<halt>:bool);
+\end{verbatim}
+can be used to override this default action and make the debugger always 
+either stop or not stop before delivering signals of a specified type.
+
+\paragraph{Signal Handler Execution}
+Signal handlers are executed under debugger control just like normal code.
+Execution of the handler is preceded by a {\tt ENTER SIGNAL HANDLER}
+pseudo-event and followed by a {\tt EXIT SIGNAL HANDLER} pseudo-event.
+It should be possible to study various forms of handler error, such
+as throwing to a continuation rather than returning one.
+Uncaught exceptions raised in a signal handler, which normally cause
+SML/NJ to terminate, produce an Uncaught Exception condition just as in
+an ordinary program body.  
+
+\begin{thebibliography}{9}
+\bibitem{thesis} A. P. Tolmach, {\em Debugging Standard ML}, Ph.D. Thesis,
+Princeton University, July 1992.  Available as Princeton Univ. Dept.
+of Computer Science Tech. Report 378-92.
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,332 @@
+-------- Sep  7 14:33 1992  0.sml --------
+
+structure B = struct val x=4 end
+structure C = struct val z=5 end
+structure D = struct val y=5 end
+
+-------- Sep  7 11:22 1992  a0.sml --------
+
+group ["a1.sml", "a2.sml"];
+group ["a1.sml", "a3.sml"];
+group ["a1.sml", "a4.sml"];
+
+-------- Sep  7 15:02 1992  a1.sml --------
+
+functor F (A:A) = struct
+  val c = C.z
+  open A
+  val b = B.x
+  val d = D.y
+end
+
+(* {rsi A dst A:A rst C
+    (ost A [rst B rst D])}
+   dfu F
+*)
+
+-------- Sep  7 15:02 1992  a2.sml --------
+
+signature A = sig end
+
+(* dsi A *)
+
+-------- Sep  7 15:08 1992  a3.sml --------
+
+signature A = sig
+  structure B :sig val x:int end
+end
+
+(* {dst B}*(dsi A [dst B]) *)
+
+signature C = A
+
+(* rsi A dsi C *)
+
+(* (rsi A)*(dsi C [dst B]) *)
+
+-------- Oct 22 14:24 1992  a4.sml --------
+
+signature A = sig
+  structure B :sig val x:int end
+  structure D :sig val y:int end
+end
+
+(* {dst B dst D}*(dsi A [dst B dst D]) *)
+
+-------- Sep  7 15:15 1992  ag.sml --------
+
+a1.sml/a2.sml:
+(* {rsi A dst A:A rst C
+    (ost A [rst B rst D])}*
+   dfu F
+*)
+(* dsi A *)
+===
+(* {rsi A dst A:A rst C
+    rst B rst D)}
+   dfu F
+*)
+
+-------- Sep  7 11:33 1992  b0.sml --------
+
+group ["b1.sml", "bx.sml", "b2.sml"];
+group ["b1.sml", "bx.sml", "b3.sml"];
+
+-------- Sep  7 11:30 1992  b1.sml --------
+
+functor F (A:A) = struct
+  val c = C.z
+  open A
+  val b = B.x
+  val d = D.y
+end
+
+structure F = F(A)
+
+-------- Sep  7 11:36 1992  b2.sml --------
+
+signature A = sig end
+structure A:A = struct end
+
+(* source sml "b1.sml"
+     import structure C, B, D, A
+     import signature A
+     export functor F
+     export structure F;
+   source sml "bx.sml"
+     import structure F, B
+     export structure S
+*)
+
+-------- Sep  7 11:40 1992  b3.sml --------
+
+signature A = sig
+  structure B :sig val x:int end
+end
+
+structure A:A = struct
+  structure B = struct val x=4 end
+end
+
+(* source sml "b1.sml"
+     import structure C, D, A
+     import signature A
+     export functor F
+     export structure F;
+   source sml "bx.sml"
+     import structure F
+     export structure S
+*)
+
+-------- Sep  7 13:14 1992  bg.sml --------
+
+b1.sml:
+  {efu F [isi A ist C
+          {Osi A [ist B ist D]}]}
+  {est F [ifu F ist A]}
+bx.sml:
+  {est S [ist F {Ost F [ist B]}]}
+----------------------------------
+b2.sml:
+  {esi A}
+  {est A [isi A]}
+b1.sml:
+  {efu F [isi A ist C
+          ist B ist D]}
+  {est F}
+bx.sml:
+  {est S [ist F ist B]}
+----------------------------------
+b3.sml:
+  {esi A [est B]}
+  {est A [isi A est B]}
+b1.sml:
+  {efu F [isi A ist C
+          est B ist D]}
+  {est F [est B]}
+bx.sml:
+  {est S [ist F]}
+
+-------- Sep  7 11:32 1992  bx.sml --------
+
+structure S = struct
+  open F
+  val b = B.x
+  end
+
+-------- Sep  7 12:30 1992  c1.sml --------
+
+signature F  = sig
+  val c :C.z
+  include A         (* open A' *)
+  val b :B.x
+  val d :D.y
+end
+
+-------- Sep  7 12:27 1992  c2.sml --------
+
+signature A = sig end
+
+(* source sml "c1.sml"
+     import structure C, B, D
+     import signature A
+     export signature F;
+*)
+
+-------- Sep  7 12:27 1992  c3.sml --------
+
+signature A = sig
+  structure B :sig type x end
+end
+
+(* source sml "c1.sml"
+     import structure C, D
+     import signature A
+     export signature F;
+*)
+
+-------- Sep  7 12:20 1992  c4.sml --------
+
+signature A = sig
+  structure B :sig type x end
+  structure D :sig type y end
+end
+
+(* source sml "c1.sml"
+     import structure C
+     import signature A
+     export signature F;
+*)
+
+-------- Sep  7 13:28 1992  cg.sml --------
+
+c1.sml:
+  {esi F [ist C isi A
+          {Isi A [ist B ist D]}]}
+----------------------------------
+c2.sml:
+  {esi A}
+c1.sml:
+  {esi F [ist C isi A
+          ist B ist D]}
+----------------------------------
+c3.sml:
+  {esi A [est B]}
+c1.sml:
+  {esi F [ist C isi A
+          est B ist D]}
+----------------------------------
+c4.sml:
+  {esi A [est B est D]}
+c1.sml:
+  {esi F [ist C isi A
+          est B est D]}
+
+-------- Sep  7 13:35 1992  d1.sml --------
+
+functor F (A:A) = struct
+  val c = C.z
+  open A
+  open B
+  val d = D.y
+end
+
+-------- Sep  7 13:36 1992  d2.sml --------
+
+signature A = sig end
+
+-------- Sep  7 13:38 1992  d3.sml --------
+
+signature A = sig
+  structure B :sig val x:int end
+end
+
+-------- Sep  7 13:41 1992  d4.sml --------
+
+signature A = sig
+  structure B :sig val x:int end
+  structure D :sig val y:int end
+end
+
+-------- Sep  7 13:43 1992  d5.sml --------
+
+signature A = sig
+  structure B :sig
+    val x:int
+    structure D :sig val y:int end
+  end
+end
+
+-------- Oct 22 14:24 1992  dg.sml --------
+
+d1.sml:
+  {efu F [isi A ist C
+          {Osi A
+            [ist B {Ost B [ist D]}]}]}
+----------------------------------
+d2.sml:
+  {esi A}
+d1.sml:
+  {efu F [isi A ist C
+          ist B
+          {Ost B [ist D]}]}
+----------------------------------
+d3.sml:
+  {esi A [est B]}
+d1.sml:
+  {efu F [isi A ist C
+          est B {Ost B [ist D]}]}
+d1.sml:
+  {efu F [isi A ist C
+          ist D]}
+----------------------------------
+d4.sml:
+  {esi A [est B est D]}
+d1.sml:
+  {efu F [isi A ist C
+          est B est D {Ost B [ist D]}]}
+d1.sml:
+  {efu F [isi A ist C
+          est B est D]}
+----------------------------------
+d5.sml:
+  {esi A [est B [est D]]}
+d1.sml:
+  {efu F [isi A ist C
+          (est B [est D]) {Ost B [ist D]}]}
+d1.sml:
+  {efu F [isi A ist C
+          (est B [est D]) est D]}
+
+-------- Sep  7 14:33 1992  z1.sml --------
+
+functor F (A:A) = struct
+  val c = C.z
+  local open A in
+    val b = B.x
+   end
+  val d = D.y
+end
+
+(*
+  {efu F [isi A dst A:A ist C
+          {Ost A [ist B]} ist D]}
+=>
+  {efu F [isi A ist C
+          {Osi A [ist B]} ist D]}
+*)
+
+-------- Sep  7 14:52 1992  z2.sml --------
+
+functor F (A:A) = struct
+  val c = C.z
+  local open A in
+    val b = B.x
+   end
+  val d = D.y
+end
+
+(*
+  {efu F [isi A dst A:A ist C
+          {Ost A [ist B]} ist D]}
+*)

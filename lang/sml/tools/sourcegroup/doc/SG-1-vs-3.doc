@@ -1,0 +1,175 @@
+(* Copyright (c) 1992 by Carnegie Mellon University *)
+
+	       Differences between SourceGroup Releases 1 and 3
+
+Gene Rollins (rollins+@cs.cmu.edu)
+School of Computer Science, Carnegie-Mellon Univ, Pittsburgh, PA 15213
+February 2, 1993
+
+The SML/NJ 0.93 compiler can generate target files for source files containing
+structures including functor applications.  So it is now possible to treat all
+SML files uniformly within SourceGroup.  SML/NJ 0.93 no longer supports the
+Import facility.
+
+SourceGroup 3 is easier to use than release 1 because it uses new features in
+SML/NJ 0.93, and it has a simplified interface.  When creating a group, all
+you need to do is list the group's source files, including sources for sml,
+lex, and yacc.
+
+The Introductory Guide (sourcegroup/doc/SourceGroup.doc) explains how
+to use the basic separate compilation mechanism.  The Advanced Guide
+(AdvancedGuide.doc) describes how to customize SourceGroup to special needs.
+The structure SourceGroup contains only the basic features.  The advanced
+features are available in the substructure SourceGroup.Expert.
+
+The structure System.Compile is now just Compile.  Calls to
+System.Compile.openEnv() should be changed to Compile.openEnv().
+
+
+==============
+Group Creation
+==============
+
+Groups are still created using the function create.  The type of its argument
+is different.
+ val create   :groupDescription list -> group
+
+OLD:
+    datatype groupDescription =
+     | Automatic of string list
+     | Library of group list  
+     | Include of group list
+     | Connections of string list  
+     | Link of string list
+
+NEW:
+ datatype groupDescription =
+    Sources of string list
+  | SubGroups of group list
+  | Connections of string list
+
+Automatic is renamed to Sources.
+Include is renamed to SubGroups.
+Libraries is omitted; use SubGroups instead.
+Link (never implemented) is omitted.
+
+Connections works a little different. See the Advanced Guide for details.
+
+SG 3 maintains a global source file table.  If more than one group shares a
+source file, that source will not be reanalyzed unless it is modified.  So,
+groups can be redefined cheaply.
+
+Target naming and indexing has changed in release 3.  Target names are chosen
+at group creation time for each source file using the value of targetNamer at
+the time of group creation. When make is applied source files are looked up in
+the global source file table, and the target name is retrieved.  The value of
+targetNamer at the time make is applied is irrelevent.  Indexing is done the
+same way.  Each time a source file is used in the creation of a group, its
+target name and indexing values are updated.
+
+The simplified interface of SourceGroup uses a naming convention for yacc and
+lex sources.  All files ending in .grm are assumed to be sml-yacc sources.
+All files ending in .lex are assumed to be sml-lex sources.  If you do
+not like this, you can still use Connections to describe files.
+
+
+====
+Make
+====
+
+Make now assumes you want to compile the source files.  If you want to
+apply other operations to the source files see the Advanced Guide.  The
+type of make has changed.
+
+OLD:
+    val make :(sourceInfo -> unit) -> group -> unit
+NEW:
+    val make :group -> string -> unit
+
+Make is now demand driven.  The old make would apply the action to
+all files in the source-dependency graph.  The new make only applies
+the action compile to those files needed to build the demanded modules.
+The second argument, a string, is a list of modules to be built.  For
+example, the call (make myGroup "Foo") will build the structure Foo by
+compiling only those files needed to build Foo.
+
+
+========
+FileList
+========
+
+The structure FileList has changed completely.  See
+/usr/misc/.sml/local/doc/fileList.doc.
+
+The old version of FileList has one function to create file lists that
+interprets a description.  The new version has several file list creating
+functions and filter functions that can be composed. 
+
+This is the old signature:
+
+signature FILELIST = sig
+    datatype limitation =
+        SKIPFILES of string list
+      | SKIPDIRS of string list
+      | EXTS of string list
+    datatype fileListDescription =
+        FILES of string list
+      | DIRS of string list
+      | RECDIRS of string list
+      | INDIRECT of string list
+      | LIMIT of (fileListDescription * limitation)
+  val create : fileListDescription list -> string list
+end
+
+This is the new signature:
+
+signature FILELIST = sig
+ val inDir :bool * string list -> string list
+ val inFile :string list -> string list
+ val cshExpansion :string -> string list
+
+ val skipFiles :string list * string list -> string list
+ val extensionsOnly :string list * string list -> string list
+end
+
+In the new interface for FileList, there is no way to skip a particular
+directory when recursively decending directories.
+
+ fun inDir (recursive:bool, names:string list) :string list
+ (* The list of all files (not starting with ".") in the directories names.
+    The subdirectories are not included in the list.  If recursive, the
+    subdirectories are recursively entered to look for more files to include
+    in the list. *)
+
+ fun inFile (pointerFiles:string list) :string list
+ (* The list of all filenames contained inside the files pointerFiles.  Each
+    file in pointerFiles contains a list filenames given as unquoted text
+    separated by any number of blanks (spaces, tabs, and newlines).  The
+    filenames are relative to the location of the pointer file they were found
+    in. *)
+
+ fun cshExpansion (pattern:string) :string list
+ (* Start a C-shell process to execute the command ("echo " ^ pattern).
+    The result will be a list of file names matching the pattern. *)
+
+ fun skipFiles (skipNames:string list, names:string list) :string list
+ (* Remove the elements of skipNames from names *)
+
+ fun extensionsOnly (exts:string list, names:string list) :string list
+ (* Remove from names, any element whose extension is in the list exts *)
+
+
+OLD FileList:
+    create [Indirect ["files.txt"]]
+NEW FileList:
+    inFile ["files.txt"]
+
+OLD FileList:
+    create (LIMIT (LIMIT (DIRS ["test"], EXTS ["sml"]),
+                   SKIPFILES ["test/define.sml", "test/make.sml"]))
+NEW FileList:
+    skipFiles (["test/define.sml", "test/make.sml"],
+               extensionsOnly (["sml"], inDir [false, "test"]))
+OR:
+    skipFiles (["test/define.sml", "test/make.sml"],
+               cshExpansion "test/*.sml")

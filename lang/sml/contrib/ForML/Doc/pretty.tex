@@ -1,0 +1,575 @@
+\newcommand{\bsl}{/}
+\documentstyle{article}
+% ForML Version 0.6 - 25 January 1993 - er@cs.cmu.edu
+\oddsidemargin 0pt \evensidemargin 20pt \headheight 0pt
+\headsep 0pt    %25pt
+\topmargin 0pt  %27pt
+\footheight 12pt \footskip 25pt \textheight 660pt \textwidth 469pt
+
+\title{ForML - a Pretty-Printing Facility for SML}
+\author{Ekkehard Rohwedder}
+\date{25 January 1993}
+\begin{document} 
+\maketitle 
+\begin{abstract}
+This is the documentation accompanying Release 0.6
+  of ForML, a prettyprinting
+  module written in SML that supports the formatting of concrete syntax in
+  languages or language-development tools.\\
+\end{abstract}
+
+\section{Introduction}
+
+A number of languages and language-development tools (e.g.\ CAML, Ppml)
+offer prettyprinting facilities to support the unparsing and formatting
+of abstract syntax. 
+ForML, a formatter written in SML of New Jersey, adresses some
+of these issues for the SML language. 
+
+After examining basic goals involved in the design of a pretty printer,
+we will introduce the ForML formatting primitives and give examples of 
+their use.
+Next we  describe the entire ForML interface, and finally we give a more
+involved example of ForML's use.
+
+The ForML ideas are taken from the CAML pretty-printing
+primitives~\cite{Weis88},
+which in
+turn are based on the Ppml pretty-printing facility of the Centaur
+system~\cite{Ppml99}.
+In contrast to the pretty printing algorithm by Oppen~\cite{Oppen80}, 
+the ForML formatting is not based on a stream interface: an
+intermediate formatting structure is generated in memory before the
+final output is printed.
+
+
+\subsection*{Unparsing and Formatting}
+Lexer and parser transform input text into trees
+containing the abstract syntax of the input language.
+In language-development environments, however, one often wants to
+take the reverse route producing nicely formatted output from some
+abstract syntax trees.
+It is advantageous to structure this process into two steps that are
+interfaced by a formatting language:
+\begin{itemize}
+  \item Unparsing --- precedences and associativity
+    in the abstract syntax tree are disabiguated (e.g.\ by
+    inserting ``('' and ``)'' or other bracketing constructs),
+    and the appropriate output functions for the subtrees are selected
+    (allowing, for example, the elision of deeply nested structures).
+  \item A device-independent formatting language interfaces
+    the unparser and the formatter.
+  \item Formatting --- the breakpoints in the output are determined, and
+    the mapping to the output device(s) is performed.
+\end{itemize}
+
+ForML does {\em not\/} take you all of the way: the unparsing of abstract
+syntax trees will have to be implemented by hand. However, ForML offers
+a formatter-language interface and output routines for a
+monospaced device.\footnote{Future versions will support other output
+devices, like LaTeX or PostScript. Please contact the author at
+{\tt er@cs.cmu.edu} if you need to produce output for other than a
+monospaced device.}
+
+Processing with ForML is efficient, allowing its use in an interactive
+environment, and its formatting language can express common formating demands
+directly and easily, while relying on perspicuous and usable concepts.
+It has been successfully employed as the formatting tool for the
+Elf-language~\cite{Pfenning91D}.
+
+In the next section we describe the primitives provided by ForML to
+build formats and how they affect the final output.
+SML program text will be set in {\tt teletype font}, and we also assume that
+the {\tt Formatter} structure has been opened, making its primitives directly
+available.
+
+\section{ForML Formats}
+
+  \subsection{Boxes}
+
+  A {\tt format} is either a string ({\tt String "}{\it a string}{\tt "}),
+  a space {\tt Space}, a breakpoint {\tt Break},
+  or a box containing a list of formats.
+  Breakpoints indicate mandatory or potential locations where
+  a new line (and possibly increased indentation) is to be
+  inserted into the output.
+
+  Boxes come in various formats, and ---depending upon the flavor of the
+  box in which they are situated and upon the available printwidth---
+  the {\tt Break}s inside of them are interpreted differently.
+  To illustrate we will fill various boxes with the following list of formats
+  \begin{center}
+  {\tt [String "XXXX", Break, String "XXXX", Break, String "XXX",
+        Break, String "XXXXX"]}
+  \end{center}
+  and observe the respective outputs\footnote{The suggestive frame drawn
+    around the boxes is {\em not} part of the actual output.}.
+  \begin{itemize}
+   \item Horizontal boxes {\tt Hbox} {\em never} break at their breakpoints.
+         {\tt Break}s are simply converted to whitespace.
+    \begin{center}
+      \begin{tabular}{|l|}
+       \hline
+        XXXX XXXX XXX XXXXX\\ 
+       \hline
+      \end{tabular}
+    \end{center}
+   \item Vertical boxes {\tt Vbox} {\em always} break at all their
+     breakpoints. The {\tt Break}s are transformed into
+     newlines, and a certain amount of indentation from the left border of
+     the box is inserted.
+    \begin{center}
+      \begin{tabular}{|l|}
+       \hline
+        XXXX \\
+        ~~XXXX\\
+        ~~XXX\\
+        ~~XXXXX\\ 
+       \hline
+      \end{tabular}
+    \end{center}
+    \item Horizontal-or-vertical boxes {\tt HOVbox}
+      can behave as a horizontal
+      box if the available pagewith accomodates the width of the
+      box, otherwise they behave exactly like vertical boxes.
+    \begin{center}
+      \begin{tabular}{|l|}
+       \hline
+        XXXX XXXX XXX XXXXX\\ 
+       \hline
+      \end{tabular}
+      ~~~or~~~
+      \begin{tabular}{|l|}
+       \hline
+        XXXX \\
+        ~~XXXX\\
+        ~~XXX\\
+        ~~XXXXX\\ 
+       \hline
+      \end{tabular}
+    \end{center}
+   \item Horizontal-vertical boxes {\tt HVbox} allow each
+     breakpoint {\em individually} to behave as if it was in a horizontal
+     box or in a vertical box, depending upon whether the material
+     after the break (and up to the next break) would still fit into
+     the available pagewidth.
+     Thus ---depending on the page width--- the above example could be
+     displayed quite differently:
+    \begin{center}
+      \begin{tabular}{|l|}
+       \hline
+        XXXX XXXX XXX XXXXX\\ 
+       \hline
+      \end{tabular}
+      ~~~or~~~
+      \begin{tabular}{|l|}
+       \hline
+        XXXX XXXX XXX\\
+        ~~XXXXX\\
+       \hline
+      \end{tabular}
+    \end{center}
+    \begin{center}
+      or~~~
+      \begin{tabular}{|l|}
+       \hline
+        XXXX XXXX\\
+        ~~XXX XXXXX\\
+       \hline
+      \end{tabular}
+      ~~~or~~~
+      \begin{tabular}{|l|}
+       \hline
+        XXXX \\
+        ~~XXXX\\
+        ~~XXX\\
+        ~~XXXXX\\ 
+       \hline
+      \end{tabular}
+    \end{center}
+  \end{itemize}
+  
+\subsection{Example: Pretty-Printer for $\lambda$-Calculus}
+Let us delve into a concrete example and put these primitives to work by
+writing a formatter for a $\lambda$-calculus language
+presented with the following concrete grammar:
+\begin{center}
+\begin{tabular}{lcl}
+$exp$ & $::=$ & $\lambda x. exp ~|~ let ~x = exp ~in~ exp ~|~ exp_A$ \\
+$exp_A$ & $::=$ & $exp_A~exp_B ~|~ exp_B  $ \\
+$exp_B$ & $::=$ & $var ~|~ {\mbox{\rm ``(''}} exp {\mbox{\rm ``)''}}$ \\
+\end{tabular}
+\end{center}
+An SML datatype {\tt exp} which captures the abstract syntax 
+of such $\lambda$-expressions might look as follows:
+\begin{verbatim}
+datatype exp =
+         Var of string
+      |  Lam of string * exp
+      |  App of exp * exp
+      |  Let of string * exp * exp
+\end{verbatim}
+
+\subsubsection{A first cut}
+Let us first design the ``boxes'' for the different language elements:
+\begin{itemize}
+ \item variable names will be output directly 
+ \item applications $e_1 ~ e_2$ may be split if they do not fit into a
+       line:
+\begin{center}
+       \begin{tabular}{|l|} \hline
+          $expression_a$ \\
+          $~~~~~~expression_b$ \\ \hline
+       \end{tabular}
+\end{center}
+ \item no breaks are allowed immediately after ``('' or immediately before ``)``
+ \item $\lambda$-abstractions allow a break after the ``.'':
+\begin{center}
+       \begin{tabular}{|l|} \hline
+          $\lambda x .$\\
+          $~~~expr$ \\ \hline
+       \end{tabular}
+\end{center}
+  \item {\tt let}-expressions also allow a break:
+\begin{center}
+       \begin{tabular}{|l|} \hline
+          $let~$\begin{tabular}{|c|}\hline $x=exp_1$\\ \hline\end{tabular}\\
+          $~in~ exp_2$\\ \hline
+       \end{tabular}
+\end{center}
+Additionally we want ---if necessary--- ``$x=exp_1$'' to break after ``$=$''.
+\end{itemize}
+Armed with this design specification,
+we now can write a simple
+pretty-printer for {\tt lambda}-expressions along the
+concrete syntax as follows:
+\begin{verbatim}
+fun format (Let(ID,exp1,exp2)) =
+           HOVbox[String "let", Space,
+                  HOVbox[String ID, String "=", Break, format exp1],
+                  Break, String "in", Space, format exp2]
+  | format (Lam(ID,exp)) =
+           HOVbox[ String "\\", String ID, String ".", Break, format exp]
+  | format exp = format_A exp
+and format_A (App(expa,expb)) = HOVbox[ format_A expa, Break, format_B expb ]
+  | format_A exp = format_B exp
+and format_B (Var ID) = String ID
+  | format_B exp = HOVbox[ String "(", format exp, String ")" ]
+\end{verbatim}
+Here is sample output from this formatter with the {\tt Pagewidth} 20:
+\begin{verbatim}
+               \x.
+                  \y.
+                     \z.
+                        let x= y
+                           in y (x y)
+                                 (z y)
+\end{verbatim}
+
+
+\subsubsection{Some improvements}
+There are a number of points about this particular formatter that we are not
+quite satisfied with. 
+\begin{itemize}
+\item We do not like that {\tt let x=\ exp in ...} inserts a white space after
+      {\tt =} in horizontal output mode. However, we are in luck: ForML allows
+      us to fine-tune breaks by specifying:
+      \begin{itemize}
+        \item how many spaces to output for the break in horizontal mode
+              (default: 1)
+        \item how many spaces to indent from the left border of the box, when
+              the break actually is taken (default: 3)
+      \end{itemize}
+      The fine-tuning break primitive is called {\tt Break0} and takes these
+      two parameters as arguments.
+      Thus in the {\tt format (Let ...)}-clause of the above 
+      {\tt format}-function we need to change the first {\tt Break} to
+      {\tt Break0 0 3} to get the desired effect.
+\item Similarly, we might want to indent the {\tt in} by one rather
+      than by three spaces to align it under the {\tt let}. We can achieve this
+      by changing the second {\tt Break} in the {\tt Let}-clause to read
+      {\tt Break0 1 1}.
+\item A long series of $\lambda$-abstractions may lead to breaks in nested 
+      boxes, although it may be nicer if the could be treated as a list, 
+      i.e.\ instead
+of\\
+\begin{tabular}{|l|} \hline
+  $\lambda x .$ \\
+  ~\ ~\ \begin{tabular}{|l|} \hline
+        $\lambda y .$ \\
+        ~\ ~\ \begin{tabular}{|l|} \hline
+              $\lambda z .$ \\
+              ~\ ~\ \begin{tabular}{|l|} \hline inner expression \\ \hline
+                    \end{tabular}
+              \\ \hline
+          \end{tabular}
+       \\ \hline
+    \end{tabular}
+   \\ \hline
+\end{tabular}
+\ ~ \ ~ \ ~we would like to have\ ~\ ~\ ~\ 
+\begin{tabular}{|l|} \hline
+  $\lambda x.$ $\lambda y.$ $\lambda z.$ \\
+              ~\ ~\ \begin{tabular}{|l|} \hline inner expression \\ \hline
+                    \end{tabular}
+       \\ \hline
+\end{tabular}\\
+To achieve this we change the line ``{\tt | format (Lam ...)}'' to read
+``{\tt | format (e as Lam(ID,exp)) = format\_lam e nil}'', and we add two
+clauses to define the auxiliary function {\tt format\_lam}:
+\begin{verbatim}
+and format_lam (Lam(ID,exp)) absl =
+                format_lam exp (ll @ [String("\\" ^ ID ^ "."), Break])
+  | format_lam exp ll = HVbox(ll @ [format exp])
+\end{verbatim}
+\end{itemize}
+With these improvements in place, the formatter now produces:
+\begin{verbatim}
+               \x. \y. \z.
+                  let x=y
+                   in y (x y) (z y)
+\end{verbatim}
+
+\subsection{The signature FORMATTER}
+We now explain the interface to the formatter by describing the components of
+its {\tt FORMATTER} signature in {\tt formatter.sig}:
+\subsubsection{Defaults and Switches}
+Several references contain default values which may be changed by the
+user:
+\begin{verbatim}
+      val Indent : int ref
+      val Blanks : int ref
+      val Skip   : int ref
+\end{verbatim}
+{\tt Indent}, {\tt Blanks}, and {\tt Skip} correspond to
+the values for added indentation, horizontal spacing, and vertical skip
+that are used by the default boxes. Their respective values are initially
+{\tt 3}, {\tt 1}, and {\tt 1}, but they may be changed at any point.
+\begin{verbatim}
+      val Pagewidth     : int ref
+\end{verbatim}
+{\tt Pagewidth} contains the display width for the page. It is initially set to
+{\tt 80}.
+\begin{verbatim}
+      val Bailout       : bool ref
+      val BailoutSpot   : int ref
+      val BailoutIndent : int ref
+\end{verbatim}
+When you turn the {\tt Bailout} flag on, ForML attempts to fail more gracefully
+whenever the output overruns the display width: such text will be output with
+an initial indentation of {\tt BailoutIndent} from the left margin.
+Since ForML views the text boxes it formats as rectangles rather than
+octagons, it tends to ``panic'' when you turn the {\tt Bailout} flag on, and
+outputs a number of text lines indented flushly by {\tt BailoutIndent},
+rather than just continuing normal indentation until the situation on the page
+really becomes tight again.
+To ameliorate this situation, set {\tt BailoutSpot}
+to a value between {\tt BailoutIndent} and {\tt Pagewidth}, and then a
+Bailout will only be triggered when the leftmost edge of text would be output
+after the {\tt BailoutSpot}. 
+Sounds like a bailout, doesn't it?
+Initially, {\tt Bailout} is set to {\tt true}, {\tt BailoutSpot} is {\tt 40},
+and {\tt BailoutIndent} is {\tt 0}.
+
+\subsubsection{Formats}
+The abstract datatype {\tt format} holds the actual formats. The minimum
+and maximum display widths of a format may be inquired with {\tt Width}.
+\begin{verbatim}
+      type format
+      val  Width: format -> (int * int)
+\end{verbatim}
+A whole slew of functions are provided to assemble formats, and you have already
+seen a cross-section of these earlier.
+\begin{verbatim}
+      val  Break: format
+      val  Break0: int -> int -> format     (* blanks, indent *)
+      val  String: string -> format
+      val  String0: int -> string -> format (* output width *)
+      val  Space: format
+      val  Spaces: int -> format
+      val  Newline: unit -> format
+      val  Newlines: int -> format
+      val  Newpage: unit -> format
+      val  Vbox: format list -> format
+      val  Vbox0: int -> int -> format list -> format  (* indent, skip *)
+      val  Hbox: format list -> format
+      val  Hbox0: int -> format list -> format         (* blanks *)
+      val  HVbox: format list -> format
+      val  HVbox0: int -> int -> int -> format list -> format  (* blanks, indent, skip *)
+      val  HOVbox: format list -> format
+      val  HOVbox0: int -> int -> int -> format list -> format (* blanks, indent, skip *)
+\end{verbatim}
+The functions ending in {\tt 0} take additionally arguments for indentation,
+horizontal spacing, or vertical skip, whereas their cousins (without the 
+{\tt 0})
+simply use the default values stored in {\tt Indent}, {\tt Blanks}, and 
+{\tt Skip}. The {\tt String}, {\tt Space}, {\tt Spaces},
+{\tt Newline}, {\tt Newlines}, and {\tt Newpage} functions do what you would
+expect them to. {\tt String0} requires you to additionally enter the width to
+be used in pagewidth calculations.
+Be forewarned, though, that ForML is pretty stupid about {\tt Newline}({\tt s})
+issued inside of boxes: it thinks they are just like any other string, except
+their length is 0, so you could get some strange formatting results --- rather
+use {\tt Break}s in {\tt Vbox}es if you need to force new lines.
+% 
+% \begin{verbatim}
+%       val  Separator : format list -> format (* format for separators *)
+% \end{verbatim}
+% The {\tt Separator} format needs a little more explanation:
+% It may only be used inside of boxes, and you cannot inquire about its
+% {\tt Width}.
+% The format list given as argument to the {\tt Separator}-format will be inserted
+% whenever the {\tt Separator} is encountered, {\em except\/} if {\tt Separator}
+% is the last item inside of a box, in which case nothing will be inserted.
+% Typically, a {\tt Separator} would hold the format for list-element separators
+%when formatting a list structure.
+
+
+\subsubsection{Shipping it out}
+The two functions
+\begin{verbatim}
+      val  makestring_fmt:        format -> string
+      val  print_fmt:             format -> unit
+\end{verbatim}
+turn formats into strings and print them out, respectively.
+If you want to put formatted output into an {\tt outstream}, consider
+at the following:
+\begin{verbatim}
+      type fmtstream
+      val  open_fmt:              outstream -> fmtstream
+      val  close_fmt:             fmtstream -> outstream
+      val  output_fmt:            (fmtstream * format) -> unit
+      val  file_open_fmt:         string -> ( (unit -> unit) * fmtstream )
+      val  with_open_fmt:         string -> (fmtstream -> 'a) -> 'a
+\end{verbatim}
+The function {\tt open\_fmt} creates a ``format-stream'' {\tt fmtstream}
+associated with a particular outstream,
+and {\tt close\_fmt} closes it, but leaves the {\tt outstream} open.
+You use {\tt output\_fmt} to print a format on the {\tt fmtstream}.
+Note that once you have closed an {\tt outstream} associated with a
+{\tt fmtstream}, any further output to that {\tt fmtstream} will result in
+an I/O error.
+% \footnote{And
+% there is also {\tt val  debug\_output\_fmt: (fmtstream * format) -> unit},
+% which decorates its output with additional information for debugging ForML.}
+
+{\tt file\_open\_format} expects a file name as an argument. It opens the
+file and returns a pair consisting of a function to later close this file,
+as well as a {\tt fmtstream} onto which to output formats.
+
+Finally, the function {\tt with\_open\_format} expects the name of a file,
+and a function whose argument is a {\tt fmtstream}. It will open the file, call
+the function with the resulting {\tt fmtstream}, and afterwards close the
+file and return the result of the function call.
+
+
+\section{An extended example: Mini-ML}
+We now extend the previous example to a subset of an ML-like language with the
+following abstract syntax:
+$$\begin{array}{lcl}
+        exp & ::=  & x ~|~ n ~|~ {\tt true} ~|~ {\tt false}
+                   ~|~ exp_1~exp_2 ~|~ \lambda x.exp\\
+            & &  ~|~ {\tt let}~x=exp_1~{\tt in}~ exp_2
+                 ~|~ {\tt if}~ exp_1 ~{\tt then}~ exp_2 ~{\tt else}~ exp_3\\
+            & &  ~|~ [exp_1,\ldots,exp_n] ~|~  exp_1 ~op~ exp_2\\
+    \end{array}
+$$
+where $x\in Var$, $n\in Nat$,
+       $\{{\tt true}, {\tt false}\} \in Bool$,
+        $op = \{ =, <, +, -, *, /, \ldots\}$, and $[\ldots]$ denotes a list.
+
+A corresponding SML datatype for abstract syntax trees might be as follows
+(purely for convenience we also decorate {\tt Op}-nodes with the operator
+precedence):
+ \begin{verbatim}
+datatype mexp = Var of string | Int of int | Bool of bool
+                  | App of mexp * mexp
+                  | Lam of string * mexp
+                  | Let of string * mexp * mexp
+                  | If of mexp * mexp * mexp
+                  | List of mexp list
+                  | Op of string * int * mexp * mexp
+ \end{verbatim}
+The formatter for {\tt mexp}s now also has to provide unparsing, i.e.\ it needs
+to take operator precedences into account.
+Below is an example of a formatting function for this language.
+Rather than mimicking some suitable concrete grammar,
+it deals with nested {\tt App}s
+similarly as the second version of the {\tt format}-function did with nested 
+{\tt Lam}s.  The reader may want to reconstruct the basic box designs.
+
+Before we start, however, we need to define an auxiliary function:
+\begin{verbatim}
+infixr 5 @@
+
+fun (l1 @@ nil) = nil
+  | (l1 @@ l2) = l1 @ l2
+\end{verbatim}
+Now on to the main formatting routine:
+\begin{verbatim}
+fun mformat (Var s) = String s
+  | mformat (Int n) = String (makestring n)
+  | mformat (Bool b) = String (if b then "true" else "false")
+  | mformat (e as Lam _) = mformat_lam e []
+  | mformat (e as App (e1,e2)) = mformat_app e1 [mformat_op 50 e2]
+  | mformat (Let(s,e1,e2)) =
+            HOVbox[String "let", Space, HOVbox[String s, String "=", Break0 3 1,
+                                               mformat e1], Break0 1 1,
+                   String "in", Space, mformat e2]
+  | mformat (If(e1,e2,e3)) = HOVbox[ String "if", Space, mformat e1, Break,
+                                     String "then", Space, mformat e2, Break,
+                                     String "else", Space, mformat e3]
+  | mformat (List l) =
+            Hbox[ String "[",
+                  HVbox (fold (fn (el, fmtl) =>
+                                  [ mformat el ] @
+                                        [String ",", Break0 1 0] @@ fmtl)
+                              l
+                              nil),
+                  String "]" ]
+  | mformat (e as Op(_,p,_,_)) = mformat_op p e
+\end{verbatim}
+In formatting {\tt App}s above (and also below), we force surrounding
+parentheses by calling the formatting routine for operators with the
+highest priority for the ``outside'' operator.
+Finally, expressions consisting of nested {\tt Lam}s, {\tt App}s, 
+and {\tt Op}s are
+formatted by the auxiliaray functions
+{\tt mformat\_lam}, {\tt mformat\_app}, and {\tt mformat\_op}
+respectively:
+\begin{verbatim}
+and mformat_lam (Lam(s,e)) l =
+                mformat_lam e (l @ [String("\\" ^ s ^ "."), Break])
+  | mformat_lam e l = HVbox(l @ [mformat e])
+and mformat_app (App(e1,e2)) l = mformat_app e1 ((mformat_op 50 e2)::Break::l)
+  | mformat_app e l = HVbox((mformat_op 50 e)::Break::l)
+and mformat_op p' (Op(s,p,e1,e2)) =
+    HOVbox( (if p'>p then [String "("] else [])
+            @ [mformat_op p e1] @ [ Break0 0 1, String s]
+            @ [mformat_op p e2] @
+            (if p'>p then [String ")"] else []) )
+  | mformat_op p e = mformat e
+\end{verbatim}
+A sample output with a {\tt Pagewidth} of 20 might look as follows:
+\begin{verbatim}
+            \x. \y. \z.
+               let silly=
+                    \x. \y. \z.
+                       if y+z>0
+                          then x
+                          else y
+                in silly
+                      [1, ~1, 0,
+                       true,
+                       false,
+                       \x. x+1]
+                      (1+(2+x)*3
+                          /(4-5)
+                       -6*7+8)
+                      15
+\end{verbatim}
+
+\bibliographystyle{plain}
+\bibliography{pretty}
+
+\end{document}

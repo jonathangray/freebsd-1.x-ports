@@ -1,0 +1,532 @@
+% RCS LOG
+%
+% $Log: user.tex,v $
+% Revision 1.1  1994/02/08 00:23:12  jkh
+% Initial revision
+%
+%Revision 1.3  1991/10/22  20:03:47  db
+%Minor formatting changes.
+%
+%Revision 1.2  91/04/11  11:16:19  11:16:19  db (Dave Berry)
+%Fixed minor bugs in description of Make system.
+%Added functor specifications to appropriate entries.
+%
+%Revision 1.1  91/03/27  16:41:38  16:41:38  db (Dave Berry)
+%Initial revision
+%
+
+\chapter{Using the Library.}	\label{user}
+
+\section{Getting Started.}
+
+To use the library, you need a version of SML with the library loaded.
+The person who installed the library on your system should have created
+such a version for you.  If not, you'll have to read Chapter~\ref{install}
+and do it yourself.
+
+Suppose that you want a function to convert integers to strings,
+and a function to prompt the user for input.  On reading the rest of this
+chapter, you will find that you want the {\tt Int} and {\tt User} library
+entries, specifically the functions {\tt Int.string} and
+{\tt User.prompt}.
+
+There are two ways that the library could be set up.
+Type {\tt loadLibrary "User"}.  If this returns the
+string {\tt "All library entries have been loaded"},
+then the entries are ready for use.  If this is not the case, the
+your call to {\tt loadLibrary} will compile the {\tt User} entry for you.
+The {\tt Make} system will ensure that all entries required by the
+{\tt User} entry itself will be loaded as well.
+
+Once you've loaded the {\tt User} and {\tt Int} entries, you can use
+the {\tt Int.string} and {\tt User.prompt} functions just like any
+other components of structures.  Most library entries are implemented
+as structures instead of functors. This saves space and makes the
+library easier to use.
+\footnote{The library can also be loaded without loading the {\tt Make}
+system or any entries at all.  This is intended for minimising space
+when building stand-alone applications rather than for general use.}
+
+
+\section{Entries.}
+
+Most library entries are structures.  Each structure is documented by a
+signature and a sample (possibly inefficient) implementation.
+Structure names are written in mixed case,
+with the corresponding signature names written in upper case.  For
+example, the {\tt Int} structure implements the {\tt INT} signature.
+
+The signature gives the usual type information, with a short
+description of each object (in English), and some introductory material.
+The introductory material includes details of the author, maintenance
+arrangements and so forth.  Signatures may include Extended ML axioms
+(in comments), if the implementer provides them.
+
+The implementation is a reference implementation of the objects
+declared in the signature.  The actual implementation may be more
+complex than this, but it must produce the same results and side-effects.
+The only exception to this rule is that implementations may produce
+debugging or tracing output in addition to their normal effects.
+
+Some entries are functors.  Since SML doesn't have a notion of ``functor
+signature'', these entries are described by comments at the start of
+each functor.
+
+The detailed descriptions of the current entries are given later in this
+report.  This section gives an overview of the whole library, to give
+you some idea of what the library contains.
+
+In addition to the entries described in this report, the library also
+includes space for contributions that don't fit the library format.
+To see these, find out where the library is installed on your system
+and browse the {\tt contrib} sub-directory. 
+
+
+
+\section{Structures.}
+
+The library currently contains the following structures:
+
+\begin{description}
+  \item[\tt General.]
+	Types, exceptions and functions that are widely used or that
+	don't fit anywhere else.  In particular, the types {\tt Result},
+	{\tt Option} and {\tt Nat} are made global and are used in many
+	other library entries.
+
+  \item[\tt Bool, Instream, Int, List, Outstream, Real, Ref, String.]
+	Basic operations on the pervasive types.
+ 
+  \item[\tt BoolParse, IntParse, ListParse, StringParse.]
+	Functions to parse the basic types from strings or instreams.
+	The {\tt ListParse} structure matches the {\tt SEQ\_PARSE}
+	signature; the others match the {\tt PARSE} signature.
+
+  \item[\tt Ascii, StringType, StringListOps.]
+	{\tt Ascii} defines constants for the non-printing Ascii
+	characters.  {\tt StringType} defines functions for testing
+	whether the first character in a string is a letter, digit,
+	control character, etc.  {\tt StringListOps} defines functions
+	on strings that mimic those in the {\tt List} entry.
+
+  \item[\tt ListSort.]
+	Functions to sort and permute lists.
+
+  \item[\tt AsciiOrdString, LexOrdString, LexOrdList.]
+	Orderings on sequences.  {\tt AsciiOrdString} compares strings
+	when case difference is significant; by contrast {\tt LexOrdString}
+	ignores case.
+
+  \item[\tt Array, ArrayParse, Byte, ByteParse, Vector, VectorParse.]
+	Types and functions for arrays, bytes, and constant vectors.
+
+  \item[\tt Pair, PairParse, ListPair, StreamPair.]
+	Operations on pairs of objects.  {\tt StreamPair} also
+	includes suggested functions for interacting with the host file
+	system using pairs of one instream and one outstream.
+ 
+  \item[\tt EqSet, Set.]
+	Polymorphic sets.  {\tt EqSet} defines sets over equality
+	types.  {\tt Set} defines sets over arbitrary types, but
+	defines several functions that require and equality function
+	to be passed as an argument.
+
+  \item[\tt Hash, EqFinMap.]
+	Hash tables and finite maps.  The keys to finite maps must
+	be equality types.   
+  
+  \item[\tt User.]
+	Functions to prompt the user for input.  A window system should
+	provide an appropriate replacement for this structure.
+
+  \item[\tt Make.]
+	The {\tt Make} system mentioned in the {\tt Getting Started}
+	section.  This will be described in more detail in
+	Section~\ref{make}.
+
+  \item[\tt Const.]
+	Creates unique copies of objects.
+
+  \item[\tt System.]
+	Some suggested functions for interacting with the host file
+	system and the SML compiler.  Many of these functions are not
+        implemented in the portable version of the library.
+
+  \item[\tt Combinator.]
+	Simple combinator functions.
+
+  \item[\tt Memo.]
+	Memoising functions.
+\end{description}
+
+
+
+\section{Signatures, Functors, and Monomorphic Types.}	\label{generic}
+
+Most of the structures mentioned in the previous section have
+corresponding signatures with the same name (but in upper case).  The
+exceptions are the Parse structures, which are match the {\tt generic}
+signatures {\tt PARSE} and {\tt SEQ\_PARSE}.  (Exception: the
+{\tt ArrayParse} structure matches the {\tt ARRAY\_PARSE} signature).
+
+There are several other generic signatures.  One example is the
+{\tt EQUALITY} signature.  This specifies a type {\tt T} and an equality
+function {\tt eq: T $\rightarrow$ T $\rightarrow$ bool}.  By convention,
+when a library entry defines a new type, it gives it the name {\tt T} in
+addition to its normal name.  For example, the types {\tt Int.int} and
+{\tt Int.T} are identical (and are also identical to the built-in type
+{\tt int}).  This means that many of the structures in the library will
+match the {\tt EQUALITY} signature.
+
+Now suppose that you define a functor that 
+takes an argument structure specified by the {\tt EQUALITY}
+signature.  For example, the functor {\tt MonoSet} takes
+such an argument and returns a set of elements of type {\tt T}.
+The library naming conventions mean that this functor can
+be applied to many of the types defined in the library.
+
+The library provides several such generic signatures.  {\tt ORDERING}
+defines a type {\tt T} and an ordering function.  {\tt PRINT} defines
+a type {\tt T}, a function to convert values of that type to strings,
+and a function to print the string representation of a value on an
+outstream.  {\tt ORD\_PRINT}, {\tt EQ\_ORD}, and {\tt EQ\_PRINT} are
+obvious combinations of these, while {\tt OBJECT} combines all of
+them in a single signature.  {\tt EQTYPE\_ORD} and {\tt EQTYPE\_PRINT}
+are versions of {\tt ORDERING} and {\tt PRINT} in which {\tt T} is an
+equality type.   
+
+The functors {\tt MonoSet}, {\tt MonoList}, {\tt MonoVector} and
+{\tt MonoArray} use generic signatures.  {\tt MonoSet} uses {\tt EQUALITY},
+and the others use {\tt EQ\_PRINT}.  They all return structures that
+are similar to their polymorphic equivalents, except that the objects
+they define contain elements of a fixed type.  This is sometimes
+desirable.
+
+One reason for creating monomorphic values in this way is that they
+can sometimes be implemented more efficiently then
+polymorphic ones.
+For example, a vector of booleans can be implemented as a bitset.
+
+Another reason is that many functions over monomorphic collections
+have a simpler type, as they
+don't need a function parameter to apply to the elements of the vector.
+For example, the equality functions on polymorphic vectors and monomorphic
+vectors have the types
+{\tt ('a $\rightarrow$ 'a $\rightarrow$ bool) 
+$\rightarrow$ 'a Vector $\rightarrow$ 'a Vector $\rightarrow$ bool}
+and {\tt MonoVector $\rightarrow$ MonoVector $\rightarrow$ bool}
+respectively.
+
+The library also contains the {\tt ByteVector}, {\tt BoolVector},
+{\tt ByteArray} and {\tt BoolArray} structures.  These can be created
+by applying
+the respective functors, or implemented directly.
+The library also contains the generic signatures {\tt SEQUENCE} and
+{\tt SEQ\_ORD}, which are matched by these structures.
+
+MonoVectors and MonoArrays can be extended to include parsing functions
+using the {\tt MonoVectorParse} and {\tt MonoArrayParse} functors.
+These take a MonoVector or MonoArray and a structure that matches the
+{\tt PARSE} signature, and produce structures that match the generic
+{\tt MONO\_SEQ\_PARSE} signature.  The type {\tt T} of the structure
+that matches the {\tt PARSE} signature must be the type of the elements
+of the MonoVector or MonoArray.  This is enforced by a sharing specification.
+
+\section{Library Conventions.}
+
+The previous section introduced the convention that types in
+library	entries can be referred to by the name {\tt T}, and showed how
+this is used to implement generic signatures.  This section describes
+some more conventions that make library entries
+consistent and therefore easier to use.
+
+\begin{description}
+  \item[\em Identifiers.]
+	We have already seen that structure and functor names are mixed
+	case, while signatures names are all upper case.
+	All words in alphanumeric identifiers are capitalised (as we have
+	already seen for structure names), except for two cases:
+   \begin{enumerate}
+    \item 
+	Alphanumeric labels and value identifiers (not including
+	constructors and exceptions) begin with a lower case letter.
+	This is so that values and constructors can be distinguished
+	easily.
+    \item As we have seen, signature identifiers are written in upper
+	case, with multiple words separated by underscores.  This is
+	a widely used convention, and is useful when writing about
+	structures and signatures in documentation or tutorial material.
+   \end{enumerate} 	
+	Apart from signature identifiers, alphanumeric identifiers never
+	include underscores.  Symbolic identifiers are only used for
+	functions or constructors, and then rarely.
+
+  \item[\em Infix functions.]
+	Functions that are intended to be used infix are declared as
+	such, with a suggested precedence, even though this status
+	doesn't propagate when a structure is opened.
+
+  \item[\em Currying.]
+	Nonfix functions are usually curried.  Entries don't usually
+	provide both curried and uncurried or infix versions of a function.
+
+  \item[\em Imperative functions.]
+	Imperative functions usually return the unit value.
+
+  \item[\em Exceptions.]
+	In the current entries, exceptions are only used to signal
+	exceptional circumstances, such as
+	a function called with unsuitable arguments.  If a function
+	sometimes returns a value and sometimes doesn't, then usually
+	its result type will be an instance of the {\tt Result} type
+	defined in the {\tt General} structure (and available globally).
+	Using these
+	types forces you to use a case expression instead of a handler to
+	check the result, which means that the compiler will report missing
+	cases.
+
+	However, this convention is not a hard and fast rule.  For example,
+	if someone wants to implement a version of the parsing
+	functions that raises an exception on incorrect input, they
+	may add this version to the library.
+
+	Exceptions usually return some information about the values that
+	caused the exception, and the name of the function in which it
+	occurred
+	(if more than one function can raise that exception).
+
+  \item[\em Equality.]
+	If an entry is defined over equality types, the name of that entry
+	usually begins with {\tt Eq}.  Sometimes there will be two
+	versions of an entry, one restricted to equality types, the other
+	taking an explicit equality function.  The {\tt Set} and
+	{\tt EqSet} entries are an example of this.
+
+	If an entry uses an explicit equality function, then this function
+	is passed to the functions that manipulate values of the type.
+	It is not passed to functions that {\tt create} values of the
+	type.  The latter approach can result in erroneous programs,
+	where two values have the same type but different associated
+	equality functions.
+
+  \item[\em Monomorphic types.]
+	Often the library includes both monomorphic and polymorphic
+	versions of an entry.  In such cases the monomorphic version
+	is implemented as a functor.  The result signature of the functor
+	is the same as that of the polymorphic structure, with the
+	monomorphic type substituted for occurrences of the polymorphic
+	type, and the elements type(s) substituted for the corresponding
+	type variables.
+
+  \item[\em Sharing.]
+	Most objects defined in a library entry are unique to that entry.
+	A few shared types are defined in the {\tt General} entry.
+\end{description}
+
+
+\section{Standard Names.}	\label{names}
+
+Many library entries define a type and operations on that type.
+These entries use several names in common, so that frequently-used
+operations are easy to remember.  (this was inspired by the SmallTalk
+and Eiffel libraries.)  It also means that the entries can be used with
+the generic signatures, as we saw in Section~\ref{generic}.
+
+\begin{description}	
+  \item[\tt eq, ne, lt, le, gt, ge.]
+		The comparison functions.
+  
+  \item[\tt fixedWidth.] 
+		True if the string representation of the type takes a
+		known amount of space (e.g. for Bytes).
+
+  \item[\tt string.] 	Converts an object to its string representation.
+
+  \item[\tt print.]	Prints the string representation of a value on an
+		outstream.
+
+  \item[\tt parse.] 	Converts the string representation of an object to that
+		object.
+
+  \item[\tt read.]		Like parse, but takes an InStream.
+
+  \item[\tt create.]	Create an object from components.
+
+  \item[\tt tabulate.]	Generate a sequence by applying a function to the
+		indices of the elements.
+
+  \item[\tt size.]		Return the number of elements in a sequence.
+
+  \item[\tt empty.]	Return true if a sequence is empty.
+
+  \item[\tt sub, nth.]	Return the nth element of a sequence.
+
+  \item[\tt extract.]	Return a subsequence of a sequence.
+
+  \item[\tt map, apply, iterate, iterateApply.]
+		Apply a function to each element of a sequence
+		(four variations of the basic idea).
+
+  \item[\tt foldL, foldR, foldL', foldR'.]
+		Combine the elements of a sequence to produce a single
+		value (four variations of the basic idea).
+
+  \item[\tt pairwise.]	Test that all adjacent pairs of elements in a
+		sequence
+		satisfy a binary predicate.
+
+  \item[\tt rev.]	Reverse a sequence.
+
+  \item[\tt \^{}.]	Catenate two sequences.
+\end{description}
+
+In addition, there is a convention for naming conversion functions --
+functions that convert values of one type to values of another type.
+If the function converts values of type {\tt X} to values of type
+{\tt Y}, and is defined in the entry {\tt X} that defines the type {\tt X},
+then the function is called {\tt X.y}.  Conversely, if the function is
+defined in the entry {\tt Y} that defines type {\tt Y}, then it is called
+{\tt Y.fromX}.  For example, the function to convert a vector to a list
+is called {\tt Vector.list}, and the function to do the opposite conversion
+is called {\tt Vector.fromList}.
+
+The rationale behind this convention is that functions are usually
+called by their qualified name, and the name of the structure is the same
+as one of the types in the conversion.  Therefore it's redundant to
+have both type names in the name of the function itself.
+
+  
+\section{Using the Make System.}	\label{make}
+
+The {\tt Make} system is used by the library to ensure that, when you load
+a new entry, all entries that the new entry requires are loaded first
+In addition, you can use {\tt Make} to minimise the amount of recompilation
+you do when you change your program.
+{\tt Make} works by keeping track of which pieces of your code depend on
+which others.  You must give {\tt Make} this information by annotating
+your code with special comments.  Then, when you tell {\tt Make} to compile
+a piece of code, it automatically loads any code that the new code requires
+that isn't already loaded.
+
+The dependency information is given by preceding each piece of code
+by a tag declaration in a special comment.
+Keeping the dependency information with each
+piece of code, instead of in a separate file like the {\small UNIX}
+{\tt make} command, makes it easier to keep the two in sync.
+Tag declaration
+comments are a subset of ordinary comments, so files containing them can
+be compiled without using make.
+
+Tag declaration comments begin with the string {\tt ($\mit\ast$\$} instead of
+the usual {\tt ($\mit\ast$}, and must start at the beginning of a line.
+Formatting
+characters are forbidden before and after the initial {\tt ($\mit\ast$} string,
+but
+are permitted between tags and dependencies.
+For example, the following tag declaration associates the tag {\tt Foo}
+with
+the code that follows it:
+
+{\tt ($\mit\ast$\$Foo $\mit\ast$)}
+
+\noindent
+The following tag declaration associates the tag {\tt Bar} with the code that
+follows it, and states that this code depends on the code associated
+with the tags {\tt Foo1} and {\tt Foo2}:
+
+{\tt ($\mit\ast$\$Bar: Foo1 Foo2 $\mit\ast$)}
+
+\noindent
+The code associated with a tag is terminated by the next tag declaration
+or the end of a file.
+
+The easiest way to consult the dependency information is to list
+the files containing the code in a file (called a tag file), and to call
+{\tt loadFrom} with the name of that tag file.  This loads all the
+dependency
+information into the make system.  If you change the dependency
+information, use {\tt consultDecl} or {\tt consultFile} to update the stored
+dependencies.
+
+Once the dependency information has been loaded, call {\tt make tag} to compile
+the code associated with the tag and all the code that it depends on.
+The system will write all the relevant code into a temporary file (called
+{\tt \%Make.tmp\%} by default) and call {\tt use} on that file.
+
+Once a piece of code has been read from a file, it is stored in a cache
+When the code associated with a tag is changed, call {\tt touch tag} to
+tell the {\tt Make} system that the current entry in the cache is obsolete.
+{\tt consultDecl} and {\tt consultFile} do this automatically for the tags
+that they read.  If a piece of code fails to compile, then that entry in
+the cache is automatically touched as well.
+The system does not check the modification dates of files.
+
+Once all the changed pieces of code have been touched, call {\tt again ()} to
+re-make your program.
+
+
+\section{Infix Operators.}
+
+This is the list of infix operators provided by the pervasives and
+by the library:
+
+\begin{tabbing}
+\hspace{0.3in}\={\tt infix  0 General.before}\\
+\>{\tt infix  1 Bool.or}\\
+\>{\tt  infix  2 Bool.\&}\\
+\>{\tt infix  3 o  Bool.implies}\\
+\>\hspace{0.5in}{\tt Combinator.oo  Combinator.co
+	Combinator.fby  Combinator.over}\\
+\>{\tt infix  4 =  $<>$  $<$  $>$  $<$=  $>$=}\\
+\>{\tt infix  5 Int.--}\\
+\>{\tt infixr 5 ::  @}\\
+\>{\tt infix  6 +  -  \verb+^+}\\
+\>{\tt infix  7 /  $\mit\ast$ div  mod  Int.divMod  Int.quot Int.rem  Int.quotRem}\\
+\>{\tt infix  8 Int.$\mit\ast\ast$ Real.$\mit\ast\ast$}\\
+\>{\tt infix  9 X.sub}, for most {\tt X}
+\end{tabbing}
+
+Note that @ associates to the right in the library.
+Remember that infix status is local to each structure.
+
+Equivalent curried functions for some of the above are as follows:
+
+\begin{tabular}{ll}
+  {\tt =}   &   {\tt X.eq}, for most {\tt X}\\
+  {\tt $<>$}  &   {\tt X.eq}, for most {\tt X}\\
+  {\tt $<$}   &   {\tt Int.lt, Real.lt}\\
+  {\tt $>$}   &   {\tt Int.gt, Real.gt}\\
+  {\tt $<$=}  &   {\tt Int.le, Real.le}\\
+  {\tt $>$=}  &   {\tt Int.ge, Real.ge}\\
+  {\tt @}   &   {\tt List.appendLast}\\
+  {\tt (,)} &   {\tt Pair.create}
+\end{tabular}
+
+
+\section{Future Entries.}
+
+The main aim of the library is to provide a framework for future
+development.  The only way that the library can grow is by users
+contributing code. 
+If you would like to add an entry to the library, please read
+Chapter~\ref{implement}.
+The following list suggests some entries that would be useful:
+
+\begin{itemize}
+  \item Trees, of various kinds, and implementations of maps etc. based
+on trees.
+
+  \item Regular expressions and substitutions over strings.
+
+  \item Lazy lists.
+
+  \item Complex numbers, rational numbers.
+
+  \item Stacks, priority queues, etc.
+
+  \item Tries.
+
+  \item Scanner generators, parser generators.
+
+  \item A portable, easy-to-use interface to host window systems.
+\end{itemize}

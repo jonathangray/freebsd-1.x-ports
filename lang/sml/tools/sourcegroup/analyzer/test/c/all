@@ -1,0 +1,153 @@
+----- Nov  5 16:33 1992  a0.sml Page 1
+(* types *)
+
+structure B = struct
+  type ('a, 'b) t = int * int * 'a * 'b
+end
+
+structure C = struct
+  type tt = int
+end
+
+structure A = struct
+  type x = int * C.tt
+end
+
+and D = struct
+  type q = (bool, C.tt) B.t
+end
+
+structure E = struct
+  type 'c r = {a:int, b:C.tt, d:bool*A.x*('c list)}
+end
+
+----- Nov  5 16:34 1992  a1.sml Page 1
+(* dec (ValDec ValrecDec FunDec)
+   exp (all)
+*)
+structure B = struct
+  val y = 4
+end
+
+structure C = struct
+  val a = 1
+  and b = B.y + 17
+end
+
+structure X = struct val x = 123 end
+
+structure A = struct
+  val a = ref 12
+  and x = B.y
+  and z = "foo"
+end
+
+and D = struct
+  val a = 1
+  exception Foo
+  val rec g = fn 1 => 1 | x => C.b + g (x-1)
+  fun f () = if (a = 4) andalso (C.a = 63) then B.y else X.x
+end
+
+structure E = struct
+  val a =
+    case A.x of
+       1 => (D.g (B.y))
+     | 2 => raise D.Foo
+     | _ => (D.f(); C.a)
+  val n = (D.a=1) orelse ((A.x:int) = 0)
+  fun g i = while ((!A.a) > i) do D.f()
+end
+
+structure F = struct
+  val b :{foo:bool, bar:int*int} =
+    let val a = (D.a, B.y) in
+      {foo=E.n, bar=a}
+    end
+  val c = #[4,B.y]
+end
+
+----- Nov  5 16:35 1992  a2.sml Page 1
+(* datatypes *)
+
+structure B = struct type b = bool end
+
+structure A = struct
+  datatype ('a, 'b) Map =
+     Empty
+   | Single of 'a * 'b
+   | Flagged of 'a * 'b * B.b
+  exception R
+end
+
+structure C = struct
+  val x :('a,'b) A.Map = A.Empty
+
+  exception E of B.b
+
+  val y =
+    case x of
+       (A.Single (_,_)) => (A.Empty; print "foo\n")
+     | _ => ()
+end
+
+structure D = struct
+  exception F = C.E
+end
+
+structure E = struct
+  exception X = A.R
+end
+
+----- Nov  4 14:37 1992  analyze.sml Page 1
+structure Traverse = TraverseFun (Scopes)
+
+structure a = struct
+  fun a filename =
+    Scopes.prScope (Traverse.traverse (Parse.parseSource filename))
+end
+
+----- Nov  5 16:20 1992  b0.sml Page 1
+signature A = sig
+  type t
+  structure M :sig val x:t end
+end
+
+functor F (A:A) = struct open A end
+
+structure B = F(struct type t=int structure M = struct val x:t=4 end end)
+(* B.M *)
+
+
+functor G (structure D:A) = struct open D end
+
+structure W = struct
+  type t=bool
+  structure M = struct val x:t=false end
+end
+
+structure K = G (structure D = W) 
+(* K.M *)
+
+structure L = F (W)
+(* L.M *)
+
+----- Nov 13 13:50 1992  err.sml Page 1
+structure Foo = end
+
+----- Nov  6 14:52 1992  why.sml Page 1
+(* You need to apply functors to analyze sml programs *)
+structure A = struct
+  structure B = F()
+  open B
+end
+
+----- Nov  5 11:13 1992  x.sml Page 1
+structure A =
+  let structure B = struct val x = 3 end
+      structure C = struct val y = B.x end
+  in
+    struct
+      val c = C.y
+    end
+  end

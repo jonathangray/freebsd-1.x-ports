@@ -1,0 +1,101 @@
+(* Copyright (c) 1992 by Carnegie Mellon University *)
+
+(* fun scan (operate :string -> string -> fileType -> unit)
+	    (map'options :mapOptions list) (dirname :string) :unit
+
+Iterate over all files in the directory dirname applying the function operate
+on each file (including directories and symbolic links).  Example:
+
+  fun print'name (dirname:string)(filename:string)(filetype:DirFile.fileType) =
+    (case filetype of
+       DirFile.DIR =>     print "   DIR: " |
+       DirFile.FILE =>    print "  FILE: " |
+       DirFile.SYMLINK => print "  SYML: ";
+     print dirname; print "/"; print filename; print "\n")
+
+  DirFile.scan print'name [] ".";
+
+In this example, the function print'name is applied to every file in
+the directory "." (the current working directory).  The result is a listing    
+of the directory ".", one line for each file, as shown here:
+  FILE: ./foo.sml
+   DIR: ./old-version
+  FILE: ./foo.sig.sml
+
+For each application of operate, three parameters are passed as in the call:
+(operate dirname filename filetype).  The pathname of the file is split into
+its directory name and filename (eg, "/usr/foo/bar.sml" => "/usr/foo" and
+"bar.sml") by Pathname.splitDirFile (see Pathname.doc).  The filetype is one of
+FILE, DIR, or SYMLINK.
+
+Any object (file, directory, or symlink) that is inaccessible (as
+denoted in the description of checkFile below) is silently ignored, and
+operate is not applied to it.
+
+The list map'options provides a way to modify the iteration in four ways:
+  ALPHA
+    Apply operate on files in increasing alphabetical order.  The default
+    is to apply operate on files in an unspecified order.
+  RECURSIVE
+    Apply scan recursively to subdirectories of dirname.  The default is to
+    not to descend into subdirectories.
+  FOLLOWDIRS
+    Follow symbolic links for directories. The default is to apply operate to
+    symbolic links.
+  FOLLOWFILES
+    Follow symbolic links for (non-directory) files.  The default is to apply
+    operate to symbolic links. *)
+
+(* fun fold (operate :string -> string -> fileType -> 'a -> 'a)
+	    (options :mapOptions list)(dirname:string) (acc:'a) :'a
+
+Similar to scan, above, except that it maintains a value as it iterates over
+the directory of files.  It works in a manner similar to the pervasive function
+List.fold.  It applies the function operate to the first file in the iteration
+and the value acc, resulting in a new value.  It continues to apply operate to
+successive files, passing the previous result as an argument to the next
+application.  The result of fold is the result of the last application of
+operate. *)
+
+(* fun timeModified (pathname:string) :int
+
+If the file denoted by pathname exists and is accessible, then this function
+returns its time of last modification in seconds.  Otherwise it returns 0. *)
+
+(* fun checkFile (dirname:string)(filename:string)
+		 (followdirs:bool)(followfiles:bool)
+	:((string*string)*fileType*bool)
+     => ((newdirname, newfilename), filetype, accessible)
+
+Creates pathname from dirname and filename.  The argument dirname must be
+non-empty.  The string "." indicates the current working directory.
+
+If followdirs, then follow symbolic links for directories.  If followfiles,
+then follow symbolic links for (non-directory) files.  In either case, if a
+symbolic link leads to another symbolic link, that link is recursively
+followed.
+
+If pathname is an accessible file or directory, the flag accessible is true.
+If symbolic links are followed, and following links leads to an accessible file
+or directory, the flag accessible is true.  If symbolic links are not followed,
+and the symbolic link itself if accessible, the flag accessible is true.  In
+all other cases the flag accessible is false.  An object may be inaccessible
+for any number of reasons (not distinguished) including the file doesn't
+exists, permission denied, or a remote file system is inaccessible.
+
+The filetype is one of FILE, DIR, or SYMLINK.  If symbolic links are followed,
+filetype will either be FILE or DIR. If the flag accessible is false, then
+filetype is undefined.
+
+If symbolic links are not followed, then newdirname = dirname and newfilename =
+filename. If symbolic links are followed to an accessible pathname,
+newpathname, then (newdirname,newfilename)=(Pathname.splitDirFile newpathname).
+If symbolic links are followed to an inaccessible pathname, newdirname and
+newfilename are undefined. *)
+
+(* fun listFiles (dirname:string)(map'options:mapOptions) :unit
+
+Lists all files, one per line, in the directory dirname. The argument dirname
+must be non-empty.  The string "." indicates the current working directory.
+The argument map'options modifies the iteration as described in scan above.
+*)

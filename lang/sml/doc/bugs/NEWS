@@ -1,0 +1,3627 @@
+-------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.93, February 1, 1992
+
+This release is mostly bug fixes. Considerable effort has been put
+into making the HPPA more robust.
+
+Bug fixes:
+
+489. exportFn image size too large
+593. Compiler bug from bad overload declaration
+671. visibility of parameter in functor signature
+673. failure of type propagation with higher-order functors
+674. System.Env.filterEnv raises exception IntmapF
+676. Out of order record field evaluation.
+677. memory leak
+679. "Compiler bug: addObject" while compiling the Edinburgh library
+680. Bad vertical alignment prettyprinting case expression.
+681. building on SGI Indigos with cc version 3.10
+682. excess newlines in compiler warning message
+683. Compiler bug: Extern: update_structure 2
+684. Compiler bug: checkList
+685. loss of line numbers loading with System.Compile
+686. floating-point divide by zero is broken on SGI
+687. src/Makefile is out of date.
+688. profiler doesn't compile
+689. Compiling lambda prolog fails with compiler bug "adjust_variable".
+690. maskSignals breaks interactive input
+691. Compiler bug: ModuleUtil: lookFormalBinding 1
+692. signal handling on 386 can dump core
+694. System.Compile.execute provokes compiler bug ModuleComp.getImport
+695. segmentation fault involving System.Ast
+696. Type system error in "includes" of signatures
+697. wrong Subscript exception in ByteArray
+699. "Compiler bug: ModuleUtil: lookFormalBinding 1" (secondary)
+700. wrong printing with toplevel vector pattern
+701. wrong types printed for top-level exception declarations
+703. betaexpand in cpsopt goes into infinite loop
+704. System.Unsafe.SysIO.access raises exception instead of returning false
+707. overloading in the profiler
+708. array too large
+
+-------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.92, November 18, 1992
+
+This is a prerelease version that is being made available for testing
+in preparation for the next public release, which is expected to
+be 0.93.  The public release should follow in about a month, depending
+on the extent of problems discovered with this version.  This is still
+a development version, but we think it is fairly solid.  The known
+bugs are listed in the openbugs and masterbugs files available in
+the ftp "working" directory at research.att.com.
+
+Ports:
+
+*  IBM RS6000 workstations under AIX by Lal George.  Use makeml option
+   "-rs6000 aix".
+
+*  AUX 3.0 on the Macintosh II family thanks to Thomas Eberhardt
+   (thomas@mathematik.uni-Bremen.de).  Use makeml option "-m68 aux".
+
+*  Mark Leone has improved Guttesen's I386 port and has provided support
+   for BSD/386, and Mach operating systems.  Use makeml options
+   "-i386 bsd", "i386 -bsd386", or "i386 mach".
+
+*  Andrew Tolmach has provided runtime support for the Sequent Symmetry
+   running under the Dynix 3 operating system.  Work is continuing on
+   support for the MP interface and for the Dynix/PTX operating system.
+   Use option "-sequent dynix3" with makeml.
+
+We hope to have a working port for HP-PA systems by 0.93.
+
+
+New Features:
+
+======================================================================
+* No more infixes in signatures
+======================================================================
+
+Infix directives in signatures are no longer recognized. This allows
+the parser to be more independent from the elaboration. The only thing
+it needs is an environment containing the top-level fixity bindings.
+The spurious TAB binding used to represent fixity information has
+disappeared.  The parser issues no complaints except when it detects a
+syntax error.
+
+If you took advantage of this unofficial feature, redefine the infix
+properties after each open of the structures concerned.
+
+
+======================================================================
+* Syntax trees
+======================================================================
+
+"Unelaborated" syntax trees are provided in the structure System.Ast.
+These can be produced from source text using System.Compile.parse and
+can be compiled using System.Compile.compileAst.
+
+
+======================================================================
+* Better Match and bind exception messages (Pierre Cregut)
+======================================================================
+
+If the file containing the definition of the binding or the match that has 
+caused the exception has been compiled with line numbers, then the reference
+System.errorMatch will contain a string giving the position of the failure
+at Runtime.  This information is automatically displayed at toplevel if the
+program aborts with an uncaught Match or Bind exception.
+
+
+======================================================================
+* Vector expressions and patterns
+======================================================================
+
+The notation #[e1,...,en] denotes a vector value.  Similarly
+#[p1,...,pn] is a vector pattern with element patterns p1 through pn.
+
+
+======================================================================
+* First-class environments
+======================================================================
+
+System.Env: ENVIRONMENT provides access to the environments used by
+the compiler.  See doc/compile.doc.
+
+
+======================================================================
+* Compilation interface
+======================================================================
+
+System.Compile: COMPILE provides access to basic compilation functions.
+See doc/compile.doc.
+
+
+======================================================================
+* Printing cyclic values
+======================================================================
+
+It is now possible to print values containing cycles because of the use
+of references or arrays.
+
+The object beginning the loop is printed as
+
+  <object> as %<number>
+
+and occurrences inside its definition are printed as %<number>.
+
+This feature can be turned off by setting the flag System.Print.printLoop
+(: bool ref) to false.
+
+
+======================================================================
+* Printing arrays
+======================================================================
+
+The contents of arrays are now printed.  Delimiters are [| and |] (the
+contents of vectors were already printed).  The array delimiters don't
+work for input.
+
+
+======================================================================
+* Print control
+======================================================================
+
+System.Print : PRINTCONTROL replaces System.Control.Print (which is
+temporarily retained and defined to be equal to System.Print).
+The definition of PRINTCONTROL is
+
+  signature PRINTCONTROL =
+  sig
+    type outstream
+    val printDepth : int ref
+    val printLength : int ref
+    val stringDepth : int ref
+    val printLoop : bool ref
+    val signatures : int ref
+    val pathnames : int ref
+    val out : outstream ref
+    val linewidth : int ref
+    val say : string -> unit 
+    val flush: unit -> unit
+  end
+
+Almost all printing by the SML system (except for some diagnostic printing
+that is normally disabled) uses System.Print.say.  The destination for
+printing can be changed by redefining System.Print.out.  For instance,
+
+  System.Print.out := open_out "/dev/null";
+
+will suppress printing.  System.Print.flush flushes output to the
+stream in System.Print.out.
+
+
+======================================================================*
+* Pretty Printing  (Konrad Slind)
+======================================================================
+
+There is a new facility for installing user-defined prettyprinters
+over (monomorphic) user-defined types for use by the top-level loop of
+the SML compiler.  The user can also directly use the prettyprinting
+functions provided in System.PrettyPrint.  See doc/prettyprint.doc
+for details.
+
+
+======================================================================
+* Higher-order modules (Pierre Cregut)
+======================================================================
+
+As an experimental extension of the module system, functors may now be
+defined in structures and functor signatures may be defined and
+referred to in structure signatures.  See doc/modules.doc.
+
+
+======================================================================
+* Info  (Pierre Cregut)
+======================================================================
+
+A utility in tools/info is now available for displaying information on
+bindings.  The file tools/info/info.sml contains the definition of a
+structure Info that provides two basic functions:
+
+- info: string list -> unit
+Takes the full path of an object and search informations on that
+object (same kind as what is displayed when the object was defined).
+
+- search: string -> unit
+Takes a string and looks for all visible bindings containing
+that string as a substring.  It walks through the full environment
+tree (i.e. top-level environment, top-level structures, their
+substructures, etc.).
+
+Example:
+
+- Info.info ["+"];
+val + : 'a * 'a -> 'a as + : int * int -> int + : real * real -> real
+
+infix 6 +
+
+val it = () : unit
+- Info.info ["Array"];
+structure Array :
+  sig
+    eqtype 'a array
+    exception Size
+    exception Subscript
+    val array : int * '1a -> '1a array
+    val arrayoflist : '1a list -> '1a array
+    val length : 'a array -> int
+    val sub : 'a array * int -> 'a
+    val tabulate : int * (int -> '1a) -> '1a array
+    val update : 'a array * int * 'a -> unit
+  end
+
+val it = () : unit
+- Info.search "compile";
+variable or constructor NewJersey.System.Compile.compile
+variable or constructor NewJersey.System.Compile.compileAst
+variable or constructor System.Compile.compile
+variable or constructor System.Compile.compileAst
+val it = () : unit
+
+
+======================================================================
+* makeml man page
+======================================================================
+
+A revised man page for makeml is provided in the doc directory.
+
+
+======================================================================
+
+
+Performance
+===========
+
+Space usage for compilation and user programs is significantly lower.
+Speed of generated code is somewhat slower, partly as a consequence of
+fixing some space safety problems.
+
+
+Looking Ahead
+=============
+
+After 0.93 the next big change is that the batch compiler will
+disappear and the SourceGroup separate compilation system will be used
+to compile the compiler.  A single type secure linkage mechanism will
+be used by the interactive top-level, separate compilation, and
+bootstrapping.  The System.Compile interface will change substantially.
+
+"Or" patterns will be supported (e.g. "fn ((nil,x) | (x,nil)) => x").
+
+
+
+Bugs fixed since 0.91
+=====================
+(see masterbugs for descriptions)
+
+657. vector values not prettyprinted
+661. prettyprinter -- Compiler bug: PPTable.install_pp
+663. gc loop on illegal character
+664. installing on Sony RISC NEWS (? not checked)
+665. Compiler bug: getSymbols on opening nonexistent structures.
+667. Compiler bug: getvars(STRdec)/fn opening a structure
+668. missing info in syntax error messages
+669. redundant rule added in some matches
+670. missing indicators in redundant match warning messages
+672. start() in i386 Mach
+-------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.91, October 26, 1992
+Added to this version are:
+
+- The runtime has been ported to AUX 3.0
+
+- New monomorphic weak pointer abstraction (see perv.sig and perv.sml)
+
+======================================================================
+Higher Order Functors
+---------------------
+A new "curried" notation for functor is available:
+
+  functor f <par1>....<parn> = <structure def>
+
+where <pari> is as usual :
+  (<id>:<signature>)
+or
+  (<signature body>)
+A corresponding functor signature can be defined by:
+  funsig f <par1> ... <parn> = <signature def>
+
+functor application is also available:
+
+  f (<arg1>) ... (<argn>)
+
+with <argi> as usual (structure def or structure body).
+
+The abstract syntax has been a little cleaned up to accomodate those
+new changes.
+
+strexp = ...
+       | AppStr of path * (strexp * bool) list (* application *)
+
+The boolean just states if the structure or just its body was given
+
+fctexp = ...
+       | FctFct of  {                     (* definition of a functor *)
+             params     : (symbol option * sigexp) list,
+             body       : strexp,
+             constraint : sigexp option}
+
+fsigexp = ...
+        | FsigFsig of {param: (symbol option * sigexp) list, def:sigexp}
+                                                  (* defined funsig *)
+
+The symbol option contains the name of the parameter if it was named.
+
+======================================================================
+Parser
+------
+Infix notations in signatures are no more recognised. This allows the
+parser to be more independant from the elaboration. The only thing it
+needs is an environment containing the top-level fixity bindings.  The
+spurious TAB binding used to represent fixity information has
+disappeared.  The parser issues no more complaints except if it
+detects a syntax error.
+
+If you took advantage of this unofficial feature, redefine the infix properties
+after each open of the structures concerned.
+
+======================================================================
+Printing
+--------
+It is now possible to print objects containing loops because of the use
+of references or arrays.
+
+The object begining the loop is printed as
+<object> as %<number>
+and its occurence inside its definition are printed as %<number>.
+
+This feature can be turned off by togling the flag 
+System.Control.Print.printLoop (bool ref) to false.
+
+The contents of arrays are now printed.  Delimiters are [| and |] (the
+contents of vectors were already printed).
+
+======================================================================
+Match and bind exception
+------------------------
+If the file containing the definition of the binding or the match that has 
+caused the exception has been compiled with line numbers, then the reference
+System.errorMatch will contain a string giving the position of the failure
+at Runtime. This information is automatically displayed at toplevel if the
+program aborts with an uncaught Match or Bind exception.
+
+======================================================================
+Info
+----
+A utility in tools/info is now available for displaying information on
+bindings.  The file tools/info/info.sml contains the definition of a
+structure Info that provides two basic functions:
+
+- info: takes the full path of an object and search informations on that
+object (same kind as what is displayed when the object was defined).
+
+- search: takes a string and looks for all visible bindings containing that
+string as a subpart. It walks through the full tree.
+
+Example:
+
+- Info.info ["+"];
+val + : 'a * 'a -> 'a as + : int * int -> int + : real * real -> real
+
+infix 6 +
+
+val it = () : unit
+- Info.info ["Array"];
+structure Array :
+  sig
+    eqtype 'a array
+    exception Size
+    exception Subscript
+    val array : int * '1a -> '1a array
+    val arrayoflist : '1a list -> '1a array
+    val length : 'a array -> int
+    val sub : 'a array * int -> 'a
+    val tabulate : int * (int -> '1a) -> '1a array
+    val update : 'a array * int * 'a -> unit
+  end
+
+val it = () : unit
+- Info.search "compile";
+variable or constructor NewJersey.System.Compile.compile
+variable or constructor NewJersey.System.Compile.compileAst
+variable or constructor System.Compile.compile
+variable or constructor System.Compile.compileAst
+val it = () : unit
+
+						-- cregut
+======================================================================
+
+Pretty Printing
+
+There is a new facility for installing user-defined prettyprinters
+over (monomorphic) user-defined types for use by the top-level loop of
+the SML compiler. The underlying algorithm is that of Oppen (1980).
+There are more expressive prettyprinting languages around, notably
+that of PPML, but the Oppen interface has the benefit of being
+efficiently implementable---it runs in constant space. Thus it is a
+good option for modest prettyprinting tasks that need to be quick,
+such as the printing of SML values.
+
+The high-level view is that the user will define a prettyprinter for a
+datatype and install it in a prettyprinter table.  When it comes time for
+the compiler to print a value, it looks first in the prettyprinter
+table, to see if a prettyprinter is installed for that type.  If so, it
+calls the prettyprinter on the value, otherwise, it calls the default
+printing routine.
+
+The Oppen algorithm provides a {\em block} abstraction:  a block
+establishes a level of indentation. Since blocks can be nested and
+offset from one another, levels of indentation can be achieved.  A block
+can be broken up by one or more {\em breaks}, which mark possible places
+to add carriage returns. There are two styles of block: CONSISTENT
+and INCONSISTENT.  If a consistent block does not fit completely
+onto the current line, a carriage return will be added after each
+component of the block.  If an INCONSISTENT block does not fit completely
+onto the current line, a carriage return is added after the last
+item that does fit on the line; this style of block conserves on
+vertical space.
+
+
+The Signature
+-------------
+
+The pervasive structure System.PrettyPrint has the following signature:
+
+signature PRETTYPRINT =
+sig
+  datatype break_style = CONSISTENT | INCONSISTENT
+  val begin_block : break_style -> int -> unit
+  val end_block : unit -> unit
+  val add_break : (int*int) -> unit
+  val add_string : string -> unit
+  val add_newline : unit -> unit
+  val reset_pp : unit -> unit
+  val flush_output : unit -> unit
+  val set_line_width : int -> unit
+  val set_pp_output_function : (string -> unit) -> (string -> unit)
+  val install_pp : string list -> ('1a -> unit) -> unit
+  val pp : (string -> unit) -> ('a -> unit) -> 'a -> unit
+  val pp_to_string : ('a -> unit) -> 'a -> string
+end
+
+datatype break_style = CONSISTENT | INCONSISTENT
+
+  This defines the type of breaks.
+
+val install_pp (path: string list) (ppfn: 'a -> unit) : unit  (* unsafe! *)
+
+  The first argument is a path designating a nullary type constructor in
+  the current interactive top-level environment.  This must be
+  generative, i.e. it must be a datatype or abstype constructor.  The
+  second argument is a prettyprinting function for that type.  Note that
+  this connection between the type constructor designated by the path
+  and the printing function cannot be enforced by type checking, so this
+  operation is unsafe.
+
+  The function ppfn is installed in the interactive system's
+  prettyprinter table and it will be used when printing values of
+  the designated type.
+
+  The facility will be extended to allow nonnullary type constructors
+  in the future.
+
+val pp (consumer: string -> unit) (ppfn: 'a -> unit) (v: 'a) : unit
+
+  This takes a value v and a prettyprinter function ppfn for the type of
+  v and applies the prettyprinter to the value, with the result directed
+  to the consumer function.  This is useful when one wants to prettyprint
+  values as a computation progresses, rather than just at the end.
+
+val begin_block : break_style -> int -> unit
+
+  This begins a new level of indentation, at the current offset from the
+  left margin. The first argument determines how the block is to be
+  broken. The second argument determines the new offset if the block
+  gets broken.
+
+val end_block ()
+
+  Prettyprinting reverts to the previous level of indentation.
+
+val add_break (size:int, offset:int): unit
+
+  Notify the prettyprinting engine that a carriage return is possible.
+  The argument to this function is a pair; the first member is the
+  size of the break, the second member is an offset. This
+  ``break'' offset is used for finer control over indentation than that
+  offered by the block offset. The current block style and the size of
+  the block determine what action is to be taken:
+
+    * block_style = CONSISTENT and the entire block fits on the
+    remainder of the current line: output size spaces.
+
+    * block_style = CONSISTENT and the block does not fit on the rest
+    of the line:  add a carriage return after each component in the block
+    and add the block offset to the current indentation level.  Each
+    component will be further indented by offset spaces.
+
+    * block_style = INCONSISTENT and the next component of the
+    current block fits on the rest of the line: Output size spaces.
+
+    * block_style = INCONSISTENT and the next component doesn't
+    fit on the rest of the line:  output a carriage return and indent to
+    the current indentation level plus the block offset plus offset
+    extra spaces.
+
+  size is taken into account when determining if there is enough room
+  to print the next component in the block.
+
+val add_string (s: string) : unit
+
+  Outputs the given string.
+
+val add_newline () : unit
+ 
+  Forces the output of a carriage return. 
+
+val set_line_width (line_width: int) : unit
+
+  Allows the user to change the prettyprinting engine's notion of how
+  wide the line is. This call re-allocates the token buffer used by the
+  prettyprinting engine, and so should only be called when
+  prettyprinting is not happening. The initial line width is 70
+  characters.
+
+val set_pp_output_function :(string -> unit) -> (string -> unit)
+
+  Prettyprinting eventually boils down to the output of strings; 
+  blocks and breaks are just instructions for artfully arranging the
+  strings. This function allows one to change the output function that
+  gets applied to strings. The returned value is the current output
+  function. The initial output function is
+
+      fn s => output(std_out,s).
+
+
+Example
+-------
+
+open System.PrettyPrint;
+     	
+datatype Num = Zero | Suc of Num;
+
+fun pp_Num Zero = add_string "Z"
+  | pp_Num (Suc n) = ( pp_Num n; add_string "'" );
+
+val _ = install_pp ["Num"] pp_Num;
+
+datatype Nexp
+  = Atom of Num
+  | Add of (Nexp*Nexp);
+
+fun pp_Nexp ne =
+    let fun pr (Atom a) = pp_Num a
+          | pr (Add(a1,a2)) =
+	      (pr a1;
+               add_string " +";
+               add_break(1,0);
+               pr a2)
+     in begin_block CONSISTENT 0;
+        pr ne;
+        end_block()
+    end;
+
+val _ = install_pp ["Nexp"] pp_Nexp;
+
+- val A = Add (Atom(Suc(Suc(Suc(Suc(Suc(Suc(Zero))))))),
+               Atom(Suc(Suc(Suc(Suc(Suc(Suc(Zero))))))));
+
+val A = Z'''''' + Z'''''' : Nexp
+- set_line_width 20;
+val it = () : unit
+- A;
+val it =
+  Z'''''' + Z''''''
+  : Nexp
+- set_line_width 10;
+
+- A;
+val it =
+  Z'''''' +
+  Z''''''
+  : Nexp
+- Add(A,A);
+val it =
+  Z'''''' +
+  Z'''''' +
+  Z'''''' +
+  Z''''''
+  : Nexp
+- 
+
+======================================================================
+
+Bug Fixes:
+449. poor error message for mismatching datatype spec
+469. infix precedence bound
+473. inadequate error message
+480. Exit status of makeml is 1.
+489. exportFn image size too large
+495. inaccurate emacs info file
+501. out of date yacc example code
+505. bad datatype definition accepted
+507. most negative integer causes compiler bug (see also 630, 632)
+511. dying on interupt with SIGEMT (same as 484, 518)
+513. not waiting for execute children
+517. type errors in examples/cat.sml
+532. squaring big real number dumps core on sparc (see also 638)
+536. twig out of date
+541. warnings while compiling runtime
+544. poor error message
+549. Match exception while compiling
+552. Error message line numbers from std_in (see also 575)
+553. incorrect syntax accepted (not a bug)
+554. unused token constructor QUERY
+566. An addition to sun2hp.el
+582. interaction of open declarations and eval_stream
+602. uncaught exception UnboundTable using System.Env.describe
+608. minor error in runtime
+609. include syntax
+610. changeLvars broken
+613. Compiler bug message on occurence of typevar in signature
+616. overloading versus user-bound type variable
+617. interpreter fails with "no default in interp"
+622. Bus error on DECstation 5000/200
+623. wildcard is equivalent to a serie of wildcards (see also 629)
+624. System.Env.filterEnv causes Compiler bug: copystat.
+625. Runbind exception still being raised.
+633. space leak
+635. byteArray.update and ByteArray.sub raise Ord
+636. Vector patterns don't work at top level
+638. subnormal numbers
+640. flakiness of System.Env (particularly filterEnv)
+642. Sourcegroup 2.1 dependency analysis fails (see also bug 649)
+643. building smld produces Compiler bug: DebugError: ...
+645. Compiler bug from bugs 183,228,343 code: CoreInfo.coreLty3
+646. module test tile mod14.sml fails with Compiler bug: ModuleUtil: getFctStamp
+647. PWR_2_CALLEESAVE not defined in some cases
+649. too strong optimization of datatype constructor (same as 642)
+650. Real.realfloor has wrong type
+651. System.Directory.cd fails on numbers as directory names
+652. Compiler bug: contmap enterv 123 building HOL
+653. VECTOR signature isn't pervasive (unlike ARRAY)
+654. System.Directory.cd fails on valid pathnames (same as 651)
+655. Compiling Isabelle-92 generates a bus error
+656. Excessive dead code
+657. vector values not prettyprinted
+658. Compiler bug: PrintVal.switch: none of the datacons matched
+
+xxx uncaught exception SpillFreemap in closure profiling
+-------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.90 September 22, 1992
+
+
+60 files changed and 16 new files were added to this version.
+
+---Bug Fixes---
+Appel:
+
+469	infix precedence bound 
+507 	most negative integer causes compiler bug (see also 630, 632)
+532  	squaring big real number dumps core on sparc (see also 638)
+541 	warnings while compiling runtime
+554 	unused token constructor QUERY
+566  	An addition to sun2hp.el (?)
+609 	include syntax
+617 	interpreter fails with "no default in interp"
+638	subnormal numbers
+
+Jhr:
+
+633	space leak bug 
+636  	top-level vector pattern bug 
+635	inline bytearray ops bug
+
+Cregut:
+623 	wildcard is equivalent to a series of wildcards (see also 629)
+646	test file mod14.sml fails with Compiler bug: ModuleUtil: getFctStamp
+642	Sourcegroup 2.1 dependency analysis fails
+
+---Changes---
+Jhr:
+
+	Made Real.abs an inline operation
+
+Zhong:
+
+      	The new cps/convert.sml now generates multi-argument cps escaping 
+      	functions and propagates the appropriate type information into the 
+      	back end if the System.Control.CG.representation tag is turned on.  
+      	The new cpsopt and closure modules dealing with multi-argument 
+      	escaping user and continuation functions are expected soon.
+
+Leone:
+	Rewrote Guttesen's Windows i386 code generator resulting
+	in a 20% reduction in code size and 25% improvement in running
+	speeds (at least on the SX chip). Ported the runtime to Mach
+	and BSD/386.
+
+Lal:
+	Removed the branch delayed architecture assumption from the
+	scheduler. Scheduling is now driven by latencies associated
+	with each instruction. (This change will affect anyone writing
+	a code generator.)
+
+	Implemented the RS6000 code generator. Some preliminary numbers:
+
+	All times in seconds.
+	--------------------------------------------------------------------
+		   IBM RS6000 (v0.88) | SPARC (v0.86)     | RATIO sparc/rs6k
+	==============================|===================|==================
+	Program:   compile  execute   | compile  execute  | compile  execute
+	------------------------------|-------------------|------------------
+	boyer  	    19.97     2.51    |  31.32    3.80    |   1.57     1.51
+	life	     5.51    22.39    |   7.90   22.13    |   1.43     0.99
+	k-bendix    14.59    16.39    |  24.69   25.67    |   1.69     1.57
+	simple      37.95    54.62    |  89.35   72.28    |   2.35     1.32
+	mandelbrot   0.90    23.88    |   0.90   30.24    |   1.00     1.26
+	lexgen      28.68    17.8     |  50.64   19.27    |   1.77     1.08
+	vliw       107.34    31.44    | 171.39   40.96    |   1.60     1.30
+	yacc       134.10     5.63    | 252.56    8.05    |   1.88     1.42
+	cml-sieve   24.09    25.75    |  38.92   39.60    |   1.61     1.54
+
+---Changed Files---
+all
+makeml 
+basics/access.sml
+basics/primop.sig
+boot/makemos.sml
+boot/math.sml
+boot/perv.sml
+build/index.sml
+build/linkage.sml
+codegen/interp.sml
+coder/coder.sml
+coder/machinstr.sig
+cps/cmachine.sig
+cps/convert.sml
+cps/cps.sml
+cps/cpscomp.sml
+cps/cpsopt.sml
+cps/expand.sml
+cps/generic.sml
+cps/limit.sml
+elaborate/elabcore.sml
+env/environ.sml
+env/prim.sml
+m68/m68.sml
+m68/m68ascode.sml
+m68/m68coder.sig
+m68/m68mcode.sml
+mips/mips.sml
+mips/mipsas.sml
+mips/mipsdepend.sml
+mips/mipsinstr.sml
+mips/mipsmc.sml
+modules/applyfct.sml
+parse/astutil.sig
+parse/astutil.sml
+parse/ml.grm
+parse/ml.grm.sig
+parse/ml.grm.sml
+print/printdec.sml
+runtime/MIPS.prim.s
+runtime/Makefile
+runtime/allmo.c
+runtime/cfuns.c
+runtime/cstruct.c
+runtime/exncode.c
+runtime/export.c
+runtime/fpregs.h
+runtime/linkdata.c
+runtime/ml_os.h
+runtime/ml_state.h
+runtime/run_ml.c
+runtime/signal.c
+runtime/sun2hp.el
+sparc/sparc.sml
+sparc/sparcas.sml
+sparc/sparcinstr.sml
+sparc/sparcmc.sml
+translate/inlineops.sml
+translate/tempexn.sml
+vax/vax.sml
+
+
+---New Files---
+rs6000/rs6000.sml
+rs6000/rs6000as.sml
+rs6000/rs6000depend.sml
+rs6000/rs6000glue.sml
+rs6000/rs6000instrset.sml
+rs6000/rs6000mc.sml
+
+i386/i386.sml
+i386/i386ascode.sml            
+i386/i386coder.sig              
+i386/i386glue.sml               
+i386/i386jumps.sig   
+i386/i386jumps.sml              
+i386/i386mcode.sml
+
+runtime/RS6000.prim.s
+runtime/I386.prim.s
+runtime/export-rs6000-aix
+
+-------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.89, September 4, 1992
+
+63 files were changed and 2 new ones added in this version 89.
+1 file (translate/mcopt.sml) is deleted from 88. 
+
+Main Changes:
+
+1) The intermediate lambda language (basics/lambda.sml) is modified to 
+   carry type information from the front end to the back end for the 
+   purpose of implementing representation analysis. This includes 
+   corresponding changes of abstract syntax, type checker, match compiler, 
+   linking interfaces between different modules, thinning interfaces, the 
+   translate module, and the convert module. The new flag System.Control.
+   CG.representations which activates representation analysis is currently 
+   turned off in this version. All type information are temporarily thrown 
+   away after the convert phase. 
+   
+2) A much cleaner and faster closure module closure.sml. The calleesaves 
+   and non-calleesavees are merged more elegantly; calleesaves 1 works
+   now; in compiling the compiler, the new closure modules is about 44%
+   faster than the old one in version 88.
+
+3) Fixes the following bug:
+   
+     461. overloading and weak polymorphism
+     539. weak typing bug
+     607. weak typing
+     612. bad lambda depth calculated in type checker
+     614. high-order-functor thinning-in
+     618. LOOKUP FAILS, Compiler bug: 110 in CPSgen
+     619. Compiler bug: Escapemap on xxxx
+     620. higher-order functor causes Compiler bug
+     621. polymorphic equality not eliminated as often as it should be
+     624. System.Env.filterEnv causes Compiler bug: copystat.
+     626. extra spaces in SPARC.prim.s
+
+--------------------------------------------------------------------------
+cps/closure.sml:
+cps/contmap.sml
+    A much cleaner version (than 87) by Trevor: the calleesaves and
+    non-calleesavees are merged more elegantly; calleesaves 1 works
+    now; the closure phase is about 30% faster than 86. 
+    Zhong merges the ebtest function in closure.sml into contmap.sml.
+    This results in another 18% speedup for the closure phase. 
+    Zhong fixed the single element closure problem and also the 
+    fillin bug. 
+
+--------------------------------------------------------------------------
+Mark's Changes:
+
+modules/applyfct.sml
+modules/abstractfct.sml
+elaborate/elabstr.sml
+basics/typesutil.sig
+basics/typesutil.sml
+runtime/SPARC.prim.s
+typing/typecheck.sml
+
+     Fixes the following bug:
+        461. overloading and weak polymorphism
+        539. weak typing bug
+        607. weak typing
+        612. bad lambda depth calculated in type checker
+        622. extra spaces in SPARC.prim.s
+
+--------------------------------------------------------------------------
+Pierre's Changes:
+
+elaborate/elabstr.sml:
+       same as Mark's changes. Fixes an old bug of type-checking. 
+       The local declarations in a top-level local were considered 
+       as top level.
+
+modules/applyfct.sml:
+
+     The thinning computed in the thinning of the argument = pair
+     parameter-parent. But what we want is the thinning of the
+     parameter only. This code extracts it.
+
+modules/instantiate.sml:
+
+     Except the pleasure of fixing a partial match, these changes provide 
+     a fix to a bug in functor signature instantiation. To instantiate the 
+     body, you need to give to elabstr a predicate identifying stamps 
+     belonging to the argument in the template body. The function provided 
+     so far was wrong because it didn't distinguished global stamps from 
+     local ones: e.g.,
+                 funsig f() = struct val x:int end
+     couldn't be instantiated correctly because it believed that int was 
+     declared in the argument of f. Having the right function is a little 
+     complex because the argument is the parameter + .... the parent, which 
+     is the body of the embedding functor and its argument and so on.
+
+env/environ.sml:
+
+     Getbindings was completely wrong. In fact the old version relied on
+     the assumption that there was a binding per symbol, so when you  
+     used it you could merge the list of symbols and the list of bindings
+     This is no more true, (we can have 0 (nothing found but no error 
+     raised in the filtering) 1 old case or 2 (an object and its fixity 
+     info)) So we keep the symbols with it. In fact fixity info are kept 
+     in a separate list.
+
+boot/system.sig
+boot/perv.sml
+parse/ast.sml
+./all
+
+     fixes the "exporting the AST" bug. see comments in ast.sml.
+
+--------------------------------------------------------------------------
+Zhong's Changes:
+
+./all 
+     Add transtypes.sml and transbinding.sml. And change the compilation
+     order of several files because of the new dependencies.
+
+absyn/absyn.sml
+     Change the definition of the abstract syntax, more specifically 
+      (1) VARexp of var ref * ty option  
+            if "var" has polymorphic type, "ty option" specifies its
+            corresponding type instance at this place; if "var" has 
+            monomorphic type, "ty option" is NONE.
+
+      (2) CONexp of datacon * ty option
+          CONpat of datacon * ty option 
+          APPpat of datacon * ty option * pat
+            if "datacon" has polymorphic type, "ty option" specifies 
+            its corresponding type instance at this place; if "datacon" 
+            has monomorphic type, "ty option" is NONE.
+
+      (3) FNexp of rule list * ty  
+            "ty" specifies the argument type of this function.
+ 
+      (4) RAISEexp of exp * ty 
+            "ty" specifies the result type of this RAISEexp.
+  
+      (5) VECTORpat of pat list * ty  
+            "ty" specifies the type of the contents in the vector. 
+
+      
+       Files affected by this:
+         absyn/printabsyn.sml 
+         build/index.sml 
+         build/linkage.sml
+         build/prof.sml
+         debug/debugger.sml
+         debug/dprintabsyn.sml
+         debug/instrum.sml
+         debug/queries.sml
+         debug/static.sml
+         debug/util.sml
+         elaborate/elabcore.sml
+         elaborate/elabutil.sml
+         elaborate/misc.sml
+         print/printdec.sml 
+         translate/mc.sml
+         translate/mccommon.sml
+         translate/nonrec.sml
+         translate/tempexpn.sml
+         translate/translate.sml
+         typing/typecheck.sml
+
+basic/lambda.sml
+     The new intermediate lambda language. More specifically,
+      (1) Add a notion of lambda type --- the new datatype lty. 
+          The translation from ML types to Lambda.lty is defined 
+          in translate/transtypes.sml and translate/transbinding.sml.
+          (for more doc, see basics/lambda.sml itself)
+
+      (2) Remove the record tag from the lambda language, add a new
+          constructor called VECTOR. This still distinguishes VECTOR 
+          and RECORD in translate phase. The lambda types for VECTOR 
+          and RECORD are different, one is BOXEDty while another is 
+          RECORDty.
+
+      (3) Add new constructors WRAP and UNWRAP.
+
+      (4) Add lty information into the dataconstr type 
+
+      (5) In FN(v,t,_), t is the type of v; in FIX(fl,tyl,_,_), tyl
+          is a list of types for fl; in RAISE(e,t), t is the result
+          type of the expression RAISE(e,t); in PRIM(p,t), t is the
+          type of the primitive p. 
+
+      (6) BOGUSty is a place holder.
+
+      Files affected by this: 
+        build/compile.sml
+        build/computil.sml 
+        build/evalloop.sml   
+        build/process.sml
+        codegen/interp.sml
+        codegen/lambdaopt.sml
+        codegen/opt.sml
+        codegen/reopen.sml
+        cps/convert.sml
+        translate/equal.sml
+        translate/inlineops.sig
+        translate/inlineops.sml
+        translate/mc.sml 
+        translate/mccommon.sml
+        translate/mcprint.sml
+        translate/reorder.sml
+        translate/translate.sml
+        translate/unboxed.sml
+
+basics/typesutil.sig
+basics/typesutil.sml
+     Add a function getRecTyvarMap : int * Types.ty -> (int -> bool); 
+     This function check whether a bound tyvar has occurred in some 
+     datatypes whose type constructor has an non-zero arity, e.g., 
+     'a list. This is useful for representation analysis. 
+
+boot/perv.sig
+boot/perv.sml
+build/batch.sml
+     Add a new flag System.Control.CG.representations used to turn on
+     or off all representation analysis code. 
+
+build/batch.sml
+build/boot.sml
+build/compile.sml
+build/computil.sml
+build/evalloop.sml
+build/process.sml
+     Add the inverseEnv to be part of the arguments in the function 
+     "process". InverseEnv is useful for finding out the type of an 
+     arbitrary lvar. Add a new function called gengetty in the 
+     computil.sml, this function returns a lambda type for each lvar.
+
+cps/convert.sml
+     Fix the bug 618 and 619. No CPS.SELp is allowed before cpsopt phase.
+     Partially add in the new converter which can take advantage of the 
+     type information when the System.Control.CG.representations flag 
+     is turned on. A new and cleaner convert module is expected in the 
+     next release.
+
+codegen/opt.sml
+     Change the linking interface, add appropriate type information
+     in the closestr and closetop functions.
+
+env/coreinfo.sig
+env/coreinfo.sml
+     Add a new coreLty reference cell which will tell you the type of
+     the module Core. This is useful to find the type of any components
+     in Core.
+
+env/invenv.sml
+     Add a Lambda.lty to the componantId type in the inverse 
+     environment. 
+
+env/environ.sml    
+     Change the function makeStaticEnv, VARbind is now also included
+     in the inverse environment. This is useful when given a lvar at
+     the linking interface, we need find out its static types. 
+     The function filterEnv now also takes the inverse environment. 
+     Originally the inverse is set to be empty.  
+
+env/prim.sml
+     Let the function "special" return true for all inline primops.
+
+modules/representation.sml
+     Change the representation of the thinning interface to 
+     add appropriate type coercions when doing signature matching. 
+ 
+     Files affected by this:
+        elaborate/elabstr.sml
+        modules/moduleutil.sml
+        modules/sigmatch.sml
+        translate/translate.sml
+
+modules/representation.sml
+modules/abstractfct.sml
+modules/applyfct.sml
+basics/printbas.sml
+translate/transbinding.sml
+     Add a "fullstr" field to the body of the raw functor FCT in 
+     representation.sml. This field records the body signatures 
+     of any arbitrary raw functors. This info is useful for the
+     representation analysis. 
+
+translate/transbinding.sml
+translate/transtypes.sml 
+     Add utility functions on the new lambda types lty. All front end
+     static information are converted by utility functions defined in
+     these files into lambda types lty.
+
+translate/mccommon.sml
+translate/mc.sml
+translate/tempexpn.sml
+     Add appropriate type information into the decision tree in the 
+     match compiler. Coercions are inserted whenever to DECON a 
+     polymorphic data constructor (DELTAPATH).
+
+translate/translate.sml
+     The new translate module which produces the new intermediate 
+     lambda language. While compiling the whole compiler, the time
+     spent in the translate phase in 89 is about same as that in 88.
+     Also the bug 621 is fixed.
+
+typing/typecheck.sml
+typing/typecheck.sig
+elaborate/elabstr.sml
+     Change the type-checker to produce the new abstract syntax tree 
+     annotated with type information. 
+     The typecheck function decType now not only does the typechecking 
+     but also modifies the abstract syntax which carries the appropriate 
+     type information into the translate module and the backend.
+
+--------------------------------------------------------------------------
+Summary:
+
+
+1 file (translate/mcopt.sml) was deleted from 88.
+2 new files (translate/transtypes.sml, 
+             translate/transbinding.sml) were added into 89.
+63 files were changed
+
+List of files changed:
+
+./all 
+absyn/absyn.sml 
+absyn/printabsyn.sml 
+basics/lambda.sml 
+basics/printbas.sml 
+basics/typesutil.sig 
+basics/typesutil.sml 
+boot/perv.sml 
+boot/system.sig 
+build/batch.sml 
+build/boot.sml 
+build/compile.sml 
+build/computil.sml 
+build/evalloop.sml 
+build/index.sml 
+build/linkage.sml 
+build/process.sml 
+build/prof.sml 
+codegen/interp.sml 
+codegen/lambdaopt.sml 
+codegen/opt.sml 
+codegen/reopen.sml 
+cps/closure.sml 
+cps/contmap.sml 
+cps/convert.sml 
+cps/cps.sml 
+debug/debugger.sml 
+debug/dprintabsyn.sml 
+debug/instrum.sml 
+debug/queries.sml 
+debug/static.sml 
+debug/util.sml 
+elaborate/elabcore.sml 
+elaborate/elabstr.sml 
+elaborate/elabutil.sml 
+elaborate/misc.sml 
+env/coreinfo.sig 
+env/coreinfo.sml 
+env/environ.sml 
+env/invenv.sml 
+env/prim.sml 
+modules/abstractfct.sml 
+modules/applyfct.sml 
+modules/instantiate.sml 
+modules/moduleutil.sml 
+modules/representation.sml 
+modules/sigmatch.sml 
+parse/ast.sml 
+print/printdec.sml 
+runtime/SPARC.prim.s 
+translate/equal.sml 
+translate/inlineops.sig 
+translate/inlineops.sml 
+translate/mc.sml 
+translate/mccommon.sml 
+translate/mcprint.sml 
+translate/nonrec.sml 
+translate/reorder.sml 
+translate/tempexpn.sml 
+translate/translate.sml 
+translate/unboxed.sml 
+typing/typecheck.sig 
+typing/typecheck.sml 
+
+(END OF NEWS.89)
+--------------------------------------------------------------------------
+
+-------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.88, August 14, 1992
+
+
+116 files were changed and 5 new ones added in this version.
+
+1) Added support runtime support for RS6000
+
+2) Closures are no longer created in the machine assembly files,
+   but are created in C (see cstruct.c)
+
+	- Lal	
+--------------------------------------------------------------------------
+
+1) Changed the representation of labels used by the scheduler.
+
+	- Andrew
+--------------------------------------------------------------------------
+
+1) Made vector into a primitive builtin type (to support typechecking
+   of vector patterns and exprressions).
+
+2) Removed uses of "syscall" in boot/perv.sml to improve portability.
+   Added additional functions to runtime/cfuns.c to support the
+   system calls that were previously implemented using syscall.
+
+3) Added a tag to the RECORD constructor in the lexp and cps datatypes.
+   This tag distinguishes records from vectors, so that vector expressions
+   of length 2 get the right tag (i.e., they don't get the pair tag).
+
+	- John
+--------------------------------------------------------------------------
+
+	Previously, when two user specified explicit type variables with
+the same name occured in the same scope with different weakness or
+equality requirements (i.e., both '1a and '2a in same scope), they were
+considered different variables.  This is no longer the case.  Such
+occurences now generate errors.
+
+	A spurious duplicate type variable message is no longer printed.
+
+	A new function, PrintType.tyvar_printname returns the print name
+of a type variable as a string.  I.e., "'1a", etc.  This is now used
+consistenly throughout the compiler to print out type variables.  This
+had the result of removing a few inconsistenes like user bound variables
+being printed without the U on the end and underscores not always being
+used correctly when System.Control.weakUnderscores was true.
+
+	- Mark
+--------------------------------------------------------------------------
+1) Change in the interface of CompileAst:
+
+CompileAst doesn't require anymore to have the information about the fixity
+of objects currently compiled because it rebuilds it and give it back
+in its result.
+
+Parse still gives back info about the fixity of objects compiled. It is
+necessary only if the parser is called immediately on other files.
+
+2) Changes in the treatment of signatures:
+
+The behaviour of include in presence of type redefinition has been changed.
+The redefinition of a type is authorised as long as it is not in conflict
+with the previous definition on arity.
+
+The purpose is to allow the inclusion of multiple signatures refering to a same
+type not yet defined.
+
+signature a = sig datatype 'a t = c of 'a val x: int t end
+signature b = sig type 'a t val y: bool t end
+signature c = sig type t end
+signature d = sig datatype 'a t = c of 'a end
+signature e = sig type 'a t val x: int t end
+
+signature b' = sig include a include b end	O.K.
+signature c' = sig include a include c end	error: arity of t
+signature d' = sig include a include d end	error: redefinition by datatype
+signature e' = sig include a include e end	error: redefinition of x
+
+3) first class environment:
+
+There is a new function filterStaticEnv: staticEnv * symbol list -> staticEnv
+System.Env.filterEnv takes care of infixes.
+
+4) bug fixes:
+
+- the Ast is always marked even if System.Control.markAbsyn is set to false
+so the compiler can give relevant error messages 
+- the printed name of types coming from a functor argument has been improved
+- no more second effect bug when an object defined by the specification of
+a functor body is in fact undefined in this body.
+- System.Symbol.makestring is fixed
+
+	- Cregut
+--------------------------------------------------------------------------
+1) Cleaned up and improved the pattern matcher.
+
+2) Allowed for vector patterns and vector expressions.
+   Vector expressions and patterns are introduced using #[.. ]
+
+3) Provided hooks for templates.
+
+	- Aitken 
+	  (more details to be provided.)
+--------------------------------------------------------------------------
+all
+build/debugger.sml -> debug/debugger.sml
+  Moved to a more convenient subdir.
+
+debug/debugger.sml
+dbguser/commands.sml
+dbguser/emacs.sml
+dbguser/interface.sml
+debug/exec.sml
+debug/motions.sml
+  Changed interface to interpolations.  Routine to set an interpolation now
+returns normally; dbguser/commands.sml then arranges to execute the
+interpolation immediately by performing a jump.
+
+all
+build/computil.sml
+build/evalloop.sml [new]
+build/inithooks.sml
+build/interact.sml
+cps/shareglue.sml
+debug/debugger.sml
+  Created a new EvalLoop structure to contain the guts of interactive
+loop processing.  Routines in this structure take a large parameter record.
+The Interact and Debugger functors now invoke these routines with 
+appropriate parameters.
+
+dbguser/commands.sml
+dbguser/interface.sml
+debug/bindings.sml
+debug/debugger.sml
+debug/instrum.sml
+debug/motions.sml
+debug/queries.sml
+debug/static.sml
+  Changes to support breakpoints at "fine-grained" events, not just the heads
+of coalesced event lists ("evn"s).  Instrumenter now produces an array of all 
+fine-grained events; type place (=int) point into this array.  
+Coalesced events are now represented as lists of places, and places are
+by query routines in dbguser/interface.sml. Last binding event numbers are
+no longer computed by instrum.sml nor stored by static.sml.
+
+debug/instrum.sml
+debug/static.sml
+elaborate/elabutil.sml
+parse/ml.grm*
+  VAL, VALREC, RAISE, LET, and LOCAL events are reported at more
+sensible locations; some additional marking of absyn is required.
+Events from rules automatically added to raise Match exceptions or
+complete handle matches are now located after last character of 
+previous rule, and are no longer returned by eventPlacesAfter/Before.
+
+all
+basics/symbol.sig
+env/env.sml
+debug/env.sml
+modules/tabify.sml [new]
+  Added support for debugger emulation of TABspaces, using
+functions in tabify.sml to convert ordinary module bindings 
+into TAB bindings.  TABspace is split into four sub-spaces for
+different module types.
+
+boot/perv.sml
+boot/system.sig
+codegen/interp.sml
+  Added cases to interpret SUBSCRIPTV, FSUBSCRIPTd, FUPDATEd, GETHDLR,
+and SETHDLR to the interpreter.  This required adding all five of these
+to System.Unsafe, and the latter two to the type-safe version of Inline.
+
+debug/debugger.sml
+debug/static.sml
+  Fixed problem with maintenance of current index.
+
+dbguser/debugperv.sml
+dbguser/hstore.sml
+  Fixed types of HistoricalArray functions.  
+  Removed tentative versions of HistoricalByteArray and HistoricalRealArray.
+
+modules/debugmod.sml
+  Fixed check for anonymous parameter name.
+
+debug/debugger.sml
+  Added type constraint case for ABSTYPEdecs.
+
+dbguser/load.sml
+  Revised and commented load sequence.
+
+	- Tolmach-------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.87, July 31, 1992
+
+cps/closure.sml 
+   Reverted to its state as of 0.85.
+
+runtime/SPARC.prim.s
+   Fixed function logb to return 0 on argument of zero.
+
+runtime/cfuns.c
+   Fixed bugs in ml_blast_out and ml_exec.
+
+All the other changes have to do with the debugger:
+
+build/interact.sml
+build/debugger.sml
+cps/nullglue.sml
+cps/shareglue.sml
+debug/interface.{sig,sml} (removed)
+m68/m68glue.sml
+mips/mipsglue.sml
+sparc/sparcglue.sml
+vax/vaxglue.sml
+
+A new file build/debugger.sml, defining a funsig DEBUGGER and functors
+BogusDebugger and RealDebugger, now controls "top-level" features for 
+the debugger.  It replaces the existing debug/interface file and code 
+that was originally folded into build/interact.sml.
+It uses the guts of interact and eval_stream in build/interact.sml, which
+have been factored out and exported as routines interact0 and eval_stream0.
+A DEBUGGER is now a parameter to IntShare; as before, the bogus version is
+used when debugger support is excluded.  The per-architecture glue modules 
+have been changed accordingly.
+
+env/dynenv.sig
+env/dynenv.sml
+env/invenv.sig
+env/invenv.sml
+
+  "Special" dynenv's and invenv's have been added to match special statenv's;
+they are used by the debugger's interactive loop.
+
+dbguser/userlevel.sml
+dbguser/load.sml
+makeml
+   
+  userlevel has been renamed to load, and makeml adjusted accordingly.
+
+debug/calctype.sml (removed)
+modules/debugmod.sml
+typing/dyntype.sml
+
+  File debug/calctype.sml has been replaced with two new
+files supporting type reconstruction.  debugmod.sml is mostly hooks for
+future.  dyntype.sml implements dynamic type reconstruction using callbacks
+to obtain static types of actual arguments to polymorphic functions.
+
+build/computil.sml
+build/interact.sml
+coder/coder.sml
+cps/cpscomp.sml
+
+  Changed signature of timemsg and added new utility function infomsg.
+
+absyn/absyn.sml
+absyn/printabsyn.sml
+boot/perv.sml
+build/index.sml
+elaborate/elabcore.sml
+print/printdec.sml
+translate/translate.sml
+
+   A new field ident is added to EBgen's to contain the expression to be
+written into the exception ref.   This is explicitly filled by elabcore
+to be the normal thing, i.e., the constructor name; translate now just
+translates the expression normally.  Under the debugger, instrum.sml 
+alters the ident field to be a record consisting of (name,time created).
+This allows the debugger to determine the type of the constructor argument
+and print it correctly if an uncaught exception occurs.
+File boot/perv.sml:exn_name has been altered to distinguish these two cases,
+(the definition of the Tags structure has been moved up to make it useable
+within PreLim.) Other files were changed to reflect adding ident.
+
+debug/*
+dbguser/*
+  Added proper support for signals and for user-interpolated code fragments.
+  Revised type reconstruction algorithm to obtain static types of arguments
+  via explicit type annotations rather than (partially) reconstructing them
+  at runtime.  Integrated support for most compiler changes since 
+  the late 0.60's  (but type reconstruction based on functor argument types 
+  still doesn't work).   Numerous bug-fixes.
+
+elaborate/elabstr.sml
+elaborate/frontend.sml
+build/process.sml
+build/compile.sml
+build/interact.sml
+
+  Added a "translate" pass to the parsing process, which occurs after
+elaboration but before type-checking.  This allows the debugger to insert
+explicit type constraints into the syntax to support dynamic type 
+reconstruction. Everywhere else, an identity transform is inserted.
+
+
+parse/ml.grm
+   Restored various forms of source marking that had disappeared since 0.75.
+
+build/process.sml
+   Added case to function comp to allow batch compilation of funsigs.
+
+util/arrayext.sml
+   Added new reset and refill functions; made minor efficiency hacks;
+   removed misleading comments on "where used".
+
+The following outdated or experimental files have been removed from 
+the release:
+
+dbguser/normperv.sml
+dbguser/system.sml
+dbguser/timeit.sml
+dbguser/usercommands.sml
+dbguser/userlevel.sml
+debug/bindings.sml.save
+debug/bogusdebug.sml
+debug/calctype.sml
+debug/commands.sml
+debug/historyio.sml
+debug/historystore.sml
+debug/instrumr.sml
+debug/interface.{sig,sml}
+debug/nstatic.sml
+debug/nkernel.sml
+debug/ninstrum.sml
+debug/nbindings.sml
+debug/nrun.sml
+
+
+Why:
+
+-------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.86, July 22, 1992
+
+From Appel:
+
+Beware that the sparc,m68,and vax mo files each contain only enough
+to build a self-compiler (batch or interactive), not a cross-compiler.
+Beware also that the mo.mipsb are as compiled by a slightly earlier
+version so you won't get fixed points equal to what's there.
+
+The last remaining vax in our department is down indefinitely,
+so I haven't tested the vax version (though the mo files are there).
+
+The profiler now works.  see src/profile/README.
+
+0.86 boots on the mipsb, sparc, and NeXT; and compiles itself on the mipsb.
+I haven't done other tests.
+
+Andrew's Changes from version 0.85 -> 0.86:
+
+cps/generic.sml, util/intmap.sig, util/intmap.sml:
+	Added new function "Intmap.clear" to delete all the entries
+	from an intmap; generic now calls this from time to time,
+	which cuts down greatly on its memory usage.
+
+mips/instrset.sml, mips/mipsmc.sml, mips/mips.sml, etc.
+	Made "register" an abstract type, so that it can be represented
+	more compactly and thus save space during scheduling.
+
+print/printdec.sml:
+	Added a space to a string that was being printed.
+
+cps/cmachine.sig, cps/generic.sml, mips/mips.sml, mips/instrset.sml,
+	sparc/sparcdepend.sml, sparc/sparc.sml, vax/vax.sml,
+	m68/m68.sml, runtime/MIPS.prim.s, runtime/SPARC.prim.s,
+	runtime/M68.prim.s, runtime/VAX.prim.s, runtime/callgc.c,
+	runtime/cfuns.c, runtime/run_ml.c:
+
+	The register masks no longer sit right before the back-pointer.
+	Instead, they are passed in a special register (on the stack
+	for the VAX) to the g.c. routine.  This will make it easier
+	(soon) to get rid of the backpointers entirely.
+
+cps/eta.sml:
+	Changed the uncurry optimization so that 
+		fun f(x) = let fun g(y) =  . . .
+	                    in g
+	                   end
+        won't be uncurried if g is recursive.  Surprisingly, this worked
+	in CPS; but it wasn't necessarily a useful optimization!
+
+runtime/signal.c:
+	Changed default handler for SIG_VTALRM per Tolmach's suggestion.
+
+runtime/M68.prim.s:
+	Made some changes that should have been made 
+	when version 0.84 with trapless g.c. was made.	
+
+basics/conrep.sml, boot/system.sig, boot/perv.sml, build/batch.sml:
+	Added a flag "newconreps" to allow compiling with the
+	new, more compact (but not quite Standard) constructor representations.
+
+coder/machinstr.sig:
+	deleted "eqtype register" which nobody used.
+
+cps/closure.sml: [Zhong Shao, modifying Trevor's changes to closure.sml
+		 listed below]
+	Eliminated closures of size one.
+
+cps/knownfiddle.sml, cps/cpscomp.sml:
+	New optimization, performed just before the closure phase,
+	tries to avoid fetching variables from closures unless they're
+	really needed.
+
+cps/expand.sml, cps/cpsopt.sml:
+	Improved "loop unrolling."
+	Also, get rid of loop-invariant arguments of loop functions.
+	If !System.Control.CG.unroll=false and CG.invariant=false
+	then it should be equivalent to the old way.
+
+profile/profile.sml, profile.profperv.sml, profile/script, profile/README
+	Code to be loaded into an interactive system to enable use
+	of the profiler.
+
+runtime/Makefile:
+	Added some missing dependencies.
+-------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.85, July 17, 1992
+
+Major user visible changes:
+
+    - The behavior of the type checker on flexible records has been
+fixed.  This required altering how flex records were represented
+internally.  Flex record types now in addition to having a weakness
+level, also have an equality flag and a depth level (used to determine
+when to generalize type variables).  This information is now displayed
+when flex types are printed.  Sample outputs:
+
+		{x:int,'a...}		1 field, x of int type,
+					not necessarily an equality type,
+					not weak
+		{x:int,''a...}		as above but an equality type
+		{x:int,'5a...}		as first one but at weakness
+					level 5
+		{x:int,'a...[3]}	as first, depth is 3.  The depth
+					information is only printed when
+					System.Control.internals is true
+					and the depth is not infinity.
+
+	The variable name before the "..." is to make it possible to
+tell when two types contain the same flex record.  This is necessary,
+for example, to tell where circularity occurs.
+
+    - As part of the fix to flex records, a new unifier has been
+installed.  The new unifier is somewhat better at preserving type
+abbreviations during unification.  Other minor differences may be
+noticeable causing slightly different but equivalent types to be
+returned.
+
+    - When expressions fail to type check, they are assigned type
+WILDCARDty (previously called ERRORty) which matches anything.  This
+allows type checking to proceed without causing redundant/spurious error
+messages.  This type used to print as "error".  It now prints as "_" to
+better reflect its meaning.
+
+    - Non-strict type abbreviations are handled differently to avoid
+some subtle bugs (see bug #'s 573 & 589 for example).  Whenever a type
+defined using a non-strict type abbreviation is entered, the non-strict
+arguments to the abbreviation are changed to wildcard types (_'s).  This
+effects nothing except internal processing and how the type prints out
+since those arguments go away anyway when the abbreviation is expanded
+out.  Example:
+
+		- type ('a,'b) FOO = 'a;	(* second arg. non-strict *)
+		type ('a,'b)  FOO = 'a
+		- fn x : ('a,'b) FOO => x;
+		val it = fn : ('a,_) FOO -> ('a,_) FOO
+
+    - type variables are now considered equal iff their name parts,
+weakness parts, and equality parts are equal instead of if their input
+forms where equal.  I.e., '01a and '1a are now equal whereas before they
+were not.
+
+    - the lexical definition of type variables have been changed to
+prevent confusing cases such as '_1a.  The grammar is now:
+
+	type_variable_name ::= '[']{weakness}{identifier}
+	weakness ::= _ | <number> | <empty>
+	identifier ::= <letter><alphanumeric(includes ', _)>*
+
+	Examples:
+		'a
+		''a
+		'_abc			(* this is same as '1abc *)
+		'45bc
+		'_this_is_weak
+		'not'this'one
+
+    - When System.Control.weakUnderscore is true, all type variables now
+have their weakness numbers (if any) replaced by "_" when printing.
+Previously this only happened for some type variables (the IBOUND ones).
+
+
+Major internal changes to the compiler:
+
+    - The representation of types (type ty) was reorganized.  The IBOUND
+case was made a type instead of a kind of variable since it is never
+instantiated and does not need equality, weakness, etc., information
+associated with it.  The FLEXRECORD case was made into a kind of
+variable from a kind of type since it does get instantiated and does
+need equality, weakness, etc., information.
+
+	Variable information was reorganized to put the common
+information (eq, weakness, depth) in the top level, instead of
+duplicated in each of the cases to make processing easier and more
+uniform.  ERRORty was renamed to WILDCARDty (see user changes for why).
+
+    - To implement fixing the non-strict type abbreviations, a new
+function TypesUtil.mkCONty was introduced.  This must be used to
+construct CONty types anytime the tycon could be a DEFtyc or an ERRORtyc.
+Failure to do this is an programming error.
+
+	This routine when given a DEFtyc takes care of changing the
+non-strict arguments to WILDCARDty's.  It does this using the strict
+field of the DEFtyc which is now a bool list instead of just a bool,
+telling exactly which arguments are non-strict.  When given an ERRORtyc,
+mkCONty returns WILDCARDty.  This causes ERRORtyc to have the proper
+matching behavior, etc.
+
+	Note that this change fixes many (unreported) internal bugs.
+This is because now expanding out type abbrievations and ERRORtyc's does
+not alter the set of type variables in a type.  This means that, for
+example, occurs checks can be done without needing to expand the type
+abbreviation.  Since WILDCARDty's match anything & esp. themselves,
+argumentwise comparison of two CONty's with the same DEFtyc is now
+legal.  Also, routines scanning down types should never have to deal
+with ERRORtyc anymore.
+
+    - UBOUND variable names no longer contain the weakness and equality
+info, only the name part.  (i.e., ''15abc has name "abc" instead of the
+old "'15abc")
+
+    - When a type constructor in a functor application fails to match
+the specification, an ERRORtyc is stored instead of the constructor.
+Specification matching has been fixed to allow WILDCARDty's to match
+anything, removing some spurious error messages that used to be produced.
+
+    - Two new utility functions were introduced:
+
+	listofarray in ArrayExt
+	zip2 in List2
+
+
+Bug fixes:
+    482. "constant" unary type abbreviations in signature matching
+    468. extra comma in printing unit record
+    521. type checking flex records
+    533. typing record types
+    569. failed type inference with flexible records
+    570. flexrecord equality types
+    571. no occurs check when instantiating flexrecords
+    572. unify doesn't update depth for flex record types
+    573. unifier detects spurious cycles with type abbrevs
+    580. compileUnit bug in separate compilation
+    588. wrong printing of flex records with no fields
+    589. occurs check with nonstrict type abbreviations
+    590. Some user type variable names are handled incorrectly.
+
+-------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.84, July 5, 1992
+
+Andrew's Changes June 1992:
+
+cps/expand.sml:
+	Changed into a two-pass algorithm:  First try ONLY loop
+	unrolling; then try everything else.
+	If !System.Control.CG.unroll=false then it should be equivalent
+	to the old way.
+
+boot/system.sig, boot/perv.sml:
+	Added new CG flag "unroll", doesn't do anything yet.
+	Moved things to Hooks that should have been there already.
+	Deleted the Profile and ProfileInternals structures.
+	Deleted System.Unsafe.isolate.
+
+build/interact.sml:
+	Made a local version of "isolate" that checks for escaping
+	top-level continuations.  (The old System.Unsafe.isolate
+	did that PLUS made sure extra variables didn't put in the
+	closure; the new safe-for-space system does that to every
+	closure automatically.)
+
+build/prof.sml, boot/loader.sml, build/interact.sml, build/computil.sml,
+runtime/run.c
+	New version of profiler no longer builds a lambda expression
+	that returns (executable,profileInfo).  Now only the executable
+	is returned; the profileInfo is automatically installed by the
+	executable itself when it is run.
+
+runtime/signal.c, boot/perv.sml, boot/system.sig
+	Added SIGPROF and SIGVTALRM as ML signals.
+
+blast_write returns size in bytes; blast_read now takes size in bytes:
+Note for compatibility:
+   fun old_blast_write(f,a) = (blast_write(f,a); ())
+   fun old_blast_read(f) = blast_read(f, can_input f)
+  
+
+codegen/lambdaopt.sml:
+Made lambdaopt accomplish what it has to do in one round instead of two.
+
+cps/cpsopt.sml:
+Eliminated the two rounds of contract before eta, no longer necessary
+given trevor's eta-optimization in convert.
+
+boot/math.sml
+improved speed and accuracy of sine and cosine (except on vax)
+
+boot/perv.sml:
+improved speed of doing input(f,k) for very large k from quadratic to linear
+	on NFS.  (Was already good on non-NFS filesystems)
+
+env/prim.sml:
+made INLUPDATE on integers avoid updating the store list
+
+cps/reorder.sml: moved to translate/reorder.sml
+
+translate/reorder.sml: see trevor's changes below; then I made it safe
+for space by never moving a SELECT to the right of an APP.
+
+build/computil.sml, coder/coder.sml, build/interact.sml, etc:
+Improved gathering of timing statistics for summary.
+
+
+Trevor's Changes June 1992:
+
+CHANGED build/computil to print out versions of lambda if saveLambda
+  is set.  There ought to be another flag for this.
+
+
+CHANGED codegen/opt.sml: the function closestr defined in opt.sml sets
+  up the header for the free structures referenced in a piece of
+  lambda.  But it didn't check for duplicates; I fixed this.
+  Also, the function "root" was duplicated as the function "last"; I
+  removed "last".
+
+
+Problem with codegen/lambdaopt.sml:
+  lambdaopt will never remove a select, even if the result is not used.
+
+
+LambdaOpt (codgen/lambdaopt.sml) is where the names of functions
+  are getting lost: if they are used only once, it inlines them,
+  completely losing the name (since functions are allowed to be
+  nameless in the lambda language).
+
+
+TO DO: at least rationalize the lambda printing a bit.  It shouldn't
+  be controlled by saveLambda; there ought to be another variable.
+  It would be nice if we could control just how far the compiler went
+  (have it stop at any phase) and control exactly which phases
+  do printing.
+
+
+CHANGED cps/convert.sml: Newly-introduced eta-redexes are reduced
+as soon as they are made, which makes the output of convert.sml 17% smaller.
+
+
+CHANGED translate/mc.sml and translate/mcopt.sml so that the function
+  for a rhs of a pattern which binds only one variable does not take a
+  record of that one value as an argument, but rather just the value
+  itself.  The change to mcopt was merely to a type definition, and the
+  changes to mc were minor, consisting of "special case" code in two
+  places, and some cleaning up.
+
+
+CHANGED cps/reorder.sml: always leave VARs, INTs, REALs, STRINGs alone
+  when they appear in records, never reorder APP(FN _,_) case.
+
+CHANGED translate/mcprint.sml: minor fixes.  Affected use of printLexp
+  in translate/mc.sml, possibly ought to change use of printLexp and
+  printFun in build/process.sml, build/computil.sml, codegen/reopen.sml.
+
+
+CHANGED runtime/MIPS.prim.s, runtime/cfuns.c, runtime/mask.h
+  to fix no-callee-save/no-share bug.   This bug also caused
+  the failure of 0.82 on the 68020.
+
+CHANGED boot/perv.sml: minor change to printing of parse time in
+  System.Stats.summary().
+
+CHANGED build/computil to charge codeopt for the time spent in
+  LambdaOpt.lambdaopt() and Reorder.reorder().
+
+
+CHANGED lots of files to modularize the cps stuff.  Previously the
+  convert phase was done in build/computil.sml, with some of the lambda
+  stuff.  I've removed it from there and put it in cps/cpscomp.sml.
+  There were lots of bogus changes because the types of signatures
+  changed.  A detailed list of changes follows:
+
+
+CHANGED cps/cpscomp.sml: cleaned up printing (messages, codesize,
+  and the cexp's).
+
+CHANGED build/batch.sml: removed duplicate flags printit and ifidiom.
+
+CHANGED cps/size.sml: to print total as well as cells, descriptors.
+
+CHANGED build/batch.sml: it now records codesize stat, just as does
+  build/interact.sml.
+
+CHANGED build/interact.sml: the function codegen was improperly
+  charging time to the codegen phase; all the timing stats are kept
+  in cps/cpscomp.sml.
+
+CHANGED all: no longer compiles cps/closure1.sml.
+
+DELETED cps/closure1.sml
+	(its functionality was merged into cps/closure.sml)
+
+CHANGED cps/cpscomp.sml: to get rid of ClosureCallee special case.
+
+CHANGED cps/profile.sml, cps/closure1.sml, cps/spill.sml,
+        cps/cpscomp.sml, build/batch.sml, all
+  Reimplemented allocation profiling; renamed profile.sml to
+  allocprof.sml.  The type of closeCPS and spill have changed; they no
+  longer take a profiling hook.
+
+CHANGED runtime/run_ml.c
+  To set up varptr for allocation profiling.
+
+CHANGED makeml
+  To add -g flag.
+
+CHANGED boot/perv.sml, boot/system.sig, build/batch.sml, cps/closure1.sml
+  Changed flag System.Control.CG.profile to System.Control.CG.allocprof.
+
+CHANGED boot/perv.sml, boot/system.sig, build/batch.sml, build/computil.sml,
+  Added flag System.Control.CG.printLambda.
+
+CHANGED boot/perv.sml: loop unrolling of @, map.
+
+CHANGED cps/generic.sml: moved code that counts known/escaping
+  functions into closure.sml
+
+CHANGED cps/contmap.sml, cps/freemap.sml: for closure changes.
+
+---------------------------------------------
+
+Interesting or useful things to do:
+
+Write paper about efficient cps conversion.
+
+Improve lookup in closure phase to make compilation faster.
+
+Measure register targeting to see if that's really the problem.
+
+Better optimize net size of callee-save continuations
+
+Do safe-for-space linked closures
+
+Fix Reppy's bug:
+	For each fix F defining an escaping function whose body
+	calls a known function h, inverse-eta-reduce h' in the same fix
+	  
+Do better register/closure allocation.
+
+
+-------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.83, June 12, 1992
+
+Higher Order Functors
+---------------------
+
+Functors can be declared inside structures. Therefore, they can be 
+arguments or results of other functors.
+
+Functors can be described by functor signatures. A functor signature
+is specified in the following way:
+
+funsig <ident>(<argument specification>) = <signature body>
+
+- <ident> identifies the name given to the functor signature,
+- <argument specification> specifies the formal parameters. It has
+  the same syntax as formal argument specifications in functors,
+- <signature body> is a regular signature body (i.e. either a
+  signature variable or a sig ... end expression).
+
+In signatures, functor signatures must be used to specify functor components.
+The syntax of a specification is the following:
+
+functor <ident functor>: <ident funsig>
+functor <ident functor> (<argument specification>) : <signature body>
+
+A functor can now be declared in two different ways:
+
+- full definition of the argument and the body:
+functor <ident functor> (<argument specification>): <optional signature body> =
+  <structure body>
+- restriction of an already existing functor:
+functor <ident functor> : <optional functor signature ident> = <functor ident>
+
+They can be used either at toplevel or inside a structure.
+
+Abstract syntax trees
+---------------------
+
+An external version of SML raw abstract syntax trees is now available.
+The corresponding datatype is defined in System.Ast .
+
+Two functions are provided to use it with the compiler. They are defined in
+System.Compile .
+
+- val parse       : source * staticEnv -> ast * staticEnv
+takes a source describing an input stream and gives back the ast of the
+expression contained with an environment containing informations about
+the infix variables defined.
+
+- val compileAst  : ast * staticEnv -> compUnit
+takes an Ast and an environment to interpret it and produces a compiled unit
+that can be executed.
+
+Infix annotations are built by the functions infixleft and infixright.
+
+
+New files to support higher-order functors and exported
+abstract syntax:
+  elaborate/elabcore.sig
+  elaborate/elabcore.sml
+  elaborate/elabsig.sig
+  elaborate/elabsig.sml
+  elaborate/elabstr.sml
+  elaborate/elabutil.sig
+  elaborate/elabutil.sml
+  elaborate/frontend.sml
+  elaborate/misc.sig
+  elaborate/misc.sml
+  elaborate/normalize.sml
+  elaborate/tyvarset.sml
+  modules/extern.sml
+  modules/modules.sig
+  modules/modules.sml
+  modules/representation.sml
+  parse/ast.sml
+  parse/astutil.sig
+  parse/astutil.sml
+
+Deleted files:
+  absyn/bareabsyn.sig
+  absyn/bareabsyn.sml
+  modules/sigmatch.sig
+  parse/corelang.sml
+  parse/misc.sig
+  parse/misc.sml
+  parse/normalize.sml
+  parse/parse.sml
+  parse/signs.sml
+  parse/strs.sml
+  parse/tyvarset.sml
+-------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.81, 15 May 1992
+
+**************************************************************************
+				WARNING
+**************************************************************************
+This is a development version of Standard ML of New Jersey.  As such it
+is untested and may be broken in various serious ways.  For instance, this
+version will not build on M680x0 based machines.  Use at your own risk.
+**************************************************************************
+
+
+   - New GC linkage mechanism summary:
+
+    limit checks only on minimum feedback vertex set
+    limit checks by conditional branch.  Address of saveregs at fixed 
+     position in stack frame.  Address of limit check in register 31 
+     (or %o7, or whatever).
+    Register "stdlink" used to pass address of any non-continuation escaping
+     function being called (also address of non-callee-save continuations
+     function code pointers).  For known funcs, stdlink can be used as 
+     ordinary register just like stdarg, stdcont, etc.  This eliminates need
+     for bltzal or call instruction to get program counter.
+    For callee-save continuations, the code address is passed in the stdcont
+     register (where it was already sitting).
+    The closure phase now makes the stdlink register an explicit argument,
+     so the arguments for standard non-continuations are:
+       stdlink stdclos stdarg stdcont [ calleesave1 calleesave2 ...]
+    and the arguments of standard continuations are:
+       stdcont stdarg  [ calleesave1 calleesave2 ...]
+
+
+
+  - made the objlength primop visible as System.Unsafe.objLength
+
+  - added the Fail exception to General
+
+  - restored "use" to General
+
+  - new primops for handling "special" objects (weak pointers and
+    suspensions).  Added the structure System.Unsafe.Susp for the
+    supporting suspensions, and removed force and delay from Unsafe.
+
+  - added gettag primop and modified polyequal to use it.  Polyequal
+    is now ready for the new GC.
+
+  - 'makeml sgi3', for SGI running IRIX 3.3.x and, 'makeml sgi'
+    for ANSI C conforming IRIX (i.e. 4.0.x)
+
+Bug fixes:
+    448. failure to build on MIPS 6280
+    488. wrong types in pervasives
+    498. bad function type in perv.sig
+    520. broken under IRIX 4.0.1
+    522. redundent patterns in compiler
+    546. System.architecture not initialized
+    551. large integers yield Illegal instruction
+    xxx. space leak.
+-------------------------------------------------------------------------
+Standard ML of New Jersey, version 0.80, April 2, 1992
+
+1. WARNING!!! -- Import gone.
+
+The "import" keyword and the old import-style separate compilation
+have been removed.  src/sepcomp no longer exists.  For separate
+compilation, use the new version of sourcegroup (V2.0) available soon
+from CMU.  This new version will rely on the new environment and
+compilation structures described below, as well as the new persistent
+stamps.
+
+
+2. First class environments
+   System.Symbol and System.Env have been added with signatures:
+
+    signature SYMBOL =
+    sig
+      type symbol
+      val valSymbol : string -> symbol
+      val tycSymbol : string -> symbol
+      val sigSymbol : string -> symbol
+      val strSymbol : string -> symbol
+      val fctSymbol : string -> symbol
+      val fixSymbol : string -> symbol
+      val name      : symbol -> string
+      val makestring: symbol -> string
+      val kind      : symbol -> string
+    end
+
+    signature ENVIRONMENT =
+    sig
+      type environment
+      type staticEnv
+      val emptyEnv     : unit -> environment
+      val concatEnv    : environment * environment -> environment
+      val layerEnv     : environment * environment -> environment
+      val staticPart   : environment -> staticEnv
+      val layerStatic  : staticEnv * staticEnv -> staticEnv
+      val filterEnv    : environment * symbol list -> environment
+      val catalogEnv   : staticEnv -> symbol list
+      val describe     : staticEnv -> symbol -> unit
+      val pervasiveEnvRef : environment ref
+      val topLevelEnvRef : environment ref
+    end
+
+The strings returned by Symbol.kind are a bit unwieldy.  They could be
+shortened, but it may be better to externalize the namespace datatype and
+have replace Env.kind with a namespace function.  See note on
+Environments and Compilation (doc/compile.doc).
+
+
+3. Compilation
+
+The new structure System.Compile provides the basic hooks for separate
+compilation.  These facilities should support a type secure
+replacement for the current batch compiler and should be used in the
+bootstrap process as well.  The signature is:
+
+    signature COMPILE =
+    sig
+      structure IO : sig type instream type outstream end
+      type source
+      type staticUnit
+      type codeUnit
+      type compUnit
+      exception Compile of string
+      val makeSource  : string * int * IO.instream * bool * IO.outstream -> source
+      val closeSource : source -> unit
+      val changeLvars : staticUnit -> staticUnit
+      val elaborate   : source * staticEnv -> staticUnit
+      val compile     : source * staticEnv -> staticUnit * codeUnit
+      val execute     : (staticUnit * codeUnit) * environment -> environment
+      val eval_stream : IO.instream * environment -> environment
+      val use         : string -> unit
+      val use_stream  : IO.instream -> unit
+    end
+
+Note that use and use_stream have been moved to System.Compile, which
+is not open by default.  An environment based eval_stream has been
+added.  These three functions use the top-level evaluation loop and
+can handle arbitrary ML input.  The other compilation functions
+(elaborate, compile, execute) handle only module declarations.
+
+NOTE: "use" has been bound at top level in the makeml startup script,
+but "use_stream" is not bound at top level and must be referred to as
+"System.Compile.use_stream."
+
+
+4. Dynamic environments.
+
+The implementation of dynamic environments (DynamicEnv in env/dynenv.*)
+is slightly incomplete.  The remove function is not fully implemented.
+This implementation is supposed to be replaced by a purely applicative
+version of dynamic environments.
+
+
+5. Persistent stamps.
+
+Persistent stamps have been implemented by Emden Gansner.  These allow
+open structures and functors (i.e. structures and functors with free
+references to other modules) to be separately compiled in a type-secure
+way.
+
+
+5. Top level loop.
+
+The toplevel loop in build/interact.sml has been simplified.
+Debugging hooks have been deleted and will have to be restored, one
+hopes in a cleaner fashion.
+
+The isolate function is still used.  It could possibly be simplified
+or eliminated, but the code to verify the top-level context of
+continuations is still necessary (see bug 145).
+
+The interface to the profiler could possibly be simplified.
+
+
+6. Changed files.
+
+The following files changed between 0.79 and 0.80.
+
+absyn/bareabsyn.sig
+absyn/bareabsyn.sml
+absyn/printabsyn.sml
+basics/basictypes.sig
+basics/basictypes.sml
+basics/symbol.sig
+boot/perv.sig
+boot/perv.sml
+boot/system.sig
+build/batch.sml
+build/boot.sml
+build/compile.sml
+build/computil.sml
+build/freelvar.sml
+build/index.sml
+build/inithooks.sml
+build/interact.sml
+build/linkage.sml
+build/process.sml
+codegen/opt.sml
+codegen/reopen.sml
+cps/shareglue.sml
+debug/env.sml
+env/coreinfo.sig
+env/coreinfo.sml
+env/dynenv.sig
+env/dynenv.sml
+env/env.sml
+env/environ.sig
+env/environ.sml
+env/invenv.sig
+env/invenv.sml
+env/prim.sml
+env/statenv.sig
+env/statenv.sml
+lex/ml.lex
+lex/ml.lex.sml
+modules/moduleutil.sig
+modules/moduleutil.sml
+parse/base.sml
+parse/ml.grm
+parse/ml.grm.sig
+parse/ml.grm.sml
+parse/parse.sml
+print/printdec.sml
+sepcomp/sepcomp.sml
+translate/translate.sml
+util/intmap.sig
+util/intmap.sml
+
+
+7. Building 0.80 booting from earlier versions
+
+Before compiling 0.80 with an earlier version of the compiler.
+
+1. comment out the body of the InitHooks functor in
+build/inithooks.sml.
+
+2. temporarilty redefine the Compile exception in the CompileUnit
+functor as
+  exception Compile of string
+
+3. temporarily redefine the topLevelEnvRef and pervasiveEnvRef
+variables as
+  val topLevelEnvRef : environment ref = ref emptyEnv
+  val pervasiveEnvRef : environment ref = ref emptyEnv
+
+After compiling with ~mBoot commented out, copy the Initial.mo,
+Math.mo, and CoreFunc.mo files from the earlier compiler into
+the new mo directory.  Then rebuild the batch compiler
+
+1. remove comments in build/inithooks.sml
+
+2. restore original definition of exception Compile in build/compile.sml
+
+3. restore original definitions topLevelEnvRef and pervasiveEnvRef in
+env/environ.sml
+
+4. remove comment from ~mBoot line in all file.
+
+and recompile.-------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.79, April 1, 1992.
+
+New object descriptor format
+
+Datatype representation optimization disabled
+
+New update primops
+
+fnegd and real primops
+
+Polyeq now knows that 0.0 and -0.0 are equal (because of new tags).
+
+
+limit checks now done by conditional branch instead of trap
+
+most known functions don't have limit checks (or backpointers,
+	       or register masks) any more.
+
+blast_write fixed to allow several sequential blasts to same file.
+
+-------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.78, February 26, 1992 (batch compiler)
+
+1. The mips code generator has been rewritten to use a machine 
+independent scheduler, with a novel algorithm for scheduling
+in the presence of span dependent instructions. The new code 
+generator is 41% faster than v0.77 and allocates 67% of the 
+memory allocated by v0.77.
+
+A summary of some important numbers when  compiling the compiler 
+upto parse/parse.sml on a mips magnum (walrus) is shown below:
+
+			   0.75      0.76     0.77     0.78	
+    ---------------------------------------------------------------
+    user time (sec)	    1278      2500     1268      901
+    sys time  (sec)	      18        33       19       18
+    gc time   (sec)	     370       601      310      302
+    minor collections	    2689      4506     3563     3365
+    major collections	      55        70       49       60
+    allocation (bytes)   8115828  17521624  9697719  6138500
+    code size (bytes)    1189392   1194924  1295172  1347912
+
+-------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.77, February 24, 1992 (batch compiler)
+1. Separate compilation:
+The compiler now supports the separate compilation of structures,
+and the loading of separately compiled modules containing free 
+references to other structures and functors.
+
+
+2. Fixed safe-for-space bugs. 
+The "bugs" were:
+
+	1.  improper hoisting in making "recordpath" optimizations in cpsopt
+	2.  improper hoisting, moving SELECT expressions downward in lambdaopt
+	3.  callee-save closure sharing
+
+The graph shows the amount of live data during each phase 
+of the compiler.  The input file is perv.sml.  The X's show the size 
+of live data at a major collection during the given phase; the vertical
+bars | show what happens in a different run with an improved version 
+of the lambdaopt and contract phases.
+
+The *'s show what happens when the executable code for the compiler 
+itself has been compiled using "safe-for-space" techniques.  
+
+	     each X represents 100 Kbytes of live data
+
+parse        XXXXXXXXXXXXXXX*XXX|
+semantics    XXXXXXXXXXXXXXX*XXX|
+translate    XXXXXXXXXXXXXX|XXX
+lamopt/cnvrt XXXXXXXXXXXXXXXXXX*XXXXXXXXX|XXX
+contract     XXXXXXXXXXXXXXXXXXXXXXX*XXXXXXXXXXXX|XX
+closure      XXXXXXXXXXXXXXXXXXXXXXXX*XXXXXXXXXXXXXXXXXXX|XXXX
+generic      XXXXXXXXXXXXXXXXXXXXXXXXXXX*XXXXXXXXXXXXXXX|XXXXXXXXXXXX
+assemble     XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX*XXXXXXXXXXXXXXXXX|X
+
+
+3. Data Representation Changes:
+
+In compiling the compiler, it appears that g.c. time goes from 
+846->788  (7% savings) and total execution time goes from 
+3839->2882 (25% savings).
+
+-------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.76, 10 October, 1991
+
+Beta reduction of functions called only once is performed
+on the lambda representation. Also functions never used are 
+eliminated. (See file codegen/lambdaopt.sml)
+
+The PRIMOP constructor for cps expressions has been broken
+up into BRANCH, SETTER, LOOKER, ARITH and PURE.
+(See the file cps/cps.sml)
+
+All frontend primop names have been capitalized. Some name changes have
+also been made, e.g. fadd is now FADDd ..., eql is now POLYEQL,
++ is now IADD, etc. (See file basics/access.sml)
+
+cmachine instructions cvti2d and fnegd has been introduced on all machines
+except the mips. (See cps/cmachine.sig)
+
+The real primop (int -> real) has been implemented in terms of 
+cvti2d but is not presently used. (See cps/generic.sml)
+
+Bugs fixed:
+
+455 - failure to handle Real.Div - sparc scheduling problem
+456 - corrupted heap with preemptive threads - error in callee saves fp regs.
+457 - type reported for Real.ceiling was wrong - no types for InLine.cast
+459 - infinite loop in signature matching
+460 - identical to 459
+-------------------------------------------------------------------------
+
+Standard ML of New Jersey, Version 0.75, 11 November, 1991
+
+Bugs fixed:
+451. sharing constraints
+453. unhandled exception crashes sml
+-------------------------------------------------------------------------
+
+Standard ML of New Jersey, Version 0.74, 10 October, 1991
+
+Changes since 0.70:
+
+  System.system now has the signature
+    val system : string -> int
+  where it returns the Unix status code of the sub-process.
+
+  The IO.execute function has a different signature and two forms:
+    val execute : (string * string list) -> (instream * outstream)
+    val execute_in_env : (string * string list * string list)
+          -> (instream * outstream)
+  The first of these allows command-line arguments to be passed
+  to the  program; the second also allows an environment to be
+  specified.  In both cases, the base name of the first argument
+  is prepended to the argument list.
+
+  The module system has been reimplemented.
+
+  Structure Compile added to pervasives to support Gene Rollins'
+  sourcegroups separate compilation system.
+
+Bugs fixed:
+253. SML Dumping core compiling mlyacc with -pervshare
+274. weakness lost with flex record pattern
+283. openread (run.c) checking
+294. weak polymorphic types
+306. list printing, printlength
+321. top level polymorphic exceptions allowed
+334. adjust_limit in M68.prim.s
+335. Dave Berry's library won't compile
+337. double error message
+342. execute destroys the unix-environment
+354. SIGILL bug on SPARC (actually fixed in 0.70)
+393. type abbreviations not transparent
+407. create_v_v for SPARC
+410. inlining property not preserved in simple renaming
+413. System and IO problems
+414. getWD wrong
+418. repeated type names in type declarations
+419. Runbind
+422. overflow on int to real conversion
+424. IO.execute on SPARC
+426. type printing
+427. Compiler bug: defineEqTycon/eqtyc
+431. ml_writev
+432. corrupted (shell) environment
+433. lexgen bug
+435. patrow syntax
+439. lexgen
+441. parsing large positive integers
+444. large constants and Overflow
+447. identity type abbreviation
+
+----------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.73, 10 September 1991
+
+Changes since 0.70:
+
+Arrays now follow the new "standard" agreed on by all implementors:
+structure Array is no longer open by default, sub must be infixed
+by the user. There is also a new Vector structure for immutable arrays.
+See doc/array. Floating arrays have been implemented.
+
+Two new primops have been added to support floating arrays 
+and an assembly routine for vector creation.
+
+The module system is internally rewritten, and should be more
+robust and efficient.
+
+System.Control.timings used to print timings
+under the title 'codegen:' twice. One was really generic 
+and the other was the sum from convert through to the end 
+of scheduling/backpatching. The first is renamed to be 'generic:'.
+
+Large number of changes have been made to the runtime system
+to support multiprocessing. The main change is that all runtime 
+globals have been added to the MLState vector. A pointer to the  
+MLState vector is saved on the stack and is now passed as an 
+arguement to all the runtime routines  that uses its components.
+
+Multiprocessing specific support routines (e.g., g.c.) have 
+been added.
+
+
+Bugs fixed:
+
+4. duplicate specifications not checked
+242. incorrect forward referencing allowed
+267. sharing again
+276. overriding included value spec
+277. incorrect "inconsistent equality property" error
+280. included infix specs not printed
+281. Import bombs out when it can't find files.
+296. patch for HP/MORE
+301. Compiler bug: tycPath
+303. bad error reporting
+304. SIGEMT on sparc
+307. signature matching in 0.69
+319. bad weakness degree (not weak enough)
+324. bulletproofWrite dies in a bad way when out of disk space
+330. comments bug
+349. function names in FUN not checked for uniqueness
+359. indexing 
+361. Error: Compiler bug: Functor.applyFunctor.insttyc
+365. fixed size of tuples causes bug
+366. lookahead
+368. missing exceptions
+369. bug in MLYACC
+370. Wrong definition of div & mod in perv.sml
+373. bug in printing fully qualified structure names
+374. mod overflows on some negative numbers
+377. prop.sml has bug
+378. Error: Compiler bug: Functor.applyFunctor.redoTycs 1
+382. missing \n on infix echo
+383. open in nested structures fails with "Runbind"
+386. printing bug with abstype
+391. truncate
+400. problem parsing weak types
+404. std_out not flushed on read from std_in
+405. identifiers starting with underscores are incorrectly allowed
+406. funny signatures in 0.71
+
+--------------------------------------------------------------
+Standard ML of New Jersey, Version 0.70, 1 July 1991
+
+Changes since 0.69:
+
+Support for NeXT version 2.0.  
+
+Callee-save registers (for 7% better performance on MIPS and 18% on SPARC).
+
+In-line array update and subscript (for 25% better performance on
+"real" programs that use arrays; program that do nothing but array accesses
+are twice as fast).
+
+Experimental new primitives "getvar" and "setvar" intended for use
+in multiprocessor versions of SML/NJ.
+
+Bug fixes:
+86. incorrectly allows redefining of "="
+221. profiling broken
+272. generalizing user bound type variables
+276. weak polymorphism
+286. Compiler bug: inststr NULLstr
+308. Mips RC6280 code generation bug  (but 6280 still has other problems)
+309: NeXTstation exported image doesn't work
+320. bad weakness degree (too weak)
+347. dec function in fastlib wrong
+348. connect_inet bug 
+351. gc messages bug
+352. gc statistics bug
+363. bug in 0.69 interpreter
+364. bug in lexgen doc
+380. regbind compiler bug
+384. signal handler never re-installed
+389. stats 
+397. Unsafe.update with constant
+Various flake-outs with ML signal-handlers have been fixed.
+---------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.69, 3 April 1991
+
+Changes since 0.66:
+
+Floating-point programs should run twice as fast (thanks to Lal George).
+
+Conforms more closely to the syntax in the Definition, so that
+1+if... doesn't work anymore; use parentheses:  1+(if...)
+Similarly for "case" and "fn".
+
+New primitives "capture" and "escape" that are like callcc
+and throw but do NOT preserve the exception handler of the saved
+continuation.  
+
+Hexadecimal integer literals like 0x5e48.  
+
+Lots of minor bug fixes:
+
+231. equality property of DEFtyc
+243. include compiler bug
+288.  extraneous "match not exhaustive" warning
+289. 0.65 prerelease  core dumps
+295. Compiler bug: r_o in mcopt
+300. uncaught exceptin RegBind
+305. Strange floating point error
+311. abstype bug
+318. rebinding of type operator "*"
+326.  very big arrays
+327. large constants cause overflow in compilation
+328. callcc not tail recursive
+329. checkopen broken
+331. type variable generalized wrongly
+333. code generation bug
+339. type = allowed
+357. import broken
+358. import & pervasives
+362. missing primop in interp
+367. Decstation mach recompolation to m68
+372. open in signature causes compiler bug
+375. overflow bugs
+376b. parsing
+385. SIGHUP, SIGQUIT, SIGTERM ignored sometimes
+387. arrays on Sparc
+388. * as label of record
+392. two type constraints
+394. strange message in 0.66 typechecker
+396. unbound variables should have type ERRORty
+399. Vax dumps core
+401. Imperative types in SML/NJ 0.66
+403. 0.0/0.0 not properly handled
+---------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.66, 2 October 1990
+
+Changes since 0.65:
+1) added exception Interrupt to General.  This was done so that programs
+  that use Interrupt in patterns won't break.  The exception is NEVER
+  raised by the run-time.  The signals mechanism should be used to handle
+  SIGINT, but see doc/SIGINT for a simple way of modifying a top-level
+  loop to deal with SIGINT.
+
+2) added the function "pause" to System.Signals.  This is essentially the
+  UNIX sigpause(2) system call.  It blocks SML until a signal occurs.
+
+3) The BASICIO signature (which was empty) was removed from perv.sig.
+
+Bug fixes:
+
+275. illegal token with structure named ?
+277. incorrect "inconsistent equality property" error
+279. big integers causing uncaught exception
+287. cosine function incorrectly defined
+---------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.65, 10 September 1990
+
+New features:
+
+A new outstream, std_err, has been added to the IO structure.  It is
+connected to the standard UNIX error stream.
+
+There is now a general mechanism for handling UNIX signals.  The file
+doc/papers/ml-signals.ps is the postscript for a paper that describes
+the mechanism (Cornell University TR 90-1144).
+
+Bugs fixed:  (complete descriptions are in doc/masterbugs)
+223. nontty standard input and uncaught exceptions
+232. user bound type variable in exception declaration 
+234/261. Compiler Bug: abstractBody.abstractType 1
+235. repeated type variables in typdesc and datdesc
+241. sharing constraint error ignored
+244. compiler bug on product of large integer constants on SPARC
+245. NeXT installation problem
+247. close_out std_out [not considered a bug]
+250. interpreter broken
+251. omits tests for repeated bindings
+255. space leak with redeclaration of variables
+256. mcopt compiler bug with improper function definition
+258. System.Directory.cd failure
+262. Using the LIBRARY with v0.62 (Runbind)
+263. problem with input via datakit con
+265. strong type variables accepted in exception declarations
+266. Io exception raised by "use"
+268. import, equality
+269. failure in abstractBody with embedded signature
+270. Compiler bug: TypesUtil.lookTycPath: NULLstr 
+271. secondary compiler bug
+
+---------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.64, 25 August 1990
+
+The compiler and user programs should use a bit less memory, as the
+collector finds more garbage.  Compilation is faster, and there
+are significant performance improvements in the SPARC and MIPS code
+generators.
+
+A preliminary version of the ML debugger, thanks to Andrew Tolmach,
+is released with this version.  See doc/debug and lib/emacs for
+details.  Warning:  using the debugger increases memory requirements
+and compilation time substantially.
+
+Bugs fixed:  (complete descriptions are in doc/masterbugs)
+12. loss of information in value printing
+182. uncaught exception after exportFn
+185. exportML size  (negative percentages in g.c. messages)
+186. type error matching against bogus tycon
+205. performance problem with many opens in a structure
+208. bug in optimizer causing bad free variable
+213. equality on int*int  (new with 0.56)
+214. Compiler bug: EnvAccess.lookPath when printing  (new with 0.56)
+215. sin gives incorrect values
+216. floating point on SPARC
+217. simultaneous opens  (new with 0.56)
+218. compiler bug after unbound variable  (new with 0.57)
+220. Match exception after error
+225. import broken in 0.59
+227. equality property of datatypes
+230. printing reals on mips
+231. equality property of DEFtyc
+233. opening locally declared structure causes Runbind
+236. Mach problems in 0.59
+237. Can't parse most-negative integer constant
+238. div is unreliable at extremes
+239. INCONSISTENT exception raised in sharing analysis
+240. concrete printing of abstype value
+243. include compiler bug
+248. abstract types are not abstract
+249. separate compilation printing problems
+252. include broken in 0.59  (simplified version of 243.)
+254. failure to detect type error
+260. failure to raise overflow
+
+---------------------------------------------------------------------------
+Standard ML of New Jersey, Version 0.56, April 1990
+ 
+The system now runs on MIPS-based computers: 
+	- MIPS computers running RISCos    (makeml -mips -riscos)
+	- DEC 5400, 3100, 5800, etc. running Ultrix  (makeml -mips -bsd)
+	Thanks to Norman Ramsey for this implementation.
+
+Installation note:  The makeml script has changed slightly; look at makeml.1.
+
+We have re-arranged our initial environment to conform better to
+the Definition of Standard ML.  In particular:
+
+Arithmetic exceptions:
+	Sum, Prod, Diff, Neg, Exp, Floor are all equivalent to Overflow
+	Div and Mod are equivalent, distinct from Overflow
+	Ln is a distinct exception; Sqrt is a distinct exception	
+   The exception "Real of string" is gone.  Real overflows raise Overflow,
+	real underflows return 0.0 with no exception, and real divide-by-zero
+	raises Div.
+Div and Mod:
+	Now work according to the definition, but are much slower.
+	The old (faster, rounding towards zero) behavior can be had
+	by using the new infixed operators, "quot" and "rem".
+Input and output:
+	The functions input and output are now uncurried:
+		output: outstream * string -> unit
+		input:  instream * int -> string
+	There are two new functions:
+		outputc =  curry(output)
+		inputc:   a curried input function, but with a difference:
+			inputc f n 
+			returns "" on end-of-stream, and otherwise
+			returns a string of length k, 0<k<=n,
+			depending on what is available and convenient.
+
+Remaining deviations from the Definition:
+
+- The arithmetic overflow exceptions are all identified (see above).
+- Strings carried by the Io exception are more informative in SML-NJ.
+- Different right-associative operators of the same precedence
+	associate to the right in SML-NJ.
+- The @ operator is right-associative in SML-NJ.
+- "local" and "open" specs in signatures have a different semantics
+		(see doc/localspec)
+- The symbol "=" can be re-bound (though usually you get a warning message)
+- The construct   val ... and rec ...   is not permitted; the "rec"
+	must immediately follow the "val".
+- The Definition prohibits some, but not all, signatures that could
+	never be matched by any structure.  We are more liberal about
+	such signatures.
+- The initial basis is a superset of the one described in the Definition.
+
+The System structure in the initial environment has been re-arranged
+slightly; see src/boot/system.sig.  In particular, "cd" is now
+accessible as System.Directory.cd.
+
+We know of two operating system bugs:
+        A floating point exception will hang the machine in Ultrix V3.1A 
+   (Rev. 26) on the DEC 5400. This is an older release of Ultrix, 
+   and newer versions fix the problem.
+        The "select" system call is unreliable on pipes in RISCos 4.20;
+   as a result, you may have to press carriage-return after control-C
+   to generate an interrupt.  We have reported this bug to MIPS.
+
+Bugs fixed:  (complete descriptions are in doc/masterbugs)
+
+26. export ML within a use
+36. overloading resolution and order of recursive definitions
+40. Exception aliasing (match compiler)
+46. equality type checking and flexrecords
+68. spurious error message -- doesn't match sig spec
+69. printing of exn spec in inferred signature
+70, 204.  constructor shouldn't appear in printed structure signature
+72. equality types with abstype declarations
+80. simultaneous type declarations
+85. bad error message for failed signature match
+101. Duplicate labels (in either types or values) are not detected
+102. One-tuples are not printed sensibly.
+103. Space missing in an error message (which might be more informative).
+104. Labels with leading zeroes should not be accepted
+106. Something strange is happening with "it".
+107. NJML disappears ... when trying to parse large real numbers
+108. More faulty error recovery?
+109. sharing of datatypes not handled properly
+117. sharing and equality attributes
+118. deviation from Definition, div and mod
+119. deviation from Definition  (input and output curried)
+122. Unimplemented parts of Standard  (let and local for structures)
+123. error recovery
+124. compiler bug after incomplete qualified identifier
+126.  scope of explicit type variables
+127. sharing and equality types
+128. question mark as reserved word
+133. overloading resolution is weaker than Edinburgh SML or Poly ML
+135. eqtype vs abstype
+138. numeric labels not equivalent to tuples
+140. comment to end of file  (see also bug 64)
+141. interrupting gc dumps core
+151. can't limit length of list printed
+       System.Control.Print.printLength : int ref  
+       now controls number of elements printed in a long list.  Default is 12.
+153. interrupting coroutine loop dumps core
+155. Compiler bug caused by of missing structure
+160. errorty fails to match sig spec 
+167. repeated bound type variables in type declaration
+169. inferring eqtypes in signatures
+171. illegal datatype declaration accepted
+172. functor subscript error
+173. Runbind
+174. import and types
+177. clinkdata on sun 3
+179. compiler bug (783 in sigmatch)
+181. 8-bit characters not supported in strings
+183. "raise" not synchronized with evaluation sequence
+187. parsing clausal definitions with infix functions
+188. infinite loop parsing simple functor declaration
+190. unclosed string in interactive system
+191. Real operators permuted
+192. bad parsing
+193. import types
+194. weak type variable syntax 
+195. Compiler bug: abstractType
+196. Compiler bug: generalizeTy -- bad arg
+197. exportFn size
+198. printing exception specs in signatures
+200. large interger literals
+203. printing of infix specs in signatures
+*.   Bugs concerning the relation of functor-result signatures to 
+       functor-parameter signatures are fixed.
+*.   The most-negative-integer can now be printed without overflowing.
+*.   Warning messages from the match compiler, the overloading resolver,
+       and the typechecker pinpoint the site of the error much more accurately.
+
+Bugs re-classified:  (complete descriptions are in doc/masterbugs)
+7. constructor representation
+	This now gives an error message when a user stumbles across it
+	(which is exceedingly rare).  Also, we believe this is an inherent
+	problem with the language, not with our compiler.
+10. exhaustiveness message at top-level.
+	This is a feature.
+20. "print" is overloaded rather than polymorphic
+	This is a feature.  The Definition makes no mention of "print".
+24.  incomplete write
+	This is removed from the list; our new signal-handling
+	system provides more appropriate primitives to solve this problem.
+86, 132. incorrectly allows redefining of "="
+	Perhaps we should fix this, but it's not important to us.
+87. execute subprocess dies on interrupt on blocked input
+	This is a feature (of Unix), not a bug.
+105. Large numeric labels are disallowed.    
+	Tough luck.  We're not going to fix this.
+110. val rec
+	This is a silliness in the Definition; we're not going to "fix" it.
+111. local polymorphic definitions
+	This is not a bug; if we allow this, the type system is unsafe:
+     local exception X of '_a in val exn0 = X(3) fun h(X(b:bool)) = b end;
+     raise exn0 handle e => h(e);
+115. cyclic signatures
+	We reserve the right to accept some signatures, even if there's
+	no structure that they could match.
+116. pattern declares no variables warning (?)
+	This is a feature.  Can't you tell?
+120. deviation from Definition (arithmetic exceptions)
+	This is fixed, after a fashion;  see above.
+121. Unimplemented parts of Standard (open specs)
+	See doc/localspec
+122. Unimplemented parts of Standard (local specs)
+	See doc/localspec
+164. NS32 in makeml
+	We are not currently supporting the NS32000 architecture,
+	but we may again support it with cooperation from users.
+
+The typechecker and match compiler give much more informative messages
+if System.Control.markabsyn is true.  Unfortunately this requires
+(even) more memory.
+
+The debugger (courtesy of Andrew Tolmach) is present in the source, but
+does not yet work and is not installed.
+
+The internal representation of first-class continuations is more explicit
+about exception-handlers; this will be useful for the new signal-handler
+mechanism.
+
+The type-checker is much cleaned up.  User-bound type variables don't appear
+in global symbol tables.
+
+Minor (unreported) bugs in the precedence parser and SPARC code generators
+are fixed.
+
+---------------------------------------------------------------------------
+Standard ML of New Jersey version 0.49, 26 January 1990
+
+New Parser:  The parser is now completely rewritten, using the parser
+generator developed by David Tarditi and Andrew Appel.  It's a bit
+slower and a bit bigger (though we're working on these problems), but
+it generates significantly better error messages and error recovery.
+It's also more maintainable.
+
+ML now runs on 68020-based HP workstations running either HP-UX or MORE.
+
+Making sharable images:
+There is now a new version of "linkdata", called "clinkdata", that
+is relatively machine- and operating-system-independent, but
+is much faster than the old "slinkdata".  This will be of interest to
+NeXT users, MIPS users, and other users of operating systems where
+the "a.out" format is different from Berkeley Unix.  The "makeml"
+file now uses "clinkdata" instead of "slinkdata" for such machines.
+
+Bug fixes---many bugs are fixed, including:
+
+2. (L.3):  Mispelled nonnullary constructors in patterns [parser]
+8. (L.9):  interactive error recovery
+11. (L.12):  poor error messages [parser]
+15. (E.12):  Error message
+17. (E.25):  Inaccurate line numbers
+29. (E.62):  use_string in structure definition
+48. printing of identity withtype declarations
+63. curried, clausal def of infix function
+70. (E.74) constructor shouldn't appear in printed structure signature
+71. (E.75) Failure to restore enviroment after exception in "use"
+73. strange function definition
+77. unparenthesized infix expressions in fun lhs
+79. withtype
+83. unexpected parsing of erroneous datatype declaration
+89. continuation line string escape at beginning of string
+90. secondary prompt is not set in multi-line strings and comments.
+95. infix declaration interferes with type parsing
+100. constructor not printed after open declaration
+112. equality of ~0.0 and ~ 0.0
+113. empty declarations
+117. sharing and equality attributes
+134. type checking
+136. linkdata problem
+145. stale top-level continuations cause type bugs
+150. incomplete sharing spec accepted
+152. floating point errors (wasn't a bug)
+154. import smashing memory (fixed in 0.44a, actually)
+156. confusing parser error message
+157. nested imports corrupt memory (same as 154)
+162. ByteArray subscript exception expected (wasn't a bug)
+163. function definition syntax
+170.  error in makeml script 
+201. funny tycon aliasing behavior
+202. type error not caught?
+204. constructors printed when not accessible
+. Runs on NeXT machine (there was a bug in makeml)
+. Runs on HP workstation (68020-based)
+. exportFn images will never include the compiler, as they sometimes did.
+
+------------------------------------------------------------------------------
+Standard ML of New Jersey version 0.44, 4 December 1989
+
+New release:
+
+Starting with this release, the compiler source code is covered by an AT&T
+copyright notice, which is included in each source code file.  The file
+doc/COPYRIGHT contains the official copyright notice, license, and
+disclaimer.  The file doc/release-form contains a release form that our
+lawyer would like you to sign if you contribute software or modifications
+that are included in the distribution.  Whether you sign it as an
+individual or get your institution to sign it is your decision, but it is
+undoubtedly quicker and simpler to sign as an individual.  The release form
+is not necessary for simple bug fixes.
+
+Mailing list:
+
+There is now a Standard ML mailing list for messages and queries of general
+interest to the ML community.  You can join by sending a request to
+sml-request@cs.cmu.edu, and you can send a message to the list by mailing
+to sml@cs.cmu.edu.  This mailing list will be the main vehicle for
+distributing announcements about Standard ML of New Jersey.
+
+Modules:
+
+All known major bugs in the module system have been fixed, so please report
+any new bugs or old bugs we missed.  The full module syntax from the
+Definition, Version 3 is now implemented with minor limitations or
+extensions, including let structure expressions and local and open
+signature specs (see comments in doc/localspec).  Include specs work
+properly once again.
+
+Local and open specs:
+
+David MacQueen has some comments about "local" and "open" specifications
+in signatures; see doc/localspec.
+
+Weak type variable syntax:
+
+Standard ML of New Jersey has a more precise system for weak typing
+(i.e. typechecking of programs that use semi-polymorphic reference
+variables).  Other compilers denote weak type variables with an underscore,
+i.e. '_abc, while ours uses an initial integer to denote level of weakness,
+i.e. '2abc.  See doc/weak-types for a fuller explanation.  However,
+for compatibility:
+  The notation for weak type variables using an initial underscore is now
+supported for input and output.  A weak type variable of the form '_a
+is equivalent to the numeric form '1a.  On output, weak type variables
+are printed using an initial integer.  However, if the ref variable 
+System.Control.weakUnderscore is set to true, then weak type variables
+of all levels are printed with an underscore.
+
+Equality types:
+
+Equality types are still broken.  Fixing these is the next order of business.
+
+Import:
+
+Nested imports do not work reliably in this version.
+
+Optimizing compiler:
+
+Hints on making your programs run faster are in doc/optimize.
+
+Miscellaneous:
+
+The SPARC code generator has been completely rewritten by John Reppy.
+
+Bruce Duba continues to make improvements to the CPS code generator.
+
+Andrew Appel is re-writing the parser to use David Tarditi's newest
+version of the ML parser generator; this re-write is not complete but
+the source files are included (along with the working recursive descent
+parser) in src/parse/.
+
+Linkdata:
+
+The "linkdata" program, used for making a sharable version of the ML
+compiler by putting all the .mo files into the text segment, did not work
+on all operating systems.  There is a more portable, albeit much less
+efficient, version of linkdata called "slinkdata".  Look in "src/makeml" to
+see how it is used for the NeXT operating system, and you can use it that
+way for your operating system too.  (Admittedly, this is very minimal
+documentation!)
+
+Bug fixes:
+
+See latest doc/bugs file for remaining bugs.  This has been brought more or
+less up to date.  We appreciate your bug reports and hope you will be 
+patient as we work our way through them.  There is a new version of the
+bug report format file (doc/bug.form), including a new "Severity:" field
+that you should use to indicate how serious the bug is from your point of
+view.  We get a lot of bug reports (which is good!) but we may not assign
+the right priority to them without your help.
+
+Version 1 plan:
+
+Our tentative schedule calls for the release of version 1 of the compiler in
+mid-January 1990.  There will probably be one more beta release between now
+and then.  This is a more or less arbitrary deadline, and we will try to fix
+as many bugs as possible before version 1 is released.  Development of the
+compiler will continue as usual following this milestone, and major, widely
+publicized releases will occur on a more regular and less frequent schedule,
+e.g. perhaps three times a year.  Interim developmental versions can be made
+available to those who have a special need for them.
+
+------------------------------------------------------------------------------
+Standard ML of New Jersey version 0.42, 27 October 1989
+
+Release notes by Andrew Appel, covering changes since version 0.39.
+
+Bug fixes:
+
+Large floating point literals do the right thing now, at least on the Vax.
+
+Duplicate constructor names and field names are again detected.
+
+Printing of records like {1="abc"} works correctly.
+
+Reading 1025 bytes from standard input works.
+
+Large list expressions of the form [(0,0),(0,0),(0,0), ..... (0,0)] no longer
+   cause the compiler to blow up.
+
+Previous versions have run on Sun-3s with Mach, this version might work
+on Vaxes with Mach.  The next version should run on anything with Mach.
+
+Compile-time processing of functors has been extensively rewritten,
+and should be more robust.  There are still some remaining bugs, however,
+which should now be easy to iron out.
+
+The Io exception now carries a much more useful string value, containing
+all sorts of information.
+
+Other changes since version 0.39 are mostly of interest to implementors.
+VALvars and STRvars now have qualids instead of ids, lexer interface
+parametrized more cleanly.  Page-faulting is no longer used to detect
+end-of-memory on most machines.
+
+---------------------------------------------------------------------------
+Standard ML of New Jersey version 0.39, 8 September 1989
+
+This notes overlap with the 0.36 release notes, since 0.36 was not
+widely distributed [neither were 0.37 or 0.38].
+
+Release notes by Andrew Appel.
+
+Changes since version 0.33:
+
+1.  Support for Sun-4 (SPARC) thanks to John Reppy at Cornell;
+    Encore (NS32032), NeXT (also Mach on other 68020 machines), and 
+    Sony NEWS (68020-based workstation), thanks to James O'Toole at MIT.
+
+2.  An interpreter for faster compilation (4x) but slower execution (18x).
+    Set System.Control.interp := true to enable this mode.  Use the -i
+    or -ionly to makeml to set this option as the default.
+
+3.  Delay and Force primitives (meant for internal use only) for research
+    in lazy evaluation.
+
+4.  Bug fixes:   reading 2049-byte files works now.  Separate compilation
+    shouldn't dump core.  Miscellaneous others.
+
+5.  A code generator generator implemented by Johan Lilius,
+    Jari Porra, & Jussi Rintanen of Helsinki University of Technology 
+    is include in the Standard ML Software Library: see lib/twig.
+
+6.  Various internal efficiency improvements; the CMACHINE signature was
+    simplified a bit; the format of generational-gc update lists was changed;
+    the CPS optimizer was beefed up.
+
+7.  Separate compilation has been improved.  The compiled version of a 
+    separately compiled file has the extension ".bin", and internally
+    identifies the version of SML-NJ and also the machine type it 
+    runs on.  The command "head -1 foo.bin" will print this information.
+
+8.  Many functor bugs have been fixed.
+
+9.  An improved version of ML-Yacc by David Tarditi at Princeton is provided,
+    more efficient and with a better interface, and with sophisticated syntax
+    error recovery.
+
+Forthcoming in future releases:
+
+- Mach support for Vax and other machines.
+
+- Some work has been done on a MacIntosh II port, and we are hoping for
+volunteers to continue this work.
+
+- Our MIPS code generator almost works now (thanks to Norman Ramsey at
+Princeton).
+
+-----------------------------------------------------------------------------
+What's new in SML of NJ Version 0.33, 1 April 1989
+
+1. CPS code generator
+
+This version uses a new CPS (Continuation Passing Style) code
+generator.  The CPS code generator differs from the older code
+generator in the following ways:
+
+   (i) The code produced is about 50% faster.
+
+   (ii) The compiler generates code about half as quickly (this should
+gradually improve with future releases).
+
+   (iii) the new code generator does not use a stack.  This makes it easier
+to support experimental features like callcc and multiple processes.
+It also makes efficient garbage collection even more critical.
+
+   (iv) The cps code generator tends to build larger intermediate
+representations, so tuning of the runtime system becomes more
+important.  See the discussion of memory management in doc/INSTALL.
+
+
+2. The runtime system
+
+The runtime system has been extensively rewritten and cleaned up.  The
+amount of assembly code has been reduced (only 220 lines for the Vax,
+385 for the Sun), and the system call interface has been simplified.  The
+mechanism for initiating garbage collection has been made more robust.
+In the m68 version (for Sun 3), exhaustion of free space is detected
+by an explicit comparison rather than by trapping a segmentation fault.
+This finally eliminates persistent flakiness caused by the way the 68020
+recovers from segmentation faults.
+
+LaTeX source for a new paper describing the runtime system can be
+found in doc/papers/runtime.  This is still an early draft, but it should
+be helpful in understanding internals of the run time system.
+
+
+3. The pervasive environment
+
+The initial environment has been reorganized to make it possible to
+build a system whose pervasives (i.e., built-in bindings) correspond
+closely to those described in "The Definition of Standard ML, Version
+2" by R. Harper, R. Milner, and M. Tofte (ECS-LFCS-88-62, August 1988,
+hereafter referred to as the "Definition").  Note that in our humble
+opinion the "standard" environment is somewhat brain-damaged and is
+missing many important features (like arrays, bytearrays, etc).  See
+the file doc/environ for discussion of specific deficiencies of the
+environment described in the Definition and our proposed fixes, some
+of which are incorporated in the "New Jersey" environment.
+
+The default initial environment set up by the bootstrapping process is
+the richer, and more efficient, New Jersey environment.  However,
+loading the source file src/lib/standard.sml defines a structure named
+Standard that provides a close approximation to the "standard"
+environment.  Opening the structure Standard at the top level replaces
+any nonstandard bindings in the New Jersey environment.  The New
+Jersey environment is still there in the background, so any New Jersey
+bindings not rebound in Standard will still be visible.  In the future
+we may provide a mechanism (e.g. a function switchEnv: string -> unit)
+for completely replacing the base environment with a different version
+specified by a structure.  For example, `switchEnv "Standard"' would
+replace the existing base environment with the contents of Standard.
+
+The initial environment also contains:
+
+(1) The signatures ARRAY, BASICIO, BITS, BOOL, BYTEARRAY, GENERAL, IO,
+    INTEGER, LIST, REF, STRING, and REAL as defined in src/boot/perv.sig, 
+    and the signature SYSTEM as defined in src/boot/system.sig
+
+(2) The structures Array : ARRAY, BasicIO : BASICIO, Bits : BITS, etc.
+    These contain the New Jersey versions of bindings.
+
+(3) The structure NewJersey, which contains the complete New Jersey initial
+    environment except for the signatures in (1) above and the structure
+    NewJersey itself.
+
+It follows that even if Standard has been defined and opened, all New Jersey
+bindings are available via the structure NewJersey, or alternatively via
+the structures Array, IO, etc.
+
+Here are some differences between the New Jersey and Standard environments:
+
+  a.  The functions +, /, *, -, div, mod are an order of magnitude 
+      slower in Standard than in the New Jersey environment.  This is
+      because they are required to raise distinct exceptions (according
+      to the Definition), and because the treatment of negative arguments
+      of div and mod doesn't match what the hardware provides; that
+      complicates their implementation.  The NewJersey functions all raise
+      Overflow on results that won't fit in 31 bits (and Div on zero divisor
+      for div and mod).
+
+  b.  The functions div and mod return different results.
+
+  c.  input and output are curried in NewJersey (and in the IO structure),
+      but not in Standard.
+
+  d.  The New Jersey environment has many more functions in it, as described
+      in the appendix of our reference manual or the signatures in the files
+      src/boot/perv.sig and src/boot/system.sig.
+
+The New Jersey environment has changed slightly from previous releases,
+mostly to make the it more compatible with the Definition [IMPORTANT --
+THESE CHANGES MAY BREAK SOME PROGRAMS]:
+
+  a.  The exception Io_failure has been renamed Io for consistency
+      with the Definition.
+
+  b.  The exception Float has been renamed Real.  Float is still defined
+      as a synonym for Real.
+
+  c.  The identifier "length" is no longer overloaded: use "size" or
+      "String.size" for string lengths, "length" or "List.length" for
+      list lengths, and "Array.length" for array lengths.
+
+  d.  The functions "cd" and "system" are now components of the
+      System structure.
+
+  e.  Various components of the System structure have been moved
+      into the System.Unsafe substructure, and are not recommended for
+      casual use.
+
+  f.  The print functions (Integer.print, Real.print, String.print,
+      and the overloaded print), now return unit rather than their
+      argument.  This is because we found that in our code virtually
+      every call of print was followed by "; ()".
+
+We plan to provide a definition of the NewJersey structure in terms of
+the "standard" environment (analogous to the definition of Standard in
+lib/src/standard.sml).  This structure would enable any Standard ML
+system to run programs based on the New Jersey environment.  Such
+programs should not reference the System structure, of course.
+
+4. Command line arguments and Shell environment
+
+System.argv : unit -> string list
+System.environ : unit -> string list
+ 
+are new functions that return the list of command line arguments and
+the Unix shell environment, respectively.
+
+5. First-class continuations: callcc, throw, and cont (experimental)
+
+These are new experimental primitives to allow one to capture and use
+"first-class continuations".  See the file doc/callcc for
+documentation of these new facilities.
+
+6. Separate compilation (experimental)
+
+We have integrated code written by Nick Rothwell and Mads Tofte of
+Edinburgh that provides a preliminary, experimental form of secure (type
+checked) separate compilation.  There is a special declaration form:
+
+   import "filename"
+
+where "filename" is a string literal designating either a source file
+filename.sml or a binary file filename.bin.  If only the source file
+exists in the current directory, then it is compiled and the binary
+version is created.  If the binary version exists, it is loaded
+instead of the source file.
+
+As a consequence of adding this new facility, the identifier "import"
+has become a reserved word.  This may cause incompatibilities with
+existing code.
+
+7. mlyacc
+
+The new directory src/lib/mlyacc contains a yacc-like parser generator
+written in ML, with documentation.  The parser generator is used much
+like the Unix yacc utility, and the grammar specification language is
+essentially that of yacc.  The parser generator was written by David
+Tarditi of Princeton, based on an earlier effort by Nick Rothwell.
+Other, more sophisticated, interfaces to the parser generator will
+probably be provided in future releases.  As before, the directory
+src/lib/lexgen contains a lexical analyzer generator.
+
+8. Fixes
+
+A number of things that have been broken are now fixed.  This includes
+the garbage collector for the Sun 3, floating point operations on the
+Sun 3, exportFn, sqrt, and execute.  Unfortunately, many old bugs
+remain and the error messages are just as bad as ever.  We expect the
+next release to fix many of these problems.  Bug reports are welcome as
+ever, as are bug fixes.
+
+9. Things to come
+
+John Reppy has ported SML of NJ to the Sun 4 (SPARC) architecture and
+his code generator will be included in the next release.  A port to
+the MIPS architecture (DECstation 3100 under Ultrix) is in the works
+at Princeton, and a NeXT port is likely.  A port to the Mac II under
+the native Mac OS may also appear soon.
+
+We are working on a new licensing scheme similar to that used by the
+Free Software Foundation.  We hope to have this approved within three
+months, and we will keep you informed of new developments.
+
+------------------------------------------------------------------------------
+New features of SML of NJ Version 0.24 (November 22, 1988)
+
+1. Profiler
+
+A call-count and statistical profiler has been implemented.  See
+operating instructions in the README file, and the paper provided in
+src/doc/papers/profiling.
+
+
+2. Runtime reorganization
+
+The runtime system has been reorganized to reduce the need for assembly
+language and provide a standard interface for Unix system calls and
+C code.  It should become possible to add special purpose C code to
+the runtime system, for instance to provide an X windows interface.
+Many of the assembly language functions have been replaced by more
+portible C implementations and uses of the system call interface.
+See src/doc/VERSION.24 for some more details.
+
+
+3. Memory Management tuning
+
+The variable
+
+  System.Control.Runtime.ratio : int ref
+
+can be used to control the garbage collection behavior to some extent,
+in conjunction with the Unix limit variable (in the csh).  See the
+discussion in README.
+
+
+4. Simple gnu emacs sml mode
+
+A simple gnu emacs sml mode was contributed by Mitch Wand.  It can be
+found in src/lib/sml.el.  If you have a better mode or make improvements
+on this version, please send them in to macqueen@research.att.com for
+inclusion in future releases.
+--------------------------------------------------------------------------
+New features of SML of NJ Version 0.22 (October 10, 1988)
+
+This file describes the most notable changes since version 0.20.  (Version 0.21
+was a local version that was not distributed.)
+
+
+1. Bugs
+
+A few bugs have been fixed; exportFn works again; the system runs under the
+latest version (4.0) of Sun Unix on a Sun-3.  See src/doc/bugs for the
+remaining known bugs.  The next release with many more bug fixes will
+probably follow fairly shortly.
+
+
+2. Sharable text segments
+
+We now have an option to run sml with the compiler read-only and sharable
+(in the Unix text segment).  This should help on systems where several
+people are running sml at once, and also improves garbage-collector performance.
+See src/doc/INSTALL for more info.
+
+
+3. CPS code generator
+
+We are including the source code for the new cps code generator with
+this release for those who would like an early look at it.  This code
+generator is still under development and works only on Vaxes at this
+point.
+
+
+4. Installation
+
+The maker script for building the interactive image has been reorganized
+and new scripts maker.batch and maker.run have been added to simplify
+making batch systems and compiling the runtime system.  See src/doc/INSTALL
+and src/doc/BATCHINSTALL for details.
+
+
+5. Lexer generator
+
+The directory src/lib is a new directory for contributed software.
+The programs included here do not come under the terms of the AT&T
+license.  The first contributed software is a lexical analyzer
+generator similar to the Unix lex utility.  It is in src/lib/lexgen.
+lexgen has been used to generate a new lexical analyzer for the
+compiler.  The specification is in src/lex/ml.lex.
+
+
+----------------------------------------------------------------------------
+New features of SML of NJ Version 0.20
+
+This file describes the most notable changes since version 0.18.  (Version 0.19
+was a local version that was not distributed.)
+
+1. Bugs
+
+Quite a few bugs have been fixed, mostly relating to type checking and modules.
+See src/doc/bugs for the remaining known bugs.  
+
+
+2. Reference types
+
+The typing of references and arrays is less restrictive.  For
+instance, the following is now permitted, whereas it used to cause an
+error message:
+
+   let val r = ref [] in r := [1]; !r end;
+
+Thus locally declared reference variables like r in this example do not
+need to be explicitly constrained to have a monotype.
+
+
+3. Equality types
+
+Equality types are now implemented.  Equality types are those
+"hereditarily concrete" types whose values admit structural equality.
+The implementation of equality types involves the new signature
+specification keyword "eqtype" indicating that the specified type
+constructor admits equality, and special equality type variables
+starting with double single quotes (e.g. ''a) that are restricted to
+range over equality types.  
+
+An equality type is one containing only type constructors that "support
+equality".  The following type constructors support equality:
+
+   int, string, real
+   
+   any datatype whose constuctor argument types are equality types
+   (disregarding parameter type variables)
+
+   record type constructors
+
+   type constructors from functor parameters that are specified as eqtypes
+
+In addition, any reference or array type is an equality type.
+
+Abstract type constructors, "->", and exn do not support equality.
+
+
+4. Include specifications in signatures
+
+Include specifications allow one to include the specifications of a previously
+defined signature in a new signature.  The syntax is 
+
+   include SIG
+
+where SIG is the name of a signature.  For example, given the declaration
+
+   signature AA =
+   sig 
+     type t
+     val x : t
+   end
+
+the declaration 
+
+   signature BB =
+   sig
+     include AA
+     val y : t -> int
+   end
+
+is equivalent to
+
+   signature BB =
+   sig
+     type t
+     val x : t
+     val y : t -> int
+   end
+
+
+5. Free identifiers in signatures and structures
+
+Structure definitions can now contain free identifiers of any sort
+(values, constructors, exceptions, types), not just free signatures,
+structures and functors.  Signature definitions can contain free
+structure and type identifiers, as well as free signature identifiers.
+
+
+6. Printing of signatures and structures
+
+Signatures defined at top level are printed.  Structures defined at
+top level have their signatures printed (currently in full -- in the
+future only the name of the signature will be printed if it has one).
+Printing of signatures can be turned off by setting the flag
+System.Control.Print.signatures to false.
+
+
+7. Memory management improvements
+
+The runtime system manages memory better.  The system automatically
+resizes the heap on startup and during collections, allowing the
+system to perform more gracefully on systems with limited memory.
+
+The behavior and type of the flag controlling gc messages has changed:
+
+  System.Control.Runtime.gcmessages: int ref
+    when 0, no messages are printed
+    when 1, only major collections are reported
+    when 2, major collections and heap resizings are reported
+    when 3, minor and major collections and heap resizings are reported

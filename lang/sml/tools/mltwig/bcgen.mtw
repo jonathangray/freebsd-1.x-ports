@@ -1,0 +1,909 @@
+(* May 1989, Helsinki University of Technology *)
+
+(* This is the Vax code generator of Andrew Appel compiled to ML-Twig *)
+
+node	PROC(2),	SEQ(2),		LABEL(0),	JUMP(1),
+	CJUMP(2),	OP(3),		UNOP(2),	MEM(1),
+	MOVE(2),	ESEQ(2),	BOOL(1),	NAME(0),
+	CONST(0),	CONSTF(0),	ALLOC(2),	TEMP(0),
+	CALL(2),	CAND(2),	NOT(1),		ARG(2),
+	NOARGS(0),	FPLUS(0),	FMINUS(0),	FMUL(0),
+	FDIV(0),	PLUS(0),	MINUS(0),	MUL(0),
+	DIV(0),		MOD(0),		AND(0),		OR(0),
+	LSHIFT(0),	RSHIFT(0),	XOR(0),		EQ(0),
+	NEQ(0),		LT(0),		LEQ(0),		GT(0),
+	GEQ(0),		ULT(0),		ULEQ(0),	UGT(0),
+	UGEQ(0),	FEQ(0),		FNEQ(0),	FLT(0),
+	FLEQ(0),	FGT(0),		FGEQ(0),	NEG(0),
+	COMP(0),	FNEG(0),	CVTSU(0),	CVTSS(0),
+	CVTSF(0),	CVTUU(0),	CVTUS(0),	CVTFS(0),
+	CVTFF(0),	RETURN(1);
+
+label	body of unit | stm of unit | reg of unit | operand of unit
+	| location of unit | ioperand of unit | destination of unit
+	| computation of unit | test of unit | ntest of unit | flag of unit
+	| bigval of unit | binop of unit | unop of unit | relop of unit
+	| cvtop of unit | cvtopu of unit | name of unit	| args of unit
+	| zero of unit | result of unit;
+
+structure_name Vaxcg ;
+	
+prologue (
+
+  exception CodeGeneration of string
+
+  fun fatal s = raise CodeGeneration s
+
+  fun int2str (i:int) = if i<0 then ("-"^(makestring (0-i))) else makestring i
+
+  val next_label = ref 0
+  fun newLabel () = (inc next_label; "_Label" ^ (int2str (!next_label - 1)))
+
+(* Tree functions *)
+
+(* Registers *)
+
+  structure Registers :
+    sig
+      type Reg
+      val reg2str : Reg -> string
+      val resultReg : unit -> Reg
+      val FPregister : Reg
+      val APregister : Reg
+      val regmask : unit -> int
+      val decreaseusage : Reg -> unit
+      val increaseusage : Reg -> unit
+      val usage : Reg -> int
+      val allocate : unit -> Reg
+      val calling : unit -> unit
+      val initialize_registers : unit -> unit
+    end
+  =
+  struct
+    datatype extension = Ext of { name: string, usage: int ref, modif: bool ref }
+    type Reg = extension ref
+
+    fun reg2str (ref (Ext { name = s, ...})) = s
+	
+    val registers =
+      [Ext {name="r1",usage= ref 0, modif = ref false},
+       Ext {name="r2",usage= ref 0, modif = ref false},
+       Ext {name="r3",usage= ref 0, modif = ref false},
+       Ext {name="r4",usage= ref 0, modif = ref false},
+       Ext {name="r5",usage= ref 0, modif = ref false},
+       Ext {name="r6",usage= ref 0, modif = ref false},
+       Ext {name="r7",usage= ref 0, modif = ref false},
+       Ext {name="r8",usage= ref 0, modif = ref false},
+       Ext {name="r9",usage= ref 0, modif = ref false},
+       Ext {name="r10",usage= ref 0, modif = ref false},
+       Ext {name="r11",usage= ref 0, modif = ref false},
+       Ext {name="r12",usage= ref 0, modif = ref false}]
+
+    val R0register = Ext {name="r0",usage= ref 0, modif = ref false}
+    val FPregister = ref (Ext {name="fp",usage= ref 1, modif = ref false})
+    val APregister = ref (Ext {name="ap",usage= ref 1, modif = ref false})
+    val SPregister = ref (Ext {name="r15",usage= ref 1, modif = ref false})
+
+    fun choose ((r as Ext {usage = ru as (ref 0), modif = m,...})::_) =
+	(m := true; ru := 1; r)
+      | choose (h::t) = choose t
+      | choose nil = fatal "run out of registers"
+
+    fun allocate () = ref (choose registers)
+    fun decreaseusage (ref (Ext{ usage = u, ... })) = dec u
+    fun increaseusage (ref (Ext{ usage = u, ... })) = inc u
+    fun usage (ref (Ext{ usage = ref u, ... })) = u
+
+    datatype rsr = UNUSED | REFERS of Reg
+
+    val rsr = ref UNUSED
+	
+    fun resultReg () =
+      let val newreg = ref R0register
+      in
+	( rsr := REFERS newreg;
+	  newreg )
+      end
+
+    fun calling () =
+      (case !rsr of
+	UNUSED => ()
+      | REFERS r =>
+	  let val Ext { usage=u, ... } = R0register
+	  in
+	    if !u <> 0
+	      then
+		let val newreg as Ext {name=s,...} = choose registers
+		in
+		  (output (std_out,"mov\tr0,"^s^"\n");
+		   r := newreg;
+		   u := 0)
+		end
+	    else ()
+	  end)
+
+    fun initialize_registers' ((Ext{usage=u,modif=m,...})::rest) =
+	(u:=0;m:=false;initialize_registers' rest;rsr:=UNUSED)
+      | initialize_registers' _ = ()
+
+    fun initialize_registers () = initialize_registers' registers
+
+    fun calcula ((Ext{modif=ref true,...})::t,n,ac:int) = calcula (t,n+n,ac+n)
+      | calcula ((Ext{modif=ref false,...})::t,n,ac) = calcula (t,n+n,ac)
+      | calcula (_,_,ac:int) = ac
+	
+    fun regmask() = calcula (registers, 2, 0)
+    
+  end  
+
+  open Registers
+
+
+  datatype sizecodefun = nofun
+    | unaryfun of (int -> string)
+    | binaryfun of ((int -> string) * (int -> string))
+
+  datatype Kind = Op of symbol | numbered of int | none
+
+  datatype reg = register of Reg | ghostregister of Reg | noreg
+
+  type support = { regre: reg ref,
+		  kind: Kind ref,
+		  truebranch : string ref,
+		  sizcod : sizecodefun ref }
+
+  fun initialized_support () = { regre = ref noreg,
+				kind = ref none,
+				truebranch = ref "",
+				sizcod = ref nofun }
+
+  datatype attribute = proclabel of string | label of string |
+    ivalue of int | temp of Reg | size of int
+
+  datatype tree = tree of (symbol * tree list * attribute list * support)
+
+  fun givereg (tree(_,_,_,{regre = rr as ref (register r),...})) =
+      (decreaseusage r;
+       if (usage r) = 0
+	 then rr := ghostregister r
+       else ())
+    | givereg _ = fatal "does not have"
+
+  fun get_reg (tree(_,_,_,{regre = ref (register r),...})) = r
+    | get_reg (tree(_,_,_,{regre = ref (ghostregister r),...})) = r
+    | get_reg _ = fatal "have not"
+
+  fun set_reg (t as tree(_,_,_,{regre = rr as ref (register r),...}),s) =
+    (rr := register s; increaseusage s)
+    | set_reg (tree(_,_,_,{regre = r,...}),s) =
+      (r := register s; increaseusage s)
+
+  fun getreg (tree(_,_,_,{regre = rr as ref (register r),...})) = rr := register (allocate())
+    | getreg (tree(_,_,_,{regre = r,...})) = r := register (allocate())
+
+
+  fun node_value (tree(v,_,_,_)) = v
+  fun get_subtrees (tree(_,t,_,_)) = t
+
+  fun map2 f ([],[]) = []
+    | map2 f (h :: t, i :: u) = f(h,i) :: (map2 f (t,u))
+    | map2 f _ = fatal "map2 failure"
+
+  fun equal (tree(i,s1,a1,_), tree(j,s2,a2,_)) =
+    (i = j) andalso (a1 = a2) andalso (length s1 = length s2)
+     andalso (fold (fn (a,b) => a andalso b) (map2 equal (s1,s2)) true)
+       
+  fun count_arguments (tree(ARG,[_,t],_,_)) = 1+(count_arguments t)
+    | count_arguments _ = 0
+
+  val get_op = node_value
+
+  fun child0 (tree(_,h :: _,_,_)) = h
+    | child0 _ = fatal "no child 0"
+      
+  fun child1 (tree(_,_ :: h :: _,_,_)) = h
+    | child1 _ = fatal "no child 1"
+      
+  fun child2 (tree(_,_ :: _ :: h :: _,_,_)) = h
+    | child2 _ = fatal "no child 2"
+      
+  fun get_kind (tree(_,_,_,{ kind = ref ir, ... })) = ir
+
+  fun get_truebranch (tree(_,_,_,{ truebranch = ref l, ... })) = l
+
+  fun attrLabel (label l :: _) = l
+    | attrLabel (_ :: t) = attrLabel t
+    | attrLabel nil = fatal "no attribute label"
+
+  fun attrSize (size i :: _) = i
+    | attrSize (_ :: t) = attrSize t
+    | attrSize nil = fatal "no attribute size"
+
+  fun attrIvalue (ivalue i :: _) = i
+    | attrIvalue (_ :: t) = attrIvalue t
+    | attrIvalue nil = fatal "no attribute ivalue"
+
+  fun attrProclabel (proclabel l :: _) = l
+    | attrProclabel (_ :: t) = attrProclabel t
+    | attrProclabel nil = fatal "no attribute proclabel"
+
+  fun attrTemp (temp t :: _) = t
+    | attrTemp (_ :: t) = attrTemp t
+    | attrTemp nil = fatal "no attribute temp"
+
+  fun pickAttrs (tree(_,_,a,_)) = a
+
+  val get_label = (attrLabel o pickAttrs)
+  val get_size = (attrSize o pickAttrs)
+  val get_ivalue = (attrIvalue o pickAttrs)
+  val get_proclabel = (attrProclabel o pickAttrs)
+    
+  val get_temp = (attrTemp o pickAttrs)
+    
+  fun set_kind_n (tree(_,_,_,{ kind = ir, ... }), n) = ir := numbered n
+  fun set_kind (tree(_,_,_,{ kind = ir, ... }), ope) = ir := Op ope
+
+  fun set_truebranch (tree(_,_,_,{ truebranch = lr, ... }), l) = lr := l
+    
+  fun get_sizecode (tree(_,_,_,{ sizcod = ref (unaryfun f), ...})) = f
+    | get_sizecode _ = fatal "no attribute sizcod = ref unaryfun"
+
+  fun get_sizecodecvt (tree(_,_,_,{ sizcod=ref(binaryfun f),...})) = f
+    | get_sizecodecvt _ = fatal "no attribute sizcod = ref binaryfun"
+
+  fun set_sizecode (tree(_,_,_,{sizcod = r,...}), s) = r := unaryfun s
+    
+  fun set_sizecodecvt (tree(_,_,_,{sizcod = r,...}),s1,s2) =
+    r := binaryfun (s1,s2)
+
+(*
+ The fields of cost
+
+ int	space
+ int	time
+ bool	setFlags: true, if the instruction sets condition code flags
+ bool	sideEffect: true, if the instruction causes sideeffects. This
+	is required, if the computations of the subtrees are reordered
+	for minimal register usage (Sethi-Ullman).
+ bool	dontDestroy: true, if the register allocated for the node may
+	not be destroyed. eg. the register is a temporary
+ int	hold: number of registers for holding the value of the node
+ int	maxregs: number of registers needed sometime  during the computation
+	of the tree
+ bool	dontEval: true, if ???
+ int	isize: ???
+*)
+
+  type cost = (int * int * bool * bool * bool * int * int * bool ref * int)
+
+  (* space * time * setFlags * sideEffect * dontDestroy * hold *
+   maxregs * dontEval * isize *)
+
+  val zerocost:cost = (0,0,false,false,false,0,0,ref false,0)
+
+  val get_sideEffect = (fn (_,_,_,e,_,_,_,_,_) => e)
+
+  fun cost_plus ((s,t,f,e,d,m,h,v,i):cost,(s2,t2,f2,e2,d2,m2,h2,v2,i2)) =
+    (s+s2,t+t2,false,f orelse f2,false,0,0,ref false,0)
+
+  fun sum_costs [] = zerocost
+  | sum_costs (h :: t) = fold (fn (a,b) => cost_plus (a,b)) t h
+
+  fun cost_less ((s1,t1,_,_,_,_,_,_,_):cost, (s2,t2,_,_,_,_,_,_,_):cost) =
+    (s1+t1) < (s2+t2)
+
+  fun C (s,t,f,e,d,m) = (s,t,f,e,d,m,0,ref false,0)
+
+    (* space * time * setFlags * sideEffect * dontDestroy * maxregs *)
+
+  fun WD ((S,T,F,E,D,M,H,V,I):cost,s,t,f,e,d,m) =
+    (S+s,T+t,false,f orelse F,false,0,0,ref false,0)
+
+  fun WDH1 ((S,T,F,E,D,M,H,V,I):cost,s,t,f,e,d,m) =
+    (S+s,T+t,false,f orelse F,false,0,1,ref false,0)
+
+  fun WDHA ((S,T,F,E,D,M,H,V,I):cost,s,t,f,e,d,m) =
+    (S+s,T+t,false,f orelse F,false,0,0,ref false,0)
+
+  fun WDHAs ((S,T,F,E,D,M,H,V,I):cost,s,t,f,e,d,m,isize) =
+    (S+s,T+t,false,f orelse F,false,0,0,ref false,isize)
+
+      (* space * time * setFlags * sideEffect * dontDestroy * maxregs *)
+
+  val emit = fn s => output (std_out,s)
+
+(* emitname constructs a string of form label n or label+n. The tree node
+  it gets as a parameter is name, i.e. NAME or CONST or OP(PLUS,NAME,CONST) *)
+
+  fun emitname t =
+    case node_value t of
+    NAME => emit (get_label t)
+    | CONST => (emit ((int2str o get_ivalue) t))
+    | LABEL =>
+	(emit ((get_label o child1 o child0) t); emit "+";
+      	 emit ((int2str o get_ivalue o child2 o child0) t))
+    | _ => fatal "incorrect node for emitname"
+
+  fun emitlocation t =
+    case (get_kind t) of
+    numbered 1 =>
+      (emit "("; emit (reg2str (get_reg t)); emit ")"; givereg t)
+    | numbered 2 =>
+	(emitname (child1 t); emit "(";	emit ((reg2str o get_reg o child2) t);
+	 emit ")"; (givereg o child2) t)
+    | numbered 3 =>
+	(emitname (child2 t); emit "("; emit ((reg2str o get_reg o child1) t);
+	 emit ")"; (givereg o child1) t)
+    | numbered 4 =>
+	(emit "*"; emitname (child1 (child0 t)); emit "(";
+	 emit ((reg2str o get_reg o child2) (child0 t)); emit ")";
+      	 (givereg o child2) (child0 t))
+    | numbered 5 =>
+	(emit "*";emitname (child2 (child0 t)); emit "(";
+	 emit ((reg2str o get_reg o child1) (child0 t)); emit ")";
+	 (givereg o child1) (child0 t))
+    | numbered 6 => emitname t
+    | _ => fatal "incorrect node for emitlocation"
+
+  val initialize = fn () => (initialize_registers();next_label := 0)
+);
+
+default_cost ( sum_costs );
+
+insert (
+
+  val get_cost_space = (fn (s,_,_,_,_,_,_,_,_) => s)
+  val get_cost_time = (fn (_,t,_,_,_,_,_,_,_) => t)
+  val get_cost_isize = (fn (_,_,_,_,_,_,_,_,i) => i)
+  val get_cost_setFlags =(fn (_,_,f,_,_,_,_,_,_) => f)
+  val get_cost_dontDestroy = (fn (_,_,_,_,d,_,_,_,_) => d)
+
+  fun emitioperand t =
+  case get_kind t of
+    numbered 11 =>
+      (emitlocation (child1 t); emit "[";
+       emit ((reg2str o get_reg o child1 o child2) t); emit "]";
+       (givereg o child1 o child2) t )
+  | numbered 12 =>
+      (emit "("; emit ((reg2str o get_reg o child2) t); emit ")";
+      emitlocation (child1 t); (givereg o child2) t )
+  | numbered 13 =>
+      (emitlocation (child2 t); emit "[";
+       emit ((reg2str o get_reg o child2 o child2) t); emit "]";
+       (givereg o child2 o child2) t )
+  | numbered 14 =>
+      (emit "("; emit ((reg2str o get_reg o child1) t); emit ")";
+       emitlocation (child2 t); (givereg o child1) t )
+  | n => fatal "incorrect node for emitioperand"
+
+  fun emitoperand t =
+    case get_kind t of
+      numbered 21 => (emit ((reg2str o get_reg) t); givereg t)
+    | numbered 22 => (emit "$"; emitname t)
+    | numbered 24 => emitlocation (child0 t)
+    | numbered 25 => emitioperand (child0 t)
+    | n => fatal "incorrect node for emitoperand"
+
+);
+
+(* 4.3.1 The top-level rule *)
+
+TOPDOWN body PROC(operand, stm)
+      = ( let val masklabel = newLabel()
+      	      and proclab = get_proclabel $$
+      	  in
+	    emit ".text.align\t1\n.globl\t"; emit proclab; emit "\n";
+      	    emit proclab; emit ":\n.word\t"; emit masklabel; emit "\n";
+	    DOoperand();
+	    emit "subl2\t"; emitoperand $1$; emit ",sp\n";
+	    DOstm();
+	    emit "ret\n.set\t"; emit masklabel; emit ",";
+	    emit (int2str (regmask())); emit "\n"
+      	  end );
+      	    
+(* 4.3.2 Rules for statements *)
+
+stm SEQ(stm,stm) = ( );
+
+stm LABEL = ( emit (get_label $$); emit ":\n" );
+
+stm JUMP(name) :
+      ( WD (DC,3,8,false,true,false,0))
+      = ( emit "jbr\t"; emitname $1$; emit "\n" );
+
+stm JUMP(location) :
+      ( WD (DC,1,8,false,true,false,0))
+      = ( emit "jmp\t"; emitlocation $1$; emit "\n" );
+
+TOPDOWN stm CJUMP(test,NAME) :
+      ( WD (DC,0,0,false,true,false,0))
+      = ( set_truebranch ($1$, get_label $2$) ; DOtest(); ());
+
+TOPDOWN stm CJUMP(ntest,location) :
+      ( WD (DC,1,4,false,true,false,0))
+      = ( set_truebranch ($1$, newLabel()); DOntest(); DOlocation();
+	 emit "jmp\t"; emitlocation $2$; emit "\n";
+	 emit (get_truebranch $1$); emit ":\n" );
+
+stm operand = ( emit "# throw away "; emitoperand $$; emit "\n" );
+
+stm bigval = ( emit "# throw away "; emit ((reg2str o get_reg) $$);
+	       givereg $$ );
+
+insert (
+
+  fun commutative PLUS = true
+    | commutative MUL = true
+    | commutative OR = true
+    | commutative EQ = true
+    | commutative _  = false
+
+  fun vaxop i =
+    case i of
+      Op PLUS => "add"
+    | Op MINUS => "sub"
+    | Op MUL => "mul"
+    | Op DIV => "div"
+    | Op OR => "bis"
+    | Op XOR => "xor"
+    | Op EQ => "eql"
+    | Op NEQ => "neq"
+    | Op LT => "lss"
+    | Op LEQ => "leq"
+    | Op GT => "gtr"
+    | Op GEQ => "geq"
+    | Op ULT => "lssu"
+    | Op ULEQ => "lequ"
+    | Op UGT => "gtru"
+    | Op UGEQ => "gequ"
+    | _ => fatal "not an opcode"
+
+  fun negate c =
+    Op
+    (case c of
+       Op EQ => NEQ
+     | Op NEQ => EQ
+     | Op LT => GEQ
+     | Op GEQ => LT
+     | Op GT => LEQ
+     | Op LEQ => GT
+     | Op ULEQ => UGT
+     | Op UGT => ULEQ
+     | Op ULT => UGEQ
+     | Op UGEQ => ULT
+     | _ => fatal "cannot negate")
+
+  fun sizecodei 1 = "b"
+    | sizecodei 2 = "w"
+    | sizecodei 4 = "l"
+    | sizecodei 8 = "q"
+    | sizecodei _ = "X"
+
+  fun sizecodef 4 = "f"
+    | sizecodef 8 = "d"
+    | sizecodef _ = "X"
+
+  val sizecode = sizecodei
+
+  val sizeioperand = get_size
+
+  fun emitcomputation t =
+    let val kind = get_kind t
+    in
+      case kind of
+	numbered 31 =>
+	  (emit ((vaxop o Op o get_op o child0) t);
+	   emit (get_sizecode (child0 t) (get_size t));
+	   emit "3\t"; ((emitoperand o child2) t); emit ",";
+	   (emitoperand o child1) t; emit ",")
+      | numbered 32 =>
+	  (emit ((vaxop o Op o get_op o child0) t);
+	   emit (sizecode (get_size t)); emit "\t";
+	   emitoperand (child1 t); emit ",")
+      | numbered 33 =>
+	  let val (sf,st) = get_sizecodecvt (child0 t)
+	      in
+		emit "cvt"; emit (sf ((get_size o child1) t));
+		emit (st (get_size t)); emit "\t";
+		(emitoperand o child1) t; emit ","
+	      end
+      | numbered 34 => emitcomputation (child1 t)
+      | Op RSHIFT =>
+	  (emit "ashl\t"; (emitoperand o child2) t; emit ",";
+	   (emitoperand o child1) t; emit ",")
+      | numbered 37 =>
+	  (emit "extzv\t$"; emit ((int2str o get_ivalue o child2) t);
+	   emit ",$"; emit (int2str (32 - ((get_ivalue o child2) t)));
+	   emit ","; emit ((reg2str o get_reg o child1) t); emit ",";
+	   (givereg o child1) t )
+      | numbered k =>
+	  (if 1 <= k andalso k <= 8
+	     then (emit "movab\t"; emitlocation t; emit ",")
+	   else if 11 <= k andalso k <= 15
+		  then (emit "mova"; emit ((sizecode o sizeioperand) t);
+			emit "\t"; emitioperand t; emit "," )
+		else if 21 <= k andalso k <= 27
+		       then (emit "mov"; emit (sizecode (get_size t));
+			     emit "\t"; emitoperand t; emit "," )
+			else (emit "# strange kind of computation"))
+      | _ => ()
+    end
+
+);
+
+(* 4.3.3 Calculating values into registers *)
+
+reg computation :
+      ( WDH1 (DC,1,0,true,false,false,0) )
+    = ( emitcomputation $$; getreg $$;
+      	emit (reg2str (get_reg $$)); emit "\n");
+
+reg MOVE(TEMP,computation) :
+      ( WD (DC,1,0,true,true,true,0))
+    = ( emitcomputation $2$;
+      	set_reg ($$, get_temp $1$);
+      	emit (reg2str (get_temp $1$)); emit "\n");
+
+reg TEMP :
+      ( WD (DC,0,0,false,false,true,0))
+    = ( set_reg ($$,get_temp $$) );
+
+(* TOPDOWN reg ALLOC(TEMP,reg) :
+      ( let val f = (get_cost_setFlags reg)
+      	    and d = (get_cost_dontDestroy reg)
+      	in WDH1 (DC,0,0,f,false,d,(get_size $1$ div 4))
+      	end)
+    = ( getreg $1$; set_temp_number ($1$, get_reg $1$); DOreg();
+      	givereg $1$; set_reg ($$, get_reg $2$); givereg $2$);
+
+TOPDOWN stm ALLOC(TEMP,stm) :
+      ( WD (DC,0,0,false,false,false,(get_size $1$) div 4))
+    = (getreg $1$; set_temp_number ($1$,get_reg $1$); DOstm(); givereg $1$);
+*)
+
+(* 4.3.4 Locations in memory *)
+
+location reg :
+      ( WDHA (DC,1,0,false,false,false,0) )
+    = ( set_kind_n ($$,1) );
+
+location OP(PLUS,name,reg) :
+      ( WDHA (DC,1,0,false,false,false,0) )
+    = ( set_kind_n ($$,2) );
+
+location OP(PLUS,reg,name) :
+      ( WDHA (DC,1,0,false,false,false,0) )
+    = ( set_kind_n ($$,3) );
+
+location MEM(OP(PLUS,name,reg)) :
+      ( WDHA (DC,1,4,false,false,false,0) )
+    = ( set_kind_n ($$,4) );
+
+location MEM(OP(PLUS,reg,name)) :
+      ( WDHA (DC,1,4,false,false,false,0) )
+    = ( set_kind_n ($$,5) );
+
+location name :
+      ( WD (DC,1,0,false,false,false,0) )
+    = ( set_kind_n ($$,6) );
+
+(* 4.3.5 Index mode *)
+
+ioperand OP(PLUS,location,OP(MUL,reg,CONST)) :
+      ( WDHAs (DC,1,6,false,false,false,0, get_ivalue $3.3$))
+    = ( set_kind_n ($$,11) );
+
+ioperand OP(PLUS,location,reg) :
+      ( WDHAs (DC,1,6,false,false,false,0, 1))
+    = ( set_kind_n ($$,12) );
+
+ioperand OP(PLUS,OP(MUL,reg,CONST),location) :
+      ( WDHAs (DC,1,6,false,false,false,0, get_ivalue $2.3$))
+    = ( set_kind_n ($$,13) );
+
+ioperand OP(PLUS,reg,location) :
+      ( WDHAs (DC,1,6,false,false,false,0, 1))
+    = ( set_kind_n ($$,14) );
+
+(* 4.3.6 Destinations *)
+
+destination MEM(location) :
+      ( WDHA (DC,0,4,false,false,false,0) )
+    = ( set_kind_n ($$,24) );
+
+destination MEM(ioperand) :
+      ( if (get_size $$) <> (get_cost_isize ioperand)
+      	then ABORT()
+      	else WDHA (DC,0,4,false,false,false,0) )
+    = ( set_kind_n ($$,25) );
+
+(* 4.3.7 R-value operands *)
+
+operand reg :
+      ( WDHA (DC,1,0,get_cost_setFlags reg,false,false,0) )
+    = ( set_kind_n ($$,21) );
+
+operand name :
+      ( WD (DC,1,0,false,false,false,0) )
+    = ( set_kind_n ($$,22) );
+
+operand CONST :
+      ( if not ((get_ivalue $$) >= 0 andalso (get_ivalue $$) < 64)
+      	then ABORT()
+      	else WD (DC,1,0,false,false,false,0) )
+    = ( set_kind_n ($$,22) );
+
+operand destination : ( WDHA (DC,0,0,false,false,false,0) ) = ();
+
+(* 4.3.8 Computations *)
+
+computation operand :
+      ( if (get_size $$) > 8 orelse
+      	((((sizecode o get_size) $$) = "X"))
+      	then ABORT()
+      	else WDHA (DC,1,4,get_cost_setFlags operand,false,false,0) )
+    = ();
+
+computation OP(binop,operand,operand) :
+      ( WDHA (DC,1,0,false,false,false,0) )
+    = ( set_kind_n ($$,31) );
+
+computation UNOP(unop,operand) :
+      ( WDHA (DC,1,0,false,false,false,0) )
+    = ( set_kind_n ($$,32) );
+
+computation UNOP(cvtop,operand) :
+      ( WDHA (DC,1,0,false,false,false,0) )
+    = ( set_kind_n ($$,33) );
+
+computation location :
+      ( WDHA (DC,1,4,false,false,false,0) ) = ();
+
+computation ioperand :
+      ( if (get_cost_isize ioperand) > 8
+      	orelse ((((sizecode o get_cost_isize) ioperand) = "X"))
+      	then ABORT()
+      	else WDHA (DC,1,4,false,false,false,0) ) = ();
+
+(* 4.3.9 Boolean conditions *)
+
+TOPDOWN test CAND(ntest,test)
+    = ( let val l = newLabel() in
+        set_truebranch ($1$, l);
+        set_truebranch ($2$, get_truebranch $$);
+      	DOntest(); DOtest();
+      	emit l; emit ":\n"
+	end);
+
+TOPDOWN ntest CAND(ntest,ntest)
+    = ( set_truebranch ($1$, get_truebranch $$);
+      	set_truebranch ($2$, get_truebranch $$);
+      	DOntest1(); DOntest2(); ());
+
+TOPDOWN test NOT(ntest)
+    = ( set_truebranch ($1$, get_truebranch $$);
+      	DOntest(); () );
+
+TOPDOWN ntest NOT(test)
+    = ( set_truebranch ($1$, get_truebranch $$);
+      	DOtest(); ());
+
+ntest flag :
+      ( WD (DC,4,8,false,false,false,0) )
+    = ( emit "j"; emit ((vaxop o negate o get_kind) $$); emit "\t";
+      	emit (get_truebranch $$); emit "\n" );
+
+test flag :
+      (WD (DC,4,8,false,false,false,0) )
+    = ( emit "j"; emit ((vaxop o get_kind) $$); emit "\t";
+      	emit (get_truebranch $$); emit "\n" );
+
+flag OP(relop,operand,operand) :
+      ( WD (DC,1,4,false,false,false,0) )
+    = ( emit "cmp"; emit (get_sizecode $1$ (get_size $2$)); emit "\t";
+        emitoperand $2$; emit ","; emitoperand $3$; emit "\n";
+      	set_kind ($$, get_op $1$) );
+
+flag OP(relop,operand,zero) :
+      ( WD (DC,1,4,false,false,false,0) )
+    = ( emit "tst"; emit (get_sizecode $1$ (get_size $2$)); emit "\t";
+        emitoperand $2$; emit "\n";
+      	set_kind ($$, get_op $1$) );
+
+flag OP(relop,stm,zero) :
+      ( if get_cost_setFlags stm then DC else ABORT() )
+    = ( set_kind ($$, get_op $1$) );
+
+TOPDOWN reg BOOL(test) :
+      ( WDH1 (DC,9,12,true,false,false,0) )
+    = ( let val merge = newLabel()
+	in
+	  set_truebranch ($1$, newLabel());
+	  DOtest();
+	  getreg $$;
+	  emit "movb\t$0,"; emit (reg2str (get_reg $$)); emit "\njbr\t";
+	  emit merge; emit "\n"; emit (get_truebranch $1$);
+	  emit ":\nmovb\t$1,"; emit (reg2str (get_reg $$)); emit "\n";
+	  emit merge; emit ":\n"
+	end);
+
+(* 4.3.10 Expressions too large to fit in registers *)
+
+(* For testing we do not need bigvals *)
+
+(* 4.3.11 Operators *)
+
+unop NEG : ( C(0,4,false,false,false,0)) = ( set_sizecode($$, sizecodei));
+unop COMP : ( C(0,4,false,false,false,0)) = ( set_sizecode($$, sizecodei));
+binop PLUS : ( C(0,4,false,false,false,0)) = ( set_sizecode($$, sizecodei));
+binop MINUS : ( C(0,4,false,false,false,0)) = ( set_sizecode($$, sizecodei));
+binop MUL : ( C(0,16,false,false,false,0)) = ( set_sizecode($$, sizecodei));
+binop DIV : (C(0,100,false,false,false,0)) = ( set_sizecode($$, sizecodei));
+binop OR : ( C(0,4,false,false,false,0)) = ( set_sizecode($$, sizecodei));
+binop XOR : ( C(0,4,false,false,false,0)) = ( set_sizecode($$, sizecodei));
+binop AND : ( C(0,4,false,false,false,0)) = ( set_sizecode($$, sizecodei));
+(* The previous tree pattern was ANDNOT *)
+
+relop EQ = ( set_sizecode ($$, sizecodei) );
+relop NEQ = ( set_sizecode ($$, sizecodei) );
+relop LT = ( set_sizecode ($$, sizecodei) );
+relop LEQ = ( set_sizecode ($$, sizecodei) );
+relop ULT = ( set_sizecode ($$, sizecodei) );
+relop ULEQ = ( set_sizecode ($$, sizecodei) );
+relop GT = ( set_sizecode ($$, sizecodei) );
+relop GEQ = ( set_sizecode ($$, sizecodei) );
+relop UGT = ( set_sizecode ($$, sizecodei) );
+relop UGEQ = ( set_sizecode ($$, sizecodei) );
+
+cvtop CVTSS :
+      ( C (0,4,false,false,false,0) )
+    = ( set_sizecodecvt ($$, sizecodei, sizecodei) );
+
+cvtopu CVTSU = ();
+cvtopu CVTUU = ();
+cvtopu CVTUS = ();
+
+(* 4.3.12 Constants and labels *)
+
+name CONST :
+      ( let val i = get_ivalue $$ in
+      	C (if i>= 0
+      	then
+      	  if i > 32767
+      	  then 4
+      	  else if i>127 then 2 else 1
+      	else
+      	  if i < ~32768
+      	  then 4
+      	  else if i < ~128 then 2 else 1, 0, false,false,false,0)
+      	end) = ();
+
+name NAME : ( C (4,0,false,false,false,0) )= ();
+
+name OP(PLUS,NAME,CONST) : ( C (4,0,false,false,false,0) ) = ();
+
+(* 4.3.13 Storing into memory *)
+
+reg MOVE(destination,reg) :
+      ( WDH1 (DC,2,12,true,true,false,0) )
+    = ( set_reg ($$, get_reg $2$);
+      	givereg $2$;
+        emit "mov"; emit ((sizecode o get_size) $2$); emit "\t";
+      	emit (reg2str (get_reg $$)); emit ","; emitoperand $1$;
+      	emit "\n" );
+
+stm MOVE(destination, computation) :
+      ( WD (DC,0,8,true,true,false,0) )
+	= ( emitcomputation $2$; emitoperand $1$; emit "\n" );
+
+TOPDOWN stm MOVE(destination,OP(binop,operand,operand)) :
+      ( if (get_sideEffect DC) orelse not (equal($1$, $2.2$))
+      	  then ABORT()
+      	  else WD (DC,1-(get_cost_space operand1),
+      	      	    8-(get_cost_time operand1),true,true,false,0)
+      	)
+    = ( DOdestination(); DObinop(); DOoperand2();
+      	emit ((vaxop o Op o get_op) $2.1$);
+	emit (get_sizecode $2.1$ (get_size $$)); emit "2\t";
+	emitoperand $2.3$; emit ","; emitoperand $1$; emit "\n"
+      );
+
+TOPDOWN stm MOVE(destination,OP(binop,operand,operand)) :
+      ( if not ((commutative o get_op) $2.1$) orelse
+      	  (get_sideEffect DC) orelse not (equal ($1$, $2.3$))
+      	  then ABORT()
+      	  else WD (DC,1-(get_cost_space operand2),
+      	      	    8-(get_cost_time operand2),true,true,false,0) )
+    = ( DOdestination(); DObinop(); DOoperand1();
+      	emit ((vaxop o Op o get_op) $2.1$);
+	emit (get_sizecode $2.1$ (get_size $$));
+      	emit "2\t"; emitoperand $2.2$; emit ","; emitoperand $1$;
+	emit "\n"
+      );
+
+TOPDOWN stm MOVE(destination,OP(PLUS,operand,CONST)) :
+      ( if not ((equal ($1$, $2.2$)) andalso
+      	  ((get_ivalue $2.3$) = 1 orelse (get_ivalue $2.3$) = ~1))
+      	then ABORT()
+      	else WD (DC,1-(get_cost_space operand), 8-(get_cost_time operand),
+      	      	  true,true,false,0) )
+    = ( DOdestination();
+      	emit (if (get_ivalue $2.3$) > 0 then "inc" else "dec");
+	emit (sizecode (get_size $1$)); emit "\t"; emitoperand $1$;
+	emit "\n" );
+
+stm MOVE(destination,zero) :
+      ( WD (DC,1,4,true,true,false,0) )
+    = ( emit "clr"; emit (sizecode (get_size $1$)); emit "\t";
+        emitoperand $1$; emit "\n");
+
+(* 4.3.14 Destructive register operations *)
+
+reg OP(binop,reg,operand) :
+      ( if get_cost_dontDestroy reg
+      	then ABORT()
+      	else WDH1 (DC,2,0,true,false,false,0) )
+    = (
+      	set_reg($$,get_reg $2$);
+      	givereg $2$;
+        emit ((vaxop o Op o get_op) $1$);
+        emit (get_sizecode $1$ (get_size $$));
+	emit "2\t"; emitoperand $3$; emit ",";
+	emit (reg2str (get_reg $$)); emit "\n"
+      );
+
+reg OP(binop,operand,reg) :
+      ( if get_cost_dontDestroy reg orelse
+      	   not ((commutative o get_op) $1$) then ABORT()
+      	else WDH1 (DC,2,0,true,false,false,0) )
+    = ( emit ((vaxop o Op o get_op) $1$);
+        emit (get_sizecode $1$ (get_size $$)); emit "2\t";
+	emitoperand $2$; emit ","; emit (reg2str (get_reg $3$));
+	emit "\n";
+	set_reg ($$, get_reg $3$);
+	givereg $3$ );
+
+reg OP(PLUS,reg,CONST) :
+      ( if not ((get_ivalue $3$) = 1 orelse (get_ivalue $3$) = ~1) orelse
+      	    get_cost_dontDestroy reg then ABORT()
+      	else WDH1 (DC,2,4,true,false,false,0) )
+    = ( set_reg ($$, get_reg $2$); givereg $2$;
+      	emit (if (get_ivalue $3$) > 0 then "inc" else "dec");
+	emit (sizecode (get_size $$)); emit "\t";
+	emit (reg2str (get_reg $$)); emit "\n");
+
+(* 4.3.15 Exceptional instructions *)
+
+(* 4.3.16 Procedure calls and parameters *)
+
+stm RETURN(result) = ( emit "ret\n" );
+stm RETURN(reg) : ( WD(DC,2,2,false,false,false,0) )
+	= ( emit "movl\t"; emit (reg2str (get_reg $1$));
+	    emit ",r0\nret\n" );
+ 
+reg result : ( WD (DC,2,2,false,false,false,0) )
+	= ( set_reg ($$,resultReg()) );
+	
+result CALL(args,location) :
+      ( WD (DC,6,20,false,false,false,0) )
+	= ( calling();
+	    emit "calls\t$"; emit ((int2str o count_arguments) $1$);
+	    emit ","; emitlocation $2$; emit "\n" );
+
+TOPDOWN args ARG(operand,args) :
+      ( WD (DC,1,6,false,false,false,0) )
+    = ( DOoperand();
+        emit "movl\t"; emitoperand $1$; emit ",-(sp)\n";
+	DOargs());
+
+args NOARGS = ();
+
+(* 4.3.17 Constants with value zero *)
+
+zero CONST : ( if (get_ivalue $$) <> 0 then ABORT() else DC ) = ();
+
+(* 4.3.18 Miscellany *)
+
+reg ESEQ(stm,reg) :
+      ( WDH1(DC,0,0,get_cost_setFlags reg,false,get_cost_dontDestroy reg,0))
+    = ( set_reg($$, get_reg $2$); givereg $2$ );

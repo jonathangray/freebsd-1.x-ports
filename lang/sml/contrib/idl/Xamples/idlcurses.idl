@@ -1,0 +1,75 @@
+(*
+	mini-Curses server for IDL
+
+	@(#)idlcurses.idl	2.1 93/03/07 00:58:15
+
+	[At present it doesn't cope with window resizings]
+*)
+
+${
+	import  "../Xidl/idlbase.sig";
+	functor idlcurses(idlbase:idlbase) =
+	struct  open idlbase
+$}
+
+%{
+
+#       include <curses.h>
+
+	WINDOW  *w;
+%}
+
+Initscr()               = %{ w=initscr(); %};
+
+Endwin () : unit        = %{ endwin(); %} => ();
+
+Endscr () : unit        = %{ endwin(); idlcontinue=0; %} => ();
+
+Mvaddstr(y:int, x:int, str: string) =
+%{
+	mvwaddstr(w, y, x, str);
+%}
+
+Move(y:int, x:int)      = %{ wmove(w, y, x); %}
+
+Addstr(str: string)     = %{ waddstr(w, str); %}
+
+Cbreak()                = %{ cbreak(); %}
+
+Noecho()                = %{ noecho(); %}
+
+Nonl()                  = %{ nonl(); %}
+
+Sync()  : unit          => ();
+
+Getch() : byte          => wgetch(w);
+
+Refresh() : unit        = %{ wrefresh(w); %} => ();
+
+
+
+${
+	fun StartServer path args =
+	(startserver path args;
+	 if Signature<>GetSignature()
+	 then  (app (outputc std_err) ["[Server ", path, " incompatible]\n"];
+		raise Interrupt
+	       ) else ()
+	)
+
+	fun StopServer() = Endscr();
+	end
+$}
+
+%{
+void    main(argc, argv)
+	int     argc;
+	char*   argv[];
+{
+	idlinit("/dev/tty");  /* This is important; curses uses std{in,out} */
+	Initscr();
+	idlserver();
+	endwin();
+}
+%}
+

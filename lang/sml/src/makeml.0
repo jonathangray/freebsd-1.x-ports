@@ -1,0 +1,727 @@
+#!/bin/sh
+#
+# makeml - build the SML/NJ system
+#
+#set -x
+
+CMD="$0>"
+
+CSV=""
+CALLEESAVE=""
+MESSAGE='""'
+MACHINE=""
+OPSYS="BSD"
+ENDIAN=""
+DEBUG=""
+IMAGE=""
+MODULEKIND="Int"
+TARGET=""
+SHARE="TRUE"
+DEFS=""
+PRECLEAN="TRUE"
+POSTCLEAN=""
+MKRUN="TRUE"
+RUNTIME="runtime"
+NOBOOT=""
+AS="as"
+COMMAND=""
+IONLY=""
+CFL=""
+LDFLAGS=""
+MOFILES=""
+USE_GCC=""
+SHELL="/bin/sh"
+LIBS=""
+MP_SYSTEM=""
+HPUX_VERSION="0"
+
+MAKE="make"
+AS="as"
+CPP="/lib/cpp"
+
+#
+# gc params
+#
+HEAP=5120
+RATIO=5
+SOFTLIMIT=12288
+
+#
+# try to guess the machine type
+#
+if [ -f /bin/arch ]; then
+    case `/bin/arch` in
+	sun3)
+	    set - -sun3 sunos $*
+	;;
+	sun4)
+	    set - -sun4 sunos $*
+	;;
+    esac
+elif [ -f /hp-ux ]; then
+	set -- -m68 hpux $*
+elif [ -d /mac ]; then
+      set - -m68 aux $*
+fi
+
+#
+# process command-line options
+#
+while test "$#" != "0"
+do
+    arg=$1
+    shift
+    case $arg in
+      #
+      # Options to specify machines/os configuration
+      #
+	-rs6k|-rs6000)
+	    MACHINE=RS6000
+	    case $1 in
+		aix) OPSYS=AIX
+		     DEFS="$DEFS -DBSD -D_BSD"
+		     LDFLAGS="$LDFLAGS -lbsd -bnso -bI:/lib/syscalls.exp"
+		     ;;
+		*)
+		    echo "$CMD opsys must be aix" 
+		    exit 1
+		;;
+            esac
+	    shift
+	    ;;
+	-sun3|-sun4)
+	    case $arg in
+		-sun3) MACHINE=M68;;
+		-sun4) MACHINE=SPARC;;
+	    esac
+	    case $1 in
+		mach)  OPSYS=MACH; DEFS="$DEFS -DBSD" ;;
+		sunos|sunos4) OPSYS=SUNOS ;;
+		solaris|sunos5)
+		  MAKE=/usr/ccs/bin/make
+		  AS=/usr/ccs/bin/as
+		  CPP=/usr/ccs/lib/cpp
+		  DEFS="$DEFS -DSUNOS"
+		  OPSYS=SOLARIS
+		  ;;
+		*)
+		    echo "$CMD must specify opsys arg for SUN (sunos or mach)"
+		    exit 1
+		;;
+	    esac
+	    shift
+	;;
+	-next|-NeXT)
+	    MACHINE=M68;
+	    OPSYS=NeXT
+	    case $1 in
+		2|2.0|2.1) ;;
+		3|3.0)
+		    DEFS="$DEFS -DNeXT_3_0"
+		;;
+		*)
+		    echo "$CMD must specify opsys version for NeXT (2.0, 3.0)"
+		    exit 1
+		;;
+	    esac
+	    shift
+	;;
+	-decstation|-DECstation)  # DEC mips box
+	    MACHINE=MIPS
+	    ENDIAN=Little
+	    case $1 in
+		ultrix|bsd) OPSYS=BSD ;;
+		mach)       OPSYS=MACH; DEFS="$DEFS -DBSD";;
+		*)
+		    echo "$CMD must specify opsys arg for DECstation (ultrix or mach)"
+		    exit 1
+		;;
+	    esac
+	    shift
+	;;
+	-vax)
+	    MACHINE=VAX
+	    case $1 in
+		bsd)    OPSYS=BSD ;;
+		mach)   OPSYS=MACH; DEFS="$DEFS -DBSD";;
+		*)
+		    echo "$CMD must specify opsys arg for VAX (bsd or mach)"
+		    exit 1
+		;;
+	    esac
+	    shift
+	;;
+        -sgi)   # Silicon Graphics box with MIPS chip
+	    MACHINE=MIPS
+	    ENDIAN=Big
+	    OPSYS=SGI
+	    case $1 in
+		irix3) DEFS="$DEFS -D_BSD_SIGNALS" ;;
+		irix) DEFS="$DEFS -D_BSD_SIGNALS -cckr -Dsgi" ;;
+		*)
+		    echo "$CMD must specify opsys arg for SGI (irix or irix3)"
+		    exit 1
+		;;
+	    esac
+	    shift
+	;;	
+	-mips)  # MipsCo box
+	    MACHINE=MIPS
+	    ENDIAN=Big
+	    case $1 in
+		riscos) OPSYS=RISCos; CFL="$CFL -systype bsd43" ;;
+	 	news)   OPSYS=BSD;;
+		mach)   OPSYS=MACH; DEFS="$DEFS -DBSD" ;;
+		*)
+		    echo "$CMD must specify opsys arg for MIPS (riscos, mach or news)"
+		    exit 1
+		;;
+	    esac
+	    shift
+	;;
+	-hppa)
+	    MACHINE=HPPA
+	    SHARE=""
+	    MESSAGE='("Beta release version"^chr(10))'
+	    case $1 in
+		hpux) OPSYS=HPUX ;;
+		hpux8) OPSYS=HPUX; HPUX_VERSION="8" ;;
+		mach) OPSYS=MACH ;;
+		*)
+		    echo "$CMD must specify opsys arg for hppa (hpux, hpux8 or mach)"
+		    exit 1
+		;;
+	    esac
+	    shift
+	;;
+	-m68)
+	    MACHINE=M68
+	    case $1 in
+		sunos)  OPSYS=SUNOS ;;
+		hpux) OPSYS=HPUX ;;
+		hpux8) OPSYS=HPUX; HPUX_VERSION="8" ;;
+                aux) OPSYS=AUX; AS="gas"; USE_GCC="TRUE"; CFL="$CFL -static" ;;
+		mach) OPSYS=MACH ;;
+		more) OPSYS=MORE ;;
+		*)
+		    echo "$CMD must specify opsys arg for M68 (sunos, hpux, hpux8, more or aux)"
+		    exit 1
+		;;
+	    esac
+	    shift
+	;;
+	-i386|-386|-i486|-486)
+	    MACHINE=I386
+	    case $1 in
+		bsd)    OPSYS=BSD ;;
+		bsd386) OPSYS=BSD; DEFS="$DEFS -DBSD386";;
+		mach)   OPSYS=MACH; DEFS="$DEFS -DBSD";;
+		*)
+		    echo "$CMD must specify opsys arg for i386/i486 (bsd, bsd386 or mach)"
+		    exit 1
+		;;
+	    esac
+	    shift
+	;;
+        -sequent)   # sequent symmetry 
+	    MACHINE=I386
+            case $1 in
+                dynix3)    OPSYS=DYNIX; DEFS="$DEFS -DBSD";;
+		*)
+		    echo "$CMD opsys must be dynix3" 
+		    exit 1
+   	        ;;
+            esac
+            shift
+         ;;
+      #
+      # options to select kind of system to build (batch, debug, ...)
+      #
+	-batch)
+	    MODULEKIND=Comp
+	;;
+	-target)
+	    if test "$#" = "0"
+	    then
+		echo "$CMD must supply machine for -target option"
+		exit 1
+	    fi
+	    MODULEKIND=Comp
+	    TARGET=$1
+	    shift
+	;;
+	-debug)
+	    DEBUG="D"
+	    COMMAND=$COMMAND'System.Control.CG.rounds:=1;use "dbguser/load.sml";'
+	;;
+	-debug0)
+	    DEBUG="D"
+	    COMMAND=$COMMAND'System.Control.CG.rounds:=1;'
+	;;
+	-i)
+	    COMMAND=$COMMAND"System.Control.interp := true;"
+	;;
+	-ionly)
+	    COMMAND=$COMMAND"System.Control.interp := true;"
+	    IONLY="TRUE"
+	;;
+      #
+      # other options
+      #
+        -g)
+	    CFL="$CFL -g"
+	;;
+	-gcc)
+	    USE_GCC="TRUE"
+	;;
+	-noshare)
+	    SHARE=""
+	;;
+	-pervshare)
+	    MOFILES="Perv.mos"
+	;;
+	-run)
+	    MKRUN="TRUE"
+	    NOBOOT="TRUE"
+	;;
+	-norun)
+	    MKRUN=""
+	    PRECLEAN=""
+	;;
+        -callee)
+	    CALLEESAVE="$1"
+            DEFS="$DEFS -DCALLEESAVE=$CALLEESAVE"
+	    
+	    shift
+	;;
+	-mp)
+	    if test "$#" = "0"
+	    then
+		echo "$CMD must supply number of processors for -mp option"
+	 	exit 1
+	    fi
+	    MP_SYSTEM="TRUE"
+	    DEFS="$DEFS -DMAX_PROCS=$1"
+	    shift
+	;;
+	-noclean)
+	    PRECLEAN=""
+	;;
+	-cleanup)
+	    POSTCLEAN="TRUE"
+	;;
+	-o)
+	    if test "$#" = "0"
+	    then
+		echo "$CMD must supply image name for -o option"
+		exit 1
+	    fi
+	    IMAGE=$1
+	    shift
+	;;
+	-runtime)
+	    if test "$#" = "0"
+	    then
+		echo "$CMD must supply runtime directory for -runtime option"
+		exit 1
+	    fi
+	    RUNTIME=$1
+	    shift
+	;;
+	-mo)
+	    if test "$#" = "0"
+	    then
+		echo "$CMD must supply mo directory for -mo option"
+		exit 1
+	    fi
+	    MO=$1
+	    shift
+	;;
+	-h)
+	    if test "$#" = "0"
+	    then
+		echo "$CMD must supply argument for -h option"
+		exit 1
+	    fi
+	    HEAP=$1
+	    shift
+	;;
+	-r)
+	    if test "$#" = "0"
+	    then
+		echo "$CMD must supply argument for -r option"
+		exit 1
+	    fi
+	    RATIO=$1
+	    shift
+	;;
+	-m)
+	    if test "$#" = "0"
+	    then
+		echo "$CMD must supply argument for -m option"
+		exit 1
+	    fi
+	    SOFTLIMIT=$1
+	    shift
+	;;
+	-D*)
+	    DEFS="$DEFS $arg"
+	;;
+	*)
+	    echo "$CMD unrecognized option $arg"
+	    exit 1
+	;;
+    esac
+done
+
+if test -n "$MP_SYSTEM"
+then
+    MESSAGE='("(with multi-processor support)"^chr(10))'
+    if test "$OPSYS" = SGI
+    then
+	LIBS="$LIBS -lmpc"
+    else
+	echo "$CMD machine and/or OS do(es) not support more than 1 processor"
+	exit 1
+    fi
+fi
+
+#
+# HPPA cannot execute in sharable mode. -noshare is default.
+#
+if test "$MACHINE" = HPPA
+then
+    if test -n "$MOFILES"
+    then
+	  echo "$CMD Hppa cannot be built using -pervshare"
+	  echo "$CMD ignoring -pervshare ..."
+	  MOFILES=""
+    fi
+fi
+
+
+if test -z "$IMAGE"
+then
+    if test "$MODULEKIND" = Int
+    then
+	if test -n "$IONLY"
+	then
+	    IMAGE=smli
+	else
+	    IMAGE=sml
+	fi
+	if test -n "$DEBUG"
+	then IMAGE="$IMAGE"d
+	fi
+    else
+	IMAGE=smlc
+    fi
+fi
+
+#if test -n "$USE_GCC" -o "$OPSYS" = MORE
+#then
+#    F68881="-m68881"
+#fi
+
+case $MACHINE in
+    RS6000)
+	MODULE="$MODULEKIND"RS6000"$DEBUG" 
+	MO=${MO-"../mo.rs6000"}
+        ;;
+    M68)
+	if test -n "$USE_GCC" -o "$OPSYS" = MORE
+	then
+		F68881="-m68881"
+	fi
+	case $OPSYS in
+	SUNOS|MACH)
+	    DEFS="$DEFS -DBSD -Dsun3"
+	    CFL="-n $F68881"
+	;;
+	MORE)
+	    OPSYS=BSD
+	    DEFS="$DEFS -DMORE -D__GNUC__"
+	    F68881="-m68881"			# gcc assumed
+	    CFL="-z -Bstatic $F68881"
+	;;
+	HPUX)
+	    if [ $HPUX_VERSION = 8 ] 
+	    then 
+	         CFL="-Wl,-a,archive"
+	    fi 
+	;;
+	NeXT)
+	    DEFS="$DEFS -DBSD"
+	;;
+	*) ;;
+	esac
+	MO=${MO-"../mo.m68"}
+	MODULE="$MODULEKIND"M68"$DEBUG"
+    ;;
+    SPARC)
+	DEFS="$DEFS -DBSD -Dsun4"
+	if [ $OPSYS = SOLARIS ]
+	then
+		if test -n "$USE_GCC"
+		then
+			LDFLAGS="-static"
+		else
+			LDFLAGS="-dn"
+		fi
+        else
+		if [ $OPSYS = SUNOS ]
+		then
+			CFL="-n"
+		fi
+	fi
+	MO=${MO-"../mo.sparc"}
+	MODULE="$MODULEKIND"Sparc"$DEBUG"
+    ;;
+    VAX)
+	MO=${MO-"../mo.vax"}
+	MODULE="$MODULEKIND"Vax"$DEBUG"
+    ;;
+    MIPS)
+	if test -z "$ENDIAN"
+	then
+	    echo "$CMD determining endianess"
+	    (cd $RUNTIME; cc -o endian endian.c)
+	    ENDIAN=`$RUNTIME/endian`
+	    (cd $RUNTIME; rm -f endian)
+	fi
+	if test -z "$MO"
+	then
+	    case $ENDIAN in
+		Little) MO="../mo.mipsl" ;;
+		Big) MO="../mo.mipsb" ;;
+	     esac
+	fi
+	case $ENDIAN in
+	    Little) MODULE="$MODULEKIND"MipsLittle"$DEBUG" ;;
+	    Big) MODULE="$MODULEKIND"MipsBig"$DEBUG" ;;
+	esac
+    ;;
+    HPPA) if [ $HPUX_VERSION = 8 ] 
+	    then 
+	         CFL="-Wl,-a,archive"
+	    fi 
+ 	MO=${MO-"../mo.hppa"}
+	MODULE="$MODULEKIND"Hppa"$DEBUG"
+    ;;
+    I386)
+	MO=${MO-"../mo.i386"}
+	MODULE="$MODULEKIND"I386"$DEBUG"
+    ;;
+    *)
+	echo "$CMD must specify machine type"
+	exit 1
+    ;;
+esac
+
+if test -n "$TARGET"
+then
+    case $TARGET in
+	rs6k|rs6000)
+	    TARGET=RS6000
+	    CSV="~setcalleesaves 3"
+	;;
+	m68|M68)
+	    TARGET=M68
+	    CSV="~setcalleesaves 0"
+	;;
+	sparc|Sparc|SPARC|sun4)
+	    TARGET=Sparc
+	    CSV="~setcalleesaves 3"
+	;;
+	vax|Vax|VAX)
+	    TARGET=Vax
+	    CSV="~setcalleesaves 0"
+	;;
+	mips|Mips|MIPS)
+	    echo "$CMD must specify MIPSL or MIPSB for -target option"
+	;;
+	mipsb|MipsB|MIPSB)
+	    TARGET=Mips
+	    TARGET_ENDIAN=Big
+	    CSV="~setcalleesaves 3"
+	;;
+	mipsl|MipsL|MIPSL)
+	    TARGET=Mips
+	    TARGET_ENDIAN=Little
+	    CSV="~setcalleesaves 3"
+	;;
+        rs6k|rs6000|RS6000)
+	    TARGET=RS6000
+	    CSV="~setcalleesaves 3"
+	;;
+	i386|386|i486|486)
+	    TARGET=I386 
+            CSV="~setcalleesaves 0"
+	;;
+	hppa|Hppa|HPPA|HP-PA|hp-pa)
+	    TARGET=Hppa
+	    CSV="~setcalleesaves 3"
+	;;
+	*)
+	    echo "$CMD invalid argument to -target option"
+	    exit 1
+    esac
+    MODULE="$MODULEKIND"$TARGET"$TARGET_ENDIAN"
+fi
+
+if test -n "$IONLY"
+then
+    if test -n "$TARGET"
+    then
+	echo "$CMD -target and -ionly options are incompatible"
+	exit 1
+    fi
+    MODULE="IntNull"
+fi
+
+if test -z "$MOFILES"
+then
+    MOFILES="$MODULE.mos"
+fi
+
+DEFS="$DEFS -D$OPSYS"
+
+
+if test -n "$PRECLEAN"
+then
+    echo "$CMD (cd $RUNTIME; $MAKE clean)"
+    (cd $RUNTIME; $MAKE clean)
+fi
+
+if test ! \( -d "$MO" \)
+then
+    echo "$CMD mo directory $MO not found"
+    exit 1
+else
+    echo "$CMD rm -f mo"
+    rm -f mo
+    if test \( -d mo \) -o \( -f mo \)
+    then
+	echo "$CMD unable to remove ./mo"
+	exit 1
+    fi
+    echo "$CMD ln -s $MO mo"
+    ln -s $MO mo
+fi
+
+if test -n "$MKRUN"
+then
+    echo "$CMD (cd $RUNTIME; rm -f run allmo.o allmo.s)"
+    (cd $RUNTIME; rm -f run allmo.o allmo.s)
+
+    if test -n "$USE_GCC"
+    then
+	GCC=${GCC-"gcc"}
+	CCARG="'CC=$GCC -traditional'"
+    else
+	CCARG=""
+    fi
+
+    if test -n "$SHARE"
+    then
+	ARG="MACHINE=$MACHINE $CCARG 'CFL=$CFL' 'LDFLAGS=$LDFLAGS' 'LIBS=$LIBS' 'DEFS=$DEFS -DRUNTIME=\\\"$RUNTIME\\\" -DAS=\\\"$AS\\\"' linkdata"
+	echo "$CMD (cd $RUNTIME; $MAKE $ARG)"
+	(cd $RUNTIME; eval $MAKE $ARG)
+	if test "$?" -ne "0"; then
+	    exit 1
+	fi
+
+	if test "$MACHINE" = "M68"; then
+	  # remove the (unnecessary) Math structure
+	    echo "(cd $RUNTIME; grep -v mo/Math.mo $MOFILES > Tmp.mos)"
+	    (cd $RUNTIME; grep -v mo/Math.mo $MOFILES > Tmp.mos)
+	    MOFILES=Tmp.mos
+	fi
+
+	echo "$CMD $RUNTIME/linkdata [$RUNTIME/$MOFILES]"
+	$RUNTIME/linkdata `cat $RUNTIME/$MOFILES`
+	if test "$?" -ne "0"; then
+	    exit 1
+	fi
+
+	rm -f $RUNTIME/Tmp.mos
+    fi
+
+    BASEARG="$CCARG MACHINE=$MACHINE 'DEFS=$DEFS'"
+    if test "$MACHINE" = MIPS
+    then
+	CPP="$CPP -P"
+    fi
+    ARG="$BASEARG 'CPP=$CPP' 'CFL=$CFL' 'LDFLAGS=$LDFLAGS' 'AS=$AS' 'LIBS=$LIBS'"
+
+    if test "$OPSYS" = HPUX -a "$MACHINE" = M68
+    then
+      # convert sun-style assembler code to HP syntax
+	echo "$CMD (cd $RUNTIME; ...)"
+	( cd $RUNTIME; \
+	  unset PWD;
+	  if test -z "$CALLEESAVE"; then CALLEESAVE="0"; fi;
+	  echo "$CMD $CPP -DCALLEESAVE=$CALLEESAVE -DM68 -DHPUX -DASM M68.prim.s > prim.s"; \
+	  $CPP -DCALLEESAVE=$CALLEESAVE -DM68 -DHPUX -DASM M68.prim.s > prim.s; \
+	  echo "$CMD   emacs -batch -l sun2hp.el prim.s prim.s"; \
+	  emacs -batch -l sun2hp.el prim.s prim.s ; \
+	  echo "$CMD   as -o prim.o prim.s"; \
+	  as -o prim.o prim.s )
+    fi
+
+    echo "$CMD (cd $RUNTIME; $MAKE $ARG)"
+    (cd $RUNTIME; eval $MAKE $ARG)
+    if test "$?" -ne "0"; then
+	exit 1
+    fi
+
+    if test "$OPSYS" = SOLARIS -a "$MACHINE" = SPARC
+    then
+        if test -n "$USE_GCC"
+        then
+          $GCC -o mlpatch runtime/mlpatch.c -lelf
+        else
+          cc -o mlpatch runtime/mlpatch.c -lelf
+        fi
+        if test "$?" -ne "0"; then
+	    exit 1
+        fi
+        ./mlpatch runtime/run
+        if test "$?" -ne "0"; then
+	    exit 1
+        fi
+        rm -f mlpatch
+    fi
+fi
+
+if test -n "$NOBOOT"
+then
+    exit 0
+fi
+
+RUNTIMESTAMP=`cat runtime/run | runtime/crc`
+COMMAND=$COMMAND" System.runtimeStamp := \"$RUNTIMESTAMP\";"
+
+if test "$MODULEKIND" = Int
+then
+    STARTUP='('$COMMAND' exportML "'$IMAGE'"; output(std_out,System.version); output(std_out,(chr 10)); output(std_out, '$MESSAGE'));'
+    echo "$CMD echo $STARTUP | $RUNTIME/run -m $SOFTLIMIT -r $RATIO -h $HEAP $MODULE"
+    $RUNTIME/run -m $SOFTLIMIT -r $RATIO -h $HEAP $MODULE <<XXX
+    $STARTUP
+XXX
+else
+    echo "$CMD $RUNTIME/run -m $SOFTLIMIT -r $RATIO -h $HEAP $MODULE"
+    $RUNTIME/run -m $SOFTLIMIT -r $RATIO -h $HEAP $MODULE <<XXX
+$CSV
+>$IMAGE
+XXX
+fi
+
+if test -n "$POSTCLEAN"
+then
+    echo "$CMD rm -f mo"
+    rm -f mo
+    (cd $RUNTIME; eval $MAKE clean; rm -f mo)
+fi
+
+exit 0

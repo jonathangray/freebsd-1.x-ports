@@ -1,0 +1,1546 @@
+(*
+	Generic (and boilerplate) X server for IDL
+
+	@(#)idlx.idl	2.1 93/03/07 00:58:14
+
+	Examples of clients are:
+
+		idlx.run.sml     -- which exercises input and output
+				    and SimpleCanvas widgets
+
+		idlx.canvas.sml  -- which exercises only output
+*)
+
+${
+	import  "../Xidl/idlbase.sig";
+	functor idlx(idlbase:idlbase) =
+	struct  open idlbase
+
+	fun lookup name default [] = default
+	|   lookup name default ((name', value) :: rest) =
+		   if name=name' then value else lookup name default rest
+
+$}
+
+%{
+
+#       include <stdio.h>
+#       include <signal.h>
+#       include <X11/Intrinsic.h>
+#       include <X11/StringDefs.h>
+#       include <X11/Xaw/Command.h>
+#       include <X11/Xaw/Box.h>
+#       include <X11/Xaw/Form.h>
+#       include <X11/Xaw/Text.h>
+#       include <X11/Xaw/AsciiText.h>
+#       include <X11/Xaw/Label.h>
+#       include <X11/Xaw/MenuButton.h>
+#       include <X11/Xaw/SimpleMenu.h>
+#       include <X11/Xaw/Sme.h>
+#       include <X11/Xaw/SmeBSB.h>
+#       include <X11/Xaw/SmeLine.h>
+#       include <X11/Xaw/Toggle.h>
+
+	Widget  topLevel;
+#       define  WIDGET(w) (w==NULL?topLevel:(Widget)w)
+
+%}
+
+(*-------------------------------------------------------------
+
+	Callback implementation
+
+---------------------------------------------------------------*)
+${
+	val EventData   = 0;
+
+$}
+
+%{
+#       define  EventData       0
+%}
+
+%{
+	/*
+		Callbacks (and all other spontaneous
+		communications) from the server to SML
+		are queued.
+	*/
+
+	typedef struct IdlDataRecord
+	{ int      kind;
+	  Widget   w;
+	  Position x,y;
+	  Bool     transient;
+	  struct   IdlDataRecord *next;
+	} IdlDataRecord, *IdlData;
+
+	static  int     qsize, qwarn;
+
+	int     junk[100];
+	IdlData freedata,
+		queue,
+		qlast;
+	Bool    listening;
+
+	IdlData NewData(kind, w, x, y)
+		int      kind;
+		Widget   w;
+		Position x,y;
+	{  IdlData r;
+	   if (freedata==NULL)
+	   { r = XtNew(IdlDataRecord);
+	     r->next = NULL;
+	   }
+	   else
+	   {  r        = freedata;
+	      freedata = r->next;
+	   }
+	   r->kind   = kind;
+	   r->w      = w;
+	   r->x      = x;
+	   r->y      = y;
+	   r->transient = True;
+	   return r;
+	}
+
+	IdlData NewPermanentData(kind, w, x, y)
+		int      kind;
+		Widget   w;
+		Position x,y;
+	{       IdlData r=NewData(kind, w, x, y);
+		r->transient=False;
+		return r;
+	}
+
+	void FreeData(d) IdlData d;
+	{
+	     if (d==NULL)
+	     {  fprintf(stderr, "[FreeData(NULL)]\n");
+		exit(2);
+	     }
+	   d -> next = freedata;
+	   freedata  = d;
+	}
+
+	void initQ()
+	{       queue    =
+		qlast    =
+		freedata =NULL;
+		listening=False;
+		qsize    =0;
+		qwarn    =10;
+	}
+
+	void enQ(data)  IdlData data;
+	{
+	     if (queue==NULL)
+	     {  queue=qlast=data;
+	     }
+	     else
+	     {  qlast->next=data;
+		qlast=data;
+	     }
+	     qlast->next=NULL;
+	     qsize++;
+	     if (qsize>qwarn) fprintf(stderr, "[Wait a moment]\n");
+	}
+
+%}
+
+(*******************************************************************
+
+	outputData and inputData are complementary: take care that
+	the outputData writes match the inputData result signature
+
+********************************************************************)
+
+%{
+	static  void outputData(d) IdlData d;
+	{
+		write_int    (d->kind);
+		write_address(d->w);
+		write_short  (d->x);
+		write_short  (d->y);
+		if (d->transient) FreeData(d);
+		idlflush();
+		listening = False;
+	}
+
+%}
+
+(*
+	Return the first queued data event if there is one.
+	Wait for a data event if none are queued.
+*)
+
+type Widget = Widget => address;
+
+inputData(): int Widget short short =
+%{      if (queue!=NULL)
+	{  IdlData next = queue->next;
+	   outputData(queue);
+	   queue=next;
+	   qsize=qsize-1;
+	}
+	else
+	{
+	   listening = True;
+	}
+%}
+
+(********************************************************************)
+
+%{      /*
+		Callbacks and events must use SendData
+	*/
+	void SendData(data) IdlData data;
+	{    if (listening)
+	     {  outputData(data);
+	     }
+	     else
+	     if (data->transient)
+	     {  enQ(data);
+	     }
+	     else
+	     {  enQ(NewData(data->kind, data->w, data->x, data->y));
+	     }
+	}
+
+%}
+
+(********************************************************************)
+
+%{
+
+	/*
+			Callbacks placed on Widgets
+	*/
+
+	void            Ignore (w, client_data, call_data)
+	Widget          w;
+	XtPointer       client_data, call_data;
+	{
+		return;
+	}
+
+	void            ReturnClientData (w, client_data, call_data)
+	Widget          w;
+	XtPointer       client_data, call_data;
+	{
+		SendData(client_data);
+	}
+
+	/*
+			Event routine
+	*/
+
+	void            send_event(w, event, params, paramc)
+	Widget          w;
+	XEvent          *event;
+	String          *params;
+	Cardinal        *paramc;
+	{  Position     x = 0, y = 0;
+	   if (!XtIsRealized(w)) return;
+	   if (params==NULL) return;
+	   if
+	   (   event->type == ButtonPress
+	   ||  event->type == ButtonRelease
+	   )
+	   {  x = ((XButtonEvent *) event)->x;
+	      y = ((XButtonEvent *) event)->y;
+	   }
+	   else
+	   if (event->type == MotionNotify)
+	   {  x = ((XMotionEvent *) event)->x;
+	      y = ((XMotionEvent *) event)->y;
+	   }
+	   { int      kind   = (params!=NULL)?atoi(params[0]):EventData;
+	     IdlData  data   = NewData(kind, w, x, y);
+	     SendData(data);
+	   }
+	}
+
+	void                    create_event(w, event, params, paramc)
+	Widget                  w;
+	XCreateWindowEvent      *event;
+	String                  *params;
+	Cardinal                *paramc;
+	{       if (!XtIsRealized(w)) return;
+		if (params!=NULL && strcmp(params[0], "backingstore")==0)
+		{  XSetWindowAttributes  xswa;
+		   xswa.backing_store = Always;
+		   XChangeWindowAttributes(XtDisplay(w), XtWindow(w), CWBackingStore, &xswa);
+		}  else
+		{  fprintf(stderr, "[Warning: IDLCREATE(%x, %s)]\n", w, params[0]);
+		}
+	}
+
+	void        interrupt_event(w, event, params, paramc)
+	Widget      w;
+	XEvent      *event;
+	String      *params;
+	Cardinal    *paramc;
+	{   if (*paramc>=1 && params!=NULL) fprintf(stderr, params[0]);
+	    kill(getppid(), SIGINT);
+	}
+
+	static  XtActionsRec Actions[] =
+	{
+		/*
+			IDLSENDEVENT, IDLCREATE for use only by internal
+			utilities such as Override/Augment Translations.
+
+			IDLCREATE("backingstore") is used to request
+			backing store for a window on its creation.
+		*/
+		{"IDLSENDEVENT",   send_event},
+		{"IDLCREATE",      create_event},
+		{"interruptevent", interrupt_event},
+	};
+
+%}
+
+(*
+	This lets us poll.
+*)
+caninputData() : int => qsize;
+
+setqueuewarn(n:int) = %{ qwarn=n; %}
+
+(*
+	Abandon all queued events.
+*)
+clearData() : unit =
+%{
+   while (queue!=NULL)
+   {  IdlData next = queue->next;
+      if (queue->transient) FreeData(queue);
+      queue=next;
+   }
+%} => ()
+
+(*-------------------------------------------------------------
+
+	Named Widget Properties
+
+---------------------------------------------------------------*)
+
+
+type    Display  = Display* => address;
+type    Screen   = Screen*  => address;
+type    Window   = Window   => address;
+type    GC       = GC       => address;
+
+${
+	datatype Gc = WrGC of GC | RoGC of GC
+
+	exception IdlX of string;
+
+$}
+
+IdlWindow(a:Widget):      Window  => XtWindow(WIDGET(a));
+IdlDisplay(a:Widget):     Display => XtDisplay(WIDGET(a));
+IdlScreen(a:Widget):      Screen  => XtScreen(WIDGET(a));
+IdlIsRealized(w: Widget): bool    => XtIsRealized(w);
+
+
+(*-------------------------------------------------------------
+
+	Primitive Xlib drawing routines which all use
+
+	(idldisplay) (idldrawable) (idlgc)
+
+---------------------------------------------------------------*)
+
+
+%{
+	Display  *idldisplay;
+	Screen   *idlscreen;
+	Drawable idldrawable;
+	GC       idlgc;
+
+
+#       define IDLDISPLAY  (idldisplay==NULL)?XtDisplay(topLevel):idldisplay
+#       define IDLSCREEN   (idlscreen==NULL)?XtScreen(topLevel):idlscreen
+
+#       define XP(name) name(IDLDISPLAY, idldrawable, idlgc,
+#       define PX );
+%}
+
+SetXDisplay(display: Display) =
+%{
+	idldisplay = (Display *) display;
+%}
+
+SetXScreen(screen: Screen) =
+%{
+	idlscreen = (Screen *) screen;
+%}
+
+SetXDrawable(window: Window) =
+%{
+	idldrawable = (Drawable) window;
+%}
+
+${
+   local
+$}
+	SetXGC(gc: GC) = %{ idlgc = (GC) gc; %}
+${
+   in
+	val SetXGC =
+	fn  RoGC gc => SetXGC gc
+	|   WrGC gc => SetXGC gc
+   end
+$}
+
+EnableBackingStore(window: Window) =
+%{ XSetWindowAttributes  xswa;
+   xswa.backing_store = Always;
+   XChangeWindowAttributes(IDLDISPLAY, (Window) window, CWBackingStore, &xswa);
+%}
+
+XdrawLine(x1:short, y1:short, x2:short, y2:short) =
+%{ XP(XDrawLine) x1, y1, x2, y2 PX
+%}
+
+XdrawImageString(x:short, y:short, s: string) =
+%{ XP(XDrawImageString) x, y, s, strlen(s) PX
+%}
+
+XdrawString(x:short, y:short, s: string) =
+%{ XP(XDrawString) x, y, s, strlen(s) PX
+%}
+
+XdrawPoint(x:short, y:short) =
+%{ XP(XDrawPoint) x, y  PX
+%}
+
+XdrawRectangle(x:short, y:short, w: short, h:short) =
+%{ XP(XDrawRectangle) x, y, w, h PX
+%}
+
+XdrawArc(x:short, y:short, w: short, h:short, a1:int, a2:int) =
+%{ XP(XDrawArc) x, y, w, h, a1, a2 PX
+%}
+
+XfillRectangle(x:short, y:short, w: short, h:short) =
+%{ XP(XFillRectangle) x, y, w, h PX
+%}
+
+XfillArc(x:short, y:short, w: short, h:short, a1:int, a2:int) =
+%{ XP(XFillArc) x, y, w, h, a1, a2 PX
+%}
+
+XclearArea(x:int, y:int, w: int, h:int) =
+%{ XClearArea(IDLDISPLAY,  idldrawable, x, y, w, h, False);
+%}
+
+XclearWindow() : unit =
+%{ XClearWindow(IDLDISPLAY, idldrawable);
+%} => ()
+
+
+(*-------------------------------------------------------------
+
+	Cursors, etc
+
+---------------------------------------------------------------*)
+
+type    Cursor = Cursor => address;
+
+CreateFontCursor(shape: int) : Cursor =
+%{ Cursor r = XCreateFontCursor(IDLDISPLAY, shape);
+%} => r
+
+DefineCursor(widget: Widget, cursor: Cursor) : unit =
+%{ XDefineCursor(XtDisplay((Widget) widget), XtWindow((Widget) widget), (int) cursor);
+%} => ()
+
+(*-------------------------------------------------------------
+
+	Fonts, etc
+
+---------------------------------------------------------------*)
+
+typedef FontStruct = XFontStruct* => address;
+
+LoadFontStruct(name: string) : FontStruct =
+%{ XFontStruct *r = XLoadQueryFont(IDLDISPLAY, name);
+%} => r
+
+type    Font = Font => address
+
+FontID(fontstruct: FontStruct) : Font => ((XFontStruct *) fontstruct)->fid;
+
+stringExtent(fontstruct: FontStruct, s: string) : short short short =
+%{      XCharStruct     box;
+	int             dir, asc, desc;
+	XTextExtents(fontstruct, s, strlen(s), &dir, &asc, &desc, &box);
+%} => box.width, asc, desc;
+
+
+(*-------------------------------------------------------------
+
+	Static application resource database
+
+	 -- unnecessary in the generic server,
+	 -- can be tailored for specific servers
+
+---------------------------------------------------------------*)
+
+%{
+/*      For each resource, RESOURCES must invoke the macro
+
+		XR(name, class, XtResourceType, type, defaultstring)
+
+*/
+
+#       define RESOURCES\
+	XR(width,   "Width",        XtRInt,         int,            "100")\
+	XR(height,  "Height",       XtRInt,         int,            "80")\
+	XR(on,      "Bool",         XtRBool,        Bool,           "yes")
+
+/*
+	Declare the resources record
+*/
+	typedef struct
+	{
+#               define XR(name, class, prefix, type, default) type name;
+		RESOURCES
+#               undef  XR
+	}       Resource;
+	Resource resource;
+
+#       define  XR(name, class, prefix, type, default)\
+		{"name", class, prefix, sizeof(type),\
+		XtOffsetOf(Resource,name), XtRString, default},
+
+/*
+	Declare an X descriptor for the resources record
+*/
+	XtResource resourcedescription[] =
+	{
+	    RESOURCES
+	};
+#       undef   XR
+
+%}
+
+(*-------------------------------------------------------------
+
+	Access to resource database from SML
+
+---------------------------------------------------------------*)
+
+
+get_resource_geometry() : int int => resource.width, resource.height
+
+
+(*-------------------------------------------------------------
+
+	Command-line option table
+
+	 -- unnecessary in the generic server,
+	 -- can be tailored for specific servers
+
+---------------------------------------------------------------*)
+
+%{
+	static XrmOptionDescRec options[] =
+	{
+	  {"-w",        "*width",       XrmoptionSepArg, NULL},
+	  {"-h",        "*height",      XrmoptionSepArg, NULL},
+	  {"-on",       "*on",          XrmoptionNoArg,  "True"},
+	};
+%}
+
+(*-------------------------------------------------------------
+
+	Dynamic resource acquisition
+
+---------------------------------------------------------------*)
+
+%{
+/*
+	Support for dynamic resource acquisition
+*/
+#       define GETRESOURCE(Ctypename, Xtypename)\
+	XtResource r;                           \
+	Ctypename  result;                      \
+	r.resource_name    = name;              \
+	r.resource_class   = class;             \
+	r.resource_type    = "Xtypename";       \
+	r.resource_size    = sizeof(Ctypename); \
+	r.resource_offset  = 0;                 \
+	r.default_type     = "String";          \
+	r.default_addr     = deflt;             \
+	XtGetApplicationResources(topLevel, &result, &r, 1, NULL, 0);
+
+%}
+
+GetIntResource(name: string, class: string, deflt: string) : int =
+%{      GETRESOURCE(int,Int)
+%}      => result
+
+GetBoolResource(name: string, class: string, deflt: string) : int =
+%{      GETRESOURCE(bool,Bool)
+%}      => result
+
+GetPixelResource(name: string, class: string, deflt: string) : int =
+%{      GETRESOURCE(Pixel,Pixel)
+%}      => result
+
+(*-------------------------------------------------------------
+
+	Translation Table manipulation
+
+---------------------------------------------------------------*)
+
+ServerAugmentTranslations(w:Widget, s:string) =
+%{      XtAugmentTranslations((Widget) w, XtParseTranslationTable(XtNewString(s)));
+%}
+
+ServerOverrideTranslations(w:Widget, s:string) =
+%{      XtOverrideTranslations((Widget) w, XtParseTranslationTable(XtNewString(s)));
+%}
+
+(*-------------------------------------------------------------
+
+	Machinery for dispatching on the client side
+
+---------------------------------------------------------------*)
+
+addservercallback(w: Widget, whatfor: string, kind: int) =
+%{  IdlData d = NewPermanentData(kind, w, 0, 0);
+    XtAddCallback((Widget) w, whatfor, ReturnClientData, d);
+%}
+
+
+${      (*  for use in constructing translation tables *)
+
+	fun format string (vs: int list) =
+	let fun C []        _       = []
+	    |   C ("%"::cs) (v::vs) = makestring v :: C cs vs
+	    |   C ( c ::cs) vs      = c :: C cs vs
+	in
+	    implode(C (explode string) vs)
+	end
+
+	val  callbackid       = ref 1;
+	fun  nextcallbackid() = !callbackid before inc callbackid;
+
+	type callback         = (int * Widget * int * int) -> unit;
+
+	fun  ignorecallback (kind, w, x, y) = ();
+
+	fun  orphancallback (kind, w, x, y) =
+	     (outputc std_err
+	      (format "[Warning: orphaned event %(%,%)]\n" [kind, x, y]));
+
+	val  emptycallbacks = Array.array(0, orphancallback) : callback array
+	val  callbacks      = ref emptycallbacks: callback array ref
+
+	fun  morecallbacks() =
+	let  open Array infix 9 sub
+	     val a = !callbacks
+	     val s = length a
+	     val s'= s+20
+	     val a'= array(s', orphancallback)
+	     fun I n = if n=s' then () else
+		       (if n<s  then update(a', n, a sub n) else ();
+			I (n+1))
+	in
+	     I 0;
+	     callbacks := a'
+	end;
+
+	fun resetcallbacks() =
+	(   callbacks  := emptycallbacks;
+	    callbackid := 1
+	)
+
+	fun  run() =
+	let  open Array infix 9 sub
+	     val  callback as (k, _, _, _) = inputData()
+	in
+	     (!callbacks sub k)(callback);
+	     run()
+	end
+
+	fun  newclientcallback call =
+	let  val n = nextcallbackid()
+	     open Array
+	in   if n < length(!callbacks) then () else morecallbacks();
+	     update(!callbacks, n, call);
+	     n
+	end;
+
+	fun  addcallback w call =
+	addservercallback(w, "callback", newclientcallback call)
+
+
+	(*
+		This appears to be the only way of sharing
+		the complete Xt event description language without
+		re-implementing it myself. The slight inefficiency
+		caused by the decoding inside send_event
+		doesn't seem particularly important.
+	*)
+	local
+		fun  when w (eventname, call) =
+		let  val  n = newclientcallback call
+		in
+		     eventname^format ": IDLSENDEVENT(%)\n" [n]
+		end
+	in
+		fun AugmentTranslations w entries =
+		let val spec = map (when w) entries
+		in
+		    ServerAugmentTranslations(w, implode spec)
+		end
+
+		fun OverrideTranslations w entries =
+		let val spec = map (when w) entries
+		in
+		    ServerOverrideTranslations(w, implode spec)
+		end
+	end
+$}
+
+(*-------------------------------------------------------------
+
+	Generic Widgetry (use getstring with GREAT caution)
+
+---------------------------------------------------------------*)
+
+setSensitive(widget:Widget, on: bool) =
+%{
+	XtVaSetValues((Widget) widget, XtNsensitive, on?True:False, NULL);
+%}
+
+getshort(widget:Widget, attribute: string) : short  =
+%{      short result;
+	XtVaGetValues((Widget) widget, attribute, &result, NULL);
+%} => result
+
+getint(widget:Widget, attribute: string) : int =
+%{      int result;
+	XtVaGetValues((Widget) widget, attribute, &result, NULL);
+%} => result
+
+getstring(widget:Widget, attribute: string) : string =
+%{      String result;
+	XtVaGetValues((Widget) widget, attribute, &result, NULL);
+%} => result
+
+getaddress(widget:Widget, attribute: string) : address =
+%{      XtPointer result;
+	XtVaGetValues((Widget) widget, attribute, &result, NULL);
+%} => result
+
+getbyte(widget:Widget, attribute: string) : byte =
+%{      byte result;
+	XtVaGetValues((Widget) widget, attribute, &result, NULL);
+%} => result
+
+DestroyWidget(w: Widget) =  (* Don't bother synchronising *)
+%{
+	XtDestroyWidget((Widget) w);
+%}
+
+(*-------------------------------------------------------------
+
+	Transmission of X argument lists
+
+---------------------------------------------------------------*)
+
+%{
+	Arg     arguments     [500];
+	Bool    stringargument[500];
+	int     narguments;
+
+	void    show()
+	{  int i;
+	   for (i=0; i<narguments; i++)
+	   {    fprintf(stderr, "%d %s : %d\n", i,
+			arguments[i].name,
+			arguments[i].value);
+	   }
+	}
+
+	void    cleararguments(strings)
+		Bool strings;
+	{       int i;
+		for (i=0; i<narguments; i++)
+		{   XtFree(arguments[i].name);
+		    if (strings && stringargument[i])
+		       XtFree((address) arguments[i].value);
+		}
+		narguments = 0;
+	}
+
+	void    setargument(name, str, arg)
+		String name;
+		Bool str;
+		XtArgVal arg;
+	{
+		XtSetArg(arguments[narguments], XtNewString(name), arg);
+		stringargument[narguments] = str;
+		if (narguments<500)
+		  narguments++;
+		else
+		{  fprintf(stderr, "[Warning: argument list overflow]\n");
+		}
+	}
+
+%}
+
+setwidgetvalues(w:Widget) =
+%{      /*
+		Free string values in the widget which are going to be replaced
+	*/
+	int     i;
+	String  s=NULL;
+	for (i=0; i<narguments; i++)
+	    if (stringargument[i])
+	    {
+		XtVaGetValues((Widget) w, arguments[i].name, &s, NULL);
+		if (s!=NULL) XtFree(s);
+	    }
+	XtSetValues((Widget) w, arguments, narguments);
+	cleararguments(False);
+%}
+
+sendint(name: string, v:int) = %{ setargument(name, False, v); %}
+
+sendshort(name: string, v:short)=%{ setargument(name, False, v); %}
+
+sendstring(name: string, v:string)=%{setargument(name, True, XtNewString(v));%}
+
+sendbool(name: string, v:bool) = %{ setargument(name, False, v); %}
+
+sendaddress(name: string, v:address) = %{ setargument(name, False, v); %}
+
+sendbyte(name: string, v:byte) = %{ setargument(name, False, v); %}
+
+cleararguments(clearstrings: bool);
+
+
+
+
+${
+
+   datatype value   = int       of int
+		    | short     of short
+		    | byte      of byte
+		    | string    of string
+		    | bool      of bool
+		    | addr      of address
+		    (* Add injections for safe types here *)
+		    | XWidget  of Widget
+		    | XDisplay of Display
+		    | XScreen  of Screen
+		    | XWindow  of Window
+		    | XFontStruct of FontStruct
+		    | XCursor  of Cursor
+		    | XGC      of GC
+		    | XFont    of Font
+
+   type argument = string * value
+
+   fun sendargument (name, v) =
+   case v of
+      int i                  => sendint (name, i)
+   |  short i                => sendshort (name, i)
+   |  string s               => sendstring (name, s)
+   |  bool b                 => sendbool (name, b)
+   |  addr a                 => sendaddress (name, a)
+   |  byte b                 => sendbyte (name, b)
+   (* Safe types *)
+   |  XWidget (Widget a)     => sendaddress (name, a)
+   |  XDisplay (Display a)   => sendaddress (name, a)
+   |  XScreen (Screen a)     => sendaddress (name, a)
+   |  XWindow (Window a)     => sendaddress (name, a)
+   |  XFont (Font a)       => sendaddress (name, a)
+   |  XFontStruct (FontStruct a)       => sendaddress (name, a)
+   |  XCursor (Cursor a)   => sendaddress (name, a)
+   |  XGC (GC a)           => sendaddress (name, a);
+
+   fun  sendarguments args =
+   (    cleararguments false;
+	app sendargument args
+   )
+
+$}
+
+(*-------------------------------------------------------------
+
+	Creation & alteration of X Graphics contexts
+
+---------------------------------------------------------------*)
+
+%{
+	XGCValues      gcvalue;
+	unsigned  long gcmask;
+
+	void setgcvalues()
+	{    int i;
+	     gcmask = 0;
+	     for (i=0; i<narguments; i++)
+	     {  String arg=arguments[i].name;
+#               define F(typename, name, shift)                 \
+		if (strcmp(arg, "name")==0)                     \
+		{ gcvalue.name=(typename) arguments[i].value;   \
+		  gcmask |= (1L<<shift);                        \
+		} else
+		F(int,function,                 0)
+		F(unsigned long,plane_mask,     1)
+		F(unsigned long,foreground,     2)
+		F(unsigned long,background,     3)
+		F(int,line_width,               4)
+		F(int,line_style,               5)
+		F(int,cap_style,                6)
+		F(int,join_style,               7)
+		F(int,fill_style,               8)
+		F(int,fill_rule,                9)
+		F(Pixmap,tile,                  10)
+		F(Pixmap,stipple,               11)
+		F(int,ts_x_origin,              12)
+		F(int,ts_y_origin,              13)
+		F(Font,font,                    14)
+		F(int,subwindow_mode,           15)
+		F(Bool,graphics_exposures,      16)
+		F(int,clip_x_origin,            17)
+		F(int,clip_y_origin,            18)
+		F(Pixmap,clip_mask,             19)
+		F(int,dash_offset,              20)
+		F(char,dashes,                  21)
+		F(int,arc_mode,                 22)
+		fprintf(stderr, "[Warning: No GC field named %s]\n", arg);
+#               undef F
+	     }
+	}
+
+%}
+
+
+${
+
+	local
+
+$}
+
+changegc(gc: GC) =
+%{
+	setgcvalues();
+	XChangeGC(IDLDISPLAY, (GC) gc, gcmask, &gcvalue);
+%}
+
+creategc(widget: Widget) : GC =
+%{      GC r;
+	setgcvalues();
+	r=XCreateGC(XtDisplay((Widget) widget), XtWindow((Widget) widget), gcmask, &gcvalue);
+%}      => r
+
+freegc(gc: GC) =
+%{
+	XFreeGC((GC) gc);
+%}
+
+getgc(widget: Widget) : GC =
+%{      GC r;
+	setgcvalues();
+	r=XtGetGC((Widget) widget, gcmask, &gcvalue);
+%}      => r
+
+releasegc(gc: GC) =
+%{
+	XtReleaseGC((GC) gc);
+%}
+
+
+${
+	in
+
+	fun ChangeGC (WrGC gc) spec = (sendarguments spec; changegc gc)
+	|   ChangeGC (RoGC gc) spec = raise IdlX "ChangeGC(RoGC)"
+
+	fun CreateGC widget spec =
+	(* Don't use this until after realization *)
+	(sendarguments spec; WrGC(creategc widget))
+
+	fun GetGC widget spec =
+	(* This may be used before realization *)
+	(sendarguments spec; RoGC(getgc widget))
+
+	fun FreeGC(RoGC gc) = freegc gc
+	|   FreeGC(WrGC gc) = releasegc gc
+
+	end
+$}
+
+(*-------------------------------------------------------------
+
+	Creation & alteration of X Widgets using argument lists
+
+---------------------------------------------------------------*)
+
+%{
+#       define  SHOW ;
+
+#       define  NEWIDLWIDGET(w, class)\
+		Widget w=XtCreateManagedWidget\
+		(XtNewString(label),class,WIDGET(parent),arguments,narguments);\
+		cleararguments(False);
+
+#       define  NEWIDLPOPUP(w, class)\
+		Widget w=XtCreatePopupShell\
+		(XtNewString(label),class,WIDGET(parent),NULL,0);\
+		cleararguments(False);
+%}
+
+${
+	    fun SetValues widget spec =
+	    (   sendarguments   spec;
+		setwidgetvalues widget
+	    )
+
+	    fun CreateWidget parent label class spec =
+	    (   sendarguments spec;
+		class(label, parent)
+		(* class functions must clear the argument list *)
+	    )
+
+$}
+
+(*-------------------------------------------------------------
+
+	Classes: Boxes, Forms, and Labels
+
+---------------------------------------------------------------*)
+
+${
+	structure Chain =
+	struct
+		val Top    = byte 0;
+		val Bottom = byte 1;
+		val Left   = byte 2;
+		val Right  = byte 3;
+		val Rubber = byte 4;
+	end
+
+	structure orient =
+	struct
+		val Horizontal = byte 0
+		and Vertical   = byte 1
+	end
+
+	structure Justify =
+	struct
+		val Left   = byte 0
+		and Center = byte 1
+		and Centre = byte 1
+		and Right  = byte 2
+	end
+
+	structure Shape =
+	struct
+		val Rectangle        = byte 1
+		and Oval             = byte 2
+		and Ellipse          = byte 3
+		and RoundedRectangle = byte 4
+	end
+$}
+
+boxwidget(label: string, parent: Widget) : Widget =
+%{      NEWIDLWIDGET(w, boxWidgetClass)
+%}      => w
+
+formwidget(label: string, parent: Widget) : Widget =
+%{      NEWIDLWIDGET(w, formWidgetClass)
+%}      => w
+
+labelwidget(label: string, parent: Widget) : Widget =
+%{      NEWIDLWIDGET(w, labelWidgetClass)
+%}      => w
+
+${      (*     Support for layout within forms   *)
+	infix  BESIDE ABOVE
+	fun w1 BESIDE w2 = (SetValues w2 [("fromHoriz", XWidget w1)]; w2)
+	fun w1 ABOVE  w2 = (SetValues w2 [("fromVert",  XWidget w1)]; w2)
+$}
+
+(*-------------------------------------------------------------
+
+	Classes: SimpleCanvas
+
+---------------------------------------------------------------*)
+%{
+#       include "SimpleCanvas.h"
+%}
+
+typedef    Thing = address;
+
+${
+	structure SimpleCanvas = struct
+$}
+
+widget(label: string, parent: Widget) : Widget =
+%{      NEWIDLWIDGET(w, simplecanvasWidgetClass)
+%}      => w
+
+Clear(canvas:Widget)  =
+	%{ SimpleCanvasClear(canvas); %}
+
+Redraw(canvas:Widget) =
+	%{ SimpleCanvasRedraw(canvas); %}
+
+SetFont(canvas:Widget, font: byte, fontstruct: FontStruct) =
+	%{ SimpleCanvasSetFont(canvas, font, fontstruct); %}
+
+${ local $}
+	SimpleCanvasSetGC(canvas:Widget, class: byte, gc: GC);
+${ in
+
+	val SetGC =
+	    fn(canvas, class, RoGC gc) => SimpleCanvasSetGC(canvas, class, gc)
+	    | (canvas, class, WrGC gc) => SimpleCanvasSetGC(canvas, class, gc)
+   end
+$}
+
+SetOffset(canvas:Widget, x: short, y:short) =
+	%{ SimpleCanvasSetOffset(canvas, x, y); %}
+
+GetOffset(canvas: Widget) : int int =
+%{ Position x, y;
+   SimpleCanvasGetOffset(canvas, &x, &y);
+%} => x, y
+
+GetExtent(canvas: Widget) : int int int int =
+%{ Position x, y;
+   Dimension w, h;
+   SimpleCanvasGetExtent(canvas, &x, &y, &w, &h);
+%} => x, y, w, h
+
+SetX(canvas: Widget, x:short) : unit =
+%{ SimpleCanvasSetX(canvas, x);
+%} => ()
+
+SetY(canvas: Widget, y:short) : unit =
+%{ SimpleCanvasSetY(canvas, y);
+%} => ()
+
+GetFont(canvas:Widget, font: byte) : FontStruct => (XFontStruct *) SimpleCanvasGetFont(canvas, font);
+
+
+GetGC(canvas:Widget, class: byte) : GC => (GC) SimpleCanvasGetGC(canvas, class);
+
+/*      These drawing routines return the objects drawn */
+
+ThingBox (canvas:Widget, class: byte, x:short, y:short, w:short, h:short): Thing
+	=> SimpleCanvasDrawBox(canvas, class, x, y, w, h)
+
+ThingLine(canvas:Widget, class: byte, x:short, y:short, w:short, h:short): Thing
+	=>  SimpleCanvasDrawLine(canvas, class, x, y, w, h)
+
+ThingString(canvas:Widget, class: byte, font:short, s: string, x:short, y:short): Thing
+	=> SimpleCanvasDrawString(canvas, class, font, s, x, y, NULL)
+
+ThingStringWidth(canvas:Widget, class: byte, font:short, s: string, x:short, y:short):int Thing =
+%{  Dimension w;
+    Thing t = (Thing) SimpleCanvasDrawString(canvas, class, font, s, x, y, &w);
+%}      => w, t
+
+/*      These drawing routines don't bother to  return the objects drawn,
+	so they're (a) a bit faster, and (b) reduce the latency in the
+	rpc pipeline.
+*/
+
+DrawBox (canvas:Widget, class: byte, x:short, y:short, w:short, h:short)
+	= %{ SimpleCanvasDrawBox(canvas, class, x, y, w, h); %}
+
+DrawLine(canvas:Widget, class: byte, x:short, y:short, w:short, h:short)
+	= %{ SimpleCanvasDrawLine(canvas, class, x, y, w, h); %}
+
+DrawString(canvas:Widget, class: byte, font:short, s: string, x:short, y:short)
+	= %{ SimpleCanvasDrawString(canvas, class, font, s, x, y, NULL); %}
+
+DrawStringWidth(canvas:Widget, class: byte, font:short, s: string, x:short, y:short): int =
+%{  Dimension w;
+    Thing t = (Thing) SimpleCanvasDrawString(canvas, class, font, s, x, y, &w);
+%}      => w
+
+GetClass(canvas:Widget, thing: Thing):byte
+	=> SimpleCanvasGetClass(canvas, thing);
+
+ChangeClass(canvas:Widget, thing: Thing, class: byte)
+	= %{ SimpleCanvasChangeClass(canvas, thing, class); %}
+
+FindAndSelect(canvas:Widget, x:short, y:short): Thing
+	=> SimpleCanvasFindAndSelect(canvas, x, y)
+
+GetSelection(canvas:Widget, class: byte): Thing
+	=> SimpleCanvasGetSelection(canvas, class)
+
+
+${
+	fun offsetcallback canvas  call =
+	    addservercallback(canvas, "offsetCallback", newclientcallback call)
+
+	fun extentcallback canvas  call =
+	    addservercallback(canvas, "extentCallback", newclientcallback call)
+
+	end (* structure SimpleCanvas *)
+$}
+
+(*-------------------------------------------------------------
+
+	Classes: Scrollbar, Viewport
+
+---------------------------------------------------------------*)
+
+%{
+#       include <X11/Xaw/Scrollbar.h>
+%}
+
+%{      void    ScrollProc(w, data, posn)
+		Widget          w;
+		IdlData         data;
+		int             posn;
+	{       data->x = posn;
+		data->y = posn;
+		ReturnClientData(w, data);
+	}
+
+%}
+
+/*
+		The documentation describing scrollbars is inaccurate;
+		I can't be bothered doing any more experiments.
+		The following machinery uses integers.
+*/
+
+scrollbarwidget(label: string, parent: Widget) : Widget =
+%{      NEWIDLWIDGET(w, scrollbarWidgetClass)
+	ServerOverrideTranslations
+	(w,
+	"<Btn1Down>:   StartScroll(Forward)\n\
+	 <Btn2Down>:   StartScroll(Forward)\n\
+	 <Btn3Down>:   StartScroll(Forward)\n\
+	 <Btn2Motion>: MoveThumb() NotifyScroll(Proportional) \n\
+	 <BtnUp>:      MoveThumb() NotifyScroll(Proportional) EndScroll()\n\
+	 ");
+%}      => w
+
+returnscrollpos(w:Widget, kind: int) =
+%{
+	XtAddCallback((Widget) w, XtNscrollProc, ScrollProc, NewPermanentData(kind, w, 0, 0));
+%}
+
+${
+	fun whenscrolled w call =
+	    returnscrollpos(w, newclientcallback call);
+
+$}
+
+scrollbarsetthumb(w: Widget, top: int, size: int) : unit =
+%{      /* top and size are expressed as thousandths of the
+	   scrolled object size
+	*/
+	XawScrollbarSetThumb((Widget) w, (top*1.0E-3), (size*1.0E-3));
+%} =>   ()
+
+
+viewportwidget(label: string, parent: Widget) : Widget =
+%{
+#       include <X11/Xaw/Viewport.h>
+	NEWIDLWIDGET(w, viewportWidgetClass);
+%} =>   w
+
+(*-------------------------------------------------------------
+
+	Classes: Commands, Toggles, Radios  and Menus
+
+---------------------------------------------------------------*)
+
+commandwidget(label: string, parent: Widget) : Widget =
+%{
+	NEWIDLWIDGET(w, commandWidgetClass)
+%}      => w
+
+${
+	fun NewCommand parent (label, arguments, callback) =
+	let val w=CreateWidget parent label commandwidget arguments;
+	in  addcallback w callback;
+	    {widget=w}
+	end
+$}
+
+togglewidget(label: string, parent: Widget) : Widget =
+%{
+	NEWIDLWIDGET(w, toggleWidgetClass)
+%}      => w
+
+ToggleGetCurrent(group: Widget):int => XawToggleGetCurrent((Widget) group)
+
+ToggleUnsetCurrent(group: Widget) = %{ XawToggleUnsetCurrent((Widget) group); %}
+
+ToggleSetCurrent(group: Widget, v: int) =
+%{ XawToggleSetCurrent((Widget) group, (XtPointer) v); %}
+
+
+${      fun fold f [u]     = u
+	|   fold f (u::us) = f(u, fold f us)
+	(*
+		Vert true  => orientation is vertical
+		Vert false => orientation is horizontal
+		Arguments describe the characteristics of ALL buttons
+		Each button has a label, an initial state and a callback.
+		Whenever the state changes the callback is
+		invoked at the new value.
+	*)
+	fun Radio parent vert arguments ((label, state, callback) :: entries) =
+	let val i = ref 1;
+	    val orient = if vert then op ABOVE else op BESIDE;
+	    val form  = CreateWidget parent label formwidget []
+	    val first = CreateWidget form label togglewidget
+			      ([("state",     bool state),
+				("radioData", int (!i before inc i))
+			       ]@arguments
+			      )
+	    fun changestate state callback =
+		(fn _ => (state := not (!state); callback(!state)))
+	    val firststate = ref state
+	    fun maketoggle(label, state, callback) =
+	    let val toggle =
+		CreateWidget form label togglewidget
+			      ([("radioGroup", XWidget first),
+				("state",      bool state),
+				("radioData",  int (!i before inc i))
+			       ]@arguments
+			      )
+		val togglestate = ref state
+	    in
+		addcallback toggle (changestate togglestate callback);
+		toggle
+	    end
+	in  addcallback first (changestate firststate callback);
+	    fold orient (first :: map maketoggle entries);
+	    {widget=form, radio=first}
+	end
+$}
+
+
+menubuttonwidget(label: string, parent: Widget) : Widget =
+%{      NEWIDLWIDGET(w, menuButtonWidgetClass)
+%}      => w
+
+simplemenuentrywidget(label: string, parent: Widget) : Widget =
+%{      NEWIDLWIDGET(w, smeBSBObjectClass)
+%}      => w
+
+simplemenulinewidget(label: string, parent: Widget) : Widget =
+%{      NEWIDLWIDGET(w, smeLineObjectClass)
+%}      => w
+
+simplemenuwidget(label: string, parent: Widget) : Widget =
+%{      NEWIDLPOPUP(w, simpleMenuWidgetClass)
+%}      => w
+
+${
+      val insensitive = [("sensitive", bool false)]
+
+      structure Menu =
+      struct
+	datatype Entry = Line | Command of string * callback  ;
+
+	fun New parent (label, args, entries) =
+	let val mn  = label ^ "Menu";
+	    val arg = ("menuName", string mn);
+	    val b   = CreateWidget parent label menubuttonwidget (arg :: args)
+	    val m   = CreateWidget b mn simplemenuwidget args
+	    fun entry Line =
+		CreateWidget m "-" simplemenulinewidget insensitive
+	    |   entry (Command (label, callback)) =
+		let val w = simplemenuentrywidget (label, m) in
+		    addcallback w callback;
+		    w
+		end
+	in
+	    {widget=b, entries = map entry entries}
+	end
+      end;
+
+$}
+
+(*-------------------------------------------------------------
+
+	Classes: Text
+
+---------------------------------------------------------------*)
+
+${
+	structure text =
+	struct
+		val AsciiFile   = int 0;
+		val AsciiString = int 1;
+		val Read        = int 0;
+		val Append      = int 1;
+		val Edit        = int 2;
+	end
+$}
+
+textwidget(label: string, parent: Widget) : Widget =
+%{      NEWIDLWIDGET(w, asciiTextWidgetClass)
+%}      => w
+
+readtext(widget: Widget) : string =
+%{ String result;
+   XtVaGetValues((Widget) widget, XtNstring, &result, NULL);
+   write_string(result);
+%}
+
+writetext(widget: Widget, s:string) =
+%{ XawTextBlock replacement;
+   String       current;
+   XtVaGetValues((Widget) widget, XtNstring, &current, NULL);
+   replacement.firstPos= 0;
+   replacement.length  = strlen(s);
+   replacement.ptr     = s;
+   replacement.format  = FMT8BIT;
+   XawTextReplace((Widget) widget, 0, strlen(current), &replacement);
+%}
+
+appendtext(widget: Widget, s:string) : unit =
+%{ XawTextBlock replacement;
+   String       current;
+   int          currentlen, slen=strlen(s);
+   XtVaGetValues((Widget) widget, XtNstring, &current, NULL);
+   currentlen = strlen(current);
+   replacement.firstPos= 0;
+   replacement.length  = slen;
+   replacement.ptr     = s;
+   replacement.format  = FMT8BIT;
+   XawTextReplace((Widget) widget, currentlen, currentlen, &replacement);
+   XawTextSetInsertionPoint((Widget) widget, currentlen+slen);
+%}
+
+(**********************************************************************
+
+	Useful utilities
+
+***********************************************************************)
+
+sync()  : unit => ()
+
+realize() : unit =
+%{
+	/*
+	   Sync with client, then exit the current call of idlx().
+	*/
+	idlcontinue=0;
+	write_unit();
+	idlflush();
+%}
+
+terminate() : unit =
+%{
+	/*
+	   Sync with client, then terminate the server side
+	   and exit the server immediately
+	*/
+	idlcontinue=0;
+	write_unit();
+	idlflush();
+	exit(0);
+%}
+
+toplevel () : Widget => topLevel;
+
+${
+	(*
+	   Start the server side, check signatures, reset callbacks
+	*)
+	fun idlx arguments =
+	let open idlbase in
+	    startserver "idlx" arguments;
+	    resetcallbacks();
+	    if   GetSignature()=Signature
+	    then (toplevel())
+	    else (output(std_err, "[Server signature mismatch]\n");
+		  raise Interrupt
+		 )
+	end;
+
+$}
+
+
+(*-------------------------------------------------------------
+
+	Server-side initialisation
+
+---------------------------------------------------------------*)
+
+%{
+	void    main(argc, argv)
+	Cardinal argc;
+	String   * argv;
+	{    XtAppContext app_context;
+	     String       app_name, app_stdio;
+
+	     app_name  = "IdlX";
+	     app_stdio = NULL;
+
+	     if (argc>2 && strcmp(argv[1], "-serverclass")==0)
+	     {  app_name=argv[2];
+		argv += 2;
+		argc -= 2;
+	     };
+
+	     if (argc>2 && strcmp(argv[1], "-stdio")==0)
+	     /* Where to connect stdio in the server */
+	     {  app_stdio =argv[2];
+		argv += 2;
+		argc -= 2;
+	     };
+
+	     topLevel = XtAppInitialize
+			(
+			&app_context,
+			app_name,
+			options, XtNumber(options),
+			&argc,   argv,
+			NULL,
+			NULL,
+			0
+			);
+
+	     XtGetApplicationResources
+	     (topLevel,            &resource,
+	      resourcedescription, XtNumber(resourcedescription),
+	      NULL, 0
+	     );
+
+	     initQ();
+
+	     idlinit(app_stdio);
+	     /* Phase 1: set up objects, fetch resources  */
+
+	     idlserver(); idlcontinue=1;
+
+	     /* Phase2: realize everything and go */
+
+	     XtAppAddActions(app_context, Actions, XtNumber(Actions));
+	     XtRealizeWidget(topLevel);
+	     XtIdlMainLoop(app_context, topLevel);
+	}
+
+%}
+
+
+${
+	end (* functor idlx *)
+$}
+

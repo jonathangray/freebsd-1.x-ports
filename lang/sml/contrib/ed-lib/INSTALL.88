@@ -1,0 +1,250 @@
+#!/bin/sh
+# This shell script installs the library.  If given an argument, it copies
+# the library to the directory named by that argument.  Then it generates
+# a tag file for the make system, and generates the build files.
+#
+# RCS LOG
+#
+# $Log: INSTALL.88,v $
+# Revision 1.1  1994/02/08 00:23:02  jkh
+# Initial revision
+#
+# Revision 1.5  1991/10/29  19:36:02  db
+# Added -poly_make option.
+# Allowed relative pathnames as well as full pathnames.
+#
+# Revision 1.4  91/02/05  11:46:09  11:46:09  db (Dave Berry)
+# Added line to generate build_core.sml from build_core.skel.
+# 
+# Revision 1.3  91/01/25  20:36:56  20:36:56  db (Dave Berry)
+# Now puts path names of signatures in ML_CONSULT file too.
+# 
+# Revision 1.2  91/01/24  15:43:44  15:43:44  db (Dave Berry)
+# Added /portable to the path in the generated ML_CONSULT file.
+# 
+# Revision 1.1  91/01/21  15:58:00  15:58:00  db (Dave Berry)
+# Initial revision
+# 
+
+LIB_DIR=""
+POLY=""
+POLY_MAKE=""
+POPLOG=""
+NJSML=""
+
+while [ $# -gt 0 ] ; do
+  case $1 in
+  -poly)
+	POLY=1;
+	shift;;
+  -poly_make)
+	POLY_MAKE=1;
+	shift;;
+  -poplog)
+	POPLOG=1;
+	shift;;
+  -nj-sml)
+	NJSML=1;
+	shift;;
+  -*)
+	echo "Usage: INSTALL [-poly_make] [-poly] [-poplog] [-nj-sml] [target]" 1>&2
+  	exit 2;;
+  *)	
+	LIB_DIR=$1
+	shift;
+	break;;
+  esac
+done
+
+if [ $# -gt 0 ]
+then
+  echo "Usage: INSTALL [-poly_make] [-poly] [-poplog] [-nj-sml] [target]"
+  exit 1
+fi
+
+if [ $LIB_DIR ]
+then
+  if [ -d $LIB_DIR -a -w $LIB_DIR ] || mkdir $LIB_DIR
+  then
+    cp -r * $LIB_DIR
+  else
+    echo "Can't write to " $LIB_DIR
+    exit 3
+  fi
+  # We need a full pathname.
+  case $LIB_DIR in
+    /*) ;;
+    *)  
+      # The LFCS has a local version of pwd, which gets the correct path 
+      # from the NFS automounter.  If you don't use an automounter you're
+      # OK using the default pwd.
+      if [ -f /usr/local/bin/pwd ]
+      then
+        LIB_DIR=`/usr/local/bin/pwd`/$LIB_DIR
+      else
+        LIB_DIR=`pwd`/$LIB_DIR
+      fi
+  esac
+else
+  if [ -f /usr/local/bin/pwd ]
+  then
+    LIB_DIR=`/usr/local/bin/pwd`
+  else
+    LIB_DIR=`pwd`
+  fi
+fi
+
+cd $LIB_DIR/signatures &&
+{
+  ls [A-Z]*.sml > TMPFILE
+  sed -e "s+^+$LIB_DIR/signatures/+" TMPFILE > ML_CONSULT
+  rm TMPFILE
+  if [ $POLY_MAKE ]
+  then
+    mkdir $LIB_DIR/poly_make > /dev/null 2>&1
+    cd $LIB_DIR/poly_make
+    {
+      mkdir Make > /dev/null 2>&1
+      ln ../portable/* . > /dev/null 2>&1
+      rm *.load > /dev/null 2>&1
+      ln ../portable/poly_make.88 poly_make.load > /dev/null 2>&1
+      rm build* > /dev/null 2>&1
+      ln ../signatures/* . > /dev/null 2>&1
+      ln ../portable/Make/* Make > /dev/null 2>&1
+      ln ../portable/Core/ARRAY.sml CORE_ARRAY.sml > /dev/null 2>&1
+      ln ../portable/Core/UTILS.sml CORE_UTILS.sml > /dev/null 2>&1
+      ln ../portable/Core/VECTOR.sml CORE_VECTOR.sml > /dev/null 2>&1
+      ln ../portable/Core/NON_STANDARD.sml NON_STANDARD.sml > /dev/null 2>&1
+      ln ../poly.dist/Core/Array.sml CoreArray.sml > /dev/null 2>&1
+      ln ../portable/Core/Utils.sml CoreUtils.sml > /dev/null 2>&1
+      ln ../portable/Core/Vector.sml CoreVector.sml > /dev/null 2>&1
+      cd ../poly.dist
+      for i in * ; do
+	  rm ../poly_make/$i > /dev/null 2>&1
+	  ln $i ../poly_make/$i > /dev/null 2>&1
+      done
+      cd ../poly_make
+      ls [A-Z]*.sml > TMPFILE
+      ls Make/[A-Z]*.sml >> TMPFILE
+      rm -f ML_CONSULT
+      cp ../signatures/ML_CONSULT .
+      sed -e "s+^+$LIB_DIR/poly_make/+" TMPFILE >> ML_CONSULT
+      rm TMPFILE
+    }
+  fi
+  if [ $POLY ]
+  then
+    mkdir $LIB_DIR/poly > /dev/null 2>&1
+    cd $LIB_DIR/poly
+    {
+      mkdir Make > /dev/null 2>&1
+      mkdir Core > /dev/null 2>&1
+      ln ../portable/* . > /dev/null 2>&1
+      rm *.load > /dev/null 2>&1
+      ln ../portable/poly.load . > /dev/null 2>&1
+      ln ../portable/Make/* Make > /dev/null 2>&1
+      ln ../portable/Core/* Core > /dev/null 2>&1
+      cd ../poly.dist
+      for i in * ; do
+	  rm ../poly/$i > /dev/null 2>&1
+	  ln $i ../poly/$i > /dev/null 2>&1
+      done
+      for i in Core/* ; do
+	  rm ../poly/$i > /dev/null 2>&1
+	  ln $i ../poly/$i > /dev/null 2>&1
+      done
+      cd ../poly
+      ls [A-Z]*.sml > TMPFILE
+      ls Core/[A-Z]*.sml >> TMPFILE
+      ls Make/[A-Z]*.sml >> TMPFILE
+      rm -f ML_CONSULT
+      cp ../signatures/ML_CONSULT .
+      sed -e "s+^+$LIB_DIR/poly/+" TMPFILE >> ML_CONSULT
+      rm TMPFILE
+      sed -e "s+LIB_DIR+\"$LIB_DIR/signatures/\"+" build_make.skel > build_make.sml
+      sed -e "s+LIB_DIR+\"$LIB_DIR/signatures/\"+" build_core.skel > build_core.sml
+      rm *.skel > /dev/null 2>&1
+    }
+  fi
+  if [ $POPLOG ]
+  then
+    mkdir $LIB_DIR/poplog > /dev/null 2>&1
+    cd $LIB_DIR/poplog
+    {
+      mkdir Make > /dev/null 2>&1
+      mkdir Core > /dev/null 2>&1
+      ln ../portable/* . > /dev/null 2>&1
+      rm *.load > /dev/null 2>&1
+      ln ../portable/poplog.load . > /dev/null 2>&1
+      ln ../portable/Make/* Make > /dev/null 2>&1
+      ln ../portable/Core/* Core > /dev/null 2>&1
+      cd ../poplog.dist
+      for i in * ; do
+	  rm ../poplog/$i > /dev/null 2>&1
+	  ln $i ../poplog/$i > /dev/null 2>&1
+      done
+      for i in Core/* ; do
+	  rm ../poplog/$i > /dev/null 2>&1
+	  ln $i ../poplog/$i > /dev/null 2>&1
+      done
+      cd ../poplog
+      ls [A-Z]*.sml > TMPFILE
+      ls Core/[A-Z]*.sml >> TMPFILE
+      ls Make/[A-Z]*.sml >> TMPFILE
+      rm -f ML_CONSULT
+      cp ../signatures/ML_CONSULT .
+      sed -e "s+^+$LIB_DIR/poplog/+" TMPFILE >> ML_CONSULT
+      rm TMPFILE
+      sed -e "s+LIB_DIR+\"$LIB_DIR/signatures/\"+" build_make.skel > build_make.sml
+      sed -e "s+LIB_DIR+\"$LIB_DIR/signatures/\"+" build_core.skel > build_core.sml
+      rm *.skel > /dev/null 2>&1
+    }
+  fi
+  if [ $NJSML ]
+  then
+    mkdir $LIB_DIR/nj-sml > /dev/null 2>&1
+    cd $LIB_DIR/nj-sml
+    {
+      mkdir Make > /dev/null 2>&1
+      mkdir Core > /dev/null 2>&1
+      ln ../portable/* . > /dev/null 2>&1
+      rm *.load > /dev/null 2>&1
+      ln ../portable/nj-sml.load . > /dev/null 2>&1
+      ln ../portable/Make/* Make > /dev/null 2>&1
+      ln ../portable/Core/* Core > /dev/null 2>&1
+      cd ../nj-sml.dist
+      for i in * ; do
+	  rm ../nj-sml/$i > /dev/null 2>&1
+	  ln $i ../nj-sml/$i > /dev/null 2>&1
+      done
+      for i in Core/* ; do
+	  rm ../nj-sml/$i > /dev/null 2>&1
+	  ln $i ../nj-sml/$i > /dev/null 2>&1
+      done
+      cd ../nj-sml
+      ls [A-Z]*.sml > TMPFILE
+      ls Core/[A-Z]*.sml >> TMPFILE
+      ls Make/[A-Z]*.sml >> TMPFILE
+      rm -f ML_CONSULT
+      cp ../signatures/ML_CONSULT .
+      sed -e "s+^+$LIB_DIR/nj-sml/+" TMPFILE >> ML_CONSULT
+      rm TMPFILE
+      sed -e "s+LIB_DIR+\"$LIB_DIR/signatures/\"+" build_make.skel > build_make.sml
+      sed -e "s+LIB_DIR+\"$LIB_DIR/signatures/\"+" build_core.skel > build_core.sml
+      rm *.skel > /dev/null 2>&1
+    }
+  fi
+  cd $LIB_DIR/portable
+  {
+    ls [A-Z]*.sml > TMPFILE
+    ls Core/[A-Z]*.sml >> TMPFILE
+    ls Make/[A-Z]*.sml >> TMPFILE
+    rm -f ML_CONSULT
+    cp ../signatures/ML_CONSULT .
+    sed -e "s+^+$LIB_DIR/portable/+" TMPFILE >> ML_CONSULT
+    rm TMPFILE
+    sed -e "s+LIB_DIR+\"$LIB_DIR/signatures/\"+" build_make.skel > build_make.sml
+    sed -e "s+LIB_DIR+\"$LIB_DIR/signatures/\"+" build_core.skel > build_core.sml
+    rm ../signatures/ML_CONSULT
+  }
+}

@@ -1,0 +1,113 @@
+(* Copyright (c) 1992 by Carnegie Mellon University *)
+
+fun getwd () :string
+   Returns the current working directory pathname as a string.
+
+
+fun clearPath (path:string) :string
+   Processes ".." and "." components of path to produce a more direct pathname.
+   For example, clearPath "/usr/foo/bar/../big/./a.sml" = "/usr/foo/big/a.sml"
+
+fun clearPath' (pathlist:string list) :string list
+   Same as clearPath, but accepts and returns exploded pathnames.
+   (clearPath = implodePath o clearPath' o explodePath)
+
+fun explodePath (path:string) :string list
+   Returns the path components as a list of strings.  The first of the list is
+   either "/" for an absolute name, or the substring of path to the left of the
+   leftmost "/" character.  The last of the list is the substring of path to
+   the right of the rightmost "/" character.  The others are those substrings
+   appearing between "/" characters.
+
+fun implodePath (pathlist:string) :string
+   Pastes the elements of pathlist together to form a pathname.  Slashes
+   are inserted between elements.  The following holds for any string x:
+        x = (implodePath (explodePath x))
+
+
+fun extension (path:string) :string
+   Returns the substring of path to the right of the rightmost ".",
+   (eg, extenstion "/usr/foo/bar.sml" => "sml").
+
+fun stripExtension (path:string) :string
+   Returns the substring of path to the left of the rightmost ".",
+   (eg, extenstion "/usr/foo/bar.sml" => "/usr/foo/bar").
+
+fun splitFileExtension (path:string) :string * string
+   splitFileExtension path = (stripExtension path, extension path)
+
+
+fun splitDirFile (pathname :string) :string*string => (dirname, filename)
+   Searches for the rightmost "/" in pathname.  Returns the substring of
+   pathname to the left of it as dirname, and to the right of it as filename.
+   The rightmost "/" does not appear in either dirname or filename.  If no "/"
+   appears in pathname, then dirname = "" and filename = pathname.
+
+fun splitDirFile' (pathname :string) :string*string => (dirname, filename)  
+   Same as splitDirFile, above, except that if no "/" appears in pathname,
+   then dirname = pathname and filename = "".
+
+fun directoryPart (pathname:string) :string
+   directoryPart = #1 o splitDirFile
+
+fun stripDirectory (pathname:string) :string
+  stripDirectory = #2 o splitDirFile
+
+fun mergeDirFile (dirname:string)(filename:string) :string 
+   Merges dirname and filename into a pathname as follows:
+     (mergeDirFile "/usr/foo" "bar.sml" => "/usr/foo/bar.sml"). 
+   Special cases include:
+     (mergeDirFile "" "bar.sml" => "bar.sml")
+     (mergeDirFile "/usr/foo/" "bar.sml" => "/usr/foo/bar.sml")
+     (mergeDirFile "/usr/foo" "" => "/usr/foo")
+
+fun mergePathnames (parts:string list) :string
+   Like mergeDirFile, but for a list of pathname parts.
+
+
+fun resolveSymLinks (pathname:string) :string
+   If pathname is not a symlink, it returns pathname.  If pathname is a
+   symlink, it follows the symlink to a new pathname, and resolveSymLinks is
+   recursively applied to the new pathname.
+
+fun resolveSymLinks' (dirname:string, filename:string) :string
+   val resolveSymLinks = resolveSymLinks' o splitDirFile
+
+fun resolveAllSymLinks (pathname:string) :string
+   Breaks pathname up into pathname components (using explodePath).  Then it
+   follows symlinks for each component.  For example,
+
+   If /afs/cs/project/venari/foo.sml -> bar.sml
+   then resolveSymLinks "/afs/cs/project/venari/foo.sml"
+           = "/afs/cs/project/venari/bar.sml"
+   but, resolveAllSymLinks "/afs/cs/project/venari/foo.sml"
+           = "/afs/cs.cmu.edu/project/venari/bar.sml"
+   because it also follows the symlink /afs/cs -> /afs/cs.cmu.edu
+
+fun resolveAllSymLinks' (pathname:string list) :string
+   val resolveAllSymLinks = resolveAllSymLinks' o explodePath
+
+
+fun relativeName (directory:string) (filename:string) :string 
+   Explodes directory and filename into components (using explodePath), call
+   the resulting string lists directory' and filename'.  If directory' is a
+   prefix of filename', then strip off that prefix and implode (using
+   implodePath) the suffix and return it.  Otherwise return filename.
+
+fun absoluteName (directory:string) (filename:string) :string 
+   If the first character of filename is "/", then return filename.
+   Otherwise merge directory and filename (using mergeDirFile), and
+   remove "." and ".." components (using clearPath).
+
+fun absoluteName' (directory:string list) (filename:string list) :string list
+   Like absoluteName, but works on exploded pathnames, and returns an
+   exploded pathname.
+
+fun absoluteRealPathname' (name :string list) :string
+   Get an absolute pathname for name.  If name is absolute then
+   absolute'pathname is name.  Otherwise, do getwd() to get the current working
+   directory, and prepend it to name to get absolute'pathname.  Then, return
+   (resolveAllSymLinks' (clearPath' absolute'pathname)).
+
+fun absoluteRealPathname (name:string) :string
+  absoluteRealPathname = absoluteRealPathname' o explodePath
