@@ -1,0 +1,127 @@
+.TH CFLOW 1 PUBLIC
+.SH NAME
+cflow \- print a function call hierarchy
+.SH SYNOPSIS
+cflow [-agivx] [-d n] [-w n] [-r name] [cpp-opts] files
+.SH DESCRIPTION
+The
+.B cflow
+command reads
+.I files
+as program source and attempts to print a graph
+of the program's function call hierarchy to the standard output.
+Called functions are indented with respect to their calling functions,
+and printed only once, in the order they occur.
+.P
+The first reference to function
+.I func
+is printed with the name of the file
+and line number where it is defined, e.g.,
+.sp
+.RS
+func {file.c n}.
+.RE
+.sp
+Subsequent references are printed as:
+.sp
+.RS
+func ... {mm},
+.RE
+.sp
+where mm is the line number in  the graph of
+.IR func 's
+first reference.
+Global variable references appear (if invoked with
+the 
+.I \-v
+option) as:
+.sp
+.RS
+var {v file.c n}.
+.RE
+.sp
+External functions and variables are printed with a null source, i.e.,
+.sp
+.RS
+func {}.
+.RE
+.sp
+An ellipsis precedes the name of a function called recursively, e.g.,
+.sp
+.RS
+ ... func ... {mm}
+.RE
+.SS OPTIONS
+.TP 10
+-a
+Print a separate call graph for each function.
+.TP 10
+.RI -d \ nn
+Print the call graph to at most depth
+.IR nn .
+.TP 10
+-g
+Add to the list of C keywords GNU CC keywords.
+.TP 10
+-i
+Print an inverted graph of depth 2, i.e.,  for each function (or
+variable if used with the
+.I \-v
+option), print a list of functions which call it.
+.TP 10
+.RI -r \ name
+Print a call graph with function or variable
+.I name
+as root (in the case of a variable, this only makes sense
+if used with the
+.I \-i
+option).  This option may be repeated.
+.TP 10
+-v
+Print references to global variables.  Only functions calls are printed
+by default. 
+.TP 10
+.RI -w \ nn
+Print the graph to fit  in
+.I nn
+columns.  The default is 132 columns.
+.TP 10
+-x
+Print each sub-graph in full.  This overrides the default format
+where subsequent references are abbreviated as described above.
+.TP 10
+\fR-D\fImacro \fRor -U\fImacro \fRor -I\fIdir\fR
+Invoke cpp with the corresponding options.  If there is a makefile, then
+the command
+.I "make -n"
+should indicate the proper flags to invoke
+.I cflow
+with.
+
+.SH AUTHORS
+The graph printing command
+.I prcg
+is essentially the one in
+M. M. Taylor's
+.IR calls (1)
+as posted to the Usenet newsgroup comp.sources.unix.
+A new parser,
+.IR prcc ,
+is based on Steven Kirkendall's
+.IR ctags (1)
+command which is distributed with the vi-clone
+.IR elvis (1).
+.br
+.SH BUGS
+An extern variable declaration is overridden by an actual (global) variable
+declaration.  A complaint is written to stderr whether there is a conflict
+or not.
+.P
+Function parameters are ignored.  If these parameters share the names
+of global variables, then references to them are  flagged as external
+references.
+.P
+The
+.I static
+qualifier is ignored.  Only the first definition of a function or
+variable is recognized.
