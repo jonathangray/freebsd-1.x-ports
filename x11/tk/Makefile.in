@@ -73,11 +73,12 @@ X11_LIB_SWITCHES =	@XLIBSW@
 # and the math library (in that order).  The "@LIBS@" part will be
 # replaced (or has already been replaced) with relevant libraries as
 # determined by the configure script.
-LIBS = libtk.a $(TCL_BIN_DIR)/libtcl.a $(X11_LIB_SWITCHES) @LIBS@ -lm
+LIBS = -L. -ltk -L$(TCL_BIN_DIR) -ltcl $(X11_LIB_SWITCHES) @LIBS@ -lm
 
 # To change the compiler switches, for example to change from -O
 # to -g, change the following line:
 CFLAGS = -O
+PICFLAGS=-DPIC -fpic
 
 # To turn off the security checks that disallow incoming sends when
 # the X server appears to be insecure, reverse the comments on the
@@ -129,7 +130,7 @@ ${AC_FLAGS} ${PROTO_FLAGS} ${SECURITY_FLAGS} ${MEM_DEBUG_FLAGS} \
 
 WIDGOBJS = tkButton.o tkEntry.o tkFrame.o tkListbox.o \
 	tkMenu.o tkMenubutton.o tkMessage.o tkScale.o \
-	tkScrollbar.o
+	tkScrollbar.o tkFScale.o
 
 CANVOBJS = tkCanvas.o tkCanvArc.o tkCanvBmap.o tkCanvLine.o \
 	tkCanvPoly.o tkCanvPs.o tkCanvText.o tkCanvWind.o \
@@ -143,15 +144,40 @@ OBJS = tk3d.o tkArgv.o tkAtom.o tkBind.o tkBitmap.o tkCmds.o \
         tkMain.o tkOption.o tkPack.o tkPlace.o tkPreserve.o tkSelect.o \
         tkSend.o tkWindow.o tkWm.o $(WIDGOBJS) \
 	$(CANVOBJS) $(TEXTOBJS)
+
+SOBJS = tk3d.so tkArgv.so tkAtom.so tkBind.so tkBitmap.so tkCmds.so \
+	tkColor.so tkConfig.so tkCursor.so tkError.so tkEvent.so \
+	tkFocus.so tkFont.so tkGet.so tkGC.so tkGeometry.so tkGrab.so \
+        tkMain.so tkOption.so tkPack.so tkPlace.so tkPreserve.so tkSelect.so \
+        tkSend.so tkWindow.so tkWm.so $(WIDGSOBJS) \
+	$(CANVSOBJS) $(TEXTSOBJS)
+
+WIDGSOBJS = tkButton.so tkEntry.so tkFrame.so tkListbox.so \
+	tkMenu.so tkMenubutton.so tkMessage.so tkScale.so \
+	tkScrollbar.so tkFScale.so
+
+CANVSOBJS = tkCanvas.so tkCanvArc.so tkCanvBmap.so tkCanvLine.so \
+	tkCanvPoly.so tkCanvPs.so tkCanvText.so tkCanvWind.so \
+	tkRectOval.so tkTrig.so
+
+TEXTSOBJS = tkText.so tkTextBTree.so tkTextDisp.so tkTextIndex.so tkTextTag.so
+
 DEMOPROGS = browse color dialog hello ixset rmt rolodex size square \
 	tcolor timer widget
 
-all: libtk.a wish
+VERS_MAJOR=7
+VERS_MINOR=3
+
+all: libtk.a libtk.so.${VERS_MAJOR}.${VERS_MINOR} wish
 
 libtk.a: $(OBJS)
 	rm -f libtk.a
 	ar cr libtk.a $(OBJS)
 	$(RANLIB) libtk.a
+
+libtk.so.${VERS_MAJOR}.${VERS_MINOR}: ${SOBJS}
+	rm -f libtk.so.${VERS_MAJOR}.${VERS_MINOR}
+	ld -Bshareable -Bforcearchive -o libtk.so.${VERS_MAJOR}.${VERS_MINOR} ${SOBJS}
 
 wish: tkAppInit.o libtk.a $(TCL_BIN_DIR)/libtcl.a
 	$(CC) $(CC_SWITCHES) tkAppInit.o $(LIBS) -o wish
@@ -167,7 +193,7 @@ test: tktest
 
 install: install-binaries install-libraries install-demos install-man
 
-install-binaries: libtk.a wish
+install-binaries: libtk.a libtk.so.${VERS_MAJOR}.${VERS_MINOR} wish
 	@for i in $(LIB_DIR) $(BIN_DIR) ; \
 	    do \
 	    if [ ! -d $$i ] ; then \
@@ -180,6 +206,8 @@ install-binaries: libtk.a wish
 	@echo "Installing libtk.a"
 	@$(INSTALL_DATA) libtk.a $(LIB_DIR)
 	@$(RANLIB) $(LIB_DIR)/libtk.a
+	@echo "Installing libtk.so.${VERS_MAJOR}.${VERS_MINOR}"
+	@$(INSTALL_DATA) libtk.so.${VERS_MAJOR}.${VERS_MINOR} $(LIB_DIR)
 	@echo "Installing wish"
 	@$(INSTALL_PROGRAM) wish $(BIN_DIR)
 
@@ -269,7 +297,7 @@ Makefile: $(SRC_DIR)/Makefile.in
 	$(SHELL) config.status
 
 clean:
-	rm -f *.a *.o core errs *~ \#* TAGS *.E a.out errors tktest wish
+	rm -f *.a *.o *.so *.so.* core errs *~ \#* TAGS *.E a.out errors tktest wish
 
 distclean: clean
 	rm -f Makefile config.status
@@ -282,3 +310,14 @@ $(WIDGOBJS): default.h
 $(CANVOBJS): default.h tkCanvas.h
 $(TEXTOBJS): default.h tkText.h
 tkWindow.o: patchlevel.h
+
+.SUFFIXES: .so
+
+.c.so:
+	$(CC) $(PICFLAGS) $(CC_SWITCHES) -c $< -o $@
+
+$(SOBJS) tkTest.so: tk.h tkInt.h tkConfig.h
+$(WIDGSOBJS): default.h
+$(CANVSOBJS): default.h tkCanvas.h
+$(TEXTSOBJS): default.h tkText.h
+tkWindow.so: patchlevel.h
