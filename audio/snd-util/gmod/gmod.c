@@ -20,8 +20,8 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/soundcard.h>
-#include <sys/ultrasound.h>
+#include <machine/soundcard.h>
+#include <machine/ultrasound.h>
 #include <stdio.h>
 
 #include "defines.h"

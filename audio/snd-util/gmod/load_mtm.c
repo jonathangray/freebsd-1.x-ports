@@ -2,7 +2,7 @@
 /* This file is part of the GMOD package */
 
 #include <sys/types.h>
-#include <sys/soundcard.h>
+#include <machine/soundcard.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -18,7 +18,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/soundcard.h>
+#include <machine/soundcard.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>

@@ -15,7 +15,7 @@
 */
 
 
-#include <sys/soundcard.h>
+#include <machine/soundcard.h>
 
 #include "defines.h"
 #include "structs.h"

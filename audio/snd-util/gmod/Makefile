@@ -9,6 +9,8 @@ STDHFILES = defines.h structs.h globals.h
 .c.o:
 	$(CC) $(CFLAGS) -c $<
 
+all: gmod
+
 gmod: $(OFILES)
 	$(CC) -o gmod $(OFILES)
 	strip gmod
