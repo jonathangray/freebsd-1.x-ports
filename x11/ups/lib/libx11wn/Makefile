@@ -132,7 +132,7 @@ $Dukcframed: ${FRAMED_OBJS}
 
 clean:
 	rm -f ${OBJS} ${FRAMED_OBJS} $Dukcframed $Dlibwn.a $Dtestwn
-	-rmdir ${OBJDIR}${SLASH}${WSNAME}
+	-@if [ -d ${OBJDIR}${SLASH}${WSNAME} ]; then rmdir ${OBJDIR}${SLASH}${WSNAME}; fi
 
 tags: ${SRCS} ${HDRS}
 	ctags -tw  ${SRCS} ${HDRS}
