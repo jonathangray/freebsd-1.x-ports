@@ -6,7 +6,7 @@
 # constructed by the following commands which follow:
 
 all:
-	make forFREEBSD
+	-make forFREEBSD
 	(cd FREEBSD; make port)
 	(cd FREEBSD/cdecl; make all)
 	(cd FREEBSD/xlib; make all)
@@ -134,6 +134,7 @@ clean:
 	cd test; make clean
 	cd cdecl; make clean
 	cd xlib; make clean
+	rm -rf FREEBSD
 
 # Clean up C source files generated from Scheme source.
 
