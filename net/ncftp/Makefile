@@ -112,7 +112,7 @@ PACK    = pack
 TEST	= test
 RM = rm -f
 CP = install -c
-BINST= -o bin -g bin
+BINST= -o bin -g bin -s
 MINST= -o bin -g bin -m 644
 #CP = cp
 
