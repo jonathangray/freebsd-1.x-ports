@@ -55,7 +55,8 @@ static char     sccsid[] = "@(#)txt_move.c 20.91 93/06/28";
 
 static int dnd_data_key = 0; /* XXX: Don't do this at home kids. */
 static int dnd_view_key = 0; 
-static int DndConvertProc();
+/*static int DndConvertProc(); It is global later ljo*/
+int DnDConvertProc();
 
 Pkg_private Es_handle textsw_esh_for_span();
 Pkg_private Es_index ev_resolve_xy();
@@ -688,7 +689,8 @@ textsw_do_drag_copy_move(view, ie, is_copy)
     xv_destroy(dnd_accept_cursor);
 }
 
-static int
+/*static int */
+int
 DndConvertProc(dnd, type, data, length, format)
     Dnd      	 dnd;
     Atom        *type;
