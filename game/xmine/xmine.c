@@ -78,6 +78,13 @@
 #define GSPACEX 16
 #define GSPACEY 16
 
+/* some systems might be better off with using "random()" instead of "rand()"*/
+#if defined __FreeBSD__
+# define USE_RANDOM 1
+#else
+# define USE_RANDOM 0
+#endif
+
 #define SCORE_FILE "~/.xmine_scores"
 #define TOPMARGIN 60
 #define BOTMARGIN 12
@@ -911,12 +918,21 @@ layout_board(fx, fy)
 {
 	int i, x, y, xd, yd, tries;
 
+#if USE_RANDOM
+	srandom((unsigned) time(0));
+#else
 	srand((unsigned int) time(0));
+#endif
 	for (i = 0; i != mine_count; i++) {
 		tries = 1000;
 		do {
+#if USE_RANDOM
+			x = (random()>>1) % gsizex;
+			y = (random()>>1) % gsizey;
+#else
 			x = (rand()>>1) % gsizex;
 			y = (rand()>>1) % gsizey;
+#endif
 			tries--;
 		} while (tries && (grid[x][y] ||
 				   !(x < fx-1 || x > fx+1 || y < fy-1

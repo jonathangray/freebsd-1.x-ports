@@ -2,6 +2,9 @@ This is an almost unmodified copy of what i submitted to comp.sources.x,
 with only slight mucking on the Imakefile, in order to add the `package'
 target.
 
+I've also modified xmine.c to use "random()" instead of "rand()" under
+FreeBSD; otherwise the game tends to become boring after short time:-)
+
 	Joerg
 
 Here's the modification to the Imakefile:
@@ -18,3 +21,45 @@ Here's the modification to the Imakefile:
 + package: install install.man
 + 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST xmine_bin
 + 
+*** xmine.c~	Sat Apr  2 00:20:15 1994
+--- xmine.c	Thu Jun 30 10:20:34 1994
+***************
+*** 78,83 ****
+--- 78,90 ----
+  #define GSPACEX 16
+  #define GSPACEY 16
+  
++ /* some systems might be better off with using "random()" instead of "rand()"*/
++ #if defined __FreeBSD__
++ # define USE_RANDOM 1
++ #else
++ # define USE_RANDOM 0
++ #endif
++ 
+  #define SCORE_FILE "~/.xmine_scores"
+  #define TOPMARGIN 60
+  #define BOTMARGIN 12
+***************
+*** 911,922 ****
+--- 918,938 ----
+  {
+  	int i, x, y, xd, yd, tries;
+  
++ #if USE_RANDOM
++ 	srandom((unsigned) time(0));
++ #else
+  	srand((unsigned int) time(0));
++ #endif
+  	for (i = 0; i != mine_count; i++) {
+  		tries = 1000;
+  		do {
++ #if USE_RANDOM
++ 			x = (random()>>1) % gsizex;
++ 			y = (random()>>1) % gsizey;
++ #else
+  			x = (rand()>>1) % gsizex;
+  			y = (rand()>>1) % gsizey;
++ #endif
+  			tries--;
+  		} while (tries && (grid[x][y] ||
+  				   !(x < fx-1 || x > fx+1 || y < fy-1
