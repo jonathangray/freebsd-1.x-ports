@@ -90,7 +90,7 @@ NONSHARED_CCLDFLAGS =
 	$(LDLIBX11)\
 	$(LDLIBM)\
 	$(ABSLIBDIRPATH)
-     EXTRA_CCLDLIBS = -lg++ -lcompat
+     EXTRA_CCLDLIBS = -lg++
 
             INSTALL = install
        INSTPGMFLAGS = -s
@@ -199,47 +199,3 @@ main.o: $(SRC)/main.$(CCSUFFIX)
 	@$(RM) main.o main..c
 	$(CCDRIVER)  $(CCFLAGS) -c $(SRC)/main.$(CCSUFFIX)
 
-# DO NOT DELETE
-
-main.o: ../../../.././src/include/Dispatch/dispatcher.h
-main.o: ../../../.././src/include/Dispatch/enter-scope.h
-main.o: ../../../.././src/include/Dispatch/dp.h
-main.o: ../../../.././src/include/Dispatch/_defines.h
-main.o: ../../../.././src/include/OS/enter-scope.h
-main.o: ../../../.././src/include/OS/os.h
-main.o: ../../../.././src/include/OS/_defines.h
-main.o: ../../../.././src/include/OS/leave-scope.h
-main.o: ../../../.././src/include/OS/_undefs.h
-main.o: ../../../.././src/include/Dispatch/iohandler.h
-main.o: ../../../.././src/include/IV-look/kit.h
-main.o: ../../../.././src/include/IV-look/button.h
-main.o: ../../../.././src/include/InterViews/input.h
-main.o: ../../../.././src/include/InterViews/monoglyph.h
-main.o: ../../../.././src/include/InterViews/glyph.h
-main.o: ../../../.././src/include/InterViews/coord.h
-main.o: ../../../.././src/include/InterViews/enter-scope.h
-main.o: ../../../.././src/include/InterViews/iv.h
-main.o: ../../../.././src/include/InterViews/_undefs.h
-main.o: ../../../.././src/include/InterViews/_defines.h
-main.o: ../../../.././src/include/InterViews/geometry.h
-main.o: ../../../.././src/include/InterViews/_enter.h
-main.o: ../../../.././src/include/InterViews/_leave.h
-main.o: ../../../.././src/include/InterViews/resource.h
-main.o: ../../../.././src/include/InterViews/observe.h
-main.o: ../../../.././src/include/IV-look/menu.h
-main.o: ../../../.././src/include/IV-look/stepper.h
-main.o: ../../../.././src/include/InterViews/adjust.h
-main.o: ../../../.././src/include/InterViews/action.h
-main.o: ../../../.././src/include/InterViews/telltale.h
-main.o: ../../../.././src/include/InterViews/background.h
-main.o: ../../../.././src/include/InterViews/display.h
-main.o: ../../../.././src/include/InterViews/layout.h
-main.o: ../../../.././src/include/InterViews/deck.h
-main.o: ../../../.././src/include/InterViews/polyglyph.h
-main.o: ../../../.././src/include/InterViews/scrbox.h
-main.o: ../../../.././src/include/InterViews/session.h
-main.o: ../../../.././src/include/InterViews/style.h
-main.o: ../../../.././src/include/InterViews/window.h
-main.o: ../../../.././src/include/InterViews/canvas.h
-main.o: ../../../.././src/include/OS/string.h /usr/include/g++/stdio.h
-main.o: /usr/include/g++/_G_config.h

@@ -90,7 +90,7 @@ NONSHARED_CCLDFLAGS =
 	$(LDLIBX11)\
 	$(LDLIBM)\
 	$(ABSLIBDIRPATH)
-     EXTRA_CCLDLIBS = -lg++ -lcompat
+     EXTRA_CCLDLIBS = -lg++
 
             INSTALL = install
        INSTPGMFLAGS = -s
