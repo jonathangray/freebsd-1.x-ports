@@ -69,8 +69,15 @@
  *	since Tahoe version of <netinet/in.h> does not define them.
  *
  * $Log: scm.c,v $
- * Revision 1.1  1993/08/21 00:46:32  jkh
- * Initial revision
+ * Revision 1.2  1994/06/20 06:04:04  rgrimes
+ * Humm.. they did a lot of #if __STDC__ but failed to properly prototype
+ * the code.  Also fixed one bad argument to a wait3 call.
+ *
+ * It won't compile -Wall, but atleast it compiles standard without warnings
+ * now.
+ *
+ * Revision 1.1.1.1  1993/08/21  00:46:33  jkh
+ * Current sup with compression support.
  *
  * Revision 1.1.1.1  1993/05/21  14:52:17  cgd
  * initial import of CMU's SUP to NetBSD
@@ -197,6 +204,12 @@ static char *myhost ();
 
 char scmversion[] = "4.3 BSD";
 
+/*
+ * PROTOTYPES
+ */
+#if __STDC__
+int	scmerr	__P((int, char *,...));
+#endif
 /*************************
  ***    M A C R O S    ***
  *************************/

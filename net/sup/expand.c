@@ -79,6 +79,17 @@ static	char	**BUFFER;		/* pointer to the buffer */
 static	int	BUFSIZE;		/* maximum number in buffer */
 static	int	bufcnt;			/* current number in buffer */
 
+#if __STDC__
+static	addone		__P((register char *, register char *));
+static	addpath		__P((char));
+static	amatch		__P((char *, char *));
+static	execbrc		__P((char *, char *));
+static	gethdir		__P((char *));
+static	glob		__P((char *));
+static	matchdir	__P((char *));
+static	match		__P((char *, char *));
+#endif
+
 int expand(spec, buffer, bufsize)
 	register char *spec;
 	char **buffer;

@@ -41,7 +41,14 @@
  *	across the network to save BandWidth
  *
  * $Log: supfilesrv.c,v $
- * Revision 1.2  1994/05/25 17:58:40  nate
+ * Revision 1.3  1994/06/20 06:04:13  rgrimes
+ * Humm.. they did a lot of #if __STDC__ but failed to properly prototype
+ * the code.  Also fixed one bad argument to a wait3 call.
+ *
+ * It won't compile -Wall, but atleast it compiles standard without warnings
+ * now.
+ *
+ * Revision 1.2  1994/05/25  17:58:40  nate
  * From Gene Stark
  *
  * system() returns non-zero status for errors, so check for non-zero
@@ -330,6 +337,13 @@ HASH *inodeH[HASHSIZE];			/* for inode lookup for linked file check */
 
 char *fmttime ();			/* time format routine */
 
+/*
+ * PROTOTYPES
+ */
+#if __STDC__
+void	goaway	__P((char *,...));
+#endif
+
 /*************************************
  ***    M A I N   R O U T I N E    ***
  *************************************/
@@ -340,7 +354,7 @@ char **argv;
 {
 	register int x,pid,signalmask;
 	struct sigvec chldvec,ignvec,oldvec;
-	int chldsig ();
+	void chldsig ();
 	long tloc;
 
 	/* initialize global variables */
@@ -403,11 +417,12 @@ char **argv;
  * Child status signal handler
  */
 
+void
 chldsig()
 {
 	union wait w;
 
-	while (wait3(&w, WNOHANG, (struct rusage *)0) > 0) {
+	while (wait3(&w.w_status, WNOHANG, (struct rusage *)0) > 0) {
 		if (nchildren) nchildren--;
 	}
 }
@@ -1510,6 +1525,7 @@ int fileuid,filegid;
 }
 
 #if __STDC__
+void
 goaway (char *fmt,...)
 #else
 /*VARARGS*//*ARGSUSED*/

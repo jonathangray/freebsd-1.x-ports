@@ -32,7 +32,14 @@
  *	across the network to save BandWidth
  *
  * $Log: supcmeat.c,v $
- * Revision 1.2  1994/05/25 17:58:38  nate
+ * Revision 1.3  1994/06/20 06:04:09  rgrimes
+ * Humm.. they did a lot of #if __STDC__ but failed to properly prototype
+ * the code.  Also fixed one bad argument to a wait3 call.
+ *
+ * It won't compile -Wall, but atleast it compiles standard without warnings
+ * now.
+ *
+ * Revision 1.2  1994/05/25  17:58:38  nate
  * From Gene Stark
  *
  * system() returns non-zero status for errors, so check for non-zero
@@ -1383,6 +1390,7 @@ FILE **finishfile;
 }
 
 #if __STDC__
+void
 done (int value,char *fmt,...)
 #else
 /*VARARGS*//*ARGSUSED*/
@@ -1423,6 +1431,7 @@ va_dcl
 		longjmp (sjbuf,TRUE);
 }
 #if __STDC__
+void
 goaway (char *fmt,...)
 #else
 /*VARARGS*//*ARGSUSED*/

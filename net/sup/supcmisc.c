@@ -27,8 +27,15 @@
  **********************************************************************
  * HISTORY
  * $Log: supcmisc.c,v $
- * Revision 1.1  1993/08/21 00:46:33  jkh
- * Initial revision
+ * Revision 1.2  1994/06/20 06:04:11  rgrimes
+ * Humm.. they did a lot of #if __STDC__ but failed to properly prototype
+ * the code.  Also fixed one bad argument to a wait3 call.
+ *
+ * It won't compile -Wall, but atleast it compiles standard without warnings
+ * now.
+ *
+ * Revision 1.1.1.1  1993/08/21  00:46:34  jkh
+ * Current sup with compression support.
  *
  * Revision 1.1.1.1  1993/05/21  14:52:18  cgd
  * initial import of CMU's SUP to NetBSD
@@ -252,6 +259,7 @@ int *uid,*gid,*mode;
  *********************************************/
 
 #if __STDC__
+void
 notify (char *fmt,...)		/* record error message */
 #else
 /*VARARGS*//*ARGSUSED*/
