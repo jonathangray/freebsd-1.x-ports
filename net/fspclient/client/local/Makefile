@@ -4,7 +4,7 @@
 srcdir	= .
 VPATH	= .
 
-CC	= cc
+CC	= gcc
 
 DEFS = -DHAVE_CONFIG_H
 
