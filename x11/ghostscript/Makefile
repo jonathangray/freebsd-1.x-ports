@@ -1,4 +1,4 @@
-prefix=/usr/local
+prefix=/usr/gnu
 lib=${prefix}/lib/ghostscript
 
 all: ghostscript
@@ -8,16 +8,12 @@ ghostscript:
 	cd gs; \
 	make
 
-install: ghostscript
-	@if whoami | egrep 'root|bin'; then : ; \
-	else \
-		echo "Install as either user root or bin"; \
-		exit 1; \
-	fi;
+install: 
 	-mkdir -p ${lib}/fonts
 	cp -R fonts  ${lib}/
 	cd gs; \
-	make install; \
+	make install
+	-mkdir -p ${prefix}/man/man1
 	cp gs.1 ${prefix}/man/man1/gs.1
 
 clean:

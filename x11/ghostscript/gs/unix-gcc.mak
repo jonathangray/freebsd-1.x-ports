@@ -32,7 +32,7 @@ INSTALL = install -c
 INSTALL_PROGRAM = $(INSTALL) -m 775
 INSTALL_DATA = $(INSTALL) -m 664
 
-prefix = /usr/local
+prefix = /usr/gnu
 exec_prefix = $(prefix)
 bindir = $(exec_prefix)/bin
 datadir = $(prefix)/lib
