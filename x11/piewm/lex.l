@@ -43,6 +43,18 @@ extern char *ProgramName;
 
 extern int ParseError;
 
+
+#undef YY_INPUT
+#define YY_INPUT(buf,result,max_size) \
+        { \
+          int res = (*twmInputFunc)() ; \
+          if (res == NULL) result = YY_NULL ; \
+          else { \
+            buf[0] = res ; \
+            result = 1 ; \
+          } \
+        }
+
 %}
 
 string				\"([^"]|\\.)*\"
@@ -88,13 +100,13 @@ number				[0-9]+
 				  ParseError = 1;
 				}
 %%
-yywrap() { return(1);}
+/* yywrap() { return(1);} */
 
 #undef unput
-#undef input
+/* #undef input */
 #undef output
 #undef feof
 #define unput(c)	twmUnput(c)
-#define input()		(*twmInputFunc)()
+/* #define input()		(*twmInputFunc)() */
 #define output(c)	TwmOutput(c)
 #define feof()		(1)

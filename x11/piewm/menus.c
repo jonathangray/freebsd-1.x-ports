@@ -48,8 +48,10 @@
  * twm menu code
  *
  * $Log: menus.c,v $
- * Revision 1.1  1994/05/18 18:13:01  asami
- * Initial revision
+ * Revision 1.2  1994/05/18 18:50:50  asami
+ * FreeBSD port (finally!).  Biggest hack (drum roll please) was defining
+ * YY_INPUT macro in lex.l so that it can read the damn startup file, not
+ * stdin!  (Thanks Guido van Rooij for the hint!)  Sorry for all the ! signs!
  *
  * Revision 1.9  1991/10/05  08:39:16  cross
  * Changed to the new version of Xpm (v3.0, released a whole day before
@@ -208,8 +210,10 @@ extern int GlobalMenuButton;
 extern int Click;
 int PieMenuWait = 100;
 
+#ifndef __FreeBSD__
 #define MAX(x,y) ((x)>(y)?(x):(y))
 #define MIN(x,y) ((x)<(y)?(x):(y))
+#endif /* !__FreeBSD__ */
 #define ABS(x) ((x)<0?-(x):(x))
 
 #define SHADOWWIDTH 5			/* in pixels */
@@ -676,7 +680,7 @@ UpdateMenu(menu, root)
 	FD_ZERO(&exceptfds); FD_SET(fd, &exceptfds); 
 
 	if (!deferred) {
-	    select(fd + 1, &readfds, &exceptfds, NULL);
+	    select(fd + 1, &readfds, NULL, &exceptfds, NULL);
 	} else {
 	    gettimeofday(&now_time, NULL);
 	    now_time.tv_sec -= start_time.tv_sec;
