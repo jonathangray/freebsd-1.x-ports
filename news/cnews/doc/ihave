@@ -1,0 +1,337 @@
+.Ch "Setting Up Netnews Feeds Using the Ihave/sendme Protocol"
+.Ix ihave/sendme
+.SH
+Introduction
+.PP
+The ihave/sendme protocol is a means of conserving network bandwidth
+at the expense of some real-time delays in getting netnews.
+It pre-dates the NetNews Transfer Protocol (NNTP)
+for the TCP/IP protocol stack by several years and attempts much
+the same optimisation,
+but ihave/sendme is batched,
+unlike NNTP.
+.PP
+The above perhaps needs emphasizing:
+\fIihave/sendme has nothing whatsoever to do with NNTP\fR.
+NNTP has ``ihave'' and ``sendme'' messages, which have somewhat similar
+functions to the ihave/sendme protocol (hence the similarity of names),
+but the implementations are completely unrelated.
+If you want to set up an NNTP feed, you are reading the wrong document.
+.PP
+Ihave/sendme
+is sketched in extremely vague terms in
+ARPA Internet RFC 1036 (nee 850),
+.Ix "RFC 1036"
+but the description therein is so lofty as
+to be useless as a protocol specification.
+.SH
+Into the Breach
+.PP
+The basic ihave/sendme strategy is for a site which has just received a new
+netnews article to send an
+.I ihave
+.Ix "control messages" ihave
+.Ix "control messages" sendme
+.Ix Message-IDs
+netnews control message
+containing the Message-ID of the new article to each
+of its ihave/sendme
+neighbours;
+the neighbour consults its netnews
+.I history
+file and if it has not seen the article,
+sends back a
+.I sendme
+control message containing the original Message-ID;
+upon receipt of the
+.I sendme ,
+the first site will transmit the article via normal channels
+to the requesting neighbour.
+If you are getting exactly one news feed,
+ihave/sendme is of no benefit and merely slows down the reception
+of news.
+If you are getting multiple feeds,
+the added delay may not be worth the reduction in volume of
+news transferred
+(though sites being fed by long-distance telephone may disagree).
+In general,
+ihave/sendme should be a last resort,
+if only because it is more complicated to understand and set up
+than an ordinary news feed.
+.PP
+Due to the high volume of netnews,
+sending individual articles is always a performance disaster
+.Ix "performance disaster" NNTP
+.Ix NNTP "performance disaster"
+(see B News,
+NNTP and unbatched ihave/sendme),
+so the golden rule of netnews is
+``Thou shalt batch thine articles.''.
+This makes the above sketch a little slower and more complicated:
+now individual articles are not sent,
+but batches of
+.I ihave ,
+.I sendme ,
+and
+netnews messages are transmitted,
+incurring further delay since netnews batchers are usually
+run only once per hour,
+say.
+.PP
+We will now walk through an example ihave/sendme set up between
+two C news sites
+(\c
+.I utzoo
+and
+.I utstat ),
+with reference to the following
+.I sys
+.Ix sys
+.Ix files sys
+file fragments and flow diagram.
+Most of the work is done by specialised batch preparers.
+.I relaynews
+merely responds to
+.I "ihave site"
+or
+.I "sendme site"
+control messages
+by writing the name of the file containing the control message
+onto
+site\c
+.B .ihave/togo
+or
+site\c
+.B .sendme/togo ,
+respectively.
+This scheme owes some ideas to Root Boy Jim of UUNET.
+.Ix "Root Boy Jim"
+.br
+.ne 1i
+.SH
+utzoo's sys file
+.LP
+.DS L
+.ft B
+# Send ihave telling utstat what we have -- batcher turns the batch into a
+# giant control message and posts it to "to.utstat".  (#1)
+utstat.wehave/utstat:rec.music.synth,!to/all:I:
+# actual transmission of control messages, via normal means (#2)
+utstat:to.utstat/all:f:
+.ft
+.DE
+.br
+.ne 1i
+.SH
+utstat's sys file
+.LP
+.DS L
+.ft B
+# Send ihave telling utzoo what we have -- batcher turns the batch into a
+# giant control message and posts it to "to.utzoo".  (#1)
+utzoo.wehave/utzoo:rec.music.synth,!to/all:I:
+# actual transmission of control messages, via normal means (#2)
+utzoo:to.utzoo/all:f:
+.ft
+.DE
+.ne 1i
+.SH
+utzoo's batchparms file
+.TS L
+l s s s s s
+l l l l l l .
+.ft B
+# sample ihave/sendme setup
+# site	size	queue	builder	muncher	sender
+# ----	----	-----	-------	-------	------
+utstat.wehave	40000	20	batchih	nocomp	viainews
+utstat.ihave	40000	20	batchsm	nocomp	viainews
+utstat.sendme	40000	20	batchra	nocomp	vianowhere
+.TE
+.ne 6i
+.so ihave.pic
+.SH
+An Example
+.SH
+An article arrives on utzoo
+.PP
+A new article arrives on
+.I utzoo
+in newsgroup
+.I rec.music.synth
+and is matched by the first
+.I sys
+file line
+.B "on utzoo" ,
+which writes the Message-ID of the article
+onto a batch file
+(\c
+.I $NEWSARTS/out.going/utstat.wehave/togo ).
+There are some subtleties here:
+it is essential to add
+.B ,!to
+to the subscription list
+if that list contains
+.B all
+or
+.B to
+to prevent looping messages;
+and
+it is always worthwhile to prevent leaking local
+newsgroups out one's full feeds,
+so if the subscription list contained
+.B all
+one would want to add something like
+.B ,!general
+or
+.B ,!utstat .
+Eventually,
+the batcher runs on the batch file.
+.PP
+The
+.I batchih
+batcher on
+.I utzoo
+prepares
+a batch of Message-IDs as an
+.I ihave
+control message to
+.I utstat
+and submits it to
+.I "inews \-h" 
+which matches
+.I sys
+line #2,
+and
+writes the file name of the
+article file containing the
+control message
+on the usual
+.I utstat
+batch file
+(\c
+.I $NEWSARTS/out.going/utstat/togo ).
+.PP
+Eventually,
+the normal batcher will run on
+.I utzoo
+on the usual
+.I utstat
+batch file
+and will produce batches,
+including the
+.I ihave
+control message,
+and transmit them to
+.I utstat
+by means specified in
+.I $NEWSCTL/batchparms .
+.SH
+The resulting ihave message arrives on utstat
+.PP
+When the
+.I ihave
+control message arrives on
+.I utstat ,
+.I relaynews
+.Ix relaynews
+will write the name of the file containing the control message
+on the
+.I utzoo
+.I ihave
+batch file
+(\c
+.I $NEWSARTS/out.going/utzoo.ihave/togo ).
+.PP
+Eventually,
+the
+.I batchsm
+batcher will run on
+.I utstat
+on that batch file,
+which will produce a
+.I sendme
+control message
+and submit it to
+.I "inews \-h"
+which matches
+.I sys
+line #2,
+and writes the name of the
+.I sendme
+control message on
+the usual
+.I utzoo
+batch file
+(\c
+.I $NEWSARTS/out.going/utzoo/togo)
+.PP
+Eventually,
+the normal batcher will run on
+.I utstat
+on the usual
+.I utzoo
+batch file,
+and will produce batches including
+the
+.I sendme
+and send them to
+.I utzoo
+by means specified in
+.I $NEWSCTL/batchparms .
+.Ix batchparms
+.Ix files batchparms
+.SH
+The resulting sendme message arrives on utzoo
+.PP
+When the
+.I sendme
+control message arrives on
+.I utzoo ,
+.I relaynews
+writes the name of the file containing the control message
+on the
+.I sendme
+batch file,
+and the
+.I batchra
+batcher eventually
+writes the file names of the requested articles
+(named by Message-ID in
+the
+.I sendme
+control message)
+on the usual
+.I utstat
+batch file.
+.PP
+Eventually,
+the normal batcher on
+.I utzoo
+will run and produce batches,
+including the articles requested by the
+.I sendme ,
+and will send them to
+.I utstat
+by means specified in
+.I $NEWSCTL/batchparms .
+.SH
+Comparison with B News
+.Ix ihave/sendme "B News"
+.PP
+There is a lot of activity involved in ihave/sendme,
+and there are at least five distinct channels
+and three transactions needed to send a batch of articles.
+B news ``simplifies'' the
+.I sys
+file by requiring certain
+.I sys
+file options (sic)
+to be set to fixed values,
+and
+by overloading madly.
+The resulting
+.I sys
+file is much more difficult to decypher,
+and if you should want to specify non-default options,
+you are out of luck.

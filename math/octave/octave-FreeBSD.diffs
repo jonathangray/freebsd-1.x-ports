@@ -1,0 +1,85 @@
+*** Makefile.in	Tue Jul 20 19:37:39 1993
+--- ../octave-0.74/Makefile.in	Sun Aug 15 00:51:53 1993
+***************
+*** 19,25 ****
+  	octave.sh octave-mode.el doinstall.sh mkpath.c
+  
+  # Complete directory trees to distribute.
+! DISTDIRS = bsd-math dld
+  
+  # Subdirectories to run make in for the primary targets.
+  SUBDIRS = libcruft liboctave @DLD_DIR@ readline src doc scripts 
+--- 19,25 ----
+  	octave.sh octave-mode.el doinstall.sh mkpath.c
+  
+  # Complete directory trees to distribute.
+! DISTDIRS = dld
+  
+  # Subdirectories to run make in for the primary targets.
+  SUBDIRS = libcruft liboctave @DLD_DIR@ readline src doc scripts 
+*** src/sysdep.cc	Thu Aug 19 17:50:51 1993
+--- ../octave-0.74/src/sysdep.cc	Wed Aug 25 03:00:51 1993
+***************
+*** 29,34 ****
+--- 29,38 ----
+  
+  #include "error.h"
+  
++ #ifdef __386BSD__
++ # include <floatingpoint.h>
++ #endif
++ 
+  #ifdef NeXT
+  extern "C"
+  {
+***************
+*** 57,62 ****
+--- 57,66 ----
+  void
+  sysdep_init (void)
+  {
++ #ifdef __386BSD__
++	/* disable trapping on common exceptions */
++ 	fpsetmask(~(FP_X_OFL | FP_X_INV | FP_X_DZ));
++ #endif
+  #ifdef NeXT
+    NeXT_init ();
+  #endif
+*** src/utils.cc	Tue Jul 20 12:30:50 1993
+--- ../octave-0.74/src/utils.cc	Thu Aug 12 20:17:41 1993
+***************
+*** 71,77 ****
+  
+  extern "C"
+  {
+!   extern int ioctl (int, int, ...);
+    char *tilde_expand (char *s); /* From readline's tilde.c */
+  }
+  
+--- 71,77 ----
+  
+  extern "C"
+  {
+!   extern int ioctl (int, unsigned long, ...);
+    char *tilde_expand (char *s); /* From readline's tilde.c */
+  }
+  
+*** libcruft/Makefile.in	Sat Jun 12 17:39:16 1993
+--- ../octave-0.74/libcruft/Makefile.in	Sun Aug 15 00:40:47 1993
+***************
+*** 40,46 ****
+  
+  ../libcruft.a: $(CRUFT_OBJ)
+  	rm -f ../libcruft.a
+! 	$(AR) $(ARFLAGS) ../libcruft.a $(CRUFT_OBJ)
+  	$(RANLIB) ../libcruft.a
+  
+  $(CRUFT_OBJ):
+--- 40,46 ----
+  
+  ../libcruft.a: $(CRUFT_OBJ)
+  	rm -f ../libcruft.a
+! 	$(AR) cTq ../libcruft.a `lorder $(CRUFT_OBJ) | tsort`
+  	$(RANLIB) ../libcruft.a
+  
+  $(CRUFT_OBJ):

@@ -1,0 +1,145 @@
+#! /bin/sh
+# newgroup group flag - create group (4-field version: B-2.10.3+ compatible)
+#	subject to our sys file group pattern
+# also subject to $NEWSCTL/newgroupperm:  four fields per line, first
+# a newsgroup pattern, second a sender name (or "any"), third a set of
+# flags ("y" do it, "n" don't, "q" don't report at all, "v" include
+# entire control message in report) (default "yv").  This is experimental
+# and likely to change.
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/usr/lib/news/bin/config}
+export NEWSCTL NEWSBIN NEWSARTS
+PATH=$NEWSCTL/bin:$NEWSBIN/relay:$NEWSBIN:$NEWSPATH; export PATH # finds mkpdir
+umask $NEWSUMASK
+
+posting=/tmp/np$$
+hdr=/tmp/nc$$
+
+# get the full article, and its header, into files for inspection
+trap "rm -f $posting $hdr; exit 0" 0
+cat >$posting
+canonhdr $posting >$hdr
+
+# who sent it?
+SENDER="`egrep '^Sender:' $hdr | sed 's/^[^:]*: *//'`"
+case "$SENDER" in
+"")	SENDER="`egrep '^From:' $hdr | sed 's/^[^:]*: *//' `" ;;
+esac
+senderid="`echo \"$SENDER\" | sed '/.*<\(.*\)>.*/s//\1/
+				   /\([^ ][^ ]*\)  *(.*).*/s//\1/'`"
+
+# was it approved?
+case "`egrep '^Approved:' $hdr`" in
+'')	reject=${reject-'no Approved header'}	;;
+esac
+
+# verify acceptable alphabet
+case "$1" in
+*[\	\ !:]*)	reject=${reject-'bad character(s) in name'}	;;
+esac
+
+# toss groups with too-long components.  usually due to alt.bozobozobozobozo
+for word in ` echo "$1" | tr . ' ' `
+do
+	case "$word" in
+	???????????????*)
+		reject=${reject-'component exceeds 14 characters'}	;;
+	esac
+done
+
+# consult control file, if present
+perms=$NEWSCTL/newgroupperm
+action=yv
+if test -r $perms
+then
+	newaction=`gngp -a -r "$1" $perms |
+		awk '$2 == "any" || $2 == "'"$senderid"'" { print $3 }' |
+		sed -n 1p`
+	case "$newaction" in
+	?*)	action=$newaction	;;
+	esac
+fi
+case "$action" in
+*n*)	reject=${reject-'newgroupperm file denies permission'}	;;
+esac
+
+# check that my sys file allows this group
+me="`newshostname`"
+gngppat=`awk -f $NEWSBIN/relay/canonsys.awk $NEWSCTL/sys |
+	egrep "^($me|ME)[:/]" |
+	awk -F: '
+{
+	fields = split($2, field2, "/")	# split ngs/dists
+	print field2[1]			# print only ngs
+	exit
+}' `
+case "`echo \"$1\" | gngp -a \"$gngppat\"`" in
+'')	reject=${reject-'unsubscribed group'}	;;
+esac
+
+# is this just a change of moderation status?
+# escape egrep metacharacters.  In theory one could add " ' ` \ to the list.
+justmod=
+egreppat="^(` echo "$1" | sed -e 's/[.+*()|[]/\\\\&/g' -e 's/,/|/g' `) "
+case "`egrep \"$egreppat\" $NEWSCTL/active`" in
+?*)	justmod=y	;;
+esac
+
+# the verdict
+case "$reject" in
+?*)	case "$action" in
+	*q*)	;;
+	*)	(
+			echo "$0: \`$SENDER' tried"
+			case "$justmod" in
+			y)	echo "to set newsgroup \`$1' to \`$2'."	;;
+			*)	echo "to create newsgroup \`$1'."	;;
+			esac
+			echo "Request was refused:  $reject."
+			case "$action" in
+			*v*)	echo '==='
+				cat $posting
+				echo '==='
+				;;
+			esac
+		) | mail $NEWSMASTER
+		;;
+	esac
+	exit
+	;;
+esac
+
+# handle changes of moderation status
+case "$justmod" in
+y)	export SENDER
+	chamod "$1" "$2"
+	exit
+	;;
+esac
+
+# finally, we are in the clear to make it
+case "$2" in
+moderated)	flag=m ;;
+*)		flag=y ;;
+esac
+echo "$1 0000000000 00001 $flag" >>$NEWSCTL/active
+echo "$1 `getdate now` $SENDER" >>$NEWSCTL/active.times
+
+# make the directory since rn will bitch if it's missing
+mkpdir $NEWSARTS/`echo $1 | tr . / `
+
+# and report it, if appropriate
+case "$action" in
+*q*)	;;
+*)	(
+		echo "newsgroup $1 was created by $SENDER."
+		case "$action" in
+		*v*)	echo '==='
+			cat $posting
+			echo '==='
+			;;
+		esac
+	) | mail $NEWSMASTER
+	;;
+esac

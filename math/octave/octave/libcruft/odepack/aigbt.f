@@ -1,0 +1,38 @@
+      SUBROUTINE AIGBT (RES, ADDA, NEQ, T, Y, YDOT,
+     1                   MB, NB, PW, IPVT, IER )
+CLLL. OPTIMIZE
+      EXTERNAL RES, ADDA
+      INTEGER NEQ, MB, NB, IPVT, IER
+      INTEGER I, LENPW, LBLOX, LPB, LPC 
+      DOUBLE PRECISION T, Y, YDOT, PW
+      DIMENSION Y(1), YDOT(1), PW(1), IPVT(1), NEQ(1)
+C-----------------------------------------------------------------------
+C THIS SUBROUTINE COMPUTES THE INITIAL VALUE
+C OF THE VECTOR YDOT SATISFYING
+C     A * YDOT = G(T,Y)
+C WHEN A IS NONSINGULAR.  IT IS CALLED BY LSOIBT FOR
+C INITIALIZATION ONLY, WHEN ISTATE = 0 .
+C AIGBT RETURNS AN ERROR FLAG IER..
+C   IER  =  0  MEANS AIGBT WAS SUCCESSFUL.
+C   IER .GE. 2 MEANS RES RETURNED AN ERROR FLAG IRES = IER. 
+C   IER .LT. 0 MEANS THE A MATRIX WAS FOUND TO HAVE A SINGULAR
+C              DIAGONAL BLOCK (HENCE YDOT COULD NOT BE SOLVED FOR).
+C-----------------------------------------------------------------------
+      LBLOX = MB*MB*NB
+      LPB = 1 + LBLOX
+      LPC = LPB + LBLOX
+      LENPW = 3*LBLOX
+      DO 10 I = 1,LENPW
+ 10     PW(I) = 0.0D0
+      IER = 1
+      CALL RES (NEQ, T, Y, PW, YDOT, IER)
+      IF (IER .GT. 1) RETURN
+      CALL ADDA (NEQ, T, Y, MB, NB, PW(1), PW(LPB), PW(LPC) )
+      CALL DECBT (MB, NB, PW, PW(LPB), PW(LPC), IPVT, IER)
+      IF (IER .EQ. 0) GO TO 20
+      IER = -IER
+      RETURN
+ 20   CALL SOLBT (MB, NB, PW, PW(LPB), PW(LPC), YDOT, IPVT) 
+      RETURN
+C-------------------- END OF SUBROUTINE AIGBT --------------------------
+      END 

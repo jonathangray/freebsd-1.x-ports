@@ -1,0 +1,175 @@
+SLURP HISTORY
+-------------
+
+V1.08
+
+    Unlink backup time file before renaming or an error occurs with the
+    rename under SVR3.
+
+
+V1.07 - 23 June 1993
+
+    Added support for a user-defined time file for use on machines with
+    short filenames which were previously having the time backup
+    trashed and couldn't support sub-lists.
+
+    If a history database type (DBZ, DBM, NDBM) is not defined then
+    don't do any history lookups. This is useful for people using slurp
+    on a machine where news is not running - perhaps piping batches to
+    uux for sending on to another machine.
+
+    Fixed problem where if slurp was interrupted before the NEWNEWS
+    section had completed, an invalid time would be written to the
+    slurp.<hostname> file.
+
+    Duplicate socket file descriptor and then carry out a separate
+    fdopen for read and write on each descriptor. This fixes some stdio
+    memory problems that were caused by fdopening read and write
+    streams on the same descriptor.
+
+    Rewrote get_ids function, removing some potential problems with its
+    previous implementation.
+
+    Rewrote read_sys function (again!).
+
+    In process_id when in debug mode print after a message ID if ID
+    discarded due to hitting maximum number of articles or was already
+    present in the tree.
+
+    Removed inclusion of <unistd.h> in time.c and sockets.c - if it is
+    needed then it will be included in slurp.h.
+
+    Replaced bzero and bcopy with ANSI memset and memcpy functions
+    throughout, plus a few other bits of tidying up to make the Keep C
+    Source Tidy Campaign happy.
+
+
+V1.06 - 22 April 1993
+
+    Added signal handler to slurp.c to trap SIGHUP, SIGINT, SIGQUIT and
+    SIGTERM. If they occur then the signal is reported to syslog, any
+    currently open batch is submitted to the news system and the
+    message IDs of any unretrieved articles are dumped to the
+    slurp.<hostname> file.
+
+    Added NOBUFFOUT option. If defined, will turn off stdio buffering
+    for the output stream to the server. This is necessary for ISC, SCO
+    and some other SVR3 implementations which will otherwise give a
+    memory fault when the socket is written to.
+
+    Added UNISTD option. If undefined then slurp won't include
+    <unistd.h> which isn't present on some versions of UNIX.
+
+    If an ERR_ACCESS (code 502) result code is reported by the server
+    when retrieving an article, then it will be treated as a missing
+    article.
+
+    Correctly defined server_time in slurp.h - was long instead of
+    time_t.
+
+
+V1.05 - 1 March 1993
+
+    Completely cleaned up space.c. Added proper support for space
+    checking in SVR4.
+
+    Modified read_sys so that it is possible to have lines in the
+    slurp.sys file which are longer than BUFSIZ.
+
+    Check unretrieved message IDs in the slurp.<hostname> file start
+    and end with chevrons.
+
+    Moved sublist in the command line arguments to being specified
+    after the hostname with a slash separating them, to make things
+    more consistent.
+
+    A few more minor tidy-ups, in particular portability has been
+    improved in a few places.
+
+
+V1.04 - 14 February 1993
+
+    Malloc message id separately from mnode structure as the previous
+    method seemed to cause problems on some architectures.
+
+    Now handles article lines of >= 511 bytes without overwriting
+    memory.
+
+    Support for simple authorisation protocol.
+
+    Support for INN 'MODE READER' command.
+
+    read_sys rewritten to allow command line flags to be specified for
+    servers, support having more than one set of newsgroups to be
+    retrieved from the same server, and provide the username and
+    password for the simple authorisation protocol.
+
+    New choice of piping articles to rnews (possibly in one batch only)
+    or writing article batches to the incoming news / rnews spool
+    directory. This will provide a speed-up for users of INN.
+
+    Replaced slurp.tim file with slurp.<hostname> files, solving
+    locking problems and providing support for the enhancement below.
+
+    If an error occurs during the article fetching stage, then dump the
+    message ids of articles not yet retrieved to slurp.<hostname>.
+    These can then be picked up in the next session, without having to
+    restart the NEWNEWS back at the previous time.
+
+    No requirement for slurp.<hostname> to exist as slurp.tim used to
+    have to be if you wanted a time written out.
+
+    Re-arranged the command line options.
+
+
+V1.03 - 19 December 1992
+
+    Added extra compilation configuration option for machines that
+    don't have strerror().
+
+    If a temporary file was opened for reading a long article into
+    which wouldn't fit in memory, then it was flushed at the end of
+    read_article. Unfortunately, the test wasn't done correctly so if a
+    long article was once read in, it would keep flushing the now
+    invalid file descriptor on future calls. Fixed by removing this
+    altogether as the subsequent rewind would do the job anyway.
+
+    Open syslog *before* we start doing things that might want to write
+    to it... Connected, articles retrieved and speed messages logged
+    as LOG_INFO instead of the previously wrong LOG_NOTICE.
+
+    When mallocing space for the article id tree, only malloc enough
+    room for the article id and left/right node pointers, not the whole
+    structure, saving oodles of memory.
+
+    Corrected the test for the maximum size of a NEWNEWS request line.
+
+    Various minor tidy-ups.
+
+    Added manual page and made various improvements to the
+    documentation.
+
+
+V1.02 - 7 December 1992
+
+    Corrected openlog calls so correct 4.2/4.3 version of syslog is
+    used.
+
+
+V1.01 - 6 December 1992
+
+    Fixed some problems with null-dereferencing of nn_distributions.
+    New slurp.tim not written if maximum number of messages that can
+    be transferred is hit.
+
+    When debugging switched on, print line being sent to server before
+    it is sent rather than after.
+
+    Added documentation on return codes.
+
+
+V1.00 - 2 December 1992
+
+    Initial release.
+
+---- END OF DOCUMENTATION

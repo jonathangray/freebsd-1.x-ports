@@ -1,0 +1,96 @@
+#! /bin/sh
+# checkgroups - check active file for missing or extra newsgroups or groups
+#	with incorrect moderation status, and update the newsgroups file.
+#	stdin must a checkgroups news article, sends mail to $NEWSMASTER.
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/usr/lib/news/bin/config}
+export NEWSCTL NEWSBIN NEWSARTS
+PATH=$NEWSCTL/bin:$NEWSBIN:$NEWSPATH ; export PATH
+desc=/tmp/cg$$d
+hiers=/tmp/cg$$h
+canact=/tmp/cg$$a
+newact=/tmp/cg$$n
+diffs=/tmp/cg$$df
+actgrps=/tmp/cg$$ag
+newgrps=/tmp/cg$$ng
+samegrps=/tmp/cg$$sg
+addgrps=/tmp/cg$$ad
+remgrps=/tmp/cg$$rm
+sameact=/tmp/cg$$sa
+samenew=/tmp/cg$$sn
+modchng=/tmp/cg$$mc
+
+umask $NEWSUMASK
+trap 'rm -f /tmp/cg$$*; exit' 0 1 2 15
+
+# behead stdin (checkgroups article) & ignore lines that don't fit the syntax
+# (should just be able to reject tabless lines, but Bitnet buggers that).
+# ignore signatures and initial !mod lines.
+ngalpha='-_+a-zA-Z0-9'
+sed -n -e '1,/^$/d' -e '1{/^!mod$/d;}' -e '/^-- $/,$d' \
+	-e "/^[$ngalpha][	 ][	 ]*/p" \
+	-e "/^[$ngalpha][$ngalpha.]*[$ngalpha][	 ][	 ]*/p" \
+	>$desc
+
+# generate list of hierarchies affected
+sed 's/\..*//' $desc | sort -u >$hiers
+
+# backup newsgroups before updating it
+cp $NEWSCTL/newsgroups $NEWSCTL/newsgroups.bac || { exit 1; }
+# toss out old newsgroups rubbish
+hierlist="`cat $hiers`"		# message is assumed authoritative for these
+hierpat="` echo $hierlist | tr ' ' , `"	# one more time, with commas
+(gngp -av "$hierpat" $NEWSCTL/newsgroups.bac
+ # add new newsgroups rubbish
+ cat $desc) >$NEWSCTL/newsgroups
+
+# canonicalise active file & select interesting hierarchies
+awk '{
+	modstat = $4
+	if (modstat != "y" && modstat != "m")
+		modstat = "y"
+	print $1, modstat
+}' $NEWSCTL/active | gngp -a "$hierpat" | sort >$canact
+
+# canonicalise body into an active-file-like thing
+awk '
+/Moderated/	{ print $1, "m" } # TODO: " (Moderated)$"? as per B 2.11.19
+!/Moderated/	{ print $1, "y" }
+' $desc | sort >$newact
+
+# what's different?  first, what groups have vanished or appeared?
+sed 's/ .*//' $canact >$actgrps
+sed 's/ .*//' $newact >$newgrps
+comm -12 $actgrps $newgrps >$samegrps
+comm -23 $actgrps $newgrps >$remgrps
+comm -13 $actgrps $newgrps >$addgrps
+if test -s $remgrps; then
+	echo
+	echo 'obsolete groups:'
+	cat $remgrps
+fi >$diffs
+if test -s $addgrps; then
+	echo
+	echo 'new groups:'
+	cat $addgrps
+fi >>$diffs
+
+# next, what surviving groups have changed moderation status?
+join $samegrps $canact >$sameact
+join $samegrps $newact >$samenew
+comm -13 $sameact $samenew >$modchng
+if test -s $modchng; then
+	echo
+	echo 'groups needing moderation status changed to that shown:'
+	cat $modchng
+fi >>$diffs
+
+if test -s $diffs; then
+	(echo "Subject: possible active file problems"; echo;
+	 echo "If you believe this checkgroups control message, the following"
+	 echo "differences may reflect groups that should be added, deleted,"
+	 echo "or have their moderation status(es) changed:"
+	 cat $diffs) | mail "$NEWSMASTER"
+fi
+exit 0		## end of new one

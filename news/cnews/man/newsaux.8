@@ -1,0 +1,214 @@
+.\" =()<.ds a @<NEWSARTS>@>()=
+.ds a /usr/spool/news
+.\" =()<.ds b @<NEWSBIN>@>()=
+.ds b /usr/lib/newsbin
+.\" =()<.ds c @<NEWSCTL>@>()=
+.ds c /usr/lib/news
+.\" =()<.ds m @<NEWSMASTER>@>()=
+.ds m usenet
+.TH NEWSAUX 8 "13 April 1992"
+.BY "C News"
+.SH NAME
+spacefor \- check available space for news
+.br
+queuelen \- get length of outbound-news uucp queues
+.br
+sizeof \- get size of file(s) for news
+.br
+ctime, getdate, getabsdate \- convert dates to and from internal representation for news
+.br
+newshostname \- get host name for news
+.br
+gngp \- search text using a newsgroup pattern
+.br
+canonhdr \- extract header and canonicalize
+.br
+newslock \- do locking for news
+.SH SYNOPSIS
+.B \*b/spacefor
+filesize location [ site ]
+.br
+.B \*b/queuelen
+site
+.br
+.B \*b/sizeof
+[
+.B \-i
+]
+file ...
+.br
+.B \*b/ctime
+[
+.B \-u
+]
+decimaldate
+.br
+.B \*b/getdate
+printabledate
+.br
+.B \*b/getabsdate
+absolute-printable-date
+.br
+.B \*b/newshostname
+.br
+.B \*b/gngp
+[
+.B \-arv
+]
+ngpattern file ...
+.br
+.B \*b/canonhdr
+[
+.B \-dm
+]
+[ file ] ...
+.br
+.B \*b/newslock
+locktemp lockname
+.SH DESCRIPTION
+These programs are minor utilities used by various parts of C News.
+.PP
+.I Spacefor
+determines how many files of size \fIfilesize\fR can fit in \fIlocation\fR
+(\fBincoming\fR, \fBarticles\fR, \fBcontrol\fR, \fBarchive\fR,
+or \fBoutbound\fR to \fIsite\fR)
+without cramping things unduly.
+The precise locations of these places, and how low space gets before
+it is unduly cramped, are site-specific.
+.I Spacefor
+invokes \fIdf\fR(1) or the equivalent system call
+to determine the available space.
+.PP
+.I Queuelen
+reports how many news batches \fIuucp\fR has queued up for \fIsite\fR.
+.PP
+.I Sizeof
+reports the total number of bytes in the \fIfile\fR(s).
+(This may seem redundant with \fIls\ \-l\fR, but the format of \fIls\ \-l\fR
+varies between systems and \fIsizeof\fR looks after all that.)
+Nonexistent files are silently ignored.
+If the
+.B \-i
+option is given,
+.I sizeof
+prints one line per (existing) file, with name and size,
+and does not print the total.
+.PP
+.IR Ctime ,
+.I getdate
+and
+.I getabsdate
+convert dates in human-readable form
+to
+.RI ( getdate
+and
+.IR getabsdate )
+and from (\fIctime\fR) decimal ASCII representations
+of Unix's internal integer dates.
+Their functionality resembles that of their namesakes in the C library.
+.I getabsdate
+parses only absolute dates,
+not relative dates.
+Both
+.I ctime
+and
+.I getdate
+recognise the argument
+.B now
+to mean the current time.
+Under
+.BR \-u ,
+.I ctime
+will print GMT instead of local time.
+.PP
+.I Newshostname
+reports the name of this system for news purposes.
+This may differ from the name of the particular CPU it is run on;
+a cluster of CPUs sharing a filesystem tree would all have the same
+\fInewshostname\fR name.
+Typically \fInewshostname\fR gets the name from \fI\*c/whoami\fR;
+failing that, it consults various other possible sources
+(e.g. the \fIhostname\fR command).
+.PP
+.I Gngp
+resembles \fIgrep\fR except that its search is based on newsgroup patterns
+(e.g. `comp', which matches `comp', `comp.lang', `comp.lang.c', ...;
+`comp,!comp.lang.c' which matches `comp' and `comp.lang' but not
+`comp.lang.c'; etc.).
+\fIGngp\fR prints only the line(s) that
+contain a substring that matches the \fIngpattern\fR.
+Normally the substring must run from a point in the line to its end.
+If the
+\fB\-a\fR
+flag is given,
+the eligible substrings start at the beginning of the
+line and end at white space or the end of the line.
+The
+.B -v
+option prints only lines that do
+.I not
+match.
+The
+\fB\-r\fR flag reverses the inputs, with patterns coming from
+the file and the argument taken as the line(s).
+.PP
+.I Canonhdr
+takes the concatenation of its input \fIfile\fR(s) (standard input if none)
+as an article,
+and outputs the header from the article with header keywords canonicalized
+for easier processing.
+Canonicalization forces all alphabetics to lower case except the first
+letter of each (hyphen-separated) word in the keyword,
+which is forced to upper case.
+(One exception:
+``Message-ID'' is the canonical form of [e.g.] ``message-id''.)
+Under
+.BR \-d ,
+.I canonhdr
+will also canonicalise dates in
+.B Date:
+and
+.B Expires:
+headers.
+Under
+.BR \-m ,
+it will accept RFC 822 headers
+and rewrite them as RFC 1036 headers.
+.PP
+.I Newslock
+makes a link named \fIlockname\fR to the file \fIlocktemp\fR,
+and returns exit status 0 for success, 1 if the link could not be made
+(typically because \fIlockname\fR already existed).
+This is used for shell-file locking in C News.
+It is a subset of \fIln\fR(1) except that (a) no error messages are
+ever produced and (b) the link is guaranteed to fail if \fIlockname\fR
+already exists.
+(Some brain-damaged versions of \fIln\fR helpfully remove \fIlockname\fR
+in that case, making them useless for locking.)
+.SH FILES
+.ta 6c
+.nf
+/usr/spool/uucp/*	uucp queues
+\*c/whoami	news host name
+\*c/L.*	lock temporaries
+\*c/LOCK*	lock files
+.SH SEE ALSO
+df(1), uucp(1), ls(1), ctime(3), getdate(3), hostname(1),
+grep(1), news(5), expire(8), newsbatch(8), rnews(8), newsmaint(8)
+.SH HISTORY
+Written at U of Toronto by Henry Spencer and Geoff Collyer.
+.SH BUGS
+.I Spacefor
+and
+.I queuelen
+are unfortunately somewhat system-specific, since \fIdf\fR output and
+\fIuucp\fR file layout vary between different versions.
+(Using system calls in
+.I spacefor
+doesn't help, as the system calls differ too.)
+.PP
+.I Queuelen
+probably ought to count bytes rather than batches, but that would make
+its system-dependency even worse.
+.PP
+The need for \fIsizeof\fR and \fInewslock\fR is a botch.

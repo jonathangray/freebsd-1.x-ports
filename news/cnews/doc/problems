@@ -1,0 +1,1129 @@
+.Ch "Known Porting Problems With C News"
+.Ix problems porting
+.SH
+Intro
+.PP
+C News
+in general is pretty portable.
+People have got it to run on a very wide range of systems with little
+trouble.
+Difficulties are usually problems in the system,
+not
+C News.
+Some of them,
+however,
+are widespread enough to be worth comment,
+for
+the guidance of people having problems.
+If you run into a novel problem,
+we are always interested in hearing about such things.
+.SH
+Unix Dependencies
+.PP
+The biggest portability glitch in
+C News
+is that it depends a lot on
+Unix
+utilities.
+The extensive use of complex shell files,
+\fIsed\fR and \fIawk\fR programs,
+and a wide range of lesser Unix utilities would make it quite difficult
+to move
+C News
+to a system that is seriously non-Unix-like.
+The actual C programs seldom depend on Unix in major ways.
+(An exception is the use
+of \fIread\fR system calls in \fIexpire\fR,
+to avoid difficulties with
+stdio end-of-file behavior;
+we now know how to avoid this but haven't implemented the fixes yet.)
+.PP
+.Ix Unix Minix
+.Ix Unix utilities
+.Ix sed
+.Ix awk
+We know that \fIawk\fR and the colon (:) operator of \fIexpr\fR are
+problem areas under Minix.
+.SH
+Shell Problems
+.PP
+C News seriously stress-tests shells.
+The current Minix shell is not robust enough
+in the face of complex inputs,
+botches some constructs entirely,
+and can run out of memory on the complex shell files.
+Any shell that is too old to implement comments begun
+by ``#'' is big trouble,
+since we use such comments everywhere.
+.PP
+Any system/shell combination that thinks that a shell script starting
+with ``#!\ /bin/sh'' should be run by the C Shell (because it starts
+with `#') is also big trouble:
+you will have to change that line to ``:\ use\ /bin/sh'' everywhere.
+We know that at least some releases of Xenix have this problem.
+It is not necessary that your kernel understand the ``#!'' feature\(emwe
+believe that nothing in C News relies on it\(embut it is essential that
+it not cause invocation of the C Shell.
+.PP
+We know that some Hewlett-Packard Unixes have broken shells,
+probably
+the result of mistakes in
+HP's efforts to make
+the shell 8-bit-clean;
+the symptom is
+that something like:
+.DS
+.ft B
+x=y
+if test " $x" != " y"
+then
+	echo oops
+fi
+.ft
+.DE
+prints ``oops''.
+This is,
+again,
+big trouble,
+because we do that a lot.
+.PP
+.Ix machines 3b1
+.Ix 3b1
+Many people using 3B1s,
+aka UNIX PCs,
+run the Korn shell as their \fI/bin/sh\fR.
+.Ix shell Korn
+.Ix ksh
+Some other folks may do this too.
+Beware that \fIksh\fR was not fully \fIsh\fR-compatible for a
+long time,
+with some subtle differences in the
+ill-documented behavior of backquotes and backslashes.
+Some of the C News shell scripts,
+notably \fIinews\fR,
+are known to hit these bugs.
+We are \fItold\fR that current \fIksh\fRs have fixed them.
+.PP
+.Ix Unix SunOS 4.0
+It is reliably reported that SunOS 4.0.\fIx\fR shells will dump core
+in some ill-defined circumstances,
+when the user environment (sum of all
+environment variables) is exactly the wrong size.
+Perhaps this has been fixed in 4.1.
+.PP
+.Ix Unix "Ultrix 3.1"
+It is reliably reported that the VAX 3.1 Ultrix shell is somewhat broken
+and gives various kinds of trouble.
+Switching to \fI/bin/sh5\fR
+(note that this requires fixing the first line
+of a zillion shell files)
+is reported to banish the problems.
+.PP
+.Ix wait
+.Ix breakage wait
+.Ix inews
+.Ix NNTP
+It is reliably reported that recent SunOS shells give the wrong exit status
+from the \fIwait\fR command:
+they give a 0 for a successful wait, rather than giving the exit status of
+the process waited for.
+This makes \fIinews \-W\fR appear to always succeed even if backgrounded
+parts of it failed, which can be troublesome in NNTP environments where
+correct exit status is important.
+.SH
+Make Problems
+.PP
+.Ix make
+.Ix machines 3b2
+.Ix 3b2
+.Ix SVID
+.Ix Unix A/UX
+There is a persistent problem on 3B2s with implementations of \fImake\fR
+that violate the SVID in a subtle way.
+They attempt to execute makefile commands directly,
+rather than via the
+shell,
+if the commands do not contain metacharacters.
+This means that if\(emas on many 3B2s\(em\fItest\fR is a shell builtin
+\fIand there is no /bin/test program\fR,
+the makefile line
+``test\ \-s\ file'' will cause \fImake\fR to complain about an unknown
+command.
+(The SVID says that makefile commands must be executed as if by
+the shell, and the shell will execute this line correctly.)
+We've added `;' on the ends of such lines,
+which suffices to convince
+\fImake\fR to run a shell on the systems we've encountered,
+but AT&T
+is good at finding ways to break such workarounds.
+This problem is also known to occur in A/UX.
+.PP
+.Ix Unix Ultrix
+Another obscure problem,
+a bug in either \fImake\fR or the shell,
+appears
+in at least some releases of Ultrix:
+a construct like
+.DS
+.ft B
+	ln ... || cp ...
+.ft
+.DE
+in a shell file is seen as an error\(emand \fImake\fR aborts\(emwhen
+the \fIln\fR fails,
+even though the \fIcp\fR would work.
+.SH
+Offsetof
+.Ix offsetof
+.Ix "ANSI C"
+.PP
+ANSI C requires C compilers to supply a macro \fIoffsetof\fR,
+which can
+be used to find the offset of a structure member within the structure.
+\fIRelaynews\fR's header-parsing code uses it,
+defining it if the system has not supplied it.
+Unfortunately,
+it is really hard to write a portable version of this.
+The implementation we currently use is:
+.DS
+.ft B
+#define offsetof(type, mem) ((char *)&((type *)NULL)\->mem \- (char *)NULL)
+.ft
+.DE
+The table in \fIrelay/hdrdefs.c\fR
+.Ix initializers
+.Ix hdrdefs.c
+puts invocations of \fIoffsetof\fR in initializers.
+This turns out to be a severe stress test for C compilers.
+A compilation error in \fIhdrdefs.c\fR is almost certain
+to be problems with this macro.
+Some compilers,
+notably the one in Microport System V for the 286,
+.Ix Unix "Microport System V for the 286"
+reject it.
+We have heard a report that System V Release 2 on the VAX silently
+miscompiles it!
+.Ix Unix "System V Release 2 on the VAX"
+If you have trouble with \fIoffsetof\fR,
+you might try this version instead:
+.DS
+.ft B
+#define offsetof(type, mem) ((int)&((type *)NULL)\->mem)
+.ft
+.DE
+.SH
+Fast Stdio Routines
+.Ix stdio "faster internals"
+.Ix problems stdio
+.PP
+We supply a set of fast standard-I/O routines that are compatible with
+most AT&T-derived implementations of \fIstdio\fR.
+They speed up C News quite a bit.
+However,
+they don't work on all Unixes.
+The tester program we supply,
+which the library-build procedure runs,
+is thought to diagnose such problems 100% of the time.
+It has been reported in the past that A/UX and Microport 386 stdios
+.Ix Unix A/UX
+.Ix Unix "Microport 386"
+flunk the test.
+SunOS 4.0 used to pass the test falsely,
+but improvements in both
+the test and the routines
+seem to have cured the problems:
+4.0.3 passes the test and
+as far as we can tell,
+the routines run correctly under it.
+.PP
+In any case,
+if you are feeling nervous or are having mysterious problems,
+telling \fIbuild\fR that you don't want to use the fast-stdio stuff is
+always safe.
+This is also the best response if you have trouble compiling those routines.
+.SH
+void
+.Ix void
+.Ix "old compilers"
+.PP
+Old compilers that don't understand the \fIvoid\fR type will choke on
+much of our code.
+.Ix news.h
+There is a commented-out ``#define\ void\ int'' in \fInews.h\fR that
+cures most cases of this if you uncomment it.
+(We have a report that you might need to add ``\-Dvoid=int'' to the
+Makefile in \fIlibv7\fR if you're using that library.)
+C News does not rely on the ANSI C ``void\ *'' type as far as we know.
+.SH
+Modes in fopen
+.Ix fopen
+.Ix Unix Minix
+.PP
+Unix V7 documented only ``r'',
+``w'',
+and ``a'' as suitable mode arguments
+to \fIfopen\fR.
+It actually implemented the read/write modes,
+``r+'',
+``w+'',
+and ``a+'',
+as well,
+and C News relies on them.
+Unix reimplementations based on old documentation may have trouble here;
+we know that at least the older versions of Minix really don't implement
+these modes.
+.PP
+A related complication in Minix is that \fIftell\fR
+reportedly doesn't give the
+right answer in ``a'' mode.
+This makes \fIdbz\fR flunk its regression test.
+.Ix dbz
+.SH
+MAXLONG
+.Ix MAXLONG
+.Ix Unix Unisys
+.PP
+The \fIrelay/cpu.h\fR file formerly defined a constant \fIMAXLONG\fR
+which is the biggest positive value of a \fIlong\fR.
+The definition was clever but failed on some odd systems (Unisys?).
+Current versions of C News
+generate the value dynamically in a less fallible way,
+and check the value for plausibility.
+(This is encountered when \fIrelaynews\fR is asked to
+process a single article,
+not a batch.
+This happens primarily when an article is posted locally,
+with \fIinews\fR.)
+.Ix inews
+It is still barely possible that the plausibility check will fail on some
+bizarre system.
+.SH
+df Output Format
+.Ix df
+.PP
+.Ix spacefor
+The \fIspacefor\fR utility needs to understand the output format of \fIdf\fR,
+unless you're lucky enough to have a system that has one of the semi-standard
+system calls to report disk space.
+There are numerous variations on \fIdf\fR.
+\fIBuild\fR and the relevant makefiles know about the more common ones,
+but customization may be necessary.
+\fISpacefor\fR is commented well enough that it should be possible to
+figure out the necessary changes;
+usually the initializations of \fInr\fR
+and \fInf\fR are all that need changing.
+If there are colons (:)
+in your \fIdf\fR's output format,
+you should
+probably start from the ``sysv'' \fIspacefor\fR,
+which attempts to
+preprocess the output to get rid of System V garbage;
+.Ix Unix "System V"
+.Ix "System V" breakage
+otherwise the ``bsd'' one is a reasonable starting point.
+.PP
+One constant nuisance is \fIdf\fRs that are too stupid to take a directory
+name as an argument.
+The long-term solution to this is to edit a suitable variant of \fIspacefor\fR
+to know about the proper arguments.
+A short-term solution is to use the ``null'' variant, sacrificing space
+checking for the sake of getting something working.
+.PP
+.Ix Unix HP-UX
+We're told that HP-UX 7.0 users are best advised to
+choose the ``bsd'' variant of spacefor,
+and edit it to
+call \fIbdf\fR instead of \fIdf\fR.
+Similar approaches may be useful on other hybrid SysV/BSD systems.
+.SH
+Floating Point
+.Ix "floating point"
+.Ix expire
+.Ix awk
+.PP
+The only places in our code where floating point is used,
+as far as we know,
+are in the calculation of expiry dates in \fIexpire\fR
+and the calculation of space in some of the variants of \fIspacefor\fR.
+These are not performance bottlenecks,
+so slow floating-point arithmetic
+is not a problem.
+Complete absence of floating point would require only minor modifications.
+Note,
+however,
+that we use \fIawk\fR a lot,
+and the typical \fIawk\fR
+implementation uses floating point extensively.
+.SH
+386 Optimizer vs. dbz
+.Ix machines 386
+.Ix dbz
+.Ix problems "broken 386 optimiser"
+.Ix Unix "System V"
+.Ix "System V" breakage
+.Ix Unix "SCO Xenix/386 2.3"
+.PP
+We have a reliable report that the System V 386 optimizer
+(invoked when
+\fIcc\fR is given the \fB\-O\fR option)
+miscompiles the \fIdbz\fR package
+badly enough to cripple it,
+without producing any error messages.
+The only fix is to compile \fIdbz\fR without \fB\-O\fR.
+.PP
+SCO Xenix/386 2.3 has the same problem.
+.SH
+nnafree and nnfree
+.Ix nnafree
+.Ix nnfree
+.Ix machines HP
+.PP
+We have a reliable report that
+the HP Spectrum C compiler has an optimiser bug that makes it throw up
+(with a 
+``cc: Internal error 3279: Please contact your local HP representative''
+message)
+on the \fInnafree\fR macro
+(and \fInnfree\fR, a historical synonym)
+in \fIh/news.h\fR.
+.Ix news.h
+The following revised version of
+the macro reportedly avoids
+the problem.
+.DS
+.ft B
+#define nnafree(mempp) do { if (*(mempp) != 0) { free((char *)*(mempp)); \e
+   *(mempp) = 0; }} while (0)
+.ft
+.DE
+.PP
+.Ix Unix Microport
+It is also reliably reported that the Microport compiler objects to
+these macros in large model.
+Whether the above fix would suffice is not known.
+Manual expansion
+[barf!]
+is known to work,
+although it would be less
+painful to define a function containing the right code and change the
+macro to call the function.
+Code for a suitable function can,
+in fact,
+be found
+in \fIh/news.h\fR,
+inside `#ifdef\ lint'.
+.SH
+ANSI C
+.Ix "ANSI C"
+.PP
+Although we made an effort to be ANSI-C compatible,
+lack of access to a real ANSI C compiler limits our ability to do this.
+A secondary problem is that it's really very difficult to get code that
+is 100% acceptable to both ANSI C compilers and older compilers.
+Some issues inevitably got resolved in favor of current compilers,
+and may cause complaints from ANSI C compilers.
+.PP
+Work is in progress on moving us closer to ANSI compatibility.
+Beware that if \fB__STDC__\fR is defined
+.Ix __STDC__
+by your compiler but it is \fInot\fR ANSI compatible, you are on your
+own as far as we're concerned, even if the value is specified as 0.
+(We can't just use ``#if\ __STDC__'' because some preprocessors choke
+on the appearance of an unknown identifier in #if.)
+.SH
+GNU C
+.Ix "GNU C"
+.PP
+If compiling with the GNU compiler,
+you may need the
+\fB\-traditional\fR flag.
+Beware,
+also,
+that if you are using your system's \fIdbm\fR library,
+it contains functions that return structure values,
+and the GNU conventions
+for handling such values are incompatible with the ones in many AT&T-derived
+compilers.
+The
+\fB\-fpcc-struct-return\fR option cures this.
+.SH
+Awk Problems
+.Ix awk
+.PP
+A number of problems can arise if your \fIawk\fR has bugs,
+since the shell
+files rely on \fIawk\fR fairly extensively.
+For example,
+\fIawk\fR is a prime suspect if \fIspacefor\fR doesn't work.
+We've fixed the worst trouble spots,
+but would appreciate detailed information
+on any more.
+.PP
+.Ix awk "line length limits"
+One known problem that is hard to avoid is line-length limits in \fIawk\fR.
+In particular,
+for several purposes in control-message
+handling C News wants to build a ``canonical'' representation
+of the \fIsys\fR file,
+with backslashed newlines removed.
+This is done by
+NEWSBIN\fI/relay/canonsys.awk\fR.
+.Ix canonsys.awk
+Most \fIawk\fRs have limits
+on line length,
+and some of the limits are too low to cope with long
+multiply-continued \fIsys\fR lines.
+512-byte limits,
+found in a number of old \fIawk\fRs,
+are particularly troublesome.
+A quick look indicates that this will interfere,
+to some uncertain extent,
+with \fIcheckgroups\fR and \fIsendsys\fR.
+.Ix checkgroups
+.Ix "control messages" checkgroups
+.Ix sendsys
+.Ix "control messages" sendsys
+Big deal. :-)
+The complaint may also appear from
+\fInewgroup\fR,
+.Ix newgroup
+.Ix "control messages" newgroup
+but there it should be harmless.
+.PP
+.Ix Unix HP-UX
+Bart Muyzer and Martijn
+Roos Lindgreen report that HP-UX 8.0 \fIawk\fR is badly broken,
+such that
+(for example)
+the regular expression ``/[\et ]/'' will match backslashes
+and t's as well as tabs and spaces.
+Installing the HP-UX 7.0 \fInawk\fR as \fIawk\fR is reportedly a workable
+fix.
+.SH
+Systems Without Hard Links
+.Ix links
+.PP
+.Ix Unix unoid
+Some vaguely Unixoid systems have trouble implementing real (``hard'') links.
+Examples are VMS in general and Eunice in particular.
+.Ix VMS
+.Ix Eunice
+There are some hooks for dealing with this,
+but it's not trivial.
+.PP
+.Ix relaynews
+\fIRelaynews\fR will try to make symbolic links if real ones fail.
+There is one exception:
+if \fIrelaynews\fR cannot buffer up enough of the article in memory to
+find the `Newsgroups:' line,
+it will drop the article into a temporary
+file and will rely on being able to move that to the first of the
+`real' locations by manipulating links.
+This should essentially never happen except on 16-bit machines,
+and should be rare even on them.
+.PP
+.Ix expire
+\fIExpire\fR has a \fB\-l\fR option which
+tells it to consider the first filename of an article its `leader',
+not expiring the article under that name until it has expired under
+all others.
+This has not been tested much recently.
+.PP
+.Ix lock
+The locking system (both C routines and the \fInewslock\fR program)
+will need revision in some system-dependent way to avoid use of links.
+.PP
+There is one minor use of links in installation
+(\fIinews\fR is found
+in two places,
+and the Makefile attempts a link before doing a copy),
+and substantially more in the regression tests.
+.SH
+16-bit Machines
+.Ix machines small
+.Ix machines PDP-11
+.PP
+C News
+has been tested on 16-bit machines\(emindeed,
+a good bit of the
+early development work was done on one\(emand does run on them.
+Nothing relies on ints being 32 bits.
+Nothing relies on pointers and ints being the same size,
+as far as we know.
+Nothing relies on large address spaces,
+although one or two modules come in separate small-space and large-space
+versions,
+and the small-space versions are slower.
+.PP
+However,
+there are some fundamental limits
+to consider.
+Both \fIrelaynews\fR and \fIexpire\fR\(emthe usual trouble spots for
+space shortages\(emwant to keep lots of stuff in core.
+There isn't any easy way around this one.
+.SH
+Number of File Descriptors
+.Ix "file descriptors"
+.PP
+There is a constant,
+NOPENBFS,
+in \fIrelay/trbatch.c\fR,
+.Ix relay/trbatch.c
+.Ix relaynews
+that defines
+how many batch files are kept open simultaneously.
+If you are feeding much news to more systems than this,
+\fIrelaynews\fR performance will suffer.
+.PP
+.Ix NOPENBFS
+The major limit on NOPENBFS is available file descriptors
+(although on a 16-bit machine there might also be a shortage of memory
+for \fIstdio\fR buffers).
+Other parts of \fIrelaynews\fR want perhaps 10 file descriptors for
+other purposes,
+so with the usual total supply of 20,
+a NOPENBFS value
+of 10 is the right default.
+If you feed many people,
+and your kernel provides a process with more than 20 file
+descriptors,
+you probably want to boost
+NOPENBFS (this can be done with -DNOPENBFS=xxx in the makefile).
+Remember to leave about 10 descriptors worth of headroom.
+.SH
+Shell Processing Order
+.Ix shell
+.Ix problems shell
+.PP
+Normally,
+shell
+variable expansion should take place before scanning for syntax
+elements such as ``0<&1''.
+At least one reimplementation of the shell
+(specifically, Bash 1.04)
+does things in the
+wrong order.
+This is known to affect,
+at least,
+\fIrelay/sh/anne.jones\fR,
+.Ix anne.jones
+which can be fixed by changing (circa line 44)
+.DS
+.ft B
+"")	USER="`who am i <&$fd |
+.ft
+.DE
+to
+.DS
+.ft B
+"")	USER="`eval \e"who am i <&$fd\e" |
+.ft
+.DE
+or so we are told.
+.SH
+Binary-Mode Fopen
+.Ix fopen
+.Ix "ANSI C"
+.Ix dbz
+.PP
+In several places,
+the new
+\fIdbz\fR
+uses ANSI C ``binary mode'' fopen codes,
+e.g.
+`fopen(...,\ "r+b")'.
+The text/binary distinction involved is meaningless
+under Unix,
+and most Unix implementations just ignore trailing nonsense in
+the second argument of
+\fIfopen\fR,
+so it all works out nicely.
+.PP
+.Ix Unix Ultrix
+Unfortunately... at least one version of DEC's Ultrix objects to the `b's,
+we are told.
+Sigh.
+DEC will have to fix this to make their systems ANSI
+compatible,
+but heaven only knows how long that will take.
+.PP
+Meanwhile,
+the fix is to delete the `b's in the second arguments of the
+\fIfopen\fRs
+in three places in
+\fIdbminit()\fR
+in
+\fIdbz/dbz.c\fR,
+if your system has
+this particular bit of brain damage.
+.SH
+size_t
+.Ix problems size_t
+.Ix size_t
+.Ix Unix Microport
+.PP
+Some systems,
+notably from Microport,
+do not define the
+\fIsize_t\fR type in the \fI<sys/types.h>\fR header.
+Worse,
+the \fIsize_t\fR in that header doesn't necessarily bear any
+relationship to the ANSI C \fIsize_t\fR.
+This causes trouble in the \fIdbz\fR library in particular.
+The proper type for \fIsize_t\fR is whatever the C \fIsizeof\fR
+operator returns,
+nominally an unsigned type which is large enough to
+contain the size of any memory object.
+We think nothing relies too heavily on it being unsigned.
+Note that \fIsize_t\fR must also be suitable for use in the two middle
+arguments of \fIfread\fR and \fIfwrite\fR,
+the last argument of
+\fImemcpy\fR,
+\fImemchr\fR,
+and \fImemcmp\fR,
+and the argument of \fImalloc\fR.
+.SH
+Background Processes vs. csh
+.Ix shell C
+.Ix csh
+.Ix problems csh
+.Ix inews
+.PP
+\fIInews\fR runs much of its processing in the background.
+We are told that this can hit problems,
+in some circumstances,
+with \fIcsh\fR's manipulations of signals,
+terminal modes,
+etc etc.
+We prefer a standard shell,
+and have made no attempt to understand the
+C shell's weirdnesses.
+We're aware that well-written programs can fail
+under the C shell due to bizarre problems with weird signals,
+etc.,
+but
+we class this as the fault of the C shell and its co-conspirators and
+decline to contort our programs to compensate for its failings.
+We do
+sympathize with people victimized by it,
+but can be of no practical help.
+.SH
+Compress Behavior
+.Ix compress
+.Ix problems compress
+.Ix batcher
+.PP
+Extremely old (pre-1985) versions of \fIcompress\fR run off at the mouth
+with a status message
+on \fIstderr\fR even when nothing goes wrong in the compression.
+This upsets the batcher,
+which thinks any \fIstderr\fR output means trouble.
+.SH
+ulimit
+.Ix ulimit
+.Ix problems ulimit
+.Ix Unix "System V"
+.Ix "System V" breakage
+.PP
+Most versions of System V have the concept of \fIulimit\fR,
+a per-process limit on how big an individual file can be.
+This limit can be lowered by anyone but raised only by the super-user;
+normally \fIinit\fR or \fIlogin\fR initializes it to some suitable value.
+Unfortunately,
+many System Vs set it far too low,
+at 1 megabyte.
+This causes trouble with many things,
+but in particular,
+.Ix relaynews
+.Ix expire
+\fIrelaynews\fR,
+\fIexpire\fR, etc.
+need to be able to work with the \fIhistory\fR file,
+.Ix history
+which can easily be several megabytes.
+It's necessary to deal with this on all paths by which
+any of these programs might be invoked:
+from \fIuucp\fR or other transport software bringing in news,
+from \fIcron\fR,
+.Ix cron
+and by users via \fIinews\fR for local postings.
+.Ix inews
+It is difficult to do this in a portable way when super-user privileges
+are needed.
+.SH
+Restricted Shells
+.Ix shell restricted
+.Ix problems "restricted shells"
+.Ix Unix "System V"
+.Ix "System V" breakage
+.PP
+There is an unfortunate interaction between the `#!' feature in shell files
+and the ``restricted shell'' feature found in some Unixes
+(notably System V):
+the restricted shell typically is just a different way of invoking
+\fI/bin/sh\fR,
+and in some versions,
+careless code just checks the first
+letter of the name the shell was invoked under to see if it was `r'.
+Unfortunately,
+if the system has the `#!' feature and there is a shell
+file named,
+say,
+.Ix rnews
+\fIrnews\fR whose first line is `#!\ /bin/sh',
+this shell file will end up invoking the restricted shell!
+.PP
+Simply deleting the `#!' line might fix this;
+on systems which have the
+Korn shell,
+.Ix shell Korn
+.Ix /bin/ksh
+changing `#!\ /bin/sh' to `#!\ /bin/ksh' might work.
+Otherwise you will have
+.Ix cunbatch
+to arrange to have your neighbors invoke \fIcunbatch\fR instead of
+\fIrnews\fR, or else write a simple \fIrnews\fR that invokes the real
+one under another name.
+It would be wise to check for other shell files whose names begin with `r',
+also,
+as \fIrnews\fR definitely isn't the only one.
+.SH
+Remote Invocation vs. Nonstandard Shells
+.Ix shell non-standard
+.Ix problems "non-standard shells"
+.Ix rsh
+.\" thanks to Paul Eggert for most of this
+.PP
+When \fInewsrun\fR is invoked on a host that is not the news server,
+it uses \fIrsh\fP to propagate news batches to the server.
+It runs \fI/bin/sh\fR explicitly to avoid major difficulties with
+non-standard shells,
+but it has to rely on the invoker's login shell to run that one command.
+This means \fInewsrun\fR will emit spurious output
+if its invoker's login shell is the C shell
+and its invoker's \fI.cshrc\fR contains commands that generate output.
+A similar problem occurs with \fIbash\fP and \fI.bashrc\fP.
+.Ix bash
+.Ix shell bash
+.Ix csh
+.Ix shell C
+.PP
+The simplest solution is to use \fI/bin/sh\fP
+as the login shell for \fInewsrun\fP's invoker.
+Otherwise,
+if you have a networked news server,
+check that the login shell is standard enough to invoke \fI/bin/sh\fP
+by executing the following command as \fInewsrun\fP's invoker.
+.DS
+.ft B
+rsh \fInewsserver\fP exec /bin/sh \-c true
+.ft
+.DE
+This command should output nothing.
+.PP
+.Ix Unix "System V"
+.Ix "System V" breakage
+A slightly related problem is that not everyone calls the run-remote-shell
+command \fIrsh\fR;
+on System V in particular,
+\fIrsh\fR means something
+different.
+For the moment we have opted to ignore this issue,
+as the possibilities
+for gratuitous differences boggle the mind.
+People facing this problem may wish to place an
+\fIrsh\fR shell file in the search path to invoke the right command in the
+right way,
+whatever that is.
+.SH
+Values of Logical Operators
+.Ix "broken compilers"
+.Ix problems "broken compilers"
+.Ix Unix Ultrix
+.PP
+There seem to
+be compilers,
+e.g. the Ultrix one on DEC's new RISC workstations,
+that go into convulsions when they see something like
+.DS
+.ft B
+*p++ = isascii(c) && isalnum(c);
+.ft
+.DE
+because they don't know how to generate a numeric value for `&&',
+or because they don't know how to turn that value into a `char'.
+One or two places in
+C News
+use constructs like this.
+If you run into this,
+you might
+want to try replacing the
+right-hand side
+with something like ``(...)\ ?\ 1\ :\ 0'' to get the
+troublesome operator back into a conditional context.
+.SH
+Empty Lines
+.Ix "empty lines"
+.Ix problems "empty lines"
+.Ix relaynews
+.PP
+Some backward operating systems
+(through which your
+C News
+distribution
+may have passed on its way to you),
+and perhaps some stupid text-handling
+software even on sane operating systems,
+do not recognize the notion of
+an empty line.
+They think all lines must have at least one character in them;
+the closest
+they can come to an empty line is a line consisting of a single blank.
+This matters because \fIrelaynews\fR will tolerate white space only in
+certain places in the \fIsys\fR file,
+and in particular,
+it tolerates
+empty lines but not lines consisting solely of white space.
+The result will be complaints (in \fIerrlog\fR)
+about white space in
+the \fIsys\fR line for a system named ``\ ''.
+.SH
+active-File Date
+.Ix problems "broken file systems"
+.Ix "broken file systems"
+.Ix Unix "Bull DPX/2 B.O.S. 1.0"
+.Ix relaynews
+.Ix active
+.Ix files active
+.\" thanks to Simon J. Gerraty for this weirdie
+.PP
+On some Bull systems, at least ones running DPX/2 B.O.S. 1.0,
+apparently \fIrelaynews\fR updates the
+contents of the \fIactive\fR file correctly, but the file's date remains
+unchanged!
+This appears to be a kernel bug.
+It reportedly upsets some news readers.
+A workaround, said to be effective, is to add the line
+.DS
+.ft B
+utime(ctlfile(actrelnm), (time_t *)NULL);
+.ft
+.DE
+after the call to \fInnafree\fR in \fIactfsync\fR
+in \fIlibbig/active.big.c\fR.
+.Ix active.big.c
+.SH
+enum Operators
+.Ix "broken compilers"
+.Ix problems "broken compilers"
+.Ix readnews
+.\" thanks to Scott Reynolds for this one
+.PP
+Some compilers have difficulty compiling the
+\fIreadnews\fR we supply,
+because they object to applying the `!' operator to an \fIenum\fR type.
+Changing the definition of \fIbooltype\fR in \fIrna/defs.h\fR to
+.DS
+.ft B
+typedef int bool;
+#define	false	0
+#define	true	1
+.ft
+.DE
+is reported to solve this.
+.SH
+Amiga Library Ordering
+.Ix Unix "Amiga System V Release 4"
+.Ix problems "amiga loading"
+.PP
+It is reliably reported that when compiling some of the programs under
+SVR4 on the Amiga,
+it is necessary to give ``\-lc \-lucb'' as library
+options\(emlinking of the C library \fImust\fR precede linking of the
+Berkeley-emulation library,
+or the code links but will not run.
+.SH
+AIX and Mach vs. fsync()
+.Ix fsync
+.Ix problems fsync
+.Ix Unix AIX
+.Ix Unix Mach
+.Ix relaynews
+.Ix /dev/null
+.Ix machines NeXT
+.PP
+The
+.I relaynews
+regression test fails under some (all?) AIXes,
+because the system refuses to do an
+.I fsync
+on a file descriptor open to
+.I /dev/null .
+It is possible that this does not affect production use, however.
+Mach (at least on the NeXT) is reported to have similar problems.
+.SH
+AIX/370 vs. Shell Files
+.Ix problems AIX/370
+.Ix Unix AIX/370
+.Ix shell AIX/370
+.Ix newsrunning
+.PP
+AIX/370 has added at least one keyword (``on'') to the shell,
+and this is
+known to cause syntax complaints
+in at least one shell script (\fInewsrunning\fR).
+Unless this is also a keyword in the final version of POSIX 1003.2,
+we don't plan to fix this.
+.SH
+Struct Conditional Expressions
+.Ix "broken compilers"
+.Ix problems "broken compilers"
+.Ix Unix "SCO Xenix"
+.PP
+Some (all?) SCO Xenix compilers take offense to expressions like
+.DS
+.ft B
+value = (dbzint) ? dbzfetch(key) : fetch(key);
+.ft
+.DE
+where the functions return
+.I struct
+values.
+This occurs in three places in
+.I dbz/dbzmain.c ,
+.Ix dbz
+and the workaround is to expand those conditionals to statements like:
+.DS
+.ft B
+if (dbzint)
+	value = dbzfetch(key);
+else
+	value = fetch(key);
+.ft
+.DE
+.SH
+staleness vs. Ultrix
+.Ix Unix Ultrix
+.Ix staleness
+.Ix problems Ultrix
+.PP
+Several Ultrix users have reported a problem with the ``staleness''
+command.
+It seems Ultrix's \fIsed\fR is an antique and blows up on the complex
+regular expression in \fIstaleness\fR.
+.Ix sed
+A fix,
+at some small cost in performance,
+is to change the last four lines
+of \fIstaleness\fR to something like
+.DS
+.ft B
+exec awk '$1 == "/expired/" { print "-o", $3 }' $NEWSCTL/explist
+.ft
+.DE
+.SH
+SCO Xenix string functions
+.Ix "botched libraries"
+.Ix problems "botched libraries"
+.Ix Unix "SCO Xenix 2.3"
+.\" Sydney S. Weinstein discovered this horror
+.PP
+Under SCO Xenix 2.3,
+and perhaps other recently-released SCO systems,
+the string functions like \fIstrchr\fR exist but can be
+inordinately slow when dealing with long strings.
+This is not an academic issue:
+one symptom is that \fIrelaynews\fR
+.Ix relaynews
+takes a long time to start up,
+eating 10-15 seconds of CPU time
+before it starts processing articles.
+This apparently is a combination of badly-written code and
+strange internationalization support.
+Just using our string functions,
+by
+telling \fIbuild\fR that your system does not have them,
+works much better.
+Telling the compiler \fB\-nointl\fR may be helpful if you don't want
+to go that far.
+.SH
+Old SCO Xenix vs. \fIsetvbuf\fP
+.Ix "botched libraries"
+.Ix problems "botched libraries"
+.Ix Unix "SCO Xenix"
+.Ix dbz
+.Ix problems setvbuf
+.Ix setvbuf
+.\" Ronald Khoo reported this unbelievable botch
+.PP
+The \fIdbz\fR package makes some use of the \fIsetvbuf\fR routine.
+Incredible though it sounds,
+old versions of SCO Xenix reportedly had
+the order of \fIsetvbuf\fR's arguments wrong!
+If you have SCO Xenix version
+2.2 or earlier,
+check the arguments to \fIsetvbuf\fR:
+if the second and third are a type and a buffer pointer respectively
+(they are supposed to be a buffer pointer and a type),
+you're in trouble and will have to tinker with the \fIdbz\fR sources.
+.SH
+SunOS 4.1.1 vs. write()
+.Ix write
+.Ix problems SunOS 4.1
+.Ix Unix "SunOS 4.1.1"
+.Ix problems "broken kernel"
+.Ix "broken kernel"
+.PP
+In some circumstances,
+a SunOS 4.1.1 \fIwrite\fR system call to a disk
+file can be interrupted by a signal.
+No other Unix does this,
+and routines like \fIfwrite\fR are not prepared
+to cope with it.
+This can result in gratuitous failures of \fIdbz\fR in particular.
+.PP
+It is thought not to be a problem in C News,
+but some other packages
+using \fIdbz\fR suffer,
+.Ix dbz
+and we mention it just in case.
+Sun acknowledges it as a bug.
+The bug-id is 1052649.
+It is fixed in patch 100293-01.
+.SH
+uucp Variations
+.Ix uucp
+.Ix problems queuelen
+.Ix queuelen
+.PP
+There are innumerable variations on the details of \fIuucp\fR that may
+require appropriate modifications to \fIqueuelen\fR.
+For example,
+some versions of Honey DanBer (aka BNU) \fIuucp\fR cut all
+system names down to seven characters,
+and \fIqueuelen\fR will have to be altered to do likewise.
+.SH
+malloc Variations
+.Ix malloc
+.Ix Unix A/UX
+.PP
+On some systems,
+performance is noticeably better if the \fB\-lmalloc\fR
+library is used,
+rather than relying on the \fImalloc\fR in the standard
+C library.
+A/UX is reportedly an example.
+.SH
+Slow egrep
+.Ix egrep
+.Ix "System V" breakage
+.Ix Unix "System V"
+.Ix Unix A/UX
+.PP
+At least some System V suppliers (including, reportedly, Apple in
+some [now obsolete?] A/UX versions) have broken \fIegrep\fR in such
+a way that it is inordinately slow.
+It may be worth substituting \fIgrep\fR for \fIegrep\fR in some of
+the shell scripts,
+with appropriate caution since they do not accept
+quite the same pattern syntax.

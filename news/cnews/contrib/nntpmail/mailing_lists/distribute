@@ -1,0 +1,221 @@
+#!/bin/sh
+#
+# $Header: /a/cvs/386BSD/ports/news/cnews/contrib/nntpmail/mailing_lists/distribute,v 1.1 1993/08/27 02:46:46 alm Exp $
+#
+# Distribute stdin (presumed to be a digest or direct-mail article from
+# a mailing list) according to the following flags
+#
+# -n newsgroup		post article to specified newsgroup.
+# -a file		append to the file specified.
+# -m people		remail to people, people may be a filename
+#			in which case the contents will be assumed
+#			to be a list of recipients, one to a line.
+#			note that in the case of a file all recipients
+#			will appear on the headers, and therefore
+#			an alias is best used for large lists.
+# -d directory		store into a file named by volume and
+#			issue under "directory".  Useful for digests.
+# -am name		shorthand for '-a name -m /local/share/mail/lists/name'
+# -dm name		shorthand for '-d name -m /local/share/mail/lists/name'
+#
+# Notes:
+# - When using -a or -m alone, a full path is required, which does differ
+#   with what -am and -dm expect (the name of the mailing list only).
+# - If invoked from sendmail, all arguments will be lowercase only!
+#
+# Rayan Zachariassen - rayan@ai.toronto.edu
+# touch-ups by Jean-Francois Lamy - lamy@ai.toronto.edu
+
+#exec 2>&1
+#set -x
+umask 022
+
+USAGE='distribute [-n newsgroup] [-a archivefile] [-d archivedir] [-m mailto]'
+
+# could be the same site, though not necessarily
+thissite=`domainname`.toronto.edu
+newsserver=jarvis.csri.toronto.edu
+
+# we keep the archives under our anonymous FTP directory so other people
+# can get at them.
+archdir=/local/ftp
+cd $archdir
+
+# this person receives bounces and such like.  Make it an alias as it
+# will appear on the sender: line of messages.
+admin=list-admin
+
+PEOPLE=/local/share/mail/lists
+LOG=/var/log/distribute
+
+Mail=/usr/ucb/Mail
+sendmail=/usr/lib/sendmail
+cat=/bin/cat
+rm=/bin/rm
+# This program should be suid daemon, so that sensitive files can be
+# protected.
+blankcat=/local/lib/mail/bin/appendfile
+
+#
+# Parse arguments
+#
+ARTICLE=/tmp/dist$$
+newsgroup=""
+file=""
+directory=""
+mailto=""
+case $# in
+0|1)	echo Usage: $USAGE
+	exit 1 ;;
+esac
+state=x
+for i in $@
+do
+	case "$i" in
+	-*)	state=$i ;;
+	*)	case $state in
+		-n)	newsgroup="$i"
+			distribution="`expr $newsgroup : '\([a-z]*\)\.*'`"
+			;;
+		-n*)	newsgroup="$i"
+			distribution="`expr $state : '-n\(.*\)'`"
+			;;
+		-a)	file="$i" ;;
+		-d)	directory="$i" ;;
+		-m)	mailto="$i" ;;
+		-am)	file="$i"
+			mailto="$PEOPLE/$i" ;;
+		-dm)	directory="$i"
+			mailto="$PEOPLE/$i" ;;
+		x)	echo Usage: $USAGE
+			exit 2 ;;
+		esac
+		state=x ;;
+	esac
+done
+#
+case "${newsgroup}${file}${directory}${mailto}" in
+?*)	$cat - > $ARTICLE ;;
+*)	exec $Mail -s "No options to /local/lib/mail/distribute" rayan
+	exec /bin/mail rayan
+	exit 4 ;;
+esac
+case $file in
+?*)	$blankcat -lists/${file} $ARTICLE ;;
+esac
+case $directory in
+?*)	eval `/usr/ucb/head -40 $ARTICLE \
+	| /usr/bin/fgrep -i digest \
+	| /bin/sed -n \
+	-e 's/.*Vol[^0-9]*\([0-9][0-9]*\)[^0-9][^0-9]*\([0-9][0-9]*\)[^0-9]*/VOL=\1 NUM=\2/p'`
+	$blankcat "-$directory/V${VOL}.${NUM}" $ARTICLE ;;
+*)	directory="$archdir" ;;
+esac
+
+# extract return path from article
+/local/bin/ed - $ARTICLE <<EOF
+1s/From \\([^ ]*\\) .*/\\1/
+1w $ARTICLE.from
+1d
+w
+q
+EOF
+
+# forwarding via mail
+if [ -s $ARTICLE.from ]; then
+	path="`cat $ARTICLE.from`"
+	case $mailto in
+	*/*)	( cd $directory ;
+		if [ -s $mailto ]; then
+			$sendmail -f $path `cat $mailto` < $ARTICLE
+		fi
+		)
+		;;
+	?*)	$sendmail -f $path $mailto < $ARTICLE
+		;;
+	esac
+else
+	path="$newsserver!news"
+fi
+
+# forwarding to newsgroups
+case $newsgroup in
+?*)	case $path in
+	*!*!*)	path="`expr $path : '.*!\([^!]*![^!]*\)$'`"
+		case $path in
+		*.*!*)	;;
+		*)	path="`echo $path | sed 's/!/.uucp&/'`" ;;
+		esac ;;
+	*!*)	;;
+	*)	path="`hostname`.toronto.edu!$path" 
+	esac
+# All this does is massage the headers so they look like what news
+# software expects.  To:, Cc: and Resent-*: headers are masked.
+# Reply-To: is turned into references, which is questionable (could
+# just as well be dropped.
+#
+# The From: line is rewritten to use the "address (comments)" form
+# instead of "phrase <route>" form our mailer uses.  Also, addresses
+# with no "@domainname" are assumed to originate locally, and so are
+# given a domain.
+#
+# The Sender: field below reflects the address of the person who
+# maintains our mailing lists.  The Approved: field is in a special
+# form, so that we can do bidirectional gatewaying.  Any message
+# in a newsgroup that bears this stamp will not be fed into the
+# matching mailing list.
+	sed -n -e "1{i\\
+		Path: $path
+		}" \
+	    -e ":a
+		/^[Rr]eceived:/b r
+		/^[Tt][Oo]:/s/^/Original-/
+		/^[Cc][Cc]:/s/^/Original-/
+		/^[Rr][Ee][Ss][Ee][Nn][Tt]-.*/s/^/Original-/
+		s/^[Ii]n-[Rr]eply-[Tt]o:/References:/
+		/^From:/{
+			s/<\([^@]*\)>\$/<\1@$thissite>/
+			s/^From:[ 	][	]*\(.*\)  *<\(.*\)>\$/From: \2 (\1)/
+			}
+		s/-[Ii]d:/-ID:/
+		s/^\([^:]*:\)[	 ]*/\1 /
+		/^\$/{i\\
+			Newsgroups: $newsgroup\\
+			Distribution: $distribution\\
+			Sender: $admin@$thissite\\
+			Approved: $newsgroup@mail.ai.toronto.edu
+			b e
+		}
+		p
+		n
+		b a
+		:r
+		s/.*//g
+		n
+		/^[ 	]/b r
+		b a
+		:e
+		p
+		n
+		b e" < $ARTICLE > ${ARTICLE}.news
+# ${ARTICLE}.news is the article to be posted.  Any method could
+# be used to do it, normally invoking "inews" or even "relaynews" 
+# directly would work.  Our setup is peculiar in that the news server
+# is another machine, for historical (hysterical?) reasons.
+# It turns out that invoking nntp on each article puts more load on
+# the news server than making up a fake batch and mailing it to them,
+# so we do just that.
+		set - `wc -c ${ARTICLE}.news`
+		(echo "#! rnews $1" ; cat ${ARTICLE}.news) |
+			sed -e 's/^/N/' |
+			$sendmail -f"$admin" recnews@jarvis.csri
+#
+# update the logs
+#
+		messageid=`egrep -i '^message-id:[ 	]' $ARTICLE`
+		messageid=`expr "$messageid" : '..........:[ 	]\(.*\)'`
+		time=`date | awk '{print $2,$3,$4}'`
+		echo $time $newsgroup $messageid >> $LOG
+esac
+$rm -f $ARTICLE $ARTICLE.from $ARTICLE.news
+exit 0

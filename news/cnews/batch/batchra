@@ -1,0 +1,26 @@
+#! /bin/sh
+# batchra [file...] - requested-articles batcher - read sendme message(s),
+# look up history entries and get file names, append the names to batch file
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/usr/lib/news/bin/config}
+export NEWSCTL NEWSBIN NEWSARTS NEWSPATH NEWSUMASK NEWSMASTER NEWSCONFIG
+PATH=$NEWSCTL/bin:$NEWSBIN/batch:$NEWSBIN:$NEWSPATH; export PATH
+
+batchdir=`expr "$NEWSSITEDIR" : "^\(.*\)\.[^./]*$"`
+case "$batchdir" in
+'')	batchdir="$NEWSARTS/out.going/$NEWSSITE"	;;
+esac
+files="`cat $*`"
+export batchdir files
+
+SHELL=/bin/sh $NEWSBIN/maint/locknews <<'!'
+	for f in $files
+	do
+		if test -r $f	# ignore control files that have vanished
+		then
+			sed '1,/^$/d' $f
+		fi
+	done | egrep '^<' | dbz -x $NEWSCTL/history |
+	sed 's/^.*	\([^ ]*\).*$/\1/' | tr . / >>$batchdir/togo
+!

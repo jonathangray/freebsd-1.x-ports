@@ -1,0 +1,25 @@
+#! /bin/sh
+# explode master batch files into normal batch files
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/usr/lib/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/relay:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+cd $NEWSARTS
+for f in out.master/[0-9]*
+do
+	case "$f" in
+	"out.master/[0-9]*")	break ;;	# no work
+	esac
+	work=$f.tmp
+	export f work
+	# lock against relaynews for the mv and
+	# batchers for explode.
+	SHELL=/bin/sh $NEWSBIN/maint/locknews <<'!'
+		mv $f $work	# move out the way of relaynews
+		explode $work
+		rm -f $work
+!
+done

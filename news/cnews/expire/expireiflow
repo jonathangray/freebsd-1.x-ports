@@ -1,0 +1,22 @@
+#! /bin/sh
+# expireiflow minmegabytes [ expireoptions ]
+# run doexpire -r if things are getting tight
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/usr/lib/news/bin/config}
+
+minimum=$1
+shift
+
+PATH=$NEWSCTL/bin:$NEWSBIN/expire:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+lock="$NEWSCTL/LOCKexpire"
+
+if test " `spacefor 1024000 articles`" -lt $minimum -a ! -f $lock; then
+	(
+		echo "Subject: space low in $NEWSARTS"
+		echo ''
+		echo "$0: space getting low in $NEWSARTS; running doexpire -r"
+	) | mail "$NEWSMASTER"
+	exec doexpire -r $*
+fi

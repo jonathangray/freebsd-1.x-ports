@@ -1,0 +1,214 @@
+.\" =()<.ds a @<NEWSARTS>@>()=
+.ds a /usr/spool/news
+.\" =()<.ds b @<NEWSBIN>@>()=
+.ds b /usr/lib/newsbin
+.\" =()<.ds c @<NEWSCTL>@>()=
+.ds c /usr/lib/news
+.\" =()<.ds m @<NEWSMASTER>@>()=
+.ds m usenet
+.\" indentation start
+.de Is
+.in +0.5i
+..
+.\" indentation end
+.de Ie
+.in -0.5i
+..
+.\" example start
+.de Es
+.LP
+.nf
+.ft B
+.Is
+..
+.\" example end
+.de Ee
+.Ie
+.ft R
+.fi
+.LP
+..
+.TH NEWSDB 5 "2 March 1992"
+.BY "C News"
+.SH NAME
+newsdb \- USENET network news database: article tree, history, active, active.times
+.SH DESCRIPTION
+Each news article is stored in a separate file
+with one or more links,
+each a numeric name
+in a directory under
+.B \*a
+corresponding to a newsgroup
+the article is (cross-)posted to.
+For example,
+an article posted to
+.B comp.unix.wizards
+might be stored in
+.BR \*a/comp/unix/wizards/4867 .
+.PP
+The file
+.B \*c/active
+defines the locally-valid news groups
+and
+contains one line per group.
+Each line consists of four blank-separated fields:
+newsgroup name,
+highest local article number assigned,
+lowest local article number in use (approximately),
+and
+a flag.
+Both article-number fields are at least five digits wide.
+(Some older news software may expect exactly five digits.)
+The current flag values are
+.B y
+(a normal unmoderated group),
+.B n
+(like
+.B y
+but local postings disallowed),
+.B m
+(a normal moderated group),
+.B x
+(a locally-disabled group,
+no articles will be filed here),
+and
+.B =
+(followed by the real group
+under which to file articles in this group;
+articles are treated exactly as if their
+.B Newsgroups:
+header specified the real group instead of the original one;
+highest and lowest fields are ignored).
+.PP
+The file
+.B \*c/active.times
+is an extension of the
+.I active
+file that records the arrival of new newsgroups by time and creator.
+When a new newsgroup is created,
+the group name,
+time of group creation
+(as seconds since January 1, 1970,
+00:00, GMT),
+and mail address of the creator
+are appended as a single line.
+The file must always be sorted in increasing order
+of the creation-time field.
+The news software only appends to the file,
+which normally suffices to ensure this.
+An initial
+.I active.times
+for already existing newsgroups,
+with all times equal to the time of its creation
+and all creators ``unknown'',
+can be built using
+.I act.to.times
+(see
+.IR newsmaint (8)).
+.I Active.times
+provides a quick
+way for newsreaders to tell when new groups have arrived,
+without weird heuristics and expensive schemes
+like storing old lists of
+newsgroups and comparing them to the
+.I active
+file.
+.PP
+The file
+.B \*c/history
+contains one line for each article received.
+Each line consists of three tab-separated fields:
+a
+.IR Message-ID: ,
+the arrival time as seconds since midnight,
+Jan 1, 1970
+and
+the
+.B Expires:
+value
+(a dash indicates there was none)
+separated by a tilde,
+and
+the list of links to this article.
+If an article has been expired or cancelled without being seen first,
+the list of links and the tab before it are omitted.
+There are also index files to permit rapid lookup by message-id,
+typically called
+.B \*c/history.dir
+and
+.BR \*c/history.pag .
+.SH EXAMPLES
+A trivial
+.I active
+file.
+.Es
+control 0000600006 600004 y
+junk 0000000076 00074 y
+comp.org.usrgroup 0000000006 00004 y
+talk.bizarre 0000296123 292136 n
+comp.sys.sun 0000050175 50173 m
+list.sun-spots 0000000076 00076 =comp.sys.sun
+comp.os.vms 0000000000 00000 x
+.Ee
+.PP
+An trivial
+.I history
+file.
+.Es
+<3451@hcr.UUCP>	581905588~-	comp.text/1317 comp.sources.wanted/4200
+<9383@alice.UUCP>	611934511~-
+.Ee
+.SH FILES
+.nf
+.BI \*a/ news/group/1234
+.B \*c/active
+.B \*c/active.times
+.B \*c/history
+.B \*c/history.dir
+.B \*c/history.pag
+.fi
+.SH SEE ALSO
+.IR dbz (1),
+.IR nn (1),
+.IR readnews (1),
+.IR rn (1),
+.IR dbz (3),
+.IR getdate (3),
+.IR getabsdate (3),
+.IR news (5),
+.IR newssys (5),
+.IR expire (8),
+.IR newshist (8),
+.IR newsmaint (8),
+.IR relaynews (8),
+.IR newsinvaders (9.1)
+.SH BUGS
+A single portable extended
+.I history
+database,
+containing more information about each article,
+might be useful for some newsreaders
+(notably
+.I nn
+and
+.IR trn )
+and would eliminate the expense of running
+.I nnmaster
+and most especially
+.IR mthreads .
+More importantly,
+sites that support more than one such newsreader
+would only need a single multi-megabyte database.
+On the other hand,
+.I gnus
+or
+.I gnews
+gets the same effect
+at run-time with no adjunct database,
+at little expense
+(or so their users claim).
+.SH HISTORY
+.I Active.times
+invented
+by Mark Moraes and Geoff Collyer
+as part of the C News project.

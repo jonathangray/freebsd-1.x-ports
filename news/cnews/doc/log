@@ -1,0 +1,93 @@
+.Ch "Log File Formats in C News"
+.Ix logs
+.Ix "file formats"
+.SH
+Introduction
+.PP
+The two main log files in C news are
+.Df log
+.Df files log
+.Df errlog
+.Df files errlog
+\fINEWSCTL\fP\fB/log\fR
+and
+\fINEWSCTL\fP\fB/errlog\fR,
+which are the standard output and standard error streams
+of
+.I relaynews .
+.Ix relaynews
+.B errlog
+should be empty;
+if not,
+something is seriously wrong,
+probably with your configuration or
+with unencapsulated news arriving mangled
+courtesy of some network.
+.SH
+Formats
+.PP
+.B errlog
+is a copy of any error messages written on
+standard error by
+.I relaynews
+or its auxiliaries
+(including control messages programs).
+There are no timestamps
+and the contents obey no special format.
+A non-empty
+.B errlog
+is a sign of trouble,
+which should be fixed promptly.
+.PP
+.B log
+is written in a stylised format,
+with whitespace separating the fields:
+date and time, to millisecond resolution though possibly not
+to millisecond accuracy;
+the machine that sent us this article;
+a single-character classification code;
+the article's message-id;
+and
+code-specific information.
+For example,
+.DS L
+.ft B
+.ps 8
+.vs 10
+Jun 30 03:32:18.960 utgpu + <1312@sunset.MATH.UCLA.EDU> mailrus dptcdc me
+Jun 30 03:32:19.600 utgpu j <1312@sunset.MATH.UCLA.EDU> junked due to groups `alt.drugs'
+Jul  3 18:55:35.492 utstat s <470@lexicon.com> utzoo-real
+Jul  3 18:55:35.912 utstat i <8907031824.AA09129@ucbvax.Berkeley.EDU> utzoo-send-ids
+Jul  4 06:40:22.395 jarvis.csri.toronto.edu + <0541.AA0541@worsel> utgpu
+Jul  4 06:40:22.595 jarvis.csri.toronto.edu + <0549.AA0549@worsel> utgpu
+Jul  4 07:00:26.565 jarvis.csri.toronto.edu + <295@lancelot> utgpu
+Jul  4 07:17:51.537 utgpu - <8258@saturn.ucsc.edu> duplicate
+Jul  4 07:17:51.697 utgpu - <1675@neoucom.UUCP> duplicate
+Jul  4 07:17:51.757 utgpu - <89Jul4.043358edt.10369@neat.ai.toronto.edu> duplicate
+Jul  4 17:23:28.234 utgpu - <2537@quanta.eng.ohio-state.edu> no subscribed groups in `rec.arts.sf-lovers,rec.arts.startrek,rec.arts.drwho'
+Jul  4 19:17:15.785 utgpu - <89Jul4.190330edt.5559@gpu.utcs.utoronto.ca> all groups `list.humanist' excluded in active
+.vs
+.ps
+.ft
+.DE
+.PP
+The classification codes are:
+.TS
+c | c | c
+cfB | lw(2.75i) | l .
+code	article disposition	code-specific information
+_
+\-	rejected	reason for rejection
++	accepted	list of sites to which this article was relayed
+j	T{
+accepted but filed in the \fIjunk\fR pseudo-newsgroup; preceding line will be \fB+\fR
+T}	reason for junking
+i	generated in response to an \fIihave\fR control message	list of sites to which this article was relayed
+s	generated in response to a \fIsendme\fR control message	list of sites to which this article was relayed
+.TE
+.PP
+Beware that control-message handlers inherit
+.I relaynews 's
+standard output, so if any of them natters on standard output
+(we believe none of ours do), the nattering will appear in
+.B log .

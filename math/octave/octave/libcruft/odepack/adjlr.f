@@ -1,0 +1,24 @@
+      SUBROUTINE ADJLR (N, ISP, LDIF)
+      INTEGER N, ISP, LDIF
+      DIMENSION ISP(1)
+C-----------------------------------------------------------------------
+C THIS ROUTINE COMPUTES AN ADJUSTMENT, LDIF, TO THE REQUIRED
+C INTEGER STORAGE SPACE IN IWK (SPARSE MATRIX WORK SPACE).
+C IT IS CALLED ONLY IF THE WORD LENGTH RATIO IS LRAT = 1.
+C THIS IS TO ACCOUNT FOR THE POSSIBILITY THAT THE SYMBOLIC LU PHASE
+C MAY REQUIRE MORE STORAGE THAN THE NUMERICAL LU AND SOLUTION PHASES. 
+C-----------------------------------------------------------------------
+      INTEGER IP, JLMAX, JUMAX, LNFC, LSFC, NZLU
+C
+      IP = 2*N + 1
+C GET JLMAX = IJL(N) AND JUMAX = IJU(N) (SIZES OF JL AND JU). ----------
+      JLMAX = ISP(IP)
+      JUMAX = ISP(IP+IP)
+C NZLU = (SIZE OF L) + (SIZE OF U) = (IL(N+1)-IL(1)) + (IU(N+1)-IU(1)).
+      NZLU = ISP(N+1) - ISP(1) + ISP(IP+N+1) - ISP(IP+1)
+      LSFC = 12*N + 3 + 2*MAX0(JLMAX,JUMAX)
+      LNFC = 9*N + 2 + JLMAX + JUMAX + NZLU
+      LDIF = MAX0(0, LSFC - LNFC)
+      RETURN
+C----------------------- END OF SUBROUTINE ADJLR -----------------------
+      END 

@@ -1,0 +1,130 @@
+.TH FGETFLN 3 local
+.DA 27 Feb 1992
+.SH NAME
+fgetfln \- read an arbitrarily long, possibly continued line (DRAFT)
+.SH SYNOPSIS
+.B "#include <stdio.h>
+.br
+.B "#include <fgetfln.h>
+.PP
+.nf
+.ft B
+char *fgetfln(stream, limit, lenp)
+FILE *stream;
+int limit, *lenp;
+.ft
+.fi
+.PP
+.B "char *fgetln(stream)
+.br
+.B "FILE *stream;"
+.PP
+.B "char *cfgetln(stream)
+.br
+.B "FILE *stream;"
+.PP
+.B "char *fgetline(stream, lenp)"
+.br
+.B "FILE *stream;"
+.br
+.B "int *lenp;"
+.PP
+.nf
+.ft B
+char *dogets(line, lenp)
+char *line;
+int *lenp;
+.ft
+.fi
+.SH DESCRIPTION
+.I Fgetfln
+reads an arbitrarily long line from
+.IR stream ,
+allocating memory via
+.IR malloc (3)
+as needed.
+If
+.I limit
+is non-negative,
+.I fgetfln
+will read no more than
+.I limit
+bytes from
+.IR stream .
+.\" yes, really.
+If
+.I lenp
+is non-null,
+.I strlen
+of the returned string will be stored through
+.IR lenp .
+.PP
+.I fgetln
+(to read without continuations)
+and
+.I cfgetln
+(to read with continuations and remove leading whitespace)
+should be used instead when the
+.I limit
+is not needed.
+Their definitions are:
+.PP
+.RS
+.nf
+.ft B
+#define fgetln(fp)  fgetfln(fp, -1, (int *)NULL)	/* unbounded read */
+#define cfgetln(fp) csfgetfln(fp, 1)	/* unbounded cont.d read */
+.ft
+.fi
+.RE
+.PP
+.I fgetline
+is the 4.4BSD routine.
+.I Dogets
+hacks any newline off the end of
+.I line
+(as determined from the
+.I strlen
+.IR *lenp ),
+adjusts
+.I *lenp
+to match,
+and
+returns
+.IR line .
+.PP
+.I Fgetfln
+is intended to provide a reliable mechanism for reading
+input containing lines of arbitrary length,
+rather than trusting that no line will be longer than some
+arbitrary tolerance.
+.PP
+The memory returned by
+.I fgetfln
+must not be
+returned via
+.IR free (3);
+it will be reused by
+.IR fgetfln .
+Conversely,
+the memory returned by
+.I csfgetln
+must be returned via
+.IR free (3).
+.\" .SH FILES
+.SH SEE ALSO
+.IR malloc (3),
+.IR fgets (3)
+.SH DIAGNOSTICS
+Returns NULL (0) if memory cannot be allocated or upon reading end-of-file;
+use
+.I feof(stream)
+to distinguish.
+.SH HISTORY
+Written by Geoff Collyer
+at Software Tool & Die
+as part of the C news project.
+.SH BUGS
+It's not yet clear how fast
+.I csfgetln
+is.

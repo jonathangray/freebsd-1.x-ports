@@ -1,0 +1,221 @@
+                SLURP - An advanced passive NNTP client
+                =======================================
+
+                             Version 1.08
+                      Written by Stephen Hebditch
+                     (C) 1992/3 TQM Communications
+                                    
+                                 ------
+
+Slurp is an advanced passive NNTP client for UNIX. It will connect to a
+remote NNTP server and retrieve articles in a specified set of Usenet
+newsgroups that have arrived after a particular date (typically the
+last time it was invoked) for processing by your local news system or
+forwarding on via UUCP to another news system. It replaces nntpxfer
+from the NNTP 1.5.11 reference implementation and nntpget from the INN
+distribution.
+
+
+The Feature List.
+
+- No restriction on the number of newsgroups that can be retrieved in a
+  session. The client does a series of NEWNEWS requests if necessary to
+  build up a list of articles which need to be retrieved from the
+  server.
+
+- Compatible with C News and INN.
+
+- No lost articles due to unsynchronised clocks. By default, the time
+  for the next NEWNEWS is set by a call to the tcp time service on the
+  remote machine. This fixes a problem in nntpxfer and nntpget where
+  articles can be missed if the clock on the server is behind that on
+  the client.
+
+- Faster article throughput. If configured to do so, slurp stacks up
+  the next article request before the current article is received,
+  decreasing the total article transfer time by around 30%. Unlike
+  nntpget, article batches can be written to the rnews spool directory
+  for processing with 'rnews -U' later, rather than being offered to
+  innd in turn. When used with C News, batches are written to the
+  in.coming directory. This provides a big speedup over nntpxfer which
+  created a new pipe to rnews for each article, lowering the transfer
+  speed and increasing the load on the client machine. These speed
+  improvements are of most use to the growing number of people
+  retrieving news over a dialup SLIP/PPP connection.
+
+- Error recovery. In the event of an error occurring while articles are
+  being fetched, the message IDs of unretrieved articles are dumped to
+  a file. The next session can then retrieve the remaining articles
+  without having to restart from the previous start time.
+
+- Easy configuration.
+
+  slurp.sys defines which groups you wish to get from which server in a
+  similar way to the normal C News sys file, e.g.
+
+	news.demon.co.uk:demon.*,!demon.msdos.announce,uk.*,\
+	!uk.net.maps/world,uk
+
+  slurp.<hostname> contains the time to be used for the NEWNEWS request
+  at each server.
+
+  The newsgroups list, start time and distributions can be overridden
+  on the command line. There are also settings to enable debugging
+  output, prevent writing the time for the next NEWNEWS to
+  slurp.<hostname>, issue a 'MODE READER' command to switch innd to
+  nnrpd, not dump unfetched message IDs in the event of an error, and
+  use the local time for the next NEWNEWS rather than the time at the
+  server.
+
+- Support for the NNTP simple authorisation protocol.
+
+- Logging to syslog of the number of new, missing and duplicate
+  articles at the end of a session plus, if required, the transfer
+  speed of the article fetching stage.
+
+- Independent of the NNTP 1.5.11 code.
+
+Slurp was written in ANSI C under Dell's SVR4/386, but ports easily to
+SunOs 4.x, Linux, BSDI BSD/386, HPUX, SCO, ISC, NeXT, Ultrix and most
+other recent versions of UNIX.
+
+
+
+CONTENTS
+--------
+
+In this archive you should have the following files:-
+
+HISTORY		How we got from there to here.
+Makefile	The Makefile (yes, really!)
+README		What you're reading now
+articles.c	Routines for reading articles and batching them up
+conf.h		Compilation configuration file
+fakesyslog.c	Fake version of syslog for those without
+fakesyslog.h	Definitions needed for the above
+history.c	Routines to open and interrogate the news history file
+misc.c		Miscellaneous routines
+newnews.c	Routines to retrieve new message ids from the server
+nntp.h		Definitions of nntp response codes
+slurp.1		Slurp manual page
+slurp.c		Main program
+slurp.h		Definitions used by everything
+slurp.sys	Configuration file for groups to take from a server
+sockets.c	Server interface routines
+space.c		Determines space available on news disk
+time.c		Retrieves current time at remote server
+
+
+
+COMPILATION AND INSTALLATION
+----------------------------
+
+1. Edit conf.h to reflect your reflect your local configuration. This
+file contains full details about each item that you may need to change.
+
+2. Edit Makefile. If you have not installed dbz.h in /usr/include then
+you will need to add -Ipathname to CFLAGS so that the compiler does a
+search of the directory where it can be found. LIBS will need to
+contain entries to pick up the dbz library and possibly the sockets
+library depending on your system. If you don't have syslog then you
+will need to uncomment the FAKESRC and FAKEOBJ lines.
+
+3. Type 'make' and hopefully you will get the slurp executable.
+
+4. Copy slurp to wherever it is that you store your news binaries.
+
+5. Copy slurp.sys to whichever location you selected for it in conf.h.
+
+6. Copy the manual page to wherever you keep your manual pages.
+
+
+
+QUICK START
+-----------
+
+The slurp manual page contains full details on how to operate slurp. As
+a quick start all you need to do is:-
+
+1. Edit slurp.sys to set the hostname of the server you wish to connect
+to for retrieving articles and the groups you wish to receive.
+
+2. Edit slurp.<hostname> and enter a single line containing the time a
+couple of days previously, say, in 'YYMMDD HHMMSS' format.
+
+3. Run 'slurp <hostname>' and sit back while the articles flood into
+your local news system.
+
+If you are running C News, then the next time that newsrun is invoked
+from cron, the articles in the in.coming directory will be added to the
+news system.
+
+If you are running INN and do not have RNEWS defined, then it will be
+necessary to run 'rnews -U' to have the files from the rnews spool
+directory processed by the news system. If RNEWS is defined then they
+will be piped to innd as they arrive - doing this will lower the speed
+at which articles are transferred from the remote server.
+
+Patches for the NNTP 1.5.11 server are available on request which
+implement caching of article locations during a NEWNEWS so that a
+further access of the history file is not required when an article is
+retrieved. I hope to have an equivalent patch available for INN soon.
+
+
+
+CONDITIONS OF USE
+-----------------
+
+The Slurp package and individual code as detailed is Copyright 1992/3
+TQM Communications, BCM Box 225, London, WC1N 3XX. All rights reserved.
+
+This package may be freely distributed provided the following
+conditions are met. The files detailed in the contents section of this
+file must all be included. No charge, other than basic online charges
+or media costs, may be levied. You are permitted to make alterations to
+the code for your own personal use, but please feed back any bug fixes
+or enhancements to us so they may be included in any future releases.
+
+
+
+DISCLAIMER
+----------
+
+TQM Communications makes no warranty of any kind in respect to this
+documentation and the software described. The user assumes any risk as
+to the quality and performance of this product. In no event will TQM
+Communications be liable for direct, indirect, incidental or
+consequential damages arising from any defect in the performance and
+use of this product.
+
+All trademarks acknowledged.
+
+
+
+ACKNOWLEDGEMENTS
+----------------
+
+The original inspiration for slurp came from nntpxfer, written by Brian
+Kantor. The article batching code is inspired by batch.c in the NNTP
+1.5.11 package, written by Stan Barber and 'based on work by Henry
+Spencer and Geoff Collyer'. The fakesyslog code is taken from the NNTP
+1.5.11 package where it is credited to John Robert LoVerso and Paul
+McKenny. The space code to determine whether there is enough space on
+the news disk was originally taken from the NNTP 1.5.11 package where
+it is credited to Stan Barber, Tad Guy, Chris Jepeway and Tom Lane.
+Regular expression expansion courtesy of Nick Lai. Network knowledge
+thanks to W. Richard Stevens, author of the most readable UNIX books
+around. For bug fixing, porting and enhancement ideas, thanks go to Tim
+Rylance, Pete Bentley, Stefan Schwarz, David Clunie, David Boyce,
+Barrie Spence and Philip Shearer.
+
+
+
+CONTACT INFORMATION
+-------------------
+
+All comments, bug reports, bug fixes, etc. should be sent to
+steveh@orbital.demon.co.uk. I'm also available for consultancy work if
+you want help in getting news and mail working.
+
+
+---- END OF DOCUMENTATION

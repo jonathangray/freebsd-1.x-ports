@@ -1,0 +1,28 @@
+#! /bin/sh
+PATH=".:$PATH"
+
+echo removing old dregs...
+rm -rf tmp
+
+echo making new working subtree...
+chmod +x master/run
+mkdir tmp 2>/dev/null
+cp ../explode tmp
+# tar B is unportable, so we can't do this:
+# (cd master; tar cf - .) | (cd tmp; tar xBf -)
+(cd master; tar cf - .) >master.tar
+(cd tmp; tar xf -) <master.tar
+rm -f master.tar
+cd tmp
+chmod u+w *
+
+echo running explode...
+./run
+
+echo comparing output...
+rm -f gmon.out explode
+# simulate: diff -r ../out .
+for f in `find . -type f -print`
+do
+	cmp $f ../out/$f
+done

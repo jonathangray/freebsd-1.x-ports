@@ -1,0 +1,184 @@
+#! /bin/sh
+# inews [-p] [-d k] [-x site] [-hMD] [-t subj] [-n ng] [-e exp] [-F ref] \
+#  [-d dist] [-a mod] [-f from] [-o org] [-C ng] [file...] - inject news:
+#
+#     pseudo inews that supports the use of a central posting server accessed
+#     via mail.  This provides less opportunities to inject fake messages, and
+#     relies on mail to do fancy things like hiding names of workstations and
+#     providing full-name return addresses.
+#
+# Jean-Francois Lamy (lamy@ai.toronto.edu) 88-02-11
+
+#NEWSCTL=${NEWSCTL-/usr/lib/news}
+#NEWSBIN=${NEWSBIN-/usr/lib/newsbin}
+#NEWSARTS=${NEWSARTS-/usr/spool/news}
+NEWSCTL=/local/share/news
+NEWSBIN=/local/lib/news
+NEWSARTS=/var/spool/news
+PATH=$NEWSBIN:$NEWSCTL:$NEWSBIN/relay:/bin:/usr/bin:/usr/ucb; export PATH
+
+allowed=sandra\|rayan\|lamy		# tailor: local news admin (may be "")
+hdrspresent=no
+
+whoami=/tmp/in$$who		# just created to determine effective uid
+input=/tmp/in$$in		# uncensored input
+censart=/tmp/in$$cens		# censored input
+rmlist="$input $censart"
+egrep=egrep
+
+# figure out where the remote server is.  We mail even if we are on the
+# server, in order to garantee proper return addresses
+   servaddr=feednews@news-server.csri.toronto.edu
+
+umask 2
+trap '' 1 2 15			# ignore signals to avoid losing articles
+
+# "inews -p": invoke rnews
+case "$1" in
+-p)
+	shift
+	exec rnews $*		# rnews, bailing out at or near line 1
+	;;
+esac
+
+# parse arguments for options, cat headers onto $input; cat files onto $input
+>$input
+while :
+do
+	case $# in
+	0)	break ;;		# arguments exhausted
+	esac
+
+	case "$1" in
+	-debug)	shift; debug="$1" ;;		# peculiar to C news
+	-x)	shift; exclusion="-x $1" ;;	# you're welcome, erik (2.11)
+	-h)	hdrspresent=yes ;;
+	-M)	# TODO: what's this *really* do? dunno, find out
+		;;
+	-D)	# obsolete, undocumented: meant "don't check for recordings".
+		# last present in B 2.10.1, invoked by readnews for followups.
+		;;
+	-t)	shift; echo "Subject: $1" >>$input ;;
+	-n)	shift; echo "Newsgroups: $1" >>$input ;;
+	-e)	shift; echo "Expires: $1" >>$input ;;
+	-F)	# undocumented in B 2.10.1, documented in B 2.11.
+		shift; echo "References: $1" >>$input ;;
+	-d)	shift; echo "Distribution: $1" >>$input ;;
+	-a)	shift; echo "Approved: $1" >>$input ;;
+
+	# pass next options as environment variables to client.censor
+
+	-f)	shift; PASSEDFROM="$1" ;;	# complex due to Sender:
+	-o)	shift; ORGANIZATION="$1"; export ORGANIZATION ;;
+
+	-[cC])
+		# megakludge-o-rama
+		# first, permit only to super-users
+		>$whoami
+		whoever = "`ls -l $whoami | awk '{print $3}'`"
+		case $whoever in
+		root|$allowed)	: a winner ;;
+		*)
+			echo "$0: $1 restricted to super-users " >&2
+			exit 1
+			;;
+		esac
+		rm -f $whoami
+		case "$1" in
+		-C)	cat <<! >>$input		# generate -C header
+Newsgroups: $ng
+Subject: newgroup $2
+Control: newgroup $2
+Approved: $whoever@`hostname`.`domainname`
+
+created by inews -C
+!		 	
+			shift
+			;;
+		-c)	cat <<! >>$input		# generate -c header
+Newsgroups: $ng
+Subject: $2
+Control: $2
+Approved: $whoever@`hostname`.`domainname`
+
+created by inews -c.
+!
+			shift
+			;;
+		esac
+		;;
+	-*)
+		echo "$0: bad option $1" >&2
+		exit 1
+		;;
+	*)
+		case "$hdrspresent" in
+		no)	echo "" >>$input; hdrspresent=yes ;;
+		esac
+		cat "$1" >>$input		# is a filename; append file
+		fileseen=yes
+		;;
+	esac
+	shift		# pass option or filename (any value was done above)
+done
+
+# if no files named, read stdin
+case "$fileseen" in
+yes)	;;
+*)
+	case "$hdrspresent" in
+	no)	echo "" >>$input; hdrspresent=yes ;;
+	esac
+	# capture incoming news in case inews fails
+	if cat >>$input; then
+		: far out
+	else
+		echo "$0: lost news; cat returned status $?" >&2
+		exit 1
+	fi
+	;;
+esac
+
+(
+# trivial censoring, before passing on to mailer.
+ORGANIZATION=${ORGANIZATION=`cat ${NEWSCTL}/organi?ation`}
+awk "BEGIN		{ subject = 0; body = 0; skipping = 0 ;
+			  newsgroups = 0; distribution = 0; organization = 0;
+			  print \"To: $servaddr\" }
+body == 1		{ print; next }
+/[A-Za-z-]*:[ ]*$/	{ next }
+/^$|^[ ][ \t]*$/        { if (!body) {
+			    if (!organization) 
+			       print \"Organization: $ORGANIZATION\";
+			    if (!newsgroups) print \"Newsgroups: $groups\";
+			    if (!subject) print \"Subject: (none)\"; 
+			  }
+			  print; body = 1; next
+			}
+/^Organization:/	{ organization = 1; skipping = 0; print; next }
+/^Newsgroups:/		{ newsgroups = 1; skipping = 0; print; next }
+/^Distribution:/	{ distribution = 1; skipping = 0; print; next }
+/^Subject:/		{ subject = 1; skipping = 0; print; next }
+/^To:|^Cc:|^X-To:/	{ skipping = 1; next }
+/^From |^Return-Path:/	{ skipping = 1; next }
+/^Apparently-To:/	{ skipping = 1; next }
+/^[ 	]/		{ if (skipping) next }
+			{ print }
+" <$input >$censart
+if test -r $HOME/.signature; then
+   echo "-- " >>$censart
+   sed 5q $HOME/.signature >>$censart	# glue on first bit of signature
+fi
+
+if /usr/lib/sendmail -t ${PASSEDFROM+-f"$PASSEDFROM"} <$censart
+then
+	rm -f $rmlist		# far out, it worked
+	exit 0
+else
+	status=$?
+	echo\
+"$0: could not send article to server; sendmail returned status $status" >&2
+	echo "$0: processed news article can be found in $input" >&2
+	exit $status
+fi
+) &

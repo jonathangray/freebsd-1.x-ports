@@ -1,0 +1,236 @@
+.Ch "Troubleshooting C News"
+.Ix troubleshooting
+.Ix "read the documentation"
+.Ix "when in doubt, read the documentation"
+.SH
+Important First Step
+.PP 0
+Read the documentation.
+.PP
+\fIRead the documentation!\fR
+.PP
+\fBREAD THE DOCUMENTATION!!!\fR
+.PP
+Reading documentation is a bit tedious, and it seems sort of peripheral
+when there's a problem crying out to be solved,
+but news processing is relatively complex and effective troubleshooting
+requires that you understand what's going on.
+The investment of time is worthwhile.
+In particular...
+.PP
+If you are having trouble getting C News installed,
+or it seems to be malfunctioning,
+you should read
+``Known Porting Problems With C News''
+carefully.
+Don't assume that your problem is not the same as one mentioned there
+just because you're on machine ABC and the one mentioned is on machine XYZ;
+some problems arise from generic causes that can occur on many systems.
+.PP
+If the software seems to be installed properly and appears to know what
+it's doing, but isn't doing what you want, careful reading of the manual
+pages is in order.
+We recommend particular attention to \fInews\fR(5),
+.Ix news(5)
+which documents the
+format of most of the control files in considerable detail.
+.SH
+General Approach
+.PP
+In general,
+your first priority should be to establish
+precisely what is going wrong and where.
+Read the documentation on how data flows within
+C News
+and how it interfaces
+to the rest of the system,
+and track down exactly where trouble is striking.
+If the software is sort of working but isn't doing things right,
+inspection of the \fIlog\fR and \fIerrlog\fR files in NEWSCTL often reveals
+what it thinks it's doing.
+.SH
+Frequently Reported Problems
+.Ix "common problems"
+.Ix problems common
+.PP
+.Ix problems "broken 386 optimiser"
+\fIIt all seems to work,
+but it's very slow and the \fRhistory.pag\fI file
+is enormous,
+many megabytes,
+much larger than the \fRhistory\fI file.
+By the way,
+this is on a 386.\fR
+See ``Known Porting Problems With C News'',
+specifically the section titled ``386 Optimizer vs. dbz''.
+(Note:
+at a site with a relatively small feed,
+it is normal for the
+\fIhistory.pag\fR file to be about half a megabyte for the first ten
+days,
+until \fIdbz\fR feels it has enough usage history to safely
+shrink the file.)
+.PP
+.Ix problems "local articles not forwarded"
+\fIIt works fine but the articles I post don't get sent to my neighbors.\fR
+This is probably a mistake in your \fIsys\fR file.
+.Ix sys
+.Ix files sys
+See \fInews\fR(5) and the sample \fIsys\fR file in the \fIconf\fR directory.
+Note in particular that an article is not sent to a site unless \fIboth\fR
+its newsgroup(s) \fIand\fR its distribution match those specified in the
+\fIsys\fR line, and the \fIsys\fR-line distribution does \fInot\fR default
+to ``all''.
+The single commonest change needed to old \fIsys\fR files is to put
+``/all'' on the ends of the newsgroup lists to specify transmission of
+all distributions.
+.PP
+.Ix problems "renouncing setuid"
+\fIIt works fine for incoming news,
+but whenever I try to post an article
+myself I get a complaint about ``renouncing setuid''.\fR
+There are two places in C News where the pathnames of things like the
+control-file directory are known.
+One is the ``config'' file,
+.Ix config
+typically \fI/usr/lib/news/bin/config\fR.
+The other is compiled into some of the programs.
+You \fIcannot\fR change one without also changing the other;
+this means that you basically cannot change either without rebuilding
+the software.
+The ``renouncing setuid'' message means that the two are inconsistent.
+Do not try to edit the config file without rebuilding the software;
+that doesn't work.
+.PP
+.Ix problems "articles filed in odd places"
+.Ix problems "articles propagated to odd sites"
+\fII'm seeing articles filed in surprising places and/or propagated
+(not propagated) to sites that I thought shouldn't (should) get them.\fR
+The interaction of various policies in this area is \fInot\fR simple.
+It is almost certain that the software is doing what you told it to do.
+Close and careful reading of the \fInews\fR(5) and \fIrelaynews\fR(8)
+.Ix news(5)
+.Ix relaynews
+manual pages will probably clear up the difference between what you
+told it to do and what you \fIthought\fR you told it to do.
+.PP
+.Ix problems "stdio mismatch"
+\fII had trouble compiling your \fRstdio\fI speedups, and/or they
+failed the compatibility test, but I used them anyway, and now I'm
+having bizarre problems.\fR
+If the speedups don't compile smoothly
+or failed the compatibility test, \fIDON'T USE THEM!\fR
+In this area,
+being ``a little bit broken'' is like being a little bit pregnant.
+As \fIbuild\fR told you, there are systems where the speedups do
+not work.
+.PP
+.Ix problems "compiling libc/datetok.c with ANSI compiler"
+\fII'm having trouble compiling \fRlibc/datetok.c\fI with my ANSI
+C compiler.\fR
+We don't have ANSI C compilers handy for our own
+use, and there are a few troublesome areas where older compilers
+make difficulties and encourage errors.
+Until this particular bug
+gets fixed,
+a workaround is to move the definitions of \fIdatetktbl\fR
+and \fIszdatetktbl\fR up to the beginning of the file,
+and delete
+the erroneous \fIextern\fR declarations.
+.PP
+.Ix problems "articles looping between me and a neighbour"
+\fII get a news feed from my neighbor,
+and it arrives fine,
+but my system
+sends him not just the things I post locally,
+but also everything I get
+from him.\fR
+.Ix Path:
+.Ix sys
+.Ix files sys
+.Ix whoami
+.Ix files whoami
+News-loop prevention is based on the \fBPath\fR header lines.
+The name your neighbor is known by in your \fIsys\fR file does not match
+the one he's inserting into \fBPath\fR,
+so your news system thinks
+he hasn't seen those articles yet.
+A common cause of this is that he's putting a full domain name in \fBPath\fR
+and you're using a short version in your \fIsys\fR file,
+or vice versa.
+The best fix is to agree on names.
+A workaround,
+often useful,
+is to alter the \fIsys\fR line to use the
+exclusion feature.
+Say he's putting ``abc.def.ghi'' in his Paths and your
+sys file knows him only as ``abc''.
+If there is some reason why you can't
+just agree on the name,
+start the \fIsys\fR line with
+``abc/abc.def.ghi:'' rather than just ``abc:'',
+to tell the news system ``send
+abc only things that have not passed through abc.def.ghi''.
+.PP
+.Ix problems "article tree on multiple filesystems"
+\fIWill C News work if my article tree is spread over more than one
+filesystem?\fR
+Yes,
+if your system supports symbolic links.
+Some tweaking is necessary:
+you will have to give \fIdoexpire\fR the \fB\-l\fR flag so it knows about
+the situation,
+and you will need to alter \fIspacefor\fR to check
+space on more than one filesystem.
+There is also a problem,
+currently,
+in that the \fIfind\fR command used
+by \fImkhistory\fR and \fIaddmissing\fR will not follow symbolic links;
+a fix for this is coming.
+.PP
+.Ix problems "want to ignore newgroup messages"
+\fIHow do I configure C News so that it will not automatically create any
+newsgroups just because some yo-yo on the net sends out a \fRnewgroup\fI
+message?\fR
+This is not provided as a configuration option at present.
+Most control messages are handled by shell files in NEWSBIN/\fIctl\fR,
+and those can be edited to implement any local policies desired.
+.PP
+.Ix problems "relaynews complains, history errors (File too large)"
+.Ix Unix "System V"
+.Ix "System V" breakage
+\fIIt ran fine for a while, but now \fRrelaynews\fI is complaining that
+it's unable to write the history file, saying ``(File too large)''.\fR
+This means you're on a System V or related system that implements the
+stupid \fIulimit\fR feature,
+limiting the size of files,
+and the
+\fIulimit\fR is too low.
+Note that while some sensible suppliers have their \fIlogin\fR raise the
+limit to a very high value,
+most of them seem to have forgotten to do
+the same for \fIcron\fR... and much of C News is run from \fIcron\fR.
+.Ix cron
+.PP
+.Ix problems "mail telling me to delete groups"
+.Ix checkgroups
+.Ix "control messages" checkgroups
+\fII occasionally get a mail message saying a whole bunch of groups are
+invalid and I should delete them.
+What's going on?\fR
+This is the result of a \fIcheckgroups\fR control message being received.
+There is no clear specification for the contents of such a message,
+and the C News \fIcheckgroups\fR code is known to be buggy.
+This will be fixed eventually.
+For now,
+ignore the mail.
+.PP
+.Ix problems "newsdaily says I'm sending bad headers"
+\fIThe daily status reports from \fRnewsdaily\fI mention my own site
+as one sending bad headers!
+What's going on?\fR
+This is a bug in the logging code:
+when it wants to generate a log message for some condition that has no
+site name associated, it uses your own rather than something like
+`<no_name>'.
+This will be fixed eventually.

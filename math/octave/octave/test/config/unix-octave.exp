@@ -1,0 +1,86 @@
+#   Copyright (C) 1993 John W. Eaton
+
+# John W. Eaton
+# jwe@che.utexas.edu
+# Department of Chemical Engineering
+# The University of Texas at Austin
+
+#
+# octave support library routines
+#
+
+#
+# default_octave_version -- extract and print the version number of octave
+#
+proc default_octave_version { } {
+    global OCTAVE
+
+    set tmp [exec $OCTAVE -v]
+    regexp "version *\[0-9\].\[0-9\]*" $tmp version
+    clone_output "[which $OCTAVE] $version\n"
+    unset tmp
+    unset version
+}
+
+#
+# default_octave_start -- interpret a program using octave
+#
+proc default_octave_start { prog } {
+    global verbose
+    global comp_output
+    global OCTAVE
+    global OCTAVE_PATH
+
+    send_log "$OCTAVE -q $prog\n"
+    if $verbose>1 then {
+	send_user "Spawning \"$OCTAVE $prog\"\n"
+    }
+
+    catch "exec $OCTAVE -q -p $OCTAVE_PATH $prog" comp_output
+    if ![string match "" $comp_output] then {
+	send_log "$comp_output\n"
+	if $verbose>1 then {
+	    send_user "$comp_output\n"
+	}
+    }
+}
+
+#
+# octave_version -- extract and print the version number of octave
+#
+proc octave_version { } {
+    default_octave_version
+}
+
+#
+# octave_load -- loads the program. For octave, we just execute it
+#
+proc octave_load { args } {
+    global verbose
+    global exec_output
+
+    if ![file exists $args] then {
+	error "$args does not exist."
+	return -1
+    }
+
+    set status [catch "exec $args" exec_output]
+    if $verbose>1 then {
+	send_user "Executed $args\n"
+    }
+    return $status
+}
+
+#
+# octave_exit -- just a stub for octave
+#
+proc octave_exit { } {
+    send_user "bye-bye.\n"
+}
+
+#
+# octave_start -- interpret source file
+#
+proc octave_start { prog } {
+    default_octave_start $prog
+}

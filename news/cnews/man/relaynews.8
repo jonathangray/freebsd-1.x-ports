@@ -1,0 +1,406 @@
+.\" =()<.ds a @<NEWSARTS>@>()=
+.ds a /usr/spool/news
+.\" =()<.ds b @<NEWSBIN>@>()=
+.ds b /usr/lib/newsbin
+.\" =()<.ds c @<NEWSCTL>@>()=
+.ds c /usr/lib/news
+.\" =()<.ds m @<NEWSMASTER>@>()=
+.ds m usenet
+.TH RELAYNEWS 8 "17 March 1992"
+.BY "C News"
+.SH NAME
+relaynews \- store and forward netnews articles
+.SH SYNOPSIS
+.B \*b/relay/relaynews
+[
+.B \-ginrsu
+]
+[
+.B \-a
+dupsite
+]
+[
+.B \-b
+xrefsite
+]
+[
+.B \-d
+.B fhlmt
+]
+[
+.B \-o
+days
+]
+[
+.B \-x
+excluded-site
+]
+.SH DESCRIPTION
+.I Relaynews
+installs locally
+and
+broadcasts (network) news articles
+read from its standard input.
+Typically the articles will be in a batch
+(see
+.IR news (5)),
+which must
+.I not
+be compressed
+(see
+.IR compress (1)).
+Articles are usually
+queued for transmission to one's netnews neighbours via
+.IR newsbatch (8)
+and thence via
+.IR uux (1)
+or
+.IR mail (1).
+.PP
+.B \-d
+turns on debugging of
+.BR f iling,
+.BR h eaders,
+.BR l ocking,
+.BR m atching,
+.BR t ransmission.
+.B \-r
+redirects stdout and stderr to
+.B \*c/log
+and
+.BR \*c/errlog .
+.B \-i
+redirects stdout only to
+.BR \*c/log .
+.B \-n
+enables ``NNTP mode''
+in which history entries are generated as articles are rejected.
+.B \-s
+makes discarding an article a serious matter,
+justifying a non-zero exit status (for the benefit of
+.IR inews ).
+.B \-u
+unlinks
+(removes)
+any filename arguments after successful processing
+and
+if the filenames contain no slashes
+and if
+.I relaynews
+was invoked in
+.BR \*a/in.coming .
+.B \-o
+causes articles with dates
+(in
+.B Date:
+headers)
+more than
+.I days
+old to be dropped
+(usually to stop accidentally-retransmitted old articles).
+.B \-x
+excludes
+.I excluded-site
+from the list of netnews neighbours to receive article(s).
+.PP
+.B \-g
+causes
+.I relaynews
+to always generate an
+.B Xref:
+header per article;
+.B \-b
+causes
+.I relaynews
+to
+not update
+.I active
+and
+file articles
+received directly from
+.I xrefsite
+under the groups and article numbers
+found in incoming
+.B Xref:
+headers.
+These two options provide the basis for a news
+mirroring facility.
+.B \-a
+similarly causes
+.I active
+to not be updated
+and
+duplicate articles
+received directly from
+.I dupsite
+to be accepted,
+but filed under the filenames found in their
+existing
+.I history
+entries.
+It may be used to recover a news spool,
+given recent
+.I active
+and
+.I history
+files.
+.PP
+.IR "Control messages" ,
+recognised by their
+.B Control:
+headers
+(or
+.I "for backward compatibility ONLY"
+a
+.B Newsgroups:
+header containing a single newsgroup ending in
+.BR .ctl ),
+are filed under the
+.B control
+pseudo-group only,
+but are forwarded as usual,
+by examining their
+.B Newsgroups:
+and
+.B Distribution:
+headers.
+Note that posting to the
+.B control
+pseudo-group
+will not cause a message to be treated as a control message;
+.B control
+is not a real newsgroup.
+.PP
+An article which contains an
+.B Also-Control:
+header is treated normally
+except that the contents of the header
+are executed as if they were the contents of a
+.B Control:
+header.
+Such an article is a form of
+.I "hybrid message"
+since it functions as an ordinary article
+yet also causes control functions to be executed.
+The
+.B Supersedes:
+header is a special case
+and is rewritten internally
+.I only
+to
+.BR "Also-Control: cancel" .
+.PP
+Articles which contain no locally-known
+(to the
+.I active
+file)
+newsgroups
+yet accepted by the local subscription list
+are filed exactly once,
+in the
+.B junk
+pseudo-group,
+and forwarded as usual.
+If all newsgroups in the article are refused by
+the local subscription list
+or
+are refused by an
+.B x
+in
+.I active
+file entries,
+then the article will be
+.I discarded
+and not filed in
+.BR junk .
+.PP
+Locally-generated articles
+need not be permitted by the local subscription list
+but are otherwise processed normally;
+this is for backward compatibility
+and perhaps to keep the local subscription list short
+by not requiring
+.B general
+and the like to be named.
+.SH EXAMPLES
+.B "cd \*a/in.coming; relaynews \-nru \-o 7 nntp.*"
+.in +0.5i
+File and forward articles in batches that arrived by NNTP,
+and remove each batch upon successfully processing it.
+Discard any articles more than a week old.
+.in -0.5i
+.SH FILES
+.PD 0
+.TP 2i
+.B \*a
+netnews article tree
+.TP
+.B \*a/comp/unix/wizards
+example newsgroup directory
+(for
+.BR comp.unix.wizards );
+such directories and their ancestor directories will be
+created automatically as needed
+.TP
+.B \*a/comp/unix/wizards/12564
+example article file name
+.TP
+.BI \*a/out.going/ system /togo
+default
+.B sys
+file
+.BR F ,
+.B f
+and
+.B I
+flags batch file name
+(N.B.:
+.BI \*a/out.going/ system
+will
+.I not
+be automatically created as needed)
+.TP
+.B \*c/sys
+determines who receives broadcast netnews articles,
+which ones,
+and
+how they are to be sent articles
+.TP
+.B \*c/active
+contains locally-legal newsgroups and (un)moderated flag
+.TP
+.B \*c/history
+record of articles received
+and mapping of message-ids to file names
+.TP
+.B \*c/history.{dir,pag}
+.IR dbm (3)
+index into
+.B history
+by message-ids
+.TP
+.B \*c/whoami
+if present,
+contains news system's site name,
+overriding any other host names
+.TP
+.B \*c/log
+log of incoming articles
+.TP
+.B \*c/errlog
+log of errors, should be empty
+.TP
+.B \*c/bin
+system-specific directory of programs to
+override
+.B \*b
+and its subdirectories
+.TP
+.B \*b/ctl
+directory of programs to implement control messages
+.TP
+.B \*b/relay/relaynews
+the lean, mean news-relayin' machine
+.TP
+.B \*b/newsreply
+generates a return address from article headers
+.PD
+.SH "SEE ALSO"
+.IR compress (1),
+.IR mail (1),
+.IR uux (1),
+.IR dbm (3),
+.IR news (5),
+.IR newsbatch (8)
+.br
+ARPA Internet RFCs 1036 and 850
+.SH DIAGNOSTICS
+Usually found in
+.BR \*c/errlog .
+.br
+.IR Relaynews 's
+exit status is a bit vector of status bits;
+see
+.B news/include/news.h
+for the bit definitions.
+.br
+If
+.I relaynews
+cannot establish safe
+standard file descriptors
+and
+standardise its environment
+(notably PATH,
+SHELL
+and IFS),
+probably due to failure of
+.IR malloc (3),
+it will exit with status of 1
+and without writing any complaints on standard error
+(\c
+.BR errlog ),
+as a security precaution.
+.SH HISTORY
+Written by Geoff Collyer
+at the University of Toronto
+as part of the C news project.
+.SH BUGS
+An article with a header that does not fit entirely in a
+static buffer
+and on a machine without real links
+(e.g. something like Eunice but on a PDP-11)
+will be filed incorrectly:
+any symbolic links under
+.B \*a
+will point at a non-existent filename.
+.PP
+A control message which cannot be filed in the
+.B control
+pseudo-group
+and
+which cannot be filed in the
+.B junk
+pseudo-group because
+.B junk
+is not in the
+.I active
+file will generate an error message
+which refers to the groups in its
+.B Newsgroups:
+header instead of referring to the
+.B control
+pseudo-group.
+.PP
+.I Relaynews
+could run faster in some circumstances
+and would be simpler
+if
+.B Control:
+were required to be the first header,
+if present,
+and if
+.B Newsgroups:
+were required to be the next.
+.PP
+The whole control message and hybrid message situation
+is a festering bug.
+Either control messages should be eliminated,
+or all forms of backward compatibility should be dropped
+(including
+.B Control:
+and
+.BR Supersedes: )
+and only
+.B Also-Control:
+should be supported.
+.PP
+Use of the
+.B =
+.I active
+file flag
+can result in a cross-posted article being filed multiple times
+in the same group,
+though with the
+.B Xref:
+header set appropriately so that newsreaders should
+suppress showing the redundant links.

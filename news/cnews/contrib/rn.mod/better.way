@@ -1,0 +1,483 @@
+Date:  9 Jun 1989 1852-EDT (Friday)
+From: csri.toronto.edu!moraes
+Received: by neat.ai.toronto.edu id 11723; Fri, 9 Jun 89 18:52:43 EDT
+Reply-To: moraes@csri.toronto.edu
+X-Mailer: Mail User's Shell (6.3 6/25/88)
+To:	henry@utzoo, geoff@utstat.toronto.edu
+Subject: rn fixes
+Cc:	moraes@csri.toronto.edu
+Message-Id: <89Jun9.185243edt.11723@neat.ai.toronto.edu>
+
+These are the rn fixes to make it use the new active.times file to
+stop the startup problems when new newsgroups are created.
+
+It seems fast, and reliable - also completely backward compatible, as
+far as I can tell. Note that a new newsreader will now not be asked
+about all the newsgroups - they can pick the ones they want later.
+
+	- moraes
+
+# To unbundle, sh this file
+echo README.rn 1>&2
+sed 's/^-//' >README.rn <<'!'
+The rn.mod file is a set of speedups for rn, which make use of a new file
+which C news can generate, called $NEWSCTL/active.times. This file contains
+the creation times of the newsgroups, and solves the problem of rn stat'ing
+every newsgroup spool directory to figure out if it is a new newsgroup or
+not.
+
+The changes to addng.c prevent rn stating all ~700 directories under
+-/usr/spool/news every time the active file changes (this is known as "the rn
+huddle").  This reduced start up time after touching active from 108 seconds
+elapsed on a Sun 3 to 5 seconds.
+
+The theory behind the 700 stats in the newgroup huddle is apparently that if
+rn stats group/1, and it exists, then group must be a newly-created group.
+With rapid expiry, group/1 won't be around for long in most groups, causing
+rn to miss some new groups, and in "valuable" groups with long expiry times,
+group/1 will be around for a very long time, making rn spuriously think that
+the old groups are new.
+
+To get this to work - apply the diffs to rn. You may need some hand patching
+-- our version of rn has been hacked to apply various local fixes and some U
+of Waterloo fixes. (The base U of Waterloo rn contains two other handy
+changes:  a -q which disables the interrogation when the active file
+changes, and a third answer during the interrogation: "q" means "I don't
+care, just show me some news, right now".)
+
+The main changes are to addng.c, and init.c, to use the new procedure
+checknewgroups() for detecting new groups, instead of the earlier heuristic.
+
+Create a active.times file from your active file using the act.to.times
+script in the C News distribution. (C News 'newgroup' will keep it uptodate)
+
+Try it.
+!
+echo rn.mod 1>&2
+sed 's/^-//' >rn.mod <<'!'
+-*** /tmp/,RCSt1a11034	Fri Jun  9 18:36:21 1989
+---- addng.c	Fri Jun  9 18:33:55 1989
+-***************
+-*** 39,44 ****
+---- 39,50 ----
+-  
+-  #ifdef FINDNEWNG
+-  /* generate a list of new newsgroups from active file */
+-+ /*
+-+  * The arguments are redundant - they used to be used in a heuristic to
+-+  * determine new newsgroups. With C News active.times file, this is
+-+  * unnecessary, since we use the faster, more reliable checknewgroups()
+-+  * procedure.
+-+  */
+-  
+-  bool
+-  newlist(munged,checkinlist)
+-***************
+-*** 71,86 ****
+-  		fprintf(tmpfp,"%s\n",buf);
+-  					/* then remember said newsgroup */
+-  	    }
+-- #ifdef FASTNEW
+-- 	    else {			/* not really a new group */
+-- 		if (!munged) {		/* did we assume not munged? */
+-- 		    fclose(tmpfp);	/* then go back, knowing that */
+-- 		    UNLINK(tmpname);
+-- 		    free(tmpname);
+-- 		    return TRUE;	/* active file was indeed munged */
+-- 		}
+-- 	    }
+-- #endif
+-  	}
+-  #ifdef DEBUGGING
+-  	else
+---- 77,82 ----
+-***************
+-*** 106,127 ****
+-      return FALSE;			/* do not call us again */
+-  }
+-  
+-! /* return creation time of newsgroup */
+-  
+-  long
+-  birthof(ngnam,ngsize)
+-  char *ngnam;
+-  ART_NUM ngsize;
+-  {
+--     long time();
+-- 
+--     /*
+--      * This used to try and stat article 1 to find the newsgroup creating
+--      * time. Almost never finds article 1, since it will always long gone.
+--      * Nuke the stat() and speed up startup immensely.
+--      */
+--     /* not there, assume something good */
+--     return (ngsize ? 0L : time(Null(long *)));
+-  }
+-  
+-  bool
+---- 102,229 ----
+-      return FALSE;			/* do not call us again */
+-  }
+-  
+-! /*
+-!  * gets the group time, from the second field, simultaneously null terminating
+-!  * after the first field in buf.
+-!  */
+-! static long
+-! getgrptime(buf)
+-! char *buf;
+-! {
+-! 	char *s;
+-! 	
+-! 	s = index(buf, ' ');
+-! 	if (s == Nullch || *(s+1) == '\0')
+-! 		return 0L;
+-! 	*s++ = '\0';
+-! 	return(atol(s));
+-! }
+-  
+-+ /*
+-+  * Use the groups file (ACTIVE.times, typically /usr/lib/news/active.times) to
+-+  * see if there are any new newsgroups
+-+  */
+-+ checknewgroups()
+-+ {
+-+     FILE *fp;
+-+     long grptime;
+-+     long ngrptime;
+-+     long pos;
+-+     long npos;
+-+     char *s;
+-+     char *grpfile;
+-+     char tmpbuf[LBUFLEN];
+-+ #define GROUPEXT ".times"
+-+ 
+-+     grpfile = safemalloc(strlen(filexp(ACTIVE)) + sizeof(GROUPEXT));
+-+     strcpy(grpfile, filexp(ACTIVE));
+-+     strcat(grpfile, GROUPEXT);
+-+     
+-+     fp = fopen(grpfile, "r");
+-+     if (fp == (FILE *) NULL) {
+-+ 	printf(cantopen, grpfile) FLUSH;
+-+     	return;
+-+     }
+-+ 
+-+     pos = npos = lastpos;
+-+     grptime = lastgrptime;
+-+     if (lastnewgroup != Nullch)
+-+ 	strcpy(tmpbuf, lastnewgroup);
+-+     /*
+-+      * In the general case, this 'if()' will be false, unless someone has
+-+      * messed up the groups file, or this is the first time this person is
+-+      * reading news
+-+      */
+-+     if (lastnewgroup == Nullch || fseek(fp, lastpos, 0) == -1 ||
+-+         fgets(buf, LBUFLEN, fp) == NULL ||
+-+ 	!strnEQ(buf, lastnewgroup, strlen(lastnewgroup))) {
+-+ 		/* We need to check the file from the start - use time */
+-+ 		if (fseek(fp, 0L, 0) == -1) {
+-+ 			printf(cantseek, grpfile) FLUSH;
+-+ 			fclose(fp);
+-+ 			free(grpfile);
+-+ 			return;
+-+ 		}
+-+ 		pos = npos = 0L;
+-+ 		while (fgets(buf, LBUFLEN, fp) != Nullch) {
+-+ 			buf[strlen(buf)-1] = '\0';
+-+ 			ngrptime = getgrptime(buf);
+-+ 			if (ngrptime > lastgrptime)
+-+ 				break;
+-+ 			if (ngrptime == 0L)
+-+ 				continue;
+-+ 			grptime = ngrptime;
+-+ 			strcpy(tmpbuf, buf);
+-+ 			pos = npos;
+-+ 			npos = ftell(fp);
+-+ 		}
+-+ 		if (fseek(fp, pos, 0) == -1) {
+-+ 			printf(cantseek, grpfile) FLUSH;
+-+ 			fclose(fp);
+-+ 			free(grpfile);
+-+ 			return;
+-+ 		}
+-+ 		npos = pos;
+-+     }
+-+     /*
+-+      * At this point, the file pointer is positioned at the start of the first
+-+      * new group. This is the value of pos. Now start asking about new groups.
+-+      */
+-+     while (fgets(buf, LBUFLEN, fp) != Nullch) {
+-+ 	buf[strlen(buf)-1] = '\0';
+-+ 	ngrptime = getgrptime(buf);
+-+ 	if (ngrptime == 0L)
+-+ 		continue;
+-+ 	grptime = ngrptime;
+-+ 	strcpy(tmpbuf, buf);
+-+ 	pos = npos;
+-+ 	if (grptime > lastgrptime && find_ng(buf) == nextrcline)
+-+ 		/* not in .newsrc and newer that last new newsgroup */
+-+ 		get_ng(buf, TRUE);
+-+ 	npos = ftell(fp);
+-+     }
+-+     lastpos = pos;
+-+     lastgrptime = grptime;
+-+     if (lastnewgroup != Nullch)
+-+     	free(lastnewgroup);
+-+     lastnewgroup = savestr(tmpbuf);
+-+     fclose(fp);
+-+     free(grpfile);
+-+ }
+-+ 
+-+ 	
+-+ 
+-+ /*
+-+  * return creation time of newsgroup - procedure made redundant by C News
+-+  * active.times and checknewgroups()
+-+  */
+-+ 
+-+ /*ARGSUSED*/
+-  long
+-  birthof(ngnam,ngsize)
+-  char *ngnam;
+-  ART_NUM ngsize;
+-  {
+-  }
+-  
+-  bool
+-*** /tmp/,RCSt1a11034	Fri Jun  9 18:36:24 1989
+---- common.h	Fri Jun  9 18:30:10 1989
+-***************
+-*** 1,9 ****
+-! /* $Header: /a/cvs/386BSD/ports/news/cnews/contrib/rn.mod/better.way,v 1.1 1993/08/27 02:46:50 alm Exp $
+-   * 
+-   * $Log: better.way,v $
+-   * Revision 1.1  1993/08/27 02:46:50  alm
+-   * Initial revision
+-   *
+--  * Revision 4.6  89/06/09  18:29:44  moraes
+--  * *** empty log message ***
+--  * 
+-   * Revision 4.5  89/06/05  21:59:37  moraes
+-   * enabled -q option permanantly. New speed mods make it unnecessary for
+-   * most people, but some people just want to see general/gradnews/ut.*
+---- 1,6 ----
+-! /* $Header: /a/cvs/386BSD/ports/news/cnews/contrib/rn.mod/better.way,v 1.1 1993/08/27 02:46:50 alm Exp $
+-   * 
+-   * $Log: better.way,v $
+-   * Revision 1.1  1993/08/27 02:46:50  alm
+-   * Initial revision
+-   *
+-   * Revision 4.5  89/06/05  21:59:37  moraes
+-   * enabled -q option permanantly. New speed mods make it unnecessary for
+-   * most people, but some people just want to see general/gradnews/ut.*
+-***************
+-*** 292,299 ****
+-  			/* (Note: both VERBOSE and TERSE can be defined; -t
+-  			 * sets terse mode.  One or the other MUST be defined.
+-  			 */
+-- #define QUICK		/* -q option - Don't ask about new newsgroups */
+-- 
+-  #ifndef pdp11
+-  #   define CACHESUBJ	/* cache subject lines in memory */
+-  			/* without this ^N still works but runs really slow */
+---- 289,294 ----
+-*** /tmp/,RCSt1a11034	Fri Jun  9 18:36:25 1989
+---- init.c	Fri Jun  9 18:30:10 1989
+-***************
+-*** 1,4 ****
+-! /* $Header: /a/cvs/386BSD/ports/news/cnews/contrib/rn.mod/better.way,v 1.1 1993/08/27 02:46:50 alm Exp $
+-   *
+-   * $Log: better.way,v $
+-   * Revision 1.1  1993/08/27 02:46:50  alm
+-   * Initial revision
+-   *
+-   * Revision 1.2  88/07/14  18:15:22  ken
+---- 1,4 ----
+-! /* $Header: /a/cvs/386BSD/ports/news/cnews/contrib/rn.mod/better.way,v 1.1 1993/08/27 02:46:50 alm Exp $
+-   *
+-   * $Log: better.way,v $
+-   * Revision 1.1  1993/08/27 02:46:50  alm
+-   * Initial revision
+-   *
+-   * Revision 1.2  88/07/14  18:15:22  ken
+-***************
+-*** 166,185 ****
+-  
+-  #ifdef FINDNEWNG
+-      fstat(actfp->_file,&filestat);	/* did active file grow? */
+-- #ifdef QUICK
+-      /* maintain the old active file size, to avoid "new newsgroup" blather */
+-      if (quick)
+-  	filestat.st_size = lastactsiz;
+-- #endif
+-      if (filestat.st_size != lastactsiz) {
+-  	long actsiz = filestat.st_size;	/* remember new size */
+-  	NG_NUM oldnext = nextrcline;	/* remember # lines in newsrc */
+-- #ifdef FASTNEW
+-- 	bool munged = writesoft || !lastactsiz;
+-- 					/* bad soft ptrs -> edited active */
+-- #else
+-- 	bool munged = TRUE;		/* just assume .newsrc munged */
+-- #endif
+-  
+-  #ifdef VERBOSE
+-  	IF(verbose)
+---- 166,177 ----
+-***************
+-*** 190,208 ****
+-  #ifdef TERSE
+-  	    fputs("\nNew newsgroups:\n",stdout) FLUSH;
+-  #endif
+-! #ifdef FASTNEW
+-! 	if (!munged) {			/* maybe just do tail of file? */
+-! 	    fseek(actfp,lastactsiz-1,0);
+-! 	    fgets(buf,LBUFLEN,actfp);
+-! 	    munged = (*buf != '\n');
+-! 	    if (!munged)
+-! 		munged = newlist(munged,FALSE);
+-! 	}
+-! #endif
+-! 	if (munged) {			/* must we scan entire file? */
+-! 	    fseek(actfp,0L,0);		/* rewind active file */
+-! 	    newlist(munged,FALSE);      /* sure hope they use hashing... */
+-! 	}
+-  	lastactsiz = actsiz;		/* remember for .rnlast */
+-  	if (nextrcline != oldnext) {	/* did we add any new groups? */
+-  	    foundany = TRUE;		/* let main() know */
+---- 182,188 ----
+-  #ifdef TERSE
+-  	    fputs("\nNew newsgroups:\n",stdout) FLUSH;
+-  #endif
+-! 	checknewgroups();
+-  	lastactsiz = actsiz;		/* remember for .rnlast */
+-  	if (nextrcline != oldnext) {	/* did we add any new groups? */
+-  	    foundany = TRUE;		/* let main() know */
+-*** /tmp/,RCSt1a11034	Fri Jun  9 18:36:26 1989
+---- last.c	Fri Jun  9 17:06:01 1989
+-***************
+-*** 1,9 ****
+-! /* $Header: /a/cvs/386BSD/ports/news/cnews/contrib/rn.mod/better.way,v 1.1 1993/08/27 02:46:50 alm Exp $
+-   *
+-   * $Log: better.way,v $
+-   * Revision 1.1  1993/08/27 02:46:50  alm
+-   * Initial revision
+-   *
+--  * Revision 1.1  89/06/09  03:52:49  moraes
+--  * Initial revision
+--  * 
+-   * Revision 4.3  85/05/01  11:42:16  lwall
+-   * Baseline for release with 4.3bsd.
+-   * 
+---- 1,6 ----
+-! /* $Header: /a/cvs/386BSD/ports/news/cnews/contrib/rn.mod/better.way,v 1.1 1993/08/27 02:46:50 alm Exp $
+-   *
+-   * $Log: better.way,v $
+-   * Revision 1.1  1993/08/27 02:46:50  alm
+-   * Initial revision
+-   *
+-   * Revision 4.3  85/05/01  11:42:16  lwall
+-   * Baseline for release with 4.3bsd.
+-   * 
+-***************
+-*** 26,37 ****
+-      lastname = savestr(filexp(LASTNAME));
+-      if ((tmpfp = fopen(lastname,"r")) != Nullfp) {
+-  	fgets(tcbuf,1024,tmpfp);
+-! 	tcbuf[strlen(tcbuf)-1] = '\0';
+-  	lastngname = savestr(tcbuf);
+-  	fgets(tcbuf,1024,tmpfp);
+-  	lasttime = atol(tcbuf);
+-  	fgets(tcbuf,1024,tmpfp);
+-  	lastactsiz = atol(tcbuf);
+-  	fclose(tmpfp);
+-      }
+-      else {
+---- 23,52 ----
+-      lastname = savestr(filexp(LASTNAME));
+-      if ((tmpfp = fopen(lastname,"r")) != Nullfp) {
+-  	fgets(tcbuf,1024,tmpfp);
+-! 	tcbuf[strlen(tcbuf) - 1] = '\0';
+-  	lastngname = savestr(tcbuf);
+-  	fgets(tcbuf,1024,tmpfp);
+-  	lasttime = atol(tcbuf);
+-  	fgets(tcbuf,1024,tmpfp);
+-  	lastactsiz = atol(tcbuf);
+-+ 	/*
+-+ 	 * The first time when new rn is used by a user who was using the old
+-+ 	 * rn, the lastgrptime is taken to be 'now', so the user is not
+-+ 	 * hassled with hundreds of newsgroups
+-+ 	 */
+-+ 	if (fgets(tcbuf, 1024,tmpfp) != (char *) NULL)
+-+ 		lastgrptime = atol(tcbuf);
+-+ 	else 
+-+ 		lastgrptime = time(0);
+-+ 	if (fgets(tcbuf, 1024, tmpfp) != (char *) NULL) {
+-+ 		tcbuf[strlen(tcbuf) - 1] = '\0';
+-+ 		lastnewgroup = savestr(tcbuf);
+-+ 	} else
+-+ 		lastnewgroup = NULL;
+-+ 	if (fgets(tcbuf, 1024, tmpfp) != (char *) NULL)
+-+ 		lastpos = atol(tcbuf);
+-+ 	else
+-+ 		lastpos = 0;
+-  	fclose(tmpfp);
+-      }
+-      else {
+-***************
+-*** 38,43 ****
+---- 53,67 ----
+-  	lastngname = nullstr;
+-  	lasttime = 0;
+-  	lastactsiz = 0;
+-+ 	/*
+-+ 	 * The default for the new reader is not to show hundreds of new
+-+ 	 * newsgroups. The system admin should use newsetup to provide a
+-+ 	 * proper starting subset - the user can select new newsgroups by
+-+ 	 * hand. Much faster
+-+ 	 */
+-+ 	lastgrptime = time(0);
+-+ 	lastnewgroup = Nullch;
+-+ 	lastpos = 0;
+-      }
+-  }
+-  
+-***************
+-*** 47,54 ****
+-  writelast()
+-  {
+-      if ((tmpfp = fopen(lastname,"w")) != Nullfp) {
+-! 	fprintf(tmpfp,"%s\n%ld\n%ld\n",
+-! 	    (ngname==Nullch?nullstr:ngname),(long)lasttime,(long)lastactsiz);
+-  	fclose(tmpfp);
+-      }
+-      else
+---- 71,81 ----
+-  writelast()
+-  {
+-      if ((tmpfp = fopen(lastname,"w")) != Nullfp) {
+-! 	fprintf(tmpfp,"%s\n%ld\n%ld\n%ld\n%s\n%ld\n",
+-! 	    (ngname==Nullch?nullstr:ngname),(long)lasttime,(long)lastactsiz,
+-! 	    lastgrptime, 
+-! 	    ((lastnewgroup == (char *) NULL) ? nullstr:lastnewgroup),
+-! 	    lastpos);
+-  	fclose(tmpfp);
+-      }
+-      else
+-*** /tmp/,RCSt1a11034	Fri Jun  9 18:36:27 1989
+---- last.h	Fri Jun  9 05:32:16 1989
+-***************
+-*** 12,17 ****
+---- 12,20 ----
+-  EXT char *lastngname INIT(Nullch);	/* last newsgroup read, from .rnlast file */
+-  EXT long lasttime INIT(0);	/* time last rn was started up */
+-  EXT long lastactsiz INIT(0);	/* size of active file when rn last started up */
+-+ EXT long lastgrptime INIT(0);	/* time the groups file was last changed */
+-+ EXT char *lastnewgroup INIT(Nullch);	/* last new newsgroup */
+-+ EXT long lastpos INIT(0);	/* pos. of last new newsgroup in groups file */
+-  
+-  void	last_init();
+-  void    writelast();
+No differences encountered
+!
+
+

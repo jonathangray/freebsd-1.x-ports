@@ -1,0 +1,37 @@
+#! /bin/sh
+# mkstripinvis - run once to generate $NEWSBIN/inject/stripinvis on stdout
+#	for inews & friends
+
+# POLICY: strip invisible chars? wrong for Kanji.
+# generate program to strip invisible chars, a la B news.
+#	bells & escapes are *right* out.
+
+cat <<'!'				# common header
+#! /bin/sh
+# stripinvis - strip invisible characters, a la B news (for local postings).
+#	bells & escapes are *right* out.
+# POLICY: strip invisible chars? wrong for Kanji.
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/usr/lib/news/bin/config}
+export NEWSCTL NEWSBIN NEWSARTS NEWSPATH NEWSUMASK NEWSMASTER NEWSCONFIG
+PATH=$NEWSCTL/bin:$NEWSPATH; export PATH
+
+!
+
+# deduce which tr we have: v6 or v7
+case "` echo B | tr A-Z a-z `" in
+b)						# a hit
+	cat <<'!'
+exec tr -d '\1-\7\13\15-\37'			# v7
+!
+	;;
+B)						# a miss
+	cat <<'!'
+exec tr -d '[\1-\7]\13[\15-\37]'		# v6 (or System V)
+!
+	;;
+*)						# gun exploded in our face
+	echo "$0: your tr is from neither v6 nor v7, sorry" >&2
+	exit 1
+	;;
+esac

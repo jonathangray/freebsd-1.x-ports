@@ -1,0 +1,111 @@
+.Ch "Locking in C News"
+.Ix lock
+.LP
+Several parts of
+C News
+need some way of locking parts of the news
+subsystem against concurrent execution.
+Various system-specific locking system calls exist,
+but none of them
+is truly portable,
+and most of them provide far more functionality than
+we need.
+.LP
+C News
+.Ix link
+locking uses the \fIlink\fR(2) system call and pre-agreed names.
+\fILink\fR has the necessary characteristic for safe locking:
+it is an atomic test-and-set operation.
+Furthermore,
+it exists in all Unixes.
+.LP
+.Ix lock names
+All locks are created in the NEWSCTL directory
+(see \fIConfiguration Mechanisms in C News\fR for where this directory
+is to be found and how programs can determine this)
+and have names starting with `LOCK'.
+To acquire a lock,
+.Ix lock acquiring
+.Ix LOCK
+.Ix files LOCK
+first create a temporary file in NEWSCTL with a name
+of the form `L.\fIn\fR', where \fIn\fR is your process id.
+You are urged to also write your process id,
+in decimal ASCII,
+into this file.
+Then attempt to link the temporary file to `LOCK\fIx\fR',
+where \fIx\fR is chosen based
+on what sort of locking you wish to do.
+Existing lock names are:
+.TS
+center;
+ll.
+LOCK	relaynews, modifications to control files
+LOCKinput	input subsystem processing spooled input
+LOCKbatch	batcher preparing batches
+LOCKexpire	expire expiring articles
+.TE
+If the link fails,
+sleep and try again.
+If it succeeds,
+proceed.
+The temporary file may be removed then or at the same time as the lock
+is removed.
+Programs are expected to make a determined effort to remove lock files
+when they terminate,
+normally or as a result of signals.
+.LP
+.Ix Unix "System V"
+.Ix "System V" breakage
+.Ix ln
+Shell programs have an additional problem in that System V has broken
+\fIln\fR(1) so that it removes a pre-existing destination file.
+C News
+therefore provides a pure,
+simple locking program under
+the name NEWSBIN/newslock
+.Ix newslock
+(if the recommendations in
+\fIDirectory Layout and PATH in C News\fR are followed,
+this will
+automatically be in the search path of shell programs).
+Usage is `newslock\ tempfile\ lockfile';
+exit status is 0 for success,
+1 for failure,
+2 for wrong number of arguments.
+No messages are printed for normal failure,
+so no redirection of output is needed.
+.LP
+A suitable locking procedure for a shell file using the standard
+configuration facilities is:
+.DS
+.ft B
+lock="$NEWSCTL/LOCKxxx"		# modify name as appropriate
+ltemp="$NEWSCTL/L.$$"
+echo $$ >$ltemp
+trap "rm \-f $ltemp ; exit 0" 0 1 2 15
+while true
+do
+	if newslock $ltemp $lock
+	then
+		trap "rm \-f $ltemp $lock ; exit 0" 0 1 2 15
+		break
+	fi
+	sleep 30
+done
+.ft	
+.DE
+A template of this form can be found in the file \fInewslock.sh\fR.
+.LP
+Although there are various thorny questions associated with breaking
+locks by dead programs,
+.Ix lock clearing
+reboot is a time when surviving locks are
+definitely invalid.
+(Although there are problems even here if a networked group of systems
+are not rebooted as a unit.)
+For this and other reasons,
+a system running C News should execute
+.Ix newsboot
+.Ix /etc/rc
+NEWSCTL/bin/newsboot at reboot time (e.g. from \fI/etc/rc\fR).

@@ -1,0 +1,85 @@
+#!/bin/sh
+#
+# post.news
+#
+# meant to be invoked as a sendmail-compatible mailer from zmailer.  Arguments
+# are the newsgroups to which the article should be posted. A complete
+# message, including To:, From: and From_ line expected on stdin.
+# 
+# To use this script as a transport agent, add the following to scheduler.cntl:
+#	usenet/*	1m	10 0 0	root	daemon	sm -c $channel news
+# The definition of the news transport agent in sm.cf should contain
+#	news	m	/usr/lib/zmail/post.news	post.news $u
+# (adjust this to reflect the actual location of the installed copy of this
+# script, of course)
+#
+# Jean-Francois Lamy (lamy@ai.toronto.edu), 88-02-13
+# based on code by Rayan Zachariassen.
+
+# Notes:
+# - The news program invoked by this script should trust From: lines
+#   (otherwise workstation name hiding, full-name id generation and
+#   all other smarts done by router.cf will be lost)
+# - router.cf checks local parts with embedded dots for membership in the
+#   active newsgroups file and routes them through this transport agent. One
+#   word newsgroup names are not tested in that fashion, because of the risk
+#   of obscure clashes with user-ids.  Explicit aliases of the form
+#      gradnews: gradnews@localnews
+#   should be used for those (such names are not a good idea to start with).
+#   If such aliases are used, add a line in hosts.transports that reads
+#      localnews usenet!
+#   This tells the router that mail to fake host localnews is to be sent to the
+#   local host (there is nothing after the !) on channel usenet. 
+
+# this version forwards the article via mail to a server that will trust
+# the return address.
+server="feednews@news-server.csri.toronto.edu"
+
+case x$DISTRIBUTE in
+x)	org="`cat /local/share/news/organi?ation`"
+	[ "$org" ] || org = "Department of Computer Science, University of Toronto"
+	orgflag=1
+	;;
+*)	orgflag=0
+	;;
+esac
+from=/tmp/from$$
+
+for i in $@
+do
+	groups="${groups+$groups,}$i"
+done
+
+awk "BEGIN		{ subject = 0; body = 0; skipping = 0 ;
+			  newsgroups = 0; distribution = 0;
+			  organization = $orgflag;
+			  print \"To: $server\" }
+body == 1		{ print; next }
+/^$|^[ ][ \\t]*$/	{ if (!body) {
+			    np = split(path,parts,\"!\");
+			    if (!organization && np == 1)
+			        print \"Organization: $org\";
+			    if (!newsgroups) print \"Newsgroups: $groups\";
+			    if (!subject) print \"Subject: (none)\"; 
+			  }
+			  print; body = 1; next
+			}
+/^To:|^X-To:|^Cc:|^Apparently-To:/	{ skipping=1 ; next }
+/^Newsgroups:/		{ newsgroups = 1; skipping = 0; printf(\"%s\",\$0);
+			  if (\"$groups\" != \"\")
+			     printf(\",%s\\n\",\"$groups\");
+			  else printf(\"\\n\");
+			  next }
+/^Distribution:/	{ distribution = 1; skipping = 0; print; next }
+/^Subject:/		{ subject = 1; skipping = 0; print; next }
+/^From |^Return-Path:/	{ print \$2 > from ; path = \$2 ; skipping = 1; next }
+/^[ 	]/		{ if (skipping) next }
+/^[A-Za-z-]*:[ \\t]*$/	{ if (!body) next }
+			{ print }
+" from="$from" - >/tmp/bug$$
+
+if [ -s $from ]; then
+	/usr/lib/sendmail -f"`cat $from`" </tmp/bug$$
+fi
+rm $from /tmp/bug$$
+exit 0

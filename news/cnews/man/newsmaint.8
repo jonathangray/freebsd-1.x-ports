@@ -1,0 +1,327 @@
+.\" =()<.ds a @<NEWSARTS>@>()=
+.ds a /usr/spool/news
+.\" =()<.ds b @<NEWSBIN>@>()=
+.ds b /usr/lib/newsbin
+.\" =()<.ds c @<NEWSCTL>@>()=
+.ds c /usr/lib/news
+.\" =()<.ds m @<NEWSMASTER>@>()=
+.ds m usenet
+.TH NEWSMAINT 8 "13 April 1992"
+.BY "C News"
+.SH NAME
+newshist \- extract history line for news article(s)
+.br
+newsdaily \- maintain news log files and report problems
+.br
+newswatch \- keep an eye on news system for difficulties
+.br
+newsboot \- clean up news debris on reboot
+.br
+locknews \- lock news system
+.br
+addgroup, delgroup \- add and delete newsgroups, locally only
+.br
+adddirs \- make any missing directories for active newsgroups
+.br
+addfeed \- add a news feed
+.br
+act.to.times \- create active.times file for news readers
+.br
+histfrom, newsfrom \- list news arriving over specific time range
+.br
+addmissing \- add missing news articles to history file
+.SH SYNOPSIS
+.B \*b/maint/newshist
+msgid ...
+.br
+.B \*b/maint/newsdaily
+[ guru ... ]
+.br
+.B \*b/maint/newswatch
+[ spacemin [ inbatchmax ] ]
+.br
+.B \*b/maint/newsboot
+.br
+.B \*b/maint/locknews
+[
+.B \-v
+]
+.br
+.B \*b/maint/addgroup
+group {\fBy\fR|\fBn\fR|\fBm\fR|\fBx\fR|\fB=\fIrealgroup\fR}
+.br
+.B \*b/maint/delgroup
+group
+.br
+.B \*b/maint/adddirs
+.br
+.B \*b/maint/addfeed
+[
+.B \-L
+]
+[
+.B \-f
+flags ]
+site groups
+.br
+.B \*b/maint/act.to.times
+activefile
+.br
+.B \*b/maint/histfrom
+startdate [ enddate ]
+.br
+.B \*b/maint/newsfrom
+startdate [ enddate ]
+.br
+.B \*b/maint/addmissing
+[
+.B \-d
+]
+.SH DESCRIPTION
+These programs are utilities useful in maintaining a C News
+system and diagnosing problems in it.
+.PP
+.I Newshist
+prints the history line for each article identified by a \fImsgid\fR.
+.PP
+.I Newsdaily
+performs minor maintenance chores
+that typically should be done once a day for the news system:
+saving copies of log files and truncating them,
+reporting logged errors, checking for anomalies suggesting something
+is wrong, and cleaning out leftover files.
+\fINewsdaily\fR saves one generation of old \fIlog\fR files and three
+generations of old \fIerrlog\fR and \fIbatchlog\fR files.
+It reports problems to the named \fIguru\fRs
+(default:  `\*m').
+.PP
+.I Newswatch
+looks for indications of news problems on a shorter time scale than those
+reported by \fInewsdaily\fR, notably strangely-persistent lock files that
+may indicate a news-system failure.
+If
+.I spacemin
+is specified,
+.I newswatch
+checks the
+.IR incoming ,
+.IR articles ,
+.IR control ,
+and
+.I outbound
+areas to confirm that there are still at least
+.I spacemin
+bytes available in each, and reports it if not.
+If
+.I inbatchmax
+is specified,
+.I newswatch
+inspects the incoming-news spooling area and reports if more than
+.I inbatchmax
+files are awaiting processing.
+.I Newswatch
+delivers its report, if any, on standard output;
+an empty report (zero bytes of output) means no problems.
+It typically should be run a few times a day with any
+non-empty output mailed to someone suitable.
+.PP
+.I Newsboot
+should be run from \fI/etc/rc\fR or the system's equivalent on reboot.
+It cleans up files that the news system might have left lying about
+if the system crashed while news was being processed,
+notably old lock files.
+.PP
+.I Locknews
+locks the news system
+(retrying until it succeeds),
+starts up a shell
+(\c
+.B $SHELL
+if set,
+otherwise the system's standard shell)
+with the
+.B PS1
+and
+.B prompt
+environment variables prepended with executable reminders,
+and waits around to
+unlock the news system when that shell terminates.
+This simplifies manual maintenance.
+.B \-v
+produces messages on standard error
+upon successful locking and unlocking;
+this is only needed by users of shells that import
+neither
+.B PS1
+nor
+.B prompt
+to set their prompts,
+notably C shells.
+.PP
+.I Addgroup
+and
+.I delgroup
+respectively add a newsgroup (with a specified flags field for the
+\fIactive\fR file, normally `y' [see \fInews\fR(5)]) and delete a
+newsgroup manually, with proper locking.
+The effect is purely local; no control message (to propagate the
+change to other machines) is sent.
+.PP
+.I Adddirs
+sweeps through the \fIactive\fR file checking that directories exist for
+all newsgroups.
+(\fIRelaynews\fR
+will create directories as needed, but some
+user-interface software gets upset if a newsgroup exists but its directory
+does not.)
+This is mostly useful when adding groups in bulk, based on another site's
+\fIactive\fR file.
+.PP
+.I Addfeed
+adds a line to the \fIsys\fR file specifying that the \fIsite\fR should
+be fed the \fIgroups\fR,
+and creates a suitable outbound-batching directory.
+If the
+.B \-L
+option is given, the \fBL\fR flag is included to restrict the feed to
+locally-generated articles only.
+If the 
+.B \-f
+option is given, then the argument following it is used as the
+flags field for the \fIsys\fR entry instead of the default \fBf\fP.
+If \fIgroups\fR does not include a distribution list (separated from the
+newsgroups by a `/'), the default distribution list `/all' is appended.
+If \fIgroups\fR is of the form \fB=\fIname\fR,
+this specifies the same groups as those fed to site `\fIname\fR',
+with the exception that `to.\fIname\fR' is rewritten to `to.\fIsite\fR'.
+.PP
+.I Act.to.times
+emits (on standard output) a new
+.I active.times
+file (see
+.IR active.times (5))
+based on the contents of
+.IR activefile ,
+which should normally be
+.IR \*c/active .
+.PP
+.I Histfrom
+emits (on standard output) all history lines for unexpired articles
+arriving between
+.I startdate
+and
+.IR enddate .
+The dates must be acceptable to
+.I getdate
+(see
+.IR newsaux (8)).
+The default
+.I enddate
+is ``now''.
+.PP
+.I Newsfrom
+runs
+.I histfrom
+and processes its output to produce a list of absolute pathnames of
+articles arriving between
+.I startdate
+and
+.I enddate
+(default ``now'').
+.PP
+.I Addmissing
+scans the
+.I history
+file and the news-article tree to find articles that are not in the history
+file, and adds them to the file
+and the
+.I dbz
+database.
+If the
+.B \-d
+option is given,
+.I addmissing
+rebuilds the
+.I dbz
+database from scratch after adding the missing articles to the history file;
+this is a convenience for use in disaster-recovery situations where
+manual repairs to the history file have rendered the file incomplete
+and the
+.I dbz
+database invalid.
+.SH FILES
+.ta 6c
+.nf
+\*c/history	history file
+\*c/history.pag	\fIdbz\fR database for history file
+\*c/history.dir	\fIdbz\fR database for history file
+\*c/log	current news log
+\*c/log.o	previous news log
+\*c/errlog	current news-error log
+\*c/errlog.o*	old news-error logs
+\*c/batchlog	current news-batcher log
+\*c/batchlog.o*	old news-batcher logs
+\*a/in.coming	input-spooling area
+\*a/out.going	output-batching area
+\*c/watchtime	last time \fInewswatch\fR was run
+\*c/active	list of current newsgroups
+\*c/active.old	backup copy created by \fIaddgroup\fR and \fIdelgroup\fR
+/bin/sh	standard Unix shell
+/bin/rc	standard Plan 9 shell
+.SH SEE ALSO
+df(1), uucp(1), ls(1), ctime(3), getdate(3), hostname(1),
+grep(1), news(5), expire(8), newsbatch(8), rnews(8), newsaux(8)
+.SH DIAGNOSTICS
+.I Locknews
+complains and exits if it is unable to lock the news system
+due to inadequate permissions.
+.PP
+.I Addfeed
+looks for a \fB/default/\fR line
+or a line for \fIsite\fR in
+the \fIbatchparms\fR file, and if
+none is found, warns the user to create one.
+.PP
+.I Addmissing
+complains and exits if it is unable to lock the news system, if
+.I expire
+appears to be running,
+or if there is not enough space for a temporary copy of the
+.I history
+file and database.
+It also notes the presence of articles which did not have intelligible
+headers (which are placed into history with an entry specifying immediate
+expiry).
+Complaints from it about articles being ``already present'' indicate
+a corrupt history file rather than merely missing articles;
+a complete rebuild is indicated if the offending entries cannot be
+identified and removed manually.
+.SH HISTORY
+Written at U of Toronto by Henry Spencer and Geoff Collyer.
+.SH BUGS
+\fIDelgroup\fR does not remove files or directories from \*a, although it
+prints a reminder to do so.
+.PP
+The \fB=\fIname\fR form of \fIaddfeed\fR
+cannot cope with continued \fIsys\fR lines.
+.PP
+\fIAddfeed\fR assumes that attention to the \fIbatchparms\fR file suffices
+to get batching going for a new feed, which is naive if you are running
+\fIsendbatches\fR selectively, i.e. with arguments.
+.PP
+.I Addmissing
+balks at dealing with
+articles which are
+already in history but with an incomplete
+list of pathnames.
+This is very hard to fix.
+.PP
+.I Addmissing
+will falsely think articles are missing\(emleading
+to the problem above\(emif a newsgroup name has a component longer
+than 14 characters on a system which limits directory entries to 14.
+This too is fairly hard to fix.
+.PP
+Various nuisances can result if the maintenance utilities are run as
+\fIroot\fR rather than as the owner of the news database.
+It's difficult to defend against this.

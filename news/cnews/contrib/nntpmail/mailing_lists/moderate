@@ -1,0 +1,38 @@
+#!/bin/sh
+# moderate owner distribution-alias
+#
+# ensure message gets redistributed to a distribution list alias yet
+# error messages come back to the list owner.  This requires invoking
+# the mailer again.
+#
+# A mailing list is then set-up by adding aliases as follows: (articles are
+# mailed to example, administrivia to example-request, error messages go back
+# to example-owner, and the list of recipients is example-people).
+#
+# example: "|/local/lib/mail/bin/moderate example-owner example-people"
+# example-request: lamy
+# example-owner: lamy
+# example-people: ":include:/local/share/mail/lists/example"
+#
+# note that your sendmail may not want the " around the :include, but
+# that zmailer does in the name of RFC-822...
+
+owner=$1;shift
+recipients=$@
+cat > /tmp/$owner$$
+/bin/ed - /tmp/$owner$$ <<EOF 2>/dev/null
+1d
+/^[Ff][Rr][Oo][Mm]:/t0
+/^\$/i
+Resent-From: $owner
+Resent-To: $recipients
+.
+1m.
+s/^From:/Resent-Reply-To:/
+s/:	*/: /
+w
+q
+EOF
+
+/usr/lib/sendmail -t -f$owner  < /tmp/$owner$$
+/bin/rm -f /tmp/$owner$$

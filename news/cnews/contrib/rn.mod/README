@@ -1,0 +1,35 @@
+The cdiff.* files contain a pair of rn speedups, relative to rn
+patchlevel 40 as modified by U of Waterloo: they remove some expensive
+stat system calls.  The base U of Waterloo rn contains two other handy
+changes:  a -q which disables the interrogation when the active file
+changes, and a third answer during the interrogation: "q" means "I
+don't care, just show me some news, right now".
+
+The changes to ngdata.c prevent rn stating every file under
+/usr/spool/news that might contain an article before opening it.
+
+The changes to addng.c prevent rn stating all ~700 directories under
+/usr/spool/news every time the active file changes (this is known as
+"the rn huddle").  In the one timing trial we did, this reduced start
+up time after touching active from 56 seconds elapsed on a Sun 3 to 8
+seconds.  Before making these changes, longer huddles in the range of
+10 to 15 minutes were observed on Sun 3s and 4s, perhaps because the
+active file was touched in a different spot.
+
+Unfortunately the new addng.c code means that you will get an even
+longer interrogation after the shorter huddle than you previously
+would, as many groups will be spuriously considered "new".  If you have
+-q available, you can keep up with new groups by just reading the
+"control" pseudo-group with "ihave", "sendme" and "cancel" in your
+control kill file.
+
+The theory behind the 700 stats in the newgroup huddle was apparently
+that if rn stats group/1, and it exists, then group must be a
+newly-created group.  There's gotta be a better way.  With rapid
+expiry, group/1 won't be around for long in most groups, causing rn to
+miss some new groups, and in "valuable" groups with long expiry times,
+group/1 will be around for a very long time, making rn spuriously think
+that the old groups are new.  Proper fixes for this problem involve
+reworking rn's strategy for determining new newsgroups completely,
+using the "active.times" file.  The file "better.way" is an attempt
+to do exactly that.

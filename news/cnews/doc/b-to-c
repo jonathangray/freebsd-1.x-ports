@@ -1,0 +1,1126 @@
+.\" tbl this-file | troff -ms
+.Ch "B News to C News Transition Guide"
+.Ix "B News to C News transition"
+.SH
+Preface
+.PP
+We describe the changes in installation
+and administration from B News to C News.
+The intended audience is B News administrators
+switching to C News.
+.SH
+Introduction
+.PP
+.Ix history
+.Ix "C News" history
+.Ix history "C News"
+C News was written by two people
+.Ix authors
+(Geoff Collyer
+and
+Henry Spencer)
+who were experienced B News administrators
+(since 1982).
+C News was intended to be a much faster and more correct
+B News
+with some of the things that irritated us in B News changed.
+C News is thus administratively similar to B News,
+though not identical.
+We have no personal experience running B News later than
+2.10.1,
+.Ix "B News 2.10.1"
+and thus may have missed subtleties in later releases,
+notably 2.11.
+.Ix "B News 2.11"
+.PP
+The single largest visible change from B News is probably
+that we wanted to allow the possibility of
+machines of
+different architectures sharing a single news data base
+(\c
+.I /usr/spool/news
+.Ix /usr/spool/news
+plus the data files in
+.I /usr/lib/news
+.Ix /usr/lib/news
+in B News terms)
+via network file systems
+while keeping separate directories of executables elsewhere.
+We did this by pushing the executables into a new directory,
+often called
+.I /usr/lib/newsbin .
+.Ix /usr/lib/newsbin
+We also took the opportunity to push most of the binaries into
+subdirectories to reduce the clutter at the top level,
+as the old B News
+.I /usr/lib/news
+had become awfully cluttered.
+.PP
+The next most visible change
+is probably that we only compile in default values
+for directory names
+(and a few other configuration parameters),
+but they can be overridden at run-time via environment variables
+(subject to restrictions to prevent spoofing).
+.I notebook/config
+.Ix config
+.Ix files config
+(relative to the C News source subtree root)
+describes the variables.
+In a nutshell,
+.I NEWSCTL
+.Df NEWSCTL
+is the equivalent of
+.I /usr/lib/news
+when referring to control files,
+.I NEWSBIN
+.Df NEWSBIN
+is the equivalent of
+.I /usr/lib/news
+when referring to executables
+(and is often
+.I /usr/lib/newsbin),
+and
+.I NEWSARTS
+.Df NEWSARTS
+is the equivalent of
+.I /usr/spool/news .
+This capability can be used to run
+B News
+and C News
+in parallel for testing,
+.Ix "test system"
+.Ix system test
+feeding them identical inputs.
+It can probably be used instead of the
+.B IHCC
+.Ix IHCC
+ifdefs in B News.
+It is also used for regression testing,
+.Ix "regression testing"
+when we run known input data through the software
+in test directories
+and verify that we get known results out;
+.B "make r"
+in a given source directory will generally invoke the relevant
+regression test
+and
+.B "make rs"
+in
+.I conf
+will invoke all of them.
+.SH
+Changes in control file formats
+.PP
+In general,
+.I news (5)
+.Ix "file formats"
+.Ix formats file
+now describes the file formats.
+.PP
+.I Sys
+.Ix files sys
+.Ix sys
+adds a few optional features
+and withdraws some old and little-used ones.
+Many obsolete flags
+draw fatal diagnostics,
+notably
+.B N ,
+.Ix "N sys flag"
+.Ix "sys flag" N
+the old,
+unbatched ihave/sendme flag.
+The other unsupported flags are
+.B A
+.Ix "A sys flag"
+.Ix "sys flag" A
+(convert outgoing messages to
+A News
+.Ix "A News"
+format;
+.I relaynews
+is not a protocol converter),
+.B H
+.Ix "H sys flag"
+.Ix "sys flag" H
+(append history entry to named file?;
+sorry),
+.B S
+.Ix "S sys flag"
+.Ix "sys flag" S
+(duplicate the work of the shell to avoid one process;
+just delete this flag),
+.B M ,
+.Ix "M sys flag"
+.Ix "sys flag" M
+and
+.B O
+.Ix "O sys flag"
+.Ix "sys flag" O
+.Ix multicast
+(multicast flags;
+obsoleted by the batcher,
+as far as we can tell).
+New flags are
+.B f
+.Ix "f sys flag"
+.Ix "sys flag" f
+(append spool file name and size in bytes to the named file)
+and
+.B n
+.Ix "n sys flag"
+.Ix "sys flag" n
+(append spool file name and Message-ID to the named file;
+equivalent to
+.B FI
+in
+B News).
+There have been some changes to flag semantics:
+.B I
+.Ix "I sys flag"
+.Ix "sys flag" I
+.Ix ihave/sendme
+in B News
+invoked all the ihave/sendme machinery
+.I and
+wrote message-ids to the batch file;
+C News
+just writes the message-ids.
+See below for how to set up ihave/sendme feeds.
+In
+C News,
+.B FI
+and
+.B I
+are equivalent;
+use
+.B n
+if you want file names and message-ids.
+All file names written
+are relative to
+.I NEWSARTS .
+.PP
+B News
+allowed comments to be continued;
+this is at odds with all other
+.UX
+software,
+including
+C News.
+To comment-out an entry under C News,
+you need to prepend
+`\c
+.B # '
+before
+.I each
+line of the entry,
+not just the first.
+.Ix "sys comments"
+.Ix comments sys
+.PP
+There is now an optional
+.I distributions
+.Ix "distributions sys subfield"
+.Ix sys distributions
+list after the newgroups pattern,
+separated by a slash.
+If the fourth
+.I sys
+field is a relative command name,
+.I NEWSCTL/bin
+and
+.I NEWSBIN/relay
+will be searched before the standard search path.
+If the fourth field is a relative file name,
+.I NEWSARTS/out.going
+will be prepended internally.
+.Ix "batch files"
+.Ix files batch
+If the fourth field is an empty file name,
+it will be replaced internally with
+\fINEWSARTS/out.going/\fPsystem\fI/togo\fP
+where
+.I system
+is the first field of the entry.
+Note that although these batch files
+live under
+.I NEWSARTS ,
+they are not news articles,
+and their parent directories will
+.I not
+be automatically created.
+.Ix ihave/sendme
+The ihave/sendme kludges of B news
+have been expunged;
+one must say what one means.
+See the section below on ihave/sendme.
+.PP
+.Ix active
+.Ix files active
+.I Active
+has four fields
+(there is vestigial code in some,
+but not all,
+programs for two or three fields)
+and
+any number of digits in the article-number fields
+(five is too few for the long term).
+Two new values are understood for the fourth
+(flags)
+field:
+.B x ,
+.Ix "x active flag"
+.Ix "active flag" x
+meaning
+``quietly discard articles for this group'',
+and
+.B = realgroup
+.Ix "= active flag"
+.Ix "active flag" =
+meaning
+``file articles for this group under
+.I realgroup
+instead''.
+.B =
+is useful for coping with badly-run
+local newsgroups,
+often created from mailing lists.
+.Ix "news system lock"
+You must lock the news system with
+.I locknews
+before editing the active file.
+.PP
+.I History
+.Ix history
+.Ix files history
+is in an extended
+B 2.10 news
+format:
+the second field consists of two subfields
+separated by a tilde:
+time received as an integer (a
+.I time_t
+in fact),
+and
+the value of the
+.I Expires:
+header,
+"-" if none.
+More subfields may appear in future.
+You must lock the news system with
+.I locknews
+.Ix "news system lock"
+before editing the history file,
+and
+run
+.I dbz (1)
+.Ix dbz
+(found in
+.I NEWSBIN )
+afterward to rebuild the index files.
+.Ix "history index files"
+.Ix files "history index"
+.PP
+.I Log
+.Ix log
+.Ix files log
+and
+.I errlog
+.Ix errlog
+.Ix files errlog
+are only faintly similar to their B News counterparts.
+Error processing in general is due for an overhaul,
+which may further revise their formats.
+Currently,
+.I errlog
+is the unadorned standard error from
+.I relaynews (8)
+.Ix relaynews
+and any programs it runs.
+.I Log
+is a time-stamped log,
+down to the millisecond
+(where possible,
+offer void where prohibited by
+System V),
+.Ix "System V" time
+.Ix time "System V"
+consisting of one line per article,
+and
+always showing the name of the host that handed us this article
+and the Message-ID of this article.
+See
+.I "Log File Formats in C News"
+for details.
+.PP
+Locks are in the style of B 2.10:
+.I NEWSCTL/LOCK
+.Ix "news system lock"
+.Ix lock "news system"
+is the news system lock,
+but it never times out.
+One locks the news system by repeatedly attempting
+to link to the lock name until successful;
+one releases the lock by removing the lock name.
+There are other locks,
+all of which begin with the prefix
+.I NEWSCTL/LOCK .
+This scheme works well over network file systems,
+can be used from shell scripts and interactively,
+permits one to
+see trivially
+what locks are present,
+and is portable across
+.UX
+variants.
+See
+.I "Locking in C News"
+for details.
+.SH
+`Missing' control files
+.Ix "B News files" missing
+.PP
+.I Aliases
+.Ix aliases
+.Ix files aliases
+does not exist,
+since we believe that header munging is to be avoided
+if at all possible
+(we do update
+.B Path: ,
+regenerate
+.B Xref: ,
+and delete some large obsolete headers
+[\c
+.B Relay-Version: ,
+.B Posting-Version: ,
+.B Date-Received: ,
+.B Received: ,
+.B Posted: ,
+.B Illegal-Object: ]).
+It is possible to file articles locally under different newsgroups
+by use of the
+.I active
+file
+.B =
+flag.
+.PP
+.I Notify
+.Ix notify
+is replaced by
+.I NEWSMASTER
+.Ix NEWSMASTER
+in
+.I NEWSCTL/bin/config .
+.Ix config
+.PP
+.I Moderators ,
+.Ix moderators
+.Ix files moderators
+.I recmail
+.Ix recmail
+and
+.I recnews
+.Ix recnews
+are missing;
+we don't know what they do (yet).
+.PP
+.I Seq
+.Ix seq
+.Ix files seq
+is gone;
+we don't need it.
+.SH
+New control files
+.Ix "C News files" new
+.PP
+.I Batchparms
+.Ix batchparms
+.Ix files batchparms
+controls outbound batching.
+See
+.I newsbatch (8).
+.PP
+.I Explist
+.Ix explist
+.Ix files explist
+controls expiry policies.
+The command-line options for
+.I expire
+are completely different from B News.
+See
+.I expire (8).
+The simplest possible
+.I explist
+is
+``\c
+.B "all x 7 -" ''
+for 7-day expiry of all articles
+and
+history entries.
+.PP
+.I Mailname
+.Ix mailname
+.Ix files mailname
+is the domain name of this machine
+for mail purposes;
+.I whoami
+.Ix whoami
+.Ix files whoami
+is the news name of this machine
+(e.g. for
+.B Path:
+headers).
+If
+.I replyusepath
+.Ix replyusepath
+.Ix files replyusepath
+exists,
+automated mail replies will use the
+.Ix "mail replies"
+.Ix Path:
+.B Path:
+header for return addresses.
+If
+.I server
+.Ix server
+.Ix files server
+exists,
+.I inews
+will
+.I rsh
+.Ix rsh
+.Ix "remote command execution"
+to the hostname found therein
+to run
+.I relaynews .
+.Ix relaynews
+.PP
+.I Setnewsids
+.Ix setnewsids
+.Ix files setnewsids
+is an optional setuid-root program
+(in the wrong directory,
+it appears)
+to set user and group ids;
+it should be obsolete now,
+but instead
+.SM
+POSIX
+.NL
+.Ix POSIX
+.Ix "System V"
+and System V
+are making it necessary all too often.
+.SH
+ihave/sendme feeds
+.Ix ihave/sendme
+.PP
+We didn't understand the implementation of ihave/sendme
+in B News for a long time and nearly didn't implement it,
+having a very dim view of ihave/sendme to start with,
+but we wanted to be RFC 1036 compliant.
+Upon discovering the tricks
+(including mandatory default values for various
+.I sys
+file fields)
+used internally by B News to implement
+ihave/sendme,
+there was immediate agreement that
+.IP (a)
+we should document how ihave/sendme works,
+and
+.IP (b)
+we should implement something more obvious
+and that would not mandate fixed values for fields
+that users might legitimately want to change from their
+default values.
+.PP
+We also see no use for the old unbatched ihave/sendme protocol:
+it is grossly wasteful of resources at today's traffic volumes
+and offers no clear advantage to sending lists of Message-IDs
+in each
+.I ihave
+or
+.I sendme
+message.
+.PP
+The result is that,
+in our second implementation,
+we have implemented batched ihave/sendme
+with
+.I batchparms
+.Ix batchparms
+.Ix files batchparms
+specifying details of batching and transport.
+One typically needs a single
+.I sys
+.Ix sys
+.Ix files sys
+entry
+to specify
+which articles are to be offered to the other system
+via an
+.I ihave
+message.
+.PP
+Note that any article requested by a
+.I sendme
+will be sent;
+there is no checking that the requesting site is permitted by its
+appropriate
+.I sys
+entry to receive this article.
+Such checking could be added,
+at some cost in performance.
+For now,
+disable ihave/sendme
+on systems with `private' newsgroups
+(if that isn't an oxymoron).
+.PP
+See
+.I "Setting Up Netnews Feeds Using the Ihave/sendme Protocol"
+for gory details including sample
+.I sys
+files.
+.SH
+Differences in behaviour
+.PP
+The
+.I checkgroups
+.Ix "checkgroups control message"
+.Ix "control messages" checkgroups
+control message
+is non-destructive;
+it merely mails its output to
+.B NEWSMASTER
+(e.g.
+.B usenet ).
+The distributed
+.I checkgroups
+script has problems,
+which will be fixed some day.
+In the mean time,
+some people have reported that the latest B News
+.I checkgroups
+script works fine for them;
+you could try it.
+.PP
+There is an
+.I Also-Control:
+header recognised,
+of which
+.I Supersedes:
+is a special case.
+.SH
+Interactions with NNTP
+.Ix NNTP
+.PP
+We had erroneously assumed when writing C News
+that the NNTP situation was not too disastrous.
+Since we didn't then run NNTP ourselves,
+we benignly ignored NNTP.
+Only once we started running NNTP did we realise what a
+performance
+.\" (and other)
+disaster it was.
+We are still working on improving the situation.
+.PP
+The
+.B CNEWS
+ifdef of NNTP
+as distributed by Stan Barber
+.Ix NNTP "Stan Barber"
+makes the situation tolerable
+(we supplied the original version of the code inside the ifdef)
+if not wonderful.
+In particular,
+it will happily accept duplicate articles,
+only to have
+.I relaynews
+throw them away.
+.\" We have an experimental
+.\" .I nntpd
+.\" based on NNTP 1.5.8 that we are reasonably happy with,
+.\" though lock contention may still be an issue
+.\" for a busy site.
+Paul Vixie's
+.I msgidd
+.Ix msgidd
+.Ix NNTP msgidd
+(and associated nntpd patch)
+is strongly recommended for sites
+that get more than one incoming NNTP feed;
+it eliminates the reception of duplicates.
+Sites not running
+.I msgidd
+or running the reference NNTP implementation without
+.B CNEWS
+defined
+are on their own;
+performance of the total news system
+is likely to be poor.
+.PP
+More work is called for.
+Several people have simultaneously invented the idea
+of a multi-threaded
+.I nntpd
+handling multiple inbound transfer sessions
+and that may be a worthwhile direction to pursue.
+(It permits cheap duplicate rejection with little lock contention
+and few processes.)
+It has the disadvantage of not exploiting parallelism on multiprocessor
+machines,
+which seem to be what
+the biggest news relay sites are becoming.
+.SH
+dbm & dbz
+.Ix dbm
+.Ix dbz
+.Ix "history index files"
+.Ix files "history index"
+.PP
+There are now several redistributable
+.I dbm (3)
+clones available.
+Before they appeared,
+we fixed and enhanced
+Jon Zeeff's
+.I dbz
+library;
+it is faster and has smaller files than any
+.I dbm
+or
+.I dbm
+clone,
+so we recommend using it for news.
+Whatever you elect to use,
+be sure to link
+NNTP and any other software that makes
+.I history
+file lookups with
+the same library that C News uses
+(picking up
+.I libcnews.a
+is usually simplest).
+.SH
+.LG
+.LG
+Migration to C News
+.Ix "migration to C News"
+.NL
+.PP
+A good first step is to read the documentation in the C News
+.I doc
+source directory.
+You will want to refer to the contents of the
+.I man
+directory.
+If you have trouble formatting any of this documentation,
+get the
+.I awf
+formatter and use it.
+.I Awf
+.Ix "awf text formatter"
+can be had
+from your nearby
+.I comp.sources.unix
+.Ix comp.sources.unix
+archive site,
+or
+by
+.I uucp
+or
+.I ftp
+from
+.I uunet
+.Ix uunet
+(\c
+.I uunet.uu.net )
+as
+.I comp.sources.unix/volume23/awf.Z .
+For side-by-side comparisons of
+B and C News
+where this document may have missed something,
+one could compare the corresponding sections for B and C News
+in
+.I "Managing uucp and Usenet" ,
+.Ix "Managing uucp and Usenet"
+.Ix books "Managing uucp and Usenet"
+by Tim O'Reilly and Grace Todino,
+O'Reilly & Associates,
+1989,
+ISBN 0-937175-48-X,
+inquiries to
+`\c
+.B nuts@ora.com '
+or
+`\c
+.B uunet!ora!nuts ',
+or
+800-338-NUTS
+(in California,
+800-533-NUTS),
+FAX 707-829-0104.
+See
+.I "Annotated Bibliography on C News"
+for a fuller bibliography.
+.PP
+It is probably safest to create parallel C News trees,
+.Ix "test system"
+.Ix system test
+at least for the equivalent of
+.I /usr/lib/news ,
+then populate them and rename the B and C trees when you are
+satisfied that C News is installed and set up correctly.
+The C News installation procedure
+(\c
+.I build )
+.Ix build
+will not overwrite existing control files in
+.I NEWSCTL ,
+so copying your old
+.Ix "saving old control files"
+.I active ,
+.I sys ,
+and possibly
+.I history
+files to
+.I NEWSCTL
+adapting them as necessary
+(see below),
+and then installing C News there
+normally should get you started.
+.PP
+One advantage of setting up a parallel tree for C News
+is that it is possible,
+though
+.I build
+doesn't know how,
+to run all incoming news into both news systems for a day or two
+to convince yourself that everything is working right.
+If you decide
+.I not
+to switch,
+you can just remove the C News tree.
+.Ix "DON'T PANIC!"
+In any case,
+running both systems simultaneously
+avoids the desperate panic of having to
+cut everything over at once
+and
+get it right first time to avoid losing news;
+this just should not be necessary any more.
+The change is just to ensure that all the commands that
+used to invoke
+.I rnews
+.Ix rnews
+(\c
+.I inews ,
+.Ix inews
+.I rnews ,
+.I cunbatch
+.Ix cunbatch
+and probably a few others)
+now hand the incoming batch to both news systems.
+Something like this should suffice
+(and has worked in the past):
+.DS
+.ft B
+# parallel rnews
+f=/tmp/rn$$
+cat >$f
+brnews <$f
+crnews <$f
+rm $f
+.ft
+.DE
+.PP
+.I Sys
+.Ix sys
+.Ix files sys
+.Ix "sys flags"
+should only need to be scanned for unsupported flags
+(I think
+.B S
+can just be deleted without ill effect),
+and entries
+with
+.B I
+flags rewritten to write
+site\c
+.B .wehave/togo
+and
+.I batchparms
+.Ix batchparms
+.Ix files batchparms
+updated to describe the
+ihave/sendme
+tango for this site.
+.I Active
+.Ix active
+.Ix files active
+can optionally be edited to refile groups locally,
+to compensate for lack of
+.I aliases .
+.Ix aliases
+.Ix files aliases
+C
+.I expire
+.Ix expire
+can read a correct B
+.I history
+.Ix history
+.Ix files history
+file,
+but B News sometimes produced incorrectly-formatted history files.
+To be safe,
+and to pick up information that B News didn't store in the history file,
+run
+.I mkhistory
+.Ix mkhistory
+to regenerate
+.I history
+and its index files.
+.I Mkhistory
+will take quite a while;
+it has to open every article in the news system,
+which can take hours on some machines.
+.\" .PP
+.\" Although some of the older documentation warns against
+.\" using
+.\" .I NEWSCTL/bin/config
+.\" as a master configuration file,
+.\" we intend to eventually make it so,
+.\" and as long as you ensure that you always invoke C News
+.\" shell scripts
+.\" (which read
+.\" .I config
+.\" to set environment variables)
+.\" and never invoke the C programs directly
+.\" (which is generally how things work anyway),
+.\" you should be able to get away with treating it as a master
+.\" configuration file,
+.\" subject to one small caveat:
+.\" you need to change
+.\" .I inews
+.\" to invoke
+.\" either
+.\" .I newsspool
+.\" or
+.\" .I rnews ,
+.\" and then
+.\" arrange to have
+.\" .I cron
+.\" run
+.\" .I newsrun
+.\" under the
+.\" .I news
+.\" userid
+.\" (or local equivalent)
+.\" fairly frequently
+.\" to at least process any local postings.
+.PP
+The normal installation procedure
+is described in
+.I "Installing ``C News'' Network News Software"
+and really just involves running
+.I conf/build ,
+.Ix build
+answering its (many) questions,
+and following its instructions.
+(We intend that eventually
+.I build
+will be run once per site for all time
+(or until the hardware or OS change drastically)
+and that thereafter
+components may be built
+using
+.I make .)
+.Ix make
+Do be careful to use the correct userid for each step of installation;
+doing the whole thing as
+.I root
+.Ix userids
+will result in incorrect file ownerships.
+Two major by-products of
+.I build
+are
+.I libcnews.a
+.Ix libcnews.a
+in the root of the source subtree
+and the directory
+.I include .
+.PP
+There are some differences in configurable options.
+All the length and size limits are gone.
+Essentially all the B News
+.I makefile
+options are now queried for by
+.I build .
+DFLTEXP and HISTEXP
+.Ix "B configuration" DFLTEXP
+.Ix "B configuration" HISTEXP
+are now specified in
+.I explist .
+.Ix explist
+.Ix files explist
+Only a trivial newsreader,
+a
+.I readnews
+.Ix readnews
+replacement,
+is included with C News,
+so little of the reader configuration is relevant.
+.Ix "B configuration" NOTIFY
+NOTIFY is now
+.I NEWSMASTER
+.Ix NEWSMASTER
+and
+.I build
+queries for it.
+.Ix "B configuration" DFTXMIT
+.Ix "B configuration" UXMIT
+DFTXMIT and UXMIT
+are now
+.Ix CMDPFX
+.Ix CMDSFX
+CMDPFX and CMDSFX
+in
+.I relay/sys.c
+with no simple override
+(though an override is in the works);
+the default command,
+in case anyone still uses it,
+is
+.B "uux - -r -z"
+.Ix uux
+system\c
+.B !rnews .
+.Ix "B configuration" MANUALLY
+.Ix "B configuration" NONEWGROUPS
+.Ix "B configuration" UUPROG
+MANUALLY,
+NONEWGROUPS
+and
+UUPROG
+are replaced by policy in shell scripts;
+edit
+.I relay/ctl/*
+to taste.
+.Ix "B configuration" BATCH
+BATCH is gone;
+the unbatcher is built into
+.Ix unbatcher
+.I relaynews .
+.Ix "B configuration" OLD
+OLD is gone
+(\c
+.I relaynews
+is not a protocol converter).
+.Ix "B configuration" DOXREFS
+DOXREFS is gone;
+.B Xref:
+is always generated for cross-posted articles.
+.Ix "B configuration" SENDMAIL
+.Ix "B configuration" MMDF
+SENDMAIL and MMDF
+are gone;
+we just use
+.I mail .
+.Ix mail
+.Ix "B configuration" DEADTIME
+DEADTIME is gone;
+locks do not time out.
+.PP
+This table summarises the disposition of the remaining B News options.
+File names in the
+`build file'
+column are relative to
+.I NEWSCTL
+and refer to files generated by
+.I build .
+A `flag' in the
+`note'
+column indicates that the presence or absence of the file
+.I is
+the flag.
+A `gone' in the
+`note'
+column indicates that the option has vanished.
+If the
+`build file'
+column is empty,
+the option has just been absorbed into
+.I build .
+.Ix "B configuration" "summary table"
+.TS
+box, center;
+c c c
+l l c .
+B option	build file	note
+_
+SPOOLNEWS	rnews.newsrun	flag
+INTERNET	replyusepath	flag
+MYDOMAIN	mailname
+MYORG	organization
+UUNAME	whoami
+_
+CHEAP		gone
+NICENESS		gone
+FASCIST		gone
+ORGDISTRIB		gone
+MULTICAST		gone
+_
+UNAME
+GHNAME
+BSD4_2
+BSD4_1C
+LOCKF
+HIDDENNET
+SMALL_ADDRESS_SPACE
+.TE
+.PP
+If you compile and install the software as two steps,
+it is simple,
+though time-consuming,
+to run regression tests
+.Ix regression tests
+for the major subsystems:
+.B cd
+into a source directory
+(e.g.
+.I expire ,
+.I batch ,
+.I relay )
+and type
+.B "make r".
+If you get no complaints,
+the software is believed (after testing)
+to work correctly on your machine.
+.PP
+.Ix relaynews tuning
+.Ix tuning relaynews
+Sites with a lot of outgoing news feeds
+(over 60, say),
+should be aware that batch file writing will probably
+dominate
+.I relaynews 's
+elapsed time.
+We hope to fix this.
+.\" could add a checklist here.
+.PP
+After installation,
+errors will generally be reported by mail
+(to
+.I NEWSMASTER
+[typically
+.I usenet ]).
+To watch the progress of incoming news,
+tail
+.I NEWSCTL/log
+and
+.I NEWSCTL/errlog .
+.I errlog
+should be empty on a smoothly-running system.

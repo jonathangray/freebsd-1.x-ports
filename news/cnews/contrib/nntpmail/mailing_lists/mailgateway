@@ -1,0 +1,45 @@
+#!/bin/sh
+#
+# mailgateway recipients
+#
+# bidirectional gatewaying utility.
+#
+# - forward a news article to recipients (typically a single alias in
+#   /usr/lib/aliases or equivalent, to avoid long lists of recipients in 
+#   messages)
+# - filter out news control message.
+# - messages fed to the newsgroup from the mailing list are not sent back.
+#   we assume that "distribute" did the feed, and we look for the tell-tale
+#   "Approved" line it tacks on to messages.
+#
+# Jean-Francois Lamy (lamy@ai.toronto.edu) 88-02-27
+
+magic="@mail.ai.toronto.edu"  # what distribute uses in Approved: line
+mail="/usr/lib/sendmail -t"
+article=/tmp/art$$
+
+case $# in
+0) echo "$0: no argument (check /usr/lib/news/sys)" | $mail usenet
+   exit 1 ;;
+*) ;;
+esac
+cat >$article
+
+check=`awk '
+   /^Subject: cmsg/		 { print "nope" ; exit }
+   /^Control:/			 { print "nope" ; exit }
+   /^$|^[ ][ \t]*$/		 { exit }
+				 { next }
+   ' $article`
+
+if [ ! "$check" ] ; then
+   if /bin/grep -s $magic $article ; then
+	   : came from distribute
+   else
+          (
+	   echo "rcvdfrom USENET"  # zmailer feature, delete for sendmail.
+	   echo "To: $@"
+	   cat $article ) | $mail
+   fi
+fi
+/bin/rm -f $article

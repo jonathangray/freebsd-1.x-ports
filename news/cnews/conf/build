@@ -1,0 +1,1092 @@
+#! /bin/sh
+PATH=:/bin:/usr/bin
+
+# configuration variables to remember for next time
+vars='newsuid newsgid binuid bingid binsrc mess unmess newsarts newsctl
+	newsbin newsumask newsmaster newsconfig chown chboth chgrp unixkind
+	addrsize dbmopt faststdio storeval faststrchr sete ranlib
+	symdef cc copts ldopts postlibs hostname uname uucptype dftype dfdirs
+	archive spacelow nfsgroup server manpages manmess rbin doui bin atok
+	postdefltdist paranoid whoami mailname organization postdefltgroup
+	newspath fake fakehdrs immediate inputstall defsub mustsub'
+# where to remember them, by default
+memory=build.def
+
+# functions and headers we are prepared to fake
+mightfake='fsync ftime getopt memcpy memcmp memchr memset mkdir
+	putenv strchr strrchr strpbrk strspn strcspn strtok symlink strerror'
+mightfakehdrs='string.h stdlib.h stddef.h'
+
+# directories in which to do makes
+# batch must precede input; relay must precede misc
+# the "doui" code below may add rna to the list
+pgmdirs='conf batch dbz expire input relay misc explode inject'
+
+# control files built in conf
+ctlf="active errlog history history.pag history.dir localgroups"
+ctlf="$ctlf log mailname mailpaths organization postdefltdist postdefltgroup"
+ctlf="$ctlf replyusepath server sys whoami rnews.stall rnews.immed"
+ctlf="$ctlf readnews.ctl"
+
+echo 'This interactive command will build shell files named doit.root,'
+echo 'doit.bin, doit.news, and again.root to do all the work.  It will not'
+echo 'actually do anything itself, so feel free to abort and start again.'
+echo
+echo 'You probably need your system manuals handy.'
+echo
+echo "When a question is asked in the form \`How are you [okay]? ', the"
+echo 'answer in brackets is what you will get if you just hit RETURN.'
+echo '(If you want give an empty string as the answer, type a single'
+echo "\`-' instead.)"
+
+chmod +x ask yesno notinlist	# just in case
+
+rewrite=yes
+case "$1" in
+-r)	rewrite=no
+	shift
+	;;
+esac
+case $# in
+0)	;;
+*)	memory="$1"	;;
+esac
+if test -r $memory
+then
+	echo
+	tmp=`yesno 'Do you want to use your previous answers as defaults' no`
+	case "$tmp" in
+	yes)	echo
+		echo 'Picking up defaults, from last run...'
+		. $memory
+		echo 'done'
+		;;
+	esac
+fi
+
+echo
+echo 'C News wants to keep most of its files under a uid which preferably'
+echo 'should be all its own.  Its programs, however, can and probably should'
+echo 'be owned by another user, typically the same one who owns most of the'
+echo 'rest of the system.  (Note that on a system running NFS, any program'
+echo 'not owned by "root" is a gaping security hole.)'
+newsuid=`ask 'What user id should be used for news files' ${newsuid-news}`
+newsgid=`ask 'What group id should be used for news files' ${newsgid-news}`
+binuid=`ask 'What user id should be used for news programs' ${binuid-bin}`
+bingid=`ask 'What group id should be used for news programs' ${bingid-bin}`
+binsrc=`yesno "Do the C News sources belong to $binuid" ${binsrc-yes}`
+case "$binsrc" in
+no)	echo "You may need to do some of the installation procedures by hand"
+	echo "after the software is built; doit.bin assumes that it has the"
+	echo "power to create files in the source directories and to update"
+	echo "the news programs."
+	;;
+esac
+
+if test '(' -d /var -a -d /usr/share ')' -o " $mess" = " yes"
+then
+	echo
+	echo 'It would appear that your system is among the victims of the'
+	echo '4.4BSD / SVR4 directory reorganization, with (e.g.) shared'
+	mess=`yesno 'data in /usr/share.  Is this correct' ${mess-yes}`
+else
+	mess=no
+fi
+case "$mess" in
+yes)	echo 'This will affect where C News directories go.  We recommend'
+	echo 'making the directories wherever they have to go and then making'
+	echo 'symbolic links to them under the standard names that are used'
+	echo 'as defaults in the following questions.  Should such links'
+	unmess=`yesno 'be made' ${unmess-yes}`
+	echo 'Our 4.4ish friends suggest putting articles in /var/spool/news'
+	echo 'and control files in /usr/share/news, with programs left where'
+	echo 'they are in /usr/lib/newsbin.'
+	;;
+*)	unmess=no	;;
+esac
+
+echo
+echo 'C News lives primarily under three directories:  one for articles (and'
+echo 'incoming and outgoing spooling), one for control files, and one for'
+echo 'programs.'
+newsarts=`ask 'Where should articles live' ${newsarts-/usr/spool/news}`
+newsctl=`ask 'Where should control files live' ${newsctl-/usr/lib/news}`
+newsbin=`ask 'Where should programs live' ${newsbin-/usr/lib/newsbin}`
+case "$unmess" in
+yes)	linkarts="/usr/spool/news"
+	linkctl="/usr/lib/news"
+	linkbin="/usr/lib/newsbin"
+	;;
+esac
+
+case "$newspath" in
+'')	pathok=no	;;
+*)	echo
+	echo "Is   $newspath"
+	echo 'the correct path to follow to find standard programs on your'
+	pathok=`yesno 'system' yes`
+	;;
+esac
+
+case "$pathok" in
+no)	newspath='/bin:/usr/bin'
+	echo
+	echo 'C News by default assumes that all normal Unix programs can be'
+	echo 'found in /bin or /usr/bin.  This is naive, especially on'
+	echo 'Berkeley-derived systems where some standard programs'
+	echo 'inexplicably moved to /usr/ucb.'
+	if test '(' ! -f /bin/wc -a ! -f /usr/bin/wc ')' -o \
+			'(' ! -f /bin/compress -a ! -f /usr/bin/compress -a \
+						-f /usr/ucb/compress ')'
+	then
+		echo 'It appears that some standard programs live in /usr/ucb'
+		needucb=`yesno 'on your system.  Is that right' yes`
+	else
+		echo 'It appears that /usr/ucb does not exist or that no'
+		echo 'standard programs live there (and only there) on your'
+		tmp=`yesno 'system.  Is that right' yes`
+		case "$tmp" in
+		yes)	needucb=no	;;
+		no)	needucb=yes	;;
+		esac
+	fi
+	case "$needucb" in
+	yes)	echo 'Should /usr/ucb be searched after /bin and /usr/bin'
+		tmp=`yesno '(as opposed to before)' yes`
+		case "$tmp" in
+		yes)	newspath="$newspath:/usr/ucb"	;;
+		no)	newspath="/usr/ucb:$newspath"	;;
+		esac
+		;;
+	esac
+	while true
+	do
+		echo 'Is there any other directory which should be searched'
+		more=`yesno 'to find standard programs on your system' no`
+		case "$more" in
+		no)	break	;;
+		esac
+		dir=`ask 'What is the full name of the directory' /urk`
+		bef=`yesno 'Should it go after (as opposed to before) the others' yes`
+		case "$bef" in
+		no)	newspath="$dir:$newspath"	;;
+		yes)	newspath="$newspath:$dir"	;;
+		esac
+	done
+	;;
+esac
+
+echo
+echo 'C News normally uses a umask of 002, turning off only the others-write'
+echo 'bit in the permissions of files used.  (The correspondence between bits'
+echo 'and number is:  rwx = 421, so turning off group-write bits and all'
+echo 'others-access bits would be a mask of 027, for example.)  Usually'
+echo 'a umask of 002 or 022 is appropriate.'
+newsumask=`ask 'What umask should C News use' ${newsumask-002}`
+case "$newsumask" in
+0*)	;;
+*)	newsumask="0$newsumask"	;;
+esac
+
+echo
+echo 'C News wants to mail some forms of trouble reports to an administrator.'
+echo 'You probably want to make this a system mailbox, rather than that of a'
+echo "specific user, so you won't have to change the software when you get a"
+echo 'new administrator.'
+newsmaster=`ask 'Where should C News mail trouble reports' ${newsmaster-usenet}`
+
+echo
+echo 'The shell files that are everywhere in C News want to pick up their'
+echo 'configuration parameters (mostly, the last few questions you have'
+echo 'answered) from a file at a known location; this is very hard to avoid'
+echo 'unless you play tricks with environment variables (see documentation).'
+echo 'Where should the shell configuration file be'
+newsconfig=`ask 'located' ${newsconfig-$newsctl/bin/config}`
+
+echo
+chown=`ask 'What is the full pathname of the chown command' ${chown-/etc/chown}`
+echo "Can I say \`$chown $newsuid.$newsgid file' to change both the user id"
+chboth=`yesno 'and group id of a file' ${chboth-yes}`
+case "$chboth" in
+no)	chgrp=`ask 'What is the full pathname of chgrp' ${chgrp-/etc/chgrp}`
+	;;
+yes)	chgrp="/etc/chgrp"	;;
+esac
+
+echo
+echo 'building doit.root...'
+>doit.root
+if test ! -w doit.root
+then
+	echo 'It appears that I cannot create doit.root.  Aborting.'
+	exit 1
+fi
+(
+	echo '#! /bin/sh'
+	echo "umask $newsumask"
+	echo 'set -x'
+	echo ": making directories..."
+	ln=
+	lb=
+	case "$unmess" in
+	yes)	echo "mkdir $newsarts $newsctl $newsbin"
+		if test " $linkarts" != " $newsarts"
+		then
+			echo "ln -s $newsarts $linkarts"
+			ln="$ln $linkarts"
+		fi
+		if test " $linkctl" != " $newsctl"
+		then
+			echo "ln -s $newsctl $linkctl"
+			ln="$ln $linkctl"
+		fi
+		if test " $linkbin" != " $newsbin"
+		then
+			echo "ln -s $newsbin $linkbin"
+			lb="$lb $linkbin"
+		fi
+		;;
+	esac
+	n="$newsarts $newsarts/in.coming $newsarts/in.coming/bad"
+	n="$n $newsarts/out.going $newsarts/out.master $newsctl $newsctl/bin"
+	b="$newsbin"
+	echo "for d in $n $b"
+	echo "do"
+	echo "	if test ! -d \$d"
+	echo "	then"
+	echo "		mkdir \$d"
+	echo "	fi"
+	echo "done"
+	case "$chboth" in
+	yes)	echo "$chown $newsuid.$newsgid $n $ln"
+		echo "$chown $binuid.$bingid $b $lb"
+		;;
+	no)	echo "$chown $newsuid $n $ln"
+		echo "$chgrp $newsgid $n $ln"
+		echo "$chown $binuid $b $lb"
+		echo "$chgrp $bingid $b $lb"
+		;;
+	esac
+	echo ": done"
+) >>doit.root
+echo 'done'
+
+echo
+echo 'C News has libraries for several kinds of Unix:'
+echo '	bsd42	4.2BSD and successors'
+echo '	usg	AT&T System V'
+echo '	v7	Version 7 (4.1BSD is pretty close, ditto Xenix)'
+echo '	v8	Version 8, aka Eighth Edition'
+while true
+do
+	unixkind=`ask 'Which best describes your system' ${unixkind-v7}`
+	if test -d ../lib$unixkind
+	then
+		break
+	fi
+	echo 'Sorry, no such library is supplied.'
+done
+
+echo
+echo 'C News has libraries for small address spaces (16 bits) and big'
+echo 'ones (preferably 32 bits, but anything rather bigger than 16).'
+while true
+do
+	addrsize=`ask 'Which best describes your system' ${addrsize-big}`
+	if test -d ../lib$addrsize
+	then
+		break
+	fi
+	echo 'Sorry, no such library is supplied.'
+done
+
+echo
+echo 'Systems vary in whether certain library functions and system calls'
+echo 'are present.  C News contains reasonably-portable versions of the'
+echo 'possibly-missing library functions, and fake versions of the'
+echo 'possibly-missing system calls, but it needs to know which are missing.'
+newfake=
+for fn in $mightfake
+do
+	has=`notinlist "$fake" $fn.o`
+	tmp=`yesno "Does your system have  $fn()" $has`
+	case "$tmp" in
+	no)	newfake="$newfake $fn.o"	;;
+	esac
+done
+
+echo
+has=`notinlist "$fake" dbz.o`
+echo 'The news system uses a database package, typically the old "dbm"'
+echo 'library from Version 7 or a lookalike, as an indexing system.  We'
+echo 'supply a version of the "dbz" library, which is faster than "dbm",'
+echo 'uses much less disk space, and is program-compatible (although'
+echo 'it is *not* file-compatible, so anything else using the database'
+echo '[notably NNTP, if applicable] has to be relinked with it).  Dbz'
+echo 'is usually preferable to dbm, barring major backward-compatibility'
+tmp=`yesno 'problems.  Do you want to use our "dbz" library' $has`
+case "$tmp" in
+yes)	dbzlib=dbz
+	dbmopt=
+	storeval=yes
+	;;
+no)	echo 'Presumably you want to use the dbm library or some local'
+	echo 'equivalent, then.  What is the compile option, or filename,'
+	dbmopt=`ask 'needed to get it' ${dbmopt--ldbm}`
+	newfake="$newfake dbz.o"	# make dbm look like dbz
+	dbzlib=
+	has=`notinlist "$fake" dbmclose.o`
+	tmp=`yesno 'Does your dbm/dbz have a dbmclose() function' $has`
+	case "$tmp" in
+	no)	newfake="$newfake dbmclose.o"	;;
+	esac
+	echo 'Does the store() function in your dbm/dbz return a'
+	storeval=`yesno 'value (some old dbms did not)' ${storeval-yes}`
+	case "$storeval" in
+	no)	echo 'You will need to modify libfake/dbz.c/dbzstore() not'
+		echo 'to return the nonexistent value of store().'
+		;;
+	esac
+	;;
+esac
+
+fake="$newfake"
+
+echo
+echo 'Many systems, notably older ones, have implementations of the Standard'
+echo 'I/O library ("stdio") in which fgets, fputs, fread, and fwrite are'
+echo 'quite slow.  We supply versions of these functions which are faster'
+echo 'than those in any stdio we know; they are compatible with most old'
+echo 'AT&T-derived stdios.  (They tend not to work on modern System V,'
+echo 'but the modern System V stdio is respectably fast.)  They can be a'
+echo 'major performance win for C News.  There is a fairly thorough'
+echo 'compatibility check run after the library is built; as far as we'
+echo 'know, if the test works, the functions do (even on SunOS 4.0).'
+faststdio=`yesno 'Do you want to use our fast stdio library' ${faststdio-yes}`
+case "$faststdio" in
+yes)	echo 'Beware that the compatibility check will work best if'
+	echo 'the output of doit.bin is NOT redirected into a file'
+	echo 'or a pipe.'
+	;;
+esac
+
+has=`notinlist "$fake" strchr.o`
+case "$has" in
+yes)	echo
+	echo 'The strchr() function is usually slower than in-line C code'
+	echo 'when small strings are involved, unless your compiler is very'
+	echo 'clever and can generate in-line code for strchr().  Is your'
+	faststrchr=`yesno 'compiler that good (okay to guess)' ${faststrchr-no}`
+	;;
+esac
+
+echo
+echo 'Modern Unixes can generally use the setuid() system call to set the'
+echo 'real and effective user ids to the current effective user id.  In'
+echo 'old Unixes, only "root" can change the real user id.  This causes'
+echo 'various problems for C News.  C News provides a small program named'
+echo '"setnewsids" to run setuserid-root; all it does is change user and'
+echo 'group ids and then execute C News "relaynews".  It is needed only on'
+echo 'uncooperative systems.  Relaynews invokes it automatically if needed'
+echo '(and it then invokes relaynews in return).  Can this system do'
+sete=`yesno 'setuid(geteuid()) to change the real uid/gid' ${sete-yes}`
+
+echo
+echo 'Some systems have header files that others lack, and C News'
+echo 'is prepared to fake missing ones.'
+newfakehdrs=
+for h in $mightfakehdrs
+do
+	has=`notinlist "$fakehdrs" ../include/$h`
+	tmp=`yesno "Does your system have an ANSI-C-conforming <$h>" $has`
+	case "$tmp" in
+	no)	newfakehdrs="$newfakehdrs ../include/$h"	;;
+	esac
+done
+has=`notinlist "$fakehdrs" ../include/sys/timeb.h`
+tmp=`yesno 'Does your system have <sys/timeb.h>' $has`
+case "$tmp" in
+no)	newfakehdrs="$newfakehdrs ../include/sys/timeb.h"	;;
+esac
+fakehdrs="$newfakehdrs"
+
+echo
+echo 'Very old Unix systems needed the order of object modules in a library'
+echo 'chosen very carefully.  V7 introduced "ranlib" which removes the need'
+echo 'for this.  Recent System Vs have had the same facility built into "ar"'
+echo '(look for the "symdef" feature in the "ar" manual page) so "ranlib"'
+ranlib=`yesno 'is not needed.  Does your system use 'ranlib'' ${ranlib-no}`
+case "$ranlib" in
+no)	symdef=`yesno 'Does your "ar" have a "symdef" feature' ${symdef-yes}`
+	case "$symdef" in
+	no)	echo 'You have trouble and may need to modify doit.bin before'
+		echo 'running it.  It will assume "ranlib" is present.'
+		ranlib=yes
+		;;
+	esac
+	;;
+yes)	symdef=no		;;
+esac
+
+echo
+echo 'Historically the C compiler is named "cc", but this is not true on'
+echo 'some systems, and on others there are several different C compilers.'
+cc=`ask 'What is the name of the C compiler to be used' ${cc-cc}`
+
+echo
+echo 'Historically the only normal compilation option needed for most'
+echo 'programs is -O, but again compilers, especially newer ones, differ.'
+case "$dbzlib" in
+'dbz')	echo '(NOTE:  many 386 compilers miscompile dbz if -O is used!)' ;;
+esac
+copts="`ask 'What options should be given to the compiler' \"${copts--O}\"`"
+
+echo
+echo 'The final linking ("ld") step of compiling might need an option,'
+echo 'such as -n or -i, to produce the preferred form of executable file.'
+echo 'On most modern systems the default is right.  What options, if any,'
+ldopts="`ask 'should be given for linking' \"${ldopts-}\"`"
+
+echo
+echo 'On unusual systems it may be necessary to link C News programs with'
+echo 'libraries other than the usual C library.  These can be specified as'
+echo 'either full pathnames or -l... options.  What libraries, in addition'
+echo 'to the one(s) picked up automatically by the compiler, should be used'
+postlibs="`ask 'when linking C News' \"${postlibs-}\"`"
+
+echo
+hostname=`yesno 'Does your system have a "hostname" command' ${hostname-yes}`
+case "$hostname" in
+yes)	uname=no	;;
+no)	uname=`yesno 'Does it have a "uname -n" command' ${uname-yes}`	;;
+esac
+
+echo
+echo 'C News tries to limit the backlog of news batches spooled up for'
+echo 'transmission to a site, to control use of disk space.  To do this,'
+echo 'it needs to be able to determine the length of the queue of news'
+echo 'batches for a particular site.  This is UUCP-version-dependent.'
+echo 'There is a good chance that you will have to customize the "queuelen"'
+echo 'program.  C News knows about several versions:'
+echo '	tlr	Taylor UUCP'
+echo '	hdb	Honey DanBer, aka Basic Networking Utilities'
+echo '	sub	old uucp with subdirectories (e.g. /usr/spool/uucp/C.)'
+echo '	old	very old uucp, no subdirectories'
+echo '	pre	prehistoric uucp, no subdirectories, no -g option on uux'
+echo "	null	don't run uucp or don't care about queue lengths"
+while true
+do
+	uucptype=`ask 'Which one is most appropriate' ${uucptype-hdb}`
+	case "$uucptype" in
+	sub|old)	echo 'Beware -- test "queuelen" to make sure it works.'	;;
+	esac
+	case "$uucptype" in
+	tlr|hdb|sub|old|pre|null)	break	;;
+	esac
+	echo 'Sorry, no such choice is available.'
+done
+
+echo
+echo 'C News often wants to ask how much disk space is available.  The'
+echo 'format of output from the "df" command unfortunately varies a lot,'
+echo 'as does the availability of a system call to get the same information.'
+echo 'C News knows about several different versions (the first three are'
+echo 'preferred):'
+echo '	statfs	system with standard statfs() (SunOS, 4.4BSD, not System V)'
+echo '	ustat	system with ustat() (most System Vs)'
+echo "	ultrix	DEC Ultrix with DEC's own bizarre statfs()"
+echo '	bsd	4.2/4.3BSD'
+echo '	sysv	old System Vs'
+echo '	xenix	some (all?) Xenixes; some System Vs, e.g. Microport, HP?'
+echo '	sgi	Silicon Graphics Iris systems'
+echo '	v7	plain old style:  no headers or fluff, just name and number'
+echo "	null	don't know or don't care how much space is available"
+while true
+do
+	dftype=`ask 'Which one is most appropriate' ${dftype-bsd}`
+	case "$dftype" in
+	sysv|xenix)
+		echo 'Beware -- test "spacefor" to make sure it works.'
+		echo 'System V "df" formats vary widely, indeed wildly.'
+		echo '"Consider it standard".  Sure.'
+		;;
+	ustat)	echo 'The block size defined in doustat.c (512) may be'
+		echo 'too conservative, as many modern System V filesystems'
+		echo 'use a 1024-byte block.  There is no way to determine'
+		echo 'this automatically and portably.'
+		;;
+	esac
+	case "$dftype" in
+	ustat|statfs|bsd|sysv|sgi|ultrix|xenix|v7|null)	break	;;
+	esac
+	echo 'Sorry, no such choice is available.'
+done
+
+echo
+echo 'Some "df" commands, especially on old systems, must be given the'
+echo 'name of a device.  Modern ones can be given any directory name and'
+echo 'the system handles the details of figuring out what device is meant.'
+echo 'A few will take a directory only if it is the "top" of a filesystem.'
+dfdirs=`yesno 'Will "df" accept any directory name as an argument' ${dfdirs-yes}`
+case "$dfdirs" in
+no)	echo 'You are going to have to customize "spacefor" for your system.'
+	echo 'It will be generated assuming that directory names do work.'
+	;;
+esac
+
+echo
+archive=`yesno 'Are you planning to use expire to archive news on disk' ${archive-no}`
+case "$archive" in
+yes)	echo 'You probably want to customize the "archive" entry in'
+	echo '"spacefor" so it knows where your archiving is done and how'
+	echo 'much space you want free there.'
+	;;
+esac
+
+echo
+spacelow=`yesno 'Are you particularly short of disk space' ${spacelow-no}`
+case "$spacelow" in
+yes)	echo 'You may want to reconsider whether you really want to get'
+	echo 'news, unless you are getting only a very small set of groups.'
+	echo 'In any case, you definitely want to inspect "spacefor" and'
+	echo 'change some of its thresholds for free space.  BE WARNED'
+	echo 'that C News is not built to run on a brim-full file system;'
+	echo 'it relies on simple, rough space checks on the assumption that'
+	echo 'there is a substantial cushion of free space.'
+	;;
+no)	echo 'You may want to inspect "spacefor" to make sure its defaults'
+	echo 'for things like desired free space are appropriate for your'
+	echo 'system, although the defaults are fairly conservative.'
+	;;
+esac
+
+echo
+echo 'It is very difficult to do anything useful with incoming news when'
+echo 'there is no space for it.  Normally, C News simply discards it and'
+echo 'mails a trouble report.  On a single-user system, it may be better'
+echo 'to just have the news reception stall until more space becomes'
+echo 'available.  Warning:  this may stall processing of other incoming'
+echo 'traffic, e.g. mail, as well, and the queue of unprocessed traffic'
+echo 'may well grow until your disk fills up.  Should news reception'
+inputstall=`yesno 'stall if space gets short' ${inputstall-no}`
+
+echo
+echo 'News processing is much more efficient when done in bulk, so C News'
+echo 'normally just saves incoming news and processes it once an hour.'
+echo 'If you have ample resources and are wildly impatient to make news'
+echo 'available the instant it arrives, that is expensive but possible.'
+immediate=`yesno 'Do you want immediate processing' ${immediate-no}`
+
+echo
+echo 'Are you running C News on a group of machines hooked together with NFS,'
+echo 'run essentially as a single system with a single administration,'
+nfsgroup=`yesno 'with articles filed on one "server" machine' ${nfsgroup-no}`
+case "$nfsgroup" in
+yes)	case "$hostname$uname" in
+	'nono')	echo 'With a server but no "hostname" command, you will have'
+		echo 'problems and will probably have to tinker by hand to'
+		echo 'get a fake "hostname" that does the right thing.  The'
+		echo 'generated files will assume you have "hostname".'
+		hostname=yes
+		;;
+	esac
+	case "$uname" in
+	yes)	tmp="uname -n"	;;
+	no)	tmp="hostname"	;;
+	esac
+	server=`ask "What is the \"$tmp\" name of the server" ${server-newsie}`
+	;;
+no)	server=newsie		;;
+esac
+
+echo
+echo 'Several programs need to know an overall name for the system news is'
+echo 'being run on, where "system" may include multiple machines if they'
+echo 'share a common set of control files and articles; this is used in'
+echo 'article headers and related places.  For uucp sites, this usually'
+echo 'should be the uucp name.  It is VITAL that you and your neighboring'
+echo 'sites agree on this name -- if their news systems know you by a'
+echo 'different name, or even a slightly-different variation of the same'
+echo 'overall name, there will be trouble.  What is the name of the'
+whoami="`ask 'overall system for news purposes' \"${whoami-nowhere}\"`"
+
+echo
+case "$whoami" in
+*.*)	tmp="$whoami"		;;
+*)	tmp="$whoami.uucp"	;;
+esac
+echo 'The "From:" lines of news postings, on the other hand, should carry'
+echo 'a mailing address, which in particular should be a domain address'
+echo 'for sites that have one.  What is the mailing-address name of this'
+mailname="`ask 'system, preferably a domain address' \"${mailname-$tmp}\"`"
+
+echo
+echo 'What is the name of the organization, for insertion into articles'
+tmp="${organization-Godcorp}"
+organization="`ask 'posted from here' \"${tmp}\"`"
+
+echo
+echo 'Manual pages are normally stored in a tree structure under /usr/man.'
+echo 'Local practices vary a great deal, however, and System V has also'
+echo 'introduced some bizarre distortions into this once-simple structure.'
+manpages=`ask 'What is the top-level manual-page directory' ${manpages-/usr/man}`
+
+echo
+chaps='1 5 8'
+echo 'C News adds manual pages to chapters 1 (programs), 5 (files), and'
+echo '8 (administrative programs).  These chapter numbers have changed'
+echo 'in some variants of Unix.  Also, originally pages from chapter 5 (for'
+echo "example) were stored in $manpages/man5.  This has also changed in"
+manmess=`yesno 'some variants.  Has your system made such changes' ${manmess-no}`
+case "$manmess" in
+yes)	echo 'You will have to hand-edit the last few lines of doit.bin'
+	echo 'to install the manual pages where they belong on your system.'
+	;;
+esac
+
+echo
+echo 'The "rnews" and "cunbatch" commands (which are identical, the latter'
+echo 'being purely for backward compatibility with seriously-old systems)'
+echo 'have to be installed somewhere where uucp can find them to execute'
+echo 'them.  It is not normally necessary for users to be able to run'
+echo 'them, so they need not go in the directories searched for normal'
+echo 'commands... although uucp often searches only those directories.'
+rbin=`ask 'What directory should "rnews" and "cunbatch" go in' ${rbin-/bin}`
+
+echo
+echo 'Our "postnews", "readnews", and "checknews" are included mostly for'
+echo 'completeness.  They are very simple and crude compared to the user'
+echo 'interface many users are accustomed to.  As far as we know, B News'
+echo '(or other) versions should run fine with C News.  If you are already'
+echo 'running such user-interface software, you may not want to change.'
+doui=`yesno 'Do you want to install our user-interface programs' ${doui-yes}`
+case "$doui" in
+yes)	pgmdirs="$pgmdirs rna"	;;
+esac
+
+echo
+case "$doui" in
+no)	tmp='"inews"'	;;
+yes)	tmp='"inews", "postnews", "readnews", and "checknews"'	;;
+esac
+echo "The $tmp command(s) should"
+echo 'go in one of the directories searched for normal commands, so users'
+echo 'can run them without special arrangements.  What directory should'
+bin=`ask 'these commands go in' ${bin-/bin}`
+
+echo
+echo 'For replies to control messages, C News invokes "mail" (typically'
+echo '/bin/mail unless you make special arrangements) with either an'
+echo 'Internet-style "@" address or a uucp-style "!" address.  Internet'
+echo 'style is probably better... if your mailer supports it at all.'
+atok=`yesno 'Will "mail" handle "@" addresses' ${atok-no}`
+
+case "$doui" in
+yes)	echo
+	echo 'Postnews can supply a default newsgroup, to aid naive users in'
+	echo 'getting this right for simple postings.  What should the default'
+	postdefltgroup="`ask 'newsgroup be' \"${postdefltgroup-none}\"`"
+
+	echo
+	echo 'Postnews can supply a default distribution, to limit news to a'
+	echo 'local area unless the user specifically changes it.  This is'
+	echo 'probably wise.  What should the default postnews distribution'
+	postdefltdist="`ask 'be' \"${postdefltdist-world}\"`"
+
+	echo
+	echo 'Readnews has a default subscription list, for users who have'
+	echo 'not specified what newsgroups they wish to see.  What groups'
+	echo 'should be in that list (comma-separated with no spaces, please,'
+	defsub="`ask 'as they would be in a .newsrc)' \"${defsub-general}\"`"
+
+	echo
+	echo 'For administrative use, readnews has one newsgroup that users'
+	echo 'must subscribe to, even if they ask not to.  What group should'
+	mustsub="`ask 'that be' \"${mustsub-general}\"`"
+	;;
+esac
+
+echo
+echo 'The ihave/sendme protocol, although marginally useful in some cases,'
+echo 'is a security hole -- it lets another site ask for any article by'
+echo 'Message-ID, and if your Message-IDs are predictable enough (which'
+echo "C News's generally are not, mind you), that site can get any article"
+echo 'currently on your system.  Do you have any newsgroups containing'
+paranoid=`yesno 'confidential or proprietary material' ${paranoid-no}`
+case "$paranoid" in
+yes)	echo 'You may want to substitute relay/ihave.not.c for relay/ihave.c'
+	echo 'before running doit.bin, so that ihave/sendme is disabled'
+	echo 'at your site.'
+	;;
+esac
+
+echo
+echo 'building doit.bin...'
+>doit.bin
+if test ! -w doit.bin
+then
+	echo 'It appears that I cannot create doit.bin.  Aborting.'
+	exit 1
+fi
+(
+	echo '#! /bin/sh'
+	echo '# -i suppresses install, -t suppresses stdio test'
+	echo '# options are seen in first argument only, i.e. use -ti not -t -i'
+	echo "umask $newsumask"
+	case "$cc" in
+	cc)	ccc="COPTS='$copts'"	;;
+	*)	ccc="CC=$cc COPTS='$copts'"	;;
+	esac
+	case "$ldopts" in
+	'')					;;
+	*)	ccc="$ccc LDFLAGS='$ldopts'"	;;
+	esac
+	case "$postlibs" in
+	'')					;;
+	*)	ccc="$ccc POST='$postlibs'"	;;
+	esac
+	ccc="$ccc DBM=$dbmopt"
+	echo "set -x"
+	echo ': setting up for substitutions'
+	echo "cat >nsubstitutions <<'!'"
+	cat <<!
+# master substitutions file
+#
+# where the programs live (see also NEWSCONFIG)
+NEWSBIN		$newsbin
+# where the control files live
+NEWSCTL		$newsctl
+# where the articles live
+NEWSARTS	$newsarts
+# what PATH should be used for finding normal programs
+# (things not in NEWSBIN, that is)
+NEWSPATH	$newspath
+# the umask under which files should be created
+NEWSUMASK	$newsumask
+# who to send mail to when there is trouble
+NEWSMASTER	$newsmaster
+# configuration file that lets shell files pick up all of this
+NEWSCONFIG	$newsconfig
+!
+	echo '!'
+	echo 'if test -r substitutions && cmp -s nsubstitutions substitutions'
+	echo 'then'
+	echo '	rm nsubstitutions'
+	echo 'else'
+	echo '	mv nsubstitutions substitutions'
+	echo 'fi'
+	echo ': done'
+	echo ': building headers'
+	echo 'cd ..'
+	echo 'if test ! -d include'
+	echo 'then'
+	echo '	mkdir include include/sys'
+	echo 'fi'
+	echo 'cd h'
+	echo 'rm -f nnewshsed'
+	case "$faststrchr" in
+	no)	echo 'echo "/FASTSTRCHR.*qqq/s;^;/* ;" >>nnewshsed'	;;
+	esac
+	case "$addrsize" in
+	big)	echo 'echo "/SMALLMEM.*qqq/s;^;/* ;" >>nnewshsed'	;;
+	esac
+	echo 'if test -f newshsed && cmp -s nnewshsed newshsed'
+	echo 'then'
+	echo '	rm -f nnewshsed'
+	echo 'else'
+	echo '	mv nnewshsed newshsed'
+	echo 'fi'
+	echo "make all $ccc || exit 1"
+	echo 'cd ../hfake'
+ 	echo "sed -e '/NEEDED =/s~.*~NEEDED = $fakehdrs~' Makefile" '>M.$$'
+ 	echo 'mv -f M.$$ Makefile'
+	echo "make all $ccc || exit 1"
+	echo ": done"
+	echo ": making substitutions..."
+	echo "cd ../conf"
+	echo "make substs $ccc || exit 1"
+	echo ": done"
+	echo ': making library...'
+	case "$ranlib" in
+	yes)	echo "touch ../ranlibed ; sleep 2"	;;
+	esac
+	case "$faststdio" in
+	yes)	libstdio=libstdio	;;
+	no)	libstdio=		;;
+	esac
+	echo "for dir in lib$unixkind lib$addrsize libc libcnews $libstdio $dbzlib"
+	echo "do"
+	echo "	cd ../\$dir"
+	echo "	make u $ccc || exit 1"
+	echo "done"
+	echo "cd ../libfake"
+ 	echo "sed -e '/NEEDED =/s/.*/NEEDED = $fake/' Makefile" '>M.$$'
+ 	echo 'mv -f M.$$ Makefile'
+	echo "make u $ccc || exit 1"
+	echo "cd ../conf"
+	case "$ranlib" in
+	yes)	echo "make ../ranlibed $ccc || exit 1"	;;
+	esac
+	echo ': library done'
+	case "$faststdio" in
+	yes)	echo 'case "$1" in'
+		echo '-*t*)	;;'
+		echo '*)	: testing libstdio'
+		echo '	cd ../libstdio'
+		echo '	: produces some meaningless-looking output on terminal,'
+		echo '	: but do not redirect it -- it is important that stdio'
+		echo '	: think output is going to a terminal.'
+		echo "	make trials $ccc || exit 1"
+		echo '	: done'
+		echo '	;;'
+		echo 'esac'
+		;;
+	esac
+	echo ": making spacefor, queuelen, etc...."
+	echo 'cd ../conf'
+	echo "rm -f spacefor queuelen hostname setnewsids"
+	echo "make sf.$dftype $ccc || exit 1"
+	echo "cp sf.$dftype spacefor"
+	echo "make queuelen.$uucptype $ccc || exit 1"
+	echo "cp queuelen.$uucptype queuelen"
+	case "$hostname" in
+	no)	case "$uname" in
+		yes)	echo "echo 'uname -n' >hostname"	;;
+		no)	echo "echo 'echo $whoami' >hostname"	;;
+		esac
+	esac
+	echo ': done'
+	echo ': building programs'
+	case "$sete" in
+	no)	echo "make setnewsids NEWSUSER=$newsuid NEWSGROUP=$newsgid $ccc || exit 1"
+		;;
+	esac
+	echo "for dir in $pgmdirs"
+	echo "do"
+	echo "	cd ../\$dir"
+	echo "	make all $ccc || exit 1"
+	echo "done"
+	echo ": done"
+	echo ": building prototype control files"
+	echo "cd ../conf"
+	echo "rm -f $ctlf"
+	echo "cp config.proto config"
+	echo "echo '$mailname' >mailname"
+	echo "cat <<'!' >organization"
+	echo "$organization"
+	echo '!'
+	case "$nfsgroup" in
+	yes)	echo "echo '$server' >server"
+	esac
+	case "$atok" in
+	no)	echo echo "'replies must use paths' >replyusepath"	;;
+	esac
+	case "$immediate" in
+	yes)	echo echo yes ">rnews.immed"	;;
+	esac
+	case "$inputstall" in
+	yes)	echo echo yes ">rnews.stall"	;;
+	esac
+	case "$doui$postdefltdist" in
+	no*)							;;
+	yesworld)						;;
+	*)	echo "echo '$postdefltdist' >>postdefltdist"	;;
+	esac
+	case "$doui$postdefltgroup" in
+	no*)							;;
+	yesnone)						;;
+	*)	echo "echo '$postdefltgroup' >>postdefltgroup"	;;
+	esac
+	case "$doui" in
+	no)							;;
+	*)	echo "echo 'defsub	$defsub' >readnews.ctl"
+		echo "echo 'mustsub	$mustsub' >>readnews.ctl"
+		;;
+	esac
+	echo "echo '$whoami' >whoami"
+	echo "echo 'general 0000000000 0000000001 y' >active"
+	echo "echo 'news.announce.newusers 0000000000 0000000001 y' >>active"
+	echo "echo 'control 0000000000 0000000001 y' >>active"
+	echo "echo 'junk 0000000000 0000000001 y' >>active"
+	echo ">errlog"
+	echo ">history"
+	echo ">history.pag"
+	echo ">history.dir"
+	echo "echo 'general	general local news' >localgroups"
+	echo ">log"
+	echo "echo 'all	uunet!%s' >mailpaths"	# crude
+	echo "cp sys.proto sys"
+	echo "cd ../expire"
+	echo "make explists $ccc && cp explist.$archive explist"
+	echo "cd ../conf"
+	case "$archive" in
+	yes)	a='-a /where/ever'	;;
+	no)	a=			;;
+	esac
+	echo "cat >cron <<'!'"
+	cat <<!
+0,15,30,45 *	1-31 *	0-6	su $newsuid -c '$newsbin/input/newsrun'
+30 8	1-31 *	1-5	su $newsuid -c '$newsbin/input/newsrunning off'
+00 17	1-31 *	1-5	su $newsuid -c '$newsbin/input/newsrunning on'
+40 *	1-31 *	0-6	su $newsuid -c '$newsbin/batch/sendbatches'
+59 0	1-31 *	0-6	su $newsuid -c '$newsbin/expire/doexpire $a'
+10 8	1-31 *	0-6	su $newsuid -c '$newsbin/maint/newsdaily'
+00 5,13,21	1-31 *	0-6	su $newsuid -c '$newsbin/maint/newswatch | mail $newsmaster'
+!
+	echo "!"
+	echo "echo 'su $newsuid -c $newsbin/maint/newsboot' >rc"
+	echo ": done"
+	echo 'case "$1" in'
+	echo '-*i*)	exit 0	;;'
+	echo 'esac'
+	echo ': installing programs'
+	echo "for dir in $pgmdirs"
+	echo "do"
+	echo "	cd ../\$dir"
+	echo "	make bininstall BIN=$bin RBIN=$rbin $ccc || exit 1"
+	echo "done"
+	echo ": done"
+	echo ': installing manual pages'
+	echo 'cd ../man'
+	case "$doui" in
+	yes)	exclude='!!nothing!!'	;;
+	no)	exclude='^(read|post|check)news\.'	;;
+	esac
+	for chap in $chaps
+	do
+		for f in `ls ../man | egrep -v "$exclude" | egrep "\.$chap\$"`
+		do
+			echo "cp $f $manpages/man$chap/$f"
+		done
+	done
+	echo ': done'
+) >>doit.bin
+echo 'done'
+
+echo
+echo 'building doit.news...'
+>doit.news
+if test ! -w doit.news
+then
+	echo 'It appears that I cannot create doit.news.  Aborting.'
+	exit 1
+fi
+(
+	echo '#! /bin/sh'
+	echo "umask $newsumask"
+	echo 'set -x'
+	echo ': installing programs'
+	echo "for dir in $pgmdirs"
+	echo "do"
+	echo "	cd ../\$dir"
+	echo "	make newsinstall BIN=$bin RBIN=$rbin $ccc || exit 1"
+	echo "done"
+	echo ": done"
+	echo ": installing control files"
+	echo "cd ../conf"
+	echo "for f in $ctlf"
+	echo "do"
+	echo "	if test -r $newsctl/\$f"
+	echo "	then"
+	echo "		echo \"$newsctl/\$f already exists; left unchanged\""
+	echo "	elif test ! -r \$f"
+	echo "	then"
+	echo "		: \"\$f\" not wanted"
+	echo "	else"
+	echo "		cp \$f $newsctl/\$f"
+	echo "	fi"
+	echo "done"
+	echo "if test -r $newsconfig"
+	echo "then"
+	echo "	cp $newsconfig $newsconfig.old"
+	echo "fi"
+	echo "cp config $newsconfig"
+	echo "chmod +x $newsconfig"
+	echo ": It is virtually certain that some of those control files"
+	echo ": need modifying to suit your system.  In particular, you"
+	echo ": should pick up a current 'active' file from your neighbors."
+	echo ": done"
+) >>doit.news
+echo 'done'
+
+echo
+echo 'building again.root...'
+>again.root
+if test ! -w again.root
+then
+	echo 'It appears that I cannot create again.root.  Aborting.'
+	exit 1
+fi
+(
+	echo '#! /bin/sh'
+	echo "umask $newsumask"
+	echo 'set -x'
+	case "$sete" in
+	no)	echo ": installing setnewsids"
+		echo "cp setnewsids $newsctl"
+		echo "$chown root $newsctl/setnewsids"
+		echo "chmod u+s $newsctl/setnewsids"
+		echo ": done"
+		;;
+	esac
+	echo ": setting uids for setuid programs..."
+	them="$newsbin/input/newsspool $newsbin/relay/relaynews"
+	case "$chboth" in
+	yes)	echo "$chown $newsuid.$newsgid $them"	;;
+	*)	echo "$chown $newsuid $them"
+		echo "$chgrp $newsgid $them"
+		;;
+	esac
+	echo "chmod u+s,g+s $them"
+	echo ": done"
+) >>again.root
+echo 'done'
+
+echo
+case "$rewrite" in
+no)	;;
+yes)	echo
+	echo 'saving defaults...'
+	rm -f $memory
+	>$memory
+	warn='# These answers are interdependent; do not edit this file!'
+	if test ! -w $memory
+	then
+		echo 'It appears that I cannot save the defaults.'
+	else
+		(
+			for v in $vars
+			do
+				echo "$warn"
+				if test " $v" = " organization"
+				then
+					echo "organization=\"$organization\""
+				else
+					# even this horror botches metachars in var
+					eval "echo $v=\\\"\"\$$v\"\\\""
+				fi
+			done
+		) >>$memory
+		echo 'done'
+	fi
+	chmod -w $memory
+	;;
+esac
+
+echo
+chmod +x doit.root doit.bin doit.news again.root
+echo "You should now run doit.root as root, doit.bin as $binuid, doit.news"
+echo "as $newsuid, and again.root as root, in that order.  (This assumes"
+echo "that the source directories are owned by $binuid.  If you need to do"
+echo "installation work by hand, run 'doit.bin -i' as the owner; this will"
+echo "create the programs but won't install them.)  (It is not necessary"
+echo "to log in as these users; use of 'su' suffices.)  Finally, you will"
+echo "want to add the contents of 'cron', or something similar, to your"
+echo "cron's work-to-be-done file(s), and the contents of 'rc', or something"
+echo "similar, to /etc/rc or whatever your system executes when booting."
+echo
+echo '"make gclean" will clean up everything afterwards.  "make lclean"'
+echo 'does a less drastic cleanup affecting only the library directories.'
+echo '"make spotless" does "make gclean" and also removes the doit files.'
+echo
+echo 'Good luck and happy news reading.'

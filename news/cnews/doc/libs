@@ -1,0 +1,394 @@
+.Ch "A Tour Through the C News Libraries and Include Files"
+.Ix libraries
+.Ix files include
+.SH
+libc and friends
+.Df libc
+.LP
+.I libc
+contains routines that are sufficiently useful
+and general that they could profitably be added to
+one's C library.
+Indeed,
+on some systems they are in the C library.
+Notable inventions include
+.I fgetmfs
+.Df fgetmfs
+.Ix "read long lines"
+which safely reads arbitrarily-long input lines;
+it has an
+.B fgetmfs.h
+over in the header directories.
+.I ldiv
+.Df ldiv
+is the ANSI one,
+if you need it.
+.I memlist
+.Df memlist
+is a
+package to ease keeping track of a lot of allocated memory.
+.I stdfdopen
+.Df stdfdopen
+is invoked by setuid programs
+to ensure that the standard file descriptors are indeed open,
+opening
+.B /dev/null
+on each closed standard descriptor.
+.\".B libc/memcpy.fast
+.\"contains some alternate
+.\"implementations of
+.\".I memcpy (3)
+.\"which may be faster than the ones in your local C library.
+.LP
+.B libstdio
+.Df libstdio
+.Ix stdio "faster internals"
+contains new (faster) guts for
+the original
+.UX
+.I stdio
+library;
+if they compile on your V7,
+4BSD
+or System III
+system,
+you may want to use them instead of the default versions
+in your C library.
+On System V,
+these routines are only slightly faster than the versions in the C library.
+.LP
+.B libfake
+.Df libfake
+contains things that probably should be in your C library,
+but might not be,
+and a couple of fake routines for system calls
+you might not have.
+.SH
+libcnews
+.LP
+.Df libcnews
+.B libcnews
+contains functions of general use to news software,
+but not the world at large.
+.I complain
+.Df complain
+is like
+.I warning ,
+but never prints the symbolic value of
+.I errno .
+.PP
+.Ix lock
+.Df lockdebug
+.Df newslock
+.Df newsunlock
+.Df errunlock
+.Df nemalloc
+There is a locking package,
+containing
+.I lockdebug ,
+.I newslock ,
+.I newsunlock ,
+.I errunlock ,
+and
+.I nemalloc .
+.I lockdebug
+enables or disables lock debugging.
+.I newslock
+attempts to lock
+the news transport layer
+against
+read-then-write access to the
+.B active
+file,
+writing to the
+.Ix history
+.Ix files batch
+.B history *,
+.B log ,
+.B errlog ,
+and batch files.
+It returns only when it has the lock;
+in the meantime it sleeps and retries until it gets the lock.
+There is no timeout;
+this is a feature.
+.I newsunlock
+removes the above-mentioned lock
+if this process locked the news system.
+.I errunlock
+is like
+.I error
+except that it
+unlocks the news system
+(via
+.I newsunlock)
+before exiting;
+it is should always be called instead of
+.I exit (3)
+or
+.I exit (2)
+if there is any chance that this process has locked the news system.
+.I nemalloc
+is like
+.I emalloc
+but it calls
+.I errunlock
+if it can't allocate memory.
+.PP
+.Ix ltoza
+.I ltoza
+converts a
+.B "long int"
+to a string of a given width,
+containing the decimal representation,
+zero-padding as needed on the left.
+.I ltozan
+.Ix ltozan
+is like
+.I ltoza
+but omits the terminating NUL,
+so it can be used to overwrite a string without truncating it.
+.I ngmatch
+.Ix ngmatch
+.Ix "newsgroup matching"
+returns a truth-value
+resulting from comparing
+a list of newsgroup patterns
+and
+a list of newsgroups.
+One may substitute ``distribution'' for ``newsgroup''.
+.PP
+.Ix files names
+.Ix configuration
+.Df artfile
+.Df fullartfile
+.Df ctlfile
+.Df binfile
+.Df cd
+.Df newsumask
+There is a package of pathname manipulators.
+.I artfile
+returns a name for its filename argument,
+assumed to be relative to
+.I $NEWSARTS ;
+.I fullartfile
+promises to return a fully-qualified path name.
+.I ctlfile
+returns a name for its filename argument,
+assumed to be relative to
+.I $NEWSCTL .
+.I binfile
+returns a name for its filename argument,
+assumed to be relative to
+.I $NEWSBIN .
+.I cd
+changes to its argument directory,
+check for errors,
+and notes the directory name,
+by making a private copy,
+for later optimisations.
+.I newsumask
+returns the value of
+.I $NEWSUMASK .
+.Df newspath
+.Df newsmaster
+.I newspath
+returns the value of
+.I $NEWSPATH .
+.I newsmaster
+returns the value of
+.I $NEWSMASTER .
+All these functions
+supply default values for the
+.I NEWS *
+variables if none are found in the environment.
+If values are found in the environment,
+they are used,
+and a function named
+.Df unprivileged
+.I unprivileged
+is called.
+.PP
+.Ix readline
+.I readline
+is like
+.I fgets ,
+but executes
+.I newslock
+upon encountering EOF
+and retries the read.
+This is used when reading growing files
+such as
+.B history
+or
+batch files.
+.Ix strlower
+.I strlower
+down-cases an entire string,
+in place.
+.Ix strsave
+.I strsave
+is like
+.I strdup
+but it calls
+.I nemalloc
+rather than
+.I emalloc .
+.Ix str3save
+.I str3save
+takes three strings,
+allocates space for their concatenation
+via
+.I nemalloc ,
+including terminating NUL,
+and concatenates them onto it.
+A
+.I NULL
+argument will be replaced by an empty string.
+.I timestamp
+writes a timestamp on a given stream,
+and returns the current time via an argument
+for later use.
+.SH
+Unix-variant-specific libraries
+.LP
+.Ix Unix variants
+There are several libraries that provide functions
+for talking to specific Unix variants.
+These are basically functions that change from one variant to another.
+.B libfake
+(see above) contains things which simply might not be there in a
+particular system.
+.LP
+These libraries all provide the same virtual interface to
+operating-system-dependent services:
+.Df fclsexec
+.Df fopenexcl
+.Df getcwd
+.Df gethostname
+.I fclsexec ,
+.I fopenexcl ,
+.I getcwd (3),
+and
+.I gethostname (3).
+Implementations for vanilla implementations of these
+.UX
+variants are provided:
+.Ix Unix V7
+Seventh Edition,
+.Ix Unix 4.1BSD
+including 4.1BSD
+(\c
+.B libv7 );
+.Df libv7
+Eighth
+and Ninth Editions
+.Ix Unix V8
+.Ix Unix V9
+.Df libv8
+(\c
+.B libv8 );
+4.2BSD and later
+.Ix Unix 4.2BSD
+.Df libbsd42
+(\c
+.B libbsd42 );
+System III and System V
+.Ix Unix "System III"
+.Ix Unix "System V"
+.Df libusg
+(\c
+.B libusg ).
+.I fclsexec
+sets the close-on-exec flag
+for a given
+.I stdio
+stream.
+.I fopenexcl
+performs an ``exclusive create'' open:
+the open fails if the file already exists.
+.SH
+Address-space-size-specific libraries
+.LP
+These libraries provide alternate versions of the
+.Ix active
+.Ix files active
+.Ix sys
+.Ix files sys
+.B active
+and
+.B sys
+file code:
+.Df libsmall
+.B libsmall
+should work on any machine,
+but is suboptimally fast;
+.B libbig
+.Df libbig
+has worked even on PDP-11s,
+.Ix machines PDP-11
+and is quite fast,
+but consumes memory without apology.
+.SH
+Include files
+.LP
+.B libh
+.Df libh
+contains include files
+unique to C news.
+.B news.h
+.Df news.h
+.Df files news.h
+defines a few limits,
+some file names,
+some types
+(\c
+.B boolean
+and
+.B statust ),
+some characters,
+some status bits,
+some macros for speed,
+and
+declares functions in
+.B libcnews
+or miscellaneous functions in
+.I relaynews
+(oops!).
+.Df config.h
+.Df files config.h
+.B config.h
+declares the pathname functions in
+.B libcnews .
+.Df fgetmfs.h
+.Df files fgetmfs.h
+.B fgetmfs.h
+declares symbolic values and macros for using
+.B fgetmfs .
+.Df libc.h
+.Df files libc.h
+.B libc.h
+is a start at a V9-like declaration of all of the C library.
+.Df memlist.h
+.Df files memlist.h
+.B memlist.h
+defines the interface to
+.B memlist .
+.LP
+.Df hfake
+.Df files hfake
+.B hfake
+contains a few include files that your system ought to have but might not.
+.Df stdlib.h
+.Df files stdlib.h
+.B stdlib.h
+is a degenerate ANSI
+.B stdlib.h .
+.Df string.h
+.Df files string.h
+.B string.h
+declares the string functions.
+.Df timeb.h
+.Df files timeb.h
+.B timeb.h
+declares the structure used by
+.I ftime .

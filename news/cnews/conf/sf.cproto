@@ -1,0 +1,31 @@
+#! /bin/sh
+# spacefor - determine available disk space
+# About how many things of $1 bytes will fit in the available space for
+# stuff of type $2 ("incoming", "articles", "control", "outbound $3",
+# or "archive") without cramping things too badly?
+#
+# You'll have to change this -- your blocksize and minimum-free-desired 
+# amounts will probably differ, and you may need to name filesystems
+# explicitly.  Note that all amounts are expressed in
+# target-filesystem blocks, not some arbitrary absolute unit.  (Absolute
+# units might be better but there is no agreement on what they should be.)
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/usr/lib/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+# file to look at, free blocks desired, and free inodes desired
+est=
+case "$2" in
+incoming)	arg="$NEWSARTS/in.coming" ; blocks=5000 ; inodes=1000	;;
+articles)	arg="$NEWSARTS" ; blocks=5000 ; inodes=1000 ; est='-e 3000' ;;
+control)	arg="$NEWSCTL" ; blocks=3000 ; inodes=100		;;
+outbound)	arg="/usr/spool/uucp" ; blocks=10000 ; inodes=1000	;;
+archive)	arg="$NEWSARTS" ; blocks=1 ; inodes=1 ; est='-e 3000'	;;
+*)		echo "$0: bad type argument \`$2'!!" >&2
+		exit 2 ;;
+esac
+
+exec dostatfs $est $1 $arg $blocks $inodes

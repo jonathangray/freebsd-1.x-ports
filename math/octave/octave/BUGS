@@ -1,0 +1,471 @@
+This file documents known bugs in Octave and describes where and how to
+report any bugs that you may find.  Copyright (C) 1992 John W. Eaton.
+You may copy, distribute, and modify it freely as long as you preserve
+this copyright notice and permission notice.
+
+Known Causes of Trouble with Octave
+***********************************
+
+   This section describes known problems that affect users of Octave.
+Most of these are not Octave bugs per se--if they were, we would fix
+them.  But the result for a user may be like the result of a bug.
+
+   Some of these problems are due to bugs in other software, some are
+missing features that are too much work to add, and some are places
+where people's opinions differ as to what is best.
+
+Actual Bugs We Haven't Fixed Yet
+================================
+
+   * Recursive function calls are not currently allowed.
+
+Installation Problems
+=====================
+
+   This is a list of problems (and some apparent problems which don't
+really mean anything is wrong) that may show up during installation of
+Octave.
+
+   * Problems with finite and isinf on systems that don't have `isinf()'
+     but do have `finite()'.
+
+     The copy of `math.h' supplied with libg++ version 2.3 (and possibly
+     other versions as well) declares `finite()' as
+          double finite (double);
+     even though some (many? all?) systems declare it as
+          int finite (double);
+
+     If the copy of `math.h' from libg++ was installed, you should edit
+     it so that the libg++ declaration of `finite()' matches the
+     system's.
+
+   * Problems compiling octave.cc on RS/6000 (and possibly other)
+     systems:
+
+     If octave.cc fails to compile due to parse errors in system include
+     files and undeclared subroutines like `gethostname' and `endpwent',
+     it is probably because not all of the libg++ include files have
+     been installed.  This appears to be a problem with libg++ version
+     2.3.  Here's a fix:
+
+     Apply the following patch to `libg++/config/rs6000.mh' and re-run
+     make install for libg++.
+
+          *** rs6000.mh~  Mon Aug 17 19:18:44 1992
+          --- rs6000.mh   Mon Dec 28 23:54:57 1992
+          ***************
+          *** 3,6 ****
+            # /usr/include/unistd.h has write(int, char*, unsigned) instead
+            # of write(int, const void*, size_t).  This causes problems due
+            # to g++ new pedantic dis-allowal of void* -> char* conversions.
+          ! G_CONFIG_ARGS = "HAVE_UNISTD=0 /*broken*/"
+          \ No newline at end of file
+          --- 3,11 ----
+            # /usr/include/unistd.h has write(int, char*, unsigned) instead
+            # of write(int, const void*, size_t).  This causes problems due
+            # to g++ new pedantic dis-allowal of void* -> char* conversions.
+          ! G_CONFIG_ARGS = "HAVE_UNISTD=0 /*broken*/"
+          !
+          ! # If the C include files are C++-ready (with extern "C"),
+          ! # define: HAVE_CPLUS_EXTERN = 1 and: WRAP_C_INCLUDES =
+          ! # If not, define HAVE_CPLUS_EXTERN = 0, and do not define WRAP_C_INCLUDES here
+          .
+          ! HAVE_CPLUS_EXTERN = 0
+
+   * Lots of warnings about `control reaches end of non-void function'
+     when compiling with -O.
+
+     This appears to be a problem with g++ and the definition of an
+     empty destructor in Complex.h from libg++.  Deleting the
+     declaration and definition of the (unnecessary) destructor from
+     Complex.h eliminates the warnings.
+
+   * If you don't have NPSOL but you still want to be able to solve
+     NLPs, or if you don't have QPSOL but you still want to solve QPs,
+     you'll need to find replacements or order them from Stanford.  If
+     you know of a freely redistributable replacement, please let us
+     know--we might be interested in distributing it with Octave.
+
+     You can get more information about NPSOL and QPSOL from
+
+          Stanford University
+          Office of Technology Licensing
+          857 Serra Street
+          Stanford CA 94305-6225
+          Tel: (415) 723-0651
+          Fax: (415) 725-7295
+
+     Octave may soon support FSQP, an NLP solver from Andre Tits
+     (andre@src.umd.edu) of the University of Maryland.  FSQP is
+     available free of charge to academic sites, but can not be
+     redistributed to third parties.
+
+Disappointments and Misunderstandings
+=====================================
+
+   These problems are perhaps regrettable, but we don't know any
+practical way around them.
+
+Reporting Bugs
+==============
+
+   Your bug reports play an essential role in making Octave reliable.
+
+   When you encounter a problem, the first thing to do is to see if it
+is already known.  *Note Trouble::.  If it isn't known, then you should
+report the problem.
+
+   Reporting a bug may help you by bringing a solution to your problem,
+or it may not.  In any case, the principal function of a bug report is
+to help the entire community by making the next version of Octave work
+better.  Bug reports are your contribution to the maintenance of Octave.
+
+   In order for a bug report to serve its purpose, you must include the
+information that makes it possible to fix the bug.
+
+Have You Found a Bug?
+=====================
+
+   If you are not sure whether you have found a bug, here are some
+guidelines:
+
+   * If Octave gets a fatal signal, for any input whatever, that is a
+     bug.  Reliable interpreters never crash.
+
+   * If Octave produces incorrect results, for any input whatever, that
+     is a bug.
+
+   * Some output may appear to be incorrect when it is in fact due to a
+     program whose behavior is undefined, which happened by chance to
+     give the desired results on another system.  For example, the
+     range operator may produce different results because of
+     differences in the way floating point arithmetic is handled on
+     various systems.
+
+   * If Octave produces an error message for valid input, that is a bug.
+
+   * If Octave does not produce an error message for invalid input,
+     that is a bug.  However, you should note that your idea of
+     "invalid input" might be my idea of "an extension" or "support for
+     traditional practice".
+
+     suggestions
+
+   * If you are an experienced user of programs like Octave, your
+     suggestions for improvement are welcome in any case.
+
+Where to Report Bugs
+====================
+
+   Send bug reports for Octave to:
+
+     bug-octave@che.utexas.edu
+
+   *Do not send bug reports to `help-octave'*.  Most users of Octave do
+not want to receive bug reports.  Those that do, have asked to be on
+`bug-octave'.
+
+   As a last resort, send bug reports on paper to:
+
+     Octave Bugs c/o John W. Eaton
+     Department of Chemical Engineering
+     The University of Texas at Austin
+     Austin, Texas 78712
+
+How to Report Bugs
+==================
+
+   The fundamental principle of reporting bugs usefully is this:
+*report all the facts*.  If you are not sure whether to state a fact or
+leave it out, state it!
+
+   Often people omit facts because they think they know what causes the
+problem and they conclude that some details don't matter.  Thus, you
+might assume that the name of the variable you use in an example does
+not matter.  Well, probably it doesn't, but one cannot be sure.
+Perhaps the bug is a stray memory reference which happens to fetch from
+the location where that name is stored in memory; perhaps, if the name
+were different, the contents of that location would fool the
+interpreter into doing the right thing despite the bug.  Play it safe
+and give a specific, complete example.  That is the easiest thing for
+you to do, and the most helpful.
+
+   Keep in mind that the purpose of a bug report is to enable someone to
+fix the bug if it is not known.  It isn't very important what happens if
+the bug is already known.  Therefore, always write your bug reports on
+the assumption that the bug is not known.
+
+   Sometimes people give a few sketchy facts and ask, "Does this ring a
+bell?"  This cannot help us fix a bug, so it is basically useless.  We
+respond by asking for enough details to enable us to investigate.  You
+might as well expedite matters by sending them to begin with.
+
+   Try to make your bug report self-contained.  If we have to ask you
+for more information, it is best if you include all the previous
+information in your response, as well as the information that was
+missing.
+
+   To enable someone to investigate the bug, you should include all
+these things:
+
+   * The version of Octave.  You can get this by noting the version
+     number that is printed when Octave starts, or running it with the
+     `-v' option.
+
+     Without this, we won't know whether there is any point in looking
+     for the bug in the current version of Octave.
+
+   * A complete input file that will reproduce the bug.
+
+     A single statement may not be enough of an example--the bug might
+     depend on other details that are missing from the single statement
+     where the error finally occurs.
+
+     Without a real example one can execute, all anyone can do about
+     your bug report is wish you luck.  It would be futile to try to
+     guess how to provoke the bug.
+
+   * The command arguments you gave Octave to execute that example and
+     observe the bug.  To guarantee you won't omit something important,
+     list all the options.
+
+     If we were to try to guess the arguments, we would probably guess
+     wrong and then we would not encounter the bug.
+
+   * The type of machine you are using, and the operating system name
+     and version number.
+
+   * The command-line arguments you gave to the `configure' command when
+     you installed the interpreter.
+
+   * A complete list of any modifications you have made to the
+     interpreter source.  (We don't promise to investigate the bug
+     unless it happens in an unmodified version of Octave.  But if
+     you've made modifications and don't tell us, then you are sending
+     us on a wild goose chase.)
+
+     Be precise about these changes--show a context diff for them.
+
+     Adding files of your own (such as a machine description for a
+     machine we don't support) is a modification of the interpreter
+     source.
+
+   * Details of any other deviations from the standard procedure for
+     installing Octave.
+
+   * A description of what behavior you observe that you believe is
+     incorrect.  For example, "The interpreter gets a fatal signal,"
+     or, "The output produced at line 208 is incorrect."
+
+     Of course, if the bug is that the interpreter gets a fatal signal,
+     then one can't miss it.  But if the bug is incorrect output, the
+     maintainer might not notice unless it is glaringly wrong.  None of
+     us has time to study all the code from a 50-line program just on
+     the chance that one instruction might be wrong.  We need `you' to
+     do this part!
+
+     Even if the problem you experience is a fatal signal, you should
+     still say so explicitly.  Suppose something strange is going on,
+     such as, your copy of the interpreter is out of synch, or you have
+     encountered a bug in the C library on your system.  Your copy
+     might crash and the copy here would not.  If you said to expect a
+     crash, then when the interpreter here fails to crash, we would
+     know that the bug was not happening.  If you don't say to expect a
+     crash, then we would not know whether the bug was happening.  We
+     would not be able to draw any conclusion from our observations.
+
+     Often the observed symptom is incorrect output when your program
+     is run.  Sad to say, this is not enough information unless the
+     program is short and simple.  None of us has time to study a large
+     program to figure out how it would work if compiled correctly,
+     much less which line of it was interpreted incorrectly.  So you
+     will have to do that.  Tell us which source line it is, and what
+     incorrect result happens when that line is executed.  A person who
+     understands the program can find this as easily as finding a bug
+     in the program itself.
+
+   * If you wish to suggest changes to the Octave source, send them as
+     context diffs.  If you even discuss something in the Octave source,
+     refer to it by context, not by line number.
+
+     The line numbers in the development sources don't match those in
+     your sources.  Your line numbers would convey no useful
+     information to the maintainers.
+
+   * Additional information from a debugger might enable someone to
+     find a problem on a machine which he does not have available.
+     However, you need to think when you collect this information if
+     you want it to have any chance of being useful.
+
+   Here are some things that are not necessary:
+
+   * A description of the envelope of the bug.
+
+     Often people who encounter a bug spend a lot of time investigating
+     which changes to the input file will make the bug go away and
+     which changes will not affect it.
+
+     This is often time consuming and not very useful, because the way
+     we will find the bug is by running a single example under the
+     debugger with breakpoints, not by pure deduction from a series of
+     examples.  You might as well save your time for something else.
+
+     Of course, if you can find a simpler example to report *instead* of
+     the original one, that is a convenience.  Errors in the output
+     will be easier to spot, running under the debugger will take less
+     time, etc.  Most Octave bugs involve just one function, so the
+     most straightforward way to simplify an example is to delete all
+     the function definitions except the one where the bug occurs.
+     Those earlier in the file may be replaced by external declarations
+     if the crucial function depends on them.
+
+     However, simplification is not vital; if you don't want to do
+     this, report the bug anyway and send the entire test case you used.
+
+   * A patch for the bug.
+
+     A patch for the bug is useful if it is a good one.  But don't omit
+     the necessary information, such as the test case, on the
+     assumption that a patch is all we need.  We might see problems
+     with your patch and decide to fix the problem another way, or we
+     might not understand it at all.
+
+     Sometimes with a program as complicated as Octave it is very hard
+     to construct an example that will make the program follow a
+     certain path through the code.  If you don't send the example, we
+     won't be able to construct one, so we won't be able to verify that
+     the bug is fixed.
+
+     And if we can't understand what bug you are trying to fix, or why
+     your patch should be an improvement, we won't install it.  A test
+     case will help us to understand.
+
+   * A guess about what the bug is or what it depends on.
+
+     Such guesses are usually wrong.  Even I can't guess right about
+     such things without first using the debugger to find the facts.
+
+Sending Patches for Octave
+==========================
+
+   If you would like to write bug fixes or improvements for Octave,
+that is very helpful.  When you send your changes, please follow these
+guidelines to avoid causing extra work for us in studying the patches.
+
+   If you don't follow these guidelines, your information might still be
+useful, but using it will take extra work.  Maintaining Octave is a lot
+of work in the best of circumstances, and we can't keep up unless you do
+your best to help.
+
+   * Send an explanation with your changes of what problem they fix or
+     what improvement they bring about.  For a bug fix, just include a
+     copy of the bug report, and explain why the change fixes the bug.
+
+     (Referring to a bug report is not as good as including it, because
+     then we will have to look it up, and we have probably already
+     deleted it if we've already fixed the bug.)
+
+   * Always include a proper bug report for the problem you think you
+     have fixed.  We need to convince ourselves that the change is
+     right before installing it.  Even if it is right, we might have
+     trouble judging it if we don't have a way to reproduce the problem.
+
+   * Include all the comments that are appropriate to help people
+     reading the source in the future understand why this change was
+     needed.
+
+   * Don't mix together changes made for different reasons.  Send them
+     *individually*.
+
+     If you make two changes for separate reasons, then we might not
+     want to install them both.  We might want to install just one.  If
+     you send them all jumbled together in a single set of diffs, we
+     have to do extra work to disentangle them--to figure out which
+     parts of the change serve which purpose.  If we don't have time
+     for this, we might have to ignore your changes entirely.
+
+     If you send each change as soon as you have written it, with its
+     own explanation, then the two changes never get tangled up, and we
+     can consider each one properly without any extra work to
+     disentangle them.
+
+     Ideally, each change you send should be impossible to subdivide
+     into parts that we might want to consider separately, because each
+     of its parts gets its motivation from the other parts.
+
+   * Send each change as soon as that change is finished.  Sometimes
+     people think they are helping us by accumulating many changes to
+     send them all together.  As explained above, this is absolutely
+     the worst thing you could do.
+
+     Since you should send each change separately, you might as well
+     send it right away.  That gives us the option of installing it
+     immediately if it is important.
+
+   * Use `diff -c' to make your diffs.  Diffs without context are hard
+     for us to install reliably.  More than that, they make it hard for
+     us to study the diffs to decide whether we want to install them.
+     Unidiff format is better than contextless diffs, but not as easy
+     to read as `-c' format.
+
+     If you have GNU diff, use `diff -cp', which shows the name of the
+     function that each change occurs in.
+
+   * Write the change log entries for your changes.  We get lots of
+     changes, and we don't have time to do all the change log writing
+     ourselves.
+
+     Read the `ChangeLog' file to see what sorts of information to put
+     in, and to learn the style that we use.  The purpose of the change
+     log is to show people where to find what was changed.  So you need
+     to be specific about what functions you changed; in large
+     functions, it's often helpful to indicate where within the
+     function the change was.
+
+     On the other hand, once you have shown people where to find the
+     change, you need not explain its purpose. Thus, if you add a new
+     function, all you need to say about it is that it is new.  If you
+     feel that the purpose needs explaining, it probably does--but the
+     explanation will be much more useful if you put it in comments in
+     the code.
+
+     If you would like your name to appear in the header line for who
+     made the change, send us the header line.
+
+   * When you write the fix, keep in mind that I can't install a change
+     that would break other systems.
+
+     People often suggest fixing a problem by changing
+     machine-independent files to do something special that a
+     particular system needs.  Sometimes it is totally obvious that
+     such changes would break Octave for almost all users.  We can't
+     possibly make a change like that.  At best it might tell us how to
+     write another patch that would solve the problem acceptably.
+
+     Sometimes people send fixes that *might* be an improvement in
+     general--but it is hard to be sure of this.  It's hard to install
+     such changes because we have to study them very carefully.  Of
+     course, a good explanation of the reasoning by which you concluded
+     the change was correct can help convince us.
+
+     Please help us keep up with the workload by designing the patch in
+     a form that is good to install.
+
+How To Get Help with Octave
+===========================
+
+   If you need help installing, using or changing Octave, the mailing
+list
+
+     help-octave@che.utexas.edu
+
+   exists for the discussion of Octave matters related to using,
+installing, and porting Octave.  If you would like to join the
+discussion, please send a short note to
+
+     help-octave-request@che.utexas.edu
+                 ^^^^^^^
+
+   *Please do not* send requests to be added or removed from the the
+mailing list, or other administrative trivia to the list itself.
+

@@ -1,0 +1,1071 @@
+
+
+
+
+
+
+
+
+
+                   NNNNeeeewwwwssss NNNNeeeeeeeedddd NNNNooootttt BBBBeeee SSSSlllloooowwww
+
+
+                       _G_e_o_f_f _C_o_l_l_y_e_r
+
+                 _D_e_p_a_r_t_m_e_n_t _o_f _S_t_a_t_i_s_t_i_c_s*
+                   _U_n_i_v_e_r_s_i_t_y _o_f _T_o_r_o_n_t_o
+                _u_t_z_o_o!_u_t_c_s_r_i!_u_t_f_r_a_s_e_r!_g_e_o_f_f
+
+
+                       _H_e_n_r_y _S_p_e_n_c_e_r
+
+                  _Z_o_o_l_o_g_y _C_o_m_p_u_t_e_r _S_y_s_t_e_m_s
+                   _U_n_i_v_e_r_s_i_t_y _o_f _T_o_r_o_n_t_o
+                        _u_t_z_o_o!_h_e_n_r_y
+
+
+                          _A_B_S_T_R_A_C_T
+
+          C news is a re-write, from  scratch,  of  the
+     `transport layer' of the Usenet software.  C rnews
+     runs at over 19 times the  speed  of  B  rnews;  C
+     expire runs in minutes rather than the hours taken
+     by B expire.  These performance improvements  were
+     (mostly)  quite  simple  and  straightforward, and
+     they exemplify general principles  of  performance
+     tuning.
+
+
+
+_1.  _H_i_s_t_o_r_y _a_n_d _M_o_t_i_v_a_t_i_o_n
+
+     In the beginning (of Usenet) (1979) was A news, written
+at  Duke  University  by Steve Bellovin, Stephen Daniel, Tom
+Truscott and others.   A  single  program,  _n_e_w_s,  received,
+relayed,  perused  and cleaned out news articles.  All arti-
+cles were stored in a single UNIX|- directory, which  made  A
+news  suitable  for  local  news  and low volumes of network
+news.  News articles were exchanged using a  simple  message
+format  in which the first five lines of a message contained
+the information  nowadays  found  in  the  article  headers:
+unique   article-id,  newsgroup(s),  author,  subject,  date
+posted.
+
+     As Usenet began to grow (1981), people  in  and  around
+the  University  of  California  at Berkeley, including Matt
+Glickman and Mark Horton, modified A news extensively.   The
+_________________________
+* Work done mostly while at U of T Computing Services.
+|- UNIX is a registered trademark of AT&T.
+
+
+
+
+                       April 18, 1990
+
+
+
+
+
+                           - 2 -
+
+
+articles of each newsgroup were now  stored  in  a  separate
+directory.   The  message  format was changed from the rigid
+and inextensible A news header format to one  conforming  to
+ARPA  RFC  822  (the  current ARPA mail-message format stan-
+dard).  _N_e_w_s was broken into  separate  programs:  _r_e_a_d_n_e_w_s,
+_i_n_e_w_s  (aka  _r_n_e_w_s),  and  _e_x_p_i_r_e.   The  authors dubbed the
+result ``B news''.  Since the release  of  B  news,  it  has
+replaced A news almost|= everywhere on Usenet.
+
+     It soon became clear that sending  individual  articles
+from  machine  to  machine as separate _u_u_c_p transactions was
+unacceptably slow, in part because it  produced  large  _u_u_c_p
+spool  directories,  which are searched quite slowly* by the
+kernel.  Sites began to _b_a_t_c_h articles into batches of (typ-
+ically)  50,000-100,000  bytes  for  transmission  to  other
+machines.
+
+     At about this time, B news was  changed  to  file  news
+articles     in     a     tree,     as     (for     example)
+/usr/spool/news/net/women/only/123,    rather    than     as
+/usr/spool/news/net.women.only/123.  The motive for this was
+primarily elimination of problems with long newsgroup names,
+but  shortening directories (and thus speeding searches) was
+also a consideration.
+
+     As Usenet traffic continued to grow explosively,  sites
+began  to  use  data  compression on news batches.  The main
+objective was to reduce expensive long-distance phone  time,
+but  again  performance  improved a bit: the extra processor
+time used for compression and decompression  was  more  than
+gained  back by the reduction in processor time used by _u_u_c_p
+itself.
+
+     Unfortunately, B news has been modified by many  people
+since 1981, and has mutated repeatedly to match the changing
+nature of Usenet.  It has become complex, slow,  and  diffi-
+cult to maintain.
+
+     During 1985, we observed that the  nightly  arrival  of
+new news and expiry of old news were consuming resources far
+out of proportion to the volume of data  involved|-.   _E_x_p_i_r_e
+often  ran  for 90 minutes, and _r_n_e_w_s processing averaged 10
+seconds or more per article.  Both programs tended to  crip-
+ple  systems  by  performing  much  disk i/o and eating much
+system-mode CPU time.  _U_t_c_s was running B 2.10.1  news  then
+_________________________
+|= AT&T Bell Laboratories Research still runs A news for
+local newsgroups.
+* Recent _u_u_c_ps (notably  Honey  DanBer)  provide  spool
+sub-directories,  and  recent  4BSD  (4.3BSD and later)
+kernels  provide  linear  (as  opposed  to   quadratic)
+directory searching, both of which help this problem.
+|- Never mind the cost/benefit ratio.
+
+
+
+
+                       April 18, 1990
+
+
+
+
+
+                           - 3 -
+
+
+and _u_t_z_o_o was running B 2.10 news.  Although  newer  B  news
+releases  were available, they offered little beyond B 2.10,
+and it was often necessary to  regression-test  new  B  news
+releases to verify that reported, published bug fixes had in
+fact been applied.
+
+     Spencer acted first and rewrote _e_x_p_i_r_e from the  ground
+up.   Though  it  initially  lacked  any  form  of selective
+expiry, this _e_x_p_i_r_e, when run each night, finished in  about
+15  minutes.   (This  was  on 750-class machines holding all
+Usenet news and expiring after 14 days.)
+
+     Collyer observed in November 1985 that  B  _r_n_e_w_s,  upon
+receiving  a  batch  of  news,  immediately _e_x_e_ced a trivial
+unbatcher which copied each article into  a  temporary  file
+and  then forked and _e_x_e_ced B rnews again.  Such a technique
+is clearly overkill for articles averaging about 3,000 bytes
+each.   Preliminary experiments failed to produce a modified
+B rnews that could unravel a batch without forking.  Consul-
+tation  with  Rick  Adams,  the  current  B-news maintainer,
+revealed that this same technique remained in the upcoming B
+news  release  (variously  B  2.10.3 or B 2.11).  Within one
+week|=, a from-scratch C _r_n_e_w_s  prototype  was  working  well
+enough to run experimentally on a `leaf' machine receiving a
+subset of news.
+
+     This prototype version lacked  a  good  many  necessary
+amenities, and over the next eight months it was enhanced to
+bring it up  to  full  functionality.   It  was  also  tuned
+heavily to improve its performance, since it was faster than
+B _r_n_e_w_s but still not fast enough to make us happy.
+
+     Once the _r_n_e_w_s newsgroup name  matching  routines  were
+working,  Spencer  revised  _e_x_p_i_r_e  to add selective expiry,
+specified in a control file.  Recently, we have also revised
+our  old batcher heavily, largely to add capability but with
+an eye on performance.
+
+_2.  _R_n_e_w_s _P_e_r_f_o_r_m_a_n_c_e
+
+     The basic objective of C  news  was  simpler  code  and
+higher  performance.   This  may  sound trite, but note that
+performance was an explicit objective.  That was  important.
+_P_r_o_g_r_a_m_s _w_i_l_l _s_e_l_d_o_m _r_u_n _f_a_s_t_e_r _u_n_l_e_s_s _y_o_u _c_a_r_e _a_b_o_u_t _m_a_k_i_n_g
+_t_h_e_m _r_u_n _f_a_s_t_e_r.
+
+     `Faster' implies comparison to a slower version.  Know-
+ing  the  value of improvements, and assessing this in rela-
+tion to their cost, requires knowing the performance of  the
+unimproved  version.   Collyer  kept detailed records of his
+work on _r_n_e_w_s, so he could see  how  much  progress  he  was
+_________________________
+|= 40 hours, Collyer didn't have to work hard.
+
+
+
+
+                       April 18, 1990
+
+
+
+
+
+                           - 4 -
+
+
+making.  See the Appendix for the final result.  _T_o _k_n_o_w _h_o_w
+_t_o _g_e_t _s_o_m_e_w_h_e_r_e, _y_o_u _m_u_s_t _k_n_o_w _w_h_e_r_e _y_o_u _a_r_e _s_t_a_r_t_i_n_g _f_r_o_m.
+
+     The first functional C _r_n_e_w_s ran at about 3  times  the
+speed  of  B  _r_n_e_w_s.  We had assumed that merely eliminating
+the fork/exec on each article would  give  a  factor  of  10
+improvement,  so  this  was disappointing.  _A_v_o_i_d_i_n_g _o_b_v_i_o_u_s
+_p_e_r_f_o_r_m_a_n_c_e _d_i_s_a_s_t_e_r_s _h_e_l_p_s...  _b_u_t _i_t'_s _n_o_t _a_l_w_a_y_s _e_n_o_u_g_h.
+
+     Profiling, first with _p_r_o_f(1) and later  with  4.2BSD's
+_g_p_r_o_f(1),  and rewriting of the bottlenecks thus discovered,
+eventually brought the speed up to over 19 times  the  speed
+of  B _r_n_e_w_s.  This required a number of write-profile-study-
+rewrite cycles.  There is undoubtedly still a  lot  of  code
+which  could be faster than it is, but since profiling shows
+that it doesn't have a significant impact on overall perfor-
+mance,  who  cares?   _T_o  _l_o_c_a_t_e  _p_e_r_f_o_r_m_a_n_c_e _p_r_o_b_l_e_m_s, _l_o_o_k
+_t_h_r_o_u_g_h _t_h_e _e_y_e_s _o_f _t_h_y _p_r_o_f_i_l_e_r.
+
+     Collyer first experimented with using  _r_e_a_d  and  _w_r_i_t_e
+system calls instead of _f_r_e_a_d and _f_w_r_i_t_e, and got a substan-
+tial saving.  Though the  usage  of  system  calls  in  this
+experiment was unportable, the saving eventually lead him to
+rewrite _f_r_e_a_d and _f_w_r_i_t_e from scratch to reduce the per-byte
+overheads.  This helped noticeably, since pre-System-V _f_r_e_a_d
+and _f_w_r_i_t_e are really quite  inefficient.   _I_f  _t_h_y  _l_i_b_r_a_r_y
+_f_u_n_c_t_i_o_n _o_f_f_e_n_d_s _t_h_e_e, _p_l_u_c_k _i_t _o_u_t _a_n_d _f_i_x _i_t.
+
+     At the time, C _r_n_e_w_s was doing fairly fine-grain  lock-
+ing,  essentially  locking  each  file independently on each
+use.  News doesn't need the resulting potential concurrency,
+especially when _r_n_e_w_s runs relatively quickly, and the lock-
+ing was clearly a  substantial  fraction  of  the  execution
+time.  C _r_n_e_w_s was changed to use B-news compatible locking,
+with a single lock for the news system as a whole.   _S_i_m_p_l_i_-
+_c_i_t_y _a_n_d _s_p_e_e_d _o_f_t_e_n _g_o _t_o_g_e_t_h_e_r.
+
+     When sending articles to a site using  batching,  _r_n_e_w_s
+just  appends  the  filename of each article to a _b_a_t_c_h _f_i_l_e
+for that site.  The batch file is  later  processed  by  the
+batcher.  In principle, batching is an option, and different
+sites may get different sets of  newsgroups.   In  practice,
+few  articles  are ever sent unbatched, and most articles go
+to all sites fed by a given system.  This means  that  _r_n_e_w_s
+is  repeatedly  appending  lines  to  the  same set of batch
+files.  Noticing this, Collyer changed C _r_n_e_w_s to keep these
+files open, rather than re-opening them for every  article*.
+_O_n_c_e _y_o_u'_v_e _g_o_t _i_t, _h_a_n_g _o_n_t_o _i_t.
+_________________________
+* The price for this tactic is that the code has to  be
+prepared  for  the possibility that the number of sites
+being fed  exceeds  the  supply  of  file  descriptors.
+Fortunately, that is rare.
+
+
+
+
+                       April 18, 1990
+
+
+
+
+
+                           - 5 -
+
+
+     These two simple changes-coarser locking and  retaining
+open  files-cut  system  time  by about 20% and real time by
+still more.
+
+     On return from Christmas holidays,  after  considerable
+agonizing  over  performance  issues,  Collyer  turned  some
+small, heavily-used character-handling functions  into  mac-
+ros.   This  reduced user-mode time quite a bit.  _A _f_u_n_c_t_i_o_n
+_c_a_l_l _i_s _a_n _e_x_p_e_n_s_i_v_e _w_a_y _t_o _p_e_r_f_o_r_m _a _s_m_a_l_l, _q_u_i_c_k _t_a_s_k.
+
+     _R_n_e_w_s was always looking up files  by  full  pathnames.
+Changing  it  to  _c_h_d_i_r  to the right place and use relative
+names thereafter reduced system time  substantially.   _A_b_s_o_-
+_l_u_t_e _p_a_t_h_n_a_m_e_s _a_r_e _c_o_n_v_e_n_i_e_n_t _b_u_t _n_o_t _c_h_e_a_p.
+
+     Studying the profiling data  revealed  that  _r_n_e_w_s  was
+spending  a  lot of time re-re-re-reading the _s_y_s and _a_c_t_i_v_e
+files.  These files are needed for processing every article,
+and  they  are  not large.  Collyer modified _r_n_e_w_s to simply
+read these files in once and keep them in core.  This change
+alone  cut system time and real time by roughly 30%.  _A_g_a_i_n,
+_o_n_c_e _y_o_u'_v_e _g_o_t _i_t, _d_o_n'_t _t_h_r_o_w _i_t _a_w_a_y!
+
+     There is a more subtle point here, as well.  When these
+files were re-read every time, they were generally processed
+a line at a time.  The revised strategy was to _s_t_a_t the file
+to  determine  its  size,  _m_a_l_l_o_c enough space for the whole
+file, and bring it in with a single _r_e_a_d.  This is a  vastly
+more  efficient way to read a file!  _T_a_s_k_s _w_h_i_c_h _c_a_n _b_e _d_o_n_e
+_i_n _o_n_e _o_p_e_r_a_t_i_o_n _s_h_o_u_l_d _b_e.
+
+     At this point (mid-January 1986), C  _r_n_e_w_s  was  faster
+than  B  _r_n_e_w_s by one order of magnitude, and there was much
+rejoicing.
+
+     In principle, the `Newsgroups:' header line,  determin-
+ing  what  directories  the article will be filed in, can be
+arbitrarily far from the start of the article.  In practice,
+it is almost always found within the first thousand bytes or
+so.  By complicating rnews substantially, it became possible
+in  most  cases to _c_r_e_a_t the file in the right place (or the
+first of the right places) in /_u_s_r/_s_p_o_o_l/_n_e_w_s before writing
+any  of  the  article to disk, eliminating the need for tem-
+porary files or even temporary links.   The  improvement  in
+system time was noticeable, and the improvement in user time
+was even more noticeable.  _P_r_e_p_a_r_e _f_o_r _t_h_e _w_o_r_s_t  _c_a_s_e,  _b_u_t
+_o_p_t_i_m_i_z_e _f_o_r _t_h_e _t_y_p_i_c_a_l _c_a_s_e.
+
+     There  are  certain  circumstances,  notably   control-
+message  articles,  in  which it is necessary to re-read the
+article after filing it.   _R_n_e_w_s  originally  re-opened  the
+article to permit this.  Changing the invocation of _f_o_p_e_n to
+use the wwww++++ mode made it possible to just seek  back  to  the
+beginning  instead,  which  is _m_u_c_h faster.  This, plus some
+
+
+
+                       April 18, 1990
+
+
+
+
+
+                           - 6 -
+
+
+similar  elimination  of  other  redundant  calls  to  _o_p_e_n,
+reduced  system  time  by  over 30%.  _G_e_t _a_s _m_u_c_h _m_i_l_e_a_g_e _a_s
+_p_o_s_s_i_b_l_e _o_u_t _o_f _e_a_c_h _c_a_l_l _t_o _t_h_e _k_e_r_n_e_l.
+
+     Both scanning the in-core _a_c_t_i_v_e and _s_y_s files and  re-
+writing  the  _a_c_t_i_v_e  file are simpler if the in-core copies
+are kept exactly as on disk, but this implied frequent scans
+to locate the ends of lines.  It turned out to be worthwhile
+to  pre-scan  the  _a_c_t_i_v_e  file  for  line  boundaries,  and
+remember them.  _W_h_e_n _s_t_o_r_i_n_g _f_i_l_e_s _i_n _a_n _u_n_s_t_r_u_c_t_u_r_e_d _w_a_y, _a
+_l_i_t_t_l_e _r_e_m_e_m_b_e_r_e_d _i_n_f_o_r_m_a_t_i_o_n _a_b_o_u_t _t_h_e_i_r _s_t_r_u_c_t_u_r_e  _g_o_e_s  _a
+_l_o_n_g _w_a_y _i_n _s_p_e_e_d_i_n_g _u_p _a_c_c_e_s_s.
+
+     We already had a _S_T_R_E_Q macro, just a simple  invocation
+of  _s_t_r_c_m_p,  as  a  convenience.   As a result of some other
+experience by Spencer, Collyer tried replacing some calls of
+_s_t_r_n_c_m_p  by a _S_T_R_E_Q_N macro, which compared the first charac-
+ter of the two strings in-line before incurring the overhead
+of  calling  _s_t_r_n_c_m_p.   This  sped things up noticeably, and
+later got propagated through more  and  more  of  the  code.
+String-equality tests usually fail on the very first charac-
+ter.  _T_e_s_t _t_h_e _w_a_t_e_r _b_e_f_o_r_e _t_a_k_i_n_g _t_h_e _p_l_u_n_g_e.
+
+     While looking at string functions, Collyer noticed that
+_s_t_r_n_c_m_ps to determine whether a line was a particular header
+line had the comparison length computed by  applying  _s_t_r_l_e_n
+to  the  prototype  header.   With a little bit of work, the
+prototypes were isolated as individual character arrays ini-
+tialized  at  compile time.  This permitted substituting the
+compile-time _s_i_z_e_o_f operation for the run-time _s_t_r_l_e_n.   _L_e_t
+_t_h_e _c_o_m_p_i_l_e_r _d_o _t_h_e _w_o_r_k _w_h_e_n _p_o_s_s_i_b_l_e.
+
+     At this point, profiling was turned off temporarily for
+speed  tests.   Profiling  does  impose  some overhead.  The
+speed trials showed that C _r_n_e_w_s was now running at over  15
+times the speed of B _r_n_e_w_s.
+
+     After months of adding frills, bunting and B 2.11  com-
+patibility*, Collyer again returned to performance tuning in
+August  1986.   The  4.2BSD  kernel on _u_t_c_s now included the
+4.3BSD _n_a_m_e_i caches, which improve  filename-lookup  perfor-
+mance  considerably.  Unfortunately, considerations of crash
+recovery dictated some loss in performance: it seemed desir-
+able to put batch-file additions out by the line rather than
+by the block.  _P_e_r_f_o_r_m_a_n_c_e _i_s _n_o_t _e_v_e_r_y_t_h_i_n_g.
+
+     _G_p_r_o_f revealed that  newsgroup  name  matching  was  an
+unexpected   bottleneck,  so  that  module  was  extensively
+tweaked by adding _r_e_g_i_s_t_e_r declarations,  turning  functions
+_________________________
+* And supposed  B  2.11  compatibility,  as  those  who
+remember  the  short-lived  cross-posting  restrictions
+will recall.
+
+
+
+
+                       April 18, 1990
+
+
+
+
+
+                           - 7 -
+
+
+into macros, applying _S_T_R_E_Q_N and such more widely, and  gen-
+erally  tuning  the  details of string operations.  The code
+that handled _s_y_s-file lines got similar treatment next.  The
+combination  cut  40% off user-mode time.  _P_e_r_s_i_s_t_e_n_t _t_u_n_i_n_g
+_o_f _k_e_y _m_o_d_u_l_e_s _c_a_n _y_i_e_l_d _l_a_r_g_e _b_e_n_e_f_i_t_s.
+
+     Newsgroup matching remained moderately costly,  and  an
+investigation  of  where  it  was  being  used  revealed two
+separate tests for a particular special form  of  name.   It
+proved  awkward  to  combine the two, so the testing routine
+was changed to remember having  done  that  particular  test
+already.  _I_f _t_h_e _s_a_m_e _q_u_e_s_t_i_o_n _i_s _a_s_k_e_d _r_e_p_e_a_t_e_d_l_y, _m_e_m_o_r_i_z_e
+_t_h_e _a_n_s_w_e_r.
+
+     By this time, the number of system calls needed to pro-
+cess a single article could be counted on one's fingers, and
+their individual contributions could be  assessed.   At  one
+point  it  was  desirable  for  a  _c_r_e_a_t to fail if the file
+already existed, so this was being checked with  a  call  to
+_a_c_c_e_s_s first.  John Gilmore pointed out that on systems with
+a 3-argument _o_p_e_n (4.2BSD,  System  V),  this  test  can  be
+folded   into  the  _o_p_e_n.   The  elimination  of  the  extra
+name->file (_n_a_m_e_i) mapping cut both  system  time  and  real
+time by another 15%.  (Note that this system _d_o_e_s have _n_a_m_e_i
+cacheing!)  _F_i_l_e _n_a_m_e _l_o_o_k_u_p_s _a_r_e _e_x_p_e_n_s_i_v_e; _m_i_n_i_m_i_z_e _t_h_e_m.
+
+     The development system (uuuuttttccccssss, a 750) is now filing  2-3
+articles  per  second on average; _u_t_f_r_a_s_e_r (a Sun 3/160 with
+an Eagle disk) is typically filing 6-7 articles per  second.
+C  _r_n_e_w_s runs over 19 times as fast in real time as B _r_n_e_w_s,
+over 25 times as fast in system-mode CPU time,  roughly  3.6
+times  as  fast  in user-mode CPU time, and over 10 times as
+fast in combined CPU times.
+
+     With one exception  (see  _F_u_t_u_r_e  _D_i_r_e_c_t_i_o_n_s),  it  now
+appears  that  very  little  can  be  done to speed up _r_n_e_w_s
+without changing the specifications.  It seems to be execut-
+ing  nearly  the bare minimum of system calls, and the user-
+level code has been hand-optimised fairly heavily.
+
+_3.  _E_x_p_i_r_e _P_e_r_f_o_r_m_a_n_c_e
+
+     The rewrite of _e_x_p_i_r_e that started  this  whole  effort
+was  only partly motivated by performance problems.  Perfor-
+mance was definitely bad enough to  require  attention,  but
+the B _e_x_p_i_r_e of the time also had some serious bugs.  Worse,
+the code was a terrible mess and was  almost  impossible  to
+understand,  never  mind  fix.   Early efforts were directed
+mainly at producing a version  that  would  _w_o_r_k;  rewriting
+_e_x_p_i_r_e  from  scratch  simply looked like the easiest route.
+Decisions made along the way,  largely  for  other  reasons,
+nevertheless produced major speedups.
+
+     The first of these decisions was  a  reduction  in  the
+
+
+
+                       April 18, 1990
+
+
+
+
+
+                           - 8 -
+
+
+scope  of  the  program.   B  _e_x_p_i_r_e had several options for
+doing quite unrelated tasks, such as rebuilding news's  his-
+tory file.  The code for these functions was substantial and
+was somewhat interwoven with the  rest.   C  _e_x_p_i_r_e  adheres
+closely  to a central tenet of the `Unix Philosophy': _a _p_r_o_-
+_g_r_a_m _s_h_o_u_l_d _d_o _o_n_e _t_a_s_k, _a_n_d _d_o _i_t _w_e_l_l.   This  may  appear
+unrelated  to  performance, but better-focussed programs are
+generally simpler and smaller, reducing their resource  con-
+sumption  and  making  performance  tuning easier (and hence
+more likely).  In addition, a  multipurpose  program  almost
+always pays some performance penalty for its generality.
+
+     The second significant decision had the biggest  effect
+on  performance,  despite  being  made for totally unrelated
+reasons.  For each news article, the  B  news  history  file
+contained  the  arrival date and an indication of what news-
+groups it was in.  This is _a_l_m_o_s_t all the  information  that
+_e_x_p_i_r_e  needs to decide whether to expire an article or not.
+The missing* data is whether the article contains an  expli-
+cit expiry date, and if so, what it is.   B  _e_x_p_i_r_e  had  to
+discover this for itself, which required opening the article
+and parsing its headers.  A site which retains news for  two
+weeks  will  have  upwards of 5,000 articles on file.  A few
+dozen of them will have explicit expiry dates.  _B_u_t _B _e_x_p_i_r_e
+_o_p_e_n_e_d  _a_n_d  _s_c_a_n_n_e_d  _a_l_l _5,_0_0_0+ _a_r_t_i_c_l_e_s _e_v_e_r_y _t_i_m_e _i_t _r_a_n!
+This was a performance disaster.
+
+     We actually did not want to parse headers in _e_x_p_i_r_e  at
+all,  because  the  B  news header-parsing code was (and is)
+complex and was known to contain major  bugs.   The  perfor-
+mance  implications of this were obvious, although secondary
+at the time.  Header parsing is itself a  non-trivial  task,
+and  accessing  5,000+  files  simply  cannot be made cheap.
+_I_n_f_o_r_m_a_t_i_o_n _n_e_e_d_e_d _c_e_n_t_r_a_l_l_y _s_h_o_u_l_d _b_e _k_e_p_t _c_e_n_t_r_a_l_l_y.
+
+     The C news history file has the same format as that  of
+B  news,  with  one addition: a field recording the explicit
+expiry date, if any, of each article.  If no expiry date  is
+present  in  the article, the field contains `-' as a place-
+marker|-.  In this way, the header parsing is done  _o_n_c_e  per
+_________________________
+* Recent versions of B news have made some  attempt  to
+redress this lack, but haven't gone as far as C expire.
+The discussion here applies to the B  expire  that  was
+current at the time C expire was written.
+|- It would be possible to simply compute  a  definitive
+expiry  date for an article when it arrives, and record
+that.   This  would   eliminate   the   decision-making
+overhead in _e_x_p_i_r_e, but would greatly slow the response
+to changes in  expiry  policy.   Since  one  reason  to
+change policy is time-critical problems like a shortage
+of disk space, this  loss  of  flexibility  was  judged
+unacceptable.    It  is  better  to  leave  the  expiry
+decision to _e_x_p_i_r_e and concentrate on making _e_x_p_i_r_e  do
+
+
+
+                       April 18, 1990
+
+
+
+
+
+                           - 9 -
+
+
+article, on arrival.  In fact, the extra effort involved  is
+essentially  nil,  since  _r_n_e_w_s  does full header parsing at
+arrival time anyway.  _R_n_e_w_s had to be changed to  write  out
+the  expiry date, and code which knew the format of the his-
+tory file had to be changed to know about the  extra  field.
+Perhaps a dozen lines of code outside _e_x_p_i_r_e were involved.
+
+     A crude first version of C _e_x_p_i_r_e, incorporating  these
+decisions in the most minimal way, ran an order of magnitude
+faster than B _e_x_p_i_r_e.  Precise timing comparisons  were  not
+practical  at  the  time,  since  the  original motive for C
+_e_x_p_i_r_e was that B _e_x_p_i_r_e  had  stopped  working  completely,
+crippled by bugs in its header parsing.  Later versions of B
+_e_x_p_i_r_e  did  cure  this  problem,  but  we  were  no  longer
+interested  in  putting up slow, buggy software just to make
+an accurate comparison.
+
+     Further work on C _e_x_p_i_r_e mostly concentrated on  clean-
+ing up the hasty first version, and on incorporating desired
+features such as selective expiry by  newsgroup.   Selective
+expiry  caused  a  small  loss  in  performance by requiring
+_e_x_p_i_r_e to check the newsgroup(s) of each article against  an
+expiry-control  list.  Here, _e_x_p_i_r_e benefitted from the work
+done to speed up the newsgroup-matching primitives of _r_n_e_w_s,
+since  _e_x_p_i_r_e  uses the same routines.  _I_f _y_o_u _r_e-_i_n_v_e_n_t _t_h_e
+_s_q_u_a_r_e _w_h_e_e_l, _y_o_u _w_i_l_l _n_o_t _b_e_n_e_f_i_t _w_h_e_n _s_o_m_e_b_o_d_y _e_l_s_e _r_o_u_n_d_s
+_o_f_f _t_h_e _c_o_r_n_e_r_s|=.
+
+     One improvement that was made late in  development  was
+in  the  format  of the dates stored in the history file.  B
+_r_n_e_w_s stored the arrival date in  human-readable  form,  and
+_e_x_p_i_r_e  converted  this into numeric form for comparisons of
+dates.  Date conversion is  a  complex  operation,  and  the
+widely-distributed  _g_e_t_d_a_t_e  function  used  by  news is not
+fast.  Inspection of the code established  that  _e_x_p_i_r_e  was
+the  only  program that ever looked at the dates in the his-
+tory file.  There is some potential use of  the  information
+for  debugging,  but this is infrequent, and a small program
+that converts decimal numeric dates to  human-readable  ones
+addresses  the  issue.   Both C _r_n_e_w_s and C _e_x_p_i_r_e now store
+the dates in decimal numeric  form.   _S_t_o_r_e  _r_e_p_e_a_t_e_d_l_y-_u_s_e_d
+_i_n_f_o_r_m_a_t_i_o_n _i_n _a _f_o_r_m _t_h_a_t _a_v_o_i_d_s _e_x_p_e_n_s_i_v_e _c_o_n_v_e_r_s_i_o_n_s.
+
+     Actually, C _e_x_p_i_r_e bows to compatibility  by  accepting
+either  form  on input, but outputs only the decimal form as
+it regenerates the history file.  Thus, in the  worst  case,
+_e_x_p_i_r_e  does the conversion only once for each history line,
+rather than once per line per run.  ``_I_f  _t_h_e_y  _h_a_n_d  _y_o_u  _a
+_l_e_m_o_n, _m_a_k_e _l_e_m_o_n_a_d_e''.
+_________________________
+it quickly.
+|=  A corollary of this is:  _k_n_o_w _t_h_y _l_i_b_r_a_r_i_e_s, _a_n_d _u_s_e
+_t_h_e_m.
+
+
+
+
+                       April 18, 1990
+
+
+
+
+
+                           - 10 -
+
+
+     If _e_x_p_i_r_e is archiving expired articles, it may need to
+create  directories  to  hold  them.   This is an inherently
+expensive operation, but it is  infrequently  needed.   How-
+ever,  checking  to see whether it _i_s in fact needed is also
+somewhat expensive... and the answer is almost always  `no'.
+The  same  is  true  of checking to see whether the original
+article really still exists:  it almost always does.   (This
+cannot  be  subsumed  under generic `archiving failed' error
+handling because a missing original is just an article  that
+was  cancelled,  and  does  not  call for a trouble report.)
+Accordingly, C _e_x_p_i_r_e just charges ahead and attempts to  do
+the  copying.   Only  if  this fails does _e_x_p_i_r_e analyze the
+situation in detail.  _C_a_r_r_y_i_n_g _a _n_e_t _i_n _f_r_o_n_t _o_f _y_o_u _i_n _c_a_s_e
+_y_o_u _t_r_i_p _i_s _u_s_u_a_l_l_y _w_a_s_t_e_d _e_f_f_o_r_t.
+
+     Archiving  expired  articles  often  requires   copying
+across  filesystem  boundaries,  since  it's not uncommon to
+give current news and archived news rather different  treat-
+ment  for  space  allocation  and backups.  Copying from one
+filesystem to another can involve major disk  head  movement
+if  the two filesystems are on the same spindle.  Since head
+movement is expensive, maximizing performance requires  get-
+ting as much use as possible out of each movement*.   _E_x_p_i_r_e
+is  not  a large program, and even on a small machine it can
+spare the space for a large copying buffer.  So it does  its
+archiving  copy  operations  using an 8KB buffer.  _B_u_y_i_n_g _i_n
+_b_u_l_k _i_s _o_f_t_e_n _c_h_e_a_p_e_r.  Since  8KB  accommodates  most  news
+articles  in one gulp, there is little point in enlarging it
+further.  _T_h_e _l_a_w _o_f _d_i_m_i_n_i_s_h_i_n_g _r_e_t_u_r_n_s _d_o_e_s _a_p_p_l_y _t_o  _b_u_y_-
+_i_n_g _i_n _b_u_l_k.
+
+     Since _e_x_p_i_r_e  is  operating  on  the  history  file  at
+(potentially)  the same time that _r_n_e_w_s is adding more arti-
+cles to it, some form of locking is necessary.   Given  that
+_e_x_p_i_r_e has to look over the whole database of news, and typ-
+ically has to expire a modest fraction of the  articles,  it
+is  a  relatively  long-running  process  compared to _r_n_e_w_s.
+Contention for the history-file lock  can  be  minimized  by
+noting  that  _r_n_e_w_s never does anything other than append to
+the file.  So _e_x_p_i_r_e can leave the file unlocked while scan-
+ning it; the contents will not change.  When (and only when)
+_e_x_p_i_r_e reaches end-of-file, it locks the news system, checks
+for  and  handles any further entries arriving on the end of
+the history file meanwhile, and finishes up.   _L_o_c_k_i_n_g  _d_a_t_a
+_t_h_a_t _w_o_n'_t _c_h_a_n_g_e _i_s _w_a_s_t_e_f_u_l.
+
+     After careful application  of  these  various  improve-
+ments,  C  _e_x_p_i_r_e is fast enough that further speedup is not
+worth much effort.  However, an analysis of where it  spends
+_________________________
+* As witness the  progressive  increase  in  filesystem
+block size that produced major performance improvements
+in successive versions of 4BSD.
+
+
+
+
+                       April 18, 1990
+
+
+
+
+
+                           - 11 -
+
+
+its time does suggest one area that might merit attention in
+the future.  _E_x_p_i_r_e rebuilds the history file to reflect the
+removal of expired articles.  The  history  file  is  large.
+_E_x_p_i_r_e  must  also rebuild the _d_b_m indexing data base, since
+it contains offsets into the history file.  This  data  base
+is  comparable  in  size  to the history file itself, and is
+generated in a less orderly manner that requires  more  disk
+accesses.
+
+     Much of the time needed for these operations  could  be
+eliminated  if _e_x_p_i_r_e could mark a history line as `expired'
+without changing its size.  This could be  done  by  writing
+into  the  history  file rather than by rebuilding the whole
+file, and the indexing database would not  need  alteration.
+This  would also permit retaining information about an arti-
+cle after the article itself expires, which  would  simplify
+rejecting  articles  that  arrive again (due to loops in the
+network, etc.) after the original has expired.  The  history
+file  should still be cleaned out, and the indexing database
+rebuilt, occasionally.  C _e_x_p_i_r_e contains  some  preliminary
+`hooks'  for  this approach, but to date full implementation
+does not seem justified:  C _e_x_p_i_r_e is already  fast  enough.
+_K_n_o_w _w_h_e_n _y_o_u _a_r_e _f_i_n_i_s_h_e_d.
+
+_4.  _B_a_t_c_h_e_r _P_e_r_f_o_r_m_a_n_c_e
+
+     The C batcher is descended  from  a  very  old  version
+written to add some minor functionality that was not present
+in the B batcher of the time.  It is small and  straightfor-
+ward,  and  contains only a couple of noteworthy performance
+hacks.
+
+     The batcher works from a list of filed articles, to  be
+composed  into  batches.   The list is by absolute pathname.
+All of these files reside in the same area of  the  system's
+directory  tree,  and  referring to them with absolute path-
+names every time implies repeatedly traversing the same ini-
+tial  pathname prefix.  To avoid this, the batcher initially
+_c_h_d_i_rs to a likely-looking place  such  as  /_u_s_r/_s_p_o_o_l/_n_e_w_s.
+Thereafter,  before  using  an  absolute pathname to open an
+article, it checks whether the beginning of the pathname  is
+identical to the directory where it already resides.  If so,
+it strips this prefix off the name  before  proceeding.   _I_f
+_y_o_u  _w_a_l_k  _t_h_e  _s_a_m_e _r_o_a_d _r_e_p_e_a_t_e_d_l_y, _c_o_n_s_i_d_e_r _m_o_v_i_n_g _t_o _t_h_e
+_o_t_h_e_r _e_n_d.
+
+     The batcher's input is usually in fairly random  order,
+with  little tendency for successive files to be in the same
+directory.   If  this  were  not  the  case,  it  would   be
+worthwhile  for  the  batcher to actually move around in the
+directory tree to be closer to the next file.
+
+     The batcher used to copy data using _p_u_t_c(_g_e_t_c()) loops.
+This   has   been   replaced   by   _f_r_e_a_d/_f_w_r_i_t_e   which  is
+
+
+
+                       April 18, 1990
+
+
+
+
+
+                           - 12 -
+
+
+significantly faster,  especially  if  using  the  souped-up
+_f_r_e_a_d/_f_w_r_i_t_e mentioned earlier.  _I_f _y_o_u _n_e_e_d _t_o _m_o_v_e _a _m_o_u_n_-
+_t_a_i_n, _u_s_e _a _b_u_l_l_d_o_z_e_r, _n_o_t _a _t_e_a_s_p_o_o_n.
+
+_5.  _F_u_t_u_r_e _D_i_r_e_c_t_i_o_n_s
+
+     The one improvement we are still considering for  _r_n_e_w_s
+is  a  radical  revision of the newsgroup-matching strategy.
+Newsgroup matching still consumes  about  18%  of  user-mode
+processor time.  The key observation is that the information
+that determines which newsgroups go to  which  sites  seldom
+changes.   It  would  probably  be  worth precompiling a bit
+array indexed by newsgroup and site, and recompiling it only
+when  the  _a_c_t_i_v_e file or the _s_y_s file changes in a relevant
+way.  This would cut the newsgroup-matching time  to  essen-
+tially zero.
+
+     _R_n_e_w_s would be faster (and  simpler)  if  `Newsgroups:'
+and `Control:' were required to be the first two headers (if
+present) of each article.  At present _r_n_e_w_s  tries  to  find
+them  before  starting  to write the article out, so that it
+can put the article in the right place from the  start,  but
+it  has  to  allow  for the possibility that vast volumes of
+other headers may precede them.
+
+     Hashing _a_c_t_i_v_e-file lookups in _r_n_e_w_s would be fun,  but
+profiling  suggests  that  it's  not  worthwhile  unless the
+number of newsgroups is in the thousands.
+
+     When PDP-11's are truly dead  on  Usenet,  the  use  of
+large  per-process  memories  _m_a_y  allow further speedups to
+_r_n_e_w_s by reading the entire batch into memory  at  once  and
+writing  each  article  to  disk  in  a few _w_r_i_t_e_s (it can't
+easily be reduced to a single _w_r_i_t_e because headers must  be
+modified before filing).
+
+     One optimization we have _n_o_t  considered  is  re-coding
+key  parts  in  assembler.  C news already runs on five dif-
+ferent types of  machine.   Use  of  assembler  would  be  a
+maintenance nightmare, and probably would not yield benefits
+comparable to those of the more high-level changes.
+
+_6.  _A_c_k_n_o_w_l_e_d_g_e_m_e_n_t_s
+
+     Ian Darwin ran the  very  earliest  alpha  versions  of
+_r_n_e_w_s  and  gave  helpful feedback.  Mike Ghesquiere, Dennis
+Ferguson and others have run later versions and prodded Col-
+lyer  to fix or implement assorted things.  John Gilmore and
+Laura Creighton read and criticized an early  alpha  version
+of _r_n_e_w_s.
+
+_7.  _A_p_p_e_n_d_i_x:  _r_n_e_w_s _T_i_m_e_s
+
+     Measurements have been  taken  on  a  VAX  750  running
+
+
+
+                       April 18, 1990
+
+
+
+
+
+                           - 13 -
+
+
+4.2BSD  under generally light load, using a batch of 297,054
+bytes of net.unix-wizards containing 171 articles  and  ~104
+cross-postings.  All times are in seconds per article.
+
+
+     time       real  user   sys               comments
+_____________________________________________________________________
+85 Dec  6 00:54 4.68  0.3   1.29
+7                                  BBBB nnnneeeewwwwssss rejecting all.  (b.1.rej)
+85 Dec  6 00:54 3.184 0.69  0.67
+7                                  first timing  trial;  _p_r_o_f_i_l_i_n_g  _o_n
+                                  (c.1)
+85 Dec  6 00:54 0.66  0.175 0.199
+7                                  rejecting all (c.2.rej)
+85 Dec  6 03:25 0.58  0.175 0.175
+7                                  still rejecting all (c.3.rej)
+85 Dec  6 23:46 9.058 0.631 2.251
+7                                  BBBB nnnneeeewwwwssss using  private  directories,
+                                  rejected  53 of the 171 articles as
+                                  "too old" (b.2)
+85 Dec  7 00:24         -     -
+7                2.0
+                (est)
+77                                  on a 10 MHz 68000 with slow  memory
+                                  and   slow   disk  (crude  timings)
+                                  (c.darwin.1)
+85 Dec  7 00:40 7.576 0.684 2.403
+7                                  BBBB nnnneeeewwwwssss without the "too old" reject
+                                  code and having cleared out history
+                                  (b.3)
+85 Dec  7 04:43 1.99  0.49  0.53
+7                                  accepting the articles, using  read
+                                  and write for bulk copies (c.4)
+85 Dec  7 06:10       0.497 0.449
+7                2.261
+                (!)
+77                                  optimized by less locking & keeping
+                                  batch files open (c.5)
+85 Dec  7 07:32 1.383 0.491 0.414
+7                                  same as the last one,  but  with  a
+                                  lower  load  average  (around  1.5)
+                                  (c.6)
+85 Dec 16 03:43 1.380 0.447 0.374
+7                                  for calibration after misc. cleanup
+                                  (c.7, c.8)
+86 Jan 13 00:23 1.232 0.349 0.301
+7                                  turned  hostchar()  into  a   macro
+                                  (c.9)
+86 Jan 13 04:26 1.36  0.333
+7                            0.242
+                            (!)
+77                                  using in-core  active  file,  under
+                                  heavy load (c.10)
+86 Jan 13 08:24 1.94  0.349 0.253
+7                                  using in-core sys file  too,  under
+                                  heavy  load.   Re-run  this  trial!
+                                  (c.11)
+86 Jan 13 08:42       0.332 0.245
+7                0.892
+                (!)
+77                                  re-run at better nice.  Not  strik-
+                                  ing, except for real time.  Was run
+                                  in  a  large   directory;   ignore.
+                                  (c.12)
+86 Jan 13 08:59       0.333
+7                0.861
+                (!)
+77                            0.212
+                            (!)
+77                                  re-run at good nice &  in  a  small
+                                  directory.   Have  beaten B news by
+                                  _o_n_e _o_r_d_e_r _o_f _m_a_g_n_i_t_u_d_e  on  real  &
+                                  sys  times!   Beat  it by more than
+                                  twice on user time.  (c.13)
+86 Jan 21 19:15 1.208 0.349 0.245
+7                                  creat 1st link  under  final  name,
+                                  only  link  to make cross-postings;
+                                  with HDRMEMSIZ too small (c.14)
+86 Jan 21 19:57 0.728 0.318 0.193
+7                                  previous  mod,  with  HDRMEMSIZ  of
+                                  4096 (c.15)
+
+
+
+
+
+
+                       April 18, 1990
+
+
+
+
+
+                           - 14 -
+
+
+86 Jan 22 01:20 0.719 0.315 0.166
+7                                  fewer opens (just rewind the  spool
+                                  file),  but  Xref(s):  not  working
+                                  (c.16)
+86 Jan 22 01:53       0.314
+7                0.637
+                (!)
+77                            0.154
+                            (!)
+77                                  fewer opens fixed  to  spell  Xref:
+                                  right; Xref: not working (c.17)
+86 Jan 22 04:00 0.874 0.325 0.174
+7                                  fewer opens with Xref: fixed (times
+                                  may be high due to calendar) (c.18)
+86 Jan 22 05:45 0.694 0.309 0.159
+7                                  under  lighter  load,   times   are
+                                  better (c.19)
+86 Jan 24 04:29 0.715 0.317
+7                            0.129
+                            (!)
+77                                  turn creat & open into just  creat,
+                                  under slightly heavy load (c.20)
+86 Jan 24 06:06
+7                0.628
+                (!)
+77                      0.288
+                      (!)
+77                            0.129
+                            (!)
+77                                  reduce number of calls on index (by
+                                  noting  line  starts  at the start)
+                                  and   strncmp   (via   macro)    in
+                                  active.mem.c,  but  still profiling
+                                  and writing stdout  and  stderr  to
+                                  the tty (c.21)
+86 Jan 24 07:22 0.653
+7                      0.209
+                      (!)
+77                            0.123
+                            (!)
+77                                  fewer strlen calls (by using ssssiiiizzzzeeeeooooffff
+                                  s - 1), writing stdout to /dev/null
+                                  and with _p_r_o_f_i_l_i_n_g _o_f_f,  but  under
+                                  moderate load; try again (c.23)
+86 Jan 24 07:35
+7                0.574
+                (!)
+77                      0.216
+                      (!)
+77                            0.123
+                            (!)
+77                                  as last time, but stdout to  tty(!)
+                                  and   under  light  load.   _r_u_n_n_i_n_g
+                                  _1_5._6_7 _t_i_m_e_s  _a_s  _f_a_s_t  _a_s  _B  _r_n_e_w_s
+                                  (c.24)
+86 Aug  8 04:23 0.839 0.51  0.124
+7                                  performance hit: fflush after  each
+                                  history  line for crash-resilience;
+                                  run for _g_p_r_o_f output  and  calibra-
+                                  tion   with  later  runs.   running
+                                  under  4.2.1BSD  (has   4.3   namei
+                                  cache)  now.   real  and user times
+                                  are way up; due to gprof profiling?
+                                  (c.25)
+86 Aug  8 04:24 0.962       0.131
+7                      0.438
+                      (!)
+77                                  run  with  faster   ngmatch,   with
+                                  rrrreeeeggggiiiisssstttteeeerrrr  decl.s  and wordmatch and
+                                  STREQN  macros;  saved  15%   user.
+                                  User  time is better than c.25, but
+                                  still up from c.24.  (c.26)
+86 Aug 10 07:35 0.805       0.135
+7                      0.345
+                      (!)
+77                                  further speedups: ngmatch has  more
+                                  rrrreeeeggggiiiisssstttteeeerrrr  decl.s and in-line index;
+                                  more  use  of  STREQ(N)  macro  for
+                                  str(n)cmp  in  hdrmatch,  ngmatch.c
+                                  and   transmit.c;   faster    ishdr
+                                  without  index.   real & user times
+                                  are better than both c.26 and  c.25
+                                  (c.27)
+86 Aug 11 04:19 1.012       0.146
+7                      0.303
+                      (!)
+77                                  rewrote  sys.c,  used   INDEX   and
+                                  STREQ(N)  macros  throughout rnews.
+                                  real and sys times are up, but user
+                                  continues to decline.  (c.28)
+86 Aug 12 03:51 1.315 0.315 0.154
+7                                  minor tweaks: all.all.ctl  caching,
+                                  etc. (c.29)
+
+
+
+
+
+                       April 18, 1990
+
+
+
+
+
+                           - 15 -
+
+
+86 Aug 30 17:56 0.564
+7                      0.189
+                      (!)
+77                            0.112
+                            (!)
+77                                  light load, thought  we  had  3-arg
+                                  open  in  fileart, but didn't. Odd.
+                                  _S_t_o_p_p_e_d _u_s_i_n_g _g_p_r_o_f.  (c.30)
+86 Aug 30 17:57       0.191
+7                0.475
+                (!)
+77                            0.095
+                            (!)
+77                                  Really  and  truly  use  the  3-arg
+                                  open.   _1_9  _t_i_m_e_s  _B  _r_n_e_w_s  _s_p_e_e_d.
+                                  (c.31)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                       April 18, 1990
+
+

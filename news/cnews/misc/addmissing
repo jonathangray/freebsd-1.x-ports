@@ -1,0 +1,98 @@
+#! /bin/sh
+# addmissing - add missing articles to history
+# Has a SORTTMP hook for feeding in a "-T dir" option if sort's default
+# temporary directory is short of space.
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/usr/lib/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/expire:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+dbzrebuild=n
+case "$1" in
+-d)	dbzrebuild=y	;;
+esac
+
+# get main lock for history examination, and lock out expire too
+lock="$NEWSCTL/LOCK"
+ltemp="$NEWSCTL/L.$$"
+echo $$ >$ltemp
+trap "rm -f $ltemp ; exit 0" 0 1 2 15
+while true
+do
+	if newslock $ltemp $lock
+	then
+		trap "rm -f $ltemp $lock ; exit 0" 0 1 2 15
+		break
+	fi
+	sleep 30
+done
+if newslock $ltemp $NEWSCTL/LOCKexpire
+then
+	trap "rm -f $ltemp $lock $NEWSCTL/LOCKexpire ; exit 0" 0 1 2 15
+else
+	echo "$0: expire is running, $0 aborted" >&2
+	exit 1
+fi
+
+# check space
+cd $NEWSCTL
+size="`sizeof history history.pag history.dir`"
+if test " `spacefor $size control`" -le 0
+then
+	echo "$0: not enough space for temporaries, $0 aborted" >&2
+	exit 1
+fi
+
+# put together a list of known filenames from history
+egrep '	.*	' history | sed 's/.*	//' | tr '. ' '/
+' | egrep '/' | sort -u $SORTTMP >/tmp/hist$$
+
+# release the main lock, temporarily
+trap "rm -f $ltemp $NEWSCTL/LOCKexpire ; exit 0" 0 1 2 15
+rm $lock
+
+# sweep the tree, ignoring things that arrive while we're working
+cd $NEWSARTS
+them=
+for f in `ls | egrep -v '\.|(^lost\+found$)'`
+do
+	if test -d $f -a -r $f
+	then
+		them="$them $f"
+	fi
+done
+find $them -type f -name '[0-9]*' ! -newer $ltemp -print |
+	sort $SORTTMP >/tmp/tree$$
+
+# find missing files, and build history entries for them
+comm -13 /tmp/hist$$ /tmp/tree$$ | histinfo | sort $SORTTMP |
+	awk -f $NEWSBIN/expire/histdups | histslash >/tmp/new$$
+
+# check for oddities
+if egrep '^<[^>]*@trash>	' /tmp/new$$ >/dev/null
+then
+	echo "$0: (warning) empty/trash articles found, will expire at once" >&2
+	echo "$0:     (grep history file for '@trash' to see them)" >&2
+fi
+
+# lock things up again and plug them in
+cd $NEWSCTL
+while true
+do
+	if newslock $ltemp $lock
+	then
+		trap "rm -f $ltemp $lock $NEWSCTL/LOCKexpire ; exit 0" 0 1 2 15
+		break
+	fi
+	sleep 30
+done
+if test " $dbzrebuild" = " y"
+then
+	cat /tmp/new$$ >>history
+	dbz history
+else
+	dbz -a history /tmp/new$$
+fi
+
+rm -f /tmp/hist$$ /tmp/tree$$ /tmp/new$$

@@ -1,0 +1,176 @@
+.\" =()<.ds a @<NEWSARTS>@>()=
+.ds a /usr/spool/news
+.\" =()<.ds b @<NEWSBIN>@>()=
+.ds b /usr/lib/newsbin
+.\" =()<.ds c @<NEWSCTL>@>()=
+.ds c /usr/lib/news
+.\" =()<.ds m @<NEWSMASTER>@>()=
+.ds m usenet
+.TH RNEWS 8 "27 Jan 1992"
+.BY "C News"
+.SH NAME
+rnews, cunbatch \- accept and spool news input
+.br
+newsspool, newsrun, c7decode \- news input spooler and processing
+.br
+newsrunning \- control news-processing daemon
+.SH SYNOPSIS
+.B rnews
+.br
+.B cunbatch
+.br
+.B \*b/input/newsspool
+[
+.B \-g
+grade ] [
+.B \-i
+] [ file ... ]
+.br
+.B \*b/input/newsrun
+[ grades ]
+.br
+.B \*b/input/c7decode
+.br
+.B \*b/input/newsrunning
+[\fBon\fR|\fBoff\fR]
+.SH DESCRIPTION
+.I Rnews
+accepts news from standard input
+and spools it up for processing, space permitting.
+If space is persistently too short,
+.I rnews
+looks for the file
+.IR \*c/rnews.stall ;
+if it is present,
+.I rnews
+waits patiently for more space to appear,
+while if it is absent,
+.I rnews
+discards the news and reports this.
+.PP
+.PP
+.I Cunbatch
+is a historical synonym for
+.IR rnews ;
+there is no difference in what they do.
+.PP
+.I Newsspool
+is the actual spooling program.
+It copies the input \fIfile\fR(s) (standard input
+default) to a file in the input-spooling directory
+\fI\*a/in.coming\fR,
+stripping off any `\fB#!\ cunbatch\fR'
+or `\fB#!\ c7unbatch\fR' header as it does so.
+The filename is based on the current time,
+plus a suffix classifying the file by type (compressed, \fIc7encode\fRd,
+or plain text),
+plus a possible prefix denoting the one-digit numeric \fIgrade\fR (if the
+.B \-g
+option is given;
+.I rnews
+does not use this option).
+If invoked with the
+.B \-i
+option, when finished
+.I newsspool
+attempts to start
+.I newsrun
+to process the new news immediately.
+.I Rnews
+invokes it this way if and only if the file
+.I \*c/rnews.immed
+exists.
+.PP
+.I Newsrun
+should be run periodically (e.g. by \fIcron\fR(8)) to process spooled news.
+.I Newsrunning
+can be used to turn \fInewsrun\fR's processing off and on if it is desired
+to avoid major news processing during certain hours.
+`\fBnewsrunning off\fR' instructs any currently-running \fInewsrun\fR to
+stop as soon as possible, and prevents later ones from running.
+(This is a slight oversimplification; see the discussion of
+.I grades
+below.)
+`\fBnewsrunning on\fR' removes the inhibition (but does not actually
+start a new \fInewsrun\fR).
+Without an argument, \fInewsrunning\fR reports the current status:
+``off'' or ``on''.
+.PP
+.I Newsrun
+checks for the \fIstop\fR file that
+\fInewsrunning\ off\fR creates,
+verifies that there is enough disk space for processing,
+and then starts processing spooled news.
+News is processed in order by \fIgrade\fR:
+if the name of the spooled file starts with a digit followed by a period,
+the digit is the file's \fIgrade\fR.
+Files without a grade are considered to have a grade just after grade 9.
+Lower-numbered grades are processed first, with processing within
+a grade in chronological order.
+.PP
+If
+.I newsrun
+is invoked with a
+.I grades
+argument, that specifies the grades to be processed.
+A
+.I grades
+argument can be a single grade (`1'), a list (`123'), or a range (`1-5').
+In the absence of the argument,
+.IR newsrun 's
+default is all grades if there is no \fIstop\fR file present, and just
+grade 0 if there is a \fIstop\fR file.
+If a \fIstop\fR file appears during processing,
+.I newsrun
+will stop processing all but grade 0 and will exit when there is no
+grade-0 news left.
+.PP
+Each batch is
+run through \fIc7decode\fR (if necessary),
+de\fIcompress\fRed (if necessary), and then fed
+to
+\fIrelaynews\fR.
+(Files that lack a classification suffix, typically because they arrived
+by some means other than \fInewsspool\fR,
+are tried first as compressed and then as plain text.)
+If \fIrelaynews\fR fails,
+\fInewsrun\fR attempts to save
+the spooled batch in the \fIbad\fR subdirectory for human inspection.
+.PP
+.I C7decode
+passes standard input to standard output, decoding a complex and bizarre
+encoding of 8-bit data as printable ASCII characters.
+.SH FILES
+.nf
+(All in \fI\*a/in.coming\fR)
+.sp
+.ta 2.5c
+000000000	(etc.) unclassified ungraded spooled news
+000000000.Z	ungraded compressed spooled news
+000000000.t	ungraded plain-text spooled news
+000000000.7	ungraded compressed \fIc7encode\fRd spooled news
+1.000000000.Z	grade 1 compressed spooled news, etc.
+stop	\fInewsrun\fR disable file
+bad	directory for failed news
+.SH SEE ALSO
+compress(1),
+newsbatch(8),
+newsmail(8),
+relaynews(8)
+.SH DIAGNOSTICS
+Complaints are mailed to \fB\*m\fR if something goes wrong.
+.SH HISTORY
+Part of C News.
+Written at University of Toronto by Henry Spencer.
+.SH BUGS
+\fIC7decode\fR should be part of the underlying transport mechanism.
+It hasn't been tested very well in the C News environment.
+\fIBdecode\fR (see \fInewsmail\fR(8)) is probably better for most uses.
+.PP
+.I Relaynews
+is a bit too enthusiastic about declaring batches bad, so things may end up
+in \fIbad\fR for no terribly good reason.
+Actually, it's rare for the contents of \fIbad\fR to be very interesting.
+.PP
+The grading mechanism relies slightly on collating sequence, and in
+particular on `.' collating before the digits.

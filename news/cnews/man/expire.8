@@ -1,0 +1,356 @@
+.\" =()<.ds a @<NEWSARTS>@>()=
+.ds a /usr/spool/news
+.\" =()<.ds b @<NEWSBIN>@>()=
+.ds b /usr/lib/newsbin
+.\" =()<.ds c @<NEWSCTL>@>()=
+.ds c /usr/lib/news
+.\" =()<.ds m @<NEWSMASTER>@>()=
+.ds m usenet
+.TH EXPIRE 8 "13 April 1992"
+.BY "C News"
+.SH NAME
+expire, doexpire, expireiflow \- expire old news
+.br
+mkhistory \- rebuild news history file
+.br
+upact \- update news active file
+.br
+recovact \- partially recover news active file
+.SH SYNOPSIS
+.B \*b/expire/expire
+[
+.B \-a
+archdir
+] [
+.B \-p
+] [
+.B \-s
+] [
+.B \-F
+c
+] [
+.B \-c
+] [
+.B \-n
+nnnnn
+] [
+.B \-t
+] [
+.B \-l
+] [
+.B \-v
+] [
+.B \-d
+] [
+.B \-r
+] [
+.B \-g
+] [
+.B \-h
+]
+[ controlfile ]
+.br
+.B \*b/expire/doexpire
+expireoptions
+.br
+.B \*b/expire/expireiflow
+minimum
+expireoptions
+.br
+.B \*b/expire/mkhistory
+[
+.B \-s
+sizemultiplier ]
+.br
+.B \*b/expire/upact
+.br
+.B \*b/expire/recovact
+.SH DESCRIPTION
+.I Expire
+expires old news, removing it from the current-news directories and
+(if asked to) archiving it elsewhere.
+It updates news's
+.I history
+file to match.
+.I Expire
+should normally be run nightly, typically by using \fIdoexpire\fR (see below).
+.PP
+.IR Expire 's
+operations are controlled by a control file
+(which can be named or supplied on standard input),
+which is not optional\(emthere is no default behavior.
+Each line of the control file
+(except for empty lines and lines starting with `#', which are ignored)
+should have four white-space-separated
+fields, as follows.
+.PP
+The first field is
+a newsgroup pattern list
+(containing no spaces!);
+partial specifications are acceptable (e.g. `comp' specifies all groups
+with that prefix).
+See
+.IR newssys (5)
+for full details.
+.PP
+The second field is one letter, `m', `u', or `x', specifying that the line
+applies only to moderated groups, only to unmoderated groups, or to both,
+respectively.
+.PP
+The third field specifies the expiry period in days.
+The most general form is three numbers separated by dashes.
+The units are days, decimal fractions are permitted,
+and ``never'' is shorthand for an extremely large number.
+The first number gives the retention period:
+how long must pass after an article's arrival before it is a candidate
+for expiry.
+The third number gives the purge period:
+how long must pass after arrival
+before the article will be expired unconditionally.
+The middle number gives the expiry period:
+how long after an article's arrival it is expired by default.
+An explicit expiry date in the article will override the expiry
+period but not the retention period or the purge period.
+If the field contains only two numbers with a dash separating them,
+the retention period defaults to 0.
+If the field contains only a number, the retention period defaults to 0
+and the purge period defaults to `never'.
+(But see below.)
+The retention period must be less than the purge period, and the expiry period
+must lie between them.
+.PP
+The fourth field is an archiving directory,
+or `@' which indicates that the default archiving directory (see \fB\-a\fR)
+should be used,
+or `\-' which suppresses archiving.
+An explicit archiving directory (not `@') prefixed with `=' means
+that articles should be archived into that directory itself;
+normally they go into subdirectories under it by newsgroup name,
+as in the current-news directory tree.
+(E.g., article 123 of comp.pc.drivel being archived into archive directory
+\fI/exp\fR would normally become \fI/exp/comp/pc/drivel/123\fR,
+but if the archiving
+directory was given as `=/exp' rather than `/exp', it would become
+\fI/exp/123\fR.)
+.I Expire
+creates subdirectories under an archiving directory automatically,
+but will not create the archiving directory itself.
+Archiving directories must be given as full pathnames.
+.PP
+The first line of the control file which applies to a given article is
+used to control its expiry.
+It is an error for no line to apply;
+the last line should be something like `all\ x\ 7\ \-'
+to ensure that at least one line is always applicable.
+Cross-posted articles are treated as if they were independently posted
+to each group.
+.PP
+The retention and purge defaults can be overridden by including a
+\fIbounds\fR line,
+one with the special first field \fB/bounds/\fR.
+The retention and purge defaults for following lines will be those of
+the bounds line.
+The defaults ``stretch'' as necessary to
+ensure that the purge period is never less than the expiry period
+and the retention period is never greater than the expiry period.
+The other fields of a bounds line are ignored but must be present.
+.PP
+Entries in the \fIhistory\fR file can be retained after article expiry,
+to stop a late-arriving copy of the article from being taken as a new article.
+To arrange this, include a line with the special first field \fB/expired/\fR;
+this line then controls the expiry of \fIhistory\fR lines after the
+corresponding articles expire.
+Dates are still measured from article arrival, not expiry.
+The other fields of such a line are ignored but must be present.
+It is strongly recommended that such a line be included, and that it
+specify as long a time as practical.
+.PP
+Command-line options are:
+.TP 10
+.BR \-a " dir"
+\fIdir\fR is the default archiving directory;
+if no default is given, the control file may not contain
+any `@' archive-directory fields.
+.TP
+.B \-p
+print an `index' line for each archived article,
+containing its pathname, message ID, date received, and `Subject:' line.
+.TP
+.B \-s
+space is tight; optimize error recovery to minimize space consumed rather
+than to leave as much evidence as possible.
+.TP
+.BR \-F " c"
+the subfield separator character
+in the middle \fIhistory\fR field is \fIc\fR rather
+than the normal `~'.
+.TP
+.B \-c
+check the format and consistency of the control file and the \fIactive\fR
+file, but do not do any expiring.
+.TP
+.BR \-n " nnnnn"
+set \fIexpire\fR's idea of the time to \fInnnnn\fR (for testing).
+.TP
+.BR \-t
+print (on standard error) a shell-script-like description of what would
+be done, but don't do it.
+In the absence of archiving, all output lines will be of the form
+``\fBremove\fR\ \fIname\fR'', where \fIname\fR is a pathname relative
+to \fI\*a\fR.
+If an article is to be archived, this will be preceded (on the same
+line) by ``\fBcopy\fR\ \fIname\fR\ \fIdir\fR\ \fB;\fR\ '', where \fIname\fR
+is as in \fBremove\fR and \fIdir\fR is an archiving directory
+(including any `=' prefix)
+as specified by the control file
+or the \fB\-a\fR option.
+.TP
+.BR \-l
+consider first filename in a \fIhistory\fR line to be the \fIleader\fR of
+its line, to be expired only after all others have expired.
+(Meant for use on obnoxious systems like VMS which don't support real links.)
+.TP
+.BR \-r
+suppress \fIhistory\fR rebuild.
+Mostly for emergencies.
+(This leaves the \fIhistory\fR file out of date and larger than necessary,
+but improves speed and eliminates the need for several megabytes of
+temporary storage.)
+.TP
+.BR \-h
+do not expire any article which would be archived if it were expired.
+Mostly for emergencies, so that \fIexpire\fR can be run
+(to delete articles in non-archived groups)
+even if space is short in archiving areas.
+.TP
+.BR \-v
+verbose:
+report some statistics after termination.
+.TP
+.BR \-g
+report expiry dates that \fIgetdate\fR(3) does not like.
+.I Expire
+ignores such dates, treating the article as if it had no explicit
+expiry date.
+.TP
+.BR \-d
+turn on (voluminous and cryptic) debugging output.
+.PP
+.I Expire
+considers the middle field of a \fIhistory\fR line to consist of one or
+more subfields separated by `~'.
+The first is the arrival date, which can be either a \fIgetdate\fR(3)-readable
+date or a decimal seconds count;
+\fIexpire\fR leaves this field unchanged.
+The second\(emif present, non-null, and not `\-'\(emis an explicit expiry
+date for the file, again in either format, which \fIexpire\fR will convert
+to a decimal seconds count as it regenerates the \fIhistory\fR file.
+Subsequent fields are preserved but ignored.
+.PP
+.I Doexpire
+checks whether another \fIdoexpire\fR is running,
+checks that there is enough disk space,
+invokes \fIexpire\fR with any \fIexpireoptions\fR given and with
+\fI\*c/explist\fR as the control file,
+and reports any difficulties by sending mail to \fI\*m\fR.
+This is usually better than just running \fIexpire\fR directly.
+If space is not adequate for archiving, \fIdoexpire\fR reports this
+and invokes \fIexpire\fR with the \fB\-h\fR option.
+If \fB\-r\fR is not among the \fIexpireoptions\fR,
+and disk space is persistently inadequate for the
+temporaries needed for history rebuilding, \fIdoexpire\fR reports this
+and invokes \fIexpire\fR with the \fB\-r\fR option anyway.
+.PP
+.I Expireiflow
+checks whether there are at least \fIminimum\fR megabytes available for
+articles,
+and invokes \fIdoexpire\fR with
+.B \-r
+and the \fIexpireoptions\fR (if any) if not.
+This may be useful on systems which run close to the edge on disk space.
+.PP
+.I Mkhistory
+rebuilds the \fIhistory\fR file and its auxiliaries to match the articles
+in \fI\*a\fR.
+Normally
+.I mkhistory
+uses a reasonable default size for the
+.IR dbz (3z)
+index database; if the
+.B \-s
+option is given, the expected number of entries in the history database
+is taken to be the number of articles found in \fI\*a\fR times
+.IR sizemultiplier .
+.PP
+.I Upact
+updates the third fields of the \fIactive\fR file to match the articles
+in \fI\*a\fR (for historical reasons, \fIexpire\fR does not do this).
+.I Recovact
+updates the second fields of the \fIactive\fR file to match the articles
+in \fI\*a\fR,
+for use in disaster recovery based on an outdated \fIactive\fR file
+or initialization of a news system based on someone else's \fIactive\fR.
+.PP
+.IR Mkhistory ,
+.IR upact ,
+and
+.IR recovact
+are all fairly slow and they all lock the whole news
+system for the duration of the run, so they should not be run casually.
+.SH FILES
+.ta 6c
+.nf
+\*c/history	history file
+\*c/history.pag	\fIdbm\fR database for history file
+\*c/history.dir	\fIdbm\fR database for history file
+\*c/explist	expiry control file
+\*c/history.o	history file as of last expiry
+\*c/history.n*	new history file and \fIdbm\fR files abuilding
+\*c/LOCKexpire	\fIdoexpire\fR's lock file
+\*b/expire/*	various auxiliaries
+.SH SEE ALSO
+.IR inews (1),
+.IR dbm (3),
+.IR newssys (5),
+.IR relaynews (8)
+.SH HISTORY
+Written at U of Toronto by Henry Spencer, with contributions by Geoff Collyer.
+.SH BUGS
+Archiving is always done by copying, never by linking.
+This has the side effect that cross-posted articles are archived as
+several independent copies.
+.PP
+The
+.B \-p
+subject-finder botches continued header lines,
+as does \fImkhistory\fR,
+although such lines are rare.
+.PP
+\fIUpact\fR is a distasteful kludge,
+but then, so is the third field of the \fIactive\fR file.
+.PP
+\fIUpact\fR forces the third field of the \fIactive\fR file to be at least
+five digits, for backward compatibility, but otherwise just makes it as
+large as necessary.
+The group-creation operations always create it ten digits long.
+The discrepancy is harmless, since unlike the second field, the third
+field is never updated in place.
+.PP
+One cannot put more than one newsgroup into a single archiving directory
+with the `=' feature, since the article numbers will collide with each
+other and expire doesn't do anything about this.
+Note that archiving a newsgroup which has subgroups into
+an `=' directory puts all the subgroups in the same directory as the parent!
+(Specifying the group as `foo.bar,!foo.bar.all' will avoid this.)
+.PP
+.I Mkhistory
+is inherently incapable of reconstructing history-file lines corresponding
+to expired articles.
+Protection against old articles reappearing is thus somewhat limited for
+a while after the history file is rebuilt.
+.PP
+.I Expire
+uses
+.IR access (2)
+to test for the presence of archiving directories,
+which can cause anomalies if it is run setuid (normally it's not).

@@ -1,0 +1,311 @@
+.\" =()<.ds a @<NEWSARTS>@>()=
+.ds a /usr/spool/news
+.\" =()<.ds b @<NEWSBIN>@>()=
+.ds b /usr/lib/newsbin
+.\" =()<.ds c @<NEWSCTL>@>()=
+.ds c /usr/lib/news
+.\" =()<.ds m @<NEWSMASTER>@>()=
+.ds m usenet
+.TH INJNEWS 1 "20 September 1991"
+.BY "C News"
+.SH NAME
+injnews, inews \- `user-friendly' news-posting front-ends for relaynews
+.SH SYNOPSIS
+.B injnews
+[
+.B \-N
+]
+[
+.B \-A
+]
+[
+.B \-V
+]
+[
+.B \-x
+excluded-site
+]
+.br
+.in +0.25i
+.ti -0.25i
+.B inews
+[
+.B \-h
+]
+[
+.B \-N
+]
+[
+.B \-A
+]
+[
+.B \-V
+]
+[
+.B \-x
+excluded-site
+]
+[
+.B \-W
+]
+.\" silly B options follow
+[
+.B \-M
+]
+[
+.B \-a
+Approved:-contents
+]
+[
+.B \-c
+Control:-contents
+]
+[
+.B \-d
+Distribution:-contents
+]
+[
+.B \-e
+Expires:-contents
+]
+[
+.B \-f
+From:-contents
+]
+[
+.B \-n
+Newsgroups:-contents
+]
+[
+.B \-o
+Organization:-contents
+]
+[
+.B \-r
+Reply-To:-contents
+]
+[
+.B \-t
+Subject:-contents
+]
+[
+.B \-C
+newsgroup
+]
+[
+.B \-F
+References:-contents
+]
+[
+file ...
+]
+.br
+.in -0.25i
+.B inews
+.B \-p
+[ file ... ]
+.SH DESCRIPTION
+.I Injnews
+and
+.I inews
+massage news articles to make them conform
+to DARPA RFC 1036,
+then
+.IR i nject
+them into the
+.I news
+flow.
+.I Injnews
+is the preferred interface.
+.I Inews
+is slower but handles all the old B News options,
+primarily for the benefit of old news readers.
+.PP
+.I Injnews
+injects an article,
+found on standard input,
+into the news flow,
+installing it locally
+and
+broadcasting it (if appropriate) onto the network.
+.I Injnews
+assumes the presence of at least
+.B Subject:
+and
+.B Newsgroups:
+headers in the article,
+then adds and alters headers,
+notably
+.BR Message-ID: ,
+.BR From:
+and
+.BR Path: ,
+deletes invisible characters,
+and
+appends the first four lines of
+.BR $HOME/.signature ,
+if any,
+to the article,
+and hands the resulting article to
+.IR relaynews (8),
+provided the newsgroup(s) are unmoderated.
+If any of the groups are moderated,
+the article will instead be mailed
+to the moderator of one of the moderated newsgroups in the
+.B Newsgroups:
+header.
+.B \-N
+suppresses posting
+and
+produces on standard output
+the article that would have otherwise been posted;
+the resultant article will have been checked for illegalities as usual
+and will be suitable as input to
+.IR relaynews (8).
+.B \-A
+waits until enough space becomes free in
+.BR \*a .
+.B \-V
+causes
+.I relaynews
+to emit a log file line on stdout
+after processing is complete,
+by having
+.I relaynews
+not redirect stdout and stderr
+to
+.B \*c/log
+and
+.B \*c/errlog.
+.B \-x
+prevents transmission to site
+.IR excluded-site .
+.PP
+.I Inews
+does everything that
+.I injnews
+does,
+plus some backwardly-compatible things.
+The article is read from
+.IR file s
+or standard input if none.
+Normal usage is
+.BR "inews \-h" ,
+which assumes that the input article starts with headers;
+otherwise it starts the article body
+and the B News options described below must be given
+to supply the headers.
+.B \-W
+waits for
+.I relaynews
+to complete,
+instead of running it in the background and not waiting.
+.B \-M
+does nothing,
+for B News compatibility.
+The rest of the options are inherited from B News
+and exist only for backward-compatibility with news readers.
+.I "They should not be used by humans,"
+as they are equivalent to
+adding the obvious headers,
+with two small twists:
+.B \-f
+generates
+.BI "From:" " From:-contents"
+which generates a
+.BI "Sender:" " user" @ "host"
+header
+if there is no
+.B Sender:
+header in the input,
+and
+.B \-C
+tells you to use
+.I addgroup
+for local group creations
+and tells you what to feed to
+.I injnews
+for global ones.
+.PP
+.B "inews \-p"
+.I files
+is exactly equivalent to invoking
+.BI "relaynews \-r " files\c
+,
+where
+.I files
+may be an empty list;
+there is no automatic recovery of the input
+file(s) in case of errors,
+full disks
+or other problems.
+.SH EXAMPLES
+.B "injnews <article"
+.in +0.5i
+Post
+.I article
+to Usenet.
+.in -0.5i
+.PP
+.B "injnews \-N <article >/dev/null"
+.in +0.5i
+Check
+.I article
+for obvious errors.
+.in -0.5i
+.SH FILES
+.PD 0
+.TP 2i
+.B \*c/active
+contains (un)moderated flag
+.TP
+.B \*c/mailpaths
+routes to moderators, Internet gateway
+.TP
+.B \*c/mailname
+the name of this cluster of machines for purposes of mail,
+including any domain
+.TP
+.B \*c/server
+the hostname of this cluster's server
+.TP
+.B \*c/whoami
+the name of this cluster for purposes of news
+.TP
+.IB $HOME /.signature
+your name and network addresses
+(no line-printer graphics, please)
+.TP
+.IB $HOME /dead.article
+saved article in case of errors or problems
+.TP
+.BR /tmp/in *
+temporaries
+.PD
+.SH "SEE ALSO"
+.IR mail (1),
+.IR news (5),
+.IR newsaux (8),
+.IR relaynews (8)
+.br
+DARPA RFC 1036
+.SH HISTORY
+Written by Geoff Collyer
+as part of the C news project.
+.SH BUGS
+.I Inews
+should be unnecessary;
+its only useful function is adding
+.B Message-ID:
+headers
+and
+most novices use
+.IR Pnews ,
+which could invoke
+.I relaynews
+directly.
+.PP
+.I Inews
+is a shell script currently
+and can fail if any of the underlying Unix tools fail.
+This typically happens with very long input lines.

@@ -1,0 +1,30 @@
+#! /bin/sh
+PATH=".:$PATH"
+
+echo removing old dregs...
+rm -rf tmp
+
+echo making new working subtree...
+chmod +x master/run
+mkdir tmp 2>/dev/null
+cp ../relaynews tmp
+# tar B is unportable, so we can't do this:
+# (cd master; tar cf - .) | (cd tmp; tar xBf -)
+(cd master; tar cf - .) >master.tar
+(cd tmp; tar xf -) <master.tar
+rm -f master.tar
+cd tmp
+chmod u+w *
+
+echo running relaynews...
+./run
+
+echo comparing output...
+sed 's/^... .. ..:..:..\..../TIME/' log >.log && mv .log log
+sed 's/	[0-9][0-9]*~/	TIME~/' history >.history && mv .history history
+rm -f gmon.out history.* relaynews
+# simulate: diff -r ../out .
+for f in `find . -type f -print`
+do
+	cmp $f ../out/$f
+done

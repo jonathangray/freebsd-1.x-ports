@@ -1,0 +1,60 @@
+#! /bin/sh
+# submit.relay - submit article on stdin via relaynews
+#	environment variables: autopost, relayopts
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/usr/lib/news/bin/config}
+export NEWSCTL NEWSBIN NEWSARTS NEWSPATH NEWSUMASK NEWSMASTER NEWSCONFIG
+PATH=$NEWSCTL/bin:$NEWSBIN/relay:$NEWSBIN:$NEWSPATH; export PATH
+
+# deal with inadequate free space
+case "$autopost" in
+no)
+	if test "`spacefor 1 articles`" -le 0; then
+		echo "$0: too little space free on $NEWSARTS" >&2
+		exit 1
+	fi
+	;;
+yes)
+	iter=0
+	while test "`spacefor 1 articles`" -le 0 -o "`spacefor 1 control`" -le 0
+	do
+		sleep 30
+		iter=`expr $iter + 1`
+		case "$iter" in
+		3)
+			mail "$NEWSMASTER" <<!
+Subject: free space too low on $NEWSARTS
+
+There is too little free space on $NEWSARTS for inews to run comfortably.
+!
+			;;
+		esac
+	done
+	;;
+*)
+	echo "$0: autopost environment variable missing" >&2
+	exit 1
+	;;
+esac
+
+# execute relaynews commands on the server, for the sake of locking.
+me="` hostname `"
+server="` cat $NEWSCTL/server 2>/dev/null `"
+case "$server" in
+"")	server="$me" ;;			# if no server file, assume this is it
+esac
+case "$me" in
+$server)
+	relaynews $relayopts
+	status=$?
+	;;
+*)
+	# send article+commands to remote shell
+	echo PATH=$PATH relaynews $relayopts >/tmp/irsh$$cmd
+	ersh $server /bin/sh </tmp/irsh$$cmd
+	status=$?
+	rm -f /tmp/irsh$$cmd
+	;;
+esac
+# echo "status $status from relaynews" >>/tmp/inewsdebug # DEBUG
+exit $status

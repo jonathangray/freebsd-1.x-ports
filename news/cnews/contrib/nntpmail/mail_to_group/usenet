@@ -1,0 +1,102 @@
+#!/bin/sh
+#
+# usenet newsgroup1 ... newsgroupn
+#
+# sendmail-compatible usenet transport agent.
+#                   Jean-Francois Lamy (lamy@ai.toronto.edu), 89-06-02
+#                   based on code by Rayan Zachariassen.
+#
+# The arguments are the newsgroups to which the article should be posted. A
+# complete message, including To:, From: and From_ line expected on stdin.
+# This assumes of course that the necessary magic has been done so that
+# the mailer recognizes newsgroup name and decides to use the usenet transport
+# agent on them.
+#
+# Notes:
+#
+# - this script should ultimately result in the invocation of a real
+#   "inews" that deals with moderated newsgroups and invokes relaynews.
+#   This version calls nntp, which results in calling a real inews on
+#   the news server.
+#   
+# - The news program invoked by this script should trust From: lines
+#   (otherwise workstation name hiding, full-name id generation and
+#   all other smarts done by the mailer will be lost)
+#
+# - newsgroup "postnews" is ignored, and is used so one can mail
+#   to a postnews alias a message with a Newsgroups: header, with
+#   postnews aliased to postnews@usenet, where usenet is a fake host
+#   handled by this transport agent.
+#
+# - Normally a From_ line of site!user and a From: line of user@site
+#   should be produced. If your sendmail cannot be coerced into rewriting
+#   envelope and headers differently you will need to kludge it here.
+#
+#
+# ZMailer notes:
+#
+# - The default router.cf does the appropriate things, provided that
+#   scheduler.cf contains:
+#	usenet/*	1m	10 0 0	root	daemon	sm -c $channel usenet
+#   sm.cf contains:
+#	usenet	m	/local/lib/mail/bin/usenet	usenet $u
+#      (adjust this to reflect the actual location of the installed copy of
+#       this script, of course)
+#   hosts.transport contains a line with:
+#       usenet usenet!  
+#   and that the aliases file contains aliases of the form
+#       gradnews: gradnews@usenet
+#      for all newsgroup names that don't have embedded ".").
+
+
+# this version forwards the article via NNTP
+NNTPSERVER="jarvis.csri" ; export NNTPSERVER
+# make sure this does not end up calling this script again!
+inews=/local/lib/news/nntp_inews
+
+orgflag=0
+org="`cat /local/share/news/organi?ation`"
+[ "$org" ] || orgflag=1  # do not print empty Organization: header
+
+from=/tmp/from$$
+
+for i in $@
+do
+	groups="${groups+$groups,}$i"
+done
+
+awk "BEGIN		{ subject = 0; body = 0; skipping = 0 ;
+			  newsgroups = 0; distribution = 0;
+			  organization = $orgflag; }
+body == 1		{ print; next }
+/^$|^[ ][ \\t]*$/	{ if (!body) {
+			    np = split(path,parts,\"!\");
+			    if (!organization && np == 1)
+			        print \"Organization: $org\";
+			    if (!newsgroups) print \"Newsgroups: $groups\";
+			    if (!subject) print \"Subject: (none)\"; 
+			  }
+			  print; body = 1; next
+			}
+/^To:|^X-To:|^Cc:|^Apparently-To:/	{ skipping=1 ; next }
+/^Received:/		{ skipping = 1; next }
+/^Newsgroups:/		{ newsgroups = 1; skipping = 0; printf(\"%s\",\$0);
+		        if (\"$groups\" != \"\" && \"$groups\" != \"postnews\")
+			     printf(\",%s\\n\",\"$groups\");
+			  else printf(\"\\n\");
+			  next }
+/^Organi[sz]ation:/	{ organization = 1; skipping = 0; print; next }
+/^Distribution:/	{ distribution = 1; skipping = 0; print; next }
+/^Subject:/		{ subject = 1; skipping = 0; print; next }
+/^From |^Return-Path:/	{ print \$2 > from ; path = \$2 ; skipping = 1; next }
+/^[ 	]/		{ if (skipping) next }
+/^[A-Za-z-]*:[ \\t]*$/	{ if (!body) next }
+			{ print }
+" from="$from" - >/tmp/usenet.$$-1
+
+if [ -s $from ]; then
+   (echo -n "Path: "; cat $from ; cat /tmp/usenet.$$-1 ) > /tmp/usenet.$$-2
+   $inews /tmp/usenet.$$-2
+fi
+rm $from /tmp/usenet.$$-*
+exit 0

@@ -1,0 +1,80 @@
+#! /bin/sh
+# mkhistory - rebuild history file and friends
+# Note, most sorts will accept "-T dir" to say where to put temporary files;
+# this can be gotten in by setting the SORTTMP environment variable in the
+# caller to "-T dir" and exporting it.  Some sorts might ask you to do it
+# by setting TMPDIR instead.
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/usr/lib/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/expire:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+sizemul=
+case "$#$1" in
+0)			;;
+2-s)	sizemul="$2"	;;
+*)	echo "Usage: $0 [-s sizemultiplier]" >&2
+	exit 2
+	;;
+esac
+
+lock="$NEWSCTL/LOCK"
+ltemp="$NEWSCTL/L.$$"
+echo $$ >$ltemp
+trap "rm -f $ltemp ; exit 0" 0 1 2 15
+while true
+do
+	if newslock $ltemp $lock
+	then
+		trap "rm -f $ltemp $lock ; exit 0" 0 1 2 15
+		break
+	fi
+	sleep 30
+done
+if newslock $ltemp $NEWSCTL/LOCKexpire
+then
+	trap "rm -f $ltemp $lock $NEWSCTL/LOCKexpire ; exit 0" 0 1 2 15
+else
+	echo "$0: expire is running, $0 aborted" >&2
+	exit 1
+fi
+
+cd $NEWSARTS
+them=
+for f in `ls | egrep -v '\.|(^lost\+found$)'`
+do
+	if test -d $f -a -r $f
+	then
+		them="$them $f"
+	fi
+done
+find $them -type f -name '[0-9]*' -print | histinfo |
+	sort $SORTTMP -t'	' +1n |
+	awk -f $NEWSBIN/expire/histdups | histslash >$NEWSCTL/history.n
+
+cd $NEWSCTL
+if egrep '^<[^>]*@trash>	' history.n >/dev/null
+then
+	echo "$0: (warning) empty/trash articles found, will expire at once" >&2
+	echo "$0:     (grep history file for '@trash' to see them)" >&2
+fi
+case "$sizemul" in
+'')	dbzparm=		;;
+*)	size="`wc -l <history.n`"
+	awkpgm='{ printf "%ld\n", $1 * $2 }'
+	# why not use expr?  because it's only 16 bits wide on 16-bit machines
+	dbzparm="-p `echo $size $sizemul | awk \"$awkpgm\"`"
+	;;
+esac
+dbz $dbzparm history.n
+
+if test -f history
+then
+	mv history history.o
+else
+	true
+fi && mv history.n history &&
+rm -f history.pag history.dir &&
+mv history.n.pag history.pag && mv history.n.dir history.dir

@@ -1,0 +1,347 @@
+.\" =()<.ds a @<NEWSARTS>@>()=
+.ds a /usr/spool/news
+.\" =()<.ds b @<NEWSBIN>@>()=
+.ds b /usr/lib/newsbin
+.\" =()<.ds c @<NEWSCTL>@>()=
+.ds c /usr/lib/news
+.\" =()<.ds m @<NEWSMASTER>@>()=
+.ds m usenet
+.TH NEWSBATCH 8 "27 April 1992"
+.BY "C News"
+.SH NAME
+sendbatches, batchsplit \- news batching to other sites
+.br
+batcher, batchih, batchsm, batchra \- news-batch preparation
+.br
+comp, comp12, nocomp, compcun, compc7, compb \- news-batch compression
+.br
+c7encode, bencode \- compressed-news-batch encoding
+.br
+viauux, viauuxz, viauuxcun, viauuxl \- news-batch transmission via uucp
+.br
+viamail, viaemail, viapmail \- news-batch transmission via mail
+.br
+viainews, viarsh, vianowhere \- news-batch transmission by misc. means
+.SH SYNOPSIS
+.B \*b/batch/sendbatches
+[
+.B \-p
+]
+[ site ... ]
+.PP
+.B \&.../batchsplit
+batchsize
+.br
+.B \&.../batcher
+listfile
+.br
+.B \&.../batchih
+listfile
+.br
+.B \&.../batchsm
+listfile
+.br
+.B \&.../batchra
+listfile
+.br
+.B \&.../comp
+.br
+.B \&.../comp12
+.br
+.B \&.../nocomp
+.br
+.B \&.../compcun
+.br
+.B \&.../compc7
+.br
+.B \&.../compb
+.br
+.B \&.../c7encode
+.br
+.B \&.../bencode
+[ file ]
+.br	
+.B \&.../viauux
+site
+.br	
+.B \&.../viauuxz
+site
+.br	
+.B \&.../viauuxcun
+site
+.br	
+.B \&.../viauuxl
+group
+.br
+.B \&.../viamail
+site
+.br
+.B \&.../viaemail
+site
+.br
+.B \&.../viapmail
+site
+.br
+.B \&.../viainews
+site
+.br
+.B \&.../viarsh
+site
+.br
+.B \&.../vianowhere
+site
+.SH DESCRIPTION
+.I Sendbatches
+administers batched transmission of news to other sites.
+It should be run periodically, under userid \fInews\fR,
+by \fIcron\fR(8) or similar means.
+It prepares and sends batches of news,
+subject to restrictions on available space and length of outbound queues.
+.PP
+Normally,
+.I sendbatches
+does locking to ensure that only one
+.I sendbatches
+is running at a time.
+The
+.B \-p
+option suppresses the locking and permits parallel
+.I sendbatches
+runs, although lower-level locking is done to ensure that only one is
+trying to prepare batches for any particular site at a given time.
+Parallel
+.I sendbatches
+runs impose very heavy system loads but may be useful to systems with
+extensive hardware parallelism and many outbound news feeds.
+.PP
+Each site that can have batches sent to it needs a \fIsite\fR directory
+under \fI\*a/out.going\fR.
+If \fIsendbatches\fR is invoked with specific \fIsite\fRs given, it
+considers batching for those sites, only, in that order.
+By default, \fIsendbatches\fR consults the \fIbatchparms\fR file (see below)
+to determine what to do:
+If there is a \fB/default/\fR entry in \fIbatchparms\fR, \fIsendbatches\fR
+will consider batching for all sites that have directories in
+\fI\*a/out.going\fR, in oldest-first order by modification time of the
+directory.
+If there is no \fB/default/\fR entry, \fIsendbatches\fR
+considers batching for those sites named in \fIbatchparms\fR, in the
+order named.
+.PP
+To use the batcher, names of files to be sent to a specific site should
+be appended to a \fItogo\fR file in its \fIsite\fR directory.
+The batcher expects the lines in \fItogo\fR to have two fields, a filename
+(as a full pathname, or relative to \fI\*a\fR)
+of an article and its size in bytes.
+A missing size field is arbitrarily assumed to be a default average.
+.PP
+\fISendbatches\fR uses a number of auxiliary programs to do the real work.
+The search path it uses to find them includes, in order,
+the \fIsite\fR directory for the site in question,
+\fI\*c/bin\fR, and \fI\*b/batch\fR.
+This permits per-site and per-news-database overrides of the default
+behaviors.
+\fISendbatches\fR provides all these programs with environment
+variables \fBNEWSSITE\fR, containing the name of the site that batches
+are being prepared for,
+and \fBNEWSSITEDIR\fR, containing the full pathname of the \fIsite\fR
+directory,
+in case these are useful in customization.
+.PP
+The names of most of the auxiliary programs, and some other parameters,
+are taken from the file \fI\*c/batchparms\fR, an ASCII text file.
+Empty lines and lines starting with `#' are ignored.
+Other lines specify the behavior for sites, one line per site.
+A site line is six fields, separated by white space.
+The first field is the site name;
+a line whose site name is \fB/default/\fR specifies what parameters should
+be used for sites not explicitly mentioned.
+(The presence or absence of such a line also influences the behavior of
+\fIsendbatches\fR when invoked without arguments; see above.)
+The second field is the size of batches to be prepared (before compression),
+in bytes.
+The third field is the maximum length of the output queue for
+transmission to that site.
+The fourth, fifth, and sixth fields are the names of the programs to
+be used to build, compress, and transmit (respectively) batches to that site.
+.PP
+For each site being considered for batches, \fIsendbatches\fR first
+determines whether there are in fact any articles to be batched.
+Assuming there are, \fIsendbatches\fR then
+finds the \fIbatchparms\fR line for that site
+and
+invokes \fIqueuelen\fR (see \fInewsaux\fR(8))
+to find out the size of the outbound queue for the site.
+\fISendbatches\fR limits the number of batches prepared to the minimum of
+the limits implied by queue lengths and available space.
+.PP
+\fISendbatches\fR uses \fIbatchsplit\fR
+as necessary
+to slice chunks out of the \fItogo\fR
+file, each chunk containing the
+\fItogo\fR lines for a batch limited to the specified size.
+Exception:  a single article bigger than the specified size will still go out
+as one batch.
+.PP
+Each chunk is then processed through a batch preparer
+(typically \fIbatcher\fR), which assembles the
+articles into a batch,
+a batch compressor (typically \fIcompcun\fR),
+which performs compression and/or any other auxiliary processing
+needed, and a batch transmitter (typically \fIviauux\fR),
+which sends the batch on its way (e.g. enqueues it for transmission).
+The preparer is run with \fI\*a\fR as the current directory,
+so non-absolute pathnames in the chunk are valid filenames;
+the others are run in the \fIsite\fR directory for easier access to
+site-specific customization files.
+.PP
+Batch preparers in the standard distribution are:
+.RS
+.IP batcher 9
+normal batching
+.IP batchih
+\fIihave\fR-sending part of uucp ihave/sendme (not to be confused with NNTP)
+.IP batchsm
+\fIsendme\fR-sending part of ihave/sendme
+.IP batchra
+requested-article-sending part of ihave/sendme
+.RE
+.PP
+.IR Batchih ,
+.IR batchsm ,
+and
+.I batchra
+have to map from the phony ``site name'' given in their \fIbatchparms\fR
+line to the name of the site they should actually send to; they do this
+by stripping off the last `.' and everything that follows (usually
+`.ihave' or `.sendme' respectively, but on machines which limit the size
+of filenames these may have to be shortened).
+.PP
+Caution:
+.I batchih
+and
+.I batchsm
+do their work by constructing an article and feeding it to
+.IR inews ,
+which means that the batch size must be within what
+.I inews
+will accept (see
+.IR inews (1)).
+.PP
+Batch compressors in the standard distribution are:
+.RS
+.IP comp 9
+ordinary
+compression
+.IP comp12
+12-bit compression (for sites with limited decompression ability)
+.IP compcun
+compression plus the silly B-news-compatible
+`#!\ cunbatch' header
+.IP nocomp
+pass data straight through, no compression
+.IP compc7
+compression plus 7-bit encoding using
+\fIc7encode\fR
+.IP compb
+compression plus very conservative 6-bit encoding
+using \fIbencode\fR
+.RE
+.PP
+Batch transmitters in the standard distribution are:
+.RS
+.IP viauux 10
+normal transmission via UUCP
+.IP viauuxz
+like \fIviauux\fR except with \fB\-z\fR option given to \fIuux\fR
+(for old UUCPs where don't-report-result-on-zero-status is not default)
+.IP viauuxcun
+like \fIviauux\fR except it invokes \fIcunbatch\fR rather than \fIrnews\fR
+at the other end (for some very old news sites)
+.IP viauuxl
+multicast transmission using the \fB\-l\fR option of \fIuux\fR (not found
+on all systems) to send the same batch to all systems listed in the
+file `\*c/sites.\fIgroup\fR'
+.IP viamail
+mail the batch to \fIsite\fB!rnews\fR
+.IP viaemail
+mail the batch to \fIsite\fB!enews\fR
+.IP viapmail
+mail the batch to \fIsite\fB!rnews\fR, attempting to
+protect an unencoded batch against the vagaries of mailers
+.IP viainews
+feed the batch back to \fIinews\fR, ignoring the \fIsite\fR argument
+(normally useful only for ihave/sendme)
+.IP viarsh
+use \fIrsh\fR to run \fIrnews\fR on the \fIsite\fR via Ethernet,
+Internet, etc.
+(the directory containing \fIrnews\fR
+must be in the default PATH on \fIsite\fR)
+.IP vianowhere
+dummy transmitter for batchers like
+.I batchra
+that don't need a real one
+.RE
+.PP
+.I C7encode
+encodes 8-bit data from standard input into a 7-bit form optimized for
+transmission by uucp `f' protocol.
+The encoding is complex and bizarre.
+.PP
+.I Bencode
+takes 8-bit data from
+the named source file (the default is standard input)
+and encodes it
+using only the ASCII characters ``A'' \- ``Z'', ``a'' \- ``z'', ``0''
+\- ``9'', ``+'', and ``-''.
+The ASCII characters blank, newline, and ``/'' also appear in the
+encoded file, but do not represent encoded bits.
+The encoded file is terminated with
+a byte count and cyclic redundancy check for detecting corrupted files.
+This ought to suffice to get data through almost any network.
+.PP
+\fISendbatches\fR logs some information about sites with backlogs in
+\fI\*c/batchlog\fR (see also \fInewsdaily\fR(8)).
+This is intended to help detection and diagnosis of flow problems.
+.SH FILES
+.ta \w'\*a/out.going/*/LOCK'u+2n
+.nf
+\*c/LOCKbatch	overall lock for \fIsendbatches\fR
+\*c/LOCK	overall news lock (used by \fIbatchsplit\fR)
+\*c/L.*	lock temporaries
+\*a/out.going/*	batch directories
+\*a/out.going/*/LOCK	per-site locks
+\*a/out.going/*/L.*	per-site lock temporaries
+\*c/batchparms	parameter file
+\*c/sites.*	\fIviauuxl\fR multicast lists
+
+also see text
+.SH SEE ALSO
+inews(1), compress(1), uux(1), relaynews(8), rnews(8)
+.SH DIAGNOSTICS
+Complaints, if any,
+from \fIsendbatches\fR and its auxiliaries are mailed to `\*m'.
+.SH HISTORY
+Written at University of Toronto as part of the C News project.
+A number of the ideas came from Chris Lewis, who was then with Motorola.
+.I Bencode
+written at University of Waterloo
+by Reg Quinton and Ken Lalonde.
+.SH BUGS
+\fISendbatches\fR estimates available space without considering the
+effects of compression;
+this is usually too conservative.
+.PP
+\fIViapmail\fR is obsolescent;
+\fIviaemail\fR with a batch encoded with \fIbencode\fR is vastly superior.
+.PP
+Queue-length limiting does not work for \fIviauuxl\fR because \fIqueuelen\fR
+(see \fInewsaux\fR(8)) does not know about multicast groups.
+Also, \fIviauuxl\fR has not been tested well.
+.PP
+.I Viarsh
+does not incorporate a spooling subsystem,
+so a slow site stalls the entire batching system
+and a non-responding site loses news.
+It is not recommended for bulk transmission or where high reliability
+is essential.

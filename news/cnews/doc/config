@@ -1,0 +1,168 @@
+.Ch "Configuration Mechanisms in C News"
+.Ix configuration
+.SH
+Intro
+.LP
+There is an overall problem with news stuff in that some pathnames
+and such are site-specific.
+In C News this hits both shell files and C programs, the former a
+particular inconvenience because they are not compiled and hence can't
+easily pick it up from a library at compile time.
+It's easy to edit shell files, but there are too many of them for this
+to be very convenient.
+.LP
+Several mechanisms are needed to solve the entire problem..
+.SH
+Configuration Parameters
+.LP
+Although there are many things that theoretically could be site-specific,
+there are only a few that really crop up constantly,
+are highly likely to change,
+and have to be known to running code.
+Here's a tentative list, with internal names and common defaults:
+.Ix configuration variables
+.TS
+lll.
+NEWSARTS	pathname of the article database	/usr/spool/news
+NEWSCTL	pathname of the control-file directory	/usr/lib/news
+NEWSBIN	pathname of the program directory	/usr/lib/newsbin
+NEWSPATH	shell PATH setting for news	/bin:/usr/bin
+NEWSUMASK	default umask for file creation	002
+NEWSMASTER	where to send mail about trouble	usenet
+NEWSCONFIG	see "Subst" section	/usr/lib/news/bin/config
+.TE
+.SH
+Environment Variables
+.LP
+All C News programs
+that care about configuration parameters are expected to look at
+environment variables with the same names as the parameters, and to
+use the environment values to override internal defaults.
+This is primarily aimed at testing and special purposes rather than
+production use, as there is a fundamental problem:
+the environment is insecure.
+The environment variables are nevertheless very useful.
+.LP
+There is a need for a canned interface to the environment variables,
+to simplify their use.
+There is also a requirement for centrally-set defaults for normal
+production use.
+These requirements are addressed differently for C and shell programs.
+.SH
+C Interface
+.LP
+\fILibcnews\fR provides a set of inquiry functions:
+.Ix configuration library
+.LP
+.RS
+.IP "char *fullartfile(char *name);"
+Returns a full pathname for the NEWSARTS-relative file \fIname\fR;
+if \fIname\fR is NULL, returns the value of NEWSARTS.
+.IP "char *ctlfile(char *name);"
+Returns a full pathname for the NEWSCTL-relative file \fIname\fR;
+if \fIname\fR is NULL, returns the value of NEWSCTL.
+.IP "char *binfile(char *name);"
+Returns a full pathname for the NEWSBIN-relative file \fIname\fR;
+if \fIname\fR is NULL, returns the value of NEWSBIN.
+.IP "char *newspath(void);"
+Returns the value of the NEWSPATH parameter.
+.IP "int newsumask(void);"
+Returns the value of the NEWSUMASK parameter.
+.IP "char *newsmaster(void);"
+Returns the value of NEWSMASTER.
+.RE
+.LP
+Functions which return string values return pointers to areas which they
+may later re-use, so the values should be copied if they are to persist
+past later calls.
+There is also a function \fIartfile\fR which returns a relative pathname,
+as a special-purpose optimization,
+and a function \fIcd\fR which does a \fIchdir\fR and notes the location
+for future use by \fIartfile\fR.
+.LP
+The first inquiry function to be invoked automatically initializes
+their internal housekeeping.
+Against the possibility of malicious setting of environment variables,
+if any environment variables are in fact present to override default
+values, and at least one value in fact differs from the default,
+this initialization includes a call to a function the user must supply:
+.LP
+.RS
+.IP "void unprivileged(char *reason);"
+Drop any special powers that should not be available to a normal user
+program,
+e.g. those obtained by set-uid bit.
+.I Reason
+is the name of the first environment variable that caused trouble.
+.RE
+.LP
+Programs that do not use the set-uid bit can normally have a null
+implementation of \fIunprivileged\fR, but to encourage thought about
+the matter this is \fInot\fR provided as a default.
+.LP
+Suitable external declarations for all these functions can be found
+in the include file \fIconfig.h\fR in the C News include directory.
+.Ix config.h
+.SH
+Shell interface
+.LP
+All shell files that want to know configuration parameters should
+execute NEWSCTL/bin/config using the `.' command;
+.Ix config
+it sets shell variables with the same names as the parameters.
+Note that it does not export these variables, so subordinate shell
+files need to pick up \fIconfig\fR themselves.
+This is to preserve the property that subordinate programs see environment
+variables set only if the user set them.
+.SH
+Subst
+.LP
+.Ix subst
+The alert mind will have noticed a circularity in the previous section:
+it's not possible to find NEWSCTL/bin/config until one knows where NEWSCTL is.
+There are also occasional annoyances in that documentation and such wants
+to know the local defaults, and can't get them from either the C or shell
+interface.
+Hence the use of \fIsubst\fR.
+.LP
+\fISubst\fR does substitutions into source files (including shell files)
+in such a way that it is not necessary to maintain two versions of the file.
+In the top-level directory of the C News sources are four files:
+\fIsubst\fR itself, the \fIsubstitutions\fR file defining the values of
+the configuration parameters, and \fIsubst.hs\fR and \fIsubst.gc\fR,
+which are lists of files (relative to the top-level source directory)
+that need substitutions done.
+(The use of two `list' files reflects C News's dual authorship.)
+See the \fIsubst\fR(1) manual page for the gory details of the syntax.
+The only C program affected is the configuration-inquiry part of the
+library, but all shell files that need any of the configuration parameters
+need to be in one of the lists.
+.SH
+Program startup
+.LP
+As a result of all this, a C program which needs to know a configuration
+parameter simply calls the appropriate inquiry function,
+and is prepared for a return call to \fIunprivileged\fR.
+A shell program has to do a bit more work; it should start with something
+on the order of:
+.Ix configuration "shell scripts"
+.DS
+.ft B
+#! /bin/sh
+# foobar \- does foo, bar, and bletch
+
+# =()<\&. ${NEWSCONFIG\-@<NEWSCONFIG>@}>()=
+\&. ${NEWSCONFIG\-/usr/lib/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/xxx:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+.ft
+.DE
+(A prototype for this is in conf/proto.sh.)
+(See an accompanying document for the logic of the PATH setting.)
+The NEWSCONFIG configuration parameter specifies the location of the
+configurer shell program, which is then executed to set up the rest
+of the parameters.
+The reason for doing it this way is to ensure that new parameters
+can be added without having to change every shell file.
+.Ix NEWSCONFIG

@@ -1,0 +1,974 @@
+.Ch "Installing ``C News'' Network News Software"
+.SH
+Introduction
+.Ix introduction
+.PP
+.Df news
+.Df netnews
+.Df "network news"
+Network news
+(or
+.I netnews
+for short)
+consists of a collection of messages formatted similarly to
+ARPAnet mail
+(see DARPA RFC 1036 for details),
+.Ix "RFC 1036"
+widely spread.
+The logical network,
+imposed on top of various real networks,
+formed by the set of all interconnected sites
+exchanging network news is called
+``Usenet''
+.Df Usenet
+and was formed in 1979,
+radiating out from Duke University.
+Netnews is propagated
+between cooperating machines
+by a flooding algorithm,
+with some loop prevention heuristics:
+each machine sends its neighbours news that the
+neighbours have (probably) not yet seen.
+.PP
+Flow of netnews between machines
+may be achieved by use of any network
+(or other medium)
+which can transmit an arbitrary stream of
+(at least 7-bit,
+preferably 8-bit)
+ASCII code, unmodified.
+If a network cannot transmit ASCII intact
+(e.g. BITNET),
+it is possible to encode netnews
+before transmission across the network
+and
+decode it upon reception from the network.
+Since one cannot be certain that
+one's network neighbours will be up and
+reachable at all times,
+outgoing netnews must be queued,
+at least in the case of network trouble.
+To date,
+at least
+these networks,
+protocols and media
+have been used to transmit netnews correctly:
+UUCP,
+.Ix UUCP
+RS232,
+NNTP,
+.Ix NNTP
+Ethernet\(rg,
+the ARPA Internet,
+.Ix Internet
+Datakit\(rg,
+.Ix Datakit
+ACSnet,
+.Ix ACSnet
+magnetic tape,
+SMTP,
+and
+BITNET,
+though at least the last two require some form of encapsulation
+to avoid corruption of articles;
+SMTP because some common implementations get the newline-CRLF
+mappings wrong,
+thus throwing off byte counts in batches,
+and
+BITNET because of its Procrustean chopping,
+.Ix BITNET
+expanding,
+mapping,
+bashing
+and
+smashing
+of all data sent through it
+(sending lines of 80 or fewer characters of
+letters of either case and digits and plus and minus
+appears to be safe).
+.PP
+Netnews arrives via some network,
+which causes a command to be executed upon arrival
+(e.g.
+.I rnews ).
+.I rnews
+.Ix rnews
+typically spools the inbound netnews for later processing.
+Eventually
+(often within the hour
+or at the end of the business day),
+the input queue is run
+and the netnews is stored locally,
+typically under
+.I /usr/spool/news ,
+.Ix /usr/spool/news
+and queued for transmission to netnews neighbours.
+Once stored on disk,
+netnews may be read by any of a collection of unprivileged news readers,
+including
+.I cat (1).
+.I Expire
+.Ix expire
+is run typically each night
+to remove old netnews from disk.
+.PP
+C News
+.Df "C News"
+was originally written to provide a
+much faster and smaller,
+more robust,
+reliable
+and
+correct
+implementation of netnews software than B 2.11 news.
+.Ix "B 2.11 News"
+(There was once a B 3.0 news under development;
+it seems to be still-born.)
+.Ix "B 3.0 News"
+.SH
+News System Overview
+.PP
+News is stored under some directory,
+referred to as
+NEWSARTS,
+which is typically
+.I /usr/spool/news .
+.Ix NEWSARTS
+.Ix /usr/spool/news
+Each newsgroup is stored in its own directory,
+whose name is formed by replacing all dots in the newsgroup name
+with slashes.
+Each article is stored in a file with a numeric name.
+There are pseudo-newsgroups
+called
+.Ix junk
+.Ix control
+.Ix pseudo-newsgroups
+.I junk
+and
+.I control
+which respectively hold
+articles that your subscription list in the
+.I sys
+.Ix sys
+.Ix files sys
+file permitted but which aren't in your
+.I active
+.Ix active
+.Ix files active
+file,
+and control messages.
+There are also directories called
+.I in.coming ,
+.I out.going ,
+and
+.I out.master ;
+.Ix in.coming
+.Ix out.going
+.Ix out.master
+they hold incoming news,
+outgoing news batch files
+and
+outgoing master batch files.
+.I in.coming
+contains temporary files with various names
+and spooled input files with numeric names.
+.I out.going
+contains one directory per outgoing news feed
+(more for ihave/sendme sites).
+.PP
+Indices and related data
+are stored in another directory,
+referred to as
+NEWSCTL,
+usually
+.I /usr/lib/news .
+.Ix /usr/lib/news
+.Ix NEWSCTL
+Some of the interesting files here include
+.I active ,
+.I active.times ,
+.I explist ,
+.I history ,
+.I sys
+and
+.I bin/config .
+There are also log files kept here,
+notably
+.I log
+and
+.I errlog ,
+which need to be aged or trimmed frequently
+(our standard
+.I cron
+entries do this automatically).
+.I newsgroups
+contains a list of group names and descriptions,
+one per line.
+.SH
+C News Components.
+.PP
+.I Rnews
+.Ix rnews
+invokes
+the input subsystem,
+.Ix "input subsystem"
+which
+spools incoming netnews in its original form,
+as received
+(usually from
+.I uucp
+or
+.I NNTP ),
+typically in compressed batches.
+Periodically,
+the input queue should be run
+by invoking
+.I newsrun ,
+.Ix newsrun
+thus uncompressing any compressed input
+and feeding it to
+.I relaynews .
+.Ix relaynews
+.PP
+.I inews
+.Ix inews
+is a front-end for
+.I relaynews
+which implements much of the per-site policy on news posting.
+Local postings are given to
+.I inews .
+.PP
+.I Relaynews
+.Df relaynews
+files incoming netnews as articles on disk
+and
+initiates spooled transmission to other machines,
+often by simply writing the names of the disk files
+containing the articles on the ends of `batch' files,
+which are in turn read by batching programs.
+.Ix batch
+Quite a bit of policy from RFC 1036 is embedded in
+.I relaynews .
+Actually,
+.I relaynews
+writes
+`master batch files',
+which the batch file exploder,
+.I explode ,
+turns into normal batch files.
+.I explode
+should be run periodically from
+.I cron
+or
+.I newsrun .
+.PP
+The output
+.I batcher
+.Df batcher
+reads lists of file names
+and
+generates news batches
+(see RFC 1036 or
+.I news (5)
+for the format)
+of prescribed sizes
+and queues the batches
+for transmission to other sites.
+The batcher is run asynchronously with
+.I relaynews ,
+typically once an hour
+outside of business hours.
+NNTP sites
+will also need to run an NNTP transmitter
+periodically
+(e.g.
+.I nntpxmit
+or
+.I nntplink ).
+.PP
+.I Expire
+.Ix expire
+is generally run once per night
+to remove from disk news articles older than a few days.
+.I Expire
+can use different expiry criterion for different newsgroups
+and can archive articles instead of removing them.
+.I Expire
+also runs asynchronously
+with
+.I relaynews .
+.PP
+Some people start their news processes from
+.I newsxd
+rather than
+.I cron ;
+we don't,
+and so can't offer much advice.
+.PP
+There are many news readers.
+.Ix "news readers"
+C News
+comes with a limited news reader
+(\c
+.I readnews
+.Ix readnews
+.Ix "news readers" readnews
+by Michael Rourke)
+sufficient to replace
+long-winded
+.I /etc/motd s
+but you will want a heavy-duty news reader
+if you plan to read more than local news groups.
+We recommend
+.I rn
+.Ix rn
+.Ix "news readers" rn
+by Larry Wall
+or
+.I nn
+.Ix nn
+.Ix "news readers" nn
+by Kim Storm,
+available from
+your netnews neighbours
+or
+your nearby
+.B comp.sources.unix
+.Ix comp.sources.unix
+archive site.
+There are many others:
+.I trn
+.Ix trn
+.Ix "news readers" trn
+and
+.I vnews
+.Ix vnews
+.Ix "news readers" vnews
+are two.
+News can be read from the local disk,
+via a network file system such as NFS,
+.Ix NFS
+or via
+NNTP
+.Ix NNTP
+(soon to be NNRP).
+.Ix NNRP
+.SH
+Preparation for Installation
+.PP
+Netnews consumes a lot of disk space
+and
+often a lot of transmission time.
+Here are some relevant measurements regarding a full netnews feed
+as of the time of writing
+.Ix news size
+.Ix news statistics
+.\" (January 1989),
+(February 1992),
+taken from
+.I news.lists :
+a day's netnews is about
+.\" 3MB and 1,400 articles in 450 newsgroups.
+30MB and 10,000 articles in 3,000 newsgroups.
+Groups cover every imaginable topic,
+and there are for-pay hierarchies such as
+.B clari ,
+which provide the UPI news wire.
+Years ago,
+sites often kept 14 days of netnews on disk,
+but now many sites keep news for 3 to 5 days,
+thus allowing for the occasional long weekend.
+.Ix expire policy
+Thus a full news feed expired after 4 days will consume
+.\" about 12MB.
+about 120MB.
+Some people feel that news volume is doubling roughly every
+.\" 16 months.
+12 months.
+If this is true,
+we can expect volume to increase by a factor of 10 in about
+.\" 4 years to 30MB per day or 115MB for 4 days.
+3 years to 300MB per day or 1.2GB for 4 days.
+It is thus wise planning to set aside a lot of disk space for netnews.
+There are two ways to cope with ever-increasing volumes of netnews:
+refuse to accept more newsgroups,
+or
+expire news after shorter intervals on disk.
+A current full feed takes
+.\" just over 7 hours to transmit at 1200 baud,
+.\" so for dial-up connections
+.\" one clearly wants the fastest modems one can afford.
+about 16 hours to transmit at 9600 bps
+(assuming only 500 bytes per second actually sent),
+so for dial-up connections,
+2400 baud and below is right out.
+.Ix "full feed" times
+In 4 years,
+a 56kbps ISDN channel should be saturdated around the clock by a full feed.
+.Ix ISDN doomed
+One clearly wants the fastest networks one can afford.
+.PP
+.Ix news feed
+Clearly,
+transmitting a full news feed is a non-trivial commitment of resources,
+so you may have some difficulty in finding a site willing to supply one.
+Such a site may in turn expect you to feed yet other sites.
+You will need to agree with your prospective netnews neighbour(s)
+upon transfer media,
+protocols
+and
+networks.
+You can always pay for a news feed from service providers such as
+UUNET and PSI.
+.Ix UUNET
+.Ix PSI
+.PP
+Before proceeding to install C News,
+you should read this document through
+to the end,
+probably read the companion document
+\fIThe Interface Between C News And The Outside World\fR,
+and possibly read selected items in this guide
+and the manual pages.
+.PP
+.Ix userids
+You will need to
+assign a user id and group id to netnews
+(often new ids called ``news'');
+initialise these directories:
+.Ix directories
+NEWSCTL
+.Df NEWSCTL
+(typically
+.B /usr/lib/news ),
+.Ix /usr/lib/news
+NEWSBIN
+.Df NEWSBIN
+(\c
+.B /usr/lib/newsbin ),
+.Ix /usr/lib/newsbin
+and
+NEWSARTS
+.Df NEWSARTS
+(\c
+.B /usr/spool/news );
+.Ix /usr/spool/news
+and
+install each subsystem
+(each subdirectory of
+NEWSBIN
+contains the programs for a given subsystem).
+NEWSCTL and NEWSARTS
+are logically one subtree,
+defining a news data base,
+but are split for backward compatibility with
+older news software,
+particularly old news readers.
+NEWSBIN
+contains programs and shell scripts
+which might be common amongst machines sharing
+a common architecture
+(e.g. Sun 3's);
+.Fn NEWSCTL /bin
+may override these.
+The goal is to install the subsystems,
+integrate them into a working news system,
+and
+configure the news system to communicate with other news systems.
+.PP
+.Ix files key
+There are a few key files that must exist before any serious
+attempt may be made to operate the news software.
+They all live in
+NEWSCTL.
+.Ix NEWSCTL
+.Fn "" active
+.Df files active
+.Df active
+is the list of newsgroups that this site knows
+(is willing to accept or individually reject),
+and must be owned by the
+NEWS
+userid
+(the userid that owns
+.Fn NEWSBIN /relay/relaynews ,
+typically
+.I news ).
+You will probably want to get your initial
+.Fn "" active
+file from your upstream feed
+and edit it to suit the set of groups you wish to receive.
+Be sure to make the second field more than five digits wide,
+by adding leading zeroes
+(ten digits is a conservative width).
+.Fn "" sys
+.Df files sys
+.Df sys
+defines the newsgroups that this site is willing to accept
+and describes how they are to be forwarded to its neighbours.
+.LG
+.B Note:
+.NL
+Your
+.B sys
+file is required,
+as a cost of membership in Usenet,
+to be public information.
+It will be sent to anyone who requests it via a
+.I sendsys
+control message.
+Don't put secrets in your
+.B sys
+file.
+.Df files server
+.Df server
+.Fn "" server
+contains the hostname of your file server,
+if you have multiple machines sharing news
+via a network file system.
+.Fn "" whoami
+.Df files whoami
+.Df whoami
+similarly contains the name by which a cluster of machines
+sharing news is to be known for purposes of news.
+.Fn "" mailname
+.Df files mailname
+.Df mailname
+is optional and contains the full
+(possibly dotted)
+name by which your cluster is known for purposes
+of mail.
+.Fn "" organisation
+.Df files organisation
+.Df organisation
+.Df files organization
+.Df organization
+(or
+.Fn "" organization
+if you insist)
+contains the name of your organisation,
+which will be copied into the
+.B Organization:
+.Ix Organization:
+header of articles posted locally,
+by default.
+.Fn "" mailpaths
+.Df files mailpaths
+defines mail routes to machines which contain aliases
+for postings to moderated newsgroups.
+.Fn "" log ,
+.Df files log
+.Df log
+.Fn "" errlog ,
+.Df files errlog
+.Df errlog
+.Fn "" history ,
+.Df files history
+.Df history
+.Fn "" history.dir ,
+.Df files history.dir
+.Df history.dir
+and
+.Fn "" history.pag
+.Df files history.pag
+.Df history.pag
+must exist and be owned by the
+NEWS
+userid.
+.Fn "" explist
+describes local expiration policy;
+N.B.:
+the order of lines is significant
+and
+articles with
+.B Expires:
+headers can interfere:
+read
+.I expire (8)
+for the full story.
+Brian Reid's
+.I arbitron
+script can be run to get
+some idea of what groups your users actually read.
+.I expire
+can be made to archive articles before removing them.
+Tentative versions of all these files are built by the installation
+procedures,
+but it is quite likely that you'll have to edit some of them.
+.SH
+C News Installation
+.PP
+.Ix installation
+Proceed to the
+.Fn \& conf
+directory of the distribution.
+There is a major shell file here,
+named
+.Fn \& build ,
+.Ix build
+that will interrogate
+you at length and construct shell files to do the real work.
+You may need to do
+``chmod\ +x\ build'' before running it,
+to make it executable.
+.PP
+You will probably need your system's manuals on hand to answer
+.Fn \& build 's
+questions.
+Another terminal (or another window, on a bitmap display)
+would also be useful.
+You'd best be prepared to take notes,
+also, as
+.Fn \& build
+will occasionally suggest that something be checked when you're done.
+.PP
+.Fn \& Build
+itself does not alter any files or perform any installation
+chores:
+all it does is create shell files in the
+.Fn \& conf
+directory.
+If you already know something about news software,
+or are merely
+suspicious that
+.Fn \& build
+hasn't done everything right,
+you should
+probably read the shell files before running them.
+There are four of them:
+.Fn \& doit.root ,
+.Ix doit.root
+.Fn \& doit.bin ,
+.Ix doit.bin
+.Fn \& doit.news ,
+.Ix doit.news
+and
+.Fn \& again.root .
+.Ix again.root
+.PP
+.Fn \& Doit.root
+sets up the major directories for news, and sets their
+ownerships correctly.
+It typically will have to be run as \fIroot\fR to have adequate permissions
+for all of this.
+It is brief.
+.PP
+.Fn \& Doit.bin
+does most of the work of building and installing the programs.
+It should be run as the user who owns the distribution directories and will
+own the executable programs under NEWSBIN.
+.B "doit.bin -i"
+suppresses installation.
+.Fn \& doit.bin
+adds creates prototype additions to
+.I crontab
+.Ix crontab
+.Ix files crontab
+and
+.I /etc/rc
+.Ix /etc/rc
+which run
+.I newsrun ,
+.I sendbatches ,
+.I doexpire ,
+.I newsdaily
+and
+.I newswatch
+periodically,
+and
+clear out the news system at boot time,
+respectively.
+.PP
+.Fn \& Doit.news
+does some other small chores and installs control files.
+If any of the control files already exist, it will complain and refuse
+to overwrite them, as a safety precaution.
+It should be run as the owner of the news files.
+Since many of the files it is installing are built by
+.Fn \& doit.bin ,
+that should be run first.
+.PP
+Finally,
+.Fn \& again.root
+tends to ownership and permission changes on
+a few programs that need to run set-userid.
+It requires the ability to change ownerships and to set permissions on
+the files afterwards, which usually means running it as \fIroot\fR.
+It too is brief.
+.PP
+There are undoubtedly strange systems out there that
+.Fn \& build
+and friends are not smart enough to cope with.
+In such cases it will be necessary to edit the shell files before running
+them, or to use them as guides and do the work by hand.
+In particular, systems that require strange options in
+.Fn \& Makefile s
+.Ix makefile
+will need to have those inserted by hand.
+.PP
+.Ix "regression testing"
+If you want to test pieces of C News without installing them, some
+(not all) of the subsystems have a ``make\ r'' feature that runs a
+regression test.
+Note:  almost all of these require that
+.Fn NEWSCTL /bin/config ,
+.Ix files config
+.Ix config
+or its local equivalent, be in place already so that shell files
+can find out what PATH (etc.)
+they should be using.
+.PP
+.Ix system test
+.Ix "test system"
+Note that it is easy to build a test news system which is completely
+independent of other existing news systems on the same machine,
+or
+to build one which shares its
+.Fn NEWSBIN ""
+with another C news system,
+or shares input of articles
+(e.g. running an old B news system
+and a new C news system off the same stream of input
+until you are confident that your new C news system is operating
+to your satisfaction).
+See
+.I subst (1)
+.Ix subst
+for the mechanism which permits quickly changing
+all the places that know the location of
+.Fn NEWSCTL /bin/config.
+After that,
+edit this news system's
+.Fn NEWSCTL /bin/config
+and things should be set up for separate existence.
+.SH
+Local policy
+.PP
+You may want to edit the
+.Ix newgroup
+.Ix rmgroup
+.I newgroup
+and
+.I rmgroup
+scripts to change group creation and deletion policy.
+By default,
+all
+.I newgroup
+control messages are honoured,
+but
+.I rmgroup
+messages merely cause mail to be sent to
+NEWSMASTER.
+Some sites prefer to not honour
+.I newgroup
+messages automatically,
+which can cause articles to be filed
+in the
+.I junk
+pseudo-group until the group is created by hand.
+Very few sites honour
+.I rmgroup
+messages automatically,
+since one is then at the mercy of pranksters.
+Groups can be created and deleted manually with the
+.I addgroup
+and
+.I delgroup
+.Ix addgroup
+.Ix delgroup
+commands.
+.SH
+First News
+.Ix "initial news"
+.PP
+When you arrange to get a news feed from your neighbor,
+you should also
+ask him to send you the current set of articles in the newsgroup
+\fBnews.announce.newusers\fR.
+.Ix news.announce.newusers
+Several of these are very important reading for people who are new to the net.
+.SH
+Unusual Systems
+.PP
+We believe that C News runs fine on 16-bit machines, but it hasn't been
+tested very thoroughly on them lately.
+It will not perform quite as well with the more limited space.
+.Ix "small machines"
+.PP
+Machines with very old compilers can be a headache.
+.Ix "old compilers"
+There are some hooks in
+.Fn \& h/news.h
+for doing without ``void'' and ``unsigned long'',
+two particular problem areas, but they have to be arranged manually;
+.Fn \& build
+does not know about them.
+.PP
+Some very old systems cannot do \fIsetuid(geteuid())\fR, which makes it
+impossible for a daemon to make directories and get the ownership right.
+We provide a small program,
+.Fn \& setnewsids ,
+to run setuid-root.
+.Ix setnewsids
+.Fn \& Relaynews
+knows about it and invokes it if \fIsetuid(geteuid())\fR fails;
+it then sets permissions correctly and re-invokes
+.Fn \& relaynews .
+.Ix relaynews
+The code is short enough to be read and understood in full, so that the
+suspicious system administrator can be sure that this setuid-root program
+is not going to do something awful.
+.SH
+Problems
+.PP
+In general,
+you should consult
+.I "Troubleshooting C News"
+if you have problems,
+and then
+.I "Known Porting Problems With C News"
+if that isn't sufficient.
+Serious errors in relaying are reported in
+.Fn NEWSCTL /errlog
+and will be mailed to NEWSMASTER
+eventually.
+C News
+generally communicates with the news administrator
+(NEWSMASTER)
+by mail.
+One common complaint is that there is a space shortage
+and incoming news has been discarded;
+the usual fix for this is to run
+.I doexpire
+immediately.
+One could modify
+.I newsrun
+to start a
+.I doexpire
+when space gets low.
+.\" TODO: more of this sort of thing
+.PP
+It may be necessary to cancel a message posted in error by a user
+who can't figure out how to cancel it himself.
+Posting a message like this:
+.DS
+.ft B
+inews -h <<'!'
+Newsgroups: what.ever
+Distribution: where.ever
+Control: cancel <user's-article's-message-id>
+Subject: cancel <user's-article's-message-id>
+
+text.
+!
+.ft
+.DE
+should do the job.
+.PP
+You may see complaints in
+.Fn NEWSCTL /log
+that articles have been rejected for bad headers.
+These will usually be from other sites,
+as
+.I inews
+will correct most such errors for your users.
+The usual errors are
+(a) text immediately following the colon after the header keyword,
+with no intervening space,
+(b) a new line immediately following the colon,
+or
+(c) no blank line separating the message header from the message body.
+.SH
+Routine Maintenance
+.PP
+You can add an outgoing news feed by adding a line to your
+.Fn NEWSCTL /sys
+file for the new site
+and creating its batch directory
+(\c
+.Fn NEWSARTS /out.going/ site).
+.PP
+As news volume grows,
+you may need to ask your upstream feed to cut back on the groups it
+sends you,
+both to conserve network bandwidth
+and disk space.
+You will likely also need to either
+cut back the length of time you keep news on disk before
+expiry,
+or get in the habit of buying new disks periodically.
+.PP
+See the article
+.I "How to set up the mailpaths file"
+by Gene Spafford
+in
+.I news.lists
+for advice on same.
+.PP
+You can turn off news processing by running
+.Fn NEWSBIN "/input/newsrunning off"
+and restore it by running
+.Fn NEWSBIN "/input/newsrunning on".
+Neither takes effect instantly;
+you have to wait for news processing to stop
+and
+wait for
+.I newsrun
+to be run for it to resume.
+You might want to turn off news processing
+before locking the news system to perform
+lengthy work on it;
+turning off processing both reduces the time until
+you get the lock,
+and
+reduces disk load due to lock contention while you have the lock.
+.PP
+You will get mail due to a
+.I checkgroups
+control message periodically,
+with a subject of
+.I "Problems with your active file" ;
+don't worry about it.
+Some day
+.I checkgroups
+will get fixed and then you can worry.
+.PP
+You will probably want to read the
+.I news.admin ,
+.I news.software.b ,
+.I news.lists
+and possibly
+.I news.groups
+newsgroups to keep current.
+.PP
+Gatewaying mail to news and vice versa is not yet
+a solved problem.
+The most severe problem here is loop prevention.
+If you reject articles that lack valid RFC 1036
+.Ix "RFC 1036"
+message-ids,
+just running RFC 822 mail messages
+.Ix "RFC 822"
+into
+.I "inews -h"
+should suffice to gateway into news.
+Gatewaying news back to mail should just require a
+.Fn NEWSCTL /sys
+file entry like
+.DS
+.ft B
+mail:sci.space/all::mail victims
+.ft
+.DE
+.bp
+.SH
+Sample build run
+.\" can't use .DS L here cuz it starts a new page in this case.  grr...
+.LP
+.nf
+.ft B\" should really be CW or C, but not everyone has it
+.so build.script
+.ft
+.fi
+.LP

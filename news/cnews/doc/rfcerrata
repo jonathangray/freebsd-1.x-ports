@@ -1,0 +1,291 @@
+.Ch "Errors in RFC 1036"
+.Ix "RFC 1036" errors
+.SH
+Introduction
+.PP
+RFC 1036,
+the standard
+.I "du jour"
+for the format of Usenet (netnews) messages
+contains significant errors,
+enumerated below.
+References are made to
+RFC 850,
+.Ix "RFC 850"
+the previous netnews message format standard,
+and also to RFC 822,
+.Ix "RFC 822"
+the mail message format standard
+(which, note, has been slightly amended by RFC 1123).
+.Ix "RFC 1123"
+.SH
+Header order insignificant
+.Ix "header order"
+.PP
+Between
+RFC 850
+and
+RFC 1036,
+a sentence stating that the order of message headers is insignificant
+has fallen out of the standard.
+This may be a reflection of the reality that
+B 2.10
+news did indeed care about the order
+of
+.B From:
+and
+.B Path: .
+.SH
+.Ix "Re: "
+``Re:'' is only three characters
+.PP
+One sees the contradiction
+``the four characters "Re:"''
+repeatedly;
+there should be a space after the colon.
+.SH
+.Ix cmsg
+cmsg incorrectly described
+.PP
+Similary,
+RFC 1036
+claims that a
+.B Subject:
+prefix of
+``cmsg''
+will be interpreted as denoting a control message;
+the correct prefix is
+``cmsg\ ''
+(including a space).
+.SH
+Xref is transmitted
+.Ix Xref:
+.PP
+RFC 1036
+says that
+.B Xref:
+headers should not be transmitted,
+yet they are stored on disk as part of message headers,
+so they will be transmitted by both B and C news.
+The standard appears to be too strict.
+.SH
+.Ix "cancel propagation"
+.Ix "control messages" cancel
+cancels should propagate always
+.PP
+RFC 1036
+says that
+.I cancel
+control messages should stop propagating if the receiving system
+is ``unable to cancel the message as requested''.
+It is not clear what this means,
+given that modern news systems hang
+onto cancellations for not-yet-seen articles in hopes of being able
+to cancel them in the future.
+B 2.11 interprets absence of the target article as ``unable to cancel''.
+It would improve the efficacy and reliability of
+\fIcancel\fRs
+to propagate them anyway,
+given that feed anomalies are widespread.
+There have been verified instances in which cancellations did not achieve
+anywhere near the propagation of the original article.
+In the interests of robustness,
+C News interprets absence of the target article as deferred cancellation
+rather than failure to cancel,
+and propagates the
+\fIcancel\fR.
+.SH
+.Ix "cancel validation"
+.Ix "control messages" cancel
+cancel validation
+.PP
+RFC 1036 requires that a
+.I cancel
+message have a
+.B Sender:
+or
+.B From:
+header matching the message it is cancelling.
+It is not entirely clear from the text whether this restriction is supposed
+to be enforced at the originating site or at each receiving site,
+although the latter is implied.
+.PP
+More seriously,
+it is not clear what ``matching'' means in this context,
+considering
+that a substantial fraction of the information in such lines is typically
+in RFC 822 comments.
+There is an unfortunate tradition of news readers generating
+header comments in varying ways.
+There is also a lot of obsolete or misdesigned
+news software still operational,
+and some of it gratuitously
+alters the header comments
+(and sometimes even the non-comment parts of the headers!)
+in messages passing through.
+While theoretically these complications should affect the original and
+the cancellation identically,
+in practice this is not consistently so,
+and it is difficult to generate a cancellation that works dependably.
+This is not just speculation;
+there are verified cases of the originators
+of messages having considerable difficulty cancelling them when it was
+important to do so.
+.PP
+The value of RFC 1036 authentication is also somewhat questionable.
+It provides no useful security against malice,
+because news is so easy to forge.
+While there is some value in preventing accidents,
+there is room for
+doubt as to whether this is worth
+the interference with legitimate cancellations.
+.PP
+C News
+takes the position that the RFC 1036 approach to authentication is
+impossible to implement in a practical way,
+due to its vagueness and the
+prevalence of gratuitous and unpredictable header rewriting,
+and on balance the inability to cancel is worse than the largely-illusory
+security provided.
+C News
+therefore does not authenticate cancellations.
+.PP
+Doing something about the problem is difficult.
+Specification of a
+.I precise
+algorithm for header matching would help,
+but finding one that
+will disregard gratuitous header mangling is hard.
+A more appealing approach would be to authenticate cancellations
+by cryptographic means,
+.Ix authentication
+.Ix cryptography
+but there are severe difficulties in key distribution
+on an unreliable non-real-time network like Usenet,
+and
+the cost of checking cryptographic credentials is disturbingly high.
+Ultimately,
+it may be necessary to abandon destructive control messages
+entirely,
+or reserve them for rare emergencies and route them through a
+trusted moderator for cryptographic authentication.
+.SH
+ihave/sendme not documented
+.Ix ihave/sendme
+.PP
+The description of the ihave/sendme protocol is so vague
+as to be useless to an implementor.
+See the
+C news
+documentation for an adequate description of the protocol.
+The description in
+RFC 1036
+also contains an error:
+.I remotesys
+is not optional;
+given that there may be multiple message-ids preceding it,
+there would be no way
+(other than ad-hocery)
+to tell if the final argument were a message-id
+or a
+.I remotesys .
+.SH
+Case-sensitivity in message-ids
+.Ix Message-IDs
+.PP
+RFC 1036 says nothing about whether message-ids are case-sensitive or not,
+thereby punting the issue to RFC 822.
+The RFC 822 rules are horrendously complex and no news system has ever
+implemented them correctly.
+(B 2.10
+considers them fully case-sensitive,
+which is wrong.
+B 2.11
+considers them fully case-insensitive,
+which is also wrong.
+C News
+gets the normal case right,
+but correct handling of certain
+obscure RFC 822 constructs would
+require a complex parsing algorithm;
+fortunately,
+the cases where this
+matters appear to be extremely rare.)
+Simplification appears necessary.
+.SH
+New headers
+.PP
+The B news
+.B Supersedes:
+.Ix Supersedes:
+header needs to be documented in the next revision of the RFC,
+as does the C news generalisation,
+.B Also-Control:
+.Ix Also-Control:
+(see
+.I relaynews (8)).
+.SH
+``Keywords''
+.Ix keywords header
+.Ix "header keywords"
+.PP
+Section 2 says that a header begins with a ``keyword'' as the header name.
+RFC 1036 never defines what a keyword is,
+and RFC 822 does not use the term.
+``Keyword'' here must be considered an informal term with no precise meaning,
+imposing no additional restrictions on header syntax.
+.PP
+In particular,
+things like ``>from:\ foo@bar'',
+which causes B News to choke,
+appear to be legal RFC 822
+(and hence 1036) headers.
+(Before quoting lexical rules,
+such as the requirement for balancing brackets,
+please
+note that the 822 lexical rules are context-sensitive.)
+.PP
+Theoretical legality notwithstanding,
+such bizarre header names are dubious and unwise practice.
+RFC 1036 probably should be tightened up to exclude them.
+.SH
+RFC 822 Comments
+.Ix "RFC 822" comments
+.PP
+RFC 1036 section 2 implies,
+both in its general discussion and in its
+discussion of the ``From:'' header,
+that RFC 822 comments are not,
+in general,
+accepted in RFC 1036 article format.
+However,
+the point is not made loudly and explicitly,
+and some nit-pickers
+argue that RFC 1036 permits dubious practices like timezone name comments
+in ``Date:'' headers.
+This needs to be nailed down in black and white.
+C News
+takes a strict position on this in cases where it cares about
+the contents of headers.
+.SH
+Duplicate Headers
+.Ix header duplicates
+.Ix "duplicate headers"
+.PP
+RFC 822 requires that at most one ``Date:''
+header occur in a message,
+and likewise for ``From:'',
+although careful reading is needed to discover this.
+It permits more than one ``Message-ID:'' or ``Subject:'' header,
+and is (of course)
+completely silent about ``Newsgroups:'' and ``Path:''.
+With the arguable exceptions of ``From:'' and ``Subject:'',
+duplicates
+of required headers are highly undesirable in news and cause difficulties
+for current implementations.
+RFC 1036 vaguely implies that the required headers are expected to be
+unique, but never says this.
+This needs to be made much more precise.
+C News
+takes a strict position and rejects articles with duplicate
+required headers.

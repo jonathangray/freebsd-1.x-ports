@@ -1,0 +1,109 @@
+      SUBROUTINE DECBT (M, N, A, B, C, IP, IER)
+      INTEGER M, N, IP(M,N), IER
+      DOUBLE PRECISION A(M,M,N), B(M,M,N), C(M,M,N)
+C-----------------------------------------------------------------------
+C THE FOLLOWING LINE IS FOR OPTIMIZED COMPILATION ON LLNL COMPILERS.
+CLLL. OPTIMIZE
+C-----------------------------------------------------------------------
+C BLOCK-TRIDIAGONAL MATRIX DECOMPOSITION ROUTINE. 
+C WRITTEN BY A. C. HINDMARSH. 
+C LATEST REVISION.. NOVEMBER 10, 1983 (ACH)
+C REFERENCE.. UCID-30150
+C             SOLUTION OF BLOCK-TRIDIAGONAL SYSTEMS OF LINEAR
+C             ALGEBRAIC EQUATIONS
+C             A.C. HINDMARSH
+C             FEBRUARY 1977
+C THE INPUT MATRIX CONTAINS THREE BLOCKS OF ELEMENTS IN EACH BLOCK-ROW,
+C INCLUDING BLOCKS IN THE (1,3) AND (N,N-2) BLOCK POSITIONS.
+C DECBT USES BLOCK GAUSS ELIMINATION AND SUBROUTINES DGEFA AND DGESL
+C FOR SOLUTION OF BLOCKS.  PARTIAL PIVOTING IS DONE WITHIN
+C BLOCK-ROWS ONLY.
+C
+C NOTE.. THIS VERSION USES LINPACK ROUTINES DGEFA/DGESL INSTEAD OF
+C OF DEC/SOL FOR SOLUTION OF BLOCKS, AND IT USES THE BLA ROUTINE DDOT 
+C FOR DOT PRODUCT CALCULATIONS.
+C
+C INPUT.. 
+C     M = ORDER OF EACH BLOCK.
+C     N = NUMBER OF BLOCKS IN EACH DIRECTION OF THE MATRIX. 
+C         N MUST BE 4 OR MORE.  THE COMPLETE MATRIX HAS ORDER M*N.
+C     A = M BY M BY N ARRAY CONTAINING DIAGONAL BLOCKS.
+C         A(I,J,K) CONTAINS THE (I,J) ELEMENT OF THE K-TH BLOCK.
+C     B = M BY M BY N ARRAY CONTAINING THE SUPER-DIAGONAL BLOCKS
+C         (IN B(*,*,K) FOR K = 1,...,N-1) AND THE BLOCK IN THE (N,N-2)
+C         BLOCK POSITION (IN B(*,*,N)). 
+C     C = M BY M BY N ARRAY CONTAINING THE SUBDIAGONAL BLOCKS
+C         (IN C(*,*,K) FOR K = 2,3,...,N) AND THE BLOCK IN THE
+C         (1,3) BLOCK POSITION (IN C(*,*,1)).
+C    IP = INTEGER ARRAY OF LENGTH M*N FOR WORKING STORAGE.
+C OUTPUT..
+C A,B,C = M BY M BY N ARRAYS CONTAINING THE BLOCK LU DECOMPOSITION
+C         OF THE INPUT MATRIX.
+C    IP = M BY N ARRAY OF PIVOT INFORMATION.  IP(*,K) CONTAINS
+C         INFORMATION FOR THE K-TH DIGONAL BLOCK. 
+C   IER = 0  IF NO TROUBLE OCCURRED, OR 
+C       = -1 IF THE INPUT VALUE OF M OR N WAS ILLEGAL, OR
+C       = K  IF A SINGULAR MATRIX WAS FOUND IN THE K-TH DIAGONAL BLOCK.
+C USE SOLBT TO SOLVE THE ASSOCIATED LINEAR SYSTEM.
+C
+C EXTERNAL ROUTINES REQUIRED.. DGEFA AND DGESL (FROM LINPACK) AND
+C DDOT (FROM THE BLAS, OR BASIC LINEAR ALGEBRA PACKAGE).
+C-----------------------------------------------------------------------
+      INTEGER NM1, NM2, KM1, I, J, K
+      DOUBLE PRECISION DP, DDOT
+      IF (M .LT. 1 .OR. N .LT. 4) GO TO 210
+      NM1 = N - 1
+      NM2 = N - 2
+C PROCESS THE FIRST BLOCK-ROW. -----------------------------------------
+      CALL DGEFA (A, M, M, IP, IER)
+      K = 1
+      IF (IER .NE. 0) GO TO 200
+      DO 10 J = 1,M 
+        CALL DGESL (A, M, M, IP, B(1,J,1), 0)
+        CALL DGESL (A, M, M, IP, C(1,J,1), 0)
+ 10     CONTINUE
+C ADJUST B(*,*,2). -----------------------------------------------------
+      DO 40 J = 1,M 
+        DO 30 I = 1,M
+          DP = DDOT (M, C(I,1,2), M, C(1,J,1), 1) 
+          B(I,J,2) = B(I,J,2) - DP
+ 30       CONTINUE
+ 40     CONTINUE
+C MAIN LOOP.  PROCESS BLOCK-ROWS 2 TO N-1. -----------------------------
+      DO 100 K = 2,NM1
+        KM1 = K - 1 
+        DO 70 J = 1,M
+          DO 60 I = 1,M
+            DP = DDOT (M, C(I,1,K), M, B(1,J,KM1), 1)
+            A(I,J,K) = A(I,J,K) - DP
+ 60         CONTINUE
+ 70       CONTINUE
+        CALL DGEFA (A(1,1,K), M, M, IP(1,K), IER) 
+        IF (IER .NE. 0) GO TO 200
+        DO 80 J = 1,M
+ 80       CALL DGESL (A(1,1,K), M, M, IP(1,K), B(1,J,K), 0) 
+ 100    CONTINUE
+C PROCESS LAST BLOCK-ROW AND RETURN. -----------------------------------
+      DO 130 J = 1,M
+        DO 120 I = 1,M
+          DP = DDOT (M, B(I,1,N), M, B(1,J,NM2), 1)
+          C(I,J,N) = C(I,J,N) - DP
+ 120      CONTINUE
+ 130    CONTINUE
+      DO 160 J = 1,M
+        DO 150 I = 1,M
+          DP = DDOT (M, C(I,1,N), M, B(1,J,NM1), 1)
+          A(I,J,N) = A(I,J,N) - DP
+ 150      CONTINUE
+ 160    CONTINUE
+      CALL DGEFA (A(1,1,N), M, M, IP(1,N), IER)
+      K = N
+      IF (IER .NE. 0) GO TO 200
+      RETURN
+C ERROR RETURNS. -------------------------------------------------------
+ 200  IER = K
+      RETURN
+ 210  IER = -1
+      RETURN
+C-----------------------  END OF SUBROUTINE DECBT  ---------------------
+      END 

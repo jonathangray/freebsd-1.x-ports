@@ -1,0 +1,27 @@
+#! /bin/sh
+PATH=".:$PATH"
+
+echo removing old dregs...
+rm -rf tmp
+
+echo making new working subtree...
+mkdir tmp tmp/inject 2>/dev/null
+chmod +x master/run
+cp ../inews ../injnews ../pnews ../tear ../stripinvis ../defaults \
+	../defhdrs.awk ../actflag ../../misc/canonhdr tmp/inject
+cp master/* tmp
+cd tmp
+chmod u+w *
+
+echo running inews...
+./run
+
+echo comparing output...
+sed '/^Message-ID:/s/<.*@/<MSGID@/' stdout >.stdout && mv .stdout stdout
+../../tear so. <stdout
+sort -o so.hdr so.hdr		# header order is arbitrary, so sort
+cat so.hdr so.body >stdout
+rm so.*
+diff output stdout
+diff errors stderr
+diff outstat status

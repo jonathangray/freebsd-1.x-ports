@@ -1,0 +1,131 @@
+The files in this distribution are:
+
+	Makefile
+	README
+	active.c
+	at.h
+	defs.h
+	expire.c
+	funcs.c
+	header.c
+	history.c
+	lib
+	lib/bsearch.c
+	lib/memset.c
+	lib/strpbrk.c
+	lib/tmpfile.c
+	lib/tmpnam.c
+	maketime.c
+	man
+	man/postnews.1
+	man/readnews.1
+	man/uurec.8
+	man/uusend.8
+	mtempnam.c
+	news.help
+	newsrc.c
+	postnews.c
+	readnews.c
+	sample.sys
+	uurec.c
+	uusend.c
+
+This news system is modelled on the USENET news system
+by Mark Horton (and others).
+
+Apart from some minor programs the system has been completely re-written.
+The aim of re-writing was to produce a system that was:
+	1. smaller
+	2. cleaner
+	3. faster
+	4. was compatible at the site <--> site level with USENET
+	5. had a better user interface ("readnews" and "postnews")
+
+These goals have been met.
+The programs "readnews" and "postnews" are 1/3 the previous size, and
+does not require separate I/D space to run on pdp11/70's.
+Also far fewer processes are needed to use "postnews".
+
+This system is compatible with USENET at the site <--> site level, provided
+communication is done with Version B format messages (the current 'standard').
+The messages meet the Standard for the format of ARPA Internet Text messages
+(RFC 822).
+
+"postnews" methods of editing messages is compatible with our local "mail"
+program (also re-written locally).
+
+To aid someone familiar with USENET to find his/her way around the source:
+    Program changes:
+	"checknews" has become a function of "readnews" (readnews -cC)
+	"postnews" and "inews" are combined into "postnews"
+	"readnews" has the same function (simplified user interface)
+	"expire" has the same function (simplified arguments)
+	"recnews" is not needed
+	"sendnews" has been renamed "uusend" (and simplified)
+	"uurec" has the same function
+    Files:
+	The layout of the news database is the same, except that articles
+	are named #<number> rather than <number>, so that numbers can
+	be a valid newsgroup (like class.6.621).
+
+	"/usr/lib/news/active" has an extra field - the lowest numbered article
+	present in a newsgroup.
+	"/usr/lib/news/history" has a sightly different format.
+	"/usr/lib/news/sys" is compatible, except that the third field
+	is ignored (always expects format B site); colons are allowed in
+	the last field.
+
+To setup the news system:
+	1. edit the "defs.h" file and make any changes necessary
+	   in particular: MYDOMAIN, MYORG and the paths of SEQ, SYS etc.
+	   MANGRPS should not be defined without making suitable
+	   modifications to getmangrps() in readnews.c
+	   UNSWMAIL is set if you have the version of mail from UNSW,
+	   in particular it allows arguments "-s subject -i include_file"
+	   to specify the subject, and make include_file available to
+	   a ".i" command (like postnews).
+	   AUSAM should not be set unless you have the hashed passwd file,
+	   and locked file facilities of AUSAM.
+	1a. edit "Makefile" for the pathnames of LIBDIR, BINDIR and NETDIR.
+	2. create the account NEWSROOT (defined in defs.h) (this is where
+	   the messages are kept).
+	3. Run the makefile. If you don't have the routines found in
+	   lib/* (bsearch, memset etc.) these can be compiled and
+	   linked in as required.
+	4. Create any groups (using "postnews -c 'newgroup <name>'"),
+	   that require immediate local posting, otherwise groups will
+	   be created automatically when news is received from other sites.
+	   Root and NEWSROOT can also mail to non-existent groups, and
+	   will be asked whether or not to create the new group.
+	5. Set up a pseudo user "rnews" to direct received news into
+	   "postnews -p" (with uid set to NEWSROOT).
+	   How this is done will depend on your network implementation.
+	   It may require a deamon emptying a mail box regularly
+	   (see rnews.sh in this case).
+	   If a mail interface is required, series of messages can be
+	   piped into /usr/lib/news/uurec instead.
+	6. Set up "/usr/lib/news/sys". See sample.sys for an example.
+	   Each line in the "sys" file specifies:
+		host name
+		distribution newsgroups
+		(empty field (system assumes type B interchange))
+		the command needed to send the item to the host.
+	   Note the current host must have the first two fields also.
+	   News transmission can be via "mail" or directly as a
+	   network file transfer.
+	7. Test the system by posting to "to.mysite".
+	8. Arrange for "expire" to be run periodically (via "cron" or "at").
+
+If you had an existing (old) news system, and wish to transfer the
+articles. The best way to do it is run the command:
+
+	find oldnewsdir -type f -a -print ^
+	while read F
+	do
+		postnews -p < $F
+	done
+
+Michael Rourke
+University of New South Wales, Australia	13 June 1984
+(decvax!mulga!michaelr:elecvax)
+(vax135!mulga!michaelr:elecvax)

@@ -1,0 +1,567 @@
+.Ch "The Interface Between C News And The Outside World"
+.Ix "outside world" interface
+.SH
+Intro and Generalities
+.PP
+C News relates to the ``outside world'',
+the system it is installed on, in a number of ways.
+This document attempts to enumerate them and explain what goes on.
+.PP
+In general,
+C News
+attempts to rely only on ``common basic Unix'',
+.Ix Unix dependencies
+and in particular it is not particularly BSD-specific or System-V-specific.
+Specifically,
+it makes no use of ornate locking mechanisms,
+silly interprocess-communication schemes,
+peculiar networking primitives,
+extensions to C,
+or other annoyances.
+.SH
+Directories And Userids
+.PP
+.Ix directories
+.Ix userids
+.Ix /usr/lib/newsbin
+.Ix /usr/lib/news
+.Ix /usr/spool/news
+Most of the components of C News live in \fI/usr/lib/newsbin\fR,
+with control files in \fI/usr/lib/news\fR and spooling areas
+(for current news, inbound traffic, and outbound traffic) in
+\fI/usr/spool/news\fR.
+See the document
+\fIDirectory Layout and PATH in C News\fR
+for elaboration on the structure,
+\fIFiles in /usr/lib/news (aka NEWSCTL)\fR
+for a summary of control files,
+and
+\fIConfiguration Mechanisms in C News\fR
+for how to change the locations of the directories.
+.PP
+There is an extensive subdirectory structure under \fI/usr/lib/newsbin\fR,
+with only a few heavily-used utilities in the top-level directory.
+In the following,
+programs not explicitly described as going elsewhere are all under there
+somewhere.
+.PP
+C News's spool areas and major control files need to be owned by a
+specific userid,
+normally \fInews\fR.
+(We believe that nothing except some of the Makefiles knows this name.)
+We suggest that this userid should not own anything else on the system.
+The programs in \fI/usr/lib/newsbin\fR can be
+owned by \fIbin\fR (or anyone else)
+except for those that need to be setuid.
+.Ix setuid
+(On our systems the non-setuid ones are owned by \fIbin\fR.)
+.SH
+Unix Utilities
+.Ix Unix utilities
+.PP
+C News requires a fairly complete Unix or equivalent.
+(We take no position on whether 4BSD, or System V, is Unix or not;
+our private opinion is that neither truly deserves the name any more,
+although we occasionally change our minds about which is less deserving.)
+.Ix Unix spelling
+(Note also that ``Unix'' is used here as an abbreviation for
+\fBThe UNIX Operating System\fR\(rg,
+a registered trademark of AT&T;
+we acquired our bad habits and incorrect capitalization from
+Unix [sic] documentation supplied by the Bell System in the mid-1970s.)
+.PP
+.Ix shell
+In particular,
+C News relies heavily on shell files.
+``Shell'' here means,
+of course,
+the standard shell,
+written by
+Steve Bourne.
+.Ix "Steve Bourne"
+If your \fI/bin/sh\fR is not a Bourne shell or \fIvery\fR good imitation,
+you're in trouble.
+Note,
+in particular,
+.Ix shell Korn
+.Ix ksh
+that some old versions of the Korn shell differ from
+the Bourne shell in some important details of quoting behavior, and
+we \fIknow\fR this causes problems with C News.
+You need a standard shell.
+.PP
+To the best of our ability,
+all our shell files begin with ``#!\ /bin/sh''.
+As far as we know,
+nothing actually relies on being able to \fIexec\fR a
+shell file;
+that is,
+if ``#!\ /bin/sh'' is just a comment to your shell,
+that should be okay.
+.Ix shell C
+.Ix csh
+If your shell misinterprets it as a request to run the C shell,
+however,
+you're in trouble.
+Running the following might help:
+.DS
+.ft B
+for f in `find . \-type f \-print`
+do
+	if test " `sed 1q $f`" = "#! /bin/sh"
+	then
+		ed $f <<'!'
+1s/#!/: use/
+w
+!
+	fi
+done
+.ft
+.DE
+.Ix shell comments
+If your shell doesn't know about ``#'' comments at all,
+again you're in trouble.
+We hope that no modern shell makes either of these mistakes.
+.PP
+We believe that none of our stuff relies on relatively modern shell features
+like shell functions or
+\fIgetopts\fR (as distinct from \fIgetopt\fR).
+.Ix shell builtins
+If \fItest\fR and \fIecho\fR are not built-in commands in your shell,
+efficiency will suffer
+but everything should still run.
+It's possible that a few obscure things will break if your shell does not
+support ``['' as a synonym for \fItest\fR,
+although we try to avoid this usage.
+.PP
+Within the shell files,
+C News
+makes heavy use of a wide variety of Unix
+utilities,
+.Ix sed
+.Ix awk
+notably \fIsed\fR and \fIawk\fR.
+Any \fIawk\fR should do;
+in particular,
+nothing needs the
+.Ix nawk
+.Ix awk new
+``new \fIawk\fR''.
+Although we have tried to avoid it,
+it is possible that some things depend
+on \fIawk\fR recognizing ``\et'' inside strings,
+which very old \fIawk\fRs
+didn't.
+.PP
+If your Unix does not put all standard Unix programs in
+the standard directories\(em\fI/bin\fR and
+.Ix /bin
+.Ix /usr/bin
+\fI/usr/bin\fR\(emyou will need to modify C News's default PATH to include
+whatever bizarre directories are involved.
+See the \fIConfiguration Mechanisms\fR document for details.
+In particular,
+for some insane reason,
+.Ix 4BSD insanity
+.Ix /usr/ucb
+4BSD relocated a few standard
+utilities like \fIwc\fR to \fI/usr/ucb\fR,
+which causes trouble
+(and not just to C News!).
+We simply put some links in \fI/usr/bin\fR to fix this on our systems,
+and this is what we recommend you do,
+but if you can't,
+you'll have to
+change the PATH.
+.PP
+.Ix mail
+Several parts of
+C News
+rely on being able to send mail to an administrative
+account
+(the name of which can be chosen;
+see \fIConfiguration Mechanisms\fR).
+The assumption is that a message,
+.Ix "RFC 822" mail
+without any RFC822 headers,
+can be piped
+.Ix /bin/mail
+into \fI/bin/mail\fR
+(or whatever \fImail\fR is first in the PATH)
+invoked with a single argument which is the addressee,
+and be delivered to the addressee's mailbox intact,
+possibly embellished
+with headers.
+That is,
+with news's standard PATH,
+if
+.DS
+.ft B
+echo "relaynews: hi there Joe" | mail joe
+.ft
+.DE
+does not result in the message ``relaynews: hi there Joe''
+arriving in the mailbox
+``joe'',
+you're going to have to fake it.
+(Note that some BSD mailers run into trouble with the colon in the example,
+interpreting such a line as a header.)
+See \fIDirectory Layout\fR for insight on where to put a fake \fImail\fR
+so that C News components will use it rather than \fI/bin/mail\fR.
+.PP
+Similarly,
+several parts of
+C News
+.Ix hostname
+rely on being able to invoke \fIhostname\fR
+without arguments,
+and have it return a single word which is the name of the
+CPU the code is running on.
+Again,
+you'll have to fake it if you don't have \fIhostname\fR
+or if it outputs something strange.
+.PP
+.Ix compress
+Input reception and output batching both want to use the \fIcompress\fR
+data-compression program.
+\fICompress\fR has been published on Usenet and is shipped with many Unix
+systems these days,
+but if you don't have it,
+we recommend that you get
+it from your neighbors or the \fIcomp.sources.unix\fR archives.
+.Ix comp.sources.unix
+It is possible to configure
+C News
+so that it doesn't use \fIcompress\fR
+to compress news being transmitted,
+but you don't want to.
+\fICompress\fR is good and it is fast.
+.SH
+Libraries
+.PP
+.Ix libraries
+C News
+is mostly self-contained as far as libraries go.
+It does need some things that are not yet universal,
+like a full set
+of string functions (e.g. \fIstrtok\fR);
+.Ix functions string
+we provide reasonably portable versions of these for places that lack them.
+.SH
+Networking
+.PP
+(We're talking here about networking in the sense of NFS and all those fun
+things,
+not \fIuucp\fR or TCP/IP.)
+C News
+is designed to run on systems which consist of a conglomeration of
+machines on a local network,
+with only one of them acting as news server.
+Be warned,
+though,
+that if you're doing this,
+.Ix rsh
+.Ix "remote command execution"
+you need to have \fIrsh\fR
+or some reasonably equivalent way of executing a program on another CPU.
+If you've only got one machine,
+.Ix server
+.Ix files server
+just make sure you \fIdon't\fR have a \fI/usr/lib/news/server\fR file and
+forget the whole issue.
+.SH
+Highly System-Specific Things
+.PP
+.Ix dependencies system
+.Ix "system dependencies"
+There are two small utilities within
+C News
+that are inevitably highly
+system-specific and have a high probability of needing changes to match
+your system.
+Both normally live in \fI/usr/lib/newsbin\fR proper.
+.PP
+.Df spacefor
+\fISpacefor\fR is invoked by various components of C News to find out
+how much disk space is available.
+The space margins in it are ones we find reasonable, but you may need
+to adjust them.
+On an old System V system in particular
+(one where \fIdf\fR can't be applied
+to any directory name,
+but needs to be given a name in \fI/dev\fR),
+you
+will also probably need to modify the locations to be \fIdf\fRed.
+You will also need to fix \fIspacefor\fR if your system's \fIdf\fR yields
+results in some strange format or in some strange units.
+We believe that we get it right for stock 4BSD,
+many (but probably not all)
+System Vs,
+modern Irix,
+and real Unix (Version 7).
+.Ix Unix real
+.Ix Unix V7
+Beware introducing major inefficiencies:
+\fIspacefor\fR is called a lot.
+Beware,
+also,
+that \fIspacefor\fR is not intended to permit routine operation
+using filesystems that are on the brink of being full;
+the limits it imposes are only approximate,
+and no attempt has been made
+to tune its clients to exploit every last available block.
+.PP
+.Df queuelen
+\fIQueuelen\fR is invoked by the batcher to determine how long the current
+\fIuucp\fR queues are,
+so it can judge whether it should suspend batching
+of output to a given site.
+.Ix uucp
+There is too much diversity in \fIuucp\fRs for us to try to do this for all
+possible versions.
+We think we get it right for the two most common flavors
+(HDB, aka BNU, and old subdirectory versions).
+Our versions measure queue length in batches,
+not bytes,
+but it would not be hard to change this:
+\fIqueuelen\fR,
+.Ix batchparms
+the \fIbatchparms\fR control file,
+.Ix sendbatches
+and the \fIsendbatches\fR
+how-many-batches-should-I-try-to-add logic need to agree on the units of
+measurement,
+but (we think) nothing else cares.
+.PP
+.Df newshostname
+It is just possible that you might have to modify \fInewshostname\fR,
+which also lives in \fI/usr/lib/newsbin\fR itself.
+\fINewshostname\fR delivers the name which should be applied to the
+whole system (not just the particular CPU) for news purposes.
+It tries to be fairly clever about different ways of getting the name,
+and in particular will take it out of \fI/usr/lib/news/whoami\fR if
+.Ix whoami
+that file exists,
+but if you're doing something odd on a strange system,
+changes may be needed.
+.SH
+Input
+.PP
+.Ix input network
+.Ix "network input"
+Input from the net via \fIuucp\fR (or equivalent) shows up as batches of
+news to be fed to \fIrnews\fR or its obsolete synonym \fIcunbatch\fR.
+.Df rnews
+.Df cunbatch
+These two programs normally live in \fI/bin\fR,
+although nothing in the
+code knows about this and they can go elsewhere
+(one of our systems does this).
+.Ix newsspool
+Both are simple front ends that invoke \fIinput/newsspool\fR to store the
+batch,
+while taking precautions to report trouble and not to overflow disks.
+Neither \fIrnews\fR nor \fIcunbatch\fR needs to be setuid.
+.PP
+.Ix NNTP input
+Input via NNTP over the Internet (or equivalent) uses rather different
+machinery but ends up creating a saved batch in much the same way as
+\fIinput/newsspool\fR does.
+.PP
+.Df newsspool
+\fIInput/newsspool\fR is a small C program that saves a batch,
+writing into a file in \fI/usr/spool/news/in.coming\fR.
+.Ix in.coming
+It must be able to create files there, and \fIinput/newsrun\fR (see below)
+needs to be able to read them and delete them.
+.Ix newsrun
+This gets a little tricky because \fInewsspool\fR will usually be
+run by \fIuuxqt\fR as userid \fIuucp\fR (or something like that),
+not as \fInews\fR,
+which \fInewsrun\fR needs to run as.
+The recommended solution is to have
+\fInewsspool\fR owned by \fInews\fR and setuid.
+An alternative is to give the \fIin.coming\fR directory
+the userid of \fInews\fR and the groupid of \fIuucp\fR,
+or vice versa,
+and set permissions so that either can access it.
+One of our systems ran that way for a while.
+.PP
+.Df newsrun
+To actually process incoming news,
+\fIinput/newsrun\fR gets invoked
+to decompress the spooled batches and
+feed them to \fIrelay/relaynews\fR (see below).
+There is an option for \fInewsspool\fR to invoke
+\fInewsrun\fR when a batch is spooled,
+but a (usually)
+.Ix cron
+preferable method is to have \fIcron\fR invoke \fInewsrun\fR once an hour.
+\fINewsrun\fR does its own locking to prevent multiple occurrences running
+simultaneously.
+There is a related program,
+.Ix newsrunning
+\fIinput/newsrunning\fR, that can be used
+to set or clear a flag that stops \fInewsrun\fR;
+this may be a useful tactic if \fInewsrun\fR should not run at
+certain times.
+Both \fInewsrun\fR and \fInewsrunning\fR must be run as \fInews\fR.
+.PP
+When a user posts news,
+he (or his news reader) does it by feeding the
+article to \fI/bin/inews\fR.
+.Df inews
+In C News, \fIinews\fR is a complex shell file that attends to preliminaries
+and then invokes \fIrelay/relaynews\fR.
+\fIInews\fR does not need to be setuid (indeed,
+we make no use of setuid
+shell files at all,
+since they are grossly insecure).
+.Df relaynews
+\fIRelaynews\fR is the heart of
+C News,
+the program that actually pulls
+batches apart and places articles into the database.
+If users are to be able to post news,
+\fIrelaynews\fR should be owned
+by \fInews\fR and setuid.
+.SH
+News Readers
+.Ix "news readers"
+.PP
+C News
+is fully compatible with
+B News
+to any news-reader program that
+does not inspect the middle field of \fI/usr/lib/news/history\fR too closely.
+.Ix history
+Standard B News news readers work fine.
+We supply a simple news reader
+(written by,
+and included with permission of,
+Michael Rourke)
+as a naive-user replacement for the B News
+\fIreadnews\fR.
+.Ix "news readers" readnews
+More complex programs are preferable for serious news enthusiasts.
+We recommend
+Larry Wall's \fIrn\fR
+.Ix "news readers" rn
+or
+Kim Storm's
+.I nn
+.Ix "news readers" nn
+(which we use, unmodified),
+but there are others.
+.SH
+Output
+.PP
+\fIRelay/relaynews\fR normally queues up news for transmission to other
+systems by appending article names and sizes to batch files
+in subdirectories under \fI/usr/spool/news/out.going\fR.
+.Ix out.going
+These are then processed by \fIbatch/sendbatches\fR,
+.Df sendbatches
+which should be run
+regularly,
+as \fInews\fR,
+by \fIcron\fR.
+.Ix cron
+\fISendbatches\fR can be configured to use a variety of transmission
+mechanisms,
+the usual one being \fIuux\fR.
+.Ix uux
+.SH
+Expiry And Related
+.PP
+.Df expire
+.Ix article removal
+.Ix article archiving
+News articles are removed,
+possibly with archiving to an archive area,
+by the expiry subsystem.
+\fIExpire/doexpire\fR should be invoked now and then,
+.Ix doexpire
+as \fInews\fR,
+by \fIcron\fR.
+.Ix cron
+We suggest nightly.
+\fIDoexpire\fR actually invokes \fIexpire/expire\fR to do the dirty work.
+.PP
+C News \fIexpire\fR does not have an option to rebuild the
+\fI/usr/lib/news/history\fR file from scratch,
+.Ix history
+since that has nothing to do with expiry.
+To rebuild \fIhistory\fR,
+e.g. if it has been destroyed,
+use \fIexpire/mkhistory\fR.
+.Ix mkhistory
+.Ix history rebuild
+.PP
+Some news readers
+(notably the NNTP-based ones)
+need to have the third field of \fI/usr/lib/news/active\fR
+updated occasionally to show the lowest article number still present in each
+newsgroup.
+.Ix active "third field"
+.Ix files active
+Frankly,
+we think such news readers
+(and NNTP)
+simply need to be fixed.
+C News
+\fIexpire\fR does not do this updating.
+For those who use such news readers,
+however,
+\fIexpire/upact\fR will do
+such an update.
+.Ix upact
+It should be run as \fInews\fR.
+A much faster, but somewhat less portable,
+C implementation is
+supplied as \fIexpire/updatemin\fR.
+.Ix updatemin
+.SH
+Reboots and Administration
+.Ix reboots
+.Ix crashes
+.Ix lock
+.PP
+If the system crashes,
+things like locks must be cleaned out if C News
+is to function properly after reboot.
+\fI/etc/rc\fR,
+or equivalent,
+should run \fImaint/newsboot\fR during reboot,
+as \fInews\fR.
+.Ix /etc/rc
+.Ix newsboot
+.PP
+.Ix logs
+Certain log files can grow without bounds if not renamed/removed now and
+then.
+We recommend running \fImaint/newsdaily\fR once a day.
+.Ix newsdaily
+It tends to logs,
+keeping a generation or two for use in trouble tracking,
+and also sends mail to the news administrator in the event that something
+funny has happened.
+.PP
+In general,
+.Ix lock problems
+C News does not attempt to break locks,
+on the philosophy that a stale lock may mean something is badly wrong.
+(See
+\fILocking in C News\fR for details on locking methods.)
+The various programs will either give up,
+to return later,
+or wait
+patiently for the lock to go away.
+If one doesn't keep an eye on things, a problem of some kind can hang up
+the news system for quite a while.
+Running \fImaint/newswatch\fR once in a while\(emwe recommend a few times
+a day\(emwill alert administrators to signs of trouble.
+.Ix newswatch
+Except on grossly slow systems,
+C News locks should never hang around for
+any great length of time.

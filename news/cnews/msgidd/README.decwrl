@@ -1,0 +1,52 @@
+[NB: there is an ihave.c as part of the cnews distribution, but
+./ihave.c.diffs should not be applied to this.  Instead the diffs
+should be applied to nntp/server/ihave.c which is part of the nntp package.
+Similarly, ./Makefile.diffs apply to nntp/server/Makefile.]
+
+NNTP daemon -- DECWRL mods
+Paul Vixie <vixie@nsl.dec.com> 17 August 1991 (cleaned up, sniffing sigpipes)
+Paul Vixie <vixie@wrl.dec.com> 13 February 1991 (ported to 1.5.11, w/ leres)
+Paul Vixie <vixie@wrl.dec.com> 04 October 1990 (improved by Steve Schoch)
+Paul Vixie <vixie@wrl.dec.com> 18 September 1990 (improved by ken@sdd.hp.com)
+Paul Vixie <vixie@wrl.dec.com> 16 June 1990 (works on 1.5.8)
+
+These modifications add a "message ID daemon" to nntpd.  Nntpd will query
+this daemon about all offered message ID's, and the daemon will keep a
+managed, memory resident list of recent ID's.  "Recent" means ID's offered
+within the last N (~1440, or one full day) minutes.  If an ID has been
+inquired of in the last N minutes, the daemon says "don't accept it", which
+keeps nntpd from accepting things that have already been accepted but which
+are sitting in the input batch queue, waiting to be unbatched.  This whole
+scheme is obviously only useful if you run C News, since nntp-for-B-News
+just forks inews once per incoming article.
+
+Installation is hopefully trivial.  Rebuild and reinstall nntpd with
+these diffs applied; install msgidd as well; add this line to rc.local,
+and execute it by hand (or reboot):
+
+echo /usr/lib/news/etc/msgidd \
+	-s /usr/lib/news/nntp_msgid \
+	-l /usr/lib/news/msgid.log \
+	-h 1440 "&" | su news >/dev/console
+
+Note that /usr/lib/news/etc is where I keep nntpd and msgidd, and that
+/usr/lib/news/nntp_msgid is the unix-domain socket used for the daemon.
+
+Future enhancements:
+	-> move all the dbz stuff out of ihave.c and just do it all here;
+	   this will serialize the dbz reads into this one process, which
+	   is debatable and needs more thought.
+
+Thanks to ken@sdd.hp.com for:
+	-> change the protocol so that requesting ID status
+	   doesn't have the side effect of marking the article
+	   as "received".  Marking it as received shouldn't be
+	   done until the article has actually been written to
+	   the batch file.
+
+Thanks to Steve Schoch for:
+	-> handle SIGPIPE properly, it's pretty common and I was
+	   just SIG_IGN'ing it.
+
+Thanks to James Brister for:
+	-> msgidd.pid file, useful for SIGHUP'ing for logfile changes

@@ -1,0 +1,384 @@
+.\" =()<.ds a @<NEWSARTS>@>()=
+.ds a /usr/spool/news
+.\" =()<.ds b @<NEWSBIN>@>()=
+.ds b /usr/lib/newsbin
+.\" =()<.ds c @<NEWSCTL>@>()=
+.ds c /usr/lib/news
+.\" =()<.ds m @<NEWSMASTER>@>()=
+.ds m usenet
+.\" indentation start
+.de Is
+.in +0.5i
+..
+.\" indentation end
+.de Ie
+.in -0.5i
+..
+.\" example start
+.de Es
+.LP
+.nf
+.ft B
+.Is
+..
+.\" example end
+.de Ee
+.Ie
+.ft R
+.fi
+.LP
+..
+.TH NEWSSYS 5 "2 March 1992"
+.BY "C News"
+.SH NAME
+newssys \- USENET network news sys (neighbours) file
+.SH DESCRIPTION
+The file
+.B \*c/sys
+describes which news groups this site is willing to receive
+and
+which groups it is willing to transmit to each netnews neighbour.
+It is public information and
+is sent automatically to any site that
+sends a
+.I sendsys
+control message.
+A
+.I sys
+line has four fields,
+separated by colons:
+.LP
+.IB system-name / exclusion1 ,\c
+.IB exclusion2... : subscriptions /\c
+.IB distributions :\c
+.IB flags : "transmission command"
+.PP
+A
+.B #
+as the first character in a line denotes a comment.
+Empty lines are ignored.
+A logical line may be continued to the next physical line by
+putting a
+.B \e
+at the end of the current physical line.
+Spaces are permitted in
+.I sys
+only in comments,
+.I "transmission command"
+when it really is a command and not a filename,
+and,
+for B news compatibility,
+at the start of a continuation line
+(after a
+.B \e
+and a newline).
+.PP
+Of the \fIsys\fR fields,
+only the
+.I system-name
+need be present.
+If a field and all the fields after it are omitted,
+the colon immediately before that field and all the colons
+after it may be omitted too.
+The optional subfields
+(\c
+.IR exclusion s
+and
+.IR distributions )
+and their leading slashes
+may be omitted.
+.PP
+The
+.I system name
+is the name of the system being sent to,
+and
+is checked against site names in
+.B Path:
+headers to avoid sending an article back
+to a site that has seen it.
+The
+.IR exclusion s
+are also checked against the
+.B Path:
+header and articles are not sent to
+.I system name
+if they have visited any of the
+.IR exclusions .
+.PP
+(The special
+.I system name
+.B ME
+stands for the name of the machine news is running on,
+as determined from
+.BR \*c/whoami .
+The
+.B ME
+line,
+or a line whose
+.I system name
+is explicitly that of the machine news is running on,
+has a rather different meaning from that of the other
+.I sys
+file lines:
+its
+.I subscriptions
+subfield
+identifies
+the newsgroups that this site subscribes to
+(i.e. is willing to receive),
+and its other fields and subfields are ignored.
+There should be one such line in the file.)
+.PP
+.I subscriptions
+is a comma-separated list of
+.I "newsgroup patterns"
+specifying the newsgroups
+to be transmitted to the
+.IR system ;
+each newsgroup from the
+.B Newsgroups:
+header of each article
+is matched against the pattern list,
+and if any newsgroup matches the pattern list,
+the article is transmitted.
+The rules for matching a newsgroup against a single pattern are:
+.\" precompute the indent to avoid passing an argument containing
+.\" whitespace into a macro, since this seems not to always work.
+.nr Bw \w'\(bu  '
+.IP \(bu \n(Bwu
+.IR word s
+in a newsgroup or a pattern
+are delimited by periods;
+.IP \(bu
+words of a pattern and a newsgroup
+match only if they are identical,
+except that
+the word
+.B all
+in a pattern
+matches any newsgroup word;
+.IP \(bu
+a newsgroup is matched against a pattern word by word,
+and all words
+must match for the newsgroup to match that pattern;
+.IP \(bu
+if the pattern has fewer words than the newsgroup,
+the pattern is implicitly
+extended to the same number of words by appending
+.B \&.all
+as many times as necessary;
+.IP \(bu
+if the newsgroup has fewer words than the pattern, the newsgroup does not
+match the pattern;
+.IP \(bu
+if
+.I pattern
+matches a newsgroup,
+.BI ! pattern
+.IR mis matches
+that newsgroup.
+.LP
+A newsgroup matches a pattern list if, and only if, it matches at least
+one of the patterns and:
+.IP \(bu \n(Bwu
+the newsgroup
+does not mismatch any of the patterns, or
+.IP \(bu
+the longest matched pattern is longer than the longest mismatched
+pattern
+(length is measured in number of words,
+with each explicit occurrence of
+.B all
+counted as slightly less than one word,
+and does not include
+the implicit extension of patterns with
+.BR \&.all ).
+.LP
+Note that order in the lists is not significant,
+and that ties are broken in favor of not matching.
+An example:
+.B comp,comp.sys.sun,!comp.sys
+matches all the
+.B comp
+groups,
+.I except
+the
+.B comp.sys
+groups
+.I "but including"
+.BR comp.sys.sun .
+.PP
+The
+distributions in the
+.B Distribution:
+header
+are similarly matched against the
+.IR distributions
+subfield, if any.
+If no
+.I distributions
+are supplied,
+.B Distribution:
+will be matched against
+the
+.I subscriptions
+instead.
+(The
+.B Distribution:
+header is ignored when receiving news;
+it is only significant when sending.)
+.PP
+Note that some older news software
+reportedly
+attached magical significance to the
+distributions ``world'' and ``local''; C News treats them as ordinary
+distribution names with no special properties (except that ``world'' is
+the default distribution of an article if none appears explicitly).
+For example, a
+.I distributions
+list like
+.B all,!local
+will
+.I not
+prevent local articles from being sent unless they contain explicit
+.B "Distribution: local"
+lines.
+Note too
+that the distribution
+``world''
+must be permitted
+(perhaps by the distribution
+``all'')
+in order to feed
+.BR Distribution: -less
+articles
+(the common case)
+to a site.
+.PP
+The
+.I flags
+are a set of letters describing how the article should be transmitted.
+Valid flags include
+.B f
+(interpret
+.I "transmission command"
+as a file name and
+write the article's file name relative to
+.B \*a
+and size in bytes
+on the end of it),
+.B F
+(like
+.B f
+but omit the size),
+.B I
+(like
+.B F
+but write Message-ID:s instead of filenames),
+.B n
+(like
+.B F
+but write a Message-ID: after each filename),
+.BI L n
+(only send articles
+generated within
+.I n
+hops of here;
+0 is the default value for
+.IR n ),
+.B m
+(transmit only moderated groups),
+.B u
+(transmit only unmoderated groups).
+There are other obsolete ones.
+.LP
+The
+.I transmission command
+is executed by the shell with the article
+to be transmitted as the standard input.
+The substring
+`\c
+.BR %s '
+will be replaced at most once per command
+with the name of a file containing the article,
+relative to
+.B \*a
+(`\c
+.BR %% '
+is replaced by
+`\c
+.BR % ').
+The default is
+`\c
+.BI "uux \- \-z \-r " sysname !rnews\c
+\&'
+for a command;
+the PATH searched includes
+.BR \*b/relay ,
+so that the commands described in \fInewsmail\fR(8)
+are available as alternatives to \fIuux\fR.
+If one of the \fIflags\fR has caused
+this field to be taken as a filename,
+the default is
+.BI \*a/out.going/ sysname /togo\c
+;
+if a filename is given but it does not start with `/',
+it is assumed
+to be relative to the
+.B \*a/out.going
+directory.
+.SH EXAMPLES
+A complex
+.I sys
+file.
+.Es
+# line indicating what we are willing to receive; note local groups near end
+ME:comp,news,sci,rec,misc,soc,talk,can,ont,tor,ut,to
+.sp 0.3
+# sample insignificant feed not using batching (for special situations only)
+huey:news.config,to.huey/all::uux - -r -gd huey!rnews
+.sp 0.3
+# sample of mailing newsgroups to someone (note distribution)
+daisy:soc.women,soc.couples/all::mail daisy@duck
+.sp 0.3
+# sample small feed using batching
+gladstone:comp.protocols.tcp-ip,rec.aviation/all:f:
+.sp 0.3
+# sample major batched feed, including assorted regional newsgroups, with
+# (unnecessary) explicit file name
+dewey:comp,news,sci,rec,misc,soc,talk,can,ont,tor,ut,to.dewey/all:f:dewey/togo
+.sp 0.3
+# sample long-haul feed; note no regional groups, exclusion of a local
+# distribution, and exclusion of anything that passed through him under
+# another name (needed because he puts that form, not just "donald", in
+# his Path lines)
+donald/donald.angry.duck:comp,news,sci,rec,misc,soc,talk,to.donald/all,!ut:f:
+.sp 0.3
+# sample local-postings-only feed direct to major site (gets them out fast)
+scrooge:comp,news,sci,rec,misc,soc,talk,to.scrooge/all:Lf:
+.sp 0.3
+# sample ihave/sendme link
+# NOTE, this is uucp ihave/sendme, not related to NNTP in any way.
+# Send ihave telling louie what we have -- batcher turns the batch into a
+# giant control message and posts it to "to.louie".
+louie.wehave/louie:comp,news,sci,rec,misc,soc,talk,!to/all:I:
+# Send the actual control messages
+louie:to.louie/all:f:
+.sp 0.3
+# Also, since ihave/sendme is slow, send local postings to louie without
+# waiting for ihave/sendme
+louie:comp,news,sci,rec,misc,soc,talk,!to/all:Lf:
+.Ee
+(The ``to.\fIsysname\fR'' groups are normal newsgroups used for testing
+individual news feeds
+and
+conveying ihave/sendme messages.)
+.SH FILES
+.B \*c/sys
+.SH SEE ALSO
+.IR relaynews (8)
+.SH HISTORY
+Written by Geoff Collyer and Henry Spencer for the C News project.
+.SH BUGS
+The flags field is a bit of mess:
+there are too many formatting flags and they aren't orthogonal.

@@ -1,0 +1,101 @@
+.Ch "Directory Layout and PATH in C News"
+.Ix directories
+.Ix PATH
+.Ix /usr/lib/news
+.Ix /usr/lib/newsbin
+.Ix /usr/spool/news
+.SH
+Intro
+.LP
+C News
+is constrained by historical compatibility with
+B News,
+but we also want to provide more flexibility for local news administrators.
+Accordingly, our directory organization is a little different from that
+of B News.
+We also make a lot of use of subordinate programs rather than lumping
+everything into a few giant lumps,
+and this means we need a notion of
+search paths.
+.LP
+See also ``Configuration Mechanisms in C News'',
+which talks about how
+to alter the defaults for these paths and such.
+.SH
+Directory organization
+.LP
+We retain the notion that a single directory
+(usually /usr/spool/news)
+is the top of the news-article database.
+We also use subdirectories of this directory,
+using names including `.' to
+ensure that they cannot collide with newsgroup names,
+to hold incoming batches and outgoing batch control files.
+One can debate whether this is the right place for these activities,
+but in practice
+/usr/spool/news
+tends to be where people want to put
+potentially-big traffic-handling directories,
+and it's not worth providing for separate variation of the location.
+.LP
+We do split the former
+/usr/lib/news
+into two,
+however.
+We reserve
+/usr/lib/news
+itself for control files that are logically
+part of the database.
+(It would make sense to put those under some subdirectory of
+/usr/spool/news,
+but that would break a lot of programs that think these
+files live in
+/usr/lib/news.)
+The programs\(emthose which don't need to be directly executable by
+users or \fIuucp\fR\(emlive in
+/usr/lib/newsbin.
+Actually,
+they usually live in subdirectories thereof,
+with each significant subsystem having its own subdirectory to keep the
+individual directories manageable in complexity.
+There are occasional general-purpose utilities at the top level;
+there aren't enough of them to be worth a separate directory.
+.SH
+PATH
+.LP
+In general,
+things are organized to permit sharing of
+/usr/lib/newsbin
+among multiple databases.
+It doesn't make sense to share
+/usr/lib/news
+among multiple databases,
+as much of the stuff that lives there is logically part of the database.
+.LP
+There is a possibility that an individual database will want to override
+specific decisions made by the programs,
+i.e. will want its own version
+of some programs.
+Accordingly,
+provision is made for a `bin' directory under
+/usr/lib/news.
+News software should set its PATH to something on the order of
+.DS
+.ft B
+/usr/lib/news/bin:/usr/lib/newsbin/xxx:/usr/lib/newsbin:/bin:/usr/bin
+.ft
+.DE
+(See the ``Configuration Mechanisms'' document for how this
+should \fIactually\fR be written,
+to facilitate configuration changes
+and local customization.)
+That is,
+first look in the database's bin directory for overrides,
+then in some subdirectory of
+/usr/lib/newsbin
+for the subsystem's
+programs,
+then in
+newsbin
+itself for news-wide utilities,
+then in the standard system directories for standard Unix utilities.

@@ -1,0 +1,59 @@
+#! /bin/sh
+# dodelayed - handle delayed control messages, if they still exist
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/usr/lib/news/bin/config}
+PATH=$NEWSCTL/bin:$NEWSBIN/ctl:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+lock="$NEWSCTL/LOCK"
+ltemp="$NEWSCTL/L.$$"
+echo $$ >$ltemp
+trap "rm -f $ltemp ; exit 0" 0 1 2 15
+while true
+do
+	if newslock $ltemp $lock
+	then
+		trap "rm -f $ltemp $lock ; exit 0" 0 1 2 15
+		break
+	fi
+	sleep 30
+done
+
+cd $NEWSARTS
+
+# first, which ones are due?
+now="`getdate now`"
+awk 'BEGIN { now = '$now' }
+	{
+		if ($1 > now)
+			print $1, $2
+		else
+			print "do", $2
+	}' $NEWSCTL/delayed >/tmp/delayed$$
+
+# second, which of those still exist?
+sed -n '/^do /s///p' /tmp/delayed$$ | dbz -x $NEWSCTL/history |
+	awk -F'	' 'NF == 3 { print $3 }' | tr . / |
+	while read first rest
+	do
+		if test -r "$first"
+		then
+			echo "$first"
+		fi
+	done >/tmp/delaydo$$
+
+# do them
+if test -s /tmp/delaydo$$
+then
+	for f in `cat /tmp/delaydo$$`
+	do
+		canonhdr $f | 
+			sed -n 's;^Control:[	 ]*;'$NEWSBIN/relay/del';p' |
+			egrep -v '/^(cancel|ihave|sendme) ' >/tmp/ctl$$
+		sh /tmp/ctl$$ <$f
+	done
+fi
+
+# and clean up
+egrep -v '^do' /tmp/delayed$$ >$NEWSCTL/delayed
+rm -f /tmp/ctl$$ /tmp/delayed$$ /tmp/delaydo$$

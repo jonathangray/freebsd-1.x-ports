@@ -1,0 +1,161 @@
+      SUBROUTINE PJIBT (NEQ, Y, YH, NYH, EWT, RTEM, SAVR, S, WM, IWM, 
+     1   RES, JAC, ADDA)
+CLLL. OPTIMIZE
+      EXTERNAL RES, JAC, ADDA 
+      INTEGER NEQ, NYH, IWM
+      INTEGER IOWND, IOWNS,
+     1   ICF, IERPJ, IERSL, JCUR, JSTART, KFLAG, L, METH, MITER,
+     2   MAXORD, MAXCOR, MSBP, MXNCF, N, NQ, NST, NRE, NJE, NQU
+      INTEGER I, IER, IIA, IIB, IIC, IPA, IPB, IPC, IRES, J, J1, J2,
+     1   K, K1, LENP, LBLOX, LPB, LPC, MB, MBSQ, MWID, NB
+      DOUBLE PRECISION Y, YH, EWT, RTEM, SAVR, S, WM
+      DOUBLE PRECISION ROWNS, 
+     1   CCMAX, EL0, H, HMIN, HMXI, HU, RC, TN, UROUND
+      DOUBLE PRECISION CON, FAC, HL0, R, SRUR
+      DIMENSION NEQ(1), Y(1), YH(NYH,1), EWT(1), RTEM(1),
+     1   S(1), SAVR(1), WM(1), IWM(1)
+      COMMON /LS0001/ ROWNS(209),
+     2   CCMAX, EL0, H, HMIN, HMXI, HU, RC, TN, UROUND,
+     3   IOWND(14), IOWNS(6), 
+     4   ICF, IERPJ, IERSL, JCUR, JSTART, KFLAG, L, METH, MITER,
+     5   MAXORD, MAXCOR, MSBP, MXNCF, N, NQ, NST, NRE, NJE, NQU
+C-----------------------------------------------------------------------
+C PJIBT IS CALLED BY STODI TO COMPUTE AND PROCESS THE MATRIX
+C P = A - H*EL(1)*J , WHERE J IS AN APPROXIMATION TO THE JACOBIAN DR/DY,
+C AND R = G(T,Y) - A(T,Y)*S.  HERE J IS COMPUTED BY THE USER-SUPPLIED 
+C ROUTINE JAC IF MITER = 1, OR BY FINITE DIFFERENCING IF MITER = 2.
+C J IS STORED IN WM, RESCALED, AND ADDA IS CALLED TO GENERATE P.
+C P IS THEN SUBJECTED TO LU DECOMPOSITION BY DECBT IN PREPARATION
+C FOR LATER SOLUTION OF LINEAR SYSTEMS WITH P AS COEFFICIENT MATRIX.
+C
+C IN ADDITION TO VARIABLES DESCRIBED PREVIOUSLY, COMMUNICATION
+C WITH PJIBT USES THE FOLLOWING..
+C Y     = ARRAY CONTAINING PREDICTED VALUES ON ENTRY.
+C RTEM  = WORK ARRAY OF LENGTH N (ACOR IN STODI). 
+C SAVR  = ARRAY USED FOR OUTPUT ONLY.  ON OUTPUT IT CONTAINS THE
+C         RESIDUAL EVALUATED AT CURRENT VALUES OF T AND Y.
+C S     = ARRAY CONTAINING PREDICTED VALUES OF DY/DT (SAVF IN STODI). 
+C WM    = REAL WORK SPACE FOR MATRICES.  ON OUTPUT IT CONTAINS THE
+C         LU DECOMPOSITION OF P.
+C         STORAGE OF MATRIX ELEMENTS STARTS AT WM(3).
+C         WM ALSO CONTAINS THE FOLLOWING MATRIX-RELATED DATA..
+C         WM(1) = DSQRT(UROUND), USED IN NUMERICAL JACOBIAN INCREMENTS.
+C IWM   = INTEGER WORK SPACE CONTAINING PIVOT INFORMATION, STARTING AT
+C         IWM(21).  IWM ALSO CONTAINS BLOCK STRUCTURE PARAMETERS
+C         MB = IWM(1) AND NB = IWM(2).
+C EL0   = EL(1) (INPUT).
+C IERPJ = OUTPUT ERROR FLAG.
+C         = 0 IF NO TROUBLE OCCURRED,
+C         = 1 IF THE P MATRIX WAS FOUND TO BE UNFACTORABLE, 
+C         = IRES (= 2 OR 3) IF RES RETURNED IRES = 2 OR 3.
+C JCUR  = OUTPUT FLAG = 1 TO INDICATE THAT THE JACOBIAN MATRIX
+C         (OR APPROXIMATION) IS NOW CURRENT.
+C THIS ROUTINE ALSO USES THE COMMON VARIABLES EL0, H, TN, UROUND,
+C MITER, N, NRE, AND NJE.
+C-----------------------------------------------------------------------
+      NJE = NJE + 1 
+      HL0 = H*EL0
+      IERPJ = 0
+      JCUR = 1
+      MB = IWM(1)
+      NB = IWM(2)
+      MBSQ = MB*MB
+      LBLOX = MBSQ*NB
+      LPB = 3 + LBLOX
+      LPC = LPB + LBLOX
+      LENP = 3*LBLOX
+      GO TO (100, 200), MITER 
+C IF MITER = 1, CALL RES, THEN JAC, AND MULTIPLY BY SCALAR. ------------
+ 100  IRES = 1
+      CALL RES (NEQ, TN, Y, S, SAVR, IRES)
+      NRE = NRE + 1 
+      IF (IRES .GT. 1) GO TO 600
+      DO 110 I = 1,LENP
+ 110    WM(I+2) = 0.0D0
+      CALL JAC (NEQ, TN, Y, S, MB, NB, WM(3), WM(LPB), WM(LPC))
+      CON = -HL0
+      DO 120 I = 1,LENP
+ 120    WM(I+2) = WM(I+2)*CON 
+      GO TO 260
+C
+C IF MITER = 2, MAKE 3*MB + 1 CALLS TO RES TO APPROXIMATE J. -----------
+ 200  CONTINUE
+      IRES = -1
+      CALL RES (NEQ, TN, Y, S, SAVR, IRES)
+      NRE = NRE + 1 
+      IF (IRES .GT. 1) GO TO 600
+      MWID = 3*MB
+      SRUR = WM(1)
+      DO 205 I = 1,LENP
+ 205    WM(2+I) = 0.0D0
+      DO 250 K = 1,3
+        DO 240 J = 1,MB
+C         INCREMENT Y(I) FOR GROUP OF COLUMN INDICES, AND CALL RES. ----
+          J1 = J+(K-1)*MB
+          DO 210 I = J1,N,MWID
+            R = DMAX1(SRUR*DABS(Y(I)),0.01D0/EWT(I))
+            Y(I) = Y(I) + R
+ 210      CONTINUE
+          CALL RES (NEQ, TN, Y, S, RTEM, IRES)
+          NRE = NRE + 1
+          IF (IRES .GT. 1) GO TO 600
+          DO 215 I = 1,N
+ 215        RTEM(I) = RTEM(I) - SAVR(I) 
+          K1 = K
+          DO 230 I = J1,N,MWID
+C           GET JACOBIAN ELEMENTS IN COLUMN I (BLOCK-COLUMN K1). -------
+            Y(I) = YH(I,1)
+            R = DMAX1(SRUR*DABS(Y(I)),0.01D0/EWT(I))
+            FAC = -HL0/R
+C           COMPUTE AND LOAD ELEMENTS PA(*,J,K1). ----------------------
+            IIA = I - J
+            IPA = 2 + (J-1)*MB + (K1-1)*MBSQ
+            DO 221 J2 = 1,MB
+ 221          WM(IPA+J2) = RTEM(IIA+J2)*FAC
+            IF (K1 .LE. 1) GO TO 223
+C           COMPUTE AND LOAD ELEMENTS PB(*,J,K1-1). --------------------
+            IIB = IIA - MB
+            IPB = IPA + LBLOX - MBSQ
+            DO 222 J2 = 1,MB
+ 222          WM(IPB+J2) = RTEM(IIB+J2)*FAC
+ 223        CONTINUE
+            IF (K1 .GE. NB) GO TO 225
+C           COMPUTE AND LOAD ELEMENTS PC(*,J,K1+1). --------------------
+            IIC = IIA + MB
+            IPC = IPA + 2*LBLOX + MBSQ
+            DO 224 J2 = 1,MB
+ 224          WM(IPC+J2) = RTEM(IIC+J2)*FAC
+ 225        CONTINUE
+            IF (K1 .NE. 3) GO TO 227
+C           COMPUTE AND LOAD ELEMENTS PC(*,J,1). -----------------------
+            IPC = IPA - 2*MBSQ + 2*LBLOX
+            DO 226 J2 = 1,MB
+ 226          WM(IPC+J2) = RTEM(J2)*FAC 
+ 227        CONTINUE
+            IF (K1 .NE. NB-2) GO TO 229 
+C           COMPUTE AND LOAD ELEMENTS PB(*,J,NB). ----------------------
+            IIB = N - MB
+            IPB = IPA + 2*MBSQ + LBLOX
+            DO 228 J2 = 1,MB
+ 228          WM(IPB+J2) = RTEM(IIB+J2)*FAC
+ 229      K1 = K1 + 3
+ 230      CONTINUE
+ 240    CONTINUE
+ 250  CONTINUE
+C RES CALL FOR FIRST CORRECTOR ITERATION. ------------------------------
+      IRES = 1
+      CALL RES (NEQ, TN, Y, S, SAVR, IRES)
+      NRE = NRE + 1 
+      IF (IRES .GT. 1) GO TO 600
+C ADD MATRIX A. --------------------------------------------------------
+ 260  CONTINUE
+      CALL ADDA (NEQ, TN, Y, MB, NB, WM(3), WM(LPB), WM(LPC))
+C DO LU DECOMPOSITION ON P. --------------------------------------------
+      CALL DECBT (MB, NB, WM(3), WM(LPB), WM(LPC), IWM(21), IER)
+      IF (IER .NE. 0) IERPJ = 1
+      RETURN
+C ERROR RETURN FOR IRES = 2 OR IRES = 3 RETURN FROM RES. ---------------
+ 600  IERPJ = IRES
+      RETURN
+C----------------------- END OF SUBROUTINE PJIBT -----------------------
+      END 

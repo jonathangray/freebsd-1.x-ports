@@ -1,0 +1,28 @@
+#! /bin/sh
+# sendme batch preparer
+
+# =()<. ${NEWSCONFIG-@<NEWSCONFIG>@}>()=
+. ${NEWSCONFIG-/usr/lib/news/bin/config}
+
+PATH=$NEWSCTL/bin:$NEWSBIN/batch:$NEWSBIN/inject:$NEWSBIN:$NEWSPATH ; export PATH
+umask $NEWSUMASK
+
+dest=`expr "$NEWSSITE" : "^\(.*\)\.[^.]*$"`
+case "$dest" in
+'')	dest="$NEWSSITE"	;;
+esac
+me="`newshostname`"
+
+files="`cat $*`"
+
+echo "Newsgroups: to.$dest"
+echo "Subject: sendme $me"
+echo "Control: sendme $me"
+echo
+for f in $files
+do
+	if test -r $f		# ignore control messages that have departed
+	then
+		sed '1,/^$/d' $f
+	fi
+done | dbz -m $NEWSCTL/history

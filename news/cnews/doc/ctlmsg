@@ -1,0 +1,115 @@
+.Ch "Control Message Implementation in C News"
+.Ix implementation "control messages"
+.Ix "control messages implementation"
+.SH
+Introduction
+.PP
+Netnews
+.I "control messages"
+are ordinary-looking netnews articles which contain the
+special header
+.B "Control:" .
+.Ix Control:
+Such articles are filed in the pseudo-newsgroup
+.I control
+and cause related actions by the local news system,
+such as mailing a file to the poster of the control message.
+.SH
+Built-ins
+.PP
+.B ihave ,
+.Ix "control messages" ihave
+.Ix "control messages" sendme
+.B sendme ,
+and
+.B cancel
+.Ix "control messages" cancel
+are handled internally by
+.I relaynews ,
+.Ix relaynews
+because processes cannot share open
+.I dbm (3)
+databases,
+there is no standard way to close them,
+and
+these control messages read or write the
+.I history
+.Ix history
+.Ix files history
+files,
+including the
+.I dbm
+files.
+.I Ihave
+and
+.I sendme
+are also permitted to have message-id arguments containing
+.B <
+and
+.B > ,
+both of which are rejected by
+.I relaynews
+in arguments to externally-implemented control messages,
+since they are shell metacharacters
+(\c
+.B /
+and
+.B ..
+are also bounced)
+and could be indicative of an attempt to
+do something nasty.
+.SH
+Normal Control Messages
+.PP
+Most control messages are implemented by
+.I relaynews
+by executing the command line following
+.B Control:
+with a search path of
+.I $NEWSCTL/bin:$NEWSBIN/ctl
+and with standard input set to
+the control message article.
+The command inherits
+the standard news search path
+and
+.I relaynews 's
+user and group ids,
+typically
+.I news ;
+this can be important
+to gain access rights to control files.
+The news system will be locked
+.Ix "news system lock"
+(by
+.I $NEWSCTL /lock)
+while the command runs,
+because
+this is often important
+for manipulating control files
+from the command,
+and
+because
+the news system is locked
+while
+.I relaynews
+runs.
+If that command returns non-zero exit status,
+mail is sent to
+.I $NEWSMASTER
+(usually
+.B usenet ).
+Standard output and standard error
+often are redirected to
+.I $NEWSCTL /log
+.Ix log
+.Ix files log
+and
+.I $NEWSCTL /errlog
+.Ix errlog
+.Ix files errlog
+respectively;
+invocations of
+.I relaynews
+by
+.I inews
+are exceptions.

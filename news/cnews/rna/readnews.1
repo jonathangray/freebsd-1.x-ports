@@ -1,0 +1,277 @@
+.TH READNEWS 1 "21 Nov 1990"
+.BY "C News"
+.SH NAME
+readnews \- read news articles
+.SH SYNOPSIS
+.B readnews
+.RB [ -n
+newsgroups]
+.RB [ -i ]
+.RB [ -clpC ]
+.RB [ -s [ -+?
+.RI [ group ]]]
+.SH DESCRIPTION
+.I Readnews
+without arguments enters command mode,
+which allows printing of unread articles.
+This is the normal way of using
+.IR readnews .
+.P
+.I Readnews
+maintains a
+.I .newsrc
+file in the user's home directory that specifies
+all news articles already read.
+It is updated at the end of each reading session.
+.P
+Some useful functions are available which don't use command mode.
+The flags for these are:
+.TP
+.B -c
+Check if there is news, and if so print `You have news.'.
+A line `readnews -c' is usually placed in the system
+.I .profile
+.RB (  /etc/profile ).
+.TP
+.B -C
+Check if there is news, and print the groups and number of
+articles in each group to be read.
+.TP
+.B -l
+List the titles of available news articles.
+.TP
+.B -p
+Print all articles on standard output,
+and update
+.IR newsrc .
+.TP
+.B -s
+Print the newsgroup subscription list.
+.TP
+.BI -s+ " group"
+Add
+.I group
+to the subscription list.
+.TP
+.BI -s- " group"
+Subtract
+.I group
+from the subscription list.
+.TP
+.B -s?
+List currently active newsgroups.
+.P
+The remaining flags determine article selection,
+and may also appear in the
+.I .newsrc
+file.
+Options may be specified in the
+.I .newsrc
+file by entering lines prefixed with the word `options',
+followed by the options arguments.
+This is most useful with the
+.B -n
+flag, specifying the usual groups one wishes to subscribe to.
+.TP
+\fB-n \fInewsgroups\fR
+Select all articles belonging to
+.IR newsgroups .
+.I newsgroups
+is a comma separated list of newsgroup names.
+The character `!' may be used to exclude certain groups,
+and the word `all' can be used to match any group.
+e.g. `-n all,!net.jokes'
+.TP
+.B -i
+Ignore
+.I .newsrc
+file. It is not read or updated.
+This allows selection of articles that have already been read.
+.P
+Some overall parameters are set by a control file,
+.IR NEWSCTL/readnews.ctl ,
+which contains control lines (each a keyword followed by white space followed
+by a value) and comments (each starting with `#').
+.P
+If no
+.B \-n
+option is specified, either by the user or his
+.I .newsrc
+file, the value specified on the
+.B defsub
+line of the control file is used as the list of newsgroups to be presented.
+A single mandatory newsgroup may be specified as the value of the
+.B mustsub
+control line; in the absence of a command-line
+.B \-n
+(not one from a
+.IR .newsrc ),
+that newsgroup is always presented to the user even if he did not ask for it.
+Both
+.B defsub
+and
+.B mustsub
+default to ``general''.
+.SH COMMANDS
+This section details the commands available when
+.I readnews
+is in command mode (no
+.B -clpsC
+arguments).
+The simplest way of using this mode, is to enter RETURN after every
+prompt.
+This will present to the user, a short heading for an article, then a prompt.
+Typing RETURN again will print the article body.
+Typing RETURN yet again will print the next heading, and so on.
+If having read the heading, you don't wish to read the article, you may
+type `n' (or `+' or ';') which will take you directly to the next heading.
+.P
+.P
+An article is treated as having been read, if either you have seen
+the article body, or typed `n' to skip over it.
+.P
+A number of commands operate on the `current' article.
+This is defined as the article whose header you have most recently seen.
+.P
+The commands to read news are:
+.TP
+.B RETURN
+Either print the current article,
+or go to the next article and print its header.
+.TP
+\fBn\fR or \fB+\fR or \fB;\fR
+Go to the next article and print its header.
+.TP
+.B .
+Print the current article.
+.TP
+.B -
+Go back to the previous article. This is a toggle, typing it
+twice returns you to the original article.
+.TP
+.I number
+Go to the article
+.I number
+in the current newsgroup.
+Like the `-' command,
+you always return to the original article
+after reading the selected article.
+.TP
+\fBs \fR[\fIfile\fR]
+Save the current article, appending it to the specified file
+(default
+.BR $HOME/articles ).
+.TP
+.B h
+Print the current header (slightly more verbose than normal header).
+.TP
+.B H
+Print the current header in full (very verbose).
+.TP
+\fBN \fR[\fInewsgroup\fR]
+Go to the next newsgroup, or to the specified newsgroup.
+.TP
+.B U
+Unsubscribe from this newsgroup, and go to the next newsgroup.
+.TP
+\fB!\fIcommand\fB
+Shell escape.
+.I Command
+is executed.
+If 
+.I command
+is `!'
+the last escape command is executed.
+.TP
+\fBq\fR or \fBEOT\fR
+Quit.
+The
+.I .newsrc
+file will be updated provided the flag
+.B -i
+was not specified.
+.TP
+.B x
+Exit.
+.I .newsrc
+is left unchanged (as if no articles had been read).
+.P
+Some commands are available to send/reply or post news articles:
+.TP
+.B r
+Reply to sender of the current article by mail.
+.I Readnews
+sets up the appropriate headers, and then calls
+.IR mail (1)
+(or $MAILER, if there is such an environment variable)
+to send a reply to the sender.
+If there is no
+.B mailvia
+line in the control file, the address is taken from the ``From'' header
+of the article, and is in Internet form.
+If the value in the
+.B mailvia
+line is ``<path>'', the address is taken from the ``Path'' header and is
+in UUCPnet form.
+If the value of
+.B mailvia
+is something else, the ``From'' address is transformed to UUCPnet syntax
+(``site.x.y!user'' rather than ``user@site.x.y''), and the
+.B mailvia
+value is prepended to it, with an intervening ``!''.
+.TP
+.B f
+Post a followup to the current article.
+.I Readnews
+sets up the appropriate headers, and then calls
+.IR postnews (1)
+to post the followup article.
+.TP
+.B p
+Post an article on a new topic.
+.IR postnews (1)
+is called to post the new article, in the current newsgroup by default.
+.P
+In order to permanently resubscribe to a newsgroup denied by `U',
+it is necessary to understand
+the format of the
+.I .newsrc
+file.
+The
+.I .newsrc
+file consists of two types of lines:
+.TP
+option lines
+These start with the word `option' and contain the same arguments
+as the
+.I readnews
+command on the command line.
+.TP
+read newsgroup lines
+These have the format <newsgroup>`:' <number>, where
+<number> represents the last item number seen in that particular newsgroup.
+If the newsgroup has been unsubscribed, the `:' is replaced by a `!'.
+To resubscribe the `!' must be changed back to a `:'.
+.SH FILES
+.ta \w'NEWSBIN/inject/postnews'u+2n
+.nf
+$HOME/.newsrc	options and list of previously read articles
+NEWSCTL/active	current newsgroups
+NEWSCTL/readnews.ctl	control file
+NEWSCTL/readnews.help	help file
+NEWSBIN/inject/postnews	for postings
+.fi
+.SH SEE ALSO
+postnews(1), mail(1), ed(1)
+.SH HISTORY
+Originally written by
+Michael Rourke, University of N.S.W (decvax!mulga!michaelr:elecvax).
+Modified and simplified for the C News project.
+.SH BUGS
+The
+.B mustsub
+control line really ought to be able to specify a subscription,
+i.e. multiple groups.
+.PP
+This program is about as simple as they come.
+Almost any seasoned news user will want something more complex.
