@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.13 1994/07/05 21:26:56 ache Exp $
+# $Id: Makefile,v 1.14 1994/07/05 21:58:54 ache Exp $
 #	Makefile.std	4.3	6/11/83
 #
 # C Shell with process control; VM/UNIX VAX Makefile
@@ -432,16 +432,18 @@ vgrind:
 	@for i in *.c; do vgrind -t -h "C Shell" $$i >/crp/bill/csh/$$i.t; done
 	@vgrind -t -x -h Index index >/crp/bill/csh/index.t
 
-install: tcsh 
+install: tcsh install.man
 	-mv -f ${DESTBIN}/tcsh  ${DESTBIN}/tcsh.old
 	cp tcsh ${DESTBIN}/tcsh
 	-strip ${DESTBIN}/tcsh
 	chmod 555 ${DESTBIN}/tcsh
+	chown bin.bin ${DESTBIN}/tcsh
 
 install.man: tcsh.man
 	-rm -f ${DESTMAN}/tcsh.${MANSECT}
 	cp tcsh.man ${DESTMAN}/tcsh.${MANSECT}
 	chmod 444 ${DESTMAN}/tcsh.${MANSECT}
+	chown bin.bin ${DESTMAN}/tcsh.${MANSECT}
 
 # Amiga Unix
 #install.man: tcsh.man
