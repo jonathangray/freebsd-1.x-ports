@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/news/nntp/common/conf.h,v 1.1 1993/07/19 20:04:28 nate Exp $
+/* $Header: /a/cvs/386BSD/ports/news/nntp/common/conf.h,v 1.2 1993/08/22 00:36:06 alm Exp $
  * Configuration information for use by NNTP server and support
  * programs.  Change these as appropriate for your system.
  */
@@ -14,7 +14,9 @@
 #undef	FASTFORK        /* True if we don't want to read active file on start*/
 #endif
 
-#define LOAD 5	        /* Loadav above which server refuses connections */
+/* #define LOAD 5	        /* Loadav above which server refuses connections */
+#undef LOAD
+
 /*
  * If you want to experiment with the dynamic allocation of the article
  * array, define DYNAMIC_ART_ARRAY.
@@ -23,10 +25,10 @@
  */
 #undef DYNAMIC_ART_ARRAY
 
-#define	BSD_42		/* 4.2 compatability code -- if this is defined, */
+#undef	BSD_42		/* 4.2 compatability code -- if this is defined, */
 			/* DBM probably wants to be defined as well. */
 
-#undef BSD_43		/* Define if you are running on BSD 4.3 */
+#define BSD_43		/* Define if you are running on BSD 4.3 */
 
 #undef CMU_MACH		/* Use CMU's MACH ioctl(FIOCFSPARAM) for dfree(). */
 
@@ -35,21 +37,26 @@
 #undef TLI		/* Define this if you want to use TLI instead of */
 			/* sockets */
 
-#undef NDBM		/* Use new-style (4.3) ndbm(3x) libraries */
+/* #define NDBM		/* Use new-style (4.3) ndbm(3x) libraries */
+#undef NDBM
 
 #undef	DBM		/* True if we want to use the old dbm(3x) libraries */
 			/* IF YOU DEFINE THIS, change CFLAGS in makefile to */
 			/* be -ldbm */
 
-#undef	DBZ		/* True if we want to use dbz libraries */
+/* #undef DBZ */
+#define	DBZ		/* True if we want to use dbz libraries */
 			/* IF YOU DEFINE THIS, change CFLAGS in makefile to */
 			/* be /usr/lib/dbz.o and install dbz.h */
 
-#define	USGHIST		/* Use USG style history file (no DBM) */
+#undef	USGHIST		/* Use USG style history file (no DBM) */
 			/* IF YOU DO NOT DEFINE NDBM or DBM, this is DEFAULT!*/
 
-#undef CNEWS		/* define this if you are running C-NEWS */
-#undef BATCHED_INPUT	/* define if you want to support C-NEWS style 
+/* #undef CNEWS		/* define this if you are running C-NEWS */
+#define CNEWS
+
+#define BATCHED_INPUT
+/*#undef BATCHED_INPUT	/* define if you want to support C-NEWS style 
 				batched input (not supported by B-NEWS,yet)  */
 
 /* Vendor specific implementations */
@@ -111,7 +118,7 @@
  * if you are running BNEWS. At least, not yet. :-)
  */
 
-/* #define UMASK 022 */
+#define UMASK 022
 
 /*
  * If you have the syslog library routine, define SYSLOG to
@@ -181,7 +188,7 @@
  * e.g.  #define	DOMAIN		"berkeley.edu"
  */
 
-#define	DOMAIN	"cdrom.com"
+#define	DOMAIN	"uucp"
 #undef HIDDENNET
 
 /*
@@ -189,7 +196,7 @@
  * Define this and HIDDENNET will have no effect.
  */
 
-#define REALDOMAIN
+#undef REALDOMAIN
 
 /*
  * Define DO_DOTDIR if you want the mini-inews to look for 
@@ -255,7 +262,7 @@
 #define DISTRIBUTIONS_FILE	"/usr/lib/news/distributions"
 #define NEWSGROUPS_FILE	"/usr/lib/news/newsgroups"
 #define HISTORY_FILE	"/usr/lib/news/history"
-#define	SPOOLDIR	"/usr/spool/news"
+#define	SPOOLDIR	"/var/spool/news"
 #define INEWS		"/usr/lib/news/inews"
 #define RNEWS		"/usr/bin/rnews"		/* Link to inews? */
 
@@ -276,9 +283,9 @@
 #define COPYSIZE 8192		/* bytes to copy at one time */
 #define MAXDIGITS 25		/* lg(maxlongint) + epsilon */
 #define MAXSTR 1024
-#define INDIR			"/usr/spool/news/in.coming"
+#define INDIR			"/var/spool/news/in.coming"
 /* You may wish to delete the pathname from the front of BATCH_FILE */
-#define BATCH_FILE		"/usr/spool/news/in.coming/nntp.XXXXXX"
+#define BATCH_FILE		"/var/spool/news/in.coming/nntp.XXXXXX"
 
 /************************************************************************/
 /* We don't recommend that you make changes in anything after this line */
@@ -292,9 +299,7 @@
 
 #ifdef BSD_42		/* This is a logical, warranted assumption */
 #   ifndef DBM		/* which will probably get me in trouble. */
-#       ifndef __386BSD__
-#	    define DBM	/* Kill it if you have 4.2 *and* ndbm.  */
-#       endif not __386BSD__
+#	define DBM	/* Kill it if you have 4.2 *and* ndbm.  */
 #   endif not DBM
 #   ifndef sun		/* not a sun */
 #       ifndef ultrix   /* not ultrix */

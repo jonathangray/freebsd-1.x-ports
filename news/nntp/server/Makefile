@@ -1,4 +1,4 @@
-# $Header: /a/cvs/386BSD/ports/news/nntp/server/Makefile,v 1.1 1993/07/19 20:04:29 nate Exp $
+# $Header: /a/cvs/386BSD/ports/news/nntp/server/Makefile,v 1.2 1993/08/22 00:36:46 alm Exp $
 # Makefile for NNTP server
 #
 
