@@ -1,0 +1,952 @@
+%			*****	  TUGBOT.STY	*****		18 Aug 85, bb
+%
+%	WARNING -- UNDER CONSTRUCTION
+%
+%	This file contains the TeX82 instructions for preparing a document
+%	in TUGboat format.  It is based on the TeX80 TUGboat format and on
+%	AMSPPT.STY (AMS-TeX82).  It is compatible with, but does not
+%	require (or load) AMS-TeX.  It assumes that PLAIN.TEX is preloaded.
+%
+%	This version differs in significant ways from the production version
+%	used at the AMS to generate the published TUGboat; particular
+%	features of the production version address idiosyncracies of the
+%	Alphatype CRS typesetter, used to prepare camera copy, which are not
+%	relevant to output prepared on, e.g., a laser printer.
+%
+%	Explicit registers:
+%		Counters:	0 = \pageno (PLAIN)
+%				1 = \xcol -- column on page (values 1 or 2)
+%				2 = \spoolno -- sequential segment count
+%		Files:		1 = page number xref definitions
+
+
+\catcode`\@=11		% used, as in PLAIN, in protected control sequences
+
+
+%      Stuff different from PLAIN, or reiterated for clarity
+
+\def~{\penalty\@M \ } % tie -- this is PLAIN value; it is reset in AMS-TeX
+
+\clubpenalty=10000
+\widowpenalty=10000
+
+\normallineskiplimit=1pt
+
+\newif\ifNoParIndent		\NoParIndentfalse
+\def \NoParIndent{\parindent=0pt \NoParIndenttrue}
+
+\newdimen\normalparindent	 \normalparindent=20pt		% plain = 20pt
+\def \NormalParIndent{\global\parindent=\normalparindent
+	\global\NoParIndentfalse}
+\NormalParIndent
+
+%		set up auxiliary `page numbers'
+%		\pageno = \count0  as used in PLAIN
+\countdef\xcol=1	\xcol=1
+\countdef\spoolno=2	\spoolno=1
+
+%	some things with the same names as in, or reiterated from, AMS-TeX
+
+\def \BlackBoxes{\overfullrule=5pt }
+\def \NoBlackBoxes{\overfullrule=0pt }
+\def \document{}		% override an AMS-TeX convention
+\def \linebreak{\unskip\break}
+\def \newline{\hskip0pt plus\colwd \break}
+%\let\brk=\linebreak		% TeX80 version
+%\let\lbrk=\newline		% TeX80 version
+\output{\output@}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%									      %
+%		*****     utility registers and definitions	*****	      %
+%									      %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%	test registers for transient use; paired - internal/external
+\newbox\T@stBox 		\newbox\TestBox
+\newcount\T@stCount		\newcount\TestCount
+\newdimen\T@stDimen		\newdimen\TestDimen
+
+
+%	\cs existence test, stolen from TeXbook exercise 7.7
+\def \ifundefined#1{\expandafter\ifx\csname#1\endcsname\relax }
+
+
+%	Smashes repeated from AMS-TeX; PLAIN implements only full \smash .
+\newif\iftop@		\newif\ifbot@
+\def\topsmash{\top@true\bot@false\smash@}
+\def\botsmash{\top@false\bot@true\smash@}
+\def\smash{\top@true\bot@true\smash@}
+\def\smash@{\relax\ifmmode\def\next{\mathpalette\mathsm@sh}%
+	\else\let\next\makesm@sh\fi \next }
+\def\finsm@sh{\iftop@\ht\z@\z@\fi\ifbot@\dp\z@\z@\fi\box\z@}
+
+
+%	Vertical `laps'; cf. \llap and \rlap
+\def\ulap#1{\vbox to \z@{\vss#1}}
+\def\dlap#1{\vbox to \z@{#1\vss}}
+
+%	And a horizontal `lap' that takes up no space on either side.
+\def\zlap#1{\hbox to \z@{\hss#1\hss}}
+
+
+%	Avoid unwanted vertical glue when making up pages.
+\def \basezero{\baselineskip\z@ \lineskip\z@}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%									      %
+%			***** fonts and friends	*****			      %
+%									      %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%	Struts give ascenders and descenders to assist in baseline alignment
+%	(e.g. of adjoining vertical boxes); useful only with text fonts.
+%
+%	\strut is defined in PLAIN .  The structure of \strutt is equivalent.
+
+\newbox\struttbox
+\def\strutt{\relax\ifmmode\copy\struttbox\else\unhcopy\struttbox\fi}
+
+%	Struts are given the following dimensions for use in TUGboat:
+%
+%		\strut = height/depth of parenthesis in current font
+%			 (not the same as PLAIN)
+%		\strutt height + depth = \normalbaselineskip,
+%			 height = same as \strut
+%			 (equivalent to PLAIN \strut )
+
+
+%	The fonts below are sufficient for most ordinary TUGboat production.
+%	Additional titling fonts are defined elsewhere, and occasionally an
+%	extra font will be needed for a particular item (e.g. the device
+%	charts) and defined in that file.
+
+%		fonts preloaded but not named in PLAIN
+
+\font\ninerm=amr9
+\font\eightrm=amr8
+\font\sixrm=amr6
+
+\font\ninei=ammi9 \skewchar\ninei='177
+\font\eighti=ammi8 \skewchar\eighti='177
+\font\sixi=ammi6 \skewchar\sixi='177
+
+\font\ninesy=amsy9 \skewchar\ninesy='60
+\font\eightsy=amsy8 \skewchar\eightsy='60
+\font\sixsy=amsy6 \skewchar\sixsy='60
+
+\font\ninebf=ambx9
+\font\eightbf=ambx8
+\font\sixbf=ambx6
+
+\font\ninesl=amsl9
+\font\eightsl=amsl8
+
+\font\nineit=amti9
+\font\eightit=amti8
+\font\sevenit=amti7
+
+\font\ninett=amtt9
+\font\eighttt=amtt8
+
+\font \tenupit=amu10 
+
+
+\def \mit{\fam\@ne}
+\def \cal{\fam\tw@}
+\def \sy{\cal}		% old name
+
+%		fonts added at AMS
+
+% \font\eightex=amex8
+
+% \newfam\cyrfam	% uncomment if needed
+
+% \font\tencyr=mcyr10
+% \font\ninemcyr=mcyr9
+% \font\eightcyr=mcyr8
+% \font\sixcyr=mcyr6
+
+\font\tensmc=amcsc10
+%\font\ninesmc=amcsc9			% when available
+\let\ninesmc=\tensmc			% temporary expedient
+%\font\eightsmc=amcsc8
+\let\eightsmc=\tensmc			% temporary expedient
+
+%\font \sixteenssb=amssbx16
+\font \sixteenssb=amssbx10 scaled \magstep3
+%\font \twelvessb=amssbx12
+\font \twelvessb=amssbx10 scaled \magstep1
+\font \tenssb=amssbx10
+%\font \eightssb=amssbx8
+
+%\font \seventphon=tphon7 		% used in macro index and device list
+
+\def \titlefont{\def\smc{\eightssb}\sixteenssb }	% \twelvessb
+
+
+%	Planned additions and changes:
+%
+%	Dynamic loading of fonts, probably in groups according to size
+%	Removal of \rm, \bf, etc., from \*point expansions, replacement
+%		by generic \rm, \bf, etc. definitions
+%	Mechanism for switching neatly between serif and sans-serif
+
+
+%	Allow text to be a bit stretchier than the built-in setting;
+%	TeXbook, page 433, 355
+
+\newdimen\normaltenptstretch	\normaltenptstretch=1.6667pt
+\newdimen\extratenptstretch	\extratenptstretch=4pt
+\def\NormalTenPointSpacing{\fontdimen3\tenrm=\normaltenptstretch
+		\fontdimen3\tenit=\normaltenptstretch}
+\def\StretchyTenPointSpacing{\fontdimen3\tenrm=\extratenptstretch
+		\fontdimen3\tenit=\extratenptstretch}
+
+\def \AddToTenPoint{}		% permit external additions to font
+
+\def \tenpoint{\normalbaselineskip=12pt 	% \def\pointsize@AmS{t}
+	\abovedisplayskip=3pt plus 3pt minus 1pt
+	\belowdisplayskip=3pt plus 3pt minus 1pt
+	\abovedisplayshortskip=0pt plus 3pt
+	\belowdisplayshortskip=1pt plus 3pt minus 1pt
+	\def\rm{\fam\z@\tenrm}%
+	\textfont0=\tenrm \scriptfont0=\sevenrm \scriptscriptfont0=\fiverm
+	\def\oldstyle{\fam\@ne\teni}%
+	\textfont1=\teni \scriptfont1=\seveni \scriptscriptfont1=\fivei
+	\textfont2=\tensy \scriptfont2=\sevensy \scriptscriptfont2=\fivesy
+	\textfont3=\tenex \scriptfont3=\tenex \scriptscriptfont3=\tenex
+	\def\it{\fam\itfam\tenit}%
+	\textfont\itfam=\tenit
+	\def\sl{\fam\slfam\tensl}%
+	\textfont\slfam=\tensl
+	\def\bf{\fam\bffam\tenbf}%
+	\textfont\bffam=\tenbf \scriptfont\bffam=\eightbf
+		\scriptscriptfont\bffam=\sixbf
+%	\def\cyr{\fam\cyrfam\tencyr}%
+%	\textfont\cyrfam=\tencyr \scriptfont\cyrfam=\eightcyr
+%		\scriptscriptfont\cyrfam=\sixcyr
+	\def\smc{\tensmc}%
+	\def\tt{\tentt}%
+	\def\upright{\tenupit}%
+	\setbox\strutbox=\hbox{\vrule height7.5pt depth2.5pt width\z@}%
+	\setbox\struttbox=\hbox{\vrule height8.5pt depth3.5pt width\z@}%
+	\normalbaselines \AddToTenPoint \rm }
+
+\tenpoint			% initialize -- default font
+
+
+\newdimen\normalnineptstretch	\normalnineptstretch=1.5pt
+\newdimen\extranineptstretch	\extranineptstretch=3.6pt
+\def\NormalNinePointSpacing{\fontdimen3\ninerm=\normalnineptstretch}
+\def\StretchyNinePointSpacing{\fontdimen3\ninerm=\extranineptstretch}
+
+\def \AddToNinePoint{}
+
+\def \ninepoint{\normalbaselineskip=11pt
+	\abovedisplayskip=2.5pt plus 2.5pt minus 1pt
+	\belowdisplayskip=2.5pt plus 2.5pt minus 1pt
+	\abovedisplayshortskip=0pt plus 2.5pt
+	\belowdisplayshortskip=1pt plus 2.5pt minus 1pt
+	\def\rm{\fam\z@\ninerm}%
+	\textfont0=\ninerm \scriptfont0=\sevenrm \scriptscriptfont0=\fiverm
+	\def\oldstyle{\fam\@ne\ninei}%
+	\textfont1=\ninei \scriptfont1=\seveni \scriptscriptfont1=\fivei
+	\textfont2=\ninesy \scriptfont2=\sevensy \scriptscriptfont2=\fivesy
+	\def\it{\fam\itfam\nineit}%
+	\textfont\itfam=\nineit
+	\def\sl{\fam\slfam\ninesl}%
+	\textfont\slfam=\ninesl
+	\def\bf{\fam\bffam\ninebf}%
+	\textfont\bffam=\ninebf \scriptfont\bffam=\sevenbf
+		\scriptscriptfont\bffam=\sixbf
+%	\def\cyr{\fam\cyrfam\ninmcyr}%
+%	\textfont\cyrfam=\ninmcyr \scriptfont\cyrfam=\sixcyr
+%		\scriptscriptfont\cyrfam=\sixcyr
+	\def\smc{\ninesmc}%
+	\def\tt{\ninett}%
+	\setbox\strutbox=\hbox{\vrule height 6.75pt depth 2.25pt width\z@}%
+	\setbox\struttbox=\hbox{\vrule height 7.25pt depth 2.75pt width\z@}%
+	\normalbaselines \AddToNinePoint \rm }
+
+%		this is equivalent to baselineskip = 10pt
+%	\setbox\struttbox=\hbox{\vrule height 7.75pt depth 3.25pt width\z@}%
+
+
+\newdimen\normaleightptstretch	\normaleightptstretch=1.333pt
+\newdimen\extraeightptstretch	\extraeightptstretch=3pt
+\def\NormalEightPointSpacing{\fontdimen3\eightrm=\normaleightptstretch}
+\def\StretchyEightPointSpacing{\fontdimen3\eightrm=\extraeightptstretch}
+
+\def \AddToEightPoint{}
+
+\def \eightpoint{\normalbaselineskip=10pt
+	\abovedisplayskip=2pt plus 2pt minus 1pt
+	\belowdisplayskip=2pt plus 2pt minus 1pt
+	\abovedisplayshortskip=0pt plus 2pt
+	\belowdisplayshortskip=1pt plus 2pt minus 1pt
+	\def\rm{\fam\z@\eightrm}%
+	\textfont0=\eightrm \scriptfont0=\sixrm \scriptscriptfont0=\fiverm
+	\def\oldstyle{\fam\@ne\eighti}%
+	\textfont1=\eighti \scriptfont1=\sixi \scriptscriptfont1=\fivei
+	\textfont2=\eightsy \scriptfont2=\sixsy \scriptscriptfont2=\fivesy
+%	\textfont3=\eightex \scriptfont3=\eightex \scriptscriptfont3=\eightex
+	\def\it{\fam\itfam\eightit}%
+	\textfont\itfam=\eightit
+	\def\sl{\fam\slfam\eightsl}%
+	\textfont\slfam=\eightsl
+	\def\bf{\fam\bffam\eightbf}%
+	\textfont\bffam=\eightbf \scriptfont\bffam=\sixbf
+		\scriptscriptfont\bffam=\sixbf
+%	\def\cyr{\fam\cyrfam\eightcyr}%
+%	\textfont\cyrfam=\eightcyr \scriptfont\cyrfam=\sixcyr
+%		\scriptscriptfont\cyrfam=\sixcyr
+	\def\smc{\eightsmc}%
+	\def\tt{\eighttt}%
+	\setbox\strutbox=\hbox{\vrule height 6pt depth 2pt width\z@}%
+	\setbox\struttbox=\hbox{\vrule height 7pt depth 3pt width\z@}%
+	\normalbaselines \AddToEightPoint \rm }
+
+%		this is equivalent to baselineskip = 9pt
+%	\setbox\struttbox=\hbox{\vrule height 6.5pt depth 2.5pt width\z@}%
+
+%	PLAIN's definition of \raggedright doesn't permit any stretch, and
+%	results in too many overfull boxes.  Change.
+\newdimen\raggedskip		\raggedskip=\z@
+\newdimen\raggedstretch		\raggedstretch=5em
+\newskip\raggedparfill		\raggedparfill=\z@ plus 1fil
+
+\def \raggedspaces{\spaceskip=.3333em \xspaceskip=.5em }
+%	Some applications may have to add stretch, in order to avoid
+%	all overfull boxes.
+
+\def \raggedright{\rightskip=\raggedskip plus\raggedstretch \raggedspaces
+		\parfillskip=\raggedparfill }
+\def \raggedleft{\leftskip=\raggedskip plus\raggedstretch \raggedspaces 
+		\parfillskip=\z@ }
+\def \raggedcenter{\leftskip=\raggedskip plus\raggedstretch
+		\rightskip=\leftskip \raggedspaces 
+		\parfillskip=\leftskip }
+
+\def \normalspaces{\spaceskip=.3333em plus.1667em minus.1111em
+		\xspaceskip=.4444em plus.5em minus.037em }
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%									      %
+%			*****	abbreviations	*****			      %
+%									      %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\def \careof{\leavevmode\hbox{\raise.75ex\hbox{c}\kern-.15em
+		/\kern-.125em\smash{\lower.3ex\hbox{o}}}}
+\def \d@sh#1{\nobreak\thinspace#1\penalty0\thinspace}
+\def \dash{\d@sh{--}}
+\def \Dash{\d@sh{---}}
+
+\def \TeX{\leavevmode\hbox{T\kern-.1667em\lower.424ex\hbox{E}\kern-.125emX}}
+\def \TUG{\TeX\ \UG}
+\def \UG{Users Group}
+\def \TUB{TUGboat}
+\def \SC{Steering Committee}
+\def \AMS{American Mathematical Society}
+\def \POBox{P.\thinspace O.~Box }
+\def \POBoxTUG{\POBox\unskip~9506, Providence, RI~02940}
+\def \AMSTeX{\leavevmode\hbox{$\cal A\kern-.2em\lower.376ex
+	\hbox{$\cal M$}\kern-.2em\cal S$-\TeX}}
+\def \JoT{{\sl The Joy of \TeX}}
+%	note -- \LaTeX definition is from LATEX.TEX 2.08 of 27 Mar 85,
+%		adapted for additional flexibility in TUGboat
+%\def\LaTeX{{\rm L\kern-.36em\raise.3ex\hbox{\sc a}\kern-.15em
+%    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\def \LaTeX{\leavevmode L\kern-.36em\raise.3ex\hbox{\smc a}\kern-.15em\TeX}
+%	note -- the `official' \MF uses \font\logo=manfnt, which is not
+%		in general distribution (to prevent unauthorized
+%		reproduction of the TeXbook)
+\let\logo=\tenssb	% replace by manfnt if that is available
+\def \MF{{\logo META}\-{\logo FONT}}
+\def \mf{{\smc Metafont}}
+\def \Pas{Pascal}
+\def \UNIX{{\smc unix}}
+\def \VAX{\leavevmode\hbox{V\kern-.12em A\kern-.1em X}}
+\def \WEB{{\tt WEB}}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%									      %
+%			*****  page dimensions	*****			      %
+%									      %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\newdimen\trimlgt	\trimlgt=11in
+\newdimen\headmargin	\headmargin=3.5pc
+\newdimen\pagelgt
+\newdimen\rheadlgt	\rheadlgt=2.5pc		% + headmargin = 6pc = 1in
+\newdimen\toplgt	\toplgt=0pt
+\newdimen\normalcollgt	\normalcollgt=54pc	% 52pc for 5#2
+\newdimen\collgt	\collgt=\normalcollgt
+\newdimen\Collgt
+\maxdepth=2pt
+\newdimen\botlgt	\botlgt=0pt
+\newdimen\rfootlgt	\rfootlgt=2pc
+
+\newif\ifThisIsFirstPage	\ThisIsFirstPagefalse
+
+\def \resetpagelgt{\pagelgt=\collgt \Collgt=\collgt
+	\advance\pagelgt by \rheadlgt
+	\ifThisIsFirstPage \advance\Collgt by-\toplgt
+			\advance\Collgt by-\botlgt \fi
+	\advance\pagelgt by \maxdepth
+	\global\advance\pagelgt by \rfootlgt
+	\global\vsize=\Collgt }
+\def \resetfpagelgt{\global\ThisIsFirstPagetrue
+	\resetpagelgt }			% exclude special first page material
+
+\resetpagelgt
+\raggedbottom
+
+\newdimen\colwd
+\newdimen\pagewd	\pagewd=39pc
+\newdimen\trimwd	\trimwd=\pagewd
+
+\def \onecol{\colwd=\pagewd		\OneCol }
+
+\newdimen\onenarrowcolwd	\onenarrowcolwd=30pc
+\def \onenarrow{\colwd=\onenarrowcolwd	\OneCol }
+
+%	before 5#2, `narrow' was 34pc
+\newdimen\onemediumcolwd	\onemediumcolwd=34pc
+\def \onemedium{\colwd=\onemediumcolwd	\OneCol }
+
+\newdimen\twocolcolwd		\twocolcolwd=18.75pc
+\def \twocol{\colwd=\twocolcolwd 	\TwoCol }
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%									      %
+%			*****	   headers/footers	*****		      %
+%									      %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\def \midrtitle{}		% to allow for ``advertisements'' notice
+
+\def \rtitlex{\TUB, \volx }
+\def \rtitle{\hbox to \pagewd{\tenrm
+	\rlap{\hbox to \pagewd{\hfil\midrtitle\hfil}}%
+	\ifodd\pageno \rtitlex\hfil\number\pageno
+	\else \number\pageno\hfil\rtitlex \fi }}
+
+\def \runhead{\vbox to \rheadlgt{\topskip=1pc \rtitle \vfil }}
+\def \runfoot{\vbox to \rfootlgt{\topskip=1.5pc
+	\ifnum\xcol=1 \hbox to \pagewd{\midrtitle\hfil\midrtitle}\fi
+	\vfil }}
+
+\def \firsthead{}
+\newbox\firsth@@d	\newbox\firsth@ad
+\long\def \setfirsthead #1{\ThisIsFirstPagetrue
+	\ifdim \toplgt=\z@
+		\global\setbox\firsth@ad=\vbox{\hsize=\pagewd #1}%
+%			assume that \firsth@ad ends with glue, hence no \dp
+		\global\toplgt=\ht\firsth@ad \resetpagelgt
+	\else \global\setbox\firsth@ad=\vbox to \toplgt{\hsize=\pagewd #1}%
+	\fi
+	\global\setbox\firsth@@d=\vbox to \toplgt{\vfil}%
+	\gdef\firsthead{\ifnum \xcol=2 \box\firsth@ad
+			\else \copy\firsth@@d \fi }}
+
+\def \firstfoot{}
+\newbox\firstf@@t	\newbox\firstf@ot
+\long\def \setfirstfoot #1{\ThisIsFirstPagetrue
+	\ifdim \botlgt=\z@
+		\global\setbox\firstf@ot=\vbox{\hsize=\pagewd #1}%
+		\botlgt=\ht\firstf@ot
+		\global\advance\botlgt by \dp\firstf@ot \resetpagelgt
+	\else \global\setbox\firstf@ot=\vbox to \botlgt{\hsize=\pagewd #1}%
+	\fi
+	\global\setbox\firstf@@t=\vbox to \botlgt{\vfil}%
+	\gdef\firstfoot{\ifnum \xcol=2 \copy\firstf@ot
+			\else \copy\firstf@@t \fi }}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%									      %
+%			*****	    output	*****			      %
+%									      %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%	In the absence of automatic column-balancing, provide a mechanism
+%	for manually shortening a specified page.
+
+\newif\ifSh@rtPage		\Sh@rtPagefalse
+\newif\ifSh@rtPagePending	\Sh@rtPagePendingfalse
+\newcount\Sh@rtPageNo
+\newdimen\Sh@rtPageLgt
+
+\def\@to{to}			\def\@by{by}
+%	#1 = to/by; #2 = \dimen; #3 = <dimen>; #4 = * of Shorten*Page
+\def\@toby#1#2#3#4{\def\1{#1}%
+	\ifx \1\@to \global #2=#3
+	\else \ifx \1\@by \T@stDimen=#3 	% accommodate negative #3
+			#2=\normalcollgt \global\advance #2 by -#3
+		\else \errmessage{#1 is invalid syntax; \string\Shorten#4Page
+				requires "to" or "by"}\fi
+	\fi }
+
+\def \ShortenPage #1 #2 #3.{\global\Sh@rtPagePendingtrue
+		\global\Sh@rtPageNo=#1
+		\@toby{#2}{\Sh@rtPageLgt}{#3}{}}
+\def \ShortenThisPage #1 #2. {\global\Sh@rtPagetrue
+		\@toby{#1}{\vsize}{#2}{This}}
+
+%	Two cases: 0 = last page was nonstandard; reset \vsize
+%		   1 = do not reset \vsize: okay or length already reset
+\def \D@EndPage{\global\advancepageno
+	\T@stCount=1
+	\ifThisIsFirstPage \T@stCount=0 \global\ThisIsFirstPagefalse
+			\global\toplgt=\z@ \global\botlgt=\z@
+			\global\collgt=\normalcollgt \fi
+	\ifSh@rtPage \T@stCount=0 \global\Sh@rtPagefalse \fi
+	\ifSh@rtPagePending
+		\ifnum\pageno = \Sh@rtPageNo \T@stCount=1
+			\global\vsize=\Sh@rtPageLgt
+			\global\Sh@rtPagePendingfalse
+			\global\Sh@rtPagetrue \fi
+	\fi
+	\ifcase \T@stCount \resetpagelgt \fi }
+
+
+%	Distinuish between laser printer output (for proofing and other
+%	general use) and production, which uses a phototypesetter.
+
+\newif\ifLaser			\Lasertrue
+
+
+%	Registration marks
+
+\def \HorzR@gisterRule{\vrule height 0.2pt depth 0pt width 0.5in }
+\def \DownShortR@gisterRule{\vrule height 0.2pt depth 1pc width 0.2pt }
+\def \UpShortR@gisterRule{\vrule height 1pc depth 0pt width 0.2pt }
+
+
+%		``T'' marks centered on top and bottom edges of paper
+
+\def \ttopregister{\dlap{%
+	\hbox to \trimwd{\HorzR@gisterRule \hfil \HorzR@gisterRule
+			\HorzR@gisterRule \hfil \HorzR@gisterRule}%
+	\hbox to \trimwd{\hfil \DownShortR@gisterRule \hfil}}}
+\def \tbotregister{\ulap{%
+	\hbox to \trimwd{\hfil \UpShortR@gisterRule \hfil}%
+	\hbox to \trimwd{\HorzR@gisterRule \hfil \HorzR@gisterRule
+			\HorzR@gisterRule \hfil \HorzR@gisterRule}}}
+
+\def \topregister{\ttopregister}
+\def \botregister{\tbotregister}
+
+
+%	All pages containing data are formatted by \midpage
+
+\def \midpage#1{\vbox{%
+	\ifLaser \hrule height\z@ depth\z@ width\p@
+		\vskip-\rheadlgt
+	\else \vbox to \trimlgt \begingroup \basezero
+		\topregister
+		\vskip \headmargin
+	\fi
+	\vbox to \pagelgt{\basezero
+		\ifnum\xcol=2 \runhead
+		\else \vbox to \rheadlgt{}\fi
+		\ifThisIsFirstPage \firsthead \fi
+		\hbox to \pagewd{#1}%	% \vsize applied in \pagebody
+		\ifThisIsFirstPage \firstfoot \fi
+		\vfil		% if no depth, avoid underfull box
+		\runfoot }%
+	\ifLaser \else \vfill \botregister \endgroup \fi}%
+	\ifnum\xcol=2 \global\xcol=1 \D@EndPage
+	\else \global\xcol=2 \fi
+	\global\advance\spoolno by 1 }
+
+%	The production version includes trim marks, which are required
+%	on photographic paper, but are unsuitable for laser printer output.
+%	The production version also generates 2 separate .dvi pages for each
+%	logical page; these are overlaid photographically, and allow the
+%	Alphatype to run more efficiently on 2-column pages.
+%	For laser printer output, each page is output as a unit.
+
+
+\def \newcol{\par\vfill\eject}
+
+\newif\ifOneColFormat
+\newbox\SaveP@geBox
+
+\def \OneCol{\hsize=\colwd
+	\gdef\newpage{\par\vfill\eject}%
+	\OneColFormattrue
+	\gdef\output@{%
+		\ifLaser \xcol=2 \shipout\midpage{\hfil\pagebody \hfil}%
+		\else \shipout\midpage{\hfil\pagebody \hfil}%
+			\shipout\vbox to \trimlgt{\basezero
+				\topregister
+				\vskip\headmargin
+				\vbox to \pagelgt{\basezero
+					\runhead
+					\vfill }%
+				\vfill
+				\botregister }%
+			\D@EndPage
+			\global\xcol=1
+		\fi
+	\global\advance\spoolno by 1 }}
+
+\def \TwoCol{\hsize=\colwd
+	\gdef\newpage{\par\vfill\eject
+			\ifnum\xcol=2 \null\vfill\eject \fi }%
+	\OneColFormatfalse
+	\gdef\output@{%	% use PLAIN's \pagebody instead of \box255
+		\ifnum\xcol=1
+			\ifLaser \global\setbox\SaveP@geBox=\vbox{\pagebody}%
+				\global\xcol=2
+			\else \shipout\midpage{\pagebody \hfil}\fi
+		\else \shipout\midpage{\ifLaser \box\SaveP@geBox \fi
+				\hfil\pagebody }\fi
+		\ifnum\outputpenalty>-\@MM \else \dosupereject \fi }}
+
+
+%	Dates and other items which identify the volume and issue
+
+%	To use: \vol 5, 2.
+%		\issdate October 1984.
+%		\issueseqno=10
+%	For production, these are set in a separate file, TUGBOT.DATES,
+%	which is issue-specific.
+
+\def \v@lx{\gdef\volx{Volume~\volno~(\volyr), No.~\issno}}
+\def \volyr{}
+\def \volno{}
+\def \vol #1,#2.{\gdef\volno{#1\unskip}%
+	\gdef\issno{\ignorespaces#2\unskip}%
+	\setbox\TestBox=\hbox{\volyr}%
+	\ifdim \wd\TestBox > .2em \v@lx \fi }
+
+\def \issdate #1#2 #3.{\gdef\issdt{#1#2 #3}\gdef\volyr{#3}%
+	\gdef\bigissdt{#1{\smc\uppercase{#2}} #3}%
+	\setbox\TestBox=\hbox{\volno}%
+	\ifdim \wd\TestBox > .2em \v@lx \fi }
+
+
+%	TUGboat conventions include the issue number in the file name.
+%	Permit this to be incorporated into file names automatically.
+%	If issue number = 11, \Input filnam  will read tb11filnam.tex.
+
+\newcount\issueseqno		\issueseqno=-1
+
+\def \Input #1 {\ifnum\issueseqno<0 \def\infil@{#1}%
+		\else \def\infil@{tb\number\issueseqno#1}\fi
+		\input \infil@ }
+
+
+%	Write out (both to a file and to the log) the starting page number
+%	of an article, to be used for cross references and in contents.
+%	\pagexref  is used for articles fully processed in the TUGboat run.
+%	\PageXref  is used for "extra" pages, where an item is submitted
+%		as camera copy, and only running heads (at most) are run.
+\def \pagexref#1{\ifFirstPar \nobreak \fi  % don't clobber switch by accident
+	\write-1{\def\expandafter\noexpand\csname#1\endcsname{\number\pageno}}%
+	\write1{\def\expandafter\noexpand\csname#1\endcsname{\number\pageno}}%
+	\ifFirstPar \nobreak \fi }	% and don't allow page break
+\def \PageXref#1{%
+	\immediate\write-1{\def\expandafter
+			\noexpand\csname#1\endcsname{\number\pageno}}%
+	\immediate\write1{\def\expandafter
+			\noexpand\csname#1\endcsname{\number\pageno}}}
+
+
+%	Section titles and separators
+
+\newskip\Tabskss
+\Tabskss=0pt plus 1000pt minus 1000pt
+\newskip\AboveTitleSkip  \AboveTitleSkip=12pt	% 10pt plus 2pt minus 2pt
+\newskip\BelowTitleSkip  \BelowTitleSkip=8pt	% plus 1pt minus 1pt
+
+\setbox\T@stBox=\hbox{\titlefont O}
+\newdimen\stfontheight		\stfontheight=\ht\T@stBox
+\newdimen\strulethickness	\strulethickness=.6pt
+\def \sthrule{\hrule height\strulethickness depth 0pt }
+\def \stvrule{\vrule height 2\stfontheight depth\stfontheight
+			width\strulethickness }
+\def \sectitlebox #1<{\vbox{\sthrule
+	\hbox to \colwd{\stvrule\hfil #1\hfil\vrule width\strulethickness }%
+	\sthrule }}
+
+\newif\ifSecTitle
+\SecTitlefalse
+\def \sectitle #1<{\par \SecTitletrue
+	\penalty-1000\vskip 5\baselineskip
+	\centerline{\sectitlebox \titlefont #1<}%
+	\nobreak \vskip\baselineskip }
+
+%\def \secsep{\vskip\baselineskip	%  * * *  as for TUGboat pre 5#2
+%	\centerline{\hbox to 180pt{%
+%		\leaders\hbox to 15pt{\hfil\char'052\hfil}\hfill}}%
+%	\vskip2\baselineskip }
+
+\def \secsep{\vskip 5\baselineskip}
+
+\def \littlesep{\vskip 3pt plus 1pt minus 1pt
+	\centerline{\hbox to 90pt{\ignorespaces
+		\leaders\hbox to 10pt{\hfil .\hfil}\hfill} }%
+	\vskip 3pt plus 1pt minus 1pt}
+
+
+%	Titles, authors, subtitles, and first-paragraph formatting
+
+\newif\ifFirstPar	\FirstParfalse
+
+%		make the first paragraph after a title start flush left,
+%		then reset \parindent; but if all paragraphs should start
+%		flush left, then don't reset.
+\everypar{\ifNoParIndent
+	\else \ifFirstPar \NormalParIndent \FirstParfalse \fi
+	\fi }
+
+%	For uppercasing title and author; from AMSPPT.STY, version 0
+
+\def\uctext@#1{\uppercase@#1\gdef\uppercase@@{}$\m@th$}
+\def\uppercase@#1$#2${\gdef\uppercase@@{\uppercase@}\uppercase
+    {#1}${#2}$\uppercase@@}
+
+
+\newif\ifCtrTitle	\CtrTitlefalse
+\def \TitleUC{}			% ordinary titles uc/lc
+\def \titleframe #1#2#3{\ifSecTitle \SecTitlefalse
+	\else \vskip\AboveTitleSkip \fi
+	\ifCtrTitle \def\CTSkip{\unskip\hfil}\CtrTitlefalse
+	\else \def\CTSkip{}\fi
+	\vbox{#1\halign{\hbox to \hsize
+		{\bf\TitleUC{\CTSkip\ignorespaces##\unskip\hfil}}\strutt\cr
+			#2\crcr}}%
+	\let\oldcr=\cr\def\cr{}%
+	\setbox\T@stBox=\hbox{#3}%
+	\let\cr=\oldcr
+        \ifdim \wd\T@stBox < 5pt		% omit if author is null
+	\else \nobreak \vskip 4pt	% 4pt + \BelowTitleSkip = \baselineskip
+		\vbox{\halign{\hbox to \hsize
+			{\hskip\parindent\CTSkip\ignorespaces##\hfil}\cr
+				#3\crcr}}\fi
+	\setbox\T@stBox=\hbox{}%
+	\nobreak \vskip\BelowTitleSkip
+	\global\parindent=0pt \global\FirstPartrue }
+
+\def \title #1\\#2\endx{\titleframe{}{#1}{#2}}
+\def \Title #1\\#2\endx{\titleframe{\def\TitleUC{\uctext@}}{#1}{#2}}
+
+\def \ctrtitle #1\\#2\endx{\CtrTitletrue\titleframe{}{#1}{#2}}
+\def \ctrTitle #1\\#2\endx{\CtrTitletrue
+	\titleframe{\def\TitleUC{\uctext@}}{#1}{#2}}
+
+%	\subtitle and \subsubtitle are used in the announcements box
+
+\def \subtitle #1\endx{{\CtrTitletrue		% \AboveTitleSkip=10pt
+	\titleframe{}{#1}{}}}
+
+\def \subsubtitle #1\endx{{\CtrTitletrue
+	\ifFirstPar \AboveTitleSkip=0pt \fi	% \else \AboveTitleSkip=10pt
+	\titleframe{}{\sl#1}{}}}
+
+%	\section  was first defined for Jacques Desarmenien's article in 5#2
+\def\section #1 #2\par{\ifFirstPar \nobreak
+	\else \penalty-200 \vskip 8pt \fi
+	\noindent{\bf\hbox to \normalparindent{#1\hfil}#2}\endgraf
+	\nobreak \vskip 4pt \parindent=0pt \FirstPartrue }
+
+
+%	Define address blocks and other structures that use \obeylines
+%	in the context  \tag ...<
+%	This requires that < be active, so that \obeylines is invoked
+%	at the outer level.  \tag{...} will not deliver the data with
+%	^M (carriage return) intact, so is not a suitable format for
+%	any construction using \obeylines; the reference (if any) in
+%	The TeXbook has not been found, and this information has been
+%	determined empirically, referring to \obeylines constructions
+%	in PLAIN and MANMAC.TeX (The TeXbook macros).
+
+{\catcode`\<=\active \obeylines
+\gdef\AddrFrame#1#2{\endgraf\def\Phone{\leavevmode\kern\parindent}#1%
+	\catcode`\<=\active %
+%		next line intentionally ends with <cr> %
+	\def<{
+		\egroup\catcode`\<=12 #2 }\bgroup \obeylines }%
+\gdef\LetterAddr{\AddrFrame{\smallskip}{}}%
+\gdef\TextAddr{\AddrFrame{}{}}%
+\gdef\Submitted{\nobreak\AddrFrame{\smallskip \parindent=2\normalparindent %
+		\def\Signed{\parfillskip=\normalparindent \qquad\hfil }}{}}%
+\gdef\Columnist{\AddrFrame{\FirstParfalse %
+		\def\NetAddr{\smallskip \indent\indent }%
+		\def\Phone{\NetAddr }}%
+	{\nobreak \vskip\BelowTitleSkip %
+		\global\parindent=0pt \global\FirstPartrue }\sl }%
+}
+
+
+%	Support verbatim listing of TeX source, as defined in TeXbook, p. 421;
+%	lifted from MANMAC.TEX, and modified slightly for narrower columns.
+
+\chardef\other=12
+\def\ttverbatim{\begingroup
+  \catcode`\\=\other \catcode`\{=\other
+  \catcode`\}=\other \catcode`\$=\other \catcode`\&=\other
+  \catcode`\#=\other \catcode`\%=\other \catcode`\~=\other
+  \catcode`\_=\other \catcode`\^=\other
+  \obeyspaces \obeylines \tt}
+
+\newdimen\ttrightskip
+\ttrightskip=5pc
+   
+\outer\def\begintt{$$\let\par=\endgraf \ttverbatim \parskip=\z@
+  \catcode`\|=0 \rightskip=-\ttrightskip \ttfinish}
+{\catcode`\|=0 |catcode`|\=\other % | is temporary escape character
+  |obeylines % end of line is active
+  |gdef|ttfinish#1^^M#2\endtt{#1|vbox{#2}|endgroup$$}}
+
+\catcode`\|=\active
+{\obeylines \gdef|{\ttverbatim \spaceskip\ttglue \let^^M=\  \let|=\endgroup}}
+
+\newskip\ttglue
+{\tenpoint\tt \global\ttglue=.5em plus .25em minus .15em}
+% this should be installed in each font
+
+\chardef\bs='134		% for \tt mode
+
+
+%	Define a structure that will permit a list (using \obeylines)
+%	to be made into 2 columns, split by \vsplit, indented the
+%	normal \parindent
+
+\def \NormalizeBlockHeight{\TestCount=1				% \@ne
+	\TestDimen=\dimen0 \advance\TestDimen by-\topskip
+	\CutOneLine }
+\def \CutOneLine{\advance\TestCount by 1 \advance\TestDimen by-\baselineskip
+	\ifdim\TestDimen < \baselineskip			% \@ne
+		\def\result{\TestDimen=\baselineskip
+			\multiply\TestDimen by \TestCount
+			\advance\TestDimen by \topskip
+			\global\dimen0=\TestDimen }%
+	\else \def\result{\CutOneLine }\fi \result }
+
+\def \twosplit{{\topskip=\baselineskip \splittopskip=\topskip
+	\setbox0=\copy\TestBox
+	\dimen0=\ht\TestBox
+	\NormalizeBlockHeight
+	\divide\dimen0 by 2
+	\setbox\LeftHalf=\vsplit\TestBox to \dimen0
+	\ifdim\ht\TestBox > \ht\LeftHalf
+		\advance\dimen0 by \baselineskip
+		\setbox\TestBox=\copy0
+		\setbox\LeftHalf=\vsplit\TestBox to \dimen0
+	\fi
+	\line{\kern\parindent\valign{##\vfil\cr
+		\unvbox\LeftHalf\cr\noalign{\hfil}\unvbox\TestBox\cr}}}%
+	\global\setbox0=\null}
+
+\newbox\LeftHalf
+\newdimen\HalfWd
+\HalfWd=\twocolcolwd
+\advance\HalfWd by-\normalparindent
+\divide\HalfWd by 2
+
+{\obeylines
+\gdef\twouplist #1{\topskip=\baselineskip \splittopskip=\topskip %
+	\begingroup \parindent=0pt \obeylines
+%			next line ends with intentional <cr>
+	\def\endtwouplist{
+			\egroup % 		% end of \vbox
+			\endgroup %		% end of \obeylines group
+			\twosplit }%
+	\global\setbox\TestBox=\vbox\bgroup\hsize=\HalfWd %
+		\indent\vrule height\topskip width 0pt #1}%
+}
+
+
+%	Tags for special formatting of editor's notes, meeting
+%	attendees lists, etc.
+
+\def \Editor{\noindent To the Editor:\par}
+\def \EdN@te{{\tenupit Editor's note:\enspace }}
+\def \EdNote #1{\if #1[\unskip\hskip1em [\thinspace\EdN@te\ignorespaces
+	\else \ifFirstPar \else \medskip\noindent \fi
+		\EdN@te #1\fi }
+
+\def \Attendee #1 {\par \noindent\hangindent 2\normalparindent
+	\hbox to .5\normalparindent{\hfil #1\thinspace}\ignorespaces}
+
+\def \Dag{\raise .6ex\hbox{$\scriptstyle\dagger$}}
+
+
+%	Footnotes are mainly supported by PLAIN format, with these
+%	exceptions.
+
+\skip\footins=24pt		% full blank line
+\def\footnoterule{\kern-8pt
+        \hrule width 5pc \kern 7.6pt } % the \hrule is .4pt high
+
+
+%	Draw a box around a whole page, e.g. announcements page;
+%	format must be \onenarrow or \onemedium, and start on a new page.
+
+\def \bigbox{\hrule \hbox\bgroup \vrule\kern 1pc
+	\vbox\bgroup \vskip 1pc }
+\def \endbox{\endgraf \vskip 1pc \egroup \kern 1pc\vrule \egroup \hrule }
+
+
+%	Macros to produce extra running heads for stripping onto pages
+%	received as camera copy.  Format must be preset to \OneCol, and
+%	start on a new page.
+
+%	Generate 5 (4 + normal running head) per page.
+%	Although \pageno is mostly self-adjusting, adjust the count
+%	explicitly to accommodate running heads on first and last pages.
+
+\newcount\ExtraP@ges
+
+\def \DrawT@pLines{\vskip\topskip
+	\ulap{\line{\raise 1ex\rlap{\leaders\hrule\hskip\pagewd}%
+			\leaders\hrule\hfill}}\medskip}
+
+\def \r@nhead{\vbox to .23\vsize{\basezero \hsize=\pagewd \vfil
+	\topregister \vskip\headmargin \runhead \DrawT@pLines }\medskip
+	\advancepageno }
+
+\def \nextrunner{\advance\TestCount by 1
+	\ifnum\TestCount = 1 \DrawT@pLines \fi
+	\ifnum\pageno > \ExtraP@ges \def\result{\newpage }%
+	\else \def\result{\r@nhead 
+		\ifnum\TestCount = 4 \TestCount=0 \eject \fi
+		\nextrunner }\fi
+	\result }
+
+%	Since extra running heads are always started on a new page,
+%	there is always 1 `free' running head; if they require more
+%	than 1 page, the running head on the last page is also `free'.
+\def \ExtraRunheads #1, #2.{\ExtraP@ges=#1
+	\ifnum\ExtraP@ges > 5 \advance\ExtraP@ges by -2
+	\else \advance\ExtraP@ges by -2 \fi
+	\advance\ExtraP@ges by \pageno
+	\gdef\pageprefix{#2}%	% as in A-10 for appendices; not used just now
+	\TestCount=0 \nextrunner }
+
+
+\catcode`\@=12
+%		@ is prohibited in AMS-TeX, but should not be in TUGboat
+
+%	some hyphenation exceptions:
+\hyphenation{man-u-script man-u-scripts}
+
+\endinput
+
+\tracingonline=1
+\showbox255
