@@ -29,6 +29,8 @@ static char sccsid[] = "@(#)xlock.c	23.21 91/06/27 XLOCK";
  *		       Mountain View, CA  94043
  *
  * Revision History:
+ * 12-Aug-93: added fetchPass function to properly deal with shadow
+ *	      password files.  Also setup xlock to run with user's uid.
  * 23-Jul-93: ported to 386BSD, revised getlogin and getpwnam routines. 
  * 24-Jun-91: make foreground and background color get used on mono.
  * 24-May-91: added -usefirst.
@@ -130,6 +132,12 @@ static char sccsid[] = "@(#)xlock.c	23.21 91/06/27 XLOCK";
 extern char *crypt();
 extern char *getenv();
 
+#define PASSLENGTH 20
+
+static char userpass[PASSLENGTH];
+static char rootpass[PASSLENGTH];
+static char *user;
+
 char       *ProgramName;	/* argv[0] */
 perscreen   Scr[MAXSCREENS];
 Display    *dsp = NULL;		/* server display connection */
@@ -158,7 +166,6 @@ static int  ssinterval;
 static int  ssblanking;
 static int  ssexposures;
 
-#define PASSLENGTH 20
 #define FALLBACK_FONTNAME	"fixed"
 #define ICONW			64
 #define ICONH			64
@@ -410,20 +417,8 @@ static int
 getPassword()
 {
     char        buffer[PASSLENGTH];
-    char        userpass[PASSLENGTH];
-    char        rootpass[PASSLENGTH];
-    char       *user;
     XWindowAttributes xgwa;
     int         y, left, done;
-    struct passwd *pw;
-    int 	uid;
-
-    pw = getpwuid(0);
-    strcpy(rootpass, pw->pw_passwd);
-
-    pw = getpwuid(uid = getuid());
-    strcpy(userpass, pw->pw_passwd);
-    user = pw->pw_name;
 
     XGetWindowAttributes(dsp, win[screen], &xgwa);
 
@@ -637,7 +632,8 @@ main(argc, argv)
 	ProgramName++;
     else
 	ProgramName = argv[0];
-
+	fetchPass();
+	setuid(getuid());
     srandom(time((long *) 0));	/* random mode needs the seed set. */
 
     GetResources(argc, argv);
@@ -781,4 +777,18 @@ main(argc, argv)
     finish();
 
     return 0;
+}
+
+int fetchPass()
+{
+
+    struct passwd *pw;
+    int         uid;
+
+    pw = getpwuid(0);
+    strcpy(rootpass, pw->pw_passwd);
+
+    pw = getpwuid(uid = getuid());
+    strcpy(userpass, pw->pw_passwd);
+    user = pw->pw_name;
 }
