@@ -19,7 +19,7 @@ GAWK     = awk
 
 #CPPNAME = /lib/cpp
 #CPP     = $(CPPNAME) `$(CPPMAGIC) $(GETCPPSYMS) $(CPPNAME)` -P
-CPP     = $(CC) -E
+CPP     = $(CC) -traditional -E
 
 CPP_MAKEFILE = cpp-Makefile
 
