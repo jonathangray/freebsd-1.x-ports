@@ -37,7 +37,7 @@ target_canonical = i386--freebsd
 # this exact string is matched for by the "configure" script.
 srcdir = .
 
-prefix = /usr/local
+prefix = /usr/gnu
 
 exec_prefix = $(prefix)
 

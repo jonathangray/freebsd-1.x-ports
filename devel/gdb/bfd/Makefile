@@ -40,7 +40,7 @@ host_makefile_frag = config/i386bsd.mh
 
 srcdir = .
 
-prefix = /usr/local
+prefix = /usr/gnu
 
 exec_prefix = $(prefix)
 bindir = $(exec_prefix)/bin

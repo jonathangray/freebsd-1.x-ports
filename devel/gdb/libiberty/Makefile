@@ -41,7 +41,7 @@ target_canonical = i386--freebsd
 
 srcdir = .
 
-prefix = /usr/local
+prefix = /usr/gnu
 
 exec_prefix = $(prefix)
 bindir = $(exec_prefix)/bin

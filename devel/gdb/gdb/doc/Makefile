@@ -32,7 +32,7 @@ target_canonical = i386--freebsd
 
 srcdir = .
 
-prefix = /usr/local
+prefix = /usr/gnu
 
 infodir = $(prefix)/info
 

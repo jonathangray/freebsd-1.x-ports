@@ -33,7 +33,7 @@ target_canonical = i386--freebsd
 
 srcdir = .
 srcroot = $(srcdir)/..
-prefix = /usr/local
+prefix = /usr/gnu
 program_transform_name = 
 
 exec_prefix = $(prefix)

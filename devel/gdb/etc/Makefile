@@ -15,7 +15,7 @@ target_canonical = i386--freebsd
 # Makefile.in for etc
 #
 
-prefix = /usr/local
+prefix = /usr/gnu
 exec_prefix = $(prefix)
 
 srcdir = .

@@ -31,7 +31,7 @@ host_makefile_frag = config/i386/i386freebsd.mh
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-prefix = /usr/local
+prefix = /usr/gnu
 
 program_transform_name = 
 exec_prefix = $(prefix)
