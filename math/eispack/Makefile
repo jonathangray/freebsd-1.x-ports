@@ -1,4 +1,6 @@
 # EISPACK sources
+LIBDIR= /usr/local/lib
+NOPROFILE= no
 
 SHLIB_MAJOR= 1
 SHLIB_MINOR= 0
@@ -15,6 +17,9 @@ SRCS =	csroot.f epslon.f pythag.f bakvec.f balanc.f balbak.f bandr.f \
 	tql2.f tqlrat.f trbak1.f trbak3.f tred1.f tred2.f tred3.f tridib.f \
 	tsturm.f cdiv.f
 CLEANFILES+= *.c
+
+pkg:	all install pkg/+DESC pkg/+ONELINE pkg/+PLIST pkg/+REQ
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST -r pkg/+REQ eispack_bin
 
 .include <bsd.lib.mk>
 
