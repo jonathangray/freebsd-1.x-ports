@@ -27,7 +27,7 @@
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <sys/console.h>
+#include <machine/console.h>
 #include "dgl.h"
 #include "stdpalette.h"
 #include "driver.h"

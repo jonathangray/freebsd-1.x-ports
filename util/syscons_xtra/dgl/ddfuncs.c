@@ -22,7 +22,7 @@
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
-#include <sys/console.h>
+#include <machine/console.h>
 #include "dgl.h"
 #include "driver.h"
 

@@ -16,7 +16,7 @@
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
-#include <sys/console.h>
+#include <machine/console.h>
 
 extern int	getopt();
 extern char*	optarg;

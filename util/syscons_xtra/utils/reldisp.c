@@ -17,7 +17,7 @@
 #include <sys/types.h>
 #ifdef __386BSD__
 #include <sys/ioctl.h>
-#include <sys/console.h>
+#include <machine/console.h>
 #endif
 #ifdef M_I386
 #include <sys/vtkd.h>
