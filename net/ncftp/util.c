@@ -1,8 +1,8 @@
 /* Util.c */
 
 /*  $RCSfile: util.c,v $
- *  $Revision: 1.3 $
- *  $Date: 1994/04/10 22:14:54 $
+ *  $Revision: 1.4 $
+ *  $Date: 1994/06/01 22:20:35 $
  */
 
 #include "sys.h"
@@ -331,13 +331,18 @@ unsigned long UnLSDate(char *dstr)
 		(void) sscanf(cp, "%d", &year);
 		year -= 1900;
 	}
+	/* Copy the whole structure of the 'tm' pointed to by t, so it will
+	 * also set all fields we don't specify explicitly to be the same as
+	 * they were in t.  That way we copy non-standard fields such as
+	 * tm_gmtoff, if it exists or not.
+	 */
+	ut = *t;
 	ut.tm_sec = 1;
 	ut.tm_min = min;
 	ut.tm_hour = hr;
 	ut.tm_mday = day;
 	ut.tm_mon = mon;
 	ut.tm_year = year;
-	ut.tm_isdst = t->tm_isdst;
 	ut.tm_wday = ut.tm_yday = 0;
 	mt = mktime(&ut);
 	if (mt != (time_t) -1)
@@ -361,6 +366,9 @@ unsigned long UnMDTMDate(char *dstr)
 	time_t mt;
 	unsigned long result = MDTM_UNKNOWN;
 
+	/* Clear out the whole structure, along with any non-standard fields. */
+	bzero((char *)&ut, sizeof (struct tm));
+
 	if (sscanf(dstr, "%*s %04d%02d%02d%02d%02d%02d",
 		&ut.tm_year,
 		&ut.tm_mon,
@@ -371,9 +379,6 @@ unsigned long UnMDTMDate(char *dstr)
 	{	
 		--ut.tm_mon;
 		ut.tm_year -= 1900;
-
-		ut.tm_isdst = 0;	/* Hmmm.... */
-		ut.tm_wday = ut.tm_yday = 0;
 		mt = mktime(&ut);
 		if (mt != (time_t) -1)
 			result = (unsigned long) mt;
@@ -873,7 +878,7 @@ aa:			cp = LocalPath(path);
 #ifdef NO_STRSTR
 
 /*
- *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.4 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor

@@ -1,13 +1,13 @@
 /* main.c */
 
 /*  $RCSfile: main.c,v $
- *  $Revision: 1.3 $
- *  $Date: 1994/04/10 22:14:46 $
+ *  $Revision: 1.4 $
+ *  $Date: 1994/06/01 22:20:23 $
  */
 
 #define _main_c_
 
-#define FTP_VERSION "1.7.2 (April 5, 1994)"
+#define FTP_VERSION "1.7.5 (May 28, 1994)"
 
 /* #define BETA 1 */ /* If defined, it prints a little warning message. */
 
@@ -406,8 +406,21 @@ int getuserinfo(void)
 	home = uinfo.homedir;	/* for glob.c */
 	pw = NULL;
 #ifdef USE_GETPWUID
+	/* Try to use getpwuid(), but if we have to, fall back to getpwnam(). */
 	pw = getpwuid(getuid());
+	if (pw == NULL) {
+		/* Oh well, try getpwnam() then. */
+		cp = getlogin();
+		if (cp == NULL) {
+			cp = getenv("LOGNAME");
+			if (cp == NULL)
+				cp = getenv("USER");
+		}
+		if (cp != NULL)
+			pw = getpwnam(cp);
+	}
 #else
+	/* Try to use getpwnam(), but if we have to, fall back to getpwuid(). */
 	cp = getlogin();
 	if (cp == NULL) {
 		cp = getenv("LOGNAME");
@@ -416,6 +429,10 @@ int getuserinfo(void)
 	}
 	if (cp != NULL)
 		pw = getpwnam(cp);
+	if (pw == NULL) {
+		/* Oh well, try getpwuid() then. */
+		pw = getpwuid(getuid());
+	}
 #endif
 	if (pw != NULL) {
 		uinfo.uid = pw->pw_uid;
@@ -1067,7 +1084,7 @@ void termcap_init(void)
 		(void) termcap_get(&tcap_normal, "meuese");
 		if (termcap_get(&tcap_boldface, "md") < 0) {
 			/* Dim-mode is better than nothing... */
-			(void) termcap_get(&tcap_normal, "mh");
+			(void) termcap_get(&tcap_boldface, "mh");
 		}
 		(void) termcap_get(&tcap_underline, "us");
 		(void) termcap_get(&tcap_reverse, "so");

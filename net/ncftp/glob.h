@@ -4,8 +4,8 @@
 #define _glob_h_ 1
 
 /*  $RCSfile: glob.h,v $
- *  $Revision: 1.3 $
- *  $Date: 1994/04/10 22:14:45 $
+ *  $Revision: 1.4 $
+ *  $Date: 1994/06/01 22:20:22 $
  */
 
 char **glob(char *v);

@@ -1,8 +1,8 @@
 /* ftp.c */
 
 /*  $RCSfile: ftp.c,v $
- *  $Revision: 1.3 $
- *  $Date: 1994/04/10 22:14:38 $
+ *  $Revision: 1.4 $
+ *  $Date: 1994/06/01 22:20:11 $
  */
 
 #include "sys.h"
@@ -176,6 +176,7 @@ int hookup(char *host, unsigned int port)
 	register struct hostent *hp = 0;
 	int s, len, hErr = -1;
 	string errstr;
+	char **curaddr;
 
 	bzero((char *)&hisctladdr, sizeof (hisctladdr));
 #ifdef BAD_INETADDR
@@ -202,8 +203,8 @@ int hookup(char *host, unsigned int port)
 			goto done;
 		}
 		hisctladdr.sin_family = hp->h_addrtype;
-		bcopy(hp->h_addr_list[0],
-		    (caddr_t)&hisctladdr.sin_addr, hp->h_length);
+		curaddr = hp->h_addr_list;
+		bcopy(*curaddr, (caddr_t)&hisctladdr.sin_addr, hp->h_length);
 		(void) Strncpy(hostname, hp->h_name);
 	}
 	s = socket(hisctladdr.sin_family, SOCK_STREAM, 0);
@@ -217,15 +218,13 @@ int hookup(char *host, unsigned int port)
 #else
 	while (Connect(s, &hisctladdr, sizeof (hisctladdr)) < 0) {
 #endif
-		if (hp && hp->h_addr_list[1]) {
+		curaddr++;
+		if (*curaddr != (char *)0) {
 			(void) sprintf(errstr, "connect error to address %s",
 				inet_ntoa(hisctladdr.sin_addr));
 			PERROR("hookup", errstr);
-			hp->h_addr_list++;
-			bcopy(hp->h_addr_list[0],
-			     (caddr_t)&hisctladdr.sin_addr, hp->h_length);
-			(void) fprintf(stdout, "Trying %s...\n",
-				inet_ntoa(hisctladdr.sin_addr));
+			bcopy(*curaddr, (caddr_t)&hisctladdr.sin_addr, hp->h_length);
+			dbprintf("Trying %s...\n", inet_ntoa(hisctladdr.sin_addr));
 			(void) close(s);
 			s = socket(hisctladdr.sin_family, SOCK_STREAM, 0);
 			if (s < 0) {
@@ -327,17 +326,6 @@ int Login(char *userNamePtr, char *passWordPtr, char *accountPtr, int doInit)
 		}
 	}
 
-	if (passWordPtr == NULL) {
-		if (((strcmp("anonymous", userName) == 0) ||
-			 (strcmp("ftp", userName) == 0)) && (*anon_password != '\0'))
-			passWordPtr = anon_password;
-		else {
-			/* Prompt for a password. */
-			++userWasPrompted;
-			passWordPtr = Getpass("Password:");
-		}
-	}
-
 #ifdef GATEWAY
 	if (*gateway)
 		(void) sprintf(str, "USER %s@%s",
@@ -350,6 +338,17 @@ int Login(char *userNamePtr, char *passWordPtr, char *accountPtr, int doInit)
 	/* Send the user name. */
 	n = command(str);
 	if (n == CONTINUE) {
+		if (passWordPtr == NULL) {
+			if (((strcmp("anonymous", userName) == 0) ||
+			     (strcmp("ftp", userName) == 0)) && (*anon_password != '\0'))
+				passWordPtr = anon_password;
+			else {
+				/* Prompt for a password. */
+				++userWasPrompted;
+				passWordPtr = Getpass("Password:");
+			}
+		}
+
 		/* The remote site is requesting us to send the password now. */
 		(void) sprintf(str, "PASS %s", passWordPtr);
 		n = command(str);
@@ -617,6 +616,7 @@ int getreply(int expecteof)
 					switch (thiscode) {
 						case 230:
 						case 214:
+						case 331:
 						case 332:
 						case 421:	/* For ftp.apple.com, etc. */
 							dp = reply_string;
@@ -928,7 +928,7 @@ void end_progress(char *direction, char *local, char *remote)
         Strncpy(infoPart1, uinfo.username);
         if (receiving) {
             Strncat(infoPart1, " received ");
-            Strncpy(infoPart1, fullRemote);
+            Strncat(infoPart1, fullRemote);
             Strncat(infoPart1, " as ");
             Strncat(infoPart1, fullLocal);
             Strncat(infoPart1, " from ");

@@ -1,7 +1,20 @@
-v1.7.2 - April, 1994.  Bytes/sec is now correct.  Fixed error when
+v1.7.5 - May 28, 1994.  Fixed a rare problem with dimmed text.  Fixed
+  compilation problem with Dynix.  Defining the domain name now takes
+  precedence over the getdomainname() function.
+
+v1.7.4 - May 16, 1994.  Tweaked hookup() a bit, to (try to) handle
+  hosts with multiple addresses better.  Fixed error with GMT offsets.
+  Fixed 'addr_t' typo in SVR4 section.  Moved SVR4 block down in sys.h.
+
+v1.7.3 - April 13, 1994.  Fixed minor error in syslog reporting.
+  Trying both getpwnam() and getpwuid(), instead of just one of them,
+  increasing the probability the program can get your passwd entry.
+  Better compatibility with other types of password input devices.
+
+v1.7.2 - April 5, 1994.  Bytes/sec is now correct.  Fixed error when
   NO_VARARGS was defined.  Added support for <varargs.h>.
 
-v1.7.1 - March 27, 1994.  Defining DOMAIN_NAME for NeXT.  Term hack can
+v1.7.1 - March 27, 1994.  Defining HAS_DOMAINNAME for NeXT.  Term hack can
   share sockets, plus some term stuff added to the Makefile.  Trimmed
   some old stuff from the patchlevel.h file, and putting new versions
   first now. Smarter about determining abbreviations from local hostnames.

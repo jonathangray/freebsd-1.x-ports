@@ -3,24 +3,10 @@
  */
 
 /*  $RCSfile: sys.h,v $
- *  $Revision: 1.3 $
- *  $Date: 1994/04/10 22:14:52 $
+ *  $Revision: 1.4 $
+ *  $Date: 1994/06/01 22:20:32 $
  */
 
-#ifdef SVR4
-#	define System "System V.4"
-#	ifndef SYSV
-#		define SYSV 1
-#	endif
-#	define VOID void
-#	ifndef HERROR
-#		define HERROR 1
-#	endif
-#	ifdef TERMH
-#		define TERMH 1
-#	endif
-#	define Gettimeofday gettimeofday
-#endif  /* SVR4 */
 
 #ifdef __sun
 #	ifndef sun
@@ -30,6 +16,9 @@
 
 #ifdef sun
 #	if !defined(__GNUC__) && !defined(__STDC__) && !defined(SunOverride)
+	/* If you choke here, but you know what you're doing, just
+	 * define SunOverride.
+	 */
 	^^^ "You need to use an ANSI C compiler.  Try using gcc or acc." ^^^
 #	endif
 #	ifdef Solaris	/* not predefined. */
@@ -341,6 +330,27 @@ extern int errno;
 #	endif
 #endif
 
+#ifdef SVR4
+#	ifndef System
+#		define System "System V.4"
+#	endif
+#	ifndef SYSV
+#		define SYSV 1
+#	endif
+#	ifndef VOID
+#		define VOID void
+#	endif
+#	ifndef HERROR
+#		define HERROR 1
+#	endif
+#	ifdef TERMH
+#		define TERMH 1
+#	endif
+#	ifndef Gettimeofday
+#		define Gettimeofday gettimeofday
+#	endif
+#endif  /* SVR4 */
+
 #ifdef SYSV
 #	ifndef RINDEX
 #		define RINDEX 1
@@ -436,7 +446,7 @@ extern int errno;
 #	define Bind(a,b,c) (bind((a), (struct sockaddr *)(b), (int)(c)))
 #	define Accept(a,b,c) (accept((a), (struct sockaddr *)(b), (int *)(c)))
 #else  /* SVR4 */
-#	define Connect(a,b,c) (connect((a), (addr_t)(b), (int)(c)))
+#	define Connect(a,b,c) (connect((a), (caddr_t)(b), (int)(c)))
 #	define Bind(a,b,c) (bind((a), (caddr_t)(b), (int)(c)))
 #	define Accept(a,b,c) (accept((a), (caddr_t)(b), (int *)(c)))
 #endif	/* SVR4 */

@@ -1,8 +1,8 @@
 /* tips.c */
 
 /*  $RCSfile: tips.c,v $
- *  $Revision: 1.3 $
- *  $Date: 1994/04/10 22:14:53 $
+ *  $Revision: 1.4 $
+ *  $Date: 1994/06/01 22:20:33 $
  */
 
 #include "sys.h"
@@ -105,8 +105,8 @@ static char *tiplist[] = {
      the rc file, while still letting you use sitename abbreviations.",
 
     "You can use World Wide Web style paths instead of colon-mode paths.\n\
-     For example, if the colon-mode path was 'cse.unl.edu:pub/mgleason/ncftp,'\n\
-     the WWW-style path would be 'ftp://cse.unl.edu/pub/mgleason/ncftp.'",
+     For example, if the colon-mode path was 'cse.unl.edu:pub/mgleason/ncftp',\n\
+     the WWW-style path would be 'ftp://cse.unl.edu/pub/mgleason/ncftp'.",
 
     "Sick and tired of these tips?  Put '#unset tips' in your .ncftprc."
 };

@@ -1,8 +1,8 @@
 /* cmds.c */
 
 /*  $RCSfile: cmds.c,v $
- *  $Revision: 1.3 $
- *  $Date: 1994/04/10 22:14:33 $
+ *  $Revision: 1.4 $
+ *  $Date: 1994/06/01 22:20:04 $
  */
 
 #include "sys.h"
@@ -1784,8 +1784,7 @@ to be the full name of your hostname.\n");
 			(void) getdomainname(domain, sizeof(domain) - 1);
 #endif
 #ifdef DOMAIN_NAME
-			if (domain[0] == '\0')
-				(void) Strncpy(domain, DOMAIN_NAME);
+			(void) Strncpy(domain, DOMAIN_NAME);
 #endif
 			if (index(host, '.') == NULL) {
 				/* If the hostname has periods we'll assume that the
