@@ -78,7 +78,7 @@ LIBS = -L. -ltk -L$(TCL_BIN_DIR) -ltcl $(X11_LIB_SWITCHES)  -lm
 
 # To change the compiler switches, for example to change from -O
 # to -g, change the following line:
-CFLAGS = -O2 -m486
+CFLAGS = -O2
 PICFLAGS=-DPIC -fpic
 
 # To turn off the security checks that disallow incoming sends when
