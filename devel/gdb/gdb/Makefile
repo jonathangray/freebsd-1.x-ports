@@ -785,7 +785,7 @@ m2-exp.tab.o: m2-exp.tab.c
 # dependency, a parallel make will attempt to build both at the same
 # time and the second yacc will pollute the first y.tab.c file.
 m2-exp.tab.c: m2-exp.y Makefile.in ch-exp.tab.c
-	$(YACC) $(YFLAGS) m2_ $(srcdir)/m2-exp.y
+	$(YACC) $(YFLAGS) -p m2_ $(srcdir)/m2-exp.y
 	-sed -e '/extern.*malloc/d' \
 	     -e '/extern.*realloc/d' \
 	     -e '/extern.*free/d' \
