@@ -1,16 +1,16 @@
 # This file was generated automatically by configure.  Do not edit.
 VPATH = .
 links = 
-host_alias = i386--netbsd
+host_alias = i386--freebsd
 host_cpu = i386
 host_vendor = 
-host_os = netbsd
-host_canonical = i386--netbsd
-target_alias = i386--netbsd
+host_os = freebsd
+host_canonical = i386--freebsd
+target_alias = i386--freebsd
 target_cpu = i386
 target_vendor = 
-target_os = netbsd
-target_canonical = i386--netbsd
+target_os = freebsd
+target_canonical = i386--freebsd
 #
 # Makefile for directory with subdirs to build.
 #   Copyright (C) 1990, 1991, 1992, 1993 Free Software Foundation
@@ -37,7 +37,7 @@ prefix = /usr/local
 exec_prefix = $(prefix)
 bindir = $(exec_prefix)/bin
 libdir = $(exec_prefix)/lib
-tooldir = $(exec_prefix)/i386--netbsd
+tooldir = $(exec_prefix)/i386--freebsd
 
 program_transform_name = 
 
@@ -56,7 +56,7 @@ infodir = $(prefix)/info
 includedir = $(prefix)/include
 docdir = $(datadir)/doc
 
-SHELL = /bin/sh
+SHELL = /bin/bash
 
 INSTALL = $${srcroot}/install.sh -c
 INSTALL_PROGRAM = $(INSTALL)
@@ -75,7 +75,7 @@ NM = nm
 MUNCH_NM = $(NM)
 GZIP = gzip
 
-BISON = bison -y
+BISON = yacc
 LEX = `if [ -f $${rootme}/flex/flex ] ; \
 	then echo $${rootme}/flex/flex ; \
 	else echo flex ; fi`

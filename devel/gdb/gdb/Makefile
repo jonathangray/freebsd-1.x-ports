@@ -1,18 +1,18 @@
 # This file was generated automatically by configure.  Do not edit.
 VPATH = .
 links =  xm.h tm.h nm.h
-host_alias = i386--netbsd
+host_alias = i386--freebsd
 host_cpu = i386
 host_vendor = 
-host_os = netbsd
-host_canonical = i386--netbsd
-target_alias = i386--netbsd
+host_os = freebsd
+host_canonical = i386--freebsd
+target_alias = i386--freebsd
 target_cpu = i386
 target_vendor = 
-target_os = netbsd
-target_canonical = i386--netbsd
-target_makefile_frag = config/i386/i386bsd.mt
-host_makefile_frag = config/i386/i386bsd.mh
+target_os = freebsd
+target_canonical = i386--freebsd
+target_makefile_frag = config/i386/i386freebsd.mt
+host_makefile_frag = config/i386/i386freebsd.mh
 #Copyright 1989, 1990, 1991, 1992, 1993 Free Software Foundation, Inc.
 
 # This file is part of GDB.
@@ -37,7 +37,7 @@ program_transform_name =
 exec_prefix = $(prefix)
 bindir = $(exec_prefix)/bin
 libdir = $(exec_prefix)/lib
-tooldir = $(exec_prefix)/i386--netbsd
+tooldir = $(exec_prefix)/i386--freebsd
 
 datadir = $(prefix)/lib
 mandir = $(prefix)/man
@@ -54,7 +54,7 @@ infodir = $(prefix)/info
 includedir = $(prefix)/include
 docdir = $(datadir)/doc
 
-SHELL = /bin/sh
+SHELL = /bin/bash
 
 INSTALL = `cd $(srcdir)/..;pwd`/install.sh -c
 INSTALL_PROGRAM = $(INSTALL)
@@ -212,14 +212,14 @@ REMOTE_O = remote.o dcache.o remote-utils.o
 
 # Host and target-dependent makefile fragments come in here.
 ####
-# Target: Intel 386 running BSD
-TDEPFILES= i386-tdep.o i386-pinsn.o
+# Target: Intel 386 running FreeBSD
+TDEPFILES= i386-tdep.o i386-pinsn.o freebsd-solib.o
 TM_FILE= tm-i386bsd.h
 # Host: Intel 386 running 386BSD
 XDEPFILES= 
-NATDEPFILES= exec.o fork-child.o infptrace.o inftarg.o corelow.o coredep.o i386b-nat.o
+NATDEPFILES= exec.o fork-child.o infptrace.o inftarg.o corelow.o coredep.o freebsd-nat.o
 XM_FILE= xm-i386bsd.h
-NAT_FILE= nm-i386bsd.h
+NAT_FILE= nm-freebsd.h
 REGEX=regex.o
 REGEX1=regex.o
 # End of host and target-dependent makefile fragments
@@ -745,7 +745,7 @@ version.c: Makefile
 c-exp.tab.o: c-exp.tab.c
 c-exp.tab.c: c-exp.y Makefile.in
 	@echo 'Expect 6 shift/reduce conflicts.'
-	$(YACC) $(YFLAGS) $(srcdir)/c-exp.y
+	$(YACC) $(YFLAGS) -p c_ $(srcdir)/c-exp.y
 	-sed -e '/extern.*malloc/d' \
 	     -e '/extern.*realloc/d' \
 	     -e '/extern.*free/d' \
@@ -765,7 +765,7 @@ ch-exp.tab.o: ch-exp.tab.c
 # dependency, a parallel make will attempt to build both at the same
 # time and the second yacc will pollute the first y.tab.c file.
 ch-exp.tab.c: ch-exp.y Makefile.in c-exp.tab.c
-	$(YACC) $(YFLAGS) $(srcdir)/ch-exp.y
+	$(YACC) $(YFLAGS) -p ch_ $(srcdir)/ch-exp.y
 	-sed -e '/extern.*malloc/d' \
 	     -e '/extern.*realloc/d' \
 	     -e '/extern.*free/d' \
@@ -785,7 +785,7 @@ m2-exp.tab.o: m2-exp.tab.c
 # dependency, a parallel make will attempt to build both at the same
 # time and the second yacc will pollute the first y.tab.c file.
 m2-exp.tab.c: m2-exp.y Makefile.in ch-exp.tab.c
-	$(YACC) $(YFLAGS) $(srcdir)/m2-exp.y
+	$(YACC) $(YFLAGS) m2_ $(srcdir)/m2-exp.y
 	-sed -e '/extern.*malloc/d' \
 	     -e '/extern.*realloc/d' \
 	     -e '/extern.*free/d' \
@@ -833,7 +833,7 @@ ALLDEPFILES = 29k-share/udi/udip2soc.c 29k-share/udi/udr.c \
 	arm-pinsn.c arm-tdep.c arm-xdep.c coff-solib.c convex-pinsn.c \
 	convex-tdep.c \
 	convex-xdep.c core-svr4.c coredep.c corelow.c dcache.c delta68-nat.c \
-	dpx2-nat.c exec.c fork-child.c \
+	dpx2-nat.c exec.c fork-child.c freebsd-solib.c freebsd-nat.c \
 	go32-xdep.c gould-pinsn.c gould-xdep.c h8300-tdep.c h8500-tdep.c \
 	hp300ux-nat.c hppa-pinsn.c hppa-tdep.c hppab-nat.c hppah-nat.c \
 	i386-pinsn.c i386-tdep.c i386b-nat.c i386mach-nat.c i386v-nat.c \
@@ -1112,6 +1112,11 @@ findvar.o: findvar.c $(defs_h) $(gdbcore_h) $(inferior_h) target.h
 
 fork-child.o: fork-child.c $(wait_h) $(defs_h) $(gdbcore_h) \
 	$(inferior_h) target.h terminal.h
+
+freebsd-solib.o: freebsd-solib.c $(command_h) $(defs_h) $(gdbcore_h) \
+	$(inferior_h) objfiles.h regex.h symfile.h target.h
+
+freebsd-nat.o: freebsd-nat.c $(defs_h) 
 
 gdbtypes.o: gdbtypes.c $(bfd_h) complaints.h $(defs_h) $(expression_h) \
 	$(gdbtypes_h) language.h objfiles.h symfile.h $(symtab_h) target.h \

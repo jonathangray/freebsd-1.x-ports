@@ -1,22 +1,22 @@
 WORDSIZE=32
 ALL_BACKENDS=$(BFD32_BACKENDS)
-BFD_BACKENDS= netbsd386.o aout32.o stab-syms.o
+BFD_BACKENDS= freebsd386.o aout32.o stab-syms.o
 BFD_MACHINES= cpu-i386.o
-TDEFAULTS = -DDEFAULT_VECTOR=netbsd386_vec -DSELECT_VECS='&netbsd386_vec' -DSELECT_ARCHITECTURES='bfd_i386_arch'
+TDEFAULTS = -DDEFAULT_VECTOR=freebsd386_vec -DSELECT_VECS='&freebsd386_vec' -DSELECT_ARCHITECTURES='bfd_i386_arch'
 # This file was generated automatically by configure.  Do not edit.
 VPATH = .
 links = sysdep.h
-host_alias = i386--netbsd
+host_alias = i386--freebsd
 host_cpu = i386
 host_vendor = 
-host_os = netbsd
-host_canonical = i386--netbsd
-target_alias = i386--netbsd
+host_os = freebsd
+host_canonical = i386--freebsd
+target_alias = i386--freebsd
 target_cpu = i386
 target_vendor = 
-target_os = netbsd
-target_canonical = i386--netbsd
-target_makefile_frag = ./config/i386-netbsd.mt
+target_os = freebsd
+target_canonical = i386--freebsd
+target_makefile_frag = ./config/i386-freebsd.mt
 host_makefile_frag = config/i386bsd.mh
 #    Makefile template for Configure for the BFD library.
 #    Copyright (C) 1990, 1991, 1992, 1993 Free Software Foundation, Inc.
@@ -62,7 +62,7 @@ includedir = $(prefix)/include
 oldincludedir =
 docdir = doc
 
-SHELL = /bin/sh
+SHELL = /bin/bash
 
 INSTALL = install -c
 INSTALL_PROGRAM = $(INSTALL)
@@ -165,6 +165,7 @@ BFD32_BACKENDS = \
 	i386lynx.o \
 	i386lynx-cf.o \
 	netbsd386.o \
+	freebsd386.o \
 	i386mach3.o \
 	ieee.o \
 	m68klynx.o \
@@ -209,7 +210,7 @@ all:
 #### host and target dependent Makefile fragments come in here.
 # Target:  Intel 386 running netbsd, using (modified) a.out
 
-DEFAULT_VECTOR=netbsd386_vec
+DEFAULT_VECTOR=freebsd386_vec
 SELECT_ARCHITECTURES=bfd_i386_arch
 HDEFINES=-DTRAD_CORE
 HDEPFILES=trad-core.o
@@ -243,7 +244,7 @@ CFILES = libbfd.c opncls.c bfd.c archive.c targets.c cache.c \
 	 coff-a29k.c coff-rs6000.c coffgen.c format.c \
 	 section.c core.c syms.c stab-syms.c reloc.c init.c ctor.c \
 	 seclet.c coff-m88k.c coff-mips.c coff-sh.c trad-core.c newsos3.c \
-	 i386aout.c i386linux.c netbsd386.c i386mach3.c bout.c aout-adobe.c coff-we32k.c \
+	 i386aout.c i386linux.c netbsd386.c freebsd386.c i386mach3.c bout.c aout-adobe.c coff-we32k.c \
 	 i386bsd.c cpu-h8300.c cpu-i960.c cpu-sparc.c cpu-m68k.c \
 	 cpu-m88k.c cpu-vax.c cpu-mips.c cpu-a29k.c cpu-i386.c \
 	 cpu-rs6000.c coff-h8300.c som.c cpu-hppa.c cpu-we32k.c reloc16.c \
@@ -616,6 +617,10 @@ i386linux.o : i386linux.c \
  $(INCDIR)/aout/stab_gnu.h $(INCDIR)/aout/stab.def \
  $(INCDIR)/aout/ar.h libaout.h aout-target.h
 netbsd386.o : netbsd386.c \
+ libaout.h \
+ aout-target.h $(INCDIR)/aout/aout64.h $(INCDIR)/aout/stab_gnu.h \
+ $(INCDIR)/aout/stab.def $(INCDIR)/aout/ar.h
+freebsd386.o : freebsd386.c \
  libaout.h \
  aout-target.h $(INCDIR)/aout/aout64.h $(INCDIR)/aout/stab_gnu.h \
  $(INCDIR)/aout/stab.def $(INCDIR)/aout/ar.h

@@ -1,16 +1,16 @@
 # This file was generated automatically by configure.  Do not edit.
 VPATH = .
 links = 
-host_alias = i386--netbsd
+host_alias = i386--freebsd
 host_cpu = i386
 host_vendor = 
-host_os = netbsd
-host_canonical = i386--netbsd
-target_alias = i386--netbsd
+host_os = freebsd
+host_canonical = i386--freebsd
+target_alias = i386--freebsd
 target_cpu = i386
 target_vendor = 
-target_os = netbsd
-target_canonical = i386--netbsd
+target_os = freebsd
+target_canonical = i386--freebsd
 ##Copyright (C) 1991, 1992 Free Software Foundation, Inc.
 
 # Makefile for GDB documentation.
@@ -36,7 +36,7 @@ prefix = /usr/local
 
 infodir = $(prefix)/info
 
-SHELL = /bin/sh
+SHELL = /bin/bash
 
 INSTALL = install -c
 INSTALL_PROGRAM = $(INSTALL)
