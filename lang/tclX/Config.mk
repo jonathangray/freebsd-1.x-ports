@@ -22,7 +22,7 @@
 # software for any purpose.  It is provided "as is" without express or
 # implied warranty.
 #------------------------------------------------------------------------------
-# $Id: Config.mk,v 1.2 1994/07/05 14:25:06 ache Exp $
+# $Id: Config.mk,v 1.3 1994/07/05 14:55:25 ache Exp $
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -112,7 +112,7 @@ CCPLUS=g++
 # built from the outside. A directory whose name is the TclX version number
 # will be built in this directory.
 #
-TCL_MASTERDIR=${prefix}/tclX
+TCL_MASTERDIR=${prefix}/lib/tclX
 
 #------------------------------------------------------------------------------
 # The master Tk directory that the Tk runtime files are installed into.
@@ -120,7 +120,7 @@ TCL_MASTERDIR=${prefix}/tclX
 # built from the outside. A directory whose name is the TkX version number
 # will be built in this directory.
 
-TK_MASTERDIR=${prefix}/tkX
+TK_MASTERDIR=${prefix}/lib/tkX
 
 #------------------------------------------------------------------------------
 # # The directory to install the tcl, wishx and tclhelp binaries into.
