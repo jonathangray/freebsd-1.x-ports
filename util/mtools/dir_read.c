@@ -37,8 +37,8 @@ unsigned int num;
 	register int i, length;
 	unsigned int next, fat_decode();
 	unsigned char *offset;
-	char *malloc();
-	void free(), perror(), exit(), disk_read(), dir_flush();
+	char *realloc();
+	void perror(), exit(), disk_read(), dir_flush();
 
 	length = 0;
 	/* CONSTCOND */
@@ -70,10 +70,9 @@ unsigned int num;
 	if (dir_dirty)
 		dir_flush();
 					/* fill the dir_buf */
-	free((char *) dir_buf);
-	dir_buf = (unsigned char *) malloc((unsigned int) length * MSECTOR_SIZE);
+	dir_buf = (unsigned char *) realloc(dir_buf, (unsigned int) length * MSECTOR_SIZE);
 	if (dir_buf == NULL) {
-		perror("fill_chain: malloc");
+		perror("fill_chain: realloc");
 		exit(1);
 	}
 
@@ -95,8 +94,8 @@ reset_chain(code)
 int code;
 {
 	register int i;
-	char *malloc();
-	void free(), disk_read(), dir_flush(), exit(), perror();
+	char *malloc(), *realloc();
+	void disk_read(), dir_flush(), exit(), perror();
 
 	if (dir_dirty)
 		dir_flush();
@@ -105,9 +104,9 @@ int code;
 		dir_chain[i] = (long) dir_start + i;
 
 	if (code == OLD)
-		free((char *) dir_buf);
-
-	dir_buf = (unsigned char *) malloc((unsigned int) dir_len * MSECTOR_SIZE);
+		dir_buf = (unsigned char *) realloc(dir_buf, (unsigned int) dir_len * MSECTOR_SIZE);
+	else
+		dir_buf = (unsigned char *) malloc((unsigned int) dir_len * MSECTOR_SIZE);
 	if (dir_buf == NULL) {
 		perror("reset_chain: malloc");
 		exit(1);

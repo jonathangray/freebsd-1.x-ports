@@ -33,7 +33,7 @@ char drive;
 int mode;
 {
 	int fat_start, tracks, heads, sectors, old_dos;
-	char *malloc(), *name, *expand();
+	char buf[256], *malloc(), *name, *expand();
 	void perror(), exit(), reset_chain(), free(), fat_read();
 	struct bootsector *boot;
 	struct device *dev;
@@ -62,7 +62,13 @@ int mode;
 
 		name = expand(dev->name);
 		if ((fd = open(name, mode | dev->mode)) < 0) {
-			perror("init: open");
+			sprintf(buf, "init: open \"%s\"", name);
+			perror(buf);
+			exit(1);
+		}
+					/* lock the device on writes */
+		if (mode == 2 && lock_dev(fd)) {
+			fprintf(stderr, "Device \"%s\" is busy\n", dev->name);
 			exit(1);
 		}
 					/* set default parameters, if needed */
@@ -209,13 +215,6 @@ try_again:	close(fd);
 	disk_size = (dev->tracks) ? sectors : 1;
 #endif /* FULL_CYL */
 
-/*
- * The driver in Dell's SVR4 v2.01 is unreliable with large writes.
- */
-#ifdef DELL
-	disk_size = 1;
-#endif /* DELL */
-
 	disk_buf = (unsigned char *) malloc((unsigned int) disk_size * MSECTOR_SIZE);
 	if (disk_buf == NULL) {
 		perror("init: malloc");
@@ -226,14 +225,6 @@ try_again:	close(fd);
 	disk_dirty = 0;
 	fat_error = 0;
 	fat_bits = dev->fat_bits;
-	if (fat_bits < 0) fat_bits = -fat_bits;
-	else if (fat_bits == 12 && num_clus > FAT12 || fat_bits == 16 &&
-	      num_clus <= FAT12 || (fat_bits != 12 && fat_bits != 16)) {
-		fprintf(stderr,"%d bit FAT on %c: sure ? (Use -%d in \
-%s to bypass this check.)\n",fat_bits,drive,fat_bits,CFG_FILE == NULL ?
-		  "devices.c" : CFG_FILE);
-		exit(1);
-	    }
 	fat_read(fat_start);
 					/* set dir_chain[] to root directory */
 	dir_dirty = 0;
@@ -330,4 +321,43 @@ read_boot()
 		return(NULL);
 
 	return(&boot);
+}
+
+/*
+ * Create an advisory lock on the device to prevent concurrent writes.
+ * Uses either lockf, flock, or fcntl locking methods.  See the Makefile
+ * and the Configure files for how to specify the proper method.
+ */
+
+static int
+lock_dev(fd)
+int fd;
+{
+#ifdef LOCKF
+#include <unistd.h>
+
+	if (lockf(fd, F_TLOCK, 0) < 0)
+		return(1);
+#endif /* LOCKF */
+
+#ifdef FLOCK
+#include <sys/file.h>
+
+	if (flock(fd, LOCK_EX|LOCK_NB) < 0)
+		return(1);
+#endif /* FLOCK */
+
+#ifdef FCNTL
+#include <fcntl.h>
+	struct flock flk;
+
+	flk.l_type = F_WRLCK;
+	flk.l_whence = 0;
+	flk.l_start = 0L;
+	flk.l_len = 0L;
+
+	if (fcntl(fd, F_SETLK, &flk) < 0)
+		return(1);
+#endif /* FCNTL */
+	return(0);
 }

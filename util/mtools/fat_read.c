@@ -1,12 +1,15 @@
 #include <stdio.h>
 #include "msdos.h"
 
+#define CHK_FAT
+
 int fat_len;				/* length of FAT table (in sectors) */
 unsigned int end_fat;			/* the end-of-chain marker */
 unsigned int last_fat;			/* the last in a chain marker */
 unsigned char *fat_buf;			/* the File Allocation Table */
 
 extern int fat_bits;
+extern unsigned num_clus;
 
 /*
  * Get and decode a FAT (file allocation table) entry.  Returns the cluster
@@ -17,8 +20,7 @@ unsigned int
 fat_decode(num)
 unsigned int num;
 {
-	unsigned int fat, fat_hi, fat_low, byte_1, byte_2;
-	int start;
+	unsigned int fat, fat_hi, fat_low, byte_1, byte_2, start;
 
 	if (fat_bits == 12) {
 		/*
@@ -69,25 +71,51 @@ unsigned int num;
 }
 
 /*
- * Read the entire FAT table into memory.
+ * Read the entire FAT table into memory.  Crude error detection on wrong
+ * FAT encoding scheme.
  */
 
 void
 fat_read(start)
 int start;
 {
-	int buflen;
+	int i, fat_size;
+	unsigned int buflen;
 	char *malloc();
 	void perror(), exit(), disk_read();
+
+#ifdef INT16
+	long junk;
+	junk = (long) fat_len * MSECTOR_SIZE;
+	
+	if (junk > 65535L) {
+		fprintf(stderr, "fat_read: FAT table is too large\n");
+		exit(1);
+	}
+#endif /* INT16 */
+
+	/*
+	 * Let's see if the length of the FAT table is appropriate for
+	 * the number of clusters and the encoding scheme
+	 */
+#ifdef CHK_FAT
+	fat_size = (fat_bits == 12) ? (num_clus +2) * 3 / 2 : (num_clus +2) * 2;
+	fat_size = (fat_size / 512) + ((fat_size % 512) ? 1 : 0);
+	if (fat_size != fat_len) {
+		fprintf(stderr, "fat_read: Wrong FAT encoding?\n");
+		exit(1);
+	}
+#endif /* CHK_FAT */
 					/* only the first copy of the FAT */
 	buflen = fat_len * MSECTOR_SIZE;
-	fat_buf = (unsigned char *) malloc((unsigned int) buflen);
+	fat_buf = (unsigned char *) malloc(buflen);
 	if (fat_buf == NULL) {
 		perror("fat_read: malloc");
 		exit(1);
 	}
 					/* read the FAT sectors */
-	disk_read((long) start, fat_buf, buflen);
+	for (i=start; i<start+fat_len; i++)
+		disk_read((long) i, &fat_buf[(i-start)*MSECTOR_SIZE], MSECTOR_SIZE);
 
 					/* the encoding scheme */
 	if (fat_bits == 12) {

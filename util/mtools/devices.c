@@ -3,9 +3,6 @@
  */
 
 #include <stdio.h>
-#include <string.h>
-#include <ctype.h>
-#include <limits.h>
 #include "msdos.h"
 
 #ifdef DELL
@@ -19,6 +16,22 @@ struct device devices[] = {
 	{'\0', (char *) NULL, 0L, 0, 0, (int (*) ()) 0, 0, 0, 0}
 };
 #endif /* DELL */
+
+#ifdef __386BSD__
+struct device devices[] = {
+        {'A', "/dev/rfd0a", 0L, 12, 0, (int (*) ()) 0, 80, 2, 18}, /* 1.44m */
+        {'A', "/dev/rfd0a", 0L, 12, 0, (int (*) ()) 0, 80, 2, 15}, /* 1.2m */
+        {'A', "/dev/rfd0a", 0L, 12, 0, (int (*) ()) 0, 80, 2, 9},  /* 720k */
+        {'A', "/dev/rfd0a", 0L, 12, 0, (int (*) ()) 0, 40, 2, 9},  /* 360k */
+        {'A', "/dev/rfd0a", 0L, 12, 0, (int (*) ()) 0, 40, 2, 8},  /* 320k */
+        {'B', "/dev/rfd1a", 0L, 12, 0, (int (*) ()) 0, 80, 2, 18}, /* 1.44m */
+        {'B', "/dev/rfd1a", 0L, 12, 0, (int (*) ()) 0, 80, 2, 15}, /* 1.2m */
+        {'B', "/dev/rfd1a", 0L, 12, 0, (int (*) ()) 0, 80, 2, 9},  /* 720k */
+        {'B', "/dev/rfd1a", 0L, 12, 0, (int (*) ()) 0, 40, 2, 9},  /* 360k */
+        {'B', "/dev/rfd1a", 0L, 12, 0, (int (*) ()) 0, 40, 2, 8},  /* 320k */
+        {'\0', (char *) NULL, 0L, 0, 0, (int (*) ()) 0, 0, 0, 0}
+};
+#endif /* __386BSD__ */
 
 #ifdef ISC
 struct device devices[] = {
@@ -34,13 +47,6 @@ struct device devices[] = {
 };
 #endif /* ISC */
 
-#ifdef MASSCOMP
-struct device devices[] = {
-	{'A', "/dev/rflp", 0L, 12, 0, (int (*) ()) 0, 80, 2, 8},
-	{'\0', (char *) NULL, 0L, 0, 0, (int (*) ()) 0, 0, 0, 0}
-};
-#endif /* MASSCOMP */
-
 #ifdef SPARC
 struct device devices[] = {
 	{'A', "/dev/rfd0c", 0L, 12, 0, (int (*) ()) 0, 80, 2, 18},
@@ -48,6 +54,14 @@ struct device devices[] = {
 	{'\0', (char *) NULL, 0L, 0, 0, (int (*) ()) 0, 0, 0, 0}
 };
 #endif /* SPARC */
+#ifdef RT_ACIS
+struct device devices[] = {
+      {'A', "/dev/rfd0", 0L, 12, 0, (int (*) ()) 0, 80, 2, 15},
+      {'A', "/dev/rfd0", 0L, 12, 0, (int (*) ()) 0, 40, 2, 9},
+      {'\0', (char *) NULL, 0L, 0, 0, (int (*) ()) 0, 0, 0, 0}
+};
+#endif /* RT_ACIS */
+
 
 #ifdef UNIXPC
 #include <sys/gdioctl.h>
@@ -72,7 +86,7 @@ int fd, ntracks, nheads, nsect;
 		return(1);
 	}
 
-	gdbuf.params.cyls = ntracks * nheads;
+	gdbuf.params.cyls = ntracks;
 	gdbuf.params.heads = nheads;
 	gdbuf.params.psectrk = nsect;
 
@@ -89,83 +103,89 @@ int fd, ntracks, nheads, nsect;
 }
 #endif /* UNIXPC */
 
-#ifdef MERGED
+#ifdef RT_ACIS
+struct device devices[] = {
+	{'A', "/dev/rfd0", 0L, 12, 0, (int (*) ()) 0, 80, 2, 15},
+	{'A', "/dev/rfd0", 0L, 12, 0, (int (*) ()) 0, 40, 2, 9},
+	{'\0', (char *) NULL, 0L, 0, 0, (int (*) ()) 0, 0, 0, 0}
+};
+#endif /* RT_ACIS */
 
-#define MAX_LINE    255+40
-#define MAX_DEVICES 10
+#ifdef SUN386
+struct device devices[] = {
+	{'A', "/dev/rfdl0c", 0L, 12, 0, (int (*) ()) 0, 80, 2, 9},
+	{'A', "/dev/rfd0c", 0L, 12, 0, (int (*) ()) 0, 80, 2, 18},
+	{'\0', (char *) NULL, 0L, 0, 0, (int (*) ()) 0, 0, 0, 0}
+};
+#endif /* SUN386 */
 
-#define SET(f,t,h,s) devices[dev].fat_bits = f; devices[dev].tracks = t; \
-  devices[dev].heads = h; devices[dev].sectors = s;
+  
+#ifdef SPARC_ODD
+#include <sys/types.h>
+#include <sun/dkio.h>
+#include <fcntl.h>
 
+int init_sparc();
 
-struct device devices[MAX_DEVICES+1];
+struct device devices[] = {
+	{'A', "/dev/rfd0c", 0L, 12, 0, init_sparc, 80, 2, 0},
+	{'\0', (char *) NULL, 0L, 0, 0, (int (*) ()) 0, 0, 0, 0}
+};
 
+/*
+ * Stuffing back the floppy parameters into the driver allows for gems
+ * like 10 sector or single sided floppies from Atari ST systems.
+ * 
+ * Martin Schulz, Universite de Moncton, N.B., Canada, March 11, 1991.
+ */
 
-void load_devices()
+int
+init_sparc(fd, ntracks, nheads, nsect)
+int fd, ntracks, nheads, nsect;
 {
-    FILE *cfg;
-    char buffer[MAX_LINE+1],name[255+1];
-    char *here,*start;
-    int items,dev,fat_bits;
+	struct fdk_char dkbuf;
+	struct dk_map   dkmap;
 
-    if ((cfg = fopen(CFG_FILE,"r")) == NULL) {
-	perror(CFG_FILE);
-	exit(1);
-    }
-    dev = 0;
-    while (fgets(buffer,MAX_LINE,cfg)) {
-	if (here = strchr(buffer,'#')) *here = 0;
-	else if (here = strchr(buffer,'\n')) *here = 0;
-	for (start = buffer; *start == ' ' || *start == '\t'; start++);
-	if (!*start) continue;
-	items = sscanf(start,"%c %255s %d %d %d %d %d",
-	  &devices[dev].drive,name,&fat_bits,&devices[dev].tracks,
-	  &devices[dev].heads,&devices[dev].sectors,&devices[dev].offset);
-	if (dev >= MAX_DEVICES) {
-	    fprintf(stderr,"Too many devices\n");
-	    exit(1);
+	if (ioctl(fd, FDKIOGCHAR, &dkbuf) != 0) {
+		ioctl(fd, FDKEJECT, NULL);
+		return(1);
 	}
-	if (items == 6 || items == 7) devices[dev].fat_bits = fat_bits;
-	else {
-	    if (items == 2 || items == 3) {
-#ifdef LINUX
-#ifdef oldLINUX
-		     if (!strncmp("/dev/at",name,7)) { SET(12,80,2,15) }
-		else if (!strncmp("/dev/xt",name,7)) { SET(12,40,2,9) }
-		else if (!strncmp("/dev/PS",name,7)) { SET(12,80,2,18) }
-		else if (!strncmp("/dev/ps",name,7)) { SET(12,80,2,9) }
-		else
-#endif
-		     if (!strncmp("/dev/hd",name,7)) { SET(16,0,0,0) }
-		else if (!strncmp("/dev/sd",name,7)) { SET(16,0,0,0) }
-		else
-#endif
-		{
-		    fprintf(stderr,"Unknown device %s, please specify all \
-parameters\n",name);
-		    exit(1);
-		}
-		if (items == 3) devices[dev].fat_bits = fat_bits;
-	    }
-	    else {
-		fprintf(stderr,"Config file syntax: drive device [ fat [ \
-tracks heads sectors [ offset ] ] ]\n");
-		exit(1);
-	    }
+
+	if (ioctl(fd, DKIOCGPART, &dkmap) != 0) {
+		ioctl(fd, FDKEJECT, NULL);
+		return(1);
 	}
-	if (islower(devices[dev].drive))
-	    devices[dev].drive = toupper(devices[dev].drive);
-	if (items < 7) devices[dev].offset = 0L;
-	devices[dev].mode = 0;
-	devices[dev].gioctl = NULL;
-	if ((devices[dev].name = (char *) malloc(strlen(name)+1)) == NULL) {
-	    fprintf(stderr,"Out of memory\n");
-	    exit(1);
+
+	if (ntracks)
+		dkbuf.ncyl = ntracks;
+	if (nheads)
+		dkbuf.nhead = nheads;
+	if (nsect)
+		dkbuf.secptrack = nsect;
+
+	if (ntracks && nheads && nsect )
+		dkmap.dkl_nblk = ntracks * nheads * nsect;
+
+	if (ioctl(fd, FDKIOSCHAR, &dkbuf) != 0) {
+		ioctl(fd, FDKEJECT, NULL);
+		return(1);
 	}
-	strcpy(devices[dev++].name,name);
-    }
-    memset(&devices[dev],0,sizeof(struct device));
-    fclose(cfg);
+
+	if (ioctl(fd, DKIOCSPART, &dkmap) != 0) {
+		ioctl(fd, FDKEJECT, NULL);
+		return(1);
+	}
+	return(0);
 }
-
-#endif
+#endif /* SPARC_ODD */
+  
+#ifdef XENIX
+struct device devices[] = {
+	{'A', "/dev/fd096ds15", 0L, 12, 0, (int (*) ()) 0, 80, 2, 15},
+	{'A', "/dev/fd048ds9", 0L, 12, 0, (int (*) ()) 0, 40, 2, 9},
+	{'B', "/dev/fd1135ds18", 0L, 12, 0, (int (*) ()) 0, 80, 2, 18},
+	{'B', "/dev/fd1135ds9", 0L, 12, 0, (int (*) ()) 0, 80, 2, 9},
+	{'C', "/dev/hd0d", 0L, 16, 0, (int (*) ()) 0, 0, 0, 0},
+	{'\0', (char *) NULL, 0L, 0, 0, (int (*) ()) 0, 0, 0, 0}
+};
+#endif /* XENIX */

@@ -110,7 +110,7 @@ int textmode;
 					/* much easier.... */
 	else {
 		if ((i = fread((char *) tbuf, sizeof(*tbuf), buflen, fp)) <= 0) {
-			perror("putcluster: fread");
+			perror("put_cluster: fread");
 			return(-1);
 		}
 	}

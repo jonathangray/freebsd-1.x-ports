@@ -13,7 +13,6 @@
 #include "msdos.h"
 #include "patchlevel.h"
 
-#ifndef MERGED
 int fd = -1;				/* the file descriptor for the device */
 int dir_start;				/* starting sector for directory */
 int dir_len;				/* length of directory (in sectors) */
@@ -21,19 +20,14 @@ int dir_entries;			/* number of directory entries */
 int clus_size;				/* cluster size (in sectors) */
 char *mcwd;				/* the Current Working Directory */
 int fat_error;				/* FAT error detected? */
-#endif
 
-#ifndef MERGED
-static
-#endif
-int got_signal();
-static int is_empty();
+static int got_signal(), is_empty();
 
 main(argc, argv)
 int argc;
 char *argv[];
 {
-	int i, ismatch, entry, oops, empty;
+	int i, ismatch, entry, oops, empty, got_one, missed_one;
 	unsigned int start;
 	char *filename, *newfile, *get_name(), drive, *pathname, *get_path();
 	char *unix_name(), get_drive(), last_drive, *fix_mcwd();
@@ -50,6 +44,8 @@ char *argv[];
 		exit(1);
 	}
 
+	got_one = 0;
+	missed_one = 0;
 	last_drive = 'x';
 	mcwd = fix_mcwd();
 
@@ -64,6 +60,7 @@ char *argv[];
 
 			if (init(drive, 2)) {
 				fprintf(stderr, "%s: Cannot initialize '%c:'\n", argv[0], drive);
+				missed_one++;
 				continue;
 			}
 			last_drive = drive;
@@ -71,8 +68,10 @@ char *argv[];
 
 		filename = get_name(argv[i]);
 		pathname = get_path(argv[i]);
-		if (subdir(drive, pathname))
+		if (subdir(drive, pathname)) {
+			missed_one++;
 			continue;
+		}
 
 		oops = 0;
 		ismatch = 0;
@@ -108,22 +107,33 @@ char *argv[];
 				dir->name[0] = 0xe5;
 				dir_write(entry, dir);
 				ismatch = 1;
+				got_one++;
 			}
 		}
-		if (fat_error)
+		if (fat_error) {
+			missed_one++;
 			break;
+		}
 
-		if (oops)
+		if (oops) {
+			missed_one++;
 			continue;
+		}
 
-		if (!ismatch)
+		if (!ismatch) {
 			fprintf(stderr, "%s: Directory \"%s\" not found\n", argv[0], filename);
+			missed_one++;
+		}
 	}
 					/* write the FAT, flush the buffers */
 	fat_write();
 	dir_flush();
 	disk_flush();
 	close(fd);
+	if (got_one && missed_one)
+		exit(2);
+	if (missed_one)
+		exit(1);
 	exit(0);
 }
 
@@ -176,7 +186,6 @@ unsigned int fat;
  * a user abort.
  */
 
-#ifndef MERGED
 static int
 got_signal()
 {
@@ -190,4 +199,3 @@ got_signal()
 	close(fd);
 	exit(1);
 }
-#endif

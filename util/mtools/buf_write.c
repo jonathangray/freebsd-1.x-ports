@@ -10,7 +10,7 @@ extern int fd, disk_size, disk_dirty, dir_start, dir_len;
 extern int clus_size;
 extern long disk_offset, disk_current;
 extern unsigned char *disk_buf;
-static int blank_cyl();
+static int read_cyl();
 
 void
 disk_write(start, buf, len)
@@ -48,15 +48,13 @@ int len;
 			if (disk_dirty)
 				disk_flush();
 
+			disk_current = (i / disk_size) * disk_size;
 			/*
 			 * If there is something on the new cylinder that
 			 * you want to keep, you'll have to read it first
 			 * before writing.
 			 */
-			if (blank_cyl(i))
-				disk_current = (i / disk_size) * disk_size;
-			else {
-				disk_current = (i / disk_size) * disk_size;
+			if (read_cyl(disk_current)) {
 				where = (disk_current * MSECTOR_SIZE) + disk_offset;
 				length = disk_size * MSECTOR_SIZE;
 
@@ -113,20 +111,18 @@ disk_flush()
 
 /*
  * Determine if the cylinder has some useful information on it.  Returns a 1
- * if it is blank.
+ * if it needs to be read.
  */
 
 static int
-blank_cyl(num)
-long num;
+read_cyl(sector)
+long sector;
 {
 	register unsigned int i;
 	unsigned int start, end, fat_decode();
-	long sector;
 
-	sector = (num / disk_size) * disk_size;
 	if (!sector)
-		return(0);
+		return(1);
 
 	start = ((sector - dir_start - dir_len) / clus_size) + 2;
 	end = ((sector + disk_size - dir_start - dir_len) / clus_size) + 2;
@@ -134,7 +130,7 @@ long num;
 	for (i = start; i < end; i++) {
 					/* if fat_decode returns non-zero */
 		if (fat_decode(i))
-			return(0);
+			return(1);
 	}
-	return(1);
+	return(0);
 }

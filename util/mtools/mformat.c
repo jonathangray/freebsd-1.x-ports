@@ -13,11 +13,9 @@
 #include "msdos.h"
 #include "patchlevel.h"
 
-#ifndef MERGED
 int fd, dir_dirty, dir_entries;
 long dir_chain[MAX_DIR_SECS];
 unsigned char *dir_buf;
-#endif
 
 main(argc, argv)
 int argc;
@@ -246,7 +244,5 @@ char *argv[];
 	exit(0);
 }
 
-#ifndef MERGED
 /* hooks for the missing parts */
 void disk_write() {}
-#endif

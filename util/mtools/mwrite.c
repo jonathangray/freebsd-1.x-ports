@@ -15,7 +15,6 @@
 #include "msdos.h"
 #include "patchlevel.h"
 
-#ifndef MERGED
 int fd = -1;				/* the file descriptor for the device */
 int dir_start;				/* starting sector for directory */
 int dir_len;				/* length of directory (in sectors) */
@@ -23,15 +22,11 @@ int dir_entries;			/* number of directory entries */
 int clus_size;				/* cluster size (in sectors) */
 char *mcwd;				/* the Current Working Directory */
 int fat_error;				/* FAT error detected? */
-#endif
 
 int full = 0;
 int textmode = 0;
 int nowarn = 0;
-#ifndef MERGED
-static
-#endif
-int got_signal();
+static int got_signal();
 static struct directory *writeit();
 static long free_space();
 
@@ -41,7 +36,7 @@ char *argv[];
 {
 	extern int optind;
 	extern char *optarg;
-	int i, entry, ismatch, nogo, slot, single;
+	int i, entry, ismatch, nogo, slot, single, got_one, missed_one;
 	int c, oops, verbose, first, mod_time;
 	unsigned int dot, start;
 	char *filename, *newfile, *get_name(), get_drive();
@@ -58,6 +53,8 @@ char *argv[];
 	oops = 0;
 	verbose = 0;
 	mod_time = 0;
+	got_one = 0;
+	missed_one = 0;
 	while ((c = getopt(argc, argv, "tnvm")) != EOF) {
 		switch (c) {
 			case 't':
@@ -180,8 +177,7 @@ char *argv[];
 					/* CONSTCOND */
 					while (1) {
 						printf("File \"%s\" exists, overwrite (y/n) ? ", target);
-						fflush(stdout);
-						fgets(ans,9,stdin);
+						gets(ans);
 						if (ans[0] == 'n' || ans[0] == 'N') {
 							nogo = 1;
 							break;
@@ -201,28 +197,36 @@ char *argv[];
 			if (ismatch)
 				break;
 		}
-		if (fat_error)
+		if (fat_error) {
+			missed_one++;
 			break;
+		}
 
 		if (nogo)		/* chickened out... */
 			continue;
 					/* no '.' entry means root directory */
 		if (dot == 0 && slot < 0) {
 			fprintf(stderr, "%s: No directory slots\n", argv[0]);
+			missed_one++;
 			break;
 		}
 					/* make the directory grow */
 		if (dot && slot < 0) {
 			if (dir_grow(dot)) {
 				fprintf(stderr, "%s: Disk full\n", argv[0]);
+				missed_one++;
 				break;
 			}
 					/* first entry in 'new' directory */
 			slot = entry;
 		}
 					/* write the file */
-		if (dir = writeit(fixed, argv[i], verbose, mod_time, single, target))
+		if (dir = writeit(fixed, argv[i], verbose, mod_time, single, target)) {
 			dir_write(slot, dir);
+			got_one++;
+		}
+		else
+			missed_one++;
 
 		if (full) {
 			fprintf(stderr, "%s: Disk full\n", argv[0]);
@@ -236,6 +240,10 @@ char *argv[];
 	dir_flush();
 	disk_flush();
 	close(fd);
+	if (got_one && missed_one)
+		exit(2);
+	if (missed_one)
+		exit(1);
 	exit(0);
 }
 
@@ -321,7 +329,6 @@ char *target;
  * a user abort.
  */
 
-#ifndef MERGED
 static int
 got_signal()
 {
@@ -335,7 +342,7 @@ got_signal()
 	close(fd);
 	exit(1);
 }
-#endif
+
 
 /*
  * Get the amount of remaining free space

@@ -12,7 +12,6 @@
 #include "msdos.h"
 #include "patchlevel.h"
 
-#ifndef MERGED
 int fd = -1;				/* the file descriptor for the device */
 int dir_start;				/* starting sector for directory */
 int dir_len;				/* length of directory (in sectors) */
@@ -20,7 +19,6 @@ int dir_entries;			/* number of directory entries */
 int clus_size;				/* cluster size (in sectors) */
 char *mcwd;				/* the Current Working Directory */
 int fat_error;				/* FAT error detected? */
-#endif
 
 main(argc, argv)
 int argc;
@@ -98,7 +96,6 @@ char *argv[];
  * stubs for read-only programs
  */
 
-#ifndef MERGED
 void
 disk_flush()
 {
@@ -116,4 +113,3 @@ dir_flush()
 	dir_dirty = 0;
 	return;
 }
-#endif

@@ -12,7 +12,6 @@
 #include "msdos.h"
 #include "patchlevel.h"
 
-#ifndef MERGED
 int fd = -1;				/* the file descriptor for the device */
 int dir_start;				/* starting sector for directory */
 int dir_len;				/* length of directory (in sectors) */
@@ -20,7 +19,6 @@ int dir_entries;			/* number of directory entries */
 int clus_size;				/* cluster size (in sectors) */
 char *mcwd;				/* the Current Working Directory */
 int fat_error;				/* FAT error detected? */
-#endif
 
 main(argc, argv)
 int argc;
@@ -68,8 +66,7 @@ char *argv[];
 	if (strcmp(temp, new) && verbose) {
 		while (!nogo) {
 			printf("Do you accept \"%s\" as the new filename (y/n) ? ", new);
-			fflush(stdout);
-			fgets(ans,9,stdin);
+			gets(ans);
 			if (ans[0] == 'y' || ans[0] == 'Y')
 				break;
 			if (ans[0] == 'n' || ans[0] == 'N')

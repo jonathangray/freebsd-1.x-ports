@@ -13,7 +13,6 @@
 #include "msdos.h"
 #include "patchlevel.h"
 
-#ifndef MERGED
 int fd = -1;				/* the file descriptor for the device */
 int dir_start;				/* starting sector for directory */
 int dir_len;				/* length of directory (in sectors) */
@@ -21,7 +20,6 @@ int dir_entries;			/* number of directory entries */
 int clus_size;				/* cluster size (in sectors) */
 char *mcwd;				/* the Current Working Directory */
 int fat_error;				/* FAT error detected? */
-#endif
 
 main(argc, argv)
 int argc;
@@ -29,8 +27,7 @@ char *argv[];
 {
 	int entry, slot, fargn, verbose, oops;
 	char filename[30], *strncpy(), drive, ans[10], *strncat();
-	char *strcpy(), *fix_mcwd(), *strchr();
-	char *here;
+	char *strcpy(), *fix_mcwd();
 	unsigned char fixed[12], vol[12];
 	void exit(), dir_write(), dir_flush(), disk_flush();
 	struct directory *dir, *dir_read(), *mk_entry();
@@ -101,9 +98,7 @@ char *argv[];
 
 					/* ask for new label */
 	printf("Enter the new volume label (11 characters): ");
-	fflush(stdout);
-	fgets(filename,29,stdin);
-	if (here = strchr(filename,'\n')) *here = 0;
+	gets(filename);
 	if (filename[0] != '\0') {
 		sprintf((char *) fixed, "%-11.11s", filename);
 		if (strlen(filename) > 11 && verbose)
@@ -114,8 +109,7 @@ char *argv[];
 			exit(0);
 
 		printf("Delete volume label (y/n): ");
-		fflush(stdout);
-		fgets(ans,9,stdin);
+		gets(ans);
 		if (ans[0] == 'y' || ans[0] == 'Y') {
 			strcpy((char *) fixed, (char *) vol);
 			fixed[0] = 0xe5;

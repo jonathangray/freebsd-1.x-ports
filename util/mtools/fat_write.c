@@ -14,7 +14,7 @@ fat_encode(num, code)
 unsigned int num;
 unsigned int code;
 {
-	int start;
+	unsigned int start;
 
 	if (fat_bits == 12) {
 		/*
@@ -70,16 +70,16 @@ unsigned int code;
 void
 fat_write()
 {
-	int fat_start, buflen, dups;
+	int i, start, dups;
 	void disk_write();
 
 	if (fd < 0)
 		return;
 
-	fat_start = dir_start - (fat_len * num_fat);
-	buflen = fat_len * MSECTOR_SIZE;
+	start = dir_start - (fat_len * num_fat);
 
-	disk_write((long) fat_start, fat_buf, buflen);
+	for (i=start; i<start+fat_len; i++)
+		disk_write((long) i, &fat_buf[(i-start)*MSECTOR_SIZE], MSECTOR_SIZE);
 
 	/*
 	 * Only duplicate the FAT table if no errors were detected
@@ -87,8 +87,9 @@ fat_write()
 	if (!fat_error) {
 		dups = num_fat - 1;
 		while (dups--) {
-			fat_start += fat_len;
-			disk_write((long) fat_start, fat_buf, buflen);
+			start += fat_len;
+			for (i=start; i<start+fat_len; i++)
+				disk_write((long) i, &fat_buf[(i-start)*MSECTOR_SIZE], MSECTOR_SIZE);
 		}
 	}
 	return;

@@ -13,7 +13,6 @@
 #include "msdos.h"
 #include "patchlevel.h"
 
-#ifndef MERGED
 int fd = -1;				/* the file descriptor for the device */
 int dir_start;				/* starting sector for directory */
 int dir_len;				/* length of directory (in sectors) */
@@ -21,19 +20,15 @@ int dir_entries;			/* number of directory entries */
 int clus_size;				/* cluster size (in sectors) */
 char *mcwd;				/* the Current Working Directory */
 int fat_error;				/* FAT error detected? */
-#endif
 
-#ifndef MERGED
-static
-#endif
-int got_signal();
+static int got_signal();
 static void empty_dir();
 
 main(argc, argv)
 int argc;
 char *argv[];
 {
-	int i, entry, slot, fargn, verbose, oops;
+	int i, entry, slot, fargn, verbose, oops, got_one, missed_one;
 	extern unsigned int end_fat;
 	unsigned int fat, dot, next_fat();
 	char filename[13], *newfile, drive, get_drive(), *get_path();
@@ -50,6 +45,8 @@ char *argv[];
 	fargn = 1;
 	verbose = 0;
 	oops = 0;
+	got_one = 0;
+	missed_one = 0;
 	if (argc > 1) {
 		if (!strcmp(argv[1], "-v")) {
 			fargn = 2;
@@ -77,6 +74,7 @@ char *argv[];
 
 			if (init(drive, 2)) {
 				fprintf(stderr, "%s: Cannot initialize '%c:'\n", argv[0], drive);
+				missed_one++;
 				continue;
 			}
 			last_drive = drive;
@@ -87,8 +85,10 @@ char *argv[];
 		strcpy(filename, unix_name(fixed, fixed + 8));
 		pathname = get_path(argv[i]);
 
-		if (subdir(drive, pathname))
+		if (subdir(drive, pathname)) {
+			missed_one++;
 			continue;
+		}
 					/* see if exists and get slot */
 		slot = -1;
 		dot = 0;
@@ -123,17 +123,21 @@ char *argv[];
 				break;
 			}
 		}
-		if (oops)
+		if (oops) {
+			missed_one++;
 			continue;
+		}
 					/* no '.' entry means root directory */
 		if (dot == 0 && slot < 0) {
 			fprintf(stderr, "%s: No directory slots\n", argv[0]);
+			missed_one++;
 			continue;
 		}
 					/* make the directory grow */
 		if (dot && slot < 0) {
 			if (dir_grow(dot)) {
 				fprintf(stderr, "%s: Disk full\n", argv[0]);
+				missed_one++;
 				continue;
 			}
 					/* first slot in the new part */
@@ -142,6 +146,7 @@ char *argv[];
 					/* grab a starting cluster */
 		if ((fat = next_fat(0)) == 1) {
 			fprintf(stderr, "%s: Disk full\n", argv[0]);
+			missed_one++;
 			continue;
 		}
 					/* make directory entry */
@@ -151,12 +156,17 @@ char *argv[];
 					/* write the cluster */
 		empty_dir(fat, dot);
 		fat_encode(fat, end_fat);
+		got_one++;
 	}
 					/* write the FAT, flush the buffers */
 	fat_write();
 	dir_flush();
 	disk_flush();
 	close(fd);
+	if (got_one && missed_one)
+		exit(2);
+	if (missed_one)
+		exit(1);
 	exit(0);
 }
 
@@ -199,10 +209,7 @@ unsigned int dot, dot_dot;
  * a user abort.
  */
 
-#ifndef MERGED
-static
-#endif
-int
+static int
 got_signal()
 {
 	void exit(), disk_flush(), fat_write(), dir_flush();

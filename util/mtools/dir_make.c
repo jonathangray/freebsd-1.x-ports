@@ -62,7 +62,7 @@ unsigned int fat;
 	new = num + clus_size;
 	dir_buf = (unsigned char *) realloc((char *) dir_buf, (unsigned int) new * MSECTOR_SIZE);
 	if (dir_buf == NULL) {
-		perror("dir_grow: malloc");
+		perror("dir_grow: realloc");
 		exit(1);
 	}
 	offset = dir_buf + (num * MSECTOR_SIZE);

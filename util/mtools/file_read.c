@@ -51,7 +51,7 @@ long size;
 			}
 					/* write it */
 			if (fwrite((char *) out_buf, sizeof(*out_buf), out_len, fp) == 0) {
-				perror("file_write: fwrite");
+				perror("file_read: fwrite");
 				return(-1);
 			}
 		}
@@ -59,7 +59,7 @@ long size;
 		else {
 			out_len = (size - current > in_len) ? in_len : size - current;
 			if (fwrite((char *) in_buf, sizeof(*in_buf), out_len, fp) == 0) {
-				perror("file_write: fwrite");
+				perror("file_read: fwrite");
 				return(-1);
 			}
 

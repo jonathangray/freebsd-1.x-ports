@@ -10,12 +10,18 @@
 
 #include <stdio.h>
 #include <ctype.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include "patchlevel.h"
 
 #define NONE	0
 #define MREAD	1
 #define MWRITE	2
 #define MKDIR
+
+#ifndef WEXITSTATUS
+#define WEXITSTATUS(x) (((x)>>8)&0xff)
+#endif /* WEXITSTATUS */
 
 main(argc, argv)
 int argc;
@@ -24,7 +30,7 @@ char *argv[];
 	extern int optind;
 	extern char *optarg;
 	int i, oops, msdos_args, unix_args, destination;
-	char **nargv, **malloc();
+	char **nargv, *malloc();
 	void exit();
 					/* get command line options */
 	msdos_args = 0;
@@ -76,11 +82,7 @@ char *argv[];
 	 * with a null when it passes it to main()
 	 */
 	nargv = (char **) malloc((unsigned int) (argc + 1) * sizeof(*argv));
-#ifndef MERGED
 	nargv[0] = "mcopy";
-#else
-	nargv[0] = destination == MWRITE ? "mwrite" : "mread";
-#endif
 	for (i = 1; i < argc; i++)
 		nargv[i] = argv[i];
 	nargv[argc] = NULL;
@@ -96,8 +98,8 @@ int argc;
 char *argv[];
 {
 	extern int optind;
-	int i, j, pid, status;
-	char *tmpdir, *mktemp(), **nargv, **malloc(), buf[256], *strcpy();
+	int i, j, pid, status_read, status_write;
+	char *tmpdir, *mktemp(), **nargv, *malloc(), buf[256], *strcpy();
 	char *unixname(), *realloc();
 	void exit();
 
@@ -112,8 +114,10 @@ char *argv[];
 	}
 					/* create a temp directory */
 	tmpdir = mktemp("/tmp/mtoolsXXXXXX");
-	if (mkdir(tmpdir, 0777) < 0)
+	if (mkdir(tmpdir, 0777) < 0) {
 		perror("mkdir");
+		exit(1);
+	}
 
 	nargv[j++] = tmpdir;
 	nargv[j] = NULL;
@@ -122,8 +126,11 @@ char *argv[];
 	if (!(pid = fork()))
 		execvp("mread", nargv);
 
-	while (wait(&status) != pid)
+	while (wait(&status_read) != pid)
 		;
+					/* we blew it... */
+	if (WEXITSTATUS(status_read) == 1)
+		exit(1);
 					/* reconstruct the argv[] */
 	nargv[0] = "sh";
 	nargv[1] = "-c";
@@ -157,12 +164,12 @@ char *argv[];
 	if (!(pid = fork()))
 		execvp("sh", nargv);
 
-	while (wait(&status) != pid)
+	while (wait(&status_write) != pid)
 		;
 					/* clobber the directory */
 	sprintf(buf, "rm -fr %s", tmpdir);
 	system(buf);
-	exit(0);
+	exit(WEXITSTATUS(status_write));
 }
 
 char *
@@ -193,6 +200,7 @@ char *filename;
 }
 
 #ifdef MKDIR
+/* ARGSUSED */
 mkdir(path, mode)
 char *path;
 int mode;

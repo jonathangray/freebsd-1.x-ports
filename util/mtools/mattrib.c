@@ -29,7 +29,7 @@ int argc;
 char *argv[];
 {
 	int entry, ismatch, oops, fargn, read_only, hidden, sys, archive;
-	int i, action;
+	int i, action, got_one, missed_one;
 	char *filename, *newfile, *unix_name(), drive, get_drive();
 	char *get_path(), *pathname, *get_name(), *fix_mcwd(), last_drive;
 	void exit(), dir_write(), dir_flush(), disk_flush();
@@ -37,6 +37,8 @@ char *argv[];
 
 	oops = 0;
 	fargn = -1;
+	got_one = 0;
+	missed_one = 0;
 	archive = LEAVE;
 	hidden = LEAVE;
 	read_only = LEAVE;
@@ -94,14 +96,17 @@ char *argv[];
 		if (last_drive != drive) {
 			if (init(drive, 2)) {
 				fprintf(stderr, "%s: Cannot initialize '%c:'\n", argv[0], drive);
+				missed_one++;
 				continue;
 			}
 			last_drive = drive;
 		}
 		filename = get_name(argv[i]);
 		pathname = get_path(argv[i]);
-		if (subdir(drive, pathname))
+		if (subdir(drive, pathname)) {
+			missed_one++;
 			continue;
+		}
 
 					/* see if exists and do it */
 		ismatch = 0;
@@ -139,13 +144,20 @@ char *argv[];
 					dir->attr &= ~0x04;
 				dir_write(entry, dir);
 				ismatch++;
+				got_one++;
 			}
 		}
-		if (!ismatch)
+		if (!ismatch) {
 			fprintf(stderr, "%s: File \"%s\" not found\n", argv[0], filename);
+			missed_one++;
+		}
 	}
 	dir_flush();
 	disk_flush();
 	close(fd);
+	if (got_one && missed_one)
+		exit(2);
+	if (missed_one)
+		exit(1);
 	exit(0);
 }

@@ -59,21 +59,3 @@ typedef void SIG_TYPE;
 #define strchr index
 #define strrchr rindex
 #endif /* BSD */
-
-#define FAT12 4086 /* max. number of clusters described by a 12 bit FAT */
-
-#ifdef MERGED
-#define CFG_FILE "/etc/mtools"
-#else
-#define CFG_FILE NULL
-#endif
-
-#ifdef MERGED
-extern int fd;				/* the file descriptor for the device */
-extern int dir_start;			/* starting sector for directory */
-extern int dir_len;			/* length of directory (in sectors) */
-extern int dir_entries;			/* number of directory entries */
-extern int clus_size;			/* cluster size (in sectors) */
-extern char *mcwd;			/* the Current Working Directory */
-extern int fat_error;			/* FAT error detected? */
-#endif

@@ -12,7 +12,6 @@
 #include "msdos.h"
 #include "patchlevel.h"
 
-#ifndef MERGED
 int fd = -1;				/* the file descriptor for the device */
 int dir_start;				/* starting sector for directory */
 int dir_len;				/* length of directory (in sectors) */
@@ -20,7 +19,6 @@ int dir_entries;			/* number of directory entries */
 int clus_size;				/* cluster size (in sectors) */
 char *mcwd;				/* the Current Working Directory */
 int fat_error;				/* FAT error detected? */
-#endif
 
 main(argc, argv)
 int argc;
@@ -28,7 +26,8 @@ char *argv[];
 {
 	extern int optind;
 	extern char *optarg;
-	int i, ismatch, entry, c, oops, textmode, stripmode;
+	int i, ismatch, entry, c, oops, textmode, stripmode, got_one;
+	int missed_one;
 	unsigned int fat;
 	long size;
 	char *filename, *newfile, *get_name(), *unix_name(), *pathname;
@@ -40,6 +39,8 @@ char *argv[];
 	oops = 0;
 	stripmode = 0;
 	textmode = 0;
+	got_one = 0;
+	missed_one = 0;
 	while ((c = getopt(argc, argv, "st")) != EOF) {
 		switch (c) {
 			case 's':
@@ -67,14 +68,17 @@ char *argv[];
 		if (drive != last_drive) {
 			if (init(drive, 0)) {
 				fprintf(stderr, "%s: Cannot initialize '%c:'\n", argv[0], drive);
+				missed_one++;
 				continue;
 			}
 			last_drive = drive;
 		}
 		filename = get_name(argv[i]);
 		pathname = get_path(argv[i]);
-		if (subdir(drive, pathname))
+		if (subdir(drive, pathname)) {
+			missed_one++;
 			continue;
+		}
 
 		ismatch = 0;
 		for (entry = 0; entry < dir_entries; entry++) {
@@ -98,15 +102,24 @@ char *argv[];
 				if (file_read(stdout, fat, textmode, stripmode, size))
 					break;
 				ismatch = 1;
+				got_one++;
 			}
 		}
-		if (fat_error)
+		if (fat_error) {
+			missed_one++;
 			break;
+		}
 
-		if (!ismatch)
+		if (!ismatch) {
 			fprintf(stderr, "%s: File \"%s\" not found\n", argv[0], filename);
+			missed_one++;
+		}
 	}
 	close(fd);
+	if (got_one && missed_one)
+		exit(2);
+	if (missed_one)
+		exit(1);
 	exit(0);
 }
 
@@ -114,7 +127,6 @@ char *argv[];
  * stubs for read-only programs
  */
 
-#ifndef MERGED
 void
 disk_flush()
 {
@@ -132,4 +144,3 @@ dir_flush()
 	dir_dirty = 0;
 	return;
 }
-#endif
