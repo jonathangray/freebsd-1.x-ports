@@ -1,5 +1,5 @@
 #ifndef lint
-static const char *rcsid = "$Id: extract.c,v 1.3 1993/09/05 04:53:48 jkh Exp $";
+static const char *rcsid = "$Id: extract.c,v 1.4 1993/09/06 23:26:21 jkh Exp $";
 #endif
 
 /*
@@ -78,7 +78,7 @@ extract_plist(char *home, Package *pkg)
 	    if (Verbose)
 		printf("extract: exec cmd '%s' (lastfile = %s)\n", p->name,
 		       last_file);
-	    if (!Fake && vsystem(p->name, last_file))
+	    if (!Fake && vsystem(p->name, Directory, last_file))
 		whinge("Command '%s' failed.", p->name);
 	    break;
 
