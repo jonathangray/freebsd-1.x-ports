@@ -29,7 +29,7 @@ TYPES = -DVOID_SIGHANDLER
 
 # Comment out "-DVI_MODE" if you don't think that anyone will ever desire
 # the vi line editing mode and features.
-READLINE_DEFINES = $(TYPES) -DVI_MODE
+READLINE_DEFINES = $(TYPES) #-DVI_MODE
 
 DEBUG_FLAGS = -O2
 LDFLAGS = $(DEBUG_FLAGS) 

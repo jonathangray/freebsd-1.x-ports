@@ -32,6 +32,7 @@ static char *xmalloc (), *xrealloc ();
 
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/ioctl.h>
 #include <fcntl.h>
 #include <sys/file.h>
 #include <signal.h>
@@ -280,6 +281,15 @@ static int stricmp (), strnicmp ();
 /* Non-zero means to save keys that we dispatch on in a kbd macro. */
 static int defining_kbd_macro = 0;
 
+/* XXX this prevents to got editing mode from tcsh */
+static void wait_foreground(void)
+{
+	struct winsize w;
+	int tty = fileno (rl_instream);
+
+	if (ioctl (tty, TIOCGWINSZ, &w) == 0)
+		(void) ioctl (tty, TIOCSWINSZ, &w);
+}
 
 /* **************************************************************** */
 /*								    */
@@ -1153,6 +1163,7 @@ readline_default_bindings ()
 #endif /* POSIX */
   int tty = fileno (rl_instream);
 
+  wait_foreground ();   /* XXX this prevents to got editing mode from tcsh */
 #if defined (_POSIX_VERSION)
   if (tcgetattr (tty, &ttybuff) != -1)
 #else
@@ -2307,6 +2318,7 @@ rl_prep_terminal ()
 #  endif /* HAVE_BSD_SIGNALS */
 #endif /* POSIX */
 
+  wait_foreground ();   /* XXX this prevents to got editing mode from tcsh */
 #if defined (_POSIX_VERSION)
   tcgetattr (tty, &tio);
 #else
