@@ -41,7 +41,7 @@
 #include <sys/vmmeter.h>
 
 
-/* #define PATCHED_KVM		/* YOU PROBABLY DON'T NEED THIS DEFINED! */
+#define PATCHED_KVM		/* YOU PROBABLY DON'T NEED THIS DEFINED! */
 				/* define this if you have a kvm.c */
 				/* that has been patched not to freshly */
 				/* alloc an array of procs each time */
