@@ -91,7 +91,7 @@
                               /* don't have terminals with Scand. nat. chars */
 #define WANTPAGER   TRUE      /* default: try to pipe through a pager (like  */
                               /* more) if stdout is tty and no -o switch     */
-#define DEFPAGER    "/usr/bin/pg"   /* CHANGE TO YOUR LOCAL PAGER            */
+#define DEFPAGER    "/usr/bin/more" /* CHANGE TO YOUR LOCAL PAGER            */
 
     /*------------------ end of customization constants ---------------------*/
 
