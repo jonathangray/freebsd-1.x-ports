@@ -1,4 +1,4 @@
-##  $Revision: 1.1 $
+##  $Revision: 1.2 $
 SHELL	= /bin/sh
 MAKE	= make
 
@@ -105,6 +105,12 @@ tar:
 	tar cf inn.tar `sed $(SEDCOMMANDS) <MANIFEST`
 	compress inn.tar
 	mv inn.tar.Z inn`date +%m%d`.tar.Z
+
+
+pkg:	pkg_src
+
+pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
+	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S inn_src
 
 ##  Local convention; for xargs.
 list:	FORCE
