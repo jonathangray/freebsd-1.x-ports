@@ -1,6 +1,6 @@
 /*
- * File: zmr.c 07-30-1989
- * Copyright 1988, 1989 Omen Technology Inc All Rights Reserved
+ * File: zmr.c
+ * Copyright 1988, 1994 Omen Technology Inc All Rights Reserved
  *
  *
  * 

@@ -117,15 +117,15 @@
 /* Parameters for ZCOMMAND frame ZF0 (otherwise 0) */
 #define ZCACK1	1	/* Acknowledge, then do command */
 
-unsigned long rclhdr();
+long rclhdr();
 
 /* Globals used by ZMODEM functions */
 extern Rxframeind;	/* ZBIN ZBIN32, or ZHEX type of frame */
 extern Rxtype;		/* Type of header received */
 extern Rxcount;		/* Count of data bytes received */
 extern Rxtimeout;	/* Tenths of seconds to wait for something */
-extern unsigned long Rxpos;	/* Received file position */
-extern unsigned long Txpos;	/* Transmitted file position */
+extern long Rxpos;	/* Received file position */
+extern long Txpos;	/* Transmitted file position */
 extern Txfcs32;		/* TURE means send binary frames with 32 bit FCS */
 extern Crc32t;		/* Display flag indicating 32 bit CRC being sent */
 extern Crc32;		/* Display flag indicating 32 bit CRC being received */

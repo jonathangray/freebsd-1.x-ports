@@ -5,7 +5,7 @@
  *   See the main files (rz.c/sz.c) for compile instructions.
  */
 
-char *Copyr = "Copyright 1993 Omen Technology Inc All Rights Reserved";
+char *Copyr = "Copyright 1994 Omen Technology Inc All Rights Reserved";
 
 #ifdef V7
 #include <sys/types.h>
@@ -16,8 +16,9 @@ char *Copyr = "Copyright 1993 Omen Technology Inc All Rights Reserved";
 #ifdef LLITOUT
 long Locmode;		/* Saved "local mode" for 4.x BSD "new driver" */
 long Locbit = LLITOUT;	/* Bit SUPPOSED to disable output translations */
-#include <strings.h>
 #endif
+#include <strings.h>
+char *ttyname(), *getenv();
 #endif
 
 #ifdef USG
@@ -28,6 +29,8 @@ long Locbit = LLITOUT;	/* Bit SUPPOSED to disable output translations */
 #define OS "SYS III/V"
 #define MODE2OK
 #include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
 #endif
 
 #ifdef POSIX
@@ -39,6 +42,8 @@ long Locbit = LLITOUT;	/* Bit SUPPOSED to disable output translations */
 #include <termios.h>
 #define OS "POSIX"
 #include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
 #ifndef READCHECK
 #ifndef FIONREAD
 #define SV
@@ -66,6 +71,7 @@ Howmany must be 255 or less
 #define sendline(c) putc(c & 0377, Ttystream)
 #define xsendline(c) putc(c, Ttystream)
 
+char *Nametty;
 FILE *Ttystream;
 FILE *Logstream;
 int Tty;
@@ -80,9 +86,6 @@ int Readnum = 1;	/* Number of bytes to ask for in read() from modem */
 int Readnum = HOWMANY;	/* Number of bytes to ask for in read() from modem */
 #endif
 int Verbose=0;
-
-
-int Twostop;		/* Use two stop bits */
 
 
 /*
@@ -123,7 +126,11 @@ rdchk(f)
 	static char bchecked;
 
 	savestat = fcntl(f, F_GETFL) ;
-	fcntl(f, F_SETFL, savestat | O_NONBLOCK) ;
+#ifdef O_NDELAY
+	fcntl(f, F_SETFL, savestat | O_NDELAY) ;
+#else
+  	fcntl(f, F_SETFL, savestat | O_NONBLOCK) ;
+#endif
 	lf = read(f, &bchecked, 1) ;
 	fcntl(f, F_SETFL, savestat) ;
 	checked = bchecked & 0377;	/* force unsigned byte */
@@ -176,8 +183,6 @@ getspeed(code)
 }
 
 
-
-
 #ifdef ICANON
 #ifdef POSIX
 struct termios oldtty, tty;
@@ -219,8 +224,6 @@ mode(n)
 
 		tty.c_cflag &= ~(PARENB|CSIZE);		/* Disable parity */
 		tty.c_cflag |= (CREAD|CS8);	/* Set character size = 8 */
-		if (Twostop)
-			tty.c_cflag |= CSTOPB;	/* Set two stop bits */
 
 
 #ifdef READCHECK
@@ -264,8 +267,6 @@ mode(n)
 
 		tty.c_cflag &= ~(CSIZE|PARENB);	/* disable parity */
 		tty.c_cflag |= CS8;	/* Set character size = 8 */
-		if (Twostop)
-			tty.c_cflag |= CSTOPB;	/* Set two stop bits */
 #ifdef NFGVMIN
 		tty.c_cc[VMIN] = 1; /* This many chars satisfies reads */
 #else
@@ -402,6 +403,9 @@ inittty()
 {
 	Tty = 0;
 	Ttystream = stdout;
+	Nametty = ttyname(Tty);
+	if (!Nametty || !*Nametty)
+		Nametty = "|pipe|";
 	Logstream = stderr;
 	setbuf(Ttystream, xXbuf);
 }

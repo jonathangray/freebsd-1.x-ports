@@ -1,4 +1,4 @@
-#define VERSION "3.24.4 11-04-93"
+#define VERSION "3.32.1 02-18-94"
 #ifdef __386BSD__
 #define PUBDIR "/var/spool/uucppublic"
 #else
@@ -7,7 +7,7 @@
 /*
  *
  * rz.c By Chuck Forsberg
- *    Copyright 1993 Omen Technology Inc All Rights Reserved
+ *    Copyright 1994 Omen Technology Inc All Rights Reserved
  *
  * A program for Unix to receive files and commands from computers running
  *  Professional-YAM, PowerCom, YAM, IMP, or programs supporting XMODEM.
@@ -25,10 +25,12 @@
  *  Technology products.  Use with other commercial or shareware
  *  programs (Crosstalk, Procomm, etc.) REQUIRES REGISTRATION.
  *
- *  Any programs which use part or all of this software must be
+ *  Any programs which incorporate part or all of this code must be
  *  provided in source form with this notice intact except by
- *  written permission from Omen Technology Incorporated.
+ *  prior written permission from Omen Technology Incorporated.
+ *  This includes compiled executables of this program.
  *
+ *   The .doc files and the file "mailer.rz" must also be included.
  * 
  * Use of this software for commercial or administrative purposes
  * except when exclusively limited to interfacing Omen Technology
@@ -63,7 +65,7 @@
  *  USG UNIX (3.0) ioctl conventions courtesy  Jeff Martin
  */
 
-char *Copyrrz = "Copyright 1993 Omen Technology Inc All Rights Reserved";
+char *Copyrrz = "Copyright 1994 Omen Technology Inc All Rights Reserved";
 
 
 #define LOGFILE "/tmp/rzlog"
@@ -125,13 +127,13 @@ FILE *fout;
  * Routine to calculate the free bytes on the current file system
  *  ~0 means many free bytes (unknown)
  */
-unsigned long getfree()
+long getfree()
 {
-	return(~0L);	/* many free bytes ... */
+	return(2147483647);	/* many free bytes ... */
 }
 
 int Lastrx;
-unsigned long rxbytes;
+long rxbytes;
 int Crcflg;
 int Firstsec;
 int Eofseen;		/* indicates cpm eof (^Z) has been received */
@@ -139,11 +141,11 @@ int errors;
 int Restricted=0;	/* restricted; no /.. or ../ in filenames */
 
 #define DEFBYTL 2000000000L	/* default rx file size */
-long Bytesleft;        /* number of bytes of incoming file left */
+long Bytesleft;	/* number of bytes of incoming file left */
 long Modtime;		/* Unix style mod time for incoming file */
 int Filemode;		/* Unix style mode for incoming file */
-unsigned long Totalleft;
-unsigned long Filesleft;
+long Totalleft;
+long Filesleft;
 char Pathname[PATHLEN];
 char *Progname;		/* the name by which we were called */
 
@@ -209,7 +211,6 @@ char *argv[];
 	register char *cp;
 	register npats;
 	char *virgin, **patts;
-	char *getenv();
 	int exitcode = 0;
 
 	Rxtimeout = 100;
@@ -222,10 +223,14 @@ char *argv[];
 	while (--argc) {
 		cp = *++argv;
 		if (*cp == '-') {
-			while( *++cp) {
-				switch(*cp) {
+			++cp;
+			while( *cp) {
+				if (isdigit(*cp)) {
+					++cp;  continue;
+				}
+				switch(*cp++) {
 				case '\\':
-					 cp[1] = toupper(cp[1]);  continue;
+					 *cp = toupper(*cp);  continue;
 				case 'a':
 					if (!Batch || Nozmodem)
 						Rxascii=TRUE;
@@ -233,18 +238,24 @@ char *argv[];
 						usage();
 					break;
 				case 't':
-					if (--argc < 1) {
-						usage();
+					if (isdigit(*cp))
+						Rxtimeout = atoi(cp);
+					else {
+						if (--argc < 1)
+							usage();
+						Rxtimeout = atoi(*++argv);
 					}
-					Rxtimeout = atoi(*++argv);
-					if (Rxtimeout<10 || Rxtimeout>1000)
+					if (Rxtimeout<1 || Rxtimeout>1000)
 						usage();
 					break;
 				case 'w':
-					if (--argc < 1) {
-						usage();
+					if (isdigit(*cp))
+						Zrwindow = atoi(cp);
+					else {
+						if (--argc < 1)
+							usage();
+						Zrwindow = atoi(*++argv);
 					}
-					Zrwindow = atoi(*++argv);
 					break;
 				case 'V':
 					log_to_screen = 1;
@@ -276,7 +287,7 @@ char *argv[];
 		setbuf(Logstream, NULL);
 		fprintf(Logstream, "argv[0]=%s Progname=%s\n", virgin, Progname);
 	}
-	vfile("%s %s for %s\n", Progname, VERSION, OS);
+	vfile("%s %s for %s tty=%s\n", Progname, VERSION, OS, Nametty);
 	mode(1);
 	if (signal(SIGINT, bibi) == SIG_IGN) {
 		signal(SIGINT, SIG_IGN); signal(SIGKILL, SIG_IGN);
@@ -326,9 +337,11 @@ usage()
 "Supports incoming ZMODEM binary (-b), ASCII CR/LF>NL (-a), newer(-n),\n\
 	newer+longer(-N), protect (-p), Crash Recovery (-r),\n\
 clobber (-y), match+clobber (-Y), compression (-Z), and append (-+).\n\n");
-	fprintf(stderr,"Copyright 1993 Omen Technology INC All Rights Reserved\n");
+	fprintf(stderr,"Copyright 1994 Omen Technology INC All Rights Reserved\n");
 	fprintf(stderr,
 	"See rz.doc for option descriptions and licensing information.\n\n");
+	fprintf(stderr,
+	"This program is intended to interface with terminal programs,\nnot to act as one.\n\n");
 	exit(2);
 }
 
@@ -429,7 +442,6 @@ wcrx()
 {
 	register int sectnum, sectcurr;
 	register char sendchar;
-	register char *p;
 	int cblklen;			/* bytes to dump this block */
 
 	Firstsec=TRUE;sectnum=0; Eofseen=FALSE;
@@ -574,7 +586,7 @@ humbug:
 procheader(name)
 char *name;
 {
-	register char *openmode, *p, **pp;
+	register char *openmode, *p;
 	static dummy;
 	struct stat f;
 
@@ -700,7 +712,6 @@ register char *pathname;
 	register char *p;		/* Points into path */
 	int madeone = 0;		/* Did we do anything yet? */
 	int save_errno = errno;		/* Remember caller's errno */
-	char *strchr();
 
 	if (errno != ENOENT)
 		return 0;		/* Not our problem */
@@ -952,7 +963,7 @@ tryz()
 		if (tryzhdrtype == ZSKIP)	/* Don't skip too far */
 			tryzhdrtype = ZRINIT;	/* CAF 8-21-87 */
 again:
-		switch (zgethdr(Rxhdr, 0)) {
+		switch (zgethdr(Rxhdr)) {
 		case ZRQINIT:
 			if (Rxhdr[ZF3] & 0x80)
 				Usevhdrs = 1;	/* we can var header */
@@ -997,7 +1008,7 @@ again:
 				do {
 					zshhdr(4,ZCOMPL, Txhdr);
 				}
-				while (++errors<20 && zgethdr(Rxhdr,1) != ZFIN);
+				while (++errors<20 && zgethdr(Rxhdr) != ZFIN);
 				ackbibi();
 				if (cmdzack1flg & ZCACK1)
 					exec2(secbuf);
@@ -1067,7 +1078,7 @@ rzfile()
 		stohdr(rxbytes);
 		zshhdr(4,ZRPOS, Txhdr);
 nxthdr:
-		switch (c = zgethdr(Rxhdr, 0)) {
+		switch (c = zgethdr(Rxhdr)) {
 		default:
 			vfile("rzfile: Wrong header %d", c);
 			if ( --n < 0) {

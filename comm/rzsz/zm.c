@@ -1,16 +1,16 @@
 /*
  *   Z M . C
- *    Copyright 1993 Omen Technology Inc All Rights Reserved
+ *    Copyright 1994 Omen Technology Inc All Rights Reserved
  *    ZMODEM protocol primitives
  *
  * Entry point Functions:
  *	zsbhdr(type, hdr) send binary header
  *	zshhdr(type, hdr) send hex header
- *	zgethdr(hdr, eflag) receive header - binary or hex
+ *	zgethdr(hdr) receive header - binary or hex
  *	zsdata(buf, len, frameend) send data
  *	zrdata(buf, len) receive data
  *	stohdr(pos) store position data in Txhdr
- *	unsigned long rclhdr(hdr) recover position offset from header
+ *	long rclhdr(hdr) recover position offset from header
  * 
  *
  *	This version implements numerous enhancements including ZMODEM
@@ -60,8 +60,8 @@ int Rxhlen;		/* Length of header received */
 int Rxcount;		/* Count of data bytes received */
 char Rxhdr[ZMAXHLEN];	/* Received header */
 char Txhdr[ZMAXHLEN];	/* Transmitted header */
-unsigned long Rxpos;		/* Received file position */
-unsigned long Txpos;		/* Transmitted file position */
+long Rxpos;		/* Received file position */
+long Txpos;		/* Transmitted file position */
 int Txfcs32;		/* TURE means send binary frames with 32 bit FCS */
 int Crc32t;		/* Controls 32 bit CRC being sent */
 			/* 1 == CRC32,  2 == CRC32 + RLE */
@@ -405,17 +405,13 @@ garbitch()
 
 /*
  * Read a ZMODEM header to hdr, either binary or hex.
- *  eflag controls local display of non zmodem characters:
- *	0:  no display
- *	1:  display printing characters only
- *	2:  display all non ZMODEM characters
  *
  *   Set Rxhlen to size of header (default 4) (valid iff good hdr)
  *  On success, set Zmodem to 1, set Rxpos and return type of header.
  *   Otherwise return negative on error.
  *   Return ERROR instantly if ZCRCW sequence, for fast error recovery.
  */
-zgethdr(hdr, eflag)
+zgethdr(hdr)
 char *hdr;
 {
 	register int c, n, cancount;
@@ -438,11 +434,11 @@ gotcan:
 		if (--cancount <= 0) {
 			c = ZCAN; goto fifi;
 		}
-		switch (c = readline(1)) {
+		switch (c = readline(Rxtimeout)) {
 		case TIMEOUT:
 			goto again;
 		case ZCRCW:
-			switch (readline(1)) {
+			switch (readline(Rxtimeout)) {
 			case TIMEOUT:
 				c = ERROR; goto fifi;
 			case RCDO:
@@ -677,10 +673,10 @@ char *hdr;
 	if (crc & 0xFFFF) {
 		zperr(badcrc); return ERROR;
 	}
-	c = readline(2);
+	c = readline(Rxtimeout);
 	if (c < 0)
 		return c;
-	c = readline(2);
+	c = readline(Rxtimeout);
 #ifdef ZMODEM
 	Protocol = ZMODEM;
 #endif
@@ -709,6 +705,7 @@ register int c;
  *  Escape XON, XOFF. Escape CR following @ (Telenet net escape)
  */
 zsendline(c)
+register c;
 {
 
 	/* Quick check for non control characters */
@@ -717,29 +714,15 @@ zsendline(c)
 	else {
 		switch (c &= 0377) {
 		case ZDLE:
-			xsendline(ZDLE);
-			xsendline (lastsent = (c ^= 0100));
+			xsendline(ZDLE);  xsendline (lastsent = (c ^= 0100));
 			break;
-		case 015:
-		case 0215:
-			if (!Zctlesc && (lastsent & 0177) != '@')
-				goto sendit;
-		/* **** FALL THRU TO **** */
-		case 020:
-		case 021:
-		case 023:
-		case 0220:
-		case 0221:
-		case 0223:
-			xsendline(ZDLE);
-			c ^= 0100;
-	sendit:
-			xsendline(lastsent = c);
+		case 021: case 023:
+		case 0221: case 0223:
+			xsendline(ZDLE);  c ^= 0100;  xsendline(lastsent = c);
 			break;
 		default:
 			if (Zctlesc && ! (c & 0140)) {
-				xsendline(ZDLE);
-				c ^= 0100;
+				xsendline(ZDLE);  c ^= 0100;
 			}
 			xsendline(lastsent = c);
 		}
@@ -873,7 +856,7 @@ noxrd7()
 
 /* Store long integer pos in Txhdr */
 stohdr(pos)
-unsigned long pos;
+long pos;
 {
 	Txhdr[ZP0] = pos;
 	Txhdr[ZP1] = pos>>8;
@@ -881,12 +864,12 @@ unsigned long pos;
 	Txhdr[ZP3] = pos>>24;
 }
 
-/* Recover a unsigned long integer from a header */
-unsigned long
+/* Recover a long integer from a header */
+long
 rclhdr(hdr)
 register char *hdr;
 {
-	register unsigned long l;
+	register long l;
 
 	l = (hdr[ZP3] & 0377);
 	l = (l << 8) | (hdr[ZP2] & 0377);
