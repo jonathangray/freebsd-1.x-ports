@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.12 1994/04/11 15:03:16 jkh Exp $
+# $Id: Makefile,v 1.13 1994/07/05 21:26:56 ache Exp $
 #	Makefile.std	4.3	6/11/83
 #
 # C Shell with process control; VM/UNIX VAX Makefile
@@ -8,7 +8,7 @@
 # things; Paul Placeway, CIS Dept., Ohio State University
 #
 SHELL=/bin/sh
-VERSION=6.04
+VERSION=6.05
 BUILD=tcsh
 
 ################################################################
@@ -43,10 +43,10 @@ LFLAGS=$(INCLUDES)
 
 # gcc 2.0
 # On the sparc, don't use -O2; it breaks setjmp() and vfork()
-#CFLAGS=-O $(INCLUDES)
+CFLAGS=-O $(INCLUDES)
 
 # gcc-2.1+
-CFLAGS=-O2 $(INCLUDES)
+#CFLAGS=-O2 $(INCLUDES)
 
 # lucid c on suns
 #CFLAGS=-O5 $(INCLUDES)
@@ -54,7 +54,7 @@ CFLAGS=-O2 $(INCLUDES)
 # gcc 2.1 on linux
 #CFLAGS=-O6 -fomit-frame-pointer $(INCLUDES)
 
-#hpux 8.0, careful about the +O3... breaks globbing in some versions
+# HP/UX 8.0, 9.0
 #CFLAGS= $(INCLUDES) +O3 -Aa
 
 # Ultrix 4.2a
@@ -62,6 +62,13 @@ CFLAGS=-O2 $(INCLUDES)
 
 # Intel Paragon OSF/1 with PGI compilers
 #CFLAGS=-O -Mnodebug -Mnoperfmon $(INCLUDES)
+
+# DEC Alpha OSF/1
+#CFLAGS= -O2 $(INCLUDES) -Olimit 2000	## Normal Optimization
+#CFLAGS= -O3 $(INCLUDES) -Olimit 2000	## Full Optimization - may not work
+#CF=-j
+#SUF=u
+#.SUFFIXES: .u
 
 # for silicon graphics (and other mips compilers) -- use the
 # global optimizer! (-O3).
@@ -84,11 +91,17 @@ CFLAGS=-O2 $(INCLUDES)
 # Stardent Stellar or sunos4 /bin/cc or Solaris2.1 /opt/SUNWspro/bin/cc
 #CFLAGS = $(INCLUDES) -O4
 
+# Intergraph clipper CLIX 3.1
+#CFLAGS= -w -O2 $(INCLUDES)
+
 # Dnix 5.3
 #CFLAGS = -O -X7
 
 # Pyramid OS/x
 #CFLAGS = -OG
+
+# Multiflow (5M binary... if you choose -O5!)
+#CFLAGS = -O5 -sb_trace 0
 
 # Apollo's with cc [apollo builtins don't work with gcc]
 # and apollo should not define __STDC__ if it does not have
@@ -102,16 +115,17 @@ CFLAGS=-O2 $(INCLUDES)
 # AU/X 2.0 needs a flag for POSIX (read the config file)
 #DFLAGS=-Zp
 # Tektronix 4300 running UTek 4.0 (BSD 4.2) needs:
-#DFLAGS = -DUTek
+#DFLAGS = -DUTek -DBSD
 # VMS_POSIX needs:
 #DFLAGS=-D_VMS_POSIX
-# DEC/osf-1 on the alpha
-#DFLAGS=-D_BSD
+# Multiflow
+#DFLAGS=-DMULTIFLOW
 DFLAGS=
+#DFLAGS=-D_PATH_TCSH='"${DESTBIN}/tcsh"'
 
 
 ################################################################
-## LDLAGS.  Define something here if you need to
+## LDFLAGS.  Define something here if you need to
 ################################################################
 LDFLAGS= 			## The simplest, suitable for all.
 #LDFLAGS= -s			## Stripped. Takes less space on disk.
@@ -126,21 +140,22 @@ LDFLAGS= 			## The simplest, suitable for all.
 ################################################################
 ## LIBES.  Pick one, or roll your own.
 ################################################################
-LIBES= -ltermcap 			 ## BSD style things
+LIBES= -ltermcap -lcrypt		 ## BSD	style things
 #LIBES= -ltermcap			 ## SunOS, HP-UX, pyramid
-#LIBES= -ltermcap -lcs			 ## Mach
+#LIBES= -ltermcap			 ## Linux
+#LIBES= -ltermcap -lshadow		 ## Linux with PW_SHADOW
 #LIBES= -ltermcap -lsec			 ## Tek XD88/10 (UTekV) with PW_SHADOW
 #LIBES= -ltermcap -lsec			 ## Motorola MPC (sysV88) with PW_SHADOW
+#LIBES= -ltermcap -lcs			 ## Mach
 #LIBES= -ltermcap -lbsd			 ## DEC osf1 on the alpha
 #LIBES= -ltermcap -lbsd			 ## Intel paragon
 #LIBES= -ltermcap -lseq			 ## Sequent's Dynix
 #LIBES= -ltermcap -lauth		 ## Ultrix with Enhanced Security
 #LIBES= -ltermcap -ldir -lx		 ## Xenix 386 style things
 #LIBES= -ltermcap -lndir -lsocket -ljobs ## masscomp RTU6.0
-#LIBES= -ltermc				 ## emx under OS/2
 #LIBES= -lcurses			 ## AIX on the rt
 #LIBES= -lcurses			 ## TitanOS on the stellar
-#LIBES= -lcurses			 ## SysV4 w/o BSDTIMES or Solaris 2
+#LIBES= -ltermlib -lsocket -lnsl	 ## SysV4 w/o BSDTIMES or Solaris 2
 #LIBES= -lcurses			 ## SysV3 w/o networking
 #LIBES= -lcurses -lnet			 ## SysV3 with networking
 #LIBES= -lcurses -ldir			 ## SysV2 w/o networking & dirlib
@@ -163,10 +178,33 @@ LIBES= -ltermcap 			 ## BSD style things
 #LIBES= -lposix -ltermcap -lc_s		 ## A/UX 3.0
 #LIBES= -ldirent -lcurses		 ## att3b1 cc w/o shared lib & dirlib
 #LIBES= -shlib -ldirent -lcurses	 ## att3b1 gcc with shared lib & dirlib
-#LIBES= -lcurses -lc /usr/ucblib/libucb.a		 ## SysV4 with BSDTIMES
+#LIBES= -ltermlib -lsocket -lnsl -lc /usr/ucblib/libucb.a ## SysV4 with BSDTIMES
 #LIBES= -lcurses -lnsl -lsocket -lc /usr/ucblib/libucb.a ## Stardent Vistra
 #LIBES= -ltermc				 ## emx under OS/2
 #LIBES=					 ## Minix, VMS_POSIX
+#LIBES= -ltermcap -lcrypt		 ## Multiflow
+
+################################################################
+## EXTRAFLAGS and EXTRALIBS
+################################################################
+# Compiling for HESIOD
+#HESDEF = -DHESIOD -I/usr/athena/include
+#HESLIB = -L/usr/athena/lib -lhesiod
+HESDEF=
+HESLIB=
+#
+# Compiling for AFS with kerberos authentication
+#AFSLIBDIR = /usr/afsws/lib
+#AFSDEF = -DAFS -I/usr/afsws/include
+#AFSLIB = -L$(AFSLIBDIR) -L$(AFSLIBDIR)/afs -lkauth -lprot -lubik\
+#         -lauth -lrxkad -lsys -ldes -lrx -llwp -lcom_err\
+#         $(AFSLIBDIR)/afs/util.a
+#
+AFSDEF=
+AFSLIB=
+
+EXTRAFLAGS = $(HESDEF) $(AFSDEF)
+EXTRALIBS = $(HESLIB) $(AFSLIB)
 
 
 # The difficult choice of a c-compiler...
@@ -179,7 +217,8 @@ LIBES= -ltermcap 			 ## BSD style things
 
 # The -B tells gcc to use /bin/ld. This is to avoid using the gnu ld, which
 # on the suns does not know how to make dynamically linked binaries.
-CC=	gcc -Wall #-B/bin/	 -ansi -pedantic
+CC=cc -Wall
+#CC=	gcc -Wall -B/bin/	# -ansi	-pedantic
 #CC=	gcc -m486 -Wall # Generate code for Intel 486 (linux)
 #CC=	cc
 #CC=	occ
@@ -240,8 +279,8 @@ TCSRCS= tc.alloc.c tc.bind.c tc.const.c tc.decls.h tc.disc.c \
 	tc.func.c tc.os.c tc.os.h tc.printf.c tc.prompt.c \
 	tc.sched.c tc.sig.c tc.sig.h tc.str.c sh.types.h tc.vers.c tc.wait.h \
 	tc.who.c tc.h
-TCOBJS=	tc.alloc.${SUF} tc.bind.${SUF} tc.const.${SUF} tc.disc.${SUF} \
-	tc.func.${SUF} tc.os.${SUF} tc.printf.${SUF} \
+TCOBJS=	tc.alloc.${SUF} tc.bind.${SUF} tc.const.${SUF} tc.defs.${SUF} \
+	tc.disc.${SUF} tc.func.${SUF} tc.os.${SUF} tc.printf.${SUF} \
 	tc.prompt.${SUF} tc.sched.${SUF} tc.sig.${SUF} tc.str.${SUF} \
 	tc.vers.${SUF} tc.who.${SUF} 
 
@@ -249,10 +288,12 @@ PVSRCS= Makefile.std Makefile.vms
 AVSRCS= Fixes MAKEDIFFS MAKESHAR NewThings README FAQ \
 	WishList config_f.h eight-bit.me glob.3 patchlevel.h \
 	pathnames.h tcsh.man Ported src.desc Imakefile imake.config \
-	README.imake complete.tcsh vmsreadme.txt termcap.vms snames.h
+	README.imake complete.tcsh vmsreadme.txt termcap.vms snames.h \
+	host.defs gethost.c tcsh.man2html
+
 VHSRCS=${PVSRCS} ${AVSRCS}
 
-CONFSRCS=config/config.* 
+CONFSRCS=config/* 
 
 ALLSRCS=  ${SHSRCS} ${TWSRCS} ${EDSRCS} ${TCSRCS} ${VHSRCS}
 DISTSRCS= ${PSSRCS} ${TWSRCS} ${EDSRCS} ${TCSRCS} ${AVSRCS}
@@ -265,15 +306,24 @@ all: ${BUILD}
 
 tcsh:$(P) ${OBJS} 
 	rm -f tcsh core
-	${CC} -o tcsh ${LDFLAGS} ${CFLAGS} ${OBJS} ${LIBES}
+	${CC} -o tcsh ${LDFLAGS} ${CFLAGS} ${OBJS} ${LIBES} ${EXTRALIBS}
 
 # Purify
 pure:$(P) ${OBJS} 
 	rm -f tcsh core
-	purify `echo ${CC} | sed -e s,-B/bin/,,` -o tcsh ${LDFLAGS} ${CFLAGS} ${OBJS} ${LIBES}
+	purify `echo ${CC} | sed -e s,-B/bin/,,` -o tcsh ${LDFLAGS} ${CFLAGS} ${OBJS} ${LIBES} ${EXTRALIBS}
 # OS/2
 tcsh.exe: tcsh
 	emxbind tcsh
+
+gethost:  gethost.c sh.err.h tc.const.h sh.h
+	rm -f gethost
+	${CC} -o gethost ${LDFLAGS} ${CFLAGS} ${DFLAGS} gethost.c ${LIBES} ${EXTRALIBS}
+
+tc.defs.c:	gethost host.defs
+	@rm -f $@
+	@echo "/* Do not edit this file, make creates it */" > $@
+	./gethost host.defs >> $@
 
 tcsh.ps: tcsh.man
 	rm -f tcsh.ps
@@ -281,13 +331,13 @@ tcsh.ps: tcsh.man
 
 
 .c.${SUF}:
-	${CC} ${CF} ${CFLAGS} ${DFLAGS} $<
+	${CC} ${CF} ${CFLAGS} ${DFLAGS} ${EXTRAFLAGS} $<
 
 # _VMS_POSIX #module addition
 #.c.${SUF}:
 #	@(echo '#module '`echo $< | sed -e 's/\./_/g'`; cat $<) > $*..c
-#	@echo ${CC} ${CF} ${CFLAGS} ${DFLAGS} $*.c
-#	@${CC} ${CF} ${CFLAGS} ${DFLAGS} $*..c
+#	@echo ${CC} ${CF} ${CFLAGS} ${DFLAGS} ${EXTRAFLAGS} $*.c
+#	@${CC} ${CF} ${CFLAGS} ${DFLAGS} ${EXTRAFLAGS} $*..c
 #	@mv $*..o $*.o
 #	@rm -f $*..c
 
@@ -341,7 +391,7 @@ tc.const.h: tc.const.c sh.char.h config.h config_f.h sh.types.h sh.err.h
 	@echo '#define _h_tc_const' >> $@
 	${CC} -E $(INCLUDES) ${DFLAGS} -D_h_tc_const tc.const.c | \
 	    grep 'Char STR' | \
-	    sed -e 's/Char \([a-zA-Z0-9_]*\)\(.*\)/extern Char \1[];/' | \
+	    sed -e 's/Char \([a-zA-Z0-9_]*\)\[\].*/extern Char \1[];/' | \
 	    sort >> $@
 	@echo '#endif /* _h_tc_const */' >> $@
 
@@ -354,10 +404,10 @@ sh.prof.${SUF}:
 	${CC} ${CF} ${CFLAGS} -DPROF sh.prof.c
 
 lint: tc.const.h ed.defns.h
-	lint ${LFLAGS} sh*.c tw*.c ed*.c tc.*.c ${LIBES}
+	lint ${DFLAGS} ${LFLAGS} sh*.c tw*.c ed*.c tc.*.c ${LIBES}
 
 alint: tc.const.h ed.defns.h
-	alint ${LFLAGS} sh*.c tw*.c ed*.c tc.*.c ${LIBES}
+	alint ${DFLAGS} ${LFLAGS} sh*.c tw*.c ed*.c tc.*.c ${LIBES}
 
 print:
 	@pr READ_ME
@@ -382,32 +432,32 @@ vgrind:
 	@for i in *.c; do vgrind -t -h "C Shell" $$i >/crp/bill/csh/$$i.t; done
 	@vgrind -t -x -h Index index >/crp/bill/csh/index.t
 
-install: tcsh manpage
+install: tcsh 
 	-mv -f ${DESTBIN}/tcsh  ${DESTBIN}/tcsh.old
 	cp tcsh ${DESTBIN}/tcsh
 	-strip ${DESTBIN}/tcsh
 	chmod 555 ${DESTBIN}/tcsh
 
-manpage: tcsh.man
+install.man: tcsh.man
 	-rm -f ${DESTMAN}/tcsh.${MANSECT}
 	cp tcsh.man ${DESTMAN}/tcsh.${MANSECT}
 	chmod 444 ${DESTMAN}/tcsh.${MANSECT}
 
 # Amiga Unix
-#manpage: tcsh.man
+#install.man: tcsh.man
 #        compress tcsh.man
 #	cp tcsh.man.Z ${DESTMAN}/tcsh.Z
 #	chmod 444 ${DESTMAN}/tcsh.Z
 
 # Apple A/UX
-#manpage: tcsh.man
+#install.man: tcsh.man
 #	-rm -f ${DESTMAN}/tcsh.${MANSECT}.Z
 #	nroff -man tcsh.man | compress > ${DESTMAN}/tcsh.${MANSECT}.Z
 #	chmod 444 ${DESTMAN}/tcsh.${MANSECT}.Z
 
 clean:
-	${RM} -f a.out strings x.c xs.c tcsh tcsh.a _MAKE_LOG core
-	${RM} -f *.${SUF} sh.prof.c ed.defns.h tc.const.h sh.err.h
+	${RM} -f a.out strings x.c xs.c tcsh tcsh.a _MAKE_LOG core gethost
+	${RM} -f *.${SUF} sh.prof.c ed.defns.h tc.const.h sh.err.h tc.defs.c
 
 veryclean: clean
 	${RM} -f *~ #*
@@ -486,7 +536,6 @@ ftp: tcsh-${VERSION}.tar.Z tcsh.tahoe-${VERSION}.tar.Z
 	cp tcsh-${VERSION}.tar.Z tcsh.tahoe-${VERSION}.tar.Z ${FTPAREA}
 	cp tcsh.man ${FTPAREA}
 
-
 package:	pkg_bin
 
 pkg_bin: install pkg/+DESC pkg/+ONELINE pkg/+PLIST
@@ -522,3 +571,6 @@ glob.${SUF} sh.glob.${SUF}: glob.h
 # ed.defns.h
 EDDINC=tc.bind.${SUF} tc.func.${SUF} tc.os.${SUF}
 ${EDOBJS} ${EDDINC}: ed.defns.h
+
+# tc.defs.o
+tc.defs.${SUF}:	tc.defs.c sh.h

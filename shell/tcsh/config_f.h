@@ -1,4 +1,4 @@
-/* $Header: /a/cvs/386BSD/ports/shell/tcsh/config_f.h,v 1.3 1993/11/13 01:06:36 ache Exp $ */
+/* $Header: /a/cvs/386BSD/ports/shell/tcsh/config_f.h,v 1.4 1994/07/05 21:26:59 ache Exp $ */
 /*
  * config_f.h -- configure various defines for tcsh
  *
@@ -56,7 +56,7 @@
  *		if you don't have <locale.h>, you don't want
  *		to define this.
  */
-#undef NLS
+#define NLS
 
 /*
  * LOGINFIRST   Source ~/.login before ~/.cshrc
@@ -90,7 +90,7 @@
  *		on the name of the tty, and environment.
  *		Does not make sense in the modern window systems!
  */
-#undef AUTOLOGOUT
+#define AUTOLOGOUT
 
 /*
  * SUSPENDED	Newer shells say 'Suspended' instead of 'Stopped'.
@@ -106,6 +106,11 @@
 #undef KANJI
 
 /*
+ * NEWGRP	Provide a newgrp builtin.
+ */
+#undef NEWGRP
+
+/*
  * SYSMALLOC	Use the system provided version of malloc and friends.
  *		This can be much slower and no memory statistics will be
  *		provided.
@@ -117,10 +122,18 @@
 #endif
 
 /*
+ * REMOTEHOST	Try to determine the remote host that we logged in from
+ *		using first getpeername, and then the utmp file. If
+ *		successful, set $REMOTEHOST to the name or address of the
+ *		host
+ */
+#define REMOTEHOST
+
+/*
  * RCSID	This defines if we want rcs strings in the binary or not
  *
  */
-#if !defined(lint) && !defined(SABER)
+#if !defined(lint) && !defined(SABER) && !defined(__CLCC__)
 # ifndef __GNUC__
 #  define RCSID(id) static char *rcsid = (id);
 # else
