@@ -62,3 +62,4 @@ tartape:
 install:
 	install -c libezd.a /usr/local/lib
 	install -cs ezd /usr/local/bin
+	install -c -m 655 doc/ezd.1 /usr/local/man/man1
