@@ -1,0 +1,882 @@
+
+Version 2.14b:
+    * The silly AutmoZmodem bug is fixed. AutoZmodem is back! Make
+      sure you set the resource autoZmodemAction properly.
+    * Upgraded the MultiList widget to version 3.4. Also changed the
+      tranlation a bit. It's now like this:
+
+        Button1 (left) - SingleClick: Select (like before)
+        Button1 (left) - DoubleClick: Select and Launch (like before)
+        Button2 (middle) - SingleClick: Select and Launch
+        Button3 (right) - SingleClick: Select
+        Button3 (right) - Motion: Extend Select
+
+    * Seyon now restores the original modem attributes on exit. So if
+      you have CLOCAL unset before launching Seyon, it'll be unset
+      after exiting Seyon. 
+    (2.13b)
+    * Tried to fix a problem with KillTerminal on SVR4 systems,
+      whether successful or not remains to be seen.
+    * The terminal used to be killed and restarted quite a few times
+      (e.g. after connection, after a script, after changing a
+      sparameter via the Set window). Now it almost never gets killed,
+      all communications between the main process and the terminal is
+      done via a pipe.
+    * New buttons under the Misc window: Edit and View, for editing
+      and viewing files - replete with search/replace ..etc.
+    * The resource zmodemAutoDownload is renamed to autoZmodem, and
+      the resource zmodemAutoDownloadCommand is no longer supported,
+      it's been superseeded by autoZmodemAction (see below).
+    * New resource: autoZmodemAction. This is a simple or compound
+      action that will be executed when Zmodem auto-download signature
+      is detected. This action will be executed only if the resource
+      autoZmodem is enabled (see above). Default is
+      ``ShellCommand($rz);''. As you can see, this is much more
+      general than than the old zmodemAutoDownloadCommand resource.
+      For example, you can make that ``Beep(); ShellCommand($rz);'' to
+      make Seyon ring th ebell beofr etsarting Zmodem.
+    * The beep is now a bit fancier.
+    * New resource: startupAction. This is a simple or compound action
+      that will be executed on startup. This action is executed prior
+      to running any script (in case the -script switch is given) or
+      dialing any entry of the dialing directory (in case the -dial
+      switch is given or the resource dialAutoStart is enabled). You
+      can make Seyon open the dialing directory automatically on
+      startup by using the simple action ``OpenWidnow(Dial);'' as a
+      constituent of this complex action stack. Note that running the
+      startup script is just a special case of this resource
+    * The resource dialDirAutoOpen is no longer supported. It's been
+      superseeded by the resource startupAction, which is much more
+      general. 
+    * Cleaned up the FAQ a bit.
+    * Some other misc. code cleanups.
+    (2.12)
+    * The ill-fated change to the way the terminal is stopped/
+      restarted is gone. Not to declare total defeat, I'm not back to
+      the old method (which has always worked), but a new (third)
+      method is introduced. This one doesn't rely on the operating
+      system, but does its own dirty work, so it should work well on
+      all platforms.
+    * The entire manual is now available on-line via the Help button.
+    (2.11)
+    * Just some cosmetic changes and a small fix for SunOS 3.x.
+    * Corrections to the manual.
+    (2.10)
+    * New actions: OpenWindow, IconifyWindow, and CloseWindow. The
+      first two can take the arguments Main, Dial, and Term,
+      corresponding to the command center, the dialing directory, and
+      the terminal windows, respectively. The third can take the
+      argument Dial. More than one argument can be given, for example:
+      ``IconifyWindow(Main, Dial, Term);'' will iconify all three
+      windows. Term is guaranteed to work only with terminal emulators
+      that set the environment variable WINDOWID, like xterm. The
+      manual has more details on all of these actions. OpenDialDir is
+      no longer supported since it's obsolete.
+    * Fixed a bug in the dialing process that manifeted itself on SVR4
+      systems. Thanks to Felix Blank for the fix.
+    * Translations for SeQuickKeys are now more robust, and SeQuickKey
+      buttons now behave like other normal buttons.
+    * The resource and command line switch ``modem'' is now replaced
+      by ``modems''. This is a list of modems that Seyon will try one
+      after the other on startup until it finds an available modem.
+      Great for modem pools. MAKE SURE YOU CHANGE THE NAME OF YOUR
+      RESOURCE FROM MODEM TO MODEMS OR SEYON WILL NOT RUN.
+    * Seyon used to kill the terminal process before running routines
+      that take control of the terminal (like dialing, script
+      execution, ..etc) and restart it again after those routines are
+      finished. Now Seyon merely suspends the terminal instead of
+      killing it. This is more CPU-efficient since a fork() call is
+      avoided each time. It's a bit less memory efficient, however,
+      since the terminal process hangs around instead of being killed,
+      but that process can be swapped out if memory is tight. THIS IS
+      A CAN OF WORM, and there can be bugs caused by the new behavior.
+      Watch out.
+    * SeQuickKeys implementation is totally revised and rewritten.
+      SeQuickKeys are now specified like this:
+
+                  Seyon*quickKey1.visible: on
+                  Seyon*quickKey1.action: FileTransfer(1, file); Beep(); 
+                  Seyon*quickKey1.label: Upload
+
+      The first resource specifies that the given SeQuickKey should be
+      visible. The second specifies the action attached to that key,
+      and the third the label. Nte the new C-like syntax and that
+      asynchronous actions can be anywhere in the action stack, see
+      below.
+    * You can no longer use QuickKeyX, it has to be quickKeyX (i.e.
+      first letter is not capital. The class name for all SeQuickKeys
+      is now Command.
+    * Actions now use a syntax similar to C. Semicolons delimit simple
+      actions (a semicolon has to be at the end of every simple
+      action), and commas delimit action argumnets.
+    * Asynchronous actions can now be anywhere in a compound action
+      (action stack) and they no longer have to be at the end.
+      However, DialEntries will probably not work correctly if not at
+      the end of a comoupnd action (or alone of course). Others are
+      fine.
+    * The resources dialDirAutoClose, dialDirAutoIconify, and
+      beepOnConnect are no longer supported. They have been superseded
+      by the new resource postConnectAction, which is more flexible.
+      Actions given by this resource will be executed after a
+      connection is made and before running any attached script (they
+      have to be synchronous). Default is ``Beep();''.
+    * New parsing routines graciously contributed by Joaquim Jorge.
+      Those allowed for the new flexibility in SeQuickKeys you see in
+      this release. I'm grateful to him for his contribution.
+    * New action: CloseWindow. Can take the argument ``Dial'' to close
+      the dialing directory window. Useful to use in the new resource
+      postConnectAction. Supersedes the action CloseDialDir, which is
+      no longer supported.
+    * Argument of the action Echo is now optional. If omitted, a
+      newline will be echoed. This is similar to the behavior of the
+      shell command echo.
+    * New resources: hangupViaDTR, modemHangupString, and
+      modemAttentionString. The first supersedes hayesHangup, which is
+      no longer supported. Refer to the manual for more details.
+    * The default now is not to hangup by droping DTR since the latter
+      apparently pisses off modem on mnay plaforms (Sun, SGI, ..etc.).
+      You can use hangupViaDTR to override that.
+    * When hanging up, the hangup and attention strings no longer show
+      up on the terminal, nor the modem response. Looks much cleaner
+      this way.
+    * New actions: Sleep and DoNothing. The first just suspends the
+      program for the given amount of seconds. The second does nothing
+      (similar to NOP). DoNothing is useful to use in actions like
+      postconnectAction to override the default and stop the beep.
+
+Version 2.06:
+    * Help is now a separate button from About and can be held open
+      all the time without affecting other funcions of Seyon (that
+      doesn't mean that help is actually helpful, however :-}).
+    * Instead of beeping when not available, some buttons now become
+      greyed out and unresponsive when not available.
+    * Dial cancelling is improved a bit to be more robust (it's a bit
+      slower to react now though) and you'll no longer see the NO
+      CARRIER message from the modem when you cancel dialing (this is
+      for purely aesthetic reasons).
+    * Fixed a bug that caused segemntation fault on some mahines
+      (notably Suns) -- thanks to the people who reported the problem
+      and to Greg Eisenhauer for the fix. Also added the approrpriate
+      symbol for machines that don't define MAX_INPUT.
+    * Minor changes to accommodate Mips RISCos.
+    * New feature: SeQuickKeys (z quickies). Extremely versatile new
+      addition to Seyon that lets you add your custom buttons to the
+      command center and attach actions to them. Resources related to
+      this feature are quickKeyX (X starts at 1). Each of these
+      resources specifies the action routine for that SeQuickKey
+      button. If the action field is empty, the corresponding
+      SeQuickKey button will not be shown. Labels for those buttons
+      can be set via the resources `Seyon*quickKeyX.label'. Seyon
+      currently offers two actions, more will be added in the future.
+      Available actions are: 1) DialEntries(<entries-list>), which
+      instructs Seyon to dial entries in the dialing directory
+      corresponding by order to the given list. If the list consists
+      of just the word `Default', then the entries given by the
+      resource defaultPhoneEntries will be dialed. 2)
+      RunScript(<script-name>) Executes the script file given by
+      <script-name>.
+    * Added a new button to the dialing directory: Default. If
+      clicked, the entries specified by the resource
+      defaultPhoneEntries will be highlighted. Seyon no longer
+      highlights those entries when Reread is chosen.
+    * Sorted the resources in the manual page alphabetically.
+    * The resource dialCancel is renamed to dialCancelString.
+    * More new actions than you can shake a stick at: Beep,
+      DivertFile, Echo, FileTransfer, Hangup, ManualDial, OpenDialDir,
+      Quit, Set, ShellCommand, and Transmit. Most of these actions
+      take one or two arguments, and can pop up dialog boxes if not
+      all information is provided. Everyone can now have his/her own
+      version of the command center, and the basic buttons are almost
+      obsoleted. Details are in the manual page.
+    * You can stack actions, e.g. Echo("Byebye..") Hangup() Quit()
+      will echo the string, hangup the line, then quit Seyon. You can
+      attach mini-script to SeQuickKeys this way. Examples are in the
+      manual page.
+    * Action DialEntries no longer opens the dialing directory. This
+      way you can attach SeQuickKeys to frequesntly-dialed hosts and
+      completely bypass the dialing directory (I rarely use the
+      dialing directory now). You can still get the behavior by
+      stacking: OpenDialDir() DialEntries(whatever).
+    * You can now have up to 10 SeQuickKeys. This limit is really
+      arbitrary and can be increased any time.
+    * MultiList is now used for the transfer console as well. looks
+      better, and can click Go instead of double-clicking if you like.
+    * Action RunScript will now pop up a dialog box if no script-name
+      is specified.
+	* Quick release to fix some bugs in the new actions.
+	* No more garbage character at end of modem reponses.
+	* Action OpenDialDir now de-iconifies the dialing directory if in
+	  an iconic state. 
+
+Version 2.01:
+    * Fixed a bug that caused a segmentation fault when using both
+      manual dialing and auto-redial.
+    * Added speedup enhancement to the terminal. People with fast
+      machines or slow modems probably won't notice this, but on my
+      hardware (386SX-25 and 9600 bps), the terminal process is about
+      40% faster (rough benchmak: 3 seconds to repaint an Emacs screen
+      compared to 5 seconds). This is done by writing text to the
+      terminal in chuncks instead of a character at a time. I'm
+      interested in feedback about this.
+    * Added toggles to show the modem line status: DCD (Data Carrier
+      Detect), DTR (Data Terminal Ready), DSR (Data Set Ready), RTS
+      (Request To Send), CTS (Clear To Send), and RNG (Ring
+      Indicator).  This, I suspect, won't work for HP-UX, since it
+      does things a bit differently. If your O/S doesn't have support
+      for this (most do), you can disable it by undefining
+      HAVE_MODEM_CONROL in config.h.
+    * Added a clock to show the on-line time. The clock also doubles
+      as a toggle to show the DCD status (see above).
+    * New resource: modemStatusInterval. This resource controls the
+      amount of time (in seconds) between updates to the modem status
+      toggles (including the clock). The default is five seconds, but
+      you can set it to one second (or any other number) if you want
+      the toggles to be updated more frequently. Even if you set this
+      to a large number, Seyon is intellegent enough to update the
+      toggles after each connect or hangup.
+    * New resource: stripHighBit. If set to 'on', the high (eights)
+      bit is stripped from incoming characters. This corresponds to
+      the the old sevenBitMask that was removed a while ago. The
+      corresponding script keyword is also stripHighBit. You can also
+      set this from the settings window.
+    * The lock routines have been revised a bit. Seyon now also
+      supports the inode.major.minor nameing convention for lock files
+      used by SVR4 (thanks to Jeff Johnson and Glenn Geers for the
+      patches).
+    * Revised config.h a bit to be more flexible and more consistent.
+      Especially affected are the lock configurations.
+    * Seyon is now less agressive in speeding up the terminal process
+      (still much seedier than before) to maintain the same level of
+      interactivity as past versions. 
+    * Incororated some modifications to accommodate Solaris (thanks to
+      Tony Vincent-Sun-Vienna for the patches).
+    * New resource: hangupBeforeDial. If set to 'on' (default), then
+      Seyon will hangup the line before dialing (if there is already a
+      connection).
+    * Changed the location of popups a bit. Now most popups are
+      located at the center of their parent buttons.
+    * Modem responses (BUSY, ..etc) now show up in the message area
+      instead of at the terminal when no connection is achieved.      
+    * Cleaned up the code bit and fixed a bug in detecting Zmodem
+      signature that was introduced in the previous version.
+    * HAVE_STRDUP is removed from config.h since strdup is no longer
+      needed.
+    * Now the high bit is always stripped if the character size is
+      different from 8. This is transparaent to the user.
+    * Added a new reource: modemVMin. This specifies the number of
+      characters that should be in the buffer before the read process
+      is satified. The read process will wait until that number of
+      incoming characters is in the buffer or 0.1 second has elapsed
+      between two characters before displaying those incoming
+      characters. This results in the data being displayed in chunks
+      and speeds up the terminal display. The speedup would be most
+      noticeable on slow machnes with fast modems. Leave this resource
+      at its default (1) or set it at a low value (6) if you have a
+      slow modem (e.g. 2400bps). Otherwise you might set it to the
+      maximum value, which is platform-dependent but generally 255. If
+      you set it to any number greater than the maximum value it will
+      be truncated to the maximum value.
+    * Fixed a bug that caused the dialing directory and transfer
+      windows not to be destroyed properly when the 'reread' button is
+      clicked. Also fixed a small race condition in the terminal
+      process. 
+    * New resource: ignoreModemDCD. If this is set to 'on', the modem
+      DCD status will be ignored. Some of the consequences of setting
+      this to on is that the "Hangup?' prompt will always be presented
+      (if exitConfirm is enabled) regadless of the modem DCD status
+      and dialing will be attempted even if Seyon thinks you're
+      on-line. It's highly recommended that you keep this set to 'off'
+      unless your modem doesn't honor the DCD line. Default is 'off'.
+    * New resource: defaultPhoneEntries. This is a list of numbers
+      corresponding to the entries in the phonebook. Seyon will
+      highlight (select) those entries at startup and whenever you
+      click 'Reread' in the dialing directory. This is useful if there
+      is a set of entries that you most frequesntly dial and want them
+      to be highlghted automatically instead of doing that every time
+      by hand. You can override this resource by the new -entries
+      command-line switch, for example: -entries "1 3 4". The quotes
+      are needed if you specify more than one entry. Phonebook entries
+      numbering starts at one.
+    * New resource: dialAutoStart. This resource specifies that Seyon
+      should start dialing the entries specified by the resource
+      defaultPhoneEntries (or its override command-line switch) on
+      startup. Seyon will commence dialing those entries after
+      executing the startup script and any script specified at the
+      command line. If enabled, this resource overrides
+      DialDirAutoOpen and forces it to be on. A more convenient way of
+      automatic dialing on startup is to use the command-line switch
+      -dial, which forces this resource to be enabled. If the resource
+      is enabled, it can disabled at the command line by the switch
+      -nodial.  Sepcifying both -dial and -nodial at the command-line
+      will select the bahavior specified by the last such switch on
+      the command line.
+    * Now Seyon will not present the 'Hangup?' popup if off-line even
+      if exitConfirm is enabled (unless ignoreModemDCD is set to on).
+    * Seyon will now abort dialing if on-line and hangupBeforeDial is
+      disabled (unless ignoreModemDCD is set to on).
+    * New script command: hangup. It just hangs up the line.
+    * The script command quit is now enabled. you can use it to
+      terminate the script and exit the whole program. Use 'exit' to
+      just terminate the script.
+    * New resource: beepOnConnect. If set to 'on', Seyon will ring the
+      bell when a connection is made. Default is 'on', so make sure
+      you disable this if it annoys you.
+    * The way Seyon looks for files has changed. Now Seyon no longer
+      looks in the user's home directory, and looks in the current
+      directory only after looking in the default directory (~/.seyon
+      by default). Hence the new order is: default directory, then
+      current directory. If this causes a problem to anyone, let me
+      know and I might change things back to the way they were.
+    * If you have neither termios not termio, Seyon can now work with
+      sgtty. This is to accommodate older BSD systems like SunOS 3.x.
+      Thanks to Bob Smith for the patches for this.
+    * New script command: shell. This will execute a shell command and
+      bahaves like the Shell button on the command center (i.e. it
+      accepts '$' for stdio redirection to the modem). With this
+      command it is possible now to write a script to do unattended
+      login and download of mail from a host (e.g. BBS) with an entry
+      in, say, crontab. A script for unattended download of QWK mail
+      packets is included as script.QWK.
+    * Fixed a race condition that would have happened if both -script
+      and -dial are specified. Also cleaned up the startup code so
+      that the startup script is executed in a child process like
+      other scripts.
+    * Added some more version information on startup (similar to that
+      of linux).
+    * Bug fixes: the lock file and script bugs are now fixed. This
+      should be mostly a bug-free release.
+    * If the ioctl call to get the modem line status fails, Seyon will
+      now automatically disable the modem status toggles for that
+      device and will refrain from polling that device for its status.
+      All this until you open another device or re-open the same
+      device.
+    * New command-line switch: -emulator. You can now specifiy which
+      terminal emulation program Seyon should use by te above switch.
+      For example: 'seyon -emulator aixterm' will make Seyon use
+      aixterm as the terminal emulator. As usuall, Seyon will fall
+      back to xterm if it cannot execute the requested emulator. This
+      switch make the link to seyon-emu less usefull, but it's still
+      supported.
+    * Cosmetically overhauled config.h. It's much cleaner now and uses
+      the more understandable YES and NO instead of define and undef.
+    * The script command 'set port' is not supported in this release.
+    * Installtions using X11R4 and such do not have some of the imake
+      macros. I've added those to the imake file.
+    * New resource: dialDirAutoIconify. If set to on, Seyon will
+      automatically iconify the dialing directory window when a
+      successful connection is made. Otherwise the dialing directory
+      will remain up until closed or iconified by the user. If both
+      dialDirAutoClose and dialDirAutoIconify are set to on, the
+      former takes precedence. Default value is 'off'.
+    * A small bug in the lock files for SVR4 is fixed, also a bug
+      related to dialDirAutoOpen. Also, 'if linked' now works
+      properly.
+    * Rewrote the low-level modem read routines. Much cleaner now
+      (except one function) and hopefully less prone to bugs. Also
+      cleaned up miscellaneous parts of the code.
+    * Unified program: there in no longer seyon-cmd. You can get the
+      same behavior as seyon-cmd by using the -noemulator switch, see
+      below. Thanks for David Boyce.
+    * New command-line switch: -noemulator. If this is specified,
+      Seyon will not launch a new terminal emulator, but will use the
+      existing one instead. You cannot use the '-- emulator_option...'
+      switches if this option is given.
+    * New command-line switch: -noargs. Seyon usually invokes the
+      terminal emulation program with some options to set the
+      application name, window and icon titles, ..etc. If this switch
+      is given, Seyon will not pass those options to the emulator.
+      This is to accommodate terminal emulation programs that use a
+      different command-line syntax than xterm, like xvt, cmdtool,
+      shelltool, ..etc. You can use the '--' switch to pass your own
+      options to the emulator in this case.
+    * The command-line switch -noargs is renamed to -nodefargs.
+    * More changes to the low-level modem read routines. Now all of
+      them have been rewritten.
+    * Some changes in the look, mostly to be ain accord with Xaw3d.
+
+Version 1.9:
+    * The baud rates are now represented by radio buttons instead of
+      requiring the user to type them manually. This has the advantage
+      that the user can no longer choose an invalid baud rate (besides
+      looking cute, of course).
+    * Fixed a few minor bugs (the dialing directory shows a spurious
+      script for the last item, script command 'dial' doesn't accept
+      '^M', script keyword 'linked' doesn't work, exitConfirm resource
+      mistyped in the source and swapped with hangupConfirm). all
+      fixed now.
+    * Added error checking for modem reads/writes. Seyon now tells the
+      user when such errors occur and why they occured. The program
+      also suspends the terminal process when an excessive number of
+      such consecutive errors occur (5). You'll see how that is sueful
+      if you specify a port with a non-existent modem as your device
+      (do it at your own risk though, some oparting systems may lock
+      up your machine f you do so).
+    * Added a new script command: when. This is a very versatile
+      command and behaves in a similar fashion as the corresponding
+      command in Qmodem. Briefly, if you have something like
+
+              when "Continue?" "y^M"
+              when "More?"     "n^M"
+              waitfor "Command?"
+              when
+
+      then while waiting for "Command? ", the script will transmit
+      "y^M" whenever it encounters "Continue?" and "n^M" whenever it
+      encounters "More?", whatever the number of times it encounters
+      those strings. The final when (with no argument) clears all
+      outstanding when commands. Some BBS systems (notably PCBoard)
+      change the prompts depeding on the time of your call, and you
+      cannot write a complete script for such boards using waitfor
+      only. An example is included.
+    * Cleaned the script module a bit and also the routine for
+      detecting the zmodem auto-download signature.
+    * Revised the interface for the settings window. Seyon now changes
+      the parameters as soon as the user clicks on them instead of
+      waiting until the 'Ok' button is pressed. A bit less efficient
+      perhaps, but more natural. You can now keep the settings window
+      open and try out different settings without having to close the
+      window in order to effect your changes.
+    * Transient windows no longer concealed by their parents, even if
+      they don't have the input focus. Didn't you just hate it when
+      those windows used to disappear behind their parents and you had
+      to move their parents in order to see them? No longer.
+    * The exit and cancel buttons are no longer hidden when they are
+      inactive. Instead, they are now visible all the time, but greyed
+      out when inactive. Looks better this way.
+    * When you choose f.delete (twm/mwm) or QUIT (olwm/olvwm) on
+      Seyon's top window (the command center), Seyon now exits
+      gracefully as if you clicked on the exit button (but with no
+      confirmation). Seyon will beep if you try to do that while
+      you're not allowed to exit though. Even though it is safe to do
+      so, I do not recommend this as the way to exit Seyon. Also,
+      never do this on any other Seyon window (like the dialing
+      directory) or Seyon won't exit gracefully. (In general, if Seyon
+      gets stuck and you have to kill it, do that by
+
+           kill <lowest-seyon-pid> 
+
+      from another xterm. Seyon will quit gracefully this way as
+      well).
+    * Added two new script commands: flush and purge. The first
+      flushes the mdoem, i.e. discards data written to the modem but
+      not transmitted and data received but not read. The second Reads
+      and discards all data coming from the modem for the duration of
+      one second.
+    * The manual page now has a listing of all the keywords the script
+      command 'set' accepts.
+    * Revised the idle guard routine so that the idleGuardInterval is
+      now observed properly.
+    * New default font. I suspect most people will hate it, so it may
+      be removed from the next version if I hear many gribes about it.
+    * New error popups. Now Seyon pops up an dialog box with an
+      explanation of the error, possible causes, and suggested action
+      when an error occurs. Not all errors are handled this way yet,
+      but the most severe ones are. Please do give this version some
+      abuse (e.g. invoking it with no modem, wrong modem, locked
+      modem, incorrect command-line switch, or even doing something as
+      evil as 'kill -SEGV <lowest-seyon-pid>').
+    * Seyon now has an icon. Try iconifying the command center (or the
+      dialing directory) to see it.
+    * Arnold is out, a pretty face is in.
+
+Version 1.8:
+    * The transfer window has been completely revamped, just like the
+      dialing directory (see below). Only the protocol titles now
+      appear in the window (those can be as descriptive as you like).
+    * Since the dialing directory and transfer console no longer show
+      the actual phone and protcols files but only a pretty summary,
+      the syntax of those files has been made much more flexible. They
+      now accept whole-line comments and blank lines, so you can put
+      as much comments there as you like. Examples are provided.
+    * Provided examples for the phone and protocols files with
+      extensive documentation (thanks to the new syntax fexibility).
+      Please look at them to take full advantage of the convenience
+      they provide.
+    * The dialing directory have been completely revamped. No more
+      ugly keywords on the display, replaced by a standard, concise,
+      and informative dialing directory. The keywords still work of
+      course, it's just that you see only their summary on the dialing
+      directory, rather than the phone file syntax itself.
+    * For the new dialing directroy, added the resource dialDirFormat.
+      This is a string that specifies the format of the dialing
+      direcotry. The default is '%-15s %-15s %6s %1c%1c%1c %1c%1c %s'.
+      Briefly: the fields represent the host name, number, the baud
+      rate, bits, parity, stop bits, whether there is a custom prefix,
+      suffix, and the script name. You can understand more what each
+      field refers to by comparing with dialing directory, fields that
+      use the current setting (via the keyword CURRENT) are designated
+      by a question mark. Notice that you cannot change the order the
+      items in the dialing directory appear at, only the format.  For
+      example, since the numbers I call are all 7-digits, my host
+      names are short, and I never use baud rates above 9600, my own
+      format string is %-10s %-8s %5s-%1c-%1c-%1c %1c%1c %s, the
+      default is just too wide for my taste, and I like dashes between
+      the bits, parity, ans stop bits fields.
+    * Renamed the resources dialAutoOpen and dialAutoClose to
+      dialDirAutoOpen and dialDirAutoClose, respectively, to reflect
+      their functions more precisely.
+    * Add an important feature: the ability to completely specify the
+      communication parameters by number of bits (charcter size),
+      parity, and stop bits. Like eeverything else in Seyon, you can
+      set those in about a half dozen ways. First, the resources
+      defaultBIts (default is 8, valid arguments are 5, 6, 7, and 8),
+      defaultParity (default is 0, valid arguments are 0 (no parity),
+      1 (odd parity), and 2 (even parity), and defaultStopBits
+      (defaults is 1, valid arguments are 1 and 2). You can set them
+      in a script through the keywords bits (e.g. set bits 8), parity,
+      and stopBits. You can also set them in the dialing directory by
+      specifying the fileds BITS, PARITY, and STOPB (you can also give
+      the argument 'CURRENT' to those fields. Finally, you can set
+      them interactively under the settings window (in two ways,either
+      directly or via a short cut).
+    * The resource sevenBitMask and the script keyword 7bit are gone.
+      they superseded by the above.
+    * Added a new button: 'About'. Among other things it tells you
+      exactly what revision number of Seyon you're using. The help
+      button is moved under About.
+    * Some cosmetic changes; for example, Seyon messages in the status
+      area are now centered.
+    * Added support for fallback resources. Seyon no longer need its
+      app-defaults file except for color (using color in fallback is
+      not a good idea).
+    * Added a new button under the 'Misc' window: Suspend. This just
+      suspends the terminal and runs a local shell in the terminal
+      window. 
+    * Seyon now supports two new speeds: 56700 and 115200 bps. This is
+      avialable only for linux, as there is no portable way of doing
+      it. This feature is not guaranteed to stay.
+    * Added a new script command: send_break. Should be obvious what
+      it does.
+    * Fixed a nasty bug (race condition) when Seyon is invoked with
+      the -script switch. That should work fine now.
+    * New resource: dialAutoOpen. If set to on, the dialing directory
+      is automatically poped up when Seyon is started.
+    * The resource funMessages is now used to specify the messages
+      only. Use the new resource showFunMessages to enable or disble
+      the display of those messages (defaults to on).
+    * Added a new feature: the ability to send a string when the
+      session (user's input to the terminal) is idle longer than a
+      specicified amout onf time. The string is sent automatically at
+      that regular interval to keep the session alive (e.g. avoid
+      auto-logout). The resources governing this feature are:
+      idleGuard (default is off), idleGaurdInterval(default is 300
+      seconds), and idleGuardString (default is " ^H", i.e. space then
+      backspace). The corresponing script keyword is idleGuard (you
+      can only enable or disable it in a script). The string is sent
+      with the current translations, so it would be <Spc><del> if
+      backspaceTranslation is on.
+    * You can now put '~' in 'transmit' to effect a pause of 1 second,
+      i.e. transmit "ATZ~~ATS0=0" is equivalent to
+                    transmit "ATZ"
+                    pause 2
+                    transmit "ATS0=0"
+    * Changed the default color for toggles to look better with Xaw3d.
+      If you're not using Xaw3d, I advice to get it and link Seyon
+      with. Seyon looks much "cooler" with Xaw3d.
+
+Version 1.7:
+    * Revied the location of transient popups. No more dangling
+      windows. Now transiet windows pop up at a small offset from the
+      the top of the parent window instead of its buttom.
+    * New resource: dialAutoClose. If set to 'on', the dialing
+      directory will be automatically closed after a successful dial.
+      Defaults to 'off'.
+    * The baud and port dialogs in the settings window now popup
+      instead of cluttering the window and causing it to be too large. 
+    * Added a new keyword for the dialing directory BPS and BITS
+      fields: CURRENT (can be abbreviated to CUR). If this is used,
+      the current baud rate and/or bit mask will be used for that
+      host. Not sure if this would be useful. Notice that if the BPS
+      or BITS field is missing, the default values (as specified in
+      the resources) would be used.
+    * Added two new fields in the dialing directory: PREFIX and
+      SUFFIX. If either is present, it overrides the default specified
+      in the resources. See examples in the included phonelist file.
+      These fields also accept the CURRENT  keyword as above.
+    * All script commands and keywords are now case sensitive.
+    * Revised newline translation. Three translation modes are now
+      available: no translation, newline to carraige return, and
+      newline to carraige return / line feed. Consequently, the
+      resource newlineTranslation is changed from boolean to string,
+      whith three possible keywords corresponding to the above: nl,
+      cr, and cr/lf. The script keyword nl is also changed to
+      newlineTranslation to coincide with the resource, and accepts
+      the same keywords.
+    * Added 'View Log' under the misc window, but currently does
+      nothing. 
+    * New script command 'echo'. This just behaves as the usual echo
+      shell command and prints its argument to the terminal (does not
+      send it to the modem, use 'transmit' for that). This command
+      supercedes the old command under the same name, which is now
+      more appropriatetly called 'debug'.
+    * Essentially got rid of the busy waits in the program -- even for
+      systems that do not have usleep -- by using Seyon's own usleep
+      if the system doesn't have one. (written by obz@raster.kodak.com). 
+    * Seyon now does not allow the user to exit the program while it
+      is executing an externala command until that command is finished.
+      (this is a feature, since exiting while a child process is still
+      running can lead to a lot of trouble).
+    * The default color for monochrome displays is now black on white.
+      Earlier versions tried to use color even if none is vailable, so
+      the color combination led to unreadable menus on monochrome
+      displays. Note that if you have a color display you must put
+      something like:
+                #ifdef COLOR
+                *customization:         -color
+                #endif
+      in your Xdefaults file, or Seyon (as well as other X
+      applications) will be monochrome even on your color setup (but
+      you already know that, don't you :-).
+    * Various changes to accomodate SunOS 4.1 (thanks to Peter Davies
+      for pointing most of those problems).
+    * New configuration script. This script probes your system looking
+      for the functions your system has and automatically writes
+      config.h for you. Tested only under bash and ksh, not sure if it
+      would run under plain old regular sh. Give it a try.
+    * YADBC, yet another default background color. This one is more
+      reminiscent of Motif.
+
+Version 1.6
+    * You can now change the modem device interactively from the 'Set'
+      console. You can even do that in a script, use the keyword
+      'port'.
+    * Support for the environment variable MODEM has been dropped.
+      You can set the modem device on startup either via the resources
+      or at the commend line.
+    * Running a script by the switch '-script' in startup was broken
+      (apparently for some time but nobody told me, I found out by
+      accident). It has now been fixed.
+    * You can now start a script interactively from the command
+      center. Use 'Script' under the 'Misc' button.
+    * Fixed the lock routines. Seyon now supports two types of lock
+      files: ascii (compatible with HDB uucp), and binary (for other
+      uucp programs). You choose which type of lock interface by
+      defining the appropriate flag in config.h before compiling.
+      Thanks to rick@rick.att.com for supplying information about the
+      different types of lock methods. Anthony Rumble originally
+      pointed out the problem.
+    * Added a new resource, hayesHangup. If this set to on, Seyon will
+      use the Hayes hangup command sequesnce. Otherwise, hangup is done
+      by dropping DTR. This should normally be set to off (default),
+      unless your modem doesn't hangup when DTR is dropped. Consult
+      your modem manual for more details.
+    * Seyon now uses the correct Zmodem signature (thanks to Ralph
+      Brown for supplying me with that). You should no longer have
+      any problem with Seyon not recognizing Zmodem auto-downloads.
+    * Although not very apprent on the surface, the dialing routines
+      have undergone a major revision. The code is now much cleaner
+      and uses pseudo-signals to do much of its work.
+    * You can now upload a text file by using 'Divert' under the
+      'Misc' button. This sends the file (slowly) to the remote host
+      as if typed on the terminal. You can start an editor an 'divert'
+      the file there as if you were typing the file, useful for
+      composing messages on-line on bulletin boards.
+    * Seyon's look is slightly revised, and the command center now has
+      two  rows of buttons by default, so it's a bit less wide.
+    * Related to the above: you can now rearrange the number of rows
+      of buttons in the command center in a much easier way. Just
+      specify the the resource Seyon.width, and the number of rows will
+      be calculated automatically to fit the requested width.
+    * If the app-defaults file is left from an older version, Seyon
+      now tells the user what version that was.
+    * Various other small fixes and enhancements.
+    * On the down side, I have not updated the FAQ since the previous
+      release, and 'don't feel like it'. If you want something added
+      to the FAQ, send it to me, and I'll gladly add it (or if someone
+      wants to be the maintainer of the FAQ, let me know).
+
+Version 1.5
+    * Zmodem auto-download can now be disabled and enabled
+      interactively (from the 'Set' console) as well as in a script
+      (use 'set autozm on/off'). Useful when you want to use a
+      different zmodem protocol from the transfer popup.
+    * Improved error handling. Seyon now gives the user more
+      informative messages about what the rogram succeeded or failed
+      to do in the form of error messages, warnings, and notices.
+    * The new boolean resource sevenBitMask now supercedes the old
+      defaultBitMask (no longer used). Seyon will use a 7 bit mask if
+      the resource is true (otherwise an 8 bit mask) for entries in
+      the dialing directory for which no bit mask is specified. The
+      default for this resource is ''off', i.e. to use an 8 bit mask.
+    * A new translation mode (my favorite): meta key (ALT)
+      translation. Use it to send keys pressed while the meta (ALT)
+      key is held down as an escape (ESC) followed by the key press.
+      This mode simulates the meta key on hosts that do not support
+      8-bit-clean connections and makes possible the use of the meta
+      key in programs like Emacs on such hosts. It is enabled by
+      default. You can control it in the resources by the resource
+      metaKeyTranslation, in a script by 'set meta_tr ...', or
+      interactivly from the 'Set' console.
+    * All the parameters that can be set in startup script can now be
+      specified in the resources. This can be done via the new
+      resources sevenBitMask, newlineTranslation,
+      backspaceTranslation, metaKeyTranslation, xonxoffFlowControl,
+      and rtsctsFlowControl.
+    * New (worse?) default window background color.
+    * Seyon now gives a warning if the app-defaults file is missing,
+      mis-installed, or out-dated. 
+    * To facilitate the use of terminal emulators other than xterm,
+      xterm is no longer hard-coded into Seyon. Seyon will try to use
+      seyon-emu first, and if it cannot find it will fall back to
+      xterm. seyon-emu should be a symbolic link to the terminal
+      emulator of your choice, e.g. xterm.
+    * You can now temporarily suspend Seyon and run a local shell in
+      the terminal window. Just use the shell button and give it an
+      empty string as the command to be run.
+    * Substituted the less-general HAVE_TERMIOS for _POSIX_SOURCE
+      while building Seyon. Apparently, 386BSD has termios but chokes
+      when _POSIX_SOURCE is defined.
+    * Fun messages are no longer hard-coded in Seyon but can now be
+      specified in the resources via the resource funMessages, which
+      superceeds the old boolean resource under the same name. refer
+      to Seyon's manual page for details.
+    * Command-switches can now be passed to the terminal emulation
+      program as well. The new seyon command line syntax is:
+      seyon [-option ...] [-toolkit_option ...] [-- -emulator_option]
+      Any switches after '--' will be passed to the terminal emulation
+      program.
+    * The default zmodem auto-download command is now '$rz' instead of
+      'rz', to use stdin/stdout.
+    * The manual page is expanded a lot. Now is has a full description
+      of all the resources, as well as a detailed description of the
+      script language. Please take the time to read it.
+    * Various other small enhancements.
+
+Version 1.4
+    * Added support for rereading and editing the phonlist and
+      protocols files from withen Seyon.
+    * Added support for capturing a remote session to a file.
+    * Fixed a few bugs in the termio routines.
+    * Cleaned up the code a bit and added some comments
+
+Version 1.3
+    * Seyon now uses termios to be POSIX-compliant. The old termio
+      interface can still be used however.
+    * Major change to the way Seyon finds its files. Seyon now expects
+      its files to be in its own default directory (~/.seyon) and
+      would look first in the current, then default, then home
+      directory for its files. Like other things in Seyon, the default
+      directory can be overridden in the resources.
+    * A default script directory can now be specified. Much better
+      than cluttering the home directory with scripts. Seyon will look
+      for scripts in the current, then script, then home direcotry.
+    * Revised the interface of the dialer. Buttons are now visible all
+      the time, even if not active (but will beep if clicked while
+      inactive). 
+    * Added full support for manual dialing
+    * Integrated the help file and the FAQ. Hence, the FAQ is now
+      vailable online via the 'Help' button.
+    * Seyon now has a manual page (but not complete).
+    * Changed a few other things to make Seyon more portable to other
+      platforms and corrected some minor bugs.
+
+Version 1.2:
+    * Setting the baud rate interactively is now fully supported.
+    * The 'show' button has been removed since it's no longer needed.
+    * The dialer timeout is now fully supported. Use the resource
+      "dialTimeOut" to set it (default is 45 sec).
+    * Added multiple dialing. Seyon will now circulate through
+      selected items in the dialing directory until a connection is
+      made. Refer to the FAQ to see how this is used.
+    * Added two new resources, dialPrefix and dialSuffix.
+    * The dialing directory and transfer console now have scroll bars
+      and would can be scrolled if they contain more than 10 entries
+      (no limit on the total number of entries).
+    * Cleaned up the dialer code quite a bit
+
+Version 1.1:
+    * Major revisions to the dialer. The dialer is now integrated into
+      the dialing directory instead of having its own popup (no need
+      to clutter the screen).
+    * Fixed it so that there may be no more than one copy of the
+      dialing direcotry. 
+    * The transfer popup now pops down after the transfer is
+      initiated. Similarly the shell popup.
+    * Auto ZMODEM download is now fully supported. See tha FAQ to
+      learn how to set it up or disable it (thanks to R. Ramish for
+      supplying the auto download string).
+    * Seyon now has an Imake file (kindly contributed by David Boyce,
+      with minor modifications by me).
+    * The dialing directory now 'remembers' its location and size if
+      moved or resized interactively.
+    * The status area is now fully supported. most of the messages now
+      appear there instead of at the terminal.
+    * Seyon now shows some 'fun' messages in the status area if it has
+      nothing else to say (I know, I got carried away. Anyhow, it can
+      be disabled, see the FAQ).
+
+Version 1.0:
+    * Fixed a problem with the new dialer. Now the dialer should work
+      fine even if your modem behaves in a non-standard way.
+    * Added five new resources. these are connectString and
+      noConnectString[1|2|3|4]. You can set these up according to your
+      modem, but the defaults should work for most people. See the FAQ
+      for more info.
+    * The delete mode (backspace sends delete) now actually works.
+    * The dialer now gives more informative messages about what it's
+      is doing.
+    * Implemented the rtscts mode. Not sure if it works.
+    * Added a new 'refresh' button, to refresh (restart) the terminal.
+    * Added a new status bar, but not used yet.
+    * Fixed a bug in the terminal routine and removed the kludge
+      introduced in the previous version.
+    * Fixed another bug that used to start a stray CIS receive in the
+      terminal mode.
+    * Cleaned up the code a bit and added a few comments.
+    * Changed the default shape style (again!) to be more fun. 
+    * Added a meke depend target to the make file.
+
+Version 0.85:
+    * Added the ability to send a break. You can do that via the
+      'Misc' button. 
+    * Corrected a bug in obtaining the dialer resources.
+    * Modified the dialing procedure (introduced in the new dialer) to
+      work on more modems.
+    * Added the ability to disable confirmation popus for hangup end
+      exit. You can set that via the resources. See the FAQ for more
+      info. 
+    * Removed XMODEM and Compuserve CIS from the code. Those should be
+      implemented though external programs.
+    * Added a kludge in the terminal routine to go about the linux new
+      FPU emulation problems with re-entrance.
+
+Version 0.8:
+    * Most the functions under the 'Set' button are now
+      implemented. The ones that are not are the cts/rts and
+      setting the baud rate.
+    * Seyon now has a brand new dialer. It dials the number upto a
+      specified number of retries with a specified interval between
+      each try (both can be set via the resources). After a
+      connection the script will be executed (if one is given).
+      Dialing and script execution can be interrupted anytime by
+      clicking a botton.
+    * Fixed a minor bug in hangup confirmation. The hangup
+      confirmation window now disappears after choosing an action.
+    * Added a new parameter. Those that want to send delete
+      instead of backspace (some BBS systems choke on it) can now
+      do that either form the 'Set' button, or through the startup
+      file or any script. See the FAQ.
+
+Version 0.5:
+    * Added a new transfer console that invokes a pre-defined
+      protocols ala minicom and all DOS comm programs.
+      Intelligent enough to prompt for a file name if needed.
+    * Added support for specifying the modem port in the
+      resources.
+    * Added a new shell button to pass commands to the shell.
+    * Moved the status button to be a part of tge set 'Set'
+      console and added initial implementation to the set
+      console (not functioning yet).
+    * The hangup button now asks for cofirmation.
+    * The exit button now asks if you want to hangup before
+      exiting.
+    * Corrected the '-g' switch problem (now '-script') and
+      enabled the execution of a script specified at the
+      command line.
+    * Added a FAQ and a CHANGELOG files.
+    * Updated the help file
+    * Fixed various minor problems.
+
+Version 0.0: 
+    Initial release
+

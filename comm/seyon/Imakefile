@@ -1,0 +1,79 @@
+/*
+ * ======================================================================
+ */
+
+/*
+ * Never edit any of the rest of this file unless you really really
+ * know what you're doing. The rest of this file should normally not
+ * be touched at all.
+ */
+
+DEPLIBS = 
+LOCAL_LIBRARIES = XawClientLibs
+
+/* SYS_LIBRARIES = -lm */
+
+SRCS  = Seyon.c SeActions.c SeScan.c SeDial.c SeErr.c SeGeneric.c \
+		SeInit.c SeIo.c SeMisc.c SeParse.c SePort.c SeScript.c \
+		SeSet.c SeSig.c SeString.c SeSubs.c SeSubsX.c SeSupp.c \
+		SeTerm.c SeTrans.c SeWin.c MultiList.c
+OBJS  = Seyon.o SeActions.o SeScan.o SeDial.o SeErr.o SeGeneric.o \
+		SeInit.o SeIo.o SeMisc.o SeParse.o SePort.o SeScript.o \
+		SeSet.o SeSig.o SeString.o SeSubs.o SeSubsX.o SeSupp.o \
+		SeTerm.o SeTrans.o SeWin.o MultiList.o
+
+HELPFILE = -DHELPFILE=\"$(LIBDIR)$(PATHSEP)seyon.help\"
+
+/* These are apparently missing from versions of X prior to R5 */
+
+#ifndef InstallNonExecFile
+#define	InstallNonExecFile(file,dest)					@@\
+install:: file								@@\
+	$(INSTALL) -c $(INSTDATFLAGS) file $(DESTDIR)dest
+#endif /* InstallNonExecFile */
+
+#ifndef InstallAppDefaultsLong
+#define	InstallAppDefaultsLong(file,class)				@@\
+install:: file.ad							@@\
+	$(INSTALL) -c $(INSTAPPFLAGS) file.ad $(DESTDIR)$(XAPPLOADDIR)/class
+#endif /* InstallAppDefaultsLong */
+
+AllTarget(version seyon)
+ComplexProgramTarget(seyon)
+SpecialObjectRule(SeInit.o,SeInit.c,$(HELPFILE))
+
+InstallAppDefaults(Seyon)
+InstallAppDefaultsLong(Seyon-co,Seyon-color)
+InstallNonExecFile(seyon.help,$(LIBDIR))
+
+install::
+	@if [ ! -d $(HOME)/.seyon ]; then mkdir $(HOME)/.seyon; fi; \
+	echo "=== Copying example files (no overwrite) to $(HOME)/.seyon ..."; \
+	for i in phonelist protocols startup script.*; do \
+		if [ ! -f $(HOME)/.seyon/$$i ]; then cp $$i $(HOME)/.seyon; fi;\
+	done;
+
+clean::
+	rm -f version.h y.tab.* SeParse.c
+
+pkg:
+	pkg_create -c pkg/+COMMENT -d pkg/+DESC -i pkg/+INSTALL -f pkg/+CONTENTS seyon_bin
+
+Seyon.c: Seyon.ad.h version.h
+
+Seyon.ad.h: Seyon.ad
+	./ad2c $? > $@
+
+version:
+	rm -f version.h
+
+version.h:
+	./makever.sh
+
+SeScan.o: y.tab.h
+
+y.tab.h y.tab.c: SeParse.y
+	$(YACC) -d SeParse.y
+
+SeParse.c: SeParse.y
+	$(MV) y.tab.c SeParse.c

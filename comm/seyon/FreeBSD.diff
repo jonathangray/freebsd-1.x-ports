@@ -1,0 +1,170 @@
+*** /usr/ports/seyon/SePort.c	Wed Apr 21 06:38:17 1993
+--- SePort.c	Wed Feb 23 18:17:51 1994
+***************
+*** 259,266 ****
+  #endif
+  
+    pmode.c_oflag &= ~OPOST;		/* transparent output */
+    pmode.c_cflag = baudrate | CREAD | CLOCAL;
+! 
+    /* this many characters satisfy reads */
+    pmode.c_cc[VMIN] = min(qres.modemVMin, MAX_INPUT);
+    pmode.c_cc[VTIME] = 1;		/* or in this many tenths of a second */
+--- 259,270 ----
+  #endif
+  
+    pmode.c_oflag &= ~OPOST;		/* transparent output */
++ #if HAVE_TERMIO
+    pmode.c_cflag = baudrate | CREAD | CLOCAL;
+! #else
+!   pmode.c_cflag = CREAD | CLOCAL;
+!   pmode.c_ispeed = pmode.c_ospeed = baudrate;
+! #endif
+    /* this many characters satisfy reads */
+    pmode.c_cc[VMIN] = min(qres.modemVMin, MAX_INPUT);
+    pmode.c_cc[VTIME] = 1;		/* or in this many tenths of a second */
+***************
+*** 620,652 ****
+        break;
+      case 38400:
+        baudrate = B38400;
+- #if USE_NONSTD_BAUD
+  #ifdef linux
+        ser_io.flags &= ~ASYNC_SPD_MASK;
+  #endif
+- #endif
+        break;
+- #if USE_NONSTD_BAUD
+- #ifdef linux
+      case 57600:
+        baudrate = B38400;
+        ser_io.flags &= ~ASYNC_SPD_MASK;
+        ser_io.flags |= ASYNC_SPD_HI;
+        break;
+      case 115200:
+        baudrate = B38400;
+        ser_io.flags &= ~ASYNC_SPD_MASK;
+        ser_io.flags |= ASYNC_SPD_VHI;
+-       break;
+  #endif
+! #endif
+      default:
+        return (-1);
+      }
+      io_set_speed(&pmode, baudrate);
+      if (mfd != -1) {
+        io_set_attr(mfd, &pmode);
+- #if USE_NONSTD_BAUD
+  #ifdef linux
+        if (baudrate == B38400)
+  	if (ioctl(mfd, TIOCSSERIAL, &ser_io) < 0) {
+--- 624,653 ----
+        break;
+      case 38400:
+        baudrate = B38400;
+  #ifdef linux
+        ser_io.flags &= ~ASYNC_SPD_MASK;
+  #endif
+        break;
+      case 57600:
+        baudrate = B38400;
++ #ifdef linux
+        ser_io.flags &= ~ASYNC_SPD_MASK;
+        ser_io.flags |= ASYNC_SPD_HI;
++ #endif
+        break;
+      case 115200:
+        baudrate = B38400;
++ #ifdef linux
+        ser_io.flags &= ~ASYNC_SPD_MASK;
+        ser_io.flags |= ASYNC_SPD_VHI;
+  #endif
+!       break;
+      default:
+        return (-1);
+      }
+      io_set_speed(&pmode, baudrate);
+      if (mfd != -1) {
+        io_set_attr(mfd, &pmode);
+  #ifdef linux
+        if (baudrate == B38400)
+  	if (ioctl(mfd, TIOCSSERIAL, &ser_io) < 0) {
+***************
+*** 654,660 ****
+  	  return -1;
+  	}
+  #endif
+- #endif
+      }
+    }
+  
+--- 655,660 ----
+***************
+*** 675,681 ****
+    case B19200:
+      return (19200);
+    case B38400:
+- #if USE_NONSTD_BAUD
+  #ifdef linux
+      if (mfd != -1)
+        if (ioctl(mfd, TIOCGSERIAL, &ser_io) < 0) {
+--- 675,680 ----
+***************
+*** 688,696 ****
+      else if ((ser_io.flags & ASYNC_SPD_MASK) == ASYNC_SPD_HI)
+        return 57600;
+      else
+! #endif
+! #endif
+        return 38400;
+    }
+  
+    SeError("Consistency error in baud rate");
+--- 687,700 ----
+      else if ((ser_io.flags & ASYNC_SPD_MASK) == ASYNC_SPD_HI)
+        return 57600;
+      else
+!       return 38400;
+! #else
+        return 38400;
++   case B57600:
++       return 57600;
++   case B115200:
++       return 115200;
++ #endif
+    }
+  
+    SeError("Consistency error in baud rate");
+*** /usr/ports/seyon/SeSet.c	Wed Apr 21 06:30:31 1993
+--- SeSet.c	Wed Feb 23 18:20:02 1994
+***************
+*** 82,90 ****
+  static struct _setRadio setRadio[] =
+  {
+    {"baud", {"300", "1200", "2400", "4800", "9600", "19200", "38400",
+- #if USE_NONSTD_BAUD
+      "57600", "115200",
+- #endif
+      NULL}, 1, MenuSetGetBaud},
+    {"bits", {"5", "6", "7", "8", NULL}, 1, MenuSetGetCSize},
+    {"parity", {"none", "odd", "even", NULL}, 1, MenuSetGetParity},
+--- 82,88 ----
+*** /usr/ports/seyon/config.h	Wed Apr 21 05:47:34 1993
+--- config.h	Thu Nov 25 10:27:12 1993
+***************
+*** 74,84 ****
+--- 74,87 ----
+  
+  #if defined(linux) || defined(_SVR3) || defined(BSD386) || defined(__386BSD__)
+  #define HAVE_TERMIOS        YES
++ #define HAVE_TERMIO         NO
+  #define HAVE_MODEM_CONTROL  YES
+  #define HAVE_DUP2           YES
+  #define HAVE_STRSTR         YES
+  #define HAVE_STRERROR       YES
+  #define HAVE_USLEEP         YES
++ #define LF_PATH             "/var/spool/lock"
++ #define LF_PREFIX           "LCK.."
+  #endif
+  
+  #ifdef SVR4

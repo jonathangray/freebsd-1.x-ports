@@ -1,0 +1,52 @@
+
+# The following IF condition tests to see if we are linked from a .phonelist
+# entry.  If not, we manually dial the local COMPUSERVE node:
+
+    if !linked
+	dial	687-0374	# Note anything past a full command is ignored
+    endif
+
+# Wait for a CONNECT message from the modem.  If we time out (20 seconds),
+# redial the number (it is probably busy).
+
+connect:
+    waitfor "CONNECT" 20
+    if !waitfor
+	redial
+	goto connect
+    endif
+
+# Pause a bit to let CIS catch up with us
+
+    pause 2
+
+# Transmit a Control-C (^C) to CompuServe, and then wait for the
+# prompt "User ID:".  If this is not seen in 10 seconds, we try again.
+
+cis:
+    transmit "^C"
+    waitfor "User ID:"  10
+    if !waitfor
+	goto cis
+    endif
+
+# Transmit the user id string (remember the ^M at the end for ENTER)...
+
+    transmit "72236,3516^M"
+
+# Wait for CompuServe to ask for a password...
+
+    waitfor "Password:"
+
+# Transmit our password
+# (You don't think for a moment that this is my REAL password, do you?????)
+
+    transmit "YELLOW*BANANA^M"
+    
+# Wait for CompuServe header, and then transmit "G UNIXFORUM^M^O"
+# (The ^M is an ENTER, the ^O tells CompuServe to shut up until we
+# get there.)
+
+    waitfor "Compuserve"
+
+    transmit "G UNIXFORUM^M^O"

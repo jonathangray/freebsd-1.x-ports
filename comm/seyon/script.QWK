@@ -1,0 +1,89 @@
+
+# script to login to a PCBoard BBS, download QWK mail, and logout
+# run this from the shell as seyon -script channel1
+# or run it from crond
+
+# dial the number
+
+if !linked
+dial "354-5776"
+endif
+
+# keep dialing the number until connected
+
+connect:
+waitfor "CONNECT"
+if !waitfor
+redial
+goto connect
+endif
+
+# pause to allow the system to catch up
+
+pause 3
+
+# usual stiff
+
+waitfor "Enter Language # to use (Enter)=no change? " # comment
+transmit "^M" 
+
+# if you turn on color, you'll have to modify the expected
+# prompts to include the color escape codes, not a good thing
+# better turn on color at the end of the script, if yo want it
+# I don't know of another Unix comm program that has when
+
+waitfor "Do you want Color? Y=Yes, N or Enter = No? "
+transmit "^M" 
+
+# name and password
+
+waitfor "Enter your first name? "
+transmit "jone doe^M"
+waitfor "Password (Dots will echo)? "
+transmit "you guess^M"
+
+# get rid of those nasty prompts that we don't know how many we will get
+# we cannot do this without the when command, since PCBoard keeps changing
+# the prompt depending on the number of your call
+
+when "(Enter)=More? " "^M"
+when "Enter = Yes? " "n^M"
+
+# the usuall Channel 1 prompt
+
+waitfor "Channel 1 Command? "
+
+# once we are here, clear all standing when commands
+
+when
+
+# goto the QWK mail door
+
+transmit "open 7^M"
+
+# once here, ask for your packet
+
+waitfor "Qmail Command? "
+transmit "d^M"
+
+# of course we want it
+
+waitfor "receive these messages (Y/N)? "
+transmit "y"
+
+# once th epacket is archived and the BBS is ready to send it, execute
+# Zmodem to receive it. Seyon doesn't allow auto-Zmodem in a script
+
+waitfor "Prepare to download"
+pause 3
+shell "$rz -vv"
+
+# all done, sign off
+
+waitfor "Qmail Command? "
+transmit "g^M"
+
+# hangup, quit Seyon and return to the shell
+
+hangup
+quit

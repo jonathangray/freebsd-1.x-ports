@@ -1,0 +1,1039 @@
+.TH SEYON 1 \" -*- nroff -*-
+
+.SH NAME
+Seyon \- X11 Telecommunications Package.
+
+.SH SYNOPSIS
+.B seyon
+[\-option ...] [\-toolkit_option ...] [\-\- \-emulator_option ...]
+
+.SH DESCRIPTION
+
+.P 
+\fISeyon\fP is a complete full-featured telecommunications package for
+the \fIX Window System\fP. Some of its features are:
+
+.IP
+* Dialing directory that supports an unlimited number of entries. The
+directory is fully mouse-driven and features call progress monitoring,
+dial timeout, automatic redial, multi-number dialing, and circular
+redial queue. Each item in the dialing directory can be configured
+with its own baud rate, bit mask, and script file.  The dialing
+directory uses a plain-text phone book that can be edited from withen
+Seyon. Seyon also supports manual dialing.
+.IP
+* Terminal emulation window supporting DEC VT02, Tektronix 4014, and
+ANSI. Seyon delegates its terminal emulation to xterm, so all the
+familiar xterm functions such as the scroll-back buffer, cut-and-paste
+utility, and visual bell are availabe through Seyon's terminal
+emulation window. Using xterm also means that Seyon has a more
+complete emulation of VT102 than other any Unix or DOS
+telecommunications program. Other terminal emulation programs can also
+be used with Seyon to suit the user's need; for example, color xterm
+can be used to provide emulation for color ANSI (popular on many BBS
+systems), and xvt can be used if memory is a bit tight.
+.IP
+* Script language to automate tedious tasks such as logging into
+remote hosts. Seyon's script interpreter uses plain-text files and has
+a syntax similar to that of sh, with a few extra addtions. It supports
+many familiar statements such as conditional branching by
+\fIif\fP-\fIelse\fP and looping by \fIgoto\fP. Scripts may be assigned
+to items in the dialing directory for automatic execution after a
+connection is made.
+.IP
+* Unlimited number of slots for external file transfer protocols.
+Protocols are activated from a mouse-driven transfer console that uses
+a plain-text file, editable from withen Seyon, for protocol
+configuration. Seyon prompts the user for filenames only if the chosen
+protocol requires filenames or if the transfer operation is an upload,
+for which Seyon also accepts wildcards. Multiple download directories
+can be specified for the different transfer slots.
+.IP
+* Support for Zmodem auto-download. Seyon detects incoming Zmodem
+signature and automatically activates a user-specified zmodem protocol
+to receive incoming files. Zmodem transfers can thus be completely
+automatic and require no user intervention.
+.IP
+* Translation modes. Seyon can perfrom useful trasnlations on the
+user's input. From example, Seyon can translate backspace to delete
+(useful on may Unix systems), newline to carriage return (useful on
+many BBS hosts), and my favorite, meta key tranlation: to send keys
+pressed while the meta (ALT) key is held down as an escape (ESC)
+followed by the key press. The latter mode simulates the meta key on
+hosts that do not support 8-bit-clean connections and makes possible
+the use of the meta key in programs like Emacs on such hosts.
+.IP
+* Other features: interactive setting of program parameters, on-line
+help, software (XONN/XOFF) and hardware (RTS/CTS) flow control,
+session capture to a file, and temporary running of a local shell in
+the terminal emulation window.
+
+.P
+Seyon is intended to be both simple and extensively configurable.
+Almost every aspect of Seyon can be configured via the resources to
+suit the user's taste.
+
+.SH OPTIONS
+
+.P
+Besides the toolkit options, Seyon recognizes the following
+command-line switches:
+
+.TP
+.BI \-modems " <device-list>"
+Overrides the resource \fImodems\fP. Refer to the description of that
+resource below.  Unlike the resource, however, the list here has to be
+quoted if it consists of more than one entry.
+.TP
+.BI \-emulator " <terminal-emulation-program>"
+Instructs Seyon to use the specified program as the terminal emulator.
+If Seyon fails to execute that program, it will fall back to xterm. If
+this option is not given, Seyon will try to use seyon-emu, which
+should be a link to your favorite terminal emulation program. Seyon
+will fall back to xterm in this case as well if it fails to execute
+seyon-emu.
+.TP
+.B \-\-
+This switch instructs Seyon to pass the rest of the command-line to
+the terminal emulation program. All options following this switch will
+be passed blindly to the emulator. This switch cannot be combined with
+\-noemulator.
+.TP
+.B \-nodefargs 
+Seyon usually invokes the terminal emulation program with some options
+to set the application name and window and icon titles (those are
+\-name Seyon \-T "Seyon Terminal Emulator" \-n Terminal). If this
+switch is given, Seyon will not pass those options to the emulator.
+This is to accommodate terminal emulation programs that use a
+different command-line syntax than xterm -- like xvt, cmdtool,
+shelltool, ..etc. You can use the '--' switch to pass your own options
+to the emulator.
+.TP
+.B \-noemulator
+This option is valid only if Seyon is invoked from withen a terminal
+emulation program in the foreground of an interactive shell session.
+If given, Seyon will not launch a new terminal emulator, but will use
+the existing one instead. You cannot use the '--' switch if this
+option is given.
+.TP
+.BI \-script " <script-file>"
+Causes Seyon to automatically executes the specified script after the
+startup script is run. The specified script file will be looked for
+according to the rule mentioned under the description of the resource
+\fIscriptDirectory\fP below.
+.TP
+.BI \-entries " <entries-list>"
+Overrides the resource \fIdefaultPhoneEntries\fP. Refer to the
+description of that resource below. Unlike the resource, however, the
+list here has to be quoted if it consists of more than one entry.
+.TP
+.BR \-dial ", " \-nodial
+Overrides the resource \fIdialAutoStart\fP and sets it to 'on' and
+'off', respectively. Refer to the description of that resource below.
+If both \fI-dial\fP and \fI-nodial\fP are specified on the
+command-line, the override value will be set according to the last of
+the two on the command-line.
+
+.SH RESOURCES
+
+.P
+Besides the toolkit resources, Seyon defines the following proprietry
+resources:
+
+.TP
+.BI autoZmodem " (boolean)"
+Specifies whether Seyon is to look for Zmodem auto-download signature.
+If enabled, Seyon will detect incoming Zmodem signature and execute
+the action given by the resource autoZmodemAction (typically to start
+a local rz). Otherwise, Zmodem signature will be ignored.
+.I Default value: on
+.TP
+.BI autoZmodemAction " (string)"
+Specifies a simple or compound action that will be executed when
+Zmodem auto-download signature is detected. This action will be
+executed only if the resource autoZmodem is enabled (see above). Refer
+to the section entitled \fISeQuickKeys\fP for a description of
+available actions.
+.I Default value: ShellCommand($rz);
+.TP
+.BI backspaceTranslation " (boolean)"
+Whether to translate user's backspace to delete. When the remote host
+is a Unix system, it's better to set this to \fIon\fP, since many Unix
+systems are not happy with backspace.
+.I Default value: off
+.TP
+.BI captureFile " (string)"
+The name of capture file. Seyon will write session captures to this
+file when capture is enabled. This file will be placed in Seyon's
+default directory. The capture file will not be overwritten by
+successive capture sessions. Seyon will merely apped new capture to
+its end. 
+.I Default value: capture
+.TP 
+.BI connectString " (string)"
+The modem connect string. This the string response the modem gives
+when a connection is made after dialing.
+.I Default value: CONNECT
+.TP
+.BI defaultBits " (int)"
+The default number of bits (character size). Seyon will set the number
+of bits to this value on startup and will use it for items in the
+dialing directory for which no such parameter is given. Valid values
+are 5, 6, 7, and 8.
+.I Default value: 8
+.TP
+.BI defaultBPS " (string)"
+The default baud rate. Seyon will set the baud rate to this value on
+startup and will use it for items in the dialing directory for which
+no baud rate is given.
+.I Default value: 9600
+.TP
+.BI defaultDirectory " (string)"
+Seyon's default directory. When looking for its files, Seyon will
+first try this default directory, then the current directory. Seyon
+will also put the capture file in this directory.
+.I Default value: ~/\.seyon
+.TP
+.BI defaultParity " (int)"
+The default parity. Seyon will set the parity to this value on startup
+and will use it for items in the dialing directory for which no such
+parameter is given. Valid values are 0 (no parity), 1 (odd parity),
+and 2 (even parity).
+.I Default value: 0
+.TP
+.BI defaultPhoneEntries " (int array)"
+This resource specifies a list of numbers corresponding to the order
+the entries in the dialing directory appear at. Seyon will highlight
+(select) those entries on startup and whenever you click ``Default''
+from the dialing directory. This is useful if there is a set of
+entries that you most frequesntly dial that want to be highlghted
+automatically instead of doing that every time by hand. You can
+override this resource by the \fI-entries\fP command-line switch.
+Unlike the command-line switch, however, the list here should not be
+quoted. Phonebook entries numbering starts at one.
+.I No default value.
+.TP
+.BI defaultStopBits " (int)"
+The default number of stop bits. Seyon will set the number of stop
+bits to this value on startup and will use it for items in the dialing
+directory for which no such parameter is given. Valid values are 1 and
+2.
+.I Default value: 1
+.TP
+.BI dialAutoStart " (boolean)"
+This resource specifies that Seyon should start dialing the entries
+specified by the resource \fIdefaultPhoneEntries\fP (or its override
+command-line switch) on startup. Seyon will commence dialing those
+entries after executing the startup script and any script specified at
+the command line. A more convenient way of automatic dialing on
+startup is to use the override command-line switch \fI-dial\fP, which
+overrides this resource and enables. If the resource is enabled, it
+can be disabled at the command line by the override switch
+\fI-nodial\fP. Refer to the description of these switches above.
+.I Default value: off
+.TP 
+.BI dialCancelString " (string)"
+The string Seyon sends to the modem to cancel dialing while in
+progress.
+.I Default value: ^M
+.TP 
+.BI dialDelay " (int)"
+How long in seconds Seyon should wait after no connection is made
+withen \fIdialTimeOut\fP before ciculating to the next number.
+.I Default value: 10
+.TP
+.BI dialDirFormat " (string)"
+This is a format string that specifies the layout of the dialing
+direcotry. The default is '%-15s %-15s %6s %1c%1c%1c %1c%1c %s' (no
+quotes).  Briefly: the fields represent the host name, number, the
+baud rate, bits, parity, stop bits, whether there is a custom prefix,
+suffix, and the script name. You can understand more what each field
+refers to by comparing with dialing directory, fields that use the
+current setting (via the keyword CURRENT) are designated by a question
+mark. Notice that you cannot change the order the items in the dialing
+directory appear at, only the format. For example, if the numbers you
+call are all 7-digits, your host names are short, you never use baud
+rates above 9600, and you like dashes between the baud rate, bits,
+parity, and stop bits fields, then you may prefer to use the format
+string '%-10s %-8s %5s-%1c-%1c-%1c %1c%1c %s', which would be narrower
+than the default format.
+.I Default value: %-15s %-15s %6s %1c%1c%1c %1c%1c %s
+.TP 
+.BI dialPrefix " (string)"
+The string Seyon sends to the modem before the phone number. To use
+pulse dialing, set this resource to .IR ATDP .
+.I Default value: ATDT
+.TP 
+.BI dialRepeat " (int)"
+How many times Seyon should try dialing a number. Seyon will give up
+on dialing a number if no connection is made after this many tries.
+.I Default value: 5
+.TP 
+.BI dialSuffix " (string)"
+The string Seyon sends to the modem after the phone number. This
+string has to contain a carraige return or the number will never get
+sent to the mode.
+.I Default value: ^M
+.TP 
+.BI dialTimeOut " (int)"
+How long in seconds Seyon should wait for a connection to made after
+dialing is complete. Seyon will cancel the dialing if no connection is
+made withen this period.
+.I Default value: 45
+.TP
+.BI exitConfirm " (boolean)"
+Whether Seyon should prompt for hanguping up before exiting. If
+off-line and the resource ignoreModemDCD is set to 'off', Seyon will
+not prompt for hanging up upon exiting even if this resource is set to
+'on', since it does not make sense to do so in this case.
+.I Default value: on
+.TP
+.BI funMessages " (string array)"
+The fun messages to be displayed when Seyon has no other important
+information to show. This should be a list of double-quoted [funny]
+sentences.
+.I Default value: varies, version-dependent
+.TP
+.BI funMessagesInterval " (int)"
+The temporal interval in seconds between successive fun messages.
+.I Default value: 15
+.TP
+.BI idleGuard " (boolean)"
+If set to on, Seyon will send a string to the remote host whenever the
+terminal session is idle (no keyboard input) for a given amount of
+time. The resources \fIidleGuardInterval\fP and \fIidleGuardString\fP
+specify the above time interval and the string to be sent to the
+remote host when idle. It is useful to enable this features to keep
+the session alive when one is away from the computer for a while (e.g.
+to prevent auto-logout).
+.I Default value: off
+.TP
+.BI idleGuardInterval " (int)"
+The amount of time in seconds Seyon is to consider the session idle
+when there is no keyboard activity at the terminal for that long.
+Seyon will send a string to the remote host every such interval as
+long as the session is idle.
+.I Default value: 300
+.TP
+.BI idleGuardString " (string)"
+The string to be sent to the remote host when the session is idle.
+This string will be sent at a regular interval as long as the sesiion
+remains idle. Note that the current translations will be used in
+sending this string; for example, if backspaceTranslation is enabled,
+then the default string <Space><BS> will be sent as <Space><DEL>.
+.I Default value: \\\s^H
+(space then backspace)
+.TP
+.BI ignoreModemDCD " (boolean)"
+If this resource is set to 'on', the modem DCD (Data Carrier Detect)
+status will be ignored. Some of the consequences of setting this to
+\'on\' is that Seyon will always prompt for hangup (if the resource
+\fIexitConfirm\fP is set to 'on') even if the modem DCD status
+indicates that it is off-line, and dialing will be attempted even if
+the modem DCD status indicates that it is on-line. It is highly
+recommended that you keep this set to 'off' unless your modem does not
+honor the DCD line. Consult your modem's manual for more details.
+.I Default value: off
+.TP
+.BI hangupBeforeDial " (boolean)"
+When set to \fIon\fP, Seyon will hangup the line (if connected) before
+dialing the phone number. Otherwise, the number will be dialed without
+hanging up, and it is the user's responsibility to ensure that the
+line is clear (no connection) when dialing.
+.I Default value: on
+.TP
+.BI hangupConfirm " (boolean)"
+Whether Seyon should ask for confirmation before hanging up the phone
+.I Default value: on
+.TP
+.BI hangupViaDTR " (boolean)"
+When enabled, Seyon will hangup up the modem by dropping DTR. This is
+much quicker than hanging up by sending a Hayes-like hangup string to
+the modem and waiting to allow for escape guard time. However, some
+modems and serial drivers choke on dropping DTR and others just don't
+hangup when DTR is dropped, so in these cases it should be disabled.
+If disabled, Seyon will hangup the modem by sending the string
+specified by the resource modemAttentionString, followed by that
+specified by the resource modemHangupString.
+.I Default value: off
+.TP
+.BI metaKeyTranslation " (boolean)"
+Whether to transmit keys pressed while the meta (ALT) key is held down
+as an escape (ESC) followed by the key press. Most hosts do not
+support 8-bit sessions, and hence do not recognize the meta key.
+Therefore, this translation mode has to be enabled when connected to
+such hosts to take advantage of the meta key in programs that make use
+of it like Emacs.
+.I Default value: on
+.TP
+.BI modemAttentionString " (string)"
+The string to send to the modem to get its attention (switch to
+command mode). This string will be sent to the modem before the hangup
+string when hangupViaDTR is disabled.
+.I  Default value: +++
+.TP
+.BI modemHangupString " (string)"
+The hangup string to send to the modem when hangupViaDTR is disabled.
+Default value: ATH^M
+.TP
+.BI modems " (string)"
+A list of modem devies to use. Seyon will try modems in this list one
+after the other until it finds an available modem or the list is
+exhausted. 
+.I No default value.
+.TP
+.BI modemStatusInterval " (int)"
+This resource controls the amount of time (in seconds) between updates
+to the modem status toggles (including the clock). The default is five
+seconds, but you can set it to one second (or any other number) if you
+want the toggles to be updated more frequently. Even if you set this
+to a large number, Seyon is intellegent enough to update the toggles
+after each connect or hangup.
+.I Default value: 5
+.TP
+.BI modemVMin " (int)"
+This resource specifies the minimum number of characters that should
+be in the buffer before the read process is satified. The read process
+will wait until that number of incoming characters is in the buffer or
+0.1 second has elapsed between the receiption of two characters before
+displaying the data in the buffer. This results in the data being
+displayed in chunks and speeds up the terminal display. The speedup
+would be most noticeable on slow machnes with fast modems.
+
+Leave this resource at its default (1) or set it at a low value (6) if
+you have a slow modem (e.g. 2400bps). Otherwise you might set it to
+the maximum value, which is platform-dependent but generally 255. If
+you set it to any number greater than the maximum value, it will be
+truncated to the maximum value.
+.I Default value: 1
+.TP
+.BI newlineTranslation " (string)"
+When the Enter key is pressed, newline character (\\n) is generated.
+This resource determines what to translate this character to. Three
+modes are possible: no translation (newline), carriage return (\\r),
+and carriage return / line feed. Unix systems usually expect newline
+or carrage return, DOS systems expect carraige return or carriage
+return / line feed. The three keywords corresponding to the above
+modes are
+.IR nl ", " cr ", and " cr/lf .
+.I Default value: cr
+.TP
+.BI noConnectStringX " [X = 1-4] (string)"
+The response strings given by the modem when connection fails. 
+.IR "Default values: NO CARRIER" ", " "NO DIALTONE" ", " BUSY ", " VOICE
+(respectively)
+.TP
+.BI phonelistFile " (string)"
+The name of the phone list (dialing directory) file. See the included
+example to learn how this file should be formatted.
+.I Default value: phonelist
+.TP
+.BI postConnectAction " (string)"
+Specifies a simple or compound action that will be executed after a
+connection to a remote host is made. This action will be executed
+before running any script attached to that host in the dialing
+directory. All actions here have to be synchronous. Refer to the
+section entitled \fISeQuickKeys\fP below for a description of
+available actions.
+.I Default value: Beep();
+.TP
+.BI protocolsFile " (string)"
+The name of the protocols file. This file tells Seyon what file transfer
+protocols are available. The user will be promted with a list based on
+this file when file transfer is to be initiated.
+.I Default value: protocols
+.TP
+.BI quickKeyX
+Refer to the section entitled \fISeQuickKeys\fP below.
+.TP
+.BI rtsctsFlowControl " (boolean)"
+Whether Seyon should turn on RTS/CTS hardware flow control. Make sure
+the modem is set to use this as well.
+.I Default value: off
+.TP
+.BI scriptDirectory " (string)"
+Seyon's script directory. When looking for scripts, Seyon will first
+try this script directory, then the current directory.
+.I Default value: defaultDirectory
+.TP
+.BI showFunMessages " (boolean)"
+Whether to display funny messages when Seyon has no other important
+information to show. Seyon will display those messages at an interval
+specified by the \fIfunMessagesInterval\fP resource when there is no
+other important information to convey to the user. To disable the
+display of fun messages, this resource has be set to off.
+.I Default value: on
+.TP
+.BI startupAction " (string)"
+Specifies a simple or compound action that will be executed on
+startup. This action is executed prior to running any script (in case
+the -script switch is given) or dialing any entry of the dialing
+directory (in case the -dial switch is given or the resource
+dialAutoStart is enabled). You can make Seyon open the dialing
+directory automatically on startup by using the simple action
+``OpenWidnow(Dial);'' as a constituent of this complex action stack.
+Note that running the startup script is just a special case of this
+resource. Refer to the section entitled \fISeQuickKeys\fP for a
+description of available actions.
+.I Default value: RunScript(startup);
+.TP
+.BI startupFile " (string)"
+Seyon's startup file. Seyon will execute all commands in this file
+upon startup. This file can have any commands acceptable as script
+commands. The most useful command to put here is the \fIset\fP
+command, to set the various communications parameters.
+.I Default value: startup
+.TP
+.BI stripHighBit " (boolean)"
+Whether to strip the high (eights) bit from incoming characters. If
+set to on, the high bit of all incoming characters will be stripped,
+which will make an 8-N-1 setting behave like 7-N-1, even though eight
+bits are used for each character.
+.I Default value: off
+.TP
+.BI xonxoffFlowControl " (boolean)"
+Whether Seyon should turn on XON/XOFF software flow control.
+.I Default value: off
+
+.SH SEQUCKKEYS
+
+Seyon allows the user to have custom buttons, called SeQuickKeys (z
+quickies), to which actions can be attached. SeQuickKeys provide a
+convenient way via which the user can invoke frequently-used
+operations by a singe mouse click. SeQuickKeys are specified through
+the resources quickKeyX, where X is an integer corresponding to the
+order at which that SeQuickKey is to appear on the command center.
+Relevant subparts of that resource are \fIvisible\fP, \fIaction\fP,
+and \fIlabel\fP. Here is an example:
+
+.PD 0
+.nf
+.IP
+Seyon*quickKey3.visible: on
+.IP
+Seyon*quickKey3.action: FileTransfer(1,file); Beep(); 
+.IP
+Seyon*quickKey3.label: Upload
+.fi
+.PD
+
+.P
+The first line specifies that SeQuickKey3 should be visible. The
+second line specifies the action bound to the SeQuickKey (in this
+case, a compound action), and the third line specifies the label for
+that SeQuickKey's button. Other subparts can also be specified in a
+similar fashion (e.g.  background, foreground, ..etc.)
+
+Actions can be either simple or compound. A compound action consists
+of a stack of simple actions and can be used as simple mini-script.
+\fIExamples:\fP 
+
+.nf
+\(bu Set(idleGuard,on); DialEntries(Default);
+\(bu Echo("Uploading files..."); Transmit(rz); \\
+      FieTransfer(1,"*.ico $HOME/acct.wks"); Echo(Done);
+\(bu OpenWindow(Dial); DialEntries("2 5 6");
+\(bu Echo("Goodbye.."); Hangup(); Quit();
+\(bu Set(baud,9600); ManualDial("555-5555");
+\(bu Echo("Will upload..."); ShellCommand("$sz *.wks");
+\(bu Set(parity,0); RunScript(login.scr); Echo(Finished);
+.fi
+
+.P
+The following is a list of actions Seyon currently supports. Asterisks
+designate asynchronoous actions. Brackets designate optional
+arguments.
+
+.TP
+.BI  Beep ();
+Rings the bell making a short beep.
+
+.TP
+.BI CloseWindow "(window [,...]);"
+Closes (dismisses) the given windows. Currenly the only valid argument
+to this action is Dial, which corresponds to the dialing idrectory
+window. \fIExample:\fP CloseWindow(Dial);
+
+.TP
+.BI DialEntries (entries-list); *
+Dials entries in the dialing directory corresponding by order to the
+given list. Entries will be dialed as if the user had selected them on
+the dialing directory. Entries will be dialed without opening the
+dialing directory. You can use the action ``OpenWindow(Dial);'' and
+stack the two actions in a compound action if you want the dialing
+directory to be opened.
+
+The list must be quoted if it consists of more than one entry, and
+entries should be separated by white space, not commas.  If the list
+consists of just the word ``Default'', then the entries given by the
+resource defaultPhoneEntries will be dialed, refer to the description
+of that resource for more details.
+
+The most common use of this action is attach frequesntly-dialed hosts
+to SeQuickKeys, making dialing those hosts a one-click operation. If
+this action is not the last in a compound action stack, actions
+specified by the resource postConnectAction may not work properly.
+\fIExamples:\fP DialEntries(2); DialEntries("2 4 5");
+DialEntries(Default);
+
+.TP
+.BI DivertFile ([file]); *
+Sends the given file to the remote host as a text upload. If the
+optional argument ``file'' is not specified, Seyon will pop up a
+dialog box asking for the file name. In the latter case this action is
+similar to clicking Divert from the Misc window. \fIExamples:\fP
+DivertFile("/tmp/acct.wks"); DivertFile();
+
+.TP
+.BI Echo ([string]);
+Echos the given string to the terminal. Does not send it to the modem
+(use Transmit for that). If the string consists of more than one word,
+it must be quoted. Note that unlike the shell command of the same
+name, this command does not accepts the switch -n but always appends
+newline to the string. If the argument is omitted, an empty line will
+be echoed. \fIExamples:\fP Echo(Hello); Echo("Hello there"); Echo();
+
+.TP
+.BI FileTransfer "(entry, [file-list]);" *
+Executes the transfer protocol corresponding by order in the trasfer
+console (protocols file) to ``entry''. If that protocol requires a
+file name and file-list is omitted, Seyon will pop up a dialog box
+asking for the file. Otherwise file-list will be passed to that
+protocol. The list must be quotes if it consists of more than one word
+and items in it should be separated by white space. It can contain
+wild cards and shell variables. \fIExamples:\fP FileTransfer(1);
+FileTransfer(2,acct.wks); FileTransfer(2,"*.wks $HOME/acct.wks");
+
+.TP
+.BI Hangup ();
+Disconnects the line. Does not pop up a confirmation box.
+
+.TP
+.BI IconifyWindow "(window [,...]);"
+Iconifies the given windows. Valid arguments to this action are Main,
+Dial, and Term, corresponding respectively to the command center,
+dialing directory, and terminal emulator windows. When the argument is
+Term, this action will work only if the terminal emulator sets the
+envirenment variable WINDOWID, like xterm does. \fIExamples:\fP
+IconifyWindow(Main,Dial,Term); IconifyWindow(Dial);
+
+.TP
+.BI ManualDial ([number]); *
+Dials a number as if the Manual button had been clicked from the
+dialing directory. If ``number'' is specified, it will be dialed
+directly and no dialog box will be popped up asking for the number.
+\fIExamples:\fP ManualDial(555-5555); ManualDial();
+
+.TP
+.BI Message ([string]);
+Echos the given string to the message box of Seyon's command center
+(main window). If the string consists of more than one word, it must
+be quoted. If the argument is omitted, an empty line will be echoed.
+\fIExamples:\fP Message(Hello); Message("Hello there"); Message();
+
+.TP
+.BI OpenWindow "(window [,...]);"
+Opens each of the given windows by popping it if closed or
+de-iconifying it if in an iconic state. Valid arguments to this action
+are Main, Dial, and Term, corresponding respectively to the command
+center, dialing directory, and terminal emulator windows. When the
+argument is Term, this action will work only if the terminal emulator
+sets the envirenment variable WINDOWID, like xterm does.
+\fIExamples:\fP OpenWindow(Main,Dial,Term); OpenWindow(Dial);
+
+.TP
+.BI Quit ();
+Exits Seyon completely and returns to the shell. Does not pop up a
+confirmation box.
+
+.TP
+.BI RunScript ([script-name]); *
+Executes the script given by the file script-name. The script will be
+executed as if the user had selected it via the Script button. If
+script-name is omitted, a dialog box will be popped up asking for the
+script name. This is a very versatile action, as many remote and local
+commands or series of commands can be performed by attaching
+appropriate scripts to SeQuickKeys. \fIExamples:\fP
+RunScript(login.scr); RunScript();
+
+.TP
+.BI Set "(parameter, value);"
+Sets the specified parameter to the given value. Can be used to set
+the various communications parameters. Available parameters are listed
+under the script command ``set''.  \fIExamples:\fP Set(baud,9600);
+Set(parity,0); Set(idleGuard,off).
+
+.TP
+.BI ShellCommand (shell-command); *
+Executes the given shell command via the user's shell pointed to by
+the SHELL environment variable, or /bin/sh if that environment
+variable is not set. Note that the command must be quoted if it
+consists of more than one word. If the first non-space letter of the
+command is the character ``$'', then standard input and standard
+output will be redirected to to the modem. This action can be used to
+execute any external program from withen Seyon. \fIExample:\fP
+ShellCommand(ls); ShellCommand("$cd $HOME; sz -vv *.wks");
+
+.TP
+.BI Transmit (string);
+Transmits the given string to the remote host. The string must be
+quoted if it consists of more than one word. The string is transmitted
+as is (no case conversions are performed). No newline character or
+carriage return is appended to the string, use the prefix characters
+for that (e.g. ^M, ^J). See the discripttion of the script command
+``transmit'' for more details. \fIExample:\fP Transmit(ls^M);
+Transmit("ls -CF^M");
+
+.SH SCRIPT LANGUAGE
+
+Script files can automate some tedious tasks such as logging into a
+system.  A script file is an ascii text file and may be entered or
+edited using any standard text editor.
+
+The script file is read line by line.  Empty lines (consisting of
+white space only) are ignored.  Comments are lines whose first
+non-space character is a pound sign (#).
+
+The script processor reads each script line, ignoring leading white
+space, into \fIwords\fP. A word is defined as either:
+
+.IP
+.PD 0
+\(bu a sequence of characters delimited by white space, or
+.IP
+\(bu a sequence of characters enclosed in single or double quotes.
+.PD
+
+.P
+The first word of a script file is considered the \fIcommand word\fP.
+If the last character of the command word is a colon (:), the line is
+considered to be a \fIlabel\fP (the object of a \fIgoto\fP statement).
+Otherwise, it is assumed to be a script command and is interpreted as
+such. Command words are case insensative.
+
+Some commands take one or more arguments. Each argument is parsed as a
+single word as defined above.  If blanks are required in an argument,
+the argument must be quoted using single or double quotes.
+
+\" .SS Startup Scripts
+
+\"    When XCOMM is started up, it looks for the file ".xcomm" in the current
+\"    or $HOME directory.  If it is found, it is executed.  This is useful for
+\"    setting your "basic" parameters without having to recompile XCOMM.  For
+\"    example, your startup file may turn CIS <ENQ> mode off, set your baud
+\"    rate to 9600, and set 7BIT translation.
+
+
+.SS Script Command List
+
+Below is the description of all commands that may be used in the Seyon
+script language:
+
+.TP
+.BI "capture on|off" " (currently may not work)"
+The command \fIcapture on\fP will enable capture. All characters
+received during \fIwaitfor\fP processing will be appended to the capture
+file. The command \fIcapture off\fP will close the capture file.
+This setting does not currently extend to terminal mode. This may be
+offered in a later release.
+
+.TP
+.B debug on|off
+If the argument is \fIon\fP, all subsequent command lines processed
+will be displayed on the local screen. The exception to this is lines
+containing a \fItransmit\fP command. These lines will just print
+\fITRANSMIT...\fP, so that passwords, etc. can be protected. If the
+argument is \fIoff\fP, scripts will execute quietly (this is the
+default setting).
+
+.TP
+.BI dial " <number>"
+Dial the specified number.  Seyon supports generic "Hayes" compatible
+modems for dialing.  Note that this command requires an actual phone
+number. The phonebook is not used for this function.
+
+.TP
+.BI echo " <string>"
+Echos the given string to the terminal. Does not send it to the
+modem (use
+.I transmit
+for that). If the string contains spaces, it must be quoted. Note that
+unlike the shell command of the same name, this command does not
+accepts the switch -n but always appends newline to the string.
+
+.TP
+.B exit
+Terminates the script file prior to the end of file. Returns to
+terminal mode.
+
+.TP
+.B flush
+Flushes the modem, i.e. discards data written to the modem but not
+transmitted and data received but not read.
+
+.TP
+.BI goto " <label>"
+Goes to the specified label in the script file and continues execution
+from that point. The label may either precede or follow the actual
+\fIgoto\fP statement. A label is any \fIcommand word\fP whose last
+character is a colon (:).
+
+.TP
+.B hanup
+Hangups up the line and disconnects from the remote host.
+
+.TP
+.BR if ", " else ", " endif
+.I Syntax: 
+.nf
+\fIif\fP <condition>
+        <statements>
+[\fIelse\fP
+        <statements>]
+\fIendif\fP
+.fi
+
+Conditionally executes statements based on specified condition. Seyon
+supports the following conditions:
+
+.IP
+.PD 0
+\fIwaitfor\fP: true if the last \fIwaitfor\fP command was successful.
+.IP
+\fIlinked\fP: true if this script was executed from the dialing
+directory.
+.PD
+
+Conditions may be negated using the prefix \fInot\fP or the character
+\fI!\fP: 
+
+.IP
+.PD 0
+\fI!waitfor\fP: true If the last \fIwaitfor\fP command timed out.
+.IP
+\fInot waitfor\fP: same as \fI!waitfor\fP above
+.PD
+
+The \fIelse\fP and \fIendif\fP keywords must appear on their own
+lines. \fIIf\fP statements may not be nested.
+
+.TP
+.BI pause " <time>"
+Suspends execution of the script for the specified number of seconds.
+This is usually used for timing considerations; for example, waiting a
+couple of seconds after receiving the \fIconnect\fP message and typing
+^C to CompuServe.
+
+.TP
+.B purge
+Reads and discards all data coming from the modem for the duration of
+one second.
+
+.TP 
+.B quit
+Terminates the script and exits the whole program (returns to the
+shell).
+
+
+.TP
+.B redial
+Redials the last number dialed using the \fIdial\fP command.
+
+.TP
+.BI send_break
+Sends a BREAK signal to te remote host.
+
+.TP
+.BI set " <parameter> <value>"
+Sets the specified parameter to the given value. Can be used to set
+the various communications parameters for each host. The follwoing is
+a list of the \fIset\fP keywords that Seyon recognizes. Keywords
+marked with an asterisk set the current parameter only, not the
+default one. Refer to the corresponig resource (in parentheses below)
+for details of the function of each keyword.
+
+.PD 0
+.IP
+\" .IR port " (modem)"
+\" .IP
+.IR baud "* (defaultBPS)"
+.IP
+.IR bits "* (defaultBits)"
+.IP
+.IR parity "* (defaultParity)"
+.IP
+.IR stopBits "* (defaultStopBits)"
+.IP
+.IR stripHighBit " (stripHighBit)"
+.IP
+.IR newlineTranslation " (newlineTranslation)"
+.IP
+.IR del " (backspaceTranslation)"
+.IP
+.IR meta_tr " (metaKeyTranslation)"
+.IP
+.IR xoff " (xonxoffFlowControl)"
+.IP
+.IR rtscts " (rtsctsFlowControl)"
+.IP
+.IR autozm " (zmodemAutoDownload)"
+.IP
+.IR idleGuard " (idleGuard)"
+.PD
+
+Boolean keywords accept \fIon\fP or \fIoff\fP as their argument, other
+keywords accept the same arguments as the corresponding resources.
+
+.TP
+.BI shell " <shell-command>"
+Executes the given shell command via the user's shell pointed to by
+the SHELL environment variable, or /bin/sh if the environment variable
+SHELL is not set. Note that the command must be quoted if it consists
+of more than one word. If the first non-space letter of the command is
+the character '$', then standard input and standard output will be
+redirected to to the modem. This command can be used to execute any
+external program from withen Seyon. \fIExample:\fP shell "cd /usr/dl;
+rz -vv".
+
+.TP
+.BI transmit " <text>"
+Transmits the specified text to the remote host. The text argument
+should be quoted (using single or double quotes) if there are spaces
+to be transmitted. The text is transmitted as is (no case conversions
+are performed).
+
+.I Prefix characters:
+.IP
+.PD 0
+^ is the Control character prefix: the next character is made into a
+control character. For example, ^M is \fIcarriage return\fP (0x0D) and
+^J is \fInewline\fP (0x0A). 
+.IP
+\\ is quote prefix: the next character is transmitted verbatim. For
+example, \\^ would transmit a literal ^.
+.PD
+
+.TP
+.B tty on|off
+This command specifies whether or not characters received from the
+modem will be displayed on the local terminal.  Since the only time
+that the script processor looks at the receive queue is during
+\fIwaitfor\fP processing, the displays may look a bit erratic.
+Use the \fItty off\fP command to disable local display of received
+characters during script processing.
+
+.TP 
+.BI waitfor " <text> [timeout]"
+Waits for the specified text to appear from the modem. The text
+argument should be quoted (using single or double quotes) if there are
+spaces to be transmitted.
+
+Special characters are interpreted the same as for \fItransmit\fP.
+If the timeout argument is specified, Seyon will wait that number of
+seconds for the string to appear.  If no timeout is given, Seyon
+defaults to 30 seconds.
+
+During \fIwaitfor\fP processing, characters received (up to and
+including the last character found in the text or in the timeout) can
+be captured to a disk file (if \fIcapture on\fP is specified), and/or
+displayed to the screen (if \fItty on\fP is specified).
+
+.TP
+.BI when " [<string-to-expect> <string-to-send>]"
+Sends string-to-send whenever it encounters string-to-expect while
+waiting in a \fIwaitfor\fP command, whatever the number if times
+string-to-expect is encountered. 
+
+This is is useful if the order of prompts expected is not known before
+hand. For example, some BBS systems (notably PCBoard) change the
+prompts depeding on the time of call, and a complete script for such
+boards cannot be written using \fIwaitfor\fP only. 
+
+As many number of \fIwhen\fP commands as desired can be specified. A
+\fIwhen\fP command with no arguments clears all outstanding \fIwhen\fP
+commands.  \fIwaitfor\fP commands take precedence over \fIwhen\fP
+commands if they expect the same string.
+
+A typical use of this command would be:
+
+.nf
+        when "Continue?"       "y^M"
+        when "More?"           "n^M"
+        waitfor "BBS Command?"
+        when
+.fi
+
+The above script keeps sending "y^M" to every Continue?" prompt and
+"n^M" to every "More?" prompt until the the string "BBS Command?" is
+encountered. The lasy \fIwhen\fP clears all outstanding \fIwhen\fP
+commands.
+
+.SH FILES
+The default Seyon files are
+.IR startup ", " phonelist ", and " protocols .
+These have to be in the current directory, Seyon's default
+directory
+.RI ( ~/\.seyon "),"
+or the user's home directory. The default script directory is Seyon's
+default directory. All of these files and directories can be
+overridden by setting the appropriate resources. See the description
+of those resources as well as the description of the files above.
+
+.SH SEE ALSO
+xterm(1), resize(1)
+
+.SH COPYRIGHT
+
+Seyon is Copyright (c) 1992-1993 of Muhammad M. Saggaf. Seyon is not
+public domain. Permission is granted to use and distribute Seyon
+freely for any use and to sell it at any price without reference to
+the copyright owner provided that in all above cases Seyon is intact
+and is not made part of any program either in whole or in part and
+that this copyright notice is included with Seyon. Permission is also
+granted to modify the source as long as the modified source is not
+distributed.
+
+.SH BUGS
+
+The script command 'set port' is not supported in this release. If the
+action DialEntries is not the last in a compound action stack, actions
+specified by the resource postConnectAction may not work properly.
+
+If Seyon is hung, it can be made to exit cleanly by killing its main
+process by signal 15 (SIGTERM) from another shell. Seyon's main process
+is the one that has the lowest PID (Process ID) number. For example,
+if ps shows:
+
+.nf
+         1100 p0 S     0:04 seyon -noemulator
+         1101 p0 S     0:00 seyon -noemulator
+         1102 p0 S     0:38 seyon -noemulator
+.fi
+
+Then ``kill -15 1100'' or ``kill 1100'' would cause Seyon clean up and
+exit gracefully.
+
+.SH AUTHOR
+
+Muhammad M. Saggaf, alsaggaf@mit.edu. Snail Mail: Muhammad Saggaf, Box
+9863, Dhahran 31311, SAUDI ARABIA. I apologize that I may not be able
+to respond to all correspondence I receive.
+
+xcomm 2.2 was written by Eric Coe and Larry Gensch.
+
+.SH ACKNOWLEDGEMENT
+
+David Boyce for helpuful suggestions, the Imake file, and patches for
+clean build under gcc \-Wall; Joaquim Jorge for the lex/yacc parsing
+routines contributed by him; and the many people who sent me patches
+for various platforms: Fred Appleman (SVR4), atae@spva.dnet.nasa.gov
+(Ultrix), Alain Hebert (SVR3.2), Peter Davies (Sun Sparc), Eric
+Schmidt (Apollo), David Sanderson (AIX), Jonathan Bayer (Sun), Jeff
+Johnson (SVR4), Glenn Geers (SVR4-Esix), Tony Vincent-Sun-Vienna
+(Solaris), Bob Smith (SunOS 3.x and sgtty interface). (pardon me if I
+forgot to mention you). I'm also thankful to all the nice people who
+sent me suggestions or bug reports.
+
+The MultiList widget used in the dialing directory is written by the
+Free Widget Foundation. You can get it and other FWF widgets by ftp
+from a.cs.uiuc.edu.
