@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: file_util.c,v 1.2 1993/08/27 00:56:22 smace Exp $";
+static char rcsid[] = "@(#)$Id: file_util.c,v 1.3 1993/10/09 19:39:46 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,18 @@ static char rcsid[] = "@(#)$Id: file_util.c,v 1.2 1993/08/27 00:56:22 smace Exp 
  *
  *******************************************************************************
  * $Log: file_util.c,v $
- * Revision 1.2  1993/08/27 00:56:22  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:39:46  smace
+ * Update to elm 2.4 pl23 release version
+ *
+ * Revision 5.10  1993/09/27  01:51:38  syd
+ * Add elm_chown to consolidate for Xenix not allowing -1
+ * From: Syd
+ *
+ * Revision 5.9  1993/09/19  23:37:29  syd
+ * I found a few places more where the code was missing a call
+ * to fflush() before it called unlock() and fclose()/exit()
+ * right after unlocking the mail drop.
+ * From: Jukka Ukkonen <ukkonen@csc.fi>
  *
  * Revision 5.8  1993/08/23  03:26:24  syd
  * Try setting group id separate from user id in chown to
@@ -125,41 +135,52 @@ char *from, *to;
 	FILE *from_file, *to_file;
 	char buffer[VERY_LONG_STRING];
 	int  len;
-	
+
+	dprint (1, (debugfile, "Copy: from='%s' to='%s'\n", from, to));
+
 	if ((from_file = fopen(from, "r")) == NULL) {
-	  dprint(1, (debugfile, "Error: could not open %s for reading (copy)\n",
-		 from));
-	  error1(catgets(elm_msg_cat, ElmSet, ElmCouldNotOpenFile,
-		"Could not open file %s."), from);
-	  return(1);
+	    dprint(1, (debugfile, "Error: could not open %s for reading (copy)\n",
+		       from));
+	    error1(catgets(elm_msg_cat, ElmSet, ElmCouldNotOpenFile,
+			   "Could not open file %s."), from);
+	    return(1);
 	}
 
 	if ((to_file = fopen(to, "w")) == NULL) {
-	  dprint(1, (debugfile, "Error: could not open %s for writing (copy)\n",
-		 to));
-	  error1(catgets(elm_msg_cat, ElmSet, ElmCouldNotOpenFile,
-		"Could not open file %s."), to);
-	  return(1);
+	    dprint(1, (debugfile, "Error: could not open %s for writing (copy)\n",
+		       to));
+	    error1(catgets(elm_msg_cat, ElmSet, ElmCouldNotOpenFile,
+			   "Could not open file %s."), to);
+	    return(1);
 	}
 
-	while (len = fread(buffer, 1, VERY_LONG_STRING, from_file))
-	  if (fwrite(buffer, 1, len, to_file) != len) {
-	      Write_to_screen(catgets(elm_msg_cat, ElmSet, ElmWriteFailedCopy,
-		      "\n\rWrite failed to temp file in copy\n\r"), 0);
-	      perror(to);
-	      fclose(to_file);
-	      fclose(from_file);
-	      return(1);
-	  }
-	fclose(from_file);
-        if (fclose(to_file) == EOF) {
-	  Write_to_screen(catgets(elm_msg_cat, ElmSet, ElmCloseFailedCopy,
-		  "\n\rClose failed on temp file in copy\n\r"), 0);
-	  perror(to);
-	  return(1);
+	while (len = fread(buffer, 1, VERY_LONG_STRING, from_file)) {
+	    if (fwrite(buffer, 1, len, to_file) != len) {
+		Write_to_screen(catgets(elm_msg_cat, ElmSet, ElmWriteFailedCopy,
+			"\n\rWrite failed to temp file in copy\n\r"), 0);
+		perror(to);
+		/*
+		 *  NEVER close anything just at whim!!
+		 *  If the file has been locked using fcntl() or lockf()
+		 *	YOU WILL DROP ALL LOCKS refering to the file.
+		 */
+		fflush(to_file);
+		fclose(to_file);
+		fclose(from_file);
+		return(1);
+	    }
 	}
-	chown( to, -1, groupid);
-	chown( to, userid, -1);	/* at least groupid will change */
+
+	fclose(from_file);
+	fflush(to_file);
+
+	if (fclose(to_file) == EOF) {
+	    Write_to_screen(catgets(elm_msg_cat, ElmSet, ElmCloseFailedCopy,
+		    "\n\rClose failed on temp file in copy\n\r"), 0);
+	    perror(to);
+	    return(1);
+	}
+	(void) elm_chown( to, userid, groupid);
 
 	return(0);
 }

@@ -126,6 +126,10 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#undef!'
 #$d_calendar	ENABLE_CALENDAR	/**/
 #define dflt_calendar_file	"$calendar"	
 
+/* CHOWN_NEG1:
+ */
+#$d_chown_neg1	CHOWN_NEG1	/**/
+
 /* DONT_ESCAPE_MESSAGES:
  *	This symbol, if defined, indicates that a binary capable MTA is in use
  *	that honors the content-length header and no message constructs need

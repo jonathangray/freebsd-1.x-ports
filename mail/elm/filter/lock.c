@@ -1,8 +1,8 @@
 
-static char rcsid[] ="@(#)$Id: lock.c,v 1.2 1993/08/27 00:54:12 smace Exp $";
+static char rcsid[] ="@(#)$Id: lock.c,v 1.3 1993/10/09 19:37:00 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  * 			Copyright (c) 1988-1992 USENET Community Trust
  * 			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,8 @@ static char rcsid[] ="@(#)$Id: lock.c,v 1.2 1993/08/27 00:54:12 smace Exp $";
  *
  *******************************************************************************
  * $Log: lock.c,v $
- * Revision 1.2  1993/08/27 00:54:12  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:37:00  smace
+ * Update to elm 2.4 pl23 release version
  *
  * Revision 5.6  1993/01/19  03:55:39  syd
  * exitprog.c makes a reference to a null character pointer, savecopy.c

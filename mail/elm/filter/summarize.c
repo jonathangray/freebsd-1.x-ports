@@ -1,8 +1,8 @@
 
-static char rcsid[] ="@(#)$Id: summarize.c,v 1.2 1993/08/27 00:54:16 smace Exp $";
+static char rcsid[] ="@(#)$Id: summarize.c,v 1.3 1993/10/09 19:37:07 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  * 			Copyright (c) 1988-1992 USENET Community Trust
  * 			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,8 @@ static char rcsid[] ="@(#)$Id: summarize.c,v 1.2 1993/08/27 00:54:16 smace Exp $
  *
  *******************************************************************************
  * $Log: summarize.c,v $
- * Revision 1.2  1993/08/27 00:54:16  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:37:07  smace
+ * Update to elm 2.4 pl23 release version
  *
  * Revision 5.8  1993/02/08  18:38:12  syd
  * Fix to copy_file to ignore unescaped from if content_length not yet reached.

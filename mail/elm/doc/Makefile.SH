@@ -16,15 +16,15 @@ esac
 echo "Extracting doc/Makefile (with variable substitutions)"
 cat >Makefile <<!GROK!THIS!
 #
-# $Id: Makefile.SH,v 1.2 1993/08/27 00:53:55 smace Exp $
+# $Id: Makefile.SH,v 1.3 1993/10/09 19:36:29 smace Exp $
 #
 #  Makefile for the documentation of the ELM mail system
 #
 #         (C) Copyright 1988-1992, USENET Community Trust
 #
 #  $Log: Makefile.SH,v $
-#  Revision 1.2  1993/08/27 00:53:55  smace
-#  Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+#  Revision 1.3  1993/10/09 19:36:29  smace
+#  Update to elm 2.4 pl23 release version
 #
 # Revision 5.11  1993/04/12  02:12:07  syd
 # Added elmalias.1 man page.  Updated Users.guide to mention elmalias.

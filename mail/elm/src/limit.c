@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: limit.c,v 1.2 1993/08/27 00:56:32 smace Exp $";
+static char rcsid[] = "@(#)$Id: limit.c,v 1.3 1993/10/09 19:39:59 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,8 @@ static char rcsid[] = "@(#)$Id: limit.c,v 1.2 1993/08/27 00:56:32 smace Exp $";
  *
  *******************************************************************************
  * $Log: limit.c,v $
- * Revision 1.2  1993/08/27 00:56:32  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:39:59  smace
+ * Update to elm 2.4 pl23 release version
  *
  * Revision 5.3  1993/05/31  19:17:02  syd
  * While looking into the feasibility of adding `limit sender' as requested

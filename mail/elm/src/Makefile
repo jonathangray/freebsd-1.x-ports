@@ -1,4 +1,4 @@
-# : Makefile.SH,v 1.2 1993/08/27 00:55:56 smace Exp $
+# : Makefile.SH,v 5.1 1992/10/03 22:58:40 syd Exp $
 #
 #  Makefile for the ELM mail program.
 #
@@ -11,11 +11,8 @@
 #			dsinc!elm
 #
 # $Log: Makefile,v $
-# Revision 1.5  1993/09/28 18:58:04  smace
-# Reran elm Configure set to not break on 8 bit chars
-#
-# Revision 1.2  1993/08/27  00:55:56  smace
-# Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+# Revision 1.6  1993/10/09 19:39:13  smace
+# Update to elm 2.4 pl23 release version
 #
 # Revision 5.1  1992/10/03  22:58:40  syd
 # Initial checkin as of 2.4 Release at PL0
@@ -36,7 +33,7 @@ DEST		=	/usr/local/bin
 ECHO		=	/bin/echo
 LFLAGS		=	 
 LIB		=	/usr/local/lib
-LIB2		= 	
+LIB2		= 	-lcrypt
 LIBS		=	 -ltermlib 
 LINT		=	lint
 MAILGRP		=	bin

@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: save_opts.c,v 1.2 1993/08/27 00:56:51 smace Exp $";
+static char rcsid[] = "@(#)$Id: save_opts.c,v 1.3 1993/10/09 19:40:25 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,12 @@ static char rcsid[] = "@(#)$Id: save_opts.c,v 1.2 1993/08/27 00:56:51 smace Exp 
  *
  *******************************************************************************
  * $Log: save_opts.c,v $
- * Revision 1.2  1993/08/27 00:56:51  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:40:25  smace
+ * Update to elm 2.4 pl23 release version
+ *
+ * Revision 5.7  1993/09/27  01:51:38  syd
+ * Add elm_chown to consolidate for Xenix not allowing -1
+ * From: Syd
  *
  * Revision 5.6  1993/08/23  03:26:24  syd
  * Try setting group id separate from user id in chown to
@@ -107,8 +111,7 @@ save_options()
 	  if (rename(newfname, oldfname) < 0)
 	    dprint(2, (debugfile, "Unable to rename %s to %s\n", 
 		   newfname, oldfname));
-	  (void) chown(oldfname, -1, groupid);
-	  (void) chown(oldfname, userid, -1);
+	  (void) elm_chown(oldfname, userid, groupid);
 
 	}
 

@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: newmbox.c,v 1.2 1993/08/27 00:56:40 smace Exp $";
+static char rcsid[] = "@(#)$Id: newmbox.c,v 1.3 1993/10/09 19:40:09 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,27 @@ static char rcsid[] = "@(#)$Id: newmbox.c,v 1.2 1993/08/27 00:56:40 smace Exp $"
  *
  *******************************************************************************
  * $Log: newmbox.c,v $
- * Revision 1.2  1993/08/27 00:56:40  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:40:09  smace
+ * Update to elm 2.4 pl23 release version
+ *
+ * Revision 5.34  1993/09/27  01:51:38  syd
+ * Add elm_chown to consolidate for Xenix not allowing -1
+ * From: Syd
+ *
+ * Revision 5.33  1993/09/19  23:38:16  syd
+ * Erroneous Content-Length:s that ended up beyond the end of the folder
+ * wasn't checked for, so the rest of the folder became one big message.
+ * From: Jan.Djarv@sa.erisoft.se (Jan Djarv)
+ *
+ * Revision 5.32  1993/09/19  23:32:35  syd
+ * Fix a code portability problem with Convex.
+ * From: Jukka Ukkonen <ukkonen@csc.fi>
+ *
+ * Revision 5.31  1993/09/19  23:15:28  syd
+ * Changed a few buffers from LONG_STRING (512) to VERY_LONG_STRING
+ * to avoid long header lines overflowing the allocated space. At
+ * least 1024 bytes should be allowed in any header line/field.
+ * From: Jukka Ukkonen <ukkonen@csc.fi>
  *
  * Revision 5.30  1993/08/23  03:26:24  syd
  * Try setting group id separate from user id in chown to
@@ -384,7 +403,7 @@ int add_new_only;
 
 	FILE *temp;
 	struct header_rec *current_header = NULL;
-	char buffer[LONG_STRING], tbuffer[LONG_STRING], *c;
+	char buffer[VERY_LONG_STRING], tbuffer[VERY_LONG_STRING], *c;
 	long fbytes = 0L, line_bytes = 0L, content_start = 0L,
 	  content_remaining = -1L, lines_start = 0L;
 	register long line = 0;
@@ -429,8 +448,7 @@ int add_new_only;
 	     rm_temps_exit();
 	    }
 	   copyit++;
-	   chown(cur_tempfolder, -1, groupid);
-	   chown(cur_tempfolder, userid, -1);
+	   (void) elm_chown(cur_tempfolder, userid, groupid);
 	   chmod(cur_tempfolder, 0700);	/* shut off file for other people! */
 	 }
 	 else {
@@ -522,7 +540,7 @@ int add_new_only;
 
 	while (fbytes < mailfile_size) {
 
-	  if ((line_bytes = mail_gets(buffer, LONG_STRING, mailfile)) == 0)
+	  if ((line_bytes = mail_gets(buffer, VERY_LONG_STRING, mailfile)) == 0)
 	    break;
 
 	  if (copyit)
@@ -729,7 +747,7 @@ int add_new_only;
 		 * reading headers of new messages that have just arrived,
 		 * and the preceding message was one of the old ones.
 		 */
-		if ((count) && (!add_new_only || count > message_count)) {
+		if (count && (!add_new_only || (count > message_count))) {
 		  headers[count-1]->lines = line;
 		  if (headers[count-1]->content_length < 0)
 		    headers[count-1]->content_length = fbytes - content_start;
@@ -849,7 +867,12 @@ int add_new_only;
 	    else if (header_cmp(buffer, "Content-Length", NULL)) {
 	      buffer[line_bytes - 1] = '\0';
 	      current_header->content_length = atol((char *) buffer + 15);
-	      content_length_found = TRUE;
+	      /* Check if content_length is > remaining size of file */
+	      if (current_header->content_length > mailfile_size-fbytes)
+		current_header->content_length = -1;
+	      else
+	        content_length_found = TRUE;
+
 	    }
 
 	    else if (header_cmp(buffer, "Expires", NULL))

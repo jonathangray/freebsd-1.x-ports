@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: elmalias.c,v 1.2 1993/08/27 00:57:19 smace Exp $";
+static char rcsid[] = "@(#)$Id: elmalias.c,v 1.3 1993/10/09 19:41:02 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $
+ *  The Elm Mail System  -  $Revision: 1.3 $
  *
  * 			Copyright (c) 1988-1992 USENET Community Trust
  * 			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,16 @@ static char rcsid[] = "@(#)$Id: elmalias.c,v 1.2 1993/08/27 00:57:19 smace Exp $
  *
  *******************************************************************************
  * $Log: elmalias.c,v $
- * Revision 1.2  1993/08/27 00:57:19  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:41:02  smace
+ * Update to elm 2.4 pl23 release version
+ *
+ * Revision 5.8  1993/09/27  01:05:37  syd
+ * Eliminate warning about redeclaring getpwuid().
+ * From: riacs!rutgers!tscs.tscs.com!fin!chip (Chip Salzenberg)
+ *
+ * Revision 5.7  1993/09/19  23:12:00  syd
+ * Add ability for elmalias to determine HOME if missing from the environment.
+ * From: chip@chinacat.unicom.com (Chip Rosenthal)
  *
  * Revision 5.6  1993/08/23  02:44:41  syd
  * fix where checkalias doesn't fully expand multi-database aliases
@@ -100,6 +108,12 @@ static char rcsid[] = "@(#)$Id: elmalias.c,v 1.2 1993/08/27 00:57:19 smace Exp $
 #include "elmutil.h"
 #include "ndbz.h"
 #include "s_elmalias.h"
+#include <pwd.h>
+
+char *getenv();
+#ifndef	_POSIX_SOURCE
+struct passwd *getpwuid();
+#endif
 
 /*
  * Maximum number of alias files we can consult.
@@ -322,13 +336,17 @@ DBZ *open_user_aliases()
 {
     char *home, *fname;
     DBZ *db;
-    extern char *getenv();
+    struct passwd *pw;
 
-    if ((home = getenv("HOME")) == NULL) {
-	fprintf(stderr, catgets(elm_msg_cat, ElmaliasSet,
-	    ElmaliasCannotDetermineHome,
-	    "%s: cannot determine your HOME directory\n"), Progname);
-	exit(1);
+    if ((home = getenv("HOME")) == NULL || *home == '\0') {
+	if ((pw = getpwuid(getuid())) == NULL) {
+	    fprintf(stderr, catgets(elm_msg_cat, ElmaliasSet,
+		ElmaliasCannotDetermineHome,
+		"%s: cannot determine your HOME directory\n"), Progname);
+	    exit(1);
+	}
+	home = pw->pw_dir;
+	endpwent();
     }
     fname = (char *)safe_malloc(strlen(home) + 1 + strlen(ALIAS_DATA) + 1);
     (void) strcat(strcat(strcpy(fname, home), "/"), ALIAS_DATA);

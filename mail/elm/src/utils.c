@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: utils.c,v 1.2 1993/08/27 00:57:04 smace Exp $";
+static char rcsid[] = "@(#)$Id: utils.c,v 1.3 1993/10/09 19:40:40 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,22 @@ static char rcsid[] = "@(#)$Id: utils.c,v 1.2 1993/08/27 00:57:04 smace Exp $";
  *
  *******************************************************************************
  * $Log: utils.c,v $
- * Revision 1.2  1993/08/27 00:57:04  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:40:40  smace
+ * Update to elm 2.4 pl23 release version
+ *
+ * Revision 5.15  1993/09/27  01:51:38  syd
+ * Add elm_chown to consolidate for Xenix not allowing -1
+ * From: Syd
+ *
+ * Revision 5.14  1993/09/20  19:21:12  syd
+ * make fflush conditional on the unit being open
+ * From: Syd
+ *
+ * Revision 5.13  1993/09/19  23:37:29  syd
+ * I found a few places more where the code was missing a call
+ * to fflush() before it called unlock() and fclose()/exit()
+ * right after unlocking the mail drop.
+ * From: Jukka Ukkonen <ukkonen@csc.fi>
  *
  * Revision 5.12  1993/08/23  03:26:24  syd
  * Try setting group id separate from user id in chown to
@@ -110,8 +124,7 @@ create_new_folders()
 	(void) system_call(com, 0);
 #endif /* MKDIR */
 
-	chown(folders, -1, groupid);
-	chown(folders, userid, -1);
+	(void) elm_chown(folders, userid, groupid);
 }
 
 create_new_elmdir()
@@ -134,8 +147,7 @@ create_new_elmdir()
 	(void) system_call(com, 0);
 #endif /* MKDIR */
 
-	chown( source, -1, groupid);
-	chown( source, userid, -1);
+	(void) elm_chown( source, userid, groupid);
 }
 
 move_old_files_to_new()
@@ -328,6 +340,9 @@ int val;	/* not used, placeholder for signal catching! */
 	  (void) unlink(cur_tempfolder);
 	}
 
+	if (mailfile)
+	    fflush (mailfile);
+
 	unlock();				/* remove lock file if any */
 
 	if (do_cursor) {
@@ -376,6 +391,10 @@ silently_exit()
 	  Raw(OFF);
 	}
 
+	if (mailfile)
+	    fflush (mailfile);
+	unlock ();
+
 	exit(0);
 }
 
@@ -414,6 +433,9 @@ int val;	/* not used, placeholder for signal catching! */
 	(void) unlink(buffer);
 
 	(void) unlink(cur_tempfolder);			/* temp mailbox */
+
+	if (mailfile)
+	    fflush (mailfile);
 
 	if (do_cursor) {
 	  MoveCursor(LINES,0);
@@ -495,4 +517,20 @@ char *filename;
 	buffer[i] = '\0';
 
 	return( (char *) buffer);
+}
+
+int elm_chown(file, userid, groupid)
+char *file;
+int userid, groupid;
+{
+#ifdef CHOWN_NEG1
+	int status;
+
+	status = chown(file, -1, groupid);
+	chown(file, userid, -1);
+
+	return(status);
+#else
+	return(chown(file, userid, groupid));
+#endif
 }

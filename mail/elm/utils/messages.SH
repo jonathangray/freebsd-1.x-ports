@@ -17,7 +17,7 @@ echo "Extracting utils/messages (with variable substitutions)"
 echo $startsh > messages
 cat >>messages <<'!NO!SUBS!'
 # messages: part of the Elm mail system
-# @(#)$Id: messages.SH,v 1.2 1993/08/27 00:57:28 smace Exp $
+# @(#)$Id: messages.SH,v 1.3 1993/10/09 19:41:10 smace Exp $
 #		Copyright (c) 1988-1992 USENET Community Trust
 # 		Copyright (c) 1986,1987 Dave Taylor
  

@@ -1,8 +1,8 @@
 
-/* $Id: regexp.h,v 1.2 1993/08/27 00:54:35 smace Exp $ */
+/* $Id: regexp.h,v 1.3 1993/10/09 19:37:32 smace Exp $ */
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  * 			Copyright (c) 1992 USENET Community Trust
  *******************************************************************************
@@ -13,8 +13,8 @@
  *
  *******************************************************************************
  * $Log: regexp.h,v $
- * Revision 1.2  1993/08/27 00:54:35  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:37:32  smace
+ * Update to elm 2.4 pl23 release version
  *
  * Revision 5.3  1992/11/15  01:38:23  syd
  * fix headers

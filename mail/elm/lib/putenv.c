@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: putenv.c,v 1.2 1993/08/27 00:55:24 smace Exp $";
+static char rcsid[] = "@(#)$Id: putenv.c,v 1.3 1993/10/09 19:38:42 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  *			Copyright (c) 1992 USENET Community Trust
  *******************************************************************************
@@ -13,8 +13,8 @@ static char rcsid[] = "@(#)$Id: putenv.c,v 1.2 1993/08/27 00:55:24 smace Exp $";
  *
  *******************************************************************************
  * $Log: putenv.c,v $
- * Revision 1.2  1993/08/27 00:55:24  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:38:42  smace
+ * Update to elm 2.4 pl23 release version
  *
  * Revision 5.1  1992/10/03  22:41:36  syd
  * Initial checkin as of 2.4 Release at PL0

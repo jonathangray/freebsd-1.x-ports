@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: read_rc.c,v 1.2 1993/08/27 00:56:47 smace Exp $";
+static char rcsid[] = "@(#)$Id: read_rc.c,v 1.3 1993/10/09 19:40:18 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,8 @@ static char rcsid[] = "@(#)$Id: read_rc.c,v 1.2 1993/08/27 00:56:47 smace Exp $"
  *
  *******************************************************************************
  * $Log: read_rc.c,v $
- * Revision 1.2  1993/08/27 00:56:47  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:40:18  smace
+ * Update to elm 2.4 pl23 release version
  *
  * Revision 5.25  1993/08/23  02:58:04  syd
  * Call to expand_env for pager should be call to do_expand_env.

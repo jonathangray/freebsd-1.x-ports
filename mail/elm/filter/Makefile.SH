@@ -21,7 +21,7 @@ if test "$mailermode" = 755; then
 fi
 cat >Makefile <<!GROK!THIS!
 #
-# @(#)$Id: Makefile.SH,v 1.2 1993/08/27 00:54:08 smace Exp $
+# @(#)$Id: Makefile.SH,v 1.3 1993/10/09 19:36:54 smace Exp $
 #  Makefile for the Elm system filter program
 #
 #         (C) Copyright 1986,1987, by Dave Taylor
@@ -33,8 +33,8 @@ cat >Makefile <<!GROK!THIS!
 #			dsinc!elm
 #
 #  $Log: Makefile.SH,v $
-#  Revision 1.2  1993/08/27 00:54:08  smace
-#  Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+#  Revision 1.3  1993/10/09 19:36:54  smace
+#  Update to elm 2.4 pl23 release version
 #
 # Revision 5.5  1993/06/06  17:35:04  syd
 # Remove useless buffer.c

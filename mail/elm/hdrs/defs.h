@@ -1,8 +1,8 @@
 
-/* $Id: defs.h,v 1.2 1993/08/27 00:54:24 smace Exp $ */
+/* $Id: defs.h,v 1.3 1993/10/09 19:37:23 smace Exp $ */
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  * 			Copyright (c) 1988-1992 USENET Community Trust
  * 			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,12 @@
  *
  *******************************************************************************
  * $Log: defs.h,v $
- * Revision 1.2  1993/08/27 00:54:24  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:37:23  smace
+ * Update to elm 2.4 pl23 release version
+ *
+ * Revision 5.33  1993/09/19  23:40:48  syd
+ * Defince SEEK_SET in one of our headers as a last resort
+ * From: Syd
  *
  * Revision 5.32  1993/08/23  02:46:51  syd
  * Test ANSI_C, not __STDC__ (which is not set on e.g. AIX).
@@ -677,6 +681,17 @@ extern SIGHAND_TYPE (*sigset(int sig, SIGHAND_TYPE (*func)(int)))(int);
 # undef  tolower
 # define tolower(c)	(isupper(c) ? ((c) - 'A' + 'a') : (c))
 #endif
+
+/*
+ *	if the seek constants arent set in an include file
+ *	lets define them ourselves
+ */
+#ifndef SEEK_SET
+#define	SEEK_SET	0	/* Set file pointer to "offset" */
+#define	SEEK_CUR	1	/* Set file pointer to current plus "offset" */
+#define	SEEK_END	2	/* Set file pointer to EOF plus "offset" */
+#endif
+
 
 /*
  * The "safe_malloc_fail_handler" vector points to a routine that is invoked

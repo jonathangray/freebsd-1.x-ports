@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: fileio.c,v 1.2 1993/08/27 00:56:23 smace Exp $";
+static char rcsid[] = "@(#)$Id: fileio.c,v 1.3 1993/10/09 19:39:47 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,16 @@ static char rcsid[] = "@(#)$Id: fileio.c,v 1.2 1993/08/27 00:56:23 smace Exp $";
  *
  *******************************************************************************
  * $Log: fileio.c,v $
- * Revision 1.2  1993/08/27 00:56:23  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:39:47  smace
+ * Update to elm 2.4 pl23 release version
+ *
+ * Revision 5.14  1993/09/27  01:51:38  syd
+ * Add elm_chown to consolidate for Xenix not allowing -1
+ * From: Syd
+ *
+ * Revision 5.13  1993/09/19  23:15:52  syd
+ * Here's some more patch stuff for undersize buffers for header lines.
+ * From: Jukka Ukkonen <ukkonen@csc.fi>
  *
  * Revision 5.12  1993/08/23  12:28:23  syd
  * Fix placement of ifdef for PC_CHOWN
@@ -129,7 +137,14 @@ int cm_options;
 	    else just copy it as it is.
 	**/
 
-    char buffer[SLEN];
+    /*
+     *	Changed buffer[SLEN] to buffer[VERY_LONG_STRING] to make it
+     *	big enough to contain a full length header line. Any header
+     *	is allowed to be at least 1024 bytes in length. (r.t.f. RFC)
+     *	14-Sep-1993 Jukka Ukkonen <ukkonen@csc.fi>
+     */
+
+    char buffer[VERY_LONG_STRING];
     register struct header_rec *current_header = headers[current-1];
     register int  lines, front_line, next_front,
 		  in_header = 1, first_line = TRUE, ignoring = FALSE;
@@ -174,7 +189,7 @@ int cm_options;
     next_front = TRUE;
 
     while (lines) {
-      if ((buf_len = mail_gets(buffer, SLEN, mailfile)) == 0)
+      if (! (buf_len = mail_gets(buffer, VERY_LONG_STRING, mailfile)))
         break;
 
       bytes_seen += buf_len;
@@ -385,7 +400,14 @@ int cm_options;
 }
 
 static struct stat saved_buf;
-static char saved_fname[SLEN];
+
+/*
+ *  Don't take chances that a file name is really longer than SLEN.
+ *  You'll just pollute the memory right after the allocated space
+ *  if you have MAXPATHLEN of 1024 (_PATH_MAX in POSIX).
+ */
+
+static char saved_fname[VERY_LONG_STRING];
 
 int
 save_file_stats(fname)
@@ -450,8 +472,7 @@ char *fname;
 	/*
 	 * Chown is restricted to root on BSD unix
 	 */
-	(void) chown(fname, -1, new_group);
-	(void) chown(fname, new_owner, -1);
+	(void) elm_chown(fname, new_owner, new_group);
 #else
 #  ifdef _PC_CHOWN_RESTRICTED
 /*
@@ -461,15 +482,14 @@ char *fname;
  */
         if (!pathconf(fname, _PC_CHOWN_RESTRICTED)) {
 #  endif
-	    if((i = chown(fname, new_owner, new_group)) == -1)
+	    if((i = elm_chown(fname, new_owner, new_group)) == -1)
 		ret_code = -1;
 
-	    dprint(2, (debugfile, "** chown(%s, %d, %d) returns %d [errno=%d] **\n",
+	    dprint(2, (debugfile, "** elm_chown(%s, %d, %d) returns %d [errno=%d] **\n",
 		       fname, new_owner, new_group, i, errno));
 #  ifdef _PC_CHOWN_RESTRICTED
 	} else {
-	    (void) chown(fname, -1, new_group);
-	    (void) chown(fname, new_owner, -1);
+	    (void) elm_chown(fname, new_owner, new_group);
 	}
 #  endif /* _PC_CHOWN_RESTRICTED */
 #endif /* BSD */
@@ -490,14 +510,14 @@ char *specific_username;
 	   'hidden users' on the system.
 	**/
 	
-	FILE *hidden_users;
-	char  buffer[SLEN];
+    FILE *hidden_users;
+    char  buffer[VERY_LONG_STRING];
 
-        /* 
+    /* 
 	this line is deliberately inserted to ensure that you THINK
 	about what you're doing, and perhaps even contact the author
 	of Elm before you USE this option...
-        */
+     */
 
 	if ((hidden_users = fopen (HIDDEN_SITE_USERS,"r")) == NULL) {
 	  dprint(1, (debugfile,

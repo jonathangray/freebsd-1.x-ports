@@ -1,5 +1,5 @@
 #
-# @(#)$Id: mailrc.awk,v 1.2 1993/08/27 00:57:26 smace Exp $
+# @(#)$Id: mailrc.awk,v 1.3 1993/10/09 19:41:08 smace Exp $
 #		Copyright (c) 1988-1992 USENET Community Trust
 # 		Copyright (c) 1986,1987 Dave Taylor
 # Bug reports, patches, comments, suggestions should be sent to:
@@ -8,8 +8,8 @@
 #					 dsinc!elm
 #
 # $Log: mailrc.awk,v $
-# Revision 1.2  1993/08/27 00:57:26  smace
-# Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+# Revision 1.3  1993/10/09 19:41:08  smace
+# Update to elm 2.4 pl23 release version
 #
 # Revision 5.1  1992/10/04  00:46:45  syd
 # Initial checkin as of 2.4 Release at PL0

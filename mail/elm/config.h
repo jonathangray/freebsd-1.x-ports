@@ -91,7 +91,7 @@
 /* CONFIGURE_DATE
  *	This symbol contains the last date that configure was run for elm -v output.
  */
-#define		CONFIGURE_DATE	"Tue Sep 28 11:53:41 PDT 1993"
+#define		CONFIGURE_DATE	"Sat Oct  9 12:15:03 PDT 1993"
 
 /* ASCII_CTYPE:
  *	This symbol, if defined, indicates that the ctype functions and
@@ -111,6 +111,10 @@
  */
 #define	ENABLE_CALENDAR	/**/
 #define dflt_calendar_file	".calendar"	
+
+/* CHOWN_NEG1:
+ */
+#define	CHOWN_NEG1	/**/
 
 /* DONT_ESCAPE_MESSAGES:
  *	This symbol, if defined, indicates that a binary capable MTA is in use
@@ -328,7 +332,7 @@
  *	This symbol defines to the C code the number of times to try
  *	locking the mail file.
  */
-/*#undef REMOVE_AT_LAST	/**/
+#define REMOVE_AT_LAST	/**/
 #define MAX_ATTEMPTS	6
 
 /* SAVE_GROUP_MAILBOX_ID:

@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: init.c,v 1.2 1993/08/27 00:56:30 smace Exp $";
+static char rcsid[] = "@(#)$Id: init.c,v 1.3 1993/10/09 19:39:56 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,12 @@ static char rcsid[] = "@(#)$Id: init.c,v 1.2 1993/08/27 00:56:30 smace Exp $";
  *
  *******************************************************************************
  * $Log: init.c,v $
- * Revision 1.2  1993/08/27 00:56:30  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:39:56  smace
+ * Update to elm 2.4 pl23 release version
+ *
+ * Revision 5.19  1993/09/27  01:51:38  syd
+ * Add elm_chown to consolidate for Xenix not allowing -1
+ * From: Syd
  *
  * Revision 5.18  1993/08/23  03:26:24  syd
  * Try setting group id separate from user id in chown to
@@ -287,8 +291,7 @@ char *requestedmfile;	/* first mail file to open, empty if the default */
 			"Could not open file %s for debug output!\n"),
 		  filename));
 	  }
-	  chown(filename, -1, groupid); /* file owned by user */
-	  chown(filename, userid, -1); /* at least groupid should change */
+	  (void) elm_chown(filename, userid, groupid); /* file owned by user */
 
 	  fprintf(debugfile, 
      "Debug output of the ELM program (at debug level %d).  Version %s\n\n",

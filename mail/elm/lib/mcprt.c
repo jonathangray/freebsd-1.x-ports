@@ -1,5 +1,5 @@
 
-static char rcsid[] = "@(#)$Id: mcprt.c,v 1.2 1993/08/27 00:55:13 smace Exp $";
+static char rcsid[] = "@(#)$Id: mcprt.c,v 1.3 1993/10/09 19:38:27 smace Exp $";
 
 /***********************************************************
 Copyright 1990, by Alfalfa Software Incorporated, Cambridge, Massachusetts.

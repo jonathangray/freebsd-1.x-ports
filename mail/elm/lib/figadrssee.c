@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: figadrssee.c,v 1.2 1993/08/27 00:54:57 smace Exp $";
+static char rcsid[] = "@(#)$Id: figadrssee.c,v 1.3 1993/10/09 19:38:11 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,8 @@ static char rcsid[] = "@(#)$Id: figadrssee.c,v 1.2 1993/08/27 00:54:57 smace Exp
  *
  *******************************************************************************
  * $Log: figadrssee.c,v $
- * Revision 1.2  1993/08/27 00:54:57  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:38:11  smace
+ * Update to elm 2.4 pl23 release version
  *
  * Revision 5.3  1993/06/12  05:33:32  syd
  * Remove useless auto

@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: ldstate.c,v 1.2 1993/08/27 00:55:09 smace Exp $";
+static char rcsid[] = "@(#)$Id: ldstate.c,v 1.3 1993/10/09 19:38:24 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  *			Copyright (c) 1992 USENET Community Trust
  *******************************************************************************
@@ -13,8 +13,8 @@ static char rcsid[] = "@(#)$Id: ldstate.c,v 1.2 1993/08/27 00:55:09 smace Exp $"
  *
  *******************************************************************************
  * $Log: ldstate.c,v $
- * Revision 1.2  1993/08/27 00:55:09  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:38:24  smace
+ * Update to elm 2.4 pl23 release version
  *
  * Revision 5.6  1993/08/23  02:46:51  syd
  * Test ANSI_C, not __STDC__ (which is not set on e.g. AIX).

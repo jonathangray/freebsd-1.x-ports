@@ -1,16 +1,13 @@
 #
-# : Makefile.SH,v 1.2 1993/08/27 00:53:55 smace Exp $
+# : Makefile.SH,v 5.11 1993/04/12 02:12:07 syd Exp $
 #
 #  Makefile for the documentation of the ELM mail system
 #
 #         (C) Copyright 1988-1992, USENET Community Trust
 #
 #  $Log: Makefile,v $
-#  Revision 1.5  1993/09/28 18:57:37  smace
-#  Reran elm Configure set to not break on 8 bit chars
-#
-# Revision 1.2  1993/08/27  00:53:55  smace
-# Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+#  Revision 1.6  1993/10/09 19:36:28  smace
+#  Update to elm 2.4 pl23 release version
 #
 # Revision 5.11  1993/04/12  02:12:07  syd
 # Added elmalias.1 man page.  Updated Users.guide to mention elmalias.
@@ -76,15 +73,15 @@ MAKE		=	/usr/bin/make
 MAN		=	/usr/local/man/man1
 MANEXT		=	.1
 CATMAN		=	none
-CATMANEXT	=	
+CATMANEXT	=	.1
 RM		= 	/bin/rm -f
 TBL       	=	/usr/bin/tbl
-MANROFF		=	
+MANROFF		=	/usr/bin/nroff
 MANROFF_OPTS	=	
 MV		=	/bin/mv
 TEST		=	test
 SUFFIX		=	
-PACKED		=	
+PACKED		=	n
 PACKER		=	
 
 #	Other variables

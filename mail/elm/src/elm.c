@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: elm.c,v 1.2 1993/08/27 00:56:17 smace Exp $";
+static char rcsid[] = "@(#)$Id: elm.c,v 1.3 1993/10/09 19:39:39 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  * This file and all associated files and documentation:
  *			Copyright (c) 1988-1992 USENET Community Trust
@@ -15,8 +15,13 @@ static char rcsid[] = "@(#)$Id: elm.c,v 1.2 1993/08/27 00:56:17 smace Exp $";
  *
  *******************************************************************************
  * $Log: elm.c,v $
- * Revision 1.2  1993/08/27 00:56:17  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:39:39  smace
+ * Update to elm 2.4 pl23 release version
+ *
+ * Revision 5.16  1993/09/19  23:46:00  syd
+ * Although it doesnt solve the limit/resync problem of new
+ * messages, allow them to be accessed anyway.
+ * From: austig@solan.unit.no
  *
  * Revision 5.15  1993/08/03  19:28:39  syd
  * Elm tries to replace the system toupper() and tolower() on current
@@ -209,6 +214,9 @@ char *argv[];
 	    newmbox(cur_folder, TRUE);	/* last won't be touched! */
 	    clear_error();
 	    header_page = pageon;
+
+	    if (selected)               /* update count of selected messages */
+	      selected += message_count - last_in_folder;
 
 	    if (on_page(current))   /* do we REALLY have to rewrite? */
 	      showscreen();

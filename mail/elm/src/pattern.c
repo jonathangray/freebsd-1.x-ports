@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: pattern.c,v 1.2 1993/08/27 00:56:44 smace Exp $";
+static char rcsid[] = "@(#)$Id: pattern.c,v 1.3 1993/10/09 19:40:14 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,14 @@ static char rcsid[] = "@(#)$Id: pattern.c,v 1.2 1993/08/27 00:56:44 smace Exp $"
  *
  *******************************************************************************
  * $Log: pattern.c,v $
- * Revision 1.2  1993/08/27 00:56:44  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:40:14  smace
+ * Update to elm 2.4 pl23 release version
+ *
+ * Revision 5.10  1993/09/19  23:15:28  syd
+ * Changed a few buffers from LONG_STRING (512) to VERY_LONG_STRING
+ * to avoid long header lines overflowing the allocated space. At
+ * least 1024 bytes should be allowed in any header line/field.
+ * From: Jukka Ukkonen <ukkonen@csc.fi>
  *
  * Revision 5.9  1993/05/14  03:53:46  syd
  * Fix wrong message being displayed and then overwritten
@@ -397,7 +403,7 @@ char *pat;
 	    Returns 1 if found, 0 if not
 	**/
 
-	char buffer[LONG_STRING];
+	char buffer[VERY_LONG_STRING];
 	int  message_number, lines, line, line_len, err;
 
 	message_number = current-1;
@@ -423,7 +429,8 @@ char *pat;
 	  line = 0;
 	  lines = headers[message_number]->lines;
 
-	  while ((line_len = mail_gets(buffer, LONG_STRING, mailfile)) && line < lines) {
+	  while ((line_len = mail_gets(buffer, VERY_LONG_STRING, mailfile)) &&
+		line < lines) {
 	
 	    if(buffer[line_len - 1] == '\n') line++;
 

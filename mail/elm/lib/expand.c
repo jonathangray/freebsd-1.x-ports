@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: expand.c,v 1.2 1993/08/27 00:54:56 smace Exp $";
+static char rcsid[] = "@(#)$Id: expand.c,v 1.3 1993/10/09 19:38:10 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  *			Copyright (c) 1988-1992 USENET Community Trust
  *			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,13 @@ static char rcsid[] = "@(#)$Id: expand.c,v 1.2 1993/08/27 00:54:56 smace Exp $";
  *
  *******************************************************************************
  * $Log: expand.c,v $
- * Revision 1.2  1993/08/27 00:54:56  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:38:10  smace
+ * Update to elm 2.4 pl23 release version
+ *
+ * Revision 5.4  1993/09/19  23:38:55  syd
+ * expand() didn't read the global rc file if the user elmrc didn't exist or
+ * didn't have an entry for maildir.
+ * From: Jan.Djarv@sa.erisoft.se (Jan Djarv)
  *
  * Revision 5.3  1992/12/11  01:45:04  syd
  * remove sys/types.h include, it is now included by defs.h
@@ -47,40 +52,17 @@ extern nl_catd elm_msg_cat;	/* message catalog	    */
 
 char *expand_define();
 
-int
-expand(filename)
+static char*
+expand_maildir(rcfile, filename, buffer)
+FILE *rcfile;
 char *filename;
+char *buffer;
 {
-	/** Expand the filename since the first character is a meta-
-	    character that should expand to the "maildir" variable
-	    in the users ".elmrc" file...
-
-	    Note: this is a brute force way of getting the entry out 
-	    of the .elmrc file, and isn't recommended for the faint 
-	    of heart!
-	**/
-
-	FILE *rcfile;
-	char  buffer[SLEN], *expanded_dir, *home, *bufptr;
-	int   foundit = 0;
+	char *home = NULL, *bufptr;
+	int  foundit = 0;
 
 	bufptr = (char *) buffer;		/* same address */
 	
-	if ((home = getenv("HOME")) == NULL) {
-	  printf(catgets(elm_msg_cat, ElmrcSet, ElmrcExpandHome,
-	     "Can't expand environment variable $HOME to find .elmrc file!\n"));
-	  return(NO);
-	}
-
-	sprintf(buffer, "%s/%s", home, elmrcfile);
-
-	if ((rcfile = fopen(buffer, "r")) == NULL) {
-	  printf(catgets(elm_msg_cat, ElmrcSet, ElmrcOpenElmrc,
-		"Can't open your \".elmrc\" file (%s) for reading!\n"),
-		 buffer);
-	  return(NO);
-	}
-
 	while (! foundit && mail_gets(buffer, SLEN, rcfile) != 0) {
 	  if (strncmp(buffer, "maildir", 7) == 0 ||
 	      strncmp(buffer, "folders", 7) == 0) {
@@ -99,10 +81,48 @@ char *filename;
 	  }
 	}
 
-	fclose(rcfile);			/* be nice... */
+	return home;
+}
 
-	if (! foundit) {
-	  /* Use default */
+int
+expand(filename)
+char *filename;
+{
+	/** Expand the filename since the first character is a meta-
+	    character that should expand to the "maildir" variable
+	    in the users ".elmrc" file or in the global rc file...
+
+	    Note: this is a brute force way of getting the entry out 
+	    of the .elmrc file, and isn't recommended for the faint 
+	    of heart!
+	**/
+
+	FILE *rcfile;
+	char  buffer[SLEN], *home, *expanded_dir;
+
+	if ((home = getenv("HOME")) == NULL) {
+	  printf(catgets(elm_msg_cat, ElmrcSet, ElmrcExpandHome,
+	     "Can't expand environment variable $HOME to find .elmrc file!\n"));
+	  return(NO);
+	}
+
+	sprintf(buffer, "%s/%s", home, elmrcfile);
+
+	home = NULL;
+	if ((rcfile = fopen(buffer, "r")) != NULL) {
+	  home = expand_maildir(rcfile, filename, buffer);
+	  fclose(rcfile);
+	}
+
+	if (home == NULL) { /* elmrc didn't exist or maildir wasn't in it */
+	  if ((rcfile = fopen(system_rc_file, "r")) != NULL) {
+	    home = expand_maildir(rcfile, filename, buffer);
+	    fclose(rcfile);
+	  }
+	}
+
+	if (home == NULL) {
+	  /* Didn't find it, use default */
 	  sprintf(buffer, "~/%s", default_folders);
 	  home = buffer;
 	}

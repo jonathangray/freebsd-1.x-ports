@@ -1,8 +1,8 @@
 
-/* @(#)$Id: save_opts.h,v 1.2 1993/08/27 00:54:36 smace Exp $ */
+/* @(#)$Id: save_opts.h,v 1.3 1993/10/09 19:37:33 smace Exp $ */
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  * 			Copyright (c) 1988-1992 USENET Community Trust
  * 			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,8 @@
  *
  *******************************************************************************
  * $Log: save_opts.h,v $
- * Revision 1.2  1993/08/27 00:54:36  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:37:33  smace
+ * Update to elm 2.4 pl23 release version
  *
  * Revision 5.10  1993/08/10  18:49:32  syd
  * When an environment variable was given as the tmpdir definition the src

@@ -1,5 +1,5 @@
 
-static char rcsid[] = "@(#)$Id: msgcat.c,v 1.2 1993/08/27 00:55:17 smace Exp $";
+static char rcsid[] = "@(#)$Id: msgcat.c,v 1.3 1993/10/09 19:38:33 smace Exp $";
 
 /* -*- c++ -*- */
 

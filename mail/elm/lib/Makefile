@@ -1,4 +1,4 @@
-# : Makefile.SH,v 1.2 1993/08/27 00:54:46 smace Exp $
+# : Makefile.SH,v 5.15 1993/08/03 19:28:39 syd Exp $
 #
 #  Makefile for the ELM mail program.
 #
@@ -11,11 +11,8 @@
 #			dsinc!elm
 #
 # $Log: Makefile,v $
-# Revision 1.5  1993/09/28 18:57:55  smace
-# Reran elm Configure set to not break on 8 bit chars
-#
-# Revision 1.2  1993/08/27  00:54:46  smace
-# Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+# Revision 1.6  1993/10/09 19:37:58  smace
+# Update to elm 2.4 pl23 release version
 #
 # Revision 5.15  1993/08/03  19:28:39  syd
 # Elm tries to replace the system toupper() and tolower() on current

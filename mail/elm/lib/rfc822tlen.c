@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: rfc822tlen.c,v 1.2 1993/08/27 00:55:28 smace Exp $";
+static char rcsid[] = "@(#)$Id: rfc822tlen.c,v 1.3 1993/10/09 19:38:47 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  *			Copyright (c) 1993 USENET Community Trust
  *******************************************************************************
@@ -13,8 +13,8 @@ static char rcsid[] = "@(#)$Id: rfc822tlen.c,v 1.2 1993/08/27 00:55:28 smace Exp
  *
  *******************************************************************************
  * $Log: rfc822tlen.c,v $
- * Revision 1.2  1993/08/27 00:55:28  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:38:47  smace
+ * Update to elm 2.4 pl23 release version
  *
  * Revision 5.2  1993/07/20  03:15:15  syd
  * remove extra garbage line

@@ -1,8 +1,8 @@
 
-static char rcsid[] ="@(#)$Id: parse.c,v 1.2 1993/08/27 00:54:13 smace Exp $";
+static char rcsid[] ="@(#)$Id: parse.c,v 1.3 1993/10/09 19:37:02 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  * 			Copyright (c) 1988-1992 USENET Community Trust
  * 			Copyright (c) 1986,1987 Dave Taylor
@@ -14,8 +14,12 @@ static char rcsid[] ="@(#)$Id: parse.c,v 1.2 1993/08/27 00:54:13 smace Exp $";
  *
  *******************************************************************************
  * $Log: parse.c,v $
- * Revision 1.2  1993/08/27 00:54:13  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:37:02  smace
+ * Update to elm 2.4 pl23 release version
+ *
+ * Revision 5.13  1993/09/19  23:11:17  syd
+ * strtokq was called with the wrong number of parameters.
+ * From: Jan.Djarv@sa.erisoft.se (Jan Djarv)
  *
  * Revision 5.12  1993/08/03  19:28:39  syd
  * Elm tries to replace the system toupper() and tolower() on current
@@ -364,7 +368,7 @@ get_outta_loop: 	/* jump out when we change state, if needed */
 		/* Special for regular expressions (enclosed between //) */
 		cond_argument[0] = '\0';
 		for (;;) {
-	          if ((word = strtokq(str, "/")) == NULL)
+	          if ((word = strtokq(str, "/", 0)) == NULL)
 	            break;
 		  strcat(cond_argument, word);
 		  if (word[strlen(word)-1] == '\\') /* If / was escaped ... */

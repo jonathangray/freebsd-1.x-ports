@@ -1,1 +1,1 @@
-#define PATCHLEVEL "23beta2"
+#define PATCHLEVEL "23"

@@ -1,8 +1,8 @@
 
-static char rcsid[] = "@(#)$Id: get_tz.c,v 1.2 1993/08/27 00:54:58 smace Exp $";
+static char rcsid[] = "@(#)$Id: get_tz.c,v 1.3 1993/10/09 19:38:14 smace Exp $";
 
 /*******************************************************************************
- *  The Elm Mail System  -  $Revision: 1.2 $   $State: Exp $
+ *  The Elm Mail System  -  $Revision: 1.3 $   $State: Exp $
  *
  * 			Copyright (c) 1992, 1993 USENET Community Trust
  *******************************************************************************
@@ -13,8 +13,8 @@ static char rcsid[] = "@(#)$Id: get_tz.c,v 1.2 1993/08/27 00:54:58 smace Exp $";
  *
  *******************************************************************************
  * $Log: get_tz.c,v $
- * Revision 1.2  1993/08/27 00:54:58  smace
- * Upgrade elm2.4 pl23beta elm2.4 pl23beta2
+ * Revision 1.3  1993/10/09 19:38:14  smace
+ * Update to elm 2.4 pl23 release version
  *
  * Revision 5.1  1993/08/10  18:56:53  syd
  * Initial Checkin
