@@ -1,0 +1,153 @@
+# Makefile for the WEB programs.
+# tangle is bootstrapped from the supplied C source.
+
+SHELL = /bin/sh
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+# This is so kpathsea will get remade automatically if you change
+# something in it and recompile from the package directory.
+kpathsea_parent = ../..
+kpathsea_dir = $(kpathsea_parent)/kpathsea
+kpathsea = $(kpathsea_dir)/kpathsea.a
+
+# Routines used everywhere.
+commondefines = $(srcdir)/../lib/common.defines
+commonh = $(srcdir)/../lib/config.h $(kpathsea_dir)/paths.h
+commono = ../lib/lib.a $(kpathsea)
+
+program = tangle weave pooltype
+
+CC = @CC@
+CFLAGS = -g
+CPPFLAGS = -I$(srcdir)/../lib -I../..
+
+CCLD = $(CC)
+LDFLAGS = $(CFLAGS) $(XLDFLAGS)
+LIBS = @LIBS@ $(extralibs)
+libs = $(commono) $(LIBS)
+
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+
+
+.SUFFIXES:
+.SUFFIXES: .o .c .p .ch
+.p.c:
+	$(SHELL) $(srcdir)/../lib/convert $*.p $*.c
+.ch.p:
+	./tangle $*.web $*.ch
+.c.o:
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $*.c
+
+
+default: $(all)
+all: $(program)
+triptrap: tangle
+
+
+tangleboot: tangleboot.o $(commono)
+	$(CCLD) -o tangleboot $(LDFLAGS) tangleboot.o $(libs)
+
+tangleboot.o: tangleboot.c tangleboot.h
+
+tangleboot.c tangleboot.h: tangleboot.p
+	cd ../web2c; $(MAKE) all
+	$(SHELL) $(srcdir)/../lib/convert tangleboot.p temp.c
+	sed s/tangle.h/tangleboot.h/ < temp.c > tangleboot.c
+	rm -f temp.c
+
+# To make tangleboot.p, we must assume a working tangle.
+tangleboot.p: tangle.web tangle.ch
+	tangle tangle.web tangle.ch
+	mv tangle.p tangleboot.p
+
+
+tangle: tangle.o $(commono)
+	$(CCLD) -o tangle $(LDFLAGS) tangle.o $(libs)
+tangle.o: tangle.c $(commonh)
+tangle.c: tangle.p $(commondefines)
+
+# Making tangle.p is a special case, since it is needed to compile
+# itself.  We compile the (distributed) tangleboot.c to make a tangle
+# which we can use to make the other programs.  (We don't bother to make
+# tangle again using itself.)
+tangle.p: tangleboot tangle.web tangle.ch
+	./tangleboot tangle.web tangle.ch
+
+tangle.web:
+	@echo "You seem to be missing tangle.web, perhaps because you"
+	@echo "only retrieved web2c.tar.gz, and not web.tar.gz."
+	@echo "You need both."
+	@echo
+	@echo "web.tar.gz should be available from the"
+	@echo "same place that you got web2c.tar.gz."
+	@echo "In any case, you can get it from ftp.cs.umb.edu:pub/tex."
+	exit 1
+
+pooltype: pooltype.o $(commono)
+	$(CCLD) -o pooltype $(LDFLAGS) pooltype.o $(libs)
+pooltype.o: pooltype.c $(commonh)
+pooltype.c: pooltype.p $(commondefines)
+pooltype.p: pooltype.web pooltype.ch
+
+
+weave: weave.o $(commono)
+	$(CCLD) -o weave $(LDFLAGS) weave.o $(libs)
+weave.o: weave.c $(commonh)
+weave.c: weave.p $(commondefines)
+weave.p: weave.web weave.ch
+
+
+Makefile: Makefile.in ../config.status
+	(cd ..; sh config.status)
+
+c-sources: pooltype.c tangle.c weave.c
+.PHONY: c-sources
+
+install install-exec: all
+	for p in $(program); do $(INSTALL_PROGRAM) $$p $(bindir)/$$p; done
+install-data:
+
+TAGS: *.c *.h
+	etags -t *.c *.h
+
+
+mostlyclean::
+	rm -f *.o $(program) $(lib) $(programs)
+
+clean:: mostlyclean
+	rm -f *.dvi *.pool
+
+distclean:: clean
+	rm -f Makefile config.status c-auto.h
+
+# Although we can remake configure and c-auto.h.in, we don't remove
+# them, since many people may lack Autoconf.  Use configclean for that.
+realclean:: distclean
+	rm -f TAGS *.info*
+
+extraclean::
+	rm -f *.aux *.bak *.bbl *.blg *.dvi *.log *.orig *.pl *.rej
+	rm -f *.i *.s *.tfm *.vf *.vpl *\#* *gf *pk *~
+	rm -f CONTENTS.tex a.out core mfput.* patch* texput.*
+
+configclean:
+	rm -f configure c-auto.h.in c-auto.h
+
+
+# Prevent GNU make 3 from overflowing arg limit on system V.
+.NOEXPORT:
+
+mostlyclean::
+	rm -f tangleboot
+
+# Can't remove *.p *.c *.h because of tangleboot.
+clean::
+	rm -f pooltype.p pooltype.c pooltype.h
+	rm -f tangle.p tangle.c tangle.h
+	rm -f weave.p weave.c weave.h
+
+# Do not remove tangleboot.[chp] at realclean, even though there are
+# targets for them in this Makefile, because we need a working tangle to
+# use them, and we might not have one.

@@ -1,0 +1,99 @@
+# ======================================================================
+# Makefile for files in <TEX.TUGBOAT> on TOPS-20
+# This constructs the tugboat.bib file from the tb*.cnt files using
+# the awk program tugboat.awk, and then produces complete test
+# bibliographies in alpha and unsrt form.
+# [29-Oct-88]
+# ======================================================================
+
+AWK = nawk
+
+BIBTEX = nbibtex
+
+DETEX = detex
+
+DEV = alw
+
+# We need a BIGG version of Common TeX to handle this big bibliography
+LATEX = cm-latex
+LATEX = latex
+
+RM = delete
+
+TEX = tex
+
+.SUFFIXES:
+
+.SUFFIXES:	.aux .dvi-$(DEV) .dvi .spell .ltx .tex .bbl .bib
+
+.bib.bbl:
+	- $(NBIBTEX) $*
+
+.dvi.dvi-$(DEV):
+	dvi$(DEV) -m$(MAG) $<
+#	cp $*.dvi-$(DEV) /$(DEV)
+	$(RM) $@
+
+.ltx.aux .ltx.dvi:
+	$(LATEX) $<
+
+.ltx.spell:
+	$(DETEX) $< | spell >$@
+
+.tex.aux .tex.dvi:
+	$(TEX) $<
+
+.tex.spell:
+#	$(DETEX) $< | spell >$@
+	qspell $< $@
+
+TUGCONTENTS = tb0180.cnt tb0281.cnt tb0382.cnt tb0483.cnt tb0584.cnt \
+	tb0685.cnt tb0786.cnt tb0887.cnt tb0988.cnt tb1089.cnt
+
+# For temporary debugging
+# TUGCONTENTS = tb0988.cnt
+
+all:	tugbib tugbib2
+
+tugbib:	tugbib.dvi
+
+# tugbib is in alpha order; this is preferable to plain (which gives
+# the same reference order) so we can test the correctness of alphanumeric
+# bibliography labels.
+tugbib.dvi:	tugbib.ltx tugboat.bib
+	- $(RM) tugbib.bbl
+	- $(RM) tugbib.aux
+	- $(LATEX) tugbib.ltx
+	- $(BIBTEX) tugbib
+	- $(LATEX) tugbib.ltx
+	- $(LATEX) tugbib.ltx
+
+tugbib.bbl:	tugbib.aux tugboat.bib
+	$(BIBTEX) tugbib
+
+tugbib2:	tugbib2.dvi
+
+# tugbib2 is in unsrt order for checking the bibliography against the
+# original TUGboat tables of contents
+tugbib2.dvi:	tugbib2.ltx tugboat.bib
+	- $(RM) tugbib2.bbl
+	- $(RM) tugbib2.aux
+	- $(LATEX) tugbib2.ltx
+	- $(BIBTEX) tugbib2
+	- $(LATEX) tugbib2.ltx
+	- $(LATEX) tugbib2.ltx
+
+tugbib2.bbl:	tugbib2.aux tugboat.bib
+	- $(BIBTEX) tugbib2
+
+tugboat.bib:	$(TUGCONTENTS) tugboat.awk Makefile
+	$(AWK) -f tugboat.awk $(TUGCONTENTS) >tugboat.bib
+
+clean:
+	@- $(RM) *.aux
+	@- $(RM) *.blg
+	@- $(RM) *.bbl
+	@- $(RM) *.dvi*
+	@- $(RM) *.log
+	@- $(RM) *.lst
+#	@- $(RM) *~*

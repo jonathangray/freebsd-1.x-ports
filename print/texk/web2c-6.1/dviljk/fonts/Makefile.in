@@ -1,0 +1,93 @@
+# Makefile for the dviljk builtin font files. --kb@cs.umb.edu, 24feb94.
+# Public domain.
+
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+# For `install'.
+prefix = /usr/gnu
+datadir = $(prefix)/lib
+texmf_prefix = $(datadir)/texmf
+fontdir = $(texmf_prefix)/fonts
+bh_fontdir = $(fontdir)/bh
+cg_fontdir = $(fontdir)/cg
+mt_fontdir = $(fontdir)/monotype
+
+INSTALL = @INSTALL@
+INSTALL_DATA = @INSTALL_DATA@
+SHELL = /bin/sh
+
+installargs = \
+  INSTALL='$(INSTALL)' \
+  INSTALL_DATA='$(INSTALL_DATA)' \
+  bh_fontdir=$(bh_fontdir) \
+  cg_fontdir=$(cg_fontdir) \
+  mt_fontdir=$(mt_fontdir) \
+
+fam_install_args = $(installargs) fam=$(fam) fam_dir=$(fam_dir) norm=$(norm)
+
+all:
+
+install: 
+	$(MAKE) $(installargs) fam=wi norm=wi fam_dir=wingdings    install-bh-family
+	$(MAKE) $(installargs) fam=al norm=al fam_dir=albertus	   install-cg-family
+	$(MAKE) $(installargs) fam=ao norm=an fam_dir=antiqueolive install-cg-family
+	$(MAKE) $(installargs) fam=cd norm=cl fam_dir=clarendon	   install-cg-family
+	$(MAKE) $(installargs) fam=cr norm=cr fam_dir=courier	   install-cg-family
+	$(MAKE) $(installargs) fam=gm norm=gr fam_dir=garamond	   install-cg-family
+	$(MAKE) $(installargs) fam=lg norm=lg fam_dir=lettergothic install-cg-family
+	$(MAKE) $(installargs) fam=mg norm=mr fam_dir=marigold	   install-cg-family
+	$(MAKE) $(installargs) fam=op norm=om fam_dir=optima	   install-cg-family
+	$(MAKE) $(installargs) fam=ot norm=co fam_dir=coronet	   install-cg-family
+	$(MAKE) $(installargs) fam=tm norm=tr fam_dir=times	   install-cg-family
+	$(MAKE) $(installargs) fam=un norm=un fam_dir=univers	   install-cg-family
+	$(MAKE) $(installargs) fam=un norm=uc fam_dir=univers	   install-cg-family
+	$(MAKE) $(installargs) fam=hv norm=ar fam_dir=helvetica	   install-mt-family
+	$(MAKE) $(installargs) fam=nt norm=tn fam_dir=newtimes	   install-mt-family
+	$(MAKE) $(installargs) fam=sy norm=sy fam_dir=symbol	   install-mt-family
+
+install-bh-family:
+	$(MAKE) $(fam_installargs) foundry=h foundry_dir=$(bh_fontdir) install-family 
+
+install-cg-family:
+	$(MAKE) $(fam_installargs) foundry=c foundry_dir=$(cg_fontdir) install-family
+
+install-mt-family:
+	$(MAKE) $(fam_installargs) foundry=m foundry_dir=$(mt_fontdir) install-family
+
+# This is only intended to be called recursively, with the necessary
+# variables defined.
+install-family:
+	$(SHELL) $(srcdir)/../../mkdirchain $(foundry_dir)/$(fam_dir)/tfm \
+	  $(foundry_dir)/$(fam_dir)/vf
+	cd $(srcdir)/base && for f in $(norm)*.tfm;     do test ! -r $$f \
+            || $(INSTALL_DATA) $$f $(foundry_dir)/$(fam_dir)/tfm/$$f; done
+	cd $(srcdir) && for f in $(foundry)$(fam)*.tfm; do test ! -r $$f \
+            || $(INSTALL_DATA) $$f $(foundry_dir)/$(fam_dir)/tfm/$$f; done
+	cd $(srcdir) && for f in $(foundry)$(fam)*.vf;  do test ! -r $$f \
+	    || $(INSTALL_DATA) $$f $(foundry_dir)/$(fam_dir)/vf/$$f; done
+
+# We don't really want to uninstall the fonts, I think.
+uninstall:
+
+
+Makefile: Makefile.in ../config.status
+	(cd ..; $(SHELL) config.status)
+
+
+depend TAGS:
+
+mostlyclean:
+
+clean: mostlyclean
+	rm -f *.dvi *.log *.ps
+
+distclean: clean
+	rm -f Makefile
+
+realclean: distclean
+
+extraclean:
+	rm -f *~ *\#* patch* *.orig *.rej core a.out *.vpl *.pl
+
+.NOEXPORT:

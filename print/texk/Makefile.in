@@ -1,0 +1,196 @@
+# Top-level Makefile for kpathsea-using programs.
+
+# Package subdirectories, the library, and all subdirectories.
+programs = dvipsk web2c xdvik dviljk dvi2tty makeindex 
+kpathsea_dir = kpathsea
+all_dirs = $(programs) $(kpathsea_dir)
+
+# The following make definitions (down to `end of installation
+# directories') are repeated in several Makefiles, because different
+# installations like to change them at different levels. If you edit the
+# top-level Makefile, the changes should propagate, however.
+# 
+# The following define installation directories. The default paths are
+# defined in kpathsea/paths.h, which is built from kpathsea/paths.h.in.
+# See kpathsea/INSTALL for a description of how the various path-related
+# files are used and created.
+
+# Generic installation directories.
+prefix = /usr/gnu
+exec_prefix = $(prefix)
+bindir = $(exec_prefix)/bin
+scriptdir = $(bindir)
+libdir = $(exec_prefix)/lib
+datadir = $(prefix)/lib
+infodir = $(prefix)/info
+includedir = $(prefix)/include
+manext = 1
+mandir = $(prefix)/man/man$(manext)
+
+# TeX & MF-specific directories. Not all of the following are relevant
+# for all programs, but it seems cleaner to collect everything in one place.
+
+# The default paths are now in kpathsea/paths.h.in. Passing all the
+# paths to sub-makes can make the arg list too long on system V.
+
+# The root of the tree.
+texmf_prefix = $(datadir)/texmf
+
+# TeX and MF source files.
+texinputdir = $(texmf_prefix)/tex
+mfinputdir = $(texmf_prefix)/mf
+
+# The top-level font directory.
+fontdir = $(texmf_prefix)/fonts
+
+# Where memory dumps are installed.
+fmtdir = $(texmf_prefix)/ini
+basedir = $(fmtdir)
+
+# Pool files.
+texpooldir = $(texmf_prefix)/ini
+mfpooldir = $(texpooldir)
+
+# If install_fonts=true, the PostScript/LaserJet TFM and VF files for
+# the builtin fonts get installed in subdirectories of this directory,
+# named for the typeface families of these directories. If you don't
+# have the default directory setup, you will want to set
+# install_fonts=false.
+install_fonts = true
+ps_fontdir = $(fontdir)/adobe
+bh_fontdir = $(fontdir)/bh
+cg_fontdir = $(fontdir)/cg
+mt_fontdir = $(fontdir)/monotype
+
+# Where the configuration files get installed.
+dvips_prefix = $(texmf_prefix)/dvips
+configdir = $(dvips_prefix)
+
+# Where the PostScript prologues go.
+headerdir = $(configdir)
+
+# Where dvips' TeX macro files get installed.
+psmacrodir = $(texinputdir)/dvips
+
+# If a font can't be found close enough to its stated size, we look for
+# each of these sizes in the order given.  This colon-separated list is
+# overridden by the envvar TEXSIZES, and by a program-specific variable
+# (e.g., XDVISIZES), and perhaps by a config file (e.g., in dvips).
+default_bdpi = 300
+default_texsizes = @default_texsizes@
+
+
+# Full filename of the database file.  It is not an error for this file
+# not to exist.  See the `Filename database' node in the kpathsea
+# documentation for details.
+db_dir = $(texmf_prefix)
+db_name = ls-R
+
+# Default MetaFont mode.  See the file `./texmf/mf/modes.mf' for a full list 
+# of available modes.
+default_mfmode = CanonCX
+
+# Default LaserJet printer.  See the file `dviljk/INSTALL' for available
+# options
+default_lj = LJ4
+
+# End of installation directory definitions.
+
+SHELL = /bin/sh
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+# I pass CFLAGS but not all the other Make compiler-related.
+# Unorthogonal, but many people like to change CFLAGS, and few people
+# like to change the others. It's impossible to pass them all, because
+# system V runs out of arg space.
+CFLAGS = -g $(XCFLAGS)
+
+
+# It's too bad we have to pass all these down, but I see no alternative,
+# if we are to propagate changes at the top level.
+makeargs = $(MFLAGS) CFLAGS='$(CFLAGS)' SHELL='$(SHELL)' \
+  prefix=$(prefix) exec_prefix=$(exec_prefix) \
+  bindir=$(bindir) scriptdir=$(scriptdir) libdir=$(libdir) \
+  datadir=$(datadir) infodir=$(infodir) includedir=$(includedir) \
+  manext=$(manext) mandir=$(mandir) \
+  texmf_prefix=$(texmf_prefix) \
+  texinputdir=$(texinputdir) mfinputdir=$(mfinputdir) \
+  fontdir=$(fontdir) \
+  fmtdir=$(fmtdir) basedir=$(basedir) \
+  texpooldir=$(texpooldir) mfpooldir=$(mfpooldir) \
+  install_fonts=$(install_fonts) \
+  ps_fontdir=$(ps_fontdir) bh_fontdir=$(bh_fontdir) \
+  cg_fontdir=$(cg_fontdir) mt_fontdir=$(mt_fontdir) \
+  dvips_prefix=$(dvips_prefix) configdir=$(configdir) \
+  headerdir=$(headerdir) psmacrodir=$(psmacrodir) \
+  default_texsizes='$(default_texsizes)' \
+  default_bdpi=$(default_bdpi) \
+  default_mfmode=$(default_mfmode) \
+  default_lj=$(default_lj) \
+  $(MAKEARGS)
+
+
+default: all
+
+# Make the library before the programs.
+all: do-texmf do-kpathsea
+	for d in $(programs); do \
+	  if test -d $$d; then (cd $$d; $(MAKE) $(makeargs) $@); \
+	  else true; fi; done
+
+# Only (un)install in the programs.
+install install-exec install-data \
+uninstall uninstall-exec uninstall-data:
+	for d in $(programs); do \
+	  if test -d $$d; then (cd $$d; $(MAKE) $(makeargs) $@); \
+	  else true; fi; done
+	ls -R $(texmf_prefix) >$(db_dir)/$(db_name)
+	if [ -f /etc/crontab ]; then \
+		echo "Adding $(db_name) update to /etc/crontab"; \
+		grep -q '>$(db_dir)/$(db_name)' /etc/crontab || \
+		echo "15	*	*	*	*	root	ls -R $(texmf_prefix) >$(db_dir)/$(db_name)" >>/etc/crontab; \
+	fi
+
+# Do other standard targets everywhere.
+mostlyclean clean distclean realclean extraclean configclean \
+TAGS info dvi check depend::
+	for d in $(all_dirs); do \
+	  if test -d $$d; then (cd $$d; $(MAKE) $(makeargs) $@); \
+	  else true; fi; done
+
+distclean realclean::
+	rm -f Makefile config.status texmf-stamp
+
+# Unconditionally recopy the texmf directory
+do-texmf:
+	if [ ! -f texmf-stamp -o ! -d $(texmf_prefix) ]; then \
+		./mkdirchain $(texmf_prefix); \
+		cp -R ../texmf/* $(texmf_prefix) && \
+		touch texmf-stamp; \
+	fi
+
+# Unconditionally remake the library, since we don't want to write out
+# the dependencies here.
+do-kpathsea:
+	cd $(kpathsea_dir); $(MAKE) $(makeargs)
+
+# Targets that only apply to web2c.
+triptrap run-triptrap clean-triptrap \
+run-trip clean-trip \
+run-trap clean-trap \
+c-sources programs \
+TeX MF BibTeX \
+formats fmts bases \
+manpages install-manpages: do-kpathsea
+	cd web2c; $(MAKE) $(makeargs) $@
+
+configure_in = $(srcdir)/configure.in
+$(srcdir)/configure: $(configure_in) $(autoconf)
+	cd $(srcdir); autoconf
+
+config.status: $(srcdir)/configure
+	$(SHELL) $(srcdir)/configure --no-create --verbose
+
+Makefile: $(srcdir)/Makefile.in config.status
+	$(SHELL) config.status

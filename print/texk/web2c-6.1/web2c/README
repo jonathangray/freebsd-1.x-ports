@@ -1,0 +1,472 @@
+This directory contains web2c, a system which converts TeX, Metafont,
+and other related WEB programs to C.  It is not a complete TeX
+distribution. Nor is it a general-purpose Pascal-to-C translator.
+
+web2c is electronically distributed in two files: the web files, in
+web.tar.gz, and the web2c-specific files, in web2c.tar.gz. If you
+already have the web files for a particular Knuthian version, you need
+not re-retrieve them. web2c changes irregularly wrt Knuth's updates.
+
+The file INSTALL contains installation instructions.
+
+The file MACHINES contains a list of configurations that have passed the
+trip and trap test.  If your configuration is not on this list, you
+should build triptex and trapmf (instructions in INSTALL), and then send
+mail to tex-k@cs.umb.edu with the vital statistics, and, of course, any
+necessary changes, preferably in the form of context diffs, with
+ChangeLog entries.
+
+The file PROBLEMS describes various difficulties people have
+encountered.  If you have trouble getting the distribution up, look here
+first.  Also look in ./MACHINES.
+
+The files COPYING* describe copying conditions for some parts of
+this distribution.
+
+If you know enough about TeX to be reading this, then you (or perhaps
+your institution) should consider joining the TeX Users Group.  TUG
+produces a periodical (TUGboat), sponsors an annual meeting (the
+proceedings of which are published as an issue of TUGboat), and arranges
+courses on TeX for all levels of users.  Given sufficient funding (which
+your joining will help), TUG could sponsor more projects that will
+benefit the TeX community (such as a successor to TeX $\pi$).  Here is
+the address:
+
+TeX Users Group
+P.O. Box 869
+Santa Barbara, CA 93102
+USA
+phone: (805) 899-4673
+email: tug@tug.org
+
+
+Here is a table of contents for the rest of this file:
+   Changing constants
+   Format files and preloading
+   Directory hierarchies
+   Online output from Metafont
+   Porting and portability
+
+
+
+Changing constants
+%%%%%%%%%%%%%%%%%%
+
+The files tex/small.sed and mf/small.sed contain changes to the TeX and
+Metafont change files to produce programs using less memory, pool space,
+etc. than the defaults.  These patches are applied automatically by
+`configure' when you define `SMALLTeX' resp. `SMALLMF' in c-auto.h.in.
+The TeX/MF that results will have a larger text segment and run slower,
+because it has to convert frequently between 16-bit and 32-bit integers.
+On the other hand, the binary will need less swap space.
+
+Similarly, the file bibtex/small.sed changes some of the constants in
+the default BibTeX to smaller values.  The default values are necessary
+for some databases (see math.utah.edu:pub/tex/bib), but are rather large.
+
+If configure fails to apply the patches, you can do so yourself with, e.g.:
+% cd tex; sed -f small.sed < tex.ch > ctex.ch
+
+I recommend the GNU version of patch, available from
+prep.ai.mit.edu:pub/gnu and many other archives.
+
+If you want to have more than 256 fonts, you might try this patch.  I
+haven't installed it in the main change file because it requires
+changing max_quarterword. (This patch will not apply cleanly to the
+current sources, but it should be easy enough to fix up. If you do so,
+please send me the corrected version.)
+
+
+From: Bernd Raichle <raichle@azu.informatik.uni-stuttgart.de>
+Date: Mon, 18 May 92 13:27:13 +0200
+
+I have applied these diffs to web2c 5.851b with a corrected
+WORDS_BIGENDIAN configuration file and *no* changes to `texmfmem.h'.
+(Changes are only needed for little-endian machines.)
+
+The changed bigTeX is able to load more than 284 fonts before the
+font_mem of 100.000 words overflows (it's a good idea to increment
+`font_mem_size' when using more than 256 fonts).  `xdvi' and `dvips'
+can print the resulted dvi file without problem.
+
+The new constant `max_font_max' is necessary, if you want different
+values of `font_max' in initex and virtex. (`max_font_max' is the
+space reserved in eqtb[] for the font identifiers; in the original
+source there is space for 256 font identifier.)
+
+*** ctex.ch.ORIG	Fri May 15 12:50:08 1992
+--- ctex.ch-32fonts	Fri May 15 15:20:28 1992
+***************
+*** 192,195 ****
+    can be going on simultaneously}
+! @!font_max=255; {maximum internal font number; must not exceed |max_quarterword|
+!   and must be at most |font_base+256|}
+  @!font_mem_size=100000; {number of words of |font_info| for all fonts}
+--- 192,195 ----
+    can be going on simultaneously}
+! @!font_max=450; {maximum internal font number; must not exceed |max_quarterword|
+!   and must be at most |font_base+max_font_max|}
+  @!font_mem_size=100000; {number of words of |font_info| for all fonts}
+***************
+*** 250,251 ****
+--- 250,252 ----
+  @d hyph_size=607 {another prime; the number of \.{\\hyphenation} exceptions}
++ @d max_font_max=512 {maximum number of internal fonts}
+  @z
+***************
+*** 721,723 ****
+  @d min_quarterword=0 {smallest allowable value in a |quarterword|}
+! @d max_quarterword=255 {largest allowable value in a |quarterword|}
+  @d min_halfword==0 {smallest allowable value in a |halfword|}
+--- 722,724 ----
+  @d min_quarterword=0 {smallest allowable value in a |quarterword|}
+! @d max_quarterword==65535 {largest allowable value in a |quarterword|}
+  @d min_halfword==0 {smallest allowable value in a |halfword|}
+***************
+*** 726,727 ****
+--- 727,737 ----
+  
++ % [8.111]
++ @x
++ if font_max>font_base+256 then bad:=16;
++ @y
++ if (max_font_max<min_quarterword)or(max_font_max>max_quarterword) then bad:=15;
++ if font_max>font_base+max_font_max then bad:=16;
++ @z
++ 
++ 
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+***************
+*** 870,871 ****
+--- 880,888 ----
+  
++ % [x.222]
++ @x
++ @d undefined_control_sequence=frozen_null_font+257 {dummy location}
++ @y
++ @d undefined_control_sequence=frozen_null_font+max_font_max+1 {dummy location}
++ @z
++ 
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+***************
+*** 1203,1204 ****
+--- 1220,1256 ----
+  bytes at a time.
++ @z
++ 
++ % [x.602]
++ @x
++ @p procedure dvi_font_def(@!f:internal_font_number);
++ var k:pool_pointer; {index into |str_pool|}
++ begin dvi_out(fnt_def1);
++ dvi_out(f-font_base-1);@/
++ @y
++ @p procedure dvi_font_def(@!f:internal_font_number);
++ var k:pool_pointer; {index into |str_pool|}
++ begin if f<=256+font_base then
++   begin dvi_out(fnt_def1);
++   dvi_out(f-font_base-1);
++   end
++ else begin dvi_out(fnt_def1+1);
++   dvi_out((f-font_base-1) div @'400);
++   dvi_out((f-font_base-1) mod @'400);
++   end;
++ @z
++ 
++ % [x.622]
++ @x
++ if f<=64+font_base then dvi_out(f-font_base-1+fnt_num_0)
++ else  begin dvi_out(fnt1); dvi_out(f-font_base-1);
++   end;
++ @y
++ if f<=64+font_base then dvi_out(f-font_base-1+fnt_num_0)
++ else if f<=256+font_base then
++   begin dvi_out(fnt1); dvi_out(f-font_base-1);
++   end
++ else begin dvi_out(fnt1+1);
++   dvi_out((f-font_base-1) div @'400);
++   dvi_out((f-font_base-1) mod @'400);
++   end;
+  @z
+
+
+Here is another patch you might like to apply, this one to make the
+font_info structure take less space.
+
+Date: Tue, 7 Sep 93 10:30:50 BST
+From: wgs@maths.ucd.ie (Wayne G. Sullivan)
+
+In moving from 5.851c to 5.851d I decided to try an idea which has been
+lurking in the subconcious for some time. Four byte words suffice for
+the font_info array, so I defined a union fmemory_word scaled/qqqq. It
+took a bit of fiddling and I had to use a hack: I defined fmemory_word
+in the pascal file as a struct which was included in ifdef/endif so as
+not to be seen by c, and gave the union def in texmfmem.h. Anyway it
+seems to work and does not involve much effort. The only other changes
+needed are in the declaration of font_info and in the debug procedure
+which prints out all forms of a memory word -- actually, one should
+not call this procedure for entries in font_info. The point in making
+this change is that the tex program uses less memory and formats files
+are about 15% smaller, depending on the font data stored. Though I have
+done no timing tests, there should be no speed difference.
+
+
+diff texmfmem.h texmfmem.h.wgs ==>
+113a114,120
+> typedef union {
+>     integer cint ;
+>   fourquarters qqqq ;
+> } fmemoryword  ;
+>
+>
+>
+
+
+diff tex.ch tex.ch.wgs ==>
+798a799,802
+> ifdef('STUFFTOOMIT')
+> @!fmemory_word=record cint:integer; qqqq: four_quarters; end;
+> endif('STUFFTOOMIT')
+>
+1177a1182,1190
+> @x 10682 m.549
+> @!font_info:array[font_index] of memory_word;
+>   {the big collection of font data}
+> @y  10683
+> @!font_info:array[font_index] of fmemory_word;
+>   {the big collection of font data}
+> @z
+>
+>
+1963a1977,1993
+>
+>
+> @x 24397 m.1339
+> 5: print_word(font_info[n]);
+> @y  24397
+> 5:
+> begin
+> print_scaled(font_info[n].sc); print_char(" ");@/
+> print_int(font_info[n].qqqq.b0); print_char(":");@/
+> print_int(font_info[n].qqqq.b1); print_char(":");@/
+> print_int(font_info[n].qqqq.b2); print_char(":");@/
+> print_int(font_info[n].qqqq.b3);
+> end;
+> @z
+
+
+
+Format files and preloading
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+TeX (and Metafont; I'll talk about TeX, but MF is completely analogous)
+can write its memory to a file; such a file is called a ``format file''.
+Why is this interesting?  Because TeX can read a format file much faster
+than the source file that gave rise to it.
+
+To create a format file, you give the command `\dump' to initex after
+reading the source file.  (This is more or less the raison d'etre for
+initex.)  For example:
+prompt$ initex
+This is TeX, C Version 3.0
+**plain \dump
+<blurbs>
+Starting to dump on file plain.fmt
+<more blurbs>
+
+Voila, you have a plain.fmt you can install somewhere with `make
+install-formats' (or cp, or whatever).
+
+The `formats' target in ./Makefile and tex/Makefile does the above for the
+formats defined by the make variable $(formats).
+
+Unlike all the other files in the TeX world, format files are not
+perfectly portable.  web2c itself writes the format files in BigEndian
+order (if NO_FMTBASE_SWAP is left undefined); for formats which do not
+dump any floating-point (e.g., |glue_ratio|) information, this suffices
+to make them portable across architectures.  Most formats (including
+plain) do not do this.  But you should always check.  (If you do compare
+format files dumped on different architectures, don't be alarmed by a
+few bytes' difference -- the date is also in the .fmt file.)
+
+Well, I said Metafont is completely analogous, but you actually need to
+do a little more: create a file that defines your local output devices
+(i.e., ``mode_defs'').  A collection of most existing Metafont modes is
+available by ftp from ftp.cs.umb.edu:pub/tex/modes.mf, or by email from
+me, karl@cs.umb.edu.  Using modes.mf for your local modes wastes a
+little bit of Metafont's memory (because it defines modes which you will
+almost certainly never use), but it has several advantages: you can be
+sure that your fonts will be identical to others'; you get extra
+information added to your fonts; you don't have to experiment to find
+your own settings.  modes.mf also explains what goes into a mode_def,
+and how to use Metafont with different devices.
+
+Once you have such a file, you say something like the following:
+prompt$ inimf
+This is METAFONT, C Version 2.0
+**plain
+<blurbs>
+*input modes
+<blurbs>
+*dump
+<final blurbs>
+
+and you should have a file `plain.base', analogous to TeX's `plain.fmt'.
+
+The target `bases' in ./Makefile and mf/Makefile does the above for the
+bases defined by the make variable $(bases).
+
+TeX uses the name it was invoked with to figure out what format file to
+read.  Therefore, for each format file, you should create a link to the
+virtex executable named the name of the format file.  For example:
+	cd $(bindir)
+	ln virtex tex
+	ln virtex latex
+	ln virtex texinfo
+
+Then, when you run, say,
+texinfo
+TeX looks for a format file named `texinfo.fmt'.
+All of this goes for Metafont, too.
+The Makefile tries to install these links automatically.
+
+One more thing about format (and base) files: It is possible to
+``preload'' TeX, i.e., avoid reading the .fmt file at runtime.  However,
+on most modern machines, you don't gain a lot of startup time, and you
+lose a lot of disk space.  Furthermore, different flavors of TeX will
+not have their code segments shared.  Therefore, it is probably best not
+to preload unless, of course, it takes your machine eons to load a
+format file.
+
+You may be wondering what the formats listed in ./Makefile are.  Here is
+a brief description:
+
+tex:
+        from plain.tex; described in the TeXbook.  The Makefile also
+        installs tex.fmt as plain.fmt, so that the constructions
+        described in the TeXbook will work.  Canonical source is
+        labrea.stanford.edu.
+latex:
+	from lplain.tex and latex.tex; described in the LaTeX manual,
+        by Leslie Lamport, published by Addison-Wesley.  Best
+        source is rusmv1.rus.uni-stuttgart.de.
+slitex:
+	LaTeX for making slides; also described in the LaTeX manual.
+texinfo:
+	from texinfo.tex; almost-completely logical markup (much more so
+        than LaTeX); can be translated into an Info document, which is
+        readable online.  Described in documentation that comes with the
+        macros.  Canonical source is prep.ai.mit.edu.
+amstex:
+        from amstex.tex; especially for mathematical papers; described
+        in the Joy of TeX, by Michael Spivak, published by the American
+        Mathematical Society.  Canonical source is e-math.ams.com.
+amslatex:
+	a combination of AMSTeX and LaTeX; incompatible with the
+        original LaTeX, because it uses Mittelbach and Schoepf's ``new
+        font selection scheme''.  Described in documentation that comes
+        with the macros.  Canonical source is e-math.ams.com.
+etex:
+        from eplain.tex; macros for common facilities that plain does
+        not have, e.g., symbolic cross-referencing.  Described in
+        documentation that comes with the macros.  Canonical source is
+        ftp.cs.umb.edu.
+inrstex:
+	from inrstex.tex; an alternative to LaTeX, with excellent
+        support for non-English supports.  Described in documentation
+        that comes with the macros.  Canonical source is
+        aldebaran.ee.mcgill.ca.
+picplus:
+        from picplus.tex; helps to make pictures; described in the
+        PiCTeX manual, by Michael Wichura, published by the TeX Users
+        Group.
+
+You can get more information about these packages and order the manuals
+from tug@math.ams.org.
+
+
+
+Directory hierarchies
+%%%%%%%%%%%%%%%%%%%%%
+
+TeX and its friends use many different sorts of files: fonts, macros,
+format dumps, pool files, etc.  When you install TeX, you have to decide
+how everything should be organized.
+
+The most painful thing to organize is the fonts.  There are both the
+.tfm files, which TeX and some DVI-readers need, and the PXL/GF/PK
+files, one for each point size and resolution, which only the
+DVI-readers look at.  Here are some of the common approaches:
+
+1) Put everything in one directory, say /usr/local/lib/tex/fonts. 
+Advantages: it's simple; everything is together; it's easy to tell if a
+particular file exists.  Disadvantage: the directory is huge.
+
+2) Put each set of pixel files at a given resolution (i.e.,
+magnification) in a different directory, and put the TFM files in
+another directory.  Advantage: the directories are smaller. 
+Disadvantage: the files for any given typeface are not together.
+
+3) Put each typeface family in a different subdirectory; e.g., have
+subdirectories `cm' (Computer Modern), `pandora', `euler', etc.
+Advantage: the files for a given typeface are together.  Disadvantage:
+many DVI-readers will not automatically look in subdirectories of
+TEXFONTS.  However, dvips (perhaps the most widely used
+dvi-to-PostScript translator), and xdvi (a previewer running under X11)
+both know how to search subdirectories, and I've modified them to use
+the same algorithm as TeX and friends; my modified versions are on
+ftp.cs.umb.edu:pub/tex.
+
+See tex.man for more details on path searching.
+
+#3 is the default organization in the Makefiles as distributed.
+See the file kpathsea/HIER for additional information.
+
+
+
+Online output from Metafont
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Metafont in C can be compiled to support multiple window systems.  You
+say which you want via definitions in `c-auto.h.in'.
+
+There are two versions of the X11 support in mf/MFwindow.  One is based
+on Xt, one on Xlib.  The Xt version is faster and has more
+functionality, so if it works on your system, you should use it.  It is
+the default.  But if it fails, you can try the Xlib version.
+
+There are also two versions of the Sun support in mf/MFwindow.  One is
+based on Sunview, the other on Suntools (i.e., the gfx_hs structure).
+The former has more functionality, and it works on recent versions of
+SunOS, so it is the default.
+
+Defining more devices is fairly straightforward.  Put the new file with
+the actual device support in mf/MFwindow.  Then add another entry to the
+tables at the end of `lib/texmf.c'; that should be it.
+
+
+
+Porting and portability
+%%%%%%%%%%%
+
+The C code generated by the web2c translator is intended to be as
+portable as possible.  If you find bugs or portability problems with the
+generated code, report them to karl@cs.umb.edu.
+
+The generated code assumes that the type `short' has at least the range
+-32768..32767, and that `unsigned short' has at least the range
+0..65535.  If this isn't the case, the translator will have to be modified.
+
+Since the code is generated automatically, it is foolish to edit it by
+hand.  Instead, you should fix the `web2c' program, or perhaps add
+commands to the `convert' scripts.  (And you should also report your
+changes to the bug address in ../README.)
+
+On another front, the `convert' scripts assume some basic Unix
+utilities: basename, cat, cp, diff, ln, make, mv, rm, sed, and touch.
+The Bourne shell is also assumed.  If your system versions are broken,
+you can try the GNU versions, available by anonymous ftp from
+prep.ai.mit.edu in pub/gnu, among many other places.  The GNU C compiler
+is also better (more reliable, faster, and produces better code) than
+many other C compilers, so you might want to get that.  For more
+information about the GNU project, write to gnu@prep.ai.mit.edu.

@@ -1,0 +1,331 @@
+# Makefile for dvi2tty from Makefile dvi2tty --kb@cs.umb.edu. Public domain.
+version = 2.11
+
+# The following make definitions (down to `end of installation
+# directories') are repeated in several Makefiles, because different
+# installations like to change them at different levels. If you edit the
+# top-level Makefile, the changes should propagate, however.
+# 
+# The following define installation directories. The default paths are
+# defined in kpathsea/paths.h, which is built from kpathsea/paths.h.in.
+# See kpathsea/INSTALL for a description of how the various path-related
+# files are used and created.
+
+# Generic installation directories.
+prefix = /usr/gnu
+exec_prefix = $(prefix)
+bindir = $(exec_prefix)/bin
+scriptdir = $(bindir)
+libdir = $(exec_prefix)/lib
+datadir = $(prefix)/lib
+infodir = $(prefix)/info
+includedir = $(prefix)/include
+manext = 1
+mandir = $(prefix)/man/man$(manext)
+
+# TeX & MF-specific directories. Not all of the following are relevant
+# for all programs, but it seems cleaner to collect everything in one place.
+
+# The default paths are now in kpathsea/paths.h.in. Passing all the
+# paths to sub-makes can make the arg list too long on system V.
+
+# The root of the tree.
+texmf_prefix = $(datadir)/texmf
+
+# TeX and MF source files.
+texinputdir = $(texmf_prefix)/tex
+mfinputdir = $(texmf_prefix)/mf
+
+# The top-level font directory.
+fontdir = $(texmf_prefix)/fonts
+
+# Where memory dumps are installed.
+fmtdir = $(texmf_prefix)/ini
+basedir = $(fmtdir)
+
+# Pool files.
+texpooldir = $(texmf_prefix)/ini
+mfpooldir = $(texpooldir)
+
+# If install_fonts=true, the PostScript/LaserJet TFM and VF files for
+# the builtin fonts get installed in subdirectories of this directory,
+# named for the typeface families of these directories. If you don't
+# have the default directory setup, you will want to set
+# install_fonts=false.
+install_fonts = true
+ps_fontdir = $(fontdir)/adobe
+bh_fontdir = $(fontdir)/bh
+cg_fontdir = $(fontdir)/cg
+mt_fontdir = $(fontdir)/monotype
+
+# Where the configuration files get installed.
+dvips_prefix = $(texmf_prefix)/dvips
+configdir = $(dvips_prefix)
+
+# Where the PostScript prologues go.
+headerdir = $(configdir)
+
+# Where dvi2tty's TeX macro files get installed.
+psmacrodir = $(texinputdir)/dvi2tty
+
+# If a font can't be found close enough to its stated size, we look for
+# each of these sizes in the order given.  This colon-separated list is
+# overridden by the envvar TEXSIZES, and by a program-specific variable
+# (e.g., XDVISIZES), and perhaps by a config file (e.g., in dvips).
+default_bdpi = 300
+default_texsizes = @default_texsizes@
+
+# Full filename of the database file.  It is not an error for this file
+# not to exist.  See the `Filename database' node in the kpathsea
+# documentation for details.
+db_dir = $(texmf_prefix)
+db_name = ls-R
+
+# Default MetaFont mode.  See the file `modes.mf' for a full list 
+# of available modes.
+default_mfmode = CanonCX
+
+# Default LaserJet printer.  See the file `dviljk/INSTALL' for available
+# options
+default_lj = LJ4
+
+# Where MakeTeXPK puts PK files. Making this name include `pk'
+# simplifies the default in kpathsea/paths.h[.in]. By default, MakeTeXPK
+# appends /<mode> to this.
+mtp_destdir = $(fontdir)/tmp/pk
+
+# The installed name of the config file.
+configfile = config.ps
+
+LN = @LN_S@
+CC = @CC@
+# CFLAGS is used for both compilation and linking.
+CFLAGS = -g $(XCFLAGS)
+
+DEFS =
+
+# Do not override CPPFLAGS; change CFLAGS or DEFS instead.
+CPPFLAGS = $(XCPPFLAGS) -I. -I$(srcdir) \
+	   -I$(kpathsea_parent) -I$(kpathsea_srcdir_parent) \
+	   $(x_include_flags) $(DEFS) 
+.c.o:
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $<
+
+# Linking.
+LDFLAGS = $(CFLAGS) $(XLDFLAGS)
+LOADLIBES = $(kpathsea) $(x_libs) $(LIBS) -lm $(x_extra_libs) $(XLOADLIBES)
+
+# This is so kpathsea will get remade automatically if you change
+# something in it and recompile from the package directory.
+kpathsea_parent = ..
+kpathsea_dir = $(kpathsea_parent)/kpathsea
+kpathsea_srcdir_parent = $(srcdir)/..
+kpathsea_srcdir = $(kpathsea_srcdir_parent)/kpathsea
+kpathsea = $(kpathsea_dir)/kpathsea.a
+
+
+LIBS = @LIBS@
+
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+
+MAKEINFO = makeinfo
+MAKEINFO_FLAGS = --paragraph-indent=2 -I$(HOME)/gnu/gnuorg
+# That -I is purely for my own benefit in doing `make dist'.  It won't
+# hurt anything for you (I hope).
+TEXI2DVI = texi2dvi
+
+.SUFFIXES: .info .texi
+.texi.info:
+	$(MAKEINFO) $(MAKEINFO_FLAGS) $< -o $@
+
+.SUFFIXES: .dvi .texi
+.texi.dvi:
+	$(TEXI2DVI) $(TEXI2DVI_FLAGS) $< -o $@
+
+SHELL = /bin/sh
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+
+objects = dvi2tty.o dvistuff.o
+
+makeargs = $(MFLAGS) SHELL='$(SHELL)' CC='$(CC)' CFLAGS='$(CFLAGS)' $(MAKEARGS)
+installargs = INSTALL='$(INSTALL)' INSTALL_DATA='$(INSTALL_DATA)' \
+  psmacrodir=$(psmacrodir)
+
+program = dvi2tty
+install_programs = $(program)
+programs = $(install_programs)
+
+prologues = 
+
+install_macros = i-d.sty myparms.sty rfc.sty rfc.tex txt-old.sty txt.sty txt.tex
+
+all: $(programs) $(prologues)
+
+$(program): $(objects)
+	$(CC) $(LDFLAGS) -o $(program) $(objects) $(LOADLIBES)
+
+$(kpathsea): $(kpathsea_srcdir)/*.c $(kpathsea_srcdir)/*.h
+	cd $(kpathsea_dir); $(MAKE) $(makeargs)
+
+# The `-t'[mp] business is so that we don't create an empty .pro file,
+# if running squeeze fails for some reason.
+# 
+
+install: install-exec install-data
+uninstall: uninstall-exec uninstall-data
+
+install-exec: all
+	$(SHELL) $(srcdir)/../mkdirchain $(bindir) $(scriptdir)
+# Binaries.
+	for p in $(install_programs); do \
+          $(INSTALL_PROGRAM) $$p $(bindir)/$$p; done
+uninstall-exec:
+	for p in $(install_programs); do rm -f $(bindir)/$$p; done
+	if grep 'original MakeTeXPK --' $(bindir)/MakeTeXPK		\
+             >/dev/null 2>&1; then rm -f $(bindir)/MakeTeXPK;		\
+        else true; fi
+
+install-data:
+	$(SHELL) $(srcdir)/../mkdirchain $(psmacrodir)
+# TeX macros.
+	for m in $(install_macros); do \
+          $(INSTALL_DATA) $(srcdir)/lib/$$m $(psmacrodir)/$$m; done
+# Man pages.
+	$(INSTALL_DATA) $(srcdir)/dvi2tty.1 $(mandir)/dvi2tty.$(manext)
+	-$(LN) $(mandir)/dvi2tty.$(manext) $(mandir)/txt.$(manext)
+
+uninstall-data:
+	for m in $(install_macros); do \
+          rm -f $(psmacrodir)/$$m; done
+	rm -f $(mandir)/dvi2tty.$(manext)
+
+distname = dvi2tty
+program_files = config.??* lib/*.sty lib/*.tex lib/*.doc *.1
+program_rm = */Makefile
+version_files = dvi2tty.h
+
+pre-dist-$(distname): depend.make TAGS
+# Save the subdir list for the next command.
+	find * -type d -print | egrep -v '$(top_distdir)|archive' >/tmp/subdir
+
+post-dist-$(distname):
+	rcp -p laurie:/w/fontname/adobe.txt $(distdir)/adobe
+#
+# Make the subdirectories.
+	for d in `cat /tmp/subdir`; do \
+	  mkdir -p $(top_distdir)/$(distname)/$$d; done
+#
+# Link all files in subdirectories.
+	find `cat /tmp/subdir` -type f \
+          -exec ln '{}' $(distdir)/'{}' \;
+top_distdir = $(distname)-$(version)
+top_files = ChangeLog Makefile.in aclocal.m4 configure configure.in README \
+  $(HOME)/gnu/gnuorg/COPYING* $(HOME)/bin/mkdirchain \
+  $(plain)/texinfo.tex
+distdir = $(top_distdir)/$(distname)
+kpathsea_distdir = ../$(distname)/$(top_distdir)/kpathsea
+ln_files = AUTHORS ChangeLog INSTALL MACHINES NEWS README TAGS *.in *.h *.c \
+  configure *.make .gdbinit
+
+dist: pre-dist-$(distname)
+	rm -rf $(top_distdir)*
+	mkdir -p $(distdir)
+	cd ..; cp -p $(top_files) $(distname)/$(top_distdir)
+	cd ..; echo >>$(distname)/$(top_distdir)/ChangeLog
+	cd ..; cat kutil/ChangeLog >>$(distname)/$(top_distdir)/ChangeLog
+	-ln $(ln_files) $(distdir)
+	ln $(program_files) $(distdir)
+	cd $(kpathsea_dir); $(MAKE) distdir=$(kpathsea_distdir) \
+	  ln_files='$(ln_files)' distdir
+	ungnumake $(distdir)/Makefile.in $(kpathsea_distdir)/Makefile.in \
+	  $(top_distdir)/Makefile.in
+# *.make gets us depend.make.
+	rm -f $(distdir)/*.make $(kpathsea_distdir)/*.make
+	cd $(distdir); rm -f c-auto.h $(program_rm)
+	$(MAKE) post-dist-$(distname)
+	cd $(distdir); add-version $(version) $(version_files)
+	chmod -R a+rw $(top_distdir)
+	GZIP=-9 tar czf $(top_distdir). $(top_distdir)
+	rm -rf $(top_distdir)
+
+
+
+# I define $(autoconf) to acgeneral.m4 and the other Autoconf files, so
+# configure automatically gets remade with a new Autoconf release.  But
+# since some people do not have AC installed, I take out the variable
+# $(autoconf) definition before release.
+configure_in = $(srcdir)/configure.in $(srcdir)/../kpathsea/common.ac
+$(srcdir)/configure: $(configure_in) $(autoconf)
+	cd $(srcdir); autoconf
+
+config.status: $(srcdir)/configure
+	$(SHELL) $(srcdir)/configure --no-create --verbose
+
+Makefile: $(srcdir)/Makefile.in config.status
+	$(SHELL) config.status
+
+# This rule isn't used for web2c or the top-level Makefile, but it
+# doesn't hurt.  We don't depend on config.status because configure
+# always rewrites config.status, even when it doesn't change. Thus it
+# might be newer than c-auto.h when we don't need to remake the latter.
+c-auto.h: $(srcdir)/c-auto.h.in
+	$(SHELL) config.status
+$(srcdir)/c-auto.h.in: $(configure_in) $(autoheader)
+	rm -f $(srcdir)/c-auto.h.in
+	echo '/* Generated by autoheader.  */' >$(srcdir)/c-auto.h.in 
+	@echo 'SMART_PUTENV will not be covered.'
+	-cd $(srcdir); autoheader configure.in >>c-auto.h.in
+	echo '#undef SMART_PUTENV' >>$(srcdir)/c-auto.h.in
+
+TAGS: *.c *.h
+	etags -t *.c *.h
+
+
+mostlyclean::
+	rm -f *.o $(program) $(lib) $(programs)
+
+clean:: mostlyclean
+	rm -f *.dvi *.lj
+
+distclean:: clean
+	rm -f Makefile config.status c-auto.h *.pool
+
+# Although we can remake configure and c-auto.h.in, we don't remove
+# them, since many people may lack Autoconf.  Use configclean for that.
+realclean:: distclean
+	rm -f TAGS *.info*
+
+extraclean::
+	rm -f *.aux *.bak *.bbl *.blg *.dvi *.log *.orig *.pl *.rej
+	rm -f *.i *.s *.tfm *.vf *.vpl *\#* *gf *pk *~
+	rm -f CONTENTS.tex a.out core mfput.* texput.*
+
+configclean:
+	rm -f configure c-auto.h.in c-auto.h
+
+
+# Prevent GNU make 3 from overflowing arg limit on system V.
+.NOEXPORT:
+
+distclean::
+	rm -f *.pro
+
+depend_encies = 
+
+# Dependencies.
+# Have to use -M, not -MM, since we use <kpathsea/...> instead of
+# "kpathsea/..." in the sources.  But then have to remove the directory
+# prefixes and all the system include files.
+depend depend.make: c-auto.h $(depend_encies)
+	$(CC) -M $(CPPFLAGS) *.c \
+	  | sed -e 's,\.\./kpathsea,$$(kpathsea_dir),g' \
+	        -e 's,/usr[^ ]* ,,g' \
+	  | uniq \
+	  >depend.make
+
+dvi2tty.o: dvi2tty.h
+dvistuff.o: dvi2tty.h commands.h

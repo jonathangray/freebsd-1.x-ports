@@ -1,0 +1,37 @@
+#!/bin/sh
+# dvihp -- run dvicopy, then dvilj[k].
+
+if test $# -eq 0; then
+  echo "Usage: $0 <dvi_file>[.dvi] [dvilj args]"
+  exit 1
+fi
+
+dvifile=$1
+shift
+
+test ! -r $dvifile && test -r $dvifile.dvi && dvifile=$dvifile.dvi
+
+if test ! -r $dvifile; then
+  echo "$dvifile: Can't find it." >&2
+  exit 1
+fi
+
+edvi=${TMPDIR-/tmp}/$$.edvi
+lj=${TMPDIR-/tmp}/$$.lj
+dvicopy_log=${TMPDIR-/tmp}/$$.dvicopy
+dvilj_log=${TMPDIR-/tmp}/$$.dvilj
+
+dvicopy $dvifile $edvi </dev/null >$dvicopy_log || {
+  echo "dvicopy failed. See $dvicopy_log." >&2
+  exit 1
+}
+
+dvilj -e$lj $* $edvi >$dvilj_log || {
+  echo "dvilj failed. See $dvilj_log." >&1
+  exit 2
+}
+
+# Maybe they sent the output elsewhere.
+test -r $lj && lpr $lj
+
+rm -f $edvi $dvicopy_log $lj $dvilj_log

@@ -1,0 +1,1253 @@
+This is Info file eplain.info, produced by Makeinfo-1.55 from the input
+file eplain.texi.
+
+  This file documents the Eplain macros.
+
+  Copyright (C) 1989, 90, 91, 92, 93, 94 Karl Berry.  Steven Smith
+wrote the documentation for the commutative diagram macros.  (He also
+wrote the macros.)
+
+  Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+  Permission is granted to copy and distribute modified versions of this
+manual under the conditions for verbatim copying, provided also that the
+section entitled "GNU General Public License" is included exactly as in
+the original, and provided that the entire resulting derived work is
+distributed under the terms of a permission notice identical to this
+one.
+
+  Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions, except that the section entitled "GNU General Public License"
+may be included in a translation approved by the author instead of in
+the original English.
+
+
+File: eplain.info,  Node: Tables,  Next: Margins,  Prev: Justification,  Up: User definitions
+
+Tables
+======
+
+  Eplain provides a single command, `\makecolumns', to make generating
+one particular kind of table easier.  More ambitious macro packages
+might be helpful to you for more difficult applications.  The files
+`ruled.tex' and `TXSruled.tex', available from `lifshitz.ph.utexas.edu'
+in `texis/tables', is the only one I know of.
+
+  Many tables are homogenous, i.e., all the entries are semantically the
+same.  The arrangement into columns is to save space on the page, not
+to encode different meanings.  In this kind of the table, it is useful
+to have the column breaks chosen automatically, so that you can add or
+delete entries without worrying about the column breaks.
+
+  `\makecolumns' takes two arguments: the number of entries in the
+table, and the number of columns to break them into.  As you can see
+from the example below, the first argument is delimited by a slash, and
+the second by a colon and a space (or end-of-line).  The entries for the
+table then follow, one per line (not including the line with the
+`\makecolumns' command itself).
+
+  `\parindent' defines the space to the left of the table.  `\hsize'
+defines the width of the table.  So you can adjust the position of the
+table on the page by assignments to these parameters, probably inside a
+group.
+
+  You can also control the penalty at a page break before the
+`\makecolumns' by setting the parameter `\abovecolumnspenalty'.
+Usually, the table is preceded by some explanatory text.  You wouldn't
+want a page break to occur after the text and before the table, so
+Eplain sets it to `10000'.  But if the table produced by `\makecolumns'
+is standing on its own, `\abovecolumnspenalty' should be decreased.
+
+  If you happen to give `\makecolumns' a smaller number of entries than
+you really have, some text beyond the (intended) end of the table will
+be incorporated into the table, probably producing an error message, or
+at least some strange looking entries.  And if you give `\makecolumns'
+a larger number of entries than you really have, some of the entries
+will be typeset as straight text, probably also looking somewhat out of
+place.
+
+  Here is an example:
+     % Arrange 6 entries into 2 columns:
+     \makecolumns 6/2: % This line doesn't have an entry.
+     one
+     two
+     three
+     four
+     five
+     six
+     Text after the table.
+
+  This produces `one', `two', and `three' in the first column, and
+`four', `five', and `six' in the second.
+
+
+File: eplain.info,  Node: Margins,  Next: Multiple columns,  Prev: Tables,  Up: User definitions
+
+Margins
+=======
+
+  TeX's primitives describe the type area in terms of an offset from
+the upper left corner, and the width and height of the type.  Some
+people prefer to think in terms of the "margins" at the top, bottom,
+left, and right of the page, and most composition systems other than
+TeX conceive of the page laid out in this way.  Therefore, Eplain
+provides commands to directly assign and increment the margins.
+
+`\topmargin = DIMEN'
+`\bottommargin = DIMEN'
+`\leftmargin = DIMEN'
+`\rightmargin = DIMEN'
+     These commands set the specified margin to the DIMEN given.  The
+     `=' and the spaces around it are optional.  The control sequences
+     here are not TeX registers, despite appearances; therefore,
+     commands like `\showthe\topmargin' will not do what you expect.
+
+`\advancetopmargin by DIMEN'
+`\advancebottommargin by DIMEN'
+`\advanceleftmargin by DIMEN'
+`\advancerightmargin by DIMEN'
+     These commands change the specified margin by the DIMEN given.
+
+  Regardless of whether you use the assignment or the advance commands,
+Eplain always changes the type area in response, not the other margins.
+For example, when TeX starts, the left and right margins are both one
+inch.  If you then say `\leftmargin = 2in', the right margin will
+remain at one inch, and the width of the lines (i.e., `\hsize') will
+decrease by one inch.
+
+  When you use any of these commands, Eplain computes the old value of
+the particular margin, by how much you want to change it, and then
+resets the values of TeX's primitive parameters to correspond.
+Unfortunately, Eplain cannot compute the right or bottom margin without
+help: you must tell it the full width and height of the final output
+page.  It defines two new parameters for this:
+
+`\paperheight'
+     The height of the output page; default is 11in.
+
+`\paperwidth'
+     The width of the output page; default is 8.5in.
+
+  If your output page has different dimensions than this, you must
+reassign to these parameters, as in
+
+     \paperheight = 11in
+     \paperwidth = 17in
+
+
+File: eplain.info,  Node: Multiple columns,  Next: Footnotes,  Prev: Margins,  Up: User definitions
+
+Multiple columns
+================
+
+  Eplain provides for double, triple, and quadruple column output:  say
+`\doublecolumns', `\triplecolumns', or `\quadcolumns', and from that
+point on, the manuscript will be set in columns.  To go back to one
+column, say `\singlecolumn'.
+
+  You may need to invoke `\singlecolumn' to balance the columns on the
+last page of output.
+
+  To do a "column eject", i.e., move to the top of the next column, do
+`\columnfill'. This does not actually force an eject, however: it
+merely inserts a kern of size `\@normalvsize' minus `\pagetotal'
+(`\@normalvsize' being the usual height of the page; to implement
+multicolumns, Eplain multiplies `\vsize' itself by the number of
+columns). In most circumstances, a column break will be forced after
+this kern (during the column splitting operation when the whole page is
+output), as desired.
+
+  The columns are separated by the value of the dimen parameter
+`\gutter'.  Default value is two picas.
+
+  All the `\...columns' macros insert the value of the glue parameter
+`\abovedoublecolumnskip' before the multicolumn text, and the value of
+the glue parameter `\belowdoublecolumnskip' after it.  The default
+value for both of these parameters is `\bigskipamount', i.e., one
+linespace in plain TeX.
+
+  The macros take into account only the insertion classes defined by
+plain TeX; namely, footnotes and `\topinsert's.  If you have additional
+insertion classes, you will need to change the implementation.
+
+  Also, Eplain makes insertions the full page width. There is no
+provision for column-width insertions.
+
+
+File: eplain.info,  Node: Footnotes,  Next: Fractions,  Prev: Multiple columns,  Up: User definitions
+
+Footnotes
+=========
+
+  The most common reference mark for footnotes is a raised number,
+incremented on each footnote.  The `\numberedfootnote' macro provides
+this.  It takes one argument, the footnote text.
+
+  If your document uses only numbered footnotes, you could make typing
+`\numberedfootnote' more convenient with a command such as:
+
+     \let\footnote = \numberedfootnote
+
+  After doing this, you can type your footnotes as `\footnote{FOOTNOTE
+TEXT}', instead of as `\numberedfootnote{FOOTNOTE TEXT}'.
+
+  Eplain keeps the current footnote number in the count register
+`\footnotenumber'.  So, to reset the footnote number to zero, as you
+might want to do at, for example, the beginning of a chapter, you could
+say `\footnotenumber=0'.
+
+  Plain TeX separates the footnote marker from the footnote text by an
+en space (it uses the `\textindent' macro).  In Eplain, you can change
+this space by setting the dimension register `\footnotemarkseparation'.
+The default is still an en.
+
+  You can produce a space between footenotes by setting the glue
+register `\interfootnoteskip'.  The default is zero.
+
+  `\parskip' is also set to zero by default before the beginning of
+each footnote (but not for the text of the footnote).
+
+  You can also control footnote formatting in a more general way:
+Eplain expands the token register `\everyfootnote' before a footnote is
+typeset, but after the default values for all the parameters have been
+established.  For example, if you want your footnotes to be printed in
+seven-point type, indented by one inch, you could say:
+     \everyfootnote = {\sevenrm \leftskip = 1in}
+
+  By default, an `\hrule' is typeset above each group of footnotes on a
+page.  You can control the dimensions of this rule by setting the
+dimension registers `\footnoterulewidth' and `\footnoteruleheight'.
+The space between the rule and the first footnote on the page is
+determined by the dimension register `\belowfootnoterulespace'.  If you
+don't want any rule at all, set `\footenoteruleheight=0pt', and, most
+likely, `\belowfootnoterulespace=0pt'.  The defaults for these
+parameters typeset the rule in the same way as plain TeX: the rule is
+0.4 points high, 2 true inches wide, with 2.6 points below it.
+
+  The space above the rule and below the text on the page is controlled
+by the glue register `\skip\footins'.  The default is a plain TeX
+`\bigskip'.
+
+
+File: eplain.info,  Node: Fractions,  Next: Paths,  Prev: Footnotes,  Up: User definitions
+
+Fractions
+=========
+
+  Exercise 11.6 of `The TeXbook' describes a macro `\frac' for setting
+fractions, but `\frac' never made it into plain TeX.  So Eplain
+includes it.
+
+  `\frac' typesets the numerator and denominator in `\scriptfont0',
+slightly raised and lowered.  The numerator and denominator are
+separated by a slash.  The denominator must be enclosed in braces if
+it's more than one token long, but the numerator need not be.  (This is
+a consequence of `\frac' taking delimited arguments; see page 203 of
+`The TeXbook' for an explanation of delimited macro arguments.)
+
+  For example, `\frac 23/{64}' turns `23/64' into 23/64 (you can't see
+the difference in the Info file).
+
+
+File: eplain.info,  Node: Paths,  Next: Logos,  Prev: Fractions,  Up: User definitions
+
+Paths
+=====
+
+  When you typeset long pathnames, electronic mail addresses, or other
+such "computer" names, you would like TeX to break lines at punctuation
+characters within the name, rather than trying to find hyphenation
+points within the words.  For example, it would be better to break the
+email address `letters@alpha.gnu.ai.mit.edu' at the `@' or a `.',
+rather than at the hyphenation points in `letters' and `alpha'.
+
+  If you use the `\path' macro to typeset the names, TeX will find
+these good breakpoints.  The argument to `\path' is delimited by any
+other other than `\' which does not appear in the name itself.  `|' is
+often a good choice, as in:
+     \path|letters@alpha.gnu.ai.mit.edu|
+
+  You can control the exact set of characters at which breakpoints will
+be allowed by calling `\discretionaries'.  This takes the same sort of
+delimited argument; any character in the argument will henceforth be a
+valid breakpoint within `\path'.  The default set is essentially all the
+punctuation characters:
+     \discretionaries |~!@$%^&*()_+`-=#{}[]:";'<>,.?\/|
+
+  If for some reason you absolutely must use `\' as the delimiter
+character for `\path', you can set `\specialpathdelimiterstrue'.
+(Other delimiter characters can still be used.)  TeX then processes the
+`\path' argument about four times more slowly.
+
+
+File: eplain.info,  Node: Logos,  Next: Boxes,  Prev: Paths,  Up: User definitions
+
+Logos
+=====
+
+  Eplain redefines the `\TeX' macro of plain TeX to end with `\null',
+so that the proper spacing is produced when `\TeX' is used at the end
+of a sentence.  The other ...TeX macros listed here do this, also.
+
+  Eplain defines `\AMSTeX', `\BibTeX' `\AMSLaTeX', `\LAMSTeX', `\LaTeX'
+`\MF', and `\SLiTeX' to produce their respective logos.  (Sorry, the
+logos are not shown here.)  Some spelling variants of these are also
+supported.
+
+
+File: eplain.info,  Node: Boxes,  Prev: Logos,  Up: User definitions
+
+Boxes
+=====
+
+  The solid rectangle that Eplain uses as a marker in unordered lists
+(*note Lists::.) is available by itself: just say `\blackbox'.
+
+  You can create black boxes of arbitrary size with `\hrule' or
+`\vrule'.
+
+  You can also get unfilled rectangles with `\makeblankbox'.  This
+takes two explicit arguments: the height and depth of the rules that
+define the top and bottom of the rectangle.  (The two arguments are
+added to get the width of the left and right borders, so that the
+thickness of the border is the same on all four sides.)  It also uses,
+as implicit arguments, the dimensions of `\box0' to define the
+dimensions of the rectangle it produces.  (The contents of `\box0' are
+ignored.)
+
+  Here is an example.  This small raised open box is suitable for
+putting next to numbers in, e.g., a table of contents.
+
+     \def\openbox{%
+       \ht0 = 1.75pt \dp0 = 1.75pt \wd0 = 3.5pt
+       \raise 2.75pt \makeblankbox{.2pt}{.2pt}
+     }
+
+  Finally, you can put a box around arbitrary text with `\boxit'.  This
+takes one argument, which must itself be a (TeX) box, and puts a
+printed box around it, separated by `\boxitspace' white space (3 points
+by default) on all four sides.  For example:
+
+     \boxit{\hbox{This text is boxed.}}
+
+  The reason that the argument must be a box is that when the text is
+more than one line long, TeX cannot figure out the line length for
+itself.  Eplain does set `\parindent' to zero inside `\boxit', since it
+is very unlikely you would want indentation there.  (If you do, you can
+always reset it yourself.)
+
+  `\boxit' uses `\ehrule' and `\evrule' so that you can easily adjust
+the thicknesses of the box rules.  *Note Rules::.
+
+
+File: eplain.info,  Node: Arrow theoretic diagrams,  Next: Programming definitions,  Prev: User definitions,  Up: Top
+
+Arrow theoretic diagrams
+************************
+
+  This chapter describes definitions for producing commutative diagrams.
+
+  Steven Smith wrote this documentation (and the macros).
+
+* Menu:
+
+* Slanted lines and vectors::
+* Commutative diagrams::
+
+
+File: eplain.info,  Node: Slanted lines and vectors,  Next: Commutative diagrams,  Up: Arrow theoretic diagrams
+
+Slanted lines and vectors
+=========================
+
+  The macros `\drawline' and `\drawvector' provide the capability found
+in LaTeX's picture mode to draw slanted lines and vectors of certain
+directions.  Both of these macros take three arguments: two integer
+arguments to specify the direction of the line or vector, and one
+argument to specify its length.  For example, `\drawvector(-4,1){60pt}'
+produces the vector
+
+      (A vector in the 2d quadrant of length 60 pt appears here.)
+
+  which lies in the 2d quadrant, has a slope of minus 1/4, and a width
+of 60 pt.
+
+  Note that if an `\hbox' is placed around `\drawline' or
+`\drawvector', then the width of the `\hbox' will be the positive
+dimension specified in the third argument, except when a vertical line
+or vector is specified, e.g., `\drawline(0,1){1in}', which has zero
+width.  If the specified direction lies in the 1st or 2d quadrant
+(e.g., `(1,1)' or `(-2,3)'), then the `\hbox' will have positive height
+and zero depth.  Conversely, if the specified direction lies in the 3d
+or 4th quadrant (e.g., `(-1,-1)' or `(2,-3)'), then the `\hbox' will
+have positive depth and zero height.
+
+  There are a finite number of directions that can be specified.  For
+`\drawline', the absolute value of each integer defining the direction
+must be less than or equal to six, i.e., `(7,-1)' is incorrect, but
+`(6,-1)' is acceptable. For `\drawvector', the absolute value of each
+integer must be less than or equal to four.  Furthermore, the two
+integers cannot have common divisors; therefore, if a line with slope 2
+is desired, say `(2,1)' instead of `(4,2)'.  Also, specify `(1,0)'
+instead of, say, `(3,0)' for horizontal lines and likewise for vertical
+lines.
+
+  Finally, these macros depend upon the LaTeX font `line10'.  If your
+site doesn't have this font, ask your system administrator to get it.
+Future enhancements will include macros to draw dotted lines and dotted
+vectors of various directions.
+
+
+File: eplain.info,  Node: Commutative diagrams,  Prev: Slanted lines and vectors,  Up: Arrow theoretic diagrams
+
+Commutative diagrams
+====================
+
+  The primitive commands `\drawline' and `\drawvector' can be used to
+typeset arrow theoretic diagrams.  This section describes (1) macros to
+facilitate typesetting arrows and morphisms, and (2) macros to
+facilitate the construction of commutative diagrams.  All macros
+described in this section must be used in math mode.
+
+* Menu:
+
+* Arrows and morphisms::
+* Construction of commutative diagrams::
+* Commutative diagram parameters::
+
+
+File: eplain.info,  Node: Arrows and morphisms,  Next: Construction of commutative diagrams,  Up: Commutative diagrams
+
+Arrows and morphisms
+--------------------
+
+  The macros `\mapright' and `\mapleft' produce right and left pointing
+arrows, respectively.  Use superscript (`^') to place a morphism above
+the arrow, e.g., `\mapright^\alpha'; use subscript (`_') to place a
+morphism below the arrow, e.g., `\mapright_{\tilde l}'.  Superscripts
+and subscripts may be used simulataneously, e.g., `\mapright^\pi_{\rm
+epimor.}'.
+
+  Similarly, the macros `\mapup' and `\mapdown' produce up and down
+pointing arrows, respectively.  Use `\rt' to place a morphism to the
+right of the arrow, e.g., `\mapup\rt{\rm id}'; use `\lft' to place a
+morphism to the left of the arrow, e.g., `\mapup\lft\omega'.  `\lft'
+and `\rt' may be used simultaneously, e.g., `\mapdown\lft\pi\rt{\rm
+monomor.}'.
+
+  Slanted arrows are produced by the macro `\arrow', which takes a
+direction argument (e.g., `\arrow(3,-4)').  Use `\rt' and `\lft' to
+place morphisms to the right and left, respectively, of the arrow.  A
+slanted line (no arrowhead) is produced with the macro `\sline', whose
+syntax is identical to that of `\arrow'.
+
+  The length of these macros is predefined by the default TeX
+dimensions `\harrowlength', for horizontal arrows (or lines),
+`\varrowlength', for vertical arrows (or lines), and `\sarrowlength',
+for slanted arrows (or lines).  To change any of these dimensions, say,
+e.g., `\harrowlength=40pt'.  As with all other TeX dimensions, the
+change may be as global or as local as you like.  Furthermore, the
+placement of morphisms on the arrows is controlled by the dimensions
+`\hmorphposn', `\vmorphposn', and `\morphdist'.  The first two
+dimensions control the horizontal and vertical position of the morphism
+from its default position; the latter dimension controls the distance
+of the morphism from the arrow.  If you have more than one morphism per
+arrow (i.e., a `^'/`_' or `\lft'/`\rt' construction), use the parameters
+`\hmorphposnup', `\hmorphposndn', `\vmorphposnup', `\vmorphposndn',
+`\hmorphposnrt', `\hmorphposnlft', `\vmorphposnrt', and
+`\vmorphposnlft'.  The default values of all these dimensions are
+provided in the section on parameters that follows below.
+
+  There is a family of macros to produce horizontal lines, arrows, and
+adjoint arrows.  The following macros produce horizontal maps and have
+the same syntax as `\mapright':
+
+`\mapright'
+     `$X\mapright Y$' = (a right arrow).
+
+`\mapleft'
+     `$X\mapleft Y$' = (a left arrow).
+
+`\hline'
+     `$X\hline Y$' = (horizontal line)
+
+`\bimapright'
+     `$X\bimapright Y$' = (two right arrows).
+
+`\bimapleft'
+     `$X\bimapleft Y$' = (two left arrows)
+
+`\adjmapright'
+     `$X\adjmapright Y$' = (two adjoint arrows; left over right)
+
+`\adjmapleft'
+     `$X\adjmapleft Y$' = (two adjoint arrows; right over left)
+
+`\bihline'
+     `$X\bihline Y$' = (two horizontal lines)
+
+  There is also a family of macros to produce vertical lines, arrows,
+and adjoint arrows.  The following macros produce vertical maps and have
+the same syntax as `\mapdown':
+
+`\mapdown'
+     (a down arrow)
+
+`\mapup'
+     (an up arrow)
+
+`\vline'
+     (vertical line)
+
+`\bimapdown'
+     (two down arrows)
+
+`\bimapup'
+     (two up arrows)
+
+`\adjmapdown'
+     (two adjoint arrows; down then up)
+
+`\adjmapup'
+     (two adjoint arrows; up then down)
+
+`\bivline'
+     (two vertical lines)
+
+  Finally, there is a family of macros to produce slanted lines, arrows,
+and adjoint arrows.  The following macros produce slanted maps and have
+the same syntax as `\arrow':
+
+`\arrow'
+     (a slanted arrow)
+
+`\sline'
+     (a slanted line)
+
+`\biarrow'
+     (two straight arrows)
+
+`\adjarrow'
+     (two adjoint arrows)
+
+`\bisline'
+     (two straight lines)
+
+  The width between double arrows is controlled by the parameter
+`\channelwidth'.  The parameters `\hchannel' and `\vchannel', if
+nonzero, override `\channelwidth' by controlling the horizontal and
+vertical shifting from the first arrow to the second.
+
+  There are no adornments on these arrows to distinguish inclusions from
+epimorphisms from monomorphisms.  Many texts, such as Lang's book
+`Algebra', use as a tasteful alternative the symbol `inc' (in roman)
+next to an arrow to denote inclusion.
+
+  Future enhancements will include a mechanism to draw curved arrows
+found in, e.g., the Snake Lemma, by employing a version of the `\path'
+macros of Appendix D of `The TeXbook'.
+
+
+File: eplain.info,  Node: Construction of commutative diagrams,  Next: Commutative diagram parameters,  Prev: Arrows and morphisms,  Up: Commutative diagrams
+
+Construction of commutative diagrams
+------------------------------------
+
+  There are two approaches to the construction of commutative diagrams
+described here.  The first approach, and the simplest, treats
+commutative diagrams like fancy matrices, as Knuth does in Exercise
+18.46 of `The TeXbook'.  This case is covered by the macro `\commdiag',
+which is an altered version of the Plain TeX macro `\matrix'.  An
+example suffices to demonstrate this macro.  The following commutative
+diagram (illustrating the covering homotopy property; Bott and Tu,
+`Differential Forms in Algebraic Topology')
+
+      (A commutative diagram appears here in the printed output.)
+
+  is produced with the code
+
+     $$\commdiag{Y&\mapright^f&E\cr \mapdown&\arrow(3,2)\lft{f_t}&\mapdown\cr
+     Y\times I&\mapright^{\bar f_t}&X}$$
+
+  Of course, the parameters may be changed to produce a different
+effect.  The following commutative diagram (illustrating the universal
+mapping property; Warner, `Foundations of Differentiable Manifolds and
+Lie Groups')
+
+      (A commutative diagram appears here in the printed output.)
+
+  is produced with the code
+
+     $$\varrowlength=20pt
+     \commdiag{V\otimes W\cr \mapup\lft\phi&\arrow(3,-1)\rt{\tilde l}\cr
+     V\times W&\mapright^l&U\cr}$$
+
+  A diagram containing isosceles triangles is achieved by placing the
+apex of the triangle in the center column, as shown in the example
+(illustrating all constant minimal realizations of a linear system;
+Brockett, `Finite Dimensional Linear Systems')
+
+      (A commutative diagram appears here in the printed output.)
+
+  which is produced with the code
+
+     $$\sarrowlength=.42\harrowlength
+     \commdiag{&R^m\cr &\arrow(-1,-1)\lft{\bf B}\quad \arrow(1,-1)\rt{\bf G}\cr
+     R^n&\mapright^{\bf P}&R^n\cr
+     \mapdown\lft{e^{{\bf A}t}}&&\mapdown\rt{e^{{\bf F}t}}\cr
+     R^n&\mapright^{\bf P}&R^n\cr
+     &\arrow(1,-1)\lft{\bf C}\quad \arrow(-1,-1)\rt{\bf H}\cr
+     &R^q\cr}$$
+
+  Other commutative diagram examples appear in the file
+`commdiags.tex', which is distributed with this package.
+
+  In these examples the arrow lengths and line slopes were carefully
+chosen to blend with each other.  In the first example, the default
+settings for the arrow lengths are used, but a direction for the arrow
+must be chosen.  The ratio of the default horizontal and vertical arrow
+lengths is approximately the golden mean gamma=1.618...; the arrow
+direction closest to this mean is `(3,2)'. In the second example, a
+slope of -1/3 is desired and the default horizontal arrow length is 60
+pt; therefore, choose a vertical arrow length of 20 pt.  You may affect
+the interline glue settings of `\commdiag' by redefining the macro
+`\commdiagbaselines'.  (cf. Exercise 18.46 of `The TeXbook' and the
+section on parameters below.)
+
+  The width, height, and depth of all morphisms are hidden so that the
+morphisms' size do not affect arrow positions.  This can cause a large
+morphism at the top or bottom of a diagram to impinge upon the text
+surrounding the diagram.  To overcome this problem, use TeX's
+`\noalign' primitive to insert a `\vskip' immediately above or below
+the offending line, e.g.,
+`$$\commdiag{\noalign{\vskip6pt}X&\mapright^\int&Y\cr ...}'.
+
+  The macro `\commdiag' is too simple to be used for more complicated
+diagrams, which may have intersecting or overlapping arrows.  A second
+approach, borrowed from Francis Borceux's `Diagram' macros for LaTeX,
+treats the commutative diagram like a grid of identically shaped boxes.
+To compose the commutative diagram, first draw an equally spaced grid,
+e.g.,
+
+                              . . . . . .
+
+                              . . . . . .
+
+                              . . . . . .
+
+                              . . . . . .
+
+  on a piece of scratch paper.  Then draw each element (vertices and
+arrows) of the commutative diagram on this grid, centered at each grid
+point.  Finally, use the macro `\gridcommdiag' to implement your design
+as a TeX alignment.  For example, the cubic diagram
+
+                 (A commutative diagram appears here.)
+
+  that appears in Francis Borceux's documentation can be implemented on
+a 7 by 7 grid, and is achieved with the code
+
+     $$\harrowlength=48pt \varrowlength=48pt \sarrowlength=20pt
+     \def\cross#1#2{\setbox0=\hbox{$#1$}%
+       \hbox to\wd0{\hss\hbox{$#2$}\hss}\llap{\unhbox0}}
+     \gridcommdiag{&&B&&\mapright^b&&D\cr
+     &\arrow(1,1)\lft a&&&&\arrow(1,1)\lft d\cr
+     A&&\cross{\hmorphposn=12pt\mapright^c}{\vmorphposn=-12pt\mapdown\lft f}
+     &&C&&\mapdown\rt h\cr\cr
+     \mapdown\lft e&&F&&\cross{\hmorphposn=-12pt\mapright_j}
+     {\vmorphposn=12pt\mapdown\rt g}&&H\cr
+     &\arrow(1,1)\lft i&&&&\arrow(1,1)\rt l\cr
+     E&&\mapright_k&&G\cr}$$
+
+  The dimensions `\hgrid' and `\vgrid' control the horizontal and
+vertical spacing of the grid used by `\gridcommdiag'. The default
+setting for both of these dimensions is 15 pt.  Note that in the
+example of the cube the arrow lengths must be adjusted so that the
+arrows overlap into neighboring boxes by the desired amount.  Hence,
+the `\gridcommdiag' method, albeit more powerful, is less automatic
+than the simpler `\commdiag' method.  Furthermore, the ad hoc macro
+`\cross' is introduced to allow the effect of overlapping arrows.
+Finally, note that the positions of four of the morphisms are adjusted
+by setting `\hmorphposn' and `\vmorphposn'.
+
+  One is not restricted to a square grid.  For example, the proof of
+Zassenhaus's Butterfly Lemma can be illustrated by the diagram
+(appearing in Lang's book `Algebra')
+
+                 (A commutative diagram appears here.)
+
+  This diagram may be implemented on a 9 by 12 grid with an aspect ratio
+of 1/2, and is set with the code
+
+     $$\hgrid=16pt \vgrid=8pt \sarrowlength=32pt
+     \def\cross#1#2{\setbox0=\hbox{$#1$}%
+       \hbox to\wd0{\hss\hbox{$#2$}\hss}\llap{\unhbox0}}
+     \def\l#1{\llap{$#1$\hskip.5em}}
+     \def\r#1{\rlap{\hskip.5em$#1$}}
+     \gridcommdiag{&&U&&&&V\cr &&\bullet&&&&\bullet\cr
+     &&\sarrowlength=16pt\sline(0,1)&&&&\sarrowlength=16pt\sline(0,1)\cr
+     &&\l{u(U\cap V)}\bullet&&&&\bullet\r{(U\cap V)v}\cr
+     &&&\sline(2,-1)&&\sline(2,1)\cr
+     &&\cross{=}{\sline(0,1)}&&\bullet&&\cross{=}{\sline(0,1)}\cr\cr
+     &&\l{^{\textstyle u(U\cap v)}}\bullet&&\cross{=}{\sline(0,1)}&&
+      \bullet\r{^{\textstyle(u\cap V)v}}\cr
+     &\sline(2,1)&&\sline(2,-1)&&\sline(2,1)&&\sline(2,-1)\cr
+     \l{u}\bullet&&&&\bullet&&&&\bullet\r{v}\cr
+     &\sline(2,-1)&&\sline(2,1)&&\sline(2,-1)&&\sline(2,1)\cr
+     &&\bullet&&&&\bullet\cr &&u\cap V&&&&U\cap v\cr}$$
+
+  Again, the construction of this diagram requires careful choices for
+the arrow lengths and is facilitated by the introduction of the ad hoc
+macros `\cross', `\r', and `\l'.  Note also that superscripts were used
+to adjust the position of the vertices u(U intersection v) and (u
+intersection V)v.  Many diagrams may be typeset with the predefined
+macros that appear here; however, ingenuity is often required to handle
+special cases.
+
+
+File: eplain.info,  Node: Commutative diagram parameters,  Prev: Construction of commutative diagrams,  Up: Commutative diagrams
+
+Commutative diagram parameters
+------------------------------
+
+  The following is a list describing the parameters used in the
+commutative diagram macros.  These dimensions may be changed globally or
+locally.
+
+`\harrowlength'
+     (Default: 60 pt) The length of right or left arrows.
+
+`\varrowlength'
+     (Default: 0.618`\harrowlength') The length of up or down arrows.
+
+`\sarrowlength'
+     (Default: 60 pt) The horizontal length of slanted arrows.
+
+`\hmorphposn'
+     (Default: 0 pt) The horizontal position of the morphism with
+     respect to its default position.  There are also the dimensions
+     `\hmorphposnup', `\hmorphposndn', `\hmorphposnrt', and
+     `\hmorphposnlft' for `^'/`_' or `\lft'/`\rt' constructions.
+
+`\vmorphposn'
+     (Default: 0 pt) The vertical position of the morphism with respect
+     to its default position. There are also the dimensions
+     `\vmorphposnup', `\vmorphposndn', `\vmorphposnrt', and
+     `\vmorphposnlft' for `^'/`_' or `\lft'/`\rt' constructions.
+
+`\morphdist'
+     (Default: 4 pt) The distance of morphisms from slanted lines or
+     arrows.
+
+`\channelwidth'
+     (Default: 3 pt) The distance between double lines or arrows.
+
+`\hchannel, \vchannel'
+     (Defaults: 0 pt) Overrides `\channelwidth'. The horizontal and
+     vertical shifts between double lines or arrows.
+
+`\commdiagbaselines'
+     (Default: `\baselineskip=15pt \lineskip=3pt \lineskiplimit=3pt ')
+     The parameters used by `\commdiag' for setting interline glue.
+
+`\hgrid'
+     (Default: 15 pt) The horizontal spacing of the grid used by
+     `\gridcommdiag'.
+
+`\vgrid'
+     (Default: 15 pt) The vertical spacing of the grid used by
+     `\gridcommdiag'.
+
+
+File: eplain.info,  Node: Programming definitions,  Next: Copying,  Prev: Arrow theoretic diagrams,  Up: Top
+
+Programming definitions
+***********************
+
+  The definitions in this section are only likely to be useful when you
+are writing nontrivial macros, not when writing a document.
+
+* Menu:
+
+* Category codes::              Changing category codes.
+* Allocation macros::           Non-outer versions of \newcount et al.
+* Iteration::                   Doing `for' loops in TeX.
+* Macro arguments::             Reading and ignoring them.
+* Converting to characters::    Normalizing control sequences and spaces.
+* Expansion::                   Controlling expansion.
+* Obeying spaces::              Making whitespace count anywhere.
+* Writing out numbers::         Making `1' into `one'.
+* Mode-specific penalties::
+* Auxiliary files::             Testing for their existence.
+
+
+File: eplain.info,  Node: Category codes,  Next: Allocation macros,  Up: Programming definitions
+
+Category codes
+==============
+
+  Plain TeX defines `\active' (as the number 13) for use in changing
+category codes.  Although the author of `The TeXbook' has
+"intentionally kept the category codes numeric", two other categories
+are commonly used: letters (category code 11) and others (12).
+Therefore, Eplain defines `\letter' and `\other'.
+
+  Sometimes it is cleaner to make a character active without actually
+writing a `\catcode' command.  The `\makeactive' command takes a
+character as an argument to make active (and ignores following spaces).
+For example, here are two commands which both make `\' active:
+
+     \makeactive`\\   \makeactive92
+
+  Usually, when you give a definition to an active character, you have
+to do so inside a group where you temporarily make the character active,
+and then give it a global definition (cf. the definition of
+`\obeyspaces' in `The TeXbook').  This is inconvenient if you are
+writing a long macro, or if the character already has a global
+definition you do not wish to transcend.  Eplain provides `\letreturn',
+which defines the usual end-of-line character to be the argument.  For
+example:
+
+     \def\mymacro{... \letreturn\myreturn ... }
+     \mymacro hello
+     there
+
+  The end-of-line between `hello' and `there' causes `\myreturn' to be
+expanded.
+
+  `The TeXbook' describes `\uncatcodespecials', which makes all
+characters which are normally "special" into "other" characters, but
+the definition never made it into plain TeX.  Eplain therefore defines
+it.
+
+  Finally, `\percentchar' expands into a literal `%' character.  This
+is useful when you `\write' TeX output to a file, and want to avoid
+spurious spaces.  For example, Eplain writes a `\percentchar' after the
+definition of cross-references.  The macros `\lbracechar' and
+`\rbracechar' expand similarly.
+
+
+File: eplain.info,  Node: Allocation macros,  Next: Iteration,  Prev: Category codes,  Up: Programming definitions
+
+Allocation macros
+=================
+
+  Plain TeX provides macros that allocate registers of each primitive
+type in TeX, to prevent different sets of macros from using the same
+register for two different things.  The macros are all named starting
+with `new', e.g., `\newcount' allocates a new "count" (integer)
+register.  Such allocations are usually needed only at the top level of
+some macro definition file; therefore, plain TeX makes the allocation
+registers `\outer', to help find errors.  (The error this helps to find
+is a missing right brace in some macro definition.)
+
+  Sometimes, however, it is useful to allocate a register as part of
+some macro.  An outer control sequence cannot be used as part of a macro
+definition (or in a few other contexts: the parameter text of a
+definition, an argument to a definition, the preamble of an alignment,
+or in conditional text that is being skipped).  Therefore, Eplain
+defines "inner" versions of all the allocation macros, named with the
+prefix `inner': `\innernewbox', `\innernewcount', `\innernewdimen',
+`\innernewfam', `\innernewhelp', `\innernewif', `\innernewinsert',
+`\innernewlanguage', `\innernewread',
+`\innernewskip', `\innernewtoks', `\innernewwrite'.
+
+  You can also define non-outer versions of other macros in the same way
+that Eplain defines the above.  The basic macro is called `\innerdef':
+
+     \innerdef \INNERNAME {OUTERNAME}
+
+  The first argument (\INNERNAME) to `\innerdef' is the control
+sequence that you want to define.  Any previous definition of
+\INNERNAME is replaced.  The second argument (OUTERNAME) is the
+*characters* in the name of the outer control sequence.  (You can't use
+the actual control sequence name, since it's outer!)
+
+  If the outer control sequence is named \CS, and you want to define
+`innerCS' as the inner one, you can use `\innerinnerdef', which is just
+an abbreviation for a call to `\innerdef'.  For example, these two
+calls are equivalent:
+
+     \innerdef\innerproclaim{proclaim}
+     \innerinnerdef{proclaim}
+
+
+File: eplain.info,  Node: Iteration,  Next: Macro arguments,  Prev: Allocation macros,  Up: Programming definitions
+
+Iteration
+=========
+
+  You can iterate through a comma-separated list of items with `\for'.
+Here is an example:
+
+     \for\name:=karl,kathy\do{%
+        \message{\name}%
+     }%
+
+  This writes `karl' and `kathy' to the terminal.  Spaces before or
+after the commas in the list, or after the `:=', are *not* ignored.
+
+  `\for' expands the iterated values fully (with `\edef'), so this is
+equivalent to the above:
+
+     \def\namelist{karl,kathy}%
+     \for\name:=\namelist\do ...
+
+
+File: eplain.info,  Node: Macro arguments,  Next: Converting to characters,  Prev: Iteration,  Up: Programming definitions
+
+Macro arguments
+===============
+
+  It is occasionally useful to redefine a macro that takes arguments to
+do nothing.  Eplain defines `\gobble', `\gobbletwo', and `\gobblethree'
+to swallow one, two, and three arguments, respectively.
+
+  For example, if you want to produce a "short" table of contents--one
+that includes only chapters, say--the easiest thing to do is read the
+entire `.toc' file (*note Contents::.), and just ignore the commands
+that produce section or subsection entries.  To be specific:
+
+     \let\tocchapterentry = \shorttocchapter
+     \let\tocsectionentry = \gobbletwo
+     \let\tocsubsectionentry = \gobbletwo
+     \readtocfile
+   (Of course, this assumes you only have chapters, sections, and
+subsections in your document.)
+
+In addition, Eplain defines `\eattoken' to swallow the single following
+token, using `\let'.  Thus, `\gobble' followed by `{...}' ignores the
+entire brace-enclosed text.  `\eattoken' followed by the same ignores
+only the opening left brace.
+
+  Eplain defines a macro `\identity' which takes one argument and
+expands to that argument.  This may be useful if you want to provide a
+function for the user to redefine, but don't need to do anything by
+default.  (For example, the default definition of `\eqconstruct' (*note
+Formatting equation references::.) is `\identity'.)
+
+  You may also want to read an optional argument.  The established
+convention is that optional arguments are put in square brackets, so
+that is the syntax Eplain recognizes.  Eplain ignores space tokens
+before an optional argument, via `\futurenonspacelet'.
+
+  You test for an optional argument by using `\@getoptionalarg'.  It
+takes one argument, a control sequence to expand after reading the
+argument, if present.  If an optional argument is present, the control
+sequence `\@optionalarg' expands to it; otherwise, `\@optionalarg' is
+`\empty'.  You must therefore have the category code of `@' set to 11
+(letter).  Here is an example:
+
+     \catcode`@=\letter
+     \def\cmd{\@getoptionalarg\finishcmd}
+     \def\finishcmd{%
+       \ifx\@optionalarg\empty
+         % No optional argument present.
+       \else
+         % One was present.
+       \fi
+     }
+
+  If an optional argument contains another optional argument, the inner
+one will need to be enclosed in braces, so TeX does not mistake the end
+of the first for the end of the second.
+
+
+File: eplain.info,  Node: Converting to characters,  Next: Expansion,  Prev: Macro arguments,  Up: Programming definitions
+
+Converting to characters
+========================
+
+  Eplain defines  `\xrlabel'.  to produce control sequence names for
+cross-reference labels, et al.  This macro expands to its argument with
+an `_' appended.  (It does this because the usual use of `\xrlabel' is
+to generate a control sequence name, and conflicts between control
+sequence names would lead to obscure bugs.)
+
+  Because `\xrlabel' is fully expandable, to make a control sequence
+name out of the result you need only do
+     `\csname \xrlabel{LABEL}\endcsname'
+
+The `\csname' primitive makes a control sequence name out of any
+sequence of character tokens, regardless of category code.  Labels can
+therefore include any characters except for `\', `{', `}', and `#', all
+of which are used in macro definitions themselves.
+
+  `\sanitize' takes a control sequence as an argument and converts the
+expansion of the control sequence into a list of character tokens.
+This is the behavior you want when writing information like chapter
+titles to an output file.  For example, here is part of the definition
+of `\writenumberedtocentry'; `#2' is the title that the user has given.
+
+     ...
+     \def\temp{#2}%
+     ...
+       \write\tocfile{%
+         ...
+         \sanitize\temp
+         ...
+       }%
+
+
+File: eplain.info,  Node: Expansion,  Next: Obeying spaces,  Prev: Converting to characters,  Up: Programming definitions
+
+Expansion
+=========
+
+  This section describes some miscellanous macros for expansion, etc.
+
+* Menu:
+
+* \csn and \ece::               Abbreviations for \csname expansions.
+* \edefappend::
+* Hooks::                       Manipulating and executing named actions.
+* Properties::                  Associating information with a csname.
+* \expandonce::
+* \ifundefined::
+* \futurenonspacelet::
+
+
+File: eplain.info,  Node: \csn and \ece,  Next: \edefappend,  Up: Expansion
+
+`\csn' and `\ece'
+-----------------
+
+  `\csn'{NAME} simply abbreviates `\csname' NAME `\encsname', thus
+saving some typing.  The extra level of expansion does take some time,
+though, so I don't recommend it for an inner loop.
+
+  `\ece'{TOKEN}{NAME} abbreviates
+
+     \expandafter TOKEN \csname NAME \endcsname
+
+For example,
+
+     \def\fontabbrevdef#1#2{\ece\def{@#1font}{#2}}
+     \fontabbrevdef{normal}{ptmr}
+
+defines a control sequence `\@normalfont' to expand to `ptmr'.
+
+
+File: eplain.info,  Node: \edefappend,  Next: Hooks,  Prev: \csn and \ece,  Up: Expansion
+
+`\edefappend'
+-------------
+
+  `\edefappend' is a way of adding on to an existing definition.  It
+takes two arguments: the first is the control sequence name, the second
+the new tokens to append to the definition.  The second argument is
+fully expanded (in the `\edef' that redefines the control sequence).
+
+  For example:
+
+     \def\foo{abc}
+     \def\bar{xyz}
+     \edefappend\foo{\bar karl}
+
+results in `\foo' being defined as `abcxyzkarl'.
+
+
+File: eplain.info,  Node: Hooks,  Next: Properties,  Prev: \edefappend,  Up: Expansion
+
+Hooks
+-----
+
+  A "hook" is simply a name for a group of actions which is executed in
+certain places--presumably when it is most useful to allow
+customization or modification.  TeX already provides many builtin
+hooks; for example, the `\every ...' token lists are all examples of
+hooks.
+
+  Eplain provides several macros for adding actions to hooks.  They all
+take two arguments: the name of the hook and the new actions.
+
+`hookaction NAME ACTIONS'
+`hookappend NAME ACTIONS'
+`hookprepend NAME ACTIONS'
+     Each of these adds ACTIONS to the hook NAME.  (Any
+     previously-defined actions are retained.)  NAME is not a control
+     sequence, but rather the characters of the name.
+
+`hookactiononce NAME `\CS''
+     `\hookactiononce' adds CS to NAME, like the macros above, but
+     first it adds
+
+          \global\let \CS \relax
+
+     to the definition of \CS.  (This implies \CS must be a true
+     expandable macro, not a control sequence `\let' to a primitive or
+     some other such thing.)  Thus, \CS is expanded the next time the
+     hook NAME is run, but it will disappear after that.
+
+     The `\global' is useful because `\hookactiononce' is most useful
+     when the grouping structure of the TeX code could be anything.
+     Neither this nor the other hook macros do global assignments to
+     the hook variable itself, so TeX's usual grouping rules apply.
+
+  The companion macro to defining hook actions is `\hookrun', for
+running them.  This takes a single argument, the name of the hook.  If
+no actions for the hook are defined, no error ensues.
+
+  Here is a skeleton of general `\begin' and `\end' macros that run
+hooks, and a couple of calls to define actions.  The use of
+`\hookprepend' for the begin action and `\hookappend' for the end
+action ensures that the actions are executed in proper sequence with
+other actions (as long as the other actions use `\hookprepend' and
+`\hookappend' also).
+
+     \def\begin#1{ ... \hookrun{begin} ... }
+     \def\end#1{ ... \hookrun{end} ... }
+     \hookprepend{begin}\start_underline
+     \hookappend{end}\finish_underline
+
+
+File: eplain.info,  Node: Properties,  Next: \expandonce,  Prev: Hooks,  Up: Expansion
+
+Properties
+----------
+
+  A "property" is a name/value pair associated with another symbol,
+traditionally called an "atom".  Both atom and property names are
+control sequence names.
+
+  Eplain provides two macros for dealing with property lists:
+`\setproperty' and `\getproperty'.
+
+`\setproperty ATOM PROPNAME VALUE'
+     `\setproperty' defines the property PROPERTY on the atom ATOM to
+     be VALUE.  ATOM and PROPNAME can be anything acceptable to
+     `\csname'.  VALUE can be anything.
+
+`\getproperty ATOM PROPNAME'
+     `\getproperty' expands to the value stored for PROPNAME on ATOM.
+     If PROPNAME is undefined, it expands to nothing (i.e., `\empty').
+
+  The idea of properties originated in Lisp (I believe).  There, the
+implementation truly does associate properties with atoms.  In TeX,
+where we have no builtin support for properties, the association is only
+conceptual.
+
+  The following example typesets `xyz'.
+
+     \setproperty{a}{pr}{xyz}
+     \getproperty{a}{pr}
+
+
+File: eplain.info,  Node: \expandonce,  Next: \ifundefined,  Prev: Properties,  Up: Expansion
+
+`\expandonce'
+-------------
+
+  `\expandonce' is defined as `\expandafter\noexpand'.  Thus,
+`\expandonce TOKEN' expands TOKEN once, instead of to TeX primitives.
+This is most useful in an `\edef'.
+
+  For example, the following defines `\temp' to be `\foo', not `abc'.
+
+     \def\foo{abc}
+     \def\bar{\foo}
+     \edef\temp{\expandonce\bar}
+
+
+File: eplain.info,  Node: \ifundefined,  Next: \futurenonspacelet,  Prev: \expandonce,  Up: Expansion
+
+`\ifundefined'
+--------------
+
+  `\ifundefined{CS} T \else F \fi' expands the T text if the control
+sequence `\CS' is undefined or has been `\let' to `\relax', and the F
+text otherwise.
+
+  Since `\ifundefined' is not a primitive conditional, it cannot be
+used in places where TeX might skip tokens "at high speed", e.g.,
+within another conditional--TeX can't match up the `\if''s and `\fi''s.
+
+  This macro was taken directly from `The TeXbook', page 308.
+
+
+File: eplain.info,  Node: \futurenonspacelet,  Prev: \ifundefined,  Up: Expansion
+
+`\futurenonspacelet'
+--------------------
+
+  The `\futurelet' primitive allows you to look at the next token from
+the input.  Sometimes, though, you want to look ahead ignoring any
+spaces.  This is what `\futurenonspacelet' does.  It is otherwise the
+same as `\futurelet': you give it two control sequences as arguments,
+and it assigns the next nonspace token to the first, and then expands
+the second.  For example:
+
+     \futurenonspacelet\temp\finishup
+     \def\finishup{\ifx\temp ...}
+
+
+File: eplain.info,  Node: Obeying spaces,  Next: Writing out numbers,  Prev: Expansion,  Up: Programming definitions
+
+Obeying spaces
+==============
+
+  `\obeywhitespace' makes both end-of-lines and space characters in the
+input be respected in the output.  Unlike plain TeX's `\obeyspaces',
+even spaces at the beginnings of lines turn into blank space.
+
+  By default, the size of the space that is produced by a space
+character is the natural space of the current font, i.e., what `\ '
+produces.
+
+  Ordinarily, a blank line in the input produces as much blank vertical
+space as a line of text would occupy.  You can adjust this by assigning
+to the parameter `\blanklineskipamount': if you set this negative, the
+space produced by a blank line will be smaller; if positive, larger.
+
+  Tabs are not affected by this routine.  In particular, if tabs occur
+at the beginning of a line, they will disappear.  (If you are trying to
+make TeX do the "right thing" with tabs, don't.  Use a utility program
+like expand instead.)
+
+
+File: eplain.info,  Node: Writing out numbers,  Next: Mode-specific penalties,  Prev: Obeying spaces,  Up: Programming definitions
+
+Writing out numbers
+===================
+
+  `\numbername' produces the written-out form of its argument, i.e.,
+`zero' through `ten' for the numbers 0-10, and numerals for all others.
+
+
+File: eplain.info,  Node: Mode-specific penalties,  Next: Auxiliary files,  Prev: Writing out numbers,  Up: Programming definitions
+
+Mode-specific penalties
+=======================
+
+  TeX's built-in `\penalty' command simply appends to the current list,
+no matter what kind of list it is.  You might intend a particular
+penalty to always be a "vertical" penalty, however, i.e., appended to a
+vertical list.  Therefore, Eplain provides `\vpenalty' and `\hpenalty'
+which first leave the other mode and then do `\penalty'.
+
+  More precisely, `\vpenalty' inserts `\par' if the current mode is
+horizontal, and `\hpenalty' inserts `\leavevmode' if the current mode
+is vertical.  (Thus, `\vpenalty' cannot be used in math mode.)
+
+
+File: eplain.info,  Node: Auxiliary files,  Prev: Mode-specific penalties,  Up: Programming definitions
+
+Auxiliary files
+===============
+
+  It is common to write some information out to a file to be used on a
+subsequent run.  But when it is time to read the file again, you only
+want to do so if the file actually exists.  `\testfileexistence' is
+given an argument which is appended to `\jobname', and sets the
+conditional `\iffileexists' appropriately.
+
+  For example:
+
+     \testfileexistence{toc}%
+     \iffileexists
+        \input \jobname.toc
+     \fi
+

@@ -1,0 +1,216 @@
+%Date: Thu, 16 May 91 14:59 PDT
+%From: David Guichard <GUICHARD%WHITMAN.BITNET@CORNELLC.cit.cornell.edu>
+%Subject: Re: eplain
+%To: karl@cs
+%
+%Karl--
+%
+%Here are my multi-column macros and a rewrite of the double columns section
+%of eplain.texinfo. I included a \quadcolumns because this seems potentially
+%useful on landscape pages.
+%
+%I ran into a couple of problems/bugs/features of the original macros that I
+%think I've fixed.
+%
+%First, if I started double columns and then returned to single column before
+%the output routine was invoked, but there was too much text in the columns to
+%fit on the current page, then all of the text was put on the next page, leaving
+%lots of blank space on the first page. I think I've fixed this by changing how
+%\vsize is defined.
+%
+%Next, unless I'm doing something screwy, it looks to me like eplain goofs up on
+%footnotes and topinserts issued in multicolumn mode. I think I've got things
+%changed around so they work.
+%
+%I also discovered that the "\vskip\interfootnoteskip" in the vfootnote macro
+%will produce a parskip even if the interfootnoteskip is 0---was this
+%intentional? If not, perhaps you'd like to add \parskip=0pt to vfootnote.
+%(I have already added it to the modified vfootnote in the columns macro).
+
+\newskip\abovecolumnskip \abovecolumnskip = \bigskipamount
+\newskip\belowcolumnskip \belowcolumnskip = \bigskipamount
+\newdimen\gutter \gutter = 2pc
+\newdimen\c@lumnhsize
+\newtoks\previousoutput
+\newcount\number@fcolumns
+\newbox\@partialpage
+\newdimen\singlec@lumnhsize
+\newdimen\singlec@lumnvsize
+\newtoks\previousoutput
+\let\@ndcolumns=\relax
+%
+% We have a few synonymous ways to refer to multiple column modes.
+%
+\def\doublecolumns{\@columns2}
+\def\triplecolumns{\@columns3}
+\def\quadcolumns{\@columns4}
+\def\begincolumns#1{\ifcase#1\relax \or \singlecolumn \or \@columns2 \or%
+                             \@columns3 \or \@columns4 \else \relax \fi}
+\def\singlecolumn{\@ndcolumns\vskip\belowcolumnskip\nointerlineskip}
+\let\endcolumns=\singlecolumn
+%
+\def\@columns#1{%
+   \@ndcolumns%
+   \begingroup
+%
+% We redefine the main footnote macro so footnotes will extend across
+% the whole page, not just the width of a column. Likewise for @ins,
+% the insertion macro.
+%
+   \def\vfootnote##1{\insert\footins\bgroup\hsize=\singlec@lumnhsize
+    \interlinepenalty\interfootnotelinepenalty
+    \splittopskip\ht\strutbox % top baseline for broken footnotes
+    \advance\splittopskip by \interfootnoteskip
+    \splitmaxdepth\dp\strutbox
+    \floatingpenalty\@MM
+    \leftskip\z@skip \rightskip\z@skip \spaceskip\z@skip \xspaceskip\z@skip
+    \everypar = {}%
+    \parskip0pt
+    \the\everyfootnote
+    \vskip\interfootnoteskip
+    \indent\llap{##1\kern\footnotemarkseparation}\footstrut\futurelet\next\fo@t}
+   %
+   \def\@ins{\par\begingroup\setbox\z@\vbox\bgroup\hsize=\singlec@lumnhsize}
+   \global\let\@ndcolumns=\@@endcolumns
+   \global\number@fcolumns=#1
+   \global\c@lumnhsize = \hsize   % If \hsize changed, get the new value.
+   \par   % Shouldn't start in horizontal mode.
+   \global\previousoutput = \expandafter{\the\output}%
+   \global\advance\c@lumnhsize by -#1\gutter
+   \global\divide\c@lumnhsize by #1
+   \global\output = {%
+      \global\setbox\@partialpage =
+         \vbox{\unvbox255\vskip\abovecolumnskip}%
+   }%
+   \pagegoal = \pagetotal
+   \eject % Now expand the \output just above.
+   \global\output = {\c@lumnoutput}%
+   \global\singlec@lumnhsize = \hsize
+   \global\singlec@lumnvsize = \vsize
+   \hsize = \c@lumnhsize
+%
+% Compute the proper vsize based on what's already on the page
+% and the number of columns. Also change the mag factor for insertions.
+%
+   \global\advance\vsize by -\ht\@partialpage
+   \global\advance\vsize by -\ht\footins
+   \ifvoid\footins\else \global\advance\vsize by -\skip\footins \fi
+   \global\advance\vsize by -\ht\topins
+   \ifvoid\topins\else \global\advance\vsize by -\skip\topins \fi
+   \global\vsize = #1\vsize
+   \multiply\count\footins by #1 \multiply\count\topins by #1
+}%
+%
+% When this is invoked box 255 should contain just the right amount of
+% material, whether triggered by an output routine or a change in the
+% number of columns. Because columns have to contain a whole number of
+% lines of type, we take a bit of care with balancing the heights of the
+% columns to prevent either losing material or having a very short last
+% column.
+%
+% Note: when a page ends due to \bye or \eject, box 255 will contain lotsa
+% white space, so the columns will not look balanced. To fix this use
+% \singlecolumn before ending the page.
+%
+\def\@columnsplit{%
+   \splittopskip = \topskip
+   \splitmaxdepth = \baselineskip
+   \dimen0 = \ht255
+   \divide\dimen0 by \number@fcolumns
+   \begingroup % the balancing act
+      \vbadness = 10000 \loop \setbox8=\copy255
+      \global\setbox1 = \vsplit8 to \dimen0 \global\wd1 = \hsize
+      \global\setbox3 = \vsplit8 to \dimen0 \global\wd3 = \hsize
+      \ifnum\number@fcolumns>2%
+        \global\setbox5 = \vsplit8 to \dimen0
+        \global\wd5 = \hsize \fi
+      \ifnum\number@fcolumns>3%
+        \global\setbox7 = \vsplit8 to \dimen0
+        \global\wd7 = \hsize \fi
+      \ifdim\ht8>0pt \advance\dimen0 by 1pt \repeat
+   \endgroup
+   \global\setbox255 = \vbox{%
+         \unvbox\@partialpage
+         \ifcase\number@fcolumns \relax\or\relax\or%
+           \hbox to \singlec@lumnhsize{\box1\hfil\box3}\or%
+           \hbox to\singlec@lumnhsize{\box1\hfil\box3\hfil\box5}\or%
+           \hbox to\singlec@lumnhsize{\box1\hfil\box3\hfil\box5\hfil\box7}\or%
+           \else\relax\fi%
+         }%
+}%
+\def\c@lumnoutput{%
+   \@columnsplit
+   \hsize = \singlec@lumnhsize % Local to the \output group.
+   \vsize = \singlec@lumnvsize
+   \the\previousoutput
+%
+% Now the correct vsize is the original vsize times the
+% number of columns.
+%
+   \global\vsize=\number@fcolumns\singlec@lumnvsize
+}%
+\def\@@endcolumns{%
+   \global\let\@ndcolumns=\relax%
+   \par % Shouldn't start in horizontal mode.
+   \global\output = {\global\setbox1 = \box255}%
+   \pagegoal = \pagetotal
+   \eject
+   \global\setbox255 = \box1
+   \@columnsplit
+   \global\vsize = \singlec@lumnvsize
+   \global\output = \expandafter{\the\previousoutput}%
+   \endgroup
+   \ifvoid\topins\else\topinsert\unvbox\topins\endinsert\fi
+   \unvbox255
+}%
+
+\endinput
+
+@node Multiple columns, Footnotes, Margins, User definitions
+@section Multiple columns
+
+@cindex double column output
+@cindex triple column output
+@cindex quadruple column output
+@cindex multiple column output
+  Eplain provides for double, triple and quadruple
+column output:  you just say
+@code{\doublecolumns},
+@findex doublecolumns
+@code{\triplecolumns}
+@findex triplecolumns
+or @code{\quadcolumns}
+@findex quadcolumns
+and from that point on, the manuscript will be
+set in columns.  If you want to go back to one column, say
+@code{\singlecolumn}.
+@findex singlecolumn
+
+  The columns macros insert the value of the glue parameter
+@code{\abovecolumnskip}
+@findex abovecolumnskip
+before the multi-column text, and the value of the glue parameter
+@code{\belowcolumnskip}
+@findex belowcolumnskip
+after it.  The default value for both of these parameters is
+@code{\bigskipamount}, i.e., one linespace.
+
+  The columns are separated by the value of the dimen parameter
+@code{\gutter}.
+@findex gutter
+The default value for @code{\gutter} is two picas.
+
+  The macros take into account only the insertion classes
+@cindex insertion classes
+defined by plain @TeX{}, namely, footnotes and @code{\topinsert}s.  If
+you have defined additional insertion classes, you will need to change
+the macros which implement multi-column mode.  Furthermore, the insertions
+do not respect the column widths; if you want them to, you have to
+change the way your output routine works.  (Eplain uses whatever the
+current output routine is; it is not tied to @code{\plainoutput}.)
+@findex plainoutput
+
+@xx: \columnfill 
+@xx: \singlecolumn to balance columns
+@xx: footnote/topinsert width of whole page
+@xx: \vfootnote resets \parskip

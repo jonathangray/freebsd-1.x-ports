@@ -1,0 +1,354 @@
+@c Copyright (C) 1993, 94 Karl Berry.
+@c For copying conditions, see the file copying.texi.
+
+@node Installation
+@chapter Installation
+
+@cindex installation
+@cindex configuration
+@cindex compilation
+
+Here are the basic steps for configuration and installation:
+
+@enumerate
+
+@flindex configure
+@item
+@code{configure}.  This automatically determines most system dependencies.
+
+@flindex Makefile@r{, editing}
+@flindex c-auto.h@r{, editing}
+@item
+If necessary, edit the definitions in @file{Makefile} or @file{c-auto.h}.
+@xref{System dependencies}, below, for additional definitions you may
+need to make.
+
+@item
+@code{make}.
+
+@item
+@code{make install}. This installs the library, header files, and
+documentation.
+
+@item
+@code{make distclean}.  This removes all files created by the build.
+
+@end enumerate
+
+Since I only distribute Kpathsea as part of another package, you will
+probably be doing the above in a top-level directory that contains a
+@samp{Makefile}, @samp{kpathsea}, and the other package.  But you can do
+the installation in @samp{kpathsea} itself, if you only want to install
+the library, not the other package.
+
+@menu
+* System dependencies::		Definitions you must supply.
+* configure::                   Options and frills for the `configure' script.
+* Bugs::			Where and how to report bugs.
+@end menu
+
+
+@node System dependencies
+@section System dependencies
+
+Although @code{configure} can reliably determine most aspects of your
+system, there are a few things you must help it out with.
+
+@menu
+* Default paths::	Changing the default paths and installation dirs.
+* wchar_t::		Working around `wchar_t' problems, e.g., on Linux.
+* putenv::		For smart putenv implementations, e.g., Net2/BSD.
+@end menu
+
+
+@node Default paths
+@subsection Default paths 
+
+@cindex paths, changing default
+@cindex installation directories, changing default
+@cindex directories, changing default installation
+@flindex kpathsea/paths.h
+@flindex paths.h
+
+The directories into which files are installed are defined in the
+top-level @file{Makefile}. The default paths which programs use to
+search for inputs are defined in @file{kpathsea/paths.h}.  You will
+almost certainly want to change either or both of these to match your
+preferred local directory structure.  In particular, if you need to
+support only one output device, the rather deep structure of the default
+paths is unnecessary.
+
+Both of these files are automatically created: the @file{Makefile} at
+@samp{configure} time, @file{kpathsea/paths.h} at @samp{make} time. Thus, to
+change the default paths, the simplest thing to do is edit the template
+files @file{Makefile.in} and @file{paths.h.in} before running
+@samp{configure}.
+
+The Make definitions are all repeated in several @file{Makefile}'s; but
+changing the top-level @file{Makefile} should suffice, as it passes down
+all the variable definitions, thus overriding the submakes. (The
+definitions are repeated so you can potentially run Make in the
+subdirectories.)
+
+@vindex MAKETEX_MODE
+If you want to include the mode in a particular path, perhaps to
+distinguish two different devices with the same resolution, use
+@code{$MAKETEX_MODE}, as in
+@file{/usr/local/lib/texmf/fonts//pk/$MAKETEX_MODE}. @xref{MakeTeX...
+script arguments, @file{MakeTeX}@dots{} script arguments}.
+
+The file @file{kpathsea/HIER} has some explanation of the default setup.
+
+@cindex recursion from @file{/}
+@cindex @samp{~} searching caveat
+@cindex @samp{$HOME} searchin caveat
+@cindex @samp{root} peculiarities
+A caveat: If you put @samp{$HOME} or @samp{~} in any of the paths, do
+not search that component recursively: when you run as root, you might
+wind up searching (say) @file{/zoneinfo/Brazil/tex/macros}. And of
+course it will take quite some time to look at every directory on the
+system.
+
+@xref{Filename database}, for a description of an external database that
+can help speed searches.
+
+
+@node wchar_t
+@subsection @code{wchar_t}
+
+@vindex NO_FOIL_X_WCHAR_T
+@tindex wchar_t
+
+The upshot of all the following is that if you get error messages
+regarding @code{wchar_t}, try defining @code{NO_FOIL_X_WCHAR_T}. This is
+reported to be necessary on Linux.
+
+@code{wchar_t} has caused infinite trouble. None of my code ever uses
+@code{wchar_t}; all I want to do is include X header files and various
+system header files, compiling with GCC. This seems an impossible task.
+
+The X11R5 @file{<Xlib.h>} and GCC's @file{<stddef.h>} have conflicting
+definitions for wchar_t.
+
+The particulars: @file{<X11/Xlib.h>} from MIT X11R5 defines
+@code{wchar_t} if @code{X_WCHAR} is defined, which is defined if
+@code{X_NOT_STDC_ENV} is defined, and we define @emph{that} if
+@code{STDC_HEADERS} is not defined (@samp{configure} decides if
+STDC_HEADERS gets defined).  But when compiling with gcc on SunOS 4.1.x,
+@code{STDC_HEADERS} is not defined (@file{string.h} doesn't declare the
+@samp{mem}* functions), so we do get X's @code{wchar_t}---and we also
+get gcc's @code{wchar_t} from its @file{<stddef.h>}.  Result:
+conflicting definitions.
+
+On the other hand, SunOS 4.1.1 with some other X configurations actually
+needs GCC to define @code{wchar_t}, and fails otherwise.
+
+My current theory is to define @code{wchar_t} to a nonsense symbol
+before the X include files are read; that way its definition (if any)
+will be ignored by other system include files.  Going along with that,
+define @code{X_WCHAR} to tell X not to use @file{<stddef.h>}, that we've
+already included, but instead to make its own definition.
+
+But this is not the end of the story. The X11 include files distributed
+with DG/UX 5.4.2 for the Aviion have been modified to include
+@file{<_int_wchar_t.h>} if @code{X_WCHAR}, so our @code{#define} will
+not have any typedef to change---but the uses of @code{wchar_t} in the X
+include files will be changed to reference this undefined symbol. So
+there's nothing to foil in this case; I don't know how to detect this
+automatically, so it's up to you to define @code{NO_FOIL_X_WCHAR_T}
+yourself.
+
+
+@node putenv
+@subsection @code{putenv}
+
+@findex putenv
+@vindex SMART_PUTENV
+If you are on a Net2/BSD or other system which has a @code{putenv} that
+knows how to avoid garbage when the same environment variable is set
+many times, define @code{SMART_PUTENV}. (And if you can write a test for
+this that could be incorporated into the @code{configure} script, please
+send it to the address given in @ref{Bugs}.)
+   
+
+@node configure
+@section The @code{configure} script
+
+@cindex prefix for installation directories
+@cindex installation directories
+@pindex configure @r{script, running}
+
+@cindex MacKenzie, David
+@pindex Autoconf
+(This section is largely from the Autoconf manual, by David MacKenzie.
+@xref{Running configure Scripts, , Running @code{configure} scripts,
+autoconf, Autoconf}.)
+
+The @code{configure} script that comes with this distribution was
+generated by the Autoconf program.  Thus, you can regenerate
+@code{configure} by rerunning Autoconf.  You might want to do this if a
+new version of Autoconf is released, for example.
+
+The purpose of @code{configure} is to adapt the present source to the
+particulars of your system.  For example, the name of the directory
+header file (@file{dirent.h} or @file{sys/dir.h}), whether the GNU C
+compiler @code{gcc} is available, and so on.
+
+@vindex PATH@r{, @file{.} omitted from}
+@flindex #! @r{in @t{configure} script}
+Normally, you do not need to give any options to @code{configure}; just
+@code{cd} to the directory with the source code and type
+@samp{configure}.  Exceptions: if @file{.} is not in your @code{PATH},
+you must type @samp{./configure}; if you are using a non-Bourne
+compatible shell on systems that do not support @samp{#!}, you must type
+@samp{sh configure}.
+
+@pindex configure @r{output, suppressing}
+@cindex verbose @code{configure} messages, suppressing
+@cindex suppressing @code{configure} output
+@opindex -v @r{option to @code{configure}}
+@flindex /dev/null
+Running @code{configure} takes a minute or two.  While it is running, it
+prints some messages that tell what it is doing.  If you don't want to
+see the messages, run @code{configure} with its standard output
+redirected to @file{/dev/null}; e.g., @samp{configure >/dev/null}.
+On the other hand, if you want to see even more messages, give
+@code{configure} the @samp{-v} option.
+
+@vindex VPATH
+@cindex compilation in another directory
+To compile the package in a different directory from the one containing
+the source code, you must use a variant of Make that supports the
+@code{VPATH} variable, such as GNU Make.  @code{cd} to the
+directory where you want the object files and executables to go and run
+@code{configure} with the option @samp{--srcdir=@var{dir}}, where
+@var{dir} is the directory that contains the source code.  Using this
+option is unnecessary if the source code is in the parent directory of
+the one in which you are compiling; @code{configure} automatically
+checks for the source code in @file{..} if it does not find it in
+@file{.}.
+
+@cindex installation prefix, default
+@cindex prefix, installation default
+@vindex prefix @r{Make variable}
+@flindex /usr/local @r{default prefix}
+@code{configure} (in the top-level directory) guesses the default
+installation prefix (we'll call it @code{$(prefix)}, which is the
+corresponding Make variable) by looking for a directory which contains
+an executable named @samp{tex}, and using its parent.  In the package
+subdirectories, such as @file{kpathsea}, @code{configure} doesn't try to
+guess the prefix (to avoid a conflict with the guess made at the top
+level); the default @file{/usr/local} is left.
+
+@opindex --prefix @r{option to @code{configure}}
+@opindex --exec-prefix @r{option to @code{configure}}
+@cindex architecture dependencies and installation
+You can override this default guess for the installation prefix by
+giving @code{configure} the option @samp{--prefix=@var{path}}.  You can
+also specify separate installation prefixes for architecture-specific
+files and architecture-independent files by giving @code{configure} the
+option @samp{--exec-prefix=@var{xpath}} (which substitutes for the Make
+variable @samp{$(exec_prefix)}).  Then @var{xpath} will be the prefix for
+installing programs and libraries.  Data files and documentation will
+still use @samp{$(prefix)}.
+
+@flindex config.status
+@opindex --no-create @r{option to @code{configure}}
+@opindex --recheck @r{option to @code{config.status}}
+You can tell @code{configure} to figure out the configuration for your
+system, and record it in a file @file{config.status}, without actually
+configuring the package.  To do this, give @code{configure} the
+@samp{--no-create} option.  Later, you can run @file{./config.status} to
+actually configure the package.  This option is useful mainly in
+@file{Makefile} rules for updating @file{config.status} and the
+@file{Makefile} itself.  You can also give @file{config.status} the
+@samp{--recheck} option, which makes it rerun @code{configure} with the
+same arguments you used before.  This is useful if you change
+@code{configure}.
+
+@code{configure} ignores any other arguments that you give it.
+
+On systems that require unusual options for compilation or linking that
+the package's @code{configure} script does not know about, you can give
+@code{configure} initial values for variables by setting them in the
+environment.  In Bourne-compatible shells, you can do that on the
+command line like this:
+
+@example
+CC='gcc -traditional' LIBS=-lposix sh configure
+@end example
+
+The Make variables that you might want to override with
+environment variables when running @code{configure} are:
+
+(For these variables, any value given in the environment overrides the
+value that @code{configure} would choose.)
+
+@table @code
+
+@vindex CC @r{variable for configuration}
+@item CC
+The C compiler program.  The default is @code{gcc} if that is in your
+@code{PATH}, @code{cc} otherwise.
+
+@vindex INSTALL @r{variable for configuration}
+@item INSTALL
+The program to use to install files.  The default is @code{install} if you
+have it, @code{cp} otherwise.
+@end table
+
+(For these variables, any value given in the environment is added to
+the value that @code{configure} chooses.)
+
+@table @code
+@vindex DEFS @r{variable for configuration}
+@item DEFS
+Configuration options, in the form @samp{-Dfoo -Dbar@dots{}}.
+
+@vindex LIBS @r{variable for configuration}
+@item LIBS
+Libraries to link with, in the form @samp{-lfoo -lbar@dots{}}.
+@end table
+
+@flindex configure.in
+@cindex configuration problems, fixing properly
+Of course, problems requiring manual intervention (e.g., setting these
+variables) should ideally be fixed by updating either the Autoconf
+macros or the @file{configure.in} file for that package.
+
+
+@node Bugs
+@section Reporting bugs
+
+@cindex reporting bugs
+@cindex bugs, reporting
+
+@flindex tex-k@@cs.umb.edu @r{bug address}
+@cindex bug address
+If you encounter problems, report them to @samp{tex-k@@cs.umb.edu}.
+Include the version number of the library, the system you are using, and
+enough information to reproduce the bug in your report.  To get on this
+mailing list yourself, email @samp{tex-k-request@@cs.umb.edu} with a
+message whose body contains a line
+@example
+subscribe @var{you@@your.preferred.address}
+@end example
+
+To avoid wasted effort and time (both mine and yours), I strongly advise
+applying the principles given in the GNU C manual (@pxref{Bugs, ,
+Reporting Bugs, gcc, The GNU CC manual}) to your bug reports for any
+software.
+
+Please also report bugs in this documentation---not only factual errors,
+but unclear explanations, typos, wrong fonts, @dots{}.
+
+@cindex warnings, pointer combinations
+@cindex pointer combination warnings
+@cindex illegal pointer combination warnings
+@pindex cc @r{warnings}
+When compiling with old C compilers, you may get some warnings about
+``illegal pointer combinations''.  These are spurious; ignore them.  I
+decline to clutter up the source with casts to get rid of them.
+In general, if you have trouble with a system C compiler, I advise
+trying the GNU C compiler. (And vice versa, unfortunately; but in that
+case I also recommend reporting a bug to the GCC bug list.)

@@ -1,0 +1,26 @@
+#!/bin/sh
+# Change placeholders to variations on the current date.  Assumes
+# various % constructs are recognized.
+
+if test $# -lt 1
+then
+  echo "Usage: $0 [<file> <file> ...]"
+  exit 1
+fi
+
+temp=${TMPDIR-/tmp}/adddate$$
+
+for f in "$@"; do
+  sed -e s/REPLACE-WITH-MONTH-YEAR/"`date +'%B %Y'`"/ \
+      -e s/REPLACE-WITH-DAY-MONTH-YEAR/"`date +'%e %B %Y'`"/ \
+      -e s/REPLACE-WITH-DATE/"`date`"/ \
+      <$f >$temp
+  if cmp -s $f $temp; then
+    echo "$f: No REPLACE-WITH-<date>."
+    exit 1
+  fi
+  rm -f $f
+  mv $temp $f
+done
+
+rm -f $temp

@@ -1,0 +1,76 @@
+#!/bin/sh
+# 
+# Merge the non-BibTeX parts of btxmac.tex into xeplain.tex, producing
+# eplain.tex.
+ 
+# Usually we are called from the Makefile, and the `version' variable is set.
+if test -z "$version"
+then
+  echo "No version number!"
+  version=xx
+fi
+
+btxtmp=/tmp/mergebtx$$
+common1tmp=/tmp/mergec1$$
+common2tmp=/tmp/mergec2$$
+common3tmp=/tmp/mergec3$$
+eplaintmp=/tmp/mergepl$$
+arrowtmp=/tmp/mergear$$
+finaltmp=/tmp/mergefn$$
+pathtmp=/tmp/mergepa$$
+
+rm -f eplain.tex
+
+# Use this regexp to strip comments with egrep.
+commentre='^ *%([^%]|$)'
+
+# Extract the relevant parts of btxmac.tex (without comments).
+egrep -v "$commentre" btxmac.tex					\
+  | sed -n								\
+        -e "1,/^%% \[\[\[start .*\]\]\]/w $common1tmp"			\
+        -e "/^%% \[\[\[start .*\]\]\]/,/^%% \[\[\[end .*\]\]\]/w $btxtmp" \
+        -e "/^%% \[\[\[end .*\]\]\]/,\$w $common2tmp"
+
+# Get texnames.sty and path.sty.  Remove the announcement, as well as
+# the comments.
+egrep -v "$commentre|immediate" texnames.sty > $common3tmp
+egrep -v "$commentre|immediate" path.sty > $pathtmp
+
+# Get arrow.tex.
+egrep -v "$commentre" arrow.tex > $arrowtmp
+
+# Merge the above into xeplain, calling the result eplain.  Also change the
+# `filename' in the comment.
+egrep -v "$commentre" xeplain.tex					\
+  | sed -e s/xeplain/eplain/						\
+        -e "/^%% \[\[\[here is the first.*\]\]\]/r $common1tmp"		\
+        -e "/^  %% \[\[\[here are the BibTeX.*\]\]\]/r $btxtmp"		\
+        -e "/^%% \[\[\[here is the second.*\]\]\]/r $common2tmp"	\
+        -e "/^%% \[\[\[include texnames.*\]\]\]/r $common3tmp"		\
+        -e "/^%% \[\[\[include path.*\]\]\]/r $pathtmp"			\
+        -e "/^ *%% \[\[\[include arrow.*\]\]\]/r $arrowtmp"		\
+    > $eplaintmp
+
+# Remove our [[[...]]] markers and \endinput's.
+egrep -v '\[\[\[|^ *$|\\endinput' $eplaintmp > eplain.tex
+
+# Fix header fields.
+add-date eplain.tex
+add-version $version eplain.tex
+fix-checksum eplain.tex
+
+# Old checksum computation:
+#checksum=`wc < $eplaintmp | sed -n "s/^ *//"`
+# Replace the checksum in the old file.  We really should loop here,
+# since one iteration may not be enough.  Only replace the first
+# checksum, since the second is for btxmac.
+#sed -e "1,50s/checksum = .*,/checksum = \"$checksum\",/" $eplaintmp \
+#  > eplain.tex
+
+chmod a-w eplain.tex
+ls -lt btxmac.tex path.sty texnames.sty xeplain.tex eplain.tex arrow.tex
+wc eplain.tex
+grep 'checksum.*=' eplain.tex
+
+rm -f $btxtmp $eplaintmp $common1tmp $common2tmp $common3tmp $finaltmp
+rm -f $arrowtmp $pathtmp

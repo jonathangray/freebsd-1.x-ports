@@ -1,0 +1,14 @@
+s/buf_size=3000/buf_size=2000/
+s/font_max=255/font_max=120/
+s/font_mem_size=100000/font_mem_size=45000/
+s/hash_prime=7919/hash_prime=2981/
+s/hash_size=9500/hash_size=4000/
+s/hyph_size=607/hyph_size=307/
+s/max_halfword==262143/max_halfword==65535/
+s/max_strings=15000/max_strings=5000/
+s/mem_max=262140/mem_max=65530/
+s/mem_top=262140/mem_top=65530/
+s/pool_size=124000/pool_size=66000/
+s/save_size=4000/save_size=2000/
+s/stack_size=300/stack_size=200/
+s/string_vacancies=100000/string_vacancies=36000/

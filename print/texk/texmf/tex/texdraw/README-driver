@@ -1,0 +1,123 @@
+$Id: README-driver,v 1.1 1994/04/14 03:16:27 alm Exp $
+
+TeXdraw, as distibuted, is designed to work with the dvips dvi to
+PostScript driver.  The graphics inclusion part of TeXdraw has been
+successfully ported to use the OzTeX and ArborText drivers.
+
+First, the general information on porting TeXdraw from the TeXdraw
+manual is repeated here.  Following that, specific information for
+OzTeX and ArborText is included.
+
+
+How TeXdraw merges graphics and text
+====================================
+
+   An understanding of the mechanism used by TeXdraw to put text and
+graphics together is useful for porting TeXdraw to other dvi to
+PostScript drivers.  The final result of a sequence of TeXdraw commands
+will be placed within a TeX box.  Both the graphics from the
+intermediate PostScript file and the TeX text will be placed in that
+box.
+
+   The graphics file that has been created by TeXdraw has the graphics
+contained within a box with lower lefthand corner at PostScript
+coordinates given by `\llxbp' and `\llybp'.  These are integer values
+in PostScript native units, referred to in TeX as big points (bp). 
+There are 72 bp to one inch.
+
+   A simplified version of the code to place graphics and text appears
+below.
+     \vbox {\vskip \vdrawsize
+            \special {psfile=\psfile\space  % graphics file
+                      hoffset=\the\llxbp\space
+                      voffset=\the\llybp}
+            \vskip \llypos
+            \hbox {\hskip -\llxpos
+                   \box\txdbox              % TeX text
+                   \hskip \llxpos}
+                   \hskip \hdrawsize
+            \vskip -\llypos}}
+In this code fragment, a TeX `\vbox' is placed at the current
+position on the page.  The size of this box is the drawing size
+(`\vdrawsize' high and `\hdrawsize' wide).
+
+   After moving down vertically in the `\vbox' by the height of the
+box, the position for the `\special' command is at the bottom lefthand
+corner of the box.  The PostScript graphics contained in the file
+`\psfile' will be placed at this location.  With no further offset,
+this would place the origin of the PostScript space at that point. 
+However, the drawing has the lower lefthand corner at the PostScript
+position given by the PostScript coordinates `\llxbp' and `\llybp'. 
+The `\special' command instructs the dvi to PostScript driver to offset
+the graphics by this amount.  In this code, the dvi to PostScript
+driver is being asked to do the shifting.  An alternate approach is
+shift the position within TeX before invoking the `\special' command. 
+In fact, moving the `\special' command to immediately precede the TeX
+text placement command (`\box\txdbox') results in the shifting being
+performed within TeX.
+
+   The TeX text to be overlaid on the TeXdraw graphics is contained in
+a box (box `\txdbox') of zero size, with the text extending outside
+this box.  The reference point for this box is TeXdraw coordinate `(0
+0)', so this box must be shifted to place the text correctly.  This is
+done by temporarily shifting the position both horizontally and
+vertically, placing the box, and then restoring the position.  The
+shift amounts, `\llxpos' and `\llypos', are TeX dimensions
+corresponding to the PostScript coordinate values `\llxbp' and `\llybp'.
+
+=========================================================
+OzTeX:
+
+The OzTeX manual clearly states that in-line PostScript cannot be used
+reliably to to things like text rotation -- \vtext will not work.
+
+However the other features will work with the \special code changed as
+follows.
+
+\special{\p@sfile\space \the\l@lxbp\space \the\l@lybp\space translate}
+
+Within a \special OzTeX takes a file name and optional PostScript code to
+be executed before inserting the PostScript code from the file.  Here,
+the PostScript code following the file name does the appropriate shifting
+of the drawing.
+
+(modifications from Laurent Decreusefond, decreuse@res.enst.fr at ENST,
+ Paris)
+
+=========================================================
+ArborText:
+
+W. J. Metzger (u632111%hnykun11.bitnet@utcs.utoronto.ca) suggests
+replacing the \special with
+
+\insertp@{\p@sfile}{\the\l@lxbp}{\the\l@lybp}
+%
+% to insert the PostScript file using \special
+%
+%           #1: PostScript file name
+% parameter #2: Offset from left margin
+%           #3: Offset from bottom of page
+% for the  Rokicki dvips driver
+%
+%\def\insertp@#1#2#3{\special{ps: plotfile #1\space
+%                                 hoffset=#2\space
+%                                 voffset=#3}}
+%
+% for the ArborText dvips driver
+%
+\def\insertp@#1#2#3{%
+       \special{ps::[asis,begin]
+          0 SPB
+          /figsave save def
+          /showpage {} def
+          gsave
+          Xpos Ypos translate
+          0.02 dup  scale
+          #2 50 mul #3 50 mul translate
+          }
+       \special{ps: plotfile #1}
+       \special{ps::[asis,end]
+          grestore
+          figsave restore
+          0 SPE}
+ }

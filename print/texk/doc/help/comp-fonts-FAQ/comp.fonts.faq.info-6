@@ -1,0 +1,1088 @@
+This is Info file comp.fonts.faq.info, produced by Makeinfo-1.55 from
+the input file FAQ.texinfo.
+
+
+File: comp.fonts.faq.info,  Node: Porting fonts to the NeXT,  Next: Font availability,  Prev: Tell me more about NeXTstep fonts,  Up: NeXT Information
+
+Porting fonts to the NeXT
+*************************
+
+Porting PC/Unix Type 1 Fonts
+============================
+
+You must have the .pfb and .afm files
+
+A PC Adobe font is stored in binary format, so the first step is to
+convert it to ascii.
+
+There are a couple of utilities out there which can do this. I think
+t1utils can do it, and there is a nice utility called pcATMfont2Next
+which has a couple of tools to do this (unfont and pfb2ps). Look for
+the file pcATMfont2Next.tar.Z; it is available on many ftp sites.
+
+Also, since NeXTstep run on Unix, there is the customary problem of
+converting the CRs (carriage returns) that PCs use to the LFs
+(Linefeeds) that Unix uses. The easiest way to do this is to use tr to
+delete the octal for the CR character from both the .afm and outline
+file. The command to do this is:
+
+        tr -d '\015' < inputfile  > outputfile
+
+The unfont program will do this automatically when it converts the .pfb
+file, but pfb2ps does not. I'm not sure if t1utils' utility does or not.
+
+Once you have the outline file, you can go ahead and install it by the
+process outlined above.
+
+Otto J. Makela (otto@jyu.fi) posted a terrific cshell script to
+comp.fonts, which automates just about everything for you. It converts
+the .pfb to ASCII format, extracts the name from the FontName field,
+creates the font folder, copies in the component files with the correct
+name, and runs buildafmdir and cacheAFMData when done.
+
+Note that it uses the unfont utility from the pcATMfont2Next package,
+so to use this you will need that too.
+
+Just take everything between the CUT HERE lines, save it into a text
+file, and make it executable with the chmod command or the Inspector.
+
+     --------------CUT HERE---------------
+     #!/bin/csh -f
+     # Font install program -- 1992 by Otto J. Makela
+     
+     set progname="$0" todir=~/Library/Fonts
+     set progname="$progname:t"
+     
+     if ( $#argv>0 && -d "$1" ) then
+     
+            set todir="$1"
+            shift
+     endif
+     
+     if ( $#argv == 0 ) then
+            echo "usage: $progname [installdir] afmfile..."
+            exit
+     endif
+     
+     foreach afmfile ( $* )
+     
+         echo "${afmfile}:"
+         set fontname=`tr -d '\015' < $afmfile | awk '$1=="FontName" {
+     print $2 } '`
+     
+         if ( -d $todir/${fontname}.font ) then
+                 echo "${progname}: font $fontname already installed"
+                 continue
+         endif
+     
+     # If there already is a pfa, no need to translate, otherwise convert
+     to ascii
+            if ( -f ${afmfile:r}.pfa ) then
+                    mkdir ${todir}/${fontname}.font
+     
+                    cp ${afmfile:r}.pfa
+     ${todir}/${fontname}.font/${fontname}
+            else if ( -f ${afmfile:r}.pfb ) then
+                    mkdir ${todir}/${fontname}.font
+                    unfont ${afmfile:r}.pfb >
+     ${todir}/${fontname}.font/${fontname}
+            else
+                    echo "${progname}: no pfa/pfb file for $fontname afm"
+                    continue
+            endif
+     # Strip CR's from afm file
+            tr -d '\015' < $afmfile >
+     ${todir}/${fontname}.font/${fontname}.afm
+     
+            echo "installed as $fontname"
+     end
+     
+     buildafmdir $todir
+     cacheAFMData $todir
+     
+     ---------------CUT HERE-----------
+
+The original installfont script is available as a shar file from
+ibis.cs.umas.edu in /pub/norm/comp.fonts/installfont-for-NeXT.
+
+Porting Mac Type 1 Fonts
+========================
+
+A variety of programs and scripts exist to convert Macintosh format
+Type 1 fonts to UNIX format.  Their ability to do a complete job
+varies.  Common traps which naive font converters fall into are:
+
+   * not dealing with Macintosh POST which are out of order.
+
+   * not dealing with Macintosh POST which are interspersed with other
+     resources.
+
+   * not dealing at all with POST Type 4 resources where the font
+     program starts in resource fork of the file but the remainder of
+     the data is in the data fork.
+
+     Most naive converters we've looked at have this problem.  This
+     means that most Type 3 fonts won't convert at all.
+
+   * not dealing with MacBinary headers.
+
+MacToPfa
+--------
+
+Trilithon Software provides a commercial NeXTstep `MacToPfa' utility
+which converts Mac to NeXTstep format and installs the converted fonts
+for you.  `MacToPfa' overcomes a lot of the problems which plague other
+font conversion schemes.
+
+MetroTools
+----------
+
+MetroSoft provides a commercial NeXTstep Mac->NeXTstep utility as a
+part of their MetroTools package for NeXTstep.  MetroTools is a kind of
+Boy Scout Knife, containing a Mac to NeXTstep font converter, a Mac to
+NeXTstep sound converter, a screen saver, a dock extender, and others.
+MetroTools will not convert Macintosh fonts if it can't find AFM files.
+The font converter converts font formats and installs them on NeXTstep
+for you.
+
+       MetroSoft,
+       San Diego, California 94028
+       (619) 488 9411.
+       info@metrosoft.com
+
+Porting PC (PFB) Type 1 Fonts
+=============================
+
+Trilithon Software provides a commercial NeXTstep `PfbToPfa' utility
+which converts Mac to NeXTstep format and installs the converted fonts
+for you.  `PfbToPfa' overcomes a lot of the problems which plague other
+font conversion schemes.
+
+
+File: comp.fonts.faq.info,  Node: Font availability,  Next: Only 256 fonts?,  Prev: Porting fonts to the NeXT,  Up: NeXT Information
+
+Font availability
+*****************
+
+Public Domain fonts for the NeXT are available via anonymous FTP from
+sonata.purdue.edu, in the directory next/graphics/fonts.  The README
+for this file states that the directory is currently being restructured
+by the archive moderator, although fonts are still available in that
+directory.
+
+
+File: comp.fonts.faq.info,  Node: Only 256 fonts?,  Prev: Font availability,  Up: NeXT Information
+
+Why can I only install 256 fonts on my NeXT?
+********************************************
+
+Included to NS3.0 there's a new 'buildafm'-routine (for non-NeXTers:
+'buildafm' is a shell script which announces a new font to the
+computer) at /usr/bin/buildafmdir. The new one only allows to install
+about 256 fonts.  Running the new 'buildafmdir' to install a new font
+surpresses every font above this number.  Workaround: Re-install the
+'old buildafmdir' from NS2.1 at /usr/bin/buildafmdir and everything
+should be fine!
+
+(thanks to: Rob Parkhill and d'Art Computers/Germany d'art)
+
+[ed: and my thanks to Borris Balzer for sending this to me]
+
+
+File: comp.fonts.faq.info,  Node: Amiga Information,  Next: X11 Information,  Prev: NeXT Information,  Up: Top
+
+Amiga Information
+*****************
+
+This section needs a lot of work.  At the time of this release, I'm not
+in a position to write it so I'm leaving it basically blank.  Even if
+you don't have time to write it, if you know what _should_ be in this
+section, please forward it to norm.
+
+Adobe Type 1 fonts for the Amiga
+================================
+
+Darrell Leland contributes the following information:
+
+There are now three high end DTP packages for the Amiga that can
+directly or indirectly use Adobe Type 1 Fonts or AGFA Compugraphic
+fonts. The best of the lot in both my and Amiga World's opinions is
+SoftLogik's Pagestream, currently in version 2.2 but about to go to
+version 3.0.  Pagestream can take Adobe fonts in MS-DOS format directly
+with no format conversion needed. All you have to do is get them on an
+Amiga format disk, which is very easy using the new version of
+Commodore's Workbench operating system. Pagestream has import modules
+for MacWrite, Adobe Illustrator, and every other format in the universe
+(seems like). It is generally a very stable and well behaved program
+with a lot of features. I haven't had a chance to see 3.0 yet, but they
+are claiming it's going to be a real killer. We shall see. It does color
+seps, twists and rotates fonts, etc. Pagestream's job has been made
+easier with Commodore's (about time) release of their own Postscript
+printer drivers and Preferences postscript printer control tools.
+
+SoftLogik also sells a program called Typesmith, which is (at last!) a
+structured font maker/editor for the Amiga. Typesmith will work with
+both formats mentioned above plus SoftLogik's own font format, which I
+get the impression they are discontinuing in favor of Postscript. They
+also sell ArtExpression, a very nice structured drawing package that
+does everything I can think of. I understand SoftLogik has also been
+getting several Mac and PC font makers to make Amiga fonts for them too.
+They even have a program system that allows programs to publish to other
+programs, sort of like in Mac System 7.0. They are lisencing it out to
+any Amiga developer who pays a paltry sum to lisence it.
+
+
+File: comp.fonts.faq.info,  Node: X11 Information,  Next: Utilities,  Prev: Amiga Information,  Up: Top
+
+X11 Information
+***************
+
+This section needs a lot of work.  At the time of this release, I'm not
+in a position to write it so I'm leaving it basically blank.  Even if
+you don't have time to write it, if you know what should be in this
+section, please forward it to norm.
+
+* Menu:
+
+* Getting X11::
+* Historical Notes::
+* X11 Font Formats::
+* X11 Font Server::
+* Fonts and utilities for X11::
+
+
+File: comp.fonts.faq.info,  Node: Getting X11,  Next: Historical Notes,  Prev: X11 Information,  Up: X11 Information
+
+Getting X11
+***********
+
+The standard location for X software is export.lcs.mit.edu.
+
+
+File: comp.fonts.faq.info,  Node: Historical Notes,  Next: X11 Font Formats,  Prev: Getting X11,  Up: X11 Information
+
+Historical Notes about X11
+**************************
+
+The X Window System has been in widespread use through releases 3, 4,
+and now 5 of X Version 11.
+
+Fonts weren't really treated by the X Consortium very well until X11
+release 5 (X11R5).  In X11R3 and X11R4, the default format used by the X
+servers was called SNF (server normal format). Basically the font was
+formatted on disk in such a way that the X server could quickly read and
+use it (it was basically a memory-dump).  The important element of the
+SNF format is that it was not a portable format: it depended on the
+architecture of the machine running the server (little endian vs. big
+endian, for example) and as a consequence you needed different directory
+structures for different systems on your network.  On top of that,
+several systems vendors implemented their own font format, making font
+portability even more difficult.
+
+With X11R5, two things changed: the font service protocol was defined as
+a standard and interoperable way for an X server to obtain fonts
+(independent of their format, origin, or current location on disk) and
+the default format for storing fonts was changed from SNF to PCF
+(Portable Compiled Font).  PCF is a format originally developed by DEC.
+Its primary advantage is that it is not architecture dependent.  That
+is, if you compile a font to PCF format on different systems, then you
+may end up having two different PCF files, but each system will be able
+to read the other's file correctly.
+
+
+File: comp.fonts.faq.info,  Node: X11 Font Formats,  Next: X11 Font Server,  Prev: Historical Notes,  Up: X11 Information
+
+X11 Font Formats
+****************
+
+There are many different font formats that can play a role in an X11
+system configuration.  The following table summarizes some of the
+common formats:
+
+   * BDF
+
+     The Bitmap Distribution Format (BDF) is the standard format for
+     distribution of fonts. It is an ASCII format so it can easily be
+     edited it with your favourite editor or E-mailed to other users.
+     As the name suggests, it stores bitmap fonts only.
+
+     Another virtue of the BDF format is that most font format
+     converters convert to or from this format. Means if you want to go
+     from format A to format B, neither of which is BDF, then you are
+     likely to convert A to BDF, then BDF to B.
+
+     The BDF format is defined by Adobe.  A document describing the
+     format is available by ftp from Adobe's file server at
+     "ps-file-server@adobe.com".  It is also available in the standard X
+     distribution.  Look under ../X11R4(5)/mit/hardcopy/BDF.  This
+     document is also reproduced in any text describing the X standard.
+
+   * SNF
+
+     The Server Normal Format (SNF) is an older format for bitmap
+     fonts. The format is X Server and host dependent.  This means that
+     if you have two SNF files, their actual format may be different.
+     Also, if you have an "snftobdf" utility, it may not be able to
+     read font files from other systems.  Convert to BDF format before
+     you move it off the host system.
+
+     Snftobdf is one utility that can generate a BDF file from a SNF
+     file.  It was part of the X11R4 contrib release.  To compile under
+     X11R5, you need some of the X11R4 snf include files.
+
+   * PCF
+
+     The Portable Compiled Font (PCF) format is a binary format for
+     bitmap fonts.  The binary contains sufficient information to be
+     readable by other systems.
+
+   * PHIGS
+
+     These fonts are only applicable in PEX environments.  PHIGS fonts
+     don't really have any relationship to the normal X font mechanism.
+
+   * DWF
+
+     The DECWindows Fonts (DWF) are bitmap fonts.
+
+   * Intellifont
+
+     These are HP scalable fonts.
+
+   * PFA/PFB
+
+     These are Adobe Type 1 PostScript fonts.
+
+     They can be used in X11R5 based X servers and font servers because
+     IBM has donated a renderer for this format to the X Consortium.
+     The renderer can be found on the X11R5 contrib, and on
+     export.lcs.mit.edu.
+
+   * Speedo
+
+     This is a format from Bitstream, Inc. Bitstream has also donated a
+     font renderer to the X Consortium, and a couple of fonts.
+
+     I have been told that in order to use commercial fonts from
+     BitStream, you must patch the renderer somewhat to make it use the
+     right decryption code for the font.
+
+   * FB
+
+     These are Sun X11/NeWS format bitmap fonts used by the Sun
+     OpenWindows system.
+
+     You can use "convertfont" which comes with OpenWindows to convert
+     to/from BDF.
+
+   * F3/F3B
+
+     This is the scalable Sun Folio format, also used by OpenWindows.
+
+     You can use "convertfont" to convert to (not from) BDF.
+
+
+File: comp.fonts.faq.info,  Node: X11 Font Server,  Next: Fonts and utilities for X11,  Prev: X11 Font Formats,  Up: X11 Information
+
+X11 Font Server Information
+***************************
+
+With X11 Release 5, the X Consortium has created a network-based
+standard font protocol. As a user of the X Window System, you have an X
+server on your desktop, which does the interface between the hardware
+(screen, mouse, keyboard), and the X network protocol. This X server
+needs fonts.  Before X11r5, the only way it could get to those fonts
+was to make font directories readable for the X server on that host,
+either by NFS-mounting or by copying.
+
+With the X Font Service protocol, you just tell your X server that it
+must use the services of a font server, which is a daemon process
+sitting on a host on your network. The font server is a program which
+talks a standardized protocol on the network, and which is capable of
+reading several font formats.
+
+The font server sources are modular, such that it is easy to add a
+renderer for an additional font format to the existing code. This is
+obviously also the intention: the X Consortium provides the core
+technology, and supposes that all systems vendors will add font
+renderers for their proprietary formats to the code, and then ship that
+to their customers.
+
+If you have a multi-vendor environment, then you are supposed to run a
+font server on every host that carries the font files. Then all of the
+X servers on your network can put all the fonts they need in their font
+path. Automatically, IBM fonts will be requested from the font server
+on an IBM host, DEC fonts from a DEC host, etc.
+
+Other benefits of using font server technology include the ability of
+the font server to implement caching, provide for fault-tolerant setup,
+etc.
+
+A final example of the good use of the font server is the combination
+of a font server with a Type 1 font renderer. As mentioned above, IBM
+donated a Type 1 font renderer which can easily be built into the X
+font server. As the Type 1 font format, and the ATM format are the same,
+it is perfectly possible to use commercial ATM fonts with the X Window
+System.
+
+
+File: comp.fonts.faq.info,  Node: Fonts and utilities for X11,  Prev: X11 Font Server,  Up: X11 Information
+
+Fonts and utilities for X11
+***************************
+
+Here's a quick list of possible steps to get from "what you got" to X:
+
+   * Mac format bitmaps:
+
+     No idea.  If you know how to read a Mac format bitmap file on some
+     other platform, please tell norm.
+
+   * PC format bitmaps:
+
+     Conversion to BDF is possible from TeX PK format and LaserJet
+     softfont format.  Other conversions are also within the realm of
+     possibility.  Feel free to ask norm for more information if you
+     have a specific conversion in mind.
+
+   * TeX PK format bitmaps:
+
+     PKtoBDF gets us directly to BDF format from here.
+
+   * Mac format postscript:
+
+     Under MS-DOS, conversion to PC format postscript allows the font to
+     be accessed with PS2PK (under *nix or MS-DOS).  See above for TeX
+     PK to X conversions.
+
+   * PC/Unix format PostScript
+
+     Conversion to TeX PK with PS2PK allows you to get to BDF
+     (indirectly).
+
+   * XtoBDF, getbdf, FStoBDF
+
+     XtoBDF and getbdf are two public-domain applications which are
+     capable of asking an X server to give them all it knows about a
+     given font. They then print the BDF representation of that font on
+     stdout.
+
+     You can use these if you have an X server that can read some font
+     file, but nothing else can.
+
+     FStoBDF is distributed with X11R5.
+
+     If you use one of these programs, you may actually be converting a
+     scalable font into a bitmap font, but converting a bitmap font to a
+     scalable one is not currently possible.
+
+
+File: comp.fonts.faq.info,  Node: Utilities,  Next: Vendor Information,  Prev: X11 Information,  Up: Top
+
+Utilities
+*********
+
+I have just started collecting information about font utilities.  I
+will gladly add any information that you can pass my way.  Please send
+your submissions to norm.
+
+I would appreciate it if you could include a paragraph or so of
+description and the appropriate site/filename for retrieval.
+
+* Menu:
+
+* PS2PK::
+* TeX Utilities::
+* MFPic::
+* fig2MF::
+* GNU font utilities::
+* Font editors::
+* t1utils::
+* Bitmap fonts::
+* xxx Converting between font formats::
+* Getting fonts by FTP and mail::
+* MetaFont to PS conversion::
+* MetaFont with Troff?::
+* PKtoBDF / MFtoBDF::
+* PKtoPS::
+* PKtoSFP / SFPtoPK::
+* PostScript to MetaFont::
+* Mac Bitmaps to BDF Format::
+
+
+File: comp.fonts.faq.info,  Node: PS2PK,  Next: TeX Utilities,  Up: Utilities
+
+PS2PK
+*****
+
+PS2PK is a utility for converting Type1 postscript fonts into TeX PK
+files.  The source code is distributed and it has been compiled for
+both *nix boxes and MS-DOS based machines.
+
+Here is the original announcement:
+
+                          Ps2pk-1.2 available
+                          -------------------
+                               (June 1992)
+     
+     Version 1.2 of ps2pk is now available on:
+     ftp.urc.tue.nl (address: 131.155.2.79)
+     directory:    /pub/tex
+     files:        ps2pk12.README         (  1k)    This file
+                   ps2pk12.tar.Z          (391k)    Sources
+                   ps2pk386.zip           (232k)    MSDOS executables
+                   utopia.tar.Z           (342k)    Adobe Utopia font family
+                   courier.tar.Z          (207k)    IBM Courier font family
+     
+     For people having difficulties in handling UNIX `.tar.Z' format I
+     have made some UNIX tools (only executables) available in:
+     directories:  /pub/unixtools/dos
+                   /pub/unixtools/vms
+     
+     See the system specific TARZ file for some help.
+     
+     Ftp.urc.tue.nl can not handle E-mail requests. But sites are free
+     to put the ps2pk12 stuff on any server that can.
+
+When do you need ps2pk?
+=======================
+
+Ps2pk is a tool that converts a PostScript type1 font into a corres-
+ponding TeX PK font.  The tool is especially interesting if you want to
+use fully hinted type1 fonts in your DVI previewer (instead of the
+unhinted type1 fonts currently used in GhostScript) or on a printer
+that has no PostScript interpreter.
+
+In order to use the ps2pk generated fonts your driver and previewer need
+to support virtual fonts.  The reason is that PostScript fonts and TeX
+fonts do have a different font encoding and handle ligatures in a
+different way.  With virtual fonts the PostScript world (encoding +
+ligatures) can be mapped to the old style TeX world on which the current
+plain macro packages still are based (despite the fact that TeX3.0 can
+handle 8bits).
+
+It is also possible to use the ps2pk generated PK fonts directly
+
+In addition, a modified version of PS2PK exists on ibis.cs.umass.edu.  I
+have added some hacks to better support really large renderings and a
+primitive "range" facility.
+
+
+File: comp.fonts.faq.info,  Node: TeX Utilities,  Next: MFPic,  Prev: PS2PK,  Up: Utilities
+
+TeX Utilities
+*************
+
+There are many TeX font utilities.  For TeX related questions, I direct
+you to comp.text.tex or the Info-TeX mailing list.  I will happily list
+any utilities here that the comp.fonts public feels should be present.
+I am listing MetaFont because it is the obvious font-specific component
+of TeX and PKtoSFP because it allows anyone to use PS2PK to create
+LaserJet softfonts.
+
+Liam R. E. Quin is the original author of the MetaFont section.  It has
+been hacked at a bit by norm to make it fit the tone of the comp.fonts
+FAQ.  Assume that norm is responsible for any errors, not Liam.
+
+MetaFont
+========
+
+About MetaFont:
+---------------
+
+Metafont is a programming language for describing fonts.  It was
+written by Donald Knuth and is documented in
+
+       Computers & Typesetting/C: The METAFONTbook
+       Knuth, Donald E.
+       Addison Wesley, 1986
+       ISBN 0-201-13445-4, or 0-201-13444-6 (soft cover)
+       Library access: Z250.8.M46K58, or 686.2'24, or 85-28675.
+
+A font written in MetaFont is actually a computer program which, when
+run, will generate a bitmap (`raster') for a given typeface at a given
+size, for some particular device.
+
+What do you need in order to use the fonts:
+-------------------------------------------
+
+You cannot print the MetaFont fonts directly (unless you want a listing
+of the program, that is).  Instead, you must generate a bitmap font and
+use that to print something.
+
+If you are using TeX, the sequence of steps is something like this:
+
+MF to MetaFont to GF
+     Convert a MetaFont program into a bitmapped font.  Also produces a
+        TFM file.
+
+MF to MetaFont to TFM
+     Covnert a MetaFont program into a TFM file.  Also produces     a
+     GF bitmapped font.
+
+GF to GFtoPK to PK
+     Convert a GF bitmapped font into a compressed PK font.
+
+TEX + TFM to TeX to DVI
+     Produce a device independent output file.
+
+DVI + PK to dvi driver to output format
+     Produce a device-specific output file (or preview).
+
+The above steps are idealized.  In reality, you have to make sure that
+the fonts get installed in the correct places and you may have to
+adjust description files, etc.  The friendly folks on comp.text.tex can
+probably get it staightened out for you if you can't find a local guru.
+
+If you are not using TeX, it's almost impossible to predict.  At some
+point in the above sequence, you'll insert some other conversion
+program and proceed differently.  Here, for example, is how you might
+use TeX fonts with WordPerfect and a LaserJet printer.
+
+PK to PKtoSFP to SFP
+     Convert a TeX PK file into an HP LaserJet softfont.
+
+SFP to SFP2Auto to TFM
+     Make HP AutoFont Tagged Font Metric file.
+
+SFP + HP AutoFont TFM to PTR to Installed in WP
+     Install the new font in WordPerfect.
+
+Use WordPerfect as you normally would.
+
+
+File: comp.fonts.faq.info,  Node: MFPic,  Next: fig2MF,  Prev: TeX Utilities,  Up: Utilities
+
+MFPic
+*****
+
+MFpic is a macro package for including pictures in TeX documents.  The
+idea behind this package is to have Metafont do the actual drawing, and
+store the pictures in a font that TeX can include in the document.  The
+macros have been designed so that the user should never have to learn
+Metafont to use these macros--the TeX macros actually write the
+Metafont file for you.
+
+
+File: comp.fonts.faq.info,  Node: fig2MF,  Next: GNU font utilities,  Prev: MFPic,  Up: Utilities
+
+fig2MF
+******
+
+Briefly, fig2MF uses the mfpic macros to create formatted, commented MF
+code from the fig graphics language. This means that programs like xfig
+can be used as interactive font creation tools. I wrote fig2MF so that
+I could portably illustrate TeX documents, but I suppose one could use
+it to design letterforms as well.
+
+The package consists of a single C source code file, modified mfpic
+macros, documentation, and sample fig files.  It is available at the
+shsu archives.
+
+
+File: comp.fonts.faq.info,  Node: GNU font utilities,  Next: Font editors,  Prev: fig2MF,  Up: Utilities
+
+GNU Font Utilities
+******************
+
+Here is a brief description of the programs included:
+
+   * imageto extracts a bitmap font from an image in PBM or IMG format,
+     or   converts the image to Encapsulated PostScript.
+
+   * xbfe is a hand-editor for bitmap fonts which runs under X11.
+
+   * charspace adds side bearings to a bitmap font.
+
+   * limn fits outlines to bitmap characters.
+
+   * bzrto converts a generic outline font to Metafont or PostScript.
+
+   * gsrenderfont renders a PostScript outline font at a particular
+     point   size and resolution, yielding a bitmap font.
+
+   * fontconvert can rearrange or delete characters in a bitmap font,
+     filter them, split them into pieces, combine them, etc., etc.
+
+   * imgrotate rotates or flips an IMG file.
+
+We need volunteers to help create fonts for the GNU project.  You do not
+need to be an expert type designer to help, but you do need to know
+enough about TeX and/or PostScript to be able to install and test new
+fonts.  Example: if you know neither (1) the purpose of TeX utility
+program `gftopk' nor (2) what the PostScript `scalefont' command does,
+you probably need more experience before you can help.
+
+If you can volunteer, the first step is to compile the font utilities.
+After that, contact me [ed: Karl Berry] (karl@gnu.ai.mit.edu).  I will
+get you a scanned type specimen image.  The manual explains how to use
+these utilities to turn that into a font you can use in TeX or
+PostScript.
+
+You can get the source by ftp from any GNU archive site.
+
+You can also order tapes with GNU software from the Free Software
+Foundation (thereby supporting the GNU project); send mail to
+gnu@prep.ai.mit.edu for the latest prices and ordering information, or
+retrieve the file DISTRIB from a GNU archive.
+
+
+File: comp.fonts.faq.info,  Node: Font editors,  Next: t1utils,  Prev: GNU font utilities,  Up: Utilities
+
+Font Editors
+************
+
+   * Editors for BDF fonts
+
+     There is a bdf font editor that comes with HP/Apollo workstations.
+     It's called 'edfont'.  It's not the best but it works.
+
+     Gary reports:
+
+     The standard X distribution for X11R5 contains "xfed", which
+     allows you to play with BDF fonts.  "xfedor" has a more elaborate
+     user interface, and is available on most contrib directories.
+
+     The last time I tried:
+
+     "xfedor" couldn't handle BDF files with more than 256 characters.
+
+     "xfed" aborts if the BDF file contains a COMMENT line with no other
+     text.  The workaround is to edit the BDF file, to put text after
+     the word COMMENT.  A single blank space is sufficient.  For some
+     reason, the standard BDF files included in the X release contain
+     blank spaces on the otherwise empty COMMENT lines.  It was
+     probably easier to add the space to the COMMENT lines of every BDF
+     file than it was to fix the lex code for xfed.  :-)
+
+   * Editors for PK fonts
+
+     The GNU font utilities include an X-based editor called Xbfe which
+     edits bitmapped fonts under X.
+
+     Eberhard Mattes' emTeX includes PKedit.
+
+
+File: comp.fonts.faq.info,  Node: t1utils,  Next: Bitmap fonts,  Prev: Font editors,  Up: Utilities
+
+The T1 Utilities
+****************
+
+This is a snippet from the README file for I. Lee Hetherington's
+t1utils package:
+
+t1utils is a collection of simple type-1 font manipulation programs.
+Together, they allow you to convert between PFA (ASCII) and PFB
+(binary) formats, disassemble PFA or PFB files into human-readable
+form, reassemble them into PFA or PFB format.  Additionally you can
+extract font resources from a Macintosh font file (ATM/Laserwriter).
+
+
+File: comp.fonts.faq.info,  Node: Bitmap fonts,  Next: xxx Converting between font formats,  Prev: t1utils,  Up: Utilities
+
+Where to get bitmap versions of the fonts
+*****************************************
+
+There are archives containing the bitmaps of many of these fonts at
+various sizes and resolutions.  The fonts must have been generated for
+the correct print engine: e.g. write-white or write-black.  The
+archives generally hold only the sizes used by TeX.  These are
+`magstep' sizes, and are not exact point sizes.  It is probably better
+to generate them from the Metafont sources yourself if you can.
+
+The best place to look for raster fonts was almost certainly:
+mims-iris.waterloo.edu
+
+but it isn't any more, the fonts have all gone.  Let me know if you
+find them elsewhere.  Most people seem to have moved to using
+PostScript fonts or Bitstream ones instead now.
+
+Some other sites are:
+
+       ctrsci.math.utah.edu (128.110.198.1)
+       science.utah.edu (128.110.192.2)
+       ymir.claremont.edu (134.173.4.23)
+
+The occasional posting of ftp sites to comp.misc and comp.archives
+lists these and several other sites.
+
+
+File: comp.fonts.faq.info,  Node: xxx Converting between font formats,  Next: Getting fonts by FTP and mail,  Prev: Bitmap fonts,  Up: Utilities
+
+Converting between font formats
+*******************************
+
+Conversions to and from pbm and pk format were posted to comp.text.tex
+and to alt.sources on the 9th of August, 1990 by Angus Duggan.  The
+program is pbmtopk, and there are also at least two patches.
+
+Chris Lewis' psroff package includes a program to go from pk both to
+the HP LaserJet and to PostScript.
+
+John McClain <ophelp@tamvenus.bitnet> has some conversion programs for
+various graphics formats to/and from pk files.
+
+A PC program, CAPTURE, turns HPGL files into PK format, US$130 from
+Micro Programs Inc., 251 Jackson Ave., Syosset, NY 11791 U.S.A.
+
+Metaplot can take pen-plotter files and prouce metafont files.  Note:
+Pat Wilcox is no longer at Ohio State.
+
+Kinch Computer Company sell .pk fonts derived from PostScript fonts.
+Kinch Computer Co., 501 S. Meadow St.Ithaca, NY 14850 U.S.A.
+telephone: +1 607 273 0222; fax: +1 607 273 0484
+
+
+File: comp.fonts.faq.info,  Node: Getting fonts by FTP and mail,  Next: MetaFont to PS conversion,  Prev: xxx Converting between font formats,  Up: Utilities
+
+Getting fonts by FTP and Mail
+*****************************
+
+If you are using ftp, you will need either the name of the host or the
+Internet number.  For example, to connect to ymir, listed as ftp:
+ymir.claremont.edu [134.173.4.23] you will need to type something like
+
+                        ftp ymir.claremont.edu
+
+If that doesn't work, try using the number:
+
+                           ftp 134.173.4.23
+
+If that doesn't work, on Unix systems you can use nslookup (it's
+usually /usr/etc/nslookup) to find the host number - it might have
+changed.  Type the entire host name, and after a few seconds nslookup
+will give you the address.  Of course, if you have nslookup installed,
+the first form will probably work...
+
+Once you have connected, you will need to go to the appropriate
+directory, lists its contents, and retrieve the files.
+
+Most of the machines listed here run Unix, and you use "ls" and "cd" to
+list files and to change directories.  Ymir runs VMS, and you will have
+to put square brackets around directory names, like [this].
+
+Remember that although Metafont sources are text files, pk fonts are
+not ASCII, and you will have to use binary mode for them.  In general,
+use text mode for README files and *.mf files, and binary mode for
+other font files.  Files ending in .Z are compressed binary files - you
+will need to use binary mode, and then uncompress the files when you
+get them.
+
+You can get files from ymir by sending mail messages to
+
+                      mailserv@ymir.claremont.edu
+
+For example,
+
+                     send [tex.mf.misc]cmapl10.mf
+
+will get the file cmapl10.mf from the directory "tex.mf.misc".  You
+can't get binary files in this way.
+
+There is an ftp-by-mail BITNET service, BITFTP, for BITNET users.
+
+Before getting large files by mail, please remember to get permission
+from all intervening sites.  Ask your site administrator, who can send
+mail to Postmaster at each site on the way if necessary.
+
+
+File: comp.fonts.faq.info,  Node: MetaFont to PS conversion,  Next: MetaFont with Troff?,  Prev: Getting fonts by FTP and mail,  Up: Utilities
+
+MetaFont to PostScript Conversion
+*********************************
+
+There are (I believe) two programs that perform this task.  At least
+one of them is called "mf2ps".  If you have any more information about
+these tools, please let me know.
+
+Chang Jin-woong reports that he found the "mf2ps" package with Archie.
+It is written by Shimon Yanai <yanai@israearn.bitnet> and Daniel M.
+Berry <dberry@cs.technion.ac.il>. The source programs are written in
+Pascal.
+
+
+File: comp.fonts.faq.info,  Node: MetaFont with Troff?,  Next: PKtoBDF / MFtoBDF,  Prev: MetaFont to PS conversion,  Up: Utilities
+
+How to use Metafont fonts with Troff
+************************************
+
+If, when you run troff, you get the message `typesetter busy', you have
+the original Ossanna-troff, also called otroff.  Chris Lewis has a
+package which will let you use TeX fonts with troff - it's called
+psroff, and comes with documentation.
+
+       ftp: gatekeeper.dec.com (16.1.0.2) pub/misc/psroff-3.0
+       ftp: ftp.cs.toronto.edu [128.100.1.105] pub/psroff-3.0/*
+
+If, when you run troff, you get something like this:
+
+       x T 300
+       x res 300 1 1
+
+you have ditroff.  This is sometimes called titroff or psroff.  In this
+case, you will probably need to do the following:
+
+  1. convert the font to your printer's format
+
+  2. generate a width table for the font
+
+  3. add the font to the DESC file for the appropriate device
+
+  4. arrange for troff to download the font
+
+  5. tell troff about the font by running `makedev DESC' in the
+     right place.
+
+If, when you run troff, you get something like this:
+
+       X hp(SCM)(CM)(AF)(AD) 300 1 1
+       Y P default letter 2550 3300 0 0 90 90 2460 3210
+
+you have sqtroff:
+
+  1. convert the font to your printer's format
+
+  2. generate a width table for the font
+
+  3. add the font to the DESC file for the appropriate device
+
+  4. put the font in the appropriate raster directory
+
+  5. tell sqtroff about the font by running `sqmakedev DESC' or
+     `sqinstall'.
+
+In each case, you should be able to get help from your vendor.
+
+Note that Chris Lewis' psroff package has software to make width tables
+for troff from pk files.
+
+
+File: comp.fonts.faq.info,  Node: PKtoBDF / MFtoBDF,  Next: PKtoPS,  Prev: MetaFont with Troff?,  Up: Utilities
+
+PKtoBDF / MFtoBDF
+*****************
+
+From the SeeTeX distribution, programs to help previewers under X11.
+They convert TeX PK files into X11 BDF fonts (which can be further
+converted into one or more server native formats).
+
+
+File: comp.fonts.faq.info,  Node: PKtoPS,  Next: PKtoSFP / SFPtoPK,  Prev: PKtoBDF / MFtoBDF,  Up: Utilities
+
+PKtoPS
+******
+
+Included in the psroff distribution, this utility converts PK fonts
+into PostScript fonts (bitmaps, I presume).  If you have any more
+information about these tools, please let me know.
+
+
+File: comp.fonts.faq.info,  Node: PKtoSFP / SFPtoPK,  Next: PostScript to MetaFont,  Prev: PKtoPS,  Up: Utilities
+
+PKtoSFP / SFPtoPK
+*****************
+
+Convert fonts from TeX PK format to HP LaserJet softfont (bitmap)
+format.
+
+
+File: comp.fonts.faq.info,  Node: PostScript to MetaFont,  Next: Mac Bitmaps to BDF Format,  Prev: PKtoSFP / SFPtoPK,  Up: Utilities
+
+PostScript to MetaFont
+**********************
+
+ps2mf started out as a way of creating bitmaps via MF for TeX. Only,
+when I had just finished it, Piet Tutelaers came with ps2pk. This was a
+far superior way runtime-wise. He uses the IBM X11-R5 fontutilities
+library, which is extremely ugly code. But, it works. So, to generate
+bitmaps, I suggest everyone use ps2pk.
+
+To generate a MF outline description, ps2mf is *the* tool. Yannis
+Haralambous has just started a project where he wants to create
+meta-ized fonts for MF from Postscript descriptions. ps2mf does the
+basic conversion. This project wants to revive the use of MF for it is
+a truly beautiful program with enormous possiblities.
+
+The following information comes from the README file for ps2mf:
+
+This is pfb2mf. It is a copyleft program. See the file COPYING for more
+details. I suggest that for the translation of Type-One to readable
+PostScript you use I. Lee Hetherington's Type-1-Utils. You can find
+these somewhere on obelix.icce.rug.nl in pub/erikjan.
+
+If you find any bugs, please do report.
+
+If you have any complaints, please do report.
+
+Now for some info about the different stages. This package contains
+four programs:
+
+   * pfb2pfa
+
+   * pfa2chr
+
+   * chr2ps
+
+   * ps2mf
+
+pfb2pfa
+=======
+
+pfb2pfa will decompress an IBM (!) Postscript type 1 fontfile into
+readable           and downloadable hexadecimal data.
+
+The resulting file still contains two layers of encryption:
+
+   * eexec encryption
+
+   * charstring encryption
+
+pfa2chr
+=======
+
+pfa2chr will do an eexec-decryption of a readable hexadecimal font file
+to a   fontfile with encrypted charstrings.
+
+chr2ps
+======
+
+chr2ps will perform a charstring-decryption of a font file with
+encrypted   charstrings to fontfile with postscript commands for type 1
+fonts.
+
+With a "-" as filename, these programs will read from <stdin> and write
+to <stdout>. This way you can pipe the results, as in:
+
+       pfb2pfa garmnd - | pfa2chr - - | chr2ps - garmnd
+
+This will create a garmnd.ps from garmnd.pfb without explicitely
+creating the intermediate files.
+
+These previous stages can be replaced by (when using Lee Hetherington's
+type-1-utils):
+
+t1disasm garmnd.pfb garmnd.ps
+
+ps2mf
+=====
+
+This last stage will convert to a MetaFont program with the use of the
+corresponding .afm file and a mapping configuration file. It can
+convert   to an ordinary form with Bezier controlpoints. It can also
+generate a curl   specification. For this last option specifify -C.
+
+
+File: comp.fonts.faq.info,  Node: Mac Bitmaps to BDF Format,  Prev: PostScript to MetaFont,  Up: Utilities
+
+Mac Bitmaps to BDF Format
+*************************
+
+I [ed: who?] have posted a program which I hacked together for
+extracting all NFNT and FONT resources from a MacBinary form of a
+standard Mac file and dumping the fonts as Adobe BDF files.  It has only
+been compiled and tested on a Sun system to date.  It can be fetched
+from METIS.COM, /pub/mac2bdf.c.
+
+I wrote this tool to be able to use Mac Bitmaps under X Windows and
+OpenWindows (which take Adobe BDF format files).
+

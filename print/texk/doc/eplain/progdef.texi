@@ -1,0 +1,627 @@
+@c Copyright (C) 1992, 93, 94 Karl Berry.
+@c This is part of the Eplain manual.
+@c For copying conditions, see the file eplain.texi.
+
+@node Programming definitions
+@chapter Programming definitions
+
+The definitions in this section are only likely to be useful when you
+are writing nontrivial macros, not when writing a document.
+
+@menu
+* Category codes::              Changing category codes.
+* Allocation macros::           Non-outer versions of \newcount et al.
+* Iteration::                   Doing `for' loops in TeX.
+* Macro arguments::             Reading and ignoring them.
+* Converting to characters::    Normalizing control sequences and spaces.
+* Expansion::                   Controlling expansion.
+* Obeying spaces::              Making whitespace count anywhere.
+* Writing out numbers::         Making `1' into `one'.
+* Mode-specific penalties::     
+* Auxiliary files::             Testing for their existence.
+@end menu
+
+
+@node Category codes
+@section Category codes
+
+@cindex category codes
+
+Plain @TeX{} defines @code{\active} (as the number 13) for use in
+changing category codes.  Although the author of @cite{The @TeX{}book}
+@cindex Knuth, Donald Ervin
+has ``intentionally kept the category codes numeric'', two other
+categories are commonly used: letters (category code 11) and others
+(12).  Therefore, Eplain defines @code{\letter} and
+@code{\other}.
+@findex letter
+@findex other
+
+Sometimes it is cleaner to make a character active without actually
+@cindex active characters
+writing a @code{\catcode} command.  The @code{\makeactive} command takes
+@findex catcode
+@findex makeactive
+a character as an argument to make active (and ignores following
+spaces).  For example, here are two commands which both make @kbd{\}
+active:
+@cindex backslash character
+
+@example
+\makeactive`\\   \makeactive92
+@end example
+
+Usually, when you give a definition to an active character, you have
+to do so inside a group where you temporarily make the character active,
+and then give it a global definition (cf.@: the definition of
+@code{\obeyspaces} in @cite{The @TeX{}book}).
+@cindex definitions, global
+This is inconvenient if you are writing a long macro, or if the
+character already has a global definition you do not wish to transcend. 
+Eplain provides @code{\letreturn}, which defines the usual end-of-line
+@findex letreturn
+@cindex return character
+character to be the argument.  For example:
+
+@example
+\def\mymacro@{@dots{} \letreturn\myreturn @dots{} @}
+\mymacro hello
+there
+@end example
+
+The end-of-line between @samp{hello} and @samp{there} causes
+@code{\myreturn} to be expanded.
+
+@cite{The @TeX{}book} describes @code{\uncatcodespecials},
+@findex uncatcodespecials
+which makes all characters which are normally ``special'' into ``other''
+characters, but the definition never made it into plain @TeX{}. 
+Eplain therefore defines it.
+
+Finally, @code{\percentchar}
+@findex percentchar
+expands into a literal `%' character.  This is useful when you
+@code{\write} @TeX{} output to a file, and want to avoid spurious
+spaces.  For example, Eplain writes a @code{\percentchar} after the
+definition of cross-references.  The macros @code{\lbracechar}
+@findex lbracechar
+and @code{\rbracechar}
+@findex rbracechar
+expand similarly.
+
+
+@node Allocation macros
+@section Allocation macros
+
+@cindex allocation macros
+@cindex register allocation
+
+Plain @TeX{} provides macros that allocate registers of each primitive
+type in @TeX{}, to prevent different sets of macros from using the same
+register for two different things.  The macros are all named starting
+with @samp{new},
+@findex new@dots{}
+e.g., @code{\newcount} allocates a new ``count''
+(integer) register.  Such allocations are usually needed only at the top
+level of some macro definition file; therefore, plain @TeX{} makes the
+allocation registers @code{\outer},
+@findex outer
+to help find errors.  (The error this helps to find is a missing right
+brace in some macro definition.)
+
+Sometimes, however, it is useful to allocate a register as part of
+some macro.  An outer control sequence cannot be used as part of a macro
+definition (or in a few other contexts: the parameter text of a
+definition, an argument to a definition, the preamble of an alignment,
+or in conditional text that is being skipped).  Therefore, Eplain
+defines ``inner'' versions of all the allocation macros, named with the
+prefix @samp{inner}:
+@code{\innernewbox},
+@findex innernewbox
+@code{\innernewcount},
+@findex innernewcount
+@code{\innernewdimen},
+@findex innernewdimen
+@code{\innernewfam},
+@findex innernewfam
+@code{\innernewhelp},
+@findex innernewhelp
+@code{\innernewif},
+@findex innernewif
+@code{\innernewinsert},
+@findex innernewinsert
+@code{\innernewlanguage},
+@findex innernewlanguage
+@code{\innernewread},@*
+@findex innernewread
+@code{\innernewskip},
+@findex innernewskip
+@code{\innernewtoks},
+@findex innernewtoks
+@code{\innernewwrite}.
+@findex innernewwrite
+
+You can also define non-outer versions of other macros in the same way
+that Eplain defines the above.  The basic macro is called
+@code{\innerdef}:
+@findex innerdef
+
+@example
+\innerdef @var{\innername} @{@var{outername}@}
+@end example
+
+The first argument (@var{\innername}) to @code{\innerdef} is the
+control sequence that you want to define.  Any previous definition of
+@var{\innername} is replaced.  The second argument
+(@var{outername}) is the @emph{characters} in the name of the outer
+control sequence.  (You can't use the actual control sequence name,
+since it's outer!)
+
+If the outer control sequence is named @var{\cs}, and you want to
+define @code{inner@var{cs}} as the inner one, you can use
+@code{\innerinnerdef},
+@findex innerinnerdef
+which is just an abbreviation for a call to @code{\innerdef}.  For
+example, these two calls are equivalent:
+
+@example
+\innerdef\innerproclaim@{proclaim@}
+\innerinnerdef@{proclaim@}
+@end example
+
+
+@node Iteration
+@section Iteration
+
+@cindex iteration
+@cindex for loops
+
+You can iterate through a comma-separated list of items with
+@code{\for}.
+@findex for
+Here is an example:
+
+@example
+\for\name:=karl,kathy\do@{%
+   \message@{\name@}%
+@}%
+@end example
+
+This writes @samp{karl} and @samp{kathy} to the terminal.  Spaces
+before or after the commas in the list, or after the @code{:=}, are
+@emph{not} ignored.
+
+@code{\for} expands the iterated values fully (with @code{\edef}), so
+this is equivalent to the above:
+
+@example
+\def\namelist@{karl,kathy@}%
+\for\name:=\namelist\do @dots{}
+@end example
+
+
+@node Macro arguments
+@section Macro arguments
+
+@cindex arguments, ignoring
+@cindex ignoring arguments
+@cindex gobbling arguments
+It is occasionally useful to redefine a macro that takes arguments to
+do nothing.  Eplain defines @code{\gobble},
+@findex gobble
+@code{\gobbletwo},
+@findex gobbletwo
+and @code{\gobblethree} to swallow one, two, and three arguments,
+respectively.
+
+For example, if you want to produce a ``short'' table of
+@cindex table of contents, short
+contents---one that includes only chapters, say---the easiest thing to
+do is read the entire @code{.toc} file (@pxref{Contents}), and just
+ignore the commands that produce section or subsection entries.  To be
+specific:
+
+@example
+\let\tocchapterentry = \shorttocchapter
+\let\tocsectionentry = \gobbletwo
+\let\tocsubsectionentry = \gobbletwo
+\readtocfile
+@end example
+@noindent (Of course, this assumes you only have chapters, sections, and
+subsections in your document.)
+
+In addition, Eplain defines @code{\eattoken}
+@findex eattoken
+to swallow the single following token, using @code{\let}.  Thus,
+@code{\gobble} followed by @samp{@{@dots{}@}} ignores the entire
+brace-enclosed text.  @code{\eattoken} followed by the same ignores only
+the opening left brace.
+
+Eplain defines a macro @code{\identity}
+@findex identity
+which takes one argument and expands to that argument.  This may be
+useful if you want to provide a function for the user to redefine, but
+don't need to do anything by default.  (For example, the default
+definition of @code{\eqconstruct} (@pxref{Formatting equation
+references}) is @code{\identity}.)
+
+You may also want to read an optional argument.  The established
+convention is that optional arguments are put in square brackets, so
+that is the syntax Eplain recognizes.  Eplain ignores space tokens
+before an optional argument, via @code{\futurenonspacelet}.
+
+You test for an optional argument by using @code{\@@getoptionalarg}.
+@c this confuses texinfo.tex: findex @@getoptionalarg
+It takes one argument, a control sequence to expand after reading the
+argument, if present.  If an optional argument is present, the control
+sequence @code{\@@optionalarg} expands to it; otherwise,
+@code{\@@optionalarg} is @code{\empty}.  You must therefore have the
+category code of @kbd{@@} set to 11 (letter).  Here is an example:
+
+@example
+\catcode`@@=\letter
+\def\cmd@{\@@getoptionalarg\finishcmd@}
+\def\finishcmd@{%
+  \ifx\@@optionalarg\empty
+    % @r{No optional argument present.}
+  \else
+    % @r{One was present.}
+  \fi
+@}
+@end example
+
+If an optional argument contains another optional argument, the inner
+one will need to be enclosed in braces, so @TeX{} does not mistake the
+end of the first for the end of the second.
+
+
+@node Converting to characters
+@section Converting to characters
+
+@cindex characters, converting to
+Eplain defines  @code{\xrlabel}.
+@findex xrlabel
+to produce control sequence names for cross-reference labels, et al.
+This macro expands to its argument with an @samp{_} appended.  (It does
+this because the usual use of @code{\xrlabel} is to generate a control
+sequence name, and conflicts between control sequence names would lead
+to obscure bugs.)
+
+Because @code{\xrlabel} is fully expandable, to make a control
+sequence name out of the result you need only do
+@example
+@code{\csname \xrlabel@{@var{label}@}\endcsname}
+@end example
+
+@noindent The @code{\csname} primitive makes a control sequence name out
+of any sequence of character tokens, regardless of category code.
+Labels can therefore include any characters except for @samp{\},
+@samp{@{}, @samp{@}}, and @samp{#}, all of which are used in macro
+definitions themselves.
+
+@findex sanitize
+@code{\sanitize} takes a control sequence as an argument and converts
+the expansion of the control sequence into a list of character tokens.
+This is the behavior you want when writing information like chapter
+titles to an output file.  For example, here is part of the definition
+of @code{\writenumberedtocentry}; @code{#2} is the title that the user
+has given.
+
+@example
+@dots{}
+\def\temp@{#2@}%
+@dots{}
+  \write\tocfile@{%
+    @dots{}
+    \sanitize\temp
+    @dots{}
+  @}%
+@end example
+
+
+@node Expansion
+@section Expansion
+
+This section describes some miscellanous macros for expansion, etc.
+
+@menu
+* \csn and \ece::               Abbreviations for \csname expansions.
+* \edefappend::                 
+* Hooks::                       Manipulating and executing named actions.
+* Properties::                  Associating information with a csname.
+* \expandonce::                 
+* \ifundefined::                
+* \futurenonspacelet::          
+@end menu
+
+
+@node \csn and \ece
+@subsection @code{\csn} and @code{\ece}
+
+@findex csn
+@code{\csn}@{@var{name}@} simply abbreviates @code{\csname} @var{name}
+@code{\encsname}, thus saving some typing.  The extra level of expansion
+does take some time, though, so I don't recommend it for an inner loop.
+
+@findex ece
+@code{\ece}@{@var{token}@}@{@var{name}@} abbreviates
+
+@example
+\expandafter @var{token} \csname @var{name} \endcsname
+@end example
+
+@noindent For example,
+
+@example
+\def\fontabbrevdef#1#2@{\ece\def@{@@#1font@}@{#2@}@}
+\fontabbrevdef@{normal@}@{ptmr@}
+@end example
+
+@noindent defines a control sequence @code{\@@normalfont} to expand to
+@code{ptmr}.
+
+
+@node \edefappend
+@subsection @code{\edefappend}
+
+@findex edefappend
+@code{\edefappend} is a way of adding on to an existing definition.  It
+takes two arguments: the first is the control sequence name, the second
+the new tokens to append to the definition.  The second argument is
+fully expanded (in the @code{\edef} that redefines the control sequence).
+
+For example:
+
+@example
+\def\foo@{abc@}
+\def\bar@{xyz@}
+\edefappend\foo@{\bar karl@}
+@end example
+
+@noindent results in @code{\foo} being defined as @samp{abcxyzkarl}.
+
+
+@node Hooks
+@subsection Hooks
+
+@cindex hooks
+A @dfn{hook} is simply a name for a group of actions which is executed
+in certain places---presumably when it is most useful to allow
+customization or modification.  @TeX{} already provides many builtin
+hooks; for example, the @code{\every @dots{}} token lists are all
+examples of hooks.
+
+Eplain provides several macros for adding actions to hooks.  They all
+take two arguments: the name of the hook and the new actions.
+
+@table @code
+
+@findex hookaction
+@itemx hookaction @var{name} @var{actions}
+@findex hookappend
+@itemx hookappend @var{name} @var{actions}
+@findex hookprepend
+@item hookprepend @var{name} @var{actions}
+Each of these adds @var{actions} to the hook @var{name}.  (Any
+previously-defined actions are retained.)  @var{name} is not a control
+sequence, but rather the characters of the name.
+
+@findex hookactiononce
+@item hookactiononce @var{name} @code{\@var{cs}}
+@code{\hookactiononce} adds @var{cs} to @var{name}, like the macros
+above, but first it adds
+
+@example
+\global\let @var{\cs} \relax
+@end example
+
+@noindent to the definition of @var{\cs}.  (This implies @var{\cs} must
+be a true expandable macro, not a control sequence @code{\let} to a
+primitive or some other such thing.)  Thus, @var{\cs} is expanded the
+next time the hook @var{name} is run, but it will disappear after that.
+
+The @code{\global} is useful because @code{\hookactiononce} is most
+useful when the grouping structure of the @TeX{} code could be anything.
+Neither this nor the other hook macros do global assignments to the hook
+variable itself, so @TeX{}'s usual grouping rules apply.
+@end table
+
+@findex hookrun
+The companion macro to defining hook actions is @code{\hookrun}, for
+running them.  This takes a single argument, the name of the hook.  If
+no actions for the hook are defined, no error ensues.
+
+Here is a skeleton of general @code{\begin} and @code{\end} macros that
+run hooks, and a couple of calls to define actions.  The use of
+@code{\hookprepend} for the begin action and @code{\hookappend} for the
+end action ensures that the actions are executed in proper sequence with
+other actions (as long as the other actions use @code{\hookprepend} and
+@code{\hookappend} also).
+
+@example
+\def\begin#1@{ @dots{} \hookrun@{begin@} @dots{} @}
+\def\end#1@{ @dots{} \hookrun@{end@} @dots{} @}
+\hookprepend@{begin@}\start_underline
+\hookappend@{end@}\finish_underline
+@end example
+
+
+@node Properties
+@subsection Properties
+
+@cindex properties
+@cindex atom
+A @dfn{property} is a name/value pair associated with another symbol,
+traditionally called an @dfn{atom}.  Both atom and property names are
+control sequence names.
+
+Eplain provides two macros for dealing with property lists:
+@code{\setproperty} and @code{\getproperty}.
+
+@table @code
+
+@findex setproperty
+@item \setproperty @var{atom} @var{propname} @var{value}
+@code{\setproperty} defines the property @var{property} on the atom
+@var{atom} to be @var{value}.  @var{atom} and @var{propname} can be
+anything acceptable to @code{\csname}.  @var{value} can be anything.
+
+@findex getproperty
+@item \getproperty @var{atom} @var{propname}
+@code{\getproperty} expands to the value stored for @var{propname} on
+@var{atom}.  If @var{propname} is undefined, it expands to nothing
+(i.e., @code{\empty}).
+
+@end table
+
+The idea of properties originated in Lisp (I believe).  There, the
+implementation truly does associate properties with atoms.  In @TeX{},
+where we have no builtin support for properties, the association is only
+conceptual.
+
+The following example typesets @samp{xyz}.
+
+@example
+\setproperty@{a@}@{pr@}@{xyz@}
+\getproperty@{a@}@{pr@}
+@end example
+
+
+@node \expandonce
+@subsection @code{\expandonce}
+
+@cindex expansion, one-level 
+@findex expandonce
+@code{\expandonce} is defined as @code{\expandafter\noexpand}.  Thus, 
+@code{\expandonce @var{token}} expands @var{token} once, instead of to
+@TeX{} primitives.  This is most useful in an @code{\edef}.  
+
+For example, the following defines @code{\temp} to be @code{\foo}, not
+@samp{abc}.
+
+@example
+\def\foo@{abc@}
+\def\bar@{\foo@}
+\edef\temp@{\expandonce\bar@}
+@end example
+
+
+@node \ifundefined
+@subsection @code{\ifundefined}
+
+@findex ifundefined
+@code{\ifundefined@{@var{cs}@} @var{t} \else @var{f} \fi} expands the
+@var{t} text if the control sequence @code{\@var{cs}} is undefined or
+has been @code{\let} to @code{\relax}, and the @var{f} text otherwise.
+
+@cindex skipping tokens
+@cindex undefined control sequence, checking for
+Since @code{\ifundefined} is not a primitive conditional, it cannot be
+used in places where @TeX{} might skip tokens ``at high speed'', e.g.,
+within another conditional---@TeX{} can't match up the @code{\if}'s and
+@code{\fi}'s.
+
+This macro was taken directly from @cite{The @TeX{}book}, page 308.
+
+
+@node \futurenonspacelet
+@subsection @code{\futurenonspacelet}
+
+@cindex lookahead without spaces
+@cindex spaces, ignoring
+@findex futurenonspacelet
+The @code{\futurelet} primitive allows you to look at the next token
+from the input.  Sometimes, though, you want to look ahead ignoring any
+spaces.  This is what @code{\futurenonspacelet} does.  It is otherwise
+the same as @code{\futurelet}: you give it two control sequences as
+arguments, and it assigns the next nonspace token to the first, and then
+expands the second.  For example:
+
+@example
+\futurenonspacelet\temp\finishup
+\def\finishup@{\ifx\temp @dots{}@}
+@end example
+
+
+@node Obeying spaces
+@section Obeying spaces
+
+@cindex whitespace
+@cindex spaces, obeying
+@cindex newlines, obeying
+@findex obeywhitespace
+
+@code{\obeywhitespace} makes both end-of-lines and space characters in
+the input be respected in the output.  Unlike plain @TeX{}'s
+@code{\obeyspaces}, even spaces at the beginnings of lines turn into
+blank space.
+
+By default, the size of the space that is produced by a space
+character is the natural space of the current font, i.e.,
+what @code{\ } produces.
+
+Ordinarily, a blank line in the input produces as much blank vertical
+space as a line of text would occupy.  You can adjust this by assigning
+to the parameter @code{\blanklineskipamount}:
+@findex blanklineskipamount @r{in obeyed text}
+if you set this negative, the space produced by a blank line will be
+smaller; if positive, larger.
+
+Tabs are not affected by this routine.  In particular, if tabs occur
+at the beginning of a line, they will disappear.  (If you are trying to
+make @TeX{} do the ``right thing'' with tabs, don't.  Use a utility
+program like @i{expand} instead.)
+@cindex tabs
+
+
+@node Writing out numbers
+@section Writing out numbers
+
+@cindex numbers, written form of
+   @code{\numbername}
+@findex numbername
+produces the written-out form of its argument, i.e., `zero' through
+`ten' for the numbers 0--10, and numerals for all others.
+
+
+@node Mode-specific penalties
+@section Mode-specific penalties
+
+@TeX{}'s built-in @code{\penalty} command simply appends to the
+current list, no matter what kind of list it is.  You might intend a
+particular penalty to always be a ``vertical'' penalty, however, i.e.,
+appended to a vertical list.  Therefore, Eplain provides
+@code{\vpenalty}
+@findex vpenalty
+and @code{\hpenalty}
+which first leave the other mode and then do @code{\penalty}.
+
+More precisely, @code{\vpenalty} inserts @code{\par} if the current
+mode is horizontal, and @code{\hpenalty} inserts @code{\leavevmode} if
+the current mode is vertical.  (Thus, @code{\vpenalty} cannot be used in
+math mode.)
+
+
+@node Auxiliary files
+@section Auxiliary files
+
+@cindex axuiliary files, existence of
+It is common to write some information out to a file to be used on a
+subsequent run.  But when it is time to read the file again, you only
+want to do so if the file actually exists.  @code{\testfileexistence}
+@findex testfileexistence
+is given an argument which is appended to @code{\jobname},
+@findex jobname
+and sets the conditional @code{\iffileexists}
+@findex iffileexists
+@findex fileexists @r{(conditional)}
+appropriately.
+
+For example:
+
+@example
+\testfileexistence@{toc@}%
+\iffileexists
+   \input \jobname.toc
+\fi
+@end example

@@ -1,0 +1,81 @@
+#!/bin/sh
+#
+# This script make a new METAFONT cm*.mf or dc*.mf file
+# because one wasn't found.  Usage
+#
+# MakeTeXMF name
+#
+# `name' is the name of the font file, such as `cmr10'
+#
+# This file need the sauter font system and the dc fonts
+#
+# Of course this need to be customized to your site
+MFDIR=/home/estwk1/pnoma/lib/mf
+DESTDIR=$MFDIR/macros/tmp
+SAUTERDIR=/home/estwk1/pnoma/src/tex/fonts/sauter
+DCDIR=/home/estwk1/pnoma/src/tex/fonts/dc
+
+NAME=`echo $1 | sed 's/\.mf$//'`
+
+umask 0
+
+MFNAME=$NAME.mf
+
+# Which type of font is this?
+case $NAME in
+  cm*) font=cm;;
+  dc*) font=dc;;
+  *) font=other;;
+esac
+
+if test -r $DESTDIR/$MFNAME
+then
+   echo "$DESTDIR/$MFNAME already exists!"
+   exit 0
+fi
+
+# check also in the standard place
+
+if test -r /usr/local/lib/mf/inputs/$MFNAME
+then
+   echo /usr/local/lib/mf/inputs/$MFNAME already exists!
+   exit 0
+fi
+
+if test $font = cm; then
+  # The font is CM.  Try Sauter's scripts.
+  cd $SAUTERDIR
+  pwd
+  rootfont=`echo $NAME | sed 's/[0-9]*$//'`
+  pointsize=`echo $NAME | sed 's/cm[a-z]*//'`
+  make-mf $rootfont $pointsize
+  echo "Trying interpolated/extrapolated (Sauter) CM source." 1>&2
+  # Install the MF file carefully, since others may be doing the same
+  # as us simultaneously.
+
+  chmod 644 mf/$MFNAME
+  mv mf/$MFNAME $DESTDIR/mftmp.$$
+  cd $DESTDIR
+  mv mftmp.$$ $MFNAME
+elif test $font = dc; then
+  # The font is DC. 
+  cd $DCDIR
+  rootfont=`echo $NAME | sed 's/[0-9]*$//'`
+  pointsize=`echo $NAME | sed 's/dc[a-z]*//'`
+  cat dcstdedt.pre > dctmp.tex
+  echo $pointsize " ) " >> dctmp.tex
+  echo "     \makefont " $rootfont " ( " $pointsize " ) " >> dctmp.tex
+  cat dcstdedt.end >> dctmp.tex
+  tex dctmp
+  rm -f dctmp.* mfbatch.bat
+  echo "Trying interpolated/extrapolated DC source." 1>&2
+  # Install the MF file carefully, since others may be doing the same
+  # as us simultaneously.
+
+  chmod 644 $MFNAME
+  mv $MFNAME $DESTDIR/mftmp.$$
+  cd $DESTDIR
+  mv mftmp.$$ $MFNAME 
+else
+  echo "MakeTeXMF is not implemented for this font"
+fi

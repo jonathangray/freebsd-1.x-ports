@@ -1,0 +1,74 @@
+#!/bin/sh
+#
+#   This script file makes a new TeX TFM font, because one wasn't
+#   found.  Usage:
+#
+#   MakeTFM name [mode]
+#
+#   `name' is the name of the font, such as `cmr10'.
+#   `mode', if supplied, is the mode to use.
+#
+#   Note that this file must execute Metafont, and place the result 
+#   in the correct location.
+#
+#   Of course, it needs to be set up for your site.
+#
+# TEMPDIR needs to be unique for each process because of the possibility
+# of simultaneous processes running this script.
+##DESTDIR=/LocalLibrary/Fonts/TeXFonts/pk
+##DESTDIR=/usr/local/lib/tex/localfonts
+TEXDIR=/home/estwk1/pnoma/lib/tex
+LOCALDIR=$TEXDIR/fonts
+DESTDIR=$LOCALDIR/tfmtmp
+TEMPDIR=$TMPDIR/mttfm.$$
+NAME=`echo $1 | sed 's/\.tfm$//'`
+MODE=$2
+
+umask 0
+
+if test "$MODE" = ""
+then MODE=nullmode
+fi
+
+TFMNAME=$NAME.$DPI'tfm'
+
+# Clean up on normal or abnormal exit
+trap "cd /; rm -rf $TEMPDIR $DESTDIR/tfmtmp.$$" 0 1 2 15
+
+if test ! -d $DESTDIR
+then
+   mkdir $DESTDIR
+fi
+
+mkdir $TEMPDIR
+cd $TEMPDIR
+
+if test -r $DESTDIR/$TFMNAME
+then
+   echo "$DESTDIR/$TFMNAME already exists!"
+   exit 0
+fi
+
+# check also in the standard place
+
+if test -r /usr/local/lib/tex/fonts/$TFMNAME
+then
+   echo /usr/local/lib/tex/fonts/$TFMNAME already exists!
+   exit 0
+fi
+
+echo mf "\mode:=$MODE; mag:=1; scrollmode; input $NAME" \\\</dev/null
+mf "\mode:=$MODE; mag:=1; scrollmode; input $NAME" </dev/null
+if test ! -r $TFMNAME
+then
+   echo "Metafont failed for some reason on $TFMNAME"
+   exit 1
+fi
+
+# Install the TFM file carefully, since others may be doing the same
+# as us simultaneously.
+
+chmod 644 $TFMNAME
+mv $TFMNAME $DESTDIR/tfmtmp.$$
+cd $DESTDIR
+mv tfmtmp.$$ $TFMNAME

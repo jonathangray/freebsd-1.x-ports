@@ -1,0 +1,329 @@
+# Makefile for TeX.
+
+SHELL = /bin/sh
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+# This is so kpathsea will get remade automatically if you change
+# something in it and recompile from the package directory.
+kpathsea_parent = ../..
+kpathsea_dir = $(kpathsea_parent)/kpathsea
+kpathsea = $(kpathsea_dir)/kpathsea.a
+
+# Routines used everywhere.
+commondefines = $(srcdir)/../lib/common.defines $(srcdir)/../lib/texmf.defines
+commonh = $(srcdir)/../lib/config.h
+commono = ../lib/lib.a $(kpathsea)
+
+# Routines used in TeX and Metafont.
+extrac = $(srcdir)/../lib/texmf.c
+extrah = $(srcdir)/../lib/texmf.h $(srcdir)/../lib/texmfmem.h texd.h
+
+# Routines used in TeX, Metafont, and BibTeX.
+fileioc = $(srcdir)/../lib/openinout.c
+fileioo = openinout.o
+
+objs = $(fileioo) tex0.o tex1.o tex2.o tex3.o tex4.o tex5.o tex6.o \
+  tex7.o tex8.o tex9.o $(extra_tex_obj)
+iobjs = iextra.o initex.o
+vobjs = vextra.o itex.o
+
+# Where the test files are.
+texsrcdir = $(srcdir)/../tex
+tripdir = $(texsrcdir)/TeXtrip
+
+program = initex virtex patgen
+
+# The -DTeX here is used for patgen, too, but that doesn't hurt anything.
+CC = @CC@
+CFLAGS = -g
+CPPFLAGS = -DTeX -I$(srcdir)/../lib -I../..
+
+CCLD = $(CC)
+LDFLAGS = $(CFLAGS) $(XLDFLAGS)
+LIBS = @LIBS@ $(extralibs)
+libs = $(commono) $(LIBS)
+
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+
+LN = @LN_S@
+
+# spiff -r5e-8 gives cleaner results than just `diff', but because it
+# also produces backspaces and other verbiage, I haven't taught
+# configure about it.
+DIFF = diff
+DIFFFLAGS =
+
+# The formats we know how to make.
+fmts = amslatex.fmt amstex.fmt etex.fmt inrstex.fmt latex.fmt \
+  picplus.fmt slitex.fmt tex.fmt texinfo.fmt 
+
+# And how to make them.
+initex = TEXPOOL=. ./initex
+
+
+# What to pass to submakes.
+makeargs=SHELL='$(SHELL)' CC='$(CC)' CFLAGS='$(CFLAGS)' CCLD='$(CCLD)' \
+LDFLAGS='$(LDFLAGS)' LIBS='$(libs)' LN='$(LN)'
+
+
+# Need the web rules for patgen.
+.SUFFIXES:
+.SUFFIXES: .o .c .p .ch
+.p.c:
+	$(SHELL) $(srcdir)/../lib/convert $*.p $*.c
+.ch.p:
+	../web/tangle $*.web $*.ch
+.c.o:
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $*.c
+
+
+default: all
+all: $(program)
+triptrap: triptex
+
+initex: $(iobjs) $(objs) $(commono)
+	$(CCLD) -o initex $(LDFLAGS) $(iobjs) $(objs) $(libs)
+
+virtex: $(vobjs) $(objs) $(commono)
+	$(CCLD) -o virtex $(LDFLAGS) $(vobjs) $(objs) $(libs)
+
+check: run-trip
+run-trip: triptex
+	rm -f trip.tex
+	-$(LN) $(tripdir)/trip.tex .
+	../fontutil/pltotf $(tripdir)/trip.pl trip.tfm
+	../fontutil/tftopl ./trip.tfm trip.pl
+	-diff $(tripdir)/trip.pl trip.pl
+	-$(SHELL) -c '. ./tripenv; \
+          ./triptex < $(tripdir)/trip1.in >/dev/null 2>&1'
+	-diff $(tripdir)/tripin.log trip.log
+	-$(SHELL) -c '. ./tripenv; ./triptex < $(tripdir)/trip2.in > trip.fot'
+# 
+# We use $(DIFF) instead of `diff' only for those files where there
+# might actually be legitimate numerical differences.
+	-$(DIFF) $(DIFFFLAGS) $(tripdir)/trip.log trip.log
+	-diff $(tripdir)/trip.fot trip.fot
+	$(SHELL) -c '. ./tripenv; \
+	  ../dviutil/dvitype trip.dvi < $(tripdir)/dvitype.in > trip.typ'
+	-$(DIFF) $(DIFFFLAGS) $(tripdir)/trip.typ trip.typ
+
+
+# Make format files automatically.
+fmts: $(fmts)
+
+# AMSLaTeX requires that you
+# 1) move Lamport's lfonts.tex out of TeX's way (I use the lfonts.tex I
+# distribute with the sauter CM parameter files, and call it lfonts.sauter),
+# 2) say `lfonts.new' when lplain.tex can't find lfonts.tex,
+# 3) choose a ``fontdef'' file (I use fontdef.ori),
+# 4) a ``preload'' file, (I use preload.ori),
+# 5) and a ``basefont'' file.  (I use basefont).
+# How automatic, huh?  I can hardly wait for LaTeX 3.
+amslatex.fmt: initex
+# Okay, so let's automate steps 1-5:
+	lfontspath=`find $(texinputdir) -name lfonts.tex`; \
+	lfontsdir=`expr "$$lfontspath" : '\(.*\)lfonts.tex'`; \
+	if [ -n "$$lfontspath" -a -f "$$lfontsdir/lfonts.ams" ]; then \
+		rm -f $$lfontspath; \
+		cp $$lfontsdir/lfonts.ams $$lfontspath; \
+	fi
+	$(initex) lplain \\dump
+	mv lplain.fmt amslatex.fmt
+	mv lplain.log amslatex.log
+
+# As of AMSTeX 2.1, the initialization file is named `amstex.ini'.
+# Because it explicitly reads plain.tex, we cannot use &./tex; that
+# produces a `Too late for \patterns' error.
+amstex.fmt: initex
+	$(initex) amstex.ini
+
+etex.fmt: tex.fmt
+	touch eplain.aux # Makes cross-reference warnings work right.
+	$(initex) \&./tex eplain \\dump
+	mv eplain.fmt etex.fmt
+	mv eplain.log etex.log
+
+inrstex.fmt: initex
+	$(initex) inrstex \\dump
+
+latex.fmt: initex
+# In case we are building amslatex (see above), let's make sure that
+# we are using the right lfonts.tex.
+	lfontspath=`find $(texinputdir) -name lfonts.tex`; \
+	lfontsdir=`expr "$$lfontspath" : '\(.*\)lfonts.tex'`; \
+	if [ -n "$$lfontspath" -a -f "$$lfontsdir/lfonts.lat" ]; then \
+		rm -f $$lfontspath; \
+		cp $$lfontsdir/lfonts.lat $$lfontspath; \
+	fi
+	$(initex) lplain \\dump
+	mv lplain.fmt latex.fmt
+	mv lplain.log latex.log
+
+picplus.fmt: tex.fmt
+	$(initex) \&./tex picplus \\dump
+
+slitex.fmt: initex
+	$(initex) splain \\dump
+	mv splain.fmt slitex.fmt
+	mv splain.log slitex.log
+
+tex.fmt: initex
+	$(initex) plain \\dump
+	mv plain.fmt tex.fmt
+	mv plain.log tex.log
+
+# Texinfo changes the escape character from `\' to `@'.
+texinfo.fmt: tex.fmt
+	$(initex) \&./tex texinfo @dump
+
+
+# We change texd.h instead of the change file, to avoid retangling.
+triptex: stamp-trip
+	$(MAKE) $(makeargs) initex
+	mv initex triptex
+
+stamp-trip: texd.h $(texsrcdir)/trip.sed
+	rm -f *.o texd.h.bak temp
+	sed -f $(texsrcdir)/trip.sed < texd.h > temp
+	mv texd.h texd.h.bak
+	mv temp texd.h
+	touch stamp-trip
+
+clean-trip:
+	rm -f *.o texd.h triptex stamp-trip
+# Don't reinstall a texd.h with the test constants.
+	if grep 'memmax 2999' texd.h.bak >/dev/null 2>&1; then \
+          rm -f texd.h*; else mv texd.h.bak texd.h; fi
+
+tex.p: tex.web ctex.ch
+	../web/tangle tex.web ctex.ch
+
+# If you're building mltex, reportedly have to add:
+#        sed -e 's/xiiix/(/;s/xtttx/)/' tex.p >tex.pp
+#        mv tex.pp tex.p
+
+ctex.ch: $(texsrcdir)/tex.ch
+	rm -f ctex.ch
+	cp $(texsrcdir)/tex.ch ctex.ch
+
+# The convert script produces the following. Touch texd.h to ensure its
+# timestamp is later than the rest.
+tex0.c tex1.c tex2.c tex3.c tex4.c tex5.c tex6.c tex7.c tex8.c tex9.c \
+itex.c coerce.h texd.h: tex.p coerce.add $(commondefines)
+	$(SHELL) $(texsrcdir)/convert
+	touch texd.h
+
+# The (hand-coded) file $(extrac) and the (generated) file itex.c have
+# #ifdefs for INITEX, so we compile them differently.
+iextra.o: iextra.c $(commonh) $(extrah)
+	$(CC) $(CPPFLAGS) -DINITEX -DINI $(CFLAGS) -c iextra.c
+
+initex.o: initex.c $(commonh) $(extrah)
+	$(CC) $(CPPFLAGS) -DINITEX $(CFLAGS) -c initex.c
+
+# Avoid compiling files in another directory.
+iextra.c: $(extrac)
+	rm -f iextra.c
+	$(LN) $(extrac) iextra.c
+
+initex.c: itex.c
+	rm -f initex.c
+	$(LN) itex.c initex.c
+
+vextra.c: $(extrac)
+	rm -f vextra.c
+	$(LN) $(extrac) vextra.c
+
+openinout.c: $(fileioc)
+	rm -f openinout.c
+	$(LN) $(fileioc) openinout.c
+
+$(iobjs) $(vobjs) $(objs): $(commonh) $(extrah)
+
+tex0.o: tex0.c
+tex1.o: tex1.c
+tex2.o: tex2.c
+tex3.o: tex3.c
+tex4.o: tex4.c
+tex5.o: tex5.c
+tex6.o: tex6.c
+tex7.o: tex7.c
+tex8.o: tex8.c
+tex9.o: tex9.c
+
+
+patgen: patgen.o $(commono)
+	$(CCLD) -o patgen $(LDFLAGS) patgen.o $(libs)
+patgen.o: patgen.c $(commonh)
+patgen.c: patgen.p $(commondefines)
+patgen.p: patgen.web patgen.ch
+
+
+Makefile: Makefile.in ../config.status
+	(cd ..; sh config.status)
+
+
+c-sources: texd.h patgen.c
+.PHONY: c-sources
+
+install: install-exec install-data
+
+install-exec: all
+	$(srcdir)/../../mkdirchain $(texpooldir) $(texdatadir) $(fontdir)
+	for p in $(program); do $(INSTALL_PROGRAM) $$p $(bindir)/$$p; done
+
+# The dependency should really be tex.pool, but can't do that in suffix rules.
+install-data: tex0.c
+	$(SHELL) $(srcdir)/../../mkdirchain $(texpooldir) $(fontdir)
+	-if test -s tex.pool; then \
+	  $(INSTALL_DATA) tex.pool $(texpooldir)/tex.pool; else true; fi
+	if test ! -f $(fontdir)/texfonts.map				\
+	   || grep 'original texfonts.map --' $(fontdir)/texfonts.map	\
+              >/dev/null 2>&1; then					\
+         $(INSTALL_DATA) $(texsrcdir)/texfonts.map $(fontdir)/texfonts.map;\
+        else true; fi
+
+TAGS: *.c *.h
+	etags -t *.c *.h
+
+
+mostlyclean::
+	rm -f *.o $(program) $(lib) $(programs)
+
+clean:: mostlyclean
+	rm -f *.dvi *.pool
+
+distclean:: clean
+	rm -f Makefile config.status c-auto.h
+
+# Although we can remake configure and c-auto.h.in, we don't remove
+# them, since many people may lack Autoconf.  Use configclean for that.
+realclean:: distclean
+	rm -f TAGS *.info*
+
+extraclean::
+	rm -f *.aux *.bak *.bbl *.blg *.dvi *.log *.orig *.pl *.rej
+	rm -f *.i *.s *.tfm *.vf *.vpl *\#* *gf *pk *~
+	rm -f CONTENTS.tex a.out core mfput.* patch* texput.*
+
+configclean:
+	rm -f configure c-auto.h.in c-auto.h
+
+
+# Prevent GNU make 3 from overflowing arg limit on system V.
+.NOEXPORT:
+
+mostlyclean::
+	rm -f stamp-* triptex
+	rm -f texd.h texd.h.bak coerce.h *.log *.fmt
+	rm -f 8terminal.tex tripos.tex trip.typ trip.dvi trip.fot
+	rm -f trip.pl trip.tfm trip.tex
+
+clean::
+	rm -f *.c *.h *.p
+
+distclean:: clean
+	rm -f ctex.ch

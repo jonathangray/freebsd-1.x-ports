@@ -1,0 +1,250 @@
+.TH DVI2TTY 1L "7 April 1994"
+.SH NAME
+dvi2tty, txt \- preview TeX(1) .dvi files on an ASCII tty
+.SH SYNOPSIS
+\edocumentstyle[txt]{...}
+.sp
+dvi2tty
+[ \fIoptions\fR ] \fIdvi\-file\fR
+.SH DESCRIPTION
+.\" .BR TeX (1)
+.\" and  
+.\" .BR LaTeX (1)
+.\" produce  nicely  formatted documents.   However,  the  final
+.\" versions of  these  documents,  the .dvi  files,  are  in  some  ways  not
+.\" accessible to further  electronic processing.   For  example, tools
+.\" like 
+.\" .BR grep (1)
+.\" and 
+.\" .BR emacs (1)
+.\" can't be used  on .dvi files, and electronic display  
+.\" of .dvi files requires a high-function bit--mapped terminal.
+.\" .PP
+.\" Some text--processing systems accommodate  both high--resolution output  and
+.\" straight ASCII  text output.    The  text  processing
+.\" tools 
+.\" .BR troff (1)
+.\" and 
+.\" .BR nroff (1)
+.\" both accept  the same input files, but troff  produces
+.\" high--quality output while nroff produces ASCII  text.  
+.\" .B troff
+.\" and 
+.\" .B nroff
+.\" are used, for example,  to produde hard--copy  and online  
+.\" versions of the  Unix user's manual, assuring that both versions 
+.\" have identical content.
+.\" .PP
+.\" .BR TeX
+.\" and 
+.\" .BR LaTeX
+.\" have no equivalent to 
+.\" .BR troff 's 
+.\" .BR nroff .
+The 
+.B txt
+style is part of
+a package that can take standard 
+.B LaTeX
+input and produce ASCII text  output.
+This output will not be identical to  the 
+.BR LaTeX \ .dvi
+file output, but  will,
+instead, be ASCII text appropriately formatted for an 8.5 by 11 inch page.
+.PP
+Generating ASCII output with 
+.B txt
+requires  two steps:  first, the 
+.B txt
+style
+must be included in the \edocumentstyle command, and then 
+.B dvi2tty 
+must be run
+on the .dvi file to generate the ASCII output.
+.PP
+The 
+.B txt
+style specification should be included after any other style  files,
+so that previously defined commands  and parameters are correctly  redefined
+by 
+.B txt
+for ASCII output.  For example, the header to this document is:
+.sp
+.RS
+\edocumentstyle[12pt,txt]{article}
+.RE
+.sp
+A sample session  to generate a  file containing the  ASCII version of  this
+doucment is (where the ``%'' character is the Unix prompt and should not  be
+typed):
+.sp
+.RS
+% latex txt.tex
+% dvi2tty txt.dvi > txt.txt
+.RE
+.SH OPTIONS
+Options may be specified in the environment variable DVI2TTY.
+Any option on the commandline, conflicting with one in the
+environment, will override the one from the environment.
+.TP
+.B \-o file
+Write output to file ``file''.
+.TP
+.B \-p list
+Print the pages chosen by list.
+Numbers refer to 
+.B TeX 
+page numbers (known as \ecount0).
+An example of format for list is ``1,3:6,8''
+to choose pages 1, 3 through 6 and 8.
+Negative numbers can be used exactly as in 
+.BR TeX ,
+e.g., \-1 comes before \-4 as in ``\-p-1:-4,17''.
+.TP
+.B \-P list
+Like \-p except that page numbers refer to
+the sequential ordering of the pages in the dvi\-file.
+Negative numbers don't make a lot of sense here...
+.TP
+.B \-w n
+Specify terminal width
+.B n.
+Legal range 16\-132.
+Default is 80. If your terminal has the
+ability to display in 132 columns it might
+be a good idea to use \-w132 and toggle the
+terminal into this mode as output will
+probably look somewhat better.
+.TP
+.B \-q
+Don't pipe the output through a pager.
+This may be the default on some systems
+(depending on the whims of the SA installing the program).
+.TP
+.B \-f
+Pipe through a pager, $PAGER if defined, or whatever your SA compiled
+in (often ``more''). This may be the default, but it is still okay
+to redirect output with ``>'', the pager will not be used if output
+is not going to a terminal.
+.TP
+.B \-F
+Specify the pager program to be used.
+This overides the $PAGER and the default pager.
+.TP
+.B \-Fprog
+Use ``prog'' as program to pipe output into. Can be used to choose an
+alternate pager (e g ``-Fless'').
+.TP
+.B \-l
+Mark pagebreaks with the two-character sequence ``^L''. The default is
+to mark them with a formfeed character.
+.TP
+.B \-u
+Don't make any attempts to find special Scandinavian characters.
+If such characters are in the text they will map to ``a'' and ``o''.
+This is probably the default outside of Scandinavia. (The SA made
+the decision when  the program was installed.)
+.TP
+.B \-s
+Try to find the special Scandinavian characters that on most (?)
+terminals in Scandinavia are mapped to ``{|}[\e]''.
+This can be the default, and output from files not containing these
+special characters will be identical regardless of this option.
+.SH THEORY
+The  problem  addressed  by  
+.B txt
+is  to  restrict  
+.BR LaTeX
+output  so   that
+it  simulates  a  line  printer,  without  rewriting  
+.BR LaTeX
+itself.      An
+accompanying program, 
+.BR dvi2tty ,
+then produces ASCII text output from  the
+.BR txt --generated 
+\ .dvi file.
+.PP
+There are three  primary areas  in which 
+.B txt
+must modify  
+.BR LaTeX
+to  produce
+ASCII output:
+.TP 3
+o
+Horizontal spacing
+.TP 3
+o
+Vertical spacing
+.TP 3
+o
+Special characters
+.PP
+.B txt 
+makes a first approximation to line--printer output by substituting  the
+12--point Courier font  for all the  standard 
+.B LaTeX
+font  styles and  sizes.
+Using 12--point Courier is assumed to be a good approximation of a  standard
+line printer, both  horizontally and vertically.   
+.B txt
+explicitly sets  the
+.BR LaTeX 
+\ebaselineskip
+to be  12 points to better  approximate a standard  line
+printer generating 66 lines on an 11.5 inch long page.
+.PP
+The next problem  in approximating  line printer  output is  to replace  all
+rubber vertical  glue with  fixed  glue.    Such rubber  glue,  included  in
+commands like \esection  and the itemize  environment, is  replaced by  fixed
+glue in multiples of  12 points.   Several other  fixed vertical spaces  are
+modified to be even  multiples of 12 points,  again to better simulate  line
+printer output.
+.PP
+There  are  two  types  of  special   characters  modified  by  
+.BR txt :
+the
+\elabelitem characters used  by the itemize  environment and footnote  marks.
+Footnote marks  are recoded  to use  arabic numbers  in parentheses  without
+superscripting (which is typically not feasible  on a line printer or  ASCII
+terminal).   The \elabelitem  characters are  redefined to  be ``o'',  ``-'',
+``*'' and ``+''.
+.SH FILES
+.TP 15
+/usr/bin/more
+probably the default pager.
+.SH ENVIRONMENT
+.TP 15
+PAGER
+the pager to use.
+.TP 15
+DVI2TTY
+can be set to hold commandline options.
+.SH "SEE ALSO"
+.BR tex (1),
+.BR latex (1),
+.BR amslatex (1),
+.BR dvips (1).
+.SH AUTHORS
+Svante Lindahl, Royal Institute of Technology, Stockholm
+.sp
+Improved C version: Marcel Mol
+.sp
+.B txt 
+style and new 
+.BR dvi2tty :
+.br
+Ralph Droms <droms@bucknell.edu>
+.SH BUGS
+Not all vertical rubber glue  has been removed:   for example, tables,  page
+headers and page footers do not always appear on even multiples of 12  point
+lines.
+.PP
+Rules aren't correct; specifically, horizontal and vertical lines in  arrays
+are likely not to work correctly.
+.PP
+The model used by dvi2tty to simulate horizontal spacing is prone to error,
+especially when horizontal spaces or fills are used.
+.PP
+Only one file may be specified on the commandline.

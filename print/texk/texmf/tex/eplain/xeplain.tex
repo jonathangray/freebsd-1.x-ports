@@ -1,0 +1,2176 @@
+% xeplain.tex: macros for nonformatting.  Written 1989--94 by (mostly)
+% Karl Berry.  These macros are in the public domain.
+% 
+% This is the ``extended plain'' TeX format that's described in
+% `eplain.texinfo', which you should have received with this file.  We
+% assume plain has been loaded.
+%
+% N.B.: A version number is defined at the beginning and end of this file;
+% please change those numbers whenever the file is modified!
+% And don't modify the file under any circumstances; rename it first.
+%
+% Some macros were written and/or suggested by Paul Abrahams.
+% Other sources (e.g., The TeXbook) are cited at the appropriate places.
+% 
+%% @texfile{
+%%   author = "Karl Berry",
+%%   version = "REPLACE-WITH-VERSION",
+%%   date = "REPLACE-WITH-DATE",
+%%   filename = "xeplain.tex",
+%%   email = "karl@cs.umb.edu",
+%%   address = "135 Center Hill Rd. // Plymouth, MA 02360"
+%%   checksum = "REPLACE-WITH-CHECKSUM",
+%%   codetable = "ISO/ASCII",
+%%   supported = "yes",
+%%   docstring = "This file defines macros that extend and expand on
+%%                plain TeX. eplain.tex is xeplain.tex and the other
+%%                source files with comments stripped; see the original
+%%                files for author credits, etc.  And please base diffs
+%%                or other contributions on xeplain.tex, not the
+%%                stripped-down eplain.tex.",
+%% }
+% 
+% 
+% Category codes, etc.
+%
+\def\makeactive#1{\catcode`#1 = \active \ignorespaces}%
+\chardef\letter = 11
+\chardef\other = 12
+% 
+% 
+% So we can have user-inaccessible control sequences.
+% 
+\edef\leftdisplays{\the\catcode`@}%
+\catcode`@ = \letter
+\let\@eplainoldatcode = \leftdisplays
+%
+% Save miniscule amounts of memory and time by writing \toks@ii instead
+% of \toks2.
+\toksdef\toks@ii = 2
+% 
+% 
+% This macro is defined in The TeXbook, but it never made it
+% into plain TeX.  \dospecials is defined there, though.
+% 
+\def\uncatcodespecials{%
+   \def\do##1{\catcode`##1 = \other}%
+   \dospecials
+}%
+%
+% 
+% Here is a way to do \let^^M = \cs, where the \let need not be global.
+{%
+   \makeactive\^^M %
+   \long\gdef\letreturn#1{\let^^M = #1}%
+}%
+% 
+% 
+% Swallow parameters, etc.
+% 
+\let\@eattoken = \relax  % Define this, so \eattoken can be used in \edef.
+\def\eattoken{\let\@eattoken = }%
+\def\gobble#1{}%
+\def\gobbletwo#1#2{}%
+\def\gobblethree#1#2#3{}%
+%
+% We can't just use \empty as the identity function, since then outer
+% braces which would supposedly delimit the argument would define a group.
+\def\identity#1{#1}%
+% 
+% True if #1 is the empty string, i.e., called like `\ifempty{}'.
+\def\ifempty#1{\@@ifempty #1\@emptymarkA\@emptymarkB}%
+\def\@@ifempty#1#2\@emptymarkB{\ifx #1\@emptymarkA}%
+%
+% Turn a definition into the characters that compose it.  See
+% ``Sanitizing control sequences under \write'', by Ron Whitney, TUGboat
+% 11(4), p.620.
+\def\@gobblemeaning#1:->{}%
+\def\sanitize{\expandafter\@gobblemeaning\meaning}%
+%
+% 
+% From p.308 of the TeXbook.  This cannot be used in places where TeX
+% might be skipping tokens, e.g., in conditionals.
+% 
+\def\ifundefined#1{\expandafter\ifx\csname#1\endcsname\relax}%
+% 
+% 
+% \csname constructions come up an awful lot, so we save typing with the
+% following.  (But the extra macro expansion does take time, so we don't
+% use these in frequently-executed code.)
+% 
+\def\csn#1{\csname#1\endcsname}%
+\def\ece#1#2{\expandafter#1\csname#2\endcsname}%
+%
+% 
+% \expandonce{TOKEN} abbreviates \expandafter\noexpand TOKEN.
+% 
+\def\expandonce{\expandafter\noexpand}%
+%
+%
+% Don't show our register allocations in the log.
+% 
+\let\@plainwlog = \wlog
+\let\wlog = \gobble
+%
+% 
+% Make it convenient to put newlines in error messages.
+% 
+\newlinechar = `^^J
+% 
+%
+% Sometimes it is convenient to have everything in the transcript file
+% and nothing on the terminal.  We don't just call \tracingall here,
+% since that produces some useless output on the terminal.
+%
+\def\gloggingall{\begingroup \globaldefs = 1 \loggingall \endgroup}%
+\def\loggingall{\tracingcommands\tw@\tracingstats\tw@
+   \tracingpages\@ne\tracingoutput\@ne\tracinglostchars\@ne
+   \tracingmacros\tw@\tracingparagraphs\@ne\tracingrestores\@ne
+   \showboxbreadth\maxdimen\showboxdepth\maxdimen
+}%
+% Show the complete contents of boxes.
+%
+\def\tracingboxes{\showboxbreadth = \maxdimen \showboxdepth = \maxdimen}%
+%
+% Don't trace anything, except restore \showbox... to plain's values.
+% 
+\def\gtracingoff{\begingroup \globaldefs = 1 \tracingoff \endgroup}%
+\def\tracingoff{\tracingonline\z@\tracingcommands\z@\tracingstats\z@
+  \tracingpages\z@\tracingoutput\z@\tracinglostchars\z@
+  \tracingmacros\z@\tracingparagraphs\z@\tracingrestores\z@
+  \showboxbreadth5 \showboxdepth3
+}%
+%
+% 
+% Definitions to produce actual `{' (et al.) characters in an output
+% file via \write.  We omit the line break after the first }, since we
+% have no comment character at that point.
+% 
+\begingroup
+  \catcode`\{ = 12 \catcode`\} = 12
+  \catcode`\[ = 1 \catcode`\] = 2
+  \gdef\lbracechar[{]%
+  \gdef\rbracechar[}]%
+  \catcode`\% = \other
+  \gdef\percentchar[%]\endgroup
+%
+% 
+% In order to do anything with ^^L inside a macro, it must
+% be made non-\outer.
+% 
+\def^^L{\par}%
+%
+% 
+% Leave horizontal mode (if we're in it), then insert a penalty.
+% And conversely.
+% 
+\def\vpenalty{\ifhmode\par\fi \penalty}%
+\def\hpenalty{\ifvmode\leavevmode\fi \penalty}%
+%
+% 
+% Make \else usable in \loop.  From Victor Eijkhout's TeX by Topic (page
+% 104).  See also Alois Kabelschacht, TUGboat 8(2), page 184.
+%
+\def\iterate{%
+  \let\next\relax
+  \body
+  \let\next\iterate
+  \fi
+  \next
+}%
+% 
+% 
+% Add #2 (which is expanded in an \edef) to the end of the definition of
+% #1 (which must be a previously-defined control sequence).  This is a
+% way to construct simple lists.
+% 
+\def\edefappend#1#2{%
+  \toks@ = \expandafter{#1}%
+  \edef#1{\the\toks@ #2}%
+}%
+%
+% 
+% 
+%  Hooks.
+%
+% \hookaction{HOOK}{TOKENS} adds TOKENS to the list of actions for
+% HOOK.  We avoid defining a \toks register for each hook, although
+% maybe that isn't so important.
+% 
+% \hookappend and \hookprepend add TOKENS specificially to the end or
+% the beginning.  When the argument is used, \toks@ will be the previous
+% value of the hook, and \toks@ii the new tokens.
+%
+\long\def\hookprepend{\@hookassign{\the\toks@ii \the\toks@}}%
+\long\def\hookappend{\@hookassign{\the\toks@ \the\toks@ii}}%
+\let\hookaction = \hookappend % either one should be ok
+%
+% 
+% \@hookassign{LAST-DEF}{HOOK}{TOKENS} makes \toks@ the previous value
+% of HOOK, and \toks@ii TOKENS, and then assigns the new value using
+% LASTDEF.  We store the hook in a control sequence \@HOOKhook.
+% 
+\long\def\@hookassign#1#2#3{%
+  % Make \toks@ be the expansion (to one level) of \@HOOKhook, or empty.
+  \expandafter\ifx\csname @#2hook\endcsname \relax
+    % If \@HOOKhook was undefined, let it be empty.
+    \toks@ = {}%
+  \else
+    % Otherwise, expand it to one level.  We can't just assign from
+    % \expandafter{\csname ...} since then the \toks register would
+    % contain the control sequence, not its definition.
+    \expandafter\let\expandafter\temp \csname @#2hook\endcsname
+    \toks@ = \expandafter{\temp}%
+  \fi
+  \toks2 = {#3}% Don't expand the argument all the way.
+  \ece\edef{@#2hook}{#1}%
+}%
+%
+% 
+% \hookactiononce{HOOK}\CS adds `\global\let\CS=\relax' to the
+% definition of \CS, then adds to HOOK.  Thus, \CS is expanded the next
+% time HOOK is called, but then it goes away.  This only works if \CS is
+% expandable, though.
+% 
+\long\def\hookactiononce#1#2{%
+  \edefappend#2{\global\let\noexpand#2\relax}
+  \hookaction{#1}#2%
+}%
+%
+% 
+% \hookrun{HOOKNAME} runs whatever actions have been defined for HOOK.
+% 
+\def\hookrun#1{%
+  \expandafter\ifx\csname @#1hook\endcsname \relax \else
+    % Isn't this fun?  We want to get rid of the \fi before expanding
+    % the actions, so that they can read what's coming up next.
+    \def\temp{\csname @#1hook\endcsname}%
+    \expandafter\temp
+  \fi
+}%
+%
+% 
+% 
+%  Properties a la Lisp.
+%
+% \setproperty{ATOM}{PROPNAME}{VALUE} defines the property PROPNAME on the
+% ``atom'' ATOM to have VALUE.
+% 
+\def\setproperty#1#2#3{\ece\edef{#1@p#2}{#3}}%
+%
+% 
+% \getproperty{ATOM}{PROPNAME} expands to the value of the property
+% PROPNAME on ATOM, or to nothing (i.e., \empty), if the property isn't
+% present.
+% 
+\def\getproperty#1#2{%
+  \expandafter\ifx\csname#1@p#2\endcsname\relax
+  % then \empty
+  \else \csname#1@p#2\endcsname
+  \fi
+}%
+%
+% 
+% 
+%  Macros to support BibTeX are in a separate file, btxmac.tex.
+% 
+% (They are maintained separately, too, by Oren Patashnik,
+% opbibtex@cs.stanford.edu.)  btxmac.tex also defines other macros we
+% want to use and make available.
+% 
+% But not all people want to read the BibTeX macros, because of either
+% space or time considerations.  Therefore, we look for \nobibtex,
+% which, if defined, causes btxmac.tex not to be read.  But we still
+% have to get \tokstostring et al. defined---so eplain.tex contains
+% those definitions, automatically edited in from btxmac.tex.  All the
+% documentation has been removed, so you must read btxmac.tex if you
+% want the comments.
+% 
+% 
+% We want to give a slightly different message than btxmac if no .aux
+% file exists (unless the person using us has already define some
+% message, possibly empty.)
+% 
+\ifx\@undefinedmessage\@undefined
+  \def\@undefinedmessage
+    {No .aux file; I won't warn you about undefined labels.}%
+\fi
+%
+% 
+% We use a token register to define all the BibTeX definitions, to avoid
+% problems with the \if... constructions when they are conditionally
+% read.
+% 
+%% [[[here is the first set of common definitions from btxmac]]]
+\toks0 = {%
+  %% [[[here are the BibTeX-specific definitions from btxmac]]]
+}%
+\ifx\nobibtex\@undefined \the\toks0 \fi
+%% [[[here is the second set of common definitions from btxmac]]]
+%
+% Here are the control sequences that btxmac.tex defines using an @,
+% because btxmac.tex wants to absolutely minimize the chance of
+% conflicts.  But these control sequence implement documented features
+% of eplain, so we want to allow people to use them without the @.
+% 
+\let\auxfile = \@auxfile
+\let\for = \@for
+\let\futurenonspacelet = \@futurenonspacelet
+\def\iffileexists{\if@fileexists}%
+\let\innerdef = \@innerdef
+\let\innernewcount = \@innernewcount
+\let\innernewdimen = \@innernewdimen
+\let\innernewif = \@innernewif
+\let\innernewwrite = \@innernewwrite
+\let\linenumber = \@linenumber
+\let\readauxfile = \@readauxfile
+\let\spacesub = \@spacesub
+\let\testfileexistence = \@testfileexistence
+\let\writeaux = \@writeaux
+% 
+%
+% btxmac.tex defines \innerdef.  Let's use it to make an abbreviation
+% for \innerdef\inner<name>{<name>}.
+% 
+\def\innerinnerdef#1{\expandafter\innerdef\csname inner#1\endcsname{#1}}%
+%
+% Use that in turn to make non-outer versions of the rest of plain TeX's
+% allocation macros.  (btxmac.tex already did a few of them.)
+% 
+\innerinnerdef{newbox}%
+\innerinnerdef{newfam}%
+\innerinnerdef{newhelp}%
+\innerinnerdef{newinsert}%
+\innerinnerdef{newlanguage}%
+\innerinnerdef{newmuskip}%
+\innerinnerdef{newread}%
+\innerinnerdef{newskip}%
+\innerinnerdef{newtoks}%
+% 
+% 
+% Besides doing a \write to the aux file, we also need to do an
+% \immediate\write.
+% 
+\def\immediatewriteaux#1{%
+  \ifx\noauxfile\@undefined
+    \immediate\write\@auxfile{#1}%
+  \fi
+}%
+% 
+% 
+% 
+%  Macros that produce output.
+% 
+% \obeywhitespace makes both end-of-lines and spaces in the input be
+% respected in the output.  Even spaces at the beginning of lines turn
+% into blank space the size of the natural space of the current font.
+% The reason why plain TeX's \obeyspaces does not do this last is that
+% it produces actual space characters, i.e., glue, and glue is discarded
+% at a(n output) line break, and so if line breaks in the input are
+% line breaks in the output...
+% 
+% Tabs are not affected; they will still produce glue (a single space).
+%
+\begingroup
+   \makeactive\^^M \makeactive\ % No spaces or ^^M's from here on.
+\gdef\obeywhitespace{%
+\makeactive\^^M\def^^M{\par\futurelet\next\@finishobeyedreturn}%
+\makeactive\ \let =\ %
+%
+% The group we use here is the one \obeywhitespace must be enclosed in.
+% If we don't do this, then if the obeyed stuff ends in a newline, the
+% indent produced by the definition of ^^M will make that line indented,
+% even if it isn't the end of the paragraph.
+\aftergroup\@removebox%
+\futurelet\next\@finishobeywhitespace%
+}%
+%
+% \@finishobeywhitespace eats any spaces and/or the end-of-line after
+% the \obeywhitespace command itself.  The group here is the one that it
+% itself creates.
+%
+\gdef\@finishobeywhitespace{{%
+\ifx\next %
+\aftergroup\@obeywhitespaceloop%
+\else\ifx\next^^M%
+\aftergroup\gobble%
+\fi\fi}}%
+%
+% \@finishobeyedreturn is invoked at the end of every input line.  We
+% check if the next thing is also a return, and, if so, insert extra
+% space.  Then we start the next line.
+% 
+\gdef\@finishobeyedreturn{%
+\ifx\next^^M\vskip\blanklineskipamount\fi%
+\indent%
+}%
+\endgroup
+%
+% The argument here is the space that we are supposed to eat after the
+% \obeywhitespace command.
+% 
+\def\@obeywhitespaceloop#1{\futurelet\next\@finishobeywhitespace}%
+% 
+% 
+% This removes the last box, if it was a empty box of width \parindent.
+% We might have been called inside a \vbox, so we have to test if we are
+% in horizontal mode before using \lastbox.
+% 
+\def\@removebox{%
+  \ifhmode
+    \setbox0 = \lastbox
+    \ifdim\wd0=\parindent
+      \setbox2 = \hbox{\unhbox0}%
+      \ifdim\wd2=0pt
+        % Don't put it back: it was an indentation box.
+        % This \ignorespaces ignores spaces after the group.
+        \ignorespaces
+      \else
+        \box2 % Put it back: it wasn't empty.
+      \fi
+    \else
+       \box0 % Put it back: it wasn't the right width.
+    \fi
+  \fi
+}%
+%
+% We allow for extra (possibly negative) space when we hit blank lines.
+% 
+\newskip\blanklineskipamount
+\blanklineskipamount = 0pt
+%
+% 
+% A good way to print fractions in text when you don't want
+% to use \over (which should be most of the time), and yet
+% just `1/2' doesn't look right.  (From the TeXbook,
+% the answer to exercise 11.6, p.311.)
+% 
+\def\frac#1/#2{\leavevmode
+   \kern.1em \raise .5ex \hbox{\the\scriptfont0 #1}%
+   \kern-.1em $/$%
+   \kern-.15em \lower .25ex \hbox{\the\scriptfont0 #2}%
+}%
+%
+% 
+% The `e' just means `Eplain', as in `Eplain's hrule'.  The advantage
+% to using these is that you can change the default thickness.
+% 
+\newdimen\hruledefaultheight  \hruledefaultheight = 0.4pt
+\newdimen\hruledefaultdepth   \hruledefaultdepth = 0.0pt
+\newdimen\vruledefaultwidth   \vruledefaultwidth = 0.4pt
+%
+\def\ehrule{\hrule height\hruledefaultheight depth\hruledefaultdepth}%
+\def\evrule{\vrule width\vruledefaultwidth}%
+%
+%
+% The texnames.sty and path.sty files included below were originally
+% written by Nelson Beebe and Philip Taylor, respectively. See the
+% complete source files (e.g., in this distribution) for comments.
+%% [[[include texnames.sty]]]
+%% [[[include path.sty]]]
+%
+% 
+% A square box, suitable for being a marker in lists.
+% 
+\def\blackbox{\vrule height .8ex width .6ex depth -.2ex \relax}% square bullet
+%
+% 
+% From p.311 of the TeXbook.
+% 
+% Make an unfilled rectangle with the dimensions of \box0.  #1 is the
+% height of the rules, #2 the depth (i.e., the thicknesses).
+% 
+\def\makeblankbox#1#2{%
+  \ifvoid0
+    \errhelp = \@makeblankboxhelp
+    \errmessage{Box 0 is void}%
+  \fi
+  \hbox{\lower\dp0
+    \vbox{\hidehrule{#1}{#2}%
+      \kern -#1% overlap rules
+      \hbox to \wd0{\hidevrule{#1}{#2}%
+        \raise\ht0\vbox to #1{}% vrule height
+        \lower\dp0\vtop to #1{}% vrule depth
+        \hfil\hidevrule{#2}{#1}%
+      }%
+      \kern-#1\hidehrule{#2}{#1}%
+    }%
+  }%
+}%
+%
+\newhelp\@makeblankboxhelp{Assigning to the dimensions of a void^^J%
+  box has no effect.  Do `\string\setbox0=\string\null' before you^^J%
+  define its dimensions.}%
+%
+% 
+% Produce an hrule with height #1 and depth #2, and insert kerning so it
+% doesn't change the current position.
+% 
+\def\hidehrule#1#2{\kern-#1\hrule height#1 depth#2 \kern-#2}%
+%
+% Produce a vrule with width #1+#2, kerning so as not to change the
+% current position.
+% 
+\def\hidevrule#1#2{%
+  \kern-#1%
+  \dimen0=#1\advance\dimen0 by #2%
+  \vrule width\dimen0
+  \kern-#2%
+}%
+% 
+% 
+% The \boxit macro from the TeXbook, trivially generalized to allow
+% something other than 3pt around the TeX box being boxed.
+% 
+\newdimen\boxitspace \boxitspace = 3pt
+%
+\long\def\boxit#1{%
+  \vbox{%
+    \ehrule
+    \hbox{%
+      \evrule
+      \kern\boxitspace
+      \vbox{\kern\boxitspace \parindent = 0pt #1\kern\boxitspace}%
+      \kern\boxitspace
+      \evrule
+    }%
+    \ehrule
+  }%
+}%
+%
+% 
+% Produce the written-out form of a number.
+% 
+\def\numbername#1{\ifcase#1%
+   zero%
+   \or one%
+   \or two%
+   \or three%
+   \or four%
+   \or five%
+   \or six%
+   \or seven%
+   \or eight%
+   \or nine%
+   \or ten%
+   \or #1%
+   \fi
+}%
+%
+% The following arrow macros were written by Steven Smith. See arrow.tex.
+\let\@plainnewif = \newif
+\let\@plainnewdimen = \newdimen
+\let\newif = \innernewif
+\let\newdimen = \innernewdimen
+\edef\@eplainoldandcode{\the\catcode`& }%
+\catcode`& = 11
+\toks0 = {%
+  %% [[[include arrow]]]
+}%
+\let\newif = \@plainnewif
+\let\newdimen = \@plainnewdimen
+\ifx\noarrow\@undefined \the\toks0 \fi
+\catcode`& = \@eplainoldandcode
+% 
+% 
+% 
+%  Environments.
+% 
+% Define an ``environment'': arbitrary text, enclosed by \begingroup and
+% \endgroup.  But you get to label the group, so that if you forget an
+% \environment or an \endenvironment, you will probably get an error
+% message about it.
+% 
+% Since the environment names appear in \errmessage arguments, it's best
+% to keep them to `letter' and `other' characters.  I suppose we could
+% call \tokstostring to allow more general labels.
+% 
+% These macros improve slightly on the answer to exercise 5.7 in
+% The TeXbook, by making some checks on \begingroup and \endgroup, as
+% well as just making sure \environment and \endenvironment's match.
+% 
+%
+\def\environment#1{%
+   \ifx\@groupname\@undefined\else
+      % This gets invoked if we have two \environments (and no matching
+      % \endenvironment to the first) with an \endgroup in between.
+      \errhelp = \@unnamedendgrouphelp
+      \errmessage{`\@groupname' was not closed by \string\endenvironment}%
+   \fi
+   % Use \edef in case we are passed a macro that contains the name,
+   % instead of the name.
+   \edef\@groupname{#1}%
+   \begingroup
+      \let\@groupname = \@undefined
+}%
+%
+\def\endenvironment#1{%
+   \endgroup
+   \edef\@thearg{#1}%
+   \ifx\@groupname\@thearg
+   \else
+      \ifx\@groupname\@undefined
+         % Unfortunately, one gets an `extra \endgroup' message before
+         % seeing this.  But we have to restore \@groupname, so I see no
+         % alternative. 
+         \errhelp = \@isolatedendenvironmenthelp
+         \errmessage{Isolated \string\endenvironment\space for `#1'}%
+      \else
+         \errhelp = \@mismatchedenvironmenthelp
+         \errmessage{Environment `#1' ended, but `\@groupname' started}%
+         \endgroup % Probably a typo in the names.
+      \fi
+   \fi
+   \let\@groupname = \@undefined
+}%
+%
+\newhelp\@unnamedendgrouphelp{Most likely, you just forgot an^^J%
+   \string\endenvironment.  Maybe you should try inserting another^^J%
+   \string\endgroup to recover.}%
+%
+\newhelp\@isolatedendenvironmenthelp{You ended an environment X, but^^J%
+   no \string\environment{X} to start it is anywhere in sight.^^J%
+   You might also be at an \string\endenvironment\space that would match^^J%
+   a \string\begingroup, i.e., you forgot an \string\endgroup.}%
+%
+\newhelp\@mismatchedenvironmenthelp{You started an environment named X, but^^J%
+   you ended one named Y.  Maybe you made a typo in one^^J%
+   or the other of the names?}%
+% 
+% 
+% The above sort of environment allows nesting.  But environments
+% shouldn't always be allowed to nest (like the \flushright,
+% \flushleft, and \center ones defined below).  Here are some macros to
+% help deal with that.
+% 
+% \checkenvironmentnesting goes at the beginning of a macro that is
+% going to define the environment.
+% 
+\newif\ifenvironment
+\def\checkenv{\ifenvironment \errhelp = \@interwovenenvhelp
+   \errmessage{Interwoven environments}%
+   \egroup \fi
+}%
+%
+\newhelp\@interwovenenvhelp{Perhaps you forgot to end the previous^^J%
+   environment? I'm finishing off the current group,^^J%
+   hoping that will fix it.}%
+%
+% 
+% 
+%  Mathematics displays.
+%
+% By default, TeX centers displayed material.  To get left-justified
+% displays, say \leftdisplays.  To go back to centered displays, say
+% \centereddisplays.
+% 
+% This is based on an approach developed by Donald Arseneau,
+% asnd@triumfrg.bitnet.
+% 
+\newtoks\previouseverydisplay
+\newdimen\leftdisplayindent
+\newif\if@leftdisplays
+%
+\def\leftdisplays{%
+  % IF we've already been called, do nothing.
+  \if@leftdisplays\else
+    \previouseverydisplay = \everydisplay
+    \everydisplay = {\the\previouseverydisplay \leftdisplaysetup}%
+    %
+    % Since we don't want to start a group (the \leftdisplays might
+    % well continue to the end of the document), we have to explicitly
+    % save and restore everything we change.
+    \let\@save@maybedisableeqno = \@maybedisableeqno
+    \let\@saveeqno = \eqno
+    \let\@saveleqno = \leqno
+    \let\@saveeqalignno = \eqalignno
+    \let\@saveleqalignno = \leqalignno
+    \let\@maybedisableeqno = \relax
+    \def\eqno{\hfill\textstyle\enspace}%
+    \def\leqno{%
+      \hfill
+      \hbox to0pt\bgroup
+        \kern-\displaywidth
+        \kern-\displayindent
+        $\aftergroup\@leftleqnoend
+    }%
+    \@redefinealignmentdisplays
+    \@leftdisplaystrue
+  \fi
+}%
+%
+\def\centereddisplays{%
+  % If \leftdisplays hasn't been called, don't try to restore all the
+  % stuff it changes.
+  % 
+  \if@leftdisplays
+    \everydisplay = \previouseverydisplay
+    \let\@maybedisableeqno = \@save@maybedisableeqno
+    \let\eqno = \@saveeqno
+    \let\leqno = \@saveleqno
+    \let\eqalignno = \@saveeqalignno
+    \let\leqalignno = \@saveleqalignno
+    \@leftdisplaysfalse
+  \fi
+}%
+%
+\def\leftdisplaysetup{%
+  \hbox to\displaywidth\bgroup
+    \strut
+    \dimen@ = \parindent
+      \advance\dimen@ by \leftdisplayindent 
+      \advance\dimen@ by \leftskip
+    \hskip\dimen@
+    % We can't use \displayindent all along, because then we would
+    % \hskip by the above plus \hangindent or \parshape indentation.
+    % See p.188.
+    \advance\displayindent by \dimen@
+    \advance\displaywidth by -\parindent
+      \advance\displaywidth by -\leftdisplayindent
+      \advance\displaywidth by -\leftskip
+    $%
+    %
+    % If we do a \noalign inside an \eqalignno, we will be in horizontal
+    % mode, and the line will be as wide as \hsize.  This will cause an
+    % overfull alignment, since we also have to fit the indentation in,
+    % before the alignment.
+    \advance\hsize by -\displayindent
+    %
+    \aftergroup\@lefteqend
+    \displaystyle
+}%
+%
+\def\@lefteqend{\hfil\egroup$}% gets inserted between the ending $$
+\def\@leftleqnoend{\hss \egroup$}%
+%
+% Since the equation is typeset in math mode and not display math mode,
+% \halign is illegal.  So we use \vcenter, a la \eqalign, to make the
+% \halign legal.  Also, we remove the \hfil from the left of the
+% template, to make the display come out flush left.
+%
+\def\@redefinealignmentdisplays{%
+  \def\displaylines##1{\displ@y
+    \vcenter{%
+      % We add another \hfil outside math mode in this template to cure
+      % underfull hboxes that sometimes result (from big fractions as in
+      % exercise 19.19).  I'm not sure why DEK does \halign{\hbox to...}
+      % instead of just \halign to... here.
+      \halign{\hbox to\displaywidth{$\@lign\displaystyle####\hfil$\hfil}\crcr
+              ##1\crcr}}}%
+  %
+  \def\eqalignno##1{\displ@y
+    \let\noalign = \@lefteqalignonoalign
+    \vcenter{%
+      \halign to\displaywidth{%
+         $\@lign\displaystyle{####}$\tabskip\z@skip
+        &$\@lign\displaystyle{{}####}$\hfil\tabskip\centering
+        &\llap{$\@lign####$}\tabskip\z@skip\crcr
+        ##1\crcr}}}%
+  %
+  \def\leqalignno##1{\displ@y
+    % Don't use the \eqno in \eqdef.
+    \let\eqno = \relax
+    \vcenter{%
+      \halign to\displaywidth{%
+         \hfil$\@lign\displaystyle{####}$\tabskip\z@skip
+        &$\@lign\displaystyle{{}####}$\hfil\tabskip\centering
+        &\kern-\displaywidth
+         \rlap{\kern-\displayindent $\@lign####$}%
+         \tabskip\displaywidth\crcr
+        ##1\crcr}}}%
+}%
+% 
+% \noalign is typically used to insert a few words (`and', for example)
+% between two aligned equations.  So I don't think the \noaligned
+% material should be indented.  Since \noalign takes <vertical mode
+% material>, we would end up with double indentation, anyway: one
+% because we're indenting the whole display, and one at the start of the
+% <v.m.m.>.  (If you want to change any of this, you can put something in
+% \@everynoalign.)  So, we use this definition for \noalign in a
+% left-justified \eqalignno:
+% 
+\let\@primitivenoalign = \noalign
+\newtoks\@everynoalign
+\def\@lefteqalignonoalign#1{%
+  \@primitivenoalign{%
+    % Is it right to set \leftskip=0pt first, thus perhaps making this
+    % work in lists and so forth?  We just compensate for the other ways
+    % the display is indented here.
+    \advance\leftskip by -\parindent
+    \advance\leftskip by -\leftdisplayindent
+    \parskip = 0pt
+    %
+    % We use \parindent=0pt instead of \noindent because the latter
+    % starts unrestricted horizontal mode, which means the alignment
+    % we're inside will wind up being as wide as the page.  When the arg
+    % is just vertical material, this is wrong.  For example, using
+    % \matrix inside \eqalignno fails if \noindent is used.
+    \parindent = 0pt
+    \the\@everynoalign
+    #1%
+  }%
+}%
+% 
+% 
+% 
+%  Time macros.
+% 
+% TeX sets \time, \day, \month, and \year when it begins.  (And does not
+% update them as it runs!)
+% 
+% 
+% \monthname produces the name of the month, abbreviated to three
+% letters.  The primitive \month should never be zero.
+% 
+\def\monthname{%
+   \ifcase\month
+      \or Jan\or Feb\or Mar\or Apr\or May\or Jun%
+      \or Jul\or Aug\or Sep\or Oct\or Nov\or Dec%
+   \fi
+}%
+%
+% \fullmonthname is like \monthname, except it doesn't abbreviate.
+% 
+\def\fullmonthname{%
+   \ifcase\month
+      \or January\or February\or March\or April\or May\or June%
+      \or July\or August\or September\or October\or November\or December%
+   \fi
+}%
+%
+% \timestring produces the current time, in a format like `1:14 p.m.'.
+% 
+\def\timestring{\begingroup
+   \count0 = \time
+   \divide\count0 by 60
+   \count2 = \count0   % The hour, from zero to 23.
+   %
+   \count4 = \time
+   \multiply\count0 by 60
+   \advance\count4 by -\count0   % The minute, from zero to 59.
+   % But we need the minutes with a leading zero, if necessary.
+   \ifnum\count4<10
+      \toks1 = {0}%
+   \else
+      \toks1 = {}%
+   \fi
+   % 
+   % Convert the hour into `a.m.' or `p.m.', and make it mod 12.
+   \ifnum\count2<12
+      \toks0 = {a.m.}%
+   \else
+      \toks0 = {p.m.}%
+      \advance\count2 by -12
+   \fi
+   %
+   % If it's midnight, call it `12', not `0'.
+   \ifnum\count2=0
+      \count2 = 12
+   \fi
+   %
+   % Produce the output.
+   \number\count2:\the\toks1 \number\count4 \thinspace \the\toks0
+\endgroup}%
+%
+%
+% \timestamp produces a text string for the whole thing like
+% `23 Apr 1964  1:14 p.m.'.
+%
+\def\timestamp{\number\day\space\monthname\space\number\year\quad\timestring}%
+%
+% 
+% \today produces the current date, as in `23 April 1964'.
+% 
+\def\today{\the\day\ \fullmonthname\ \the\year}%
+%
+% 
+% 
+%  (Typographical) lists.
+% 
+% These macros can produce numbered or unnumbered lists.
+% 
+% You can change the spacing by assigning new values to these registers.
+% They are used by both kinds of lists.  \listleftindent is relative to
+% the current paragraph indentation, while \listrightindent is an
+% absolute value.  I do this for two reasons: (1) it is more useful, if not
+% more ``logical'', to make list indentation depend on the paragraph
+% indentation; (2) footnotes do not work if \parindent is zero, and
+% having a footnote in a list item is perfectly reasonable.
+% 
+% If you change \baselineskip and want \abovelistskip and \belowlistskip
+% to retain their meanings here, you will have to reassign to them.  The
+% \baselineskip here is the value at the time eplain.tex is read, i.e.,
+% 12pt (most likely).
+% 
+% If the items in your lists are very long, you might want to
+% make \interitemskipamount nonzero.  
+% 
+\newskip\abovelistskipamount      \abovelistskipamount = .5\baselineskip
+  \newcount\abovelistpenalty      \abovelistpenalty    = 10000
+  \def\abovelistskip{\vpenalty\abovelistpenalty \vskip\abovelistskipamount}%
+\newskip\interitemskipamount      \interitemskipamount = 0pt
+  \newcount\belowlistpenalty      \belowlistpenalty    = -50
+  \def\belowlistskip{\vpenalty\belowlistpenalty \vskip\belowlistskipamount}%
+\newskip\belowlistskipamount      \belowlistskipamount = .5\baselineskip
+  \newcount\interitempenalty      \interitempenalty    = 0
+  \def\interitemskip{\vpenalty\interitempenalty \vskip\interitemskipamount}%
+\newdimen\listleftindent    \listleftindent = 0pt
+\newdimen\listrightindent   \listrightindent = 0pt        
+\let\listmarkerspace = \enspace
+%
+% To do arbitrary things at the start of each list:
+\newtoks\everylist
+%
+% If you want no space between items for a particular list
+% (perhaps because the items in it are short), you can say,
+% e.g., \numberedlist\listcompact.
+% 
+\def\listcompact{\interitemskipamount = 0pt \relax}%
+%
+% This is called to set up the parameters by both sorts of lists.
+% Because we set \rightskip, we finish off the current paragraph.
+% 
+\newdimen\@listindent
+%
+\def\beginlist{%
+  % Insert the space above this list, before we change \leftskip
+  % (because the \vskip in here might be what ends the paragraph).
+  \abovelistskip
+  %
+  \@listindent = \parindent
+  \advance\@listindent by \listleftindent
+  %
+  % \leftskip shifts nested lists to the right on the page.
+  \advance\leftskip by \@listindent
+  \advance\rightskip by \listrightindent
+  %
+  % We always need \itemnumber, so we can know whether an item is the
+  % first one or not.
+  \itemnumber = 1
+  %
+  \the\everylist
+}%
+%
+% A list item, for both kinds of lists.
+% 
+\def\li{\@getoptionalarg\@finli}%
+\def\@finli{%
+  \ifx\@optionalarg\empty \else
+    \expandafter\writeitemxref\expandafter{\@optionalarg}%
+  \fi
+  \ifnum\itemnumber=1 \else \interitemskip \fi
+  \printitem
+  \advance\itemnumber by 1
+  \advance\itemletter by 1
+  \advance\itemromannumeral by 1
+  %
+  % Just in case somebody creeps in with an argument or something.
+  \ignorespaces
+}%
+%
+% \writeitemxref{LABEL} writes out a definition for LABEL to be \marker
+% for the aux file.
+% 
+\def\writeitemxref#1{\definexref{#1}\marker{item}}%
+%
+% \printitem is used to print items by both sorts of lists.  A \par gets
+% produced before every item -- even the first one.  We also want to
+% make paragraphs after the first appear to be indented -- i.e., they
+% will have double indentation.  It is usually bad exposition to have
+% lists with multiparagraph items, but sometimes it is unavoidable.
+% 
+\def\printitem{%
+  \par
+  \vskip-\parskip
+  \noindent
+  \printmarker\marker
+}%
+%
+% Output the list marker.
+% 
+\def\printmarker#1{\llap{\marker \enspace}}%
+%
+% Common ending.
+% 
+\def\endlist{\belowlistskip}%
+%
+% 
+% \numberedlist produces items which are numbered sequentially, starting
+% from one.  You start items with \li (`list item').  End the list with
+% \endnumberedlist.
+% 
+% A nested \numberedlist produces items labelled `(a)', `(b)', etc.  A
+% doubly (and deeper) nested \numberedlist labels items with `*'.
+% 
+% These registers keep track of where we are.
+% 
+\newcount\numberedlistdepth
+\newcount\itemnumber
+\newcount\itemletter
+\newcount\itemromannumeral
+%
+\def\numberedmarker{%
+  \ifcase\numberedlistdepth
+      (impossible)%
+  \or \printitemnumber
+  \or \printitemletter
+  \or \printitemromannumeral
+  \else *%
+  \fi
+}%
+%
+% These produce the text of the labels.  We use \the\itemletter so that
+% the value will expand.
+% 
+\def\printitemnumber{\number\itemnumber}%
+\def\printitemletter{\char\the\itemletter}%
+\def\printitemromannumeral{\romannumeral\itemromannumeral}%
+\def\numberedprintmarker#1{\llap{#1) \listmarkerspace}}%
+%
+\def\numberedlist{\environment{@numbered-list}%
+  % This is set back to zero by getting to the end of the group.
+  \advance\numberedlistdepth by 1
+  \itemletter = `a
+  \itemromannumeral = 1
+  \beginlist
+  \let\marker = \numberedmarker
+  \let\printmarker = \numberedprintmarker
+}%
+%
+\def\endnumberedlist{%
+  \par
+  \endenvironment{@numbered-list}%
+  \endlist
+}%
+%
+% Allow synonyms for \numberedlist.
+\let\orderedlist = \numberedlist
+\let\endorderedlist = \endnumberedlist
+% 
+% 
+% 
+% \unorderedlist produces items which are labelled with bullets.  You
+% start an item with \li, just as with numbered lists.  You end the list
+% with \endunorderedlist.
+% 
+% A nested \unorderedlist produces items labelled with em-dashes.  A
+% doubly (and deeper) nested \unorderedlist uses `*'.
+% 
+\newcount\unorderedlistdepth
+%
+\def\unorderedmarker{%
+  \ifcase\unorderedlistdepth
+      (impossible)%
+  \or \blackbox
+  \or ---%
+  \else *%
+  \fi
+}%
+\def\unorderedprintmarker#1{\llap{#1\listmarkerspace}}%
+%
+\def\unorderedlist{\environment{@unordered-list}%
+  \advance\unorderedlistdepth by 1
+  \beginlist
+  \let\marker = \unorderedmarker
+  \let\printmarker = \unorderedprintmarker
+}%
+%
+\def\endunorderedlist{%
+  \par
+  \endenvironment{@unordered-list}%
+  \endlist
+}%
+%
+% 
+% 
+%  Verbatim listing.
+% 
+% ... well, almost verbatim.  We assume the font \tt has all the
+% characters that will appear.  Control characters, except for tabs and
+% form feeds (and returns) won't produce anything useful.  Tabs produce
+% a fixed amount of space, and form feeds produce a page break.
+% 
+% This is based on Knuth's ideas in Appendix D of the TeXbook, p. 380.
+% The argument should be a filename.
+% 
+% if you need to do something more for your particular fonts and/or
+% environment before the file is input, give a definition to
+% \setuplistinghook.  If you want line numbers on the output, you can
+% say \let\setuplistinghook = \linenumberedlisting.
+% 
+\def\listing#1{%
+   \par \begingroup
+   \@setuplisting
+   \setuplistinghook
+   \input #1
+   \endgroup
+}%
+%
+\let\setuplistinghook = \relax
+%
+\def\linenumberedlisting{%
+  \ifx\lineno\undefined \innernewcount\lineno \fi
+  \lineno = 0
+  \everypar = {\advance\lineno by 1 \printlistinglineno}%
+}%
+\def\printlistinglineno{\llap{[\the\lineno]\quad}}%
+%
+% 
+% \uncatcodespecials must come before \obeywhitespace, lest a space
+% character in the input produce character 32 from the \tt font.
+% 
+\def\listingfont{\tt}%
+\def\@setuplisting{%
+   \uncatcodespecials
+   \obeywhitespace
+   \makeactive\`
+   \makeactive\^^I
+   \def^^L{\vfill\eject}%
+   \parskip = 0pt
+   \listingfont
+}%
+%
+% Give definitions to the characters we want to be special.
+% 
+% Do ` separately, so can use ` in the \catcode commands elsewhere.
+% 
+{%
+   \makeactive\`
+   \gdef`{\relax\lq}% Defeat ligatures.
+}%
+{%
+   \makeactive\^^I
+   \gdef^^I{\hskip8\fontdimen2\font \relax}%
+}%
+%
+% 
+% \verbatim ... |endverbatim typesets the ... in typewriter.  To produce a |
+% in the ..., use ||.  This macro was contributed by beebe@math.utah.edu.
+% Generalized to characters other than | by dorai@cs.rice.edu.
+% 
+\def\verbatimescapechar#1{%
+  \gdef\@makeverbatimescapechar{%
+    \@makeverbatimdoubleescape #1%
+    \catcode`#1 = 0
+  }%
+}%
+\def\@makeverbatimdoubleescape#1{%
+  \catcode`#1 = \other
+  \begingroup
+    \lccode`\* = `#1%
+    \lowercase{\endgroup \ece\def*{*}}%
+}%
+\verbatimescapechar\|  % initially escapechar is |
+%
+\def\verbatim{\begingroup
+  \uncatcodespecials
+  \obeywhitespace
+  \makeactive\` % make space character a single space, not stretchable
+  \@makeverbatimescapechar
+  \tt}
+\let\endverbatim = \endgroup
+% 
+% 
+% 
+%  Contents.
+% 
+% Entries for the table of contents are recorded in \jobname.toc, which
+% we open for writing at the first \writetocentry or when \readtocfile
+% is invoked (after we read it, in the latter case).  We use
+% \tocfilebasename as the root of the filename to read; this defaults to
+% \jobname.
+% 
+\newif\if@tocfileopened
+\newwrite\tocfile
+\let\tocfilebasename = \jobname
+%
+\def\opentocfile{%
+  \if@tocfileopened\else
+     \global\@tocfileopenedtrue
+     \immediate\openout\tocfile = \tocfilebasename.toc
+  \fi
+}%
+%
+% \writetocentry#1#2 produces a line in the .toc file that
+% looks like:
+% \toc#1entry{#2}{page number}
+% e.g., 
+% \tocchapterentry{Introduction}{2}
+% would be written by
+% \writetocentry{chapter}{Introduction}
+% if the chapter started on page two.
+% 
+% Thus, #1 is intended to be something like `chapter' or `section', #2
+% to be the text of the title.
+% 
+% Of course, if you want, you can \write\tocfile yourself with whatever
+% you like.  In that case, you must also call \opentocfile.
+% 
+% By the way, it would be wrong to put a \percentchar at the end of the
+% output line.  Then, when the .toc file is read, if each line is turned
+% into a \leftline, say, there would be no legal breakpoint between the
+% boxes, and one extremely long line would result.
+% 
+\def\writetocentry#1#2{\writenumberedtocentry{#1}{#2}{}}%
+%
+% Sometimes you want the control sequence to take another number (e.g.,
+% a chapter number) as a parameter.  (Although you can pass anything you
+% want as the third parameter, naturally.)  The third parameter is
+% expanded at the point of the \writenumberedtocentry, not when the
+% \write actually happens.  This makes the usual case---the third
+% parameter being \the\someregister---work.
+% 
+% For example:
+% \writenumberedtocentry{chapter}{The second chapter}{2}
+% would produce:
+% \tocchapterentry{The second chapter}{2}{14}
+% 
+% if the second chapter started on page 14.
+% 
+\def\writenumberedtocentry#1#2#3{%
+  \ifrewritetocfile
+    \opentocfile
+    \toks0 = {\expandafter\noexpand \csname toc#1entry\endcsname}%
+    \def\temp{#2}%
+    %
+    % Usually #3 is just `\the\register', which we want to expand.  But
+    % if it's not a number at all -- e.g., if it's an author's name, we
+    % don't want to expand control sequences for accents and the like.
+    % So we play some games here.
+    \toks2 = \expandafter{#3}%
+    \edef\cs{\the\toks2}%
+    \edef\@wr{%
+      \write\tocfile{%
+        % The \toc...entry control sequence:
+        \the\toks0
+        %
+        % The text:
+        {\sanitize\temp}%
+        %
+        % A secondary number, or nothing:
+        \ifx\empty\cs\else {\sanitize\cs}\fi
+        %
+        % The page number:
+        {\noexpand\folio}%
+      }%
+    }%
+    \@wr
+  \fi
+  \ignorespaces
+}%
+%
+% 
+% The entries are read in when the user invokes \readtocfile (which
+% should be before the first \writetocentry).  The .toc file is also
+% opened for writing (i.e., emptied) here, unless \rewritetocfilefalse.
+% You might want to set that to, e.g., read it in twice.
+% 
+\newif\ifrewritetocfile   \rewritetocfiletrue
+%
+\def\readtocfile{%
+   \testfileexistence[\tocfilebasename]{toc}%
+   \if@fileexists
+      \input \tocfilebasename.toc
+      \ifrewritetocfile \opentocfile \fi
+   \fi
+}%
+%
+% 
+% Here are some sample definitions of the \toc...entry macros.  Perhaps
+% you or your book designer can come up with a better way of handling
+% contents than leaders.  These definitions are just as examples, not as
+% something you might want to actually use to print a document.
+% 
+\def\tocchapterentry#1#2{\line{\bf #1 \dotfill\ #2}}%
+\def\tocsectionentry#1#2{\line{\quad\sl #1 \dotfill\ \rm #2}}%
+\def\tocsubsectionentry#1#2{\line{\qquad\rm #1 \dotfill\ #2}}%
+%
+% 
+% 
+%  Cross-references.
+% 
+% Definitions of references are recorded in \jobname.aux, called
+% \auxfile in the macros, which btxmac.tex has opened.
+% 
+% When a label isn't defined, we only want to complain if
+% \xrefwarningtrue; btxmac uses \if@citewarning for this, so we have to
+% reuse that name.  We can't just say \let\ifxrefwarning =
+% \if@citewarning, since then changes to the latter won't be reflected
+% in the former.  On the other hand, we have to have a true \if...
+% command, so \if's and \fi's match properly.  What a mess.
+%
+\let\ifxrefwarning = \iftrue
+\def\xrefwarningtrue{\@citewarningtrue \let\ifxrefwarning = \iftrue}%
+\def\xrefwarningfalse{\@citewarningfalse \let\ifxrefwarning = \iffalse}%
+%
+% 
+% \xref{foo} produces ``p.\thinspace <page#>''.  \xrefn{foo} produces
+% ``<page#>''.  \xrdef{foo} produces nothing, but defines the label
+% `foo' to be on the current page.
+%
+% As usual, it takes two passes to get the cross-references right.  I
+% would like to check for labels being defined twice, but I don't know
+% how to do that.  If the cross-reference file has been read in, many
+% cross-references will be defined that I don't want to complain about.
+% It is only if two \xrdef commands are given to the same string that I
+% want to complain.  I could define a new control sequence for each
+% cross-reference, and check that, but that seems like too high of a
+% price to pay.
+%
+% 
+% \xrlabel{LABEL} expands to a cross-reference internal name.  We append
+% an _ character to NAME, to help avoid conflicts.  And we append an `x'
+% so that we don't redefine \_ on an empty label.
+% 
+\begingroup
+  % Mike Spivak's MathTime macros for Times Roman fonts changes the
+  % catcode of _ to be active.  (From adam@symcom.math.uiuc.edu.)
+  \catcode`\_ = 8
+  \gdef\xrlabel#1{#1_x}%
+\endgroup
+%
+%
+% \xrdef{LABEL} defines LABEL to be the current page number.  But we
+% don't define the label here, because the page number might be off: if
+% this is not the first time through, the label would already be
+% defined, and we would redefine it with the wrong information.
+% 
+\def\xrdef#1{\definexref{#1}{\noexpand\folio}{page}}%
+%
+% \definexref{LABEL}{DEFINITION}{CLASS} defines a cross-reference named
+% LABEL of label class CLASS to be DEFINITION.  (Or LABEL can be a
+% control sequence; it's expanded to get the label text.)  To get a
+% possible page number right, we have to write the definition out to the
+% auxiliary file, instead of only defining it directly.
+% 
+\def\definexref#1#2#3{%
+  % Remember what we're given; it might be `\@optionalarg', which
+  % \readauxfile trashes.  (No loss of generality here, since \csname
+  % will fully expand the label anyway.)
+  \edef\temp{#1}%
+  %
+  % Be sure we've read the aux file before we zap it:
+  \readauxfile
+  %
+  % When we read in the aux file next time, define the label:
+  \edef\@wr{\noexpand\writeaux{\string\@definelabel{\temp}{#2}{#3}}}%
+  \@wr
+  \ignorespaces
+}%
+%
+% \@definelabel{LABEL}{DEFINITION}{CLASS} actually defines LABEL of
+% label class CLASS to be DEFINITION.
+% 
+\def\@definelabel#1#2#3{%
+  % Define the control sequence.
+  \expandafter\gdef\csname\xrlabel{#1}\endcsname{#2}%
+  %
+  % Remember what kind of label this is, so \ref will know what to do.
+  \global\setproperty{\xrlabel{#1}}{class}{#3}%
+}%
+%
+% 
+% Typeset a reference to the label #1.
+% 
+\def\xrefn#1{%
+  \readauxfile
+  %
+  \expandafter \ifx\csname\xrlabel{#1}\endcsname\relax
+    \if@citewarning
+       \message{\linenumber Undefined label `#1'.}%
+    \fi
+    %
+    % Give it a dummy definition, though, to stop multiple error messages.
+    \expandafter\def\csname\xrlabel{#1}\endcsname{%
+      `{\tt
+        \escapechar = -1
+        \expandafter\string\csname#1\endcsname
+      }'%
+    }%
+  \fi
+  \csname\xrlabel{#1}\endcsname % Always produce something.
+}%
+%
+% \refn is just a synonym.
+% 
+\let\refn = \xrefn
+%
+% One common case: print `p. ' before the page number.
+% 
+\def\xref{p.\thinspace\xrefn}%
+%
+% \ref{LABEL} typesets \CLASSword for LABEL's class (if it's defined)
+% and then does \refn on LABEL. But amstex also has a \ref, so tell the
+% user if they try to use \ref and have loaded amsppt.sty.
+% 
+% \refs is similar, but puts the letter `s' after the \...word, thus
+% producing (for example) `Figures 1.2' (presumably to be followed by
+% `and~\refn{fig-1.3}').
+% 
+\def\@maybewarnref{%
+  \ifundefined{amsppt.sty}%
+    % No amsppt.sty, so just use ours.
+  \else
+    \message{Warning: amsppt.sty and Eplain both define \string\ref. See
+             the Eplain manual.}%
+    % Remember their definition.
+    \let\amsref = \ref
+  \fi
+  \let\ref = \eplainref
+  \ref
+}
+\let\ref = \@maybewarnref
+%
+\def\eplainref{\@generalref{}}%
+\def\refs{\@generalref s}%
+%
+% #1 is the text to follow the \...word, and is supplied by the macros
+% above.  #2 comes from the document, and is the LABEL.
+% 
+\def\@generalref#1#2{%
+  \readauxfile
+  %
+  \edef\temp{\getproperty{\xrlabel{#2}}{class}}%
+  %
+  % If the word for this class is not defined, don't complain.
+  \expandafter\ifx\csname \temp word\endcsname\relax \else
+    % Produce the word.
+    \csname \temp word\endcsname
+    % Add the suffix and then put in a tie before the \refn.  Do not
+    % rely on `~' being defined as a tie.
+    #1\penalty\@M \ 
+  \fi
+  %
+  \refn{#2}%
+}%
+%
+%
+% References to equations are similar.
+%
+% \eqref{foo} produces ``(<text for equation label foo>)''.
+% \eqdefn{foo} advances \eqnumber, resets \eqsubnumber, and defines
+%   `foo' to be the new number. 
+% \eqsubdefn{foo} advances \eqsubnumber and defines `foo'.  \eqref works
+%   for both equations and subequations,
+% \eqdef{foo} does \eqdefn, then inserts an \eqno and \eqref.
+% \eqsubdef{foo} does \eqsubdefn, then what \eqdef does.
+% 
+% The non-``sub'' macros also take an optional argument; if it's
+% present, we use it as the text for the equation label, instead of the
+% various counters.
+%
+% Because there are no page break issues with equations, we can
+% immediately define the control sequence.  But we also need to write
+% the definition out, in case the user wants to forward reference an
+% equation (bad style as that may be).
+%
+% The current equation number is in \eqnumber; we just advance it by one
+% for each \eqdef.  You can handle fancier equation numbers (e.g., ones
+% that include a chapter number) by redefining \eqprint, below, and
+% using your own counters.  We do provide for one level of substructure,
+% since that's more painful to implement than superstructures.
+%
+\newcount\eqnumber
+\newcount\subeqnumber
+%
+%
+% \eqdefn[TEXT]{LABEL} defines LABEL to be TEXT (if it's present),
+% otherwise it advances \eqnumber and defines LABEL to be that.  It
+% doesn't produce anything.
+% 
+\def\eqdefn{\@getoptionalarg\@fineqdefn}%
+\def\@fineqdefn#1{%
+  \ifx\@optionalarg\empty
+    \global\advance\eqnumber by 1
+    % We call \eqconstruct here instead of in \@eqdefn because we don't
+    % want to expand it for \eqsubdefn -- \eqsubdefn already includes an
+    % \eqrefn which includes the text of the label which was \eqconstructed.
+    \def\temp{\eqconstruct{\number\eqnumber}}%
+  \else
+    \def\temp{\noexpand\@optionalarg}%
+  \fi
+  %
+  % Always reset the current subequation number:
+  \global\subeqnumber = 0
+  %
+  % Remember this label, so that we can define subequations:
+  \gdef\@currenteqlabel{#1}%
+  \toks0 = \expandafter{\@currenteqlabel}%
+  %
+  % Actually do the definition, taking precautions not to expand \eqrefn
+  % in what we output to the aux file.  \eqrefn expands to many things,
+  % including \count@'s and \edef's and the expansion of \xrlabel, and
+  % it's just a real mess.
+  \begingroup
+    \def\eqrefn{\noexpand\eqrefn}%
+    \edef\temp{\noexpand\@eqdefn{\the\toks0}{\temp}}%
+    \temp
+  \endgroup
+}%
+% 
+% 
+% \eqsubdefn defines its argument as a ``subequation'' of the last \eqdef.
+%
+\def\eqsubdefn#1{%
+  \global\advance\subeqnumber by 1
+  \toks0 = {#1}%
+  %
+  % Get the text of the label;
+  \toks2 = \expandafter{\@currenteqlabel}%
+  %
+  % We must expand \@currenteqlabel.  We have to not expand
+  % \eqsubreftext here, as well \eqrefn, since the first arg to
+  % \eqsubreftext could also include lots of complicated things.
+  \begingroup
+    \def\eqrefn{\noexpand\eqrefn}%
+    \def\eqsubreftext{\noexpand\eqsubreftext}%
+    \edef\temp{%
+      \noexpand\@eqdefn
+        {\the\toks0}%
+        {\eqsubreftext{\eqrefn{\the\toks2}}{\the\subeqnumber}}%
+    }%
+    \temp           
+  \endgroup
+}%
+% 
+% \@eqdefn{LABEL}{REF-TEXT} actually handles the equation number
+% definitions and writing to the aux file.
+% 
+% In contrast to \xrdef, we define LABEL right away (as REF-TEXT).  We
+% can do this since we know right now what the right equation number is.
+% This eliminates some unnecessary warning.  It also lets the user put
+% \eqdef{} on all equations and have it work, since then \eqref
+% refers to the just-defined new value.
+% 
+\def\@eqdefn#1#2{%
+  \definexref{#1}{#2}{eq}%
+  \@definelabel{#1}{#2}{eq}%
+}%
+% 
+% \eqdef{LABEL} defines LABEL, with \eqdefn, then prints it.  We allow
+% an optional argument to explicitly specify the text which we define
+% the label as.
+%
+\def\eqdef{\@getoptionalarg\@fineqdef}%
+\def\@fineqdef{%
+  \toks0 = \expandafter{\@optionalarg}%
+  \edef\temp{\noexpand\@eqdef{\noexpand\eqdefn[\the\toks0]}}%
+  \temp
+}%
+%
+% \eqsubdef is to \eqdef as \eqsubdefn is to \eqdefn.  No optional
+% argument allowed here.
+% 
+\def\eqsubdef{\@eqdef\eqsubdefn}%
+%
+% \@eqdef{DEFN-CMD}{LABEL} defines LABEL, using DEFN-CMD.  Then it
+% inserts an \eqno (unless it's called when an \eqno would be invalid).
+% Then it prints the newly-defined value using \eqprint.
+% 
+\def\@eqdef#1#2{%
+  #1{#2}% Define the label.
+  %
+  \@maybedisableeqno
+  \eqno \eqref{#2}% Print the text.
+  \@mayberestoreeqno
+  \ignorespaces
+}%
+% 
+% 
+% If we are in an alignment or some other inner place, \eqno won't work.
+% 
+\let\@mayberestoreeqno = \relax
+%
+\def\@maybedisableeqno{%
+  \ifinner
+    \global\let\eqno = \relax
+    \global\let\@mayberestoreeqno = \@restoreeqno
+  \fi
+}%
+%
+% This makes `\eqno' mean \eqno again.
+% 
+\let\@primitiveeqno = \eqno
+\def\@restoreeqno{%
+  \global\let\eqno = \@primitiveeqno
+  \global\let\@mayberestoreeqno = \empty
+}%
+%
+% 
+% \eqrefn{LABEL} produces the text for the equation label LABEL, or
+% something suitable if LABEL is undefined.  (It possibly issues a
+% warning in the latter case as well.)
+%
+\let\eqrefn = \xrefn
+%
+% \eqref{LABEL} is the usual way to refer to equation labels; it calls
+% \eqprint on the text of LABEL.
+% 
+\def\eqref#1{\eqprint{\eqrefn{#1}}}%
+%
+% 
+% \eqconstruct{EQ-TEXT} constructs an equation number, i.e., the text to
+% be defined as the value of a label.
+% 
+\let\eqconstruct = \identity
+%
+% \eqprint{EQ-TEXT} produces the typeset equation number EQ-TEXT.
+%
+\def\eqprint#1{(#1)}%
+%
+% \eqsubreftext{EQ-TEXT}{SUBEQ-TEXT} produces the text of a subequation
+% reference.  (\eqprint is later called on the result of this to produce
+% output for subequations; I didn't define any \subeqprint.)
+% 
+\def\eqsubreftext#1#2{#1.#2}%
+%
+%
+% 
+%  Justification of multiple input lines.
+%
+% You use these by saying 
+% {\flushright 
+% <flush right text>
+% }
+% 
+% and similarly for \flushleft and \center.  The command must be
+% embedded in a group.  The lines are set in paragraphs as usual, i.e.,
+% blank lines start a new paragraph (by virtue of the
+% \blanklineskipamount vertical glue being inserted).
+% 
+% \environment ... \endenvironment isn't appropriate in this case, since
+% these ``environments'' can't be nested.
+% 
+\begingroup
+  \catcode `\^^M = \active %
+  \gdef\flushleft{%
+    \def\@endjustifycmd{\@endflushleft}%
+    \def\@eoljustifyaction{\null\hfil\break}%
+    \let\@firstlinejustifyaction = \relax
+    \@startjustify %
+  }%
+  \gdef\flushright{%
+    \def\@endjustifycmd{\@endflushright}%
+    \def\@eoljustifyaction{\break\null\hfil}%
+    \def\@firstlinejustifyaction{\hfil\null}%
+    \@startjustify %
+  }%
+  \gdef\center{%
+    \def\@endjustifycmd{\@endcenter}%
+    \def\@eoljustifyaction{\hfil\break\null\hfil}%
+    \def\@firstlinejustifyaction{\hfil\null}%
+    \@startjustify %
+  }%
+  %
+  % We do this before starting any of the justification commands.
+  \gdef\@startjustify{%
+    \parskip = 0pt
+    \catcode`\^^M = \active %
+    \def^^M{\futurelet\next\@finjustifyreturn}%
+    %
+    % \@eateol is called at the beginning of each justified paragraph.
+    \def\@eateol##1^^M{%
+      \def\temp{##1}%
+      \@firstlinejustifyaction %
+      \ifx\temp\empty\else \temp^^M\fi %
+    }%
+    \expandafter\aftergroup\@endjustifycmd %
+    \checkenv \environmenttrue %
+    \par\noindent %
+    \@eateol %
+  }%
+  %
+  % If the next thing is a ^^M, insert \blanklineskipamount glue.  Then
+  % do \@eoljustifyaction (which each justification command defines).
+  \gdef\@finjustifyreturn{%
+    \@eoljustifyaction %
+    \ifx\next^^M%
+      % Insert extra glue when the \@end... command does the \par.
+      \def\par{\endgraf\vskip\blanklineskipamount \global\let\par = \endgraf}%
+      \@endjustifycmd %
+      % Get back into horizontal mode for the next line.
+      \noindent %
+      \@firstlinejustifyaction %
+    \fi %
+  }%
+\endgroup
+% 
+\def\@endflushleft{\unpenalty{\parfillskip = 0pt plus1fil\par}\ignorespaces}%
+\def\@endflushright{% Remove the \hfil\null\break we just put on.
+   \unskip \setbox0=\lastbox \unpenalty
+   % We have fil glue at the left of the line; \parfillskip shouldn't
+   % affect that.
+   {\parfillskip = 0pt \par}\ignorespaces
+}%
+\def\@endcenter{% Remove the \hfil\null\break we just put on.
+   \unskip \setbox0=\lastbox \unpenalty
+   % We have fil glue at the left of the line; \parfillskip must balance it.
+   {\parfillskip = 0pt plus1fil \par}\ignorespaces
+}%
+% 
+%
+% 
+%  Automatically-columnated tables.
+% 
+% \makecolumns N/K: organizes the entries on the following N lines into
+% K columns.  If N is too small, some text beyond the end of the table
+% will be incorporated into the table, probably producing an error
+% message.  If N is too large, some of the entries will appear after the
+% table, probably looking very out of place.
+% 
+% You can adjust the position of the table on the page by changing
+% \parindent (space to the left of the block) and \hsize (distance from
+% the left margin to the right of the block).  (No doubt inside a
+% group.)  And you can allow a page break above the valign by changing
+% \abovecolumnspenalty.
+% 
+\newcount\abovecolumnspenalty   \abovecolumnspenalty = 10000
+\newcount\@linestogo         % Lines remaining to process.
+\newcount\@linestogoincolumn % Lines remaining in column.
+\newcount\@columndepth       % Number of lines in a column.
+\newdimen\@columnwidth       % Width of each column.
+\newtoks\crtok  \crtok = {\cr}%
+\newcount\currentcolumn
+%
+% The space matches an end-of-line that will probably be there.
+% 
+\def\makecolumns#1/#2: {\par \begingroup
+   % Set \@columndepth to the number of items we will put in a column:
+   % (N - 1) / K.
+   \@columndepth = #1
+   \advance\@columndepth by #2
+   \advance\@columndepth by -1
+   \divide \@columndepth by #2
+   \@linestogoincolumn = \@columndepth
+   \@linestogo = #1
+   %
+   % We start in the first column.
+   \currentcolumn = 1
+   %
+   \def\@endcolumnactions{%
+      \ifnum \@linestogo<2 
+         \the\crtok \egroup \endgroup \par % End \valign and \makecolumns.
+      \else
+         % We've done one more line out of the total.
+         \global\advance\@linestogo by -1
+         % 
+         % How many left in the column?
+         % 
+         \ifnum\@linestogoincolumn<2
+            % End this column, that was the last line.
+            \global\advance\currentcolumn by 1
+            \global\@linestogoincolumn = \@columndepth
+            \the\crtok
+         \else
+            % Still got more lines to go.
+            &\global\advance\@linestogoincolumn by -1
+         \fi
+      \fi
+   }%
+   %
+   % Set up to read the table.
+   % 
+   \makeactive\^^M
+   \letreturn \@endcolumnactions
+   % 
+   % Figure out how wide our columns are going to be; each column has
+   % exactly the same template, so we can use the feature described on
+   % p.241 of the TeXbook for repeating preambles.
+   % 
+   \@columnwidth = \hsize
+     \advance\@columnwidth by -\parindent
+     \divide\@columnwidth by #2
+   \penalty\abovecolumnspenalty
+   \noindent % It's not a paragraph (usually).
+   \valign\bgroup
+     &\hbox to \@columnwidth{\strut \hsize = \@columnwidth ##\hfil}\cr
+     %
+     % The next end-of-line starts everything going.
+}%
+%
+% 
+% 
+% \numberedfootnote is like plain TeX's \footnote, but automatically
+% numbered.  When you want to reset the footnote number, say
+% \footnotenumber = 0.
+% 
+% We also provide for more general formatting than \footnote:
+%   \footnotemarkseparation is the space between the reference mark and
+%     the footnote text;
+%  \interfootnoteskip is the space between footnotes;
+%  \everyfootnote is expanded just before we typeset the footnote.
+% 
+% The dimensions of the footnote rule are controlled by
+% \footnoterulewidth and \footnoteruleheight (the depth is always zero);
+% the space after the rule is \belowfootnoterulespace.
+% 
+\newcount\footnotenumber
+\newdimen\footnotemarkseparation \footnotemarkseparation = .5em
+\newskip\interfootnoteskip \interfootnoteskip = 0pt
+\newtoks\everyfootnote
+\newdimen\footnoterulewidth \footnoterulewidth = 2in
+\newdimen\footnoteruleheight \footnoteruleheight = 0.4pt
+\newdimen\belowfootnoterulespace \belowfootnoterulespace = 2.6pt
+%
+\let\@plainfootnote = \footnote
+\let\@plainvfootnote = \vfootnote
+%
+\def\vfootnote#1{\insert\footins\bgroup
+  \interlinepenalty\interfootnotelinepenalty
+  \splittopskip\ht\strutbox % top baseline for broken footnotes
+  \advance\splittopskip by \interfootnoteskip
+  \splitmaxdepth\dp\strutbox
+  \floatingpenalty\@MM
+  \leftskip\z@skip \rightskip\z@skip \spaceskip\z@skip \xspaceskip\z@skip
+  \everypar = {}%
+  \parskip = 0pt % because of the vskip
+  % Even if typesetting in multicolumns, do footnotes in normal page width.
+  % (We don't have any provision in the output routine for having
+  % footnotes per column, anyway.)
+  \ifnum\@numcolumns > 1 \hsize = \@normalhsize \fi
+  \the\everyfootnote
+  \vskip\interfootnoteskip
+  \indent\llap{#1\kern\footnotemarkseparation}\footstrut\futurelet\next\fo@t
+}%
+%
+\def\footnoterule{\dimen0 = \footnoteruleheight
+  \advance\dimen0 by \belowfootnoterulespace
+  \kern-\dimen0
+  \hrule width\footnoterulewidth height\footnoteruleheight depth0pt
+  \kern\belowfootnoterulespace
+  \vskip-\interfootnoteskip
+}%
+%
+\def\numberedfootnote{%
+  \global\advance\footnotenumber by 1
+  \@plainfootnote{$^{\number\footnotenumber}$}%
+}%
+%
+%
+% 
+%  Margins.
+% 
+% TeX's primitives determine the type area.  But some users prefer to
+% think in terms of margins.  These definitions allow one to say, for
+% example, `\topmargin = 2in', instead of `\voffset=1in\advance\vsize by
+% -1in'.  Constructions like `\advance\topmargin by 1in' give an error
+% message, though, since \topmargin is not a parameter.  Instead, the
+% macro \advancetopmargin has to be used.
+% 
+% 
+\newdimen\paperheight \paperheight = 11in
+%
+\def\topmargin{\afterassignment\@finishtopmargin \dimen0}%
+\def\@finishtopmargin{%
+  \dimen2 = \voffset		% Remember the old \voffset.
+  \voffset = \dimen0 \advance\voffset by -1in
+  \advance\dimen2 by -\voffset	% Compute the change in \voffset.
+  \advance\vsize by \dimen2	% Change type area accordingly.
+}%
+\def\advancetopmargin{%
+  \dimen0 = 0pt \afterassignment\@finishadvancetopmargin \advance\dimen0
+}%
+\def\@finishadvancetopmargin{%
+  \advance\voffset by \dimen0
+  \advance\vsize by -\dimen0
+}%
+%
+%
+\def\bottommargin{\afterassignment\@finishbottommargin \dimen0}%
+\def\@finishbottommargin{%
+  \@computebottommargin		% Result in \dimen2.
+  \advance\dimen2 by -\dimen0	% Compute the change in the bottom margin.
+  \advance\vsize by \dimen2	% Change the type area.
+}%
+\def\advancebottommargin{%
+  \dimen0 = 0pt \afterassignment\@finishadvancebottommargin \advance\dimen0
+}%
+\def\@finishadvancebottommargin{%
+  \advance\vsize by -\dimen0
+}%
+%
+% Find the current bottom margin, putting the result in \dimen2.
+% 
+\def\@computebottommargin{%
+  \dimen2 = \paperheight	% The total paper size.
+  \advance\dimen2 by -\vsize	% Less the text size.
+  \advance\dimen2 by -\voffset	% Less the offset at the top.
+  \advance\dimen2 by -1in	% Less the default offset.
+}%
+% 
+% 
+\newdimen\paperwidth \paperwidth = 8.5in
+%
+\def\leftmargin{\afterassignment\@finishleftmargin \dimen0}%
+\def\@finishleftmargin{%
+  \dimen2 = \hoffset		% Remember the old \hoffset.
+  \hoffset = \dimen0 \advance\hoffset by -1in
+  \advance\dimen2 by -\hoffset	% Compute the change in \hoffset.
+  \advance\hsize by \dimen2	% Change type area accordingly.
+}%
+\def\advanceleftmargin{%
+  \dimen0 = 0pt \afterassignment\@finishadvanceleftmargin \advance\dimen0
+}%
+\def\@finishadvanceleftmargin{%
+  \advance\hoffset by \dimen0
+  \advance\hsize by -\dimen0
+}%
+%
+%
+\def\rightmargin{\afterassignment\@finishrightmargin \dimen0}%
+\def\@finishrightmargin{%
+  \@computerightmargin		% Result in \dimen2.
+  \advance\dimen2 by -\dimen0	% Compute the change in the right margin.
+  \advance\hsize by \dimen2	% Change the type area.
+}%
+\def\advancerightmargin{%
+  \dimen0 = 0pt \afterassignment\@finishadvancerightmargin \advance\dimen0
+}%
+\def\@finishadvancerightmargin{%
+  \advance\hsize by -\dimen0
+}%
+%
+% Find the current right margin, putting the result in \dimen2.
+% 
+\def\@computerightmargin{%
+  \dimen2 = \paperwidth		% The total paper size.
+  \advance\dimen2 by -\hsize	% Less the text size.
+  \advance\dimen2 by -\hoffset	% Less the offset at the left.
+  \advance\dimen2 by -1in	% Less the default offset.
+}%
+% 
+% 
+% 
+%  Double column output.
+%
+% \doublecolumns begins double column output.  It can be called
+% in the midst of a page.  \singlecolumn restores single column 
+% output.  (It would be wrong to require \enddoublecolumns, because 
+% often one wants double column mode to continue to the end of 
+% the document.)
+%
+% The basic approach is that of Appendix E of the TeXbook, p.417.
+% David Guichard made significant improvements to my original implementation.
+%
+% The glue here (the default is intended to be one linespace) is inserted
+% before double columns start, and after they end.
+%
+\newskip\abovecolumnskip \abovecolumnskip = \bigskipamount
+\newskip\belowcolumnskip \belowcolumnskip = \bigskipamount
+%
+% Space between the columns. It can be changed as desired.
+\newdimen\gutter \gutter = 2pc
+%
+% These registers are needed for dealing with switching back and forth.
+\newbox\@partialpage
+\newdimen\@columnhsize
+\newdimen\@normalhsize
+\newdimen\@normalvsize
+\newtoks\previousoutput
+%
+% Some synonymous ways to refer to multiple column modes.
+\def\quadcolumns{\@columns4}%
+\def\triplecolumns{\@columns3}%
+\def\doublecolumns{\@columns2}%
+\def\begincolumns#1{\ifcase#1\relax \or \singlecolumn \or \@columns2 \or
+                            \@columns3 \or \@columns4 \else \relax \fi}%
+\let\endcolumns = \singlecolumn
+\let\@ndcolumns = \relax
+%
+% Set this by default so \vfootnote can unconditionally inspect it.
+\chardef\@numcolumns = 1
+%
+% Start typesetting with #1 columns.
+\def\@columns#1{%
+  \@ndcolumns
+  %
+  \let\@ndcolumns = \@endcolumns
+  \chardef\@numcolumns = #1
+  %
+  \par                     % Shouldn't start in horizontal mode.
+  \previousoutput = \expandafter{\the\output}%
+  %
+  % Figure out how wide the columns should be -- for n columns,
+  % decrement by n - 1 gutters.
+  \@columnhsize = \hsize
+  \count@ = \@numcolumns
+  \advance\count@ by -1
+  \advance\@columnhsize by -\count@\gutter
+  \divide\@columnhsize by \@numcolumns
+  %
+  % Set up to grab the page so far and save it in \@partialpage.
+  \output = {\global\setbox\@partialpage =
+    \vbox{\unvbox255\vskip\abovecolumnskip}%
+  }%
+  %
+  % \pagegoal is the size that TeX will make \box255.  We want a box
+  % exactly the size of the current height of the page, i.e., \pagetotal.
+  \pagegoal = \pagetotal
+  %
+  % Expand the \output we just defined.
+  \eject
+  %
+  % Reset \output to prepare for the first real page break.
+  \output = {\@columnoutput}%
+  \@normalhsize = \hsize
+  \@normalvsize = \vsize
+  \hsize = \@columnhsize
+  %
+  % Compute \vsize based on what's already on the page
+  % and the number of columns. Also change the mag factor for insertions.
+  \advance\vsize by -\ht\@partialpage
+  %
+  \advance\vsize by -\ht\footins
+  \ifvoid\footins\else \advance\vsize by -\skip\footins \fi
+  \multiply\count\footins by \@numcolumns
+  %
+  \advance\vsize by -\ht\topins
+  \ifvoid\topins\else \advance\vsize by -\skip\topins \fi
+  \multiply\count\topins by \@numcolumns
+  %
+  \global\vsize = \@numcolumns\vsize
+}%
+%
+% When this is invoked box 255 contains just the right amount of
+% material, whether triggered by an output routine or a change in the
+% number of columns. Because columns have to contain an integral number
+% of lines of type, we take a bit of care with balancing the heights of
+% the columns to prevent either losing material or having a very short
+% last column.
+%
+% when a page ends due to \bye or \eject, box 255 will contain lots of
+% white space, so the columns will not look balanced. To fix this use
+% \singlecolumn before ending the page.
+%
+\def\@columnsplit{%
+  \splittopskip = \topskip
+  \splitmaxdepth = \baselineskip
+  %
+  % \dimen0 will be the height that the double-column material on this
+  % page should have, i.e., the height of the page (\singlecolumvsize)
+  % minus single-column material, which includes insertions.  (If you
+  % want your insertions to respect the columns, you will have to
+  % change the output routine.)  If you add more insertions, they
+  % should be taken into account both here and in \singlecolumn.
+  %
+  % Unfortunately, we lose on flexible glue because we must
+  % \vsplit to a <dimen>.
+  \dimen@ = \ht255
+    \divide\dimen@ by \@numcolumns
+ %
+ % Split the long scroll into columns.
+ \begingroup
+    % We do not want to see underfull \vbox messages unless the final
+    % page is underfull.
+    \vbadness = 10000
+    %
+    % The first (leftmost) column.
+    \global\setbox1 = \vsplit255 to \dimen@  \global\wd1 = \hsize
+    %
+    % The second column.
+    \global\setbox3 = \vsplit255 to \dimen@  \global\wd3 = \hsize
+    %
+    \ifnum\@numcolumns > 2
+      % The third column, if requested.
+      \global\setbox5 = \vsplit255 to \dimen@ \global\wd5 = \hsize
+    \fi
+    \ifnum\@numcolumns > 3
+      % The fourth column, likewise if requested.
+      \global\setbox7 = \vsplit255 to \dimen@ \global\wd7 = \hsize
+    \fi
+  \endgroup
+  % 
+  % Preserve what's left over.
+  \setbox0 = \box255
+  %
+  % Set up \box255 with the real output page, as the previous output
+  % routine expects.
+  \global\setbox255 = \vbox{%
+    \unvbox\@partialpage
+    \ifcase\@numcolumns \relax\or\relax
+      \or \hbox to \@normalhsize{\box1\hfil\box3}%
+      \or \hbox to \@normalhsize{\box1\hfil\box3\hfil\box5}%
+      \or \hbox to \@normalhsize{\box1\hfil\box3\hfil\box5\hfil\box7}%
+    \fi
+  }%
+  %
+  % Save what's left over in a private register before calling their
+  % output routine.
+  \setbox\@partialpage = \box0
+}%
+%
+% Our output routine splits the columns and then calls the previous one.
+% 
+\def\@columnoutput{%
+  \@columnsplit
+  \hsize = \@normalhsize % Local to \output's group.
+  \vsize = \@normalvsize
+  \the\previousoutput
+  %
+  % Put back what didn't fit.
+  \unvbox\@partialpage
+  \penalty\outputpenalty
+  %
+  % The correct vsize is the original vsize times the
+  % number of columns.
+  \global\vsize = \@numcolumns\@normalvsize
+}%
+%
+% Go back to single-column typesetting.  Assume \doublecolumns has
+% been called.
+% 
+\def\singlecolumn{%
+  \@ndcolumns
+  \chardef\@numcolumns = 1
+  \vskip\belowcolumnskip
+  \nointerlineskip
+}%
+%
+\def\@endcolumns{%
+  \global\let\@ndcolumns = \relax
+  \par % Shouldn't start in horizontal mode.
+  %
+  \global\output = {\global\setbox1 = \box255}%
+  \pagegoal = \pagetotal
+  \eject                    % Exercise the page builder, i.e., \output.
+  \global\setbox255 = \box1 % Retrieve what the fake \output set.
+  %
+  % \box255 now has the double-column material.  On the page where we
+  % switch back to one column, the double-column material might not
+  % fill up the page.  We want to split whatever is there.
+  \@columnsplit
+  %
+  \global\vsize = \@normalvsize
+  \global\hsize = \@normalhsize
+  \global\output = \expandafter{\the\previousoutput}%
+  %
+  \ifvoid\topins\else\topinsert\unvbox\topins\endinsert\fi
+  \unvbox255
+}%
+%
+% We don't have any way to force a column eject, since the \output
+% routine is only prepared to split up a full page of material. Instead,
+% we provide the following as a guess at enough space to fill up the
+% current column.
+\def\columnfill{%
+  \dimen@ = \@normalvsize
+  \advance\dimen@ by -\pagetotal
+  \kern\dimen@
+}
+%
+%
+\let\wlog = \@plainwlog
+\catcode`@ = \@eplainoldatcode
+%
+\def\fmtname{eplain}%
+\def\eplain{t}%
+{\edef\plainversion{\fmtversion}%
+ \xdef\fmtversion{REPLACE-WITH-VERSION: REPLACE-WITH-DAY-MONTH-YEAR (and plain \plainversion)}%
+}%
+%
+% 
+% 
+% 
+% Local variables:
+% page-delimiter: "^% \f"
+% End:

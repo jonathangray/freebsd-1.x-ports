@@ -1,0 +1,102 @@
+# Makefile for TeX to C conversion programs.
+
+SHELL = /bin/sh
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+# This is so kpathsea will get remade automatically if you change
+# something in it and recompile from the package directory.
+kpathsea_parent = ../..
+kpathsea_dir = $(kpathsea_parent)/kpathsea
+kpathsea = $(kpathsea_dir)/kpathsea.a
+
+# Routines used everywhere.
+commono = ../lib/lib.a $(kpathsea)
+
+CC = @CC@
+CFLAGS = -g
+CPPFLAGS = -I$(srcdir)/../lib -I../..
+
+LEX = @LEX@
+LEXLIB = @LEXLIB@
+LEX_OUTPUT_ROOT = @LEX_OUTPUT_ROOT@
+YACC = @YACC@
+
+CCLD = $(CC)
+LDFLAGS = $(CFLAGS) $(XLDFLAGS)
+LIBS = @LIBS@ $(extralibs)
+libs = $(commono) $(LIBS)
+
+program = web2c fixwrites splitup regfix
+
+.SUFFIXES:
+.SUFFIXES: .o .c
+.c.o:
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $*.c
+
+
+all: $(program)
+
+web2c: web2c.o y.tab.o $(LEX_OUTPUT_ROOT).o
+	$(CCLD) -o web2c $(LDFLAGS) web2c.o y.tab.o $(LEX_OUTPUT_ROOT).o \
+	  $(LEXLIB) $(libs) 
+
+web2c.o: web2c.c y.tab.h
+
+$(LEX_OUTPUT_ROOT).o: $(LEX_OUTPUT_ROOT).c y.tab.h
+$(LEX_OUTPUT_ROOT).c: web2c.lex
+	$(LEX) web2c.lex
+
+y.tab.o: y.tab.c
+y.tab.c y.tab.h: web2c.yacc
+	@echo Expect one shift/reduce conflict.
+	$(YACC) -d -v web2c.yacc
+
+fixwrites: fixwrites.o
+	$(CCLD) -o fixwrites $(LDFLAGS) fixwrites.o $(libs)
+
+splitup: splitup.o
+	$(CCLD) -o splitup $(LDFLAGS) splitup.o $(libs)
+
+regfix: regfix.o
+	$(CCLD) -o regfix $(LDFLAGS) regfix.o $(libs)
+
+
+Makefile: Makefile.in ../config.status
+	(cd ..; $(SHELL) config.status)
+
+
+install install-exec install-data:
+
+TAGS: *.c *.h
+	etags -t *.c *.h
+
+
+mostlyclean::
+	rm -f *.o $(program) $(lib) $(programs)
+
+clean:: mostlyclean
+	rm -f *.dvi *.pool
+
+distclean:: clean
+	rm -f Makefile config.status c-auto.h
+
+# Although we can remake configure and c-auto.h.in, we don't remove
+# them, since many people may lack Autoconf.  Use configclean for that.
+realclean:: distclean
+	rm -f TAGS *.info*
+
+extraclean::
+	rm -f *.aux *.bak *.bbl *.blg *.dvi *.log *.orig *.pl *.rej
+	rm -f *.i *.s *.tfm *.vf *.vpl *\#* *gf *pk *~
+	rm -f CONTENTS.tex a.out core mfput.* patch* texput.*
+
+configclean:
+	rm -f configure c-auto.h.in c-auto.h
+
+
+# Prevent GNU make 3 from overflowing arg limit on system V.
+.NOEXPORT:
+
+clean::
+	rm -f y.tab.c y.tab.h y.output yacc.* $(LEX_OUTPUT_ROOT).c

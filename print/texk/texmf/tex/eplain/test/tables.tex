@@ -1,0 +1,119 @@
+% Copyright Michael J. Ferguson, INRS-Telecommunications (1985,1986)
+% All rights reserved.
+\catcode`\@=11
+
+%======= Additional active Characters ===========
+% ALL ACTIVE CHARACTERS MUST BE DECLARED AND DEFINED AT THE VERY
+% BEGINNING OR THERE IS A DANGER OF INCORRECT TOKENIZATION
+% ======== THESE ARE USED IN THE TABLE MACROS =========
+\message{<< Additional Active Characters >>}
+\catcode`\:= \active
+\def:{\ifmmode \vert\else \char`\:\fi} % effectively undoes activeness
+\def\q@m{\string"}
+\catcode`\"=\active \def"{\char`\"}
+%=== these are redefined inside the table macros =====
+
+
+%============= Table making macros ============
+% the basic format is
+% \begintable
+% <special definitions for this table>
+% \table format <format as in halign except it needs ## instead of #>
+% \br{<struts>} .... : .... : .... " ..... : .... \er{<stuff>}
+% \-
+% ....etc
+
+% these macros require that : and " be active during the entire
+% document to work correctly. ... although some definitions specifically
+% set them active
+\newcount\a@lignstate  \a@lignstate=0  %0 -- between lines after \cr
+                                       %1 -- beginning of line in \bl
+                                       %2 -- midline
+                                       %3 -- endline in \el
+\def\hssf{\hskip 0pt plus 1fill minus 1fill}
+\def\n@ewaligndefs{\def\center##1{\hssf ##1\hssf\null}
+          \def\left##1{##1\hssf\null}
+          \def\right##1{\hssf ##1\null}}
+\newdimen\trulesize
+\let\tr=\trulesize
+\trulesize = .4pt
+\def\zerocenteredbox#1{\ifmmode \ifinner \setbox2 =\hbox{$#1$}\else
+                           \setbox2 =\hbox{$\displaystyle#1$}\fi
+                     \else \setbox2 =\hbox{#1}\fi
+      \setbox0=\hbox{\lower.5ex\hbox{$\vcenter{\box2}$}}\ht0=0pt\dp0 =0pt\box0}
+\let\zb=\zerocenteredbox
+
+%this macro creates a strut with the that is higher by #2 and deeper than #3
+% than the natural size of #1 ... the sizes may be negative
+\def\modifystrut#1#2#3{\setbox4=\hbox{#1}\dimen0=\ht4
+             \advance \dimen0 by #2 \dimen2 = \dp4
+             \advance  \dimen2 by #3
+            \vrule width 0pt height \dimen0 depth \dimen2}
+\let\mst=\modifystrut
+%general math form
+\def\math#1{\relax $\relax#1\relax$}
+\def\displaymath #1{\relax$\displaystyle #1\relax$}
+
+
+%
+\newskip\tcs
+\newtoks\tablespread
+\newskip\midtabglue \midtabglue = 0pt plus 1fill
+\newtoks\everytable  \everytable = {\relax}
+
+{\catcode`\:=\active   \catcode`\" = \active
+  \gdef\begintable{\vbox\bgroup \tcs=.5em % uses font in force when entering
+                  \catcode`\:=\active
+                  \catcode`\"=\active
+                   \def\:{\relax \vrule height 2.5ex depth .9ex width 0pt}
+          \def\-{\ifcase\a@lignstate \fulltablerule{\tr}
+                  \else
+                  \thrule{\tr}\fi}
+          \let\t@xx =\relax % for premature expansions
+          \everycr={\noalign{\global\a@lignstate=0}}
+          \def\fulltablerule##1{\noalign{\hrule height
+                   ##1}}
+          \def\thrule##1{\omit\leaders\hrule height ##1\hfill}
+          \def\center{\hskip\tcs\hss ########\hss\hskip\tcs}
+          \def\left{\hskip\tcs ########\hss\hskip\tcs}
+          \def\right{\hskip\tcs\hss ########\hskip\tcs}
+          \def\sprule{\tvrule{2.5\tr}}
+          \def:{\ifcase\a@lignstate \def\t@xx{\tvrule{\tr}}\or
+                            \def\t@xx{\tvrule{\tr}}\or
+                             \def\t@xx{\unskip&\tvrule{\tr}&}\else
+                             \def\t@xx{\tvrule{\tr}}\fi\t@xx}
+          \def\:{\ifcase\a@lignstate \def\t@xx{\sprule}\or
+                            \def\t@xx{\sprule}\or
+                             \def\t@xx{\unskip&\sprule&}\else
+                              \def\t@xx{\sprule}\fi\t@xx}
+          \def"{&########&} % for table format
+          \def\br##1{\global\a@lignstate=1 ##1\unskip\global\a@lignstate=2&}
+          \def\er##1{\global\a@lignstate=3\unskip&##1\unskip
+                      \global\a@lignstate=0\cr}
+          \def\tvrule##1{\hss\vrule width ##1\hss}
+          \def~{\penalty\@M \hphantom{0}}
+%                               % changes ~ to be phantom of width .5em
+          \tablespread = {}
+          \the\everytable
+               }
+  \gdef\begintableformat #1\endtableformat{\offinterlineskip \tabskip = 0pt
+       \edef\t@blform{####\tabskip =\midtabglue &#1&####\tabskip=0pt\cr}
+%                                               % adds rules front and back
+                                  \n@ewaligndefs
+                                 \def"{\ifcase\a@lignstate \def\t@xx{\relax}\or
+                                          \def\t@xx{\relax}\or
+                                        \def\t@xx{\unskip&&}\else
+                                        \def\t@xx{\relax}\fi\t@xx}
+                                \edef\h@align{\halign \the\tablespread}
+                                  \h@align\bgroup\span\t@blform}
+      }% " and : are always active in INRSTEX
+
+\def\use#1{\omit\mscount=#1 \advance\mscount by -1\multiply\mscount by2
+                \loop\ifnum\mscount>1 \sp@n\repeat
+                \ifnum\mscount>0 \span \else \relax \fi}
+\let\sp=\span
+\let\om = \omit
+\def\sa#1{\setbox0=\hbox{#1}\hbox to \wd0{}}
+\def\endtable{\crcr\egroup\egroup}
+
+\catcode`\@=12

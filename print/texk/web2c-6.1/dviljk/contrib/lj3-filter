@@ -1,0 +1,116 @@
+#!/usr/local/bin/perl
+#####################################################################
+#  Stefan Esser
+#
+# /usr/local/lib/lpdfilters/lj3-filter
+#
+#	BSD line printer filter for HP-PCL 5 printer
+#	  with independent init and uninit strings 
+#	  for HP-PCL and HP-GL modes
+#
+#       Fri Jan  3 12:39:43 1992 -- Gustaf Neumann
+#       added support for printing of dvi-files 
+#
+# CONFIGURATION:
+#  - the location of perl (headerline)             /usr/local/bin/perl
+#  - the location of the tmp file (variable $tmpfile below)
+#  - the name of the dvi-filter and its options (variable $dvifilter below)
+
+$tmpfile = "/usr/tmp/dvilj$$.dvi";
+$dvifilter = "/usr/local/bin/dvilj -q -s26 -e- $tmpfile";
+
+#--------------------------------------------------------------------
+# init and uninit strings for HP-PCL and HP-GL modes
+#
+$text_inistr = "\033E\033&k2G";		# Text init string
+$text_unistr = "\033E";			# Text un_init string
+
+#$hpgl_inistr = "\033E\033%0B";		# HP-GL init string
+$hpgl_inistr = "\033E\033&l1O\033%0B";	# HP-GL init string (rot 90 degree)
+$hpgl_unistr = "\033E";			# HP-GL un_init string
+$stdpwcmd    = "PW 0.15;";		# default pen width in HP-GL mode
+
+#--------------------------------------------------------------------
+# describe (a superset of :-) the HP-GL commands
+#
+$hpglcmd = '(SM.|LB[^\003]*\003|[A-Z][A-Z][-\d,.\s]*|[.,;]|\033\..([\d;\s]*:)?|\s)';
+
+#--------------------------------------------------------------------
+# lprm sends SIGINT (is THIS signal handler necessary ???)
+#
+$SIG{'INT'}  = 'CLEANUP';
+
+sub CLEANUP {
+    print ($hpglfile ? $hpgl_unistr : $text_unistr);
+    unlink $tmpfile if $dvifile;
+    close(STDOUT);
+    exit 2;
+}
+
+#--------------------------------------------------------------------
+# read enough (=4KByte) data to choose HP-GL or HP-PCL mode
+#
+$numread = read(STDIN,$buffer,4096);
+
+#--------------------------------------------------------------------
+# check whether the file is a dvi-file
+
+$dvifile = $buffer =~ m/^\367\002/oi;
+if ($dvifile) {
+    open(SPOOL,">$tmpfile") || die "Can't open $tmpfile for writing!";
+    while ($numread > 0) {
+	print SPOOL  $buffer;
+	$numread=read(STDIN,$buffer,4096);
+    }
+    close(SPOOL) || exit (1);
+    system $dvifilter || exit (1);
+    unlink $tmpfile;
+    close(STDOUT) || exit (1);
+    exit (0);
+}
+
+ 
+#--------------------------------------------------------------------
+# look for a sequence of HP-GL commands
+#
+$buffer  =~ m/^$hpglcmd+/oi;
+
+$matchlen= length($&);
+$hpglfile= $matchlen > 10 && $matchlen / $numread > 0.95;
+
+#--------------------------------------------------------------------
+# add command to set pen width after 'IN', if found within the first 20 bytes
+# else that default pen width
+#
+if ($hpglfile && substr($buffer,0,20) =~ m/IN/i) {
+    $pwcmd  = ($buffer =~ m/(PW\s*\d+\.?\d*\s*;)/i)[0] || $stdpwcmd;
+    $buffer =~ s/IN\s*;/IN;$pwcmd/i;
+}
+
+
+#--------------------------------------------------------------------
+# print init string, all data, uninit string to STDOUT
+#
+print ($hpglfile ? $hpgl_inistr : $text_inistr);
+
+while ($numread > 0) {
+    print $buffer;
+    $numread=read(STDIN,$buffer,4096);
+}
+
+print ($hpglfile ? $hpgl_unistr : $text_unistr);
+
+close(STDOUT) || exit (1);
+
+exit (0);
+
+
+
+
+
+
+
+
+
+
+

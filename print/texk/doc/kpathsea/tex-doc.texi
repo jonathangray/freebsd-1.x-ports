@@ -1,0 +1,440 @@
+@c Copyright (C) 1993 Karl Berry.
+@c For copying conditions, see the file copying.texi.
+
+@node TeX support
+@chapter @TeX{} support
+
+@cindex @TeX{} features
+
+Although the basic features in Kpathsea can be used for any type of path
+searching, I wrote Kpathsea specifically for @TeX{} system programs.
+I had been struggling with the programs I was using (Dvips, Xdvi, and
+@TeX{} itself) having slightly different notions of how to specify
+paths; and debugging was painful, since no code was shared.
+
+Therefore, Kpathsea provides some @TeX{}-specific features.  Indeed,
+many of the supposedly generic path searching features were provided
+because it seemed useful in con@TeX{}t, particularly for font lookup.
+
+@menu
+* Envvars: TeX environment variables.	Overriding compiled-in paths.
+* Glyph lookup::			Searching for bitmap fonts.
+@end menu
+
+
+@node TeX environment variables
+@section @TeX{} environment variables
+
+@cindex environment variables for @TeX{}
+@cindex @TeX{} environment variables
+
+Kpathsea defines a sequence of environment variables to search for each
+type of @TeX{} file.  This makes it easy for different programs to check
+the same environment variables, in the same order.
+
+The following table lists the environment variables searched for each
+file type in the order they are searched (and a brief description of the
+file type).  That is, only if the first variable is unset is the second
+variable checked, and so on.  If none are set, a default set at
+compilation time is used.
+
+@table @samp
+
+@item .base
+@flindex .base
+@vindex MFBASES
+(Metafont memory dump)
+@samp{MFBASES}
+
+@item .bib
+@flindex .bib
+@vindex BIBINPUTS
+(Bib@TeX{} source)
+@samp{BIBINPUTS}
+
+@item .bst
+@flindex .bst
+@vindex BSTINPUTS
+@vindex TEXINPUTS
+(Bib@TeX{} style file)
+@samp{BSTINPUTS}, @samp{TEXINPUTS}
+
+@item .fmt
+@flindex .fmt
+@vindex TEXFORMATS
+(@TeX{} memory dump)
+@samp{TEXFORMATS}
+
+@item gf
+@flindex .gf
+@vindex GFFONTS
+@vindex GLYPHFONTS
+@vindex TEXFONTS
+(generic font bitmap)
+@samp{GFFONTS}, @samp{GLYPHFONTS}, @samp{TEXFONTS}
+
+@item .mf
+@flindex .mf
+@vindex MFINPUTS
+(Metafont source)
+@samp{MFINPUTS}
+
+@item mf.pool
+@flindex .pool
+@vindex MFPOOL
+(Metafont program strings)
+@samp{MFPOOL}
+
+@item pk
+@flindex .pk
+@vindex PKFONTS
+@vindex TEXPKS
+@vindex GLYPHFONTS
+@vindex TEXFONTS
+(packed bitmap font)
+@samp{PKFONTS}, @samp{TEXPKS}, @samp{GLYPHFONTS}, @samp{TEXFONTS}
+
+@item .tex
+@flindex .tex
+@vindex TEXINPUTS
+(@TeX{} source)
+@samp{TEXINPUTS}
+
+@item tex.pool
+@flindex .pool
+@vindex TEXPOOL
+(@TeX{} program strings)
+@samp{TEXPOOL}
+
+@item .tfm
+@flindex .tfm
+@vindex TFMFONTS
+@vindex TEXFONTS
+(@TeX{} font metrics)
+@samp{TFMFONTS}, @samp{TEXFONTS}
+
+@item .vf
+@flindex .vf
+@vindex VFFONTS
+@vindex TEXFONTS
+(virtual font)
+@samp{VFFONTS}, @samp{TEXFONTS}
+
+@end table
+
+@flindex kpathsea/filefmt.h
+@noindent These lists are defined in the source file @file{kpathsea/filefmt.h}.
+
+For the font variables, the intent is that:
+
+@enumerate
+
+@item
+@samp{TEXFONTS} is the default for everything.
+
+@item
+@samp{GLYPHFONTS} the default for bitmap (or, more precisely,
+non-metric) files.
+
+@item
+Each format has its own variable.
+
+@item
+@vindex XDVIFONTS
+@vindex DVIPSFONTS
+Not shown in the table is that each program can and should have its own
+path as well---@samp{XDVIFONTS} and @samp{DVIPSFONTS} in the case of
+Xdvik and Dvipsk.
+
+@end enumerate
+
+
+@node Glyph lookup
+@section Glyph lookup
+
+@cindex glyph lookup
+@cindex searching for glyphs
+@cindex @TeX{} glyph lookup
+
+@flindex kpathsea/tex-glyph.c
+@findex kpse_find_glyph_format
+Kpathsea provides a routine (@code{kpse_find_glyph_format} in
+@file{kpathsea/tex-glyph.c}) which searches for a bitmap font in GF or
+PK format (or either) given a font name (e.g., @samp{cmr10}) and a
+resolution (e.g., 300).
+
+The search is based solely on filenames, not file contents---if a PK
+file is named @file{cmr10.300gf}, it will be found as a GF file.
+
+Here is an outline of the search strategy (details in the sections
+below) for a file @var{name} at resolution @var{dpi}.  The search stops
+at the first successful lookup.
+
+@enumerate
+
+@item Look for an existing file @var{name}.@var{dpi} in the specified formats.
+
+@item If @var{name} is an alias for a file @var{a} in some ``fontmap''
+file, look for @var{a}.@var{dpi}.
+
+@item Run an external script (typically named @code{MakeTeXPK}) to
+generate the font.
+
+@item Look for @var{fallback}.@var{dpi}, where @var{fallback} is some
+last-resort font (typically @samp{cmr10}).
+
+@end enumerate
+
+@menu
+* Basic glyph lookup::		Features common to all glyph lookups.
+* Fontmap::			Aliases for fonts.
+* MakeTeX... scripts::		Creating files on the fly.
+* Fallback font::		Resolutions and fonts of last resort.
+@end menu
+
+
+@node Basic glyph lookup
+@subsection Basic glyph lookup
+
+@cindex basic glyph lookup
+@cindex common features in glyph lookup
+
+When Kpathsea looks for a bitmap font @var{name} at resolution
+@var{dpi} in a format @var{format}, it first checks if a file
+@samp{@var{name}.@var{dpi}@var{format}} exists; for example,
+@samp{cmr10.300pk}.  Kpathsea looks for a PK file first, then a GF file.
+
+@cindex tolerance for glyph lookup
+@cindex glyph lookup bitmap tolerance
+@findex KPSE_BITMAP_TOLERANCE
+If that fails, Kpathsea looks for a font with a close-enough @var{dpi}.
+``Close enough'' is defined (by the macro @code{KPSE_BITMAP_TOLERANCE}
+in @file{kpathsea/tex-glyph.h}) to be @code{@var{dpi} / 500 + 1}, which
+is slightly more than the 0.2% allowed by the DVI standard.
+
+@vindex KPATHSEA_BITMAP_NAME
+The filename is not hardwired to @samp{@var{name}.@var{dpi}@var{format}};
+you can change it by setting the environment variable
+@samp{KPATHSEA_BITMAP_NAME} to a different specification.  The default
+spec is
+
+@example
+$KPATHSEA_NAME.$KPATHSEA_DPI$KPATHSEA_FORMAT
+@end example
+
+@noindent Kpathsea sets these environment variables as it runs,
+as appropriate for each lookup.  You can use any environment variables
+you like, not just these, in the spec.
+
+
+@node Fontmap
+@subsection Fontmap
+
+@cindex fontmap files
+@cindex font alias files
+@cindex aliases for fonts
+
+If a bitmap font is not found, Kpathsea looks through any @dfn{fontmap}
+files for an @dfn{alias} for the original font name.  I implemented this
+for two reasons:
+
+@enumerate
+
+@item
+@cindex fontnames, unlimited length
+An alias name is limited in length only by your available memory, not by
+whatever bizarre limitations your filesystem might impose.  Therefore,
+if you want to ask for @file{Adobe-Lucida-Bold-Sans=Typewriter--10}
+instead of @file{plcbst10}, you can.
+
+@item
+@cindex circle fonts
+A few fonts have historically had multiple names: specifically,
+La@TeX{}'s ``circle font'' has variously been known as @file{circle10},
+@file{lcircle10}, and @file{lcirc10}.  Aliases can make all the names
+equivalent, so that it no longer matters what the name of the installed
+file is; @TeX{} documents will find their favorite name.
+
+@end enumerate
+
+The format of fontmap files that implement these ideas is
+straightforward: the first word on each line is the true filename; the
+second word is the alias; subsequent words are ignored.  A @dfn{word} is
+just a sequence of non-whitespace characters.  Blank lines are ignored;
+comments start with @samp{%} and continue to end-of-line.
+
+If an alias has an extension, it matches only those files with
+that extension; otherwise, it matches anything with the same root,
+regardless of extension.  For example, an alias @samp{foo.tfm} matches only
+when exactly @file{foo.tfm} is being searched for; but an alias
+@samp{foo} matches @file{foo.vf}, @file{foo.300pk}, or whatever.
+
+As an example, here are the fontmap entries that make the circle fonts
+equivalent:
+
+@example
+circle10	lcircle10
+circle10	lcirc10
+lcircle10	circle10
+lcircle10	lcirc10
+lcirc10		circle10
+lcirc10		lcircle10
+@end example
+
+
+@node MakeTeX... scripts
+@subsection @file{MakeTeX}@dots{} scripts
+
+@cindex @file{MakeTeX}@dots{} scripts
+@cindex scripts for file creation
+
+If Kpathsea cannot find a bitmap font, by either its original name or a
+fontmap alias, it can be configured to invoke an external program to
+create it.  The same mechanism can be used for other nonexistent files.
+
+The script is passed the name of the file to create and possibly other
+arguments, as explained below.  It must echo the full pathname of the
+file it created (and nothing else) to standard output; it can write
+diagnostics to standard error.
+
+@menu
+* MakeTeX... script names::
+* MakeTeX... script arguments::
+@end menu
+
+
+@node MakeTeX... script names
+@subsubsection @file{MakeTeX}@dots{} script names
+
+@cindex @file{MakeTeX}@dots{} script names
+@cindex names for @file{MakeTeX}@dots{} scripts
+
+@flindex tex-make.c
+@vindex kpse_make_specs
+The following table shows the default name of the script for each
+possible file types.  (The source is the variable @code{kpse_make_specs}
+in @file{kpathsea/tex-make.c}.)
+
+@table @file
+
+@item MakeTeXPK
+@pindex MakeTeXPK
+Glyph fonts.
+
+@item MakeTeXTeX
+@pindex MakeTeXTeX
+@TeX{} input files.
+
+@item MakeTeXMF
+@pindex MakeTeXMF
+Metafont input files.
+
+@item MakeTeXTFM
+@pindex MakeTeXTFM
+TFM files.
+
+@end table
+
+@vindex DVIPSMAKEPK
+@vindex XDVIMAKEPK
+@noindent These names are overridden by an environment variable specific
+to the program---@samp{DVIPSMAKEPK} and @samp{XDVIMAKEPK}, in the case
+of Dvipsk and Xdvik.
+
+
+@node MakeTeX... script arguments
+@subsubsection @file{MakeTeX}@dots{} script arguments
+
+@cindex arguments to @file{MakeTeX}@dots{}
+
+The first argument to a @file{MakeTeX}@dots{} script is always the name
+of the file to be created.  In the case of @file{MakeTeXPK}, there are
+three or four additional arguments passed, via corresponding environment
+variables:
+
+@enumerate
+
+@item
+@vindex KPATHSEA_DPI
+The dpi to make the font at (@samp{KPATHSEA_DPI}).
+
+@item
+@vindex MAKETEX_BASE_DPI
+@cindex base dpi
+The ``base dpi'' the program is operating at (@samp{MAKETEX_BASE_DPI}),
+i.e., the assumed resolution of the output device.
+
+@item
+@vindex MAKETEX_MAG
+@vindex mag @r{Metafont variable}
+@cindex magstep for @file{MakeTeXPK}
+A ``magstep'' string suitable for assigning to the Metafont @code{mag}
+variable (@samp{MAKETEX_MAG}).
+
+@item
+@vindex MAKETEX_MODE
+@vindex mode @r{Metafont variable}
+@cindex Metafont mode name for @file{MakeTeXPK}
+Optionally, a Metafont mode name for assigning to the Metafont @code{mode}
+variable (@samp{MAKETEX_MODE}).
+
+@item
+@vindex mtp_destdir
+@cindex destination directory for @file{MakeTeXPK}
+Optionally, a directory name. If the directory is absolute, it is used
+as-is. Otherwise, it is appended to the root destination directory set
+at compile-time (the Make variable @code{mtp_destdir}). If this argument
+is not supplied, the mode name is appended to @code{mtp_destdir}.
+@end enumerate
+
+@noindent Kpathsea sets @samp{KPATHSEA_DPI} appropriately for each
+attempt at building a font.  It's up to the program using Kpathsea to
+set the others.
+
+@vindex MAKETEXPK @r{environment variable}
+@cindex specification for @file{MakeTeXPK}
+You can change the specification for the arguments passed to the
+external script by setting the environment variable named as the script
+name, but all capitals---@samp{MAKETEXPK}, for example.  If you've
+changed the script name by setting (say) @samp{DVIPSMAKEPK} to
+@samp{foo}, then the spec is taken from the environment variable @samp{FOO}.
+
+The spec can contain any variable references, to the above variables or
+any others you might have set.  As an example, the default spec for
+@file{MakeTeXPK} is
+
+@example
+$KPATHSEA_DPI $MAKETEX_BASE_DPI $MAKETEX_MAG $MAKETEX_MODE
+@end example
+
+@noindent The convention of passing the name of the file to be created
+as the first argument cannot be changed.
+
+
+@node Fallback font
+@subsection Fallback font
+
+@cindex fallback font
+@cindex fallback resolutions
+@cindex font of last resort
+@cindex resolutions, last-resort
+@cindex last-resort font
+
+@vindex DVIPSSIZES
+@vindex XDVISIZES
+@vindex TEXSIZES
+@vindex default_texsizes
+If a bitmap font cannot be found or created at the requested size,
+Kpathsea looks for the font at a set of @dfn{fallback resolutions}.  You
+specify these resolutions as a colon-separated list (like search paths).
+Kpathsea looks first for a program-specific environment variable
+(@samp{DVIPSSIZES} and @samp{XDVISIZES}, in the case of Dvipsk and
+Xdvik), then the environment variable @samp{TEXSIZES}, then a default
+specified at compilation time (the Make variable
+@code{default_texsizes}).  You can set this list to be empty if you
+prefer to find fonts at their stated size or not at all.
+
+Finally, if the font cannot be found even at the fallback resolutions,
+Kpathsea looks for a fallback font, typically @samp{cmr10}.  Programs
+must enable this feature by assigning to the global variable
+@code{kpse_fallback_font}; the default is no such fallback font.

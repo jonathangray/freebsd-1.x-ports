@@ -1,0 +1,207 @@
+#!/bin/sh
+# original MakeTeXPK -- make a new PK font, because one wasn't found.
+# 
+# (If you change or delete the word `original' on the previous line,
+# installation won't write this MakeTeXPK over yours.)
+#
+# This script must echo the name of the generated PK file (and nothing
+# else) to standard output. Yes, this is different from the original dvips.
+# 
+# Parameters:
+#   name dpi bdpi magnification [mode] [destdir]
+#
+#   `name' is the base name of the font, such as `cmr10'.
+#   `dpi' is the resolution the font is needed at.
+#   `bdpi' is the base resolution, used to intuit the mode to use.
+#   `magnification' is a string to pass to MF as the value of `mag'.
+#   `mode', if supplied, is the mode to use.
+#   `destdir', if supplied is either the absolute directory name to use
+#     (if it starts with a /) or relative to the default DESTDIR (if not).
+
+echo "Running MakeTeXPK $*" >&2
+
+# The root of where to put the new file. The Makefile substitutes for this.
+# (Using the sh construct ${var=value} lets an environment variable
+# `var' override the value given here.)
+: ${DESTDIR=${MTP_DESTDIR-@mtp_destdir@}}
+
+# Define to `gsftopk' or `ps2pk' or whatever to make PK files for
+# PostScript fonts. If this is defined, MAPFILE must also be defined to
+# be your psfonts.map file or some equivalent. The Makefile substitutes
+# for this, too. You can get gsftopk from
+# math.berkeley.edu:pub/Software/TeX/gsftopk.tar.Z.
+: ${gsftopk=""}
+: ${MAPFILE=@configdir@/psfonts.map}
+
+# If this directory doesn't exist, the Sauter stuff won't be attempted.
+: ${sauterdir=@texmf_prefix@/sauter}
+
+# Likewise, for the F3 stuff.
+: ${f3dir=/groups/dtrg/typescaler/fonts/f3b}
+
+# TEMPDIR needs to be unique for each process because of the possibility
+# of simultaneous processes running this script.
+TEMPDIR=${TMPDIR-/tmp}/mtpk.$$
+
+NAME=$1
+DPI=$2
+BDPI=$3
+MAG=$4
+MODE=$5
+
+# If an explicit mode is not supplied, try to guess. You can get a
+# list of extant modes from ftp.cs.umb.edu:pub/tex/modes.mf.
+if test -z "$MODE"; then
+  case "$BDPI" in
+    85) MODE=sun;;
+   118) MODE=lview;;
+   180) MODE=lqlores;;
+   300) MODE=CanonCX;;
+   600) MODE=ljfour;;
+  1270) MODE=LinotypeOneZeroZero;;
+      *) MODE=@default_mfmode@;;
+#     *) echo "MakeTeXPK doesn't have a guess for $BDPI dpi devices." >&2
+#        echo "Put the mode in a config file, or update MakeTeXPK." >&2
+#        exit 1
+  esac
+fi
+
+if test -n "$6"; then
+  case "$6" in
+    /*) DESTDIR="$6";;
+     *) DESTDIR="$DESTDIR/$6";;
+  esac
+else
+  DESTDIR=$DESTDIR/$MODE
+fi
+
+umask 0
+
+GFNAME=$NAME.$DPI'gf'
+PKNAME=$NAME.$DPI'pk'
+
+# Have we been spuriously called? No harm done, if so.
+if test -r $DESTDIR/$PKNAME; then
+  echo "$DESTDIR/$PKNAME already exists!" >&2
+  echo $DESTDIR/$PKNAME
+  exit 0
+fi
+
+# Clean up on normal or abnormal exit.
+trap "cd /; rm -rf $TEMPDIR $DESTDIR/pktmp.$$" 0 1 2 15
+
+# Do we have a GF file in the current directory?
+if test -r $GFNAME; then
+  cmd="gftopk ./$GFNAME $PKNAME"
+  echo "Running $cmd" >&2
+  if $cmd; then
+    # Don't move the font; if the person knows enough to make fonts, they
+    # know enough to have . in the font paths.
+    echo $PKNAME
+    exit 0
+  else
+    echo "gftopk failed." >&2
+    exit 1
+  fi
+
+# Do we have an F3 font?
+elif test -r $f3dir/$NAME.f3b; then
+  # You will need Sun's f3tobm program, plus a program I wrote.
+  # See ftp.cs.umb.edu:private/f3totex.
+  cd $f3dir || exit 1
+  command="f3topk -r $DPI $NAME"
+  echo "Running $cmd" >&2
+  if $cmd; then
+    # Best if f3topk echoes its output filename, I think.
+    exit 0
+  else
+    echo "f3topk failed." >&2
+    exit 1
+  fi
+
+# Is this a PostScript font?
+elif test -n "$gsftopk" && egrep \^$NAME'([ 	]|$)' $MAPFILE >/dev/null; then
+  cmd="$gsftopk $NAME $DPI"
+  echo "Running $cmd" >&2
+  if $cmd >&2; then
+    : # Move the output file to $DESTDIR below.
+  else
+    echo "$gsftopk failed." >&2
+    exit 1
+  fi
+  
+# We're down to trying Metafont.  Since we want to run it in a
+# temporary directory, add the current directory to MFINPUTS.
+else
+  MFINPUTS=`pwd`:${MFINPUTS}:
+  export MFINPUTS
+
+  test -d $TEMPDIR || mkdir $TEMPDIR 
+  cd $TEMPDIR || exit 1
+
+  # Which version of Metafont shall we use?
+  case $NAME in
+    cm*) mf=cmmf;;
+      *) mf=mf;;
+  esac
+
+  # Run Metafont. 
+  echo "Running $mf \mode:=$MODE; mag:=$MAG; scrollmode; input $NAME" >&2
+  $mf "\mode:=$MODE; mag:=$MAG; scrollmode; input $NAME" </dev/null >&2
+
+  if test -d $sauterdir && test $? -eq 1 && test $mf = cmmf; then
+    echo "Trying interpolated/extrapolated (Sauter) CM source." >&2
+    # Perhaps no such MF source file, and it's CM.  Try Sauter's scripts.
+    cd $sauterdir
+    rootfont=`echo $NAME | sed 's/[0-9]*$//'`
+    pointsize=`echo $NAME | sed 's/^\(.*\)\([0-9]*\)$/\1/'`
+    make-mf $rootfont $pointsize
+    $mf "\mode:=$MODE; mag:=$MAG; scrollmode; input mf/$NAME" </dev/null
+    if test $? -eq 0 && test -r $GFNAME; then
+      mv $GFNAME $TEMPDIR
+    fi
+    rm -f $NAME.log mf/$NAME
+    cd $TEMPDIR
+  fi
+
+  if test ! -r $GFNAME; then
+    # Maybe it succeeded at DPI +- 1?  Annoying to have to check for this,
+    # but means we can use floating-point in the sources, so fine.
+    test_dpi=`expr $DPI - 1`
+    test_name=$NAME.${test_dpi}
+    if test -r ${test_name}gf; then
+      GFNAME=${test_name}gf
+      PKNAME=${test_name}pk
+    else
+      test_dpi=`expr $DPI + 1`
+      test_name=$NAME.${test_dpi}
+      if test -r ${test_name}gf; then
+        GFNAME=${test_name}gf
+        PKNAME=${test_name}pk
+      else
+        echo "MakeTeXPK failed to make $GFNAME." >&2
+        exit 1
+      fi
+    fi
+  fi
+
+  # Metafont succeeded.  Make the PK file.
+  gftopk ./$GFNAME $PKNAME || exit 1
+fi
+
+# If we get here, we've succeeded and we're supposed to move the final
+# font to $DESTDIR.
+test -d $DESTDIR \
+  || mkdir $DESTDIR \
+  || (echo "${DESTDIR}: MakeTeXPK could not create directory." >&2; exit 1)
+
+# Install the PK file carefully, since others may be working simultaneously.
+mv $PKNAME $DESTDIR/pktmp.$$ \
+  || (echo "$0: Could not mv $PKNAME $DESTDIR/pktmp.$$." >&2; exit 1)
+
+cd $DESTDIR || exit 1
+mv pktmp.$$ $PKNAME
+
+# If this line (or an equivalent) is not present, dvipsk/xdvik/dviljk
+# will think MakeTeXPK failed.  Any other output to stdout will also.
+echo $DESTDIR/$PKNAME

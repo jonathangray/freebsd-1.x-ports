@@ -1,0 +1,100 @@
+Here is the list of configurations that seem to work.
+Except as noted, compilation is without optimization and default DEFS.
+Send new entries to tex-k@cs.umb.edu.
+
+Here are email addresses for the `who':
+
+curtis = curtis@crl.com
+interran = interran@uluru.Stanford.EDU
+karl = karl@cs.umb.edu
+
+machine		operating system		compiler		who
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+DEC Alpha	OSF/1 T1.3-4			gcc 2.5.7		karl
+
+DEC MIPS	Ultrix 4.3			gcc 2.5.7		karl
+	-O2 works.
+
+DG Aviion	DG/UX 5.4.2			gcc 2.5.7		karl
+	-O2 works.
+
+HP 9000/370	HP-UX B.09.00.A			gcc 2.4.5	       charnier
+	-O2 doesn't work on virmf -- lasy10 gets segmentation fault.
+
+HP 9000/700	HP-UX 9.01			gcc 2.5.7		karl
+	XLDFLAGS="-Xlinker a -Xlinker default" if no
+	  static library for libXaw.
+	-O2 fails (but not -O).
+
+IBM RS/6000	AIX 3.2				gcc 2.5.8		karl
+	If no Xaw, set XDEFS=-DNOTOOL and tool_libs="".
+	gcc 2.5.7 is broken on the RS/6000. Get 2.5.8.
+
+IBM RT		AOS (BSD 4.3)			gcc 2.5.7		karl
+
+Intel x86	Interactive Unix 2.2.1		gcc 2.5.8		karl
+	-O2 works.
+
+Intel x86	Interactive Unix 2.2.1		cc			karl
+
+Intel x86	NCR SVR4.0.2.x			cc			curtis
+
+SGI		IRIX 4.0.5F			gcc 2.5.7		karl
+	Add -noasmopt to CFLAGS, unless gcc was configured as
+	mips-sgi-irix4loser. Otherwise Metafont is miscompiled.
+
+Sun Sparc	Solaris 2.1 aka SunOS 5.1	gcc 2.5.7		karl
+
+Sun Sparc	SunOS 4.1.2			gcc 2.5.8	       interran
+	-O works.
+
+Sun Sparc	SunOS 4.1.3			gcc 2.5.7		karl
+	-O2 works.
+
+Sun Sparc	SunOS 4.1.3			cc			karl
+	Dynamic linking with openwin libraries winds up with
+	`_get_wmShellWidgetClass' and `_get_applicationShellWidgetClass'
+	undefined.  (Either cc or gcc.) See below.
+
+From the comp.sys.sun.admin FAQ, as quoted by pln@egret0.stanford.edu:
+
+47)  When I try to compile MITs X11R4 applications under Openwindows 3.0,
+     I get the following "undefined" symbols(_get_wmShellWidgetClass, and
+     _get_applicationShellWidgetClass). What is the Problem?
+
+     There are problems with the Xmu shared library as shipped from Sun.
+
+     There are two "fixes". One is to get the Openwindows patches
+     that apply to this problem and the other is to "statically" link
+     the Xmu library into the executable.
+
+     The patches you will need are as follows:
+
+     Patch i.d.      Bug i.d.'s      O/S     Description
+     ---------- -------------------------------------------------------
+     100512-02       1086793 1086912         4.1.x OpenWindows 3.0 libXt
+                     1074766                 Jumbo patch 
+
+     100573-03       1087332                 4.1.x OpenWindows 3.0 undefined
+                                             symbols when using shared
+                                             libXmu.
+ 
+        To "statically" link your executable with libXmu modify the
+        compile line as follows (with cc):
+                   -Bstatic -lXmu -Bdynamic
+
+(end FAQ quote, begin kb's comments)
+
+1) If you use the MIT X11R5 libraries, this problem does not arise.
+
+2) If you're using gcc, use -static to link statically.
+
+3) If you're using gcc, and you want to link -lXmu statically and
+everything else dynamically, you have to do it by hand: run gcc -v and
+grab the ld line, and add the -B's given above around -lXmu.
+
+The reason is that gcc moves all linker options (specified with, e.g.,
+-Xlinker) to the front of the ld command line.  So you can't specify
+different options for different libraries.  When I reported this to
+bug-gcc, the reply was that if I wanted to work on it, I was welcome to,
+and they would happily merge the changes.

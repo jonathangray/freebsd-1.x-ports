@@ -1,0 +1,77 @@
+# Makefile for the dvipsk PostScript font files. Public domain.
+
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+# For `install'.
+prefix = /usr/gnu
+datadir = $(prefix)/lib
+texmf_prefix = $(datadir)/texmf
+fontdir = $(texmf_prefix)/fonts
+ps_fontdir = $(fontdir)/adobe
+texinputdir = $(texprefix)/macros
+psmacrodir = $(texinputdir)/dvips
+
+INSTALL = @INSTALL@
+INSTALL_DATA = @INSTALL_DATA@
+SHELL = /bin/sh
+
+installargs = \
+  INSTALL='$(INSTALL)' \
+  INSTALL_DATA='$(INSTALL_DATA)' \
+  ps_fontdir=$(ps_fontdir)
+
+all:
+
+# I used to read the family/directory mapping from a file, but that was
+# too fragile wrt various systems' sed.
+install: 
+	$(SHELL) $(srcdir)/../../mkdirchain $(psmacrodir)
+	cd $(srcdir) && for f in *.sty; do \
+          $(INSTALL_DATA) $$f $(psmacrodir)/$$f; done 
+	$(MAKE) $(installargs) fam=ag fam_dir=avantgarde	install-family
+	$(MAKE) $(installargs) fam=bk fam_dir=bookman		install-family
+	$(MAKE) $(installargs) fam=cr fam_dir=courier		install-family
+	$(MAKE) $(installargs) fam=hv fam_dir=helvetica		install-family
+	$(MAKE) $(installargs) fam=nc fam_dir=newcenturyschl	install-family
+	$(MAKE) $(installargs) fam=pl fam_dir=palatino		install-family
+	$(MAKE) $(installargs) fam=sy fam_dir=symbol		install-family
+	$(MAKE) $(installargs) fam=tm fam_dir=times		install-family
+	$(MAKE) $(installargs) fam=zc fam_dir=zapfchancery	install-family
+	$(MAKE) $(installargs) fam=zd fam_dir=zapfdingbats	install-family
+
+# This is only intended to be called recursively, with the fam and
+# fam_dir variables assigned.
+install-family:
+	$(SHELL) $(srcdir)/../../mkdirchain $(ps_fontdir)/$(fam_dir)/tfm \
+	  $(ps_fontdir)/$(fam_dir)/vf
+	cd $(srcdir) && for f in p$(fam)*.tfm rp$(fam)*.tfm; do		\
+          $(INSTALL_DATA) $$f $(ps_fontdir)/$(fam_dir)/tfm/$$f; done
+	cd $(srcdir) && for f in p$(fam)*.vf; do			\
+          test ! -r $$f 						\
+	  || $(INSTALL_DATA) $$f $(ps_fontdir)/$(fam_dir)/vf/$$f; done
+
+# Do we really want to uninstall the fonts?
+uninstall:
+
+
+Makefile: Makefile.in ../config.status
+	(cd ..; $(SHELL) config.status)
+
+
+depend TAGS:
+
+mostlyclean:
+
+clean: mostlyclean
+	rm -f *.dvi *.log *.ps
+
+distclean: clean
+	rm -f Makefile
+
+realclean: distclean
+
+extraclean:
+	rm -f *~ *\#* patch* *.orig *.rej core a.out *.vpl *.pl
+
+.NOEXPORT:

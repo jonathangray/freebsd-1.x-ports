@@ -1,0 +1,485 @@
+# Makefile for web2c, a port of TeX, Metafont, and friends --karl@cs.umb.edu.
+version = 6.1
+
+# The following make definitions (down to `end of installation
+# directories') are repeated in several Makefiles, because different
+# installations like to change them at different levels. If you edit the
+# top-level Makefile, the changes should propagate, however.
+# 
+# The following define installation directories. The default paths are
+# defined in kpathsea/paths.h, which is built from kpathsea/paths.h.in.
+# See kpathsea/INSTALL for a description of how the various path-related
+# files are used and created.
+
+# Generic installation directories.
+prefix = /usr/gnu
+exec_prefix = $(prefix)
+bindir = $(exec_prefix)/bin
+scriptdir = $(bindir)
+libdir = $(exec_prefix)/lib
+datadir = $(prefix)/lib
+infodir = $(prefix)/info
+includedir = $(prefix)/include
+manext = 1
+mandir = $(prefix)/man/man$(manext)
+
+# TeX & MF-specific directories. Not all of the following are relevant
+# for all programs, but it seems cleaner to collect everything in one place.
+
+# The default paths are now in kpathsea/Makefile.in. Passing all the
+# paths to sub-makes can make the arg list too long on system V.
+
+# The root of the tree.
+texmf_prefix = $(datadir)/texmf
+
+# TeX and MF source files.
+texinputdir = $(texmf_prefix)/tex
+mfinputdir = $(texmf_prefix)/mf
+
+# The top-level font directory.
+fontdir = $(texmf_prefix)/fonts
+
+# Where memory dumps are installed.
+fmtdir = $(texmf_prefix)/ini
+basedir = $(fmtdir)
+
+# Pool files.
+texpooldir = $(texmf_prefix)/ini
+mfpooldir = $(texpooldir)
+
+# The PostScript TFM and VF files get installed in subdirectories of
+# this directory, named for the typeface families of these directories.
+psfontdir = $(fontdir)/adobe
+
+# Where the configuration files get installed.
+dvips_prefix = $(texmf_prefix)/dvips
+configdir = $(dvips_prefix)
+
+# Where the PostScript prologues go.
+headerdir = $(configdir)
+
+# Where dvips' TeX macro files get installed.
+psmacrodir = $(texinputdir)/dvips
+
+# If a font can't be found close enough to its stated size, we look for
+# each of these sizes in the order given.  This colon-separated list is
+# overridden by the envvar TEXSIZES, and by a program-specific variable
+# (e.g., XDVISIZES), and perhaps by a config file (e.g., in dvips).
+default_bdpi = 300
+default_texsizes = @default_texsizes@
+
+# End of installation directory definitions.
+
+# These lines define the format and base files that `make fmts' and
+# `make bases' will try to make, and `make install-fmts' and `make
+# install-bases' will try to install.  See `README' for a brief
+# description of each of these formats.
+bases = mf.base cmmf.base
+# Both latex.fmt and amslatex.fmt are correctly built by first replacing
+# lfonts.tex
+fmts = tex.fmt latex.fmt slitex.fmt texinfo.fmt etex.fmt amstex.fmt \
+	amslatex.fmt
+#picplus.fmt inrstex.fmt
+
+# The name of the file that defines your local devices, for use with
+# Metafont.  (Only relevant during `make bases'.)  I urge you to get the
+# file `modes.mf', which defines all known modes, plus useful
+# definitions for all fonts.  It's available from ftp.cs.umb.edu as
+# pub/tex/modes.mf, among other places.
+localmodes = modes
+
+
+# Compilation options.
+DEFS = $(XDEFS)
+
+# CFLAGS is used for both compilation and linking.
+CFLAGS = -g $(XCFLAGS)
+
+# Do not override CPPFLAGS; change CFLAGS or DEFS instead.
+CPPFLAGS = $(XCPPFLAGS) -I. -I$(srcdir) -I$(kpathsea_parent) \
+           $(x_include_flags) $(DEFS) 
+.c.o:
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $<
+
+# Linking.
+LDFLAGS = $(CFLAGS) $(XLDFLAGS)
+LOADLIBES = $(kpathsea) $(x_libs) $(LIBS) -lm $(x_extra_libs)
+
+# This is so kpathsea will get remade automatically if you change
+# something in it and recompile from the package directory.
+kpathsea_parent = ..
+kpathsea_dir = $(kpathsea_parent)/kpathsea
+kpathsea_srcdir_parent = $(srcdir)/..
+kpathsea_srcdir = $(kpathsea_srcdir_parent)/kpathsea
+kpathsea = $(kpathsea_dir)/kpathsea.a
+
+CC = @CC@
+
+LEX = @LEX@
+LEXLIB = @LEXLIB@
+YACC = @YACC@
+
+# Command to link an executable.
+CCLD = $(CC)
+RANLIB = @RANLIB@
+LN = @LN_S@
+
+# Make `#include <X11/...>' and `-lX...' work.
+# wlibs is substituted by web2c's configure, LIBS by general configure
+# routines, and the others by AC_FIND_XTRA.
+x_include_flags = @x_include_flags@
+x_lib_flags = @x_lib_flags@
+x_extra_libs = @x_extra_libs@
+wlibs = @wlibs@
+LIBS = @LIBS@ $(extralibs)
+
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+
+SHELL = /bin/sh
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+
+# 
+# Things below here not changed by configure.
+
+# What to do by default.
+default: programs
+.PHONY: default
+
+# Where we need to make things.
+# 
+triptrapdirs = dviutil fontutil
+progdirs = $(triptrapdirs) tex mf bibtex web
+alldirs = $(progdirs) lib man web2c
+
+# What to pass to subdirectories when making various things.
+# $(MAKEARGS) is for the user.
+makeargs=$(MFLAGS) SHELL='$(SHELL)' CC='$(CC)' CFLAGS='$(CFLAGS)'	\
+  RANLIB='$(RANLIB)' LN='$(LN)' DEFS='$(DEFS)'                          \
+  CCLD='$(CCLD)' LDFLAGS='$(LDFLAGS)' LIBS='$(LIBS)' 			\
+  x_extra_libs='$(x_extra_libs)' x_include_flags='$(x_include_flags)'	\
+  x_lib_flags='$(x_lib_flags)' $(MAKEARGS) 
+web2cmakeargs=$(makeargs) YACC='$(YACC)' LEX='$(LEX)' LEXLIB='$(LEXLIB)'
+installargs=$(makeargs) 						\
+  INSTALL_DATA='$(INSTALL_DATA)'					\
+  INSTALL_PROGRAM='$(INSTALL_PROGRAM)'					\
+  bindir=$(bindir)							\
+  fontdir=$(fontdir)							\
+  texpooldir=$(texpooldir)						\
+  mfpooldir=$(mfpooldir)
+
+
+# The TeX and Metafont torture tests.
+triptrap: trip trap
+.PHONY: triptrap
+
+common-trip: do-tangle
+	for name in $(triptrapdirs); do					\
+          (cd $${name}; $(MAKE) $(makeargs) triptrap); done
+
+check run-triptrap: run-trip run-trap
+.PHONY: check run-triptrap
+
+clean-triptrap: clean-trip clean-trap
+.PHONY: clean-triptrap
+
+
+run-trip: trip
+	cd tex; $(MAKE) $(makeargs) run-trip
+.PHONY: run-trip
+
+trip: common-trip
+	cd tex; $(MAKE) $(makeargs) triptrap
+.PHONY: trip
+
+clean-trip: 
+	cd tex; $(MAKE) clean-trip
+.PHONY: clean-trip
+
+
+run-trap: trap
+	cd mf; $(MAKE) $(makeargs) run-trap
+.PHONY: run-trap
+
+trap: common-trip
+	cd mf; $(MAKE) $(makeargs) triptrap
+.PHONY: trap
+
+clean-trap:
+	cd mf; $(MAKE) clean-trap
+.PHONY: clean-trap
+
+
+# 
+# The following targets build production TeX and MF.
+
+all: programs manpages formats
+.PHONY: all
+
+programs: do-tangle
+	for d in $(progdirs); do (cd $$d; $(MAKE) $(makeargs) all); done
+.PHONY: programs
+
+TeX:	do-tangle
+	cd tex; $(MAKE) $(makeargs) all
+.PHONY: TeX
+
+MF:	do-tangle
+	cd mf; $(MAKE) $(makeargs) all
+.PHONY: MF
+
+BibTeX: do-tangle
+	cd bibtex; $(MAKE) $(makeargs) all
+.PHONY: BibTeX
+
+
+do-tangle: do-web2c
+	cd web; $(MAKE) $(makeargs) tangle
+.PHONY: do-tangle
+
+do-web2c: do-kpathsea do-lib
+	cd web2c; $(MAKE) $(web2cmakeargs) all
+.PHONY: do-web2c
+
+do-kpathsea: $(kpathsea_srcdir)/*.c $(kpathsea_srcdir)/*.h
+	cd $(kpathsea_dir); $(MAKE) $(makeargs)
+.PHONY: do-kpathsea
+
+do-lib: $(srcdir)/lib/*.c
+	cd lib; $(MAKE) $(makeargs) all
+.PHONY: do-lib
+
+
+c-sources: do-tangle
+	for d in $(progdirs); do (cd $$d; $(MAKE) $(makeargs) c-sources); done
+.PHONY: c-sources
+
+manpages: $(kpathsea_dir)/paths.h
+	cd man; $(MAKE) bindir=$(bindir) texdatadir=$(texdatadir)	\
+		texpooldir=$(texpooldir) fmtdir=$(fmtdir)		\
+		texinputdir=$(texinputdir) fontdir=$(fontdir)		\
+		mfdatadir=$(mfdatadir) mfpooldir=$(mfpooldir)		\
+		basedir=$(basedir) mfinputdir=$(mfinputdir)		\
+                localmodes='$(localmodes)'				\
+                all
+.PHONY: manpages
+
+formats: bases fmts
+.PHONY: formats
+
+bases: MF
+	cd mf; \
+          $(MAKE) $(makeargs) bases="$(bases)" localmodes='$(localmodes)' bases
+.PHONY: bases
+
+fmts: TeX
+	cd tex; $(MAKE) $(makeargs) fmts="$(fmts)" \
+	texinputdir="$(texinputdir)" fmts
+.PHONY: fmts
+
+
+# 
+# Installation targets.
+
+install: install-exec install-data
+.PHONY: install
+install-data: install-fmts install-bases install-manpages
+	for name in $(progdirs); do					\
+          (cd $${name}; $(MAKE) $(installargs) install-data);		\
+        done
+.PHONY: install-data
+
+install-exec: programs
+	$(SHELL) $(srcdir)/../mkdirchain $(bindir)
+	for name in $(progdirs); do					\
+          (cd $${name}; $(MAKE) $(installargs) install-exec);		\
+        done
+	for f in $(fmts); do						\
+	  rm -f $(bindir)/`basename $$f .fmt`;				\
+          $(LN) $(bindir)/virtex $(bindir)/`basename $$f .fmt`;		\
+	done
+	for f in $(bases); do						\
+	  rm -f $(bindir)/`basename $$f .base`;				\
+	  $(LN) $(bindir)/virmf $(bindir)/`basename $$f .base`;		\
+	done
+.PHONY: install-exec
+
+install-fmts: fmts
+	$(SHELL) $(srcdir)/../mkdirchain $(fmtdir)
+	for f in $(fmts); do						\
+          $(INSTALL_DATA) tex/$$f $(fmtdir)/$$f;			\
+	done
+	cd $(fmtdir); rm -f plain.fmt; $(LN) tex.fmt plain.fmt
+.PHONY: install-fmts
+
+install-bases: bases
+	$(SHELL) $(srcdir)/../mkdirchain $(basedir)
+	for f in $(bases); do						\
+          $(INSTALL_DATA) mf/$$f $(basedir)/$$f;			\
+	done
+	cd $(basedir); rm -f plain.base; $(LN) mf.base plain.base
+.PHONY: install-bases
+
+install-manpages: manpages
+	cd man; $(MAKE) $(installargs)					\
+           mandir=$(mandir) manext=$(manext) install
+.PHONY: install-manpages
+
+
+# 
+# Other targets.
+
+
+# We can't make useful tags files out of the web sources, more's the pity.
+TAGS:
+
+# Prevent GNU make 3 from overflowing arg limit on system V.
+.NOEXPORT:
+
+# Need GNU tar for this.
+distname = web2c
+program_files = PROBLEMS
+program_rm = */Makefile
+version_files = lib/version.c
+
+pre-dist-$(distname):
+	cd lib; $(MAKE) c-auto.h.in
+	cd web2c; $(MAKE) lex.yy.c y.tab.c
+	cd web; $(MAKE) tangleboot.c
+# Save the subdir list for the next command.
+	find * -type d -print | sed '/$(top_distdir)/d' >/tmp/subdir
+
+post-dist-$(distname):
+# Make the subdirectories.
+	for d in `cat /tmp/subdir`; do \
+	  mkdir -p $(top_distdir)/$(distname)/$$d; done
+#
+# Link files in subdirectories.
+	dirs="`grep -v / /tmp/subdir`";         \
+	for f in `find $$dirs                   \
+                       \(    -name README       \
+                          -o -name .gdbinit     \
+                          -o -name ChangeLog    \
+                          -o -name MakeTeX\*    \
+                          -o -name convert      \
+                          -o -name tr\*penv     \
+                          -o -name \*.add       \
+                          -o -name \*.ch        \
+                          -o -name \*.defines   \
+                          -o -name \*.in        \
+                          -o -name \*.lex       \
+                          -o -name \*.man       \
+                          -o -name \*.map       \
+                          -o -name \*.sed       \
+                          -o -name \*.sok       \
+                          -o -name \*.start     \
+                          -o -name \*.yacc      \
+                       \) -print`; do           \
+          ln $$f $(distdir)/`dirname $$f`;	\
+        done
+	ln lib/*.c lib/*.h $(distdir)/lib
+	rm -f lib/c-auto.h
+	ln mf/MFwindow/*.c $(distdir)/mf/MFwindow
+	rm -f mf/MFwindow/x11.c mf/MFwindow/sun.c
+	ln mf/MFtrap/trap.* mf/MFtrap/trapin.log mf/MFtrap/trapman.tex \
+	  $(distdir)/mf/MFtrap
+	ln fontutil/gftodmem.h $(distdir)/fontutil
+	ln tex/TeXtrip/trip.* tex/TeXtrip/tripin.log \
+           tex/TeXtrip/tripman.tex tex/TeXtrip/tripos.tex \
+	  $(distdir)/tex/TeXtrip
+	for d in tex mf bibtex; do rm -f $(distdir)/$$d/c$$d.ch; done
+	ln web/tangleboot.* $(distdir)/web
+	rm -f $(distdir)/web/tangleboot.o
+	ln web2c/*.c web2c/*.h $(distdir)/web2c
+	(cd $(distdir)/web2c; mv y.tab.c y.tab.c-dist; \
+	  mv y.tab.h y.tab.h-dist; \
+	  mv lex.yy.c lex.yy.c-dist)
+	cd $(distdir); ungnumake */Makefile.in */*/Makefile.in
+top_distdir = $(distname)-$(version)
+top_files = ChangeLog Makefile.in configure configure.in README \
+  $(HOME)/gnu/gnuorg/COPYING* $(HOME)/bin/mkdirchain \
+  $(plain)/texinfo.tex
+distdir = $(top_distdir)/$(distname)
+kpathsea_distdir = ../$(distname)/$(top_distdir)/kpathsea
+ln_files = AUTHORS ChangeLog INSTALL MACHINES NEWS README TAGS *.in *.h *.c \
+  configure *.make .gdbinit
+
+dist: pre-dist-$(distname)
+	rm -rf $(top_distdir)*
+	mkdir -p $(distdir)
+	cd ..; cp -p $(top_files) $(distname)/$(top_distdir)
+	cd ..; echo >>$(distname)/$(top_distdir)/ChangeLog
+	cd ..; cat kutil/ChangeLog >>$(distname)/$(top_distdir)/ChangeLog
+	-ln $(ln_files) $(distdir)
+	ln $(program_files) $(distdir)
+	cd $(kpathsea_dir); $(MAKE) distdir=$(kpathsea_distdir) \
+	  ln_files='$(ln_files)' distdir
+	ungnumake $(distdir)/Makefile.in $(kpathsea_distdir)/Makefile.in \
+	  $(top_distdir)/Makefile.in
+# *.make gets us depend.make.
+	rm -f $(distdir)/*.make $(kpathsea_distdir)/*.make
+	cd $(distdir); rm -f c-auto.h $(program_rm)
+	$(MAKE) post-dist-$(distname)
+	cd $(distdir); add-version $(version) $(version_files)
+	chmod -R a+rw $(top_distdir)
+	GZIP=-9 tar czf $(top_distdir). $(top_distdir)
+	rm -rf $(top_distdir)
+
+
+
+# I define $(autoconf) to acgeneral.m4 and the other Autoconf files, so
+# configure automatically gets remade with a new Autoconf release.  But
+# since some people do not have AC installed, I take out the variable
+# $(autoconf) definition before release.
+configure_in = $(srcdir)/configure.in $(srcdir)/../kpathsea/common.ac
+$(srcdir)/configure: $(configure_in) $(autoconf)
+	cd $(srcdir); autoconf
+
+config.status: $(srcdir)/configure
+	$(SHELL) $(srcdir)/configure --no-create --verbose
+
+Makefile: $(srcdir)/Makefile.in config.status
+	$(SHELL) config.status
+
+# This rule isn't used for web2c or the top-level Makefile, but it
+# doesn't hurt.  We don't depend on config.status because configure
+# always rewrites config.status, even when it doesn't change. Thus it
+# might be newer than c-auto.h when we don't need to remake the latter.
+c-auto.h: $(srcdir)/c-auto.h.in
+	$(SHELL) config.status
+
+web-dist:
+	rm -rf $(top_distdir)
+	mkdir -p $(top_distdir)/$(distname)
+	cd $(top_distdir)/$(distname); \
+          mkdir `cd ../..; find -name \*.web -exec dirname '{}' \; | uniq`
+	for d in `find . -name $(distdir) -prune -o -name \*.web -print` ; do\
+          ln $$d $(distdir)/`dirname $$d`;				\
+        done
+	GZIP=-9 tar czf web-$(version). $(top_distdir)
+	rm -rf $(top_distdir)
+
+web/tangleboot.c:
+	cd web; $(MAKE) tangleboot.c
+
+
+mostlyclean clean distclean extraclean realclean::
+	for name in $(alldirs); do (cd $${name}; $(MAKE) $@); done
+
+realclean distclean::
+	rm -f Makefile config.status
+
+extraclean::
+	rm -f *~ *\#* patch* *.orig *.rej core a.out *.i *.s
+	rm -f *log *gf *pk *.tfm *.pl *.dvi
+
+configclean:
+	rm -f configure lib/c-auto.h.in lib/c-auto.h
+
+# 
+# Local variables:
+# page-delimiter: "^# \f"
+# End:

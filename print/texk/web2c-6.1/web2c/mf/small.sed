@@ -1,0 +1,17 @@
+s/bistack_size=1500/bistack_size=785/
+s/buf_size=3000/buf_size=500/
+s/hash_prime=7919/hash_prime=1777/
+s/hash_size=9500/hash_size=2100/
+s/lig_table_size=15000/lig_table_size=5000/
+s/max_halfword==262143/max_halfword==65535/
+s/max_internal=300/max_internal=100/
+s/max_kerns=2500/max_kerns=500/
+s/max_strings=7500/max_strings=3000/
+s/max_wiggle=1000/max_wiggle=300/
+s/mem_max=262140/mem_max=60000/
+s/mem_top=262140/mem_top=60000/
+s/move_size=20000/move_size=5000/
+s/path_size=1000/path_size=300/
+s/pool_size=100000/pool_size=36000/
+s/stack_size=300/stack_size=30/
+s/string_vacancies=74000/string_vacancies=10000/

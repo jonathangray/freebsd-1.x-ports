@@ -1,0 +1,86 @@
+Subject: Re: SYSV4 and DVI Laserjet IIIp printer driver
+Date: Sun, 5 Jan 92 15:09:10 MET
+
+PROBLEM:
+Fred Appelman <fred@cv.ruu.nl> wrote:
+
++> I am looking for a TeX printer driver that runs under System V release 4
++> (Dell Unix) that can drive my Laserjet IIIp printer. I have already tried
++> various packages, but have been unsucessfull so far. The printer has
++> 1 Mb of printer memory.
++> 
++> I have tried the following:
++>         dvi2lj (Version 0.50) -- Compiles fine. When I print I do get a result,
++>                                  but several of the letters are printed at the
++>                                  wrong position. 
+
+My reply:
++I am really wondering, what is going on to happen under Dell Unix.
++As i am the author of the driver mentioned above, i KNOW that on a lot
++of various platforms and operating systems your problem never occured.
++I have no DELL unix around, but at least with interactive unix, the driver
++works like a charm.
++
++The most frequent problem with the driver in the UNIX world is, that
++the printer setup is somewhat messed up. people spoiled with postscript
++do not pay attention that the printer setup (such as line-print filter, tty
++settings) is 8 bit transparent. The easiest way to figure out whether
++this is happening is to print a tex document containing just the 
++text "aeiou" whith cmr10 (no magn). the with of the i in the font is 10
++pixels, which is encoded in pcl as 0x0a, which many printer drivers like
++to translate in <cr><lf>. As a consequence the output after "i" is messed
++up.
+
+
+SOLUTION (Fred Appelman):
+
+Thank you for your help. The problem was exactly as you described. The 
+printer output was not 8 bit transparent. Your suggested test procedure 
+was brilliant. By directly copying the data to the device file, I had
+no problems, so I was pretty sure that the problem was somewhere in the
+driver. I have found the error:
+
+This is a part of the original code:
+	: ${TERM:=unknown}
+	if [ ${TERM} = hplaser ]; then
+		jetfile=1
+	else
+		TERM=hplaser
+		export TERM
+		jetfile=
+	fi
+	tput lines 1>/dev/null 2>&1 || TPUT=:
+After the fix:
+	: ${TERM:=unknown}
+	if [ ${TERM} = hplaser ]; then
+		jetfile=1
+	else
+		TERM=hplaser
+		export TERM
+		jetfile=1
+	fi
+	tput lines 1>/dev/null 2>&1 || TPUT=:
+
+
+So a description of the fix:
+	1. Log in as root
+	2. Edit the file /usr/lib/lp/model/hplaser
+	3. Change line 486 from
+		jetfile=
+	   into
+		jetfile=1
+	4. Remove the printerdefintion:
+		lpadmin -xlj (or whatever name you have choosen)
+	5. Reinstall the printer
+		lpadmin -p lj -mhplaser -T "hplaser" -v /dev/lp
+	Note1: The name of the printer (lj) or the device
+               (/dev/lp) can vary.
+        Note2: This fix was necessary on Dell UNIX SYSVR4 relase 2.0
+               Newer releases may not need this fix.
+
+
+
+
+
+
+

@@ -1,0 +1,227 @@
+# Makefile for web2c manual pages.
+# 
+# You need to change the variables and the pathnames only if this
+# Makefile is invoked on its own, instead of from `../Makefile'.
+
+SHELL = /bin/sh
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+# This is so kpathsea will get remade automatically if you change
+# something in it and recompile from the package directory.
+kpathsea_parent = ../..
+kpathsea_dir = $(kpathsea_parent)/kpathsea
+kpathsea = $(kpathsea_dir)/kpathsea.a
+
+INSTALL = @INSTALL@
+INSTALL_DATA = @INSTALL_DATA@
+
+DITROFF = ditroff
+DITROFF = groff
+
+# These pathnames are used to customize the manual pages with local
+# directory names.  They should match the system directories so the
+# documentation and the programs will be consistent. They are overridden
+# by make from web2c/Makefile.
+# The following make definitions (down to `end of installation
+# directories') are repeated in several Makefiles, because different
+# installations like to change them at different levels. If you edit the
+# top-level Makefile, the changes should propagate, however.
+# 
+# The following define installation directories. The default paths are
+# defined in kpathsea/paths.h, which is built from kpathsea/paths.h.in.
+# See kpathsea/INSTALL for a description of how the various path-related
+# files are used and created.
+
+# Generic installation directories.
+prefix = /usr/gnu
+exec_prefix = $(prefix)
+bindir = $(exec_prefix)/bin
+scriptdir = $(bindir)
+libdir = $(exec_prefix)/lib
+datadir = $(prefix)/lib
+infodir = $(prefix)/info
+includedir = $(prefix)/include
+manext = 1
+mandir = $(prefix)/man/man$(manext)
+
+# TeX & MF-specific directories. Not all of the following are relevant
+# for all programs, but it seems cleaner to collect everything in one place.
+
+# The default paths are now in kpathsea/Makefile.in. Passing all the
+# paths to sub-makes can make the arg list too long on system V.
+
+# The root of the tree.
+texmf_prefix = $(datadir)/texmf
+
+# TeX and MF source files.
+texinputdir = $(texmf_prefix)/tex
+mfinputdir = $(texmf_prefix)/mf
+
+# The top-level font directory.
+fontdir = $(texmf_prefix)/fonts
+
+# Where memory dumps are installed.
+fmtdir = $(texmf_prefix)/ini
+basedir = $(fmtdir)
+
+# Pool files.
+texpooldir = $(texmf_prefix)/ini
+mfpooldir = $(texpooldir)
+
+# The PostScript TFM and VF files get installed in subdirectories of
+# this directory, named for the typeface families of these directories.
+psfontdir = $(fontdir)/adobe
+
+# Where the configuration files get installed.
+dvips_prefix = $(texmf_prefix)/dvips
+configdir = $(dvips_prefix)
+
+# Where the PostScript prologues go.
+headerdir = $(configdir)
+
+# Where dvips' TeX macro files get installed.
+psmacrodir = $(texinputdir)/dvips
+
+# If a font can't be found close enough to its stated size, we look for
+# each of these sizes in the order given.  This colon-separated list is
+# overridden by the envvar TEXSIZES, and by a program-specific variable
+# (e.g., XDVISIZES), and perhaps by a config file (e.g., in dvips).
+default_bdpi = 300
+default_texsizes = @default_texsizes@
+
+# End of installation directory definitions.
+
+localmodes = modes
+
+# If you like, delete the man pages for programs you aren't installing.
+# The programs are listed in alphabetical order.
+# 
+manfiles=		\
+	amslatex.1	\
+	amstex.1	\
+	bibtex.1	\
+	dvitype.1	\
+	etex.1		\
+	gftodvi.1	\
+	gftopk.1	\
+	gftype.1	\
+	initex.1	\
+	lamstex.1	\
+	latex.1		\
+	mf.1		\
+	mft.1		\
+	patgen.1	\
+	pktogf.1	\
+	pktype.1	\
+	pltotf.1	\
+	pooltype.1	\
+	slitex.1	\
+	tangle.1	\
+	tex.1 		\
+	tftopl.1	\
+	vftovp.1	\
+	virtex.1	\
+	vptovf.1	\
+	weave.1
+
+# The edited file always has extension .1; we change it when we install.
+.SUFFIXES: .man .1 .txt .ps .dvi
+.man.1:
+	sed -f sedscript $*.man >$@
+.1.dvi:
+	$(DITROFF) -Tdvi -man $*.1 >$@
+.1.ps:
+	$(DITROFF) -Tps -man $*.1 >$@
+.1.txt:
+	$(DITROFF) -Tascii -man $*.1 | col -b | expand >$@
+
+all: $(manfiles)
+.PHONY: dw
+
+$(manfiles): sedscript
+
+manfiles: $(manfiles)
+dvi: $(manfiles:.1=.dvi)
+ps: $(manfiles:.1=.ps)
+txt: $(manfiles:.1=.txt)
+
+# We do not depend on the top-level Makefile since the top-level
+# Makefile can change for reasons that do not affect the man pages.
+sedscript: $(kpathsea_dir)/paths.h ../lib/c-auto.h
+	cp /dev/null sedscript
+	for f in $(kpathsea_dir)/paths.h ../lib/c-auto.h; do \
+	  sed -n -e '/^#define/s/#define[ 	][ 	]*\([A-Z_a-z][A-Z_a-z]*\)[ 	][ 	]*\(.*\)/s!@\1@!\2!/p' \
+		$$f \
+	  | sed -e 's/"//g' -e 's/[ 	]*\/\*[^*]*\*\///g' >>sedscript;\
+	done
+	echo 's!@BINDIR@!$(bindir)!'		>>sedscript
+	echo 's!@INFODIR@!$(infodir)!'		>>sedscript
+	echo 's!@TEXINPUTDIR@!$(texinputdir)!'	>>sedscript
+	echo 's!@MFINPUTDIR@!$(mfinputdir)!'	>>sedscript
+	echo 's!@FONTDIR@!$(fontdir)!'		>>sedscript
+	echo 's!@FMTDIR@!$(fmtdir)!'		>>sedscript
+	echo 's!@BASEDIR@!$(basedir)!'		>>sedscript
+	echo "s!@TEXPOOLDIR@!$(texpooldir)!"	>>sedscript
+	echo 's!@MFPOOLDIR@!$(mfpooldir)!'	>>sedscript
+	echo 's!@LOCALMODES@!$(localmodes)!'	>>sedscript
+
+
+Makefile: Makefile.in ../config.status
+	(cd ..; $(SHELL) config.status)
+
+# Prevent GNU make 3 from overflowing arg limit on system V.
+.NOEXPORT:
+
+
+check: $(manfiles)
+	for f in $(manfiles); do \
+		echo =============== $$f =============== ; \
+		checknr -c.BI.BR.IR.IB.RB.RI $$f ; \
+	done
+.PHONY: check
+
+# Doubled word check.  You can find the dw utility on ftp.math.utah.edu in
+# pub/tex/errata/dw.shar (an email message "send dw.shar from tex/errata"
+# to tuglib@math.utah.edu will return a copy).
+dw: $(manfiles:.1=.txt)
+	for f in $(manfiles:.1=.txt); do \
+		echo =============== $$f =============== ; \
+		dw <$$f ; \
+	done
+.PHONY: dw
+
+# manpages.sok is an additional custom spelling dictionary for these
+# manual pages.  UNIX variants in the Berkeley tradition support the
+# command-line syntax +dictfile to provide additional dictionaries.
+# AT&T spell derivatives are not so friendly.
+spell: $(manfiles) manpages.sok
+	for f in $(manfiles) ; \
+	do \
+		echo =============== $$f =============== ; \
+		deroff $$f | spell +manpages.sok ; \
+	done
+.PHONY: spell
+
+
+install install-data: all
+	$(srcdir)/../../mkdirchain $(mandir)
+	for nameone in $(manfiles); do					\
+          name=`basename $${nameone} .1`;				\
+          $(INSTALL_DATA) $${name}.1 $(mandir)/$${name}.$(manext);	\
+        done
+install-exec:
+
+mostlyclean:
+
+clean: mostlyclean
+	rm -f sedscript *.1
+
+distclean: clean
+	rm -f Makefile
+
+realclean: distclean
+
+extraclean:
+	rm -f *~ *\#* patch* *.orig *.rej *.bak *.ckp *.i *.s
+	rm -f *.dvi *.log *.aux *gf *pk *.tfm core a.out

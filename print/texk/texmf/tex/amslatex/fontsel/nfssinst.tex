@@ -1,0 +1,231 @@
+
+% This file is part of the NFSS (New Font Selection Scheme) package.
+% ------------------------------------------------------------------
+
+\def\fileversion{v1.0a}
+\def\filedate{91/03/29}
+
+
+\documentstyle{article}
+
+ \title{Installation of the new font selection scheme, 
+        $\beta$-Test release}
+
+ \author{Frank Mittelbach \and
+         Rainer Sch\"opf}
+
+\date{\filedate, \fileversion}
+
+
+\newcommand{\AmS}{{\the\textfont2 A}\kern-.1667em\lower.5ex\hbox
+        {\the\textfont2 M}\kern-.125em{\the\textfont2 S}}
+\newcommand{\AmSTeX}{\AmS-\TeX}
+\newcommand{\AmSLaTeX}{\AmS-\LaTeX}
+\newcommand{\meta}[1]{$\langle${\it#1\/$\rangle$}}
+
+
+\begin{document}
+
+\maketitle
+\begin{abstract}
+  This file gives some basic information which are necessary to
+  generate a format with the new font selection scheme. It is
+  essentially the last part of {\tt fontsel.tex} the article that
+  appeared in TUGboat. However, it was modified and updated to reflect
+  changes within the font selection scheme, wheras {\tt fontsel.tex}
+  was left unchanged.
+\end{abstract}
+
+ When setting up a new format one has to start Ini\TeX{} with {\tt
+ lplain.tex} as the input file. After displaying some progress report
+ on the terminal, {\tt lplain.tex} will try to \verb+\input+ the files
+ {\tt hyphen.tex} and {\tt lfonts.tex}.
+
+ It seems a good idea to rename these files because, when \TeX{}
+ complains that it cannot find them and asks you to type in another
+ file name, you get the chance to substitute your favourate
+ hyphenation patterns without changing {\tt lplain.tex} or copying
+ something to {\tt hyphen.tex}.  The transcript file will show the
+ name of the file used which is very useful to debug weird errors
+ (later).
+
+ When the point is reached where \TeX{} wants to read in {\tt
+ lfonts.tex}, you now have to specify `{\tt lfonts.new}'.  After
+ processing this file (which will take some time), Ini\TeX{} stops
+ once more since it cannot find the file {\tt xxxlfont.sty}.  This is
+ intentional;  in this way you may now specify the desired
+ default by entering one of the following file names:
+\begin{description}
+ \item[{\tt oldlfont.sty}]
+    If you choose this file, your format will be identical to the
+     standard \LaTeX{} version 2.09 except that a few additional
+     commands (like \verb+\normalshape+) are available.  Of course,
+     documents or style options which explicitly refer to things like
+     \verb+\tentt+ will produce error messages since such internal
+     commands are no longer defined.\footnote{By the way, such
+     documents were at no time portable since Leslie Lamport stated
+     that it was always permissible to customize {\tt lfonts.tex}
+     according to the local needs. Therefore this is {\em not\/} an
+     incompatible change.} Nevertheless it is easy to fix the
+     problem in such a case: if we know that \verb+\tentt+ referred to
+     {\tt cmtt10}, i.e.\ Computer modern typewriter normal at 10pt,
+     we can define it as
+    \begin{verbatim}
+ \newcommand{\tentt}{\fontfamily{cmtt}%
+     \fontseries{m}\fontshape{n}\fontsize{10}{12pt}%
+     \selectfont}
+\end{verbatim}
+    Since we assume the `{\tt oldlfont}' option as default, where
+     \verb+\tt+ resets series and shape, the definition could be
+     shortened to
+    \begin{verbatim}
+\newcommand{\tentt}{\fontsize{10}{12pt}\tt}
+\end{verbatim}
+    To get the new way of font selection as described in {\tt
+ fontsel.tex} (e.g.\ where \verb+\tt+ simply means to switch to
+ another family) you only have to add the `{\tt newlfont}' style
+ option to the \verb+\documentstyle+ command in your document.
+
+  \item[\tt newlfont.sty]
+    This is just the counterpart to {\tt oldlfont.sty}: it will make
+     the new mechanism the default and you have to add `{\tt oldlfont}'
+     as a style option if you want to process older documents which
+     depend on the old mechanism.
+
+  \item[\tt basefont.tex]
+    This file is similar to {\tt newlfont.sty} but does not define the
+     \LaTeX{} symbol fonts. These fonts contain only a few characters
+     which are also included in the AMS symbol fonts.  Therefore we
+     provided the possibility of generating a format which doesn't
+     unnecessarily occupy one of the (only) sixteen math groups within
+     one math version. Using this file you can easily switch to the
+     old scheme (adding `{\tt oldlfont}' as an option), to the new
+     scheme with \LaTeX{} symbol fonts (using `{\tt newlfont}') or to
+     the new scheme with additional AMS fonts by using either the
+     style option `{\tt amsfonts}' (fonts only) or the style option `{\tt
+     amstex}' (defining the whole set of \AmSTeX{} macros in a \LaTeX{}
+     like syntax).
+ \end{description}
+We suggest using the {\tt basefont.tex} file since the new font
+ selection scheme will be incorporated into \LaTeX{} version 2.10, but
+ on installations with many users it might be better to switch
+ smoothly to the new font
+ selection scheme by first using `{\tt oldlfont}' as a default.
+
+Anyway, after reading the file chosen, \TeX{} will continue by
+ processing {\tt latex.tex} and finally displaying the message ``Input
+ any local modifications here''.  If you don't dare to do so, use
+ \verb+\dump+ to finish the run.  This will leave you with a new {\tt
+ .fmt} file (to be put into \TeX's format area) and the corresponding
+ transcript file.  It isn't a very good idea to delete this one
+ because you might need it later to find out what you did when you
+ dumped the format!
+
+
+ \section{Remarks on the development of this interface}
+
+ We started designing the new font selection scheme around April 1989.
+ A first implementation was available after one month's work and
+ thereafter the prototype version ran successfully for some months at
+ a few sites in Germany and the UK\null. Frank's visit to Stanford as
+ well as our work on the `{\tt amstex}' style option brought new
+ aspects to our view. The result was a more or less complete
+ redefinition of the \LaTeX{} interface for this font mechanism.  It
+ was a long way from the first sketch (which was about five pages in
+ Frank's notebook) to the current implementation of the interface
+ which now consists of nearly 2000 lines of code and about 4000 lines
+ of internal documentation. The \AmSTeX{} project itself, which
+ triggered this reimplemenation, has about the same dimensions. Surely
+ in such a huge software package one will find typos and bugs. But we
+ hope that most of the bugs in the code are found by now. It is
+ planned that the new font selection scheme will replace the old one
+ in \LaTeX{} version 2.10.  We therefore hope that this pre-release
+ which runs in version 2.09 will help to find all remaining problems
+ so that the switch to version 2.10 will be without discomfort to the
+ user.
+
+ \section{Acknowledgements}
+
+During this project we got help from many people. A big `thank you'
+to all of them, especially to Michael Downes from the AMS for his
+cooperation and help, to Stefan Lindner for his help with the
+Atari \TeX{} and to Sebastian Rahtz for playing a willing
+guinea-pig. Finally we also want to thank Ron Whitney who did a
+marvelous job on all our articles so far. This time we posed some
+extra problems because he had to first make a new format in
+order to read how to make a new format.
+
+ \section{List of distributed files}
+
+ \begin{description}
+  \item[\tt lfonts.new]
+   The new version of {\tt lfonts.tex}, to be copied to a file of
+   this name after the old {\tt lfonts.tex} has been renamed.
+  \item[\tt fontdef.ori]
+   The font definitions for the computer modern fonts in the
+   distribution by
+   Donald~E. Knuth.  To be copied to {\tt fontdef.tex} if this
+   selection is to be used.
+  \item[\tt fontdef.max]
+   Complete font definitions for the computer modern fonts and the
+   AMSFonts collections.  To be copied to {\tt fontdef.tex} if this
+   selection is to be used.
+  \item[\tt preload.ori]
+   Preloads the same fonts as the old {\tt
+   lfonts.tex} does.  To be copied
+   to {\tt preload.tex} if this is desired.
+  \item[\tt preload.min]
+   Preloads only the absolute minimum of fonts.  To be copied
+   to {\tt preload.tex} if this is desired.
+  \item[\tt newlfont.sty]
+   Selects new version of font selection for \LaTeX.
+  \item[\tt oldlfont.sty]
+   Selects old version of font selection for \LaTeX.
+  \item[\tt basefont.tex]
+   Like {\tt newlfont.sty}, but does not define the \LaTeX{} symbol
+   fonts.
+  \item[\tt margid.sty]
+   Style file that
+   defines all \meta{math alphabet identifiers} to have one argument.
+   This is the default that is built in into the new font selection
+   scheme.  Therefore this style file is only necessary if the
+   installation decided to load `{\tt nomargid.sty}' at dump time.
+  \item[\tt nomargid.sty]
+   In contrast to {\tt margid.sty}, defines all
+   \meta{math alphabet identifiers} to switch to the
+   alphabet.  This style option is necessary if you want to be
+   compatible to the old \LaTeX{} syntax {\em in math mode only}.
+  \item[\tt tracefnt.sty]
+   Style file that allows the tracing of font usage.
+   Use \verb=\tracingfonts= with values 1 to 3 and watch
+   what happens.
+  \item[\tt syntonly.sty]
+   Defines the \verb+\syntaxonly+ declaration.  This can be used
+   in the preamble of a document to suppress all output.
+  \item[\tt euscript.sty]
+   Contains the definitions to use the Euler script fonts.
+ \end{description}
+There are some more files included in the distribution. For a complete
+ set see the {\tt readme} files. 
+
+Together with the \AmSLaTeX{} package (that uses the the new font
+ selection scheme) there are some additional file that might be of
+ interest of many users even even if they don't intend to use the
+ mathematical features of the \AmSLaTeX{} package. This includes the
+ files:
+\begin{description}
+  \item[\tt amsfonts.sty]
+   Defines the commands to select symbols from the AmSFonts
+   collection.
+  \item[\tt amsbsy.sty]
+   Defines the \verb+\boldsymbol+ command.
+  \item[\tt amssymb.sty]
+   Defines additional \AmSTeX{} symbols.
+  \item[\tt amstext.sty]
+   Defines the \AmSTeX{} \verb+\text+ command.
+\end{description}
+Note, that these files come with the \AmSLaTeX{} distribution and not
+ with the standard fontsel package.
+
+
+\end{document}

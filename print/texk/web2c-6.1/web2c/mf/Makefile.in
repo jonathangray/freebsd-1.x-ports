@@ -1,0 +1,265 @@
+# Makefile for Metafont.
+
+SHELL = /bin/sh
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+# This is so kpathsea will get remade automatically if you change
+# something in it and recompile from the package directory.
+kpathsea_parent = ../..
+kpathsea_dir = $(kpathsea_parent)/kpathsea
+kpathsea = $(kpathsea_dir)/kpathsea.a
+
+# Routines used everywhere.
+commondefines = $(srcdir)/../lib/common.defines $(srcdir)/../lib/texmf.defines
+commonh = $(srcdir)/../lib/config.h
+commono = ../lib/lib.a $(kpathsea)
+
+# Routines used in TeX and Metafont.
+extrac = $(srcdir)/../lib/texmf.c
+extrah = $(srcdir)/../lib/texmf.h $(srcdir)/../lib/texmfmem.h mfd.h
+
+# Routines used in TeX, Metafont, and BibTeX.
+fileioc = $(srcdir)/../lib/openinout.c
+fileioo = openinout.o
+
+objs = $(fileioo) mf0.o mf1.o mf2.o mf3.o mf4.o mf5.o mf6.o mf7.o mf8.o \
+       mf9.o mf10.o 
+iobjs = iextra.o inimf.o
+vobjs = vextra.o imf.o
+
+# Where the test files are.
+mfsrcdir = $(srcdir)/../mf
+trapdir = $(mfsrcdir)/MFtrap
+
+program = inimf virmf
+
+CC = @CC@
+CFLAGS = -g
+CPPFLAGS = -DMF -I$(srcdir)/../lib -I../..
+
+CCLD = $(CC)
+RANLIB = @RANLIB@
+LN = @LN_S@
+
+LDFLAGS = $(CFLAGS) $(XLDFLAGS)
+libs = $(commono) $(LIBS)
+
+x_include_flags = @x_include_flags@
+x_lib_flags = @x_lib_flags@
+x_extra_libs = @x_extra_libs@
+wlibs = @wlibs@
+LIBS = @LIBS@
+
+windowlib = MFwindow/window.a
+windowlibs = $(x_lib_flags) $(windowlib) $(wlibs) $(x_extra_libs)
+
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+
+
+# The bases we know how to make.
+bases = plain.base cmmf.base
+
+# Name of the file that defines the local devices.
+localmodes = modes.mf
+
+# And how to make them.
+inimf = MFPOOL=. ./inimf
+
+
+# What to pass to submakes.
+makeargs=SHELL='$(SHELL)' CC='$(CC)' CFLAGS='$(CFLAGS)' \
+LDFLAGS='$(LDFLAGS)' LIBS='$(libs)' RANLIB='$(RANLIB)' LN='$(LN)' \
+srcdir=$(srcdir)  
+
+
+.SUFFIXES:
+.SUFFIXES: .o .c
+.c.o:
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $*.c
+
+
+default: all
+all: $(program)
+triptrap: trapmf
+
+
+# It is a waste of disk space to have window support in inimf.
+inimf: $(iobjs) $(objs) $(commono)
+	$(CCLD) -o inimf $(LDFLAGS) $(iobjs) $(objs) $(libs)
+
+virmf: $(vobjs) $(objs) $(windowlib) $(commono)
+	$(CCLD) -o virmf $(LDFLAGS) $(vobjs) $(objs) $(windowlibs) $(libs)
+
+check: run-trap
+run-trap: trapmf 
+	rm -f trap.mf
+	-$(LN) $(trapdir)/trap.mf .
+	-$(SHELL) -c '. ./trapenv; \
+	  ./trapmf < $(trapdir)/trap1.in > /dev/null 2>&1'
+	-diff $(trapdir)/trapin.log trap.log
+	-$(SHELL) -c '. ./trapenv; ./trapmf < $(trapdir)/trap2.in > trap.fot'
+	-diff $(trapdir)/trap.log trap.log
+	-diff $(trapdir)/trap.fot trap.fot
+	../fontutil/tftopl ./trap.tfm trap.pl
+	-diff $(trapdir)/trap.pl trap.pl
+	$(SHELL) -c '. ./trapenv; \
+	  ../fontutil/gftype -m -i ./trap.72270gf > trap.typ'
+	-diff $(trapdir)/trap.typ trap.typ
+
+
+# Make base files automatically.
+bases: $(bases)
+
+mf.base: inimf
+	$(inimf) 'plain; input $(localmodes); dump'
+	mv plain.base mf.base
+	mv plain.log mf.log
+
+cmmf.base: mf.base
+	$(inimf) \&./mf cmbase dump
+	mv cmbase.base cmmf.base
+	mv cmbase.log cmmf.log
+
+
+# The `ini_to_trap' script changes mfd.h, instead of the change file, so
+# retangling is not necessary.  After changing constants, making a
+# trapmf means making an inimf.
+# 
+trapmf: stamp-trap
+	$(MAKE) $(makeargs) inimf
+	mv inimf trapmf
+
+stamp-trap: mfd.h $(mfsrcdir)/trap.sed
+	rm -f *.o temp
+	sed -f $(mfsrcdir)/trap.sed < mfd.h > temp
+	mv mfd.h mfd.h.bak
+	mv temp mfd.h
+	touch stamp-trap
+
+clean-trap:
+	rm -f *.o mfd.h trapmf stamp-trap
+# Don't reinstall mfd.h with the test constants.
+	if grep 'memmax 3000' mfd.h.bak >/dev/null 2>&1; then \
+          rm -f mfd.h*; else mv mfd.h.bak mfd.h; fi
+
+mf.p mf.pool: mf.web cmf.ch
+	../web/tangle mf.web cmf.ch
+
+cmf.ch: $(mfsrcdir)/mf.ch
+	rm -f cmf.ch
+	cp $(mfsrcdir)/mf.ch cmf.ch
+
+# The convert script produces the following files:
+mf0.c mf1.c mf2.c mf3.c mf4.c mf5.c mf6.c mf7.c mf8.c mf9.c \
+imf.c coerce.h mfd.h: mf.p coerce.add $(commondefines)
+	$(SHELL) $(mfsrcdir)/convert
+	touch mfd.h
+
+# The (hand-coded) file $(extrac) and the (generated) file itex.c have
+# #ifdefs for INIMF, so we compile them differently.
+iextra.o: iextra.c $(commonh) $(extrah)
+	$(CC) $(CPPFLAGS) -DINIMF -DINI $(CFLAGS) -c iextra.c
+
+inimf.o: inimf.c $(commonh) $(extrah)
+	$(CC) $(CPPFLAGS) -DINIMF $(CFLAGS) -c inimf.c
+
+# Avoid compiling files in another directory.
+iextra.c: $(extrac)
+	rm -f iextra.c
+	$(LN) $(extrac) iextra.c
+
+inimf.c: imf.c
+	rm -f inimf.c
+	$(LN) imf.c inimf.c
+
+vextra.c: $(extrac)
+	rm -f vextra.c
+	$(LN) $(extrac) vextra.c
+
+openinout.c: $(fileioc)
+	rm -f openinout.c
+	$(LN) $(fileioc) openinout.c
+
+$(iobjs) $(vobjs) $(objs): $(commonh) $(extrah)
+
+mf0.o: mf0.c
+mf1.o: mf1.c
+mf2.o: mf2.c
+mf3.o: mf3.c
+mf4.o: mf4.c
+mf5.o: mf5.c
+mf6.o: mf6.c
+mf7.o: mf7.c
+mf8.o: mf8.c
+mf9.o: mf9.c
+mf10.o: mf10.c
+
+$(windowlib): mfd.h
+	cd MFwindow; $(MAKE) $(makeargs) x_include_flags='$(x_include_flags)'
+
+
+Makefile: Makefile.in ../config.status
+	(cd ..; sh config.status)
+
+c-sources: mfd.h
+.PHONY: c-sources
+
+install: install-exec install-data
+
+install-exec: all
+	for p in $(program); do $(INSTALL_PROGRAM) $$p $(bindir)/$$p; done
+
+install-data: mf.pool
+	$(SHELL) $(srcdir)/../../mkdirchain $(mfpooldir)
+	-if test -s mf.pool; then \
+	  $(INSTALL_DATA) mf.pool $(mfpooldir)/mf.pool; else true; fi
+
+TAGS: *.c *.h
+	etags -t *.c *.h
+
+
+mostlyclean::
+	rm -f *.o $(program) $(lib) $(programs)
+
+clean:: mostlyclean
+	rm -f *.dvi *.pool
+
+distclean:: clean
+	rm -f Makefile config.status c-auto.h
+
+# Although we can remake configure and c-auto.h.in, we don't remove
+# them, since many people may lack Autoconf.  Use configclean for that.
+realclean:: distclean
+	rm -f TAGS *.info*
+
+extraclean::
+	rm -f *.aux *.bak *.bbl *.blg *.dvi *.log *.orig *.pl *.rej
+	rm -f *.i *.s *.tfm *.vf *.vpl *\#* *gf *pk *~
+	rm -f CONTENTS.tex a.out core mfput.* patch* texput.*
+
+configclean:
+	rm -f configure c-auto.h.in c-auto.h
+
+
+# Prevent GNU make 3 from overflowing arg limit on system V.
+.NOEXPORT:
+
+mostlyclean::
+	rm -f stamp-* trapmf
+	rm -f mfd.h mfd.h.bak coerce.h *.log *.base 
+	rm -f trap.72270gf trap.fot trap.tfm trap.typ trap.pl trap.mf
+	cd MFwindow; $(MAKE) mostlyclean
+
+clean::
+	rm -f *.c *.p *.h
+	cd MFwindow; $(MAKE) clean
+
+distclean::
+	rm -f cmf.ch
+	cd MFwindow; $(MAKE) distclean
+
+extraclean::
+	cd MFwindow; $(MAKE) extraclean

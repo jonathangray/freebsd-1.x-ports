@@ -1,0 +1,127 @@
+dnl Top-level configure for kpathsea-using programs.
+dnl Our job is to run configure in the relevant subdirectories.
+dnl
+dnl Assumption: each program will create a c-auto.h that defines
+dnl everything kpathsea needs.  We arrange this by including (at
+dnl autoconf time) kpathsea/common.ac.
+dnl 
+dnl Consequence: we don't need to run configure in the kpathsea directory
+dnl itself; we can just copy from a program directory.  We'll use the
+dnl first one.
+dnl 
+dnl This is an Autoconf script only so -prefix and like will affect the
+dnl top-level Makefile.
+dnl
+AC_INIT(kpathsea/paths.h.in)
+
+dnl If we guessed the prefix in the subdirectories, it might guess
+dnl differently than the prefix here, and that would cause confusion.
+AC_PREFIX(tex)
+
+# Use this shell to run the configure scripts.
+: ${CONFIG_SHELL=/bin/sh}
+
+# Set to `true' (or `false', or whatever) to omit messages.
+verbose=echo
+
+# Take bdpi from the `default_bdpi' variable in ./Makefile.in.
+changequote(,)dnl
+bdpi=`sed -n '/^default_bdpi *= *\([0-9]*\).*$/s//\1/p' Makefile.in`
+default_texsizes=$(printf "define m(x,y) {\nreturn (x * (1.2 ^ y))\n}\nprint \
+    ${bdpi},\":\",\
+    m(${bdpi},1),\":\",\
+    m(${bdpi},2),\":\",\
+    m(${bdpi},3),\":\",\
+    m(${bdpi},4),\":\",\
+    m(${bdpi},5),\"\n\"\n" | 
+    bc)
+changequote([,])dnl
+AC_SUBST(default_texsizes)
+
+# Take the subdir list from the `programs' variable in ./Makefile.in.
+: ${programs="`sed -n -e 's/programs *= *//p' $srcdir/Makefile.in`"}
+if test -z "$programs"; then
+  echo "No assignment to programs variable in $srcdir/Makefile.in?!"
+  exit 1
+fi
+
+# How to get to subdirectories differs with srcdir.
+if test $srcdir = .; then
+  backup=../
+else
+  backup=
+fi
+
+# Run configure in each program directory that exists, passing all our args.
+# The echo here makes Ultrix sh break up $programs into its separate
+# words. Otherwise it doesn't.
+for d in `echo $programs`; do
+  test -z "$d" && continue
+  if test -d $srcdir/$d; then
+    # Remember the first program directory we find.
+    test -z "$first_program" && first_program=$d
+    
+    $verbose "Running configure in $d..."
+#    test -d $d || mkdir $d # in case srcdir != .
+#    (cd $d && $CONFIG_SHELL $srcdir/$backup$d/configure "$@") || exit 1
+    if test "$srcdir" = .; then
+      (cd $d && $CONFIG_SHELL configure "$@")
+    else
+      test -d $d || mkdir $d
+      (cd $d && $CONFIG_SHELL $srcdir/$d/configure "$@")
+    fi
+  fi
+done
+
+# Copy from the first program subdir to kpathsea.
+# Generate only a top-level Makefile and c-auto.h in kpathsea, even if
+# the config.status that we copied generates more things (e.g., dvipsk's).
+# 
+# The CONFIG_FILES line in the configure script might be more than one
+# line, so have to read (and omit) the entire definition.
+$verbose "Using $first_program/config.status to configure kpathsea..."
+awk '
+/CONFIG_HEADERS=/   { print "CONFIG_HEADERS=${CONFIG_HEADERS-\"c-auto.h\"}"
+		      next }
+
+# This is supposed to match a single-line CONFIG_FILES.
+/CONFIG_FILES=.*}/  { print "CONFIG_FILES=${CONFIG_FILES-\"Makefile\"}"
+		      next }
+
+# This is supposed to match the first line of a multiline CONFIG_FILES.
+/CONFIG_FILES=/     { multiline_config_files = 1
+		      next }
+/}/		    { if (multiline_config_files)
+			{
+                          print "CONFIG_FILES=${CONFIG_FILES-\"Makefile\"}"
+                          multiline_config_files = 0
+                        }
+                      else
+                        print
+                      next
+	            }
+
+		    { if (!multiline_config_files) print }
+' $first_program/config.status \
+changequote(,)dnl
+| sed -e "/srcdir=/s%/$first_program"'\([^-/]\)$%/kpathsea\1%g' \
+      -e "s%$first_program/configure%kpathsea/configure%" \
+changequote([,])dnl
+>conftest.stat
+# The sed lines are supposed to transform, e.g.,
+# /prefix/xdvik/xdvik-1.7/xdvik into /prefix/xdvik/xdvik-1.7/kpathsea.
+# This occurs on the srcdir line and when running configure.
+if cmp -s conftest.stat kpathsea/config.status 2>/dev/null; then
+  # The file exists and we would not be changing it.
+  :
+else
+  rm -f kpathsea/config.status
+  test -d kpathsea || mkdir kpathsea
+  cp conftest.stat kpathsea/config.status
+  (cd kpathsea; $CONFIG_SHELL config.status)
+fi
+rm -f conftest.stat
+
+
+
+AC_OUTPUT(Makefile)

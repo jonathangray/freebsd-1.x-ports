@@ -1,0 +1,97 @@
+# This file makes an archive library consisting of the window support
+# for all the devices.  To make Metafont support another device, just
+# add a file here, and the obvious declarations in ../../common/texmf.c
+# (the device support is the last page in that file).
+# 
+# By making the result into an archive file, the final binary has only
+# the devices which are actually desired, thus saving some small amount
+# of time and space.
+
+SHELL = /bin/sh
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+CC = @CC@
+CFLAGS = -g
+# We need `-I.' for mfd.h (when compiling the files from ../lib).
+CPPFLAGS = -I$(srcdir)/../../lib -I../../.. -I. $(x_include_flags)
+
+LN = @LN_S@
+RANLIB = @RANLIB@
+
+# X-specific compiler/linker arguments.
+x_include_flags = @x_include_flags@
+
+lib = window.a
+objs = hp2627.o next.o regis.o sun.o tek.o uniterm.o x10.o x11.o
+
+
+.SUFFIXES:
+.SUFFIXES: .o .c
+.c.o:
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $*.c
+
+
+default: all
+
+all: $(lib)
+
+$(lib):	$(objs)
+	rm -f $(lib)
+	ar qc $(lib) $(objs)
+	$(RANLIB) $(lib)
+
+$(objs): ../mfd.h
+
+
+Makefile: Makefile.in ../../config.status
+	(cd ../..; sh config.status)
+
+
+c-sources: sun.c x11.c
+.PHONY: c-sources
+
+
+# If configure hasn't set these up, do it ourselves. Guess the more
+# recent Sun and X stuff is being used.
+sun.c:
+	rm -f sun.c
+	$(LN) $(srcdir)/../../mf/MFwindow/sun-xview.c sun.c
+x11.c:
+	rm -f x11.c
+	$(LN) $(srcdir)/../../mf/MFwindow/x11-Xt.c x11.c
+
+install install-exec install-data:
+
+TAGS: *.c *.h
+	etags -t *.c *.h
+
+
+mostlyclean::
+	rm -f *.o $(program) $(lib) $(programs)
+
+clean:: mostlyclean
+	rm -f *.dvi *.pool
+
+distclean:: clean
+	rm -f Makefile config.status c-auto.h
+
+# Although we can remake configure and c-auto.h.in, we don't remove
+# them, since many people may lack Autoconf.  Use configclean for that.
+realclean:: distclean
+	rm -f TAGS *.info*
+
+extraclean::
+	rm -f *.aux *.bak *.bbl *.blg *.dvi *.log *.orig *.pl *.rej
+	rm -f *.i *.s *.tfm *.vf *.vpl *\#* *gf *pk *~
+	rm -f CONTENTS.tex a.out core mfput.* patch* texput.*
+
+configclean:
+	rm -f configure c-auto.h.in c-auto.h
+
+
+# Prevent GNU make 3 from overflowing arg limit on system V.
+.NOEXPORT:
+
+distclean realclean::
+	rm -f sun.c x11.c

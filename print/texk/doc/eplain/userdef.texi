@@ -1,0 +1,1599 @@
+@c Copyright (C) 1992, 93, 94 Karl Berry.
+@c This is part of the Eplain manual.
+@c For copying conditions, see the file eplain.texi.
+
+@node User definitions
+@chapter User definitions
+
+This chapter describes definitions that are meant to be used directly
+in a document.  When appropriate, ways to change the default
+formatting are described in subsections.
+
+@menu
+* Diagnostics::          Tracing information.
+* Rules::                Changing the default rule dimensions.
+* Citations::            Using BibTeX and Eplain to make bibliographies.
+* Displays::             Changing the formatting of math displays.
+* Time of day::          Producing the time of day.
+* Lists::                Producing numbered and unordered lists.
+* Verbatim listing::     Producing text just as it appears.
+* Contents::             Making a table of contents.
+* Cross-references::     Symbolic references to equations, figures, etc.
+* Page references::      Symbolic references to page numbers.
+* Justification::        Left- or right-justification, or centering.
+* Tables::               Producing ordered tables.
+* Margins::              Changing the margins directly.
+* Multiple columns::     Getting output in two columns.
+* Footnotes::            Autonumbered footnotes; changing formatting.
+* Fractions::            A better way to produce fractions in text.
+* Paths::                Allowing line breaks in pathnames.
+* Logos::                Various logos.
+* Boxes::                Producing filled or open rectangles.
+@end menu
+
+
+@node Diagnostics
+@section Diagnostics
+
+@cindex diagnostics
+@cindex tracing
+Plain @TeX{} provides the @code{\tracingall} command, to turn on the
+maximum amount of tracing possible in @TeX{}.  The (usually voluminous)
+output from @code{\tracingall} goes both on the terminal and into the
+transcript file.
+@findex tracingall
+It is sometimes easier to have the output go only to the transcript
+file, so you can peruse it at your leisure and not obscure other output
+to the terminal.  So, Eplain provides the command @code{\loggingall}.
+@findex loggingall
+(For some reason, this command is available in Metafont, but not in
+@TeX{}.)
+
+It is also sometimes useful to see the complete contents of boxes. 
+@code{\tracingboxes} does this.  (It doesn't affect whether or not the
+contents
+@findex tracingboxes
+are shown on the terminal.)
+
+You can turn off all tracing with @code{\tracingoff}.
+@findex tracingoff
+
+You can also turn logging on and off globally, so you don't have to
+worry about whether or not you're inside a group at the time of command.
+These variants are named @code{\gloggingall}
+@findex gloggingall
+and @code{\gtracingall}.
+@findex gtracingall
+
+Finally, if you write your own help messages (see @code{\newhelp}
+@cindex help messages
+@cindex error messages
+in @cite{The @TeX{}book}), you want a convenient way to break lines in
+them.  This is what @TeX{}'s @code{\newlinechar} parameter is for;
+@cindex newlinechar
+however, plain @TeX{} doesn't set @code{\newlinechar}.  Therefore,
+Eplain defines it to be the character @code{^^J}.
+
+For example, one of Eplain's own error messages is defined as follows:
+@example
+\newhelp\envhelp@{Perhaps you forgot to end the previous^^J%
+   environment? I'm finishing off the current group,^^J%
+   hoping that will fix it.@}%
+@end example
+
+
+@node Rules
+@section Rules
+
+The default dimensions of rules are defined in @w{chapter 21} of the
+@cite{The @TeX{}book}.  To sum up what is given there, the ``thickness''
+of rules is
+@cindex rule thickness
+0.4pt by default.  Eplain defines three parameters that let you change
+this dimension: @code{\hruledefaultheight}, @code{\hruledefaultdepth},
+@findex hruledefaultheight
+@findex hruledefaultdepth
+and @code{\vruledefaultwidth}.  By default, they are defined as
+@findex vruledefaultwidth
+@cite{The @TeX{}book} describes.
+
+But it would be wrong to redefine @code{\hrule} and @code{\vrule}.  For
+one thing, some macros in plain @TeX{} depend on the default dimensions
+being used; for another, rules are used quite heavily, and the
+performance impact of making it a macro can be noticeable.  Therefore,
+to take advantage of the default rule parameters, you must use
+@code{\ehrule}
+@findex ehrule
+and @code{\evrule}.
+@findex evrule
+
+
+@node Citations
+@section Citations
+
+@cindex citations
+@cindex bibliographies
+Bibliographies are part of almost every technical document.  To handle
+them easily, you need two things: a program to do the tedious
+formatting, and a way to cite references by labels, rather than by
+numbers.  The Bib@TeX{} program, written by Oren Patashnik, takes care
+@cindex Bib@TeX{}
+@cindex Patashnik, Oren
+of the first item; the citation commands in La@TeX{}, written to be used
+@cindex La@TeX{}
+with Bib@TeX{}, take care of the second.  Therefore,
+Eplain adopts the use of Bib@TeX{}, and virtually the same interface as
+La@TeX{}.
+
+The general idea is that you put citation commands in the text of your
+document, and commands saying where the bibliography data is.  When you
+run @TeX{}, these commands produce output on the file with the same root
+name as your document (by default) and the extension @file{.aux}.
+@pindex .aux @r{file}
+@findex jobname
+Bib@TeX{} reads this file.  You should put the bibliography data in a
+file or files with the extension @file{.bib}. Bib@TeX{} writes out a
+file with the same root
+@pindex .bib @r{file}
+name as your document and extension @file{.bbl}.  Eplain reads this file
+@pindex .bbl @r{file}
+the next time you run your document through @TeX{}.  (It takes
+multiple passes to get everything straight, because usually after seeing
+your bibliography typeset, you want to make changes in the @file{.bib}
+file, which means you have to run Bib@TeX{} again, which means you have
+to run @TeX{} again@dots{})  An annotated example of the whole process is
+given below.  
+
+If your document has more than one bibliography---for example, if it
+is a collection of papers---you can tell Eplain to use a different root
+name for the @file{.bbl} file by defining the control sequence
+@code{\bblfilebasename}.
+@findex bblfilebasename
+The default definition is simply @code{\jobname}.
+
+See the document @cite{Bib@TeX{}ing} (whose text is in the file
+@file{btxdoc.tex}, which should be in the Eplain distribution you got)
+for information on how to write your @t{.bib} files.  Both the
+Bib@TeX{} and the Eplain distributions contain several examples, also.
+
+The @code{\cite}
+@findex cite
+command produces a citation in the text of your document.  The exact
+printed form the citation will take is under your control;
+@pxref{Formatting citations}.  @code{\cite} takes one
+required argument, a comma-separated list of cross-reference labels
+(@pxref{Cross-references}, for exactly what characters are allowed in
+such labels).  Warning: spaces in this list are taken as part of the
+following label name, which is probably not what you expect.
+@cindex citations, undefined
+The @code{\cite} command also produces a command
+in the @t{.aux} file that tells Bib@TeX{} to retrieve the given reference(s)
+from the @t{.bib} file.  @code{\cite} also takes one optional argument,
+which you specify within square brackets, as in La@TeX{}.  This text is
+simply typeset after the citations.  (See the example below.)
+
+Another command, @code{\nocite},
+@findex nocite
+puts the given reference(s) into the bibliography, but produces nothing
+in the text.
+
+The @code{\bibliography}
+@findex bibliography
+command is next.  It serves two purposes: producing the typeset
+bibliography, and telling Bib@TeX{} the root names of the @t{.bib}
+files.  Therefore, the argument to @code{\bibliography} is a comma
+separated list of the @t{.bib} files (without the @samp{.bib}).  Again,
+spaces in this list are significant.
+
+You tell Bib@TeX{} the particular style in which you want your
+bibliography typeset with one more command:
+@code{\bibliographystyle}.
+@findex bibliographystyle
+The argument to this is a single filename @var{style}, which tells
+Bib@TeX{} to look for a file @var{style}@t{.bst}.
+@pindex .bst @r{files}
+See the document @cite{Designing Bib@TeX{} styles} (whose text is in the
+@file{btxhak.tex}) for information on how to write your own styles.
+
+Eplain automatically reads the citations from the @t{.aux} file when
+your job starts.
+
+If you don't want to see the messages about undefined citations, you
+can say @code{\xrefwarningfalse} before making any citations.
+@findex xrefwarningfalse
+Eplain automatically does this if the @t{.aux} file does not exist.
+You can restore the default by saying @code{\xrefwarningtrue}.
+
+Here is a @TeX{} input file that illustrates the various commands.
+
+@example
+\input eplain                    % Reads the .aux file.
+Two citations to Knuthian works:
+  \cite[note]@{surreal,concrete-math@}.
+\beginsection@{References.@}\par   % Title for the bibliography.
+\bibliography@{knuth@}             % Use knuth.bib for the labels.
+\bibliographystyle@{plain@}        % Number the references.
+\end                             % End of the document.
+@end example
+@cindex Knuth, Donald Ervin
+@cindex Graham, Ronald L.
+@cindex numbered references
+@cindex references, numbered
+
+If we suppose that this file was named @file{citex.tex} and that the
+bibliography data is in @file{knuth.bib} (as the @code{\bibliography}
+command says), the following commands do what's required.  (@samp{$ }
+represents the shell prompt.)
+
+@example
+$ tex citex       (produces undefined citation messages)
+$ bibtex citex    (read knuth.bib and citex.aux, write citex.bbl)
+$ tex citex       (read citex.bbl, still have undefined citations)
+$ tex citex       (one more time, to resolve the references)
+@end example
+
+The output looks something like (because we used the @t{plain}
+bibliography style):
+  
+@quotation
+Two citations to Knuthian works: [2,1 note].
+
+@b{References}
+@tex
+@frenchspacing
+@end tex
+
+[1] Ronald L. Graham, Donald E. Knuth, and Oren Patashnik.  @i{Concrete
+Mathematics}. Addison-Wesley, Reading, Massachusetts, 1989.
+
+[2] Donald E. Knuth. @i{Surreal Numbers}. Addison-Wesley, Reading,
+Massachusetts, 1974.
+@end quotation
+
+See the Bib@TeX{} documentation for information on how to write the
+bibliography databases, and the bibliography styles that are available.
+(If you want your references printed with names, as in [Knu74], instead
+of numbered, the bibliography style is @code{alpha}.)
+@cindex alphanumeric references
+@cindex references, alphanumeric
+
+@menu
+* Formatting citations::        Changing the way citations are printed.
+* Formatting bibliographies::   Changing the way bibliographies are printed.
+@end menu
+
+
+@node Formatting citations
+@subsection Formatting citations
+
+@cindex citations, formatting
+
+You may wish to change Eplain's formatting of citations; i.e., the
+result of your @code{\cite} commands.  By default, the citation labels
+are printed one after another, separated by commas and enclosed in
+brackets, using the main text font.  Some formats require other styles,
+such as superscripted labels.  You can accomodate such formats by
+redefining the following macros.
+
+@table @code
+@itemx \printcitestart
+@item \printcitefinish
+@findex printcitestart
+@findex printcitefinish
+Eplain expands these macros at the begining and end of the list of
+citations for each @code{\cite} command.  By default, they produce a
+@samp{[} and @samp{]}, respectively.
+
+@item \printbetweencitations
+@findex printbetweencitations
+If a @code{\cite} command has multiple citations, as in
+@code{\cite@{acp,texbook@}}, Eplain expands this macro in between each
+pair of citations.  By default, it produces a comma followed by a space.
+
+@item \printcitenote
+@findex printcitenote
+This macro takes one argument, which is the optional note to the
+@code{\cite} command.  If the @code{\cite} command had no note, this
+macro isn't used.  Otherwise, it should print the note.  By default, the
+note is preceded with a comma and a space.
+@end table
+
+
+Here is an example, showing you could produce citations as
+superscripted labels, with the optional notes in parentheses.
+
+@example
+\def\printcitestart@{\unskip $^\bgroup@}
+\def\printbetweencitations@{,@}
+\def\printcitefinish@{\egroup$@}
+\def\printcitenote#1@{\hbox@{\sevenrm\space (#1)@}@}
+@end example
+
+
+@node Formatting bibliographies
+@subsection Formatting bibliographies
+
+@cindex bibliography, formatting the
+
+You may wish to change Eplain's formatting of the bibliography,
+especially with respect to the fonts that are used.  Therefore, Eplain
+provides the following control sequences:
+
+@table @code
+
+@item \biblabelwidth
+@findex biblabelwidth
+This control sequence represents a @code{\dimen} register, and its value
+is the width of the widest label in the bibliography.  Although it is
+unlikely you will ever want to redefine it, you might want 
+to use it if you redefine @code{\biblabelprint}, below.
+
+@item \biblabelprint
+@findex biblabelprint
+This macro takes one argument, the label to print.  By default, the
+label is put in a box of width @code{\biblabelwidth}, and is followed by
+an enspace.  When you want to change the spacing around the labels, this
+is the right macro to redefine.
+
+@item \biblabelcontents
+@findex biblabelcontents
+This macro also takes one argument, the label to print.  By default, the
+label is printed using the font @code{\bblrm} (below), and enclosed in
+brackets.  When you want to change the appearance of the label, but not
+the spacing around it, this is the right macro to redefine.
+
+@item \bblrm
+@findex bblrm
+@cindex bibliography fonts
+The default font used for printing the bibliography.
+
+@item \bblem
+@findex bblem
+The font used for printing the titles and other ``emphasized'' material.
+
+@item \bblsc
+@findex bblsc
+In some styles, authors' names are printed in a caps-and-small-caps
+font.  In those cases, this font is used.
+
+@item \bblnewblock
+@findex bblnewblock
+This is invoked between each of the parts of a bibliography entry.  The
+default is to leave some extra space between the parts; you could
+redefine it to start each part on a new line (for example).  A part is
+simply a main element of the entry; for example, the author is a part. 
+(It was La@TeX{} that introduced the (misleading, as far as I am
+concerned) term `block' for this.)
+
+@item \biblabelextraspace
+@findex biblabelextraspace
+Bibliography entries are typeset with a hanging indentation of
+@code{\biblabelwidth} plus this.  The default is @code{.5em}, where the
+em width is taken from the @code{\bblrm} font.  If you want to change
+this, you should do it inside @code{\bblhook}.
+
+@item \bblhook
+@findex bblhook
+@cindex bibliography items, extra space between
+This is expanded before reading the @t{.bbl} file.  By
+default, it does nothing.  You could, for example, define it to set the
+bibliography fonts, or produce the heading for the references.  Two
+spacing parameters must be changed inside @code{\bblhook}:
+@code{\parskip}, which produces extra space between the items; and
+@code{\biblabelextraspace}, which is described above.
+(By the way, @code{\hookappend} won't work with @code{\bblhook}, despite
+the names. Just use @code{\def}.)
+
+@end table
+
+If you are really desperate, you can also hand-edit the @t{.bbl} file
+that Bib@TeX{} produces to do anything you wish.
+
+
+@node Displays
+@section Displays
+
+@cindex displays, left-justifying
+@cindex mathematics displays, formatting
+@cindex left-justification of displays
+
+By default, @TeX{} centers displayed material.  (Displayed material is
+just whatever you put between @code{$$}'s---it's not necessarily
+mathematics.)  Many layouts would be better served if the displayed
+material was left-justified.  Therefore, Eplain provides the command
+@code{\leftdisplays},
+@findex leftdisplays
+which indents displayed material by @code{\parindent} plus
+@code{\leftskip}, plus @code{\leftdisplayindent}.
+@findex leftdisplayindent
+
+You can go back to centering displays with @code{\centereddisplays}.
+@findex centereddisplays
+(It is usually poor typography to have both centered and left-justified
+displays in a single publication, though.)
+
+@code{\leftdisplays} also changes the plain @TeX{} commands that deal
+with alignments inside math displays,
+@code{\displaylines},
+@findex displaylines
+@code{\eqalignno},
+@findex eqalignno
+and @code{\leqalignno},
+@findex leqalignno
+to produce left-justified text.  You can still override this formatting
+by inserting @code{\hfill} glue, as explained in @cite{The @TeX{}book}.
+
+@menu
+* Formatting displays::         General formatting of displays.
+@end menu
+
+
+@node Formatting displays
+@subsection Formatting displays
+
+If you want some other kind of formatting, you can write a definition
+of your own, analogous to @code{\leftdisplays}.  You need only make sure
+that @code{\leftdisplaysetup}
+@findex leftdisplaysetup
+is called at the beginning of every display (presumably by invoking it
+in @TeX{}'s @code{\everydisplay} parameter), and to define
+@code{\generaldisplay}.
+@findex generaldisplay
+
+@code{\leftdisplays} expands the old value of @code{\everydisplay}
+before calling @code{\leftdisplaysetup}, so that any changes you have made
+to it won't be lost.  That old token list as available as the value of
+the token register @code{\previouseverydisplay}.
+@findex previouseverydisplay
+
+
+@node Time of day
+@section Time of day
+
+@cindex time of day
+@cindex date
+
+@TeX{} provides the day, month, and year as numeric quantities (unless
+your @TeX{} implementation is woefully deficient).  Eplain provides some
+control sequences to make them a little more friendly to humans. 
+
+@code{\monthname}
+@findex monthname
+produces the name of the current month, abbreviated to three letters.
+
+@code{\fullmonthname}
+@findex fullmonthname
+produces the name of the current month, unabbreviated (in English).
+
+@code{\timestring}
+@findex timestring
+produces the current time, as in `1:14 p.m.'
+
+@code{\timestamp}
+@findex timestamp
+produces the current date and time, as in `23 Apr 64  1:14 p.m.'.
+(Except the spacing is slightly different.)
+
+@code{\today}
+@findex today
+produces the current date, as in `23 April 1964'.
+
+
+@node Lists
+@section Lists
+
+@cindex lists
+@cindex numbered lists
+@cindex ordered list
+@cindex unordered lists
+
+Many documents require lists of items, either numbered or simply
+enumerated.  Plain @TeX{} defines one macro to help with creating lists,
+@code{\item}, but that is insufficient in many cases.  Therefore,
+Eplain provides two pairs of commands:
+
+@table @code
+
+@itemx \numberedlist @dots{} \endnumberedlist
+@item \orderedlist @dots{} \endorderedlist
+@findex numberedlist
+@findex endnumberedlist
+@findex orderedlist
+@findex endorderedlist
+These commands (they are synonyms) produce a list with the items
+numbered sequentially, starting from one.  A nested @code{\numberedlist}
+labels the items with lowercase letters, starting with `a'.  Another
+nested @code{\numberedlist} labels the items with roman numerals.  Yet
+more deeply nested numbered lists label items with @samp{*}.
+
+@item \unorderedlist @dots{} \endunorderedlist
+@findex unorderedlist
+@findex endunorderedlist
+This produces a list with the items labelled with small black boxes
+(``square bullets''). A nested @code{\unorderedlist} labels items with
+em-dashes.  Doubly (and deeper) nested unordered lists label items with
+`*'s.
+
+@end table
+
+The two kinds of lists can be nested within each other, as well.
+
+In both kinds of lists, you begin an item with @code{\li}.
+@findex li
+An item may continue for several paragraphs.  Each item starts a
+paragraph.
+
+You can give @code{\li} an optional argument, a cross-reference label.
+It's defined to be the ``marker'' for the current item.  This is useful
+if the list items are numbered.  You can produce the value of the label
+with @code{\xrefn}.  @xref{Cross-references}.
+
+You can also say @code{\listcompact}
+@findex listcompact
+right after @code{\numberedlist} or @code{\unorderedlist}.  The items in
+the list will then not have any extra space between them
+(@pxref{Formatting lists}).  You might want to do this if the items in
+this particular list are short.
+
+Here is an example:
+@example
+\numberedlist\listcompact
+\li The first item.
+\li The second item.
+
+The second paragraph of the second item.
+\endnumberedlist
+@end example
+
+@menu
+* Formatting lists::            Changing how the lists look.
+@end menu
+
+
+@node Formatting lists
+@subsection Formatting lists
+
+@cindex lists, formatting
+
+Several registers define the spacing associated with lists.  It is
+likely that their default values won't suit your particular layout.
+
+@table @code
+@item \abovelistskipamount, \belowlistskipamount
+@findex abovelistskipamount
+@findex belowlistskipamount
+The vertical glue inserted before and after every list, respectively.
+
+@item \interitemskipamount
+@findex interitemskipamount
+The vertical glue inserted before each item except the first. 
+@code{\listcompact} resets this to zero, as mentioned above.
+
+@item \listleftindent, \listrightindent
+@findex listleftindent
+@findex listrightindent
+@code{\listrightindent} is the amount of space by which the list is
+indented on the right; i.e., it is added to @code{\rightskip}. 
+@code{\listleftindent} is the amount of space, @emph{relative to}
+@code{\parindent}, by which the list is indented on the left.  Why treat
+the two parameters differently?  Because @w{(a) it} is more useful to
+make the list indentation depend on the paragraph indentation;
+@w{(b) footnotes} aren't formatted right if @code{\parindent} is reset
+to zero.
+
+@end table
+
+The three vertical glues are inserted by macros, and preceded by
+penalties: @code{\abovelistskip}
+@findex abovelistskip
+does @code{\vpenalty\abovelistpenalty}
+@findex abovelistpenalty
+and then @code{\vskip\abovelistskip}.  @code{\belowlistskip}
+@findex belowlistskip
+and @code{\interitemskip}
+@findex interitemskip
+are analogous.
+
+In addition, the macro @code{\listmarkerspace}
+@findex listmarkerspace
+is called to separate the item label from the item text.  This is set to
+@code{\enspace} by default.
+
+If you want to change the labels on the items, you can redefine these
+macros:
+@code{\numberedmarker}
+@findex numberedmarker
+or @code{\unorderedmarker}.
+@findex unorderedmarker
+The following registers might be useful if you do:
+
+@table @code
+@item \numberedlistdepth, \unorderedlistdepth
+@findex numberedlistdepth
+@findex unorderedlistdepth
+These keep track of the depth of nesting of the two kinds of lists. 
+
+@item \itemnumber, \itemletter
+@findex itemnumber
+@findex itemletter
+These keep track of the number of items that have been seen in the current
+numbered list.  They are both integer registers.  The difference is that
+@code{\itemnumber} starts at one, and @code{\itemletter} starts at 97,
+i.e., lowercase `a'.
+
+@end table
+
+You can also redefine the control sequences that are used internally,
+if you want to do something radically different:  @code{\beginlist}
+@findex beginlist
+is invoked to begin both kinds of lists; @code{\printitem}
+@findex printitem
+is invoked to print the label (and space following the label) for each
+item; and @code{\endlist}
+@findex endlist
+is invoked to end both kinds of
+lists.
+@cindex item labels, changing
+@cindex labels on items, changing
+
+
+@node Verbatim listing
+@section Verbatim listing
+
+@cindex verbatim listing
+@cindex listing files
+@cindex files, verbatim listing of
+It is sometimes useful to include a file verbatim in your document;
+for example, part of a computer program.  The @code{\listing} 
+@findex listing
+command is given one argument, a filename, and produces the contents of
+that file in your document.  @code{\listing} expands @code{\listingfont}
+to set the current font.  The default value of @code{listingfont}
+@findex listingfont
+is @code{\tt}.
+
+You can take arbitrary actions before reading the file by defining the macro
+@code{\setuplistinghook}.
+@findex setuplistinghook
+This is expanded just before the file is input.
+
+If you want to have line numbers on the output, you can say
+@code{\let\setuplistinghook = \linenumberedlisting}.
+@findex linenumberedlisting
+The line numbers are stored in the count register @code{\lineno} while
+the file is being read.  You can redefine the macro
+@code{\printlistinglineno} to change how they are printed.
+
+You can produce in-line verbatim text in your document with @code{\verbatim}.
+@findex verbatim
+End the text with @code{|endverbatim}.  If you need a @samp{|} in the text,
+double it.  If the first character of the verbatim text is a space, use
+@code{| }. (@code{| } will work elsewhere in the argument, too, but
+isn't necessary.)
+
+For example:
+
+@example
+  \verbatim| ||\#%&!|endverbatim
+@end example
+
+@noindent produces @code{ |\#%&!}.
+
+Line breaks and spaces in the verbatim text are preserved.
+
+@findex verbatimescapechar
+@cindex escape character, changing verbatim
+You can change the verbatim escape character from the default @samp{|}
+with @code{\verbatimescapechar @var{char}}; for example, this changes
+it to @samp{@@}.
+
+@example
+\verbatimescapechar \@@
+@end example
+
+@noindent The backslash is not necessary in some cases, but is in
+others, depending on the catcode of the character.  The argument to
+@code{\verbatimescapechar} is used as @code{\catcode `@var{char}}, so
+the exact rules follow that for @code{\catcode}.
+
+Because @code{\verbatim} must change the category code of special
+characters, calling inside a macro definition of your own does not work
+properly.  For example:
+
+@example
+\def\mymacro@{\verbatim &#%|endverbatim@}% Doesn't work!
+@end example
+
+To accomplish this, you must change the category codes yourself before
+making the macro definition.  Perhaps @code{\uncatcodespecials} will
+help you (@pxref{Category codes}).
+
+
+@node Contents
+@section Contents
+
+@cindex table of contents
+@cindex contents
+Producing a table of contents that is both useful and aesthetic is one
+of the most difficult design problems in any work.  Naturally, Eplain
+does not pretend to solve the design problem.  Collecting the raw data
+for a table of contents, however, is much the same across documents. 
+Eplain uses an auxiliary file with extension @t{.toc}
+@pindex .toc @r{file}
+(and the same root name as your document) to save the information.
+
+To write an entry for the table of contents, you say
+@code{\writetocentry@{@var{part}@}@{@var{text}@}},
+@findex writetocentry
+where @var{part} is the type of part this entry is, e.g.,
+@samp{chapter}, and @var{text} is the text of the title. 
+@code{\writetocentry} puts an entry into the @t{.toc} file that looks
+like @code{\toc@var{part}entry@{@var{text}@}@{@var{page number}@}}.  The
+@var{text} is written unexpanded.
+@findex toc@dots{}entry
+
+A related command, @code{\writenumberedtocentry},
+@findex writenumberedtocentry
+takes one additional argument, and writes it unchanged.  The first token
+is expanded at the point of the @code{\writenumberedtocentry}, but the
+rest of the argument is not expanded.  The usual application is when the
+parts of the document are numbered.  On the other hand, the one-level
+expansion allows you to use the argument for other things as well
+(author's names in a proceedings, say), and not have accents or other
+control sequences expanded.  The downside is that if you @emph{want}
+full expansion of the third argument, you don't get it---you must expand
+it yourself, before you call @code{\writenumberedtocentry}.
+
+Here is a concrete example:
+@example
+\writenumberedtocentry@{chapter@}@{A $\sin$ wave@}@{\the\chapno@}
+\writetocentry@{section@}@{A section title@}
+@end example
+
+Supposing @code{\the\chapno} expanded to @samp{3} and that the
+@code{\write}'s occurred on pages eight and nine, respectively, those
+lines would write the following to the @t{.toc} file:
+@example
+\tocchapterentry@{A $\sin$ wave@}@{3@}@{8@}
+\tocsectionentry@{A section title@}@{9@}
+@end example
+
+You read the @t{.toc} file with the command @code{\readtocfile}.
+@findex readtocfile
+Naturally, whatever @code{\toc @dots{} entry} commands that were written to
+the file must be defined when @code{\readtocfile} is invoked.
+Eplain has minimal definitions for @code{\tocchapterentry},
+@code{\tocsectionentry}, and @code{\tocsubsectionentry}, just to prevent
+undefined control sequence errors in common cases.
+They aren't suitable for anything but preliminary proofs.
+
+After reading the @t{.toc} file, @code{\readtocfile} opens the file
+for writing, thereby deleting the information from the previous run.  You
+should therefore arrange that @code{\readtocfile} be called
+@emph{before} the first call to a @code{\writetoc @dots{}} macro.
+On the other hand, if you don't want to rewrite the @t{.toc} file,
+perhaps because you are only running @TeX{} on part of your manuscript,
+you can set @code{\rewritetocfilefalse}.
+@findex ifrewritetocfile
+@findex rewritetocfile @r{(conditional)}
+
+By default, the @file{.toc} file has the root @code{\jobname}.  If
+your document has more than one contents---for example, if it
+is a collection of papers---you can tell Eplain to use a different root
+name by defining the control sequence
+@code{\tocfilebasename}.
+@findex tocfilebasename
+
+
+@node Cross-references
+@section Cross-references
+
+@cindex cross-references
+It is often useful to refer the reader to other parts of your document;
+but putting literal page, section, equation, or whatever numbers in the
+text is certainly a bad thing.
+
+Eplain therefore provides commands for symbolic cross-references.  It
+uses an auxiliary file with extension @t{.aux}
+@pindex .aux @r{file}
+(and the same root name as your document) to keep track of the
+information.  Therefore, it takes two passes to get the cross-references
+right---one to write them out, and one to read them in.  Eplain
+automatically reads the @t{.aux} file at the first reference; after
+reading it, Eplain reopens it for writing.
+
+You can control whether or not Eplain warns you about undefined
+labels.  @xref{Citations}.
+
+@cindex labels, characters valid in
+Labels in Eplain's cross-reference commands can use characters of
+category code eleven (letter), twelve (other), ten (space), three (math
+shift), four (alignment tab), seven (superscript), or eight (subscript).
+For example, @samp{(a1 $&^_} is a valid label (assuming the category
+codes of plain @TeX{}), but @samp{%#\@{} has no valid characters.
+
+You can also do symbolic cross-references for bibliographic citations
+and list items.  @xref{Citations}, and @ref{Lists}.
+
+@menu
+* Defining generic references::  
+* Using generic references::    
+@end menu
+
+
+@node Defining generic references
+@subsection Defining generic references
+
+@cindex defining general references
+@cindex references, defining general
+@cindex cross-references, defining general
+
+@findex definexref
+Eplain provides the command @code{\definexref} for general
+cross-references.  It takes three arguments: the name of the label (see
+section above for valid label names), the value of the label (which can
+be anything), and the ``class'' of the reference---whether it's a
+section, or theorem, or what.  For example:
+
+@example
+\definexref@{sec-intro@}@{3.1@}@{section@}
+@end example
+
+@noindent Of course, the label value is usually generated by another
+macro using @TeX{} count registers or some such.
+
+@code{\definexref} doesn't actually define @var{label}; instead, it
+writes out the definition to the @t{.aux} file, where Eplain will read
+it on the next @TeX{} run.
+
+The @var{class} argument is used by the @code{\ref} and @code{\refs}
+commands.  See the next section.
+
+
+@node Using generic references
+@subsection Using generic references
+
+@cindex defining general references
+@cindex references, defining general
+@cindex cross-references, defining general
+
+To retrieve the value of the label defined via @code{\definexref} (see
+the previous section), Eplain provides the following macros:
+
+@table @code
+
+@findex refn
+@itemx \refn@{@var{label}@}
+@findex xrefn
+@item \xrefn@{@var{label}@}
+@code{\refn} and @code{\xrefn} (they are synonyms) produce the bare
+definition of @var{label}.  If @var{label} isn't defined, issue a
+warning, and produce @var{label} itself instead, in typewriter.  (The
+warning isn't given if @code{\xrefwarningfalse}.)
+@findex xrefwarning @r{conditional}
+
+@findex ref
+@item \ref@{@var{label}@}
+Given the class @var{c} for @var{label} (see the description of
+@code{\definexref} in the previous section), expand the control sequence
+@code{\@var{c} word} (if it's defined) followed by a tie.  Then call
+@code{\refn} on @var{label}.  (Example below.)
+
+@findex refs
+@item \refs@{@var{label}@}
+Like @code{\ref}, but append the letter @samp{s} to the
+@code{\@dots{}word}.
+
+@end table
+
+The purpose of the @code{\@dots{}word} macro is to produce the word
+`Section' or `Figure' or whatever that usually precedes the actual
+reference number.
+
+Here is an example:
+
+@example
+\def\sectionword@{Section@}
+\definexref@{sec-intro@}@{3.1@}@{section@}
+\definexref@{sec-next@}@{3.2@}@{section@}
+See \refs@{sec-intro@} and \refn@{sec-next@} @dots{}
+@end example
+
+@noindent This produces `See Sections 3.1 and 3.2 @dots{}'
+
+
+@node Page references
+@section Page references
+
+Eplain provides two commands for handling references to page numbers,
+one for definition and one for use.
+
+@table @code
+
+@item \xrdef@{@var{label}@}
+@findex xrdef
+Define @var{label} to be the current page number.  This produces no
+printed output, and ignores following spaces.
+
+@item \xref@{@var{label}@}
+@findex xref
+Produce the text @w{`p. @var{page-number}}', which is the usual form
+for cross-references.  The @var{page-number} is actually @var{label}'s
+definition; if @var{label} isn't defined, the text of the label itself
+is printed.
+
+@end table
+
+@menu
+* Equation references::         
+@end menu
+
+@node Equation references
+@subsection Equation references
+
+@cindex equations, references to
+@cindex equations, numbering
+Instead of referring to pages, it's most useful if equation labels
+refer to equation numbers.  Therefore, Eplain reserves a @code{\count}
+register, @code{\eqnumber},
+@findex eqnumber
+for the current equation number, and increments it at each
+numbered equation.  
+
+Here are the commands to define equation labels and then refer to them:
+
+@table @code
+
+@item \eqdef@{@var{label}@}
+@findex eqdef
+This defines @var{label} to be the current value of @code{\eqnumber},
+and, if the current context is not inner, then produces a @code{\eqno}
+command.  (The condition makes it possible to use @code{\eqdef} in an
+@code{\eqalignno} construction, for example.)  The text of the equation
+number is produced using @code{\eqprint}.  @xref{Formatting equation
+references}.
+
+@cindex empty labels
+@cindex labels, empty
+@cindex equations, giving numbers to all
+If @var{label} is empty, you still get an equation number (although
+naturally you can't reliably refer to it).  This is useful if you want
+to put numbers on all equations in your document, and you don't want to
+think up unique labels.
+
+@item \eqdefn@{@var{label}@}
+@findex eqdefn
+This is like @code{\eqdef}, except it always omits the @code{\eqno}
+command.  It can therefore be used in places where @code{\eqdef} can't;
+for example, in a non-displayed equation.  The text of the equation
+number is not produced, so you can also use it in the (admittedly
+unusual) circumstance when you want to define an equation label but not
+print that label.
+
+@item \eqref@{@var{label}@}
+@findex eqref
+This produces a formatted reference to @var{label}.  If @var{label} is
+undefined (perhaps because it is a forward reference), it just produces
+the text of the label itself.  Otherwise, it calls @code{\eqprint}.
+
+@item \eqrefn@{@var{label}@}
+@findex eqrefn
+This produces the cross-reference text for @var{label}.  That is, it
+is like @code{\eqref}, except it doesn't call @code{\eqprint}.
+
+@end table
+
+@cindex equation labels, characters valid in
+Equation labels can contain the same characters that are valid in
+general cross-references.
+
+@menu
+* Formatting equation references::  
+* Subequation references::      
+@end menu
+
+
+@node Formatting equation references
+@subsubsection Formatting equation references
+
+@cindex equation numbers, formatting of
+Both defining an equation label and referring to it should usually
+produce output.  This output is produced with the @code{\eqprint} macro,
+which takes one argument, the equation number being defined or referred
+to.  By default, this just produces @samp{(@var{number})}, where
+@var{number} is the equation number.  To produce the equation number in
+a different font, or with different surrounding symbols, or whatever,
+you can redefine @code{\eqprint}.
+@findex eqprint
+For example, the following definition would print all equation numbers
+in italics.  (The extra braces define a group, to keep the font change
+from affecting surrounding text.)
+
+@example
+\def\eqprint#1@{@{\it (#1)@}@}
+@end example
+
+In addition to changing the formatting of equation numbers, you might
+to add more structure to the equation number; for example, you might
+want to include the chapter number, to get equation numbers like
+`(1.2)'.  To achieve this, you redefine @code{\eqconstruct}.
+@findex eqconstruct
+For example:
+
+@example
+\def\eqconstruct#1@{\the\chapternumber.#1@}
+@end example
+
+@noindent
+(If you are keeping the chapter number in a count register named
+@code{\chapternumber}, naturally.)
+
+The reason why both @code{\eqconstruct} and @code{\eqprint} may not be
+immediately apparent, since they appear to perform similar functions.
+The difference is that @code{\eqconstruct} affects the text that
+cross-reference label is defined to be, while @code{\eqprint} affects
+only what is typeset on the page.  The example just below might help.
+
+Usually, you want equation labels to refer to equation numbers.  But
+sometimes you might want a more complicated text.  For example, you
+might have an equation `(1)', and then have a variation several pages
+later which you want to refer to as `(1*)'.
+
+Therefore, Eplain allows you to give an optional argument (i.e.,
+arbitrary text in square brackets) before the cross-reference label to
+\eqdef.  Then, when you refer to the equation, that text is produced.
+Here's how to get the example just mentioned:
+
+@example
+$$@dots{}\eqdef@{a-eq@}$$
+@dots{}
+$$@dots{}\eqdef[\eqrefn@{a-eq@}*]@{a-eq-var@}$$
+In \eqref@{a-eq-var@}, we expand on \eqref@{a-eq@}, @dots{}
+@end example
+
+We use @code{\eqrefn} in the cross-reference text, not
+@code{\eqref}, so that @code{\eqprint} is called only once.
+
+
+@node Subequation references
+@subsubsection Subequation references
+
+@cindex equations, groups of
+@cindex subequations, referring to
+Eplain also provides for one level of substructure for equations.  That
+is, you might want to define a related group of equations with numbers
+like `2.1' and `2.2', and then be able to refer to the group as a whole:
+``@dots{} in the system of equations (2)@dots{}''.
+
+The commands to do this are @code{\eqsubdef} and
+@findex eqsubdef
+@code{\eqsubdefn}.
+@findex eqsubdefn
+They take one @var{label} argument like their counterparts above,
+and generally behave in the same way.  The difference is in how they
+construct the equation number: instead of using just @code{\eqnumber},
+they also use another counter, @code{\subeqnumber}.
+@findex subeqnumber
+This counter is advanced by one at every @code{\eqsubdef} or
+@code{\eqsubdefn}, and reset to zero at every @code{\eqdef} or
+@code{\eqdefn}.
+
+You use @code{\eqref} to refer to subequations as well as main
+equations.
+
+To put the two together to construct the text that the label will
+produce, they use a macro @code{\eqsubreftext}.
+@findex eqsubreftext
+This macros takes two arguments, the ``main'' equation number (which,
+because the equation label can be defined as arbitrary text, as
+described in the previous section, might be anything at all) and the
+``sub'' equation number (which is always just a number).  Eplain's
+default definition just puts a period between them:
+@example
+  \def\eqsubreftext#1#2@{#1.#2@}%
+@end example
+
+@noindent You can redefine @code{\eqsubreftext} to print however you
+like.  For example, this definition makes the labels print as `2a',
+`2b', and so on.
+@example
+\newcount\subref
+\def\eqsubreftext#1#2@{%
+  \subref = #2           % The space stops a <number>.
+  \advance\subref by 96  % `a' is character code 97.
+  #1\char\subref
+@}
+@end example
+
+@noindent Sadly, we must define a new count register, @code{\subref},
+instead of using the scratch count register @code{\count255}, because
+@samp{#1} might include other macro calls which use @code{\count255}.
+
+
+@node Justification
+@section Justification
+
+@cindex centering
+@cindex left-justification
+@cindex right-justification
+@cindex justification
+Eplain defines three commands to conveniently justify multiple
+lines of text: @code{\flushright}, @code{\flushleft}, and
+@code{\center}.
+@findex flushright
+@findex flushleft
+@findex center
+
+They all work in the same way; let's take @code{\center} as the
+example.  To start centering lines, you say @code{\center} inside a
+group; to stop, you end the group.  Between the two commands, each
+end-of-line in the input file also starts a new line in the output file.
+
+The entire block of text is broken into paragraphs at blank lines,
+so all the @TeX{} paragraph-shaping parameters apply in the usual way.
+This is convenient, but it implies something else that isn't so
+convenient: changes to any linespacing parameters, such as
+@code{\baselineskip}, will have @emph{no effect} on the paragraph in
+which they are changed.  @TeX{} does not handle linespacing changes
+within a paragraph (because it doesn't know where the line breaks are
+until the end of the paragraph).
+
+The space between paragraphs is by default one blank line's worth.
+You can adjust this space by assigning to @code{\blanklineskipamount};
+@findex blanklineskipamount @r{in justified text}
+this (vertical) glue is inserted after each blank line.
+
+Here is an example:
+@example
+@{\center First line.
+
+   Second line, with a blank line before.
+@}
+@end example
+
+This produces:
+
+@center First line.
+@center
+@center Second line, with a blank line before.
+
+You may wish to use the justification macros inside of your own
+macros.  Just be sure to put them in a group.  For example, here is how
+a title macro might be defined:
+
+@example
+\def\title@{\begingroup\titlefont\center@}
+\def\endtitle@{\endgroup@}
+@end example
+
+
+@node Tables
+@section Tables
+
+@cindex tables
+@cindex alignments
+Eplain provides a single command, @code{\makecolumns},
+@findex makecolumns
+to make generating one particular kind of table easier.  More ambitious
+macro packages might be helpful to you for more difficult applications.
+The files @file{ruled.tex} and @file{TXSruled.tex}, available from
+@samp{lifshitz.ph.utexas.edu} in @file{texis/tables}, is the only one I
+know of.
+
+Many tables are homogenous, i.e., all the entries are semantically the
+same.  The arrangement into columns is to save space on the page, not
+to encode different meanings.  In this kind of the table, it is useful to
+have the column breaks chosen automatically, so that you can add or
+delete entries without worrying about the column breaks.
+
+@code{\makecolumns} takes two arguments: the number of entries in the
+table, and the number of columns to break them into.  As you can see
+from the example below, the first argument is delimited by a slash, and
+the second by a colon and a space (or end-of-line).  The entries for the
+table then follow, one per line (not including the line with the
+@code{\makecolumns} command itself).
+
+@code{\parindent} defines the space to the left of the
+table.  @code{\hsize} defines the width of the table.
+So you can adjust the position of the table on the page by assignments
+to these parameters, probably inside a group.
+
+You can also control the penalty at a page break before the
+@code{\makecolumns} by setting the parameter
+@code{\abovecolumnspenalty}.
+@findex abovecolumnspenalty
+Usually, the table is preceded by some explanatory text.  You wouldn't
+want a page break to occur after the text and before the table, so
+Eplain sets it to @code{10000}.  But if the table produced by
+@code{\makecolumns} is standing on its own, @code{\abovecolumnspenalty}
+should be decreased.
+
+If you happen to give @code{\makecolumns} a smaller number of entries
+than you really have, some text beyond the (intended) end of the table
+will be incorporated into the table, probably producing an error
+message, or at least some strange looking entries.  And if you give
+@code{\makecolumns} a larger number of entries than you really have,
+some of the entries will be typeset as straight text, probably also
+looking somewhat out of place.
+
+Here is an example:
+@example
+% Arrange 6 entries into 2 columns:
+\makecolumns 6/2: % This line doesn't have an entry.
+one
+two
+three
+four
+five
+six
+Text after the table.
+@end example
+
+This produces `one', `two', and `three' in the first column, and
+`four', `five', and `six' in the second.
+
+
+@node Margins
+@section Margins
+
+@cindex margins, changing
+@TeX{}'s primitives describe the type area in terms of an offset from
+the upper left corner, and the width and height of the type.  Some
+people prefer to think in terms of the @dfn{margins} at the top, bottom,
+left, and right of the page, and most composition systems other than
+@TeX{} conceive of the page laid out in this way.  Therefore, Eplain
+provides commands to directly assign and increment the margins.
+
+@table @code
+@itemx \topmargin = @var{dimen}
+@itemx \bottommargin = @var{dimen}
+@itemx \leftmargin = @var{dimen}
+@item \rightmargin = @var{dimen}
+@findex topmargin
+@findex bottommargin
+@findex leftmargin
+@findex rightmargin
+These commands set the specified margin to the @var{dimen} given.
+The @code{=} and the spaces around it are optional.  The control
+sequences here are not @TeX{} registers, despite appearances;
+therefore, commands like @code{\showthe\topmargin} will not do what you
+expect.
+
+@itemx \advancetopmargin by @var{dimen}
+@itemx \advancebottommargin by @var{dimen}
+@itemx \advanceleftmargin by @var{dimen}
+@item \advancerightmargin by @var{dimen}
+@findex advancetopmargin
+@findex advancebottommargin
+@findex advanceleftmargin
+@findex advancerightmargin
+These commands change the specified margin by the @var{dimen} given.
+@end table
+
+Regardless of whether you use the assignment or the advance commands,
+Eplain always changes the type area in response, not the other margins.
+For example, when @TeX{} starts, the left and right margins are both one
+inch.  If you then say @code{\leftmargin = 2in}, the right margin will
+remain at one inch, and the width of the lines (i.e., @code{\hsize})
+@findex hsize
+will decrease by one inch.
+
+When you use any of these commands, Eplain computes the old value of
+the particular margin, by how much you want to change it, and then
+resets the values of @TeX{}'s primitive parameters to correspond.
+Unfortunately, Eplain cannot compute the right or bottom margin without
+help: you must tell it the full width and height of the final output
+page.  It defines two new parameters for this:
+
+@table @code
+@item \paperheight
+@findex paperheight
+The height of the output page; default is 11in.
+
+@item \paperwidth
+@findex paperwidth
+The width of the output page; default is 8.5in.
+@end table
+
+If your output page has different dimensions than this, you must
+reassign to these parameters, as in
+
+@example
+\paperheight = 11in
+\paperwidth = 17in
+@end example
+
+
+@node Multiple columns
+@section Multiple columns
+
+@cindex double column output
+@cindex triple column output
+@cindex quadruple column output
+@cindex multiple column output
+Eplain provides for double, triple, and quadruple column output:  say
+@code{\doublecolumns},
+@findex doublecolumns
+@code{\triplecolumns},
+@findex triplecolumns
+or @code{\quadcolumns},
+@findex quadcolumns
+and from that point on, the manuscript will be
+set in columns.  To go back to one column, say
+@code{\singlecolumn}.
+@findex singlecolumn
+
+@cindex column balancing with @code{\singlecolumn}
+@cindex balancing of columns with @code{\singlecolumn}
+You may need to invoke @code{\singlecolumn} to balance the columns
+on the last page of output.
+
+@findex columnfill
+@cindex column eject
+@cindex eject in multicolumns
+@findex pagetotal
+To do a ``column eject'', i.e., move to the top of the next column, do
+@code{\columnfill}. This does not actually force an eject, however: it
+merely inserts a kern of size @code{\@@normalvsize} minus
+@code{\pagetotal} (@code{\@@normalvsize} being the usual height of the
+page; to implement multicolumns, Eplain multiplies @code{\vsize} itself
+by the number of columns). In most circumstances, a column break will be
+forced after this kern (during the column splitting operation when the
+whole page is output), as desired.
+
+@findex gutter
+The columns are separated by the value of the dimen parameter
+@code{\gutter}.  Default value is two picas.
+
+All the @code{\@dots{}columns} macros insert the value of the glue parameter
+@code{\abovedoublecolumnskip}
+@findex abovedoublecolumnskip
+before the multicolumn text, and the value of the glue parameter
+@code{\belowdoublecolumnskip}
+@findex belowdoublecolumnskip
+after it.  The default value for both of these parameters is
+@code{\bigskipamount}, i.e., one linespace in plain @TeX{}.
+
+The macros take into account only the insertion classes
+@cindex insertion classes
+defined by plain @TeX{}; namely, footnotes and @code{\topinsert}s.  If
+you have additional insertion classes, you will need to change
+the implementation.
+
+Also, Eplain makes insertions the full page width. There is no
+provision for column-width insertions.
+
+
+@node Footnotes
+@section Footnotes
+
+@cindex footnotes, numbered
+The most common reference mark for footnotes is a raised number,
+incremented on each footnote.  The @code{\numberedfootnote}
+@findex numberedfootnote
+macro provides this.  It takes one argument, the footnote text.
+
+If your document uses only numbered footnotes, you could make typing
+@code{\numberedfootnote} more convenient with a command such as:
+
+@example
+\let\footnote = \numberedfootnote
+@end example
+
+After doing this, you can type your footnotes as
+@code{\footnote@{@var{footnote text}@}}, instead of as
+@code{\numberedfootnote@{@var{footnote text}@}}.
+
+Eplain keeps the current footnote number in the count register
+@code{\footnotenumber}.  So, to reset the footnote number to zero,
+as you might want to do at, for example, the beginning of a chapter, you
+could say @code{\footnotenumber=0}.
+
+Plain @TeX{} separates the footnote marker from the footnote text by
+an en space (it uses the @code{\textindent} macro).  In Eplain, you can
+change this space by setting the dimension register
+@code{\footnotemarkseparation}.
+@findex footnotemarkseparation
+The default is still an en.
+
+You can produce a space between footenotes by setting the glue
+register @code{\interfootnoteskip}.
+@findex interfootnoteskip
+The default is zero.
+
+@code{\parskip} is also set to zero by default before the beginning of
+each footnote (but not for the text of the footnote).
+
+You can also control footnote formatting in a more general way:
+Eplain expands the token register @code{\everyfootnote}
+@findex everyfootnote
+before a footnote is typeset, but after the default values for all the
+parameters have been established.  For example, if you want your
+footnotes to be printed in seven-point type, indented by one inch, you
+could say:
+@example
+\everyfootnote = @{\sevenrm \leftskip = 1in@}
+@end example
+
+By default, an @code{\hrule} is typeset above each group of footnotes
+on a page.  You can control the dimensions of this rule by setting
+the dimension registers @code{\footnoterulewidth}
+@findex footnoterulewidth
+and @code{\footnoteruleheight}.
+@findex footnoteruleheight
+The space between the rule and the first footnote on the page is
+determined by the dimension register @code{\belowfootnoterulespace}.
+@findex belowfootnoterulespace
+If you don't want any rule at all, set @code{\footenoteruleheight=0pt},
+and, most likely, @code{\belowfootnoterulespace=0pt}.  The defaults for
+these parameters typeset the rule in the same way as plain @TeX{}: the
+rule is 0.4 points high, 2 true inches wide, with 2.6 points below it.
+
+The space above the rule and below the text on the page is controlled
+by the glue register @code{\skip\footins}.  The default is a plain @TeX{}
+@code{\bigskip}.
+
+
+@node Fractions
+@section Fractions
+
+@cindex fractions
+Exercise 11.6 of @cite{The @TeX{}book} describes a macro @code{\frac}
+@findex frac
+for setting fractions, but @code{\frac} never made it into plain @TeX{}.
+So Eplain includes it.
+
+@code{\frac} typesets the numerator and denominator in
+@code{\scriptfont0}, slightly raised and lowered.  The numerator and
+denominator are separated by a slash.  The denominator must be enclosed
+in braces if it's more than one token long, but the numerator need not
+be.  (This is a consequence of @code{\frac} taking delimited arguments;
+see @w{page 203} of @cite{The @TeX{}book} for an explanation of
+delimited macro arguments.)
+
+For example, @code{\frac 23/@{64@}} turns `23/64' into
+@tex
+\leavevmode
+   \kern-.1em \raise .5ex \hbox{\the\scriptfont0 23}@comment
+   \kern-.1em $/$@comment
+   \kern-.15em \lower .25ex \hbox{\the\scriptfont0 64}@comment
+@end tex
+@ifinfo
+23/64 (you can't see the difference in the Info file)@comment
+@end ifinfo
+.
+
+
+@node Paths
+@section Paths
+
+@cindex pathnames, breaking
+@cindex filenames, breaking
+@cindex electronic mail addresses, breaking
+
+When you typeset long pathnames, electronic mail addresses, or other
+such ``computer'' names, you would like @TeX{} to break lines at
+punctuation characters within the name, rather than trying to find
+hyphenation points within the words.  For example, it would be better to
+break the email address @code{letters@@alpha.gnu.ai.mit.edu} at the
+@samp{@@} or a @samp{.}, rather than at the hyphenation points in
+@samp{letters} and @samp{alpha}.
+
+@findex path
+If you use the @code{\path} macro to typeset the names, @TeX{} will find
+these good breakpoints.  The argument to @code{\path} is delimited by
+any other other than @samp{\} which does not appear in the name itself.
+@samp{|} is often a good choice, as in:
+@example
+\path|letters@@alpha.gnu.ai.mit.edu|
+@end example
+
+@findex discretionaries
+You can control the exact set of characters at which breakpoints will be
+allowed by calling @code{\discretionaries}.  This takes the same sort of
+delimited argument; any character in the argument will henceforth be a valid
+breakpoint within @code{\path}.  The default set is essentially all the
+punctuation characters:
+@example
+\discretionaries |~!@@$%^&*()_+`-=#@{@}[]:";'<>,.?\/|
+@end example
+
+@findex specialpathdelimiters @r{(conditional)}
+If for some reason you absolutely must use @code{\} as the delimiter
+character for @code{\path}, you can set
+@code{\specialpathdelimiterstrue}.  (Other delimiter characters can
+still be used.)  @TeX{} then processes the @code{\path} argument
+about four times more slowly.
+
+
+@node Logos
+@section Logos
+
+@cindex logos
+@cindex names, of @TeX{} variants
+
+Eplain redefines the @code{\TeX}
+@findex TeX
+macro of plain @TeX{} to end with @code{\null}, so that the proper
+spacing is produced when @code{\TeX} is used at the end of a sentence. 
+The other @dots{}@TeX{} macros listed here do this, also.
+
+Eplain defines
+@code{\AMSTeX},
+@cindex AMS@TeX{}
+@findex AMSTeX
+@code{\BibTeX}
+@cindex Bib@TeX{}
+@findex BibTeX
+@code{\AMSLaTeX},
+@cindex AMSLa@TeX{}
+@findex AMSLaTeX
+@code{\LAMSTeX},
+@cindex LAMS@TeX{}
+@findex LAMSTeX
+@code{\LaTeX}
+@cindex La@TeX{}
+@findex LaTeX
+@code{\MF},
+@cindex Metafont
+@findex MF
+and @code{\SLiTeX}
+@cindex SLi@TeX{}
+@findex SLiTeX
+to produce their respective logos.  (Sorry, the logos are not shown
+here.)  Some spelling variants of these are also supported.
+
+
+@node Boxes
+@section Boxes
+
+@cindex black boxes
+@cindex rectangles
+The solid rectangle that Eplain uses as a marker in unordered lists
+(@pxref{Lists}) is available by itself: just say @code{\blackbox}.
+@findex blackbox
+
+You can create black boxes of arbitrary size with @code{\hrule} or
+@code{\vrule}.
+
+@cindex open boxes
+@cindex boxes, open
+You can also get unfilled rectangles with @code{\makeblankbox}.
+@findex makeblankbox
+This takes two explicit arguments: the height and depth of the rules that
+define the top and bottom of the rectangle.  (The two arguments are
+added to get the width of the left and right borders, so that the
+thickness of the border is the same on all four sides.)  It also uses,
+as implicit arguments, the dimensions of @code{\box0} to define the
+dimensions of the rectangle it produces.  (The contents of @code{\box0}
+are ignored.)
+
+Here is an example.  This small raised open box is suitable for
+putting next to numbers in, e.g., a table of contents.
+
+@example
+\def\openbox@{%
+  \ht0 = 1.75pt \dp0 = 1.75pt \wd0 = 3.5pt
+  \raise 2.75pt \makeblankbox@{.2pt@}@{.2pt@}
+@}
+@end example
+
+Finally, you can put a box around arbitrary text with @code{\boxit}.
+@findex boxit
+This takes one argument, which must itself be a (@TeX{}) box, and puts a
+printed box around it, separated by @code{\boxitspace}
+@findex boxitspace
+white space (3 points by default) on all four sides.  For example:
+
+@example
+\boxit@{\hbox@{This text is boxed.@}@}
+@end example
+
+The reason that the argument must be a box is that when the text is
+more than one line long, @TeX{} cannot figure out the line length for
+itself.  Eplain does set @code{\parindent} to zero inside @code{\boxit},
+since it is very unlikely you would want indentation there.  (If you do,
+you can always reset it yourself.)
+
+@code{\boxit} uses @code{\ehrule} and @code{\evrule} so that you can
+easily adjust the thicknesses of the box rules.  @xref{Rules}.

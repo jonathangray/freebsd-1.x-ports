@@ -1,0 +1,766 @@
+@c Copyright (C) 1991, 1992 Steven Smith.
+@c email: stsmith@mit.edu
+@c This is part of the Eplain manual.
+@c For copying conditions, see the file eplain.texi.
+
+@comment \input texinfo
+@comment setfilename arrow.info
+@comment settitle Arrow Theoretic Diagrams
+
+@c Input arrow macros without altering texinfo's \catcodes.
+@c Use the arrow macros in an `@iftex @tex ... @end iftex' environment.
+
+@iftex
+@catcode`@$=3 @catcode`@%=14 @catcode`@&=4 @catcode`@#=6
+@catcode`@^=7 @catcode`@_=8
+@catcode`@"=@other @catcode`@<=@other @catcode`@>=@other
+@catcode`@\=0
+\catcode`\@=\other
+\input arrow
+\catcode`\@=0
+@catcode`@\=@active
+@catcode`@$=@other @catcode`@%=@other @catcode`@&=@other @catcode`@#=@other
+@catcode`@^=@active @catcode`@_=@active
+@catcode`@"=@active @catcode`@<=@active @catcode`@>=@active
+@end iftex
+
+
+@node Arrow theoretic diagrams
+@chapter Arrow theoretic diagrams
+
+This chapter describes definitions for producing commutative diagrams.
+
+Steven Smith wrote this documentation (and the macros).
+
+@menu
+* Slanted lines and vectors::   
+* Commutative diagrams::        
+@end menu
+
+@node Slanted lines and vectors
+@section Slanted lines and vectors
+
+The macros @code{\drawline}
+@findex drawline
+and @code{\drawvector}
+@findex drawvector
+provide the capability found in La@TeX{}'s
+@cindex La@TeX{}
+picture mode to draw slanted lines and vectors of certain directions.
+Both of these macros take three arguments: two integer arguments to
+specify the direction of the line or vector, and one argument to specify
+its length.  For example, @samp{\drawvector(-4,1)@{60pt@}} produces the
+vector
+@iftex
+@tex
+$$\vbox{\hbox{\drawvector(-4,1){60pt}}\smallskip
+  \hbox{$\mathop{\hbox to60pt{\leftarrowfill\hskip-5pt\rightarrowfill}}
+  \limits_{{\fam0 60\,pt}}$}}$$
+@end tex
+@end iftex
+@ifinfo
+
+@center (A vector in the 2d quadrant of length 60 pt appears here.)
+
+@end ifinfo
+@cindex lines
+@cindex vectors
+which lies in the 2d quadrant, has a slope of minus 1/4, and a width of
+60 pt.
+
+Note that if an @code{\hbox} is placed around @code{\drawline} or
+@code{\drawvector}, then the width of the @code{\hbox} will be the
+positive dimension specified in the third argument, except when a
+vertical line or vector is specified, e.g.,
+@code{\drawline(0,1)@{1in@}}, which has zero width.  If the specified
+direction lies in the 1st or 2d quadrant (e.g., @code{(1,1)} or
+@code{(-2,3)}), then the @code{\hbox} will have positive height and zero
+depth.  Conversely, if the specified direction lies in the 3d or 4th
+quadrant (e.g., @code{(-1,-1)} or @code{(2,-3)}), then the @code{\hbox}
+will have positive depth and zero height.
+
+There are a finite number of directions that can be specified.  For
+@code{\drawline}, the absolute value of each integer defining the
+direction must be less than or equal to six, i.e., @code{(7,-1)} is
+incorrect, but @code{(6,-1)} is acceptable. For @code{\drawvector}, the
+absolute value of each integer must be less than or equal to four.
+Furthermore, the two integers cannot have common divisors; therefore, if
+a line with slope 2 is desired, say @code{(2,1)} instead of
+@code{(4,2)}.  Also, specify @code{(1,0)} instead of, say, @code{(3,0)}
+for horizontal lines and likewise for vertical lines.
+
+Finally, these macros depend upon the La@TeX{} font @code{line10}.  If
+your site doesn't have this font, ask your system administrator to get
+it.  Future enhancements will include macros to draw dotted lines and
+dotted vectors of various directions.
+
+
+@node Commutative diagrams
+@section Commutative diagrams
+
+@cindex commutative diagrams
+
+The primitive commands @code{\drawline} and @code{\drawvector} can be
+used to typeset arrow theoretic diagrams.  This section describes (1)
+macros to facilitate typesetting arrows and morphisms, and (2) macros to
+facilitate the construction of commutative diagrams.  All macros
+described in this section must be used in math mode.
+
+@menu
+* Arrows and morphisms::        
+* Construction of commutative diagrams::  
+* Commutative diagram parameters::  
+@end menu
+
+@node Arrows and morphisms
+@subsection Arrows and morphisms
+@cindex arrows
+@cindex morphisms
+
+The macros @code{\mapright} and @code{\mapleft} produce right and left
+@findex mapright
+@findex mapleft
+pointing arrows, respectively.  Use superscript (@code{^}) to place a
+morphism above the arrow, e.g., @samp{\mapright^\alpha}; use subscript
+(@code{_}) to place a morphism below the arrow, e.g.,
+@samp{\mapright_@{\tilde l@}}.  Superscripts and subscripts may be used
+simulataneously, e.g., @samp{\mapright^\pi_@{\rm epimor.@}}.
+
+Similarly, the macros @code{\mapup} and @code{\mapdown} produce up and
+@findex mapup
+@findex mapdown
+down pointing arrows, respectively.  Use @code{\rt}
+@findex rt
+to place a morphism to the right of the arrow, e.g., @samp{\mapup\rt@{\rm
+id@}}; use @code{\lft}
+@findex lft
+to place a morphism to the left of the arrow, e.g., @samp{\mapup\lft\omega}.
+@code{\lft} and @code{\rt} may be used simultaneously, e.g.,
+@samp{\mapdown\lft\pi\rt@{\rm monomor.@}}.
+
+Slanted arrows are produced by the macro @code{\arrow}, which takes
+@findex arrow
+a direction argument (e.g., @samp{\arrow(3,-4)}).  Use @code{\rt} and
+@code{\lft} to place morphisms to the right and left, respectively, of
+the arrow.  A slanted line (no arrowhead) is produced with the macro
+@code{\sline},
+@findex sline
+whose syntax is identical to that of @code{\arrow}.
+
+The length of these macros is predefined by the default @TeX{}
+dimensions @code{\harrowlength},
+@findex harrowlength
+for horizontal arrows (or lines),
+@code{\varrowlength},
+@findex varrowlength
+for vertical arrows (or lines), and
+@code{\sarrowlength},
+@findex sarrowlength
+for slanted arrows (or lines).  To change any of these dimensions, say,
+e.g., @samp{\harrowlength=40pt}.  As with all other @TeX{} dimensions,
+the change may be as global or as local as you like.  Furthermore, the
+placement of morphisms on the arrows is controlled by the dimensions
+@code{\hmorphposn},
+@findex hmorphposn
+@code{\vmorphposn},
+@findex vmorphposn
+and @code{\morphdist}.
+@findex morphdist
+The first two dimensions control the horizontal and vertical position of
+the morphism from its default position; the latter dimension controls
+the distance of the morphism from the arrow.  If you have more than one
+morphism per arrow (i.e., a @code{^}/@code{_} or @code{\lft}/@code{\rt}
+construction), use the parameters
+@code{\hmorphposnup},
+@findex hmorphposnup
+@code{\hmorphposndn},
+@findex hmorphposndn
+@code{\vmorphposnup},
+@findex vmorphposnup
+@code{\vmorphposndn},
+@findex vmorphposndn
+@code{\hmorphposnrt},
+@findex hmorphposnrt
+@code{\hmorphposnlft},
+@findex hmorphposnlft
+@code{\vmorphposnrt},
+@findex vmorphposnrt
+and @code{\vmorphposnlft}.
+@findex vmorphposnlft
+The default values of all these dimensions are provided in the section
+on parameters that follows below.
+
+There is a family of macros to produce horizontal lines, arrows, and
+adjoint arrows.  The following macros produce horizontal maps and have
+the same syntax as @code{\mapright}:
+
+@table @code
+
+@item \mapright
+@findex mapright
+@code{$X\mapright Y$}
+@iftex
+@tex
+$\equiv$ $\harrowlength=20ptX\mapright Y$.
+@end tex
+@end iftex
+@ifinfo
+= (a right arrow).
+@end ifinfo
+
+@item \mapleft
+@findex mapleft
+@code{$X\mapleft Y$}
+@iftex
+@tex
+$\equiv$ $\harrowlength=20ptX\mapleft Y$.
+@end tex
+@end iftex
+@ifinfo
+= (a left arrow).
+@end ifinfo
+
+@item \hline
+@findex hline
+@code{$X\hline Y$}
+@iftex
+@tex
+$\equiv$ $\harrowlength=20ptX\hline Y$.
+@end tex
+@end iftex
+@ifinfo
+= (horizontal line)
+@end ifinfo
+
+@ignore
+@item \dothline
+@findex dothline
+(dotted horizontal line)	{@bf Unimplemented.}
+@end ignore
+
+@item \bimapright
+@findex bimapright
+@code{$X\bimapright Y$}
+@iftex
+@tex
+$\equiv$ $\harrowlength=20ptX\bimapright Y$.
+@end tex
+@end iftex
+@ifinfo
+= (two right arrows).
+@end ifinfo
+
+@item \bimapleft
+@findex bimapleft
+@code{$X\bimapleft Y$}
+@iftex
+@tex
+$\equiv$ $\harrowlength=20ptX\bimapleft Y$.
+@end tex
+@end iftex
+@ifinfo
+= (two left arrows)
+@end ifinfo
+
+@item \adjmapright
+@findex adjmapright
+@code{$X\adjmapright Y$}
+@iftex
+@tex
+$\equiv$ $\harrowlength=20ptX\adjmapright Y$.
+@end tex
+@end iftex
+@ifinfo
+= (two adjoint arrows; left over right)
+@end ifinfo
+
+@item \adjmapleft
+@findex adjmapleft
+@code{$X\adjmapleft Y$}
+@iftex
+@tex
+$\equiv$ $\harrowlength=20ptX\adjmapleft Y$.
+@end tex
+@end iftex
+@ifinfo
+= (two adjoint arrows; right over left)
+@end ifinfo
+
+@item \bihline
+@findex bihline
+@code{$X\bihline Y$}
+@iftex
+@tex
+$\equiv$ $\harrowlength=20ptX\bihline Y$.
+@end tex
+@end iftex
+@ifinfo
+= (two horizontal lines)
+@end ifinfo
+@end table
+
+There is also a family of macros to produce vertical lines, arrows, and
+adjoint arrows.  The following macros produce vertical maps and have
+the same syntax as @code{\mapdown}:
+
+@table @code
+
+@item \mapdown
+@findex mapdown
+(a down arrow)
+
+@item \mapup
+@findex mapup
+(an up arrow)
+
+@item \vline
+@findex vline
+(vertical line)
+
+@ignore
+@item \dotvline
+@findex dotvline
+(dotted vertical line) {@bf Unimplemented.}
+@end ignore
+
+@item \bimapdown
+@findex bimapdown
+(two down arrows)
+
+@item \bimapup
+@findex bimapup
+(two up arrows)
+
+@item \adjmapdown
+@findex adjmapdown
+(two adjoint arrows; down then up)
+
+@item \adjmapup
+@findex adjmapup
+(two adjoint arrows; up then down)
+
+@item \bivline
+@findex bivline
+(two vertical lines)
+@end table
+
+Finally, there is a family of macros to produce slanted lines, arrows,
+and adjoint arrows.  The following macros produce slanted maps and have
+the same syntax as @code{\arrow}:
+
+@table @code
+
+@item \arrow
+@findex arrow
+(a slanted arrow)
+
+@item \sline
+@findex sline
+(a slanted line)
+
+@item \biarrow
+@findex biarrow
+(two straight arrows)
+
+@item \adjarrow
+@findex adjarrow
+(two adjoint arrows)
+
+@item \bisline
+@findex bisline
+(two straight lines)
+
+@end table
+
+The width between double arrows is controlled by the parameter
+@code{\channelwidth}.
+@findex channelwidth
+The parameters @code{\hchannel} and @code{\vchannel}, if nonzero,
+override @code{\channelwidth} by controlling the horizontal and vertical
+shifting from the first arrow to the second.
+
+There are no adornments on these arrows to distinguish inclusions from
+epimorphisms from monomorphisms.  Many texts, such as Lang's book
+@cite{Algebra}, use as a tasteful alternative the symbol `inc' (in roman) next
+to an arrow to denote inclusion.
+@cindex Lang, Serge
+
+Future enhancements will include a mechanism to draw curved arrows
+found in, e.g., the Snake Lemma, by employing a version of the
+@code{\path} macros of Appendix D of @cite{The @TeX{}book}.
+@cindex Snake Lemma
+
+
+@node Construction of commutative diagrams
+@subsection Construction of commutative diagrams
+
+There are two approaches to the construction of commutative diagrams
+described here.  The first approach, and the simplest, treats
+commutative diagrams like fancy matrices, as Knuth does in Exercise
+18.46 of @cite{The @TeX{}book}.  This case is covered by the macro
+@code{\commdiag},
+@findex commdiag
+which is an altered version of the Plain @TeX{} macro @code{\matrix}.
+@findex matrix
+An example suffices to demonstrate this macro.  The following
+commutative diagram (illustrating the covering homotopy property; Bott
+and Tu, @cite{Differential Forms in Algebraic Topology})
+@cindex Bott, Raoul
+@cindex Tu, Loring W.
+@cindex covering homotopy property
+@iftex
+@tex
+$$\commdiag{Y&\mapright^f&E\cr \mapdown&\arrow(3,2)\lft{f_t}&\mapdown\cr
+Y\times I&\mapright^{\bar f_t}&X}$$
+@end tex
+@end iftex
+@ifinfo
+
+@center (A commutative diagram appears here in the printed output.)
+
+@end ifinfo
+is produced with the code
+
+@example
+$$\commdiag@{Y&\mapright^f&E\cr \mapdown&\arrow(3,2)\lft@{f_t@}&\mapdown\cr
+Y\times I&\mapright^@{\bar f_t@}&X@}$$
+@end example
+
+Of course, the parameters may be changed to produce a different effect.
+The following commutative diagram (illustrating the universal mapping
+property; Warner, @cite{Foundations of Differentiable Manifolds and Lie
+Groups})
+@cindex Warner, Frank W.
+@cindex universal mapping property
+@iftex
+@tex
+$$\varrowlength=20pt
+\commdiag{V\otimes W\cr \mapup\lft\phi&\arrow(3,-1)\rt{\tilde l}\cr
+V\times W&\mapright^l&U\cr}$$
+@end tex
+@end iftex
+@ifinfo
+
+@center (A commutative diagram appears here in the printed output.)
+
+@end ifinfo
+is produced with the code
+
+@example
+$$\varrowlength=20pt
+\commdiag@{V\otimes W\cr \mapup\lft\phi&\arrow(3,-1)\rt@{\tilde l@}\cr
+V\times W&\mapright^l&U\cr@}$$
+@end example
+
+A diagram containing isosceles triangles is achieved by placing the apex
+of the triangle in the center column, as shown in the example
+(illustrating all constant minimal realizations of a linear system;
+Brockett, @cite{Finite Dimensional Linear Systems})
+@cindex Brockett, Roger W.
+@cindex minimal realizations
+@cindex linear systems theory
+@iftex
+@tex
+$$\sarrowlength=.42\harrowlength
+\commdiag{&R^m\cr &\arrow(-1,-1)\lft{\fam6 B}\quad \arrow(1,-1)\rt{\fam6 G}\cr
+R^n&\mapright^{\fam6 P}&R^n\cr
+\mapdown\lft{e^{{\fam6 A}t}}&&\mapdown\rt{e^{{\fam6 F}t}}\cr
+R^n&\mapright^{\fam6 P}&R^n\cr
+&\arrow(1,-1)\lft{\fam6 C}\quad \arrow(-1,-1)\rt{\fam6 H}\cr
+&R^q\cr}$$
+@end tex
+@end iftex
+@ifinfo
+
+@center (A commutative diagram appears here in the printed output.)
+
+@end ifinfo
+which is produced with the code
+
+@example
+$$\sarrowlength=.42\harrowlength
+\commdiag@{&R^m\cr &\arrow(-1,-1)\lft@{\bf B@}\quad \arrow(1,-1)\rt@{\bf G@}\cr
+R^n&\mapright^@{\bf P@}&R^n\cr
+\mapdown\lft@{e^@{@{\bf A@}t@}@}&&\mapdown\rt@{e^@{@{\bf F@}t@}@}\cr
+R^n&\mapright^@{\bf P@}&R^n\cr
+&\arrow(1,-1)\lft@{\bf C@}\quad \arrow(-1,-1)\rt@{\bf H@}\cr
+&R^q\cr@}$$
+@end example
+
+Other commutative diagram examples appear in the file
+@code{commdiags.tex}, which is distributed with this package.
+
+In these examples the arrow lengths and line slopes were carefully
+chosen to blend with each other.  In the first example, the default
+settings for the arrow lengths are used, but a direction for the arrow
+must be chosen.  The ratio of the default horizontal and vertical arrow
+lengths is approximately the golden mean
+@cindex golden mean
+@iftex
+@tex
+$\gamma=1.618\ldots$;
+@end tex
+@end iftex
+@ifinfo
+gamma=1.618...;
+@end ifinfo
+@cindex golden mean
+the arrow direction closest to this mean is @code{(3,2)}. In the second
+example, a slope of
+@iftex
+@tex
+$-1/3$
+@end tex
+@end iftex
+@ifinfo
+-1/3
+@end ifinfo
+is desired and the default horizontal arrow length is 60 pt; therefore,
+choose a vertical arrow length of 20 pt.  You may affect the interline
+glue settings of @code{\commdiag} by redefining the macro
+@code{\commdiagbaselines}.
+@findex commdiagbaselines
+(cf@. Exercise 18.46 of @cite{The @TeX{}book} and the section on
+parameters below.)
+
+The width, height, and depth of all morphisms are hidden so that the
+morphisms' size do not affect arrow positions.  This can cause a large
+morphism at the top or bottom of a diagram to impinge upon the text
+surrounding the diagram.  To overcome this problem, use @TeX{}'s
+@code{\noalign} primitive to insert a @code{\vskip} immediately above or
+below the offending line, e.g.,
+@samp{$$\commdiag@{\noalign@{\vskip6pt@}X&\mapright^\int&Y\cr ...@}}.
+
+The macro @code{\commdiag} is too simple to be used for more complicated
+diagrams, which may have intersecting or overlapping arrows.  A second
+approach, borrowed from Francis Borceux's @cite{Diagram} macros for
+La@TeX{}, treats the commutative diagram like a grid of identically
+shaped boxes.  To compose the commutative diagram, first draw an equally
+spaced grid, e.g.,
+@cindex grid
+@cindex Borceux, Francis
+@cindex Diagram, macros for LaTeX
+@iftex
+@tex
+$$\def\grid{\cdot&\cdot&\cdot&\cdot&\cdot&\cdot\cr}
+\matrix{\grid\grid\grid\grid}$$
+@end tex
+@end iftex
+@ifinfo
+
+@center                    . . . . . .
+@center                    . . . . . .
+@center                    . . . . . .
+@center                    . . . . . .
+
+@end ifinfo
+on a piece of scratch paper.  Then draw each element (vertices and
+arrows) of the commutative diagram on this grid, centered at each
+grid point.  Finally, use the macro @code{\gridcommdiag}
+@findex gridcommdiag
+to implement your design as a @TeX{} alignment.  For example, the cubic
+diagram
+@cindex cube
+@iftex
+@tex
+$$\harrowlength=48pt \varrowlength=48pt \sarrowlength=20pt
+\def\cross#1#2{\setbox0=\hbox{$#1$}%
+  \hbox to\wd0{\hss\hbox{$#2$}\hss}\llap{\unhbox0}}
+\gridcommdiag{&&B&&\mapright^b&&D\cr
+&\arrow(1,1)\lft a&&&&\arrow(1,1)\lft d\cr
+A&&\cross{\hmorphposn=12pt\mapright^c}{\vmorphposn=-12pt\mapdown\lft f}
+&&C&&\mapdown\rt h\cr\cr
+\mapdown\lft e&&F&&\cross{\hmorphposn=-12pt\mapright_j}
+{\vmorphposn=12pt\mapdown\rt g}&&H\cr
+&\arrow(1,1)\lft i&&&&\arrow(1,1)\rt l\cr
+E&&\mapright_k&&G\cr}$$
+@end tex
+@end iftex
+@ifinfo
+
+@center (A commutative diagram appears here.)
+
+@end ifinfo
+that appears in Francis Borceux's documentation can be implemented on
+a 7 by 7 grid, and is achieved with the code
+
+@example
+$$\harrowlength=48pt \varrowlength=48pt \sarrowlength=20pt
+\def\cross#1#2@{\setbox0=\hbox@{$#1$@}%
+  \hbox to\wd0@{\hss\hbox@{$#2$@}\hss@}\llap@{\unhbox0@}@}
+\gridcommdiag@{&&B&&\mapright^b&&D\cr
+&\arrow(1,1)\lft a&&&&\arrow(1,1)\lft d\cr
+A&&\cross@{\hmorphposn=12pt\mapright^c@}@{\vmorphposn=-12pt\mapdown\lft f@}
+&&C&&\mapdown\rt h\cr\cr
+\mapdown\lft e&&F&&\cross@{\hmorphposn=-12pt\mapright_j@}
+@{\vmorphposn=12pt\mapdown\rt g@}&&H\cr
+&\arrow(1,1)\lft i&&&&\arrow(1,1)\rt l\cr
+E&&\mapright_k&&G\cr@}$$
+@end example
+
+The dimensions @code{\hgrid} and @code{\vgrid}
+@findex hgrid
+@findex vgrid
+control the horizontal and vertical spacing of the grid used by
+@code{\gridcommdiag}. The default setting for both of these dimensions
+is 15 pt.  Note that in the example of the cube the arrow lengths must
+be adjusted so that the arrows overlap into neighboring boxes by the
+desired amount.  Hence, the @code{\gridcommdiag} method, albeit more
+powerful, is less automatic than the simpler @code{\commdiag} method.
+Furthermore, the ad hoc macro @code{\cross} is introduced to allow the
+effect of overlapping arrows.  Finally, note that the positions of four
+of the morphisms are adjusted by setting @code{\hmorphposn} and
+@code{\vmorphposn}.
+
+One is not restricted to a square grid.  For example, the proof of
+Zassenhaus's Butterfly Lemma can be illustrated by the diagram (appearing
+in Lang's book @cite{Algebra})
+@cindex Zassenhaus, Hans
+@cindex Lang, Serge
+@cindex Butterfly Lemma
+@iftex
+@tex
+$$\hgrid=16pt \vgrid=8pt \sarrowlength=32pt
+\def\cross#1#2{\setbox0=\hbox{$#1$}%
+  \hbox to\wd0{\hss\hbox{$#2$}\hss}\llap{\unhbox0}}
+\def\l#1{\llap{$#1$\hskip.5em}}
+\def\r#1{\rlap{\hskip.5em$#1$}}
+\gridcommdiag{&&U&&&&V\cr &&\bullet&&&&\bullet\cr
+&&\sarrowlength=16pt\sline(0,1)&&&&\sarrowlength=16pt\sline(0,1)\cr
+&&\l{u(U\cap V)}\bullet&&&&\bullet\r{(U\cap V)v}\cr
+&&&\sline(2,-1)&&\sline(2,1)\cr
+&&\cross{=}{\sline(0,1)}&&\bullet&&\cross{=}{\sline(0,1)}\cr\cr
+&&\l{^{\textstyle u(U\cap v)}}\bullet&&\cross{=}{\sline(0,1)}&&
+ \bullet\r{^{\textstyle(u\cap V)v}}\cr
+&\sline(2,1)&&\sline(2,-1)&&\sline(2,1)&&\sline(2,-1)\cr
+\l{u}\bullet&&&&\bullet&&&&\bullet\r{v}\cr
+&\sline(2,-1)&&\sline(2,1)&&\sline(2,-1)&&\sline(2,1)\cr
+&&\bullet&&&&\bullet\cr &&u\cap V&&&&U\cap v\cr}$$
+@end tex
+@end iftex
+@ifinfo
+
+@center (A commutative diagram appears here.)
+
+@end ifinfo
+This diagram may be implemented on a 9 by 12 grid with an aspect ratio
+of 1/2, and is set with the code
+
+@example
+$$\hgrid=16pt \vgrid=8pt \sarrowlength=32pt
+\def\cross#1#2@{\setbox0=\hbox@{$#1$@}%
+  \hbox to\wd0@{\hss\hbox@{$#2$@}\hss@}\llap@{\unhbox0@}@}
+\def\l#1@{\llap@{$#1$\hskip.5em@}@}
+\def\r#1@{\rlap@{\hskip.5em$#1$@}@}
+\gridcommdiag@{&&U&&&&V\cr &&\bullet&&&&\bullet\cr
+&&\sarrowlength=16pt\sline(0,1)&&&&\sarrowlength=16pt\sline(0,1)\cr
+&&\l@{u(U\cap V)@}\bullet&&&&\bullet\r@{(U\cap V)v@}\cr
+&&&\sline(2,-1)&&\sline(2,1)\cr
+&&\cross@{=@}@{\sline(0,1)@}&&\bullet&&\cross@{=@}@{\sline(0,1)@}\cr\cr
+&&\l@{^@{\textstyle u(U\cap v)@}@}\bullet&&\cross@{=@}@{\sline(0,1)@}&&
+ \bullet\r@{^@{\textstyle(u\cap V)v@}@}\cr
+&\sline(2,1)&&\sline(2,-1)&&\sline(2,1)&&\sline(2,-1)\cr
+\l@{u@}\bullet&&&&\bullet&&&&\bullet\r@{v@}\cr
+&\sline(2,-1)&&\sline(2,1)&&\sline(2,-1)&&\sline(2,1)\cr
+&&\bullet&&&&\bullet\cr &&u\cap V&&&&U\cap v\cr@}$$
+@end example
+
+Again, the construction of this diagram requires careful choices for the
+arrow lengths and is facilitated by the introduction of the ad hoc
+macros @code{\cross}, @code{\r}, and @code{\l}.  Note also that
+superscripts were used to adjust the position of the vertices
+@iftex
+@tex
+$u(U\cap v)$ and $(u\cap V)v$.
+@end tex
+@end iftex
+@ifinfo
+u(U intersection v) and (u intersection V)v.
+@end ifinfo
+Many diagrams may be typeset with the predefined macros that appear
+here; however, ingenuity is often required to handle special cases.
+
+@node Commutative diagram parameters
+@subsection Commutative diagram parameters
+
+The following is a list describing the parameters used in the
+commutative diagram macros.  These dimensions may be changed globally or
+locally.
+
+@table @code
+@item \harrowlength
+@findex harrowlength
+(Default: 60 pt) The length of right or left arrows.
+
+@item \varrowlength
+@findex varrowlength
+(Default: 0.618@code{\harrowlength}) The length of up or down
+arrows.
+
+@item \sarrowlength
+@findex sarrowlength
+(Default: 60 pt) The horizontal length of slanted arrows.
+
+@item \hmorphposn
+@findex hmorphposn
+(Default: 0 pt) The horizontal position of the morphism with
+respect to its default position.  There are also the dimensions
+@code{\hmorphposnup},
+@findex hmorphposnup
+@code{\hmorphposndn},
+@findex hmorphposndn
+@code{\hmorphposnrt},
+@findex hmorphposnrt
+and @code{\hmorphposnlft}
+@findex hmorphposnlft
+for @code{^}/@code{_} or @code{\lft}/@code{\rt} constructions.
+
+@item \vmorphposn
+@findex vmorphposn
+(Default: 0 pt) The vertical position of the morphism with
+respect to its default position. There are also the dimensions
+@code{\vmorphposnup},
+@findex vmorphposnup
+@code{\vmorphposndn},
+@findex vmorphposndn
+@code{\vmorphposnrt},
+@findex vmorphposnrt
+and @code{\vmorphposnlft}
+@findex vmorphposnlft
+for @code{^}/@code{_} or @code{\lft}/@code{\rt} constructions.
+
+@item \morphdist
+@findex morphdist
+(Default: 4 pt) The distance of morphisms from slanted lines
+or arrows.
+
+@item \channelwidth
+@findex channelwidth
+(Default: 3 pt) The distance between double lines or arrows.
+
+@item \hchannel, \vchannel
+@findex hchannel
+@findex vchannel
+(Defaults: 0 pt) Overrides @code{\channelwidth}. The
+horizontal and vertical shifts between double lines or arrows.
+
+@item \commdiagbaselines
+@findex commdiagbaselines
+(Default: @code{\baselineskip=15pt
+\lineskip=3pt
+\lineskiplimit=3pt })
+The parameters used by @code{\commdiag} for setting interline glue.
+
+@item \hgrid
+@findex hgrid
+(Default: 15 pt) The horizontal spacing of the grid used by
+@code{\gridcommdiag}.
+
+@item \vgrid
+@findex vgrid
+(Default: 15 pt) The vertical spacing of the grid used by
+@code{\gridcommdiag}.
+
+@end table
+
+@comment bye

@@ -1,0 +1,164 @@
+# Makefile for the font utility programs.
+
+SHELL = /bin/sh
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+# This is so kpathsea will get remade automatically if you change
+# something in it and recompile from the package directory.
+kpathsea_parent = ../..
+kpathsea_dir = $(kpathsea_parent)/kpathsea
+kpathsea = $(kpathsea_dir)/kpathsea.a
+
+# Routines used everywhere.
+commondefines = $(srcdir)/../lib/common.defines
+commonh = $(srcdir)/../lib/config.h $(kpathsea_dir)/paths.h
+commono = ../lib/lib.a $(kpathsea)
+
+program = gftodvi gftopk mft pktogf pktype vftovp vptovf gftype pltotf tftopl
+
+CC = @CC@
+CFLAGS = -g
+CPPFLAGS = -I$(srcdir)/../lib -I../..
+
+CCLD = $(CC)
+LDFLAGS = $(CFLAGS) $(XLDFLAGS)
+LIBS = @LIBS@ $(extralibs)
+libs = $(commono) $(LIBS)
+
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+
+
+.SUFFIXES:
+.SUFFIXES: .o .c .p .ch
+.p.c:
+	$(SHELL) $(srcdir)/../lib/convert $*.p $*.c
+.ch.p:
+	../web/tangle $*.web $*.ch
+.c.o:
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $*.c
+
+
+default: all
+all: $(program)
+triptrap: gftype pltotf tftopl
+
+
+gftodvi: gftodvi.o $(commono)
+	$(CCLD) -o gftodvi $(LDFLAGS) gftodvi.o $(libs)
+gftodvi.o: gftodvi.c $(commonh) gftodmem.h
+gftodvi.c: gftodvi.p $(commondefines)
+gftodvi.p: gftodvi.web gftodvi.ch
+
+
+gftopk: gftopk.o $(commono)
+	$(CCLD) -o gftopk $(LDFLAGS) gftopk.o $(libs)
+gftopk.o: gftopk.c $(commonh)
+gftopk.c: gftopk.p $(commondefines)
+gftopk.p: gftopk.web gftopk.ch
+
+
+gftype: gftype.o $(commono)
+	$(CCLD) -o gftype $(LDFLAGS) gftype.o $(libs) 
+gftype.o: gftype.c $(commonh)
+gftype.c: gftype.p $(commondefines)
+gftype.p: gftype.web gftype.ch
+
+
+mft: mft.o $(commono)
+	$(CCLD) -o mft $(LDFLAGS) mft.o $(libs)
+mft.o: mft.c $(commonh)
+mft.c: mft.p $(commondefines)
+mft.p: mft.web mft.ch
+
+
+pktogf: pktogf.o $(commono)
+	$(CCLD) -o pktogf $(LDFLAGS) pktogf.o $(libs)
+pktogf.o: pktogf.c $(commonh)
+pktogf.c: pktogf.p $(commondefines)
+pktogf.p: pktogf.web pktogf.ch
+
+
+pktype: pktype.o $(commono)
+	$(CCLD) -o pktype $(LDFLAGS) pktype.o $(libs)
+pktype.o: pktype.c $(commonh)
+pktype.c: pktype.p $(commondefines)
+pktype.p: pktype.web pktype.ch
+
+
+pltotf: pltotf.o $(commono)
+	$(CCLD) -o pltotf $(LDFLAGS) pltotf.o $(libs)
+pltotf.o: pltotf.c $(commonh)
+pltotf.c: pltotf.p $(commondefines)
+pltotf.p: pltotf.web pltotf.ch
+
+
+tftopl: tftopl.o $(commono)
+	$(CCLD) -o tftopl $(LDFLAGS) tftopl.o $(libs)
+tftopl.o: tftopl.c $(commonh)
+tftopl.c: tftopl.p $(commondefines)
+tftopl.p: tftopl.web tftopl.ch
+
+
+vftovp: vftovp.o $(commono)
+	$(CCLD) -o vftovp $(LDFLAGS) vftovp.o $(libs)
+vftovp.o: vftovp.c $(commonh)
+vftovp.c: vftovp.p $(commondefines)
+vftovp.p: vftovp.web vftovp.ch
+
+
+vptovf: vptovf.o $(commono)
+	$(CCLD) -o vptovf $(LDFLAGS) vptovf.o $(libs)
+vptovf.o: vptovf.c $(commonh)
+vptovf.c: vptovf.p $(commondefines)
+vptovf.p: vptovf.web vptovf.ch
+
+
+Makefile: Makefile.in ../config.status
+	(cd ..; sh config.status)
+
+
+c-sources: gftodvi.c gftype.c gftopk.c mft.c pktogf.c pktype.c vftovp.c \
+vptovf.c 
+.PHONY: c-sources
+
+install install-exec: all
+	for p in $(program); do $(INSTALL_PROGRAM) $$p $(bindir)/$$p; done
+install-data:
+
+TAGS: *.c *.h
+	etags -t *.c *.h
+
+
+mostlyclean::
+	rm -f *.o $(program) $(lib) $(programs)
+
+clean:: mostlyclean
+	rm -f *.dvi *.pool
+
+distclean:: clean
+	rm -f Makefile config.status c-auto.h
+
+# Although we can remake configure and c-auto.h.in, we don't remove
+# them, since many people may lack Autoconf.  Use configclean for that.
+realclean:: distclean
+	rm -f TAGS *.info*
+
+extraclean::
+	rm -f *.aux *.bak *.bbl *.blg *.dvi *.log *.orig *.pl *.rej
+	rm -f *.i *.s *.tfm *.vf *.vpl *\#* *gf *pk *~
+	rm -f CONTENTS.tex a.out core mfput.* patch* texput.*
+
+configclean:
+	rm -f configure c-auto.h.in c-auto.h
+
+
+# Prevent GNU make 3 from overflowing arg limit on system V.
+.NOEXPORT:
+
+# Can't remove *.h, since that clobbers gftodmem.h.
+clean:: mostlyclean
+	rm -f *.p *.c
+	rm -f gftodvi.h gftype.h gftopk.h mft.h pktogf.h pktype.h
+	rm -f pltotf.h tftopl.h vftovp.h vptovf.h

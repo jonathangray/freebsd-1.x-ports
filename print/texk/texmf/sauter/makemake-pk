@@ -1,0 +1,48 @@
+#!/bin/csh -f
+# Make a set of fonts, at their natural sizes.
+
+if (! -d tfm || ! -d gf || ! -d pk) then
+   echo 'Sorry, no subdirectories tfm, gf, and pk.'
+   exit(1)
+endif
+
+# Get the list of possible files.
+cd mf
+set font_list=`ls *.mf`
+cd ..
+
+# Has this already been run?  If so, overwrite it.
+set out_file = make_pk_files
+rm -f $out_file
+#if (-e $out_file) then
+#   echo "The script $out_file already exists."
+#   exit(2)
+#endif
+
+set program = cmmf # Assume cmbase preloaded.
+
+# Get the output device.
+echo -n 'Mode name to generate for? '
+set mf_mode = $<
+
+echo \#\!/bin/sh > $out_file
+# The trailing colon ensures we search the system directories (perhaps
+# this is a different search order than the user's MFINPUTS implied, but
+# it is unlikely to matter).
+echo 'MFINPUTS=.:mf:${MFINPUTS}: export MFINPUTS' >> $out_file
+
+foreach long_name ($font_list)
+   set font=$long_name:r
+
+   echo "echo $font" >> $out_file
+   echo "if $program '\\nonstopmode;mode:=$mf_mode;input $font'" >> $out_file
+   echo "then" >> $out_file
+   echo "  gftopk $font.*gf" >> $out_file
+   echo "  mv -f $font.tfm tfm" >> $out_file
+   echo "  mv -f $font.*gf gf"  >> $out_file
+   echo "  mv -f $font.*pk pk"  >> $out_file
+   echo "fi" >> $out_file
+end
+
+# Make it executable.
+chmod +x $out_file

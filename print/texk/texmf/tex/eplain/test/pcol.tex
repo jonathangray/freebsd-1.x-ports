@@ -1,0 +1,181 @@
+% These are the double-column macros from Paul Abrahams, Dec 1991
+% They add the following features:
+%    \ifbalance  (by default true, causes last page to be balanced)
+%    \everycolumn (a token list, useful for marks)
+%    \pageeject
+%    \eject does a column eject
+
+\newtoks\mainoutput
+\newbox\partialpage
+\newdimen\fullvsize \newdimen \fullhsize
+\newbox\leftcolumn  \newbox \rightcolumn
+\newbox\savefootins \newskip\footskip 
+\newbox\savetopins  \newskip\topinsskip
+\newif\ifbalance \balancetrue
+\newtoks\everycolumn
+
+
+\def\pageeject{\penalty -10005 }%
+
+\def\doublecolumns{%
+  \mainoutput = \output % Save the previous \output.
+  %
+  % This grabs any single-column material.
+  \output = {\global\setbox\partialpage = \vbox{\unvbox255}}%
+  \vskip\abovedoublecolumnskip
+  \par % \par updates \pagetotal
+  \pagegoal = \pagetotal
+  \break % Now expand the \output we assigned just above.
+  \output = {\doublecolumnoutput}%
+  %
+  % Set up \hsize and \vsize for double columns.
+  \fullvsize = \vsize
+  \fullhsize = \hsize
+  \advance\hsize by -\gutter
+  \divide \hsize by 2
+  \advance\vsize by -\ht\partialpage
+  %
+  % Take account of existing insertions.
+  \ifvoid\footins\else
+    \advance\vsize by -\ht\footins
+    \advance\vsize by -\skip\footins
+  \fi
+  \setbox\savefootins = \box\footins
+  \footskip = \skip\footins
+  %
+  \ifvoid\topins\else
+    \advance\vsize by -\ht\topins
+    \advance\vsize by -\skip\topins
+  \fi
+  \setbox\savetopins = \box\topins
+  \topinsskip = \skip\topins
+  %
+  % Start at the left, clear the existing columns.
+  \let\lr = L%
+  \setbox0 = \box\leftcolumn \setbox0 = \box\rightcolumn
+}%
+%
+% This routine actually does the outputting.
+\def\doublecolumnoutput{%
+   \ifbalance\else \ifnum \outputpenalty < -10000
+      \setbox255 = \vbox{\unvbox255 \vfil}%
+   \fi\fi
+   %
+   \the\everycolumn
+   \if \lr L%
+      \buildcolumn\leftcolumn
+      \global\let\lr = R%
+   \else
+      \buildcolumn\rightcolumn
+      \global\let\lr = L%
+   \fi
+   %
+   \ifnum \outputpenalty < -10000
+      \ifbalance
+      \ifdim \ht\leftcolumn > 8\baselineskip
+         \balancecolumns
+         \global \let \lr = L%
+   \fi\fi\fi
+   %
+   \if \lr L%
+      \setbox255 = \vbox{%
+         \unvbox\partialpage
+         \dimen0 = \ht\leftcolumn \dimen1 = \dp\leftcolumn
+         \joincolumns
+         \ifnum \outputpenalty = -10005 \vfil \fi
+         }%
+      % The restoration of the insertion boxes happens only once, since
+      % they are empty thereafter.
+      \setbox\footins = \box\savefootins
+      \setbox\topins = \box\savetopins
+      \vsize = \fullvsize % Because we've taken care of \partialoutput
+      \ifnum \outputpenalty = -10006
+         \unvbox255
+      \else
+         \the\mainoutput
+         \global\vsize = \fullvsize
+      \fi
+   \fi
+}%
+%
+% 
+% \joincolumns joins \leftcolumn and \rightcolumn into a vbox that aligns
+% the tops of the two columns and has the depth of the deeper column.
+% It adds the resulting box to the main vertical list.
+%
+\def\joincolumns{%
+   \dimen0 = \dp\leftcolumn \dimen1 = \dp \rightcolumn
+   \setbox0 = \hbox to \fullhsize{%
+      \vtop to \ht\leftcolumn{\unvbox\leftcolumn}%
+      \hfil
+      \vtop to \ht\rightcolumn{\unvbox\rightcolumn}%
+      }%
+   \dimen2 = \boxmaxdepth  % For restoring it later    
+   \ifdim \dimen0 < \dimen1
+      \boxmaxdepth = \dimen1
+   \else
+      \boxmaxdepth = \dimen0
+   \fi
+   \setbox0 = \vbox{\box0}%
+   \boxmaxdepth = \dimen2
+   \box0  % Produce for the calling context
+}%
+
+\def\buildcolumn #1{%
+   \ifnum \outputpenalty < -9999
+      \global \setbox #1 = \vbox{\pagecontents}%
+   \else
+      \global \setbox #1 = \vbox to \vsize{\pagecontents}%
+   \fi
+}%
+%
+% 
+% Go back to single-column typesetting.  Unfortunately, we cannot start
+% a group in \doublecolumns and end it here, because some documents
+% might want double-column mode to continue to the end.  So we have to
+% restore the things we've changed manually.
+% 
+\def\singlecolumn{%
+  \penalty -10006
+  \output = \mainoutput
+  \hsize = \fullhsize
+  \vsize = \fullvsize
+  %
+  % Add \belowdoublecolumnskip if there's enough room, otherwise a \vfil
+  % to fill out the page.
+  \dimen0 = \pagetotal \advance \dimen0 by \belowdoublecolumnskip
+  \ifdim \dimen0 < \pagegoal
+    \vskip\belowdoublecolumnskip
+  \else
+    \vfil
+  \fi
+  \allowbreak
+}%
+%
+\def \balancecolumns{%
+   \setbox\leftcolumn = \vbox{\unvbox\leftcolumn \unskip}%
+   \setbox\rightcolumn = \vbox{\unvbox\rightcolumn \unskip}%
+   \setbox0 = \vbox{%
+      \dimen0 = \dp\leftcolumn
+      \unvbox \leftcolumn
+      \if \lr L
+         \kern -\dimen0
+         \vskip -\topskip      
+         \vskip \baselineskip
+         \unvbox \rightcolumn
+      \fi
+      }%
+   \dimen0 = \ht0
+   \advance \dimen0 by \topskip \advance \dimen0 by -\baselineskip
+   \divide \dimen0 by 2 \splittopskip = \topskip
+   \count@ = \vbadness \vbadness = 10000
+   \loop
+      \setbox2 = \copy0
+      \setbox1 = \vsplit2 to \dimen0
+   \ifdim \ht2 > \dimen0
+      \advance \dimen0 by 1pt
+   \repeat
+   \vbadness = \count@
+   \setbox \leftcolumn = \vbox to \dimen0{\unvbox1}%
+   \setbox \rightcolumn = \vbox to \dimen0{\unvbox2}%
+}%
