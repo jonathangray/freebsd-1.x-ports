@@ -31,7 +31,7 @@
  *
  *	Written by: Alistair G. Crooks, (agc@uts.amdahl.com)
  *
- *	$Id: endian.h,v 1.1 1994/06/19 04:07:48 alm Exp $
+ *	$Id: endian.h,v 1.2 1994/06/19 05:38:20 alm Exp $
  */
 
 #ifndef	INGRES_ENDIAN_H_

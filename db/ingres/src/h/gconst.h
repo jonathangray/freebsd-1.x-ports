@@ -31,7 +31,7 @@
  *
  *	Written by: Alistair G. Crooks, (agc@uts.amdahl.com)
  *
- *	$Id: gconst.h,v 1.1 1994/06/19 04:07:48 alm Exp $
+ *	$Id: gconst.h,v 1.2 1994/06/19 05:38:22 alm Exp $
  */
 #ifndef	INGRES_GCONST_H_
 #define	INGRES_GCONST_H_

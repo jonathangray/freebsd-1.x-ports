@@ -31,7 +31,7 @@
  *
  *	Written by: Alistair G. Crooks, (agc@uts.amdahl.com)
  *
- *	$Id: nodbuf.h,v 1.1 1994/06/19 04:08:05 alm Exp $
+ *	$Id: nodbuf.h,v 1.2 1994/06/19 05:38:41 alm Exp $
  */
 
 #ifndef	INGRES_NODBUF_H_

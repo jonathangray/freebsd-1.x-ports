@@ -1,5 +1,5 @@
 /*
- *	$Header: /a/cvs/386BSD/ports/db/ingres/src/util/sre.c,v 1.1 1994/06/19 04:08:06 alm Exp $
+ *	$Header: /a/cvs/386BSD/ports/db/ingres/src/util/sre.c,v 1.2 1994/06/19 05:38:42 alm Exp $
  *	%W% %E% %U%
  *
  *	Changed by agc for Ingres to include SREsub,

@@ -31,7 +31,7 @@
  *
  *	Written by: Alistair G. Crooks, (agc@uts.amdahl.com)
  *
- *	$Id: protos.h,v 1.1 1994/06/19 04:07:48 alm Exp $
+ *	$Id: protos.h,v 1.2 1994/06/19 05:38:24 alm Exp $
  */
 
 #ifndef	INGRES_PROTOTYPES_H_

@@ -1,6 +1,6 @@
 #ifndef lint
 /*static char yysccsid[] = "from: @(#)yaccpar	1.9 (Berkeley) 02/21/93";*/
-static char yyrcsid[] = "$Id: sql2.c,v 1.1 1994/06/19 04:07:58 alm Exp $";
+static char yyrcsid[] = "$Id: sql2.c,v 1.2 1994/06/19 05:38:34 alm Exp $";
 #endif
 #define YYBYACC 1
 #define YYMAJOR 1

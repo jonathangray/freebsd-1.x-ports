@@ -1,5 +1,5 @@
 /*
- *	$Header: /a/cvs/386BSD/ports/db/ingres/src/h/sre.h,v 1.1 1994/06/19 04:07:48 alm Exp $
+ *	$Header: /a/cvs/386BSD/ports/db/ingres/src/h/sre.h,v 1.2 1994/06/19 05:38:25 alm Exp $
  *	%W% %E% %U%
  *
  *	Modified by agc for the wi editor, and the ineterpreter.

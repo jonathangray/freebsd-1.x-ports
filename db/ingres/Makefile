@@ -16,7 +16,7 @@ all: ingres
 	@echo done
 
 ingres:
-	@PWD=`pwd`; \
+	PWD=`pwd`; \
 	INGRES_HOME=`grep ingres /etc/passwd | cut -d : -f 6`; \
 	cd $$INGRES_HOME; \
 	INGRES_HOME=`pwd`; \
@@ -27,14 +27,14 @@ ingres:
 		echo "using GCC version 1.x"; \
 		echo "See the README files for more information."; \
 		exit 1; \
-	fi
-	@if whoami | grep ingres; then : ; \
+	fi; \
+	if whoami | grep ingres; then : ; \
 	else \
 		echo "compile as user ingres"; \
 		exit 1; \
-	fi
+	fi; \
 	cd src/conf; \
-	make allinstall
+	make INGRES=$$INGRES_HOME allinstall
 
 install:
 	@if whoami | egrep 'root|bin'; then : ; \

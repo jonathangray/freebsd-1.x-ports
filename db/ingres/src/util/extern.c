@@ -31,7 +31,7 @@
  *
  *	Written by: Alistair G. Crooks, (agc@uts.amdahl.com)
  *
- *	$Id: extern.c,v 1.1 1994/06/19 04:08:04 alm Exp $
+ *	$Id: extern.c,v 1.2 1994/06/19 05:38:40 alm Exp $
  */
 #include <stdio.h>
 
