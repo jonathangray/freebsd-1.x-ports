@@ -125,11 +125,11 @@ install: all
 
 pkg:	pkg_src pkg_bin
 
-pkg_src: +DESC_S +ONELINE_S +PLIST_S
-	pkg_create -c +ONELINE_S -d +DESC_S -f +PLIST_S jpeg_src
+pkg_src: pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
+	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S jpeg_src
 
-pkg_bin: +DESC_B +ONELINE_B +PLIST_B
-	pkg_create -c +ONELINE_B -d +DESC_B -f +PLIST_B jpeg_bin
+pkg_bin: pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B
+	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B jpeg_bin
 
 jbsmooth.o : jbsmooth.c jinclude.h jconfig.h jpegdata.h 
 jcarith.o : jcarith.c jinclude.h jconfig.h jpegdata.h 
