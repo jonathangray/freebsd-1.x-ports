@@ -75,5 +75,5 @@ install: mush
 package: pkg_bin
 
 pkg_bin: install
-        pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST mush_bin
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST mush_bin
 
