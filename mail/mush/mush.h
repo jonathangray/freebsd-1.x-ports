@@ -169,28 +169,40 @@ extern int bell();
 #define stty(fd, sgttybuf)	ioctl(fd, TIOCSETN, sgttybuf)
 #endif /* TIOCSETN */
 
-/* for system-V machines that run termio */
-#if defined(SYSV) && defined(USG) || defined(AIX)
+/* for system-V machines that run termio[s] */
+#if defined(SYSV) && defined(USG) || defined(AIX) || defined(FreeBSD)
 #ifdef crmode
 #undef crmode
 #undef nocrmode
 #endif /* nocrmode */
 
 unsigned char vmin, vtime;
+#if defined(FreeBSD)
+#define sg_erase  c_cc[3]
+#define sg_kill   c_cc[5]
+#else /* !FreeBSD */
 #define sg_erase  c_cc[2]
-#define sg_flags  c_lflag
 #define sg_kill   c_cc[3]
+#endif /* FreeBSD */
+#define sg_flags  c_lflag
 #define sg_ospeed c_cflag
-#define gtty(fd, SGTTYbuf)	ioctl(fd, TCGETA, SGTTYbuf)
+#undef gtty
 #undef stty
+#if defined(FreeBSD)
+#define gtty(fd, SGTTYbuf)	tcgetattr(fd, SGTTYbuf)
+#define stty(fd, sgttybuf)	tcsetattr(fd, TCSADRAIN, sgttybuf)
+#else /* !FreeBSD */
+#define gtty(fd, SGTTYbuf)	ioctl(fd, TCGETA, SGTTYbuf)
 #define stty(fd, SGTTYbuf)	ioctl(fd, TCSETAW, SGTTYbuf)
+#endif /* FreeBSD */
 #define echon()    (_tty.sg_flags |= (ECHO|ECHOE),    stty(0, &_tty))
 #define echoff()   (_tty.sg_flags &= ~ECHO,   stty(0, &_tty))
 #define cbrkon()   \
-	(_tty.sg_flags &= ~ICANON, _tty.c_cc[VMIN] = 1, stty(0, &_tty))
+	(_tty.sg_flags &= ~ICANON,_tty.c_cc[VMIN] = 1, _tty.c_iflag &= ~ICRNL, \
+		_tty.c_cc[VTIME] = 5, stty(0, &_tty))
 #define cbrkoff()  \
 	(_tty.sg_flags |= ICANON,_tty.c_cc[VMIN] = vmin,_tty.c_iflag |= ICRNL, \
-		_tty.c_cc[VTIME] = vtime, stty(0, &_tty))
+		_tty.c_oflag |= ONLCR, _tty.c_cc[VTIME] = vtime, stty(0, &_tty))
 #define savetty()  \
 	(void) gtty(0, &_tty), vtime = _tty.c_cc[VTIME], vmin = _tty.c_cc[VMIN]
 #define cbreak()   cbrkon()
@@ -213,9 +225,9 @@ typedef struct termio SGTTY;
 #define crmode()   ((iscurses) ? cbreak() : cbrkon())
 #define nocrmode() ((iscurses) ? nocbreak() : cbrkoff())
 #endif /* CURSES */
-#endif /* SYSV && USG || AIX */
+#endif /* SYSV && USG || AIX || FreeBSD */
 
-#if !defined(USG) && !defined(AIX)
+#if !defined(USG) && !defined(AIX) && !defined(FreeBSD)
 #ifndef CURSES
 /* if curses is not defined, simulate the same tty based macros */
 typedef struct sgttyb SGTTY;

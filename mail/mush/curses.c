@@ -11,7 +11,7 @@ register char **argv;
 {
     char buf[80];
     extern char *UP;
-#ifndef M_UNIX
+#if !defined(M_UNIX) && !defined(FreeBSD)
     extern char ttytype[];
 #endif /* M_UNIX */
 
@@ -804,7 +804,7 @@ int *redo;
 scrn_line(line, buf)
 char *buf;
 {
-#ifndef AIX
+#if !defined(AIX) && !defined(FreeBSD)
 #ifndef A_CHARTEXT
     (void) strncpy(buf, stdscr->_y[line], COLS-1);
     buf[COLS-1] = 0; /* strncpy does not null terminate */
